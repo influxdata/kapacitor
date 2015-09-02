@@ -9,7 +9,7 @@ There are two different ways to consume Kapacitor.
 1. Define tasks that process streams of data.
   This method provides low latency (order of 100ms) processing but without aggregations or anything, just the raw data stream.
 2. Define tasks that process batches of data. The batches are the results of scheduled queries.
-  This method is higher latency (order of minutes) but allows for aggregations or anything else you can do with a query.
+  This method is higher latency (order of 10s) but allows for aggregations or anything else you can do with a query.
 
 
 # Stream workflow
@@ -201,6 +201,16 @@ Data flow of the script:
 
 To keep the type system simple we could treat everything as a vector and scalars are just vectors of length 1.
 But we can't really talk about the type system right now until we get earlier things more solidified.
+
+## What can you do with the DSL?
+
+* Window data. Windowing can be done by time or by number of data points.
+* Calculate various mathematical and statistical properties on data.
+    The list of aggregation functions currently supported by InfluxQL is probably a good place to start.
+* Write various boolean expression and trigger logic on their values
+* Emit data into a new stream.
+* Emit data into an InfluxDB database.
+* Trigger a notification.
 
 
 # Questions
