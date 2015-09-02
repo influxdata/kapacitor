@@ -1,7 +1,18 @@
 # Kapacitor
 Open source framework for processing, monitoring, and alerting on time series data
 
-# Proposed workflow
+
+# Workflows
+
+There are two different ways to consume Kapacitor.
+
+1. Define tasks that process streams of data.
+  This method provides low latency (order of 100ms) processing but without aggregations or anything, just the raw data stream.
+2. Define tasks that process batches of data. The batches are the results of scheduled queries.
+  This method is higher latency (order of minutes) but allows for aggregations or anything else you can do with a query.
+
+
+# Stream workflow
 
 1. Start Kapacitor
 
@@ -14,7 +25,7 @@ Open source framework for processing, monitoring, and alerting on time series da
   * Select data from an existing InfluxDB host and save it:
 
       ```sh
-      $ kapacitor record --host address_to_influxdb --query 'select value from cpu_idle where time > start and time < stop'
+      $ kapacitor record stream --host address_of_influxdb --query 'select value from cpu_idle where time > start and time < stop'
       RecordingID=2869246
       ```
   * Or record the live stream for a bit:
@@ -26,40 +37,92 @@ Open source framework for processing, monitoring, and alerting on time series da
       RecordingID=2869246
       ```
 
-4. Define kapacitor plugin
+4. Define a Kapacitor `streamer`. A `streamer` is an entity that defines what data should be processed and how.
 
     ```sh
-    $ kapacitor define \
-        --name my_alert_script \
+    $ kapacitor define streamer \
+        --name alert_cpu_idle_any_host \
         --from cpu_idle \
-        --where "key = 'value' and key2 = 'other_value'" \
+        --where "cpu = 'cpu-total'" \
         --script path/to/dsl/script
     ```
 
-5. Test plugin. Replay recording to just your plugin
+5. Replay the recording to test the `streamer`.
 
     ```sh
-    $ kapacitor replay 2869246 my_alert_script
+    $ kapacitor replay 2869246 alert_cpu_idle_any_host
     ```
 
-6. Edit kapacitor plugin and test until its working
+6. Edit the `streamer` and test until its working
 
     ```sh
-    $ kapacitor define \
-        --name my_alert_script \
+    $ kapacitor define streamer \
+        --name alert_cpu_idle_any_host \
         --from cpu_idle \
-        --where "key = 'value' and key2 = 'other_value'" \
+        --where "cpu = 'cpu-total'" \
         --script path/to/dsl/script
-    $ kapacitor replay 2869246 my_alert_script
+    $ kapacitor replay 2869246 alert_cpu_idle_any_host
     ```
 
-7. Enable or push the plugin once you are satisfied that it is working
+7. Enable or push the `streamer` once you are satisfied that it is working
 
     ```sh
-    $ # enable the plugin locally
-    $ kapacitor enable my_alert_script
-    $ # or push the tested plugin to a prod server
-    $ kapacitor push --remote address_to_remote_kapacitor my_alert_script
+    $ # enable the streamer locally
+    $ kapacitor enable alert_cpu_idle_any_host
+    $ # or push the tested streamer to a prod server
+    $ kapacitor push --remote address_to_remote_kapacitor alert_cpu_idle_any_host
+    ```
+
+# Batch workflow
+
+0. Start Kapacitor
+
+    ```sh
+    $ kapacitord
+    ```
+
+1. Define a `batcher`. Like a `streamer` a `batcher` defines what data to process and how, only it operates on batches of data instead of streams.
+
+    ```sh
+    $ kapacitor define batcher \
+        --name alert_mean_cpu_idle_logs_by_dc \
+        --query "select mean(value) from cpu_idle where role = 'logs' group by dc" \
+        --period 15m \
+        --group-by 1h \
+        --script path/to/dsl/script
+    ```
+2. Save a batch of data for replaying using the definition in the `batcher`.
+
+      ```sh
+      $ kapacitor record batch alert_mean_cpu_idle_logs_by_dc
+      RecordingID=2869246
+      ```
+
+3. Replay the batch of data to the `batcher`.
+
+    ```sh
+    $ kapacitor replay 2869246 alert_mean_cpu_idle_logs_by_dc
+    ```
+
+4. Iterate on the `batcher` definition until it works
+
+    ```sh
+    $ kapacitor define batcher \
+        --name alert_mean_cpu_idle_logs_by_dc \
+        --query "select max(value) from cpu_idle where role = 'logs' group by dc" \
+        --period 15m \
+        --group-by 1h \
+        --script path/to/dsl/script
+    $ kapacitor replay 2869246 alert_mean_cpu_idle_logs_by_dc
+    ```
+
+5. Once it works enable locally or push to remote
+
+    ```sh
+    $ # enable the batcher locally
+    $ kapacitor enable alert_mean_cpu_idle_logs_by_dc
+    $ # or push the tested batcher to a prod server
+    $ kapacitor push --remote address_to_remote_kapacitor alert_mean_cpu_idle_logs_by_dc
     ```
 
 # Components
@@ -67,10 +130,13 @@ Open source framework for processing, monitoring, and alerting on time series da
 Below are the logical components to make the workflow  possible.
 
 * Kapacitor daemon `kapacitord` that listens on a net/unix socket and manages the rest of the components.
-* Matching -- uses the `where` clause of a plugin to map points in the data stream to a plugin instance.
+* Matching -- uses the `where` clause of a streamer to map points in the data stream to a streamer instance.
 * Interpreter for DSL -- executes the DSL based on incoming metrics.
-* Replay engine -- records and replays bits of the data stream. Can replay metrics to independent streams so testing can be done in isolation of live stream. Can also save the result of a query for replaying.
-* Plugin manager -- handles defining, updating and shipping plugins around.
+* Stream engine -- keeps track of various streams and their topologies.
+* Batch engine -- handles the results of scheduled queries and passes them to batchers for processing.
+* Replay engine -- records and replays bits of the data stream to the stream engine. Can replay metrics to independent streams so testing can be done in isolation of live stream. Can also save the result of a query for replaying.
+* Query Scheduler -- keeps track of schedules for various script and executes them passing data to the batch engine.
+* Streamer/Batcher manager -- handles defining, updating and shipping streamers and batchers around.
 * API -- HTTP API for accessing method of other components.
 * CLI -- `kapacitor` command line utility to call the HTTP API.
 
@@ -113,6 +179,7 @@ alert(avg(window(value, 10)), <, 30)
 My interpretation of the above script.
 
 1. The `window` function is essentially a ring buffer and waits till it has 10 data points to emit a value.
+  It seems more useful if the buffer were by time instead of number of data points but that is harder to work with so for now keeping it simple with a ring buffer.
 2. Once the buffer is full it passes the full buffer to the `avg` function. It continues to emit a full buffer every time it gets a new data point.
 3. The `avg` function computes the avg of the buffer.
 4. The `alert` function receives a scalar which is the average cpu_idle of the last 10 data points.
@@ -125,7 +192,6 @@ Data flow of the script:
 
 ![Alt text](http://g.gravizo.com/g?
  digraph G {
-    aize ="4,4";
     window [shape=doublecircle];
     value -> window [label="scalar"];
     window -> avg [label="vector"];
@@ -155,3 +221,5 @@ But we can't really talk about the type system right now until we get earlier th
   * A: We could treat them as completely different entities and the workflow would be different for each. Seems like they naturally have different workflows so maybe this is better.
   * A: We could treat them the same but just ones that have `where` clauses are stream plugins and ones that have a schedule and a `select` statement are scheduled plugins. Not a good idea right now.
 
+* Q: Do we need a different DSL for `streamers`s vs `batcher`s?
+  * A: Hopefully not, but we need to make sure that it is clear how they work (and good error messages) since a DSL script written for a `streamer` will not work for a `batcher` and vice versa.
