@@ -80,7 +80,7 @@ This part is a brain dump of some of my ideas.
 I don't have any concrete ideas for the DSL yet so I expect this to change a lot before we like it.
 
 What should the DSL look like?
-Things we have already discussed/
+Things we have already discussed:
 
 * We don't like Lua, it doesn't provide anymore power over a completely custom DSL and could have serious negative performance issues.
     Lua would provide too much flexibility that would be hard to keep a clean performance profile compared to a predefined DSL.
@@ -112,14 +112,14 @@ alert(avg(window(value, 10)), <, 30)
 
 My interpretation of the above script.
 
-1. The `window` function is essentially a ring buffer and waits till it have 10 data points to emit a value.
-2. Once the buffer is full is passes the full buffer to the `avg` function.
+1. The `window` function is essentially a ring buffer and waits till it has 10 data points to emit a value.
+2. Once the buffer is full it passes the full buffer to the `avg` function. It continues to emit a full buffer every time it gets a new data point.
 3. The `avg` function computes the avg of the buffer.
 4. The `alert` function receives a scalar which is the average cpu_idle of the last 10 data points.
 5. The `alert` function use the `<` operator to compare the average cpu_idle and `30`.
-    If the expression is true an alert fires.
+    If the expression is true an alert fires. What firing an alert does can come later and is not part of the DSL.
 
-Using this nested function method makes it easy to parse and evaluate since there are only literals, functions, and variables populated by the incoming data point.
+Using this nested function method, makes it easy to parse and evaluate since there are only literals, functions, and variables populated by the incoming data point.
 
 Data flow of the script:
 
