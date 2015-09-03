@@ -374,3 +374,9 @@ Below are the logical components to make the workflow  possible.
 
     I like the simplicity of putting all the information in a single file.
     I can also see issues where you have a single script that processes data from several different sources and duplicating/importing or otherwise maintaining that association could get difficult.
+
+* Q: How is Kapacitor different than other stream processing engines like Storm, Spark, and Flink, apart from its golang and specific to the TICK stack?
+    A: I think we need to understand where we are going to be different than these other tools so we can adjust correctly from their design patterns.
+    One thing that comes to mind is 'ease of use'. Like we discussed earlier, if people need incredible performance they are going to build it themselves; so we want to build an out-of-the box solution.
+
+
