@@ -317,6 +317,58 @@ batch.filter(<, 30).alert()
 * We like the idea of writing our own lexer and parser to keep the DSL simple and flexible for us.
 * DSL should be EBNF.
 
+### POC
+
+So to see if we were headed down the right path I built a proof of concept a little DSL to API system.
+For example the following DSL script gets parsed and via reflection calls the following go code.
+
+
+DSL:
+
+```
+var w = stream.window();
+w.period(10s);
+w.every(1s);
+```
+
+Go equivalent:
+
+```go
+s := &Stream{}
+w := s.Window()
+w.Period(time.Duration(10) * time.Second)
+w.Every(time.Duration(1) * time.Second)
+```
+
+Local scope is populate so that `stream` is a go `Stream` object.
+When the DSL is parsed and then evaluated the `window` method gets called directly on the stream instance.
+Each method is called via reflection so as we update the Go API the DSL dynamically maps to it.
+Since the DSL is only used to setup the DAG we wont likely have to worry about the performance hit of reflection.
+
+Example Go code that consumes the DSL to build a DAG:
+
+```go
+var dslScript = `
+var w = stream.window();
+w.period(10s);
+w.every(1s);
+`
+
+s, err := dsl.CreatePipeline(dslScript)
+if err != nil {
+    return err
+    log.Fatal(err)
+}
+s.Start() //start the stream pipeline.
+```
+
+Since `s` in the above example is just an instance of a `Stream` object we could have created it directly in go or via the DSL as shown. 
+Now that we have a reference to the `s` stream we no longer need or execute code from the DSL.
+
+**This means that we can build out a golang API similar to Flink's and then instead of shipping jars around with compiled code we can ship DSL scripts around and have nearly the same features and performance.**
+The only piece that is missing in this model are user defined functions; but using the DSL to define and execute those is going to be way to slow. We just need to figure out a way over sockets etc for users
+to define their own functions, (which was the plan from the beginning).
+
 
 # Components
 
@@ -374,6 +426,10 @@ Below are the logical components to make the workflow  possible.
 
     I like the simplicity of putting all the information in a single file.
     I can also see issues where you have a single script that processes data from several different sources and duplicating/importing or otherwise maintaining that association could get difficult.
+
+
+    Based on my POC it is helpful to know where the DSL script is a streamer or batcher script before parsing so I think we should leave the DSL as just the script and not the meta information.
+    We should probably find a way to encapsulate the meta information in a config file or something though so its not all CLI args.
 
 * Q: How is Kapacitor different than other stream processing engines like Storm, Spark, and Flink, apart from its golang and specific to the TICK stack?
     A: I think we need to understand where we are going to be different than these other tools so we can adjust correctly from their design patterns.
