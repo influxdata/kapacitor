@@ -88,6 +88,7 @@ There are two different ways to consume Kapacitor.
         --name alert_mean_cpu_idle_logs_by_dc \
         --query "select mean(value) from cpu_idle where role = 'logs' group by dc" \
         --period 15m \
+        `# or --cron */15 * * * *` \
         --group-by 1h \
         --script path/to/dsl/script
     ```
@@ -111,6 +112,7 @@ There are two different ways to consume Kapacitor.
         --name alert_mean_cpu_idle_logs_by_dc \
         --query "select max(value) from cpu_idle where role = 'logs' group by dc" \
         --period 15m \
+        `# or --cron */15 * * * *` \
         --group-by 1h \
         --script path/to/dsl/script
     $ kapacitor replay 2869246 alert_mean_cpu_idle_logs_by_dc
