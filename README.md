@@ -42,8 +42,6 @@ There are two different ways to consume Kapacitor.
     ```sh
     $ kapacitor define streamer \
         --name alert_cpu_idle_any_host \
-        --from cpu_idle \
-        --where "cpu = 'cpu-total'" \
         --script path/to/dsl/script
     ```
 
@@ -58,8 +56,6 @@ There are two different ways to consume Kapacitor.
     ```sh
     $ kapacitor define streamer \
         --name alert_cpu_idle_any_host \
-        --from cpu_idle \
-        --where "cpu = 'cpu-total'" \
         --script path/to/dsl/script
     $ kapacitor replay 2869246 alert_cpu_idle_any_host
     ```
@@ -86,10 +82,6 @@ There are two different ways to consume Kapacitor.
     ```sh
     $ kapacitor define batcher \
         --name alert_mean_cpu_idle_logs_by_dc \
-        --query "select mean(value) from cpu_idle where role = 'logs' group by dc" \
-        --period 15m \
-        `# or --cron */15 * * * *` \
-        --group-by 1h \
         --script path/to/dsl/script
     ```
 2. Save a batch of data for replaying using the definition in the `batcher`.
@@ -110,10 +102,6 @@ There are two different ways to consume Kapacitor.
     ```sh
     $ kapacitor define batcher \
         --name alert_mean_cpu_idle_logs_by_dc \
-        --query "select max(value) from cpu_idle where role = 'logs' group by dc" \
-        --period 15m \
-        `# or --cron */15 * * * *` \
-        --group-by 1h \
         --script path/to/dsl/script
     $ kapacitor replay 2869246 alert_mean_cpu_idle_logs_by_dc
     ```
@@ -142,18 +130,20 @@ The following is an example DSL script that triggers an alert if idle cpu drops 
 
 ```
 stream
+  .from("cpu_idle")
+  .where("cpu = cpu-total")
   .window()
   .period(10s)
   .every(5s)
   .map(influxql.mean, "value")
-  .filter("value", "<", 30)
+  .where("value < 30")
   .alert()
   .email("oncall@example.com");
 ```
 
 This script maintains a window of data for 10s and emits the current window every 5s.
 Then the average is calculated for each emitted window.
-Finally all values less than `30` pass through the filter and make it to the alert node, which triggers the alert by sending an email.
+Finally all values less than `30` pass through the where condition and make it to the alert node, which triggers the alert by sending an email.
 
 The DAG that is constructed from the script looks like this:
 
@@ -162,8 +152,8 @@ The DAG that is constructed from the script looks like this:
     rankdir=LR;
     stream -> window;
     window -> mean[label="every 10s"];
-    mean -> filter;
-    filter -> alert [label="<30"];
+    mean -> where;
+    where-> alert [label="<30"];
   }
 )
 
@@ -173,16 +163,16 @@ Notice how the `map` function took an argument of another function `influxql.mea
 It will also be possible to define your own functions via plugins to Kapacitor and reference them in the DSL.
 
 
-We have not mentioned parallelism yet, by adding `groupby` and `parallelism` statements we can see how to easily scale out each layer of the DAG.
+We have not mentioned parallelism yet, by adding `groupBy` and `parallelism` statements we can see how to easily scale out each layer of the DAG.
 
 ```
 stream
   .window()
   .period(10s)
   .every(5s)
-  .groupby("dc")
+  .groupBy("dc")
   .map(influxql.mean, "value")
-  .filter("<", 30)
+  .where("value < 30")
   .parallelism(4)
   .alert()
   .email("oncall@example.com");
@@ -196,38 +186,38 @@ The DAG that is constructed is similar, but with parallelism explicitly shown.:
     rankdir=LR;
     splines=line;
     stream -> window;
-    window -> nyc [label="groupby dc"];
-    window -> sfc [label="groupby dc"];
-    window -> slc [label="groupby dc"];
+    window -> nyc [label="groupBy dc"];
+    window -> sfc [label="groupBy dc"];
+    window -> slc [label="groupBy dc"];
     subgraph cluster_avg {
         label="avg"
         nyc;
         sfc;
         slc;
     }
-    nyc -> filter_0;
-    nyc -> filter_1;
-    nyc -> filter_2;
-    nyc -> filter_3;
-    sfc -> filter_0;
-    sfc -> filter_1;
-    sfc -> filter_2;
-    sfc -> filter_3;
-    slc -> filter_0;
-    slc -> filter_1;
-    slc -> filter_2;
-    slc -> filter_3;
-    subgraph cluster_filter {
-        label="filter"
-        filter_0 [label="0"];
-        filter_1 [label="1"];
-        filter_2 [label="2"];
-        filter_3 [label="3"];
+    nyc -> where_0;
+    nyc -> where_1;
+    nyc -> where_2;
+    nyc -> where_3;
+    sfc -> where_0;
+    sfc -> where_1;
+    sfc -> where_2;
+    sfc -> where_3;
+    slc -> where_0;
+    slc -> where_1;
+    slc -> where_2;
+    slc -> where_3;
+    subgraph cluster_where {
+        label="where"
+        where_0 [label="0"];
+        where_1 [label="1"];
+        where_2 [label="2"];
+        where_3 [label="3"];
     }
-    filter_0 -> alert;
-    filter_1 -> alert;
-    filter_2 -> alert;
-    filter_3 -> alert;
+    where_0 -> alert;
+    where_1 -> alert;
+    where_2 -> alert;
+    where_3 -> alert;
   }
 )
 
@@ -241,7 +231,11 @@ Example DSL for batchers where we are running a query every minute and want to a
 
 ```
 batch
-  .filter("<", 30)
+  .query("select max(value) from cpu_idle where role = 'logs'")
+  .period(15m)
+  // or  .cron("*/15 * * * 0")
+  .groupBy(time(1h), "dc")
+  .where("value < 30")
   .alert()
   .email("oncall@example.com");
 ```
@@ -282,13 +276,72 @@ stream
   .period(1m)
   .every(1m)
   .map(influxql.count, "value")
-  .filter("==", 0)
+  .where("count == 0")
   .alert();
 
 //Now define normal processing on the stream
 stream
   ...
 ```
+
+#### Setup flapping detection on alerts
+
+```
+stream
+  .window()
+  ...
+  .alert()
+  .flapping(25.0, 50.0);
+```
+
+#### Aggregate alerts
+
+If you are monitoring lots of stats for a service across multiple hosts
+and the host dies you would rather get a single alert that the host is dead
+and not 10 alerts for each stat.
+
+For example say we are monitoring a redis cluster and we have stats `used_memory` and `instantaneous_ops_per_sec`.
+Using the following script we setup alerts for each host if `used_memory` gets too high or if `instantaneous_ops_per_sec` drops too low.
+
+```
+//Select the redis data stream and group by host
+var redis_data = stream
+  .from("redis")
+  .groupBy("host");
+
+
+// Alert on data points where the used_memory has climbed too high
+redis_data
+  .where("used_memory > 1000"
+  .alert();
+
+// Alert on data points where the instantaneous_ops_per_sec has dropped too low
+redis_data
+  .where("instantaneous_ops_per_sec < 10"
+  .alert();
+```
+
+Now lets say we want to join the alerts so that if a either alert triggers we can send them in the same alert.
+
+```
+//Select the redis data stream and group by host
+var redis_data = stream
+                    .from("redis")
+                    .groupBy("host");
+
+
+// Get only data points where the used_memory has climbed too high
+var mem = redis_data
+            .where("used_memory > 1000");
+
+// Get only data points where the instantaneous_ops_per_sec has dropped too low
+var ops = redis_data
+            .where("instantaneous_ops_per_sec < 10");
+
+// Join the two streams and sends a single alert for all services per host
+mem.join(ops).alert();
+```
+
 
 # Components
 
