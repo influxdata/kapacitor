@@ -163,7 +163,7 @@ Notice how the `map` function took an argument of another function `influxql.mea
 It will also be possible to define your own functions via plugins to Kapacitor and reference them in the DSL.
 
 
-We have not mentioned parallelism yet, by adding `groupBy` and `parallelism` statements we can see how to easily scale out each layer of the DAG.
+By adding `groupBy` statements we can see how to easily partition our data set and process each group independently.
 
 ```
 stream
@@ -173,7 +173,6 @@ stream
   .groupBy("dc")
   .map(influxql.mean, "value")
   .where("value < 30")
-  .parallelism(4)
   .alert()
   .email("oncall@example.com");
 ```
@@ -300,47 +299,102 @@ If you are monitoring lots of stats for a service across multiple hosts
 and the host dies you would rather get a single alert that the host is dead
 and not 10 alerts for each stat.
 
-For example say we are monitoring a redis cluster and we have stats `used_memory` and `instantaneous_ops_per_sec`.
-Using the following script we setup alerts for each host if `used_memory` gets too high or if `instantaneous_ops_per_sec` drops too low.
+For example say we are monitoring a redis cluster and we have stats `cpu` and `redis.instantaneous_ops_per_sec`.
+Using the following script we setup alerts for each host if `cpu` get too high or if `redis.instantaneous_ops_per_sec` drops too low.
 
 ```
-//Select the redis data stream and group by host
-var redis_data = stream
+// Alert on redis stats
+var redis = stream
   .from("redis")
-  .groupBy("host");
-
-
-// Alert on data points where the used_memory has climbed too high
-redis_data
-  .where("used_memory > 1000"
+  .where("instantaneous_ops_per_sec < 10")
+  .groupBy("host")
   .alert();
 
-// Alert on data points where the instantaneous_ops_per_sec has dropped too low
-redis_data
-  .where("instantaneous_ops_per_sec < 10"
+var cpu = stream
+  .from("cpu")
+  .where("idle < 20")
+  .groupBy("host")
   .alert();
 ```
 
-Now lets say we want to join the alerts so that if a either alert triggers we can send them in the same alert.
+Now lets say we want to combine the alerts so that if a either alert triggers we can send them in the same alert.
 
 ```
-//Select the redis data stream and group by host
-var redis_data = stream
-                    .from("redis")
-                    .groupBy("host");
+var redis = stream
+  .from("redis")
+  .where("instantaneous_ops_per_sec < 10");
 
+var cpu = stream
+  .from("cpu")
+  .where("idle < 20");
 
-// Get only data points where the used_memory has climbed too high
-var mem = redis_data
-            .where("used_memory > 1000");
-
-// Get only data points where the instantaneous_ops_per_sec has dropped too low
-var ops = redis_data
-            .where("instantaneous_ops_per_sec < 10");
-
-// Join the two streams and sends a single alert for all services per host
-mem.join(ops).alert();
+redis.union(cpu)
+  .groupBy("host")
+  .window()
+  .period(10s)
+  .every(10s)
+  .alert();
 ```
+
+This will aggregate the union of all alerts every 10s by host. Then it will send out one alert with the aggregate information.
+You could easily add more alerts to the union like so.
+
+```
+redis.union(cpu, mem, disk, ...)
+```
+
+Or if you wanted to group by service instead of host just change the `groupBy` field.
+
+```
+redis.union(cpu)
+  .groupBy("service")
+```
+
+
+#### Persisting results
+
+
+Now lets say we want to perform some custom processing on a stream of data and then keep the resulting time series data.
+
+```
+stream
+    ... //Define custom processing pipeline
+    .influxdb_output("https://influxhost:8086", "db", "rp", "user", "pass");
+```
+
+Or you simply need to keep the data cached so you can request it when you need it.
+
+```
+stream
+    ... //Define custom processing pipeline
+    .cache("custom_data_set");
+```
+
+Now you can make a request to `http://kapacitorhost:9092/api/<streamer_name>/custom_data_set`.
+The data returned will be the current value of the result.
+
+
+#### Using custom functions
+
+What about when you want to do something not built-in to Kapacitor?
+Simply load your custom functions in the DSL like so:
+
+```
+var fMap = loadMapFunc("./mapFunction.py");
+var fReduce = loadReduceFunc("./reduceFunction.py");
+stream
+	.from("cpu")
+	.where("host", "=", "serverA")
+	.window()
+		.period(1s)
+		.every(1s)
+	.map(fMap, "idle")
+	.reduce(fReduce)
+	.cache();
+```
+
+The `mapFunction.py` and `reduceFunction.py` files contain python scripts that read data on an incoming stream perform their function and output the result.
+More on how to write these custom functions later...
 
 
 # Components
