@@ -135,7 +135,7 @@ stream
   .window()
   .period(10s)
   .every(5s)
-  .map(influxql.mean, "value")
+  .mapReduce(influxql.mean, "value")
   .where("value < 30")
   .alert()
   .email("oncall@example.com");
@@ -171,7 +171,7 @@ stream
   .period(10s)
   .every(5s)
   .groupBy("dc")
-  .map(influxql.mean, "value")
+  .mapReduce(influxql.mean, "value")
   .where("value < 30")
   .alert()
   .email("oncall@example.com");
@@ -274,7 +274,7 @@ stream
   .window()
   .period(1m)
   .every(1m)
-  .map(influxql.count, "value")
+  .mapReduce(influxql.count, "value")
   .where("count == 0")
   .alert();
 
