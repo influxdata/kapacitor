@@ -25,39 +25,43 @@ There are two different ways to consume Kapacitor.
   * Select data from an existing InfluxDB host and save it:
 
       ```sh
-      $ kapacitor record stream --host address_of_influxdb --query 'select value from cpu_idle where time > start and time < stop'
-      RecordingID=2869246
+      $ kapacitor record query -addr http://address_of_influxdb -query 'select value from cpu_idle where time > start and time < stop'
+      b6d1de3f-b27f-4420-96ee-b0365d859d1c
       ```
   * Or record the live stream for a bit:
 
       ```sh
-      $ kapacitor start-recording
-      $ sleep 60
-      $ kapacitor stop-recording
-      RecordingID=2869246
+      $ kapacitor record stream -duration 60s
+      b6d1de3f-b27f-4420-96ee-b0365d859d1c
       ```
 
 4. Define a Kapacitor `streamer`. A `streamer` is an entity that defines what data should be processed and how.
 
     ```sh
-    $ kapacitor define streamer \
-        --name alert_cpu_idle_any_host \
-        --script path/to/dsl/script
+    $ kapacitor define \
+        -type streamer \
+        -name alert_cpu_idle_any_host \
+        -tick path/to/tick/script
     ```
 
 5. Replay the recording to test the `streamer`.
 
     ```sh
-    $ kapacitor replay 2869246 alert_cpu_idle_any_host
+    $ kapacitor replay \
+        b6d1de3f-b27f-4420-96ee-b0365d859d1c \
+        alert_cpu_idle_any_host
     ```
 
 6. Edit the `streamer` and test until its working
 
     ```sh
-    $ kapacitor define streamer \
-        --name alert_cpu_idle_any_host \
-        --script path/to/dsl/script
-    $ kapacitor replay 2869246 alert_cpu_idle_any_host
+    $ kapacitor define \
+        -type streamer \
+        -name alert_cpu_idle_any_host \
+        -tick path/to/tick/script
+    $ kapacitor replay \
+        b6d1de3f-b27f-4420-96ee-b0365d859d1c \
+        alert_cpu_idle_any_host
     ```
 
 7. Enable or push the `streamer` once you are satisfied that it is working
@@ -66,7 +70,7 @@ There are two different ways to consume Kapacitor.
     $ # enable the streamer locally
     $ kapacitor enable alert_cpu_idle_any_host
     $ # or push the tested streamer to a prod server
-    $ kapacitor push --remote address_to_remote_kapacitor alert_cpu_idle_any_host
+    $ kapacitor push -remote http://address_to_remote_kapacitor alert_cpu_idle_any_host
     ```
 
 # Batch workflow
@@ -80,39 +84,45 @@ There are two different ways to consume Kapacitor.
 1. Define a `batcher`. Like a `streamer` a `batcher` defines what data to process and how, only it operates on batches of data instead of streams.
 
     ```sh
-    $ kapacitor define batcher \
-        --name alert_mean_cpu_idle_logs_by_dc \
-        --script path/to/dsl/script
+    $ kapacitor define \
+        -type batcher \
+        -name alert_mean_cpu_idle_logs_by_dc \
+        -tick path/to/tick/script
     ```
 2. Save a batch of data for replaying using the definition in the `batcher`.
 
       ```sh
       $ kapacitor record batch alert_mean_cpu_idle_logs_by_dc
-      RecordingID=2869246
+      b6d1de3f-b27f-4420-96ee-b0365d859d1c
       ```
 
 3. Replay the batch of data to the `batcher`.
 
     ```sh
-    $ kapacitor replay 2869246 alert_mean_cpu_idle_logs_by_dc
+    $ kapacitor replay \
+        b6d1de3f-b27f-4420-96ee-b0365d859d1c \
+        alert_mean_cpu_idle_logs_by_dc
     ```
 
 4. Iterate on the `batcher` definition until it works
 
     ```sh
     $ kapacitor define batcher \
-        --name alert_mean_cpu_idle_logs_by_dc \
-        --script path/to/dsl/script
-    $ kapacitor replay 2869246 alert_mean_cpu_idle_logs_by_dc
+        -type batcher \
+        -name alert_mean_cpu_idle_logs_by_dc \
+        -tick path/to/tick/script
+    $ kapacitor replay \
+        b6d1de3f-b27f-4420-96ee-b0365d859d1c \
+        alert_mean_cpu_idle_logs_by_dc
     ```
 
-5. Once it works enable locally or push to remote
+5. Once it works, enable locally or push to remote
 
     ```sh
     $ # enable the batcher locally
     $ kapacitor enable alert_mean_cpu_idle_logs_by_dc
     $ # or push the tested batcher to a prod server
-    $ kapacitor push --remote address_to_remote_kapacitor alert_mean_cpu_idle_logs_by_dc
+    $ kapacitor push -remote http://address_to_remote_kapacitor alert_mean_cpu_idle_logs_by_dc
     ```
 
 # Data processing with pipelines
@@ -275,7 +285,6 @@ stream
   .period(1m)
   .every(1m)
   .mapReduce(influxql.count, "value")
-  .where("count == 0")
   .alert();
 
 //Now define normal processing on the stream

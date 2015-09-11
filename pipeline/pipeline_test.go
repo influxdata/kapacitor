@@ -4,39 +4,60 @@ import (
 	"testing"
 	"time"
 
+	"github.com/influxdb/kapacitor/tick"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestDSL2PipelineMultiLine(t *testing.T) {
 	assert := assert.New(t)
 
-	var dslScript = `
+	var tickScript = `
 var w = stream.window();
 w.period(10s);
 w.every(1s);
 `
 
-	s, err := CreatePipeline(dslScript)
+	scope := tick.NewScope()
+	p, err := CreatePipeline(tickScript, StreamEdge, scope)
 	assert.Nil(err)
-	assert.NotNil(s)
-	assert.Equal(1, s.NumChildren())
-	w := s.Children()[0]
-	assert.Equal(time.Duration(10)*time.Second, w.Period)
-	assert.Equal(time.Duration(1)*time.Second, w.Every)
+	assert.NotNil(p)
+	assert.Equal(1, len(p.Source.Children()))
+	w, ok := p.Source.Children()[0].(*WindowNode)
+	if assert.True(ok) {
+		assert.Equal(time.Duration(10)*time.Second, w.Period)
+		assert.Equal(time.Duration(1)*time.Second, w.Every)
+	}
 
 }
-func TestDSL2PipelineSingleLine(t *testing.T) {
+
+func TestPipelineSort(t *testing.T) {
 	assert := assert.New(t)
-	var dslScript = `
-stream.window().options(30s, 4s);
-`
-	s, err := CreatePipeline(dslScript)
-	if !assert.Nil(err) {
-		t.FailNow()
+
+	p1 := &node{}
+	p2 := &node{}
+	p3 := &node{}
+	p4 := &node{}
+	p5 := &node{}
+
+	p1.linkChild(p2)
+	p2.linkChild(p3)
+	p1.linkChild(p4)
+	p4.linkChild(p5)
+	p5.linkChild(p3)
+
+	p := &Pipeline{
+		Source: p1,
 	}
-	assert.NotNil(s)
-	assert.Equal(1, s.NumChildren())
-	w := s.Children()[0]
-	assert.Equal(time.Duration(30)*time.Second, w.Period)
-	assert.Equal(time.Duration(4)*time.Second, w.Every)
+
+	p.sort()
+
+	sorted := []Node{
+		p1,
+		p4,
+		p5,
+		p2,
+		p3,
+	}
+
+	assert.Equal(sorted, p.sorted)
 }

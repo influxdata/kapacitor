@@ -4,20 +4,21 @@ import (
 	"time"
 )
 
-type WindowedStream struct {
-	stream *Stream
+// Windows data over time. A window of length Period is emitted into the pipeline every Every durations.
+type WindowNode struct {
+	node
+	// The period, or length in time, of the window.
 	Period time.Duration
-	Every  time.Duration
+	// How often the current window is emitted into the pipeline.
+	Every time.Duration
 }
 
-func NewWindowedStream(s *Stream) *WindowedStream {
-	return &WindowedStream{
-		stream: s,
+func newWindowNode() *WindowNode {
+	return &WindowNode{
+		node: node{
+			desc:     "window",
+			wants:    StreamEdge,
+			provides: BatchEdge,
+		},
 	}
-}
-
-func (w *WindowedStream) Options(period, every time.Duration) *WindowedStream {
-	w.Period = period
-	w.Every = every
-	return w
 }
