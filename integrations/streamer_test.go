@@ -204,6 +204,45 @@ stream
 	testStreamer(t, "TestCustomMRFunction", script, expectedResult)
 }
 
+func TestStreamingAlert(t *testing.T) {
+	var script = `
+stream
+	.from("cpu")
+	.where("host = 'serverA'")
+	.window()
+		.period(1s)
+		.every(1s)
+	.mapReduce(influxql.percentile(10), "idle")
+	.where("percentile < 30")
+	.alert()
+	.post("http://localhost");
+`
+
+	expectedResult := executor.Result{}
+
+	testBatcher(t, "TestStreamingAlert", script, expectedResult)
+}
+
+func TestBatchingAlertFlapping(t *testing.T) {
+	var script = `
+stream
+	.from("cpu")
+	.where("host = 'serverA'")
+	.window()
+		.period(1s)
+		.every(1s)
+	.mapReduce(influxql.percentile(10), "idle")
+	.where("percentile < 30")
+	.alert()
+	.flapping(25, 50)
+	.post("http://localhost");
+`
+
+	expectedResult := executor.Result{}
+
+	testBatcher(t, "TestStreamingAlertFlapping", script, expectedResult)
+}
+
 // Helper test function for streamer
 func testStreamer(t *testting.T, name, script string, expectedResult interface{}) {
 	assert := assert.New(t)

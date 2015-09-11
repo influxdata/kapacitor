@@ -78,7 +78,7 @@ errorCounts.join(viewCounts)
 	testStreamer(t, "TestJoinBatchData", script, expectedResult)
 }
 
-func TestUnionStreamData(t *testing.T) {
+func TestUnionBatchData(t *testing.T) {
 
 	var script = `
 var cpu = batch
@@ -100,7 +100,40 @@ cpu.union(mem, disk)
 
 	expectedResult := executor.Result{}
 
-	testStreamer(t, "TestUnionStreamData", script, expectedResult)
+	testStreamer(t, "TestUnionBatchData", script, expectedResult)
+}
+
+func TestBatchingAlert(t *testing.T) {
+	var script = `
+batch
+	.query('''select percentile("idle", 10) as p10 from "tests"."default".cpu where "host" = 'serverA' ''')
+	.period(10s)
+	.groupBy(time(2s))
+	.where("p10 < 30")
+	.alert()
+	.post("http://localhost");
+`
+
+	expectedResult := executor.Result{}
+
+	testBatcher(t, "TestBatchingAlert", script, expectedResult)
+}
+
+func TestBatchingAlertFlapping(t *testing.T) {
+	var script = `
+batch
+	.query('''select percentile("idle", 10) as p10 from "tests"."default".cpu where "host" = 'serverA' ''')
+	.period(10s)
+	.groupBy(time(2s))
+	.where("p10 < 30")
+	.alert()
+	.flapping(25, 50)
+	.post("http://localhost");
+`
+
+	expectedResult := executor.Result{}
+
+	testBatcher(t, "TestBatchingAlertFlapping", script, expectedResult)
 }
 
 // Helper test function for batcher
