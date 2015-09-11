@@ -251,7 +251,7 @@ func testStreamer(t *testting.T, name, script string, expectedResult interface{}
 	t := task.NewStreamer(name, script)
 
 	// Load test data
-	data, err := os.Open(name + ".dat")
+	data, err := os.Open(name + ".rpl")
 	if !assert.Nil(err) {
 		t.FailNow()
 	}
