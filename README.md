@@ -396,20 +396,3 @@ stream
 The `mapFunction.py` and `reduceFunction.py` files contain python scripts that read data on an incoming stream perform their function and output the result.
 More on how to write these custom functions later...
 
-
-# Components
-
-Below are the logical components to make the workflow  possible.
-
-* Kapacitor daemon `kapacitord` that manages the rest of the components.
-* Matching -- uses the `where` clause of a streamer to map points in the data stream to a streamer instance.
-* Interpreter for DSL -- executes the DSL based on incoming metrics.
-* Pipeline Deployment -- takes the defined DAG from the DSL and deploys it on the cluster.
-* Stream engine -- keeps track of various streams and their topologies.
-* Batch engine -- handles the results of scheduled queries and passes them to batchers for processing.
-* Replay engine -- records and replays bits of the data stream to the stream engine. Can replay metrics to independent streams so testing can be done in isolation of live stream. Can also save the result of a query for replaying.
-* Query Scheduler -- keeps track of schedules for various script and executes them passing data to the batch engine.
-* Streamer/Batcher manager -- handles defining, updating and shipping streamers and batchers around.
-* API -- HTTP API for accessing methods of other components.
-* CLI -- `kapacitor` command line utility to call the HTTP API.
-
