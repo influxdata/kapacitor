@@ -223,7 +223,7 @@ stream
 
 	er := kapacitor.Result{
 		Window: map[models.GroupID][]*models.Point{
-			"cartA": {
+			"service=cartA,": {
 				{
 					Name:   "errors",
 					Tags:   map[string]string{"service": "cartA", "dc": "A"},
@@ -231,7 +231,7 @@ stream
 					Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
 				},
 			},
-			"login": {
+			"service=login,": {
 				{
 					Name:   "errors",
 					Tags:   map[string]string{"service": "login", "dc": "B"},
@@ -239,7 +239,7 @@ stream
 					Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
 				},
 			},
-			"front": {
+			"service=front,": {
 				{
 					Name:   "errors",
 					Tags:   map[string]string{"service": "front", "dc": "B"},
@@ -275,17 +275,19 @@ stream
 	result := kapacitor.ResultFromJSON(resp.Body)
 	if assert.Equal(len(er.Window), len(result.Window)) {
 		for g := range er.Window {
-			for i := range er.Window[g] {
-				assert.Equal(er.Window[g][i].Name, result.Window[g][i].Name, "g: %s i: %d", g, i)
-				assert.Equal(er.Window[g][i].Tags, result.Window[g][i].Tags, "g: %s i: %d", g, i)
-				assert.Equal(er.Window[g][i].Fields, result.Window[g][i].Fields, "g: %s i: %d", g, i)
-				assert.True(
-					er.Window[g][i].Time.Equal(result.Window[g][i].Time),
-					"g: %s i: %d %s != %s",
-					g,
-					i,
-					er.Window[g][i].Time, result.Window[g][i].Time,
-				)
+			if assert.Equal(len(er.Window[g]), len(result.Window[g])) {
+				for i := range er.Window[g] {
+					assert.Equal(er.Window[g][i].Name, result.Window[g][i].Name, "g: %s i: %d", g, i)
+					assert.Equal(er.Window[g][i].Tags, result.Window[g][i].Tags, "g: %s i: %d", g, i)
+					assert.Equal(er.Window[g][i].Fields, result.Window[g][i].Fields, "g: %s i: %d", g, i)
+					assert.True(
+						er.Window[g][i].Time.Equal(result.Window[g][i].Time),
+						"g: %s i: %d %s != %s",
+						g,
+						i,
+						er.Window[g][i].Time, result.Window[g][i].Time,
+					)
+				}
 			}
 		}
 	} else {
@@ -324,7 +326,7 @@ errorCounts.join(viewCounts)
 
 	er := kapacitor.Result{
 		Window: map[models.GroupID][]*models.Point{
-			"cartA": {
+			"service=cartA,": {
 				{
 					Name:   "error_rate",
 					Tags:   map[string]string{"service": "cartA", "dc": "A"},
@@ -332,7 +334,7 @@ errorCounts.join(viewCounts)
 					Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
 				},
 			},
-			"login": {
+			"service=login,": {
 				{
 					Name:   "error_rate",
 					Tags:   map[string]string{"service": "login", "dc": "B"},
@@ -340,7 +342,7 @@ errorCounts.join(viewCounts)
 					Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
 				},
 			},
-			"front": {
+			"service=front,": {
 				{
 					Name:   "error_rate",
 					Tags:   map[string]string{"service": "front", "dc": "B"},
@@ -358,10 +360,8 @@ errorCounts.join(viewCounts)
 	clock.Set(clock.Zero().Add(13 * time.Second))
 	// Wait till the replay has finished
 	assert.Nil(<-errCh)
-	fmt.Println("replay finished")
 	// Wait till the task is finished
 	assert.Nil(et.Err())
-	fmt.Println("task finished")
 
 	// Get the result
 	output, err := et.GetOutput("error_rate")
@@ -378,17 +378,19 @@ errorCounts.join(viewCounts)
 	result := kapacitor.ResultFromJSON(resp.Body)
 	if assert.Equal(len(er.Window), len(result.Window)) {
 		for g := range er.Window {
-			for i := range er.Window[g] {
-				assert.Equal(er.Window[g][i].Name, result.Window[g][i].Name, "g: %s i: %d", g, i)
-				assert.Equal(er.Window[g][i].Tags, result.Window[g][i].Tags, "g: %s i: %d", g, i)
-				assert.Equal(er.Window[g][i].Fields, result.Window[g][i].Fields, "g: %s i: %d", g, i)
-				assert.True(
-					er.Window[g][i].Time.Equal(result.Window[g][i].Time),
-					"g: %s i: %d %s != %s",
-					g,
-					i,
-					er.Window[g][i].Time, result.Window[g][i].Time,
-				)
+			if assert.Equal(len(er.Window[g]), len(result.Window[g])) {
+				for i := range er.Window[g] {
+					assert.Equal(er.Window[g][i].Name, result.Window[g][i].Name, "g: %s i: %d", g, i)
+					assert.Equal(er.Window[g][i].Tags, result.Window[g][i].Tags, "g: %s i: %d", g, i)
+					assert.Equal(er.Window[g][i].Fields, result.Window[g][i].Fields, "g: %s i: %d", g, i)
+					assert.True(
+						er.Window[g][i].Time.Equal(result.Window[g][i].Time),
+						"g: %s i: %d %s != %s",
+						g,
+						i,
+						er.Window[g][i].Time, result.Window[g][i].Time,
+					)
+				}
 			}
 		}
 	} else {
@@ -800,10 +802,8 @@ stream
 	clock.Set(clock.Zero().Add(13 * time.Second))
 	// Wait till the replay has finished
 	assert.Nil(<-errCh)
-	fmt.Println("replay finished")
 	// Wait till the task is finished
 	assert.Nil(et.Err())
-	fmt.Println("task finished")
 
 	assert.Equal(1, requestCount)
 }
@@ -864,6 +864,6 @@ func testStreamer(t *testing.T, name, script string) (clock.Setter, *kapacitor.E
 	// Replay test data to executor
 	errCh := r.ReplayStream(data, tm.Stream)
 
-	fmt.Println(string(et.Task.Dot()))
+	fmt.Fprintln(os.Stderr, string(et.Task.Dot()))
 	return r.Setter, et, errCh, tm
 }

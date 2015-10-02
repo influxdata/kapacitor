@@ -132,7 +132,6 @@ func (s *sigma) fnc() expr.Func {
 }
 
 func (s *sigma) call(args ...float64) (float64, error) {
-	fmt.Println("sigma")
 	if len(args) != 1 {
 		return 0, errors.New("sigma expected exactly one argument")
 	}

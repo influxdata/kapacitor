@@ -60,8 +60,30 @@ func NewTask(name, script string, tt TaskType) (*Task, error) {
 	t.Pipeline = p
 	return t, nil
 }
+
 func (t *Task) Dot() []byte {
 	return t.Pipeline.Dot(t.Name)
+}
+
+func (t *Task) Query() (*Query, error) {
+	if t.Type == BatcherTask {
+		bn := t.Pipeline.Source.(*pipeline.BatchNode)
+		query := bn.Query
+		q, err := NewQuery(query)
+		if err != nil {
+			return nil, err
+		}
+		q.Dimensions(bn.Dimensions)
+		return q, nil
+	}
+	return nil, fmt.Errorf("not a batcher, does not have query")
+}
+
+func (t *Task) Period() time.Duration {
+	if t.Type == BatcherTask {
+		return t.Pipeline.Source.(*pipeline.BatchNode).Period
+	}
+	return 0
 }
 
 // Create a new streamer task from a script.
@@ -74,9 +96,8 @@ func NewBatcher(name, script string) (*Task, error) {
 	return NewTask(name, script, BatcherTask)
 }
 
-///////////////////
+// ----------------------------------
 // ExecutingTask
-///////////////////
 
 // A task that can be  in an executor.
 type ExecutingTask struct {

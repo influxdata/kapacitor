@@ -251,6 +251,6 @@ func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.Ex
 	batch := tm.BatchCollector(name)
 	errCh := r.ReplayBatch(data, batch)
 
-	fmt.Println(string(et.Task.Dot()))
+	fmt.Fprintln(os.Stderr, string(et.Task.Dot()))
 	return r.Setter, et, errCh, tm
 }

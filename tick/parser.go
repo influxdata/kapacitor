@@ -287,7 +287,8 @@ func (t *tree) args() []node {
 		case tokenString:
 			args = append(args, t.str())
 		}
-		if t.peek().typ != tokenComma {
+		if t.next().typ != tokenComma {
+			t.backup()
 			break
 		}
 	}

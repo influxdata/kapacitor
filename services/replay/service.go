@@ -2,11 +2,14 @@ package replay
 
 import (
 	"compress/gzip"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
+	"strconv"
 	"time"
 
 	"github.com/influxdb/kapacitor"
@@ -15,7 +18,8 @@ import (
 	"github.com/twinj/uuid"
 )
 
-const ext = ".rpl"
+const streamEXT = ".srpl"
+const batchEXT = ".brpl"
 
 // Handles recording, starting, and waiting on replays
 type Service struct {
@@ -71,15 +75,16 @@ func (r *Service) handleReplay(w http.ResponseWriter, req *http.Request) {
 	name := req.URL.Query().Get("name")
 	id := req.URL.Query().Get("id")
 	clockTyp := req.URL.Query().Get("clock")
-	f, err := r.Find(id)
-	if err != nil {
-		httpd.HttpError(w, "replay find: "+err.Error(), true, http.StatusNotFound)
-		return
-	}
 
 	t, err := r.TaskStore.Load(name)
 	if err != nil {
 		httpd.HttpError(w, "task load: "+err.Error(), true, http.StatusNotFound)
+		return
+	}
+
+	f, err := r.Find(id, t.Type)
+	if err != nil {
+		httpd.HttpError(w, "replay find: "+err.Error(), true, http.StatusNotFound)
 		return
 	}
 
@@ -140,43 +145,81 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 			httpd.HttpError(w, "invalid duration string: "+err.Error(), true, http.StatusBadRequest)
 			return
 		}
-		e := r.TaskMaster.NewFork(rid.String())
-		rpath := path.Join(r.saveDir, rid.String()+ext)
-		f, err := os.Create(rpath)
+		err = r.doRecordStream(rid, dur)
 		if err != nil {
-			httpd.HttpError(w, "failed to save recording: "+err.Error(), true, http.StatusInternalServerError)
+			httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
 			return
 		}
-		defer f.Close()
-		gz := gzip.NewWriter(f)
-		defer gz.Close()
 
-		done := false
-		go func() {
-			for p := e.NextPoint(); p != nil && !done; p = e.NextPoint() {
-				gz.Write(p.Bytes("s"))
-				gz.Write([]byte("\n"))
-			}
-		}()
-		time.Sleep(dur)
-		done = true
-		e.Close()
-		r.TaskMaster.DelFork(rid.String())
-		type response struct {
-			RecordingID string `json:"RecordingID"`
+	case "batch":
+		addr := req.URL.Query().Get("addr")
+		if addr == "" {
+			httpd.HttpError(w, "no InfluxDB address specified", true, http.StatusBadRequest)
+			return
 		}
-		w.Write(httpd.MarshalJSON(response{rid.String()}, true))
+		num, err := strconv.ParseInt(req.URL.Query().Get("num"), 10, 64)
+		if err != nil {
+			httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
+			return
+		}
+
+		start, err := time.Parse(time.RFC3339, req.URL.Query().Get("start"))
+		if err != nil {
+			httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
+			return
+		}
+
+		task := req.URL.Query().Get("name")
+		if task == "" {
+			httpd.HttpError(w, "no task specified", true, http.StatusBadRequest)
+			return
+		}
+
+		t, err := r.TaskStore.Load(task)
+		if err != nil {
+			httpd.HttpError(w, err.Error(), true, http.StatusNotFound)
+			return
+		}
+
+		err = r.doRecordBatch(rid, t, addr, start, int(num))
+		if err != nil {
+			httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
+			return
+		}
 	case "query":
+		httpd.HttpError(w, "not implemented", true, http.StatusInternalServerError)
+		return
+
 	default:
-		httpd.HttpError(w, "invalid recording type", true, http.StatusBadRequest)
+		httpd.HttpError(w, "invalid replay type", true, http.StatusBadRequest)
 		return
 	}
+	// Respond with the replay ID
+	type response struct {
+		ReplayID string `json:"ReplayID"`
+	}
+	w.Write(httpd.MarshalJSON(response{rid.String()}, true))
 }
 
-func (r *Service) Find(id string) (io.ReadCloser, error) {
+func (r *Service) Find(id string, typ kapacitor.TaskType) (io.ReadCloser, error) {
+	var ext string
+	var other string
+	switch typ {
+	case kapacitor.StreamerTask:
+		ext = streamEXT
+		other = batchEXT
+	case kapacitor.BatcherTask:
+		ext = batchEXT
+		other = streamEXT
+	default:
+		return nil, fmt.Errorf("unknown task type %q", typ)
+	}
 	p := path.Join(r.saveDir, id+ext)
 	f, err := os.Open(p)
 	if err != nil {
+		if _, err := os.Stat(path.Join(r.saveDir, id+other)); err == nil {
+			return nil, fmt.Errorf("found replay of wrong type, check task type matches replay.")
+		}
 		return nil, err
 	}
 	gz, err := gzip.NewReader(f)
@@ -200,6 +243,68 @@ func (r rc) Close() error {
 	err = r.c.Close()
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+// Record the stream for a duration
+func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration) error {
+	e := r.TaskMaster.NewFork(rid.String())
+	rpath := path.Join(r.saveDir, rid.String()+streamEXT)
+	f, err := os.Create(rpath)
+	if err != nil {
+		return fmt.Errorf("failed to save replay: %s", err)
+	}
+	defer f.Close()
+	gz := gzip.NewWriter(f)
+	defer gz.Close()
+
+	done := false
+	go func() {
+		for p := e.NextPoint(); p != nil && !done; p = e.NextPoint() {
+			gz.Write(p.Bytes("s"))
+			gz.Write([]byte("\n"))
+		}
+	}()
+	time.Sleep(dur)
+	done = true
+	e.Close()
+	r.TaskMaster.DelFork(rid.String())
+	return nil
+}
+
+// Record a series of batch queries defined by a batcher task
+func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, addr string, start time.Time, num int) error {
+	query, err := t.Query()
+	if err != nil {
+		return err
+	}
+	period := t.Period()
+
+	rpath := path.Join(r.saveDir, rid.String()+batchEXT)
+	f, err := os.Create(rpath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	gz := gzip.NewWriter(f)
+	defer gz.Close()
+
+	for i := 0; i < num; i++ {
+		stop := start.Add(period)
+		query.Start(start)
+		query.Stop(stop)
+		v := url.Values{}
+		fmt.Println("RQ:", query.String())
+		v.Add("q", query.String())
+		res, err := http.Get(addr + "/query?" + v.Encode())
+		if err != nil {
+			return err
+		}
+		defer res.Body.Close()
+		io.Copy(gz, res.Body)
+
+		start = stop
 	}
 	return nil
 }

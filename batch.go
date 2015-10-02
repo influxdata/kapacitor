@@ -6,22 +6,20 @@ import (
 	"time"
 
 	"github.com/influxdb/influxdb/client"
-	"github.com/influxdb/influxdb/influxql"
 	"github.com/influxdb/kapacitor/models"
 	"github.com/influxdb/kapacitor/pipeline"
 )
 
 type BatchNode struct {
 	node
-	b       *pipeline.BatchNode
-	query   *influxql.SelectStatement
-	ticker  *time.Ticker
-	startTL *influxql.TimeLiteral
-	stopTL  *influxql.TimeLiteral
-	conf    client.Config
+	b      *pipeline.BatchNode
+	query  *Query
+	ticker *time.Ticker
+	conf   client.Config
 }
 
 func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode) (*BatchNode, error) {
+	fmt.Println("new batch node ")
 	bn := &BatchNode{
 		node: node{Node: n, et: et},
 		b:    n,
@@ -34,86 +32,17 @@ func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode) (*BatchNode, error) 
 		URL: *u,
 	}
 
-	// Parse and validate query
-	stmt, err := influxql.ParseStatement(n.Query)
+	q, err := NewQuery(n.Query)
 	if err != nil {
 		return nil, err
 	}
-	var ok bool
-	bn.query, ok = stmt.(*influxql.SelectStatement)
-	if !ok {
-		return nil, fmt.Errorf("query is not a select statement %q", n.Query)
+	bn.query = q
+	err = bn.query.Dimensions(n.Dimensions)
+	if err != nil {
+		return nil, err
 	}
 
-	// Add in dimensions
-	hasTime := false
-	for _, d := range n.Dimensions {
-		switch dim := d.(type) {
-		case time.Duration:
-			if hasTime {
-				return nil, fmt.Errorf("groupBy cannot have more than one time dimension")
-			}
-			// Add time dimension
-			hasTime = true
-			bn.query.Dimensions = append(bn.query.Dimensions,
-				&influxql.Dimension{
-					Expr: &influxql.Call{
-						Name: "time",
-						Args: []influxql.Expr{
-							&influxql.DurationLiteral{
-								Val: dim,
-							},
-						},
-					},
-				})
-		case string:
-			bn.query.Dimensions = append(bn.query.Dimensions,
-				&influxql.Dimension{
-					Expr: &influxql.VarRef{
-						Val: dim,
-					},
-				})
-		default:
-			return nil, fmt.Errorf("invalid dimension type:%T, must be string or time.Duration", d)
-		}
-	}
-
-	if !hasTime {
-		return nil, fmt.Errorf("groupBy must have a time dimension.")
-	}
-
-	// Add in time condition nodes
-	bn.startTL = &influxql.TimeLiteral{}
-	startExpr := &influxql.BinaryExpr{
-		Op:  influxql.GT,
-		LHS: &influxql.VarRef{Val: "time"},
-		RHS: bn.startTL,
-	}
-
-	bn.stopTL = &influxql.TimeLiteral{}
-	stopExpr := &influxql.BinaryExpr{
-		Op:  influxql.LT,
-		LHS: &influxql.VarRef{Val: "time"},
-		RHS: bn.stopTL,
-	}
-
-	if bn.query.Condition != nil {
-		bn.query.Condition = &influxql.BinaryExpr{
-			Op:  influxql.AND,
-			LHS: bn.query.Condition,
-			RHS: &influxql.BinaryExpr{
-				Op:  influxql.AND,
-				LHS: startExpr,
-				RHS: stopExpr,
-			},
-		}
-	} else {
-		bn.query.Condition = &influxql.BinaryExpr{
-			Op:  influxql.AND,
-			LHS: startExpr,
-			RHS: stopExpr,
-		}
-	}
+	fmt.Println("batch node created")
 
 	return bn, nil
 }
@@ -126,8 +55,8 @@ func (b *BatchNode) Query(batch BatchCollector) {
 	for now := range b.ticker.C {
 
 		// Update times for query
-		b.startTL.Val = now.Add(-1 * b.b.Period)
-		b.stopTL.Val = now
+		b.query.Start(now.Add(-1 * b.b.Period))
+		b.query.Stop(now)
 
 		// Connect
 		con, err := client.NewClient(b.conf)

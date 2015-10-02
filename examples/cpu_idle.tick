@@ -1,9 +1,0 @@
-stream
-    .from("cpu_usage_idle")
-    .where("cpu = 'cpu0'")
-    .window()
-        .period(10s)
-        .every(5s)
-    .mapReduce(influxql.min, "value")
-    .httpOut("min_idle_cpu");
-

@@ -341,6 +341,5 @@ func (f *funcNode) Return(v Vars, fs Funcs) (float64, error) {
 		args[i] = r
 	}
 	r, err := fnc(args...)
-	fmt.Println("FR:", f.name, args, r)
 	return r, err
 }

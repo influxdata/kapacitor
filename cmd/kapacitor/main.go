@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -147,45 +148,62 @@ func doHelp(args []string) error {
 // Record
 var (
 	recordFlags = flag.NewFlagSet("record", flag.ExitOnError)
-	raddr       = recordFlags.String("addr", "", "the URL address of the InfluxDB server. Only applicable if recording a query.")
-	rquery      = recordFlags.String("query", "", "the query to record. Only applicable if recording a query.")
-	rdur        = recordFlags.Duration("duration", time.Minute*5, "how long to record the data stream. Only applicable if recording the data stream.")
+	raddr       = recordFlags.String("addr", "", "the URL address of the InfluxDB server. If recording a batch or query.")
+	rname       = recordFlags.String("name", "", "the name of a task. If recording a batch")
+	rstart      = recordFlags.String("start", "", "the start time of a task query.")
+	rnum        = recordFlags.Int("num", 1, "the number of periods to query. If recording a batch")
+
+	rquery = recordFlags.String("query", "", "the query to record. If recording a query.")
+	rtype  = recordFlags.String("type", "", "the type of the recording to save (streamer|batcher). If recording a query.")
+
+	rdur = recordFlags.Duration("duration", time.Minute*5, "how long to record the data stream. If recording a stream.")
 )
 
 func recordUsage() {
-	var u = `Usage: kapacitor record [query|stream] [options]
+	var u = `Usage: kapacitor record [batch|stream|query] [options]
 
 	Record the result of a InfluxDB query or a snapshot of the live data stream.
 
-	Prints the recording ID on exit.
+	Prints the replay ID on exit.
 
-Example:
+	Replays have types like tasks. If recording a raw query you must specify the desired type.
 
-	$ kapacitor record query -addr 'http://localhost:8086' -query "select value from cpu_idle where time > now() - 1h and time < now()"
-
-		This records the result of the query.
+Examples:
 
 	$ kapacitor record stream -duration 1m
 
 		This records the live data stream for 1 minute.
+	
+	$ kapacitor record batch -addr 'http://localhost:8086' -name cpu_idle -start 2015-09-01T00:00:00Z -num 10
+		
+		This records the result of the query defined in task 'cpu_idle' and runs the query 10 times
+		starting at time 'start' and incrementing by the period defined in the task.
+
+	$ kapacitor record query -addr 'http://localhost:8086' -query "select value from cpu_idle where time > now() - 1h and time < now()" -type streamer
+
+		This records the result of the query and stores it as a stream replay. Use -type batcher to store as batch replay.
 
 Options:
 `
 	fmt.Fprintln(os.Stderr, u)
-	replayFlags.PrintDefaults()
+	recordFlags.PrintDefaults()
 }
 
 func doRecord(args []string) error {
 
 	v := url.Values{}
+	v.Add("type", args[0])
 	switch args[0] {
 	case "stream":
-		v.Add("type", "stream")
 		v.Add("duration", rdur.String())
-	case "query":
-		v.Add("type", "query")
+	case "batch":
+		v.Add("name", *rname)
+		v.Add("start", *rstart)
+		v.Add("num", strconv.FormatInt(int64(*rnum), 10))
 		v.Add("addr", *raddr)
-		v.Add("query", *rquery)
+	case "query":
+		v.Add("qtype", *rtype)
+		v.Add("addr", *raddr)
 	default:
 		return fmt.Errorf("Unknown record type %q, expected 'stream' or 'query'", args[0])
 	}
@@ -197,8 +215,8 @@ func doRecord(args []string) error {
 
 	// Decode valid response
 	type resp struct {
-		RecordingID string `json:"RecordingID"`
-		Error       string `json:"Error"`
+		ReplayID string `json:"ReplayID"`
+		Error    string `json:"Error"`
 	}
 	d := json.NewDecoder(r.Body)
 	rp := resp{}
@@ -206,7 +224,7 @@ func doRecord(args []string) error {
 	if rp.Error != "" {
 		return errors.New(rp.Error)
 	}
-	fmt.Println(rp.RecordingID)
+	fmt.Println(rp.ReplayID)
 	return nil
 }
 
@@ -268,8 +286,8 @@ func doDefine(args []string) error {
 // Replay
 var (
 	replayFlags = flag.NewFlagSet("replay", flag.ExitOnError)
-	rname       = replayFlags.String("name", "", "the task name")
-	rid         = replayFlags.String("id", "", "the recording id")
+	rtname      = replayFlags.String("name", "", "the task name")
+	rid         = replayFlags.String("id", "", "the replay id")
 	rfast       = replayFlags.Bool("fast", false, "whether to replay the data as fast as possible. If false, replay the data in real time")
 )
 
@@ -278,7 +296,7 @@ func replayUsage() {
 
 Replay a recording to a task. Waits until the task finishes.
 
-See 'kapacitor help record' for how to create a recording.
+See 'kapacitor help record' for how to create a replay.
 See 'kapacitor help define' for how to create a task.
 
 Options:
@@ -290,7 +308,7 @@ Options:
 func doReplay(args []string) error {
 
 	v := url.Values{}
-	v.Add("name", *rname)
+	v.Add("name", *rtname)
 	v.Add("id", *rid)
 	if *rfast {
 		v.Add("clock", "fast")
