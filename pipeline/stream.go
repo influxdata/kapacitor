@@ -1,19 +1,26 @@
 package pipeline
 
-type Stream struct {
-	children []*WindowedStream
+// Passes a filtered stream to its children. The stream is filtered based on the From and Where conditions.
+type StreamNode struct {
+	node
+	// Which database retenion policy and measuremnt to require.
+	From string
+	// An influxql Where condition to further filter the stream.
+	Where string
 }
 
-func (s *Stream) Window() *WindowedStream {
-	w := NewWindowedStream(s)
-	s.children = append(s.children, w)
-	return w
+func newStreamNode() *StreamNode {
+	return &StreamNode{
+		node: node{
+			desc:     "stream",
+			wants:    StreamEdge,
+			provides: StreamEdge,
+		},
+	}
 }
 
-func (s *Stream) NumChildren() int {
-	return len(s.children)
-}
-
-func (s *Stream) Children() []*WindowedStream {
-	return s.children
+func (s *StreamNode) Fork() *StreamNode {
+	c := newStreamNode()
+	s.linkChild(c)
+	return c
 }

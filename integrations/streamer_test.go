@@ -2,31 +2,184 @@ package integrations
 
 import (
 	"bytes"
-	"io"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"path"
 	"testing"
+	"text/template"
+	"time"
 
-	"github.com/influxdb/kapacitor/executor"
-	"github.com/influxdb/kapacitor/replay"
-	"github.com/influxdb/kapacitor/task"
+	"github.com/influxdb/kapacitor"
+	"github.com/influxdb/kapacitor/clock"
+	"github.com/influxdb/kapacitor/models"
+	"github.com/influxdb/kapacitor/services/httpd"
 	"github.com/stretchr/testify/assert"
 )
 
+var httpService *httpd.Service
+
+var NG = models.NilGroup
+
+func init() {
+	// create API server
+	httpService = httpd.NewService(httpd.NewConfig())
+	err := httpService.Open()
+	if err != nil {
+		panic(err)
+	}
+}
+
+func nilGroup(pts []*models.Point) map[models.GroupID][]*models.Point {
+	return map[models.GroupID][]*models.Point{
+		NG: pts,
+	}
+}
+
 func TestWindowDataByTime(t *testing.T) {
+	assert := assert.New(t)
 
 	var script = `
 stream
 	.from("cpu")
 	.where("host = 'serverA'")
 	.window()
-		.period(1s)
-		.every(1s)
-	.cache();
+		.period(10s)
+		.every(10s)
+	.httpOut("TestWindowDataByTime");
 `
 
-	expectedResult := executor.Result{}
+	tags := map[string]string{
+		"type": "idle",
+		"host": "serverA",
+	}
 
-	testStreamer(t, "TestWindowDataByTime", script, expectedResult)
+	values := []float64{
+		97.1,
+		92.6,
+		95.6,
+		93.1,
+		92.6,
+		95.8,
+		92.7,
+		96.0,
+		93.4,
+		95.3,
+	}
+
+	pts := make([]*models.Point, len(values))
+	for i, v := range values {
+		pts[i] = &models.Point{
+			Name:   "cpu",
+			Tags:   tags,
+			Fields: map[string]interface{}{"value": v},
+			Time:   time.Date(1970, 1, 1, 0, 0, i, 0, time.UTC),
+		}
+	}
+
+	er := kapacitor.Result{Window: nilGroup(pts)}
+
+	clock, et, errCh, tm := testStreamer(t, "TestWindowDataByTime", script)
+	defer tm.Close()
+
+	// Move time forward
+	clock.Set(clock.Zero().Add(13 * time.Second))
+	// Wait till the replay has finished
+	assert.Nil(<-errCh)
+	// Wait till the task is finished
+	assert.Nil(et.Err())
+
+	// Get the result
+	output, err := et.GetOutput("TestWindowDataByTime")
+	if !assert.Nil(err) {
+		t.FailNow()
+	}
+
+	resp, err := http.Get(output.Endpoint())
+	if !assert.Nil(err) {
+		t.FailNow()
+	}
+
+	// Assert we got the expected result
+	result := kapacitor.ResultFromJSON(resp.Body)
+	if assert.Equal(len(er.Window), len(result.Window)) {
+		for i := range er.Window[NG] {
+			assert.Equal(er.Window[NG][i].Name, result.Window[NG][i].Name, "i: %d", i)
+			assert.Equal(er.Window[NG][i].Tags, result.Window[NG][i].Tags, "i: %d", i)
+			assert.Equal(er.Window[NG][i].Fields, result.Window[NG][i].Fields, "i: %d", i)
+			assert.True(
+				er.Window[NG][i].Time.Equal(result.Window[NG][i].Time),
+				"i: %d %s != %s",
+				i,
+				er.Window[NG][i].Time, result.Window[NG][i].Time,
+			)
+		}
+	}
+
+}
+
+func TestSimpleMapReduce(t *testing.T) {
+	assert := assert.New(t)
+
+	var script = `
+stream
+	.from("cpu")
+	.where("host = 'serverA'")
+	.window()
+		.period(10s)
+		.every(10s)
+	.mapReduce(influxql.count, "value")
+	.httpOut("TestSimpleMapReduce");
+`
+	er := kapacitor.Result{
+		Window: nilGroup([]*models.Point{
+			{
+				Name:   "cpu",
+				Fields: map[string]interface{}{"count": 10.0},
+				Tags:   map[string]string{"type": "idle", "host": "serverA"},
+				Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+			},
+		}),
+	}
+
+	clock, et, errCh, tm := testStreamer(t, "TestSimpleMapReduce", script)
+	defer tm.Close()
+
+	// Move time forward
+	clock.Set(clock.Zero().Add(15 * time.Second))
+	// Wait till the replay has finished
+	assert.Nil(<-errCh)
+	// Wait till the task is finished
+	assert.Nil(et.Err())
+
+	// Get the result
+	output, err := et.GetOutput("TestSimpleMapReduce")
+	if !assert.Nil(err) {
+		t.FailNow()
+	}
+
+	resp, err := http.Get(output.Endpoint())
+	if !assert.Nil(err) {
+		t.FailNow()
+	}
+
+	// Assert we got the expected result
+	result := kapacitor.ResultFromJSON(resp.Body)
+	if assert.Equal(len(er.Window), len(result.Window)) {
+		for i := range er.Window[NG] {
+			assert.Equal(er.Window[NG][i].Name, result.Window[NG][i].Name, "i: %d", i)
+			assert.Equal(er.Window[NG][i].Tags, result.Window[NG][i].Tags, "i: %d", i)
+			assert.Equal(er.Window[NG][i].Fields, result.Window[NG][i].Fields, "i: %d", i)
+			assert.True(
+				er.Window[NG][i].Time.Equal(result.Window[NG][i].Time),
+				"i: %d %s != %s",
+				i,
+				er.Window[NG][i].Time, result.Window[NG][i].Time,
+			)
+		}
+	}
 }
 
 func TestSplitStreamData(t *testing.T) {
@@ -50,107 +203,440 @@ cpu
 		.every(1s)
 	.cache("/b");
 `
-	expectedResult := executor.Result{}
+	//er := kapacitor.Result{}
 
-	testStreamer(t, "TestSplitStreamData", script, expectedResult)
+	testStreamer(t, "TestSplitStreamData", script)
+}
+func TestGroupByStream(t *testing.T) {
+	assert := assert.New(t)
+
+	var script = `
+stream
+	.from("errors")
+	.groupBy("service")
+	.window()
+		.period(10s)
+		.every(10s)
+	.mapReduce(influxql.sum, "value")
+	.httpOut("error_count");
+`
+
+	er := kapacitor.Result{
+		Window: map[models.GroupID][]*models.Point{
+			"cartA": {
+				{
+					Name:   "errors",
+					Tags:   map[string]string{"service": "cartA", "dc": "A"},
+					Fields: map[string]interface{}{"sum": 47.0},
+					Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+				},
+			},
+			"login": {
+				{
+					Name:   "errors",
+					Tags:   map[string]string{"service": "login", "dc": "B"},
+					Fields: map[string]interface{}{"sum": 45.0},
+					Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+				},
+			},
+			"front": {
+				{
+					Name:   "errors",
+					Tags:   map[string]string{"service": "front", "dc": "B"},
+					Fields: map[string]interface{}{"sum": 32.0},
+					Time:   time.Date(1970, 1, 1, 0, 0, 8, 0, time.UTC),
+				},
+			},
+		},
+	}
+
+	clock, et, errCh, tm := testStreamer(t, "TestGroupByStream", script)
+	defer tm.Close()
+
+	// Move time forward
+	clock.Set(clock.Zero().Add(13 * time.Second))
+	// Wait till the replay has finished
+	assert.Nil(<-errCh)
+	// Wait till the task is finished
+	assert.Nil(et.Err())
+
+	// Get the result
+	output, err := et.GetOutput("error_count")
+	if !assert.Nil(err) {
+		t.FailNow()
+	}
+
+	resp, err := http.Get(output.Endpoint())
+	if !assert.Nil(err) {
+		t.FailNow()
+	}
+
+	// Assert we got the expected result
+	result := kapacitor.ResultFromJSON(resp.Body)
+	if assert.Equal(len(er.Window), len(result.Window)) {
+		for g := range er.Window {
+			for i := range er.Window[g] {
+				assert.Equal(er.Window[g][i].Name, result.Window[g][i].Name, "g: %s i: %d", g, i)
+				assert.Equal(er.Window[g][i].Tags, result.Window[g][i].Tags, "g: %s i: %d", g, i)
+				assert.Equal(er.Window[g][i].Fields, result.Window[g][i].Fields, "g: %s i: %d", g, i)
+				assert.True(
+					er.Window[g][i].Time.Equal(result.Window[g][i].Time),
+					"g: %s i: %d %s != %s",
+					g,
+					i,
+					er.Window[g][i].Time, result.Window[g][i].Time,
+				)
+			}
+		}
+	} else {
+		fmt.Println(result.Window)
+	}
 }
 
 func TestJoinStreamData(t *testing.T) {
+	assert := assert.New(t)
 
 	var script = `
 var errorCounts = stream
+			.fork()
 			.from("errors")
 			.groupBy("service")
 			.window()
 				.period(10s)
 				.every(10s)
-			.mapReduce(influxql.count, "value");
+			.mapReduce(influxql.sum, "value");
 
 var viewCounts = stream
+			.fork()
 			.from("views")
 			.groupBy("service")
 			.window()
 				.period(10s)
 				.every(10s)
-			.mapReduce(influxql.count, "value");
+			.mapReduce(influxql.sum, "value");
 
 errorCounts.join(viewCounts)
 		.as("errors", "views")
-		.map(expr("error_percent", "errors.count / views.count"), "*")
-		.cache();
+		.rename("error_rate")
+		.apply(expr("value", "errors.sum / views.sum"))
+		.httpOut("error_rate");
 `
 
-	expectedResult := executor.Result{}
+	er := kapacitor.Result{
+		Window: map[models.GroupID][]*models.Point{
+			"cartA": {
+				{
+					Name:   "error_rate",
+					Tags:   map[string]string{"service": "cartA", "dc": "A"},
+					Fields: map[string]interface{}{"value": 0.01},
+					Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+				},
+			},
+			"login": {
+				{
+					Name:   "error_rate",
+					Tags:   map[string]string{"service": "login", "dc": "B"},
+					Fields: map[string]interface{}{"value": 0.01},
+					Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+				},
+			},
+			"front": {
+				{
+					Name:   "error_rate",
+					Tags:   map[string]string{"service": "front", "dc": "B"},
+					Fields: map[string]interface{}{"value": 0.01},
+					Time:   time.Date(1970, 1, 1, 0, 0, 8, 0, time.UTC),
+				},
+			},
+		},
+	}
 
-	testStreamer(t, "TestJoinStreamData", script, expectedResult)
+	clock, et, errCh, tm := testStreamer(t, "TestJoinStreamData", script)
+	defer tm.Close()
+
+	// Move time forward
+	clock.Set(clock.Zero().Add(13 * time.Second))
+	// Wait till the replay has finished
+	assert.Nil(<-errCh)
+	fmt.Println("replay finished")
+	// Wait till the task is finished
+	assert.Nil(et.Err())
+	fmt.Println("task finished")
+
+	// Get the result
+	output, err := et.GetOutput("error_rate")
+	if !assert.Nil(err) {
+		t.FailNow()
+	}
+
+	resp, err := http.Get(output.Endpoint())
+	if !assert.Nil(err) {
+		t.FailNow()
+	}
+
+	// Assert we got the expected result
+	result := kapacitor.ResultFromJSON(resp.Body)
+	if assert.Equal(len(er.Window), len(result.Window)) {
+		for g := range er.Window {
+			for i := range er.Window[g] {
+				assert.Equal(er.Window[g][i].Name, result.Window[g][i].Name, "g: %s i: %d", g, i)
+				assert.Equal(er.Window[g][i].Tags, result.Window[g][i].Tags, "g: %s i: %d", g, i)
+				assert.Equal(er.Window[g][i].Fields, result.Window[g][i].Fields, "g: %s i: %d", g, i)
+				assert.True(
+					er.Window[g][i].Time.Equal(result.Window[g][i].Time),
+					"g: %s i: %d %s != %s",
+					g,
+					i,
+					er.Window[g][i].Time, result.Window[g][i].Time,
+				)
+			}
+		}
+	} else {
+		fmt.Println(result.Window)
+	}
+
 }
 
 func TestUnionStreamData(t *testing.T) {
+	assert := assert.New(t)
 
 	var script = `
 var cpu = stream
-			.from("cpu")
+			.fork()
+				.from("cpu")
+				.where("cpu = 'total'");
 var mem = stream
-			.from("memory")
+			.fork()
+				.from("memory")
+				.where("type = 'free'");
 var disk = stream
-			.from("disk")
+			.fork()
+				.from("disk")
+				.where("device = 'sda'");
 
 cpu.union(mem, disk)
 		.window()
 			.period(10s)
 			.every(10s)
-		.cache();
+		.mapReduce(influxql.count, "value")
+		.httpOut("all");
 `
 
-	expectedResult := executor.Result{}
+	er := kapacitor.Result{
+		Window: nilGroup([]*models.Point{
+			{
+				Name:   "disk",
+				Tags:   map[string]string{"device": "sda", "host": "serverB"},
+				Fields: map[string]interface{}{"count": 24.0},
+				Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+			},
+		}),
+	}
 
-	testStreamer(t, "TestUnionStreamData", script, expectedResult)
+	clock, et, errCh, tm := testStreamer(t, "TestUnionStreamData", script)
+	defer tm.Close()
+
+	// Move time forward
+	clock.Set(clock.Zero().Add(15 * time.Second))
+	// Wait till the replay has finished
+	assert.Nil(<-errCh)
+	// Wait till the task is finished
+	assert.Nil(et.Err())
+
+	// Get the result
+	output, err := et.GetOutput("all")
+	if !assert.Nil(err) {
+		t.FailNow()
+	}
+
+	resp, err := http.Get(output.Endpoint())
+	if !assert.Nil(err) {
+		t.FailNow()
+	}
+
+	// Assert we got the expected result
+	result := kapacitor.ResultFromJSON(resp.Body)
+	if assert.Equal(len(er.Window), len(result.Window)) {
+		for i := range er.Window[NG] {
+			assert.Equal(er.Window[NG][i].Name, result.Window[NG][i].Name, "i: %d", i)
+			assert.Equal(er.Window[NG][i].Tags, result.Window[NG][i].Tags, "i: %d", i)
+			assert.Equal(er.Window[NG][i].Fields, result.Window[NG][i].Fields, "i: %d", i)
+			assert.True(
+				er.Window[NG][i].Time.Equal(result.Window[NG][i].Time),
+				"i: %d %s != %s",
+				i,
+				er.Window[NG][i].Time, result.Window[NG][i].Time,
+			)
+		}
+	}
 }
 
 func TestStreamAggregations(t *testing.T) {
 	assert := assert.New(t)
 
 	type testCase struct {
-		Method         string
-		ExpectedResult executor.Result
+		Method string
+		ER     kapacitor.Result
 	}
 
 	var scriptTmpl = `
-var fMapReduce = {{ .Map }};
 stream
 	.from("cpu")
 	.where("host = 'serverA'")
 	.window()
-		.period(1s)
-		.every(1s)
-	.mapReduce(fMapReduce, "idle")
-	.cache();
+		.period(10s)
+		.every(10s)
+	.mapReduce({{ .Method }}, "value")
+	.httpOut("{{ .Method }}");
 `
+	tags := map[string]string{
+		"type": "idle",
+		"host": "serverA",
+	}
 
 	testCases := []testCase{
 		testCase{
-			Method:         "influxql.sum",
-			ExpectedResult: executor.Result{},
+			Method: "influxql.sum",
+			ER: kapacitor.Result{
+				Window: nilGroup([]*models.Point{
+					{
+						Name:   "cpu",
+						Tags:   tags,
+						Fields: map[string]interface{}{"sum": 941.0},
+						Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+					},
+				}),
+			},
 		},
 		testCase{
-			Method:         "influxql.count",
-			ExpectedResult: executor.Result{},
+			Method: "influxql.count",
+			ER: kapacitor.Result{
+				Window: nilGroup([]*models.Point{
+					{
+						Name:   "cpu",
+						Tags:   tags,
+						Fields: map[string]interface{}{"count": 10.0},
+						Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+					},
+				}),
+			},
 		},
 		testCase{
-			Method:         "influxql.min",
-			ExpectedResult: executor.Result{},
+			Method: "influxql.distinct",
+			ER: kapacitor.Result{
+				Window: nilGroup([]*models.Point{
+					{
+						Name:   "cpu",
+						Tags:   tags,
+						Fields: map[string]interface{}{"distinct": []interface{}{92.0, 93.0, 95.0, 96.0, 98.0}},
+						Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+					},
+				}),
+			},
 		},
 		testCase{
-			Method:         "influxql.max",
-			ExpectedResult: executor.Result{},
+			Method: "influxql.mean",
+			ER: kapacitor.Result{
+				Window: nilGroup([]*models.Point{
+					{
+						Name:   "cpu",
+						Tags:   tags,
+						Fields: map[string]interface{}{"mean": 94.1},
+						Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+					},
+				}),
+			},
 		},
 		testCase{
-			Method:         "influxql.median",
-			ExpectedResult: executor.Result{},
+			Method: "influxql.median",
+			ER: kapacitor.Result{
+				Window: nilGroup([]*models.Point{
+					{
+						Name:   "cpu",
+						Tags:   tags,
+						Fields: map[string]interface{}{"median": 94.0},
+						Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+					},
+				}),
+			},
 		},
 		testCase{
-			Method:         "influxql.mean",
-			ExpectedResult: executor.Result{},
+			Method: "influxql.min",
+			ER: kapacitor.Result{
+				Window: nilGroup([]*models.Point{
+					{
+						Name:   "cpu",
+						Tags:   tags,
+						Fields: map[string]interface{}{"min": 92.0},
+						Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+					},
+				}),
+			},
+		},
+		testCase{
+			Method: "influxql.max",
+			ER: kapacitor.Result{
+				Window: nilGroup([]*models.Point{
+					{
+						Name:   "cpu",
+						Tags:   tags,
+						Fields: map[string]interface{}{"max": 98.0},
+						Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+					},
+				}),
+			},
+		},
+		testCase{
+			Method: "influxql.spread",
+			ER: kapacitor.Result{
+				Window: nilGroup([]*models.Point{
+					{
+						Name:   "cpu",
+						Tags:   tags,
+						Fields: map[string]interface{}{"spread": 6.0},
+						Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+					},
+				}),
+			},
+		},
+		testCase{
+			Method: "influxql.stddev",
+			ER: kapacitor.Result{
+				Window: nilGroup([]*models.Point{
+					{
+						Name:   "cpu",
+						Tags:   tags,
+						Fields: map[string]interface{}{"stddev": 2.0248456731316584},
+						Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+					},
+				}),
+			},
+		},
+		testCase{
+			Method: "influxql.first",
+			ER: kapacitor.Result{
+				Window: nilGroup([]*models.Point{
+					{
+						Name:   "cpu",
+						Tags:   tags,
+						Fields: map[string]interface{}{"first": 98.0},
+						Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+					},
+				}),
+			},
+		},
+		testCase{
+			Method: "influxql.last",
+			ER: kapacitor.Result{
+				Window: nilGroup([]*models.Point{
+					{
+						Name:   "cpu",
+						Tags:   tags,
+						Fields: map[string]interface{}{"last": 95.0},
+						Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+					},
+				}),
+			},
 		},
 	}
 
@@ -160,9 +646,49 @@ stream
 	}
 
 	for _, tc := range testCases {
+		fmt.Println("Method:", tc.Method)
 		var script bytes.Buffer
-		tmpl.Execute(script, tc)
-		testStreamer(t, "TestStreamAggregation:"+tc.Method, string(script.Bytes()), tc.ExpectedResult)
+		tmpl.Execute(&script, tc)
+		clock, et, errCh, tm := testStreamer(
+			t,
+			"TestStreamAggregation",
+			string(script.Bytes()),
+		)
+		defer tm.Close()
+
+		// Move time forward
+		clock.Set(clock.Zero().Add(13 * time.Second))
+		// Wait till the replay has finished
+		assert.Nil(<-errCh)
+		// Wait till the task is finished
+		assert.Nil(et.Err())
+
+		// Get the result
+		output, err := et.GetOutput(tc.Method)
+		if !assert.Nil(err) {
+			t.FailNow()
+		}
+
+		resp, err := http.Get(output.Endpoint())
+		if !assert.Nil(err) {
+			t.FailNow()
+		}
+
+		// Assert we got the expected result
+		result := kapacitor.ResultFromJSON(resp.Body)
+		if assert.Equal(len(tc.ER.Window), len(result.Window)) {
+			for i := range tc.ER.Window[NG] {
+				assert.Equal(tc.ER.Window[NG][i].Name, result.Window[NG][i].Name, "i: %d", i)
+				assert.Equal(tc.ER.Window[NG][i].Tags, result.Window[NG][i].Tags, "i: %d", i)
+				assert.Equal(tc.ER.Window[NG][i].Fields, result.Window[NG][i].Fields, "i: %d", i)
+				assert.True(
+					tc.ER.Window[NG][i].Time.Equal(result.Window[NG][i].Time),
+					"i: %d %s != %s",
+					i,
+					tc.ER.Window[NG][i].Time, result.Window[NG][i].Time,
+				)
+			}
+		}
 	}
 }
 
@@ -181,9 +707,9 @@ stream
 	.cache();
 `
 
-	expectedResult := executor.Result{}
+	//er := kapacitor.Result{}
 
-	testStreamer(t, "TestCustomFunctions", script, expectedResult)
+	testStreamer(t, "TestCustomFunctions", script)
 }
 
 func TestCustomMRFunction(t *testing.T) {
@@ -199,31 +725,90 @@ stream
 	.cache();
 `
 
-	expectedResult := executor.Result{}
+	//er := kapacitor.Result{}
 
-	testStreamer(t, "TestCustomMRFunction", script, expectedResult)
+	testStreamer(t, "TestCustomMRFunction", script)
 }
 
 func TestStreamingAlert(t *testing.T) {
+	assert := assert.New(t)
+
+	requestCount := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ans, err := ioutil.ReadAll(r.Body)
+		if !assert.Nil(err) {
+			t.FailNow()
+		}
+		requestCount++
+		expAns := `[{"Name":"cpu","Group":"","Tags":{"host":"serverA","type":"idle"},"Fields":{"count":10},"Time":"1970-01-01T00:00:09Z"}]`
+		assert.Equal(expAns, string(ans))
+	}))
+	defer ts.Close()
+
 	var script = `
 stream
 	.from("cpu")
 	.where("host = 'serverA'")
 	.window()
-		.period(1s)
-		.every(1s)
-	.mapReduce(influxql.percentile(10), "idle")
-	.where("percentile < 30")
+		.period(10s)
+		.every(10s)
+	.mapReduce(influxql.count, "idle")
 	.alert()
-	.post("http://localhost");
-`
+		.predicate("count > 5")
+		.post("` + ts.URL + `");`
 
-	expectedResult := executor.Result{}
+	clock, et, errCh, tm := testStreamer(t, "TestStreamingAlert", script)
+	defer tm.Close()
 
-	testBatcher(t, "TestStreamingAlert", script, expectedResult)
+	// Move time forward
+	clock.Set(clock.Zero().Add(13 * time.Second))
+	// Wait till the replay has finished
+	assert.Nil(<-errCh)
+	// Wait till the task is finished
+	assert.Nil(et.Err())
+
+	assert.Equal(1, requestCount)
 }
 
-func TestBatchingAlertFlapping(t *testing.T) {
+func TestStreamingAlertSigma(t *testing.T) {
+	assert := assert.New(t)
+
+	requestCount := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ans, err := ioutil.ReadAll(r.Body)
+		if !assert.Nil(err) {
+			t.FailNow()
+		}
+		requestCount++
+		expAns := `[{"Name":"cpu","Group":"","Tags":{"host":"serverA","type":"idle"},"Fields":{"value":16},"Time":"1970-01-01T00:00:07Z"}]`
+		assert.Equal(expAns, string(ans))
+	}))
+	defer ts.Close()
+
+	var script = `
+stream
+	.from("cpu")
+	.where("host = 'serverA'")
+	.alert()
+		.predicate("sigma(value) > 2")
+		.post("` + ts.URL + `");`
+
+	clock, et, errCh, tm := testStreamer(t, "TestStreamingAlertSigma", script)
+	defer tm.Close()
+
+	// Move time forward
+	clock.Set(clock.Zero().Add(13 * time.Second))
+	// Wait till the replay has finished
+	assert.Nil(<-errCh)
+	fmt.Println("replay finished")
+	// Wait till the task is finished
+	assert.Nil(et.Err())
+	fmt.Println("task finished")
+
+	assert.Equal(1, requestCount)
+}
+
+func TestStreamingAlertFlapping(t *testing.T) {
 	var script = `
 stream
 	.from("cpu")
@@ -234,61 +819,51 @@ stream
 	.mapReduce(influxql.percentile(10), "idle")
 	.where("percentile < 30")
 	.alert()
-	.flapping(25, 50)
-	.post("http://localhost");
+		.flapping(25, 50)
+		.post("http://localhost");
 `
 
-	expectedResult := executor.Result{}
+	//er := kapacitor.Result{}
 
-	testBatcher(t, "TestStreamingAlertFlapping", script, expectedResult)
+	testStreamer(t, "TestStreamingAlertFlapping", script)
 }
 
 // Helper test function for streamer
-func testStreamer(t *testting.T, name, script string, expectedResult interface{}) {
+func testStreamer(t *testing.T, name, script string) (clock.Setter, *kapacitor.ExecutingTask, <-chan error, *kapacitor.TaskMaster) {
 	assert := assert.New(t)
 
 	//Create the task
-	t := task.NewStreamer(name, script)
+	task, err := kapacitor.NewStreamer(name, script)
+	if !assert.Nil(err) {
+		t.FailNow()
+	}
 
 	// Load test data
-	data, err := os.Open(name + ".rpl")
+	dir, err := os.Getwd()
 	if !assert.Nil(err) {
 		t.FailNow()
 	}
-	defer data.Close()
-	r := replay.New()
-	r.Load(name, data)
+	data, err := os.Open(path.Join(dir, "data", name+".rpl"))
+	if !assert.Nil(err) {
+		t.FailNow()
+	}
+	c := clock.New(time.Unix(0, 0))
+	r := kapacitor.NewReplay(c)
 
 	// Create a new execution env
-	e, err := executor.NewExecutor()
-	if !assert.Nil(err) {
-		t.FailNow()
-	}
-	defer e.Shutdown()
+	tm := kapacitor.NewTaskMaster()
+	tm.HTTPDService = httpService
+	tm.Open()
 
 	//Start the task
-	rt, err := e.StartTask(t)
+	et, err := tm.StartTask(task)
 	if !assert.Nil(err) {
 		t.FailNow()
 	}
-	defer rt.Stop()
 
 	// Replay test data to executor
-	r.Replay(name, e)
+	errCh := r.ReplayStream(data, tm.Stream)
 
-	// Get the result
-	output, err := rt.GetOutput(name)
-	if !assert.Nil(err) {
-		t.FailNow()
-	}
-	resp, err := http.Get(output.Endpoint())
-	if !assert.Nil(err) {
-		t.FailNow()
-	}
-
-	//Assert we got the expected result
-	result := decodeResult(resp)
-	expectedResult := executor.Result{}
-	assert.Equal(expectedResult, result)
-
+	fmt.Println(string(et.Task.Dot()))
+	return r.Setter, et, errCh, tm
 }

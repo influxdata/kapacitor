@@ -1,29 +1,111 @@
 package integrations
 
 import (
-	"bytes"
-	"io"
+	"fmt"
+	"net/http"
 	"os"
+	"path"
 	"testing"
+	"time"
 
-	"github.com/influxdb/kapacitor/executor"
-	"github.com/influxdb/kapacitor/replay"
-	"github.com/influxdb/kapacitor/task"
+	"github.com/influxdb/kapacitor"
+	"github.com/influxdb/kapacitor/clock"
+	"github.com/influxdb/kapacitor/models"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestBatchingData(t *testing.T) {
+	assert := assert.New(t)
+
 	var script = `
 batch
-	.query('''select "idle" from "tests"."default".cpu where "host" = 'serverA' ''')
-	.period(10s)
-	.groupBy(time(2s))
-	.cache();
+	.query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "host" = 'serverA'
+''')
+		.period(10s)
+		.groupBy(time(2s), "cpu")
+	.mapReduce(influxql.count, "value")
+	.window()
+		.period(20s)
+		.every(20s)
+	.mapReduce(influxql.sum, "count")
+	.httpOut("TestBatchingData");
 `
 
-	expectedResult := executor.Result{}
+	er := kapacitor.Result{
+		Window: map[models.GroupID][]*models.Point{
+			"cpu=cpu-total,": {
+				{
+					Name:   "cpu_usage_idle",
+					Tags:   map[string]string{"cpu": "cpu-total"},
+					Fields: map[string]interface{}{"sum": 20.0},
+					Time:   time.Date(1970, 1, 1, 0, 0, 19, 0, time.UTC),
+				},
+			},
+			"cpu=cpu0,": {
+				{
+					Name:   "cpu_usage_idle",
+					Tags:   map[string]string{"cpu": "cpu0"},
+					Fields: map[string]interface{}{"sum": 20.0},
+					Time:   time.Date(1970, 1, 1, 0, 0, 19, 0, time.UTC),
+				},
+			},
+			"cpu=cpu1,": {
+				{
+					Name:   "cpu_usage_idle",
+					Tags:   map[string]string{"cpu": "cpu1"},
+					Fields: map[string]interface{}{"sum": 20.0},
+					Time:   time.Date(1970, 1, 1, 0, 0, 19, 0, time.UTC),
+				},
+			},
+		},
+	}
 
-	testBatcher(t, "TestBatchingData", script, expectedResult)
+	clock, et, errCh, tm := testBatcher(t, "TestBatchingData", script)
+	defer tm.Close()
+
+	// Move time forward
+	clock.Set(clock.Zero().Add(30 * time.Second))
+	// Wait till the replay has finished
+	assert.Nil(<-errCh)
+	// Wait till the task is finished
+	assert.Nil(et.Err())
+
+	// Get the result
+	output, err := et.GetOutput("TestBatchingData")
+	if !assert.Nil(err) {
+		t.FailNow()
+	}
+
+	resp, err := http.Get(output.Endpoint())
+	if !assert.Nil(err) {
+		t.FailNow()
+	}
+
+	// Assert we got the expected result
+	result := kapacitor.ResultFromJSON(resp.Body)
+	if assert.Equal(len(er.Window), len(result.Window)) {
+		for g := range er.Window {
+			if assert.Equal(len(er.Window[g]), len(result.Window[g])) {
+				for i := range er.Window[g] {
+					assert.Equal(er.Window[g][i].Name, result.Window[g][i].Name, "g: %s i: %d", g, i)
+					assert.Equal(er.Window[g][i].Tags, result.Window[g][i].Tags, "g: %s i: %d", g, i)
+					assert.Equal(er.Window[g][i].Fields, result.Window[g][i].Fields, "g: %s i: %d", g, i)
+					assert.True(
+						er.Window[g][i].Time.Equal(result.Window[g][i].Time),
+						"g: %s i: %d %s != %s",
+						g,
+						i,
+						er.Window[g][i].Time, result.Window[g][i].Time,
+					)
+				}
+			}
+		}
+	} else {
+		fmt.Println(result.Window)
+	}
 }
 
 func TestSplitBatchData(t *testing.T) {
@@ -48,9 +130,9 @@ cpu
 		.every(1s)
 	.cache("/b");
 `
-	expectedResult := executor.Result{}
+	//er := kapacitor.Result{}
 
-	testStreamer(t, "TestSplitBatchData", script, expectedResult)
+	testBatcher(t, "TestSplitBatchData", script)
 }
 
 func TestJoinBatchData(t *testing.T) {
@@ -73,9 +155,9 @@ errorCounts.join(viewCounts)
 		.cache();
 `
 
-	expectedResult := executor.Result{}
+	//er := kapacitor.Result{}
 
-	testStreamer(t, "TestJoinBatchData", script, expectedResult)
+	testBatcher(t, "TestJoinBatchData", script)
 }
 
 func TestUnionBatchData(t *testing.T) {
@@ -98,9 +180,9 @@ cpu.union(mem, disk)
 		.cache();
 `
 
-	expectedResult := executor.Result{}
+	//er := kapacitor.Result{}
 
-	testStreamer(t, "TestUnionBatchData", script, expectedResult)
+	testBatcher(t, "TestUnionBatchData", script)
 }
 
 func TestBatchingAlert(t *testing.T) {
@@ -114,9 +196,9 @@ batch
 	.post("http://localhost");
 `
 
-	expectedResult := executor.Result{}
+	//er := kapacitor.Result{}
 
-	testBatcher(t, "TestBatchingAlert", script, expectedResult)
+	testBatcher(t, "TestBatchingAlert", script)
 }
 
 func TestBatchingAlertFlapping(t *testing.T) {
@@ -131,56 +213,44 @@ batch
 	.post("http://localhost");
 `
 
-	expectedResult := executor.Result{}
+	//er := kapacitor.Result{}
 
-	testBatcher(t, "TestBatchingAlertFlapping", script, expectedResult)
+	testBatcher(t, "TestBatchingAlertFlapping", script)
 }
 
 // Helper test function for batcher
-func testBatcher(t *testting.T, name, script string, expectedResult interface{}) {
+func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.ExecutingTask, <-chan error, *kapacitor.TaskMaster) {
 	assert := assert.New(t)
 
 	// Create task
-	t := task.NewBatcher(name, script)
+	task, err := kapacitor.NewBatcher(name, script)
+	if !assert.Nil(err) {
+		t.FailNow()
+	}
 
 	// Load test data
-	data, err := os.Open(name + ".dat")
+	data, err := os.Open(path.Join("data", name+".rpl"))
 	if !assert.Nil(err) {
 		t.FailNow()
 	}
-	defer data.Close()
-	r := replay.New()
-	r.Load(name, data)
+	c := clock.New(time.Unix(0, 0))
+	r := kapacitor.NewReplay(c)
 
 	// Create a new execution env
-	e, err := executor.NewExecutor()
-	if !assert.Nil(err) {
-		t.FailNow()
-	}
-	defer e.Shutdown()
+	tm := kapacitor.NewTaskMaster()
+	tm.HTTPDService = httpService
+	tm.Open()
 
 	//Start the task
-	rt, err := e.StartTask(t)
+	et, err := tm.StartTask(task)
 	if !assert.Nil(err) {
 		t.FailNow()
 	}
-	defer rt.Stop()
 
 	// Replay test data to executor
-	r.Replay(name, e)
+	batch := tm.BatchCollector(name)
+	errCh := r.ReplayBatch(data, batch)
 
-	// Get the result
-	output, err := rt.GetOutput(name)
-	if !assert.Nil(err) {
-		t.FailNow()
-	}
-	resp, err := http.Get(output.Endpoint())
-	if !assert.Nil(err) {
-		t.FailNow()
-	}
-
-	//Assert we got the expected result
-	result := decodeResult(resp)
-	expectedResult := executor.Result{}
-	assert.Equal(expectedResult, result)
+	fmt.Println(string(et.Task.Dot()))
+	return r.Setter, et, errCh, tm
 }
