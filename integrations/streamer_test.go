@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -290,8 +291,6 @@ stream
 				}
 			}
 		}
-	} else {
-		fmt.Println(result.Window)
 	}
 }
 
@@ -393,8 +392,6 @@ errorCounts.join(viewCounts)
 				}
 			}
 		}
-	} else {
-		fmt.Println(result.Window)
 	}
 
 }
@@ -648,7 +645,7 @@ stream
 	}
 
 	for _, tc := range testCases {
-		fmt.Println("Method:", tc.Method)
+		log.Println("Method:", tc.Method)
 		var script bytes.Buffer
 		tmpl.Execute(&script, tc)
 		clock, et, errCh, tm := testStreamer(

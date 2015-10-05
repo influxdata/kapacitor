@@ -2,6 +2,8 @@ package kapacitor
 
 import (
 	"fmt"
+	"log"
+	"os"
 
 	"github.com/influxdb/kapacitor/pipeline"
 )
@@ -38,6 +40,7 @@ type node struct {
 	errCh    chan error
 	ins      []*Edge
 	outs     []*Edge
+	l        *log.Logger
 }
 
 func (n *node) addParentEdge(e *Edge) {
@@ -51,6 +54,7 @@ func (n *node) closeParentEdges() {
 }
 
 func (n *node) start() {
+	n.l = log.New(os.Stderr, fmt.Sprintf("[%s] ", n.Name()), log.LstdFlags)
 	n.errCh = make(chan error, 1)
 	go func() {
 		var err error

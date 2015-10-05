@@ -1,7 +1,6 @@
 package kapacitor
 
 import (
-	"fmt"
 	"net/url"
 	"time"
 
@@ -19,7 +18,6 @@ type BatchNode struct {
 }
 
 func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode) (*BatchNode, error) {
-	fmt.Println("new batch node ")
 	bn := &BatchNode{
 		node: node{Node: n, et: et},
 		b:    n,
@@ -42,8 +40,6 @@ func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode) (*BatchNode, error) 
 		return nil, err
 	}
 
-	fmt.Println("batch node created")
-
 	return bn, nil
 }
 
@@ -61,7 +57,7 @@ func (b *BatchNode) Query(batch BatchCollector) {
 		// Connect
 		con, err := client.NewClient(b.conf)
 		if err != nil {
-			fmt.Println(err)
+			b.l.Println(err)
 			break
 		}
 		q := client.Query{
@@ -71,23 +67,23 @@ func (b *BatchNode) Query(batch BatchCollector) {
 		// Execute query
 		resp, err := con.Query(q)
 		if err != nil {
-			fmt.Println(err)
+			b.l.Println(err)
 			return
 		}
 
 		if resp.Err != nil {
-			fmt.Println(resp.Err)
+			b.l.Println(resp.Err)
 			return
 		}
 
 		// Collect batches
 		for _, res := range resp.Results {
 			if res.Err != nil {
-				fmt.Println(res.Err)
+				b.l.Println(res.Err)
 				return
 			}
 			for _, series := range res.Series {
-				b := make([]*models.Point, len(series.Values))
+				bch := make([]*models.Point, len(series.Values))
 				groupID := models.TagsToGroupID(
 					models.SortedKeys(series.Tags),
 					series.Tags,
@@ -99,14 +95,14 @@ func (b *BatchNode) Query(batch BatchCollector) {
 						if c == "time" {
 							t, err = time.Parse(time.RFC3339, v[i].(string))
 							if err != nil {
-								fmt.Println(err)
+								b.l.Println(err)
 								return
 							}
 						} else {
 							fields[c] = v[i]
 						}
 					}
-					b[i] = models.NewPoint(
+					bch[i] = models.NewPoint(
 						series.Name,
 						groupID,
 						series.Tags,
@@ -114,7 +110,7 @@ func (b *BatchNode) Query(batch BatchCollector) {
 						t,
 					)
 				}
-				batch.CollectBatch(b)
+				batch.CollectBatch(bch)
 			}
 		}
 	}

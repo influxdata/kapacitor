@@ -2,6 +2,7 @@ package integrations
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path"
@@ -103,8 +104,6 @@ batch
 				}
 			}
 		}
-	} else {
-		fmt.Println(result.Window)
 	}
 }
 

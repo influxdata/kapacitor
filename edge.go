@@ -6,6 +6,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/influxdb/kapacitor/log_writer"
 	"github.com/influxdb/kapacitor/models"
 	"github.com/influxdb/kapacitor/pipeline"
 )
@@ -32,7 +33,7 @@ type Edge struct {
 }
 
 func newEdge(name string, t pipeline.EdgeType) *Edge {
-	l := log.New(os.Stderr, fmt.Sprintf("[edge:%s] ", name), log.LstdFlags)
+	l := log_writer.New(os.Stderr, fmt.Sprintf("[edge:%s] ", name), log.LstdFlags)
 	switch t {
 	case pipeline.StreamEdge:
 		return &Edge{stream: make(chan *models.Point), l: l}
@@ -50,7 +51,7 @@ func (e *Edge) Close() {
 		return
 	}
 	e.closed = true
-	e.l.Printf("closing c: %d e: %d\n", e.collected, e.emitted)
+	e.l.Printf("I@closing c: %d e: %d\n", e.collected, e.emitted)
 	if e.stream != nil {
 		close(e.stream)
 	}
@@ -63,7 +64,7 @@ func (e *Edge) Close() {
 }
 
 func (e *Edge) NextPoint() *models.Point {
-	e.l.Printf("next point c: %d e: %d\n", e.collected, e.emitted)
+	e.l.Printf("D@next point c: %d e: %d\n", e.collected, e.emitted)
 	p := <-e.stream
 	if p != nil {
 		e.emitted++
@@ -72,7 +73,7 @@ func (e *Edge) NextPoint() *models.Point {
 }
 
 func (e *Edge) NextBatch() []*models.Point {
-	e.l.Printf("next batch c: %d e: %d\n", e.collected, e.emitted)
+	e.l.Printf("D@next batch c: %d e: %d\n", e.collected, e.emitted)
 	b := <-e.batch
 	if b != nil {
 		e.emitted++
@@ -81,7 +82,7 @@ func (e *Edge) NextBatch() []*models.Point {
 }
 
 func (e *Edge) NextMaps() *MapResult {
-	e.l.Printf("next maps c: %d e: %d\n", e.collected, e.emitted)
+	e.l.Printf("D@next maps c: %d e: %d\n", e.collected, e.emitted)
 	m := <-e.reduce
 	if m != nil {
 		e.emitted++
@@ -97,7 +98,7 @@ func (e *Edge) recover(errp *error) {
 
 func (e *Edge) CollectPoint(p *models.Point) (err error) {
 	defer e.recover(&err)
-	e.l.Printf("collect point c: %d e: %d\n", e.collected, e.emitted)
+	e.l.Printf("D@collect point c: %d e: %d\n", e.collected, e.emitted)
 	e.collected++
 	e.stream <- p
 	return
@@ -105,7 +106,7 @@ func (e *Edge) CollectPoint(p *models.Point) (err error) {
 
 func (e *Edge) CollectBatch(b []*models.Point) (err error) {
 	defer e.recover(&err)
-	e.l.Printf("collect batch c: %d e: %d\n", e.collected, e.emitted)
+	e.l.Printf("D@collect batch c: %d e: %d\n", e.collected, e.emitted)
 	e.collected++
 	e.batch <- b
 	return
@@ -113,7 +114,7 @@ func (e *Edge) CollectBatch(b []*models.Point) (err error) {
 
 func (e *Edge) CollectMaps(m *MapResult) (err error) {
 	defer e.recover(&err)
-	e.l.Printf("collect maps c: %d e: %d\n", e.collected, e.emitted)
+	e.l.Printf("D@collect maps c: %d e: %d\n", e.collected, e.emitted)
 	e.collected++
 	e.reduce <- m
 	return

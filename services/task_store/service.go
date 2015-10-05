@@ -5,7 +5,9 @@ import (
 	"encoding/gob"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"os"
 	"path"
 	"strings"
 
@@ -31,6 +33,7 @@ type Service struct {
 		StartTask(t *kapacitor.Task) (*kapacitor.ExecutingTask, error)
 		StopTask(name string)
 	}
+	l *log.Logger
 }
 
 type taskStore struct {
@@ -40,7 +43,10 @@ type taskStore struct {
 }
 
 func NewService(conf Config) *Service {
-	return &Service{dbpath: path.Join(conf.Dir, taskDB)}
+	return &Service{
+		dbpath: path.Join(conf.Dir, taskDB),
+		l:      log.New(os.Stderr, "[task] ", log.LstdFlags),
+	}
 }
 
 func (ts *Service) Open() error {
@@ -194,13 +200,11 @@ func (ts *Service) handleDisable(w http.ResponseWriter, r *http.Request) {
 
 func (ts *Service) Save(name, tick string, tt kapacitor.TaskType) error {
 
-	fmt.Println("saveing")
 	// Validate task
 	_, err := kapacitor.NewTask(name, tick, tt)
 	if err != nil {
 		return fmt.Errorf("invalid task: %s", err)
 	}
-	fmt.Println("valid")
 
 	var buf bytes.Buffer
 	task := taskStore{
@@ -220,7 +224,6 @@ func (ts *Service) Save(name, tick string, tt kapacitor.TaskType) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("put")
 		return b.Put([]byte(name), buf.Bytes())
 	})
 	return err

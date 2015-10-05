@@ -1,7 +1,7 @@
 package tick_test
 
 import (
-	"fmt"
+	"log"
 	"testing"
 	"time"
 
@@ -89,7 +89,7 @@ s2.structC()
 
 	err := tick.Evaluate(script, scope)
 	if !assert.Nil(err) {
-		fmt.Println(err)
+		log.Println(err)
 	}
 
 	s2, ok := scope.Get("s2").(*structB)

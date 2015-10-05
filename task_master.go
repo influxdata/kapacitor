@@ -29,7 +29,7 @@ type TaskMaster struct {
 
 // Create a new Executor with a given clock.
 func NewTaskMaster() *TaskMaster {
-	src := newEdge("src->str", pipeline.StreamEdge)
+	src := newEdge("src->stream", pipeline.StreamEdge)
 	return &TaskMaster{
 		Stream:  src,
 		in:      src,
@@ -104,7 +104,7 @@ func (tm *TaskMaster) NewFork(name string) *Edge {
 	if len(short) > 8 {
 		short = short[:8]
 	}
-	e := newEdge("str->"+name, pipeline.StreamEdge)
+	e := newEdge("stream->"+name, pipeline.StreamEdge)
 	tm.forks[name] = e
 	return e
 }

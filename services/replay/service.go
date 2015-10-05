@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -36,12 +37,15 @@ type Service struct {
 		NewFork(name string) *kapacitor.Edge
 		DelFork(name string)
 	}
+
+	l *log.Logger
 }
 
 // Create a new replay master.
 func NewService(conf Config) *Service {
 	return &Service{
 		saveDir: conf.Dir,
+		l:       log.New(os.Stderr, "[replay] ", log.LstdFlags),
 	}
 }
 
@@ -295,7 +299,6 @@ func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, addr string, s
 		query.Start(start)
 		query.Stop(stop)
 		v := url.Values{}
-		fmt.Println("RQ:", query.String())
 		v.Add("q", query.String())
 		res, err := http.Get(addr + "/query?" + v.Encode())
 		if err != nil {

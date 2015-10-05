@@ -64,14 +64,14 @@ func (s *StreamNode) matches(p *models.Point) bool {
 	if s.s.From != "" && p.Name != s.s.From {
 		return false
 	}
-	if !evalExpr(p, s.condition) {
+	if !s.evalExpr(p, s.condition) {
 		return false
 	}
 	return true
 }
 
 //evaluate a given influxql.Expr a against a Point
-func evalExpr(p *models.Point, expr influxql.Expr) bool {
+func (s *StreamNode) evalExpr(p *models.Point, expr influxql.Expr) bool {
 	if expr == nil {
 		return true
 	}
@@ -84,7 +84,7 @@ func evalExpr(p *models.Point, expr influxql.Expr) bool {
 		case *influxql.VarRef:
 			lit, ok := be.RHS.(*influxql.StringLiteral)
 			if !ok {
-				fmt.Println("unexpected RHS expected StringLiteral", be.RHS)
+				s.l.Println("unexpected RHS expected StringLiteral", be.RHS)
 				return false
 			}
 			key = be.LHS.(*influxql.VarRef).Val
@@ -92,7 +92,7 @@ func evalExpr(p *models.Point, expr influxql.Expr) bool {
 		case *influxql.StringLiteral:
 			ref, ok := be.RHS.(*influxql.VarRef)
 			if !ok {
-				fmt.Println("unexpected RHS expected VarRef", be.RHS)
+				s.l.Println("unexpected RHS expected VarRef", be.RHS)
 				return false
 			}
 			key = ref.Val
@@ -105,7 +105,7 @@ func evalExpr(p *models.Point, expr influxql.Expr) bool {
 			return p.Tags[key] != value
 		}
 	default:
-		fmt.Println("unexpected expr", expr)
+		s.l.Println("unexpected expr", expr)
 		return false
 
 	}

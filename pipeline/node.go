@@ -48,6 +48,7 @@ type Node interface {
 
 	// Friendly readable unique name of the node
 	Name() string
+	SetName(string)
 
 	// Unique id for the node
 	ID() ID
@@ -97,6 +98,10 @@ func (n *node) Name() string {
 		n.name = fmt.Sprintf("%s%d", n.Desc(), n.ID())
 	}
 	return n.name
+}
+
+func (n *node) SetName(name string) {
+	n.name = name
 }
 
 func (n *node) Parents() []Node {

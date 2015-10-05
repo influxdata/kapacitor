@@ -87,8 +87,6 @@ func (a *AlertNode) runAlert() error {
 				}
 			}
 		}
-	default:
-		fmt.Println("Unhandled EdgeType")
 	}
 	return nil
 }
@@ -109,7 +107,7 @@ func (a *AlertNode) check(p *models.Point) (bool, error) {
 func (a *AlertNode) handlePost(pts []*models.Point) {
 	b, err := json.Marshal(pts)
 	if err != nil {
-		fmt.Println("failed to marshal points json")
+		a.l.Println("failed to marshal points json")
 		return
 	}
 	buf := bytes.NewBuffer(b)

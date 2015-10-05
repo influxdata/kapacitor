@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -21,6 +22,8 @@ var (
 	commit  string
 	branch  string
 )
+
+var l = log.New(os.Stderr, "[run] ", log.LstdFlags)
 
 var usageStr = `
 Usage: kapacitor [command] [args]
@@ -237,7 +240,7 @@ func doRecord(args []string) error {
 	if rp.Error != "" {
 		return errors.New(rp.Error)
 	}
-	fmt.Println(rp.ReplayID)
+	l.Println(rp.ReplayID)
 	return nil
 }
 

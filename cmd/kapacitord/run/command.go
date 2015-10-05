@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/influxdb/kapacitor/log_writer"
 )
 
 const logo = `
@@ -58,6 +59,12 @@ func NewCommand() *Command {
 func (cmd *Command) Run(args ...string) error {
 	// Parse the command line flags.
 	options, err := cmd.ParseFlags(args...)
+	if err != nil {
+		return err
+	}
+
+	// Set log level
+	err = log_writer.SetLevel(options.LogLevel)
 	if err != nil {
 		return err
 	}
@@ -148,6 +155,7 @@ func (cmd *Command) ParseFlags(args ...string) (Options, error) {
 	fs.StringVar(&options.Hostname, "hostname", "", "")
 	fs.StringVar(&options.CPUProfile, "cpuprofile", "", "")
 	fs.StringVar(&options.MemProfile, "memprofile", "", "")
+	fs.StringVar(&options.LogLevel, "loglevel", "INFO", "")
 	fs.Usage = func() { fmt.Fprintln(cmd.Stderr, usage) }
 	if err := fs.Parse(args); err != nil {
 		return Options{}, err
@@ -209,6 +217,10 @@ run starts the Kapacitor server.
 
         -pidfile <path>
                           Write process ID to a file.
+
+        -loglevel <level>
+                          Sets the log level. One of debug,info,warn,error.
+                          Default: info
 `
 
 // Options represents the command line options that can be parsed.
@@ -218,4 +230,5 @@ type Options struct {
 	Hostname   string
 	CPUProfile string
 	MemProfile string
+	LogLevel   string
 }
