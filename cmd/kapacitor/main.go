@@ -36,8 +36,8 @@ Commands:
 	enable   enable and start running a task with live data.
 	disable  stop running a task.
 	push     publish a task definition to another Kapacitor instance.
-	delete   delete a task.
-	list     list information about running tasks.
+	delete   delete a task or a recording.
+	list     list information about tasks or recordings.
 	help     get help for a command.
 	version  displays the Kapacitor version info.
 `
@@ -180,9 +180,11 @@ func recordUsage() {
 
 	Record the result of a InfluxDB query or a snapshot of the live data stream.
 
-	Prints the replay ID on exit.
+	Prints the recording ID on exit.
 
-	Replays have types like tasks. If recording a raw query you must specify the desired type.
+	Recordings have types like tasks. If recording a raw query you must specify the desired type.
+
+	See 'kapacitor help replay' for how to replay a recording.
 
 Examples:
 
@@ -197,7 +199,7 @@ Examples:
 
 	$ kapacitor record query -addr 'http://localhost:8086' -query "select value from cpu_idle where time > now() - 1h and time < now()" -type streamer
 
-		This records the result of the query and stores it as a stream replay. Use -type batcher to store as batch replay.
+		This records the result of the query and stores it as a stream recording. Use -type batcher to store as batch recording.
 
 Options:
 `
@@ -231,8 +233,8 @@ func doRecord(args []string) error {
 
 	// Decode valid response
 	type resp struct {
-		ReplayID string `json:"ReplayID"`
-		Error    string `json:"Error"`
+		RecordingID string `json:"RecordingID"`
+		Error       string `json:"Error"`
 	}
 	d := json.NewDecoder(r.Body)
 	rp := resp{}
@@ -240,7 +242,7 @@ func doRecord(args []string) error {
 	if rp.Error != "" {
 		return errors.New(rp.Error)
 	}
-	l.Println(rp.ReplayID)
+	fmt.Println(rp.RecordingID)
 	return nil
 }
 
@@ -303,7 +305,7 @@ func doDefine(args []string) error {
 var (
 	replayFlags = flag.NewFlagSet("replay", flag.ExitOnError)
 	rtname      = replayFlags.String("name", "", "the task name")
-	rid         = replayFlags.String("id", "", "the replay id")
+	rid         = replayFlags.String("id", "", "the recording ID")
 	rfast       = replayFlags.Bool("fast", false, "whether to replay the data as fast as possible. If false, replay the data in real time")
 )
 
@@ -429,46 +431,86 @@ func doDisable(args []string) error {
 // List
 
 func listUsage() {
-	var u = `Usage: kapacitor list [task...]
+	var u = `Usage: kapacitor list (tasks|recordings) [task name|recording ID]...
 
-List tasks and their current state.
+List tasks or recordings and their current state.
 
-If no tasks are given then all tasks are listed.
-If a set of task names is provided only those tasks will be listed.
+If no tasks are given then all tasks are listed. Same for recordings.
+If a set of task names or recordings IDs is provided only those entries will be listed.
 `
 	fmt.Fprintln(os.Stderr, u)
 }
 
 func doList(args []string) error {
 
-	tasks := strings.Join(args, ",")
-	v := url.Values{}
-	v.Add("tasks", tasks)
-	r, err := http.Get("http://localhost:9092/tasks?" + v.Encode())
-	if err != nil {
-		return err
-	}
-	defer r.Body.Close()
-	// Decode valid response
-	type resp struct {
-		Error string `json:"Error"`
-		Tasks []struct {
-			Name    string
-			Type    kapacitor.TaskType
-			Enabled bool
-		} `json:"Tasks"`
-	}
-	d := json.NewDecoder(r.Body)
-	rp := resp{}
-	d.Decode(&rp)
-	if rp.Error != "" {
-		return errors.New(rp.Error)
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "Must specify 'tasks' or 'recordings'")
+		listUsage()
+		os.Exit(2)
 	}
 
-	outFmt := "%-30s%-10v%-10v\n"
-	fmt.Fprintf(os.Stdout, outFmt, "Name", "Type", "Enabled")
-	for _, t := range rp.Tasks {
-		fmt.Fprintf(os.Stdout, outFmt, t.Name, t.Type, t.Enabled)
+	switch args[0] {
+	case "tasks":
+		tasks := strings.Join(args[1:], ",")
+		v := url.Values{}
+		v.Add("tasks", tasks)
+		r, err := http.Get("http://localhost:9092/tasks?" + v.Encode())
+		if err != nil {
+			return err
+		}
+		defer r.Body.Close()
+		// Decode valid response
+		type resp struct {
+			Error string `json:"Error"`
+			Tasks []struct {
+				Name    string
+				Type    kapacitor.TaskType
+				Enabled bool
+			} `json:"Tasks"`
+		}
+		d := json.NewDecoder(r.Body)
+		rp := resp{}
+		d.Decode(&rp)
+		if rp.Error != "" {
+			return errors.New(rp.Error)
+		}
+
+		outFmt := "%-30s%-10v%-10v\n"
+		fmt.Fprintf(os.Stdout, outFmt, "Name", "Type", "Enabled")
+		for _, t := range rp.Tasks {
+			fmt.Fprintf(os.Stdout, outFmt, t.Name, t.Type, t.Enabled)
+		}
+	case "recordings":
+
+		rids := strings.Join(args[1:], ",")
+		v := url.Values{}
+		v.Add("rids", rids)
+		r, err := http.Get("http://localhost:9092/recordings?" + v.Encode())
+		if err != nil {
+			return err
+		}
+		defer r.Body.Close()
+		// Decode valid response
+		type resp struct {
+			Error      string `json:"Error"`
+			Recordings []struct {
+				ID   string
+				Type kapacitor.TaskType
+				Size int64
+			} `json:"Recordings"`
+		}
+		d := json.NewDecoder(r.Body)
+		rp := resp{}
+		d.Decode(&rp)
+		if rp.Error != "" {
+			return errors.New(rp.Error)
+		}
+
+		outFmt := "%-40s%-10v%15.2f\n"
+		fmt.Fprintf(os.Stdout, "%-40s%-10s%15s\n", "ID", "Type", "Size (MB)")
+		for _, r := range rp.Recordings {
+			fmt.Fprintf(os.Stdout, outFmt, r.ID, r.Type, float64(r.Size)/1024.0/1024.0)
+		}
 	}
 	return nil
 
@@ -476,24 +518,39 @@ func doList(args []string) error {
 
 // Delete
 func deleteUsage() {
-	var u = `Usage: kapacitor delete [task name...]
+	var u = `Usage: kapacitor delete (task|recording) [task name|recording ID]...
 
-	Delete a task. If enabled it will be disabled and then deleted.
+	Delete a task or recording.
+	
+	If a task is enabled it will be disabled and then deleted.
 `
 	fmt.Fprintln(os.Stderr, u)
 }
 
 func doDelete(args []string) error {
-	if len(args) < 1 {
-		fmt.Fprintln(os.Stderr, "Must pass at least one task name")
+	if len(args) < 2 {
+		fmt.Fprintln(os.Stderr, "Must pass at least one task name or recording ID")
 		enableUsage()
 		os.Exit(2)
 	}
 
-	for _, name := range args {
+	var baseURL string
+	var paramName string
+	switch args[0] {
+	case "task":
+		baseURL = "http://localhost:9092/task"
+		paramName = "name"
+	case "recording":
+		baseURL = "http://localhost:9092/recording"
+		paramName = "rid"
+	}
+
+	l.Println(args)
+
+	for _, arg := range args[1:] {
 		v := url.Values{}
-		v.Add("name", name)
-		req, err := http.NewRequest("DELETE", "http://localhost:9092/task?"+v.Encode(), nil)
+		v.Add(paramName, arg)
+		req, err := http.NewRequest("DELETE", baseURL+v.Encode(), nil)
 		if err != nil {
 			return err
 		}
@@ -514,6 +571,7 @@ func doDelete(args []string) error {
 			return errors.New(rp.Error)
 		}
 	}
+
 	return nil
 }
 

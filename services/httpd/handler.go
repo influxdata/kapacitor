@@ -92,6 +92,10 @@ func NewHandler(requireAuthentication, loggingEnabled, writeTrace bool, statMap 
 			"POST", "/write", true, true, h.serveWrite,
 		},
 		Route{
+			"routes", // Display current API routes
+			"GET", "/:routes", true, true, h.serveRoutes,
+		},
+		Route{
 			"404", // Catch all 404
 			"GET", "/", true, true, h.serve404,
 		},
@@ -185,6 +189,20 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			mux.ServeHTTP(w, r)
 		}
 	}
+}
+
+// serveRoutes returns a list of all routs and their methods
+func (h *Handler) serveRoutes(w http.ResponseWriter, r *http.Request) {
+	routes := make(map[string][]string)
+
+	for method, mux := range h.methodMux {
+		patterns := mux.Patterns()
+		for _, p := range patterns {
+			routes[p] = append(routes[p], method)
+		}
+	}
+
+	w.Write(MarshalJSON(routes, true))
 }
 
 // serve404 returns an a formated 404 error

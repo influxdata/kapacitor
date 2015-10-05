@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/influxdb/kapacitor/log_writer"
 	"github.com/influxdb/kapacitor/pipeline"
 )
 
@@ -54,7 +55,7 @@ func (n *node) closeParentEdges() {
 }
 
 func (n *node) start() {
-	n.l = log.New(os.Stderr, fmt.Sprintf("[%s] ", n.Name()), log.LstdFlags)
+	n.l = log_writer.New(os.Stderr, fmt.Sprintf("[%s] ", n.Name()), log.LstdFlags)
 	n.errCh = make(chan error, 1)
 	go func() {
 		var err error

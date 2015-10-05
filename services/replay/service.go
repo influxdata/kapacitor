@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/influxdb/kapacitor"
@@ -52,12 +54,20 @@ func NewService(conf Config) *Service {
 func (r *Service) Open() error {
 	routes := []httpd.Route{
 		{
-			"replay",
-			"POST",
-			"/replay",
+			"recordings",
+			"GET",
+			"/recordings",
 			true,
 			true,
-			r.handleReplay,
+			r.handleList,
+		},
+		{
+			"recording-delete",
+			"DELETE",
+			"/recording",
+			true,
+			true,
+			r.handleDelete,
 		},
 		{
 			"record",
@@ -67,12 +77,45 @@ func (r *Service) Open() error {
 			true,
 			r.handleRecord,
 		},
+		{
+			"replay",
+			"POST",
+			"/replay",
+			true,
+			true,
+			r.handleReplay,
+		},
 	}
 	return r.HTTPDService.AddRoutes(routes)
 }
 
 func (r *Service) Close() error {
 	return nil
+}
+
+func (s *Service) handleList(w http.ResponseWriter, req *http.Request) {
+	ridsStr := req.URL.Query().Get("rids")
+	var rids []string
+	if ridsStr != "" {
+		rids = strings.Split(ridsStr, ",")
+	}
+
+	infos, err := s.GetRecordings(rids)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusNotFound)
+		return
+	}
+
+	type response struct {
+		Recordings []recordingInfo `json:"Recordings"`
+	}
+
+	w.Write(httpd.MarshalJSON(response{infos}, true))
+}
+
+func (s *Service) handleDelete(w http.ResponseWriter, r *http.Request) {
+	rid := r.URL.Query().Get("rid")
+	s.Delete(rid)
 }
 
 func (r *Service) handleReplay(w http.ResponseWriter, req *http.Request) {
@@ -195,14 +238,64 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 		return
 
 	default:
-		httpd.HttpError(w, "invalid replay type", true, http.StatusBadRequest)
+		httpd.HttpError(w, "invalid recording type", true, http.StatusBadRequest)
 		return
 	}
-	// Respond with the replay ID
+	// Respond with the recording ID
 	type response struct {
-		ReplayID string `json:"ReplayID"`
+		RecordingID string `json:"RecordingID"`
 	}
 	w.Write(httpd.MarshalJSON(response{rid.String()}, true))
+}
+
+type recordingInfo struct {
+	ID   string
+	Type kapacitor.TaskType
+	Size int64
+}
+
+func (r *Service) GetRecordings(rids []string) ([]recordingInfo, error) {
+	files, err := ioutil.ReadDir(r.saveDir)
+	if err != nil {
+		return nil, err
+	}
+
+	ids := make(map[string]bool)
+	for _, id := range rids {
+		ids[id] = true
+	}
+
+	r.l.Println(ids)
+	infos := make([]recordingInfo, 0, len(files))
+
+	for _, info := range files {
+		if info.IsDir() {
+			continue
+		}
+		name := info.Name()
+		i := strings.LastIndex(name, ".")
+		ext := name[i:]
+		id := name[:i]
+		if len(ids) > 0 && !ids[id] {
+			continue
+		}
+		var typ kapacitor.TaskType
+		switch ext {
+		case streamEXT:
+			typ = kapacitor.StreamerTask
+		case batchEXT:
+			typ = kapacitor.BatcherTask
+		default:
+			continue
+		}
+		info := recordingInfo{
+			ID:   id,
+			Type: typ,
+			Size: info.Size(),
+		}
+		infos = append(infos, info)
+	}
+	return infos, nil
 }
 
 func (r *Service) Find(id string, typ kapacitor.TaskType) (io.ReadCloser, error) {
@@ -222,12 +315,19 @@ func (r *Service) Find(id string, typ kapacitor.TaskType) (io.ReadCloser, error)
 	f, err := os.Open(p)
 	if err != nil {
 		if _, err := os.Stat(path.Join(r.saveDir, id+other)); err == nil {
-			return nil, fmt.Errorf("found replay of wrong type, check task type matches replay.")
+			return nil, fmt.Errorf("found recording of wrong type, check task type matches recording.")
 		}
 		return nil, err
 	}
 	gz, err := gzip.NewReader(f)
 	return rc{gz, f}, nil
+}
+
+func (r *Service) Delete(id string) {
+	ps := path.Join(r.saveDir, id+streamEXT)
+	pb := path.Join(r.saveDir, id+batchEXT)
+	os.Remove(ps)
+	os.Remove(pb)
 }
 
 type rc struct {
@@ -257,7 +357,7 @@ func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration) error {
 	rpath := path.Join(r.saveDir, rid.String()+streamEXT)
 	f, err := os.Create(rpath)
 	if err != nil {
-		return fmt.Errorf("failed to save replay: %s", err)
+		return fmt.Errorf("failed to save recording: %s", err)
 	}
 	defer f.Close()
 	gz := gzip.NewWriter(f)

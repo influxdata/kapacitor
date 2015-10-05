@@ -54,10 +54,12 @@ func (b *BatchNode) Query(batch BatchCollector) {
 		b.query.Start(now.Add(-1 * b.b.Period))
 		b.query.Stop(now)
 
+		b.l.Println("D@starting next batch query:", b.query.String())
+
 		// Connect
 		con, err := client.NewClient(b.conf)
 		if err != nil {
-			b.l.Println(err)
+			b.l.Println("E@" + err.Error())
 			break
 		}
 		q := client.Query{
@@ -67,19 +69,19 @@ func (b *BatchNode) Query(batch BatchCollector) {
 		// Execute query
 		resp, err := con.Query(q)
 		if err != nil {
-			b.l.Println(err)
+			b.l.Println("E@" + err.Error())
 			return
 		}
 
 		if resp.Err != nil {
-			b.l.Println(resp.Err)
+			b.l.Println("E@" + resp.Err.Error())
 			return
 		}
 
 		// Collect batches
 		for _, res := range resp.Results {
 			if res.Err != nil {
-				b.l.Println(res.Err)
+				b.l.Println("E@" + res.Err.Error())
 				return
 			}
 			for _, series := range res.Series {
@@ -95,7 +97,7 @@ func (b *BatchNode) Query(batch BatchCollector) {
 						if c == "time" {
 							t, err = time.Parse(time.RFC3339, v[i].(string))
 							if err != nil {
-								b.l.Println(err)
+								b.l.Println("E@" + err.Error())
 								return
 							}
 						} else {

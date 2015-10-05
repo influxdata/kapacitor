@@ -198,3 +198,15 @@ func (mux *ServeMux) Deregister(pattern string) {
 	defer mux.mu.Unlock()
 	delete(mux.m, pattern)
 }
+
+func (mux *ServeMux) Patterns() []string {
+	mux.mu.Lock()
+	defer mux.mu.Unlock()
+	patterns := make([]string, len(mux.m))
+	i := 0
+	for p, _ := range mux.m {
+		patterns[i] = p
+		i++
+	}
+	return patterns
+}

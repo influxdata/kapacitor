@@ -327,9 +327,6 @@ func (ts *Service) GetTaskInfo(tasks []string) ([]taskInfo, error) {
 			return nil
 		}
 		eb := tx.Bucket([]byte(enabledBucket))
-		if eb == nil {
-			return nil
-		}
 		// Grab task info
 		f := func(k, v []byte) error {
 			t, err := ts.Load(string(k))
@@ -337,7 +334,7 @@ func (ts *Service) GetTaskInfo(tasks []string) ([]taskInfo, error) {
 				return err
 			}
 
-			enabled := eb.Get(k) != nil
+			enabled := eb != nil && eb.Get(k) != nil
 
 			info := taskInfo{
 				Name:    t.Name,
