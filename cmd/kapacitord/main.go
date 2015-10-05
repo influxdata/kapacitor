@@ -18,7 +18,7 @@ import (
 
 // These variables are populated via the Go linker.
 var (
-	version string = "0.1"
+	version string = "v0.1"
 	commit  string
 	branch  string
 )
@@ -176,7 +176,7 @@ func (cmd *VersionCommand) Run(args ...string) error {
 	}
 
 	// Print version info.
-	fmt.Fprintf(cmd.Stdout, "Kapacitor v%s (git: %s %s)\n", version, branch, commit)
+	fmt.Fprintf(cmd.Stdout, "Kapacitor %s (git: %s %s)\n", version, branch, commit)
 
 	return nil
 }

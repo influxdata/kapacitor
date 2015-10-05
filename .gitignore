@@ -1,3 +1,5 @@
 .*.swp
 kapacitor
 kapacitord
+kapacitor_linux*
+kapacitord_linux*

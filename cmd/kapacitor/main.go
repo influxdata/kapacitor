@@ -15,6 +15,13 @@ import (
 	"github.com/influxdb/kapacitor"
 )
 
+// These variables are populated via the Go linker.
+var (
+	version string = "v0.1"
+	commit  string
+	branch  string
+)
+
 var usageStr = `
 Usage: kapacitor [command] [args]
 
@@ -29,6 +36,7 @@ Commands:
 	delete   delete a task.
 	list     list information about running tasks.
 	help     get help for a command.
+	version  displays the Kapacitor version info.
 `
 
 func usage() {
@@ -79,6 +87,9 @@ func main() {
 	case "list":
 		commandArgs = args
 		commandF = doList
+	case "version":
+		commandArgs = args
+		commandF = doVersion
 	default:
 		fmt.Fprintln(os.Stderr, "Unknown command", command)
 		usage()
@@ -135,6 +146,8 @@ func doHelp(args []string) error {
 			deleteUsage()
 		case "help":
 			helpUsage()
+		case "version":
+			versionUsage()
 		default:
 			fmt.Fprintln(os.Stderr, "Unknown command", command)
 			usage()
@@ -498,5 +511,19 @@ func doDelete(args []string) error {
 			return errors.New(rp.Error)
 		}
 	}
+	return nil
+}
+
+// Version
+func versionUsage() {
+	var u = `Usage: kapacitor version
+
+	Print version info.
+`
+	fmt.Fprintln(os.Stderr, u)
+}
+
+func doVersion(args []string) error {
+	fmt.Fprintf(os.Stdout, "Kapacitor %s (git: %s %s)\n", version, branch, commit)
 	return nil
 }
