@@ -9,8 +9,10 @@ import (
 type EdgeType int
 
 const (
+	// No data is transfered
+	NoEdge EdgeType = iota
 	// Data is transfered immediately and one point at a time.
-	StreamEdge EdgeType = iota
+	StreamEdge
 	// Data is transfered in batches as soon as it is ready.
 	BatchEdge
 	// Data is transfered as it is received from a map function.
@@ -206,6 +208,13 @@ func (n *node) HttpOut(endpoint string) *HTTPOutNode {
 	h := newHTTPOutNode(n.provides, endpoint)
 	n.linkChild(h)
 	return h
+}
+
+// Create subnode that will store the incoming data into InfluxDB
+func (n *node) InfluxDBOut() *InfluxDBOutNode {
+	i := newInfluxDBOutNode(n.provides)
+	n.linkChild(i)
+	return i
 }
 
 func (n *node) Alert() *AlertNode {

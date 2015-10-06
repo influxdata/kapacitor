@@ -1,7 +1,6 @@
 package kapacitor
 
 import (
-	"net/url"
 	"time"
 
 	"github.com/influxdb/influxdb/client"
@@ -14,7 +13,6 @@ type BatchNode struct {
 	b      *pipeline.BatchNode
 	query  *Query
 	ticker *time.Ticker
-	conf   client.Config
 }
 
 func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode) (*BatchNode, error) {
@@ -24,11 +22,6 @@ func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode) (*BatchNode, error) 
 	}
 	bn.node.runF = bn.runBatch
 	bn.node.stopF = bn.stopBatch
-
-	u, _ := url.Parse("http://localhost:8086")
-	bn.conf = client.Config{
-		URL: *u,
-	}
 
 	q, err := NewQuery(n.Query)
 	if err != nil {
@@ -57,7 +50,7 @@ func (b *BatchNode) Query(batch BatchCollector) {
 		b.l.Println("D@starting next batch query:", b.query.String())
 
 		// Connect
-		con, err := client.NewClient(b.conf)
+		con, err := b.et.tm.InfluxDBService.NewClient()
 		if err != nil {
 			b.l.Println("E@" + err.Error())
 			break

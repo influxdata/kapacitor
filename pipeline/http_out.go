@@ -13,7 +13,7 @@ func newHTTPOutNode(wants EdgeType, endpoint string) *HTTPOutNode {
 		node: node{
 			desc:     "http_out",
 			wants:    wants,
-			provides: BatchEdge,
+			provides: NoEdge,
 		},
 		Endpoint: endpoint,
 	}

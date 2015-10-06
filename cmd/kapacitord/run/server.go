@@ -11,6 +11,7 @@ import (
 
 	"github.com/influxdb/kapacitor"
 	"github.com/influxdb/kapacitor/services/httpd"
+	"github.com/influxdb/kapacitor/services/influxdb"
 	"github.com/influxdb/kapacitor/services/replay"
 	"github.com/influxdb/kapacitor/services/streamer"
 	"github.com/influxdb/kapacitor/services/task_store"
@@ -45,6 +46,7 @@ type Server struct {
 	Streamer      *streamer.Service
 	TaskStore     *task_store.Service
 	ReplayService *replay.Service
+	InfluxDB      *influxdb.Service
 
 	MetaStore     *metastore
 	QueryExecutor *queryexecutor
@@ -80,6 +82,7 @@ func NewServer(c *Config, buildInfo *BuildInfo) (*Server, error) {
 
 	// Append Kapacitor services.
 	s.appendStreamerService()
+	s.appendInfluxDBService(c.InfluxDB)
 	s.appendHTTPDService(c.HTTP)
 	s.appendTaskStoreService(c.Task)
 	s.appendReplayStoreService(c.Replay)
@@ -109,6 +112,14 @@ func (s *Server) appendStreamerService() {
 	s.Services = append(s.Services, srv)
 }
 
+func (s *Server) appendInfluxDBService(c influxdb.Config) {
+	srv := influxdb.NewService(c)
+
+	s.InfluxDB = srv
+	s.TaskMaster.InfluxDBService = srv
+	s.Services = append(s.Services, srv)
+}
+
 func (s *Server) appendHTTPDService(c httpd.Config) {
 	srv := httpd.NewService(c)
 
@@ -134,6 +145,7 @@ func (s *Server) appendReplayStoreService(c replay.Config) {
 	srv := replay.NewService(c)
 	srv.TaskStore = s.TaskStore
 	srv.HTTPDService = s.HTTPDService
+	srv.InfluxDBService = s.InfluxDB
 	srv.TaskMaster = s.TaskMaster
 
 	s.ReplayService = srv

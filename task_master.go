@@ -3,6 +3,7 @@ package kapacitor
 import (
 	"net"
 
+	"github.com/influxdb/influxdb/client"
 	"github.com/influxdb/kapacitor/pipeline"
 	"github.com/influxdb/kapacitor/services/httpd"
 )
@@ -14,6 +15,9 @@ type TaskMaster struct {
 		AddRoutes([]httpd.Route) error
 		DelRoutes([]httpd.Route)
 		Addr() net.Addr
+	}
+	InfluxDBService interface {
+		NewClient() (*client.Client, error)
 	}
 
 	// Incoming stream and forks

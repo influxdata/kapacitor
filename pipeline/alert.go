@@ -11,7 +11,7 @@ func newAlertNode(wants EdgeType) *AlertNode {
 		node: node{
 			desc:     "alert",
 			wants:    wants,
-			provides: BatchEdge,
+			provides: NoEdge,
 		},
 	}
 }

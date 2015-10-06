@@ -2,6 +2,7 @@ package integrations
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -13,6 +14,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/influxdb/influxdb/client"
+	imodels "github.com/influxdb/influxdb/models"
 	"github.com/influxdb/kapacitor"
 	"github.com/influxdb/kapacitor/clock"
 	"github.com/influxdb/kapacitor/models"
@@ -823,6 +826,84 @@ stream
 	//er := kapacitor.Result{}
 
 	testStreamer(t, "TestStreamingAlertFlapping", script)
+}
+func TestInfluxDBOut(t *testing.T) {
+	assert := assert.New(t)
+
+	var script = `
+stream
+	.from("cpu")
+	.where("host = 'serverA'")
+	.window()
+		.period(10s)
+		.every(10s)
+	.mapReduce(influxql.count, "value")
+	.influxDBOut()
+		.database("db")
+		.retentionPolicy("rp")
+		.measurement("m");
+`
+	//er := kapacitor.Result{
+	//	Window: nilGroup([]*models.Point{
+	//		{
+	//			Name:   "cpu",
+	//			Fields: map[string]interface{}{"count": 10.0},
+	//			Tags:   map[string]string{"type": "idle", "host": "serverA"},
+	//			Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+	//		},
+	//	}),
+	//}
+
+	done := make(chan error, 1)
+	var points []imodels.Point
+	var database string
+	var rp string
+	var precision string
+
+	influxdb := NewMockInfluxDBService(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		//Respond
+		var data client.Response
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(data)
+		//Get request data
+		log.Println(r.URL)
+		database = r.URL.Query().Get("db")
+		rp = r.URL.Query().Get("rp")
+		precision = r.URL.Query().Get("precision")
+
+		b, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			done <- err
+			return
+		}
+		points, err = imodels.ParsePointsWithPrecision(b, time.Unix(0, 0), precision)
+		done <- err
+	}))
+
+	clock, et, errCh, tm := testStreamer(t, "TestInfluxDBOut", script)
+	tm.InfluxDBService = influxdb
+	defer tm.Close()
+
+	// Move time forward
+	clock.Set(clock.Zero().Add(15 * time.Second))
+	// Wait till the replay has finished
+	assert.Nil(<-errCh)
+	// Wait till the task is finished
+	assert.Nil(et.Err())
+	// Wait till we received a request
+	assert.Nil(<-done)
+
+	assert.Equal("db", database)
+	assert.Equal("rp", rp)
+	assert.Equal("s", precision, "This fix is waiting on https://github.com/influxdb/influxdb/issues/4344")
+	log.Println(points)
+	if assert.Equal(1, len(points)) {
+		p := points[0]
+		assert.Equal("m", p.Name())
+		assert.Equal(imodels.Fields(map[string]interface{}{"count": 10.0}), p.Fields())
+		assert.Equal(imodels.Tags(map[string]string{"type": "idle", "host": "serverA"}), p.Tags())
+		assert.True(time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC).Equal(p.Time()))
+	}
 }
 
 // Helper test function for streamer

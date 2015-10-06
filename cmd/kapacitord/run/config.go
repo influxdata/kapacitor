@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/influxdb/kapacitor/services/httpd"
+	"github.com/influxdb/kapacitor/services/influxdb"
 	"github.com/influxdb/kapacitor/services/replay"
 	"github.com/influxdb/kapacitor/services/task_store"
 
@@ -22,9 +23,10 @@ import (
 
 // Config represents the configuration format for the kapacitord binary.
 type Config struct {
-	HTTP   httpd.Config      `toml:"http"`
-	Replay replay.Config     `toml:"replay"`
-	Task   task_store.Config `toml:"task"`
+	HTTP     httpd.Config      `toml:"http"`
+	Replay   replay.Config     `toml:"replay"`
+	Task     task_store.Config `toml:"task"`
+	InfluxDB influxdb.Config   `toml:"influxdb"`
 
 	Graphites []graphite.Config `toml:"graphite"`
 	Collectd  collectd.Config   `toml:"collectd"`
@@ -43,6 +45,7 @@ func NewConfig() *Config {
 	c.HTTP = httpd.NewConfig()
 	c.Replay = replay.NewConfig()
 	c.Task = task_store.NewConfig()
+	c.InfluxDB = influxdb.NewConfig()
 
 	c.Collectd = collectd.NewConfig()
 	c.OpenTSDB = opentsdb.NewConfig()
@@ -78,6 +81,10 @@ func (c *Config) Validate() error {
 		return err
 	}
 	err = c.Task.Validate()
+	if err != nil {
+		return err
+	}
+	err = c.InfluxDB.Validate()
 	if err != nil {
 		return err
 	}

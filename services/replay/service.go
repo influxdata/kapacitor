@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/influxdb/influxdb/client"
 	"github.com/influxdb/kapacitor"
 	"github.com/influxdb/kapacitor/clock"
 	"github.com/influxdb/kapacitor/services/httpd"
@@ -34,6 +35,9 @@ type Service struct {
 		AddRoutes([]httpd.Route) error
 		DelRoutes([]httpd.Route)
 		Addr() net.Addr
+	}
+	InfluxDBService interface {
+		NewClient() (*client.Client, error)
 	}
 	TaskMaster interface {
 		NewFork(name string) *kapacitor.Edge
@@ -146,6 +150,7 @@ func (r *Service) handleReplay(w http.ResponseWriter, req *http.Request) {
 	// Create new isolated task master
 	tm := kapacitor.NewTaskMaster()
 	tm.HTTPDService = r.HTTPDService
+	tm.InfluxDBService = r.InfluxDBService
 	tm.Open()
 	et, err := tm.StartTask(t)
 	if err != nil {

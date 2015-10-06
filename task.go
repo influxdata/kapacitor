@@ -242,6 +242,8 @@ func (et *ExecutingTask) createNode(p pipeline.Node) (Node, error) {
 		return newWindowNode(et, t)
 	case *pipeline.HTTPOutNode:
 		return newHTTPOutNode(et, t)
+	case *pipeline.InfluxDBOutNode:
+		return newInfluxDBOutNode(et, t)
 	case *pipeline.MapNode:
 		return newMapNode(et, t)
 	case *pipeline.ReduceNode:
