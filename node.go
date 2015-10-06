@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/influxdb/kapacitor/log_writer"
+	"github.com/influxdb/kapacitor/wlog"
 	"github.com/influxdb/kapacitor/pipeline"
 )
 
@@ -41,7 +41,7 @@ type node struct {
 	errCh    chan error
 	ins      []*Edge
 	outs     []*Edge
-	l        *log.Logger
+	logger   *log.Logger
 }
 
 func (n *node) addParentEdge(e *Edge) {
@@ -55,7 +55,7 @@ func (n *node) closeParentEdges() {
 }
 
 func (n *node) start() {
-	n.l = log_writer.New(os.Stderr, fmt.Sprintf("[%s] ", n.Name()), log.LstdFlags)
+	n.logger = wlog.New(os.Stderr, fmt.Sprintf("[%s] ", n.Name()), log.LstdFlags)
 	n.errCh = make(chan error, 1)
 	go func() {
 		var err error

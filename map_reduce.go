@@ -46,13 +46,13 @@ func newMapNode(et *ExecutingTask, n *pipeline.MapNode) (*MapNode, error) {
 func (s *MapNode) runMaps() error {
 	done := make(chan bool, s.parallel)
 	for b := s.ins[0].NextBatch(); b != nil; b = s.ins[0].NextBatch() {
-		mr := &MapResult{
-			Outs: make([]interface{}, s.parallel),
-		}
-		itr := newItr(b, s.mr.Fields[0])
 		if len(b) == 0 {
 			continue
 		}
+		mr := &MapResult{
+			Outs: make([]interface{}, s.parallel),
+		}
+		itr := newItr(b, s.mr.Field)
 
 		l := len(b) - 1
 		mr.Name = b[l].Name

@@ -18,6 +18,7 @@ import (
 	"github.com/influxdb/influxdb/client"
 	"github.com/influxdb/kapacitor"
 	"github.com/influxdb/kapacitor/clock"
+	"github.com/influxdb/kapacitor/wlog"
 	"github.com/influxdb/kapacitor/services/httpd"
 	"github.com/twinj/uuid"
 )
@@ -44,14 +45,14 @@ type Service struct {
 		DelFork(name string)
 	}
 
-	l *log.Logger
+	logger *log.Logger
 }
 
 // Create a new replay master.
 func NewService(conf Config) *Service {
 	return &Service{
 		saveDir: conf.Dir,
-		l:       log.New(os.Stderr, "[replay] ", log.LstdFlags),
+		logger:  wlog.New(os.Stderr, "[replay] ", log.LstdFlags),
 	}
 }
 
@@ -270,7 +271,6 @@ func (r *Service) GetRecordings(rids []string) ([]recordingInfo, error) {
 		ids[id] = true
 	}
 
-	r.l.Println(ids)
 	infos := make([]recordingInfo, 0, len(files))
 
 	for _, info := range files {

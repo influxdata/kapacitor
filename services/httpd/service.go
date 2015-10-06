@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/influxdb/kapacitor/wlog"
 )
 
 type Service struct {
@@ -26,6 +28,7 @@ type Service struct {
 func NewService(c Config) *Service {
 	statMap := &expvar.Map{}
 	statMap.Init()
+	l := wlog.New(os.Stderr, "[http] ", log.LstdFlags)
 	s := &Service{
 		addr:  c.BindAddress,
 		https: c.HttpsEnabled,
@@ -36,8 +39,9 @@ func NewService(c Config) *Service {
 			c.LogEnabled,
 			c.WriteTracing,
 			statMap,
+			l,
 		),
-		Logger: log.New(os.Stderr, "[http] ", log.LstdFlags),
+		Logger: l,
 	}
 	s.Handler.Logger = s.Logger
 	return s
@@ -45,8 +49,8 @@ func NewService(c Config) *Service {
 
 // Open starts the service
 func (s *Service) Open() error {
-	s.Logger.Println("Starting HTTP service")
-	s.Logger.Println("Authentication enabled:", s.Handler.requireAuthentication)
+	s.Logger.Println("I! Starting HTTP service")
+	s.Logger.Println("I! Authentication enabled:", s.Handler.requireAuthentication)
 
 	// Open listener.
 	if s.https {
@@ -62,7 +66,7 @@ func (s *Service) Open() error {
 			return err
 		}
 
-		s.Logger.Println("Listening on HTTPS:", listener.Addr().String())
+		s.Logger.Println("I! Listening on HTTPS:", listener.Addr().String())
 		s.ln = listener
 	} else {
 		listener, err := net.Listen("tcp", s.addr)
@@ -70,7 +74,7 @@ func (s *Service) Open() error {
 			return err
 		}
 
-		s.Logger.Println("Listening on HTTP:", listener.Addr().String())
+		s.Logger.Println("I! Listening on HTTP:", listener.Addr().String())
 		s.ln = listener
 	}
 

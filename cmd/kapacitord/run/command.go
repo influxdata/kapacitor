@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/influxdb/kapacitor/log_writer"
+	"github.com/influxdb/kapacitor/wlog"
 )
 
 const logo = `
@@ -64,7 +64,7 @@ func (cmd *Command) Run(args ...string) error {
 	}
 
 	// Set log level
-	err = log_writer.SetLevel(options.LogLevel)
+	err = wlog.SetLevel(options.LogLevel)
 	if err != nil {
 		return err
 	}
@@ -107,7 +107,8 @@ func (cmd *Command) Run(args ...string) error {
 
 	// Create server from config and start it.
 	buildInfo := &BuildInfo{Version: cmd.Version, Commit: cmd.Commit, Branch: cmd.Branch}
-	s, err := NewServer(config, buildInfo)
+	l := wlog.New(cmd.Stderr, "[srv] ", log.LstdFlags)
+	s, err := NewServer(config, buildInfo, l)
 	if err != nil {
 		return fmt.Errorf("create server: %s", err)
 	}
@@ -135,11 +136,11 @@ func (cmd *Command) Close() error {
 }
 
 func (cmd *Command) monitorServerErrors() {
-	logger := log.New(cmd.Stderr, "", log.LstdFlags)
+	logger := wlog.New(cmd.Stderr, "", log.LstdFlags)
 	for {
 		select {
 		case err := <-cmd.Server.Err():
-			logger.Println(err)
+			logger.Println("E! " + err.Error())
 		case <-cmd.closing:
 			return
 		}
@@ -155,7 +156,7 @@ func (cmd *Command) ParseFlags(args ...string) (Options, error) {
 	fs.StringVar(&options.Hostname, "hostname", "", "")
 	fs.StringVar(&options.CPUProfile, "cpuprofile", "", "")
 	fs.StringVar(&options.MemProfile, "memprofile", "", "")
-	fs.StringVar(&options.LogLevel, "loglevel", "INFO", "")
+	fs.StringVar(&options.LogLevel, "loglevel", "info", "")
 	fs.Usage = func() { fmt.Fprintln(cmd.Stderr, usage) }
 	if err := fs.Parse(args); err != nil {
 		return Options{}, err

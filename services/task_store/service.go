@@ -33,7 +33,7 @@ type Service struct {
 		StartTask(t *kapacitor.Task) (*kapacitor.ExecutingTask, error)
 		StopTask(name string)
 	}
-	l *log.Logger
+	logger *log.Logger
 }
 
 type taskStore struct {
@@ -45,7 +45,7 @@ type taskStore struct {
 func NewService(conf Config) *Service {
 	return &Service{
 		dbpath: path.Join(conf.Dir, taskDB),
-		l:      log.New(os.Stderr, "[task] ", log.LstdFlags),
+		logger: log.New(os.Stderr, "[task] ", log.LstdFlags),
 	}
 }
 

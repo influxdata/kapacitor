@@ -84,7 +84,7 @@ func (s *StreamNode) evalExpr(p *models.Point, expr influxql.Expr) bool {
 		case *influxql.VarRef:
 			lit, ok := be.RHS.(*influxql.StringLiteral)
 			if !ok {
-				s.l.Println("E@unexpected RHS expected StringLiteral", be.RHS)
+				s.logger.Println("E! unexpected RHS expected StringLiteral", be.RHS)
 				return false
 			}
 			key = be.LHS.(*influxql.VarRef).Val
@@ -92,7 +92,7 @@ func (s *StreamNode) evalExpr(p *models.Point, expr influxql.Expr) bool {
 		case *influxql.StringLiteral:
 			ref, ok := be.RHS.(*influxql.VarRef)
 			if !ok {
-				s.l.Println("E@unexpected RHS expected VarRef", be.RHS)
+				s.logger.Println("E! unexpected RHS expected VarRef", be.RHS)
 				return false
 			}
 			key = ref.Val
@@ -105,7 +105,7 @@ func (s *StreamNode) evalExpr(p *models.Point, expr influxql.Expr) bool {
 			return p.Tags[key] != value
 		}
 	default:
-		s.l.Println("E@unexpected expr", expr)
+		s.logger.Println("E! unexpected expr", expr)
 		return false
 
 	}

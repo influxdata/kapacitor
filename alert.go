@@ -70,7 +70,7 @@ func (a *AlertNode) runAlert() error {
 				return err
 			} else if c {
 				for _, h := range a.handlers {
-					h([]*models.Point{p})
+					go h([]*models.Point{p})
 				}
 			}
 		}
@@ -81,7 +81,7 @@ func (a *AlertNode) runAlert() error {
 					return err
 				} else if c {
 					for _, h := range a.handlers {
-						h(w)
+						go h(w)
 					}
 					break
 				}
@@ -107,7 +107,7 @@ func (a *AlertNode) check(p *models.Point) (bool, error) {
 func (a *AlertNode) handlePost(pts []*models.Point) {
 	b, err := json.Marshal(pts)
 	if err != nil {
-		a.l.Println("E@failed to marshal points json")
+		a.logger.Println("E! failed to marshal points json")
 		return
 	}
 	buf := bytes.NewBuffer(b)

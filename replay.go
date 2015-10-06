@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
-	"os"
 	"time"
 	"unicode"
 
@@ -19,8 +17,6 @@ const (
 	batchBegin = "BEGIN"
 	batchEnd   = "END"
 )
-
-var l = log.New(os.Stderr, "[replay] ", log.LstdFlags)
 
 // Replay engine that can replay static data sets against a specific executor and its tasks.
 type Replay struct {

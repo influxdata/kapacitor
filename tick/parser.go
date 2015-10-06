@@ -2,12 +2,8 @@ package tick
 
 import (
 	"fmt"
-	"log"
-	"os"
 	"runtime"
 )
-
-var l = log.New(os.Stderr, "[tick] ", log.LstdFlags)
 
 // tree is the representation of a parsed dsl script.
 type tree struct {

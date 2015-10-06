@@ -39,6 +39,7 @@ Commands:
 	delete   delete a task or a recording.
 	list     list information about tasks or recordings.
 	help     get help for a command.
+	level    sets the logging level on the kapacitord server.
 	version  displays the Kapacitor version info.
 `
 
@@ -90,6 +91,9 @@ func main() {
 	case "list":
 		commandArgs = args
 		commandF = doList
+	case "level":
+		commandArgs = args
+		commandF = doLevel
 	case "version":
 		commandArgs = args
 		commandF = doVersion
@@ -143,10 +147,12 @@ func doHelp(args []string) error {
 			enableUsage()
 		case "disable":
 			disableUsage()
-		case "list":
-			listUsage()
 		case "delete":
 			deleteUsage()
+		case "list":
+			listUsage()
+		case "level":
+			levelUsage()
 		case "help":
 			helpUsage()
 		case "version":
@@ -572,6 +578,41 @@ func doDelete(args []string) error {
 		}
 	}
 
+	return nil
+}
+
+// Level
+func levelUsage() {
+	var u = `Usage: kapacitor level (debug|info|warn|error)
+
+	Sets the logging level on the kapacitord server.
+`
+	fmt.Fprintln(os.Stderr, u)
+}
+
+func doLevel(args []string) error {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "Must pass a log level")
+		levelUsage()
+		os.Exit(2)
+	}
+	v := url.Values{}
+	v.Add("level", args[0])
+	r, err := http.Post("http://localhost:9092/loglevel?"+v.Encode(), "text/plain", nil)
+	if err != nil {
+		return err
+	}
+	defer r.Body.Close()
+	// Decode valid response
+	type resp struct {
+		Error string `json:"Error"`
+	}
+	d := json.NewDecoder(r.Body)
+	rp := resp{}
+	d.Decode(&rp)
+	if rp.Error != "" {
+		return errors.New(rp.Error)
+	}
 	return nil
 }
 

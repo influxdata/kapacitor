@@ -59,10 +59,12 @@ type Server struct {
 	// Profiling
 	CPUProfile string
 	MemProfile string
+
+	Logger *log.Logger
 }
 
 // NewServer returns a new instance of Server built from a config.
-func NewServer(c *Config, buildInfo *BuildInfo) (*Server, error) {
+func NewServer(c *Config, buildInfo *BuildInfo, l *log.Logger) (*Server, error) {
 
 	s := &Server{
 		buildInfo:     *buildInfo,
@@ -73,6 +75,7 @@ func NewServer(c *Config, buildInfo *BuildInfo) (*Server, error) {
 		QueryExecutor: &queryexecutor{},
 
 		reportingDisabled: c.ReportingDisabled,
+		Logger:            l,
 	}
 
 	// Start Task Master
@@ -207,7 +210,7 @@ func (s *Server) Err() <-chan error { return s.err }
 func (s *Server) Open() error {
 	if err := func() error {
 		// Start profiling, if set.
-		startProfile(s.CPUProfile, s.MemProfile)
+		s.startProfile(s.CPUProfile, s.MemProfile)
 
 		for _, service := range s.Services {
 			if err := service.Open(); err != nil {
@@ -242,7 +245,7 @@ func (s *Server) Open() error {
 
 // Close shuts down the meta and data stores and all services.
 func (s *Server) Close() error {
-	stopProfile()
+	s.stopProfile()
 
 	// Close services to allow any inflight requests to complete
 	// and prevent new requests from being accepted.
@@ -263,7 +266,7 @@ func (s *Server) startServerReporting() {
 		default:
 		}
 		if err := s.MetaStore.WaitForLeader(30 * time.Second); err != nil {
-			log.Printf("no leader available for reporting: %s", err.Error())
+			s.Logger.Printf("E! no leader available for reporting: %s", err.Error())
 			time.Sleep(time.Second)
 			continue
 		}
@@ -290,13 +293,13 @@ var prof struct {
 }
 
 // StartProfile initializes the cpu and memory profile, if specified.
-func startProfile(cpuprofile, memprofile string) {
+func (s *Server) startProfile(cpuprofile, memprofile string) {
 	if cpuprofile != "" {
 		f, err := os.Create(cpuprofile)
 		if err != nil {
-			log.Fatalf("cpuprofile: %v", err)
+			s.Logger.Fatalf("E! cpuprofile: %v", err)
 		}
-		log.Printf("writing CPU profile to: %s\n", cpuprofile)
+		s.Logger.Printf("I! writing CPU profile to: %s\n", cpuprofile)
 		prof.cpu = f
 		pprof.StartCPUProfile(prof.cpu)
 	}
@@ -304,9 +307,9 @@ func startProfile(cpuprofile, memprofile string) {
 	if memprofile != "" {
 		f, err := os.Create(memprofile)
 		if err != nil {
-			log.Fatalf("memprofile: %v", err)
+			s.Logger.Fatalf("E! memprofile: %v", err)
 		}
-		log.Printf("writing mem profile to: %s\n", memprofile)
+		s.Logger.Printf("I! writing mem profile to: %s\n", memprofile)
 		prof.mem = f
 		runtime.MemProfileRate = 4096
 	}
@@ -314,16 +317,16 @@ func startProfile(cpuprofile, memprofile string) {
 }
 
 // StopProfile closes the cpu and memory profiles if they are running.
-func stopProfile() {
+func (s *Server) stopProfile() {
 	if prof.cpu != nil {
 		pprof.StopCPUProfile()
 		prof.cpu.Close()
-		log.Println("CPU profile stopped")
+		s.Logger.Println("I! CPU profile stopped")
 	}
 	if prof.mem != nil {
 		pprof.Lookup("heap").WriteTo(prof.mem, 0)
 		prof.mem.Close()
-		log.Println("mem profile stopped")
+		s.Logger.Println("I! mem profile stopped")
 	}
 }
 

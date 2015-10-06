@@ -4,19 +4,19 @@ type MapReduceFunc func() (mapF interface{}, reduceF interface{})
 
 type MapNode struct {
 	node
-	Func   interface{}
-	Fields []string
+	Func  interface{}
+	Field string
 }
 
-func NewMapNode(f interface{}, fields ...string) *MapNode {
+func NewMapNode(f interface{}, field string) *MapNode {
 	return &MapNode{
 		node: node{
 			desc:     "map",
 			wants:    BatchEdge,
 			provides: ReduceEdge,
 		},
-		Func:   f,
-		Fields: fields,
+		Func:  f,
+		Field: field,
 	}
 }
 

@@ -157,18 +157,18 @@ func (n *node) dot(buf *bytes.Buffer) {
 // Chaining methods
 //
 
-func (n *node) Map(f interface{}, fields ...string) (c Node) {
+func (n *node) Map(f interface{}, field string) (c Node) {
 	switch n.provides {
 	case StreamEdge:
 		panic("cannot MapReduce stream edge, did you forget to window the data?")
 	case BatchEdge:
-		c = NewMapNode(f, fields...)
+		c = NewMapNode(f, field)
 	}
 	n.linkChild(c)
 	return c
 }
 
-func (n *node) Reduce(f interface{}, fields ...string) (c Node) {
+func (n *node) Reduce(f interface{}) (c Node) {
 	switch n.provides {
 	case StreamEdge:
 		panic("cannot MapReduce stream edge, did you forget to window the data?")
@@ -179,7 +179,7 @@ func (n *node) Reduce(f interface{}, fields ...string) (c Node) {
 	return c
 }
 
-func (n *node) MapReduce(f MapReduceFunc, fields ...string) Node {
+func (n *node) MapReduce(f MapReduceFunc, field string) Node {
 	var m Node
 	var r Node
 	mf, rf := f()
@@ -187,7 +187,7 @@ func (n *node) MapReduce(f MapReduceFunc, fields ...string) Node {
 	case StreamEdge:
 		panic("cannot MapReduce stream edge, did you forget to window the data?")
 	case BatchEdge:
-		m = NewMapNode(mf, fields...)
+		m = NewMapNode(mf, field)
 		r = NewReduceNode(rf)
 	}
 	n.linkChild(m)

@@ -47,12 +47,12 @@ func (b *BatchNode) Query(batch BatchCollector) {
 		b.query.Start(now.Add(-1 * b.b.Period))
 		b.query.Stop(now)
 
-		b.l.Println("D@starting next batch query:", b.query.String())
+		b.logger.Println("D! starting next batch query:", b.query.String())
 
 		// Connect
 		con, err := b.et.tm.InfluxDBService.NewClient()
 		if err != nil {
-			b.l.Println("E@" + err.Error())
+			b.logger.Println("E! " + err.Error())
 			break
 		}
 		q := client.Query{
@@ -62,19 +62,19 @@ func (b *BatchNode) Query(batch BatchCollector) {
 		// Execute query
 		resp, err := con.Query(q)
 		if err != nil {
-			b.l.Println("E@" + err.Error())
+			b.logger.Println("E! " + err.Error())
 			return
 		}
 
 		if resp.Err != nil {
-			b.l.Println("E@" + resp.Err.Error())
+			b.logger.Println("E! " + resp.Err.Error())
 			return
 		}
 
 		// Collect batches
 		for _, res := range resp.Results {
 			if res.Err != nil {
-				b.l.Println("E@" + res.Err.Error())
+				b.logger.Println("E! " + res.Err.Error())
 				return
 			}
 			for _, series := range res.Series {
@@ -88,9 +88,14 @@ func (b *BatchNode) Query(batch BatchCollector) {
 					var t time.Time
 					for i, c := range series.Columns {
 						if c == "time" {
-							t, err = time.Parse(time.RFC3339, v[i].(string))
+							tStr, ok := v[i].(string)
+							if !ok {
+								b.logger.Printf("E! unexpected time value: %v", v[i])
+								return
+							}
+							t, err = time.Parse(time.RFC3339, tStr)
 							if err != nil {
-								b.l.Println("E@" + err.Error())
+								b.logger.Println("E! unexpected time format: " + err.Error())
 								return
 							}
 						} else {

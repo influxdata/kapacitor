@@ -1,4 +1,21 @@
-package log_writer
+/*
+	Provides an io.Writer that filters log messages based on a log level.
+
+	Valid log levels are: DEBUG, INFO, WARN, ERROR.
+
+	Log messages need to begin with a L! where L is one of D, I, W, or E.
+
+	Examples:
+		log.Println("D! this is a debug log")
+		log.Println("I! this is an info log")
+		log.Println("W! this is a warn log")
+		log.Println("E! this is an error log")
+
+	Simply pass a instance of wlog.Writer to log.New or use the helper wlog.New function.
+
+	The log level can be changed via the LogLevel variable or the SetLevel function.
+*/
+package wlog
 
 import (
 	"fmt"
@@ -17,7 +34,9 @@ const (
 	ERROR
 )
 
-const Delimeter = '@'
+const Delimeter = '!'
+
+var invalidMSG = []byte("log messages must have L! prefix where L is one of 'D', 'I', 'W', 'E'\n")
 
 var Levels = map[byte]Level{
 	'D': DEBUG,
@@ -26,7 +45,7 @@ var Levels = map[byte]Level{
 	'E': ERROR,
 }
 
-// The global log level.
+// The global and only log level. Log levels are not implemented per writer.
 var LogLevel = INFO
 
 // name to Level mappings
@@ -78,16 +97,14 @@ func (w *Writer) Write(buf []byte) (int, error) {
 				}
 			}
 			if w.start == -1 {
-				return w.w.Write([]byte("log messages must have L@ prefix where L is one of 'D', 'I', 'W', 'E'\n"))
+				return w.w.Write(invalidMSG)
 			}
 		}
 		l := Levels[buf[w.start]]
 		if l >= LogLevel {
-			n, err := w.w.Write(buf[:w.start])
-			if err != nil {
-				return n, err
-			}
-			return w.w.Write(buf[w.start+2:])
+			return w.w.Write(buf)
+		} else if l == 0 {
+			return w.w.Write(invalidMSG)
 		}
 	}
 	return 0, nil

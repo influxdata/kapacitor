@@ -10,7 +10,6 @@ import (
 	"log"
 	"net/http"
 	"net/http/pprof"
-	"os"
 	"strings"
 	"time"
 
@@ -20,6 +19,7 @@ import (
 	"github.com/influxdb/influxdb/meta"
 	"github.com/influxdb/influxdb/models"
 	"github.com/influxdb/influxdb/uuid"
+	"github.com/influxdb/kapacitor/wlog"
 )
 
 // statistics gathered by the httpd package.
@@ -64,11 +64,11 @@ type Handler struct {
 }
 
 // NewHandler returns a new instance of handler with routes.
-func NewHandler(requireAuthentication, loggingEnabled, writeTrace bool, statMap *expvar.Map) *Handler {
+func NewHandler(requireAuthentication, loggingEnabled, writeTrace bool, statMap *expvar.Map, l *log.Logger) *Handler {
 	h := &Handler{
 		methodMux:             make(map[string]*ServeMux),
 		requireAuthentication: requireAuthentication,
-		Logger:                log.New(os.Stderr, "[http] ", log.LstdFlags),
+		Logger:                l,
 		loggingEnabled:        loggingEnabled,
 		WriteTrace:            writeTrace,
 		statMap:               statMap,
@@ -94,6 +94,10 @@ func NewHandler(requireAuthentication, loggingEnabled, writeTrace bool, statMap 
 		Route{
 			"routes", // Display current API routes
 			"GET", "/:routes", true, true, h.serveRoutes,
+		},
+		Route{
+			"log-level", // Display current API routes
+			"POST", "/loglevel", true, true, h.serveLogLevel,
 		},
 		Route{
 			"404", // Catch all 404
@@ -191,6 +195,15 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// serveLogLevel sets the log level of the server
+func (h *Handler) serveLogLevel(w http.ResponseWriter, r *http.Request) {
+	l := r.URL.Query().Get("level")
+	err := wlog.SetLevel(l)
+	if err != nil {
+		HttpError(w, err.Error(), true, http.StatusBadRequest)
+	}
+}
+
 // serveRoutes returns a list of all routs and their methods
 func (h *Handler) serveRoutes(w http.ResponseWriter, r *http.Request) {
 	routes := make(map[string][]string)
@@ -245,14 +258,14 @@ func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user *meta.
 	b, err := ioutil.ReadAll(body)
 	if err != nil {
 		if h.WriteTrace {
-			h.Logger.Print("write handler unable to read bytes from request body")
+			h.Logger.Print("E! write handler unable to read bytes from request body")
 		}
 		h.writeError(w, influxql.Result{Err: err}, http.StatusBadRequest)
 		return
 	}
 	h.statMap.Add(statWriteRequestBytesReceived, int64(len(b)))
 	if h.WriteTrace {
-		h.Logger.Printf("write body received by handler: %s", string(b))
+		h.Logger.Printf("E! write body received by handler: %s", string(b))
 	}
 
 	h.serveWriteLine(w, r, b, user)
@@ -525,7 +538,7 @@ func logging(inner http.Handler, name string, weblog *log.Logger) http.Handler {
 		start := time.Now()
 		l := &responseLogger{w: w}
 		inner.ServeHTTP(l, r)
-		logLine := buildLogLine(l, r, start)
+		logLine := "I! " + buildLogLine(l, r, start)
 		weblog.Println(logLine)
 	})
 }
@@ -537,7 +550,7 @@ func recovery(inner http.Handler, name string, weblog *log.Logger) http.Handler 
 		inner.ServeHTTP(l, r)
 		if err := recover(); err != nil {
 			logLine := buildLogLine(l, r, start)
-			logLine = fmt.Sprintf(`%s [err:%s]`, logLine, err)
+			logLine = fmt.Sprintf("E! %s [err:%s]", logLine, err)
 			weblog.Println(logLine)
 		}
 	})
