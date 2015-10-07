@@ -1,14 +1,15 @@
 package kapacitor
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"sync"
 
-	"github.com/influxdb/kapacitor/wlog"
 	"github.com/influxdb/kapacitor/models"
 	"github.com/influxdb/kapacitor/pipeline"
+	"github.com/influxdb/kapacitor/wlog"
 )
 
 type StreamCollector interface {
@@ -92,7 +93,12 @@ func (e *Edge) NextMaps() *MapResult {
 
 func (e *Edge) recover(errp *error) {
 	if r := recover(); r != nil {
-		*errp = fmt.Errorf("%s", r)
+		msg := fmt.Sprintf("%s", r)
+		if msg == "send on closed channel" {
+			*errp = errors.New(msg)
+		} else {
+			panic(r)
+		}
 	}
 }
 
@@ -143,8 +149,10 @@ func (s *streamItr) Next() (time int64, value interface{}) {
 	if i >= len(s.batch) {
 		return -1, nil
 	}
-
 	p := s.batch[i]
+	if p == nil {
+		return -1, nil
+	}
 	time = p.Time.Unix()
 	value = p.Fields[s.field]
 	return

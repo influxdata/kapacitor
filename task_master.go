@@ -1,11 +1,14 @@
 package kapacitor
 
 import (
+	"log"
 	"net"
+	"os"
 
 	"github.com/influxdb/influxdb/client"
 	"github.com/influxdb/kapacitor/pipeline"
 	"github.com/influxdb/kapacitor/services/httpd"
+	"github.com/influxdb/kapacitor/wlog"
 )
 
 // An execution framework for  a set of tasks.
@@ -29,6 +32,8 @@ type TaskMaster struct {
 
 	// Executing tasks
 	tasks map[string]*ExecutingTask
+
+	logger *log.Logger
 }
 
 // Create a new Executor with a given clock.
@@ -40,6 +45,7 @@ func NewTaskMaster() *TaskMaster {
 		forks:   make(map[string]*Edge),
 		batches: make(map[string]*Edge),
 		tasks:   make(map[string]*ExecutingTask),
+		logger:  wlog.New(os.Stderr, "[tm] ", log.LstdFlags),
 	}
 }
 
@@ -74,6 +80,7 @@ func (tm *TaskMaster) StartTask(t *Task) (*ExecutingTask, error) {
 	}
 
 	tm.tasks[et.Task.Name] = et
+	tm.logger.Println("I! Started task:", t.Name)
 
 	return et, nil
 }
@@ -89,13 +96,17 @@ func (tm *TaskMaster) StopTask(name string) {
 			tm.DelFork(et.Task.Name)
 		}
 		et.stop()
+		tm.logger.Println("I! Stopped task:", name)
 	}
 }
 
 func (tm *TaskMaster) runForking() {
 	for p := tm.in.NextPoint(); p != nil; p = tm.in.NextPoint() {
-		for _, out := range tm.forks {
-			out.CollectPoint(p)
+		for name, out := range tm.forks {
+			err := out.CollectPoint(p)
+			if err != nil {
+				tm.StopTask(name)
+			}
 		}
 	}
 	for _, out := range tm.forks {
@@ -112,6 +123,11 @@ func (tm *TaskMaster) NewFork(name string) *Edge {
 	tm.forks[name] = e
 	return e
 }
+
 func (tm *TaskMaster) DelFork(name string) {
+	fork := tm.forks[name]
 	delete(tm.forks, name)
+	if fork != nil {
+		fork.Close()
+	}
 }

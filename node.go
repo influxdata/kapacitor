@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime"
 
-	"github.com/influxdb/kapacitor/wlog"
 	"github.com/influxdb/kapacitor/pipeline"
+	"github.com/influxdb/kapacitor/wlog"
 )
 
 // A node that can be  in an executor.
@@ -65,11 +66,14 @@ func (n *node) start() {
 			// Handle panic in runF
 			r := recover()
 			if r != nil {
-				err = fmt.Errorf("%s: %s", n.Name(), r)
+				trace := make([]byte, 512)
+				n := runtime.Stack(trace, false)
+				err = fmt.Errorf("%s: Trace:%s", r, string(trace[:n]))
 			}
 			// Propogate error up
 			if err != nil {
 				n.closeParentEdges()
+				n.logger.Println("E!", err)
 			}
 			n.errCh <- err
 		}()

@@ -6,11 +6,11 @@ import (
 )
 
 type Config struct {
-	URLs      []string
-	Username  string
-	Password  string
-	Timeout   time.Duration
-	Precision string
+	URLs      []string      `toml:"urls"`
+	Username  string        `toml:"username"`
+	Password  string        `toml:"password"`
+	Timeout   time.Duration `toml:"timeout"`
+	Precision string        `toml:"precision"`
 }
 
 func NewConfig() Config {

@@ -107,6 +107,14 @@ func NewHandler(requireAuthentication, loggingEnabled, writeTrace bool, statMap 
 			"404", // Catch all 404
 			"POST", "/", true, true, h.serve404,
 		},
+		Route{
+			"404", // Catch all 404
+			"DELETE", "/", true, true, h.serve404,
+		},
+		Route{
+			"404", // Catch all 404
+			"HEAD", "/", true, true, h.serve404,
+		},
 	})
 
 	return h

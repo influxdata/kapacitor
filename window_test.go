@@ -1,6 +1,8 @@
 package kapacitor
 
 import (
+	"log"
+	"os"
 	"testing"
 	"time"
 
@@ -8,10 +10,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var logger = log.New(os.Stderr, "[window] ", log.LstdFlags|log.Lshortfile)
+
 func TestWindowBuffer(t *testing.T) {
 	assert := assert.New(t)
 
-	buf := &windowBuffer{}
+	buf := &windowBuffer{logger: logger}
 
 	size := 100
 
@@ -48,15 +52,22 @@ func TestWindowBuffer(t *testing.T) {
 	assert.Equal(0, buf.size)
 
 	// fill buffer again
-	for i := 1; i <= size; i++ {
+	oldest := time.Unix(int64(size), 0)
+	for i := 1; i <= size*2; i++ {
 
-		t := time.Unix(int64(i), 0)
+		t := time.Unix(int64(i+size), 0)
 		p := models.NewPoint("TestWindowBuffer", models.NilGroup, nil, nil, t)
 		buf.insert(p)
 
 		assert.Equal(i, buf.size)
 
 		points := buf.points()
-		assert.Equal(i, len(points))
+		if assert.Equal(i, len(points)) {
+			for i, p := range points {
+				if assert.NotNil(p, "i:%d", i) {
+					assert.True(!p.Time.Before(oldest), "Point %s is not after oldest time %s", p.Time, oldest)
+				}
+			}
+		}
 	}
 }

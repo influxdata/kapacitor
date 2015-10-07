@@ -2,6 +2,7 @@ package kapacitor
 
 import (
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -39,7 +40,7 @@ func (w *WindowNode) runWindow() error {
 		wnd := windows[p.Group]
 		if wnd == nil {
 			wnd = &window{
-				buf:      &windowBuffer{},
+				buf:      &windowBuffer{logger: w.logger},
 				nextEmit: p.Time.Add(w.w.Every),
 				period:   w.w.Period,
 				every:    w.w.Every,
@@ -76,10 +77,14 @@ type windowBuffer struct {
 	start  int
 	stop   int
 	size   int
+	logger *log.Logger
 }
 
 // Insert a single point into the buffer.
 func (b *windowBuffer) insert(p *models.Point) {
+	if p == nil {
+		panic("do not insert nil values")
+	}
 	b.Lock()
 	defer b.Unlock()
 	if b.size == cap(b.window) {
@@ -96,7 +101,7 @@ func (b *windowBuffer) insert(p *models.Point) {
 		} else {
 			n := 0
 			n += copy(w, b.window[b.start:])
-			n += copy(w[b.start+1:], b.window[:b.stop])
+			n += copy(w[b.size-b.start:], b.window[:b.stop])
 			if n != b.size {
 				panic(fmt.Sprintf("did not copy all the data: copied: %d size: %d start: %d stop: %d\n", n, b.size, b.start, b.stop))
 			}
@@ -119,23 +124,6 @@ func (b *windowBuffer) insert(p *models.Point) {
 	}
 	b.size++
 	b.stop++
-	//b.check()
-}
-
-func (b *windowBuffer) check() {
-	if b.start < b.stop {
-		if b.size != b.stop-b.start {
-			panic(fmt.Sprintf("invalid size: size: %d start: %d stop: %d len: %d\n", b.size, b.start, b.stop, len(b.window)))
-		}
-	} else if b.start > b.stop {
-		if b.size != len(b.window)-b.start+b.stop {
-			panic(fmt.Sprintf("invalid size: size: %d start: %d stop: %d len: %d\n", b.size, b.start, b.stop, len(b.window)))
-		}
-	} else {
-		if b.size != 0 && b.size != len(b.window) {
-			panic(fmt.Sprintf("invalid size: size: %d start: %d stop: %d len: %d\n", b.size, b.start, b.stop, len(b.window)))
-		}
-	}
 }
 
 // Purge expired data from the window.
@@ -170,7 +158,6 @@ func (b *windowBuffer) purge(oldest time.Time) {
 			b.size = b.stop - b.start
 		}
 	}
-	//b.check()
 }
 
 // Returns a copy of the current buffer.
@@ -178,7 +165,10 @@ func (b *windowBuffer) points() []*models.Point {
 	b.Lock()
 	defer b.Unlock()
 	buf := make([]*models.Point, b.size)
-	if b.start <= b.stop {
+	if b.size == 0 {
+		return buf
+	}
+	if b.stop > b.start {
 		for i, p := range b.window[b.start:b.stop] {
 			buf[i] = p
 		}
@@ -190,7 +180,8 @@ func (b *windowBuffer) points() []*models.Point {
 			j++
 		}
 		for i := 0; i < b.stop; i++ {
-			buf[j] = b.window[i]
+			p := b.window[i]
+			buf[j] = p
 			j++
 		}
 	}

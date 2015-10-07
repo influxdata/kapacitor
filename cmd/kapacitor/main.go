@@ -544,14 +544,12 @@ func doDelete(args []string) error {
 	var paramName string
 	switch args[0] {
 	case "task":
-		baseURL = "http://localhost:9092/task"
+		baseURL = "http://localhost:9092/task?"
 		paramName = "name"
 	case "recording":
-		baseURL = "http://localhost:9092/recording"
+		baseURL = "http://localhost:9092/recording?"
 		paramName = "rid"
 	}
-
-	l.Println(args)
 
 	for _, arg := range args[1:] {
 		v := url.Values{}
