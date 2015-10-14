@@ -15,13 +15,6 @@ type WindowNode struct {
 	w *pipeline.WindowNode
 }
 
-type window struct {
-	buf      *windowBuffer
-	nextEmit time.Time
-	period   time.Duration
-	every    time.Duration
-}
-
 // Create a new  WindowNode, which windows data for a period of time and emits the window.
 func newWindowNode(et *ExecutingTask, n *pipeline.WindowNode) (*WindowNode, error) {
 	wn := &WindowNode{
@@ -36,14 +29,21 @@ func (w *WindowNode) runWindow() error {
 
 	windows := make(map[models.GroupID]*window)
 	// Loops through points windowing by group
-	for p := w.ins[0].NextPoint(); p != nil; p = w.ins[0].NextPoint() {
+	for p, ok := w.ins[0].NextPoint(); ok; p, ok = w.ins[0].NextPoint() {
 		wnd := windows[p.Group]
 		if wnd == nil {
+			tags := p.Tags
+			if p.Group == models.NilGroup {
+				tags = nil
+			}
 			wnd = &window{
 				buf:      &windowBuffer{logger: w.logger},
 				nextEmit: p.Time.Add(w.w.Every),
 				period:   w.w.Period,
 				every:    w.w.Every,
+				name:     p.Name,
+				group:    p.Group,
+				tags:     tags,
 			}
 			windows[p.Group] = wnd
 		}
@@ -59,21 +59,34 @@ func (w *WindowNode) runWindow() error {
 	return nil
 }
 
-func (w *window) emit(now time.Time) []*models.Point {
+type window struct {
+	buf      *windowBuffer
+	nextEmit time.Time
+	period   time.Duration
+	every    time.Duration
+	name     string
+	group    models.GroupID
+	tags     map[string]string
+}
+
+func (w *window) emit(now time.Time) models.Batch {
 	oldest := now.Add(-1 * w.period)
 	w.buf.purge(oldest)
 
 	w.nextEmit = w.nextEmit.Add(w.every)
 
-	points := w.buf.points()
+	batch := w.buf.batch()
+	batch.Name = w.name
+	batch.Group = w.group
+	batch.Tags = w.tags
 
-	return points
+	return batch
 }
 
 // implements a purpose built ring buffer for the window of points
 type windowBuffer struct {
 	sync.Mutex
-	window []*models.Point
+	window []models.Point
 	start  int
 	stop   int
 	size   int
@@ -81,16 +94,13 @@ type windowBuffer struct {
 }
 
 // Insert a single point into the buffer.
-func (b *windowBuffer) insert(p *models.Point) {
-	if p == nil {
-		panic("do not insert nil values")
-	}
+func (b *windowBuffer) insert(p models.Point) {
 	b.Lock()
 	defer b.Unlock()
 	if b.size == cap(b.window) {
 		//Increase our buffer
 		c := 2 * (b.size + 1)
-		w := make([]*models.Point, b.size+1, c)
+		w := make([]models.Point, b.size+1, c)
 		if b.size == 0 {
 			//do nothing
 		} else if b.stop > b.start {
@@ -161,29 +171,31 @@ func (b *windowBuffer) purge(oldest time.Time) {
 }
 
 // Returns a copy of the current buffer.
-func (b *windowBuffer) points() []*models.Point {
+func (b *windowBuffer) batch() models.Batch {
 	b.Lock()
 	defer b.Unlock()
-	buf := make([]*models.Point, b.size)
+	batch := models.Batch{}
 	if b.size == 0 {
-		return buf
+		return batch
 	}
+	batch.Points = make([]models.TimeFields, b.size)
 	if b.stop > b.start {
 		for i, p := range b.window[b.start:b.stop] {
-			buf[i] = p
+			batch.Points[i] = models.TimeFields{Time: p.Time, Fields: p.Fields}
 		}
 	} else {
 		j := 0
 		l := len(b.window)
 		for i := b.start; i < l; i++ {
-			buf[j] = b.window[i]
+			p := b.window[i]
+			batch.Points[j] = models.TimeFields{Time: p.Time, Fields: p.Fields}
 			j++
 		}
 		for i := 0; i < b.stop; i++ {
 			p := b.window[i]
-			buf[j] = p
+			batch.Points[j] = models.TimeFields{Time: p.Time, Fields: p.Fields}
 			j++
 		}
 	}
-	return buf
+	return batch
 }

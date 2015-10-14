@@ -26,7 +26,8 @@ func (u *UnionNode) runUnion() error {
 		go func(e *Edge) {
 			switch u.Wants() {
 			case pipeline.StreamEdge:
-				for p := e.NextPoint(); p != nil; p = e.NextPoint() {
+				for p, ok := e.NextPoint(); ok; p, ok = e.NextPoint() {
+					p.Name = u.u.NewName
 					for _, out := range u.outs {
 						err := out.CollectPoint(p)
 						if err != nil {
@@ -36,7 +37,8 @@ func (u *UnionNode) runUnion() error {
 					}
 				}
 			case pipeline.BatchEdge:
-				for b := e.NextBatch(); b != nil; b = e.NextBatch() {
+				for b, ok := e.NextBatch(); ok; b, ok = e.NextBatch() {
+					b.Name = u.u.NewName
 					for _, out := range u.outs {
 						err := out.CollectBatch(b)
 						if err != nil {

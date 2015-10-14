@@ -27,9 +27,9 @@ type expression struct {
 	t     *expr.Tree
 }
 
-func (x *expression) Eval(p *models.Point) (*models.Point, error) {
+func (x *expression) Eval(fields models.Fields) (models.Fields, error) {
 	vars := make(expr.Vars)
-	for k, v := range p.Fields {
+	for k, v := range fields {
 		if f, ok := v.(float64); ok {
 			vars[k] = f
 		} else {
@@ -37,18 +37,11 @@ func (x *expression) Eval(p *models.Point) (*models.Point, error) {
 		}
 	}
 
-	fields := make(map[string]interface{}, 1)
+	nfields := make(models.Fields, 1)
 	v, err := x.t.EvalNumber(vars, nil)
 	if err != nil {
 		return nil, err
 	}
-	fields[x.field] = v
-	np := models.NewPoint(
-		p.Name,
-		p.Group,
-		p.Tags,
-		fields,
-		p.Time,
-	)
-	return np, nil
+	nfields[x.field] = v
+	return nfields, nil
 }

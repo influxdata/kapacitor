@@ -28,8 +28,13 @@ func newGroupByNode(et *ExecutingTask, n *pipeline.GroupByNode) (*GroupByNode, e
 func (g *GroupByNode) runGroupBy() error {
 	switch g.Wants() {
 	case pipeline.StreamEdge:
-		for pt := g.ins[0].NextPoint(); pt != nil; pt = g.ins[0].NextPoint() {
+		for pt, ok := g.ins[0].NextPoint(); ok; pt, ok = g.ins[0].NextPoint() {
 			pt.Group = models.TagsToGroupID(g.dimensions, pt.Tags)
+			tags := make(map[string]string, len(g.dimensions))
+			for _, dim := range g.dimensions {
+				tags[dim] = pt.Tags[dim]
+			}
+			pt.Tags = tags
 			for _, child := range g.outs {
 				err := child.CollectPoint(pt)
 				if err != nil {

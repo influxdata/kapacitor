@@ -14,11 +14,11 @@ import (
 	"github.com/influxdb/kapacitor/services/influxdb"
 	"github.com/influxdb/kapacitor/services/replay"
 	"github.com/influxdb/kapacitor/services/task_store"
+	"github.com/influxdb/kapacitor/services/udp"
 
 	"github.com/influxdb/influxdb/services/collectd"
 	"github.com/influxdb/influxdb/services/graphite"
 	"github.com/influxdb/influxdb/services/opentsdb"
-	"github.com/influxdb/influxdb/services/udp"
 )
 
 // Config represents the configuration format for the kapacitord binary.
@@ -70,12 +70,18 @@ func NewDemoConfig() (*Config, error) {
 
 	c.Replay.Dir = filepath.Join(homeDir, ".kapacitor", c.Replay.Dir)
 	c.Task.Dir = filepath.Join(homeDir, ".kapacitor", c.Task.Dir)
+	c.InfluxDB.Dir = filepath.Join(homeDir, ".kapacitor", c.InfluxDB.Dir)
+
+	c.Hostname, _ = os.Hostname()
 
 	return c, nil
 }
 
 // Validate returns an error if the config is invalid.
 func (c *Config) Validate() error {
+	if c.Hostname == "" {
+		return fmt.Errorf("must configure valid hostname")
+	}
 	err := c.Replay.Validate()
 	if err != nil {
 		return err

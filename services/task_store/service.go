@@ -26,8 +26,10 @@ var (
 type Service struct {
 	dbpath       string
 	db           *bolt.DB
+	routes       []httpd.Route
 	HTTPDService interface {
 		AddRoutes([]httpd.Route) error
+		DelRoutes([]httpd.Route)
 	}
 	TaskMaster interface {
 		StartTask(t *kapacitor.Task) (*kapacitor.ExecutingTask, error)
@@ -58,7 +60,7 @@ func (ts *Service) Open() error {
 	ts.db = db
 
 	// Define API routes
-	routes := []httpd.Route{
+	ts.routes = []httpd.Route{
 		{
 			"task-list",
 			"GET",
@@ -100,7 +102,7 @@ func (ts *Service) Open() error {
 			ts.handleDisable,
 		},
 	}
-	err = ts.HTTPDService.AddRoutes(routes)
+	err = ts.HTTPDService.AddRoutes(ts.routes)
 	if err != nil {
 		return err
 	}
@@ -118,6 +120,7 @@ func (ts *Service) Open() error {
 }
 
 func (ts *Service) Close() error {
+	ts.HTTPDService.DelRoutes(ts.routes)
 	if ts.db != nil {
 		return ts.db.Close()
 	}

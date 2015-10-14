@@ -1,18 +1,53 @@
 package influxdb
 
 import (
+	"fmt"
+	"log"
+	"net"
 	"net/url"
+	"os"
+	"strings"
 
 	"github.com/influxdb/influxdb/client"
+	"github.com/influxdb/influxdb/cluster"
+	"github.com/influxdb/kapacitor/services/udp"
+	"github.com/influxdb/kapacitor/wlog"
+)
+
+const (
+	subName = "kapacitor"
 )
 
 // Handles requests to write or read from an InfluxDB cluster
 type Service struct {
-	configs []client.Config
-	i       int
+	configs    []client.Config
+	i          int
+	configSubs map[subEntry]bool
+	hostname   string
+	logger     *log.Logger
+
+	PointsWriter interface {
+		WritePoints(p *cluster.WritePointsRequest) error
+	}
+
+	services []interface {
+		Open() error
+		Close() error
+	}
 }
 
-func NewService(c Config) *Service {
+type subEntry struct {
+	db   string
+	rp   string
+	name string
+}
+
+type subInfo struct {
+	Mode         string
+	Destinations []string
+}
+
+func NewService(c Config, hostname string) *Service {
 	configs := make([]client.Config, len(c.URLs))
 	for i, u := range c.URLs {
 		host, _ := url.Parse(u)
@@ -25,15 +60,34 @@ func NewService(c Config) *Service {
 			Precision: c.Precision,
 		}
 	}
-	return &Service{configs: configs}
+	subs := make(map[subEntry]bool, len(c.Subscriptions))
+	for db, rps := range c.Subscriptions {
+		for _, rp := range rps {
+			se := subEntry{db, rp, subName}
+			subs[se] = true
+		}
+	}
+	return &Service{
+		configs:    configs,
+		configSubs: subs,
+		hostname:   hostname,
+		logger:     wlog.New(os.Stderr, "[influxdb] ", log.LstdFlags),
+	}
 }
 
 func (s *Service) Open() error {
-	return nil
+	return s.linkSubscriptions()
 }
 
 func (s *Service) Close() error {
-	return nil
+	var lastErr error
+	for _, service := range s.services {
+		err := service.Close()
+		if err != nil {
+			lastErr = err
+		}
+	}
+	return lastErr
 }
 
 func (s *Service) NewClient() (c *client.Client, err error) {
@@ -54,4 +108,182 @@ func (s *Service) NewClient() (c *client.Client, err error) {
 		return
 	}
 	return
+}
+
+func (s *Service) linkSubscriptions() error {
+	cli, err := s.NewClient()
+	if err != nil {
+		return err
+	}
+
+	// Get all databases and retention policies
+	var allSubs []subEntry
+	resp, err := s.execQuery(cli, "SHOW DATABASES")
+	if err != nil {
+		return err
+	}
+
+	s.logger.Println("D! configSubs", s.configSubs)
+
+	if len(resp.Results) == 1 && len(resp.Results[0].Series) == 1 && len(resp.Results[0].Series[0].Values) > 0 {
+		dbs := resp.Results[0].Series[0].Values
+		for _, v := range dbs {
+			dbname := v[0].(string)
+
+			rpResp, err := s.execQuery(cli, fmt.Sprintf(`SHOW RETENTION POLICIES ON "%s"`, dbname))
+			if err != nil {
+				return err
+			}
+			if len(rpResp.Results) == 1 && len(rpResp.Results[0].Series) == 1 && len(rpResp.Results[0].Series[0].Values) > 0 {
+				rps := rpResp.Results[0].Series[0].Values
+				for _, v := range rps {
+					rpname := v[0].(string)
+
+					se := subEntry{
+						db:   dbname,
+						rp:   rpname,
+						name: subName,
+					}
+					allSubs = append(allSubs, se)
+				}
+			}
+
+		}
+	}
+
+	s.logger.Println("D! allSubs", allSubs)
+
+	// Get all existing subscriptions
+	resp, err = s.execQuery(cli, "SHOW SUBSCRIPTIONS")
+	if err != nil {
+		return err
+	}
+	existingSubs := make(map[subEntry]subInfo)
+	for _, res := range resp.Results {
+		for _, series := range res.Series {
+			for _, v := range series.Values {
+				se := subEntry{
+					db: series.Name,
+				}
+				si := subInfo{}
+				for i, c := range series.Columns {
+					switch c {
+					case "retention_policy":
+						se.rp = v[i].(string)
+					case "name":
+						se.name = v[i].(string)
+					case "mode":
+						si.Mode = v[i].(string)
+					case "destinations":
+						destinations := v[i].([]interface{})
+						si.Destinations = make([]string, len(destinations))
+						for i := range destinations {
+							si.Destinations[i] = destinations[i].(string)
+						}
+					}
+					if se.name == subName {
+						existingSubs[se] = si
+					}
+				}
+			}
+		}
+	}
+
+	s.logger.Println("D! existingSubs", existingSubs)
+
+	// Compare to configured list
+	startedSubs := make(map[subEntry]bool)
+	all := len(s.configSubs) == 0
+	for se, si := range existingSubs {
+		if s.configSubs[se] || all {
+			// Check if this kapacitor instance is in the list of hosts
+			for _, dest := range si.Destinations {
+				u, err := url.Parse(dest)
+				if err != nil {
+					s.logger.Println("E! invalid URL in subscription destinations:", err)
+					continue
+				}
+				pair := strings.Split(u.Host, ":")
+				if pair[0] == s.hostname {
+					_, err := s.startListener(se.db, se.rp, *u)
+					if err != nil {
+						s.logger.Println("E! failed to start listener:", err)
+					}
+					startedSubs[se] = true
+					break
+				}
+			}
+		}
+	}
+	// create and start any new subscriptions
+	for _, se := range allSubs {
+		// If we have been configured to subscribe and the subscription is not started yet.
+		if (s.configSubs[se] || all) && !startedSubs[se] {
+			u, err := url.Parse("udp://:0")
+			if err != nil {
+				return fmt.Errorf("could not create valid destination url, is hostname correct? err: %s", err)
+			}
+
+			addr, err := s.startListener(se.db, se.rp, *u)
+			if err != nil {
+				s.logger.Println("E! failed to start listener:", err)
+			}
+
+			// Get port from addr
+			parts := strings.Split(addr.String(), ":")
+			port := parts[len(parts)-1]
+			destination := "udp://" + s.hostname + ":" + port
+
+			_, err = s.execQuery(
+				cli,
+				fmt.Sprintf(`CREATE SUBSCRIPTION "%s" ON "%s"."%s" DESTINATIONS ANY '%s'`,
+					se.name,
+					se.db,
+					se.rp,
+					destination,
+				),
+			)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *Service) startListener(db, rp string, u url.URL) (net.Addr, error) {
+	switch u.Scheme {
+	case "udp":
+
+		c := udp.Config{}
+		c.Enabled = true
+		c.BindAddress = u.Host
+		c.Database = db
+		c.RetentionPolicy = rp
+
+		service := udp.NewService(c)
+		service.PointsWriter = s.PointsWriter
+		err := service.Open()
+		if err != nil {
+			return nil, err
+		}
+		s.services = append(s.services, service)
+		return service.Addr(), nil
+	}
+	return nil, fmt.Errorf("unsupported scheme %q", u.Scheme)
+}
+
+func (s *Service) execQuery(cli *client.Client, q string) (*client.Response, error) {
+	query := client.Query{
+		Command: q,
+	}
+	resp, err := cli.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	if resp.Err != nil {
+		return nil, resp.Err
+	}
+	return resp, nil
 }

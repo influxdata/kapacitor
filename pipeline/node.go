@@ -157,6 +157,12 @@ func (n *node) dot(buf *bytes.Buffer) {
 // Chaining methods
 //
 
+func (n *node) Where(predicate string) Node {
+	w := newWhereNode(n.provides, predicate)
+	n.linkChild(w)
+	return w
+}
+
 func (n *node) Map(f interface{}, field string) (c Node) {
 	switch n.provides {
 	case StreamEdge:

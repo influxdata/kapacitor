@@ -13,6 +13,7 @@ import (
 
 // An execution framework for  a set of tasks.
 type TaskMaster struct {
+	//Stream       map[DBRP]StreamCollector
 	Stream       StreamCollector
 	HTTPDService interface {
 		AddRoutes([]httpd.Route) error
@@ -101,7 +102,7 @@ func (tm *TaskMaster) StopTask(name string) {
 }
 
 func (tm *TaskMaster) runForking() {
-	for p := tm.in.NextPoint(); p != nil; p = tm.in.NextPoint() {
+	for p, ok := tm.in.NextPoint(); ok; p, ok = tm.in.NextPoint() {
 		for name, out := range tm.forks {
 			err := out.CollectPoint(p)
 			if err != nil {

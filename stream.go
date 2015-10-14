@@ -12,6 +12,9 @@ type StreamNode struct {
 	node
 	s         *pipeline.StreamNode
 	condition influxql.Expr
+	db        string
+	rp        string
+	name      string
 }
 
 // Create a new  StreamNode which filters data from a source.
@@ -21,15 +24,36 @@ func newStreamNode(et *ExecutingTask, n *pipeline.StreamNode) (*StreamNode, erro
 		s:    n,
 	}
 	sn.node.runF = sn.runStream
-	if sn.s.Where != "" {
-		//Parse where condition
-		var err error
-		sn.condition, err = parseWhereCondition(sn.s.Where)
+	var err error
+	if sn.s.From != "" {
+		sn.db, sn.rp, sn.name, err = parseFromClause(sn.s.From)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing where %q %s", sn.s.Where, err)
+			return nil, fmt.Errorf("error parsing FROM clause %q %v", sn.s.From, err)
+		}
+	}
+	if sn.s.Predicate != "" {
+		//Parse where condition
+		sn.condition, err = parseWhereCondition(sn.s.Predicate)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing WHERE clause  %q %v", sn.s.Predicate, err)
 		}
 	}
 	return sn, nil
+}
+
+func parseFromClause(from string) (db, rp, mm string, err error) {
+	//create fake but complete query for parsing
+	query := "select v from " + from
+	s, err := influxql.ParseStatement(query)
+	if err != nil {
+		return "", "", "", err
+	}
+	if slct, ok := s.(*influxql.SelectStatement); ok && len(slct.Sources) == 1 {
+		if m, ok := slct.Sources[0].(*influxql.Measurement); ok {
+			return m.Database, m.RetentionPolicy, m.Name, nil
+		}
+	}
+	return "", "", "", fmt.Errorf("invalid from condition: %q", from)
 }
 
 func parseWhereCondition(where string) (influxql.Expr, error) {
@@ -47,7 +71,7 @@ func parseWhereCondition(where string) (influxql.Expr, error) {
 
 func (s *StreamNode) runStream() error {
 
-	for pt := s.ins[0].NextPoint(); pt != nil; pt = s.ins[0].NextPoint() {
+	for pt, ok := s.ins[0].NextPoint(); ok; pt, ok = s.ins[0].NextPoint() {
 		if s.matches(pt) {
 			for _, child := range s.outs {
 				err := child.CollectPoint(pt)
@@ -60,8 +84,14 @@ func (s *StreamNode) runStream() error {
 	return nil
 }
 
-func (s *StreamNode) matches(p *models.Point) bool {
-	if s.s.From != "" && p.Name != s.s.From {
+func (s *StreamNode) matches(p models.Point) bool {
+	if s.db != "" && p.Database != s.db {
+		return false
+	}
+	if s.rp != "" && p.RetentionPolicy != s.rp {
+		return false
+	}
+	if s.name != "" && p.Name != s.name {
 		return false
 	}
 	if !s.evalExpr(p, s.condition) {
@@ -71,7 +101,7 @@ func (s *StreamNode) matches(p *models.Point) bool {
 }
 
 //evaluate a given influxql.Expr a against a Point
-func (s *StreamNode) evalExpr(p *models.Point, expr influxql.Expr) bool {
+func (s *StreamNode) evalExpr(p models.Point, expr influxql.Expr) bool {
 	if expr == nil {
 		return true
 	}

@@ -85,13 +85,13 @@ func (r *replaySource) ReplayStream(stream StreamCollector) {
 			}
 			t := points[0].Time().Add(diff).UTC()
 			mp := points[0]
-			p := models.NewPoint(
-				mp.Name(),
-				models.NilGroup,
-				mp.Tags(),
-				mp.Fields(),
-				t,
-			)
+			p := models.Point{
+				Name:   mp.Name(),
+				Group:  models.NilGroup,
+				Tags:   mp.Tags(),
+				Fields: models.Fields(mp.Fields()),
+				Time:   t,
+			}
 			r.clck.Until(t)
 			err = stream.CollectPoint(p)
 			if err != nil {
@@ -136,14 +136,18 @@ func (r *replaySource) ReplayBatch(batch BatchCollector) {
 			var lastTime time.Time
 			for _, res := range br.Results {
 				for _, series := range res.Series {
-					b := make([]*models.Point, len(series.Values))
-					groupID := models.TagsToGroupID(
-						models.SortedKeys(series.Tags),
-						series.Tags,
-					)
+					b := models.Batch{
+						Name: series.Name,
+						Group: models.TagsToGroupID(
+							models.SortedKeys(series.Tags),
+							series.Tags,
+						),
+						Tags:   series.Tags,
+						Points: make([]models.TimeFields, len(series.Values)),
+					}
 					for i, v := range series.Values {
-						fields := make(map[string]interface{})
-						var t time.Time
+						tf := models.TimeFields{}
+						tf.Fields = make(models.Fields, len(series.Columns))
 						for i, c := range series.Columns {
 							if c == "time" {
 								st, err := time.Parse(time.RFC3339, v[i].(string))
@@ -151,19 +155,13 @@ func (r *replaySource) ReplayBatch(batch BatchCollector) {
 									r.err <- err
 									return
 								}
-								t = st.Add(diff).UTC()
+								tf.Time = st.Add(diff).UTC()
 							} else {
-								fields[c] = v[i]
+								tf.Fields[c] = v[i]
 							}
 						}
-						lastTime = t
-						b[i] = models.NewPoint(
-							series.Name,
-							groupID,
-							series.Tags,
-							fields,
-							t,
-						)
+						lastTime = tf.Time
+						b.Points[i] = tf
 					}
 					r.clck.Until(lastTime)
 					batch.CollectBatch(b)

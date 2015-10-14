@@ -6,7 +6,7 @@ type StreamNode struct {
 	// Which database retenion policy and measuremnt to require.
 	From string
 	// An influxql Where condition to further filter the stream.
-	Where string
+	Predicate string
 }
 
 func newStreamNode() *StreamNode {
@@ -23,4 +23,9 @@ func (s *StreamNode) Fork() *StreamNode {
 	c := newStreamNode()
 	s.linkChild(c)
 	return c
+}
+
+func (s *StreamNode) Where(predicate string) Node {
+	s.Predicate = predicate
+	return s
 }

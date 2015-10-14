@@ -25,7 +25,10 @@ func (j *JoinNode) runJoin() error {
 	switch j.Wants() {
 	case pipeline.StreamEdge:
 
-		groups := []map[models.GroupID]*models.Point{make(map[models.GroupID]*models.Point), make(map[models.GroupID]*models.Point)}
+		groups := []map[models.GroupID]*models.Point{
+			make(map[models.GroupID]*models.Point),
+			make(map[models.GroupID]*models.Point),
+		}
 		n := 0
 		m := 1
 
@@ -33,8 +36,8 @@ func (j *JoinNode) runJoin() error {
 
 		for !empty[0] || !empty[1] {
 
-			pn := j.ins[n].NextPoint()
-			if pn == nil {
+			pn, ok := j.ins[n].NextPoint()
+			if !ok {
 				empty[n] = true
 				n, m = m, n
 				continue
@@ -42,19 +45,11 @@ func (j *JoinNode) runJoin() error {
 
 			pm := groups[m][pn.Group]
 			if pm == nil {
-				groups[n][pn.Group] = pn
+				groups[n][pn.Group] = &pn
 				n, m = m, n
 				continue
 			}
 			groups[m][pn.Group] = nil
-
-			tags := make(map[string]string, len(pn.Tags)+len(pm.Tags))
-			for k, v := range pn.Tags {
-				tags[k] = v
-			}
-			for k, v := range pm.Tags {
-				tags[k] = v
-			}
 
 			fields := make(map[string]interface{}, len(pn.Fields)+len(pm.Fields))
 			for k, v := range pn.Fields {
@@ -63,13 +58,13 @@ func (j *JoinNode) runJoin() error {
 			for k, v := range pm.Fields {
 				fields[j.j.Names[m]+"."+k] = v
 			}
-			p := models.NewPoint(
-				j.j.Rename,
-				pn.Group,
-				tags,
-				fields,
-				pn.Time,
-			)
+			p := models.Point{
+				Name:   j.j.Rename,
+				Group:  pn.Group,
+				Tags:   pn.Tags,
+				Fields: fields,
+				Time:   pn.Time,
+			}
 
 			for _, out := range j.outs {
 				err := out.CollectPoint(p)

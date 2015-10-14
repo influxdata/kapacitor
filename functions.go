@@ -13,12 +13,12 @@ type influxqlMapReducers struct {
 	Distinct,
 	Mean,
 	Median,
-	Min,
-	Max,
+	//Min,
+	//Max,
 	Spread,
-	Stddev,
-	First,
-	Last pipeline.MapReduceFunc
+	Stddev pipeline.MapReduceFunc
+	//First,
+	//Last pipeline.MapReduceFunc
 }
 
 type influxqlMappers struct {
@@ -27,12 +27,12 @@ type influxqlMappers struct {
 	Distinct,
 	Mean,
 	Median,
-	Min,
-	Max,
+	//Min,
+	//Max,
 	Spread,
-	Stddev,
-	First,
-	Last MapFunc
+	Stddev MapFunc
+	//First,
+	//Last MapFunc
 }
 
 type influxqlReducers struct {
@@ -41,12 +41,12 @@ type influxqlReducers struct {
 	Distinct,
 	Mean,
 	Median,
-	Min,
-	Max,
+	//Min,
+	//Max,
 	Spread,
-	Stddev,
-	First,
-	Last ReduceFunc
+	Stddev ReduceFunc
+	//First,
+	//Last ReduceFunc
 }
 
 func newInfluxQL() *influxqlMapReducers {
@@ -57,12 +57,12 @@ func newInfluxQL() *influxqlMapReducers {
 			Distinct: mapDistinct,
 			Mean:     mapMean,
 			Median:   mapStddev,
-			Min:      mapMin,
-			Max:      mapMax,
-			Spread:   mapSpread,
-			Stddev:   mapStddev,
-			First:    mapFirst,
-			Last:     mapLast,
+			//Min:      mapMin,
+			//Max:      mapMax,
+			Spread: mapSpread,
+			Stddev: mapStddev,
+			//First:    mapFirst,
+			//Last:     mapLast,
 		},
 		Reduce: influxqlReducers{
 			Sum:      reduceSum,
@@ -70,24 +70,24 @@ func newInfluxQL() *influxqlMapReducers {
 			Distinct: reduceDistinct,
 			Mean:     reduceMean,
 			Median:   reduceMedian,
-			Min:      reduceMin,
-			Max:      reduceMax,
-			Spread:   reduceSpread,
-			Stddev:   reduceStddev,
-			First:    reduceFirst,
-			Last:     reduceLast,
+			//Min:      reduceMin,
+			//Max:      reduceMax,
+			Spread: reduceSpread,
+			Stddev: reduceStddev,
+			//First:    reduceFirst,
+			//Last:     reduceLast,
 		},
 		Sum:      mrSum,
 		Count:    mrCount,
 		Distinct: mrDistinct,
 		Mean:     mrMean,
 		Median:   mrMedian,
-		Min:      mrMin,
-		Max:      mrMax,
-		Spread:   mrSpread,
-		Stddev:   mrStddev,
-		First:    mrFirst,
-		Last:     mrLast,
+		//Min:      mrMin,
+		//Max:      mrMax,
+		Spread: mrSpread,
+		Stddev: mrStddev,
+		//First:    mrFirst,
+		//Last:     mrLast,
 	}
 }
 
@@ -116,14 +116,14 @@ var reduceMedian = reduce(tsdb.ReduceMedian, "median")
 var mrMedian = mr(mapStddev, reduceMedian)
 
 // min
-var reduceMin = reduce(tsdb.ReduceMin, "min")
-var mapMin = MapFunc(tsdb.MapMin)
-var mrMin = mr(mapMin, reduceMin)
+//var reduceMin = reduce(tsdb.ReduceMin, "min")
+//var mapMin = MapFunc(tsdb.MapMin)
+//var mrMin = mr(mapMin, reduceMin)
 
 // max
-var reduceMax = reduce(tsdb.ReduceMax, "max")
-var mapMax = MapFunc(tsdb.MapMax)
-var mrMax = mr(mapMax, reduceMax)
+//var reduceMax = reduce(tsdb.ReduceMax, "max")
+//var mapMax = MapFunc(tsdb.MapMax)
+//var mrMax = mr(mapMax, reduceMax)
 
 // spread
 var reduceSpread = reduce(tsdb.ReduceSpread, "spread")
@@ -136,14 +136,14 @@ var mapStddev = MapFunc(tsdb.MapStddev)
 var mrStddev = mr(mapStddev, reduceStddev)
 
 // first
-var reduceFirst = reduce(tsdb.ReduceFirst, "first")
-var mapFirst = MapFunc(tsdb.MapFirst)
-var mrFirst = mr(mapFirst, reduceFirst)
+//var reduceFirst = reduce(tsdb.ReduceFirst, "first")
+//var mapFirst = MapFunc(tsdb.MapFirst)
+//var mrFirst = mr(mapFirst, reduceFirst)
 
 // last
-var reduceLast = reduce(tsdb.ReduceLast, "last")
-var mapLast = MapFunc(tsdb.MapLast)
-var mrLast = mr(mapLast, reduceLast)
+//var reduceLast = reduce(tsdb.ReduceLast, "last")
+//var mapLast = MapFunc(tsdb.MapLast)
+//var mrLast = mr(mapLast, reduceLast)
 
 // top
 //var reduceTop = reduce(tsdb.ReduceTop,  "top")

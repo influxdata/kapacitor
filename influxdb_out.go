@@ -23,15 +23,21 @@ func newInfluxDBOutNode(et *ExecutingTask, n *pipeline.InfluxDBOutNode) (*Influx
 func (i *InfluxDBOutNode) runOut() error {
 	switch i.Wants() {
 	case pipeline.StreamEdge:
-		for p := i.ins[0].NextPoint(); p != nil; p = i.ins[0].NextPoint() {
-			err := i.write([]*models.Point{p})
+		for p, ok := i.ins[0].NextPoint(); ok; p, ok = i.ins[0].NextPoint() {
+			batch := models.Batch{
+				Name:   p.Name,
+				Group:  p.Group,
+				Tags:   p.Tags,
+				Points: []models.TimeFields{{Time: p.Time, Fields: p.Fields}},
+			}
+			err := i.write(batch)
 			if err != nil {
 				return err
 			}
 		}
 	case pipeline.BatchEdge:
-		for w := i.ins[0].NextBatch(); w != nil; w = i.ins[0].NextBatch() {
-			err := i.write(w)
+		for b, ok := i.ins[0].NextBatch(); ok; b, ok = i.ins[0].NextBatch() {
+			err := i.write(b)
 			if err != nil {
 				return err
 			}
@@ -40,19 +46,21 @@ func (i *InfluxDBOutNode) runOut() error {
 	return nil
 }
 
-func (i *InfluxDBOutNode) write(pts []*models.Point) error {
+func (i *InfluxDBOutNode) write(batch models.Batch) error {
 
+	i.logger.Println("D! batch", batch)
 	c, err := i.et.tm.InfluxDBService.NewClient()
 	if err != nil {
 		return err
 	}
-	points := make([]client.Point, len(pts))
-	for j, p := range pts {
+	points := make([]client.Point, len(batch.Points))
+	for j, p := range batch.Points {
 		points[j] = client.Point{
 			Measurement: i.i.Measurement,
-			Tags:        p.Tags,
+			Tags:        batch.Tags,
 			Time:        p.Time,
 			Fields:      p.Fields,
+			Precision:   i.i.Precision,
 		}
 	}
 
@@ -62,6 +70,7 @@ func (i *InfluxDBOutNode) write(pts []*models.Point) error {
 		RetentionPolicy:  i.i.RetentionPolicy,
 		WriteConsistency: i.i.WriteConsistency,
 		Tags:             i.i.Tags,
+		Precision:        i.i.Precision,
 	}
 	_, err = c.Write(bp)
 	return err

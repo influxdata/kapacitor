@@ -32,6 +32,7 @@ const (
 	INFO
 	WARN
 	ERROR
+	OFF
 )
 
 const Delimeter = '!'
@@ -54,6 +55,7 @@ var levels = map[string]Level{
 	"INFO":  INFO,
 	"WARN":  WARN,
 	"ERROR": ERROR,
+	"OFF":   OFF,
 }
 
 // Set the log level via a string name. To set it directly use 'LogLevel'.

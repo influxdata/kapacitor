@@ -18,14 +18,12 @@ import (
 	imodels "github.com/influxdb/influxdb/models"
 	"github.com/influxdb/kapacitor"
 	"github.com/influxdb/kapacitor/clock"
-	"github.com/influxdb/kapacitor/models"
 	"github.com/influxdb/kapacitor/services/httpd"
+	"github.com/influxdb/kapacitor/wlog"
 	"github.com/stretchr/testify/assert"
 )
 
 var httpService *httpd.Service
-
-var NG = models.NilGroup
 
 func init() {
 	// create API server
@@ -33,12 +31,6 @@ func init() {
 	err := httpService.Open()
 	if err != nil {
 		panic(err)
-	}
-}
-
-func nilGroup(pts []*models.Point) map[models.GroupID][]*models.Point {
-	return map[models.GroupID][]*models.Point{
-		NG: pts,
 	}
 }
 
@@ -55,12 +47,7 @@ stream
 	.httpOut("TestWindowDataByTime");
 `
 
-	tags := map[string]string{
-		"type": "idle",
-		"host": "serverA",
-	}
-
-	values := []float64{
+	nums := []float64{
 		97.1,
 		92.6,
 		95.6,
@@ -73,17 +60,27 @@ stream
 		95.3,
 	}
 
-	pts := make([]*models.Point, len(values))
-	for i, v := range values {
-		pts[i] = &models.Point{
-			Name:   "cpu",
-			Tags:   tags,
-			Fields: map[string]interface{}{"value": v},
-			Time:   time.Date(1970, 1, 1, 0, 0, i, 0, time.UTC),
+	values := make([][]interface{}, len(nums))
+	for i, num := range nums {
+		values[i] = []interface{}{
+			time.Date(1970, 1, 1, 0, 0, i, 0, time.UTC),
+			num,
 		}
 	}
 
-	er := kapacitor.Result{Window: nilGroup(pts)}
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name: "cpu",
+				Tags: map[string]string{
+					"type": "idle",
+					"host": "serverA",
+				},
+				Columns: []string{"time", "value"},
+				Values:  values,
+			},
+		},
+	}
 
 	clock, et, errCh, tm := testStreamer(t, "TestWindowDataByTime", script)
 	defer tm.Close()
@@ -108,20 +105,9 @@ stream
 
 	// Assert we got the expected result
 	result := kapacitor.ResultFromJSON(resp.Body)
-	if assert.Equal(len(er.Window), len(result.Window)) {
-		for i := range er.Window[NG] {
-			assert.Equal(er.Window[NG][i].Name, result.Window[NG][i].Name, "i: %d", i)
-			assert.Equal(er.Window[NG][i].Tags, result.Window[NG][i].Tags, "i: %d", i)
-			assert.Equal(er.Window[NG][i].Fields, result.Window[NG][i].Fields, "i: %d", i)
-			assert.True(
-				er.Window[NG][i].Time.Equal(result.Window[NG][i].Time),
-				"i: %d %s != %s",
-				i,
-				er.Window[NG][i].Time, result.Window[NG][i].Time,
-			)
-		}
+	if eq, msg := compareResults(er, result); !eq {
+		t.Error(msg)
 	}
-
 }
 
 func TestSimpleMapReduce(t *testing.T) {
@@ -138,14 +124,17 @@ stream
 	.httpOut("TestSimpleMapReduce");
 `
 	er := kapacitor.Result{
-		Window: nilGroup([]*models.Point{
+		Series: imodels.Rows{
 			{
-				Name:   "cpu",
-				Fields: map[string]interface{}{"count": 10.0},
-				Tags:   map[string]string{"type": "idle", "host": "serverA"},
-				Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+				Name:    "cpu",
+				Tags:    map[string]string{"type": "idle", "host": "serverA"},
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+					10.0,
+				}},
 			},
-		}),
+		},
 	}
 
 	clock, et, errCh, tm := testStreamer(t, "TestSimpleMapReduce", script)
@@ -171,18 +160,8 @@ stream
 
 	// Assert we got the expected result
 	result := kapacitor.ResultFromJSON(resp.Body)
-	if assert.Equal(len(er.Window), len(result.Window)) {
-		for i := range er.Window[NG] {
-			assert.Equal(er.Window[NG][i].Name, result.Window[NG][i].Name, "i: %d", i)
-			assert.Equal(er.Window[NG][i].Tags, result.Window[NG][i].Tags, "i: %d", i)
-			assert.Equal(er.Window[NG][i].Fields, result.Window[NG][i].Fields, "i: %d", i)
-			assert.True(
-				er.Window[NG][i].Time.Equal(result.Window[NG][i].Time),
-				"i: %d %s != %s",
-				i,
-				er.Window[NG][i].Time, result.Window[NG][i].Time,
-			)
-		}
+	if eq, msg := compareResults(er, result); !eq {
+		t.Error(msg)
 	}
 }
 
@@ -226,30 +205,33 @@ stream
 `
 
 	er := kapacitor.Result{
-		Window: map[models.GroupID][]*models.Point{
-			"service=cartA,": {
-				{
-					Name:   "errors",
-					Tags:   map[string]string{"service": "cartA", "dc": "A"},
-					Fields: map[string]interface{}{"sum": 47.0},
-					Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
-				},
+		Series: imodels.Rows{
+			{
+				Name:    "errors",
+				Tags:    map[string]string{"service": "cartA", "dc": "A"},
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+					47.0,
+				}},
 			},
-			"service=login,": {
-				{
-					Name:   "errors",
-					Tags:   map[string]string{"service": "login", "dc": "B"},
-					Fields: map[string]interface{}{"sum": 45.0},
-					Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
-				},
+			{
+				Name:    "errors",
+				Tags:    map[string]string{"service": "login", "dc": "B"},
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+					45.0,
+				}},
 			},
-			"service=front,": {
-				{
-					Name:   "errors",
-					Tags:   map[string]string{"service": "front", "dc": "B"},
-					Fields: map[string]interface{}{"sum": 32.0},
-					Time:   time.Date(1970, 1, 1, 0, 0, 8, 0, time.UTC),
-				},
+			{
+				Name:    "errors",
+				Tags:    map[string]string{"service": "front", "dc": "B"},
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1970, 1, 1, 0, 0, 8, 0, time.UTC),
+					32.0,
+				}},
 			},
 		},
 	}
@@ -277,23 +259,8 @@ stream
 
 	// Assert we got the expected result
 	result := kapacitor.ResultFromJSON(resp.Body)
-	if assert.Equal(len(er.Window), len(result.Window)) {
-		for g := range er.Window {
-			if assert.Equal(len(er.Window[g]), len(result.Window[g])) {
-				for i := range er.Window[g] {
-					assert.Equal(er.Window[g][i].Name, result.Window[g][i].Name, "g: %s i: %d", g, i)
-					assert.Equal(er.Window[g][i].Tags, result.Window[g][i].Tags, "g: %s i: %d", g, i)
-					assert.Equal(er.Window[g][i].Fields, result.Window[g][i].Fields, "g: %s i: %d", g, i)
-					assert.True(
-						er.Window[g][i].Time.Equal(result.Window[g][i].Time),
-						"g: %s i: %d %s != %s",
-						g,
-						i,
-						er.Window[g][i].Time, result.Window[g][i].Time,
-					)
-				}
-			}
-		}
+	if eq, msg := compareResults(er, result); !eq {
+		t.Error(msg)
 	}
 }
 
@@ -327,30 +294,33 @@ errorCounts.join(viewCounts)
 `
 
 	er := kapacitor.Result{
-		Window: map[models.GroupID][]*models.Point{
-			"service=cartA,": {
-				{
-					Name:   "error_rate",
-					Tags:   map[string]string{"service": "cartA", "dc": "A"},
-					Fields: map[string]interface{}{"value": 0.01},
-					Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
-				},
+		Series: imodels.Rows{
+			{
+				Name:    "error_rate",
+				Tags:    map[string]string{"service": "cartA"},
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+					0.01,
+				}},
 			},
-			"service=login,": {
-				{
-					Name:   "error_rate",
-					Tags:   map[string]string{"service": "login", "dc": "B"},
-					Fields: map[string]interface{}{"value": 0.01},
-					Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
-				},
+			{
+				Name:    "error_rate",
+				Tags:    map[string]string{"service": "login"},
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+					0.01,
+				}},
 			},
-			"service=front,": {
-				{
-					Name:   "error_rate",
-					Tags:   map[string]string{"service": "front", "dc": "B"},
-					Fields: map[string]interface{}{"value": 0.01},
-					Time:   time.Date(1970, 1, 1, 0, 0, 8, 0, time.UTC),
-				},
+			{
+				Name:    "error_rate",
+				Tags:    map[string]string{"service": "front"},
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1970, 1, 1, 0, 0, 8, 0, time.UTC),
+					0.01,
+				}},
 			},
 		},
 	}
@@ -378,25 +348,9 @@ errorCounts.join(viewCounts)
 
 	// Assert we got the expected result
 	result := kapacitor.ResultFromJSON(resp.Body)
-	if assert.Equal(len(er.Window), len(result.Window)) {
-		for g := range er.Window {
-			if assert.Equal(len(er.Window[g]), len(result.Window[g])) {
-				for i := range er.Window[g] {
-					assert.Equal(er.Window[g][i].Name, result.Window[g][i].Name, "g: %s i: %d", g, i)
-					assert.Equal(er.Window[g][i].Tags, result.Window[g][i].Tags, "g: %s i: %d", g, i)
-					assert.Equal(er.Window[g][i].Fields, result.Window[g][i].Fields, "g: %s i: %d", g, i)
-					assert.True(
-						er.Window[g][i].Time.Equal(result.Window[g][i].Time),
-						"g: %s i: %d %s != %s",
-						g,
-						i,
-						er.Window[g][i].Time, result.Window[g][i].Time,
-					)
-				}
-			}
-		}
+	if eq, msg := compareResults(er, result); !eq {
+		t.Error(msg)
 	}
-
 }
 
 func TestUnionStreamData(t *testing.T) {
@@ -405,18 +359,19 @@ func TestUnionStreamData(t *testing.T) {
 	var script = `
 var cpu = stream
 			.fork()
-				.from("cpu")
-				.where("cpu = 'total'");
+			.from("cpu")
+			.where("cpu = 'total'");
 var mem = stream
 			.fork()
-				.from("memory")
-				.where("type = 'free'");
+			.from("memory")
+			.where("type = 'free'");
 var disk = stream
 			.fork()
-				.from("disk")
-				.where("device = 'sda'");
+			.from("disk")
+			.where("device = 'sda'");
 
 cpu.union(mem, disk)
+		.newName("cpu_mem_disk")
 		.window()
 			.period(10s)
 			.every(10s)
@@ -425,14 +380,17 @@ cpu.union(mem, disk)
 `
 
 	er := kapacitor.Result{
-		Window: nilGroup([]*models.Point{
+		Series: imodels.Rows{
 			{
-				Name:   "disk",
-				Tags:   map[string]string{"device": "sda", "host": "serverB"},
-				Fields: map[string]interface{}{"count": 24.0},
-				Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+				Name:    "cpu_mem_disk",
+				Tags:    nil,
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+					24.0,
+				}},
 			},
-		}),
+		},
 	}
 
 	clock, et, errCh, tm := testStreamer(t, "TestUnionStreamData", script)
@@ -458,18 +416,8 @@ cpu.union(mem, disk)
 
 	// Assert we got the expected result
 	result := kapacitor.ResultFromJSON(resp.Body)
-	if assert.Equal(len(er.Window), len(result.Window)) {
-		for i := range er.Window[NG] {
-			assert.Equal(er.Window[NG][i].Name, result.Window[NG][i].Name, "i: %d", i)
-			assert.Equal(er.Window[NG][i].Tags, result.Window[NG][i].Tags, "i: %d", i)
-			assert.Equal(er.Window[NG][i].Fields, result.Window[NG][i].Fields, "i: %d", i)
-			assert.True(
-				er.Window[NG][i].Time.Equal(result.Window[NG][i].Time),
-				"i: %d %s != %s",
-				i,
-				er.Window[NG][i].Time, result.Window[NG][i].Time,
-			)
-		}
+	if eq, msg := compareResults(er, result); !eq {
+		t.Error(msg)
 	}
 }
 
@@ -500,144 +448,177 @@ stream
 		testCase{
 			Method: "influxql.sum",
 			ER: kapacitor.Result{
-				Window: nilGroup([]*models.Point{
+				Series: imodels.Rows{
 					{
-						Name:   "cpu",
-						Tags:   tags,
-						Fields: map[string]interface{}{"sum": 941.0},
-						Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+						Name:    "cpu",
+						Tags:    tags,
+						Columns: []string{"time", "sum"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+							941.0,
+						}},
 					},
-				}),
+				},
 			},
 		},
 		testCase{
 			Method: "influxql.count",
 			ER: kapacitor.Result{
-				Window: nilGroup([]*models.Point{
+				Series: imodels.Rows{
 					{
-						Name:   "cpu",
-						Tags:   tags,
-						Fields: map[string]interface{}{"count": 10.0},
-						Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+						Name:    "cpu",
+						Tags:    tags,
+						Columns: []string{"time", "count"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+							10.0,
+						}},
 					},
-				}),
+				},
 			},
 		},
 		testCase{
 			Method: "influxql.distinct",
 			ER: kapacitor.Result{
-				Window: nilGroup([]*models.Point{
+				Series: imodels.Rows{
 					{
-						Name:   "cpu",
-						Tags:   tags,
-						Fields: map[string]interface{}{"distinct": []interface{}{92.0, 93.0, 95.0, 96.0, 98.0}},
-						Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+						Name:    "cpu",
+						Tags:    tags,
+						Columns: []string{"time", "distinct"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+							[]interface{}{92.0, 93.0, 95.0, 96.0, 98.0},
+						}},
 					},
-				}),
+				},
 			},
 		},
 		testCase{
 			Method: "influxql.mean",
 			ER: kapacitor.Result{
-				Window: nilGroup([]*models.Point{
+				Series: imodels.Rows{
 					{
-						Name:   "cpu",
-						Tags:   tags,
-						Fields: map[string]interface{}{"mean": 94.1},
-						Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+						Name:    "cpu",
+						Tags:    tags,
+						Columns: []string{"time", "mean"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+							94.1,
+						}},
 					},
-				}),
+				},
 			},
 		},
 		testCase{
 			Method: "influxql.median",
 			ER: kapacitor.Result{
-				Window: nilGroup([]*models.Point{
+				Series: imodels.Rows{
 					{
-						Name:   "cpu",
-						Tags:   tags,
-						Fields: map[string]interface{}{"median": 94.0},
-						Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+						Name:    "cpu",
+						Tags:    tags,
+						Columns: []string{"time", "median"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+							94.0,
+						}},
 					},
-				}),
+				},
 			},
 		},
 		testCase{
 			Method: "influxql.min",
 			ER: kapacitor.Result{
-				Window: nilGroup([]*models.Point{
+				Series: imodels.Rows{
 					{
-						Name:   "cpu",
-						Tags:   tags,
-						Fields: map[string]interface{}{"min": 92.0},
-						Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+						Name:    "cpu",
+						Tags:    tags,
+						Columns: []string{"time", "min"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+							92.0,
+						}},
 					},
-				}),
+				},
 			},
 		},
 		testCase{
 			Method: "influxql.max",
 			ER: kapacitor.Result{
-				Window: nilGroup([]*models.Point{
+				Series: imodels.Rows{
 					{
-						Name:   "cpu",
-						Tags:   tags,
-						Fields: map[string]interface{}{"max": 98.0},
-						Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+						Name:    "cpu",
+						Tags:    tags,
+						Columns: []string{"time", "max"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+							98.0,
+						}},
 					},
-				}),
+				},
 			},
 		},
 		testCase{
 			Method: "influxql.spread",
 			ER: kapacitor.Result{
-				Window: nilGroup([]*models.Point{
+				Series: imodels.Rows{
 					{
-						Name:   "cpu",
-						Tags:   tags,
-						Fields: map[string]interface{}{"spread": 6.0},
-						Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+						Name:    "cpu",
+						Tags:    tags,
+						Columns: []string{"time", "spread"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+							6.0,
+						}},
 					},
-				}),
+				},
 			},
 		},
 		testCase{
 			Method: "influxql.stddev",
 			ER: kapacitor.Result{
-				Window: nilGroup([]*models.Point{
+				Series: imodels.Rows{
 					{
-						Name:   "cpu",
-						Tags:   tags,
-						Fields: map[string]interface{}{"stddev": 2.0248456731316584},
-						Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+						Name:    "cpu",
+						Tags:    tags,
+						Columns: []string{"time", "stddev"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+							2.0248456731316584,
+						}},
 					},
-				}),
+				},
 			},
 		},
 		testCase{
 			Method: "influxql.first",
 			ER: kapacitor.Result{
-				Window: nilGroup([]*models.Point{
+				Series: imodels.Rows{
 					{
-						Name:   "cpu",
-						Tags:   tags,
-						Fields: map[string]interface{}{"first": 98.0},
-						Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+						Name:    "cpu",
+						Tags:    tags,
+						Columns: []string{"time", "first"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+							98.0,
+						}},
 					},
-				}),
+				},
 			},
 		},
 		testCase{
 			Method: "influxql.last",
 			ER: kapacitor.Result{
-				Window: nilGroup([]*models.Point{
+				Series: imodels.Rows{
 					{
-						Name:   "cpu",
-						Tags:   tags,
-						Fields: map[string]interface{}{"last": 95.0},
-						Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+						Name:    "cpu",
+						Tags:    tags,
+						Columns: []string{"time", "last"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+							95.0,
+						}},
 					},
-				}),
+				},
 			},
 		},
 	}
@@ -678,18 +659,8 @@ stream
 
 		// Assert we got the expected result
 		result := kapacitor.ResultFromJSON(resp.Body)
-		if assert.Equal(len(tc.ER.Window), len(result.Window)) {
-			for i := range tc.ER.Window[NG] {
-				assert.Equal(tc.ER.Window[NG][i].Name, result.Window[NG][i].Name, "i: %d", i)
-				assert.Equal(tc.ER.Window[NG][i].Tags, result.Window[NG][i].Tags, "i: %d", i)
-				assert.Equal(tc.ER.Window[NG][i].Fields, result.Window[NG][i].Fields, "i: %d", i)
-				assert.True(
-					tc.ER.Window[NG][i].Time.Equal(result.Window[NG][i].Time),
-					"i: %d %s != %s",
-					i,
-					tc.ER.Window[NG][i].Time, result.Window[NG][i].Time,
-				)
-			}
+		if eq, msg := compareResults(tc.ER, result); !eq {
+			t.Error(msg)
 		}
 	}
 }
@@ -742,7 +713,7 @@ func TestStreamingAlert(t *testing.T) {
 			t.FailNow()
 		}
 		requestCount++
-		expAns := `[{"Name":"cpu","Group":"","Tags":{"host":"serverA","type":"idle"},"Fields":{"count":10},"Time":"1970-01-01T00:00:09Z"}]`
+		expAns := `{"name":"cpu","tags":{"host":"serverA","type":"idle"},"points":[{"fields":{"count":10},"time":"1970-01-01T00:00:09Z"}]}`
 		assert.Equal(expAns, string(ans))
 	}))
 	defer ts.Close()
@@ -755,8 +726,8 @@ stream
 		.period(10s)
 		.every(10s)
 	.mapReduce(influxql.count, "idle")
+	.where("count > 5")
 	.alert()
-		.predicate("count > 5")
 		.post("` + ts.URL + `");`
 
 	clock, et, errCh, tm := testStreamer(t, "TestStreamingAlert", script)
@@ -782,7 +753,7 @@ func TestStreamingAlertSigma(t *testing.T) {
 			t.FailNow()
 		}
 		requestCount++
-		expAns := `[{"Name":"cpu","Group":"","Tags":{"host":"serverA","type":"idle"},"Fields":{"value":16},"Time":"1970-01-01T00:00:07Z"}]`
+		expAns := `{"name":"cpu","tags":{"host":"serverA","type":"idle"},"points":[{"fields":{"value":16},"time":"1970-01-01T00:00:07Z"}]}`
 		assert.Equal(expAns, string(ans))
 	}))
 	defer ts.Close()
@@ -790,9 +761,10 @@ func TestStreamingAlertSigma(t *testing.T) {
 	var script = `
 stream
 	.from("cpu")
+	// Need to combine this into a single expression
 	.where("host = 'serverA'")
+	.where("sigma(value) > 2")
 	.alert()
-		.predicate("sigma(value) > 2")
 		.post("` + ts.URL + `");`
 
 	clock, et, errCh, tm := testStreamer(t, "TestStreamingAlertSigma", script)
@@ -841,19 +813,9 @@ stream
 	.influxDBOut()
 		.database("db")
 		.retentionPolicy("rp")
-		.measurement("m");
+		.measurement("m")
+		.precision("s");
 `
-	//er := kapacitor.Result{
-	//	Window: nilGroup([]*models.Point{
-	//		{
-	//			Name:   "cpu",
-	//			Fields: map[string]interface{}{"count": 10.0},
-	//			Tags:   map[string]string{"type": "idle", "host": "serverA"},
-	//			Time:   time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
-	//		},
-	//	}),
-	//}
-
 	done := make(chan error, 1)
 	var points []imodels.Point
 	var database string
@@ -895,20 +857,26 @@ stream
 
 	assert.Equal("db", database)
 	assert.Equal("rp", rp)
-	assert.Equal("s", precision, "This fix is waiting on https://github.com/influxdb/influxdb/issues/4344")
+	assert.Equal("s", precision)
 	log.Println(points)
 	if assert.Equal(1, len(points)) {
 		p := points[0]
 		assert.Equal("m", p.Name())
 		assert.Equal(imodels.Fields(map[string]interface{}{"count": 10.0}), p.Fields())
-		assert.Equal(imodels.Tags(map[string]string{"type": "idle", "host": "serverA"}), p.Tags())
-		assert.True(time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC).Equal(p.Time()))
+		assert.Equal(imodels.Tags{}, p.Tags())
+		t := time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC)
+		assert.True(t.Equal(p.Time()), "times are not equal exp %s got %s", t, p.Time())
 	}
 }
 
 // Helper test function for streamer
 func testStreamer(t *testing.T, name, script string) (clock.Setter, *kapacitor.ExecutingTask, <-chan error, *kapacitor.TaskMaster) {
 	assert := assert.New(t)
+	if testing.Verbose() {
+		wlog.LogLevel = wlog.DEBUG
+	} else {
+		wlog.LogLevel = wlog.OFF
+	}
 
 	//Create the task
 	task, err := kapacitor.NewStreamer(name, script)

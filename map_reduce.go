@@ -17,7 +17,7 @@ type MapResult struct {
 	Outs  []interface{}
 }
 
-type MapFunc func(itr tsdb.Iterator) interface{}
+type MapFunc func(in *tsdb.MapInput) interface{}
 type ReduceFunc func([]interface{}) (string, interface{})
 type MapReduceFunc func() (MapFunc, ReduceFunc)
 
@@ -45,24 +45,39 @@ func newMapNode(et *ExecutingTask, n *pipeline.MapNode) (*MapNode, error) {
 
 func (s *MapNode) runMaps() error {
 	done := make(chan bool, s.parallel)
-	for b := s.ins[0].NextBatch(); b != nil; b = s.ins[0].NextBatch() {
-		if len(b) == 0 {
+	for b, ok := s.ins[0].NextBatch(); ok; b, ok = s.ins[0].NextBatch() {
+		if len(b.Points) == 0 {
 			continue
 		}
 		mr := &MapResult{
 			Outs: make([]interface{}, s.parallel),
 		}
-		itr := newItr(b, s.mr.Field)
+		inputs := make([]tsdb.MapInput, s.parallel)
+		j := 0
+		for _, p := range b.Points {
+			item := tsdb.MapItem{
+				Timestamp: p.Time.Unix(),
+				Value:     p.Fields[s.mr.Field],
+				Fields:    p.Fields,
+				Tags:      b.Tags,
+			}
+			inputs[j].Items = append(inputs[j].Items, item)
+			if len(inputs[j].Items) == 1 {
+				inputs[j].TMin = item.Timestamp
+			}
+			j = (j + 1) % s.parallel
+		}
 
-		l := len(b) - 1
-		mr.Name = b[l].Name
-		mr.Tags = b[l].Tags
-		mr.Time = b[l].Time
-		mr.Group = b[l].Group
+		l := len(b.Points) - 1
+		mr.Name = b.Name
+		mr.Group = b.Group
+		mr.Tags = b.Tags
+
+		mr.Time = b.Points[l].Time
 
 		for i := 0; i < s.parallel; i++ {
 			go func(i int) {
-				mr.Outs[i] = s.f(itr)
+				mr.Outs[i] = s.f(&inputs[i])
 				done <- true
 			}(i)
 		}
@@ -104,15 +119,15 @@ func newReduceNode(et *ExecutingTask, n *pipeline.ReduceNode) (*ReduceNode, erro
 }
 
 func (s *ReduceNode) runReduce() error {
-	for m := s.ins[0].NextMaps(); m != nil; m = s.ins[0].NextMaps() {
+	for m, ok := s.ins[0].NextMaps(); ok; m, ok = s.ins[0].NextMaps() {
 		field, v := s.f(m.Outs)
-		p := models.NewPoint(
-			m.Name,
-			m.Group,
-			m.Tags,
-			map[string]interface{}{field: v},
-			m.Time,
-		)
+		p := models.Point{
+			Name:   m.Name,
+			Group:  m.Group,
+			Tags:   m.Tags,
+			Fields: models.Fields{field: v},
+			Time:   m.Time,
+		}
 		for _, c := range s.outs {
 			err := c.CollectPoint(p)
 			if err != nil {

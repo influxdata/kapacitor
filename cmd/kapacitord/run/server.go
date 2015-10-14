@@ -15,13 +15,13 @@ import (
 	"github.com/influxdb/kapacitor/services/replay"
 	"github.com/influxdb/kapacitor/services/streamer"
 	"github.com/influxdb/kapacitor/services/task_store"
+	"github.com/influxdb/kapacitor/services/udp"
 
 	"github.com/influxdb/influxdb/influxql"
 	"github.com/influxdb/influxdb/meta"
 	"github.com/influxdb/influxdb/services/collectd"
 	"github.com/influxdb/influxdb/services/graphite"
 	"github.com/influxdb/influxdb/services/opentsdb"
-	"github.com/influxdb/influxdb/services/udp"
 )
 
 // BuildInfo represents the build details for the server code.
@@ -85,8 +85,8 @@ func NewServer(c *Config, buildInfo *BuildInfo, l *log.Logger) (*Server, error) 
 
 	// Append Kapacitor services.
 	s.appendStreamerService()
-	s.appendInfluxDBService(c.InfluxDB)
 	s.appendHTTPDService(c.HTTP)
+	s.appendInfluxDBService(c.InfluxDB, c.Hostname)
 	s.appendTaskStoreService(c.Task)
 	s.appendReplayStoreService(c.Replay)
 
@@ -115,8 +115,9 @@ func (s *Server) appendStreamerService() {
 	s.Services = append(s.Services, srv)
 }
 
-func (s *Server) appendInfluxDBService(c influxdb.Config) {
-	srv := influxdb.NewService(c)
+func (s *Server) appendInfluxDBService(c influxdb.Config, hostname string) {
+	srv := influxdb.NewService(c, hostname)
+	srv.PointsWriter = s.Streamer
 
 	s.InfluxDB = srv
 	s.TaskMaster.InfluxDBService = srv

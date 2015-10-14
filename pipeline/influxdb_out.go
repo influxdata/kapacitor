@@ -8,6 +8,7 @@ type InfluxDBOutNode struct {
 	RetentionPolicy  string
 	Measurement      string
 	WriteConsistency string
+	Precision        string
 	Tags             map[string]string
 }
 

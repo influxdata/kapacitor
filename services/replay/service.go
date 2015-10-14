@@ -18,8 +18,8 @@ import (
 	"github.com/influxdb/influxdb/client"
 	"github.com/influxdb/kapacitor"
 	"github.com/influxdb/kapacitor/clock"
-	"github.com/influxdb/kapacitor/wlog"
 	"github.com/influxdb/kapacitor/services/httpd"
+	"github.com/influxdb/kapacitor/wlog"
 	"github.com/twinj/uuid"
 )
 

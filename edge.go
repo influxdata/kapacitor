@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"sync"
 
 	"github.com/influxdb/kapacitor/models"
 	"github.com/influxdb/kapacitor/pipeline"
@@ -13,18 +12,18 @@ import (
 )
 
 type StreamCollector interface {
-	CollectPoint(*models.Point) error
+	CollectPoint(models.Point) error
 	Close()
 }
 
 type BatchCollector interface {
-	CollectBatch([]*models.Point) error
+	CollectBatch(models.Batch) error
 	Close()
 }
 
 type Edge struct {
-	stream chan *models.Point
-	batch  chan []*models.Point
+	stream chan models.Point
+	batch  chan models.Batch
 	reduce chan *MapResult
 
 	collected int64
@@ -37,9 +36,9 @@ func newEdge(name string, t pipeline.EdgeType) *Edge {
 	l := wlog.New(os.Stderr, fmt.Sprintf("[edge:%s] ", name), log.LstdFlags)
 	switch t {
 	case pipeline.StreamEdge:
-		return &Edge{stream: make(chan *models.Point), logger: l}
+		return &Edge{stream: make(chan models.Point), logger: l}
 	case pipeline.BatchEdge:
-		return &Edge{batch: make(chan []*models.Point), logger: l}
+		return &Edge{batch: make(chan models.Batch), logger: l}
 	case pipeline.ReduceEdge:
 		return &Edge{reduce: make(chan *MapResult), logger: l}
 	}
@@ -64,31 +63,31 @@ func (e *Edge) Close() {
 	}
 }
 
-func (e *Edge) NextPoint() *models.Point {
+func (e *Edge) NextPoint() (p models.Point, ok bool) {
 	e.logger.Printf("D! next point c: %d e: %d\n", e.collected, e.emitted)
-	p := <-e.stream
-	if p != nil {
+	p, ok = <-e.stream
+	if ok {
 		e.emitted++
 	}
-	return p
+	return
 }
 
-func (e *Edge) NextBatch() []*models.Point {
+func (e *Edge) NextBatch() (b models.Batch, ok bool) {
 	e.logger.Printf("D! next batch c: %d e: %d\n", e.collected, e.emitted)
-	b := <-e.batch
-	if b != nil {
+	b, ok = <-e.batch
+	if ok {
 		e.emitted++
 	}
-	return b
+	return
 }
 
-func (e *Edge) NextMaps() *MapResult {
+func (e *Edge) NextMaps() (m *MapResult, ok bool) {
 	e.logger.Printf("D! next maps c: %d e: %d\n", e.collected, e.emitted)
-	m := <-e.reduce
+	m, ok = <-e.reduce
 	if m != nil {
 		e.emitted++
 	}
-	return m
+	return
 }
 
 func (e *Edge) recover(errp *error) {
@@ -102,7 +101,7 @@ func (e *Edge) recover(errp *error) {
 	}
 }
 
-func (e *Edge) CollectPoint(p *models.Point) (err error) {
+func (e *Edge) CollectPoint(p models.Point) (err error) {
 	defer e.recover(&err)
 	e.logger.Printf("D! collect point c: %d e: %d\n", e.collected, e.emitted)
 	e.collected++
@@ -110,7 +109,7 @@ func (e *Edge) CollectPoint(p *models.Point) (err error) {
 	return
 }
 
-func (e *Edge) CollectBatch(b []*models.Point) (err error) {
+func (e *Edge) CollectBatch(b models.Batch) (err error) {
 	defer e.recover(&err)
 	e.logger.Printf("D! collect batch c: %d e: %d\n", e.collected, e.emitted)
 	e.collected++
@@ -124,44 +123,4 @@ func (e *Edge) CollectMaps(m *MapResult) (err error) {
 	e.collected++
 	e.reduce <- m
 	return
-}
-
-type streamItr struct {
-	sync.Mutex
-	field string
-	tags  map[string]string
-	batch []*models.Point
-	i     int
-}
-
-func newItr(batch []*models.Point, field string) *streamItr {
-	return &streamItr{
-		batch: batch,
-		field: field,
-	}
-}
-
-func (s *streamItr) Next() (time int64, value interface{}) {
-	s.Lock()
-	i := s.i
-	s.i++
-	s.Unlock()
-	if i >= len(s.batch) {
-		return -1, nil
-	}
-	p := s.batch[i]
-	if p == nil {
-		return -1, nil
-	}
-	time = p.Time.Unix()
-	value = p.Fields[s.field]
-	return
-}
-
-func (s *streamItr) Tags() map[string]string {
-	return s.tags
-}
-
-func (s *streamItr) TMin() int64 {
-	return 0
 }

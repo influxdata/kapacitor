@@ -258,6 +258,8 @@ func (et *ExecutingTask) createNode(p pipeline.Node) (Node, error) {
 		return newJoinNode(et, t)
 	case *pipeline.ApplyNode:
 		return newApplyNode(et, t)
+	case *pipeline.WhereNode:
+		return newWhereNode(et, t)
 	default:
 		return nil, fmt.Errorf("unknown pipeline node type %T", p)
 	}

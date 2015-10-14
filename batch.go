@@ -78,13 +78,18 @@ func (b *BatchNode) Query(batch BatchCollector) {
 				return
 			}
 			for _, series := range res.Series {
-				bch := make([]*models.Point, len(series.Values))
 				groupID := models.TagsToGroupID(
 					models.SortedKeys(series.Tags),
 					series.Tags,
 				)
+				bch := models.Batch{
+					Name:  series.Name,
+					Group: groupID,
+					Tags:  series.Tags,
+				}
+				bch.Points = make([]models.TimeFields, len(series.Values))
 				for i, v := range series.Values {
-					fields := make(map[string]interface{})
+					fields := make(models.Fields)
 					var t time.Time
 					for i, c := range series.Columns {
 						if c == "time" {
@@ -102,13 +107,7 @@ func (b *BatchNode) Query(batch BatchCollector) {
 							fields[c] = v[i]
 						}
 					}
-					bch[i] = models.NewPoint(
-						series.Name,
-						groupID,
-						series.Tags,
-						fields,
-						t,
-					)
+					bch.Points[i] = models.TimeFields{Time: t, Fields: fields}
 				}
 				batch.CollectBatch(bch)
 			}
@@ -123,7 +122,7 @@ func (b *BatchNode) stopBatch() {
 }
 
 func (b *BatchNode) runBatch() error {
-	for bt := b.ins[0].NextBatch(); bt != nil; bt = b.ins[0].NextBatch() {
+	for bt, ok := b.ins[0].NextBatch(); ok; bt, ok = b.ins[0].NextBatch() {
 		for _, child := range b.outs {
 			err := child.CollectBatch(bt)
 			if err != nil {

@@ -3,6 +3,7 @@ package pipeline
 // Takes the union of all of its parents
 type UnionNode struct {
 	node
+	NewName string
 }
 
 func newUnionNode(e EdgeType, nodes []Node) *UnionNode {

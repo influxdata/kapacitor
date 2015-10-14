@@ -8,9 +8,10 @@ import (
 	"testing"
 	"time"
 
+	imodels "github.com/influxdb/influxdb/models"
 	"github.com/influxdb/kapacitor"
 	"github.com/influxdb/kapacitor/clock"
-	"github.com/influxdb/kapacitor/models"
+	"github.com/influxdb/kapacitor/wlog"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -35,30 +36,33 @@ batch
 `
 
 	er := kapacitor.Result{
-		Window: map[models.GroupID][]*models.Point{
-			"cpu=cpu-total,": {
-				{
-					Name:   "cpu_usage_idle",
-					Tags:   map[string]string{"cpu": "cpu-total"},
-					Fields: map[string]interface{}{"sum": 20.0},
-					Time:   time.Date(1970, 1, 1, 0, 0, 19, 0, time.UTC),
-				},
+		Series: imodels.Rows{
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"cpu": "cpu-total"},
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1970, 1, 1, 0, 0, 19, 0, time.UTC),
+					20.0,
+				}},
 			},
-			"cpu=cpu0,": {
-				{
-					Name:   "cpu_usage_idle",
-					Tags:   map[string]string{"cpu": "cpu0"},
-					Fields: map[string]interface{}{"sum": 20.0},
-					Time:   time.Date(1970, 1, 1, 0, 0, 19, 0, time.UTC),
-				},
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"cpu": "cpu0"},
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1970, 1, 1, 0, 0, 19, 0, time.UTC),
+					20.0,
+				}},
 			},
-			"cpu=cpu1,": {
-				{
-					Name:   "cpu_usage_idle",
-					Tags:   map[string]string{"cpu": "cpu1"},
-					Fields: map[string]interface{}{"sum": 20.0},
-					Time:   time.Date(1970, 1, 1, 0, 0, 19, 0, time.UTC),
-				},
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"cpu": "cpu1"},
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1970, 1, 1, 0, 0, 19, 0, time.UTC),
+					20.0,
+				}},
 			},
 		},
 	}
@@ -86,23 +90,8 @@ batch
 
 	// Assert we got the expected result
 	result := kapacitor.ResultFromJSON(resp.Body)
-	if assert.Equal(len(er.Window), len(result.Window)) {
-		for g := range er.Window {
-			if assert.Equal(len(er.Window[g]), len(result.Window[g])) {
-				for i := range er.Window[g] {
-					assert.Equal(er.Window[g][i].Name, result.Window[g][i].Name, "g: %s i: %d", g, i)
-					assert.Equal(er.Window[g][i].Tags, result.Window[g][i].Tags, "g: %s i: %d", g, i)
-					assert.Equal(er.Window[g][i].Fields, result.Window[g][i].Fields, "g: %s i: %d", g, i)
-					assert.True(
-						er.Window[g][i].Time.Equal(result.Window[g][i].Time),
-						"g: %s i: %d %s != %s",
-						g,
-						i,
-						er.Window[g][i].Time, result.Window[g][i].Time,
-					)
-				}
-			}
-		}
+	if eq, msg := compareResults(er, result); !eq {
+		t.Error(msg)
 	}
 }
 
@@ -219,6 +208,11 @@ batch
 // Helper test function for batcher
 func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.ExecutingTask, <-chan error, *kapacitor.TaskMaster) {
 	assert := assert.New(t)
+	if testing.Verbose() {
+		wlog.LogLevel = wlog.DEBUG
+	} else {
+		wlog.LogLevel = wlog.OFF
+	}
 
 	// Create task
 	task, err := kapacitor.NewBatcher(name, script)
