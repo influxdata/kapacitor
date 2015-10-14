@@ -19,24 +19,30 @@ type MapResult struct {
 
 type MapFunc func(in *tsdb.MapInput) interface{}
 type ReduceFunc func([]interface{}) (string, interface{})
-type MapReduceFunc func() (MapFunc, ReduceFunc)
+
+type MapInfo struct {
+	Field string
+	Func  MapFunc
+}
 
 type MapNode struct {
 	node
 	mr       *pipeline.MapNode
 	f        MapFunc
+	field    string
 	parallel int
 }
 
 func newMapNode(et *ExecutingTask, n *pipeline.MapNode) (*MapNode, error) {
-	f, ok := n.Func.(MapFunc)
+	f, ok := n.Map.(MapInfo)
 	if !ok {
-		return nil, fmt.Errorf("invalid func given to batch map node %T", n.Func)
+		return nil, fmt.Errorf("invalid map given to map node %T", n.Map)
 	}
 	s := &MapNode{
 		node:     node{Node: n, et: et},
 		mr:       n,
-		f:        f,
+		f:        f.Func,
+		field:    f.Field,
 		parallel: 2,
 	}
 	s.node.runF = s.runMaps
@@ -57,7 +63,7 @@ func (s *MapNode) runMaps() error {
 		for _, p := range b.Points {
 			item := tsdb.MapItem{
 				Timestamp: p.Time.Unix(),
-				Value:     p.Fields[s.mr.Field],
+				Value:     p.Fields[s.field],
 				Fields:    p.Fields,
 				Tags:      b.Tags,
 			}
@@ -105,9 +111,9 @@ type ReduceNode struct {
 }
 
 func newReduceNode(et *ExecutingTask, n *pipeline.ReduceNode) (*ReduceNode, error) {
-	f, ok := n.Func.(ReduceFunc)
+	f, ok := n.Reduce.(ReduceFunc)
 	if !ok {
-		return nil, fmt.Errorf("invalid func given to batch reduce node %T", n.Func)
+		return nil, fmt.Errorf("invalid func given to batch reduce node %T", n.Reduce)
 	}
 	b := &ReduceNode{
 		node: node{Node: n, et: et},

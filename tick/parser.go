@@ -199,23 +199,39 @@ func (t *tree) vr() node {
 
 //parse an expression
 func (t *tree) expr() node {
+	var term node
 	//We reverse the tree under expr
-	term := t.ident()
+	t.next()
+	if t.peek().typ == tokenLParen {
+		t.backup()
+		term = t.fnc()
+	} else {
+		t.backup()
+		term = t.ident()
+	}
 	if i := t.peek(); i.typ == tokenDot {
-		top, bottom := t.fchain()
+		top, bottom := t.chain()
 		top.Right = term
 		return bottom
 	}
 	return term
 }
 
-//parse an function invocation chain
-func (t *tree) fchain() (*binaryNode, *binaryNode) {
+//parse an function or reference invocation chain
+func (t *tree) chain() (*binaryNode, *binaryNode) {
 	op := t.next()
-	n := t.fnc()
+	var n node
+	t.next()
+	if t.peek().typ == tokenLParen {
+		t.backup()
+		n = t.fnc()
+	} else {
+		t.backup()
+		n = t.ident()
+	}
 	b := newBinary(op, n, nil)
 	if i := t.peek(); i.typ == tokenDot {
-		o, bottom := t.fchain()
+		o, bottom := t.chain()
 		o.Right = b
 		return b, bottom
 	}
@@ -227,31 +243,6 @@ func (t *tree) ident() node {
 	ident := t.expect(tokenIdent)
 	n := newIdent(ident.pos, ident.val)
 	return n
-}
-
-//parse a reference
-func (t *tree) ref() node {
-	//We reverse the tree under ref
-	term := t.ident()
-	if i := t.peek(); i.typ == tokenDot {
-		top, bottom := t.rchain()
-		top.Right = term
-		return bottom
-	}
-	return term
-}
-
-//parse a refernce chain
-func (t *tree) rchain() (*binaryNode, *binaryNode) {
-	op := t.next()
-	n := t.ident()
-	b := newBinary(op, n, nil)
-	if i := t.peek(); i.typ == tokenDot {
-		o, bottom := t.rchain()
-		o.Right = b
-		return b, bottom
-	}
-	return b, b
 }
 
 //parse a function call
@@ -272,14 +263,7 @@ func (t *tree) args() []node {
 		typ := t.peek().typ
 		switch typ {
 		case tokenIdent:
-			t.next()
-			if t.peek().typ == tokenLParen {
-				t.backup()
-				args = append(args, t.fnc())
-			} else {
-				t.backup()
-				args = append(args, t.ref())
-			}
+			args = append(args, t.expr())
 		case tokenDuration:
 			args = append(args, t.dur())
 		case tokenNumber:

@@ -1,37 +1,38 @@
 package pipeline
 
-type MapReduceFunc func() (mapF interface{}, reduceF interface{})
+type MapReduceInfo struct {
+	MapI    interface{}
+	ReduceI interface{}
+}
 
 type MapNode struct {
 	node
-	Func  interface{}
-	Field string
+	Map interface{}
 }
 
-func NewMapNode(f interface{}, field string) *MapNode {
+func NewMapNode(i interface{}) *MapNode {
 	return &MapNode{
 		node: node{
 			desc:     "map",
 			wants:    BatchEdge,
 			provides: ReduceEdge,
 		},
-		Func:  f,
-		Field: field,
+		Map: i,
 	}
 }
 
 type ReduceNode struct {
 	node
-	Func interface{}
+	Reduce interface{}
 }
 
-func NewReduceNode(f interface{}) *ReduceNode {
+func NewReduceNode(i interface{}) *ReduceNode {
 	return &ReduceNode{
 		node: node{
 			desc:     "reduce",
 			wants:    ReduceEdge,
 			provides: StreamEdge,
 		},
-		Func: f,
+		Reduce: i,
 	}
 }

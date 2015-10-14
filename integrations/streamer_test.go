@@ -120,14 +120,14 @@ stream
 	.window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.count, "value")
+	.mapReduce(influxql.count("value"))
 	.httpOut("TestSimpleMapReduce");
 `
 	er := kapacitor.Result{
 		Series: imodels.Rows{
 			{
 				Name:    "cpu",
-				Tags:    map[string]string{"type": "idle", "host": "serverA"},
+				Tags:    nil,
 				Columns: []string{"time", "count"},
 				Values: [][]interface{}{[]interface{}{
 					time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
@@ -165,31 +165,6 @@ stream
 	}
 }
 
-func TestSplitStreamData(t *testing.T) {
-
-	var script = `
-var cpu = stream
-	.from("cpu")
-	.where("dc = 'nyc'");
-
-cpu
-	.where("host = 'serverA'");
-	.window()
-		.period(1s)
-		.every(1s)
-	.cache("/a");
-
-cpu
-	.where("host = 'serverB'");
-	.window()
-		.period(1s)
-		.every(1s)
-	.cache("/b");
-`
-	//er := kapacitor.Result{}
-
-	testStreamer(t, "TestSplitStreamData", script)
-}
 func TestGroupByStream(t *testing.T) {
 	assert := assert.New(t)
 
@@ -200,7 +175,7 @@ stream
 	.window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.sum, "value")
+	.mapReduce(influxql.sum("value"))
 	.httpOut("error_count");
 `
 
@@ -208,7 +183,7 @@ stream
 		Series: imodels.Rows{
 			{
 				Name:    "errors",
-				Tags:    map[string]string{"service": "cartA", "dc": "A"},
+				Tags:    map[string]string{"service": "cartA"},
 				Columns: []string{"time", "sum"},
 				Values: [][]interface{}{[]interface{}{
 					time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
@@ -217,7 +192,7 @@ stream
 			},
 			{
 				Name:    "errors",
-				Tags:    map[string]string{"service": "login", "dc": "B"},
+				Tags:    map[string]string{"service": "login"},
 				Columns: []string{"time", "sum"},
 				Values: [][]interface{}{[]interface{}{
 					time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
@@ -226,7 +201,7 @@ stream
 			},
 			{
 				Name:    "errors",
-				Tags:    map[string]string{"service": "front", "dc": "B"},
+				Tags:    map[string]string{"service": "front"},
 				Columns: []string{"time", "sum"},
 				Values: [][]interface{}{[]interface{}{
 					time.Date(1970, 1, 1, 0, 0, 8, 0, time.UTC),
@@ -275,7 +250,7 @@ var errorCounts = stream
 			.window()
 				.period(10s)
 				.every(10s)
-			.mapReduce(influxql.sum, "value");
+			.mapReduce(influxql.sum("value"));
 
 var viewCounts = stream
 			.fork()
@@ -284,7 +259,7 @@ var viewCounts = stream
 			.window()
 				.period(10s)
 				.every(10s)
-			.mapReduce(influxql.sum, "value");
+			.mapReduce(influxql.sum("value"));
 
 errorCounts.join(viewCounts)
 		.as("errors", "views")
@@ -375,7 +350,7 @@ cpu.union(mem, disk)
 		.window()
 			.period(10s)
 			.every(10s)
-		.mapReduce(influxql.count, "value")
+		.mapReduce(influxql.count("value"))
 		.httpOut("all");
 `
 
@@ -426,6 +401,7 @@ func TestStreamAggregations(t *testing.T) {
 
 	type testCase struct {
 		Method string
+		Args   string
 		ER     kapacitor.Result
 	}
 
@@ -436,14 +412,9 @@ stream
 	.window()
 		.period(10s)
 		.every(10s)
-	.mapReduce({{ .Method }}, "value")
+	.mapReduce({{ .Method }}("value" {{ .Args }}))
 	.httpOut("{{ .Method }}");
 `
-	tags := map[string]string{
-		"type": "idle",
-		"host": "serverA",
-	}
-
 	testCases := []testCase{
 		testCase{
 			Method: "influxql.sum",
@@ -451,7 +422,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    tags,
+						Tags:    nil,
 						Columns: []string{"time", "sum"},
 						Values: [][]interface{}{[]interface{}{
 							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
@@ -467,7 +438,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    tags,
+						Tags:    nil,
 						Columns: []string{"time", "count"},
 						Values: [][]interface{}{[]interface{}{
 							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
@@ -483,7 +454,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    tags,
+						Tags:    nil,
 						Columns: []string{"time", "distinct"},
 						Values: [][]interface{}{[]interface{}{
 							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
@@ -499,7 +470,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    tags,
+						Tags:    nil,
 						Columns: []string{"time", "mean"},
 						Values: [][]interface{}{[]interface{}{
 							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
@@ -515,7 +486,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    tags,
+						Tags:    nil,
 						Columns: []string{"time", "median"},
 						Values: [][]interface{}{[]interface{}{
 							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
@@ -531,7 +502,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    tags,
+						Tags:    nil,
 						Columns: []string{"time", "min"},
 						Values: [][]interface{}{[]interface{}{
 							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
@@ -547,7 +518,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    tags,
+						Tags:    nil,
 						Columns: []string{"time", "max"},
 						Values: [][]interface{}{[]interface{}{
 							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
@@ -563,7 +534,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    tags,
+						Tags:    nil,
 						Columns: []string{"time", "spread"},
 						Values: [][]interface{}{[]interface{}{
 							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
@@ -579,7 +550,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    tags,
+						Tags:    nil,
 						Columns: []string{"time", "stddev"},
 						Values: [][]interface{}{[]interface{}{
 							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
@@ -595,7 +566,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    tags,
+						Tags:    nil,
 						Columns: []string{"time", "first"},
 						Values: [][]interface{}{[]interface{}{
 							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
@@ -611,11 +582,62 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    tags,
+						Tags:    nil,
 						Columns: []string{"time", "last"},
 						Values: [][]interface{}{[]interface{}{
 							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
 							95.0,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method: "influxql.percentile",
+			Args:   ", 90.0",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    nil,
+						Columns: []string{"time", "percentile"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+							96.0,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method: "influxql.top",
+			Args:   ", 2",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    nil,
+						Columns: []string{"time", "top"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+							[]interface{}{98.0, 96.0},
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method: "influxql.bottom",
+			Args:   ", 3",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    nil,
+						Columns: []string{"time", "bottom"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+							[]interface{}{92.0, 92.0, 92.0},
 						}},
 					},
 				},
@@ -660,7 +682,7 @@ stream
 		// Assert we got the expected result
 		result := kapacitor.ResultFromJSON(resp.Body)
 		if eq, msg := compareResults(tc.ER, result); !eq {
-			t.Error(msg)
+			t.Error(tc.Method + ": " + msg)
 		}
 	}
 }
@@ -725,7 +747,7 @@ stream
 	.window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.count, "idle")
+	.mapReduce(influxql.count("idle"))
 	.where("count > 5")
 	.alert()
 		.post("` + ts.URL + `");`
@@ -788,7 +810,7 @@ stream
 	.window()
 		.period(1s)
 		.every(1s)
-	.mapReduce(influxql.percentile(10), "idle")
+	.mapReduce(influxql.percentile("idle", 10.0))
 	.where("percentile < 30")
 	.alert()
 		.flapping(25, 50)
@@ -809,7 +831,7 @@ stream
 	.window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.count, "value")
+	.mapReduce(influxql.count("value"))
 	.influxDBOut()
 		.database("db")
 		.retentionPolicy("rp")

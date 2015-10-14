@@ -180,9 +180,9 @@ stream
     .window()
         .period(10s)
         .every(5s)
-    .mapReduce(influxql.mean, "value")
+    .mapReduce(influxql.mean("value"))
+    .where("sigma(value) >  3")
     .alert()
-        .predicate("sigma(value) >  3")
         .post("http://localhost:8000");
 ```
 

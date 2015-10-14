@@ -55,7 +55,7 @@ func TestParseErrors(t *testing.T) {
 		},
 		testCase{
 			Text:  "a;\n\n\nvar b = stream.window\nb.period(10s);",
-			Error: `parser: unexpected "b" line 5 char 1 in "am.window\nb.period(1". expected: "("`,
+			Error: `parser: unexpected "b" line 5 char 1 in "am.window\nb.period(1". expected: ";"`,
 		},
 	}
 
@@ -72,7 +72,7 @@ var x = stream
 		.window()
 		.period(5m)
 		.every(1m)
-		.map(influxql.agg.mean, "value");
+		.map(influxql.agg.mean("value"));
 `
 	tree, err := parse(script)
 	assert.Nil(err)
@@ -90,18 +90,18 @@ var x = stream
 	               /   \
 	              /     \
 	         (map)       (b2 .)
-	          / \          |   \
-	         /   \         |    \
-	        /     \        |     \
-	    (b5 .)  ("value") (every) (b3 .)
+	          /            |   \
+	         /             |    \
+	        /              |     \
+	    (b5 .)            (every) (b3 .)
 	     /  \               |       / \
 	    /    \             (1m)    /   \
 	   /      \                   /     \
-	 (mean) (b6 .)            (period) (b4 .)
-	         /  \                |       / \
-	        /    \              (5m)    /   \
-	       /      \                    /     \
-	    (agg)  (influxql)         (window) (stream)
+	 (mean)    (b6 .)         (period) (b4 .)
+	    |       /  \             |       / \
+	 ("value") /    \           (5m)    /   \
+	          /      \                 /     \
+	       (agg)  (influxql)      (window) (stream)
 	*/
 	//Notice the inverted nature of the tree. This structure makes evaluating the tree recursive depth first.
 
@@ -141,7 +141,7 @@ var x = stream
 		t.FailNow()
 	}
 	assert.Equal("map", fMap.Func)
-	if assert.Equal(2, len(fMap.Args)) {
+	if assert.Equal(1, len(fMap.Args)) {
 
 		//Assert first arg to 'map' is binary node
 		b5, ok := fMap.Args[0].(*binaryNode)
@@ -150,9 +150,17 @@ var x = stream
 		}
 
 		//Assert b5.left is ident node 'mean'
-		mean, ok := b5.Left.(*identNode)
-		if assert.True(ok, "b5.left is not a ident node %q", b5.Left) {
-			assert.Equal("mean", mean.Ident)
+		fMean, ok := b5.Left.(*funcNode)
+		if assert.True(ok, "b5.left is not a func node %q", b5.Left) {
+			assert.Equal("mean", fMean.Func)
+		}
+		// Assert mean() has single "value" argument
+		if assert.Equal(1, len(fMean.Args)) {
+			//Assert first arg to 'mean' is stringNode
+			value, ok := fMean.Args[0].(*stringNode)
+			if assert.True(ok, "first argument to 'mean' is not string node %q", fMap.Args[0]) {
+				assert.Equal("value", value.Literal)
+			}
 		}
 
 		//Assert b5.right is binary node of operator '.'
@@ -173,11 +181,6 @@ var x = stream
 			assert.Equal("influxql", influxql.Ident)
 		}
 
-		//Assert second arg is string node 'value'
-		value, ok := fMap.Args[1].(*stringNode)
-		if assert.True(ok, "Second argument to 'map' is not string node %q", fMap.Args[0]) {
-			assert.Equal("value", value.Literal)
-		}
 	}
 
 	//Assert b1.right is binary node of operator '.'

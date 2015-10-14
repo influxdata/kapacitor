@@ -92,6 +92,34 @@ func TestLexer(t *testing.T) {
 				token{tokenEOF, 5, ""},
 			},
 		},
+		testCase{
+			in: "-42",
+			tokens: []token{
+				token{tokenNumber, 0, "-42"},
+				token{tokenEOF, 3, ""},
+			},
+		},
+		testCase{
+			in: "-42.21",
+			tokens: []token{
+				token{tokenNumber, 0, "-42.21"},
+				token{tokenEOF, 6, ""},
+			},
+		},
+		testCase{
+			in: "-.421",
+			tokens: []token{
+				token{tokenNumber, 0, "-.421"},
+				token{tokenEOF, 5, ""},
+			},
+		},
+		testCase{
+			in: "-0.421",
+			tokens: []token{
+				token{tokenNumber, 0, "-0.421"},
+				token{tokenEOF, 6, ""},
+			},
+		},
 		//Durations
 		testCase{
 			in: "42s",

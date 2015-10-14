@@ -184,7 +184,7 @@ func lexToken(l *lexer) stateFn {
 		switch r := l.next(); {
 		case isSymbol(r):
 			return lexSymbol
-		case unicode.IsDigit(r):
+		case unicode.IsDigit(r), r == '-':
 			l.backup()
 			return lexNumberOrDuration
 		case r == 'v':
@@ -276,6 +276,12 @@ func isDurUnit(r rune) bool {
 func lexNumberOrDuration(l *lexer) stateFn {
 	foundDecimal := false
 
+	neg := false
+	if l.peek() == '-' {
+		l.next() //absorb sign
+		neg = true
+	}
+
 	for {
 		switch r := l.next(); {
 		case r == '.':
@@ -286,6 +292,9 @@ func lexNumberOrDuration(l *lexer) stateFn {
 		case unicode.IsDigit(r):
 			//absorb
 		case isDurUnit(r):
+			if neg {
+				return l.errorf("cannot have negative duration")
+			}
 			if r == 'm' && l.peek() == 's' {
 				l.next()
 			}

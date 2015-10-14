@@ -163,12 +163,12 @@ func (n *node) Where(predicate string) Node {
 	return w
 }
 
-func (n *node) Map(f interface{}, field string) (c Node) {
+func (n *node) Map(f interface{}) (c Node) {
 	switch n.provides {
 	case StreamEdge:
 		panic("cannot MapReduce stream edge, did you forget to window the data?")
 	case BatchEdge:
-		c = NewMapNode(f, field)
+		c = NewMapNode(f)
 	}
 	n.linkChild(c)
 	return c
@@ -185,16 +185,15 @@ func (n *node) Reduce(f interface{}) (c Node) {
 	return c
 }
 
-func (n *node) MapReduce(f MapReduceFunc, field string) Node {
+func (n *node) MapReduce(mr MapReduceInfo) Node {
 	var m Node
 	var r Node
-	mf, rf := f()
 	switch n.provides {
 	case StreamEdge:
 		panic("cannot MapReduce stream edge, did you forget to window the data?")
 	case BatchEdge:
-		m = NewMapNode(mf, field)
-		r = NewReduceNode(rf)
+		m = NewMapNode(mr.MapI)
+		r = NewReduceNode(mr.ReduceI)
 	}
 	n.linkChild(m)
 	m.linkChild(r)

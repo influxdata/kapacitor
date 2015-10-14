@@ -89,9 +89,9 @@ type numberNode struct {
 	nodeType
 	pos
 	returnType
-	IsUint  bool    // Number has an unsigned integral value.
+	IsInt   bool    // Number has an integral value.
 	IsFloat bool    // Number has a floating-point value.
-	Uint64  uint64  // The unsigned integer value.
+	Int64   int64   // The integer value.
 	Float64 float64 // The floating-point value.
 	Text    string  // The original textual representation from the input.
 }
@@ -104,10 +104,10 @@ func newNumber(p int, text string) (*numberNode, error) {
 		returnType: returnNumber,
 		Text:       text,
 	}
-	u, err := strconv.ParseUint(text, 10, 64)
+	i, err := strconv.ParseInt(text, 10, 64)
 	if err == nil {
-		n.IsUint = true
-		n.Uint64 = u
+		n.IsInt = true
+		n.Int64 = i
 	} else {
 		f, err := strconv.ParseFloat(text, 64)
 		if err == nil {
@@ -115,7 +115,7 @@ func newNumber(p int, text string) (*numberNode, error) {
 			n.Float64 = f
 		}
 	}
-	if !n.IsUint && !n.IsFloat {
+	if !n.IsInt && !n.IsFloat {
 		return nil, fmt.Errorf("illegal number syntax: %q", text)
 	}
 	return n, nil
@@ -130,8 +130,8 @@ func (n *numberNode) Check() error {
 }
 
 func (n *numberNode) Return(s *Scope) (interface{}, error) {
-	if n.IsUint {
-		return n.Uint64, nil
+	if n.IsInt {
+		return n.Int64, nil
 	}
 	return n.Float64, nil
 }
@@ -276,7 +276,7 @@ func (b *binaryNode) Return(s *Scope) (interface{}, error) {
 		} else if rrt == returnObject {
 			obj = right
 		} else {
-			return nil, fmt.Errorf("invalide arguments to binary operator '.'")
+			return nil, fmt.Errorf("invalid arguments to binary operator '.'")
 		}
 
 		if lrt == returnFunc {
@@ -316,6 +316,7 @@ func (b *binaryNode) Return(s *Scope) (interface{}, error) {
 					return field.Interface(), nil
 				}
 			}
+			return nil, fmt.Errorf("return: unknown field %s of obj %T", name, obj)
 		}
 		return nil, fmt.Errorf("return: unknown operator %s", b.Operator.val)
 	}
@@ -428,7 +429,7 @@ func (f *funcNode) Return(s *Scope) (interface{}, error) {
 	rec := func(obj interface{}, errp *error) {
 		e := recover()
 		if e != nil {
-			*errp = fmt.Errorf("error calling func %q on obj %v: %s", f.Func, obj, e)
+			*errp = fmt.Errorf("error calling func %q on obj %T: %s", f.Func, obj, e)
 		}
 	}
 	//Return function that will call the defined func on obj
@@ -449,7 +450,7 @@ func (f *funcNode) Return(s *Scope) (interface{}, error) {
 		} else {
 			v := reflect.ValueOf(obj)
 			if !v.IsValid() {
-				return nil, fmt.Errorf("error calling %q on object %v", f.Func, obj)
+				return nil, fmt.Errorf("error calling %q on object %T", f.Func, obj)
 			}
 			method = v.MethodByName(name)
 		}
@@ -464,7 +465,7 @@ func (f *funcNode) Return(s *Scope) (interface{}, error) {
 			} else if l == 2 {
 				if i := ret[1].Interface(); i != nil {
 					if err, ok := i.(error); !ok {
-						return nil, fmt.Errorf("second return value form function must be an 'error', got %v", i)
+						return nil, fmt.Errorf("second return value form function must be an 'error', got %T", i)
 					} else {
 						return nil, err
 					}

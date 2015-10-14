@@ -17,7 +17,7 @@ type structA struct {
 
 type structB struct {
 	Field1 string
-	Field2 uint64
+	Field2 int64
 	Field3 time.Duration
 	c      *structC
 }
@@ -96,7 +96,7 @@ s2.structC()
 	assert.NotNil(s2)
 	if assert.True(ok, "s2 is not a *structB %q", s2) {
 		assert.Equal("f1", s2.Field1)
-		assert.Equal(uint64(42), s2.Field2)
+		assert.Equal(int64(42), s2.Field2)
 		assert.Equal(time.Minute*15, s2.Field3)
 
 		s3 := s2.c

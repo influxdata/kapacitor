@@ -13,9 +13,9 @@ func TestnumberNode(t *testing.T) {
 	type testCase struct {
 		Text    string
 		Pos     int
-		IsUint  bool
+		IsInt   bool
 		IsFloat bool
-		Uint64  uint64
+		Int64   int64
 		Float64 float64
 		Err     error
 	}
@@ -31,25 +31,25 @@ func TestnumberNode(t *testing.T) {
 			assert.Equal(nodeNumber, n.nodeType)
 			assert.Equal(tc.Text, n.Text)
 			assert.Equal(tc.Pos, int(n.pos))
-			assert.Equal(tc.IsUint, n.IsUint)
+			assert.Equal(tc.IsInt, n.IsInt)
 			assert.Equal(tc.IsFloat, n.IsFloat)
-			assert.Equal(tc.Uint64, n.Uint64)
+			assert.Equal(tc.Int64, n.Int64)
 			assert.Equal(tc.Float64, n.Float64)
 		}
 	}
 
 	cases := []testCase{
 		testCase{
-			Text:   "04",
-			Pos:    6,
-			IsUint: true,
-			Uint64: 4,
+			Text:  "04",
+			Pos:   6,
+			IsInt: true,
+			Int64: 4,
 		},
 		testCase{
-			Text:   "42",
-			Pos:    5,
-			IsUint: true,
-			Uint64: 42,
+			Text:  "42",
+			Pos:   5,
+			IsInt: true,
+			Int64: 42,
 		},
 		testCase{
 			Text:    "42.21",

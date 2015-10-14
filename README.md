@@ -145,7 +145,7 @@ stream
   .window()
   .period(10s)
   .every(5s)
-  .mapReduce(influxql.mean, "value")
+  .mapReduce(influxql.mean("value"))
   .where("value < 30")
   .alert()
   .email("oncall@example.com");
@@ -181,7 +181,7 @@ stream
   .period(10s)
   .every(5s)
   .groupBy("dc")
-  .mapReduce(influxql.mean, "value")
+  .mapReduce(influxql.mean("value"))
   .where("value < 30")
   .alert()
   .email("oncall@example.com");
@@ -284,7 +284,7 @@ stream
   .window()
   .period(1m)
   .every(1m)
-  .mapReduce(influxql.count, "value")
+  .mapReduce(influxql.count("value"))
   .alert();
 
 //Now define normal processing on the stream
