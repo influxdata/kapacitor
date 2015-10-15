@@ -23,10 +23,13 @@ var (
 	branch  string
 )
 
+var mainFlags = flag.NewFlagSet("main", flag.ExitOnError)
+var kapacitordURL = mainFlags.String("url", "http://localhost:9092", "the URL http(s)://host:port of the kapacitord server.")
+
 var l = log.New(os.Stderr, "[run] ", log.LstdFlags)
 
 var usageStr = `
-Usage: kapacitor [command] [args]
+Usage: kapacitor [options] [command] [args]
 
 Commands:
 
@@ -41,22 +44,29 @@ Commands:
 	help     get help for a command.
 	level    sets the logging level on the kapacitord server.
 	version  displays the Kapacitor version info.
+
+Options:
 `
 
 func usage() {
 	fmt.Fprintln(os.Stderr, usageStr)
+	mainFlags.PrintDefaults()
 	os.Exit(1)
 }
 
 func main() {
 
-	if len(os.Args) == 1 {
+	mainFlags.Parse(os.Args[1:])
+
+	args := mainFlags.Args()
+
+	if len(args) == 0 {
 		fmt.Fprintln(os.Stderr, "Error: Must pass a command.")
 		usage()
 	}
 
-	command := os.Args[1]
-	args := os.Args[2:]
+	command := args[0]
+	args = args[1:]
 	var commandF func(args []string) error
 	var commandArgs []string
 	switch command {
@@ -231,7 +241,7 @@ func doRecord(args []string) error {
 	default:
 		return fmt.Errorf("Unknown record type %q, expected 'stream' or 'query'", args[0])
 	}
-	r, err := http.Post("http://localhost:9092/record?"+v.Encode(), "application/octetstream", nil)
+	r, err := http.Post(*kapacitordURL+"/record?"+v.Encode(), "application/octetstream", nil)
 	if err != nil {
 		return err
 	}
@@ -288,7 +298,7 @@ func doDefine(args []string) error {
 	v := url.Values{}
 	v.Add("name", *dname)
 	v.Add("type", *dtype)
-	r, err := http.Post("http://localhost:9092/task?"+v.Encode(), "application/octetstream", f)
+	r, err := http.Post(*kapacitordURL+"/task?"+v.Encode(), "application/octetstream", f)
 	if err != nil {
 		return err
 	}
@@ -337,7 +347,7 @@ func doReplay(args []string) error {
 	if *rfast {
 		v.Add("clock", "fast")
 	}
-	r, err := http.Post("http://localhost:9092/replay?"+v.Encode(), "application/octetstream", nil)
+	r, err := http.Post(*kapacitordURL+"/replay?"+v.Encode(), "application/octetstream", nil)
 	if err != nil {
 		return err
 	}
@@ -375,7 +385,7 @@ func doEnable(args []string) error {
 	for _, name := range args {
 		v := url.Values{}
 		v.Add("name", name)
-		r, err := http.Post("http://localhost:9092/enable?"+v.Encode(), "application/octetstream", nil)
+		r, err := http.Post(*kapacitordURL+"/enable?"+v.Encode(), "application/octetstream", nil)
 		if err != nil {
 			return err
 		}
@@ -414,7 +424,7 @@ func doDisable(args []string) error {
 	for _, name := range args {
 		v := url.Values{}
 		v.Add("name", name)
-		r, err := http.Post("http://localhost:9092/disable?"+v.Encode(), "application/octetstream", nil)
+		r, err := http.Post(*kapacitordURL+"/disable?"+v.Encode(), "application/octetstream", nil)
 		if err != nil {
 			return err
 		}
@@ -460,7 +470,7 @@ func doList(args []string) error {
 		tasks := strings.Join(args[1:], ",")
 		v := url.Values{}
 		v.Add("tasks", tasks)
-		r, err := http.Get("http://localhost:9092/tasks?" + v.Encode())
+		r, err := http.Get(*kapacitordURL + "/tasks?" + v.Encode())
 		if err != nil {
 			return err
 		}
@@ -491,7 +501,7 @@ func doList(args []string) error {
 		rids := strings.Join(args[1:], ",")
 		v := url.Values{}
 		v.Add("rids", rids)
-		r, err := http.Get("http://localhost:9092/recordings?" + v.Encode())
+		r, err := http.Get(*kapacitordURL + "/recordings?" + v.Encode())
 		if err != nil {
 			return err
 		}
@@ -600,7 +610,7 @@ func doLevel(args []string) error {
 	}
 	v := url.Values{}
 	v.Add("level", args[0])
-	r, err := http.Post("http://localhost:9092/loglevel?"+v.Encode(), "text/plain", nil)
+	r, err := http.Post(*kapacitordURL+"/loglevel?"+v.Encode(), "text/plain", nil)
 	if err != nil {
 		return err
 	}
