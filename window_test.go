@@ -23,7 +23,9 @@ func TestWindowBuffer(t *testing.T) {
 	for i := 1; i <= size; i++ {
 
 		t := time.Unix(int64(i), 0)
-		p := models.NewPoint("TestWindowBuffer", models.NilGroup, nil, nil, t)
+		p := models.Point{
+			Time: t,
+		}
 		buf.insert(p)
 
 		assert.Equal(i, buf.size)
@@ -41,9 +43,9 @@ func TestWindowBuffer(t *testing.T) {
 		assert.Equal(i, buf.start, "i: %d", i)
 		assert.Equal(size, buf.stop, "i: %d", i)
 
-		points := buf.points()
-		if assert.Equal(size-i, len(points)) {
-			for _, p := range points {
+		batch := buf.batch()
+		if assert.Equal(size-i, len(batch.Points)) {
+			for _, p := range batch.Points {
 				assert.True(!p.Time.Before(oldest), "Point %s is not after oldest time %s", p.Time, oldest)
 			}
 		}
@@ -56,14 +58,16 @@ func TestWindowBuffer(t *testing.T) {
 	for i := 1; i <= size*2; i++ {
 
 		t := time.Unix(int64(i+size), 0)
-		p := models.NewPoint("TestWindowBuffer", models.NilGroup, nil, nil, t)
+		p := models.Point{
+			Time: t,
+		}
 		buf.insert(p)
 
 		assert.Equal(i, buf.size)
 
-		points := buf.points()
-		if assert.Equal(i, len(points)) {
-			for i, p := range points {
+		batch := buf.batch()
+		if assert.Equal(size-i, len(batch.Points)) {
+			for _, p := range batch.Points {
 				if assert.NotNil(p, "i:%d", i) {
 					assert.True(!p.Time.Before(oldest), "Point %s is not after oldest time %s", p.Time, oldest)
 				}

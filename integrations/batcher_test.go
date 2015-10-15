@@ -1,7 +1,6 @@
 package integrations
 
 import (
-	"fmt"
 	"net/http"
 	"os"
 	"path"
@@ -221,7 +220,7 @@ func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.Ex
 	}
 
 	// Load test data
-	data, err := os.Open(path.Join("data", name+".rpl"))
+	data, err := os.Open(path.Join("data", name+".brpl"))
 	if !assert.Nil(err) {
 		t.FailNow()
 	}
@@ -243,6 +242,6 @@ func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.Ex
 	batch := tm.BatchCollector(name)
 	errCh := r.ReplayBatch(data, batch)
 
-	fmt.Fprintln(os.Stderr, string(et.Task.Dot()))
+	t.Log(string(et.Task.Dot()))
 	return r.Setter, et, errCh, tm
 }

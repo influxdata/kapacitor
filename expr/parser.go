@@ -31,16 +31,16 @@ func (t *Tree) EvalBool(v Vars, f Funcs) (bool, error) {
 	if t.RType() != ReturnBool {
 		return false, fmt.Errorf("Tree does not evaluate to boolean")
 	}
-	r, err := t.Root.Return(v, f)
-	return r > 0, err
+	r, err := t.Root.ReturnBool(v, f)
+	return r, err
 }
 
 //Evaluate the Tree on a given Scope
 func (t *Tree) EvalNumber(v Vars, f Funcs) (float64, error) {
-	if t.RType() != ReturnNumber {
+	if t.RType() != ReturnNum {
 		return 0, fmt.Errorf("Tree does not evaluate to number")
 	}
-	r, err := t.Root.Return(v, f)
+	r, err := t.Root.ReturnNum(v, f)
 	return r, err
 }
 
@@ -151,16 +151,24 @@ func (t *Tree) parse(text string) (err error) {
 // Operator Precedence parsing
 /* Psuedo Grammar
 Expr -> Primary Operator Primary
-Primary -> ( Expr ) | Fnc | Num | Var | - Primary
+Primary -> ( Expr ) | Fnc | Num | Var | String | - Primary | ! Primary
 Fnc -> Var( Params )
 Params -> {Primary { , Primary }
 */
 
-var precedence = map[string]int{
-	"+": 0,
-	"-": 0,
-	"*": 1,
-	"/": 1,
+var precedence = [...]int{
+	tokenOr:           0,
+	tokenAnd:          1,
+	tokenEqual:        2,
+	tokenNotEqual:     2,
+	tokenGreater:      3,
+	tokenGreaterEqual: 3,
+	tokenLess:         3,
+	tokenLessEqual:    3,
+	tokenPlus:         4,
+	tokenMinus:        4,
+	tokenMult:         5,
+	tokenDiv:          5,
 }
 
 func (t *Tree) expr() node {
@@ -172,12 +180,12 @@ func (t *Tree) expr() node {
 // https://en.wikipedia.org/wiki/Operator-precedence_parser#Pseudo-code
 func (t *Tree) prec(lhs node, minP int) node {
 	look := t.peek()
-	for look.typ == tokenOp && precedence[look.val] >= minP {
+	for isOperator(look.typ) && precedence[look.typ] >= minP {
 		op := t.next()
 		rhs := t.primary()
 		look = t.peek()
-		for look.typ == tokenOp && precedence[look.val] >= precedence[op.val] {
-			rhs = t.prec(rhs, precedence[look.val])
+		for isOperator(look.typ) && precedence[look.typ] >= precedence[op.typ] {
+			rhs = t.prec(rhs, precedence[look.typ])
 			look = t.peek()
 		}
 		lhs = newBinary(op, lhs, rhs)
@@ -186,15 +194,15 @@ func (t *Tree) prec(lhs node, minP int) node {
 }
 
 func (t *Tree) primary() node {
-	switch tok := t.peek(); tok.typ {
-	case tokenLParen:
+	switch tok := t.peek(); {
+	case tok.typ == tokenLParen:
 		t.next()
 		n := t.expr()
 		t.expect(tokenRParen)
 		return n
-	case tokenNumber:
+	case tok.typ == tokenNumber:
 		return t.num()
-	case tokenIdent:
+	case tok.typ == tokenIdent:
 		t.next()
 		if t.peek().typ == tokenLParen {
 			t.backup()
@@ -202,13 +210,18 @@ func (t *Tree) primary() node {
 		}
 		t.backup()
 		return t.vr()
-	case tokenOp:
-		if tok.val == "-" {
+	case tok.typ == tokenString:
+		return t.str()
+	case isOperator(tok.typ):
+		if tok.typ == tokenMinus {
+			return newUnary(tok, t.primary())
+		} else if tok.typ == tokenNot {
 			return newUnary(tok, t.primary())
 		} else {
 			t.errorf("unexpected operator %q", tok.val)
 			return nil
 		}
+
 	default:
 		t.errorf("unexpected token %q", tok)
 		return nil
@@ -217,7 +230,7 @@ func (t *Tree) primary() node {
 
 func (t *Tree) num() node {
 	n := t.expect(tokenNumber)
-	num, err := newNumber(n.pos, n.val)
+	num, err := newNum(n.pos, n.val)
 	if err != nil {
 		t.error(err)
 	}
@@ -227,6 +240,11 @@ func (t *Tree) num() node {
 func (t *Tree) vr() node {
 	v := t.expect(tokenIdent)
 	return newVar(v.pos, v.val)
+}
+
+func (t *Tree) str() node {
+	s := t.expect(tokenString)
+	return newStr(s.pos, s.val)
 }
 
 func (t *Tree) fnc() node {

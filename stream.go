@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/influxdb/influxdb/influxql"
+	"github.com/influxdb/kapacitor/expr"
 	"github.com/influxdb/kapacitor/models"
 	"github.com/influxdb/kapacitor/pipeline"
 )
@@ -11,10 +12,11 @@ import (
 type StreamNode struct {
 	node
 	s         *pipeline.StreamNode
-	condition influxql.Expr
+	predicate *expr.Tree
 	db        string
 	rp        string
 	name      string
+	funcs     expr.Funcs
 }
 
 // Create a new  StreamNode which filters data from a source.
@@ -31,13 +33,18 @@ func newStreamNode(et *ExecutingTask, n *pipeline.StreamNode) (*StreamNode, erro
 			return nil, fmt.Errorf("error parsing FROM clause %q %v", sn.s.From, err)
 		}
 	}
-	if sn.s.Predicate != "" {
-		//Parse where condition
-		sn.condition, err = parseWhereCondition(sn.s.Predicate)
+	// Parse predicate
+	if n.Predicate != "" {
+		sn.predicate, err = expr.Parse(n.Predicate)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing WHERE clause  %q %v", sn.s.Predicate, err)
+			return nil, err
+		}
+		if sn.predicate.RType() != expr.ReturnBool {
+			return nil, fmt.Errorf("WHERE clause does not evaluate to boolean value %q", n.Predicate)
 		}
 	}
+	// Initialize expr functions
+	sn.funcs = expr.Functions()
 	return sn, nil
 }
 
@@ -54,19 +61,6 @@ func parseFromClause(from string) (db, rp, mm string, err error) {
 		}
 	}
 	return "", "", "", fmt.Errorf("invalid from condition: %q", from)
-}
-
-func parseWhereCondition(where string) (influxql.Expr, error) {
-	//create fake but complete query for parsing
-	query := "select v from m where " + where
-	s, err := influxql.ParseStatement(query)
-	if err != nil {
-		return nil, err
-	}
-	if slct, ok := s.(*influxql.SelectStatement); ok {
-		return slct.Condition, nil
-	}
-	return nil, fmt.Errorf("invalid where condition: %q", where)
 }
 
 func (s *StreamNode) runStream() error {
@@ -94,50 +88,33 @@ func (s *StreamNode) matches(p models.Point) bool {
 	if s.name != "" && p.Name != s.name {
 		return false
 	}
-	if !s.evalExpr(p, s.condition) {
+	if !s.evalPredicate(p) {
 		return false
 	}
 	return true
 }
 
-//evaluate a given influxql.Expr a against a Point
-func (s *StreamNode) evalExpr(p models.Point, expr influxql.Expr) bool {
-	if expr == nil {
+//evaluate a given predicate a against a Point
+func (s *StreamNode) evalPredicate(p models.Point) bool {
+	if s.predicate == nil {
 		return true
 	}
-	switch expr.(type) {
-	case *influxql.BinaryExpr:
-		be := expr.(*influxql.BinaryExpr)
-		var key string
-		var value string
-		switch be.LHS.(type) {
-		case *influxql.VarRef:
-			lit, ok := be.RHS.(*influxql.StringLiteral)
-			if !ok {
-				s.logger.Println("E! unexpected RHS expected StringLiteral", be.RHS)
-				return false
-			}
-			key = be.LHS.(*influxql.VarRef).Val
-			value = lit.Val
-		case *influxql.StringLiteral:
-			ref, ok := be.RHS.(*influxql.VarRef)
-			if !ok {
-				s.logger.Println("E! unexpected RHS expected VarRef", be.RHS)
-				return false
-			}
-			key = ref.Val
-			value = be.LHS.(*influxql.StringLiteral).Val
+	vars := make(expr.Vars)
+	for k, v := range p.Fields {
+		if p.Tags[k] != "" {
+			s.logger.Println("E! cannot have field and tags with same name")
+			return false
 		}
-		switch be.Op {
-		case influxql.EQ:
-			return p.Tags[key] == value
-		case influxql.NEQ:
-			return p.Tags[key] != value
-		}
-	default:
-		s.logger.Println("E! unexpected expr", expr)
-		return false
-
+		vars[k] = v
 	}
-	return true
+	for k, v := range p.Tags {
+		vars[k] = v
+	}
+
+	b, err := s.predicate.EvalBool(vars, s.funcs)
+	if err != nil {
+		s.logger.Println("E! error evaluating WHERE:", err)
+		return false
+	}
+	return b
 }

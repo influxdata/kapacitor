@@ -1,9 +1,7 @@
 package kapacitor
 
 import (
-	"errors"
 	"fmt"
-	"math"
 
 	"github.com/influxdb/kapacitor/expr"
 	"github.com/influxdb/kapacitor/models"
@@ -15,8 +13,8 @@ type WhereNode struct {
 	w         *pipeline.WhereNode
 	endpoint  string
 	predicate *expr.Tree
-	funcs     expr.Funcs
 	fs        []exprFunc
+	funcs     expr.Funcs
 }
 
 type exprFunc interface {
@@ -37,16 +35,9 @@ func newWhereNode(et *ExecutingTask, n *pipeline.WhereNode) (wn *WhereNode, err 
 		return nil, err
 	}
 	if wn.predicate.RType() != expr.ReturnBool {
-		return nil, fmt.Errorf("Predicate does not evaluate to boolean value %q", n.Predicate)
+		return nil, fmt.Errorf("WHERE clause does not evaluate to boolean value %q", n.Predicate)
 	}
-
-	// Initialize functions for the predicate
-	wn.fs = append(wn.fs, &sigma{})
-
-	wn.funcs = make(expr.Funcs)
-	for _, f := range wn.fs {
-		wn.funcs[f.name()] = f.fnc()
-	}
+	wn.funcs = expr.Functions()
 	return
 }
 
@@ -54,7 +45,7 @@ func (w *WhereNode) runWhere() error {
 	switch w.Wants() {
 	case pipeline.StreamEdge:
 		for p, ok := w.ins[0].NextPoint(); ok; p, ok = w.ins[0].NextPoint() {
-			if w.check(p.Fields) {
+			if w.check(p.Fields, p.Tags) {
 				for _, child := range w.outs {
 					err := child.CollectPoint(p)
 					if err != nil {
@@ -66,7 +57,7 @@ func (w *WhereNode) runWhere() error {
 	case pipeline.BatchEdge:
 		for b, ok := w.ins[0].NextBatch(); ok; b, ok = w.ins[0].NextBatch() {
 			for i, p := range b.Points {
-				if !w.check(p.Fields) {
+				if !w.check(p.Fields, b.Tags) {
 					b.Points = append(b.Points[:i], b.Points[i+1:]...)
 				}
 			}
@@ -82,15 +73,17 @@ func (w *WhereNode) runWhere() error {
 }
 
 // check if a set of fields and values match the condition
-func (w *WhereNode) check(fields models.Fields) bool {
+func (w *WhereNode) check(fields models.Fields, tags map[string]string) bool {
 	vars := make(expr.Vars)
 	for k, v := range fields {
-		if f, ok := v.(float64); ok {
-			vars[k] = f
-		} else {
-			w.logger.Println("W! fields values must be float64")
+		if tags[k] != "" {
+			w.logger.Println("E! cannot have field and tags with same name")
 			return false
 		}
+		vars[k] = v
+	}
+	for k, v := range tags {
+		vars[k] = v
 	}
 	b, err := w.predicate.EvalBool(vars, w.funcs)
 	if err != nil {
@@ -98,37 +91,4 @@ func (w *WhereNode) check(fields models.Fields) bool {
 		return false
 	}
 	return b
-}
-
-type sigma struct {
-	mean     float64
-	variance float64
-	m2       float64
-	n        float64
-}
-
-func (s *sigma) name() string {
-	return "sigma"
-}
-
-func (s *sigma) fnc() expr.Func {
-	return s.call
-}
-
-func (s *sigma) call(args ...float64) (float64, error) {
-	if len(args) != 1 {
-		return 0, errors.New("sigma expected exactly one argument")
-	}
-	x := args[0]
-	s.n++
-	delta := x - s.mean
-	s.mean = s.mean + delta/s.n
-	s.m2 = s.m2 + delta*(x-s.mean)
-	s.variance = s.m2 / (s.n - 1)
-
-	if s.n < 2 {
-		return 0, nil
-	}
-	return math.Abs(x-s.mean) / math.Sqrt(s.variance), nil
-
 }

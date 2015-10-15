@@ -3,9 +3,7 @@ package integrations
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -26,6 +24,7 @@ import (
 var httpService *httpd.Service
 
 func init() {
+	wlog.LogLevel = wlog.OFF
 	// create API server
 	httpService = httpd.NewService(httpd.NewConfig())
 	err := httpService.Open()
@@ -39,7 +38,7 @@ func TestWindowDataByTime(t *testing.T) {
 
 	var script = `
 stream
-	.from("cpu")
+	.from('''"dbname"."rpname"."cpu"''')
 	.where("host = 'serverA'")
 	.window()
 		.period(10s)
@@ -71,11 +70,8 @@ stream
 	er := kapacitor.Result{
 		Series: imodels.Rows{
 			{
-				Name: "cpu",
-				Tags: map[string]string{
-					"type": "idle",
-					"host": "serverA",
-				},
+				Name:    "cpu",
+				Tags:    nil,
 				Columns: []string{"time", "value"},
 				Values:  values,
 			},
@@ -651,7 +647,7 @@ stream
 	}
 
 	for _, tc := range testCases {
-		log.Println("Method:", tc.Method)
+		t.Log("Method:", tc.Method)
 		var script bytes.Buffer
 		tmpl.Execute(&script, tc)
 		clock, et, errCh, tm := testStreamer(
@@ -735,7 +731,7 @@ func TestStreamingAlert(t *testing.T) {
 			t.FailNow()
 		}
 		requestCount++
-		expAns := `{"name":"cpu","tags":{"host":"serverA","type":"idle"},"points":[{"fields":{"count":10},"time":"1970-01-01T00:00:09Z"}]}`
+		expAns := `{"name":"cpu","points":[{"fields":{"count":10},"time":"1970-01-01T00:00:09Z"}]}`
 		assert.Equal(expAns, string(ans))
 	}))
 	defer ts.Close()
@@ -783,9 +779,7 @@ func TestStreamingAlertSigma(t *testing.T) {
 	var script = `
 stream
 	.from("cpu")
-	// Need to combine this into a single expression
-	.where("host = 'serverA'")
-	.where("sigma(value) > 2")
+	.where("host = 'serverA' AND sigma(value) > 2")
 	.alert()
 		.post("` + ts.URL + `");`
 
@@ -850,7 +844,6 @@ stream
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(data)
 		//Get request data
-		log.Println(r.URL)
 		database = r.URL.Query().Get("db")
 		rp = r.URL.Query().Get("rp")
 		precision = r.URL.Query().Get("precision")
@@ -880,7 +873,6 @@ stream
 	assert.Equal("db", database)
 	assert.Equal("rp", rp)
 	assert.Equal("s", precision)
-	log.Println(points)
 	if assert.Equal(1, len(points)) {
 		p := points[0]
 		assert.Equal("m", p.Name())
@@ -911,7 +903,7 @@ func testStreamer(t *testing.T, name, script string) (clock.Setter, *kapacitor.E
 	if !assert.Nil(err) {
 		t.FailNow()
 	}
-	data, err := os.Open(path.Join(dir, "data", name+".rpl"))
+	data, err := os.Open(path.Join(dir, "data", name+".srpl"))
 	if !assert.Nil(err) {
 		t.FailNow()
 	}
@@ -932,6 +924,6 @@ func testStreamer(t *testing.T, name, script string) (clock.Setter, *kapacitor.E
 	// Replay test data to executor
 	errCh := r.ReplayStream(data, tm.Stream)
 
-	fmt.Fprintln(os.Stderr, string(et.Task.Dot()))
+	t.Log(string(et.Task.Dot()))
 	return r.Setter, et, errCh, tm
 }

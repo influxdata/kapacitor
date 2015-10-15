@@ -142,15 +142,12 @@ func (t *tree) parse() {
 Prog -> Stmt { Stmt ...}
 Stmt -> Decl ';' | Expr ';'
 Decl -> Vr '=' Expr
-Expr -> Ident { FChain }
-FChain -> '.' Fnc { FChain }
+Expr -> Ident { Chain } | Fnc { Chain }
+Chain -> '.' Fnc { Chain } | '.' Ident { Chain}
 Vr -> 'var' Ident
 Fnc -> Ident '( Args ')'
 Args -> {Param {',' Param}}
-Param -> Fnc | Ref | Dur | Num | Str
-Ref -> Ident { RChain }
-RChain -> '.' Ident { RChain }
-Ident -> [a-zA-Z][a-zA-Z0-9]*
+Param -> Expr | Dur | Num | Str
 Dur -> duration
 Num -> number
 Str => string_literal

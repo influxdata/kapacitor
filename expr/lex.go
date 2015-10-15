@@ -18,11 +18,111 @@ const (
 	tokenEOF
 	tokenIdent
 	tokenNumber
-	tokenOp
+	tokenString
 	tokenLParen
 	tokenRParen
 	tokenComma
+	tokenNot
+
+	// begin operator tokens
+	begin_tok_operator
+
+	//begin mathematical operators
+	begin_tok_operator_math
+
+	tokenPlus
+	tokenMinus
+	tokenMult
+	tokenDiv
+
+	//end mathematical operators
+	end_tok_operator_math
+
+	// begin comparison operators
+	begin_tok_operator_comp
+
+	tokenEqual
+	tokenNotEqual
+	tokenLess
+	tokenGreater
+	tokenLessEqual
+	tokenGreaterEqual
+	tokenRegexEqual
+	tokenRegexNotEqual
+
+	//end comparison operators
+	end_tok_operator_comp
+
+	tokenAnd
+	tokenOr
+
+	//end operator tokens
+	end_tok_operator
 )
+
+var operatorStr = [...]string{
+	tokenPlus:          "+",
+	tokenMinus:         "-",
+	tokenMult:          "*",
+	tokenDiv:           "/",
+	tokenEqual:         "=",
+	tokenNotEqual:      "!=",
+	tokenLess:          "<",
+	tokenGreater:       ">",
+	tokenLessEqual:     "<=",
+	tokenGreaterEqual:  ">=",
+	tokenRegexEqual:    "=~",
+	tokenRegexNotEqual: "!~",
+	tokenAnd:           "AND",
+	tokenOr:            "OR",
+}
+
+var strToOperator map[string]tokenType
+
+func init() {
+	strToOperator = make(map[string]tokenType, len(operatorStr))
+	for t, s := range operatorStr {
+		strToOperator[s] = tokenType(t)
+	}
+}
+
+func (t tokenType) String() string {
+	switch {
+	case t == tokenError:
+		return "ERR"
+	case t == tokenEOF:
+		return "EOF"
+	case t == tokenIdent:
+		return "identifier"
+	case t == tokenNumber:
+		return "number"
+	case t == tokenString:
+		return "literal"
+	case t == tokenLParen:
+		return "("
+	case t == tokenRParen:
+		return ")"
+	case t == tokenComma:
+		return ","
+	case t == tokenNot:
+		return "!"
+	case isOperator(t):
+		return operatorStr[t]
+	}
+	return "unknown"
+}
+
+func isOperator(typ tokenType) bool {
+	return typ > begin_tok_operator && typ < end_tok_operator
+}
+
+func isMathOperator(typ tokenType) bool {
+	return typ > begin_tok_operator_math && typ < end_tok_operator_math
+}
+
+func isCompOperator(typ tokenType) bool {
+	return typ > begin_tok_operator_comp && typ < end_tok_operator_comp
+}
 
 // token represents a token or text string returned from the scanner.
 type token struct {
@@ -38,27 +138,6 @@ type lexer struct {
 	pos    int        // current position in the input.
 	width  int        // width of last rune read from input.
 	tokens chan token // channel of scanned tokens.
-}
-
-//String representation of an tokenType
-func (t tokenType) String() string {
-	switch t {
-	case tokenError:
-		return "Error"
-	case tokenEOF:
-		return "EOF"
-	case tokenIdent:
-		return "identifier"
-	case tokenNumber:
-		return "number"
-	case tokenOp:
-		return "operator"
-	case tokenLParen:
-		return "("
-	case tokenRParen:
-		return ")"
-	}
-	return "unknow type"
 }
 
 //String representation of an token
@@ -164,17 +243,26 @@ func (l *lexer) expect(r rune) bool {
 	return false
 }
 
+// ----------------------
+// Lex stateFns
+
 func lexToken(l *lexer) stateFn {
 	for {
 		switch r := l.next(); {
-		case isOperator(r):
+		case isOperatorChar(r):
 			l.backup()
 			return lexOperator
 		case unicode.IsDigit(r):
 			l.backup()
 			return lexNumber
 		case unicode.IsLetter(r):
-			return lexIdent
+			return lexIdentOrKeyword
+		case r == '"':
+			l.backup()
+			return lexQuotedIdent
+		case r == '\'':
+			l.backup()
+			return lexString
 		case r == '(':
 			l.emit(tokenLParen)
 			return lexToken
@@ -195,51 +283,96 @@ func lexToken(l *lexer) stateFn {
 	}
 }
 
-const operators = "+-*/><&|!"
+const operatorChars = "+-*/><!="
 
-func isOperator(r rune) bool {
-	return strings.IndexRune(operators, r) != -1
+func isOperatorChar(r rune) bool {
+	return strings.IndexRune(operatorChars, r) != -1
 }
 
 func lexOperator(l *lexer) stateFn {
 	for {
 		switch l.next() {
 		case '+', '-', '*', '/':
-			l.emit(tokenOp)
+			op := strToOperator[l.current()]
+			l.emit(op)
 			return lexToken
 		case '>', '<', '!':
 			if l.peek() == '=' {
 				l.next()
 			}
-			l.emit(tokenOp)
+			op := strToOperator[l.current()]
+			l.emit(op)
 			return lexToken
 		case '=':
-			if l.expect('=') {
-				l.emit(tokenOp)
-			} else {
-				return l.errorf("unexpected '=' did you mean '=='")
-			}
+			op := strToOperator[l.current()]
+			l.emit(op)
 			return lexToken
 		}
 	}
 }
 
-func lexIdent(l *lexer) stateFn {
+var keywords = map[string]bool{
+	"AND": true,
+	"OR":  true,
+}
+
+func lexIdentOrKeyword(l *lexer) stateFn {
 	for {
 		switch r := l.next(); {
 		case isValidIdent(r):
 			//absorb
 		default:
 			l.backup()
+			if keywords[l.current()] {
+				op := strToOperator[l.current()]
+				l.emit(op)
+			} else {
+				l.emit(tokenIdent)
+			}
+			return lexToken
+		}
+	}
+}
+
+func lexQuotedIdent(l *lexer) stateFn {
+	if n := l.next(); n != '"' {
+		return l.errorf("unexpected %q expected '\"'", n)
+	}
+	for {
+		switch r := l.next(); {
+		case isValidIdent(r):
+			//absorb
+		case r == '"':
 			l.emit(tokenIdent)
 			return lexToken
+		default:
+			return l.errorf("invalid char in identifier %q", r)
 		}
 	}
 }
 
 // isValidIdent reports whether r is either a letter or a digit
 func isValidIdent(r rune) bool {
-	return unicode.IsDigit(r) || unicode.IsLetter(r) || r == '.'
+	return unicode.IsDigit(r) || unicode.IsLetter(r) || r == '.' || r == '_'
+}
+
+func lexString(l *lexer) stateFn {
+	if n := l.next(); n != '\'' {
+		return l.errorf(`unexpected "%s" expected "'"`, n)
+	}
+	for {
+		switch r := l.next(); {
+		case r == '\\':
+			if l.peek() == '\'' {
+				l.next()
+			}
+		case r == '\'':
+			l.emit(tokenString)
+			return lexToken
+		default:
+			//absorb
+		}
+	}
 }
 
 // isSpace reports whether r is a space character.

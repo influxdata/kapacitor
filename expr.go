@@ -12,7 +12,7 @@ func ExprFunc(field, e string) (TransFunc, error) {
 	if err != nil {
 		return nil, err
 	}
-	if t.RType() != expr.ReturnNumber {
+	if t.RType() != expr.ReturnNum {
 		return nil, fmt.Errorf("expression does not evaluate to a number")
 	}
 	x := &expression{
