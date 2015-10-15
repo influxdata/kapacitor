@@ -2,8 +2,14 @@ package pipeline
 
 type AlertNode struct {
 	node
-	Predicate string
-	Post      string
+
+	// HTTP POST
+	Post string
+
+	// Email settings
+	From    string
+	ToList  []string
+	Subject string
 }
 
 func newAlertNode(wants EdgeType) *AlertNode {
@@ -14,4 +20,11 @@ func newAlertNode(wants EdgeType) *AlertNode {
 			provides: NoEdge,
 		},
 	}
+}
+
+func (a *AlertNode) Email(from, subject string, to ...string) Node {
+	a.From = from
+	a.Subject = subject
+	a.ToList = to
+	return a
 }

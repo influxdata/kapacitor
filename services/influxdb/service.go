@@ -57,7 +57,6 @@ func NewService(c Config, hostname string) *Service {
 			Password:  c.Password,
 			UserAgent: "Kapacitor",
 			Timeout:   c.Timeout,
-			Precision: c.Precision,
 		}
 	}
 	subs := make(map[subEntry]bool, len(c.Subscriptions))
@@ -123,8 +122,6 @@ func (s *Service) linkSubscriptions() error {
 		return err
 	}
 
-	s.logger.Println("D! configSubs", s.configSubs)
-
 	if len(resp.Results) == 1 && len(resp.Results[0].Series) == 1 && len(resp.Results[0].Series[0].Values) > 0 {
 		dbs := resp.Results[0].Series[0].Values
 		for _, v := range dbs {
@@ -150,8 +147,6 @@ func (s *Service) linkSubscriptions() error {
 
 		}
 	}
-
-	s.logger.Println("D! allSubs", allSubs)
 
 	// Get all existing subscriptions
 	resp, err = s.execQuery(cli, "SHOW SUBSCRIPTIONS")
@@ -188,8 +183,6 @@ func (s *Service) linkSubscriptions() error {
 			}
 		}
 	}
-
-	s.logger.Println("D! existingSubs", existingSubs)
 
 	// Compare to configured list
 	startedSubs := make(map[subEntry]bool)

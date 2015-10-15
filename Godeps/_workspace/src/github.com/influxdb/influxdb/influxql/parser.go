@@ -7,6 +7,7 @@ import (
 	"io"
 	"math"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -145,9 +146,29 @@ func (p *Parser) parseShowStatement() (Statement, error) {
 		return nil, newParseError(tokstr(tok, lit), []string{"KEYS", "VALUES"}, pos)
 	case USERS:
 		return p.parseShowUsersStatement()
+	case SUBSCRIPTIONS:
+		return p.parseShowSubscriptionsStatement()
 	}
 
-	return nil, newParseError(tokstr(tok, lit), []string{"CONTINUOUS", "DATABASES", "FIELD", "GRANTS", "MEASUREMENTS", "RETENTION", "SERIES", "SERVERS", "TAG", "USERS"}, pos)
+	showQueryKeywords := []string{
+		"CONTINUOUS",
+		"DATABASES",
+		"FIELD",
+		"GRANTS",
+		"MEASUREMENTS",
+		"RETENTION",
+		"SERIES",
+		"SERVERS",
+		"TAG",
+		"USERS",
+		"STATS",
+		"DIAGNOSTICS",
+		"SHARDS",
+		"SUBSCRIPTIONS",
+	}
+	sort.Strings(showQueryKeywords)
+
+	return nil, newParseError(tokstr(tok, lit), showQueryKeywords, pos)
 }
 
 // parseCreateStatement parses a string and returns a create statement.
@@ -166,9 +187,11 @@ func (p *Parser) parseCreateStatement() (Statement, error) {
 			return nil, newParseError(tokstr(tok, lit), []string{"POLICY"}, pos)
 		}
 		return p.parseCreateRetentionPolicyStatement()
+	} else if tok == SUBSCRIPTION {
+		return p.parseCreateSubscriptionStatement()
 	}
 
-	return nil, newParseError(tokstr(tok, lit), []string{"CONTINUOUS", "DATABASE", "USER", "RETENTION"}, pos)
+	return nil, newParseError(tokstr(tok, lit), []string{"CONTINUOUS", "DATABASE", "USER", "RETENTION", "SUBSCRIPTION"}, pos)
 }
 
 // parseDropStatement parses a string and returns a drop statement.
@@ -190,23 +213,31 @@ func (p *Parser) parseDropStatement() (Statement, error) {
 		return p.parseDropRetentionPolicyStatement()
 	} else if tok == USER {
 		return p.parseDropUserStatement()
+	} else if tok == SERVER {
+		return p.parseDropServerStatement()
+	} else if tok == SUBSCRIPTION {
+		return p.parseDropSubscriptionStatement()
 	}
 
-	return nil, newParseError(tokstr(tok, lit), []string{"SERIES", "CONTINUOUS", "MEASUREMENT"}, pos)
+	return nil, newParseError(tokstr(tok, lit), []string{"SERIES", "CONTINUOUS", "MEASUREMENT", "SERVER", "SUBSCRIPTION"}, pos)
 }
 
 // parseAlterStatement parses a string and returns an alter statement.
 // This function assumes the ALTER token has already been consumed.
 func (p *Parser) parseAlterStatement() (Statement, error) {
 	tok, pos, lit := p.scanIgnoreWhitespace()
-	if tok == RETENTION {
+
+	switch tok {
+	case RETENTION:
 		if tok, pos, lit = p.scanIgnoreWhitespace(); tok != POLICY {
 			return nil, newParseError(tokstr(tok, lit), []string{"POLICY"}, pos)
 		}
 		return p.parseAlterRetentionPolicyStatement()
+	case DATABASE:
+		return p.parseAlterDatabaseRenameStatement()
 	}
 
-	return nil, newParseError(tokstr(tok, lit), []string{"RETENTION"}, pos)
+	return nil, newParseError(tokstr(tok, lit), []string{"RETENTION", "DATABASE"}, pos)
 }
 
 // parseSetPasswordUserStatement parses a string and returns a set statement.
@@ -237,6 +268,61 @@ func (p *Parser) parseSetPasswordUserStatement() (*SetPasswordUserStatement, err
 		return nil, err
 	}
 	stmt.Password = ident
+
+	return stmt, nil
+}
+
+// parseCreateSubscriptionStatement parses a string and returns a CreatesubScriptionStatement.
+// This function assumes the "CREATE SUBSCRIPTION" tokens have already been consumed.
+func (p *Parser) parseCreateSubscriptionStatement() (*CreateSubscriptionStatement, error) {
+	stmt := &CreateSubscriptionStatement{}
+
+	// Read the id of the subscription to create.
+	ident, err := p.parseIdent()
+	if err != nil {
+		return nil, err
+	}
+	stmt.Name = ident
+
+	// Expect an "ON" keyword.
+	if tok, pos, lit := p.scanIgnoreWhitespace(); tok != ON {
+		return nil, newParseError(tokstr(tok, lit), []string{"ON"}, pos)
+	}
+
+	// Read the name of the database.
+	if ident, err = p.parseIdent(); err != nil {
+		return nil, err
+	}
+	stmt.Database = ident
+
+	if tok, pos, lit := p.scan(); tok != DOT {
+		return nil, newParseError(tokstr(tok, lit), []string{"."}, pos)
+	}
+
+	// Read the name of the retention policy.
+	if ident, err = p.parseIdent(); err != nil {
+		return nil, err
+	}
+	stmt.RetentionPolicy = ident
+
+	// Expect a "DESTINATIONS" keyword.
+	if tok, pos, lit := p.scanIgnoreWhitespace(); tok != DESTINATIONS {
+		return nil, newParseError(tokstr(tok, lit), []string{"DESTINATIONS"}, pos)
+	}
+
+	// Expect one of "ANY ALL" keywords.
+	if tok, pos, lit := p.scanIgnoreWhitespace(); tok == ALL || tok == ANY {
+		stmt.Mode = tokens[tok]
+	} else {
+		return nil, newParseError(tokstr(tok, lit), []string{"ALL", "ANY"}, pos)
+	}
+
+	// Read list of destinations.
+	var destinations []string
+	if destinations, err = p.parseStringList(); err != nil {
+		return nil, err
+	}
+	stmt.Destinations = destinations
 
 	return stmt, nil
 }
@@ -293,8 +379,8 @@ func (p *Parser) parseCreateRetentionPolicyStatement() (*CreateRetentionPolicySt
 	// Parse optional DEFAULT token.
 	if tok, pos, lit = p.scanIgnoreWhitespace(); tok == DEFAULT {
 		stmt.Default = true
-	} else {
-		p.unscan()
+	} else if tok != EOF && tok != SEMICOLON {
+		return nil, newParseError(tokstr(tok, lit), []string{"DEFAULT"}, pos)
 	}
 
 	return stmt, nil
@@ -522,6 +608,30 @@ func (p *Parser) parseString() (string, error) {
 		return "", newParseError(tokstr(tok, lit), []string{"string"}, pos)
 	}
 	return lit, nil
+}
+
+// parserString parses a string.
+func (p *Parser) parseStringList() ([]string, error) {
+	// Parse first (required) string.
+	str, err := p.parseString()
+	if err != nil {
+		return nil, err
+	}
+	strs := []string{str}
+
+	// Parse remaining (optional) strings.
+	for {
+		if tok, _, _ := p.scanIgnoreWhitespace(); tok != COMMA {
+			p.unscan()
+			return strs, nil
+		}
+
+		if str, err = p.parseString(); err != nil {
+			return nil, err
+		}
+
+		strs = append(strs, str)
+	}
 }
 
 // parseRevokeStatement parses a string and returns a revoke statement.
@@ -1082,6 +1192,13 @@ func (p *Parser) parseShowUsersStatement() (*ShowUsersStatement, error) {
 	return &ShowUsersStatement{}, nil
 }
 
+// parseShowSubscriptionsStatement parses a string and returns a ShowSubscriptionsStatement
+// This function assumes the "SHOW SUBSCRIPTIONS" tokens have been consumed.
+func (p *Parser) parseShowSubscriptionsStatement() (*ShowSubscriptionsStatement, error) {
+	stmt := &ShowSubscriptionsStatement{}
+	return stmt, nil
+}
+
 // parseShowFieldKeysStatement parses a string and returns a ShowSeriesStatement.
 // This function assumes the "SHOW FIELD KEYS" tokens have already been consumed.
 func (p *Parser) parseShowFieldKeysStatement() (*ShowFieldKeysStatement, error) {
@@ -1158,6 +1275,27 @@ func (p *Parser) parseDropSeriesStatement() (*DropSeriesStatement, error) {
 	}
 
 	return stmt, nil
+}
+
+// parseDropServerStatement parses a string and returns a DropServerStatement.
+// This function assumes the "DROP SERVER" tokens have already been consumed.
+func (p *Parser) parseDropServerStatement() (*DropServerStatement, error) {
+	s := &DropServerStatement{}
+	var err error
+
+	// Parse the server's ID.
+	if s.NodeID, err = p.parseUInt64(); err != nil {
+		return nil, err
+	}
+
+	// Parse optional FORCE token.
+	if tok, pos, lit := p.scanIgnoreWhitespace(); tok == FORCE {
+		s.Force = true
+	} else if tok != EOF && tok != SEMICOLON {
+		return nil, newParseError(tokstr(tok, lit), []string{"FORCE"}, pos)
+	}
+
+	return s, nil
 }
 
 // parseShowContinuousQueriesStatement parses a string and returns a ShowContinuousQueriesStatement.
@@ -1311,6 +1449,69 @@ func (p *Parser) parseDropDatabaseStatement() (*DropDatabaseStatement, error) {
 	return stmt, nil
 }
 
+// parseAlterDatabaseRenameStatement parses a string and returns an AlterDatabaseRenameStatement.
+// This function assumes the "ALTER DATABASE" tokens have already been consumed.
+func (p *Parser) parseAlterDatabaseRenameStatement() (*AlterDatabaseRenameStatement, error) {
+	stmt := &AlterDatabaseRenameStatement{}
+
+	// Parse the name of the database to be renamed.
+	lit, err := p.parseIdent()
+	if err != nil {
+		return nil, err
+	}
+	stmt.OldName = lit
+
+	// Parse required RENAME TO tokens.
+	if err := p.parseTokens([]Token{RENAME, TO}); err != nil {
+		return nil, err
+	}
+
+	// Parse the new name of the database.
+	lit, err = p.parseIdent()
+	if err != nil {
+		return nil, err
+	}
+	stmt.NewName = lit
+
+	return stmt, nil
+}
+
+// parseDropSubscriptionStatement parses a string and returns a DropSubscriptionStatement.
+// This function assumes the "DROP SUBSCRIPTION" tokens have already been consumed.
+func (p *Parser) parseDropSubscriptionStatement() (*DropSubscriptionStatement, error) {
+	stmt := &DropSubscriptionStatement{}
+
+	// Read the id of the subscription to drop.
+	ident, err := p.parseIdent()
+	if err != nil {
+		return nil, err
+	}
+	stmt.Name = ident
+
+	// Expect an "ON" keyword.
+	if tok, pos, lit := p.scanIgnoreWhitespace(); tok != ON {
+		return nil, newParseError(tokstr(tok, lit), []string{"ON"}, pos)
+	}
+
+	// Read the name of the database.
+	if ident, err = p.parseIdent(); err != nil {
+		return nil, err
+	}
+	stmt.Database = ident
+
+	if tok, pos, lit := p.scan(); tok != DOT {
+		return nil, newParseError(tokstr(tok, lit), []string{"."}, pos)
+	}
+
+	// Read the name of the retention policy.
+	if ident, err = p.parseIdent(); err != nil {
+		return nil, err
+	}
+	stmt.RetentionPolicy = ident
+
+	return stmt, nil
+}
+
 // parseDropRetentionPolicyStatement parses a string and returns a DropRetentionPolicyStatement.
 // This function assumes the DROP RETENTION POLICY tokens have been consumed.
 func (p *Parser) parseDropRetentionPolicyStatement() (*DropRetentionPolicyStatement, error) {
@@ -1433,8 +1634,8 @@ func (p *Parser) parseShowStatsStatement() (*ShowStatsStatement, error) {
 	stmt := &ShowStatsStatement{}
 	var err error
 
-	if tok, _, _ := p.scanIgnoreWhitespace(); tok == ON {
-		stmt.Host, err = p.parseString()
+	if tok, _, _ := p.scanIgnoreWhitespace(); tok == FOR {
+		stmt.Module, err = p.parseString()
 	} else {
 		p.unscan()
 	}
@@ -1445,7 +1646,15 @@ func (p *Parser) parseShowStatsStatement() (*ShowStatsStatement, error) {
 // parseShowDiagnostics parses a string and returns a ShowDiagnosticsStatement.
 func (p *Parser) parseShowDiagnosticsStatement() (*ShowDiagnosticsStatement, error) {
 	stmt := &ShowDiagnosticsStatement{}
-	return stmt, nil
+	var err error
+
+	if tok, _, _ := p.scanIgnoreWhitespace(); tok == FOR {
+		stmt.Module, err = p.parseString()
+	} else {
+		p.unscan()
+	}
+
+	return stmt, err
 }
 
 // parseDropContinuousQueriesStatement parses a string and returns a DropContinuousQueryStatement.

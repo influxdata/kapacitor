@@ -455,7 +455,7 @@ func doList(args []string) error {
 		os.Exit(2)
 	}
 
-	switch args[0] {
+	switch kind := args[0]; kind {
 	case "tasks":
 		tasks := strings.Join(args[1:], ",")
 		v := url.Values{}
@@ -517,6 +517,8 @@ func doList(args []string) error {
 		for _, r := range rp.Recordings {
 			fmt.Fprintf(os.Stdout, outFmt, r.ID, r.Type, float64(r.Size)/1024.0/1024.0)
 		}
+	default:
+		return fmt.Errorf("cannot list '%s' did you mean 'tasks' or 'recordings'?", kind)
 	}
 	return nil
 
@@ -524,7 +526,7 @@ func doList(args []string) error {
 
 // Delete
 func deleteUsage() {
-	var u = `Usage: kapacitor delete (task|recording) [task name|recording ID]...
+	var u = `Usage: kapacitor delete (tasks|recordings) [task name|recording ID]...
 
 	Delete a task or recording.
 	
@@ -542,13 +544,15 @@ func doDelete(args []string) error {
 
 	var baseURL string
 	var paramName string
-	switch args[0] {
-	case "task":
+	switch kind := args[0]; kind {
+	case "tasks":
 		baseURL = "http://localhost:9092/task?"
 		paramName = "name"
-	case "recording":
+	case "recordings":
 		baseURL = "http://localhost:9092/recording?"
 		paramName = "rid"
+	default:
+		return fmt.Errorf("cannot delete '%s' did you mean 'tasks' or 'recordings'?", kind)
 	}
 
 	for _, arg := range args[1:] {

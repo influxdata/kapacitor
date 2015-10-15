@@ -13,6 +13,7 @@ import (
 	"github.com/influxdb/kapacitor/services/httpd"
 	"github.com/influxdb/kapacitor/services/influxdb"
 	"github.com/influxdb/kapacitor/services/replay"
+	"github.com/influxdb/kapacitor/services/smtp"
 	"github.com/influxdb/kapacitor/services/task_store"
 	"github.com/influxdb/kapacitor/services/udp"
 
@@ -32,6 +33,7 @@ type Config struct {
 	Collectd  collectd.Config   `toml:"collectd"`
 	OpenTSDB  opentsdb.Config   `toml:"opentsdb"`
 	UDPs      []udp.Config      `toml:"udp"`
+	SMTP      smtp.Config       `toml:"smtp"`
 
 	Hostname string `toml:"hostname"`
 
@@ -49,6 +51,7 @@ func NewConfig() *Config {
 
 	c.Collectd = collectd.NewConfig()
 	c.OpenTSDB = opentsdb.NewConfig()
+	c.SMTP = smtp.NewConfig()
 
 	return c
 }

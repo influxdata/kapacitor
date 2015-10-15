@@ -30,8 +30,8 @@
 		},
 		{
 			"ImportPath": "github.com/influxdb/influxdb",
-			"Comment": "v0.9.4-rc1-153-g522f9ea",
-			"Rev": "522f9eaef4d9970880c349a70ebc3c09d95e9c2a"
+			"Comment": "v0.9.4-rc1-584-gd338f38",
+			"Rev": "d338f38d65fe660fe414bedfaa55223d8d338f69"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/assert",

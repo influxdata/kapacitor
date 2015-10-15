@@ -40,6 +40,9 @@ type Service struct {
 	InfluxDBService interface {
 		NewClient() (*client.Client, error)
 	}
+	SMTPService interface {
+		SendMail(from string, to []string, subject string, msg string)
+	}
 	TaskMaster interface {
 		NewFork(name string) *kapacitor.Edge
 		DelFork(name string)
@@ -152,6 +155,7 @@ func (r *Service) handleReplay(w http.ResponseWriter, req *http.Request) {
 	tm := kapacitor.NewTaskMaster()
 	tm.HTTPDService = r.HTTPDService
 	tm.InfluxDBService = r.InfluxDBService
+	tm.SMTPService = r.SMTPService
 	tm.Open()
 	et, err := tm.StartTask(t)
 	if err != nil {
@@ -370,7 +374,8 @@ func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration) error {
 
 	done := false
 	go func() {
-		for p := e.NextPoint(); p != nil && !done; p = e.NextPoint() {
+		for p, ok := e.NextPoint(); ok && !done; p, ok = e.NextPoint() {
+			fmt.Fprintf(gz, "%s\n%s\n", p.Database, p.RetentionPolicy)
 			gz.Write(p.Bytes("s"))
 			gz.Write([]byte("\n"))
 		}

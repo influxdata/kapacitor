@@ -10,7 +10,6 @@ type Config struct {
 	Username      string              `toml:"username"`
 	Password      string              `toml:"password"`
 	Timeout       time.Duration       `toml:"timeout"`
-	Precision     string              `toml:"precision"`
 	Subscriptions map[string][]string `toml:"subscriptions"`
 	Dir           string              `toml:"dir"`
 }
@@ -20,7 +19,6 @@ func NewConfig() Config {
 		URLs:          []string{"http://localhost:8086"},
 		Username:      "",
 		Password:      "",
-		Precision:     "s",
 		Subscriptions: make(map[string][]string),
 		Dir:           "subscriptions",
 	}

@@ -23,6 +23,9 @@ type TaskMaster struct {
 	InfluxDBService interface {
 		NewClient() (*client.Client, error)
 	}
+	SMTPService interface {
+		SendMail(from string, to []string, subject string, msg string)
+	}
 
 	// Incoming stream and forks
 	in    *Edge

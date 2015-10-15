@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/influxdb/influxdb/influxql"
+	"github.com/influxdb/influxdb/pkg/slices"
 )
 
 // Mapper is the interface all Mapper types must implement.
@@ -247,7 +248,7 @@ func (m *RawMapper) openMeasurement(mm *Measurement) error {
 
 		tsc := NewTagSetCursor(mm.Name, t.Tags, cursors)
 		tsc.SelectFields = m.selectFields
-		tsc.Fields = fields
+		tsc.SelectWhereFields = fields
 		if ascending {
 			tsc.Init(m.qmin)
 		} else {
@@ -464,7 +465,8 @@ func (m *AggregateMapper) openMeasurement(mm *Measurement) error {
 		cursors := []*TagsCursor{}
 
 		for i, key := range t.SeriesKeys {
-			c := m.tx.Cursor(key, m.fieldNames, m.shard.FieldCodec(mm.Name), true)
+			fields := slices.Union(selectFields, m.fieldNames, false)
+			c := m.tx.Cursor(key, fields, m.shard.FieldCodec(mm.Name), true)
 			if c == nil {
 				continue
 			}
@@ -601,17 +603,27 @@ func (m *AggregateMapper) NextChunk() (interface{}, error) {
 		}
 
 		tsc.SelectFields = []string{m.fieldNames[i]}
-		tsc.Fields = uniqueStrings([]string{m.fieldNames[i]}, m.whereFields)
+		tsc.SelectWhereFields = uniqueStrings([]string{m.fieldNames[i]}, m.whereFields)
+
+		// Build a map input from the cursor.
+		input := &MapInput{
+			TMin: -1,
+		}
+		if len(m.stmt.Dimensions) > 0 && !m.stmt.HasTimeFieldSpecified() {
+			input.TMin = tmin
+		}
+
+		for k, v := tsc.Next(qmin, qmax); k != -1; k, v = tsc.Next(qmin, qmax) {
+			input.Items = append(input.Items, MapItem{
+				Timestamp: k,
+				Value:     v,
+				Fields:    tsc.Fields(),
+				Tags:      tsc.Tags(),
+			})
+		}
 
 		// Execute the map function which walks the entire interval, and aggregates the result.
-		mapValue := m.mapFuncs[i](&AggregateTagSetCursor{
-			cursor: tsc,
-			tmin:   tmin,
-			stmt:   m.stmt,
-
-			qmin: qmin,
-			qmax: qmax,
-		})
+		mapValue := m.mapFuncs[i](input)
 		output.Values[0].Value = append(output.Values[0].Value.([]interface{}), mapValue)
 	}
 
@@ -631,35 +643,6 @@ func (m *AggregateMapper) nextInterval() (start, end int64) {
 		start, end = t, t+m.intervalSize
 	}
 	return
-}
-
-// AggregateTagSetCursor wraps a standard tagSetCursor, such that the values it emits are aggregated by intervals.
-type AggregateTagSetCursor struct {
-	cursor *TagSetCursor
-	qmin   int64
-	qmax   int64
-
-	tmin int64
-	stmt *influxql.SelectStatement
-}
-
-// Next returns the next aggregate value for the cursor.
-func (a *AggregateTagSetCursor) Next() (time int64, value interface{}) {
-	return a.cursor.Next(a.qmin, a.qmax)
-}
-
-// Tags returns the current tags for the cursor
-func (a *AggregateTagSetCursor) Tags() map[string]string { return a.cursor.Tags() }
-
-// TMin returns the current floor time for the bucket being worked on
-func (a *AggregateTagSetCursor) TMin() int64 {
-	if len(a.stmt.Dimensions) == 0 {
-		return -1
-	}
-	if !a.stmt.HasTimeFieldSpecified() {
-		return a.tmin
-	}
-	return -1
 }
 
 // uniqueStrings returns a slice of unique strings from all lists in a.

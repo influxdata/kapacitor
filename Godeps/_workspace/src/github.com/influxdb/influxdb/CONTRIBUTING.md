@@ -167,10 +167,10 @@ go install ./...
 To set the version and commit flags during the build pass the following to the build command:
 
 ```bash
--ldflags="-X main.version=$VERSION -X main.branch=$BRANCH -X main.commit=$COMMIT"
+-ldflags="-X main.version=$VERSION -X main.branch=$BRANCH -X main.commit=$COMMIT -X main.buildTime=$TIME"
 ```
 
-where `$VERSION` is the version, `$BRANCH` is the branch, and `$COMMIT` is the git commit hash.
+where `$VERSION` is the version, `$BRANCH` is the branch, `$COMMIT` is the git commit hash, and `$TIME` is the build timestamp.
 
 If you want to build packages, see `package.sh` help:
 ```bash
@@ -229,7 +229,8 @@ When troubleshooting problems with CPU or memory the Go toolchain can be helpful
 # start influx with profiling
 ./influxd -cpuprofile influxd.prof
 # run queries, writes, whatever you're testing
-# open up pprof
+# Quit out of influxd and influxd.prof will then be written.
+# open up pprof to examine the profiling data.
 go tool pprof influxd influxd.prof
 # once inside run "web", opens up browser with the CPU graph
 # can also run "web <function name>" to zoom in. Or "list <function name>" to see specific lines

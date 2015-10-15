@@ -31,6 +31,8 @@ const (
 	statWriteTimeout        = "write_timeout"
 	statWriteErr            = "write_error"
 	statWritePointReqHH     = "point_req_hh"
+	statSubWriteOK          = "sub_write_ok"
+	statSubWriteDrop        = "sub_write_drop"
 )
 
 const (
@@ -40,7 +42,7 @@ const (
 	// ConsistencyLevelOne requires at least one data node acknowledged a write
 	ConsistencyLevelOne
 
-	// ConsistencyLevelOne requires a quorum of data nodes to acknowledge a write
+	// ConsistencyLevelQuorum requires a quorum of data nodes to acknowledge a write
 	ConsistencyLevelQuorum
 
 	// ConsistencyLevelAll requires all data nodes to acknowledge a write
@@ -63,6 +65,7 @@ var (
 	ErrInvalidConsistencyLevel = errors.New("invalid consistency level")
 )
 
+// ParseConsistencyLevel converts a consistency level string to the corresponding ConsistencyLevel const
 func ParseConsistencyLevel(level string) (ConsistencyLevel, error) {
 	switch strings.ToLower(level) {
 	case "any":
@@ -106,6 +109,10 @@ type PointsWriter struct {
 		WriteShard(shardID, ownerID uint64, points []models.Point) error
 	}
 
+	Subscriber interface {
+		Points() chan<- *WritePointsRequest
+	}
+
 	statMap *expvar.Map
 }
 
@@ -144,6 +151,7 @@ func (s *ShardMapping) MapPoint(shardInfo *meta.ShardInfo, p models.Point) {
 	s.Shards[shardInfo.ID] = shardInfo
 }
 
+// Open opens the communication channel with the point writer
 func (w *PointsWriter) Open() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -153,6 +161,7 @@ func (w *PointsWriter) Open() error {
 	return nil
 }
 
+// Close closes the communication channel with the point writer
 func (w *PointsWriter) Close() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -201,6 +210,18 @@ func (w *PointsWriter) MapShards(wp *WritePointsRequest) (*ShardMapping, error) 
 	return mapping, nil
 }
 
+// WritePointsInto is a copy of WritePoints that uses a tsdb structure instead of
+// a cluster structure for information. This is to avoid a circular dependency
+func (w *PointsWriter) WritePointsInto(p *tsdb.IntoWriteRequest) error {
+	req := WritePointsRequest{
+		Database:         p.Database,
+		RetentionPolicy:  p.RetentionPolicy,
+		ConsistencyLevel: ConsistencyLevelAny,
+		Points:           p.Points,
+	}
+	return w.WritePoints(&req)
+}
+
 // WritePoints writes across multiple local and remote data nodes according the consistency level.
 func (w *PointsWriter) WritePoints(p *WritePointsRequest) error {
 	w.statMap.Add(statWriteReq, 1)
@@ -228,6 +249,16 @@ func (w *PointsWriter) WritePoints(p *WritePointsRequest) error {
 		go func(shard *meta.ShardInfo, database, retentionPolicy string, points []models.Point) {
 			ch <- w.writeToShard(shard, p.Database, p.RetentionPolicy, p.ConsistencyLevel, points)
 		}(shardMappings.Shards[shardID], p.Database, p.RetentionPolicy, points)
+	}
+
+	// Send points to subscriptions if possible.
+	if w.Subscriber != nil {
+		select {
+		case w.Subscriber.Points() <- p:
+			w.statMap.Add(statSubWriteOK, 1)
+		default:
+			w.statMap.Add(statSubWriteDrop, 1)
+		}
 	}
 
 	for range shardMappings.Points {
@@ -327,7 +358,7 @@ func (w *PointsWriter) writeToShard(shard *meta.ShardInfo, database, retentionPo
 				continue
 			}
 
-			wrote += 1
+			wrote++
 
 			// We wrote the required consistency level
 			if wrote >= required {

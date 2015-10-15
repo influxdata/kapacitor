@@ -19,17 +19,26 @@ import (
 	"github.com/influxdb/influxdb/influxql"
 )
 
-// iterator represents a forward-only iterator over a set of points.
-// These are used by the mapFunctions in this file
-type Iterator interface {
-	Next() (time int64, value interface{})
-	Tags() map[string]string
-	TMin() int64
+type MapInput struct {
+	TMin  int64
+	Items []MapItem
+}
+
+type MapItem struct {
+	Timestamp int64
+	Value     interface{}
+
+	// TODO(benbjohnson):
+	//   Move fields and tags up to MapInput. Currently the engine combines
+	//   multiple series together during processing. This needs to be fixed so
+	//   that each map function only operates on a single series at a time instead.
+	Fields map[string]interface{}
+	Tags   map[string]string
 }
 
 // mapFunc represents a function used for mapping over a sequential series of data.
 // The iterator represents a single group by interval
-type mapFunc func(Iterator) interface{}
+type mapFunc func(*MapInput) interface{}
 
 // reduceFunc represents a function used for reducing mapper output.
 type reduceFunc func([]interface{}) interface{}
@@ -66,20 +75,34 @@ func initializeMapFunc(c *influxql.Call) (mapFunc, error) {
 	case "median":
 		return MapStddev, nil
 	case "min":
-		return MapMin, nil
+		return func(input *MapInput) interface{} {
+			return MapMin(input, c.Fields()[0])
+		}, nil
 	case "max":
-		return MapMax, nil
+		return func(input *MapInput) interface{} {
+			return MapMax(input, c.Fields()[0])
+		}, nil
 	case "spread":
 		return MapSpread, nil
 	case "stddev":
 		return MapStddev, nil
 	case "first":
-		return MapFirst, nil
+		return func(input *MapInput) interface{} {
+			return MapFirst(input, c.Fields()[0])
+		}, nil
 	case "last":
-		return MapLast, nil
+		return func(input *MapInput) interface{} {
+			return MapLast(input, c.Fields()[0])
+		}, nil
+
 	case "top", "bottom":
-		return func(itr Iterator) interface{} {
-			return MapTopBottom(itr, c)
+		// Capture information from the call that the Map function will require
+		lit, _ := c.Args[len(c.Args)-1].(*influxql.NumberLiteral)
+		limit := int(lit.Val)
+		fields := topCallArgs(c)
+
+		return func(input *MapInput) interface{} {
+			return MapTopBottom(input, limit, fields, len(c.Args), c.Name)
 		}, nil
 	case "percentile":
 		return MapEcho, nil
@@ -131,11 +154,18 @@ func initializeReduceFunc(c *influxql.Call) (reduceFunc, error) {
 		return ReduceLast, nil
 	case "top", "bottom":
 		return func(values []interface{}) interface{} {
-			return ReduceTopBottom(values, c)
+			lit, _ := c.Args[len(c.Args)-1].(*influxql.NumberLiteral)
+			limit := int(lit.Val)
+			fields := topCallArgs(c)
+			return ReduceTopBottom(values, limit, fields, c.Name)
 		}, nil
 	case "percentile":
 		return func(values []interface{}) interface{} {
-			return ReducePercentile(values, c)
+			// Checks that this arg exists and is a valid type are done in the parsing validation
+			// and have test coverage there
+			lit, _ := c.Args[1].(*influxql.NumberLiteral)
+			percentile := lit.Val
+			return ReducePercentile(values, percentile)
 		}, nil
 	case "derivative", "non_negative_derivative":
 		// If the arg is another aggregate e.g. derivative(mean(value)), then
@@ -213,9 +243,9 @@ func InitializeUnmarshaller(c *influxql.Call) (UnmarshalFunc, error) {
 }
 
 // MapCount computes the number of values in an iterator.
-func MapCount(itr Iterator) interface{} {
+func MapCount(input *MapInput) interface{} {
 	n := float64(0)
-	for k, _ := itr.Next(); k != -1; k, _ = itr.Next() {
+	for range input.Items {
 		n++
 	}
 	if n > 0 {
@@ -238,20 +268,19 @@ func (d interfaceValues) Less(i, j int) bool {
 }
 
 // MapDistinct computes the unique values in an iterator.
-func MapDistinct(itr Iterator) interface{} {
-	var index = make(map[interface{}]struct{})
-
-	for time, value := itr.Next(); time != -1; time, value = itr.Next() {
-		index[value] = struct{}{}
+func MapDistinct(input *MapInput) interface{} {
+	m := make(map[interface{}]struct{})
+	for _, item := range input.Items {
+		m[item.Value] = struct{}{}
 	}
 
-	if len(index) == 0 {
+	if len(m) == 0 {
 		return nil
 	}
 
-	results := make(interfaceValues, len(index))
+	results := make(interfaceValues, len(m))
 	var i int
-	for value, _ := range index {
+	for value, _ := range m {
 		results[i] = value
 		i++
 	}
@@ -292,11 +321,11 @@ func ReduceDistinct(values []interface{}) interface{} {
 }
 
 // MapCountDistinct computes the unique count of values in an iterator.
-func MapCountDistinct(itr Iterator) interface{} {
+func MapCountDistinct(input *MapInput) interface{} {
 	var index = make(map[interface{}]struct{})
 
-	for time, value := itr.Next(); time != -1; time, value = itr.Next() {
-		index[value] = struct{}{}
+	for _, item := range input.Items {
+		index[item.Value] = struct{}{}
 	}
 
 	if len(index) == 0 {
@@ -336,29 +365,31 @@ const (
 )
 
 // MapSum computes the summation of values in an iterator.
-func MapSum(itr Iterator) interface{} {
+func MapSum(input *MapInput) interface{} {
+	if len(input.Items) == 0 {
+		return nil
+	}
+
 	n := float64(0)
-	count := 0
 	var resultType NumberType
-	for k, v := itr.Next(); k != -1; k, v = itr.Next() {
-		count++
-		switch n1 := v.(type) {
+	for _, item := range input.Items {
+		switch v := item.Value.(type) {
 		case float64:
-			n += n1
+			n += v
 		case int64:
-			n += float64(n1)
+			n += float64(v)
 			resultType = Int64Type
 		}
 	}
-	if count > 0 {
-		switch resultType {
-		case Float64Type:
-			return n
-		case Int64Type:
-			return int64(n)
-		}
+
+	switch resultType {
+	case Float64Type:
+		return n
+	case Int64Type:
+		return int64(n)
+	default:
+		return nil
 	}
-	return nil
 }
 
 // ReduceSum computes the sum of values for each key.
@@ -391,25 +422,23 @@ func ReduceSum(values []interface{}) interface{} {
 }
 
 // MapMean computes the count and sum of values in an iterator to be combined by the reducer.
-func MapMean(itr Iterator) interface{} {
-	out := &meanMapOutput{}
+func MapMean(input *MapInput) interface{} {
+	if len(input.Items) == 0 {
+		return nil
+	}
 
-	for k, v := itr.Next(); k != -1; k, v = itr.Next() {
+	out := &meanMapOutput{}
+	for _, item := range input.Items {
 		out.Count++
-		switch n1 := v.(type) {
+		switch v := item.Value.(type) {
 		case float64:
-			out.Mean += (n1 - out.Mean) / float64(out.Count)
+			out.Mean += (v - out.Mean) / float64(out.Count)
 		case int64:
-			out.Mean += (float64(n1) - out.Mean) / float64(out.Count)
+			out.Mean += (float64(v) - out.Mean) / float64(out.Count)
 			out.ResultType = Int64Type
 		}
 	}
-
-	if out.Count > 0 {
-		return out
-	}
-
-	return nil
+	return out
 }
 
 type meanMapOutput struct {
@@ -592,32 +621,52 @@ func partition(data []float64) (lows []float64, pivotValue float64, highs []floa
 }
 
 type minMaxMapOut struct {
-	Val  float64
-	Type NumberType
+	Time   int64
+	Val    float64
+	Type   NumberType
+	Fields map[string]interface{}
+	Tags   map[string]string
 }
 
 // MapMin collects the values to pass to the reducer
-func MapMin(itr Iterator) interface{} {
+func MapMin(input *MapInput, fieldName string) interface{} {
 	min := &minMaxMapOut{}
 
 	pointsYielded := false
 	var val float64
 
-	for k, v := itr.Next(); k != -1; k, v = itr.Next() {
-		switch n := v.(type) {
+	for _, item := range input.Items {
+		switch v := item.Value.(type) {
 		case float64:
-			val = n
+			val = v
 		case int64:
-			val = float64(n)
+			val = float64(v)
 			min.Type = Int64Type
+		case map[string]interface{}:
+			if d, t, ok := decodeValueAndNumberType(v[fieldName]); ok {
+				val, min.Type = d, t
+			} else {
+				continue
+			}
 		}
 
 		// Initialize min
 		if !pointsYielded {
+			min.Time = item.Timestamp
 			min.Val = val
+			min.Fields = item.Fields
+			min.Tags = item.Tags
 			pointsYielded = true
 		}
+		current := min.Val
 		min.Val = math.Min(min.Val, val)
+
+		// Check to see if the value changed, if so, update the fields/tags
+		if current != min.Val {
+			min.Time = item.Timestamp
+			min.Fields = item.Fields
+			min.Tags = item.Tags
+		}
 	}
 	if pointsYielded {
 		return min
@@ -642,45 +691,92 @@ func ReduceMin(values []interface{}) interface{} {
 
 		// Initialize min
 		if !pointsYielded {
+			min.Time = v.Time
 			min.Val = v.Val
 			min.Type = v.Type
+			min.Fields = v.Fields
+			min.Tags = v.Tags
 			pointsYielded = true
 		}
 		min.Val = math.Min(min.Val, v.Val)
+		current := min.Val
+		if current != min.Val {
+			min.Time = v.Time
+			min.Fields = v.Fields
+			min.Tags = v.Tags
+		}
 	}
 	if pointsYielded {
 		switch min.Type {
 		case Float64Type:
-			return min.Val
+			return PositionPoint{
+				Time:   min.Time,
+				Value:  min.Val,
+				Fields: min.Fields,
+				Tags:   min.Tags,
+			}
 		case Int64Type:
-			return int64(min.Val)
+			return PositionPoint{
+				Time:   min.Time,
+				Value:  int64(min.Val),
+				Fields: min.Fields,
+				Tags:   min.Tags,
+			}
 		}
 	}
 	return nil
 }
 
+func decodeValueAndNumberType(v interface{}) (float64, NumberType, bool) {
+	switch n := v.(type) {
+	case float64:
+		return n, Float64Type, true
+	case int64:
+		return float64(n), Int64Type, true
+	default:
+		return 0, Float64Type, false
+	}
+}
+
 // MapMax collects the values to pass to the reducer
-func MapMax(itr Iterator) interface{} {
+func MapMax(input *MapInput, fieldName string) interface{} {
 	max := &minMaxMapOut{}
 
 	pointsYielded := false
 	var val float64
 
-	for k, v := itr.Next(); k != -1; k, v = itr.Next() {
-		switch n := v.(type) {
+	for _, item := range input.Items {
+		switch v := item.Value.(type) {
 		case float64:
-			val = n
+			val = v
 		case int64:
-			val = float64(n)
+			val = float64(v)
 			max.Type = Int64Type
+		case map[string]interface{}:
+			if d, t, ok := decodeValueAndNumberType(v[fieldName]); ok {
+				val, max.Type = d, t
+			} else {
+				continue
+			}
 		}
 
 		// Initialize max
 		if !pointsYielded {
+			max.Time = item.Timestamp
 			max.Val = val
+			max.Fields = item.Fields
+			max.Tags = item.Tags
 			pointsYielded = true
 		}
+		current := max.Val
 		max.Val = math.Max(max.Val, val)
+
+		// Check to see if the value changed, if so, update the fields/tags
+		if current != max.Val {
+			max.Time = item.Timestamp
+			max.Fields = item.Fields
+			max.Tags = item.Tags
+		}
 	}
 	if pointsYielded {
 		return max
@@ -705,18 +801,37 @@ func ReduceMax(values []interface{}) interface{} {
 
 		// Initialize max
 		if !pointsYielded {
+			max.Time = v.Time
 			max.Val = v.Val
 			max.Type = v.Type
+			max.Fields = v.Fields
+			max.Tags = v.Tags
 			pointsYielded = true
 		}
+		current := max.Val
 		max.Val = math.Max(max.Val, v.Val)
+		if current != max.Val {
+			max.Time = v.Time
+			max.Fields = v.Fields
+			max.Tags = v.Tags
+		}
 	}
 	if pointsYielded {
 		switch max.Type {
 		case Float64Type:
-			return max.Val
+			return PositionPoint{
+				Time:   max.Time,
+				Value:  max.Val,
+				Fields: max.Fields,
+				Tags:   max.Tags,
+			}
 		case Int64Type:
-			return int64(max.Val)
+			return PositionPoint{
+				Time:   max.Time,
+				Value:  int64(max.Val),
+				Fields: max.Fields,
+				Tags:   max.Tags,
+			}
 		}
 	}
 	return nil
@@ -728,17 +843,17 @@ type spreadMapOutput struct {
 }
 
 // MapSpread collects the values to pass to the reducer
-func MapSpread(itr Iterator) interface{} {
+func MapSpread(input *MapInput) interface{} {
 	out := &spreadMapOutput{}
 	pointsYielded := false
 	var val float64
 
-	for k, v := itr.Next(); k != -1; k, v = itr.Next() {
-		switch n := v.(type) {
+	for _, item := range input.Items {
+		switch v := item.Value.(type) {
 		case float64:
-			val = n
+			val = v
 		case int64:
-			val = float64(n)
+			val = float64(v)
 			out.Type = Int64Type
 		}
 
@@ -789,19 +904,17 @@ func ReduceSpread(values []interface{}) interface{} {
 }
 
 // MapStddev collects the values to pass to the reducer
-func MapStddev(itr Iterator) interface{} {
-	var values []float64
-
-	for k, v := itr.Next(); k != -1; k, v = itr.Next() {
-		switch n := v.(type) {
+func MapStddev(input *MapInput) interface{} {
+	var a []float64
+	for _, item := range input.Items {
+		switch v := item.Value.(type) {
 		case float64:
-			values = append(values, n)
+			a = append(a, v)
 		case int64:
-			values = append(values, float64(n))
+			a = append(a, float64(v))
 		}
 	}
-
-	return values
+	return a
 }
 
 // ReduceStddev computes the stddev of values.
@@ -841,25 +954,43 @@ func ReduceStddev(values []interface{}) interface{} {
 }
 
 type firstLastMapOutput struct {
-	Time int64
-	Val  interface{}
+	Time   int64
+	Value  interface{}
+	Fields map[string]interface{}
+	Tags   map[string]string
 }
 
 // MapFirst collects the values to pass to the reducer
 // This function assumes time ordered input
-func MapFirst(itr Iterator) interface{} {
-	k, v := itr.Next()
-	if k == -1 {
+func MapFirst(input *MapInput, fieldName string) interface{} {
+	if len(input.Items) == 0 {
 		return nil
 	}
-	nextk, nextv := itr.Next()
-	for nextk == k {
+
+	k, v := input.Items[0].Timestamp, input.Items[0].Value
+	tags := input.Items[0].Tags
+	fields := input.Items[0].Fields
+	if n, ok := v.(map[string]interface{}); ok {
+		v = n[fieldName]
+	}
+
+	// Find greatest value at same timestamp.
+	for _, item := range input.Items[1:] {
+		nextk, nextv := item.Timestamp, item.Value
+		if nextk != k {
+			break
+		}
+		if n, ok := nextv.(map[string]interface{}); ok {
+			nextv = n[fieldName]
+		}
+
 		if greaterThan(nextv, v) {
+			fields = item.Fields
+			tags = item.Tags
 			v = nextv
 		}
-		nextk, nextv = itr.Next()
 	}
-	return &firstLastMapOutput{k, v}
+	return &firstLastMapOutput{Time: k, Value: v, Fields: fields, Tags: tags}
 }
 
 // ReduceFirst computes the first of value.
@@ -875,39 +1006,61 @@ func ReduceFirst(values []interface{}) interface{} {
 		// Initialize first
 		if !pointsYielded {
 			out.Time = val.Time
-			out.Val = val.Val
+			out.Value = val.Value
+			out.Fields = val.Fields
+			out.Tags = val.Tags
 			pointsYielded = true
 		}
 		if val.Time < out.Time {
 			out.Time = val.Time
-			out.Val = val.Val
-		} else if val.Time == out.Time && greaterThan(val.Val, out.Val) {
-			out.Val = val.Val
+			out.Value = val.Value
+			out.Fields = val.Fields
+			out.Tags = val.Tags
+		} else if val.Time == out.Time && greaterThan(val.Value, out.Value) {
+			out.Value = val.Value
+			out.Fields = val.Fields
+			out.Tags = val.Tags
 		}
 	}
 	if pointsYielded {
-		return out.Val
+		return PositionPoint{
+			Time:   out.Time,
+			Value:  out.Value,
+			Fields: out.Fields,
+			Tags:   out.Tags,
+		}
 	}
 	return nil
 }
 
 // MapLast collects the values to pass to the reducer
-func MapLast(itr Iterator) interface{} {
+func MapLast(input *MapInput, fieldName string) interface{} {
 	out := &firstLastMapOutput{}
 	pointsYielded := false
 
-	for k, v := itr.Next(); k != -1; k, v = itr.Next() {
+	for _, item := range input.Items {
+		k, v := item.Timestamp, item.Value
+		if m, ok := v.(map[string]interface{}); ok {
+			v = m[fieldName]
+		}
+
 		// Initialize last
 		if !pointsYielded {
 			out.Time = k
-			out.Val = v
+			out.Value = v
+			out.Fields = item.Fields
+			out.Tags = item.Tags
 			pointsYielded = true
 		}
 		if k > out.Time {
 			out.Time = k
-			out.Val = v
-		} else if k == out.Time && greaterThan(v, out.Val) {
-			out.Val = v
+			out.Value = v
+			out.Fields = item.Fields
+			out.Tags = item.Tags
+		} else if k == out.Time && greaterThan(v, out.Value) {
+			out.Value = v
+			out.Fields = item.Fields
+			out.Tags = item.Tags
 		}
 	}
 	if pointsYielded {
@@ -930,18 +1083,29 @@ func ReduceLast(values []interface{}) interface{} {
 		// Initialize last
 		if !pointsYielded {
 			out.Time = val.Time
-			out.Val = val.Val
+			out.Value = val.Value
+			out.Fields = val.Fields
+			out.Tags = val.Tags
 			pointsYielded = true
 		}
 		if val.Time > out.Time {
 			out.Time = val.Time
-			out.Val = val.Val
-		} else if val.Time == out.Time && greaterThan(val.Val, out.Val) {
-			out.Val = val.Val
+			out.Value = val.Value
+			out.Fields = val.Fields
+			out.Tags = val.Tags
+		} else if val.Time == out.Time && greaterThan(val.Value, out.Value) {
+			out.Value = val.Value
+			out.Fields = val.Fields
+			out.Tags = val.Tags
 		}
 	}
 	if pointsYielded {
-		return out.Val
+		return PositionPoint{
+			Time:   out.Time,
+			Value:  out.Value,
+			Fields: out.Fields,
+			Tags:   out.Tags,
+		}
 	}
 	return nil
 }
@@ -1157,11 +1321,17 @@ func valueCompare(a, b interface{}) int {
 	panic(fmt.Sprintf("unreachable code; types were %T, %T", a, b))
 }
 
+// PositionPoints is a slice of PositionPoints used to return richer data from a reduce func
 type PositionPoints []PositionPoint
+
+// PositionPoint will return all data points from a written point that were selected in the query
+// to be used in the post processing phase of the query executor to fill in additional
+// tag and field values
 type PositionPoint struct {
-	Time  int64
-	Value interface{}
-	Tags  map[string]string
+	Time   int64
+	Value  interface{}
+	Fields map[string]interface{}
+	Tags   map[string]string
 }
 
 type topBottomMapOut struct {
@@ -1274,13 +1444,18 @@ func tagkeytop(args []string, fields map[string]interface{}, keys map[string]str
 // query, but luckily that doesn't require ordered
 // iteration, so we can fake it
 type mapIter struct {
-	m        map[string]PositionPoint
-	currTags map[string]string
-	tmin     int64
+	m          map[string]PositionPoint
+	currTags   map[string]string
+	currFields map[string]interface{}
+	tmin       int64
 }
 
 func (m *mapIter) TMin() int64 {
 	return m.tmin
+}
+
+func (m *mapIter) Fields() map[string]interface{} {
+	return m.currFields
 }
 
 func (m *mapIter) Tags() map[string]string {
@@ -1291,6 +1466,7 @@ func (m *mapIter) Next() (time int64, value interface{}) {
 	// this is a bit ugly, but can't think of  any other way that doesn't involve dumping
 	// the entire map to an array
 	for key, p := range m.m {
+		m.currFields = p.Fields
 		m.currTags = p.Tags
 		time = p.Time
 		value = p.Value
@@ -1301,16 +1477,12 @@ func (m *mapIter) Next() (time int64, value interface{}) {
 }
 
 // MapTopBottom emits the top/bottom data points for each group by interval
-func MapTopBottom(itr Iterator, c *influxql.Call) interface{} {
-	// Capture the limit if it was specified in the call
-	lit, _ := c.Args[len(c.Args)-1].(*influxql.NumberLiteral)
-	limit := int(lit.Val)
-
-	out := positionOut{callArgs: topCallArgs(c)}
+func MapTopBottom(input *MapInput, limit int, fields []string, argCount int, callName string) interface{} {
+	out := positionOut{callArgs: fields}
 	out.points = make([]PositionPoint, 0, limit)
 	minheap := topBottomMapOut{
 		&out,
-		c.Name == "bottom",
+		callName == "bottom",
 	}
 	tagmap := make(map[string]PositionPoint)
 
@@ -1320,36 +1492,47 @@ func MapTopBottom(itr Iterator, c *influxql.Call) interface{} {
 
 	// buffer so we don't allocate every time through
 	var pp PositionPoint
-	if len(c.Args) > 2 {
+	if argCount > 2 {
 		// this is a tag aggregating query.
 		// For each unique permutation of the tags given,
 		// select the max and then fall through to select top of those
 		// points
-		for k, v := itr.Next(); k != -1; k, v = itr.Next() {
-			pp = PositionPoint{k, v, itr.Tags()}
-			callArgs := c.Fields()
-			tags := itr.Tags()
+		for _, item := range input.Items {
+			pp = PositionPoint{
+				Time:   item.Timestamp,
+				Value:  item.Value,
+				Fields: item.Fields,
+				Tags:   item.Tags,
+			}
+			tags := item.Tags
+
 			// TODO in the future we need to send in fields as well
 			// this will allow a user to query on both fields and tags
 			// fields will take the priority over tags if there is a name collision
-			key := tagkeytop(callArgs, nil, tags)
+			key := tagkeytop(fields, nil, tags)
 			p, ok := tagmap[key]
 			if !ok || minheap.positionPointLess(&p, &pp) {
 				tagmap[key] = pp
 			}
 		}
-		itr = &mapIter{
-			m:    tagmap,
-			tmin: itr.TMin(),
+
+		items := make([]MapItem, 0, len(tagmap))
+		for _, p := range tagmap {
+			items = append(items, MapItem{Timestamp: p.Time, Value: p.Value, Fields: p.Fields, Tags: p.Tags})
+		}
+		input = &MapInput{
+			TMin:  input.TMin,
+			Items: items,
 		}
 	}
-	for k, v := itr.Next(); k != -1; k, v = itr.Next() {
-		t := k
-		if bt := itr.TMin(); bt > -1 {
-			t = bt
+
+	for _, item := range input.Items {
+		t := item.Timestamp
+		if input.TMin > -1 {
+			t = input.TMin
 		}
 		if len(out.points) < limit {
-			out.points = append(out.points, PositionPoint{t, v, itr.Tags()})
+			out.points = append(out.points, PositionPoint{t, item.Value, item.Fields, item.Tags})
 			if len(out.points) == limit {
 				heap.Init(&minheap)
 			}
@@ -1357,12 +1540,13 @@ func MapTopBottom(itr Iterator, c *influxql.Call) interface{} {
 			// we're over the limit, so find out if we're bigger than the
 			// smallest point in the set and eject it if we are
 			minval := &out.points[0]
-			pp = PositionPoint{t, v, itr.Tags()}
+			pp = PositionPoint{t, item.Value, item.Fields, item.Tags}
 			if minheap.positionPointLess(minval, &pp) {
 				minheap.insert(pp)
 			}
 		}
 	}
+
 	// should only happen on empty iterator.
 	if len(out.points) == 0 {
 		return nil
@@ -1372,6 +1556,7 @@ func MapTopBottom(itr Iterator, c *influxql.Call) interface{} {
 		// rid of another sort order.
 		heap.Init(&minheap)
 	}
+
 	// minheap should now contain the largest/smallest values that were encountered
 	// during iteration.
 	//
@@ -1384,22 +1569,22 @@ func MapTopBottom(itr Iterator, c *influxql.Call) interface{} {
 	for len(out.points) > 0 {
 		p := out.points[0]
 		heap.Pop(&minheap)
+
 		// reslice so that we can get to the element just after the heap
 		endslice := out.points[:len(out.points)+1]
 		endslice[len(endslice)-1] = p
 	}
+
 	// the ascending order is now in the result slice
 	return result
 }
 
 // ReduceTop computes the top values for each key.
 // This function assumes that its inputs are in sorted ascending order.
-func ReduceTopBottom(values []interface{}, c *influxql.Call) interface{} {
-	lit, _ := c.Args[len(c.Args)-1].(*influxql.NumberLiteral)
-	limit := int(lit.Val)
+func ReduceTopBottom(values []interface{}, limit int, fields []string, callName string) interface{} {
 
-	out := positionOut{callArgs: topCallArgs(c)}
-	minheap := topBottomMapOut{&out, c.Name == "bottom"}
+	out := positionOut{callArgs: fields}
+	minheap := topBottomMapOut{&out, callName == "bottom"}
 	results := make([]PositionPoints, 0, len(values))
 	out.points = make([]PositionPoint, 0, limit)
 	for _, v := range values {
@@ -1426,7 +1611,7 @@ func ReduceTopBottom(values []interface{}, c *influxql.Call) interface{} {
 		if whichselected == -1 {
 			// none of the points have any values
 			// so we can return what we have now
-			sort.Sort(topBottomReduceOut{out, c.Name == "bottom"})
+			sort.Sort(topBottomReduceOut{out, callName == "bottom"})
 			return out.points
 		}
 		v := results[whichselected]
@@ -1435,26 +1620,21 @@ func ReduceTopBottom(values []interface{}, c *influxql.Call) interface{} {
 	}
 
 	// now we need to resort the tops by time
-	sort.Sort(topBottomReduceOut{out, c.Name == "bottom"})
+	sort.Sort(topBottomReduceOut{out, callName == "bottom"})
 	return out.points
 }
 
 // MapEcho emits the data points for each group by interval
-func MapEcho(itr Iterator) interface{} {
+func MapEcho(input *MapInput) interface{} {
 	var values []interface{}
-
-	for k, v := itr.Next(); k != -1; k, v = itr.Next() {
-		values = append(values, v)
+	for _, item := range input.Items {
+		values = append(values, item.Value)
 	}
 	return values
 }
 
 // ReducePercentile computes the percentile of values for each key.
-func ReducePercentile(values []interface{}, c *influxql.Call) interface{} {
-	// Checks that this arg exists and is a valid type are done in the parsing validation
-	// and have test coverage there
-	lit, _ := c.Args[1].(*influxql.NumberLiteral)
-	percentile := lit.Val
+func ReducePercentile(values []interface{}, percentile float64) interface{} {
 
 	var allValues []float64
 
@@ -1496,11 +1676,10 @@ func IsNumeric(c *influxql.Call) bool {
 }
 
 // MapRawQuery is for queries without aggregates
-func MapRawQuery(itr Iterator) interface{} {
+func MapRawQuery(input *MapInput) interface{} {
 	var values []*rawQueryMapOutput
-	for k, v := itr.Next(); k != -1; k, v = itr.Next() {
-		val := &rawQueryMapOutput{k, v}
-		values = append(values, val)
+	for _, item := range input.Items {
+		values = append(values, &rawQueryMapOutput{item.Timestamp, item.Value})
 	}
 	return values
 }

@@ -70,6 +70,16 @@ func (r *replaySource) ReplayStream(stream StreamCollector) {
 		var diff time.Duration
 		zero := r.clck.Zero()
 		for r.in.Scan() {
+			db := r.in.Text()
+			if !r.in.Scan() {
+				r.err <- fmt.Errorf("invalid replay file format, expected another line")
+				return
+			}
+			rp := r.in.Text()
+			if !r.in.Scan() {
+				r.err <- fmt.Errorf("invalid replay file format, expected another line")
+				return
+			}
 			points, err := dbmodels.ParsePointsWithPrecision(
 				r.in.Bytes(),
 				zero,
@@ -86,11 +96,13 @@ func (r *replaySource) ReplayStream(stream StreamCollector) {
 			t := points[0].Time().Add(diff).UTC()
 			mp := points[0]
 			p := models.Point{
-				Name:   mp.Name(),
-				Group:  models.NilGroup,
-				Tags:   mp.Tags(),
-				Fields: models.Fields(mp.Fields()),
-				Time:   t,
+				Database:        db,
+				RetentionPolicy: rp,
+				Name:            mp.Name(),
+				Group:           models.NilGroup,
+				Tags:            mp.Tags(),
+				Fields:          models.Fields(mp.Fields()),
+				Time:            t,
 			}
 			r.clck.Until(t)
 			err = stream.CollectPoint(p)

@@ -99,10 +99,17 @@ type Client struct {
 }
 
 const (
-	ConsistencyOne    = "one"
-	ConsistencyAll    = "all"
+	// ConsistencyOne requires at least one data node acknowledged a write.
+	ConsistencyOne = "one"
+
+	// ConsistencyAll requires all data nodes to acknowledge a write.
+	ConsistencyAll = "all"
+
+	// ConsistencyQuorum requires a quorum of data nodes to acknowledge a write.
 	ConsistencyQuorum = "quorum"
-	ConsistencyAny    = "any"
+
+	// ConsistencyAny allows for hinted hand off, potentially no write happened yet.
+	ConsistencyAny = "any"
 )
 
 // NewClient will instantiate and return a connected client to issue commands to the server.
@@ -220,10 +227,16 @@ func (c *Client) Write(bp BatchPoints) (*Response, error) {
 	if c.username != "" {
 		req.SetBasicAuth(c.username, c.password)
 	}
+
+	precision := bp.Precision
+	if precision == "" {
+		precision = c.precision
+	}
+
 	params := req.URL.Query()
 	params.Set("db", bp.Database)
 	params.Set("rp", bp.RetentionPolicy)
-	params.Set("precision", bp.Precision)
+	params.Set("precision", precision)
 	params.Set("consistency", bp.WriteConsistency)
 	req.URL.RawQuery = params.Encode()
 
@@ -458,6 +471,8 @@ func (p *Point) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&point)
 }
 
+// MarshalString renders string representation of a Point with specified
+// precision. The default precision is nanoseconds.
 func (p *Point) MarshalString() string {
 	pt := models.NewPoint(p.Measurement, p.Tags, p.Fields, p.Time)
 	if p.Precision == "" || p.Precision == "ns" || p.Precision == "n" {

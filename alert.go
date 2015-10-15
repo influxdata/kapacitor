@@ -30,6 +30,9 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode) (an *AlertNode, err 
 	if n.Post != "" {
 		an.handlers = append(an.handlers, an.handlePost)
 	}
+	if n.From != "" && len(n.ToList) != 0 {
+		an.handlers = append(an.handlers, an.handleEmail)
+	}
 	return
 }
 
@@ -48,9 +51,9 @@ func (a *AlertNode) runAlert() error {
 			}
 		}
 	case pipeline.BatchEdge:
-		for w, ok := a.ins[0].NextBatch(); ok; w, ok = a.ins[0].NextBatch() {
+		for b, ok := a.ins[0].NextBatch(); ok; b, ok = a.ins[0].NextBatch() {
 			for _, h := range a.handlers {
-				h(w)
+				h(b)
 			}
 		}
 	}
@@ -67,5 +70,18 @@ func (a *AlertNode) handlePost(batch models.Batch) {
 	_, err = http.Post(a.a.Post, "application/json", buf)
 	if err != nil {
 		a.logger.Println("E! failed to POST batch", err)
+	}
+}
+
+func (a *AlertNode) handleEmail(batch models.Batch) {
+	b, err := json.Marshal(batch)
+	if err != nil {
+		a.logger.Println("E! failed to marshal batch json", err)
+		return
+	}
+	if a.et.tm.SMTPService != nil {
+		a.et.tm.SMTPService.SendMail(a.a.From, a.a.ToList, a.a.Subject, string(b))
+	} else {
+		a.logger.Println("W! smtp service not enabled, cannot send email.")
 	}
 }

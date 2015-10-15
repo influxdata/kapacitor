@@ -13,6 +13,7 @@ import (
 	"github.com/influxdb/kapacitor/services/httpd"
 	"github.com/influxdb/kapacitor/services/influxdb"
 	"github.com/influxdb/kapacitor/services/replay"
+	"github.com/influxdb/kapacitor/services/smtp"
 	"github.com/influxdb/kapacitor/services/streamer"
 	"github.com/influxdb/kapacitor/services/task_store"
 	"github.com/influxdb/kapacitor/services/udp"
@@ -47,6 +48,7 @@ type Server struct {
 	TaskStore     *task_store.Service
 	ReplayService *replay.Service
 	InfluxDB      *influxdb.Service
+	SMTPService   *smtp.Service
 
 	MetaStore     *metastore
 	QueryExecutor *queryexecutor
@@ -85,6 +87,7 @@ func NewServer(c *Config, buildInfo *BuildInfo, l *log.Logger) (*Server, error) 
 
 	// Append Kapacitor services.
 	s.appendStreamerService()
+	s.appendSMTPService(c.SMTP)
 	s.appendHTTPDService(c.HTTP)
 	s.appendInfluxDBService(c.InfluxDB, c.Hostname)
 	s.appendTaskStoreService(c.Task)
@@ -113,6 +116,16 @@ func (s *Server) appendStreamerService() {
 
 	s.Streamer = srv
 	s.Services = append(s.Services, srv)
+}
+
+func (s *Server) appendSMTPService(c smtp.Config) {
+	if c.Enabled {
+		srv := smtp.NewService(c)
+
+		s.SMTPService = srv
+		s.TaskMaster.SMTPService = srv
+		s.Services = append(s.Services, srv)
+	}
 }
 
 func (s *Server) appendInfluxDBService(c influxdb.Config, hostname string) {
@@ -150,6 +163,7 @@ func (s *Server) appendReplayStoreService(c replay.Config) {
 	srv.TaskStore = s.TaskStore
 	srv.HTTPDService = s.HTTPDService
 	srv.InfluxDBService = s.InfluxDB
+	srv.SMTPService = s.SMTPService
 	srv.TaskMaster = s.TaskMaster
 
 	s.ReplayService = srv

@@ -207,7 +207,7 @@ func parsePoint(buf []byte, defaultTime time.Time, precision string) (Point, err
 		if err != nil {
 			return nil, err
 		}
-		pt.time = time.Unix(0, ts*pt.GetPrecisionMultiplier(precision))
+		pt.time = time.Unix(0, ts*pt.GetPrecisionMultiplier(precision)).UTC()
 	}
 	return pt, nil
 }
@@ -268,8 +268,8 @@ func scanKey(buf []byte, i int) (int, []byte, error) {
 			i += 1
 			equals += 1
 
-			// Check for "cpu,a=1,b= value=1"
-			if i < len(buf) && buf[i] == ' ' {
+			// Check for "cpu,a=1,b= value=1" or "cpu,a=1,b=,c=foo value=1"
+			if i < len(buf) && (buf[i] == ' ' || buf[i] == ',') {
 				return i, buf[start:i], fmt.Errorf("missing tag value")
 			}
 			continue
@@ -560,6 +560,10 @@ func scanNumber(buf []byte, i int) (int, error) {
 	// Is negative number?
 	if i < len(buf) && buf[i] == '-' {
 		i += 1
+		// There must be more characters now, as just '-' is illegal.
+		if i == len(buf) {
+			return i, fmt.Errorf("invalid number")
+		}
 	}
 
 	// how many decimal points we've see
@@ -593,14 +597,14 @@ func scanNumber(buf []byte, i int) (int, error) {
 		}
 
 		// `e` is valid for floats but not as the first char
-		if i > start && (buf[i] == 'e') {
+		if i > start && (buf[i] == 'e' || buf[i] == 'E') {
 			scientific = true
 			i += 1
 			continue
 		}
 
 		// + and - are only valid at this point if they follow an e (scientific notation)
-		if (buf[i] == '+' || buf[i] == '-') && buf[i-1] == 'e' {
+		if (buf[i] == '+' || buf[i] == '-') && (buf[i-1] == 'e' || buf[i-1] == 'E') {
 			i += 1
 			continue
 		}
@@ -1017,6 +1021,10 @@ func (p *point) Tags() Tags {
 			i, key = scanTo(p.key, i, '=')
 			i, value = scanTagValue(p.key, i+1)
 
+			if len(value) == 0 {
+				continue
+			}
+
 			tags[string(unescapeTag(key))] = string(unescapeTag(value))
 
 			i += 1
@@ -1137,7 +1145,10 @@ func (t Tags) HashKey() []byte {
 	for k, v := range t {
 		ek := escapeTag([]byte(k))
 		ev := escapeTag([]byte(v))
-		escaped[string(ek)] = string(ev)
+
+		if len(ev) > 0 {
+			escaped[string(ek)] = string(ev)
+		}
 	}
 
 	// Extract keys and determine final size.

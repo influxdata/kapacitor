@@ -114,7 +114,11 @@ func (ts *Service) Open() error {
 			return nil
 		}
 		return b.ForEach(func(k, v []byte) error {
-			return ts.Enable(string(k))
+			err := ts.Enable(string(k))
+			if err != nil {
+				ts.logger.Printf("E! error enabling task %s, err: %s\n", string(k), err)
+			}
+			return nil
 		})
 	})
 }

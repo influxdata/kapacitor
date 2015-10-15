@@ -80,10 +80,12 @@ type Node interface {
 func (*Query) node()     {}
 func (Statements) node() {}
 
+func (*AlterDatabaseRenameStatement) node()   {}
 func (*AlterRetentionPolicyStatement) node()  {}
 func (*CreateContinuousQueryStatement) node() {}
 func (*CreateDatabaseStatement) node()        {}
 func (*CreateRetentionPolicyStatement) node() {}
+func (*CreateSubscriptionStatement) node()    {}
 func (*CreateUserStatement) node()            {}
 func (*Distinct) node()                       {}
 func (*DeleteStatement) node()                {}
@@ -92,6 +94,8 @@ func (*DropDatabaseStatement) node()          {}
 func (*DropMeasurementStatement) node()       {}
 func (*DropRetentionPolicyStatement) node()   {}
 func (*DropSeriesStatement) node()            {}
+func (*DropServerStatement) node()            {}
+func (*DropSubscriptionStatement) node()      {}
 func (*DropUserStatement) node()              {}
 func (*GrantStatement) node()                 {}
 func (*GrantAdminStatement) node()            {}
@@ -109,6 +113,7 @@ func (*ShowMeasurementsStatement) node()      {}
 func (*ShowSeriesStatement) node()            {}
 func (*ShowShardsStatement) node()            {}
 func (*ShowStatsStatement) node()             {}
+func (*ShowSubscriptionsStatement) node()     {}
 func (*ShowDiagnosticsStatement) node()       {}
 func (*ShowTagKeysStatement) node()           {}
 func (*ShowTagValuesStatement) node()         {}
@@ -187,10 +192,12 @@ type ExecutionPrivilege struct {
 // ExecutionPrivileges is a list of privileges required to execute a statement.
 type ExecutionPrivileges []ExecutionPrivilege
 
+func (*AlterDatabaseRenameStatement) stmt()   {}
 func (*AlterRetentionPolicyStatement) stmt()  {}
 func (*CreateContinuousQueryStatement) stmt() {}
 func (*CreateDatabaseStatement) stmt()        {}
 func (*CreateRetentionPolicyStatement) stmt() {}
+func (*CreateSubscriptionStatement) stmt()    {}
 func (*CreateUserStatement) stmt()            {}
 func (*DeleteStatement) stmt()                {}
 func (*DropContinuousQueryStatement) stmt()   {}
@@ -198,6 +205,8 @@ func (*DropDatabaseStatement) stmt()          {}
 func (*DropMeasurementStatement) stmt()       {}
 func (*DropRetentionPolicyStatement) stmt()   {}
 func (*DropSeriesStatement) stmt()            {}
+func (*DropServerStatement) stmt()            {}
+func (*DropSubscriptionStatement) stmt()      {}
 func (*DropUserStatement) stmt()              {}
 func (*GrantStatement) stmt()                 {}
 func (*GrantAdminStatement) stmt()            {}
@@ -211,6 +220,7 @@ func (*ShowRetentionPoliciesStatement) stmt() {}
 func (*ShowSeriesStatement) stmt()            {}
 func (*ShowShardsStatement) stmt()            {}
 func (*ShowStatsStatement) stmt()             {}
+func (*ShowSubscriptionsStatement) stmt()     {}
 func (*ShowDiagnosticsStatement) stmt()       {}
 func (*ShowTagKeysStatement) stmt()           {}
 func (*ShowTagValuesStatement) stmt()         {}
@@ -497,6 +507,30 @@ func (s *GrantAdminStatement) String() string {
 
 // RequiredPrivileges returns the privilege required to execute a GrantAdminStatement.
 func (s *GrantAdminStatement) RequiredPrivileges() ExecutionPrivileges {
+	return ExecutionPrivileges{{Admin: true, Name: "", Privilege: AllPrivileges}}
+}
+
+// AlterDatabaseRenameStatement represents a command for renaming a database.
+type AlterDatabaseRenameStatement struct {
+	// Current name of the database
+	OldName string
+	// New name of the database
+	NewName string
+}
+
+// String returns a string representation of the rename database statement.
+func (s *AlterDatabaseRenameStatement) String() string {
+	var buf bytes.Buffer
+	_, _ = buf.WriteString("ALTER DATABASE ")
+	_, _ = buf.WriteString(s.OldName)
+	_, _ = buf.WriteString(" RENAME ")
+	_, _ = buf.WriteString(" TO ")
+	_, _ = buf.WriteString(s.NewName)
+	return buf.String()
+}
+
+// RequiredPrivileges returns the privilege required to execute an AlterDatabaseRenameStatement.
+func (s *AlterDatabaseRenameStatement) RequiredPrivileges() ExecutionPrivileges {
 	return ExecutionPrivileges{{Admin: true, Name: "", Privilege: AllPrivileges}}
 }
 
@@ -979,31 +1013,6 @@ func (s *SelectStatement) RequiredPrivileges() ExecutionPrivileges {
 	return ep
 }
 
-// OnlyTimeDimensions returns true if the statement has a where clause with only time constraints
-func (s *SelectStatement) OnlyTimeDimensions() bool {
-	return s.walkForTime(s.Condition)
-}
-
-// walkForTime is called by the OnlyTimeDimensions method to walk the where clause to determine if
-// the only things specified are based on time
-func (s *SelectStatement) walkForTime(node Node) bool {
-	switch n := node.(type) {
-	case *BinaryExpr:
-		if n.Op == AND || n.Op == OR {
-			return s.walkForTime(n.LHS) && s.walkForTime(n.RHS)
-		}
-		if ref, ok := n.LHS.(*VarRef); ok && strings.ToLower(ref.Val) == "time" {
-			return true
-		}
-		return false
-	case *ParenExpr:
-		// walk down the tree
-		return s.walkForTime(n.Expr)
-	default:
-		return false
-	}
-}
-
 // HasWildcard returns whether or not the select statement has at least 1 wildcard
 func (s *SelectStatement) HasWildcard() bool {
 	return s.HasFieldWildcard() || s.HasDimensionWildcard()
@@ -1032,26 +1041,6 @@ func (s *SelectStatement) HasDimensionWildcard() bool {
 	}
 
 	return false
-}
-
-// hasTimeDimensions returns whether or not the select statement has at least 1
-// where condition with time as the condition
-func (s *SelectStatement) hasTimeDimensions(node Node) bool {
-	switch n := node.(type) {
-	case *BinaryExpr:
-		if n.Op == AND || n.Op == OR {
-			return s.hasTimeDimensions(n.LHS) || s.hasTimeDimensions(n.RHS)
-		}
-		if ref, ok := n.LHS.(*VarRef); ok && strings.ToLower(ref.Val) == "time" {
-			return true
-		}
-		return false
-	case *ParenExpr:
-		// walk down the tree
-		return s.hasTimeDimensions(n.Expr)
-	default:
-		return false
-	}
 }
 
 func (s *SelectStatement) validate(tr targetRequirement) error {
@@ -1125,7 +1114,40 @@ func (s *SelectStatement) validateDimensions() error {
 // Currently we don't have support for all aggregates, but aggregates that
 // can be combined with fields/tags are:
 //  TOP, BOTTOM, MAX, MIN, FIRST, LAST
-func (s *SelectStatement) validSelectWithAggregate(numAggregates int) error {
+func (s *SelectStatement) validSelectWithAggregate() error {
+	calls := map[string]struct{}{}
+	numAggregates := 0
+	for _, f := range s.Fields {
+		fieldCalls := walkFunctionCalls(f.Expr)
+		for _, c := range fieldCalls {
+			calls[c.Name] = struct{}{}
+		}
+		if len(fieldCalls) != 0 {
+			numAggregates++
+		}
+	}
+	// For TOP, BOTTOM, MAX, MIN, FIRST, LAST (selector functions) it is ok to ask for fields and tags
+	// but only if one function is specified.  Combining multiple functions and fields and tags is not currently supported
+	onlySelectors := true
+	for k := range calls {
+		switch k {
+		case "top", "bottom", "max", "min", "first", "last":
+		default:
+			onlySelectors = false
+			break
+		}
+	}
+	if onlySelectors {
+		// If they only have one selector, they can have as many fields or tags as they want
+		if numAggregates == 1 {
+			return nil
+		}
+		// If they have multiple selectors, they are not allowed to have any other fields or tags specified
+		if numAggregates > 1 && len(s.Fields) != numAggregates {
+			return fmt.Errorf("mixing multiple selector functions with tags or fields is not supported")
+		}
+	}
+
 	if numAggregates != 0 && numAggregates != len(s.Fields) {
 		return fmt.Errorf("mixing aggregate and non-aggregate queries is not supported")
 	}
@@ -1133,35 +1155,26 @@ func (s *SelectStatement) validSelectWithAggregate(numAggregates int) error {
 }
 
 func (s *SelectStatement) validateAggregates(tr targetRequirement) error {
-	// Curently most aggregates can be the ONLY thing in a select statement
-	// Others, like TOP/BOTTOM can mix aggregates and tags/fields
-	numAggregates := 0
 	for _, f := range s.Fields {
-		if _, ok := f.Expr.(*Call); ok {
-			numAggregates++
-		}
-	}
-
-	for _, f := range s.Fields {
-		switch expr := f.Expr.(type) {
-		case *Call:
+		for _, expr := range walkFunctionCalls(f.Expr) {
 			switch expr.Name {
 			case "derivative", "non_negative_derivative":
-				if err := s.validSelectWithAggregate(numAggregates); err != nil {
+				if err := s.validSelectWithAggregate(); err != nil {
 					return err
 				}
 				if min, max, got := 1, 2, len(expr.Args); got > max || got < min {
 					return fmt.Errorf("invalid number of arguments for %s, expected at least %d but no more than %d, got %d", expr.Name, min, max, got)
 				}
-				// Validate that if they have a time dimension, they need a sub-call like min/max, etc.
-				if s.hasTimeDimensions(s.Condition) {
+				// Validate that if they have grouping by time, they need a sub-call like min/max, etc.
+				groupByInterval, _ := s.GroupByInterval()
+				if groupByInterval > 0 {
 					if _, ok := expr.Args[0].(*Call); !ok {
 						return fmt.Errorf("aggregate function required inside the call to %s", expr.Name)
 					}
 				}
 
 			case "percentile":
-				if err := s.validSelectWithAggregate(numAggregates); err != nil {
+				if err := s.validSelectWithAggregate(); err != nil {
 					return err
 				}
 				if exp, got := 2, len(expr.Args); got != exp {
@@ -1192,7 +1205,7 @@ func (s *SelectStatement) validateAggregates(tr targetRequirement) error {
 					}
 				}
 			default:
-				if err := s.validSelectWithAggregate(numAggregates); err != nil {
+				if err := s.validSelectWithAggregate(); err != nil {
 					return err
 				}
 				if exp, got := 1, len(expr.Args); got != exp {
@@ -1228,7 +1241,7 @@ func (s *SelectStatement) validateAggregates(tr targetRequirement) error {
 
 	// If we have an aggregate function with a group by time without a where clause, it's an invalid statement
 	if tr == targetNotRequired { // ignore create continuous query statements
-		if !s.IsRawQuery && groupByDuration > 0 && !s.hasTimeDimensions(s.Condition) {
+		if !s.IsRawQuery && groupByDuration > 0 && !HasTimeExpr(s.Condition) {
 			return fmt.Errorf("aggregate functions with GROUP BY time require a WHERE time clause")
 		}
 	}
@@ -1589,6 +1602,15 @@ func (s *SelectStatement) FunctionCalls() []*Call {
 	return a
 }
 
+// FunctionCallsByPosition returns the Call objects from the query in the order they appear in the select statement
+func (s *SelectStatement) FunctionCallsByPosition() [][]*Call {
+	var a [][]*Call
+	for _, f := range s.Fields {
+		a = append(a, walkFunctionCalls(f.Expr))
+	}
+	return a
+}
+
 // walkFunctionCalls walks the Field of a query for any function calls made
 func walkFunctionCalls(exp Expr) []*Call {
 	switch expr := exp.(type) {
@@ -1701,7 +1723,7 @@ func (s *DeleteStatement) String() string {
 		_, _ = buf.WriteString(" WHERE ")
 		_, _ = buf.WriteString(s.Condition.String())
 	}
-	return s.String()
+	return buf.String()
 }
 
 // RequiredPrivileges returns the privilege required to execute a DeleteStatement.
@@ -1791,6 +1813,30 @@ func (s *DropSeriesStatement) String() string {
 // RequiredPrivileges returns the privilege required to execute a DropSeriesStatement.
 func (s DropSeriesStatement) RequiredPrivileges() ExecutionPrivileges {
 	return ExecutionPrivileges{{Admin: false, Name: "", Privilege: WritePrivilege}}
+}
+
+// DropServerStatement represents a command for removing a server from the cluster.
+type DropServerStatement struct {
+	// ID of the node to be dropped.
+	NodeID uint64
+	// Force will force the server to drop even it it means losing data
+	Force bool
+}
+
+// String returns a string representation of the drop series statement.
+func (s *DropServerStatement) String() string {
+	var buf bytes.Buffer
+	_, _ = buf.WriteString("DROP SERVER ")
+	_, _ = buf.WriteString(strconv.FormatUint(s.NodeID, 10))
+	if s.Force {
+		_, _ = buf.WriteString(" FORCE")
+	}
+	return buf.String()
+}
+
+// RequiredPrivileges returns the privilege required to execute a DropServerStatement.
+func (s *DropServerStatement) RequiredPrivileges() ExecutionPrivileges {
+	return ExecutionPrivileges{{Name: "", Privilege: AllPrivileges}}
 }
 
 // ShowContinuousQueriesStatement represents a command for listing continuous queries.
@@ -1988,18 +2034,19 @@ func (s *ShowRetentionPoliciesStatement) RequiredPrivileges() ExecutionPrivilege
 	return ExecutionPrivileges{{Admin: false, Name: "", Privilege: ReadPrivilege}}
 }
 
-// ShowRetentionPoliciesStatement represents a command for displaying stats for a given server.
+// ShowStats statement displays statistics for a given module.
 type ShowStatsStatement struct {
-	// Hostname or IP of the server for stats.
-	Host string
+	// Module
+	Module string
 }
 
 // String returns a string representation of a ShowStatsStatement.
 func (s *ShowStatsStatement) String() string {
 	var buf bytes.Buffer
 	_, _ = buf.WriteString("SHOW STATS ")
-	if s.Host != "" {
-		_, _ = buf.WriteString(s.Host)
+	if s.Module != "" {
+		_, _ = buf.WriteString("FOR ")
+		_, _ = buf.WriteString(s.Module)
 	}
 	return buf.String()
 }
@@ -2021,13 +2068,83 @@ func (s *ShowShardsStatement) RequiredPrivileges() ExecutionPrivileges {
 }
 
 // ShowDiagnosticsStatement represents a command for show node diagnostics.
-type ShowDiagnosticsStatement struct{}
+type ShowDiagnosticsStatement struct {
+	// Module
+	Module string
+}
 
 // String returns a string representation of the ShowDiagnosticsStatement.
-func (s *ShowDiagnosticsStatement) String() string { return "SHOW DIAGNOSTICS" }
+func (s *ShowDiagnosticsStatement) String() string {
+	var buf bytes.Buffer
+	_, _ = buf.WriteString("SHOW DIAGNOSTICS ")
+	if s.Module != "" {
+		_, _ = buf.WriteString("FOR ")
+		_, _ = buf.WriteString(s.Module)
+	}
+	return buf.String()
+}
 
 // RequiredPrivileges returns the privilege required to execute a ShowDiagnosticsStatement
 func (s *ShowDiagnosticsStatement) RequiredPrivileges() ExecutionPrivileges {
+	return ExecutionPrivileges{{Admin: true, Name: "", Privilege: AllPrivileges}}
+}
+
+// CreateSubscriptionStatement represents a command to add a subscription to the incoming data stream
+type CreateSubscriptionStatement struct {
+	Name            string
+	Database        string
+	RetentionPolicy string
+	Destinations    []string
+	Mode            string
+}
+
+// String returns a string representation of the CreateSubscriptionStatement.
+func (s *CreateSubscriptionStatement) String() string {
+	var destinations bytes.Buffer
+	for i, dest := range s.Destinations {
+		if i != 0 {
+			destinations.Write([]byte(`, `))
+		}
+		destinations.Write([]byte(`'`))
+		destinations.Write([]byte(dest))
+		destinations.Write([]byte(`'`))
+	}
+	return fmt.Sprintf(`CREATE SUBSCRIPTION "%s" ON "%s"."%s" DESTINATIONS %s %s `, s.Name, s.Database, s.RetentionPolicy, s.Mode, string(destinations.Bytes()))
+}
+
+// RequiredPrivileges returns the privilege required to execute a CreateSubscriptionStatement
+func (s *CreateSubscriptionStatement) RequiredPrivileges() ExecutionPrivileges {
+	return ExecutionPrivileges{{Admin: true, Name: "", Privilege: AllPrivileges}}
+}
+
+// DropSubscriptionStatement represents a command to drop a subscription to the incoming data stream.
+type DropSubscriptionStatement struct {
+	Name            string
+	Database        string
+	RetentionPolicy string
+}
+
+// String returns a string representation of the DropSubscriptionStatement.
+func (s *DropSubscriptionStatement) String() string {
+	return fmt.Sprintf(`DROP SUBSCRIPTION "%s" ON "%s"."%s"`, s.Name, s.Database, s.RetentionPolicy)
+}
+
+// RequiredPrivileges returns the privilege required to execute a DropSubscriptionStatement
+func (s *DropSubscriptionStatement) RequiredPrivileges() ExecutionPrivileges {
+	return ExecutionPrivileges{{Admin: true, Name: "", Privilege: AllPrivileges}}
+}
+
+// ShowSubscriptionsStatement represents a command to show a list of subscriptions.
+type ShowSubscriptionsStatement struct {
+}
+
+// String returns a string representation of the ShowSubscriptionStatement.
+func (s *ShowSubscriptionsStatement) String() string {
+	return "SHOW SUBSCRIPTIONS"
+}
+
+// RequiredPrivileges returns the privilege required to execute a ShowSubscriptionStatement
+func (s *ShowSubscriptionsStatement) RequiredPrivileges() ExecutionPrivileges {
 	return ExecutionPrivileges{{Admin: true, Name: "", Privilege: AllPrivileges}}
 }
 
@@ -2426,8 +2543,22 @@ func (c *Call) Fields() []string {
 			}
 		}
 		return keys
+	case "min", "max", "first", "last", "sum", "mean":
+		// maintain the order the user specified in the query
+		keyMap := make(map[string]struct{})
+		keys := []string{}
+		for _, a := range c.Args {
+			switch v := a.(type) {
+			case *VarRef:
+				if _, ok := keyMap[v.Val]; !ok {
+					keyMap[v.Val] = struct{}{}
+					keys = append(keys, v.Val)
+				}
+			}
+		}
+		return keys
 	default:
-		return []string{}
+		panic(fmt.Sprintf("*call.Fields is unable to provide information on %s", c.Name))
 	}
 }
 
@@ -2550,7 +2681,7 @@ type RegexLiteral struct {
 // String returns a string representation of the literal.
 func (r *RegexLiteral) String() string {
 	if r.Val != nil {
-		return fmt.Sprintf("/%s/", r.Val.String())
+		return fmt.Sprintf("/%s/", strings.Replace(r.Val.String(), `/`, `\/`, -1))
 	}
 	return ""
 }
@@ -2611,6 +2742,47 @@ func CloneExpr(expr Expr) Expr {
 		return &Wildcard{}
 	}
 	panic("unreachable")
+}
+
+// HasTimeExpr returns true if the expression has a time term.
+func HasTimeExpr(expr Expr) bool {
+	switch n := expr.(type) {
+	case *BinaryExpr:
+		if n.Op == AND || n.Op == OR {
+			return HasTimeExpr(n.LHS) || HasTimeExpr(n.RHS)
+		}
+		if ref, ok := n.LHS.(*VarRef); ok && strings.ToLower(ref.Val) == "time" {
+			return true
+		}
+		return false
+	case *ParenExpr:
+		// walk down the tree
+		return HasTimeExpr(n.Expr)
+	default:
+		return false
+	}
+}
+
+// OnlyTimeExpr returns true if the expression only has time constraints.
+func OnlyTimeExpr(expr Expr) bool {
+	if expr == nil {
+		return false
+	}
+	switch n := expr.(type) {
+	case *BinaryExpr:
+		if n.Op == AND || n.Op == OR {
+			return OnlyTimeExpr(n.LHS) && OnlyTimeExpr(n.RHS)
+		}
+		if ref, ok := n.LHS.(*VarRef); ok && strings.ToLower(ref.Val) == "time" {
+			return true
+		}
+		return false
+	case *ParenExpr:
+		// walk down the tree
+		return OnlyTimeExpr(n.Expr)
+	default:
+		return false
+	}
 }
 
 // TimeRange returns the minimum and maximum times specified by an expression.
@@ -2738,6 +2910,10 @@ func Walk(v Visitor, node Node) {
 		for _, c := range n {
 			Walk(v, c)
 		}
+
+	case *DropSeriesStatement:
+		Walk(v, n.Sources)
+		Walk(v, n.Condition)
 
 	case *Field:
 		Walk(v, n.Expr)

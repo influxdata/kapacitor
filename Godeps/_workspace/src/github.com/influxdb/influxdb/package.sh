@@ -63,11 +63,13 @@ if [ -z "$FPM" ]; then
     FPM=`which fpm`
 fi
 
-GO_VERSION="go1.5"
+GO_VERSION="go1.5.1"
 GOPATH_INSTALL=
 BINS=(
     influxd
     influx
+    influx_stress
+    influx_inspect
     )
 
 ###########################################################################
@@ -83,6 +85,7 @@ $0 [-h] [-p|-w] [-t <dist>] [-r <number>] <version>
     -r release candidate number, if any.
        Example: -r 7
     -p just build packages
+    -x build with race-detection enabled
     -w build packages for current working directory
        imply -p
     -t <dist>
@@ -110,7 +113,7 @@ full_version() {
     if [ -z "$rc" ]; then
         echo $version
     else
-        echo ${VERSION}-rc${RC}
+        echo ${version}-rc${rc}
     fi
 }
 
@@ -263,7 +266,8 @@ do_build() {
         cleanup_exit 1
     fi
 
-    go install -a -ldflags="-X main.version=$version -X main.branch=$branch -X main.commit=$commit" ./...
+    date=`date -u --iso-8601=seconds`
+    go install $RACE -a -ldflags="-X main.version=$version -X main.branch=$branch -X main.commit=$commit -X main.buildTime='$date'" ./...
     if [ $? -ne 0 ]; then
         echo "Build failed, unable to create package -- aborting"
         cleanup_exit 1
@@ -282,6 +286,8 @@ rm -f $INSTALL_ROOT_DIR/influx
 rm -f $INSTALL_ROOT_DIR/init.sh
 ln -s $INSTALL_ROOT_DIR/versions/$version/influxd $INSTALL_ROOT_DIR/influxd
 ln -s $INSTALL_ROOT_DIR/versions/$version/influx $INSTALL_ROOT_DIR/influx
+ln -s $INSTALL_ROOT_DIR/versions/$version/influx_inspect $INSTALL_ROOT_DIR/influx_inspect
+ln -s $INSTALL_ROOT_DIR/versions/$version/influx_stress $INSTALL_ROOT_DIR/influx_stress
 ln -s $INSTALL_ROOT_DIR/versions/$version/scripts/init.sh $INSTALL_ROOT_DIR/init.sh
 
 if ! id influxdb >/dev/null 2>&1; then
@@ -316,21 +322,6 @@ mkdir -p $INFLUXDB_DATA_DIR
 chown -R -L influxdb:influxdb $INFLUXDB_DATA_DIR
 EOF
     echo "Post-install script created successfully at $POST_INSTALL_PATH"
-}
-
-generate_postuninstall_script() {
-    cat << EOF >$POST_UNINSTALL_PATH
-#!/bin/sh
-if [ -d $INSTALL_ROOT_DIR ]; then
-    rm -r "$INSTALL_ROOT_DIR"
-fi
-
-id influxdb 2>/dev/null 1>/dev/null
-if [ $? -eq 0 ]; then
-    userdel -r influxdb
-fi
-EOF
-    echo "Post-uninstall script created successfully at $POST_UNINSTALL_PATH"
 }
 
 ###########################################################################
@@ -369,6 +360,11 @@ do
             echo "RC number required"
         fi
         shift 2
+        ;;
+
+    -x)
+        RACE="-race"
+        shift
         ;;
 
     -w | --working-directory)
@@ -482,7 +478,6 @@ if [ $? -ne 0 ]; then
 fi
 
 generate_postinstall_script `full_version $VERSION $RC`
-generate_postuninstall_script
 
 ###########################################################################
 # Create the actual packages.
@@ -497,19 +492,6 @@ if [ -z "$NIGHTLY_BUILD" -a -z "$PACKAGES_ONLY" ]; then
     fi
 fi
 
-if [ $ARCH == "i386" ]; then
-    rpm_package=influxdb-${VERSION}-1.i686.rpm # RPM packages use 1 for default package release.
-    debian_package=influxdb_`full_version $VERSION $RC`_i686.deb
-    deb_args="-a i686"
-    rpm_args="setarch i686"
-elif [ $ARCH == "arm" ]; then
-    rpm_package=influxdb-${VERSION}-1.armel.rpm
-    debian_package=influxdb_`full_version $VERSION $RC`_armel.deb
-else
-    rpm_package=influxdb-${VERSION}-1.x86_64.rpm
-    debian_package=influxdb_`full_version $VERSION $RC`_amd64.deb
-fi
-
 COMMON_FPM_ARGS="\
 --log error \
 -C $TMP_WORK_DIR \
@@ -519,7 +501,7 @@ COMMON_FPM_ARGS="\
 --maintainer $MAINTAINER \
 --after-install $POST_INSTALL_PATH \
 --after-remove $POST_UNINSTALL_PATH \
---name influxdb \
+--name influxdb${RACE} \
 --config-files $CONFIG_ROOT_DIR \
 --config-files $LOGROTATE_DIR"
 
@@ -533,7 +515,11 @@ if [ -n "$DEB_WANTED" ]; then
 fi
 
 if [ -n "$TAR_WANTED" ]; then
-    $FPM -s dir -t tar --prefix influxdb_`full_version $VERSION $RC`_${ARCH} -p influxdb_`full_version $VERSION $RC`_${ARCH}.tar.gz --description "$DESCRIPTION" $COMMON_FPM_ARGS --version `full_version $VERSION $RC ` .
+    if [ -n "$RACE" ]; then
+        # Tweak race prefix for tarball.
+        race="race_"
+    fi
+    $FPM -s dir -t tar --prefix influxdb_$race`full_version $VERSION $RC`_${ARCH} -p influxdb_$race`full_version $VERSION $RC`_${ARCH}.tar.gz --description "$DESCRIPTION" $COMMON_FPM_ARGS --version `full_version $VERSION $RC ` .
     if [ $? -ne 0 ]; then
         echo "Failed to create Tar package -- aborting."
         cleanup_exit 1

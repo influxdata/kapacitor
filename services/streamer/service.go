@@ -7,7 +7,7 @@ import (
 
 type Service struct {
 	StreamCollector interface {
-		CollectPoint(*models.Point) error
+		CollectPoint(models.Point) error
 	}
 }
 
@@ -25,13 +25,15 @@ func (s *Service) Close() error {
 
 func (s *Service) WritePoints(pts *cluster.WritePointsRequest) (err error) {
 	for _, mp := range pts.Points {
-		p := models.NewPoint(
-			mp.Name(),
-			models.NilGroup,
-			mp.Tags(),
-			mp.Fields(),
-			mp.Time(),
-		)
+		p := models.Point{
+			Database:        pts.Database,
+			RetentionPolicy: pts.RetentionPolicy,
+			Name:            mp.Name(),
+			Group:           models.NilGroup,
+			Tags:            mp.Tags(),
+			Fields:          models.Fields(mp.Fields()),
+			Time:            mp.Time(),
+		}
 		err = s.StreamCollector.CollectPoint(p)
 		if err != nil {
 			return
