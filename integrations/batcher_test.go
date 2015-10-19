@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestBatchingData(t *testing.T) {
+func TestBatch_SimpleMR(t *testing.T) {
 	assert := assert.New(t)
 
 	var script = `
@@ -66,7 +66,7 @@ batch
 		},
 	}
 
-	clock, et, errCh, tm := testBatcher(t, "TestBatchingData", script)
+	clock, et, errCh, tm := testBatcher(t, "TestBatch_SimpleMR", script)
 	defer tm.Close()
 
 	// Move time forward
@@ -94,7 +94,7 @@ batch
 	}
 }
 
-func TestSplitBatchData(t *testing.T) {
+func TestBatch_Fork(t *testing.T) {
 
 	var script = `
 var cpu = batch
@@ -103,14 +103,16 @@ var cpu = batch
 	.groupBy(time(2s));
 
 cpu
-	.where("host = 'serverA'");
+	.fork()
+	.where("host = 'serverA'")
 	.window()
 		.period(1s)
 		.every(1s)
 	.cache("/a");
 
 cpu
-	.where("host = 'serverB'");
+	.fork()
+	.where("host = 'serverB'")
 	.window()
 		.period(1s)
 		.every(1s)
@@ -118,35 +120,10 @@ cpu
 `
 	//er := kapacitor.Result{}
 
-	testBatcher(t, "TestSplitBatchData", script)
+	testBatcher(t, "TestBatch_Fork", script)
 }
 
-func TestJoinBatchData(t *testing.T) {
-
-	var script = `
-var errorCounts = batch
-			.query('''select count("value") from "tests"."default"."errors"''')
-			.period(10s)
-			.groupBy(time(5s), "service");
-
-var viewCounts = batch
-			.query('''select count("value") from "tests"."default"."errors"''')
-			.period(10s)
-			.groupBy(time(5s), "service");
-
-errorCounts.join(viewCounts)
-		.as("errors", "views")
-		//No need for a map phase
-		.reduce(expr("error_percent", "errors.count / views.count"), "*")
-		.cache();
-`
-
-	//er := kapacitor.Result{}
-
-	testBatcher(t, "TestJoinBatchData", script)
-}
-
-func TestUnionBatchData(t *testing.T) {
+func TestBatch_Union(t *testing.T) {
 
 	var script = `
 var cpu = batch
@@ -168,40 +145,7 @@ cpu.union(mem, disk)
 
 	//er := kapacitor.Result{}
 
-	testBatcher(t, "TestUnionBatchData", script)
-}
-
-func TestBatchingAlert(t *testing.T) {
-	var script = `
-batch
-	.query('''select percentile("idle", 10) as p10 from "tests"."default".cpu where "host" = 'serverA' ''')
-	.period(10s)
-	.groupBy(time(2s))
-	.where("p10 < 30")
-	.alert()
-	.post("http://localhost");
-`
-
-	//er := kapacitor.Result{}
-
-	testBatcher(t, "TestBatchingAlert", script)
-}
-
-func TestBatchingAlertFlapping(t *testing.T) {
-	var script = `
-batch
-	.query('''select percentile("idle", 10) as p10 from "tests"."default".cpu where "host" = 'serverA' ''')
-	.period(10s)
-	.groupBy(time(2s))
-	.where("p10 < 30")
-	.alert()
-	.flapping(25, 50)
-	.post("http://localhost");
-`
-
-	//er := kapacitor.Result{}
-
-	testBatcher(t, "TestBatchingAlertFlapping", script)
+	testBatcher(t, "TestBatch_Union", script)
 }
 
 // Helper test function for batcher

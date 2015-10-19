@@ -3,6 +3,7 @@ package kapacitor
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/influxdb/influxdb/influxql"
@@ -11,6 +12,15 @@ import (
 	"github.com/influxdb/kapacitor/models"
 	"github.com/influxdb/kapacitor/pipeline"
 )
+
+// Number of previous states to remember when computing flapping percentage.
+const defaultFlapHistory = 21
+
+// The newest state change is weighted 'weightDiff' times more than oldest state change.
+const weightDiff = 1.5
+
+// Maximum weight applied to newest state change.
+const maxWeight = 1.2
 
 type AlertHandler func(ad AlertData)
 
@@ -53,6 +63,9 @@ type AlertNode struct {
 	endpoint string
 	handlers []AlertHandler
 	levels   []*expr.StatefulExpr
+	history  []AlertLevel
+	hIdx     int
+	flapping bool
 }
 
 // Create a new  AlertNode which caches the most recent item and exposes it over the HTTP API.
@@ -93,6 +106,20 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode) (an *AlertNode, err 
 		}
 		an.levels[CritAlert] = &expr.StatefulExpr{tree, expr.Functions()}
 	}
+	// Configure flapping
+	if n.UseFlapping {
+		history := n.History
+		if history == 0 {
+			history = defaultFlapHistory
+		}
+		if history < 2 {
+			return nil, errors.New("alert history count must be >= 2")
+		}
+		an.history = make([]AlertLevel, history)
+		if n.FlapLow > 1 || n.FlapHigh > 1 {
+			return nil, errors.New("alert flap thresholds are percentages and should be between 0 and 1")
+		}
+	}
 	return
 }
 
@@ -101,6 +128,12 @@ func (a *AlertNode) runAlert() error {
 	case pipeline.StreamEdge:
 		for p, ok := a.ins[0].NextPoint(); ok; p, ok = a.ins[0].NextPoint() {
 			l := a.determineLevel(p.Fields, p.Tags)
+			if a.a.UseFlapping {
+				a.updateFlapping(l)
+				if a.flapping {
+					continue
+				}
+			}
 			if l > NoAlert {
 				batch := models.Batch{
 					Name:   p.Name,
@@ -117,19 +150,29 @@ func (a *AlertNode) runAlert() error {
 					h(ad)
 				}
 			}
-
 		}
 	case pipeline.BatchEdge:
 		for b, ok := a.ins[0].NextBatch(); ok; b, ok = a.ins[0].NextBatch() {
+			triggered := false
 			for _, p := range b.Points {
 				l := a.determineLevel(p.Fields, b.Tags)
 				if l > NoAlert {
+					triggered = true
+					if a.a.UseFlapping {
+						a.updateFlapping(l)
+						if a.flapping {
+							break
+						}
+					}
 					ad := AlertData{l, a.batchToResult(b)}
 					for _, h := range a.handlers {
 						h(ad)
 					}
 					break
 				}
+			}
+			if !triggered && a.a.UseFlapping {
+				a.updateFlapping(NoAlert)
 			}
 		}
 	}
@@ -159,6 +202,38 @@ func (a *AlertNode) batchToResult(b models.Batch) influxql.Result {
 		Series: imodels.Rows{row},
 	}
 	return r
+}
+
+func (a *AlertNode) updateFlapping(level AlertLevel) {
+	a.history[a.hIdx] = level
+	a.hIdx = (a.hIdx + 1) % len(a.history)
+
+	l := len(a.history)
+	changes := 0.0
+	weight := (maxWeight / weightDiff)
+	step := (maxWeight - weight) / float64(l-1)
+	for i := 1; i < l; i++ {
+		// get current index
+		c := (i + a.hIdx) % l
+		// get previous index
+		p := c - 1
+		// check for wrap around
+		if p < 0 {
+			p = l - 1
+		}
+		if a.history[c] != a.history[p] {
+			changes += weight
+		}
+		weight += step
+	}
+
+	p := changes / float64(l-1)
+
+	if a.flapping && p < a.a.FlapLow {
+		a.flapping = false
+	} else if !a.flapping && p > a.a.FlapHigh {
+		a.flapping = true
+	}
 }
 
 func (a *AlertNode) handlePost(ad AlertData) {

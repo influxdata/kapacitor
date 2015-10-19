@@ -33,7 +33,7 @@ func init() {
 	}
 }
 
-func TestWindowDataByTime(t *testing.T) {
+func TestStream_Window(t *testing.T) {
 	assert := assert.New(t)
 
 	var script = `
@@ -43,7 +43,7 @@ stream
 	.window()
 		.period(10s)
 		.every(10s)
-	.httpOut("TestWindowDataByTime");
+	.httpOut("TestStream_Window");
 `
 
 	nums := []float64{
@@ -78,7 +78,7 @@ stream
 		},
 	}
 
-	clock, et, errCh, tm := testStreamer(t, "TestWindowDataByTime", script)
+	clock, et, errCh, tm := testStreamer(t, "TestStream_Window", script)
 	defer tm.Close()
 
 	// Move time forward
@@ -89,7 +89,7 @@ stream
 	assert.Nil(et.Err())
 
 	// Get the result
-	output, err := et.GetOutput("TestWindowDataByTime")
+	output, err := et.GetOutput("TestStream_Window")
 	if !assert.Nil(err) {
 		t.FailNow()
 	}
@@ -106,7 +106,7 @@ stream
 	}
 }
 
-func TestSimpleMapReduce(t *testing.T) {
+func TestStream_SimpleMR(t *testing.T) {
 	assert := assert.New(t)
 
 	var script = `
@@ -117,7 +117,7 @@ stream
 		.period(10s)
 		.every(10s)
 	.mapReduce(influxql.count("value"))
-	.httpOut("TestSimpleMapReduce");
+	.httpOut("TestStream_SimpleMR");
 `
 	er := kapacitor.Result{
 		Series: imodels.Rows{
@@ -133,7 +133,7 @@ stream
 		},
 	}
 
-	clock, et, errCh, tm := testStreamer(t, "TestSimpleMapReduce", script)
+	clock, et, errCh, tm := testStreamer(t, "TestStream_SimpleMR", script)
 	defer tm.Close()
 
 	// Move time forward
@@ -144,7 +144,7 @@ stream
 	assert.Nil(et.Err())
 
 	// Get the result
-	output, err := et.GetOutput("TestSimpleMapReduce")
+	output, err := et.GetOutput("TestStream_SimpleMR")
 	if !assert.Nil(err) {
 		t.FailNow()
 	}
@@ -161,7 +161,7 @@ stream
 	}
 }
 
-func TestGroupByStream(t *testing.T) {
+func TestStream_GroupBy(t *testing.T) {
 	assert := assert.New(t)
 
 	var script = `
@@ -207,7 +207,7 @@ stream
 		},
 	}
 
-	clock, et, errCh, tm := testStreamer(t, "TestGroupByStream", script)
+	clock, et, errCh, tm := testStreamer(t, "TestStream_GroupBy", script)
 	defer tm.Close()
 
 	// Move time forward
@@ -235,7 +235,7 @@ stream
 	}
 }
 
-func TestJoinStreamData(t *testing.T) {
+func TestStream_Join(t *testing.T) {
 	assert := assert.New(t)
 
 	var script = `
@@ -259,44 +259,50 @@ var viewCounts = stream
 
 errorCounts.join(viewCounts)
 		.as("errors", "views")
-		.rename("error_rate")
-		.apply(expr("value", "errors.sum / views.sum"))
+		.rename("error_view")
+		.apply(expr("error_percent", "errors.sum / views.sum"))
 		.httpOut("error_rate");
 `
 
 	er := kapacitor.Result{
 		Series: imodels.Rows{
 			{
-				Name:    "error_rate",
+				Name:    "error_view",
 				Tags:    map[string]string{"service": "cartA"},
-				Columns: []string{"time", "value"},
+				Columns: []string{"time", "error_percent", "errors.sum", "views.sum"},
 				Values: [][]interface{}{[]interface{}{
 					time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
 					0.01,
+					47.0,
+					4700.0,
 				}},
 			},
 			{
-				Name:    "error_rate",
+				Name:    "error_view",
 				Tags:    map[string]string{"service": "login"},
-				Columns: []string{"time", "value"},
+				Columns: []string{"time", "error_percent", "errors.sum", "views.sum"},
 				Values: [][]interface{}{[]interface{}{
 					time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
 					0.01,
+					45.0,
+					4500.0,
 				}},
 			},
 			{
-				Name:    "error_rate",
+				Name:    "error_view",
 				Tags:    map[string]string{"service": "front"},
-				Columns: []string{"time", "value"},
+				Columns: []string{"time", "error_percent", "errors.sum", "views.sum"},
 				Values: [][]interface{}{[]interface{}{
 					time.Date(1970, 1, 1, 0, 0, 8, 0, time.UTC),
 					0.01,
+					32.0,
+					3200.0,
 				}},
 			},
 		},
 	}
 
-	clock, et, errCh, tm := testStreamer(t, "TestJoinStreamData", script)
+	clock, et, errCh, tm := testStreamer(t, "TestStream_Join", script)
 	defer tm.Close()
 
 	// Move time forward
@@ -324,7 +330,7 @@ errorCounts.join(viewCounts)
 	}
 }
 
-func TestUnionStreamData(t *testing.T) {
+func TestStream_Union(t *testing.T) {
 	assert := assert.New(t)
 
 	var script = `
@@ -364,7 +370,7 @@ cpu.union(mem, disk)
 		},
 	}
 
-	clock, et, errCh, tm := testStreamer(t, "TestUnionStreamData", script)
+	clock, et, errCh, tm := testStreamer(t, "TestStream_Union", script)
 	defer tm.Close()
 
 	// Move time forward
@@ -392,7 +398,7 @@ cpu.union(mem, disk)
 	}
 }
 
-func TestStreamAggregations(t *testing.T) {
+func TestStream_Aggregations(t *testing.T) {
 	assert := assert.New(t)
 
 	type testCase struct {
@@ -652,7 +658,7 @@ stream
 		tmpl.Execute(&script, tc)
 		clock, et, errCh, tm := testStreamer(
 			t,
-			"TestStreamAggregation",
+			"TestStream_Aggregations",
 			string(script.Bytes()),
 		)
 		defer tm.Close()
@@ -683,7 +689,7 @@ stream
 	}
 }
 
-func TestCustomFunctions(t *testing.T) {
+func TestStream_CustomFunctions(t *testing.T) {
 	var script = `
 var fMap = loadMapFunc("./TestCustomMapFunction.py");
 var fReduce = loadReduceFunc("./TestCustomReduceFunction.py");
@@ -700,10 +706,10 @@ stream
 
 	//er := kapacitor.Result{}
 
-	testStreamer(t, "TestCustomFunctions", script)
+	testStreamer(t, "TestStream_CustomFunctions", script)
 }
 
-func TestCustomMRFunction(t *testing.T) {
+func TestStream_CustomMRFunction(t *testing.T) {
 	var script = `
 var fMapReduce = loadMapReduceFunc("./TestCustomMapReduceFunction.py");
 stream
@@ -718,10 +724,10 @@ stream
 
 	//er := kapacitor.Result{}
 
-	testStreamer(t, "TestCustomMRFunction", script)
+	testStreamer(t, "TestStream_CustomMRFunction", script)
 }
 
-func TestStreamingAlert(t *testing.T) {
+func TestStream_Alert(t *testing.T) {
 	assert := assert.New(t)
 
 	requestCount := 0
@@ -750,7 +756,7 @@ stream
 		.crit("count > 8")
 		.post("` + ts.URL + `");`
 
-	clock, et, errCh, tm := testStreamer(t, "TestStreamingAlert", script)
+	clock, et, errCh, tm := testStreamer(t, "TestStream_Alert", script)
 	defer tm.Close()
 
 	// Move time forward
@@ -763,7 +769,7 @@ stream
 	assert.Equal(1, requestCount)
 }
 
-func TestStreamingAlertSigma(t *testing.T) {
+func TestStream_AlertSigma(t *testing.T) {
 	assert := assert.New(t)
 
 	requestCount := 0
@@ -789,7 +795,7 @@ stream
 		.crit("sigma > 3.5")
 		.post("` + ts.URL + `");`
 
-	clock, et, errCh, tm := testStreamer(t, "TestStreamingAlertSigma", script)
+	clock, et, errCh, tm := testStreamer(t, "TestStream_AlertSigma", script)
 	defer tm.Close()
 
 	// Move time forward
@@ -802,7 +808,7 @@ stream
 	assert.Equal(1, requestCount)
 }
 
-func TestStreamingAlertComplexWhere(t *testing.T) {
+func TestStream_AlertComplexWhere(t *testing.T) {
 	assert := assert.New(t)
 
 	requestCount := 0
@@ -825,7 +831,7 @@ stream
 		.crit("true")
 		.post("` + ts.URL + `");`
 
-	clock, et, errCh, tm := testStreamer(t, "TestStreamingAlertComplexWhere", script)
+	clock, et, errCh, tm := testStreamer(t, "TestStream_AlertComplexWhere", script)
 	defer tm.Close()
 
 	// Move time forward
@@ -838,26 +844,41 @@ stream
 	assert.Equal(1, requestCount)
 }
 
-func TestStreamingAlertFlapping(t *testing.T) {
+func TestStream_AlertFlapping(t *testing.T) {
+	assert := assert.New(t)
+
+	requestCount := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+	}))
+	defer ts.Close()
 	var script = `
 stream
 	.from("cpu")
 	.where("host = 'serverA'")
-	.window()
-		.period(1s)
-		.every(1s)
-	.mapReduce(influxql.percentile("idle", 10.0))
-	.where("percentile < 30")
 	.alert()
-		.flapping(25, 50)
-		.post("http://localhost");
+		.info("value < 95")
+		.warn("value < 94")
+		.crit("value < 93")
+		.flapping(0.25, 0.50)
+		.post("` + ts.URL + `");
 `
 
-	//er := kapacitor.Result{}
+	clock, et, errCh, tm := testStreamer(t, "TestStream_AlertFlapping", script)
+	defer tm.Close()
 
-	testStreamer(t, "TestStreamingAlertFlapping", script)
+	// Move time forward
+	clock.Set(clock.Zero().Add(13 * time.Second))
+	// Wait till the replay has finished
+	assert.Nil(<-errCh)
+	// Wait till the task is finished
+	assert.Nil(et.Err())
+
+	// Flapping detection should drop the last alert.
+	assert.Equal(5, requestCount)
 }
-func TestInfluxDBOut(t *testing.T) {
+
+func TestStream_InfluxDBOut(t *testing.T) {
 	assert := assert.New(t)
 
 	var script = `
@@ -899,7 +920,7 @@ stream
 		done <- err
 	}))
 
-	clock, et, errCh, tm := testStreamer(t, "TestInfluxDBOut", script)
+	clock, et, errCh, tm := testStreamer(t, "TestStream_InfluxDBOut", script)
 	tm.InfluxDBService = influxdb
 	defer tm.Close()
 

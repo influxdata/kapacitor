@@ -71,3 +71,22 @@ func TagsToGroupID(dims []string, tags map[string]string) GroupID {
 
 	return GroupID(buf.Bytes())
 }
+
+func PointToRow(p Point) (row *models.Row) {
+	row = &models.Row{
+		Name:    p.Name,
+		Tags:    p.Tags,
+		Columns: []string{"time"},
+		Values:  make([][]interface{}, 1),
+	}
+
+	for _, f := range SortedFields(p.Fields) {
+		row.Columns = append(row.Columns, f)
+	}
+	row.Values[0] = make([]interface{}, len(p.Fields)+1)
+	row.Values[0][0] = p.Time
+	for i, c := range row.Columns[1:] {
+		row.Values[0][i+1] = p.Fields[c]
+	}
+	return
+}

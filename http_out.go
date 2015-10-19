@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/influxdb/influxdb/influxql"
-	imodels "github.com/influxdb/influxdb/models"
 	"github.com/influxdb/kapacitor/models"
 	"github.com/influxdb/kapacitor/pipeline"
 	"github.com/influxdb/kapacitor/services/httpd"
@@ -95,27 +94,13 @@ func (h *HTTPOutNode) runOut() error {
 func (h *HTTPOutNode) updateResultWithPoint(p models.Point) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	batch := &imodels.Row{
-		Name:    p.Name,
-		Tags:    p.Tags,
-		Columns: []string{"time"},
-		Values:  make([][]interface{}, 1),
-	}
-
-	for f := range p.Fields {
-		batch.Columns = append(batch.Columns, f)
-	}
-	batch.Values[0] = make([]interface{}, len(p.Fields)+1)
-	batch.Values[0][0] = p.Time
-	for i, c := range batch.Columns[1:] {
-		batch.Values[0][i+1] = p.Fields[c]
-	}
+	row := models.PointToRow(p)
 	if idx, ok := h.groupSeriesIdx[p.Group]; !ok {
 		idx = len(h.result.Series)
 		h.groupSeriesIdx[p.Group] = idx
-		h.result.Series = append(h.result.Series, batch)
+		h.result.Series = append(h.result.Series, row)
 	} else {
-		h.result.Series[idx] = batch
+		h.result.Series[idx] = row
 	}
 }
 
