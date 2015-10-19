@@ -78,7 +78,7 @@ stream
         // if idle drops below 70% (aka cpu used > 30%)
         .crit("value <  70")
         // Post the data for the point to a URL
-        .post("http://localhost:8000");
+        .post("http://localhost:8000")
 ```
 
 
@@ -154,7 +154,7 @@ stream
     .from("cpu_usage_idle")
     .alert()
         .crit("sigma(value) >  3")
-        .post("http://localhost:8000");
+        .post("http://localhost:8000")
 ```
 
 Just like that we have told Kapacitor to only alert us if the current value is more than `3 sigma` away from the running mean.
@@ -186,7 +186,7 @@ stream
         .info("sigma > 2")
         .warn("sigma > 2.5")
         .crit("sigma > 3")
-        .post("http://localhost:8000");
+        .post("http://localhost:8000")
 ```
 
 This `TICK` script alerts if the `mean` idle cpu, over the last `10s` `window` for each `service` group is `3` sigma away from the running mean, every `5s`.

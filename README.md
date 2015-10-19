@@ -148,7 +148,7 @@ stream
   .mapReduce(influxql.mean("value"))
   .alert()
   .crit("value < 30")
-  .email("oncall@example.com");
+  .email("oncall@example.com")
 ```
 
 This script maintains a window of data for 10s and emits the current window every 5s.
@@ -184,7 +184,7 @@ stream
   .mapReduce(influxql.mean("value"))
   .alert()
   .crit("value < 30")
-  .email("oncall@example.com");
+  .email("oncall@example.com")
 ```
 
 
@@ -246,7 +246,7 @@ batch
   .groupBy(time(1h), "dc")
   .alert()
   .crit("value < 30")
-  .email("oncall@example.com");
+  .email("oncall@example.com")
 ```
 
 The main difference is instead of a stream object we start with a batch object. Since batches are already windowed there is not need to define a new window.
@@ -287,7 +287,7 @@ stream
   .mapReduce(influxql.count("value"))
   .alert()
     .crit("true")
-    .email("oncall@example.com");
+    .email("oncall@example.com")
 
 //Now define normal processing on the stream
 stream
@@ -303,7 +303,7 @@ stream
   .alert()
     .crit("true")
     .flapping(25.0, 50.0)
-    .email("oncall@example.com");
+    .email("oncall@example.com")
 ```
 
 #### Aggregate alerts
@@ -323,7 +323,7 @@ var redis = stream
   .groupBy("host")
   .alert()
     .crit("true")
-    .email("oncall@example.com");
+    .email("oncall@example.com")
 
 var cpu = stream
   .from("cpu")
@@ -331,7 +331,7 @@ var cpu = stream
   .groupBy("host")
   .alert()
     .crit("true")
-    .email("oncall@example.com");
+    .email("oncall@example.com")
 ```
 
 Now lets say we want to combine the alerts so that if a either alert triggers we can send them in the same alert.
@@ -339,11 +339,11 @@ Now lets say we want to combine the alerts so that if a either alert triggers we
 ```
 var redis = stream
   .from("redis")
-  .where("instantaneous_ops_per_sec < 10");
+  .where("instantaneous_ops_per_sec < 10")
 
 var cpu = stream
   .from("cpu")
-  .where("idle < 20");
+  .where("idle < 20")
 
 redis.union(cpu)
   .groupBy("host")
@@ -352,7 +352,7 @@ redis.union(cpu)
   .every(10s)
   .alert()
     .crit("true")
-    .email("oncall@example.com");
+    .email("oncall@example.com")
 ```
 
 This will aggregate the union of all alerts every 10s by host. Then it will send out one alert with the aggregate information.
@@ -378,7 +378,7 @@ Now lets say we want to perform some custom processing on a stream of data and t
 ```
 stream
     ... //Define custom processing pipeline
-    .influxdb_output("https://influxhost:8086", "db", "rp", "user", "pass");
+    .influxdb_output("https://influxhost:8086", "db", "rp", "user", "pass")
 ```
 
 Or you simply need to keep the data cached so you can request it when you need it.
@@ -386,7 +386,7 @@ Or you simply need to keep the data cached so you can request it when you need i
 ```
 stream
     ... //Define custom processing pipeline
-    .cache("custom_data_set");
+    .cache("custom_data_set")
 ```
 
 Now you can make a request to `http://kapacitorhost:9092/api/<streamer_name>/custom_data_set`.
@@ -399,8 +399,8 @@ What about when you want to do something not built-in to Kapacitor?
 Simply load your custom functions in the DSL like so:
 
 ```
-var fMap = loadMapFunc("./mapFunction.py");
-var fReduce = loadReduceFunc("./reduceFunction.py");
+var fMap = loadMapFunc("./mapFunction.py")
+var fReduce = loadReduceFunc("./reduceFunction.py")
 stream
 	.from("cpu")
 	.where("host", "=", "serverA")
@@ -409,7 +409,7 @@ stream
 		.every(1s)
 	.map(fMap, "idle")
 	.reduce(fReduce)
-	.httpOut("http://example.com/path");
+	.httpOut("http://example.com/path")
 ```
 
 The `mapFunction.py` and `reduceFunction.py` files contain python scripts that read data on an incoming stream perform their function and output the result.
