@@ -12,11 +12,10 @@ import (
 type StreamNode struct {
 	node
 	s         *pipeline.StreamNode
-	predicate *expr.Tree
+	predicate *expr.StatefulExpr
 	db        string
 	rp        string
 	name      string
-	funcs     expr.Funcs
 }
 
 // Create a new  StreamNode which filters data from a source.
@@ -35,16 +34,12 @@ func newStreamNode(et *ExecutingTask, n *pipeline.StreamNode) (*StreamNode, erro
 	}
 	// Parse predicate
 	if n.Predicate != "" {
-		sn.predicate, err = expr.Parse(n.Predicate)
+		tree, err := expr.ParseForType(n.Predicate, expr.ReturnBool)
 		if err != nil {
 			return nil, err
 		}
-		if sn.predicate.RType() != expr.ReturnBool {
-			return nil, fmt.Errorf("WHERE clause does not evaluate to boolean value %q", n.Predicate)
-		}
+		sn.predicate = &expr.StatefulExpr{tree, expr.Functions()}
 	}
-	// Initialize expr functions
-	sn.funcs = expr.Functions()
 	return sn, nil
 }
 
@@ -88,33 +83,13 @@ func (s *StreamNode) matches(p models.Point) bool {
 	if s.name != "" && p.Name != s.name {
 		return false
 	}
-	if !s.evalPredicate(p) {
-		return false
+	if s.predicate != nil {
+		if pass, err := EvalPredicate(s.predicate, p.Fields, p.Tags); err != nil {
+			s.logger.Println("E! error while evaluating WHERE expression:", err)
+			return false
+		} else {
+			return pass
+		}
 	}
 	return true
-}
-
-//evaluate a given predicate a against a Point
-func (s *StreamNode) evalPredicate(p models.Point) bool {
-	if s.predicate == nil {
-		return true
-	}
-	vars := make(expr.Vars)
-	for k, v := range p.Fields {
-		if p.Tags[k] != "" {
-			s.logger.Println("E! cannot have field and tags with same name")
-			return false
-		}
-		vars[k] = v
-	}
-	for k, v := range p.Tags {
-		vars[k] = v
-	}
-
-	b, err := s.predicate.EvalBool(vars, s.funcs)
-	if err != nil {
-		s.logger.Println("E! error evaluating WHERE:", err)
-		return false
-	}
-	return b
 }

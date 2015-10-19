@@ -26,6 +26,18 @@ func Parse(text string) (t *Tree, err error) {
 	return
 }
 
+// parses expression and expects the return type of the expression to be 'typ'.
+func ParseForType(text string, typ ReturnType) (t *Tree, err error) {
+	tree, err := Parse(text)
+	if err != nil {
+		return nil, err
+	}
+	if tree.RType() != typ {
+		return nil, fmt.Errorf("expression does not evaluate to %s value: %s", typ, text)
+	}
+	return tree, nil
+}
+
 //Evaluate the Tree on a given Scope
 func (t *Tree) EvalBool(v Vars, f Funcs) (bool, error) {
 	if t.RType() != ReturnBool {
@@ -36,7 +48,7 @@ func (t *Tree) EvalBool(v Vars, f Funcs) (bool, error) {
 }
 
 //Evaluate the Tree on a given Scope
-func (t *Tree) EvalNumber(v Vars, f Funcs) (float64, error) {
+func (t *Tree) EvalNum(v Vars, f Funcs) (float64, error) {
 	if t.RType() != ReturnNum {
 		return 0, fmt.Errorf("Tree does not evaluate to number")
 	}
@@ -151,7 +163,7 @@ func (t *Tree) parse(text string) (err error) {
 // Operator Precedence parsing
 /* Psuedo Grammar
 Expr -> Primary Operator Primary
-Primary -> ( Expr ) | Fnc | Num | Var | String | - Primary | ! Primary
+Primary -> ( Expr ) | Fnc | Num | Var | String | Boolean | - Primary | ! Primary
 Fnc -> Var( Params )
 Params -> {Primary { , Primary }
 */
@@ -221,7 +233,8 @@ func (t *Tree) primary() node {
 			t.errorf("unexpected operator %q", tok.val)
 			return nil
 		}
-
+	case tok.typ == tokenTrue, tok.typ == tokenFalse:
+		return t.boolean()
 	default:
 		t.errorf("unexpected token %q", tok)
 		return nil
@@ -231,6 +244,15 @@ func (t *Tree) primary() node {
 func (t *Tree) num() node {
 	n := t.expect(tokenNumber)
 	num, err := newNum(n.pos, n.val)
+	if err != nil {
+		t.error(err)
+	}
+	return num
+}
+
+func (t *Tree) boolean() node {
+	n := t.next()
+	num, err := newBool(n.pos, n.val)
 	if err != nil {
 		t.error(err)
 	}

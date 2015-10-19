@@ -731,7 +731,7 @@ func TestStreamingAlert(t *testing.T) {
 			t.FailNow()
 		}
 		requestCount++
-		expAns := `{"name":"cpu","points":[{"fields":{"count":10},"time":"1970-01-01T00:00:09Z"}]}`
+		expAns := `{"level":"CRITICAL","data":{"Series":[{"name":"cpu","columns":["time","count"],"values":[["1970-01-01T00:00:09Z",10]]}],"Err":null}}`
 		assert.Equal(expAns, string(ans))
 	}))
 	defer ts.Close()
@@ -744,8 +744,10 @@ stream
 		.period(10s)
 		.every(10s)
 	.mapReduce(influxql.count("idle"))
-	.where("count > 5")
 	.alert()
+		.info("count > 6")
+		.warn("count > 7")
+		.crit("count > 8")
 		.post("` + ts.URL + `");`
 
 	clock, et, errCh, tm := testStreamer(t, "TestStreamingAlert", script)
@@ -771,7 +773,46 @@ func TestStreamingAlertSigma(t *testing.T) {
 			t.FailNow()
 		}
 		requestCount++
-		expAns := `{"name":"cpu","tags":{"host":"serverA","type":"idle"},"points":[{"fields":{"value":16},"time":"1970-01-01T00:00:07Z"}]}`
+		expAns := `{"level":"INFO","data":{"Series":[{"name":"cpu","tags":{"host":"serverA","type":"idle"},"columns":["time","sigma","value"],"values":[["1970-01-01T00:00:07Z",2.469916402324427,16]]}],"Err":null}}`
+		assert.Equal(expAns, string(ans))
+	}))
+	defer ts.Close()
+
+	var script = `
+stream
+	.from("cpu")
+	.where("host = 'serverA'")
+	.apply(expr("sigma", "sigma(value)"))
+	.alert()
+		.info("sigma > 2")
+		.warn("sigma > 3")
+		.crit("sigma > 3.5")
+		.post("` + ts.URL + `");`
+
+	clock, et, errCh, tm := testStreamer(t, "TestStreamingAlertSigma", script)
+	defer tm.Close()
+
+	// Move time forward
+	clock.Set(clock.Zero().Add(13 * time.Second))
+	// Wait till the replay has finished
+	assert.Nil(<-errCh)
+	// Wait till the task is finished
+	assert.Nil(et.Err())
+
+	assert.Equal(1, requestCount)
+}
+
+func TestStreamingAlertComplexWhere(t *testing.T) {
+	assert := assert.New(t)
+
+	requestCount := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ans, err := ioutil.ReadAll(r.Body)
+		if !assert.Nil(err) {
+			t.FailNow()
+		}
+		requestCount++
+		expAns := `{"level":"CRITICAL","data":{"Series":[{"name":"cpu","tags":{"host":"serverA","type":"idle"},"columns":["time","value"],"values":[["1970-01-01T00:00:07Z",16]]}],"Err":null}}`
 		assert.Equal(expAns, string(ans))
 	}))
 	defer ts.Close()
@@ -781,9 +822,10 @@ stream
 	.from("cpu")
 	.where("host = 'serverA' AND sigma(value) > 2")
 	.alert()
+		.crit("true")
 		.post("` + ts.URL + `");`
 
-	clock, et, errCh, tm := testStreamer(t, "TestStreamingAlertSigma", script)
+	clock, et, errCh, tm := testStreamer(t, "TestStreamingAlertComplexWhere", script)
 	defer tm.Close()
 
 	// Move time forward

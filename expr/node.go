@@ -22,9 +22,11 @@ const (
 func (r ReturnType) String() string {
 	switch r {
 	case ReturnBool:
-		return "bool"
+		return "boolean"
 	case ReturnNum:
 		return "number"
+	case ReturnStr:
+		return "string"
 	}
 	return "unknown"
 }
@@ -34,7 +36,6 @@ func (r ReturnType) RType() ReturnType {
 }
 
 type node interface {
-	Type() nodeType
 	String() string
 	Position() int                              // byte position of start of node in full original input string
 	Check() error                               // performs type checking for itself and sub-nodes
@@ -43,22 +44,6 @@ type node interface {
 	ReturnBool(v Vars, f Funcs) (bool, error)   // the boolean return value of the node
 	ReturnStr(v Vars, f Funcs) (string, error)  // the string return value of the node
 }
-
-// nodeType identifies the type of a parse tree node.
-type nodeType int
-
-func (t nodeType) Type() nodeType {
-	return t
-}
-
-const (
-	nodeBinary nodeType = iota // Binary operator: math
-	nodeUnary                  // Unary operator: -
-	nodeNum                    // A numerical constant.
-	nodeVar                    // An variable
-	nodeFunc                   // A function call node
-	nodeStr                    // A string literal node
-)
 
 type pos int
 
@@ -73,7 +58,6 @@ var errWrongRType = errors.New("wrong return type")
 // The value is parsed and stored under all the types that can represent the value.
 // This simulates in a small amount of code the behavior of Go's ideal constants.
 type numNode struct {
-	nodeType
 	ReturnType
 	pos
 	Float64 float64 // The floating-point value.
@@ -83,16 +67,15 @@ type numNode struct {
 // create a new number from a text string
 func newNum(p int, text string) (*numNode, error) {
 	n := &numNode{
-		nodeType:   nodeNum,
 		ReturnType: ReturnNum,
 		pos:        pos(p),
 		Text:       text,
 	}
-	// Only parse uints
 	f, err := strconv.ParseFloat(text, 64)
-	if err == nil {
-		n.Float64 = f
+	if err != nil {
+		return nil, err
 	}
+	n.Float64 = f
 	return n, nil
 }
 
@@ -116,9 +99,51 @@ func (n *numNode) ReturnNum(v Vars, f Funcs) (float64, error) {
 	return n.Float64, nil
 }
 
+// boolNode: holds a boolean literal
+type boolNode struct {
+	ReturnType
+	pos
+	Bool bool
+	Text string // The original textual representation from the input.
+}
+
+// create a new number from a text string
+func newBool(p int, text string) (*boolNode, error) {
+	n := &boolNode{
+		ReturnType: ReturnBool,
+		pos:        pos(p),
+		Text:       text,
+	}
+	b, err := strconv.ParseBool(text)
+	if err != nil {
+		return nil, err
+	}
+	n.Bool = b
+	return n, nil
+}
+
+func (n *boolNode) String() string {
+	return fmt.Sprintf("boolNode{%s}", n.Text)
+}
+
+func (n *boolNode) Check() error {
+	return nil
+}
+
+func (n *boolNode) ReturnStr(v Vars, f Funcs) (string, error) {
+	return "", errWrongRType
+}
+
+func (n *boolNode) ReturnBool(v Vars, f Funcs) (bool, error) {
+	return n.Bool, nil
+}
+
+func (n *boolNode) ReturnNum(v Vars, f Funcs) (float64, error) {
+	return 0, errWrongRType
+}
+
 //Holds the textual representation of an variable
 type varNode struct {
-	nodeType
 	ReturnType
 	pos
 	Var string // The variable name
@@ -129,7 +154,6 @@ func newVar(p int, v string) *varNode {
 		v = v[1 : len(v)-1]
 	}
 	return &varNode{
-		nodeType:   nodeVar,
 		ReturnType: ReturnUnknown,
 		pos:        pos(p),
 		Var:        v,
@@ -180,7 +204,6 @@ func (v *varNode) ReturnNum(vs Vars, fs Funcs) (float64, error) {
 
 //Holds the textual representation of a string literal
 type strNode struct {
-	nodeType
 	ReturnType
 	pos
 	Literal string
@@ -196,7 +219,6 @@ func newStr(p int, s string) *strNode {
 		buf = append(buf, s[i])
 	}
 	return &strNode{
-		nodeType:   nodeStr,
 		ReturnType: ReturnStr,
 		pos:        pos(p),
 		Literal:    string(buf),
@@ -223,7 +245,6 @@ func (s *strNode) ReturnStr(vs Vars, fs Funcs) (string, error) {
 
 // unaryNode holds two arguments and an operator.
 type unaryNode struct {
-	nodeType
 	pos
 	n        node
 	Operator tokenType
@@ -231,7 +252,6 @@ type unaryNode struct {
 
 func newUnary(operator token, n node) *unaryNode {
 	return &unaryNode{
-		nodeType: nodeUnary,
 		pos:      pos(operator.pos),
 		n:        n,
 		Operator: operator.typ,
@@ -282,7 +302,6 @@ func (u *unaryNode) ReturnNum(v Vars, f Funcs) (float64, error) {
 
 // binaryNode holds two arguments and an operator.
 type binaryNode struct {
-	nodeType
 	pos
 	Left     node
 	Right    node
@@ -291,7 +310,6 @@ type binaryNode struct {
 
 func newBinary(operator token, left, right node) *binaryNode {
 	return &binaryNode{
-		nodeType: nodeBinary,
 		pos:      pos(operator.pos),
 		Left:     left,
 		Right:    right,
@@ -490,7 +508,6 @@ func compareNums(l, r float64, o tokenType) (b bool, err error) {
 
 // funcNode holds a list of arguments and a function to call
 type funcNode struct {
-	nodeType
 	ReturnType
 	pos
 	name string
@@ -499,7 +516,6 @@ type funcNode struct {
 
 func newFunc(p int, name string, args []node) *funcNode {
 	return &funcNode{
-		nodeType:   nodeFunc,
 		ReturnType: ReturnNum,
 		pos:        pos(p),
 		name:       name,
@@ -541,6 +557,6 @@ func (f *funcNode) ReturnNum(v Vars, fs Funcs) (float64, error) {
 		}
 		args[i] = r
 	}
-	r, err := fnc(args...)
+	r, err := fnc.Call(args...)
 	return r, err
 }

@@ -123,33 +123,14 @@ func (h *HTTPOutNode) updateResultWithPoint(p models.Point) {
 func (h *HTTPOutNode) updateResultWithBatch(b models.Batch) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	batch := &imodels.Row{
-		Name:    b.Name,
-		Tags:    b.Tags,
-		Columns: []string{"time"},
-	}
+	row := models.BatchToRow(b)
 	idx, ok := h.groupSeriesIdx[b.Group]
 	if !ok {
 		idx = len(h.result.Series)
 		h.groupSeriesIdx[b.Group] = idx
-		h.result.Series = append(h.result.Series, batch)
+		h.result.Series = append(h.result.Series, row)
 	} else {
-		h.result.Series[idx] = batch
-	}
-	if len(b.Points) == 0 {
-		return
-	}
-	p := b.Points[0]
-	for f := range p.Fields {
-		batch.Columns = append(batch.Columns, f)
-	}
-	batch.Values = make([][]interface{}, len(b.Points))
-	for i, p := range b.Points {
-		batch.Values[i] = make([]interface{}, len(p.Fields)+1)
-		batch.Values[i][0] = p.Time
-		for j, c := range batch.Columns[1:] {
-			batch.Values[i][j+1] = p.Fields[c]
-		}
+		h.result.Series[idx] = row
 	}
 }
 func (h *HTTPOutNode) stopOut() {

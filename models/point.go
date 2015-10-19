@@ -42,6 +42,15 @@ func (p Point) Bytes(precision string) []byte {
 	return []byte(mp.PrecisionString(precision))
 }
 
+func SortedFields(fields Fields) []string {
+	a := make([]string, 0, len(fields))
+	for k := range fields {
+		a = append(a, k)
+	}
+	sort.Strings(a)
+	return a
+}
+
 func SortedKeys(tags map[string]string) []string {
 	a := make([]string, 0, len(tags))
 	for k := range tags {

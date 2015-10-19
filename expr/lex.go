@@ -23,6 +23,8 @@ const (
 	tokenRParen
 	tokenComma
 	tokenNot
+	tokenTrue
+	tokenFalse
 
 	// begin operator tokens
 	begin_tok_operator
@@ -311,9 +313,11 @@ func lexOperator(l *lexer) stateFn {
 	}
 }
 
-var keywords = map[string]bool{
-	"AND": true,
-	"OR":  true,
+var keywords = map[string]tokenType{
+	"and":   tokenAnd,
+	"or":    tokenOr,
+	"true":  tokenTrue,
+	"false": tokenFalse,
 }
 
 func lexIdentOrKeyword(l *lexer) stateFn {
@@ -323,9 +327,8 @@ func lexIdentOrKeyword(l *lexer) stateFn {
 			//absorb
 		default:
 			l.backup()
-			if keywords[l.current()] {
-				op := strToOperator[l.current()]
-				l.emit(op)
+			if t := keywords[strings.ToLower(l.current())]; t > 0 {
+				l.emit(t)
 			} else {
 				l.emit(tokenIdent)
 			}

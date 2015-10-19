@@ -3,6 +3,15 @@ package pipeline
 type AlertNode struct {
 	node
 
+	// Alert filters, each is an expression.
+	// The assumption is that each sucessive level is a subset
+	// of the previous level so the filter will only be applied if
+	// a data point passed the previous level.
+	// An empty value indicates the level is invalid and is skipped.
+	Info string
+	Warn string
+	Crit string
+
 	// HTTP POST
 	Post string
 

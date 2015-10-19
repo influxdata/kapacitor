@@ -6,7 +6,10 @@ import (
 )
 
 // A callable function from within the expression
-type Func func(...float64) (float64, error)
+type Func interface {
+	Reset()
+	Call(...float64) (float64, error)
+}
 
 // Lookup for functions
 type Funcs map[string]Func
@@ -15,8 +18,7 @@ type Funcs map[string]Func
 func Functions() Funcs {
 	funcs := make(Funcs)
 
-	s := &sigma{}
-	funcs["sigma"] = s.call
+	funcs["sigma"] = &sigma{}
 
 	return funcs
 }
@@ -28,8 +30,15 @@ type sigma struct {
 	n        float64
 }
 
+func (s *sigma) Reset() {
+	s.mean = 0
+	s.variance = 0
+	s.m2 = 0
+	s.n = 0
+}
+
 // Computes the number of standard devaitions a given value is from the running mean.
-func (s *sigma) call(args ...float64) (float64, error) {
+func (s *sigma) Call(args ...float64) (float64, error) {
 	if len(args) != 1 {
 		return 0, errors.New("sigma expected exactly one argument")
 	}

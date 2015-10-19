@@ -76,7 +76,7 @@ stream
     .alert()
         // We are using idle so we want to check
         // if idle drops below 70% (aka cpu used > 30%)
-        .predicate("value <  70")
+        .crit("value <  70")
         // Post the data for the point to a URL
         .post("http://localhost:8000");
 ```
@@ -121,7 +121,7 @@ If not then lets lower the threshold so we will see some alerts.
 Note the `-fast` flag tells Kapacitor to replay the data as fast as possible but it still emulates the time in the recording.
 Without the `-fast` Kapacitor would replay the data in real time.
 
-Edit the `.predicate("value < 70")` line to be `.predicate("value < 99")`.
+Edit the `.crit("value < 70")` line to be `.crit("value < 99")`.
 Now if your system is at least 1% busy you will get an alert.
 
 Redefine the `task` so that Kapacitor knows about your update.
@@ -153,7 +153,7 @@ We want to only get alerts when things are really bad. Try this:
 stream
     .from("cpu_usage_idle")
     .alert()
-        .predicate("sigma(value) >  3")
+        .crit("sigma(value) >  3")
         .post("http://localhost:8000");
 ```
 
@@ -181,8 +181,11 @@ stream
         .period(10s)
         .every(5s)
     .mapReduce(influxql.mean("value"))
-    .where("sigma(value) >  3")
+    .apply(expr("sigma", "sigma(value)"))
     .alert()
+        .info("sigma > 2")
+        .warn("sigma > 2.5")
+        .crit("sigma > 3")
         .post("http://localhost:8000");
 ```
 

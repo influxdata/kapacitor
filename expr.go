@@ -17,14 +17,14 @@ func ExprFunc(field, e string) (TransFunc, error) {
 	}
 	x := &expression{
 		field: field,
-		t:     t,
+		se:    &expr.StatefulExpr{t, expr.Functions()},
 	}
 	return TransFunc(x.Eval), nil
 }
 
 type expression struct {
 	field string
-	t     *expr.Tree
+	se    *expr.StatefulExpr
 }
 
 func (x *expression) Eval(fields models.Fields) (models.Fields, error) {
@@ -37,11 +37,29 @@ func (x *expression) Eval(fields models.Fields) (models.Fields, error) {
 		}
 	}
 
-	nfields := make(models.Fields, 1)
-	v, err := x.t.EvalNumber(vars, nil)
+	v, err := x.se.EvalNum(vars)
 	if err != nil {
 		return nil, err
 	}
-	nfields[x.field] = v
-	return nfields, nil
+	fields[x.field] = v
+	return fields, nil
+}
+
+// Evaluate a given expression as a boolean predicate against a set of fields and tags
+func EvalPredicate(se *expr.StatefulExpr, fields models.Fields, tags map[string]string) (bool, error) {
+	vars := make(expr.Vars)
+	for k, v := range fields {
+		if tags[k] != "" {
+			return false, fmt.Errorf("cannot have field and tags with same name %q", k)
+		}
+		vars[k] = v
+	}
+	for k, v := range tags {
+		vars[k] = v
+	}
+	b, err := se.EvalBool(vars)
+	if err != nil {
+		return false, err
+	}
+	return b, nil
 }

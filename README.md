@@ -146,8 +146,8 @@ stream
   .period(10s)
   .every(5s)
   .mapReduce(influxql.mean("value"))
-  .where("value < 30")
   .alert()
+  .crit("value < 30")
   .email("oncall@example.com");
 ```
 
@@ -182,8 +182,8 @@ stream
   .every(5s)
   .groupBy("dc")
   .mapReduce(influxql.mean("value"))
-  .where("value < 30")
   .alert()
+  .crit("value < 30")
   .email("oncall@example.com");
 ```
 
@@ -244,8 +244,8 @@ batch
   .period(15m)
   // or  .cron("*/15 * * * 0")
   .groupBy(time(1h), "dc")
-  .where("value < 30")
   .alert()
+  .crit("value < 30")
   .email("oncall@example.com");
 ```
 
@@ -285,7 +285,9 @@ stream
   .period(1m)
   .every(1m)
   .mapReduce(influxql.count("value"))
-  .alert();
+  .alert()
+    .crit("true")
+    .email("oncall@example.com");
 
 //Now define normal processing on the stream
 stream
@@ -299,7 +301,9 @@ stream
   .window()
   ...
   .alert()
-  .flapping(25.0, 50.0);
+    .crit("true")
+    .flapping(25.0, 50.0)
+    .email("oncall@example.com");
 ```
 
 #### Aggregate alerts
@@ -317,13 +321,17 @@ var redis = stream
   .from("redis")
   .where("instantaneous_ops_per_sec < 10")
   .groupBy("host")
-  .alert();
+  .alert()
+    .crit("true")
+    .email("oncall@example.com");
 
 var cpu = stream
   .from("cpu")
   .where("idle < 20")
   .groupBy("host")
-  .alert();
+  .alert()
+    .crit("true")
+    .email("oncall@example.com");
 ```
 
 Now lets say we want to combine the alerts so that if a either alert triggers we can send them in the same alert.
@@ -342,7 +350,9 @@ redis.union(cpu)
   .window()
   .period(10s)
   .every(10s)
-  .alert();
+  .alert()
+    .crit("true")
+    .email("oncall@example.com");
 ```
 
 This will aggregate the union of all alerts every 10s by host. Then it will send out one alert with the aggregate information.
@@ -399,7 +409,7 @@ stream
 		.every(1s)
 	.map(fMap, "idle")
 	.reduce(fReduce)
-	.cache();
+	.httpOut("http://example.com/path");
 ```
 
 The `mapFunction.py` and `reduceFunction.py` files contain python scripts that read data on an incoming stream perform their function and output the result.
