@@ -140,7 +140,7 @@ func (t *tree) parse() {
 /* Grammar
 
 Prog -> Stmt { Stmt ...}
-Stmt -> Decl ';' | Expr ';'
+Stmt -> Decl | Expr
 Decl -> Vr '=' Expr
 Expr -> Ident { Chain } | Fnc { Chain }
 Chain -> '.' Fnc { Chain } | '.' Ident { Chain}
@@ -175,7 +175,6 @@ func (t *tree) stmt() node {
 	} else {
 		n = t.expr()
 	}
-	t.expect(tokenSColon)
 	return n
 }
 

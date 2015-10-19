@@ -26,12 +26,12 @@ batch
 ''')
 		.period(10s)
 		.groupBy(time(2s), "cpu")
-	.mapReduce(influxql.count, "value")
+	.mapReduce(influxql.count("value"))
 	.window()
 		.period(20s)
 		.every(20s)
-	.mapReduce(influxql.sum, "count")
-	.httpOut("TestBatchingData");
+	.mapReduce(influxql.sum("count"))
+	.httpOut("TestBatch_SimpleMR")
 `
 
 	er := kapacitor.Result{
@@ -77,7 +77,7 @@ batch
 	assert.Nil(et.Err())
 
 	// Get the result
-	output, err := et.GetOutput("TestBatchingData")
+	output, err := et.GetOutput("TestBatch_SimpleMR")
 	if !assert.Nil(err) {
 		t.FailNow()
 	}
@@ -100,7 +100,7 @@ func TestBatch_Fork(t *testing.T) {
 var cpu = batch
 	.query('''select "idle" from "tests"."default".cpu where dc = 'nyc' ''')
 	.period(10s)
-	.groupBy(time(2s));
+	.groupBy(time(2s))
 
 cpu
 	.fork()
@@ -108,7 +108,7 @@ cpu
 	.window()
 		.period(1s)
 		.every(1s)
-	.cache("/a");
+	.cache("/a")
 
 cpu
 	.fork()
@@ -116,7 +116,7 @@ cpu
 	.window()
 		.period(1s)
 		.every(1s)
-	.cache("/b");
+	.cache("/b")
 `
 	//er := kapacitor.Result{}
 
@@ -140,7 +140,7 @@ var disk = batch
 			.groupBy(time(5s))
 
 cpu.union(mem, disk)
-		.cache();
+	.httpOut("TestBatch_Union")
 `
 
 	//er := kapacitor.Result{}

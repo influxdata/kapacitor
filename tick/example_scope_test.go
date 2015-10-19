@@ -26,19 +26,19 @@ func ExampleEvaluate() {
 	//Run a test that evaluates the DSL against the Process struct.
 	script := `
 //Name the parent
-parent.name("parent");
+parent.name("parent")
 
 // Spawn a first child
-var child1 = parent.spawn();
+var child1 = parent.spawn()
 
 // Name the first child
-child1.name("child1");
+child1.name("child1")
 
 //Spawn a grandchild and name it
-child1.spawn().name("grandchild");
+child1.spawn().name("grandchild")
 
 //Spawn a second child and name it
-parent.spawn().name("child2");
+parent.spawn().name("child2")
 `
 
 	scope := tick.NewScope()

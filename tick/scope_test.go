@@ -70,13 +70,13 @@ func TestEvaluate(t *testing.T) {
 	script := `
 var s2 = a.structB()
 			.field1("f1")
-			.field2(42);
+			.field2(42)
 
-s2.field3(15m);
+s2.field3(15m)
 
 s2.structC()
 	.options("c", 21.5, 7h)
-	.aggFunc(influxql.agg.sum);
+	.aggFunc(influxql.agg.sum)
 `
 
 	scope := tick.NewScope()

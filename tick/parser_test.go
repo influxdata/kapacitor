@@ -42,20 +42,16 @@ func TestParseErrors(t *testing.T) {
 
 	cases := []testCase{
 		testCase{
-			Text:  "a",
-			Error: `parser: unexpected EOF line 1 char 2 in "a". expected: ";"`,
+			Text:  "a\n\n\nvar b = ",
+			Error: `parser: unexpected EOF line 4 char 9 in "\n\nvar b = ". expected: "identifier"`,
 		},
 		testCase{
-			Text:  "a;\n\n\nvar b = stream",
-			Error: `parser: unexpected EOF line 4 char 15 in "b = stream". expected: ";"`,
+			Text:  "a\n\n\nvar b = stream.window()var period",
+			Error: `parser: unexpected EOF line 4 char 34 in "var period". expected: "="`,
 		},
 		testCase{
-			Text:  "a;\n\n\nvar b = stream.window()period",
-			Error: `parser: unexpected "period" line 4 char 24 in "m.window()period". expected: ";"`,
-		},
-		testCase{
-			Text:  "a;\n\n\nvar b = stream.window\nb.period(10s);",
-			Error: `parser: unexpected "b" line 5 char 1 in "am.window\nb.period(1". expected: ";"`,
+			Text:  "a\n\n\nvar b = stream.window(\nb.period(10s)",
+			Error: `parser: unexpected EOF line 5 char 14 in "eriod(10s)". expected: ")"`,
 		},
 	}
 
@@ -72,7 +68,7 @@ var x = stream
 		.window()
 		.period(5m)
 		.every(1m)
-		.map(influxql.agg.mean("value"));
+		.map(influxql.agg.mean("value"))
 `
 	tree, err := parse(script)
 	assert.Nil(err)

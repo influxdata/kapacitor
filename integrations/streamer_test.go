@@ -43,7 +43,7 @@ stream
 	.window()
 		.period(10s)
 		.every(10s)
-	.httpOut("TestStream_Window");
+	.httpOut("TestStream_Window")
 `
 
 	nums := []float64{
@@ -117,7 +117,7 @@ stream
 		.period(10s)
 		.every(10s)
 	.mapReduce(influxql.count("value"))
-	.httpOut("TestStream_SimpleMR");
+	.httpOut("TestStream_SimpleMR")
 `
 	er := kapacitor.Result{
 		Series: imodels.Rows{
@@ -172,7 +172,7 @@ stream
 		.period(10s)
 		.every(10s)
 	.mapReduce(influxql.sum("value"))
-	.httpOut("error_count");
+	.httpOut("error_count")
 `
 
 	er := kapacitor.Result{
@@ -246,7 +246,7 @@ var errorCounts = stream
 			.window()
 				.period(10s)
 				.every(10s)
-			.mapReduce(influxql.sum("value"));
+			.mapReduce(influxql.sum("value"))
 
 var viewCounts = stream
 			.fork()
@@ -255,13 +255,13 @@ var viewCounts = stream
 			.window()
 				.period(10s)
 				.every(10s)
-			.mapReduce(influxql.sum("value"));
+			.mapReduce(influxql.sum("value"))
 
 errorCounts.join(viewCounts)
 		.as("errors", "views")
 		.rename("error_view")
 		.apply(expr("error_percent", "errors.sum / views.sum"))
-		.httpOut("error_rate");
+		.httpOut("error_rate")
 `
 
 	er := kapacitor.Result{
@@ -337,15 +337,15 @@ func TestStream_Union(t *testing.T) {
 var cpu = stream
 			.fork()
 			.from("cpu")
-			.where("cpu = 'total'");
+			.where("cpu = 'total'")
 var mem = stream
 			.fork()
 			.from("memory")
-			.where("type = 'free'");
+			.where("type = 'free'")
 var disk = stream
 			.fork()
 			.from("disk")
-			.where("device = 'sda'");
+			.where("device = 'sda'")
 
 cpu.union(mem, disk)
 		.newName("cpu_mem_disk")
@@ -353,7 +353,7 @@ cpu.union(mem, disk)
 			.period(10s)
 			.every(10s)
 		.mapReduce(influxql.count("value"))
-		.httpOut("all");
+		.httpOut("all")
 `
 
 	er := kapacitor.Result{
@@ -415,7 +415,7 @@ stream
 		.period(10s)
 		.every(10s)
 	.mapReduce({{ .Method }}("value" {{ .Args }}))
-	.httpOut("{{ .Method }}");
+	.httpOut("{{ .Method }}")
 `
 	testCases := []testCase{
 		testCase{
@@ -691,8 +691,8 @@ stream
 
 func TestStream_CustomFunctions(t *testing.T) {
 	var script = `
-var fMap = loadMapFunc("./TestCustomMapFunction.py");
-var fReduce = loadReduceFunc("./TestCustomReduceFunction.py");
+var fMap = loadMapFunc("./TestCustomMapFunction.py")
+var fReduce = loadReduceFunc("./TestCustomReduceFunction.py")
 stream
 	.from("cpu")
 	.where("host = 'serverA'")
@@ -701,7 +701,7 @@ stream
 		.every(1s)
 	.map(fMap, "idle")
 	.reduce(fReduce)
-	.cache();
+	.cache()
 `
 
 	//er := kapacitor.Result{}
@@ -711,7 +711,7 @@ stream
 
 func TestStream_CustomMRFunction(t *testing.T) {
 	var script = `
-var fMapReduce = loadMapReduceFunc("./TestCustomMapReduceFunction.py");
+var fMapReduce = loadMapReduceFunc("./TestCustomMapReduceFunction.py")
 stream
 	.from("cpu")
 	.where("host = 'serverA'")
@@ -719,7 +719,7 @@ stream
 		.period(1s)
 		.every(1s)
 	.mapReduce(fMap, "idle")
-	.cache();
+	.cache()
 `
 
 	//er := kapacitor.Result{}
@@ -754,7 +754,8 @@ stream
 		.info("count > 6")
 		.warn("count > 7")
 		.crit("count > 8")
-		.post("` + ts.URL + `");`
+		.post("` + ts.URL + `")
+`
 
 	clock, et, errCh, tm := testStreamer(t, "TestStream_Alert", script)
 	defer tm.Close()
@@ -793,7 +794,8 @@ stream
 		.info("sigma > 2")
 		.warn("sigma > 3")
 		.crit("sigma > 3.5")
-		.post("` + ts.URL + `");`
+		.post("` + ts.URL + `")
+`
 
 	clock, et, errCh, tm := testStreamer(t, "TestStream_AlertSigma", script)
 	defer tm.Close()
@@ -829,7 +831,8 @@ stream
 	.where("host = 'serverA' AND sigma(value) > 2")
 	.alert()
 		.crit("true")
-		.post("` + ts.URL + `");`
+		.post("` + ts.URL + `")
+`
 
 	clock, et, errCh, tm := testStreamer(t, "TestStream_AlertComplexWhere", script)
 	defer tm.Close()
@@ -861,7 +864,7 @@ stream
 		.warn("value < 94")
 		.crit("value < 93")
 		.flapping(0.25, 0.50)
-		.post("` + ts.URL + `");
+		.post("` + ts.URL + `")
 `
 
 	clock, et, errCh, tm := testStreamer(t, "TestStream_AlertFlapping", script)
@@ -893,7 +896,7 @@ stream
 		.database("db")
 		.retentionPolicy("rp")
 		.measurement("m")
-		.precision("s");
+		.precision("s")
 `
 	done := make(chan error, 1)
 	var points []imodels.Point

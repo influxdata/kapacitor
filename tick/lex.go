@@ -63,7 +63,7 @@ func (t tokenType) String() string {
 	case tokenLParen:
 		return "("
 	case tokenRParen:
-		return "("
+		return ")"
 	case tokenComma:
 		return ","
 	case tokenNumber:
