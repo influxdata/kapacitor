@@ -8,6 +8,7 @@ import (
 )
 
 // A complete data processing pipeline. Starts with a single source.
+// tick:ignore
 type Pipeline struct {
 	Source Node
 	id     ID
@@ -15,6 +16,7 @@ type Pipeline struct {
 }
 
 // Create a pipeline from a given script.
+// tick:ignore
 func CreatePipeline(script string, sourceEdge EdgeType, scope *tick.Scope) (*Pipeline, error) {
 	var src Node
 	switch sourceEdge {
@@ -45,6 +47,7 @@ func (p *Pipeline) setID(n Node) error {
 
 // Walks the entire pipeline and calls func f on each node exactly once.
 // f will be called on a node n only after all of its parents have already had f called.
+// tick:ignore
 func (p *Pipeline) Walk(f func(n Node) error) error {
 	if p.sorted == nil {
 		p.sort()
@@ -85,6 +88,7 @@ func (p *Pipeline) visit(n Node) {
 }
 
 // Return a graphviz .dot formatted byte array.
+// tick:ignore
 func (p *Pipeline) Dot(name string) []byte {
 
 	var buf bytes.Buffer

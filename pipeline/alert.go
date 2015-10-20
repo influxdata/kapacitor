@@ -1,29 +1,56 @@
 package pipeline
 
+// An AlertNode can trigger an alert of varying severity levels
+// based on the data it receives.
+//
+// Example:
+//   stream
+//        .alert()
+//            .info("value > 10")
+//            .warn("value > 20")
+//            .crit("value > 30")
+//            .post("http://example.com/api/alert")
+//
+//
+// It is assumed that each successive level filters a subset
+// of the previous level. As a result the filter will only be applied if
+// a data point passed the previous level.
+// In the above example if value = 15 then the INFO and
+// WARNING expressions would be evaluated but not the
+// CRITICAL expression.
+//
+// Each expression maintains its own state.
 type AlertNode struct {
 	node
 
-	// Alert filters, each is an expression.
-	// The assumption is that each sucessive level is a subset
-	// of the previous level so the filter will only be applied if
-	// a data point passed the previous level.
+	// Filter expression for the INFO alert level.
 	// An empty value indicates the level is invalid and is skipped.
 	Info string
+	// Filter expression for the WARNING alert level.
+	// An empty value indicates the level is invalid and is skipped.
 	Warn string
+	// Filter expression for the CRITICAL alert level.
+	// An empty value indicates the level is invalid and is skipped.
 	Crit string
 
-	//Flapping
+	//tick:ignore
 	UseFlapping bool
-	FlapLow     float64
-	FlapHigh    float64
-	History     int
+	//tick:ignore
+	FlapLow float64
+	//tick:ignore
+	FlapHigh float64
+	// Number of previous states to remember when computing flapping levels.
+	History int
 
-	// HTTP POST
+	// Post the alert data to the specified URL.
 	Post string
 
 	// Email settings
-	From    string
-	ToList  []string
+	//tick:ignore
+	From string
+	//tick:ignore
+	ToList []string
+	//tick:ignore
 	Subject string
 }
 
@@ -37,16 +64,21 @@ func newAlertNode(wants EdgeType) *AlertNode {
 	}
 }
 
-func (a *AlertNode) Email(from, subject string, to ...string) Node {
+// Email the alert data.
+// tick:property
+func (a *AlertNode) Email(from, subject string, to ...string) *AlertNode {
 	a.From = from
 	a.Subject = subject
 	a.ToList = to
 	return a
 }
 
-// Perform flap detection on the alerts using a similar method to Nagios:
+// Perform flap detection on the alerts.
+// The method used is similar method to Nagios:
 // https://assets.nagios.com/downloads/nagioscore/docs/nagioscore/3/en/flapping.html
+//
 // Each different alerting level is considered a different state.
+// tick:property
 func (a *AlertNode) Flapping(low, high float64) Node {
 	a.UseFlapping = true
 	a.FlapLow = low

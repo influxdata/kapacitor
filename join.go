@@ -22,6 +22,10 @@ func newJoinNode(et *ExecutingTask, n *pipeline.JoinNode) (*JoinNode, error) {
 
 func (j *JoinNode) runJoin() error {
 
+	rename := j.j.Rename
+	if rename == "" {
+		rename = j.parents[1].Name()
+	}
 	switch j.Wants() {
 	case pipeline.StreamEdge:
 
@@ -59,7 +63,7 @@ func (j *JoinNode) runJoin() error {
 				fields[j.j.Names[m]+"."+k] = v
 			}
 			p := models.Point{
-				Name:   j.j.Rename,
+				Name:   rename,
 				Group:  pn.Group,
 				Tags:   pn.Tags,
 				Fields: fields,

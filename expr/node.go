@@ -243,6 +243,47 @@ func (s *strNode) ReturnStr(vs Vars, fs Funcs) (string, error) {
 	return s.Literal, nil
 }
 
+//Holds the textual representation of a regex literal
+type regexNode struct {
+	ReturnType
+	pos
+	Literal string
+}
+
+func newRegex(p int, s string) *regexNode {
+
+	buf := make([]byte, 0, len(s))
+	for i := 1; i < len(s)-1; i++ {
+		if s[i] == '\\' && s[i+1] == '/' {
+			i++
+		}
+		buf = append(buf, s[i])
+	}
+	return &regexNode{
+		ReturnType: ReturnStr,
+		pos:        pos(p),
+		Literal:    string(buf),
+	}
+}
+
+func (s *regexNode) String() string {
+	return fmt.Sprintf("regexNode{%s}", s.Literal)
+}
+
+func (s *regexNode) Check() error {
+	return nil
+}
+
+func (s *regexNode) ReturnBool(vs Vars, fs Funcs) (bool, error) {
+	return false, errWrongRType
+}
+func (s *regexNode) ReturnNum(vs Vars, fs Funcs) (float64, error) {
+	return 0, errWrongRType
+}
+func (s *regexNode) ReturnStr(vs Vars, fs Funcs) (string, error) {
+	return s.Literal, nil
+}
+
 // unaryNode holds two arguments and an operator.
 type unaryNode struct {
 	pos

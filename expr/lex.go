@@ -25,6 +25,7 @@ const (
 	tokenNot
 	tokenTrue
 	tokenFalse
+	tokenRegex
 
 	// begin operator tokens
 	begin_tok_operator
@@ -274,6 +275,9 @@ func lexToken(l *lexer) stateFn {
 		case r == ',':
 			l.emit(tokenComma)
 			return lexToken
+		case r == '/':
+			l.backup()
+			return lexRegex
 		case isSpace(r):
 			l.ignore()
 		case r == eof:
@@ -371,6 +375,25 @@ func lexString(l *lexer) stateFn {
 			}
 		case r == '\'':
 			l.emit(tokenString)
+			return lexToken
+		default:
+			//absorb
+		}
+	}
+}
+
+func lexRegex(l *lexer) stateFn {
+	if n := l.next(); n != '/' {
+		return l.errorf(`unexpected "%s" expected "/"`, n)
+	}
+	for {
+		switch r := l.next(); {
+		case r == '\\':
+			if l.peek() == '/' {
+				l.next()
+			}
+		case r == '/':
+			l.emit(tokenRegex)
 			return lexToken
 		default:
 			//absorb

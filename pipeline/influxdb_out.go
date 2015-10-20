@@ -1,15 +1,34 @@
 package pipeline
 
-// Writes the data to InfluxDB
+// Writes the data to InfluxDB as it is received.
+//
+// Example:
+//    stream
+//        .apply(expr("error_percent", "errors / total"))
+//        // Write the transformed data to InfluxDB
+//        .influxDBOut()
+//            .database("mydb")
+//            .retentionPolicy("myrp")
+//            .measurement("errors")
+//            .tag("kapacitor", "true")
+//            .tag("version", "0.1")
+//
 type InfluxDBOutNode struct {
 	node
 
-	Database         string
-	RetentionPolicy  string
-	Measurement      string
+	// The name of the database.
+	Database string
+	// The name of the retention policy.
+	RetentionPolicy string
+	// The name of the measurement.
+	Measurement string
+	// The write consistency to use when writing the data.
 	WriteConsistency string
-	Precision        string
-	Tags             map[string]string
+	// The precision to use when writing the data.
+	Precision string
+	// Static set of tags to add to all data points before writing them.
+	//tick:ignore
+	Tags map[string]string
 }
 
 func newInfluxDBOutNode(wants EdgeType) *InfluxDBOutNode {
@@ -20,4 +39,13 @@ func newInfluxDBOutNode(wants EdgeType) *InfluxDBOutNode {
 			provides: NoEdge,
 		},
 	}
+}
+
+// Add a static tag to all data points.
+// Tag can be called more than once.
+//
+// tick:property
+func (i *InfluxDBOutNode) Tag(key, value string) *InfluxDBOutNode {
+	i.Tags[key] = value
+	return i
 }

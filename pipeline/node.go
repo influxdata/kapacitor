@@ -83,10 +83,12 @@ type node struct {
 	pm       bool
 }
 
+// tick:ignore
 func (n *node) Desc() string {
 	return n.desc
 }
 
+// tick:ignore
 func (n *node) ID() ID {
 	return n.id
 }
@@ -95,6 +97,7 @@ func (n *node) setID(id ID) {
 	n.id = id
 }
 
+// tick:ignore
 func (n *node) Name() string {
 	if n.name == "" {
 		n.name = fmt.Sprintf("%s%d", n.Desc(), n.ID())
@@ -102,14 +105,17 @@ func (n *node) Name() string {
 	return n.name
 }
 
+// tick:ignore
 func (n *node) SetName(name string) {
 	n.name = name
 }
 
+// tick:ignore
 func (n *node) Parents() []Node {
 	return n.parents
 }
 
+// tick:ignore
 func (n *node) Children() []Node {
 	return n.children
 }
@@ -139,10 +145,12 @@ func (n *node) setPMark(b bool) {
 	n.pm = b
 }
 
+// tick:ignore
 func (n *node) Wants() EdgeType {
 	return n.wants
 }
 
+// tick:ignore
 func (n *node) Provides() EdgeType {
 	return n.provides
 }
@@ -157,106 +165,116 @@ func (n *node) dot(buf *bytes.Buffer) {
 // Chaining methods
 //
 
-func (n *node) Where(predicate string) Node {
-	w := newWhereNode(n.provides, predicate)
+// Create a new node that filters the data stream by a given expression.
+func (n *node) Where(expression string) *WhereNode {
+	w := newWhereNode(n.provides, expression)
 	n.linkChild(w)
 	return w
 }
 
-func (n *node) Map(f interface{}) (c Node) {
+// Perform just the map step of a map-reduce operation.
+// A map step must always be followed by a reduce step.
+// See Apply for performing simple transformations.
+// See MapReduce for performing map-reduce in one command.
+func (n *node) Map(f interface{}) (c *MapNode) {
 	switch n.provides {
 	case StreamEdge:
 		panic("cannot MapReduce stream edge, did you forget to window the data?")
 	case BatchEdge:
-		c = NewMapNode(f)
+		c = newMapNode(f)
 	}
 	n.linkChild(c)
 	return c
 }
 
-func (n *node) Reduce(f interface{}) (c Node) {
+// Perform just the reduce step of a map-reduce operation.
+func (n *node) Reduce(f interface{}) (c *ReduceNode) {
 	switch n.provides {
 	case StreamEdge:
 		panic("cannot MapReduce stream edge, did you forget to window the data?")
 	case BatchEdge:
-		c = NewReduceNode(f)
+		c = newReduceNode(f)
 	}
 	n.linkChild(c)
 	return c
 }
 
-func (n *node) MapReduce(mr MapReduceInfo) Node {
-	var m Node
-	var r Node
+// Perform a map-reduce operation on the data.
+// The built-in functions under `influxql` provide the
+// selection,aggregation, and transformation functions
+// from the InfluxQL language.
+func (n *node) MapReduce(mr MapReduceInfo) *ReduceNode {
+	var m *MapNode
+	var r *ReduceNode
 	switch n.provides {
 	case StreamEdge:
 		panic("cannot MapReduce stream edge, did you forget to window the data?")
 	case BatchEdge:
-		m = NewMapNode(mr.MapI)
-		r = NewReduceNode(mr.ReduceI)
+		m = newMapNode(mr.MapI)
+		r = newReduceNode(mr.ReduceI)
 	}
 	n.linkChild(m)
 	m.linkChild(r)
 	return r
 }
 
-// Create a subnode that windows the stream by time.
+// Create a new node that windows the stream by time.
 func (n *node) Window() *WindowNode {
 	w := newWindowNode()
 	n.linkChild(w)
 	return w
 }
 
-// Create subnode that contains a cache of the most recent window.
-// The endpoint is the relative path in the API where the cached data will be exposed.
+// Create an http output node that caches the most recent data it has received.
+// The cached data is available at the given endpoint.
+// The endpoint is the relative path from the API endpoint of the running task.
+// For example if the task endpoint is at "/api/v1/task/<task_name>" and endpoint is
+// "top10", then the data can be requested from "/api/v1/task/<task_name>/top10".
 func (n *node) HttpOut(endpoint string) *HTTPOutNode {
 	h := newHTTPOutNode(n.provides, endpoint)
 	n.linkChild(h)
 	return h
 }
 
-// Create subnode that will store the incoming data into InfluxDB
+// Create an influxdb output node that will store the incoming data into InfluxDB.
 func (n *node) InfluxDBOut() *InfluxDBOutNode {
 	i := newInfluxDBOutNode(n.provides)
 	n.linkChild(i)
 	return i
 }
 
+// Create an alert node, which can trigger alerts.
 func (n *node) Alert() *AlertNode {
 	a := newAlertNode(n.provides)
 	n.linkChild(a)
 	return a
 }
 
-func (n *node) Union(ns ...Node) *UnionNode {
-	u := newUnionNode(n.provides, ns)
+// Perform the union of this node and all other given nodes.
+func (n *node) Union(node ...Node) *UnionNode {
+	u := newUnionNode(n.provides, node)
 	n.linkChild(u)
 	return u
 }
 
-func (n *node) Join(o Node) *JoinNode {
-	j := newJoinNode(n.provides, o)
+// Join this node with another node. The data is joined on time.
+func (n *node) Join(other Node) *JoinNode {
+	j := newJoinNode(n.provides, other)
 	n.linkChild(j)
 	return j
 }
 
-func (n *node) Apply(f interface{}) Node {
-	a := newApplyNode(n.provides, f)
+// Create an apply node that will apply the given transformation function to each data point.
+// See the built-in function `expr` in order to write in-line custom transformation functions.
+func (n *node) Apply(transform interface{}) *ApplyNode {
+	a := newApplyNode(n.provides, transform)
 	n.linkChild(a)
 	return a
 }
 
-// Group the data by a set of dimensions.
-func (n *node) GroupBy(ds ...interface{}) Node {
-	dims := make([]string, len(ds))
-	for i, d := range ds {
-		str, ok := d.(string)
-		if !ok {
-			panic("GroupBy dimensions must be strings")
-		}
-		dims[i] = str
-	}
-	g := newGroupByNode(n.provides, dims)
+// Group the data by a set of tags.
+func (n *node) GroupBy(tag ...string) *GroupByNode {
+	g := newGroupByNode(n.provides, tag)
 	n.linkChild(g)
 	return g
 }
