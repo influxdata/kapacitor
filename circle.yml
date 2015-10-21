@@ -9,7 +9,7 @@ dependencies:
 
 test:
   pre:
-    - go vet --composites=false ./...
+    - go tool vet --composites=false ./
     - go get -u -t ./...
 
   override:
