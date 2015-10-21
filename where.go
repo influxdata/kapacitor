@@ -30,7 +30,7 @@ func newWhereNode(et *ExecutingTask, n *pipeline.WhereNode) (wn *WhereNode, err 
 	if err != nil {
 		return nil, err
 	}
-	wn.predicate = &expr.StatefulExpr{tree, expr.Functions()}
+	wn.predicate = &expr.StatefulExpr{Tree: tree, Funcs: expr.Functions()}
 	return
 }
 

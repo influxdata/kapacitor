@@ -365,7 +365,7 @@ func isValidIdent(r rune) bool {
 
 func lexString(l *lexer) stateFn {
 	if n := l.next(); n != '\'' {
-		return l.errorf(`unexpected "%s" expected "'"`, n)
+		return l.errorf(`unexpected "%c" expected "'"`, n)
 	}
 	for {
 		switch r := l.next(); {
@@ -384,7 +384,7 @@ func lexString(l *lexer) stateFn {
 
 func lexRegex(l *lexer) stateFn {
 	if n := l.next(); n != '/' {
-		return l.errorf(`unexpected "%s" expected "/"`, n)
+		return l.errorf(`unexpected "%c" expected "/"`, n)
 	}
 	for {
 		switch r := l.next(); {

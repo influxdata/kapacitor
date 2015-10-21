@@ -522,7 +522,7 @@ func compareStrs(l, r string, o tokenType) (b bool, err error) {
 	case tokenRegexNotEqual:
 		b, err = regexp.MatchString(l, r)
 	default:
-		fmt.Errorf("unsupported operator %v on strings", o)
+		err = fmt.Errorf("unsupported operator %v on strings", o)
 	}
 	return
 }
@@ -542,7 +542,7 @@ func compareNums(l, r float64, o tokenType) (b bool, err error) {
 	case tokenNotEqual:
 		b = l != r
 	default:
-		fmt.Errorf("unsupported operator %v on numbers", o)
+		err = fmt.Errorf("unsupported operator %v on numbers", o)
 	}
 	return
 }

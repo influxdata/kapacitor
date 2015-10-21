@@ -2,8 +2,8 @@ package pipeline
 
 // tick:ignore
 type MapReduceInfo struct {
-	MapI    interface{}
-	ReduceI interface{}
+	Map    interface{}
+	Reduce interface{}
 }
 
 // Performs a map operation on the data stream.

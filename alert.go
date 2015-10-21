@@ -98,21 +98,21 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode) (an *AlertNode, err 
 		if err != nil {
 			return nil, err
 		}
-		an.levels[InfoAlert] = &expr.StatefulExpr{tree, expr.Functions()}
+		an.levels[InfoAlert] = &expr.StatefulExpr{Tree: tree, Funcs: expr.Functions()}
 	}
 	if n.Warn != "" {
 		tree, err := expr.ParseForType(n.Warn, expr.ReturnBool)
 		if err != nil {
 			return nil, err
 		}
-		an.levels[WarnAlert] = &expr.StatefulExpr{tree, expr.Functions()}
+		an.levels[WarnAlert] = &expr.StatefulExpr{Tree: tree, Funcs: expr.Functions()}
 	}
 	if n.Crit != "" {
 		tree, err := expr.ParseForType(n.Crit, expr.ReturnBool)
 		if err != nil {
 			return nil, err
 		}
-		an.levels[CritAlert] = &expr.StatefulExpr{tree, expr.Functions()}
+		an.levels[CritAlert] = &expr.StatefulExpr{Tree: tree, Funcs: expr.Functions()}
 	}
 	// Configure flapping
 	if n.UseFlapping {

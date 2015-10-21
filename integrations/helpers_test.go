@@ -33,7 +33,7 @@ func (m *MockInfluxDBService) NewClient() (*client.Client, error) {
 
 func compareResults(exp, got kapacitor.Result) (bool, string) {
 	if (exp.Err == nil && got.Err != nil) || (exp.Err != nil && got.Err == nil) {
-		return false, fmt.Sprintf("unexpected error: exp %p got %p", exp.Err, got.Err)
+		return false, fmt.Sprintf("unexpected error: exp %v got %v", exp.Err, got.Err)
 	}
 	if exp.Err != nil && exp.Err.Error() != got.Err.Error() {
 		return false, fmt.Sprintf("unexpected error: exp %v got %v", exp.Err, got.Err)

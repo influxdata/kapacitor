@@ -289,7 +289,7 @@ Options:
 
 func doDefine(args []string) error {
 
-	if *dtick == "" || *dname == "" || *dtick == "" {
+	if *dtick == "" || *dname == "" || *dtype == "" {
 		fmt.Fprintln(os.Stderr, "Must pass name,tick and type options.")
 		defineFlags.Usage()
 		os.Exit(2)

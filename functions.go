@@ -100,11 +100,11 @@ func (influxqlMapReducers) Bottom(field string, limit int64, fields ...string) p
 // create MapReduceInfo
 func mr(field, newField string, m func(*tsdb.MapInput) interface{}, r func([]interface{}) interface{}) pipeline.MapReduceInfo {
 	return pipeline.MapReduceInfo{
-		MapInfo{
-			field,
-			m,
+		Map: MapInfo{
+			Field: field,
+			Func:  m,
 		},
-		reduce(r, newField),
+		Reduce: reduce(r, newField),
 	}
 }
 

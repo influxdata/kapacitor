@@ -17,7 +17,7 @@ func ExprFunc(field, e string) (TransFunc, error) {
 	}
 	x := &expression{
 		field: field,
-		se:    &expr.StatefulExpr{t, expr.Functions()},
+		se:    &expr.StatefulExpr{Tree: t, Funcs: expr.Functions()},
 	}
 	return TransFunc(x.Eval), nil
 }

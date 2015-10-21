@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+fmtcount=`git ls-files | grep '.go$' | xargs gofmt -l 2>&1 | wc -l`
+if [ $fmtcount -gt 0 ]; then
+    echo "Some files aren't formatted, please run 'go fmt ./...' to format your source code before committing"
+    exit 1
+fi
+
+# Due to the way composites work, vet will fail for some of our tests so we ignore it
+vetcount=`go tool vet --composites=false ./ 2>&1  | wc -l`
+if [ $vetcount -gt 0 ]; then
+    echo "Some files aren't passing vet heuristics, please run 'go vet ./...' to see the errors it flags and correct your source code before committing"
+    exit 1
+fi
+exit 0

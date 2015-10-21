@@ -38,7 +38,7 @@ func newStreamNode(et *ExecutingTask, n *pipeline.StreamNode) (*StreamNode, erro
 		if err != nil {
 			return nil, err
 		}
-		sn.predicate = &expr.StatefulExpr{tree, expr.Functions()}
+		sn.predicate = &expr.StatefulExpr{Tree: tree, Funcs: expr.Functions()}
 	}
 	return sn, nil
 }

@@ -283,8 +283,8 @@ func (n *chainnode) MapReduce(mr MapReduceInfo) *ReduceNode {
 	case StreamEdge:
 		panic("cannot MapReduce stream edge, did you forget to window the data?")
 	case BatchEdge:
-		m = newMapNode(mr.MapI)
-		r = newReduceNode(mr.ReduceI)
+		m = newMapNode(mr.Map)
+		r = newReduceNode(mr.Reduce)
 	}
 	n.linkChild(m)
 	m.linkChild(r)
