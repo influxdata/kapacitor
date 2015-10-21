@@ -12,4 +12,4 @@ dependencies:
 
 test:
   override:
-    - source $HOME/.gvm/scripts/gvm; gvm use "go1.5.1"; make -C "$GOPATH/src/$IMPORT_PATH/"
+    - source $HOME/.gvm/scripts/gvm; gvm use "go1.5.1"; make -C "$GOPATH/src/$IMPORT_PATH/" test
