@@ -107,6 +107,11 @@ func (ts *Service) Open() error {
 		return err
 	}
 
+	err = os.MkdirAll(path.Dir(ts.dbpath), 0755)
+	if err != nil {
+		return err
+	}
+
 	// Enable tasks
 	return ts.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(enabledBucket))
@@ -156,9 +161,9 @@ func (ts *Service) handleSave(w http.ResponseWriter, r *http.Request) {
 	var tt kapacitor.TaskType
 	ttStr := r.URL.Query().Get("type")
 	switch ttStr {
-	case "streamer":
+	case "stream":
 		tt = kapacitor.StreamerTask
-	case "batcher":
+	case "batch":
 		tt = kapacitor.BatcherTask
 	default:
 		httpd.HttpError(w, fmt.Sprintf("unknown type %q", ttStr), true, http.StatusBadRequest)
@@ -338,7 +343,7 @@ func (ts *Service) GetTaskInfo(tasks []string) ([]taskInfo, error) {
 		f := func(k, v []byte) error {
 			t, err := ts.Load(string(k))
 			if err != nil {
-				return err
+				return fmt.Errorf("found invalid task in db. name: %s, err: %s", string(k), err)
 			}
 
 			enabled := eb != nil && eb.Get(k) != nil

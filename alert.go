@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"os"
+	"os/exec"
 
 	"github.com/influxdb/influxdb/influxql"
 	imodels "github.com/influxdb/influxdb/models"
@@ -82,6 +84,12 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode) (an *AlertNode, err 
 	}
 	if n.From != "" && len(n.ToList) != 0 {
 		an.handlers = append(an.handlers, an.handleEmail)
+	}
+	if n.Log != "" {
+		an.handlers = append(an.handlers, an.handleLog)
+	}
+	if len(n.Command) > 0 {
+		an.handlers = append(an.handlers, an.handleExec)
 	}
 	// Parse level expressions
 	an.levels = make([]*expr.StatefulExpr, CritAlert+1)
@@ -176,6 +184,7 @@ func (a *AlertNode) runAlert() error {
 			}
 		}
 	}
+	a.logger.Println("I! alert node done")
 	return nil
 }
 
@@ -259,5 +268,46 @@ func (a *AlertNode) handleEmail(ad AlertData) {
 		a.et.tm.SMTPService.SendMail(a.a.From, a.a.ToList, a.a.Subject, string(b))
 	} else {
 		a.logger.Println("W! smtp service not enabled, cannot send email.")
+	}
+}
+
+func (a *AlertNode) handleLog(ad AlertData) {
+	b, err := json.Marshal(ad)
+	if err != nil {
+		a.logger.Println("E! failed to marshal alert data json", err)
+		return
+	}
+	f, err := os.OpenFile(a.a.Log, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0600)
+	if err != nil {
+		a.logger.Println("E! failed to open file for alert logging", err)
+		return
+	}
+	defer f.Close()
+	n, err := f.Write(b)
+	if n != len(b) || err != nil {
+		a.logger.Println("E! failed to write to file", err)
+	}
+	n, err = f.Write([]byte("\n"))
+	if n != 1 || err != nil {
+		a.logger.Println("E! failed to write to file", err)
+	}
+	a.logger.Println("I! handled Log")
+}
+
+func (a *AlertNode) handleExec(ad AlertData) {
+	b, err := json.Marshal(ad)
+	if err != nil {
+		a.logger.Println("E! failed to marshal alert data json", err)
+		return
+	}
+	cmd := exec.Command(a.a.Command[0], a.a.Command[1:]...)
+	cmd.Stdin = bytes.NewBuffer(b)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	err = cmd.Run()
+	if err != nil {
+		a.logger.Println("E! error running alert command:", err, out)
+		return
 	}
 }

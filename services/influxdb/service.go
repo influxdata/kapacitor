@@ -89,6 +89,12 @@ func (s *Service) Close() error {
 	return lastErr
 }
 
+func (s *Service) Addr() string {
+	config := s.configs[s.i]
+	s.i = (s.i + 1) % len(s.configs)
+	return config.URL.String()
+}
+
 func (s *Service) NewClient() (c *client.Client, err error) {
 
 	tries := 0

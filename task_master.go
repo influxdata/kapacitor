@@ -53,6 +53,15 @@ func NewTaskMaster() *TaskMaster {
 	}
 }
 
+// Returns a new TaskMaster instance with the same services as the current one.
+func (tm *TaskMaster) New() *TaskMaster {
+	n := NewTaskMaster()
+	n.HTTPDService = tm.HTTPDService
+	n.InfluxDBService = tm.InfluxDBService
+	n.SMTPService = tm.SMTPService
+	return n
+}
+
 func (tm *TaskMaster) Open() error {
 	go tm.runForking()
 	return nil

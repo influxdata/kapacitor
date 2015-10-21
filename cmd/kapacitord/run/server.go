@@ -163,7 +163,6 @@ func (s *Server) appendReplayStoreService(c replay.Config) {
 	srv.TaskStore = s.TaskStore
 	srv.HTTPDService = s.HTTPDService
 	srv.InfluxDBService = s.InfluxDB
-	srv.SMTPService = s.SMTPService
 	srv.TaskMaster = s.TaskMaster
 
 	s.ReplayService = srv

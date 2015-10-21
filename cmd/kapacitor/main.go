@@ -24,7 +24,7 @@ var (
 )
 
 var mainFlags = flag.NewFlagSet("main", flag.ExitOnError)
-var kapacitordURL = mainFlags.String("url", "http://localhost:9092", "the URL http(s)://host:port of the kapacitord server.")
+var kapacitordURL = mainFlags.String("url", "http://localhost:9092/api/v1", "the URL http(s)://host:port of the kapacitord server.")
 
 var l = log.New(os.Stderr, "[run] ", log.LstdFlags)
 
@@ -38,6 +38,7 @@ Commands:
 	replay   replay a recording to a task.
 	enable   enable and start running a task with live data.
 	disable  stop running a task.
+	renable  disable then enable a running task.
 	push     publish a task definition to another Kapacitor instance.
 	delete   delete a task or a recording.
 	list     list information about tasks or recordings.
@@ -95,6 +96,9 @@ func main() {
 	case "disable":
 		commandArgs = args
 		commandF = doDisable
+	case "reenable":
+		commandArgs = args
+		commandF = doReenable
 	case "delete":
 		commandArgs = args
 		commandF = doDelete
@@ -157,6 +161,8 @@ func doHelp(args []string) error {
 			enableUsage()
 		case "disable":
 			disableUsage()
+		case "reenable":
+			reenableUsage()
 		case "delete":
 			deleteUsage()
 		case "list":
@@ -180,13 +186,12 @@ func doHelp(args []string) error {
 // Record
 var (
 	recordFlags = flag.NewFlagSet("record", flag.ExitOnError)
-	raddr       = recordFlags.String("addr", "", "the URL address of the InfluxDB server. If recording a batch or query.")
 	rname       = recordFlags.String("name", "", "the name of a task. If recording a batch")
-	rstart      = recordFlags.String("start", "", "the start time of a task query.")
+	rstop       = recordFlags.String("stop", "", "the stop time of a query if recording a batch. Defaults to now.")
 	rnum        = recordFlags.Int("num", 1, "the number of periods to query. If recording a batch")
 
 	rquery = recordFlags.String("query", "", "the query to record. If recording a query.")
-	rtype  = recordFlags.String("type", "", "the type of the recording to save (streamer|batcher). If recording a query.")
+	rtype  = recordFlags.String("type", "", "the type of the recording to save (stream|batch). If recording a query.")
 
 	rdur = recordFlags.Duration("duration", time.Minute*5, "how long to record the data stream. If recording a stream.")
 )
@@ -208,12 +213,12 @@ Examples:
 
 		This records the live data stream for 1 minute.
 	
-	$ kapacitor record batch -addr 'http://localhost:8086' -name cpu_idle -start 2015-09-01T00:00:00Z -num 10
+	$ kapacitor record batch -name cpu_idle -stop 2015-09-01T00:00:00Z -num 10
 		
 		This records the result of the query defined in task 'cpu_idle' and runs the query 10 times
-		starting at time 'start' and incrementing by the period defined in the task.
+		starting at time 'stop - num*period' and incrementing by the period defined in the task.
 
-	$ kapacitor record query -addr 'http://localhost:8086' -query "select value from cpu_idle where time > now() - 1h and time < now()" -type streamer
+	$ kapacitor record query -query "select value from cpu_idle where time > now() - 1h and time < now()" -type stream
 
 		This records the result of the query and stores it as a stream recording. Use -type batcher to store as batch recording.
 
@@ -232,12 +237,10 @@ func doRecord(args []string) error {
 		v.Add("duration", rdur.String())
 	case "batch":
 		v.Add("name", *rname)
-		v.Add("start", *rstart)
+		v.Add("stop", *rstop)
 		v.Add("num", strconv.FormatInt(int64(*rnum), 10))
-		v.Add("addr", *raddr)
 	case "query":
 		v.Add("qtype", *rtype)
-		v.Add("addr", *raddr)
 	default:
 		return fmt.Errorf("Unknown record type %q, expected 'stream' or 'query'", args[0])
 	}
@@ -267,7 +270,7 @@ var (
 	defineFlags = flag.NewFlagSet("define", flag.ExitOnError)
 	dname       = defineFlags.String("name", "", "the task name")
 	dtick       = defineFlags.String("tick", "", "path to the TICK script")
-	dtype       = defineFlags.String("type", "", "the task type (streamer|batcher)")
+	dtype       = defineFlags.String("type", "", "the task type (stream|batch)")
 )
 
 func defineUsage() {
@@ -444,6 +447,25 @@ func doDisable(args []string) error {
 	return nil
 }
 
+// Reenable
+
+func reenableUsage() {
+	var u = `Usage: kapacitor reenable [task name...]
+
+	Disable then enable a task running.
+`
+	fmt.Fprintln(os.Stderr, u)
+}
+
+func doReenable(args []string) error {
+	err := doEnable(args)
+	if err != nil {
+		return err
+	}
+
+	return doDisable(args)
+}
+
 // List
 
 func listUsage() {
@@ -556,10 +578,10 @@ func doDelete(args []string) error {
 	var paramName string
 	switch kind := args[0]; kind {
 	case "tasks":
-		baseURL = "http://localhost:9092/task?"
+		baseURL = *kapacitordURL + "/task?"
 		paramName = "name"
 	case "recordings":
-		baseURL = "http://localhost:9092/recording?"
+		baseURL = *kapacitordURL + "/recording?"
 		paramName = "rid"
 	default:
 		return fmt.Errorf("cannot delete '%s' did you mean 'tasks' or 'recordings'?", kind)

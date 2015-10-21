@@ -2,6 +2,7 @@ package kapacitor
 
 import (
 	"errors"
+	"expvar"
 	"fmt"
 	"log"
 	"os"
@@ -9,6 +10,11 @@ import (
 	"github.com/influxdb/kapacitor/models"
 	"github.com/influxdb/kapacitor/pipeline"
 	"github.com/influxdb/kapacitor/wlog"
+)
+
+const (
+	statCollected = "collected"
+	statEmitted   = "emitted"
 )
 
 type StreamCollector interface {
@@ -26,24 +32,27 @@ type Edge struct {
 	batch  chan models.Batch
 	reduce chan *MapResult
 
-	collected int64
-	emitted   int64
-	logger    *log.Logger
-	closed    bool
+	logger  *log.Logger
+	closed  bool
+	statMap *expvar.Map
 }
 
 func newEdge(name string, t pipeline.EdgeType) *Edge {
 	l := wlog.New(os.Stderr, fmt.Sprintf("[edge:%s] ", name), log.LstdFlags)
+	sm := &expvar.Map{}
+	sm.Init()
+	sm.Add(statCollected, 0)
+	sm.Add(statEmitted, 0)
+	e := &Edge{logger: l, statMap: sm}
 	switch t {
 	case pipeline.StreamEdge:
-		return &Edge{stream: make(chan models.Point), logger: l}
+		e.stream = make(chan models.Point)
 	case pipeline.BatchEdge:
-		return &Edge{batch: make(chan models.Batch), logger: l}
+		e.batch = make(chan models.Batch)
 	case pipeline.ReduceEdge:
-		return &Edge{reduce: make(chan *MapResult), logger: l}
+		e.reduce = make(chan *MapResult)
 	}
-	return nil
-
+	return e
 }
 
 func (e *Edge) Close() {
@@ -51,7 +60,11 @@ func (e *Edge) Close() {
 		return
 	}
 	e.closed = true
-	e.logger.Printf("I! closing c: %d e: %d\n", e.collected, e.emitted)
+	e.logger.Printf(
+		"I! closing c: %s e: %s\n",
+		e.statMap.Get(statCollected),
+		e.statMap.Get(statEmitted),
+	)
 	if e.stream != nil {
 		close(e.stream)
 	}
@@ -64,28 +77,49 @@ func (e *Edge) Close() {
 }
 
 func (e *Edge) NextPoint() (p models.Point, ok bool) {
-	e.logger.Printf("D! next point c: %d e: %d\n", e.collected, e.emitted)
+	if wlog.LogLevel == wlog.DEBUG {
+		// Explicitly check log level since this is expensive and frequent
+		e.logger.Printf(
+			"D! next point c: %s e: %s\n",
+			e.statMap.Get(statCollected),
+			e.statMap.Get(statEmitted),
+		)
+	}
 	p, ok = <-e.stream
 	if ok {
-		e.emitted++
+		e.statMap.Add(statEmitted, 1)
 	}
 	return
 }
 
 func (e *Edge) NextBatch() (b models.Batch, ok bool) {
-	e.logger.Printf("D! next batch c: %d e: %d\n", e.collected, e.emitted)
+	if wlog.LogLevel == wlog.DEBUG {
+		// Explicitly check log level since this is expensive and frequent
+		e.logger.Printf(
+			"D! next batch c: %s e: %s\n",
+			e.statMap.Get(statCollected),
+			e.statMap.Get(statEmitted),
+		)
+	}
 	b, ok = <-e.batch
 	if ok {
-		e.emitted++
+		e.statMap.Add(statEmitted, 1)
 	}
 	return
 }
 
 func (e *Edge) NextMaps() (m *MapResult, ok bool) {
-	e.logger.Printf("D! next maps c: %d e: %d\n", e.collected, e.emitted)
+	if wlog.LogLevel == wlog.DEBUG {
+		// Explicitly check log level since this is expensive and frequent
+		e.logger.Printf(
+			"D! next maps c: %s e: %s\n",
+			e.statMap.Get(statCollected),
+			e.statMap.Get(statEmitted),
+		)
+	}
 	m, ok = <-e.reduce
-	if m != nil {
-		e.emitted++
+	if ok {
+		e.statMap.Add(statEmitted, 1)
 	}
 	return
 }
@@ -103,24 +137,45 @@ func (e *Edge) recover(errp *error) {
 
 func (e *Edge) CollectPoint(p models.Point) (err error) {
 	defer e.recover(&err)
-	e.logger.Printf("D! collect point c: %d e: %d\n", e.collected, e.emitted)
-	e.collected++
+	if wlog.LogLevel == wlog.DEBUG {
+		// Explicitly check log level since this is expensive and frequent
+		e.logger.Printf(
+			"D! collect point c: %s e: %s\n",
+			e.statMap.Get(statCollected),
+			e.statMap.Get(statEmitted),
+		)
+	}
+	e.statMap.Add(statCollected, 1)
 	e.stream <- p
 	return
 }
 
 func (e *Edge) CollectBatch(b models.Batch) (err error) {
 	defer e.recover(&err)
-	e.logger.Printf("D! collect batch c: %d e: %d\n", e.collected, e.emitted)
-	e.collected++
+	if wlog.LogLevel == wlog.DEBUG {
+		// Explicitly check log level since this is expensive and frequent
+		e.logger.Printf(
+			"D! collect batch c: %s e: %s\n",
+			e.statMap.Get(statCollected),
+			e.statMap.Get(statEmitted),
+		)
+	}
+	e.statMap.Add(statCollected, 1)
 	e.batch <- b
 	return
 }
 
 func (e *Edge) CollectMaps(m *MapResult) (err error) {
 	defer e.recover(&err)
-	e.logger.Printf("D! collect maps c: %d e: %d\n", e.collected, e.emitted)
-	e.collected++
+	if wlog.LogLevel == wlog.DEBUG {
+		// Explicitly check log level since this is expensive and frequent
+		e.logger.Printf(
+			"D! collect maps c: %s e: %s\n",
+			e.statMap.Get(statCollected),
+			e.statMap.Get(statEmitted),
+		)
+	}
+	e.statMap.Add(statCollected, 1)
 	e.reduce <- m
 	return
 }

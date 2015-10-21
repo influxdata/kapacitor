@@ -6,7 +6,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -15,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/influxdb/influxdb/client"
 	"github.com/influxdb/kapacitor"
 	"github.com/influxdb/kapacitor/clock"
 	"github.com/influxdb/kapacitor/services/httpd"
@@ -29,23 +27,21 @@ const batchEXT = ".brpl"
 // Handles recording, starting, and waiting on replays
 type Service struct {
 	saveDir   string
+	routes    []httpd.Route
 	TaskStore interface {
 		Load(name string) (*kapacitor.Task, error)
 	}
 	HTTPDService interface {
 		AddRoutes([]httpd.Route) error
 		DelRoutes([]httpd.Route)
-		Addr() net.Addr
 	}
 	InfluxDBService interface {
-		NewClient() (*client.Client, error)
-	}
-	SMTPService interface {
-		SendMail(from string, to []string, subject string, msg string)
+		Addr() string
 	}
 	TaskMaster interface {
 		NewFork(name string) *kapacitor.Edge
 		DelFork(name string)
+		New() *kapacitor.TaskMaster
 	}
 
 	logger *log.Logger
@@ -60,7 +56,7 @@ func NewService(conf Config) *Service {
 }
 
 func (r *Service) Open() error {
-	routes := []httpd.Route{
+	r.routes = []httpd.Route{
 		{
 			"recordings",
 			"GET",
@@ -94,10 +90,17 @@ func (r *Service) Open() error {
 			r.handleReplay,
 		},
 	}
-	return r.HTTPDService.AddRoutes(routes)
+
+	err := os.MkdirAll(r.saveDir, 0755)
+	if err != nil {
+		return err
+	}
+
+	return r.HTTPDService.AddRoutes(r.routes)
 }
 
 func (r *Service) Close() error {
+	r.HTTPDService.DelRoutes(r.routes)
 	return nil
 }
 
@@ -152,11 +155,9 @@ func (r *Service) handleReplay(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Create new isolated task master
-	tm := kapacitor.NewTaskMaster()
-	tm.HTTPDService = r.HTTPDService
-	tm.InfluxDBService = r.InfluxDBService
-	tm.SMTPService = r.SMTPService
+	tm := r.TaskMaster.New()
 	tm.Open()
+	defer tm.Close()
 	et, err := tm.StartTask(t)
 	if err != nil {
 		httpd.HttpError(w, "task start: "+err.Error(), true, http.StatusBadRequest)
@@ -183,6 +184,7 @@ func (r *Service) handleReplay(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Call close explicity to check for error
 	err = tm.Close()
 	if err != nil {
 		httpd.HttpError(w, "closing: "+err.Error(), true, http.StatusInternalServerError)
@@ -209,21 +211,22 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 		}
 
 	case "batch":
-		addr := req.URL.Query().Get("addr")
-		if addr == "" {
-			httpd.HttpError(w, "no InfluxDB address specified", true, http.StatusBadRequest)
-			return
-		}
 		num, err := strconv.ParseInt(req.URL.Query().Get("num"), 10, 64)
 		if err != nil {
 			httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
 			return
 		}
 
-		start, err := time.Parse(time.RFC3339, req.URL.Query().Get("start"))
-		if err != nil {
-			httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
-			return
+		var stop time.Time
+		stopStr := req.URL.Query().Get("stop")
+		if stopStr == "" {
+			stop = time.Now()
+		} else {
+			stop, err = time.Parse(time.RFC3339, stopStr)
+			if err != nil {
+				httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
+				return
+			}
 		}
 
 		task := req.URL.Query().Get("name")
@@ -238,7 +241,7 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		err = r.doRecordBatch(rid, t, addr, start, int(num))
+		err = r.doRecordBatch(rid, t, r.InfluxDBService.Addr(), stop, int(num))
 		if err != nil {
 			httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
 			return
@@ -388,7 +391,7 @@ func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration) error {
 }
 
 // Record a series of batch queries defined by a batcher task
-func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, addr string, start time.Time, num int) error {
+func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, addr string, stop time.Time, num int) error {
 	query, err := t.Query()
 	if err != nil {
 		return err
@@ -403,6 +406,8 @@ func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, addr string, s
 	defer f.Close()
 	gz := gzip.NewWriter(f)
 	defer gz.Close()
+
+	start := stop.Add(time.Duration(-num) * period)
 
 	for i := 0; i < num; i++ {
 		stop := start.Add(period)

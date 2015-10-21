@@ -52,6 +52,13 @@ type AlertNode struct {
 	ToList []string
 	//tick:ignore
 	Subject string
+
+	// A command to run when an alert triggers
+	//tick:ignore
+	Command []string
+
+	// Log alert data to file
+	Log string
 }
 
 func newAlertNode(wants EdgeType) *AlertNode {
@@ -62,6 +69,13 @@ func newAlertNode(wants EdgeType) *AlertNode {
 			provides: NoEdge,
 		},
 	}
+}
+
+// Execute a command whenever an alert is trigger and pass the alert data over STDIN.
+// tick:property
+func (a *AlertNode) Exec(executable string, args ...string) *AlertNode {
+	a.Command = append([]string{executable}, args...)
+	return a
 }
 
 // Email the alert data.
