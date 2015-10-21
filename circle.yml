@@ -1,16 +1,16 @@
 machine:
+  pre:
+    - bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
+    - source $HOME/.gvm/scripts/gvm; gvm install $GO_VERSION --binary
   environment:
     IMPORT_PATH: "github.com/influxdb/kapacitor"
+    GO_VERSION: go1.5.1
 
 dependencies:
   override:
-    - mkdir -p "$GOPATH/src/$IMPORT_PATH"
-    - rsync -azC --delete ./ "$GOPATH/src/$IMPORT_PATH/"
+    - source $HOME/.gvm/scripts/gvm; gvm use $GO_VERSION; mkdir -p "$GOPATH/src/$IMPORT_PATH"
+    - source $HOME/.gvm/scripts/gvm; gvm use $GO_VERSION; rsync -azC --delete ./ "$GOPATH/src/$IMPORT_PATH/"
 
 test:
-  pre:
-    - go tool vet --composites=false ./
-    - go get -u -t ./...
-
   override:
-    - go test ./...
+    - source $HOME/.gvm/scripts/gvm; gvm use $GO_VERSION; make -C "$GOPATH/src/$IMPORT_PATH/"

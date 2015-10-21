@@ -36,9 +36,10 @@ build-linux-bins: prepare
 		./cmd/kapacitord/main.go
 
 prepare:
-	go get -u ./...
+	go get -u -t ./...
 
 test: prepare
+	$(GO) tool vet --composites=false ./
 	$(GO) test ./...
 
 test-short: prepare
