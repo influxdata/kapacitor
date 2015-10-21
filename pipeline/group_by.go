@@ -14,7 +14,7 @@ package pipeline
 // Groups are dynamically created as new data arrives and each group is processed
 // independently.
 type GroupByNode struct {
-	node
+	chainnode
 	//The dimensions by which to group to the data.
 	// tick:ignore
 	Dimensions []string
@@ -22,11 +22,7 @@ type GroupByNode struct {
 
 func newGroupByNode(wants EdgeType, dims []string) *GroupByNode {
 	return &GroupByNode{
-		node: node{
-			desc:     "groupby",
-			wants:    wants,
-			provides: wants,
-		},
+		chainnode:  newBasicChainNode("groupby", wants, wants),
 		Dimensions: dims,
 	}
 }

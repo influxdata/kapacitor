@@ -12,13 +12,13 @@ package pipeline
 //    errors.join(requests)
 //            .as("errors", "requests")
 //            .rename("error_rate")
-//        .apply(expr("rate", "errors.value / requests.value")
+//        .apply(expr("rate", "errors.value / requests.value"))
 //        ...
 //
 // In the above example the `errors` and `requests` streams are joined
 // and then transformed to calculate a combined field.
 type JoinNode struct {
-	node
+	chainnode
 	// The alias names of the two parents.
 	// Note:
 	//       Names[1] corresponds to the left  parent
@@ -32,11 +32,7 @@ type JoinNode struct {
 
 func newJoinNode(e EdgeType, n Node) *JoinNode {
 	j := &JoinNode{
-		node: node{
-			desc:     "join",
-			wants:    e,
-			provides: e,
-		},
+		chainnode: newBasicChainNode("join", e, e),
 	}
 	n.linkChild(j)
 	return j

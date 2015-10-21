@@ -12,7 +12,7 @@ package pipeline
 // data point with the result of `error_count / total_count` where
 // `error_count` and `total_count` are existing fields on the data point.
 type ApplyNode struct {
-	node
+	chainnode
 
 	// tick:ignore
 	Func interface{}
@@ -20,12 +20,8 @@ type ApplyNode struct {
 
 func newApplyNode(e EdgeType, f interface{}) *ApplyNode {
 	a := &ApplyNode{
-		node: node{
-			desc:     "apply",
-			wants:    e,
-			provides: e,
-		},
-		Func: f,
+		chainnode: newBasicChainNode("apply", e, e),
+		Func:      f,
 	}
 	return a
 }

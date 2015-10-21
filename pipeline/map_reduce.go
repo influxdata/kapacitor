@@ -21,7 +21,7 @@ type MapReduceInfo struct {
 //        .mapReduce(influxql.sum("value"))
 //        ...
 type MapNode struct {
-	node
+	chainnode
 	// The map function
 	// tick:ignore
 	Map interface{}
@@ -29,12 +29,8 @@ type MapNode struct {
 
 func newMapNode(i interface{}) *MapNode {
 	return &MapNode{
-		node: node{
-			desc:     "map",
-			wants:    BatchEdge,
-			provides: ReduceEdge,
-		},
-		Map: i,
+		chainnode: newBasicChainNode("map", BatchEdge, ReduceEdge),
+		Map:       i,
 	}
 }
 
@@ -53,7 +49,7 @@ func newMapNode(i interface{}) *MapNode {
 //        .mapReduce(influxql.sum("value"))
 //        ...
 type ReduceNode struct {
-	node
+	chainnode
 	//The reduce function
 	// tick:ignore
 	Reduce interface{}
@@ -61,11 +57,7 @@ type ReduceNode struct {
 
 func newReduceNode(i interface{}) *ReduceNode {
 	return &ReduceNode{
-		node: node{
-			desc:     "reduce",
-			wants:    ReduceEdge,
-			provides: StreamEdge,
-		},
-		Reduce: i,
+		chainnode: newBasicChainNode("reduce", ReduceEdge, StreamEdge),
+		Reduce:    i,
 	}
 }

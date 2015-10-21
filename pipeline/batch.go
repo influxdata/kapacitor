@@ -22,7 +22,7 @@ import (
 // In the above example InfluxDB is queried every 10 seconds and the results
 // are then processed by the rest of the pipeline.
 type BatchNode struct {
-	node
+	chainnode
 	// The query to execute. Must not contain a time condition
 	// in the `WHERE` clause or contain a `GROUP BY` clause.
 	// The time conditions are added dynamically according to the period.
@@ -40,11 +40,7 @@ type BatchNode struct {
 
 func newBatchNode() *BatchNode {
 	return &BatchNode{
-		node: node{
-			desc:     "batch",
-			wants:    BatchEdge,
-			provides: BatchEdge,
-		},
+		chainnode: newBasicChainNode("batch", BatchEdge, BatchEdge),
 	}
 }
 

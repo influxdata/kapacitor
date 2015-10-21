@@ -15,7 +15,7 @@ package pipeline
 //        ...
 //
 type UnionNode struct {
-	node
+	chainnode
 	// The new name of the stream.
 	// If empty the name of the left node
 	// (i.e. `leftNode.union(otherNode1, otherNode2)`) is used.
@@ -24,11 +24,7 @@ type UnionNode struct {
 
 func newUnionNode(e EdgeType, nodes []Node) *UnionNode {
 	u := &UnionNode{
-		node: node{
-			desc:     "union",
-			wants:    e,
-			provides: e,
-		},
+		chainnode: newBasicChainNode("union", e, e),
 	}
 	for _, n := range nodes {
 		n.linkChild(u)

@@ -18,7 +18,7 @@ package pipeline
 // and retention policy `myrp` and measurement `mymeasurement` where
 // the tag `host` matches the regex `logger\d+`
 type StreamNode struct {
-	node
+	chainnode
 	// Which database, retention policy and measurement to select.
 	// This is equivalent to the FROM statement in an InfluxQL
 	// query. As such shortened selectors can be supplied
@@ -35,11 +35,7 @@ type StreamNode struct {
 
 func newStreamNode() *StreamNode {
 	return &StreamNode{
-		node: node{
-			desc:     "stream",
-			wants:    StreamEdge,
-			provides: StreamEdge,
-		},
+		chainnode: newBasicChainNode("stream", StreamEdge, StreamEdge),
 	}
 }
 

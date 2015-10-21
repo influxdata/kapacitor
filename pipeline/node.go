@@ -165,19 +165,88 @@ func (n *node) dot(buf *bytes.Buffer) {
 // Chaining methods
 //
 
+// basic implementation of node + chaining methods
+type chainnode struct {
+	node
+}
+
+func newBasicChainNode(desc string, wants, provides EdgeType) chainnode {
+	return chainnode{node{
+		desc:     desc,
+		wants:    wants,
+		provides: provides,
+	}}
+}
+
 // Create a new node that filters the data stream by a given expression.
-func (n *node) Where(expression string) *WhereNode {
+func (n *chainnode) Where(expression string) *WhereNode {
 	w := newWhereNode(n.provides, expression)
 	n.linkChild(w)
 	return w
+}
+
+// Create an http output node that caches the most recent data it has received.
+// The cached data is available at the given endpoint.
+// The endpoint is the relative path from the API endpoint of the running task.
+// For example if the task endpoint is at "/api/v1/task/<task_name>" and endpoint is
+// "top10", then the data can be requested from "/api/v1/task/<task_name>/top10".
+func (n *chainnode) HttpOut(endpoint string) *HTTPOutNode {
+	h := newHTTPOutNode(n.provides, endpoint)
+	n.linkChild(h)
+	return h
+}
+
+// Create an influxdb output node that will store the incoming data into InfluxDB.
+func (n *chainnode) InfluxDBOut() *InfluxDBOutNode {
+	i := newInfluxDBOutNode(n.provides)
+	n.linkChild(i)
+	return i
+}
+
+// Create an alert node, which can trigger alerts.
+func (n *chainnode) Alert() *AlertNode {
+	a := newAlertNode(n.provides)
+	n.linkChild(a)
+	return a
+}
+
+// Perform the union of this node and all other given nodes.
+func (n *chainnode) Union(node ...Node) *UnionNode {
+	u := newUnionNode(n.provides, node)
+	n.linkChild(u)
+	return u
+}
+
+// Join this node with another node. The data is joined on time.
+func (n *chainnode) Join(other Node) *JoinNode {
+	j := newJoinNode(n.provides, other)
+	n.linkChild(j)
+	return j
+}
+
+// Create an apply node that will apply the given transformation function to each data point.
+// See the built-in function `expr` in order to write in-line custom transformation functions.
+func (n *chainnode) Apply(transform interface{}) *ApplyNode {
+	a := newApplyNode(n.provides, transform)
+	n.linkChild(a)
+	return a
+}
+
+// Group the data by a set of tags.
+func (n *chainnode) GroupBy(tag ...string) *GroupByNode {
+	g := newGroupByNode(n.provides, tag)
+	n.linkChild(g)
+	return g
 }
 
 // Perform just the map step of a map-reduce operation.
 // A map step must always be followed by a reduce step.
 // See Apply for performing simple transformations.
 // See MapReduce for performing map-reduce in one command.
-func (n *node) Map(f interface{}) (c *MapNode) {
-	switch n.provides {
+//
+// NOTE: Map can only be applied to batch edges.
+func (n *chainnode) Map(f interface{}) (c *MapNode) {
+	switch n.Provides() {
 	case StreamEdge:
 		panic("cannot MapReduce stream edge, did you forget to window the data?")
 	case BatchEdge:
@@ -188,8 +257,10 @@ func (n *node) Map(f interface{}) (c *MapNode) {
 }
 
 // Perform just the reduce step of a map-reduce operation.
-func (n *node) Reduce(f interface{}) (c *ReduceNode) {
-	switch n.provides {
+//
+// NOTE: Reduce can only be applied to map edges.
+func (n *chainnode) Reduce(f interface{}) (c *ReduceNode) {
+	switch n.Provides() {
 	case StreamEdge:
 		panic("cannot MapReduce stream edge, did you forget to window the data?")
 	case BatchEdge:
@@ -203,10 +274,12 @@ func (n *node) Reduce(f interface{}) (c *ReduceNode) {
 // The built-in functions under `influxql` provide the
 // selection,aggregation, and transformation functions
 // from the InfluxQL language.
-func (n *node) MapReduce(mr MapReduceInfo) *ReduceNode {
+//
+// NOTE: MapReduce can only be applied to batch edges.
+func (n *chainnode) MapReduce(mr MapReduceInfo) *ReduceNode {
 	var m *MapNode
 	var r *ReduceNode
-	switch n.provides {
+	switch n.Provides() {
 	case StreamEdge:
 		panic("cannot MapReduce stream edge, did you forget to window the data?")
 	case BatchEdge:
@@ -219,62 +292,14 @@ func (n *node) MapReduce(mr MapReduceInfo) *ReduceNode {
 }
 
 // Create a new node that windows the stream by time.
-func (n *node) Window() *WindowNode {
-	w := newWindowNode()
-	n.linkChild(w)
-	return w
-}
-
-// Create an http output node that caches the most recent data it has received.
-// The cached data is available at the given endpoint.
-// The endpoint is the relative path from the API endpoint of the running task.
-// For example if the task endpoint is at "/api/v1/task/<task_name>" and endpoint is
-// "top10", then the data can be requested from "/api/v1/task/<task_name>/top10".
-func (n *node) HttpOut(endpoint string) *HTTPOutNode {
-	h := newHTTPOutNode(n.provides, endpoint)
-	n.linkChild(h)
-	return h
-}
-
-// Create an influxdb output node that will store the incoming data into InfluxDB.
-func (n *node) InfluxDBOut() *InfluxDBOutNode {
-	i := newInfluxDBOutNode(n.provides)
-	n.linkChild(i)
-	return i
-}
-
-// Create an alert node, which can trigger alerts.
-func (n *node) Alert() *AlertNode {
-	a := newAlertNode(n.provides)
-	n.linkChild(a)
-	return a
-}
-
-// Perform the union of this node and all other given nodes.
-func (n *node) Union(node ...Node) *UnionNode {
-	u := newUnionNode(n.provides, node)
-	n.linkChild(u)
-	return u
-}
-
-// Join this node with another node. The data is joined on time.
-func (n *node) Join(other Node) *JoinNode {
-	j := newJoinNode(n.provides, other)
-	n.linkChild(j)
-	return j
-}
-
-// Create an apply node that will apply the given transformation function to each data point.
-// See the built-in function `expr` in order to write in-line custom transformation functions.
-func (n *node) Apply(transform interface{}) *ApplyNode {
-	a := newApplyNode(n.provides, transform)
-	n.linkChild(a)
-	return a
-}
-
-// Group the data by a set of tags.
-func (n *node) GroupBy(tag ...string) *GroupByNode {
-	g := newGroupByNode(n.provides, tag)
-	n.linkChild(g)
-	return g
+//
+// NOTE: Window can only be applied to stream edges.
+func (n *chainnode) Window() *WindowNode {
+	if n.Provides() == StreamEdge {
+		w := newWindowNode()
+		n.linkChild(w)
+		return w
+	} else {
+		panic("cannot Window batch edge")
+	}
 }

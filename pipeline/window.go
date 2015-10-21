@@ -23,7 +23,7 @@ import (
 // As a result if the incoming data stream stops then no more windows will be emitted because time is no longer
 // increasing for the window node.
 type WindowNode struct {
-	node
+	chainnode
 	// The period, or length in time, of the window.
 	Period time.Duration
 	// How often the current window is emitted into the pipeline.
@@ -32,10 +32,6 @@ type WindowNode struct {
 
 func newWindowNode() *WindowNode {
 	return &WindowNode{
-		node: node{
-			desc:     "window",
-			wants:    StreamEdge,
-			provides: BatchEdge,
-		},
+		chainnode: newBasicChainNode("window", StreamEdge, BatchEdge),
 	}
 }

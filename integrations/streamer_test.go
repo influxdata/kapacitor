@@ -348,7 +348,7 @@ var disk = stream
 			.where("device = 'sda'")
 
 cpu.union(mem, disk)
-		.newName("cpu_mem_disk")
+		.rename("cpu_mem_disk")
 		.window()
 			.period(10s)
 			.every(10s)

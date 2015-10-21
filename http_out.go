@@ -68,7 +68,7 @@ func (h *HTTPOutNode) runOut() error {
 		HandlerFunc: hndl,
 	}}
 
-	h.endpoint = h.et.tm.HTTPDService.Addr().String() + p
+	h.endpoint = h.et.tm.HTTPDService.Addr().String() + httpd.APIRoot + p
 	h.routes = r
 
 	err := h.et.tm.HTTPDService.AddRoutes(r)

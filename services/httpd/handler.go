@@ -32,6 +32,10 @@ const (
 	statPointsWrittenFail         = "points_written_fail" // Number of points that failed to be written
 )
 
+const (
+	APIRoot = "/api/v1"
+)
+
 type Route struct {
 	Name        string
 	Method      string
@@ -99,22 +103,23 @@ func NewHandler(requireAuthentication, loggingEnabled, writeTrace bool, statMap 
 			"log-level", // Display current API routes
 			"POST", "/loglevel", true, true, h.serveLogLevel,
 		},
-		Route{
-			"404", // Catch all 404
-			"GET", "/", true, true, h.serve404,
-		},
-		Route{
-			"404", // Catch all 404
-			"POST", "/", true, true, h.serve404,
-		},
-		Route{
-			"404", // Catch all 404
-			"DELETE", "/", true, true, h.serve404,
-		},
-		Route{
-			"404", // Catch all 404
-			"HEAD", "/", true, true, h.serve404,
-		},
+	})
+
+	h.addRawRoute(Route{
+		"404", // Catch all 404
+		"GET", "/", true, true, h.serve404,
+	})
+	h.addRawRoute(Route{
+		"404", // Catch all 404
+		"POST", "/", true, true, h.serve404,
+	})
+	h.addRawRoute(Route{
+		"404", // Catch all 404
+		"DELETE", "/", true, true, h.serve404,
+	})
+	h.addRawRoute(Route{
+		"404", // Catch all 404
+		"HEAD", "/", true, true, h.serve404,
 	})
 
 	return h
@@ -129,8 +134,12 @@ func (h *Handler) AddRoutes(routes []Route) error {
 	}
 	return nil
 }
-
 func (h *Handler) AddRoute(r Route) error {
+	r.Pattern = APIRoot + r.Pattern
+	return h.addRawRoute(r)
+}
+
+func (h *Handler) addRawRoute(r Route) error {
 	var handler http.Handler
 	// If it's a handler func that requires authorization, wrap it in authorization
 	if hf, ok := r.HandlerFunc.(func(http.ResponseWriter, *http.Request, *meta.UserInfo)); ok {

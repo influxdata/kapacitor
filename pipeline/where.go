@@ -34,7 +34,7 @@ package pipeline
 //        .httpOut("serverB")
 //
 type WhereNode struct {
-	node
+	chainnode
 	// The expression predicate.
 	// tick:ignore
 	Predicate string
@@ -42,11 +42,7 @@ type WhereNode struct {
 
 func newWhereNode(wants EdgeType, predicate string) *WhereNode {
 	return &WhereNode{
-		node: node{
-			desc:     "where",
-			wants:    wants,
-			provides: wants,
-		},
+		chainnode: newBasicChainNode("where", wants, wants),
 		Predicate: predicate,
 	}
 }
