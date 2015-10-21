@@ -8,13 +8,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestDSL2PipelineMultiLine(t *testing.T) {
+func TestTICK_To_Pipeline_MultiLine(t *testing.T) {
 	assert := assert.New(t)
 
 	var tickScript = `
-var w = stream.window();
-w.period(10s);
-w.every(1s);
+var w = stream.window()
+w.period(10s)
+w.every(1s)
 `
 
 	scope := tick.NewScope()

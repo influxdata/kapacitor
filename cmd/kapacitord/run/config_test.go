@@ -17,7 +17,7 @@ func TestConfig_Parse(t *testing.T) {
 dir = "/tmp/replay"
 
 [task]
-dbpath = "/tmp/task"
+dir = "/tmp/task"
 `, &c); err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestConfig_Parse_EnvOverride(t *testing.T) {
 dir = "/tmp/replay"
 
 [task]
-dbpath = "/tmp/task"
+dir = "/tmp/task"
 `, &c); err != nil {
 		t.Fatal(err)
 	}

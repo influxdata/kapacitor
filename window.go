@@ -48,7 +48,7 @@ func (w *WindowNode) runWindow() error {
 			windows[p.Group] = wnd
 		}
 		if !p.Time.Before(wnd.nextEmit) {
-			points := wnd.emit(p.Time)
+			points := wnd.emit()
 			// Send window to all children
 			for _, child := range w.outs {
 				child.CollectBatch(points)
@@ -69,8 +69,8 @@ type window struct {
 	tags     map[string]string
 }
 
-func (w *window) emit(now time.Time) models.Batch {
-	oldest := now.Add(-1 * w.period)
+func (w *window) emit() models.Batch {
+	oldest := w.nextEmit.Add(-1 * w.period)
 	w.buf.purge(oldest)
 
 	w.nextEmit = w.nextEmit.Add(w.every)
@@ -152,7 +152,7 @@ func (b *windowBuffer) purge(oldest time.Time) {
 		}
 		b.size = b.stop - b.start
 	} else {
-		if b.window[l-1].Time.After(oldest) {
+		if !b.window[l-1].Time.Before(oldest) {
 			for ; b.start < l; b.start++ {
 				if !b.window[b.start].Time.Before(oldest) {
 					break

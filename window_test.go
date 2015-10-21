@@ -66,7 +66,7 @@ func TestWindowBuffer(t *testing.T) {
 		assert.Equal(i, buf.size)
 
 		batch := buf.batch()
-		if assert.Equal(size-i, len(batch.Points)) {
+		if assert.Equal(i, len(batch.Points)) {
 			for _, p := range batch.Points {
 				if assert.NotNil(p, "i:%d", i) {
 					assert.True(!p.Time.Before(oldest), "Point %s is not after oldest time %s", p.Time, oldest)

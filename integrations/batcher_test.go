@@ -94,60 +94,6 @@ batch
 	}
 }
 
-func TestBatch_Fork(t *testing.T) {
-
-	var script = `
-var cpu = batch
-	.query('''select "idle" from "tests"."default".cpu where dc = 'nyc' ''')
-	.period(10s)
-	.groupBy(time(2s))
-
-cpu
-	.fork()
-	.where("host = 'serverA'")
-	.window()
-		.period(1s)
-		.every(1s)
-	.cache("/a")
-
-cpu
-	.fork()
-	.where("host = 'serverB'")
-	.window()
-		.period(1s)
-		.every(1s)
-	.cache("/b")
-`
-	//er := kapacitor.Result{}
-
-	testBatcher(t, "TestBatch_Fork", script)
-}
-
-func TestBatch_Union(t *testing.T) {
-
-	var script = `
-var cpu = batch
-			.query('''select mean("idle") from "tests"."default"."errors"''')
-			.period(10s)
-			.groupBy(time(5s))
-var mem = batch
-			.query('''select mean("free") from "tests"."default"."errors"''')
-			.period(10s)
-			.groupBy(time(5s))
-var disk = batch
-			.query('''select mean("iops") from "tests"."default"."errors"''')
-			.period(10s)
-			.groupBy(time(5s))
-
-cpu.union(mem, disk)
-	.httpOut("TestBatch_Union")
-`
-
-	//er := kapacitor.Result{}
-
-	testBatcher(t, "TestBatch_Union", script)
-}
-
 // Helper test function for batcher
 func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.ExecutingTask, <-chan error, *kapacitor.TaskMaster) {
 	assert := assert.New(t)

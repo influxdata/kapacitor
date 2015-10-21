@@ -63,7 +63,7 @@ rpname
 memory,type=free,host=serverA value=1000 0000000005
 dbname
 rpname
-cpu,cpu=total;,host=serverB value=92 0000000005
+cpu,cpu=total,host=serverB value=92 0000000005
 dbname
 rpname
 disk,device=sda,host=serverB value=39 0000000005

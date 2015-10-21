@@ -48,7 +48,7 @@ func newBatchNode() *BatchNode {
 // At least one dimension should be a `time()`
 // dimension, the rest are tag names.
 // tick:property
-func (b *BatchNode) GroupBy(d ...interface{}) Node {
+func (b *BatchNode) GroupBy(d ...interface{}) *BatchNode {
 	b.Dimensions = d
 	return b
 }

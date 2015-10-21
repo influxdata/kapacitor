@@ -4,7 +4,7 @@ Open source framework for processing, monitoring, and alerting on time series da
 # Getting Started
 
 This README gives you a high level overview of what Kapacitor is and what its like to use it. As well as some details of how it works.
-For a guide to get starting using Kapacitor see [this guide](http://influxdb.com/docs/kapacitor/v0.1/introduction/getting_started.html).
+To get starting using Kapacitor see [this guide](http://influxdb.com/docs/kapacitor/v0.1/introduction/getting_started.html).
 
 # Workflows
 
