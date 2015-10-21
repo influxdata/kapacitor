@@ -8,7 +8,7 @@ machine:
 dependencies:
   override:
     - source $HOME/.gvm/scripts/gvm; gvm use "go1.5.1"; mkdir -p "$GOPATH/src/$IMPORT_PATH"
-    - source $HOME/.gvm/scripts/gvm; gvm use "go1.5.1"; rsync -azC --delete ./ "$GOPATH/src/$IMPORT_PATH/"
+    - source $HOME/.gvm/scripts/gvm; gvm use "go1.5.1"; rsync -a --delete ./ "$GOPATH/src/$IMPORT_PATH/"
 
 test:
   override:
