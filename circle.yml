@@ -4,13 +4,13 @@ machine:
     - source $HOME/.gvm/scripts/gvm; gvm install $GO_VERSION --binary
   environment:
     IMPORT_PATH: "github.com/influxdb/kapacitor"
-    GO_VERSION: go1.5.1
+    GO_VERSION: "go1.5.1"
 
 dependencies:
   override:
-    - source $HOME/.gvm/scripts/gvm; gvm use $GO_VERSION; mkdir -p "$GOPATH/src/$IMPORT_PATH"
-    - source $HOME/.gvm/scripts/gvm; gvm use $GO_VERSION; rsync -azC --delete ./ "$GOPATH/src/$IMPORT_PATH/"
+    - source $HOME/.gvm/scripts/gvm; gvm use "$GO_VERSION"; mkdir -p "$GOPATH/src/$IMPORT_PATH"
+    - source $HOME/.gvm/scripts/gvm; gvm use "$GO_VERSION"; rsync -azC --delete ./ "$GOPATH/src/$IMPORT_PATH/"
 
 test:
   override:
-    - source $HOME/.gvm/scripts/gvm; gvm use $GO_VERSION; make -C "$GOPATH/src/$IMPORT_PATH/"
+    - source $HOME/.gvm/scripts/gvm; gvm use "$GO_VERSION"; make -C "$GOPATH/src/$IMPORT_PATH/"
