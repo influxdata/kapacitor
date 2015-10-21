@@ -52,6 +52,11 @@ func NewService(conf Config) *Service {
 }
 
 func (ts *Service) Open() error {
+	err := os.MkdirAll(path.Dir(ts.dbpath), 0755)
+	if err != nil {
+		return err
+	}
+
 	// Open db
 	db, err := bolt.Open(ts.dbpath, 0600, nil)
 	if err != nil {
@@ -103,11 +108,6 @@ func (ts *Service) Open() error {
 		},
 	}
 	err = ts.HTTPDService.AddRoutes(ts.routes)
-	if err != nil {
-		return err
-	}
-
-	err = os.MkdirAll(path.Dir(ts.dbpath), 0755)
 	if err != nil {
 		return err
 	}

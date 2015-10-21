@@ -254,7 +254,6 @@ func (s *Service) linkSubscriptions() error {
 func (s *Service) startListener(db, rp string, u url.URL) (net.Addr, error) {
 	switch u.Scheme {
 	case "udp":
-
 		c := udp.Config{}
 		c.Enabled = true
 		c.BindAddress = u.Host
@@ -268,6 +267,7 @@ func (s *Service) startListener(db, rp string, u url.URL) (net.Addr, error) {
 			return nil, err
 		}
 		s.services = append(s.services, service)
+		s.logger.Println("I! started UDP listener for", db, rp)
 		return service.Addr(), nil
 	}
 	return nil, fmt.Errorf("unsupported scheme %q", u.Scheme)

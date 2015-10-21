@@ -49,7 +49,7 @@ func NewTaskMaster() *TaskMaster {
 		forks:   make(map[string]*Edge),
 		batches: make(map[string]*Edge),
 		tasks:   make(map[string]*ExecutingTask),
-		logger:  wlog.New(os.Stderr, "[tm] ", log.LstdFlags),
+		logger:  wlog.New(os.Stderr, "[task_master] ", log.LstdFlags),
 	}
 }
 

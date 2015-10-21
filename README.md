@@ -1,6 +1,10 @@
 # Kapacitor
 Open source framework for processing, monitoring, and alerting on time series data
 
+# Getting Started
+
+This README gives you a high level overview of what Kapacitor is and what its like to use it. As well as some details of how it works.
+For a guide to get starting using Kapacitor see [this guide](http://influxdb.com/docs/kapacitor/v0.1/introduction/getting_started.html).
 
 # Workflows
 
@@ -25,7 +29,7 @@ There are two different ways to consume Kapacitor.
   * Select data from an existing InfluxDB host and save it:
 
       ```sh
-      $ kapacitor record query -addr http://address_of_influxdb -query 'select value from cpu_idle where time > start and time < stop'
+      $ kapacitor record query -type stream -query 'select value from cpu_idle where time > start and time < stop'
       b6d1de3f-b27f-4420-96ee-b0365d859d1c
       ```
   * Or record the live stream for a bit:
@@ -35,41 +39,41 @@ There are two different ways to consume Kapacitor.
       b6d1de3f-b27f-4420-96ee-b0365d859d1c
       ```
 
-4. Define a Kapacitor `streamer`. A `streamer` is an entity that defines what data should be processed and how.
+4. Define a Kapacitor `stream` task. A `stream` task is an entity that defines what data should be processed and how.
 
     ```sh
     $ kapacitor define \
-        -type streamer \
+        -type stream \
         -name alert_cpu_idle_any_host \
         -tick path/to/tick/script
     ```
 
-5. Replay the recording to test the `streamer`.
+5. Replay the recording to test the task.
 
     ```sh
     $ kapacitor replay \
-        b6d1de3f-b27f-4420-96ee-b0365d859d1c \
-        alert_cpu_idle_any_host
+        -id b6d1de3f-b27f-4420-96ee-b0365d859d1c \
+        -name alert_cpu_idle_any_host
     ```
 
-6. Edit the `streamer` and test until its working
+6. Edit the `stream` and test until its working
 
     ```sh
     $ kapacitor define \
-        -type streamer \
+        -type stream \
         -name alert_cpu_idle_any_host \
         -tick path/to/tick/script
     $ kapacitor replay \
-        b6d1de3f-b27f-4420-96ee-b0365d859d1c \
-        alert_cpu_idle_any_host
+        -id b6d1de3f-b27f-4420-96ee-b0365d859d1c \
+        -name alert_cpu_idle_any_host
     ```
 
-7. Enable or push the `streamer` once you are satisfied that it is working
+7. Enable or push the `stream` once you are satisfied that it is working
 
     ```sh
-    $ # enable the streamer locally
+    $ # enable the stream locally
     $ kapacitor enable alert_cpu_idle_any_host
-    $ # or push the tested streamer to a prod server
+    $ # or push the tested stream to a prod server
     $ kapacitor push -remote http://address_to_remote_kapacitor alert_cpu_idle_any_host
     ```
 
@@ -81,47 +85,47 @@ There are two different ways to consume Kapacitor.
     $ kapacitord
     ```
 
-1. Define a `batcher`. Like a `streamer` a `batcher` defines what data to process and how, only it operates on batches of data instead of streams.
+1. Define a `batch` task . Like a `stream` a `batch` task defines what data to process and how, only it operates on batches of data instead of streams.
 
     ```sh
     $ kapacitor define \
-        -type batcher \
+        -type batch \
         -name alert_mean_cpu_idle_logs_by_dc \
         -tick path/to/tick/script
     ```
-2. Save a batch of data for replaying using the definition in the `batcher`.
+2. Save a batch of data for replaying using the definition in the `batch`.
 
       ```sh
       $ kapacitor record batch alert_mean_cpu_idle_logs_by_dc
-      b6d1de3f-b27f-4420-96ee-b0365d859d1c
+      e6d1de3f-b27f-4420-96ee-b0365d859d1c
       ```
 
-3. Replay the batch of data to the `batcher`.
+3. Replay the batch of data to the `batch`.
 
     ```sh
     $ kapacitor replay \
-        b6d1de3f-b27f-4420-96ee-b0365d859d1c \
-        alert_mean_cpu_idle_logs_by_dc
+        -id e6d1de3f-b27f-4420-96ee-b0365d859d1c \
+        -name alert_mean_cpu_idle_logs_by_dc
     ```
 
-4. Iterate on the `batcher` definition until it works
+4. Iterate on the `batch` definition until it works
 
     ```sh
-    $ kapacitor define batcher \
-        -type batcher \
+    $ kapacitor define batch \
+        -type batch \
         -name alert_mean_cpu_idle_logs_by_dc \
         -tick path/to/tick/script
     $ kapacitor replay \
-        b6d1de3f-b27f-4420-96ee-b0365d859d1c \
-        alert_mean_cpu_idle_logs_by_dc
+        -id e6d1de3f-b27f-4420-96ee-b0365d859d1c \
+        -name alert_mean_cpu_idle_logs_by_dc
     ```
 
 5. Once it works, enable locally or push to remote
 
     ```sh
-    $ # enable the batcher locally
+    $ # enable the batch locally
     $ kapacitor enable alert_mean_cpu_idle_logs_by_dc
-    $ # or push the tested batcher to a prod server
+    $ # or push the tested batch to a prod server
     $ kapacitor push -remote http://address_to_remote_kapacitor alert_mean_cpu_idle_logs_by_dc
     ```
 
@@ -132,23 +136,23 @@ Kapacitor models the different data processing pipelines as a DAGs (Directed Acy
 
 Kapacitor allows you to define the DAG implicitly via operators and invocation chaining in an pipeline API. Similar to how [Flink](http://flink.apache.org) and [Spark](http://spark.apache.org) work.
 
-## DSL
+## TICK DSL
 
-Kapacitor uses a DSL to define the DAG so that you are not required to write and compile Go code.
+Kapacitor uses a DSL called [TICK](http://influxdb.com/docs/kapacitor/v0.1/tick/) to define the DAG so that you are not required to write and compile Go code.
 
-The following is an example DSL script that triggers an alert if idle cpu drops below 30%. In this DSL the variable `stream` represents the stream of values from InfluxDB.
+The following is an example TICK script that triggers an alert if idle cpu drops below 30%. In the language the variable `stream` represents the stream of values.
 
 ```
 stream
   .from("cpu_idle")
-  .where("cpu = cpu-total")
+    .where("cpu = 'cpu-total'")
   .window()
-  .period(10s)
-  .every(5s)
+    .period(10s)
+    .every(5s)
   .mapReduce(influxql.mean("value"))
   .alert()
-  .crit("value < 30")
-  .email("oncall@example.com")
+    .crit("value < 30")
+    .email("oncall@example.com")
 ```
 
 This script maintains a window of data for 10s and emits the current window every 5s.
@@ -162,13 +166,12 @@ The DAG that is constructed from the script looks like this:
     rankdir=LR;
     stream -> window;
     window -> mean[label="every 10s"];
-    mean -> where;
-    where-> alert [label="<30"];
+    mean -> alert [label="<30"];
   }
 )
 
 
-Based on how the DAG is constructed you can use the DSL to both construct the DAG and define what each node does via built-in functions.
+Based on how the DAG is constructed you can use the TICK language to both construct the DAG and define what each node does via built-in functions.
 Notice how the `map` function took an argument of another function `influxql.mean`, this is an example of a built-in function that can be used to process the data stream.
 It will also be possible to define your own functions via plugins to Kapacitor and reference them in the DSL.
 
@@ -177,66 +180,21 @@ By adding `groupBy` statements we can see how to easily partition our data set a
 
 ```
 stream
-  .window()
-  .period(10s)
-  .every(5s)
   .groupBy("dc")
+  .window()
+    .period(10s)
+    .every(5s)
   .mapReduce(influxql.mean("value"))
   .alert()
-  .crit("value < 30")
-  .email("oncall@example.com")
+    .crit("value < 30")
+    .email("oncall@example.com")
 ```
 
-
-The DAG that is constructed is similar, but with parallelism explicitly shown.:
-
-![Alt text](http://g.gravizo.com/g?
- digraph G {
-    rankdir=LR;
-    splines=line;
-    stream -> window;
-    window -> nyc [label="groupBy dc"];
-    window -> sfc [label="groupBy dc"];
-    window -> slc [label="groupBy dc"];
-    subgraph cluster_avg {
-        label="avg"
-        nyc;
-        sfc;
-        slc;
-    }
-    nyc -> where_0;
-    nyc -> where_1;
-    nyc -> where_2;
-    nyc -> where_3;
-    sfc -> where_0;
-    sfc -> where_1;
-    sfc -> where_2;
-    sfc -> where_3;
-    slc -> where_0;
-    slc -> where_1;
-    slc -> where_2;
-    slc -> where_3;
-    subgraph cluster_where {
-        label="where"
-        where_0 [label="0"];
-        where_1 [label="1"];
-        where_2 [label="2"];
-        where_3 [label="3"];
-    }
-    where_0 -> alert;
-    where_1 -> alert;
-    where_2 -> alert;
-    where_3 -> alert;
-  }
-)
-
-Parellelism is easily achieved and scaled at each layer.
-
-### The DSL and batch processing
+### TICK and batch processing
 
 Batch processors work similarly to the stream processing.
 
-Example DSL for batchers where we are running a query every minute and want to alert on cpu. The query: `select mean(value) from cpu_idle group by dc, time(1m)`.
+Example TICK script for batchs where we are running a query every minute and want to alert on cpu. The query: `select mean(value) from cpu_idle group by dc, time(1m)`.
 
 ```
 batch
@@ -251,9 +209,7 @@ batch
 
 The main difference is instead of a stream object we start with a batch object. Since batches are already windowed there is not need to define a new window.
 
-
-
-### What you can do with the DSL
+### What you can do with  TICK
 
 * Define the DAG for your data pipeline needs.
 * Window data. Windowing can be done by time or by number of data points and various other conditions, see [this](https://ci.apache.org/projects/flink/flink-docs-master/apis/streaming_guide.html#window-operators).
@@ -265,14 +221,14 @@ The main difference is instead of a stream object we start with a batch object. 
 * Emit data into an InfluxDB database.
 * Trigger events/notifications.
 
-### What you can NOT do with the DSL
-* Define custom functions in the DSL.
+### What you can NOT do with TICK
+* Define custom functions in the language.
     You can call out to custom functions defined via a plugins but you cannot define the function itself within the DSL.
     The DSL will be too slow to actually process any of the data but is used simply to define the data flow.
 
-### Example DSL scripts
+### Example TICK scripts
 
-Several examples demonstrating various features of the DSL follow:
+Several examples demonstrating various features of Kapacitor follow:
 
 #### Setup a dead man's switch
 
@@ -281,16 +237,18 @@ If your stream stops sending data this may be serious cause for concern. Setting
 ```
 //Create dead man's switch
 stream
+  .fork()
   .window()
-  .period(1m)
-  .every(1m)
+    .period(1m)
+    .every(1m)
   .mapReduce(influxql.count("value"))
   .alert()
-    .crit("true")
+    .crit("count = 0")
     .email("oncall@example.com")
 
 //Now define normal processing on the stream
 stream
+  .fork()
   ...
 ```
 
@@ -302,7 +260,7 @@ stream
   ...
   .alert()
     .crit("true")
-    .flapping(25.0, 50.0)
+    .flapping(0.2, 0.5)
     .email("oncall@example.com")
 ```
 
@@ -317,7 +275,7 @@ Using the following script we setup alerts for each host if `cpu` get too high o
 
 ```
 // Alert on redis stats
-var redis = stream
+var redis = stream.fork()
   .from("redis")
   .where("instantaneous_ops_per_sec < 10")
   .groupBy("host")
@@ -325,7 +283,7 @@ var redis = stream
     .crit("true")
     .email("oncall@example.com")
 
-var cpu = stream
+var cpu = stream.fork()
   .from("cpu")
   .where("idle < 20")
   .groupBy("host")
@@ -348,8 +306,8 @@ var cpu = stream
 redis.union(cpu)
   .groupBy("host")
   .window()
-  .period(10s)
-  .every(10s)
+    .period(10s)
+    .every(10s)
   .alert()
     .crit("true")
     .email("oncall@example.com")
@@ -367,6 +325,7 @@ Or if you wanted to group by service instead of host just change the `groupBy` f
 ```
 redis.union(cpu)
   .groupBy("service")
+  ...
 ```
 
 
@@ -378,7 +337,10 @@ Now lets say we want to perform some custom processing on a stream of data and t
 ```
 stream
     ... //Define custom processing pipeline
-    .influxdb_output("https://influxhost:8086", "db", "rp", "user", "pass")
+    .influxDBOut()
+        .database("mydb")
+        .retentionPolicy("myrp")
+        .measurement("m")
 ```
 
 Or you simply need to keep the data cached so you can request it when you need it.
@@ -386,10 +348,10 @@ Or you simply need to keep the data cached so you can request it when you need i
 ```
 stream
     ... //Define custom processing pipeline
-    .cache("custom_data_set")
+    .httpOut("custom_data_set")
 ```
 
-Now you can make a request to `http://kapacitorhost:9092/api/<streamer_name>/custom_data_set`.
+Now you can make a request to `http://kapacitorhost:9092/api/v1/<task_name>/custom_data_set`.
 The data returned will be the current value of the result.
 
 
@@ -407,7 +369,7 @@ stream
 	.window()
 		.period(1s)
 		.every(1s)
-	.map(fMap, "idle")
+	.map(fMap("idle"))
 	.reduce(fReduce)
 	.httpOut("http://example.com/path")
 ```

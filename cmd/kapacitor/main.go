@@ -39,7 +39,7 @@ Commands:
 	enable   enable and start running a task with live data.
 	disable  stop running a task.
 	renable  disable then enable a running task.
-	push     publish a task definition to another Kapacitor instance.
+	push     publish a task definition to another Kapacitor instance. Not implemented yet.
 	delete   delete a task or a recording.
 	list     list information about tasks or recordings.
 	help     get help for a command.
@@ -179,6 +179,7 @@ func doHelp(args []string) error {
 		}
 	} else {
 		helpUsage()
+		usage()
 	}
 	return nil
 }
