@@ -1,7 +1,8 @@
-checkout:
-  post:
-    - rm -rf ~/kapacitor
-    - git clone git@github.com:influxdb/kapacitor.git ~/kapacitor
+# The forces Circle CI to get a fresh clone of the repo.
+#checkout:
+#  post:
+#    - rm -rf ~/kapacitor
+#    - git clone git@github.com:influxdb/kapacitor.git ~/kapacitor
 
 machine:
   pre:
