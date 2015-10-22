@@ -34,4 +34,4 @@ deployment:
       - >
         source $HOME/.gvm/scripts/gvm;
         gvm use "go1.5.1";
-        make release;
+        make -C "$GOPATH/src/$IMPORT_PATH/" release;
