@@ -25,6 +25,7 @@ dist: prepare
 	gox -ldflags="$(LDFLAGS)" -osarch="$(OS_ARCH)" -output "$(DIST_DIR)/{{.Dir}}_$(VERSION)_{{.OS}}_{{.Arch}}" ./cmd/kapacitor ./cmd/kapacitord
 
 release: dist
+	# This command requires that GITHUB_TOKEN env be set with a token that can create releases.
 	ghr -u influxdb -r kapacitor $(SHORT_VERSION) dist/
 
 update:
