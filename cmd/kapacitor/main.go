@@ -270,7 +270,7 @@ func doRecord(args []string) error {
 var (
 	defineFlags = flag.NewFlagSet("define", flag.ExitOnError)
 	dname       = defineFlags.String("name", "", "the task name")
-	dtick       = defineFlags.String("tick", "", "path to the TICK script")
+	dtick       = defineFlags.String("tick", "", "path to the TICKscript")
 	dtype       = defineFlags.String("type", "", "the task type (stream|batch)")
 )
 
@@ -279,7 +279,7 @@ func defineUsage() {
 
 Create or update a task.
 
-A task is defined via a TICK script that defines the data processing pipeline of the task.
+A task is defined via a TICKscript that defines the data processing pipeline of the task.
 
 Options:
 `
