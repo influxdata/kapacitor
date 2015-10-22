@@ -59,6 +59,69 @@ func TestParseErrors(t *testing.T) {
 		test(tc)
 	}
 }
+func TestParseStrings(t *testing.T) {
+	assert := assert.New(t)
+
+	testCases := []struct {
+		script  string
+		literal string
+	}{
+		{
+			script:  `f('a')`,
+			literal: "a",
+		},
+		{
+			script:  `f("a")`,
+			literal: "a",
+		},
+		{
+			script:  `f('''a''')`,
+			literal: "a",
+		},
+		{
+			script:  `f('a\'')`,
+			literal: "a'",
+		},
+		{
+			script:  `f("a\"")`,
+			literal: "a\"",
+		},
+		{
+			script:  `f('''\'a''')`,
+			literal: `\'a`,
+		},
+	}
+
+	for _, tc := range testCases {
+		tree, err := parse(tc.script)
+		assert.Nil(err)
+
+		//Assert we have a list of one statement
+		l, ok := tree.Root.(*listNode)
+		if !assert.True(ok, "tree.Root is not a list node") {
+			t.FailNow()
+		}
+		if !assert.Equal(1, len(l.Nodes), "Did not get exactly one node in statement list") {
+			t.FailNow()
+		}
+
+		//Assert the first statement is a binary node with operator '='
+		f, ok := l.Nodes[0].(*funcNode)
+		if !assert.True(ok, "first statement is not a func node %q", l.Nodes[0]) {
+			t.FailNow()
+		}
+		if !assert.Equal(1, len(f.Args), "unexpected number of args got %d exp %d", len(f.Args), 1) {
+			t.FailNow()
+		}
+		str, ok := f.Args[0].(*stringNode)
+		if !assert.True(ok, "first argument is not a string node %q", f.Args[0]) {
+			t.FailNow()
+		}
+
+		assert.Equal(tc.literal, str.Literal)
+	}
+
+}
 
 func TestParseSingleStmt(t *testing.T) {
 	assert := assert.New(t)
