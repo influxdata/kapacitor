@@ -19,6 +19,9 @@ dependencies:
       source $HOME/.gvm/scripts/gvm;
       gvm use "go1.5.1";
       rsync -a --delete ./ "$GOPATH/src/$IMPORT_PATH/"
+# Temp blow source cache
+  post:
+    - rm -rf ~/kapacitor/
 
 test:
   override:
