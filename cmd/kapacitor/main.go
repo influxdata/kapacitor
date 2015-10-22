@@ -38,7 +38,7 @@ Commands:
 	replay   replay a recording to a task.
 	enable   enable and start running a task with live data.
 	disable  stop running a task.
-	renable  disable then enable a running task.
+	reload   reload a running task with an updated task definition.
 	push     publish a task definition to another Kapacitor instance. Not implemented yet.
 	delete   delete a task or a recording.
 	list     list information about tasks or recordings.
@@ -96,9 +96,9 @@ func main() {
 	case "disable":
 		commandArgs = args
 		commandF = doDisable
-	case "reenable":
+	case "reload":
 		commandArgs = args
-		commandF = doReenable
+		commandF = doReload
 	case "delete":
 		commandArgs = args
 		commandF = doDelete
@@ -161,8 +161,8 @@ func doHelp(args []string) error {
 			enableUsage()
 		case "disable":
 			disableUsage()
-		case "reenable":
-			reenableUsage()
+		case "reload":
+			reloadUsage()
 		case "delete":
 			deleteUsage()
 		case "list":
@@ -448,17 +448,17 @@ func doDisable(args []string) error {
 	return nil
 }
 
-// Reenable
+// Reload
 
-func reenableUsage() {
-	var u = `Usage: kapacitor reenable [task name...]
+func reloadUsage() {
+	var u = `Usage: kapacitor reload [task name...]
 
-	Disable then enable a task running.
+	Disable then enable a running task.
 `
 	fmt.Fprintln(os.Stderr, u)
 }
 
-func doReenable(args []string) error {
+func doReload(args []string) error {
 	err := doEnable(args)
 	if err != nil {
 		return err
