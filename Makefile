@@ -23,7 +23,6 @@ dist: prepare
 	rm -rf $(DIST_DIR)
 	mkdir $(DIST_DIR)
 	gox -ldflags="$(LDFLAGS)" -osarch="$(OS_ARCH)" -output "$(DIST_DIR)/{{.Dir}}_$(VERSION)_{{.OS}}_{{.Arch}}" ./cmd/kapacitor ./cmd/kapacitord
-	#gox -ldflags="$(LDFLAGS)" -osarch="$(OS_ARCH)" -output "$(DIST_DIR)/{{.Dir}}_$(VERSION)_{{.OS}}_{{.Arch}}" ./cmd/kapacitord
 
 release: dist
 	ghr -u influxdb -r kapacitor $(SHORT_VERSION) dist/
