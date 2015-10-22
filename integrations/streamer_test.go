@@ -18,7 +18,6 @@ import (
 	"github.com/influxdb/kapacitor/clock"
 	"github.com/influxdb/kapacitor/services/httpd"
 	"github.com/influxdb/kapacitor/wlog"
-	"github.com/stretchr/testify/assert"
 )
 
 var httpService *httpd.Service
@@ -36,7 +35,6 @@ func init() {
 }
 
 func TestStream_Window(t *testing.T) {
-	assert := assert.New(t)
 
 	var script = `
 stream
@@ -86,19 +84,23 @@ stream
 	// Move time forward
 	clock.Set(clock.Zero().Add(13 * time.Second))
 	// Wait till the replay has finished
-	assert.Nil(<-errCh)
+	if e := <-errCh; e != nil {
+		t.Error(e)
+	}
 	// Wait till the task is finished
-	assert.Nil(et.Err())
+	if e := et.Err(); e != nil {
+		t.Error(e)
+	}
 
 	// Get the result
 	output, err := et.GetOutput("TestStream_Window")
-	if !assert.Nil(err) {
-		t.FailNow()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	resp, err := http.Get(output.Endpoint())
-	if !assert.Nil(err) {
-		t.FailNow()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Assert we got the expected result
@@ -109,7 +111,6 @@ stream
 }
 
 func TestStream_SimpleMR(t *testing.T) {
-	assert := assert.New(t)
 
 	var script = `
 stream
@@ -141,19 +142,23 @@ stream
 	// Move time forward
 	clock.Set(clock.Zero().Add(15 * time.Second))
 	// Wait till the replay has finished
-	assert.Nil(<-errCh)
+	if e := <-errCh; e != nil {
+		t.Error(e)
+	}
 	// Wait till the task is finished
-	assert.Nil(et.Err())
+	if e := et.Err(); e != nil {
+		t.Error(e)
+	}
 
 	// Get the result
 	output, err := et.GetOutput("TestStream_SimpleMR")
-	if !assert.Nil(err) {
-		t.FailNow()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	resp, err := http.Get(output.Endpoint())
-	if !assert.Nil(err) {
-		t.FailNow()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Assert we got the expected result
@@ -164,7 +169,6 @@ stream
 }
 
 func TestStream_GroupBy(t *testing.T) {
-	assert := assert.New(t)
 
 	var script = `
 stream
@@ -215,19 +219,23 @@ stream
 	// Move time forward
 	clock.Set(clock.Zero().Add(13 * time.Second))
 	// Wait till the replay has finished
-	assert.Nil(<-errCh)
+	if e := <-errCh; e != nil {
+		t.Error(e)
+	}
 	// Wait till the task is finished
-	assert.Nil(et.Err())
+	if e := et.Err(); e != nil {
+		t.Error(e)
+	}
 
 	// Get the result
 	output, err := et.GetOutput("error_count")
-	if !assert.Nil(err) {
-		t.FailNow()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	resp, err := http.Get(output.Endpoint())
-	if !assert.Nil(err) {
-		t.FailNow()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Assert we got the expected result
@@ -238,7 +246,6 @@ stream
 }
 
 func TestStream_Join(t *testing.T) {
-	assert := assert.New(t)
 
 	var script = `
 var errorCounts = stream
@@ -310,19 +317,23 @@ errorCounts.join(viewCounts)
 	// Move time forward
 	clock.Set(clock.Zero().Add(13 * time.Second))
 	// Wait till the replay has finished
-	assert.Nil(<-errCh)
+	if e := <-errCh; e != nil {
+		t.Error(e)
+	}
 	// Wait till the task is finished
-	assert.Nil(et.Err())
+	if e := et.Err(); e != nil {
+		t.Error(e)
+	}
 
 	// Get the result
 	output, err := et.GetOutput("error_rate")
-	if !assert.Nil(err) {
-		t.FailNow()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	resp, err := http.Get(output.Endpoint())
-	if !assert.Nil(err) {
-		t.FailNow()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Assert we got the expected result
@@ -333,7 +344,6 @@ errorCounts.join(viewCounts)
 }
 
 func TestStream_Union(t *testing.T) {
-	assert := assert.New(t)
 
 	var script = `
 var cpu = stream
@@ -378,19 +388,23 @@ cpu.union(mem, disk)
 	// Move time forward
 	clock.Set(clock.Zero().Add(15 * time.Second))
 	// Wait till the replay has finished
-	assert.Nil(<-errCh)
+	if e := <-errCh; e != nil {
+		t.Error(e)
+	}
 	// Wait till the task is finished
-	assert.Nil(et.Err())
+	if e := et.Err(); e != nil {
+		t.Error(e)
+	}
 
 	// Get the result
 	output, err := et.GetOutput("all")
-	if !assert.Nil(err) {
-		t.FailNow()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	resp, err := http.Get(output.Endpoint())
-	if !assert.Nil(err) {
-		t.FailNow()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Assert we got the expected result
@@ -401,7 +415,6 @@ cpu.union(mem, disk)
 }
 
 func TestStream_Aggregations(t *testing.T) {
-	assert := assert.New(t)
 
 	type testCase struct {
 		Method string
@@ -650,8 +663,8 @@ stream
 	}
 
 	tmpl, err := template.New("script").Parse(scriptTmpl)
-	if !assert.Nil(err) {
-		t.FailNow()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	for _, tc := range testCases {
@@ -668,19 +681,23 @@ stream
 		// Move time forward
 		clock.Set(clock.Zero().Add(13 * time.Second))
 		// Wait till the replay has finished
-		assert.Nil(<-errCh)
+		if e := <-errCh; e != nil {
+			t.Error(e)
+		}
 		// Wait till the task is finished
-		assert.Nil(et.Err())
+		if e := et.Err(); e != nil {
+			t.Error(e)
+		}
 
 		// Get the result
 		output, err := et.GetOutput(tc.Method)
-		if !assert.Nil(err) {
-			t.FailNow()
+		if err != nil {
+			t.Fatal(err)
 		}
 
 		resp, err := http.Get(output.Endpoint())
-		if !assert.Nil(err) {
-			t.FailNow()
+		if err != nil {
+			t.Fatal(err)
 		}
 
 		// Assert we got the expected result
@@ -732,17 +749,18 @@ stream
 }
 
 func TestStream_Alert(t *testing.T) {
-	assert := assert.New(t)
 
 	requestCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ans, err := ioutil.ReadAll(r.Body)
-		if !assert.Nil(err) {
-			t.FailNow()
+		if err != nil {
+			t.Fatal(err)
 		}
 		requestCount++
 		expAns := `{"level":"CRITICAL","data":{"Series":[{"name":"cpu","columns":["time","count"],"values":[["1970-01-01T00:00:09Z",10]]}],"Err":null}}`
-		assert.Equal(expAns, string(ans))
+		if string(ans) != expAns {
+			t.Errorf("got %v exp %v", string(ans), expAns)
+		}
 	}))
 	defer ts.Close()
 
@@ -767,25 +785,32 @@ stream
 	// Move time forward
 	clock.Set(clock.Zero().Add(13 * time.Second))
 	// Wait till the replay has finished
-	assert.Nil(<-errCh)
+	if e := <-errCh; e != nil {
+		t.Error(e)
+	}
 	// Wait till the task is finished
-	assert.Nil(et.Err())
+	if e := et.Err(); e != nil {
+		t.Error(e)
+	}
 
-	assert.Equal(1, requestCount)
+	if requestCount != 1 {
+		t.Errorf("got %v exp %v", requestCount, 1)
+	}
 }
 
 func TestStream_AlertSigma(t *testing.T) {
-	assert := assert.New(t)
 
 	requestCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ans, err := ioutil.ReadAll(r.Body)
-		if !assert.Nil(err) {
-			t.FailNow()
+		if err != nil {
+			t.Fatal(err)
 		}
 		requestCount++
 		expAns := `{"level":"INFO","data":{"Series":[{"name":"cpu","tags":{"host":"serverA","type":"idle"},"columns":["time","sigma","value"],"values":[["1970-01-01T00:00:07Z",2.469916402324427,16]]}],"Err":null}}`
-		assert.Equal(expAns, string(ans))
+		if string(ans) != expAns {
+			t.Errorf("got %v exp %v", string(ans), expAns)
+		}
 	}))
 	defer ts.Close()
 
@@ -807,25 +832,32 @@ stream
 	// Move time forward
 	clock.Set(clock.Zero().Add(13 * time.Second))
 	// Wait till the replay has finished
-	assert.Nil(<-errCh)
+	if e := <-errCh; e != nil {
+		t.Error(e)
+	}
 	// Wait till the task is finished
-	assert.Nil(et.Err())
+	if e := et.Err(); e != nil {
+		t.Error(e)
+	}
 
-	assert.Equal(1, requestCount)
+	if requestCount != 1 {
+		t.Errorf("got %v exp %v", requestCount, 1)
+	}
 }
 
 func TestStream_AlertComplexWhere(t *testing.T) {
-	assert := assert.New(t)
 
 	requestCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ans, err := ioutil.ReadAll(r.Body)
-		if !assert.Nil(err) {
-			t.FailNow()
+		if err != nil {
+			t.Fatal(err)
 		}
 		requestCount++
 		expAns := `{"level":"CRITICAL","data":{"Series":[{"name":"cpu","tags":{"host":"serverA","type":"idle"},"columns":["time","value"],"values":[["1970-01-01T00:00:07Z",16]]}],"Err":null}}`
-		assert.Equal(expAns, string(ans))
+		if string(ans) != expAns {
+			t.Errorf("got %v exp %v", string(ans), expAns)
+		}
 	}))
 	defer ts.Close()
 
@@ -844,15 +876,20 @@ stream
 	// Move time forward
 	clock.Set(clock.Zero().Add(13 * time.Second))
 	// Wait till the replay has finished
-	assert.Nil(<-errCh)
+	if e := <-errCh; e != nil {
+		t.Error(e)
+	}
 	// Wait till the task is finished
-	assert.Nil(et.Err())
+	if e := et.Err(); e != nil {
+		t.Error(e)
+	}
 
-	assert.Equal(1, requestCount)
+	if requestCount != 1 {
+		t.Errorf("got %v exp %v", requestCount, 1)
+	}
 }
 
 func TestStream_AlertFlapping(t *testing.T) {
-	assert := assert.New(t)
 
 	requestCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -877,16 +914,21 @@ stream
 	// Move time forward
 	clock.Set(clock.Zero().Add(13 * time.Second))
 	// Wait till the replay has finished
-	assert.Nil(<-errCh)
+	if e := <-errCh; e != nil {
+		t.Error(e)
+	}
 	// Wait till the task is finished
-	assert.Nil(et.Err())
+	if e := et.Err(); e != nil {
+		t.Error(e)
+	}
 
 	// Flapping detection should drop the last alert.
-	assert.Equal(5, requestCount)
+	if requestCount != 5 {
+		t.Errorf("got %v exp %v", requestCount, 5)
+	}
 }
 
 func TestStream_InfluxDBOut(t *testing.T) {
-	assert := assert.New(t)
 
 	var script = `
 stream
@@ -934,28 +976,49 @@ stream
 	// Move time forward
 	clock.Set(clock.Zero().Add(15 * time.Second))
 	// Wait till the replay has finished
-	assert.Nil(<-errCh)
+	if e := <-errCh; e != nil {
+		t.Error(e)
+	}
 	// Wait till the task is finished
-	assert.Nil(et.Err())
+	if e := et.Err(); e != nil {
+		t.Error(e)
+	}
 	// Wait till we received a request
-	assert.Nil(<-done)
+	if e := <-done; e != nil {
+		t.Error(e)
+	}
 
-	assert.Equal("db", database)
-	assert.Equal("rp", rp)
-	assert.Equal("s", precision)
-	if assert.Equal(1, len(points)) {
+	if database != "db" {
+		t.Errorf("got %v exp %v", database, "db")
+	}
+	if rp != "rp" {
+		t.Errorf("got %v exp %v", rp, "rp")
+	}
+	if precision != "s" {
+		t.Errorf("got %v exp %v", precision, "s")
+	}
+	if 1 != len(points) {
+		t.Errorf("got %v exp %v", len(points), 1)
+	} else {
 		p := points[0]
-		assert.Equal("m", p.Name())
-		assert.Equal(imodels.Fields(map[string]interface{}{"count": 10.0}), p.Fields())
-		assert.Equal(imodels.Tags{}, p.Tags())
-		t := time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC)
-		assert.True(t.Equal(p.Time()), "times are not equal exp %s got %s", t, p.Time())
+		if p.Name() != "m" {
+			t.Errorf("got %v exp %v", p.Name(), "m")
+		}
+		if p.Fields()["count"] != 10.0 {
+			t.Errorf("got %v exp %v", p.Fields()["count"], 10.0)
+		}
+		if len(p.Tags()) != 0 {
+			t.Errorf("got %v exp %v", len(p.Tags()), 0)
+		}
+		tm := time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC)
+		if !tm.Equal(p.Time()) {
+			t.Errorf("times are not equal exp %s got %s", tm, p.Time())
+		}
 	}
 }
 
 // Helper test function for streamer
 func testStreamer(t *testing.T, name, script string) (clock.Setter, *kapacitor.ExecutingTask, <-chan error, *kapacitor.TaskMaster) {
-	assert := assert.New(t)
 	if testing.Verbose() {
 		wlog.LogLevel = wlog.DEBUG
 	} else {
@@ -964,18 +1027,18 @@ func testStreamer(t *testing.T, name, script string) (clock.Setter, *kapacitor.E
 
 	//Create the task
 	task, err := kapacitor.NewStreamer(name, script)
-	if !assert.Nil(err) {
-		t.FailNow()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Load test data
 	dir, err := os.Getwd()
-	if !assert.Nil(err) {
-		t.FailNow()
+	if err != nil {
+		t.Fatal(err)
 	}
 	data, err := os.Open(path.Join(dir, "data", name+".srpl"))
-	if !assert.Nil(err) {
-		t.FailNow()
+	if err != nil {
+		t.Fatal(err)
 	}
 	c := clock.New(time.Unix(0, 0))
 	r := kapacitor.NewReplay(c)
@@ -987,8 +1050,8 @@ func testStreamer(t *testing.T, name, script string) (clock.Setter, *kapacitor.E
 
 	//Start the task
 	et, err := tm.StartTask(task)
-	if !assert.Nil(err) {
-		t.FailNow()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Replay test data to executor

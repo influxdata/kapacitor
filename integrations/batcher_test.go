@@ -11,11 +11,9 @@ import (
 	"github.com/influxdb/kapacitor"
 	"github.com/influxdb/kapacitor/clock"
 	"github.com/influxdb/kapacitor/wlog"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestBatch_SimpleMR(t *testing.T) {
-	assert := assert.New(t)
 
 	var script = `
 batch
@@ -72,19 +70,23 @@ batch
 	// Move time forward
 	clock.Set(clock.Zero().Add(30 * time.Second))
 	// Wait till the replay has finished
-	assert.Nil(<-errCh)
+	if e := <-errCh; e != nil {
+		t.Error(e)
+	}
 	// Wait till the task is finished
-	assert.Nil(et.Err())
+	if e := et.Err(); e != nil {
+		t.Error(e)
+	}
 
 	// Get the result
 	output, err := et.GetOutput("TestBatch_SimpleMR")
-	if !assert.Nil(err) {
-		t.FailNow()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	resp, err := http.Get(output.Endpoint())
-	if !assert.Nil(err) {
-		t.FailNow()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Assert we got the expected result
@@ -96,7 +98,6 @@ batch
 
 // Helper test function for batcher
 func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.ExecutingTask, <-chan error, *kapacitor.TaskMaster) {
-	assert := assert.New(t)
 	if testing.Verbose() {
 		wlog.LogLevel = wlog.DEBUG
 	} else {
@@ -105,14 +106,14 @@ func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.Ex
 
 	// Create task
 	task, err := kapacitor.NewBatcher(name, script)
-	if !assert.Nil(err) {
-		t.FailNow()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Load test data
 	data, err := os.Open(path.Join("data", name+".brpl"))
-	if !assert.Nil(err) {
-		t.FailNow()
+	if err != nil {
+		t.Fatal(err)
 	}
 	c := clock.New(time.Unix(0, 0))
 	r := kapacitor.NewReplay(c)
@@ -124,8 +125,8 @@ func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.Ex
 
 	//Start the task
 	et, err := tm.StartTask(task)
-	if !assert.Nil(err) {
-		t.FailNow()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Replay test data to executor
