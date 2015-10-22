@@ -26,6 +26,7 @@ dist: prepare
 
 release: dist
 	# This command requires that GITHUB_TOKEN env be set with a token that can create releases.
+	echo $(SHORT_VERSION) $(COUNT) $(VERSION) $(COMMIT)
 	ghr -u influxdb -r kapacitor $(SHORT_VERSION) dist/
 
 update:
