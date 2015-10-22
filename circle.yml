@@ -1,3 +1,8 @@
+checkout:
+  override:
+    - rm -rf ~/kapacitor
+    - git clone git@github.com:influxdb/kapacitor.git ~/kapacitor
+
 machine:
   pre:
     - bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
