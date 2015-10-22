@@ -19,7 +19,7 @@ build: prepare
 	$(GO) build -o kapacitord -ldflags=$(LDFLAGS) \
 		./cmd/kapacitord/main.go
 
-dist: prepare test
+dist: prepare
 	rm -rf $(DIST_DIR)
 	mkdir $(DIST_DIR)
 	gox -ldflags="$(LDFLAGS)" -osarch="$(OS_ARCH)" -output "$(DIST_DIR)/{{.Dir}}_$(VERSION)_{{.OS}}_{{.Arch}}" ./cmd/kapacitor

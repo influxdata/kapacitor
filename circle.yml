@@ -35,4 +35,5 @@ deployment:
         source $HOME/.gvm/scripts/gvm;
         gvm use "go1.5.1";
         go get github.com/tcnksm/ghr;
+        make dist;
         ghr -t $GITHUB_TOKEN -u $CIRCLE_PROJECT_USERNAME -r $CIRCLE_PROJECT_REPONAME `git describe --tags` dist/
