@@ -105,7 +105,7 @@ func TestParseStrings(t *testing.T) {
 			t.FailNow()
 		}
 
-		//Assert the first statement is a binary node with operator '='
+		//Assert the first statement is a function with one stringNode argument
 		f, ok := l.Nodes[0].(*funcNode)
 		if !assert.True(ok, "first statement is not a func node %q", l.Nodes[0]) {
 			t.FailNow()
@@ -118,6 +118,7 @@ func TestParseStrings(t *testing.T) {
 			t.FailNow()
 		}
 
+		// Assert strings literals are equal
 		assert.Equal(tc.literal, str.Literal)
 	}
 
