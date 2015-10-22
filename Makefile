@@ -1,4 +1,6 @@
-VERSION := $(shell sh -c 'git describe --always --tags')
+SHORT_VERSION := $(shell sh -c 'git describe --always --tags --abbrev=0')
+COUNT := $(shell sh -c 'git rev-list $(SHORT_VERSION)..HEAD --count')
+VERSION=$(SHORT_VERSION).$(COUNT)
 BRANCH:= $(shell sh -c 'git rev-parse --abbrev-ref HEAD')
 COMMIT:= $(shell sh -c 'git rev-parse HEAD')
 ifndef GOBIN
