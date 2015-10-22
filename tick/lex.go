@@ -192,10 +192,10 @@ func lexToken(l *lexer) stateFn {
 		case unicode.IsLetter(r):
 			return lexIdent
 		case r == '"':
-			return lexString
+			return lexDoubleString
 		case r == '\'':
 			l.backup()
-			return lexTripleString
+			return lexSingleOrTripleString
 		case isSpace(r):
 			l.ignore()
 		case r == '/':
@@ -308,9 +308,13 @@ func lexNumberOrDuration(l *lexer) stateFn {
 	}
 }
 
-func lexString(l *lexer) stateFn {
+func lexDoubleString(l *lexer) stateFn {
 	for {
 		switch r := l.next(); r {
+		case '\\':
+			if l.peek() == '"' {
+				l.next()
+			}
 		case '"':
 			l.emit(tokenString)
 			return lexToken
@@ -320,25 +324,44 @@ func lexString(l *lexer) stateFn {
 	}
 }
 
-func lexTripleString(l *lexer) stateFn {
+func lexSingleOrTripleString(l *lexer) stateFn {
 	count := 0
+	total := 0
 	for {
 		switch r := l.next(); r {
 		case '\'':
 			count++
-			if count == 3 {
+			if count == 1 && l.peek() == '\'' {
+				// check for empty '' string
+				count++
+				l.next()
+				if l.peek() == '\'' {
+					count++
+					l.next()
+				} else {
+					l.emit(tokenString)
+					return lexToken
+				}
+			}
+			if (count == 1 && l.peek() != '\'') || count == 3 {
+				total = count
 				for {
-					switch r := l.next(); r {
-					case '\'':
+					switch r := l.next(); {
+					//escape single quotes if single quoted
+					case r == '\\' && count == 1:
+						if l.peek() == '\'' {
+							l.next()
+						}
+					case r == '\'':
 						count--
 						if count == 0 {
 							l.emit(tokenString)
 							return lexToken
 						}
-					case eof:
+					case r == eof:
 						return l.errorf("unterminated string")
 					default:
-						count = 3
+						count = total
 					}
 				}
 			}

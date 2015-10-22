@@ -215,6 +215,77 @@ func TestLexer(t *testing.T) {
 				token{tokenEOF, 7, ""},
 			},
 		},
+		//Strings
+		testCase{
+			in: `''`,
+			tokens: []token{
+				token{tokenString, 0, `''`},
+				token{tokenEOF, 2, ""},
+			},
+		},
+		testCase{
+			in: `""`,
+			tokens: []token{
+				token{tokenString, 0, `""`},
+				token{tokenEOF, 2, ""},
+			},
+		},
+		testCase{
+			in: `''''''`,
+			tokens: []token{
+				token{tokenString, 0, `''''''`},
+				token{tokenEOF, 6, ""},
+			},
+		},
+		testCase{
+			in: `'str'`,
+			tokens: []token{
+				token{tokenString, 0, `'str'`},
+				token{tokenEOF, 5, ""},
+			},
+		},
+		testCase{
+			in: `"str"`,
+			tokens: []token{
+				token{tokenString, 0, `"str"`},
+				token{tokenEOF, 5, ""},
+			},
+		},
+		testCase{
+			in: `'str\''`,
+			tokens: []token{
+				token{tokenString, 0, `'str\''`},
+				token{tokenEOF, 7, ""},
+			},
+		},
+		testCase{
+			in: `"str\""`,
+			tokens: []token{
+				token{tokenString, 0, `"str\""`},
+				token{tokenEOF, 7, ""},
+			},
+		},
+		testCase{
+			in: `'''s'tr'''`,
+			tokens: []token{
+				token{tokenString, 0, `'''s'tr'''`},
+				token{tokenEOF, 10, ""},
+			},
+		},
+		testCase{
+			in: `'''s\'tr'''`,
+			tokens: []token{
+				token{tokenString, 0, `'''s\'tr'''`},
+				token{tokenEOF, 11, ""},
+			},
+		},
+		testCase{
+			in: `'''str'''`,
+			tokens: []token{
+				token{tokenString, 0, `'''str'''`},
+				token{tokenEOF, 9, ""},
+			},
+		},
 		//Space
 		testCase{
 			in: " ",

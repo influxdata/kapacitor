@@ -1,6 +1,7 @@
 package tick
 
 import (
+	"bytes"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -363,11 +364,26 @@ type stringNode struct {
 
 func newString(p int, txt string) *stringNode {
 
+	// Remove leading and trailing quotes
 	var literal string
-	if txt[0] == '\'' {
+	if len(txt) >= 6 && txt[0:3] == "'''" {
 		literal = txt[3 : len(txt)-3]
 	} else {
 		literal = txt[1 : len(txt)-1]
+		quote := txt[0]
+		// Unescape quotes
+		var buf bytes.Buffer
+		buf.Grow(len(literal))
+		last := 0
+		for i := 0; i < len(literal)-1; i++ {
+			if literal[i] == '\\' && literal[i+1] == quote {
+				buf.Write([]byte(literal[last:i]))
+				i++
+				last = i
+			}
+		}
+		buf.Write([]byte(literal[last:]))
+		literal = buf.String()
 	}
 
 	return &stringNode{
