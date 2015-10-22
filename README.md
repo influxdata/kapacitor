@@ -45,7 +45,7 @@ There are two different ways to consume Kapacitor.
     $ kapacitor define \
         -type stream \
         -name alert_cpu_idle_any_host \
-        -tick path/to/tick/script
+        -tick path/to/tickscript
     ```
 
 5. Replay the recording to test the task.
@@ -62,7 +62,7 @@ There are two different ways to consume Kapacitor.
     $ kapacitor define \
         -type stream \
         -name alert_cpu_idle_any_host \
-        -tick path/to/tick/script
+        -tick path/to/tickscript
     $ kapacitor replay \
         -id b6d1de3f-b27f-4420-96ee-b0365d859d1c \
         -name alert_cpu_idle_any_host
@@ -91,7 +91,7 @@ There are two different ways to consume Kapacitor.
     $ kapacitor define \
         -type batch \
         -name alert_mean_cpu_idle_logs_by_dc \
-        -tick path/to/tick/script
+        -tick path/to/tickscript
     ```
 2. Save a batch of data for replaying using the definition in the `batch`.
 
@@ -114,7 +114,7 @@ There are two different ways to consume Kapacitor.
     $ kapacitor define batch \
         -type batch \
         -name alert_mean_cpu_idle_logs_by_dc \
-        -tick path/to/tick/script
+        -tick path/to/tickscript
     $ kapacitor replay \
         -id e6d1de3f-b27f-4420-96ee-b0365d859d1c \
         -name alert_mean_cpu_idle_logs_by_dc
@@ -136,11 +136,11 @@ Kapacitor models the different data processing pipelines as a DAGs (Directed Acy
 
 Kapacitor allows you to define the DAG implicitly via operators and invocation chaining in an pipeline API. Similar to how [Flink](http://flink.apache.org) and [Spark](http://spark.apache.org) work.
 
-## TICK DSL
+## TICKscript DSL
 
-Kapacitor uses a DSL called [TICK](http://influxdb.com/docs/kapacitor/v0.1/tick/) to define the DAG so that you are not required to write and compile Go code.
+Kapacitor uses a DSL called [TICKscript](http://influxdb.com/docs/kapacitor/v0.1/tick/) to define the DAG so that you are not required to write and compile Go code.
 
-The following is an example TICK script that triggers an alert if idle cpu drops below 30%. In the language the variable `stream` represents the stream of values.
+The following is an example TICKscript that triggers an alert if idle cpu drops below 30%. In the language the variable `stream` represents the stream of values.
 
 ```
 stream
@@ -171,7 +171,7 @@ The DAG that is constructed from the script looks like this:
 )
 
 
-Based on how the DAG is constructed you can use the TICK language to both construct the DAG and define what each node does via built-in functions.
+Based on how the DAG is constructed you can use the TICKscript language to both construct the DAG and define what each node does via built-in functions.
 Notice how the `map` function took an argument of another function `influxql.mean`, this is an example of a built-in function that can be used to process the data stream.
 It will also be possible to define your own functions via plugins to Kapacitor and reference them in the DSL.
 
@@ -190,11 +190,11 @@ stream
     .email("oncall@example.com")
 ```
 
-### TICK and batch processing
+### TICKscript and batch processing
 
 Batch processors work similarly to the stream processing.
 
-Example TICK script for batchs where we are running a query every minute and want to alert on cpu. The query: `select mean(value) from cpu_idle group by dc, time(1m)`.
+Example TICKscript for batchs where we are running a query every minute and want to alert on cpu. The query: `select mean(value) from cpu_idle group by dc, time(1m)`.
 
 ```
 batch
@@ -209,7 +209,7 @@ batch
 
 The main difference is instead of a stream object we start with a batch object. Since batches are already windowed there is not need to define a new window.
 
-### What you can do with  TICK
+### What you can do with TICKscript
 
 * Define the DAG for your data pipeline needs.
 * Window data. Windowing can be done by time or by number of data points and various other conditions, see [this](https://ci.apache.org/projects/flink/flink-docs-master/apis/streaming_guide.html#window-operators).
@@ -221,12 +221,12 @@ The main difference is instead of a stream object we start with a batch object. 
 * Emit data into an InfluxDB database.
 * Trigger events/notifications.
 
-### What you can NOT do with TICK
+### What you can NOT do with TICKscript
 * Define custom functions in the language.
     You can call out to custom functions defined via a plugins but you cannot define the function itself within the DSL.
     The DSL will be too slow to actually process any of the data but is used simply to define the data flow.
 
-### Example TICK scripts
+### Example TICKscripts
 
 Several examples demonstrating various features of Kapacitor follow:
 

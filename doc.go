@@ -8,7 +8,7 @@
 	The pipeline package provides an API for how nodes can be connected to form a pipeline.
 	The individual implementations of each node exist in this kapacitor package.
 	The reason for the separation is to keep the exported API from the pipeline package
-	clean as it is consumed via the TICK scripts (a DSL for Kapacitor).
+	clean as it is consumed via the TICKscripts (a DSL for Kapacitor).
 
 	Other Concepts:
 
@@ -22,7 +22,5 @@
 	Task Master -- Responsible for executing a task in a specific environment.
 
 	Replay -- Replays static datasets against tasks.
-
-
 */
 package kapacitor
