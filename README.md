@@ -1,4 +1,4 @@
-# Kapacitor
+# Kapacitor [![Circle CI](https://circleci.com/gh/influxdb/kapacitor/tree/master.svg?style=svg&circle-token=78c97422cf89526309e502a290c230e8a463229f)](https://circleci.com/gh/influxdb/kapacitor/tree/master)
 Open source framework for processing, monitoring, and alerting on time series data
 
 # Getting Started
