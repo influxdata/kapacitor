@@ -1,5 +1,5 @@
 checkout:
-  override:
+  post:
     - rm -rf ~/kapacitor
     - git clone git@github.com:influxdb/kapacitor.git ~/kapacitor
 
