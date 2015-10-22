@@ -14,9 +14,9 @@ OS_ARCH=linux/amd64 darwin/amd64 windows/amd64
 LDFLAGS=-X main.version=$(VERSION) -X main.branch=$(BRANCH) -X main.commit=$(COMMIT)
 
 build: prepare
-	$(GO) build -o kapacitor -ldflags=$(LDFLAGS) \
+	$(GO) build -o kapacitor -ldflags="$(LDFLAGS)" \
 		./cmd/kapacitor/main.go
-	$(GO) build -o kapacitord -ldflags=$(LDFLAGS) \
+	$(GO) build -o kapacitord -ldflags="$(LDFLAGS)" \
 		./cmd/kapacitord/main.go
 
 dist: prepare
