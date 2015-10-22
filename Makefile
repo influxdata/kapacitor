@@ -4,10 +4,12 @@ COMMIT:= $(shell sh -c 'git rev-parse HEAD')
 ifndef GOBIN
 	GOBIN = $(GOPATH)/bin
 endif
-#GO=$(GOBIN)/godep go
 GO=go
+DIST_DIR=./dist
+# List of Golang os/arch pairs
+OS_ARCH=linux/amd64 darwin/amd64 windows/amd64
 
-LDFLAGS="-X main.version=$(VERSION) -X main.branch=$(BRANCH) -X main.commit=$(COMMIT)"
+LDFLAGS=-X main.version=$(VERSION) -X main.branch=$(BRANCH) -X main.commit=$(COMMIT)
 
 build: prepare
 	$(GO) build -o kapacitor -ldflags=$(LDFLAGS) \
@@ -15,28 +17,15 @@ build: prepare
 	$(GO) build -o kapacitord -ldflags=$(LDFLAGS) \
 		./cmd/kapacitord/main.go
 
-build-linux-bins: prepare
-	GOARCH=amd64 GOOS=linux $(GO) build -o kapacitor_linux_amd64 \
-		-ldflags=$(LDFLAGS) \
-		./cmd/kapacitor/main.go
-	GOARCH=amd64 GOOS=linux $(GO) build -o kapacitord_linux_amd64 \
-		-ldflags=$(LDFLAGS) \
-		./cmd/kapacitord/main.go
-	GOARCH=386 GOOS=linux $(GO) build -o kapacitor_linux_386 \
-		-ldflags=$(LDFLAGS) \
-		./cmd/kapacitor/main.go
-	GOARCH=386 GOOS=linux $(GO) build -o kapacitord_linux_386 \
-		-ldflags=$(LDFLAGS) \
-		./cmd/kapacitord/main.go
-	GOARCH=arm GOOS=linux $(GO) build -o kapacitor_linux_arm \
-		-ldflags=$(LDFLAGS) \
-		./cmd/kapacitor/main.go
-	GOARCH=arm GOOS=linux $(GO) build -o kapacitord_linux_arm \
-		-ldflags=$(LDFLAGS) \
-		./cmd/kapacitord/main.go
+dist: prepare test
+	rm -rf $(DIST_DIR)
+	mkdir $(DIST_DIR)
+	gox -ldflags="$(LDFLAGS)" -osarch="$(OS_ARCH)" -output "$(DIST_DIR)/{{.Dir}}_$(VERSION)_{{.OS}}_{{.Arch}}" ./cmd/kapacitor
+	gox -ldflags="$(LDFLAGS)" -osarch="$(OS_ARCH)" -output "$(DIST_DIR)/{{.Dir}}_$(VERSION)_{{.OS}}_{{.Arch}}" ./cmd/kapacitord
 
 prepare:
-	go get -u -t ./...
+	$(GO) get -u -t ./...
+	$(GO) get github.com/mitchellh/gox
 
 test: prepare
 	$(GO) tool vet --composites=false ./
