@@ -43,7 +43,9 @@ type Config struct {
 
 // NewConfig returns an instance of Config with reasonable defaults.
 func NewConfig() *Config {
-	c := &Config{}
+	c := &Config{
+		Hostname: "localhost",
+	}
 	c.HTTP = httpd.NewConfig()
 	c.Replay = replay.NewConfig()
 	c.Task = task_store.NewConfig()
@@ -73,8 +75,6 @@ func NewDemoConfig() (*Config, error) {
 
 	c.Replay.Dir = filepath.Join(homeDir, ".kapacitor", c.Replay.Dir)
 	c.Task.Dir = filepath.Join(homeDir, ".kapacitor", c.Task.Dir)
-
-	c.Hostname, _ = os.Hostname()
 
 	return c, nil
 }
