@@ -1,0 +1,84 @@
+# The hostname of this node.
+# Must be resolvable by any configured InfluxDB hosts.
+hostname = "localhost"
+reporting-disabled = false
+
+[http]
+  # HTTP API Server for Kapacitor
+  # This server is always on,
+  # it servers both a write endpoint
+  # and all other Kapacitor API calls
+  bind-address = ":9092"
+  auth-enabled = false
+  log-enabled = true
+  write-tracing = false
+  pprof-enabled = false
+  https-enabled = false
+  https-certificate = "/etc/ssl/kapacitor.pem"
+
+[replay]
+  # Where to store replay files
+  dir = "/var/lib/kapacitor/replay"
+
+[task]
+  # Where to store the tasks database
+  dir = "/var/lib/kapacitor/tasks"
+
+[influxdb]
+  # Connect to an InfluxDB cluster
+  # Kapacitor can subscribe, query and write to this cluster.
+  # Not required.
+  enabled = true
+  urls = ["http://localhost:8086"]
+  username = ""
+  password = ""
+  timeout = 0
+  [influxdb.subscriptions]
+    # Set of databases and retention policies to subscribe to.
+    # If empty will subscribe to all.
+    #
+    # Format
+    # db_name = <list of retention policies>
+    #
+    # Example:
+    my_database = [ "default", "longterm" ]
+
+[smtp]
+  # Configure an SMTP email server
+  # Will use TLS and authentication if possible
+  # Only necessary for sending emails from alerts.
+  enabled = false
+  host = "localhost"
+  port = 25
+  username = ""
+  password = ""
+  # Close idle connections after timeout
+  idle-timeout = "30s"
+
+
+
+##################################
+# Input Methods, same as InfluxDB
+#
+
+[collectd]
+  enabled = false
+  bind-address = ":25826"
+  database = "collectd"
+  retention-policy = ""
+  batch-size = 1000
+  batch-pending = 5
+  batch-timeout = "10s"
+  typesdb = "/usr/share/collectd/types.db"
+
+[opentsdb]
+  enabled = false
+  bind-address = ":4242"
+  database = "opentsdb"
+  retention-policy = ""
+  consistency-level = "one"
+  tls-enabled = false
+  certificate = "/etc/ssl/influxdb.pem"
+  batch-size = 1000
+  batch-pending = 5
+  batch-timeout = "1s"

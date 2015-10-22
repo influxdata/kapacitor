@@ -6,21 +6,21 @@ import (
 )
 
 type Config struct {
+	Enabled       bool
 	URLs          []string            `toml:"urls"`
 	Username      string              `toml:"username"`
 	Password      string              `toml:"password"`
 	Timeout       time.Duration       `toml:"timeout"`
 	Subscriptions map[string][]string `toml:"subscriptions"`
-	Dir           string              `toml:"dir"`
 }
 
 func NewConfig() Config {
 	return Config{
+		Enabled:       true,
 		URLs:          []string{"http://localhost:8086"},
 		Username:      "",
 		Password:      "",
 		Subscriptions: make(map[string][]string),
-		Dir:           "subscriptions",
 	}
 }
 

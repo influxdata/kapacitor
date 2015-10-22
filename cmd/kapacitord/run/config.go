@@ -73,7 +73,6 @@ func NewDemoConfig() (*Config, error) {
 
 	c.Replay.Dir = filepath.Join(homeDir, ".kapacitor", c.Replay.Dir)
 	c.Task.Dir = filepath.Join(homeDir, ".kapacitor", c.Task.Dir)
-	c.InfluxDB.Dir = filepath.Join(homeDir, ".kapacitor", c.InfluxDB.Dir)
 
 	c.Hostname, _ = os.Hostname()
 
