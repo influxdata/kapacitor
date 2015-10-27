@@ -268,7 +268,7 @@ var viewCounts = stream
 
 errorCounts.join(viewCounts)
 		.as('errors', 'views')
-		.rename('error_view')
+		.streamName('error_view')
 		.eval(lambda: "errors.sum" / "views.sum")
 			.as('error_percent')
 		.httpOut('error_rate')

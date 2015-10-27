@@ -1,6 +1,9 @@
 package kapacitor
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/influxdb/kapacitor/models"
 	"github.com/influxdb/kapacitor/pipeline"
 )
@@ -12,6 +15,17 @@ type JoinNode struct {
 
 // Create a new  JoinNode, which takes pairs from parent streams combines them into a single point.
 func newJoinNode(et *ExecutingTask, n *pipeline.JoinNode) (*JoinNode, error) {
+	for _, name := range n.Names {
+		if len(name) == 0 {
+			return nil, fmt.Errorf("must provide a prefix name for the join node, see .as() property method")
+		}
+		if strings.ContainsRune(name, '.') {
+			return nil, fmt.Errorf("cannot use name %s as field prefix, it contains a '.' character", name)
+		}
+	}
+	if n.Names[0] == n.Names[1] {
+		return nil, fmt.Errorf("cannot use the same prefix name see .as() property method")
+	}
 	jn := &JoinNode{
 		j:    n,
 		node: node{Node: n, et: et},
@@ -22,7 +36,7 @@ func newJoinNode(et *ExecutingTask, n *pipeline.JoinNode) (*JoinNode, error) {
 
 func (j *JoinNode) runJoin() error {
 
-	rename := j.j.Rename
+	rename := j.j.StreamName
 	if rename == "" {
 		rename = j.parents[1].Name()
 	}
