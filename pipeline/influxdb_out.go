@@ -4,14 +4,15 @@ package pipeline
 //
 // Example:
 //    stream
-//        .apply(expr("error_percent", "errors / total"))
+//        .eval(lambda: "errors" / "total")
+//            .as('error_percent')
 //        // Write the transformed data to InfluxDB
 //        .influxDBOut()
-//            .database("mydb")
-//            .retentionPolicy("myrp")
-//            .measurement("errors")
-//            .tag("kapacitor", "true")
-//            .tag("version", "0.1")
+//            .database('mydb')
+//            .retentionPolicy('myrp')
+//            .measurement('errors')
+//            .tag('kapacitor', 'true')
+//            .tag('version', '0.1')
 //
 type InfluxDBOutNode struct {
 	node

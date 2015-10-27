@@ -28,8 +28,6 @@ func TestnumberNode(t *testing.T) {
 			if !assert.NotNil(n) {
 				t.FailNow()
 			}
-			assert.Equal(nodeNumber, n.nodeType)
-			assert.Equal(tc.Text, n.Text)
 			assert.Equal(tc.Pos, int(n.pos))
 			assert.Equal(tc.IsInt, n.IsInt)
 			assert.Equal(tc.IsFloat, n.IsFloat)
@@ -84,12 +82,12 @@ func TestnumberNode(t *testing.T) {
 	}
 }
 
-func TestNewbinaryNode(t *testing.T) {
+func TestNewBinaryNode(t *testing.T) {
 	assert := assert.New(t)
 
 	type testCase struct {
-		Left     node
-		Right    node
+		Left     Node
+		Right    Node
 		Operator token
 	}
 
@@ -98,11 +96,10 @@ func TestNewbinaryNode(t *testing.T) {
 		if !assert.NotNil(n) {
 			t.FailNow()
 		}
-		assert.Equal(nodeBinary, n.nodeType)
 		assert.Equal(tc.Operator.pos, int(n.pos))
-		assert.Equal(tc.Left, n.Left)
-		assert.Equal(tc.Right, n.Right)
-		assert.Equal(tc.Operator, n.Operator)
+		assert.Equal(tc.Left, n.Right)
+		assert.Equal(tc.Right, n.Left)
+		assert.Equal(tc.Operator.typ, n.Operator)
 	}
 
 	cases := []testCase{
@@ -111,7 +108,7 @@ func TestNewbinaryNode(t *testing.T) {
 			Right: nil,
 			Operator: token{
 				pos: 0,
-				typ: tokenAsgn,
+				typ: tokenEqual,
 				val: "=",
 			},
 		},

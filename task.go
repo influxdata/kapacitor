@@ -50,7 +50,6 @@ func NewTask(name, script string, tt TaskType) (*Task, error) {
 
 	scope := tick.NewScope()
 	scope.Set("influxql", newInfluxQL())
-	scope.Set("expr", ExprFunc)
 	scope.Set("time", func(d time.Duration) time.Duration { return d })
 
 	p, err := pipeline.CreatePipeline(script, srcEdge, scope)
@@ -256,7 +255,7 @@ func (et *ExecutingTask) createNode(p pipeline.Node) (Node, error) {
 		return newUnionNode(et, t)
 	case *pipeline.JoinNode:
 		return newJoinNode(et, t)
-	case *pipeline.ApplyNode:
+	case *pipeline.EvalNode:
 		return newApplyNode(et, t)
 	case *pipeline.WhereNode:
 		return newWhereNode(et, t)

@@ -4,18 +4,18 @@ import (
 	"fmt"
 
 	"github.com/influxdb/influxdb/influxql"
-	"github.com/influxdb/kapacitor/expr"
 	"github.com/influxdb/kapacitor/models"
 	"github.com/influxdb/kapacitor/pipeline"
+	"github.com/influxdb/kapacitor/tick"
 )
 
 type StreamNode struct {
 	node
-	s         *pipeline.StreamNode
-	predicate *expr.StatefulExpr
-	db        string
-	rp        string
-	name      string
+	s          *pipeline.StreamNode
+	expression *tick.StatefulExpr
+	db         string
+	rp         string
+	name       string
 }
 
 // Create a new  StreamNode which filters data from a source.
@@ -32,13 +32,8 @@ func newStreamNode(et *ExecutingTask, n *pipeline.StreamNode) (*StreamNode, erro
 			return nil, fmt.Errorf("error parsing FROM clause %q %v", sn.s.From, err)
 		}
 	}
-	// Parse predicate
-	if n.Predicate != "" {
-		tree, err := expr.ParseForType(n.Predicate, expr.ReturnBool)
-		if err != nil {
-			return nil, err
-		}
-		sn.predicate = &expr.StatefulExpr{Tree: tree, Funcs: expr.Functions()}
+	if n.Expression != nil {
+		sn.expression = tick.NewStatefulExpr(n.Expression)
 	}
 	return sn, nil
 }
@@ -83,8 +78,8 @@ func (s *StreamNode) matches(p models.Point) bool {
 	if s.name != "" && p.Name != s.name {
 		return false
 	}
-	if s.predicate != nil {
-		if pass, err := EvalPredicate(s.predicate, p.Fields, p.Tags); err != nil {
+	if s.expression != nil {
+		if pass, err := EvalPredicate(s.expression, p.Fields, p.Tags); err != nil {
 			s.logger.Println("E! error while evaluating WHERE expression:", err)
 			return false
 		} else {

@@ -17,17 +17,144 @@ const (
 	tokenError tokenType = iota
 	tokenEOF
 	tokenVar
-	tokenIdent
 	tokenAsgn
 	tokenDot
+	tokenIdent
+	tokenReference
+	tokenLambda
+	tokenNumber
+	tokenString
+	tokenDuration
 	tokenLParen
 	tokenRParen
 	tokenComma
-	tokenNumber
-	tokenDuration
-	tokenString
-	tokenSColon
+	tokenNot
+	tokenTrue
+	tokenFalse
+	tokenRegex
+
+	// begin operator tokens
+	begin_tok_operator
+
+	//begin mathematical operators
+	begin_tok_operator_math
+
+	tokenPlus
+	tokenMinus
+	tokenMult
+	tokenDiv
+
+	//end mathematical operators
+	end_tok_operator_math
+
+	// begin comparison operators
+	begin_tok_operator_comp
+
+	tokenAnd
+	tokenOr
+	tokenEqual
+	tokenNotEqual
+	tokenLess
+	tokenGreater
+	tokenLessEqual
+	tokenGreaterEqual
+	tokenRegexEqual
+	tokenRegexNotEqual
+
+	//end comparison operators
+	end_tok_operator_comp
+
+	//end operator tokens
+	end_tok_operator
 )
+
+var operatorStr = [...]string{
+	tokenPlus:          "+",
+	tokenMinus:         "-",
+	tokenMult:          "*",
+	tokenDiv:           "/",
+	tokenEqual:         "==",
+	tokenNotEqual:      "!=",
+	tokenLess:          "<",
+	tokenGreater:       ">",
+	tokenLessEqual:     "<=",
+	tokenGreaterEqual:  ">=",
+	tokenRegexEqual:    "=~",
+	tokenRegexNotEqual: "!~",
+	tokenAnd:           "AND",
+	tokenOr:            "OR",
+}
+
+var strToOperator map[string]tokenType
+
+var keywords = map[string]tokenType{
+	"AND":    tokenAnd,
+	"OR":     tokenOr,
+	"TRUE":   tokenTrue,
+	"FALSE":  tokenFalse,
+	"var":    tokenVar,
+	"lambda": tokenLambda,
+}
+
+func init() {
+	strToOperator = make(map[string]tokenType, len(operatorStr))
+	for t, s := range operatorStr {
+		strToOperator[s] = tokenType(t)
+	}
+}
+
+//String representation of an tokenType
+func (t tokenType) String() string {
+	switch {
+	case t == tokenError:
+		return "ERR"
+	case t == tokenEOF:
+		return "EOF"
+	case t == tokenVar:
+		return "var"
+	case t == tokenIdent:
+		return "identifier"
+	case t == tokenReference:
+		return "reference"
+	case t == tokenDuration:
+		return "duration"
+	case t == tokenNumber:
+		return "number"
+	case t == tokenString:
+		return "string"
+	case t == tokenDot:
+		return "."
+	case t == tokenAsgn:
+		return "="
+	case t == tokenLParen:
+		return "("
+	case t == tokenRParen:
+		return ")"
+	case t == tokenComma:
+		return ","
+	case t == tokenNot:
+		return "!"
+	case t == tokenTrue:
+		return "TRUE"
+	case t == tokenFalse:
+		return "FALSE"
+	case isOperator(t):
+		return operatorStr[t]
+	}
+	return fmt.Sprintf("%d", t)
+}
+
+func isOperator(typ tokenType) bool {
+	return typ > begin_tok_operator && typ < end_tok_operator
+}
+
+func isMathOperator(typ tokenType) bool {
+	return typ > begin_tok_operator_math && typ < end_tok_operator_math
+}
+
+func isCompOperator(typ tokenType) bool {
+	return typ > begin_tok_operator_comp && typ < end_tok_operator_comp
+}
 
 // token represents a token or text string returned from the scanner.
 type token struct {
@@ -43,51 +170,6 @@ type lexer struct {
 	pos    int        // current position in the input.
 	width  int        // width of last rune read from input.
 	tokens chan token // channel of scanned tokens.
-}
-
-//String representation of an tokenType
-func (t tokenType) String() string {
-	switch t {
-	case tokenError:
-		return "Error"
-	case tokenEOF:
-		return "EOF"
-	case tokenVar:
-		return "var"
-	case tokenIdent:
-		return "identifier"
-	case tokenAsgn:
-		return "="
-	case tokenDot:
-		return "."
-	case tokenLParen:
-		return "("
-	case tokenRParen:
-		return ")"
-	case tokenComma:
-		return ","
-	case tokenNumber:
-		return "number"
-	case tokenString:
-		return "string"
-	case tokenSColon:
-		return ";"
-	}
-	return "unknow type"
-}
-
-//String representation of an token
-func (t token) String() string {
-	switch t.typ {
-	case tokenError:
-		return t.val
-	case tokenEOF:
-		return "EOF"
-	}
-	if len(t.val) > 10 {
-		return fmt.Sprintf("%.10q...", t.val)
-	}
-	return fmt.Sprintf("%q", t.val)
 }
 
 func lex(input string) *lexer {
@@ -182,24 +264,36 @@ func (l *lexer) expect(r rune) bool {
 func lexToken(l *lexer) stateFn {
 	for {
 		switch r := l.next(); {
-		case isSymbol(r):
-			return lexSymbol
+		case isOperatorChar(r):
+			l.backup()
+			return lexOperator
 		case unicode.IsDigit(r), r == '-':
 			l.backup()
 			return lexNumberOrDuration
-		case r == 'v':
-			return lexVarOrIdent
 		case unicode.IsLetter(r):
-			return lexIdent
+			return lexIdentOrKeyword
 		case r == '"':
-			return lexDoubleString
+			return lexReference
 		case r == '\'':
 			l.backup()
 			return lexSingleOrTripleString
+		case r == '/':
+			l.backup()
+			return lexRegex
 		case isSpace(r):
 			l.ignore()
-		case r == '/':
-			return lexComment
+		case r == '(':
+			l.emit(tokenLParen)
+			return lexToken
+		case r == ')':
+			l.emit(tokenRParen)
+			return lexToken
+		case r == '.':
+			l.emit(tokenDot)
+			return lexToken
+		case r == ',':
+			l.emit(tokenComma)
+			return lexToken
 		case r == eof:
 			l.emit(tokenEOF)
 			return nil
@@ -210,48 +304,69 @@ func lexToken(l *lexer) stateFn {
 	}
 }
 
-const symbols = "=().;,"
+const operatorChars = "+-*/><!="
 
-func isSymbol(r rune) bool {
-	return strings.IndexRune(symbols, r) != -1
+func isOperatorChar(r rune) bool {
+	return strings.IndexRune(operatorChars, r) != -1
 }
 
-func lexSymbol(l *lexer) stateFn {
-	s := l.current()
-	switch s {
-	case "=":
-		l.emit(tokenAsgn)
-	case "(":
-		l.emit(tokenLParen)
-	case ")":
-		l.emit(tokenRParen)
-	case ".":
-		l.emit(tokenDot)
-	case ";":
-		l.emit(tokenSColon)
-	case ",":
-		l.emit(tokenComma)
+func lexOperator(l *lexer) stateFn {
+	for {
+		switch l.next() {
+		case '/':
+			if l.peek() == '/' {
+				l.backup()
+				return lexComment
+			}
+			op := strToOperator[l.current()]
+			l.emit(op)
+			return lexToken
+		case '+', '-', '*':
+			op := strToOperator[l.current()]
+			l.emit(op)
+			return lexToken
+		case '!':
+			if l.peek() == '=' || l.peek() == '~' {
+				l.next()
+			}
+			op := strToOperator[l.current()]
+			l.emit(op)
+			return lexToken
+		case '>', '<':
+			if l.peek() == '=' {
+				l.next()
+			}
+			op := strToOperator[l.current()]
+			l.emit(op)
+			return lexToken
+		case '=':
+			if l.peek() == '~' || l.peek() == '=' {
+				l.next()
+				op := strToOperator[l.current()]
+				l.emit(op)
+			} else {
+				l.emit(tokenAsgn)
+			}
+			return lexToken
+		}
 	}
-	return lexToken
 }
 
-func lexVarOrIdent(l *lexer) stateFn {
-	if l.expect('a') && l.expect('r') && isSpace(l.peek()) {
-		l.emit(tokenVar)
-		return lexToken
-	}
-
-	return lexIdent
-}
-
-func lexIdent(l *lexer) stateFn {
+func lexIdentOrKeyword(l *lexer) stateFn {
 	for {
 		switch r := l.next(); {
 		case isValidIdent(r):
 			//absorb
 		default:
 			l.backup()
-			l.emit(tokenIdent)
+			if t := keywords[l.current()]; t > 0 {
+				if t == tokenLambda && l.next() != ':' {
+					return l.errorf("missing ':' on lambda keyword")
+				}
+				l.emit(t)
+			} else {
+				l.emit(tokenIdent)
+			}
 			return lexToken
 		}
 	}
@@ -259,7 +374,7 @@ func lexIdent(l *lexer) stateFn {
 
 // isValidIdent reports whether r is either a letter or a digit
 func isValidIdent(r rune) bool {
-	return unicode.IsDigit(r) || unicode.IsLetter(r)
+	return unicode.IsDigit(r) || unicode.IsLetter(r) || r == '_'
 }
 
 // isSpace reports whether r is a space character.
@@ -275,13 +390,6 @@ func isDurUnit(r rune) bool {
 
 func lexNumberOrDuration(l *lexer) stateFn {
 	foundDecimal := false
-
-	neg := false
-	if l.peek() == '-' {
-		l.next() //absorb sign
-		neg = true
-	}
-
 	for {
 		switch r := l.next(); {
 		case r == '.':
@@ -292,9 +400,6 @@ func lexNumberOrDuration(l *lexer) stateFn {
 		case unicode.IsDigit(r):
 			//absorb
 		case isDurUnit(r):
-			if neg {
-				return l.errorf("cannot have negative duration")
-			}
 			if r == 'm' && l.peek() == 's' {
 				l.next()
 			}
@@ -308,7 +413,7 @@ func lexNumberOrDuration(l *lexer) stateFn {
 	}
 }
 
-func lexDoubleString(l *lexer) stateFn {
+func lexReference(l *lexer) stateFn {
 	for {
 		switch r := l.next(); r {
 		case '\\':
@@ -316,10 +421,10 @@ func lexDoubleString(l *lexer) stateFn {
 				l.next()
 			}
 		case '"':
-			l.emit(tokenString)
+			l.emit(tokenReference)
 			return lexToken
 		case eof:
-			return l.errorf("unterminated string")
+			return l.errorf("unterminated field reference")
 		}
 	}
 }
@@ -367,6 +472,25 @@ func lexSingleOrTripleString(l *lexer) stateFn {
 			}
 		default:
 			return l.errorf("unterminated string")
+		}
+	}
+}
+
+func lexRegex(l *lexer) stateFn {
+	if n := l.next(); n != '/' {
+		return l.errorf(`unexpected "%c" expected "/"`, n)
+	}
+	for {
+		switch r := l.next(); {
+		case r == '\\':
+			if l.peek() == '/' {
+				l.next()
+			}
+		case r == '/':
+			l.emit(tokenRegex)
+			return lexToken
+		default:
+			//absorb
 		}
 	}
 }

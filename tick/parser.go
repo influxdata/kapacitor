@@ -3,12 +3,13 @@ package tick
 import (
 	"fmt"
 	"runtime"
+	"strings"
 )
 
 // tree is the representation of a parsed dsl script.
 type tree struct {
-	Text string // text parsed to create the expression.
-	Root node   // top-level root of the tree
+	Text string //the text being parsed
+	Root Node   // top-level root of the tree
 
 	// Parsing only; cleared after parse.
 	lex       *lexer
@@ -19,20 +20,15 @@ type tree struct {
 // parse returns a Tree, created by parsing the DSL described in the
 // argument string. If an error is encountered, parsing stops and an empty Tree
 // is returned with the error.
-func parse(text string) (t *tree, err error) {
-	t = &tree{}
-	t.Text = text
-	err = t.Parse(text)
-	return
+func parse(text string) (Node, error) {
+	t := &tree{}
+	err := t.Parse(text)
+	return t.Root, err
 }
 
-//Evaluate the tree on a given Scope
-func (t *tree) Eval(s *Scope) error {
-	_, err := t.Root.Return(s)
-	return err
-}
-
-// Parsing
+// --------------------
+// Parsing methods
+//
 
 // next returns the next token.
 func (t *tree) next() token {
@@ -82,7 +78,7 @@ func (t *tree) expect(expected tokenType) token {
 }
 
 // unexpected complains about the token and terminates processing.
-func (t *tree) unexpected(tok token, expected tokenType) {
+func (t *tree) unexpected(tok token, expected ...tokenType) {
 	const bufSize = 10
 	start := tok.pos - bufSize
 	if start < 0 {
@@ -93,7 +89,16 @@ func (t *tree) unexpected(tok token, expected tokenType) {
 		stop = len(t.Text)
 	}
 	line, char := t.lex.lineNumber(tok.pos)
-	t.errorf("unexpected %s line %d char %d in %q. expected: %q", tok, line, char, t.Text[start:stop], expected)
+	expectedStrs := make([]string, len(expected))
+	for i := range expected {
+		expectedStrs[i] = fmt.Sprintf("%q", expected[i])
+	}
+	expectedStr := strings.Join(expectedStrs, ",")
+	tokStr := tok.typ.String()
+	if tok.typ == tokenError {
+		tokStr = tok.val
+	}
+	t.errorf("unexpected %s line %d char %d in \"%s\". expected: %s", tokStr, line, char, t.Text[start:stop], expectedStr)
 }
 
 // recover is the handler that turns panics into returns from the top level of Parse.
@@ -130,154 +135,211 @@ func (t *tree) Parse(text string) (err error) {
 // parse is the top-level parser for an expression.
 // It runs to EOF.
 func (t *tree) parse() {
-	t.Root = t.prog()
+	t.Root = t.program()
 	t.expect(tokenEOF)
-	if err := t.Root.Check(); err != nil {
-		t.error(err)
-	}
+	//if err := t.Root.Check(); err != nil {
+	//	t.error(err)
+	//}
 }
 
-/* Grammar
-
-Prog -> Stmt { Stmt ...}
-Stmt -> Decl | Expr
-Decl -> Vr '=' Expr
-Expr -> Ident { Chain } | Fnc { Chain }
-Chain -> '.' Fnc { Chain } | '.' Ident { Chain}
-Vr -> 'var' Ident
-Fnc -> Ident '( Args ')'
-Args -> {Param {',' Param}}
-Param -> Expr | Dur | Num | Str
-Dur -> duration
-Num -> number
-Str => string_literal
-*/
-
 //parse a complete program
-func (t *tree) prog() node {
+func (t *tree) program() Node {
 	l := newList(t.peek().pos)
 	for {
 		switch t.peek().typ {
 		case tokenEOF:
 			return l
 		default:
-			s := t.stmt()
+			s := t.statement()
 			l.Add(s)
 		}
 	}
 }
 
 //parse a statement
-func (t *tree) stmt() node {
-	var n node
+func (t *tree) statement() Node {
+	var n Node
 	if t.peek().typ == tokenVar {
-		n = t.decl()
+		n = t.declaration()
 	} else {
-		n = t.expr()
+		n = t.expression()
 	}
 	return n
 }
 
 //parse a declaration statement
-func (t *tree) decl() node {
+func (t *tree) declaration() Node {
 	v := t.vr()
 	op := t.expect(tokenAsgn)
-	b := t.expr()
+	b := t.expression()
 	return newBinary(op, v, b)
 }
 
-//parse a 'var' epression
-func (t *tree) vr() node {
+//parse a 'var ident' expression
+func (t *tree) vr() Node {
 	t.expect(tokenVar)
 	ident := t.expect(tokenIdent)
 	return newIdent(ident.pos, ident.val)
 }
 
 //parse an expression
-func (t *tree) expr() node {
-	var term node
-	//We reverse the tree under expr
-	t.next()
-	if t.peek().typ == tokenLParen {
-		t.backup()
-		term = t.fnc()
-	} else {
-		t.backup()
-		term = t.ident()
-	}
-	if i := t.peek(); i.typ == tokenDot {
-		top, bottom := t.chain()
-		top.Right = term
-		return bottom
-	}
-	return term
+func (t *tree) expression() Node {
+	term := t.funcOrIdent()
+	return t.chain(term)
 }
 
-//parse an function or reference invocation chain
-func (t *tree) chain() (*binaryNode, *binaryNode) {
-	op := t.next()
-	var n node
+//parse a function or identifier invocation chain
+// '.' operator is left-associative
+func (t *tree) chain(lhs Node) Node {
+	for look := t.peek().typ; look == tokenDot; look = t.peek().typ {
+		op := t.next()
+		rhs := t.funcOrIdent()
+		lhs = newBinary(op, lhs, rhs)
+	}
+	return lhs
+}
+
+func (t *tree) funcOrIdent() (n Node) {
 	t.next()
 	if t.peek().typ == tokenLParen {
 		t.backup()
-		n = t.fnc()
+		n = t.function()
 	} else {
 		t.backup()
-		n = t.ident()
+		n = t.identifier()
 	}
-	b := newBinary(op, n, nil)
-	if i := t.peek(); i.typ == tokenDot {
-		o, bottom := t.chain()
-		o.Right = b
-		return b, bottom
-	}
-	return b, b
+	return
 }
 
 //parse an identifier
-func (t *tree) ident() node {
+func (t *tree) identifier() Node {
 	ident := t.expect(tokenIdent)
 	n := newIdent(ident.pos, ident.val)
 	return n
 }
 
 //parse a function call
-func (t *tree) fnc() node {
+func (t *tree) function() Node {
 	ident := t.expect(tokenIdent)
 	t.expect(tokenLParen)
-	args := t.args()
+	args := t.parameters()
 	t.expect(tokenRParen)
 
 	n := newFunc(ident.pos, ident.val, args)
 	return n
 }
 
-//parse an argument list
-func (t *tree) args() []node {
-	args := make([]node, 0)
+//parse a parameter list
+func (t *tree) parameters() (args []Node) {
 	for {
-		typ := t.peek().typ
-		switch typ {
-		case tokenIdent:
-			args = append(args, t.expr())
-		case tokenDuration:
-			args = append(args, t.dur())
-		case tokenNumber:
-			args = append(args, t.num())
-		case tokenString:
-			args = append(args, t.str())
+		if t.peek().typ == tokenRParen {
+			return
 		}
+		args = append(args, t.parameter())
 		if t.next().typ != tokenComma {
 			t.backup()
-			break
+			return
 		}
 	}
+}
 
-	return args
+func (t *tree) parameter() (n Node) {
+	switch t.peek().typ {
+	case tokenIdent:
+		n = t.expression()
+	case tokenLambda:
+		lambda := t.next()
+		l := t.lambdaExpr()
+		n = newLambda(lambda.pos, l)
+	default:
+		n = t.primary()
+	}
+	return
+}
+
+// parse the lambda expression.
+func (t *tree) lambdaExpr() Node {
+	return t.precedence(t.primary(), 0)
+}
+
+// Operator Precedence parsing
+var precedence = [...]int{
+	tokenOr:           0,
+	tokenAnd:          1,
+	tokenEqual:        2,
+	tokenNotEqual:     2,
+	tokenGreater:      3,
+	tokenGreaterEqual: 3,
+	tokenLess:         3,
+	tokenLessEqual:    3,
+	tokenPlus:         4,
+	tokenMinus:        4,
+	tokenMult:         5,
+	tokenDiv:          5,
+}
+
+// parse the expression considering operator precedence.
+// https://en.wikipedia.org/wiki/Operator-precedence_parser#Pseudo-code
+func (t *tree) precedence(lhs Node, minP int) Node {
+	look := t.peek()
+	for isOperator(look.typ) && precedence[look.typ] >= minP {
+		op := t.next()
+		rhs := t.primary()
+		look = t.peek()
+		// right-associative
+		for isOperator(look.typ) && precedence[look.typ] >= precedence[op.typ] {
+			rhs = t.precedence(rhs, precedence[look.typ])
+			look = t.peek()
+		}
+		lhs = newBinary(op, lhs, rhs)
+	}
+	return lhs
+}
+
+// parse a primary expression
+func (t *tree) primary() Node {
+	switch tok := t.peek(); {
+	case tok.typ == tokenLParen:
+		t.next()
+		n := t.lambdaExpr()
+		t.expect(tokenRParen)
+		return n
+	case tok.typ == tokenNumber:
+		return t.number()
+	case tok.typ == tokenString:
+		return t.string()
+	case tok.typ == tokenTrue, tok.typ == tokenFalse:
+		return t.boolean()
+	case tok.typ == tokenDuration:
+		return t.duration()
+	case tok.typ == tokenRegex:
+		return t.regex()
+	case tok.typ == tokenReference:
+		return t.reference()
+	case tok.typ == tokenIdent:
+		return t.function()
+	case tok.typ == tokenMinus, tok.typ == tokenNot:
+		return newUnary(tok, t.primary())
+	default:
+		t.unexpected(
+			tok,
+			tokenNumber,
+			tokenString,
+			tokenDuration,
+			tokenIdent,
+			tokenTrue,
+			tokenFalse,
+			tokenEqual,
+			tokenLParen,
+			tokenMinus,
+			tokenNot,
+		)
+		return nil
+	}
 }
 
 //parse a duration literal
-func (t *tree) dur() node {
+func (t *tree) duration() Node {
 	token := t.expect(tokenDuration)
 	num, err := newDur(token.pos, token.val)
 	if err != nil {
@@ -287,7 +349,7 @@ func (t *tree) dur() node {
 }
 
 //parse a number literal
-func (t *tree) num() node {
+func (t *tree) number() Node {
 	token := t.expect(tokenNumber)
 	num, err := newNumber(token.pos, token.val)
 	if err != nil {
@@ -297,8 +359,34 @@ func (t *tree) num() node {
 }
 
 //parse a string literal
-func (t *tree) str() node {
+func (t *tree) string() Node {
 	token := t.expect(tokenString)
 	s := newString(token.pos, token.val)
 	return s
+}
+
+//parse a regex literal
+func (t *tree) regex() Node {
+	token := t.expect(tokenRegex)
+	r, err := newRegex(token.pos, token.val)
+	if err != nil {
+		t.error(err)
+	}
+	return r
+}
+
+//parse a reference literal
+func (t *tree) reference() Node {
+	token := t.expect(tokenReference)
+	r := newReference(token.pos, token.val)
+	return r
+}
+
+func (t *tree) boolean() Node {
+	n := t.next()
+	num, err := newBool(n.pos, n.val)
+	if err != nil {
+		t.error(err)
+	}
+	return num
 }

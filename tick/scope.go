@@ -1,5 +1,9 @@
 package tick
 
+import (
+	"fmt"
+)
+
 // Contains a set of variables references and their values.
 type Scope struct {
 	variables map[string]interface{}
@@ -17,22 +21,10 @@ func (s *Scope) Set(name string, value interface{}) {
 	s.variables[name] = value
 }
 
-// Get returns the value of 'name' or nil if it does not exist.
-func (s *Scope) Get(name string) interface{} {
+// Get returns the value of 'name'.
+func (s *Scope) Get(name string) (interface{}, error) {
 	if v, ok := s.variables[name]; ok {
-		return v
+		return v, nil
 	}
-	return nil
-}
-
-// Evaluate a given DSL script for a given scope.
-func Evaluate(script string, scope *Scope) (err error) {
-
-	ast, err := parse(script)
-	if err != nil {
-		return err
-	}
-
-	err = ast.Eval(scope)
-	return
+	return nil, fmt.Errorf("name %s is undefined", name)
 }

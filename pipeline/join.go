@@ -6,13 +6,14 @@ package pipeline
 // Aliases are used to prefix all fields from the respective nodes.
 //
 // Example:
-//    var errors = stream.fork().from("errors")
-//    var requests = stream.fork().from("requests")
+//    var errors = stream.fork().from('errors')
+//    var requests = stream.fork().from('requests')
 //    // Join the errors and requests stream
 //    errors.join(requests)
-//            .as("errors", "requests")
-//            .rename("error_rate")
-//        .apply(expr("rate", "errors.value / requests.value"))
+//            .as('errors', 'requests')
+//            .rename('error_rate')
+//        .eval(lambda: "errors.value" / "requests.value"))
+//           .as('rate')
 //        ...
 //
 // In the above example the `errors` and `requests` streams are joined

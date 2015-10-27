@@ -3,6 +3,8 @@ package pipeline
 import (
 	"bytes"
 	"fmt"
+
+	"github.com/influxdb/kapacitor/tick"
 )
 
 // The type of data that travels along an edge connecting two nodes in a Pipeline.
@@ -179,7 +181,7 @@ func newBasicChainNode(desc string, wants, provides EdgeType) chainnode {
 }
 
 // Create a new node that filters the data stream by a given expression.
-func (n *chainnode) Where(expression string) *WhereNode {
+func (n *chainnode) Where(expression tick.Node) *WhereNode {
 	w := newWhereNode(n.provides, expression)
 	n.linkChild(w)
 	return w
@@ -224,12 +226,12 @@ func (n *chainnode) Join(other Node) *JoinNode {
 	return j
 }
 
-// Create an apply node that will apply the given transformation function to each data point.
+// Create an eval node that will evaluate the given transformation function to each data point.
 // See the built-in function `expr` in order to write in-line custom transformation functions.
-func (n *chainnode) Apply(transform interface{}) *ApplyNode {
-	a := newApplyNode(n.provides, transform)
-	n.linkChild(a)
-	return a
+func (n *chainnode) Eval(transform tick.Node) *EvalNode {
+	e := newEvalNode(n.provides, transform)
+	n.linkChild(e)
+	return e
 }
 
 // Group the data by a set of tags.

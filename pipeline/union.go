@@ -6,12 +6,12 @@ package pipeline
 // without modification.
 //
 // Example:
-//    var logins = stream.fork().from("logins")
-//    var logouts = stream.fork().from("logouts")
-//    var frontpage = stream.fork().from("frontpage")
+//    var logins = stream.fork().from('logins')
+//    var logouts = stream.fork().from('logouts')
+//    var frontpage = stream.fork().from('frontpage')
 //    // Union all user actions into a single stream
 //    logins.union(logouts, frontpage)
-//            .rename("user_actions")
+//            .rename('user_actions')
 //        ...
 //
 type UnionNode struct {

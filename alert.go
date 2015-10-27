@@ -10,9 +10,9 @@ import (
 
 	"github.com/influxdb/influxdb/influxql"
 	imodels "github.com/influxdb/influxdb/models"
-	"github.com/influxdb/kapacitor/expr"
 	"github.com/influxdb/kapacitor/models"
 	"github.com/influxdb/kapacitor/pipeline"
+	"github.com/influxdb/kapacitor/tick"
 )
 
 // Number of previous states to remember when computing flapping percentage.
@@ -64,7 +64,7 @@ type AlertNode struct {
 	a        *pipeline.AlertNode
 	endpoint string
 	handlers []AlertHandler
-	levels   []*expr.StatefulExpr
+	levels   []*tick.StatefulExpr
 	history  []AlertLevel
 	hIdx     int
 	flapping bool
@@ -92,27 +92,15 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode) (an *AlertNode, err 
 		an.handlers = append(an.handlers, an.handleExec)
 	}
 	// Parse level expressions
-	an.levels = make([]*expr.StatefulExpr, CritAlert+1)
-	if n.Info != "" {
-		tree, err := expr.ParseForType(n.Info, expr.ReturnBool)
-		if err != nil {
-			return nil, err
-		}
-		an.levels[InfoAlert] = &expr.StatefulExpr{Tree: tree, Funcs: expr.Functions()}
+	an.levels = make([]*tick.StatefulExpr, CritAlert+1)
+	if n.Info != nil {
+		an.levels[InfoAlert] = tick.NewStatefulExpr(n.Info)
 	}
-	if n.Warn != "" {
-		tree, err := expr.ParseForType(n.Warn, expr.ReturnBool)
-		if err != nil {
-			return nil, err
-		}
-		an.levels[WarnAlert] = &expr.StatefulExpr{Tree: tree, Funcs: expr.Functions()}
+	if n.Warn != nil {
+		an.levels[WarnAlert] = tick.NewStatefulExpr(n.Warn)
 	}
-	if n.Crit != "" {
-		tree, err := expr.ParseForType(n.Crit, expr.ReturnBool)
-		if err != nil {
-			return nil, err
-		}
-		an.levels[CritAlert] = &expr.StatefulExpr{Tree: tree, Funcs: expr.Functions()}
+	if n.Crit != nil {
+		an.levels[CritAlert] = tick.NewStatefulExpr(n.Crit)
 	}
 	// Configure flapping
 	if n.UseFlapping {

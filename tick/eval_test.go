@@ -1,7 +1,6 @@
 package tick_test
 
 import (
-	"log"
 	"testing"
 	"time"
 
@@ -69,13 +68,13 @@ func TestEvaluate(t *testing.T) {
 	//Run a test that evaluates the DSL against the above structures.
 	script := `
 var s2 = a.structB()
-			.field1("f1")
+			.field1('f1')
 			.field2(42)
 
 s2.field3(15m)
 
 s2.structC()
-	.options("c", 21.5, 7h)
+	.options('c', 21.5, 7h)
 	.aggFunc(influxql.agg.sum)
 `
 
@@ -88,26 +87,27 @@ s2.structC()
 	scope.Set("influxql", i)
 
 	err := tick.Evaluate(script, scope)
-	if !assert.Nil(err) {
-		log.Println(err)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	s2, ok := scope.Get("s2").(*structB)
+	s2I, err := scope.Get("s2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s2 := s2I.(*structB)
 	assert.NotNil(s2)
-	if assert.True(ok, "s2 is not a *structB %q", s2) {
-		assert.Equal("f1", s2.Field1)
-		assert.Equal(int64(42), s2.Field2)
-		assert.Equal(time.Minute*15, s2.Field3)
+	assert.Equal("f1", s2.Field1)
+	assert.Equal(int64(42), s2.Field2)
+	assert.Equal(time.Minute*15, s2.Field3)
 
-		s3 := s2.c
-		if assert.NotNil(s3) {
-			assert.Equal("c", s3.field1)
-			assert.Equal(21.5, s3.field2)
-			assert.Equal(time.Hour*7, s3.field3)
-			if assert.NotNil(s3.AggFunc) {
-				assert.Equal([]float64{10.0}, s3.AggFunc([]float64{5, 5}))
-			}
+	s3 := s2.c
+	if assert.NotNil(s3) {
+		assert.Equal("c", s3.field1)
+		assert.Equal(21.5, s3.field2)
+		assert.Equal(time.Hour*7, s3.field3)
+		if assert.NotNil(s3.AggFunc) {
+			assert.Equal([]float64{10.0}, s3.AggFunc([]float64{5, 5}))
 		}
 	}
-
 }

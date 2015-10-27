@@ -16,7 +16,7 @@ import (
 //         WHERE "host" = 'serverA'
 //     ''')
 //     .period(10s)
-//     .groupBy(time(2s), "cpu")
+//     .groupBy(time(2s), 'cpu')
 //     ...
 //
 // In the above example InfluxDB is queried every 10 seconds and the results

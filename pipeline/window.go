@@ -13,7 +13,7 @@ import (
 //        .window()
 //            .period(10m)
 //            .every(5m)
-//        .httpOut("recent")
+//        .httpOut('recent')
 //
 // The above windowing example emits a window to the pipeline every `5 minutes`
 // and the window contains the last `10 minutes` worth of data.
