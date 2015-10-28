@@ -8,6 +8,8 @@ import (
 // streamed to Kapacitor via any of its inputs.
 // The stream node allows you to select which portion of the stream
 // you want to process.
+// The `stream` variable in stream tasks is an instance of
+// a StreamNode.
 //
 // Example:
 //    stream

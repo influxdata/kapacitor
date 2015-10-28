@@ -44,6 +44,7 @@ Commands:
 	push     publish a task definition to another Kapacitor instance. Not implemented yet.
 	delete   delete a task or a recording.
 	list     list information about tasks or recordings.
+	show     display detailed information about a task.
 	help     get help for a command.
 	level    sets the logging level on the kapacitord server.
 	version  displays the Kapacitor version info.
@@ -107,6 +108,9 @@ func main() {
 	case "list":
 		commandArgs = args
 		commandF = doList
+	case "show":
+		commandArgs = args
+		commandF = doShow
 	case "level":
 		commandArgs = args
 		commandF = doLevel
@@ -169,6 +173,8 @@ func doHelp(args []string) error {
 			deleteUsage()
 		case "list":
 			listUsage()
+		case "show":
+			showUsage()
 		case "level":
 			levelUsage()
 		case "help":
@@ -192,8 +198,8 @@ var (
 	rname       = recordFlags.String("name", "", "the name of a task. If recording a batch or stream")
 
 	rstart = recordFlags.String("start", "", "the start time for the set of queries when recording a batch.")
+	rstop  = recordFlags.String("stop", "", "the stop time for the set of queries when recording a batch. (default now)")
 	rpast  = recordFlags.String("past", "", "set start time via 'now - past'.")
-	rnum   = recordFlags.Int("num", 0, "the number of periods to query, if zero will query as many times as the schedule defines until the queries reach the present time. Applies only to recording a batch.")
 
 	rquery = recordFlags.String("query", "", "the query to record. If recording a query.")
 	rtype  = recordFlags.String("type", "", "the type of the recording to save (stream|batch). If recording a query.")
@@ -219,9 +225,10 @@ Examples:
 		This records the live data stream for 1 minute using the databases and retention policies
 		from the named task.
 	
-	$ kapacitor record batch -name cpu_idle -start 2015-09-01T00:00:00Z -num 10
+	$ kapacitor record batch -name cpu_idle -start 2015-09-01T00:00:00Z -stop 2015-09-02T00:00:00Z
 		
-		This records the result of the query defined in task 'cpu_idle' and runs the query 10 times
+		This records the result of the query defined in task 'cpu_idle' and runs the query as many times
+		as many times as defined by the schedule until the queries reaches the stop time.
 		starting at time 'start' and incrementing by the schedule defined in the task.
 
 	$ kapacitor record batch -name cpu_idle -past 10h
@@ -254,8 +261,8 @@ func doRecord(args []string) error {
 		}
 		v.Add("name", *rname)
 		v.Add("start", *rstart)
+		v.Add("stop", *rstop)
 		v.Add("past", *rpast)
-		v.Add("num", strconv.FormatInt(int64(*rnum), 10))
 	case "query":
 		v.Add("qtype", *rtype)
 	default:
@@ -436,12 +443,17 @@ var (
 	rtname      = replayFlags.String("name", "", "the task name")
 	rid         = replayFlags.String("id", "", "the recording ID")
 	rfast       = replayFlags.Bool("fast", false, "If set, replay the data as fast as possible. If not set, replay the data in real time.")
+	rrec        = replayFlags.Bool("rec-time", false, "If set, use the times saved in the recording instead of present times.")
 )
 
 func replayUsage() {
 	var u = `Usage: kapacitor replay [options]
 
 Replay a recording to a task. Waits until the task finishes.
+
+The times of the data points will either be relative to now or the exact times
+in the recording if the '-rec-time' flag is set. In either case the relative times
+between the data points remains the same.
 
 See 'kapacitor help record' for how to create a replay.
 See 'kapacitor help define' for how to create a task.
@@ -457,6 +469,7 @@ func doReplay(args []string) error {
 	v := url.Values{}
 	v.Add("name", *rtname)
 	v.Add("id", *rid)
+	v.Add("rec-time", strconv.FormatBool(*rrec))
 	if *rfast {
 		v.Add("clock", "fast")
 	}
@@ -574,6 +587,57 @@ func doReload(args []string) error {
 	}
 
 	return doEnable(args)
+}
+
+// Show
+
+func showUsage() {
+	var u = `Usage: kapacitor show [task name]
+
+	Show details about a specific task.
+`
+	fmt.Fprintln(os.Stderr, u)
+}
+
+func doShow(args []string) error {
+
+	if len(args) != 1 {
+		fmt.Fprintln(os.Stderr, "Must specify one task name")
+		showUsage()
+		os.Exit(2)
+	}
+
+	v := url.Values{}
+	v.Add("task", args[0])
+	r, err := http.Get(*kapacitordURL + "/task?" + v.Encode())
+	if err != nil {
+		return err
+	}
+	defer r.Body.Close()
+	// Decode valid response
+	type resp struct {
+		Error      string
+		Name       string
+		Type       kapacitor.TaskType
+		DBRPs      []kapacitor.DBRP
+		TICKscript string
+		Dot        string
+		Enabled    bool
+	}
+	d := json.NewDecoder(r.Body)
+	rp := resp{}
+	d.Decode(&rp)
+	if rp.Error != "" {
+		return errors.New(rp.Error)
+	}
+
+	fmt.Println("Name:", rp.Name)
+	fmt.Println("Type:", rp.Type)
+	fmt.Println("Enabled:", rp.Enabled)
+	fmt.Println("Databases Retention Policies:", rp.DBRPs)
+	fmt.Printf("TICKscript:\n%s\n\n", rp.TICKscript)
+	fmt.Printf("DOT:\n%s\n", rp.Dot)
+	return nil
 }
 
 // List

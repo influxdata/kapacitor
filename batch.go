@@ -1,16 +1,90 @@
 package kapacitor
 
 import (
-	"encoding/json"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/gorhill/cronexpr"
 	"github.com/influxdb/influxdb/client"
+	"github.com/influxdb/influxdb/influxql"
 	"github.com/influxdb/kapacitor/models"
 	"github.com/influxdb/kapacitor/pipeline"
 )
+
+type SourceBatchNode struct {
+	node
+	s   *pipeline.SourceBatchNode
+	idx int
+}
+
+func newSourceBatchNode(et *ExecutingTask, n *pipeline.SourceBatchNode) (*SourceBatchNode, error) {
+	sn := &SourceBatchNode{
+		node: node{Node: n, et: et},
+		s:    n,
+	}
+	return sn, nil
+}
+
+func (s *SourceBatchNode) linkChild(c Node) error {
+
+	// add child
+	if s.Provides() != c.Wants() {
+		return fmt.Errorf("cannot add child mismatched edges: %s -> %s", s.Provides(), c.Wants())
+	}
+	s.children = append(s.children, c)
+
+	// add parent
+	c.addParent(s)
+
+	return nil
+}
+
+func (s *SourceBatchNode) addParentEdge(in *Edge) {
+	// Pass edges down to children
+	s.children[s.idx].addParentEdge(in)
+	s.idx++
+}
+
+func (s *SourceBatchNode) start() {
+}
+
+func (s *SourceBatchNode) Err() error {
+	return nil
+}
+
+// Return list of databases and retention policies
+// the batcher will query.
+func (s *SourceBatchNode) DBRPs() ([]DBRP, error) {
+	var dbrps []DBRP
+	for _, b := range s.children {
+		d, err := b.(*BatchNode).DBRPs()
+		if err != nil {
+			return nil, err
+		}
+		dbrps = append(dbrps, d...)
+	}
+	return dbrps, nil
+}
+
+func (s *SourceBatchNode) Count() int {
+	return len(s.children)
+}
+
+func (s *SourceBatchNode) Start(collectors []*Edge) {
+	for i, b := range s.children {
+		b.(*BatchNode).Start(collectors[i])
+	}
+}
+
+func (s *SourceBatchNode) Queries(start, stop time.Time) [][]string {
+	queries := make([][]string, len(s.children))
+	for i, b := range s.children {
+		queries[i] = b.(*BatchNode).Queries(start, stop)
+	}
+	return queries
+}
 
 type BatchNode struct {
 	node
@@ -28,14 +102,49 @@ func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode) (*BatchNode, error) 
 	bn.node.runF = bn.runBatch
 	bn.node.stopF = bn.stopBatch
 
-	q, err := NewQuery(n.Query)
+	// Create query
+	q, err := NewQuery(n.QueryStr)
 	if err != nil {
 		return nil, err
 	}
 	bn.query = q
+	// Add in dimensions
 	err = bn.query.Dimensions(n.Dimensions)
 	if err != nil {
 		return nil, err
+	}
+	// Set fill
+	switch fill := n.FillOption.(type) {
+	case string:
+		switch fill {
+		case "null":
+			bn.query.Fill(influxql.NullFill, nil)
+		case "none":
+			bn.query.Fill(influxql.NoFill, nil)
+		case "previous":
+			bn.query.Fill(influxql.PreviousFill, nil)
+		default:
+			return nil, fmt.Errorf("unexpected fill option %s", fill)
+		}
+	case int64, float64:
+		bn.query.Fill(influxql.NumberFill, fill)
+	}
+
+	// Determine schedule
+	if n.Every != 0 && n.Cron != "" {
+		return nil, errors.New("must not set both 'every' and 'cron' properties")
+	}
+	switch {
+	case n.Every != 0:
+		bn.ticker = newTimeTicker(n.Every)
+	case n.Cron != "":
+		var err error
+		bn.ticker, err = newCronTicker(n.Cron)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errors.New("must define one of 'every' or 'cron'")
 	}
 
 	if n.Every != 0 && n.Cron != "" {
@@ -68,24 +177,27 @@ func (b *BatchNode) Start(batch BatchCollector) {
 	go b.doQuery(batch)
 }
 
-func (b *BatchNode) NextQueries(start time.Time, num int) []string {
+func (b *BatchNode) Queries(start, stop time.Time) []string {
 	now := time.Now()
+	if stop.IsZero() {
+		stop = now
+	}
 	// Crons are sensitive to timezones.
+	// Make sure we are using local time.
 	start = start.Local()
-	queries := make([]string, 0, num)
-	for i := 0; i < num || num == 0; i++ {
+	queries := make([]string, 0)
+	for {
 		start = b.ticker.Next(start)
-		if start.IsZero() {
+		if start.IsZero() || start.After(stop) {
 			break
 		}
 		b.query.Start(start)
-		stop := start.Add(b.b.Period)
-		if stop.After(now) {
+		qstop := start.Add(b.b.Period)
+		if qstop.After(now) {
 			break
 		}
-		b.query.Stop(stop)
+		b.query.Stop(qstop)
 		queries = append(queries, b.query.String())
-
 	}
 	return queries
 }
@@ -129,59 +241,12 @@ func (b *BatchNode) doQuery(batch BatchCollector) {
 
 		// Collect batches
 		for _, res := range resp.Results {
-			if res.Err != nil {
-				b.logger.Println("E! " + res.Err.Error())
+			batches, err := models.ResultToBatches(res)
+			if err != nil {
+				b.logger.Println("E!", err)
 				return
 			}
-			for _, series := range res.Series {
-				groupID := models.TagsToGroupID(
-					models.SortedKeys(series.Tags),
-					series.Tags,
-				)
-				bch := models.Batch{
-					Name:  series.Name,
-					Group: groupID,
-					Tags:  series.Tags,
-				}
-				bch.Points = make([]models.TimeFields, 0, len(series.Values))
-				for _, v := range series.Values {
-					var skip bool
-					fields := make(models.Fields)
-					var t time.Time
-					for i, c := range series.Columns {
-						if c == "time" {
-							tStr, ok := v[i].(string)
-							if !ok {
-								b.logger.Printf("E! unexpected time value: %v", v[i])
-								return
-							}
-							t, err = time.Parse(time.RFC3339, tStr)
-							if err != nil {
-								b.logger.Println("E! unexpected time format: " + err.Error())
-								return
-							}
-						} else {
-							value := v[i]
-							if n, ok := value.(json.Number); ok {
-								f, err := n.Float64()
-								if err == nil {
-									value = f
-								}
-							}
-							if value == nil {
-								skip = true
-								break
-							}
-							fields[c] = value
-						}
-					}
-					if !skip {
-						bch.Points = append(
-							bch.Points,
-							models.TimeFields{Time: t, Fields: fields},
-						)
-					}
-				}
+			for _, bch := range batches {
 				batch.CollectBatch(bch)
 			}
 		}

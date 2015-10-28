@@ -38,12 +38,12 @@ type Edge struct {
 }
 
 func newEdge(name string, t pipeline.EdgeType) *Edge {
-	l := wlog.New(os.Stderr, fmt.Sprintf("[edge:%s] ", name), log.LstdFlags)
 	sm := &expvar.Map{}
 	sm.Init()
 	sm.Add(statCollected, 0)
 	sm.Add(statEmitted, 0)
-	e := &Edge{logger: l, statMap: sm}
+	e := &Edge{statMap: sm}
+	e.logger = wlog.New(os.Stderr, fmt.Sprintf("[edge:%s] ", name), log.LstdFlags)
 	switch t {
 	case pipeline.StreamEdge:
 		e.stream = make(chan models.Point)

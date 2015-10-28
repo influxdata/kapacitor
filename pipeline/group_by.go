@@ -17,10 +17,10 @@ type GroupByNode struct {
 	chainnode
 	//The dimensions by which to group to the data.
 	// tick:ignore
-	Dimensions []string
+	Dimensions []interface{}
 }
 
-func newGroupByNode(wants EdgeType, dims []string) *GroupByNode {
+func newGroupByNode(wants EdgeType, dims []interface{}) *GroupByNode {
 	return &GroupByNode{
 		chainnode:  newBasicChainNode("groupby", wants, wants),
 		Dimensions: dims,

@@ -274,9 +274,10 @@ var viewCounts = stream
 errorCounts.join(viewCounts)
 		.as('errors', 'views')
 		.streamName('error_view')
-		.eval(lambda: "errors.sum" / "views.sum")
-			.as('error_percent')
-		.httpOut('error_rate')
+	.eval(lambda: "errors.sum" / "views.sum")
+		.as('error_percent')
+		.keep()
+	.httpOut('error_rate')
 `
 
 	er := kapacitor.Result{
@@ -823,6 +824,7 @@ stream
 	.where(lambda: "host" == 'serverA')
 	.eval(lambda: sigma("value"))
 		.as('sigma')
+		.keep()
 	.alert()
 		.info(lambda: "sigma" > 2.0)
 		.warn(lambda: "sigma" > 3.0)
@@ -1059,7 +1061,7 @@ func testStreamer(t *testing.T, name, script string) (clock.Setter, *kapacitor.E
 	}
 
 	// Replay test data to executor
-	errCh := r.ReplayStream(data, tm.Stream)
+	errCh := r.ReplayStream(data, tm.Stream, false)
 
 	t.Log(string(et.Task.Dot()))
 	return r.Setter, et, errCh, tm

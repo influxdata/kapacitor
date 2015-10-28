@@ -24,7 +24,7 @@ func CreatePipeline(script string, sourceEdge EdgeType, scope *tick.Scope) (*Pip
 		src = newStreamNode()
 		scope.Set("stream", src)
 	case BatchEdge:
-		src = newBatchNode()
+		src = newSourceBatchNode()
 		scope.Set("batch", src)
 	default:
 		return nil, fmt.Errorf("source edge type must be either Stream or Batch not %s", sourceEdge)

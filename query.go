@@ -5,12 +5,13 @@ import (
 	"time"
 
 	"github.com/influxdb/influxdb/influxql"
+	"github.com/influxdb/kapacitor/tick"
 )
 
 type Query struct {
 	startTL *influxql.TimeLiteral
 	stopTL  *influxql.TimeLiteral
-	q       *influxql.SelectStatement
+	stmt    *influxql.SelectStatement
 }
 
 func NewQuery(q string) (*Query, error) {
@@ -21,7 +22,7 @@ func NewQuery(q string) (*Query, error) {
 		return nil, err
 	}
 	var ok bool
-	query.q, ok = stmt.(*influxql.SelectStatement)
+	query.stmt, ok = stmt.(*influxql.SelectStatement)
 	if !ok {
 		return nil, fmt.Errorf("query is not a select statement %q", q)
 	}
@@ -41,10 +42,10 @@ func NewQuery(q string) (*Query, error) {
 		RHS: query.stopTL,
 	}
 
-	if query.q.Condition != nil {
-		query.q.Condition = &influxql.BinaryExpr{
+	if query.stmt.Condition != nil {
+		query.stmt.Condition = &influxql.BinaryExpr{
 			Op:  influxql.AND,
-			LHS: query.q.Condition,
+			LHS: query.stmt.Condition,
 			RHS: &influxql.BinaryExpr{
 				Op:  influxql.AND,
 				LHS: startExpr,
@@ -52,7 +53,7 @@ func NewQuery(q string) (*Query, error) {
 			},
 		}
 	} else {
-		query.q.Condition = &influxql.BinaryExpr{
+		query.stmt.Condition = &influxql.BinaryExpr{
 			Op:  influxql.AND,
 			LHS: startExpr,
 			RHS: stopExpr,
@@ -63,8 +64,8 @@ func NewQuery(q string) (*Query, error) {
 
 // Return the db rp pairs of the query
 func (q *Query) DBRPs() ([]DBRP, error) {
-	dbrps := make([]DBRP, len(q.q.Sources))
-	for i, s := range q.q.Sources {
+	dbrps := make([]DBRP, len(q.stmt.Sources))
+	for i, s := range q.stmt.Sources {
 		m, ok := s.(*influxql.Measurement)
 		if !ok {
 			return nil, fmt.Errorf("unknown query source %T", s)
@@ -89,7 +90,7 @@ func (q *Query) Stop(s time.Time) {
 
 // Set the dimensions on the query
 func (q *Query) Dimensions(dims []interface{}) error {
-	q.q.Dimensions = q.q.Dimensions[:0]
+	q.stmt.Dimensions = q.stmt.Dimensions[:0]
 	// Add in dimensions
 	hasTime := false
 	for _, d := range dims {
@@ -100,7 +101,7 @@ func (q *Query) Dimensions(dims []interface{}) error {
 			}
 			// Add time dimension
 			hasTime = true
-			q.q.Dimensions = append(q.q.Dimensions,
+			q.stmt.Dimensions = append(q.stmt.Dimensions,
 				&influxql.Dimension{
 					Expr: &influxql.Call{
 						Name: "time",
@@ -112,12 +113,18 @@ func (q *Query) Dimensions(dims []interface{}) error {
 					},
 				})
 		case string:
-			q.q.Dimensions = append(q.q.Dimensions,
+			q.stmt.Dimensions = append(q.stmt.Dimensions,
 				&influxql.Dimension{
 					Expr: &influxql.VarRef{
 						Val: dim,
 					},
 				})
+		case *tick.StarNode:
+			q.stmt.Dimensions = append(q.stmt.Dimensions,
+				&influxql.Dimension{
+					Expr: &influxql.Wildcard{},
+				})
+
 		default:
 			return fmt.Errorf("invalid dimension type:%T, must be string or time.Duration", d)
 		}
@@ -126,6 +133,11 @@ func (q *Query) Dimensions(dims []interface{}) error {
 	return nil
 }
 
+func (q *Query) Fill(option influxql.FillOption, value interface{}) {
+	q.stmt.Fill = option
+	q.stmt.FillValue = value
+}
+
 func (q *Query) String() string {
-	return q.q.String()
+	return q.stmt.String()
 }

@@ -4,6 +4,46 @@ import (
 	"time"
 )
 
+// A node that handles creating several child BatchNodes.
+// Each call to `query` creates a child batch node that
+// can further be configured. See BatchNode
+// The `batch` variable in batch tasks is an instance of
+// a SourceBatchNode.
+//
+// Example:
+//     var errors = batch
+//                      .query('SELECT value from errors')
+//                      ...
+//     var views = batch
+//                      .query('SELECT value from views')
+//                      ...
+//
+type SourceBatchNode struct {
+	node
+}
+
+func newSourceBatchNode() *SourceBatchNode {
+	return &SourceBatchNode{
+		node: node{
+			desc:     "srcbatch",
+			wants:    NoEdge,
+			provides: BatchEdge,
+		},
+	}
+}
+
+// The query to execute. Must not contain a time condition
+// in the `WHERE` clause or contain a `GROUP BY` clause.
+// The time conditions are added dynamically according to the period, offset and schedule.
+// The `GROUP BY` clause is added dynamically according to the dimensions
+// passed to the `groupBy` method.
+func (b *SourceBatchNode) Query(q string) *BatchNode {
+	n := newBatchNode()
+	n.QueryStr = q
+	b.linkChild(n)
+	return n
+}
+
 // A BatchNode defines a source and a schedule for
 // processing batch data. The data is queried from
 // an InfluxDB database and then passed into the data pipeline.
@@ -24,12 +64,10 @@ import (
 // spans 1 minute and is grouped into 10 second buckets.
 type BatchNode struct {
 	chainnode
-	// The query to execute. Must not contain a time condition
-	// in the `WHERE` clause or contain a `GROUP BY` clause.
-	// The time conditions are added dynamically according to the period, offset and schedule.
-	// The `GROUP BY` clause is added dynamically according to the dimensions
-	// passed to the `groupBy` method.
-	Query string
+
+	// The query text
+	//tick:ignore
+	QueryStr string
 
 	// The period or length of time that will be queried from InfluxDB
 	Period time.Duration
@@ -59,6 +97,10 @@ type BatchNode struct {
 	// The list of dimensions for the group-by clause.
 	//tick:ignore
 	Dimensions []interface{}
+
+	// The fill option
+	//tick:ignore
+	FillOption interface{}
 }
 
 func newBatchNode() *BatchNode {
@@ -68,10 +110,22 @@ func newBatchNode() *BatchNode {
 }
 
 // Group the data by a set of dimensions.
-// At least one dimension should be a `time()`
-// dimension, the rest are tag names.
 // tick:property
 func (b *BatchNode) GroupBy(d ...interface{}) *BatchNode {
 	b.Dimensions = d
+	return b
+}
+
+// Fill the data.
+// Options are:
+//
+//   - Any numerical value
+//   - null - exhibits the same behavior as the default
+//   - previous - reports the value of the previous window
+//   - none - suppresses timestamps and values where the value is null
+//
+// tick:property
+func (b *BatchNode) Fill(f interface{}) *BatchNode {
+	b.FillOption = f
 	return b
 }

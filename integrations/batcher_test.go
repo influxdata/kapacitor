@@ -1,6 +1,7 @@
 package integrations
 
 import (
+	"io"
 	"net/http"
 	"os"
 	"path"
@@ -40,8 +41,8 @@ batch
 				Tags:    map[string]string{"cpu": "cpu-total"},
 				Columns: []string{"time", "sum"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1970, 1, 1, 0, 0, 19, 0, time.UTC),
-					20.0,
+					time.Date(1970, 1, 1, 0, 0, 18, 0, time.UTC),
+					10.0,
 				}},
 			},
 			{
@@ -49,8 +50,8 @@ batch
 				Tags:    map[string]string{"cpu": "cpu0"},
 				Columns: []string{"time", "sum"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1970, 1, 1, 0, 0, 19, 0, time.UTC),
-					20.0,
+					time.Date(1970, 1, 1, 0, 0, 18, 0, time.UTC),
+					10.0,
 				}},
 			},
 			{
@@ -58,8 +59,8 @@ batch
 				Tags:    map[string]string{"cpu": "cpu1"},
 				Columns: []string{"time", "sum"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1970, 1, 1, 0, 0, 19, 0, time.UTC),
-					20.0,
+					time.Date(1970, 1, 1, 0, 0, 18, 0, time.UTC),
+					10.0,
 				}},
 			},
 		},
@@ -92,6 +93,7 @@ batch
 
 	// Assert we got the expected result
 	result := kapacitor.ResultFromJSON(resp.Body)
+	t.Log(result.Series[0])
 	if eq, msg := compareResults(er, result); !eq {
 		t.Error(msg)
 	}
@@ -131,8 +133,8 @@ func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.Ex
 	}
 
 	// Replay test data to executor
-	batch := tm.BatchCollector(name)
-	errCh := r.ReplayBatch(data, batch)
+	batches := tm.BatchCollectors(name)
+	errCh := r.ReplayBatch([]io.ReadCloser{data}, batches, false)
 
 	t.Log(string(et.Task.Dot()))
 	return r.Setter, et, errCh, tm

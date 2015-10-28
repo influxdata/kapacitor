@@ -1,22 +1,24 @@
 package replay
 
 import (
+	"archive/zip"
 	"compress/gzip"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"path"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/influxdb/influxdb/client"
 	"github.com/influxdb/influxdb/influxql"
 	"github.com/influxdb/kapacitor"
 	"github.com/influxdb/kapacitor/clock"
+	"github.com/influxdb/kapacitor/models"
 	"github.com/influxdb/kapacitor/services/httpd"
 	"github.com/influxdb/kapacitor/wlog"
 	"github.com/twinj/uuid"
@@ -37,7 +39,7 @@ type Service struct {
 		DelRoutes([]httpd.Route)
 	}
 	InfluxDBService interface {
-		Addr() string
+		NewClient() (*client.Client, error)
 	}
 	TaskMaster interface {
 		NewFork(name string, dbrps []kapacitor.DBRP) *kapacitor.Edge
@@ -134,16 +136,20 @@ func (r *Service) handleReplay(w http.ResponseWriter, req *http.Request) {
 	name := req.URL.Query().Get("name")
 	id := req.URL.Query().Get("id")
 	clockTyp := req.URL.Query().Get("clock")
+	recTimeStr := req.URL.Query().Get("rec-time")
+	var recTime bool
+	if recTimeStr != "" {
+		var err error
+		recTime, err = strconv.ParseBool(recTimeStr)
+		if err != nil {
+			httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
+			return
+		}
+	}
 
 	t, err := r.TaskStore.Load(name)
 	if err != nil {
 		httpd.HttpError(w, "task load: "+err.Error(), true, http.StatusNotFound)
-		return
-	}
-
-	f, err := r.Find(id, t.Type)
-	if err != nil {
-		httpd.HttpError(w, "replay find: "+err.Error(), true, http.StatusNotFound)
 		return
 	}
 
@@ -168,11 +174,21 @@ func (r *Service) handleReplay(w http.ResponseWriter, req *http.Request) {
 	replay := kapacitor.NewReplay(clk)
 	var replayC <-chan error
 	switch t.Type {
-	case kapacitor.StreamerTask:
-		replayC = replay.ReplayStream(f, tm.Stream)
-	case kapacitor.BatcherTask:
-		batch := tm.BatchCollector(name)
-		replayC = replay.ReplayBatch(f, batch)
+	case kapacitor.StreamTask:
+		f, err := r.FindStreamRecording(id)
+		if err != nil {
+			httpd.HttpError(w, "replay find: "+err.Error(), true, http.StatusNotFound)
+			return
+		}
+		replayC = replay.ReplayStream(f, tm.Stream, recTime)
+	case kapacitor.BatchTask:
+		fs, err := r.FindBatchRecording(id)
+		if err != nil {
+			httpd.HttpError(w, "replay find: "+err.Error(), true, http.StatusNotFound)
+			return
+		}
+		batches := tm.BatchCollectors(name)
+		replayC = replay.ReplayBatch(fs, batches, recTime)
 	}
 
 	// Check first for error on task
@@ -228,11 +244,7 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 		}
 
 	case "batch":
-		num, err := strconv.ParseInt(req.URL.Query().Get("num"), 10, 64)
-		if err != nil {
-			httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
-			return
-		}
+		var err error
 
 		// Determine start time.
 		var start time.Time
@@ -259,6 +271,17 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 			start = time.Now().Add(-1 * diff)
 		}
 
+		// Get stop time, if present
+		var stop time.Time
+		stopStr := req.URL.Query().Get("stop")
+		if stopStr != "" {
+			stop, err = time.Parse(time.RFC3339, stopStr)
+			if err != nil {
+				httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
+				return
+			}
+		}
+
 		// Get task
 		task := req.URL.Query().Get("name")
 		if task == "" {
@@ -273,7 +296,7 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 		}
 
 		// Record batch data
-		err = r.doRecordBatch(rid, t, r.InfluxDBService.Addr(), start, int(num))
+		err = r.doRecordBatch(rid, t, start, stop)
 		if err != nil {
 			httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
 			return
@@ -326,9 +349,9 @@ func (r *Service) GetRecordings(rids []string) ([]recordingInfo, error) {
 		var typ kapacitor.TaskType
 		switch ext {
 		case streamEXT:
-			typ = kapacitor.StreamerTask
+			typ = kapacitor.StreamTask
 		case batchEXT:
-			typ = kapacitor.BatcherTask
+			typ = kapacitor.BatchTask
 		default:
 			continue
 		}
@@ -342,14 +365,14 @@ func (r *Service) GetRecordings(rids []string) ([]recordingInfo, error) {
 	return infos, nil
 }
 
-func (r *Service) Find(id string, typ kapacitor.TaskType) (io.ReadCloser, error) {
+func (r *Service) find(id string, typ kapacitor.TaskType) (*os.File, error) {
 	var ext string
 	var other string
 	switch typ {
-	case kapacitor.StreamerTask:
+	case kapacitor.StreamTask:
 		ext = streamEXT
 		other = batchEXT
-	case kapacitor.BatcherTask:
+	case kapacitor.BatchTask:
 		ext = batchEXT
 		other = streamEXT
 	default:
@@ -363,8 +386,43 @@ func (r *Service) Find(id string, typ kapacitor.TaskType) (io.ReadCloser, error)
 		}
 		return nil, err
 	}
+	return f, nil
+}
+
+func (r *Service) FindStreamRecording(id string) (io.ReadCloser, error) {
+	f, err := r.find(id, kapacitor.StreamTask)
+	if err != nil {
+		return nil, err
+	}
 	gz, err := gzip.NewReader(f)
+	if err != nil {
+		return nil, err
+	}
 	return rc{gz, f}, nil
+}
+
+func (r *Service) FindBatchRecording(id string) ([]io.ReadCloser, error) {
+	f, err := r.find(id, kapacitor.BatchTask)
+	if err != nil {
+		return nil, err
+	}
+	stat, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	archive, err := zip.NewReader(f, stat.Size())
+	if err != nil {
+		return nil, err
+	}
+	rcs := make([]io.ReadCloser, len(archive.File))
+	for i, file := range archive.File {
+		rc, err := file.Open()
+		if err != nil {
+			return nil, err
+		}
+		rcs[i] = rc
+	}
+	return rcs, nil
 }
 
 func (r *Service) Delete(id string) {
@@ -410,9 +468,7 @@ func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration, dbrps []kapac
 	done := false
 	go func() {
 		for p, ok := e.NextPoint(); ok && !done; p, ok = e.NextPoint() {
-			fmt.Fprintf(gz, "%s\n%s\n", p.Database, p.RetentionPolicy)
-			gz.Write(p.Bytes("s"))
-			gz.Write([]byte("\n"))
+			kapacitor.WritePointForRecording(gz, p)
 		}
 	}()
 	time.Sleep(dur)
@@ -423,35 +479,55 @@ func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration, dbrps []kapac
 }
 
 // Record a series of batch queries defined by a batch task
-func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, addr string, start time.Time, num int) error {
+func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, start, stop time.Time) error {
 	et, err := kapacitor.NewExecutingTask(nil, t)
 	if err != nil {
 		return err
 	}
 
-	queries, err := et.BatchQueries(start, num)
+	batches, err := et.BatchQueries(start, stop)
 	if err != nil {
 		return err
 	}
 
+	con, err := r.InfluxDBService.NewClient()
+	if err != nil {
+		return err
+	}
 	rpath := path.Join(r.saveDir, rid.String()+batchEXT)
 	f, err := os.Create(rpath)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	gz := gzip.NewWriter(f)
-	defer gz.Close()
+	archive := zip.NewWriter(f)
 
-	for _, query := range queries {
-		v := url.Values{}
-		v.Add("q", query)
-		res, err := http.Get(addr + "/query?" + v.Encode())
+	for batchIdx, queries := range batches {
+		w, err := archive.Create(strconv.FormatInt(int64(batchIdx), 10))
 		if err != nil {
 			return err
 		}
-		defer res.Body.Close()
-		io.Copy(gz, res.Body)
+		for _, q := range queries {
+			query := client.Query{
+				Command: q,
+			}
+			resp, err := con.Query(query)
+			if err != nil {
+				return err
+			}
+			if resp.Err != nil {
+				return resp.Err
+			}
+			for _, res := range resp.Results {
+				batches, err := models.ResultToBatches(res)
+				if err != nil {
+					return err
+				}
+				for _, b := range batches {
+					kapacitor.WriteBatchForRecording(w, b)
+				}
+			}
+		}
 	}
-	return nil
+	return archive.Close()
 }
