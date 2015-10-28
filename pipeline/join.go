@@ -6,8 +6,8 @@ package pipeline
 // Aliases are used to prefix all fields from the respective nodes.
 //
 // Example:
-//    var errors = stream.fork().from('errors')
-//    var requests = stream.fork().from('requests')
+//    var errors = stream.from('errors')
+//    var requests = stream.from('requests')
 //    // Join the errors and requests streams
 //    errors.join(requests)
 //            // Provide prefix names for the fields of the data points.

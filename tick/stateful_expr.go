@@ -31,12 +31,9 @@ func (s *StatefulExpr) Reset() {
 	}
 }
 
-// Lookup for variables
-type Vars map[string]interface{}
-
-func (s *StatefulExpr) EvalBool(v Vars) (bool, error) {
+func (s *StatefulExpr) EvalBool(scope *Scope) (bool, error) {
 	stck := &stack{}
-	err := s.eval(s.Node, v, stck)
+	err := s.eval(s.Node, scope, stck)
 	if err != nil {
 		return false, err
 	}
@@ -44,7 +41,10 @@ func (s *StatefulExpr) EvalBool(v Vars) (bool, error) {
 		value := stck.Pop()
 		// Resolve reference
 		if ref, ok := value.(*ReferenceNode); ok {
-			value = v[ref.Reference]
+			value, err = scope.Get(ref.Reference)
+			if err != nil {
+				return false, err
+			}
 		}
 		b, ok := value.(bool)
 		if ok {
@@ -56,9 +56,9 @@ func (s *StatefulExpr) EvalBool(v Vars) (bool, error) {
 	return false, ErrInvalidExpr
 }
 
-func (s *StatefulExpr) EvalNum(v Vars) (float64, error) {
+func (s *StatefulExpr) EvalNum(scope *Scope) (float64, error) {
 	stck := &stack{}
-	err := s.eval(s.Node, v, stck)
+	err := s.eval(s.Node, scope, stck)
 	if err != nil {
 		return math.NaN(), err
 	}
@@ -66,7 +66,10 @@ func (s *StatefulExpr) EvalNum(v Vars) (float64, error) {
 		value := stck.Pop()
 		// Resolve reference
 		if ref, ok := value.(*ReferenceNode); ok {
-			value = v[ref.Reference]
+			value, err = scope.Get(ref.Reference)
+			if err != nil {
+				return math.NaN(), err
+			}
 		}
 		n, ok := value.(float64)
 		if ok {
@@ -78,7 +81,7 @@ func (s *StatefulExpr) EvalNum(v Vars) (float64, error) {
 	return math.NaN(), ErrInvalidExpr
 }
 
-func (s *StatefulExpr) eval(n Node, v Vars, stck *stack) (err error) {
+func (s *StatefulExpr) eval(n Node, scope *Scope, stck *stack) (err error) {
 	switch node := n.(type) {
 	case *BoolNode:
 		stck.Push(node.Bool)
@@ -95,36 +98,36 @@ func (s *StatefulExpr) eval(n Node, v Vars, stck *stack) (err error) {
 	case *RegexNode:
 		stck.Push(node.Regex)
 	case *UnaryNode:
-		err = s.eval(node.Node, v, stck)
+		err = s.eval(node.Node, scope, stck)
 		if err != nil {
 			return
 		}
-		s.evalUnary(node.Operator, v, stck)
+		s.evalUnary(node.Operator, scope, stck)
 	case *BinaryNode:
-		err = s.eval(node.Left, v, stck)
+		err = s.eval(node.Left, scope, stck)
 		if err != nil {
 			return
 		}
-		err = s.eval(node.Right, v, stck)
+		err = s.eval(node.Right, scope, stck)
 		if err != nil {
 			return
 		}
-		err = s.evalBinary(node.Operator, v, stck)
+		err = s.evalBinary(node.Operator, scope, stck)
 		if err != nil {
 			return
 		}
 	case *FunctionNode:
 		args := make([]interface{}, len(node.Args))
 		for i, arg := range node.Args {
-			err = s.eval(arg, v, stck)
+			err = s.eval(arg, scope, stck)
 			if err != nil {
 				return
 			}
 			a := stck.Pop()
 			if r, ok := a.(*ReferenceNode); ok {
-				a = v[r.Reference]
-				if a == nil {
-					return fmt.Errorf("undefined variable %s", r.Reference)
+				a, err = scope.Get(r.Reference)
+				if err != nil {
+					return err
 				}
 			}
 			args[i] = a
@@ -145,7 +148,7 @@ func (s *StatefulExpr) eval(n Node, v Vars, stck *stack) (err error) {
 	return nil
 }
 
-func (s *StatefulExpr) evalUnary(op tokenType, vars Vars, stck *stack) error {
+func (s *StatefulExpr) evalUnary(op tokenType, scope *Scope, stck *stack) error {
 	v := stck.Pop()
 	switch op {
 	case tokenMinus:
@@ -167,17 +170,25 @@ func (s *StatefulExpr) evalUnary(op tokenType, vars Vars, stck *stack) error {
 	return nil
 }
 
-var ErrMismatchedTypes = errors.New("operands of binary operators must be of the same type, use bool(), int() and float() as needed")
+func errMismatched(op tokenType, l, r interface{}) error {
+	return fmt.Errorf("mismatched type to binary operator. got %T %v %T. see bool(), int(), float()", l, op, r)
+}
 
-func (s *StatefulExpr) evalBinary(op tokenType, vars Vars, stck *stack) (err error) {
+func (s *StatefulExpr) evalBinary(op tokenType, scope *Scope, stck *stack) (err error) {
 	r := stck.Pop()
 	l := stck.Pop()
 	// Resolve any references
 	if ref, ok := l.(*ReferenceNode); ok {
-		l = vars[ref.Reference]
+		l, err = scope.Get(ref.Reference)
+		if err != nil {
+			return err
+		}
 	}
 	if ref, ok := r.(*ReferenceNode); ok {
-		r = vars[ref.Reference]
+		r, err = scope.Get(ref.Reference)
+		if err != nil {
+			return err
+		}
 	}
 	var v interface{}
 	switch {
@@ -186,24 +197,24 @@ func (s *StatefulExpr) evalBinary(op tokenType, vars Vars, stck *stack) (err err
 		case int64:
 			rn, ok := r.(int64)
 			if !ok {
-				return ErrMismatchedTypes
+				return errMismatched(op, l, r)
 			}
 			v, err = doIntMath(op, ln, rn)
 		case float64:
 			rn, ok := r.(float64)
 			if !ok {
-				return ErrMismatchedTypes
+				return errMismatched(op, l, r)
 			}
 			v, err = doFloatMath(op, ln, rn)
 		default:
-			return ErrMismatchedTypes
+			return errMismatched(op, l, r)
 		}
 	case isCompOperator(op):
 		switch ln := l.(type) {
 		case bool:
 			rn, ok := r.(bool)
 			if !ok {
-				return ErrMismatchedTypes
+				return errMismatched(op, l, r)
 			}
 			v, err = doBoolComp(op, ln, rn)
 		case int64:
@@ -215,7 +226,7 @@ func (s *StatefulExpr) evalBinary(op tokenType, vars Vars, stck *stack) (err err
 			case float64:
 				rf = rn
 			default:
-				return ErrMismatchedTypes
+				return errMismatched(op, l, r)
 			}
 			v, err = doFloatComp(op, lf, rf)
 		case float64:
@@ -226,7 +237,7 @@ func (s *StatefulExpr) evalBinary(op tokenType, vars Vars, stck *stack) (err err
 			case float64:
 				rf = rn
 			default:
-				return ErrMismatchedTypes
+				return errMismatched(op, l, r)
 			}
 			v, err = doFloatComp(op, ln, rf)
 		case string:
@@ -236,10 +247,10 @@ func (s *StatefulExpr) evalBinary(op tokenType, vars Vars, stck *stack) (err err
 			} else if rx, ok := r.(*regexp.Regexp); ok {
 				v, err = doRegexComp(op, ln, rx)
 			} else {
-				return ErrMismatchedTypes
+				return errMismatched(op, l, r)
 			}
 		default:
-			return ErrMismatchedTypes
+			return errMismatched(op, l, r)
 		}
 	default:
 		return fmt.Errorf("return: unknown operator %v", op)

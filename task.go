@@ -1,11 +1,15 @@
 package kapacitor
 
 import (
+	"errors"
 	"fmt"
+	"log"
+	"os"
 	"time"
 
 	"github.com/influxdb/kapacitor/pipeline"
 	"github.com/influxdb/kapacitor/tick"
+	"github.com/influxdb/kapacitor/wlog"
 )
 
 // The type of a task
@@ -27,17 +31,36 @@ func (t TaskType) String() string {
 	}
 }
 
+type DBRP struct {
+	Database        string
+	RetentionPolicy string
+}
+
+func CreateDBRPMap(dbrps []DBRP) map[DBRP]bool {
+	dbMap := make(map[DBRP]bool, len(dbrps))
+	for _, dbrp := range dbrps {
+		dbMap[dbrp] = true
+	}
+	return dbMap
+}
+
+func (d DBRP) String() string {
+	return fmt.Sprintf("%q.%q", d.Database, d.RetentionPolicy)
+}
+
 // The complete definition of a task, its name, pipeline and type.
 type Task struct {
 	Name     string
 	Pipeline *pipeline.Pipeline
 	Type     TaskType
+	DBRPs    []DBRP
 }
 
-func NewTask(name, script string, tt TaskType) (*Task, error) {
+func NewTask(name, script string, tt TaskType, dbrps []DBRP) (*Task, error) {
 	t := &Task{
-		Name: name,
-		Type: tt,
+		Name:  name,
+		Type:  tt,
+		DBRPs: dbrps,
 	}
 
 	var srcEdge pipeline.EdgeType
@@ -86,13 +109,13 @@ func (t *Task) Period() time.Duration {
 }
 
 // Create a new streamer task from a script.
-func NewStreamer(name, script string) (*Task, error) {
-	return NewTask(name, script, StreamerTask)
+func NewStreamer(name, script string, dbrps []DBRP) (*Task, error) {
+	return NewTask(name, script, StreamerTask, dbrps)
 }
 
 // Create a new batcher task from a script.
-func NewBatcher(name, script string) (*Task, error) {
-	return NewTask(name, script, BatcherTask)
+func NewBatcher(name, script string, dbrps []DBRP) (*Task, error) {
+	return NewTask(name, script, BatcherTask, dbrps)
 }
 
 // ----------------------------------
@@ -186,6 +209,11 @@ func (et *ExecutingTask) start(in *Edge) error {
 	et.source.addParentEdge(et.in)
 
 	return et.walk(func(n Node) error {
+		n.setLogger(wlog.New(
+			os.Stderr,
+			fmt.Sprintf("[%s:%s] ", et.Task.Name, n.Name()),
+			log.LstdFlags,
+		))
 		n.start()
 		return nil
 	})
@@ -199,14 +227,30 @@ func (et *ExecutingTask) stop() {
 	et.in.Close()
 }
 
+var ErrWrongTaskType = errors.New("wrong task type")
+
 // Instruct source batch node to start querying and sending batches of data
-func (et *ExecutingTask) StartBatching() {
+func (et *ExecutingTask) StartBatching() error {
 	if et.Task.Type != BatcherTask {
-		return
+		return ErrWrongTaskType
 	}
 
 	batcher := et.source.(*BatchNode)
+
+	// Check that the task allows access to DBRPs
+	dbMap := CreateDBRPMap(et.Task.DBRPs)
+	dbrps, err := batcher.DBRPs()
+	if err != nil {
+		return err
+	}
+	for _, dbrp := range dbrps {
+		if !dbMap[dbrp] {
+			return fmt.Errorf("batch query is not allowed to request data from %v", dbrp)
+		}
+	}
+
 	go batcher.Query(et.in)
+	return nil
 }
 
 // Wait till the task finishes and return any error

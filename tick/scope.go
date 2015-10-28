@@ -26,5 +26,5 @@ func (s *Scope) Get(name string) (interface{}, error) {
 	if v, ok := s.variables[name]; ok {
 		return v, nil
 	}
-	return nil, fmt.Errorf("name %s is undefined", name)
+	return nil, fmt.Errorf("name %q is undefined", name)
 }

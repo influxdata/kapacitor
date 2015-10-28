@@ -105,7 +105,7 @@ func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.Ex
 	}
 
 	// Create task
-	task, err := kapacitor.NewBatcher(name, script)
+	task, err := kapacitor.NewBatcher(name, script, dbrps)
 	if err != nil {
 		t.Fatal(err)
 	}

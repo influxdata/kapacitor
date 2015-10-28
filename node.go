@@ -3,11 +3,9 @@ package kapacitor
 import (
 	"fmt"
 	"log"
-	"os"
 	"runtime"
 
 	"github.com/influxdb/kapacitor/pipeline"
-	"github.com/influxdb/kapacitor/wlog"
 )
 
 // A node that can be  in an executor.
@@ -19,6 +17,9 @@ type Node interface {
 	// start the node and its children
 	start()
 	stop()
+
+	// set the logger
+	setLogger(logger *log.Logger)
 
 	// wait for the node to finish processing and return any errors
 	Err() error
@@ -55,8 +56,11 @@ func (n *node) closeParentEdges() {
 	}
 }
 
+func (n *node) setLogger(l *log.Logger) {
+	n.logger = l
+}
+
 func (n *node) start() {
-	n.logger = wlog.New(os.Stderr, fmt.Sprintf("[%s] ", n.Name()), log.LstdFlags)
 	n.errCh = make(chan error, 1)
 	go func() {
 		var err error
