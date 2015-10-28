@@ -13,7 +13,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/dustin/go-humanize"
 	"github.com/influxdb/kapacitor"
@@ -193,13 +192,13 @@ var (
 	rname       = recordFlags.String("name", "", "the name of a task. If recording a batch or stream")
 
 	rstart = recordFlags.String("start", "", "the start time for the set of queries when recording a batch.")
-	rpast  = recordFlags.Duration("past", 0, "set start time via 'now - past'.")
+	rpast  = recordFlags.String("past", "", "set start time via 'now - past'.")
 	rnum   = recordFlags.Int("num", 0, "the number of periods to query, if zero will query as many times as the schedule defines until the queries reach the present time. Applies only to recording a batch.")
 
 	rquery = recordFlags.String("query", "", "the query to record. If recording a query.")
 	rtype  = recordFlags.String("type", "", "the type of the recording to save (stream|batch). If recording a query.")
 
-	rdur = recordFlags.Duration("duration", time.Minute*5, "how long to record the data stream. If recording a stream.")
+	rdur = recordFlags.String("duration", "", "how long to record the data stream. If recording a stream.")
 )
 
 func recordUsage() {
@@ -248,14 +247,14 @@ func doRecord(args []string) error {
 	switch args[0] {
 	case "stream":
 		v.Add("name", *rname)
-		v.Add("duration", rdur.String())
+		v.Add("duration", *rdur)
 	case "batch":
-		if *rstart != "" && *rpast != 0 {
+		if *rstart != "" && *rpast != "" {
 			return errors.New("cannot set both start and past flags.")
 		}
 		v.Add("name", *rname)
 		v.Add("start", *rstart)
-		v.Add("past", (*rpast).String())
+		v.Add("past", *rpast)
 		v.Add("num", strconv.FormatInt(int64(*rnum), 10))
 	case "query":
 		v.Add("qtype", *rtype)

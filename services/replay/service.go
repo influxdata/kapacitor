@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/influxdb/influxdb/influxql"
 	"github.com/influxdb/kapacitor"
 	"github.com/influxdb/kapacitor/clock"
 	"github.com/influxdb/kapacitor/services/httpd"
@@ -214,7 +215,7 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 		}
 
 		durStr := req.URL.Query().Get("duration")
-		dur, err := time.ParseDuration(durStr)
+		dur, err := influxql.ParseDuration(durStr)
 		if err != nil {
 			httpd.HttpError(w, "invalid duration string: "+err.Error(), true, http.StatusBadRequest)
 			return
@@ -250,7 +251,7 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 				return
 			}
 		case pastStr != "":
-			diff, err := time.ParseDuration(pastStr)
+			diff, err := influxql.ParseDuration(pastStr)
 			if err != nil {
 				httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
 				return
