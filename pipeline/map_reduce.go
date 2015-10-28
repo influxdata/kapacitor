@@ -18,7 +18,7 @@ type MapReduceInfo struct {
 //            .period(10s)
 //            .every(10s)
 //        // Sum the values for each 10s window of data.
-//        .mapReduce(influxql.sum("value"))
+//        .mapReduce(influxql.sum('value'))
 //        ...
 type MapNode struct {
 	chainnode
@@ -46,7 +46,7 @@ func newMapNode(i interface{}) *MapNode {
 //            .period(10s)
 //            .every(10s)
 //        // Sum the values for each 10s window of data.
-//        .mapReduce(influxql.sum("value"))
+//        .mapReduce(influxql.sum('value'))
 //        ...
 type ReduceNode struct {
 	chainnode

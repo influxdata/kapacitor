@@ -23,13 +23,13 @@ batch
 		WHERE "host" = 'serverA'
 ''')
 		.period(10s)
-		.groupBy(time(2s), "cpu")
-	.mapReduce(influxql.count("value"))
+		.groupBy(time(2s), 'cpu')
+	.mapReduce(influxql.count('value'))
 	.window()
 		.period(20s)
 		.every(20s)
-	.mapReduce(influxql.sum("count"))
-	.httpOut("TestBatch_SimpleMR")
+	.mapReduce(influxql.sum('count'))
+	.httpOut('TestBatch_SimpleMR')
 `
 
 	er := kapacitor.Result{

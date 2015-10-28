@@ -2,12 +2,9 @@ package tick
 
 import (
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestLexer(t *testing.T) {
-	assert := assert.New(t)
 
 	type testCase struct {
 		in     string
@@ -16,68 +13,190 @@ func TestLexer(t *testing.T) {
 
 	test := func(tc testCase) {
 		l := lex(tc.in)
-		tokens := make([]token, 0)
-		var i token
+		i := 0
+		var tok token
 		var ok bool
-		for i, ok = l.nextToken(); ok; i, ok = l.nextToken() {
-			tokens = append(tokens, i)
+		for tok, ok = l.nextToken(); ok; tok, ok = l.nextToken() {
+			if i >= len(tc.tokens) {
+				t.Fatalf("unexpected extra token %v", tok)
+			}
+			if tok != tc.tokens[i] {
+				t.Errorf("unexpected token: got %v exp %v i: %d in %s", tok, tc.tokens[i], i, tc.in)
+			}
+			i++
 		}
-		assert.Equal(tc.tokens, tokens)
+
+		if i != len(tc.tokens) {
+			t.Error("missing tokens", tc.tokens[i:])
+		}
 	}
 
 	cases := []testCase{
-		//Symbols
-		testCase{
+		//Symbols + Operators
+		{
+			in: "+",
+			tokens: []token{
+				token{tokenPlus, 0, "+"},
+				token{tokenEOF, 1, ""},
+			},
+		},
+		{
+			in: "-",
+			tokens: []token{
+				token{tokenMinus, 0, "-"},
+				token{tokenEOF, 1, ""},
+			},
+		},
+		{
+			in: "*",
+			tokens: []token{
+				token{tokenMult, 0, "*"},
+				token{tokenEOF, 1, ""},
+			},
+		},
+		{
+			in: "/",
+			tokens: []token{
+				token{tokenDiv, 0, "/"},
+				token{tokenEOF, 1, ""},
+			},
+		},
+		{
 			in: "=",
 			tokens: []token{
 				token{tokenAsgn, 0, "="},
 				token{tokenEOF, 1, ""},
 			},
 		},
-		testCase{
+		{
+			in: "==",
+			tokens: []token{
+				token{tokenEqual, 0, "=="},
+				token{tokenEOF, 2, ""},
+			},
+		},
+		{
+			in: "!=",
+			tokens: []token{
+				token{tokenNotEqual, 0, "!="},
+				token{tokenEOF, 2, ""},
+			},
+		},
+		{
+			in: ">",
+			tokens: []token{
+				token{tokenGreater, 0, ">"},
+				token{tokenEOF, 1, ""},
+			},
+		},
+		{
+			in: ">=",
+			tokens: []token{
+				token{tokenGreaterEqual, 0, ">="},
+				token{tokenEOF, 2, ""},
+			},
+		},
+		{
+			in: "<",
+			tokens: []token{
+				token{tokenLess, 0, "<"},
+				token{tokenEOF, 1, ""},
+			},
+		},
+		{
+			in: "<=",
+			tokens: []token{
+				token{tokenLessEqual, 0, "<="},
+				token{tokenEOF, 2, ""},
+			},
+		},
+		{
+			in: "=~",
+			tokens: []token{
+				token{tokenRegexEqual, 0, "=~"},
+				token{tokenEOF, 2, ""},
+			},
+		},
+		{
+			in: "!~",
+			tokens: []token{
+				token{tokenRegexNotEqual, 0, "!~"},
+				token{tokenEOF, 2, ""},
+			},
+		},
+		{
 			in: "(",
 			tokens: []token{
 				token{tokenLParen, 0, "("},
 				token{tokenEOF, 1, ""},
 			},
 		},
-		testCase{
+		{
 			in: ")",
 			tokens: []token{
 				token{tokenRParen, 0, ")"},
 				token{tokenEOF, 1, ""},
 			},
 		},
-		testCase{
+		{
 			in: ".",
 			tokens: []token{
 				token{tokenDot, 0, "."},
 				token{tokenEOF, 1, ""},
 			},
 		},
-		testCase{
-			in: ";",
+		// Keywords
+		{
+			in: "AND",
 			tokens: []token{
-				token{tokenSColon, 0, ";"},
-				token{tokenEOF, 1, ""},
+				token{tokenAnd, 0, "AND"},
+				token{tokenEOF, 3, ""},
+			},
+		},
+		{
+			in: "OR",
+			tokens: []token{
+				token{tokenOr, 0, "OR"},
+				token{tokenEOF, 2, ""},
+			},
+		},
+		{
+			in: "TRUE",
+			tokens: []token{
+				token{tokenTrue, 0, "TRUE"},
+				token{tokenEOF, 4, ""},
+			},
+		},
+		{
+			in: "FALSE",
+			tokens: []token{
+				token{tokenFalse, 0, "FALSE"},
+				token{tokenEOF, 5, ""},
+			},
+		},
+		{
+			in: "var",
+			tokens: []token{
+				token{tokenVar, 0, "var"},
+				token{tokenEOF, 3, ""},
 			},
 		},
 		//Numbers
-		testCase{
+		{
 			in: "42",
 			tokens: []token{
 				token{tokenNumber, 0, "42"},
 				token{tokenEOF, 2, ""},
 			},
 		},
-		testCase{
+		{
 			in: "42.21",
 			tokens: []token{
 				token{tokenNumber, 0, "42.21"},
 				token{tokenEOF, 5, ""},
 			},
 		},
-		testCase{
+		{
 			in: ".421",
 			tokens: []token{
 				token{tokenDot, 0, "."},
@@ -85,57 +204,29 @@ func TestLexer(t *testing.T) {
 				token{tokenEOF, 4, ""},
 			},
 		},
-		testCase{
+		{
 			in: "0.421",
 			tokens: []token{
 				token{tokenNumber, 0, "0.421"},
 				token{tokenEOF, 5, ""},
 			},
 		},
-		testCase{
-			in: "-42",
-			tokens: []token{
-				token{tokenNumber, 0, "-42"},
-				token{tokenEOF, 3, ""},
-			},
-		},
-		testCase{
-			in: "-42.21",
-			tokens: []token{
-				token{tokenNumber, 0, "-42.21"},
-				token{tokenEOF, 6, ""},
-			},
-		},
-		testCase{
-			in: "-.421",
-			tokens: []token{
-				token{tokenNumber, 0, "-.421"},
-				token{tokenEOF, 5, ""},
-			},
-		},
-		testCase{
-			in: "-0.421",
-			tokens: []token{
-				token{tokenNumber, 0, "-0.421"},
-				token{tokenEOF, 6, ""},
-			},
-		},
 		//Durations
-		testCase{
+		{
 			in: "42s",
 			tokens: []token{
 				token{tokenDuration, 0, "42s"},
 				token{tokenEOF, 3, ""},
 			},
 		},
-		testCase{
+		{
 			in: "42.21m",
 			tokens: []token{
 				token{tokenDuration, 0, "42.21m"},
 				token{tokenEOF, 6, ""},
 			},
 		},
-		testCase{
+		{
 			in: ".421h",
 			tokens: []token{
 				token{tokenDot, 0, "."},
@@ -143,143 +234,136 @@ func TestLexer(t *testing.T) {
 				token{tokenEOF, 5, ""},
 			},
 		},
-		testCase{
+		{
 			in: "0.421s",
 			tokens: []token{
 				token{tokenDuration, 0, "0.421s"},
 				token{tokenEOF, 6, ""},
 			},
 		},
-		testCase{
+		{
 			in: "1u",
 			tokens: []token{
 				token{tokenDuration, 0, "1u"},
 				token{tokenEOF, 2, ""},
 			},
 		},
-		testCase{
+		{
 			in: "1µ",
 			tokens: []token{
 				token{tokenDuration, 0, "1µ"},
 				token{tokenEOF, 3, ""},
 			},
 		},
-		testCase{
+		{
 			in: "1ms",
 			tokens: []token{
 				token{tokenDuration, 0, "1ms"},
 				token{tokenEOF, 3, ""},
 			},
 		},
-		testCase{
+		{
 			in: "1h",
 			tokens: []token{
 				token{tokenDuration, 0, "1h"},
 				token{tokenEOF, 2, ""},
 			},
 		},
-		testCase{
+		{
 			in: "1d",
 			tokens: []token{
 				token{tokenDuration, 0, "1d"},
 				token{tokenEOF, 2, ""},
 			},
 		},
-		testCase{
+		{
 			in: "1w",
 			tokens: []token{
 				token{tokenDuration, 0, "1w"},
 				token{tokenEOF, 2, ""},
 			},
 		},
-		//Var
-		testCase{
-			in: "var ",
-			tokens: []token{
-				token{tokenVar, 0, "var"},
-				token{tokenEOF, 4, ""},
-			},
-		},
-		//Ident
-		testCase{
+		//Identifier
+		{
 			in: "variable",
 			tokens: []token{
 				token{tokenIdent, 0, "variable"},
 				token{tokenEOF, 8, ""},
 			},
 		},
-		testCase{
+		{
 			in: "myVar01",
 			tokens: []token{
 				token{tokenIdent, 0, "myVar01"},
 				token{tokenEOF, 7, ""},
 			},
 		},
+		// References
+		{
+			in: `""`,
+			tokens: []token{
+				token{tokenReference, 0, `""`},
+				token{tokenEOF, 2, ""},
+			},
+		},
+		{
+			in: `"ref with spaces"`,
+			tokens: []token{
+				token{tokenReference, 0, `"ref with spaces"`},
+				token{tokenEOF, 17, ""},
+			},
+		},
+		{
+			in: `"ref\""`,
+			tokens: []token{
+				token{tokenReference, 0, `"ref\""`},
+				token{tokenEOF, 7, ""},
+			},
+		},
 		//Strings
-		testCase{
+		{
 			in: `''`,
 			tokens: []token{
 				token{tokenString, 0, `''`},
 				token{tokenEOF, 2, ""},
 			},
 		},
-		testCase{
-			in: `""`,
-			tokens: []token{
-				token{tokenString, 0, `""`},
-				token{tokenEOF, 2, ""},
-			},
-		},
-		testCase{
+		{
 			in: `''''''`,
 			tokens: []token{
 				token{tokenString, 0, `''''''`},
 				token{tokenEOF, 6, ""},
 			},
 		},
-		testCase{
+		{
 			in: `'str'`,
 			tokens: []token{
 				token{tokenString, 0, `'str'`},
 				token{tokenEOF, 5, ""},
 			},
 		},
-		testCase{
-			in: `"str"`,
-			tokens: []token{
-				token{tokenString, 0, `"str"`},
-				token{tokenEOF, 5, ""},
-			},
-		},
-		testCase{
+		{
 			in: `'str\''`,
 			tokens: []token{
 				token{tokenString, 0, `'str\''`},
 				token{tokenEOF, 7, ""},
 			},
 		},
-		testCase{
-			in: `"str\""`,
-			tokens: []token{
-				token{tokenString, 0, `"str\""`},
-				token{tokenEOF, 7, ""},
-			},
-		},
-		testCase{
+		{
 			in: `'''s'tr'''`,
 			tokens: []token{
 				token{tokenString, 0, `'''s'tr'''`},
 				token{tokenEOF, 10, ""},
 			},
 		},
-		testCase{
+		{
 			in: `'''s\'tr'''`,
 			tokens: []token{
 				token{tokenString, 0, `'''s\'tr'''`},
 				token{tokenEOF, 11, ""},
 			},
 		},
-		testCase{
+		{
 			in: `'''str'''`,
 			tokens: []token{
 				token{tokenString, 0, `'''str'''`},
@@ -287,21 +371,21 @@ func TestLexer(t *testing.T) {
 			},
 		},
 		//Space
-		testCase{
+		{
 			in: " ",
 			tokens: []token{
 				token{tokenEOF, 1, ""},
 			},
 		},
-		testCase{
+		{
 			in: " \t\n",
 			tokens: []token{
 				token{tokenEOF, 3, ""},
 			},
 		},
 		//Combinations
-		testCase{
-			in: "var x = avg();",
+		{
+			in: "var x = avg()",
 			tokens: []token{
 				token{tokenVar, 0, "var"},
 				token{tokenIdent, 4, "x"},
@@ -309,12 +393,11 @@ func TestLexer(t *testing.T) {
 				token{tokenIdent, 8, "avg"},
 				token{tokenLParen, 11, "("},
 				token{tokenRParen, 12, ")"},
-				token{tokenSColon, 13, ";"},
-				token{tokenEOF, 14, ""},
+				token{tokenEOF, 13, ""},
 			},
 		},
-		testCase{
-			in: "var x = avg().parallel(4);x.groupby(\"cpu\").window().period(10s);",
+		{
+			in: "var x = avg().parallel(4)x.groupby('cpu').window().period(10s)",
 			tokens: []token{
 				token{tokenVar, 0, "var"},
 				token{tokenIdent, 4, "x"},
@@ -327,29 +410,27 @@ func TestLexer(t *testing.T) {
 				token{tokenLParen, 22, "("},
 				token{tokenNumber, 23, "4"},
 				token{tokenRParen, 24, ")"},
-				token{tokenSColon, 25, ";"},
-				token{tokenIdent, 26, "x"},
-				token{tokenDot, 27, "."},
-				token{tokenIdent, 28, "groupby"},
-				token{tokenLParen, 35, "("},
-				token{tokenString, 36, `"cpu"`},
-				token{tokenRParen, 41, ")"},
-				token{tokenDot, 42, "."},
-				token{tokenIdent, 43, "window"},
-				token{tokenLParen, 49, "("},
-				token{tokenRParen, 50, ")"},
-				token{tokenDot, 51, "."},
-				token{tokenIdent, 52, "period"},
-				token{tokenLParen, 58, "("},
-				token{tokenDuration, 59, "10s"},
-				token{tokenRParen, 62, ")"},
-				token{tokenSColon, 63, ";"},
-				token{tokenEOF, 64, ""},
+				token{tokenIdent, 25, "x"},
+				token{tokenDot, 26, "."},
+				token{tokenIdent, 27, "groupby"},
+				token{tokenLParen, 34, "("},
+				token{tokenString, 35, "'cpu'"},
+				token{tokenRParen, 40, ")"},
+				token{tokenDot, 41, "."},
+				token{tokenIdent, 42, "window"},
+				token{tokenLParen, 48, "("},
+				token{tokenRParen, 49, ")"},
+				token{tokenDot, 50, "."},
+				token{tokenIdent, 51, "period"},
+				token{tokenLParen, 57, "("},
+				token{tokenDuration, 58, "10s"},
+				token{tokenRParen, 61, ")"},
+				token{tokenEOF, 62, ""},
 			},
 		},
 		//Comments
-		testCase{
-			in: "var x = avg();\n// Comment all of this is ignored\nx.groupby(\"cpu\");",
+		{
+			in: "var x = avg()\n// Comment all of this is ignored\nx.groupby('cpu')",
 			tokens: []token{
 				token{tokenVar, 0, "var"},
 				token{tokenIdent, 4, "x"},
@@ -357,19 +438,17 @@ func TestLexer(t *testing.T) {
 				token{tokenIdent, 8, "avg"},
 				token{tokenLParen, 11, "("},
 				token{tokenRParen, 12, ")"},
-				token{tokenSColon, 13, ";"},
-				token{tokenIdent, 49, "x"},
-				token{tokenDot, 50, "."},
-				token{tokenIdent, 51, "groupby"},
-				token{tokenLParen, 58, "("},
-				token{tokenString, 59, `"cpu"`},
-				token{tokenRParen, 64, ")"},
-				token{tokenSColon, 65, ";"},
-				token{tokenEOF, 66, ""},
+				token{tokenIdent, 48, "x"},
+				token{tokenDot, 49, "."},
+				token{tokenIdent, 50, "groupby"},
+				token{tokenLParen, 57, "("},
+				token{tokenString, 58, "'cpu'"},
+				token{tokenRParen, 63, ")"},
+				token{tokenEOF, 64, ""},
 			},
 		},
-		testCase{
-			in: "var x = avg();\n// Comment all of this is ignored",
+		{
+			in: "var x = avg()\n// Comment all of this is ignored",
 			tokens: []token{
 				token{tokenVar, 0, "var"},
 				token{tokenIdent, 4, "x"},
@@ -377,8 +456,7 @@ func TestLexer(t *testing.T) {
 				token{tokenIdent, 8, "avg"},
 				token{tokenLParen, 11, "("},
 				token{tokenRParen, 12, ")"},
-				token{tokenSColon, 13, ";"},
-				token{tokenEOF, 48, ""},
+				token{tokenEOF, 47, ""},
 			},
 		},
 	}

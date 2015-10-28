@@ -342,6 +342,10 @@ func (n *Node) Render(buf *bytes.Buffer, r Renderer) error {
 	// Properties
 	if len(n.Properties) > 0 {
 		r.Header(buf, func() bool { buf.Write([]byte("Properties")); return true }, 2, "")
+		r.Paragraph(buf, func() bool {
+			buf.Write([]byte("Property methods modify state on the calling node. They do not add another node to the pipeline and always return a reference to the calling node."))
+			return true
+		})
 		props := make([]string, len(n.Properties))
 		i := 0
 		for name, _ := range n.Properties {
@@ -358,6 +362,10 @@ func (n *Node) Render(buf *bytes.Buffer, r Renderer) error {
 	// Methods
 	if len(n.Methods) > 0 {
 		r.Header(buf, func() bool { buf.Write([]byte("Chaining Methods")); return true }, 2, "")
+		r.Paragraph(buf, func() bool {
+			buf.Write([]byte("Chaining methods create a new node in the pipeline as a child of the calling node. They do not modify the calling node."))
+			return true
+		})
 		methods := make([]string, len(n.Methods))
 		i := 0
 		for name, _ := range n.Methods {

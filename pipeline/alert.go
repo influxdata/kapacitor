@@ -1,14 +1,18 @@
 package pipeline
 
+import (
+	"github.com/influxdb/kapacitor/tick"
+)
+
 // An AlertNode can trigger an alert of varying severity levels
 // based on the data it receives.
 //
 // Example:
 //   stream
 //        .alert()
-//            .info("value > 10")
-//            .warn("value > 20")
-//            .crit("value > 30")
+//            .info(lambda: "value" > 10)
+//            .warn(lambda: "value" > 20)
+//            .crit(lambda: "value" > 30)
 //            .post("http://example.com/api/alert")
 //
 //
@@ -25,13 +29,13 @@ type AlertNode struct {
 
 	// Filter expression for the INFO alert level.
 	// An empty value indicates the level is invalid and is skipped.
-	Info string
+	Info tick.Node
 	// Filter expression for the WARNING alert level.
 	// An empty value indicates the level is invalid and is skipped.
-	Warn string
+	Warn tick.Node
 	// Filter expression for the CRITICAL alert level.
 	// An empty value indicates the level is invalid and is skipped.
-	Crit string
+	Crit tick.Node
 
 	//tick:ignore
 	UseFlapping bool

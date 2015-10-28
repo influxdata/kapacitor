@@ -38,12 +38,12 @@ func TestStream_Window(t *testing.T) {
 
 	var script = `
 stream
-	.from('''"dbname"."rpname"."cpu"''')
-	.where("host = 'serverA'")
+	.from('"dbname"."rpname"."cpu"')
+	.where(lambda: "host" == 'serverA')
 	.window()
 		.period(10s)
 		.every(10s)
-	.httpOut("TestStream_Window")
+	.httpOut('TestStream_Window')
 `
 
 	nums := []float64{
@@ -114,13 +114,13 @@ func TestStream_SimpleMR(t *testing.T) {
 
 	var script = `
 stream
-	.from("cpu")
-	.where("host = 'serverA'")
+	.from('cpu')
+	.where(lambda: "host" == 'serverA')
 	.window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.count("value"))
-	.httpOut("TestStream_SimpleMR")
+	.mapReduce(influxql.count('value'))
+	.httpOut('TestStream_SimpleMR')
 `
 	er := kapacitor.Result{
 		Series: imodels.Rows{
@@ -172,13 +172,13 @@ func TestStream_GroupBy(t *testing.T) {
 
 	var script = `
 stream
-	.from("errors")
-	.groupBy("service")
+	.from('errors')
+	.groupBy('service')
 	.window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.sum("value"))
-	.httpOut("error_count")
+	.mapReduce(influxql.sum('value'))
+	.httpOut('error_count')
 `
 
 	er := kapacitor.Result{
@@ -250,27 +250,28 @@ func TestStream_Join(t *testing.T) {
 	var script = `
 var errorCounts = stream
 			.fork()
-			.from("errors")
-			.groupBy("service")
+			.from('errors')
+			.groupBy('service')
 			.window()
 				.period(10s)
 				.every(10s)
-			.mapReduce(influxql.sum("value"))
+			.mapReduce(influxql.sum('value'))
 
 var viewCounts = stream
 			.fork()
-			.from("views")
-			.groupBy("service")
+			.from('views')
+			.groupBy('service')
 			.window()
 				.period(10s)
 				.every(10s)
-			.mapReduce(influxql.sum("value"))
+			.mapReduce(influxql.sum('value'))
 
 errorCounts.join(viewCounts)
-		.as("errors", "views")
-		.rename("error_view")
-		.apply(expr("error_percent", "errors.sum / views.sum"))
-		.httpOut("error_rate")
+		.as('errors', 'views')
+		.streamName('error_view')
+		.eval(lambda: "errors.sum" / "views.sum")
+			.as('error_percent')
+		.httpOut('error_rate')
 `
 
 	er := kapacitor.Result{
@@ -348,24 +349,24 @@ func TestStream_Union(t *testing.T) {
 	var script = `
 var cpu = stream
 			.fork()
-			.from("cpu")
-			.where("cpu = 'total'")
+			.from('cpu')
+			.where(lambda: "cpu" == 'total')
 var mem = stream
 			.fork()
-			.from("memory")
-			.where("type = 'free'")
+			.from('memory')
+			.where(lambda: "type" == 'free')
 var disk = stream
 			.fork()
-			.from("disk")
-			.where("device = 'sda'")
+			.from('disk')
+			.where(lambda: "device" == 'sda')
 
 cpu.union(mem, disk)
-		.rename("cpu_mem_disk")
+		.rename('cpu_mem_disk')
 		.window()
 			.period(10s)
 			.every(10s)
-		.mapReduce(influxql.count("value"))
-		.httpOut("all")
+		.mapReduce(influxql.count('value'))
+		.httpOut('all')
 `
 
 	er := kapacitor.Result{
@@ -424,13 +425,13 @@ func TestStream_Aggregations(t *testing.T) {
 
 	var scriptTmpl = `
 stream
-	.from("cpu")
-	.where("host = 'serverA'")
+	.from('cpu')
+	.where(lambda: "host" == 'serverA')
 	.window()
 		.period(10s)
 		.every(10s)
-	.mapReduce({{ .Method }}("value" {{ .Args }}))
-	.httpOut("{{ .Method }}")
+	.mapReduce({{ .Method }}('value' {{ .Args }}))
+	.httpOut('{{ .Method }}')
 `
 	testCases := []testCase{
 		testCase{
@@ -711,15 +712,15 @@ stream
 func TestStream_CustomFunctions(t *testing.T) {
 	t.Skip()
 	var script = `
-var fMap = loadMapFunc("./TestCustomMapFunction.py")
-var fReduce = loadReduceFunc("./TestCustomReduceFunction.py")
+var fMap = loadMapFunc('./TestCustomMapFunction.py')
+var fReduce = loadReduceFunc('./TestCustomReduceFunction.py')
 stream
-	.from("cpu")
-	.where("host = 'serverA'")
+	.from('cpu')
+	.where(lambda: "host" == 'serverA')
 	.window()
 		.period(1s)
 		.every(1s)
-	.map(fMap, "idle")
+	.map(fMap, 'idle')
 	.reduce(fReduce)
 	.cache()
 `
@@ -732,14 +733,14 @@ stream
 func TestStream_CustomMRFunction(t *testing.T) {
 	t.Skip()
 	var script = `
-var fMapReduce = loadMapReduceFunc("./TestCustomMapReduceFunction.py")
+var fMapReduce = loadMapReduceFunc('./TestCustomMapReduceFunction.py')
 stream
-	.from("cpu")
-	.where("host = 'serverA'")
+	.from('cpu')
+	.where(lambda: "host" = 'serverA')
 	.window()
 		.period(1s)
 		.every(1s)
-	.mapReduce(fMap, "idle")
+	.mapReduce(fMap, 'idle')
 	.cache()
 `
 
@@ -766,17 +767,17 @@ func TestStream_Alert(t *testing.T) {
 
 	var script = `
 stream
-	.from("cpu")
-	.where("host = 'serverA'")
+	.from('cpu')
+	.where(lambda: "host" == 'serverA')
 	.window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.count("idle"))
+	.mapReduce(influxql.count('idle'))
 	.alert()
-		.info("count > 6")
-		.warn("count > 7")
-		.crit("count > 8")
-		.post("` + ts.URL + `")
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.post('` + ts.URL + `')
 `
 
 	clock, et, errCh, tm := testStreamer(t, "TestStream_Alert", script)
@@ -816,14 +817,15 @@ func TestStream_AlertSigma(t *testing.T) {
 
 	var script = `
 stream
-	.from("cpu")
-	.where("host = 'serverA'")
-	.apply(expr("sigma", "sigma(value)"))
+	.from('cpu')
+	.where(lambda: "host" == 'serverA')
+	.eval(lambda: sigma("value"))
+		.as('sigma')
 	.alert()
-		.info("sigma > 2")
-		.warn("sigma > 3")
-		.crit("sigma > 3.5")
-		.post("` + ts.URL + `")
+		.info(lambda: "sigma" > 2.0)
+		.warn(lambda: "sigma" > 3.0)
+		.crit(lambda: "sigma" > 3.5)
+		.post('` + ts.URL + `')
 `
 
 	clock, et, errCh, tm := testStreamer(t, "TestStream_AlertSigma", script)
@@ -856,18 +858,18 @@ func TestStream_AlertComplexWhere(t *testing.T) {
 		requestCount++
 		expAns := `{"level":"CRITICAL","data":{"Series":[{"name":"cpu","tags":{"host":"serverA","type":"idle"},"columns":["time","value"],"values":[["1970-01-01T00:00:07Z",16]]}],"Err":null}}`
 		if string(ans) != expAns {
-			t.Errorf("got %v exp %v", string(ans), expAns)
+			t.Errorf("unexpected result:\ngot %v\nexp %v", string(ans), expAns)
 		}
 	}))
 	defer ts.Close()
 
 	var script = `
 stream
-	.from("cpu")
-	.where("host = 'serverA' AND sigma(value) > 2")
+	.from('cpu')
+	.where(lambda: "host" == 'serverA' AND sigma("value") > 2)
 	.alert()
-		.crit("true")
-		.post("` + ts.URL + `")
+		.crit(lambda: TRUE)
+		.post('` + ts.URL + `')
 `
 
 	clock, et, errCh, tm := testStreamer(t, "TestStream_AlertComplexWhere", script)
@@ -898,14 +900,14 @@ func TestStream_AlertFlapping(t *testing.T) {
 	defer ts.Close()
 	var script = `
 stream
-	.from("cpu")
-	.where("host = 'serverA'")
+	.from('cpu')
+	.where(lambda: "host" == 'serverA')
 	.alert()
-		.info("value < 95")
-		.warn("value < 94")
-		.crit("value < 93")
+		.info(lambda: "value" < 95)
+		.warn(lambda: "value" < 94)
+		.crit(lambda: "value" < 93)
 		.flapping(0.25, 0.50)
-		.post("` + ts.URL + `")
+		.post('` + ts.URL + `')
 `
 
 	clock, et, errCh, tm := testStreamer(t, "TestStream_AlertFlapping", script)
@@ -932,17 +934,17 @@ func TestStream_InfluxDBOut(t *testing.T) {
 
 	var script = `
 stream
-	.from("cpu")
-	.where("host = 'serverA'")
+	.from('cpu')
+	.where(lambda: "host" == 'serverA')
 	.window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.count("value"))
+	.mapReduce(influxql.count('value'))
 	.influxDBOut()
-		.database("db")
-		.retentionPolicy("rp")
-		.measurement("m")
-		.precision("s")
+		.database('db')
+		.retentionPolicy('rp')
+		.measurement('m')
+		.precision('s')
 `
 	done := make(chan error, 1)
 	var points []imodels.Point

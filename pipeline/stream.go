@@ -1,5 +1,9 @@
 package pipeline
 
+import (
+	"github.com/influxdb/kapacitor/tick"
+)
+
 // A StreamNode represents the source of data being
 // streamed to Kapacitor via any of its inputs.
 // The stream node allows you to select which portion of the stream
@@ -9,8 +13,8 @@ package pipeline
 //
 // Example:
 //    stream
-//           .from('''"mydb"."myrp"."mymeasurement"''')
-//           .where("host =~ /logger\d+/")
+//           .from('"mydb"."myrp"."mymeasurement"')
+//           .where(lambda: "host" =~ /logger\d+/)
 //        .window()
 //        ...
 //
@@ -30,7 +34,7 @@ type StreamNode struct {
 	From string
 	// An expression to filter the data stream.
 	// tick:ignore
-	Predicate string
+	Expression tick.Node
 }
 
 func newStreamNode() *StreamNode {
@@ -66,7 +70,7 @@ func (s *StreamNode) Fork() *StreamNode {
 //
 // If empty then all data points are considered to match.
 // tick:property
-func (s *StreamNode) Where(expression string) *StreamNode {
-	s.Predicate = expression
+func (s *StreamNode) Where(expression tick.Node) *StreamNode {
+	s.Expression = expression
 	return s
 }

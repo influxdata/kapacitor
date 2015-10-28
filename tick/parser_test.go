@@ -1,6 +1,7 @@
 package tick
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -36,14 +37,16 @@ func TestParseErrors(t *testing.T) {
 	test := func(tc testCase) {
 		_, err := parse(tc.Text)
 		if assert.NotNil(err) {
-			assert.Equal(tc.Error, err.Error())
+			if e, g := tc.Error, err.Error(); g != e {
+				t.Errorf("unexpected error: \ngot %s \nexp %s", g, e)
+			}
 		}
 	}
 
 	cases := []testCase{
 		testCase{
 			Text:  "a\n\n\nvar b = ",
-			Error: `parser: unexpected EOF line 4 char 9 in "\n\nvar b = ". expected: "identifier"`,
+			Error: "parser: unexpected EOF line 4 char 9 in \"\n\nvar b = \". expected: \"identifier\"",
 		},
 		testCase{
 			Text:  "a\n\n\nvar b = stream.window()var period",
@@ -67,37 +70,29 @@ func TestParseStrings(t *testing.T) {
 		literal string
 	}{
 		{
-			script:  `f('a')`,
-			literal: "a",
+			script:  `f('asdf')`,
+			literal: "asdf",
 		},
 		{
-			script:  `f("a")`,
-			literal: "a",
+			script:  `f('''asdf''')`,
+			literal: "asdf",
 		},
 		{
-			script:  `f('''a''')`,
-			literal: "a",
+			script:  `f('a\'sdf')`,
+			literal: "a'sdf",
 		},
 		{
-			script:  `f('a\'')`,
-			literal: "a'",
-		},
-		{
-			script:  `f("a\"")`,
-			literal: "a\"",
-		},
-		{
-			script:  `f('''\'a''')`,
-			literal: `\'a`,
+			script:  `f('''\'asdf''')`,
+			literal: `\'asdf`,
 		},
 	}
 
 	for _, tc := range testCases {
-		tree, err := parse(tc.script)
+		root, err := parse(tc.script)
 		assert.Nil(err)
 
 		//Assert we have a list of one statement
-		l, ok := tree.Root.(*listNode)
+		l, ok := root.(*ListNode)
 		if !assert.True(ok, "tree.Root is not a list node") {
 			t.FailNow()
 		}
@@ -106,14 +101,14 @@ func TestParseStrings(t *testing.T) {
 		}
 
 		//Assert the first statement is a function with one stringNode argument
-		f, ok := l.Nodes[0].(*funcNode)
+		f, ok := l.Nodes[0].(*FunctionNode)
 		if !assert.True(ok, "first statement is not a func node %q", l.Nodes[0]) {
 			t.FailNow()
 		}
 		if !assert.Equal(1, len(f.Args), "unexpected number of args got %d exp %d", len(f.Args), 1) {
 			t.FailNow()
 		}
-		str, ok := f.Args[0].(*stringNode)
+		str, ok := f.Args[0].(*StringNode)
 		if !assert.True(ok, "first argument is not a string node %q", f.Args[0]) {
 			t.FailNow()
 		}
@@ -124,185 +119,137 @@ func TestParseStrings(t *testing.T) {
 
 }
 
-func TestParseSingleStmt(t *testing.T) {
-	assert := assert.New(t)
+func TestParseStatements(t *testing.T) {
 
-	script := `
+	testCases := []struct {
+		script string
+		Root   Node
+		err    error
+	}{
+		{
+			script: `var x = a.f()`,
+			Root: &ListNode{
+				Nodes: []Node{
+					&BinaryNode{
+						pos:      6,
+						Operator: tokenAsgn,
+						Left: &IdentifierNode{
+							pos:   4,
+							Ident: "x",
+						},
+						Right: &BinaryNode{
+							pos:      9,
+							Operator: tokenDot,
+							Left: &IdentifierNode{
+								pos:   8,
+								Ident: "a",
+							},
+							Right: &FunctionNode{
+								pos:  10,
+								Func: "f",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			script: `
 var x = stream
 		.window()
 		.period(5m)
 		.every(1m)
-		.map(influxql.agg.mean("value"))
-`
-	tree, err := parse(script)
-	assert.Nil(err)
-
-	// Expect a tree like so:
-	/*
-	           Root
-	            |
-	          (b0 =)
-	           / \
-	          /   \
-	         /     \
-	       (x)     (b1 .)
-	                / \
-	               /   \
-	              /     \
-	         (map)       (b2 .)
-	          /            |   \
-	         /             |    \
-	        /              |     \
-	    (b5 .)            (every) (b3 .)
-	     /  \               |       / \
-	    /    \             (1m)    /   \
-	   /      \                   /     \
-	 (mean)    (b6 .)         (period) (b4 .)
-	    |       /  \             |       / \
-	 ("value") /    \           (5m)    /   \
-	          /      \                 /     \
-	       (agg)  (influxql)      (window) (stream)
-	*/
-	//Notice the inverted nature of the tree. This structure makes evaluating the tree recursive depth first.
-
-	//Assert we have a list of one statement
-	l, ok := tree.Root.(*listNode)
-	if !assert.True(ok, "tree.Root is not a list node") {
-		t.FailNow()
+		.map(influxql.agg.mean('value'))`,
+			Root: &ListNode{
+				pos: 1,
+				Nodes: []Node{&BinaryNode{
+					pos:      7,
+					Operator: tokenAsgn,
+					Left: &IdentifierNode{
+						pos:   5,
+						Ident: "x",
+					},
+					Right: &BinaryNode{
+						pos:      57,
+						Operator: tokenDot,
+						Left: &BinaryNode{
+							pos:      44,
+							Operator: tokenDot,
+							Left: &BinaryNode{
+								pos:      30,
+								Operator: tokenDot,
+								Left: &BinaryNode{
+									pos:      18,
+									Operator: tokenDot,
+									Left: &IdentifierNode{
+										pos:   9,
+										Ident: "stream",
+									},
+									Right: &FunctionNode{
+										pos:  19,
+										Func: "window",
+									},
+								},
+								Right: &FunctionNode{
+									pos:  31,
+									Func: "period",
+									Args: []Node{&DurationNode{
+										pos: 38,
+										Dur: 5 * time.Minute,
+									}},
+								},
+							},
+							Right: &FunctionNode{
+								pos:  45,
+								Func: "every",
+								Args: []Node{&DurationNode{
+									pos: 51,
+									Dur: time.Minute,
+								}},
+							},
+						},
+						Right: &FunctionNode{
+							pos:  58,
+							Func: "map",
+							Args: []Node{&BinaryNode{
+								pos:      74,
+								Operator: tokenDot,
+								Left: &BinaryNode{
+									pos:      70,
+									Operator: tokenDot,
+									Left: &IdentifierNode{
+										pos:   62,
+										Ident: "influxql",
+									},
+									Right: &IdentifierNode{
+										pos:   71,
+										Ident: "agg",
+									},
+								},
+								Right: &FunctionNode{
+									pos:  75,
+									Func: "mean",
+									Args: []Node{&StringNode{
+										pos:     80,
+										Literal: "value",
+									}},
+								},
+							}},
+						},
+					},
+				}},
+			},
+		},
 	}
-	if !assert.Equal(1, len(l.Nodes), "Did not get exactly one node in statement list") {
-		t.FailNow()
-	}
 
-	//Assert the first statement is a binary node with operator '='
-	b0, ok := l.Nodes[0].(*binaryNode)
-	if !assert.True(ok, "first statement is not a binary node %q", l.Nodes[0]) {
-		t.FailNow()
-	}
-	assert.Equal("=", b0.Operator.val)
-
-	//Assert b0.left is an ident node of 'x'
-	varX, ok := b0.Left.(*identNode)
-	if !assert.True(ok, "b0.left is not an ident node %q", b0.Left) {
-		t.FailNow()
-	}
-	assert.Equal("x", varX.Ident)
-
-	//Assert b0.right is a binary node of operator '.'
-	b1, ok := b0.Right.(*binaryNode)
-	if !assert.True(ok, "b0.right is not a binary node %q", b0.Right) {
-		t.FailNow()
-	}
-	assert.Equal(".", b1.Operator.val)
-
-	//Assert b1.left is func node 'map'
-	fMap, ok := b1.Left.(*funcNode)
-	if !assert.True(ok, "b1.left is not func node %q", b1.Left) {
-		t.FailNow()
-	}
-	assert.Equal("map", fMap.Func)
-	if assert.Equal(1, len(fMap.Args)) {
-
-		//Assert first arg to 'map' is binary node
-		b5, ok := fMap.Args[0].(*binaryNode)
-		if !assert.True(ok, "First argument to 'map' is not binary node %q", fMap.Args[0]) {
-			t.FailNow()
+	for _, tc := range testCases {
+		root, err := parse(tc.script)
+		if err != tc.err {
+			t.Fatalf("unexpected error: got %v exp %v", err, tc.err)
 		}
 
-		//Assert b5.left is ident node 'mean'
-		fMean, ok := b5.Left.(*funcNode)
-		if assert.True(ok, "b5.left is not a func node %q", b5.Left) {
-			assert.Equal("mean", fMean.Func)
-		}
-		// Assert mean() has single "value" argument
-		if assert.Equal(1, len(fMean.Args)) {
-			//Assert first arg to 'mean' is stringNode
-			value, ok := fMean.Args[0].(*stringNode)
-			if assert.True(ok, "first argument to 'mean' is not string node %q", fMap.Args[0]) {
-				assert.Equal("value", value.Literal)
-			}
-		}
-
-		//Assert b5.right is binary node of operator '.'
-		b6, ok := b5.Right.(*binaryNode)
-		if assert.True(ok, "b5.right is not a binary node %q", b5.Right) {
-			assert.Equal(".", b6.Operator.val)
-		}
-
-		//Assert b6.left is ident node 'agg'
-		agg, ok := b6.Left.(*identNode)
-		if assert.True(ok, "b6.left is not a ident node %q", b6.Left) {
-			assert.Equal("agg", agg.Ident)
-		}
-
-		//Assert b6.right is ident node 'influxql'
-		influxql, ok := b6.Right.(*identNode)
-		if assert.True(ok, "b6.right is not a ident node %q", b6.Right) {
-			assert.Equal("influxql", influxql.Ident)
-		}
-
-	}
-
-	//Assert b1.right is binary node of operator '.'
-	b2, ok := b1.Right.(*binaryNode)
-	if !assert.True(ok, "b1.right is not a binary node %q", b1.Right) {
-		t.FailNow()
-	}
-	assert.Equal(".", b2.Operator.val)
-
-	//Assert b2.left is func node 'every'
-	fEvery, ok := b2.Left.(*funcNode)
-	if !assert.True(ok, "b2.left is not func node %q", b2.Left) {
-		t.FailNow()
-	}
-	assert.Equal("every", fEvery.Func)
-	if assert.Equal(1, len(fEvery.Args)) {
-		d, ok := fEvery.Args[0].(*durationNode)
-		if assert.True(ok, "First argument to 'every' is not duration node %q", fEvery.Args[0]) {
-			assert.Equal(time.Minute, d.Dur)
+		if !reflect.DeepEqual(root, tc.Root) {
+			t.Fatalf("unequal trees: \ngot %v \nexp %v", root, tc.Root)
 		}
 	}
-
-	//Assert b2.right is binary node of operator '.'
-	b3, ok := b2.Right.(*binaryNode)
-	if !assert.True(ok, "b2.right is not a binary node %q", b2.Right) {
-		t.FailNow()
-	}
-	assert.Equal(".", b3.Operator.val)
-
-	//Assert b3.left is func node 'period'
-	fPeriod, ok := b3.Left.(*funcNode)
-	if !assert.True(ok, "b3.left is not func node %q", b3.Left) {
-		t.FailNow()
-	}
-	assert.Equal("period", fPeriod.Func)
-	if assert.Equal(1, len(fPeriod.Args)) {
-		d, ok := fPeriod.Args[0].(*durationNode)
-		if assert.True(ok, "First argument to 'period' is not duration node %q", fPeriod.Args[0]) {
-			assert.Equal(time.Minute*5, d.Dur)
-		}
-	}
-
-	//Assert b3.right is a binary node of operator '.'
-	b4, ok := b3.Right.(*binaryNode)
-	if !assert.True(ok, "b3.right is not a binary node %q", b3.Right) {
-		t.FailNow()
-	}
-	assert.Equal(".", b4.Operator.val)
-
-	//Assert b4.left is func node 'window'
-	fWindow, ok := b4.Left.(*funcNode)
-	if !assert.True(ok, "b4.left is not func node %q", b4.Left) {
-		t.FailNow()
-	}
-	assert.Equal("window", fWindow.Func)
-	assert.Equal(0, len(fWindow.Args))
-
-	//Assert b4.right is ident node 'stream'
-	iStream, ok := b4.Right.(*identNode)
-	if !assert.True(ok, "b4.right is not ident node %q", b4.Right) {
-		t.FailNow()
-	}
-	assert.Equal("stream", iStream.Ident)
-
 }
