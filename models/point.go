@@ -32,12 +32,15 @@ type Point struct {
 
 // Returns byte array of a line protocol representation of the point
 func (p Point) Bytes(precision string) []byte {
-	mp := models.NewPoint(
+	mp, err := models.NewPoint(
 		p.Name,
 		p.Tags,
 		map[string]interface{}(p.Fields),
 		p.Time,
 	)
+	if err != nil {
+		panic(err)
+	}
 
 	return []byte(mp.PrecisionString(precision))
 }
