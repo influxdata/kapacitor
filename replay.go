@@ -155,9 +155,10 @@ func (r *replaySource) ReplayBatch(batch BatchCollector) {
 							series.Tags,
 						),
 						Tags:   series.Tags,
-						Points: make([]models.TimeFields, len(series.Values)),
+						Points: make([]models.TimeFields, 0, len(series.Values)),
 					}
-					for i, v := range series.Values {
+					for _, v := range series.Values {
+						var skip bool
 						tf := models.TimeFields{}
 						tf.Fields = make(models.Fields, len(series.Columns))
 						for i, c := range series.Columns {
@@ -169,11 +170,17 @@ func (r *replaySource) ReplayBatch(batch BatchCollector) {
 								}
 								tf.Time = st.Add(diff).UTC()
 							} else {
+								if v[i] == nil {
+									skip = true
+									break
+								}
 								tf.Fields[c] = v[i]
 							}
 						}
-						lastTime = tf.Time
-						b.Points[i] = tf
+						if !skip {
+							lastTime = tf.Time
+							b.Points = append(b.Points, tf)
+						}
 					}
 					r.clck.Until(lastTime)
 					batch.CollectBatch(b)

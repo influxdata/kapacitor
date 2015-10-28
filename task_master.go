@@ -81,7 +81,10 @@ func (tm *TaskMaster) Close() error {
 }
 
 func (tm *TaskMaster) StartTask(t *Task) (*ExecutingTask, error) {
-	et := NewExecutingTask(tm, t)
+	et, err := NewExecutingTask(tm, t)
+	if err != nil {
+		return nil, err
+	}
 
 	var in *Edge
 	switch et.Task.Type {
@@ -92,7 +95,7 @@ func (tm *TaskMaster) StartTask(t *Task) (*ExecutingTask, error) {
 		tm.batches[t.Name] = in
 	}
 
-	err := et.start(in)
+	err = et.start(in)
 	if err != nil {
 		return nil, err
 	}

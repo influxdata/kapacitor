@@ -123,9 +123,6 @@ func (q *Query) Dimensions(dims []interface{}) error {
 		}
 	}
 
-	if !hasTime {
-		return fmt.Errorf("groupBy must have a time dimension.")
-	}
 	return nil
 }
 
