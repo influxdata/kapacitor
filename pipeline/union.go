@@ -6,9 +6,9 @@ package pipeline
 // without modification.
 //
 // Example:
-//    var logins = stream.fork().from('logins')
-//    var logouts = stream.fork().from('logouts')
-//    var frontpage = stream.fork().from('frontpage')
+//    var logins = stream.from('logins')
+//    var logouts = stream.from('logouts')
+//    var frontpage = stream.from('frontpage')
 //    // Union all user actions into a single stream
 //    logins.union(logouts, frontpage)
 //            .rename('user_actions')

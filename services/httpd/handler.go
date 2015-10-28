@@ -179,7 +179,7 @@ func (h *Handler) DelRoutes(routes []Route) {
 func (h *Handler) DelRoute(r Route) {
 	mux, ok := h.methodMux[r.Method]
 	if ok {
-		mux.Deregister(r.Pattern)
+		mux.Deregister(APIRoot + r.Pattern)
 	}
 }
 

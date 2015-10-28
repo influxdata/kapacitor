@@ -26,10 +26,10 @@ func newStreamNode(et *ExecutingTask, n *pipeline.StreamNode) (*StreamNode, erro
 	}
 	sn.node.runF = sn.runStream
 	var err error
-	if sn.s.From != "" {
-		sn.db, sn.rp, sn.name, err = parseFromClause(sn.s.From)
+	if sn.s.FromSelector != "" {
+		sn.db, sn.rp, sn.name, err = parseFromClause(sn.s.FromSelector)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing FROM clause %q %v", sn.s.From, err)
+			return nil, fmt.Errorf("error parsing FROM clause %q %v", sn.s.FromSelector, err)
 		}
 	}
 	if n.Expression != nil {

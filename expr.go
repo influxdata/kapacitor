@@ -20,16 +20,16 @@ func EvalPredicate(se *tick.StatefulExpr, fields models.Fields, tags map[string]
 	return b, nil
 }
 
-func mergeFieldsAndTags(fields models.Fields, tags map[string]string) (tick.Vars, error) {
-	vars := make(tick.Vars)
+func mergeFieldsAndTags(fields models.Fields, tags map[string]string) (*tick.Scope, error) {
+	scope := tick.NewScope()
 	for k, v := range fields {
 		if _, ok := tags[k]; ok {
 			return nil, fmt.Errorf("cannot have field and tags with same name %q", k)
 		}
-		vars[k] = v
+		scope.Set(k, v)
 	}
 	for k, v := range tags {
-		vars[k] = v
+		scope.Set(k, v)
 	}
-	return vars, nil
+	return scope, nil
 }

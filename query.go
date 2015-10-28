@@ -61,6 +61,22 @@ func NewQuery(q string) (*Query, error) {
 	return query, nil
 }
 
+// Return the db rp pairs of the query
+func (q *Query) DBRPs() ([]DBRP, error) {
+	dbrps := make([]DBRP, len(q.q.Sources))
+	for i, s := range q.q.Sources {
+		m, ok := s.(*influxql.Measurement)
+		if !ok {
+			return nil, fmt.Errorf("unknown query source %T", s)
+		}
+		dbrps[i] = DBRP{
+			Database:        m.Database,
+			RetentionPolicy: m.RetentionPolicy,
+		}
+	}
+	return dbrps, nil
+}
+
 // Set the start time of the query
 func (q *Query) Start(s time.Time) {
 	q.startTL.Val = s

@@ -9,11 +9,9 @@ import (
 // The stream node allows you to select which portion of the stream
 // you want to process.
 //
-// If you want to process multiple independent streams see the `fork` chaining method.
-//
 // Example:
 //    stream
-//           .from('"mydb"."myrp"."mymeasurement"')
+//        .from('"mydb"."myrp"."mymeasurement"')
 //           .where(lambda: "host" =~ /logger\d+/)
 //        .window()
 //        ...
@@ -23,18 +21,13 @@ import (
 // the tag `host` matches the regex `logger\d+`
 type StreamNode struct {
 	chainnode
-	// Which database, retention policy and measurement to select.
-	// This is equivalent to the FROM statement in an InfluxQL
-	// query. As such shortened selectors can be supplied
-	// (i.e. "mymeasurement" is valid and selects all data points
-	// from the measurement "mymeasurement" independent
-	// of database or retention policy).
-	//
-	// If empty then all data points are considered to match.
-	From string
 	// An expression to filter the data stream.
 	// tick:ignore
 	Expression tick.Node
+
+	// The db.rp.m from clause
+	// tick:ignore
+	FromSelector string
 }
 
 func newStreamNode() *StreamNode {
@@ -43,24 +36,30 @@ func newStreamNode() *StreamNode {
 	}
 }
 
-// Fork the current stream. This is useful if you want to
-// select multiple different data streams.
+// Which database, retention policy and measurement to select.
+// This is equivalent to the FROM statement in an InfluxQL
+// query. As such shortened selectors can be supplied
+// (i.e. "mymeasurement" is valid and selects all data points
+// from the measurement "mymeasurement" independent
+// of database or retention policy).
+//
+// Creates a new stream node that can be further
+// filtered using the Where property.
+// From can be called multiple times to create multiple
+// independent forks of the data stream.
 //
 // Example:
-//    var errors = stream.fork().from("errors")
-//    var requests = stream.fork().from("requests")
-//
-// Example:
-//    // This will not work since you are just changing
-//    // the 'from' condition on the same stream node.
-//    var errors = stream.from("errors")
-//    var requests = stream.from("requests")
-//    // 'errors' is now the same as 'requests'.
-//
-func (s *StreamNode) Fork() *StreamNode {
-	c := newStreamNode()
-	s.linkChild(c)
-	return c
+//    var cpu = stream.from('cpu')
+//    var load = stream.from('load')
+//    // Join cpu and load streams and do further processing
+//    cpu.join(load)
+//            .as('cpu', 'load')
+//        ...
+func (s *StreamNode) From(from string) *StreamNode {
+	f := newStreamNode()
+	f.FromSelector = from
+	s.linkChild(f)
+	return f
 }
 
 // Filter the current stream using the given expression.

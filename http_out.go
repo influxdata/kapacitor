@@ -118,6 +118,7 @@ func (h *HTTPOutNode) updateResultWithBatch(b models.Batch) {
 		h.result.Series[idx] = row
 	}
 }
+
 func (h *HTTPOutNode) stopOut() {
 	h.et.tm.HTTPDService.DelRoutes(h.routes)
 }

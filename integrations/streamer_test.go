@@ -22,6 +22,13 @@ import (
 
 var httpService *httpd.Service
 
+var dbrps = []kapacitor.DBRP{
+	{
+		Database:        "dbname",
+		RetentionPolicy: "rpname",
+	},
+}
+
 func init() {
 	wlog.LogLevel = wlog.OFF
 	// create API server
@@ -249,7 +256,6 @@ func TestStream_Join(t *testing.T) {
 
 	var script = `
 var errorCounts = stream
-			.fork()
 			.from('errors')
 			.groupBy('service')
 			.window()
@@ -258,7 +264,6 @@ var errorCounts = stream
 			.mapReduce(influxql.sum('value'))
 
 var viewCounts = stream
-			.fork()
 			.from('views')
 			.groupBy('service')
 			.window()
@@ -348,15 +353,12 @@ func TestStream_Union(t *testing.T) {
 
 	var script = `
 var cpu = stream
-			.fork()
 			.from('cpu')
 			.where(lambda: "cpu" == 'total')
 var mem = stream
-			.fork()
 			.from('memory')
 			.where(lambda: "type" == 'free')
 var disk = stream
-			.fork()
 			.from('disk')
 			.where(lambda: "device" == 'sda')
 
@@ -1028,7 +1030,7 @@ func testStreamer(t *testing.T, name, script string) (clock.Setter, *kapacitor.E
 	}
 
 	//Create the task
-	task, err := kapacitor.NewStreamer(name, script)
+	task, err := kapacitor.NewStreamer(name, script, dbrps)
 	if err != nil {
 		t.Fatal(err)
 	}

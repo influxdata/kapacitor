@@ -39,7 +39,7 @@ type Service struct {
 		Addr() string
 	}
 	TaskMaster interface {
-		NewFork(name string) *kapacitor.Edge
+		NewFork(name string, dbrps []kapacitor.DBRP) *kapacitor.Edge
 		DelFork(name string)
 		New() *kapacitor.TaskMaster
 	}
@@ -165,22 +165,26 @@ func (r *Service) handleReplay(w http.ResponseWriter, req *http.Request) {
 	}
 
 	replay := kapacitor.NewReplay(clk)
+	var replayC <-chan error
 	switch t.Type {
 	case kapacitor.StreamerTask:
-		err = <-replay.ReplayStream(f, tm.Stream)
+		replayC = replay.ReplayStream(f, tm.Stream)
 	case kapacitor.BatcherTask:
 		batch := tm.BatchCollector(name)
-		err = <-replay.ReplayBatch(f, batch)
+		replayC = replay.ReplayBatch(f, batch)
 	}
 
-	if err != nil {
-		httpd.HttpError(w, "replay: "+err.Error(), true, http.StatusInternalServerError)
-		return
-	}
-
+	// Check first for error on task
 	err = et.Err()
 	if err != nil {
 		httpd.HttpError(w, "task run: "+err.Error(), true, http.StatusInternalServerError)
+		return
+	}
+
+	// Check for error on replay
+	err = <-replayC
+	if err != nil {
+		httpd.HttpError(w, "replay: "+err.Error(), true, http.StatusInternalServerError)
 		return
 	}
 
@@ -198,13 +202,25 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 	typ := req.URL.Query().Get("type")
 	switch typ {
 	case "stream":
+		task := req.URL.Query().Get("name")
+		if task == "" {
+			httpd.HttpError(w, "no task specified", true, http.StatusBadRequest)
+			return
+		}
+		t, err := r.TaskStore.Load(task)
+		if err != nil {
+			httpd.HttpError(w, err.Error(), true, http.StatusNotFound)
+			return
+		}
+
 		durStr := req.URL.Query().Get("duration")
 		dur, err := time.ParseDuration(durStr)
 		if err != nil {
 			httpd.HttpError(w, "invalid duration string: "+err.Error(), true, http.StatusBadRequest)
 			return
 		}
-		err = r.doRecordStream(rid, dur)
+
+		err = r.doRecordStream(rid, dur, t.DBRPs)
 		if err != nil {
 			httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
 			return
@@ -241,7 +257,7 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		err = r.doRecordBatch(rid, t, r.InfluxDBService.Addr(), stop, int(num))
+		err = r.doRecordBatch(rid, t, r.InfluxDBService.Addr(), stop, int(num), t.DBRPs)
 		if err != nil {
 			httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
 			return
@@ -364,8 +380,8 @@ func (r rc) Close() error {
 }
 
 // Record the stream for a duration
-func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration) error {
-	e := r.TaskMaster.NewFork(rid.String())
+func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration, dbrps []kapacitor.DBRP) error {
+	e := r.TaskMaster.NewFork(rid.String(), dbrps)
 	rpath := path.Join(r.saveDir, rid.String()+streamEXT)
 	f, err := os.Create(rpath)
 	if err != nil {
@@ -391,11 +407,23 @@ func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration) error {
 }
 
 // Record a series of batch queries defined by a batcher task
-func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, addr string, stop time.Time, num int) error {
+func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, addr string, stop time.Time, num int, dbrps []kapacitor.DBRP) error {
 	query, err := t.Query()
 	if err != nil {
 		return err
 	}
+	// Check that the task allows access to DBRPs
+	dbMap := kapacitor.CreateDBRPMap(dbrps)
+	qdbrps, err := query.DBRPs()
+	if err != nil {
+		return err
+	}
+	for _, dbrp := range qdbrps {
+		if !dbMap[dbrp] {
+			return fmt.Errorf("batch query is not allowed to request data from %v", dbrp)
+		}
+	}
+
 	period := t.Period()
 
 	rpath := path.Join(r.saveDir, rid.String()+batchEXT)

@@ -13,7 +13,6 @@ import (
 
 // An execution framework for  a set of tasks.
 type TaskMaster struct {
-	//Stream       map[DBRP]StreamCollector
 	Stream       StreamCollector
 	HTTPDService interface {
 		AddRoutes([]httpd.Route) error
@@ -29,7 +28,7 @@ type TaskMaster struct {
 
 	// Incoming stream and forks
 	in    *Edge
-	forks map[string]*Edge
+	forks map[string]fork
 
 	// Set on incoming batches
 	batches map[string]*Edge
@@ -40,13 +39,19 @@ type TaskMaster struct {
 	logger *log.Logger
 }
 
+// A fork of the main data stream filtered by a set of DBRPs
+type fork struct {
+	Edge  *Edge
+	dbrps map[DBRP]bool
+}
+
 // Create a new Executor with a given clock.
 func NewTaskMaster() *TaskMaster {
 	src := newEdge("src->stream", pipeline.StreamEdge)
 	return &TaskMaster{
 		Stream:  src,
 		in:      src,
-		forks:   make(map[string]*Edge),
+		forks:   make(map[string]fork),
 		batches: make(map[string]*Edge),
 		tasks:   make(map[string]*ExecutingTask),
 		logger:  wlog.New(os.Stderr, "[task_master] ", log.LstdFlags),
@@ -81,7 +86,7 @@ func (tm *TaskMaster) StartTask(t *Task) (*ExecutingTask, error) {
 	var in *Edge
 	switch et.Task.Type {
 	case StreamerTask:
-		in = tm.NewFork(et.Task.Name)
+		in = tm.NewFork(et.Task.Name, et.Task.DBRPs)
 	case BatcherTask:
 		in = newEdge("batch->"+et.Task.Name, pipeline.BatchEdge)
 		tm.batches[t.Name] = in
@@ -115,32 +120,41 @@ func (tm *TaskMaster) StopTask(name string) {
 
 func (tm *TaskMaster) runForking() {
 	for p, ok := tm.in.NextPoint(); ok; p, ok = tm.in.NextPoint() {
-		for name, out := range tm.forks {
-			err := out.CollectPoint(p)
-			if err != nil {
-				tm.StopTask(name)
+		for name, fork := range tm.forks {
+			dbrp := DBRP{
+				Database:        p.Database,
+				RetentionPolicy: p.RetentionPolicy,
+			}
+			if fork.dbrps[dbrp] {
+				err := fork.Edge.CollectPoint(p)
+				if err != nil {
+					tm.StopTask(name)
+				}
 			}
 		}
 	}
-	for _, out := range tm.forks {
-		out.Close()
+	for _, fork := range tm.forks {
+		fork.Edge.Close()
 	}
 }
 
-func (tm *TaskMaster) NewFork(name string) *Edge {
+func (tm *TaskMaster) NewFork(name string, dbrps []DBRP) *Edge {
 	short := name
 	if len(short) > 8 {
 		short = short[:8]
 	}
 	e := newEdge("stream->"+name, pipeline.StreamEdge)
-	tm.forks[name] = e
+	tm.forks[name] = fork{
+		Edge:  e,
+		dbrps: CreateDBRPMap(dbrps),
+	}
 	return e
 }
 
 func (tm *TaskMaster) DelFork(name string) {
 	fork := tm.forks[name]
 	delete(tm.forks, name)
-	if fork != nil {
-		fork.Close()
+	if fork.Edge != nil {
+		fork.Edge.Close()
 	}
 }

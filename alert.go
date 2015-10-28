@@ -172,7 +172,6 @@ func (a *AlertNode) runAlert() error {
 			}
 		}
 	}
-	a.logger.Println("I! alert node done")
 	return nil
 }
 
@@ -279,7 +278,6 @@ func (a *AlertNode) handleLog(ad AlertData) {
 	if n != 1 || err != nil {
 		a.logger.Println("E! failed to write to file", err)
 	}
-	a.logger.Println("I! handled Log")
 }
 
 func (a *AlertNode) handleExec(ad AlertData) {

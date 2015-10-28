@@ -1,6 +1,7 @@
 package kapacitor
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/influxdb/influxdb/client"
@@ -34,6 +35,12 @@ func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode) (*BatchNode, error) 
 	}
 
 	return bn, nil
+}
+
+// Return list of databases and retention policies
+// the batcher will query.
+func (b *BatchNode) DBRPs() ([]DBRP, error) {
+	return b.query.DBRPs()
 }
 
 // Query InfluxDB return Edge with data
@@ -87,8 +94,9 @@ func (b *BatchNode) Query(batch BatchCollector) {
 					Group: groupID,
 					Tags:  series.Tags,
 				}
-				bch.Points = make([]models.TimeFields, len(series.Values))
-				for i, v := range series.Values {
+				bch.Points = make([]models.TimeFields, 0, len(series.Values))
+				for _, v := range series.Values {
+					var skip bool
 					fields := make(models.Fields)
 					var t time.Time
 					for i, c := range series.Columns {
@@ -104,10 +112,26 @@ func (b *BatchNode) Query(batch BatchCollector) {
 								return
 							}
 						} else {
-							fields[c] = v[i]
+							value := v[i]
+							if n, ok := value.(json.Number); ok {
+								f, err := n.Float64()
+								if err == nil {
+									value = f
+								}
+							}
+							if value == nil {
+								skip = true
+								break
+							}
+							fields[c] = value
 						}
 					}
-					bch.Points[i] = models.TimeFields{Time: t, Fields: fields}
+					if !skip {
+						bch.Points = append(
+							bch.Points,
+							models.TimeFields{Time: t, Fields: fields},
+						)
+					}
 				}
 				batch.CollectBatch(bch)
 			}

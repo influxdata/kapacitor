@@ -194,7 +194,7 @@ func evalFunc(f *FunctionNode, scope *Scope, stck *stack, args []reflect.Value) 
 		e := recover()
 		if e != nil {
 			*errp = fmt.Errorf("error calling func %q on obj %T: %v", f.Func, obj, e)
-			if strings.Contains((*errp).Error(), "value of type *tick.ReferenceNode is not assignable to type string") {
+			if strings.Contains((*errp).Error(), "*tick.ReferenceNode") && strings.Contains((*errp).Error(), "type string") {
 				*errp = fmt.Errorf("cannot assign *tick.ReferenceNode to type string, did you use double quotes instead of single quotes?")
 			}
 
