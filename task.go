@@ -87,27 +87,6 @@ func (t *Task) Dot() []byte {
 	return t.Pipeline.Dot(t.Name)
 }
 
-func (t *Task) Query() (*Query, error) {
-	if t.Type == BatcherTask {
-		bn := t.Pipeline.Source.(*pipeline.BatchNode)
-		query := bn.Query
-		q, err := NewQuery(query)
-		if err != nil {
-			return nil, err
-		}
-		q.Dimensions(bn.Dimensions)
-		return q, nil
-	}
-	return nil, fmt.Errorf("not a batcher, does not have query")
-}
-
-func (t *Task) Period() time.Duration {
-	if t.Type == BatcherTask {
-		return t.Pipeline.Source.(*pipeline.BatchNode).Period
-	}
-	return 0
-}
-
 // Create a new streamer task from a script.
 func NewStreamer(name, script string, dbrps []DBRP) (*Task, error) {
 	return NewTask(name, script, StreamerTask, dbrps)
@@ -134,14 +113,18 @@ type ExecutingTask struct {
 }
 
 // Create a new  task from a defined kapacitor.
-func NewExecutingTask(tm *TaskMaster, t *Task) *ExecutingTask {
+func NewExecutingTask(tm *TaskMaster, t *Task) (*ExecutingTask, error) {
 	et := &ExecutingTask{
 		tm:      tm,
 		Task:    t,
 		outputs: make(map[string]Output),
 		lookup:  make(map[pipeline.ID]Node),
 	}
-	return et
+	err := et.link()
+	if err != nil {
+		return nil, err
+	}
+	return et, nil
 }
 
 // walks the entire pipeline applying function f.
@@ -201,10 +184,6 @@ func (et *ExecutingTask) link() error {
 // Start the task.
 func (et *ExecutingTask) start(in *Edge) error {
 	et.in = in
-	err := et.link()
-	if err != nil {
-		return err
-	}
 
 	et.source.addParentEdge(et.in)
 
@@ -237,7 +216,33 @@ func (et *ExecutingTask) StartBatching() error {
 
 	batcher := et.source.(*BatchNode)
 
-	// Check that the task allows access to DBRPs
+	err := et.checkDBRPs(batcher)
+	if err != nil {
+		return err
+	}
+
+	batcher.Start(et.in)
+	return nil
+}
+
+// Get the next `num` batch queries that the batcher will run starting at time `start`.
+func (et *ExecutingTask) BatchQueries(start time.Time, num int) ([]string, error) {
+	if et.Task.Type != BatcherTask {
+		return nil, ErrWrongTaskType
+	}
+
+	batcher := et.source.(*BatchNode)
+
+	err := et.checkDBRPs(batcher)
+	if err != nil {
+		return nil, err
+	}
+
+	return batcher.NextQueries(start, num), nil
+}
+
+// Check that the task allows access to DBRPs
+func (et *ExecutingTask) checkDBRPs(batcher *BatchNode) error {
 	dbMap := CreateDBRPMap(et.Task.DBRPs)
 	dbrps, err := batcher.DBRPs()
 	if err != nil {
@@ -248,8 +253,6 @@ func (et *ExecutingTask) StartBatching() error {
 			return fmt.Errorf("batch query is not allowed to request data from %v", dbrp)
 		}
 	}
-
-	go batcher.Query(et.in)
 	return nil
 }
 

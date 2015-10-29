@@ -2,8 +2,11 @@ package kapacitor
 
 import (
 	"encoding/json"
+	"errors"
+	"sync"
 	"time"
 
+	"github.com/gorhill/cronexpr"
 	"github.com/influxdb/influxdb/client"
 	"github.com/influxdb/kapacitor/models"
 	"github.com/influxdb/kapacitor/pipeline"
@@ -13,7 +16,8 @@ type BatchNode struct {
 	node
 	b      *pipeline.BatchNode
 	query  *Query
-	ticker *time.Ticker
+	ticker ticker
+	wg     sync.WaitGroup
 }
 
 func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode) (*BatchNode, error) {
@@ -34,6 +38,22 @@ func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode) (*BatchNode, error) 
 		return nil, err
 	}
 
+	if n.Every != 0 && n.Cron != "" {
+		return nil, errors.New("must not set both 'every' and 'cron' properties")
+	}
+	switch {
+	case n.Every != 0:
+		bn.ticker = newTimeTicker(n.Every)
+	case n.Cron != "":
+		var err error
+		bn.ticker, err = newCronTicker(n.Cron)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errors.New("must define one of 'every' or 'cron'")
+	}
+
 	return bn, nil
 }
 
@@ -43,16 +63,45 @@ func (b *BatchNode) DBRPs() ([]DBRP, error) {
 	return b.query.DBRPs()
 }
 
-// Query InfluxDB return Edge with data
-func (b *BatchNode) Query(batch BatchCollector) {
-	defer batch.Close()
+func (b *BatchNode) Start(batch BatchCollector) {
+	b.wg.Add(1)
+	go b.doQuery(batch)
+}
 
-	b.ticker = time.NewTicker(b.b.Period)
-	for now := range b.ticker.C {
+func (b *BatchNode) NextQueries(start time.Time, num int) []string {
+	now := time.Now()
+	// Crons are sensitive to timezones.
+	start = start.Local()
+	queries := make([]string, 0, num)
+	for i := 0; i < num || num == 0; i++ {
+		start = b.ticker.Next(start)
+		if start.IsZero() {
+			break
+		}
+		b.query.Start(start)
+		stop := start.Add(b.b.Period)
+		if stop.After(now) {
+			break
+		}
+		b.query.Stop(stop)
+		queries = append(queries, b.query.String())
+
+	}
+	return queries
+}
+
+// Query InfluxDB return Edge with data
+func (b *BatchNode) doQuery(batch BatchCollector) {
+	defer batch.Close()
+	defer b.wg.Done()
+
+	tickC := b.ticker.Start()
+	for now := range tickC {
 
 		// Update times for query
-		b.query.Start(now.Add(-1 * b.b.Period))
-		b.query.Stop(now)
+		stop := now.Add(-1 * b.b.Offset)
+		b.query.Start(stop.Add(-1 * b.b.Period))
+		b.query.Stop(stop)
 
 		b.logger.Println("D! starting next batch query:", b.query.String())
 
@@ -143,6 +192,7 @@ func (b *BatchNode) stopBatch() {
 	if b.ticker != nil {
 		b.ticker.Stop()
 	}
+	b.wg.Wait()
 }
 
 func (b *BatchNode) runBatch() error {
@@ -155,4 +205,83 @@ func (b *BatchNode) runBatch() error {
 		}
 	}
 	return nil
+}
+
+type ticker interface {
+	Start() <-chan time.Time
+	Stop()
+	// Return the next time the ticker will tick
+	// after now.
+	Next(now time.Time) time.Time
+}
+
+type timeTicker struct {
+	every  time.Duration
+	ticker *time.Ticker
+}
+
+func newTimeTicker(every time.Duration) *timeTicker {
+	return &timeTicker{every: every}
+}
+
+func (t *timeTicker) Start() <-chan time.Time {
+	t.ticker = time.NewTicker(t.every)
+	return t.ticker.C
+}
+
+func (t *timeTicker) Stop() {
+	if t.ticker != nil {
+		t.ticker.Stop()
+	}
+}
+
+func (t *timeTicker) Next(now time.Time) time.Time {
+	return now.Add(t.every)
+}
+
+type cronTicker struct {
+	expr    *cronexpr.Expression
+	ticker  chan time.Time
+	closing chan struct{}
+	wg      sync.WaitGroup
+}
+
+func newCronTicker(cronExpr string) (*cronTicker, error) {
+	expr, err := cronexpr.Parse(cronExpr)
+	if err != nil {
+		return nil, err
+	}
+	return &cronTicker{
+		expr:    expr,
+		ticker:  make(chan time.Time),
+		closing: make(chan struct{}),
+	}, nil
+}
+
+func (c *cronTicker) Start() <-chan time.Time {
+	c.wg.Add(1)
+	go func() {
+		defer c.wg.Done()
+		for {
+			now := time.Now()
+			next := c.expr.Next(now)
+			diff := next.Sub(now)
+			select {
+			case <-time.After(diff):
+				c.ticker <- next
+			case <-c.closing:
+				return
+			}
+		}
+	}()
+	return c.ticker
+}
+
+func (c *cronTicker) Stop() {
+	close(c.closing)
+	c.wg.Wait()
+}
+
+func (c *cronTicker) Next(now time.Time) time.Time {
+	return c.expr.Next(now)
 }

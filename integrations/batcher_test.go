@@ -23,6 +23,7 @@ batch
 		WHERE "host" = 'serverA'
 ''')
 		.period(10s)
+		.every(10s)
 		.groupBy(time(2s), 'cpu')
 	.mapReduce(influxql.count('value'))
 	.window()

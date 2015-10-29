@@ -13,7 +13,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/dustin/go-humanize"
 	"github.com/influxdb/kapacitor"
@@ -192,13 +191,14 @@ var (
 	recordFlags = flag.NewFlagSet("record", flag.ExitOnError)
 	rname       = recordFlags.String("name", "", "the name of a task. If recording a batch or stream")
 
-	rstop = recordFlags.String("stop", "", "the stop time of a query if recording a batch. Defaults to now.")
-	rnum  = recordFlags.Int("num", 1, "the number of periods to query. If recording a batch")
+	rstart = recordFlags.String("start", "", "the start time for the set of queries when recording a batch.")
+	rpast  = recordFlags.String("past", "", "set start time via 'now - past'.")
+	rnum   = recordFlags.Int("num", 0, "the number of periods to query, if zero will query as many times as the schedule defines until the queries reach the present time. Applies only to recording a batch.")
 
 	rquery = recordFlags.String("query", "", "the query to record. If recording a query.")
 	rtype  = recordFlags.String("type", "", "the type of the recording to save (stream|batch). If recording a query.")
 
-	rdur = recordFlags.Duration("duration", time.Minute*5, "how long to record the data stream. If recording a stream.")
+	rdur = recordFlags.String("duration", "", "how long to record the data stream. If recording a stream.")
 )
 
 func recordUsage() {
@@ -219,10 +219,16 @@ Examples:
 		This records the live data stream for 1 minute using the databases and retention policies
 		from the named task.
 	
-	$ kapacitor record batch -name cpu_idle -stop 2015-09-01T00:00:00Z -num 10
+	$ kapacitor record batch -name cpu_idle -start 2015-09-01T00:00:00Z -num 10
 		
 		This records the result of the query defined in task 'cpu_idle' and runs the query 10 times
-		starting at time 'stop - num*period' and incrementing by the period defined in the task.
+		starting at time 'start' and incrementing by the schedule defined in the task.
+
+	$ kapacitor record batch -name cpu_idle -past 10h
+		
+		This records the result of the query defined in task 'cpu_idle' and runs the query
+		as many times as defined by the schedule until the queries reaches the present time.
+		The starting time for the queries is 'now - 10h' and increments by the schedule defined in the task.
 
 	$ kapacitor record query -query "select value from cpu_idle where time > now() - 1h and time < now()" -type stream
 
@@ -241,10 +247,14 @@ func doRecord(args []string) error {
 	switch args[0] {
 	case "stream":
 		v.Add("name", *rname)
-		v.Add("duration", rdur.String())
+		v.Add("duration", *rdur)
 	case "batch":
+		if *rstart != "" && *rpast != "" {
+			return errors.New("cannot set both start and past flags.")
+		}
 		v.Add("name", *rname)
-		v.Add("stop", *rstop)
+		v.Add("start", *rstart)
+		v.Add("past", *rpast)
 		v.Add("num", strconv.FormatInt(int64(*rnum), 10))
 	case "query":
 		v.Add("qtype", *rtype)

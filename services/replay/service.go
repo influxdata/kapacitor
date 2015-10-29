@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/influxdb/influxdb/influxql"
 	"github.com/influxdb/kapacitor"
 	"github.com/influxdb/kapacitor/clock"
 	"github.com/influxdb/kapacitor/services/httpd"
@@ -214,7 +215,7 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 		}
 
 		durStr := req.URL.Query().Get("duration")
-		dur, err := time.ParseDuration(durStr)
+		dur, err := influxql.ParseDuration(durStr)
 		if err != nil {
 			httpd.HttpError(w, "invalid duration string: "+err.Error(), true, http.StatusBadRequest)
 			return
@@ -233,18 +234,32 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		var stop time.Time
-		stopStr := req.URL.Query().Get("stop")
-		if stopStr == "" {
-			stop = time.Now()
-		} else {
-			stop, err = time.Parse(time.RFC3339, stopStr)
+		// Determine start time.
+		var start time.Time
+		startStr := req.URL.Query().Get("start")
+		pastStr := req.URL.Query().Get("past")
+		if startStr != "" && pastStr != "" {
+			httpd.HttpError(w, "must not pass both 'start' and 'past' parameters", true, http.StatusBadRequest)
+			return
+		}
+
+		switch {
+		case startStr != "":
+			start, err = time.Parse(time.RFC3339, startStr)
 			if err != nil {
 				httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
 				return
 			}
+		case pastStr != "":
+			diff, err := influxql.ParseDuration(pastStr)
+			if err != nil {
+				httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
+				return
+			}
+			start = time.Now().Add(-1 * diff)
 		}
 
+		// Get task
 		task := req.URL.Query().Get("name")
 		if task == "" {
 			httpd.HttpError(w, "no task specified", true, http.StatusBadRequest)
@@ -257,7 +272,8 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		err = r.doRecordBatch(rid, t, r.InfluxDBService.Addr(), stop, int(num), t.DBRPs)
+		// Record batch data
+		err = r.doRecordBatch(rid, t, r.InfluxDBService.Addr(), start, int(num))
 		if err != nil {
 			httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
 			return
@@ -406,25 +422,17 @@ func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration, dbrps []kapac
 	return nil
 }
 
-// Record a series of batch queries defined by a batcher task
-func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, addr string, stop time.Time, num int, dbrps []kapacitor.DBRP) error {
-	query, err := t.Query()
+// Record a series of batch queries defined by a batch task
+func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, addr string, start time.Time, num int) error {
+	et, err := kapacitor.NewExecutingTask(nil, t)
 	if err != nil {
 		return err
-	}
-	// Check that the task allows access to DBRPs
-	dbMap := kapacitor.CreateDBRPMap(dbrps)
-	qdbrps, err := query.DBRPs()
-	if err != nil {
-		return err
-	}
-	for _, dbrp := range qdbrps {
-		if !dbMap[dbrp] {
-			return fmt.Errorf("batch query is not allowed to request data from %v", dbrp)
-		}
 	}
 
-	period := t.Period()
+	queries, err := et.BatchQueries(start, num)
+	if err != nil {
+		return err
+	}
 
 	rpath := path.Join(r.saveDir, rid.String()+batchEXT)
 	f, err := os.Create(rpath)
@@ -435,22 +443,15 @@ func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, addr string, s
 	gz := gzip.NewWriter(f)
 	defer gz.Close()
 
-	start := stop.Add(time.Duration(-num) * period)
-
-	for i := 0; i < num; i++ {
-		stop := start.Add(period)
-		query.Start(start)
-		query.Stop(stop)
+	for _, query := range queries {
 		v := url.Values{}
-		v.Add("q", query.String())
+		v.Add("q", query)
 		res, err := http.Get(addr + "/query?" + v.Encode())
 		if err != nil {
 			return err
 		}
 		defer res.Body.Close()
 		io.Copy(gz, res.Body)
-
-		start = stop
 	}
 	return nil
 }
