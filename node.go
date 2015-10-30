@@ -26,6 +26,7 @@ type Node interface {
 
 	// link specified child
 	linkChild(c Node) error
+	addParent(p Node)
 
 	// close children edges
 	closeChildEdges()
@@ -111,6 +112,10 @@ func (n *node) addChild(c Node) (*Edge, error) {
 	return edge, nil
 }
 
+func (n *node) addParent(p Node) {
+	n.parents = append(n.parents, p)
+}
+
 func (n *node) linkChild(c Node) error {
 
 	// add child
@@ -118,6 +123,9 @@ func (n *node) linkChild(c Node) error {
 	if err != nil {
 		return err
 	}
+
+	// add parent
+	c.addParent(n)
 
 	// store edge to child
 	n.outs = append(n.outs, edge)

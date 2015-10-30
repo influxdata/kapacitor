@@ -79,6 +79,7 @@ func NewServer(c *Config, buildInfo *BuildInfo, l *log.Logger) (*Server, error) 
 		reportingDisabled: c.ReportingDisabled,
 		Logger:            l,
 	}
+	s.Logger.Println("I! Kapacitor hostname:", c.Hostname)
 
 	// Start Task Master
 	if err := s.TaskMaster.Open(); err != nil {

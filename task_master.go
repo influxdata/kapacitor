@@ -1,6 +1,7 @@
 package kapacitor
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -30,8 +31,8 @@ type TaskMaster struct {
 	in    *Edge
 	forks map[string]fork
 
-	// Set on incoming batches
-	batches map[string]*Edge
+	// Set of incoming batches
+	batches map[string][]BatchCollector
 
 	// Executing tasks
 	tasks map[string]*ExecutingTask
@@ -52,7 +53,7 @@ func NewTaskMaster() *TaskMaster {
 		Stream:  src,
 		in:      src,
 		forks:   make(map[string]fork),
-		batches: make(map[string]*Edge),
+		batches: make(map[string][]BatchCollector),
 		tasks:   make(map[string]*ExecutingTask),
 		logger:  wlog.New(os.Stderr, "[task_master] ", log.LstdFlags),
 	}
@@ -86,34 +87,44 @@ func (tm *TaskMaster) StartTask(t *Task) (*ExecutingTask, error) {
 		return nil, err
 	}
 
-	var in *Edge
+	var ins []*Edge
 	switch et.Task.Type {
-	case StreamerTask:
-		in = tm.NewFork(et.Task.Name, et.Task.DBRPs)
-	case BatcherTask:
-		in = newEdge("batch->"+et.Task.Name, pipeline.BatchEdge)
-		tm.batches[t.Name] = in
+	case StreamTask:
+		ins = []*Edge{tm.NewFork(et.Task.Name, et.Task.DBRPs)}
+	case BatchTask:
+		count, err := et.BatchCount()
+		if err != nil {
+			return nil, err
+		}
+		ins = make([]*Edge, count)
+		for i := 0; i < count; i++ {
+			in := newEdge(fmt.Sprintf("batch->%s:%d", t.Name, i), pipeline.BatchEdge)
+			ins[i] = in
+			tm.batches[t.Name] = append(tm.batches[t.Name], in)
+		}
+
 	}
 
-	err = et.start(in)
+	err = et.start(ins)
 	if err != nil {
 		return nil, err
 	}
 
 	tm.tasks[et.Task.Name] = et
 	tm.logger.Println("I! Started task:", t.Name)
+	tm.logger.Println("D!", string(t.Dot()))
 
 	return et, nil
 }
 
-func (tm *TaskMaster) BatchCollector(name string) BatchCollector {
+func (tm *TaskMaster) BatchCollectors(name string) []BatchCollector {
 	return tm.batches[name]
 }
 
 func (tm *TaskMaster) StopTask(name string) {
 	if et, ok := tm.tasks[name]; ok {
 		delete(tm.tasks, name)
-		if et.Task.Type == StreamerTask {
+		if et.Task.Type == StreamTask {
 			tm.DelFork(et.Task.Name)
 		}
 		et.stop()

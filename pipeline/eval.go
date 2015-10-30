@@ -22,6 +22,9 @@ type EvalNode struct {
 
 	// tick:ignore
 	Expression tick.Node
+
+	// tick:ignore
+	KeepFlag bool
 }
 
 func newEvalNode(e EdgeType, expr tick.Node) *EvalNode {
@@ -30,4 +33,12 @@ func newEvalNode(e EdgeType, expr tick.Node) *EvalNode {
 		Expression: expr,
 	}
 	return n
+}
+
+// If called the existing fields will be preserved in addition
+// to the new field being set.
+//tick:property
+func (e *EvalNode) Keep() *EvalNode {
+	e.KeepFlag = true
+	return e
 }

@@ -69,6 +69,14 @@ func (ts *Service) Open() error {
 	// Define API routes
 	ts.routes = []httpd.Route{
 		{
+			"task-show",
+			"GET",
+			"/task",
+			true,
+			true,
+			ts.handleTask,
+		},
+		{
 			"task-list",
 			"GET",
 			"/tasks",
@@ -138,6 +146,45 @@ func (ts *Service) Close() error {
 	return nil
 }
 
+func (ts *Service) handleTask(w http.ResponseWriter, r *http.Request) {
+	name := r.URL.Query().Get("task")
+	if name == "" {
+		httpd.HttpError(w, "must pass task name", true, http.StatusBadRequest)
+		return
+	}
+
+	raw, err := ts.LoadRaw(name)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusNotFound)
+		return
+	}
+	task, err := ts.Load(name)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusNotFound)
+		return
+	}
+
+	type response struct {
+		Name       string
+		Type       kapacitor.TaskType
+		DBRPs      []kapacitor.DBRP
+		TICKscript string
+		Dot        string
+		Enabled    bool
+	}
+
+	res := response{
+		Name:       name,
+		Type:       task.Type,
+		DBRPs:      task.DBRPs,
+		TICKscript: raw.TICKscript,
+		Dot:        string(task.Dot()),
+		Enabled:    ts.IsEnabled(name),
+	}
+
+	w.Write(httpd.MarshalJSON(res, true))
+}
+
 func (ts *Service) handleTasks(w http.ResponseWriter, r *http.Request) {
 	tasksStr := r.URL.Query().Get("tasks")
 	var tasks []string
@@ -182,9 +229,9 @@ func (ts *Service) handleSave(w http.ResponseWriter, r *http.Request) {
 	ttStr := r.URL.Query().Get("type")
 	switch ttStr {
 	case "stream":
-		newTask.Type = kapacitor.StreamerTask
+		newTask.Type = kapacitor.StreamTask
 	case "batch":
-		newTask.Type = kapacitor.BatcherTask
+		newTask.Type = kapacitor.BatchTask
 	default:
 		if !exists {
 			if ttStr == "" {
@@ -358,7 +405,7 @@ func (ts *Service) Enable(name string) error {
 	}
 
 	// Start batching
-	if t.Type == kapacitor.BatcherTask {
+	if t.Type == kapacitor.BatchTask {
 		err := et.StartBatching()
 		if err != nil {
 			return err
@@ -385,6 +432,15 @@ type taskInfo struct {
 	Type    kapacitor.TaskType
 	DBRPs   []kapacitor.DBRP
 	Enabled bool
+}
+
+func (ts *Service) IsEnabled(name string) (e bool) {
+	ts.db.View(func(tx *bolt.Tx) error {
+		eb := tx.Bucket([]byte(enabledBucket))
+		e = eb != nil && eb.Get([]byte(name)) != nil
+		return nil
+	})
+	return
 }
 
 func (ts *Service) GetTaskInfo(tasks []string) ([]taskInfo, error) {

@@ -235,7 +235,12 @@ func (n *chainnode) Eval(transform tick.Node) *EvalNode {
 }
 
 // Group the data by a set of tags.
-func (n *chainnode) GroupBy(tag ...string) *GroupByNode {
+//
+// Can pass literal * to group by all dimensions.
+// Example:
+//    .groupBy(*)
+//
+func (n *chainnode) GroupBy(tag ...interface{}) *GroupByNode {
 	g := newGroupByNode(n.provides, tag)
 	n.linkChild(g)
 	return g

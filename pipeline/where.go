@@ -5,8 +5,6 @@ import (
 )
 
 // The WhereNode filters the data stream by a given expression.
-// See `Expressions` for documentation on the syntax and behavior
-// of expressions.
 //
 // Example:
 // var sums = stream

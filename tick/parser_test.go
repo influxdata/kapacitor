@@ -11,19 +11,19 @@ import (
 func TestParserLookAhead(t *testing.T) {
 	assert := assert.New(t)
 
-	tree := &tree{}
-	tree.lex = lex("0 1 2 3")
+	p := &parser{}
+	p.lex = lex("0 1 2 3")
 
-	assert.Equal(token{tokenNumber, 0, "0"}, tree.next())
-	assert.Equal(token{tokenNumber, 2, "1"}, tree.peek())
-	assert.Equal(token{tokenNumber, 2, "1"}, tree.next())
-	tree.backup()
-	assert.Equal(token{tokenNumber, 2, "1"}, tree.next())
-	assert.Equal(token{tokenNumber, 4, "2"}, tree.peek())
-	tree.backup()
-	assert.Equal(token{tokenNumber, 2, "1"}, tree.next())
-	assert.Equal(token{tokenNumber, 4, "2"}, tree.next())
-	assert.Equal(token{tokenNumber, 6, "3"}, tree.next())
+	assert.Equal(token{tokenNumber, 0, "0"}, p.next())
+	assert.Equal(token{tokenNumber, 2, "1"}, p.peek())
+	assert.Equal(token{tokenNumber, 2, "1"}, p.next())
+	p.backup()
+	assert.Equal(token{tokenNumber, 2, "1"}, p.next())
+	assert.Equal(token{tokenNumber, 4, "2"}, p.peek())
+	p.backup()
+	assert.Equal(token{tokenNumber, 2, "1"}, p.next())
+	assert.Equal(token{tokenNumber, 4, "2"}, p.next())
+	assert.Equal(token{tokenNumber, 6, "3"}, p.next())
 }
 
 func TestParseErrors(t *testing.T) {

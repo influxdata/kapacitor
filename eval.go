@@ -68,6 +68,9 @@ func (e *EvalNode) eval(fields models.Fields, tags map[string]string) (models.Fi
 	if err != nil {
 		return nil, err
 	}
+	if !e.e.KeepFlag {
+		fields = make(models.Fields, 1)
+	}
 	fields[e.e.As] = v
 	return fields, nil
 }

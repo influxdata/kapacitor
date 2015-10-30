@@ -284,6 +284,21 @@ func (s *RegexNode) String() string {
 	return fmt.Sprintf("RegexNode@%d{%v}", s.pos, s.Regex)
 }
 
+// Represents a standalone '*' token.
+type StarNode struct {
+	pos
+}
+
+func newStar(p int) *StarNode {
+	return &StarNode{
+		pos: pos(p),
+	}
+}
+
+func (s *StarNode) String() string {
+	return fmt.Sprintf("StarNode@%d{*}", s.pos)
+}
+
 //Holds the a function call with its args
 type FunctionNode struct {
 	pos

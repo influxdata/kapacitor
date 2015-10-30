@@ -16,16 +16,16 @@ import (
 type TaskType int
 
 const (
-	StreamerTask TaskType = iota
-	BatcherTask
+	StreamTask TaskType = iota
+	BatchTask
 )
 
 func (t TaskType) String() string {
 	switch t {
-	case StreamerTask:
-		return "streamer"
-	case BatcherTask:
-		return "batcher"
+	case StreamTask:
+		return "stream"
+	case BatchTask:
+		return "batch"
 	default:
 		return "unknown"
 	}
@@ -65,9 +65,9 @@ func NewTask(name, script string, tt TaskType, dbrps []DBRP) (*Task, error) {
 
 	var srcEdge pipeline.EdgeType
 	switch tt {
-	case StreamerTask:
+	case StreamTask:
 		srcEdge = pipeline.StreamEdge
-	case BatcherTask:
+	case BatchTask:
 		srcEdge = pipeline.BatchEdge
 	}
 
@@ -89,22 +89,22 @@ func (t *Task) Dot() []byte {
 
 // Create a new streamer task from a script.
 func NewStreamer(name, script string, dbrps []DBRP) (*Task, error) {
-	return NewTask(name, script, StreamerTask, dbrps)
+	return NewTask(name, script, StreamTask, dbrps)
 }
 
 // Create a new batcher task from a script.
 func NewBatcher(name, script string, dbrps []DBRP) (*Task, error) {
-	return NewTask(name, script, BatcherTask, dbrps)
+	return NewTask(name, script, BatchTask, dbrps)
 }
 
 // ----------------------------------
 // ExecutingTask
 
-// A task that can be  in an executor.
+// A task that is ready for execution.
 type ExecutingTask struct {
 	tm      *TaskMaster
 	Task    *Task
-	in      *Edge
+	ins     []*Edge
 	source  Node
 	outputs map[string]Output
 	// node lookup from pipeline.ID -> Node
@@ -158,6 +158,11 @@ func (et *ExecutingTask) link() error {
 		if err != nil {
 			return err
 		}
+		en.setLogger(wlog.New(
+			os.Stderr,
+			fmt.Sprintf("[%s:%s] ", et.Task.Name, en.Name()),
+			log.LstdFlags,
+		))
 		et.lookup[n.ID()] = en
 		// Save the walk order
 		et.nodes = append(et.nodes, en)
@@ -182,17 +187,14 @@ func (et *ExecutingTask) link() error {
 }
 
 // Start the task.
-func (et *ExecutingTask) start(in *Edge) error {
-	et.in = in
+func (et *ExecutingTask) start(ins []*Edge) error {
+	et.ins = ins
 
-	et.source.addParentEdge(et.in)
+	for _, in := range et.ins {
+		et.source.addParentEdge(in)
+	}
 
 	return et.walk(func(n Node) error {
-		n.setLogger(wlog.New(
-			os.Stderr,
-			fmt.Sprintf("[%s:%s] ", et.Task.Name, n.Name()),
-			log.LstdFlags,
-		))
 		n.start()
 		return nil
 	})
@@ -203,46 +205,57 @@ func (et *ExecutingTask) stop() {
 		n.stop()
 		return nil
 	})
-	et.in.Close()
+	for _, in := range et.ins {
+		in.Close()
+	}
 }
 
 var ErrWrongTaskType = errors.New("wrong task type")
 
 // Instruct source batch node to start querying and sending batches of data
 func (et *ExecutingTask) StartBatching() error {
-	if et.Task.Type != BatcherTask {
+	if et.Task.Type != BatchTask {
 		return ErrWrongTaskType
 	}
 
-	batcher := et.source.(*BatchNode)
+	batcher := et.source.(*SourceBatchNode)
 
 	err := et.checkDBRPs(batcher)
 	if err != nil {
 		return err
 	}
 
-	batcher.Start(et.in)
+	batcher.Start(et.ins)
 	return nil
 }
 
+func (et *ExecutingTask) BatchCount() (int, error) {
+	if et.Task.Type != BatchTask {
+		return 0, ErrWrongTaskType
+	}
+
+	batcher := et.source.(*SourceBatchNode)
+	return batcher.Count(), nil
+}
+
 // Get the next `num` batch queries that the batcher will run starting at time `start`.
-func (et *ExecutingTask) BatchQueries(start time.Time, num int) ([]string, error) {
-	if et.Task.Type != BatcherTask {
+func (et *ExecutingTask) BatchQueries(start, stop time.Time) ([][]string, error) {
+	if et.Task.Type != BatchTask {
 		return nil, ErrWrongTaskType
 	}
 
-	batcher := et.source.(*BatchNode)
+	batcher := et.source.(*SourceBatchNode)
 
 	err := et.checkDBRPs(batcher)
 	if err != nil {
 		return nil, err
 	}
 
-	return batcher.NextQueries(start, num), nil
+	return batcher.Queries(start, stop), nil
 }
 
 // Check that the task allows access to DBRPs
-func (et *ExecutingTask) checkDBRPs(batcher *BatchNode) error {
+func (et *ExecutingTask) checkDBRPs(batcher *SourceBatchNode) error {
 	dbMap := CreateDBRPMap(et.Task.DBRPs)
 	dbrps, err := batcher.DBRPs()
 	if err != nil {
@@ -282,6 +295,8 @@ func (et *ExecutingTask) createNode(p pipeline.Node) (Node, error) {
 	switch t := p.(type) {
 	case *pipeline.StreamNode:
 		return newStreamNode(et, t)
+	case *pipeline.SourceBatchNode:
+		return newSourceBatchNode(et, t)
 	case *pipeline.BatchNode:
 		return newBatchNode(et, t)
 	case *pipeline.WindowNode:
