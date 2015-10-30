@@ -3,9 +3,11 @@ COUNT := $(shell sh -c 'git rev-list $(SHORT_VERSION)..HEAD --count')
 VERSION=$(SHORT_VERSION).$(COUNT)
 BRANCH:= $(shell sh -c 'git rev-parse --abbrev-ref HEAD')
 COMMIT:= $(shell sh -c 'git rev-parse HEAD')
-ifndef GOBIN
-	GOBIN = $(GOPATH)/bin
+
+ifndef
+	GOBIN=$(GOPATH)/bin
 endif
+
 GO=go
 DIST_DIR=./dist
 # List of Golang os/arch pairs
