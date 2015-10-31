@@ -4,3 +4,9 @@ kapacitor
 kapacitord
 kapacitor_linux*
 kapacitord_linux*
+*~
+*#
+kapacitor*.rpm
+kapacitor*.deb
+kapacitor*.tar
+kapacitor*.zip

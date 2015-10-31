@@ -4,13 +4,15 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os"
 
 	"github.com/influxdb/influxdb/client"
 	"github.com/influxdb/kapacitor/pipeline"
 	"github.com/influxdb/kapacitor/services/httpd"
-	"github.com/influxdb/kapacitor/wlog"
 )
+
+type LogService interface {
+	NewLogger(prefix string, flag int) *log.Logger
+}
 
 // An execution framework for  a set of tasks.
 type TaskMaster struct {
@@ -26,6 +28,7 @@ type TaskMaster struct {
 	SMTPService interface {
 		SendMail(from string, to []string, subject string, msg string)
 	}
+	LogService LogService
 
 	// Incoming stream and forks
 	in    *Edge
@@ -47,21 +50,22 @@ type fork struct {
 }
 
 // Create a new Executor with a given clock.
-func NewTaskMaster() *TaskMaster {
-	src := newEdge("src->stream", pipeline.StreamEdge)
+func NewTaskMaster(l LogService) *TaskMaster {
+	src := newEdge("src->stream", pipeline.StreamEdge, l)
 	return &TaskMaster{
-		Stream:  src,
-		in:      src,
-		forks:   make(map[string]fork),
-		batches: make(map[string][]BatchCollector),
-		tasks:   make(map[string]*ExecutingTask),
-		logger:  wlog.New(os.Stderr, "[task_master] ", log.LstdFlags),
+		Stream:     src,
+		in:         src,
+		forks:      make(map[string]fork),
+		batches:    make(map[string][]BatchCollector),
+		tasks:      make(map[string]*ExecutingTask),
+		LogService: l,
+		logger:     l.NewLogger("[task_master] ", log.LstdFlags),
 	}
 }
 
 // Returns a new TaskMaster instance with the same services as the current one.
 func (tm *TaskMaster) New() *TaskMaster {
-	n := NewTaskMaster()
+	n := NewTaskMaster(tm.LogService)
 	n.HTTPDService = tm.HTTPDService
 	n.InfluxDBService = tm.InfluxDBService
 	n.SMTPService = tm.SMTPService
@@ -69,6 +73,7 @@ func (tm *TaskMaster) New() *TaskMaster {
 }
 
 func (tm *TaskMaster) Open() error {
+
 	go tm.runForking()
 	return nil
 }
@@ -98,7 +103,7 @@ func (tm *TaskMaster) StartTask(t *Task) (*ExecutingTask, error) {
 		}
 		ins = make([]*Edge, count)
 		for i := 0; i < count; i++ {
-			in := newEdge(fmt.Sprintf("batch->%s:%d", t.Name, i), pipeline.BatchEdge)
+			in := newEdge(fmt.Sprintf("batch->%s:%d", t.Name, i), pipeline.BatchEdge, tm.LogService)
 			ins[i] = in
 			tm.batches[t.Name] = append(tm.batches[t.Name], in)
 		}
@@ -157,7 +162,7 @@ func (tm *TaskMaster) NewFork(name string, dbrps []DBRP) *Edge {
 	if len(short) > 8 {
 		short = short[:8]
 	}
-	e := newEdge("stream->"+name, pipeline.StreamEdge)
+	e := newEdge("stream->"+name, pipeline.StreamEdge, tm.LogService)
 	tm.forks[name] = fork{
 		Edge:  e,
 		dbrps: CreateDBRPMap(dbrps),

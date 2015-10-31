@@ -2,13 +2,16 @@ package integrations
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"reflect"
 
 	"github.com/influxdb/influxdb/client"
 	"github.com/influxdb/kapacitor"
+	"github.com/influxdb/kapacitor/wlog"
 )
 
 type MockInfluxDBService struct {
@@ -56,4 +59,10 @@ func compareResults(exp, got kapacitor.Result) (bool, string) {
 		}
 	}
 	return true, ""
+}
+
+type LogService struct{}
+
+func (l *LogService) NewLogger(prefix string, flag int) *log.Logger {
+	return wlog.New(os.Stderr, prefix, flag)
 }

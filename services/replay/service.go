@@ -20,7 +20,6 @@ import (
 	"github.com/influxdb/kapacitor/clock"
 	"github.com/influxdb/kapacitor/models"
 	"github.com/influxdb/kapacitor/services/httpd"
-	"github.com/influxdb/kapacitor/wlog"
 	"github.com/twinj/uuid"
 )
 
@@ -51,10 +50,10 @@ type Service struct {
 }
 
 // Create a new replay master.
-func NewService(conf Config) *Service {
+func NewService(conf Config, l *log.Logger) *Service {
 	return &Service{
 		saveDir: conf.Dir,
-		logger:  wlog.New(os.Stderr, "[replay] ", log.LstdFlags),
+		logger:  l,
 	}
 }
 

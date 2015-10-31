@@ -77,7 +77,13 @@ func (m *Main) Run(args ...string) error {
 		cmd.Commit = commit
 		cmd.Branch = branch
 
-		if err := cmd.Run(args...); err != nil {
+		err := cmd.Run(args...)
+		// Use logger from cmd since it may have special config now.
+		if cmd.Logger != nil {
+			m.Logger = cmd.Logger
+		}
+		if err != nil {
+			m.Logger.Println("E!", err)
 			return fmt.Errorf("run: %s", err)
 		}
 

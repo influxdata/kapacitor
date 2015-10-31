@@ -5,7 +5,6 @@ import (
 	"expvar"
 	"log"
 	"net"
-	"os"
 	"strings"
 	"sync"
 
@@ -49,12 +48,12 @@ type Service struct {
 	statMap *expvar.Map
 }
 
-func NewService(c Config) *Service {
+func NewService(c Config, l *log.Logger) *Service {
 	d := *c.WithDefaults()
 	return &Service{
 		config: d,
 		done:   make(chan struct{}),
-		Logger: log.New(os.Stderr, "[udp] ", log.LstdFlags),
+		Logger: l,
 	}
 }
 
@@ -74,19 +73,19 @@ func (s *Service) Open() (err error) {
 
 	s.addr, err = net.ResolveUDPAddr("udp", s.config.BindAddress)
 	if err != nil {
-		s.Logger.Printf("Failed to resolve UDP address %s: %s", s.config.BindAddress, err)
+		s.Logger.Printf("E! Failed to resolve UDP address %s: %s", s.config.BindAddress, err)
 		return err
 	}
 
 	s.conn, err = net.ListenUDP("udp", s.addr)
 	if err != nil {
-		s.Logger.Printf("Failed to set up UDP listener at address %s: %s", s.addr, err)
+		s.Logger.Printf("E! Failed to set up UDP listener at address %s: %s", s.addr, err)
 		return err
 	}
 	//save fully resolved and bound addr. Useful if port given was '0'.
 	s.addr = s.conn.LocalAddr().(*net.UDPAddr)
 
-	s.Logger.Printf("Started listening on UDP: %s", s.addr.String())
+	s.Logger.Printf("I! Started listening on UDP: %s", s.addr.String())
 
 	s.wg.Add(1)
 	go s.serve()
@@ -112,7 +111,7 @@ func (s *Service) serve() {
 		if err != nil {
 			if !strings.Contains(err.Error(), "use of closed network connection") {
 				s.statMap.Add(statReadFail, 1)
-				s.Logger.Printf("Failed to read UDP message: %s", err)
+				s.Logger.Printf("E! Failed to read UDP message: %s", err)
 			}
 			continue
 		}
@@ -121,7 +120,7 @@ func (s *Service) serve() {
 		points, err := models.ParsePoints(buf[:n])
 		if err != nil {
 			s.statMap.Add(statPointsParseFail, 1)
-			s.Logger.Printf("Failed to parse points: %s", err)
+			s.Logger.Printf("E! Failed to parse points: %s", err)
 			continue
 		}
 
@@ -133,7 +132,7 @@ func (s *Service) serve() {
 		}); err == nil {
 			s.statMap.Add(statPointsTransmitted, int64(len(points)))
 		} else {
-			s.Logger.Printf("failed to write points to database %q: %s", s.config.Database, err)
+			s.Logger.Printf("E! failed to write points to database %q: %s", s.config.Database, err)
 			s.statMap.Add(statTransmitFail, 1)
 		}
 
@@ -154,14 +153,9 @@ func (s *Service) Close() error {
 	s.done = nil
 	s.conn = nil
 
-	s.Logger.Print("Service closed")
+	s.Logger.Print("I! Service closed")
 
 	return nil
-}
-
-// SetLogger sets the internal logger to the logger passed in.
-func (s *Service) SetLogger(l *log.Logger) {
-	s.Logger = l
 }
 
 func (s *Service) Addr() net.Addr {

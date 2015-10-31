@@ -4,12 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	"github.com/influxdb/kapacitor/pipeline"
 	"github.com/influxdb/kapacitor/tick"
-	"github.com/influxdb/kapacitor/wlog"
 )
 
 // The type of a task
@@ -158,8 +156,7 @@ func (et *ExecutingTask) link() error {
 		if err != nil {
 			return err
 		}
-		en.setLogger(wlog.New(
-			os.Stderr,
+		en.setLogger(et.tm.LogService.NewLogger(
 			fmt.Sprintf("[%s:%s] ", et.Task.Name, en.Name()),
 			log.LstdFlags,
 		))

@@ -31,13 +31,7 @@ test:
     - >
       source $HOME/.gvm/scripts/gvm;
       gvm use "go1.5.1";
-      make -C "$GOPATH/src/$IMPORT_PATH/" test
+      cd "$GOPATH/src/$IMPORT_PATH/";
+      go get -d -t ./...;
+      go test ./...
 
-deployment:
-  release:
-    tag: /v[0-9]+(\.[0-9]+)*/
-    commands:
-      - >
-        source $HOME/.gvm/scripts/gvm;
-        gvm use "go1.5.1";
-        make -C "$GOPATH/src/$IMPORT_PATH/" release;

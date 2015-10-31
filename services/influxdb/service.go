@@ -5,13 +5,11 @@ import (
 	"log"
 	"net"
 	"net/url"
-	"os"
 	"strings"
 
 	"github.com/influxdb/influxdb/client"
 	"github.com/influxdb/influxdb/cluster"
 	"github.com/influxdb/kapacitor/services/udp"
-	"github.com/influxdb/kapacitor/wlog"
 )
 
 const (
@@ -28,6 +26,9 @@ type Service struct {
 
 	PointsWriter interface {
 		WritePoints(p *cluster.WritePointsRequest) error
+	}
+	LogService interface {
+		NewLogger(string, int) *log.Logger
 	}
 
 	services []interface {
@@ -47,7 +48,7 @@ type subInfo struct {
 	Destinations []string
 }
 
-func NewService(c Config, hostname string) *Service {
+func NewService(c Config, hostname string, l *log.Logger) *Service {
 	configs := make([]client.Config, len(c.URLs))
 	for i, u := range c.URLs {
 		host, _ := url.Parse(u)
@@ -70,7 +71,7 @@ func NewService(c Config, hostname string) *Service {
 		configs:    configs,
 		configSubs: subs,
 		hostname:   hostname,
-		logger:     wlog.New(os.Stderr, "[influxdb] ", log.LstdFlags),
+		logger:     l,
 	}
 }
 
@@ -260,7 +261,8 @@ func (s *Service) startListener(db, rp string, u url.URL) (net.Addr, error) {
 		c.Database = db
 		c.RetentionPolicy = rp
 
-		service := udp.NewService(c)
+		l := s.LogService.NewLogger(fmt.Sprintf("[udp:%s.%s] ", db, rp), log.LstdFlags)
+		service := udp.NewService(c, l)
 		service.PointsWriter = s.PointsWriter
 		err := service.Open()
 		if err != nil {

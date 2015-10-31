@@ -104,7 +104,7 @@ func (n *node) addChild(c Node) (*Edge, error) {
 	}
 	n.children = append(n.children, c)
 
-	edge := newEdge(fmt.Sprintf("%s->%s", n.Name(), c.Name()), n.Provides())
+	edge := newEdge(fmt.Sprintf("%s->%s", n.Name(), c.Name()), n.Provides(), n.et.tm.LogService)
 	if edge == nil {
 		return nil, fmt.Errorf("unknown edge type %s", n.Provides())
 	}

@@ -1,0 +1,19 @@
+# If you modify this, please also make sure to edit init.sh
+
+[Unit]
+Description=Time series data processing engine.
+Documentation=https://github.com/influxdb/kapacitor
+After=network.target
+
+[Service]
+User=kapacitor
+Group=kapacitor
+LimitNOFILE=65536
+EnvironmentFile=-/etc/default/kapacitor
+ExecStart=/usr/bin/kapacitord -config /etc/kapacitor/kapacitor.conf $KAPACITOR_OPTS
+KillMode=process
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+Alias=kapacitor.service

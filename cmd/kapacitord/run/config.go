@@ -12,6 +12,7 @@ import (
 
 	"github.com/influxdb/kapacitor/services/httpd"
 	"github.com/influxdb/kapacitor/services/influxdb"
+	"github.com/influxdb/kapacitor/services/logging"
 	"github.com/influxdb/kapacitor/services/replay"
 	"github.com/influxdb/kapacitor/services/smtp"
 	"github.com/influxdb/kapacitor/services/task_store"
@@ -28,6 +29,7 @@ type Config struct {
 	Replay   replay.Config     `toml:"replay"`
 	Task     task_store.Config `toml:"task"`
 	InfluxDB influxdb.Config   `toml:"influxdb"`
+	Logging  logging.Config
 
 	Graphites []graphite.Config `toml:"graphite"`
 	Collectd  collectd.Config   `toml:"collectd"`
@@ -50,6 +52,7 @@ func NewConfig() *Config {
 	c.Replay = replay.NewConfig()
 	c.Task = task_store.NewConfig()
 	c.InfluxDB = influxdb.NewConfig()
+	c.Logging = logging.NewConfig()
 
 	c.Collectd = collectd.NewConfig()
 	c.OpenTSDB = opentsdb.NewConfig()
