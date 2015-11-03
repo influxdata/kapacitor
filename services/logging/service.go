@@ -61,6 +61,10 @@ func (s *Service) NewLogger(prefix string, flag int) *log.Logger {
 	return wlog.New(s.f, prefix, flag)
 }
 
+func (s *Service) NewStaticLevelLogger(prefix string, flag int, l wlog.Level) *log.Logger {
+	return log.New(wlog.NewStaticLevelWriter(s.f, l), prefix, flag)
+}
+
 type nopCloser struct {
 	f io.Writer
 }

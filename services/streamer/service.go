@@ -1,6 +1,8 @@
 package streamer
 
 import (
+	"log"
+
 	"github.com/influxdb/influxdb/cluster"
 	"github.com/influxdb/kapacitor/models"
 )
@@ -9,10 +11,13 @@ type Service struct {
 	StreamCollector interface {
 		CollectPoint(models.Point) error
 	}
+	logger *log.Logger
 }
 
-func NewService() *Service {
-	return &Service{}
+func NewService(l *log.Logger) *Service {
+	return &Service{
+		logger: l,
+	}
 }
 
 func (s *Service) Open() error {
@@ -36,6 +41,7 @@ func (s *Service) WritePoints(pts *cluster.WritePointsRequest) (err error) {
 		}
 		err = s.StreamCollector.CollectPoint(p)
 		if err != nil {
+			s.logger.Println("E!", err)
 			return
 		}
 	}

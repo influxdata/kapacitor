@@ -37,13 +37,21 @@ const (
 
 const Delimeter = '!'
 
-var invalidMSG = []byte("log messages must have 'L!' prefix where L is one of 'D', 'I', 'W', 'E'\n")
+var invalidMSG = []byte("log messages must have 'L!' prefix where L is one of 'D', 'I', 'W', 'E'")
 
 var Levels = map[byte]Level{
 	'D': DEBUG,
 	'I': INFO,
 	'W': WARN,
 	'E': ERROR,
+}
+var ReverseLevels map[Level]byte
+
+func init() {
+	ReverseLevels = make(map[Level]byte, len(Levels))
+	for k, l := range Levels {
+		ReverseLevels[l] = k
+	}
 }
 
 // The global and only log level. Log levels are not implemented per writer.
@@ -99,15 +107,35 @@ func (w *Writer) Write(buf []byte) (int, error) {
 				}
 			}
 			if w.start == -1 {
-				return w.w.Write(invalidMSG)
+				buf = append(invalidMSG, buf...)
+				return w.w.Write(buf)
 			}
 		}
 		l := Levels[buf[w.start]]
 		if l >= LogLevel {
 			return w.w.Write(buf)
 		} else if l == 0 {
-			return w.w.Write(invalidMSG)
+			buf = append(invalidMSG, buf...)
+			return w.w.Write(buf)
 		}
 	}
 	return 0, nil
+}
+
+type StaticLevelWriter struct {
+	levelPrefix []byte
+	w           io.Writer
+}
+
+func NewStaticLevelWriter(w io.Writer, level Level) *StaticLevelWriter {
+	levelPrefix := []byte{ReverseLevels[level], '!', ' '}
+	return &StaticLevelWriter{
+		levelPrefix: levelPrefix,
+		w:           w,
+	}
+}
+
+func (w *StaticLevelWriter) Write(buf []byte) (int, error) {
+	buf = append(w.levelPrefix, buf...)
+	return w.w.Write(buf)
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/influxdb/kapacitor/services/streamer"
 	"github.com/influxdb/kapacitor/services/task_store"
 	"github.com/influxdb/kapacitor/services/udp"
+	"github.com/influxdb/kapacitor/wlog"
 
 	"github.com/influxdb/influxdb/influxql"
 	"github.com/influxdb/influxdb/meta"
@@ -75,7 +76,6 @@ func NewServer(c *Config, buildInfo *BuildInfo, l *log.Logger, logService *loggi
 		err:           make(chan error),
 		closing:       make(chan struct{}),
 		LogService:    logService,
-		TaskMaster:    kapacitor.NewTaskMaster(),
 		MetaStore:     &metastore{},
 		QueryExecutor: &queryexecutor{},
 
@@ -85,6 +85,7 @@ func NewServer(c *Config, buildInfo *BuildInfo, l *log.Logger, logService *loggi
 	s.Logger.Println("I! Kapacitor hostname:", c.Hostname)
 
 	// Start Task Master
+	s.TaskMaster = kapacitor.NewTaskMaster(logService)
 	if err := s.TaskMaster.Open(); err != nil {
 		return nil, err
 	}
@@ -111,14 +112,12 @@ func NewServer(c *Config, buildInfo *BuildInfo, l *log.Logger, logService *loggi
 		}
 	}
 
-	// Add logService last so it is closed last
-	s.Services = append(s.Services, logService)
-
 	return s, nil
 }
 
 func (s *Server) appendStreamerService() {
-	srv := streamer.NewService()
+	l := s.LogService.NewLogger("[streamer] ", log.LstdFlags)
+	srv := streamer.NewService(l)
 	srv.StreamCollector = s.TaskMaster.Stream
 
 	s.Streamer = srv
@@ -127,7 +126,8 @@ func (s *Server) appendStreamerService() {
 
 func (s *Server) appendSMTPService(c smtp.Config) {
 	if c.Enabled {
-		srv := smtp.NewService(c)
+		l := s.LogService.NewLogger("[smtp] ", log.LstdFlags)
+		srv := smtp.NewService(c, l)
 
 		s.SMTPService = srv
 		s.TaskMaster.SMTPService = srv
@@ -136,8 +136,10 @@ func (s *Server) appendSMTPService(c smtp.Config) {
 }
 
 func (s *Server) appendInfluxDBService(c influxdb.Config, hostname string) {
-	srv := influxdb.NewService(c, hostname)
+	l := s.LogService.NewLogger("[influxdb] ", log.LstdFlags)
+	srv := influxdb.NewService(c, hostname, l)
 	srv.PointsWriter = s.Streamer
+	srv.LogService = s.LogService
 
 	s.InfluxDB = srv
 	s.TaskMaster.InfluxDBService = srv
@@ -145,7 +147,8 @@ func (s *Server) appendInfluxDBService(c influxdb.Config, hostname string) {
 }
 
 func (s *Server) appendHTTPDService(c httpd.Config) {
-	srv := httpd.NewService(c)
+	l := s.LogService.NewLogger("[httpd] ", log.LstdFlags)
+	srv := httpd.NewService(c, l)
 
 	srv.Handler.MetaStore = s.MetaStore
 	srv.Handler.PointsWriter = s.Streamer
@@ -157,7 +160,8 @@ func (s *Server) appendHTTPDService(c httpd.Config) {
 }
 
 func (s *Server) appendTaskStoreService(c task_store.Config) {
-	srv := task_store.NewService(c)
+	l := s.LogService.NewLogger("[task] ", log.LstdFlags)
+	srv := task_store.NewService(c, l)
 	srv.HTTPDService = s.HTTPDService
 	srv.TaskMaster = s.TaskMaster
 
@@ -166,7 +170,8 @@ func (s *Server) appendTaskStoreService(c task_store.Config) {
 }
 
 func (s *Server) appendReplayStoreService(c replay.Config) {
-	srv := replay.NewService(c)
+	l := s.LogService.NewLogger("[replay] ", log.LstdFlags)
+	srv := replay.NewService(c, l)
 	srv.TaskStore = s.TaskStore
 	srv.HTTPDService = s.HTTPDService
 	srv.InfluxDBService = s.InfluxDB
@@ -180,7 +185,9 @@ func (s *Server) appendCollectdService(c collectd.Config) {
 	if !c.Enabled {
 		return
 	}
+	l := s.LogService.NewStaticLevelLogger("[collectd] ", log.LstdFlags, wlog.INFO)
 	srv := collectd.NewService(c)
+	srv.SetLogger(l)
 	srv.MetaStore = s.MetaStore
 	srv.PointsWriter = s.Streamer
 	s.Services = append(s.Services, srv)
@@ -190,10 +197,12 @@ func (s *Server) appendOpenTSDBService(c opentsdb.Config) error {
 	if !c.Enabled {
 		return nil
 	}
+	l := s.LogService.NewStaticLevelLogger("[opentsdb] ", log.LstdFlags, wlog.INFO)
 	srv, err := opentsdb.NewService(c)
 	if err != nil {
 		return err
 	}
+	srv.SetLogger(l)
 	srv.PointsWriter = s.Streamer
 	srv.MetaStore = s.MetaStore
 	s.Services = append(s.Services, srv)
@@ -204,10 +213,12 @@ func (s *Server) appendGraphiteService(c graphite.Config) error {
 	if !c.Enabled {
 		return nil
 	}
+	l := s.LogService.NewStaticLevelLogger("[graphite] ", log.LstdFlags, wlog.INFO)
 	srv, err := graphite.NewService(c)
 	if err != nil {
 		return err
 	}
+	srv.SetLogger(l)
 
 	srv.PointsWriter = s.Streamer
 	srv.MetaStore = s.MetaStore
@@ -219,7 +230,8 @@ func (s *Server) appendUDPService(c udp.Config) {
 	if !c.Enabled {
 		return
 	}
-	srv := udp.NewService(c)
+	l := s.LogService.NewLogger("[udp] ", log.LstdFlags)
+	srv := udp.NewService(c, l)
 	srv.PointsWriter = s.Streamer
 	s.Services = append(s.Services, srv)
 }

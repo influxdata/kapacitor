@@ -13,7 +13,6 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/influxdb/kapacitor/services/logging"
-	"github.com/influxdb/kapacitor/wlog"
 )
 
 const logo = `
@@ -41,7 +40,9 @@ type Command struct {
 	Stdout io.Writer
 	Stderr io.Writer
 
-	Server *Server
+	Server     *Server
+	Logger     *log.Logger
+	logService *logging.Service
 }
 
 // NewCommand return a new instance of Command.
@@ -62,6 +63,9 @@ func (cmd *Command) Run(args ...string) error {
 	if err != nil {
 		return err
 	}
+
+	// Print sweet Kapacitor logo.
+	fmt.Print(logo)
 
 	// Parse config
 	config, err := cmd.ParseConfig(options.ConfigPath)
@@ -95,19 +99,16 @@ func (cmd *Command) Run(args ...string) error {
 	}
 
 	// Initialize Logging Services
-	logService := logging.NewService(config.Logging, cmd.Stdout, cmd.Stderr)
-	err = logService.Open()
+	cmd.logService = logging.NewService(config.Logging, cmd.Stdout, cmd.Stderr)
+	err = cmd.logService.Open()
 	if err != nil {
 		return fmt.Errorf("init logging: %s", err)
 	}
-	l := logService.NewLogger("[srv] ", log.LstdFlags)
+	cmd.Logger = cmd.logService.NewLogger("[run] ", log.LstdFlags)
 
-	// Print sweet Kapacitor logo.
-	fmt.Print(logo)
-
-	// Mark start-up in log.
-	l.Printf("I! Kapacitor starting, version %s, branch %s, commit %s", cmd.Version, cmd.Branch, cmd.Commit)
-	l.Printf("I! Go version %s, GOMAXPROCS set to %d", runtime.Version(), runtime.GOMAXPROCS(0))
+	// Mark start-up in log.,
+	cmd.Logger.Printf("I! Kapacitor starting, version %s, branch %s, commit %s", cmd.Version, cmd.Branch, cmd.Commit)
+	cmd.Logger.Printf("I! Go version %s, GOMAXPROCS set to %d", runtime.Version(), runtime.GOMAXPROCS(0))
 
 	// Write the PID file.
 	if err := cmd.writePIDFile(options.PIDFile); err != nil {
@@ -116,7 +117,8 @@ func (cmd *Command) Run(args ...string) error {
 
 	// Create server from config and start it.
 	buildInfo := &BuildInfo{Version: cmd.Version, Commit: cmd.Commit, Branch: cmd.Branch}
-	s, err := NewServer(config, buildInfo, l, logService)
+	l := cmd.logService.NewLogger("[srv] ", log.LstdFlags)
+	s, err := NewServer(config, buildInfo, l, cmd.logService)
 	if err != nil {
 		return fmt.Errorf("create server: %s", err)
 	}
@@ -140,15 +142,17 @@ func (cmd *Command) Close() error {
 	if cmd.Server != nil {
 		return cmd.Server.Close()
 	}
+	if cmd.logService != nil {
+		return cmd.logService.Close()
+	}
 	return nil
 }
 
 func (cmd *Command) monitorServerErrors() {
-	logger := wlog.New(cmd.Stderr, "", log.LstdFlags)
 	for {
 		select {
 		case err := <-cmd.Server.Err():
-			logger.Println("E! " + err.Error())
+			cmd.Logger.Println("E! " + err.Error())
 		case <-cmd.closing:
 			return
 		}
