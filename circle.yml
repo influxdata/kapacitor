@@ -32,6 +32,6 @@ test:
       source $HOME/.gvm/scripts/gvm;
       gvm use "go1.5.1";
       cd "$GOPATH/src/$IMPORT_PATH/";
-      go get -d -f -t ./...;
+      go get -d -t ./...;
       go test ./...
 
