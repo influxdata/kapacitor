@@ -137,20 +137,22 @@ Make sure you have Go installed and the project structure as shown above. To the
 
 ```bash
 cd $GOPATH/src/github.com/influxdb/kapacitor
-make
+go build ./cmd/kapacitor
+go build ./cmd/kapacitord
 ```
 Kapacitor builds two binares is named `kapacitor`, and `kapacitord`.
-
-If you want to build packages run:
-```bash
-make dist
-```
 
 To run the tests, execute the following command:
 
 ```bash
-make test
+go test ./...
 ```
+
+If you want to build packages run:
+```bash
+./build.py --packages
+```
+
 
 Profiling
 ---------

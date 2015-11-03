@@ -10,10 +10,9 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
-	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/influxdb/kapacitor/wlog"
+	"github.com/influxdb/kapacitor/services/logging"
 )
 
 const logo = `
@@ -41,7 +40,9 @@ type Command struct {
 	Stdout io.Writer
 	Stderr io.Writer
 
-	Server *Server
+	Server     *Server
+	Logger     *log.Logger
+	logService *logging.Service
 }
 
 // NewCommand return a new instance of Command.
@@ -63,26 +64,8 @@ func (cmd *Command) Run(args ...string) error {
 		return err
 	}
 
-	// Set log level
-	err = wlog.SetLevel(options.LogLevel)
-	if err != nil {
-		return err
-	}
-
 	// Print sweet Kapacitor logo.
 	fmt.Print(logo)
-
-	// Mark start-up in log.
-	log.Printf("Kapacitor starting, version %s, branch %s, commit %s", cmd.Version, cmd.Branch, cmd.Commit)
-	log.Printf("Go version %s, GOMAXPROCS set to %d", runtime.Version(), runtime.GOMAXPROCS(0))
-
-	// Write the PID file.
-	if err := cmd.writePIDFile(options.PIDFile); err != nil {
-		return fmt.Errorf("write pid file: %s", err)
-	}
-
-	// Turn on block profiling to debug stuck databases
-	runtime.SetBlockProfileRate(int(1 * time.Second))
 
 	// Parse config
 	config, err := cmd.ParseConfig(options.ConfigPath)
@@ -100,15 +83,42 @@ func (cmd *Command) Run(args ...string) error {
 		config.Hostname = options.Hostname
 	}
 
+	// Override config logging file if specified in the command line args.
+	if options.LogFile != "" {
+		config.Logging.File = options.LogFile
+	}
+
+	// Override config logging level if specified in the command line args.
+	if options.LogLevel != "" {
+		config.Logging.Level = options.LogLevel
+	}
+
 	// Validate the configuration.
 	if err := config.Validate(); err != nil {
 		return fmt.Errorf("%s. To generate a valid configuration file run `kapacitord config > kapacitor.generated.conf`.", err)
 	}
 
+	// Initialize Logging Services
+	cmd.logService = logging.NewService(config.Logging, cmd.Stdout, cmd.Stderr)
+	err = cmd.logService.Open()
+	if err != nil {
+		return fmt.Errorf("init logging: %s", err)
+	}
+	cmd.Logger = cmd.logService.NewLogger("[run] ", log.LstdFlags)
+
+	// Mark start-up in log.,
+	cmd.Logger.Printf("I! Kapacitor starting, version %s, branch %s, commit %s", cmd.Version, cmd.Branch, cmd.Commit)
+	cmd.Logger.Printf("I! Go version %s, GOMAXPROCS set to %d", runtime.Version(), runtime.GOMAXPROCS(0))
+
+	// Write the PID file.
+	if err := cmd.writePIDFile(options.PIDFile); err != nil {
+		return fmt.Errorf("write pid file: %s", err)
+	}
+
 	// Create server from config and start it.
 	buildInfo := &BuildInfo{Version: cmd.Version, Commit: cmd.Commit, Branch: cmd.Branch}
-	l := wlog.New(cmd.Stderr, "[srv] ", log.LstdFlags)
-	s, err := NewServer(config, buildInfo, l)
+	l := cmd.logService.NewLogger("[srv] ", log.LstdFlags)
+	s, err := NewServer(config, buildInfo, l, cmd.logService)
 	if err != nil {
 		return fmt.Errorf("create server: %s", err)
 	}
@@ -132,15 +142,17 @@ func (cmd *Command) Close() error {
 	if cmd.Server != nil {
 		return cmd.Server.Close()
 	}
+	if cmd.logService != nil {
+		return cmd.logService.Close()
+	}
 	return nil
 }
 
 func (cmd *Command) monitorServerErrors() {
-	logger := wlog.New(cmd.Stderr, "", log.LstdFlags)
 	for {
 		select {
 		case err := <-cmd.Server.Err():
-			logger.Println("E! " + err.Error())
+			cmd.Logger.Println("E! " + err.Error())
 		case <-cmd.closing:
 			return
 		}
@@ -156,7 +168,8 @@ func (cmd *Command) ParseFlags(args ...string) (Options, error) {
 	fs.StringVar(&options.Hostname, "hostname", "", "")
 	fs.StringVar(&options.CPUProfile, "cpuprofile", "", "")
 	fs.StringVar(&options.MemProfile, "memprofile", "", "")
-	fs.StringVar(&options.LogLevel, "loglevel", "info", "")
+	fs.StringVar(&options.LogFile, "log-file", "", "")
+	fs.StringVar(&options.LogLevel, "log-level", "", "")
 	fs.Usage = func() { fmt.Fprintln(cmd.Stderr, usage) }
 	if err := fs.Parse(args); err != nil {
 		return Options{}, err
@@ -219,9 +232,11 @@ run starts the Kapacitor server.
         -pidfile <path>
                           Write process ID to a file.
 
-        -loglevel <level>
+        -log-file <path>
+                          Write logs to a file.
+
+        -log-level <level>
                           Sets the log level. One of debug,info,warn,error.
-                          Default: info
 `
 
 // Options represents the command line options that can be parsed.
@@ -231,5 +246,6 @@ type Options struct {
 	Hostname   string
 	CPUProfile string
 	MemProfile string
+	LogFile    string
 	LogLevel   string
 }

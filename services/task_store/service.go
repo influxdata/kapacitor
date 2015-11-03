@@ -46,10 +46,10 @@ type taskStore struct {
 	TICKScript string
 }
 
-func NewService(conf Config) *Service {
+func NewService(conf Config, l *log.Logger) *Service {
 	return &Service{
 		dbpath: path.Join(conf.Dir, taskDB),
-		logger: log.New(os.Stderr, "[task] ", log.LstdFlags),
+		logger: l,
 	}
 }
 

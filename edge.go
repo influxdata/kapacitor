@@ -5,7 +5,6 @@ import (
 	"expvar"
 	"fmt"
 	"log"
-	"os"
 
 	"github.com/influxdb/kapacitor/models"
 	"github.com/influxdb/kapacitor/pipeline"
@@ -37,13 +36,13 @@ type Edge struct {
 	statMap *expvar.Map
 }
 
-func newEdge(name string, t pipeline.EdgeType) *Edge {
+func newEdge(name string, t pipeline.EdgeType, logService LogService) *Edge {
 	sm := &expvar.Map{}
 	sm.Init()
 	sm.Add(statCollected, 0)
 	sm.Add(statEmitted, 0)
 	e := &Edge{statMap: sm}
-	e.logger = wlog.New(os.Stderr, fmt.Sprintf("[edge:%s] ", name), log.LstdFlags)
+	e.logger = logService.NewLogger(fmt.Sprintf("[edge:%s] ", name), log.LstdFlags)
 	switch t {
 	case pipeline.StreamEdge:
 		e.stream = make(chan models.Point)

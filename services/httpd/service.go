@@ -7,10 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"os"
 	"strings"
-
-	"github.com/influxdb/kapacitor/wlog"
 )
 
 type Service struct {
@@ -25,10 +22,9 @@ type Service struct {
 	Logger *log.Logger
 }
 
-func NewService(c Config) *Service {
+func NewService(c Config, l *log.Logger) *Service {
 	statMap := &expvar.Map{}
 	statMap.Init()
-	l := wlog.New(os.Stderr, "[http] ", log.LstdFlags)
 	s := &Service{
 		addr:  c.BindAddress,
 		https: c.HttpsEnabled,

@@ -2,11 +2,9 @@ package smtp
 
 import (
 	"log"
-	"os"
 	"sync"
 	"time"
 
-	"github.com/influxdb/kapacitor/wlog"
 	"gopkg.in/gomail.v2"
 )
 
@@ -17,11 +15,11 @@ type Service struct {
 	wg     sync.WaitGroup
 }
 
-func NewService(c Config) *Service {
+func NewService(c Config, l *log.Logger) *Service {
 	return &Service{
 		c:      c,
 		mail:   make(chan *gomail.Message),
-		logger: wlog.New(os.Stderr, "[smtp] ", log.LstdFlags),
+		logger: l,
 	}
 }
 

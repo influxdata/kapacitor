@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -21,6 +22,7 @@ import (
 )
 
 var httpService *httpd.Service
+var logService = &LogService{}
 
 var dbrps = []kapacitor.DBRP{
 	{
@@ -34,7 +36,7 @@ func init() {
 	// create API server
 	config := httpd.NewConfig()
 	config.BindAddress = ":0" // Choose port dynamically
-	httpService = httpd.NewService(config)
+	httpService = httpd.NewService(config, logService.NewLogger("[http] ", log.LstdFlags))
 	err := httpService.Open()
 	if err != nil {
 		panic(err)
@@ -1050,7 +1052,7 @@ func testStreamer(t *testing.T, name, script string) (clock.Setter, *kapacitor.E
 	r := kapacitor.NewReplay(c)
 
 	// Create a new execution env
-	tm := kapacitor.NewTaskMaster()
+	tm := kapacitor.NewTaskMaster(logService)
 	tm.HTTPDService = httpService
 	tm.Open()
 
