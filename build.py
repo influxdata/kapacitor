@@ -7,6 +7,13 @@ import time
 import datetime
 import shutil
 import tempfile
+import re
+
+try:
+    import boto
+    from boto.s3.key import Key
+except ImportError:
+    pass
 
 # PACKAGING VARIABLES
 INSTALL_ROOT_DIR = "/usr/bin"
@@ -110,10 +117,9 @@ def create_temp_dir():
     return tempfile.mkdtemp(prefix='kapacitor-build')
 
 def get_current_version():
-    command = "git describe --always --tags --abbrev=0"
-    out = run(command)
+    version = run("git describe --always --tags --abbrev=0").strip()
     # Remove leading 'v'
-    return out.strip()[1:]
+    return version[1:]
 
 def get_current_commit(short=False):
     command = None
@@ -258,6 +264,7 @@ def package_scripts(build_root):
     shutil.copy(DEFAULT_CONFIG, os.path.join(build_root, DEFAULT_CONFIG))
 
 def build_packages(build_output, version):
+    outfiles = []
     TMP_BUILD_DIR = create_temp_dir()
     try:
         print "Packaging..."
@@ -278,17 +285,45 @@ def build_packages(build_output, version):
                     print "\t- Packaging directory '{}' as '{}'...".format(BUILD_ROOT, package_type),
                     name = 'kapacitor'
                     if package_type in ['zip', 'tar']:
-                        name = '{}-{}'.format(name, version)
+                        name = '{}-{}_{}_{}'.format(name, version, p, a)
                     fpm_command = "fpm {} --name {} -t {} --version {} -C {} ".format(fpm_common_args,
                                                                            name,
                                                                            package_type,
                                                                            version,
                                                                            BUILD_ROOT)
                     out = run(fpm_command, shell=True)
+                    matches = re.search(':path=>"(.*)"', out)
+                    outfile = None
+                    if matches is not None:
+                        outfile = matches.groups()[0]
+                    if outfile is None:
+                        print "Could not determine output file of fpm command"
+                    else:
+                        outfiles.append(outfile)
                     print "[ DONE ]"
         print ""
+        return outfiles
     finally:
         shutil.rmtree(TMP_BUILD_DIR)
+
+def upload_packages(packages):
+    print "Uploading packages to S3..."
+    print ""
+
+    c = boto.connect_s3()
+    bucket = c.get_bucket('influxdb')
+    for p in packages:
+        if bucket.get_key(p) is None:
+            print "\t uploading {}...".format(p),
+            k = Key(bucket)
+            k.key = p
+            n = k.set_contents_from_filename(p,replace=False)
+            print "[ DONE ]"
+        else:
+            print "\t not uploading {} already exists".format(p)
+
+    print ""
+
 
 def main():
     print ""
@@ -308,6 +343,7 @@ def main():
     rc = None
     package = False
     update = False
+    upload = False
 
     for arg in sys.argv[1:]:
         if '--outdir' in arg:
@@ -343,6 +379,9 @@ def main():
         elif '--update' in arg:
             # Signifies that deps should be checked for updates
             update = True
+        elif '--upload' in arg:
+            # Signifies that the resulting packages should be uploaded to S3
+            upload = True
         else:
             print "!! Unknown argument: {}".format(arg)
             sys.exit(1)
@@ -387,7 +426,10 @@ def main():
         if not check_path_for("fpm"):
             print "!! Cannot package without command 'fpm'. Stopping."
             sys.exit(1)
-        build_packages(build_output, version)
+        packages = build_packages(build_output, version)
+        print packages
+        if upload:
+            upload_packages(packages)
 
 if __name__ == '__main__':
     main()

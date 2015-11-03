@@ -14,7 +14,9 @@ RUN apt-get install -y \
     ruby-dev \
     rpm \
     zip \
-    python
+    python \
+    python-boto
+
 RUN gem install fpm
 
 # Install go

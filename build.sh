@@ -8,4 +8,4 @@ set -e
 # Run the build utility via Docker
 docker build --tag=kapacitor-builder $DIR
 echo "Running build.py"
-docker run -v $DIR:/gopath/src/github.com/influxdb/kapacitor kapacitor-builder "$@"
+docker run -e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" -e AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" -v $DIR:/gopath/src/github.com/influxdb/kapacitor kapacitor-builder "$@"
