@@ -3,6 +3,7 @@ package replay
 import (
 	"archive/zip"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -489,6 +490,9 @@ func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, start, stop ti
 		return err
 	}
 
+	if r.InfluxDBService == nil {
+		return errors.New("InfluxDB not configured, cannot record batch query")
+	}
 	con, err := r.InfluxDBService.NewClient()
 	if err != nil {
 		return err

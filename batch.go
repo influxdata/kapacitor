@@ -92,12 +92,14 @@ type BatchNode struct {
 	query  *Query
 	ticker ticker
 	wg     sync.WaitGroup
+	errC   chan error
 }
 
 func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode) (*BatchNode, error) {
 	bn := &BatchNode{
 		node: node{Node: n, et: et},
 		b:    n,
+		errC: make(chan error, 1),
 	}
 	bn.node.runF = bn.runBatch
 	bn.node.stopF = bn.stopBatch
@@ -174,7 +176,9 @@ func (b *BatchNode) DBRPs() ([]DBRP, error) {
 
 func (b *BatchNode) Start(batch BatchCollector) {
 	b.wg.Add(1)
-	go b.doQuery(batch)
+	go func() {
+		b.errC <- b.doQuery(batch)
+	}()
 }
 
 func (b *BatchNode) Queries(start, stop time.Time) []string {
@@ -203,9 +207,13 @@ func (b *BatchNode) Queries(start, stop time.Time) []string {
 }
 
 // Query InfluxDB return Edge with data
-func (b *BatchNode) doQuery(batch BatchCollector) {
+func (b *BatchNode) doQuery(batch BatchCollector) error {
 	defer batch.Close()
 	defer b.wg.Done()
+
+	if b.et.tm.InfluxDBService == nil {
+		return errors.New("InfluxDB not configured, cannot query InfluxDB for batch query")
+	}
 
 	tickC := b.ticker.Start()
 	for now := range tickC {
@@ -220,8 +228,7 @@ func (b *BatchNode) doQuery(batch BatchCollector) {
 		// Connect
 		con, err := b.et.tm.InfluxDBService.NewClient()
 		if err != nil {
-			b.logger.Println("E! " + err.Error())
-			break
+			return err
 		}
 		q := client.Query{
 			Command: b.query.String(),
@@ -230,27 +237,25 @@ func (b *BatchNode) doQuery(batch BatchCollector) {
 		// Execute query
 		resp, err := con.Query(q)
 		if err != nil {
-			b.logger.Println("E! " + err.Error())
-			return
+			return err
 		}
 
 		if resp.Err != nil {
-			b.logger.Println("E! " + resp.Err.Error())
-			return
+			return resp.Err
 		}
 
 		// Collect batches
 		for _, res := range resp.Results {
 			batches, err := models.ResultToBatches(res)
 			if err != nil {
-				b.logger.Println("E!", err)
-				return
+				return err
 			}
 			for _, bch := range batches {
 				batch.CollectBatch(bch)
 			}
 		}
 	}
+	return errors.New("batch ticker schedule stopped")
 }
 
 func (b *BatchNode) stopBatch() {
@@ -261,22 +266,32 @@ func (b *BatchNode) stopBatch() {
 }
 
 func (b *BatchNode) runBatch() error {
-	for bt, ok := b.ins[0].NextBatch(); ok; bt, ok = b.ins[0].NextBatch() {
-		for _, child := range b.outs {
-			err := child.CollectBatch(bt)
-			if err != nil {
-				return err
+	errC := make(chan error, 1)
+	go func() {
+		for bt, ok := b.ins[0].NextBatch(); ok; bt, ok = b.ins[0].NextBatch() {
+			for _, child := range b.outs {
+				err := child.CollectBatch(bt)
+				if err != nil {
+					errC <- err
+					return
+				}
 			}
 		}
+		errC <- nil
+	}()
+	// Wait for errors
+	select {
+	case err := <-b.errC:
+		return err
+	case err := <-errC:
+		return err
 	}
-	return nil
 }
 
 type ticker interface {
 	Start() <-chan time.Time
 	Stop()
-	// Return the next time the ticker will tick
-	// after now.
+	// Return the next time the ticker will tick after now.
 	Next(now time.Time) time.Time
 }
 

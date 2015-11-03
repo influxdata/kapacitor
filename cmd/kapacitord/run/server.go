@@ -45,13 +45,13 @@ type Server struct {
 
 	TaskMaster *kapacitor.TaskMaster
 
-	LogService    *logging.Service
-	HTTPDService  *httpd.Service
-	Streamer      *streamer.Service
-	TaskStore     *task_store.Service
-	ReplayService *replay.Service
-	InfluxDB      *influxdb.Service
-	SMTPService   *smtp.Service
+	LogService      *logging.Service
+	HTTPDService    *httpd.Service
+	Streamer        *streamer.Service
+	TaskStore       *task_store.Service
+	ReplayService   *replay.Service
+	InfluxDBService *influxdb.Service
+	SMTPService     *smtp.Service
 
 	MetaStore     *metastore
 	QueryExecutor *queryexecutor
@@ -136,14 +136,16 @@ func (s *Server) appendSMTPService(c smtp.Config) {
 }
 
 func (s *Server) appendInfluxDBService(c influxdb.Config, hostname string) {
-	l := s.LogService.NewLogger("[influxdb] ", log.LstdFlags)
-	srv := influxdb.NewService(c, hostname, l)
-	srv.PointsWriter = s.Streamer
-	srv.LogService = s.LogService
+	if c.Enabled {
+		l := s.LogService.NewLogger("[influxdb] ", log.LstdFlags)
+		srv := influxdb.NewService(c, hostname, l)
+		srv.PointsWriter = s.Streamer
+		srv.LogService = s.LogService
 
-	s.InfluxDB = srv
-	s.TaskMaster.InfluxDBService = srv
-	s.Services = append(s.Services, srv)
+		s.InfluxDBService = srv
+		s.TaskMaster.InfluxDBService = srv
+		s.Services = append(s.Services, srv)
+	}
 }
 
 func (s *Server) appendHTTPDService(c httpd.Config) {
@@ -174,7 +176,7 @@ func (s *Server) appendReplayStoreService(c replay.Config) {
 	srv := replay.NewService(c, l)
 	srv.TaskStore = s.TaskStore
 	srv.HTTPDService = s.HTTPDService
-	srv.InfluxDBService = s.InfluxDB
+	srv.InfluxDBService = s.InfluxDBService
 	srv.TaskMaster = s.TaskMaster
 
 	s.ReplayService = srv

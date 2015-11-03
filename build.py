@@ -13,14 +13,13 @@ INSTALL_ROOT_DIR = "/usr/bin"
 LOG_DIR = "/var/log/kapacitor"
 DATA_DIR = "/var/lib/kapacitor"
 SCRIPT_DIR = "/usr/lib/kapacitor/scripts"
-CONFIG_DIR = "/etc/kapacitor"
-LOGROTATE_DIR = "/etc/logrotate.d"
 
 INIT_SCRIPT = "scripts/init.sh"
 SYSTEMD_SCRIPT = "scripts/kapacitor.service"
 POSTINST_SCRIPT = "scripts/post-install.sh"
-LOGROTATE_SCRIPT = "scripts/logrotate"
-CONFIG_SAMPLE = "etc/config.sample.toml"
+POSTUNINST_SCRIPT = "scripts/post-uninstall.sh"
+LOGROTATE_CONFIG = "etc/logrotate.d/kapacitor"
+DEFAULT_CONFIG = "etc/kapacitor/kapacitor.conf"
 PREINST_SCRIPT = None
 
 # META-PACKAGE VARIABLES
@@ -34,7 +33,33 @@ DESCRIPTION = "Time series data processing engine"
 prereqs = [ 'git', 'go' ]
 optional_prereqs = [ 'gvm', 'fpm', 'awscmd', 'rpmbuild' ]
 
-fpm_common_args = "-f -s dir --log error  --vendor {} --url {} --after-install {} --license {} --maintainer {} --config-files {} --config-files {} --description \"{}\"".format(VENDOR, PACKAGE_URL, POSTINST_SCRIPT, PACKAGE_LICENSE, MAINTAINER, CONFIG_DIR, LOGROTATE_DIR, DESCRIPTION)
+fpm_common_args = "-f -s dir --log error \
+ --vendor {} \
+ --url {} \
+ --after-install {} \
+ --after-remove {} \
+ --license {} \
+ --maintainer {} \
+ --config-files {} \
+ --config-files {} \
+ --directories {} \
+ --description \"{}\"".format(
+        VENDOR,
+        PACKAGE_URL,
+        POSTINST_SCRIPT,
+        POSTUNINST_SCRIPT,
+        PACKAGE_LICENSE,
+        MAINTAINER,
+        DEFAULT_CONFIG,
+        LOGROTATE_CONFIG,
+        ' --directories '.join([
+                         LOG_DIR[1:],
+                         DATA_DIR[1:],
+                         SCRIPT_DIR[1:],
+                         os.path.dirname(SCRIPT_DIR[1:]),
+                         os.path.dirname(DEFAULT_CONFIG),
+                    ]),
+        DESCRIPTION)
 
 targets = {
     'kapacitor' : './cmd/kapacitor/main.go',
@@ -209,12 +234,9 @@ def create_dir(path):
 
 def move_file(fr, to):
     try:
-        os.rename(fr, to)
+        shutil.move(fr, to)
     except OSError as e:
-        try:
-            shutil.copyfile(fr, to)
-        except OSError as e:
-            print e
+        print e
 
 def create_package_fs(build_root):
     print "\t- Creating a filesystem hierarchy from directory: {}".format(build_root)
@@ -224,15 +246,15 @@ def create_package_fs(build_root):
     create_dir(os.path.join(build_root, LOG_DIR[1:]))
     create_dir(os.path.join(build_root, DATA_DIR[1:]))
     create_dir(os.path.join(build_root, SCRIPT_DIR[1:]))
-    create_dir(os.path.join(build_root, CONFIG_DIR[1:]))
-    create_dir(os.path.join(build_root, LOGROTATE_DIR[1:]))
+    create_dir(os.path.join(build_root, os.path.dirname(DEFAULT_CONFIG)))
+    create_dir(os.path.join(build_root, os.path.dirname(LOGROTATE_CONFIG)))
 
 def package_scripts(build_root):
-    print "\t- Copying scripts and sample configuration to build directory"
-    shutil.copyfile(INIT_SCRIPT, os.path.join(build_root, SCRIPT_DIR[1:], INIT_SCRIPT.split('/')[1]))
-    shutil.copyfile(SYSTEMD_SCRIPT, os.path.join(build_root, SCRIPT_DIR[1:], SYSTEMD_SCRIPT.split('/')[1]))
-    shutil.copyfile(LOGROTATE_SCRIPT, os.path.join(build_root, SCRIPT_DIR[1:], LOGROTATE_SCRIPT.split('/')[1]))
-    shutil.copyfile(CONFIG_SAMPLE, os.path.join(build_root, CONFIG_DIR[1:], CONFIG_SAMPLE.split('/')[1]))
+    print "\t- Copying scripts and configuration to build directory"
+    shutil.copy(INIT_SCRIPT, os.path.join(build_root, SCRIPT_DIR[1:], INIT_SCRIPT.split('/')[1]))
+    shutil.copy(SYSTEMD_SCRIPT, os.path.join(build_root, SCRIPT_DIR[1:], SYSTEMD_SCRIPT.split('/')[1]))
+    shutil.copy(LOGROTATE_CONFIG, os.path.join(build_root, LOGROTATE_CONFIG))
+    shutil.copy(DEFAULT_CONFIG, os.path.join(build_root, DEFAULT_CONFIG))
 
 def build_packages(build_output, version):
     TMP_BUILD_DIR = create_temp_dir()
@@ -256,7 +278,7 @@ def build_packages(build_output, version):
                     name = 'kapacitor'
                     if package_type in ['zip', 'tar']:
                         name = '{}-{}'.format(name, version)
-                    fpm_command = "fpm {} --name {} -t {} --version {} -C {}".format(fpm_common_args,
+                    fpm_command = "fpm {} --name {} -t {} --version {} -C {} ".format(fpm_common_args,
                                                                            name,
                                                                            package_type,
                                                                            version,
