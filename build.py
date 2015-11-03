@@ -318,6 +318,7 @@ def upload_packages(packages):
             k = Key(bucket)
             k.key = p
             n = k.set_contents_from_filename(p,replace=False)
+            k.make_public()
             print "[ DONE ]"
         else:
             print "\t not uploading {} already exists".format(p)
