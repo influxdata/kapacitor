@@ -112,7 +112,8 @@ def create_temp_dir():
 def get_current_version():
     command = "git describe --always --tags --abbrev=0"
     out = run(command)
-    return out.strip()
+    # Remove leading 'v'
+    return out.strip()[1:]
 
 def get_current_commit(short=False):
     command = None
