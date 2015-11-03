@@ -122,7 +122,7 @@ func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.Ex
 	r := kapacitor.NewReplay(c)
 
 	// Create a new execution env
-	tm := kapacitor.NewTaskMaster()
+	tm := kapacitor.NewTaskMaster(logService)
 	tm.HTTPDService = httpService
 	tm.Open()
 
