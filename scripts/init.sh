@@ -9,7 +9,7 @@
 # Short-Description: Start kapacitord at boot time
 ### END INIT INFO
 
-# If you modify this, please make sure to also edit influxdb.service
+# If you modify this, please make sure to also edit kapacitor.service
 # this init script supports three different variations:
 #  1. New lsb that define start-stop-daemon
 #  2. Old lsb that don't have start-stop-daemon but define, log, pidofproc and killproc
@@ -60,14 +60,14 @@ if [ ! -f "$STDOUT" ]; then
 fi
 
 if [ -z "$STDERR" ]; then
-    STDERR=/var/log/kapacitor/kapacitord.log
+    STDERR=/var/log/kapacitor/kapacitord.err
 fi
 
 if [ ! -f "$STDERR" ]; then
     mkdir -p $(dirname $STDERR)
 fi
 
-# Overwrite init script variables with /etc/default/influxdb values
+# Overwrite init script variables with /etc/default/kapacitor values
 if [ -r $DEFAULT ]; then
     source $DEFAULT
 fi
@@ -157,9 +157,9 @@ case $1 in
 
         log_success_msg "Starting the process" "$NAME"
         if which start-stop-daemon > /dev/null 2>&1; then
-            start-stop-daemon --chuid $GROUP:$USER --start --quiet --pidfile $PIDFILE --exec $DAEMON -- -pidfile $PIDFILE -config $CONFIG $INFLUXD_OPTS >>$STDOUT 2>>$STDERR &
+            start-stop-daemon --chuid $GROUP:$USER --start --quiet --pidfile $PIDFILE --exec $DAEMON -- -pidfile $PIDFILE -config $CONFIG $KAPACITOR_OPTS >>$STDOUT 2>>$STDERR &
         else
-            su -s /bin/sh -c "nohup $DAEMON -pidfile $PIDFILE -config $CONFIG $INFLUXD_OPTS >>$STDOUT 2>>$STDERR &" $USER
+            su -s /bin/sh -c "nohup $DAEMON -pidfile $PIDFILE -config $CONFIG $KAPACITOR_OPTS >>$STDOUT 2>>$STDERR &" $USER
         fi
         log_success_msg "$NAME process was started"
         ;;

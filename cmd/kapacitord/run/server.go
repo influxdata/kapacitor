@@ -12,6 +12,7 @@ import (
 	"github.com/influxdb/kapacitor"
 	"github.com/influxdb/kapacitor/services/httpd"
 	"github.com/influxdb/kapacitor/services/influxdb"
+	"github.com/influxdb/kapacitor/services/logging"
 	"github.com/influxdb/kapacitor/services/replay"
 	"github.com/influxdb/kapacitor/services/smtp"
 	"github.com/influxdb/kapacitor/services/streamer"
@@ -43,6 +44,7 @@ type Server struct {
 
 	TaskMaster *kapacitor.TaskMaster
 
+	LogService    *logging.Service
 	HTTPDService  *httpd.Service
 	Streamer      *streamer.Service
 	TaskStore     *task_store.Service
@@ -66,12 +68,13 @@ type Server struct {
 }
 
 // NewServer returns a new instance of Server built from a config.
-func NewServer(c *Config, buildInfo *BuildInfo, l *log.Logger) (*Server, error) {
+func NewServer(c *Config, buildInfo *BuildInfo, l *log.Logger, logService *logging.Service) (*Server, error) {
 
 	s := &Server{
 		buildInfo:     *buildInfo,
 		err:           make(chan error),
 		closing:       make(chan struct{}),
+		LogService:    logService,
 		TaskMaster:    kapacitor.NewTaskMaster(),
 		MetaStore:     &metastore{},
 		QueryExecutor: &queryexecutor{},
@@ -107,6 +110,9 @@ func NewServer(c *Config, buildInfo *BuildInfo, l *log.Logger) (*Server, error) 
 			return nil, err
 		}
 	}
+
+	// Add logService last so it is closed last
+	s.Services = append(s.Services, logService)
 
 	return s, nil
 }

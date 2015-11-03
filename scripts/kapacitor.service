@@ -1,7 +1,7 @@
 # If you modify this, please also make sure to edit init.sh
 
 [Unit]
-Description=The plugin-driven server agent for reporting metrics into InfluxDB
+Description=Time series data processing engine.
 Documentation=https://github.com/influxdb/kapacitor
 After=network.target
 
@@ -10,7 +10,7 @@ User=kapacitor
 Group=kapacitor
 LimitNOFILE=65536
 EnvironmentFile=-/etc/default/kapacitor
-ExecStart=/usr/bin/kapacitord -config /etc/kapacitor/kapacitor.conf $INFLUXD_OPTS
+ExecStart=/usr/bin/kapacitord -config /etc/kapacitor/kapacitor.conf $KAPACITOR_OPTS
 KillMode=process
 Restart=on-failure
 

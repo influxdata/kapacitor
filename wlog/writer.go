@@ -37,7 +37,7 @@ const (
 
 const Delimeter = '!'
 
-var invalidMSG = []byte("log messages must have L! prefix where L is one of 'D', 'I', 'W', 'E'\n")
+var invalidMSG = []byte("log messages must have 'L!' prefix where L is one of 'D', 'I', 'W', 'E'\n")
 
 var Levels = map[byte]Level{
 	'D': DEBUG,
