@@ -480,7 +480,7 @@ func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration, dbrps []kapac
 
 // Record a series of batch queries defined by a batch task
 func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, start, stop time.Time) error {
-	et, err := kapacitor.NewExecutingTask(nil, t)
+	et, err := kapacitor.NewExecutingTask(r.TaskMaster.New(), t)
 	if err != nil {
 		return err
 	}
