@@ -48,9 +48,11 @@ func newReplayStreamSource(data io.ReadCloser, clck clock.Clock) *replayStreamSo
 		err:  make(chan error, 1),
 	}
 }
+
 func (r *replayStreamSource) Err() <-chan error {
 	return r.err
 }
+
 func (r *replayStreamSource) replayStream(stream StreamCollector, recTime bool) {
 	go func() {
 		defer stream.Close()

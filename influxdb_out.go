@@ -8,7 +8,8 @@ import (
 
 type InfluxDBOutNode struct {
 	node
-	i *pipeline.InfluxDBOutNode
+	i    *pipeline.InfluxDBOutNode
+	conn *client.Client
 }
 
 func newInfluxDBOutNode(et *ExecutingTask, n *pipeline.InfluxDBOutNode) (*InfluxDBOutNode, error) {
@@ -49,9 +50,12 @@ func (i *InfluxDBOutNode) runOut() error {
 func (i *InfluxDBOutNode) write(batch models.Batch) error {
 
 	i.logger.Println("D! batch", batch)
-	c, err := i.et.tm.InfluxDBService.NewClient()
-	if err != nil {
-		return err
+	if i.conn == nil {
+		var err error
+		i.conn, err = i.et.tm.InfluxDBService.NewClient()
+		if err != nil {
+			return err
+		}
 	}
 	points := make([]client.Point, len(batch.Points))
 	for j, p := range batch.Points {
@@ -72,6 +76,6 @@ func (i *InfluxDBOutNode) write(batch models.Batch) error {
 		Tags:             i.i.Tags,
 		Precision:        i.i.Precision,
 	}
-	_, err = c.Write(bp)
+	_, err := i.conn.Write(bp)
 	return err
 }
