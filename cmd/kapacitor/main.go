@@ -30,7 +30,9 @@ var (
 )
 
 var mainFlags = flag.NewFlagSet("main", flag.ExitOnError)
-var kapacitordURL = mainFlags.String("url", "http://localhost:9092/api/v1", "the URL http(s)://host:port of the kapacitord server.")
+var kapacitordURL = mainFlags.String("url", "http://localhost:9092", "the URL http(s)://host:port of the kapacitord server.")
+
+var kapacitorEndpoint string
 
 var l = log.New(os.Stderr, "[run] ", log.LstdFlags)
 
@@ -65,6 +67,8 @@ func usage() {
 func main() {
 
 	mainFlags.Parse(os.Args[1:])
+
+	kapacitorEndpoint = *kapacitordURL + "/api/v1"
 
 	args := mainFlags.Args()
 
@@ -273,7 +277,7 @@ func doRecord(args []string) error {
 	default:
 		return fmt.Errorf("Unknown record type %q, expected 'stream' or 'query'", args[0])
 	}
-	r, err := http.Post(*kapacitordURL+"/record?"+v.Encode(), "application/octetstream", nil)
+	r, err := http.Post(kapacitorEndpoint+"/record?"+v.Encode(), "application/octetstream", nil)
 	if err != nil {
 		return err
 	}
@@ -423,7 +427,7 @@ func doDefine(args []string) error {
 		}
 		v.Add("dbrps", string(b))
 	}
-	r, err := http.Post(*kapacitordURL+"/task?"+v.Encode(), "application/octetstream", f)
+	r, err := http.Post(kapacitorEndpoint+"/task?"+v.Encode(), "application/octetstream", f)
 	if err != nil {
 		return err
 	}
@@ -478,7 +482,7 @@ func doReplay(args []string) error {
 	if *rfast {
 		v.Add("clock", "fast")
 	}
-	r, err := http.Post(*kapacitordURL+"/replay?"+v.Encode(), "application/octetstream", nil)
+	r, err := http.Post(kapacitorEndpoint+"/replay?"+v.Encode(), "application/octetstream", nil)
 	if err != nil {
 		return err
 	}
@@ -516,7 +520,7 @@ func doEnable(args []string) error {
 	for _, name := range args {
 		v := url.Values{}
 		v.Add("name", name)
-		r, err := http.Post(*kapacitordURL+"/enable?"+v.Encode(), "application/octetstream", nil)
+		r, err := http.Post(kapacitorEndpoint+"/enable?"+v.Encode(), "application/octetstream", nil)
 		if err != nil {
 			return err
 		}
@@ -555,7 +559,7 @@ func doDisable(args []string) error {
 	for _, name := range args {
 		v := url.Values{}
 		v.Add("name", name)
-		r, err := http.Post(*kapacitordURL+"/disable?"+v.Encode(), "application/octetstream", nil)
+		r, err := http.Post(kapacitorEndpoint+"/disable?"+v.Encode(), "application/octetstream", nil)
 		if err != nil {
 			return err
 		}
@@ -614,7 +618,7 @@ func doShow(args []string) error {
 
 	v := url.Values{}
 	v.Add("name", args[0])
-	r, err := http.Get(*kapacitordURL + "/task?" + v.Encode())
+	r, err := http.Get(kapacitorEndpoint + "/task?" + v.Encode())
 	if err != nil {
 		return err
 	}
@@ -663,7 +667,7 @@ func doList(args []string) error {
 		tasks := strings.Join(args[1:], ",")
 		v := url.Values{}
 		v.Add("tasks", tasks)
-		r, err := http.Get(*kapacitordURL + "/tasks?" + v.Encode())
+		r, err := http.Get(kapacitorEndpoint + "/tasks?" + v.Encode())
 		if err != nil {
 			return err
 		}
@@ -695,7 +699,7 @@ func doList(args []string) error {
 		rids := strings.Join(args[1:], ",")
 		v := url.Values{}
 		v.Add("rids", rids)
-		r, err := http.Get(*kapacitordURL + "/recordings?" + v.Encode())
+		r, err := http.Get(kapacitorEndpoint + "/recordings?" + v.Encode())
 		if err != nil {
 			return err
 		}
@@ -753,10 +757,10 @@ func doDelete(args []string) error {
 	var paramName string
 	switch kind := args[0]; kind {
 	case "tasks":
-		baseURL = *kapacitordURL + "/task?"
+		baseURL = kapacitorEndpoint + "/task?"
 		paramName = "name"
 	case "recordings":
-		baseURL = *kapacitordURL + "/recording?"
+		baseURL = kapacitorEndpoint + "/recording?"
 		paramName = "rid"
 	default:
 		return fmt.Errorf("cannot delete '%s' did you mean 'tasks' or 'recordings'?", kind)
@@ -807,7 +811,7 @@ func doLevel(args []string) error {
 	}
 	v := url.Values{}
 	v.Add("level", args[0])
-	r, err := http.Post(*kapacitordURL+"/loglevel?"+v.Encode(), "text/plain", nil)
+	r, err := http.Post(kapacitorEndpoint+"/loglevel?"+v.Encode(), "text/plain", nil)
 	if err != nil {
 		return err
 	}

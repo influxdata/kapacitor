@@ -25,6 +25,7 @@ import (
 	"github.com/influxdb/kapacitor/services/replay"
 	"github.com/influxdb/kapacitor/services/reporting"
 	"github.com/influxdb/kapacitor/services/smtp"
+	"github.com/influxdb/kapacitor/services/stats"
 	"github.com/influxdb/kapacitor/services/streamer"
 	"github.com/influxdb/kapacitor/services/task_store"
 	"github.com/influxdb/kapacitor/services/udp"
@@ -143,21 +144,13 @@ func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*
 		}
 	}
 
-	// append ReportingService last so all stats are ready
+	// append StatsService and ReportingService last so all stats are ready
 	// to be reported
+	s.appendStatsService(c.Stats)
 	s.appendReportingService(c.Reporting, c.Token)
 
 	return s, nil
 }
-func (s *Server) appendReportingService(c reporting.Config, token string) {
-	if c.Enabled {
-		l := s.LogService.NewLogger("[reporting] ", log.LstdFlags)
-		srv := reporting.NewService(c, token, l)
-
-		s.Services = append(s.Services, srv)
-	}
-}
-
 func (s *Server) appendStreamerService() {
 	l := s.LogService.NewLogger("[streamer] ", log.LstdFlags)
 	srv := streamer.NewService(l)
@@ -279,6 +272,25 @@ func (s *Server) appendUDPService(c udp.Config) {
 	srv := udp.NewService(c, l)
 	srv.PointsWriter = s.Streamer
 	s.Services = append(s.Services, srv)
+}
+
+func (s *Server) appendStatsService(c stats.Config) {
+	if c.Enabled {
+		l := s.LogService.NewLogger("[stats] ", log.LstdFlags)
+		srv := stats.NewService(c, l)
+		srv.StreamCollector = s.TaskMaster.Stream
+
+		s.Services = append(s.Services, srv)
+	}
+}
+
+func (s *Server) appendReportingService(c reporting.Config, token string) {
+	if c.Enabled {
+		l := s.LogService.NewLogger("[reporting] ", log.LstdFlags)
+		srv := reporting.NewService(c, token, l)
+
+		s.Services = append(s.Services, srv)
+	}
 }
 
 // Err returns an error channel that multiplexes all out of band errors received from all services.

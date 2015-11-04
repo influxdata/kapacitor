@@ -163,10 +163,6 @@ func (et *ExecutingTask) link() error {
 		et.lookup[n.ID()] = en
 		// Save the walk order
 		et.nodes = append(et.nodes, en)
-		// Set source node to task name
-		if len(et.nodes) == 1 {
-			et.nodes[0].SetName(et.Task.Name)
-		}
 		// Duplicate the Edges
 		for _, p := range n.Parents() {
 			ep := et.lookup[p.ID()]
