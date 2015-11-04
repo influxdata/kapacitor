@@ -15,7 +15,7 @@ dependencies:
   cache_directories:
     - "~/docker"
   override:
-    - if [[ -e ~/docker/image.tar ]]; then docker load -i ~/docker/kapacitor-builder.tar; fi
+    - if [[ -e ~/docker/kapacitor-builder.tar ]]; then docker load -i ~/docker/kapacitor-builder.tar; fi
     - docker build -t influxdb/kapacitor-builder .
     - mkdir -p ~/docker; docker save influxdb/kapacitor-builder > ~/docker/kapacitor-builder.tar
 
