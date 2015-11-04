@@ -5,33 +5,27 @@
 #    - git clone git@github.com:influxdb/kapacitor.git ~/kapacitor
 
 machine:
-  pre:
-    - bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
-    - source $HOME/.gvm/scripts/gvm; gvm install go1.5.1 --binary
-  environment:
-    IMPORT_PATH: "github.com/influxdb/kapacitor"
+  services:
+    - docker
 
 dependencies:
   pre:
     # setup ipv6
     - sudo sysctl -w net.ipv6.conf.lo.disable_ipv6=0 net.ipv6.conf.default.disable_ipv6=0 net.ipv6.conf.all.disable_ipv6=0
-
+  cache_directories:
+    - "~/docker"
   override:
-    - >
-      source $HOME/.gvm/scripts/gvm;
-      gvm use "go1.5.1";
-      mkdir -p "$GOPATH/src/$IMPORT_PATH"
-    - >
-      source $HOME/.gvm/scripts/gvm;
-      gvm use "go1.5.1";
-      rsync -a --delete ./ "$GOPATH/src/$IMPORT_PATH/"
+    - if [[ -e ~/docker/image.tar ]]; then docker load -i ~/docker/kapacitor-builder.tar; fi
+    - docker build -t influxdb/kapacitor-builder .
+    - mkdir -p ~/docker; docker save influxdb/kapacitor-builder > ~/docker/kapacitor-builder.tar
 
 test:
   override:
-    - >
-      source $HOME/.gvm/scripts/gvm;
-      gvm use "go1.5.1";
-      cd "$GOPATH/src/$IMPORT_PATH/";
-      go get -d -t ./...;
-      go test ./...
+    - ./build.sh --test
 
+
+deployment:
+  release:
+    tag: /v[0-9]+(\.[0-9]+)*/
+    commands:
+      - ./build.sh --clean --packages --upload --platform=all --arch=all

@@ -1,7 +1,6 @@
 .*.swp
 dist/*
-/kapacitor
-/kapacitord
+/build/*
 kapacitor_linux*
 kapacitord_linux*
 *~

@@ -38,7 +38,7 @@ DESCRIPTION = "Time series data processing engine"
 
 # SCRIPT START
 prereqs = [ 'git', 'go' ]
-optional_prereqs = [ 'gvm', 'fpm', 'awscmd', 'rpmbuild' ]
+optional_prereqs = [ 'fpm', 'rpmbuild' ]
 
 fpm_common_args = "-f -s dir --log error \
  --vendor {} \
@@ -73,10 +73,12 @@ targets = {
     'kapacitord' : './cmd/kapacitord/main.go'
 }
 
+
+supported_arches = [ 'amd64' ]
 supported_packages = {
     "darwin": [ "tar", "zip" ],
     "linux": [ "deb", "rpm", "tar", "zip" ],
-    "windows": [ "tar", "zip" ],
+    "windows": [ "zip" ],
 }
 
 def run(command, allow_failure=False, shell=False):
@@ -162,6 +164,7 @@ def check_environ(build_dir = None):
     cwd = os.getcwd()
     if build_dir == None and os.environ.get("GOPATH") not in cwd:
         print "\n!! WARNING: Your current directory is not under your GOPATH! This probably won't work."
+    print ""
 
 def check_prereqs():
     print "\nChecking for dependencies:"
@@ -181,6 +184,20 @@ def check_prereqs():
             print "?"
     print ""
 
+def run_tests():
+    get_command = "go get -d -t ./..."
+    print "Retrieving Go dependencies...",
+    run(get_command)
+    print "done."
+    print "Running tests..."
+    code = os.system("go test ./...")
+    if code != 0:
+        print "Tests Failed"
+        return False
+    else:
+        print "Tests Passed"
+        return True
+
 def build(version=None,
           branch=None,
           commit=None,
@@ -190,7 +207,9 @@ def build(version=None,
           nightly_version=None,
           rc=None,
           race=False,
-          update=False):
+          clean=False,
+          update=False,
+          outdir='.'):
     print "Building for..."
     print "\t- version: {}".format(version)
     if rc:
@@ -202,6 +221,12 @@ def build(version=None,
     print "\t- nightly? {}".format(str(nightly).lower())
     print "\t- race enabled? {}".format(str(race).lower())
     print ""
+
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
+    elif clean and outdir != '/':
+        shutil.rmtree(outdir)
+        os.makedirs(outdir)
 
     if rc:
         # If a release candidate, update the version information accordingly
@@ -218,10 +243,12 @@ def build(version=None,
 
     print "Starting build..."
     for b, c in targets.iteritems():
+        if platform == 'windows':
+            b = b + '.exe'
         print "\t- Building '{}'...".format(b),
         build_command = ""
         build_command += "GOOS={} GOOARCH={} ".format(platform, arch)
-        build_command += "go build -o {} ".format(b)
+        build_command += "go build -o {} ".format(os.path.join(outdir, b))
         if race:
             build_command += "-race "
         build_command += "-ldflags=\"-X main.buildTime='{}' ".format(datetime.datetime.utcnow().isoformat())
@@ -239,9 +266,9 @@ def create_dir(path):
     except OSError as e:
         print e
 
-def move_file(fr, to):
+def copy_file(fr, to):
     try:
-        shutil.move(fr, to)
+        shutil.copy(fr, to)
     except OSError as e:
         print e
 
@@ -265,32 +292,37 @@ def package_scripts(build_root):
 
 def build_packages(build_output, version):
     outfiles = []
-    TMP_BUILD_DIR = create_temp_dir()
+    tmp_build_dir = create_temp_dir()
     try:
         print "Packaging..."
         for p in build_output:
-            create_dir(os.path.join(TMP_BUILD_DIR, p))
+            create_dir(os.path.join(tmp_build_dir, p))
             for a in build_output[p]:
-                BUILD_ROOT = os.path.join(TMP_BUILD_DIR, p, a)
-                create_dir(BUILD_ROOT)
-                create_package_fs(BUILD_ROOT)
-                package_scripts(BUILD_ROOT)
                 current_location = build_output[p][a]
+                build_root = os.path.join(tmp_build_dir, p, a)
+                create_dir(build_root)
+                create_package_fs(build_root)
+                package_scripts(build_root)
                 for b in targets:
+                    if p == 'windows':
+                        b = b + '.exe'
                     fr = os.path.join(current_location, b)
-                    to = os.path.join(BUILD_ROOT, INSTALL_ROOT_DIR[1:], b)
+                    to = os.path.join(build_root, INSTALL_ROOT_DIR[1:], b)
                     print "\t- [{}][{}] - Moving from '{}' to '{}'".format(p, a, fr, to)
-                    move_file(fr, to)
+                    copy_file(fr, to)
                 for package_type in supported_packages[p]:
-                    print "\t- Packaging directory '{}' as '{}'...".format(BUILD_ROOT, package_type),
+                    print "\t- Packaging directory '{}' as '{}'...".format(build_root, package_type),
                     name = 'kapacitor'
                     if package_type in ['zip', 'tar']:
                         name = '{}-{}_{}_{}'.format(name, version, p, a)
-                    fpm_command = "fpm {} --name {} -t {} --version {} -C {} ".format(fpm_common_args,
-                                                                           name,
-                                                                           package_type,
-                                                                           version,
-                                                                           BUILD_ROOT)
+                    fpm_command = "fpm {} --name {} -t {} --version {} -C {} -p {}".format(
+                            fpm_common_args,
+                            name,
+                            package_type,
+                            version,
+                            build_root,
+                            current_location,
+                        )
                     out = run(fpm_command, shell=True)
                     matches = re.search(':path=>"(.*)"', out)
                     outfile = None
@@ -299,12 +331,12 @@ def build_packages(build_output, version):
                     if outfile is None:
                         print "Could not determine output file of fpm command"
                     else:
-                        outfiles.append(outfile)
+                        outfiles.append(os.path.join(current_location,outfile))
                     print "[ DONE ]"
         print ""
         return outfiles
     finally:
-        shutil.rmtree(TMP_BUILD_DIR)
+        shutil.rmtree(tmp_build_dir)
 
 def upload_packages(packages):
     print "Uploading packages to S3..."
@@ -313,10 +345,11 @@ def upload_packages(packages):
     c = boto.connect_s3()
     bucket = c.get_bucket('influxdb')
     for p in packages:
-        if bucket.get_key(p) is None:
-            print "\t uploading {}...".format(p),
+        name = os.path.basename(p)
+        if bucket.get_key(name) is None:
+            print "\t uploading {}...".format(name),
             k = Key(bucket)
-            k.key = p
+            k.key = name
             n = k.set_contents_from_filename(p,replace=False)
             k.make_public()
             print "[ DONE ]"
@@ -331,8 +364,8 @@ def main():
     print "--- Kapacitor Builder ---"
 
     check_environ()
-    check_prereqs()
 
+    outdir = 'build'
     commit = None
     target_platform = None
     target_arch = None
@@ -342,18 +375,20 @@ def main():
     branch = None
     version = get_current_version()
     rc = None
+    clean = False
     package = False
     update = False
     upload = False
+    test = False
 
     for arg in sys.argv[1:]:
         if '--outdir' in arg:
-            # Output directory. If none is specified, then builds will be placed in the same directory.
-            output_dir = arg.split("=")[1]
-        if '--commit' in arg:
+            # Output build artifacts into dir.
+            outdir = arg.split("=")[1]
+        elif '--commit' in arg:
             # Commit to build from. If none is specified, then it will build from the most recent commit.
             commit = arg.split("=")[1]
-        if '--branch' in arg:
+        elif '--branch' in arg:
             # Branch to build from. If none is specified, then it will build from the current branch.
             branch = arg.split("=")[1]
         elif '--arch' in arg:
@@ -368,6 +403,9 @@ def main():
         elif '--race' in arg:
             # Signifies that race detection should be enabled.
             race = True
+        elif '--clean' in arg:
+            # Signifies that the outdir should be deleted before building
+            clean = True
         elif '--package' in arg:
             # Signifies that distribution packages will be built
             package = True
@@ -383,6 +421,9 @@ def main():
         elif '--upload' in arg:
             # Signifies that the resulting packages should be uploaded to S3
             upload = True
+        elif '--test' in arg:
+            # Run tests and exit
+            test = True
         else:
             print "!! Unknown argument: {}".format(arg)
             sys.exit(1)
@@ -403,34 +444,63 @@ def main():
     if target_arch == "x86_64":
         target_arch = "amd64"
 
-    build_output = {}
     # TODO(rossmcdonald): Prepare git repo for build (checking out correct branch/commit, etc.)
     # prepare(branch=branch, commit=commit)
-    if target_platform == 'all' or target_arch == 'all':
-        # Create multiple builds
-        pass
-    else:
-        # Create single build
-        build(version=version,
-              branch=branch,
-              commit=commit,
-              platform=target_platform,
-              arch=target_arch,
-              nightly=nightly,
-              nightly_version=nightly_version,
-              rc=rc,
-              race=race,
-              update=update)
-        build_output.update( { target_platform : { target_arch : '.' } } )
 
+    if test:
+        if not run_tests():
+            return 1
+        return 0
+
+
+
+    check_prereqs()
+
+    single_build = True
+    build_output = {}
+    platforms = []
+    arches = []
+    if target_platform == 'all':
+        platforms = supported_packages.keys()
+        single_build = False
+    else:
+        platforms = [target_platform]
+
+    if target_arch == 'all':
+        arches = supported_arches
+        single_build = False
+    else:
+        arches = [target_arch]
+
+    # Run builds
+    for platform in platforms:
+        for arch in arches:
+            od = outdir
+            if not single_build:
+                od = os.path.join(outdir, platform, arch)
+            build(version=version,
+                  branch=branch,
+                  commit=commit,
+                  platform=platform,
+                  arch=arch,
+                  nightly=nightly,
+                  nightly_version=nightly_version,
+                  rc=rc,
+                  race=race,
+                  clean=clean,
+                  update=update,
+                  outdir=od)
+            build_output.update( { platform : { arch : od } } )
+
+    # Build packages
     if package:
         if not check_path_for("fpm"):
             print "!! Cannot package without command 'fpm'. Stopping."
             sys.exit(1)
         packages = build_packages(build_output, version)
-        print packages
         if upload:
             upload_packages(packages)
+    return 0
 
 if __name__ == '__main__':
-    main()
+    exit(main())
