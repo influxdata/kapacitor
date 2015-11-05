@@ -122,8 +122,26 @@ func (ts *Service) Open() error {
 		return err
 	}
 
+	numTasks := int64(0)
+	numEnabledTasks := int64(0)
+
+	// Count all tasks
+	err = ts.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(tasksBucket))
+		if b == nil {
+			return nil
+		}
+		return b.ForEach(func(k, v []byte) error {
+			numTasks++
+			return nil
+		})
+	})
+	if err != nil {
+		return err
+	}
+
 	// Enable tasks
-	return ts.db.View(func(tx *bolt.Tx) error {
+	err = ts.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(enabledBucket))
 		if b == nil {
 			return nil
@@ -132,10 +150,20 @@ func (ts *Service) Open() error {
 			err := ts.Enable(string(k))
 			if err != nil {
 				ts.logger.Printf("E! error enabling task %s, err: %s\n", string(k), err)
+			} else {
+				numEnabledTasks++
 			}
 			return nil
 		})
 	})
+	if err != nil {
+		return err
+	}
+
+	// Set expvars
+	kapacitor.NumTasks.Set(numTasks)
+	kapacitor.NumEnabledTasks.Set(numEnabledTasks)
+	return nil
 }
 
 func (ts *Service) Close() error {
@@ -327,7 +355,15 @@ func (ts *Service) Save(task *rawTask) error {
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte(task.Name), buf.Bytes())
+		exists := b.Get([]byte(task.Name)) != nil
+		err = b.Put([]byte(task.Name), buf.Bytes())
+		if err != nil {
+			return err
+		}
+		if !exists {
+			kapacitor.NumTasks.Add(1)
+		}
+		return nil
 	})
 	return err
 }
@@ -338,7 +374,11 @@ func (ts *Service) Delete(name string) error {
 	return ts.db.Update(func(tx *bolt.Tx) error {
 		tb := tx.Bucket(tasksBucket)
 		if tb != nil {
-			tb.Delete([]byte(name))
+			exists := tb.Get([]byte(name)) != nil
+			if exists {
+				tb.Delete([]byte(name))
+				kapacitor.NumTasks.Add(-1)
+			}
 		}
 		eb := tx.Bucket(enabledBucket)
 		if eb != nil {
@@ -395,8 +435,19 @@ func (ts *Service) Enable(name string) error {
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte(name), []byte{})
+		enabled := b.Get([]byte(name)) != nil
+		err = b.Put([]byte(name), []byte{})
+		if err != nil {
+			return err
+		}
+		if !enabled {
+			kapacitor.NumEnabledTasks.Add(1)
+		}
+		return nil
 	})
+	if err != nil {
+		return err
+	}
 
 	// Start the task
 	et, err := ts.TaskMaster.StartTask(t)
@@ -421,7 +472,15 @@ func (ts *Service) Disable(name string) error {
 		if err != nil {
 			return err
 		}
-		return b.Delete([]byte(name))
+		enabled := b.Get([]byte(name)) != nil
+		if enabled {
+			err = b.Delete([]byte(name))
+			if err != nil {
+				return err
+			}
+			kapacitor.NumEnabledTasks.Add(-1)
+		}
+		return nil
 	})
 	ts.TaskMaster.StopTask(name)
 	return err

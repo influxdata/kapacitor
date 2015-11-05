@@ -88,18 +88,20 @@ func (s *SourceBatchNode) Queries(start, stop time.Time) [][]string {
 
 type BatchNode struct {
 	node
-	b      *pipeline.BatchNode
-	query  *Query
-	ticker ticker
-	wg     sync.WaitGroup
-	errC   chan error
+	b       *pipeline.BatchNode
+	query   *Query
+	ticker  ticker
+	wg      sync.WaitGroup
+	errC    chan error
+	closing chan struct{}
 }
 
 func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode) (*BatchNode, error) {
 	bn := &BatchNode{
-		node: node{Node: n, et: et},
-		b:    n,
-		errC: make(chan error, 1),
+		node:    node{Node: n, et: et},
+		b:       n,
+		errC:    make(chan error, 1),
+		closing: make(chan struct{}),
 	}
 	bn.node.runF = bn.runBatch
 	bn.node.stopF = bn.stopBatch
@@ -206,7 +208,7 @@ func (b *BatchNode) Queries(start, stop time.Time) []string {
 	return queries
 }
 
-// Query InfluxDB return Edge with data
+// Query InfluxDB and collect batches on batch collector.
 func (b *BatchNode) doQuery(batch BatchCollector) error {
 	defer batch.Close()
 	defer b.wg.Done()
@@ -216,52 +218,58 @@ func (b *BatchNode) doQuery(batch BatchCollector) error {
 	}
 
 	tickC := b.ticker.Start()
-	for now := range tickC {
+	for {
+		select {
+		case <-b.closing:
+			return nil
+		case now := <-tickC:
 
-		// Update times for query
-		stop := now.Add(-1 * b.b.Offset)
-		b.query.Start(stop.Add(-1 * b.b.Period))
-		b.query.Stop(stop)
+			// Update times for query
+			stop := now.Add(-1 * b.b.Offset)
+			b.query.Start(stop.Add(-1 * b.b.Period))
+			b.query.Stop(stop)
 
-		b.logger.Println("D! starting next batch query:", b.query.String())
+			b.logger.Println("D! starting next batch query:", b.query.String())
 
-		// Connect
-		con, err := b.et.tm.InfluxDBService.NewClient()
-		if err != nil {
-			return err
-		}
-		q := client.Query{
-			Command: b.query.String(),
-		}
-
-		// Execute query
-		resp, err := con.Query(q)
-		if err != nil {
-			return err
-		}
-
-		if resp.Err != nil {
-			return resp.Err
-		}
-
-		// Collect batches
-		for _, res := range resp.Results {
-			batches, err := models.ResultToBatches(res)
+			// Connect
+			con, err := b.et.tm.InfluxDBService.NewClient()
 			if err != nil {
 				return err
 			}
-			for _, bch := range batches {
-				batch.CollectBatch(bch)
+			q := client.Query{
+				Command: b.query.String(),
+			}
+
+			// Execute query
+			resp, err := con.Query(q)
+			if err != nil {
+				return err
+			}
+
+			if resp.Err != nil {
+				return resp.Err
+			}
+
+			// Collect batches
+			for _, res := range resp.Results {
+				batches, err := models.ResultToBatches(res)
+				if err != nil {
+					return err
+				}
+				for _, bch := range batches {
+					batch.CollectBatch(bch)
+				}
 			}
 		}
+		return errors.New("batch ticker schedule stopped")
 	}
-	return errors.New("batch ticker schedule stopped")
 }
 
 func (b *BatchNode) stopBatch() {
 	if b.ticker != nil {
 		b.ticker.Stop()
 	}
+	close(b.closing)
 	b.wg.Wait()
 }
 

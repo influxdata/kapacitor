@@ -14,6 +14,7 @@ import (
 	"github.com/influxdb/kapacitor/services/influxdb"
 	"github.com/influxdb/kapacitor/services/logging"
 	"github.com/influxdb/kapacitor/services/replay"
+	"github.com/influxdb/kapacitor/services/reporting"
 	"github.com/influxdb/kapacitor/services/smtp"
 	"github.com/influxdb/kapacitor/services/task_store"
 	"github.com/influxdb/kapacitor/services/udp"
@@ -29,18 +30,18 @@ type Config struct {
 	Replay   replay.Config     `toml:"replay"`
 	Task     task_store.Config `toml:"task"`
 	InfluxDB influxdb.Config   `toml:"influxdb"`
-	Logging  logging.Config
+	Logging  logging.Config    `toml:"logging"`
 
 	Graphites []graphite.Config `toml:"graphite"`
 	Collectd  collectd.Config   `toml:"collectd"`
 	OpenTSDB  opentsdb.Config   `toml:"opentsdb"`
 	UDPs      []udp.Config      `toml:"udp"`
 	SMTP      smtp.Config       `toml:"smtp"`
+	Reporting reporting.Config  `toml:"reporting"`
 
 	Hostname string `toml:"hostname"`
-
-	// Server reporting
-	ReportingDisabled bool `toml:"reporting-disabled"`
+	DataDir  string `toml:"data_dir"`
+	Token    string `toml:"token"`
 }
 
 // NewConfig returns an instance of Config with reasonable defaults.
@@ -57,6 +58,7 @@ func NewConfig() *Config {
 	c.Collectd = collectd.NewConfig()
 	c.OpenTSDB = opentsdb.NewConfig()
 	c.SMTP = smtp.NewConfig()
+	c.Reporting = reporting.NewConfig()
 
 	return c
 }
@@ -79,6 +81,7 @@ func NewDemoConfig() (*Config, error) {
 	c.Replay.Dir = filepath.Join(homeDir, ".kapacitor", c.Replay.Dir)
 	c.Task.Dir = filepath.Join(homeDir, ".kapacitor", c.Task.Dir)
 
+	c.DataDir = filepath.Join(homeDir, ".kapacitor", c.DataDir)
 	return c, nil
 }
 
@@ -86,6 +89,9 @@ func NewDemoConfig() (*Config, error) {
 func (c *Config) Validate() error {
 	if c.Hostname == "" {
 		return fmt.Errorf("must configure valid hostname")
+	}
+	if c.DataDir == "" {
+		return fmt.Errorf("must configure valid data dir")
 	}
 	err := c.Replay.Validate()
 	if err != nil {

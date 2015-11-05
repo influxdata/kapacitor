@@ -9,6 +9,7 @@ import (
 
 	"github.com/influxdb/influxdb/client"
 	"github.com/influxdb/influxdb/cluster"
+	"github.com/influxdb/kapacitor"
 	"github.com/influxdb/kapacitor/services/udp"
 )
 
@@ -122,6 +123,8 @@ func (s *Service) linkSubscriptions() error {
 		return err
 	}
 
+	numSubscriptions := int64(0)
+
 	// Get all databases and retention policies
 	var allSubs []subEntry
 	resp, err := s.execQuery(cli, "SHOW DATABASES")
@@ -205,6 +208,7 @@ func (s *Service) linkSubscriptions() error {
 				}
 				pair := strings.Split(u.Host, ":")
 				if pair[0] == s.hostname {
+					numSubscriptions++
 					_, err := s.startListener(se.db, se.rp, *u)
 					if err != nil {
 						s.logger.Println("E! failed to start listener:", err)
@@ -224,6 +228,7 @@ func (s *Service) linkSubscriptions() error {
 				return fmt.Errorf("could not create valid destination url, is hostname correct? err: %s", err)
 			}
 
+			numSubscriptions++
 			addr, err := s.startListener(se.db, se.rp, *u)
 			if err != nil {
 				s.logger.Println("E! failed to start listener:", err)
@@ -249,6 +254,7 @@ func (s *Service) linkSubscriptions() error {
 		}
 	}
 
+	kapacitor.NumSubscriptions.Set(numSubscriptions)
 	return nil
 }
 
