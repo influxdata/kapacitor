@@ -21,7 +21,7 @@ dependencies:
 
 test:
   override:
-    - ./build.sh --test
+    - ./build.sh --test --race
 
 
 deployment:

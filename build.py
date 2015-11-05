@@ -184,13 +184,16 @@ def check_prereqs():
             print "?"
     print ""
 
-def run_tests():
+def run_tests(race):
     get_command = "go get -d -t ./..."
     print "Retrieving Go dependencies...",
     run(get_command)
     print "done."
     print "Running tests..."
-    code = os.system("go test ./...")
+    test_command = "go test ./..."
+    if race:
+        test_command = "go test -race ./..."
+    code = os.system(test_command)
     if code != 0:
         print "Tests Failed"
         return False
@@ -448,7 +451,7 @@ def main():
     # prepare(branch=branch, commit=commit)
 
     if test:
-        if not run_tests():
+        if not run_tests(race):
             return 1
         return 0
 

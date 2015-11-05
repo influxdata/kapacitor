@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"sync"
 
 	"github.com/influxdb/influxdb/client"
+	"github.com/influxdb/kapacitor/models"
 	"github.com/influxdb/kapacitor/pipeline"
 	"github.com/influxdb/kapacitor/services/httpd"
 )
@@ -41,6 +43,8 @@ type TaskMaster struct {
 	tasks map[string]*ExecutingTask
 
 	logger *log.Logger
+
+	mu sync.RWMutex
 }
 
 // A fork of the main data stream filtered by a set of DBRPs
@@ -139,25 +143,35 @@ func (tm *TaskMaster) StopTask(name string) {
 
 func (tm *TaskMaster) runForking() {
 	for p, ok := tm.in.NextPoint(); ok; p, ok = tm.in.NextPoint() {
-		for name, fork := range tm.forks {
-			dbrp := DBRP{
-				Database:        p.Database,
-				RetentionPolicy: p.RetentionPolicy,
-			}
-			if fork.dbrps[dbrp] {
-				err := fork.Edge.CollectPoint(p)
-				if err != nil {
-					tm.StopTask(name)
-				}
-			}
-		}
+		tm.forkPoint(p)
 	}
+	tm.mu.RLock()
+	defer tm.mu.RUnlock()
 	for _, fork := range tm.forks {
 		fork.Edge.Close()
 	}
 }
 
+func (tm *TaskMaster) forkPoint(p models.Point) {
+	tm.mu.RLock()
+	defer tm.mu.RUnlock()
+	for name, fork := range tm.forks {
+		dbrp := DBRP{
+			Database:        p.Database,
+			RetentionPolicy: p.RetentionPolicy,
+		}
+		if fork.dbrps[dbrp] {
+			err := fork.Edge.CollectPoint(p)
+			if err != nil {
+				tm.StopTask(name)
+			}
+		}
+	}
+}
+
 func (tm *TaskMaster) NewFork(name string, dbrps []DBRP) *Edge {
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
 	short := name
 	if len(short) > 8 {
 		short = short[:8]
@@ -171,6 +185,8 @@ func (tm *TaskMaster) NewFork(name string, dbrps []DBRP) *Edge {
 }
 
 func (tm *TaskMaster) DelFork(name string) {
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
 	fork := tm.forks[name]
 	delete(tm.forks, name)
 	if fork.Edge != nil {
