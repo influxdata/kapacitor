@@ -6,7 +6,7 @@ import (
 )
 
 type Config struct {
-	Enabled       bool
+	Enabled       bool                `toml:"enabled"`
 	URLs          []string            `toml:"urls"`
 	Username      string              `toml:"username"`
 	Password      string              `toml:"password"`

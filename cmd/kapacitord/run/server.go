@@ -2,30 +2,38 @@ package run
 
 import (
 	"errors"
+	"expvar"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"runtime"
 	"runtime/pprof"
+	"strings"
 	"time"
-
-	"github.com/influxdb/kapacitor"
-	"github.com/influxdb/kapacitor/services/httpd"
-	"github.com/influxdb/kapacitor/services/influxdb"
-	"github.com/influxdb/kapacitor/services/logging"
-	"github.com/influxdb/kapacitor/services/replay"
-	"github.com/influxdb/kapacitor/services/smtp"
-	"github.com/influxdb/kapacitor/services/streamer"
-	"github.com/influxdb/kapacitor/services/task_store"
-	"github.com/influxdb/kapacitor/services/udp"
-	"github.com/influxdb/kapacitor/wlog"
 
 	"github.com/influxdb/influxdb/influxql"
 	"github.com/influxdb/influxdb/meta"
 	"github.com/influxdb/influxdb/services/collectd"
 	"github.com/influxdb/influxdb/services/graphite"
 	"github.com/influxdb/influxdb/services/opentsdb"
+	"github.com/influxdb/kapacitor"
+	"github.com/influxdb/kapacitor/services/httpd"
+	"github.com/influxdb/kapacitor/services/influxdb"
+	"github.com/influxdb/kapacitor/services/logging"
+	"github.com/influxdb/kapacitor/services/replay"
+	"github.com/influxdb/kapacitor/services/reporting"
+	"github.com/influxdb/kapacitor/services/smtp"
+	"github.com/influxdb/kapacitor/services/streamer"
+	"github.com/influxdb/kapacitor/services/task_store"
+	"github.com/influxdb/kapacitor/services/udp"
+	"github.com/influxdb/kapacitor/wlog"
+	"github.com/twinj/uuid"
 )
+
+const clusterIDFilename = "cluster.id"
+const serverIDFilename = "server.id"
 
 // BuildInfo represents the build details for the server code.
 type BuildInfo struct {
@@ -39,6 +47,8 @@ type BuildInfo struct {
 // services in the proper order.
 type Server struct {
 	buildInfo BuildInfo
+	dataDir   string
+	hostname  string
 
 	err     chan error
 	closing chan struct{}
@@ -58,8 +68,8 @@ type Server struct {
 
 	Services []Service
 
-	// Server reporting
-	reportingDisabled bool
+	ClusterID string
+	ServerID  string
 
 	// Profiling
 	CPUProfile string
@@ -73,16 +83,16 @@ func NewServer(c *Config, buildInfo *BuildInfo, l *log.Logger, logService *loggi
 
 	s := &Server{
 		buildInfo:     *buildInfo,
+		dataDir:       c.DataDir,
+		hostname:      c.Hostname,
 		err:           make(chan error),
 		closing:       make(chan struct{}),
 		LogService:    logService,
 		MetaStore:     &metastore{},
 		QueryExecutor: &queryexecutor{},
-
-		reportingDisabled: c.ReportingDisabled,
-		Logger:            l,
+		Logger:        l,
 	}
-	s.Logger.Println("I! Kapacitor hostname:", c.Hostname)
+	s.Logger.Println("I! Kapacitor hostname:", s.hostname)
 
 	// Start Task Master
 	s.TaskMaster = kapacitor.NewTaskMaster(logService)
@@ -112,7 +122,19 @@ func NewServer(c *Config, buildInfo *BuildInfo, l *log.Logger, logService *loggi
 		}
 	}
 
+	// append ReportingService last so all stats are ready
+	// to be reported
+	s.appendReportingService(c.Reporting, c.Token)
+
 	return s, nil
+}
+func (s *Server) appendReportingService(c reporting.Config, token string) {
+	if c.Enabled {
+		l := s.LogService.NewLogger("[reporting] ", log.LstdFlags)
+		srv := reporting.NewService(c, token, l)
+
+		s.Services = append(s.Services, srv)
+	}
 }
 
 func (s *Server) appendStreamerService() {
@@ -244,6 +266,33 @@ func (s *Server) Err() <-chan error { return s.err }
 // Open opens all the services.
 func (s *Server) Open() error {
 	if err := func() error {
+		// Setup IDs
+		err := s.setupIDs()
+		if err != nil {
+			return err
+		}
+
+		// Publish Vars
+		cid := &expvar.String{}
+		cid.Set(s.ClusterID)
+		expvar.Publish(kapacitor.ClusterIDVarName, cid)
+
+		sid := &expvar.String{}
+		sid.Set(s.ServerID)
+		expvar.Publish(kapacitor.ServerIDVarName, sid)
+
+		host := &expvar.String{}
+		host.Set(s.hostname)
+		expvar.Publish(kapacitor.HostVarName, host)
+
+		product := &expvar.String{}
+		product.Set(kapacitor.Product)
+		expvar.Publish(kapacitor.ProductVarName, product)
+
+		version := &expvar.String{}
+		version.Set(s.buildInfo.Version)
+		expvar.Publish(kapacitor.VersionVarName, version)
+
 		// Start profiling, if set.
 		s.startProfile(s.CPUProfile, s.MemProfile)
 
@@ -252,13 +301,6 @@ func (s *Server) Open() error {
 				return fmt.Errorf("open service: %s", err)
 			}
 		}
-
-		// Start the reporting service, if not disabled.
-		if !s.reportingDisabled {
-			//TODO (nathanielc) setup kapacitor reporting
-			//go s.startServerReporting()
-		}
-
 		return nil
 
 	}(); err != nil {
@@ -292,27 +334,56 @@ func (s *Server) Close() error {
 	return nil
 }
 
-// startServerReporting starts periodic server reporting.
-func (s *Server) startServerReporting() {
-	for {
-		select {
-		case <-s.closing:
-			return
-		default:
-		}
-		if err := s.MetaStore.WaitForLeader(30 * time.Second); err != nil {
-			s.Logger.Printf("E! no leader available for reporting: %s", err.Error())
-			time.Sleep(time.Second)
-			continue
-		}
-		s.reportServer()
-		<-time.After(24 * time.Hour)
+func (s *Server) setupIDs() error {
+	clusterIDPath := filepath.Join(s.dataDir, clusterIDFilename)
+	clusterID, err := s.readID(clusterIDPath)
+	if err != nil && !os.IsNotExist(err) {
+		return err
 	}
+	if clusterID == "" {
+		clusterID = uuid.NewV4().String()
+		s.writeID(clusterIDPath, clusterID)
+	}
+	s.ClusterID = clusterID
+
+	serverIDPath := filepath.Join(s.dataDir, serverIDFilename)
+	serverID, err := s.readID(serverIDPath)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if serverID == "" {
+		serverID = uuid.NewV4().String()
+		s.writeID(serverIDPath, serverID)
+	}
+	s.ServerID = serverID
+
+	return nil
 }
 
-// reportServer reports anonymous statistics about the system.
-func (s *Server) reportServer() {
+func (s *Server) readID(file string) (string, error) {
+	f, err := os.Open(file)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	b, err := ioutil.ReadAll(f)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(b)), nil
+}
 
+func (s *Server) writeID(file, id string) error {
+	f, err := os.Create(file)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = f.Write([]byte(id))
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // Service represents a service attached to the server.
