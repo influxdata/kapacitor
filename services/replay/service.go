@@ -121,7 +121,7 @@ func (s *Service) handleList(w http.ResponseWriter, req *http.Request) {
 	}
 
 	type response struct {
-		Recordings []recordingInfo `json:"Recordings"`
+		Recordings []RecordingInfo `json:"Recordings"`
 	}
 
 	w.Write(httpd.MarshalJSON(response{infos}, true))
@@ -302,9 +302,28 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 	case "query":
-		httpd.HttpError(w, "not implemented", true, http.StatusInternalServerError)
-		return
+		query := req.URL.Query().Get("query")
+		if query == "" {
+			httpd.HttpError(w, "must pass query parameter", true, http.StatusBadRequest)
+			return
+		}
 
+		typeStr := req.URL.Query().Get("ttype")
+		var tt kapacitor.TaskType
+		switch typeStr {
+		case "stream":
+			tt = kapacitor.StreamTask
+		case "batch":
+			tt = kapacitor.BatchTask
+		default:
+			httpd.HttpError(w, fmt.Sprintf("invalid type %q", typeStr), true, http.StatusBadRequest)
+			return
+		}
+		err := r.doRecordQuery(rid, query, tt)
+		if err != nil {
+			httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
+			return
+		}
 	default:
 		httpd.HttpError(w, "invalid recording type", true, http.StatusBadRequest)
 		return
@@ -316,13 +335,14 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 	w.Write(httpd.MarshalJSON(response{rid.String()}, true))
 }
 
-type recordingInfo struct {
-	ID   string
-	Type kapacitor.TaskType
-	Size int64
+type RecordingInfo struct {
+	ID      string
+	Type    kapacitor.TaskType
+	Size    int64
+	Created time.Time
 }
 
-func (r *Service) GetRecordings(rids []string) ([]recordingInfo, error) {
+func (r *Service) GetRecordings(rids []string) ([]RecordingInfo, error) {
 	files, err := ioutil.ReadDir(r.saveDir)
 	if err != nil {
 		return nil, err
@@ -333,7 +353,7 @@ func (r *Service) GetRecordings(rids []string) ([]recordingInfo, error) {
 		ids[id] = true
 	}
 
-	infos := make([]recordingInfo, 0, len(files))
+	infos := make([]RecordingInfo, 0, len(files))
 
 	for _, info := range files {
 		if info.IsDir() {
@@ -355,12 +375,13 @@ func (r *Service) GetRecordings(rids []string) ([]recordingInfo, error) {
 		default:
 			continue
 		}
-		info := recordingInfo{
-			ID:   id,
-			Type: typ,
-			Size: info.Size(),
+		rinfo := RecordingInfo{
+			ID:      id,
+			Type:    typ,
+			Size:    info.Size(),
+			Created: info.ModTime().UTC(),
 		}
-		infos = append(infos, info)
+		infos = append(infos, rinfo)
 	}
 	return infos, nil
 }
@@ -453,22 +474,48 @@ func (r rc) Close() error {
 	return nil
 }
 
-// Record the stream for a duration
-func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration, dbrps []kapacitor.DBRP) error {
-	e := r.TaskMaster.NewFork(rid.String(), dbrps)
+// create new stream writer
+func (r *Service) newStreamWriter(rid uuid.UUID) (io.WriteCloser, error) {
 	rpath := path.Join(r.saveDir, rid.String()+streamEXT)
 	f, err := os.Create(rpath)
 	if err != nil {
-		return fmt.Errorf("failed to save recording: %s", err)
+		return nil, fmt.Errorf("failed to save recording: %s", err)
 	}
-	defer f.Close()
 	gz := gzip.NewWriter(f)
-	defer gz.Close()
+	sw := streamWriter{f: f, gz: gz}
+	return sw, nil
+}
+
+// wrap gzipped writer and underlying file
+type streamWriter struct {
+	f  io.Closer
+	gz io.WriteCloser
+}
+
+// write to gzip writer
+func (s streamWriter) Write(b []byte) (int, error) {
+	return s.gz.Write(b)
+}
+
+// close both gzip stream and file
+func (s streamWriter) Close() error {
+	s.gz.Close()
+	return s.f.Close()
+}
+
+// Record the stream for a duration
+func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration, dbrps []kapacitor.DBRP) error {
+	e := r.TaskMaster.NewFork(rid.String(), dbrps)
+	sw, err := r.newStreamWriter(rid)
+	if err != nil {
+		return err
+	}
+	defer sw.Close()
 
 	done := false
 	go func() {
 		for p, ok := e.NextPoint(); ok && !done; p, ok = e.NextPoint() {
-			kapacitor.WritePointForRecording(gz, p)
+			kapacitor.WritePointForRecording(sw, p)
 		}
 	}()
 	time.Sleep(dur)
@@ -476,6 +523,38 @@ func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration, dbrps []kapac
 	e.Close()
 	r.TaskMaster.DelFork(rid.String())
 	return nil
+}
+
+// open an archive for writing batch recordings
+func (r *Service) newBatchArchive(rid uuid.UUID) (*batchArchive, error) {
+	rpath := path.Join(r.saveDir, rid.String()+batchEXT)
+	f, err := os.Create(rpath)
+	if err != nil {
+		return nil, err
+	}
+	archive := zip.NewWriter(f)
+	return &batchArchive{f: f, archive: archive}, nil
+}
+
+// wrap the underlying file and archive
+type batchArchive struct {
+	f       io.Closer
+	archive *zip.Writer
+}
+
+// create new file in archive from batch index
+func (b batchArchive) Create(idx int) (io.Writer, error) {
+	return b.archive.Create(strconv.FormatInt(int64(idx), 10))
+}
+
+// close both archive and file
+func (b batchArchive) Close() error {
+	err := b.archive.Close()
+	if err != nil {
+		b.f.Close()
+		return err
+	}
+	return b.f.Close()
 }
 
 // Record a series of batch queries defined by a batch task
@@ -497,16 +576,14 @@ func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, start, stop ti
 	if err != nil {
 		return err
 	}
-	rpath := path.Join(r.saveDir, rid.String()+batchEXT)
-	f, err := os.Create(rpath)
+
+	archive, err := r.newBatchArchive(rid)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	archive := zip.NewWriter(f)
 
 	for batchIdx, queries := range batches {
-		w, err := archive.Create(strconv.FormatInt(int64(batchIdx), 10))
+		w, err := archive.Create(batchIdx)
 		if err != nil {
 			return err
 		}
@@ -533,4 +610,86 @@ func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, start, stop ti
 		}
 	}
 	return archive.Close()
+}
+
+func (r *Service) doRecordQuery(rid uuid.UUID, q string, tt kapacitor.TaskType) error {
+	// Parse query to determine dbrp
+	var db, rp string
+	s, err := influxql.ParseStatement(q)
+	if err != nil {
+		return err
+	}
+	if slct, ok := s.(*influxql.SelectStatement); ok && len(slct.Sources) == 1 {
+		if m, ok := slct.Sources[0].(*influxql.Measurement); ok {
+			db = m.Database
+			rp = m.RetentionPolicy
+		}
+	}
+	if db == "" || rp == "" {
+		return errors.New("could not determine database and retention policy. Is the query fully qualified?")
+	}
+	// Query InfluxDB
+	con, err := r.InfluxDBService.NewClient()
+	if err != nil {
+		return err
+	}
+	query := client.Query{
+		Command: q,
+	}
+	resp, err := con.Query(query)
+	if err != nil {
+		return err
+	}
+	if resp.Err != nil {
+		return resp.Err
+	}
+	// Open appropriate writer
+	var w io.Writer
+	var c io.Closer
+	switch tt {
+	case kapacitor.StreamTask:
+		sw, err := r.newStreamWriter(rid)
+		if err != nil {
+			return err
+		}
+		w = sw
+		c = sw
+	case kapacitor.BatchTask:
+		archive, err := r.newBatchArchive(rid)
+		if err != nil {
+			return err
+		}
+		w, err = archive.Create(0)
+		if err != nil {
+			return err
+		}
+		c = archive
+	}
+	// Write results to writer
+	for _, res := range resp.Results {
+		batches, err := models.ResultToBatches(res)
+		if err != nil {
+			c.Close()
+			return err
+		}
+		for _, batch := range batches {
+			switch tt {
+			case kapacitor.StreamTask:
+				for _, ft := range batch.Points {
+					p := models.Point{
+						Name:            batch.Name,
+						Database:        db,
+						RetentionPolicy: rp,
+						Tags:            batch.Tags,
+						Fields:          ft.Fields,
+						Time:            ft.Time,
+					}
+					kapacitor.WritePointForRecording(w, p)
+				}
+			case kapacitor.BatchTask:
+				kapacitor.WriteBatchForRecording(w, batch)
+			}
+		}
+	}
+	return c.Close()
 }
