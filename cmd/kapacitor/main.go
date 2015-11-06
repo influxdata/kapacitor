@@ -11,11 +11,14 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/dustin/go-humanize"
 	"github.com/influxdb/kapacitor"
+	"github.com/influxdb/kapacitor/services/replay"
 )
 
 // These variables are populated via the Go linker.
@@ -237,9 +240,9 @@ Examples:
 		as many times as defined by the schedule until the queries reaches the present time.
 		The starting time for the queries is 'now - 10h' and increments by the schedule defined in the task.
 
-	$ kapacitor record query -query "select value from cpu_idle where time > now() - 1h and time < now()" -type stream
+	$ kapacitor record query -query 'select value from "telegraf"."default"."cpu_idle" where time > now() - 1h and time < now()' -type stream
 
-		This records the result of the query and stores it as a stream recording. Use -type batch to store as batch recording.
+		This records the result of the query and stores it as a stream recording. Use '-type batch' to store as batch recording.
 
 Options:
 `
@@ -264,7 +267,8 @@ func doRecord(args []string) error {
 		v.Add("stop", *rstop)
 		v.Add("past", *rpast)
 	case "query":
-		v.Add("qtype", *rtype)
+		v.Add("query", *rquery)
+		v.Add("ttype", *rtype)
 	default:
 		return fmt.Errorf("Unknown record type %q, expected 'stream' or 'query'", args[0])
 	}
@@ -705,12 +709,8 @@ func doList(args []string) error {
 		defer r.Body.Close()
 		// Decode valid response
 		type resp struct {
-			Error      string `json:"Error"`
-			Recordings []struct {
-				ID   string
-				Type kapacitor.TaskType
-				Size int64
-			} `json:"Recordings"`
+			Error      string         `json:"Error"`
+			Recordings recordingInfos `json:"Recordings"`
 		}
 		d := json.NewDecoder(r.Body)
 		rp := resp{}
@@ -718,11 +718,12 @@ func doList(args []string) error {
 		if rp.Error != "" {
 			return errors.New(rp.Error)
 		}
+		sort.Sort(rp.Recordings)
 
-		outFmt := "%-40s%-10v%15s\n"
-		fmt.Fprintf(os.Stdout, "%-40s%-10s%15s\n", "ID", "Type", "Size")
+		outFmt := "%-40s%-8v%-10s%-23s\n"
+		fmt.Fprintf(os.Stdout, "%-40s%-8s%-10s%-23s\n", "ID", "Type", "Size", "Created")
 		for _, r := range rp.Recordings {
-			fmt.Fprintf(os.Stdout, outFmt, r.ID, r.Type, humanize.Bytes(uint64(r.Size)))
+			fmt.Fprintf(os.Stdout, outFmt, r.ID, r.Type, humanize.Bytes(uint64(r.Size)), r.Created.Local().Format(time.RFC822))
 		}
 	default:
 		return fmt.Errorf("cannot list '%s' did you mean 'tasks' or 'recordings'?", kind)
@@ -730,6 +731,12 @@ func doList(args []string) error {
 	return nil
 
 }
+
+type recordingInfos []replay.RecordingInfo
+
+func (r recordingInfos) Len() int           { return len(r) }
+func (r recordingInfos) Swap(i, j int)      { r[i], r[j] = r[j], r[i] }
+func (r recordingInfos) Less(i, j int) bool { return r[i].Created.Before(r[j].Created) }
 
 // Delete
 func deleteUsage() {
