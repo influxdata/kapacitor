@@ -184,7 +184,7 @@ func (s *Server) appendHTTPDService(c httpd.Config) {
 }
 
 func (s *Server) appendTaskStoreService(c task_store.Config) {
-	l := s.LogService.NewLogger("[task] ", log.LstdFlags)
+	l := s.LogService.NewLogger("[task_store] ", log.LstdFlags)
 	srv := task_store.NewService(c, l)
 	srv.HTTPDService = s.HTTPDService
 	srv.TaskMaster = s.TaskMaster

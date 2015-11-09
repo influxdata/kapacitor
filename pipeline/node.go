@@ -227,9 +227,10 @@ func (n *chainnode) Join(other Node) *JoinNode {
 }
 
 // Create an eval node that will evaluate the given transformation function to each data point.
-// See the built-in function `expr` in order to write in-line custom transformation functions.
-func (n *chainnode) Eval(transform tick.Node) *EvalNode {
-	e := newEvalNode(n.provides, transform)
+//  A list of expressions may be provided and will be evaluated in the order they are given
+// and results of previous expressions are made available to later expressions.
+func (n *chainnode) Eval(expressions ...tick.Node) *EvalNode {
+	e := newEvalNode(n.provides, expressions)
 	n.linkChild(e)
 	return e
 }
@@ -246,53 +247,50 @@ func (n *chainnode) GroupBy(tag ...interface{}) *GroupByNode {
 	return g
 }
 
-// Perform just the map step of a map-reduce operation.
-// A map step must always be followed by a reduce step.
-// See Apply for performing simple transformations.
-// See MapReduce for performing map-reduce in one command.
+// Curently you must use MapReduce
+//// Perform just the map step of a map-reduce operation.
+//// A map step must always be followed by a reduce step.
+//// See Apply for performing simple transformations.
+//// See MapReduce for performing map-reduce in one command.
+////
+//// NOTE: Map can only be applied to batch edges.
+//func (n *chainnode) Map(f interface{}) (c *MapNode) {
+//	if n.Provides() != BatchEdge {
+//		panic("cannot MapReduce non batch edge, did you forget to window the data?")
+//	}
+//	c = newMapNode(f)
+//	n.linkChild(c)
+//	return c
+//}
 //
-// NOTE: Map can only be applied to batch edges.
-func (n *chainnode) Map(f interface{}) (c *MapNode) {
-	switch n.Provides() {
-	case StreamEdge:
-		panic("cannot MapReduce stream edge, did you forget to window the data?")
-	case BatchEdge:
-		c = newMapNode(f)
-	}
-	n.linkChild(c)
-	return c
-}
-
-// Perform just the reduce step of a map-reduce operation.
-//
-// NOTE: Reduce can only be applied to map edges.
-func (n *chainnode) Reduce(f interface{}) (c *ReduceNode) {
-	switch n.Provides() {
-	case StreamEdge:
-		panic("cannot MapReduce stream edge, did you forget to window the data?")
-	case BatchEdge:
-		c = newReduceNode(f)
-	}
-	n.linkChild(c)
-	return c
-}
+//// Perform just the reduce step of a map-reduce operation.
+////
+//// NOTE: Reduce can only be applied to map edges.
+//func (n *chainnode) Reduce(f interface{}) (c *ReduceNode) {
+//	switch n.Provides() {
+//	case ReduceEdge:
+//		c = newReduceNode(f)
+//	default:
+//		panic("cannot Reduce non reduce edge, did you forget to map the data?")
+//	}
+//	n.linkChild(c)
+//	return c
+//}
 
 // Perform a map-reduce operation on the data.
 // The built-in functions under `influxql` provide the
 // selection,aggregation, and transformation functions
 // from the InfluxQL language.
 //
-// NOTE: MapReduce can only be applied to batch edges.
+// MapReduce may be applied to either a batch or a stream edge.
+// In the case of a batch each batch is passed to the mapper idependently.
+// In the case of a stream all incoming data points that have
+// the exact same time are combined into a batch and sent to the mapper.
 func (n *chainnode) MapReduce(mr MapReduceInfo) *ReduceNode {
 	var m *MapNode
 	var r *ReduceNode
-	switch n.Provides() {
-	case StreamEdge:
-		panic("cannot MapReduce stream edge, did you forget to window the data?")
-	case BatchEdge:
-		m = newMapNode(mr.Map)
-		r = newReduceNode(mr.Reduce)
-	}
+	m = newMapNode(n.Provides(), mr.Map)
+	r = newReduceNode(mr.Reduce, mr.Edge)
 	n.linkChild(m)
 	m.linkChild(r)
 	return r
@@ -302,11 +300,10 @@ func (n *chainnode) MapReduce(mr MapReduceInfo) *ReduceNode {
 //
 // NOTE: Window can only be applied to stream edges.
 func (n *chainnode) Window() *WindowNode {
-	if n.Provides() == StreamEdge {
-		w := newWindowNode()
-		n.linkChild(w)
-		return w
-	} else {
+	if n.Provides() != StreamEdge {
 		panic("cannot Window batch edge")
 	}
+	w := newWindowNode()
+	n.linkChild(w)
+	return w
 }

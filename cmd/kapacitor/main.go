@@ -19,6 +19,7 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/influxdb/kapacitor"
 	"github.com/influxdb/kapacitor/services/replay"
+	"github.com/influxdb/kapacitor/services/task_store"
 )
 
 // These variables are populated via the Go linker.
@@ -618,29 +619,21 @@ func doShow(args []string) error {
 		return err
 	}
 	defer r.Body.Close()
-	// Decode valid response
-	type resp struct {
-		Error      string
-		Name       string
-		Type       kapacitor.TaskType
-		DBRPs      []kapacitor.DBRP
-		TICKscript string
-		Dot        string
-		Enabled    bool
-	}
 	d := json.NewDecoder(r.Body)
-	rp := resp{}
-	d.Decode(&rp)
-	if rp.Error != "" {
-		return errors.New(rp.Error)
+	ti := task_store.TaskInfo{}
+	d.Decode(&ti)
+
+	if ti.Name == "" && ti.Error != "" {
+		return errors.New(ti.Error)
 	}
 
-	fmt.Println("Name:", rp.Name)
-	fmt.Println("Type:", rp.Type)
-	fmt.Println("Enabled:", rp.Enabled)
-	fmt.Println("Databases Retention Policies:", rp.DBRPs)
-	fmt.Printf("TICKscript:\n%s\n\n", rp.TICKscript)
-	fmt.Printf("DOT:\n%s\n", rp.Dot)
+	fmt.Println("Name:", ti.Name)
+	fmt.Println("Error:", ti.Error)
+	fmt.Println("Type:", ti.Type)
+	fmt.Println("Enabled:", ti.Enabled)
+	fmt.Println("Databases Retention Policies:", ti.DBRPs)
+	fmt.Printf("TICKscript:\n%s\n\n", ti.TICKscript)
+	fmt.Printf("DOT:\n%s\n", ti.Dot)
 	return nil
 }
 

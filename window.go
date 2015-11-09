@@ -32,18 +32,23 @@ func (w *WindowNode) runWindow() error {
 	for p, ok := w.ins[0].NextPoint(); ok; p, ok = w.ins[0].NextPoint() {
 		wnd := windows[p.Group]
 		if wnd == nil {
-			tags := p.Tags
-			if p.Group == models.NilGroup {
-				tags = nil
+			tags := make(map[string]string, len(p.Dimensions))
+			for _, dim := range p.Dimensions {
+				tags[dim] = p.Tags[dim]
+			}
+			nextEmit := p.Time.Add(w.w.Every)
+			if w.w.AlignFlag {
+				nextEmit = nextEmit.Truncate(w.w.Every)
 			}
 			wnd = &window{
 				buf:      &windowBuffer{logger: w.logger},
-				nextEmit: p.Time.Add(w.w.Every),
+				nextEmit: nextEmit,
 				period:   w.w.Period,
 				every:    w.w.Every,
 				name:     p.Name,
 				group:    p.Group,
 				tags:     tags,
+				logger:   w.logger,
 			}
 			windows[p.Group] = wnd
 		}
@@ -67,19 +72,20 @@ type window struct {
 	name     string
 	group    models.GroupID
 	tags     map[string]string
+	logger   *log.Logger
 }
 
 func (w *window) emit() models.Batch {
 	oldest := w.nextEmit.Add(-1 * w.period)
 	w.buf.purge(oldest)
 
-	w.nextEmit = w.nextEmit.Add(w.every)
-
 	batch := w.buf.batch()
 	batch.Name = w.name
 	batch.Group = w.group
 	batch.Tags = w.tags
+	batch.TMax = w.nextEmit
 
+	w.nextEmit = w.nextEmit.Add(w.every)
 	return batch
 }
 
@@ -178,22 +184,22 @@ func (b *windowBuffer) batch() models.Batch {
 	if b.size == 0 {
 		return batch
 	}
-	batch.Points = make([]models.TimeFields, b.size)
+	batch.Points = make([]models.BatchPoint, b.size)
 	if b.stop > b.start {
 		for i, p := range b.window[b.start:b.stop] {
-			batch.Points[i] = models.TimeFields{Time: p.Time, Fields: p.Fields}
+			batch.Points[i] = models.BatchPointFromPoint(p)
 		}
 	} else {
 		j := 0
 		l := len(b.window)
 		for i := b.start; i < l; i++ {
 			p := b.window[i]
-			batch.Points[j] = models.TimeFields{Time: p.Time, Fields: p.Fields}
+			batch.Points[j] = models.BatchPointFromPoint(p)
 			j++
 		}
 		for i := 0; i < b.stop; i++ {
 			p := b.window[i]
-			batch.Points[j] = models.TimeFields{Time: p.Time, Fields: p.Fields}
+			batch.Points[j] = models.BatchPointFromPoint(p)
 			j++
 		}
 	}

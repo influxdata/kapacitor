@@ -28,10 +28,22 @@ type WindowNode struct {
 	Period time.Duration
 	// How often the current window is emitted into the pipeline.
 	Every time.Duration
+	// Wether to align the window edges with the zero time
+	// tick:ignore
+	AlignFlag bool
 }
 
 func newWindowNode() *WindowNode {
 	return &WindowNode{
 		chainnode: newBasicChainNode("window", StreamEdge, BatchEdge),
 	}
+}
+
+// Wether to align the window edges with the zero time.
+// If not aligned the window starts and ends relative to the
+// first data point it receives.
+// tick:property
+func (w *WindowNode) Align() *WindowNode {
+	w.AlignFlag = true
+	return w
 }

@@ -27,6 +27,8 @@ import (
 const streamEXT = ".srpl"
 const batchEXT = ".brpl"
 
+const precision = "n"
+
 // Handles recording, starting, and waiting on replays
 type Service struct {
 	saveDir   string
@@ -180,7 +182,7 @@ func (r *Service) handleReplay(w http.ResponseWriter, req *http.Request) {
 			httpd.HttpError(w, "replay find: "+err.Error(), true, http.StatusNotFound)
 			return
 		}
-		replayC = replay.ReplayStream(f, tm.Stream, recTime)
+		replayC = replay.ReplayStream(f, tm.Stream, recTime, precision)
 	case kapacitor.BatchTask:
 		fs, err := r.FindBatchRecording(id)
 		if err != nil {
@@ -515,7 +517,7 @@ func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration, dbrps []kapac
 	done := false
 	go func() {
 		for p, ok := e.NextPoint(); ok && !done; p, ok = e.NextPoint() {
-			kapacitor.WritePointForRecording(sw, p)
+			kapacitor.WritePointForRecording(sw, p, precision)
 		}
 	}()
 	time.Sleep(dur)
@@ -675,16 +677,16 @@ func (r *Service) doRecordQuery(rid uuid.UUID, q string, tt kapacitor.TaskType) 
 		for _, batch := range batches {
 			switch tt {
 			case kapacitor.StreamTask:
-				for _, ft := range batch.Points {
+				for _, bp := range batch.Points {
 					p := models.Point{
 						Name:            batch.Name,
 						Database:        db,
 						RetentionPolicy: rp,
-						Tags:            batch.Tags,
-						Fields:          ft.Fields,
-						Time:            ft.Time,
+						Tags:            bp.Tags,
+						Fields:          bp.Fields,
+						Time:            bp.Time,
 					}
-					kapacitor.WritePointForRecording(w, p)
+					kapacitor.WritePointForRecording(w, p, precision)
 				}
 			case kapacitor.BatchTask:
 				kapacitor.WriteBatchForRecording(w, batch)

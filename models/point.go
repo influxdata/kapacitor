@@ -21,7 +21,8 @@ type Point struct {
 	Database        string
 	RetentionPolicy string
 
-	Group GroupID
+	Group      GroupID
+	Dimensions []string
 
 	Tags map[string]string
 

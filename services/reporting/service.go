@@ -156,7 +156,10 @@ func (s *Service) registerServer() error {
 		Version:   s.version,
 		Product:   s.product,
 	}
-	_, err := s.client.Save(server)
+	resp, err := s.client.Save(server)
+	if resp != nil {
+		resp.Body.Close()
+	}
 	return err
 }
 
@@ -178,7 +181,10 @@ func (s *Service) sendUsageReport() error {
 		Data:    []client.UsageData{data},
 	}
 
-	_, err := s.client.Save(usage)
+	resp, err := s.client.Save(usage)
+	if resp != nil {
+		resp.Body.Close()
+	}
 	return err
 }
 
@@ -194,8 +200,11 @@ func (s *Service) sendStatsReport() error {
 		Product:   s.product,
 		Data:      data,
 	}
-	_, err = s.client.Save(stats)
 
+	resp, err := s.client.Save(stats)
+	if resp != nil {
+		resp.Body.Close()
+	}
 	return err
 }
 

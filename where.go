@@ -46,7 +46,7 @@ func (w *WhereNode) runWhere() error {
 	case pipeline.BatchEdge:
 		for b, ok := w.ins[0].NextBatch(); ok; b, ok = w.ins[0].NextBatch() {
 			for i, p := range b.Points {
-				if pass, err := EvalPredicate(w.expression, p.Fields, b.Tags); !pass {
+				if pass, err := EvalPredicate(w.expression, p.Fields, p.Tags); !pass {
 					if err != nil {
 						w.logger.Println("E! error while evaluating WHERE expression:", err)
 					}

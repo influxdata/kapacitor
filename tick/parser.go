@@ -299,6 +299,39 @@ func (p *parser) precedence(lhs Node, minP int) Node {
 	return lhs
 }
 
+//parse a function call in a lambda expr
+func (p *parser) lfunction() Node {
+	ident := p.expect(tokenIdent)
+	p.expect(tokenLParen)
+	args := p.lparameters()
+	p.expect(tokenRParen)
+
+	n := newFunc(ident.pos, ident.val, args)
+	return n
+}
+
+//parse a parameter list in a lfunction
+func (p *parser) lparameters() (args []Node) {
+	for {
+		if p.peek().typ == tokenRParen {
+			return
+		}
+		args = append(args, p.lparameter())
+		if p.next().typ != tokenComma {
+			p.backup()
+			return
+		}
+	}
+}
+
+func (p *parser) lparameter() (n Node) {
+	n = p.primary()
+	if isOperator(p.peek().typ) {
+		n = p.precedence(n, 0)
+	}
+	return
+}
+
 // parse a primary expression
 func (p *parser) primary() Node {
 	switch tok := p.peek(); {
@@ -322,7 +355,7 @@ func (p *parser) primary() Node {
 	case tok.typ == tokenReference:
 		return p.reference()
 	case tok.typ == tokenIdent:
-		return p.function()
+		return p.lfunction()
 	case tok.typ == tokenMinus, tok.typ == tokenNot:
 		return newUnary(tok, p.primary())
 	default:

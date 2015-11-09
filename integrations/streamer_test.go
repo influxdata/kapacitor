@@ -72,6 +72,8 @@ stream
 	for i, num := range nums {
 		values[i] = []interface{}{
 			time.Date(1970, 1, 1, 0, 0, i, 0, time.UTC),
+			"serverA",
+			"idle",
 			num,
 		}
 	}
@@ -81,7 +83,7 @@ stream
 			{
 				Name:    "cpu",
 				Tags:    nil,
-				Columns: []string{"time", "value"},
+				Columns: []string{"time", "host", "type", "value"},
 				Values:  values,
 			},
 		},
@@ -138,7 +140,7 @@ stream
 				Tags:    nil,
 				Columns: []string{"time", "count"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+					time.Date(1970, 1, 1, 0, 0, 10, 0, time.UTC),
 					10.0,
 				}},
 			},
@@ -197,7 +199,7 @@ stream
 				Tags:    map[string]string{"service": "cartA"},
 				Columns: []string{"time", "sum"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+					time.Date(1970, 1, 1, 0, 0, 10, 0, time.UTC),
 					47.0,
 				}},
 			},
@@ -206,7 +208,7 @@ stream
 				Tags:    map[string]string{"service": "login"},
 				Columns: []string{"time", "sum"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+					time.Date(1970, 1, 1, 0, 0, 10, 0, time.UTC),
 					45.0,
 				}},
 			},
@@ -215,7 +217,7 @@ stream
 				Tags:    map[string]string{"service": "front"},
 				Columns: []string{"time", "sum"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1970, 1, 1, 0, 0, 8, 0, time.UTC),
+					time.Date(1970, 1, 1, 0, 0, 11, 0, time.UTC),
 					32.0,
 				}},
 			},
@@ -289,7 +291,7 @@ errorCounts.join(viewCounts)
 				Tags:    map[string]string{"service": "cartA"},
 				Columns: []string{"time", "error_percent", "errors.sum", "views.sum"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+					time.Date(1970, 1, 1, 0, 0, 10, 0, time.UTC),
 					0.01,
 					47.0,
 					4700.0,
@@ -300,7 +302,7 @@ errorCounts.join(viewCounts)
 				Tags:    map[string]string{"service": "login"},
 				Columns: []string{"time", "error_percent", "errors.sum", "views.sum"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+					time.Date(1970, 1, 1, 0, 0, 10, 0, time.UTC),
 					0.01,
 					45.0,
 					4500.0,
@@ -311,7 +313,7 @@ errorCounts.join(viewCounts)
 				Tags:    map[string]string{"service": "front"},
 				Columns: []string{"time", "error_percent", "errors.sum", "views.sum"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1970, 1, 1, 0, 0, 8, 0, time.UTC),
+					time.Date(1970, 1, 1, 0, 0, 10, 0, time.UTC),
 					0.01,
 					32.0,
 					3200.0,
@@ -381,7 +383,7 @@ cpu.union(mem, disk)
 				Tags:    nil,
 				Columns: []string{"time", "count"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+					time.Date(1970, 1, 1, 0, 0, 10, 0, time.UTC),
 					24.0,
 				}},
 			},
@@ -423,9 +425,10 @@ cpu.union(mem, disk)
 func TestStream_Aggregations(t *testing.T) {
 
 	type testCase struct {
-		Method string
-		Args   string
-		ER     kapacitor.Result
+		Method        string
+		Args          string
+		ER            kapacitor.Result
+		UsePointTimes bool
 	}
 
 	var scriptTmpl = `
@@ -435,9 +438,11 @@ stream
 	.window()
 		.period(10s)
 		.every(10s)
-	.mapReduce({{ .Method }}('value' {{ .Args }}))
+	.mapReduce({{ .Method }}({{ .Args }}))
+		{{ if .UsePointTimes }}.usePointTimes(){{ end }}
 	.httpOut('{{ .Method }}')
 `
+	endTime := time.Date(1970, 1, 1, 0, 0, 10, 0, time.UTC)
 	testCases := []testCase{
 		testCase{
 			Method: "influxql.sum",
@@ -448,8 +453,8 @@ stream
 						Tags:    nil,
 						Columns: []string{"time", "sum"},
 						Values: [][]interface{}{[]interface{}{
-							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
-							941.0,
+							endTime,
+							940.0,
 						}},
 					},
 				},
@@ -464,7 +469,7 @@ stream
 						Tags:    nil,
 						Columns: []string{"time", "count"},
 						Values: [][]interface{}{[]interface{}{
-							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+							endTime,
 							10.0,
 						}},
 					},
@@ -479,10 +484,32 @@ stream
 						Name:    "cpu",
 						Tags:    nil,
 						Columns: []string{"time", "distinct"},
-						Values: [][]interface{}{[]interface{}{
-							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
-							[]interface{}{92.0, 93.0, 95.0, 96.0, 98.0},
-						}},
+						Values: [][]interface{}{
+							{
+								endTime,
+								91.0,
+							},
+							{
+								endTime,
+								92.0,
+							},
+							{
+								endTime,
+								93.0,
+							},
+							{
+								endTime,
+								95.0,
+							},
+							{
+								endTime,
+								96.0,
+							},
+							{
+								endTime,
+								98.0,
+							},
+						},
 					},
 				},
 			},
@@ -496,8 +523,8 @@ stream
 						Tags:    nil,
 						Columns: []string{"time", "mean"},
 						Values: [][]interface{}{[]interface{}{
-							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
-							94.1,
+							endTime,
+							94.0,
 						}},
 					},
 				},
@@ -512,8 +539,25 @@ stream
 						Tags:    nil,
 						Columns: []string{"time", "median"},
 						Values: [][]interface{}{[]interface{}{
-							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+							endTime,
 							94.0,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method:        "influxql.min",
+			UsePointTimes: true,
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    nil,
+						Columns: []string{"time", "min"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1970, 1, 1, 0, 0, 1, 0, time.UTC),
+							91.0,
 						}},
 					},
 				},
@@ -528,8 +572,25 @@ stream
 						Tags:    nil,
 						Columns: []string{"time", "min"},
 						Values: [][]interface{}{[]interface{}{
-							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
-							92.0,
+							endTime,
+							91.0,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method:        "influxql.max",
+			UsePointTimes: true,
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    nil,
+						Columns: []string{"time", "max"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
+							98.0,
 						}},
 					},
 				},
@@ -544,7 +605,7 @@ stream
 						Tags:    nil,
 						Columns: []string{"time", "max"},
 						Values: [][]interface{}{[]interface{}{
-							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+							endTime,
 							98.0,
 						}},
 					},
@@ -560,8 +621,8 @@ stream
 						Tags:    nil,
 						Columns: []string{"time", "spread"},
 						Values: [][]interface{}{[]interface{}{
-							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
-							6.0,
+							endTime,
+							7.0,
 						}},
 					},
 				},
@@ -576,8 +637,25 @@ stream
 						Tags:    nil,
 						Columns: []string{"time", "stddev"},
 						Values: [][]interface{}{[]interface{}{
-							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
-							2.0248456731316584,
+							endTime,
+							2.160246899469287,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method:        "influxql.first",
+			UsePointTimes: true,
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    nil,
+						Columns: []string{"time", "first"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
+							98.0,
 						}},
 					},
 				},
@@ -592,7 +670,7 @@ stream
 						Tags:    nil,
 						Columns: []string{"time", "first"},
 						Values: [][]interface{}{[]interface{}{
-							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+							endTime,
 							98.0,
 						}},
 					},
@@ -600,7 +678,8 @@ stream
 			},
 		},
 		testCase{
-			Method: "influxql.last",
+			Method:        "influxql.last",
+			UsePointTimes: true,
 			ER: kapacitor.Result{
 				Series: imodels.Rows{
 					{
@@ -616,8 +695,24 @@ stream
 			},
 		},
 		testCase{
+			Method: "influxql.last",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    nil,
+						Columns: []string{"time", "last"},
+						Values: [][]interface{}{[]interface{}{
+							endTime,
+							95.0,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
 			Method: "influxql.percentile",
-			Args:   ", 90.0",
+			Args:   "'value', 50.0",
 			ER: kapacitor.Result{
 				Series: imodels.Rows{
 					{
@@ -625,43 +720,131 @@ stream
 						Tags:    nil,
 						Columns: []string{"time", "percentile"},
 						Values: [][]interface{}{[]interface{}{
-							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
-							96.0,
+							endTime,
+							93.0,
 						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method:        "influxql.top",
+			UsePointTimes: true,
+			Args:          "2, 'value'",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    nil,
+						Columns: []string{"time", "host", "top", "type"},
+						Values: [][]interface{}{
+							{
+								time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
+								"serverA",
+								98.0,
+								"idle",
+							},
+							{
+								time.Date(1970, 1, 1, 0, 0, 7, 0, time.UTC),
+								"serverA",
+								96.0,
+								"idle",
+							},
+						},
 					},
 				},
 			},
 		},
 		testCase{
 			Method: "influxql.top",
-			Args:   ", 2",
+			Args:   "2, 'value'",
 			ER: kapacitor.Result{
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
 						Tags:    nil,
-						Columns: []string{"time", "top"},
-						Values: [][]interface{}{[]interface{}{
-							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
-							[]interface{}{98.0, 96.0},
-						}},
+						Columns: []string{"time", "host", "top", "type"},
+						Values: [][]interface{}{
+							{
+								endTime,
+								"serverA",
+								98.0,
+								"idle",
+							},
+							{
+								endTime,
+								"serverA",
+								96.0,
+								"idle",
+							},
+						},
+					},
+				},
+			},
+		},
+		testCase{
+			Method:        "influxql.bottom",
+			UsePointTimes: true,
+			Args:          "3, 'value'",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    nil,
+						Columns: []string{"time", "bottom", "host", "type"},
+						Values: [][]interface{}{
+							{
+								time.Date(1970, 1, 1, 0, 0, 1, 0, time.UTC),
+								91.0,
+								"serverA",
+								"idle",
+							},
+							{
+								time.Date(1970, 1, 1, 0, 0, 4, 0, time.UTC),
+								92.0,
+								"serverA",
+								"idle",
+							},
+							{
+								time.Date(1970, 1, 1, 0, 0, 6, 0, time.UTC),
+								92.0,
+								"serverA",
+								"idle",
+							},
+						},
 					},
 				},
 			},
 		},
 		testCase{
 			Method: "influxql.bottom",
-			Args:   ", 3",
+			Args:   "3, 'value'",
 			ER: kapacitor.Result{
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
 						Tags:    nil,
-						Columns: []string{"time", "bottom"},
-						Values: [][]interface{}{[]interface{}{
-							time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
-							[]interface{}{92.0, 92.0, 92.0},
-						}},
+						Columns: []string{"time", "bottom", "host", "type"},
+						Values: [][]interface{}{
+							{
+								endTime,
+								91.0,
+								"serverA",
+								"idle",
+							},
+							{
+								endTime,
+								92.0,
+								"serverA",
+								"idle",
+							},
+							{
+								endTime,
+								92.0,
+								"serverA",
+								"idle",
+							},
+						},
 					},
 				},
 			},
@@ -676,6 +859,9 @@ stream
 	for _, tc := range testCases {
 		t.Log("Method:", tc.Method)
 		var script bytes.Buffer
+		if tc.Args == "" {
+			tc.Args = "'value'"
+		}
 		tmpl.Execute(&script, tc)
 		clock, et, errCh, tm := testStreamer(
 			t,
@@ -711,6 +897,8 @@ stream
 		if eq, msg := compareResults(tc.ER, result); !eq {
 			t.Error(tc.Method + ": " + msg)
 		}
+
+		tm.StopTask(et.Task.Name)
 	}
 }
 
@@ -763,7 +951,7 @@ func TestStream_Alert(t *testing.T) {
 			t.Fatal(err)
 		}
 		requestCount++
-		expAns := `{"level":"CRITICAL","data":{"Series":[{"name":"cpu","columns":["time","count"],"values":[["1970-01-01T00:00:09Z",10]]}],"Err":null}}`
+		expAns := `{"level":"CRITICAL","data":{"Series":[{"name":"cpu","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",10]]}],"Err":null}}`
 		if string(ans) != expAns {
 			t.Errorf("got %v exp %v", string(ans), expAns)
 		}
@@ -1018,10 +1206,90 @@ stream
 		if len(p.Tags()) != 0 {
 			t.Errorf("got %v exp %v", len(p.Tags()), 0)
 		}
-		tm := time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC)
+		tm := time.Date(1970, 1, 1, 0, 0, 10, 0, time.UTC)
 		if !tm.Equal(p.Time()) {
 			t.Errorf("times are not equal exp %s got %s", tm, p.Time())
 		}
+	}
+}
+
+func TestStream_TopSelector(t *testing.T) {
+
+	var script = `
+stream
+    .from('scores')
+    // Get the most recent score for each player
+    .groupBy('game', 'player')
+    .window()
+        .period(5s)
+        .every(2s)
+        .align()
+    .mapReduce(influxql.last('value'))
+    // Calculate the top 5 scores per game
+    .groupBy('game')
+    .mapReduce(influxql.top(5, 'last', 'player'))
+    .httpOut('top_scores')
+`
+
+	tw := time.Date(1970, 1, 1, 0, 0, 2, 0, time.UTC)
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "scores",
+				Tags:    map[string]string{"game": "g0"},
+				Columns: []string{"time", "player", "top"},
+				Values: [][]interface{}{
+					{tw, "p11", 931.0},
+					{tw, "p13", 894.0},
+					{tw, "p2", 872.0},
+					{tw, "p6", 843.0},
+					{tw, "p4", 840.0},
+				},
+			},
+			{
+				Name:    "scores",
+				Tags:    map[string]string{"game": "g1"},
+				Columns: []string{"time", "player", "top"},
+				Values: [][]interface{}{
+					{tw, "p0", 965.0},
+					{tw, "p8", 953.0},
+					{tw, "p12", 833.0},
+					{tw, "p18", 813.0},
+					{tw, "p13", 734.0},
+				},
+			},
+		},
+	}
+
+	clock, et, errCh, tm := testStreamer(t, "TestStream_TopSelector", script)
+	defer tm.Close()
+
+	// Move time forward
+	clock.Set(clock.Zero().Add(10 * time.Second))
+	// Wait till the replay has finished
+	if e := <-errCh; e != nil {
+		t.Error(e)
+	}
+	// Wait till the task is finished
+	if e := et.Err(); e != nil {
+		t.Error(e)
+	}
+
+	// Get the result
+	output, err := et.GetOutput("top_scores")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := http.Get(output.Endpoint())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert we got the expected result
+	result := kapacitor.ResultFromJSON(resp.Body)
+	if eq, msg := compareResults(er, result); !eq {
+		t.Error(msg)
 	}
 }
 
@@ -1063,7 +1331,7 @@ func testStreamer(t *testing.T, name, script string) (clock.Setter, *kapacitor.E
 	}
 
 	// Replay test data to executor
-	errCh := r.ReplayStream(data, tm.Stream, false)
+	errCh := r.ReplayStream(data, tm.Stream, false, "s")
 
 	t.Log(string(et.Task.Dot()))
 	return r.Setter, et, errCh, tm
