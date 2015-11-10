@@ -43,6 +43,7 @@ const (
 	tokenMinus
 	tokenMult
 	tokenDiv
+	tokenMod
 
 	//end mathematical operators
 	end_tok_operator_math
@@ -73,6 +74,7 @@ var operatorStr = [...]string{
 	tokenMinus:         "-",
 	tokenMult:          "*",
 	tokenDiv:           "/",
+	tokenMod:           "%",
 	tokenEqual:         "==",
 	tokenNotEqual:      "!=",
 	tokenLess:          "<",
@@ -304,7 +306,7 @@ func lexToken(l *lexer) stateFn {
 	}
 }
 
-const operatorChars = "+-*/><!="
+const operatorChars = "+-*/><!=%"
 
 func isOperatorChar(r rune) bool {
 	return strings.IndexRune(operatorChars, r) != -1
@@ -313,15 +315,15 @@ func isOperatorChar(r rune) bool {
 func lexOperator(l *lexer) stateFn {
 	for {
 		switch l.next() {
+		case '+', '-', '*', '%':
+			op := strToOperator[l.current()]
+			l.emit(op)
+			return lexToken
 		case '/':
 			if l.peek() == '/' {
 				l.backup()
 				return lexComment
 			}
-			op := strToOperator[l.current()]
-			l.emit(op)
-			return lexToken
-		case '+', '-', '*':
 			op := strToOperator[l.current()]
 			l.emit(op)
 			return lexToken

@@ -307,3 +307,12 @@ func (n *chainnode) Window() *WindowNode {
 	n.linkChild(w)
 	return w
 }
+
+// Create a new node that samples the incoming points or batches.
+//
+// One point will be emitted every count or duration specified.
+func (n *chainnode) Sample(rate interface{}) *SampleNode {
+	s := newSampleNode(n.Provides(), rate)
+	n.linkChild(s)
+	return s
+}

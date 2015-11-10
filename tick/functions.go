@@ -26,6 +26,7 @@ func NewFunctions() Funcs {
 	funcs["bool"] = &boolean{}
 	funcs["int"] = &integer{}
 	funcs["float"] = &float{}
+	funcs["count"] = &count{}
 
 	return funcs
 }
@@ -98,6 +99,20 @@ func (*float) Call(args ...interface{}) (v interface{}, err error) {
 		err = fmt.Errorf("cannot convert %T to float", a)
 	}
 	return
+}
+
+type count struct {
+	n int64
+}
+
+func (c *count) Reset() {
+	c.n = 0
+}
+
+// Counts the number of values processed.
+func (c *count) Call(args ...interface{}) (v interface{}, err error) {
+	c.n++
+	return c.n, nil
 }
 
 type sigma struct {

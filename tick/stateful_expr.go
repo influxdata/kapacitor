@@ -272,6 +272,8 @@ func doIntMath(op tokenType, l, r int64) (v int64, err error) {
 		v = l * r
 	case tokenDiv:
 		v = l / r
+	case tokenMod:
+		v = l % r
 	default:
 		return 0, fmt.Errorf("invalid integer math operator %v", op)
 	}
