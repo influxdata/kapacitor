@@ -1216,22 +1216,28 @@ stream
 func TestStream_TopSelector(t *testing.T) {
 
 	var script = `
-stream
+var topScores = stream
     .from('scores')
     // Get the most recent score for each player
     .groupBy('game', 'player')
     .window()
-        .period(5s)
+        .period(2s)
         .every(2s)
         .align()
     .mapReduce(influxql.last('value'))
     // Calculate the top 5 scores per game
     .groupBy('game')
     .mapReduce(influxql.top(5, 'last', 'player'))
+
+topScores
     .httpOut('top_scores')
+
+topScores.sample(4s)
+    .mapReduce(influxql.count('top'))
+    .httpOut('top_scores_sampled')
 `
 
-	tw := time.Date(1970, 1, 1, 0, 0, 2, 0, time.UTC)
+	tw := time.Date(1970, 1, 1, 0, 0, 4, 0, time.UTC)
 	er := kapacitor.Result{
 		Series: imodels.Rows{
 			{
@@ -1239,11 +1245,11 @@ stream
 				Tags:    map[string]string{"game": "g0"},
 				Columns: []string{"time", "player", "top"},
 				Values: [][]interface{}{
-					{tw, "p11", 931.0},
-					{tw, "p13", 894.0},
-					{tw, "p2", 872.0},
-					{tw, "p6", 843.0},
-					{tw, "p4", 840.0},
+					{tw, "p7", 978.0},
+					{tw, "p10", 957.0},
+					{tw, "p9", 878.0},
+					{tw, "p5", 877.0},
+					{tw, "p15", 791.0},
 				},
 			},
 			{
@@ -1251,12 +1257,35 @@ stream
 				Tags:    map[string]string{"game": "g1"},
 				Columns: []string{"time", "player", "top"},
 				Values: [][]interface{}{
-					{tw, "p0", 965.0},
-					{tw, "p8", 953.0},
-					{tw, "p12", 833.0},
-					{tw, "p18", 813.0},
-					{tw, "p13", 734.0},
+					{tw, "p19", 926.0},
+					{tw, "p12", 887.0},
+					{tw, "p0", 879.0},
+					{tw, "p15", 872.0},
+					{tw, "p16", 863.0},
 				},
+			},
+		},
+	}
+
+	sampleER := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "scores",
+				Tags:    map[string]string{"game": "g0"},
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{{
+					time.Date(1970, 1, 1, 0, 0, 4, 0, time.UTC),
+					5.0,
+				}},
+			},
+			{
+				Name:    "scores",
+				Tags:    map[string]string{"game": "g1"},
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{{
+					time.Date(1970, 1, 1, 0, 0, 4, 0, time.UTC),
+					5.0,
+				}},
 			},
 		},
 	}
@@ -1289,6 +1318,23 @@ stream
 	// Assert we got the expected result
 	result := kapacitor.ResultFromJSON(resp.Body)
 	if eq, msg := compareResults(er, result); !eq {
+		t.Error(msg)
+	}
+
+	// Get the result
+	output, err = et.GetOutput("top_scores_sampled")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err = http.Get(output.Endpoint())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert we got the expected result
+	result = kapacitor.ResultFromJSON(resp.Body)
+	if eq, msg := compareResults(sampleER, result); !eq {
 		t.Error(msg)
 	}
 }

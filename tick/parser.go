@@ -279,6 +279,7 @@ var precedence = [...]int{
 	tokenMinus:        4,
 	tokenMult:         5,
 	tokenDiv:          5,
+	tokenMod:          5,
 }
 
 // parse the expression considering operator precedence.

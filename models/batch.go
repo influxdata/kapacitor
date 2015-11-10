@@ -10,7 +10,11 @@ import (
 	"github.com/influxdb/influxdb/models"
 )
 
-//Represents purely a set of fields and a time.
+// A point in batch, similar to Point but most information is
+// found on the containing Batch.
+//
+// Tags on a BatchPoint are a superset of the tags on the Batch
+// All points in a batch should have the same tag keys.
 type BatchPoint struct {
 	Fields Fields            `json:"fields"`
 	Time   time.Time         `json:"time"`

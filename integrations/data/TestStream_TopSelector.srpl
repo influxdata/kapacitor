@@ -486,21 +486,6 @@ rpname
 top_scores_gap,game=g1 gap=142,topFirst=998,topLast=856 1447114070
 dbname
 rpname
-top_scores,game=g1,player=p14 top=998 1447114070
-dbname
-rpname
-top_scores,game=g1,player=p8 top=940 1447114070
-dbname
-rpname
-top_scores,game=g1,player=p17 top=926 1447114070
-dbname
-rpname
-top_scores,game=g1,player=p4 top=861 1447114070
-dbname
-rpname
-top_scores,game=g1,player=p9 top=856 1447114070
-dbname
-rpname
 scores,game=g0,player=p0 value=971 1447114141
 dbname
 rpname
@@ -619,3 +604,15 @@ scores,game=g1,player=p18 value=739 1447114141
 dbname
 rpname
 scores,game=g1,player=p19 value=861 1447114141
+dbname
+rpname
+scores,game=g0,player=p16 value=748 1447114142
+dbname
+rpname
+scores,game=g1,player=p16 value=748 1447114142
+dbname
+rpname
+scores,game=g0,player=p17 value=434 1447114143
+dbname
+rpname
+scores,game=g1,player=p17 value=434 1447114143
