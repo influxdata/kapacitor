@@ -12,13 +12,14 @@ import (
 type MapResult struct {
 	Name  string
 	Group models.GroupID
+	Dims  []string
 	Tags  map[string]string
-	Time  time.Time
+	TMax  time.Time
 	Outs  []interface{}
 }
 
 type MapFunc func(in *tsdb.MapInput) interface{}
-type ReduceFunc func([]interface{}) (string, interface{})
+type ReduceFunc func(in []interface{}, tmax time.Time, useTMax bool) interface{}
 
 type MapInfo struct {
 	Field string
@@ -38,67 +39,116 @@ func newMapNode(et *ExecutingTask, n *pipeline.MapNode) (*MapNode, error) {
 	if !ok {
 		return nil, fmt.Errorf("invalid map given to map node %T", n.Map)
 	}
-	s := &MapNode{
+	m := &MapNode{
 		node:     node{Node: n, et: et},
 		mr:       n,
 		f:        f.Func,
 		field:    f.Field,
 		parallel: 2,
 	}
-	s.node.runF = s.runMaps
-	return s, nil
+	m.node.runF = m.runMaps
+	return m, nil
 }
 
-func (s *MapNode) runMaps() error {
-	done := make(chan bool, s.parallel)
-	for b, ok := s.ins[0].NextBatch(); ok; b, ok = s.ins[0].NextBatch() {
-		if len(b.Points) == 0 {
-			continue
-		}
-		mr := &MapResult{
-			Outs: make([]interface{}, s.parallel),
-		}
-		inputs := make([]tsdb.MapInput, s.parallel)
-		j := 0
-		for _, p := range b.Points {
-			item := tsdb.MapItem{
-				Timestamp: p.Time.Unix(),
-				Value:     p.Fields[s.field],
-				Fields:    p.Fields,
-				Tags:      b.Tags,
+func (m *MapNode) runMaps() error {
+	switch m.mr.Wants() {
+	case pipeline.StreamEdge:
+		return m.runStreamMap()
+	case pipeline.BatchEdge:
+		return m.runBatchMap()
+	default:
+		return fmt.Errorf("cannot map %v edge", m.mr.Wants())
+	}
+}
+
+func (m *MapNode) runStreamMap() error {
+	batches := make(map[models.GroupID]*models.Batch)
+	for p, ok := m.ins[0].NextPoint(); ok; {
+		b := batches[p.Group]
+		if b == nil {
+			// Create new batch
+			tags := make(map[string]string, len(p.Dimensions))
+			for _, dim := range p.Dimensions {
+				tags[dim] = p.Tags[dim]
 			}
-			inputs[j].Items = append(inputs[j].Items, item)
-			if len(inputs[j].Items) == 1 {
-				inputs[j].TMin = item.Timestamp
+			b = &models.Batch{
+				Name:  p.Name,
+				Group: p.Group,
+				Tags:  tags,
+				TMax:  p.Time,
 			}
-			j = (j + 1) % s.parallel
+			batches[p.Group] = b
 		}
-
-		l := len(b.Points) - 1
-		mr.Name = b.Name
-		mr.Group = b.Group
-		mr.Tags = b.Tags
-
-		mr.Time = b.Points[l].Time
-
-		for i := 0; i < s.parallel; i++ {
-			go func(i int) {
-				mr.Outs[i] = s.f(&inputs[i])
-				done <- true
-			}(i)
-		}
-
-		finished := 0
-		for finished != s.parallel {
-			<-done
-			finished++
-		}
-
-		for _, child := range s.outs {
-			err := child.CollectMaps(mr)
+		if p.Time.Equal(b.TMax) {
+			b.Points = append(b.Points, models.BatchPointFromPoint(p))
+			// advance to next point
+			p, ok = m.ins[0].NextPoint()
+		} else {
+			err := m.mapBatch(*b)
 			if err != nil {
 				return err
 			}
+			batches[b.Group] = nil
+		}
+	}
+	return nil
+}
+
+func (m *MapNode) runBatchMap() error {
+	for b, ok := m.ins[0].NextBatch(); ok; b, ok = m.ins[0].NextBatch() {
+		err := m.mapBatch(b)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *MapNode) mapBatch(b models.Batch) error {
+	if len(b.Points) == 0 {
+		return nil
+	}
+	done := make(chan bool, m.parallel)
+	mr := &MapResult{
+		Outs: make([]interface{}, m.parallel),
+	}
+	inputs := make([]tsdb.MapInput, m.parallel)
+	j := 0
+	for _, p := range b.Points {
+		item := tsdb.MapItem{
+			Timestamp: p.Time.Unix(),
+			Value:     p.Fields[m.field],
+			Fields:    p.Fields,
+			Tags:      p.Tags,
+		}
+		inputs[j].Items = append(inputs[j].Items, item)
+		inputs[j].TMin = -1
+		j = (j + 1) % m.parallel
+	}
+
+	mr.Name = b.Name
+	mr.Group = b.Group
+	mr.TMax = b.TMax
+	mr.Tags = b.Tags
+	mr.Dims = models.SortedKeys(b.Tags)
+
+	for i := 0; i < m.parallel; i++ {
+		go func(i int) {
+			mr.Outs[i] = m.f(&inputs[i])
+			done <- true
+		}(i)
+	}
+
+	finished := 0
+	for finished != m.parallel {
+		<-done
+		finished++
+	}
+
+	for _, child := range m.outs {
+		err := child.CollectMaps(mr)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
@@ -106,8 +156,8 @@ func (s *MapNode) runMaps() error {
 
 type ReduceNode struct {
 	node
-	mr *pipeline.ReduceNode
-	f  ReduceFunc
+	r *pipeline.ReduceNode
+	f ReduceFunc
 }
 
 func newReduceNode(et *ExecutingTask, n *pipeline.ReduceNode) (*ReduceNode, error) {
@@ -117,30 +167,44 @@ func newReduceNode(et *ExecutingTask, n *pipeline.ReduceNode) (*ReduceNode, erro
 	}
 	b := &ReduceNode{
 		node: node{Node: n, et: et},
-		mr:   n,
+		r:    n,
 		f:    f,
 	}
 	b.node.runF = b.runReduce
 	return b, nil
 }
 
-func (s *ReduceNode) runReduce() error {
-	for m, ok := s.ins[0].NextMaps(); ok; m, ok = s.ins[0].NextMaps() {
-		field, v := s.f(m.Outs)
-		p := models.Point{
-			Name:   m.Name,
-			Group:  m.Group,
-			Tags:   m.Tags,
-			Fields: models.Fields{field: v},
-			Time:   m.Time,
-		}
-		for _, c := range s.outs {
-			err := c.CollectPoint(p)
-			if err != nil {
-				return err
+func (r *ReduceNode) runReduce() error {
+	for m, ok := r.ins[0].NextMaps(); ok; m, ok = r.ins[0].NextMaps() {
+		rr := r.f(m.Outs, m.TMax, r.r.PointTimes)
+		switch result := rr.(type) {
+		case models.Point:
+			result.Name = m.Name
+			result.Group = m.Group
+			result.Dimensions = m.Dims
+			result.Tags = m.Tags
+			for _, c := range r.outs {
+				err := c.CollectPoint(result)
+				if err != nil {
+					return err
+				}
 			}
+		case models.Batch:
+			result.Name = m.Name
+			result.Group = m.Group
+			result.Tags = m.Tags
+			result.TMax = m.TMax
+			for _, c := range r.outs {
+				err := c.CollectBatch(result)
+				if err != nil {
+					return err
+				}
+			}
+		default:
+			return fmt.Errorf("unexpected result from reduce function %T", rr)
 		}
+
 	}
-	s.closeChildEdges()
+	r.closeChildEdges()
 	return nil
 }

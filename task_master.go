@@ -91,6 +91,7 @@ func (tm *TaskMaster) Close() error {
 }
 
 func (tm *TaskMaster) StartTask(t *Task) (*ExecutingTask, error) {
+	tm.logger.Println("D! Starting task:", t.Name)
 	et, err := NewExecutingTask(tm, t)
 	if err != nil {
 		return nil, err

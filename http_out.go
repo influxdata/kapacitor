@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/influxdb/influxdb/influxql"
+	imodels "github.com/influxdb/influxdb/models"
 	"github.com/influxdb/kapacitor/models"
 	"github.com/influxdb/kapacitor/pipeline"
 	"github.com/influxdb/kapacitor/services/httpd"
@@ -19,7 +20,7 @@ type HTTPOutNode struct {
 	groupSeriesIdx map[models.GroupID]int
 	endpoint       string
 	routes         []httpd.Route
-	mu             sync.Mutex
+	mu             sync.RWMutex
 }
 
 // Create a new  HTTPOutNode which caches the most recent item and exposes it over the HTTP API.
@@ -42,8 +43,8 @@ func (h *HTTPOutNode) Endpoint() string {
 func (h *HTTPOutNode) runOut() error {
 
 	hndl := func(w http.ResponseWriter, req *http.Request) {
-		h.mu.Lock()
-		defer h.mu.Unlock()
+		h.mu.RLock()
+		defer h.mu.RUnlock()
 
 		if b, err := json.Marshal(h.result); err != nil {
 			httpd.HttpError(
@@ -79,40 +80,26 @@ func (h *HTTPOutNode) runOut() error {
 	switch h.Wants() {
 	case pipeline.StreamEdge:
 		for p, ok := h.ins[0].NextPoint(); ok; p, ok = h.ins[0].NextPoint() {
-			h.updateResultWithPoint(p)
+			row := models.PointToRow(p)
+			h.updateResultWithRow(p.Group, row)
 		}
 	case pipeline.BatchEdge:
 		for b, ok := h.ins[0].NextBatch(); ok; b, ok = h.ins[0].NextBatch() {
-			h.updateResultWithBatch(b)
+			row := models.BatchToRow(b)
+			h.updateResultWithRow(b.Group, row)
 		}
 	}
-
 	return nil
 }
 
-// Update the result structure with a single point.
-func (h *HTTPOutNode) updateResultWithPoint(p models.Point) {
+// Update the result structure with a row.
+func (h *HTTPOutNode) updateResultWithRow(group models.GroupID, row *imodels.Row) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	row := models.PointToRow(p)
-	if idx, ok := h.groupSeriesIdx[p.Group]; !ok {
-		idx = len(h.result.Series)
-		h.groupSeriesIdx[p.Group] = idx
-		h.result.Series = append(h.result.Series, row)
-	} else {
-		h.result.Series[idx] = row
-	}
-}
-
-// Update the result structure with a batch.
-func (h *HTTPOutNode) updateResultWithBatch(b models.Batch) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	row := models.BatchToRow(b)
-	idx, ok := h.groupSeriesIdx[b.Group]
+	idx, ok := h.groupSeriesIdx[group]
 	if !ok {
 		idx = len(h.result.Series)
-		h.groupSeriesIdx[b.Group] = idx
+		h.groupSeriesIdx[group] = idx
 		h.result.Series = append(h.result.Series, row)
 	} else {
 		h.result.Series[idx] = row

@@ -140,16 +140,22 @@ func (ts *Service) Open() error {
 		return err
 	}
 
-	// Enable tasks
+	// Start enabled tasks
 	err = ts.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(enabledBucket))
 		if b == nil {
 			return nil
 		}
 		return b.ForEach(func(k, v []byte) error {
-			err := ts.Enable(string(k))
+			ts.logger.Println("D! enabling task on startup", string(k))
+			t, err := ts.Load(string(k))
 			if err != nil {
-				ts.logger.Printf("E! error enabling task %s, err: %s\n", string(k), err)
+				ts.logger.Printf("E! error loading enabled task %s, err: %s\n", string(k), err)
+				return nil
+			}
+			err = ts.StartTask(t)
+			if err != nil {
+				ts.logger.Printf("E! error starting enabled task %s, err: %s\n", string(k), err)
 			} else {
 				numEnabledTasks++
 			}
@@ -174,6 +180,16 @@ func (ts *Service) Close() error {
 	return nil
 }
 
+type TaskInfo struct {
+	Name       string
+	Type       kapacitor.TaskType
+	DBRPs      []kapacitor.DBRP
+	TICKscript string
+	Dot        string
+	Enabled    bool
+	Error      string
+}
+
 func (ts *Service) handleTask(w http.ResponseWriter, r *http.Request) {
 	name := r.URL.Query().Get("task")
 	if name == "" {
@@ -186,31 +202,27 @@ func (ts *Service) handleTask(w http.ResponseWriter, r *http.Request) {
 		httpd.HttpError(w, err.Error(), true, http.StatusNotFound)
 		return
 	}
+
+	errMsg := ""
+	dot := ""
 	task, err := ts.Load(name)
-	if err != nil {
-		httpd.HttpError(w, err.Error(), true, http.StatusNotFound)
-		return
+	if err == nil {
+		dot = string(task.Dot())
+	} else {
+		errMsg = err.Error()
 	}
 
-	type response struct {
-		Name       string
-		Type       kapacitor.TaskType
-		DBRPs      []kapacitor.DBRP
-		TICKscript string
-		Dot        string
-		Enabled    bool
-	}
-
-	res := response{
+	info := TaskInfo{
 		Name:       name,
-		Type:       task.Type,
-		DBRPs:      task.DBRPs,
+		Type:       raw.Type,
+		DBRPs:      raw.DBRPs,
 		TICKscript: raw.TICKscript,
-		Dot:        string(task.Dot()),
+		Dot:        dot,
 		Enabled:    ts.IsEnabled(name),
+		Error:      errMsg,
 	}
 
-	w.Write(httpd.MarshalJSON(res, true))
+	w.Write(httpd.MarshalJSON(info, true))
 }
 
 func (ts *Service) handleTasks(w http.ResponseWriter, r *http.Request) {
@@ -429,13 +441,14 @@ func (ts *Service) Enable(name string) error {
 		return err
 	}
 
+	var enabled bool
 	// Save the enabled state
 	err = ts.db.Update(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucketIfNotExists(enabledBucket)
 		if err != nil {
 			return err
 		}
-		enabled := b.Get([]byte(name)) != nil
+		enabled = b.Get([]byte(name)) != nil
 		err = b.Put([]byte(name), []byte{})
 		if err != nil {
 			return err
@@ -449,6 +462,13 @@ func (ts *Service) Enable(name string) error {
 		return err
 	}
 
+	if !enabled {
+		return ts.StartTask(t)
+	}
+	return nil
+}
+
+func (ts *Service) StartTask(t *kapacitor.Task) error {
 	// Start the task
 	et, err := ts.TaskMaster.StartTask(t)
 	if err != nil {

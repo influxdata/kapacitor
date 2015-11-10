@@ -41,7 +41,7 @@ batch
 				Tags:    map[string]string{"cpu": "cpu-total"},
 				Columns: []string{"time", "sum"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1970, 1, 1, 0, 0, 18, 0, time.UTC),
+					time.Date(1970, 1, 1, 0, 0, 28, 0, time.UTC),
 					10.0,
 				}},
 			},
@@ -50,7 +50,7 @@ batch
 				Tags:    map[string]string{"cpu": "cpu0"},
 				Columns: []string{"time", "sum"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1970, 1, 1, 0, 0, 18, 0, time.UTC),
+					time.Date(1970, 1, 1, 0, 0, 28, 0, time.UTC),
 					10.0,
 				}},
 			},
@@ -59,7 +59,7 @@ batch
 				Tags:    map[string]string{"cpu": "cpu1"},
 				Columns: []string{"time", "sum"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1970, 1, 1, 0, 0, 18, 0, time.UTC),
+					time.Date(1970, 1, 1, 0, 0, 28, 0, time.UTC),
 					10.0,
 				}},
 			},
@@ -93,7 +93,6 @@ batch
 
 	// Assert we got the expected result
 	result := kapacitor.ResultFromJSON(resp.Body)
-	t.Log(result.Series[0])
 	if eq, msg := compareResults(er, result); !eq {
 		t.Error(msg)
 	}

@@ -1,7 +1,11 @@
 package kapacitor
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/influxdb/influxdb/tsdb"
+	"github.com/influxdb/kapacitor/models"
 	"github.com/influxdb/kapacitor/pipeline"
 )
 
@@ -12,116 +16,174 @@ func newInfluxQL() *influxqlMapReducers {
 }
 
 func (influxqlMapReducers) Sum(field string) pipeline.MapReduceInfo {
-	return mr(field, "sum", tsdb.MapSum, tsdb.ReduceSum)
+	return mr(field, "sum", pipeline.StreamEdge, tsdb.MapSum, tsdb.ReduceSum)
 }
 
 func (influxqlMapReducers) Count(field string) pipeline.MapReduceInfo {
-	return mr(field, "count", tsdb.MapCount, tsdb.ReduceSum)
+	return mr(field, "count", pipeline.StreamEdge, tsdb.MapCount, tsdb.ReduceSum)
 }
 
 func (influxqlMapReducers) Distinct(field string) pipeline.MapReduceInfo {
-	return mr(field, "distinct", tsdb.MapDistinct, tsdb.ReduceDistinct)
+	return mr(field, "distinct", pipeline.BatchEdge, tsdb.MapDistinct, tsdb.ReduceDistinct)
 }
 
 func (influxqlMapReducers) Mean(field string) pipeline.MapReduceInfo {
-	return mr(field, "mean", tsdb.MapMean, tsdb.ReduceMean)
+	return mr(field, "mean", pipeline.StreamEdge, tsdb.MapMean, tsdb.ReduceMean)
 }
 
 func (influxqlMapReducers) Median(field string) pipeline.MapReduceInfo {
-	return mr(field, "median", tsdb.MapStddev, tsdb.ReduceMedian)
+	return mr(field, "median", pipeline.StreamEdge, tsdb.MapStddev, tsdb.ReduceMedian)
 }
 
 func (influxqlMapReducers) Min(field string) pipeline.MapReduceInfo {
 	m := func(in *tsdb.MapInput) interface{} {
 		return tsdb.MapMin(in, field)
 	}
-	return mr(field, "min", m, tsdb.ReduceMin)
+	return mr(field, "min", pipeline.StreamEdge, m, tsdb.ReduceMin)
 }
 
 func (influxqlMapReducers) Max(field string) pipeline.MapReduceInfo {
 	m := func(in *tsdb.MapInput) interface{} {
 		return tsdb.MapMax(in, field)
 	}
-	return mr(field, "max", m, tsdb.ReduceMax)
+	return mr(field, "max", pipeline.StreamEdge, m, tsdb.ReduceMax)
 }
 
 func (influxqlMapReducers) Spread(field string) pipeline.MapReduceInfo {
-	return mr(field, "spread", tsdb.MapSpread, tsdb.ReduceSpread)
+	return mr(field, "spread", pipeline.StreamEdge, tsdb.MapSpread, tsdb.ReduceSpread)
 }
 
 func (influxqlMapReducers) Stddev(field string) pipeline.MapReduceInfo {
-	return mr(field, "stddev", tsdb.MapStddev, tsdb.ReduceStddev)
+	return mr(field, "stddev", pipeline.StreamEdge, tsdb.MapStddev, tsdb.ReduceStddev)
 }
 
 func (influxqlMapReducers) First(field string) pipeline.MapReduceInfo {
 	m := func(in *tsdb.MapInput) interface{} {
 		return tsdb.MapFirst(in, field)
 	}
-	return mr(field, "first", m, tsdb.ReduceFirst)
+	return mr(field, "first", pipeline.StreamEdge, m, tsdb.ReduceFirst)
 }
 
 func (influxqlMapReducers) Last(field string) pipeline.MapReduceInfo {
 	m := func(in *tsdb.MapInput) interface{} {
 		return tsdb.MapLast(in, field)
 	}
-	return mr(field, "last", m, tsdb.ReduceLast)
+	return mr(field, "last", pipeline.StreamEdge, m, tsdb.ReduceLast)
 }
 
 func (influxqlMapReducers) Percentile(field string, p float64) pipeline.MapReduceInfo {
 	r := func(values []interface{}) interface{} {
 		return tsdb.ReducePercentile(values, p)
 	}
-	return mr(field, "percentile", tsdb.MapEcho, r)
+	return mr(field, "percentile", pipeline.StreamEdge, tsdb.MapEcho, r)
 }
 
-func (influxqlMapReducers) Top(field string, limit int64, fields ...string) pipeline.MapReduceInfo {
+func (influxqlMapReducers) Top(limit int64, field string, fieldsOrTags ...string) pipeline.MapReduceInfo {
 	m := func(in *tsdb.MapInput) interface{} {
-		return tsdb.MapTopBottom(in, int(limit), fields, len(fields)+1, "top")
+		return tsdb.MapTopBottom(in, int(limit), fieldsOrTags, len(fieldsOrTags)+2, "top")
 	}
 	r := func(values []interface{}) interface{} {
-		return tsdb.ReduceTopBottom(values, int(limit), fields, "top")
+		return tsdb.ReduceTopBottom(values, int(limit), fieldsOrTags, "top")
 	}
-	return mr(field, "top", m, r)
+	return mr(field, "top", pipeline.BatchEdge, m, r)
 }
 
-func (influxqlMapReducers) Bottom(field string, limit int64, fields ...string) pipeline.MapReduceInfo {
+func (influxqlMapReducers) Bottom(limit int64, field string, fieldsOrTags ...string) pipeline.MapReduceInfo {
 	m := func(in *tsdb.MapInput) interface{} {
-		return tsdb.MapTopBottom(in, int(limit), fields, len(fields)+1, "bottom")
+		return tsdb.MapTopBottom(in, int(limit), fieldsOrTags, len(fieldsOrTags)+2, "bottom")
 	}
 	r := func(values []interface{}) interface{} {
-		return tsdb.ReduceTopBottom(values, int(limit), fields, "bottom")
+		return tsdb.ReduceTopBottom(values, int(limit), fieldsOrTags, "bottom")
 	}
-	return mr(field, "bottom", m, r)
+	return mr(field, "bottom", pipeline.BatchEdge, m, r)
 }
 
 // -----------------
 // helper methods
 
 // create MapReduceInfo
-func mr(field, newField string, m func(*tsdb.MapInput) interface{}, r func([]interface{}) interface{}) pipeline.MapReduceInfo {
+func mr(field, newField string, et pipeline.EdgeType, m func(*tsdb.MapInput) interface{}, r func([]interface{}) interface{}) pipeline.MapReduceInfo {
 	return pipeline.MapReduceInfo{
 		Map: MapInfo{
 			Field: field,
 			Func:  m,
 		},
-		Reduce: reduce(r, newField),
+		Reduce: reduce(r, newField, et),
+		Edge:   et,
 	}
 }
 
 // wrap tsdb.reduceFunc for ReduceFunc
-func reduce(f func([]interface{}) interface{}, field string) ReduceFunc {
-	return ReduceFunc(func(in []interface{}) (string, interface{}) {
+func reduce(f func([]interface{}) interface{}, field string, et pipeline.EdgeType) ReduceFunc {
+	return ReduceFunc(func(in []interface{}, tmax time.Time, usePointTimes bool) interface{} {
 		v := f(in)
-		if pp, ok := v.(tsdb.PositionPoint); ok {
-			return field, pp.Value
+		switch et {
+		case pipeline.StreamEdge:
+			return reduceResultToPoint(field, v, tmax, usePointTimes)
+		case pipeline.BatchEdge:
+			return reduceResultToBatch(field, v, tmax, usePointTimes)
+		default:
+			panic(fmt.Errorf("unknown edge type %v", et))
 		}
-		if pp, ok := v.(tsdb.PositionPoints); ok {
-			values := make([]interface{}, len(pp))
-			for i := range pp {
-				values[i] = pp[i].Value
-			}
-			return field, values
-		}
-		return field, v
 	})
+}
+
+// take the result of a reduce operation and convert it to a point
+func reduceResultToPoint(field string, v interface{}, tmax time.Time, usePointTimes bool) models.Point {
+	if pp, ok := v.(tsdb.PositionPoint); ok {
+		p := models.Point{}
+		if usePointTimes {
+			p.Time = time.Unix(pp.Time, 0).UTC()
+		} else {
+			p.Time = tmax
+		}
+		p.Fields = models.Fields{field: pp.Value}
+		p.Tags = pp.Tags
+		return p
+	}
+	p := models.Point{}
+	p.Fields = models.Fields{field: v}
+	p.Time = tmax
+	return p
+}
+
+// take the result of a reduce operation and convert it to a batch
+func reduceResultToBatch(field string, value interface{}, tmax time.Time, usePointTimes bool) models.Batch {
+	b := models.Batch{}
+	b.TMax = tmax
+	switch v := value.(type) {
+	case tsdb.PositionPoints:
+		b.Points = make([]models.BatchPoint, len(v))
+		for i, pp := range v {
+			if usePointTimes {
+				b.Points[i].Time = time.Unix(pp.Time, 0).UTC()
+			} else {
+				b.Points[i].Time = tmax
+			}
+			b.Points[i].Fields = models.Fields{field: pp.Value}
+			b.Points[i].Fields[field] = pp.Value
+			b.Points[i].Tags = pp.Tags
+		}
+	case tsdb.PositionPoint:
+		b.Points = make([]models.BatchPoint, 1)
+		if usePointTimes {
+			b.Points[0].Time = time.Unix(v.Time, 0).UTC()
+		} else {
+			b.Points[0].Time = tmax
+		}
+		b.Points[0].Fields = models.Fields{field: v.Value}
+		b.Points[0].Fields[field] = v.Value
+		b.Points[0].Tags = v.Tags
+	case tsdb.InterfaceValues:
+		b.Points = make([]models.BatchPoint, len(v))
+		for i, p := range v {
+			b.Points[i].Time = tmax
+			b.Points[i].Fields = models.Fields{field: p}
+		}
+	default:
+		b.Points = make([]models.BatchPoint, 1)
+		b.Points[0].Time = tmax
+		b.Points[0].Fields = models.Fields{field: v}
+	}
+	return b
 }

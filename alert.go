@@ -135,7 +135,7 @@ func (a *AlertNode) runAlert() error {
 					Name:   p.Name,
 					Group:  p.Group,
 					Tags:   p.Tags,
-					Points: []models.TimeFields{{Time: p.Time, Fields: p.Fields}},
+					Points: []models.BatchPoint{models.BatchPointFromPoint(p)},
 				}
 
 				ad := AlertData{
@@ -151,7 +151,7 @@ func (a *AlertNode) runAlert() error {
 		for b, ok := a.ins[0].NextBatch(); ok; b, ok = a.ins[0].NextBatch() {
 			triggered := false
 			for _, p := range b.Points {
-				l := a.determineLevel(p.Fields, b.Tags)
+				l := a.determineLevel(p.Fields, p.Tags)
 				if l > NoAlert {
 					triggered = true
 					if a.a.UseFlapping {

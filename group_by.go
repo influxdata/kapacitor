@@ -41,17 +41,11 @@ func (g *GroupByNode) runGroupBy() error {
 	switch g.Wants() {
 	case pipeline.StreamEdge:
 		for pt, ok := g.ins[0].NextPoint(); ok; pt, ok = g.ins[0].NextPoint() {
-			var tags map[string]string
 			if g.allDimensions {
-				tags = pt.Tags
-			} else {
-				tags = make(map[string]string, len(g.dimensions))
-				for _, dim := range g.dimensions {
-					tags[dim] = pt.Tags[dim]
-				}
+				g.dimensions = models.SortedKeys(pt.Tags)
 			}
-			pt.Tags = tags
 			pt.Group = models.TagsToGroupID(g.dimensions, pt.Tags)
+			pt.Dimensions = g.dimensions
 			for _, child := range g.outs {
 				err := child.CollectPoint(pt)
 				if err != nil {
@@ -59,6 +53,8 @@ func (g *GroupByNode) runGroupBy() error {
 				}
 			}
 		}
+	default:
+		panic("not implemented")
 	}
 	return nil
 }

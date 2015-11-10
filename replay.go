@@ -27,9 +27,9 @@ func NewReplay(c clock.Clock) *Replay {
 }
 
 // Replay a data set against an executor.
-func (r *Replay) ReplayStream(data io.ReadCloser, stream StreamCollector, recTime bool) <-chan error {
+func (r *Replay) ReplayStream(data io.ReadCloser, stream StreamCollector, recTime bool, precision string) <-chan error {
 	src := newReplayStreamSource(data, r.clck)
-	src.replayStream(stream, recTime)
+	src.replayStream(stream, recTime, precision)
 	return src.Err()
 }
 
@@ -53,7 +53,7 @@ func (r *replayStreamSource) Err() <-chan error {
 	return r.err
 }
 
-func (r *replayStreamSource) replayStream(stream StreamCollector, recTime bool) {
+func (r *replayStreamSource) replayStream(stream StreamCollector, recTime bool, precision string) {
 	go func() {
 		defer stream.Close()
 		defer r.data.Close()
@@ -74,7 +74,7 @@ func (r *replayStreamSource) replayStream(stream StreamCollector, recTime bool) 
 			points, err := dbmodels.ParsePointsWithPrecision(
 				r.in.Bytes(),
 				zero,
-				"s",
+				precision,
 			)
 			if err != nil {
 				r.err <- err
@@ -187,6 +187,14 @@ func (r *replayBatchSource) replayBatchFromData(data io.ReadCloser, batch BatchC
 			start = b.Points[0].Time
 			diff = zero.Sub(start)
 		}
+		// Add tags to all points
+		if len(b.Tags) > 0 {
+			for i := range b.Points {
+				if len(b.Points[i].Tags) == 0 {
+					b.Points[i].Tags = b.Tags
+				}
+			}
+		}
 		var lastTime time.Time
 		if !recTime {
 			for i := range b.Points {
@@ -197,14 +205,15 @@ func (r *replayBatchSource) replayBatchFromData(data io.ReadCloser, batch BatchC
 			lastTime = b.Points[len(b.Points)-1].Time.Add(diff).UTC()
 		}
 		r.clck.Until(lastTime)
+		b.TMax = b.Points[len(b.Points)-1].Time
 		batch.CollectBatch(b)
 	}
 	r.allErrs <- in.Err()
 }
 
-func WritePointForRecording(w io.Writer, p models.Point) error {
+func WritePointForRecording(w io.Writer, p models.Point, precision string) error {
 	fmt.Fprintf(w, "%s\n%s\n", p.Database, p.RetentionPolicy)
-	w.Write(p.Bytes("s"))
+	w.Write(p.Bytes(precision))
 	w.Write([]byte("\n"))
 	return nil
 }

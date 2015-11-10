@@ -66,10 +66,13 @@ Function     = identifier "(" Parameters ")" .
 Parameters   = { Parameter "," } [ Parameter ] .
 Parameter    = Expression | "lambda:" LambdaExpr | Primary .
 Primary      = "(" LambdaExpr ")" | number_lit | string_lit |
-                boolean_lit | duration_lit | regex_lit | star_lit
-                Reference | "-" Primary | "!" Primary .
+                boolean_lit | duration_lit | regex_lit | star_lit |
+                LFunc | Reference | "-" Primary | "!" Primary .
 Reference    = `"` { unicode_char } `"` .
-LambdaExpr   = "lambda:" Primary operator_lit Primary .
+LambdaExpr   = Primary operator_lit Primary .
+LFunc        = identifier "(" LParameters ")"
+LParameters   = { LParameter "," } [ LParameter ] .
+LParameter    = LambdaExpr |  Primary .
 
 ```
 

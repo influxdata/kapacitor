@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/influxdb/influxdb/client"
@@ -10,16 +11,26 @@ import (
 )
 
 //Represents purely a set of fields and a time.
-type TimeFields struct {
-	Fields Fields    `json:"fields"`
-	Time   time.Time `json:"time"`
+type BatchPoint struct {
+	Fields Fields            `json:"fields"`
+	Time   time.Time         `json:"time"`
+	Tags   map[string]string `json:"tags,omitempty"`
 }
 
 type Batch struct {
 	Name   string            `json:"name,omitempty"`
 	Group  GroupID           `json:"-"`
+	TMax   time.Time         `json:"-"`
 	Tags   map[string]string `json:"tags,omitempty"`
-	Points []TimeFields      `json:"points,omitempty"`
+	Points []BatchPoint      `json:"points,omitempty"`
+}
+
+func BatchPointFromPoint(p Point) BatchPoint {
+	return BatchPoint{
+		Time:   p.Time,
+		Fields: p.Fields,
+		Tags:   p.Tags,
+	}
 }
 
 func BatchToRow(b Batch) (row *models.Row) {
@@ -32,15 +43,27 @@ func BatchToRow(b Batch) (row *models.Row) {
 	}
 	row.Columns = []string{"time"}
 	p := b.Points[0]
-	for _, f := range SortedFields(p.Fields) {
+	for f := range p.Fields {
 		row.Columns = append(row.Columns, f)
 	}
+	// Append tags that are not on the batch
+	for t := range p.Tags {
+		if _, ok := b.Tags[t]; !ok {
+			row.Columns = append(row.Columns, t)
+		}
+	}
+	// Sort all columns but leave time as first
+	sort.Strings(row.Columns[1:])
 	row.Values = make([][]interface{}, len(b.Points))
 	for i, p := range b.Points {
-		row.Values[i] = make([]interface{}, len(p.Fields)+1)
+		row.Values[i] = make([]interface{}, len(row.Columns))
 		row.Values[i][0] = p.Time
 		for j, c := range row.Columns[1:] {
-			row.Values[i][j+1] = p.Fields[c]
+			if v, ok := p.Fields[c]; ok {
+				row.Values[i][j+1] = v
+			} else if v, ok := p.Tags[c]; ok {
+				row.Values[i][j+1] = v
+			}
 		}
 	}
 	return
@@ -61,7 +84,7 @@ func ResultToBatches(res client.Result) ([]Batch, error) {
 			Group: groupID,
 			Tags:  series.Tags,
 		}
-		b.Points = make([]TimeFields, 0, len(series.Values))
+		b.Points = make([]BatchPoint, 0, len(series.Values))
 		for _, v := range series.Values {
 			var skip bool
 			fields := make(Fields)
@@ -95,7 +118,7 @@ func ResultToBatches(res client.Result) ([]Batch, error) {
 			if !skip {
 				b.Points = append(
 					b.Points,
-					TimeFields{Time: t, Fields: fields},
+					BatchPoint{Time: t, Fields: fields, Tags: b.Tags},
 				)
 			}
 		}

@@ -1,6 +1,8 @@
 package kapacitor
 
 import (
+	"errors"
+
 	"github.com/influxdb/kapacitor/models"
 	"github.com/influxdb/kapacitor/pipeline"
 	"github.com/influxdb/kapacitor/tick"
@@ -8,17 +10,25 @@ import (
 
 type EvalNode struct {
 	node
-	e          *pipeline.EvalNode
-	expression *tick.StatefulExpr
+	e           *pipeline.EvalNode
+	expressions []*tick.StatefulExpr
 }
 
 // Create a new  ApplyNode which applies a transformation func to each point in a stream and returns a single point.
 func newApplyNode(et *ExecutingTask, n *pipeline.EvalNode) (*EvalNode, error) {
-	en := &EvalNode{
-		node:       node{Node: n, et: et},
-		e:          n,
-		expression: tick.NewStatefulExpr(n.Expression),
+	if len(n.AsList) != len(n.Expressions) {
+		return nil, errors.New("must provide one name per expression via the 'As' property")
 	}
+	en := &EvalNode{
+		node: node{Node: n, et: et},
+		e:    n,
+	}
+	// Create stateful expressions
+	en.expressions = make([]*tick.StatefulExpr, len(n.Expressions))
+	for i, expr := range n.Expressions {
+		en.expressions[i] = tick.NewStatefulExpr(expr)
+	}
+
 	en.node.runF = en.runApply
 	return en, nil
 }
@@ -42,7 +52,7 @@ func (e *EvalNode) runApply() error {
 	case pipeline.BatchEdge:
 		for b, ok := e.ins[0].NextBatch(); ok; b, ok = e.ins[0].NextBatch() {
 			for i, p := range b.Points {
-				fields, err := e.eval(p.Fields, b.Tags)
+				fields, err := e.eval(p.Fields, p.Tags)
 				if err != nil {
 					return err
 				}
@@ -64,13 +74,44 @@ func (e *EvalNode) eval(fields models.Fields, tags map[string]string) (models.Fi
 	if err != nil {
 		return nil, err
 	}
-	v, err := e.expression.EvalNum(vars)
-	if err != nil {
-		return nil, err
+	for i, expr := range e.expressions {
+		v, err := expr.EvalNum(vars)
+		if err != nil {
+			return nil, err
+		}
+		name := e.e.AsList[i]
+		vars.Set(name, v)
 	}
-	if !e.e.KeepFlag {
-		fields = make(models.Fields, 1)
+	var newFields models.Fields
+	if e.e.KeepFlag {
+		if l := len(e.e.KeepList); l != 0 {
+			newFields = make(models.Fields, l)
+			for _, f := range e.e.KeepList {
+				newFields[f], err = vars.Get(f)
+				if err != nil {
+					return nil, err
+				}
+			}
+		} else {
+			newFields = make(models.Fields, len(fields)+len(e.e.AsList))
+			for f, v := range fields {
+				newFields[f] = v
+			}
+			for _, f := range e.e.AsList {
+				newFields[f], err = vars.Get(f)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+	} else {
+		newFields = make(models.Fields, len(e.e.AsList))
+		for _, f := range e.e.AsList {
+			newFields[f], err = vars.Get(f)
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
-	fields[e.e.As] = v
-	return fields, nil
+	return newFields, nil
 }

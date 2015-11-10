@@ -132,7 +132,7 @@ func (j *JoinNode) joinBatches(rename string) error {
 			return fmt.Errorf("batches are different lengths cannot join. Use groupBy time and fill to ensure batches match")
 		}
 		// Rename fields
-		newPoints := make([]models.TimeFields, len(bn.Points))
+		newPoints := make([]models.BatchPoint, len(bn.Points))
 		for i, pn := range bn.Points {
 			pm := bm.Points[i]
 			if pn.Time.Equal(pm.Time) {
@@ -143,9 +143,10 @@ func (j *JoinNode) joinBatches(rename string) error {
 				for k, v := range pm.Fields {
 					fields[j.j.Names[m]+"."+k] = v
 				}
-				newPoints[i] = models.TimeFields{
+				newPoints[i] = models.BatchPoint{
 					Time:   pn.Time,
 					Fields: fields,
+					Tags:   bn.Tags,
 				}
 			}
 		}
@@ -153,6 +154,7 @@ func (j *JoinNode) joinBatches(rename string) error {
 			Name:   rename,
 			Group:  bn.Group,
 			Tags:   bn.Tags,
+			TMax:   bn.TMax,
 			Points: newPoints,
 		}
 

@@ -29,7 +29,7 @@ func (i *InfluxDBOutNode) runOut() error {
 				Name:   p.Name,
 				Group:  p.Group,
 				Tags:   p.Tags,
-				Points: []models.TimeFields{{Time: p.Time, Fields: p.Fields}},
+				Points: []models.BatchPoint{models.BatchPointFromPoint(p)},
 			}
 			err := i.write(batch)
 			if err != nil {
@@ -61,11 +61,18 @@ func (i *InfluxDBOutNode) write(batch models.Batch) error {
 	for j, p := range batch.Points {
 		points[j] = client.Point{
 			Measurement: i.i.Measurement,
-			Tags:        batch.Tags,
+			Tags:        p.Tags,
 			Time:        p.Time,
 			Fields:      p.Fields,
 			Precision:   i.i.Precision,
 		}
+	}
+	tags := make(map[string]string, len(i.i.Tags)+len(batch.Tags))
+	for k, v := range batch.Tags {
+		tags[k] = v
+	}
+	for k, v := range i.i.Tags {
+		tags[k] = v
 	}
 
 	bp := client.BatchPoints{
@@ -73,7 +80,7 @@ func (i *InfluxDBOutNode) write(batch models.Batch) error {
 		Database:         i.i.Database,
 		RetentionPolicy:  i.i.RetentionPolicy,
 		WriteConsistency: i.i.WriteConsistency,
-		Tags:             i.i.Tags,
+		Tags:             tags,
 		Precision:        i.i.Precision,
 	}
 	_, err := i.conn.Write(bp)
