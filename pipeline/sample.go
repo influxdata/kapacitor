@@ -18,7 +18,7 @@ import (
 //        .sample(10s)
 //
 // Keep only samples that land on the 10s boundary.
-// See WindowNode.Align or BatchNode.GroupBy time,
+// See StreamNode.Truncate, BatchNode.GroupBy time or WindowNode.Align
 // for ensuring data is aligned with a boundary.
 type SampleNode struct {
 	chainnode

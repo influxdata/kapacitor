@@ -1,0 +1,56 @@
+// Define a result that contains the most recent score per player.
+var topPlayerScores = stream
+    .from('scores')
+    // Get the most recent score for each player per game.
+    // Not likely that a player is playing two games but just in case.
+    .groupBy('game', 'player')
+    .window()
+        // keep a buffer of the last 11s of scores
+        // just in case a player score hasn't updated in a while
+        .period(11s)
+        // Emit the current score per player every second.
+        .every(1s)
+        // Align the window boundaries to be on the second.
+        .align()
+    .mapReduce(influxql.last('value'))
+
+// Calculate the top 15 scores per game
+var topScores = topPlayerScores
+    .groupBy('game')
+    .mapReduce(influxql.top(15, 'last', 'player'))
+
+// Expose top scores over the HTTP API at the 'top_scores' endpoint.
+// Now your app can just request the top scores from Kapacitor
+// and always get the most recent result.
+//
+// http://localhost:9092/api/v1/top_scores/top_scores
+topScores
+   .httpOut('top_scores')
+
+// Sample the top scores and keep a score once every 10s
+var topScoresSampled = topScores
+    .sample(10s)
+
+// Store top fifteen player scores in InfluxDB.
+topScoresSampled
+    .influxDBOut()
+        .database('game')
+        .measurement('top_scores')
+
+// Calculate the max and min of the top scores.
+var max = topScoresSampled
+    .mapReduce(influxql.max('top'))
+var min = topScoresSampled
+    .mapReduce(influxql.min('top'))
+
+// Join the max and min streams back together and calculate the gap.
+max.join(min)
+        .as('max', 'min')
+    // calculate the difference between the max and min scores.
+    .eval(lambda: "max.max" - "min.min", lambda: "max.max", lambda: "min.min")
+        .as('gap', 'topFirst', 'topLast')
+    // store the fields: gap, topFirst, and topLast in InfluxDB.
+    .influxDBOut()
+        .database('game')
+        .measurement('top_scores_gap')
+

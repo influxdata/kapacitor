@@ -26,7 +26,6 @@ func newWindowNode(et *ExecutingTask, n *pipeline.WindowNode) (*WindowNode, erro
 }
 
 func (w *WindowNode) runWindow() error {
-
 	windows := make(map[models.GroupID]*window)
 	// Loops through points windowing by group
 	for p, ok := w.ins[0].NextPoint(); ok; p, ok = w.ins[0].NextPoint() {

@@ -329,13 +329,23 @@ func addNodeLinks(nodes map[string]*Node, line string) []byte {
 	scan := bufio.NewScanner(strings.NewReader(line))
 	scan.Split(bufio.ScanWords)
 	for scan.Scan() {
-		word := scan.Text()
-		node := strings.TrimFunc(word, unicode.IsPunct)
+		word := strings.TrimFunc(scan.Text(), unicode.IsPunct)
+		parts := strings.Split(word, ".")
+		node := word
+		method := ""
+		if len(parts) == 2 {
+			node = parts[0]
+			method = parts[1]
+		}
 		if nodes[node] != nil && ast.IsExported(node) {
 			buf.Write([]byte("["))
 			buf.Write(scan.Bytes())
 			buf.Write([]byte("]("))
-			buf.Write([]byte(nodeNameToLink(node)))
+			if method == "" {
+				buf.Write([]byte(nodeNameToLink(node)))
+			} else {
+				buf.Write([]byte(methodNameToLink(node, method)))
+			}
 			buf.Write([]byte(") "))
 		} else {
 			buf.Write(scan.Bytes())

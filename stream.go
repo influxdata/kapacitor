@@ -57,6 +57,9 @@ func (s *StreamNode) runStream() error {
 
 	for pt, ok := s.ins[0].NextPoint(); ok; pt, ok = s.ins[0].NextPoint() {
 		if s.matches(pt) {
+			if s.s.Truncate != 0 {
+				pt.Time = pt.Time.Truncate(s.s.Truncate)
+			}
 			for _, child := range s.outs {
 				err := child.CollectPoint(pt)
 				if err != nil {

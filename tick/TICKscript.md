@@ -49,7 +49,7 @@ int_lit             = "1" … "9" { digit }
 letter              = ascii_letter | "_" .
 number_lit          = digit { digit } { "." {digit} } .
 duration_lit        = int_lit duration_unit .
-duration_unit       = "u" | "µ" | "ms" | "s" | "h" | "d" | "w" .
+duration_unit       = "u" | "µ" | "ms" | "s" | "m" | "h" | "d" | "w" .
 string_lit          = `'` { unicode_char } `'` .
 star_lit            = "*"
 

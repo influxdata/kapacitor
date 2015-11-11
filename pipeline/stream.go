@@ -1,6 +1,8 @@
 package pipeline
 
 import (
+	"time"
+
 	"github.com/influxdb/kapacitor/tick"
 )
 
@@ -30,6 +32,16 @@ type StreamNode struct {
 	// The db.rp.m from clause
 	// tick:ignore
 	FromSelector string
+
+	// Optional duration for truncating timestamps.
+	// Helpful to ensure data points land on specfic boundaries
+	// Example:
+	//    stream
+	//       .from('mydata')
+	//           .truncate(1s)
+	//
+	// All incoming data will be truncated to 1 second resolution.
+	Truncate time.Duration
 }
 
 func newStreamNode() *StreamNode {

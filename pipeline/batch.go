@@ -110,6 +110,12 @@ func newBatchNode() *BatchNode {
 }
 
 // Group the data by a set of dimensions.
+// Can specify one time dimension.
+//
+// Example:
+//    batch
+//        .groupBy(time(10s), 'tag1', 'tag2'))
+//
 // tick:property
 func (b *BatchNode) GroupBy(d ...interface{}) *BatchNode {
 	b.Dimensions = d
