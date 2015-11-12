@@ -115,8 +115,11 @@ func mr(field, newField string, et pipeline.EdgeType, m func(*tsdb.MapInput) int
 
 // wrap tsdb.reduceFunc for ReduceFunc
 func reduce(f func([]interface{}) interface{}, field string, et pipeline.EdgeType) ReduceFunc {
-	return ReduceFunc(func(in []interface{}, tmax time.Time, usePointTimes bool) interface{} {
+	return ReduceFunc(func(in []interface{}, tmax time.Time, usePointTimes bool, as string) interface{} {
 		v := f(in)
+		if as != "" {
+			field = as
+		}
 		switch et {
 		case pipeline.StreamEdge:
 			return reduceResultToPoint(field, v, tmax, usePointTimes)

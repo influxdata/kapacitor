@@ -219,10 +219,10 @@ func (n *chainnode) Union(node ...Node) *UnionNode {
 	return u
 }
 
-// Join this node with another node. The data is joined on time.
-func (n *chainnode) Join(other Node) *JoinNode {
-	j := newJoinNode(n.provides, other)
-	n.linkChild(j)
+// Join this node with other nodes. The data is joined on timestamp.
+func (n *chainnode) Join(others ...Node) *JoinNode {
+	others = append([]Node{n}, others...)
+	j := newJoinNode(n.provides, others)
 	return j
 }
 

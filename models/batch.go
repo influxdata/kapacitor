@@ -14,11 +14,19 @@ import (
 // found on the containing Batch.
 //
 // Tags on a BatchPoint are a superset of the tags on the Batch
-// All points in a batch should have the same tag keys.
+// All points in a batch should have the same tag and field keys.
 type BatchPoint struct {
-	Fields Fields            `json:"fields"`
-	Time   time.Time         `json:"time"`
-	Tags   map[string]string `json:"tags,omitempty"`
+	Time   time.Time `json:"time"`
+	Fields Fields    `json:"fields"`
+	Tags   Tags      `json:"tags"`
+}
+
+func BatchPointFromPoint(p Point) BatchPoint {
+	return BatchPoint{
+		Time:   p.Time,
+		Fields: p.Fields,
+		Tags:   p.Tags,
+	}
 }
 
 type Batch struct {
@@ -29,12 +37,29 @@ type Batch struct {
 	Points []BatchPoint      `json:"points,omitempty"`
 }
 
-func BatchPointFromPoint(p Point) BatchPoint {
-	return BatchPoint{
-		Time:   p.Time,
-		Fields: p.Fields,
-		Tags:   p.Tags,
+func (b Batch) PointName() string {
+	return b.Name
+}
+func (b Batch) PointGroup() GroupID {
+	return b.Group
+}
+func (b Batch) PointTime() time.Time {
+	return b.TMax
+}
+
+func (b Batch) PointFields() Fields {
+	if len(b.Points) > 0 {
+		return b.Points[0].Fields
 	}
+	return nil
+}
+
+func (b Batch) PointTags() Tags {
+	return b.Tags
+}
+
+func (b Batch) PointDimensions() []string {
+	return nil
 }
 
 func BatchToRow(b Batch) (row *models.Row) {

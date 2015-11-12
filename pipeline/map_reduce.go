@@ -59,6 +59,10 @@ type ReduceNode struct {
 	// time of the selected point
 	// tick:ignore
 	PointTimes bool
+
+	// The name of the field, defaults to the name of
+	// MR function used (i.e. influxql.mean -> 'mean')
+	As string
 }
 
 func newReduceNode(i interface{}, et EdgeType) *ReduceNode {

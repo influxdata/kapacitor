@@ -98,9 +98,14 @@ type BatchNode struct {
 	//tick:ignore
 	Dimensions []interface{}
 
-	// The fill option
-	//tick:ignore
-	FillOption interface{}
+	// Fill the data.
+	// Options are:
+	//
+	//   - Any numerical value
+	//   - null - exhibits the same behavior as the default
+	//   - previous - reports the value of the previous window
+	//   - none - suppresses timestamps and values where the value is null
+	Fill interface{}
 }
 
 func newBatchNode() *BatchNode {
@@ -119,19 +124,5 @@ func newBatchNode() *BatchNode {
 // tick:property
 func (b *BatchNode) GroupBy(d ...interface{}) *BatchNode {
 	b.Dimensions = d
-	return b
-}
-
-// Fill the data.
-// Options are:
-//
-//   - Any numerical value
-//   - null - exhibits the same behavior as the default
-//   - previous - reports the value of the previous window
-//   - none - suppresses timestamps and values where the value is null
-//
-// tick:property
-func (b *BatchNode) Fill(f interface{}) *BatchNode {
-	b.FillOption = f
 	return b
 }

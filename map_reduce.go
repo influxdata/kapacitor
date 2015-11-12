@@ -19,7 +19,7 @@ type MapResult struct {
 }
 
 type MapFunc func(in *tsdb.MapInput) interface{}
-type ReduceFunc func(in []interface{}, tmax time.Time, useTMax bool) interface{}
+type ReduceFunc func(in []interface{}, tmax time.Time, useTMax bool, as string) interface{}
 
 type MapInfo struct {
 	Field string
@@ -176,7 +176,7 @@ func newReduceNode(et *ExecutingTask, n *pipeline.ReduceNode) (*ReduceNode, erro
 
 func (r *ReduceNode) runReduce() error {
 	for m, ok := r.ins[0].NextMaps(); ok; m, ok = r.ins[0].NextMaps() {
-		rr := r.f(m.Outs, m.TMax, r.r.PointTimes)
+		rr := r.f(m.Outs, m.TMax, r.r.PointTimes, r.r.As)
 		switch result := rr.(type) {
 		case models.Point:
 			result.Name = m.Name

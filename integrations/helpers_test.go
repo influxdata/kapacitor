@@ -34,7 +34,7 @@ func (m *MockInfluxDBService) NewClient() (*client.Client, error) {
 
 }
 
-func compareResults(exp, got kapacitor.Result) (bool, string) {
+func compareResultsMetainfo(exp, got kapacitor.Result) (bool, string) {
 	if (exp.Err == nil && got.Err != nil) || (exp.Err != nil && got.Err == nil) {
 		return false, fmt.Sprintf("unexpected error: exp %v got %v", exp.Err, got.Err)
 	}
@@ -43,6 +43,14 @@ func compareResults(exp, got kapacitor.Result) (bool, string) {
 	}
 	if len(exp.Series) != len(got.Series) {
 		return false, fmt.Sprintf("unexpected number of series: exp %d got %d", len(exp.Series), len(got.Series))
+	}
+	return true, ""
+}
+
+func compareResults(exp, got kapacitor.Result) (bool, string) {
+	ok, msg := compareResultsMetainfo(exp, got)
+	if !ok {
+		return ok, msg
 	}
 	for i := range exp.Series {
 		if exp.Series[i].Name != got.Series[i].Name {
@@ -56,6 +64,36 @@ func compareResults(exp, got kapacitor.Result) (bool, string) {
 		}
 		if !reflect.DeepEqual(exp.Series[i].Values, got.Series[i].Values) {
 			return false, fmt.Sprintf("unexpected series values: i: %d \nexp %v \ngot %v", i, exp.Series[i].Values, got.Series[i].Values)
+		}
+	}
+	return true, ""
+}
+
+func compareResultsIgnoreSeriesOrder(exp, got kapacitor.Result) (bool, string) {
+	ok, msg := compareResultsMetainfo(exp, got)
+	if !ok {
+		return ok, msg
+	}
+	set := make(map[int]struct{}, len(exp.Series))
+	for i := range exp.Series {
+		set[i] = struct{}{}
+	}
+	for i := range exp.Series {
+		// Find series with same name
+		var j int
+		for j = range set {
+			if exp.Series[i].Name == got.Series[j].Name &&
+				reflect.DeepEqual(exp.Series[i].Tags, got.Series[j].Tags) {
+				// found matching series
+				delete(set, j)
+				break
+			}
+		}
+		if !reflect.DeepEqual(exp.Series[i].Columns, got.Series[j].Columns) {
+			return false, fmt.Sprintf("unexpected series columns: i: %d \nexp %v \ngot %v", i, exp.Series[i].Columns, got.Series[j].Columns)
+		}
+		if !reflect.DeepEqual(exp.Series[i].Values, got.Series[j].Values) {
+			return false, fmt.Sprintf("unexpected series values: i: %d \nexp %v \ngot %v", i, exp.Series[i].Values, got.Series[j].Values)
 		}
 	}
 	return true, ""
