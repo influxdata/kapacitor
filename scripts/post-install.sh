@@ -7,7 +7,6 @@ SCRIPT_DIR=/usr/lib/kapacitor/scripts
 if ! id kapacitor >/dev/null 2>&1; then
         useradd --system -U -M kapacitor -s /bin/false -d $DATA_DIR
 fi
-chown kapacitor:kapacitor $BIN_DIR/kapacitor*
 chmod a+rX $BIN_DIR/kapacitor*
 
 mkdir -p $LOG_DIR
