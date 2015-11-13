@@ -261,7 +261,6 @@ func (b *BatchNode) doQuery(batch BatchCollector) error {
 				}
 			}
 		}
-		return errors.New("batch ticker schedule stopped")
 	}
 }
 
