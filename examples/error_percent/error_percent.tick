@@ -24,3 +24,4 @@ errors.join(views)
         .influxDBOut()
             .database('pages')
             .measurement('error_percent')
+

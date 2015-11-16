@@ -10,10 +10,21 @@ import (
 
 type GroupID string
 type Fields map[string]interface{}
+type Tags map[string]string
 
 const (
 	NilGroup GroupID = ""
 )
+
+// Common interface for both Point and Batch objects
+type PointInterface interface {
+	PointName() string
+	PointTime() time.Time
+	PointGroup() GroupID
+	PointTags() Tags
+	PointDimensions() []string
+	PointFields() Fields
+}
 
 // Represents a single data point
 type Point struct {
@@ -24,18 +35,46 @@ type Point struct {
 	Group      GroupID
 	Dimensions []string
 
-	Tags map[string]string
+	Tags Tags
 
 	Fields Fields
 
 	Time time.Time
 }
 
+func (p Point) PointName() string {
+	return p.Name
+}
+
+func (p Point) PointGroup() GroupID {
+	return p.Group
+}
+
+func (p Point) PointTime() time.Time {
+	return p.Time
+}
+
+func (p Point) PointFields() Fields {
+	return p.Fields
+}
+
+func (p Point) PointTags() Tags {
+	tags := make(Tags, len(p.Dimensions))
+	for _, dim := range p.Dimensions {
+		tags[dim] = p.Tags[dim]
+	}
+	return tags
+}
+
+func (p Point) PointDimensions() []string {
+	return p.Dimensions
+}
+
 // Returns byte array of a line protocol representation of the point
 func (p Point) Bytes(precision string) []byte {
 	mp, err := models.NewPoint(
 		p.Name,
-		p.Tags,
+		map[string]string(p.Tags),
 		map[string]interface{}(p.Fields),
 		p.Time,
 	)

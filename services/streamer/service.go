@@ -35,7 +35,7 @@ func (s *Service) WritePoints(pts *cluster.WritePointsRequest) (err error) {
 			RetentionPolicy: pts.RetentionPolicy,
 			Name:            mp.Name(),
 			Group:           models.NilGroup,
-			Tags:            mp.Tags(),
+			Tags:            models.Tags(mp.Tags()),
 			Fields:          models.Fields(mp.Fields()),
 			Time:            mp.Time(),
 		}

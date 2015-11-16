@@ -97,7 +97,7 @@ func (r *replayStreamSource) replayStream(stream StreamCollector, recTime bool, 
 				RetentionPolicy: rp,
 				Name:            mp.Name(),
 				Group:           models.NilGroup,
-				Tags:            mp.Tags(),
+				Tags:            models.Tags(mp.Tags()),
 				Fields:          models.Fields(mp.Fields()),
 				Time:            t,
 			}
@@ -180,6 +180,10 @@ func (r *replayBatchSource) replayBatchFromData(data io.ReadCloser, batch BatchC
 		if err != nil {
 			r.allErrs <- err
 			return
+		}
+		if len(b.Points) == 0 {
+			// do nothing
+			continue
 		}
 		b.Group = models.TagsToGroupID(models.SortedKeys(b.Tags), b.Tags)
 

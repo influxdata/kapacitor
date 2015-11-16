@@ -118,7 +118,7 @@ func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode) (*BatchNode, error) 
 		return nil, err
 	}
 	// Set fill
-	switch fill := n.FillOption.(type) {
+	switch fill := n.Fill.(type) {
 	case string:
 		switch fill {
 		case "null":

@@ -75,6 +75,13 @@ func (e *Edge) Close() {
 	}
 }
 
+func (e *Edge) Next() (p models.PointInterface, ok bool) {
+	if e.stream != nil {
+		return e.NextPoint()
+	}
+	return e.NextBatch()
+}
+
 func (e *Edge) NextPoint() (p models.Point, ok bool) {
 	if wlog.LogLevel == wlog.DEBUG {
 		// Explicitly check log level since this is expensive and frequent
