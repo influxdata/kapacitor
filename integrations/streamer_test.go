@@ -32,7 +32,7 @@ var dbrps = []kapacitor.DBRP{
 }
 
 func init() {
-	wlog.LogLevel = wlog.OFF
+	wlog.SetLevel(wlog.OFF)
 	// create API server
 	config := httpd.NewConfig()
 	config.BindAddress = ":0" // Choose port dynamically
@@ -1590,9 +1590,9 @@ topScores.sample(4s)
 // Helper test function for streamer
 func testStreamer(t *testing.T, name, script string) (clock.Setter, *kapacitor.ExecutingTask, <-chan error, *kapacitor.TaskMaster) {
 	if testing.Verbose() {
-		wlog.LogLevel = wlog.DEBUG
+		wlog.SetLevel(wlog.DEBUG)
 	} else {
-		wlog.LogLevel = wlog.OFF
+		wlog.SetLevel(wlog.OFF)
 	}
 
 	//Create the task

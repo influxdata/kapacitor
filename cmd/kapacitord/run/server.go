@@ -35,6 +35,27 @@ import (
 const clusterIDFilename = "cluster.id"
 const serverIDFilename = "server.id"
 
+var (
+	//Published vars
+	cidVar = &expvar.String{}
+
+	sidVar = &expvar.String{}
+
+	hostVar = &expvar.String{}
+
+	productVar = &expvar.String{}
+
+	versionVar = &expvar.String{}
+)
+
+func init() {
+	expvar.Publish(kapacitor.ClusterIDVarName, cidVar)
+	expvar.Publish(kapacitor.ServerIDVarName, sidVar)
+	expvar.Publish(kapacitor.HostVarName, hostVar)
+	expvar.Publish(kapacitor.ProductVarName, productVar)
+	expvar.Publish(kapacitor.VersionVarName, versionVar)
+}
+
 // BuildInfo represents the build details for the server code.
 type BuildInfo struct {
 	Version string
@@ -55,7 +76,7 @@ type Server struct {
 
 	TaskMaster *kapacitor.TaskMaster
 
-	LogService      *logging.Service
+	LogService      logging.Interface
 	HTTPDService    *httpd.Service
 	Streamer        *streamer.Service
 	TaskStore       *task_store.Service
@@ -79,8 +100,8 @@ type Server struct {
 }
 
 // NewServer returns a new instance of Server built from a config.
-func NewServer(c *Config, buildInfo *BuildInfo, l *log.Logger, logService *logging.Service) (*Server, error) {
-
+func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*Server, error) {
+	l := logService.NewLogger("[srv] ", log.LstdFlags)
 	s := &Server{
 		buildInfo:     *buildInfo,
 		dataDir:       c.DataDir,
@@ -272,26 +293,12 @@ func (s *Server) Open() error {
 			return err
 		}
 
-		// Publish Vars
-		cid := &expvar.String{}
-		cid.Set(s.ClusterID)
-		expvar.Publish(kapacitor.ClusterIDVarName, cid)
-
-		sid := &expvar.String{}
-		sid.Set(s.ServerID)
-		expvar.Publish(kapacitor.ServerIDVarName, sid)
-
-		host := &expvar.String{}
-		host.Set(s.hostname)
-		expvar.Publish(kapacitor.HostVarName, host)
-
-		product := &expvar.String{}
-		product.Set(kapacitor.Product)
-		expvar.Publish(kapacitor.ProductVarName, product)
-
-		version := &expvar.String{}
-		version.Set(s.buildInfo.Version)
-		expvar.Publish(kapacitor.VersionVarName, version)
+		// Set published vars
+		cidVar.Set(s.ClusterID)
+		sidVar.Set(s.ServerID)
+		hostVar.Set(s.hostname)
+		productVar.Set(kapacitor.Product)
+		versionVar.Set(s.buildInfo.Version)
 
 		// Start profiling, if set.
 		s.startProfile(s.CPUProfile, s.MemProfile)

@@ -19,7 +19,7 @@ import (
 
 // These variables are populated via the Go linker.
 var (
-	version string = "v0.1"
+	version string
 	commit  string
 	branch  string
 )

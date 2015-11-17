@@ -24,7 +24,7 @@ import (
 
 // These variables are populated via the Go linker.
 var (
-	version string = "v0.1"
+	version string
 	commit  string
 	branch  string
 )
@@ -228,15 +228,15 @@ Examples:
 
 		This records the live data stream for 1 minute using the databases and retention policies
 		from the named task.
-	
+
 	$ kapacitor record batch -name cpu_idle -start 2015-09-01T00:00:00Z -stop 2015-09-02T00:00:00Z
-		
+
 		This records the result of the query defined in task 'cpu_idle' and runs the query as many times
 		as many times as defined by the schedule until the queries reaches the stop time.
 		starting at time 'start' and incrementing by the schedule defined in the task.
 
 	$ kapacitor record batch -name cpu_idle -past 10h
-		
+
 		This records the result of the query defined in task 'cpu_idle' and runs the query
 		as many times as defined by the schedule until the queries reaches the present time.
 		The starting time for the queries is 'now - 10h' and increments by the schedule defined in the task.
@@ -379,7 +379,7 @@ For example:
 
     $ kapacitor define -name my_task -tick path/to/TICKscript -type stream -dbrp mydb.myrp
 
-    Later you can change a sinlge property of the task by referencing its name 
+    Later you can change a single property of the task by referencing its name
     and only providing the single option you wish to modify.
 
     $ kapacitor define -name my_task -tick path/to/TICKscript
@@ -613,7 +613,7 @@ func doShow(args []string) error {
 	}
 
 	v := url.Values{}
-	v.Add("task", args[0])
+	v.Add("name", args[0])
 	r, err := http.Get(*kapacitordURL + "/task?" + v.Encode())
 	if err != nil {
 		return err
@@ -736,7 +736,7 @@ func deleteUsage() {
 	var u = `Usage: kapacitor delete (tasks|recordings) [task name|recording ID]...
 
 	Delete a task or recording.
-	
+
 	If a task is enabled it will be disabled and then deleted.
 `
 	fmt.Fprintln(os.Stderr, u)
