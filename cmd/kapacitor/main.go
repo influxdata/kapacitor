@@ -379,7 +379,7 @@ For example:
 
     $ kapacitor define -name my_task -tick path/to/TICKscript -type stream -dbrp mydb.myrp
 
-    Later you can change a sinlge property of the task by referencing its name
+    Later you can change a single property of the task by referencing its name
     and only providing the single option you wish to modify.
 
     $ kapacitor define -name my_task -tick path/to/TICKscript
