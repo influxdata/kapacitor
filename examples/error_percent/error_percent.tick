@@ -1,18 +1,18 @@
 // Get errors batch data
 var errors = batch
             .query('SELECT sum(value) FROM "pages"."default".errors')
-            .period(1h)
-            .every(1h)
-            .groupBy(time(1m), *)
-            .fill(0)
+                .period(1h)
+                .every(1h)
+                .groupBy(time(1m), *)
+                .fill(0)
 
 // Get views batch data
 var views = batch
             .query('SELECT sum(value) FROM "pages"."default".views')
-            .period(1h)
-            .every(1h)
-            .groupBy(time(1m), *)
-            .fill(0)
+                .period(1h)
+                .every(1h)
+                .groupBy(time(1m), *)
+                .fill(0)
 
 // Join errors and views
 errors.join(views)

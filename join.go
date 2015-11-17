@@ -2,6 +2,7 @@ package kapacitor
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -185,7 +186,7 @@ func (g *group) collect(i int, p models.PointInterface) {
 
 	set := g.sets[t]
 	if set == nil {
-		set = newJoinset(g.j.j.StreamName, g.j.fill, g.j.fillValue, g.j.j.Names, g.j.j.Tolerance, t)
+		set = newJoinset(g.j.j.StreamName, g.j.fill, g.j.fillValue, g.j.j.Names, g.j.j.Tolerance, t, g.j.logger)
 		g.sets[t] = set
 	}
 	set.Add(i, p)
@@ -246,6 +247,8 @@ type joinset struct {
 	finished int
 
 	first int
+
+	logger *log.Logger
 }
 
 func newJoinset(
@@ -255,6 +258,7 @@ func newJoinset(
 	prefixes []string,
 	tolerance time.Duration,
 	time time.Time,
+	l *log.Logger,
 ) *joinset {
 	expected := len(prefixes)
 	return &joinset{
@@ -266,6 +270,7 @@ func newJoinset(
 		values:    make([]models.PointInterface, expected),
 		first:     expected,
 		time:      time,
+		logger:    l,
 	}
 }
 
@@ -334,6 +339,7 @@ func (js *joinset) JoinIntoBatch() (models.Batch, bool) {
 	for emptyCount < js.expected {
 		set := make([]*models.BatchPoint, js.expected)
 		setTime := time.Time{}
+		count := 0
 		for i, batch := range js.values {
 			if empty[i] {
 				continue
@@ -362,7 +368,13 @@ func (js *joinset) JoinIntoBatch() (models.Batch, bool) {
 				}
 				set[i] = &bp
 				indexes[i]++
+				count++
 			}
+		}
+		// we didn't get any points from any group we must be empty
+		// skip this set
+		if count == 0 {
+			continue
 		}
 		// Join all batch points in set
 		fields := make(models.Fields, js.expected*len(fieldNames))
