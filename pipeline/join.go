@@ -4,15 +4,19 @@ import (
 	"time"
 )
 
-// Joins the data from any number of nodes in the order that data arrives.
-// The join can be an inner or outer join, see the JoinNode.Fill property.
+// Joins the data from any number of nodes.
 // As each data point is received from a parent node it is paired
-// with the next data point from the other parent node with a
-// matching timestamp.
-// A tolerance can be supplied in order to consider points within the give
-// tolerance duration will be considered to be the same time.
+// with the next data points from the other parent nodes with a
+// matching timestamp. Each parent node contributes at most one point
+// to each joined point. A tolerance can be supplied to join points
+// that do not have perfectly aligned timestamps.
+// Any points that fall within the tolerance are joined on the timestamp.
+// If multiple points fall within the same tolerance window than they are joined in the order
+// they arrive.
 //
 // Aliases are used to prefix all fields from the respective nodes.
+//
+// The join can be an inner or outer join, see the JoinNode.Fill property.
 //
 // Example:
 //    var errors = stream

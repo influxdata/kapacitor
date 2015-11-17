@@ -117,6 +117,10 @@ func newBatchNode() *BatchNode {
 // Group the data by a set of dimensions.
 // Can specify one time dimension.
 //
+// This property adds a `GROUP BY` clause to the query
+// so all the normal behaviors when quering InfluxDB with a `GROUP BY` apply.
+// More details: https://influxdb.com/docs/v0.9/query_language/data_exploration.html#the-group-by-clause
+//
 // Example:
 //    batch
 //        .groupBy(time(10s), 'tag1', 'tag2'))
