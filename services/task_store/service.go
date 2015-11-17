@@ -191,7 +191,7 @@ type TaskInfo struct {
 }
 
 func (ts *Service) handleTask(w http.ResponseWriter, r *http.Request) {
-	name := r.URL.Query().Get("task")
+	name := r.URL.Query().Get("name")
 	if name == "" {
 		httpd.HttpError(w, "must pass task name", true, http.StatusBadRequest)
 		return

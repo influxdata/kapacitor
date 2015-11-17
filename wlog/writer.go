@@ -13,7 +13,7 @@
 
 	Simply pass a instance of wlog.Writer to log.New or use the helper wlog.New function.
 
-	The log level can be changed via the LogLevel variable or the SetLevel function.
+	The log level can be changed via the SetLevel or the SetLevelFromName functions.
 */
 package wlog
 
@@ -22,6 +22,7 @@ import (
 	"io"
 	"log"
 	"strings"
+	"sync"
 )
 
 type Level int
@@ -55,7 +56,21 @@ func init() {
 }
 
 // The global and only log level. Log levels are not implemented per writer.
-var LogLevel = INFO
+var logLevel = INFO
+
+var mu sync.RWMutex
+
+func SetLevel(l Level) {
+	mu.Lock()
+	defer mu.Unlock()
+	logLevel = l
+}
+
+func LogLevel() Level {
+	mu.RLock()
+	defer mu.RUnlock()
+	return logLevel
+}
 
 // name to Level mappings
 var levels = map[string]Level{
@@ -66,11 +81,11 @@ var levels = map[string]Level{
 	"OFF":   OFF,
 }
 
-// Set the log level via a string name. To set it directly use 'LogLevel'.
-func SetLevel(level string) error {
+// Set the log level via a string name. To set it directly use 'logLevel'.
+func SetLevelFromName(level string) error {
 	l := levels[strings.ToUpper(level)]
 	if l > 0 {
-		LogLevel = l
+		SetLevel(l)
 	} else {
 		return fmt.Errorf("invalid log level: %q", level)
 	}
@@ -112,7 +127,7 @@ func (w *Writer) Write(buf []byte) (int, error) {
 			}
 		}
 		l := Levels[buf[w.start]]
-		if l >= LogLevel {
+		if l >= LogLevel() {
 			return w.w.Write(buf)
 		} else if l == 0 {
 			buf = append(invalidMSG, buf...)

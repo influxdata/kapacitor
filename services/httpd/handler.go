@@ -215,7 +215,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // serveLogLevel sets the log level of the server
 func (h *Handler) serveLogLevel(w http.ResponseWriter, r *http.Request) {
 	l := r.URL.Query().Get("level")
-	err := wlog.SetLevel(l)
+	err := wlog.SetLevelFromName(l)
 	if err != nil {
 		HttpError(w, err.Error(), true, http.StatusBadRequest)
 	}

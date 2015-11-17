@@ -30,8 +30,8 @@ func (t TaskType) String() string {
 }
 
 type DBRP struct {
-	Database        string
-	RetentionPolicy string
+	Database        string `json:"db"`
+	RetentionPolicy string `json:"rp"`
 }
 
 func CreateDBRPMap(dbrps []DBRP) map[DBRP]bool {

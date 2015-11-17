@@ -9,6 +9,12 @@ import (
 	"github.com/influxdb/kapacitor/wlog"
 )
 
+// Interface for creating new loggers
+type Interface interface {
+	NewLogger(prefix string, flag int) *log.Logger
+	NewStaticLevelLogger(prefix string, flag int, l wlog.Level) *log.Logger
+}
+
 type Service struct {
 	f      io.WriteCloser
 	c      Config
@@ -46,7 +52,7 @@ func (s *Service) Open() error {
 		s.f = f
 	}
 
-	wlog.SetLevel(s.c.Level)
+	wlog.SetLevelFromName(s.c.Level)
 	return nil
 }
 

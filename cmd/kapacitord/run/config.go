@@ -80,8 +80,8 @@ func NewDemoConfig() (*Config, error) {
 
 	c.Replay.Dir = filepath.Join(homeDir, ".kapacitor", c.Replay.Dir)
 	c.Task.Dir = filepath.Join(homeDir, ".kapacitor", c.Task.Dir)
-
 	c.DataDir = filepath.Join(homeDir, ".kapacitor", c.DataDir)
+
 	return c, nil
 }
 

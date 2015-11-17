@@ -5,6 +5,7 @@ import (
 	"expvar"
 	"fmt"
 	"log"
+	"sync"
 
 	"github.com/influxdb/kapacitor/models"
 	"github.com/influxdb/kapacitor/pipeline"
@@ -33,6 +34,7 @@ type Edge struct {
 
 	logger  *log.Logger
 	closed  bool
+	mu      sync.Mutex
 	statMap *expvar.Map
 }
 
@@ -55,6 +57,8 @@ func newEdge(name string, t pipeline.EdgeType, logService LogService) *Edge {
 }
 
 func (e *Edge) Close() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	if e.closed {
 		return
 	}
@@ -83,7 +87,7 @@ func (e *Edge) Next() (p models.PointInterface, ok bool) {
 }
 
 func (e *Edge) NextPoint() (p models.Point, ok bool) {
-	if wlog.LogLevel == wlog.DEBUG {
+	if wlog.LogLevel() == wlog.DEBUG {
 		// Explicitly check log level since this is expensive and frequent
 		e.logger.Printf(
 			"D! next point c: %s e: %s\n",
@@ -99,7 +103,7 @@ func (e *Edge) NextPoint() (p models.Point, ok bool) {
 }
 
 func (e *Edge) NextBatch() (b models.Batch, ok bool) {
-	if wlog.LogLevel == wlog.DEBUG {
+	if wlog.LogLevel() == wlog.DEBUG {
 		// Explicitly check log level since this is expensive and frequent
 		e.logger.Printf(
 			"D! next batch c: %s e: %s\n",
@@ -115,7 +119,7 @@ func (e *Edge) NextBatch() (b models.Batch, ok bool) {
 }
 
 func (e *Edge) NextMaps() (m *MapResult, ok bool) {
-	if wlog.LogLevel == wlog.DEBUG {
+	if wlog.LogLevel() == wlog.DEBUG {
 		// Explicitly check log level since this is expensive and frequent
 		e.logger.Printf(
 			"D! next maps c: %s e: %s\n",
@@ -142,8 +146,10 @@ func (e *Edge) recover(errp *error) {
 }
 
 func (e *Edge) CollectPoint(p models.Point) (err error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	defer e.recover(&err)
-	if wlog.LogLevel == wlog.DEBUG {
+	if wlog.LogLevel() == wlog.DEBUG {
 		// Explicitly check log level since this is expensive and frequent
 		e.logger.Printf(
 			"D! collect point c: %s e: %s\n",
@@ -157,8 +163,10 @@ func (e *Edge) CollectPoint(p models.Point) (err error) {
 }
 
 func (e *Edge) CollectBatch(b models.Batch) (err error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	defer e.recover(&err)
-	if wlog.LogLevel == wlog.DEBUG {
+	if wlog.LogLevel() == wlog.DEBUG {
 		// Explicitly check log level since this is expensive and frequent
 		e.logger.Printf(
 			"D! collect batch c: %s e: %s\n",
@@ -172,8 +180,10 @@ func (e *Edge) CollectBatch(b models.Batch) (err error) {
 }
 
 func (e *Edge) CollectMaps(m *MapResult) (err error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	defer e.recover(&err)
-	if wlog.LogLevel == wlog.DEBUG {
+	if wlog.LogLevel() == wlog.DEBUG {
 		// Explicitly check log level since this is expensive and frequent
 		e.logger.Printf(
 			"D! collect maps c: %s e: %s\n",

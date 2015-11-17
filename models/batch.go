@@ -125,9 +125,12 @@ func ResultToBatches(res client.Result) ([]Batch, error) {
 						return nil, fmt.Errorf("unexpected time value: %v", v[i])
 					}
 					var err error
-					t, err = time.Parse(time.RFC3339, tStr)
+					t, err = time.Parse(time.RFC3339Nano, tStr)
 					if err != nil {
-						return nil, fmt.Errorf("unexpected time format: %v", err)
+						t, err = time.Parse(time.RFC3339, tStr)
+						if err != nil {
+							return nil, fmt.Errorf("unexpected time format: %v", err)
+						}
 					}
 				} else {
 					value := v[i]
@@ -145,6 +148,9 @@ func ResultToBatches(res client.Result) ([]Batch, error) {
 				}
 			}
 			if !skip {
+				if t.After(b.TMax) {
+					b.TMax = t
+				}
 				b.Points = append(
 					b.Points,
 					BatchPoint{Time: t, Fields: fields, Tags: b.Tags},

@@ -101,9 +101,9 @@ batch
 // Helper test function for batcher
 func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.ExecutingTask, <-chan error, *kapacitor.TaskMaster) {
 	if testing.Verbose() {
-		wlog.LogLevel = wlog.DEBUG
+		wlog.SetLevel(wlog.DEBUG)
 	} else {
-		wlog.LogLevel = wlog.OFF
+		wlog.SetLevel(wlog.OFF)
 	}
 
 	// Create task
