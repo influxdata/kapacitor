@@ -1,10 +1,13 @@
 #!/bin/bash
 
+set -e
+
 # This script uses influx_stress to create ~11 days of page view/error data with a data point every 10s.
 # It creates data for two measurements 'errors' and 'views' in a database called 'pages'.
 #  The 'errors' measurement represent to number of page views that resulted in an error.
 #  The 'views' measurement represent to number of page views that did not result in an error.
-
+DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
+cd $DIR
 
 cat > pages.toml << EOF
 channel_buffer_size = 100000

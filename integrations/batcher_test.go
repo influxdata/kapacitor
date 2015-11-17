@@ -1,6 +1,7 @@
 package integrations
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -98,6 +99,84 @@ batch
 	}
 }
 
+func TestBatch_Join(t *testing.T) {
+
+	var script = `
+var cpu0 = batch
+	.query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "cpu" = 'cpu0'
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s))
+
+var cpu1 = batch
+	.query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "cpu" = 'cpu1'
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s))
+
+cpu0.join(cpu1)
+	.as('cpu0', 'cpu1')
+	.mapReduce(influxql.count('cpu0.mean'))
+	.window()
+		.period(20s)
+		.every(20s)
+	.mapReduce(influxql.sum('count'))
+	.httpOut('TestBatch_Join')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu_usage_idle",
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1970, 1, 1, 0, 0, 28, 0, time.UTC),
+					10.0,
+				}},
+			},
+		},
+	}
+
+	clock, et, errCh, tm := testBatcher(t, "TestBatch_Join", script)
+	defer tm.Close()
+
+	// Move time forward
+	clock.Set(clock.Zero().Add(30 * time.Second))
+	// Wait till the replay has finished
+	if e := <-errCh; e != nil {
+		t.Error(e)
+	}
+	// Wait till the task is finished
+	if e := et.Err(); e != nil {
+		t.Error(e)
+	}
+
+	// Get the result
+	output, err := et.GetOutput("TestBatch_Join")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := http.Get(output.Endpoint())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert we got the expected result
+	result := kapacitor.ResultFromJSON(resp.Body)
+	if eq, msg := compareResults(er, result); !eq {
+		t.Error(msg)
+	}
+}
+
 // Helper test function for batcher
 func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.ExecutingTask, <-chan error, *kapacitor.TaskMaster) {
 	if testing.Verbose() {
@@ -113,10 +192,20 @@ func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.Ex
 	}
 
 	// Load test data
-	data, err := os.Open(path.Join("data", name+".brpl"))
-	if err != nil {
-		t.Fatal(err)
+	var allData []io.ReadCloser
+	var data io.ReadCloser
+	for i := 0; err == nil; {
+		f := fmt.Sprintf("%s.%d.brpl", name, i)
+		data, err = os.Open(path.Join("data", f))
+		if err == nil {
+			allData = append(allData, data)
+			i++
+		}
 	}
+	if len(allData) == 0 {
+		t.Fatal("could not find any data files for", name)
+	}
+
 	c := clock.New(time.Unix(0, 0))
 	r := kapacitor.NewReplay(c)
 
@@ -133,7 +222,7 @@ func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.Ex
 
 	// Replay test data to executor
 	batches := tm.BatchCollectors(name)
-	errCh := r.ReplayBatch([]io.ReadCloser{data}, batches, false)
+	errCh := r.ReplayBatch(allData, batches, false)
 
 	t.Log(string(et.Task.Dot()))
 	return r.Setter, et, errCh, tm
