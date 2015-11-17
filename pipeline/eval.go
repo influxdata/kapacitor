@@ -7,7 +7,7 @@ import (
 // Evaluates expressions on each data point it receives.
 // A list of expressions may be provided and will be evaluated in the order they are given
 // and results of previous expressions are made available to later expressions.
-// See the property 'As' for details on how to reference the results.
+// See the property EvalNode.As for details on how to reference the results.
 //
 // Example:
 //    stream
@@ -47,8 +47,16 @@ func newEvalNode(e EdgeType, exprs []tick.Node) *EvalNode {
 
 // List of names for each expression.
 // The expressions are evaluated in order and the result
-// of a previous will be available in later expressions
+// of a previous expression will be available in later expressions
 // via the name provided.
+//
+// Example:
+//    stream
+//        .eval(lambda: "value" * "value", lambda: 1.0 / "value2")
+//            .as('value2', 'inv_value2')
+//
+// The above example calculates two fields from the value and names them
+// `value2` and `inv_value2` respectively.
 //
 // tick:property
 func (e *EvalNode) As(names ...string) *EvalNode {
@@ -58,14 +66,23 @@ func (e *EvalNode) As(names ...string) *EvalNode {
 
 // If called the existing fields will be preserved in addition
 // to the new fields being set.
+// If not called then only new fields are preserved.
 //
-// Optionally a list of field names can be given.
+// Optionally intermediate values can be discarded
+// by passing a list of field names.
 // Only fields in the list will be kept.
-// If no list is given then all fields are kept.
-// The list of fields to keep is evaluated after all
-// expressions have been evaluated.
-// This way intermediate values can be discarded.
+// If no list is given then all fields, new and old, are kept.
 //
+// Example:
+//    stream
+//        .eval(lambda: "value" * "value", lambda: 1.0 / "value2")
+//            .as('value2', 'inv_value2')
+//        .keep('value', 'inv_value2')
+//
+// In the above example the original field `value` is preserved.
+// In addition the new field `value2` is calculated and used in evaluating
+// `inv_value2` but is discarded before the point is sent on to children nodes.
+// The resulting point has only two fields `value` and `inv_value2`.
 // tick:property
 func (e *EvalNode) Keep(fields ...string) *EvalNode {
 	e.KeepFlag = true
