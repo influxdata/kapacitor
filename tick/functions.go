@@ -18,18 +18,199 @@ type Func interface {
 // Lookup for functions
 type Funcs map[string]Func
 
+var statelessFuncs Funcs
+
+func init() {
+	statelessFuncs = make(Funcs)
+	// Conversion functions
+	statelessFuncs["bool"] = &boolean{}
+	statelessFuncs["int"] = &integer{}
+	statelessFuncs["float"] = &float{}
+
+	// Math functions
+	statelessFuncs["abs"] = newMath1("abs", math.Abs)
+	statelessFuncs["acos"] = newMath1("acos", math.Acos)
+	statelessFuncs["acosh"] = newMath1("acosh", math.Acosh)
+	statelessFuncs["asin"] = newMath1("asin", math.Asin)
+	statelessFuncs["asinh"] = newMath1("asinh", math.Asinh)
+	statelessFuncs["atan"] = newMath1("atan", math.Atan)
+	statelessFuncs["atan2"] = newMath2("atan2", math.Atan2)
+	statelessFuncs["atanh"] = newMath1("atanh", math.Atanh)
+	statelessFuncs["cbrt"] = newMath1("cbrt", math.Cbrt)
+	statelessFuncs["ceil"] = newMath1("ceil", math.Ceil)
+	statelessFuncs["cos"] = newMath1("cos", math.Cos)
+	statelessFuncs["cosh"] = newMath1("cosh", math.Cosh)
+	statelessFuncs["erf"] = newMath1("erf", math.Erf)
+	statelessFuncs["erfc"] = newMath1("erfc", math.Erfc)
+	statelessFuncs["exp"] = newMath1("exp", math.Exp)
+	statelessFuncs["exp2"] = newMath1("exp2", math.Exp2)
+	statelessFuncs["expm1"] = newMath1("expm1", math.Expm1)
+	statelessFuncs["floor"] = newMath1("floor", math.Floor)
+	statelessFuncs["gamma"] = newMath1("gamma", math.Gamma)
+	statelessFuncs["hypot"] = newMath2("hypot", math.Hypot)
+	statelessFuncs["j0"] = newMath1("j0", math.J0)
+	statelessFuncs["j1"] = newMath1("j1", math.J1)
+	statelessFuncs["jn"] = newMathIF("jn", math.Jn)
+	statelessFuncs["log"] = newMath1("log", math.Log)
+	statelessFuncs["log10"] = newMath1("log10", math.Log10)
+	statelessFuncs["log1p"] = newMath1("log1p", math.Log1p)
+	statelessFuncs["log2"] = newMath1("log2", math.Log2)
+	statelessFuncs["logb"] = newMath1("logb", math.Logb)
+	statelessFuncs["max"] = newMath2("max", math.Max)
+	statelessFuncs["min"] = newMath2("min", math.Min)
+	statelessFuncs["mod"] = newMath2("mod", math.Mod)
+	statelessFuncs["pow"] = newMath2("pow", math.Pow)
+	statelessFuncs["pow10"] = newMathI("pow10", math.Pow10)
+	statelessFuncs["sin"] = newMath1("sin", math.Sin)
+	statelessFuncs["sinh"] = newMath1("sinh", math.Sinh)
+	statelessFuncs["sqrt"] = newMath1("sqrt", math.Sqrt)
+	statelessFuncs["tan"] = newMath1("tan", math.Tan)
+	statelessFuncs["tanh"] = newMath1("tanh", math.Tanh)
+	statelessFuncs["trunc"] = newMath1("trunc", math.Trunc)
+	statelessFuncs["y0"] = newMath1("y0", math.Y0)
+	statelessFuncs["y1"] = newMath1("y1", math.Y1)
+	statelessFuncs["yn"] = newMathIF("yn", math.Yn)
+}
+
 // Return set of built-in Funcs
 func NewFunctions() Funcs {
-	funcs := make(Funcs)
+	funcs := make(Funcs, len(statelessFuncs)+2)
+	for n, f := range statelessFuncs {
+		funcs[n] = f
+	}
 
+	// Statefull functions -- need new instance
 	funcs["sigma"] = &sigma{}
-	funcs["bool"] = &boolean{}
-	funcs["int"] = &integer{}
-	funcs["float"] = &float{}
 	funcs["count"] = &count{}
 
 	return funcs
 }
+
+type math1Func func(float64) float64
+type math1 struct {
+	name string
+	f    math1Func
+}
+
+func newMath1(name string, f math1Func) *math1 {
+	return &math1{
+		name: name,
+		f:    f,
+	}
+}
+
+// Converts the value to a boolean
+func (m *math1) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 1 {
+		return 0, errors.New(m.name + " expects exactly one argument")
+	}
+	a0, ok := args[0].(float64)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T to %s, must be float64", args[0], m.name)
+		return
+	}
+	v = m.f(a0)
+	return
+}
+
+func (m *math1) Reset() {}
+
+type math2Func func(float64, float64) float64
+type math2 struct {
+	name string
+	f    math2Func
+}
+
+func newMath2(name string, f math2Func) *math2 {
+	return &math2{
+		name: name,
+		f:    f,
+	}
+}
+
+// Converts the value to a boolean
+func (m *math2) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 2 {
+		return 0, errors.New(m.name + " expects exactly two arguments")
+	}
+	a0, ok := args[0].(float64)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T to %s, must be float64", args[0], m.name)
+		return
+	}
+	a1, ok := args[1].(float64)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T to %s, must be float64", args[1], m.name)
+		return
+	}
+	v = m.f(a0, a1)
+	return
+}
+
+func (m *math2) Reset() {}
+
+type mathIFunc func(int) float64
+type mathI struct {
+	name string
+	f    mathIFunc
+}
+
+func newMathI(name string, f mathIFunc) *mathI {
+	return &mathI{
+		name: name,
+		f:    f,
+	}
+}
+
+// Converts the value to a boolean
+func (m *mathI) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 1 {
+		return 0, errors.New(m.name + " expects exactly two arguments")
+	}
+	a0, ok := args[0].(int64)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T to %s, must be int64", args[0], m.name)
+		return
+	}
+	v = m.f(int(a0))
+	return
+}
+
+func (m *mathI) Reset() {}
+
+type mathIFFunc func(int, float64) float64
+type mathIF struct {
+	name string
+	f    mathIFFunc
+}
+
+func newMathIF(name string, f mathIFFunc) *mathIF {
+	return &mathIF{
+		name: name,
+		f:    f,
+	}
+}
+
+// Converts the value to a boolean
+func (m *mathIF) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 2 {
+		return 0, errors.New(m.name + " expects exactly two arguments")
+	}
+	a0, ok := args[0].(int64)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T to %s as first arg, must be int64", args[0], m.name)
+		return
+	}
+	a1, ok := args[1].(float64)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T to %s as second arg, must be float64", args[1], m.name)
+		return
+	}
+	v = m.f(int(a0), a1)
+	return
+}
+
+func (m *mathIF) Reset() {}
 
 type boolean struct {
 }
