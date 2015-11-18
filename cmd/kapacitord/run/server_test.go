@@ -307,13 +307,10 @@ stream
 	endpoint := fmt.Sprintf("%s/api/v1/%s/count", s.URL(), name)
 
 	// Request data before any writes and expect null responses
-	r, err = s.HTTPGet(endpoint)
-	if err != nil {
-		t.Fatal(err)
-	}
 	nullResponse := `{"Series":null,"Err":null}`
-	if r != nullResponse {
-		t.Fatalf("unexpected result got %s exp %s", r, nullResponse)
+	err = s.HTTPGetRetry(endpoint, "", nullResponse, 20, time.Millisecond*5)
+	if err != nil {
+		t.Error(err)
 	}
 
 	points := `test value=1 0000000000
@@ -339,21 +336,9 @@ test value=1 0000000011
 	s.MustWrite("mydb", "myrp", points, v)
 
 	exp := `{"Series":[{"name":"test","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}],"Err":null}`
-	retries := 3
-	for retries > 0 {
-		r, err = s.HTTPGet(endpoint)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if r == nullResponse {
-			retries--
-			time.Sleep(time.Millisecond * 5)
-		} else {
-			break
-		}
-	}
-	if r != exp {
-		t.Fatalf("unexpected result\ngot %s\nexp %s", r, exp)
+	err = s.HTTPGetRetry(endpoint, nullResponse, exp, 20, time.Millisecond*5)
+	if err != nil {
+		t.Error(err)
 	}
 }
 
@@ -423,32 +408,11 @@ batch
 
 	endpoint := fmt.Sprintf("%s/api/v1/%s/count", s.URL(), name)
 
-	// Request data before any writes and expect null responses
-	r, err = s.HTTPGet(endpoint)
-	if err != nil {
-		t.Fatal(err)
-	}
 	nullResponse := `{"Series":null,"Err":null}`
-	if r != nullResponse {
-		t.Fatalf("unexpected result got %s exp %s", r, nullResponse)
-	}
-
 	exp := `{"Series":[{"name":"cpu","columns":["time","count"],"values":[["1971-01-01T00:00:01.002Z",2]]}],"Err":null}`
-	retries := 3
-	for retries > 0 {
-		r, err = s.HTTPGet(endpoint)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if r == nullResponse {
-			retries--
-			time.Sleep(time.Millisecond * 5)
-		} else {
-			break
-		}
-	}
-	if r != exp {
-		t.Errorf("unexpected result\ngot %s\nexp %s", r, exp)
+	err = s.HTTPGetRetry(endpoint, nullResponse, exp, 20, time.Millisecond*5)
+	if err != nil {
+		t.Error(err)
 	}
 
 	r, err = s.DisableTask(name)

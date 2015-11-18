@@ -15,6 +15,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/influxdb/influxdb/client"
 	"github.com/influxdb/kapacitor"
@@ -31,6 +32,7 @@ type Server struct {
 
 // NewServer returns a new instance of Server.
 func NewServer(c *run.Config) *Server {
+	configureLogging()
 	buildInfo := &run.BuildInfo{
 		Version: "testServer",
 		Commit:  "testCommit",
@@ -42,7 +44,6 @@ func NewServer(c *run.Config) *Server {
 		Server: srv,
 		Config: c,
 	}
-	configureLogging()
 	return &s
 }
 
@@ -92,6 +93,29 @@ func (s *Server) HTTPGet(url string) (results string, err error) {
 	default:
 		return "", fmt.Errorf("unexpected status code: code=%d, body=%s", resp.StatusCode, body)
 	}
+}
+
+func (s *Server) HTTPGetRetry(url, retry, exp string, retries int, sleep time.Duration) error {
+	var r string
+	var err error
+	for retries > 0 {
+		r, err = s.HTTPGet(url)
+		if err != nil {
+			return err
+		}
+		if r == exp {
+			break
+		} else if retry == "" || r == retry {
+			retries--
+			time.Sleep(sleep)
+		} else {
+			break
+		}
+	}
+	if r != exp {
+		return fmt.Errorf("unexpected result\ngot %s\nexp %s", r, exp)
+	}
+	return nil
 }
 
 // HTTPPost makes an HTTP POST request to the server and returns the response.
