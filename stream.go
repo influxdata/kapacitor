@@ -23,15 +23,12 @@ func newStreamNode(et *ExecutingTask, n *pipeline.StreamNode) (*StreamNode, erro
 	sn := &StreamNode{
 		node: node{Node: n, et: et},
 		s:    n,
+		db:   n.Database,
+		rp:   n.RetentionPolicy,
+		name: n.Measurement,
 	}
 	sn.node.runF = sn.runStream
-	var err error
-	if sn.s.FromSelector != "" {
-		sn.db, sn.rp, sn.name, err = parseFromClause(sn.s.FromSelector)
-		if err != nil {
-			return nil, fmt.Errorf("error parsing FROM clause %q %v", sn.s.FromSelector, err)
-		}
-	}
+
 	if n.Expression != nil {
 		sn.expression = tick.NewStatefulExpr(n.Expression)
 	}

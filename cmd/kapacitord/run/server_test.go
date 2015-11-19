@@ -58,7 +58,7 @@ func TestServer_DefineTask(t *testing.T) {
 			RetentionPolicy: "default",
 		},
 	}
-	tick := "stream.from('test')"
+	tick := "stream.from().measurement('test')"
 	r, err := s.DefineTask(name, ttype, tick, dbrps)
 	if err != nil {
 		t.Fatal(err)
@@ -113,7 +113,7 @@ func TestServer_EnableTask(t *testing.T) {
 			RetentionPolicy: "default",
 		},
 	}
-	tick := "stream.from('test')"
+	tick := "stream.from().measurement('test')"
 	r, err := s.DefineTask(name, ttype, tick, dbrps)
 	if err != nil {
 		t.Fatal(err)
@@ -176,7 +176,7 @@ func TestServer_DisableTask(t *testing.T) {
 			RetentionPolicy: "default",
 		},
 	}
-	tick := "stream.from('test')"
+	tick := "stream.from().measurement('test')"
 	r, err := s.DefineTask(name, ttype, tick, dbrps)
 	if err != nil {
 		t.Fatal(err)
@@ -247,7 +247,7 @@ func TestServer_DeleteTask(t *testing.T) {
 			RetentionPolicy: "default",
 		},
 	}
-	tick := "stream.from('test')"
+	tick := "stream.from().measurement('test')"
 	r, err := s.DefineTask(name, ttype, tick, dbrps)
 	if err != nil {
 		t.Fatal(err)
@@ -280,7 +280,7 @@ func TestServer_StreamTask(t *testing.T) {
 	}}
 	tick := `
 stream
-	.from('test')
+	.from().measurement('test')
 	.window()
 		.period(10s)
 		.every(10s)
