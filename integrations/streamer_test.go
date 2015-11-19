@@ -47,8 +47,11 @@ func TestStream_Window(t *testing.T) {
 
 	var script = `
 stream
-	.from('"dbname"."rpname"."cpu"')
-	.where(lambda: "host" == 'serverA')
+	.from()
+		.database('dbname')
+		.retentionPolicy('rpname')
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
 	.window()
 		.period(10s)
 		.every(10s)
@@ -125,7 +128,7 @@ func TestStream_SimpleMR(t *testing.T) {
 
 	var script = `
 stream
-	.from('cpu')
+	.from().measurement('cpu')
 	.where(lambda: "host" == 'serverA')
 	.window()
 		.period(10s)
@@ -183,7 +186,7 @@ func TestStream_GroupBy(t *testing.T) {
 
 	var script = `
 stream
-	.from('errors')
+	.from().measurement('errors')
 	.groupBy('service')
 	.window()
 		.period(10s)
@@ -260,7 +263,7 @@ func TestStream_Join(t *testing.T) {
 
 	var script = `
 var errorCounts = stream
-			.from('errors')
+			.from().measurement('errors')
 			.groupBy('service')
 			.window()
 				.period(10s)
@@ -269,7 +272,7 @@ var errorCounts = stream
 			.mapReduce(influxql.sum('value'))
 
 var viewCounts = stream
-			.from('views')
+			.from().measurement('views')
 			.groupBy('service')
 			.window()
 				.period(10s)
@@ -360,11 +363,11 @@ func TestStream_JoinTolerance(t *testing.T) {
 
 	var script = `
 var errorCounts = stream
-			.from('errors')
+			.from().measurement('errors')
 			.groupBy('service')
 
 var viewCounts = stream
-			.from('views')
+			.from().measurement('views')
 			.groupBy('service')
 
 errorCounts.join(viewCounts)
@@ -448,11 +451,11 @@ errorCounts.join(viewCounts)
 func TestStream_JoinFill(t *testing.T) {
 	var script = `
 var errorCounts = stream
-			.from('errors')
+			.from().measurement('errors')
 			.groupBy('service')
 
 var viewCounts = stream
-			.from('views')
+			.from().measurement('views')
 			.groupBy('service')
 
 errorCounts.join(viewCounts)
@@ -536,13 +539,13 @@ func TestStream_JoinN(t *testing.T) {
 
 	var script = `
 var cpu = stream
-			.from('cpu')
+			.from().measurement('cpu')
 			.where(lambda: "cpu" == 'total')
 var mem = stream
-			.from('memory')
+			.from().measurement('memory')
 			.where(lambda: "type" == 'free')
 var disk = stream
-			.from('disk')
+			.from().measurement('disk')
 			.where(lambda: "device" == 'sda')
 
 cpu.join(mem, disk)
@@ -606,13 +609,13 @@ func TestStream_Union(t *testing.T) {
 
 	var script = `
 var cpu = stream
-			.from('cpu')
+			.from().measurement('cpu')
 			.where(lambda: "cpu" == 'total')
 var mem = stream
-			.from('memory')
+			.from().measurement('memory')
 			.where(lambda: "type" == 'free')
 var disk = stream
-			.from('disk')
+			.from().measurement('disk')
 			.where(lambda: "device" == 'sda')
 
 cpu.union(mem, disk)
@@ -681,7 +684,7 @@ func TestStream_Aggregations(t *testing.T) {
 
 	var scriptTmpl = `
 stream
-	.from('cpu')
+	.from().measurement('cpu')
 	.where(lambda: "host" == 'serverA')
 	.window()
 		.period(10s)
@@ -1156,7 +1159,7 @@ func TestStream_CustomFunctions(t *testing.T) {
 var fMap = loadMapFunc('./TestCustomMapFunction.py')
 var fReduce = loadReduceFunc('./TestCustomReduceFunction.py')
 stream
-	.from('cpu')
+	.from().measurement('cpu')
 	.where(lambda: "host" == 'serverA')
 	.window()
 		.period(1s)
@@ -1176,7 +1179,7 @@ func TestStream_CustomMRFunction(t *testing.T) {
 	var script = `
 var fMapReduce = loadMapReduceFunc('./TestCustomMapReduceFunction.py')
 stream
-	.from('cpu')
+	.from().measurement('cpu')
 	.where(lambda: "host" = 'serverA')
 	.window()
 		.period(1s)
@@ -1208,7 +1211,7 @@ func TestStream_Alert(t *testing.T) {
 
 	var script = `
 stream
-	.from('cpu')
+	.from().measurement('cpu')
 	.where(lambda: "host" == 'serverA')
 	.window()
 		.period(10s)
@@ -1258,7 +1261,7 @@ func TestStream_AlertSigma(t *testing.T) {
 
 	var script = `
 stream
-	.from('cpu')
+	.from().measurement('cpu')
 	.where(lambda: "host" == 'serverA')
 	.eval(lambda: sigma("value"))
 		.as('sigma')
@@ -1307,7 +1310,7 @@ func TestStream_AlertComplexWhere(t *testing.T) {
 
 	var script = `
 stream
-	.from('cpu')
+	.from().measurement('cpu')
 	.where(lambda: "host" == 'serverA' AND sigma("value") > 2)
 	.alert()
 		.crit(lambda: TRUE)
@@ -1342,7 +1345,7 @@ func TestStream_AlertFlapping(t *testing.T) {
 	defer ts.Close()
 	var script = `
 stream
-	.from('cpu')
+	.from().measurement('cpu')
 	.where(lambda: "host" == 'serverA')
 	.alert()
 		.info(lambda: "value" < 95)
@@ -1376,7 +1379,7 @@ func TestStream_InfluxDBOut(t *testing.T) {
 
 	var script = `
 stream
-	.from('cpu')
+	.from().measurement('cpu')
 	.where(lambda: "host" == 'serverA')
 	.window()
 		.period(10s)
@@ -1465,7 +1468,7 @@ func TestStream_TopSelector(t *testing.T) {
 
 	var script = `
 var topScores = stream
-    .from('scores')
+    .from().measurement('scores')
     // Get the most recent score for each player
     .groupBy('game', 'player')
     .window()

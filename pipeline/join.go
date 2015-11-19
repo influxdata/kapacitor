@@ -20,9 +20,9 @@ import (
 //
 // Example:
 //    var errors = stream
-//                   .from('errors')
+//                   .from().measurement('errors')
 //    var requests = stream
-//                   .from('requests')
+//                   .from().measurement('requests')
 //    // Join the errors and requests streams
 //    errors.join(requests)
 //            // Provide prefix names for the fields of the data points.
