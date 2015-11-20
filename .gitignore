@@ -4,6 +4,7 @@ dist/*
 /kapacitor.conf
 kapacitor_linux*
 kapacitord_linux*
+/*.tick
 *~
 *#
 kapacitor*.rpm

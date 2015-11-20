@@ -3,24 +3,31 @@ package influxdb
 import (
 	"net/url"
 	"time"
+
+	"github.com/influxdb/kapacitor/services/udp"
 )
 
 type Config struct {
-	Enabled       bool                `toml:"enabled"`
-	URLs          []string            `toml:"urls"`
-	Username      string              `toml:"username"`
-	Password      string              `toml:"password"`
-	Timeout       time.Duration       `toml:"timeout"`
-	Subscriptions map[string][]string `toml:"subscriptions"`
+	Enabled               bool                `toml:"enabled"`
+	URLs                  []string            `toml:"urls"`
+	Username              string              `toml:"username"`
+	Password              string              `toml:"password"`
+	Timeout               time.Duration       `toml:"timeout"`
+	Subscriptions         map[string][]string `toml:"subscriptions"`
+	ExcludedSubscriptions map[string][]string `toml:"excluded-subscriptions"`
+	UDPBuffer             int                 `toml:"udp-buffer"`
+	UDPReadBuffer         int                 `toml:"udp-read-buffer"`
 }
 
 func NewConfig() Config {
 	return Config{
-		Enabled:       true,
-		URLs:          []string{"http://localhost:8086"},
-		Username:      "",
-		Password:      "",
-		Subscriptions: make(map[string][]string),
+		Enabled:               true,
+		URLs:                  []string{"http://localhost:8086"},
+		Username:              "",
+		Password:              "",
+		Subscriptions:         make(map[string][]string),
+		ExcludedSubscriptions: make(map[string][]string),
+		UDPBuffer:             udp.DefaultBuffer,
 	}
 }
 

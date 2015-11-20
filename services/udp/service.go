@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	UDPBufferSize = 65536
+	UDPPacketSize = 65536
 )
 
 // statistics gathered by the UDP package.
@@ -33,10 +33,11 @@ const (
 // formatted with the inline protocol
 //
 type Service struct {
-	conn *net.UDPConn
-	addr *net.UDPAddr
-	wg   sync.WaitGroup
-	done chan struct{}
+	conn    *net.UDPConn
+	addr    *net.UDPAddr
+	wg      sync.WaitGroup
+	done    chan struct{}
+	packets chan []byte
 
 	config Config
 
@@ -82,22 +83,36 @@ func (s *Service) Open() (err error) {
 		s.Logger.Printf("E! Failed to set up UDP listener at address %s: %s", s.addr, err)
 		return err
 	}
+
+	if s.config.ReadBuffer != 0 {
+		err = s.conn.SetReadBuffer(s.config.ReadBuffer)
+		if err != nil {
+			s.Logger.Printf("E! Failed to set UDP read buffer to %d: %s", s.config.ReadBuffer, err)
+			return err
+		}
+	}
+
 	//save fully resolved and bound addr. Useful if port given was '0'.
 	s.addr = s.conn.LocalAddr().(*net.UDPAddr)
 
 	s.Logger.Printf("I! Started listening on UDP: %s", s.addr.String())
 
+	// Start reading and processing packets
+	s.packets = make(chan []byte, s.config.Buffer)
 	s.wg.Add(1)
 	go s.serve()
+	s.wg.Add(1)
+	go s.processPackets()
 
 	return nil
 }
 
 func (s *Service) serve() {
 	defer s.wg.Done()
+	defer close(s.packets)
 
+	buf := make([]byte, UDPPacketSize)
 	for {
-		buf := make([]byte, UDPBufferSize)
 
 		select {
 		case <-s.done:
@@ -116,8 +131,17 @@ func (s *Service) serve() {
 			continue
 		}
 		s.statMap.Add(statBytesReceived, int64(n))
+		p := make([]byte, n)
+		copy(p, buf[:n])
+		s.packets <- p
+	}
+}
 
-		points, err := models.ParsePoints(buf[:n])
+func (s *Service) processPackets() {
+	defer s.wg.Done()
+
+	for p := range s.packets {
+		points, err := models.ParsePoints(p)
 		if err != nil {
 			s.statMap.Add(statPointsParseFail, 1)
 			s.Logger.Printf("E! Failed to parse points: %s", err)
@@ -145,13 +169,14 @@ func (s *Service) Close() error {
 		return errors.New("Service already closed")
 	}
 
-	s.conn.Close()
 	close(s.done)
+	s.conn.Close()
 	s.wg.Wait()
 
 	// Release all remaining resources.
 	s.done = nil
 	s.conn = nil
+	s.packets = nil
 
 	s.Logger.Print("I! Service closed")
 

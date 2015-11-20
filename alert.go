@@ -293,7 +293,7 @@ func (a *AlertNode) handleExec(ad AlertData) {
 	cmd.Stderr = &out
 	err = cmd.Run()
 	if err != nil {
-		a.logger.Println("E! error running alert command:", err, out)
+		a.logger.Println("E! error running alert command:", err, out.String())
 		return
 	}
 }

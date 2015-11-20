@@ -16,6 +16,7 @@ import (
 	"github.com/influxdb/kapacitor/services/replay"
 	"github.com/influxdb/kapacitor/services/reporting"
 	"github.com/influxdb/kapacitor/services/smtp"
+	"github.com/influxdb/kapacitor/services/stats"
 	"github.com/influxdb/kapacitor/services/task_store"
 	"github.com/influxdb/kapacitor/services/udp"
 
@@ -38,6 +39,7 @@ type Config struct {
 	UDPs      []udp.Config      `toml:"udp"`
 	SMTP      smtp.Config       `toml:"smtp"`
 	Reporting reporting.Config  `toml:"reporting"`
+	Stats     stats.Config      `toml:"stats"`
 
 	Hostname string `toml:"hostname"`
 	DataDir  string `toml:"data_dir"`
@@ -59,6 +61,7 @@ func NewConfig() *Config {
 	c.OpenTSDB = opentsdb.NewConfig()
 	c.SMTP = smtp.NewConfig()
 	c.Reporting = reporting.NewConfig()
+	c.Stats = stats.NewConfig()
 
 	return c
 }

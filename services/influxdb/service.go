@@ -19,11 +19,14 @@ const (
 
 // Handles requests to write or read from an InfluxDB cluster
 type Service struct {
-	configs    []client.Config
-	i          int
-	configSubs map[subEntry]bool
-	hostname   string
-	logger     *log.Logger
+	configs       []client.Config
+	i             int
+	configSubs    map[subEntry]bool
+	exConfigSubs  map[subEntry]bool
+	hostname      string
+	logger        *log.Logger
+	udpBuffer     int
+	udpReadBuffer int
 
 	PointsWriter interface {
 		WritePoints(p *cluster.WritePointsRequest) error
@@ -68,11 +71,21 @@ func NewService(c Config, hostname string, l *log.Logger) *Service {
 			subs[se] = true
 		}
 	}
+	exSubs := make(map[subEntry]bool, len(c.ExcludedSubscriptions))
+	for db, rps := range c.ExcludedSubscriptions {
+		for _, rp := range rps {
+			se := subEntry{db, rp, subName}
+			exSubs[se] = true
+		}
+	}
 	return &Service{
-		configs:    configs,
-		configSubs: subs,
-		hostname:   hostname,
-		logger:     l,
+		configs:       configs,
+		configSubs:    subs,
+		exConfigSubs:  exSubs,
+		hostname:      hostname,
+		logger:        l,
+		udpBuffer:     c.UDPBuffer,
+		udpReadBuffer: c.UDPReadBuffer,
 	}
 }
 
@@ -198,7 +211,7 @@ func (s *Service) linkSubscriptions() error {
 	startedSubs := make(map[subEntry]bool)
 	all := len(s.configSubs) == 0
 	for se, si := range existingSubs {
-		if s.configSubs[se] || all {
+		if (s.configSubs[se] || all) && !s.exConfigSubs[se] {
 			// Check if this kapacitor instance is in the list of hosts
 			for _, dest := range si.Destinations {
 				u, err := url.Parse(dest)
@@ -222,7 +235,7 @@ func (s *Service) linkSubscriptions() error {
 	// create and start any new subscriptions
 	for _, se := range allSubs {
 		// If we have been configured to subscribe and the subscription is not started yet.
-		if (s.configSubs[se] || all) && !startedSubs[se] {
+		if (s.configSubs[se] || all) && !startedSubs[se] && !s.exConfigSubs[se] {
 			u, err := url.Parse("udp://:0")
 			if err != nil {
 				return fmt.Errorf("could not create valid destination url, is hostname correct? err: %s", err)
@@ -266,6 +279,8 @@ func (s *Service) startListener(db, rp string, u url.URL) (net.Addr, error) {
 		c.BindAddress = u.Host
 		c.Database = db
 		c.RetentionPolicy = rp
+		c.Buffer = s.udpBuffer
+		c.ReadBuffer = s.udpReadBuffer
 
 		l := s.LogService.NewLogger(fmt.Sprintf("[udp:%s.%s] ", db, rp), log.LstdFlags)
 		service := udp.NewService(c, l)

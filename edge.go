@@ -38,12 +38,18 @@ type Edge struct {
 	statMap *expvar.Map
 }
 
-func newEdge(name string, t pipeline.EdgeType, logService LogService) *Edge {
-	sm := &expvar.Map{}
-	sm.Init()
+func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, logService LogService) *Edge {
+	tags := map[string]string{
+		"task":   taskName,
+		"parent": parentName,
+		"child":  childName,
+		"type":   t.String(),
+	}
+	sm := NewStatistics("edges", tags)
 	sm.Add(statCollected, 0)
 	sm.Add(statEmitted, 0)
 	e := &Edge{statMap: sm}
+	name := fmt.Sprintf("%s|%s->%s", taskName, parentName, childName)
 	e.logger = logService.NewLogger(fmt.Sprintf("[edge:%s] ", name), log.LstdFlags)
 	switch t {
 	case pipeline.StreamEdge:

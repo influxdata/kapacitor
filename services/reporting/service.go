@@ -2,10 +2,8 @@
 package reporting
 
 import (
-	"expvar"
 	"log"
 	"runtime"
-	"strconv"
 	"sync"
 	"time"
 
@@ -190,7 +188,7 @@ func (s *Service) sendUsageReport() error {
 
 // Send all internal stats.
 func (s *Service) sendStatsReport() error {
-	data, err := s.getStatsData()
+	data, err := kapacitor.GetStatsData()
 	if err != nil {
 		return err
 	}
@@ -206,117 +204,4 @@ func (s *Service) sendStatsReport() error {
 		resp.Body.Close()
 	}
 	return err
-}
-
-// Return all stats data from the expvars.
-func (s *Service) getStatsData() ([]client.StatsData, error) {
-	allData := make([]client.StatsData, 0)
-	// Add Global expvars
-	globalData := client.StatsData{
-		Name:   "kapacitor",
-		Values: make(client.Values),
-	}
-
-	allData = append(allData, globalData)
-
-	expvar.Do(func(kv expvar.KeyValue) {
-		var f interface{}
-		var err error
-		switch v := kv.Value.(type) {
-		case *expvar.Float:
-			f, err = strconv.ParseFloat(v.String(), 64)
-			if err == nil {
-				globalData.Values[kv.Key] = f
-			}
-		case *expvar.Int:
-			f, err = strconv.ParseInt(v.String(), 10, 64)
-			if err == nil {
-				globalData.Values[kv.Key] = f
-			}
-		case *expvar.Map:
-			data := client.StatsData{
-				Tags:   make(client.Tags),
-				Values: make(client.Values),
-			}
-
-			v.Do(func(subKV expvar.KeyValue) {
-				switch subKV.Key {
-				case "name":
-					// straight to string name.
-					u, err := strconv.Unquote(subKV.Value.String())
-					if err != nil {
-						return
-					}
-					data.Name = u
-				case "tags":
-					// string-string tags map.
-					n := subKV.Value.(*expvar.Map)
-					n.Do(func(t expvar.KeyValue) {
-						u, err := strconv.Unquote(t.Value.String())
-						if err != nil {
-							return
-						}
-						data.Tags[t.Key] = u
-					})
-				case "values":
-					// string-interface map.
-					n := subKV.Value.(*expvar.Map)
-					n.Do(func(kv expvar.KeyValue) {
-						var f interface{}
-						var err error
-						switch v := kv.Value.(type) {
-						case *expvar.Float:
-							f, err = strconv.ParseFloat(v.String(), 64)
-							if err != nil {
-								return
-							}
-						case *expvar.Int:
-							f, err = strconv.ParseInt(v.String(), 10, 64)
-							if err != nil {
-								return
-							}
-						default:
-							return
-						}
-						data.Values[kv.Key] = f
-					})
-				}
-			})
-
-			// If a registered client has no field data, don't include it in the results
-			if len(data.Values) == 0 {
-				return
-			}
-
-			allData = append(allData, data)
-		}
-	})
-
-	// Add Go memstats.
-	data := client.StatsData{
-		Name: "runtime",
-	}
-
-	var rt runtime.MemStats
-	runtime.ReadMemStats(&rt)
-	data.Values = client.Values{
-		"Alloc":        int64(rt.Alloc),
-		"TotalAlloc":   int64(rt.TotalAlloc),
-		"Sys":          int64(rt.Sys),
-		"Lookups":      int64(rt.Lookups),
-		"Mallocs":      int64(rt.Mallocs),
-		"Frees":        int64(rt.Frees),
-		"HeapAlloc":    int64(rt.HeapAlloc),
-		"HeapSys":      int64(rt.HeapSys),
-		"HeapIdle":     int64(rt.HeapIdle),
-		"HeapInUse":    int64(rt.HeapInuse),
-		"HeapReleased": int64(rt.HeapReleased),
-		"HeapObjects":  int64(rt.HeapObjects),
-		"PauseTotalNs": int64(rt.PauseTotalNs),
-		"NumGC":        int64(rt.NumGC),
-		"NumGoroutine": int64(runtime.NumGoroutine()),
-	}
-	allData = append(allData, data)
-
-	return allData, nil
 }

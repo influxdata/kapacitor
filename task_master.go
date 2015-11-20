@@ -55,7 +55,7 @@ type fork struct {
 
 // Create a new Executor with a given clock.
 func NewTaskMaster(l LogService) *TaskMaster {
-	src := newEdge("src->stream", pipeline.StreamEdge, l)
+	src := newEdge("TASK_MASTER", "sources", "stream", pipeline.StreamEdge, l)
 	return &TaskMaster{
 		Stream:     src,
 		in:         src,
@@ -108,7 +108,7 @@ func (tm *TaskMaster) StartTask(t *Task) (*ExecutingTask, error) {
 		}
 		ins = make([]*Edge, count)
 		for i := 0; i < count; i++ {
-			in := newEdge(fmt.Sprintf("batch->%s:%d", t.Name, i), pipeline.BatchEdge, tm.LogService)
+			in := newEdge(t.Name, "batch", fmt.Sprintf("batch%d", i), pipeline.BatchEdge, tm.LogService)
 			ins[i] = in
 			tm.batches[t.Name] = append(tm.batches[t.Name], in)
 		}
@@ -170,15 +170,11 @@ func (tm *TaskMaster) forkPoint(p models.Point) {
 	}
 }
 
-func (tm *TaskMaster) NewFork(name string, dbrps []DBRP) *Edge {
+func (tm *TaskMaster) NewFork(taskName string, dbrps []DBRP) *Edge {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
-	short := name
-	if len(short) > 8 {
-		short = short[:8]
-	}
-	e := newEdge("stream->"+name, pipeline.StreamEdge, tm.LogService)
-	tm.forks[name] = fork{
+	e := newEdge(taskName, "stream", "stream0", pipeline.StreamEdge, tm.LogService)
+	tm.forks[taskName] = fork{
 		Edge:  e,
 		dbrps: CreateDBRPMap(dbrps),
 	}
