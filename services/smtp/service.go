@@ -36,6 +36,10 @@ func (s *Service) Close() error {
 	return nil
 }
 
+func (s *Service) Global() bool {
+	return s.c.Global
+}
+
 func (s *Service) runMailer() {
 	defer s.wg.Done()
 	d := gomail.NewPlainDialer(s.c.Host, s.c.Port, s.c.Username, s.c.Password)
@@ -75,12 +79,15 @@ func (s *Service) runMailer() {
 	}
 }
 
-func (s *Service) SendMail(from string, to []string, subject string, msg string) {
+func (s *Service) SendMail(to []string, subject, msg string) {
 	if len(to) == 0 {
 		return
 	}
+	if len(to) == 0 {
+		to = s.c.To
+	}
 	m := gomail.NewMessage()
-	m.SetHeader("From", from)
+	m.SetHeader("From", s.c.From)
 	m.SetHeader("To", to...)
 	m.SetHeader("Subject", subject)
 	m.SetBody("text/plain", msg)

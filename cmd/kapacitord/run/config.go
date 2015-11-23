@@ -13,12 +13,15 @@ import (
 	"github.com/influxdb/kapacitor/services/httpd"
 	"github.com/influxdb/kapacitor/services/influxdb"
 	"github.com/influxdb/kapacitor/services/logging"
+	"github.com/influxdb/kapacitor/services/pagerduty"
 	"github.com/influxdb/kapacitor/services/replay"
 	"github.com/influxdb/kapacitor/services/reporting"
+	"github.com/influxdb/kapacitor/services/slack"
 	"github.com/influxdb/kapacitor/services/smtp"
 	"github.com/influxdb/kapacitor/services/stats"
 	"github.com/influxdb/kapacitor/services/task_store"
 	"github.com/influxdb/kapacitor/services/udp"
+	"github.com/influxdb/kapacitor/services/victorops"
 
 	"github.com/influxdb/influxdb/services/collectd"
 	"github.com/influxdb/influxdb/services/graphite"
@@ -38,6 +41,9 @@ type Config struct {
 	OpenTSDB  opentsdb.Config   `toml:"opentsdb"`
 	UDPs      []udp.Config      `toml:"udp"`
 	SMTP      smtp.Config       `toml:"smtp"`
+	VictorOps victorops.Config  `toml:"victorops"`
+	PagerDuty pagerduty.Config  `toml:"pagerduty"`
+	Slack     slack.Config      `toml:"slack"`
 	Reporting reporting.Config  `toml:"reporting"`
 	Stats     stats.Config      `toml:"stats"`
 
@@ -60,6 +66,9 @@ func NewConfig() *Config {
 	c.Collectd = collectd.NewConfig()
 	c.OpenTSDB = opentsdb.NewConfig()
 	c.SMTP = smtp.NewConfig()
+	c.VictorOps = victorops.NewConfig()
+	c.PagerDuty = pagerduty.NewConfig()
+	c.Slack = slack.NewConfig()
 	c.Reporting = reporting.NewConfig()
 	c.Stats = stats.NewConfig()
 

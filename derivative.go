@@ -80,23 +80,36 @@ func (d *DerivativeNode) runDerivative() error {
 }
 
 func (d *DerivativeNode) derivative(prev, curr models.Fields, prevTime, currTime time.Time) (float64, bool) {
-	f0, ok := prev[d.d.Field].(float64)
+	f0, ok := numToFloat(prev[d.d.Field])
 	if !ok {
+		d.logger.Printf("E! cannot apply derivative to type %T", prev[d.d.Field])
 		return 0, false
 	}
 
-	f1, ok := curr[d.d.Field].(float64)
+	f1, ok := numToFloat(curr[d.d.Field])
 	if !ok {
+		d.logger.Printf("E! cannot apply derivative to type %T", curr[d.d.Field])
 		return 0, false
 	}
 
-	elapsed := currTime.Sub(prevTime)
+	elapsed := float64(currTime.Sub(prevTime))
 	diff := f1 - f0
 	// Drop negative values for non-negative derivatives
 	if d.d.NonNegativeFlag && diff < 0 {
 		return 0, false
 	}
 
-	value := float64(diff) / (float64(elapsed) / float64(d.d.Unit))
+	value := float64(diff) / (elapsed / float64(d.d.Unit))
 	return value, true
+}
+
+func numToFloat(num interface{}) (float64, bool) {
+	switch n := num.(type) {
+	case int64:
+		return float64(n), true
+	case float64:
+		return n, true
+	default:
+		return 0, false
+	}
 }

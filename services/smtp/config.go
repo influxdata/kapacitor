@@ -12,7 +12,14 @@ type Config struct {
 	Port     int    `toml:"port"`
 	Username string `toml:"username"`
 	Password string `toml:"password"`
-	NoVerify bool   `toml:"no-verify"`
+	// Whether to skip TLS verify.
+	NoVerify bool `toml:"no-verify"`
+	// Whether all alerts should trigger an email.
+	Global bool `toml:"global"`
+	// Default from address
+	From string `toml:"from"`
+	// Default to addresses
+	To []string `toml:"to"`
 	// Close connection to SMTP server after idle timeout has elapsed
 	IdleTimeout toml.Duration `toml:"idle-timeout"`
 }

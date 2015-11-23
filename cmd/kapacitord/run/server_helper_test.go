@@ -73,7 +73,7 @@ func (s *Server) Close() {
 // URL returns the base URL for the httpd endpoint.
 func (s *Server) URL() string {
 	if s.HTTPDService != nil {
-		return "http://" + s.HTTPDService.Addr().String()
+		return s.HTTPDService.URL()
 	}
 	panic("httpd server not found in services")
 }
