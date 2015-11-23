@@ -39,6 +39,7 @@ func newInfluxDBOutNode(wants EdgeType) *InfluxDBOutNode {
 			wants:    wants,
 			provides: NoEdge,
 		},
+		Tags: make(map[string]string),
 	}
 }
 
