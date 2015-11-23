@@ -12,6 +12,7 @@ type Config struct {
 	Port     int    `toml:"port"`
 	Username string `toml:"username"`
 	Password string `toml:"password"`
+	NoVerify bool   `toml:"no-verify"`
 	// Close connection to SMTP server after idle timeout has elapsed
 	IdleTimeout toml.Duration `toml:"idle-timeout"`
 }

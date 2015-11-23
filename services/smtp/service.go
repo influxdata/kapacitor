@@ -1,6 +1,7 @@
 package smtp
 
 import (
+	"crypto/tls"
 	"log"
 	"sync"
 	"time"
@@ -38,6 +39,9 @@ func (s *Service) Close() error {
 func (s *Service) runMailer() {
 	defer s.wg.Done()
 	d := gomail.NewPlainDialer(s.c.Host, s.c.Port, s.c.Username, s.c.Password)
+	if s.c.NoVerify {
+		d.TLSConfig = &tls.Config{InsecureSkipVerify: true}
+	}
 
 	var conn gomail.SendCloser
 	var err error

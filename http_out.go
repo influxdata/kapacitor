@@ -70,7 +70,11 @@ func (h *HTTPOutNode) runOut() error {
 	}}
 
 	h.endpoint = h.et.tm.HTTPDService.Addr().String() + httpd.APIRoot + p
-	h.routes = r
+	func() {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		h.routes = r
+	}()
 
 	err := h.et.tm.HTTPDService.AddRoutes(r)
 	if err != nil {
@@ -107,5 +111,7 @@ func (h *HTTPOutNode) updateResultWithRow(group models.GroupID, row *imodels.Row
 }
 
 func (h *HTTPOutNode) stopOut() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.et.tm.HTTPDService.DelRoutes(h.routes)
 }
