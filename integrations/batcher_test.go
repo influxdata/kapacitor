@@ -15,6 +15,303 @@ import (
 	"github.com/influxdb/kapacitor/wlog"
 )
 
+func TestBatch_Derivative(t *testing.T) {
+
+	var script = `
+batch
+	.query('''
+		SELECT sum("value") as "value"
+		FROM "telegraf"."default".packets
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s))
+	.derivative('value')
+	.httpOut('TestBatch_Derivative')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "packets",
+				Tags:    nil,
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						0.5,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						0.5,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						0.5,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						0.5,
+					},
+				},
+			},
+		},
+	}
+
+	clock, et, errCh, tm := testBatcher(t, "TestBatch_Derivative", script)
+	defer tm.Close()
+
+	// Move time forward
+	clock.Set(clock.Zero().Add(21 * time.Second))
+	// Wait till the replay has finished
+	if e := <-errCh; e != nil {
+		t.Error(e)
+	}
+	// Wait till the task is finished
+	if e := et.Err(); e != nil {
+		t.Error(e)
+	}
+
+	// Get the result
+	output, err := et.GetOutput("TestBatch_Derivative")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := http.Get(output.Endpoint())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert we got the expected result
+	result := kapacitor.ResultFromJSON(resp.Body)
+	if eq, msg := compareResults(er, result); !eq {
+		t.Error(msg)
+	}
+}
+
+func TestBatch_DerivativeUnit(t *testing.T) {
+
+	var script = `
+batch
+	.query('''
+		SELECT sum("value") as "value"
+		FROM "telegraf"."default".packets
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s))
+	.derivative('value')
+		.unit(2s)
+	.httpOut('TestBatch_Derivative')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "packets",
+				Tags:    nil,
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						1.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						1.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						1.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						1.0,
+					},
+				},
+			},
+		},
+	}
+
+	clock, et, errCh, tm := testBatcher(t, "TestBatch_Derivative", script)
+	defer tm.Close()
+
+	// Move time forward
+	clock.Set(clock.Zero().Add(21 * time.Second))
+	// Wait till the replay has finished
+	if e := <-errCh; e != nil {
+		t.Error(e)
+	}
+	// Wait till the task is finished
+	if e := et.Err(); e != nil {
+		t.Error(e)
+	}
+
+	// Get the result
+	output, err := et.GetOutput("TestBatch_Derivative")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := http.Get(output.Endpoint())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert we got the expected result
+	result := kapacitor.ResultFromJSON(resp.Body)
+	if eq, msg := compareResults(er, result); !eq {
+		t.Error(msg)
+	}
+}
+
+func TestBatch_DerivativeN(t *testing.T) {
+
+	var script = `
+batch
+	.query('''
+		SELECT sum("value") as "value"
+		FROM "telegraf"."default".packets
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s))
+	.derivative('value')
+	.httpOut('TestBatch_Derivative')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "packets",
+				Tags:    nil,
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						0.5,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						0.5,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						-501.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						0.5,
+					},
+				},
+			},
+		},
+	}
+
+	clock, et, errCh, tm := testBatcher(t, "TestBatch_DerivativeNN", script)
+	defer tm.Close()
+
+	// Move time forward
+	clock.Set(clock.Zero().Add(21 * time.Second))
+	// Wait till the replay has finished
+	if e := <-errCh; e != nil {
+		t.Error(e)
+	}
+	// Wait till the task is finished
+	if e := et.Err(); e != nil {
+		t.Error(e)
+	}
+
+	// Get the result
+	output, err := et.GetOutput("TestBatch_Derivative")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := http.Get(output.Endpoint())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert we got the expected result
+	result := kapacitor.ResultFromJSON(resp.Body)
+	if eq, msg := compareResults(er, result); !eq {
+		t.Error(msg)
+	}
+}
+func TestBatch_DerivativeNN(t *testing.T) {
+
+	var script = `
+batch
+	.query('''
+		SELECT sum("value") as "value"
+		FROM "telegraf"."default".packets
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s))
+	.derivative('value')
+		.nonNegative()
+	.httpOut('TestBatch_Derivative')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "packets",
+				Tags:    nil,
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						0.5,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						0.5,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						0.5,
+					},
+				},
+			},
+		},
+	}
+
+	clock, et, errCh, tm := testBatcher(t, "TestBatch_DerivativeNN", script)
+	defer tm.Close()
+
+	// Move time forward
+	clock.Set(clock.Zero().Add(21 * time.Second))
+	// Wait till the replay has finished
+	if e := <-errCh; e != nil {
+		t.Error(e)
+	}
+	// Wait till the task is finished
+	if e := et.Err(); e != nil {
+		t.Error(e)
+	}
+
+	// Get the result
+	output, err := et.GetOutput("TestBatch_Derivative")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := http.Get(output.Endpoint())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert we got the expected result
+	result := kapacitor.ResultFromJSON(resp.Body)
+	if eq, msg := compareResults(er, result); !eq {
+		t.Error(msg)
+	}
+}
+
 func TestBatch_SimpleMR(t *testing.T) {
 
 	var script = `
@@ -42,7 +339,7 @@ batch
 				Tags:    map[string]string{"cpu": "cpu-total"},
 				Columns: []string{"time", "sum"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1970, 1, 1, 0, 0, 28, 0, time.UTC),
+					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					10.0,
 				}},
 			},
@@ -51,7 +348,7 @@ batch
 				Tags:    map[string]string{"cpu": "cpu0"},
 				Columns: []string{"time", "sum"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1970, 1, 1, 0, 0, 28, 0, time.UTC),
+					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					10.0,
 				}},
 			},
@@ -60,7 +357,7 @@ batch
 				Tags:    map[string]string{"cpu": "cpu1"},
 				Columns: []string{"time", "sum"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1970, 1, 1, 0, 0, 28, 0, time.UTC),
+					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					10.0,
 				}},
 			},
@@ -138,7 +435,7 @@ cpu0.join(cpu1)
 				Name:    "cpu_usage_idle",
 				Columns: []string{"time", "sum"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1970, 1, 1, 0, 0, 28, 0, time.UTC),
+					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
 					10.0,
 				}},
 			},
@@ -206,7 +503,8 @@ func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.Ex
 		t.Fatal("could not find any data files for", name)
 	}
 
-	c := clock.New(time.Unix(0, 0))
+	// Use 1971 so that we don't get true negatives on Epoch 0 collisions
+	c := clock.New(time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC))
 	r := kapacitor.NewReplay(c)
 
 	// Create a new execution env

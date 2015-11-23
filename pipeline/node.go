@@ -316,3 +316,10 @@ func (n *chainnode) Sample(rate interface{}) *SampleNode {
 	n.linkChild(s)
 	return s
 }
+
+// Create a new node that computes the derivative of adjacent points.
+func (n *chainnode) Derivative(field string) *DerivativeNode {
+	s := newDerivativeNode(n.Provides(), field)
+	n.linkChild(s)
+	return s
+}

@@ -43,6 +43,240 @@ func init() {
 	}
 }
 
+func TestStream_Derivative(t *testing.T) {
+
+	var script = `
+stream
+	.from().measurement('packets')
+	.derivative('value')
+	.window()
+		.period(10s)
+		.every(10s)
+	.mapReduce(influxql.mean('value'))
+	.httpOut('TestStream_Derivative')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "packets",
+				Tags:    nil,
+				Columns: []string{"time", "mean"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					1.0,
+				}},
+			},
+		},
+	}
+
+	clock, et, errCh, tm := testStreamer(t, "TestStream_Derivative", script)
+	defer tm.Close()
+
+	// Move time forward
+	clock.Set(clock.Zero().Add(15 * time.Second))
+	// Wait till the replay has finished
+	if e := <-errCh; e != nil {
+		t.Error(e)
+	}
+	// Wait till the task is finished
+	if e := et.Err(); e != nil {
+		t.Error(e)
+	}
+
+	// Get the result
+	output, err := et.GetOutput("TestStream_Derivative")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := http.Get(output.Endpoint())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert we got the expected result
+	result := kapacitor.ResultFromJSON(resp.Body)
+	if eq, msg := compareResults(er, result); !eq {
+		t.Error(msg)
+	}
+}
+
+func TestStream_DerivativeUnit(t *testing.T) {
+
+	var script = `
+stream
+	.from().measurement('packets')
+	.derivative('value')
+		.unit(10s)
+	.window()
+		.period(10s)
+		.every(10s)
+	.mapReduce(influxql.mean('value'))
+	.httpOut('TestStream_Derivative')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "packets",
+				Tags:    nil,
+				Columns: []string{"time", "mean"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					10.0,
+				}},
+			},
+		},
+	}
+
+	clock, et, errCh, tm := testStreamer(t, "TestStream_Derivative", script)
+	defer tm.Close()
+
+	// Move time forward
+	clock.Set(clock.Zero().Add(15 * time.Second))
+	// Wait till the replay has finished
+	if e := <-errCh; e != nil {
+		t.Error(e)
+	}
+	// Wait till the task is finished
+	if e := et.Err(); e != nil {
+		t.Error(e)
+	}
+
+	// Get the result
+	output, err := et.GetOutput("TestStream_Derivative")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := http.Get(output.Endpoint())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert we got the expected result
+	result := kapacitor.ResultFromJSON(resp.Body)
+	if eq, msg := compareResults(er, result); !eq {
+		t.Error(msg)
+	}
+}
+
+func TestStream_DerivativeNN(t *testing.T) {
+
+	var script = `
+stream
+	.from().measurement('packets')
+	.derivative('value')
+		.nonNegative()
+	.window()
+		.period(10s)
+		.every(10s)
+	.mapReduce(influxql.mean('value'))
+	.httpOut('TestStream_Derivative')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "packets",
+				Tags:    nil,
+				Columns: []string{"time", "mean"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					1.0,
+				}},
+			},
+		},
+	}
+
+	clock, et, errCh, tm := testStreamer(t, "TestStream_DerivativeNN", script)
+	defer tm.Close()
+
+	// Move time forward
+	clock.Set(clock.Zero().Add(15 * time.Second))
+	// Wait till the replay has finished
+	if e := <-errCh; e != nil {
+		t.Error(e)
+	}
+	// Wait till the task is finished
+	if e := et.Err(); e != nil {
+		t.Error(e)
+	}
+
+	// Get the result
+	output, err := et.GetOutput("TestStream_Derivative")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := http.Get(output.Endpoint())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert we got the expected result
+	result := kapacitor.ResultFromJSON(resp.Body)
+	if eq, msg := compareResults(er, result); !eq {
+		t.Error(msg)
+	}
+}
+
+func TestStream_DerivativeN(t *testing.T) {
+
+	var script = `
+stream
+	.from().measurement('packets')
+	.derivative('value')
+	.window()
+		.period(10s)
+		.every(10s)
+	.mapReduce(influxql.mean('value'))
+	.httpOut('TestStream_Derivative')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "packets",
+				Tags:    nil,
+				Columns: []string{"time", "mean"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					-99.7,
+				}},
+			},
+		},
+	}
+
+	clock, et, errCh, tm := testStreamer(t, "TestStream_DerivativeNN", script)
+	defer tm.Close()
+
+	// Move time forward
+	clock.Set(clock.Zero().Add(15 * time.Second))
+	// Wait till the replay has finished
+	if e := <-errCh; e != nil {
+		t.Error(e)
+	}
+	// Wait till the task is finished
+	if e := et.Err(); e != nil {
+		t.Error(e)
+	}
+
+	// Get the result
+	output, err := et.GetOutput("TestStream_Derivative")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := http.Get(output.Endpoint())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert we got the expected result
+	result := kapacitor.ResultFromJSON(resp.Body)
+	if eq, msg := compareResults(er, result); !eq {
+		t.Error(msg)
+	}
+}
+
 func TestStream_Window(t *testing.T) {
 
 	var script = `
@@ -1613,6 +1847,7 @@ func testStreamer(t *testing.T, name, script string) (clock.Setter, *kapacitor.E
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Use 1971 so that we don't get true negatives on Epoch 0 collisions
 	c := clock.New(time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC))
 	r := kapacitor.NewReplay(c)
 

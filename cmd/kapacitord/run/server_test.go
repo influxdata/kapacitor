@@ -308,7 +308,7 @@ stream
 
 	// Request data before any writes and expect null responses
 	nullResponse := `{"Series":null,"Err":null}`
-	err = s.HTTPGetRetry(endpoint, "", nullResponse, 20, time.Millisecond*5)
+	err = s.HTTPGetRetry(endpoint, "", nullResponse, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
 	}
@@ -336,7 +336,7 @@ test value=1 0000000011
 	s.MustWrite("mydb", "myrp", points, v)
 
 	exp := `{"Series":[{"name":"test","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}],"Err":null}`
-	err = s.HTTPGetRetry(endpoint, nullResponse, exp, 20, time.Millisecond*5)
+	err = s.HTTPGetRetry(endpoint, nullResponse, exp, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
 	}
@@ -410,7 +410,7 @@ batch
 
 	nullResponse := `{"Series":null,"Err":null}`
 	exp := `{"Series":[{"name":"cpu","columns":["time","count"],"values":[["1971-01-01T00:00:01.002Z",2]]}],"Err":null}`
-	err = s.HTTPGetRetry(endpoint, nullResponse, exp, 20, time.Millisecond*5)
+	err = s.HTTPGetRetry(endpoint, nullResponse, exp, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
 	}
