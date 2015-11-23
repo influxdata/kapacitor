@@ -4,6 +4,26 @@ import (
 	"time"
 )
 
+// Compute the derivative of a stream or batch.
+// The derivative is computed on a single field
+// and behaves similarly to the InfluxQL derivative
+// function. Deriviative is not a MapReduce function
+// and as a result is not part of the normal influxql functions.
+//
+// Example:
+//     stream
+//         .from().measurement('net_rx_packets')
+//         .derivative('value')
+//            .unit(1s) // default
+//            .nonNegative()
+//         ...
+//
+// Computes the derivative via:
+//    (current - previous ) / ( time_difference / unit)
+//
+// For batch edges the derivative is computed for each
+// point in the batch and because of boundary conditions
+// the number of points is reduced by one.
 type DerivativeNode struct {
 	chainnode
 
@@ -34,8 +54,7 @@ func newDerivativeNode(wants EdgeType, field string) *DerivativeNode {
 	}
 }
 
-// If called the derivative will never return a negative
-// value.
+// If called the derivative will skip negative results.
 // tick:property
 func (d *DerivativeNode) NonNegative() *DerivativeNode {
 	d.NonNegativeFlag = true
