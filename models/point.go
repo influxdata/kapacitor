@@ -133,3 +133,11 @@ func PointToRow(p Point) (row *models.Row) {
 	}
 	return
 }
+
+func (f Fields) Copy() Fields {
+	cf := make(Fields, len(f))
+	for k, v := range f {
+		cf[k] = v
+	}
+	return cf
+}
