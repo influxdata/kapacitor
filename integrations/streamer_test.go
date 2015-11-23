@@ -1390,6 +1390,7 @@ stream
 		.retentionPolicy('rp')
 		.measurement('m')
 		.precision('s')
+		.tag('key', 'value')
 `
 	done := make(chan error, 1)
 	var points []imodels.Point
@@ -1454,8 +1455,11 @@ stream
 		if p.Fields()["count"] != 10.0 {
 			t.Errorf("got %v exp %v", p.Fields()["count"], 10.0)
 		}
-		if len(p.Tags()) != 0 {
-			t.Errorf("got %v exp %v", len(p.Tags()), 0)
+		if len(p.Tags()) != 1 {
+			t.Errorf("got %v exp %v", len(p.Tags()), 1)
+		}
+		if p.Tags()["key"] != "value" {
+			t.Errorf("got %s exp %s", p.Tags()["key"], "value")
 		}
 		tm := time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC)
 		if !tm.Equal(p.Time()) {
