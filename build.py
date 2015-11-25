@@ -321,7 +321,7 @@ def build_packages(build_output, version, rc):
                         b = b + '.exe'
                     fr = os.path.join(current_location, b)
                     to = os.path.join(build_root, INSTALL_ROOT_DIR[1:], b)
-                    print "\t- [{}][{}] - Moving from '{}' to '{}'".format(p, a, fr, to)
+                    print "\t- [{}][{}] - Copying from '{}' to '{}'".format(p, a, fr, to)
                     copy_file(fr, to)
                 for package_type in supported_packages[p]:
                     print "\t- Packaging directory '{}' as '{}'...".format(build_root, package_type),
@@ -351,7 +351,7 @@ def build_packages(build_output, version, rc):
                     if outfile is None:
                         print "Could not determine output file of fpm command"
                     else:
-                        outfiles.append(os.path.join(current_location,outfile))
+                        outfiles.append(outfile)
                     print "[ DONE ]"
         print ""
         return outfiles
@@ -361,6 +361,9 @@ def build_packages(build_output, version, rc):
 def upload_packages(packages):
     print "Uploading packages to S3..."
     print ""
+
+    print packages
+    print os.path.exists(packages[0])
 
     c = boto.connect_s3()
     bucket = c.get_bucket('influxdb')
