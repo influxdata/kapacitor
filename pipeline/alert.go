@@ -16,7 +16,7 @@ const defaultMessageTmpl = "{{ .ID }} is {{ .Level }}"
 // An AlertNode can trigger an event of varying severity levels,
 // and pass the event to alert handlers. The criteria for triggering
 // an alert is specified via a [lambda expression](https://influxdb.com/docs/kapacitor/v0.1/tick/expr.html).
-// See AlertNode.Info, AlertNode.Warn, and AlertNode.Cirt below.
+// See AlertNode.Info, AlertNode.Warn, and AlertNode.Crit below.
 //
 // Different event handlers can be configured for each AlertNode.
 // Some handlers like Email, Slack, VictorOps and PagerDuty have a configuration
