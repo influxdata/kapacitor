@@ -398,7 +398,7 @@ func (n *Node) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node) err
 	if len(n.Properties) > 0 {
 		r.Header(buf, func() bool { buf.Write([]byte("Properties")); return true }, 2, "")
 		r.Paragraph(buf, func() bool {
-			buf.Write([]byte("Property methods modify state on the calling node. They do not add another node to the pipeline and always return a reference to the calling node."))
+			buf.Write([]byte("Property methods modify state on the calling node. They do not add another node to the pipeline, and always return a reference to the calling node."))
 			return true
 		})
 		props := make([]string, len(n.Properties))

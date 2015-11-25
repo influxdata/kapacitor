@@ -2,6 +2,7 @@ package smtp
 
 import (
 	"crypto/tls"
+	"errors"
 	"log"
 	"sync"
 	"time"
@@ -25,6 +26,9 @@ func NewService(c Config, l *log.Logger) *Service {
 }
 
 func (s *Service) Open() error {
+	if s.c.From == "" {
+		return errors.New("cannot open smtp service: missing from address in configuration")
+	}
 	s.wg.Add(1)
 	go s.runMailer()
 	return nil
@@ -42,7 +46,12 @@ func (s *Service) Global() bool {
 
 func (s *Service) runMailer() {
 	defer s.wg.Done()
-	d := gomail.NewPlainDialer(s.c.Host, s.c.Port, s.c.Username, s.c.Password)
+	var d *gomail.Dialer
+	if s.c.Username == "" {
+		d = &gomail.Dialer{Host: s.c.Host, Port: s.c.Port}
+	} else {
+		d = gomail.NewPlainDialer(s.c.Host, s.c.Port, s.c.Username, s.c.Password)
+	}
 	if s.c.NoVerify {
 		d.TLSConfig = &tls.Config{InsecureSkipVerify: true}
 	}

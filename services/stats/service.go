@@ -23,6 +23,7 @@
 package stats
 
 import (
+	"errors"
 	"log"
 	"sync"
 	"time"
@@ -43,7 +44,9 @@ type Service struct {
 	db       string
 	rp       string
 
+	open    bool
 	closing chan struct{}
+	mu      sync.Mutex
 	wg      sync.WaitGroup
 
 	logger *log.Logger
@@ -59,6 +62,9 @@ func NewService(c Config, l *log.Logger) *Service {
 }
 
 func (s *Service) Open() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.open = true
 	s.closing = make(chan struct{})
 	s.wg.Add(1)
 	go s.sendStats()
@@ -67,6 +73,12 @@ func (s *Service) Open() error {
 }
 
 func (s *Service) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.open {
+		return errors.New("error closing stats service: service not open")
+	}
+	s.open = false
 	close(s.closing)
 	s.wg.Wait()
 	s.logger.Println("I! closed service")

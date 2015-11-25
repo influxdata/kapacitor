@@ -17,4 +17,4 @@ docker run --rm \
     -e AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
     -v $DIR:/gopath/src/github.com/influxdb/kapacitor \
     influxdb/kapacitor-builder \
-    --outdir=/tmp/kapacitor-build "$@"
+    "$@"
