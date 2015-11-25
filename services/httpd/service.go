@@ -98,6 +98,16 @@ func (s *Service) Addr() net.Addr {
 	return nil
 }
 
+func (s *Service) URL() string {
+	if s.ln != nil {
+		if s.https {
+			return "https://" + s.Addr().String()
+		}
+		return "http://" + s.Addr().String()
+	}
+	return ""
+}
+
 // serve serves the handler from the listener.
 func (s *Service) serve() {
 	go func() {

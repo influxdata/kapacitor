@@ -37,7 +37,7 @@ func newHTTPOutNode(et *ExecutingTask, n *pipeline.HTTPOutNode) (*HTTPOutNode, e
 }
 
 func (h *HTTPOutNode) Endpoint() string {
-	return "http://" + h.endpoint
+	return h.endpoint
 }
 
 func (h *HTTPOutNode) runOut() error {
@@ -69,7 +69,7 @@ func (h *HTTPOutNode) runOut() error {
 		HandlerFunc: hndl,
 	}}
 
-	h.endpoint = h.et.tm.HTTPDService.Addr().String() + httpd.APIRoot + p
+	h.endpoint = h.et.tm.HTTPDService.URL() + httpd.APIRoot + p
 	func() {
 		h.mu.Lock()
 		defer h.mu.Unlock()

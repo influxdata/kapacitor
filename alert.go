@@ -4,9 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
+	"text/template"
+	"time"
 
 	"github.com/influxdb/influxdb/influxql"
 	imodels "github.com/influxdb/influxdb/models"
@@ -15,21 +19,18 @@ import (
 	"github.com/influxdb/kapacitor/tick"
 )
 
-// Number of previous states to remember when computing flapping percentage.
-const defaultFlapHistory = 21
-
 // The newest state change is weighted 'weightDiff' times more than oldest state change.
 const weightDiff = 1.5
 
 // Maximum weight applied to newest state change.
 const maxWeight = 1.2
 
-type AlertHandler func(ad AlertData)
+type AlertHandler func(ad *AlertData)
 
 type AlertLevel int
 
 const (
-	NoAlert AlertLevel = iota
+	OKAlert AlertLevel = iota
 	InfoAlert
 	WarnAlert
 	CritAlert
@@ -37,8 +38,8 @@ const (
 
 func (l AlertLevel) String() string {
 	switch l {
-	case NoAlert:
-		return "noalert"
+	case OKAlert:
+		return "OK"
 	case InfoAlert:
 		return "INFO"
 	case WarnAlert:
@@ -55,19 +56,22 @@ func (l AlertLevel) MarshalText() ([]byte, error) {
 }
 
 type AlertData struct {
-	Level AlertLevel      `json:"level"`
-	Data  influxql.Result `json:"data"`
+	ID      string          `json:"id"`
+	Message string          `json:"message"`
+	Time    time.Time       `json:"time"`
+	Level   AlertLevel      `json:"level"`
+	Data    influxql.Result `json:"data"`
 }
 
 type AlertNode struct {
 	node
-	a        *pipeline.AlertNode
-	endpoint string
-	handlers []AlertHandler
-	levels   []*tick.StatefulExpr
-	history  []AlertLevel
-	hIdx     int
-	flapping bool
+	a           *pipeline.AlertNode
+	endpoint    string
+	handlers    []AlertHandler
+	levels      []*tick.StatefulExpr
+	states      map[models.GroupID]*alertState
+	idTmpl      *template.Template
+	messageTmpl *template.Template
 }
 
 // Create a new  AlertNode which caches the most recent item and exposes it over the HTTP API.
@@ -77,20 +81,50 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode) (an *AlertNode, err 
 		a:    n,
 	}
 	an.node.runF = an.runAlert
+
+	// Parse templates
+	tmpl, err := template.New("id").Parse(n.Id)
+	if err != nil {
+		return nil, err
+	}
+	an.idTmpl = tmpl
+	tmpl, err = template.New("message").Parse(n.Message)
+	if err != nil {
+		return nil, err
+	}
+	an.messageTmpl = tmpl
+
 	// Construct alert handlers
 	an.handlers = make([]AlertHandler, 0)
 	if n.Post != "" {
 		an.handlers = append(an.handlers, an.handlePost)
 	}
-	if n.From != "" && len(n.ToList) != 0 {
-		an.handlers = append(an.handlers, an.handleEmail)
-	}
 	if n.Log != "" {
+		if !path.IsAbs(n.Log) {
+			return nil, fmt.Errorf("alert log path must be absolute: %s is not absolute", n.Log)
+		}
 		an.handlers = append(an.handlers, an.handleLog)
 	}
 	if len(n.Command) > 0 {
 		an.handlers = append(an.handlers, an.handleExec)
 	}
+	if n.UseEmail || (et.tm.SMTPService != nil && et.tm.SMTPService.Global()) {
+		an.handlers = append(an.handlers, an.handleEmail)
+	}
+	if n.UseVictorOps || (et.tm.VictorOpsService != nil && et.tm.VictorOpsService.Global()) {
+		an.handlers = append(an.handlers, an.handleVictorOps)
+	}
+	if n.UsePagerDuty || (et.tm.PagerDutyService != nil && et.tm.PagerDutyService.Global()) {
+		an.handlers = append(an.handlers, an.handlePagerDuty)
+	}
+	if n.UseSlack || (et.tm.SlackService != nil && et.tm.SlackService.Global()) {
+		an.handlers = append(an.handlers, an.handleSlack)
+		// If slack has been configured globally only send state changes.
+		if et.tm.SlackService != nil && et.tm.SlackService.Global() {
+			n.IsStateChangesOnly = true
+		}
+	}
+
 	// Parse level expressions
 	an.levels = make([]*tick.StatefulExpr, CritAlert+1)
 	if n.Info != nil {
@@ -102,20 +136,19 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode) (an *AlertNode, err 
 	if n.Crit != nil {
 		an.levels[CritAlert] = tick.NewStatefulExpr(n.Crit)
 	}
+	// Setup states
+	if n.History < 2 {
+		n.History = 2
+	}
+	an.states = make(map[models.GroupID]*alertState)
+
 	// Configure flapping
 	if n.UseFlapping {
-		history := n.History
-		if history == 0 {
-			history = defaultFlapHistory
-		}
-		if history < 2 {
-			return nil, errors.New("alert history count must be >= 2")
-		}
-		an.history = make([]AlertLevel, history)
 		if n.FlapLow > 1 || n.FlapHigh > 1 {
 			return nil, errors.New("alert flap thresholds are percentages and should be between 0 and 1")
 		}
 	}
+
 	return
 }
 
@@ -124,23 +157,21 @@ func (a *AlertNode) runAlert() error {
 	case pipeline.StreamEdge:
 		for p, ok := a.ins[0].NextPoint(); ok; p, ok = a.ins[0].NextPoint() {
 			l := a.determineLevel(p.Fields, p.Tags)
-			if a.a.UseFlapping {
-				a.updateFlapping(l)
-				if a.flapping {
-					continue
-				}
+			state := a.updateState(l, p.Group)
+			if (a.a.UseFlapping && state.flapping) || (a.a.IsStateChangesOnly && !state.changed) {
+				continue
 			}
-			if l > NoAlert {
+			// send alert if we are not OK or we are OK and state changed (i.e recovery)
+			if l != OKAlert || state.changed {
 				batch := models.Batch{
 					Name:   p.Name,
 					Group:  p.Group,
 					Tags:   p.Tags,
 					Points: []models.BatchPoint{models.BatchPointFromPoint(p)},
 				}
-
-				ad := AlertData{
-					l,
-					a.batchToResult(batch),
+				ad, err := a.alertData(p.Name, p.Group, p.Tags, p.Fields, l, p.Time, batch)
+				if err != nil {
+					return err
 				}
 				for _, h := range a.handlers {
 					h(ad)
@@ -152,23 +183,37 @@ func (a *AlertNode) runAlert() error {
 			triggered := false
 			for _, p := range b.Points {
 				l := a.determineLevel(p.Fields, p.Tags)
-				if l > NoAlert {
+				if l > OKAlert {
 					triggered = true
-					if a.a.UseFlapping {
-						a.updateFlapping(l)
-						if a.flapping {
-							break
-						}
+					state := a.updateState(l, b.Group)
+					if (a.a.UseFlapping && state.flapping) || (a.a.IsStateChangesOnly && !state.changed) {
+						break
 					}
-					ad := AlertData{l, a.batchToResult(b)}
+					ad, err := a.alertData(b.Name, b.Group, b.Tags, p.Fields, l, p.Time, b)
+					if err != nil {
+						return err
+					}
 					for _, h := range a.handlers {
 						h(ad)
 					}
 					break
 				}
 			}
-			if !triggered && a.a.UseFlapping {
-				a.updateFlapping(NoAlert)
+			if !triggered {
+				state := a.updateState(OKAlert, b.Group)
+				if state.changed {
+					var fields models.Fields
+					if l := len(b.Points); l > 0 {
+						fields = b.Points[l-1].Fields
+					}
+					ad, err := a.alertData(b.Name, b.Group, b.Tags, fields, OKAlert, b.TMax, b)
+					if err != nil {
+						return err
+					}
+					for _, h := range a.handlers {
+						h(ad)
+					}
+				}
 			}
 		}
 	}
@@ -200,17 +245,54 @@ func (a *AlertNode) batchToResult(b models.Batch) influxql.Result {
 	return r
 }
 
-func (a *AlertNode) updateFlapping(level AlertLevel) {
-	a.history[a.hIdx] = level
-	a.hIdx = (a.hIdx + 1) % len(a.history)
+func (a *AlertNode) alertData(
+	name string,
+	group models.GroupID,
+	tags models.Tags,
+	fields models.Fields,
+	level AlertLevel,
+	t time.Time,
+	b models.Batch,
+) (*AlertData, error) {
+	id, err := a.renderID(name, group, tags)
+	if err != nil {
+		return nil, err
+	}
+	msg, err := a.renderMessage(id, name, group, tags, fields, level)
+	if err != nil {
+		return nil, err
+	}
+	ad := &AlertData{
+		id,
+		msg,
+		t,
+		level,
+		a.batchToResult(b),
+	}
+	return ad, nil
+}
 
+type alertState struct {
+	history  []AlertLevel
+	idx      int
+	flapping bool
+	changed  bool
+}
+
+func (a *alertState) addEvent(level AlertLevel) {
+	a.changed = a.history[a.idx] != level
+	a.idx = (a.idx + 1) % len(a.history)
+	a.history[a.idx] = level
+}
+
+func (a *alertState) percentChange() float64 {
 	l := len(a.history)
 	changes := 0.0
 	weight := (maxWeight / weightDiff)
 	step := (maxWeight - weight) / float64(l-1)
-	for i := 1; i < l; i++ {
+	for i := 0; i < l-1; i++ {
 		// get current index
-		c := (i + a.hIdx) % l
+		c := (i + a.idx) % l
 		// get previous index
 		p := c - 1
 		// check for wrap around
@@ -224,15 +306,101 @@ func (a *AlertNode) updateFlapping(level AlertLevel) {
 	}
 
 	p := changes / float64(l-1)
-
-	if a.flapping && p < a.a.FlapLow {
-		a.flapping = false
-	} else if !a.flapping && p > a.a.FlapHigh {
-		a.flapping = true
-	}
+	return p
 }
 
-func (a *AlertNode) handlePost(ad AlertData) {
+func (a *AlertNode) updateState(level AlertLevel, group models.GroupID) *alertState {
+	state, ok := a.states[group]
+	if !ok {
+		state = &alertState{
+			history: make([]AlertLevel, a.a.History),
+		}
+		a.states[group] = state
+	}
+	state.addEvent(level)
+
+	if a.a.UseFlapping {
+		p := state.percentChange()
+		if state.flapping && p < a.a.FlapLow {
+			state.flapping = false
+		} else if !state.flapping && p > a.a.FlapHigh {
+			state.flapping = true
+		}
+	}
+
+	return state
+}
+
+// Type containing information available to ID template.
+type idInfo struct {
+	// Measurement name
+	Name string
+
+	// Concatenation of all group-by tags of the form [key=value,]+.
+	// If not groupBy is performed equal to literal 'nil'
+	Group string
+
+	// Map of tags
+	Tags map[string]string
+}
+type messageInfo struct {
+	idInfo
+
+	// The ID of the alert.
+	ID string
+
+	// Fields of alerting data point.
+	Fields map[string]interface{}
+
+	// Alert Level, one of: INFO, WARNING, CRITICAL.
+	Level string
+}
+
+func (a *AlertNode) renderID(name string, group models.GroupID, tags models.Tags) (string, error) {
+	g := string(group)
+	if group == models.NilGroup {
+		g = "nil"
+	}
+	info := idInfo{
+		Name:  name,
+		Group: g,
+		Tags:  tags,
+	}
+	var id bytes.Buffer
+	err := a.idTmpl.Execute(&id, info)
+	if err != nil {
+		return "", err
+	}
+	return id.String(), nil
+}
+
+func (a *AlertNode) renderMessage(id, name string, group models.GroupID, tags models.Tags, fields models.Fields, level AlertLevel) (string, error) {
+	g := string(group)
+	if group == models.NilGroup {
+		g = "nil"
+	}
+	info := messageInfo{
+		idInfo: idInfo{
+			Name:  name,
+			Group: g,
+			Tags:  tags,
+		},
+		ID:     id,
+		Fields: fields,
+		Level:  level.String(),
+	}
+	var msg bytes.Buffer
+	err := a.messageTmpl.Execute(&msg, info)
+	if err != nil {
+		return "", err
+	}
+	return msg.String(), nil
+}
+
+//--------------------------------
+// Alert handlers
+
+func (a *AlertNode) handlePost(ad *AlertData) {
 	b, err := json.Marshal(ad)
 	if err != nil {
 		a.logger.Println("E! failed to marshal alert data json", err)
@@ -245,20 +413,20 @@ func (a *AlertNode) handlePost(ad AlertData) {
 	}
 }
 
-func (a *AlertNode) handleEmail(ad AlertData) {
+func (a *AlertNode) handleEmail(ad *AlertData) {
 	b, err := json.Marshal(ad)
 	if err != nil {
 		a.logger.Println("E! failed to marshal alert data json", err)
 		return
 	}
 	if a.et.tm.SMTPService != nil {
-		a.et.tm.SMTPService.SendMail(a.a.From, a.a.ToList, a.a.Subject, string(b))
+		a.et.tm.SMTPService.SendMail(a.a.ToList, ad.Message, string(b))
 	} else {
 		a.logger.Println("W! smtp service not enabled, cannot send email.")
 	}
 }
 
-func (a *AlertNode) handleLog(ad AlertData) {
+func (a *AlertNode) handleLog(ad *AlertData) {
 	b, err := json.Marshal(ad)
 	if err != nil {
 		a.logger.Println("E! failed to marshal alert data json", err)
@@ -280,7 +448,7 @@ func (a *AlertNode) handleLog(ad AlertData) {
 	}
 }
 
-func (a *AlertNode) handleExec(ad AlertData) {
+func (a *AlertNode) handleExec(ad *AlertData) {
 	b, err := json.Marshal(ad)
 	if err != nil {
 		a.logger.Println("E! failed to marshal alert data json", err)
@@ -294,6 +462,64 @@ func (a *AlertNode) handleExec(ad AlertData) {
 	err = cmd.Run()
 	if err != nil {
 		a.logger.Println("E! error running alert command:", err, out.String())
+		return
+	}
+}
+
+func (a *AlertNode) handleVictorOps(ad *AlertData) {
+	if a.et.tm.VictorOpsService == nil {
+		a.logger.Println("E! failed to send VictorOps alert. VictorOps is not enabled")
+		return
+	}
+	var messageType string
+	switch ad.Level {
+	case OKAlert:
+		messageType = "RECOVERY"
+	default:
+		messageType = ad.Level.String()
+	}
+	err := a.et.tm.VictorOpsService.Alert(
+		a.a.VictorOpsRoutingKey,
+		messageType,
+		ad.Message,
+		ad.ID,
+		ad.Time,
+		ad.Data,
+	)
+	if err != nil {
+		a.logger.Println("E! failed to send alert data to VictorOps:", err)
+		return
+	}
+}
+
+func (a *AlertNode) handlePagerDuty(ad *AlertData) {
+	if a.et.tm.PagerDutyService == nil {
+		a.logger.Println("E! failed to send PagerDuty alert. PagerDuty is not enabled")
+		return
+	}
+	err := a.et.tm.PagerDutyService.Alert(
+		ad.ID,
+		ad.Message,
+		ad.Data,
+	)
+	if err != nil {
+		a.logger.Println("E! failed to send alert data to PagerDuty:", err)
+		return
+	}
+}
+
+func (a *AlertNode) handleSlack(ad *AlertData) {
+	if a.et.tm.SlackService == nil {
+		a.logger.Println("E! failed to send Slack message. Slack is not enabled")
+		return
+	}
+	err := a.et.tm.SlackService.Alert(
+		a.a.SlackChannel,
+		ad.Message,
+		ad.Level,
+	)
+	if err != nil {
+		a.logger.Println("E! failed to send alert data to Slack:", err)
 		return
 	}
 }

@@ -308,7 +308,7 @@ stream
 
 	// Request data before any writes and expect null responses
 	nullResponse := `{"Series":null,"Err":null}`
-	err = s.HTTPGetRetry(endpoint, "", nullResponse, 100, time.Millisecond*5)
+	err = s.HTTPGetRetry(endpoint, "", nullResponse, 1000, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
 	}

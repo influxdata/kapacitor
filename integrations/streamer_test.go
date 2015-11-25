@@ -18,6 +18,9 @@ import (
 	"github.com/influxdb/kapacitor"
 	"github.com/influxdb/kapacitor/clock"
 	"github.com/influxdb/kapacitor/services/httpd"
+	"github.com/influxdb/kapacitor/services/pagerduty"
+	"github.com/influxdb/kapacitor/services/slack"
+	"github.com/influxdb/kapacitor/services/victorops"
 	"github.com/influxdb/kapacitor/wlog"
 )
 
@@ -1436,9 +1439,9 @@ func TestStream_Alert(t *testing.T) {
 			t.Fatal(err)
 		}
 		requestCount++
-		expAns := `{"level":"CRITICAL","data":{"Series":[{"name":"cpu","columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}],"Err":null}}`
+		expAns := `{"id":"kapacitor/cpu/serverA","message":"kapacitor/cpu/serverA is CRITICAL","time":"1971-01-01T00:00:10Z","level":"CRITICAL","data":{"series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}]}}`
 		if string(ans) != expAns {
-			t.Errorf("got %v exp %v", string(ans), expAns)
+			t.Errorf("\ngot %v\nexp %v", string(ans), expAns)
 		}
 	}))
 	defer ts.Close()
@@ -1447,11 +1450,13 @@ func TestStream_Alert(t *testing.T) {
 stream
 	.from().measurement('cpu')
 	.where(lambda: "host" == 'serverA')
+	.groupBy('host')
 	.window()
 		.period(10s)
 		.every(10s)
 	.mapReduce(influxql.count('idle'))
 	.alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
 		.info(lambda: "count" > 6.0)
 		.warn(lambda: "count" > 7.0)
 		.crit(lambda: "count" > 8.0)
@@ -1476,9 +1481,256 @@ stream
 		t.Errorf("got %v exp %v", requestCount, 1)
 	}
 }
+func TestStream_AlertSlack(t *testing.T) {
+	requestCount := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		type postData struct {
+			Channel     string `json:"channel"`
+			Username    string `json:"username"`
+			Text        string `json:"text"`
+			Attachments []struct {
+				Fallback string `json:"fallback"`
+				Color    string `json:"color"`
+				Text     string `json:"text"`
+			} `json:"attachments"`
+		}
+		pd := postData{}
+		dec := json.NewDecoder(r.Body)
+		dec.Decode(&pd)
+		if exp := "/test/slack/url"; r.URL.String() != exp {
+			t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
+		}
+		if exp := "#alerts"; pd.Channel != exp {
+			t.Errorf("unexpected channel got %s exp %s", pd.Channel, exp)
+		}
+		if exp := "kapacitor"; pd.Username != exp {
+			t.Errorf("unexpected username got %s exp %s", pd.Username, exp)
+		}
+		if exp := ""; pd.Text != exp {
+			t.Errorf("unexpected text got %s exp %s", pd.Text, exp)
+		}
+		if len(pd.Attachments) != 1 {
+			t.Errorf("unexpected attachments got %v", pd.Attachments)
+		} else {
+			exp := "kapacitor/cpu/serverA is CRITICAL"
+			if pd.Attachments[0].Fallback != exp {
+				t.Errorf("unexpected fallback got %s exp %s", pd.Attachments[0].Fallback, exp)
+			}
+			if pd.Attachments[0].Text != exp {
+				t.Errorf("unexpected text got %s exp %s", pd.Attachments[0].Text, exp)
+			}
+			if exp := "danger"; pd.Attachments[0].Color != exp {
+				t.Errorf("unexpected color got %s exp %s", pd.Attachments[0].Color, exp)
+			}
+		}
+	}))
+	defer ts.Close()
+
+	var script = `
+stream
+	.from().measurement('cpu')
+	.where(lambda: "host" == 'serverA')
+	.groupBy('host')
+	.window()
+		.period(10s)
+		.every(10s)
+	.mapReduce(influxql.count('idle'))
+	.alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.slack()
+		.channel('#alerts')
+`
+
+	clock, et, errCh, tm := testStreamer(t, "TestStream_Alert", script)
+	defer tm.Close()
+	c := slack.NewConfig()
+	c.URL = ts.URL + "/test/slack/url"
+	c.Channel = "#channel"
+	sl := slack.NewService(c, logService.NewLogger("[test_slack] ", log.LstdFlags))
+	tm.SlackService = sl
+
+	// Move time forward
+	clock.Set(clock.Zero().Add(13 * time.Second))
+	// Wait till the replay has finished
+	if e := <-errCh; e != nil {
+		t.Error(e)
+	}
+	// Wait till the task is finished
+	if e := et.Err(); e != nil {
+		t.Error(e)
+	}
+
+	if requestCount != 1 {
+		t.Errorf("unexpected requestCount got %d exp 1", requestCount)
+	}
+}
+
+func TestStream_AlertPagerDuty(t *testing.T) {
+	requestCount := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		type postData struct {
+			ServiceKey  string      `json:"service_key"`
+			EventType   string      `json:"event_type"`
+			Description string      `json:"description"`
+			Client      string      `json:"client"`
+			ClientURL   string      `json:"client_url"`
+			Details     interface{} `json:"details"`
+		}
+		pd := postData{}
+		dec := json.NewDecoder(r.Body)
+		dec.Decode(&pd)
+		if exp := "service_key"; pd.ServiceKey != exp {
+			t.Errorf("unexpected service key got %s exp %s", pd.ServiceKey, exp)
+		}
+		if exp := "trigger"; pd.EventType != exp {
+			t.Errorf("unexpected event type got %s exp %s", pd.EventType, exp)
+		}
+		if exp := "CRITICAL alert for kapacitor/cpu/serverA"; pd.Description != exp {
+			t.Errorf("unexpected description got %s exp %s", pd.Description, exp)
+		}
+		if exp := "kapacitor"; pd.Client != exp {
+			t.Errorf("unexpected client got %s exp %s", pd.Client, exp)
+		}
+		if len(pd.ClientURL) == 0 {
+			t.Errorf("unexpected client url got empty string")
+		}
+		if pd.Details == nil {
+			t.Error("unexpected data got nil")
+		}
+	}))
+	defer ts.Close()
+
+	var script = `
+stream
+	.from().measurement('cpu')
+	.where(lambda: "host" == 'serverA')
+	.groupBy('host')
+	.window()
+		.period(10s)
+		.every(10s)
+	.mapReduce(influxql.count('idle'))
+	.alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.message('{{ .Level }} alert for {{ .ID }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.pagerDuty()
+`
+
+	clock, et, errCh, tm := testStreamer(t, "TestStream_Alert", script)
+	defer tm.Close()
+	c := pagerduty.NewConfig()
+	c.URL = ts.URL
+	c.ServiceKey = "service_key"
+	pd := pagerduty.NewService(c, logService.NewLogger("[test_pd] ", log.LstdFlags))
+	pd.HTTPDService = tm.HTTPDService
+	tm.PagerDutyService = pd
+
+	// Move time forward
+	clock.Set(clock.Zero().Add(13 * time.Second))
+	// Wait till the replay has finished
+	if e := <-errCh; e != nil {
+		t.Error(e)
+	}
+	// Wait till the task is finished
+	if e := et.Err(); e != nil {
+		t.Error(e)
+	}
+
+	if requestCount != 1 {
+		t.Errorf("unexpected requestCount got %d exp 1", requestCount)
+	}
+}
+
+func TestStream_AlertVictorOps(t *testing.T) {
+	requestCount := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		if exp, got := "/api_key/test_key", r.URL.String(); got != exp {
+			t.Errorf("unexpected VO url got %s exp %s", got, exp)
+		}
+		type postData struct {
+			MessageType       string      `json:"message_type"`
+			EntityID          string      `json:"entity_id"`
+			EntityDisplayName string      `json:"entity_display_name"`
+			Timestamp         int         `json:"timestamp"`
+			MonitoringTool    string      `json:"monitoring_tool"`
+			Data              interface{} `json:"data"`
+		}
+		pd := postData{}
+		dec := json.NewDecoder(r.Body)
+		dec.Decode(&pd)
+		if exp := "CRITICAL"; pd.MessageType != exp {
+			t.Errorf("unexpected message type got %s exp %s", pd.MessageType, exp)
+		}
+		if exp := "kapacitor/cpu/serverA"; pd.EntityID != exp {
+			t.Errorf("unexpected entity id got %s exp %s", pd.EntityID, exp)
+		}
+		if exp := "kapacitor/cpu/serverA is CRITICAL"; pd.EntityDisplayName != exp {
+			t.Errorf("unexpected entity id got %s exp %s", pd.EntityDisplayName, exp)
+		}
+		if exp := "kapacitor"; pd.MonitoringTool != exp {
+			t.Errorf("unexpected monitoring tool got %s exp %s", pd.MonitoringTool, exp)
+		}
+		if exp := 31536010; pd.Timestamp != exp {
+			t.Errorf("unexpected timestamp got %d exp %d", pd.Timestamp, exp)
+		}
+		if pd.Data == nil {
+			t.Error("unexpected data got nil")
+		}
+	}))
+	defer ts.Close()
+
+	var script = `
+stream
+	.from().measurement('cpu')
+	.where(lambda: "host" == 'serverA')
+	.groupBy('host')
+	.window()
+		.period(10s)
+		.every(10s)
+	.mapReduce(influxql.count('idle'))
+	.alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.victorOps()
+		.routingKey('test_key')
+`
+
+	clock, et, errCh, tm := testStreamer(t, "TestStream_Alert", script)
+	defer tm.Close()
+	c := victorops.NewConfig()
+	c.URL = ts.URL
+	c.APIKey = "api_key"
+	c.RoutingKey = "routing_key"
+	vo := victorops.NewService(c, logService.NewLogger("[test_vo] ", log.LstdFlags))
+	tm.VictorOpsService = vo
+
+	// Move time forward
+	clock.Set(clock.Zero().Add(13 * time.Second))
+	// Wait till the replay has finished
+	if e := <-errCh; e != nil {
+		t.Error(e)
+	}
+	// Wait till the task is finished
+	if e := et.Err(); e != nil {
+		t.Error(e)
+	}
+
+	if requestCount != 1 {
+		t.Errorf("unexpected requestCount got %d exp 1", requestCount)
+	}
+}
 
 func TestStream_AlertSigma(t *testing.T) {
-
 	requestCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ans, err := ioutil.ReadAll(r.Body)
@@ -1486,9 +1738,16 @@ func TestStream_AlertSigma(t *testing.T) {
 			t.Fatal(err)
 		}
 		requestCount++
-		expAns := `{"level":"INFO","data":{"Series":[{"name":"cpu","tags":{"host":"serverA","type":"idle"},"columns":["time","sigma","value"],"values":[["1971-01-01T00:00:07Z",2.469916402324427,16]]}],"Err":null}}`
-		if string(ans) != expAns {
-			t.Errorf("got %v exp %v", string(ans), expAns)
+		expAns := `{"id":"cpu:nil","message":"cpu:nil is INFO","time":"1971-01-01T00:00:07Z","level":"INFO","data":{"series":[{"name":"cpu","tags":{"host":"serverA","type":"idle"},"columns":["time","sigma","value"],"values":[["1971-01-01T00:00:07Z",2.469916402324427,16]]}]}}`
+		expOKAns := `{"id":"cpu:nil","message":"cpu:nil is OK","time":"1971-01-01T00:00:08Z","level":"OK","data":{"series":[{"name":"cpu","tags":{"host":"serverA","type":"idle"},"columns":["time","sigma","value"],"values":[["1971-01-01T00:00:08Z",0.3053477916297622,93.4]]}]}}`
+		if requestCount == 1 {
+			if string(ans) != expAns {
+				t.Errorf("\ngot %v \nexp %v", string(ans), expAns)
+			}
+		} else {
+			if string(ans) != expOKAns {
+				t.Errorf("\ngot %v \nexp %v", string(ans), expOKAns)
+			}
 		}
 	}))
 	defer ts.Close()
@@ -1521,8 +1780,8 @@ stream
 		t.Error(e)
 	}
 
-	if requestCount != 1 {
-		t.Errorf("got %v exp %v", requestCount, 1)
+	if requestCount != 2 {
+		t.Errorf("got %v exp %v", requestCount, 2)
 	}
 }
 
@@ -1535,7 +1794,7 @@ func TestStream_AlertComplexWhere(t *testing.T) {
 			t.Fatal(err)
 		}
 		requestCount++
-		expAns := `{"level":"CRITICAL","data":{"Series":[{"name":"cpu","tags":{"host":"serverA","type":"idle"},"columns":["time","value"],"values":[["1971-01-01T00:00:07Z",16]]}],"Err":null}}`
+		expAns := `{"id":"cpu:nil","message":"cpu:nil is CRITICAL","time":"1971-01-01T00:00:07Z","level":"CRITICAL","data":{"series":[{"name":"cpu","tags":{"host":"serverA","type":"idle"},"columns":["time","value"],"values":[["1971-01-01T00:00:07Z",16]]}]}}`
 		if string(ans) != expAns {
 			t.Errorf("unexpected result:\ngot %v\nexp %v", string(ans), expAns)
 		}
@@ -1567,6 +1826,42 @@ stream
 
 	if requestCount != 1 {
 		t.Errorf("got %v exp %v", requestCount, 1)
+	}
+}
+
+func TestStream_AlertStateChangesOnly(t *testing.T) {
+
+	requestCount := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+	}))
+	defer ts.Close()
+	var script = `
+stream
+	.from().measurement('cpu')
+	.alert()
+		.crit(lambda: "value" < 93)
+		.stateChangesOnly()
+		.post('` + ts.URL + `')
+`
+
+	clock, et, errCh, tm := testStreamer(t, "TestStream_AlertStateChangesOnly", script)
+	defer tm.Close()
+
+	// Move time forward
+	clock.Set(clock.Zero().Add(13 * time.Second))
+	// Wait till the replay has finished
+	if e := <-errCh; e != nil {
+		t.Error(e)
+	}
+	// Wait till the task is finished
+	if e := et.Err(); e != nil {
+		t.Error(e)
+	}
+
+	// Only 4 points below 93 so 8 state changes.
+	if requestCount != 8 {
+		t.Errorf("got %v exp %v", requestCount, 5)
 	}
 }
 
@@ -1603,9 +1898,9 @@ stream
 		t.Error(e)
 	}
 
-	// Flapping detection should drop the last alert.
-	if requestCount != 5 {
-		t.Errorf("got %v exp %v", requestCount, 5)
+	// Flapping detection should drop the last alerts.
+	if requestCount != 9 {
+		t.Errorf("got %v exp %v", requestCount, 9)
 	}
 }
 

@@ -3,8 +3,8 @@ package kapacitor
 import (
 	"fmt"
 	"log"
-	"net"
 	"sync"
+	"time"
 
 	"github.com/influxdb/influxdb/client"
 	"github.com/influxdb/kapacitor/models"
@@ -22,13 +22,26 @@ type TaskMaster struct {
 	HTTPDService interface {
 		AddRoutes([]httpd.Route) error
 		DelRoutes([]httpd.Route)
-		Addr() net.Addr
+		URL() string
 	}
 	InfluxDBService interface {
 		NewClient() (*client.Client, error)
 	}
 	SMTPService interface {
-		SendMail(from string, to []string, subject string, msg string)
+		Global() bool
+		SendMail(to []string, subject string, msg string)
+	}
+	VictorOpsService interface {
+		Global() bool
+		Alert(routingKey, messageType, message, entityID string, t time.Time, extra interface{}) error
+	}
+	PagerDutyService interface {
+		Global() bool
+		Alert(incidentKey, desc string, details interface{}) error
+	}
+	SlackService interface {
+		Global() bool
+		Alert(channel, message string, level AlertLevel) error
 	}
 	LogService LogService
 

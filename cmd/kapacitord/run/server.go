@@ -22,13 +22,16 @@ import (
 	"github.com/influxdb/kapacitor/services/httpd"
 	"github.com/influxdb/kapacitor/services/influxdb"
 	"github.com/influxdb/kapacitor/services/logging"
+	"github.com/influxdb/kapacitor/services/pagerduty"
 	"github.com/influxdb/kapacitor/services/replay"
 	"github.com/influxdb/kapacitor/services/reporting"
+	"github.com/influxdb/kapacitor/services/slack"
 	"github.com/influxdb/kapacitor/services/smtp"
 	"github.com/influxdb/kapacitor/services/stats"
 	"github.com/influxdb/kapacitor/services/streamer"
 	"github.com/influxdb/kapacitor/services/task_store"
 	"github.com/influxdb/kapacitor/services/udp"
+	"github.com/influxdb/kapacitor/services/victorops"
 	"github.com/influxdb/kapacitor/wlog"
 	"github.com/twinj/uuid"
 )
@@ -83,7 +86,6 @@ type Server struct {
 	TaskStore       *task_store.Service
 	ReplayService   *replay.Service
 	InfluxDBService *influxdb.Service
-	SMTPService     *smtp.Service
 
 	MetaStore     *metastore
 	QueryExecutor *queryexecutor
@@ -129,6 +131,9 @@ func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*
 	s.appendInfluxDBService(c.InfluxDB, c.Hostname)
 	s.appendTaskStoreService(c.Task)
 	s.appendReplayStoreService(c.Replay)
+	s.appendVictorOpsService(c.VictorOps)
+	s.appendPagerDutyService(c.PagerDuty)
+	s.appendSlackService(c.Slack)
 
 	// Append InfluxDB services
 	s.appendCollectdService(c.Collectd)
@@ -165,7 +170,6 @@ func (s *Server) appendSMTPService(c smtp.Config) {
 		l := s.LogService.NewLogger("[smtp] ", log.LstdFlags)
 		srv := smtp.NewService(c, l)
 
-		s.SMTPService = srv
 		s.TaskMaster.SMTPService = srv
 		s.Services = append(s.Services, srv)
 	}
@@ -217,6 +221,37 @@ func (s *Server) appendReplayStoreService(c replay.Config) {
 
 	s.ReplayService = srv
 	s.Services = append(s.Services, srv)
+}
+
+func (s *Server) appendVictorOpsService(c victorops.Config) {
+	if c.Enabled {
+		l := s.LogService.NewLogger("[victorops] ", log.LstdFlags)
+		srv := victorops.NewService(c, l)
+		s.TaskMaster.VictorOpsService = srv
+
+		s.Services = append(s.Services, srv)
+	}
+}
+
+func (s *Server) appendPagerDutyService(c pagerduty.Config) {
+	if c.Enabled {
+		l := s.LogService.NewLogger("[pagerduty] ", log.LstdFlags)
+		srv := pagerduty.NewService(c, l)
+		srv.HTTPDService = s.HTTPDService
+		s.TaskMaster.PagerDutyService = srv
+
+		s.Services = append(s.Services, srv)
+	}
+}
+
+func (s *Server) appendSlackService(c slack.Config) {
+	if c.Enabled {
+		l := s.LogService.NewLogger("[slack] ", log.LstdFlags)
+		srv := slack.NewService(c, l)
+		s.TaskMaster.SlackService = srv
+
+		s.Services = append(s.Services, srv)
+	}
 }
 
 func (s *Server) appendCollectdService(c collectd.Config) {
