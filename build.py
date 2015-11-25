@@ -362,9 +362,6 @@ def upload_packages(packages):
     print "Uploading packages to S3..."
     print ""
 
-    print packages
-    print os.path.exists(packages[0])
-
     c = boto.connect_s3()
     bucket = c.get_bucket('influxdb')
     for p in packages:
