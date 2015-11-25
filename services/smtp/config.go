@@ -16,9 +16,9 @@ type Config struct {
 	NoVerify bool `toml:"no-verify"`
 	// Whether all alerts should trigger an email.
 	Global bool `toml:"global"`
-	// Default from address
+	// From address
 	From string `toml:"from"`
-	// Default to addresses
+	// Default To addresses
 	To []string `toml:"to"`
 	// Close connection to SMTP server after idle timeout has elapsed
 	IdleTimeout toml.Duration `toml:"idle-timeout"`

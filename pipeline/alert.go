@@ -13,7 +13,7 @@ const defaultIDTmpl = "{{ .Name }}:{{ .Group }}"
 // Default template for constructing a message.
 const defaultMessageTmpl = "{{ .ID }} is {{ .Level }}"
 
-// An AlertNode can trigger an event of varying severity levels
+// An AlertNode can trigger an event of varying severity levels,
 // and pass the event to alert handlers. The criteria for triggering
 // an alert is specified via a [lambda expression](https://influxdb.com/docs/kapacitor/v0.1/tick/expr.html).
 // See AlertNode.Info, AlertNode.Warn, and AlertNode.Cirt below.
@@ -60,10 +60,10 @@ const defaultMessageTmpl = "{{ .ID }} is {{ .Level }}"
 //
 //
 // It is assumed that each successive level filters a subset
-// of the previous level. As a result the filter will only be applied if
+// of the previous level. As a result, the filter will only be applied if
 // a data point passed the previous level.
-// In the above example if value = 15 then the INFO and
-// WARNING expressions would be evaluated but not the
+// In the above example, if value = 15 then the INFO and
+// WARNING expressions would be evaluated, but not the
 // CRITICAL expression.
 // Each expression maintains its own state.
 type AlertNode struct {
@@ -73,9 +73,9 @@ type AlertNode struct {
 	//
 	// Available template data:
 	//
-	//    * Name -- Measurement name
+	//    * Name -- Measurement name.
 	//    * Group -- Concatenation of all group-by tags of the form [key=value,]+.
-	//        If no groupBy is performed equal to literal 'nil'
+	//        If no groupBy is performed equal to literal 'nil'.
 	//    * Tags -- Map of tags. Use '{{ index .Tags "key" }}' to get a specific tag value.
 	//
 	// Example:
@@ -110,9 +110,9 @@ type AlertNode struct {
 	// Available template data:
 	//
 	//    * ID -- The ID of the alert.
-	//    * Name -- Measurement name
+	//    * Name -- Measurement name.
 	//    * Group -- Concatenation of all group-by tags of the form [key=value,]+.
-	//        If no groupBy is performed equal to literal 'nil'
+	//        If no groupBy is performed equal to literal 'nil'.
 	//    * Tags -- Map of tags. Use '{{ index .Tags "key" }}' to get a specific tag value.
 	//    * Level -- Alert Level, one of: INFO, WARNING, CRITICAL.
 	//    * Fields -- Map of fields. Use '{{ index .Fields "key" }}' to get a specific field value.
@@ -215,10 +215,34 @@ func (a *AlertNode) Exec(executable string, args ...string) *AlertNode {
 }
 
 // Email the alert data.
-// If the To list is empty uses the To addresses from the configuration.
 //
+// If the To list is empty, the To addresses from the configuration are used.
 // The email subject is the AlertNode.Message property.
 // The email body is the JSON alert data.
+//
+// If the 'smtp' section in the configuration has the option: global = true
+// then all alerts are sent via email without the need to explicitly state it
+// in the TICKscript.
+//
+// Example:
+//     [smtp]
+//       enabled = true
+//       host = "localhost"
+//       port = 25
+//       username = ""
+//       password = ""
+//       from = "kapacitor@example.com"
+//       to = ["oncall@example.com"]
+//       # Set global to true so all alert trigger emails.
+//       global = true
+//
+// Example:
+//    stream...
+//         .alert()
+//
+// Send email to 'oncall@example.com' from 'kapacitor@example.com'
+//
+// **NOTE**: The global option for email also implies stateChangesOnly is set on all alerts.
 // tick:property
 func (a *AlertNode) Email(to ...string) *AlertNode {
 	a.UseEmail = true
@@ -233,11 +257,11 @@ func (a *AlertNode) Email(to ...string) *AlertNode {
 // Each different alerting level is considered a different state.
 // The low and high thresholds are inverted thresholds of a percentage of state changes.
 // Meaning that if the percentage of state changes goes above the `high`
-// threshold the alert enters a flapping state. The alert remains in the flapping state
+// threshold, the alert enters a flapping state. The alert remains in the flapping state
 // until the percentage of state changes goes below the `low` threshold.
 // Typical values are low: 0.25 and high: 0.5. The percentage values represent the number state changes
 // over the total possible number of state changes. A percentage change of 0.5 means that the alert changed
-// state in half of the recorded history and remained the same in the other half of the history.
+// state in half of the recorded history, and remained the same in the other half of the history.
 // tick:property
 func (a *AlertNode) Flapping(low, high float64) Node {
 	a.UseFlapping = true
@@ -313,7 +337,7 @@ func (a *AlertNode) RoutingKey(routingKey string) *AlertNode {
 //    3. Click the "Add Service" button.
 //    4. Once the service is created, you'll be taken to the service page. On this page, you'll see the "Service key", which is needed to access the API
 //
-// Place the 'service key' into the 'pagerduty' section of the Kapacitor configuration as the option 'service-key'
+// Place the 'service key' into the 'pagerduty' section of the Kapacitor configuration as the option 'service-key'.
 //
 // Example:
 //    [pagerduty]
@@ -326,8 +350,6 @@ func (a *AlertNode) RoutingKey(routingKey string) *AlertNode {
 //    stream...
 //         .alert()
 //             .pagerDuty()
-//
-// Send alerts to PagerDuty.
 //
 // If the 'pagerduty' section in the configuration has the option: global = true
 // then all alerts are sent to PagerDuty without the need to explicitly state it
@@ -351,7 +373,7 @@ func (a *AlertNode) PagerDuty() *AlertNode {
 }
 
 // Send the alert to Slack.
-// To allow Kapacitor to post to Slack
+// To allow Kapacitor to post to Slack,
 // go to the URL https://slack.com/services/new/incoming-webhook
 // and create a new incoming webhook and place the generated URL
 // in the 'slack' configuration section.
@@ -405,7 +427,7 @@ func (a *AlertNode) PagerDuty() *AlertNode {
 //         .alert()
 //
 // Send alert to Slack using default channel '#general'.
-// *NOTE*: The global option for Slack also implies stateChangesOnly is set on all alerts.
+// **NOTE**: The global option for Slack also implies stateChangesOnly is set on all alerts.
 // tick:property
 func (a *AlertNode) Slack() *AlertNode {
 	a.UseSlack = true
@@ -434,10 +456,10 @@ func (a *AlertNode) Channel(channel string) *AlertNode {
 //            .stateChangesOnly()
 //            .slack()
 //
-// If the "value" is greater than 10 for a total of 60s then
-// only two events will be sent. First when the value crosses
-// the threshold and second when it falls back into an OK state.
-// Without stateChangesOnly the alert would have triggered 7 times:
+// If the "value" is greater than 10 for a total of 60s, then
+// only two events will be sent. First, when the value crosses
+// the threshold, and second, when it falls back into an OK state.
+// Without stateChangesOnly, the alert would have triggered 7 times:
 // 6 times for each 10s period where the condition was met and once more
 // for the recovery.
 //

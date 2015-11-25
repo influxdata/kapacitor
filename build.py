@@ -118,10 +118,23 @@ def run(command, allow_failure=False, shell=False):
 def create_temp_dir():
     return tempfile.mkdtemp(prefix='kapacitor-build')
 
-def get_current_version():
+def get_current_version_tag():
     version = run("git describe --always --tags --abbrev=0").strip()
-    # Remove leading 'v'
-    return version[1:]
+    return version
+
+def get_current_version():
+    version_tag = get_current_version_tag()
+    # Remove leading 'v' and possible '-rc\d+'
+    version = re.sub(r'-rc\d+', '', version_tag[1:])
+    return version
+
+def get_current_rc():
+    rc = None
+    version_tag = get_current_version_tag()
+    matches = re.match(r'.*-rc(\d+)', version_tag)
+    if matches:
+        rc, = matches.groups(1)
+    return rc
 
 def get_current_commit(short=False):
     command = None
@@ -231,9 +244,6 @@ def build(version=None,
         shutil.rmtree(outdir)
         os.makedirs(outdir)
 
-    if rc:
-        # If a release candidate, update the version information accordingly
-        version = "{}rc{}".format(version, rc)
 
     get_command = None
     if update:
@@ -293,7 +303,7 @@ def package_scripts(build_root):
     shutil.copy(LOGROTATE_CONFIG, os.path.join(build_root, LOGROTATE_CONFIG))
     shutil.copy(DEFAULT_CONFIG, os.path.join(build_root, DEFAULT_CONFIG))
 
-def build_packages(build_output, version):
+def build_packages(build_output, version, rc):
     outfiles = []
     tmp_build_dir = create_temp_dir()
     try:
@@ -317,12 +327,19 @@ def build_packages(build_output, version):
                     print "\t- Packaging directory '{}' as '{}'...".format(build_root, package_type),
                     name = 'kapacitor'
                     if package_type in ['zip', 'tar']:
-                        name = '{}-{}_{}_{}'.format(name, version, p, a)
-                    fpm_command = "fpm {} --name {} -t {} --version {} -C {} -p {}".format(
+                        v = version
+                        if rc is not None:
+                            v = '{}-1.rc{}'.format(version, rc)
+                        name = '{}-{}_{}_{}'.format(name, v, p, a)
+                    iteration = '1'
+                    if rc is not None:
+                        iteration = '1.rc{}'.format(rc)
+                    fpm_command = "fpm {} --name {} -t {} --version {} --iteration {} -C {} -p {} ".format(
                             fpm_common_args,
                             name,
                             package_type,
                             version,
+                            iteration,
                             build_root,
                             current_location,
                         )
@@ -377,7 +394,7 @@ def main():
     nightly_version = None
     branch = None
     version = get_current_version()
-    rc = None
+    rc = get_current_rc()
     clean = False
     package = False
     update = False
@@ -500,7 +517,7 @@ def main():
         if not check_path_for("fpm"):
             print "!! Cannot package without command 'fpm'. Stopping."
             sys.exit(1)
-        packages = build_packages(build_output, version)
+        packages = build_packages(build_output, version, rc)
         if upload:
             upload_packages(packages)
     return 0

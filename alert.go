@@ -110,6 +110,10 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode) (an *AlertNode, err 
 	}
 	if n.UseEmail || (et.tm.SMTPService != nil && et.tm.SMTPService.Global()) {
 		an.handlers = append(an.handlers, an.handleEmail)
+		// If email has been configured globally only send state changes.
+		if et.tm.SMTPService != nil && et.tm.SMTPService.Global() {
+			n.IsStateChangesOnly = true
+		}
 	}
 	if n.UseVictorOps || (et.tm.VictorOpsService != nil && et.tm.VictorOpsService.Global()) {
 		an.handlers = append(an.handlers, an.handleVictorOps)
