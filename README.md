@@ -47,7 +47,7 @@ stream
     .eval(lambda: 100.0 - "mean")
         .as('used')
     .alert()
-        .message('{{ .Level}}: {{ .Name }}/{{ index .Tags "host" }} has high cpu usage: {{ index .Fields "used" }}'
+        .message('{{ .Level}}: {{ .Name }}/{{ index .Tags "host" }} has high cpu usage: {{ index .Fields "used" }}')
         .warn(lambda: "used" > 70.0)
         .crit(lambda: "used" > 85.0)
 
