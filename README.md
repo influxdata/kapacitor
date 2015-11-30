@@ -8,7 +8,7 @@ Kapacitor has two binaries:
 * kapacitor – a CLI program for calling the Kapacitor API.
 * kapacitord – the Kapacitor server daemon.
 
-You can either download the binaries directly from the [downloads](https://influxdb.com/download) page or go get them:
+You can either download the binaries directly from the [downloads](https://influxdb.com/download/#kapacitor) page or go get them:
 
 ```sh
 go get github.com/influxdb/kapacitor/cmd/kapacitor
