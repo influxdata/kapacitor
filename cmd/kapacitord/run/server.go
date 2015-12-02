@@ -352,7 +352,7 @@ func (s *Server) Open() error {
 
 		for _, service := range s.Services {
 			if err := service.Open(); err != nil {
-				return fmt.Errorf("open service: %s", err)
+				return fmt.Errorf("open service %T: %s", service, err)
 			}
 		}
 		return nil
