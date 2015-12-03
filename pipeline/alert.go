@@ -151,7 +151,7 @@ type AlertNode struct {
 	// Minimum value is 2 in order to keep track of current and previous states.
 	//
 	// Default: 21
-	History int
+	History int64
 
 	// Post the JSON alert data to the specified URL.
 	Post string

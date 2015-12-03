@@ -1881,6 +1881,7 @@ stream
 		.warn(lambda: "value" < 94)
 		.crit(lambda: "value" < 93)
 		.flapping(0.25, 0.50)
+		.history(21)
 		.post('` + ts.URL + `')
 `
 
