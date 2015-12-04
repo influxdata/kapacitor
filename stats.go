@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/influxdb/enterprise-client/v1"
 	"github.com/twinj/uuid"
 )
 
@@ -116,13 +115,19 @@ func NewStatistics(name string, tags map[string]string) *expvar.Map {
 	return statMap
 }
 
+type StatsData struct {
+	Name   string                 `json:"name"`
+	Tags   map[string]string      `json:"tags"`
+	Values map[string]interface{} `json:"values"`
+}
+
 // Return all stats data from the expvars.
-func GetStatsData() ([]client.StatsData, error) {
-	allData := make([]client.StatsData, 0)
+func GetStatsData() ([]StatsData, error) {
+	allData := make([]StatsData, 0)
 	// Add Global expvars
-	globalData := client.StatsData{
+	globalData := StatsData{
 		Name:   "kapacitor",
-		Values: make(client.Values),
+		Values: make(map[string]interface{}),
 	}
 
 	allData = append(allData, globalData)
@@ -142,9 +147,9 @@ func GetStatsData() ([]client.StatsData, error) {
 				globalData.Values[kv.Key] = f
 			}
 		case *expvar.Map:
-			data := client.StatsData{
-				Tags:   make(client.Tags),
-				Values: make(client.Values),
+			data := StatsData{
+				Tags:   make(map[string]string),
+				Values: make(map[string]interface{}),
 			}
 
 			v.Do(func(subKV expvar.KeyValue) {
@@ -191,7 +196,7 @@ func GetStatsData() ([]client.StatsData, error) {
 				}
 			})
 
-			// If a registered client has no field data, don't include it in the results
+			// If no field data, don't include it in the results
 			if len(data.Values) == 0 {
 				return
 			}
@@ -204,13 +209,13 @@ func GetStatsData() ([]client.StatsData, error) {
 	globalData.Values[UptimeVarName] = Uptime().Seconds()
 
 	// Add Go memstats.
-	data := client.StatsData{
+	data := StatsData{
 		Name: "runtime",
 	}
 
 	var rt runtime.MemStats
 	runtime.ReadMemStats(&rt)
-	data.Values = client.Values{
+	data.Values = map[string]interface{}{
 		"Alloc":        int64(rt.Alloc),
 		"TotalAlloc":   int64(rt.TotalAlloc),
 		"Sys":          int64(rt.Sys),
