@@ -5,6 +5,7 @@ import (
 	"runtime"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/influxdb/enterprise-client/v1"
 	"github.com/twinj/uuid"
@@ -22,6 +23,8 @@ const (
 	NumEnabledTasksVarName  = "num_enabled_tasks"
 	NumSubscriptionsVarName = "num_subscriptions"
 
+	UptimeVarName = "uptime"
+
 	// The name of the product
 	Product = "kapacitor"
 )
@@ -33,7 +36,12 @@ var (
 	NumSubscriptions = &expvar.Int{}
 )
 
+var (
+	startTime time.Time
+)
+
 func init() {
+	startTime = time.Now().UTC()
 	expvar.Publish(NumTasksVarName, NumTasks)
 	expvar.Publish(NumEnabledTasksVarName, NumEnabledTasks)
 	expvar.Publish(NumSubscriptionsVarName, NumSubscriptions)
@@ -64,6 +72,10 @@ func GetFloatVar(name string) float64 {
 		panic(err)
 	}
 	return f
+}
+
+func Uptime() time.Duration {
+	return time.Now().Sub(startTime)
 }
 
 var expvarMu sync.Mutex
@@ -187,6 +199,9 @@ func GetStatsData() ([]client.StatsData, error) {
 			allData = append(allData, data)
 		}
 	})
+
+	// Add uptime to globalData
+	globalData.Values[UptimeVarName] = Uptime().Seconds()
 
 	// Add Go memstats.
 	data := client.StatsData{

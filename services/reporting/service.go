@@ -173,6 +173,7 @@ func (s *Service) sendUsageReport() error {
 	data.Values[kapacitor.NumTasksVarName] = kapacitor.GetIntVar(kapacitor.NumTasksVarName)
 	data.Values[kapacitor.NumEnabledTasksVarName] = kapacitor.GetIntVar(kapacitor.NumEnabledTasksVarName)
 	data.Values[kapacitor.NumSubscriptionsVarName] = kapacitor.GetIntVar(kapacitor.NumSubscriptionsVarName)
+	data.Values[kapacitor.UptimeVarName] = kapacitor.Uptime().Seconds()
 
 	usage := client.Usage{
 		Product: kapacitor.Product,

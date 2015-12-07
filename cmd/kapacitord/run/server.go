@@ -346,14 +346,17 @@ func (s *Server) Open() error {
 		hostVar.Set(s.hostname)
 		productVar.Set(kapacitor.Product)
 		versionVar.Set(s.buildInfo.Version)
+		s.Logger.Printf("I! ClusterID: %s ServerID: %s", s.ClusterID, s.ServerID)
 
 		// Start profiling, if set.
 		s.startProfile(s.CPUProfile, s.MemProfile)
 
 		for _, service := range s.Services {
+			s.Logger.Printf("D! opening service: %T", service)
 			if err := service.Open(); err != nil {
 				return fmt.Errorf("open service %T: %s", service, err)
 			}
+			s.Logger.Printf("D! opened service: %T", service)
 		}
 		return nil
 
@@ -381,7 +384,9 @@ func (s *Server) Close() error {
 	// Close services to allow any inflight requests to complete
 	// and prevent new requests from being accepted.
 	for _, service := range s.Services {
+		s.Logger.Printf("D! closing service: %T", service)
 		service.Close()
+		s.Logger.Printf("D! closed service: %T", service)
 	}
 
 	close(s.closing)
