@@ -27,6 +27,7 @@ import (
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/stats"
 	"github.com/influxdata/kapacitor/services/task_store"
+	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/wlog"
@@ -104,6 +105,10 @@ type Server struct {
 
 // NewServer returns a new instance of Server built from a config.
 func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*Server, error) {
+	err := c.Validate()
+	if err != nil {
+		return nil, fmt.Errorf("%s. To generate a valid configuration file run `kapacitord config > kapacitor.generated.conf`.", err)
+	}
 	l := logService.NewLogger("[srv] ", log.LstdFlags)
 	s := &Server{
 		buildInfo:     *buildInfo,
@@ -124,6 +129,7 @@ func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*
 	}
 
 	// Append Kapacitor services.
+	s.appendUDFService(c.UDF)
 	s.appendSMTPService(c.SMTP)
 	s.appendHTTPDService(c.HTTP)
 	s.appendInfluxDBService(c.InfluxDB, c.Hostname)
@@ -201,6 +207,7 @@ func (s *Server) appendTaskStoreService(c task_store.Config) {
 	srv.TaskMaster = s.TaskMaster
 
 	s.TaskStore = srv
+	s.TaskMaster.TaskStore = srv
 	s.Services = append(s.Services, srv)
 }
 
@@ -213,6 +220,14 @@ func (s *Server) appendReplayStoreService(c replay.Config) {
 	srv.TaskMaster = s.TaskMaster
 
 	s.ReplayService = srv
+	s.Services = append(s.Services, srv)
+}
+
+func (s *Server) appendUDFService(c udf.Config) {
+	l := s.LogService.NewLogger("[udf] ", log.LstdFlags)
+	srv := udf.NewService(c, l)
+
+	s.TaskMaster.UDFService = srv
 	s.Services = append(s.Services, srv)
 }
 

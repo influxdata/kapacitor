@@ -2,6 +2,7 @@ package kapacitor
 
 import (
 	"errors"
+	"log"
 	"time"
 
 	"github.com/influxdata/kapacitor/models"
@@ -17,9 +18,9 @@ type SampleNode struct {
 }
 
 // Create a new  SampleNode which filters data from a source.
-func newSampleNode(et *ExecutingTask, n *pipeline.SampleNode) (*SampleNode, error) {
+func newSampleNode(et *ExecutingTask, n *pipeline.SampleNode, l *log.Logger) (*SampleNode, error) {
 	sn := &SampleNode{
-		node:     node{Node: n, et: et},
+		node:     node{Node: n, et: et, logger: l},
 		s:        n,
 		counts:   make(map[models.GroupID]int64),
 		duration: n.Duration,
@@ -31,7 +32,7 @@ func newSampleNode(et *ExecutingTask, n *pipeline.SampleNode) (*SampleNode, erro
 	return sn, nil
 }
 
-func (s *SampleNode) runSample() error {
+func (s *SampleNode) runSample([]byte) error {
 	switch s.Wants() {
 	case pipeline.StreamEdge:
 		for p, ok := s.ins[0].NextPoint(); ok; p, ok = s.ins[0].NextPoint() {

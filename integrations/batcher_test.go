@@ -309,8 +309,15 @@ func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.Ex
 		wlog.SetLevel(wlog.OFF)
 	}
 
+	// Create a new execution env
+	tm := kapacitor.NewTaskMaster(logService)
+	tm.HTTPDService = httpService
+	tm.TaskStore = taskStore{}
+	tm.Open()
+	scope := tm.CreateTICKScope()
+
 	// Create task
-	task, err := kapacitor.NewBatcher(name, script, dbrps)
+	task, err := kapacitor.NewTask(name, script, kapacitor.BatchTask, dbrps, 0, scope)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -333,11 +340,6 @@ func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.Ex
 	// Use 1971 so that we don't get true negatives on Epoch 0 collisions
 	c := clock.New(time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC))
 	r := kapacitor.NewReplay(c)
-
-	// Create a new execution env
-	tm := kapacitor.NewTaskMaster(logService)
-	tm.HTTPDService = httpService
-	tm.Open()
 
 	//Start the task
 	et, err := tm.StartTask(task)

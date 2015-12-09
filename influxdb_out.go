@@ -1,6 +1,8 @@
 package kapacitor
 
 import (
+	"log"
+
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdb/influxdb/client"
@@ -12,16 +14,16 @@ type InfluxDBOutNode struct {
 	conn *client.Client
 }
 
-func newInfluxDBOutNode(et *ExecutingTask, n *pipeline.InfluxDBOutNode) (*InfluxDBOutNode, error) {
+func newInfluxDBOutNode(et *ExecutingTask, n *pipeline.InfluxDBOutNode, l *log.Logger) (*InfluxDBOutNode, error) {
 	in := &InfluxDBOutNode{
-		node: node{Node: n, et: et},
+		node: node{Node: n, et: et, logger: l},
 		i:    n,
 	}
 	in.node.runF = in.runOut
 	return in, nil
 }
 
-func (i *InfluxDBOutNode) runOut() error {
+func (i *InfluxDBOutNode) runOut([]byte) error {
 	switch i.Wants() {
 	case pipeline.StreamEdge:
 		for p, ok := i.ins[0].NextPoint(); ok; p, ok = i.ins[0].NextPoint() {

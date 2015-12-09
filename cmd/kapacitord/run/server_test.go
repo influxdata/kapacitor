@@ -8,15 +8,21 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/cmd/kapacitord/run"
+	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdb/influxdb/client"
 	"github.com/influxdb/influxdb/influxql"
 	"github.com/influxdb/influxdb/models"
+	"github.com/influxdb/influxdb/toml"
 )
 
 func TestServer_Ping(t *testing.T) {
@@ -690,5 +696,149 @@ batch
 		t.Errorf("unexpected alert log:\ngot %v\nexp %v", got, exp)
 		t.Errorf("unexpected alert log:\ngot %v\nexp %v", got[0].Data.Series[0], exp[0].Data.Series[0])
 		t.Errorf("unexpected alert log:\ngot %v\nexp %v", got[1].Data.Series[0], exp[1].Data.Series[0])
+	}
+}
+
+func TestServer_UDFAgents(t *testing.T) {
+
+	dir, err := os.Getwd()
+	udfDir := filepath.Clean(filepath.Join(dir, "../../../udf"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tmpDir, err := ioutil.TempDir("", "testStreamTaskRecording")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+	agents := []struct {
+		buildFunc func() error
+		config    udf.FunctionConfig
+	}{
+		// Go
+		{
+			buildFunc: func() error {
+				cmd := exec.Command(
+					"go",
+					"build",
+					"-o",
+					filepath.Join(tmpDir, "go-moving_avg"),
+					filepath.Join(udfDir, "agent/examples/moving_avg.go"),
+				)
+				out, err := cmd.CombinedOutput()
+				if err != nil {
+					return fmt.Errorf("go build failed: %v: %s", err, string(out))
+				}
+				return nil
+			},
+			config: udf.FunctionConfig{
+				Prog:    filepath.Join(tmpDir, "go-moving_avg"),
+				Timeout: toml.Duration(time.Minute),
+			},
+		},
+		// Python
+		{
+			buildFunc: func() error { return nil },
+			config: udf.FunctionConfig{
+				Prog:    "python2",
+				Args:    []string{"-u", filepath.Join(udfDir, "agent/examples/moving_avg.py")},
+				Timeout: toml.Duration(time.Minute),
+				Env: map[string]string{
+					"PYTHONPATH": strings.Join(
+						[]string{filepath.Join(udfDir, "agent/py"), os.Getenv("PYTHONPATH")},
+						string(filepath.ListSeparator),
+					),
+				},
+			},
+		},
+	}
+	for _, agent := range agents {
+		err := agent.buildFunc()
+		if err != nil {
+			t.Fatal(err)
+		}
+		c := NewConfig()
+		c.UDF.Functions = map[string]udf.FunctionConfig{
+			"movingAvg": agent.config,
+		}
+		testAgent(t, c)
+	}
+}
+
+func testAgent(t *testing.T, c *run.Config) {
+	s := NewServer(c)
+	err := s.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	name := "testUDFTask"
+	ttype := "stream"
+	dbrps := []kapacitor.DBRP{{
+		Database:        "mydb",
+		RetentionPolicy: "myrp",
+	}}
+	tick := `
+stream
+	.from().measurement('test')
+	.movingAvg()
+		.field('value')
+		.size(10)
+		.as('mean')
+	.window()
+		.period(11s)
+		.every(11s)
+	.mapReduce(influxql.last('mean')).as('mean')
+	.httpOut('moving_avg')
+`
+
+	r, err := s.DefineTask(name, ttype, tick, dbrps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r != "" {
+		t.Fatal("unexpected result", r)
+	}
+
+	r, err = s.EnableTask(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r != "" {
+		t.Fatal("unexpected result", r)
+	}
+
+	endpoint := fmt.Sprintf("%s/api/v1/%s/moving_avg", s.URL(), name)
+
+	// Request data before any writes and expect null responses
+	nullResponse := `{"Series":null,"Err":null}`
+	err = s.HTTPGetRetry(endpoint, "", nullResponse, 1000, time.Millisecond*5)
+	if err != nil {
+		t.Error(err)
+	}
+
+	points := `test value=1 0000000000
+test value=1 0000000001
+test value=1 0000000002
+test value=1 0000000003
+test value=1 0000000004
+test value=1 0000000005
+test value=1 0000000006
+test value=1 0000000007
+test value=1 0000000008
+test value=1 0000000009
+test value=0 0000000010
+test value=0 0000000011
+`
+	v := url.Values{}
+	v.Add("precision", "s")
+	s.MustWrite("mydb", "myrp", points, v)
+
+	exp := `{"Series":[{"name":"test","columns":["time","mean"],"values":[["1970-01-01T00:00:11Z",0.9]]}],"Err":null}`
+	err = s.HTTPGetRetry(endpoint, nullResponse, exp, 100, time.Millisecond*5)
+	if err != nil {
+		t.Error(err)
 	}
 }

@@ -1,6 +1,7 @@
 package kapacitor
 
 import (
+	"log"
 	"time"
 
 	"github.com/influxdata/kapacitor/models"
@@ -13,9 +14,9 @@ type DerivativeNode struct {
 }
 
 // Create a new derivative node.
-func newDerivativeNode(et *ExecutingTask, n *pipeline.DerivativeNode) (*DerivativeNode, error) {
+func newDerivativeNode(et *ExecutingTask, n *pipeline.DerivativeNode, l *log.Logger) (*DerivativeNode, error) {
 	dn := &DerivativeNode{
-		node: node{Node: n, et: et},
+		node: node{Node: n, et: et, logger: l},
 		d:    n,
 	}
 	// Create stateful expressions
@@ -23,7 +24,7 @@ func newDerivativeNode(et *ExecutingTask, n *pipeline.DerivativeNode) (*Derivati
 	return dn, nil
 }
 
-func (d *DerivativeNode) runDerivative() error {
+func (d *DerivativeNode) runDerivative([]byte) error {
 	switch d.Provides() {
 	case pipeline.StreamEdge:
 		previous := make(map[models.GroupID]models.Point)

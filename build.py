@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/python2.7 -u
 
 import sys
 import os
@@ -204,7 +204,7 @@ def run_tests(race):
     run(get_command)
     print "done."
     print "Running tests..."
-    test_command = "go test ./..."
+    test_command = "go test -v ./..."
     if race:
         test_command = "go test -race ./..."
     code = os.system(test_command)
@@ -214,6 +214,18 @@ def run_tests(race):
     else:
         print "Tests Passed"
         return True
+
+def run_generate():
+    print "Running generate..."
+    command = "go generate ./..."
+    code = os.system(command)
+    if code != 0:
+        print "Generate Failed"
+        return False
+    else:
+        print "Generate Succeeded"
+    return True
+
 
 def build(version=None,
           branch=None,
@@ -407,6 +419,7 @@ def main():
     update = False
     upload = False
     test = False
+    generate = False
 
     for arg in sys.argv[1:]:
         if '--outdir' in arg:
@@ -451,6 +464,9 @@ def main():
         elif '--test' in arg:
             # Run tests and exit
             test = True
+        elif '--generate' in arg:
+            # Run go generate ./...
+            generate = True
         else:
             print "!! Unknown argument: {}".format(arg)
             sys.exit(1)
@@ -473,6 +489,10 @@ def main():
 
     # TODO(rossmcdonald): Prepare git repo for build (checking out correct branch/commit, etc.)
     # prepare(branch=branch, commit=commit)
+
+    if generate:
+        if not run_generate():
+            return 1
 
     if test:
         if not run_tests(race):

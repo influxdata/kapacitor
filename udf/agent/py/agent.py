@@ -1,0 +1,168 @@
+# Kapacitor UDF Agent implementation in Python
+#
+# Requires protobuf v3
+#   pip install protobuf==3.0.0b2
+
+import sys
+import udf_pb2
+from threading import Lock, Thread
+from Queue import Queue
+import io
+
+import logging
+logger = logging.getLogger()
+
+
+# The Agent calls the appropriate methods on the Handler as requests are read off STDIN.
+#
+# Throwing an exception will cause the Agent to stop and an ErrorResponse to be sent.
+# Some *Response objects (like SnapshotResponse) allow for returning their own error within the object itself.
+# These types of errors will not stop the Agent and Kapacitor will deal with them appropriately.
+#
+# The Handler is called from a single thread, meaning methods will not be called concurrently.
+#
+# To write Points/Batches back to the Agent/Kapacitor use the Agent.write_response method, which is thread safe.
+class Handler(object):
+    def info():
+        pass
+    def init(init_req):
+        pass
+    def snapshot():
+        pass
+    def restore(restore_req):
+        pass
+    def begin_batch():
+        pass
+    def point():
+        pass
+    def end_batch(end_req):
+        pass
+
+
+# Python implementation of a Kapacitor UDF agent.
+# This agent is responsible for reading and writing
+# messages over STDIN and STDOUT.
+#
+# The Agent requires a Handler object in order to fulfill requests.
+class Agent(object):
+    def __init__(self, _in=sys.stdin, out=sys.stdout,handler=None):
+        self._in = _in
+        self._out = out
+        self._thread = None
+        self.handler = handler
+        self._write_lock = Lock()
+
+    # Start the agent.
+    # This method returns immediately
+    def start(self):
+        self._thread = Thread(target=self._read_loop)
+        self._thread.start()
+
+    # Wait for the Agent to terminate.
+    # The Agent will terminate if STDIN is closed or an error occurs
+    def wait(self):
+        self._thread.join()
+
+    # Write a response to STDOUT.
+    # This method is thread safe.
+    def write_response(self, response, flush=False):
+        if response is None:
+            raise Exception("cannot write None response")
+
+        # Serialize message
+        self._write_lock.acquire()
+        try:
+            data = response.SerializeToString()
+            # Write message len
+            encodeUvarint(sys.stdout, len(data))
+            # Write message
+            sys.stdout.write(data)
+            if flush:
+                sys.stdout.flush()
+        finally:
+            self._write_lock.release()
+
+    # Read requests off stdin
+    def _read_loop(self):
+        request = udf_pb2.Request()
+        while True:
+            msg = 'unknown'
+            try:
+                size = decodeUvarint32(sys.stdin)
+                data = sys.stdin.read(size)
+
+                request.ParseFromString(data)
+
+                # use parsed message
+                msg = request.WhichOneof("message")
+                if msg == "info":
+                    response = self.handler.info()
+                    self.write_response(response, flush=True)
+                elif msg == "init":
+                    response = self.handler.init(request.init)
+                    self.write_response(response, flush=True)
+                elif msg == "keepalive":
+                    response = udf_pb2.Response()
+                    response.keepalive.time = request.keepalive.time
+                    self.write_response(response, flush=True)
+                elif msg == "snapshot":
+                    response = self.handler.snapshot()
+                    self.write_response(response, flush=True)
+                elif msg == "restore":
+                    response = self.handler.restore(request.restore)
+                    self.write_response(response, flush=True)
+                elif msg == "begin":
+                    self.handler.begin_batch()
+                elif msg == "point":
+                    self.handler.point(request.point)
+                elif msg == "end":
+                    self.handler.end_batch(request.end)
+                else:
+                    logger.error("received unhandled request %s", msg)
+            except EOF:
+                break
+            except Exception as e:
+                error = "error processing request of type %s: %s" % (msg, e)
+                logger.error(error)
+                response = udf_pb2.Response()
+                response.error.error = error
+                self.write_response(response)
+
+# Indicates the end of a file/stream has been reached.
+class EOF(Exception):
+    pass
+
+# Varint encode decode values
+mask32uint = (1 << 32) - 1
+byteSize = 8
+shiftSize = byteSize - 1
+varintMoreMask = 2**shiftSize
+varintMask = varintMoreMask - 1
+
+
+# Encode an unsigned varint
+def encodeUvarint(writer, value):
+    bits = value & varintMask
+    value >>= shiftSize
+    while value:
+        writer.write(chr(varintMoreMask|bits))
+        bits = value & varintMask
+        value >>= shiftSize
+    return writer.write(chr(bits))
+
+# Decode an unsigned varint, max of 32 bits
+def decodeUvarint32(reader):
+    result = 0
+    shift = 0
+    while True:
+        byte = reader.read(1)
+        if len(byte) == 0:
+            raise EOF
+        b = ord(byte)
+        result |= ((b & varintMask) << shift)
+        if not (b & varintMoreMask):
+            result &= mask32uint
+            return result
+        shift += shiftSize
+        if shift >= 32:
+            raise Exception("too many bytes when decoding varint, larger than 32bit uint")

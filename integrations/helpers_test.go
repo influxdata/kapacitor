@@ -1,6 +1,7 @@
 package integrations
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -103,4 +104,25 @@ type LogService struct{}
 
 func (l *LogService) NewLogger(prefix string, flag int) *log.Logger {
 	return wlog.New(os.Stderr, prefix, flag)
+}
+
+type UDFService struct {
+	FunctionListFunc func() []string
+	FunctionInfoFunc func(name string) (kapacitor.UDFProcessInfo, bool)
+}
+
+func (u UDFService) FunctionList() []string {
+	return u.FunctionListFunc()
+}
+
+func (u UDFService) FunctionInfo(name string) (kapacitor.UDFProcessInfo, bool) {
+	return u.FunctionInfoFunc(name)
+}
+
+type taskStore struct{}
+
+func (ts taskStore) SaveSnapshot(name string, snapshot *kapacitor.TaskSnapshot) error { return nil }
+func (ts taskStore) HasSnapshot(name string) bool                                     { return false }
+func (ts taskStore) LoadSnapshot(name string) (*kapacitor.TaskSnapshot, error) {
+	return nil, errors.New("not implemented")
 }

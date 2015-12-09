@@ -17,11 +17,12 @@ type Node interface {
 	addParentEdge(*Edge)
 
 	// start the node and its children
-	start()
+	start(snapshot []byte)
 	stop()
 
-	// set the logger
-	setLogger(logger *log.Logger)
+	// snapshot running state
+	snapshot() ([]byte, error)
+	restore(snapshot []byte) error
 
 	// wait for the node to finish processing and return any errors
 	Err() error
@@ -45,7 +46,7 @@ type node struct {
 	et         *ExecutingTask
 	parents    []Node
 	children   []Node
-	runF       func() error
+	runF       func(snapshot []byte) error
 	stopF      func()
 	errCh      chan error
 	err        error
@@ -66,11 +67,7 @@ func (n *node) abortParentEdges() {
 	}
 }
 
-func (n *node) setLogger(l *log.Logger) {
-	n.logger = l
-}
-
-func (n *node) start() {
+func (n *node) start(snapshot []byte) {
 	n.errCh = make(chan error, 1)
 	go func() {
 		var err error
@@ -92,7 +89,7 @@ func (n *node) start() {
 			n.errCh <- err
 		}()
 		// Run node
-		err = n.runF()
+		err = n.runF(snapshot)
 	}()
 }
 
@@ -102,6 +99,12 @@ func (n *node) stop() {
 	}
 
 }
+
+// no-op snapshot
+func (n *node) snapshot() (b []byte, err error) { return }
+
+// no-op restore
+func (n *node) restore([]byte) error { return nil }
 
 func (n *node) Err() error {
 	n.finishedMu.Lock()

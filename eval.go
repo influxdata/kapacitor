@@ -2,6 +2,7 @@ package kapacitor
 
 import (
 	"errors"
+	"log"
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
@@ -14,13 +15,13 @@ type EvalNode struct {
 	expressions []*tick.StatefulExpr
 }
 
-// Create a new  ApplyNode which applies a transformation func to each point in a stream and returns a single point.
-func newApplyNode(et *ExecutingTask, n *pipeline.EvalNode) (*EvalNode, error) {
+// Create a new  EvalNode which applies a transformation func to each point in a stream and returns a single point.
+func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalNode, error) {
 	if len(n.AsList) != len(n.Expressions) {
 		return nil, errors.New("must provide one name per expression via the 'As' property")
 	}
 	en := &EvalNode{
-		node: node{Node: n, et: et},
+		node: node{Node: n, et: et, logger: l},
 		e:    n,
 	}
 	// Create stateful expressions
@@ -29,11 +30,11 @@ func newApplyNode(et *ExecutingTask, n *pipeline.EvalNode) (*EvalNode, error) {
 		en.expressions[i] = tick.NewStatefulExpr(expr)
 	}
 
-	en.node.runF = en.runApply
+	en.node.runF = en.runEval
 	return en, nil
 }
 
-func (e *EvalNode) runApply() error {
+func (e *EvalNode) runEval(snapshot []byte) error {
 	switch e.Provides() {
 	case pipeline.StreamEdge:
 		for p, ok := e.ins[0].NextPoint(); ok; p, ok = e.ins[0].NextPoint() {

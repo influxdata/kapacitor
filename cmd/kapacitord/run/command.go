@@ -93,11 +93,6 @@ func (cmd *Command) Run(args ...string) error {
 		config.Logging.Level = options.LogLevel
 	}
 
-	// Validate the configuration.
-	if err := config.Validate(); err != nil {
-		return fmt.Errorf("%s. To generate a valid configuration file run `kapacitord config > kapacitor.generated.conf`.", err)
-	}
-
 	// Initialize Logging Services
 	cmd.logService = logging.NewService(config.Logging, cmd.Stdout, cmd.Stderr)
 	err = cmd.logService.Open()
@@ -151,7 +146,9 @@ func (cmd *Command) monitorServerErrors() {
 	for {
 		select {
 		case err := <-cmd.Server.Err():
-			cmd.Logger.Println("E! " + err.Error())
+			if err != nil {
+				cmd.Logger.Println("E! " + err.Error())
+			}
 		case <-cmd.closing:
 			return
 		}

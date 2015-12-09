@@ -59,14 +59,8 @@ func (s *Service) Open() error {
 	s.tags["arch"] = runtime.GOARCH
 	s.tags["os"] = runtime.GOOS
 
-	// Send anonymous usage stats on startup
-	s.usageTicker = time.NewTicker(reportingInterval)
-	err := s.sendUsageReport()
-	if err != nil {
-		s.logger.Println("E! error sending usage stats:", err)
-	}
-
 	// Send periodic anonymous usage stats
+	s.usageTicker = time.NewTicker(reportingInterval)
 	s.wg.Add(1)
 	go s.usage()
 	return nil

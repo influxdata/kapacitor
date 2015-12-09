@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -75,9 +76,9 @@ type AlertNode struct {
 }
 
 // Create a new  AlertNode which caches the most recent item and exposes it over the HTTP API.
-func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode) (an *AlertNode, err error) {
+func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *AlertNode, err error) {
 	an = &AlertNode{
-		node: node{Node: n, et: et},
+		node: node{Node: n, et: et, logger: l},
 		a:    n,
 	}
 	an.node.runF = an.runAlert
@@ -207,7 +208,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode) (an *AlertNode, err 
 	return
 }
 
-func (a *AlertNode) runAlert() error {
+func (a *AlertNode) runAlert([]byte) error {
 	switch a.Wants() {
 	case pipeline.StreamEdge:
 		for p, ok := a.ins[0].NextPoint(); ok; p, ok = a.ins[0].NextPoint() {

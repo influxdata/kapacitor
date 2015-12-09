@@ -12,6 +12,21 @@ import (
 	"unicode/utf8"
 )
 
+// Interface for interacting with objects.
+// If an object does not self describe via this interface
+// than a reflection based implemenation will be used.
+type SelfDescriber interface {
+	//A description the object
+	Desc() string
+
+	HasMethod(name string) bool
+	CallMethod(name string, args ...interface{}) (interface{}, error)
+
+	HasProperty(name string) bool
+	Property(name string) interface{}
+	SetProperty(name string, arg interface{}) error
+}
+
 // Parse and evaluate a given script for the scope.
 // This evaluation method uses reflection to call
 // methods on objects within the scope.
@@ -91,7 +106,7 @@ func eval(n Node, scope *Scope, stck *stack) (err error) {
 			return
 		}
 	case *FunctionNode:
-		args := make([]reflect.Value, len(node.Args))
+		args := make([]interface{}, len(node.Args))
 		for i, arg := range node.Args {
 			err = eval(arg, scope, stck)
 			if err != nil {
@@ -113,7 +128,7 @@ func eval(n Node, scope *Scope, stck *stack) (err error) {
 				}
 			}
 
-			args[i] = reflect.ValueOf(a)
+			args[i] = a
 		}
 		err = evalFunc(node, scope, stck, args)
 		if err != nil {
@@ -182,22 +197,20 @@ func evalBinary(op tokenType, scope *Scope, stck *stack) error {
 			}
 			stck.Push(ret)
 		case *IdentifierNode:
-			name := capilatizeFirst(right.Ident)
+			name := right.Ident
 
 			//Lookup field by name of left object
-			v := reflect.ValueOf(l)
-			if !v.IsValid() {
-				return fmt.Errorf("object is not valid, cannot get field %s of %v", name, l)
+			var describer SelfDescriber
+			if d, ok := l.(SelfDescriber); ok {
+				describer = d
+			} else {
+				describer = NewReflectionDescriber(l)
 			}
-			v = reflect.Indirect(v)
-			if v.Kind() == reflect.Struct {
-				field := v.FieldByName(name)
-				if field.IsValid() {
-					stck.Push(field.Interface())
-					break
-				}
+			if describer.HasProperty(name) {
+				stck.Push(describer.Property(name))
+			} else {
+				return fmt.Errorf("object %T has no property %s", l, name)
 			}
-			return fmt.Errorf("unknown field %s of obj %T", name, l)
 		default:
 			return fmt.Errorf("invalid right operand of type %T to '.' operator", r)
 		}
@@ -205,7 +218,7 @@ func evalBinary(op tokenType, scope *Scope, stck *stack) error {
 	return nil
 }
 
-func evalFunc(f *FunctionNode, scope *Scope, stck *stack, args []reflect.Value) error {
+func evalFunc(f *FunctionNode, scope *Scope, stck *stack, args []interface{}) error {
 	rec := func(obj interface{}, errp *error) {
 		e := recover()
 		if e != nil {
@@ -217,57 +230,159 @@ func evalFunc(f *FunctionNode, scope *Scope, stck *stack, args []reflect.Value) 
 		}
 	}
 	fnc := unboundFunc(func(obj interface{}) (_ interface{}, err error) {
-		//Setup recover method if there is a panic during reflection
+		//Setup recover method if there is a panic during the method call
 		defer rec(obj, &err)
-		name := capilatizeFirst(f.Func)
-		// Check for method
-		var method reflect.Value
+
 		if obj == nil {
 			// Object is nil, check for func in scope
 			fnc, _ := scope.Get(f.Func)
 			if fnc == nil {
 				return nil, fmt.Errorf("no global function %q defined", f.Func)
 			}
-			method = reflect.ValueOf(fnc)
-		} else {
-			v := reflect.ValueOf(obj)
-			if !v.IsValid() {
-				return nil, fmt.Errorf("error calling %q on object %T", f.Func, obj)
-			}
-			method = v.MethodByName(name)
-		}
-		if method.IsValid() {
-			ret := method.Call(args)
-			if l := len(ret); l == 1 {
-				return ret[0].Interface(), nil
-			} else if l == 2 {
-				if i := ret[1].Interface(); i != nil {
-					if err, ok := i.(error); !ok {
-						return nil, fmt.Errorf("second return value form function must be an 'error', got %T", i)
-					} else {
-						return nil, err
-					}
-				} else {
-					return ret[0].Interface(), nil
-				}
-			} else {
-				return nil, fmt.Errorf("functions must return a single value or (interface{}, error)")
-			}
+			method := reflect.ValueOf(fnc)
+			return callMethodReflection(method, args)
 		}
 
-		// Check for settable field
-		v := reflect.Indirect(reflect.ValueOf(obj))
-		if len(f.Args) == 1 && v.Kind() == reflect.Struct {
-			field := v.FieldByName(name)
-			if field.IsValid() && field.CanSet() {
-				field.Set(args[0])
-				return obj, nil
-			}
+		// Get SelfDescriber
+		name := f.Func
+		var describer SelfDescriber
+		if d, ok := obj.(SelfDescriber); ok {
+			describer = d
+		} else {
+			describer = NewReflectionDescriber(obj)
 		}
-		return nil, fmt.Errorf("No method or field %q on %T", name, obj)
+
+		// Check for Method
+		if describer.HasMethod(name) {
+			return describer.CallMethod(name, args...)
+		}
+
+		// Check for dynamic method.
+		dm := scope.DynamicMethod(name)
+		if dm != nil {
+			ret, err := dm(obj, args...)
+			if err != nil {
+				return nil, err
+			}
+			return ret, nil
+		}
+
+		// Ran out of options...
+		return nil, fmt.Errorf("No method or property %q on %s", name, describer.Desc())
 	})
 	stck.Push(fnc)
 	return nil
+}
+
+// Wraps any object as a SelfDescriber using reflection.
+type ReflectionDescriber struct {
+	obj interface{}
+}
+
+func NewReflectionDescriber(obj interface{}) *ReflectionDescriber {
+	return &ReflectionDescriber{obj: obj}
+}
+
+func (r *ReflectionDescriber) Desc() string {
+	return reflect.TypeOf(r.obj).Name()
+}
+
+// Using reflection check if the object has the method or field.
+// A field is a valid method because we can set it via reflection too.
+func (r *ReflectionDescriber) HasMethod(name string) bool {
+	name = capilatizeFirst(name)
+	v := reflect.ValueOf(r.obj)
+	if !v.IsValid() {
+		return false
+	}
+	if v.MethodByName(name).IsValid() {
+		return true
+	}
+	// Check for a field of the same name,
+	// we can wrap setting it in a method.
+	return r.HasProperty(name)
+}
+
+func (r *ReflectionDescriber) CallMethod(name string, args ...interface{}) (interface{}, error) {
+	name = capilatizeFirst(name)
+	v := reflect.ValueOf(r.obj)
+	if !v.IsValid() {
+		return nil, fmt.Errorf("cannot get reflect.ValueOf %T", r.obj)
+	}
+
+	// Check for a method and call it
+	if method := v.MethodByName(name); method.IsValid() {
+		return callMethodReflection(method, args)
+	}
+
+	// Check for a field and set it
+	if len(args) == 1 && r.HasProperty(name) {
+		err := r.SetProperty(name, args[0])
+		if err != nil {
+			return nil, err
+		}
+		return r.obj, nil
+	}
+	return nil, fmt.Errorf("unknown method or field %s on %T", name, r.obj)
+}
+
+// Using reflection check if the object has a field with the property name.
+func (r *ReflectionDescriber) HasProperty(name string) bool {
+	name = capilatizeFirst(name)
+	v := reflect.Indirect(reflect.ValueOf(r.obj))
+	if v.Kind() == reflect.Struct {
+		field := v.FieldByName(name)
+		return field.IsValid() && field.CanSet()
+	}
+	return false
+}
+
+func (r *ReflectionDescriber) Property(name string) interface{} {
+	name = capilatizeFirst(name)
+	v := reflect.Indirect(reflect.ValueOf(r.obj))
+	if v.Kind() == reflect.Struct {
+		field := v.FieldByName(name)
+		if field.IsValid() {
+			return field.Interface()
+		}
+	}
+	return nil
+}
+
+func (r *ReflectionDescriber) SetProperty(name string, value interface{}) error {
+	v := reflect.Indirect(reflect.ValueOf(r.obj))
+	if v.Kind() == reflect.Struct {
+		field := v.FieldByName(name)
+		if field.IsValid() && field.CanSet() {
+			field.Set(reflect.ValueOf(value))
+			return nil
+		}
+	}
+	return fmt.Errorf("no field %s on %T", name, r.obj)
+}
+
+func callMethodReflection(method reflect.Value, args []interface{}) (interface{}, error) {
+	rargs := make([]reflect.Value, len(args))
+	for i, arg := range args {
+		rargs[i] = reflect.ValueOf(arg)
+	}
+	ret := method.Call(rargs)
+	if l := len(ret); l == 1 {
+		return ret[0].Interface(), nil
+	} else if l == 2 {
+		if i := ret[1].Interface(); i != nil {
+			if err, ok := i.(error); !ok {
+				return nil, fmt.Errorf("second return value form function must be an 'error', got %T", i)
+			} else {
+				return nil, err
+			}
+		} else {
+			return ret[0].Interface(), nil
+		}
+	} else {
+		return nil, fmt.Errorf("functions must return a single value or (interface{}, error)")
+	}
+
 }
 
 // Capilatizes the first rune in the string

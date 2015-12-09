@@ -16,16 +16,16 @@ type WindowNode struct {
 }
 
 // Create a new  WindowNode, which windows data for a period of time and emits the window.
-func newWindowNode(et *ExecutingTask, n *pipeline.WindowNode) (*WindowNode, error) {
+func newWindowNode(et *ExecutingTask, n *pipeline.WindowNode, l *log.Logger) (*WindowNode, error) {
 	wn := &WindowNode{
 		w:    n,
-		node: node{Node: n, et: et},
+		node: node{Node: n, et: et, logger: l},
 	}
 	wn.node.runF = wn.runWindow
 	return wn, nil
 }
 
-func (w *WindowNode) runWindow() error {
+func (w *WindowNode) runWindow([]byte) error {
 	windows := make(map[models.GroupID]*window)
 	// Loops through points windowing by group
 	for p, ok := w.ins[0].NextPoint(); ok; p, ok = w.ins[0].NextPoint() {
