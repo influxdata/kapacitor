@@ -44,9 +44,10 @@ type Service struct {
 		NewClient() (*client.Client, error)
 	}
 	TaskMaster interface {
-		NewFork(name string, dbrps []kapacitor.DBRP) *kapacitor.Edge
+		NewFork(name string, dbrps []kapacitor.DBRP) (*kapacitor.Edge, error)
 		DelFork(name string)
 		New() *kapacitor.TaskMaster
+		Stream(name string) (kapacitor.StreamCollector, error)
 	}
 
 	logger *log.Logger
@@ -182,7 +183,12 @@ func (r *Service) handleReplay(w http.ResponseWriter, req *http.Request) {
 			httpd.HttpError(w, "replay find: "+err.Error(), true, http.StatusNotFound)
 			return
 		}
-		replayC = replay.ReplayStream(f, tm.Stream, recTime, precision)
+		stream, err := tm.Stream(id)
+		if err != nil {
+			httpd.HttpError(w, "stream start: "+err.Error(), true, http.StatusInternalServerError)
+			return
+		}
+		replayC = replay.ReplayStream(f, stream, recTime, precision)
 	case kapacitor.BatchTask:
 		fs, err := r.FindBatchRecording(id)
 		if err != nil {
@@ -507,7 +513,10 @@ func (s streamWriter) Close() error {
 
 // Record the stream for a duration
 func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration, dbrps []kapacitor.DBRP) error {
-	e := r.TaskMaster.NewFork(rid.String(), dbrps)
+	e, err := r.TaskMaster.NewFork(rid.String(), dbrps)
+	if err != nil {
+		return err
+	}
 	sw, err := r.newStreamWriter(rid)
 	if err != nil {
 		return err
@@ -522,7 +531,6 @@ func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration, dbrps []kapac
 	}()
 	time.Sleep(dur)
 	done = true
-	e.Close()
 	r.TaskMaster.DelFork(rid.String())
 	return nil
 }

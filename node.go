@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"runtime"
+	"sync"
 
 	"github.com/influxdb/kapacitor/pipeline"
 )
@@ -30,30 +31,34 @@ type Node interface {
 
 	// close children edges
 	closeChildEdges()
-	closeParentEdges()
+	// abort parent edges
+	abortParentEdges()
 }
 
 //implementation of Node
 type node struct {
 	pipeline.Node
-	et       *ExecutingTask
-	parents  []Node
-	children []Node
-	runF     func() error
-	stopF    func()
-	errCh    chan error
-	ins      []*Edge
-	outs     []*Edge
-	logger   *log.Logger
+	et         *ExecutingTask
+	parents    []Node
+	children   []Node
+	runF       func() error
+	stopF      func()
+	errCh      chan error
+	err        error
+	finishedMu sync.Mutex
+	finished   bool
+	ins        []*Edge
+	outs       []*Edge
+	logger     *log.Logger
 }
 
 func (n *node) addParentEdge(e *Edge) {
 	n.ins = append(n.ins, e)
 }
 
-func (n *node) closeParentEdges() {
+func (n *node) abortParentEdges() {
 	for _, in := range n.ins {
-		in.Close()
+		in.Abort()
 	}
 }
 
@@ -68,16 +73,16 @@ func (n *node) start() {
 		defer func() {
 			// Always close children edges
 			n.closeChildEdges()
-			// Handle panic in runF
-			r := recover()
-			if r != nil {
-				trace := make([]byte, 512)
-				n := runtime.Stack(trace, false)
-				err = fmt.Errorf("%s: Trace:%s", r, string(trace[:n]))
-			}
 			// Propogate error up
 			if err != nil {
-				n.closeParentEdges()
+				// Handle panic in runF
+				r := recover()
+				if r != nil {
+					trace := make([]byte, 512)
+					n := runtime.Stack(trace, false)
+					err = fmt.Errorf("%s: Trace:%s", r, string(trace[:n]))
+				}
+				n.abortParentEdges()
 				n.logger.Println("E!", err)
 			}
 			n.errCh <- err
@@ -91,11 +96,17 @@ func (n *node) stop() {
 	if n.stopF != nil {
 		n.stopF()
 	}
-	n.closeChildEdges()
+
 }
 
 func (n *node) Err() error {
-	return <-n.errCh
+	n.finishedMu.Lock()
+	defer n.finishedMu.Unlock()
+	if !n.finished {
+		n.finished = true
+		n.err = <-n.errCh
+	}
+	return n.err
 }
 
 func (n *node) addChild(c Node) (*Edge, error) {

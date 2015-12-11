@@ -38,7 +38,7 @@ func TestClockUntilSleepFirst(t *testing.T) {
 	c.Set(zero.Add(10 * time.Microsecond))
 	select {
 	case <-done:
-	case <-time.After(10 * time.Millisecond):
+	case <-time.After(20 * time.Millisecond):
 		t.Fatal("expected return from c.Until")
 	}
 }
@@ -139,7 +139,7 @@ func TestClockUntilMultipleGos(t *testing.T) {
 		c.Set(now)
 		select {
 		case <-done:
-		case <-time.After(10 * time.Millisecond):
+		case <-time.After(20 * time.Millisecond):
 			t.Fatalf("expected return from c.Until i: %d", i)
 		}
 	}

@@ -58,36 +58,7 @@ batch
 		},
 	}
 
-	clock, et, errCh, tm := testBatcher(t, "TestBatch_Derivative", script)
-	defer tm.Close()
-
-	// Move time forward
-	clock.Set(clock.Zero().Add(21 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
-	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
-	}
-
-	// Get the result
-	output, err := et.GetOutput("TestBatch_Derivative")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	resp, err := http.Get(output.Endpoint())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Assert we got the expected result
-	result := kapacitor.ResultFromJSON(resp.Body)
-	if eq, msg := compareResults(er, result); !eq {
-		t.Error(msg)
-	}
+	testBatcherWithOutput(t, "TestBatch_Derivative", script, 21*time.Second, er)
 }
 
 func TestBatch_DerivativeUnit(t *testing.T) {
@@ -134,36 +105,7 @@ batch
 		},
 	}
 
-	clock, et, errCh, tm := testBatcher(t, "TestBatch_Derivative", script)
-	defer tm.Close()
-
-	// Move time forward
-	clock.Set(clock.Zero().Add(21 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
-	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
-	}
-
-	// Get the result
-	output, err := et.GetOutput("TestBatch_Derivative")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	resp, err := http.Get(output.Endpoint())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Assert we got the expected result
-	result := kapacitor.ResultFromJSON(resp.Body)
-	if eq, msg := compareResults(er, result); !eq {
-		t.Error(msg)
-	}
+	testBatcherWithOutput(t, "TestBatch_Derivative", script, 21*time.Second, er)
 }
 
 func TestBatch_DerivativeN(t *testing.T) {
@@ -178,7 +120,7 @@ batch
 		.every(10s)
 		.groupBy(time(2s))
 	.derivative('value')
-	.httpOut('TestBatch_Derivative')
+	.httpOut('TestBatch_DerivativeNN')
 `
 
 	er := kapacitor.Result{
@@ -209,37 +151,9 @@ batch
 		},
 	}
 
-	clock, et, errCh, tm := testBatcher(t, "TestBatch_DerivativeNN", script)
-	defer tm.Close()
-
-	// Move time forward
-	clock.Set(clock.Zero().Add(21 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
-	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
-	}
-
-	// Get the result
-	output, err := et.GetOutput("TestBatch_Derivative")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	resp, err := http.Get(output.Endpoint())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Assert we got the expected result
-	result := kapacitor.ResultFromJSON(resp.Body)
-	if eq, msg := compareResults(er, result); !eq {
-		t.Error(msg)
-	}
+	testBatcherWithOutput(t, "TestBatch_DerivativeNN", script, 21*time.Second, er)
 }
+
 func TestBatch_DerivativeNN(t *testing.T) {
 
 	var script = `
@@ -253,7 +167,7 @@ batch
 		.groupBy(time(2s))
 	.derivative('value')
 		.nonNegative()
-	.httpOut('TestBatch_Derivative')
+	.httpOut('TestBatch_DerivativeNN')
 `
 
 	er := kapacitor.Result{
@@ -280,36 +194,7 @@ batch
 		},
 	}
 
-	clock, et, errCh, tm := testBatcher(t, "TestBatch_DerivativeNN", script)
-	defer tm.Close()
-
-	// Move time forward
-	clock.Set(clock.Zero().Add(21 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
-	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
-	}
-
-	// Get the result
-	output, err := et.GetOutput("TestBatch_Derivative")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	resp, err := http.Get(output.Endpoint())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Assert we got the expected result
-	result := kapacitor.ResultFromJSON(resp.Body)
-	if eq, msg := compareResults(er, result); !eq {
-		t.Error(msg)
-	}
+	testBatcherWithOutput(t, "TestBatch_DerivativeNN", script, 21*time.Second, er)
 }
 
 func TestBatch_SimpleMR(t *testing.T) {
@@ -364,36 +249,7 @@ batch
 		},
 	}
 
-	clock, et, errCh, tm := testBatcher(t, "TestBatch_SimpleMR", script)
-	defer tm.Close()
-
-	// Move time forward
-	clock.Set(clock.Zero().Add(30 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
-	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
-	}
-
-	// Get the result
-	output, err := et.GetOutput("TestBatch_SimpleMR")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	resp, err := http.Get(output.Endpoint())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Assert we got the expected result
-	result := kapacitor.ResultFromJSON(resp.Body)
-	if eq, msg := compareResults(er, result); !eq {
-		t.Error(msg)
-	}
+	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er)
 }
 
 func TestBatch_Join(t *testing.T) {
@@ -442,36 +298,7 @@ cpu0.join(cpu1)
 		},
 	}
 
-	clock, et, errCh, tm := testBatcher(t, "TestBatch_Join", script)
-	defer tm.Close()
-
-	// Move time forward
-	clock.Set(clock.Zero().Add(30 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
-	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
-	}
-
-	// Get the result
-	output, err := et.GetOutput("TestBatch_Join")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	resp, err := http.Get(output.Endpoint())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Assert we got the expected result
-	result := kapacitor.ResultFromJSON(resp.Body)
-	if eq, msg := compareResults(er, result); !eq {
-		t.Error(msg)
-	}
+	testBatcherWithOutput(t, "TestBatch_Join", script, 30*time.Second, er)
 }
 
 // Helper test function for batcher
@@ -520,8 +347,42 @@ func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.Ex
 
 	// Replay test data to executor
 	batches := tm.BatchCollectors(name)
-	errCh := r.ReplayBatch(allData, batches, false)
+	replayErr := r.ReplayBatch(allData, batches, false)
 
 	t.Log(string(et.Task.Dot()))
-	return r.Setter, et, errCh, tm
+	return r.Setter, et, replayErr, tm
+}
+
+func testBatcherWithOutput(
+	t *testing.T,
+	name,
+	script string,
+	duration time.Duration,
+	er kapacitor.Result,
+	ignoreOrder ...bool,
+) {
+	clock, et, replayErr, tm := testBatcher(t, name, script)
+	defer tm.Close()
+
+	err := fastForwardTask(clock, et, replayErr, tm, duration)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Get the result
+	output, err := et.GetOutput(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := http.Get(output.Endpoint())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert we got the expected result
+	result := kapacitor.ResultFromJSON(resp.Body)
+	if eq, msg := compareResults(er, result); !eq {
+		t.Error(msg)
+	}
 }

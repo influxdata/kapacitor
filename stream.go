@@ -1,9 +1,6 @@
 package kapacitor
 
 import (
-	"fmt"
-
-	"github.com/influxdb/influxdb/influxql"
 	"github.com/influxdb/kapacitor/models"
 	"github.com/influxdb/kapacitor/pipeline"
 	"github.com/influxdb/kapacitor/tick"
@@ -33,21 +30,6 @@ func newStreamNode(et *ExecutingTask, n *pipeline.StreamNode) (*StreamNode, erro
 		sn.expression = tick.NewStatefulExpr(n.Expression)
 	}
 	return sn, nil
-}
-
-func parseFromClause(from string) (db, rp, mm string, err error) {
-	//create fake but complete query for parsing
-	query := "select v from " + from
-	s, err := influxql.ParseStatement(query)
-	if err != nil {
-		return "", "", "", err
-	}
-	if slct, ok := s.(*influxql.SelectStatement); ok && len(slct.Sources) == 1 {
-		if m, ok := slct.Sources[0].(*influxql.Measurement); ok {
-			return m.Database, m.RetentionPolicy, m.Name, nil
-		}
-	}
-	return "", "", "", fmt.Errorf("invalid from condition: %q", from)
 }
 
 func (s *StreamNode) runStream() error {

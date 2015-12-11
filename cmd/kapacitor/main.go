@@ -635,6 +635,7 @@ func doShow(args []string) error {
 	fmt.Println("Error:", ti.Error)
 	fmt.Println("Type:", ti.Type)
 	fmt.Println("Enabled:", ti.Enabled)
+	fmt.Println("Executing:", ti.Executing)
 	fmt.Println("Databases Retention Policies:", ti.DBRPs)
 	fmt.Printf("TICKscript:\n%s\n\n", ti.TICKscript)
 	fmt.Printf("DOT:\n%s\n", ti.Dot)
@@ -676,10 +677,11 @@ func doList(args []string) error {
 		type resp struct {
 			Error string `json:"Error"`
 			Tasks []struct {
-				Name    string
-				Type    kapacitor.TaskType
-				DBRPs   []kapacitor.DBRP
-				Enabled bool
+				Name      string
+				Type      kapacitor.TaskType
+				DBRPs     []kapacitor.DBRP
+				Enabled   bool
+				Executing bool
 			} `json:"Tasks"`
 		}
 		d := json.NewDecoder(r.Body)
@@ -689,10 +691,10 @@ func doList(args []string) error {
 			return errors.New(rp.Error)
 		}
 
-		outFmt := "%-30s%-10v%-10v%s\n"
-		fmt.Fprintf(os.Stdout, outFmt, "Name", "Type", "Enabled", "Databases and Retention Policies")
+		outFmt := "%-30s%-10v%-10v%-10v%s\n"
+		fmt.Fprintf(os.Stdout, outFmt, "Name", "Type", "Enabled", "Executing", "Databases and Retention Policies")
 		for _, t := range rp.Tasks {
-			fmt.Fprintf(os.Stdout, outFmt, t.Name, t.Type, t.Enabled, t.DBRPs)
+			fmt.Fprintf(os.Stdout, outFmt, t.Name, t.Type, t.Enabled, t.Executing, t.DBRPs)
 		}
 	case "recordings":
 
@@ -749,7 +751,7 @@ func deleteUsage() {
 func doDelete(args []string) error {
 	if len(args) < 2 {
 		fmt.Fprintln(os.Stderr, "Must pass at least one task name or recording ID")
-		enableUsage()
+		deleteUsage()
 		os.Exit(2)
 	}
 

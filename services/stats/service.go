@@ -36,9 +36,11 @@ import (
 // Internal stats come from running tasks and other
 // services running within Kapacitor.
 type Service struct {
-	StreamCollector interface {
-		CollectPoint(models.Point) error
+	TaskMaster interface {
+		Stream(name string) (kapacitor.StreamCollector, error)
 	}
+
+	stream kapacitor.StreamCollector
 
 	interval time.Duration
 	db       string
@@ -61,15 +63,19 @@ func NewService(c Config, l *log.Logger) *Service {
 	}
 }
 
-func (s *Service) Open() error {
+func (s *Service) Open() (err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.stream, err = s.TaskMaster.Stream("stats")
+	if err != nil {
+		return
+	}
 	s.open = true
 	s.closing = make(chan struct{})
 	s.wg.Add(1)
 	go s.sendStats()
 	s.logger.Println("I! opened service")
-	return nil
+	return
 }
 
 func (s *Service) Close() error {
@@ -81,6 +87,7 @@ func (s *Service) Close() error {
 	s.open = false
 	close(s.closing)
 	s.wg.Wait()
+	s.stream.Close()
 	s.logger.Println("I! closed service")
 	return nil
 }
@@ -116,6 +123,6 @@ func (s *Service) reportStats() {
 			Time:            now,
 			Fields:          models.Fields(stat.Values),
 		}
-		s.StreamCollector.CollectPoint(p)
+		s.stream.CollectPoint(p)
 	}
 }

@@ -205,6 +205,5 @@ func (r *ReduceNode) runReduce() error {
 		}
 
 	}
-	r.closeChildEdges()
 	return nil
 }
