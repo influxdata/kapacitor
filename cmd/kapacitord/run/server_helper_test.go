@@ -39,7 +39,10 @@ func NewServer(c *run.Config) *Server {
 		Branch:  "testBranch",
 	}
 	ls := &LogService{}
-	srv, _ := run.NewServer(c, buildInfo, ls)
+	srv, err := run.NewServer(c, buildInfo, ls)
+	if err != nil {
+		panic(err)
+	}
 	s := Server{
 		Server: srv,
 		Config: c,

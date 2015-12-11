@@ -102,7 +102,6 @@ func NewBatcher(name, script string, dbrps []DBRP) (*Task, error) {
 type ExecutingTask struct {
 	tm      *TaskMaster
 	Task    *Task
-	ins     []*Edge
 	source  Node
 	outputs map[string]Output
 	// node lookup from pipeline.ID -> Node
@@ -181,9 +180,8 @@ func (et *ExecutingTask) link() error {
 
 // Start the task.
 func (et *ExecutingTask) start(ins []*Edge) error {
-	et.ins = ins
 
-	for _, in := range et.ins {
+	for _, in := range ins {
 		et.source.addParentEdge(in)
 	}
 
@@ -193,14 +191,16 @@ func (et *ExecutingTask) start(ins []*Edge) error {
 	})
 }
 
-func (et *ExecutingTask) stop() {
-	et.rwalk(func(n Node) error {
+func (et *ExecutingTask) stop() (err error) {
+	et.walk(func(n Node) error {
 		n.stop()
+		e := n.Err()
+		if e != nil {
+			err = e
+		}
 		return nil
 	})
-	for _, in := range et.ins {
-		in.Close()
-	}
+	return
 }
 
 var ErrWrongTaskType = errors.New("wrong task type")
@@ -218,7 +218,7 @@ func (et *ExecutingTask) StartBatching() error {
 		return err
 	}
 
-	batcher.Start(et.ins)
+	batcher.Start()
 	return nil
 }
 

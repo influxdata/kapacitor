@@ -5,7 +5,6 @@ import (
 	"expvar"
 	"fmt"
 	"log"
-	"sync"
 
 	"github.com/influxdb/kapacitor/models"
 	"github.com/influxdb/kapacitor/pipeline"
@@ -16,6 +15,8 @@ const (
 	statCollected = "collected"
 	statEmitted   = "emitted"
 )
+
+var ErrAborted = errors.New("edged aborted")
 
 type StreamCollector interface {
 	CollectPoint(models.Point) error
@@ -33,8 +34,7 @@ type Edge struct {
 	reduce chan *MapResult
 
 	logger  *log.Logger
-	closed  bool
-	mu      sync.Mutex
+	aborted chan struct{}
 	statMap *expvar.Map
 }
 
@@ -48,7 +48,7 @@ func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, logSer
 	sm := NewStatistics("edges", tags)
 	sm.Add(statCollected, 0)
 	sm.Add(statEmitted, 0)
-	e := &Edge{statMap: sm}
+	e := &Edge{statMap: sm, aborted: make(chan struct{})}
 	name := fmt.Sprintf("%s|%s->%s", taskName, parentName, childName)
 	e.logger = logService.NewLogger(fmt.Sprintf("[edge:%s] ", name), log.LstdFlags)
 	switch t {
@@ -62,13 +62,9 @@ func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, logSer
 	return e
 }
 
+// Close the edge, this can only be called after all
+// collect calls to the edge have finished.
 func (e *Edge) Close() {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	if e.closed {
-		return
-	}
-	e.closed = true
 	e.logger.Printf(
 		"I! closing c: %s e: %s\n",
 		e.statMap.Get(statCollected),
@@ -83,6 +79,17 @@ func (e *Edge) Close() {
 	if e.reduce != nil {
 		close(e.reduce)
 	}
+}
+
+// Abort all next and collect calls.
+// Items in flight may or may not be processed.
+func (e *Edge) Abort() {
+	close(e.aborted)
+	e.logger.Printf(
+		"I! aborting c: %s e: %s\n",
+		e.statMap.Get(statCollected),
+		e.statMap.Get(statEmitted),
+	)
 }
 
 func (e *Edge) Next() (p models.PointInterface, ok bool) {
@@ -101,9 +108,12 @@ func (e *Edge) NextPoint() (p models.Point, ok bool) {
 			e.statMap.Get(statEmitted),
 		)
 	}
-	p, ok = <-e.stream
-	if ok {
-		e.statMap.Add(statEmitted, 1)
+	select {
+	case <-e.aborted:
+	case p, ok = <-e.stream:
+		if ok {
+			e.statMap.Add(statEmitted, 1)
+		}
 	}
 	return
 }
@@ -117,9 +127,12 @@ func (e *Edge) NextBatch() (b models.Batch, ok bool) {
 			e.statMap.Get(statEmitted),
 		)
 	}
-	b, ok = <-e.batch
-	if ok {
-		e.statMap.Add(statEmitted, 1)
+	select {
+	case <-e.aborted:
+	case b, ok = <-e.batch:
+		if ok {
+			e.statMap.Add(statEmitted, 1)
+		}
 	}
 	return
 }
@@ -133,28 +146,17 @@ func (e *Edge) NextMaps() (m *MapResult, ok bool) {
 			e.statMap.Get(statEmitted),
 		)
 	}
-	m, ok = <-e.reduce
-	if ok {
-		e.statMap.Add(statEmitted, 1)
+	select {
+	case <-e.aborted:
+	case m, ok = <-e.reduce:
+		if ok {
+			e.statMap.Add(statEmitted, 1)
+		}
 	}
 	return
 }
 
-func (e *Edge) recover(errp *error) {
-	if r := recover(); r != nil {
-		msg := fmt.Sprintf("%s", r)
-		if msg == "send on closed channel" {
-			*errp = errors.New(msg)
-		} else {
-			panic(r)
-		}
-	}
-}
-
-func (e *Edge) CollectPoint(p models.Point) (err error) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	defer e.recover(&err)
+func (e *Edge) CollectPoint(p models.Point) error {
 	if wlog.LogLevel() == wlog.DEBUG {
 		// Explicitly check log level since this is expensive and frequent
 		e.logger.Printf(
@@ -164,14 +166,15 @@ func (e *Edge) CollectPoint(p models.Point) (err error) {
 		)
 	}
 	e.statMap.Add(statCollected, 1)
-	e.stream <- p
-	return
+	select {
+	case <-e.aborted:
+		return ErrAborted
+	case e.stream <- p:
+		return nil
+	}
 }
 
-func (e *Edge) CollectBatch(b models.Batch) (err error) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	defer e.recover(&err)
+func (e *Edge) CollectBatch(b models.Batch) error {
 	if wlog.LogLevel() == wlog.DEBUG {
 		// Explicitly check log level since this is expensive and frequent
 		e.logger.Printf(
@@ -181,14 +184,15 @@ func (e *Edge) CollectBatch(b models.Batch) (err error) {
 		)
 	}
 	e.statMap.Add(statCollected, 1)
-	e.batch <- b
-	return
+	select {
+	case <-e.aborted:
+		return ErrAborted
+	case e.batch <- b:
+		return nil
+	}
 }
 
-func (e *Edge) CollectMaps(m *MapResult) (err error) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	defer e.recover(&err)
+func (e *Edge) CollectMaps(m *MapResult) error {
 	if wlog.LogLevel() == wlog.DEBUG {
 		// Explicitly check log level since this is expensive and frequent
 		e.logger.Printf(
@@ -198,6 +202,10 @@ func (e *Edge) CollectMaps(m *MapResult) (err error) {
 		)
 	}
 	e.statMap.Add(statCollected, 1)
-	e.reduce <- m
-	return
+	select {
+	case <-e.aborted:
+		return ErrAborted
+	case e.reduce <- m:
+		return nil
+	}
 }

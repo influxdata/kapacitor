@@ -72,36 +72,7 @@ stream
 		},
 	}
 
-	clock, et, errCh, tm := testStreamer(t, "TestStream_Derivative", script)
-	defer tm.Close()
-
-	// Move time forward
-	clock.Set(clock.Zero().Add(15 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
-	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
-	}
-
-	// Get the result
-	output, err := et.GetOutput("TestStream_Derivative")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	resp, err := http.Get(output.Endpoint())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Assert we got the expected result
-	result := kapacitor.ResultFromJSON(resp.Body)
-	if eq, msg := compareResults(er, result); !eq {
-		t.Error(msg)
-	}
+	testStreamerWithOutput(t, "TestStream_Derivative", script, 15*time.Second, er)
 }
 
 func TestStream_DerivativeUnit(t *testing.T) {
@@ -131,36 +102,7 @@ stream
 		},
 	}
 
-	clock, et, errCh, tm := testStreamer(t, "TestStream_Derivative", script)
-	defer tm.Close()
-
-	// Move time forward
-	clock.Set(clock.Zero().Add(15 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
-	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
-	}
-
-	// Get the result
-	output, err := et.GetOutput("TestStream_Derivative")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	resp, err := http.Get(output.Endpoint())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Assert we got the expected result
-	result := kapacitor.ResultFromJSON(resp.Body)
-	if eq, msg := compareResults(er, result); !eq {
-		t.Error(msg)
-	}
+	testStreamerWithOutput(t, "TestStream_Derivative", script, 15*time.Second, er)
 }
 
 func TestStream_DerivativeNN(t *testing.T) {
@@ -174,7 +116,7 @@ stream
 		.period(10s)
 		.every(10s)
 	.mapReduce(influxql.mean('value'))
-	.httpOut('TestStream_Derivative')
+	.httpOut('TestStream_DerivativeNN')
 `
 	er := kapacitor.Result{
 		Series: imodels.Rows{
@@ -190,36 +132,7 @@ stream
 		},
 	}
 
-	clock, et, errCh, tm := testStreamer(t, "TestStream_DerivativeNN", script)
-	defer tm.Close()
-
-	// Move time forward
-	clock.Set(clock.Zero().Add(15 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
-	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
-	}
-
-	// Get the result
-	output, err := et.GetOutput("TestStream_Derivative")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	resp, err := http.Get(output.Endpoint())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Assert we got the expected result
-	result := kapacitor.ResultFromJSON(resp.Body)
-	if eq, msg := compareResults(er, result); !eq {
-		t.Error(msg)
-	}
+	testStreamerWithOutput(t, "TestStream_DerivativeNN", script, 15*time.Second, er)
 }
 
 func TestStream_DerivativeN(t *testing.T) {
@@ -232,7 +145,7 @@ stream
 		.period(10s)
 		.every(10s)
 	.mapReduce(influxql.mean('value'))
-	.httpOut('TestStream_Derivative')
+	.httpOut('TestStream_DerivativeNN')
 `
 	er := kapacitor.Result{
 		Series: imodels.Rows{
@@ -248,36 +161,7 @@ stream
 		},
 	}
 
-	clock, et, errCh, tm := testStreamer(t, "TestStream_DerivativeNN", script)
-	defer tm.Close()
-
-	// Move time forward
-	clock.Set(clock.Zero().Add(15 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
-	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
-	}
-
-	// Get the result
-	output, err := et.GetOutput("TestStream_Derivative")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	resp, err := http.Get(output.Endpoint())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Assert we got the expected result
-	result := kapacitor.ResultFromJSON(resp.Body)
-	if eq, msg := compareResults(er, result); !eq {
-		t.Error(msg)
-	}
+	testStreamerWithOutput(t, "TestStream_DerivativeNN", script, 15*time.Second, er)
 }
 
 func TestStream_Window(t *testing.T) {
@@ -329,36 +213,7 @@ stream
 		},
 	}
 
-	clock, et, errCh, tm := testStreamer(t, "TestStream_Window", script)
-	defer tm.Close()
-
-	// Move time forward
-	clock.Set(clock.Zero().Add(13 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
-	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
-	}
-
-	// Get the result
-	output, err := et.GetOutput("TestStream_Window")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	resp, err := http.Get(output.Endpoint())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Assert we got the expected result
-	result := kapacitor.ResultFromJSON(resp.Body)
-	if eq, msg := compareResults(er, result); !eq {
-		t.Error(msg)
-	}
+	testStreamerWithOutput(t, "TestStream_Window", script, 13*time.Second, er)
 }
 
 func TestStream_SimpleMR(t *testing.T) {
@@ -387,36 +242,7 @@ stream
 		},
 	}
 
-	clock, et, errCh, tm := testStreamer(t, "TestStream_SimpleMR", script)
-	defer tm.Close()
-
-	// Move time forward
-	clock.Set(clock.Zero().Add(15 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
-	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
-	}
-
-	// Get the result
-	output, err := et.GetOutput("TestStream_SimpleMR")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	resp, err := http.Get(output.Endpoint())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Assert we got the expected result
-	result := kapacitor.ResultFromJSON(resp.Body)
-	if eq, msg := compareResults(er, result); !eq {
-		t.Error(msg)
-	}
+	testStreamerWithOutput(t, "TestStream_SimpleMR", script, 15*time.Second, er)
 }
 
 func TestStream_GroupBy(t *testing.T) {
@@ -429,7 +255,7 @@ stream
 		.period(10s)
 		.every(10s)
 	.mapReduce(influxql.sum('value'))
-	.httpOut('error_count')
+	.httpOut('TestStream_GroupBy')
 `
 
 	er := kapacitor.Result{
@@ -464,36 +290,7 @@ stream
 		},
 	}
 
-	clock, et, errCh, tm := testStreamer(t, "TestStream_GroupBy", script)
-	defer tm.Close()
-
-	// Move time forward
-	clock.Set(clock.Zero().Add(13 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
-	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
-	}
-
-	// Get the result
-	output, err := et.GetOutput("error_count")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	resp, err := http.Get(output.Endpoint())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Assert we got the expected result
-	result := kapacitor.ResultFromJSON(resp.Body)
-	if eq, msg := compareResults(er, result); !eq {
-		t.Error(msg)
-	}
+	testStreamerWithOutput(t, "TestStream_GroupBy", script, 13*time.Second, er)
 }
 
 func TestStream_Join(t *testing.T) {
@@ -523,7 +320,7 @@ errorCounts.join(viewCounts)
 	.eval(lambda: "errors.sum" / "views.sum")
 		.as('error_percent')
 		.keep()
-	.httpOut('error_rate')
+	.httpOut('TestStream_Join')
 `
 
 	er := kapacitor.Result{
@@ -564,36 +361,7 @@ errorCounts.join(viewCounts)
 		},
 	}
 
-	clock, et, errCh, tm := testStreamer(t, "TestStream_Join", script)
-	defer tm.Close()
-
-	// Move time forward
-	clock.Set(clock.Zero().Add(13 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
-	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
-	}
-
-	// Get the result
-	output, err := et.GetOutput("error_rate")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	resp, err := http.Get(output.Endpoint())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Assert we got the expected result
-	result := kapacitor.ResultFromJSON(resp.Body)
-	if eq, msg := compareResultsIgnoreSeriesOrder(er, result); !eq {
-		t.Error(msg)
-	}
+	testStreamerWithOutput(t, "TestStream_Join", script, 13*time.Second, er, true)
 }
 
 func TestStream_JoinTolerance(t *testing.T) {
@@ -618,7 +386,7 @@ errorCounts.join(viewCounts)
 		.every(10s)
 	.mapReduce(influxql.mean('error_percent'))
 		.as('error_percent')
-	.httpOut('error_rate')
+	.httpOut('TestStream_JoinTolerance')
 `
 
 	er := kapacitor.Result{
@@ -653,36 +421,7 @@ errorCounts.join(viewCounts)
 		},
 	}
 
-	clock, et, errCh, tm := testStreamer(t, "TestStream_JoinTolerance", script)
-	defer tm.Close()
-
-	// Move time forward
-	clock.Set(clock.Zero().Add(13 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
-	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
-	}
-
-	// Get the result
-	output, err := et.GetOutput("error_rate")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	resp, err := http.Get(output.Endpoint())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Assert we got the expected result
-	result := kapacitor.ResultFromJSON(resp.Body)
-	if eq, msg := compareResultsIgnoreSeriesOrder(er, result); !eq {
-		t.Error(msg)
-	}
+	testStreamerWithOutput(t, "TestStream_JoinTolerance", script, 13*time.Second, er, true)
 }
 
 func TestStream_JoinFill(t *testing.T) {
@@ -705,7 +444,7 @@ errorCounts.join(viewCounts)
 		.period(10s)
 		.every(10s)
 	.mapReduce(influxql.count('error_percent'))
-	.httpOut('error_rate')
+	.httpOut('TestStream_JoinFill')
 `
 
 	er := kapacitor.Result{
@@ -740,36 +479,7 @@ errorCounts.join(viewCounts)
 		},
 	}
 
-	clock, et, errCh, tm := testStreamer(t, "TestStream_JoinFill", script)
-	defer tm.Close()
-
-	// Move time forward
-	clock.Set(clock.Zero().Add(13 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
-	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
-	}
-
-	// Get the result
-	output, err := et.GetOutput("error_rate")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	resp, err := http.Get(output.Endpoint())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Assert we got the expected result
-	result := kapacitor.ResultFromJSON(resp.Body)
-	if eq, msg := compareResultsIgnoreSeriesOrder(er, result); !eq {
-		t.Error(msg)
-	}
+	testStreamerWithOutput(t, "TestStream_JoinFill", script, 13*time.Second, er, true)
 }
 
 func TestStream_JoinN(t *testing.T) {
@@ -793,7 +503,7 @@ cpu.join(mem, disk)
 			.period(10s)
 			.every(10s)
 		.mapReduce(influxql.count('cpu.value'))
-		.httpOut('all')
+		.httpOut('TestStream_JoinN')
 `
 
 	er := kapacitor.Result{
@@ -810,36 +520,7 @@ cpu.join(mem, disk)
 		},
 	}
 
-	clock, et, errCh, tm := testStreamer(t, "TestStream_JoinN", script)
-	defer tm.Close()
-
-	// Move time forward
-	clock.Set(clock.Zero().Add(15 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
-	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
-	}
-
-	// Get the result
-	output, err := et.GetOutput("all")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	resp, err := http.Get(output.Endpoint())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Assert we got the expected result
-	result := kapacitor.ResultFromJSON(resp.Body)
-	if eq, msg := compareResults(er, result); !eq {
-		t.Error(msg)
-	}
+	testStreamerWithOutput(t, "TestStream_JoinN", script, 15*time.Second, er)
 }
 
 func TestStream_Union(t *testing.T) {
@@ -861,7 +542,7 @@ cpu.union(mem, disk)
 			.period(10s)
 			.every(10s)
 		.mapReduce(influxql.count('value'))
-		.httpOut('all')
+		.httpOut('TestStream_Union')
 `
 
 	er := kapacitor.Result{
@@ -878,36 +559,7 @@ cpu.union(mem, disk)
 		},
 	}
 
-	clock, et, errCh, tm := testStreamer(t, "TestStream_Union", script)
-	defer tm.Close()
-
-	// Move time forward
-	clock.Set(clock.Zero().Add(15 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
-	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
-	}
-
-	// Get the result
-	output, err := et.GetOutput("all")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	resp, err := http.Get(output.Endpoint())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Assert we got the expected result
-	result := kapacitor.ResultFromJSON(resp.Body)
-	if eq, msg := compareResults(er, result); !eq {
-		t.Error(msg)
-	}
+	testStreamerWithOutput(t, "TestStream_Union", script, 15*time.Second, er)
 }
 
 func TestStream_Aggregations(t *testing.T) {
@@ -928,7 +580,7 @@ stream
 		.every(10s)
 	.mapReduce({{ .Method }}({{ .Args }}))
 		{{ if .UsePointTimes }}.usePointTimes(){{ end }}
-	.httpOut('{{ .Method }}')
+	.httpOut('TestStream_Aggregations')
 `
 	endTime := time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC)
 	testCases := []testCase{
@@ -1351,42 +1003,13 @@ stream
 			tc.Args = "'value'"
 		}
 		tmpl.Execute(&script, tc)
-		clock, et, errCh, tm := testStreamer(
+		testStreamerWithOutput(
 			t,
 			"TestStream_Aggregations",
 			string(script.Bytes()),
+			13*time.Second,
+			tc.ER,
 		)
-		defer tm.Close()
-
-		// Move time forward
-		clock.Set(clock.Zero().Add(13 * time.Second))
-		// Wait till the replay has finished
-		if e := <-errCh; e != nil {
-			t.Error(e)
-		}
-		// Wait till the task is finished
-		if e := et.Err(); e != nil {
-			t.Error(e)
-		}
-
-		// Get the result
-		output, err := et.GetOutput(tc.Method)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		resp, err := http.Get(output.Endpoint())
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		// Assert we got the expected result
-		result := kapacitor.ResultFromJSON(resp.Body)
-		if eq, msg := compareResults(tc.ER, result); !eq {
-			t.Error(tc.Method + ": " + msg)
-		}
-
-		tm.StopTask(et.Task.Name)
 	}
 }
 
@@ -1463,19 +1086,7 @@ stream
 		.post('` + ts.URL + `')
 `
 
-	clock, et, errCh, tm := testStreamer(t, "TestStream_Alert", script)
-	defer tm.Close()
-
-	// Move time forward
-	clock.Set(clock.Zero().Add(13 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
-	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
-	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second)
 
 	if requestCount != 1 {
 		t.Errorf("got %v exp %v", requestCount, 1)
@@ -1545,23 +1156,18 @@ stream
 		.channel('#alerts')
 `
 
-	clock, et, errCh, tm := testStreamer(t, "TestStream_Alert", script)
+	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script)
 	defer tm.Close()
+
 	c := slack.NewConfig()
 	c.URL = ts.URL + "/test/slack/url"
 	c.Channel = "#channel"
 	sl := slack.NewService(c, logService.NewLogger("[test_slack] ", log.LstdFlags))
 	tm.SlackService = sl
 
-	// Move time forward
-	clock.Set(clock.Zero().Add(13 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
-	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
+	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
+	if err != nil {
+		t.Error(err)
 	}
 
 	if requestCount != 1 {
@@ -1623,7 +1229,7 @@ stream
 		.pagerDuty()
 `
 
-	clock, et, errCh, tm := testStreamer(t, "TestStream_Alert", script)
+	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script)
 	defer tm.Close()
 	c := pagerduty.NewConfig()
 	c.URL = ts.URL
@@ -1632,15 +1238,9 @@ stream
 	pd.HTTPDService = tm.HTTPDService
 	tm.PagerDutyService = pd
 
-	// Move time forward
-	clock.Set(clock.Zero().Add(13 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
-	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
+	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
+	if err != nil {
+		t.Error(err)
 	}
 
 	if requestCount != 1 {
@@ -1705,7 +1305,7 @@ stream
 		.routingKey('test_key')
 `
 
-	clock, et, errCh, tm := testStreamer(t, "TestStream_Alert", script)
+	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script)
 	defer tm.Close()
 	c := victorops.NewConfig()
 	c.URL = ts.URL
@@ -1714,15 +1314,9 @@ stream
 	vo := victorops.NewService(c, logService.NewLogger("[test_vo] ", log.LstdFlags))
 	tm.VictorOpsService = vo
 
-	// Move time forward
-	clock.Set(clock.Zero().Add(13 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
-	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
+	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
+	if err != nil {
+		t.Error(err)
 	}
 
 	if requestCount != 1 {
@@ -1766,15 +1360,17 @@ stream
 		.post('` + ts.URL + `')
 `
 
-	clock, et, errCh, tm := testStreamer(t, "TestStream_AlertSigma", script)
+	clock, et, replayErr, tm := testStreamer(t, "TestStream_AlertSigma", script)
 	defer tm.Close()
 
 	// Move time forward
 	clock.Set(clock.Zero().Add(13 * time.Second))
 	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
+	if e := <-replayErr; e != nil {
 		t.Error(e)
 	}
+	// We don't want anymore data for the task
+	tm.DelFork(et.Task.Name)
 	// Wait till the task is finished
 	if e := et.Err(); e != nil {
 		t.Error(e)
@@ -1810,19 +1406,7 @@ stream
 		.post('` + ts.URL + `')
 `
 
-	clock, et, errCh, tm := testStreamer(t, "TestStream_AlertComplexWhere", script)
-	defer tm.Close()
-
-	// Move time forward
-	clock.Set(clock.Zero().Add(13 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
-	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
-	}
+	testStreamerNoOutput(t, "TestStream_AlertComplexWhere", script, 13*time.Second)
 
 	if requestCount != 1 {
 		t.Errorf("got %v exp %v", requestCount, 1)
@@ -1845,19 +1429,7 @@ stream
 		.post('` + ts.URL + `')
 `
 
-	clock, et, errCh, tm := testStreamer(t, "TestStream_AlertStateChangesOnly", script)
-	defer tm.Close()
-
-	// Move time forward
-	clock.Set(clock.Zero().Add(13 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
-	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
-	}
+	testStreamerNoOutput(t, "TestStream_AlertStateChangesOnly", script, 13*time.Second)
 
 	// Only 4 points below 93 so 8 state changes.
 	if requestCount != 8 {
@@ -1885,19 +1457,7 @@ stream
 		.post('` + ts.URL + `')
 `
 
-	clock, et, errCh, tm := testStreamer(t, "TestStream_AlertFlapping", script)
-	defer tm.Close()
-
-	// Move time forward
-	clock.Set(clock.Zero().Add(13 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
-	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
-	}
+	testStreamerNoOutput(t, "TestStream_AlertFlapping", script, 13*time.Second)
 
 	// Flapping detection should drop the last alerts.
 	if requestCount != 9 {
@@ -1947,20 +1507,15 @@ stream
 		done <- err
 	}))
 
-	clock, et, errCh, tm := testStreamer(t, "TestStream_InfluxDBOut", script)
+	clock, et, replayErr, tm := testStreamer(t, "TestStream_InfluxDBOut", script)
 	tm.InfluxDBService = influxdb
 	defer tm.Close()
 
-	// Move time forward
-	clock.Set(clock.Zero().Add(15 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
+	err := fastForwardTask(clock, et, replayErr, tm, 15*time.Second)
+	if err != nil {
+		t.Error(err)
 	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
-	}
+
 	// Wait till we received a request
 	if e := <-done; e != nil {
 		t.Error(e)
@@ -2075,18 +1630,12 @@ topScores.sample(4s)
 		},
 	}
 
-	clock, et, errCh, tm := testStreamer(t, "TestStream_TopSelector", script)
+	clock, et, replayErr, tm := testStreamer(t, "TestStream_TopSelector", script)
 	defer tm.Close()
 
-	// Move time forward
-	clock.Set(clock.Zero().Add(10 * time.Second))
-	// Wait till the replay has finished
-	if e := <-errCh; e != nil {
-		t.Error(e)
-	}
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
+	err := fastForwardTask(clock, et, replayErr, tm, 10*time.Second)
+	if err != nil {
+		t.Error(err)
 	}
 
 	// Get the result
@@ -2125,7 +1674,16 @@ topScores.sample(4s)
 }
 
 // Helper test function for streamer
-func testStreamer(t *testing.T, name, script string) (clock.Setter, *kapacitor.ExecutingTask, <-chan error, *kapacitor.TaskMaster) {
+func testStreamer(
+	t *testing.T,
+	name,
+	script string,
+) (
+	clock.Setter,
+	*kapacitor.ExecutingTask,
+	<-chan error,
+	*kapacitor.TaskMaster,
+) {
 	if testing.Verbose() {
 		wlog.SetLevel(wlog.DEBUG)
 	} else {
@@ -2163,8 +1721,86 @@ func testStreamer(t *testing.T, name, script string) (clock.Setter, *kapacitor.E
 	}
 
 	// Replay test data to executor
-	errCh := r.ReplayStream(data, tm.Stream, false, "s")
+	stream, err := tm.Stream(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replayErr := r.ReplayStream(data, stream, false, "s")
 
 	t.Log(string(et.Task.Dot()))
-	return r.Setter, et, errCh, tm
+	return r.Setter, et, replayErr, tm
+}
+
+func fastForwardTask(
+	clock clock.Setter,
+	et *kapacitor.ExecutingTask,
+	replayErr <-chan error,
+	tm *kapacitor.TaskMaster,
+	duration time.Duration,
+) error {
+	// Move time forward
+	clock.Set(clock.Zero().Add(duration))
+	// Wait till the replay has finished
+	if err := <-replayErr; err != nil {
+		return err
+	}
+	tm.Drain()
+	// Wait till the task is finished
+	if err := et.Err(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func testStreamerNoOutput(
+	t *testing.T,
+	name,
+	script string,
+	duration time.Duration,
+) {
+	clock, et, replayErr, tm := testStreamer(t, name, script)
+	err := fastForwardTask(clock, et, replayErr, tm, duration)
+	if err != nil {
+		t.Error(err)
+	}
+	defer tm.Close()
+}
+
+func testStreamerWithOutput(
+	t *testing.T,
+	name,
+	script string,
+	duration time.Duration,
+	er kapacitor.Result,
+	ignoreOrder ...bool,
+) {
+	clock, et, replayErr, tm := testStreamer(t, name, script)
+	err := fastForwardTask(clock, et, replayErr, tm, duration)
+	if err != nil {
+		t.Error(err)
+	}
+	defer tm.Close()
+
+	// Get the result
+	output, err := et.GetOutput(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := http.Get(output.Endpoint())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert we got the expected result
+	result := kapacitor.ResultFromJSON(resp.Body)
+	if len(ignoreOrder) > 0 && ignoreOrder[0] {
+		if eq, msg := compareResultsIgnoreSeriesOrder(er, result); !eq {
+			t.Error(msg)
+		}
+	} else {
+		if eq, msg := compareResults(er, result); !eq {
+			t.Error(msg)
+		}
+	}
 }

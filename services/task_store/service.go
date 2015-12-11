@@ -35,7 +35,8 @@ type Service struct {
 	}
 	TaskMaster interface {
 		StartTask(t *kapacitor.Task) (*kapacitor.ExecutingTask, error)
-		StopTask(name string)
+		StopTask(name string) error
+		IsExecuting(name string) bool
 	}
 	logger *log.Logger
 }
@@ -187,6 +188,7 @@ type TaskInfo struct {
 	TICKscript string
 	Dot        string
 	Enabled    bool
+	Executing  bool
 	Error      string
 }
 
@@ -203,7 +205,7 @@ func (ts *Service) handleTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	errMsg := ""
+	errMsg := raw.Error
 	dot := ""
 	task, err := ts.Load(name)
 	if err == nil {
@@ -219,6 +221,7 @@ func (ts *Service) handleTask(w http.ResponseWriter, r *http.Request) {
 		TICKscript: raw.TICKscript,
 		Dot:        dot,
 		Enabled:    ts.IsEnabled(name),
+		Executing:  ts.TaskMaster.IsExecuting(name),
 		Error:      errMsg,
 	}
 
@@ -246,10 +249,16 @@ func (ts *Service) handleTasks(w http.ResponseWriter, r *http.Request) {
 }
 
 type rawTask struct {
-	Name       string
+	// The name of the task.
+	Name string
+	// The TICKscript for the task.
 	TICKscript string
-	Type       kapacitor.TaskType
-	DBRPs      []kapacitor.DBRP
+	// Last error the task had either while defining or executing.
+	Error string
+	// The task type (stream|batch).
+	Type kapacitor.TaskType
+	// The DBs and RPs the task is allowed to access.
+	DBRPs []kapacitor.DBRP
 }
 
 func (ts *Service) handleSave(w http.ResponseWriter, r *http.Request) {
@@ -469,9 +478,13 @@ func (ts *Service) Enable(name string) error {
 }
 
 func (ts *Service) StartTask(t *kapacitor.Task) error {
+	// Starting task, remove last error
+	ts.SaveLastError(t.Name, "")
+
 	// Start the task
 	et, err := ts.TaskMaster.StartTask(t)
 	if err != nil {
+		ts.SaveLastError(et.Task.Name, err.Error())
 		return err
 	}
 
@@ -479,8 +492,40 @@ func (ts *Service) StartTask(t *kapacitor.Task) error {
 	if t.Type == kapacitor.BatchTask {
 		err := et.StartBatching()
 		if err != nil {
+			ts.SaveLastError(et.Task.Name, err.Error())
 			return err
 		}
+	}
+
+	go func() {
+		// Wait for task to finish
+		err := et.Err()
+		// Stop task
+		ts.TaskMaster.StopTask(et.Task.Name)
+
+		if err != nil {
+			ts.logger.Printf("E! task %s finished with error: %s", et.Task.Name, err)
+			// Save last error from task.
+			err = ts.SaveLastError(et.Task.Name, err.Error())
+			if err != nil {
+				ts.logger.Println("E! failed to save last error for task", et.Task.Name)
+			}
+		}
+	}()
+	return nil
+}
+
+// Save last error from task.
+func (ts *Service) SaveLastError(name string, errStr string) error {
+
+	raw, err := ts.LoadRaw(name)
+	if err != nil {
+		return err
+	}
+	raw.Error = errStr
+	err = ts.Save(raw)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -502,15 +547,18 @@ func (ts *Service) Disable(name string) error {
 		}
 		return nil
 	})
-	ts.TaskMaster.StopTask(name)
-	return err
+	if err != nil {
+		return err
+	}
+	return ts.TaskMaster.StopTask(name)
 }
 
 type taskInfo struct {
-	Name    string
-	Type    kapacitor.TaskType
-	DBRPs   []kapacitor.DBRP
-	Enabled bool
+	Name      string
+	Type      kapacitor.TaskType
+	DBRPs     []kapacitor.DBRP
+	Enabled   bool
+	Executing bool
 }
 
 func (ts *Service) IsEnabled(name string) (e bool) {
@@ -541,10 +589,11 @@ func (ts *Service) GetTaskInfo(tasks []string) ([]taskInfo, error) {
 			enabled := eb != nil && eb.Get(k) != nil
 
 			info := taskInfo{
-				Name:    t.Name,
-				Type:    t.Type,
-				DBRPs:   t.DBRPs,
-				Enabled: enabled,
+				Name:      t.Name,
+				Type:      t.Type,
+				DBRPs:     t.DBRPs,
+				Enabled:   enabled,
+				Executing: ts.TaskMaster.IsExecuting(t.Name),
 			}
 			taskInfos = append(taskInfos, info)
 			return nil

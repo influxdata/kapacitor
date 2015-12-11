@@ -28,7 +28,6 @@ import (
 	"github.com/influxdb/kapacitor/services/slack"
 	"github.com/influxdb/kapacitor/services/smtp"
 	"github.com/influxdb/kapacitor/services/stats"
-	"github.com/influxdb/kapacitor/services/streamer"
 	"github.com/influxdb/kapacitor/services/task_store"
 	"github.com/influxdb/kapacitor/services/udp"
 	"github.com/influxdb/kapacitor/services/victorops"
@@ -75,14 +74,12 @@ type Server struct {
 	dataDir   string
 	hostname  string
 
-	err     chan error
-	closing chan struct{}
+	err chan error
 
 	TaskMaster *kapacitor.TaskMaster
 
 	LogService      logging.Interface
 	HTTPDService    *httpd.Service
-	Streamer        *streamer.Service
 	TaskStore       *task_store.Service
 	ReplayService   *replay.Service
 	InfluxDBService *influxdb.Service
@@ -110,7 +107,6 @@ func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*
 		dataDir:       c.DataDir,
 		hostname:      c.Hostname,
 		err:           make(chan error),
-		closing:       make(chan struct{}),
 		LogService:    logService,
 		MetaStore:     &metastore{},
 		QueryExecutor: &queryexecutor{},
@@ -125,7 +121,6 @@ func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*
 	}
 
 	// Append Kapacitor services.
-	s.appendStreamerService()
 	s.appendSMTPService(c.SMTP)
 	s.appendHTTPDService(c.HTTP)
 	s.appendInfluxDBService(c.InfluxDB, c.Hostname)
@@ -156,14 +151,6 @@ func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*
 
 	return s, nil
 }
-func (s *Server) appendStreamerService() {
-	l := s.LogService.NewLogger("[streamer] ", log.LstdFlags)
-	srv := streamer.NewService(l)
-	srv.StreamCollector = s.TaskMaster.Stream
-
-	s.Streamer = srv
-	s.Services = append(s.Services, srv)
-}
 
 func (s *Server) appendSMTPService(c smtp.Config) {
 	if c.Enabled {
@@ -179,7 +166,7 @@ func (s *Server) appendInfluxDBService(c influxdb.Config, hostname string) {
 	if c.Enabled {
 		l := s.LogService.NewLogger("[influxdb] ", log.LstdFlags)
 		srv := influxdb.NewService(c, hostname, l)
-		srv.PointsWriter = s.Streamer
+		srv.PointsWriter = s.TaskMaster
 		srv.LogService = s.LogService
 
 		s.InfluxDBService = srv
@@ -193,7 +180,7 @@ func (s *Server) appendHTTPDService(c httpd.Config) {
 	srv := httpd.NewService(c, l)
 
 	srv.Handler.MetaStore = s.MetaStore
-	srv.Handler.PointsWriter = s.Streamer
+	srv.Handler.PointsWriter = s.TaskMaster
 	srv.Handler.Version = s.buildInfo.Version
 
 	s.HTTPDService = srv
@@ -262,7 +249,7 @@ func (s *Server) appendCollectdService(c collectd.Config) {
 	srv := collectd.NewService(c)
 	srv.SetLogger(l)
 	srv.MetaStore = s.MetaStore
-	srv.PointsWriter = s.Streamer
+	srv.PointsWriter = s.TaskMaster
 	s.Services = append(s.Services, srv)
 }
 
@@ -276,7 +263,7 @@ func (s *Server) appendOpenTSDBService(c opentsdb.Config) error {
 		return err
 	}
 	srv.SetLogger(l)
-	srv.PointsWriter = s.Streamer
+	srv.PointsWriter = s.TaskMaster
 	srv.MetaStore = s.MetaStore
 	s.Services = append(s.Services, srv)
 	return nil
@@ -293,7 +280,7 @@ func (s *Server) appendGraphiteService(c graphite.Config) error {
 	}
 	srv.SetLogger(l)
 
-	srv.PointsWriter = s.Streamer
+	srv.PointsWriter = s.TaskMaster
 	srv.MetaStore = s.MetaStore
 	s.Services = append(s.Services, srv)
 	return nil
@@ -305,7 +292,7 @@ func (s *Server) appendUDPService(c udp.Config) {
 	}
 	l := s.LogService.NewLogger("[udp] ", log.LstdFlags)
 	srv := udp.NewService(c, l)
-	srv.PointsWriter = s.Streamer
+	srv.PointsWriter = s.TaskMaster
 	s.Services = append(s.Services, srv)
 }
 
@@ -313,7 +300,7 @@ func (s *Server) appendStatsService(c stats.Config) {
 	if c.Enabled {
 		l := s.LogService.NewLogger("[stats] ", log.LstdFlags)
 		srv := stats.NewService(c, l)
-		srv.StreamCollector = s.TaskMaster.Stream
+		srv.TaskMaster = s.TaskMaster
 
 		s.Services = append(s.Services, srv)
 	}
@@ -389,8 +376,7 @@ func (s *Server) Close() error {
 		s.Logger.Printf("D! closed service: %T", service)
 	}
 
-	close(s.closing)
-	return nil
+	return s.TaskMaster.Close()
 }
 
 func (s *Server) setupIDs() error {

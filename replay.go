@@ -29,7 +29,7 @@ func NewReplay(c clock.Clock) *Replay {
 // Replay a data set against an executor.
 func (r *Replay) ReplayStream(data io.ReadCloser, stream StreamCollector, recTime bool, precision string) <-chan error {
 	src := newReplayStreamSource(data, r.clck)
-	src.replayStream(stream, recTime, precision)
+	go src.replayStream(stream, recTime, precision)
 	return src.Err()
 }
 
@@ -54,62 +54,60 @@ func (r *replayStreamSource) Err() <-chan error {
 }
 
 func (r *replayStreamSource) replayStream(stream StreamCollector, recTime bool, precision string) {
-	go func() {
-		defer stream.Close()
-		defer r.data.Close()
-		start := time.Time{}
-		var diff time.Duration
-		zero := r.clck.Zero()
-		for r.in.Scan() {
-			db := r.in.Text()
-			if !r.in.Scan() {
-				r.err <- fmt.Errorf("invalid replay file format, expected another line")
-				return
-			}
-			rp := r.in.Text()
-			if !r.in.Scan() {
-				r.err <- fmt.Errorf("invalid replay file format, expected another line")
-				return
-			}
-			points, err := dbmodels.ParsePointsWithPrecision(
-				r.in.Bytes(),
-				zero,
-				precision,
-			)
-			if err != nil {
-				r.err <- err
-				return
-			}
-			if start.IsZero() {
-				start = points[0].Time()
-				diff = zero.Sub(start)
-			}
-			var t time.Time
-			waitTime := points[0].Time().Add(diff).UTC()
-			if !recTime {
-				t = waitTime
-			} else {
-				t = points[0].Time().UTC()
-			}
-			mp := points[0]
-			p := models.Point{
-				Database:        db,
-				RetentionPolicy: rp,
-				Name:            mp.Name(),
-				Group:           models.NilGroup,
-				Tags:            models.Tags(mp.Tags()),
-				Fields:          models.Fields(mp.Fields()),
-				Time:            t,
-			}
-			r.clck.Until(waitTime)
-			err = stream.CollectPoint(p)
-			if err != nil {
-				r.err <- err
-				return
-			}
+	defer stream.Close()
+	defer r.data.Close()
+	start := time.Time{}
+	var diff time.Duration
+	zero := r.clck.Zero()
+	for r.in.Scan() {
+		db := r.in.Text()
+		if !r.in.Scan() {
+			r.err <- fmt.Errorf("invalid replay file format, expected another line")
+			return
 		}
-		r.err <- r.in.Err()
-	}()
+		rp := r.in.Text()
+		if !r.in.Scan() {
+			r.err <- fmt.Errorf("invalid replay file format, expected another line")
+			return
+		}
+		points, err := dbmodels.ParsePointsWithPrecision(
+			r.in.Bytes(),
+			zero,
+			precision,
+		)
+		if err != nil {
+			r.err <- err
+			return
+		}
+		if start.IsZero() {
+			start = points[0].Time()
+			diff = zero.Sub(start)
+		}
+		var t time.Time
+		waitTime := points[0].Time().Add(diff).UTC()
+		if !recTime {
+			t = waitTime
+		} else {
+			t = points[0].Time().UTC()
+		}
+		mp := points[0]
+		p := models.Point{
+			Database:        db,
+			RetentionPolicy: rp,
+			Name:            mp.Name(),
+			Group:           models.NilGroup,
+			Tags:            models.Tags(mp.Tags()),
+			Fields:          models.Fields(mp.Fields()),
+			Time:            t,
+		}
+		r.clck.Until(waitTime)
+		err = stream.CollectPoint(p)
+		if err != nil {
+			r.err <- err
+			return
+		}
+	}
+	r.err <- r.in.Err()
 }
 
 // Replay a data set against an executor.

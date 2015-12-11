@@ -72,9 +72,9 @@ func (s *SourceBatchNode) Count() int {
 	return len(s.children)
 }
 
-func (s *SourceBatchNode) Start(collectors []*Edge) {
-	for i, b := range s.children {
-		b.(*BatchNode).Start(collectors[i])
+func (s *SourceBatchNode) Start() {
+	for _, b := range s.children {
+		b.(*BatchNode).Start()
 	}
 }
 
@@ -88,19 +88,18 @@ func (s *SourceBatchNode) Queries(start, stop time.Time) [][]string {
 
 type BatchNode struct {
 	node
-	b       *pipeline.BatchNode
-	query   *Query
-	ticker  ticker
-	wg      sync.WaitGroup
-	errC    chan error
-	closing chan struct{}
+	b        *pipeline.BatchNode
+	query    *Query
+	ticker   ticker
+	queryMu  sync.Mutex
+	queryErr chan error
+	closing  chan struct{}
 }
 
 func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode) (*BatchNode, error) {
 	bn := &BatchNode{
 		node:    node{Node: n, et: et},
 		b:       n,
-		errC:    make(chan error, 1),
 		closing: make(chan struct{}),
 	}
 	bn.node.runF = bn.runBatch
@@ -176,10 +175,12 @@ func (b *BatchNode) DBRPs() ([]DBRP, error) {
 	return b.query.DBRPs()
 }
 
-func (b *BatchNode) Start(batch BatchCollector) {
-	b.wg.Add(1)
+func (b *BatchNode) Start() {
+	b.queryMu.Lock()
+	defer b.queryMu.Unlock()
+	b.queryErr = make(chan error, 1)
 	go func() {
-		b.errC <- b.doQuery(batch)
+		b.queryErr <- b.doQuery()
 	}()
 }
 
@@ -209,9 +210,8 @@ func (b *BatchNode) Queries(start, stop time.Time) []string {
 }
 
 // Query InfluxDB and collect batches on batch collector.
-func (b *BatchNode) doQuery(batch BatchCollector) error {
-	defer batch.Close()
-	defer b.wg.Done()
+func (b *BatchNode) doQuery() error {
+	defer b.ins[0].Close()
 
 	if b.et.tm.InfluxDBService == nil {
 		return errors.New("InfluxDB not configured, cannot query InfluxDB for batch query")
@@ -257,24 +257,22 @@ func (b *BatchNode) doQuery(batch BatchCollector) error {
 					return err
 				}
 				for _, bch := range batches {
-					batch.CollectBatch(bch)
+					b.ins[0].CollectBatch(bch)
 				}
 			}
 		}
 	}
 }
 
-func (b *BatchNode) stopBatch() {
-	if b.ticker != nil {
-		b.ticker.Stop()
-	}
-	close(b.closing)
-	b.wg.Wait()
-}
-
 func (b *BatchNode) runBatch() error {
 	errC := make(chan error, 1)
 	go func() {
+		defer func() {
+			err := recover()
+			if err != nil {
+				errC <- fmt.Errorf("%v", err)
+			}
+		}()
 		for bt, ok := b.ins[0].NextBatch(); ok; bt, ok = b.ins[0].NextBatch() {
 			for _, child := range b.outs {
 				err := child.CollectBatch(bt)
@@ -286,13 +284,27 @@ func (b *BatchNode) runBatch() error {
 		}
 		errC <- nil
 	}()
-	// Wait for errors
-	select {
-	case err := <-b.errC:
-		return err
-	case err := <-errC:
-		return err
+	var queryErr error
+	b.queryMu.Lock()
+	if b.queryErr != nil {
+		b.queryMu.Unlock()
+		queryErr = <-b.queryErr
+	} else {
+		b.queryMu.Unlock()
 	}
+
+	err := <-errC
+	if queryErr != nil {
+		return queryErr
+	}
+	return err
+}
+
+func (b *BatchNode) stopBatch() {
+	if b.ticker != nil {
+		b.ticker.Stop()
+	}
+	close(b.closing)
 }
 
 type ticker interface {

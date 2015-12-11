@@ -14,7 +14,6 @@ import (
 )
 
 func TestServer_Ping(t *testing.T) {
-	t.Parallel()
 	s := OpenDefaultServer()
 	defer s.Close()
 	r, err := s.HTTPGet(s.URL() + "/api/v1/ping")
@@ -27,7 +26,6 @@ func TestServer_Ping(t *testing.T) {
 }
 
 func TestServer_Version(t *testing.T) {
-	t.Parallel()
 	s := OpenDefaultServer()
 	defer s.Close()
 	resp, err := http.Get(s.URL() + "/api/v1/ping")
@@ -42,7 +40,6 @@ func TestServer_Version(t *testing.T) {
 }
 
 func TestServer_DefineTask(t *testing.T) {
-	t.Parallel()
 	s := OpenDefaultServer()
 	defer s.Close()
 
@@ -97,7 +94,6 @@ func TestServer_DefineTask(t *testing.T) {
 }
 
 func TestServer_EnableTask(t *testing.T) {
-	t.Parallel()
 	s := OpenDefaultServer()
 	defer s.Close()
 
@@ -160,7 +156,6 @@ func TestServer_EnableTask(t *testing.T) {
 }
 
 func TestServer_DisableTask(t *testing.T) {
-	t.Parallel()
 	s := OpenDefaultServer()
 	defer s.Close()
 
@@ -231,7 +226,6 @@ func TestServer_DisableTask(t *testing.T) {
 }
 
 func TestServer_DeleteTask(t *testing.T) {
-	t.Parallel()
 	s := OpenDefaultServer()
 	defer s.Close()
 
@@ -268,12 +262,10 @@ func TestServer_DeleteTask(t *testing.T) {
 }
 
 func TestServer_StreamTask(t *testing.T) {
-	t.Skip() // Need to figure out why its taking so long to enable the task.
-	t.Parallel()
 	s := OpenDefaultServer()
 	defer s.Close()
 
-	name := "testTaskName"
+	name := "testStreamTask"
 	ttype := "stream"
 	dbrps := []kapacitor.DBRP{{
 		Database:        "mydb",
@@ -344,8 +336,6 @@ test value=1 0000000011
 }
 
 func TestServer_BatchTask(t *testing.T) {
-	t.Skip() // Need to figure out why its taking so long to enable the task.
-	t.Parallel()
 	c := NewConfig()
 	c.InfluxDB.Enabled = true
 	count := 0
@@ -377,7 +367,7 @@ func TestServer_BatchTask(t *testing.T) {
 	s := OpenServer(c)
 	defer s.Close()
 
-	name := "testTaskName"
+	name := "testBatchTask"
 	ttype := "batch"
 	dbrps := []kapacitor.DBRP{{
 		Database:        "mydb",
@@ -416,7 +406,6 @@ batch
 	if err != nil {
 		t.Error(err)
 	}
-
 	r, err = s.DisableTask(name)
 	if err != nil {
 		t.Fatal(err)
