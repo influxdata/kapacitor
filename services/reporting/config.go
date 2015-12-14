@@ -1,22 +1,17 @@
 package reporting
 
 import (
-	"time"
-
-	"github.com/influxdb/enterprise-client/v1"
-	"github.com/influxdb/influxdb/toml"
+	"github.com/influxdb/usage-client/v1"
 )
 
 type Config struct {
-	Enabled       bool          `toml:"enabled"`
-	EnterpriseURL string        `toml:"enterprise-url"`
-	StatsInterval toml.Duration `toml:"stats-interval"`
+	Enabled bool   `toml:"enabled"`
+	URL     string `toml:"url"`
 }
 
 func NewConfig() Config {
 	return Config{
-		Enabled:       true,
-		EnterpriseURL: client.URL,
-		StatsInterval: toml.Duration(time.Minute),
+		Enabled: true,
+		URL:     client.URL,
 	}
 }

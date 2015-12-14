@@ -147,7 +147,7 @@ func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*
 	// append StatsService and ReportingService last so all stats are ready
 	// to be reported
 	s.appendStatsService(c.Stats)
-	s.appendReportingService(c.Reporting, c.Token)
+	s.appendReportingService(c.Reporting)
 
 	return s, nil
 }
@@ -306,10 +306,10 @@ func (s *Server) appendStatsService(c stats.Config) {
 	}
 }
 
-func (s *Server) appendReportingService(c reporting.Config, token string) {
+func (s *Server) appendReportingService(c reporting.Config) {
 	if c.Enabled {
 		l := s.LogService.NewLogger("[reporting] ", log.LstdFlags)
-		srv := reporting.NewService(c, token, l)
+		srv := reporting.NewService(c, l)
 
 		s.Services = append(s.Services, srv)
 	}

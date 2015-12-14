@@ -49,7 +49,6 @@ type Config struct {
 
 	Hostname string `toml:"hostname"`
 	DataDir  string `toml:"data_dir"`
-	Token    string `toml:"token"`
 }
 
 // NewConfig returns an instance of Config with reasonable defaults.
