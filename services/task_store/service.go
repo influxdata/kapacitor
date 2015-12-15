@@ -142,29 +142,38 @@ func (ts *Service) Open() error {
 	}
 
 	// Start enabled tasks
+	enabledTasks := make([]string, 0)
 	err = ts.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(enabledBucket))
 		if b == nil {
 			return nil
 		}
 		return b.ForEach(func(k, v []byte) error {
-			ts.logger.Println("D! enabling task on startup", string(k))
-			t, err := ts.Load(string(k))
-			if err != nil {
-				ts.logger.Printf("E! error loading enabled task %s, err: %s\n", string(k), err)
-				return nil
-			}
-			err = ts.StartTask(t)
-			if err != nil {
-				ts.logger.Printf("E! error starting enabled task %s, err: %s\n", string(k), err)
-			} else {
-				numEnabledTasks++
-			}
+			enabledTasks = append(enabledTasks, string(k))
 			return nil
 		})
 	})
 	if err != nil {
 		return err
+	}
+
+	// Start each enabled task
+	for _, name := range enabledTasks {
+		ts.logger.Println("D! enabling task on startup", name)
+		t, err := ts.Load(name)
+		ts.logger.Println("D! loaded", name)
+		if err != nil {
+			ts.logger.Printf("E! error loading enabled task %s, err: %s\n", name, err)
+			return nil
+		}
+		err = ts.StartTask(t)
+		ts.logger.Println("D! started", name)
+		if err != nil {
+			ts.logger.Printf("E! error starting enabled task %s, err: %s\n", name, err)
+		} else {
+			numEnabledTasks++
+		}
+		ts.logger.Println("D! enabled task on startup", name)
 	}
 
 	// Set expvars
