@@ -333,7 +333,7 @@ def build_packages(build_output, version, rc):
                         name = '{}-{}_{}_{}'.format(name, v, p, a)
                     iteration = '1'
                     if rc is not None:
-                        iteration = '1.rc{}'.format(rc)
+                        iteration = '0.rc{}'.format(rc)
                     fpm_command = "fpm {} --name {} -t {} --version {} --iteration {} -C {} -p {} ".format(
                             fpm_common_args,
                             name,
