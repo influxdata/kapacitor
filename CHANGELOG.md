@@ -8,6 +8,7 @@
 - [#96](https://github.com/influxdb/kapacitor/issues/96): Use KAPACITOR_URL env var for setting the kapacitord url in the client.
 
 ### Bugfixes
+- [#102](https://github.com/influxdb/kapacitor/issues/102): Fix race when start/stoping timeTicker in batch.go
 
 ## v0.2.2 [2015-12-16]
 
