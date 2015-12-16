@@ -7,6 +7,7 @@ import time
 import datetime
 import shutil
 import tempfile
+import hashlib
 import re
 
 try:
@@ -303,6 +304,13 @@ def package_scripts(build_root):
     shutil.copy(LOGROTATE_CONFIG, os.path.join(build_root, LOGROTATE_CONFIG))
     shutil.copy(DEFAULT_CONFIG, os.path.join(build_root, DEFAULT_CONFIG))
 
+def generate_md5_from_file(path):
+    m = hashlib.md5()
+    with open(path, 'rb') as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            m.update(chunk)
+    return m.hexdigest()
+
 def build_packages(build_output, version, rc):
     outfiles = []
     tmp_build_dir = create_temp_dir()
@@ -326,14 +334,11 @@ def build_packages(build_output, version, rc):
                 for package_type in supported_packages[p]:
                     print "\t- Packaging directory '{}' as '{}'...".format(build_root, package_type),
                     name = 'kapacitor'
-                    if package_type in ['zip', 'tar']:
-                        v = version
-                        if rc is not None:
-                            v = '{}-1.rc{}'.format(version, rc)
-                        name = '{}-{}_{}_{}'.format(name, v, p, a)
                     iteration = '1'
                     if rc is not None:
                         iteration = '0.rc{}'.format(rc)
+                    if package_type in ['zip', 'tar']:
+                        name = '{}-{}-{}_{}_{}'.format(name, version, iteration, p, a)
                     fpm_command = "fpm {} --name {} -t {} --version {} --iteration {} -C {} -p {} ".format(
                             fpm_common_args,
                             name,
@@ -353,6 +358,8 @@ def build_packages(build_output, version, rc):
                     else:
                         outfiles.append(outfile)
                     print "[ DONE ]"
+                    # Display MD5 hash for generated package
+                    print "\t\tMD5 = {}".format(generate_md5_from_file(outfile))
         print ""
         return outfiles
     finally:
