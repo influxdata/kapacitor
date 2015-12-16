@@ -317,6 +317,7 @@ type ticker interface {
 type timeTicker struct {
 	every  time.Duration
 	ticker *time.Ticker
+	mu     sync.Mutex
 }
 
 func newTimeTicker(every time.Duration) *timeTicker {
@@ -324,11 +325,15 @@ func newTimeTicker(every time.Duration) *timeTicker {
 }
 
 func (t *timeTicker) Start() <-chan time.Time {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	t.ticker = time.NewTicker(t.every)
 	return t.ticker.C
 }
 
 func (t *timeTicker) Stop() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	if t.ticker != nil {
 		t.ticker.Stop()
 	}
