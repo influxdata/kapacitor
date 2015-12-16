@@ -29,8 +29,10 @@ var (
 	branch  string
 )
 
+var defaultURL = "http://localhost:9092"
+
 var mainFlags = flag.NewFlagSet("main", flag.ExitOnError)
-var kapacitordURL = mainFlags.String("url", "http://localhost:9092", "the URL http(s)://host:port of the kapacitord server.")
+var kapacitordURL = mainFlags.String("url", "", "the URL http(s)://host:port of the kapacitord server. Defaults to the KAPACITOR_URL environment variable or "+defaultURL+" if not set.")
 
 var kapacitorEndpoint string
 
@@ -68,7 +70,15 @@ func main() {
 
 	mainFlags.Parse(os.Args[1:])
 
-	kapacitorEndpoint = *kapacitordURL + "/api/v1"
+	url := defaultURL
+	if urlEnv := os.Getenv("KAPACITOR_URL"); urlEnv != "" {
+		url = urlEnv
+	}
+	if *kapacitordURL != "" {
+		url = *kapacitordURL
+	}
+
+	kapacitorEndpoint = url + "/api/v1"
 
 	args := mainFlags.Args()
 
