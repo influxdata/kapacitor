@@ -1,14 +1,20 @@
 package run_test
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
+	"path"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/influxdb/influxdb/client"
+	"github.com/influxdb/influxdb/influxql"
 	"github.com/influxdb/influxdb/models"
 	"github.com/influxdb/kapacitor"
 )
@@ -416,5 +422,273 @@ batch
 
 	if count == 0 {
 		t.Error("unexpected query count", count)
+	}
+}
+
+func TestServer_RecordReplayStream(t *testing.T) {
+	s := OpenDefaultServer()
+	defer s.Close()
+
+	name := "testStreamTask"
+	ttype := "stream"
+	dbrps := []kapacitor.DBRP{{
+		Database:        "mydb",
+		RetentionPolicy: "myrp",
+	}}
+
+	tmpDir, err := ioutil.TempDir("", "testStreamTaskRecording")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+	tick := `
+stream
+	.from().measurement('test')
+	.window()
+		.period(10s)
+		.every(10s)
+	.mapReduce(influxql.count('value'))
+	.alert()
+		.id('test-count')
+		.message('{{ .ID }} got: {{ index .Fields "count" }}')
+		.crit(lambda: TRUE)
+		.log('` + tmpDir + `/alert.log')
+`
+
+	r, err := s.DefineTask(name, ttype, tick, dbrps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r != "" {
+		t.Fatal("unexpected result", r)
+	}
+
+	points := `test value=1 0000000000
+test value=1 0000000001
+test value=1 0000000001
+test value=1 0000000002
+test value=1 0000000002
+test value=1 0000000003
+test value=1 0000000003
+test value=1 0000000004
+test value=1 0000000005
+test value=1 0000000005
+test value=1 0000000005
+test value=1 0000000006
+test value=1 0000000007
+test value=1 0000000008
+test value=1 0000000009
+test value=1 0000000010
+test value=1 0000000011
+test value=1 0000000012
+`
+	rid := make(chan string, 1)
+	started := make(chan struct{})
+	go func() {
+		id, err := s.DoStreamRecording(name, 10*time.Second, started)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rid <- id
+	}()
+	<-started
+	v := url.Values{}
+	v.Add("precision", "s")
+	s.MustWrite("mydb", "myrp", points, v)
+	id := <-rid
+
+	_, err = s.DoReplay(name, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	f, err := os.Open(path.Join(tmpDir, "alert.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	type response struct {
+		ID      string          `json:"id"`
+		Message string          `json:"message"`
+		Time    time.Time       `json:"time"`
+		Level   string          `json:"level"`
+		Data    influxql.Result `json:"data"`
+	}
+	exp := response{
+		ID:      "test-count",
+		Message: "test-count got: 15",
+		Time:    time.Date(1970, 1, 1, 0, 0, 10, 0, time.UTC),
+		Level:   "CRITICAL",
+		Data: influxql.Result{
+			Series: models.Rows{
+				{
+					Name:    "test",
+					Columns: []string{"time", "count"},
+					Values: [][]interface{}{
+						{
+							time.Date(1970, 1, 1, 0, 0, 10, 0, time.UTC).Format(time.RFC3339Nano),
+							15.0,
+						},
+					},
+				},
+			},
+		},
+	}
+	got := response{}
+	d := json.NewDecoder(f)
+	d.Decode(&got)
+	if !reflect.DeepEqual(exp, got) {
+		t.Errorf("unexpected alert log:\ngot %v\nexp %v", got, exp)
+	}
+}
+
+func TestServer_RecordReplayBatch(t *testing.T) {
+	c := NewConfig()
+	c.InfluxDB.Enabled = true
+	value := 0
+	db := NewInfluxDB(func(q string) *client.Response {
+		if len(q) > 6 && q[:6] == "SELECT" {
+			r := &client.Response{
+				Results: []client.Result{{
+					Series: []models.Row{{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, value, 0, time.UTC).Format(time.RFC3339Nano),
+								float64(value),
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, value+1, 0, time.UTC).Format(time.RFC3339Nano),
+								float64(value + 1),
+							},
+						},
+					}},
+				}},
+			}
+			value += 2
+			return r
+		}
+		return nil
+	})
+	c.InfluxDB.URLs = []string{db.URL()}
+	s := OpenServer(c)
+	defer s.Close()
+
+	name := "testBatchTask"
+	ttype := "batch"
+	dbrps := []kapacitor.DBRP{{
+		Database:        "mydb",
+		RetentionPolicy: "myrp",
+	}}
+
+	tmpDir, err := ioutil.TempDir("", "testBatchTaskRecording")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+	tick := `
+batch
+	.query('SELECT value from mydb.myrp.cpu')
+		.period(2s)
+		.every(2s)
+	.alert()
+		.id('test-batch')
+		.message('{{ .ID }} got: {{ index .Fields "value" }}')
+		.crit(lambda: "value" > 2.0)
+		.log('` + tmpDir + `/alert.log')
+`
+
+	r, err := s.DefineTask(name, ttype, tick, dbrps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r != "" {
+		t.Fatal("unexpected result", r)
+	}
+
+	id, err := s.DoBatchRecording(name, time.Second*8)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = s.DoReplay(name, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	f, err := os.Open(path.Join(tmpDir, "alert.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	type response struct {
+		ID      string          `json:"id"`
+		Message string          `json:"message"`
+		Time    time.Time       `json:"time"`
+		Level   string          `json:"level"`
+		Data    influxql.Result `json:"data"`
+	}
+	exp := []response{
+		{
+			ID:      "test-batch",
+			Message: "test-batch got: 3",
+			Time:    time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+			Level:   "CRITICAL",
+			Data: influxql.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC).Format(time.RFC3339Nano),
+								2.0,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC).Format(time.RFC3339Nano),
+								3.0,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			ID:      "test-batch",
+			Message: "test-batch got: 4",
+			Time:    time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+			Level:   "CRITICAL",
+			Data: influxql.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC).Format(time.RFC3339Nano),
+								4.0,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC).Format(time.RFC3339Nano),
+								5.0,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	scanner := bufio.NewScanner(f)
+	got := make([]response, 0)
+	g := response{}
+	for scanner.Scan() {
+		json.Unmarshal(scanner.Bytes(), &g)
+		got = append(got, g)
+	}
+	if !reflect.DeepEqual(exp, got) {
+		t.Errorf("unexpected alert log:\ngot %v\nexp %v", got, exp)
+		t.Errorf("unexpected alert log:\ngot %v\nexp %v", got[0].Data.Series[0], exp[0].Data.Series[0])
+		t.Errorf("unexpected alert log:\ngot %v\nexp %v", got[1].Data.Series[0], exp[1].Data.Series[0])
 	}
 }

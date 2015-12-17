@@ -13,6 +13,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/influxdb/influxdb/client"
@@ -50,14 +51,18 @@ type Service struct {
 		Stream(name string) (kapacitor.StreamCollector, error)
 	}
 
+	recordingsMu      sync.RWMutex
+	runningRecordings map[string]<-chan error
+
 	logger *log.Logger
 }
 
 // Create a new replay master.
 func NewService(conf Config, l *log.Logger) *Service {
 	return &Service{
-		saveDir: conf.Dir,
-		logger:  l,
+		saveDir:           conf.Dir,
+		logger:            l,
+		runningRecordings: make(map[string]<-chan error),
 	}
 }
 
@@ -86,6 +91,14 @@ func (r *Service) Open() error {
 			true,
 			true,
 			r.handleRecord,
+		},
+		{
+			"record",
+			"GET",
+			"/record",
+			true,
+			true,
+			r.handleGetRecording,
 		},
 		{
 			"replay",
@@ -199,17 +212,20 @@ func (r *Service) handleReplay(w http.ResponseWriter, req *http.Request) {
 		replayC = replay.ReplayBatch(fs, batches, recTime)
 	}
 
-	// Check first for error on task
-	err = et.Err()
-	if err != nil {
-		httpd.HttpError(w, "task run: "+err.Error(), true, http.StatusInternalServerError)
-		return
-	}
-
 	// Check for error on replay
 	err = <-replayC
 	if err != nil {
 		httpd.HttpError(w, "replay: "+err.Error(), true, http.StatusInternalServerError)
+		return
+	}
+
+	// Drain tm so the task can finish
+	tm.Drain()
+
+	// Check for error on task
+	err = et.Err()
+	if err != nil {
+		httpd.HttpError(w, "task run: "+err.Error(), true, http.StatusInternalServerError)
 		return
 	}
 
@@ -222,6 +238,8 @@ func (r *Service) handleReplay(w http.ResponseWriter, req *http.Request) {
 }
 
 func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
+	type doFunc func() error
+	var doF doFunc
 
 	rid := uuid.NewV4()
 	typ := req.URL.Query().Get("type")
@@ -245,10 +263,8 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		err = r.doRecordStream(rid, dur, t.DBRPs)
-		if err != nil {
-			httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
-			return
+		doF = func() error {
+			return r.doRecordStream(rid, dur, t.DBRPs)
 		}
 
 	case "batch":
@@ -263,6 +279,8 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
+		now := time.Now()
+
 		switch {
 		case startStr != "":
 			start, err = time.Parse(time.RFC3339, startStr)
@@ -276,11 +294,11 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 				httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
 				return
 			}
-			start = time.Now().Add(-1 * diff)
+			start = now.Add(-1 * diff)
 		}
 
 		// Get stop time, if present
-		var stop time.Time
+		stop := now
 		stopStr := req.URL.Query().Get("stop")
 		if stopStr != "" {
 			stop, err = time.Parse(time.RFC3339, stopStr)
@@ -303,11 +321,8 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		// Record batch data
-		err = r.doRecordBatch(rid, t, start, stop)
-		if err != nil {
-			httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
-			return
+		doF = func() error {
+			return r.doRecordBatch(rid, t, start, stop)
 		}
 	case "query":
 		query := req.URL.Query().Get("query")
@@ -327,15 +342,35 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 			httpd.HttpError(w, fmt.Sprintf("invalid type %q", typeStr), true, http.StatusBadRequest)
 			return
 		}
-		err := r.doRecordQuery(rid, query, tt)
-		if err != nil {
-			httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
-			return
+		doF = func() error {
+			return r.doRecordQuery(rid, query, tt)
 		}
 	default:
 		httpd.HttpError(w, "invalid recording type", true, http.StatusBadRequest)
 		return
 	}
+	// Store recording in running recordings.
+	errC := make(chan error, 1)
+	func() {
+		r.recordingsMu.Lock()
+		defer r.recordingsMu.Unlock()
+		r.runningRecordings[rid.String()] = errC
+	}()
+
+	// Spawn routine to perform actual recording.
+	go func() {
+		err := doF()
+		if err != nil {
+			// Always log an error since the user may not have requested the error.
+			r.logger.Printf("E! recording %s failed: %v", rid.String(), err)
+		}
+		errC <- err
+		// We have finished delete from running map
+		r.recordingsMu.Lock()
+		defer r.recordingsMu.Unlock()
+		delete(r.runningRecordings, rid.String())
+	}()
+
 	// Respond with the recording ID
 	type response struct {
 		RecordingID string `json:"RecordingID"`
@@ -343,11 +378,51 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 	w.Write(httpd.MarshalJSON(response{rid.String()}, true))
 }
 
+func (r *Service) handleGetRecording(w http.ResponseWriter, req *http.Request) {
+	rid := req.URL.Query().Get("id")
+
+	// First check if its still running
+	var errC <-chan error
+	var running bool
+	func() {
+		r.recordingsMu.RLock()
+		defer r.recordingsMu.RUnlock()
+		errC, running = r.runningRecordings[rid]
+	}()
+
+	if running {
+		// It is still running wait for it to finish
+		err := <-errC
+		if err != nil {
+			info := RecordingInfo{
+				ID:    rid,
+				Error: err.Error(),
+			}
+			w.Write(httpd.MarshalJSON(info, true))
+			return
+		}
+	}
+
+	// It already finished, return its info
+	info, err := r.GetRecordings([]string{rid})
+	if err != nil {
+		httpd.HttpError(w, "error finding recording: "+err.Error(), true, http.StatusInternalServerError)
+		return
+	}
+	if len(info) != 1 {
+		httpd.HttpError(w, "recording not found", true, http.StatusNotFound)
+		return
+	}
+
+	w.Write(httpd.MarshalJSON(info[0], true))
+}
+
 type RecordingInfo struct {
 	ID      string
-	Type    kapacitor.TaskType
-	Size    int64
-	Created time.Time
+	Type    kapacitor.TaskType `json:",omitempty"`
+	Size    int64              `json:",omitempty"`
+	Created time.Time          `json:",omitempty"`
+	Error   string             `json:",omitempty"`
 }
 
 func (r *Service) GetRecordings(rids []string) ([]RecordingInfo, error) {
@@ -523,14 +598,28 @@ func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration, dbrps []kapac
 	}
 	defer sw.Close()
 
-	done := false
+	done := make(chan struct{})
 	go func() {
-		for p, ok := e.NextPoint(); ok && !done; p, ok = e.NextPoint() {
+		start := time.Time{}
+		closed := false
+		for p, ok := e.NextPoint(); ok; p, ok = e.NextPoint() {
+			if closed {
+				continue
+			}
+			if start.IsZero() {
+				start = p.Time
+			}
+			if p.Time.Sub(start) > dur {
+				closed = true
+				close(done)
+				//continue to read any data already on the edge, but just drop it.
+				continue
+			}
 			kapacitor.WritePointForRecording(sw, p, precision)
 		}
 	}()
-	time.Sleep(dur)
-	done = true
+	<-done
+	e.Abort()
 	r.TaskMaster.DelFork(rid.String())
 	return nil
 }

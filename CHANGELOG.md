@@ -10,6 +10,8 @@
 
 ### Bugfixes
 - [#102](https://github.com/influxdb/kapacitor/issues/102): Fix race when start/stoping timeTicker in batch.go
+- [#106](https://github.com/influxdb/kapacitor/pull/106): Fix hang when replaying stream recording.
+
 
 ## v0.2.2 [2015-12-16]
 

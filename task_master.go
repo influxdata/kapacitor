@@ -274,8 +274,6 @@ func (tm *TaskMaster) forkPoint(p models.Point) {
 }
 
 func (tm *TaskMaster) WritePoints(pts *cluster.WritePointsRequest) error {
-	tm.mu.RLock()
-	defer tm.mu.RUnlock()
 	if tm.closed {
 		return ErrTaskMasterClosed
 	}
