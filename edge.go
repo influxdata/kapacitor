@@ -62,6 +62,10 @@ func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, logSer
 	return e
 }
 
+func (e *Edge) collectedCount() string {
+	return e.statMap.Get(statCollected).String()
+}
+
 // Close the edge, this can only be called after all
 // collect calls to the edge have finished.
 func (e *Edge) Close() {

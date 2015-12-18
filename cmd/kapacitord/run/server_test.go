@@ -149,7 +149,7 @@ func TestServer_EnableTask(t *testing.T) {
 	if ti.TICKscript != tick {
 		t.Fatalf("unexpected TICKscript got %s exp %s", ti.TICKscript, tick)
 	}
-	dot := "digraph testTaskName {\nstream0 -> stream1;\n}"
+	dot := "digraph testTaskName {\nstream0 -> stream1 [label=\"0\"];\n}"
 	if ti.Dot != dot {
 		t.Fatalf("unexpected dot got %s exp %s", ti.Dot, dot)
 	}
