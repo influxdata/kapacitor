@@ -3,14 +3,14 @@ package udp_test
 import (
 	"testing"
 
-	"github.com/BurntSushi/toml"
-	"github.com/influxdb/influxdb/services/udp"
+	"github.com/influxdata/config"
+	"github.com/influxdata/influxdb/services/udp"
 )
 
 func TestConfig_Parse(t *testing.T) {
 	// Parse configuration.
 	var c udp.Config
-	if _, err := toml.Decode(`
+	if err := config.Decode(`
 enabled = true
 bind-address = ":4444"
 database = "awesomedb"

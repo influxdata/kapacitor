@@ -14,11 +14,11 @@ import (
 	text "text/template"
 	"time"
 
+	"github.com/influxdata/influxdb/influxql"
+	imodels "github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick"
-	"github.com/influxdb/influxdb/influxql"
-	imodels "github.com/influxdb/influxdb/models"
 )
 
 const (

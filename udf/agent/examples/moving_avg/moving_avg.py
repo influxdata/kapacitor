@@ -1,4 +1,3 @@
-
 import sys
 import json
 from agent import Agent, Handler
@@ -67,7 +66,6 @@ class AvgHandler(Handler):
         response.info.options['size'].valueTypes.append(udf_pb2.INT)
         response.info.options['as'].valueTypes.append(udf_pb2.STRING)
 
-        logger.info("info")
         return response
 
     def init(self, init_req):

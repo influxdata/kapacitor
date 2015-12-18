@@ -10,10 +10,10 @@ import (
 	"reflect"
 	"time"
 
+	client "github.com/influxdata/influxdb/client/v2"
+	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/wlog"
-	client "github.com/influxdb/influxdb/client/v2"
-	"github.com/influxdb/influxdb/influxql"
 )
 
 type MockInfluxDBService struct {

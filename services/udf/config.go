@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/influxdb/influxdb/toml"
+	"github.com/influxdata/config"
 )
 
 type Config struct {
@@ -14,7 +14,7 @@ type Config struct {
 type FunctionConfig struct {
 	Prog    string            `toml:"prog"`
 	Args    []string          `toml:"args"`
-	Timeout toml.Duration     `toml:"timeout"`
+	Timeout config.Duration   `toml:"timeout"`
 	Env     map[string]string `toml:"env"`
 }
 

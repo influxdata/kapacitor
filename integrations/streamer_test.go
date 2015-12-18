@@ -16,6 +16,9 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/influxdata/influxdb/client"
+	"github.com/influxdata/influxdb/influxql"
+	imodels "github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/clock"
 	cmd_test "github.com/influxdata/kapacitor/command/test"
@@ -31,9 +34,6 @@ import (
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/wlog"
-	"github.com/influxdb/influxdb/client"
-	"github.com/influxdb/influxdb/influxql"
-	imodels "github.com/influxdb/influxdb/models"
 )
 
 var httpService *httpd.Service

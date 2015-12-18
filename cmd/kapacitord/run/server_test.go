@@ -18,13 +18,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/influxdata/config"
+	client "github.com/influxdata/influxdb/client/v2"
+	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/cmd/kapacitord/run"
 	"github.com/influxdata/kapacitor/services/udf"
-	client "github.com/influxdb/influxdb/client/v2"
-	"github.com/influxdb/influxdb/influxql"
-	"github.com/influxdb/influxdb/models"
-	"github.com/influxdb/influxdb/toml"
+	"github.com/influxdata/kapacitor/vendor/github.com/influxdata/influxdb/toml"
 )
 
 func TestServer_Ping(t *testing.T) {
@@ -792,7 +793,7 @@ func TestServer_UDFStreamAgents(t *testing.T) {
 			},
 			config: udf.FunctionConfig{
 				Prog:    filepath.Join(tdir, "movavg"),
-				Timeout: toml.Duration(time.Minute),
+				Timeout: config.Duration(time.Minute),
 			},
 		},
 		// Python
@@ -801,7 +802,7 @@ func TestServer_UDFStreamAgents(t *testing.T) {
 			config: udf.FunctionConfig{
 				Prog:    "python2",
 				Args:    []string{"-u", filepath.Join(udfDir, "agent/examples/moving_avg/moving_avg.py")},
-				Timeout: toml.Duration(time.Minute),
+				Timeout: config.Duration(time.Minute),
 				Env: map[string]string{
 					"PYTHONPATH": strings.Join(
 						[]string{filepath.Join(udfDir, "agent/py"), os.Getenv("PYTHONPATH")},

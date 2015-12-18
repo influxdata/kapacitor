@@ -7,11 +7,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/timer"
-	"github.com/influxdb/influxdb/influxql"
 )
 
 type JoinNode struct {

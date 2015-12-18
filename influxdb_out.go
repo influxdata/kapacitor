@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
+	client "github.com/influxdata/influxdb/client/v2"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
-	client "github.com/influxdb/influxdb/client/v2"
 )
 
 const (

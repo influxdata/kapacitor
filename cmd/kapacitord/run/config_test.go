@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/BurntSushi/toml"
+	"github.com/influxdata/config"
 	"github.com/influxdata/kapacitor/cmd/kapacitord/run"
 )
 
@@ -12,7 +12,7 @@ import (
 func TestConfig_Parse(t *testing.T) {
 	// Parse configuration.
 	var c run.Config
-	if _, err := toml.Decode(`
+	if err := config.Decode(`
 [replay]
 dir = "/tmp/replay"
 
@@ -34,7 +34,7 @@ dir = "/tmp/task"
 func TestConfig_Parse_EnvOverride(t *testing.T) {
 	// Parse configuration.
 	var c run.Config
-	if _, err := toml.Decode(`
+	if err := config.Decode(`
 [replay]
 dir = "/tmp/replay"
 
