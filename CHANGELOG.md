@@ -6,6 +6,7 @@
 
 ### Features
 - [#96](https://github.com/influxdb/kapacitor/issues/96): Use KAPACITOR_URL env var for setting the kapacitord url in the client.
+- [#109](https://github.com/influxdb/kapacitor/pull/109): Add throughput counts to DOT format in `kapacitor show` command, if task is executing.
 
 ### Bugfixes
 - [#102](https://github.com/influxdb/kapacitor/issues/102): Fix race when start/stoping timeTicker in batch.go

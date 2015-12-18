@@ -225,6 +225,16 @@ func (tm *TaskMaster) IsExecuting(name string) bool {
 	return executing
 }
 
+func (tm *TaskMaster) ExecutingDot(name string) string {
+	tm.mu.RLock()
+	defer tm.mu.RUnlock()
+	et, executing := tm.tasks[name]
+	if executing {
+		return string(et.EDot())
+	}
+	return ""
+}
+
 func (tm *TaskMaster) Stream(name string) (StreamCollector, error) {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()

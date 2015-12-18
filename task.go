@@ -1,6 +1,7 @@
 package kapacitor
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"log"
@@ -281,6 +282,24 @@ func (et *ExecutingTask) GetOutput(name string) (Output, error) {
 // Register a named output.
 func (et *ExecutingTask) registerOutput(name string, o Output) {
 	et.outputs[name] = o
+}
+
+// Return a graphviz .dot formatted byte array.
+// Label edges with relavant execution information.
+func (et *ExecutingTask) EDot() []byte {
+
+	var buf bytes.Buffer
+
+	buf.Write([]byte("digraph "))
+	buf.Write([]byte(et.Task.Name))
+	buf.Write([]byte(" {\n"))
+	et.walk(func(n Node) error {
+		n.edot(&buf)
+		return nil
+	})
+	buf.Write([]byte("}"))
+
+	return buf.Bytes()
 }
 
 // Create a  node from a given pipeline node.

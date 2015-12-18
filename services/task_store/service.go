@@ -37,6 +37,7 @@ type Service struct {
 		StartTask(t *kapacitor.Task) (*kapacitor.ExecutingTask, error)
 		StopTask(name string) error
 		IsExecuting(name string) bool
+		ExecutingDot(name string) string
 	}
 	logger *log.Logger
 }
@@ -214,11 +215,16 @@ func (ts *Service) handleTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	executing := ts.TaskMaster.IsExecuting(name)
 	errMsg := raw.Error
 	dot := ""
 	task, err := ts.Load(name)
 	if err == nil {
-		dot = string(task.Dot())
+		if executing {
+			dot = ts.TaskMaster.ExecutingDot(name)
+		} else {
+			dot = string(task.Dot())
+		}
 	} else {
 		errMsg = err.Error()
 	}
@@ -230,7 +236,7 @@ func (ts *Service) handleTask(w http.ResponseWriter, r *http.Request) {
 		TICKscript: raw.TICKscript,
 		Dot:        dot,
 		Enabled:    ts.IsEnabled(name),
-		Executing:  ts.TaskMaster.IsExecuting(name),
+		Executing:  executing,
 		Error:      errMsg,
 	}
 

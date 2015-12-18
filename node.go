@@ -1,6 +1,7 @@
 package kapacitor
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"runtime"
@@ -33,6 +34,9 @@ type Node interface {
 	closeChildEdges()
 	// abort parent edges
 	abortParentEdges()
+
+	// executing dot
+	edot(buf *bytes.Buffer)
 }
 
 //implementation of Node
@@ -146,5 +150,17 @@ func (n *node) linkChild(c Node) error {
 func (n *node) closeChildEdges() {
 	for _, child := range n.outs {
 		child.Close()
+	}
+}
+
+func (n *node) edot(buf *bytes.Buffer) {
+	for i, c := range n.children {
+		buf.Write([]byte(
+			fmt.Sprintf("%s -> %s [label=\"%s\"];\n",
+				n.Name(),
+				c.Name(),
+				n.outs[i].collectedCount(),
+			),
+		))
 	}
 }
