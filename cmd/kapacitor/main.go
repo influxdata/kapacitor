@@ -304,7 +304,23 @@ func doRecord(args []string) error {
 	if rp.Error != "" {
 		return errors.New(rp.Error)
 	}
-	fmt.Println(rp.RecordingID)
+
+	v = url.Values{}
+	v.Add("id", rp.RecordingID)
+	r, err = http.Get(kapacitorEndpoint + "/record?" + v.Encode())
+	if err != nil {
+		return err
+	}
+	defer r.Body.Close()
+
+	d = json.NewDecoder(r.Body)
+	ri := replay.RecordingInfo{}
+	d.Decode(&ri)
+	if ri.Error != "" {
+		return errors.New(ri.Error)
+	}
+
+	fmt.Println(ri.ID)
 	return nil
 }
 

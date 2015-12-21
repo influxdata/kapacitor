@@ -220,10 +220,11 @@ func (s *Server) GetTask(name string) (ti task_store.TaskInfo, err error) {
 	if err != nil {
 		return
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		err = fmt.Errorf("unexpected status code got %d exp %d", resp.StatusCode, http.StatusOK)
+		return
 	}
-	defer resp.Body.Close()
 	d := json.NewDecoder(resp.Body)
 	d.Decode(&ti)
 	return
@@ -245,6 +246,84 @@ func (s *Server) MustWrite(db, rp, body string, params url.Values) string {
 		panic(err)
 	}
 	return results
+}
+
+func (s *Server) DoStreamRecording(name string, duration time.Duration, started chan struct{}) (id string, err error) {
+	v := url.Values{}
+	v.Add("type", "stream")
+	v.Add("name", name)
+	v.Add("duration", duration.String())
+	r, err := http.Post(s.URL()+"/api/v1/record?"+v.Encode(), "", nil)
+	if err != nil {
+		return
+	}
+	defer r.Body.Close()
+	if r.StatusCode != http.StatusOK {
+		err = fmt.Errorf("unexpected status code got %d exp %d", r.StatusCode, http.StatusOK)
+		return
+	}
+
+	// Decode valid response
+	type resp struct {
+		RecordingID string `json:"RecordingID"`
+		Error       string `json:"Error"`
+	}
+	rp := resp{}
+	d := json.NewDecoder(r.Body)
+	d.Decode(&rp)
+	if rp.Error != "" {
+		err = errors.New(rp.Error)
+		return
+	}
+	id = rp.RecordingID
+	close(started)
+	v = url.Values{}
+	v.Add("id", id)
+	_, err = s.HTTPGet(s.URL() + "/api/v1/record?" + v.Encode())
+	return
+}
+
+func (s *Server) DoBatchRecording(name string, past time.Duration) (id string, err error) {
+	v := url.Values{}
+	v.Add("type", "batch")
+	v.Add("name", name)
+	v.Add("past", past.String())
+	r, err := http.Post(s.URL()+"/api/v1/record?"+v.Encode(), "", nil)
+	if err != nil {
+		return
+	}
+	defer r.Body.Close()
+	if r.StatusCode != http.StatusOK {
+		err = fmt.Errorf("unexpected status code got %d exp %d", r.StatusCode, http.StatusOK)
+		return
+	}
+
+	// Decode valid response
+	type resp struct {
+		RecordingID string `json:"RecordingID"`
+		Error       string `json:"Error"`
+	}
+	rp := resp{}
+	d := json.NewDecoder(r.Body)
+	d.Decode(&rp)
+	if rp.Error != "" {
+		err = errors.New(rp.Error)
+		return
+	}
+	id = rp.RecordingID
+	v = url.Values{}
+	v.Add("id", id)
+	_, err = s.HTTPGet(s.URL() + "/api/v1/record?" + v.Encode())
+	return
+}
+
+func (s *Server) DoReplay(name, id string) (string, error) {
+	v := url.Values{}
+	v.Add("name", name)
+	v.Add("id", id)
+	v.Add("clock", "fast")
+	v.Add("rec-time", "true")
+	return s.HTTPPost(s.URL()+"/api/v1/replay?"+v.Encode(), nil)
 }
 
 // NewConfig returns the default config with temporary paths.
