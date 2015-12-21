@@ -4,6 +4,10 @@
 
 ### Release Notes
 
+Bugfix #106 made a breaking change to the internal HTTP API. This was to facilitate integration testing and overall better design.
+Now POSTing a recording request will start the recording and immediately return. If you want to wait till it is complete do
+a GET for the recording info and it will block until its complete. The kapacitor cli has been updated accordingly.
+
 ### Features
 - [#96](https://github.com/influxdb/kapacitor/issues/96): Use KAPACITOR_URL env var for setting the kapacitord url in the client.
 - [#109](https://github.com/influxdb/kapacitor/pull/109): Add throughput counts to DOT format in `kapacitor show` command, if task is executing.
