@@ -19,7 +19,7 @@ const defaultMessageTmpl = "{{ .ID }} is {{ .Level }}"
 // See AlertNode.Info, AlertNode.Warn, and AlertNode.Crit below.
 //
 // Different event handlers can be configured for each AlertNode.
-// Some handlers like Email, Slack, VictorOps and PagerDuty have a configuration
+// Some handlers like Email, Slack, OpsGenie, VictorOps and PagerDuty have a configuration
 // option 'global' that indicates that all alerts implicitly use the handler.
 //
 // Available event handlers:
@@ -29,6 +29,7 @@ const defaultMessageTmpl = "{{ .ID }} is {{ .Level }}"
 //    * email -- Send and email with alert data.
 //    * exec -- Execute a command passing alert data over STDIN.
 //    * Slack -- Post alert message to Slack channel.
+//	  * OpsGenie -- Send alert to OpsGenie.
 //    * VictorOps -- Send alert to VictorOps.
 //    * PagerDuty -- Send alert to PagerDuty.
 //
@@ -169,6 +170,18 @@ type AlertNode struct {
 	// Log JSON alert data to file. One event per line.
 	Log string
 
+	// Send alert to OpsGenie.
+	// tick:ignore
+	UseOpsGenie bool
+
+	// OpsGenie Teams.
+	// tick:ignore
+	OpsGenieTeams []string
+
+	// OpsGenie Recipients.
+	// tick:ignore
+	OpsGenieRecipients []string
+
 	// Send alert to VictorOps.
 	// tick:ignore
 	UseVictorOps bool
@@ -267,6 +280,70 @@ func (a *AlertNode) Flapping(low, high float64) Node {
 	a.UseFlapping = true
 	a.FlapLow = low
 	a.FlapHigh = high
+	return a
+}
+
+// Send alert to OpsGenie.
+// To use OpsGenie alerting you must first enable the 'Alert Ingestion API'
+// in the 'Integrations' section of OpsGenie.
+// Then place the API key from the URL into the 'opsgenie' section of the Kapacitor configuration.
+//
+// Example:
+//    [opsgenie]
+//      enabled = true
+//      api-key = "xxxxx"
+//      teams = ["everyone"]
+//
+// With the correct configuration you can now use OpsGenie in TICKscripts.
+//
+// Example:
+//    stream...
+//         .alert()
+//             .opsGenie()
+//
+// Send alerts to OpsGenie using the routing key in the configuration file.
+//
+// Example:
+//    stream...
+//         .alert()
+//             .opsGenie()
+//             .teams('team_rocket','team_test')
+//
+// Send alerts to OpsGenie with team set to 'team_rocket' and 'team_test'
+//
+// If the 'opsgenie' section in the configuration has the option: global = true
+// then all alerts are sent to OpsGenie without the need to explicitly state it
+// in the TICKscript.
+//
+// Example:
+//    [opsgenie]
+//      enabled = true
+//      api-key = "xxxxx"
+//		recipients = "johndoe"
+//      global = true
+//
+// Example:
+//    stream...
+//         .alert()
+//
+// Send alert to OpsGenie using the default recipients, found in the configuration.
+// tick:property
+func (a *AlertNode) OpsGenie() *AlertNode {
+	a.UseOpsGenie = true
+	return a
+}
+
+// The OpsGenie Teams. If not set uses key specified in configuration.
+// tick:property
+func (a *AlertNode) Teams(teams ...string) *AlertNode {
+	a.OpsGenieTeams = teams
+	return a
+}
+
+// The OpsGenie Recipients. If not set uses key specified in configuration.
+// tick:property
+func (a *AlertNode) Recipients(recipients ...string) *AlertNode {
+	a.OpsGenieRecipients = recipients
 	return a
 }
 

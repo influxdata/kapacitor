@@ -115,6 +115,9 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode) (an *AlertNode, err 
 			n.IsStateChangesOnly = true
 		}
 	}
+	if n.UseOpsGenie || (et.tm.OpsGenieService != nil && et.tm.OpsGenieService.Global()) {
+		an.handlers = append(an.handlers, an.handleOpsGenie)
+	}
 	if n.UseVictorOps || (et.tm.VictorOpsService != nil && et.tm.VictorOpsService.Global()) {
 		an.handlers = append(an.handlers, an.handleVictorOps)
 	}
@@ -466,6 +469,34 @@ func (a *AlertNode) handleExec(ad *AlertData) {
 	err = cmd.Run()
 	if err != nil {
 		a.logger.Println("E! error running alert command:", err, out.String())
+		return
+	}
+}
+
+func (a *AlertNode) handleOpsGenie(ad *AlertData) {
+	if a.et.tm.OpsGenieService == nil {
+		a.logger.Println("E! failed to send OpsGenie alert. OpsGenie is not enabled")
+		return
+	}
+	var messageType string
+	switch ad.Level {
+	case OKAlert:
+		messageType = "RECOVERY"
+	default:
+		messageType = ad.Level.String()
+	}
+
+	err := a.et.tm.OpsGenieService.Alert(
+		a.a.OpsGenieTeams,
+		a.a.OpsGenieRecipients,
+		messageType,
+		ad.Message,
+		ad.ID,
+		ad.Time,
+		ad.Data,
+	)
+	if err != nil {
+		a.logger.Println("E! failed to send alert data to OpsGenie:", err)
 		return
 	}
 }
