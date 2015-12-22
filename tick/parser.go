@@ -87,9 +87,17 @@ func (p *parser) unexpected(tok token, expected ...tokenType) {
 	if start < 0 {
 		start = 0
 	}
+	// Skip any new lines just show a single line
+	if i := strings.LastIndexByte(p.Text[start:tok.pos], '\n'); i != -1 {
+		start = start + i + 1
+	}
 	stop := tok.pos + bufSize
 	if stop > len(p.Text) {
 		stop = len(p.Text)
+	}
+	// Skip any new lines just show a single line
+	if i := strings.IndexByte(p.Text[tok.pos:stop], '\n'); i != -1 {
+		stop = tok.pos + i
 	}
 	line, char := p.lex.lineNumber(tok.pos)
 	expectedStrs := make([]string, len(expected))
@@ -187,8 +195,13 @@ func (p *parser) vr() Node {
 
 //parse an expression
 func (p *parser) expression() Node {
-	term := p.funcOrIdent()
-	return p.chain(term)
+	switch p.peek().typ {
+	case tokenIdent:
+		term := p.funcOrIdent()
+		return p.chain(term)
+	default:
+		return p.primary()
+	}
 }
 
 //parse a function or identifier invocation chain
@@ -267,19 +280,21 @@ func (p *parser) lambdaExpr() Node {
 
 // Operator Precedence parsing
 var precedence = [...]int{
-	tokenOr:           0,
-	tokenAnd:          1,
-	tokenEqual:        2,
-	tokenNotEqual:     2,
-	tokenGreater:      3,
-	tokenGreaterEqual: 3,
-	tokenLess:         3,
-	tokenLessEqual:    3,
-	tokenPlus:         4,
-	tokenMinus:        4,
-	tokenMult:         5,
-	tokenDiv:          5,
-	tokenMod:          5,
+	tokenOr:            0,
+	tokenAnd:           1,
+	tokenEqual:         2,
+	tokenNotEqual:      2,
+	tokenRegexEqual:    2,
+	tokenRegexNotEqual: 2,
+	tokenGreater:       3,
+	tokenGreaterEqual:  3,
+	tokenLess:          3,
+	tokenLessEqual:     3,
+	tokenPlus:          4,
+	tokenMinus:         4,
+	tokenMult:          5,
+	tokenDiv:           5,
+	tokenMod:           5,
 }
 
 // parse the expression considering operator precedence.
@@ -356,8 +371,15 @@ func (p *parser) primary() Node {
 	case tok.typ == tokenReference:
 		return p.reference()
 	case tok.typ == tokenIdent:
-		return p.lfunction()
+		p.next()
+		if p.peek().typ == tokenLParen {
+			p.backup()
+			return p.lfunction()
+		}
+		p.backup()
+		return p.identifier()
 	case tok.typ == tokenMinus, tok.typ == tokenNot:
+		p.next()
 		return newUnary(tok, p.primary())
 	default:
 		p.unexpected(

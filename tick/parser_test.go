@@ -2,6 +2,7 @@ package tick
 
 import (
 	"reflect"
+	"regexp"
 	"testing"
 	"time"
 
@@ -46,11 +47,11 @@ func TestParseErrors(t *testing.T) {
 	cases := []testCase{
 		testCase{
 			Text:  "a\n\n\nvar b = ",
-			Error: "parser: unexpected EOF line 4 char 9 in \"\n\nvar b = \". expected: \"identifier\"",
+			Error: `parser: unexpected EOF line 4 char 9 in "var b = ". expected: "number","string","duration","identifier","TRUE","FALSE","==","(","-","!"`,
 		},
 		testCase{
-			Text:  "a\n\n\nvar b = stream.window()var period",
-			Error: `parser: unexpected EOF line 4 char 34 in "var period". expected: "="`,
+			Text:  "a\n\n\nvar b = stream.window()var period)\n\nvar x = 1",
+			Error: `parser: unexpected ) line 4 char 34 in "var period)". expected: "="`,
 		},
 		testCase{
 			Text:  "a\n\n\nvar b = stream.window(\nb.period(10s)",
@@ -127,6 +128,216 @@ func TestParseStatements(t *testing.T) {
 		err    error
 	}{
 		{
+			script: `var x = 'str'`,
+			Root: &ListNode{
+				Nodes: []Node{
+					&BinaryNode{
+						pos:      6,
+						Operator: tokenAsgn,
+						Left: &IdentifierNode{
+							pos:   4,
+							Ident: "x",
+						},
+						Right: &StringNode{
+							pos:     8,
+							Literal: "str",
+						},
+					},
+				},
+			},
+		},
+		{
+			script: `var x = TRUE`,
+			Root: &ListNode{
+				Nodes: []Node{
+					&BinaryNode{
+						pos:      6,
+						Operator: tokenAsgn,
+						Left: &IdentifierNode{
+							pos:   4,
+							Ident: "x",
+						},
+						Right: &BoolNode{
+							pos:  8,
+							Bool: true,
+						},
+					},
+				},
+			},
+		},
+		{
+			script: `var x = !FALSE`,
+			Root: &ListNode{
+				Nodes: []Node{
+					&BinaryNode{
+						pos:      6,
+						Operator: tokenAsgn,
+						Left: &IdentifierNode{
+							pos:   4,
+							Ident: "x",
+						},
+						Right: &UnaryNode{
+							pos:      8,
+							Operator: tokenNot,
+							Node: &BoolNode{
+								pos:  9,
+								Bool: false,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			script: `var x = 1`,
+			Root: &ListNode{
+				Nodes: []Node{
+					&BinaryNode{
+						pos:      6,
+						Operator: tokenAsgn,
+						Left: &IdentifierNode{
+							pos:   4,
+							Ident: "x",
+						},
+						Right: &NumberNode{
+							pos:   8,
+							IsInt: true,
+							Int64: 1,
+						},
+					},
+				},
+			},
+		},
+		{
+			script: `var x = -1`,
+			Root: &ListNode{
+				Nodes: []Node{
+					&BinaryNode{
+						pos:      6,
+						Operator: tokenAsgn,
+						Left: &IdentifierNode{
+							pos:   4,
+							Ident: "x",
+						},
+						Right: &UnaryNode{
+							pos:      8,
+							Operator: tokenMinus,
+							Node: &NumberNode{
+								pos:   9,
+								IsInt: true,
+								Int64: 1,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			script: `var x = 1.0`,
+			Root: &ListNode{
+				Nodes: []Node{
+					&BinaryNode{
+						pos:      6,
+						Operator: tokenAsgn,
+						Left: &IdentifierNode{
+							pos:   4,
+							Ident: "x",
+						},
+						Right: &NumberNode{
+							pos:     8,
+							IsFloat: true,
+							Float64: 1.0,
+						},
+					},
+				},
+			},
+		},
+		{
+			script: `var x = -1.0`,
+			Root: &ListNode{
+				Nodes: []Node{
+					&BinaryNode{
+						pos:      6,
+						Operator: tokenAsgn,
+						Left: &IdentifierNode{
+							pos:   4,
+							Ident: "x",
+						},
+						Right: &UnaryNode{
+							pos:      8,
+							Operator: tokenMinus,
+							Node: &NumberNode{
+								pos:     9,
+								IsFloat: true,
+								Float64: 1.0,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			script: `var x = 5h`,
+			Root: &ListNode{
+				Nodes: []Node{
+					&BinaryNode{
+						pos:      6,
+						Operator: tokenAsgn,
+						Left: &IdentifierNode{
+							pos:   4,
+							Ident: "x",
+						},
+						Right: &DurationNode{
+							pos: 8,
+							Dur: time.Hour * 5,
+						},
+					},
+				},
+			},
+		},
+		{
+			script: `var x = -5h`,
+			Root: &ListNode{
+				Nodes: []Node{
+					&BinaryNode{
+						pos:      6,
+						Operator: tokenAsgn,
+						Left: &IdentifierNode{
+							pos:   4,
+							Ident: "x",
+						},
+						Right: &UnaryNode{
+							pos:      8,
+							Operator: tokenMinus,
+							Node: &DurationNode{
+								pos: 9,
+								Dur: time.Hour * 5,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			script: `var x = /.*\//`,
+			Root: &ListNode{
+				Nodes: []Node{
+					&BinaryNode{
+						pos:      6,
+						Operator: tokenAsgn,
+						Left: &IdentifierNode{
+							pos:   4,
+							Ident: "x",
+						},
+						Right: &RegexNode{
+							pos:   8,
+							Regex: regexp.MustCompile(".*/"),
+						},
+					},
+				},
+			},
+		},
+		{
 			script: `var x = a.f()`,
 			Root: &ListNode{
 				Nodes: []Node{
@@ -147,6 +358,57 @@ func TestParseStatements(t *testing.T) {
 							Right: &FunctionNode{
 								pos:  10,
 								Func: "f",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			script: `var t = 42
+			stream.where(lambda: "value" > t)
+			`,
+			Root: &ListNode{
+				Nodes: []Node{
+					&BinaryNode{
+						pos:      6,
+						Operator: tokenAsgn,
+						Left: &IdentifierNode{
+							pos:   4,
+							Ident: "t",
+						},
+						Right: &NumberNode{
+							pos:   8,
+							IsInt: true,
+							Int64: 42,
+						},
+					},
+					&BinaryNode{
+						pos:      20,
+						Operator: tokenDot,
+						Left: &IdentifierNode{
+							pos:   14,
+							Ident: "stream",
+						},
+						Right: &FunctionNode{
+							pos:  21,
+							Func: "where",
+							Args: []Node{
+								&LambdaNode{
+									pos: 27,
+									Node: &BinaryNode{
+										pos:      43,
+										Operator: tokenGreater,
+										Left: &ReferenceNode{
+											pos:       35,
+											Reference: "value",
+										},
+										Right: &IdentifierNode{
+											pos:   45,
+											Ident: "t",
+										},
+									},
+								},
 							},
 						},
 					},
