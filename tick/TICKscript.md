@@ -52,6 +52,7 @@ duration_lit        = int_lit duration_unit .
 duration_unit       = "u" | "µ" | "ms" | "s" | "m" | "h" | "d" | "w" .
 string_lit          = `'` { unicode_char } `'` .
 star_lit            = "*"
+regex_lit           = `/` { unicode_char } `/` .
 
 operator_lit       = "+" | "-" | "*" | "/" | "==" | "!=" |
                      "<" | "<=" | ">" | ">=" | "=~" | "!~" |
@@ -60,14 +61,14 @@ operator_lit       = "+" | "-" | "*" | "/" | "==" | "!=" |
 Program      = Statement { Statement } .
 Statement    = Declaration | Expression .
 Declaration  = "var" identifier  "=" Expression .
-Expression   = identifier { Chain } | Function { Chain } .
+Expression   = identifier { Chain } | Function { Chain } | Primary .
 Chain        = "." Function { Chain} | "." identifier { Chain } .
 Function     = identifier "(" Parameters ")" .
 Parameters   = { Parameter "," } [ Parameter ] .
 Parameter    = Expression | "lambda:" LambdaExpr | Primary .
 Primary      = "(" LambdaExpr ")" | number_lit | string_lit |
                 boolean_lit | duration_lit | regex_lit | star_lit |
-                LFunc | Reference | "-" Primary | "!" Primary .
+                LFunc | identifier | Reference | "-" Primary | "!" Primary .
 Reference    = `"` { unicode_char } `"` .
 LambdaExpr   = Primary operator_lit Primary .
 LFunc        = identifier "(" LParameters ")"

@@ -70,6 +70,7 @@ const (
 )
 
 var operatorStr = [...]string{
+	tokenNot:           "!",
 	tokenPlus:          "+",
 	tokenMinus:         "-",
 	tokenMult:          "*",
@@ -124,6 +125,8 @@ func (t tokenType) String() string {
 		return "number"
 	case t == tokenString:
 		return "string"
+	case t == tokenRegex:
+		return "regex"
 	case t == tokenDot:
 		return "."
 	case t == tokenAsgn:
@@ -163,6 +166,10 @@ type token struct {
 	typ tokenType
 	pos int
 	val string
+}
+
+func (t token) String() string {
+	return fmt.Sprintf("{%v pos: %d val: %s}", t.typ, t.pos, t.val)
 }
 
 // lexer holds the state of the scanner.
@@ -254,6 +261,14 @@ func (l *lexer) ignore() {
 	l.start = l.pos
 }
 
+// ignore a contiguous block of spaces.
+func (l *lexer) ignoreSpace() {
+	for isSpace(l.next()) {
+		l.ignore()
+	}
+	l.backup()
+}
+
 // expect the next rune to be r
 func (l *lexer) expect(r rune) bool {
 	if l.peek() == r {
@@ -279,9 +294,6 @@ func lexToken(l *lexer) stateFn {
 		case r == '\'':
 			l.backup()
 			return lexSingleOrTripleString
-		case r == '/':
-			l.backup()
-			return lexRegex
 		case isSpace(r):
 			l.ignore()
 		case r == '(':
@@ -333,6 +345,12 @@ func lexOperator(l *lexer) stateFn {
 			}
 			op := strToOperator[l.current()]
 			l.emit(op)
+			if op == tokenRegexNotEqual {
+				l.ignoreSpace()
+				if l.peek() == '/' {
+					return lexRegex
+				}
+			}
 			return lexToken
 		case '>', '<':
 			if l.peek() == '=' {
@@ -346,8 +364,18 @@ func lexOperator(l *lexer) stateFn {
 				l.next()
 				op := strToOperator[l.current()]
 				l.emit(op)
+				if op == tokenRegexEqual {
+					l.ignoreSpace()
+					if l.peek() == '/' {
+						return lexRegex
+					}
+				}
 			} else {
 				l.emit(tokenAsgn)
+				l.ignoreSpace()
+				if l.peek() == '/' {
+					return lexRegex
+				}
 			}
 			return lexToken
 		}

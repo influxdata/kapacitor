@@ -167,6 +167,8 @@ stream
 func TestStream_Window(t *testing.T) {
 
 	var script = `
+var period = 10s
+var every = 10s
 stream
 	.from()
 		.database('dbname')
@@ -174,8 +176,8 @@ stream
 		.measurement('cpu')
 		.where(lambda: "host" == 'serverA')
 	.window()
-		.period(10s)
-		.every(10s)
+		.period(period)
+		.every(every)
 	.httpOut('TestStream_Window')
 `
 
@@ -222,6 +224,66 @@ func TestStream_SimpleMR(t *testing.T) {
 stream
 	.from().measurement('cpu')
 	.where(lambda: "host" == 'serverA')
+	.window()
+		.period(10s)
+		.every(10s)
+	.mapReduce(influxql.count('value'))
+	.httpOut('TestStream_SimpleMR')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    nil,
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					10.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_SimpleMR", script, 15*time.Second, er)
+}
+
+func TestStream_VarWhereString(t *testing.T) {
+
+	var script = `
+var serverStr = 'serverA'
+stream
+	.from().measurement('cpu')
+	.where(lambda: "host" == serverStr )
+	.window()
+		.period(10s)
+		.every(10s)
+	.mapReduce(influxql.count('value'))
+	.httpOut('TestStream_SimpleMR')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    nil,
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					10.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_SimpleMR", script, 15*time.Second, er)
+}
+
+func TestStream_VarWhereRegex(t *testing.T) {
+
+	var script = `
+var serverPattern = /^serverA$/
+stream
+	.from().measurement('cpu')
+	.where(lambda: "host" =~ serverPattern )
 	.window()
 		.period(10s)
 		.every(10s)
@@ -1070,6 +1132,10 @@ func TestStream_Alert(t *testing.T) {
 	defer ts.Close()
 
 	var script = `
+var infoThreshold = 6.0
+var warnThreshold = 7.0
+var critThreshold = 8.0
+
 stream
 	.from().measurement('cpu')
 	.where(lambda: "host" == 'serverA')
@@ -1080,9 +1146,9 @@ stream
 	.mapReduce(influxql.count('idle'))
 	.alert()
 		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
-		.info(lambda: "count" > 6.0)
-		.warn(lambda: "count" > 7.0)
-		.crit(lambda: "count" > 8.0)
+		.info(lambda: "count" > infoThreshold)
+		.warn(lambda: "count" > warnThreshold)
+		.crit(lambda: "count" > critThreshold)
 		.post('` + ts.URL + `')
 `
 

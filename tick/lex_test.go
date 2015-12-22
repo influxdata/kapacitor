@@ -34,6 +34,13 @@ func TestLexer(t *testing.T) {
 	cases := []testCase{
 		//Symbols + Operators
 		{
+			in: "!",
+			tokens: []token{
+				token{tokenNot, 0, "!"},
+				token{tokenEOF, 1, ""},
+			},
+		},
+		{
 			in: "+",
 			tokens: []token{
 				token{tokenPlus, 0, "+"},
@@ -370,6 +377,40 @@ func TestLexer(t *testing.T) {
 				token{tokenEOF, 9, ""},
 			},
 		},
+		// Regex -- can only be lexed within context
+		{
+			in: `=~ //`,
+			tokens: []token{
+				token{tokenRegexEqual, 0, "=~"},
+				token{tokenRegex, 3, "//"},
+				token{tokenEOF, 5, ""},
+			},
+		},
+		{
+			in: `!~ //`,
+			tokens: []token{
+				token{tokenRegexNotEqual, 0, "!~"},
+				token{tokenRegex, 3, "//"},
+				token{tokenEOF, 5, ""},
+			},
+		},
+		{
+			in: `= //`,
+			tokens: []token{
+				token{tokenAsgn, 0, "="},
+				token{tokenRegex, 2, "//"},
+				token{tokenEOF, 4, ""},
+			},
+		},
+		{
+			in: `= /^((.*)[a-z]+\S{0,2})|cat\/\/$/`,
+			tokens: []token{
+				token{tokenAsgn, 0, "="},
+				token{tokenRegex, 2, `/^((.*)[a-z]+\S{0,2})|cat\/\/$/`},
+				token{tokenEOF, 33, ""},
+			},
+		},
+
 		//Space
 		{
 			in: " ",

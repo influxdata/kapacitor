@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.4 [unreleased]
+
+### Release Notes
+
+### Features
+- [#107](https://github.com/influxdb/kapacitor/issues/107): Enable TICKscript variables to be defined and then referenced from lambda expressions.
+        Also fixes various bugs around using regexes.
+
+### Bugfixes
+
 ## v0.2.3 [2015-12-22]
 
 ### Release Notes

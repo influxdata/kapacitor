@@ -4,8 +4,10 @@ package tick
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 	"runtime"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 )
@@ -60,6 +62,20 @@ func eval(n Node, scope *Scope, stck *stack) (err error) {
 		}
 		evalUnary(node.Operator, scope, stck)
 	case *LambdaNode:
+		// Catch panic from resolveIdents and return as error.
+		err = func() (e error) {
+			defer func(ep *error) {
+				err := recover()
+				if err != nil {
+					*ep = err.(error)
+				}
+			}(&e)
+			node.Node = resolveIdents(node.Node, scope)
+			return e
+		}()
+		if err != nil {
+			return
+		}
 		stck.Push(node.Node)
 	case *BinaryNode:
 		err = eval(node.Left, scope, stck)
@@ -259,4 +275,72 @@ func capilatizeFirst(s string) string {
 	r, n := utf8.DecodeRuneInString(s)
 	s = string(unicode.ToUpper(r)) + s[n:]
 	return s
+}
+
+// Resolve all identifiers immediately in the tree with their value from the scope.
+// This operation is performed in place.
+// Panics if the scope value does not exist or if the value cannot be expressed as a literal.
+func resolveIdents(n Node, scope *Scope) Node {
+	switch node := n.(type) {
+	case *IdentifierNode:
+		v, err := scope.Get(node.Ident)
+		if err != nil {
+			panic(err)
+		}
+		return valueToLiteralNode(node.pos, v)
+	case *UnaryNode:
+		node.Node = resolveIdents(node.Node, scope)
+	case *BinaryNode:
+		node.Left = resolveIdents(node.Left, scope)
+		node.Right = resolveIdents(node.Right, scope)
+	case *FunctionNode:
+		for i, arg := range node.Args {
+			node.Args[i] = resolveIdents(arg, scope)
+		}
+	case *ListNode:
+		for i, n := range node.Nodes {
+			node.Nodes[i] = resolveIdents(n, scope)
+		}
+	}
+	return n
+}
+
+// Convert raw value to literal node, for all supported basic types.
+func valueToLiteralNode(pos pos, v interface{}) Node {
+	switch value := v.(type) {
+	case bool:
+		return &BoolNode{
+			pos:  pos,
+			Bool: value,
+		}
+	case int64:
+		return &NumberNode{
+			pos:   pos,
+			IsInt: true,
+			Int64: value,
+		}
+	case float64:
+		return &NumberNode{
+			pos:     pos,
+			IsFloat: true,
+			Float64: value,
+		}
+	case time.Duration:
+		return &DurationNode{
+			pos: pos,
+			Dur: value,
+		}
+	case string:
+		return &StringNode{
+			pos:     pos,
+			Literal: value,
+		}
+	case *regexp.Regexp:
+		return &RegexNode{
+			pos:   pos,
+			Regex: value,
+		}
+	default:
+		panic(fmt.Errorf("unsupported literal type %T", v))
+	}
 }
