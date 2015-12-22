@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.2.3 [unreleased]
+## v0.2.3 [2015-12-22]
 
 ### Release Notes
 
