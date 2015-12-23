@@ -120,6 +120,29 @@ In the case of the batch tasks, the TaskMaster manages starting the schedules fo
 The results of the queries are passed to the root nodes of the task directly.
 
 
+### Windowing
+
+Windowing data is an important piece to creating pipelines.
+Windowing is concerned with how you can slice a data stream into multiple windows and is orthogonal to how batches are transfered.
+Kapacitor handles windowing explicitly, by allowing the user to define a WindowNode
+that has two parameters. First, the `period` is the length of the window in time.
+Second, the `every` property defines how often an window should be emitted into the stream.
+This allows for creating windows that overlap, have no overlap, or have gaps between the windows.
+As a result the concept of a window does not exist inherently in the data stream, but rather windowing is the method of converting a stream of data into a batch of data.
+
+Example TICKscript:
+
+```javascript
+stream
+    .window()
+        .period(10s)
+        .every(5s)
+```
+
+The above script slices the incoming stream into overlapping windows.
+Each window contains the last 10s of data and a new window is emitted every 5s.
+
+
 ### Challenges
 
 Challenges with the current implementation:
