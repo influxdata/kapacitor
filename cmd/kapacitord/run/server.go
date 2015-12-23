@@ -22,6 +22,7 @@ import (
 	"github.com/influxdb/kapacitor/services/httpd"
 	"github.com/influxdb/kapacitor/services/influxdb"
 	"github.com/influxdb/kapacitor/services/logging"
+	"github.com/influxdb/kapacitor/services/opsgenie"
 	"github.com/influxdb/kapacitor/services/pagerduty"
 	"github.com/influxdb/kapacitor/services/replay"
 	"github.com/influxdb/kapacitor/services/reporting"
@@ -126,6 +127,7 @@ func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*
 	s.appendInfluxDBService(c.InfluxDB, c.Hostname)
 	s.appendTaskStoreService(c.Task)
 	s.appendReplayStoreService(c.Replay)
+	s.appendOpsGenieService(c.OpsGenie)
 	s.appendVictorOpsService(c.VictorOps)
 	s.appendPagerDutyService(c.PagerDuty)
 	s.appendSlackService(c.Slack)
@@ -208,6 +210,16 @@ func (s *Server) appendReplayStoreService(c replay.Config) {
 
 	s.ReplayService = srv
 	s.Services = append(s.Services, srv)
+}
+
+func (s *Server) appendOpsGenieService(c opsgenie.Config) {
+	if c.Enabled {
+		l := s.LogService.NewLogger("[opsgenie] ", log.LstdFlags)
+		srv := opsgenie.NewService(c, l)
+		s.TaskMaster.OpsGenieService = srv
+
+		s.Services = append(s.Services, srv)
+	}
 }
 
 func (s *Server) appendVictorOpsService(c victorops.Config) {

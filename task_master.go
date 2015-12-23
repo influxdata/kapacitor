@@ -35,6 +35,10 @@ type TaskMaster struct {
 		Global() bool
 		SendMail(to []string, subject string, msg string)
 	}
+	OpsGenieService interface {
+		Global() bool
+		Alert(teams []string, recipients []string, messageType, message, entityID string, t time.Time, details interface{}) error
+	}
 	VictorOpsService interface {
 		Global() bool
 		Alert(routingKey, messageType, message, entityID string, t time.Time, extra interface{}) error

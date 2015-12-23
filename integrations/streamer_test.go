@@ -18,6 +18,7 @@ import (
 	"github.com/influxdb/kapacitor"
 	"github.com/influxdb/kapacitor/clock"
 	"github.com/influxdb/kapacitor/services/httpd"
+	"github.com/influxdb/kapacitor/services/opsgenie"
 	"github.com/influxdb/kapacitor/services/pagerduty"
 	"github.com/influxdb/kapacitor/services/slack"
 	"github.com/influxdb/kapacitor/services/victorops"
@@ -1230,6 +1231,97 @@ stream
 	c.Channel = "#channel"
 	sl := slack.NewService(c, logService.NewLogger("[test_slack] ", log.LstdFlags))
 	tm.SlackService = sl
+
+	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if requestCount != 1 {
+		t.Errorf("unexpected requestCount got %d exp 1", requestCount)
+	}
+}
+
+func TestStream_AlertOpsGenie(t *testing.T) {
+	requestCount := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+
+		type postData struct {
+			ApiKey      string                 `json:"apiKey"`
+			Message     string                 `json:"message"`
+			Entity      string                 `json:"entity"`
+			Alias       string                 `json:"alias"`
+			Note        int                    `json:"note"`
+			Details     map[string]interface{} `json:"details"`
+			Description interface{}            `json:"description"`
+			Teams       []string               `json:"teams"`
+			Recipients  []string               `json:"recipients"`
+		}
+
+		pd := postData{}
+		dec := json.NewDecoder(r.Body)
+		dec.Decode(&pd)
+
+		if exp := "CRITICAL"; pd.Details["Level"] != exp {
+			t.Errorf("unexpected level got %s exp %s", pd.Details["level"], exp)
+		}
+		if exp := "kapacitor/cpu/serverA"; pd.Entity != exp {
+			t.Errorf("unexpected entity got %s exp %s", pd.Entity, exp)
+		}
+		if exp := "kapacitor/cpu/serverA"; pd.Alias != exp {
+			t.Errorf("unexpected alias got %s exp %s", pd.Alias, exp)
+		}
+		if exp := "kapacitor/cpu/serverA is CRITICAL"; pd.Message != exp {
+			t.Errorf("unexpected entity id got %s exp %s", pd.Message, exp)
+		}
+		if exp := "Kapacitor"; pd.Details["Monitoring Tool"] != exp {
+			t.Errorf("unexpected monitoring tool got %s exp %s", pd.Details["Monitoring Tool"], exp)
+		}
+		if pd.Description == nil {
+			t.Error("unexpected description got nil")
+		}
+		if exp := "test_team"; pd.Teams[0] != exp {
+			t.Errorf("unexpected teams[0] got %s exp %s", pd.Teams[0], exp)
+		}
+		if exp := "another_team"; pd.Teams[1] != exp {
+			t.Errorf("unexpected teams[1] got %s exp %s", pd.Teams[1], exp)
+		}
+		if exp := "test_recipient"; pd.Recipients[0] != exp {
+			t.Errorf("unexpected recipients[0] got %s exp %s", pd.Recipients[0], exp)
+		}
+		if exp := "another_recipient"; pd.Recipients[1] != exp {
+			t.Errorf("unexpected recipients[1] got %s exp %s", pd.Recipients[1], exp)
+		}
+	}))
+	defer ts.Close()
+
+	var script = `
+stream
+	.from().measurement('cpu')
+	.where(lambda: "host" == 'serverA')
+	.groupBy('host')
+	.window()
+		.period(10s)
+		.every(10s)
+	.mapReduce(influxql.count('idle'))
+	.alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.opsGenie()
+		.teams('test_team', 'another_team')
+		.recipients('test_recipient', 'another_recipient')
+`
+
+	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script)
+	defer tm.Close()
+	c := opsgenie.NewConfig()
+	c.URL = ts.URL
+	c.APIKey = "api_key"
+	og := opsgenie.NewService(c, logService.NewLogger("[test_og] ", log.LstdFlags))
+	tm.OpsGenieService = og
 
 	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
 	if err != nil {
