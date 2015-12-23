@@ -15,7 +15,7 @@ const defaultMessageTmpl = "{{ .ID }} is {{ .Level }}"
 
 // An AlertNode can trigger an event of varying severity levels,
 // and pass the event to alert handlers. The criteria for triggering
-// an alert is specified via a [lambda expression](https://influxdb.com/docs/kapacitor/v0.1/tick/expr.html).
+// an alert is specified via a [lambda expression](/kapacitor/v0.2/tick/expr/).
 // See AlertNode.Info, AlertNode.Warn, and AlertNode.Crit below.
 //
 // Different event handlers can be configured for each AlertNode.
@@ -48,6 +48,8 @@ const defaultMessageTmpl = "{{ .ID }} is {{ .Level }}"
 // Using the AlertNode.StateChangesOnly property events will only be sent to handlers
 // if the alert changed state.
 //
+// It is valid to configure multiple alert handlers of the same type and of different types.
+//
 // Example:
 //   stream
 //        .groupBy('service')
@@ -58,6 +60,8 @@ const defaultMessageTmpl = "{{ .ID }} is {{ .Level }}"
 //            .warn(lambda: "value" > 20)
 //            .crit(lambda: "value" > 30)
 //            .post("http://example.com/api/alert")
+//            .post("http://another.example.com/api/alert")
+//            .email('oncall@example.com')
 //
 //
 // It is assumed that each successive level filters a subset
@@ -154,57 +158,41 @@ type AlertNode struct {
 	// Default: 21
 	History int64
 
-	// Post the JSON alert data to the specified URL.
-	Post string
-
-	// Email settings
-	//tick:ignore
-	UseEmail bool
-	//tick:ignore
-	ToList []string
-
-	// A command to run when an alert triggers
-	//tick:ignore
-	Command []string
-
-	// Log JSON alert data to file. One event per line.
-	Log string
-
-	// Send alert to OpsGenie.
-	// tick:ignore
-	UseOpsGenie bool
-
-	// OpsGenie Teams.
-	// tick:ignore
-	OpsGenieTeams []string
-
-	// OpsGenie Recipients.
-	// tick:ignore
-	OpsGenieRecipients []string
-
-	// Send alert to VictorOps.
-	// tick:ignore
-	UseVictorOps bool
-
-	// VictorOps RoutingKey.
-	// tick:ignore
-	VictorOpsRoutingKey string
-
-	// Send alert to PagerDuty.
-	// tick:ignore
-	UsePagerDuty bool
-
-	// Send alert to Slack.
-	// tick:ignore
-	UseSlack bool
-
-	// Slack channel
-	// tick:ignore
-	SlackChannel string
-
 	// Send alerts only on state changes.
 	// tick:ignore
 	IsStateChangesOnly bool
+
+	// Post the JSON alert data to the specified URL.
+	// tick:ignore
+	PostHandlers []*PostHandler
+
+	// Email handlers
+	// tick:ignore
+	EmailHandlers []*EmailHandler
+
+	// A commands to run when an alert triggers
+	// tick:ignore
+	ExecHandlers []*ExecHandler
+
+	// Log JSON alert data to file. One event per line.
+	// tick:ignore
+	LogHandlers []*LogHandler
+
+	// Send alert to VictorOps.
+	// tick:ignore
+	VictorOpsHandlers []*VictorOpsHandler
+
+	// Send alert to PagerDuty.
+	// tick:ignore
+	PagerDutyHandlers []*PagerDutyHandler
+
+	// Send alert to Slack.
+	// tick:ignore
+	SlackHandlers []*SlackHandler
+
+	// Send alert to OpsGenie
+	// tick:ignore
+	OpsGenieHandlers []*OpsGenieHandler
 }
 
 func newAlertNode(wants EdgeType) *AlertNode {
@@ -220,11 +208,71 @@ func newAlertNode(wants EdgeType) *AlertNode {
 	}
 }
 
-// Execute a command whenever an alert is trigger and pass the alert data over STDIN in JSON format.
+// Only sends events where the state changed.
+// Each different alert level OK, INFO, WARNING, and CRITICAL
+// are considered different states.
+//
+// Example:
+//    stream...
+//        .window()
+//             .period(10s)
+//             .every(10s)
+//        .alert()
+//            .crit(lambda: "value" > 10)
+//            .stateChangesOnly()
+//            .slack()
+//
+// If the "value" is greater than 10 for a total of 60s, then
+// only two events will be sent. First, when the value crosses
+// the threshold, and second, when it falls back into an OK state.
+// Without stateChangesOnly, the alert would have triggered 7 times:
+// 6 times for each 10s period where the condition was met and once more
+// for the recovery.
+//
 // tick:property
-func (a *AlertNode) Exec(executable string, args ...string) *AlertNode {
-	a.Command = append([]string{executable}, args...)
+func (a *AlertNode) StateChangesOnly() *AlertNode {
+	a.IsStateChangesOnly = true
 	return a
+}
+
+// Perform flap detection on the alerts.
+// The method used is similar method to Nagios:
+// https://assets.nagios.com/downloads/nagioscore/docs/nagioscore/3/en/flapping.html
+//
+// Each different alerting level is considered a different state.
+// The low and high thresholds are inverted thresholds of a percentage of state changes.
+// Meaning that if the percentage of state changes goes above the `high`
+// threshold, the alert enters a flapping state. The alert remains in the flapping state
+// until the percentage of state changes goes below the `low` threshold.
+// Typical values are low: 0.25 and high: 0.5. The percentage values represent the number state changes
+// over the total possible number of state changes. A percentage change of 0.5 means that the alert changed
+// state in half of the recorded history, and remained the same in the other half of the history.
+// tick:property
+func (a *AlertNode) Flapping(low, high float64) *AlertNode {
+	a.UseFlapping = true
+	a.FlapLow = low
+	a.FlapHigh = high
+	return a
+}
+
+// HTTP POST JSON alert data to a specified URL.
+// tick:property
+func (a *AlertNode) Post(url string) *PostHandler {
+	post := &PostHandler{
+		AlertNode: a,
+		URL:       url,
+	}
+	a.PostHandlers = append(a.PostHandlers, post)
+	return post
+}
+
+// tick:embedded:AlertNode.Email
+type PostHandler struct {
+	*AlertNode
+
+	// The POST URL.
+	// tick:ignore
+	URL string
 }
 
 // Email the alert data.
@@ -257,94 +305,66 @@ func (a *AlertNode) Exec(executable string, args ...string) *AlertNode {
 //
 // **NOTE**: The global option for email also implies stateChangesOnly is set on all alerts.
 // tick:property
-func (a *AlertNode) Email(to ...string) *AlertNode {
-	a.UseEmail = true
-	a.ToList = to
-	return a
+func (a *AlertNode) Email(to ...string) *EmailHandler {
+	em := &EmailHandler{
+		AlertNode: a,
+		ToList:    to,
+	}
+	a.EmailHandlers = append(a.EmailHandlers, em)
+	return em
 }
 
-// Perform flap detection on the alerts.
-// The method used is similar method to Nagios:
-// https://assets.nagios.com/downloads/nagioscore/docs/nagioscore/3/en/flapping.html
-//
-// Each different alerting level is considered a different state.
-// The low and high thresholds are inverted thresholds of a percentage of state changes.
-// Meaning that if the percentage of state changes goes above the `high`
-// threshold, the alert enters a flapping state. The alert remains in the flapping state
-// until the percentage of state changes goes below the `low` threshold.
-// Typical values are low: 0.25 and high: 0.5. The percentage values represent the number state changes
-// over the total possible number of state changes. A percentage change of 0.5 means that the alert changed
-// state in half of the recorded history, and remained the same in the other half of the history.
-// tick:property
-func (a *AlertNode) Flapping(low, high float64) Node {
-	a.UseFlapping = true
-	a.FlapLow = low
-	a.FlapHigh = high
-	return a
+// Email AlertHandler
+// tick:embedded:AlertNode.Email
+type EmailHandler struct {
+	*AlertNode
+
+	// List of email recipients.
+	// tick:ignore
+	ToList []string
 }
 
-// Send alert to OpsGenie.
-// To use OpsGenie alerting you must first enable the 'Alert Ingestion API'
-// in the 'Integrations' section of OpsGenie.
-// Then place the API key from the URL into the 'opsgenie' section of the Kapacitor configuration.
-//
-// Example:
-//    [opsgenie]
-//      enabled = true
-//      api-key = "xxxxx"
-//      teams = ["everyone"]
-//
-// With the correct configuration you can now use OpsGenie in TICKscripts.
-//
-// Example:
-//    stream...
-//         .alert()
-//             .opsGenie()
-//
-// Send alerts to OpsGenie using the routing key in the configuration file.
-//
-// Example:
-//    stream...
-//         .alert()
-//             .opsGenie()
-//             .teams('team_rocket','team_test')
-//
-// Send alerts to OpsGenie with team set to 'team_rocket' and 'team_test'
-//
-// If the 'opsgenie' section in the configuration has the option: global = true
-// then all alerts are sent to OpsGenie without the need to explicitly state it
-// in the TICKscript.
-//
-// Example:
-//    [opsgenie]
-//      enabled = true
-//      api-key = "xxxxx"
-//		recipients = "johndoe"
-//      global = true
-//
-// Example:
-//    stream...
-//         .alert()
-//
-// Send alert to OpsGenie using the default recipients, found in the configuration.
+// Execute a command whenever an alert is triggered and pass the alert data over STDIN in JSON format.
 // tick:property
-func (a *AlertNode) OpsGenie() *AlertNode {
-	a.UseOpsGenie = true
-	return a
+func (a *AlertNode) Exec(executable string, args ...string) *ExecHandler {
+	exec := &ExecHandler{
+		AlertNode: a,
+		Command:   append([]string{executable}, args...),
+	}
+	a.ExecHandlers = append(a.ExecHandlers, exec)
+	return exec
 }
 
-// The OpsGenie Teams. If not set uses key specified in configuration.
-// tick:property
-func (a *AlertNode) Teams(teams ...string) *AlertNode {
-	a.OpsGenieTeams = teams
-	return a
+// tick:embedded:AlertNode.Exec
+type ExecHandler struct {
+	*AlertNode
+
+	// The command to execute
+	// tick:ignore
+	Command []string
 }
 
-// The OpsGenie Recipients. If not set uses key specified in configuration.
+// Log JSON alert data to file. One event per line.
+// Must specify the absolute path the the log file.
+// It will be created if it does not exist.
 // tick:property
-func (a *AlertNode) Recipients(recipients ...string) *AlertNode {
-	a.OpsGenieRecipients = recipients
-	return a
+func (a *AlertNode) Log(filepath string) *LogHandler {
+	log := &LogHandler{
+		AlertNode: a,
+		FilePath:  filepath,
+	}
+	a.LogHandlers = append(a.LogHandlers, log)
+	return log
+}
+
+// tick:embedded:AlertNode.Log
+type LogHandler struct {
+	*AlertNode
+
+	// Absolute path the the log file.
+	// It will be created if it does not exist.
+	// tick:ignore
+	FilePath string
 }
 
 // Send alert to VictorOps.
@@ -392,16 +412,21 @@ func (a *AlertNode) Recipients(recipients ...string) *AlertNode {
 //
 // Send alert to VictorOps using the default routing key, found in the configuration.
 // tick:property
-func (a *AlertNode) VictorOps() *AlertNode {
-	a.UseVictorOps = true
-	return a
+func (a *AlertNode) VictorOps() *VictorOpsHandler {
+	vo := &VictorOpsHandler{
+		AlertNode: a,
+	}
+	a.VictorOpsHandlers = append(a.VictorOpsHandlers, vo)
+	return vo
 }
 
-// The VictorOps routing key. If not set uses key specified in configuration.
-// tick:property
-func (a *AlertNode) RoutingKey(routingKey string) *AlertNode {
-	a.VictorOpsRoutingKey = routingKey
-	return a
+// tick:embedded:AlertNode.VictorOps
+type VictorOpsHandler struct {
+	*AlertNode
+
+	// The routing key to use for the alert.
+	// Defaults to the value in the configuration if empty.
+	RoutingKey string
 }
 
 // Send the alert to PagerDuty.
@@ -444,9 +469,17 @@ func (a *AlertNode) RoutingKey(routingKey string) *AlertNode {
 //
 // Send alert to PagerDuty.
 // tick:property
-func (a *AlertNode) PagerDuty() *AlertNode {
-	a.UsePagerDuty = true
-	return a
+func (a *AlertNode) PagerDuty() *PagerDutyHandler {
+	pd := &PagerDutyHandler{
+		AlertNode: a,
+	}
+	a.PagerDutyHandlers = append(a.PagerDutyHandlers, pd)
+	return pd
+}
+
+// tick:embedded:AlertNode.PagerDuty
+type PagerDutyHandler struct {
+	*AlertNode
 }
 
 // Send the alert to Slack.
@@ -506,42 +539,100 @@ func (a *AlertNode) PagerDuty() *AlertNode {
 // Send alert to Slack using default channel '#general'.
 // **NOTE**: The global option for Slack also implies stateChangesOnly is set on all alerts.
 // tick:property
-func (a *AlertNode) Slack() *AlertNode {
-	a.UseSlack = true
-	return a
+func (a *AlertNode) Slack() *SlackHandler {
+	slack := &SlackHandler{
+		AlertNode: a,
+	}
+	a.SlackHandlers = append(a.SlackHandlers, slack)
+	return slack
 }
 
-// Slack channel in which to post messages.
-// If empty uses the channel from the configuration.
-// tick:property
-func (a *AlertNode) Channel(channel string) *AlertNode {
-	a.SlackChannel = channel
-	return a
+// tick:embedded:AlertNode.Slack
+type SlackHandler struct {
+	*AlertNode
+
+	// Slack channel in which to post messages.
+	// If empty uses the channel from the configuration.
+	Channel string
 }
 
-// Only sends events where the state changed.
-// Each different alert level OK, INFO, WARNING, and CRITICAL
-// are considered different states.
+// Send alert to OpsGenie.
+// To use OpsGenie alerting you must first enable the 'Alert Ingestion API'
+// in the 'Integrations' section of OpsGenie.
+// Then place the API key from the URL into the 'opsgenie' section of the Kapacitor configuration.
+//
+// Example:
+//    [opsgenie]
+//      enabled = true
+//      api-key = "xxxxx"
+//      teams = ["everyone"]
+//      recipients = ["jim", "bob"]
+//
+// With the correct configuration you can now use OpsGenie in TICKscripts.
 //
 // Example:
 //    stream...
-//        .window()
-//             .period(10s)
-//             .every(10s)
-//        .alert()
-//            .crit(lambda: "value" > 10)
-//            .stateChangesOnly()
-//            .slack()
+//         .alert()
+//             .opsGenie()
 //
-// If the "value" is greater than 10 for a total of 60s, then
-// only two events will be sent. First, when the value crosses
-// the threshold, and second, when it falls back into an OK state.
-// Without stateChangesOnly, the alert would have triggered 7 times:
-// 6 times for each 10s period where the condition was met and once more
-// for the recovery.
+// Send alerts to OpsGenie using the teams and recipients in the configuration file.
 //
+// Example:
+//    stream...
+//         .alert()
+//             .opsGenie()
+//             .teams('team_rocket','team_test')
+//
+// Send alerts to OpsGenie with team set to 'team_rocket' and 'team_test'
+//
+// If the 'opsgenie' section in the configuration has the option: global = true
+// then all alerts are sent to OpsGenie without the need to explicitly state it
+// in the TICKscript.
+//
+// Example:
+//    [opsgenie]
+//      enabled = true
+//      api-key = "xxxxx"
+//      recipients = ["johndoe"]
+//      global = true
+//
+// Example:
+//    stream...
+//         .alert()
+//
+// Send alert to OpsGenie using the default recipients, found in the configuration.
 // tick:property
-func (a *AlertNode) StateChangesOnly() *AlertNode {
-	a.IsStateChangesOnly = true
-	return a
+func (a *AlertNode) OpsGenie() *OpsGenieHandler {
+	og := &OpsGenieHandler{
+		AlertNode: a,
+	}
+	a.OpsGenieHandlers = append(a.OpsGenieHandlers, og)
+	return og
+}
+
+// tick:embedded:AlertNode.OpsGenie
+type OpsGenieHandler struct {
+	*AlertNode
+
+	// OpsGenie Teams.
+	// tick:ignore
+	TeamsList []string
+
+	// OpsGenie Recipients.
+	// tick:ignore
+	RecipientsList []string
+}
+
+// The list of teams to be alerted. If empty defaults to the teams from the configuration.
+// tick:property
+func (og *OpsGenieHandler) Teams(teams ...string) *OpsGenieHandler {
+	og.TeamsList = teams
+	return og
+}
+
+// The list of recipients to be alerted. If empty defaults to the recipients from the configuration.
+// tick:property
+func (og *OpsGenieHandler) Recipients(recipients ...string) *OpsGenieHandler {
+	og.RecipientsList = recipients
+	return og
 }

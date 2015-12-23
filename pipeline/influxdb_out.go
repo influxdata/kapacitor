@@ -12,7 +12,7 @@ package pipeline
 //            .retentionPolicy('myrp')
 //            .measurement('errors')
 //            .tag('kapacitor', 'true')
-//            .tag('version', '0.1')
+//            .tag('version', '0.2')
 //
 type InfluxDBOutNode struct {
 	node

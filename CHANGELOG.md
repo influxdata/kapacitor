@@ -5,6 +5,8 @@
 ### Release Notes
 
 ### Features
+- [#118](https://github.com/influxdb/kapacitor/issues/118): Can now define multiple handlers of the same type on an AlertNode.
+- [#113](https://github.com/influxdb/kapacitor/issues/113): OpsGenie support thanks! @ericiles
 - [#107](https://github.com/influxdb/kapacitor/issues/107): Enable TICKscript variables to be defined and then referenced from lambda expressions.
         Also fixes various bugs around using regexes.
 

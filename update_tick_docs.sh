@@ -5,7 +5,7 @@
 # of structs into property methods and chaining methods.
 
 dest=$1 # output path for the .md files
-docspath=${2-/docs/kapacitor/v0.1/tick}
+docspath=${2-/kapacitor/v0.2/tick}
 
 if [ -z "$dest" ]
 then
