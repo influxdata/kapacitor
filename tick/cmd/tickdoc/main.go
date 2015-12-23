@@ -1,11 +1,13 @@
 // Tickdoc is a simple utility similiar to godoc that generates documentation from comments.
 //
-// The 'tickdoc' utility understands two special comments to help it generate clean documentation.
+// The 'tickdoc' utility understands several special comments to help it generate clean documentation.
 //
 // 1. tick:ignore -- can be added to any field, method, function or struct and tickdoc will simply skip it
 // and not generate any documentation for it. Useful for ignore fields that are set via property methods.
 //
 // 2. tick:property -- is only added to methods and informs tickdoc that the method is a property method not a chaining method.
+//
+// 3. tick:embedded:[NODE_NAME].[PROPERTY_NAME] -- The object's properties are embedded into a parent node's property identified by NODE_NAME.PROPERTY_NAME.
 //
 // Just place one of these comments on a line all by itself and tickdoc will find it and behave accordingly.
 //
@@ -19,7 +21,7 @@
 // Tickdoc will format examples like godoc but assumes the examples are TICKscript instead of
 // golang code and styles them accordingly.
 //
-// Otherwise just document your code normaly and tickdoc will do the rest.
+// Otherwise just document your code normally and tickdoc will do the rest.
 package main
 
 import (
@@ -33,6 +35,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"regexp"
 	"sort"
 	"strings"
 	"unicode"
@@ -41,10 +44,15 @@ import (
 	"github.com/shurcooL/markdownfmt/markdown"
 )
 
+// The weight difference between two pages.
+const indexWidth = 10
+
 const tickIgnore = "tick:ignore"
 const tickProperty = "tick:property"
 const tickExample = "Example:"
 const tickLang = "javascript"
+
+var tickEmbedded = regexp.MustCompile(`^tick:embedded:(\w+Node).(\w+)$`)
 
 var absPath string
 
@@ -90,18 +98,25 @@ func main() {
 		if name == "" || !ast.IsExported(name) {
 			continue
 		}
-		ordered = append(ordered, name)
-		node.Flatten(nodes)
+		if node.Embedded {
+			err := node.Embed(nodes)
+			if err != nil {
+				log.Fatal(err)
+			}
+		} else {
+			ordered = append(ordered, name)
+			node.Flatten(nodes)
+		}
 	}
 	sort.Strings(ordered)
 
 	r := markdown.NewRenderer()
-	for _, name := range ordered {
+	for i, name := range ordered {
 		var buf bytes.Buffer
 		n := nodes[name]
-		n.Render(&buf, r, nodes)
+		n.Render(&buf, r, nodes, i)
 		filename := path.Join(out, snaker.CamelToSnake(name)+".md")
-		log.Println("Writing file:", filename)
+		log.Println("Writing file:", filename, i)
 		f, err := os.Create(filename)
 		if err != nil {
 			log.Fatal(err)
@@ -120,14 +135,12 @@ func handleGenDecl(nodes map[string]*Node, decl *ast.GenDecl) {
 		if s, ok := t.Type.(*ast.StructType); ok {
 			node := nodes[t.Name.Name]
 			if node == nil {
-				node = &Node{
-					Properties: make(map[string]*Property),
-					Methods:    make(map[string]*Method),
-				}
+				node = newNode()
 				nodes[t.Name.Name] = node
 			}
 			node.Name = t.Name.Name
 			node.Doc = decl.Doc
+			node.Embedded, node.EmbeddedParent, node.EmbeddedProperty = isEmbedded(decl.Doc)
 			processFields(node, s)
 		}
 	}
@@ -180,10 +193,7 @@ func handleFuncDecl(nodes map[string]*Node, decl *ast.FuncDecl) {
 		}
 		node := nodes[self]
 		if node == nil {
-			node = &Node{
-				Properties: make(map[string]*Property),
-				Methods:    make(map[string]*Method),
-			}
+			node = newNode()
 			nodes[self] = node
 		}
 		typ := determineFuncType(decl.Doc)
@@ -230,6 +240,19 @@ func shouldIgnore(cg *ast.CommentGroup) bool {
 		}
 	}
 	return false
+}
+
+func isEmbedded(cg *ast.CommentGroup) (bool, string, string) {
+	if cg == nil {
+		return false, "", ""
+	}
+	for _, l := range cg.List {
+		s := strings.TrimSpace(strings.TrimLeft(l.Text, "/"))
+		if matches := tickEmbedded.FindStringSubmatch(s); len(matches) == 3 {
+			return true, matches[1], matches[2]
+		}
+	}
+	return false, "", ""
 }
 
 type FuncType int
@@ -280,7 +303,7 @@ func nameToTickName(name string) string {
 }
 
 func nodeNameToLink(name string) string {
-	return fmt.Sprintf("%s/%s.html", absPath, snaker.CamelToSnake(name))
+	return fmt.Sprintf("%s/%s/", absPath, snaker.CamelToSnake(name))
 }
 
 func methodNameToLink(node, name string) string {
@@ -356,11 +379,21 @@ func addNodeLinks(nodes map[string]*Node, line string) []byte {
 }
 
 type Node struct {
-	Name       string
-	Doc        *ast.CommentGroup
-	Properties map[string]*Property
-	Methods    map[string]*Method
-	AnonFields []string
+	Name             string
+	Doc              *ast.CommentGroup
+	Properties       map[string]*Property
+	Methods          map[string]*Method
+	AnonFields       []string
+	Embedded         bool
+	EmbeddedParent   string
+	EmbeddedProperty string
+}
+
+func newNode() *Node {
+	return &Node{
+		Properties: make(map[string]*Property),
+		Methods:    make(map[string]*Method),
+	}
 }
 
 // Recurse up through anonymous fields and flatten list of methods etc.
@@ -387,10 +420,39 @@ func (n *Node) Flatten(nodes map[string]*Node) {
 	}
 }
 
-func (n *Node) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node) error {
-	buf.Write([]byte("---\ntitle: "))
-	buf.Write([]byte(n.Name))
-	buf.Write([]byte("\nnote: Auto generated by tickdoc\n---\n"))
+func (n *Node) Embed(nodes map[string]*Node) error {
+	parent := nodes[n.EmbeddedParent]
+	if parent == nil {
+		return fmt.Errorf("no node %s", n.EmbeddedParent)
+	}
+	if prop, ok := parent.Properties[n.EmbeddedProperty]; ok {
+		prop.EmbeddedProperties = n.Properties
+	} else {
+		return fmt.Errorf("no property %s no node %s", n.EmbeddedProperty, n.EmbeddedParent)
+	}
+	return nil
+}
+
+func (n *Node) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node, index int) error {
+	header := fmt.Sprintf(`---
+title: %s
+note: Auto generated by tickdoc
+
+menu:
+  kapacitor_02:
+    name: %s
+    identifier: %s
+    weight: %d
+    parent: tick
+---
+`,
+		n.Name,
+		strings.Replace(n.Name, "Node", "", 1),
+		snaker.CamelToSnake(n.Name),
+		(index+1)*indexWidth,
+	)
+
+	buf.Write([]byte(header))
 
 	renderDoc(buf, nodes, r, n.Doc)
 
@@ -401,17 +463,7 @@ func (n *Node) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node) err
 			buf.Write([]byte("Property methods modify state on the calling node. They do not add another node to the pipeline, and always return a reference to the calling node."))
 			return true
 		})
-		props := make([]string, len(n.Properties))
-		i := 0
-		for name, _ := range n.Properties {
-			props[i] = name
-			i++
-		}
-		sort.Strings(props)
-		for _, name := range props {
-			n.Properties[name].Render(buf, r, nodes)
-			buf.Write([]byte("\n"))
-		}
+		renderProperties(buf, r, n.Properties, nodes, 3, "node")
 	}
 
 	// Methods
@@ -437,19 +489,35 @@ func (n *Node) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node) err
 	return nil
 }
 
-type Property struct {
-	Name   string
-	Doc    *ast.CommentGroup
-	Params []Param
+func renderProperties(buf *bytes.Buffer, r Renderer, properties map[string]*Property, nodes map[string]*Node, header int, node string) {
+	props := make([]string, len(properties))
+	i := 0
+	for name, _ := range properties {
+		props[i] = name
+		i++
+	}
+	sort.Strings(props)
+	for _, name := range props {
+		properties[name].Render(buf, r, nodes, header, node)
+		buf.Write([]byte("\n"))
+	}
 }
 
-func (p *Property) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node) error {
-	r.Header(buf, func() bool { buf.Write([]byte(p.Name)); return true }, 3, "")
+type Property struct {
+	Name               string
+	Doc                *ast.CommentGroup
+	Params             []Param
+	EmbeddedProperties map[string]*Property
+}
+
+func (p *Property) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node, header int, node string) error {
+	r.Header(buf, func() bool { buf.Write([]byte(p.Name)); return true }, header, "")
 
 	renderDoc(buf, nodes, r, p.Doc)
 
 	var code bytes.Buffer
-	code.Write([]byte("node."))
+	code.Write([]byte(node))
+	code.Write([]byte("."))
 	code.Write([]byte(nameToTickName(p.Name)))
 	code.Write([]byte("("))
 	for i, param := range p.Params {
@@ -461,6 +529,15 @@ func (p *Property) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node)
 	code.Write([]byte(")\n"))
 
 	r.BlockCode(buf, code.Bytes(), tickLang)
+
+	if len(p.EmbeddedProperties) > 0 {
+		r.Paragraph(buf, func() bool {
+			buf.Write([]byte("Properties of "))
+			buf.Write([]byte(p.Name))
+			return true
+		})
+		renderProperties(buf, r, p.EmbeddedProperties, nodes, header+1, code.String()+"      ")
+	}
 
 	return nil
 }

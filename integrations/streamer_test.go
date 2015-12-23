@@ -1159,6 +1159,7 @@ stream
 		t.Errorf("got %v exp %v", requestCount, 1)
 	}
 }
+
 func TestStream_AlertSlack(t *testing.T) {
 	requestCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1179,8 +1180,14 @@ func TestStream_AlertSlack(t *testing.T) {
 		if exp := "/test/slack/url"; r.URL.String() != exp {
 			t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
 		}
-		if exp := "#alerts"; pd.Channel != exp {
-			t.Errorf("unexpected channel got %s exp %s", pd.Channel, exp)
+		if requestCount == 1 {
+			if exp := "#alerts"; pd.Channel != exp {
+				t.Errorf("unexpected channel got %s exp %s", pd.Channel, exp)
+			}
+		} else if requestCount == 2 {
+			if exp := "@jim"; pd.Channel != exp {
+				t.Errorf("unexpected channel got %s exp %s", pd.Channel, exp)
+			}
 		}
 		if exp := "kapacitor"; pd.Username != exp {
 			t.Errorf("unexpected username got %s exp %s", pd.Username, exp)
@@ -1220,7 +1227,9 @@ stream
 		.warn(lambda: "count" > 7.0)
 		.crit(lambda: "count" > 8.0)
 		.slack()
-		.channel('#alerts')
+			.channel('#alerts')
+		.slack()
+			.channel('@jim')
 `
 
 	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script)
@@ -1237,8 +1246,8 @@ stream
 		t.Error(err)
 	}
 
-	if requestCount != 1 {
-		t.Errorf("unexpected requestCount got %d exp 1", requestCount)
+	if requestCount != 2 {
+		t.Errorf("unexpected requestCount got %d exp 2", requestCount)
 	}
 }
 
@@ -1281,17 +1290,41 @@ func TestStream_AlertOpsGenie(t *testing.T) {
 		if pd.Description == nil {
 			t.Error("unexpected description got nil")
 		}
-		if exp := "test_team"; pd.Teams[0] != exp {
-			t.Errorf("unexpected teams[0] got %s exp %s", pd.Teams[0], exp)
-		}
-		if exp := "another_team"; pd.Teams[1] != exp {
-			t.Errorf("unexpected teams[1] got %s exp %s", pd.Teams[1], exp)
-		}
-		if exp := "test_recipient"; pd.Recipients[0] != exp {
-			t.Errorf("unexpected recipients[0] got %s exp %s", pd.Recipients[0], exp)
-		}
-		if exp := "another_recipient"; pd.Recipients[1] != exp {
-			t.Errorf("unexpected recipients[1] got %s exp %s", pd.Recipients[1], exp)
+		if requestCount == 1 {
+			if exp, l := 2, len(pd.Teams); l != exp {
+				t.Errorf("unexpected teams count got %d exp %d", l, exp)
+			}
+			if exp := "test_team"; pd.Teams[0] != exp {
+				t.Errorf("unexpected teams[0] got %s exp %s", pd.Teams[0], exp)
+			}
+			if exp := "another_team"; pd.Teams[1] != exp {
+				t.Errorf("unexpected teams[1] got %s exp %s", pd.Teams[1], exp)
+			}
+			if exp, l := 2, len(pd.Recipients); l != exp {
+				t.Errorf("unexpected recipients count got %d exp %d", l, exp)
+			}
+			if exp := "test_recipient"; pd.Recipients[0] != exp {
+				t.Errorf("unexpected recipients[0] got %s exp %s", pd.Recipients[0], exp)
+			}
+			if exp := "another_recipient"; pd.Recipients[1] != exp {
+				t.Errorf("unexpected recipients[1] got %s exp %s", pd.Recipients[1], exp)
+			}
+		} else if requestCount == 2 {
+			if exp, l := 1, len(pd.Teams); l != exp {
+				t.Errorf("unexpected teams count got %d exp %d", l, exp)
+			}
+			if exp := "test_team2"; pd.Teams[0] != exp {
+				t.Errorf("unexpected teams[0] got %s exp %s", pd.Teams[0], exp)
+			}
+			if exp, l := 2, len(pd.Recipients); l != exp {
+				t.Errorf("unexpected recipients count got %d exp %d", l, exp)
+			}
+			if exp := "test_recipient2"; pd.Recipients[0] != exp {
+				t.Errorf("unexpected recipients[0] got %s exp %s", pd.Recipients[0], exp)
+			}
+			if exp := "another_recipient"; pd.Recipients[1] != exp {
+				t.Errorf("unexpected recipients[1] got %s exp %s", pd.Recipients[1], exp)
+			}
 		}
 	}))
 	defer ts.Close()
@@ -1311,8 +1344,11 @@ stream
 		.warn(lambda: "count" > 7.0)
 		.crit(lambda: "count" > 8.0)
 		.opsGenie()
-		.teams('test_team', 'another_team')
-		.recipients('test_recipient', 'another_recipient')
+			.teams('test_team', 'another_team')
+			.recipients('test_recipient', 'another_recipient')
+		.opsGenie()
+			.teams('test_team2' )
+			.recipients('test_recipient2', 'another_recipient')
 `
 
 	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script)
@@ -1328,7 +1364,7 @@ stream
 		t.Error(err)
 	}
 
-	if requestCount != 1 {
+	if requestCount != 2 {
 		t.Errorf("unexpected requestCount got %d exp 1", requestCount)
 	}
 }
@@ -1385,6 +1421,7 @@ stream
 		.warn(lambda: "count" > 7.0)
 		.crit(lambda: "count" > 8.0)
 		.pagerDuty()
+		.pagerDuty()
 `
 
 	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script)
@@ -1401,7 +1438,7 @@ stream
 		t.Error(err)
 	}
 
-	if requestCount != 1 {
+	if requestCount != 2 {
 		t.Errorf("unexpected requestCount got %d exp 1", requestCount)
 	}
 }
@@ -1410,8 +1447,14 @@ func TestStream_AlertVictorOps(t *testing.T) {
 	requestCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestCount++
-		if exp, got := "/api_key/test_key", r.URL.String(); got != exp {
-			t.Errorf("unexpected VO url got %s exp %s", got, exp)
+		if requestCount == 1 {
+			if exp, got := "/api_key/test_key", r.URL.String(); got != exp {
+				t.Errorf("unexpected VO url got %s exp %s", got, exp)
+			}
+		} else if requestCount == 2 {
+			if exp, got := "/api_key/test_key2", r.URL.String(); got != exp {
+				t.Errorf("unexpected VO url got %s exp %s", got, exp)
+			}
 		}
 		type postData struct {
 			MessageType       string      `json:"message_type"`
@@ -1460,7 +1503,9 @@ stream
 		.warn(lambda: "count" > 7.0)
 		.crit(lambda: "count" > 8.0)
 		.victorOps()
-		.routingKey('test_key')
+			.routingKey('test_key')
+		.victorOps()
+			.routingKey('test_key2')
 `
 
 	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script)
@@ -1477,7 +1522,7 @@ stream
 		t.Error(err)
 	}
 
-	if requestCount != 1 {
+	if requestCount != 2 {
 		t.Errorf("unexpected requestCount got %d exp 1", requestCount)
 	}
 }
