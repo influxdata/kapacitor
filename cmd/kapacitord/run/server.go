@@ -19,6 +19,7 @@ import (
 	"github.com/influxdb/influxdb/services/graphite"
 	"github.com/influxdb/influxdb/services/opentsdb"
 	"github.com/influxdb/kapacitor"
+	"github.com/influxdb/kapacitor/services/hipchat"
 	"github.com/influxdb/kapacitor/services/httpd"
 	"github.com/influxdb/kapacitor/services/influxdb"
 	"github.com/influxdb/kapacitor/services/logging"
@@ -130,6 +131,7 @@ func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*
 	s.appendOpsGenieService(c.OpsGenie)
 	s.appendVictorOpsService(c.VictorOps)
 	s.appendPagerDutyService(c.PagerDuty)
+	s.appendHipChatService(c.HipChat)
 	s.appendSlackService(c.Slack)
 
 	// Append InfluxDB services
@@ -248,6 +250,16 @@ func (s *Server) appendSlackService(c slack.Config) {
 		l := s.LogService.NewLogger("[slack] ", log.LstdFlags)
 		srv := slack.NewService(c, l)
 		s.TaskMaster.SlackService = srv
+
+		s.Services = append(s.Services, srv)
+	}
+}
+
+func (s *Server) appendHipChatService(c hipchat.Config) {
+	if c.Enabled {
+		l := s.LogService.NewLogger("[hipchat] ", log.LstdFlags)
+		srv := hipchat.NewService(c, l)
+		s.TaskMaster.HipChatService = srv
 
 		s.Services = append(s.Services, srv)
 	}

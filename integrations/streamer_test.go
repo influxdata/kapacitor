@@ -17,6 +17,7 @@ import (
 	imodels "github.com/influxdb/influxdb/models"
 	"github.com/influxdb/kapacitor"
 	"github.com/influxdb/kapacitor/clock"
+	"github.com/influxdb/kapacitor/services/hipchat"
 	"github.com/influxdb/kapacitor/services/httpd"
 	"github.com/influxdb/kapacitor/services/opsgenie"
 	"github.com/influxdb/kapacitor/services/pagerduty"
@@ -1240,6 +1241,86 @@ stream
 	c.Channel = "#channel"
 	sl := slack.NewService(c, logService.NewLogger("[test_slack] ", log.LstdFlags))
 	tm.SlackService = sl
+
+	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if requestCount != 2 {
+		t.Errorf("unexpected requestCount got %d exp 2", requestCount)
+	}
+}
+
+func TestStream_AlertHipChat(t *testing.T) {
+	requestCount := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		type postData struct {
+			From    string `json:"from"`
+			Message string `json:"message"`
+			Color   string `json:"color"`
+			Notify  bool   `json:"notify"`
+		}
+		pd := postData{}
+		dec := json.NewDecoder(r.Body)
+		dec.Decode(&pd)
+
+		if requestCount == 1 {
+			if exp := "/1234567/notification?auth_token=testtoken1234567"; r.URL.String() != exp {
+				t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
+			}
+		} else if requestCount == 2 {
+			if exp := "/Test%20Room/notification?auth_token=testtokenTestRoom"; r.URL.String() != exp {
+				t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
+			}
+		}
+		if exp := "kapacitor"; pd.From != exp {
+			t.Errorf("unexpected username got %s exp %s", pd.From, exp)
+		}
+		if exp := "kapacitor/cpu/serverA is CRITICAL"; pd.Message != exp {
+			t.Errorf("unexpected text got %s exp %s", pd.Message, exp)
+		}
+		if exp := "red"; pd.Color != exp {
+			t.Errorf("unexpected color got %s exp %s", pd.Color, exp)
+		}
+		if exp := true; pd.Notify != exp {
+			t.Errorf("unexpected notify got %t exp %t", pd.Notify, exp)
+		}
+	}))
+	defer ts.Close()
+
+	var script = `
+stream
+	.from().measurement('cpu')
+	.where(lambda: "host" == 'serverA')
+	.groupBy('host')
+	.window()
+		.period(10s)
+		.every(10s)
+	.mapReduce(influxql.count('idle'))
+	.alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.hipChat()
+			.room('1234567')
+			.token('testtoken1234567')
+		.hipChat()
+			.room('Test Room')
+			.token('testtokenTestRoom')
+`
+
+	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script)
+	defer tm.Close()
+
+	c := hipchat.NewConfig()
+	c.URL = ts.URL
+	c.Room = "1231234"
+	c.Token = "testtoken1231234"
+	sl := hipchat.NewService(c, logService.NewLogger("[test_hipchat] ", log.LstdFlags))
+	tm.HipChatService = sl
 
 	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
 	if err != nil {
