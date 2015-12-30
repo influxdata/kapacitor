@@ -51,6 +51,10 @@ type TaskMaster struct {
 		Global() bool
 		Alert(channel, message string, level AlertLevel) error
 	}
+	HipChatService interface {
+		Global() bool
+		Alert(room, token, message string, level AlertLevel) error
+	}
 	LogService LogService
 
 	// Incoming streams

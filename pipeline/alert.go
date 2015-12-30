@@ -19,7 +19,7 @@ const defaultMessageTmpl = "{{ .ID }} is {{ .Level }}"
 // See AlertNode.Info, AlertNode.Warn, and AlertNode.Crit below.
 //
 // Different event handlers can be configured for each AlertNode.
-// Some handlers like Email, Slack, OpsGenie, VictorOps and PagerDuty have a configuration
+// Some handlers like Email, HipChat, Slack, OpsGenie, VictorOps and PagerDuty have a configuration
 // option 'global' that indicates that all alerts implicitly use the handler.
 //
 // Available event handlers:
@@ -28,6 +28,7 @@ const defaultMessageTmpl = "{{ .ID }} is {{ .Level }}"
 //    * post -- HTTP POST data to a specified URL.
 //    * email -- Send and email with alert data.
 //    * exec -- Execute a command passing alert data over STDIN.
+//    * HipChat -- Post alert message to HipChat room.
 //    * Slack -- Post alert message to Slack channel.
 //	  * OpsGenie -- Send alert to OpsGenie.
 //    * VictorOps -- Send alert to VictorOps.
@@ -189,6 +190,10 @@ type AlertNode struct {
 	// Send alert to Slack.
 	// tick:ignore
 	SlackHandlers []*SlackHandler
+
+	// Send alert to HipChat.
+	// tick:ignore
+	HipChatHandlers []*HipChatHandler
 
 	// Send alert to OpsGenie
 	// tick:ignore
@@ -480,6 +485,79 @@ func (a *AlertNode) PagerDuty() *PagerDutyHandler {
 // tick:embedded:AlertNode.PagerDuty
 type PagerDutyHandler struct {
 	*AlertNode
+}
+
+// Send the alert to HipChat.
+// To allow Kapacitor to post to HipChat,
+// go to the URL https://www.hipchat.com/docs/apiv2 for
+// information on how to get your room id and tokens.
+//
+// Example:
+//    [hipchat]
+//      enabled = true
+//      url = "https://orgname.hipchat.com/v2/room"
+//      room = "4189212"
+//      token = "9hiWoDOZ9IbmHsOTeST123ABciWTIqXQVFDo63h9"
+//
+// In order to not post a message every alert interval
+// use AlertNode.StateChangesOnly so that only events
+// where the alert changed state are posted to the room.
+//
+// Example:
+//    stream...
+//         .alert()
+//             .hipChat()
+//
+// Send alerts to HipChat room in the configuration file.
+//
+// Example:
+//    stream...
+//         .alert()
+//             .hipChat()
+//             .room('Kapacitor')
+//
+// Send alerts to HipChat room 'Kapacitor'
+
+//
+// If the 'hipchat' section in the configuration has the option: global = true
+// then all alerts are sent to HipChat without the need to explicitly state it
+// in the TICKscript.
+//
+// Example:
+//    [hipchat]
+//      enabled = true
+//      url = "https://orgname.hipchat.com/v2/room"
+//      room = "Test Room"
+//      token = "9hiWoDOZ9IbmHsOTeST123ABciWTIqXQVFDo63h9"
+//      global = true
+//
+// Example:
+//    stream...
+//         .alert()
+//
+// Send alert to HipChat using default room 'Test Room'.
+// **NOTE**: The global option for HipChat also implies stateChangesOnly is set on all alerts.
+// Also, the room can either be the room id (numerical) or the room name.
+// tick:property
+func (a *AlertNode) HipChat() *HipChatHandler {
+	hipchat := &HipChatHandler{
+		AlertNode: a,
+	}
+	a.HipChatHandlers = append(a.HipChatHandlers, hipchat)
+	return hipchat
+}
+
+// tick:embedded:AlertNode.HipChat
+type HipChatHandler struct {
+	*AlertNode
+
+	// HipChat room in which to post messages.
+	// If empty uses the channel from the configuration.
+	Room string
+
+	// HipChat authentication token.
+	// If empty uses the token from the configuration.
+	Token string
 }
 
 // Send the alert to Slack.

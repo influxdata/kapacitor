@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/influxdb/kapacitor/services/hipchat"
 	"github.com/influxdb/kapacitor/services/httpd"
 	"github.com/influxdb/kapacitor/services/influxdb"
 	"github.com/influxdb/kapacitor/services/logging"
@@ -46,6 +47,7 @@ type Config struct {
 	VictorOps victorops.Config  `toml:"victorops"`
 	PagerDuty pagerduty.Config  `toml:"pagerduty"`
 	Slack     slack.Config      `toml:"slack"`
+	HipChat   hipchat.Config    `toml:"hipchat"`
 	Reporting reporting.Config  `toml:"reporting"`
 	Stats     stats.Config      `toml:"stats"`
 
@@ -71,6 +73,7 @@ func NewConfig() *Config {
 	c.VictorOps = victorops.NewConfig()
 	c.PagerDuty = pagerduty.NewConfig()
 	c.Slack = slack.NewConfig()
+	c.HipChat = hipchat.NewConfig()
 	c.Reporting = reporting.NewConfig()
 	c.Stats = stats.NewConfig()
 

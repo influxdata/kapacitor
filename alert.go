@@ -155,6 +155,18 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode) (an *AlertNode, err 
 		n.IsStateChangesOnly = true
 	}
 
+	for _, hipchat := range n.HipChatHandlers {
+		hipchat := hipchat
+		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleHipChat(hipchat, ad) })
+	}
+	if len(n.HipChatHandlers) == 0 && (et.tm.HipChatService != nil && et.tm.HipChatService.Global()) {
+		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleHipChat(&pipeline.HipChatHandler{}, ad) })
+	}
+	// If HipChat has been configured globally only send state changes.
+	if et.tm.HipChatService != nil && et.tm.HipChatService.Global() {
+		n.IsStateChangesOnly = true
+	}
+
 	for _, og := range n.OpsGenieHandlers {
 		og := og
 		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleOpsGenie(og, ad) })
@@ -558,6 +570,23 @@ func (a *AlertNode) handleSlack(slack *pipeline.SlackHandler, ad *AlertData) {
 	)
 	if err != nil {
 		a.logger.Println("E! failed to send alert data to Slack:", err)
+		return
+	}
+}
+
+func (a *AlertNode) handleHipChat(hipchat *pipeline.HipChatHandler, ad *AlertData) {
+	if a.et.tm.HipChatService == nil {
+		a.logger.Println("E! failed to send HipChat message. HipChat is not enabled")
+		return
+	}
+	err := a.et.tm.HipChatService.Alert(
+		hipchat.Room,
+		hipchat.Token,
+		ad.Message,
+		ad.Level,
+	)
+	if err != nil {
+		a.logger.Println("E! failed to send alert data to HipChat:", err)
 		return
 	}
 }
