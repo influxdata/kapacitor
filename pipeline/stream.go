@@ -32,6 +32,10 @@ type StreamNode struct {
 	// tick:ignore
 	Expression tick.Node
 
+	// The dimensions by which to group to the data.
+	// tick:ignore
+	Dimensions []interface{}
+
 	// The database name.
 	// If empty any database will be used.
 	Database string
@@ -96,5 +100,16 @@ func (s *StreamNode) From() *StreamNode {
 // tick:property
 func (s *StreamNode) Where(expression tick.Node) *StreamNode {
 	s.Expression = expression
+	return s
+}
+
+// Group the data by a set of tags.
+//
+// Can pass literal * to group by all dimensions.
+// Example:
+//    .groupBy(*)
+//
+func (s *StreamNode) GroupBy(tag ...interface{}) *StreamNode {
+	s.Dimensions = tag
 	return s
 }

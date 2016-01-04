@@ -8,11 +8,13 @@ import (
 
 type StreamNode struct {
 	node
-	s          *pipeline.StreamNode
-	expression *tick.StatefulExpr
-	db         string
-	rp         string
-	name       string
+	s             *pipeline.StreamNode
+	expression    *tick.StatefulExpr
+	dimensions    []string
+	allDimensions bool
+	db            string
+	rp            string
+	name          string
 }
 
 // Create a new  StreamNode which filters data from a source.
@@ -25,10 +27,12 @@ func newStreamNode(et *ExecutingTask, n *pipeline.StreamNode) (*StreamNode, erro
 		name: n.Measurement,
 	}
 	sn.node.runF = sn.runStream
+	sn.allDimensions, sn.dimensions = determineDimensions(n.Dimensions)
 
 	if n.Expression != nil {
 		sn.expression = tick.NewStatefulExpr(n.Expression)
 	}
+
 	return sn, nil
 }
 
@@ -39,6 +43,7 @@ func (s *StreamNode) runStream() error {
 			if s.s.Truncate != 0 {
 				pt.Time = pt.Time.Truncate(s.s.Truncate)
 			}
+			pt = setGroupOnPoint(pt, s.allDimensions, s.dimensions)
 			for _, child := range s.outs {
 				err := child.CollectPoint(pt)
 				if err != nil {
