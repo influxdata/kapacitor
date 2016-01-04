@@ -499,7 +499,7 @@ func (ts *Service) StartTask(t *kapacitor.Task) error {
 	// Start the task
 	et, err := ts.TaskMaster.StartTask(t)
 	if err != nil {
-		ts.SaveLastError(et.Task.Name, err.Error())
+		ts.SaveLastError(t.Name, err.Error())
 		return err
 	}
 
@@ -507,7 +507,7 @@ func (ts *Service) StartTask(t *kapacitor.Task) error {
 	if t.Type == kapacitor.BatchTask {
 		err := et.StartBatching()
 		if err != nil {
-			ts.SaveLastError(et.Task.Name, err.Error())
+			ts.SaveLastError(t.Name, err.Error())
 			return err
 		}
 	}
@@ -521,7 +521,7 @@ func (ts *Service) StartTask(t *kapacitor.Task) error {
 		if err != nil {
 			ts.logger.Printf("E! task %s finished with error: %s", et.Task.Name, err)
 			// Save last error from task.
-			err = ts.SaveLastError(et.Task.Name, err.Error())
+			err = ts.SaveLastError(t.Name, err.Error())
 			if err != nil {
 				ts.logger.Println("E! failed to save last error for task", et.Task.Name)
 			}
