@@ -23,17 +23,7 @@ func newGroupByNode(et *ExecutingTask, n *pipeline.GroupByNode) (*GroupByNode, e
 	}
 	gn.node.runF = gn.runGroupBy
 
-DIMS:
-	for _, dim := range n.Dimensions {
-		switch d := dim.(type) {
-		case string:
-			gn.dimensions = append(gn.dimensions, d)
-		case *tick.StarNode:
-			gn.allDimensions = true
-			break DIMS
-		}
-	}
-	sort.Strings(gn.dimensions)
+	gn.allDimensions, gn.dimensions = determineDimensions(n.Dimensions)
 	return gn, nil
 }
 
@@ -41,11 +31,7 @@ func (g *GroupByNode) runGroupBy() error {
 	switch g.Wants() {
 	case pipeline.StreamEdge:
 		for pt, ok := g.ins[0].NextPoint(); ok; pt, ok = g.ins[0].NextPoint() {
-			if g.allDimensions {
-				g.dimensions = models.SortedKeys(pt.Tags)
-			}
-			pt.Group = models.TagsToGroupID(g.dimensions, pt.Tags)
-			pt.Dimensions = g.dimensions
+			pt = setGroupOnPoint(pt, g.allDimensions, g.dimensions)
 			for _, child := range g.outs {
 				err := child.CollectPoint(pt)
 				if err != nil {
@@ -57,4 +43,28 @@ func (g *GroupByNode) runGroupBy() error {
 		panic("not implemented")
 	}
 	return nil
+}
+
+func determineDimensions(dimensions []interface{}) (allDimensions bool, realDimensions []string) {
+DIMS:
+	for _, dim := range dimensions {
+		switch d := dim.(type) {
+		case string:
+			realDimensions = append(realDimensions, d)
+		case *tick.StarNode:
+			allDimensions = true
+			break DIMS
+		}
+	}
+	sort.Strings(realDimensions)
+	return
+}
+
+func setGroupOnPoint(p models.Point, allDimensions bool, dimensions []string) models.Point {
+	if allDimensions {
+		dimensions = models.SortedKeys(p.Tags)
+	}
+	p.Group = models.TagsToGroupID(dimensions, p.Tags)
+	p.Dimensions = dimensions
+	return p
 }

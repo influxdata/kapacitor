@@ -18,8 +18,9 @@ type WhereNode struct {
 // Create a new WhereNode which filters down the batch or stream by a condition
 func newWhereNode(et *ExecutingTask, n *pipeline.WhereNode) (wn *WhereNode, err error) {
 	wn = &WhereNode{
-		node: node{Node: n, et: et},
-		w:    n,
+		node:        node{Node: n, et: et},
+		w:           n,
+		expressions: make(map[models.GroupID]*tick.StatefulExpr),
 	}
 	wn.runF = wn.runWhere
 	if n.Expression == nil {
