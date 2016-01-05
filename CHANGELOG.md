@@ -14,6 +14,7 @@
 ### Bugfixes
 - [#124](https://github.com/influxdb/kapacitor/issues/124): Fix panic where there is an error starting a task.
 - [#122](https://github.com/influxdb/kapacitor/issues/122): Fixes panic when using WhereNode.
+- [#128](https://github.com/influxdb/kapacitor/issues/128): Fix not sending emails when using recipient list from config.
 
 ## v0.2.3 [2015-12-22]
 

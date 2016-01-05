@@ -33,7 +33,7 @@ type TaskMaster struct {
 	}
 	SMTPService interface {
 		Global() bool
-		SendMail(to []string, subject string, msg string)
+		SendMail(to []string, subject string, msg string) error
 	}
 	OpsGenieService interface {
 		Global() bool
