@@ -470,9 +470,12 @@ func (a *AlertNode) handleEmail(email *pipeline.EmailHandler, ad *AlertData) {
 		return
 	}
 	if a.et.tm.SMTPService != nil {
-		a.et.tm.SMTPService.SendMail(email.ToList, ad.Message, string(b))
+		err := a.et.tm.SMTPService.SendMail(email.ToList, ad.Message, string(b))
+		if err != nil {
+			a.logger.Println("E!", err)
+		}
 	} else {
-		a.logger.Println("W! smtp service not enabled, cannot send email.")
+		a.logger.Println("E! smtp service not enabled, cannot send email.")
 	}
 }
 

@@ -10,6 +10,8 @@ import (
 	"gopkg.in/gomail.v2"
 )
 
+var ErrNoRecipients = errors.New("not sending email, no recipients defined")
+
 type Service struct {
 	c      Config
 	mail   chan *gomail.Message
@@ -26,6 +28,7 @@ func NewService(c Config, l *log.Logger) *Service {
 }
 
 func (s *Service) Open() error {
+	s.logger.Println("I! Starting SMTP service")
 	if s.c.From == "" {
 		return errors.New("cannot open smtp service: missing from address in configuration")
 	}
@@ -35,6 +38,7 @@ func (s *Service) Open() error {
 }
 
 func (s *Service) Close() error {
+	s.logger.Println("I! Closing SMTP service")
 	close(s.mail)
 	s.wg.Wait()
 	return nil
@@ -73,7 +77,7 @@ func (s *Service) runMailer() {
 				open = true
 			}
 			if err := gomail.Send(conn, m); err != nil {
-				log.Print(err)
+				s.logger.Println("E!", err)
 			}
 		// Close the connection to the SMTP server if no email was sent in
 		// the last IdleTimeout duration.
@@ -88,12 +92,12 @@ func (s *Service) runMailer() {
 	}
 }
 
-func (s *Service) SendMail(to []string, subject, msg string) {
-	if len(to) == 0 {
-		return
-	}
+func (s *Service) SendMail(to []string, subject, msg string) error {
 	if len(to) == 0 {
 		to = s.c.To
+	}
+	if len(to) == 0 {
+		return ErrNoRecipients
 	}
 	m := gomail.NewMessage()
 	m.SetHeader("From", s.c.From)
@@ -101,4 +105,5 @@ func (s *Service) SendMail(to []string, subject, msg string) {
 	m.SetHeader("Subject", subject)
 	m.SetBody("text/plain", msg)
 	s.mail <- m
+	return nil
 }
