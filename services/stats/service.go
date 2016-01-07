@@ -28,8 +28,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/influxdb/kapacitor"
-	"github.com/influxdb/kapacitor/models"
+	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/models"
 )
 
 // Sends internal stats back into the Kapacitor stream.

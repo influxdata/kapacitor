@@ -17,11 +17,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/cmd/kapacitord/run"
+	"github.com/influxdata/kapacitor/services/task_store"
+	"github.com/influxdata/kapacitor/wlog"
 	"github.com/influxdb/influxdb/client"
-	"github.com/influxdb/kapacitor"
-	"github.com/influxdb/kapacitor/cmd/kapacitord/run"
-	"github.com/influxdb/kapacitor/services/task_store"
-	"github.com/influxdb/kapacitor/wlog"
 )
 
 // Server represents a test wrapper for run.Server.

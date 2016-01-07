@@ -9,12 +9,12 @@ cd $DIR
 
 
 # Build new docker image
-docker build -t influxdb/kapacitor-builder $DIR
+docker build -t influxdata/kapacitor-builder $DIR
 echo "Running build.py"
 # Run docker
 docker run --rm \
     -e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
     -e AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
-    -v $DIR:/gopath/src/github.com/influxdb/kapacitor \
-    influxdb/kapacitor-builder \
+    -v $DIR:/gopath/src/github.com/influxdata/kapacitor \
+    influxdata/kapacitor-builder \
     "$@"

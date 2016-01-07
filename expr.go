@@ -3,8 +3,8 @@ package kapacitor
 import (
 	"fmt"
 
-	"github.com/influxdb/kapacitor/models"
-	"github.com/influxdb/kapacitor/tick"
+	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/tick"
 )
 
 // Evaluate a given expression as a boolean predicate against a set of fields and tags

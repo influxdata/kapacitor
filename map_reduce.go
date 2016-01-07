@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdb/influxdb/tsdb"
-	"github.com/influxdb/kapacitor/models"
-	"github.com/influxdb/kapacitor/pipeline"
 )
 
 type MapResult struct {

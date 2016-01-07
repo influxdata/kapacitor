@@ -12,7 +12,7 @@ import (
 	"strconv"
 
 	"github.com/BurntSushi/toml"
-	"github.com/influxdb/kapacitor/services/logging"
+	"github.com/influxdata/kapacitor/services/logging"
 )
 
 const logo = `

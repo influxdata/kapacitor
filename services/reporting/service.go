@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/influxdb/kapacitor"
+	"github.com/influxdata/kapacitor"
 	"github.com/influxdb/usage-client/v1"
 )
 

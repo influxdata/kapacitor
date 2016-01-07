@@ -9,9 +9,9 @@ import (
 	"os"
 	"reflect"
 
+	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/wlog"
 	"github.com/influxdb/influxdb/client"
-	"github.com/influxdb/kapacitor"
-	"github.com/influxdb/kapacitor/wlog"
 )
 
 type MockInfluxDBService struct {

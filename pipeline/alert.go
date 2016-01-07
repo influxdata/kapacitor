@@ -1,7 +1,7 @@
 package pipeline
 
 import (
-	"github.com/influxdb/kapacitor/tick"
+	"github.com/influxdata/kapacitor/tick"
 )
 
 // Number of previous states to remember when computing flapping percentage.

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/influxdb/kapacitor/clock"
+	"github.com/influxdata/kapacitor/clock"
 )
 
 func TestClockUntilSleepFirst(t *testing.T) {

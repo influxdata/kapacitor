@@ -7,10 +7,10 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdb/influxdb/client"
 	"github.com/influxdb/influxdb/cluster"
-	"github.com/influxdb/kapacitor"
-	"github.com/influxdb/kapacitor/services/udp"
 )
 
 const (

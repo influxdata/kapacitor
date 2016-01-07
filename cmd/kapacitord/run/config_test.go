@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/BurntSushi/toml"
-	"github.com/influxdb/kapacitor/cmd/kapacitord/run"
+	"github.com/influxdata/kapacitor/cmd/kapacitord/run"
 )
 
 // Ensure the configuration can be parsed.

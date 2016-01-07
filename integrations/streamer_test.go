@@ -13,17 +13,17 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/clock"
+	"github.com/influxdata/kapacitor/services/hipchat"
+	"github.com/influxdata/kapacitor/services/httpd"
+	"github.com/influxdata/kapacitor/services/opsgenie"
+	"github.com/influxdata/kapacitor/services/pagerduty"
+	"github.com/influxdata/kapacitor/services/slack"
+	"github.com/influxdata/kapacitor/services/victorops"
+	"github.com/influxdata/kapacitor/wlog"
 	"github.com/influxdb/influxdb/client"
 	imodels "github.com/influxdb/influxdb/models"
-	"github.com/influxdb/kapacitor"
-	"github.com/influxdb/kapacitor/clock"
-	"github.com/influxdb/kapacitor/services/hipchat"
-	"github.com/influxdb/kapacitor/services/httpd"
-	"github.com/influxdb/kapacitor/services/opsgenie"
-	"github.com/influxdb/kapacitor/services/pagerduty"
-	"github.com/influxdb/kapacitor/services/slack"
-	"github.com/influxdb/kapacitor/services/victorops"
-	"github.com/influxdb/kapacitor/wlog"
 )
 
 var httpService *httpd.Service

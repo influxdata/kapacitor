@@ -3,7 +3,7 @@ package tick_test
 import (
 	"fmt"
 
-	"github.com/influxdb/kapacitor/tick"
+	"github.com/influxdata/kapacitor/tick"
 )
 
 type Process struct {

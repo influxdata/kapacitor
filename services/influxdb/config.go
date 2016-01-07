@@ -4,7 +4,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/influxdb/kapacitor/services/udp"
+	"github.com/influxdata/kapacitor/services/udp"
 )
 
 type Config struct {
