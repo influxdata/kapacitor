@@ -6,11 +6,11 @@ import (
 	"path"
 	"sync"
 
+	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdb/influxdb/influxql"
 	imodels "github.com/influxdb/influxdb/models"
-	"github.com/influxdb/kapacitor/models"
-	"github.com/influxdb/kapacitor/pipeline"
-	"github.com/influxdb/kapacitor/services/httpd"
 )
 
 type HTTPOutNode struct {

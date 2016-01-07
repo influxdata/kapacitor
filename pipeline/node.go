@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/influxdb/kapacitor/tick"
+	"github.com/influxdata/kapacitor/tick"
 )
 
 // The type of data that travels along an edge connecting two nodes in a Pipeline.

@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/influxdb/kapacitor"
+	"github.com/influxdata/kapacitor"
 )
 
 type Service struct {

@@ -13,13 +13,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/influxdata/kapacitor/wlog"
 	"github.com/influxdb/influxdb"
 	"github.com/influxdb/influxdb/cluster"
 	"github.com/influxdb/influxdb/influxql"
 	"github.com/influxdb/influxdb/meta"
 	"github.com/influxdb/influxdb/models"
 	"github.com/influxdb/influxdb/uuid"
-	"github.com/influxdb/kapacitor/wlog"
 )
 
 // statistics gathered by the httpd package.

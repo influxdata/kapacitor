@@ -3,7 +3,7 @@ package pipeline
 import (
 	"time"
 
-	"github.com/influxdb/kapacitor/tick"
+	"github.com/influxdata/kapacitor/tick"
 )
 
 // A StreamNode represents the source of data being

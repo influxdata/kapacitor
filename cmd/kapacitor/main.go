@@ -17,9 +17,9 @@ import (
 	"time"
 
 	"github.com/dustin/go-humanize"
-	"github.com/influxdb/kapacitor"
-	"github.com/influxdb/kapacitor/services/replay"
-	"github.com/influxdb/kapacitor/services/task_store"
+	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/services/replay"
+	"github.com/influxdata/kapacitor/services/task_store"
 )
 
 // These variables are populated via the Go linker.

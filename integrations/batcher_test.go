@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/clock"
+	"github.com/influxdata/kapacitor/wlog"
 	imodels "github.com/influxdb/influxdb/models"
-	"github.com/influxdb/kapacitor"
-	"github.com/influxdb/kapacitor/clock"
-	"github.com/influxdb/kapacitor/wlog"
 )
 
 func TestBatch_Derivative(t *testing.T) {

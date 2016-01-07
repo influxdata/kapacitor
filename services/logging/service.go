@@ -6,7 +6,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/influxdb/kapacitor/wlog"
+	"github.com/influxdata/kapacitor/wlog"
 )
 
 // Interface for creating new loggers

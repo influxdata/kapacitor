@@ -2,7 +2,7 @@
 #checkout:
 #  post:
 #    - rm -rf ~/kapacitor
-#    - git clone git@github.com:influxdb/kapacitor.git ~/kapacitor
+#    - git clone git@github.com:influxdata/kapacitor.git ~/kapacitor
 
 machine:
   services:
@@ -16,8 +16,8 @@ dependencies:
     - "~/docker"
   override:
     - if [[ -e ~/docker/kapacitor-builder.tar ]]; then docker load -i ~/docker/kapacitor-builder.tar; fi
-    - docker build -t influxdb/kapacitor-builder .
-    - mkdir -p ~/docker; docker save influxdb/kapacitor-builder > ~/docker/kapacitor-builder.tar
+    - docker build -t influxdata/kapacitor-builder .
+    - mkdir -p ~/docker; docker save influxdata/kapacitor-builder > ~/docker/kapacitor-builder.tar
 
 test:
   override:

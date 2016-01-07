@@ -12,11 +12,11 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/tick"
 	"github.com/influxdb/influxdb/influxql"
 	imodels "github.com/influxdb/influxdb/models"
-	"github.com/influxdb/kapacitor/models"
-	"github.com/influxdb/kapacitor/pipeline"
-	"github.com/influxdb/kapacitor/tick"
 )
 
 // The newest state change is weighted 'weightDiff' times more than oldest state change.

@@ -1,9 +1,9 @@
 package kapacitor
 
 import (
-	"github.com/influxdb/kapacitor/models"
-	"github.com/influxdb/kapacitor/pipeline"
-	"github.com/influxdb/kapacitor/tick"
+	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/tick"
 )
 
 type StreamNode struct {

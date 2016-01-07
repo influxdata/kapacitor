@@ -1,7 +1,7 @@
 package pipeline
 
 import (
-	"github.com/influxdb/kapacitor/tick"
+	"github.com/influxdata/kapacitor/tick"
 )
 
 // The WhereNode filters the data stream by a given expression.

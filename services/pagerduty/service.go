@@ -7,7 +7,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/influxdb/kapacitor"
+	"github.com/influxdata/kapacitor"
 )
 
 const eventType = "trigger"

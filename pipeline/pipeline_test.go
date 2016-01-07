@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/influxdb/kapacitor/tick"
+	"github.com/influxdata/kapacitor/tick"
 	"github.com/stretchr/testify/assert"
 )
 

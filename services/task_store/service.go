@@ -14,8 +14,8 @@ import (
 	"strings"
 
 	"github.com/boltdb/bolt"
-	"github.com/influxdb/kapacitor"
-	"github.com/influxdb/kapacitor/services/httpd"
+	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/services/httpd"
 )
 
 const taskDB = "task.db"

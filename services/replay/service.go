@@ -16,12 +16,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/clock"
+	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdb/influxdb/client"
 	"github.com/influxdb/influxdb/influxql"
-	"github.com/influxdb/kapacitor"
-	"github.com/influxdb/kapacitor/clock"
-	"github.com/influxdb/kapacitor/models"
-	"github.com/influxdb/kapacitor/services/httpd"
 	"github.com/twinj/uuid"
 )
 

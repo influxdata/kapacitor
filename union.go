@@ -1,7 +1,7 @@
 package kapacitor
 
 import (
-	"github.com/influxdb/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/pipeline"
 )
 
 type UnionNode struct {

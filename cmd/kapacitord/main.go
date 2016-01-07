@@ -12,9 +12,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/influxdb/kapacitor/cmd/kapacitord/help"
-	"github.com/influxdb/kapacitor/cmd/kapacitord/run"
-	"github.com/influxdb/kapacitor/wlog"
+	"github.com/influxdata/kapacitor/cmd/kapacitord/help"
+	"github.com/influxdata/kapacitor/cmd/kapacitord/run"
+	"github.com/influxdata/kapacitor/wlog"
 )
 
 // These variables are populated via the Go linker.

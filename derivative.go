@@ -3,8 +3,8 @@ package kapacitor
 import (
 	"time"
 
-	"github.com/influxdb/kapacitor/models"
-	"github.com/influxdb/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/pipeline"
 )
 
 type DerivativeNode struct {

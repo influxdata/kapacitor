@@ -7,8 +7,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/influxdb/kapacitor/pipeline"
-	"github.com/influxdb/kapacitor/tick"
+	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/tick"
 )
 
 // The type of a task

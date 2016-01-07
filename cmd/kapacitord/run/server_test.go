@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/influxdata/kapacitor"
 	"github.com/influxdb/influxdb/client"
 	"github.com/influxdb/influxdb/influxql"
 	"github.com/influxdb/influxdb/models"
-	"github.com/influxdb/kapacitor"
 )
 
 func TestServer_Ping(t *testing.T) {

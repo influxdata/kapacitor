@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/influxdb/kapacitor/models"
+	"github.com/influxdata/kapacitor/models"
 	"github.com/stretchr/testify/assert"
 )
 

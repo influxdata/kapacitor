@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/influxdb/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/pipeline"
 )
 
 // A node that can be  in an executor.

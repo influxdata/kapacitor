@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/influxdata/kapacitor/tick"
 	"github.com/influxdb/influxdb/influxql"
-	"github.com/influxdb/kapacitor/tick"
 )
 
 type Query struct {

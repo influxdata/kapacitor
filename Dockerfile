@@ -20,10 +20,14 @@ RUN apt-get install -y \
 RUN gem install fpm
 
 # Install go
-RUN wget https://storage.googleapis.com/golang/go1.5.1.linux-amd64.tar.gz; tar -C /usr/local/ -xf /go1.5.1.linux-amd64.tar.gz ; rm /go1.5.1.linux-amd64.tar.gz
-ENV PATH $PATH:/usr/local/go/bin
+ENV GO_VERSION 1.5.2
+ENV GO_ARCH amd64
+RUN wget https://storage.googleapis.com/golang/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz; \
+   tar -C /usr/local/ -xf /go${GO_VERSION}.linux-${GO_ARCH}.tar.gz ; \
+   rm /go${GO_VERSION}.linux-${GO_ARCH}.tar.gz
+ENV PATH /usr/local/go/bin:$PATH
 ENV GOPATH /gopath
-ENV PROJECT_PATH $GOPATH/src/github.com/influxdb/kapacitor
+ENV PROJECT_PATH $GOPATH/src/github.com/influxdata/kapacitor
 RUN mkdir -p $PROJECT_PATH
 
 WORKDIR $PROJECT_PATH

@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/influxdb/kapacitor/models"
-	"github.com/influxdb/kapacitor/pipeline"
-	"github.com/influxdb/kapacitor/wlog"
+	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/wlog"
 )
 
 const (

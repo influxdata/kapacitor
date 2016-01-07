@@ -32,7 +32,7 @@ PREINST_SCRIPT = None
 
 # META-PACKAGE VARIABLES
 PACKAGE_LICENSE = "MIT"
-PACKAGE_URL = "github.com/influxdb/kapacitor"
+PACKAGE_URL = "github.com/influxdata/kapacitor"
 MAINTAINER = "support@influxdata.com"
 VENDOR = "InfluxData"
 DESCRIPTION = "Time series data processing engine"

@@ -1,7 +1,7 @@
 package pipeline
 
 import (
-	"github.com/influxdb/kapacitor/tick"
+	"github.com/influxdata/kapacitor/tick"
 )
 
 // Evaluates expressions on each data point it receives.
