@@ -55,6 +55,9 @@ type TaskMaster struct {
 		Global() bool
 		Alert(room, token, message string, level AlertLevel) error
 	}
+	AlertaService interface {
+		Alert(token, resource, event, environment, severity, status, group, value, message, origin string, data interface{}) error
+	}
 	LogService LogService
 
 	// Incoming streams

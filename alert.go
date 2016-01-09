@@ -167,6 +167,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode) (an *AlertNode, err 
 		n.IsStateChangesOnly = true
 	}
 
+	for _, alerta := range n.AlertaHandlers {
+		alerta := alerta
+		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleAlerta(alerta, ad) })
+	}
+
 	for _, og := range n.OpsGenieHandlers {
 		og := og
 		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleOpsGenie(og, ad) })
@@ -590,6 +595,52 @@ func (a *AlertNode) handleHipChat(hipchat *pipeline.HipChatHandler, ad *AlertDat
 	)
 	if err != nil {
 		a.logger.Println("E! failed to send alert data to HipChat:", err)
+		return
+	}
+}
+
+func (a *AlertNode) handleAlerta(alerta *pipeline.AlertaHandler, ad *AlertData) {
+	if a.et.tm.AlertaService == nil {
+		a.logger.Println("E! failed to send Alerta message. Alerta is not enabled")
+		return
+	}
+
+	var severity string
+	var status string
+
+	switch ad.Level {
+	case OKAlert:
+		severity = "ok"
+		status = "closed"
+	case InfoAlert:
+		severity = "informational"
+		status = "open"
+	case WarnAlert:
+		severity = "warning"
+		status = "open"
+	case CritAlert:
+		severity = "critical"
+		status = "open"
+	default:
+		severity = "unknown"
+		status = "unknown"
+	}
+
+	err := a.et.tm.AlertaService.Alert(
+		alerta.Token,
+		alerta.Resource,
+		alerta.Event,
+		alerta.Environment,
+		severity,
+		status,
+		alerta.Group,
+		alerta.Value,
+		ad.Message,
+		alerta.Origin,
+		ad.Data,
+	)
+	if err != nil {
+		a.logger.Println("E! failed to send alert data to Alerta:", err)
 		return
 	}
 }
