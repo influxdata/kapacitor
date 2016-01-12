@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/influxdb"
@@ -132,6 +133,7 @@ func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*
 	s.appendVictorOpsService(c.VictorOps)
 	s.appendPagerDutyService(c.PagerDuty)
 	s.appendHipChatService(c.HipChat)
+	s.appendAlertaService(c.Alerta)
 	s.appendSlackService(c.Slack)
 
 	// Append InfluxDB services
@@ -260,6 +262,16 @@ func (s *Server) appendHipChatService(c hipchat.Config) {
 		l := s.LogService.NewLogger("[hipchat] ", log.LstdFlags)
 		srv := hipchat.NewService(c, l)
 		s.TaskMaster.HipChatService = srv
+
+		s.Services = append(s.Services, srv)
+	}
+}
+
+func (s *Server) appendAlertaService(c alerta.Config) {
+	if c.Enabled {
+		l := s.LogService.NewLogger("[alerta] ", log.LstdFlags)
+		srv := alerta.NewService(c, l)
+		s.TaskMaster.AlertaService = srv
 
 		s.Services = append(s.Services, srv)
 	}

@@ -29,6 +29,7 @@ const defaultMessageTmpl = "{{ .ID }} is {{ .Level }}"
 //    * email -- Send and email with alert data.
 //    * exec -- Execute a command passing alert data over STDIN.
 //    * HipChat -- Post alert message to HipChat room.
+//    * Alerta -- Post alert message to Alerta.
 //    * Slack -- Post alert message to Slack channel.
 //	  * OpsGenie -- Send alert to OpsGenie.
 //    * VictorOps -- Send alert to VictorOps.
@@ -194,6 +195,10 @@ type AlertNode struct {
 	// Send alert to HipChat.
 	// tick:ignore
 	HipChatHandlers []*HipChatHandler
+
+	// Send alert to Alerta.
+	// tick:ignore
+	AlertaHandlers []*AlertaHandler
 
 	// Send alert to OpsGenie
 	// tick:ignore
@@ -558,6 +563,81 @@ type HipChatHandler struct {
 	// HipChat authentication token.
 	// If empty uses the token from the configuration.
 	Token string
+}
+
+// Send the alert to Alerta.
+//
+// Example:
+//    [alerta]
+//      enabled = true
+//      url = "https://alerta.yourdomain"
+//      token = "9hiWoDOZ9IbmHsOTeST123ABciWTIqXQVFDo63h9"
+//      environment = "Production"
+//      origin = "Kapacitor"
+//
+// In order to not post a message every alert interval
+// use AlertNode.StateChangesOnly so that only events
+// where the alert changed state are posted to the room.
+//
+// Example:
+//    stream...
+//         .alert()
+//             .alerta()
+//                 .resource('Hostname or service')
+//                 .event('Something went wrong')
+//
+// Send alerts to Alerta. Alerta requires a resource and event description.
+//
+// Example:
+//    stream...
+//         .alert()
+//             .alerta()
+//                 .resource('Hostname or service')
+//                 .event('Something went wrong')
+//                 .environment('Development')
+//                 .status('Open')
+//                 .group('Dev. Servers')
+//
+// Send alerts to Alerta. Alerta accepts detailed alert information.
+// tick:property
+func (a *AlertNode) Alerta() *AlertaHandler {
+	alerta := &AlertaHandler{
+		AlertNode: a,
+	}
+	a.AlertaHandlers = append(a.AlertaHandlers, alerta)
+	return alerta
+}
+
+// tick:embedded:AlertNode.Alerta
+type AlertaHandler struct {
+	*AlertNode
+
+	// Alerta authentication token.
+	// If empty uses the token from the configuration.
+        Token string
+
+	// Alerta resource.
+        // This is a required field.
+        Resource string
+
+	// Alerta event.
+	// This is a required field.
+        Event string
+
+	// Alerta environment.
+	// If empty uses the environment from the configuration.
+        Environment string
+
+	// Alerta group.
+        Group string
+
+	// Alerta value.
+        Value string
+
+	// Alerta origin.
+	// If empty uses the origin from the configuration.
+        Origin string
+
 }
 
 // Send the alert to Slack.

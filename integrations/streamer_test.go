@@ -15,6 +15,7 @@ import (
 
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/clock"
+	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/opsgenie"
@@ -1351,6 +1352,101 @@ stream
 	c.Token = "testtoken1231234"
 	sl := hipchat.NewService(c, logService.NewLogger("[test_hipchat] ", log.LstdFlags))
 	tm.HipChatService = sl
+
+	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if requestCount != 2 {
+		t.Errorf("unexpected requestCount got %d exp 2", requestCount)
+	}
+}
+
+func TestStream_AlertAlerta(t *testing.T) {
+	requestCount := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		type postData struct {
+			Resource    string `json:"resource"`
+			Event       string `json:"event"`
+			Environment string `json:"environment"`
+			Text        string `json:"text"`
+                        Origin      string `json:"origin"`
+		}
+		pd := postData{}
+		dec := json.NewDecoder(r.Body)
+		dec.Decode(&pd)
+
+                if requestCount == 1 {
+                        if exp := "/alert?api-key=testtoken1234567"; r.URL.String() != exp {
+                                t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
+                        }
+                        if exp := "production"; pd.Environment != exp {
+                                t.Errorf("unexpected environment got %s exp %s", pd.Environment, exp)
+                        }
+                        if exp := "Kapacitor"; pd.Origin != exp {
+                                t.Errorf("unexpected origin got %s exp %s", pd.Origin, exp)
+                        }
+                } else {
+                        if exp := "/alert?api-key=anothertesttoken"; r.URL.String() != exp {
+                                t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
+                        }
+                        if exp := "development"; pd.Environment != exp {
+                                t.Errorf("unexpected environment got %s exp %s", pd.Environment, exp)
+                        }
+                        if exp := "override"; pd.Origin != exp {
+                                t.Errorf("unexpected origin got %s exp %s", pd.Origin, exp)
+                        }
+                }
+		if exp := "serverA"; pd.Resource != exp {
+			t.Errorf("unexpected resource got %s exp %s", pd.Resource, exp)
+		}
+		if exp := "CPU Idle"; pd.Event != exp {
+			t.Errorf("unexpected event got %s exp %s", pd.Event, exp)
+		}
+		if exp := "kapacitor/cpu/serverA is CRITICAL"; pd.Text != exp {
+			t.Errorf("unexpected text got %s exp %s", pd.Text, exp)
+		}
+	}))
+	defer ts.Close()
+
+	var script = `
+stream
+	.from().measurement('cpu')
+	.where(lambda: "host" == 'serverA')
+	.groupBy('host')
+	.window()
+		.period(10s)
+		.every(10s)
+	.mapReduce(influxql.count('idle'))
+	.alert()
+                .id('{{ index .Tags "host" }}')
+		.message('kapacitor/{{ .Name }}/{{ index .Tags "host" }} is {{ .Level }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.alerta()
+			.token('testtoken1234567')
+			.resource('serverA')
+                        .event('CPU Idle')
+                        .environment('production')
+		.alerta()
+			.token('anothertesttoken')
+			.resource('serverA')
+                        .event('CPU Idle')
+                        .environment('development')
+                        .origin('override')
+`
+
+	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script)
+	defer tm.Close()
+
+	c := alerta.NewConfig()
+	c.URL = ts.URL
+        c.Origin = "Kapacitor"
+	sl := alerta.NewService(c, logService.NewLogger("[test_alerta] ", log.LstdFlags))
+	tm.AlertaService = sl
 
 	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
 	if err != nil {
