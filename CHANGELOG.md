@@ -6,6 +6,7 @@
 
 ### Features
 - [#138](https://github.com/influxdata/kapacitor/issues/138): Change over to influxdata github org.
+- [#139](https://github.com/influxdata/kapacitor/issues/139): Alerta.io support thanks! @md14454
 
 ### Bugfixes
 

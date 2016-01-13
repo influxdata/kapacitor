@@ -1372,33 +1372,33 @@ func TestStream_AlertAlerta(t *testing.T) {
 			Event       string `json:"event"`
 			Environment string `json:"environment"`
 			Text        string `json:"text"`
-                        Origin      string `json:"origin"`
+			Origin      string `json:"origin"`
 		}
 		pd := postData{}
 		dec := json.NewDecoder(r.Body)
 		dec.Decode(&pd)
 
-                if requestCount == 1 {
-                        if exp := "/alert?api-key=testtoken1234567"; r.URL.String() != exp {
-                                t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
-                        }
-                        if exp := "production"; pd.Environment != exp {
-                                t.Errorf("unexpected environment got %s exp %s", pd.Environment, exp)
-                        }
-                        if exp := "Kapacitor"; pd.Origin != exp {
-                                t.Errorf("unexpected origin got %s exp %s", pd.Origin, exp)
-                        }
-                } else {
-                        if exp := "/alert?api-key=anothertesttoken"; r.URL.String() != exp {
-                                t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
-                        }
-                        if exp := "development"; pd.Environment != exp {
-                                t.Errorf("unexpected environment got %s exp %s", pd.Environment, exp)
-                        }
-                        if exp := "override"; pd.Origin != exp {
-                                t.Errorf("unexpected origin got %s exp %s", pd.Origin, exp)
-                        }
-                }
+		if requestCount == 1 {
+			if exp := "/alert?api-key=testtoken1234567"; r.URL.String() != exp {
+				t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
+			}
+			if exp := "production"; pd.Environment != exp {
+				t.Errorf("unexpected environment got %s exp %s", pd.Environment, exp)
+			}
+			if exp := "Kapacitor"; pd.Origin != exp {
+				t.Errorf("unexpected origin got %s exp %s", pd.Origin, exp)
+			}
+		} else {
+			if exp := "/alert?api-key=anothertesttoken"; r.URL.String() != exp {
+				t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
+			}
+			if exp := "development"; pd.Environment != exp {
+				t.Errorf("unexpected environment got %s exp %s", pd.Environment, exp)
+			}
+			if exp := "override"; pd.Origin != exp {
+				t.Errorf("unexpected origin got %s exp %s", pd.Origin, exp)
+			}
+		}
 		if exp := "serverA"; pd.Resource != exp {
 			t.Errorf("unexpected resource got %s exp %s", pd.Resource, exp)
 		}
@@ -1444,7 +1444,7 @@ stream
 
 	c := alerta.NewConfig()
 	c.URL = ts.URL
-        c.Origin = "Kapacitor"
+	c.Origin = "Kapacitor"
 	sl := alerta.NewService(c, logService.NewLogger("[test_alerta] ", log.LstdFlags))
 	tm.AlertaService = sl
 

@@ -614,30 +614,29 @@ type AlertaHandler struct {
 
 	// Alerta authentication token.
 	// If empty uses the token from the configuration.
-        Token string
+	Token string
 
 	// Alerta resource.
-        // This is a required field.
-        Resource string
+	// This is a required field.
+	Resource string
 
 	// Alerta event.
 	// This is a required field.
-        Event string
+	Event string
 
 	// Alerta environment.
 	// If empty uses the environment from the configuration.
-        Environment string
+	Environment string
 
 	// Alerta group.
-        Group string
+	Group string
 
 	// Alerta value.
-        Value string
+	Value string
 
 	// Alerta origin.
 	// If empty uses the origin from the configuration.
-        Origin string
-
+	Origin string
 }
 
 // Send the alert to Slack.

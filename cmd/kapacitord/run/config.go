@@ -49,7 +49,7 @@ type Config struct {
 	PagerDuty pagerduty.Config  `toml:"pagerduty"`
 	Slack     slack.Config      `toml:"slack"`
 	HipChat   hipchat.Config    `toml:"hipchat"`
-        Alerta    alerta.Config     `toml:"alerta"`
+	Alerta    alerta.Config     `toml:"alerta"`
 	Reporting reporting.Config  `toml:"reporting"`
 	Stats     stats.Config      `toml:"stats"`
 
@@ -76,7 +76,7 @@ func NewConfig() *Config {
 	c.PagerDuty = pagerduty.NewConfig()
 	c.Slack = slack.NewConfig()
 	c.HipChat = hipchat.NewConfig()
-        c.Alerta = alerta.NewConfig()
+	c.Alerta = alerta.NewConfig()
 	c.Reporting = reporting.NewConfig()
 	c.Stats = stats.NewConfig()
 
