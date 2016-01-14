@@ -1,4 +1,4 @@
-# Kapacitor [![Circle CI](https://circleci.com/gh/influxdb/kapacitor/tree/master.svg?style=svg&circle-token=78c97422cf89526309e502a290c230e8a463229f)](https://circleci.com/gh/influxdb/kapacitor/tree/master)
+# Kapacitor [![Circle CI](https://circleci.com/gh/influxdata/kapacitor/tree/master.svg?style=svg&circle-token=78c97422cf89526309e502a290c230e8a463229f)](https://circleci.com/gh/influxdata/kapacitor/tree/master)
 Open source framework for processing, monitoring, and alerting on time series data
 
 # Installation
@@ -8,15 +8,15 @@ Kapacitor has two binaries:
 * kapacitor – a CLI program for calling the Kapacitor API.
 * kapacitord – the Kapacitor server daemon.
 
-You can either download the binaries directly from the [downloads](https://influxdb.com/download/#kapacitor) page or go get them:
+You can either download the binaries directly from the [downloads](https://influxdata.com/downloads/#kapacitor) page or go get them:
 
 ```sh
-go get github.com/influxdb/kapacitor/cmd/kapacitor
-go get github.com/influxdb/kapacitor/cmd/kapacitord
+go get github.com/influxdata/kapacitor/cmd/kapacitor
+go get github.com/influxdata/kapacitor/cmd/kapacitord
 ```
 
 # Configuration
-An example configuration file can be found [here](https://github.com/influxdb/kapacitor/blob/master/etc/kapacitor/kapacitor.conf)
+An example configuration file can be found [here](https://github.com/influxdata/kapacitor/blob/master/etc/kapacitor/kapacitor.conf)
 
 Kapacitor can also provide an example config for you using this command:
 
@@ -28,11 +28,11 @@ kapacitord config
 # Getting Started
 
 This README gives you a high level overview of what Kapacitor is and what its like to use it. As well as some details of how it works.
-To get started using Kapacitor see [this guide](http://influxdb.com/docs/kapacitor/v0.1/introduction/getting_started.html).
+To get started using Kapacitor see [this guide](http://docs.influxdata.com/kapacitor/v0.2/introduction/getting_started/).
 
 # Basic Example
 
-Kapacitor use a DSL named [TICKscript](https://influxdb.com/docs/kapacitor/v0.1/tick/index.html) to define tasks.
+Kapacitor use a DSL named [TICKscript](https://docs.influxdata.com/kapacitor/v0.2/tick/) to define tasks.
 
 A simple TICKscript that alerts on high cpu usage looks like this:
 
@@ -79,4 +79,4 @@ kapacitor define \
 kapacitor enable cpu_alert
 ```
 
-For more complete examples see the [documentation](https://influxdb.com/docs/kapacitor/v0.1/introduction/index.html)
+For more complete examples see the [documentation](https://docs.influxdata.com/kapacitor/v0.2/introduction/)
