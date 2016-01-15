@@ -1,10 +1,23 @@
 # Changelog
 
-## v0.2.5 [unreleased]
+## v0.10.0 [unreleased]
 
 ### Release Notes
 
+This release marks the next release of Kapacitor.
+With this release you can now run your own custom code for processing data within Kapacitor.
+See [udf/agent/README.md](https://github.com/influxdata/kapacitor/blob/master/udf/agent/README.md) for more details.
+
+With the addition of UDFs it is now possible to run custom anomaly detection alogrithms suited to your needs.
+There are simple examples of how to use UDFs in [udf/agent/examples](https://github.com/influxdata/kapacitor/tree/master/udf/agent/examples/).
+
+
+The version has jumped significantly so that it is inline with other projects in the TICK stack.
+This way you can easily tell which versions of Telegraf, InfluxDB, Chronograf and Kapacitor work together.
+
+
 ### Features
+- [#72](https://github.com/influxdata/kapacitor/issues/72): Add support for User Defined Functions (UDFs).
 - [#138](https://github.com/influxdata/kapacitor/issues/138): Change over to influxdata github org.
 - [#139](https://github.com/influxdata/kapacitor/issues/139): Alerta.io support thanks! @md14454
 

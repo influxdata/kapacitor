@@ -23,6 +23,7 @@ import (
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/stats"
 	"github.com/influxdata/kapacitor/services/task_store"
+	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
 
@@ -52,6 +53,7 @@ type Config struct {
 	Alerta    alerta.Config     `toml:"alerta"`
 	Reporting reporting.Config  `toml:"reporting"`
 	Stats     stats.Config      `toml:"stats"`
+	UDF       udf.Config        `toml:"udf"`
 
 	Hostname string `toml:"hostname"`
 	DataDir  string `toml:"data_dir"`
@@ -79,6 +81,7 @@ func NewConfig() *Config {
 	c.Alerta = alerta.NewConfig()
 	c.Reporting = reporting.NewConfig()
 	c.Stats = stats.NewConfig()
+	c.UDF = udf.NewConfig()
 
 	return c
 }
@@ -122,6 +125,10 @@ func (c *Config) Validate() error {
 		return err
 	}
 	err = c.InfluxDB.Validate()
+	if err != nil {
+		return err
+	}
+	err = c.UDF.Validate()
 	if err != nil {
 		return err
 	}

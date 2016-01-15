@@ -10,12 +10,17 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/services/httpd"
+	"github.com/influxdata/kapacitor/tick"
 	"github.com/influxdb/influxdb/client"
 	"github.com/influxdb/influxdb/cluster"
 )
 
 type LogService interface {
 	NewLogger(prefix string, flag int) *log.Logger
+}
+type UDFService interface {
+	FunctionList() []string
+	FunctionInfo(name string) (UDFProcessInfo, bool)
 }
 
 var ErrTaskMasterClosed = errors.New("TaskMaster is closed")
@@ -28,6 +33,14 @@ type TaskMaster struct {
 		DelRoutes([]httpd.Route)
 		URL() string
 	}
+	TaskStore interface {
+		SaveSnapshot(name string, snapshot *TaskSnapshot) error
+		HasSnapshot(name string) bool
+		LoadSnapshot(name string) (*TaskSnapshot, error)
+	}
+
+	UDFService UDFService
+
 	InfluxDBService interface {
 		NewClient() (*client.Client, error)
 	}
@@ -101,8 +114,16 @@ func NewTaskMaster(l LogService) *TaskMaster {
 func (tm *TaskMaster) New() *TaskMaster {
 	n := NewTaskMaster(tm.LogService)
 	n.HTTPDService = tm.HTTPDService
+	n.UDFService = tm.UDFService
+	n.TaskStore = tm.TaskStore
 	n.InfluxDBService = tm.InfluxDBService
 	n.SMTPService = tm.SMTPService
+	n.OpsGenieService = tm.OpsGenieService
+	n.VictorOpsService = tm.VictorOpsService
+	n.PagerDutyService = tm.PagerDutyService
+	n.SlackService = tm.SlackService
+	n.HipChatService = tm.HipChatService
+	n.AlertaService = tm.AlertaService
 	return n
 }
 
@@ -156,6 +177,39 @@ func (tm *TaskMaster) waitForForks() {
 	tm.wg.Wait()
 }
 
+func (tm *TaskMaster) CreateTICKScope() *tick.Scope {
+	scope := tick.NewScope()
+	scope.Set("influxql", newInfluxQL())
+	scope.Set("time", func(d time.Duration) time.Duration { return d })
+	// Add dynamic methods to the scope for UDFs
+	if tm.UDFService != nil {
+		for _, f := range tm.UDFService.FunctionList() {
+			f := f
+			info, _ := tm.UDFService.FunctionInfo(f)
+			scope.SetDynamicMethod(
+				f,
+				tick.DynamicMethod(func(self interface{}, args ...interface{}) (interface{}, error) {
+					parent, ok := self.(pipeline.Node)
+					if !ok {
+						return nil, fmt.Errorf("cannot call %s on %T", f, self)
+					}
+					udf := pipeline.NewUDF(
+						parent,
+						f,
+						info.Commander,
+						info.Timeout,
+						info.Wants,
+						info.Provides,
+						info.Options,
+					)
+					return udf, nil
+				}),
+			)
+		}
+	}
+	return scope
+}
+
 func (tm *TaskMaster) StartTask(t *Task) (*ExecutingTask, error) {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
@@ -189,7 +243,15 @@ func (tm *TaskMaster) StartTask(t *Task) (*ExecutingTask, error) {
 		}
 	}
 
-	err = et.start(ins)
+	var snapshot *TaskSnapshot
+	if tm.TaskStore.HasSnapshot(t.Name) {
+		snapshot, err = tm.TaskStore.LoadSnapshot(t.Name)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	err = et.start(ins, snapshot)
 	if err != nil {
 		return nil, err
 	}
@@ -338,4 +400,15 @@ func (tm *TaskMaster) delFork(name string) {
 	if fork.Edge != nil {
 		fork.Edge.Close()
 	}
+}
+
+func (tm *TaskMaster) SnapshotTask(name string) (*TaskSnapshot, error) {
+	tm.mu.RLock()
+	et, ok := tm.tasks[name]
+	tm.mu.RUnlock()
+
+	if ok {
+		return et.Snapshot()
+	}
+	return nil, fmt.Errorf("task %s is not running or does not exist", name)
 }

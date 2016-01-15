@@ -1,6 +1,8 @@
 package kapacitor
 
 import (
+	"log"
+
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick"
@@ -18,9 +20,9 @@ type StreamNode struct {
 }
 
 // Create a new  StreamNode which filters data from a source.
-func newStreamNode(et *ExecutingTask, n *pipeline.StreamNode) (*StreamNode, error) {
+func newStreamNode(et *ExecutingTask, n *pipeline.StreamNode, l *log.Logger) (*StreamNode, error) {
 	sn := &StreamNode{
-		node: node{Node: n, et: et},
+		node: node{Node: n, et: et, logger: l},
 		s:    n,
 		db:   n.Database,
 		rp:   n.RetentionPolicy,
@@ -36,7 +38,7 @@ func newStreamNode(et *ExecutingTask, n *pipeline.StreamNode) (*StreamNode, erro
 	return sn, nil
 }
 
-func (s *StreamNode) runStream() error {
+func (s *StreamNode) runStream([]byte) error {
 
 	for pt, ok := s.ins[0].NextPoint(); ok; pt, ok = s.ins[0].NextPoint() {
 		if s.matches(pt) {

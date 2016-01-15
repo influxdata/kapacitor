@@ -2,15 +2,20 @@ package task_store
 
 import (
 	"fmt"
+	"time"
+
+	"github.com/influxdb/influxdb/toml"
 )
 
 type Config struct {
-	Dir string `toml:"dir"`
+	Dir              string        `toml:"dir"`
+	SnapshotInterval toml.Duration `toml:"snapshot-interval"`
 }
 
 func NewConfig() Config {
 	return Config{
-		Dir: "./tasks",
+		Dir:              "./tasks",
+		SnapshotInterval: toml.Duration(time.Minute),
 	}
 }
 

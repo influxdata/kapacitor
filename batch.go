@@ -3,6 +3,7 @@ package kapacitor
 import (
 	"errors"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -19,9 +20,9 @@ type SourceBatchNode struct {
 	idx int
 }
 
-func newSourceBatchNode(et *ExecutingTask, n *pipeline.SourceBatchNode) (*SourceBatchNode, error) {
+func newSourceBatchNode(et *ExecutingTask, n *pipeline.SourceBatchNode, l *log.Logger) (*SourceBatchNode, error) {
 	sn := &SourceBatchNode{
-		node: node{Node: n, et: et},
+		node: node{Node: n, et: et, logger: l},
 		s:    n,
 	}
 	return sn, nil
@@ -47,7 +48,7 @@ func (s *SourceBatchNode) addParentEdge(in *Edge) {
 	s.idx++
 }
 
-func (s *SourceBatchNode) start() {
+func (s *SourceBatchNode) start([]byte) {
 }
 
 func (s *SourceBatchNode) Err() error {
@@ -96,9 +97,9 @@ type BatchNode struct {
 	closing  chan struct{}
 }
 
-func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode) (*BatchNode, error) {
+func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode, l *log.Logger) (*BatchNode, error) {
 	bn := &BatchNode{
-		node:    node{Node: n, et: et},
+		node:    node{Node: n, et: et, logger: l},
 		b:       n,
 		closing: make(chan struct{}),
 	}
@@ -264,7 +265,7 @@ func (b *BatchNode) doQuery() error {
 	}
 }
 
-func (b *BatchNode) runBatch() error {
+func (b *BatchNode) runBatch([]byte) error {
 	errC := make(chan error, 1)
 	go func() {
 		defer func() {

@@ -8,7 +8,6 @@ import (
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
-	"github.com/influxdata/kapacitor/wlog"
 )
 
 const (
@@ -70,7 +69,7 @@ func (e *Edge) collectedCount() string {
 // collect calls to the edge have finished.
 func (e *Edge) Close() {
 	e.logger.Printf(
-		"I! closing c: %s e: %s\n",
+		"D! closing c: %s e: %s\n",
 		e.statMap.Get(statCollected),
 		e.statMap.Get(statEmitted),
 	)
@@ -104,14 +103,6 @@ func (e *Edge) Next() (p models.PointInterface, ok bool) {
 }
 
 func (e *Edge) NextPoint() (p models.Point, ok bool) {
-	if wlog.LogLevel() == wlog.DEBUG {
-		// Explicitly check log level since this is expensive and frequent
-		e.logger.Printf(
-			"D! next point c: %s e: %s\n",
-			e.statMap.Get(statCollected),
-			e.statMap.Get(statEmitted),
-		)
-	}
 	select {
 	case <-e.aborted:
 	case p, ok = <-e.stream:
@@ -123,14 +114,6 @@ func (e *Edge) NextPoint() (p models.Point, ok bool) {
 }
 
 func (e *Edge) NextBatch() (b models.Batch, ok bool) {
-	if wlog.LogLevel() == wlog.DEBUG {
-		// Explicitly check log level since this is expensive and frequent
-		e.logger.Printf(
-			"D! next batch c: %s e: %s\n",
-			e.statMap.Get(statCollected),
-			e.statMap.Get(statEmitted),
-		)
-	}
 	select {
 	case <-e.aborted:
 	case b, ok = <-e.batch:
@@ -142,14 +125,6 @@ func (e *Edge) NextBatch() (b models.Batch, ok bool) {
 }
 
 func (e *Edge) NextMaps() (m *MapResult, ok bool) {
-	if wlog.LogLevel() == wlog.DEBUG {
-		// Explicitly check log level since this is expensive and frequent
-		e.logger.Printf(
-			"D! next maps c: %s e: %s\n",
-			e.statMap.Get(statCollected),
-			e.statMap.Get(statEmitted),
-		)
-	}
 	select {
 	case <-e.aborted:
 	case m, ok = <-e.reduce:
@@ -161,14 +136,6 @@ func (e *Edge) NextMaps() (m *MapResult, ok bool) {
 }
 
 func (e *Edge) CollectPoint(p models.Point) error {
-	if wlog.LogLevel() == wlog.DEBUG {
-		// Explicitly check log level since this is expensive and frequent
-		e.logger.Printf(
-			"D! collect point c: %s e: %s\n",
-			e.statMap.Get(statCollected),
-			e.statMap.Get(statEmitted),
-		)
-	}
 	e.statMap.Add(statCollected, 1)
 	select {
 	case <-e.aborted:
@@ -179,14 +146,6 @@ func (e *Edge) CollectPoint(p models.Point) error {
 }
 
 func (e *Edge) CollectBatch(b models.Batch) error {
-	if wlog.LogLevel() == wlog.DEBUG {
-		// Explicitly check log level since this is expensive and frequent
-		e.logger.Printf(
-			"D! collect batch c: %s e: %s\n",
-			e.statMap.Get(statCollected),
-			e.statMap.Get(statEmitted),
-		)
-	}
 	e.statMap.Add(statCollected, 1)
 	select {
 	case <-e.aborted:
@@ -197,14 +156,6 @@ func (e *Edge) CollectBatch(b models.Batch) error {
 }
 
 func (e *Edge) CollectMaps(m *MapResult) error {
-	if wlog.LogLevel() == wlog.DEBUG {
-		// Explicitly check log level since this is expensive and frequent
-		e.logger.Printf(
-			"D! collect maps c: %s e: %s\n",
-			e.statMap.Get(statCollected),
-			e.statMap.Get(statEmitted),
-		)
-	}
 	e.statMap.Add(statCollected, 1)
 	select {
 	case <-e.aborted:

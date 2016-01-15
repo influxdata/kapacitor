@@ -12,24 +12,29 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/boltdb/bolt"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/services/httpd"
+	"github.com/influxdata/kapacitor/tick"
+	"github.com/influxdb/influxdb/influxql"
 )
 
 const taskDB = "task.db"
 
 var (
-	tasksBucket   = []byte("tasks")
-	enabledBucket = []byte("enabled")
+	tasksBucket    = []byte("tasks")
+	enabledBucket  = []byte("enabled")
+	snapshotBucket = []byte("snapshots")
 )
 
 type Service struct {
-	dbpath       string
-	db           *bolt.DB
-	routes       []httpd.Route
-	HTTPDService interface {
+	dbpath           string
+	db               *bolt.DB
+	routes           []httpd.Route
+	snapshotInterval time.Duration
+	HTTPDService     interface {
 		AddRoutes([]httpd.Route) error
 		DelRoutes([]httpd.Route)
 	}
@@ -38,7 +43,9 @@ type Service struct {
 		StopTask(name string) error
 		IsExecuting(name string) bool
 		ExecutingDot(name string) string
+		CreateTICKScope() *tick.Scope
 	}
+
 	logger *log.Logger
 }
 
@@ -50,8 +57,9 @@ type taskStore struct {
 
 func NewService(conf Config, l *log.Logger) *Service {
 	return &Service{
-		dbpath: path.Join(conf.Dir, taskDB),
-		logger: l,
+		dbpath:           path.Join(conf.Dir, taskDB),
+		snapshotInterval: time.Duration(conf.SnapshotInterval),
+		logger:           l,
 	}
 }
 
@@ -142,7 +150,7 @@ func (ts *Service) Open() error {
 		return err
 	}
 
-	// Start enabled tasks
+	// Get enabled tasks
 	enabledTasks := make([]string, 0)
 	err = ts.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(enabledBucket))
@@ -189,6 +197,70 @@ func (ts *Service) Close() error {
 		return ts.db.Close()
 	}
 	return nil
+}
+
+func (ts *Service) SaveSnapshot(name string, snapshot *kapacitor.TaskSnapshot) error {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	err := enc.Encode(snapshot)
+	if err != nil {
+		return fmt.Errorf("failed to encode task snapshot %s %v", name, err)
+	}
+
+	err = ts.db.Update(func(tx *bolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists(snapshotBucket)
+		if err != nil {
+			return err
+		}
+
+		return b.Put([]byte(name), buf.Bytes())
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+func (ts *Service) HasSnapshot(name string) bool {
+	err := ts.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(snapshotBucket)
+		if b == nil {
+			return fmt.Errorf("no snapshot found for task %s", name)
+		}
+
+		data := b.Get([]byte(name))
+		if data == nil {
+			return fmt.Errorf("no snapshot found for task %s", name)
+		}
+		return nil
+	})
+	return err == nil
+}
+
+func (ts *Service) LoadSnapshot(name string) (*kapacitor.TaskSnapshot, error) {
+	var data []byte
+	err := ts.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(snapshotBucket)
+		if b == nil {
+			return fmt.Errorf("no snapshot found for task %s", name)
+		}
+
+		data = b.Get([]byte(name))
+		if data == nil {
+			return fmt.Errorf("no snapshot found for task %s", name)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	buf := bytes.NewBuffer(data)
+	dec := gob.NewDecoder(buf)
+	snapshot := &kapacitor.TaskSnapshot{}
+	err = dec.Decode(snapshot)
+	if err != nil {
+		return nil, err
+	}
+	return snapshot, nil
 }
 
 type TaskInfo struct {
@@ -273,13 +345,15 @@ type rawTask struct {
 	// The task type (stream|batch).
 	Type kapacitor.TaskType
 	// The DBs and RPs the task is allowed to access.
-	DBRPs []kapacitor.DBRP
+	DBRPs            []kapacitor.DBRP
+	SnapshotInterval time.Duration
 }
 
 func (ts *Service) handleSave(w http.ResponseWriter, r *http.Request) {
 	name := r.URL.Query().Get("name")
 	newTask := &rawTask{
-		Name: name,
+		Name:             name,
+		SnapshotInterval: ts.snapshotInterval,
 	}
 
 	// Check for existing task
@@ -335,6 +409,17 @@ func (ts *Service) handleSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get snapshot interval
+	snapshotIntervalStr := r.URL.Query().Get("snapshot")
+	if snapshotIntervalStr != "" {
+		snapshotInterval, err := influxql.ParseDuration(snapshotIntervalStr)
+		if err != nil {
+			httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
+			return
+		}
+		newTask.SnapshotInterval = snapshotInterval
+	}
+
 	err = ts.Save(newTask)
 	if err != nil {
 		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
@@ -373,9 +458,21 @@ func (ts *Service) handleDisable(w http.ResponseWriter, r *http.Request) {
 func (ts *Service) Save(task *rawTask) error {
 
 	// Validate task
-	_, err := kapacitor.NewTask(task.Name, task.TICKscript, task.Type, task.DBRPs)
+	_, err := kapacitor.NewTask(task.Name,
+		task.TICKscript,
+		task.Type,
+		task.DBRPs,
+		task.SnapshotInterval,
+		ts.TaskMaster.CreateTICKScope(),
+	)
 	if err != nil {
 		return fmt.Errorf("invalid task: %s", err)
+	}
+
+	// Write 0 snapshot interval if it is the default.
+	// This way if the default changes the task will change too.
+	if task.SnapshotInterval == ts.snapshotInterval {
+		task.SnapshotInterval = 0
 	}
 
 	var buf bytes.Buffer
@@ -443,7 +540,10 @@ func (ts *Service) LoadRaw(name string) (*rawTask, error) {
 	buf := bytes.NewBuffer(data)
 	dec := gob.NewDecoder(buf)
 	task := &rawTask{}
-	err = dec.Decode(&task)
+	err = dec.Decode(task)
+	if task.SnapshotInterval == 0 {
+		task.SnapshotInterval = ts.snapshotInterval
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -455,7 +555,13 @@ func (ts *Service) Load(name string) (*kapacitor.Task, error) {
 	if err != nil {
 		return nil, err
 	}
-	return kapacitor.NewTask(task.Name, task.TICKscript, task.Type, task.DBRPs)
+	return kapacitor.NewTask(task.Name,
+		task.TICKscript,
+		task.Type,
+		task.DBRPs,
+		task.SnapshotInterval,
+		ts.TaskMaster.CreateTICKScope(),
+	)
 }
 
 func (ts *Service) Enable(name string) error {

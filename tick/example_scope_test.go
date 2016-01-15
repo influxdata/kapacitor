@@ -1,9 +1,7 @@
-package tick_test
+package tick
 
 import (
 	"fmt"
-
-	"github.com/influxdata/kapacitor/tick"
 )
 
 type Process struct {
@@ -41,11 +39,11 @@ child1.spawn().name('grandchild')
 parent.spawn().name('child2')
 `
 
-	scope := tick.NewScope()
+	scope := NewScope()
 	parent := &Process{}
 	scope.Set("parent", parent)
 
-	err := tick.Evaluate(script, scope)
+	err := Evaluate(script, scope)
 	if err != nil {
 		fmt.Println(err)
 	}
