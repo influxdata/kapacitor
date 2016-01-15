@@ -108,7 +108,7 @@ func TestNewBinaryNode(t *testing.T) {
 			Right: nil,
 			Operator: token{
 				pos: 0,
-				typ: tokenEqual,
+				typ: TokenEqual,
 				val: "=",
 			},
 		},

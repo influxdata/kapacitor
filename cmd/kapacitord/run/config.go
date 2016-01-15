@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor/services/alerta"
+	"github.com/influxdata/kapacitor/services/deadman"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/influxdb"
@@ -54,6 +55,7 @@ type Config struct {
 	Reporting reporting.Config  `toml:"reporting"`
 	Stats     stats.Config      `toml:"stats"`
 	UDF       udf.Config        `toml:"udf"`
+	Deadman   deadman.Config    `toml:"deadman"`
 
 	Hostname string `toml:"hostname"`
 	DataDir  string `toml:"data_dir"`
@@ -64,6 +66,7 @@ func NewConfig() *Config {
 	c := &Config{
 		Hostname: "localhost",
 	}
+
 	c.HTTP = httpd.NewConfig()
 	c.Replay = replay.NewConfig()
 	c.Task = task_store.NewConfig()
@@ -82,6 +85,7 @@ func NewConfig() *Config {
 	c.Reporting = reporting.NewConfig()
 	c.Stats = stats.NewConfig()
 	c.UDF = udf.NewConfig()
+	c.Deadman = deadman.NewConfig()
 
 	return c
 }

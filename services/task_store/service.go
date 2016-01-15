@@ -17,7 +17,6 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/services/httpd"
-	"github.com/influxdata/kapacitor/tick"
 	"github.com/influxdb/influxdb/influxql"
 )
 
@@ -39,11 +38,17 @@ type Service struct {
 		DelRoutes([]httpd.Route)
 	}
 	TaskMaster interface {
+		NewTask(
+			name,
+			script string,
+			tt kapacitor.TaskType,
+			dbrps []kapacitor.DBRP,
+			snapshotInterval time.Duration,
+		) (*kapacitor.Task, error)
 		StartTask(t *kapacitor.Task) (*kapacitor.ExecutingTask, error)
 		StopTask(name string) error
 		IsExecuting(name string) bool
 		ExecutingDot(name string) string
-		CreateTICKScope() *tick.Scope
 	}
 
 	logger *log.Logger
@@ -458,12 +463,11 @@ func (ts *Service) handleDisable(w http.ResponseWriter, r *http.Request) {
 func (ts *Service) Save(task *rawTask) error {
 
 	// Validate task
-	_, err := kapacitor.NewTask(task.Name,
+	_, err := ts.TaskMaster.NewTask(task.Name,
 		task.TICKscript,
 		task.Type,
 		task.DBRPs,
 		task.SnapshotInterval,
-		ts.TaskMaster.CreateTICKScope(),
 	)
 	if err != nil {
 		return fmt.Errorf("invalid task: %s", err)
@@ -555,12 +559,11 @@ func (ts *Service) Load(name string) (*kapacitor.Task, error) {
 	if err != nil {
 		return nil, err
 	}
-	return kapacitor.NewTask(task.Name,
+	return ts.TaskMaster.NewTask(task.Name,
 		task.TICKscript,
 		task.Type,
 		task.DBRPs,
 		task.SnapshotInterval,
-		ts.TaskMaster.CreateTICKScope(),
 	)
 }
 

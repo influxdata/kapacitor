@@ -15,16 +15,16 @@ func TestParserLookAhead(t *testing.T) {
 	p := &parser{}
 	p.lex = lex("0 1 2 3")
 
-	assert.Equal(token{tokenNumber, 0, "0"}, p.next())
-	assert.Equal(token{tokenNumber, 2, "1"}, p.peek())
-	assert.Equal(token{tokenNumber, 2, "1"}, p.next())
+	assert.Equal(token{TokenNumber, 0, "0"}, p.next())
+	assert.Equal(token{TokenNumber, 2, "1"}, p.peek())
+	assert.Equal(token{TokenNumber, 2, "1"}, p.next())
 	p.backup()
-	assert.Equal(token{tokenNumber, 2, "1"}, p.next())
-	assert.Equal(token{tokenNumber, 4, "2"}, p.peek())
+	assert.Equal(token{TokenNumber, 2, "1"}, p.next())
+	assert.Equal(token{TokenNumber, 4, "2"}, p.peek())
 	p.backup()
-	assert.Equal(token{tokenNumber, 2, "1"}, p.next())
-	assert.Equal(token{tokenNumber, 4, "2"}, p.next())
-	assert.Equal(token{tokenNumber, 6, "3"}, p.next())
+	assert.Equal(token{TokenNumber, 2, "1"}, p.next())
+	assert.Equal(token{TokenNumber, 4, "2"}, p.next())
+	assert.Equal(token{TokenNumber, 6, "3"}, p.next())
 }
 
 func TestParseErrors(t *testing.T) {
@@ -133,7 +133,7 @@ func TestParseStatements(t *testing.T) {
 				Nodes: []Node{
 					&BinaryNode{
 						pos:      6,
-						Operator: tokenAsgn,
+						Operator: TokenAsgn,
 						Left: &IdentifierNode{
 							pos:   4,
 							Ident: "x",
@@ -152,7 +152,7 @@ func TestParseStatements(t *testing.T) {
 				Nodes: []Node{
 					&BinaryNode{
 						pos:      6,
-						Operator: tokenAsgn,
+						Operator: TokenAsgn,
 						Left: &IdentifierNode{
 							pos:   4,
 							Ident: "x",
@@ -171,14 +171,14 @@ func TestParseStatements(t *testing.T) {
 				Nodes: []Node{
 					&BinaryNode{
 						pos:      6,
-						Operator: tokenAsgn,
+						Operator: TokenAsgn,
 						Left: &IdentifierNode{
 							pos:   4,
 							Ident: "x",
 						},
 						Right: &UnaryNode{
 							pos:      8,
-							Operator: tokenNot,
+							Operator: TokenNot,
 							Node: &BoolNode{
 								pos:  9,
 								Bool: false,
@@ -194,7 +194,7 @@ func TestParseStatements(t *testing.T) {
 				Nodes: []Node{
 					&BinaryNode{
 						pos:      6,
-						Operator: tokenAsgn,
+						Operator: TokenAsgn,
 						Left: &IdentifierNode{
 							pos:   4,
 							Ident: "x",
@@ -214,14 +214,14 @@ func TestParseStatements(t *testing.T) {
 				Nodes: []Node{
 					&BinaryNode{
 						pos:      6,
-						Operator: tokenAsgn,
+						Operator: TokenAsgn,
 						Left: &IdentifierNode{
 							pos:   4,
 							Ident: "x",
 						},
 						Right: &UnaryNode{
 							pos:      8,
-							Operator: tokenMinus,
+							Operator: TokenMinus,
 							Node: &NumberNode{
 								pos:   9,
 								IsInt: true,
@@ -238,7 +238,7 @@ func TestParseStatements(t *testing.T) {
 				Nodes: []Node{
 					&BinaryNode{
 						pos:      6,
-						Operator: tokenAsgn,
+						Operator: TokenAsgn,
 						Left: &IdentifierNode{
 							pos:   4,
 							Ident: "x",
@@ -258,14 +258,14 @@ func TestParseStatements(t *testing.T) {
 				Nodes: []Node{
 					&BinaryNode{
 						pos:      6,
-						Operator: tokenAsgn,
+						Operator: TokenAsgn,
 						Left: &IdentifierNode{
 							pos:   4,
 							Ident: "x",
 						},
 						Right: &UnaryNode{
 							pos:      8,
-							Operator: tokenMinus,
+							Operator: TokenMinus,
 							Node: &NumberNode{
 								pos:     9,
 								IsFloat: true,
@@ -282,7 +282,7 @@ func TestParseStatements(t *testing.T) {
 				Nodes: []Node{
 					&BinaryNode{
 						pos:      6,
-						Operator: tokenAsgn,
+						Operator: TokenAsgn,
 						Left: &IdentifierNode{
 							pos:   4,
 							Ident: "x",
@@ -301,14 +301,14 @@ func TestParseStatements(t *testing.T) {
 				Nodes: []Node{
 					&BinaryNode{
 						pos:      6,
-						Operator: tokenAsgn,
+						Operator: TokenAsgn,
 						Left: &IdentifierNode{
 							pos:   4,
 							Ident: "x",
 						},
 						Right: &UnaryNode{
 							pos:      8,
-							Operator: tokenMinus,
+							Operator: TokenMinus,
 							Node: &DurationNode{
 								pos: 9,
 								Dur: time.Hour * 5,
@@ -324,7 +324,7 @@ func TestParseStatements(t *testing.T) {
 				Nodes: []Node{
 					&BinaryNode{
 						pos:      6,
-						Operator: tokenAsgn,
+						Operator: TokenAsgn,
 						Left: &IdentifierNode{
 							pos:   4,
 							Ident: "x",
@@ -343,14 +343,14 @@ func TestParseStatements(t *testing.T) {
 				Nodes: []Node{
 					&BinaryNode{
 						pos:      6,
-						Operator: tokenAsgn,
+						Operator: TokenAsgn,
 						Left: &IdentifierNode{
 							pos:   4,
 							Ident: "x",
 						},
 						Right: &BinaryNode{
 							pos:      9,
-							Operator: tokenDot,
+							Operator: TokenDot,
 							Left: &IdentifierNode{
 								pos:   8,
 								Ident: "a",
@@ -372,7 +372,7 @@ func TestParseStatements(t *testing.T) {
 				Nodes: []Node{
 					&BinaryNode{
 						pos:      6,
-						Operator: tokenAsgn,
+						Operator: TokenAsgn,
 						Left: &IdentifierNode{
 							pos:   4,
 							Ident: "t",
@@ -385,7 +385,7 @@ func TestParseStatements(t *testing.T) {
 					},
 					&BinaryNode{
 						pos:      20,
-						Operator: tokenDot,
+						Operator: TokenDot,
 						Left: &IdentifierNode{
 							pos:   14,
 							Ident: "stream",
@@ -398,7 +398,7 @@ func TestParseStatements(t *testing.T) {
 									pos: 27,
 									Node: &BinaryNode{
 										pos:      43,
-										Operator: tokenGreater,
+										Operator: TokenGreater,
 										Left: &ReferenceNode{
 											pos:       35,
 											Reference: "value",
@@ -426,23 +426,23 @@ var x = stream
 				pos: 1,
 				Nodes: []Node{&BinaryNode{
 					pos:      7,
-					Operator: tokenAsgn,
+					Operator: TokenAsgn,
 					Left: &IdentifierNode{
 						pos:   5,
 						Ident: "x",
 					},
 					Right: &BinaryNode{
 						pos:      57,
-						Operator: tokenDot,
+						Operator: TokenDot,
 						Left: &BinaryNode{
 							pos:      44,
-							Operator: tokenDot,
+							Operator: TokenDot,
 							Left: &BinaryNode{
 								pos:      30,
-								Operator: tokenDot,
+								Operator: TokenDot,
 								Left: &BinaryNode{
 									pos:      18,
-									Operator: tokenDot,
+									Operator: TokenDot,
 									Left: &IdentifierNode{
 										pos:   9,
 										Ident: "stream",
@@ -475,10 +475,10 @@ var x = stream
 							Func: "map",
 							Args: []Node{&BinaryNode{
 								pos:      74,
-								Operator: tokenDot,
+								Operator: TokenDot,
 								Left: &BinaryNode{
 									pos:      70,
-									Operator: tokenDot,
+									Operator: TokenDot,
 									Left: &IdentifierNode{
 										pos:   62,
 										Ident: "influxql",

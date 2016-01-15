@@ -14,24 +14,24 @@ type stateFn func(*lexer) stateFn
 const eof = -1
 
 const (
-	tokenError tokenType = iota
-	tokenEOF
-	tokenVar
-	tokenAsgn
-	tokenDot
-	tokenIdent
-	tokenReference
-	tokenLambda
-	tokenNumber
-	tokenString
-	tokenDuration
-	tokenLParen
-	tokenRParen
-	tokenComma
-	tokenNot
-	tokenTrue
-	tokenFalse
-	tokenRegex
+	TokenError tokenType = iota
+	TokenEOF
+	TokenVar
+	TokenAsgn
+	TokenDot
+	TokenIdent
+	TokenReference
+	TokenLambda
+	TokenNumber
+	TokenString
+	TokenDuration
+	TokenLParen
+	TokenRParen
+	TokenComma
+	TokenNot
+	TokenTrue
+	TokenFalse
+	TokenRegex
 
 	// begin operator tokens
 	begin_tok_operator
@@ -39,11 +39,11 @@ const (
 	//begin mathematical operators
 	begin_tok_operator_math
 
-	tokenPlus
-	tokenMinus
-	tokenMult
-	tokenDiv
-	tokenMod
+	TokenPlus
+	TokenMinus
+	TokenMult
+	TokenDiv
+	TokenMod
 
 	//end mathematical operators
 	end_tok_operator_math
@@ -51,16 +51,16 @@ const (
 	// begin comparison operators
 	begin_tok_operator_comp
 
-	tokenAnd
-	tokenOr
-	tokenEqual
-	tokenNotEqual
-	tokenLess
-	tokenGreater
-	tokenLessEqual
-	tokenGreaterEqual
-	tokenRegexEqual
-	tokenRegexNotEqual
+	TokenAnd
+	TokenOr
+	TokenEqual
+	TokenNotEqual
+	TokenLess
+	TokenGreater
+	TokenLessEqual
+	TokenGreaterEqual
+	TokenRegexEqual
+	TokenRegexNotEqual
 
 	//end comparison operators
 	end_tok_operator_comp
@@ -70,33 +70,33 @@ const (
 )
 
 var operatorStr = [...]string{
-	tokenNot:           "!",
-	tokenPlus:          "+",
-	tokenMinus:         "-",
-	tokenMult:          "*",
-	tokenDiv:           "/",
-	tokenMod:           "%",
-	tokenEqual:         "==",
-	tokenNotEqual:      "!=",
-	tokenLess:          "<",
-	tokenGreater:       ">",
-	tokenLessEqual:     "<=",
-	tokenGreaterEqual:  ">=",
-	tokenRegexEqual:    "=~",
-	tokenRegexNotEqual: "!~",
-	tokenAnd:           "AND",
-	tokenOr:            "OR",
+	TokenNot:           "!",
+	TokenPlus:          "+",
+	TokenMinus:         "-",
+	TokenMult:          "*",
+	TokenDiv:           "/",
+	TokenMod:           "%",
+	TokenEqual:         "==",
+	TokenNotEqual:      "!=",
+	TokenLess:          "<",
+	TokenGreater:       ">",
+	TokenLessEqual:     "<=",
+	TokenGreaterEqual:  ">=",
+	TokenRegexEqual:    "=~",
+	TokenRegexNotEqual: "!~",
+	TokenAnd:           "AND",
+	TokenOr:            "OR",
 }
 
 var strToOperator map[string]tokenType
 
 var keywords = map[string]tokenType{
-	"AND":    tokenAnd,
-	"OR":     tokenOr,
-	"TRUE":   tokenTrue,
-	"FALSE":  tokenFalse,
-	"var":    tokenVar,
-	"lambda": tokenLambda,
+	"AND":    TokenAnd,
+	"OR":     TokenOr,
+	"TRUE":   TokenTrue,
+	"FALSE":  TokenFalse,
+	"var":    TokenVar,
+	"lambda": TokenLambda,
 }
 
 func init() {
@@ -109,39 +109,39 @@ func init() {
 //String representation of an tokenType
 func (t tokenType) String() string {
 	switch {
-	case t == tokenError:
+	case t == TokenError:
 		return "ERR"
-	case t == tokenEOF:
+	case t == TokenEOF:
 		return "EOF"
-	case t == tokenVar:
+	case t == TokenVar:
 		return "var"
-	case t == tokenIdent:
+	case t == TokenIdent:
 		return "identifier"
-	case t == tokenReference:
+	case t == TokenReference:
 		return "reference"
-	case t == tokenDuration:
+	case t == TokenDuration:
 		return "duration"
-	case t == tokenNumber:
+	case t == TokenNumber:
 		return "number"
-	case t == tokenString:
+	case t == TokenString:
 		return "string"
-	case t == tokenRegex:
+	case t == TokenRegex:
 		return "regex"
-	case t == tokenDot:
+	case t == TokenDot:
 		return "."
-	case t == tokenAsgn:
+	case t == TokenAsgn:
 		return "="
-	case t == tokenLParen:
+	case t == TokenLParen:
 		return "("
-	case t == tokenRParen:
+	case t == TokenRParen:
 		return ")"
-	case t == tokenComma:
+	case t == TokenComma:
 		return ","
-	case t == tokenNot:
+	case t == TokenNot:
 		return "!"
-	case t == tokenTrue:
+	case t == TokenTrue:
 		return "TRUE"
-	case t == tokenFalse:
+	case t == TokenFalse:
 		return "FALSE"
 	case isOperator(t):
 		return operatorStr[t]
@@ -235,7 +235,7 @@ func (l *lexer) next() (r rune) {
 // errorf returns an error token and terminates the scan by passing
 // back a nil pointer that will be the next state, terminating l.nextToken.
 func (l *lexer) errorf(format string, args ...interface{}) stateFn {
-	l.tokens <- token{tokenError, l.start, fmt.Sprintf(format, args...)}
+	l.tokens <- token{TokenError, l.start, fmt.Sprintf(format, args...)}
 	return nil
 }
 
@@ -297,19 +297,19 @@ func lexToken(l *lexer) stateFn {
 		case isSpace(r):
 			l.ignore()
 		case r == '(':
-			l.emit(tokenLParen)
+			l.emit(TokenLParen)
 			return lexToken
 		case r == ')':
-			l.emit(tokenRParen)
+			l.emit(TokenRParen)
 			return lexToken
 		case r == '.':
-			l.emit(tokenDot)
+			l.emit(TokenDot)
 			return lexToken
 		case r == ',':
-			l.emit(tokenComma)
+			l.emit(TokenComma)
 			return lexToken
 		case r == eof:
-			l.emit(tokenEOF)
+			l.emit(TokenEOF)
 			return nil
 		default:
 			l.errorf("unknown state")
@@ -345,7 +345,7 @@ func lexOperator(l *lexer) stateFn {
 			}
 			op := strToOperator[l.current()]
 			l.emit(op)
-			if op == tokenRegexNotEqual {
+			if op == TokenRegexNotEqual {
 				l.ignoreSpace()
 				if l.peek() == '/' {
 					return lexRegex
@@ -364,14 +364,14 @@ func lexOperator(l *lexer) stateFn {
 				l.next()
 				op := strToOperator[l.current()]
 				l.emit(op)
-				if op == tokenRegexEqual {
+				if op == TokenRegexEqual {
 					l.ignoreSpace()
 					if l.peek() == '/' {
 						return lexRegex
 					}
 				}
 			} else {
-				l.emit(tokenAsgn)
+				l.emit(TokenAsgn)
 				l.ignoreSpace()
 				if l.peek() == '/' {
 					return lexRegex
@@ -390,12 +390,12 @@ func lexIdentOrKeyword(l *lexer) stateFn {
 		default:
 			l.backup()
 			if t := keywords[l.current()]; t > 0 {
-				if t == tokenLambda && l.next() != ':' {
+				if t == TokenLambda && l.next() != ':' {
 					return l.errorf("missing ':' on lambda keyword")
 				}
 				l.emit(t)
 			} else {
-				l.emit(tokenIdent)
+				l.emit(TokenIdent)
 			}
 			return lexToken
 		}
@@ -433,11 +433,11 @@ func lexNumberOrDuration(l *lexer) stateFn {
 			if r == 'm' && l.peek() == 's' {
 				l.next()
 			}
-			l.emit(tokenDuration)
+			l.emit(TokenDuration)
 			return lexToken
 		default:
 			l.backup()
-			l.emit(tokenNumber)
+			l.emit(TokenNumber)
 			return lexToken
 		}
 	}
@@ -451,7 +451,7 @@ func lexReference(l *lexer) stateFn {
 				l.next()
 			}
 		case '"':
-			l.emit(tokenReference)
+			l.emit(TokenReference)
 			return lexToken
 		case eof:
 			return l.errorf("unterminated field reference")
@@ -474,7 +474,7 @@ func lexSingleOrTripleString(l *lexer) stateFn {
 					count++
 					l.next()
 				} else {
-					l.emit(tokenString)
+					l.emit(TokenString)
 					return lexToken
 				}
 			}
@@ -490,7 +490,7 @@ func lexSingleOrTripleString(l *lexer) stateFn {
 					case r == '\'':
 						count--
 						if count == 0 {
-							l.emit(tokenString)
+							l.emit(TokenString)
 							return lexToken
 						}
 					case r == eof:
@@ -517,7 +517,7 @@ func lexRegex(l *lexer) stateFn {
 				l.next()
 			}
 		case r == '/':
-			l.emit(tokenRegex)
+			l.emit(TokenRegex)
 			return lexToken
 		default:
 			//absorb

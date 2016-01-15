@@ -154,7 +154,7 @@ func eval(n Node, scope *Scope, stck *stack) (err error) {
 func evalUnary(op tokenType, scope *Scope, stck *stack) error {
 	v := stck.Pop()
 	switch op {
-	case tokenMinus:
+	case TokenMinus:
 		switch n := v.(type) {
 		case float64:
 			stck.Push(-1 * n)
@@ -163,7 +163,7 @@ func evalUnary(op tokenType, scope *Scope, stck *stack) error {
 		default:
 			return fmt.Errorf("invalid arugument to '-' %v", v)
 		}
-	case tokenNot:
+	case TokenNot:
 		if b, ok := v.(bool); ok {
 			stck.Push(!b)
 		} else {
@@ -177,10 +177,10 @@ func evalBinary(op tokenType, scope *Scope, stck *stack) error {
 	r := stck.Pop()
 	l := stck.Pop()
 	switch op {
-	case tokenAsgn:
+	case TokenAsgn:
 		i := l.(*IdentifierNode)
 		scope.Set(i.Ident, r)
-	case tokenDot:
+	case TokenDot:
 		// Resolve identifier
 		if left, ok := l.(*IdentifierNode); ok {
 			var err error

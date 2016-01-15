@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"reflect"
@@ -705,33 +704,16 @@ func TestServer_UDFAgents(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tmpDir, err := ioutil.TempDir("", "testStreamTaskRecording")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
 	agents := []struct {
 		buildFunc func() error
 		config    udf.FunctionConfig
 	}{
 		// Go
 		{
-			buildFunc: func() error {
-				cmd := exec.Command(
-					"go",
-					"build",
-					"-o",
-					filepath.Join(tmpDir, "go-moving_avg"),
-					filepath.Join(udfDir, "agent/examples/moving_avg.go"),
-				)
-				out, err := cmd.CombinedOutput()
-				if err != nil {
-					return fmt.Errorf("go build failed: %v: %s", err, string(out))
-				}
-				return nil
-			},
+			buildFunc: func() error { return nil },
 			config: udf.FunctionConfig{
-				Prog:    filepath.Join(tmpDir, "go-moving_avg"),
+				Prog:    "go",
+				Args:    []string{"run", filepath.Join(udfDir, "agent/examples/moving_avg.go")},
 				Timeout: toml.Duration(time.Minute),
 			},
 		},

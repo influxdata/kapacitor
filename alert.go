@@ -392,6 +392,9 @@ type idInfo struct {
 	// Measurement name
 	Name string
 
+	// Task name
+	TaskName string
+
 	// Concatenation of all group-by tags of the form [key=value,]+.
 	// If not groupBy is performed equal to literal 'nil'
 	Group string
@@ -418,9 +421,10 @@ func (a *AlertNode) renderID(name string, group models.GroupID, tags models.Tags
 		g = "nil"
 	}
 	info := idInfo{
-		Name:  name,
-		Group: g,
-		Tags:  tags,
+		Name:     name,
+		TaskName: a.et.Task.Name,
+		Group:    g,
+		Tags:     tags,
 	}
 	var id bytes.Buffer
 	err := a.idTmpl.Execute(&id, info)
@@ -437,9 +441,10 @@ func (a *AlertNode) renderMessage(id, name string, group models.GroupID, tags mo
 	}
 	info := messageInfo{
 		idInfo: idInfo{
-			Name:  name,
-			Group: g,
-			Tags:  tags,
+			Name:     name,
+			TaskName: a.et.Task.Name,
+			Group:    g,
+			Tags:     tags,
 		},
 		ID:     id,
 		Fields: fields,

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor/pipeline"
-	"github.com/influxdata/kapacitor/tick"
 )
 
 // The type of a task
@@ -56,37 +55,6 @@ type Task struct {
 	Type             TaskType
 	DBRPs            []DBRP
 	SnapshotInterval time.Duration
-}
-
-func NewTask(
-	name,
-	script string,
-	tt TaskType,
-	dbrps []DBRP,
-	snapshotInterval time.Duration,
-	scope *tick.Scope,
-) (*Task, error) {
-	t := &Task{
-		Name:             name,
-		Type:             tt,
-		DBRPs:            dbrps,
-		SnapshotInterval: snapshotInterval,
-	}
-
-	var srcEdge pipeline.EdgeType
-	switch tt {
-	case StreamTask:
-		srcEdge = pipeline.StreamEdge
-	case BatchTask:
-		srcEdge = pipeline.BatchEdge
-	}
-
-	p, err := pipeline.CreatePipeline(script, srcEdge, scope)
-	if err != nil {
-		return nil, err
-	}
-	t.Pipeline = p
-	return t, nil
 }
 
 func (t *Task) Dot() []byte {
@@ -369,6 +337,8 @@ func (et *ExecutingTask) createNode(p pipeline.Node, l *log.Logger) (Node, error
 		return newDerivativeNode(et, t, l)
 	case *pipeline.UDFNode:
 		return newUDFNode(et, t, l)
+	case *pipeline.StatsNode:
+		return newStatsNode(et, t, l)
 	default:
 		return nil, fmt.Errorf("unknown pipeline node type %T", p)
 	}
