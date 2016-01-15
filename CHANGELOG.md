@@ -22,6 +22,7 @@ This way you can easily tell which versions of Telegraf, InfluxDB, Chronograf an
 - [#139](https://github.com/influxdata/kapacitor/issues/139): Alerta.io support thanks! @md14454
 
 ### Bugfixes
+- [#153](https://github.com/influxdata/kapacitor/issues/153): Fix panic if referencing non existant field in MapReduce function.
 
 ## v0.2.4 [2016-01-07]
 
