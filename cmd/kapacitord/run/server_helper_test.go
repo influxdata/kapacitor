@@ -98,7 +98,7 @@ func (s *Server) HTTPGet(url string) (results string, err error) {
 	}
 }
 
-func (s *Server) HTTPGetRetry(url, retry, exp string, retries int, sleep time.Duration) error {
+func (s *Server) HTTPGetRetry(url, exp string, retries int, sleep time.Duration) error {
 	var r string
 	for retries > 0 {
 		resp, err := http.Get(url)
@@ -108,11 +108,9 @@ func (s *Server) HTTPGetRetry(url, retry, exp string, retries int, sleep time.Du
 		r = string(MustReadAll(resp.Body))
 		if r == exp {
 			break
-		} else if retry == "" || r == retry {
+		} else {
 			retries--
 			time.Sleep(sleep)
-		} else {
-			break
 		}
 	}
 	if r != exp {

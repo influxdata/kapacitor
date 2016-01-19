@@ -240,6 +240,7 @@ func (r *Service) handleReplay(w http.ResponseWriter, req *http.Request) {
 func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 	type doFunc func() error
 	var doF doFunc
+	started := make(chan struct{})
 
 	rid := uuid.NewV4()
 	typ := req.URL.Query().Get("type")
@@ -264,7 +265,11 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 		}
 
 		doF = func() error {
-			return r.doRecordStream(rid, dur, t.DBRPs)
+			err := r.doRecordStream(rid, dur, t.DBRPs, started)
+			if err != nil {
+				close(started)
+			}
+			return err
 		}
 
 	case "batch":
@@ -322,6 +327,7 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 		}
 
 		doF = func() error {
+			close(started)
 			return r.doRecordBatch(rid, t, start, stop)
 		}
 	case "query":
@@ -343,6 +349,7 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		doF = func() error {
+			close(started)
 			return r.doRecordQuery(rid, query, tt)
 		}
 	default:
@@ -370,6 +377,9 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 		defer r.recordingsMu.Unlock()
 		delete(r.runningRecordings, rid.String())
 	}()
+
+	// Wait till the goroutine for doing the recording has actually started
+	<-started
 
 	// Respond with the recording ID
 	type response struct {
@@ -587,7 +597,7 @@ func (s streamWriter) Close() error {
 }
 
 // Record the stream for a duration
-func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration, dbrps []kapacitor.DBRP) error {
+func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration, dbrps []kapacitor.DBRP, started chan struct{}) error {
 	e, err := r.TaskMaster.NewFork(rid.String(), dbrps)
 	if err != nil {
 		return err
@@ -600,6 +610,7 @@ func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration, dbrps []kapac
 
 	done := make(chan struct{})
 	go func() {
+		close(started)
 		start := time.Time{}
 		closed := false
 		for p, ok := e.NextPoint(); ok; p, ok = e.NextPoint() {

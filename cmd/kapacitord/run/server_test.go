@@ -313,7 +313,7 @@ stream
 
 	// Request data before any writes and expect null responses
 	nullResponse := `{"Series":null,"Err":null}`
-	err = s.HTTPGetRetry(endpoint, "", nullResponse, 100, time.Millisecond*5)
+	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
 	}
@@ -341,7 +341,7 @@ test value=1 0000000011
 	s.MustWrite("mydb", "myrp", points, v)
 
 	exp := `{"Series":[{"name":"test","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}],"Err":null}`
-	err = s.HTTPGetRetry(endpoint, nullResponse, exp, 100, time.Millisecond*5)
+	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
 	}
@@ -412,9 +412,8 @@ batch
 
 	endpoint := fmt.Sprintf("%s/api/v1/%s/count", s.URL(), name)
 
-	nullResponse := `{"Series":null,"Err":null}`
 	exp := `{"Series":[{"name":"cpu","columns":["time","count"],"values":[["1971-01-01T00:00:01.002Z",2]]}],"Err":null}`
-	err = s.HTTPGetRetry(endpoint, nullResponse, exp, 100, time.Millisecond*5)
+	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
 	}
@@ -700,7 +699,6 @@ batch
 }
 
 func TestServer_UDFAgents(t *testing.T) {
-
 	dir, err := os.Getwd()
 	udfDir := filepath.Clean(filepath.Join(dir, "../../../udf"))
 	if err != nil {
@@ -814,7 +812,7 @@ stream
 
 	// Request data before any writes and expect null responses
 	nullResponse := `{"Series":null,"Err":null}`
-	err = s.HTTPGetRetry(endpoint, "", nullResponse, 100, time.Millisecond*5)
+	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
 	}
@@ -837,7 +835,7 @@ test value=0 0000000011
 	s.MustWrite("mydb", "myrp", points, v)
 
 	exp := `{"Series":[{"name":"test","columns":["time","mean"],"values":[["1970-01-01T00:00:11Z",0.9]]}],"Err":null}`
-	err = s.HTTPGetRetry(endpoint, nullResponse, exp, 100, time.Millisecond*5)
+	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
 	}
