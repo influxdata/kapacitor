@@ -100,12 +100,12 @@ func (s *Server) HTTPGet(url string) (results string, err error) {
 
 func (s *Server) HTTPGetRetry(url, retry, exp string, retries int, sleep time.Duration) error {
 	var r string
-	var err error
 	for retries > 0 {
-		r, err = s.HTTPGet(url)
+		resp, err := http.Get(url)
 		if err != nil {
 			return err
 		}
+		r = string(MustReadAll(resp.Body))
 		if r == exp {
 			break
 		} else if retry == "" || r == retry {
