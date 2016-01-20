@@ -180,11 +180,6 @@ func (n *node) dot(buf *bytes.Buffer) {
 // Create a new stream of data that contains the internal statistics of the node.
 // The interval represents how often to emit the statistics based on real time.
 // This means the interval time is independent of the times of the data points the source node is receiving.
-//
-// Each node has these internal statistics:
-//
-//    * collected -- the number of points or batches this node has received.
-//
 func (n *node) Stats(interval time.Duration) *StatsNode {
 	stats := newStatsNode(n, interval)
 	n.pipeline().addSource(stats)

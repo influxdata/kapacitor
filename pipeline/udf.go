@@ -9,9 +9,42 @@ import (
 	"github.com/influxdata/kapacitor/udf"
 )
 
-// A UDFNode is a User Defined Function.
-// UDFs can be defined in the configuration file. in the [udf] section.
+// A UDFNode is a node that can run a User Defined Function (UDF) in a separate process.
 //
+// A UDF is a custom script or binary that can communicate via Kapacitor's UDF RPC protocol.
+// The path and arguments to the UDF program are specified in Kapacitor's configuration.
+// Using TICKscripts you can invoke and configure your UDF for each task.
+//
+// See the [README.md](https://github.com/influxdata/kapacitor/tree/master/udf/agent/)
+// for details on how to write your own UDF.
+//
+// UDFs are configured via Kapacitor's main configuration file.
+//
+// Example:
+//    [udf]
+//    [udf.functions]
+//        # Example moving average UDF.
+//        [udf.functions.movingAverage]
+//            prog = "/path/to/executable/moving_avg"
+//            args = []
+//            timeout = "10s"
+//
+// UDFs are first class objects in TICKscripts and are referenced via their configuration name.
+//
+// Example:
+//     // Given you have a UDF that computes a moving average
+//     // The UDF can define what its options are and then can be
+//     // invoked via a TICKscript like so:
+//     stream
+//         .from()...
+//         .movingAverage()
+//             .field('value')
+//             .size(100)
+//             .as('mavg')
+//         .httpOut('movingaverage')
+//
+// NOTE: The UDF process runs as the same user as the Kapacitor daemon.
+// As a result make the user is properly secured as well as the configuration file.
 type UDFNode struct {
 	chainnode
 
@@ -51,10 +84,12 @@ func NewUDF(
 	return udf
 }
 
+// tick:ignore
 func (u *UDFNode) Desc() string {
 	return u.desc
 }
 
+// tick:ignore
 func (u *UDFNode) HasMethod(name string) bool {
 	_, ok := u.options[name]
 	if ok {
@@ -63,6 +98,7 @@ func (u *UDFNode) HasMethod(name string) bool {
 	return u.describer.HasMethod(name)
 }
 
+// tick:ignore
 func (u *UDFNode) CallMethod(name string, args ...interface{}) (interface{}, error) {
 	opt, ok := u.options[name]
 	if ok {
@@ -102,14 +138,17 @@ func (u *UDFNode) CallMethod(name string, args ...interface{}) (interface{}, err
 	return u.describer.CallMethod(name, args...)
 }
 
+// tick:ignore
 func (u *UDFNode) HasProperty(name string) bool {
 	return u.describer.HasProperty(name)
 }
 
+// tick:ignore
 func (u *UDFNode) Property(name string) interface{} {
 	return u.describer.Property(name)
 }
 
+// tick:ignore
 func (u *UDFNode) SetProperty(name string, value interface{}) error {
 	return u.describer.SetProperty(name, value)
 }
