@@ -116,9 +116,17 @@ func (m *MapNode) mapBatch(b models.Batch) error {
 	inputs := make([]tsdb.MapInput, m.parallel)
 	j := 0
 	for _, p := range b.Points {
+		value, ok := p.Fields[m.field]
+		if !ok {
+			fields := make([]string, 0, len(p.Fields))
+			for field := range p.Fields {
+				fields = append(fields, field)
+			}
+			return fmt.Errorf("unknown field %s, available fields %v", m.field, fields)
+		}
 		item := tsdb.MapItem{
 			Timestamp: p.Time.Unix(),
-			Value:     p.Fields[m.field],
+			Value:     value,
 			Fields:    p.Fields,
 			Tags:      p.Tags,
 		}

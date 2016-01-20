@@ -209,7 +209,7 @@ batch
 		.period(10s)
 		.every(10s)
 		.groupBy(time(2s), 'cpu')
-	.mapReduce(influxql.count('value'))
+	.mapReduce(influxql.count('mean'))
 	.window()
 		.period(20s)
 		.every(20s)
