@@ -50,7 +50,7 @@ const defaultMessageTmpl = "{{ .ID }} is {{ .Level }}"
 // Using the AlertNode.StateChangesOnly property events will only be sent to handlers
 // if the alert changed state.
 //
-// It is valid to configure multiple alert handlers of the same type and of different types.
+// It is valid to configure multiple alert handlers, even with the same type.
 //
 // Example:
 //   stream
@@ -357,7 +357,7 @@ type ExecHandler struct {
 }
 
 // Log JSON alert data to file. One event per line.
-// Must specify the absolute path the the log file.
+// Must specify the absolute path to the log file.
 // It will be created if it does not exist.
 // tick:property
 func (a *AlertNode) Log(filepath string) *LogHandler {
@@ -579,7 +579,9 @@ type HipChatHandler struct {
 //
 // In order to not post a message every alert interval
 // use AlertNode.StateChangesOnly so that only events
-// where the alert changed state are posted to the room.
+// where the alert changed state are sent to Alerta.
+//
+// Send alerts to Alerta. The resource and event properties are required.
 //
 // Example:
 //    stream...
@@ -588,7 +590,7 @@ type HipChatHandler struct {
 //                 .resource('Hostname or service')
 //                 .event('Something went wrong')
 //
-// Send alerts to Alerta. Alerta requires a resource and event description.
+// Alerta also accepts optional alert information.
 //
 // Example:
 //    stream...
@@ -597,10 +599,9 @@ type HipChatHandler struct {
 //                 .resource('Hostname or service')
 //                 .event('Something went wrong')
 //                 .environment('Development')
-//                 .status('Open')
 //                 .group('Dev. Servers')
 //
-// Send alerts to Alerta. Alerta accepts detailed alert information.
+// NOTE: Alerta cannot be configured globally because of its required properties.
 // tick:property
 func (a *AlertNode) Alerta() *AlertaHandler {
 	alerta := &AlertaHandler{
