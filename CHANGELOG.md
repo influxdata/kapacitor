@@ -4,7 +4,7 @@
 
 ### Release Notes
 
-This release marks the next release of Kapacitor.
+This release marks the next major release of Kapacitor.
 With this release you can now run your own custom code for processing data within Kapacitor.
 See [udf/agent/README.md](https://github.com/influxdata/kapacitor/blob/master/udf/agent/README.md) for more details.
 
@@ -18,11 +18,11 @@ This way you can easily tell which versions of Telegraf, InfluxDB, Chronograf an
 ### Features
 - [#137](https://github.com/influxdata/kapacitor/issues/137): Add deadman's switch. Can be setup via TICKscript and globally via configuration.
 - [#72](https://github.com/influxdata/kapacitor/issues/72): Add support for User Defined Functions (UDFs).
-- [#138](https://github.com/influxdata/kapacitor/issues/138): Change over to influxdata github org.
 - [#139](https://github.com/influxdata/kapacitor/issues/139): Alerta.io support thanks! @md14454
 
 ### Bugfixes
 - [#153](https://github.com/influxdata/kapacitor/issues/153): Fix panic if referencing non existant field in MapReduce function.
+- [#138](https://github.com/influxdata/kapacitor/issues/138): Change over to influxdata github org.
 
 ## v0.2.4 [2016-01-07]
 
