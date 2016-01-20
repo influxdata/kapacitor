@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"reflect"
+	"time"
 
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/wlog"
@@ -126,3 +127,17 @@ func (ts taskStore) HasSnapshot(name string) bool                               
 func (ts taskStore) LoadSnapshot(name string) (*kapacitor.TaskSnapshot, error) {
 	return nil, errors.New("not implemented")
 }
+
+type deadman struct {
+	interval  time.Duration
+	threshold float64
+	id        string
+	message   string
+	global    bool
+}
+
+func (d deadman) Interval() time.Duration { return d.interval }
+func (d deadman) Threshold() float64      { return d.threshold }
+func (d deadman) Id() string              { return d.id }
+func (d deadman) Message() string         { return d.message }
+func (d deadman) Global() bool            { return d.global }

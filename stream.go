@@ -39,7 +39,6 @@ func newStreamNode(et *ExecutingTask, n *pipeline.StreamNode, l *log.Logger) (*S
 }
 
 func (s *StreamNode) runStream([]byte) error {
-
 	for pt, ok := s.ins[0].NextPoint(); ok; pt, ok = s.ins[0].NextPoint() {
 		if s.matches(pt) {
 			if s.s.Truncate != 0 {

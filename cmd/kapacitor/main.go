@@ -616,6 +616,11 @@ func reloadUsage() {
 }
 
 func doReload(args []string) error {
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, "Must pass at least one task name")
+		reloadUsage()
+		os.Exit(2)
+	}
 	err := doDisable(args)
 	if err != nil {
 		return err

@@ -3,21 +3,36 @@ package pipeline
 import (
 	"bytes"
 	"fmt"
+	"time"
 
 	"github.com/influxdata/kapacitor/tick"
 )
 
+// Information relavant to configuring a deadman's swith
+type DeadmanService interface {
+	Interval() time.Duration
+	Threshold() float64
+	Id() string
+	Message() string
+	Global() bool
+}
+
 // A complete data processing pipeline. Starts with a single source.
 // tick:ignore
 type Pipeline struct {
-	Source Node
-	id     ID
-	sorted []Node
+	sources []Node
+	id      ID
+	sorted  []Node
+
+	deadman DeadmanService
 }
 
 // Create a pipeline from a given script.
 // tick:ignore
-func CreatePipeline(script string, sourceEdge EdgeType, scope *tick.Scope) (*Pipeline, error) {
+func CreatePipeline(script string, sourceEdge EdgeType, scope *tick.Scope, deadman DeadmanService) (*Pipeline, error) {
+	p := &Pipeline{
+		deadman: deadman,
+	}
 	var src Node
 	switch sourceEdge {
 	case StreamEdge:
@@ -29,17 +44,26 @@ func CreatePipeline(script string, sourceEdge EdgeType, scope *tick.Scope) (*Pip
 	default:
 		return nil, fmt.Errorf("source edge type must be either Stream or Batch not %s", sourceEdge)
 	}
+	p.addSource(src)
+
 	err := tick.Evaluate(script, scope)
 	if err != nil {
 		return nil, err
 	}
-	p := &Pipeline{Source: src}
-	p.Walk(p.setID)
+	if sourceEdge == StreamEdge && deadman.Global() {
+		src.(*StreamNode).Deadman(deadman.Threshold(), deadman.Interval())
+	}
 	return p, nil
 
 }
 
-func (p *Pipeline) setID(n Node) error {
+func (p *Pipeline) addSource(src Node) {
+	src.setPipeline(p)
+	p.assignID(src)
+	p.sources = append(p.sources, src)
+}
+
+func (p *Pipeline) assignID(n Node) error {
 	n.setID(p.id)
 	p.id++
 	return nil
@@ -62,7 +86,10 @@ func (p *Pipeline) Walk(f func(n Node) error) error {
 }
 
 func (p *Pipeline) sort() {
-	p.visit(p.Source)
+	// Iterate the sources in reverse order
+	for i := len(p.sources) - 1; i >= 0; i-- {
+		p.visit(p.sources[i])
+	}
 	//reverse p.sorted
 	s := p.sorted
 	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {

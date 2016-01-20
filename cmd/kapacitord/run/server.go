@@ -15,6 +15,7 @@ import (
 
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/services/alerta"
+	"github.com/influxdata/kapacitor/services/deadman"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/influxdb"
@@ -130,6 +131,7 @@ func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*
 
 	// Append Kapacitor services.
 	s.appendUDFService(c.UDF)
+	s.appendDeadmanService(c.Deadman)
 	s.appendSMTPService(c.SMTP)
 	s.appendHTTPDService(c.HTTP)
 	s.appendInfluxDBService(c.InfluxDB, c.Hostname)
@@ -220,6 +222,14 @@ func (s *Server) appendReplayStoreService(c replay.Config) {
 	srv.TaskMaster = s.TaskMaster
 
 	s.ReplayService = srv
+	s.Services = append(s.Services, srv)
+}
+
+func (s *Server) appendDeadmanService(c deadman.Config) {
+	l := s.LogService.NewLogger("[deadman] ", log.LstdFlags)
+	srv := deadman.NewService(c, l)
+
+	s.TaskMaster.DeadmanService = srv
 	s.Services = append(s.Services, srv)
 }
 

@@ -36,378 +36,378 @@ func TestLexer(t *testing.T) {
 		{
 			in: "!",
 			tokens: []token{
-				token{tokenNot, 0, "!"},
-				token{tokenEOF, 1, ""},
+				token{TokenNot, 0, "!"},
+				token{TokenEOF, 1, ""},
 			},
 		},
 		{
 			in: "+",
 			tokens: []token{
-				token{tokenPlus, 0, "+"},
-				token{tokenEOF, 1, ""},
+				token{TokenPlus, 0, "+"},
+				token{TokenEOF, 1, ""},
 			},
 		},
 		{
 			in: "-",
 			tokens: []token{
-				token{tokenMinus, 0, "-"},
-				token{tokenEOF, 1, ""},
+				token{TokenMinus, 0, "-"},
+				token{TokenEOF, 1, ""},
 			},
 		},
 		{
 			in: "*",
 			tokens: []token{
-				token{tokenMult, 0, "*"},
-				token{tokenEOF, 1, ""},
+				token{TokenMult, 0, "*"},
+				token{TokenEOF, 1, ""},
 			},
 		},
 		{
 			in: "/",
 			tokens: []token{
-				token{tokenDiv, 0, "/"},
-				token{tokenEOF, 1, ""},
+				token{TokenDiv, 0, "/"},
+				token{TokenEOF, 1, ""},
 			},
 		},
 		{
 			in: "=",
 			tokens: []token{
-				token{tokenAsgn, 0, "="},
-				token{tokenEOF, 1, ""},
+				token{TokenAsgn, 0, "="},
+				token{TokenEOF, 1, ""},
 			},
 		},
 		{
 			in: "==",
 			tokens: []token{
-				token{tokenEqual, 0, "=="},
-				token{tokenEOF, 2, ""},
+				token{TokenEqual, 0, "=="},
+				token{TokenEOF, 2, ""},
 			},
 		},
 		{
 			in: "!=",
 			tokens: []token{
-				token{tokenNotEqual, 0, "!="},
-				token{tokenEOF, 2, ""},
+				token{TokenNotEqual, 0, "!="},
+				token{TokenEOF, 2, ""},
 			},
 		},
 		{
 			in: ">",
 			tokens: []token{
-				token{tokenGreater, 0, ">"},
-				token{tokenEOF, 1, ""},
+				token{TokenGreater, 0, ">"},
+				token{TokenEOF, 1, ""},
 			},
 		},
 		{
 			in: ">=",
 			tokens: []token{
-				token{tokenGreaterEqual, 0, ">="},
-				token{tokenEOF, 2, ""},
+				token{TokenGreaterEqual, 0, ">="},
+				token{TokenEOF, 2, ""},
 			},
 		},
 		{
 			in: "<",
 			tokens: []token{
-				token{tokenLess, 0, "<"},
-				token{tokenEOF, 1, ""},
+				token{TokenLess, 0, "<"},
+				token{TokenEOF, 1, ""},
 			},
 		},
 		{
 			in: "<=",
 			tokens: []token{
-				token{tokenLessEqual, 0, "<="},
-				token{tokenEOF, 2, ""},
+				token{TokenLessEqual, 0, "<="},
+				token{TokenEOF, 2, ""},
 			},
 		},
 		{
 			in: "=~",
 			tokens: []token{
-				token{tokenRegexEqual, 0, "=~"},
-				token{tokenEOF, 2, ""},
+				token{TokenRegexEqual, 0, "=~"},
+				token{TokenEOF, 2, ""},
 			},
 		},
 		{
 			in: "!~",
 			tokens: []token{
-				token{tokenRegexNotEqual, 0, "!~"},
-				token{tokenEOF, 2, ""},
+				token{TokenRegexNotEqual, 0, "!~"},
+				token{TokenEOF, 2, ""},
 			},
 		},
 		{
 			in: "(",
 			tokens: []token{
-				token{tokenLParen, 0, "("},
-				token{tokenEOF, 1, ""},
+				token{TokenLParen, 0, "("},
+				token{TokenEOF, 1, ""},
 			},
 		},
 		{
 			in: ")",
 			tokens: []token{
-				token{tokenRParen, 0, ")"},
-				token{tokenEOF, 1, ""},
+				token{TokenRParen, 0, ")"},
+				token{TokenEOF, 1, ""},
 			},
 		},
 		{
 			in: ".",
 			tokens: []token{
-				token{tokenDot, 0, "."},
-				token{tokenEOF, 1, ""},
+				token{TokenDot, 0, "."},
+				token{TokenEOF, 1, ""},
 			},
 		},
 		// Keywords
 		{
 			in: "AND",
 			tokens: []token{
-				token{tokenAnd, 0, "AND"},
-				token{tokenEOF, 3, ""},
+				token{TokenAnd, 0, "AND"},
+				token{TokenEOF, 3, ""},
 			},
 		},
 		{
 			in: "OR",
 			tokens: []token{
-				token{tokenOr, 0, "OR"},
-				token{tokenEOF, 2, ""},
+				token{TokenOr, 0, "OR"},
+				token{TokenEOF, 2, ""},
 			},
 		},
 		{
 			in: "TRUE",
 			tokens: []token{
-				token{tokenTrue, 0, "TRUE"},
-				token{tokenEOF, 4, ""},
+				token{TokenTrue, 0, "TRUE"},
+				token{TokenEOF, 4, ""},
 			},
 		},
 		{
 			in: "FALSE",
 			tokens: []token{
-				token{tokenFalse, 0, "FALSE"},
-				token{tokenEOF, 5, ""},
+				token{TokenFalse, 0, "FALSE"},
+				token{TokenEOF, 5, ""},
 			},
 		},
 		{
 			in: "var",
 			tokens: []token{
-				token{tokenVar, 0, "var"},
-				token{tokenEOF, 3, ""},
+				token{TokenVar, 0, "var"},
+				token{TokenEOF, 3, ""},
 			},
 		},
 		//Numbers
 		{
 			in: "42",
 			tokens: []token{
-				token{tokenNumber, 0, "42"},
-				token{tokenEOF, 2, ""},
+				token{TokenNumber, 0, "42"},
+				token{TokenEOF, 2, ""},
 			},
 		},
 		{
 			in: "42.21",
 			tokens: []token{
-				token{tokenNumber, 0, "42.21"},
-				token{tokenEOF, 5, ""},
+				token{TokenNumber, 0, "42.21"},
+				token{TokenEOF, 5, ""},
 			},
 		},
 		{
 			in: ".421",
 			tokens: []token{
-				token{tokenDot, 0, "."},
-				token{tokenNumber, 1, "421"},
-				token{tokenEOF, 4, ""},
+				token{TokenDot, 0, "."},
+				token{TokenNumber, 1, "421"},
+				token{TokenEOF, 4, ""},
 			},
 		},
 		{
 			in: "0.421",
 			tokens: []token{
-				token{tokenNumber, 0, "0.421"},
-				token{tokenEOF, 5, ""},
+				token{TokenNumber, 0, "0.421"},
+				token{TokenEOF, 5, ""},
 			},
 		},
 		//Durations
 		{
 			in: "42s",
 			tokens: []token{
-				token{tokenDuration, 0, "42s"},
-				token{tokenEOF, 3, ""},
+				token{TokenDuration, 0, "42s"},
+				token{TokenEOF, 3, ""},
 			},
 		},
 		{
 			in: "42.21m",
 			tokens: []token{
-				token{tokenDuration, 0, "42.21m"},
-				token{tokenEOF, 6, ""},
+				token{TokenDuration, 0, "42.21m"},
+				token{TokenEOF, 6, ""},
 			},
 		},
 		{
 			in: ".421h",
 			tokens: []token{
-				token{tokenDot, 0, "."},
-				token{tokenDuration, 1, "421h"},
-				token{tokenEOF, 5, ""},
+				token{TokenDot, 0, "."},
+				token{TokenDuration, 1, "421h"},
+				token{TokenEOF, 5, ""},
 			},
 		},
 		{
 			in: "0.421s",
 			tokens: []token{
-				token{tokenDuration, 0, "0.421s"},
-				token{tokenEOF, 6, ""},
+				token{TokenDuration, 0, "0.421s"},
+				token{TokenEOF, 6, ""},
 			},
 		},
 		{
 			in: "1u",
 			tokens: []token{
-				token{tokenDuration, 0, "1u"},
-				token{tokenEOF, 2, ""},
+				token{TokenDuration, 0, "1u"},
+				token{TokenEOF, 2, ""},
 			},
 		},
 		{
 			in: "1µ",
 			tokens: []token{
-				token{tokenDuration, 0, "1µ"},
-				token{tokenEOF, 3, ""},
+				token{TokenDuration, 0, "1µ"},
+				token{TokenEOF, 3, ""},
 			},
 		},
 		{
 			in: "1ms",
 			tokens: []token{
-				token{tokenDuration, 0, "1ms"},
-				token{tokenEOF, 3, ""},
+				token{TokenDuration, 0, "1ms"},
+				token{TokenEOF, 3, ""},
 			},
 		},
 		{
 			in: "1h",
 			tokens: []token{
-				token{tokenDuration, 0, "1h"},
-				token{tokenEOF, 2, ""},
+				token{TokenDuration, 0, "1h"},
+				token{TokenEOF, 2, ""},
 			},
 		},
 		{
 			in: "1d",
 			tokens: []token{
-				token{tokenDuration, 0, "1d"},
-				token{tokenEOF, 2, ""},
+				token{TokenDuration, 0, "1d"},
+				token{TokenEOF, 2, ""},
 			},
 		},
 		{
 			in: "1w",
 			tokens: []token{
-				token{tokenDuration, 0, "1w"},
-				token{tokenEOF, 2, ""},
+				token{TokenDuration, 0, "1w"},
+				token{TokenEOF, 2, ""},
 			},
 		},
 		//Identifier
 		{
 			in: "variable",
 			tokens: []token{
-				token{tokenIdent, 0, "variable"},
-				token{tokenEOF, 8, ""},
+				token{TokenIdent, 0, "variable"},
+				token{TokenEOF, 8, ""},
 			},
 		},
 		{
 			in: "myVar01",
 			tokens: []token{
-				token{tokenIdent, 0, "myVar01"},
-				token{tokenEOF, 7, ""},
+				token{TokenIdent, 0, "myVar01"},
+				token{TokenEOF, 7, ""},
 			},
 		},
 		// References
 		{
 			in: `""`,
 			tokens: []token{
-				token{tokenReference, 0, `""`},
-				token{tokenEOF, 2, ""},
+				token{TokenReference, 0, `""`},
+				token{TokenEOF, 2, ""},
 			},
 		},
 		{
 			in: `"ref with spaces"`,
 			tokens: []token{
-				token{tokenReference, 0, `"ref with spaces"`},
-				token{tokenEOF, 17, ""},
+				token{TokenReference, 0, `"ref with spaces"`},
+				token{TokenEOF, 17, ""},
 			},
 		},
 		{
 			in: `"ref\""`,
 			tokens: []token{
-				token{tokenReference, 0, `"ref\""`},
-				token{tokenEOF, 7, ""},
+				token{TokenReference, 0, `"ref\""`},
+				token{TokenEOF, 7, ""},
 			},
 		},
 		//Strings
 		{
 			in: `''`,
 			tokens: []token{
-				token{tokenString, 0, `''`},
-				token{tokenEOF, 2, ""},
+				token{TokenString, 0, `''`},
+				token{TokenEOF, 2, ""},
 			},
 		},
 		{
 			in: `''''''`,
 			tokens: []token{
-				token{tokenString, 0, `''''''`},
-				token{tokenEOF, 6, ""},
+				token{TokenString, 0, `''''''`},
+				token{TokenEOF, 6, ""},
 			},
 		},
 		{
 			in: `'str'`,
 			tokens: []token{
-				token{tokenString, 0, `'str'`},
-				token{tokenEOF, 5, ""},
+				token{TokenString, 0, `'str'`},
+				token{TokenEOF, 5, ""},
 			},
 		},
 		{
 			in: `'str\''`,
 			tokens: []token{
-				token{tokenString, 0, `'str\''`},
-				token{tokenEOF, 7, ""},
+				token{TokenString, 0, `'str\''`},
+				token{TokenEOF, 7, ""},
 			},
 		},
 		{
 			in: `'''s'tr'''`,
 			tokens: []token{
-				token{tokenString, 0, `'''s'tr'''`},
-				token{tokenEOF, 10, ""},
+				token{TokenString, 0, `'''s'tr'''`},
+				token{TokenEOF, 10, ""},
 			},
 		},
 		{
 			in: `'''s\'tr'''`,
 			tokens: []token{
-				token{tokenString, 0, `'''s\'tr'''`},
-				token{tokenEOF, 11, ""},
+				token{TokenString, 0, `'''s\'tr'''`},
+				token{TokenEOF, 11, ""},
 			},
 		},
 		{
 			in: `'''str'''`,
 			tokens: []token{
-				token{tokenString, 0, `'''str'''`},
-				token{tokenEOF, 9, ""},
+				token{TokenString, 0, `'''str'''`},
+				token{TokenEOF, 9, ""},
 			},
 		},
 		// Regex -- can only be lexed within context
 		{
 			in: `=~ //`,
 			tokens: []token{
-				token{tokenRegexEqual, 0, "=~"},
-				token{tokenRegex, 3, "//"},
-				token{tokenEOF, 5, ""},
+				token{TokenRegexEqual, 0, "=~"},
+				token{TokenRegex, 3, "//"},
+				token{TokenEOF, 5, ""},
 			},
 		},
 		{
 			in: `!~ //`,
 			tokens: []token{
-				token{tokenRegexNotEqual, 0, "!~"},
-				token{tokenRegex, 3, "//"},
-				token{tokenEOF, 5, ""},
+				token{TokenRegexNotEqual, 0, "!~"},
+				token{TokenRegex, 3, "//"},
+				token{TokenEOF, 5, ""},
 			},
 		},
 		{
 			in: `= //`,
 			tokens: []token{
-				token{tokenAsgn, 0, "="},
-				token{tokenRegex, 2, "//"},
-				token{tokenEOF, 4, ""},
+				token{TokenAsgn, 0, "="},
+				token{TokenRegex, 2, "//"},
+				token{TokenEOF, 4, ""},
 			},
 		},
 		{
 			in: `= /^((.*)[a-z]+\S{0,2})|cat\/\/$/`,
 			tokens: []token{
-				token{tokenAsgn, 0, "="},
-				token{tokenRegex, 2, `/^((.*)[a-z]+\S{0,2})|cat\/\/$/`},
-				token{tokenEOF, 33, ""},
+				token{TokenAsgn, 0, "="},
+				token{TokenRegex, 2, `/^((.*)[a-z]+\S{0,2})|cat\/\/$/`},
+				token{TokenEOF, 33, ""},
 			},
 		},
 
@@ -415,89 +415,89 @@ func TestLexer(t *testing.T) {
 		{
 			in: " ",
 			tokens: []token{
-				token{tokenEOF, 1, ""},
+				token{TokenEOF, 1, ""},
 			},
 		},
 		{
 			in: " \t\n",
 			tokens: []token{
-				token{tokenEOF, 3, ""},
+				token{TokenEOF, 3, ""},
 			},
 		},
 		//Combinations
 		{
 			in: "var x = avg()",
 			tokens: []token{
-				token{tokenVar, 0, "var"},
-				token{tokenIdent, 4, "x"},
-				token{tokenAsgn, 6, "="},
-				token{tokenIdent, 8, "avg"},
-				token{tokenLParen, 11, "("},
-				token{tokenRParen, 12, ")"},
-				token{tokenEOF, 13, ""},
+				token{TokenVar, 0, "var"},
+				token{TokenIdent, 4, "x"},
+				token{TokenAsgn, 6, "="},
+				token{TokenIdent, 8, "avg"},
+				token{TokenLParen, 11, "("},
+				token{TokenRParen, 12, ")"},
+				token{TokenEOF, 13, ""},
 			},
 		},
 		{
 			in: "var x = avg().parallel(4)x.groupby('cpu').window().period(10s)",
 			tokens: []token{
-				token{tokenVar, 0, "var"},
-				token{tokenIdent, 4, "x"},
-				token{tokenAsgn, 6, "="},
-				token{tokenIdent, 8, "avg"},
-				token{tokenLParen, 11, "("},
-				token{tokenRParen, 12, ")"},
-				token{tokenDot, 13, "."},
-				token{tokenIdent, 14, "parallel"},
-				token{tokenLParen, 22, "("},
-				token{tokenNumber, 23, "4"},
-				token{tokenRParen, 24, ")"},
-				token{tokenIdent, 25, "x"},
-				token{tokenDot, 26, "."},
-				token{tokenIdent, 27, "groupby"},
-				token{tokenLParen, 34, "("},
-				token{tokenString, 35, "'cpu'"},
-				token{tokenRParen, 40, ")"},
-				token{tokenDot, 41, "."},
-				token{tokenIdent, 42, "window"},
-				token{tokenLParen, 48, "("},
-				token{tokenRParen, 49, ")"},
-				token{tokenDot, 50, "."},
-				token{tokenIdent, 51, "period"},
-				token{tokenLParen, 57, "("},
-				token{tokenDuration, 58, "10s"},
-				token{tokenRParen, 61, ")"},
-				token{tokenEOF, 62, ""},
+				token{TokenVar, 0, "var"},
+				token{TokenIdent, 4, "x"},
+				token{TokenAsgn, 6, "="},
+				token{TokenIdent, 8, "avg"},
+				token{TokenLParen, 11, "("},
+				token{TokenRParen, 12, ")"},
+				token{TokenDot, 13, "."},
+				token{TokenIdent, 14, "parallel"},
+				token{TokenLParen, 22, "("},
+				token{TokenNumber, 23, "4"},
+				token{TokenRParen, 24, ")"},
+				token{TokenIdent, 25, "x"},
+				token{TokenDot, 26, "."},
+				token{TokenIdent, 27, "groupby"},
+				token{TokenLParen, 34, "("},
+				token{TokenString, 35, "'cpu'"},
+				token{TokenRParen, 40, ")"},
+				token{TokenDot, 41, "."},
+				token{TokenIdent, 42, "window"},
+				token{TokenLParen, 48, "("},
+				token{TokenRParen, 49, ")"},
+				token{TokenDot, 50, "."},
+				token{TokenIdent, 51, "period"},
+				token{TokenLParen, 57, "("},
+				token{TokenDuration, 58, "10s"},
+				token{TokenRParen, 61, ")"},
+				token{TokenEOF, 62, ""},
 			},
 		},
 		//Comments
 		{
 			in: "var x = avg()\n// Comment all of this is ignored\nx.groupby('cpu')",
 			tokens: []token{
-				token{tokenVar, 0, "var"},
-				token{tokenIdent, 4, "x"},
-				token{tokenAsgn, 6, "="},
-				token{tokenIdent, 8, "avg"},
-				token{tokenLParen, 11, "("},
-				token{tokenRParen, 12, ")"},
-				token{tokenIdent, 48, "x"},
-				token{tokenDot, 49, "."},
-				token{tokenIdent, 50, "groupby"},
-				token{tokenLParen, 57, "("},
-				token{tokenString, 58, "'cpu'"},
-				token{tokenRParen, 63, ")"},
-				token{tokenEOF, 64, ""},
+				token{TokenVar, 0, "var"},
+				token{TokenIdent, 4, "x"},
+				token{TokenAsgn, 6, "="},
+				token{TokenIdent, 8, "avg"},
+				token{TokenLParen, 11, "("},
+				token{TokenRParen, 12, ")"},
+				token{TokenIdent, 48, "x"},
+				token{TokenDot, 49, "."},
+				token{TokenIdent, 50, "groupby"},
+				token{TokenLParen, 57, "("},
+				token{TokenString, 58, "'cpu'"},
+				token{TokenRParen, 63, ")"},
+				token{TokenEOF, 64, ""},
 			},
 		},
 		{
 			in: "var x = avg()\n// Comment all of this is ignored",
 			tokens: []token{
-				token{tokenVar, 0, "var"},
-				token{tokenIdent, 4, "x"},
-				token{tokenAsgn, 6, "="},
-				token{tokenIdent, 8, "avg"},
-				token{tokenLParen, 11, "("},
-				token{tokenRParen, 12, ")"},
-				token{tokenEOF, 47, ""},
+				token{TokenVar, 0, "var"},
+				token{TokenIdent, 4, "x"},
+				token{TokenAsgn, 6, "="},
+				token{TokenIdent, 8, "avg"},
+				token{TokenLParen, 11, "("},
+				token{TokenRParen, 12, ")"},
+				token{TokenEOF, 47, ""},
 			},
 		},
 	}

@@ -38,6 +38,7 @@ type TaskMaster struct {
 		HasSnapshot(name string) bool
 		LoadSnapshot(name string) (*TaskSnapshot, error)
 	}
+	DeadmanService pipeline.DeadmanService
 
 	UDFService UDFService
 
@@ -115,6 +116,7 @@ func (tm *TaskMaster) New() *TaskMaster {
 	n := NewTaskMaster(tm.LogService)
 	n.HTTPDService = tm.HTTPDService
 	n.UDFService = tm.UDFService
+	n.DeadmanService = tm.DeadmanService
 	n.TaskStore = tm.TaskStore
 	n.InfluxDBService = tm.InfluxDBService
 	n.SMTPService = tm.SMTPService
@@ -166,6 +168,38 @@ func (tm *TaskMaster) Drain() {
 	for name := range tm.forks {
 		tm.delFork(name)
 	}
+}
+
+// Create a new task in the context of a TaskMaster
+func (tm *TaskMaster) NewTask(
+	name,
+	script string,
+	tt TaskType,
+	dbrps []DBRP,
+	snapshotInterval time.Duration,
+) (*Task, error) {
+	t := &Task{
+		Name:             name,
+		Type:             tt,
+		DBRPs:            dbrps,
+		SnapshotInterval: snapshotInterval,
+	}
+	scope := tm.CreateTICKScope()
+
+	var srcEdge pipeline.EdgeType
+	switch tt {
+	case StreamTask:
+		srcEdge = pipeline.StreamEdge
+	case BatchTask:
+		srcEdge = pipeline.BatchEdge
+	}
+
+	p, err := pipeline.CreatePipeline(script, srcEdge, scope, tm.DeadmanService)
+	if err != nil {
+		return nil, err
+	}
+	t.Pipeline = p
+	return t, nil
 }
 
 func (tm *TaskMaster) waitForForks() {

@@ -2224,11 +2224,11 @@ func testStreamer(
 	tm.HTTPDService = httpService
 	tm.UDFService = udfService
 	tm.TaskStore = taskStore{}
+	tm.DeadmanService = deadman{}
 	tm.Open()
-	scope := tm.CreateTICKScope()
 
 	//Create the task
-	task, err := kapacitor.NewTask(name, script, kapacitor.StreamTask, dbrps, 0, scope)
+	task, err := tm.NewTask(name, script, kapacitor.StreamTask, dbrps, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

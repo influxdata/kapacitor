@@ -151,7 +151,7 @@ func (s *StatefulExpr) eval(n Node, scope *Scope, stck *stack) (err error) {
 func (s *StatefulExpr) evalUnary(op tokenType, scope *Scope, stck *stack) error {
 	v := stck.Pop()
 	switch op {
-	case tokenMinus:
+	case TokenMinus:
 		switch n := v.(type) {
 		case float64:
 			stck.Push(-1 * n)
@@ -160,7 +160,7 @@ func (s *StatefulExpr) evalUnary(op tokenType, scope *Scope, stck *stack) error 
 		default:
 			return fmt.Errorf("invalid arugument to '-' %v", v)
 		}
-	case tokenNot:
+	case TokenNot:
 		if b, ok := v.(bool); ok {
 			stck.Push(!b)
 		} else {
@@ -264,15 +264,15 @@ func (s *StatefulExpr) evalBinary(op tokenType, scope *Scope, stck *stack) (err 
 
 func doIntMath(op tokenType, l, r int64) (v int64, err error) {
 	switch op {
-	case tokenPlus:
+	case TokenPlus:
 		v = l + r
-	case tokenMinus:
+	case TokenMinus:
 		v = l - r
-	case tokenMult:
+	case TokenMult:
 		v = l * r
-	case tokenDiv:
+	case TokenDiv:
 		v = l / r
-	case tokenMod:
+	case TokenMod:
 		v = l % r
 	default:
 		return 0, fmt.Errorf("invalid integer math operator %v", op)
@@ -282,13 +282,13 @@ func doIntMath(op tokenType, l, r int64) (v int64, err error) {
 
 func doFloatMath(op tokenType, l, r float64) (v float64, err error) {
 	switch op {
-	case tokenPlus:
+	case TokenPlus:
 		v = l + r
-	case tokenMinus:
+	case TokenMinus:
 		v = l - r
-	case tokenMult:
+	case TokenMult:
 		v = l * r
-	case tokenDiv:
+	case TokenDiv:
 		v = l / r
 	default:
 		return math.NaN(), fmt.Errorf("invalid float math operator %v", op)
@@ -298,13 +298,13 @@ func doFloatMath(op tokenType, l, r float64) (v float64, err error) {
 
 func doBoolComp(op tokenType, l, r bool) (v bool, err error) {
 	switch op {
-	case tokenEqual:
+	case TokenEqual:
 		v = l == r
-	case tokenNotEqual:
+	case TokenNotEqual:
 		v = l != r
-	case tokenAnd:
+	case TokenAnd:
 		v = l && r
-	case tokenOr:
+	case TokenOr:
 		v = l || r
 	default:
 		err = fmt.Errorf("invalid boolean comparison operator %v", op)
@@ -314,17 +314,17 @@ func doBoolComp(op tokenType, l, r bool) (v bool, err error) {
 
 func doFloatComp(op tokenType, l, r float64) (v bool, err error) {
 	switch op {
-	case tokenEqual:
+	case TokenEqual:
 		v = l == r
-	case tokenNotEqual:
+	case TokenNotEqual:
 		v = l != r
-	case tokenLess:
+	case TokenLess:
 		v = l < r
-	case tokenGreater:
+	case TokenGreater:
 		v = l > r
-	case tokenLessEqual:
+	case TokenLessEqual:
 		v = l <= r
-	case tokenGreaterEqual:
+	case TokenGreaterEqual:
 		v = l >= r
 	default:
 		err = fmt.Errorf("invalid float comparison operator %v", op)
@@ -334,17 +334,17 @@ func doFloatComp(op tokenType, l, r float64) (v bool, err error) {
 
 func doStringComp(op tokenType, l, r string) (v bool, err error) {
 	switch op {
-	case tokenEqual:
+	case TokenEqual:
 		v = l == r
-	case tokenNotEqual:
+	case TokenNotEqual:
 		v = l != r
-	case tokenLess:
+	case TokenLess:
 		v = l < r
-	case tokenGreater:
+	case TokenGreater:
 		v = l > r
-	case tokenLessEqual:
+	case TokenLessEqual:
 		v = l <= r
-	case tokenGreaterEqual:
+	case TokenGreaterEqual:
 		v = l >= r
 	default:
 		err = fmt.Errorf("invalid string comparison operator %v", op)
@@ -354,9 +354,9 @@ func doStringComp(op tokenType, l, r string) (v bool, err error) {
 
 func doRegexComp(op tokenType, l string, r *regexp.Regexp) (v bool, err error) {
 	switch op {
-	case tokenRegexEqual:
+	case TokenRegexEqual:
 		v = r.MatchString(l)
-	case tokenRegexNotEqual:
+	case TokenRegexNotEqual:
 		v = !r.MatchString(l)
 	default:
 		err = fmt.Errorf("invalid regex comparison operator %v", op)

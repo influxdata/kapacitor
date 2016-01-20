@@ -106,7 +106,7 @@ func (p *parser) unexpected(tok token, expected ...tokenType) {
 	}
 	expectedStr := strings.Join(expectedStrs, ",")
 	tokStr := tok.typ.String()
-	if tok.typ == tokenError {
+	if tok.typ == TokenError {
 		tokStr = tok.val
 	}
 	p.errorf("unexpected %s line %d char %d in \"%s\". expected: %s", tokStr, line, char, p.Text[start:stop], expectedStr)
@@ -147,7 +147,7 @@ func (p *parser) Parse(text string) (err error) {
 // It runs to EOF.
 func (p *parser) parse() {
 	p.Root = p.program()
-	p.expect(tokenEOF)
+	p.expect(TokenEOF)
 	//if err := t.Root.Check(); err != nil {
 	//	t.error(err)
 	//}
@@ -158,7 +158,7 @@ func (p *parser) program() Node {
 	l := newList(p.peek().pos)
 	for {
 		switch p.peek().typ {
-		case tokenEOF:
+		case TokenEOF:
 			return l
 		default:
 			s := p.statement()
@@ -170,7 +170,7 @@ func (p *parser) program() Node {
 //parse a statement
 func (p *parser) statement() Node {
 	var n Node
-	if p.peek().typ == tokenVar {
+	if p.peek().typ == TokenVar {
 		n = p.declaration()
 	} else {
 		n = p.expression()
@@ -181,22 +181,22 @@ func (p *parser) statement() Node {
 //parse a declaration statement
 func (p *parser) declaration() Node {
 	v := p.vr()
-	op := p.expect(tokenAsgn)
+	op := p.expect(TokenAsgn)
 	b := p.expression()
 	return newBinary(op, v, b)
 }
 
 //parse a 'var ident' expression
 func (p *parser) vr() Node {
-	p.expect(tokenVar)
-	ident := p.expect(tokenIdent)
+	p.expect(TokenVar)
+	ident := p.expect(TokenIdent)
 	return newIdent(ident.pos, ident.val)
 }
 
 //parse an expression
 func (p *parser) expression() Node {
 	switch p.peek().typ {
-	case tokenIdent:
+	case TokenIdent:
 		term := p.funcOrIdent()
 		return p.chain(term)
 	default:
@@ -207,7 +207,7 @@ func (p *parser) expression() Node {
 //parse a function or identifier invocation chain
 // '.' operator is left-associative
 func (p *parser) chain(lhs Node) Node {
-	for look := p.peek().typ; look == tokenDot; look = p.peek().typ {
+	for look := p.peek().typ; look == TokenDot; look = p.peek().typ {
 		op := p.next()
 		rhs := p.funcOrIdent()
 		lhs = newBinary(op, lhs, rhs)
@@ -217,7 +217,7 @@ func (p *parser) chain(lhs Node) Node {
 
 func (p *parser) funcOrIdent() (n Node) {
 	p.next()
-	if p.peek().typ == tokenLParen {
+	if p.peek().typ == TokenLParen {
 		p.backup()
 		n = p.function()
 	} else {
@@ -229,17 +229,17 @@ func (p *parser) funcOrIdent() (n Node) {
 
 //parse an identifier
 func (p *parser) identifier() Node {
-	ident := p.expect(tokenIdent)
+	ident := p.expect(TokenIdent)
 	n := newIdent(ident.pos, ident.val)
 	return n
 }
 
 //parse a function call
 func (p *parser) function() Node {
-	ident := p.expect(tokenIdent)
-	p.expect(tokenLParen)
+	ident := p.expect(TokenIdent)
+	p.expect(TokenLParen)
 	args := p.parameters()
-	p.expect(tokenRParen)
+	p.expect(TokenRParen)
 
 	n := newFunc(ident.pos, ident.val, args)
 	return n
@@ -248,11 +248,11 @@ func (p *parser) function() Node {
 //parse a parameter list
 func (p *parser) parameters() (args []Node) {
 	for {
-		if p.peek().typ == tokenRParen {
+		if p.peek().typ == TokenRParen {
 			return
 		}
 		args = append(args, p.parameter())
-		if p.next().typ != tokenComma {
+		if p.next().typ != TokenComma {
 			p.backup()
 			return
 		}
@@ -261,9 +261,9 @@ func (p *parser) parameters() (args []Node) {
 
 func (p *parser) parameter() (n Node) {
 	switch p.peek().typ {
-	case tokenIdent:
+	case TokenIdent:
 		n = p.expression()
-	case tokenLambda:
+	case TokenLambda:
 		lambda := p.next()
 		l := p.lambdaExpr()
 		n = newLambda(lambda.pos, l)
@@ -280,21 +280,21 @@ func (p *parser) lambdaExpr() Node {
 
 // Operator Precedence parsing
 var precedence = [...]int{
-	tokenOr:            0,
-	tokenAnd:           1,
-	tokenEqual:         2,
-	tokenNotEqual:      2,
-	tokenRegexEqual:    2,
-	tokenRegexNotEqual: 2,
-	tokenGreater:       3,
-	tokenGreaterEqual:  3,
-	tokenLess:          3,
-	tokenLessEqual:     3,
-	tokenPlus:          4,
-	tokenMinus:         4,
-	tokenMult:          5,
-	tokenDiv:           5,
-	tokenMod:           5,
+	TokenOr:            0,
+	TokenAnd:           1,
+	TokenEqual:         2,
+	TokenNotEqual:      2,
+	TokenRegexEqual:    2,
+	TokenRegexNotEqual: 2,
+	TokenGreater:       3,
+	TokenGreaterEqual:  3,
+	TokenLess:          3,
+	TokenLessEqual:     3,
+	TokenPlus:          4,
+	TokenMinus:         4,
+	TokenMult:          5,
+	TokenDiv:           5,
+	TokenMod:           5,
 }
 
 // parse the expression considering operator precedence.
@@ -317,10 +317,10 @@ func (p *parser) precedence(lhs Node, minP int) Node {
 
 //parse a function call in a lambda expr
 func (p *parser) lfunction() Node {
-	ident := p.expect(tokenIdent)
-	p.expect(tokenLParen)
+	ident := p.expect(TokenIdent)
+	p.expect(TokenLParen)
 	args := p.lparameters()
-	p.expect(tokenRParen)
+	p.expect(TokenRParen)
 
 	n := newFunc(ident.pos, ident.val, args)
 	return n
@@ -329,11 +329,11 @@ func (p *parser) lfunction() Node {
 //parse a parameter list in a lfunction
 func (p *parser) lparameters() (args []Node) {
 	for {
-		if p.peek().typ == tokenRParen {
+		if p.peek().typ == TokenRParen {
 			return
 		}
 		args = append(args, p.lparameter())
-		if p.next().typ != tokenComma {
+		if p.next().typ != TokenComma {
 			p.backup()
 			return
 		}
@@ -351,49 +351,49 @@ func (p *parser) lparameter() (n Node) {
 // parse a primary expression
 func (p *parser) primary() Node {
 	switch tok := p.peek(); {
-	case tok.typ == tokenLParen:
+	case tok.typ == TokenLParen:
 		p.next()
 		n := p.lambdaExpr()
-		p.expect(tokenRParen)
+		p.expect(TokenRParen)
 		return n
-	case tok.typ == tokenNumber:
+	case tok.typ == TokenNumber:
 		return p.number()
-	case tok.typ == tokenString:
+	case tok.typ == TokenString:
 		return p.string()
-	case tok.typ == tokenTrue, tok.typ == tokenFalse:
+	case tok.typ == TokenTrue, tok.typ == TokenFalse:
 		return p.boolean()
-	case tok.typ == tokenDuration:
+	case tok.typ == TokenDuration:
 		return p.duration()
-	case tok.typ == tokenRegex:
+	case tok.typ == TokenRegex:
 		return p.regex()
-	case tok.typ == tokenMult:
+	case tok.typ == TokenMult:
 		return p.star()
-	case tok.typ == tokenReference:
+	case tok.typ == TokenReference:
 		return p.reference()
-	case tok.typ == tokenIdent:
+	case tok.typ == TokenIdent:
 		p.next()
-		if p.peek().typ == tokenLParen {
+		if p.peek().typ == TokenLParen {
 			p.backup()
 			return p.lfunction()
 		}
 		p.backup()
 		return p.identifier()
-	case tok.typ == tokenMinus, tok.typ == tokenNot:
+	case tok.typ == TokenMinus, tok.typ == TokenNot:
 		p.next()
 		return newUnary(tok, p.primary())
 	default:
 		p.unexpected(
 			tok,
-			tokenNumber,
-			tokenString,
-			tokenDuration,
-			tokenIdent,
-			tokenTrue,
-			tokenFalse,
-			tokenEqual,
-			tokenLParen,
-			tokenMinus,
-			tokenNot,
+			TokenNumber,
+			TokenString,
+			TokenDuration,
+			TokenIdent,
+			TokenTrue,
+			TokenFalse,
+			TokenEqual,
+			TokenLParen,
+			TokenMinus,
+			TokenNot,
 		)
 		return nil
 	}
@@ -401,7 +401,7 @@ func (p *parser) primary() Node {
 
 //parse a duration literal
 func (p *parser) duration() Node {
-	token := p.expect(tokenDuration)
+	token := p.expect(TokenDuration)
 	num, err := newDur(token.pos, token.val)
 	if err != nil {
 		p.error(err)
@@ -411,7 +411,7 @@ func (p *parser) duration() Node {
 
 //parse a number literal
 func (p *parser) number() Node {
-	token := p.expect(tokenNumber)
+	token := p.expect(TokenNumber)
 	num, err := newNumber(token.pos, token.val)
 	if err != nil {
 		p.error(err)
@@ -421,14 +421,14 @@ func (p *parser) number() Node {
 
 //parse a string literal
 func (p *parser) string() Node {
-	token := p.expect(tokenString)
+	token := p.expect(TokenString)
 	s := newString(token.pos, token.val)
 	return s
 }
 
 //parse a regex literal
 func (p *parser) regex() Node {
-	token := p.expect(tokenRegex)
+	token := p.expect(TokenRegex)
 	r, err := newRegex(token.pos, token.val)
 	if err != nil {
 		p.error(err)
@@ -438,13 +438,13 @@ func (p *parser) regex() Node {
 
 // parse '*' literal
 func (p *parser) star() Node {
-	tok := p.expect(tokenMult)
+	tok := p.expect(TokenMult)
 	return newStar(tok.pos)
 }
 
 //parse a reference literal
 func (p *parser) reference() Node {
-	token := p.expect(tokenReference)
+	token := p.expect(TokenReference)
 	r := newReference(token.pos, token.val)
 	return r
 }

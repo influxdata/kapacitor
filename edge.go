@@ -5,6 +5,7 @@ import (
 	"expvar"
 	"fmt"
 	"log"
+	"strconv"
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
@@ -61,8 +62,20 @@ func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, logSer
 	return e
 }
 
-func (e *Edge) collectedCount() string {
-	return e.statMap.Get(statCollected).String()
+func (e *Edge) emittedCount() int64 {
+	c, err := strconv.ParseUint(e.statMap.Get(statEmitted).String(), 10, 64)
+	if err != nil {
+		panic("emitted count is not an int")
+	}
+	return int64(c)
+}
+
+func (e *Edge) collectedCount() int64 {
+	c, err := strconv.ParseUint(e.statMap.Get(statCollected).String(), 10, 64)
+	if err != nil {
+		panic("collected count is not an int")
+	}
+	return int64(c)
 }
 
 // Close the edge, this can only be called after all

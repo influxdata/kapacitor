@@ -38,6 +38,9 @@ type Node interface {
 
 	// executing dot
 	edot(buf *bytes.Buffer)
+
+	// the number of points/batches this node has collected
+	collectedCount() int64
 }
 
 //implementation of Node
@@ -159,11 +162,22 @@ func (n *node) closeChildEdges() {
 func (n *node) edot(buf *bytes.Buffer) {
 	for i, c := range n.children {
 		buf.Write([]byte(
-			fmt.Sprintf("%s -> %s [label=\"%s\"];\n",
+			fmt.Sprintf("%s -> %s [label=\"%d\"];\n",
 				n.Name(),
 				c.Name(),
 				n.outs[i].collectedCount(),
 			),
 		))
 	}
+}
+
+// Return the number of points/batches this node
+// has collected.
+func (n *node) collectedCount() (c int64) {
+
+	// Count how many points each parent edge has emitted.
+	for _, in := range n.ins {
+		c += in.emittedCount()
+	}
+	return c
 }

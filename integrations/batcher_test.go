@@ -313,11 +313,11 @@ func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.Ex
 	tm := kapacitor.NewTaskMaster(logService)
 	tm.HTTPDService = httpService
 	tm.TaskStore = taskStore{}
+	tm.DeadmanService = deadman{}
 	tm.Open()
-	scope := tm.CreateTICKScope()
 
 	// Create task
-	task, err := kapacitor.NewTask(name, script, kapacitor.BatchTask, dbrps, 0, scope)
+	task, err := tm.NewTask(name, script, kapacitor.BatchTask, dbrps, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

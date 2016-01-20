@@ -3,6 +3,8 @@ package pipeline
 import (
 	"bytes"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/influxdata/kapacitor/tick"
 )
@@ -68,12 +70,15 @@ type Node interface {
 	setTMark(b bool)
 	pMark() bool
 	setPMark(b bool)
+	setPipeline(*Pipeline)
+	pipeline() *Pipeline
 
 	// Return .dot string to graph DAG
 	dot(buf *bytes.Buffer)
 }
 
 type node struct {
+	p        *Pipeline
 	desc     string
 	name     string
 	id       ID
@@ -127,6 +132,8 @@ func (n *node) addParent(c Node) {
 }
 
 func (n *node) linkChild(c Node) {
+	c.setPipeline(n.p)
+	n.p.assignID(c)
 	n.children = append(n.children, c)
 	c.addParent(n)
 }
@@ -147,6 +154,13 @@ func (n *node) setPMark(b bool) {
 	n.pm = b
 }
 
+func (n *node) setPipeline(p *Pipeline) {
+	n.p = p
+}
+func (n *node) pipeline() *Pipeline {
+	return n.p
+}
+
 // tick:ignore
 func (n *node) Wants() EdgeType {
 	return n.wants
@@ -161,6 +175,83 @@ func (n *node) dot(buf *bytes.Buffer) {
 	for _, c := range n.children {
 		buf.Write([]byte(fmt.Sprintf("%s -> %s;\n", n.Name(), c.Name())))
 	}
+}
+
+// Create a new stream of data that contains the internal statistics of the node.
+// The interval represents how often to emit the statistics based on real time.
+// This means the interval time is independent of the times of the data points the source node is receiving.
+//
+// Each node has these internal statistics:
+//
+//    * collected -- the number of points or batches this node has received.
+//
+func (n *node) Stats(interval time.Duration) *StatsNode {
+	stats := newStatsNode(n, interval)
+	n.pipeline().addSource(stats)
+	return stats
+}
+
+const nodeNameMarker = "NODE_NAME"
+const intervalMarker = "INTERVAL"
+
+// Helper function for creating an alert on low throughput, aka deadman's switch.
+//
+// - Threshold -- trigger alert if throughput drops below threshold in points/interval.
+// - Interval -- how often to check the throughput.
+//
+// Example:
+//    var data = stream.from()...
+//    // Trigger critical alert if the throughput drops below 100 points per 10s and checked every 10s.
+//    data.deadman(100.0, 10s)
+//    //Do normal processing of data
+//    data....
+//
+// The above is equivalent to this
+// Example:
+//    var data = stream.from()...
+//    // Trigger critical alert if the throughput drops below 100 points per 10s and checked every 10s.
+//    data.stats(10s)
+//          .derivative('collected')
+//              .unit(10s)
+//              .nonNegative()
+//          .alert()
+//              .id('node \'stream0\' in task \'{{ .TaskName }}\'')
+//              .message('{{ .ID }} is {{ if eq .Level "OK" }}alive{{ else }}dead{{ end }}: {{ index .Fields "collected" | printf "%0.3f" }} points/10s.')
+//              .crit(lamdba: "collected" <= 100.0)
+//    //Do normal processing of data
+//    data....
+//
+// The `id` and `message` alert properties can be configured globally via the 'deadman' configuration section.
+//
+// Since the AlertNode is the last piece it can be further modified as normal.
+// Example:
+//    var data = stream.from()...
+//    // Trigger critical alert if the throughput drops below 100 points per 1s and checked every 10s.
+//    data.deadman(100.0, 10s).slack().channel('#dead_tasks')
+//    //Do normal processing of data
+//    data....
+//
+func (n *node) Deadman(threshold float64, interval time.Duration) *AlertNode {
+	dn := n.Stats(interval).
+		Derivative("collected").NonNegative()
+	dn.Unit = interval
+
+	an := dn.Alert()
+	an.Crit = &tick.BinaryNode{
+		Operator: tick.TokenLessEqual,
+		Left: &tick.ReferenceNode{
+			Reference: "collected",
+		},
+		Right: &tick.NumberNode{
+			IsFloat: true,
+			Float64: threshold,
+		},
+	}
+	// Replace NODE_NAME with actual name of the node in the Id.
+	an.Id = strings.Replace(n.pipeline().deadman.Id(), nodeNameMarker, n.Name(), 1)
+	// Set the message on the alert node.
+	an.Message = strings.Replace(n.pipeline().deadman.Message(), intervalMarker, interval.String(), 1)
+	return an
 }
 
 // ---------------------------------
