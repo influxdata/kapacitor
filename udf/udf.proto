@@ -167,10 +167,10 @@ message Point {
 // Indicates the end of a batch and contains
 // all meta data associated with the batch.
 message EndBatch {
-    string             Name  = 1;
-    string             Group = 2;
-    int64              TMax  = 3;
-    map<string,string> Tags  = 4;
+    string             name  = 1;
+    string             group = 2;
+    int64              tmax  = 3;
+    map<string,string> tags  = 4;
 }
 
 //-----------------------------------------------------------

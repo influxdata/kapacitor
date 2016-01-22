@@ -600,7 +600,6 @@ func doDisable(args []string) error {
 		if rp.Error != "" {
 			return errors.New(rp.Error)
 		}
-		return nil
 	}
 	return nil
 }

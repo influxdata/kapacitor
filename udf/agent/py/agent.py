@@ -8,6 +8,7 @@ import udf_pb2
 from threading import Lock, Thread
 from Queue import Queue
 import io
+import traceback
 
 import logging
 logger = logging.getLogger()
@@ -23,19 +24,19 @@ logger = logging.getLogger()
 #
 # To write Points/Batches back to the Agent/Kapacitor use the Agent.write_response method, which is thread safe.
 class Handler(object):
-    def info():
+    def info(self):
         pass
-    def init(init_req):
+    def init(self, init_req):
         pass
-    def snapshot():
+    def snapshot(self):
         pass
-    def restore(restore_req):
+    def restore(self, restore_req):
         pass
-    def begin_batch():
+    def begin_batch(self):
         pass
-    def point():
+    def point(self):
         pass
-    def end_batch(end_req):
+    def end_batch(self, end_req):
         pass
 
 
@@ -122,11 +123,13 @@ class Agent(object):
             except EOF:
                 break
             except Exception as e:
+                traceback.print_exc()
                 error = "error processing request of type %s: %s" % (msg, e)
                 logger.error(error)
                 response = udf_pb2.Response()
                 response.error.error = error
                 self.write_response(response)
+                break
 
 # Indicates the end of a file/stream has been reached.
 class EOF(Exception):
