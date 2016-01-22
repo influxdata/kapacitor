@@ -460,20 +460,24 @@ func (p *UDFProcess) watchKeepalive() {
 	defer func() {
 		if err != nil {
 			p.setError(err)
+			aborted := make(chan struct{})
 			go func() {
 				timeout := p.keepaliveTimeout * 2
 				if timeout <= 0 {
 					timeout = time.Second
 				}
 				time.Sleep(timeout)
-				p.mu.Lock()
-				defer p.mu.Unlock()
-				if !p.stopped {
+				select {
+				case <-aborted:
+					// We cleanly aborted process is stopped
+				default:
+					// We failed to abort just kill it.
 					p.logger.Println("E! process not responding! killing")
 					p.kill()
 				}
 			}()
 			p.abort()
+			close(aborted)
 		}
 	}()
 	defer p.requestsGroup.Done()
@@ -640,7 +644,10 @@ func (p *UDFProcess) writeBatch(b models.Batch) error {
 
 	req.Message = &udf.Request_End{
 		&udf.EndBatch{
-			Name: b.Name,
+			Name:  b.Name,
+			Group: string(b.Group),
+			Tmax:  b.TMax.UnixNano(),
+			Tags:  b.Tags,
 		},
 	}
 	return p.writeRequest(req)
@@ -746,7 +753,7 @@ func (p *UDFProcess) handleResponse(response *udf.Response) error {
 		}
 	case *udf.Response_End:
 		p.batch.Name = msg.End.Name
-		p.batch.TMax = time.Unix(0, msg.End.TMax)
+		p.batch.TMax = time.Unix(0, msg.End.Tmax)
 		p.batch.Group = models.GroupID(msg.End.Group)
 		p.batch.Tags = msg.End.Tags
 		select {

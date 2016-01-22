@@ -459,10 +459,10 @@ func (m *Point) GetFieldsString() map[string]string {
 // Indicates the end of a batch and contains
 // all meta data associated with the batch.
 type EndBatch struct {
-	Name  string            `protobuf:"bytes,1,opt,name=Name,proto3" json:"Name,omitempty"`
-	Group string            `protobuf:"bytes,2,opt,name=Group,proto3" json:"Group,omitempty"`
-	TMax  int64             `protobuf:"varint,3,opt,name=TMax,proto3" json:"TMax,omitempty"`
-	Tags  map[string]string `protobuf:"bytes,4,rep,name=Tags" json:"Tags,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Name  string            `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Group string            `protobuf:"bytes,2,opt,name=group,proto3" json:"group,omitempty"`
+	Tmax  int64             `protobuf:"varint,3,opt,name=tmax,proto3" json:"tmax,omitempty"`
+	Tags  map[string]string `protobuf:"bytes,4,rep,name=tags" json:"tags,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
 func (m *EndBatch) Reset()         { *m = EndBatch{} }
