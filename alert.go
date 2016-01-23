@@ -144,6 +144,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		an.handlers = append(an.handlers, func(ad *AlertData) { an.handlePagerDuty(&pipeline.PagerDutyHandler{}, ad) })
 	}
 
+	for _, sensu := range n.SensuHandlers {
+		sensu := sensu
+		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleSensu(sensu, ad) })
+	}
+
 	for _, slack := range n.SlackHandlers {
 		slack := slack
 		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleSlack(slack, ad) })
@@ -568,6 +573,23 @@ func (a *AlertNode) handlePagerDuty(pd *pipeline.PagerDutyHandler, ad *AlertData
 	)
 	if err != nil {
 		a.logger.Println("E! failed to send alert data to PagerDuty:", err)
+		return
+	}
+}
+
+func (a *AlertNode) handleSensu(sensu *pipeline.SensuHandler, ad *AlertData) {
+	if a.et.tm.SensuService == nil {
+		a.logger.Println("E! failed to send Sensu message. Sensu is not enabled")
+		return
+	}
+
+	err := a.et.tm.SensuService.Alert(
+		ad.ID,
+		ad.Message,
+		ad.Level,
+	)
+	if err != nil {
+		a.logger.Println("E! failed to send alert data to Sensu:", err)
 		return
 	}
 }

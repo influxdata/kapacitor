@@ -23,6 +23,7 @@ import (
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
+	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/udf"
@@ -1307,6 +1308,74 @@ stream
 
 	if requestCount != 1 {
 		t.Errorf("got %v exp %v", requestCount, 1)
+	}
+}
+
+func TestStream_AlertSensu(t *testing.T) {
+	requestCount := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		type postData struct {
+			Name   string `json:"name"`
+			Source string `json:"source"`
+			Output string `json:"output"`
+			Status int    `json:"status"`
+		}
+		pd := postData{}
+		dec := json.NewDecoder(r.Body)
+		dec.Decode(&pd)
+
+		if exp := "Kapacitor"; pd.Source != exp {
+			t.Errorf("unexpected source got %s exp %s", pd.Source, exp)
+		}
+
+		if exp := "kapacitor/cpu/serverA is CRITICAL"; pd.Output != exp {
+			t.Errorf("unexpected text got %s exp %s", pd.Output, exp)
+		}
+
+		if exp := "kapacitor/cpu/serverA"; pd.Name != exp {
+			t.Errorf("unexpected text got %s exp %s", pd.Name, exp)
+		}
+
+		if exp := 2; pd.Status != exp {
+			t.Errorf("unexpected status got %s exp %s", pd.Status, exp)
+		}
+	}))
+	defer ts.Close()
+
+	var script = `
+stream
+	.from().measurement('cpu')
+	.where(lambda: "host" == 'serverA')
+	.groupBy('host')
+	.window()
+		.period(10s)
+		.every(10s)
+	.mapReduce(influxql.count('value'))
+	.alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.sensu()
+`
+
+	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
+	defer tm.Close()
+
+	c := sensu.NewConfig()
+	c.URL = ts.URL
+	c.Source = "Kapacitor"
+	sl := sensu.NewService(c, logService.NewLogger("[test_sensu] ", log.LstdFlags))
+	tm.SensuService = sl
+
+	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if requestCount != 1 {
+		t.Errorf("unexpected requestCount got %d exp 1", requestCount)
 	}
 }
 

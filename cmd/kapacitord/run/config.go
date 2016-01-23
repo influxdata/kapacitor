@@ -20,6 +20,7 @@ import (
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/replay"
 	"github.com/influxdata/kapacitor/services/reporting"
+	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/stats"
@@ -49,6 +50,7 @@ type Config struct {
 	OpsGenie  opsgenie.Config   `toml:"opsgenie"`
 	VictorOps victorops.Config  `toml:"victorops"`
 	PagerDuty pagerduty.Config  `toml:"pagerduty"`
+	Sensu     sensu.Config      `toml:"sensu"`
 	Slack     slack.Config      `toml:"slack"`
 	HipChat   hipchat.Config    `toml:"hipchat"`
 	Alerta    alerta.Config     `toml:"alerta"`
@@ -79,6 +81,7 @@ func NewConfig() *Config {
 	c.OpsGenie = opsgenie.NewConfig()
 	c.VictorOps = victorops.NewConfig()
 	c.PagerDuty = pagerduty.NewConfig()
+	c.Sensu = sensu.NewConfig()
 	c.Slack = slack.NewConfig()
 	c.HipChat = hipchat.NewConfig()
 	c.Alerta = alerta.NewConfig()
@@ -133,6 +136,10 @@ func (c *Config) Validate() error {
 		return err
 	}
 	err = c.UDF.Validate()
+	if err != nil {
+		return err
+	}
+	err = c.Sensu.Validate()
 	if err != nil {
 		return err
 	}
