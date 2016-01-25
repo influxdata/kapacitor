@@ -193,6 +193,7 @@ const intervalMarker = "INTERVAL"
 //
 // - Threshold -- trigger alert if throughput drops below threshold in points/interval.
 // - Interval -- how often to check the throughput.
+// - Expressions -- optional list of expressions to also evaluate. Useful for time of day alerting.
 //
 // Example:
 //    var data = stream.from()...
@@ -226,13 +227,22 @@ const intervalMarker = "INTERVAL"
 //    //Do normal processing of data
 //    data....
 //
-func (n *node) Deadman(threshold float64, interval time.Duration) *AlertNode {
+// You can specify additional lambda expressions to further constrain when the deadman's switch is triggered.
+// Example:
+//    var data = stream.from()...
+//    // Trigger critical alert if the throughput drops below 100 points per 10s and checked every 10s.
+//    // Only trigger the alert if the time of day is between 8am-5pm.
+//    data.deadman(100.0, 10s, lambda: hour("time") >= 8 AND hour("time") <= 17)
+//    //Do normal processing of data
+//    data....
+//
+func (n *node) Deadman(threshold float64, interval time.Duration, expr ...tick.Node) *AlertNode {
 	dn := n.Stats(interval).
 		Derivative("collected").NonNegative()
 	dn.Unit = interval
 
 	an := dn.Alert()
-	an.Crit = &tick.BinaryNode{
+	critExpr := &tick.BinaryNode{
 		Operator: tick.TokenLessEqual,
 		Left: &tick.ReferenceNode{
 			Reference: "collected",
@@ -242,6 +252,15 @@ func (n *node) Deadman(threshold float64, interval time.Duration) *AlertNode {
 			Float64: threshold,
 		},
 	}
+	// Add any additional expressions
+	for _, e := range expr {
+		critExpr = &tick.BinaryNode{
+			Operator: tick.TokenAnd,
+			Left:     critExpr,
+			Right:    e,
+		}
+	}
+	an.Crit = critExpr
 	// Replace NODE_NAME with actual name of the node in the Id.
 	an.Id = strings.Replace(n.pipeline().deadman.Id(), nodeNameMarker, n.Name(), 1)
 	// Set the message on the alert node.

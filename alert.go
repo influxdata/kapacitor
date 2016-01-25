@@ -217,7 +217,7 @@ func (a *AlertNode) runAlert([]byte) error {
 	switch a.Wants() {
 	case pipeline.StreamEdge:
 		for p, ok := a.ins[0].NextPoint(); ok; p, ok = a.ins[0].NextPoint() {
-			l := a.determineLevel(p.Fields, p.Tags)
+			l := a.determineLevel(p.Time, p.Fields, p.Tags)
 			state := a.updateState(l, p.Group)
 			if (a.a.UseFlapping && state.flapping) || (a.a.IsStateChangesOnly && !state.changed) {
 				continue
@@ -243,7 +243,7 @@ func (a *AlertNode) runAlert([]byte) error {
 		for b, ok := a.ins[0].NextBatch(); ok; b, ok = a.ins[0].NextBatch() {
 			triggered := false
 			for _, p := range b.Points {
-				l := a.determineLevel(p.Fields, p.Tags)
+				l := a.determineLevel(p.Time, p.Fields, p.Tags)
 				if l > OKAlert {
 					triggered = true
 					state := a.updateState(l, b.Group)
@@ -281,12 +281,12 @@ func (a *AlertNode) runAlert([]byte) error {
 	return nil
 }
 
-func (a *AlertNode) determineLevel(fields models.Fields, tags map[string]string) (level AlertLevel) {
+func (a *AlertNode) determineLevel(now time.Time, fields models.Fields, tags map[string]string) (level AlertLevel) {
 	for l, se := range a.levels {
 		if se == nil {
 			continue
 		}
-		if pass, err := EvalPredicate(se, fields, tags); pass {
+		if pass, err := EvalPredicate(se, now, fields, tags); pass {
 			level = AlertLevel(l)
 		} else if err != nil {
 			a.logger.Println("E! error evaluating expression:", err)

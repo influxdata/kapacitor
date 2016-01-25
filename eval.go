@@ -3,6 +3,7 @@ package kapacitor
 import (
 	"errors"
 	"log"
+	"time"
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
@@ -38,7 +39,7 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 	switch e.Provides() {
 	case pipeline.StreamEdge:
 		for p, ok := e.ins[0].NextPoint(); ok; p, ok = e.ins[0].NextPoint() {
-			fields, err := e.eval(p.Fields, p.Tags)
+			fields, err := e.eval(p.Time, p.Fields, p.Tags)
 			if err != nil {
 				return err
 			}
@@ -53,7 +54,7 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 	case pipeline.BatchEdge:
 		for b, ok := e.ins[0].NextBatch(); ok; b, ok = e.ins[0].NextBatch() {
 			for i, p := range b.Points {
-				fields, err := e.eval(p.Fields, p.Tags)
+				fields, err := e.eval(p.Time, p.Fields, p.Tags)
 				if err != nil {
 					return err
 				}
@@ -70,8 +71,8 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 	return nil
 }
 
-func (e *EvalNode) eval(fields models.Fields, tags map[string]string) (models.Fields, error) {
-	vars, err := mergeFieldsAndTags(fields, tags)
+func (e *EvalNode) eval(now time.Time, fields models.Fields, tags map[string]string) (models.Fields, error) {
+	vars, err := mergeFieldsAndTags(now, fields, tags)
 	if err != nil {
 		return nil, err
 	}

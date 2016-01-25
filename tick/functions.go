@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"time"
 )
 
 var ErrNotFloat = errors.New("value is not a float")
@@ -70,6 +71,14 @@ func init() {
 	statelessFuncs["y0"] = newMath1("y0", math.Y0)
 	statelessFuncs["y1"] = newMath1("y1", math.Y1)
 	statelessFuncs["yn"] = newMathIF("yn", math.Yn)
+
+	// Time functions
+	statelessFuncs["minute"] = &minute{}
+	statelessFuncs["hour"] = &hour{}
+	statelessFuncs["weekday"] = &weekday{}
+	statelessFuncs["day"] = &day{}
+	statelessFuncs["month"] = &month{}
+	statelessFuncs["year"] = &year{}
 }
 
 // Return set of built-in Funcs
@@ -329,4 +338,124 @@ func (s *sigma) Call(args ...interface{}) (interface{}, error) {
 		return float64(0), nil
 	}
 	return math.Abs(x-s.mean) / math.Sqrt(s.variance), nil
+}
+
+type minute struct {
+}
+
+func (*minute) Reset() {
+}
+
+// Return the minute within the hour for the given time, within the range [0,59].
+func (*minute) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 1 {
+		return 0, errors.New("minute expects exactly one argument")
+	}
+	switch a := args[0].(type) {
+	case time.Time:
+		v = int64(a.Minute())
+	default:
+		err = fmt.Errorf("cannot convert %T to time.Time", a)
+	}
+	return
+}
+
+type hour struct {
+}
+
+func (*hour) Reset() {
+}
+
+// Return the hour within the day for the given time, within the range [0,23].
+func (*hour) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 1 {
+		return 0, errors.New("hour expects exactly one argument")
+	}
+	switch a := args[0].(type) {
+	case time.Time:
+		v = int64(a.Hour())
+	default:
+		err = fmt.Errorf("cannot convert %T to time.Time", a)
+	}
+	return
+}
+
+type weekday struct {
+}
+
+func (*weekday) Reset() {
+}
+
+// Return the weekday within the week for the given time, within the range [0,6] where 0 is Sunday.
+func (*weekday) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 1 {
+		return 0, errors.New("weekday expects exactly one argument")
+	}
+	switch a := args[0].(type) {
+	case time.Time:
+		v = int64(a.Weekday())
+	default:
+		err = fmt.Errorf("cannot convert %T to time.Time", a)
+	}
+	return
+}
+
+type day struct {
+}
+
+func (*day) Reset() {
+}
+
+// Return the day within the month for the given time, within the range [1,31] depending on the month.
+func (*day) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 1 {
+		return 0, errors.New("day expects exactly one argument")
+	}
+	switch a := args[0].(type) {
+	case time.Time:
+		v = int64(a.Day())
+	default:
+		err = fmt.Errorf("cannot convert %T to time.Time", a)
+	}
+	return
+}
+
+type month struct {
+}
+
+func (*month) Reset() {
+}
+
+// Return the month within the year for the given time, within the range [1,12].
+func (*month) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 1 {
+		return 0, errors.New("month expects exactly one argument")
+	}
+	switch a := args[0].(type) {
+	case time.Time:
+		v = int64(a.Month())
+	default:
+		err = fmt.Errorf("cannot convert %T to time.Time", a)
+	}
+	return
+}
+
+type year struct {
+}
+
+func (*year) Reset() {
+}
+
+// Return the year for the given time.
+func (*year) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 1 {
+		return 0, errors.New("year expects exactly one argument")
+	}
+	switch a := args[0].(type) {
+	case time.Time:
+		v = int64(a.Year())
+	default:
+		err = fmt.Errorf("cannot convert %T to time.Time", a)
+	}
+	return
 }
