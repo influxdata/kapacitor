@@ -67,7 +67,7 @@ func (s *StreamNode) matches(p models.Point) bool {
 		return false
 	}
 	if s.expression != nil {
-		if pass, err := EvalPredicate(s.expression, p.Fields, p.Tags); err != nil {
+		if pass, err := EvalPredicate(s.expression, p.Time, p.Fields, p.Tags); err != nil {
 			s.logger.Println("E! error while evaluating WHERE expression:", err)
 			return false
 		} else {
