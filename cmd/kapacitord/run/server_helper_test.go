@@ -148,7 +148,7 @@ func (s *Server) Write(db, rp, body string, params url.Values) (results string, 
 	if params.Get("rp") == "" {
 		params.Set("rp", rp)
 	}
-	resp, err := http.Post(s.URL()+"/api/v1/write?"+params.Encode(), "", strings.NewReader(body))
+	resp, err := http.Post(s.URL()+"/write?"+params.Encode(), "", strings.NewReader(body))
 	if err != nil {
 		return "", err
 	} else if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
@@ -166,26 +166,26 @@ func (s *Server) DefineTask(name, ttype, tick string, dbrps []kapacitor.DBRP) (r
 	v.Add("name", name)
 	v.Add("type", ttype)
 	v.Add("dbrps", string(dbrpsStr))
-	results, err = s.HTTPPost(s.URL()+"/api/v1/task?"+v.Encode(), []byte(tick))
+	results, err = s.HTTPPost(s.URL()+"/task?"+v.Encode(), []byte(tick))
 	return
 }
 
 func (s *Server) EnableTask(name string) (string, error) {
 	v := url.Values{}
 	v.Add("name", name)
-	return s.HTTPPost(s.URL()+"/api/v1/enable?"+v.Encode(), nil)
+	return s.HTTPPost(s.URL()+"/enable?"+v.Encode(), nil)
 }
 
 func (s *Server) DisableTask(name string) (string, error) {
 	v := url.Values{}
 	v.Add("name", name)
-	return s.HTTPPost(s.URL()+"/api/v1/disable?"+v.Encode(), nil)
+	return s.HTTPPost(s.URL()+"/disable?"+v.Encode(), nil)
 }
 
 func (s *Server) DeleteTask(name string) error {
 	v := url.Values{}
 	v.Add("name", name)
-	req, err := http.NewRequest("DELETE", s.URL()+"/api/v1/task?"+v.Encode(), nil)
+	req, err := http.NewRequest("DELETE", s.URL()+"/task?"+v.Encode(), nil)
 	if err != nil {
 		return err
 	}
@@ -214,7 +214,7 @@ func (s *Server) DeleteTask(name string) error {
 func (s *Server) GetTask(name string) (ti task_store.TaskInfo, err error) {
 	v := url.Values{}
 	v.Add("name", name)
-	resp, err := http.Get(s.URL() + "/api/v1/task?" + v.Encode())
+	resp, err := http.Get(s.URL() + "/task?" + v.Encode())
 	if err != nil {
 		return
 	}
@@ -251,7 +251,7 @@ func (s *Server) DoStreamRecording(name string, duration time.Duration, started 
 	v.Add("type", "stream")
 	v.Add("name", name)
 	v.Add("duration", duration.String())
-	r, err := http.Post(s.URL()+"/api/v1/record?"+v.Encode(), "", nil)
+	r, err := http.Post(s.URL()+"/record?"+v.Encode(), "", nil)
 	if err != nil {
 		return
 	}
@@ -277,7 +277,7 @@ func (s *Server) DoStreamRecording(name string, duration time.Duration, started 
 	close(started)
 	v = url.Values{}
 	v.Add("id", id)
-	_, err = s.HTTPGet(s.URL() + "/api/v1/record?" + v.Encode())
+	_, err = s.HTTPGet(s.URL() + "/record?" + v.Encode())
 	return
 }
 
@@ -286,7 +286,7 @@ func (s *Server) DoBatchRecording(name string, past time.Duration) (id string, e
 	v.Add("type", "batch")
 	v.Add("name", name)
 	v.Add("past", past.String())
-	r, err := http.Post(s.URL()+"/api/v1/record?"+v.Encode(), "", nil)
+	r, err := http.Post(s.URL()+"/record?"+v.Encode(), "", nil)
 	if err != nil {
 		return
 	}
@@ -311,7 +311,7 @@ func (s *Server) DoBatchRecording(name string, past time.Duration) (id string, e
 	id = rp.RecordingID
 	v = url.Values{}
 	v.Add("id", id)
-	_, err = s.HTTPGet(s.URL() + "/api/v1/record?" + v.Encode())
+	_, err = s.HTTPGet(s.URL() + "/record?" + v.Encode())
 	return
 }
 
@@ -321,7 +321,7 @@ func (s *Server) DoReplay(name, id string) (string, error) {
 	v.Add("id", id)
 	v.Add("clock", "fast")
 	v.Add("rec-time", "true")
-	return s.HTTPPost(s.URL()+"/api/v1/replay?"+v.Encode(), nil)
+	return s.HTTPPost(s.URL()+"/replay?"+v.Encode(), nil)
 }
 
 // NewConfig returns the default config with temporary paths.
