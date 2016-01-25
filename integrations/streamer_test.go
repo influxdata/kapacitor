@@ -1338,7 +1338,7 @@ func TestStream_AlertSensu(t *testing.T) {
 		}
 
 		if exp := 2; pd.Status != exp {
-			t.Errorf("unexpected status got %s exp %s", pd.Status, exp)
+			t.Errorf("unexpected status got %v exp %v", pd.Status, exp)
 		}
 	}))
 	defer ts.Close()
