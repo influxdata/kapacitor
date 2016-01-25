@@ -152,9 +152,10 @@ func TestProcess_StartInfoAbort(t *testing.T) {
 }
 
 func TestProcess_Keepalive(t *testing.T) {
+	t.Parallel()
 	cmd := cmd_test.NewCommandHelper()
 	l := log.New(os.Stderr, "[TestProcess_Keepalive] ", log.LstdFlags)
-	p := kapacitor.NewUDFProcess(cmd, l, time.Millisecond*10, nil)
+	p := kapacitor.NewUDFProcess(cmd, l, time.Millisecond*100, nil)
 	p.Start()
 	p.Init(nil)
 	req := <-cmd.Requests
@@ -168,7 +169,7 @@ func TestProcess_Keepalive(t *testing.T) {
 		t.Fatal("expected keepalive message")
 	}
 	if req == nil {
-		t.Fatal("expected keepalive message got nil")
+		t.Fatal("expected keepalive message got nil, cmd was killed.")
 	}
 	_, ok = req.Message.(*udf.Request_Keepalive)
 	if !ok {
@@ -186,6 +187,7 @@ func TestProcess_Keepalive(t *testing.T) {
 }
 
 func TestProcess_MissedKeepalive(t *testing.T) {
+	t.Parallel()
 	abortCalled := make(chan struct{})
 	aborted := func() {
 		close(abortCalled)
@@ -193,7 +195,7 @@ func TestProcess_MissedKeepalive(t *testing.T) {
 
 	cmd := cmd_test.NewCommandHelper()
 	l := log.New(os.Stderr, "[TestProcess_MissedKeepalive] ", log.LstdFlags)
-	p := kapacitor.NewUDFProcess(cmd, l, 2, aborted)
+	p := kapacitor.NewUDFProcess(cmd, l, time.Millisecond*100, aborted)
 	p.Start()
 
 	// Since the keepalive is missed, the process should abort on its own.
@@ -202,7 +204,7 @@ func TestProcess_MissedKeepalive(t *testing.T) {
 
 	select {
 	case <-abortCalled:
-	case <-time.After(time.Second * 20):
+	case <-time.After(time.Second):
 		t.Error("expected abort callback to be called")
 	}
 
@@ -213,14 +215,15 @@ func TestProcess_MissedKeepalive(t *testing.T) {
 }
 
 func TestProcess_MissedKeepaliveInit(t *testing.T) {
+	t.Parallel()
 	abortCalled := make(chan struct{})
 	aborted := func() {
 		close(abortCalled)
 	}
 
 	cmd := cmd_test.NewCommandHelper()
-	l := log.New(os.Stderr, "[TestProcess_MissedKeepalive] ", log.LstdFlags)
-	p := kapacitor.NewUDFProcess(cmd, l, 2, aborted)
+	l := log.New(os.Stderr, "[TestProcess_MissedKeepaliveInit] ", log.LstdFlags)
+	p := kapacitor.NewUDFProcess(cmd, l, time.Millisecond*100, aborted)
 	p.Start()
 	p.Init(nil)
 
@@ -230,7 +233,7 @@ func TestProcess_MissedKeepaliveInit(t *testing.T) {
 
 	select {
 	case <-abortCalled:
-	case <-time.After(time.Second * 20):
+	case <-time.After(time.Second):
 		t.Error("expected abort callback to be called")
 	}
 	close(cmd.Responses)
@@ -240,14 +243,15 @@ func TestProcess_MissedKeepaliveInit(t *testing.T) {
 }
 
 func TestProcess_MissedKeepaliveInfo(t *testing.T) {
+	t.Parallel()
 	abortCalled := make(chan struct{})
 	aborted := func() {
 		close(abortCalled)
 	}
 
 	cmd := cmd_test.NewCommandHelper()
-	l := log.New(os.Stderr, "[TestProcess_MissedKeepalive] ", log.LstdFlags)
-	p := kapacitor.NewUDFProcess(cmd, l, 2, aborted)
+	l := log.New(os.Stderr, "[TestProcess_MissedKeepaliveInfo] ", log.LstdFlags)
+	p := kapacitor.NewUDFProcess(cmd, l, time.Millisecond*100, aborted)
 	p.Start()
 	p.Info()
 
@@ -257,7 +261,7 @@ func TestProcess_MissedKeepaliveInfo(t *testing.T) {
 
 	select {
 	case <-abortCalled:
-	case <-time.After(time.Second * 20):
+	case <-time.After(time.Second):
 		t.Error("expected abort callback to be called")
 	}
 	close(cmd.Responses)

@@ -17,8 +17,8 @@ import (
 	"github.com/influxdb/influxdb"
 	"github.com/influxdb/influxdb/cluster"
 	"github.com/influxdb/influxdb/influxql"
-	"github.com/influxdb/influxdb/meta"
 	"github.com/influxdb/influxdb/models"
+	"github.com/influxdb/influxdb/services/meta"
 	"github.com/influxdb/influxdb/uuid"
 )
 
@@ -51,7 +51,7 @@ type Handler struct {
 	requireAuthentication bool
 	Version               string
 
-	MetaStore interface {
+	MetaClient interface {
 		Database(name string) (*meta.DatabaseInfo, error)
 		Authenticate(username, password string) (ui *meta.UserInfo, err error)
 		Users() ([]meta.UserInfo, error)
@@ -330,7 +330,7 @@ func (h *Handler) serveWriteLine(w http.ResponseWriter, r *http.Request, body []
 		return
 	}
 
-	if di, err := h.MetaStore.Database(database); err != nil {
+	if di, err := h.MetaClient.Database(database); err != nil {
 		h.writeError(w, influxql.Result{Err: fmt.Errorf("metastore database error: %s", err)}, http.StatusInternalServerError)
 		return
 	} else if di == nil {
