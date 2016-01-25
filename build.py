@@ -77,9 +77,10 @@ targets = {
 
 supported_arches = [ 'amd64' ]
 supported_packages = {
-    "darwin": [ "tar", "zip" ],
-    "linux": [ "deb", "rpm", "tar", "zip" ],
-    "windows": [ "zip" ],
+    "darwin": [ "tar"],
+    "linux": [ "deb", "rpm", "tar"],
+    #"windows": [ "zip" ], Windows zips are crap, bad paths etc.
+    # Need a real solution
 }
 
 def run(command, allow_failure=False, shell=False):
@@ -351,6 +352,9 @@ def build_packages(build_output, version, rc):
                         iteration = '0.rc{}'.format(rc)
                     if package_type in ['zip', 'tar']:
                         name = '{}-{}-{}_{}_{}'.format(name, version, iteration, p, a)
+                    loc = current_location
+                    if package_type == 'tar':
+                        loc = os.path.join(current_location, name + '.tar.gz')
                     fpm_command = "fpm {} --name {} -t {} --version {} --iteration {} -C {} -p {} ".format(
                             fpm_common_args,
                             name,
@@ -358,7 +362,7 @@ def build_packages(build_output, version, rc):
                             version,
                             iteration,
                             build_root,
-                            current_location,
+                            loc,
                         )
                     out = run(fpm_command, shell=True)
                     matches = re.search(':path=>"(.*)"', out)

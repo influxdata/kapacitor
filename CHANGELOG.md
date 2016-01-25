@@ -29,6 +29,7 @@ See note on a breaking change in the HTTP API below. #163
 - [#163](https://github.com/influxdata/kapacitor/issues/163): BREAKING CHANGE: Removed the 'api/v1' pathing from the HTTP API so that Kapacitor is 
     path compatible with InfluxDB. While this is a breaking change the kapacitor cli has been updated accordingly and you will not experience any distruptions unless you 
     were calling the HTTP API directly.
+- [#147](https://github.com/influxdata/kapacitor/issues/147): Compress .tar archives from builds.
 
 ## v0.2.4 [2016-01-07]
 
