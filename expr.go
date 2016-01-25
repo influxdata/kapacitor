@@ -23,7 +23,7 @@ func EvalPredicate(se *tick.StatefulExpr, now time.Time, fields models.Fields, t
 
 func mergeFieldsAndTags(now time.Time, fields models.Fields, tags models.Tags) (*tick.Scope, error) {
 	scope := tick.NewScope()
-	scope.Set("time", now)
+	scope.Set("time", now.Local())
 	for k, v := range fields {
 		if _, ok := tags[k]; ok {
 			return nil, fmt.Errorf("cannot have field and tags with same name %q", k)
