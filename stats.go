@@ -46,7 +46,7 @@ func (s *StatsNode) runStats([]byte) error {
 		case <-s.closing:
 			return nil
 		case now := <-ticker.C:
-			point.Time = now
+			point.Time = now.UTC()
 			count := s.en.collectedCount()
 			point.Fields = models.Fields{"collected": count}
 			for _, out := range s.outs {
