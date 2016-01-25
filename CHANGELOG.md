@@ -21,6 +21,7 @@ See note on a breaking change in the HTTP API below. #163
 - [#137](https://github.com/influxdata/kapacitor/issues/137): Add deadman's switch. Can be setup via TICKscript and globally via configuration.
 - [#72](https://github.com/influxdata/kapacitor/issues/72): Add support for User Defined Functions (UDFs).
 - [#139](https://github.com/influxdata/kapacitor/issues/139): Alerta.io support thanks! @md14454
+- [#85](https://github.com/influxdata/kapacitor/issues/85): Sensu support using JIT clients. Thanks @sstarcher!
 
 ### Bugfixes
 - [#153](https://github.com/influxdata/kapacitor/issues/153): Fix panic if referencing non existant field in MapReduce function.
