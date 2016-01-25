@@ -23,6 +23,7 @@ This way you can easily tell which versions of Telegraf, InfluxDB, Chronograf an
 ### Bugfixes
 - [#153](https://github.com/influxdata/kapacitor/issues/153): Fix panic if referencing non existant field in MapReduce function.
 - [#138](https://github.com/influxdata/kapacitor/issues/138): Change over to influxdata github org.
+- [#164](https://github.com/influxdata/kapacitor/issues/164): Update imports etc from InfluxDB as per the new meta store/client changes.
 
 ## v0.2.4 [2016-01-07]
 

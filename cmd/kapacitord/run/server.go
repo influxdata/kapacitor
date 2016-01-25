@@ -33,9 +33,9 @@ import (
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/wlog"
 	"github.com/influxdb/influxdb/influxql"
-	"github.com/influxdb/influxdb/meta"
 	"github.com/influxdb/influxdb/services/collectd"
 	"github.com/influxdb/influxdb/services/graphite"
+	"github.com/influxdb/influxdb/services/meta"
 	"github.com/influxdb/influxdb/services/opentsdb"
 	"github.com/twinj/uuid"
 )
@@ -89,7 +89,7 @@ type Server struct {
 	ReplayService   *replay.Service
 	InfluxDBService *influxdb.Service
 
-	MetaStore     *metastore
+	MetaClient    *metaclient
 	QueryExecutor *queryexecutor
 
 	Services []Service
@@ -117,7 +117,7 @@ func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*
 		hostname:      c.Hostname,
 		err:           make(chan error),
 		LogService:    logService,
-		MetaStore:     &metastore{},
+		MetaClient:    &metaclient{},
 		QueryExecutor: &queryexecutor{},
 		Logger:        l,
 	}
@@ -193,7 +193,7 @@ func (s *Server) appendHTTPDService(c httpd.Config) {
 	l := s.LogService.NewLogger("[httpd] ", log.LstdFlags)
 	srv := httpd.NewService(c, l)
 
-	srv.Handler.MetaStore = s.MetaStore
+	srv.Handler.MetaClient = s.MetaClient
 	srv.Handler.PointsWriter = s.TaskMaster
 	srv.Handler.Version = s.buildInfo.Version
 
@@ -309,7 +309,7 @@ func (s *Server) appendCollectdService(c collectd.Config) {
 	l := s.LogService.NewStaticLevelLogger("[collectd] ", log.LstdFlags, wlog.INFO)
 	srv := collectd.NewService(c)
 	srv.SetLogger(l)
-	srv.MetaStore = s.MetaStore
+	srv.MetaClient = s.MetaClient
 	srv.PointsWriter = s.TaskMaster
 	s.Services = append(s.Services, srv)
 }
@@ -325,7 +325,7 @@ func (s *Server) appendOpenTSDBService(c opentsdb.Config) error {
 	}
 	srv.SetLogger(l)
 	srv.PointsWriter = s.TaskMaster
-	srv.MetaStore = s.MetaStore
+	srv.MetaClient = s.MetaClient
 	s.Services = append(s.Services, srv)
 	return nil
 }
@@ -342,7 +342,7 @@ func (s *Server) appendGraphiteService(c graphite.Config) error {
 	srv.SetLogger(l)
 
 	srv.PointsWriter = s.TaskMaster
-	srv.MetaStore = s.MetaStore
+	srv.MetaClient = s.MetaClient
 	s.Services = append(s.Services, srv)
 	return nil
 }
@@ -547,23 +547,23 @@ type tcpaddr struct{ host string }
 func (a *tcpaddr) Network() string { return "tcp" }
 func (a *tcpaddr) String() string  { return a.host }
 
-type metastore struct{}
+type metaclient struct{}
 
-func (m *metastore) WaitForLeader(d time.Duration) error {
+func (m *metaclient) WaitForLeader(d time.Duration) error {
 	return nil
 }
-func (m *metastore) CreateDatabaseIfNotExists(name string) (*meta.DatabaseInfo, error) {
+func (m *metaclient) CreateDatabase(name string) (*meta.DatabaseInfo, error) {
 	return nil, nil
 }
-func (m *metastore) Database(name string) (*meta.DatabaseInfo, error) {
+func (m *metaclient) Database(name string) (*meta.DatabaseInfo, error) {
 	return &meta.DatabaseInfo{
 		Name: name,
 	}, nil
 }
-func (m *metastore) Authenticate(username, password string) (ui *meta.UserInfo, err error) {
+func (m *metaclient) Authenticate(username, password string) (ui *meta.UserInfo, err error) {
 	return nil, errors.New("not authenticated")
 }
-func (m *metastore) Users() ([]meta.UserInfo, error) {
+func (m *metaclient) Users() ([]meta.UserInfo, error) {
 	return nil, errors.New("no user")
 }
 
