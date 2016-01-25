@@ -70,7 +70,7 @@ func (h *HTTPOutNode) runOut([]byte) error {
 		HandlerFunc: hndl,
 	}}
 
-	h.endpoint = h.et.tm.HTTPDService.URL() + httpd.APIRoot + p
+	h.endpoint = h.et.tm.HTTPDService.URL() + p
 	func() {
 		h.mu.Lock()
 		defer h.mu.Unlock()

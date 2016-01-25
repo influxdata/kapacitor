@@ -78,7 +78,7 @@ func main() {
 		url = *kapacitordURL
 	}
 
-	kapacitorEndpoint = url + "/api/v1"
+	kapacitorEndpoint = url
 
 	args := mainFlags.Args()
 

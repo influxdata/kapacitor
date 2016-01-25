@@ -27,7 +27,7 @@ import (
 func TestServer_Ping(t *testing.T) {
 	s := OpenDefaultServer()
 	defer s.Close()
-	r, err := s.HTTPGet(s.URL() + "/api/v1/ping")
+	r, err := s.HTTPGet(s.URL() + "/ping")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestServer_Ping(t *testing.T) {
 func TestServer_Version(t *testing.T) {
 	s := OpenDefaultServer()
 	defer s.Close()
-	resp, err := http.Get(s.URL() + "/api/v1/ping")
+	resp, err := http.Get(s.URL() + "/ping")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -308,7 +308,7 @@ stream
 		t.Fatal("unexpected result", r)
 	}
 
-	endpoint := fmt.Sprintf("%s/api/v1/%s/count", s.URL(), name)
+	endpoint := fmt.Sprintf("%s/%s/count", s.URL(), name)
 
 	// Request data before any writes and expect null responses
 	nullResponse := `{"Series":null,"Err":null}`
@@ -409,7 +409,7 @@ batch
 		t.Fatal("unexpected result", r)
 	}
 
-	endpoint := fmt.Sprintf("%s/api/v1/%s/count", s.URL(), name)
+	endpoint := fmt.Sprintf("%s/%s/count", s.URL(), name)
 
 	exp := `{"Series":[{"name":"cpu","columns":["time","count"],"values":[["1971-01-01T00:00:01.002Z",2]]}],"Err":null}`
 	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
@@ -790,7 +790,7 @@ stream
 		t.Fatal("unexpected result", r)
 	}
 
-	endpoint := fmt.Sprintf("%s/api/v1/%s/moving_avg", s.URL(), name)
+	endpoint := fmt.Sprintf("%s/%s/moving_avg", s.URL(), name)
 
 	// Request data before any writes and expect null responses
 	nullResponse := `{"Series":null,"Err":null}`

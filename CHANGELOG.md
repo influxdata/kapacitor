@@ -14,6 +14,8 @@ There are simple examples of how to use UDFs in [udf/agent/examples](https://git
 The version has jumped significantly so that it is inline with other projects in the TICK stack.
 This way you can easily tell which versions of Telegraf, InfluxDB, Chronograf and Kapacitor work together.
 
+See note on a breaking change in the HTTP API below. #163
+
 
 ### Features
 - [#137](https://github.com/influxdata/kapacitor/issues/137): Add deadman's switch. Can be setup via TICKscript and globally via configuration.
@@ -24,6 +26,9 @@ This way you can easily tell which versions of Telegraf, InfluxDB, Chronograf an
 - [#153](https://github.com/influxdata/kapacitor/issues/153): Fix panic if referencing non existant field in MapReduce function.
 - [#138](https://github.com/influxdata/kapacitor/issues/138): Change over to influxdata github org.
 - [#164](https://github.com/influxdata/kapacitor/issues/164): Update imports etc from InfluxDB as per the new meta store/client changes.
+- [#163](https://github.com/influxdata/kapacitor/issues/163): BREAKING CHANGE: Removed the 'api/v1' pathing from the HTTP API so that Kapacitor is 
+    path compatible with InfluxDB. While this is a breaking change the kapacitor cli has been updated accordingly and you will not experience any distruptions unless you 
+    were calling the HTTP API directly.
 
 ## v0.2.4 [2016-01-07]
 
