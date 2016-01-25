@@ -72,6 +72,9 @@ type TaskMaster struct {
 	AlertaService interface {
 		Alert(token, resource, event, environment, severity, status, group, value, message, origin string, data interface{}) error
 	}
+	SensuService interface {
+		Alert(name, output string, level AlertLevel) error
+	}
 	LogService LogService
 
 	// Incoming streams

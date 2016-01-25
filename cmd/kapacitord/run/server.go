@@ -24,6 +24,7 @@ import (
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/replay"
 	"github.com/influxdata/kapacitor/services/reporting"
+	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/stats"
@@ -143,6 +144,7 @@ func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*
 	s.appendHipChatService(c.HipChat)
 	s.appendAlertaService(c.Alerta)
 	s.appendSlackService(c.Slack)
+	s.appendSensuService(c.Sensu)
 
 	// Append InfluxDB services
 	s.appendCollectdService(c.Collectd)
@@ -267,6 +269,16 @@ func (s *Server) appendPagerDutyService(c pagerduty.Config) {
 		srv := pagerduty.NewService(c, l)
 		srv.HTTPDService = s.HTTPDService
 		s.TaskMaster.PagerDutyService = srv
+
+		s.Services = append(s.Services, srv)
+	}
+}
+
+func (s *Server) appendSensuService(c sensu.Config) {
+	if c.Enabled {
+		l := s.LogService.NewLogger("[sensu] ", log.LstdFlags)
+		srv := sensu.NewService(c, l)
+		s.TaskMaster.SensuService = srv
 
 		s.Services = append(s.Services, srv)
 	}

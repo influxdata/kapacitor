@@ -19,7 +19,7 @@ const defaultMessageTmpl = "{{ .ID }} is {{ .Level }}"
 // See AlertNode.Info, AlertNode.Warn, and AlertNode.Crit below.
 //
 // Different event handlers can be configured for each AlertNode.
-// Some handlers like Email, HipChat, Slack, OpsGenie, VictorOps and PagerDuty have a configuration
+// Some handlers like Email, HipChat, Sensu, Slack, OpsGenie, VictorOps and PagerDuty have a configuration
 // option 'global' that indicates that all alerts implicitly use the handler.
 //
 // Available event handlers:
@@ -30,6 +30,7 @@ const defaultMessageTmpl = "{{ .ID }} is {{ .Level }}"
 //    * exec -- Execute a command passing alert data over STDIN.
 //    * HipChat -- Post alert message to HipChat room.
 //    * Alerta -- Post alert message to Alerta.
+//    * Sensu -- Post alert message to Sensu client.
 //    * Slack -- Post alert message to Slack channel.
 //	  * OpsGenie -- Send alert to OpsGenie.
 //    * VictorOps -- Send alert to VictorOps.
@@ -189,6 +190,10 @@ type AlertNode struct {
 	// Send alert to PagerDuty.
 	// tick:ignore
 	PagerDutyHandlers []*PagerDutyHandler
+
+	// Send alert to Sensu.
+	// tick:ignore
+	SensuHandlers []*SensuHandler
 
 	// Send alert to Slack.
 	// tick:ignore
@@ -640,6 +645,35 @@ type AlertaHandler struct {
 	// Alerta origin.
 	// If empty uses the origin from the configuration.
 	Origin string
+}
+
+// Send the alert to Sensu.
+//
+// Example:
+//    [sensu]
+//      enabled = true
+//      url = "http://sensu:3030"
+//      source = "Kapacitor"
+//
+// Example:
+//    stream...
+//         .alert()
+//             .sensu()
+//
+// Send alerts to Sensu client.
+//
+// tick:property
+func (a *AlertNode) Sensu() *SensuHandler {
+	sensu := &SensuHandler{
+		AlertNode: a,
+	}
+	a.SensuHandlers = append(a.SensuHandlers, sensu)
+	return sensu
+}
+
+// tick:embedded:AlertNode.Sensu
+type SensuHandler struct {
+	*AlertNode
 }
 
 // Send the alert to Slack.
