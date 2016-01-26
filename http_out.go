@@ -59,7 +59,7 @@ func (h *HTTPOutNode) runOut([]byte) error {
 		}
 	}
 
-	p := path.Join("/", h.et.Task.Name, h.c.Endpoint)
+	p := path.Join("/task", h.et.Task.Name, h.c.Endpoint)
 
 	r := []httpd.Route{{
 		Name:        h.Name(),

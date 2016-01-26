@@ -4,8 +4,8 @@ package pipeline
 //
 // The cached data is available at the given endpoint.
 // The endpoint is the relative path from the API endpoint of the running task.
-// For example if the task endpoint is at "/api/v1/task/<task_name>" and endpoint is
-// "top10", then the data can be requested from "/api/v1/task/<task_name>/top10".
+// For example if the task endpoint is at "/task/<task_name>" and endpoint is
+// "top10", then the data can be requested from "/task/<task_name>/top10".
 //
 // Example:
 //    stream
