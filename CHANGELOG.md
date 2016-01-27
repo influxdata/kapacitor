@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.10.1 [unreleased]
+
+### Release Notes
+
+### Features
+
+### Bugfixes
+
+- [#177](https://github.com/influxdata/kapacitor/issues/177): Fix panic for show command on batch tasks.
+
 ## v0.10.0 [2016-01-26]
 
 ### Release Notes

@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"bytes"
 	"time"
 )
 
@@ -42,6 +43,12 @@ func (b *SourceBatchNode) Query(q string) *BatchNode {
 	n.QueryStr = q
 	b.linkChild(n)
 	return n
+}
+
+// Do not add the source batch node to the dot output
+// since its not really an edge.
+// tick:ignore
+func (b *SourceBatchNode) dot(buf *bytes.Buffer) {
 }
 
 // A BatchNode defines a source and a schedule for
