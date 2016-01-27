@@ -12,3 +12,4 @@ kapacitor*.deb
 kapacitor*.tar
 kapacitor*.zip
 *.pyc
+*.test

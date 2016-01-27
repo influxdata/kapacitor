@@ -31,7 +31,7 @@ type Handler interface {
 	Restore(*udf.RestoreRequest) (*udf.RestoreResponse, error)
 
 	// A batch has begun.
-	BeginBatch() error
+	BeginBatch(*udf.BeginBatch) error
 	// A point has arrived.
 	Point(*udf.Point) error
 	// The batch is complete.
@@ -194,7 +194,7 @@ func (a *Agent) readLoop() error {
 				Restore: restore,
 			}
 		case *udf.Request_Begin:
-			err := a.Handler.BeginBatch()
+			err := a.Handler.BeginBatch(msg.Begin)
 			if err != nil {
 				return err
 			}

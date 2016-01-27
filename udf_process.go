@@ -617,7 +617,11 @@ func (p *UDFProcess) typeMapsToFields(
 
 func (p *UDFProcess) writeBatch(b models.Batch) error {
 	req := &udf.Request{
-		Message: &udf.Request_Begin{&udf.BeginBatch{}},
+		Message: &udf.Request_Begin{&udf.BeginBatch{
+			Name:  b.Name,
+			Group: string(b.Group),
+			Tags:  b.Tags,
+		}},
 	}
 	err := p.writeRequest(req)
 	if err != nil {
@@ -753,7 +757,7 @@ func (p *UDFProcess) handleResponse(response *udf.Response) error {
 		}
 	case *udf.Response_End:
 		p.batch.Name = msg.End.Name
-		p.batch.TMax = time.Unix(0, msg.End.Tmax)
+		p.batch.TMax = time.Unix(0, msg.End.Tmax).UTC()
 		p.batch.Group = models.GroupID(msg.End.Group)
 		p.batch.Tags = msg.End.Tags
 		select {

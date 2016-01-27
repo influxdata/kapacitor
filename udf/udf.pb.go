@@ -402,12 +402,28 @@ func (*ErrorResponse) ProtoMessage()    {}
 // Indicates the beginning of a batch.
 // All subsequent points should be considered
 // part of the batch until EndBatch arrives.
+// This includes grouping. Batches of
+// differing groups may not be interleaved.
+//
+// All the meta data but tmax is provided,
+// since tmax may not be known at
+// the beginning of a batch.
 type BeginBatch struct {
+	Name  string            `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Group string            `protobuf:"bytes,2,opt,name=group,proto3" json:"group,omitempty"`
+	Tags  map[string]string `protobuf:"bytes,3,rep,name=tags" json:"tags,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
 func (m *BeginBatch) Reset()         { *m = BeginBatch{} }
 func (m *BeginBatch) String() string { return proto.CompactTextString(m) }
 func (*BeginBatch) ProtoMessage()    {}
+
+func (m *BeginBatch) GetTags() map[string]string {
+	if m != nil {
+		return m.Tags
+	}
+	return nil
+}
 
 // Message containing information about a single data point.
 // Can be sent on it's own or bookended by BeginBatch and EndBatch messages.
@@ -458,6 +474,9 @@ func (m *Point) GetFieldsString() map[string]string {
 
 // Indicates the end of a batch and contains
 // all meta data associated with the batch.
+// The same meta information is provided for
+// ease of use with the addition of tmax since it
+// may not be know at BeginBatch.
 type EndBatch struct {
 	Name  string            `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Group string            `protobuf:"bytes,2,opt,name=group,proto3" json:"group,omitempty"`

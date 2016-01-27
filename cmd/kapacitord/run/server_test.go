@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -697,7 +699,7 @@ batch
 	}
 }
 
-func TestServer_UDFAgents(t *testing.T) {
+func TestServer_UDFStreamAgents(t *testing.T) {
 	dir, err := os.Getwd()
 	udfDir := filepath.Clean(filepath.Join(dir, "../../../udf"))
 	if err != nil {
@@ -713,7 +715,7 @@ func TestServer_UDFAgents(t *testing.T) {
 			buildFunc: func() error { return nil },
 			config: udf.FunctionConfig{
 				Prog:    "go",
-				Args:    []string{"run", filepath.Join(udfDir, "agent/examples/moving_avg.go")},
+				Args:    []string{"run", filepath.Join(udfDir, "agent/examples/moving_avg/moving_avg.go")},
 				Timeout: toml.Duration(time.Minute),
 			},
 		},
@@ -722,7 +724,7 @@ func TestServer_UDFAgents(t *testing.T) {
 			buildFunc: func() error { return nil },
 			config: udf.FunctionConfig{
 				Prog:    "python2",
-				Args:    []string{"-u", filepath.Join(udfDir, "agent/examples/moving_avg.py")},
+				Args:    []string{"-u", filepath.Join(udfDir, "agent/examples/moving_avg/moving_avg.py")},
 				Timeout: toml.Duration(time.Minute),
 				Env: map[string]string{
 					"PYTHONPATH": strings.Join(
@@ -742,11 +744,11 @@ func TestServer_UDFAgents(t *testing.T) {
 		c.UDF.Functions = map[string]udf.FunctionConfig{
 			"movingAvg": agent.config,
 		}
-		testAgent(t, c)
+		testStreamAgent(t, c)
 	}
 }
 
-func testAgent(t *testing.T, c *run.Config) {
+func testStreamAgent(t *testing.T, c *run.Config) {
 	s := NewServer(c)
 	err := s.Open()
 	if err != nil {
@@ -763,6 +765,7 @@ func testAgent(t *testing.T, c *run.Config) {
 	tick := `
 stream
 	.from().measurement('test')
+	.groupBy('group')
 	.movingAvg()
 		.field('value')
 		.size(10)
@@ -799,26 +802,209 @@ stream
 		t.Error(err)
 	}
 
-	points := `test value=1 0000000000
-test value=1 0000000001
-test value=1 0000000002
-test value=1 0000000003
-test value=1 0000000004
-test value=1 0000000005
-test value=1 0000000006
-test value=1 0000000007
-test value=1 0000000008
-test value=1 0000000009
-test value=0 0000000010
-test value=0 0000000011
+	points := `test,group=a value=1 0000000000
+test,group=b value=2 0000000000
+test,group=a value=1 0000000001
+test,group=b value=2 0000000001
+test,group=a value=1 0000000002
+test,group=b value=2 0000000002
+test,group=a value=1 0000000003
+test,group=b value=2 0000000003
+test,group=a value=1 0000000004
+test,group=b value=2 0000000004
+test,group=a value=1 0000000005
+test,group=b value=2 0000000005
+test,group=a value=1 0000000006
+test,group=b value=2 0000000006
+test,group=a value=1 0000000007
+test,group=b value=2 0000000007
+test,group=a value=1 0000000008
+test,group=b value=2 0000000008
+test,group=a value=1 0000000009
+test,group=b value=2 0000000009
+test,group=a value=0 0000000010
+test,group=b value=1 0000000010
+test,group=a value=0 0000000011
+test,group=b value=0 0000000011
 `
 	v := url.Values{}
 	v.Add("precision", "s")
 	s.MustWrite("mydb", "myrp", points, v)
 
-	exp := `{"Series":[{"name":"test","columns":["time","mean"],"values":[["1970-01-01T00:00:11Z",0.9]]}],"Err":null}`
+	exp := `{"Series":[{"name":"test","tags":{"group":"a"},"columns":["time","mean"],"values":[["1970-01-01T00:00:11Z",0.9]]},{"name":"test","tags":{"group":"b"},"columns":["time","mean"],"values":[["1970-01-01T00:00:11Z",1.9]]}],"Err":null}`
 	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
+	}
+}
+
+func TestServer_UDFBatchAgents(t *testing.T) {
+	dir, err := os.Getwd()
+	udfDir := filepath.Clean(filepath.Join(dir, "../../../udf"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	agents := []struct {
+		buildFunc func() error
+		config    udf.FunctionConfig
+	}{
+		// Go
+		{
+			buildFunc: func() error { return nil },
+			config: udf.FunctionConfig{
+				Prog:    "go",
+				Args:    []string{"run", filepath.Join(udfDir, "agent/examples/outliers/outliers.go")},
+				Timeout: toml.Duration(time.Minute),
+			},
+		},
+		// Python
+		{
+			buildFunc: func() error { return nil },
+			config: udf.FunctionConfig{
+				Prog:    "python2",
+				Args:    []string{"-u", filepath.Join(udfDir, "agent/examples/outliers/outliers.py")},
+				Timeout: toml.Duration(time.Minute),
+				Env: map[string]string{
+					"PYTHONPATH": strings.Join(
+						[]string{filepath.Join(udfDir, "agent/py"), os.Getenv("PYTHONPATH")},
+						string(filepath.ListSeparator),
+					),
+				},
+			},
+		},
+	}
+	for _, agent := range agents {
+		err := agent.buildFunc()
+		if err != nil {
+			t.Fatal(err)
+		}
+		c := NewConfig()
+		c.UDF.Functions = map[string]udf.FunctionConfig{
+			"outliers": agent.config,
+		}
+		testBatchAgent(t, c)
+	}
+}
+
+func testBatchAgent(t *testing.T, c *run.Config) {
+	count := 0
+	db := NewInfluxDB(func(q string) *client.Response {
+		if len(q) > 6 && q[:6] == "SELECT" {
+			count++
+			data := []float64{
+				5,
+				6,
+				7,
+				13,
+				33,
+				35,
+				36,
+				45,
+				46,
+				47,
+				48,
+				50,
+				51,
+				52,
+				53,
+				54,
+				80,
+				85,
+				90,
+				100,
+			}
+			// Shuffle data using count as seed.
+			// Data order should not effect the result.
+			r := rand.New(rand.NewSource(int64(count)))
+			for i := range data {
+				j := r.Intn(i + 1)
+				data[i], data[j] = data[j], data[i]
+			}
+
+			// Create set values with time from shuffled data.
+			values := make([][]interface{}, len(data))
+			for i, value := range data {
+				values[i] = []interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, (i+1)*int(time.Millisecond), time.UTC).Format(time.RFC3339Nano),
+					value,
+				}
+			}
+
+			return &client.Response{
+				Results: []client.Result{{
+					Series: []models.Row{{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Tags: map[string]string{
+							"count": strconv.FormatInt(int64(count%2), 10),
+						},
+						Values: values,
+					}},
+				}},
+			}
+		}
+		return nil
+	})
+	c.InfluxDB.URLs = []string{db.URL()}
+	c.InfluxDB.Enabled = true
+	s := NewServer(c)
+	err := s.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	name := "testUDFTask"
+	ttype := "batch"
+	dbrps := []kapacitor.DBRP{{
+		Database:        "mydb",
+		RetentionPolicy: "myrp",
+	}}
+	tick := `
+batch
+	.query(' SELECT value from mydb.myrp.cpu ')
+		.period(5ms)
+		.every(5ms)
+	.groupBy('count')
+	.outliers()
+		.field('value')
+		.scale(1.5)
+	.mapReduce(influxql.count('value'))
+	.httpOut('count')
+`
+
+	r, err := s.DefineTask(name, ttype, tick, dbrps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r != "" {
+		t.Fatal("unexpected result", r)
+	}
+
+	r, err = s.EnableTask(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r != "" {
+		t.Fatal("unexpected result", r)
+	}
+
+	endpoint := fmt.Sprintf("%s/task/%s/count", s.URL(), name)
+	exp := `{"Series":[{"name":"cpu","tags":{"count":"1"},"columns":["time","count"],"values":[["1971-01-01T00:00:00.02Z",5]]},{"name":"cpu","tags":{"count":"0"},"columns":["time","count"],"values":[["1971-01-01T00:00:00.02Z",5]]}],"Err":null}`
+	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*50)
+	if err != nil {
+		t.Error(err)
+	}
+	r, err = s.DisableTask(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r != "" {
+		t.Fatal("unexpected result", r)
+	}
+
+	if count == 0 {
+		t.Error("unexpected query count", count)
 	}
 }

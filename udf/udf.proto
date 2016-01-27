@@ -146,7 +146,16 @@ message ErrorResponse {
 // Indicates the beginning of a batch.
 // All subsequent points should be considered
 // part of the batch until EndBatch arrives.
+// This includes grouping. Batches of
+// differing groups may not be interleaved.
+//
+// All the meta data but tmax is provided,
+// since tmax may not be known at
+// the beginning of a batch.
 message BeginBatch {
+    string             name  = 1;
+    string             group = 2;
+    map<string,string> tags  = 3;
 }
 
 // Message containing information about a single data point.
@@ -166,6 +175,9 @@ message Point {
 
 // Indicates the end of a batch and contains
 // all meta data associated with the batch.
+// The same meta information is provided for
+// ease of use with the addition of tmax since it
+// may not be know at BeginBatch.
 message EndBatch {
     string             name  = 1;
     string             group = 2;
