@@ -1,6 +1,7 @@
 package kapacitor
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"log"
@@ -85,6 +86,11 @@ func (s *SourceBatchNode) Queries(start, stop time.Time) [][]string {
 		queries[i] = b.(*BatchNode).Queries(start, stop)
 	}
 	return queries
+}
+
+// Do not add the source batch node to the dot output
+// since its not really an edge.
+func (s *SourceBatchNode) edot(buf *bytes.Buffer) {
 }
 
 type BatchNode struct {
