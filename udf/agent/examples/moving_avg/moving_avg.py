@@ -18,8 +18,8 @@ logger = logging.getLogger()
 class AvgHandler(Handler):
 
     class state(object):
-        def __init__(self):
-            self.size = 0
+        def __init__(self, size):
+            self.size = size
             self._window = []
             self._avg = 0.0
 
@@ -40,15 +40,13 @@ class AvgHandler(Handler):
 
 
         def snapshot(self):
-            data = {
+            return {
                     'size' : self.size,
                     'window' : self._window,
                     'avg' : self._avg,
             }
-            return json.dumps(data)
 
-        def restore(self, snapshot):
-            data = json.loads(snapshot)
+        def restore(self, data):
             self.size = int(data['size'])
             self._window = [float(d) for d in data['window']]
             self._avg = float(data['avg'])
@@ -56,8 +54,9 @@ class AvgHandler(Handler):
     def __init__(self, agent):
         self._agent = agent
         self._field = None
+        self._size = 0
         self._as = 'avg'
-        self._state = AvgHandler.state()
+        self._state = {}
 
 
     def info(self):
@@ -78,14 +77,14 @@ class AvgHandler(Handler):
             if opt.name == 'field':
                 self._field = opt.values[0].stringValue
             elif opt.name == 'size':
-                self._state.size = opt.values[0].intValue
+                self._size = opt.values[0].intValue
             elif opt.name == 'as':
                 self._as = opt.values[0].stringValue
 
         if self._field is None:
             success = False
             msg += ' must supply field name'
-        if self._state.size == 0:
+        if self._size == 0:
             success = False
             msg += ' must supply window size'
         if self._as == '':
@@ -99,9 +98,12 @@ class AvgHandler(Handler):
         return response
 
     def snapshot(self):
-        data = self._state.snapshot()
+        data = {}
+        for group, state in self._state:
+            data[group] = state.snapshot()
+
         response = udf_pb2.Response()
-        response.snapshot.snapshot = data
+        response.snapshot.snapshot = json.dumps(data)
 
         return response
 
@@ -109,7 +111,10 @@ class AvgHandler(Handler):
         success = False
         msg = ''
         try:
-            self._state.restore(restore_req.snapshot)
+            data = json.loads(restore_req.snapshot)
+            for group, snapshot in data:
+                self._state[group] = AvgHandler.state(0)
+                self._state[group].restore(snapshot)
             success = True
         except Exception as e:
             success = False
@@ -121,21 +126,21 @@ class AvgHandler(Handler):
 
         return response
 
-    def begin_batch(self):
+    def begin_batch(self, begin_req):
         raise Exception("not supported")
 
     def point(self, point):
         response = udf_pb2.Response()
-        response.point.time = point.time
-        response.point.name = point.name
-        response.point.database = point.database
-        response.point.retentionPolicy = point.retentionPolicy
-        response.point.group =  point.group
-        response.point.dimensions.extend(point.dimensions)
-        response.point.tags.update(point.tags)
+        response.point.CopyFrom(point)
+        response.point.ClearField('fieldsInt')
+        response.point.ClearField('fieldsString')
+        response.point.ClearField('fieldsDouble')
 
         value = point.fieldsDouble[self._field]
-        avg = self._state.update(value)
+        if point.group not in self._state:
+            self._state[point.group] = AvgHandler.state(self._size)
+        avg = self._state[point.group].update(value)
+
         response.point.fieldsDouble[self._as] = avg
         self._agent.write_response(response)
 

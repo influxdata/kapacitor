@@ -129,6 +129,7 @@ func (tm *TaskMaster) New() *TaskMaster {
 	n.SlackService = tm.SlackService
 	n.HipChatService = tm.HipChatService
 	n.AlertaService = tm.AlertaService
+	n.SensuService = tm.SensuService
 	return n
 }
 

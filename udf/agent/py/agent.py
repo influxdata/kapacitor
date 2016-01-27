@@ -32,7 +32,7 @@ class Handler(object):
         pass
     def restore(self, restore_req):
         pass
-    def begin_batch(self):
+    def begin_batch(self, begin_req):
         pass
     def point(self):
         pass
@@ -113,7 +113,7 @@ class Agent(object):
                     response = self.handler.restore(request.restore)
                     self.write_response(response, flush=True)
                 elif msg == "begin":
-                    self.handler.begin_batch()
+                    self.handler.begin_batch(request.begin)
                 elif msg == "point":
                     self.handler.point(request.point)
                 elif msg == "end":

@@ -14,7 +14,8 @@ import (
 type avgHandler struct {
 	field string
 	as    string
-	state *avgState
+	size  int
+	state map[string]*avgState
 
 	agent *agent.Agent
 }
@@ -41,7 +42,7 @@ func (a *avgState) update(value float64) float64 {
 
 func newMovingAvgHandler(a *agent.Agent) *avgHandler {
 	return &avgHandler{
-		state: &avgState{},
+		state: make(map[string]*avgState),
 		as:    "avg",
 		agent: a,
 	}
@@ -72,7 +73,7 @@ func (a *avgHandler) Init(r *udf.InitRequest) (*udf.InitResponse, error) {
 		case "field":
 			a.field = opt.Values[0].Value.(*udf.OptionValue_StringValue).StringValue
 		case "size":
-			a.state.Size = int(opt.Values[0].Value.(*udf.OptionValue_IntValue).IntValue)
+			a.size = int(opt.Values[0].Value.(*udf.OptionValue_IntValue).IntValue)
 		case "as":
 			a.as = opt.Values[0].Value.(*udf.OptionValue_StringValue).StringValue
 		}
@@ -82,7 +83,7 @@ func (a *avgHandler) Init(r *udf.InitRequest) (*udf.InitResponse, error) {
 		init.Success = false
 		init.Error += " must supply field"
 	}
-	if a.state.Size == 0 {
+	if a.size == 0 {
 		init.Success = false
 		init.Error += " must supply window size"
 	}
@@ -121,7 +122,7 @@ func (a *avgHandler) Restore(req *udf.RestoreRequest) (*udf.RestoreResponse, err
 }
 
 // This handler does not do batching
-func (a *avgHandler) BeginBatch() error {
+func (a *avgHandler) BeginBatch(*udf.BeginBatch) error {
 	return errors.New("batching not supported")
 }
 
@@ -130,7 +131,12 @@ func (a *avgHandler) BeginBatch() error {
 func (a *avgHandler) Point(p *udf.Point) error {
 	// Update the moving average.
 	value := p.FieldsDouble[a.field]
-	avg := a.state.update(value)
+	state := a.state[p.Group]
+	if state == nil {
+		state = &avgState{Size: a.size}
+		a.state[p.Group] = state
+	}
+	avg := state.update(value)
 
 	// Re-use the existing point so we keep the same tags etc.
 	p.FieldsDouble = map[string]float64{a.as: avg}

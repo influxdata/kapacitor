@@ -4,7 +4,12 @@
 
 ### Release Notes
 
+Improved UDFs, lots of bug fixes and improvements on the API. There was a breaking change for UDFs protobuf messages, see #176.
+
 ### Features
+
+- [#176](https://github.com/influxdata/kapacitor/issues/176): Improved UDFs and groups. Now it is easy to deal with groups from the UDF process.
+    NOTE: There is a breaking change in the BeginBatch protobuf message for this change.
 
 ### Bugfixes
 

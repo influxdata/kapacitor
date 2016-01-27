@@ -18,7 +18,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='udf.proto',
   package='udf',
   syntax='proto3',
-  serialized_pb=b'\n\tudf.proto\x12\x03udf\"\r\n\x0bInfoRequest\"\xbf\x01\n\x0cInfoResponse\x12\x1c\n\x05wants\x18\x01 \x01(\x0e\x32\r.udf.EdgeType\x12\x1f\n\x08provides\x18\x02 \x01(\x0e\x32\r.udf.EdgeType\x12/\n\x07options\x18\x03 \x03(\x0b\x32\x1e.udf.InfoResponse.OptionsEntry\x1a?\n\x0cOptionsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x1e\n\x05value\x18\x02 \x01(\x0b\x32\x0f.udf.OptionInfo:\x02\x38\x01\"0\n\nOptionInfo\x12\"\n\nvalueTypes\x18\x01 \x03(\x0e\x32\x0e.udf.ValueType\"+\n\x0bInitRequest\x12\x1c\n\x07options\x18\x01 \x03(\x0b\x32\x0b.udf.Option\"8\n\x06Option\x12\x0c\n\x04name\x18\x01 \x01(\t\x12 \n\x06values\x18\x02 \x03(\x0b\x32\x10.udf.OptionValue\"\xa4\x01\n\x0bOptionValue\x12\x1c\n\x04type\x18\x01 \x01(\x0e\x32\x0e.udf.ValueType\x12\x13\n\tboolValue\x18\x02 \x01(\x08H\x00\x12\x12\n\x08intValue\x18\x03 \x01(\x03H\x00\x12\x15\n\x0b\x64oubleValue\x18\x04 \x01(\x01H\x00\x12\x15\n\x0bstringValue\x18\x05 \x01(\tH\x00\x12\x17\n\rdurationValue\x18\x06 \x01(\x03H\x00\x42\x07\n\x05value\".\n\x0cInitResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\r\n\x05\x65rror\x18\x02 \x01(\t\"\x11\n\x0fSnapshotRequest\"$\n\x10SnapshotResponse\x12\x10\n\x08snapshot\x18\x01 \x01(\x0c\"\"\n\x0eRestoreRequest\x12\x10\n\x08snapshot\x18\x01 \x01(\x0c\"1\n\x0fRestoreResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\r\n\x05\x65rror\x18\x02 \x01(\t\" \n\x10KeepaliveRequest\x12\x0c\n\x04time\x18\x01 \x01(\x03\"!\n\x11KeepaliveResponse\x12\x0c\n\x04time\x18\x01 \x01(\x03\"\x1e\n\rErrorResponse\x12\r\n\x05\x65rror\x18\x01 \x01(\t\"\x0c\n\nBeginBatch\"\xf4\x03\n\x05Point\x12\x0c\n\x04time\x18\x01 \x01(\x03\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x10\n\x08\x64\x61tabase\x18\x03 \x01(\t\x12\x17\n\x0fretentionPolicy\x18\x04 \x01(\t\x12\r\n\x05group\x18\x05 \x01(\t\x12\x12\n\ndimensions\x18\x06 \x03(\t\x12\"\n\x04tags\x18\x07 \x03(\x0b\x32\x14.udf.Point.TagsEntry\x12\x32\n\x0c\x66ieldsDouble\x18\x08 \x03(\x0b\x32\x1c.udf.Point.FieldsDoubleEntry\x12,\n\tfieldsInt\x18\t \x03(\x0b\x32\x19.udf.Point.FieldsIntEntry\x12\x32\n\x0c\x66ieldsString\x18\n \x03(\x0b\x32\x1c.udf.Point.FieldsStringEntry\x1a+\n\tTagsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x33\n\x11\x46ieldsDoubleEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x01:\x02\x38\x01\x1a\x30\n\x0e\x46ieldsIntEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x03:\x02\x38\x01\x1a\x33\n\x11\x46ieldsStringEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x89\x01\n\x08\x45ndBatch\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05group\x18\x02 \x01(\t\x12\x0c\n\x04tmax\x18\x03 \x01(\x03\x12%\n\x04tags\x18\x04 \x03(\x0b\x32\x17.udf.EndBatch.TagsEntry\x1a+\n\tTagsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\xb3\x02\n\x07Request\x12 \n\x04info\x18\x01 \x01(\x0b\x32\x10.udf.InfoRequestH\x00\x12 \n\x04init\x18\x02 \x01(\x0b\x32\x10.udf.InitRequestH\x00\x12*\n\tkeepalive\x18\x03 \x01(\x0b\x32\x15.udf.KeepaliveRequestH\x00\x12(\n\x08snapshot\x18\x04 \x01(\x0b\x32\x14.udf.SnapshotRequestH\x00\x12&\n\x07restore\x18\x05 \x01(\x0b\x32\x13.udf.RestoreRequestH\x00\x12 \n\x05\x62\x65gin\x18\x10 \x01(\x0b\x32\x0f.udf.BeginBatchH\x00\x12\x1b\n\x05point\x18\x11 \x01(\x0b\x32\n.udf.PointH\x00\x12\x1c\n\x03\x65nd\x18\x12 \x01(\x0b\x32\r.udf.EndBatchH\x00\x42\t\n\x07message\"\xde\x02\n\x08Response\x12!\n\x04info\x18\x01 \x01(\x0b\x32\x11.udf.InfoResponseH\x00\x12!\n\x04init\x18\x02 \x01(\x0b\x32\x11.udf.InitResponseH\x00\x12+\n\tkeepalive\x18\x03 \x01(\x0b\x32\x16.udf.KeepaliveResponseH\x00\x12)\n\x08snapshot\x18\x04 \x01(\x0b\x32\x15.udf.SnapshotResponseH\x00\x12\'\n\x07restore\x18\x05 \x01(\x0b\x32\x14.udf.RestoreResponseH\x00\x12#\n\x05\x65rror\x18\x06 \x01(\x0b\x32\x12.udf.ErrorResponseH\x00\x12 \n\x05\x62\x65gin\x18\x10 \x01(\x0b\x32\x0f.udf.BeginBatchH\x00\x12\x1b\n\x05point\x18\x11 \x01(\x0b\x32\n.udf.PointH\x00\x12\x1c\n\x03\x65nd\x18\x12 \x01(\x0b\x32\r.udf.EndBatchH\x00\x42\t\n\x07message*!\n\x08\x45\x64geType\x12\n\n\x06STREAM\x10\x00\x12\t\n\x05\x42\x41TCH\x10\x01*D\n\tValueType\x12\x08\n\x04\x42OOL\x10\x00\x12\x07\n\x03INT\x10\x01\x12\n\n\x06\x44OUBLE\x10\x02\x12\n\n\x06STRING\x10\x03\x12\x0c\n\x08\x44URATION\x10\x04\x62\x06proto3'
+  serialized_pb=b'\n\tudf.proto\x12\x03udf\"\r\n\x0bInfoRequest\"\xbf\x01\n\x0cInfoResponse\x12\x1c\n\x05wants\x18\x01 \x01(\x0e\x32\r.udf.EdgeType\x12\x1f\n\x08provides\x18\x02 \x01(\x0e\x32\r.udf.EdgeType\x12/\n\x07options\x18\x03 \x03(\x0b\x32\x1e.udf.InfoResponse.OptionsEntry\x1a?\n\x0cOptionsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x1e\n\x05value\x18\x02 \x01(\x0b\x32\x0f.udf.OptionInfo:\x02\x38\x01\"0\n\nOptionInfo\x12\"\n\nvalueTypes\x18\x01 \x03(\x0e\x32\x0e.udf.ValueType\"+\n\x0bInitRequest\x12\x1c\n\x07options\x18\x01 \x03(\x0b\x32\x0b.udf.Option\"8\n\x06Option\x12\x0c\n\x04name\x18\x01 \x01(\t\x12 \n\x06values\x18\x02 \x03(\x0b\x32\x10.udf.OptionValue\"\xa4\x01\n\x0bOptionValue\x12\x1c\n\x04type\x18\x01 \x01(\x0e\x32\x0e.udf.ValueType\x12\x13\n\tboolValue\x18\x02 \x01(\x08H\x00\x12\x12\n\x08intValue\x18\x03 \x01(\x03H\x00\x12\x15\n\x0b\x64oubleValue\x18\x04 \x01(\x01H\x00\x12\x15\n\x0bstringValue\x18\x05 \x01(\tH\x00\x12\x17\n\rdurationValue\x18\x06 \x01(\x03H\x00\x42\x07\n\x05value\".\n\x0cInitResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\r\n\x05\x65rror\x18\x02 \x01(\t\"\x11\n\x0fSnapshotRequest\"$\n\x10SnapshotResponse\x12\x10\n\x08snapshot\x18\x01 \x01(\x0c\"\"\n\x0eRestoreRequest\x12\x10\n\x08snapshot\x18\x01 \x01(\x0c\"1\n\x0fRestoreResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\r\n\x05\x65rror\x18\x02 \x01(\t\" \n\x10KeepaliveRequest\x12\x0c\n\x04time\x18\x01 \x01(\x03\"!\n\x11KeepaliveResponse\x12\x0c\n\x04time\x18\x01 \x01(\x03\"\x1e\n\rErrorResponse\x12\r\n\x05\x65rror\x18\x01 \x01(\t\"\x7f\n\nBeginBatch\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05group\x18\x02 \x01(\t\x12\'\n\x04tags\x18\x03 \x03(\x0b\x32\x19.udf.BeginBatch.TagsEntry\x1a+\n\tTagsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\xf4\x03\n\x05Point\x12\x0c\n\x04time\x18\x01 \x01(\x03\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x10\n\x08\x64\x61tabase\x18\x03 \x01(\t\x12\x17\n\x0fretentionPolicy\x18\x04 \x01(\t\x12\r\n\x05group\x18\x05 \x01(\t\x12\x12\n\ndimensions\x18\x06 \x03(\t\x12\"\n\x04tags\x18\x07 \x03(\x0b\x32\x14.udf.Point.TagsEntry\x12\x32\n\x0c\x66ieldsDouble\x18\x08 \x03(\x0b\x32\x1c.udf.Point.FieldsDoubleEntry\x12,\n\tfieldsInt\x18\t \x03(\x0b\x32\x19.udf.Point.FieldsIntEntry\x12\x32\n\x0c\x66ieldsString\x18\n \x03(\x0b\x32\x1c.udf.Point.FieldsStringEntry\x1a+\n\tTagsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x33\n\x11\x46ieldsDoubleEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x01:\x02\x38\x01\x1a\x30\n\x0e\x46ieldsIntEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x03:\x02\x38\x01\x1a\x33\n\x11\x46ieldsStringEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x89\x01\n\x08\x45ndBatch\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05group\x18\x02 \x01(\t\x12\x0c\n\x04tmax\x18\x03 \x01(\x03\x12%\n\x04tags\x18\x04 \x03(\x0b\x32\x17.udf.EndBatch.TagsEntry\x1a+\n\tTagsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\xb3\x02\n\x07Request\x12 \n\x04info\x18\x01 \x01(\x0b\x32\x10.udf.InfoRequestH\x00\x12 \n\x04init\x18\x02 \x01(\x0b\x32\x10.udf.InitRequestH\x00\x12*\n\tkeepalive\x18\x03 \x01(\x0b\x32\x15.udf.KeepaliveRequestH\x00\x12(\n\x08snapshot\x18\x04 \x01(\x0b\x32\x14.udf.SnapshotRequestH\x00\x12&\n\x07restore\x18\x05 \x01(\x0b\x32\x13.udf.RestoreRequestH\x00\x12 \n\x05\x62\x65gin\x18\x10 \x01(\x0b\x32\x0f.udf.BeginBatchH\x00\x12\x1b\n\x05point\x18\x11 \x01(\x0b\x32\n.udf.PointH\x00\x12\x1c\n\x03\x65nd\x18\x12 \x01(\x0b\x32\r.udf.EndBatchH\x00\x42\t\n\x07message\"\xde\x02\n\x08Response\x12!\n\x04info\x18\x01 \x01(\x0b\x32\x11.udf.InfoResponseH\x00\x12!\n\x04init\x18\x02 \x01(\x0b\x32\x11.udf.InitResponseH\x00\x12+\n\tkeepalive\x18\x03 \x01(\x0b\x32\x16.udf.KeepaliveResponseH\x00\x12)\n\x08snapshot\x18\x04 \x01(\x0b\x32\x15.udf.SnapshotResponseH\x00\x12\'\n\x07restore\x18\x05 \x01(\x0b\x32\x14.udf.RestoreResponseH\x00\x12#\n\x05\x65rror\x18\x06 \x01(\x0b\x32\x12.udf.ErrorResponseH\x00\x12 \n\x05\x62\x65gin\x18\x10 \x01(\x0b\x32\x0f.udf.BeginBatchH\x00\x12\x1b\n\x05point\x18\x11 \x01(\x0b\x32\n.udf.PointH\x00\x12\x1c\n\x03\x65nd\x18\x12 \x01(\x0b\x32\r.udf.EndBatchH\x00\x42\t\n\x07message*!\n\x08\x45\x64geType\x12\n\n\x06STREAM\x10\x00\x12\t\n\x05\x42\x41TCH\x10\x01*D\n\tValueType\x12\x08\n\x04\x42OOL\x10\x00\x12\x07\n\x03INT\x10\x01\x12\n\n\x06\x44OUBLE\x10\x02\x12\n\n\x06STRING\x10\x03\x12\x0c\n\x08\x44URATION\x10\x04\x62\x06proto3'
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -39,8 +39,8 @@ _EDGETYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=2160,
-  serialized_end=2193,
+  serialized_start=2275,
+  serialized_end=2308,
 )
 _sym_db.RegisterEnumDescriptor(_EDGETYPE)
 
@@ -74,8 +74,8 @@ _VALUETYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=2195,
-  serialized_end=2263,
+  serialized_start=2310,
+  serialized_end=2378,
 )
 _sym_db.RegisterEnumDescriptor(_VALUETYPE)
 
@@ -620,6 +620,43 @@ _ERRORRESPONSE = _descriptor.Descriptor(
 )
 
 
+_BEGINBATCH_TAGSENTRY = _descriptor.Descriptor(
+  name='TagsEntry',
+  full_name='udf.BeginBatch.TagsEntry',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='key', full_name='udf.BeginBatch.TagsEntry.key', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='value', full_name='udf.BeginBatch.TagsEntry.value', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=_descriptor._ParseOptions(descriptor_pb2.MessageOptions(), b'8\001'),
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=924,
+  serialized_end=967,
+)
+
 _BEGINBATCH = _descriptor.Descriptor(
   name='BeginBatch',
   full_name='udf.BeginBatch',
@@ -627,10 +664,31 @@ _BEGINBATCH = _descriptor.Descriptor(
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
+    _descriptor.FieldDescriptor(
+      name='name', full_name='udf.BeginBatch.name', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='group', full_name='udf.BeginBatch.group', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='tags', full_name='udf.BeginBatch.tags', index=2,
+      number=3, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
-  nested_types=[],
+  nested_types=[_BEGINBATCH_TAGSENTRY, ],
   enum_types=[
   ],
   options=None,
@@ -640,7 +698,7 @@ _BEGINBATCH = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=840,
-  serialized_end=852,
+  serialized_end=967,
 )
 
 
@@ -677,8 +735,8 @@ _POINT_TAGSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1156,
-  serialized_end=1199,
+  serialized_start=924,
+  serialized_end=967,
 )
 
 _POINT_FIELDSDOUBLEENTRY = _descriptor.Descriptor(
@@ -714,8 +772,8 @@ _POINT_FIELDSDOUBLEENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1201,
-  serialized_end=1252,
+  serialized_start=1316,
+  serialized_end=1367,
 )
 
 _POINT_FIELDSINTENTRY = _descriptor.Descriptor(
@@ -751,8 +809,8 @@ _POINT_FIELDSINTENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1254,
-  serialized_end=1302,
+  serialized_start=1369,
+  serialized_end=1417,
 )
 
 _POINT_FIELDSSTRINGENTRY = _descriptor.Descriptor(
@@ -788,8 +846,8 @@ _POINT_FIELDSSTRINGENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1304,
-  serialized_end=1355,
+  serialized_start=1419,
+  serialized_end=1470,
 )
 
 _POINT = _descriptor.Descriptor(
@@ -881,8 +939,8 @@ _POINT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=855,
-  serialized_end=1355,
+  serialized_start=970,
+  serialized_end=1470,
 )
 
 
@@ -919,8 +977,8 @@ _ENDBATCH_TAGSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1156,
-  serialized_end=1199,
+  serialized_start=924,
+  serialized_end=967,
 )
 
 _ENDBATCH = _descriptor.Descriptor(
@@ -970,8 +1028,8 @@ _ENDBATCH = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1358,
-  serialized_end=1495,
+  serialized_start=1473,
+  serialized_end=1610,
 )
 
 
@@ -1053,8 +1111,8 @@ _REQUEST = _descriptor.Descriptor(
       name='message', full_name='udf.Request.message',
       index=0, containing_type=None, fields=[]),
   ],
-  serialized_start=1498,
-  serialized_end=1805,
+  serialized_start=1613,
+  serialized_end=1920,
 )
 
 
@@ -1143,8 +1201,8 @@ _RESPONSE = _descriptor.Descriptor(
       name='message', full_name='udf.Response.message',
       index=0, containing_type=None, fields=[]),
   ],
-  serialized_start=1808,
-  serialized_end=2158,
+  serialized_start=1923,
+  serialized_end=2273,
 )
 
 _INFORESPONSE_OPTIONSENTRY.fields_by_name['value'].message_type = _OPTIONINFO
@@ -1171,6 +1229,8 @@ _OPTIONVALUE.fields_by_name['stringValue'].containing_oneof = _OPTIONVALUE.oneof
 _OPTIONVALUE.oneofs_by_name['value'].fields.append(
   _OPTIONVALUE.fields_by_name['durationValue'])
 _OPTIONVALUE.fields_by_name['durationValue'].containing_oneof = _OPTIONVALUE.oneofs_by_name['value']
+_BEGINBATCH_TAGSENTRY.containing_type = _BEGINBATCH
+_BEGINBATCH.fields_by_name['tags'].message_type = _BEGINBATCH_TAGSENTRY
 _POINT_TAGSENTRY.containing_type = _POINT
 _POINT_FIELDSDOUBLEENTRY.containing_type = _POINT
 _POINT_FIELDSINTENTRY.containing_type = _POINT
@@ -1378,11 +1438,19 @@ ErrorResponse = _reflection.GeneratedProtocolMessageType('ErrorResponse', (_mess
 _sym_db.RegisterMessage(ErrorResponse)
 
 BeginBatch = _reflection.GeneratedProtocolMessageType('BeginBatch', (_message.Message,), dict(
+
+  TagsEntry = _reflection.GeneratedProtocolMessageType('TagsEntry', (_message.Message,), dict(
+    DESCRIPTOR = _BEGINBATCH_TAGSENTRY,
+    __module__ = 'udf_pb2'
+    # @@protoc_insertion_point(class_scope:udf.BeginBatch.TagsEntry)
+    ))
+  ,
   DESCRIPTOR = _BEGINBATCH,
   __module__ = 'udf_pb2'
   # @@protoc_insertion_point(class_scope:udf.BeginBatch)
   ))
 _sym_db.RegisterMessage(BeginBatch)
+_sym_db.RegisterMessage(BeginBatch.TagsEntry)
 
 Point = _reflection.GeneratedProtocolMessageType('Point', (_message.Message,), dict(
 
@@ -1455,6 +1523,8 @@ _sym_db.RegisterMessage(Response)
 
 _INFORESPONSE_OPTIONSENTRY.has_options = True
 _INFORESPONSE_OPTIONSENTRY._options = _descriptor._ParseOptions(descriptor_pb2.MessageOptions(), b'8\001')
+_BEGINBATCH_TAGSENTRY.has_options = True
+_BEGINBATCH_TAGSENTRY._options = _descriptor._ParseOptions(descriptor_pb2.MessageOptions(), b'8\001')
 _POINT_TAGSENTRY.has_options = True
 _POINT_TAGSENTRY._options = _descriptor._ParseOptions(descriptor_pb2.MessageOptions(), b'8\001')
 _POINT_FIELDSDOUBLEENTRY.has_options = True
