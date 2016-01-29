@@ -13,6 +13,7 @@ EnvironmentFile=-/etc/default/kapacitor
 ExecStart=/usr/bin/kapacitord -config /etc/kapacitor/kapacitor.conf $KAPACITOR_OPTS
 KillMode=process
 Restart=on-failure
+RestartSec=5s
 
 [Install]
 WantedBy=multi-user.target
