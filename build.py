@@ -91,7 +91,7 @@ supported_packages = {
 ################
 
 def create_package_fs(build_root):
-    print "\t- Creating a filesystem hierarchy from directory: {}".format(build_root)
+    print "Creating a filesystem hierarchy from directory: {}".format(build_root)
     # Using [1:] for the path names due to them being absolute
     # (will overwrite previous paths, per 'os.path.join' documentation)
     create_dir(os.path.join(build_root, INSTALL_ROOT_DIR[1:]))
@@ -102,7 +102,7 @@ def create_package_fs(build_root):
     create_dir(os.path.join(build_root, os.path.dirname(LOGROTATE_CONFIG)))
 
 def package_scripts(build_root):
-    print "\t- Copying scripts and configuration to build directory"
+    print "Copying scripts and configuration to build directory"
     shutil.copy(INIT_SCRIPT, os.path.join(build_root, SCRIPT_DIR[1:], INIT_SCRIPT.split('/')[1]))
     shutil.copy(SYSTEMD_SCRIPT, os.path.join(build_root, SCRIPT_DIR[1:], SYSTEMD_SCRIPT.split('/')[1]))
     shutil.copy(LOGROTATE_CONFIG, os.path.join(build_root, LOGROTATE_CONFIG))
