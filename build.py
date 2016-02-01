@@ -638,7 +638,7 @@ def main():
     for arg in sys.argv[1:]:
         if '--outdir' in arg:
             # Output directory. If none is specified, then builds will be placed in the same directory.
-            output_dir = arg.split("=")[1]
+            outdir = arg.split("=")[1]
         if '--commit' in arg:
             # Commit to build from. If none is specified, then it will build from the most recent commit.
             commit = arg.split("=")[1]
