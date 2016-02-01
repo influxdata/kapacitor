@@ -78,7 +78,11 @@ targets = {
     'kapacitord' : './cmd/kapacitord/main.go'
 }
 
-supported_arches = [ 'amd64' ]
+supported_builds = {
+    'darwin': [ "amd64" ],
+    'linux': [ "amd64" ]
+}
+
 supported_packages = {
     "darwin": [ "tar"],
     "linux": [ "deb", "rpm", "tar"],
