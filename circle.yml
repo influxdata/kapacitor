@@ -21,8 +21,8 @@ dependencies:
 
 test:
   override:
-    - ./build.sh --test --generate
-    - ./build.sh --test --generate --race
+    - ./build.sh --test --generate --no-vet
+    - ./build.sh --test --generate --race --no-vet
 
 
 deployment:
