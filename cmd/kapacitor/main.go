@@ -348,17 +348,20 @@ func (d *dbrps) String() string {
 func (d *dbrps) Set(value string) error {
 	dbrp := kapacitor.DBRP{}
 	if len(value) == 0 {
-		return fmt.Errorf("dbrp cannot be empty")
+		return errors.New("dbrp cannot be empty")
 	}
 	var n int
 	if value[0] == '"' {
 		dbrp.Database, n = parseQuotedStr(value)
 	} else {
 		n = strings.IndexRune(value, '.')
+		if n == -1 {
+			return errors.New("does not contain a '.', it must be in the form \"dbname\".\"rpname\" where the quotes are optional.")
+		}
 		dbrp.Database = value[:n]
 	}
 	if value[n] != '.' {
-		return fmt.Errorf("dbrp must specify retention policy, do you have a missing or extra '.'?")
+		return errors.New("dbrp must specify retention policy, do you have a missing or extra '.'?")
 	}
 	value = value[n+1:]
 	if value[0] == '"' {
