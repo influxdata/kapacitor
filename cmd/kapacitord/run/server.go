@@ -28,6 +28,7 @@ import (
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/stats"
+	"github.com/influxdata/kapacitor/services/talk"
 	"github.com/influxdata/kapacitor/services/task_store"
 	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/udp"
@@ -145,6 +146,7 @@ func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*
 	s.appendAlertaService(c.Alerta)
 	s.appendSlackService(c.Slack)
 	s.appendSensuService(c.Sensu)
+	s.appendTalkService(c.Talk)
 
 	// Append InfluxDB services
 	s.appendCollectdService(c.Collectd)
@@ -383,6 +385,16 @@ func (s *Server) appendReportingService(c reporting.Config) {
 	if c.Enabled {
 		l := s.LogService.NewLogger("[reporting] ", log.LstdFlags)
 		srv := reporting.NewService(c, l)
+
+		s.Services = append(s.Services, srv)
+	}
+}
+
+func (s *Server) appendTalkService(c talk.Config) {
+	if c.Enabled {
+		l := s.LogService.NewLogger("[jiaoliao] ", log.LstdFlags)
+		srv := talk.NewService(c, l)
+		s.TaskMaster.TalkService = srv
 
 		s.Services = append(s.Services, srv)
 	}

@@ -19,7 +19,7 @@ const defaultMessageTmpl = "{{ .ID }} is {{ .Level }}"
 // See AlertNode.Info, AlertNode.Warn, and AlertNode.Crit below.
 //
 // Different event handlers can be configured for each AlertNode.
-// Some handlers like Email, HipChat, Sensu, Slack, OpsGenie, VictorOps and PagerDuty have a configuration
+// Some handlers like Email, HipChat, Sensu, Slack, OpsGenie, VictorOps, PagerDuty and Talk have a configuration
 // option 'global' that indicates that all alerts implicitly use the handler.
 //
 // Available event handlers:
@@ -35,6 +35,7 @@ const defaultMessageTmpl = "{{ .ID }} is {{ .Level }}"
 //	  * OpsGenie -- Send alert to OpsGenie.
 //    * VictorOps -- Send alert to VictorOps.
 //    * PagerDuty -- Send alert to PagerDuty.
+//    * Talk -- Post alert message to Talk client.
 //
 // See below for more details on configuring each handler.
 //
@@ -210,6 +211,10 @@ type AlertNode struct {
 	// Send alert to OpsGenie
 	// tick:ignore
 	OpsGenieHandlers []*OpsGenieHandler
+
+	// Send alert to Talk.
+	// tick:ignore
+	TalkHandlers []*TalkHandler
 }
 
 func newAlertNode(wants EdgeType) *AlertNode {
@@ -671,7 +676,7 @@ func (a *AlertNode) Sensu() *SensuHandler {
 	return sensu
 }
 
-// tick:embedded:AlertNode.Sensu
+// tick:embedded:AlertNode.SensuHandler
 type SensuHandler struct {
 	*AlertNode
 }
@@ -829,4 +834,33 @@ func (og *OpsGenieHandler) Teams(teams ...string) *OpsGenieHandler {
 func (og *OpsGenieHandler) Recipients(recipients ...string) *OpsGenieHandler {
 	og.RecipientsList = recipients
 	return og
+}
+
+// Send the alert to Talk.
+//
+// Example:
+//    [talk]
+//      enabled = true
+//      url = "https://jianliao.com/v2/services/webhook/uuid"
+//      author_name = "Kapacitor"
+//
+// Example:
+//    stream...
+//         .alert()
+//             .talk()
+//
+// Send alerts to Talk client.
+//
+// tick:property
+func (a *AlertNode) Talk() *TalkHandler {
+	talk := &TalkHandler{
+		AlertNode: a,
+	}
+	a.TalkHandlers = append(a.TalkHandlers, talk)
+	return talk
+}
+
+// tick:embedded:AlertNode.Talk
+type TalkHandler struct {
+	*AlertNode
 }

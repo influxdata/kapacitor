@@ -75,6 +75,9 @@ type TaskMaster struct {
 	SensuService interface {
 		Alert(name, output string, level AlertLevel) error
 	}
+	TalkService interface {
+		Alert(name, output string, level AlertLevel) error
+	}
 	LogService LogService
 
 	// Incoming streams
@@ -130,6 +133,7 @@ func (tm *TaskMaster) New() *TaskMaster {
 	n.HipChatService = tm.HipChatService
 	n.AlertaService = tm.AlertaService
 	n.SensuService = tm.SensuService
+	n.TalkService = tm.TalkService
 	return n
 }
 

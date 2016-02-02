@@ -24,6 +24,7 @@ import (
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/stats"
+	"github.com/influxdata/kapacitor/services/talk"
 	"github.com/influxdata/kapacitor/services/task_store"
 	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/udp"
@@ -58,6 +59,7 @@ type Config struct {
 	Stats     stats.Config      `toml:"stats"`
 	UDF       udf.Config        `toml:"udf"`
 	Deadman   deadman.Config    `toml:"deadman"`
+	Talk      talk.Config       `toml:"talk"`
 
 	Hostname string `toml:"hostname"`
 	DataDir  string `toml:"data_dir"`
@@ -89,6 +91,7 @@ func NewConfig() *Config {
 	c.Stats = stats.NewConfig()
 	c.UDF = udf.NewConfig()
 	c.Deadman = deadman.NewConfig()
+	c.Talk = talk.NewConfig()
 
 	return c
 }
@@ -140,6 +143,10 @@ func (c *Config) Validate() error {
 		return err
 	}
 	err = c.Sensu.Validate()
+	if err != nil {
+		return err
+	}
+	err = c.Talk.Validate()
 	if err != nil {
 		return err
 	}
