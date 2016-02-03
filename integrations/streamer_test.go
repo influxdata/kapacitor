@@ -261,12 +261,14 @@ func TestStream_SimpleWhere(t *testing.T) {
 	var script = `
 stream
 	.from().measurement('cpu')
-	.where(lambda: "host" == 'serverA')
+		.where(lambda: "host" == 'serverA')
+		.where(lambda: "host" != 'serverB')
 	.window()
 		.period(10s)
 		.every(10s)
 	.mapReduce(influxql.count('value'))
 	.where(lambda: "count" > 0)
+	.where(lambda: "count" < 12)
 	.httpOut('TestStream_SimpleMR')
 `
 	er := kapacitor.Result{

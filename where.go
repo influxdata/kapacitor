@@ -57,18 +57,23 @@ func (w *WhereNode) runWhere(snapshot []byte) error {
 				expr = tick.NewStatefulExpr(w.w.Expression)
 				w.expressions[b.Group] = expr
 			}
-			for i, p := range b.Points {
+			for i := 0; i < len(b.Points); {
+				p := b.Points[i]
 				if pass, err := EvalPredicate(expr, p.Time, p.Fields, p.Tags); !pass {
 					if err != nil {
 						w.logger.Println("E! error while evaluating WHERE expression:", err)
 					}
 					b.Points = append(b.Points[:i], b.Points[i+1:]...)
+				} else {
+					i++
 				}
 			}
-			for _, child := range w.outs {
-				err := child.CollectBatch(b)
-				if err != nil {
-					return err
+			if len(b.Points) > 0 {
+				for _, child := range w.outs {
+					err := child.CollectBatch(b)
+					if err != nil {
+						return err
+					}
 				}
 			}
 		}
