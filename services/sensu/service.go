@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"github.com/influxdata/kapacitor"
+	"io/ioutil"
 	"log"
 	"net/http"
+
+	"github.com/influxdata/kapacitor"
 )
 
 type Service struct {
@@ -65,11 +67,16 @@ func (s *Service) Alert(name, output string, level kapacitor.AlertLevel) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
 		type response struct {
 			Error string `json:"error"`
 		}
-		r := &response{Error: "failed to understand Sensu response"}
-		dec := json.NewDecoder(resp.Body)
+		r := &response{Error: "failed to understand Sensu response: " + string(body)}
+		b := bytes.NewReader(body)
+		dec := json.NewDecoder(b)
 		dec.Decode(r)
 		return errors.New(r.Error)
 	}

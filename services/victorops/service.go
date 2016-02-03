@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"time"
@@ -72,11 +73,16 @@ func (s *Service) Alert(routingKey, messageType, message, entityID string, t tim
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
 		type response struct {
 			Message string `json:"message"`
 		}
-		r := &response{Message: "failed to understand VictorOps response"}
-		dec := json.NewDecoder(resp.Body)
+		r := &response{Message: "failed to understand VictorOps response: " + string(body)}
+		b := bytes.NewReader(body)
+		dec := json.NewDecoder(b)
 		dec.Decode(r)
 		return errors.New(r.Message)
 	}

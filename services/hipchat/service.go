@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -86,11 +87,16 @@ func (s *Service) Alert(room, token, message string, level kapacitor.AlertLevel)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
 		type response struct {
 			Error string `json:"error"`
 		}
-		r := &response{Error: "failed to understand HipChat response"}
-		dec := json.NewDecoder(resp.Body)
+		r := &response{Error: "failed to understand HipChat response: " + string(body)}
+		b := bytes.NewReader(body)
+		dec := json.NewDecoder(b)
 		dec.Decode(r)
 		return errors.New(r.Error)
 	}
