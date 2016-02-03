@@ -388,7 +388,7 @@ func (n *chainnode) GroupBy(tag ...interface{}) *GroupByNode {
 // from the InfluxQL language.
 //
 // MapReduce may be applied to either a batch or a stream edge.
-// In the case of a batch each batch is passed to the mapper idependently.
+// In the case of a batch each batch is passed to the mapper independently.
 // In the case of a stream all incoming data points that have
 // the exact same time are combined into a batch and sent to the mapper.
 func (n *chainnode) MapReduce(mr MapReduceInfo) *ReduceNode {
