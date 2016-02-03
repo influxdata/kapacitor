@@ -30,3 +30,13 @@ func newWhereNode(wants EdgeType, predicate tick.Node) *WhereNode {
 		Expression: predicate,
 	}
 }
+
+// And another expression onto the existing expression.
+func (w *WhereNode) Where(expression tick.Node) *WhereNode {
+	w.Expression = &tick.BinaryNode{
+		Operator: tick.TokenAnd,
+		Left:     w.Expression,
+		Right:    expression,
+	}
+	return w
+}

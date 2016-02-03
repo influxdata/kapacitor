@@ -94,12 +94,62 @@ func (s *StreamNode) From() *StreamNode {
 // Filter the current stream using the given expression.
 // This expression is a Kapacitor expression. Kapacitor
 // expressions are a superset of InfluxQL WHERE expressions.
-// See the `Expression` docs for more information.
+// See the [expression](https://docs.influxdata.com/kapacitor/v0.10/tick/expr/) docs for more information.
+//
+// Multiple calls to the Where method will `AND` together each expression.
+//
+// Example:
+//    stream
+//       .from()
+//          .where(lambda: condition1)
+//          .where(lambda: condition2)
+//
+// The above is equivalent to this
+// Example:
+//    stream
+//       .from()
+//          .where(lambda: condition1 AND condition2)
+//
+//
+// NOTE: Becareful to always use `.from` if you want multiple different streams.
+//
+// Example:
+//  var data = stream.from().measurement('cpu')
+//  var total = data.where(lambda: "cpu" == 'cpu-total')
+//  var others = data.where(lambda: "cpu" != 'cpu-total')
+//
+// The example above is equivalent to the example below,
+// which is obviously not what was intended.
+//
+// Example:
+//  var data = stream
+//              .from()
+//                  .measurement('cpu')
+//                  .where(lambda: "cpu" == 'cpu-total' AND "cpu" != 'cpu-total')
+//  var total = data
+//  var others = total
+//
+// The example below will create two different streams each selecting
+// a different subset of the original stream.
+//
+// Example:
+//  var data = stream.from().measurement('cpu')
+//  var total = stream.from().measurement('cpu').where(lambda: "cpu" == 'cpu-total')
+//  var others = stream.from().measurement('cpu').where(lambda: "cpu" != 'cpu-total')
+//
 //
 // If empty then all data points are considered to match.
 // tick:property
 func (s *StreamNode) Where(expression tick.Node) *StreamNode {
-	s.Expression = expression
+	if s.Expression != nil {
+		s.Expression = &tick.BinaryNode{
+			Operator: tick.TokenAnd,
+			Left:     s.Expression,
+			Right:    expression,
+		}
+	} else {
+		s.Expression = expression
+	}
 	return s
 }
 
