@@ -68,10 +68,12 @@ func (w *WhereNode) runWhere(snapshot []byte) error {
 					i++
 				}
 			}
-			for _, child := range w.outs {
-				err := child.CollectBatch(b)
-				if err != nil {
-					return err
+			if len(b.Points) > 0 {
+				for _, child := range w.outs {
+					err := child.CollectBatch(b)
+					if err != nil {
+						return err
+					}
 				}
 			}
 		}
