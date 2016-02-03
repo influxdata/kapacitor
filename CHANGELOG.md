@@ -10,6 +10,7 @@ Improved UDFs, lots of bug fixes and improvements on the API. There was a breaki
 
 - [#176](https://github.com/influxdata/kapacitor/issues/176): Improved UDFs and groups. Now it is easy to deal with groups from the UDF process.
     NOTE: There is a breaking change in the BeginBatch protobuf message for this change.
+- [#196](https://github.com/influxdata/kapacitor/issues/196): Adds a 'details' property to the alert node so that the email body can be defined. See also [#75](https://github.com/influxdata/kapacitor/issues/75).
 
 ### Bugfixes
 

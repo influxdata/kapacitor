@@ -29,6 +29,7 @@ import (
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/wlog"
 	"github.com/influxdb/influxdb/client"
+	"github.com/influxdb/influxdb/influxql"
 	imodels "github.com/influxdb/influxdb/models"
 )
 
@@ -1271,14 +1272,35 @@ func TestStream_Alert(t *testing.T) {
 
 	requestCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ans, err := ioutil.ReadAll(r.Body)
+		ad := kapacitor.AlertData{}
+		dec := json.NewDecoder(r.Body)
+		err := dec.Decode(&ad)
 		if err != nil {
 			t.Fatal(err)
 		}
 		requestCount++
-		expAns := `{"id":"kapacitor/cpu/serverA","message":"kapacitor/cpu/serverA is CRITICAL","time":"1971-01-01T00:00:10Z","level":"CRITICAL","data":{"series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}]}}`
-		if string(ans) != expAns {
-			t.Errorf("\ngot %v\nexp %v", string(ans), expAns)
+		expAd := kapacitor.AlertData{
+			ID:      "kapacitor/cpu/serverA",
+			Message: "kapacitor/cpu/serverA is CRITICAL",
+			Details: "details",
+			Time:    time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+			Level:   kapacitor.CritAlert,
+			Data: influxql.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA"},
+						Columns: []string{"time", "count"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+							10.0,
+						}},
+					},
+				},
+			},
+		}
+		if eq, msg := compareAlertData(expAd, ad); !eq {
+			t.Error(msg)
 		}
 	}))
 	defer ts.Close()
@@ -1298,6 +1320,7 @@ stream
 	.mapReduce(influxql.count('value'))
 	.alert()
 		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.details('details')
 		.info(lambda: "count" > infoThreshold)
 		.warn(lambda: "count" > warnThreshold)
 		.crit(lambda: "count" > critThreshold)
@@ -1924,20 +1947,62 @@ stream
 func TestStream_AlertSigma(t *testing.T) {
 	requestCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ans, err := ioutil.ReadAll(r.Body)
+		ad := kapacitor.AlertData{}
+		dec := json.NewDecoder(r.Body)
+		err := dec.Decode(&ad)
 		if err != nil {
 			t.Fatal(err)
 		}
 		requestCount++
-		expAns := `{"id":"cpu:nil","message":"cpu:nil is INFO","time":"1971-01-01T00:00:07Z","level":"INFO","data":{"series":[{"name":"cpu","tags":{"host":"serverA","type":"idle"},"columns":["time","sigma","value"],"values":[["1971-01-01T00:00:07Z",2.469916402324427,16]]}]}}`
-		expOKAns := `{"id":"cpu:nil","message":"cpu:nil is OK","time":"1971-01-01T00:00:08Z","level":"OK","data":{"series":[{"name":"cpu","tags":{"host":"serverA","type":"idle"},"columns":["time","sigma","value"],"values":[["1971-01-01T00:00:08Z",0.3053477916297622,93.4]]}]}}`
 		if requestCount == 1 {
-			if string(ans) != expAns {
-				t.Errorf("\ngot %v \nexp %v", string(ans), expAns)
+			expAd := kapacitor.AlertData{
+				ID:      "cpu:nil",
+				Message: "cpu:nil is INFO",
+				Details: "cpu:nil is INFO",
+				Time:    time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+				Level:   kapacitor.InfoAlert,
+				Data: influxql.Result{
+					Series: imodels.Rows{
+						{
+							Name:    "cpu",
+							Tags:    map[string]string{"host": "serverA", "type": "idle"},
+							Columns: []string{"time", "sigma", "value"},
+							Values: [][]interface{}{[]interface{}{
+								time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+								2.469916402324427,
+								16.0,
+							}},
+						},
+					},
+				},
+			}
+			if eq, msg := compareAlertData(expAd, ad); !eq {
+				t.Error(msg)
 			}
 		} else {
-			if string(ans) != expOKAns {
-				t.Errorf("\ngot %v \nexp %v", string(ans), expOKAns)
+			expAd := kapacitor.AlertData{
+				ID:      "cpu:nil",
+				Message: "cpu:nil is OK",
+				Details: "cpu:nil is OK",
+				Time:    time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+				Level:   kapacitor.OKAlert,
+				Data: influxql.Result{
+					Series: imodels.Rows{
+						{
+							Name:    "cpu",
+							Tags:    map[string]string{"host": "serverA", "type": "idle"},
+							Columns: []string{"time", "sigma", "value"},
+							Values: [][]interface{}{[]interface{}{
+								time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+								0.3053477916297622,
+								93.4,
+							}},
+						},
+					},
+				},
+			}
+			if eq, msg := compareAlertData(expAd, ad); !eq {
+				t.Error(msg)
 			}
 		}
 	}))
@@ -1951,6 +2016,7 @@ stream
 		.as('sigma')
 		.keep()
 	.alert()
+		.details('{{ .Message }}')
 		.info(lambda: "sigma" > 2.0)
 		.warn(lambda: "sigma" > 3.0)
 		.crit(lambda: "sigma" > 3.5)
@@ -1982,14 +2048,35 @@ func TestStream_AlertComplexWhere(t *testing.T) {
 
 	requestCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ans, err := ioutil.ReadAll(r.Body)
+		ad := kapacitor.AlertData{}
+		dec := json.NewDecoder(r.Body)
+		err := dec.Decode(&ad)
 		if err != nil {
 			t.Fatal(err)
 		}
 		requestCount++
-		expAns := `{"id":"cpu:nil","message":"cpu:nil is CRITICAL","time":"1971-01-01T00:00:07Z","level":"CRITICAL","data":{"series":[{"name":"cpu","tags":{"host":"serverA","type":"idle"},"columns":["time","value"],"values":[["1971-01-01T00:00:07Z",16]]}]}}`
-		if string(ans) != expAns {
-			t.Errorf("unexpected result:\ngot %v\nexp %v", string(ans), expAns)
+		expAd := kapacitor.AlertData{
+			ID:      "cpu:nil",
+			Message: "cpu:nil is CRITICAL",
+			Details: "",
+			Time:    time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+			Level:   kapacitor.CritAlert,
+			Data: influxql.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+							16.0,
+						}},
+					},
+				},
+			},
+		}
+		if eq, msg := compareAlertData(expAd, ad); !eq {
+			t.Error(msg)
 		}
 	}))
 	defer ts.Close()
@@ -1999,6 +2086,7 @@ stream
 	.from().measurement('cpu')
 	.where(lambda: "host" == 'serverA' AND sigma("value") > 2)
 	.alert()
+		.details('')
 		.crit(lambda: TRUE)
 		.post('` + ts.URL + `')
 `

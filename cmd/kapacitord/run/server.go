@@ -441,14 +441,20 @@ func (s *Server) Open() error {
 func (s *Server) Close() error {
 	s.stopProfile()
 
-	// Close services to allow any inflight requests to complete
-	// and prevent new requests from being accepted.
+	// First stop all tasks.
+	s.TaskMaster.StopTasks()
+
+	// Close services now that all tasks are stopped.
 	for _, service := range s.Services {
 		s.Logger.Printf("D! closing service: %T", service)
-		service.Close()
+		err := service.Close()
+		if err != nil {
+			s.Logger.Printf("E! error closing service %T: %v", service, err)
+		}
 		s.Logger.Printf("D! closed service: %T", service)
 	}
 
+	// Finally close the task master
 	return s.TaskMaster.Close()
 }
 

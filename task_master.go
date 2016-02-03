@@ -150,6 +150,14 @@ func (tm *TaskMaster) Open() (err error) {
 	return
 }
 
+func (tm *TaskMaster) StopTasks() {
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
+	for _, et := range tm.tasks {
+		tm.stopTask(et.Task.Name)
+	}
+}
+
 func (tm *TaskMaster) Close() error {
 	tm.Drain()
 	tm.mu.Lock()

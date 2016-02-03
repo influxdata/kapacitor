@@ -92,7 +92,7 @@ func (s *Service) runMailer() {
 	}
 }
 
-func (s *Service) SendMail(to []string, subject, msg string) error {
+func (s *Service) SendMail(to []string, subject, body string) error {
 	if len(to) == 0 {
 		to = s.c.To
 	}
@@ -103,7 +103,7 @@ func (s *Service) SendMail(to []string, subject, msg string) error {
 	m.SetHeader("From", s.c.From)
 	m.SetHeader("To", to...)
 	m.SetHeader("Subject", subject)
-	m.SetBody("text/plain", msg)
+	m.SetBody("text/html", body)
 	s.mail <- m
 	return nil
 }
