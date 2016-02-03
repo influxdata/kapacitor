@@ -6,8 +6,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-
-	"github.com/influxdata/kapacitor"
 )
 
 type Service struct {
@@ -32,7 +30,7 @@ func (s *Service) Close() error {
 	return nil
 }
 
-func (s *Service) Alert(title, text string, level kapacitor.AlertLevel) error {
+func (s *Service) Alert(title, text string) error {
 	postData := make(map[string]interface{})
 	postData["title"] = title
 	postData["text"] = text

@@ -76,7 +76,7 @@ type TaskMaster struct {
 		Alert(name, output string, level AlertLevel) error
 	}
 	TalkService interface {
-		Alert(name, output string, level AlertLevel) error
+		Alert(title, text string) error
 	}
 	LogService LogService
 

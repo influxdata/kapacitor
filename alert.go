@@ -715,7 +715,6 @@ func (a *AlertNode) handleTalk(talk *pipeline.TalkHandler, ad *AlertData) {
 	err := a.et.tm.TalkService.Alert(
 		ad.ID,
 		ad.Message,
-		ad.Level,
 	)
 	if err != nil {
 		a.logger.Println("E! failed to send alert data to Talk:", err)

@@ -392,7 +392,7 @@ func (s *Server) appendReportingService(c reporting.Config) {
 
 func (s *Server) appendTalkService(c talk.Config) {
 	if c.Enabled {
-		l := s.LogService.NewLogger("[jiaoliao] ", log.LstdFlags)
+		l := s.LogService.NewLogger("[talk] ", log.LstdFlags)
 		srv := talk.NewService(c, l)
 		s.TaskMaster.TalkService = srv
 

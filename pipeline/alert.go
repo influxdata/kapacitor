@@ -676,7 +676,7 @@ func (a *AlertNode) Sensu() *SensuHandler {
 	return sensu
 }
 
-// tick:embedded:AlertNode.SensuHandler
+// tick:embedded:AlertNode.Sensu
 type SensuHandler struct {
 	*AlertNode
 }
@@ -837,6 +837,15 @@ func (og *OpsGenieHandler) Recipients(recipients ...string) *OpsGenieHandler {
 }
 
 // Send the alert to Talk.
+// To use Talk alerting you must first follow the steps to create a new incoming webhook.
+//
+//    1. Go to the URL https:/account.jianliao.com/signin.
+//    2. Sign in with you account. under the Team tab, click "Integrations".
+//    3. Select "Customize service", click incoming Webhook "Add" button.
+//    4. After choose the topic to connect with "xxx", click "Confirm Add" button.
+//    5. Once the service is created, you'll see the "Generate Webhook url".
+//
+// Place the 'Generate Webhook url' into the 'Talk' section of the Kapacitor configuration as the option 'url'.
 //
 // Example:
 //    [talk]
