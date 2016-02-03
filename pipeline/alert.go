@@ -13,6 +13,9 @@ const defaultIDTmpl = "{{ .Name }}:{{ .Group }}"
 // Default template for constructing a message.
 const defaultMessageTmpl = "{{ .ID }} is {{ .Level }}"
 
+// Default template for constructing a details message.
+const defaultDetailsTmpl = "{{ json . }}"
+
 // An AlertNode can trigger an event of varying severity levels,
 // and pass the event to alert handlers. The criteria for triggering
 // an alert is specified via a [lambda expression](/kapacitor/v0.10/tick/expr/).
@@ -32,7 +35,7 @@ const defaultMessageTmpl = "{{ .ID }} is {{ .Level }}"
 //    * Alerta -- Post alert message to Alerta.
 //    * Sensu -- Post alert message to Sensu client.
 //    * Slack -- Post alert message to Slack channel.
-//	  * OpsGenie -- Send alert to OpsGenie.
+//    * OpsGenie -- Send alert to OpsGenie.
 //    * VictorOps -- Send alert to VictorOps.
 //    * PagerDuty -- Send alert to PagerDuty.
 //
@@ -42,6 +45,7 @@ const defaultMessageTmpl = "{{ .ID }} is {{ .Level }}"
 //
 //    * ID -- the ID of the alert, user defined.
 //    * Message -- the alert message, user defined.
+//    * Details -- the alert details, user defined HTML content.
 //    * Time -- the time the alert occurred.
 //    * Level -- one of OK, INFO, WARNING or CRITICAL.
 //    * Data -- influxql.Result containing the data that triggered the alert.
@@ -139,6 +143,33 @@ type AlertNode struct {
 	// Default: {{ .ID }} is {{ .Level }}
 	Message string
 
+	// Template for constructing a detailed HTML message for the alert.
+	// The same template data is available as the AlertNode.Message property,
+	// in addition to a Message field that contains the rendered Message value.
+	//
+	// The intent is that the Message property be a single line summary while the
+	// Details property is a more detailed message possibly spanning multiple lines,
+	// and containing HTML formatting.
+	//
+	// This template is rendered using the html/template package in Go so that
+	// safe and valid HTML can be generated.
+	//
+	// The `json` method is available within the template to convert any variable to a valid
+	// JSON string.
+	//
+	// Example:
+	//    .alert()
+	//       .id('{{ .Name }}')
+	//       .details('''
+	//<h1>{{ .ID }}</h1>
+	//<b>{{ .Message }}</b>
+	//Value: {{ index .Fields "value" }}
+	//''')
+	//       .email()
+	//
+	// Default: {{ json . }}
+	Details string
+
 	// Filter expression for the INFO alert level.
 	// An empty value indicates the level is invalid and is skipped.
 	Info tick.Node
@@ -222,6 +253,7 @@ func newAlertNode(wants EdgeType) *AlertNode {
 		History: defaultFlapHistory,
 		Id:      defaultIDTmpl,
 		Message: defaultMessageTmpl,
+		Details: defaultDetailsTmpl,
 	}
 }
 
@@ -296,7 +328,8 @@ type PostHandler struct {
 //
 // If the To list is empty, the To addresses from the configuration are used.
 // The email subject is the AlertNode.Message property.
-// The email body is the JSON alert data.
+// The email body is the AlertNode.Details property.
+// The emails are sent as HTML emails and so the body can contain html markup.
 //
 // If the 'smtp' section in the configuration has the option: global = true
 // then all alerts are sent via email without the need to explicitly state it

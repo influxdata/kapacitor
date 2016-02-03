@@ -14,6 +14,7 @@ import (
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/wlog"
 	"github.com/influxdb/influxdb/client"
+	"github.com/influxdb/influxdb/influxql"
 )
 
 type MockInfluxDBService struct {
@@ -99,6 +100,21 @@ func compareResultsIgnoreSeriesOrder(exp, got kapacitor.Result) (bool, string) {
 		}
 	}
 	return true, ""
+}
+
+func compareAlertData(exp, got kapacitor.AlertData) (bool, string) {
+	// Pull out Result for comparision
+	expData := kapacitor.Result(exp.Data)
+	exp.Data = influxql.Result{}
+	gotData := kapacitor.Result(got.Data)
+	kapacitor.ConvertResultTimes(&gotData)
+	got.Data = influxql.Result{}
+
+	if !reflect.DeepEqual(got, exp) {
+		return false, fmt.Sprintf("\ngot %v\nexp %v", got, exp)
+	}
+
+	return compareResults(expData, gotData)
 }
 
 type LogService struct{}

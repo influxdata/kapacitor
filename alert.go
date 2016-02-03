@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	html "html/template"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"path"
-	"text/template"
+	text "text/template"
 	"time"
 
 	"github.com/influxdata/kapacitor/models"
@@ -56,9 +57,27 @@ func (l AlertLevel) MarshalText() ([]byte, error) {
 	return []byte(l.String()), nil
 }
 
+func (l *AlertLevel) UnmarshalText(text []byte) error {
+	s := string(text)
+	switch s {
+	case "OK":
+		*l = OKAlert
+	case "INFO":
+		*l = InfoAlert
+	case "WARNING":
+		*l = WarnAlert
+	case "CRITICAL":
+		*l = CritAlert
+	default:
+		return fmt.Errorf("unknown AlertLevel %s", s)
+	}
+	return nil
+}
+
 type AlertData struct {
 	ID      string          `json:"id"`
 	Message string          `json:"message"`
+	Details string          `json:"details"`
 	Time    time.Time       `json:"time"`
 	Level   AlertLevel      `json:"level"`
 	Data    influxql.Result `json:"data"`
@@ -71,8 +90,9 @@ type AlertNode struct {
 	handlers    []AlertHandler
 	levels      []*tick.StatefulExpr
 	states      map[models.GroupID]*alertState
-	idTmpl      *template.Template
-	messageTmpl *template.Template
+	idTmpl      *text.Template
+	messageTmpl *text.Template
+	detailsTmpl *html.Template
 }
 
 // Create a new  AlertNode which caches the most recent item and exposes it over the HTTP API.
@@ -84,16 +104,25 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 	an.node.runF = an.runAlert
 
 	// Parse templates
-	tmpl, err := template.New("id").Parse(n.Id)
+	an.idTmpl, err = text.New("id").Parse(n.Id)
 	if err != nil {
 		return nil, err
 	}
-	an.idTmpl = tmpl
-	tmpl, err = template.New("message").Parse(n.Message)
+
+	an.messageTmpl, err = text.New("message").Parse(n.Message)
 	if err != nil {
 		return nil, err
 	}
-	an.messageTmpl = tmpl
+
+	an.detailsTmpl, err = html.New("details").Funcs(html.FuncMap{
+		"json": func(v interface{}) html.JS {
+			a, _ := json.Marshal(v)
+			return html.JS(a)
+		},
+	}).Parse(n.Details)
+	if err != nil {
+		return nil, err
+	}
 
 	// Construct alert handlers
 	an.handlers = make([]AlertHandler, 0)
@@ -319,16 +348,17 @@ func (a *AlertNode) alertData(
 	if err != nil {
 		return nil, err
 	}
-	msg, err := a.renderMessage(id, name, group, tags, fields, level)
+	msg, details, err := a.renderMessageAndDetails(id, name, group, tags, fields, level)
 	if err != nil {
 		return nil, err
 	}
 	ad := &AlertData{
-		id,
-		msg,
-		t,
-		level,
-		a.batchToResult(b),
+		ID:      id,
+		Message: msg,
+		Details: details,
+		Time:    t,
+		Level:   level,
+		Data:    a.batchToResult(b),
 	}
 	return ad, nil
 }
@@ -420,6 +450,12 @@ type messageInfo struct {
 	Level string
 }
 
+type detailsInfo struct {
+	messageInfo
+	// The Message of the Alert
+	Message string
+}
+
 func (a *AlertNode) renderID(name string, group models.GroupID, tags models.Tags) (string, error) {
 	g := string(group)
 	if group == models.NilGroup {
@@ -439,12 +475,12 @@ func (a *AlertNode) renderID(name string, group models.GroupID, tags models.Tags
 	return id.String(), nil
 }
 
-func (a *AlertNode) renderMessage(id, name string, group models.GroupID, tags models.Tags, fields models.Fields, level AlertLevel) (string, error) {
+func (a *AlertNode) renderMessageAndDetails(id, name string, group models.GroupID, tags models.Tags, fields models.Fields, level AlertLevel) (string, string, error) {
 	g := string(group)
 	if group == models.NilGroup {
 		g = "nil"
 	}
-	info := messageInfo{
+	minfo := messageInfo{
 		idInfo: idInfo{
 			Name:     name,
 			TaskName: a.et.Task.Name,
@@ -456,11 +492,20 @@ func (a *AlertNode) renderMessage(id, name string, group models.GroupID, tags mo
 		Level:  level.String(),
 	}
 	var msg bytes.Buffer
-	err := a.messageTmpl.Execute(&msg, info)
+	err := a.messageTmpl.Execute(&msg, minfo)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	return msg.String(), nil
+	dinfo := detailsInfo{
+		messageInfo: minfo,
+		Message:     msg.String(),
+	}
+	var details bytes.Buffer
+	err = a.detailsTmpl.Execute(&details, dinfo)
+	if err != nil {
+		return "", "", err
+	}
+	return msg.String(), details.String(), nil
 }
 
 //--------------------------------
@@ -480,13 +525,8 @@ func (a *AlertNode) handlePost(post *pipeline.PostHandler, ad *AlertData) {
 }
 
 func (a *AlertNode) handleEmail(email *pipeline.EmailHandler, ad *AlertData) {
-	b, err := json.Marshal(ad)
-	if err != nil {
-		a.logger.Println("E! failed to marshal alert data json", err)
-		return
-	}
 	if a.et.tm.SMTPService != nil {
-		err := a.et.tm.SMTPService.SendMail(email.ToList, ad.Message, string(b))
+		err := a.et.tm.SMTPService.SendMail(email.ToList, ad.Message, ad.Details)
 		if err != nil {
 			a.logger.Println("E!", err)
 		}

@@ -22,16 +22,20 @@ func ResultFromJSON(in io.Reader) (r Result) {
 
 	json.Unmarshal(b, &r)
 	// Convert all times to time.Time
+	ConvertResultTimes(&r)
+	return
+}
+
+func ConvertResultTimes(r *Result) {
 	for _, series := range r.Series {
 		for i, v := range series.Values {
-			var t time.Time
 			for j, c := range series.Columns {
 				if c == "time" {
 					tStr, ok := v[j].(string)
 					if !ok {
 						continue
 					}
-					t, err = time.Parse(time.RFC3339, tStr)
+					t, err := time.Parse(time.RFC3339, tStr)
 					if err != nil {
 						continue
 					}
@@ -41,6 +45,4 @@ func ResultFromJSON(in io.Reader) (r Result) {
 			}
 		}
 	}
-
-	return
 }
