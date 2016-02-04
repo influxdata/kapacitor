@@ -52,26 +52,47 @@ type Service struct {
 	wg      sync.WaitGroup
 
 	logger *log.Logger
+
+	enterpriseHosts []*client.Host
+
+	clusterID string
+	productID string
+	hostname  string
+	version   string
+	product   string
 }
 
 func NewService(c Config, l *log.Logger) *Service {
 	return &Service{
-		interval: time.Duration(c.StatsInterval),
-		db:       c.Database,
-		rp:       c.RetentionPolicy,
-		logger:   l,
+		interval:        time.Duration(c.StatsInterval),
+		db:              c.Database,
+		rp:              c.RetentionPolicy,
+		logger:          l,
+		enterpriseHosts: c.EnterpriseHosts,
 	}
 }
 
 func (s *Service) Open() (err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// Populate published vars
+	s.clusterID = kapacitor.GetStringVar(kapacitor.ClusterIDVarName)
+	s.productID = kapacitor.GetStringVar(kapacitor.ServerIDVarName)
+	s.hostname = kapacitor.GetStringVar(kapacitor.HostVarName)
+	s.version = kapacitor.GetStringVar(kapacitor.VersionVarName)
+	s.product = kapacitor.Product
+
 	s.stream, err = s.TaskMaster.Stream("stats")
 	if err != nil {
 		return
 	}
 	s.open = true
 	s.closing = make(chan struct{})
+
+	if err := s.registerServer(); err != nil {
+		s.logger.Println("E! Unable to register with Enterprise Manager")
+	}
 	s.wg.Add(1)
 	go s.sendStats()
 	s.logger.Println("I! opened service")
@@ -89,6 +110,39 @@ func (s *Service) Close() error {
 	s.wg.Wait()
 	s.stream.Close()
 	s.logger.Println("I! closed service")
+	return nil
+}
+
+func (s *Service) registerServer() error {
+	if !s.enabled || len(s.enterpriseHosts) == 0 {
+		return nil
+	}
+
+	cl, err := client.New(s.enterpriseHosts)
+	if err != nil {
+		s.logger.Printf("E! Unable to contact one or more Enterprise hosts: %s\n", err.Error())
+		return err
+	}
+
+	product := client.Product{
+		ClusterID: s.clusterID,
+		ProductID: s.productID,
+		Host:      s.hostname,
+		Name:      s.product,
+		Version:   s.version,
+	}
+
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+
+		resp, err := cl.Register(&product)
+
+		if err != nil {
+			s.logger.Printf("failed to register Kapacitor with %s, received code %s, error: %s", resp.Response.Request.URL.String(), resp.Status, err)
+			return
+		}
+	}()
 	return nil
 }
 
