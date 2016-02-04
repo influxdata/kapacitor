@@ -330,6 +330,7 @@ var (
 	dname       = defineFlags.String("name", "", "the task name")
 	dtick       = defineFlags.String("tick", "", "path to the TICKscript")
 	dtype       = defineFlags.String("type", "", "the task type (stream|batch)")
+	dnoReload   = defineFlags.Bool("no-reload", false, "do not reload the task even if it is enabled")
 	ddbrp       = make(dbrps, 0)
 )
 
@@ -406,6 +407,8 @@ A task is defined via a TICKscript that defines the data processing pipeline of 
 
 If an option is absent it will be left unmodified.
 
+If the task is enabled then it will be reloaded unless -no-reload is specified.
+
 For example:
 
     You can define a task for the first time with all the flags.
@@ -472,6 +475,30 @@ func doDefine(args []string) error {
 	if rp.Error != "" {
 		return errors.New(rp.Error)
 	}
+
+	// Check if task is enabled if -no-reload was not given
+	if !*dnoReload {
+		v = url.Values{}
+		v.Add("name", *dname)
+		r, err = http.Get(kapacitorEndpoint + "/task?" + v.Encode())
+		if err != nil {
+			return err
+		}
+		defer r.Body.Close()
+		d = json.NewDecoder(r.Body)
+		ti := task_store.TaskInfo{}
+		d.Decode(&ti)
+
+		if ti.Name == "" && ti.Error != "" {
+			return errors.New(ti.Error)
+		}
+
+		// Reload task if enabled.
+		if ti.Enabled {
+			doReload([]string{*dname})
+		}
+	}
+
 	return nil
 }
 

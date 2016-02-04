@@ -6,18 +6,22 @@
 
 Improved UDFs, lots of bug fixes and improvements on the API. There was a breaking change for UDFs protobuf messages, see #176.
 
+There was a breaking change to the `define` command, see [#173](https://github.com/influxdata/kapacitor/issues/173) below.
+
 ### Features
 
-- [#176](https://github.com/influxdata/kapacitor/issues/176): Improved UDFs and groups. Now it is easy to deal with groups from the UDF process.
-    NOTE: There is a breaking change in the BeginBatch protobuf message for this change.
+- [#176](https://github.com/influxdata/kapacitor/issues/176): BREAKING: Improved UDFs and groups. Now it is easy to deal with groups from the UDF process.
+    There is a breaking change in the BeginBatch protobuf message for this change.
 - [#196](https://github.com/influxdata/kapacitor/issues/196): Adds a 'details' property to the alert node so that the email body can be defined. See also [#75](https://github.com/influxdata/kapacitor/issues/75).
 - [#132](https://github.com/influxdata/kapacitor/issues/132): Make is so multiple calls to `where` simply `AND` expressions together instead of replacing or creating extra nodes in the pipeline.
+- [#173](https://github.com/influxdata/kapacitor/issues/173): BREAKING: Added a `-no-reload` flag to the define command in the CLI. Now if the task is enabled define will automatically reload it unless `-no-reload` is passed.
 
 ### Bugfixes
 
 - [#177](https://github.com/influxdata/kapacitor/issues/177): Fix panic for show command on batch tasks.
 - [#185](https://github.com/influxdata/kapacitor/issues/185): Fix panic in define command with invalid dbrp value.
 - [#195](https://github.com/influxdata/kapacitor/issues/195): Fix panic in where node.
+- [#208](https://github.com/influxdata/kapacitor/issues/208): Add default stats dbrp to default subscription excludes.
 
 ## v0.10.0 [2016-01-26]
 
