@@ -1,33 +1,23 @@
-# This Dockerfile provides the needed environment to build Kapacitor.
-FROM ubuntu:trusty
+FROM ubuntu:latest
+
+# This dockerfile capabable  of the the minumum required
+# to run the tests and nothing else.
 
 MAINTAINER support@influxdb.com
 
-# Install deps
-RUN apt-get update
-RUN apt-get install -y \
-    make \
-    wget  \
+RUN apt-get update && apt-get install -y \
+    wget \
     git \
     mercurial \
-    ruby \
-    ruby-dev \
-    rpm \
-    zip \
-    python \
-    python-boto
-
-RUN gem install fpm
-
-# Install protobuf3
-RUN apt-get install -y \
     build-essential \
     autoconf \
     automake \
     libtool \
     python-setuptools \
+    zip \
     curl
 
+# Install protobuf3
 ENV PROTO_VERSION 3.0.0-beta-2
 # Download and compile protoc
 RUN wget https://github.com/google/protobuf/archive/v${PROTO_VERSION}.tar.gz && \
@@ -44,30 +34,29 @@ RUN wget https://github.com/google/protobuf/archive/v${PROTO_VERSION}.tar.gz && 
 RUN cd protobuf-${PROTO_VERSION}/python && \
     python setup.py install;
 
+# Setup env
+ENV GOPATH /root/go
+ENV PROJECT_DIR $GOPATH/src/github.com/influxdata/kapacitor
+ENV PATH $GOPATH/bin:$PATH
+RUN mkdir -p $PROJECT_DIR
+
+VOLUME $PROJECT_DIR
 
 
 # Install go
-ENV GO_VERSION 1.5.3
+ENV GO_VERSION 1.4.3
 ENV GO_ARCH amd64
 RUN wget https://storage.googleapis.com/golang/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz; \
    tar -C /usr/local/ -xf /go${GO_VERSION}.linux-${GO_ARCH}.tar.gz ; \
    rm /go${GO_VERSION}.linux-${GO_ARCH}.tar.gz
-ENV PATH /usr/local/go/bin:$PATH
-ENV GOPATH /gopath
-ENV PATH $GOPATH/bin:$PATH
-ENV PROJECT_PATH $GOPATH/src/github.com/influxdata/kapacitor
-RUN mkdir -p $PROJECT_PATH
 
-WORKDIR $PROJECT_PATH
-ENTRYPOINT ["/usr/local/bin/build"]
-CMD []
+# Clone Go tip for compilation
+ENV GOROOT_BOOTSTRAP /usr/local/go
+RUN git clone https://go.googlesource.com/go
+ENV PATH /go/bin:$PATH
 
-# Get gogo for golang protobuf
-RUN go get github.com/gogo/protobuf/protoc-gen-gogo
 
-# Initialize git, needed to stash changes before 'go get ./...'
-RUN git config --global user.email "support@influxdb.com"
-RUN git config --global user.name "Docker Builder"
-
-ADD ./build.py /usr/local/bin/build
-
+# Add script for compiling go
+ENV GO_CHECKOUT master
+ADD ./gobuild.sh /gobuild.sh
+ENTRYPOINT [ "/gobuild.sh" ]

@@ -1,0 +1,53 @@
+FROM 32bit/ubuntu:14.04
+
+# This dockerfile capabable  of the the minumum required
+# to run the tests and nothing else.
+
+MAINTAINER support@influxdb.com
+
+RUN apt-get update && apt-get install -y \
+    wget \
+    git \
+    mercurial \
+    build-essential \
+    autoconf \
+    automake \
+    libtool \
+    python-setuptools \
+    zip \
+    curl
+
+# Install protobuf3
+ENV PROTO_VERSION 3.0.0-beta-2
+# Download and compile protoc
+RUN wget https://github.com/google/protobuf/archive/v${PROTO_VERSION}.tar.gz && \
+    tar xf v${PROTO_VERSION}.tar.gz && \
+    rm -f v${PROTO_VERSION}.tar.gz && \
+    cd protobuf-${PROTO_VERSION} && \
+    ./autogen.sh && \
+    ./configure --prefix=/usr && \
+    make -j $(nproc) && \
+    make check && \
+    make install
+
+# Install Python Protobuf3
+RUN cd protobuf-${PROTO_VERSION}/python && \
+    python setup.py install;
+
+# Install go
+ENV GOPATH /root/go
+ENV GO_VERSION 1.5.3
+ENV GO_ARCH 386
+RUN wget https://storage.googleapis.com/golang/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz; \
+   tar -C /usr/local/ -xf /go${GO_VERSION}.linux-${GO_ARCH}.tar.gz ; \
+   rm /go${GO_VERSION}.linux-${GO_ARCH}.tar.gz
+ENV PATH /usr/local/go/bin:$PATH
+
+ENV PROJECT_DIR $GOPATH/src/github.com/influxdata/kapacitor
+ENV PATH $GOPATH/bin:$PATH
+RUN mkdir -p $PROJECT_DIR
+WORKDIR $PROJECT_DIR
+
+VOLUME $PROJECT_DIR
+
+ENTRYPOINT [ "/root/go/src/github.com/influxdata/kapacitor/build.py" ]

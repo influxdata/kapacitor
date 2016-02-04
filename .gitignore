@@ -13,3 +13,4 @@ kapacitor*.tar
 kapacitor*.zip
 *.pyc
 *.test
+/test-logs

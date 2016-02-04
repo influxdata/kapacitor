@@ -9,7 +9,7 @@ cd $DIR
 
 
 # Build new docker image
-docker build -t influxdata/kapacitor-builder $DIR
+docker build -f Dockerfile_build_ubuntu64 -t influxdata/kapacitor-builder $DIR
 echo "Running build.py"
 # Run docker
 docker run --rm \
