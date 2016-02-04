@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/influxdata/kapacitor/services/stats"
 	"github.com/influxdata/kapacitor/services/udp"
 )
 
@@ -21,13 +22,15 @@ type Config struct {
 
 func NewConfig() Config {
 	return Config{
-		Enabled:               true,
-		URLs:                  []string{"http://localhost:8086"},
-		Username:              "",
-		Password:              "",
-		Subscriptions:         make(map[string][]string),
-		ExcludedSubscriptions: make(map[string][]string),
-		UDPBuffer:             udp.DefaultBuffer,
+		Enabled:       true,
+		URLs:          []string{"http://localhost:8086"},
+		Username:      "",
+		Password:      "",
+		Subscriptions: make(map[string][]string),
+		ExcludedSubscriptions: map[string][]string{
+			stats.DefaultDatabse: []string{stats.DefaultRetentionPolicy},
+		},
+		UDPBuffer: udp.DefaultBuffer,
 	}
 }
 

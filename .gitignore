@@ -1,7 +1,7 @@
 .*.swp
 dist/*
 /build/*
-/kapacitor.conf
+/*.conf
 kapacitor_linux*
 kapacitord_linux*
 /*.tick

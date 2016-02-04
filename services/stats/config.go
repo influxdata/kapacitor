@@ -6,6 +6,12 @@ import (
 	"github.com/influxdb/influxdb/toml"
 )
 
+const (
+	DefaultDatabse         = "_kapacitor"
+	DefaultRetentionPolicy = "default"
+	DefaultStatsInterval   = toml.Duration(10 * time.Second)
+)
+
 type Config struct {
 	Enabled         bool          `toml:"enabled"`
 	StatsInterval   toml.Duration `toml:"stats-interval"`
@@ -16,8 +22,8 @@ type Config struct {
 func NewConfig() Config {
 	return Config{
 		Enabled:         true,
-		Database:        "_kapacitor",
-		RetentionPolicy: "default",
-		StatsInterval:   toml.Duration(10 * time.Second),
+		Database:        DefaultDatabse,
+		RetentionPolicy: DefaultRetentionPolicy,
+		StatsInterval:   DefaultStatsInterval,
 	}
 }
