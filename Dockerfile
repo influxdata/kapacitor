@@ -65,5 +65,9 @@ CMD []
 # Get gogo for golang protobuf
 RUN go get github.com/gogo/protobuf/protoc-gen-gogo
 
+# Initialize git, needed to stash changes before 'go get ./...'
+RUN git config --global user.email "support@influxdb.com"
+RUN git config --global user.name "Docker Builder"
+
 ADD ./build.py /usr/local/bin/build
 
