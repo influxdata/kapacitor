@@ -142,7 +142,11 @@ func (s *Service) registerServer() error {
 		if err != nil {
 			s.logger.Printf("E! failed to register Kapacitor, err: %s", err)
 			return
+		} else {
+			s.logger.Println("I! Registered product")
 		}
+
+		s.enterpriseHosts = cl.Hosts
 	}()
 	return nil
 }
@@ -168,6 +172,37 @@ func (s *Service) reportStats() {
 		s.logger.Println("E! error getting stats data:", err)
 		return
 	}
+
+	if len(s.enterpriseHosts) != 0 {
+		eData := make([]client.StatsData, len(data))
+
+		for i, d := range data {
+			eData[i] = client.StatsData{
+				Name:   d.Name,
+				Tags:   d.Tags,
+				Values: client.Values(d.Values),
+			}
+		}
+
+		eStats := client.Stats{
+			ProductName: s.product,
+			ClusterID:   s.clusterID,
+			ProductID:   s.productID,
+			Data:        eData,
+		}
+
+		cl, err := client.New(s.enterpriseHosts)
+		if err != nil {
+			s.logger.Printf("E! Unable to contact one or or more Enterprise hosts: %s\n", err.Error())
+			return
+		}
+
+		resp, err := cl.Save(eStats)
+		if err != nil {
+			s.logger.Printf("E! Error saving stats to Enterprise: response code: %d: error: %s", resp.StatusCode, err)
+		}
+	}
+
 	for _, stat := range data {
 		p := models.Point{
 			Database:        s.db,
