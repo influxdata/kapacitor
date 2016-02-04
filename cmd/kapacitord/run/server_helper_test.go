@@ -126,14 +126,23 @@ func (s *Server) HTTPPost(url string, content []byte) (results string, err error
 	if err != nil {
 		return "", err
 	}
-	body := string(MustReadAll(resp.Body))
+	body := MustReadAll(resp.Body)
+	type response struct {
+		Error string `json:"Error"`
+	}
+	d := json.NewDecoder(bytes.NewReader(body))
+	rp := response{}
+	d.Decode(&rp)
+	if rp.Error != "" {
+		return "", errors.New(rp.Error)
+	}
 	switch resp.StatusCode {
 	case http.StatusBadRequest:
-		return "", fmt.Errorf("unexpected status code: code=%d, body=%s", resp.StatusCode, body)
+		return "", fmt.Errorf("unexpected status code: code=%d, body=%s", resp.StatusCode, string(body))
 	case http.StatusOK, http.StatusNoContent:
-		return body, nil
+		return string(body), nil
 	default:
-		return "", fmt.Errorf("unexpected status code: code=%d, body=%s", resp.StatusCode, body)
+		return "", fmt.Errorf("unexpected status code: code=%d, body=%s", resp.StatusCode, string(body))
 	}
 }
 

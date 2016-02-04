@@ -214,6 +214,7 @@ func (et *ExecutingTask) StartBatching() error {
 
 	err := et.checkDBRPs(batcher)
 	if err != nil {
+		batcher.Abort()
 		return err
 	}
 

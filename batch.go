@@ -80,6 +80,12 @@ func (s *SourceBatchNode) Start() {
 	}
 }
 
+func (s *SourceBatchNode) Abort() {
+	for _, b := range s.children {
+		b.(*BatchNode).Abort()
+	}
+}
+
 func (s *SourceBatchNode) Queries(start, stop time.Time) [][]string {
 	queries := make([][]string, len(s.children))
 	for i, b := range s.children {
@@ -101,13 +107,15 @@ type BatchNode struct {
 	queryMu  sync.Mutex
 	queryErr chan error
 	closing  chan struct{}
+	aborting chan struct{}
 }
 
 func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode, l *log.Logger) (*BatchNode, error) {
 	bn := &BatchNode{
-		node:    node{Node: n, et: et, logger: l},
-		b:       n,
-		closing: make(chan struct{}),
+		node:     node{Node: n, et: et, logger: l},
+		b:        n,
+		closing:  make(chan struct{}),
+		aborting: make(chan struct{}),
 	}
 	bn.node.runF = bn.runBatch
 	bn.node.stopF = bn.stopBatch
@@ -191,6 +199,10 @@ func (b *BatchNode) Start() {
 	}()
 }
 
+func (b *BatchNode) Abort() {
+	close(b.aborting)
+}
+
 func (b *BatchNode) Queries(start, stop time.Time) []string {
 	now := time.Now()
 	if stop.IsZero() {
@@ -229,6 +241,8 @@ func (b *BatchNode) doQuery() error {
 		select {
 		case <-b.closing:
 			return nil
+		case <-b.aborting:
+			return errors.New("batch doQuery aborted")
 		case now := <-tickC:
 
 			// Update times for query
@@ -295,12 +309,21 @@ func (b *BatchNode) runBatch([]byte) error {
 	b.queryMu.Lock()
 	if b.queryErr != nil {
 		b.queryMu.Unlock()
-		queryErr = <-b.queryErr
+		select {
+		case queryErr = <-b.queryErr:
+		case <-b.aborting:
+			queryErr = errors.New("batch queryErr aborted")
+		}
 	} else {
 		b.queryMu.Unlock()
 	}
 
-	err := <-errC
+	var err error
+	select {
+	case err = <-errC:
+	case <-b.aborting:
+		err = errors.New("batch run aborted")
+	}
 	if queryErr != nil {
 		return queryErr
 	}

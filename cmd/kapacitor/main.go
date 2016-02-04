@@ -495,7 +495,7 @@ func doDefine(args []string) error {
 
 		// Reload task if enabled.
 		if ti.Enabled {
-			doReload([]string{*dname})
+			return doReload([]string{*dname})
 		}
 	}
 
