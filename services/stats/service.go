@@ -28,6 +28,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/influxdata/enterprise-client/v2"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/models"
 )
@@ -114,7 +115,7 @@ func (s *Service) Close() error {
 }
 
 func (s *Service) registerServer() error {
-	if !s.enabled || len(s.enterpriseHosts) == 0 {
+	if len(s.enterpriseHosts) == 0 {
 		return nil
 	}
 
@@ -136,10 +137,10 @@ func (s *Service) registerServer() error {
 	go func() {
 		defer s.wg.Done()
 
-		resp, err := cl.Register(&product)
+		_, err := cl.Register(&product)
 
 		if err != nil {
-			s.logger.Printf("failed to register Kapacitor with %s, received code %s, error: %s", resp.Response.Request.URL.String(), resp.Status, err)
+			s.logger.Printf("E! failed to register Kapacitor, err: %s", err)
 			return
 		}
 	}()
