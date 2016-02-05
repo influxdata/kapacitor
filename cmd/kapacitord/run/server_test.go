@@ -431,6 +431,51 @@ batch
 	}
 }
 
+func TestServer_InvalidBatchTask(t *testing.T) {
+	c := NewConfig()
+	c.InfluxDB.Enabled = true
+	db := NewInfluxDB(func(q string) *client.Response {
+		return nil
+	})
+	c.InfluxDB.URLs = []string{db.URL()}
+	s := OpenServer(c)
+	defer s.Close()
+
+	name := "testInvalidBatchTask"
+	ttype := "batch"
+	dbrps := []kapacitor.DBRP{{
+		Database:        "mydb",
+		RetentionPolicy: "myrp",
+	}}
+	tick := `
+batch
+	.query(' SELECT value from unknowndb.unknownrp.cpu ')
+		.period(5ms)
+		.every(5ms)
+	.mapReduce(influxql.count('value'))
+	.httpOut('count')
+`
+
+	r, err := s.DefineTask(name, ttype, tick, dbrps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r != "" {
+		t.Fatal("unexpected result", r)
+	}
+
+	r, err = s.EnableTask(name)
+	expErr := `batch query is not allowed to request data from "unknowndb"."unknownrp"`
+	if err != nil && err.Error() != expErr {
+		t.Fatalf("unexpected err: got %v exp %s", err, expErr)
+	}
+
+	err = s.DeleteTask(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestServer_RecordReplayStream(t *testing.T) {
 	s := OpenDefaultServer()
 	defer s.Close()

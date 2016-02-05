@@ -173,21 +173,19 @@ func (ts *Service) Open() error {
 
 	// Start each enabled task
 	for _, name := range enabledTasks {
-		ts.logger.Println("D! enabling task on startup", name)
+		ts.logger.Println("D! starting enabled task on startup", name)
 		t, err := ts.Load(name)
-		ts.logger.Println("D! loaded", name)
 		if err != nil {
 			ts.logger.Printf("E! error loading enabled task %s, err: %s\n", name, err)
 			return nil
 		}
 		err = ts.StartTask(t)
-		ts.logger.Println("D! started", name)
 		if err != nil {
 			ts.logger.Printf("E! error starting enabled task %s, err: %s\n", name, err)
 		} else {
+			ts.logger.Println("D! started task during startup", name)
 			numEnabledTasks++
 		}
-		ts.logger.Println("D! enabled task on startup", name)
 	}
 
 	// Set expvars
@@ -617,6 +615,7 @@ func (ts *Service) StartTask(t *kapacitor.Task) error {
 		err := et.StartBatching()
 		if err != nil {
 			ts.SaveLastError(t.Name, err.Error())
+			ts.TaskMaster.StopTask(t.Name)
 			return err
 		}
 	}

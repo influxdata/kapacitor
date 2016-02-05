@@ -22,6 +22,7 @@ There was a breaking change to the `define` command, see [#173](https://github.c
 - [#185](https://github.com/influxdata/kapacitor/issues/185): Fix panic in define command with invalid dbrp value.
 - [#195](https://github.com/influxdata/kapacitor/issues/195): Fix panic in where node.
 - [#208](https://github.com/influxdata/kapacitor/issues/208): Add default stats dbrp to default subscription excludes.
+- [#203](https://github.com/influxdata/kapacitor/issues/203): Fix hang when deleteing invalid batch task.
 
 ## v0.10.0 [2016-01-26]
 
