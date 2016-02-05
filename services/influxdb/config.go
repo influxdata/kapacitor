@@ -6,6 +6,12 @@ import (
 
 	"github.com/influxdata/kapacitor/services/stats"
 	"github.com/influxdata/kapacitor/services/udp"
+	"github.com/influxdb/influxdb/toml"
+)
+
+const (
+	// Maximum time to try and connect to InfluxDB during startup.
+	DefaultStartUpTimeout = time.Minute * 5
 )
 
 type Config struct {
@@ -13,11 +19,12 @@ type Config struct {
 	URLs                  []string            `toml:"urls"`
 	Username              string              `toml:"username"`
 	Password              string              `toml:"password"`
-	Timeout               time.Duration       `toml:"timeout"`
+	Timeout               toml.Duration       `toml:"timeout"`
 	Subscriptions         map[string][]string `toml:"subscriptions"`
 	ExcludedSubscriptions map[string][]string `toml:"excluded-subscriptions"`
 	UDPBuffer             int                 `toml:"udp-buffer"`
 	UDPReadBuffer         int                 `toml:"udp-read-buffer"`
+	StartUpTimeout        toml.Duration       `toml:"startup-timeout"`
 }
 
 func NewConfig() Config {
@@ -30,7 +37,8 @@ func NewConfig() Config {
 		ExcludedSubscriptions: map[string][]string{
 			stats.DefaultDatabse: []string{stats.DefaultRetentionPolicy},
 		},
-		UDPBuffer: udp.DefaultBuffer,
+		UDPBuffer:      udp.DefaultBuffer,
+		StartUpTimeout: toml.Duration(DefaultStartUpTimeout),
 	}
 }
 
