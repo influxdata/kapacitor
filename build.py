@@ -744,7 +744,7 @@ def main():
     if nightly:
         # In order to cleanly delineate nightly version, we are adding the epoch timestamp
         # to the version so that version numbers are always greater than the previous nightly.
-        version = "{}.n{}".format(version, int(time.time()))
+        version = "{}~n{}".format(version, int(time.time()))
         iteration = 0
     elif rc:
         iteration = 0
