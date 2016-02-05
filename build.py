@@ -472,7 +472,7 @@ def go_get(branch, platform=None, update=False, no_stash=False):
         run("git reset --hard")
 
         print "Retrieving Go dependencies (moving to master)..."
-        run(get_command)
+        run(get_command, shell=True)
         sys.stdout.flush()
 
         print "Moving back to branch '{}'...".format(branch)
@@ -482,7 +482,7 @@ def go_get(branch, platform=None, update=False, no_stash=False):
         run("git stash apply {}".format(stash))
     else:
         print "Retrieving Go dependencies..."
-        run(get_command)
+        run(get_command, shell=True)
 
         print "Moving back to branch '{}'...".format(branch)
         run("git checkout {}".format(branch))
