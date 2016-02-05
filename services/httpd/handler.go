@@ -36,8 +36,6 @@ type Route struct {
 	Name        string
 	Method      string
 	Pattern     string
-	Gzipped     bool
-	Log         bool
 	HandlerFunc interface{}
 }
 
@@ -75,45 +73,75 @@ func NewHandler(requireAuthentication, loggingEnabled, writeTrace bool, statMap 
 	}
 
 	h.AddRoutes([]Route{
-		Route{ // Ping
-			"ping",
-			"GET", "/ping", true, true, h.servePing,
-		},
-		Route{ // Ping
-			"ping-head",
-			"HEAD", "/ping", true, true, h.servePing,
+		Route{
+			// Ping
+			Name:        "ping",
+			Method:      "GET",
+			Pattern:     "/ping",
+			HandlerFunc: h.servePing,
 		},
 		Route{
-			"write", // Satisfy CORS checks.
-			"OPTIONS", "/write", true, true, h.serveOptions,
+			// Ping
+			Name:        "ping-head",
+			Method:      "HEAD",
+			Pattern:     "/ping",
+			HandlerFunc: h.servePing,
 		},
 		Route{
-			"write", // Data-ingest route.
-			"POST", "/write", true, true, h.serveWrite,
+			// Satisfy CORS checks.
+			Name:        "write",
+			Method:      "OPTIONS",
+			Pattern:     "/write",
+			HandlerFunc: h.serveOptions,
 		},
 		Route{
-			"routes", // Display current API routes
-			"GET", "/:routes", true, true, h.serveRoutes,
+			// Data-ingest route.
+			Name:        "write",
+			Method:      "POST",
+			Pattern:     "/write",
+			HandlerFunc: h.serveWrite,
 		},
 		Route{
-			"log-level", // Display current API routes
-			"POST", "/loglevel", true, true, h.serveLogLevel,
+			// Display current API routes
+			Name:        "routes",
+			Method:      "GET",
+			Pattern:     "/:routes",
+			HandlerFunc: h.serveRoutes,
 		},
 		Route{
-			"404", // Catch all 404
-			"GET", "/", true, true, h.serve404,
+			// Display current log level
+			Name:        "log-level",
+			Method:      "POST",
+			Pattern:     "/loglevel",
+			HandlerFunc: h.serveLogLevel,
 		},
 		Route{
-			"404", // Catch all 404
-			"POST", "/", true, true, h.serve404,
+			// Catch all 404
+			Name:        "404",
+			Method:      "GET",
+			Pattern:     "/",
+			HandlerFunc: h.serve404,
 		},
 		Route{
-			"404", // Catch all 404
-			"DELETE", "/", true, true, h.serve404,
+			// Catch all 404
+			Name:        "404",
+			Method:      "POST",
+			Pattern:     "/",
+			HandlerFunc: h.serve404,
 		},
 		Route{
-			"404", // Catch all 404
-			"HEAD", "/", true, true, h.serve404,
+			// Catch all 404
+			Name:        "404",
+			Method:      "DELETE",
+			Pattern:     "/",
+			HandlerFunc: h.serve404,
+		},
+		Route{
+			// Catch all 404
+			Name:        "404",
+			Method:      "HEAD",
+			Pattern:     "/",
+			HandlerFunc: h.serve404,
 		},
 	})
 
@@ -141,13 +169,14 @@ func (h *Handler) AddRoute(r Route) error {
 		handler = http.HandlerFunc(hf)
 	}
 
-	if r.Gzipped {
-		handler = gzipFilter(handler)
-	}
+	// Set basic handlers for all requests
+	handler = jsonContent(handler)
+	handler = gzipFilter(handler)
 	handler = versionHeader(handler, h)
 	handler = cors(handler)
 	handler = requestID(handler)
-	if h.loggingEnabled && r.Log {
+
+	if h.loggingEnabled {
 		handler = logging(handler, r.Name, h.Logger)
 	}
 	handler = recovery(handler, r.Name, h.Logger) // make sure recovery is always last
@@ -281,25 +310,6 @@ func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user *meta.
 
 // serveWriteLine receives incoming series data in line protocol format and writes it to the database.
 func (h *Handler) serveWriteLine(w http.ResponseWriter, r *http.Request, body []byte, user *meta.UserInfo) {
-	// Some clients may not set the content-type header appropriately and send JSON with a non-json
-	// content-type.  If the body looks JSON, try to handle it as as JSON instead
-	if len(body) > 0 {
-		var i int
-		for {
-			// JSON requests must start w/ an opening bracket
-			if body[i] == '{' {
-				h.writeError(w, influxql.Result{Err: fmt.Errorf("kapacitor does not support the JSON write protocol")}, http.StatusBadRequest)
-				return
-			}
-
-			// check that the byte is in the standard ascii code range
-			if body[i] > 32 {
-				break
-			}
-			i += 1
-		}
-	}
-
 	precision := r.FormValue("precision")
 	if precision == "" {
 		precision = "n"
@@ -390,7 +400,6 @@ func MarshalJSON(v interface{}, pretty bool) []byte {
 
 // serveExpvar serves registered expvar information over HTTP.
 func serveExpvar(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	fmt.Fprintf(w, "{\n")
 	first := true
 	expvar.Do(func(kv expvar.KeyValue) {
@@ -405,7 +414,6 @@ func serveExpvar(w http.ResponseWriter, r *http.Request) {
 
 // HttpError writes an error to the client in a standard format.
 func HttpError(w http.ResponseWriter, err string, pretty bool, code int) {
-	w.Header().Add("content-type", "application/json")
 	w.WriteHeader(code)
 
 	type errResponse struct {
@@ -423,7 +431,6 @@ func HttpError(w http.ResponseWriter, err string, pretty bool, code int) {
 }
 
 func resultError(w http.ResponseWriter, result influxql.Result, code int) {
-	w.Header().Add("content-type", "application/json")
 	w.WriteHeader(code)
 	_ = json.NewEncoder(w).Encode(&result)
 }
@@ -486,6 +493,13 @@ func gzipFilter(inner http.Handler) http.Handler {
 		defer gz.Close()
 		gzw := gzipResponseWriter{Writer: gz, ResponseWriter: w}
 		inner.ServeHTTP(gzw, r)
+	})
+}
+
+func jsonContent(inner http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		inner.ServeHTTP(w, r)
 	})
 }
 
