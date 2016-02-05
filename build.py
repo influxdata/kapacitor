@@ -449,12 +449,15 @@ def copy_file(fr, to):
     except OSError as e:
         print e
 
-def go_get(branch, update=False, no_stash=False):
-    get_command = None
+def go_get(branch, platform=None, update=False, no_stash=False):
+    get_command = ""
+    if platform:
+        get_command = "GOOS={} ".format(platform)
+        
     if update:
-        get_command = "go get -u -f -d ./..."
+        get_command += "go get -u -f -d ./..."
     else:
-        get_command = "go get -d ./..."
+        get_command += "go get -d ./..."
 
     # 'go get' switches to master, so stash what we currently have
     changes = run("git status --porcelain").strip()
@@ -469,7 +472,7 @@ def go_get(branch, update=False, no_stash=False):
         run("git reset --hard")
 
         print "Retrieving Go dependencies (moving to master)..."
-        run(get_command)
+        run(get_command, shell=True)
         sys.stdout.flush()
 
         print "Moving back to branch '{}'...".format(branch)
@@ -479,7 +482,7 @@ def go_get(branch, update=False, no_stash=False):
         run("git stash apply {}".format(stash))
     else:
         print "Retrieving Go dependencies..."
-        run(get_command)
+        run(get_command, shell=True)
 
         print "Moving back to branch '{}'...".format(branch)
         run("git checkout {}".format(branch))
@@ -685,9 +688,6 @@ def main():
         elif '--nightly' in arg:
             # Signifies that this is a nightly build.
             nightly = True
-            # In order to cleanly delineate nightly version, we are adding the epoch timestamp
-            # to the version so that version numbers are always greater than the previous nightly.
-            version = "{}.n{}".format(version, int(time.time()))
         elif '--update' in arg:
             # Signifies that dependencies should be updated.
             update = True
@@ -740,7 +740,15 @@ def main():
     if nightly and rc:
         print "!! Cannot be both nightly and a release candidate! Stopping."
         return 1
-
+    
+    if nightly:
+        # In order to cleanly delineate nightly version, we are adding the epoch timestamp
+        # to the version so that version numbers are always greater than the previous nightly.
+        version = "{}.n{}".format(version, int(time.time()))
+        iteration = 0
+    elif rc:
+        iteration = 0
+    
     # Pre-build checks
     check_environ()
     check_prereqs()
@@ -758,9 +766,6 @@ def main():
             target_arch = system_arch
     if not target_platform:
         target_platform = get_system_platform()
-    if rc or nightly:
-        # If a release candidate or nightly, set iteration to 0 (instead of 1)
-        iteration = 0
 
     if target_arch == '386':
         target_arch = 'i386'
@@ -778,10 +783,6 @@ def main():
             return 1
         return 0
 
-    if run_get:
-        if not go_get(branch, update=update, no_stash=no_stash):
-            print "!! Cannot continue: go get failed"
-            return 1
 
     platforms = []
     single_build = True
@@ -799,6 +800,13 @@ def main():
             archs = supported_builds.get(platform)
         else:
             archs = [target_arch]
+
+        if run_get:
+            # Run 'go get' for every platform in case there are platform-specific includes
+            if not go_get(branch, platform=platform, update=update, no_stash=no_stash):
+                print "!! Cannot continue: go get failed"
+                return 1
+
         for arch in archs:
             od = outdir
             if not single_build:
