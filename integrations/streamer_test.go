@@ -25,6 +25,7 @@ import (
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/slack"
+	"github.com/influxdata/kapacitor/services/talk"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/wlog"
@@ -1942,6 +1943,70 @@ stream
 	}
 
 	if requestCount != 2 {
+		t.Errorf("unexpected requestCount got %d exp 1", requestCount)
+	}
+}
+
+func TestStream_AlertTalk(t *testing.T) {
+	requestCount := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		type postData struct {
+			Title      string `json:"title"`
+			Text       string `json:"text"`
+			AuthorName string `json:"authorName"`
+		}
+		pd := postData{}
+		dec := json.NewDecoder(r.Body)
+		dec.Decode(&pd)
+
+		if exp := "Kapacitor"; pd.AuthorName != exp {
+			t.Errorf("unexpected source got %s exp %s", pd.AuthorName, exp)
+		}
+
+		if exp := "kapacitor/cpu/serverA is CRITICAL"; pd.Text != exp {
+			t.Errorf("unexpected text got %s exp %s", pd.Text, exp)
+		}
+
+		if exp := "kapacitor/cpu/serverA"; pd.Title != exp {
+			t.Errorf("unexpected text got %s exp %s", pd.Title, exp)
+		}
+
+	}))
+	defer ts.Close()
+
+	var script = `
+stream
+	.from().measurement('cpu')
+	.where(lambda: "host" == 'serverA')
+	.groupBy('host')
+	.window()
+		.period(10s)
+		.every(10s)
+	.mapReduce(influxql.count('value'))
+	.alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.talk()
+`
+
+	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
+	defer tm.Close()
+
+	c := talk.NewConfig()
+	c.URL = ts.URL
+	c.AuthorName = "Kapacitor"
+	sl := talk.NewService(c, logService.NewLogger("[test_talk] ", log.LstdFlags))
+	tm.TalkService = sl
+
+	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if requestCount != 1 {
 		t.Errorf("unexpected requestCount got %d exp 1", requestCount)
 	}
 }

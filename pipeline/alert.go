@@ -22,7 +22,7 @@ const defaultDetailsTmpl = "{{ json . }}"
 // See AlertNode.Info, AlertNode.Warn, and AlertNode.Crit below.
 //
 // Different event handlers can be configured for each AlertNode.
-// Some handlers like Email, HipChat, Sensu, Slack, OpsGenie, VictorOps and PagerDuty have a configuration
+// Some handlers like Email, HipChat, Sensu, Slack, OpsGenie, VictorOps, PagerDuty and Talk have a configuration
 // option 'global' that indicates that all alerts implicitly use the handler.
 //
 // Available event handlers:
@@ -38,6 +38,7 @@ const defaultDetailsTmpl = "{{ json . }}"
 //    * OpsGenie -- Send alert to OpsGenie.
 //    * VictorOps -- Send alert to VictorOps.
 //    * PagerDuty -- Send alert to PagerDuty.
+//    * Talk -- Post alert message to Talk client.
 //
 // See below for more details on configuring each handler.
 //
@@ -241,6 +242,10 @@ type AlertNode struct {
 	// Send alert to OpsGenie
 	// tick:ignore
 	OpsGenieHandlers []*OpsGenieHandler
+
+	// Send alert to Talk.
+	// tick:ignore
+	TalkHandlers []*TalkHandler
 }
 
 func newAlertNode(wants EdgeType) *AlertNode {
@@ -862,4 +867,42 @@ func (og *OpsGenieHandler) Teams(teams ...string) *OpsGenieHandler {
 func (og *OpsGenieHandler) Recipients(recipients ...string) *OpsGenieHandler {
 	og.RecipientsList = recipients
 	return og
+}
+
+// Send the alert to Talk.
+// To use Talk alerting you must first follow the steps to create a new incoming webhook.
+//
+//    1. Go to the URL https:/account.jianliao.com/signin.
+//    2. Sign in with you account. under the Team tab, click "Integrations".
+//    3. Select "Customize service", click incoming Webhook "Add" button.
+//    4. After choose the topic to connect with "xxx", click "Confirm Add" button.
+//    5. Once the service is created, you'll see the "Generate Webhook url".
+//
+// Place the 'Generate Webhook url' into the 'Talk' section of the Kapacitor configuration as the option 'url'.
+//
+// Example:
+//    [talk]
+//      enabled = true
+//      url = "https://jianliao.com/v2/services/webhook/uuid"
+//      author_name = "Kapacitor"
+//
+// Example:
+//    stream...
+//         .alert()
+//             .talk()
+//
+// Send alerts to Talk client.
+//
+// tick:property
+func (a *AlertNode) Talk() *TalkHandler {
+	talk := &TalkHandler{
+		AlertNode: a,
+	}
+	a.TalkHandlers = append(a.TalkHandlers, talk)
+	return talk
+}
+
+// tick:embedded:AlertNode.Talk
+type TalkHandler struct {
+	*AlertNode
 }

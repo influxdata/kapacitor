@@ -215,6 +215,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleOpsGenie(&pipeline.OpsGenieHandler{}, ad) })
 	}
 
+	for _, talk := range n.TalkHandlers {
+		talk := talk
+		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleTalk(talk, ad) })
+	}
+
 	// Parse level expressions
 	an.levels = make([]*tick.StatefulExpr, CritAlert+1)
 	if n.Info != nil {
@@ -737,6 +742,22 @@ func (a *AlertNode) handleOpsGenie(og *pipeline.OpsGenieHandler, ad *AlertData) 
 	)
 	if err != nil {
 		a.logger.Println("E! failed to send alert data to OpsGenie:", err)
+		return
+	}
+}
+
+func (a *AlertNode) handleTalk(talk *pipeline.TalkHandler, ad *AlertData) {
+	if a.et.tm.TalkService == nil {
+		a.logger.Println("E! failed to send Talk message. Talk is not enabled")
+		return
+	}
+
+	err := a.et.tm.TalkService.Alert(
+		ad.ID,
+		ad.Message,
+	)
+	if err != nil {
+		a.logger.Println("E! failed to send alert data to Talk:", err)
 		return
 	}
 }
