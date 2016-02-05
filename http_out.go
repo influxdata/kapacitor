@@ -65,8 +65,6 @@ func (h *HTTPOutNode) runOut([]byte) error {
 		Name:        h.Name(),
 		Method:      "GET",
 		Pattern:     p,
-		Gzipped:     true,
-		Log:         true,
 		HandlerFunc: hndl,
 	}}
 
