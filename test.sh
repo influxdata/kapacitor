@@ -104,7 +104,10 @@ function save_docker_image {
         mkdir -p "$DOCKER_SAVE_DIR"
     fi
 
-    if [[ -e "$imagefile" ]]
+    # Check if we already have a docker image
+    exists=$(docker images "$imagename")
+    # If not exists and we have a save, load it.
+    if [[ -z "$exists" && -e "$imagefile" ]]
     then
         zcat $imagefile | docker load
     fi
