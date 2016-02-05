@@ -115,6 +115,7 @@ def package_scripts(build_root):
 
 def run_generate():
     print "Running generate..."
+    run("go get github.com/gogo/protobuf/protoc-gen-gogo")
     command = "go generate ./..."
     code = os.system(command)
     if code != 0:
