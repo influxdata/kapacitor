@@ -685,9 +685,6 @@ def main():
         elif '--nightly' in arg:
             # Signifies that this is a nightly build.
             nightly = True
-            # In order to cleanly delineate nightly version, we are adding the epoch timestamp
-            # to the version so that version numbers are always greater than the previous nightly.
-            version = "{}.n{}".format(version, int(time.time()))
         elif '--update' in arg:
             # Signifies that dependencies should be updated.
             update = True
@@ -740,7 +737,15 @@ def main():
     if nightly and rc:
         print "!! Cannot be both nightly and a release candidate! Stopping."
         return 1
-
+    
+    if nightly:
+        # In order to cleanly delineate nightly version, we are adding the epoch timestamp
+        # to the version so that version numbers are always greater than the previous nightly.
+        version = "{}.n{}".format(version, int(time.time()))
+        iteration = 0
+    elif rc:
+        iteration = 0
+    
     # Pre-build checks
     check_environ()
     check_prereqs()
@@ -758,9 +763,6 @@ def main():
             target_arch = system_arch
     if not target_platform:
         target_platform = get_system_platform()
-    if rc or nightly:
-        # If a release candidate or nightly, set iteration to 0 (instead of 1)
-        iteration = 0
 
     if target_arch == '386':
         target_arch = 'i386'
