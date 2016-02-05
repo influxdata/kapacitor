@@ -15,6 +15,7 @@ There was a breaking change to the `define` command, see [#173](https://github.c
 - [#196](https://github.com/influxdata/kapacitor/issues/196): Adds a 'details' property to the alert node so that the email body can be defined. See also [#75](https://github.com/influxdata/kapacitor/issues/75).
 - [#132](https://github.com/influxdata/kapacitor/issues/132): Make is so multiple calls to `where` simply `AND` expressions together instead of replacing or creating extra nodes in the pipeline.
 - [#173](https://github.com/influxdata/kapacitor/issues/173): BREAKING: Added a `-no-reload` flag to the define command in the CLI. Now if the task is enabled define will automatically reload it unless `-no-reload` is passed.
+- [#194](https://github.com/influxdata/kapacitor/pull/194): Adds Talk integration for alerts. Thanks @wutaizeng!
 
 ### Bugfixes
 
