@@ -449,12 +449,15 @@ def copy_file(fr, to):
     except OSError as e:
         print e
 
-def go_get(branch, update=False, no_stash=False):
-    get_command = None
+def go_get(branch, platform=None, update=False, no_stash=False):
+    get_command = ""
+    if platform:
+        get_command = "GOOS={} ".format(platform)
+        
     if update:
-        get_command = "go get -u -f -d ./..."
+        get_command += "go get -u -f -d ./..."
     else:
-        get_command = "go get -d ./..."
+        get_command += "go get -d ./..."
 
     # 'go get' switches to master, so stash what we currently have
     changes = run("git status --porcelain").strip()
@@ -780,10 +783,6 @@ def main():
             return 1
         return 0
 
-    if run_get:
-        if not go_get(branch, update=update, no_stash=no_stash):
-            print "!! Cannot continue: go get failed"
-            return 1
 
     platforms = []
     single_build = True
@@ -801,6 +800,13 @@ def main():
             archs = supported_builds.get(platform)
         else:
             archs = [target_arch]
+
+        if run_get:
+            # Run 'go get' for every platform in case there are platform-specific includes
+            if not go_get(branch, platform=platform, update=update, no_stash=no_stash):
+                print "!! Cannot continue: go get failed"
+                return 1
+
         for arch in archs:
             od = outdir
             if not single_build:
