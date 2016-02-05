@@ -6,7 +6,9 @@ import (
 	"net"
 	"net/url"
 	"strings"
+	"time"
 
+	"github.com/cenkalti/backoff"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdb/influxdb/client"
@@ -14,19 +16,21 @@ import (
 )
 
 const (
+	// The name to give to all subscriptions
 	subName = "kapacitor"
 )
 
 // Handles requests to write or read from an InfluxDB cluster
 type Service struct {
-	configs       []client.Config
-	i             int
-	configSubs    map[subEntry]bool
-	exConfigSubs  map[subEntry]bool
-	hostname      string
-	logger        *log.Logger
-	udpBuffer     int
-	udpReadBuffer int
+	configs        []client.Config
+	i              int
+	configSubs     map[subEntry]bool
+	exConfigSubs   map[subEntry]bool
+	hostname       string
+	logger         *log.Logger
+	udpBuffer      int
+	udpReadBuffer  int
+	startupTimeout time.Duration
 
 	PointsWriter interface {
 		WritePoints(p *cluster.WritePointsRequest) error
@@ -61,7 +65,7 @@ func NewService(c Config, hostname string, l *log.Logger) *Service {
 			Username:  c.Username,
 			Password:  c.Password,
 			UserAgent: "Kapacitor",
-			Timeout:   c.Timeout,
+			Timeout:   time.Duration(c.Timeout),
 		}
 	}
 	subs := make(map[subEntry]bool, len(c.Subscriptions))
@@ -79,13 +83,14 @@ func NewService(c Config, hostname string, l *log.Logger) *Service {
 		}
 	}
 	return &Service{
-		configs:       configs,
-		configSubs:    subs,
-		exConfigSubs:  exSubs,
-		hostname:      hostname,
-		logger:        l,
-		udpBuffer:     c.UDPBuffer,
-		udpReadBuffer: c.UDPReadBuffer,
+		configs:        configs,
+		configSubs:     subs,
+		exConfigSubs:   exSubs,
+		hostname:       hostname,
+		logger:         l,
+		udpBuffer:      c.UDPBuffer,
+		udpReadBuffer:  c.UDPReadBuffer,
+		startupTimeout: time.Duration(c.StartUpTimeout),
 	}
 }
 
@@ -111,7 +116,6 @@ func (s *Service) Addr() string {
 }
 
 func (s *Service) NewClient() (c *client.Client, err error) {
-
 	tries := 0
 	for tries < len(s.configs) {
 		tries++
@@ -131,7 +135,21 @@ func (s *Service) NewClient() (c *client.Client, err error) {
 }
 
 func (s *Service) linkSubscriptions() error {
-	cli, err := s.NewClient()
+	s.logger.Println("I! linking subscriptions")
+	b := backoff.NewExponentialBackOff()
+	b.MaxElapsedTime = s.startupTimeout
+	ticker := backoff.NewTicker(b)
+	var err error
+	var cli *client.Client
+	for range ticker.C {
+		cli, err = s.NewClient()
+		if err != nil {
+			s.logger.Println("D! failed to connect to InfluxDB, retrying... ", err)
+			continue
+		}
+		ticker.Stop()
+		break
+	}
 	if err != nil {
 		return err
 	}

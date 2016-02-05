@@ -25,6 +25,7 @@ There was a breaking change to the `define` command, see [#173](https://github.c
 - [#208](https://github.com/influxdata/kapacitor/issues/208): Add default stats dbrp to default subscription excludes.
 - [#203](https://github.com/influxdata/kapacitor/issues/203): Fix hang when deleteing invalid batch task.
 - [#182](https://github.com/influxdata/kapacitor/issues/182): Fix missing/incorrect Content-Type headers for various HTTP endpoints.
+- [#187](https://github.com/influxdata/kapacitor/issues/187): Retry connecting to InfluxDB on startup for up to 5 minutes by default.
 
 ## v0.10.0 [2016-01-26]
 
