@@ -1,8 +1,11 @@
 # Changelog
 
-## v0.10.1 [unreleased]
+## v0.10.1 [2013-02-08]
 
 ### Release Notes
+
+This is a bug fix release that fixes many issues releated to the recent 0.10.0 release.
+The few additional features are focused on usability improvements from recent feedback.
 
 Improved UDFs, lots of bug fixes and improvements on the API. There was a breaking change for UDFs protobuf messages, see #176.
 
