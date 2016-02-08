@@ -24,11 +24,16 @@ package stats
 
 import (
 	"errors"
+	"fmt"
 	"log"
+	"net"
+	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
 	"github.com/influxdata/enterprise-client/v2"
+	"github.com/influxdata/enterprise-client/v2/admin"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/models"
 )
@@ -54,7 +59,12 @@ type Service struct {
 
 	logger *log.Logger
 
-	enterpriseHosts []*client.Host
+	enterpriseHosts   []*client.Host
+	adminPort         string
+	adminHost         string
+	token             string
+	secret            string
+	productRegistered chan struct{}
 
 	clusterID string
 	productID string
@@ -70,6 +80,8 @@ func NewService(c Config, l *log.Logger) *Service {
 		rp:              c.RetentionPolicy,
 		logger:          l,
 		enterpriseHosts: c.EnterpriseHosts,
+		adminPort:       fmt.Sprintf(":%d", c.AdminPort),
+		adminHost:       c.AdminHost,
 	}
 }
 
@@ -90,12 +102,14 @@ func (s *Service) Open() (err error) {
 	}
 	s.open = true
 	s.closing = make(chan struct{})
+	s.productRegistered = make(chan struct{})
 
 	if err := s.registerServer(); err != nil {
-		s.logger.Println("E! Unable to register with Enterprise Manager")
+		s.logger.Println("E! Unable to register with Enterprise")
 	}
-	s.wg.Add(1)
+	s.wg.Add(2)
 	go s.sendStats()
+	go s.launchAdminInterface()
 	s.logger.Println("I! opened service")
 	return
 }
@@ -125,12 +139,19 @@ func (s *Service) registerServer() error {
 		return err
 	}
 
+	adminURL, err := url.Parse("http://" + s.adminHost + s.adminPort)
+	if err != nil {
+		s.logger.Printf("E! Unable to parse admin URL: %s\n", err.Error())
+		return err
+	}
+
 	product := client.Product{
 		ClusterID: s.clusterID,
 		ProductID: s.productID,
 		Host:      s.hostname,
 		Name:      s.product,
 		Version:   s.version,
+		AdminURL:  adminURL.String(),
 	}
 
 	s.wg.Add(1)
@@ -147,7 +168,40 @@ func (s *Service) registerServer() error {
 		}
 
 		s.enterpriseHosts = cl.Hosts
+		for _, host := range s.enterpriseHosts {
+			if host.Primary {
+				s.token = host.Token
+				s.secret = host.SecretKey
+			}
+		}
+		close(s.productRegistered)
 	}()
+	return nil
+}
+
+func (s *Service) launchAdminInterface() error {
+	defer s.wg.Done()
+
+	<-s.productRegistered
+
+	srv := &http.Server{
+		Addr:         s.adminPort,
+		Handler:      admin.App(s.token, []byte(s.secret)),
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+	}
+
+	l, err := net.Listen("tcp", s.adminPort)
+	if err != nil {
+		s.logger.Printf("E! Unable to bind enterprise admin interface to port %s. err: %s\n", s.adminPort, err)
+		return err
+	}
+	go srv.Serve(l)
+	select {
+	case <-s.closing:
+		s.logger.Println("Shutting down enterprise admin interface")
+		l.Close()
+	}
 	return nil
 }
 
