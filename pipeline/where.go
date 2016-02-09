@@ -15,7 +15,7 @@ import (
 //    .where(lambda: "host" == 'h001.example.com')
 //    .alert()
 //        .crit(lambda: TRUE)
-//        .email('user@example.com')
+//        .email().to('user@example.com')
 //
 type WhereNode struct {
 	chainnode

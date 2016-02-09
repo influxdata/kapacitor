@@ -69,7 +69,7 @@ const defaultDetailsTmpl = "{{ json . }}"
 //            .crit(lambda: "value" > 30)
 //            .post("http://example.com/api/alert")
 //            .post("http://another.example.com/api/alert")
-//            .email('oncall@example.com')
+//            .email().to('oncall@example.com')
 //
 //
 // It is assumed that each successive level filters a subset
@@ -339,6 +339,21 @@ type PostHandler struct {
 // If the 'smtp' section in the configuration has the option: global = true
 // then all alerts are sent via email without the need to explicitly state it
 // in the TICKscript.
+//
+// Example:
+//    .alert()
+//       .id('{{ .Name }}')
+//       // Email subject
+//       .meassage('{{ .ID }}:{{ .Level }}')
+//       //Email body as HTML
+//       .details('''
+//<h1>{{ .ID }}</h1>
+//<b>{{ .Message }}</b>
+//Value: {{ index .Fields "value" }}
+//''')
+//       .email()
+//
+// Send an email with custom subject and body.
 //
 // Example:
 //     [smtp]
