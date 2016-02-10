@@ -664,10 +664,15 @@ type HipChatHandler struct {
 func (a *AlertNode) Alerta() *AlertaHandler {
 	alerta := &AlertaHandler{
 		AlertNode: a,
+		Resource:  defaultAlertaResource,
+		Group:     defaultAlertaGroup,
 	}
 	a.AlertaHandlers = append(a.AlertaHandlers, alerta)
 	return alerta
 }
+
+const defaultAlertaResource = "{{ .Name }}"
+const defaultAlertaGroup = "{{ .Group }}"
 
 // tick:embedded:AlertNode.Alerta
 type AlertaHandler struct {
@@ -678,26 +683,38 @@ type AlertaHandler struct {
 	Token string
 
 	// Alerta resource.
-	// This is a required field.
+	// Can be a template and has access to the same data as the AlertNode.Details property.
+	// Default: {{ .Name }}
 	Resource string
-
-	// Alerta event.
-	// This is a required field.
-	Event string
 
 	// Alerta environment.
 	// If empty uses the environment from the configuration.
 	Environment string
 
 	// Alerta group.
+	// Can be a template and has access to the same data as the AlertNode.Details property.
+	// Default: {{ .Group }}
 	Group string
 
 	// Alerta value.
+	// Can be a template and has access to the same data as the AlertNode.Details property.
+	// Default is an empty string.
 	Value string
 
 	// Alerta origin.
 	// If empty uses the origin from the configuration.
 	Origin string
+
+	// List of effected Services
+	// tick:ignore
+	Service []string
+}
+
+// List of effected services.
+// If not specified defaults to the Name of the stream.
+func (a *AlertaHandler) Services(service ...string) *AlertaHandler {
+	a.Service = service
+	return a
 }
 
 // Send the alert to Sensu.

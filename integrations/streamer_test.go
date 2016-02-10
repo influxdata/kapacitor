@@ -1581,11 +1581,14 @@ func TestStream_AlertAlerta(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestCount++
 		type postData struct {
-			Resource    string `json:"resource"`
-			Event       string `json:"event"`
-			Environment string `json:"environment"`
-			Text        string `json:"text"`
-			Origin      string `json:"origin"`
+			Resource    string   `json:"resource"`
+			Event       string   `json:"event"`
+			Group       string   `json:"group"`
+			Environment string   `json:"environment"`
+			Text        string   `json:"text"`
+			Origin      string   `json:"origin"`
+			Service     []string `json:"service"`
+			Value       string   `json:"value"`
 		}
 		pd := postData{}
 		dec := json.NewDecoder(r.Body)
@@ -1595,8 +1598,20 @@ func TestStream_AlertAlerta(t *testing.T) {
 			if exp := "/alert?api-key=testtoken1234567"; r.URL.String() != exp {
 				t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
 			}
+			if exp := "cpu"; pd.Resource != exp {
+				t.Errorf("unexpected resource got %s exp %s", pd.Resource, exp)
+			}
 			if exp := "production"; pd.Environment != exp {
 				t.Errorf("unexpected environment got %s exp %s", pd.Environment, exp)
+			}
+			if exp := "host=serverA,"; pd.Group != exp {
+				t.Errorf("unexpected group got %s exp %s", pd.Group, exp)
+			}
+			if exp := ""; pd.Value != exp {
+				t.Errorf("unexpected value got %s exp %s", pd.Value, exp)
+			}
+			if exp := []string{"cpu"}; !reflect.DeepEqual(pd.Service, exp) {
+				t.Errorf("unexpected service got %s exp %s", pd.Service, exp)
 			}
 			if exp := "Kapacitor"; pd.Origin != exp {
 				t.Errorf("unexpected origin got %s exp %s", pd.Origin, exp)
@@ -1605,17 +1620,26 @@ func TestStream_AlertAlerta(t *testing.T) {
 			if exp := "/alert?api-key=anothertesttoken"; r.URL.String() != exp {
 				t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
 			}
+			if exp := "resource: cpu"; pd.Resource != exp {
+				t.Errorf("unexpected resource got %s exp %s", pd.Resource, exp)
+			}
 			if exp := "development"; pd.Environment != exp {
 				t.Errorf("unexpected environment got %s exp %s", pd.Environment, exp)
+			}
+			if exp := "serverA"; pd.Group != exp {
+				t.Errorf("unexpected group got %s exp %s", pd.Group, exp)
+			}
+			if exp := "10"; pd.Value != exp {
+				t.Errorf("unexpected value got %s exp %s", pd.Value, exp)
+			}
+			if exp := []string{"serviceA", "serviceB"}; !reflect.DeepEqual(pd.Service, exp) {
+				t.Errorf("unexpected service got %s exp %s", pd.Service, exp)
 			}
 			if exp := "override"; pd.Origin != exp {
 				t.Errorf("unexpected origin got %s exp %s", pd.Origin, exp)
 			}
 		}
-		if exp := "serverA"; pd.Resource != exp {
-			t.Errorf("unexpected resource got %s exp %s", pd.Resource, exp)
-		}
-		if exp := "CPU Idle"; pd.Event != exp {
+		if exp := "serverA"; pd.Event != exp {
 			t.Errorf("unexpected event got %s exp %s", pd.Event, exp)
 		}
 		if exp := "kapacitor/cpu/serverA is CRITICAL"; pd.Text != exp {
@@ -1634,22 +1658,22 @@ stream
 		.every(10s)
 	.mapReduce(influxql.count('value'))
 	.alert()
-                .id('{{ index .Tags "host" }}')
+		.id('{{ index .Tags "host" }}')
 		.message('kapacitor/{{ .Name }}/{{ index .Tags "host" }} is {{ .Level }}')
 		.info(lambda: "count" > 6.0)
 		.warn(lambda: "count" > 7.0)
 		.crit(lambda: "count" > 8.0)
 		.alerta()
 			.token('testtoken1234567')
-			.resource('serverA')
-                        .event('CPU Idle')
-                        .environment('production')
+			.environment('production')
 		.alerta()
 			.token('anothertesttoken')
-			.resource('serverA')
-                        .event('CPU Idle')
-                        .environment('development')
-                        .origin('override')
+			.resource('resource: {{ .Name }}')
+			.environment('development')
+			.origin('override')
+			.group('{{ .ID }}')
+			.value('{{ index .Fields "count" | printf "%0.0f" }}')
+			.services('serviceA', 'serviceB')
 `
 
 	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)

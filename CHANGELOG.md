@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.11.0 [unreleased]
+
+### Release Notes
+
+### Features
+
+### Bugfixes
+- [#199](https://github.com/influxdata/kapacitor/issues/199): BREAKING: Various fixes for the Alerta integration.
+    The `event` property has been removed from the Alerta node and is now set as the value of the alert ID.
+
 ## v0.10.1 [2013-02-08]
 
 ### Release Notes
