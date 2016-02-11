@@ -228,6 +228,210 @@ stream
 	testStreamerWithOutput(t, "TestStream_Window", script, 13*time.Second, er, nil, false)
 }
 
+func TestStream_Shift(t *testing.T) {
+
+	var script = `
+var period  = 5s
+
+var data  = stream
+	.from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+
+var past = data
+	.window()
+		.period(period)
+		.every(period)
+		.align()
+	.mapReduce(influxql.count('value'))
+	.shift(period)
+
+var current = data
+	.window()
+		.period(period)
+		.every(period)
+		.align()
+	.mapReduce(influxql.count('value'))
+
+past.join(current)
+	.as('past', 'current')
+	.eval(lambda: "current.count" - "past.count")
+		.keep()
+		.as('diff')
+	.httpOut('TestStream_Shift')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    nil,
+				Columns: []string{"time", "current.count", "diff", "past.count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					5.0,
+					1.0,
+					4.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Shift", script, 15*time.Second, er, nil, false)
+}
+
+func TestStream_ShiftBatch(t *testing.T) {
+
+	var script = `
+var period  = 5s
+
+var data  = stream
+	.from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+
+var past = data
+	.window()
+		.period(period)
+		.every(period)
+		.align()
+	.shift(period)
+	.mapReduce(influxql.count('value'))
+
+var current = data
+	.window()
+		.period(period)
+		.every(period)
+		.align()
+	.mapReduce(influxql.count('value'))
+
+past.join(current)
+	.as('past', 'current')
+	.eval(lambda: "current.count" - "past.count")
+		.keep()
+		.as('diff')
+	.httpOut('TestStream_Shift')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    nil,
+				Columns: []string{"time", "current.count", "diff", "past.count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					5.0,
+					1.0,
+					4.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Shift", script, 15*time.Second, er, nil, false)
+}
+
+func TestStream_ShiftNegative(t *testing.T) {
+
+	var script = `
+var period  = 5s
+
+var data  = stream
+	.from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+
+var past = data
+	.window()
+		.period(period)
+		.every(period)
+		.align()
+	.mapReduce(influxql.count('value'))
+
+var current = data
+	.window()
+		.period(period)
+		.every(period)
+		.align()
+	.mapReduce(influxql.count('value'))
+	.shift(-period)
+
+past.join(current)
+	.as('past', 'current')
+	.eval(lambda: "current.count" - "past.count")
+		.keep()
+		.as('diff')
+	.httpOut('TestStream_Shift')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    nil,
+				Columns: []string{"time", "current.count", "diff", "past.count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+					5.0,
+					1.0,
+					4.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Shift", script, 15*time.Second, er, nil, false)
+}
+
+func TestStream_ShiftBatchNegative(t *testing.T) {
+
+	var script = `
+var period  = 5s
+
+var data  = stream
+	.from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+
+var past = data
+	.window()
+		.period(period)
+		.every(period)
+		.align()
+	.mapReduce(influxql.count('value'))
+
+var current = data
+	.window()
+		.period(period)
+		.every(period)
+		.align()
+	.shift(-period)
+	.mapReduce(influxql.count('value'))
+
+past.join(current)
+	.as('past', 'current')
+	.eval(lambda: "current.count" - "past.count")
+		.keep()
+		.as('diff')
+	.httpOut('TestStream_Shift')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    nil,
+				Columns: []string{"time", "current.count", "diff", "past.count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+					5.0,
+					1.0,
+					4.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Shift", script, 15*time.Second, er, nil, false)
+}
+
 func TestStream_SimpleMR(t *testing.T) {
 
 	var script = `

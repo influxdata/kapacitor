@@ -75,7 +75,10 @@ func eval(n Node, scope *Scope, stck *stack) (err error) {
 		if err != nil {
 			return
 		}
-		evalUnary(node.Operator, scope, stck)
+		err := evalUnary(node.Operator, scope, stck)
+		if err != nil {
+			return err
+		}
 	case *LambdaNode:
 		// Catch panic from resolveIdents and return as error.
 		err = func() (e error) {
@@ -155,15 +158,31 @@ func evalUnary(op tokenType, scope *Scope, stck *stack) error {
 	v := stck.Pop()
 	switch op {
 	case TokenMinus:
+		if ident, ok := v.(*IdentifierNode); ok {
+			value, err := scope.Get(ident.Ident)
+			if err != nil {
+				return err
+			}
+			v = value
+		}
 		switch n := v.(type) {
 		case float64:
 			stck.Push(-1 * n)
 		case int64:
 			stck.Push(-1 * n)
+		case time.Duration:
+			stck.Push(-1 * n)
 		default:
 			return fmt.Errorf("invalid arugument to '-' %v", v)
 		}
 	case TokenNot:
+		if ident, ok := v.(*IdentifierNode); ok {
+			value, err := scope.Get(ident.Ident)
+			if err != nil {
+				return err
+			}
+			v = value
+		}
 		if b, ok := v.(bool); ok {
 			stck.Push(!b)
 		} else {

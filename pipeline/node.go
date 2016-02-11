@@ -428,3 +428,10 @@ func (n *chainnode) Derivative(field string) *DerivativeNode {
 	n.linkChild(s)
 	return s
 }
+
+// Create a new node that shifts the incoming points or batches in time.
+func (n *chainnode) Shift(shift time.Duration) *ShiftNode {
+	s := newShiftNode(n.Provides(), shift)
+	n.linkChild(s)
+	return s
+}

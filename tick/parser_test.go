@@ -365,6 +365,42 @@ func TestParseStatements(t *testing.T) {
 			},
 		},
 		{
+			script: `var x = 3m
+			var y = -x`,
+			Root: &ListNode{
+				Nodes: []Node{
+					&BinaryNode{
+						pos:      6,
+						Operator: TokenAsgn,
+						Left: &IdentifierNode{
+							pos:   4,
+							Ident: "x",
+						},
+						Right: &DurationNode{
+							pos: 8,
+							Dur: time.Minute * 3,
+						},
+					},
+					&BinaryNode{
+						pos:      20,
+						Operator: TokenAsgn,
+						Left: &IdentifierNode{
+							pos:   18,
+							Ident: "y",
+						},
+						Right: &UnaryNode{
+							pos:      22,
+							Operator: TokenMinus,
+							Node: &IdentifierNode{
+								pos:   23,
+								Ident: "x",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			script: `var t = 42
 			stream.where(lambda: "value" > t)
 			`,
