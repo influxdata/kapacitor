@@ -61,4 +61,8 @@ WORKDIR $PROJECT_DIR
 
 VOLUME $PROJECT_DIR
 
+# Configure local git
+RUN git config --global user.email "support@influxdb.com"
+RUN git config --global user.Name "Docker Builder"
+
 ENTRYPOINT [ "/root/go/src/github.com/influxdata/kapacitor/build.py" ]
