@@ -1,4 +1,11 @@
-#!/usr/bin/python2.7 -u
+#!/usr/bin/env python2.7
+#
+# This is the InfluxDB build script.
+#
+# Current caveats:
+#   - Does not checkout the correct commit/branch (for now, you will need to do so manually)
+#   - Has external dependencies for packaging (fpm) and uploading (boto)
+#
 
 import sys
 import os
@@ -13,123 +20,129 @@ import re
 debug = False
 
 ################
-#### Kapacitor Variables
+#### InfluxDB Variables
 ################
 
-# Enable Go vendoring
-os.environ["GO15VENDOREXPERIMENT"] = "1"
-
-# PACKAGING VARIABLES
-PACKAGE_NAME = "kapacitor"
+# Packaging variables
+PACKAGE_NAME = "influxdb"
 INSTALL_ROOT_DIR = "/usr/bin"
-LOG_DIR = "/var/log/kapacitor"
-DATA_DIR = "/var/lib/kapacitor"
-SCRIPT_DIR = "/usr/lib/kapacitor/scripts"
+LOG_DIR = "/var/log/influxdb"
+DATA_DIR = "/var/lib/influxdb"
+SCRIPT_DIR = "/usr/lib/influxdb/scripts"
+CONFIG_DIR = "/etc/influxdb"
+LOGROTATE_DIR = "/etc/logrotate.d"
 
 INIT_SCRIPT = "scripts/init.sh"
-SYSTEMD_SCRIPT = "scripts/kapacitor.service"
+SYSTEMD_SCRIPT = "scripts/influxdb.service"
+PREINST_SCRIPT = "scripts/pre-install.sh"
 POSTINST_SCRIPT = "scripts/post-install.sh"
 POSTUNINST_SCRIPT = "scripts/post-uninstall.sh"
-LOGROTATE_CONFIG = "etc/logrotate.d/kapacitor"
-DEFAULT_CONFIG = "etc/kapacitor/kapacitor.conf"
-PREINST_SCRIPT = None
+LOGROTATE_SCRIPT = "scripts/logrotate"
+DEFAULT_CONFIG = "etc/config.sample.toml"
 
 # Default AWS S3 bucket for uploads
-DEFAULT_BUCKET = "kapacitor"
+DEFAULT_BUCKET = "influxdb"
 
-# META-PACKAGE VARIABLES
+CONFIGURATION_FILES = [
+    CONFIG_DIR + '/influxdb.conf',
+    LOGROTATE_DIR + '/influxdb',
+]
+
 PACKAGE_LICENSE = "MIT"
-PACKAGE_URL = "github.com/influxdata/kapacitor"
+PACKAGE_URL = "https://github.com/influxdata/influxdb"
 MAINTAINER = "support@influxdb.com"
 VENDOR = "InfluxData"
-DESCRIPTION = "Time series data processing engine"
+DESCRIPTION = "Distributed time-series database."
 
-# SCRIPT START
-go_vet_command = ["go", "tool", "vet", "-composites=false", "./"]
 prereqs = [ 'git', 'go' ]
-optional_prereqs = [ 'fpm', 'rpmbuild' ]
+optional_prereqs = [ 'gvm', 'fpm', 'rpmbuild' ]
 
 fpm_common_args = "-f -s dir --log error \
- --vendor {} \
- --url {} \
- --after-install {} \
- --after-remove {} \
- --license {} \
- --maintainer {} \
- --config-files {} \
- --config-files {} \
- --directories {} \
- --description \"{}\"".format(
-        VENDOR,
-        PACKAGE_URL,
-        POSTINST_SCRIPT,
-        POSTUNINST_SCRIPT,
-        PACKAGE_LICENSE,
-        MAINTAINER,
-        DEFAULT_CONFIG,
-        LOGROTATE_CONFIG,
-        ' --directories '.join([
-                         LOG_DIR[1:],
-                         DATA_DIR[1:],
-                         SCRIPT_DIR[1:],
-                         os.path.dirname(SCRIPT_DIR[1:]),
-                         os.path.dirname(DEFAULT_CONFIG),
-                    ]),
-        DESCRIPTION)
+--vendor {} \
+--url {} \
+--after-install {} \
+--before-install {} \
+--after-remove {} \
+--license {} \
+--maintainer {} \
+--directories {} \
+--directories {} \
+--description \"{}\"".format(
+     VENDOR,
+     PACKAGE_URL,
+     POSTINST_SCRIPT,
+     PREINST_SCRIPT,
+     POSTUNINST_SCRIPT,
+     PACKAGE_LICENSE,
+     MAINTAINER,
+     LOG_DIR,
+     DATA_DIR,
+     DESCRIPTION)
+
+for f in CONFIGURATION_FILES:
+    fpm_common_args += " --config-files {}".format(f)
 
 targets = {
-    'kapacitor' : './cmd/kapacitor/main.go',
-    'kapacitord' : './cmd/kapacitord/main.go'
+    'influx' : './cmd/influx/main.go',
+    'influxd' : './cmd/influxd/main.go',
+    'influx_stress' : './cmd/influx_stress/influx_stress.go',
+    'influx_inspect' : './cmd/influx_inspect/*.go',
+    'influx_tsm' : './cmd/influx_tsm/*.go',
 }
 
 supported_builds = {
     'darwin': [ "amd64", "i386" ],
-    'linux': [ "amd64", "i386", "arm"]
+    # InfluxDB does not currently support Windows
+    # 'windows': [ "amd64", "386", "arm" ],
+    'linux': [ "amd64", "i386", "arm" ]
 }
 
 supported_packages = {
-    "darwin": [ "tar"],
-    "linux": [ "deb", "rpm", "tar"],
-    #"windows": [ "zip" ], Windows zips are crap, bad paths etc.
-    # Need a real solution
+    "darwin": [ "tar" ],
+    "linux": [ "deb", "rpm", "tar" ],
+    "windows": [ "tar" ],
 }
 
 ################
-#### Kapacitor Functions
+#### InfluxDB Functions
 ################
 
 def create_package_fs(build_root):
-    print "Creating a filesystem hierarchy from directory: {}".format(build_root)
+    print "Creating package filesystem at root: {}".format(build_root)
     # Using [1:] for the path names due to them being absolute
     # (will overwrite previous paths, per 'os.path.join' documentation)
-    create_dir(os.path.join(build_root, INSTALL_ROOT_DIR[1:]))
-    create_dir(os.path.join(build_root, LOG_DIR[1:]))
-    create_dir(os.path.join(build_root, DATA_DIR[1:]))
-    create_dir(os.path.join(build_root, SCRIPT_DIR[1:]))
-    create_dir(os.path.join(build_root, os.path.dirname(DEFAULT_CONFIG)))
-    create_dir(os.path.join(build_root, os.path.dirname(LOGROTATE_CONFIG)))
+    dirs = [ INSTALL_ROOT_DIR[1:], LOG_DIR[1:], DATA_DIR[1:], SCRIPT_DIR[1:], CONFIG_DIR[1:], LOGROTATE_DIR[1:] ]
+    for d in dirs:
+        create_dir(os.path.join(build_root, d))
+        os.chmod(os.path.join(build_root, d), 0755)
 
 def package_scripts(build_root):
-    print "Copying scripts and configuration to build directory"
-    shutil.copy(INIT_SCRIPT, os.path.join(build_root, SCRIPT_DIR[1:], INIT_SCRIPT.split('/')[1]))
-    shutil.copy(SYSTEMD_SCRIPT, os.path.join(build_root, SCRIPT_DIR[1:], SYSTEMD_SCRIPT.split('/')[1]))
-    shutil.copy(LOGROTATE_CONFIG, os.path.join(build_root, LOGROTATE_CONFIG))
-    shutil.copy(DEFAULT_CONFIG, os.path.join(build_root, DEFAULT_CONFIG))
+    print "Copying scripts and sample configuration to build directory"
+    shutil.copyfile(INIT_SCRIPT, os.path.join(build_root, SCRIPT_DIR[1:], INIT_SCRIPT.split('/')[1]))
+    os.chmod(os.path.join(build_root, SCRIPT_DIR[1:], INIT_SCRIPT.split('/')[1]), 0644)
+    shutil.copyfile(SYSTEMD_SCRIPT, os.path.join(build_root, SCRIPT_DIR[1:], SYSTEMD_SCRIPT.split('/')[1]))
+    os.chmod(os.path.join(build_root, SCRIPT_DIR[1:], SYSTEMD_SCRIPT.split('/')[1]), 0644)
+    shutil.copyfile(LOGROTATE_SCRIPT, os.path.join(build_root, LOGROTATE_DIR[1:], "influxdb"))
+    os.chmod(os.path.join(build_root, LOGROTATE_DIR[1:], "influxdb"), 0644)
+    shutil.copyfile(DEFAULT_CONFIG, os.path.join(build_root, CONFIG_DIR[1:], "influxdb.conf"))
+    os.chmod(os.path.join(build_root, CONFIG_DIR[1:], "influxdb.conf"), 0644)
 
 def run_generate():
-    print "Running generate..."
-    run("go get github.com/gogo/protobuf/protoc-gen-gogo")
-    command = "go generate ./..."
-    code = os.system(command)
-    if code != 0:
-        print "Generate Failed"
-        return False
-    else:
-        print "Generate Succeeded"
-    return True
-
+    # TODO - Port this functionality to InfluxDB, currently a NOOP
+    print "NOTE: The `--generate` flag is currently a NNOP. Skipping..."
+    # print "Running generate..."
+    # command = "go generate ./..."
+    # code = os.system(command)
+    # if code != 0:
+    #     print "Generate Failed"
+    #     return False
+    # else:
+    #     print "Generate Succeeded"
+    # return True
+    pass
+    
 ################
-#### All Kapacitor-specific content above this line
+#### All InfluxDB-specific content above this line
 ################
 
 def run(command, allow_failure=False, shell=False):
@@ -178,12 +191,6 @@ def create_temp_dir(prefix = None):
 
 def get_current_version_tag():
     version = run("git describe --always --tags --abbrev=0").strip()
-    return version
-
-def get_current_version():
-    version_tag = get_current_version_tag()
-    # Remove leading 'v' and possible '-rc\d+'
-    version = re.sub(r'-rc\d+', '', version_tag[1:])
     return version
 
 def get_current_rc():
@@ -329,7 +336,7 @@ def run_tests(race, parallel, timeout, no_vet):
         print err
         return False
     if not no_vet:
-        p = subprocess.Popen(go_vet_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        p = subprocess.Popen(["go", "tool", "vet", "-composites=true", "./"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = p.communicate()
         if len(out) > 0 or len(err) > 0:
             print "Go vet failed. Please run 'go vet ./...' and fix any errors."
@@ -399,7 +406,7 @@ def build(version=None,
         arch = '386'
     elif arch == 'x86_64':
         arch = 'amd64'
-
+    
     print "Starting build..."
     tmp_build_dir = create_temp_dir()
     for b, c in targets.iteritems():
@@ -452,48 +459,36 @@ def copy_file(fr, to):
     except OSError as e:
         print e
 
-def go_get(branch, platform=None, update=False, no_stash=False):
-    get_command = ""
-    if platform:
-        get_command = "GOOS={} ".format(platform)
-        
+def go_get(branch, update=False):
+    get_command = None
     if update:
-        get_command += "go get -u -f -d ./..."
+        get_command = "go get -u -f -d ./..."
     else:
-        get_command += "go get -d ./..."
+        get_command = "go get -d ./..."
 
     # 'go get' switches to master, so stash what we currently have
-    changes = run("git status --porcelain").strip()
-    if len(changes) > 0:
-        if no_stash:
-            print "There are un-committed changes in your local branch, --no-stash was given, cannot continue"
-            return False
-
-        stash = run("git stash create -a").strip()
+    stash = run("git stash create -a").strip()
+    if len(stash) > 0:
         print "There are un-committed changes in your local branch, stashing them as {}".format(stash)
         # reset to ensure we don't have any checkout issues
         run("git reset --hard")
 
         print "Retrieving Go dependencies (moving to master)..."
-        try:
-            run(get_command, shell=True)
-            sys.stdout.flush()
-        finally:
-            # Unstash even if go get fails so that changes are left in the stash
-            print "Moving back to branch '{}'...".format(branch)
-            run("git checkout {}".format(branch))
-
-            print "Applying previously stashed contents..."
-            run("git stash apply {}".format(stash))
-    else:
-        print "Retrieving Go dependencies..."
-        run(get_command, shell=True)
+        run(get_command)
+        sys.stdout.flush()
 
         print "Moving back to branch '{}'...".format(branch)
         run("git checkout {}".format(branch))
+        
+        print "Applying previously stashed contents..."
+        run("git stash apply {}".format(stash))
+    else:
+        print "Retrieving Go dependencies..."
+        run(get_command)
 
-    return True
-
+        print "Moving back to branch '{}'...".format(branch)
+        run("git checkout {}".format(branch))
+        
 def generate_md5_from_file(path):
     m = hashlib.md5()
     with open(path, 'rb') as f:
@@ -516,7 +511,7 @@ def build_packages(build_output, version, pkg_arch, nightly=False, rc=None, iter
             for a in build_output[p]:
                 current_location = build_output[p][a]
                 # Create second-level directory displaying the architecture (amd64, etc)
-                build_root = os.path.join(tmp_build_dir, p, a, '{}-{}-{}'.format(PACKAGE_NAME, version, iteration))
+                build_root = os.path.join(tmp_build_dir, p, a, 'influxdb-{}-{}'.format(version, iteration))
                 # Create directory tree to mimic file system of package
                 create_dir(build_root)
                 create_package_fs(build_root)
@@ -548,20 +543,21 @@ def build_packages(build_output, version, pkg_arch, nightly=False, rc=None, iter
                             name = '{}-nightly_{}_{}'.format(name, p, a)
                         else:
                             name = '{}-{}-{}_{}_{}'.format(name, package_version, package_iteration, p, a)
-
+                    
                     if package_type == 'tar':
                         # Add `tar.gz` to path to ensure a small package size
                         current_location = os.path.join(current_location, name + '.tar.gz')
                     elif package_type == 'zip':
                         current_location = os.path.join(current_location, name + '.zip')
-
+                    
                     if rc is not None:
                         package_iteration = "0.rc{}".format(rc)
+                    saved_a = a
                     if pkg_arch is not None:
                         a = pkg_arch
                     if a == '386':
                         a = 'i386'
-
+                    
                     fpm_command = "fpm {} --name {} -a {} -t {} --version {} --iteration {} -C {} -p {} ".format(
                         fpm_common_args,
                         name,
@@ -573,6 +569,8 @@ def build_packages(build_output, version, pkg_arch, nightly=False, rc=None, iter
                         current_location)
                     if debug:
                         fpm_command += "--verbose "
+                    if pkg_arch is not None:
+                        a = saved_a
                     if package_type == "rpm":
                         fpm_command += "--depends coreutils --rpm-posttrans {}".format(POSTINST_SCRIPT)
                     out = run(fpm_command, shell=True)
@@ -630,7 +628,7 @@ def print_package_summary(packages):
 
 def main():
     global debug
-
+    
     # Command-line arguments
     outdir = "build"
     commit = None
@@ -640,7 +638,7 @@ def main():
     nightly = False
     race = False
     branch = None
-    version = get_current_version()
+    version = get_current_version_tag()
     rc = get_current_rc()
     package = False
     update = False
@@ -655,8 +653,7 @@ def main():
     run_get = True
     upload_bucket = None
     generate = False
-    no_stash = False
-
+    
     for arg in sys.argv[1:]:
         if '--outdir' in arg:
             # Output directory. If none is specified, then builds will be placed in the same directory.
@@ -688,11 +685,12 @@ def main():
         elif '--package' in arg:
             # Signifies that packages should be built.
             package = True
-            # If packaging do not allow stashing of local changes
-            no_stash = True
         elif '--nightly' in arg:
             # Signifies that this is a nightly build.
             nightly = True
+            # In order to cleanly delineate nightly version, we are adding the epoch timestamp
+            # to the version so that version numbers are always greater than the previous nightly.
+            version = "{}.n{}".format(version, int(time.time()))
         elif '--update' in arg:
             # Signifies that dependencies should be updated.
             update = True
@@ -723,10 +721,6 @@ def main():
         elif '--bucket' in arg:
             # The bucket to upload the packages to, relies on boto
             upload_bucket = arg.split("=")[1]
-        elif '--no-stash' in arg:
-            # Do not stash uncommited changes
-            # Fail if uncommited changes exist
-            no_stash = True
         elif '--generate' in arg:
             # Run go generate ./...
             # TODO - this currently does nothing for InfluxDB
@@ -745,19 +739,11 @@ def main():
     if nightly and rc:
         print "!! Cannot be both nightly and a release candidate! Stopping."
         return 1
-    
-    if nightly:
-        # In order to cleanly delineate nightly version, we are adding the epoch timestamp
-        # to the version so that version numbers are always greater than the previous nightly.
-        version = "{}~n{}".format(version, int(time.time()))
-        iteration = 0
-    elif rc:
-        iteration = 0
-    
+
     # Pre-build checks
     check_environ()
     check_prereqs()
-
+    
     if not commit:
         commit = get_current_commit(short=True)
     if not branch:
@@ -771,23 +757,28 @@ def main():
             target_arch = system_arch
     if not target_platform:
         target_platform = get_system_platform()
+    if rc or nightly:
+        # If a release candidate or nightly, set iteration to 0 (instead of 1)
+        iteration = 0
 
     if target_arch == '386':
         target_arch = 'i386'
     elif target_arch == 'x86_64':
         target_arch = 'amd64'
-
+    
     build_output = {}
 
     if generate:
         if not run_generate():
             return 1
-
+    
     if test:
         if not run_tests(race, parallel, timeout, no_vet):
             return 1
         return 0
 
+    if run_get:
+        go_get(branch, update=update)
 
     platforms = []
     single_build = True
@@ -805,13 +796,6 @@ def main():
             archs = supported_builds.get(platform)
         else:
             archs = [target_arch]
-
-        if run_get:
-            # Run 'go get' for every platform in case there are platform-specific includes
-            if not go_get(branch, platform=platform, update=update, no_stash=no_stash):
-                print "!! Cannot continue: go get failed"
-                return 1
-
         for arch in archs:
             od = outdir
             if not single_build:
