@@ -340,6 +340,8 @@ func (et *ExecutingTask) createNode(p pipeline.Node, l *log.Logger) (Node, error
 		return newUDFNode(et, t, l)
 	case *pipeline.StatsNode:
 		return newStatsNode(et, t, l)
+	case *pipeline.ShiftNode:
+		return newShiftNode(et, t, l)
 	default:
 		return nil, fmt.Errorf("unknown pipeline node type %T", p)
 	}

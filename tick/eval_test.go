@@ -173,3 +173,68 @@ func TestEvaluate_DynamicMethod(t *testing.T) {
 		t.Errorf("unexpected x.args[1]: got %v exp %v", got, exp)
 	}
 }
+
+func TestEvaluate_Vars(t *testing.T) {
+	script := `
+var x = 3m
+var y = -x
+
+var n = TRUE 
+var m = !n 
+`
+
+	scope := tick.NewScope()
+	err := tick.Evaluate(script, scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	x, err := scope.Get("x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if value, ok := x.(time.Duration); ok {
+		if exp, got := time.Minute*3, value; exp != got {
+			t.Errorf("unexpected x value: exp %v got %v", exp, got)
+		}
+	} else {
+		t.Errorf("unexpected x value type: exp time.Duration got %T", x)
+	}
+
+	y, err := scope.Get("y")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if value, ok := y.(time.Duration); ok {
+		if exp, got := time.Minute*-3, value; exp != got {
+			t.Errorf("unexpected y value: exp %v got %v", exp, got)
+		}
+	} else {
+		t.Errorf("unexpected y value type: exp time.Duration got %T", x)
+	}
+
+	n, err := scope.Get("n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if value, ok := n.(bool); ok {
+		if exp, got := true, value; exp != got {
+			t.Errorf("unexpected n value: exp %v got %v", exp, got)
+		}
+	} else {
+		t.Errorf("unexpected m value type: exp bool got %T", x)
+	}
+
+	m, err := scope.Get("m")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if value, ok := m.(bool); ok {
+		if exp, got := false, value; exp != got {
+			t.Errorf("unexpected m value: exp %v got %v", exp, got)
+		}
+	} else {
+		t.Errorf("unexpected m value type: exp bool got %T", x)
+	}
+
+}

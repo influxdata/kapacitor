@@ -5,6 +5,8 @@
 ### Release Notes
 
 ### Features
+- [#231](https://github.com/influxdata/kapacitor/pull/231): Add ShiftNode so values can be shifted in time for joining/comparisons.
+
 
 ### Bugfixes
 - [#199](https://github.com/influxdata/kapacitor/issues/199): BREAKING: Various fixes for the Alerta integration.
