@@ -81,6 +81,9 @@ type AlertData struct {
 	Time    time.Time       `json:"time"`
 	Level   AlertLevel      `json:"level"`
 	Data    influxql.Result `json:"data"`
+
+	// Info for custom templates
+	info detailsInfo
 }
 
 type AlertNode struct {
@@ -203,8 +206,26 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 	}
 
 	for _, alerta := range n.AlertaHandlers {
-		alerta := alerta
-		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleAlerta(alerta, ad) })
+		// Validate alerta templates
+		rtmpl, err := text.New("resource").Parse(alerta.Resource)
+		if err != nil {
+			return nil, err
+		}
+		gtmpl, err := text.New("group").Parse(alerta.Group)
+		if err != nil {
+			return nil, err
+		}
+		vtmpl, err := text.New("value").Parse(alerta.Value)
+		if err != nil {
+			return nil, err
+		}
+		ai := alertaHandler{
+			AlertaHandler: alerta,
+			resourceTmpl:  rtmpl,
+			groupTmpl:     gtmpl,
+			valueTmpl:     vtmpl,
+		}
+		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleAlerta(ai, ad) })
 	}
 
 	for _, og := range n.OpsGenieHandlers {
@@ -353,7 +374,7 @@ func (a *AlertNode) alertData(
 	if err != nil {
 		return nil, err
 	}
-	msg, details, err := a.renderMessageAndDetails(id, name, group, tags, fields, level)
+	msg, details, info, err := a.renderMessageAndDetails(id, name, group, tags, fields, level)
 	if err != nil {
 		return nil, err
 	}
@@ -364,6 +385,7 @@ func (a *AlertNode) alertData(
 		Time:    t,
 		Level:   level,
 		Data:    a.batchToResult(b),
+		info:    info,
 	}
 	return ad, nil
 }
@@ -480,7 +502,7 @@ func (a *AlertNode) renderID(name string, group models.GroupID, tags models.Tags
 	return id.String(), nil
 }
 
-func (a *AlertNode) renderMessageAndDetails(id, name string, group models.GroupID, tags models.Tags, fields models.Fields, level AlertLevel) (string, string, error) {
+func (a *AlertNode) renderMessageAndDetails(id, name string, group models.GroupID, tags models.Tags, fields models.Fields, level AlertLevel) (string, string, detailsInfo, error) {
 	g := string(group)
 	if group == models.NilGroup {
 		g = "nil"
@@ -499,7 +521,7 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, group models.GroupI
 	var msg bytes.Buffer
 	err := a.messageTmpl.Execute(&msg, minfo)
 	if err != nil {
-		return "", "", err
+		return "", "", detailsInfo{}, err
 	}
 	dinfo := detailsInfo{
 		messageInfo: minfo,
@@ -508,9 +530,9 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, group models.GroupI
 	var details bytes.Buffer
 	err = a.detailsTmpl.Execute(&details, dinfo)
 	if err != nil {
-		return "", "", err
+		return "", "", dinfo, err
 	}
-	return msg.String(), details.String(), nil
+	return msg.String(), details.String(), dinfo, nil
 }
 
 //--------------------------------
@@ -672,7 +694,15 @@ func (a *AlertNode) handleHipChat(hipchat *pipeline.HipChatHandler, ad *AlertDat
 	}
 }
 
-func (a *AlertNode) handleAlerta(alerta *pipeline.AlertaHandler, ad *AlertData) {
+type alertaHandler struct {
+	*pipeline.AlertaHandler
+
+	resourceTmpl *text.Template
+	valueTmpl    *text.Template
+	groupTmpl    *text.Template
+}
+
+func (a *AlertNode) handleAlerta(alerta alertaHandler, ad *AlertData) {
 	if a.et.tm.AlertaService == nil {
 		a.logger.Println("E! failed to send Alerta message. Alerta is not enabled")
 		return
@@ -698,18 +728,44 @@ func (a *AlertNode) handleAlerta(alerta *pipeline.AlertaHandler, ad *AlertData) 
 		severity = "unknown"
 		status = "unknown"
 	}
+	var buf bytes.Buffer
+	err := alerta.resourceTmpl.Execute(&buf, ad.info)
+	if err != nil {
+		a.logger.Printf("E! failed to evaluate Alerta Resource template %s", alerta.Resource)
+		return
+	}
+	resource := buf.String()
+	buf.Reset()
+	err = alerta.groupTmpl.Execute(&buf, ad.info)
+	if err != nil {
+		a.logger.Printf("E! failed to evaluate Alerta Group template %s", alerta.Group)
+		return
+	}
+	group := buf.String()
+	buf.Reset()
+	err = alerta.valueTmpl.Execute(&buf, ad.info)
+	if err != nil {
+		a.logger.Printf("E! failed to evaluate Alerta Value template %s", alerta.Value)
+		return
+	}
+	value := buf.String()
+	service := alerta.Service
+	if len(alerta.Service) == 0 {
+		service = []string{ad.info.Name}
+	}
 
-	err := a.et.tm.AlertaService.Alert(
+	err = a.et.tm.AlertaService.Alert(
 		alerta.Token,
-		alerta.Resource,
-		alerta.Event,
+		resource,
+		ad.ID,
 		alerta.Environment,
 		severity,
 		status,
-		alerta.Group,
-		alerta.Value,
+		group,
+		value,
 		ad.Message,
 		alerta.Origin,
+		service,
 		ad.Data,
 	)
 	if err != nil {

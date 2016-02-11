@@ -70,7 +70,18 @@ type TaskMaster struct {
 		Alert(room, token, message string, level AlertLevel) error
 	}
 	AlertaService interface {
-		Alert(token, resource, event, environment, severity, status, group, value, message, origin string, data interface{}) error
+		Alert(token,
+			resource,
+			event,
+			environment,
+			severity,
+			status,
+			group,
+			value,
+			message,
+			origin string,
+			service []string,
+			data interface{}) error
 	}
 	SensuService interface {
 		Alert(name, output string, level AlertLevel) error

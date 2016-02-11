@@ -36,7 +36,7 @@ func (s *Service) Close() error {
 	return nil
 }
 
-func (s *Service) Alert(token, resource, event, environment, severity, status, group, value, message, origin string, data interface{}) error {
+func (s *Service) Alert(token, resource, event, environment, severity, status, group, value, message, origin string, service []string, data interface{}) error {
 	if resource == "" || event == "" {
 		return errors.New("Resource and Event are required to send an alert")
 	}
@@ -70,6 +70,9 @@ func (s *Service) Alert(token, resource, event, environment, severity, status, g
 	postData["text"] = message
 	postData["origin"] = origin
 	postData["data"] = data
+	if len(service) > 0 {
+		postData["service"] = service
+	}
 
 	var post bytes.Buffer
 	enc := json.NewEncoder(&post)
@@ -83,19 +86,19 @@ func (s *Service) Alert(token, resource, event, environment, severity, status, g
 		return err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusCreated {
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return err
 		}
 		type response struct {
-			Error string `json:"error"`
+			Message string `json:"message"`
 		}
-		r := &response{Error: "failed to understand Alerta response: " + string(body)}
+		r := &response{Message: "failed to understand Alerta response: " + string(body)}
 		b := bytes.NewReader(body)
 		dec := json.NewDecoder(b)
 		dec.Decode(r)
-		return errors.New(r.Error)
+		return errors.New(r.Message)
 	}
 	return nil
 }
