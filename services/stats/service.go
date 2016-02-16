@@ -59,12 +59,11 @@ type Service struct {
 
 	logger *log.Logger
 
-	enterpriseHosts   []*client.Host
-	adminPort         string
-	adminHost         string
-	token             string
-	secret            string
-	productRegistered chan struct{}
+	enterpriseHosts []*client.Host
+	adminPort       string
+	adminHost       string
+	token           string
+	secret          string
 
 	clusterID string
 	productID string
@@ -102,14 +101,16 @@ func (s *Service) Open() (err error) {
 	}
 	s.open = true
 	s.closing = make(chan struct{})
-	s.productRegistered = make(chan struct{})
 
-	if err := s.registerServer(); err != nil {
-		s.logger.Println("E! Unable to register with Enterprise")
-	}
 	s.wg.Add(2)
 	go s.sendStats()
-	go s.launchAdminInterface()
+	go func() {
+		if err := s.registerServer(); err != nil {
+			s.logger.Println("E! Unable to register with Enterprise")
+		} else {
+			s.launchAdminInterface()
+		}
+	}()
 	s.logger.Println("I! opened service")
 	return
 }
@@ -174,15 +175,12 @@ func (s *Service) registerServer() error {
 				s.secret = host.SecretKey
 			}
 		}
-		close(s.productRegistered)
 	}()
 	return nil
 }
 
 func (s *Service) launchAdminInterface() error {
 	defer s.wg.Done()
-
-	<-s.productRegistered
 
 	srv := &http.Server{
 		Addr:         s.adminPort,

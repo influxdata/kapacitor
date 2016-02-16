@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/influxdata/enterprise-client/v2"
-	"github.com/influxdata/influxdb/toml"
+	"github.com/influxdb/influxdb/toml"
 )
 
 const (
