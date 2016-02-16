@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 )
 
@@ -39,8 +40,7 @@ type Node interface {
 	// executing dot
 	edot(buf *bytes.Buffer)
 
-	// the number of points/batches this node has collected
-	collectedCount() int64
+	nodeStatsByGroup() map[models.GroupID]nodeStats
 }
 
 //implementation of Node
@@ -174,10 +174,45 @@ func (n *node) edot(buf *bytes.Buffer) {
 // Return the number of points/batches this node
 // has collected.
 func (n *node) collectedCount() (c int64) {
-
 	// Count how many points each parent edge has emitted.
 	for _, in := range n.ins {
 		c += in.emittedCount()
 	}
-	return c
+	return
+}
+
+// Return the number of points/batches this node
+// has emitted.
+func (n *node) emittedCount() (c int64) {
+	// Count how many points each output edge has collected.
+	for _, out := range n.outs {
+		c += out.collectedCount()
+	}
+	return
+}
+
+// Statistics for a node
+type nodeStats struct {
+	Fields     models.Fields
+	Tags       models.Tags
+	Dimensions []string
+}
+
+// Return a copy of the current node statistics.
+func (n *node) nodeStatsByGroup() (stats map[models.GroupID]nodeStats) {
+	// Get the counts for just one output.
+	if len(n.outs) > 0 {
+		stats = make(map[models.GroupID]nodeStats)
+		n.outs[0].readGroupStats(func(group models.GroupID, c, e int64, tags models.Tags, dims []string) {
+			stats[group] = nodeStats{
+				Fields: models.Fields{
+					// A node's emitted count is the collected count of its output.
+					"emitted": c,
+				},
+				Tags:       tags,
+				Dimensions: dims,
+			}
+		})
+	}
+	return
 }

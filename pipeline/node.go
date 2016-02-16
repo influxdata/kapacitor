@@ -183,6 +183,13 @@ func (n *node) dot(buf *bytes.Buffer) {
 func (n *node) Stats(interval time.Duration) *StatsNode {
 	stats := newStatsNode(n, interval)
 	n.pipeline().addSource(stats)
+	// If the source node does not have any children add a NoOpNode.
+	// This is a work around to make it so that the source node has somewhere to send its data.
+	// That way we can get stats on its behavior.
+	if len(n.Children()) == 0 {
+		noop := newNoOpNode(n.Provides())
+		n.linkChild(noop)
+	}
 	return stats
 }
 
@@ -238,14 +245,14 @@ const intervalMarker = "INTERVAL"
 //
 func (n *node) Deadman(threshold float64, interval time.Duration, expr ...tick.Node) *AlertNode {
 	dn := n.Stats(interval).
-		Derivative("collected").NonNegative()
+		Derivative("emitted").NonNegative()
 	dn.Unit = interval
 
 	an := dn.Alert()
 	critExpr := &tick.BinaryNode{
 		Operator: tick.TokenLessEqual,
 		Left: &tick.ReferenceNode{
-			Reference: "collected",
+			Reference: "emitted",
 		},
 		Right: &tick.NumberNode{
 			IsFloat: true,

@@ -14,7 +14,7 @@ const (
 	// Default deadman's switch id
 	DefaultId = "node 'NODE_NAME' in task '{{ .TaskName }}'"
 	// Default deadman's switch message
-	DefaultMessage = "{{ .ID }} is {{ if eq .Level \"OK\" }}alive{{ else }}dead{{ end }}: {{ index .Fields \"collected\" | printf \"%0.3f\" }} points/INTERVAL."
+	DefaultMessage = "{{ .ID }} is {{ if eq .Level \"OK\" }}alive{{ else }}dead{{ end }}: {{ index .Fields \"emitted\" | printf \"%0.3f\" }} points/INTERVAL."
 )
 
 type Config struct {
