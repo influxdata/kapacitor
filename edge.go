@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"sync"
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
@@ -33,9 +34,11 @@ type Edge struct {
 	batch  chan models.Batch
 	reduce chan *MapResult
 
-	logger  *log.Logger
-	aborted chan struct{}
-	statMap *expvar.Map
+	logger     *log.Logger
+	aborted    chan struct{}
+	statMap    *expvar.Map
+	groupMu    sync.RWMutex
+	groupStats map[models.GroupID]*edgeStat
 }
 
 func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, logService LogService) *Edge {
@@ -48,7 +51,11 @@ func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, logSer
 	sm := NewStatistics("edges", tags)
 	sm.Add(statCollected, 0)
 	sm.Add(statEmitted, 0)
-	e := &Edge{statMap: sm, aborted: make(chan struct{})}
+	e := &Edge{
+		statMap:    sm,
+		aborted:    make(chan struct{}),
+		groupStats: make(map[models.GroupID]*edgeStat),
+	}
 	name := fmt.Sprintf("%s|%s->%s", taskName, parentName, childName)
 	e.logger = logService.NewLogger(fmt.Sprintf("[edge:%s] ", name), log.LstdFlags)
 	switch t {
@@ -76,6 +83,29 @@ func (e *Edge) collectedCount() int64 {
 		panic("collected count is not an int")
 	}
 	return int64(c)
+}
+
+// Stats for a given group for this edge
+type edgeStat struct {
+	collected int64
+	emitted   int64
+	tags      models.Tags
+	dims      []string
+}
+
+// Get a snapshot of the current group statistics for this edge
+func (e *Edge) readGroupStats(f func(group models.GroupID, collected, emitted int64, tags models.Tags, dims []string)) {
+	e.groupMu.RLock()
+	defer e.groupMu.RUnlock()
+	for group, stats := range e.groupStats {
+		f(
+			group,
+			stats.collected,
+			stats.emitted,
+			stats.tags,
+			stats.dims,
+		)
+	}
 }
 
 // Close the edge, this can only be called after all
@@ -121,6 +151,7 @@ func (e *Edge) NextPoint() (p models.Point, ok bool) {
 	case p, ok = <-e.stream:
 		if ok {
 			e.statMap.Add(statEmitted, 1)
+			e.incEmitted(p)
 		}
 	}
 	return
@@ -132,6 +163,7 @@ func (e *Edge) NextBatch() (b models.Batch, ok bool) {
 	case b, ok = <-e.batch:
 		if ok {
 			e.statMap.Add(statEmitted, 1)
+			e.incEmitted(b)
 		}
 	}
 	return
@@ -150,6 +182,7 @@ func (e *Edge) NextMaps() (m *MapResult, ok bool) {
 
 func (e *Edge) CollectPoint(p models.Point) error {
 	e.statMap.Add(statCollected, 1)
+	e.incCollected(p)
 	select {
 	case <-e.aborted:
 		return ErrAborted
@@ -160,6 +193,7 @@ func (e *Edge) CollectPoint(p models.Point) error {
 
 func (e *Edge) CollectBatch(b models.Batch) error {
 	e.statMap.Add(statCollected, 1)
+	e.incCollected(b)
 	select {
 	case <-e.aborted:
 		return ErrAborted
@@ -175,5 +209,37 @@ func (e *Edge) CollectMaps(m *MapResult) error {
 		return ErrAborted
 	case e.reduce <- m:
 		return nil
+	}
+}
+
+// Increment the emitted count of the group for this edge.
+func (e *Edge) incEmitted(p models.PointInterface) {
+	e.groupMu.Lock()
+	defer e.groupMu.Unlock()
+	if stats, ok := e.groupStats[p.PointGroup()]; ok {
+		stats.emitted += 1
+	} else {
+		stats = &edgeStat{
+			emitted: 1,
+			tags:    p.PointTags(),
+			dims:    p.PointDimensions(),
+		}
+		e.groupStats[p.PointGroup()] = stats
+	}
+}
+
+// Increment the  ollected count of the group for this edge.
+func (e *Edge) incCollected(p models.PointInterface) {
+	e.groupMu.Lock()
+	defer e.groupMu.Unlock()
+	if stats, ok := e.groupStats[p.PointGroup()]; ok {
+		stats.collected += 1
+	} else {
+		stats = &edgeStat{
+			collected: 1,
+			tags:      p.PointTags(),
+			dims:      p.PointDimensions(),
+		}
+		e.groupStats[p.PointGroup()] = stats
 	}
 }
