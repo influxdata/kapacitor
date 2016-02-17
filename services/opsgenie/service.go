@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -115,7 +116,7 @@ func (s *Service) Alert(teams []string, recipients []string, messageType, messag
 		type response struct {
 			Message string `json:"message"`
 		}
-		r := &response{Message: "failed to understand OpsGenie response: " + string(body)}
+		r := &response{Message: fmt.Sprintf("failed to understand OpsGenie response. code: %d content: %s", resp.StatusCode, string(body))}
 		b := bytes.NewReader(body)
 		dec := json.NewDecoder(b)
 		dec.Decode(r)

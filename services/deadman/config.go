@@ -12,7 +12,7 @@ const (
 	// Default deadman's switch threshold
 	DefaultThreshold = float64(0)
 	// Default deadman's switch id
-	DefaultId = "node 'NODE_NAME' in task '{{ .TaskName }}'"
+	DefaultId = "{{ .Group }}:NODE_NAME for task '{{ .TaskName }}'"
 	// Default deadman's switch message
 	DefaultMessage = "{{ .ID }} is {{ if eq .Level \"OK\" }}alive{{ else }}dead{{ end }}: {{ index .Fields \"emitted\" | printf \"%0.3f\" }} points/INTERVAL."
 )

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -94,7 +95,7 @@ func (s *Service) Alert(token, resource, event, environment, severity, status, g
 		type response struct {
 			Message string `json:"message"`
 		}
-		r := &response{Message: "failed to understand Alerta response: " + string(body)}
+		r := &response{Message: fmt.Sprintf("failed to understand Alerta response. code: %d content: %s", resp.StatusCode, string(body))}
 		b := bytes.NewReader(body)
 		dec := json.NewDecoder(b)
 		dec.Decode(r)

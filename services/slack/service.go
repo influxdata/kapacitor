@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -90,7 +91,7 @@ func (s *Service) Alert(channel, message string, level kapacitor.AlertLevel) err
 		type response struct {
 			Error string `json:"error"`
 		}
-		r := &response{Error: "failed to understand Slack response: " + string(body)}
+		r := &response{Error: fmt.Sprintf("failed to understand Slack response. code: %d content: %s", resp.StatusCode, string(body))}
 		b := bytes.NewReader(body)
 		dec := json.NewDecoder(b)
 		dec.Decode(r)
