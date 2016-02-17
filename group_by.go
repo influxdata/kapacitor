@@ -41,7 +41,43 @@ func (g *GroupByNode) runGroupBy([]byte) error {
 			}
 		}
 	default:
-		panic("not implemented")
+		for b, ok := g.ins[0].NextBatch(); ok; b, ok = g.ins[0].NextBatch() {
+			groups := make(map[models.GroupID]*models.Batch)
+			for _, p := range b.Points {
+				var dims []string
+				if g.allDimensions {
+					dims = models.SortedKeys(p.Tags)
+				} else {
+					dims = g.dimensions
+				}
+				groupID := models.TagsToGroupID(dims, p.Tags)
+				group, ok := groups[groupID]
+				if !ok {
+					tags := make(map[string]string, len(dims))
+					for _, dim := range dims {
+						tags[dim] = p.Tags[dim]
+					}
+					group = &models.Batch{
+						Name:  b.Name,
+						Group: groupID,
+						TMax:  b.TMax,
+						Tags:  tags,
+					}
+					groups[groupID] = group
+				}
+				group.Points = append(group.Points, p)
+			}
+
+			for _, group := range groups {
+				for _, child := range g.outs {
+					err := child.CollectBatch(*group)
+					if err != nil {
+						return err
+					}
+				}
+			}
+
+		}
 	}
 	return nil
 }

@@ -461,6 +461,100 @@ stream
 	testStreamerWithOutput(t, "TestStream_SimpleMR", script, 15*time.Second, er, nil, false)
 }
 
+func TestStream_BatchGroupBy(t *testing.T) {
+
+	var script = `
+stream
+	.from().measurement('cpu')
+	.window()
+		.period(10s)
+		.every(10s)
+	.groupBy('host')
+	.mapReduce(influxql.count('value'))
+	.httpOut('TestStream_BatchGroupBy')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverA"},
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					10.0,
+				}},
+			},
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverB"},
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					9.0,
+				}},
+			},
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverC"},
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					1.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_BatchGroupBy", script, 15*time.Second, er, nil, true)
+}
+
+func TestStream_BatchGroupByAll(t *testing.T) {
+
+	var script = `
+stream
+	.from().measurement('cpu')
+	.window()
+		.period(10s)
+		.every(10s)
+	.groupBy(*)
+	.mapReduce(influxql.count('value'))
+	.httpOut('TestStream_BatchGroupBy')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverA", "type": "idle"},
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					10.0,
+				}},
+			},
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverB", "type": "idle"},
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					9.0,
+				}},
+			},
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverC", "type": "idle"},
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					1.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_BatchGroupBy", script, 15*time.Second, er, nil, true)
+}
+
 func TestStream_SimpleWhere(t *testing.T) {
 
 	var script = `

@@ -5,6 +5,7 @@
 ### Release Notes
 
 ### Features
+- [#236](https://github.com/influxdata/kapacitor/issues/236): Implement batched group by
 - [#231](https://github.com/influxdata/kapacitor/pull/231): Add ShiftNode so values can be shifted in time for joining/comparisons.
 - [#190](https://github.com/influxdata/kapacitor/issues/190): BREAKING: Deadman's switch now triggers off emitted counts and is grouped by to original grouping of the data.
     The breaking change is that the 'collected' stat is no longer output for `.stats` and has been replaced by `emitted`.
