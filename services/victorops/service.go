@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -73,6 +74,9 @@ func (s *Service) Alert(routingKey, messageType, message, entityID string, t tim
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusNotFound {
+			return errors.New("URL or API key not found: 404")
+		}
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return err
@@ -80,7 +84,7 @@ func (s *Service) Alert(routingKey, messageType, message, entityID string, t tim
 		type response struct {
 			Message string `json:"message"`
 		}
-		r := &response{Message: "failed to understand VictorOps response: " + string(body)}
+		r := &response{Message: fmt.Sprintf("failed to understand VictorOps response. code: %d content: %s", resp.StatusCode, string(body))}
 		b := bytes.NewReader(body)
 		dec := json.NewDecoder(b)
 		dec.Decode(r)

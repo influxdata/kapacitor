@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 )
@@ -49,10 +51,14 @@ func (s *Service) Alert(title, text string) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
 		type response struct {
 			Error string `json:"error"`
 		}
-		r := &response{Error: "failed to understand Talk response"}
+		r := &response{Error: fmt.Sprintf("failed to understand Talk response. code: %d content: %s", resp.StatusCode, string(body))}
 		dec := json.NewDecoder(resp.Body)
 		dec.Decode(r)
 		return errors.New(r.Error)

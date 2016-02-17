@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -74,7 +75,7 @@ func (s *Service) Alert(name, output string, level kapacitor.AlertLevel) error {
 		type response struct {
 			Error string `json:"error"`
 		}
-		r := &response{Error: "failed to understand Sensu response: " + string(body)}
+		r := &response{Error: fmt.Sprintf("failed to understand Sensu response. code: %d content: %s", resp.StatusCode, string(body))}
 		b := bytes.NewReader(body)
 		dec := json.NewDecoder(b)
 		dec.Decode(r)
