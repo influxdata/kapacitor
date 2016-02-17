@@ -41,6 +41,7 @@ func (w *WindowNode) runWindow([]byte) error {
 			}
 			wnd = &window{
 				buf:      &windowBuffer{logger: w.logger},
+				align:    w.w.AlignFlag,
 				nextEmit: nextEmit,
 				period:   w.w.Period,
 				every:    w.w.Every,
@@ -52,7 +53,7 @@ func (w *WindowNode) runWindow([]byte) error {
 			windows[p.Group] = wnd
 		}
 		if !p.Time.Before(wnd.nextEmit) {
-			points := wnd.emit()
+			points := wnd.emit(p.Time)
 			// Send window to all children
 			for _, child := range w.outs {
 				child.CollectBatch(points)
@@ -65,6 +66,7 @@ func (w *WindowNode) runWindow([]byte) error {
 
 type window struct {
 	buf      *windowBuffer
+	align    bool
 	nextEmit time.Time
 	period   time.Duration
 	every    time.Duration
@@ -74,7 +76,7 @@ type window struct {
 	logger   *log.Logger
 }
 
-func (w *window) emit() models.Batch {
+func (w *window) emit(now time.Time) models.Batch {
 	oldest := w.nextEmit.Add(-1 * w.period)
 	w.buf.purge(oldest)
 
@@ -84,7 +86,12 @@ func (w *window) emit() models.Batch {
 	batch.Tags = w.tags
 	batch.TMax = w.nextEmit
 
-	w.nextEmit = w.nextEmit.Add(w.every)
+	// Determine next emit time.
+	// This is dependent on the current time not the last time we emitted.
+	w.nextEmit = now.Add(w.every)
+	if w.align {
+		w.nextEmit = w.nextEmit.Truncate(w.every)
+	}
 	return batch
 }
 
