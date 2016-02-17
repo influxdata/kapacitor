@@ -110,7 +110,7 @@ func (a *avgHandler) Snaphost() (*udf.SnapshotResponse, error) {
 func (a *avgHandler) Restore(req *udf.RestoreRequest) (*udf.RestoreResponse, error) {
 	buf := bytes.NewReader(req.Snapshot)
 	dec := gob.NewDecoder(buf)
-	err := dec.Decode(a.state)
+	err := dec.Decode(&a.state)
 	msg := ""
 	if err != nil {
 		msg = err.Error()

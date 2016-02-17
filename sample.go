@@ -36,25 +36,33 @@ func (s *SampleNode) runSample([]byte) error {
 	switch s.Wants() {
 	case pipeline.StreamEdge:
 		for p, ok := s.ins[0].NextPoint(); ok; p, ok = s.ins[0].NextPoint() {
+			s.timer.Start()
 			if s.shouldKeep(p.Group, p.Time) {
+				s.timer.Pause()
 				for _, child := range s.outs {
 					err := child.CollectPoint(p)
 					if err != nil {
 						return err
 					}
 				}
+				s.timer.Resume()
 			}
+			s.timer.Stop()
 		}
 	case pipeline.BatchEdge:
 		for b, ok := s.ins[0].NextBatch(); ok; b, ok = s.ins[0].NextBatch() {
+			s.timer.Start()
 			if s.shouldKeep(b.Group, b.TMax) {
+				s.timer.Pause()
 				for _, child := range s.outs {
 					err := child.CollectBatch(b)
 					if err != nil {
 						return err
 					}
 				}
+				s.timer.Resume()
 			}
+			s.timer.Stop()
 		}
 	}
 	return nil

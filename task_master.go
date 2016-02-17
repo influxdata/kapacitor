@@ -11,6 +11,7 @@ import (
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/tick"
+	"github.com/influxdata/kapacitor/timer"
 	"github.com/influxdb/influxdb/client"
 	"github.com/influxdb/influxdb/cluster"
 )
@@ -89,6 +90,9 @@ type TaskMaster struct {
 	TalkService interface {
 		Alert(title, text string) error
 	}
+	TimingService interface {
+		NewTimer() timer.Timer
+	}
 	LogService LogService
 
 	// Incoming streams
@@ -119,12 +123,13 @@ type fork struct {
 // Create a new Executor with a given clock.
 func NewTaskMaster(l LogService) *TaskMaster {
 	return &TaskMaster{
-		forks:      make(map[string]fork),
-		batches:    make(map[string][]BatchCollector),
-		tasks:      make(map[string]*ExecutingTask),
-		LogService: l,
-		logger:     l.NewLogger("[task_master] ", log.LstdFlags),
-		closed:     true,
+		forks:         make(map[string]fork),
+		batches:       make(map[string][]BatchCollector),
+		tasks:         make(map[string]*ExecutingTask),
+		LogService:    l,
+		logger:        l.NewLogger("[task_master] ", log.LstdFlags),
+		closed:        true,
+		TimingService: noOpTimingService{},
 	}
 }
 
@@ -145,6 +150,7 @@ func (tm *TaskMaster) New() *TaskMaster {
 	n.AlertaService = tm.AlertaService
 	n.SensuService = tm.SensuService
 	n.TalkService = tm.TalkService
+	n.TimingService = tm.TimingService
 	return n
 }
 
@@ -472,4 +478,10 @@ func (tm *TaskMaster) SnapshotTask(name string) (*TaskSnapshot, error) {
 		return et.Snapshot()
 	}
 	return nil, fmt.Errorf("task %s is not running or does not exist", name)
+}
+
+type noOpTimingService struct{}
+
+func (noOpTimingService) NewTimer() timer.Timer {
+	return timer.NewNoOp()
 }

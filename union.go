@@ -2,13 +2,16 @@ package kapacitor
 
 import (
 	"log"
+	"time"
 
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/timer"
 )
 
 type UnionNode struct {
 	node
-	u *pipeline.UnionNode
+	u      *pipeline.UnionNode
+	timers []timer.Timer
 }
 
 // Create a new  UnionNode which combines all parent data streams into a single stream.
@@ -30,11 +33,15 @@ func (u *UnionNode) runUnion([]byte) error {
 	}
 	errors := make(chan error, len(u.ins))
 	for _, in := range u.ins {
-		go func(e *Edge) {
+		t := u.et.tm.TimingService.NewTimer()
+		u.timers = append(u.timers, t)
+		go func(e *Edge, t timer.Timer) {
 			switch u.Wants() {
 			case pipeline.StreamEdge:
 				for p, ok := e.NextPoint(); ok; p, ok = e.NextPoint() {
+					t.Start()
 					p.Name = rename
+					t.Stop()
 					for _, out := range u.outs {
 						err := out.CollectPoint(p)
 						if err != nil {
@@ -45,7 +52,9 @@ func (u *UnionNode) runUnion([]byte) error {
 				}
 			case pipeline.BatchEdge:
 				for b, ok := e.NextBatch(); ok; b, ok = e.NextBatch() {
+					t.Start()
 					b.Name = rename
+					t.Stop()
 					for _, out := range u.outs {
 						err := out.CollectBatch(b)
 						if err != nil {
@@ -56,7 +65,7 @@ func (u *UnionNode) runUnion([]byte) error {
 				}
 			}
 			errors <- nil
-		}(in)
+		}(in, t)
 	}
 
 	for range u.ins {
@@ -66,4 +75,18 @@ func (u *UnionNode) runUnion([]byte) error {
 		}
 	}
 	return nil
+}
+
+func (u *UnionNode) nodeExecTime() time.Duration {
+	sum := 0.0
+	total := 0.0
+	for _, t := range u.timers {
+		avg, count := t.AverageTime()
+		sum += float64(avg) * float64(count)
+		total += float64(count)
+	}
+	if total == 0 {
+		return 0
+	}
+	return time.Duration(sum / total)
 }

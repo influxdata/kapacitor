@@ -83,13 +83,17 @@ func (h *HTTPOutNode) runOut([]byte) error {
 	switch h.Wants() {
 	case pipeline.StreamEdge:
 		for p, ok := h.ins[0].NextPoint(); ok; p, ok = h.ins[0].NextPoint() {
+			h.timer.Start()
 			row := models.PointToRow(p)
 			h.updateResultWithRow(p.Group, row)
+			h.timer.Stop()
 		}
 	case pipeline.BatchEdge:
 		for b, ok := h.ins[0].NextBatch(); ok; b, ok = h.ins[0].NextBatch() {
+			h.timer.Start()
 			row := models.BatchToRow(b)
 			h.updateResultWithRow(b.Group, row)
+			h.timer.Stop()
 		}
 	}
 	return nil

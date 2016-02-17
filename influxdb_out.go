@@ -27,6 +27,7 @@ func (i *InfluxDBOutNode) runOut([]byte) error {
 	switch i.Wants() {
 	case pipeline.StreamEdge:
 		for p, ok := i.ins[0].NextPoint(); ok; p, ok = i.ins[0].NextPoint() {
+			i.timer.Start()
 			batch := models.Batch{
 				Name:   p.Name,
 				Group:  p.Group,
@@ -37,13 +38,16 @@ func (i *InfluxDBOutNode) runOut([]byte) error {
 			if err != nil {
 				return err
 			}
+			i.timer.Stop()
 		}
 	case pipeline.BatchEdge:
 		for b, ok := i.ins[0].NextBatch(); ok; b, ok = i.ins[0].NextBatch() {
+			i.timer.Start()
 			err := i.write("", "", b)
 			if err != nil {
 				return err
 			}
+			i.timer.Stop()
 		}
 	}
 	return nil

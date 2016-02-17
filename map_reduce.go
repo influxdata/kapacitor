@@ -109,6 +109,7 @@ func (m *MapNode) mapBatch(b models.Batch) error {
 	if len(b.Points) == 0 {
 		return nil
 	}
+	m.timer.Start()
 	done := make(chan bool, m.parallel)
 	mr := &MapResult{
 		Outs: make([]interface{}, m.parallel),
@@ -154,6 +155,7 @@ func (m *MapNode) mapBatch(b models.Batch) error {
 		finished++
 	}
 
+	m.timer.Stop()
 	for _, child := range m.outs {
 		err := child.CollectMaps(mr)
 		if err != nil {
@@ -185,6 +187,7 @@ func newReduceNode(et *ExecutingTask, n *pipeline.ReduceNode, l *log.Logger) (*R
 
 func (r *ReduceNode) runReduce([]byte) error {
 	for m, ok := r.ins[0].NextMaps(); ok; m, ok = r.ins[0].NextMaps() {
+		r.timer.Start()
 		rr := r.f(m.Outs, m.TMax, r.r.PointTimes, r.r.As)
 		switch result := rr.(type) {
 		case models.Point:
@@ -192,6 +195,7 @@ func (r *ReduceNode) runReduce([]byte) error {
 			result.Group = m.Group
 			result.Dimensions = m.Dims
 			result.Tags = m.Tags
+			r.timer.Stop()
 			for _, c := range r.outs {
 				err := c.CollectPoint(result)
 				if err != nil {
@@ -203,6 +207,7 @@ func (r *ReduceNode) runReduce([]byte) error {
 			result.Group = m.Group
 			result.Tags = m.Tags
 			result.TMax = m.TMax
+			r.timer.Stop()
 			for _, c := range r.outs {
 				err := c.CollectBatch(result)
 				if err != nil {
@@ -212,7 +217,6 @@ func (r *ReduceNode) runReduce([]byte) error {
 		default:
 			return fmt.Errorf("unexpected result from reduce function %T", rr)
 		}
-
 	}
 	return nil
 }
