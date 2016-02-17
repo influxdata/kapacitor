@@ -59,7 +59,7 @@ func (b Batch) PointTags() Tags {
 }
 
 func (b Batch) PointDimensions() []string {
-	return nil
+	return SortedKeys(b.Tags)
 }
 
 func BatchToRow(b Batch) (row *models.Row) {

@@ -84,13 +84,18 @@ func compareResultsIgnoreSeriesOrder(exp, got kapacitor.Result) (bool, string) {
 	for i := range exp.Series {
 		// Find series with same name
 		var j int
+		found := false
 		for j = range set {
 			if exp.Series[i].Name == got.Series[j].Name &&
 				reflect.DeepEqual(exp.Series[i].Tags, got.Series[j].Tags) {
 				// found matching series
 				delete(set, j)
+				found = true
 				break
 			}
+		}
+		if !found {
+			return false, fmt.Sprintf("could not find matching series: %s %v", exp.Series[i].Name, exp.Series[i].Tags)
 		}
 		if !reflect.DeepEqual(exp.Series[i].Columns, got.Series[j].Columns) {
 			return false, fmt.Sprintf("unexpected series columns: i: %d \nexp %v \ngot %v", i, exp.Series[i].Columns, got.Series[j].Columns)
