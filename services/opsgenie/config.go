@@ -5,7 +5,7 @@ const DefaultOpsGenieRecoveryURL = "https://api.opsgenie.com/v1/json/alert/note"
 
 type Config struct {
 	// Whether to enable OpsGenie integration.
-	Enabled bool
+	Enabled bool `toml:"enabled"`
 	// The OpsGenie API key.
 	APIKey string `toml:"api-key"`
 	// The default Teams, can be overriden per alert.

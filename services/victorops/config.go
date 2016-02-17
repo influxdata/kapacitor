@@ -4,7 +4,7 @@ const DefaultVictorOpsAPIURL = "https://alert.victorops.com/integrations/generic
 
 type Config struct {
 	// Whether to enable Victor Ops integration.
-	Enabled bool
+	Enabled bool `toml:"enabled"`
 	// The Victor Ops API key.
 	APIKey string `toml:"api-key"`
 	// The default Routing Key, can be overriden per alert.
