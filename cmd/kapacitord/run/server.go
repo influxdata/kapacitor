@@ -377,6 +377,7 @@ func (s *Server) appendStatsService(c stats.Config) {
 		srv := stats.NewService(c, l)
 		srv.TaskMaster = s.TaskMaster
 
+		s.TaskMaster.TimingService = srv
 		s.Services = append(s.Services, srv)
 	}
 }

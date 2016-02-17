@@ -39,11 +39,13 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 	switch e.Provides() {
 	case pipeline.StreamEdge:
 		for p, ok := e.ins[0].NextPoint(); ok; p, ok = e.ins[0].NextPoint() {
+			e.timer.Start()
 			fields, err := e.eval(p.Time, p.Fields, p.Tags)
 			if err != nil {
 				return err
 			}
 			p.Fields = fields
+			e.timer.Stop()
 			for _, child := range e.outs {
 				err := child.CollectPoint(p)
 				if err != nil {
@@ -53,6 +55,7 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 		}
 	case pipeline.BatchEdge:
 		for b, ok := e.ins[0].NextBatch(); ok; b, ok = e.ins[0].NextBatch() {
+			e.timer.Start()
 			for i, p := range b.Points {
 				fields, err := e.eval(p.Time, p.Fields, p.Tags)
 				if err != nil {
@@ -60,6 +63,7 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 				}
 				b.Points[i].Fields = fields
 			}
+			e.timer.Stop()
 			for _, child := range e.outs {
 				err := child.CollectBatch(b)
 				if err != nil {

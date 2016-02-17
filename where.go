@@ -34,24 +34,29 @@ func (w *WhereNode) runWhere(snapshot []byte) error {
 	switch w.Wants() {
 	case pipeline.StreamEdge:
 		for p, ok := w.ins[0].NextPoint(); ok; p, ok = w.ins[0].NextPoint() {
+			w.timer.Start()
 			expr := w.expressions[p.Group]
 			if expr == nil {
 				expr = tick.NewStatefulExpr(w.w.Expression)
 				w.expressions[p.Group] = expr
 			}
 			if pass, err := EvalPredicate(expr, p.Time, p.Fields, p.Tags); pass {
+				w.timer.Pause()
 				for _, child := range w.outs {
 					err := child.CollectPoint(p)
 					if err != nil {
 						return err
 					}
 				}
+				w.timer.Resume()
 			} else if err != nil {
 				w.logger.Println("E! error while evaluating expression:", err)
 			}
+			w.timer.Stop()
 		}
 	case pipeline.BatchEdge:
 		for b, ok := w.ins[0].NextBatch(); ok; b, ok = w.ins[0].NextBatch() {
+			w.timer.Start()
 			expr := w.expressions[b.Group]
 			if expr == nil {
 				expr = tick.NewStatefulExpr(w.w.Expression)
@@ -68,6 +73,7 @@ func (w *WhereNode) runWhere(snapshot []byte) error {
 					i++
 				}
 			}
+			w.timer.Stop()
 			if len(b.Points) > 0 {
 				for _, child := range w.outs {
 					err := child.CollectBatch(b)

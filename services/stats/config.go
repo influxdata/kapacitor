@@ -7,23 +7,29 @@ import (
 )
 
 const (
-	DefaultDatabse         = "_kapacitor"
-	DefaultRetentionPolicy = "default"
-	DefaultStatsInterval   = toml.Duration(10 * time.Second)
+	DefaultDatabse                 = "_kapacitor"
+	DefaultRetentionPolicy         = "default"
+	DefaultStatsInterval           = toml.Duration(10 * time.Second)
+	DefaultTimingSampleRate        = 0.10
+	DefaultTimingMovingAverageSize = 1000
 )
 
 type Config struct {
-	Enabled         bool          `toml:"enabled"`
-	StatsInterval   toml.Duration `toml:"stats-interval"`
-	Database        string        `toml:"database"`
-	RetentionPolicy string        `toml:"retention-policy"`
+	Enabled                 bool          `toml:"enabled"`
+	StatsInterval           toml.Duration `toml:"stats-interval"`
+	Database                string        `toml:"database"`
+	RetentionPolicy         string        `toml:"retention-policy"`
+	TimingSampleRate        float64       `toml:"timing-sample-rate"`
+	TimingMovingAverageSize int           `toml:"timing-movavg-size"`
 }
 
 func NewConfig() Config {
 	return Config{
-		Enabled:         true,
-		Database:        DefaultDatabse,
-		RetentionPolicy: DefaultRetentionPolicy,
-		StatsInterval:   DefaultStatsInterval,
+		Enabled:                 true,
+		Database:                DefaultDatabse,
+		RetentionPolicy:         DefaultRetentionPolicy,
+		StatsInterval:           DefaultStatsInterval,
+		TimingSampleRate:        DefaultTimingSampleRate,
+		TimingMovingAverageSize: DefaultTimingMovingAverageSize,
 	}
 }

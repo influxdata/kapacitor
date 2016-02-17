@@ -32,7 +32,9 @@ func (g *GroupByNode) runGroupBy([]byte) error {
 	switch g.Wants() {
 	case pipeline.StreamEdge:
 		for pt, ok := g.ins[0].NextPoint(); ok; pt, ok = g.ins[0].NextPoint() {
+			g.timer.Start()
 			pt = setGroupOnPoint(pt, g.allDimensions, g.dimensions)
+			g.timer.Stop()
 			for _, child := range g.outs {
 				err := child.CollectPoint(pt)
 				if err != nil {
@@ -42,6 +44,7 @@ func (g *GroupByNode) runGroupBy([]byte) error {
 		}
 	default:
 		for b, ok := g.ins[0].NextBatch(); ok; b, ok = g.ins[0].NextBatch() {
+			g.timer.Start()
 			groups := make(map[models.GroupID]*models.Batch)
 			for _, p := range b.Points {
 				var dims []string
@@ -67,7 +70,7 @@ func (g *GroupByNode) runGroupBy([]byte) error {
 				}
 				group.Points = append(group.Points, p)
 			}
-
+			g.timer.Stop()
 			for _, group := range groups {
 				for _, child := range g.outs {
 					err := child.CollectBatch(*group)
@@ -76,7 +79,6 @@ func (g *GroupByNode) runGroupBy([]byte) error {
 					}
 				}
 			}
-
 		}
 	}
 	return nil

@@ -29,6 +29,7 @@ func (w *WindowNode) runWindow([]byte) error {
 	windows := make(map[models.GroupID]*window)
 	// Loops through points windowing by group
 	for p, ok := w.ins[0].NextPoint(); ok; p, ok = w.ins[0].NextPoint() {
+		w.timer.Start()
 		wnd := windows[p.Group]
 		if wnd == nil {
 			tags := make(map[string]string, len(p.Dimensions))
@@ -55,11 +56,14 @@ func (w *WindowNode) runWindow([]byte) error {
 		if !p.Time.Before(wnd.nextEmit) {
 			points := wnd.emit(p.Time)
 			// Send window to all children
+			w.timer.Pause()
 			for _, child := range w.outs {
 				child.CollectBatch(points)
 			}
+			w.timer.Resume()
 		}
 		wnd.buf.insert(p)
+		w.timer.Stop()
 	}
 	return nil
 }

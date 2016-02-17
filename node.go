@@ -6,9 +6,11 @@ import (
 	"log"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/timer"
 )
 
 // A node that can be  in an executor.
@@ -38,9 +40,13 @@ type Node interface {
 	abortParentEdges()
 
 	// executing dot
-	edot(buf *bytes.Buffer)
+	edot(buf *bytes.Buffer, execTime time.Duration)
 
 	nodeStatsByGroup() map[models.GroupID]nodeStats
+
+	nodeExecTime() time.Duration
+
+	collectedCount() int64
 }
 
 //implementation of Node
@@ -58,6 +64,7 @@ type node struct {
 	ins        []*Edge
 	outs       []*Edge
 	logger     *log.Logger
+	timer      timer.Timer
 }
 
 func (n *node) addParentEdge(e *Edge) {
@@ -71,6 +78,7 @@ func (n *node) abortParentEdges() {
 }
 
 func (n *node) start(snapshot []byte) {
+	n.timer = n.et.tm.TimingService.NewTimer()
 	n.errCh = make(chan error, 1)
 	go func() {
 		var err error
@@ -159,7 +167,19 @@ func (n *node) closeChildEdges() {
 	}
 }
 
-func (n *node) edot(buf *bytes.Buffer) {
+func (n *node) nodeExecTime() time.Duration {
+	execTime, _ := n.timer.AverageTime()
+	return execTime
+}
+
+func (n *node) edot(buf *bytes.Buffer, execTime time.Duration) {
+	buf.Write([]byte(
+		fmt.Sprintf("\n%s [label=\"%s %v\"];\n",
+			n.Name(),
+			n.Name(),
+			execTime,
+		),
+	))
 	for i, c := range n.children {
 		buf.Write([]byte(
 			fmt.Sprintf("%s -> %s [label=\"%d\"];\n",
@@ -171,22 +191,9 @@ func (n *node) edot(buf *bytes.Buffer) {
 	}
 }
 
-// Return the number of points/batches this node
-// has collected.
-func (n *node) collectedCount() (c int64) {
-	// Count how many points each parent edge has emitted.
+func (n *node) collectedCount() (count int64) {
 	for _, in := range n.ins {
-		c += in.emittedCount()
-	}
-	return
-}
-
-// Return the number of points/batches this node
-// has emitted.
-func (n *node) emittedCount() (c int64) {
-	// Count how many points each output edge has collected.
-	for _, out := range n.outs {
-		c += out.collectedCount()
+		count += in.emittedCount()
 	}
 	return
 }

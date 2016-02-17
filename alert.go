@@ -272,9 +272,11 @@ func (a *AlertNode) runAlert([]byte) error {
 	switch a.Wants() {
 	case pipeline.StreamEdge:
 		for p, ok := a.ins[0].NextPoint(); ok; p, ok = a.ins[0].NextPoint() {
+			a.timer.Start()
 			l := a.determineLevel(p.Time, p.Fields, p.Tags)
 			state := a.updateState(l, p.Group)
 			if (a.a.UseFlapping && state.flapping) || (a.a.IsStateChangesOnly && !state.changed) {
+				a.timer.Stop()
 				continue
 			}
 			// send alert if we are not OK or we are OK and state changed (i.e recovery)
@@ -293,9 +295,11 @@ func (a *AlertNode) runAlert([]byte) error {
 					h(ad)
 				}
 			}
+			a.timer.Stop()
 		}
 	case pipeline.BatchEdge:
 		for b, ok := a.ins[0].NextBatch(); ok; b, ok = a.ins[0].NextBatch() {
+			a.timer.Start()
 			triggered := false
 			for _, p := range b.Points {
 				l := a.determineLevel(p.Time, p.Fields, p.Tags)
@@ -331,6 +335,7 @@ func (a *AlertNode) runAlert([]byte) error {
 					}
 				}
 			}
+			a.timer.Stop()
 		}
 	}
 	return nil
