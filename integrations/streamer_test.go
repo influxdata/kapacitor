@@ -174,6 +174,77 @@ stream
 	testStreamerWithOutput(t, "TestStream_DerivativeNN", script, 15*time.Second, er, nil, false)
 }
 
+func TestStream_WindowMissing(t *testing.T) {
+
+	var script = `
+var period = 3s
+var every = 2s
+stream
+	.from()
+		.database('dbname')
+		.retentionPolicy('rpname')
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+	.window()
+		.period(period)
+		.every(every)
+	.mapReduce(influxql.count('value'))
+	.httpOut('TestStream_WindowMissing')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    nil,
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
+					3.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_WindowMissing", script, 13*time.Second, er, nil, false)
+}
+
+func TestStream_WindowMissingAligned(t *testing.T) {
+
+	var script = `
+var period = 3s
+var every = 2s
+stream
+	.from()
+		.database('dbname')
+		.retentionPolicy('rpname')
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+	.window()
+		.period(period)
+		.every(every)
+		.align()
+	.mapReduce(influxql.count('value'))
+	.httpOut('TestStream_WindowMissing')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    nil,
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					3.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_WindowMissing", script, 13*time.Second, er, nil, false)
+}
+
 func TestStream_Window(t *testing.T) {
 
 	var script = `
