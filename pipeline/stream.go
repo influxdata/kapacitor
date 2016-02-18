@@ -6,12 +6,53 @@ import (
 	"github.com/influxdata/kapacitor/tick"
 )
 
-// A StreamNode represents the source of data being
+// A SourceStreamNode represents the source of data being
 // streamed to Kapacitor via any of its inputs.
-// The stream node allows you to select which portion of the stream
-// you want to process.
 // The `stream` variable in stream tasks is an instance of
-// a StreamNode.
+// a SourceStreamNode.
+// SourceStreamNode.From is the method/property of this node.
+type SourceStreamNode struct {
+	node
+}
+
+func newSourceStreamNode() *SourceStreamNode {
+	return &SourceStreamNode{
+		node: node{
+			desc:     "srcstream",
+			wants:    StreamEdge,
+			provides: StreamEdge,
+		},
+	}
+}
+
+// Creates a new StreamNode that can be further
+// filtered using the Database, RetentionPolicy, Measurement and Where properties.
+// From can be called multiple times to create multiple
+// independent forks of the data stream.
+//
+// Example:
+//    // Select the 'cpu' measurement from just the database 'mydb'
+//    // and retention policy 'myrp'.
+//    var cpu = stream.from()
+//                       .database('mydb')
+//                       .retentionPolicy('myrp')
+//                       .measurement('cpu')
+//    // Select the 'load' measurement from any database and retention policy.
+//    var load = stream.from()
+//                        .measurement('load')
+//    // Join cpu and load streams and do further processing.
+//    cpu.join(load)
+//            .as('cpu', 'load')
+//        ...
+//
+func (s *SourceStreamNode) From() *StreamNode {
+	f := newStreamNode()
+	s.linkChild(f)
+	return f
+}
+
+// A StreamNode selects a subset of the data flowing through a SourceStreamNode.
+// The stream node allows you to select which portion of the stream you want to process.
 //
 // Example:
 //    stream

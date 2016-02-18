@@ -23,10 +23,8 @@ func (d deadman) Message() string         { return d.message }
 func (d deadman) Global() bool            { return d.global }
 
 func TestTICK_To_Pipeline_MultiLine(t *testing.T) {
-	assert := assert.New(t)
-
 	var tickScript = `
-var w = stream.window()
+var w = stream.from().window()
 w.period(10s)
 w.every(1s)
 `
@@ -35,15 +33,33 @@ w.every(1s)
 
 	scope := tick.NewScope()
 	p, err := CreatePipeline(tickScript, StreamEdge, scope, d)
-	assert.Nil(err)
-	assert.NotNil(p)
-	assert.Equal(1, len(p.sources[0].Children()))
-	w, ok := p.sources[0].Children()[0].(*WindowNode)
-	if assert.True(ok) {
-		assert.Equal(time.Duration(10)*time.Second, w.Period)
-		assert.Equal(time.Duration(1)*time.Second, w.Every)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p == nil {
+		t.Fatal("unexpected pipeline, got nil")
+	}
+	if exp, got := 1, len(p.sources); exp != got {
+		t.Errorf("unexpected number of pipeline sources: exp %d got %d", exp, got)
+	}
+	if exp, got := 1, len(p.sources[0].Children()); exp != got {
+		t.Errorf("unexpected number of source0 children: exp %d got %d", exp, got)
+	}
+	sn, ok := p.sources[0].Children()[0].(*StreamNode)
+	if !ok {
+		t.Fatalf("unexpected node type: exp StreamNode got %T", p.sources[0].Children()[0])
+	}
+	w, ok := sn.Children()[0].(*WindowNode)
+	if !ok {
+		t.Fatalf("unexpected node type: exp WindowNode got %T", sn.Children()[0])
 	}
 
+	if exp, got := time.Duration(10)*time.Second, w.Period; exp != got {
+		t.Errorf("unexpected window period exp %v got %v", exp, got)
+	}
+	if exp, got := time.Duration(1)*time.Second, w.Every; exp != got {
+		t.Errorf("unexpected window every exp %v got %v", exp, got)
+	}
 }
 
 func TestPipelineSort(t *testing.T) {
