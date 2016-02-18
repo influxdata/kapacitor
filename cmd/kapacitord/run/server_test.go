@@ -166,10 +166,10 @@ func TestServer_EnableTask(t *testing.T) {
 	dot := `digraph testTaskName {
 graph [throughput="0.00 points/s"];
 
-srcstream0 [avg_exec_time="0" ];
+srcstream0 [avg_exec_time_ns="0" ];
 srcstream0 -> stream1 [processed="0"];
 
-stream1 [avg_exec_time="0" ];
+stream1 [avg_exec_time_ns="0" ];
 }`
 	if ti.Dot != dot {
 		t.Fatalf("unexpected dot got\n%s exp\n%s", ti.Dot, dot)

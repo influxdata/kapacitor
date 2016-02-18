@@ -1,0 +1,108 @@
+dbname
+rpname
+errors,service=cartA,dc=A,rack=0 value=7 0000000001
+dbname
+rpname
+errors,service=login,dc=B,rack=1 value=9 0000000001
+dbname
+rpname
+errors,service=front,dc=A,rack=0 value=2 0000000001
+dbname
+rpname
+errors,service=cartA,dc=B,rack=1 value=9 0000000002
+dbname
+rpname
+errors,service=login,dc=A,rack=0 value=5 0000000003
+dbname
+rpname
+errors,service=front,dc=B,rack=1 value=9 0000000003
+dbname
+rpname
+errors,service=cartA,dc=A,rack=0 value=3 0000000004
+dbname
+rpname
+errors,service=login,dc=B,rack=1 value=9 0000000004
+dbname
+rpname
+errors,service=front,dc=A,rack=0 value=2 0000000005
+dbname
+rpname
+errors,service=login,dc=B,rack=1 value=2 0000000005
+dbname
+rpname
+errors,service=front,dc=A,rack=0 value=5 0000000006
+dbname
+rpname
+errors,service=cartA,dc=B,rack=1 value=9 0000000006
+dbname
+rpname
+errors,service=login,dc=C,rack=0 value=7 0000000006
+dbname
+rpname
+errors,service=front,dc=A,rack=1 value=4 0000000007
+dbname
+rpname
+errors,service=cartA,dc=B,rack=0 value=8 0000000007
+dbname
+rpname
+errors,service=front,dc=A,rack=1 value=6 0000000008
+dbname
+rpname
+errors,service=cartA,dc=B,rack=0 value=6 0000000008
+dbname
+rpname
+errors,service=login,dc=A,rack=1 value=10 0000000009
+dbname
+rpname
+errors,service=front,dc=B,rack=0 value=4 0000000009
+dbname
+rpname
+errors,service=cartA,dc=A,rack=1 value=5 0000000010
+dbname
+rpname
+errors,service=login,dc=B,rack=0 value=3 0000000010
+dbname
+rpname
+errors,service=login,dc=B,rack=0 value=6 0000000011
+dbname
+rpname
+errors,service=cartA,dc=A,rack=1 value=8 0000000012
+dbname
+rpname
+errors,service=cartA,dc=A,rack=0 value=8 0000000012
+dbname
+rpname
+errors,service=front,dc=A,rack=0 value=9 0000000012
+dbname
+rpname
+errors,service=front,dc=A,rack=1 value=9 0000000012
+dbname
+rpname
+errors,service=login,dc=A,rack=1 value=5 0000000012
+dbname
+rpname
+errors,service=login,dc=A,rack=0 value=5 0000000012
+dbname
+rpname
+errors,service=cartA,dc=B,rack=0 value=8 0000000012
+dbname
+rpname
+errors,service=cartA,dc=B,rack=1 value=8 0000000012
+dbname
+rpname
+errors,service=front,dc=B,rack=1 value=9 0000000012
+dbname
+rpname
+errors,service=front,dc=B,rack=0 value=9 0000000012
+dbname
+rpname
+errors,service=login,dc=B,rack=0 value=5 0000000012
+dbname
+rpname
+errors,service=login,dc=B,rack=1 value=5 0000000012
+dbname
+rpname
+errors,service=login,dc=C,rack=1 value=5 0000000012
+dbname
+rpname
+errors,service=login,dc=C,rack=0 value=5 0000000012

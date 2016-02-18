@@ -2,6 +2,7 @@ package timer
 
 import (
 	"math/rand"
+	"sync"
 	"time"
 )
 
@@ -26,7 +27,7 @@ type timerState int
 // The use of this interface allows for control
 // on how the averaged timed value accessed.
 type Setter interface {
-	Set(float64)
+	Set(int64)
 }
 
 const (
@@ -98,10 +99,12 @@ func (t *timer) Stop() {
 		return
 	}
 	t.current += time.Now().Sub(t.start)
+	// Use float64 precision when performing movavg calculations.
 	avg := t.avg.update(float64(t.current))
 	t.current = 0
 	t.state = Stopped
-	t.avgVar.Set(avg)
+	// Truncate to int64 now that we have a final value.
+	t.avgVar.Set(int64(avg))
 }
 
 // Maintains a moving average of values
@@ -134,4 +137,85 @@ func (m *movavg) update(value float64) float64 {
 	}
 	m.history[m.idx] = value
 	return m.avg
+}
+
+// A setter that can have distinct part or sections.
+// By using a MultiPartSetter one can time distinct sections
+// of code and have their individuals times summed
+// to form a total timed value.
+type MultiPartSetter struct {
+	mu       sync.Mutex
+	wg       sync.WaitGroup
+	stopping chan struct{}
+
+	setter     Setter
+	partValues []int64
+	updates    chan update
+}
+
+func NewMultiPartSetter(setter Setter) *MultiPartSetter {
+	mp := &MultiPartSetter{
+		setter:   setter,
+		updates:  make(chan update),
+		stopping: make(chan struct{}),
+	}
+	mp.wg.Add(1)
+	go mp.run()
+	return mp
+}
+
+// Add a new distinct part. As new timings are set
+// for this part they will contribute to the total time.
+func (mp *MultiPartSetter) NewPart() Setter {
+	mp.mu.Lock()
+	defer mp.mu.Unlock()
+
+	p := part{
+		id:       len(mp.partValues),
+		updates:  mp.updates,
+		stopping: mp.stopping,
+	}
+	mp.partValues = append(mp.partValues, 0)
+
+	return p
+}
+
+func (mp *MultiPartSetter) Stop() {
+	close(mp.stopping)
+	mp.wg.Wait()
+}
+
+func (mp *MultiPartSetter) run() {
+	defer mp.wg.Done()
+	for {
+		select {
+		case <-mp.stopping:
+			return
+		case update := <-mp.updates:
+			mp.partValues[update.part] = update.value
+			var sum int64
+			for _, v := range mp.partValues {
+				sum += v
+			}
+			mp.setter.Set(sum)
+		}
+	}
+}
+
+type update struct {
+	part  int
+	value int64
+}
+
+type part struct {
+	id       int
+	updates  chan<- update
+	stopping chan struct{}
+}
+
+func (p part) Set(v int64) {
+	select {
+	case <-p.stopping:
+	case p.updates <- update{part: p.id, value: v}:
+	}
 }

@@ -13,6 +13,10 @@ Significant performance improvements have also been added.
 In some cases Kapacitor throughput has improved by 4X.
 
 
+Various improvements to joining features have been implemented.
+With #144 you can now join streams with differing group by dimensions.
+
+
 ### Features
 - [#236](https://github.com/influxdata/kapacitor/issues/236): Implement batched group by
 - [#231](https://github.com/influxdata/kapacitor/pull/231): Add ShiftNode so values can be shifted in time for joining/comparisons.
@@ -20,6 +24,7 @@ In some cases Kapacitor throughput has improved by 4X.
     The breaking change is that the 'collected' stat is no longer output for `.stats` and has been replaced by `emitted`.
 - [#145](https://github.com/influxdata/kapacitor/issues/145): The InfluxDB Out Node now writes data to InfluxDB in buffers.
 - [#215](https://github.com/influxdata/kapacitor/issues/215): Add performance metrics to nodes for average execution times and node throughput values.
+- [#144](https://github.com/influxdata/kapacitor/issues/144): Can now join streams with differing dimensions using the join.On property.
 
 
 ### Bugfixes
