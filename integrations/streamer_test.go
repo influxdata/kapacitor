@@ -2634,6 +2634,10 @@ stream
 	var precision string
 
 	influxdb := NewMockInfluxDBService(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/ping" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		//Respond
 		var data client.Response
 		w.WriteHeader(http.StatusOK)

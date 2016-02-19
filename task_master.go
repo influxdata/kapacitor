@@ -12,7 +12,7 @@ import (
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/tick"
 	"github.com/influxdata/kapacitor/timer"
-	"github.com/influxdb/influxdb/client"
+	client "github.com/influxdb/influxdb/client/v2"
 	"github.com/influxdb/influxdb/cluster"
 )
 
@@ -44,7 +44,7 @@ type TaskMaster struct {
 	UDFService UDFService
 
 	InfluxDBService interface {
-		NewClient() (*client.Client, error)
+		NewClient() (client.Client, error)
 	}
 	SMTPService interface {
 		Global() bool

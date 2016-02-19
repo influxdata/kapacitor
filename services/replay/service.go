@@ -20,7 +20,7 @@ import (
 	"github.com/influxdata/kapacitor/clock"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/services/httpd"
-	"github.com/influxdb/influxdb/client"
+	client "github.com/influxdb/influxdb/client/v2"
 	"github.com/influxdb/influxdb/influxql"
 	"github.com/twinj/uuid"
 )
@@ -42,7 +42,7 @@ type Service struct {
 		DelRoutes([]httpd.Route)
 	}
 	InfluxDBService interface {
-		NewClient() (*client.Client, error)
+		NewClient() (client.Client, error)
 	}
 	TaskMaster interface {
 		NewFork(name string, dbrps []kapacitor.DBRP) (*kapacitor.Edge, error)
@@ -695,8 +695,8 @@ func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, start, stop ti
 			if err != nil {
 				return err
 			}
-			if resp.Err != nil {
-				return resp.Err
+			if err := resp.Error(); err != nil {
+				return err
 			}
 			for _, res := range resp.Results {
 				batches, err := models.ResultToBatches(res)
@@ -740,8 +740,8 @@ func (r *Service) doRecordQuery(rid uuid.UUID, q string, tt kapacitor.TaskType) 
 	if err != nil {
 		return err
 	}
-	if resp.Err != nil {
-		return resp.Err
+	if err := resp.Error(); err != nil {
+		return err
 	}
 	// Open appropriate writer
 	var w io.Writer
