@@ -284,7 +284,7 @@ func (s *Service) linkSubscriptions() error {
 		}
 	}
 
-	kapacitor.NumSubscriptions.Set(numSubscriptions)
+	kapacitor.NumSubscriptionsVar.Set(numSubscriptions)
 	return nil
 }
 

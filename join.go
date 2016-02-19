@@ -99,22 +99,6 @@ func (j *JoinNode) runJoin([]byte) error {
 	return nil
 }
 
-func (j *JoinNode) nodeExecTime() time.Duration {
-	j.mu.RLock()
-	defer j.mu.RUnlock()
-	sum := 0.0
-	total := 0.0
-	for _, group := range j.groups {
-		avg, count := group.timer.AverageTime()
-		sum += float64(avg) * float64(count)
-		total += float64(count)
-	}
-	if total == 0 {
-		return 0
-	}
-	return time.Duration(sum / total)
-}
-
 // safely get the group for the point or create one if it doesn't exist.
 func (j *JoinNode) getGroup(p models.PointInterface) *group {
 	j.mu.Lock()
@@ -151,7 +135,7 @@ func newGroup(i int, j *JoinNode) *group {
 		head:   make([]time.Time, i),
 		j:      j,
 		points: make(chan srcPoint),
-		timer:  j.et.tm.TimingService.NewTimer(),
+		timer:  j.et.tm.TimingService.NewTimer(j.avgExecVar),
 	}
 }
 

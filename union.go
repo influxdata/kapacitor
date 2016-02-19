@@ -2,7 +2,6 @@ package kapacitor
 
 import (
 	"log"
-	"time"
 
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/timer"
@@ -33,7 +32,7 @@ func (u *UnionNode) runUnion([]byte) error {
 	}
 	errors := make(chan error, len(u.ins))
 	for _, in := range u.ins {
-		t := u.et.tm.TimingService.NewTimer()
+		t := u.et.tm.TimingService.NewTimer(u.avgExecVar)
 		u.timers = append(u.timers, t)
 		go func(e *Edge, t timer.Timer) {
 			switch u.Wants() {
@@ -75,18 +74,4 @@ func (u *UnionNode) runUnion([]byte) error {
 		}
 	}
 	return nil
-}
-
-func (u *UnionNode) nodeExecTime() time.Duration {
-	sum := 0.0
-	total := 0.0
-	for _, t := range u.timers {
-		avg, count := t.AverageTime()
-		sum += float64(avg) * float64(count)
-		total += float64(count)
-	}
-	if total == 0 {
-		return 0
-	}
-	return time.Duration(sum / total)
 }

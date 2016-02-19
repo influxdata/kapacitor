@@ -96,7 +96,7 @@ func (s *SourceBatchNode) Queries(start, stop time.Time) [][]string {
 
 // Do not add the source batch node to the dot output
 // since its not really an edge.
-func (s *SourceBatchNode) edot(*bytes.Buffer, time.Duration) {}
+func (s *SourceBatchNode) edot(*bytes.Buffer) {}
 
 func (s *SourceBatchNode) collectedCount() (count int64) {
 	for _, child := range s.children {

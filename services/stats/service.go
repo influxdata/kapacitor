@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/timer"
 )
@@ -133,6 +134,6 @@ func (s *Service) reportStats() {
 	}
 }
 
-func (s *Service) NewTimer() timer.Timer {
-	return timer.New(s.timingSampleRate, s.timingMovingAvgSize)
+func (s *Service) NewTimer(avgVar *expvar.MaxFloat) timer.Timer {
+	return timer.New(s.timingSampleRate, s.timingMovingAvgSize, avgVar)
 }

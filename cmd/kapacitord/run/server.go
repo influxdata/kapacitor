@@ -2,7 +2,6 @@ package run
 
 import (
 	"errors"
-	"expvar"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -44,27 +43,6 @@ import (
 
 const clusterIDFilename = "cluster.id"
 const serverIDFilename = "server.id"
-
-var (
-	//Published vars
-	cidVar = &expvar.String{}
-
-	sidVar = &expvar.String{}
-
-	hostVar = &expvar.String{}
-
-	productVar = &expvar.String{}
-
-	versionVar = &expvar.String{}
-)
-
-func init() {
-	expvar.Publish(kapacitor.ClusterIDVarName, cidVar)
-	expvar.Publish(kapacitor.ServerIDVarName, sidVar)
-	expvar.Publish(kapacitor.HostVarName, hostVar)
-	expvar.Publish(kapacitor.ProductVarName, productVar)
-	expvar.Publish(kapacitor.VersionVarName, versionVar)
-}
 
 // BuildInfo represents the build details for the server code.
 type BuildInfo struct {
@@ -414,11 +392,11 @@ func (s *Server) Open() error {
 		}
 
 		// Set published vars
-		cidVar.Set(s.ClusterID)
-		sidVar.Set(s.ServerID)
-		hostVar.Set(s.hostname)
-		productVar.Set(kapacitor.Product)
-		versionVar.Set(s.buildInfo.Version)
+		kapacitor.ClusterIDVar.Set(s.ClusterID)
+		kapacitor.ServerIDVar.Set(s.ServerID)
+		kapacitor.HostVar.Set(s.hostname)
+		kapacitor.ProductVar.Set(kapacitor.Product)
+		kapacitor.VersionVar.Set(s.buildInfo.Version)
 		s.Logger.Printf("I! ClusterID: %s ServerID: %s", s.ClusterID, s.ServerID)
 
 		// Start profiling, if set.

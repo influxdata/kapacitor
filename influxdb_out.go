@@ -10,6 +10,10 @@ import (
 	client "github.com/influxdb/influxdb/client/v2"
 )
 
+const (
+	statsInfluxDBPointsWritten = "points_written"
+)
+
 type InfluxDBOutNode struct {
 	node
 	i  *pipeline.InfluxDBOutNode
@@ -22,6 +26,7 @@ func newInfluxDBOutNode(et *ExecutingTask, n *pipeline.InfluxDBOutNode, l *log.L
 		i:    n,
 		wb:   newWriteBuffer(int(n.Buffer), n.FlushInterval),
 	}
+	l.Println("D! fi: ", in.wb.flushInterval)
 	in.node.runF = in.runOut
 	in.node.stopF = in.stopOut
 	in.wb.i = in
@@ -93,7 +98,6 @@ func (i *InfluxDBOutNode) write(db, rp string, batch models.Batch) error {
 		} else {
 			tags = p.Tags
 		}
-
 		points[j], err = client.NewPoint(
 			name,
 			tags,
@@ -173,6 +177,8 @@ func (w *writeBuffer) abort() {
 
 func (w *writeBuffer) run() {
 	defer w.wg.Done()
+	flushTick := time.NewTicker(w.flushInterval)
+	defer flushTick.Stop()
 	var err error
 	for {
 		select {
@@ -200,8 +206,8 @@ func (w *writeBuffer) run() {
 			// Explicit flush called
 			w.writeAll()
 			w.flushed <- struct{}{}
-		case <-time.After(w.flushInterval):
-			// Flush all points after timeout
+		case <-flushTick.C:
+			// Flush all points after flush interval timeout
 			w.writeAll()
 		case <-w.stopping:
 			return
@@ -227,5 +233,6 @@ func (w *writeBuffer) write(bp client.BatchPoints) error {
 			return err
 		}
 	}
+	w.i.statMap.Add(statsInfluxDBPointsWritten, int64(len(bp.Points())))
 	return w.conn.Write(bp)
 }
