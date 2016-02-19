@@ -306,6 +306,8 @@ func (et *ExecutingTask) createNode(p pipeline.Node, l *log.Logger) (Node, error
 	switch t := p.(type) {
 	case *pipeline.StreamNode:
 		return newStreamNode(et, t, l)
+	case *pipeline.SourceStreamNode:
+		return newSourceStreamNode(et, t, l)
 	case *pipeline.SourceBatchNode:
 		return newSourceBatchNode(et, t, l)
 	case *pipeline.BatchNode:
