@@ -2,12 +2,12 @@ package kapacitor
 
 import (
 	"errors"
-	"expvar"
 	"fmt"
 	"log"
 	"strconv"
 	"sync"
 
+	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 )
@@ -36,6 +36,7 @@ type Edge struct {
 
 	logger     *log.Logger
 	aborted    chan struct{}
+	statsKey   string
 	statMap    *expvar.Map
 	groupMu    sync.RWMutex
 	groupStats map[models.GroupID]*edgeStat
@@ -48,10 +49,11 @@ func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, logSer
 		"child":  childName,
 		"type":   t.String(),
 	}
-	sm := NewStatistics("edges", tags)
+	key, sm := NewStatistics("edges", tags)
 	sm.Add(statCollected, 0)
 	sm.Add(statEmitted, 0)
 	e := &Edge{
+		statsKey:   key,
 		statMap:    sm,
 		aborted:    make(chan struct{}),
 		groupStats: make(map[models.GroupID]*edgeStat),
@@ -125,6 +127,7 @@ func (e *Edge) Close() {
 	if e.reduce != nil {
 		close(e.reduce)
 	}
+	DeleteStatistics(e.statsKey)
 }
 
 // Abort all next and collect calls.

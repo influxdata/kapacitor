@@ -310,7 +310,7 @@ func (et *ExecutingTask) EDot() []byte {
 	))
 
 	et.walk(func(n Node) error {
-		n.edot(&buf, n.nodeExecTime())
+		n.edot(&buf)
 		return nil
 	})
 	buf.Write([]byte("}"))

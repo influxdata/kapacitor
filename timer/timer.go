@@ -2,8 +2,9 @@ package timer
 
 import (
 	"math/rand"
-	"sync"
 	"time"
+
+	"github.com/influxdata/kapacitor/expvar"
 )
 
 type Timer interface {
@@ -19,9 +20,6 @@ type Timer interface {
 	// Stop the timer.
 	// Timer must be started.
 	Stop()
-	// Return average of timings and number of
-	// timings used to compute the average.
-	AverageTime() (time.Duration, int)
 }
 
 type timerState int
@@ -40,12 +38,15 @@ type timer struct {
 	current    time.Duration
 	avg        *movavg
 	state      timerState
+
+	avgVar *expvar.MaxFloat
 }
 
-func New(sampleRate float64, movingAverageSize int) Timer {
+func New(sampleRate float64, movingAverageSize int, avgVar *expvar.MaxFloat) Timer {
 	return &timer{
 		sampleRate: sampleRate,
 		avg:        newMovAvg(movingAverageSize),
+		avgVar:     avgVar,
 	}
 }
 
@@ -85,16 +86,10 @@ func (t *timer) Stop() {
 		return
 	}
 	t.current += time.Now().Sub(t.start)
-	t.avg.update(float64(t.current))
+	avg := t.avg.update(float64(t.current))
 	t.current = 0
 	t.state = Stopped
-}
-
-// Return the average time in nanoseconds and
-// the number of timings used to compute the average.
-func (t *timer) AverageTime() (time.Duration, int) {
-	avg, count := t.avg.average()
-	return time.Duration(avg), count
+	t.avgVar.Set(avg)
 }
 
 // Maintains a moving average of values
@@ -104,7 +99,6 @@ type movavg struct {
 	idx     int
 	count   int
 	avg     float64
-	mu      sync.RWMutex
 }
 
 func newMovAvg(size int) *movavg {
@@ -115,14 +109,12 @@ func newMovAvg(size int) *movavg {
 	}
 }
 
-func (m *movavg) update(value float64) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+func (m *movavg) update(value float64) float64 {
 	n := float64(m.count)
 	if n == 0 {
 		m.count = 1
 		m.avg = value
-		return
+		return m.avg
 	}
 
 	m.avg += (value - m.avg) / n
@@ -135,10 +127,5 @@ func (m *movavg) update(value float64) {
 		m.count++
 	}
 	m.history[m.idx] = value
-}
-
-func (m *movavg) average() (float64, int) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.avg, m.count
+	return m.avg
 }

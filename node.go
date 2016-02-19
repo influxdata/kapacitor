@@ -8,9 +8,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/timer"
+)
+
+const (
+	averageExecTimeVarName = "avg_execution_time"
 )
 
 // A node that can be  in an executor.
@@ -40,11 +45,9 @@ type Node interface {
 	abortParentEdges()
 
 	// executing dot
-	edot(buf *bytes.Buffer, execTime time.Duration)
+	edot(buf *bytes.Buffer)
 
 	nodeStatsByGroup() map[models.GroupID]nodeStats
-
-	nodeExecTime() time.Duration
 
 	collectedCount() int64
 }
@@ -65,6 +68,9 @@ type node struct {
 	outs       []*Edge
 	logger     *log.Logger
 	timer      timer.Timer
+	statsKey   string
+	statMap    *expvar.Map
+	avgExecVar *expvar.MaxFloat
 }
 
 func (n *node) addParentEdge(e *Edge) {
@@ -78,7 +84,16 @@ func (n *node) abortParentEdges() {
 }
 
 func (n *node) start(snapshot []byte) {
-	n.timer = n.et.tm.TimingService.NewTimer()
+	tags := map[string]string{
+		"task": n.et.Task.Name,
+		"node": n.Name(),
+		"type": n.et.Task.Type.String(),
+		"kind": n.Desc(),
+	}
+	n.statsKey, n.statMap = NewStatistics("nodes", tags)
+	n.avgExecVar = &expvar.MaxFloat{}
+	n.statMap.Set(averageExecTimeVarName, n.avgExecVar)
+	n.timer = n.et.tm.TimingService.NewTimer(n.avgExecVar)
 	n.errCh = make(chan error, 1)
 	go func() {
 		var err error
@@ -108,7 +123,7 @@ func (n *node) stop() {
 	if n.stopF != nil {
 		n.stopF()
 	}
-
+	DeleteStatistics(n.statsKey)
 }
 
 // no-op snapshot
@@ -167,17 +182,12 @@ func (n *node) closeChildEdges() {
 	}
 }
 
-func (n *node) nodeExecTime() time.Duration {
-	execTime, _ := n.timer.AverageTime()
-	return execTime
-}
-
-func (n *node) edot(buf *bytes.Buffer, execTime time.Duration) {
+func (n *node) edot(buf *bytes.Buffer) {
 	buf.Write([]byte(
 		fmt.Sprintf("\n%s [label=\"%s %v\"];\n",
 			n.Name(),
 			n.Name(),
-			execTime,
+			time.Duration(n.avgExecVar.Get()),
 		),
 	))
 	for i, c := range n.children {

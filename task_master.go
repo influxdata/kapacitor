@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/services/httpd"
@@ -91,7 +92,7 @@ type TaskMaster struct {
 		Alert(title, text string) error
 	}
 	TimingService interface {
-		NewTimer() timer.Timer
+		NewTimer(*expvar.MaxFloat) timer.Timer
 	}
 	LogService LogService
 
@@ -482,6 +483,6 @@ func (tm *TaskMaster) SnapshotTask(name string) (*TaskSnapshot, error) {
 
 type noOpTimingService struct{}
 
-func (noOpTimingService) NewTimer() timer.Timer {
+func (noOpTimingService) NewTimer(*expvar.MaxFloat) timer.Timer {
 	return timer.NewNoOp()
 }
