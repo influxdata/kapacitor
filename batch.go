@@ -11,7 +11,7 @@ import (
 	"github.com/gorhill/cronexpr"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
-	"github.com/influxdb/influxdb/client"
+	client "github.com/influxdb/influxdb/client/v2"
 	"github.com/influxdb/influxdb/influxql"
 )
 
@@ -274,8 +274,8 @@ func (b *BatchNode) doQuery() error {
 				return err
 			}
 
-			if resp.Err != nil {
-				return resp.Err
+			if err := resp.Error(); err != nil {
+				return err
 			}
 
 			// Collect batches

@@ -6,14 +6,13 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"reflect"
 	"time"
 
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/wlog"
-	"github.com/influxdb/influxdb/client"
+	client "github.com/influxdb/influxdb/client/v2"
 	"github.com/influxdb/influxdb/influxql"
 )
 
@@ -28,11 +27,9 @@ func NewMockInfluxDBService(h http.Handler) *MockInfluxDBService {
 	}
 }
 
-func (m *MockInfluxDBService) NewClient() (*client.Client, error) {
-	u, _ := url.Parse(m.ts.URL)
-	return client.NewClient(client.Config{
-		URL:       *u,
-		Precision: "s",
+func (m *MockInfluxDBService) NewClient() (client.Client, error) {
+	return client.NewHTTPClient(client.HTTPConfig{
+		Addr: m.ts.URL,
 	})
 
 }

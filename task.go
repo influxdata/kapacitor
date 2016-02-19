@@ -194,9 +194,7 @@ func (et *ExecutingTask) start(ins []*Edge, snapshot *TaskSnapshot) error {
 }
 
 func (et *ExecutingTask) stop() (err error) {
-	if et.Task.SnapshotInterval > 0 {
-		close(et.stopping)
-	}
+	close(et.stopping)
 	et.walk(func(n Node) error {
 		n.stop()
 		e := n.Err()

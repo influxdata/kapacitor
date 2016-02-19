@@ -11,7 +11,7 @@ import (
 	"github.com/cenkalti/backoff"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/services/udp"
-	"github.com/influxdb/influxdb/client"
+	client "github.com/influxdb/influxdb/client/v2"
 	"github.com/influxdb/influxdb/cluster"
 )
 
@@ -22,7 +22,7 @@ const (
 
 // Handles requests to write or read from an InfluxDB cluster
 type Service struct {
-	configs        []client.Config
+	configs        []client.HTTPConfig
 	i              int
 	configSubs     map[subEntry]bool
 	exConfigSubs   map[subEntry]bool
@@ -57,11 +57,10 @@ type subInfo struct {
 }
 
 func NewService(c Config, hostname string, l *log.Logger) *Service {
-	configs := make([]client.Config, len(c.URLs))
+	configs := make([]client.HTTPConfig, len(c.URLs))
 	for i, u := range c.URLs {
-		host, _ := url.Parse(u)
-		configs[i] = client.Config{
-			URL:       *host,
+		configs[i] = client.HTTPConfig{
+			Addr:      u,
 			Username:  c.Username,
 			Password:  c.Password,
 			UserAgent: "Kapacitor",
@@ -112,20 +111,20 @@ func (s *Service) Close() error {
 func (s *Service) Addr() string {
 	config := s.configs[s.i]
 	s.i = (s.i + 1) % len(s.configs)
-	return config.URL.String()
+	return config.Addr
 }
 
-func (s *Service) NewClient() (c *client.Client, err error) {
+func (s *Service) NewClient() (c client.Client, err error) {
 	tries := 0
 	for tries < len(s.configs) {
 		tries++
 		config := s.configs[s.i]
 		s.i = (s.i + 1) % len(s.configs)
-		c, err = client.NewClient(config)
+		c, err = client.NewHTTPClient(config)
 		if err != nil {
 			continue
 		}
-		_, _, err = c.Ping()
+		_, _, err = c.Ping(config.Timeout)
 		if err != nil {
 			continue
 		}
@@ -140,7 +139,7 @@ func (s *Service) linkSubscriptions() error {
 	b.MaxElapsedTime = s.startupTimeout
 	ticker := backoff.NewTicker(b)
 	var err error
-	var cli *client.Client
+	var cli client.Client
 	for range ticker.C {
 		cli, err = s.NewClient()
 		if err != nil {
@@ -314,7 +313,7 @@ func (s *Service) startListener(db, rp string, u url.URL) (net.Addr, error) {
 	return nil, fmt.Errorf("unsupported scheme %q", u.Scheme)
 }
 
-func (s *Service) execQuery(cli *client.Client, q string) (*client.Response, error) {
+func (s *Service) execQuery(cli client.Client, q string) (*client.Response, error) {
 	query := client.Query{
 		Command: q,
 	}
@@ -322,8 +321,8 @@ func (s *Service) execQuery(cli *client.Client, q string) (*client.Response, err
 	if err != nil {
 		return nil, err
 	}
-	if resp.Err != nil {
-		return nil, resp.Err
+	if err := resp.Error(); err != nil {
+		return nil, err
 	}
 	return resp, nil
 }

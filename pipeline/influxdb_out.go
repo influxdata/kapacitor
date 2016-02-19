@@ -1,5 +1,10 @@
 package pipeline
 
+import "time"
+
+const DefaultBufferSize = 1000
+const DefaultFlushInterval = time.Second * 10
+
 // Writes the data to InfluxDB as it is received.
 //
 // Example:
@@ -27,6 +32,12 @@ type InfluxDBOutNode struct {
 	WriteConsistency string
 	// The precision to use when writing the data.
 	Precision string
+	// Number of points to buffer when writing to InfluxDB.
+	// Default: 1000
+	Buffer int64
+	// Write points to InfluxDB after interval even if buffer is not full.
+	// Default: 10s
+	FlushInterval time.Duration
 	// Static set of tags to add to all data points before writing them.
 	//tick:ignore
 	Tags map[string]string
@@ -39,7 +50,9 @@ func newInfluxDBOutNode(wants EdgeType) *InfluxDBOutNode {
 			wants:    wants,
 			provides: NoEdge,
 		},
-		Tags: make(map[string]string),
+		Tags:          make(map[string]string),
+		Buffer:        DefaultBufferSize,
+		FlushInterval: DefaultFlushInterval,
 	}
 }
 
