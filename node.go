@@ -148,7 +148,7 @@ func (n *node) addChild(c Node) (*Edge, error) {
 	}
 	n.children = append(n.children, c)
 
-	edge := newEdge(n.et.Task.Name, n.Name(), c.Name(), n.Provides(), n.et.tm.LogService)
+	edge := newEdge(n.et.Task.Name, n.Name(), c.Name(), n.Provides(), defaultEdgeBufferSize, n.et.tm.LogService)
 	if edge == nil {
 		return nil, fmt.Errorf("unknown edge type %s", n.Provides())
 	}

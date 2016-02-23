@@ -15,6 +15,8 @@ import (
 const (
 	statCollected = "collected"
 	statEmitted   = "emitted"
+
+	defaultEdgeBufferSize = 1000
 )
 
 var ErrAborted = errors.New("edged aborted")
@@ -42,7 +44,7 @@ type Edge struct {
 	groupStats map[models.GroupID]*edgeStat
 }
 
-func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, logService LogService) *Edge {
+func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, size int, logService LogService) *Edge {
 	tags := map[string]string{
 		"task":   taskName,
 		"parent": parentName,
@@ -62,11 +64,11 @@ func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, logSer
 	e.logger = logService.NewLogger(fmt.Sprintf("[edge:%s] ", name), log.LstdFlags)
 	switch t {
 	case pipeline.StreamEdge:
-		e.stream = make(chan models.Point)
+		e.stream = make(chan models.Point, size)
 	case pipeline.BatchEdge:
-		e.batch = make(chan models.Batch)
+		e.batch = make(chan models.Batch, size)
 	case pipeline.ReduceEdge:
-		e.reduce = make(chan *MapResult)
+		e.reduce = make(chan *MapResult, size)
 	}
 	return e
 }

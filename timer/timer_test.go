@@ -97,7 +97,7 @@ func TestSampling(t *testing.T) {
 	count := sr * float64(size)
 	err := 0.1
 	if math.Abs(float64(tmr.avg.count)-count) > err*count {
-		t.Errorf("unexpected numbers of samples taken got: %d exp: %d", tmr.avg.count, count)
+		t.Errorf("unexpected numbers of samples taken got: %d exp: %d", int(tmr.avg.count), int(count))
 	}
 
 }

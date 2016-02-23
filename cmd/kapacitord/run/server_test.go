@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"reflect"
@@ -753,10 +754,16 @@ batch
 
 func TestServer_UDFStreamAgents(t *testing.T) {
 	dir, err := os.Getwd()
-	udfDir := filepath.Clean(filepath.Join(dir, "../../../udf"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	udfDir := filepath.Clean(filepath.Join(dir, "../../../udf"))
+
+	tdir, err := ioutil.TempDir("", "kapacitor_server_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tdir)
 
 	agents := []struct {
 		buildFunc func() error
@@ -764,10 +771,27 @@ func TestServer_UDFStreamAgents(t *testing.T) {
 	}{
 		// Go
 		{
-			buildFunc: func() error { return nil },
+			buildFunc: func() error {
+				// Explicitly compile the binary.
+				// We could just use 'go run' but I ran into race conditions
+				// where 'go run' was not handing off to the compiled process in time
+				// and I didn't care to dig into 'go run's specific behavior.
+				cmd := exec.Command(
+					"go",
+					"build",
+					"-o",
+					filepath.Join(tdir, "movavg"),
+					filepath.Join(udfDir, "agent/examples/moving_avg/moving_avg.go"),
+				)
+				out, err := cmd.CombinedOutput()
+				if err != nil {
+					t.Log(string(out))
+					return err
+				}
+				return nil
+			},
 			config: udf.FunctionConfig{
-				Prog:    "go",
-				Args:    []string{"run", filepath.Join(udfDir, "agent/examples/moving_avg/moving_avg.go")},
+				Prog:    filepath.Join(tdir, "movavg"),
 				Timeout: toml.Duration(time.Minute),
 			},
 		},
@@ -892,10 +916,16 @@ test,group=b value=0 0000000011
 
 func TestServer_UDFBatchAgents(t *testing.T) {
 	dir, err := os.Getwd()
-	udfDir := filepath.Clean(filepath.Join(dir, "../../../udf"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	udfDir := filepath.Clean(filepath.Join(dir, "../../../udf"))
+
+	tdir, err := ioutil.TempDir("", "kapacitor_server_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tdir)
 
 	agents := []struct {
 		buildFunc func() error
@@ -903,10 +933,27 @@ func TestServer_UDFBatchAgents(t *testing.T) {
 	}{
 		// Go
 		{
-			buildFunc: func() error { return nil },
+			buildFunc: func() error {
+				// Explicitly compile the binary.
+				// We could just use 'go run' but I ran into race conditions
+				// where 'go run' was not handing off to the compiled process in time
+				// and I didn't care to dig into 'go run's specific behavior.
+				cmd := exec.Command(
+					"go",
+					"build",
+					"-o",
+					filepath.Join(tdir, "outliers"),
+					filepath.Join(udfDir, "agent/examples/outliers/outliers.go"),
+				)
+				out, err := cmd.CombinedOutput()
+				if err != nil {
+					t.Log(string(out))
+					return err
+				}
+				return nil
+			},
 			config: udf.FunctionConfig{
-				Prog:    "go",
-				Args:    []string{"run", filepath.Join(udfDir, "agent/examples/outliers/outliers.go")},
+				Prog:    filepath.Join(tdir, "outliers"),
 				Timeout: toml.Duration(time.Minute),
 			},
 		},

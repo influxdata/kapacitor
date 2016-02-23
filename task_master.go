@@ -305,7 +305,7 @@ func (tm *TaskMaster) StartTask(t *Task) (*ExecutingTask, error) {
 		}
 		ins = make([]*Edge, count)
 		for i := 0; i < count; i++ {
-			in := newEdge(t.Name, "batch", fmt.Sprintf("batch%d", i), pipeline.BatchEdge, tm.LogService)
+			in := newEdge(t.Name, "batch", fmt.Sprintf("batch%d", i), pipeline.BatchEdge, defaultEdgeBufferSize, tm.LogService)
 			ins[i] = in
 			tm.batches[t.Name] = append(tm.batches[t.Name], in)
 		}
@@ -386,7 +386,7 @@ func (tm *TaskMaster) stream(name string) (StreamCollector, error) {
 	if tm.closed {
 		return nil, ErrTaskMasterClosed
 	}
-	in := newEdge("TASK_MASTER", name, "stream", pipeline.StreamEdge, tm.LogService)
+	in := newEdge("TASK_MASTER", name, "stream", pipeline.StreamEdge, defaultEdgeBufferSize, tm.LogService)
 	tm.drained = false
 	tm.wg.Add(1)
 	go tm.runForking(in)
@@ -447,7 +447,7 @@ func (tm *TaskMaster) newFork(taskName string, dbrps []DBRP) (*Edge, error) {
 	if tm.closed {
 		return nil, ErrTaskMasterClosed
 	}
-	e := newEdge(taskName, "stream", "stream0", pipeline.StreamEdge, tm.LogService)
+	e := newEdge(taskName, "stream", "srcstream0", pipeline.StreamEdge, defaultEdgeBufferSize, tm.LogService)
 	tm.forks[taskName] = fork{
 		Edge:  e,
 		dbrps: CreateDBRPMap(dbrps),
