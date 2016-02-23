@@ -131,10 +131,10 @@ func GetStatsData() ([]StatsData, error) {
 	// Get all global statistics
 	expvar.Do(func(kv expvar.KeyValue) {
 		switch v := kv.Value.(type) {
-		case *kexpvar.Int:
-			globalData.Values[kv.Key] = v.Get()
-		case *kexpvar.Float:
-			globalData.Values[kv.Key] = v.Get()
+		case kexpvar.IntVar:
+			globalData.Values[kv.Key] = v.Int()
+		case kexpvar.FloatVar:
+			globalData.Values[kv.Key] = v.Float()
 		case *kexpvar.Map:
 			if kv.Key != Product {
 				panic("unexpected published top level expvar.Map with key " + kv.Key)
@@ -153,24 +153,22 @@ func GetStatsData() ([]StatsData, error) {
 		v.Do(func(subKV expvar.KeyValue) {
 			switch subKV.Key {
 			case "name":
-				data.Name = subKV.Value.(*kexpvar.String).Get()
+				data.Name = subKV.Value.(*kexpvar.String).StringValue()
 			case "tags":
 				// string-string tags map.
 				n := subKV.Value.(*kexpvar.Map)
 				n.Do(func(t expvar.KeyValue) {
-					data.Tags[t.Key] = t.Value.(*kexpvar.String).Get()
+					data.Tags[t.Key] = t.Value.(*kexpvar.String).StringValue()
 				})
 			case "values":
 				// string-interface map.
 				n := subKV.Value.(*kexpvar.Map)
 				n.Do(func(kv expvar.KeyValue) {
 					switch v := kv.Value.(type) {
-					case *kexpvar.Int:
-						data.Values[kv.Key] = v.Get()
-					case *kexpvar.Float:
-						data.Values[kv.Key] = v.Get()
-					case *kexpvar.MaxFloat:
-						data.Values[kv.Key] = v.Get()
+					case kexpvar.IntVar:
+						data.Values[kv.Key] = v.Int()
+					case kexpvar.FloatVar:
+						data.Values[kv.Key] = v.Float()
 					default:
 						panic(fmt.Sprintf("unknown expvar.Var type for stats %T", kv.Value))
 					}

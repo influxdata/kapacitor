@@ -4,9 +4,13 @@
 
 ### Release Notes
 
-Kapacitor now exposes more internal metrics for determining the performance of a given task. 
-The internal stats now includes a measurement `node` that contains an averaged execution time for the node, tagged by the task, node, task type and kind of node (i.e. window vs union).
+Kapacitor now exposes more internal metrics for determining the performance of a given task.
+The internal statistics includes a new measurement named `node` that contains any stats a node provides, tagged by the task, node, task type and kind of node (i.e. window vs union).
+All nodes provide an averaged execution time for the node.
 These stats are also available in the DOT output of the Kapacitor show command.
+
+Significant performance improvements have also been added.
+In some cases Kapacitor throughput has improved by 4X.
 
 
 ### Features

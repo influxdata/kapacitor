@@ -290,7 +290,7 @@ func (et *ExecutingTask) registerOutput(name string, o Output) {
 
 // Return a graphviz .dot formatted byte array.
 // Label edges with relavant execution information.
-func (et *ExecutingTask) EDot() []byte {
+func (et *ExecutingTask) EDot(labels bool) []byte {
 
 	var buf bytes.Buffer
 
@@ -302,15 +302,24 @@ func (et *ExecutingTask) EDot() []byte {
 	if et.Task.Type == BatchTask {
 		unit = "batches"
 	}
-	buf.Write([]byte(
-		fmt.Sprintf("graph [label=\"Throughput: %0.2f %s/s\"];\n",
-			et.getThroughput(),
-			unit,
-		),
-	))
+	if labels {
+		buf.Write([]byte(
+			fmt.Sprintf("graph [label=\"Throughput: %0.2f %s/s\"];\n",
+				et.getThroughput(),
+				unit,
+			),
+		))
+	} else {
+		buf.Write([]byte(
+			fmt.Sprintf("graph [throughput=\"%0.2f %s/s\"];\n",
+				et.getThroughput(),
+				unit,
+			),
+		))
+	}
 
 	et.walk(func(n Node) error {
-		n.edot(&buf)
+		n.edot(&buf, labels)
 		return nil
 	})
 	buf.Write([]byte("}"))

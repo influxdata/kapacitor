@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -48,7 +49,7 @@ type Service struct {
 		StartTask(t *kapacitor.Task) (*kapacitor.ExecutingTask, error)
 		StopTask(name string) error
 		IsExecuting(name string) bool
-		ExecutingDot(name string) string
+		ExecutingDot(name string, labels bool) string
 	}
 
 	logger *log.Logger
@@ -271,6 +272,17 @@ func (ts *Service) handleTask(w http.ResponseWriter, r *http.Request) {
 		httpd.HttpError(w, "must pass task name", true, http.StatusBadRequest)
 		return
 	}
+	labels := false
+	labelsStr := r.URL.Query().Get("labels")
+	if labelsStr != "" {
+		var err error
+		labels, err = strconv.ParseBool(labelsStr)
+		if err != nil {
+			httpd.HttpError(w, "invalid labels value:", true, http.StatusBadRequest)
+			return
+		}
+
+	}
 
 	raw, err := ts.LoadRaw(name)
 	if err != nil {
@@ -284,7 +296,7 @@ func (ts *Service) handleTask(w http.ResponseWriter, r *http.Request) {
 	task, err := ts.Load(name)
 	if err == nil {
 		if executing {
-			dot = ts.TaskMaster.ExecutingDot(name)
+			dot = ts.TaskMaster.ExecutingDot(name, labels)
 		} else {
 			dot = string(task.Dot())
 		}

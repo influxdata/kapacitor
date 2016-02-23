@@ -26,7 +26,6 @@ func newInfluxDBOutNode(et *ExecutingTask, n *pipeline.InfluxDBOutNode, l *log.L
 		i:    n,
 		wb:   newWriteBuffer(int(n.Buffer), n.FlushInterval),
 	}
-	l.Println("D! fi: ", in.wb.flushInterval)
 	in.node.runF = in.runOut
 	in.node.stopF = in.stopOut
 	in.wb.i = in
@@ -34,6 +33,7 @@ func newInfluxDBOutNode(et *ExecutingTask, n *pipeline.InfluxDBOutNode, l *log.L
 }
 
 func (i *InfluxDBOutNode) runOut([]byte) error {
+	i.statMap.Add(statsInfluxDBPointsWritten, 0)
 	// Start the write buffer
 	i.wb.start()
 

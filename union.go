@@ -80,6 +80,7 @@ func (u *UnionNode) runUnion([]byte) error {
 			// One of the parents errored out, return the error.
 			return err
 		case source, ok := <-union:
+			u.timer.Start()
 			if !ok {
 				// We are done, emit all buffered points
 				for {
@@ -100,6 +101,7 @@ func (u *UnionNode) runUnion([]byte) error {
 			if err != nil {
 				return err
 			}
+			u.timer.Stop()
 		}
 	}
 }
@@ -148,6 +150,8 @@ func (u *UnionNode) emitNext(drain bool) (more bool, err error) {
 }
 
 func (u *UnionNode) emit(v models.PointInterface) error {
+	u.timer.Pause()
+	defer u.timer.Resume()
 	switch u.Provides() {
 	case pipeline.StreamEdge:
 		p := v.(models.Point)

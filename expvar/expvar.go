@@ -13,13 +13,25 @@ import (
 	"sync/atomic"
 )
 
+type IntVar interface {
+	Int() int64
+}
+
+type FloatVar interface {
+	Float() float64
+}
+
+type StringVar interface {
+	StringValue() float64
+}
+
 // Int is a 64-bit integer variable that satisfies the expvar.Var interface.
 type Int struct {
 	i int64
 }
 
 func (v *Int) String() string {
-	return strconv.FormatInt(v.Get(), 10)
+	return strconv.FormatInt(v.Int(), 10)
 }
 
 func (v *Int) Add(delta int64) {
@@ -30,7 +42,7 @@ func (v *Int) Set(value int64) {
 	atomic.StoreInt64(&v.i, value)
 }
 
-func (v *Int) Get() int64 {
+func (v *Int) Int() int64 {
 	return atomic.LoadInt64(&v.i)
 }
 
@@ -40,10 +52,10 @@ type Float struct {
 }
 
 func (v *Float) String() string {
-	return strconv.FormatFloat(v.Get(), 'g', -1, 64)
+	return strconv.FormatFloat(v.Float(), 'g', -1, 64)
 }
 
-func (v *Float) Get() float64 {
+func (v *Float) Float() float64 {
 	return math.Float64frombits(atomic.LoadUint64(&v.f))
 }
 
@@ -63,36 +75,6 @@ func (v *Float) Add(delta float64) {
 // Set sets v to value.
 func (v *Float) Set(value float64) {
 	atomic.StoreUint64(&v.f, math.Float64bits(value))
-}
-
-// MaxFloat is a 64-bit float variable that satisfies the expvar.Var interface.
-// When setting a value it will only be set if it is greater than the current value.
-type MaxFloat struct {
-	f uint64
-}
-
-func (v *MaxFloat) String() string {
-	return strconv.FormatFloat(v.Get(), 'g', -1, 64)
-}
-
-func (v *MaxFloat) Get() float64 {
-	return math.Float64frombits(atomic.LoadUint64(&v.f))
-}
-
-// Set sets v to value.
-func (v *MaxFloat) Set(value float64) {
-	nxtBits := math.Float64bits(value)
-	for {
-		curBits := atomic.LoadUint64(&v.f)
-		cur := math.Float64frombits(curBits)
-		if value > cur {
-			if atomic.CompareAndSwapUint64(&v.f, curBits, nxtBits) {
-				return
-			}
-		} else {
-			return
-		}
-	}
 }
 
 // Map is a string-to-expvar.Var map variable that satisfies the expvar.Var interface.
@@ -238,7 +220,7 @@ func (v *String) Set(value string) {
 	v.s = value
 }
 
-func (v *String) Get() string {
+func (v *String) StringValue() string {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
 	return v.s
