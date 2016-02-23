@@ -28,11 +28,11 @@ kapacitord config
 # Getting Started
 
 This README gives you a high level overview of what Kapacitor is and what its like to use it. As well as some details of how it works.
-To get started using Kapacitor see [this guide](http://docs.influxdata.com/kapacitor/v0.2/introduction/getting_started/).
+To get started using Kapacitor see [this guide](https://docs.influxdata.com/kapacitor/v0.10/introduction/getting_started/).
 
 # Basic Example
 
-Kapacitor use a DSL named [TICKscript](https://docs.influxdata.com/kapacitor/v0.2/tick/) to define tasks.
+Kapacitor use a DSL named [TICKscript](https://docs.influxdata.com/kapacitor/v0.10/tick/) to define tasks.
 
 A simple TICKscript that alerts on high cpu usage looks like this:
 
@@ -79,4 +79,4 @@ kapacitor define \
 kapacitor enable cpu_alert
 ```
 
-For more complete examples see the [documentation](https://docs.influxdata.com/kapacitor/v0.2/introduction/)
+For more complete examples see the [documentation](https://docs.influxdata.com/kapacitor/v0.10/examples/)
