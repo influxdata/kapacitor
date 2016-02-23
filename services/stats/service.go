@@ -24,10 +24,16 @@ package stats
 
 import (
 	"errors"
+	"fmt"
 	"log"
+	"net"
+	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
+	"github.com/influxdata/enterprise-client/v2"
+	"github.com/influxdata/enterprise-client/v2/admin"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/models"
 )
@@ -52,28 +58,59 @@ type Service struct {
 	wg      sync.WaitGroup
 
 	logger *log.Logger
+
+	enterpriseHosts []*client.Host
+	adminPort       string
+	adminHost       string
+	token           string
+	secret          string
+
+	clusterID string
+	productID string
+	hostname  string
+	version   string
+	product   string
 }
 
 func NewService(c Config, l *log.Logger) *Service {
 	return &Service{
-		interval: time.Duration(c.StatsInterval),
-		db:       c.Database,
-		rp:       c.RetentionPolicy,
-		logger:   l,
+		interval:        time.Duration(c.StatsInterval),
+		db:              c.Database,
+		rp:              c.RetentionPolicy,
+		logger:          l,
+		enterpriseHosts: c.EnterpriseHosts,
+		adminPort:       fmt.Sprintf(":%d", c.AdminPort),
+		adminHost:       c.AdminHost,
 	}
 }
 
 func (s *Service) Open() (err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// Populate published vars
+	s.clusterID = kapacitor.GetStringVar(kapacitor.ClusterIDVarName)
+	s.productID = kapacitor.GetStringVar(kapacitor.ServerIDVarName)
+	s.hostname = kapacitor.GetStringVar(kapacitor.HostVarName)
+	s.version = kapacitor.GetStringVar(kapacitor.VersionVarName)
+	s.product = kapacitor.Product
+
 	s.stream, err = s.TaskMaster.Stream("stats")
 	if err != nil {
 		return
 	}
 	s.open = true
 	s.closing = make(chan struct{})
-	s.wg.Add(1)
+
+	s.wg.Add(2)
 	go s.sendStats()
+	go func() {
+		if err := s.registerServer(); err != nil {
+			s.logger.Println("E! Unable to register with Enterprise")
+		} else {
+			s.launchAdminInterface()
+		}
+	}()
 	s.logger.Println("I! opened service")
 	return
 }
@@ -89,6 +126,80 @@ func (s *Service) Close() error {
 	s.wg.Wait()
 	s.stream.Close()
 	s.logger.Println("I! closed service")
+	return nil
+}
+
+func (s *Service) registerServer() error {
+	if len(s.enterpriseHosts) == 0 {
+		return nil
+	}
+
+	cl, err := client.New(s.enterpriseHosts)
+	if err != nil {
+		s.logger.Printf("E! Unable to contact one or more Enterprise hosts: %s\n", err.Error())
+		return err
+	}
+
+	adminURL, err := url.Parse("http://" + s.adminHost + s.adminPort)
+	if err != nil {
+		s.logger.Printf("E! Unable to parse admin URL: %s\n", err.Error())
+		return err
+	}
+
+	product := client.Product{
+		ClusterID: s.clusterID,
+		ProductID: s.productID,
+		Host:      s.hostname,
+		Name:      s.product,
+		Version:   s.version,
+		AdminURL:  adminURL.String(),
+	}
+
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+
+		_, err := cl.Register(&product)
+
+		if err != nil {
+			s.logger.Printf("E! failed to register Kapacitor, err: %s", err)
+			return
+		} else {
+			s.logger.Println("I! Registered product")
+		}
+
+		s.enterpriseHosts = cl.Hosts
+		for _, host := range s.enterpriseHosts {
+			if host.Primary {
+				s.token = host.Token
+				s.secret = host.SecretKey
+			}
+		}
+	}()
+	return nil
+}
+
+func (s *Service) launchAdminInterface() error {
+	defer s.wg.Done()
+
+	srv := &http.Server{
+		Addr:         s.adminPort,
+		Handler:      admin.App(s.token, []byte(s.secret)),
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+	}
+
+	l, err := net.Listen("tcp", s.adminPort)
+	if err != nil {
+		s.logger.Printf("E! Unable to bind enterprise admin interface to port %s. err: %s\n", s.adminPort, err)
+		return err
+	}
+	go srv.Serve(l)
+	select {
+	case <-s.closing:
+		s.logger.Println("Shutting down enterprise admin interface")
+		l.Close()
+	}
 	return nil
 }
 
@@ -113,6 +224,37 @@ func (s *Service) reportStats() {
 		s.logger.Println("E! error getting stats data:", err)
 		return
 	}
+
+	if len(s.enterpriseHosts) != 0 {
+		eData := make([]client.StatsData, len(data))
+
+		for i, d := range data {
+			eData[i] = client.StatsData{
+				Name:   d.Name,
+				Tags:   d.Tags,
+				Values: client.Values(d.Values),
+			}
+		}
+
+		eStats := client.Stats{
+			ProductName: s.product,
+			ClusterID:   s.clusterID,
+			ProductID:   s.productID,
+			Data:        eData,
+		}
+
+		cl, err := client.New(s.enterpriseHosts)
+		if err != nil {
+			s.logger.Printf("E! Unable to contact one or or more Enterprise hosts: %s\n", err.Error())
+			return
+		}
+
+		resp, err := cl.Save(eStats)
+		if err != nil {
+			s.logger.Printf("E! Error saving stats to Enterprise: response code: %d: error: %s", resp.StatusCode, err)
+		}
+	}
+
 	for _, stat := range data {
 		p := models.Point{
 			Database:        s.db,
