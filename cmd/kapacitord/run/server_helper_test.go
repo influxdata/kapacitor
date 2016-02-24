@@ -21,7 +21,7 @@ import (
 	"github.com/influxdata/kapacitor/cmd/kapacitord/run"
 	"github.com/influxdata/kapacitor/services/task_store"
 	"github.com/influxdata/kapacitor/wlog"
-	"github.com/influxdb/influxdb/client"
+	client "github.com/influxdb/influxdb/client/v2"
 )
 
 // Server represents a test wrapper for run.Server.
@@ -382,6 +382,10 @@ type InfluxDB struct {
 
 func NewInfluxDB(callback queryFunc) *InfluxDB {
 	handler := func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/ping" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		q := r.URL.Query().Get("q")
 		res := callback(q)
 		enc := json.NewEncoder(w)

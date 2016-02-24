@@ -30,6 +30,7 @@ import (
 
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/timer"
 )
 
 // Sends internal stats back into the Kapacitor stream.
@@ -46,6 +47,9 @@ type Service struct {
 	db       string
 	rp       string
 
+	timingSampleRate    float64
+	timingMovingAvgSize int
+
 	open    bool
 	closing chan struct{}
 	mu      sync.Mutex
@@ -56,10 +60,12 @@ type Service struct {
 
 func NewService(c Config, l *log.Logger) *Service {
 	return &Service{
-		interval: time.Duration(c.StatsInterval),
-		db:       c.Database,
-		rp:       c.RetentionPolicy,
-		logger:   l,
+		interval:            time.Duration(c.StatsInterval),
+		db:                  c.Database,
+		rp:                  c.RetentionPolicy,
+		timingSampleRate:    c.TimingSampleRate,
+		timingMovingAvgSize: c.TimingMovingAverageSize,
+		logger:              l,
 	}
 }
 
@@ -125,4 +131,8 @@ func (s *Service) reportStats() {
 		}
 		s.stream.CollectPoint(p)
 	}
+}
+
+func (s *Service) NewTimer(avgVar timer.Setter) timer.Timer {
+	return timer.New(s.timingSampleRate, s.timingMovingAvgSize, avgVar)
 }

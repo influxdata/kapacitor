@@ -47,10 +47,10 @@ func (s *Service) Open() error {
 	}
 
 	// Populate published vars
-	s.clusterID = kapacitor.GetStringVar(kapacitor.ClusterIDVarName)
-	s.serverID = kapacitor.GetStringVar(kapacitor.ServerIDVarName)
-	s.hostname = kapacitor.GetStringVar(kapacitor.HostVarName)
-	s.version = kapacitor.GetStringVar(kapacitor.VersionVarName)
+	s.clusterID = kapacitor.ClusterIDVar.StringValue()
+	s.serverID = kapacitor.ServerIDVar.StringValue()
+	s.hostname = kapacitor.HostVar.StringValue()
+	s.version = kapacitor.VersionVar.StringValue()
 	s.product = kapacitor.Product
 
 	// Populate anonymous tags
@@ -104,9 +104,9 @@ func (s *Service) sendUsageReport() error {
 	// Add values
 	data.Values[kapacitor.ClusterIDVarName] = s.clusterID
 	data.Values[kapacitor.ServerIDVarName] = s.serverID
-	data.Values[kapacitor.NumTasksVarName] = kapacitor.GetIntVar(kapacitor.NumTasksVarName)
-	data.Values[kapacitor.NumEnabledTasksVarName] = kapacitor.GetIntVar(kapacitor.NumEnabledTasksVarName)
-	data.Values[kapacitor.NumSubscriptionsVarName] = kapacitor.GetIntVar(kapacitor.NumSubscriptionsVarName)
+	data.Values[kapacitor.NumTasksVarName] = kapacitor.NumTasksVar.Int()
+	data.Values[kapacitor.NumEnabledTasksVarName] = kapacitor.NumEnabledTasksVar.Int()
+	data.Values[kapacitor.NumSubscriptionsVarName] = kapacitor.NumSubscriptionsVar.Int()
 	data.Values[kapacitor.UptimeVarName] = kapacitor.Uptime().Seconds()
 
 	usage := client.Usage{

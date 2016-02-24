@@ -2,11 +2,11 @@ package kapacitor
 
 import (
 	"expvar"
+	"fmt"
 	"runtime"
-	"strconv"
-	"sync"
 	"time"
 
+	kexpvar "github.com/influxdata/kapacitor/expvar"
 	"github.com/twinj/uuid"
 )
 
@@ -30,9 +30,18 @@ const (
 
 var (
 	// Global expvars
-	NumTasks         = &expvar.Int{}
-	NumEnabledTasks  = &expvar.Int{}
-	NumSubscriptions = &expvar.Int{}
+	NumTasksVar         = &kexpvar.Int{}
+	NumEnabledTasksVar  = &kexpvar.Int{}
+	NumSubscriptionsVar = &kexpvar.Int{}
+
+	ClusterIDVar = &kexpvar.String{}
+	ServerIDVar  = &kexpvar.String{}
+	HostVar      = &kexpvar.String{}
+	ProductVar   = &kexpvar.String{}
+	VersionVar   = &kexpvar.String{}
+
+	// All internal stats are added as sub-maps to this top level map.
+	stats *kexpvar.Map
 )
 
 var (
@@ -41,78 +50,65 @@ var (
 
 func init() {
 	startTime = time.Now().UTC()
-	expvar.Publish(NumTasksVarName, NumTasks)
-	expvar.Publish(NumEnabledTasksVarName, NumEnabledTasks)
-	expvar.Publish(NumSubscriptionsVarName, NumSubscriptions)
-}
 
-// Gets an exported var and returns its unquoted string contents
-func GetStringVar(name string) string {
-	s, err := strconv.Unquote(expvar.Get(name).String())
-	if err != nil {
-		panic(err)
-	}
-	return s
-}
+	expvar.Publish(NumTasksVarName, NumTasksVar)
+	expvar.Publish(NumEnabledTasksVarName, NumEnabledTasksVar)
+	expvar.Publish(NumSubscriptionsVarName, NumSubscriptionsVar)
 
-// Gets an exported var and returns its int value
-func GetIntVar(name string) int64 {
-	i, err := strconv.ParseInt(expvar.Get(name).String(), 10, 64)
-	if err != nil {
-		panic(err)
-	}
-	return i
-}
+	expvar.Publish(ClusterIDVarName, ClusterIDVar)
+	expvar.Publish(ServerIDVarName, ServerIDVar)
+	expvar.Publish(HostVarName, HostVar)
+	expvar.Publish(ProductVarName, ProductVar)
+	expvar.Publish(VersionVarName, VersionVar)
 
-// Gets an exported var and returns its float value
-func GetFloatVar(name string) float64 {
-	f, err := strconv.ParseFloat(expvar.Get(name).String(), 64)
-	if err != nil {
-		panic(err)
-	}
-	return f
+	// Initialze the global stats map
+	stats = &kexpvar.Map{}
+	stats.Init()
+	expvar.Publish(Product, stats)
 }
 
 func Uptime() time.Duration {
 	return time.Now().Sub(startTime)
 }
 
-var expvarMu sync.Mutex
-
 // NewStatistics creates an expvar-based map. Within there "name" is the Measurement name, "tags" are the tags,
 // and values are placed at the key "values".
 // The "values" map is returned so that statistics can be set.
-func NewStatistics(name string, tags map[string]string) *expvar.Map {
-	expvarMu.Lock()
-	defer expvarMu.Unlock()
-
+func NewStatistics(name string, tags map[string]string) (string, *kexpvar.Map) {
 	key := uuid.NewV4().String()
 
-	m := &expvar.Map{}
+	m := &kexpvar.Map{}
 	m.Init()
-	expvar.Publish(key, m)
 
 	// Set the name
-	nameVar := &expvar.String{}
+	nameVar := &kexpvar.String{}
 	nameVar.Set(name)
 	m.Set("name", nameVar)
 
 	// Set the tags
-	tagsVar := &expvar.Map{}
+	tagsVar := &kexpvar.Map{}
 	tagsVar.Init()
 	for k, v := range tags {
-		value := &expvar.String{}
+		value := &kexpvar.String{}
 		value.Set(v)
 		tagsVar.Set(k, value)
 	}
 	m.Set("tags", tagsVar)
 
 	// Create and set the values entry used for actual stats.
-	statMap := &expvar.Map{}
+	statMap := &kexpvar.Map{}
 	statMap.Init()
 	m.Set("values", statMap)
 
-	return statMap
+	// Set new statsMap on the top level map.
+	stats.Set(key, m)
+
+	return key, statMap
+}
+
+// Remove a statistics map.
+func DeleteStatistics(key string) {
+	stats.Delete(key)
 }
 
 type StatsData struct {
@@ -132,83 +128,66 @@ func GetStatsData() ([]StatsData, error) {
 
 	allData = append(allData, globalData)
 
+	// Get all global statistics
 	expvar.Do(func(kv expvar.KeyValue) {
-		var f interface{}
-		var err error
 		switch v := kv.Value.(type) {
-		case *expvar.Float:
-			f, err = strconv.ParseFloat(v.String(), 64)
-			if err == nil {
-				globalData.Values[kv.Key] = f
+		case kexpvar.IntVar:
+			globalData.Values[kv.Key] = v.Int()
+		case kexpvar.FloatVar:
+			globalData.Values[kv.Key] = v.Float()
+		case *kexpvar.Map:
+			if kv.Key != Product {
+				panic("unexpected published top level expvar.Map with key " + kv.Key)
 			}
-		case *expvar.Int:
-			f, err = strconv.ParseInt(v.String(), 10, 64)
-			if err == nil {
-				globalData.Values[kv.Key] = f
-			}
-		case *expvar.Map:
-			data := StatsData{
-				Tags:   make(map[string]string),
-				Values: make(map[string]interface{}),
-			}
-
-			v.Do(func(subKV expvar.KeyValue) {
-				switch subKV.Key {
-				case "name":
-					// straight to string name.
-					u, err := strconv.Unquote(subKV.Value.String())
-					if err != nil {
-						return
-					}
-					data.Name = u
-				case "tags":
-					// string-string tags map.
-					n := subKV.Value.(*expvar.Map)
-					n.Do(func(t expvar.KeyValue) {
-						u, err := strconv.Unquote(t.Value.String())
-						if err != nil {
-							return
-						}
-						data.Tags[t.Key] = u
-					})
-				case "values":
-					// string-interface map.
-					n := subKV.Value.(*expvar.Map)
-					n.Do(func(kv expvar.KeyValue) {
-						var f interface{}
-						var err error
-						switch v := kv.Value.(type) {
-						case *expvar.Float:
-							f, err = strconv.ParseFloat(v.String(), 64)
-							if err != nil {
-								return
-							}
-						case *expvar.Int:
-							f, err = strconv.ParseInt(v.String(), 10, 64)
-							if err != nil {
-								return
-							}
-						default:
-							return
-						}
-						data.Values[kv.Key] = f
-					})
-				}
-			})
-
-			// If no field data, don't include it in the results
-			if len(data.Values) == 0 {
-				return
-			}
-
-			allData = append(allData, data)
 		}
+	})
+	// Get all other specific statistics
+	stats.Do(func(kv expvar.KeyValue) {
+		v := kv.Value.(*kexpvar.Map)
+
+		data := StatsData{
+			Tags:   make(map[string]string),
+			Values: make(map[string]interface{}),
+		}
+
+		v.Do(func(subKV expvar.KeyValue) {
+			switch subKV.Key {
+			case "name":
+				data.Name = subKV.Value.(*kexpvar.String).StringValue()
+			case "tags":
+				// string-string tags map.
+				n := subKV.Value.(*kexpvar.Map)
+				n.Do(func(t expvar.KeyValue) {
+					data.Tags[t.Key] = t.Value.(*kexpvar.String).StringValue()
+				})
+			case "values":
+				// string-interface map.
+				n := subKV.Value.(*kexpvar.Map)
+				n.Do(func(kv expvar.KeyValue) {
+					switch v := kv.Value.(type) {
+					case kexpvar.IntVar:
+						data.Values[kv.Key] = v.Int()
+					case kexpvar.FloatVar:
+						data.Values[kv.Key] = v.Float()
+					default:
+						panic(fmt.Sprintf("unknown expvar.Var type for stats %T", kv.Value))
+					}
+				})
+			}
+		})
+
+		// If no field data, don't include it in the results
+		if len(data.Values) == 0 {
+			return
+		}
+
+		allData = append(allData, data)
 	})
 
 	// Add uptime to globalData
 	globalData.Values[UptimeVarName] = Uptime().Seconds()
 
-	// Add Go memstats.
+	// Add Go runtime stats.
 	data := StatsData{
 		Name: "runtime",
 	}

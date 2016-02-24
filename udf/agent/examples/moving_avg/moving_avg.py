@@ -99,7 +99,7 @@ class AvgHandler(Handler):
 
     def snapshot(self):
         data = {}
-        for group, state in self._state:
+        for group, state in self._state.iteritems():
             data[group] = state.snapshot()
 
         response = udf_pb2.Response()
@@ -112,7 +112,7 @@ class AvgHandler(Handler):
         msg = ''
         try:
             data = json.loads(restore_req.snapshot)
-            for group, snapshot in data:
+            for group, snapshot in data.iteritems():
                 self._state[group] = AvgHandler.state(0)
                 self._state[group].restore(snapshot)
             success = True

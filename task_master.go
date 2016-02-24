@@ -11,7 +11,8 @@ import (
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/tick"
-	"github.com/influxdb/influxdb/client"
+	"github.com/influxdata/kapacitor/timer"
+	client "github.com/influxdb/influxdb/client/v2"
 	"github.com/influxdb/influxdb/cluster"
 )
 
@@ -43,7 +44,7 @@ type TaskMaster struct {
 	UDFService UDFService
 
 	InfluxDBService interface {
-		NewClient() (*client.Client, error)
+		NewClient() (client.Client, error)
 	}
 	SMTPService interface {
 		Global() bool
@@ -89,6 +90,9 @@ type TaskMaster struct {
 	TalkService interface {
 		Alert(title, text string) error
 	}
+	TimingService interface {
+		NewTimer(timer.Setter) timer.Timer
+	}
 	LogService LogService
 
 	// Incoming streams
@@ -119,12 +123,13 @@ type fork struct {
 // Create a new Executor with a given clock.
 func NewTaskMaster(l LogService) *TaskMaster {
 	return &TaskMaster{
-		forks:      make(map[string]fork),
-		batches:    make(map[string][]BatchCollector),
-		tasks:      make(map[string]*ExecutingTask),
-		LogService: l,
-		logger:     l.NewLogger("[task_master] ", log.LstdFlags),
-		closed:     true,
+		forks:         make(map[string]fork),
+		batches:       make(map[string][]BatchCollector),
+		tasks:         make(map[string]*ExecutingTask),
+		LogService:    l,
+		logger:        l.NewLogger("[task_master] ", log.LstdFlags),
+		closed:        true,
+		TimingService: noOpTimingService{},
 	}
 }
 
@@ -145,6 +150,7 @@ func (tm *TaskMaster) New() *TaskMaster {
 	n.AlertaService = tm.AlertaService
 	n.SensuService = tm.SensuService
 	n.TalkService = tm.TalkService
+	n.TimingService = tm.TimingService
 	return n
 }
 
@@ -298,7 +304,7 @@ func (tm *TaskMaster) StartTask(t *Task) (*ExecutingTask, error) {
 		}
 		ins = make([]*Edge, count)
 		for i := 0; i < count; i++ {
-			in := newEdge(t.Name, "batch", fmt.Sprintf("batch%d", i), pipeline.BatchEdge, tm.LogService)
+			in := newEdge(t.Name, "batch", fmt.Sprintf("batch%d", i), pipeline.BatchEdge, defaultEdgeBufferSize, tm.LogService)
 			ins[i] = in
 			tm.batches[t.Name] = append(tm.batches[t.Name], in)
 		}
@@ -359,12 +365,12 @@ func (tm *TaskMaster) IsExecuting(name string) bool {
 	return executing
 }
 
-func (tm *TaskMaster) ExecutingDot(name string) string {
+func (tm *TaskMaster) ExecutingDot(name string, labels bool) string {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
 	et, executing := tm.tasks[name]
 	if executing {
-		return string(et.EDot())
+		return string(et.EDot(labels))
 	}
 	return ""
 }
@@ -379,7 +385,7 @@ func (tm *TaskMaster) stream(name string) (StreamCollector, error) {
 	if tm.closed {
 		return nil, ErrTaskMasterClosed
 	}
-	in := newEdge("TASK_MASTER", name, "stream", pipeline.StreamEdge, tm.LogService)
+	in := newEdge("TASK_MASTER", name, "stream", pipeline.StreamEdge, defaultEdgeBufferSize, tm.LogService)
 	tm.drained = false
 	tm.wg.Add(1)
 	go tm.runForking(in)
@@ -440,7 +446,7 @@ func (tm *TaskMaster) newFork(taskName string, dbrps []DBRP) (*Edge, error) {
 	if tm.closed {
 		return nil, ErrTaskMasterClosed
 	}
-	e := newEdge(taskName, "stream", "stream0", pipeline.StreamEdge, tm.LogService)
+	e := newEdge(taskName, "stream", "srcstream0", pipeline.StreamEdge, defaultEdgeBufferSize, tm.LogService)
 	tm.forks[taskName] = fork{
 		Edge:  e,
 		dbrps: CreateDBRPMap(dbrps),
@@ -472,4 +478,10 @@ func (tm *TaskMaster) SnapshotTask(name string) (*TaskSnapshot, error) {
 		return et.Snapshot()
 	}
 	return nil, fmt.Errorf("task %s is not running or does not exist", name)
+}
+
+type noOpTimingService struct{}
+
+func (noOpTimingService) NewTimer(timer.Setter) timer.Timer {
+	return timer.NewNoOp()
 }

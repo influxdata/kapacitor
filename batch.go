@@ -11,7 +11,7 @@ import (
 	"github.com/gorhill/cronexpr"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
-	"github.com/influxdb/influxdb/client"
+	client "github.com/influxdb/influxdb/client/v2"
 	"github.com/influxdb/influxdb/influxql"
 )
 
@@ -96,7 +96,13 @@ func (s *SourceBatchNode) Queries(start, stop time.Time) [][]string {
 
 // Do not add the source batch node to the dot output
 // since its not really an edge.
-func (s *SourceBatchNode) edot(buf *bytes.Buffer) {
+func (s *SourceBatchNode) edot(*bytes.Buffer, bool) {}
+
+func (s *SourceBatchNode) collectedCount() (count int64) {
+	for _, child := range s.children {
+		count += child.collectedCount()
+	}
+	return
 }
 
 type BatchNode struct {
@@ -244,6 +250,7 @@ func (b *BatchNode) doQuery() error {
 		case <-b.aborting:
 			return errors.New("batch doQuery aborted")
 		case now := <-tickC:
+			b.timer.Start()
 
 			// Update times for query
 			stop := now.Add(-1 * b.b.Offset)
@@ -267,8 +274,8 @@ func (b *BatchNode) doQuery() error {
 				return err
 			}
 
-			if resp.Err != nil {
-				return resp.Err
+			if err := resp.Error(); err != nil {
+				return err
 			}
 
 			// Collect batches
@@ -277,10 +284,13 @@ func (b *BatchNode) doQuery() error {
 				if err != nil {
 					return err
 				}
+				b.timer.Pause()
 				for _, bch := range batches {
 					b.ins[0].CollectBatch(bch)
 				}
+				b.timer.Resume()
 			}
+			b.timer.Stop()
 		}
 	}
 }

@@ -2483,21 +2483,7 @@ stream
 		.post('` + ts.URL + `')
 `
 
-	clock, et, replayErr, tm := testStreamer(t, "TestStream_AlertSigma", script, nil)
-	defer tm.Close()
-
-	// Move time forward
-	clock.Set(clock.Zero().Add(13 * time.Second))
-	// Wait till the replay has finished
-	if e := <-replayErr; e != nil {
-		t.Error(e)
-	}
-	// We don't want anymore data for the task
-	tm.DelFork(et.Task.Name)
-	// Wait till the task is finished
-	if e := et.Err(); e != nil {
-		t.Error(e)
-	}
+	testStreamerNoOutput(t, "TestStream_AlertSigma", script, 13*time.Second)
 
 	if requestCount != 2 {
 		t.Errorf("got %v exp %v", requestCount, 2)
@@ -2634,6 +2620,10 @@ stream
 	var precision string
 
 	influxdb := NewMockInfluxDBService(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/ping" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		//Respond
 		var data client.Response
 		w.WriteHeader(http.StatusOK)

@@ -9,6 +9,7 @@ import (
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/timer"
 	"github.com/influxdb/influxdb/influxql"
 )
 
@@ -18,7 +19,7 @@ type JoinNode struct {
 	fill          influxql.FillOption
 	fillValue     interface{}
 	groups        map[models.GroupID]*group
-	mu            sync.Mutex
+	mu            sync.RWMutex
 	runningGroups sync.WaitGroup
 }
 
@@ -112,36 +113,6 @@ func (j *JoinNode) getGroup(p models.PointInterface) *group {
 	return group
 }
 
-// emit a single joined set
-func (j *JoinNode) emitJoinedSet(set *joinset) error {
-	if set.name == "" {
-		set.name = set.First().PointName()
-	}
-	switch j.Wants() {
-	case pipeline.StreamEdge:
-		p, ok := set.JoinIntoPoint()
-		if ok {
-			for _, out := range j.outs {
-				err := out.CollectPoint(p)
-				if err != nil {
-					return err
-				}
-			}
-		}
-	case pipeline.BatchEdge:
-		b, ok := set.JoinIntoBatch()
-		if ok {
-			for _, out := range j.outs {
-				err := out.CollectBatch(b)
-				if err != nil {
-					return err
-				}
-			}
-		}
-	}
-	return nil
-}
-
 // represents an incoming data point and which parent it came from
 type srcPoint struct {
 	src int
@@ -155,6 +126,7 @@ type group struct {
 	oldestTime time.Time
 	j          *JoinNode
 	points     chan srcPoint
+	timer      timer.Timer
 }
 
 func newGroup(i int, j *JoinNode) *group {
@@ -163,6 +135,7 @@ func newGroup(i int, j *JoinNode) *group {
 		head:   make([]time.Time, i),
 		j:      j,
 		points: make(chan srcPoint),
+		timer:  j.et.tm.TimingService.NewTimer(j.avgExecVar),
 	}
 }
 
@@ -170,7 +143,9 @@ func newGroup(i int, j *JoinNode) *group {
 func (g *group) run() {
 	defer g.j.runningGroups.Done()
 	for sp := range g.points {
+		g.timer.Start()
 		g.collect(sp.src, sp.p)
+		g.timer.Stop()
 	}
 }
 
@@ -211,7 +186,7 @@ func (g *group) collect(i int, p models.PointInterface) {
 // emit a set and update the oldestTime.
 func (g *group) emit() {
 	set := g.sets[g.oldestTime]
-	g.j.emitJoinedSet(set)
+	g.emitJoinedSet(set)
 	delete(g.sets, g.oldestTime)
 
 	g.oldestTime = time.Time{}
@@ -227,6 +202,40 @@ func (g *group) emitAll() {
 	for len(g.sets) > 0 {
 		g.emit()
 	}
+}
+
+// emit a single joined set
+func (g *group) emitJoinedSet(set *joinset) error {
+	if set.name == "" {
+		set.name = set.First().PointName()
+	}
+	switch g.j.Wants() {
+	case pipeline.StreamEdge:
+		p, ok := set.JoinIntoPoint()
+		if ok {
+			g.timer.Pause()
+			for _, out := range g.j.outs {
+				err := out.CollectPoint(p)
+				if err != nil {
+					return err
+				}
+			}
+			g.timer.Resume()
+		}
+	case pipeline.BatchEdge:
+		b, ok := set.JoinIntoBatch()
+		if ok {
+			g.timer.Pause()
+			for _, out := range g.j.outs {
+				err := out.CollectBatch(b)
+				if err != nil {
+					return err
+				}
+			}
+			g.timer.Resume()
+		}
+	}
+	return nil
 }
 
 // represents a set of points or batches from the same joined time

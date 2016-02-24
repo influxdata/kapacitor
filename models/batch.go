@@ -2,11 +2,12 @@ package models
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
 
-	"github.com/influxdb/influxdb/client"
+	client "github.com/influxdb/influxdb/client/v2"
 	"github.com/influxdb/influxdb/models"
 )
 
@@ -99,8 +100,8 @@ func BatchToRow(b Batch) (row *models.Row) {
 }
 
 func ResultToBatches(res client.Result) ([]Batch, error) {
-	if res.Err != nil {
-		return nil, res.Err
+	if res.Err != "" {
+		return nil, errors.New(res.Err)
 	}
 	batches := make([]Batch, len(res.Series))
 	for i, series := range res.Series {

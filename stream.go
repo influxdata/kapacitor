@@ -67,18 +67,22 @@ func newStreamNode(et *ExecutingTask, n *pipeline.StreamNode, l *log.Logger) (*S
 
 func (s *StreamNode) runStream([]byte) error {
 	for pt, ok := s.ins[0].NextPoint(); ok; pt, ok = s.ins[0].NextPoint() {
+		s.timer.Start()
 		if s.matches(pt) {
 			if s.s.Truncate != 0 {
 				pt.Time = pt.Time.Truncate(s.s.Truncate)
 			}
 			pt = setGroupOnPoint(pt, s.allDimensions, s.dimensions)
+			s.timer.Pause()
 			for _, child := range s.outs {
 				err := child.CollectPoint(pt)
 				if err != nil {
 					return err
 				}
 			}
+			s.timer.Resume()
 		}
+		s.timer.Stop()
 	}
 	return nil
 }

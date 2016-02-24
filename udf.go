@@ -109,19 +109,23 @@ func (u *UDFNode) runUDF(snapshot []byte) (err error) {
 		switch u.Wants() {
 		case pipeline.StreamEdge:
 			for p, ok := u.ins[0].NextPoint(); ok; p, ok = u.ins[0].NextPoint() {
+				u.timer.Start()
 				select {
 				case u.process.PointIn <- p:
 				case <-u.aborted:
 					return
 				}
+				u.timer.Stop()
 			}
 		case pipeline.BatchEdge:
 			for b, ok := u.ins[0].NextBatch(); ok; b, ok = u.ins[0].NextBatch() {
+				u.timer.Start()
 				select {
 				case u.process.BatchIn <- b:
 				case <-u.aborted:
 					return
 				}
+				u.timer.Stop()
 			}
 		}
 	}()

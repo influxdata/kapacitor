@@ -2,12 +2,12 @@ package kapacitor
 
 import (
 	"errors"
-	"expvar"
 	"fmt"
 	"log"
 	"strconv"
 	"sync"
 
+	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 )
@@ -15,6 +15,8 @@ import (
 const (
 	statCollected = "collected"
 	statEmitted   = "emitted"
+
+	defaultEdgeBufferSize = 1000
 )
 
 var ErrAborted = errors.New("edged aborted")
@@ -36,22 +38,24 @@ type Edge struct {
 
 	logger     *log.Logger
 	aborted    chan struct{}
+	statsKey   string
 	statMap    *expvar.Map
 	groupMu    sync.RWMutex
 	groupStats map[models.GroupID]*edgeStat
 }
 
-func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, logService LogService) *Edge {
+func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, size int, logService LogService) *Edge {
 	tags := map[string]string{
 		"task":   taskName,
 		"parent": parentName,
 		"child":  childName,
 		"type":   t.String(),
 	}
-	sm := NewStatistics("edges", tags)
+	key, sm := NewStatistics("edges", tags)
 	sm.Add(statCollected, 0)
 	sm.Add(statEmitted, 0)
 	e := &Edge{
+		statsKey:   key,
 		statMap:    sm,
 		aborted:    make(chan struct{}),
 		groupStats: make(map[models.GroupID]*edgeStat),
@@ -60,11 +64,11 @@ func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, logSer
 	e.logger = logService.NewLogger(fmt.Sprintf("[edge:%s] ", name), log.LstdFlags)
 	switch t {
 	case pipeline.StreamEdge:
-		e.stream = make(chan models.Point)
+		e.stream = make(chan models.Point, size)
 	case pipeline.BatchEdge:
-		e.batch = make(chan models.Batch)
+		e.batch = make(chan models.Batch, size)
 	case pipeline.ReduceEdge:
-		e.reduce = make(chan *MapResult)
+		e.reduce = make(chan *MapResult, size)
 	}
 	return e
 }
@@ -125,6 +129,7 @@ func (e *Edge) Close() {
 	if e.reduce != nil {
 		close(e.reduce)
 	}
+	DeleteStatistics(e.statsKey)
 }
 
 // Abort all next and collect calls.
@@ -151,7 +156,7 @@ func (e *Edge) NextPoint() (p models.Point, ok bool) {
 	case p, ok = <-e.stream:
 		if ok {
 			e.statMap.Add(statEmitted, 1)
-			e.incEmitted(p)
+			e.incEmitted(&p)
 		}
 	}
 	return
@@ -163,7 +168,7 @@ func (e *Edge) NextBatch() (b models.Batch, ok bool) {
 	case b, ok = <-e.batch:
 		if ok {
 			e.statMap.Add(statEmitted, 1)
-			e.incEmitted(b)
+			e.incEmitted(&b)
 		}
 	}
 	return
@@ -182,7 +187,7 @@ func (e *Edge) NextMaps() (m *MapResult, ok bool) {
 
 func (e *Edge) CollectPoint(p models.Point) error {
 	e.statMap.Add(statCollected, 1)
-	e.incCollected(p)
+	e.incCollected(&p)
 	select {
 	case <-e.aborted:
 		return ErrAborted
@@ -193,7 +198,7 @@ func (e *Edge) CollectPoint(p models.Point) error {
 
 func (e *Edge) CollectBatch(b models.Batch) error {
 	e.statMap.Add(statCollected, 1)
-	e.incCollected(b)
+	e.incCollected(&b)
 	select {
 	case <-e.aborted:
 		return ErrAborted
