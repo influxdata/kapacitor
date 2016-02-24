@@ -73,70 +73,70 @@ func NewHandler(requireAuthentication, loggingEnabled, writeTrace bool, statMap 
 	}
 
 	h.AddRoutes([]Route{
-		Route{
+		{
 			// Ping
 			Name:        "ping",
 			Method:      "GET",
 			Pattern:     "/ping",
 			HandlerFunc: h.servePing,
 		},
-		Route{
+		{
 			// Ping
 			Name:        "ping-head",
 			Method:      "HEAD",
 			Pattern:     "/ping",
 			HandlerFunc: h.servePing,
 		},
-		Route{
+		{
 			// Satisfy CORS checks.
 			Name:        "write",
 			Method:      "OPTIONS",
 			Pattern:     "/write",
-			HandlerFunc: h.serveOptions,
+			HandlerFunc: ServeOptions,
 		},
-		Route{
+		{
 			// Data-ingest route.
 			Name:        "write",
 			Method:      "POST",
 			Pattern:     "/write",
 			HandlerFunc: h.serveWrite,
 		},
-		Route{
+		{
 			// Display current API routes
 			Name:        "routes",
 			Method:      "GET",
 			Pattern:     "/:routes",
 			HandlerFunc: h.serveRoutes,
 		},
-		Route{
+		{
 			// Display current log level
 			Name:        "log-level",
 			Method:      "POST",
 			Pattern:     "/loglevel",
 			HandlerFunc: h.serveLogLevel,
 		},
-		Route{
+		{
 			// Catch all 404
 			Name:        "404",
 			Method:      "GET",
 			Pattern:     "/",
 			HandlerFunc: h.serve404,
 		},
-		Route{
+		{
 			// Catch all 404
 			Name:        "404",
 			Method:      "POST",
 			Pattern:     "/",
 			HandlerFunc: h.serve404,
 		},
-		Route{
+		{
 			// Catch all 404
 			Name:        "404",
 			Method:      "DELETE",
 			Pattern:     "/",
 			HandlerFunc: h.serve404,
 		},
-		Route{
+		{
 			// Catch all 404
 			Name:        "404",
 			Method:      "HEAD",
@@ -266,8 +266,8 @@ func (h *Handler) writeError(w http.ResponseWriter, result influxql.Result, stat
 	w.Write([]byte("\n"))
 }
 
-// serveOptions returns an empty response to comply with OPTIONS pre-flight requests
-func (h *Handler) serveOptions(w http.ResponseWriter, r *http.Request) {
+// ServeOptions returns an empty response to comply with OPTIONS pre-flight requests
+func ServeOptions(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
