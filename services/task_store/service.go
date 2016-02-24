@@ -109,6 +109,13 @@ func (ts *Service) Open() error {
 			HandlerFunc: ts.handleDelete,
 		},
 		{
+			// Satisfy CORS checks.
+			Name:        "task-delete",
+			Method:      "OPTIONS",
+			Pattern:     "/task",
+			HandlerFunc: httpd.ServeOptions,
+		},
+		{
 			Name:        "task-enable",
 			Method:      "POST",
 			Pattern:     "/enable",
