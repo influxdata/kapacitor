@@ -132,9 +132,9 @@ func GetStatsData() ([]StatsData, error) {
 	expvar.Do(func(kv expvar.KeyValue) {
 		switch v := kv.Value.(type) {
 		case kexpvar.IntVar:
-			globalData.Values[kv.Key] = v.Int()
+			globalData.Values[kv.Key] = v.IntValue()
 		case kexpvar.FloatVar:
-			globalData.Values[kv.Key] = v.Float()
+			globalData.Values[kv.Key] = v.FloatValue()
 		case *kexpvar.Map:
 			if kv.Key != Product {
 				panic("unexpected published top level expvar.Map with key " + kv.Key)
@@ -166,9 +166,9 @@ func GetStatsData() ([]StatsData, error) {
 				n.Do(func(kv expvar.KeyValue) {
 					switch v := kv.Value.(type) {
 					case kexpvar.IntVar:
-						data.Values[kv.Key] = v.Int()
+						data.Values[kv.Key] = v.IntValue()
 					case kexpvar.FloatVar:
-						data.Values[kv.Key] = v.Float()
+						data.Values[kv.Key] = v.FloatValue()
 					default:
 						panic(fmt.Sprintf("unknown expvar.Var type for stats %T", kv.Value))
 					}

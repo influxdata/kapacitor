@@ -50,6 +50,10 @@ type JoinNode struct {
 	// tick:ignore
 	Names []string
 
+	// The dimensions on which to join
+	// tick:ignore
+	Dimensions []string
+
 	// The name of this new joined data stream.
 	// If empty the name of the left parent is used.
 	StreamName string
@@ -89,5 +93,30 @@ func newJoinNode(e EdgeType, parents []Node) *JoinNode {
 // tick:property
 func (j *JoinNode) As(names ...string) *JoinNode {
 	j.Names = names
+	return j
+}
+
+// Join on specfic dimensions.
+// For example given two measurements:
+//
+// 1. building_power -- tagged by building, value is the total power consumed by the building.
+// 2. floor_power -- tagged by building and floor, values is the total power consumed by the floor.
+//
+// You want to calculate the percentage of the total building power consumed by each floor.
+//
+// Example:
+//    var buidling = stream.from().measurement('building_power')
+//                         .groupBy('building')
+//    var floor = stream.from().measurement('floor_power')
+//                         .groupBy('building', 'floor')
+//    building.join(floor)
+//                .as('building', 'floor')
+//                .on('building')
+//            .eval(lambda: "floor.value" / "building.value")
+//            ... // Values here are grouped by 'building' and 'floor'
+//
+// tick:property
+func (j *JoinNode) On(dims ...string) *JoinNode {
+	j.Dimensions = dims
 	return j
 }

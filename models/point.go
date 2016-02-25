@@ -11,6 +11,7 @@ import (
 type GroupID string
 type Fields map[string]interface{}
 type Tags map[string]string
+type Dimensions []string
 
 const (
 	NilGroup GroupID = ""
@@ -22,8 +23,18 @@ type PointInterface interface {
 	PointTime() time.Time
 	PointGroup() GroupID
 	PointTags() Tags
-	PointDimensions() []string
+	PointDimensions() Dimensions
 	PointFields() Fields
+
+	// Return a copy of self
+	Copy() PointInterface
+	Setter() PointSetter
+}
+
+type PointSetter interface {
+	PointInterface
+	SetNewDimTag(key string, value string)
+	UpdateGroup()
 }
 
 // Represents a single data point
@@ -33,7 +44,7 @@ type Point struct {
 	RetentionPolicy string
 
 	Group      GroupID
-	Dimensions []string
+	Dimensions Dimensions
 
 	Tags Tags
 
@@ -66,8 +77,38 @@ func (p Point) PointTags() Tags {
 	return tags
 }
 
-func (p Point) PointDimensions() []string {
+func (p Point) PointDimensions() Dimensions {
 	return p.Dimensions
+}
+
+func (p Point) Copy() PointInterface {
+	cp := p
+	cp.Fields = p.Fields.Copy()
+	cp.Tags = p.Tags.Copy()
+	cp.Dimensions = p.Dimensions.Copy()
+	return &cp
+}
+
+func (p Point) Setter() PointSetter {
+	return &p
+}
+
+func (p *Point) SetNewDimTag(key string, value string) {
+	p.Tags[key] = value
+	// Only add dim if it does not exist.
+	for _, dim := range p.Dimensions {
+		if dim == value {
+			// Key exists we are done.
+			return
+		}
+	}
+	// Key doesn't exist add it.
+	p.Dimensions = append(p.Dimensions, key)
+}
+
+func (p *Point) UpdateGroup() {
+	sort.Strings(p.Dimensions)
+	p.Group = TagsToGroupID(p.Dimensions, p.Tags)
 }
 
 // Returns byte array of a line protocol representation of the point
@@ -140,4 +181,18 @@ func (f Fields) Copy() Fields {
 		cf[k] = v
 	}
 	return cf
+}
+
+func (t Tags) Copy() Tags {
+	ct := make(Tags, len(t))
+	for k, v := range t {
+		ct[k] = v
+	}
+	return ct
+}
+
+func (d Dimensions) Copy() Dimensions {
+	cd := make([]string, len(d))
+	copy(cd, d)
+	return cd
 }

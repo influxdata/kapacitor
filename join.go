@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/timer"
@@ -21,9 +22,22 @@ type JoinNode struct {
 	groups        map[models.GroupID]*group
 	mu            sync.RWMutex
 	runningGroups sync.WaitGroup
+
+	// Buffer for caching points that need to be matched with specific points.
+	matchGroupsBuffer map[models.GroupID][]srcPoint
+	// Buffer for caching specific points until their match arrivces.
+	specificGroupsBuffer map[models.GroupID][]srcPoint
+	// Represents the lower bound of times from each parent.
+	lowMark     time.Time
+	reported    map[int]bool
+	allReported bool
+
+	//timing vars
+	mpSetter *timer.MultiPartSetter
+	postVar  timer.Setter
 }
 
-// Create a new  JoinNode, which takes pairs from parent streams combines them into a single point.
+// Create a new JoinNode, which takes pairs from parent streams combines them into a single point.
 func newJoinNode(et *ExecutingTask, n *pipeline.JoinNode, l *log.Logger) (*JoinNode, error) {
 	for _, name := range n.Names {
 		if len(name) == 0 {
@@ -42,8 +56,11 @@ func newJoinNode(et *ExecutingTask, n *pipeline.JoinNode, l *log.Logger) (*JoinN
 	}
 
 	jn := &JoinNode{
-		j:    n,
-		node: node{Node: n, et: et, logger: l},
+		j:                    n,
+		node:                 node{Node: n, et: et, logger: l},
+		matchGroupsBuffer:    make(map[models.GroupID][]srcPoint),
+		specificGroupsBuffer: make(map[models.GroupID][]srcPoint),
+		reported:             make(map[int]bool),
 	}
 	// Set fill
 	switch fill := n.Fill.(type) {
@@ -63,29 +80,58 @@ func newJoinNode(et *ExecutingTask, n *pipeline.JoinNode, l *log.Logger) (*JoinN
 		jn.fill = influxql.NoFill
 	}
 	jn.node.runF = jn.runJoin
+	jn.node.stopF = jn.stopJoin
 	return jn, nil
+}
+
+func (j *JoinNode) stopJoin() {
+	j.mpSetter.Stop()
 }
 
 func (j *JoinNode) runJoin([]byte) error {
 	j.groups = make(map[models.GroupID]*group)
 	wg := sync.WaitGroup{}
+
+	// Setup multi part timer to time both the
+	// 'pre' work and 'post' work.
+	avgExecVar := &durationVar{}
+	j.statMap.Set(statAverageExecTime, avgExecVar)
+	j.mpSetter = timer.NewMultiPartSetter(avgExecVar)
+	// Time work to resolve join.on dimensions.
+	pre := j.mpSetter.NewPart()
+	preVar := &MaxDuration{setter: pre}
+	// Time work to join points.
+	post := j.mpSetter.NewPart()
+	j.postVar = &MaxDuration{setter: post}
+
 	for i := range j.ins {
 		// Start gorouting per parent so we do not deadlock.
 		// This way independent of the order that parents receive data
 		// we can handle it.
 		wg.Add(1)
-		go func(i int) {
+		t := j.et.tm.TimingService.NewTimer(preVar)
+		go func(i int, t timer.Timer) {
 			defer wg.Done()
 			in := j.ins[i]
 			for p, ok := in.Next(); ok; p, ok = in.Next() {
-				// Get the group for this point or batch
-				g := j.getGroup(p)
-				g.points <- srcPoint{
-					src: i,
-					p:   p,
+				t.Start()
+				srcP := srcPoint{src: i, p: p}
+				if len(j.j.Dimensions) > 0 {
+					// Match points with their group based on join dimensions.
+					j.matchPoints(srcP)
+				} else {
+					// Just send point on to group, we are not joining on specific dimensions.
+					func() {
+						j.mu.Lock()
+						defer j.mu.Unlock()
+						group := j.getGroup(p)
+						// Send current point
+						group.points <- srcP
+					}()
 				}
+				t.Stop()
 			}
-		}(i)
+		}(i, t)
 	}
 	wg.Wait()
 	// No more points are comming signal all groups to finish up.
@@ -99,10 +145,92 @@ func (j *JoinNode) runJoin([]byte) error {
 	return nil
 }
 
-// safely get the group for the point or create one if it doesn't exist.
-func (j *JoinNode) getGroup(p models.PointInterface) *group {
+// The purpose of this method is to match more specific points
+// with the less specific points as they arrive.
+//
+// Where 'more specific' means, that a point has more dimensions than the join.on dimensions.
+func (j *JoinNode) matchPoints(p srcPoint) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
+
+	if !j.allReported {
+		j.reported[p.src] = true
+		j.allReported = len(j.reported) == len(j.ins)
+	}
+	t := p.p.PointTime().Round(j.j.Tolerance)
+	if j.lowMark.IsZero() || t.Before(j.lowMark) {
+		j.lowMark = t
+	}
+
+	groupId := models.TagsToGroupID(j.j.Dimensions, p.p.PointTags())
+	if len(p.p.PointDimensions()) > len(j.j.Dimensions) {
+		// We have a specific point, find its cached match and send both to group
+		matches := j.matchGroupsBuffer[groupId]
+		matched := false
+		for _, match := range matches {
+			if match.p.PointTime().Round(j.j.Tolerance).Equal(t) {
+				j.sendMatchPoint(p, match)
+				matched = true
+			}
+		}
+		if !matched {
+			// Cache this point for when its match arrives
+			j.specificGroupsBuffer[groupId] = append(j.specificGroupsBuffer[groupId], p)
+		}
+
+		// Purge cached match points
+		if j.allReported {
+			for id, cached := range j.matchGroupsBuffer {
+				var i int
+				l := len(cached)
+				for i = 0; i < l; i++ {
+					if !cached[i].p.PointTime().Round(j.j.Tolerance).Before(j.lowMark) {
+						break
+					}
+				}
+				j.matchGroupsBuffer[id] = cached[i:]
+			}
+		}
+
+	} else {
+
+		// Cache match point.
+		j.matchGroupsBuffer[groupId] = append(j.matchGroupsBuffer[groupId], p)
+
+		// Send all specific points, that match, to the group.
+		var i int
+		buf := j.specificGroupsBuffer[groupId]
+		l := len(buf)
+		for i = 0; i < l; i++ {
+			if buf[i].p.PointTime().Round(j.j.Tolerance).Equal(t) {
+				j.sendMatchPoint(buf[i], p)
+			} else {
+				break
+			}
+		}
+		// Remove all sent points
+		j.specificGroupsBuffer[groupId] = buf[i:]
+	}
+}
+
+// Add the specific tags from the specific point to the matched point
+// and then send both on to the group.
+func (j *JoinNode) sendMatchPoint(specific, matched srcPoint) {
+	np := matched.p.Copy().Setter()
+	for key, value := range specific.p.PointTags() {
+		np.SetNewDimTag(key, value)
+	}
+	np.UpdateGroup()
+	group := j.getGroup(specific.p)
+	// Send current point
+	group.points <- specific
+	// Send new matched point
+	matched.p = np
+	group.points <- matched
+}
+
+// safely get the group for the point or create one if it doesn't exist.
+func (j *JoinNode) getGroup(p models.PointInterface) *group {
 	group := j.groups[p.PointGroup()]
 	if group == nil {
 		group = newGroup(len(j.ins), j)
@@ -135,7 +263,7 @@ func newGroup(i int, j *JoinNode) *group {
 		head:   make([]time.Time, i),
 		j:      j,
 		points: make(chan srcPoint),
-		timer:  j.et.tm.TimingService.NewTimer(j.avgExecVar),
+		timer:  j.et.tm.TimingService.NewTimer(j.postVar),
 	}
 }
 
@@ -414,4 +542,12 @@ func (js *joinset) JoinIntoBatch() (models.Batch, bool) {
 		newBatch.Points = append(newBatch.Points, bp)
 	}
 	return newBatch, true
+}
+
+type durationVar struct {
+	expvar.Int
+}
+
+func (d *durationVar) String() string {
+	return time.Duration(d.IntValue()).String()
 }

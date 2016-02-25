@@ -40,7 +40,7 @@ func (u *UnionNode) runUnion([]byte) error {
 	// Spawn goroutine for each parent
 	errors := make(chan error, len(u.ins))
 	for i, in := range u.ins {
-		t := u.et.tm.TimingService.NewTimer(u.avgExecVar)
+		t := u.et.tm.TimingService.NewTimer(u.statMap.Get(statAverageExecTime).(timer.Setter))
 		go func(index int, e *Edge, t timer.Timer) {
 			for p, ok := e.Next(); ok; p, ok = e.Next() {
 				union <- srcPoint{

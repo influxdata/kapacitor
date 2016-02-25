@@ -104,9 +104,9 @@ func (s *Service) sendUsageReport() error {
 	// Add values
 	data.Values[kapacitor.ClusterIDVarName] = s.clusterID
 	data.Values[kapacitor.ServerIDVarName] = s.serverID
-	data.Values[kapacitor.NumTasksVarName] = kapacitor.NumTasksVar.Int()
-	data.Values[kapacitor.NumEnabledTasksVarName] = kapacitor.NumEnabledTasksVar.Int()
-	data.Values[kapacitor.NumSubscriptionsVarName] = kapacitor.NumSubscriptionsVar.Int()
+	data.Values[kapacitor.NumTasksVarName] = kapacitor.NumTasksVar.IntValue()
+	data.Values[kapacitor.NumEnabledTasksVarName] = kapacitor.NumEnabledTasksVar.IntValue()
+	data.Values[kapacitor.NumSubscriptionsVarName] = kapacitor.NumSubscriptionsVar.IntValue()
 	data.Values[kapacitor.UptimeVarName] = kapacitor.Uptime().Seconds()
 
 	usage := client.Usage{

@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	statAverageExecTime = "avg_exec_time"
+	statAverageExecTime = "avg_exec_time_ns"
 )
 
 // A node that can be  in an executor.
@@ -72,7 +72,6 @@ type node struct {
 	timer      timer.Timer
 	statsKey   string
 	statMap    *kexpvar.Map
-	avgExecVar *MaxDuration
 }
 
 func (n *node) addParentEdge(e *Edge) {
@@ -93,9 +92,9 @@ func (n *node) start(snapshot []byte) {
 		"kind": n.Desc(),
 	}
 	n.statsKey, n.statMap = NewStatistics("nodes", tags)
-	n.avgExecVar = &MaxDuration{}
-	n.statMap.Set(statAverageExecTime, n.avgExecVar)
-	n.timer = n.et.tm.TimingService.NewTimer(n.avgExecVar)
+	avgExecVar := &MaxDuration{}
+	n.statMap.Set(statAverageExecTime, avgExecVar)
+	n.timer = n.et.tm.TimingService.NewTimer(avgExecVar)
 	n.errCh = make(chan error, 1)
 	go func() {
 		var err error
@@ -277,24 +276,28 @@ func (n *node) nodeStatsByGroup() (stats map[models.GroupID]nodeStats) {
 // MaxDuration is a 64-bit int variable representing a duration in nanoseconds,that satisfies the expvar.Var interface.
 // When setting a value it will only be set if it is greater than the current value.
 type MaxDuration struct {
-	d int64
+	d      int64
+	setter timer.Setter
 }
 
 func (v *MaxDuration) String() string {
-	return time.Duration(v.Int()).String()
+	return time.Duration(v.IntValue()).String()
 }
 
-func (v *MaxDuration) Int() int64 {
+func (v *MaxDuration) IntValue() int64 {
 	return atomic.LoadInt64(&v.d)
 }
 
 // Set sets value if it is greater than current value.
-func (v *MaxDuration) Set(value float64) {
-	next := int64(value)
+// If set was successful and a setter exists, will pass on value to setter.
+func (v *MaxDuration) Set(next int64) {
 	for {
-		cur := v.Int()
+		cur := v.IntValue()
 		if next > cur {
 			if atomic.CompareAndSwapInt64(&v.d, cur, next) {
+				if v.setter != nil {
+					v.setter.Set(next)
+				}
 				return
 			}
 		} else {

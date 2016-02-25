@@ -74,10 +74,10 @@ func BenchmarkMovAvgUpdate(b *testing.B) {
 }
 
 type setter struct {
-	value float64
+	value int64
 }
 
-func (s *setter) Set(v float64) {
+func (s *setter) Set(v int64) {
 	s.value = v
 }
 

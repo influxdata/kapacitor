@@ -996,6 +996,302 @@ cpu.join(mem, disk)
 	testStreamerWithOutput(t, "TestStream_JoinN", script, 15*time.Second, er, nil, false)
 }
 
+func TestStream_JoinOn(t *testing.T) {
+	var script = `
+var errorsByServiceDC = stream
+			.from().measurement('errors')
+			.groupBy('dc', 'service')
+			.window()
+				.period(10s)
+				.every(10s)
+				.align()
+			.mapReduce(influxql.sum('value'))
+
+var errorsByServiceGlobal = stream
+			.from().measurement('errors')
+			.groupBy('service')
+			.window()
+				.period(10s)
+				.every(10s)
+				.align()
+			.mapReduce(influxql.sum('value'))
+
+errorsByServiceGlobal.join(errorsByServiceDC)
+		.as('service', 'dc')
+		.on('service')
+		.streamName('dc_error_percent')
+	.eval(lambda: "dc.sum" / "service.sum")
+		.keep()
+		.as('value')
+	.httpOut('TestStream_JoinOn')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "dc_error_percent",
+				Tags:    map[string]string{"dc": "A", "service": "cartA"},
+				Columns: []string{"time", "dc.sum", "service.sum", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					15.0,
+					47.0,
+					15.0 / 47.0,
+				}},
+			},
+			{
+				Name:    "dc_error_percent",
+				Tags:    map[string]string{"dc": "B", "service": "cartA"},
+				Columns: []string{"time", "dc.sum", "service.sum", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					32.0,
+					47.0,
+					32.0 / 47.0,
+				}},
+			},
+			{
+				Name:    "dc_error_percent",
+				Tags:    map[string]string{"dc": "A", "service": "login"},
+				Columns: []string{"time", "dc.sum", "service.sum", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					15.0,
+					45.0,
+					15.0 / 45.0,
+				}},
+			},
+			{
+				Name:    "dc_error_percent",
+				Tags:    map[string]string{"dc": "B", "service": "login"},
+				Columns: []string{"time", "dc.sum", "service.sum", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					23.0,
+					45.0,
+					23.0 / 45.0,
+				}},
+			},
+			{
+				Name:    "dc_error_percent",
+				Tags:    map[string]string{"dc": "C", "service": "login"},
+				Columns: []string{"time", "dc.sum", "service.sum", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					7.0,
+					45.0,
+					7.0 / 45.0,
+				}},
+			},
+			{
+				Name:    "dc_error_percent",
+				Tags:    map[string]string{"dc": "A", "service": "front"},
+				Columns: []string{"time", "dc.sum", "service.sum", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					19.0,
+					32.0,
+					19.0 / 32.0,
+				}},
+			},
+			{
+				Name:    "dc_error_percent",
+				Tags:    map[string]string{"dc": "B", "service": "front"},
+				Columns: []string{"time", "dc.sum", "service.sum", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					13.0,
+					32.0,
+					13.0 / 32.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_JoinOn", script, 13*time.Second, er, nil, true)
+}
+
+func TestStream_JoinOnGap(t *testing.T) {
+	var script = `
+var errorsByServiceDCRack = stream
+			.from().measurement('errors')
+			.groupBy('dc', 'service', 'rack')
+			.window()
+				.period(10s)
+				.every(10s)
+				.align()
+			.mapReduce(influxql.sum('value'))
+
+var errorsByServiceGlobal = stream
+			.from().measurement('errors')
+			.groupBy('service')
+			.window()
+				.period(10s)
+				.every(10s)
+				.align()
+			.mapReduce(influxql.sum('value'))
+
+errorsByServiceGlobal.join(errorsByServiceDCRack)
+		.as('service', 'loc')
+		.on('service')
+		.streamName('loc_error_percent')
+	.eval(lambda: "loc.sum" / "service.sum")
+		.keep()
+		.as('value')
+	.httpOut('TestStream_JoinOn')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "loc_error_percent",
+				Tags:    map[string]string{"dc": "A", "service": "cartA", "rack": "0"},
+				Columns: []string{"time", "loc.sum", "service.sum", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					10.0,
+					47.0,
+					10.0 / 47.0,
+				}},
+			},
+			{
+				Name:    "loc_error_percent",
+				Tags:    map[string]string{"dc": "A", "service": "cartA", "rack": "1"},
+				Columns: []string{"time", "loc.sum", "service.sum", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					5.0,
+					47.0,
+					5.0 / 47.0,
+				}},
+			},
+			{
+				Name:    "loc_error_percent",
+				Tags:    map[string]string{"dc": "B", "service": "cartA", "rack": "0"},
+				Columns: []string{"time", "loc.sum", "service.sum", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					14.0,
+					47.0,
+					14.0 / 47.0,
+				}},
+			},
+			{
+				Name:    "loc_error_percent",
+				Tags:    map[string]string{"dc": "B", "service": "cartA", "rack": "1"},
+				Columns: []string{"time", "loc.sum", "service.sum", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					18.0,
+					47.0,
+					18.0 / 47.0,
+				}},
+			},
+			{
+				Name:    "loc_error_percent",
+				Tags:    map[string]string{"dc": "A", "service": "login", "rack": "0"},
+				Columns: []string{"time", "loc.sum", "service.sum", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					5.0,
+					45.0,
+					5.0 / 45.0,
+				}},
+			},
+			{
+				Name:    "loc_error_percent",
+				Tags:    map[string]string{"dc": "A", "service": "login", "rack": "1"},
+				Columns: []string{"time", "loc.sum", "service.sum", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					10.0,
+					45.0,
+					10.0 / 45.0,
+				}},
+			},
+			{
+				Name:    "loc_error_percent",
+				Tags:    map[string]string{"dc": "B", "service": "login", "rack": "0"},
+				Columns: []string{"time", "loc.sum", "service.sum", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					3.0,
+					45.0,
+					3.0 / 45.0,
+				}},
+			},
+			{
+				Name:    "loc_error_percent",
+				Tags:    map[string]string{"dc": "B", "service": "login", "rack": "1"},
+				Columns: []string{"time", "loc.sum", "service.sum", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					20.0,
+					45.0,
+					20.0 / 45.0,
+				}},
+			},
+			{
+				Name:    "loc_error_percent",
+				Tags:    map[string]string{"dc": "C", "service": "login", "rack": "0"},
+				Columns: []string{"time", "loc.sum", "service.sum", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					7.0,
+					45.0,
+					7.0 / 45.0,
+				}},
+			},
+			{
+				Name:    "loc_error_percent",
+				Tags:    map[string]string{"dc": "A", "service": "front", "rack": "0"},
+				Columns: []string{"time", "loc.sum", "service.sum", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					9.0,
+					32.0,
+					9.0 / 32.0,
+				}},
+			},
+			{
+				Name:    "loc_error_percent",
+				Tags:    map[string]string{"dc": "A", "service": "front", "rack": "1"},
+				Columns: []string{"time", "loc.sum", "service.sum", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					10.0,
+					32.0,
+					10.0 / 32.0,
+				}},
+			},
+			{
+				Name:    "loc_error_percent",
+				Tags:    map[string]string{"dc": "B", "service": "front", "rack": "0"},
+				Columns: []string{"time", "loc.sum", "service.sum", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					4.0,
+					32.0,
+					4.0 / 32.0,
+				}},
+			},
+			{
+				Name:    "loc_error_percent",
+				Tags:    map[string]string{"dc": "B", "service": "front", "rack": "1"},
+				Columns: []string{"time", "loc.sum", "service.sum", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					9.0,
+					32.0,
+					9.0 / 32.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_JoinOn", script, 13*time.Second, er, nil, true)
+}
+
 func TestStream_Union(t *testing.T) {
 
 	var script = `

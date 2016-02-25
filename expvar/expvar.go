@@ -14,11 +14,11 @@ import (
 )
 
 type IntVar interface {
-	Int() int64
+	IntValue() int64
 }
 
 type FloatVar interface {
-	Float() float64
+	FloatValue() float64
 }
 
 type StringVar interface {
@@ -31,7 +31,7 @@ type Int struct {
 }
 
 func (v *Int) String() string {
-	return strconv.FormatInt(v.Int(), 10)
+	return strconv.FormatInt(v.IntValue(), 10)
 }
 
 func (v *Int) Add(delta int64) {
@@ -42,7 +42,7 @@ func (v *Int) Set(value int64) {
 	atomic.StoreInt64(&v.i, value)
 }
 
-func (v *Int) Int() int64 {
+func (v *Int) IntValue() int64 {
 	return atomic.LoadInt64(&v.i)
 }
 
@@ -52,10 +52,10 @@ type Float struct {
 }
 
 func (v *Float) String() string {
-	return strconv.FormatFloat(v.Float(), 'g', -1, 64)
+	return strconv.FormatFloat(v.FloatValue(), 'g', -1, 64)
 }
 
-func (v *Float) Float() float64 {
+func (v *Float) FloatValue() float64 {
 	return math.Float64frombits(atomic.LoadUint64(&v.f))
 }
 
