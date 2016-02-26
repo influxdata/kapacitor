@@ -404,6 +404,8 @@ func (et *ExecutingTask) createNode(p pipeline.Node, l *log.Logger) (Node, error
 		return newShiftNode(et, t, l)
 	case *pipeline.NoOpNode:
 		return newNoOpNode(et, t, l)
+	case *pipeline.InfluxQLNode:
+		return newInfluxQLNode(et, t, l)
 	default:
 		return nil, fmt.Errorf("unknown pipeline node type %T", p)
 	}

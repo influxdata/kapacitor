@@ -1,0 +1,231 @@
+package kapacitor
+
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/pipeline"
+)
+
+{{/* Define typed Aggregate/Emit types */}}
+{{range .}}
+
+type {{.name}}PointAggregator struct {
+	field         string
+	topBottomInfo *pipeline.TopBottomCallInfo
+	aggregator influxql.{{.Name}}PointAggregator
+}
+
+func {{.name}}PopulateAuxFieldsAndTags(ap *influxql.{{.Name}}Point, fieldsAndTags []string, fields models.Fields, tags models.Tags) {
+	ap.Aux = make([]interface{}, len(fieldsAndTags))
+	for i, name := range fieldsAndTags {
+		if f, ok := fields[name]; ok {
+			ap.Aux[i] = f
+		} else {
+			ap.Aux[i] = tags[name]
+		}
+	}
+}
+
+func (a *{{.name}}PointAggregator) AggregateBatch(b *models.Batch) {
+	for _, p := range b.Points {
+		ap := &influxql.{{.Name}}Point{
+			Name:  b.Name,
+			Tags:  influxql.NewTags(p.Tags),
+			Time:  p.Time.UnixNano(),
+			Value: p.Fields[a.field].({{.Type}}),
+		}
+		if a.topBottomInfo != nil {
+			// We need to populate the Aux fields
+			{{.name}}PopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
+		}
+		a.aggregator.Aggregate{{.Name}}(ap)
+	}
+}
+
+func (a *{{.name}}PointAggregator) AggregatePoint(p *models.Point) {
+	ap := &influxql.{{.Name}}Point{
+		Name:  p.Name,
+		Tags:  influxql.NewTags(p.Tags),
+		Time:  p.Time.UnixNano(),
+		Value: p.Fields[a.field].({{.Type}}),
+	}
+	if a.topBottomInfo != nil {
+		// We need to populate the Aux fields
+		{{.name}}PopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
+	}
+	a.aggregator.Aggregate{{.Name}}(ap)
+}
+
+
+
+type {{.name}}PointBulkAggregator struct {
+	field      string
+	topBottomInfo *pipeline.TopBottomCallInfo
+	aggregator    pipeline.{{.Name}}BulkPointAggregator
+}
+
+func (a *{{.name}}PointBulkAggregator) AggregateBatch(b *models.Batch) {
+	slice := make([]influxql.{{.Name}}Point, len(b.Points))
+	for i, p := range b.Points {
+		slice[i] = influxql.{{.Name}}Point{
+			Name:  b.Name,
+			Tags:  influxql.NewTags(p.Tags),
+			Time:  p.Time.UnixNano(),
+			Value: p.Fields[a.field].({{.Type}}),
+		}
+		if a.topBottomInfo != nil {
+			// We need to populate the Aux fields
+			{{.name}}PopulateAuxFieldsAndTags(&slice[i], a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
+		}
+	}
+	a.aggregator.Aggregate{{.Name}}Bulk(slice)
+}
+
+func (a *{{.name}}PointBulkAggregator) AggregatePoint(p *models.Point) {
+	ap := &influxql.{{.Name}}Point{
+		Name:  p.Name,
+		Tags:  influxql.NewTags(p.Tags),
+		Time:  p.Time.UnixNano(),
+		Value: p.Fields[a.field].({{.Type}}),
+	}
+	if a.topBottomInfo != nil {
+		// We need to populate the Aux fields
+		{{.name}}PopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
+	}
+	a.aggregator.Aggregate{{.Name}}(ap)
+}
+
+type {{.name}}PointEmitter struct {
+	baseReduceContext
+	emitter influxql.{{.Name}}PointEmitter
+}
+
+func (e *{{.name}}PointEmitter) EmitPoint() (models.Point, error) {
+	slice := e.emitter.Emit()
+	if len(slice) != 1 {
+		return models.Point{}, fmt.Errorf("unexpected result from InfluxQL function, got %d points expected 1", len(slice))
+	}
+	ap := slice[0]
+	var t time.Time
+	if e.pointTimes {
+		if ap.Time == influxql.ZeroTime {
+			t = e.time
+		} else {
+			t = time.Unix(0, ap.Time).UTC()
+		}
+	} else {
+		t = e.time
+	}
+	return models.Point{
+		Name:       e.name,
+		Time:       t,
+		Group:      e.group,
+		Dimensions: e.dimensions,
+		Tags:       e.tags,
+		Fields:     map[string]interface{}{e.as: ap.Value},
+	}, nil
+}
+
+func (e *{{.name}}PointEmitter) EmitBatch() models.Batch {
+	slice := e.emitter.Emit()
+	b := models.Batch{
+		Name:   e.name,
+		TMax:   e.time,
+		Group:  e.group,
+		Tags:   e.tags,
+		Points: make([]models.BatchPoint, len(slice)),
+	}
+	var t time.Time
+	for i, ap := range slice {
+		if e.pointTimes {
+			if ap.Time == influxql.ZeroTime {
+				t = e.time
+			} else {
+				t = time.Unix(0, ap.Time).UTC()
+			}
+		} else {
+			t = e.time
+		}
+		b.Points[i] = models.BatchPoint{
+			Time:   t,
+			Tags:   ap.Tags.KeyValues(),
+			Fields: map[string]interface{}{e.as: ap.Value},
+		}
+	}
+	return b
+}
+
+{{end}}
+
+{{/* Define composite types for reduceContext */}}
+{{with $types := .}}
+{{range $a := $types}}
+{{range $e := $types}}
+
+// {{$a.name}}{{if ne $a.Name $e.Name}}{{$e.Name}}{{end}}ReduceContext uses composition to implement the reduceContext interface
+type {{$a.name}}{{if ne $a.Name $e.Name}}{{$e.Name}}{{end}}ReduceContext struct {
+    {{$a.name}}PointAggregator
+    {{$e.name}}PointEmitter
+}
+
+// {{$a.name}}Bulk{{if ne $a.Name $e.Name}}{{$e.Name}}{{end}}ReduceContext uses composition to implement the reduceContext interface
+type {{$a.name}}Bulk{{if ne $a.Name $e.Name}}{{$e.Name}}{{end}}ReduceContext struct {
+    {{$a.name}}PointBulkAggregator
+    {{$e.name}}PointEmitter
+}
+{{end}}{{end}}
+
+
+{{/* Define switch cases for reduceContext contruction */}}
+
+func determineReduceContextCreateFn(method string, value interface{}, rc pipeline.ReduceCreater)  (fn createReduceContextFunc, err error) {
+	switch value.(type) {
+{{range $a := $types}}
+	case {{.Type}}:
+		switch {
+{{range $e := $types}}
+		case rc.Create{{$a.Name}}{{if ne $a.Name $e.Name}}{{$e.Name}}{{end}}Reducer != nil:
+			 fn = func(c baseReduceContext) reduceContext {
+				a, e := rc.Create{{$a.Name}}{{if ne $a.Name $e.Name}}{{$e.Name}}{{end}}Reducer()
+				return &{{$a.name}}{{if ne $a.Name $e.Name}}{{$e.Name}}{{end}}ReduceContext{
+					{{$a.name}}PointAggregator: {{$a.name}}PointAggregator{
+						field:      c.field,
+						topBottomInfo: rc.TopBottomCallInfo,
+						aggregator: a,
+					},
+					{{$e.name}}PointEmitter: {{$e.name}}PointEmitter{
+						baseReduceContext: c,
+						emitter:           e,
+					},
+				}
+			}
+		case rc.Create{{$a.Name}}Bulk{{if ne $a.Name $e.Name}}{{$e.Name}}{{end}}Reducer != nil:
+			 fn = func(c baseReduceContext) reduceContext {
+				a, e := rc.Create{{$a.Name}}Bulk{{if ne $a.Name $e.Name}}{{$e.Name}}{{end}}Reducer()
+				return &{{$a.name}}Bulk{{if ne $a.Name $e.Name}}{{$e.Name}}{{end}}ReduceContext{
+					{{$a.name}}PointBulkAggregator: {{$a.name}}PointBulkAggregator{
+						field:      c.field,
+						topBottomInfo: rc.TopBottomCallInfo,
+						aggregator: a,
+					},
+					{{$e.name}}PointEmitter: {{$e.name}}PointEmitter{
+						baseReduceContext: c,
+						emitter:           e,
+					},
+				}
+			}
+{{end}}
+		default:
+			err = fmt.Errorf("cannot apply %s to {{$a.Type}} field", method)
+		}
+{{end}}
+	default:
+		err = fmt.Errorf("invalid field type: %T", value)
+	}
+	return
+}
+{{end}}

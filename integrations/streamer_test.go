@@ -1333,7 +1333,7 @@ cpu.union(mem, disk)
 	testStreamerWithOutput(t, "TestStream_Union", script, 15*time.Second, er, nil, false)
 }
 
-func TestStream_Aggregations(t *testing.T) {
+func TestStream_InfluxQL(t *testing.T) {
 
 	type testCase struct {
 		Method        string
@@ -1349,14 +1349,26 @@ stream
 	.window()
 		.period(10s)
 		.every(10s)
-	.mapReduce({{ .Method }}({{ .Args }}))
+	.mapReduce(influxql.{{ .Method }}({{ .Args }}))
 		{{ if .UsePointTimes }}.usePointTimes(){{ end }}
-	.httpOut('TestStream_Aggregations')
+	.httpOut('TestStream_InfluxQL')
+`
+
+	var newScriptTmpl = `
+stream
+	.from().measurement('cpu')
+	.where(lambda: "host" == 'serverA')
+	.window()
+		.period(10s)
+		.every(10s)
+	.{{ .Method }}({{ .Args }})
+		{{ if .UsePointTimes }}.usePointTimes(){{ end }}
+	.httpOut('TestStream_InfluxQL')
 `
 	endTime := time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC)
 	testCases := []testCase{
 		testCase{
-			Method: "influxql.sum",
+			Method: "sum",
 			ER: kapacitor.Result{
 				Series: imodels.Rows{
 					{
@@ -1372,7 +1384,7 @@ stream
 			},
 		},
 		testCase{
-			Method: "influxql.count",
+			Method: "count",
 			ER: kapacitor.Result{
 				Series: imodels.Rows{
 					{
@@ -1388,7 +1400,7 @@ stream
 			},
 		},
 		testCase{
-			Method: "influxql.distinct",
+			Method: "distinct",
 			ER: kapacitor.Result{
 				Series: imodels.Rows{
 					{
@@ -1398,15 +1410,11 @@ stream
 						Values: [][]interface{}{
 							{
 								endTime,
+								98.0,
+							},
+							{
+								endTime,
 								91.0,
-							},
-							{
-								endTime,
-								92.0,
-							},
-							{
-								endTime,
-								93.0,
 							},
 							{
 								endTime,
@@ -1414,11 +1422,15 @@ stream
 							},
 							{
 								endTime,
-								96.0,
+								93.0,
 							},
 							{
 								endTime,
-								98.0,
+								92.0,
+							},
+							{
+								endTime,
+								96.0,
 							},
 						},
 					},
@@ -1426,7 +1438,7 @@ stream
 			},
 		},
 		testCase{
-			Method: "influxql.mean",
+			Method: "mean",
 			ER: kapacitor.Result{
 				Series: imodels.Rows{
 					{
@@ -1442,7 +1454,7 @@ stream
 			},
 		},
 		testCase{
-			Method: "influxql.median",
+			Method: "median",
 			ER: kapacitor.Result{
 				Series: imodels.Rows{
 					{
@@ -1458,7 +1470,7 @@ stream
 			},
 		},
 		testCase{
-			Method:        "influxql.min",
+			Method:        "min",
 			UsePointTimes: true,
 			ER: kapacitor.Result{
 				Series: imodels.Rows{
@@ -1475,7 +1487,7 @@ stream
 			},
 		},
 		testCase{
-			Method: "influxql.min",
+			Method: "min",
 			ER: kapacitor.Result{
 				Series: imodels.Rows{
 					{
@@ -1491,7 +1503,7 @@ stream
 			},
 		},
 		testCase{
-			Method:        "influxql.max",
+			Method:        "max",
 			UsePointTimes: true,
 			ER: kapacitor.Result{
 				Series: imodels.Rows{
@@ -1508,7 +1520,7 @@ stream
 			},
 		},
 		testCase{
-			Method: "influxql.max",
+			Method: "max",
 			ER: kapacitor.Result{
 				Series: imodels.Rows{
 					{
@@ -1524,7 +1536,7 @@ stream
 			},
 		},
 		testCase{
-			Method: "influxql.spread",
+			Method: "spread",
 			ER: kapacitor.Result{
 				Series: imodels.Rows{
 					{
@@ -1540,7 +1552,7 @@ stream
 			},
 		},
 		testCase{
-			Method: "influxql.stddev",
+			Method: "stddev",
 			ER: kapacitor.Result{
 				Series: imodels.Rows{
 					{
@@ -1556,7 +1568,7 @@ stream
 			},
 		},
 		testCase{
-			Method:        "influxql.first",
+			Method:        "first",
 			UsePointTimes: true,
 			ER: kapacitor.Result{
 				Series: imodels.Rows{
@@ -1573,7 +1585,7 @@ stream
 			},
 		},
 		testCase{
-			Method: "influxql.first",
+			Method: "first",
 			ER: kapacitor.Result{
 				Series: imodels.Rows{
 					{
@@ -1589,7 +1601,7 @@ stream
 			},
 		},
 		testCase{
-			Method:        "influxql.last",
+			Method:        "last",
 			UsePointTimes: true,
 			ER: kapacitor.Result{
 				Series: imodels.Rows{
@@ -1606,7 +1618,7 @@ stream
 			},
 		},
 		testCase{
-			Method: "influxql.last",
+			Method: "last",
 			ER: kapacitor.Result{
 				Series: imodels.Rows{
 					{
@@ -1622,7 +1634,7 @@ stream
 			},
 		},
 		testCase{
-			Method: "influxql.percentile",
+			Method: "percentile",
 			Args:   "'value', 50.0",
 			ER: kapacitor.Result{
 				Series: imodels.Rows{
@@ -1639,7 +1651,7 @@ stream
 			},
 		},
 		testCase{
-			Method:        "influxql.top",
+			Method:        "top",
 			UsePointTimes: true,
 			Args:          "2, 'value'",
 			ER: kapacitor.Result{
@@ -1667,7 +1679,7 @@ stream
 			},
 		},
 		testCase{
-			Method: "influxql.top",
+			Method: "top",
 			Args:   "2, 'value'",
 			ER: kapacitor.Result{
 				Series: imodels.Rows{
@@ -1694,7 +1706,7 @@ stream
 			},
 		},
 		testCase{
-			Method:        "influxql.bottom",
+			Method:        "bottom",
 			UsePointTimes: true,
 			Args:          "3, 'value'",
 			ER: kapacitor.Result{
@@ -1728,7 +1740,7 @@ stream
 			},
 		},
 		testCase{
-			Method: "influxql.bottom",
+			Method: "bottom",
 			Args:   "3, 'value'",
 			ER: kapacitor.Result{
 				Series: imodels.Rows{
@@ -1767,22 +1779,35 @@ stream
 		t.Fatal(err)
 	}
 
+	newTmpl, err := template.New("script").Parse(newScriptTmpl)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tmpls := []*template.Template{tmpl, newTmpl}
+
 	for _, tc := range testCases {
-		t.Log("Method:", tc.Method)
-		var script bytes.Buffer
-		if tc.Args == "" {
-			tc.Args = "'value'"
+		for i, tmpl := range tmpls {
+			if tc.Method == "distinct" && i == 0 {
+				// Skip legacy test for new behavior
+				continue
+			}
+			t.Log("Method:", tc.Method, i)
+			var script bytes.Buffer
+			if tc.Args == "" {
+				tc.Args = "'value'"
+			}
+			tmpl.Execute(&script, tc)
+			testStreamerWithOutput(
+				t,
+				"TestStream_InfluxQL",
+				string(script.Bytes()),
+				13*time.Second,
+				tc.ER,
+				nil,
+				false,
+			)
 		}
-		tmpl.Execute(&script, tc)
-		testStreamerWithOutput(
-			t,
-			"TestStream_Aggregations",
-			string(script.Bytes()),
-			13*time.Second,
-			tc.ER,
-			nil,
-			false,
-		)
 	}
 }
 
@@ -3019,7 +3044,7 @@ var topScores = stream
     .mapReduce(influxql.last('value'))
     // Calculate the top 5 scores per game
     .groupBy('game')
-    .mapReduce(influxql.top(5, 'last', 'player'))
+    .top(5, 'last', 'player')
 
 topScores
     .httpOut('top_scores')

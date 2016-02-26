@@ -78,22 +78,22 @@ func (influxqlMapReducers) Percentile(field string, p float64) pipeline.MapReduc
 	return mr(field, "percentile", pipeline.StreamEdge, tsdb.MapEcho, r)
 }
 
-func (influxqlMapReducers) Top(limit int64, field string, fieldsOrTags ...string) pipeline.MapReduceInfo {
+func (influxqlMapReducers) Top(limit int64, field string, fieldsAndTags ...string) pipeline.MapReduceInfo {
 	m := func(in *tsdb.MapInput) interface{} {
-		return tsdb.MapTopBottom(in, int(limit), fieldsOrTags, len(fieldsOrTags)+2, "top")
+		return tsdb.MapTopBottom(in, int(limit), fieldsAndTags, len(fieldsAndTags)+2, "top")
 	}
 	r := func(values []interface{}) interface{} {
-		return tsdb.ReduceTopBottom(values, int(limit), fieldsOrTags, "top")
+		return tsdb.ReduceTopBottom(values, int(limit), fieldsAndTags, "top")
 	}
 	return mr(field, "top", pipeline.BatchEdge, m, r)
 }
 
-func (influxqlMapReducers) Bottom(limit int64, field string, fieldsOrTags ...string) pipeline.MapReduceInfo {
+func (influxqlMapReducers) Bottom(limit int64, field string, fieldsAndTags ...string) pipeline.MapReduceInfo {
 	m := func(in *tsdb.MapInput) interface{} {
-		return tsdb.MapTopBottom(in, int(limit), fieldsOrTags, len(fieldsOrTags)+2, "bottom")
+		return tsdb.MapTopBottom(in, int(limit), fieldsAndTags, len(fieldsAndTags)+2, "bottom")
 	}
 	r := func(values []interface{}) interface{} {
-		return tsdb.ReduceTopBottom(values, int(limit), fieldsOrTags, "bottom")
+		return tsdb.ReduceTopBottom(values, int(limit), fieldsAndTags, "bottom")
 	}
 	return mr(field, "bottom", pipeline.BatchEdge, m, r)
 }

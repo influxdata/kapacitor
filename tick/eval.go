@@ -303,7 +303,7 @@ func NewReflectionDescriber(obj interface{}) *ReflectionDescriber {
 }
 
 func (r *ReflectionDescriber) Desc() string {
-	return reflect.TypeOf(r.obj).Name()
+	return fmt.Sprintf("%T", r.obj)
 }
 
 // Using reflection check if the object has the method or field.

@@ -1,0 +1,17 @@
+[
+	{
+		"Name":"Float",
+		"name":"float",
+		"Type":"float64",
+		"Nil":"0",
+		"Zero":"float64(0)"
+	},
+	{
+		"Name":"Integer",
+		"name":"integer",
+		"Type":"int64",
+		"Nil":"0",
+		"Zero":"int64(0)"
+	}
+]
+
