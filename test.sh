@@ -129,24 +129,24 @@ fi
 case $ENVIRONMENT_INDEX in
     0)
         # 64 bit tests
-        run_test_docker Dockerfile_build_ubuntu64 test_64bit --test --generate --no-stash
+        run_test_docker Dockerfile_build_ubuntu64 test_64bit --debug --test --generate --no-stash
         rc=$?
         ;;
     1)
         # 64 bit race tests
         GORACE="halt_on_error=1"
-        run_test_docker Dockerfile_build_ubuntu64 test_64bit_race --test --generate --no-stash --race
+        run_test_docker Dockerfile_build_ubuntu64 test_64bit_race --debug --test --generate --no-stash --race
         rc=$?
         ;;
     2)
         # 32 bit tests
-        run_test_docker Dockerfile_build_ubuntu32 test_32bit --test --generate --no-stash
+        run_test_docker Dockerfile_build_ubuntu32 test_32bit --debug --test --generate --no-stash
         rc=$?
         ;;
     3)
         # 64 bit tests on golang go1.6
         GO_CHECKOUT=go1.6rc2
-        run_test_docker Dockerfile_build_ubuntu64_git test_64bit_go1.6 --test --generate --no-stash
+        run_test_docker Dockerfile_build_ubuntu64_git test_64bit_go1.6 --debug --test --generate --no-stash
         rc=$?
         ;;
     "save")

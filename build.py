@@ -119,13 +119,8 @@ def package_scripts(build_root):
 def run_generate():
     print "Running generate..."
     run("go get github.com/gogo/protobuf/protoc-gen-gogo")
-    command = "go generate ./..."
-    code = os.system(command)
-    if code != 0:
-        print "Generate Failed"
-        return False
-    else:
-        print "Generate Succeeded"
+    run("go generate ./...")
+    print "Generate succeeded."
     return True
 
 def go_get(branch, update=False, no_stash=False):
@@ -180,6 +175,8 @@ def run(command, allow_failure=False, shell=False):
             out = subprocess.check_output(command, stderr=subprocess.STDOUT, shell=shell)
         else:
             out = subprocess.check_output(command.split(), stderr=subprocess.STDOUT)
+        if debug:
+            print "[DEBUG] command output: \n{}\n".format(out)
     except subprocess.CalledProcessError as e:
         print ""
         print ""
@@ -346,14 +343,9 @@ def upload_packages(packages, bucket_name=None, nightly=False):
     return 0
 
 def run_tests(race, parallel, timeout, no_vet):
-    print "Retrieving Go dependencies...",
-    get_command = "go get -d -t ./..."
+    print "Downloading vet tool..."
     sys.stdout.flush()
-    run(get_command)
-    get_command = "go get golang.org/x/tools/cmd/vet"
-    sys.stdout.flush()
-    run(get_command)
-    print "done."
+    run("go get golang.org/x/tools/cmd/vet")
     print "Running tests:"
     print "\tRace: ", race
     if parallel is not None:
@@ -797,7 +789,8 @@ def main():
             return 1
 
     if run_get:
-        go_get(branch, update=update, no_stash=no_stash)
+        if not go_get(branch, update=update, no_stash=no_stash):
+            return 1
 
     if test:
         if not run_tests(race, parallel, timeout, no_vet):
