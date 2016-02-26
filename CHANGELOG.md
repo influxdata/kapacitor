@@ -12,7 +12,6 @@ These stats are also available in the DOT output of the Kapacitor show command.
 Significant performance improvements have also been added.
 In some cases Kapacitor throughput has improved by 4X.
 
-
 Various improvements to joining features have been implemented.
 With #144 you can now join streams with differing group by dimensions.
 
@@ -34,6 +33,7 @@ With #144 you can now join streams with differing group by dimensions.
 - [#231](https://github.com/influxdata/kapacitor/issues/231): Fix window logic when there were gaps in the data stream longer than window every value.
 - [#213](https://github.com/influxdata/kapacitor/issues/231): Add SourceStreamNode so that yuou must always first call `.from` on the `stream` object before filtering it, so as to not create confusing to understand TICKscripts.
 - [#255](https://github.com/influxdata/kapacitor/issues/255): Add OPTIONS handler for task delete method so it can be preflighted.
+- [#258](https://github.com/influxdata/kapacitor/issues/258): Fix UDP internal metrics, change subscriptions to use clusterID.
 
 ## v0.10.1 [2016-02-08]
 

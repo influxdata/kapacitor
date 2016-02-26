@@ -2,13 +2,13 @@ package udp
 
 import (
 	"errors"
-	"expvar"
 	"log"
 	"net"
 	"strings"
 	"sync"
 
-	"github.com/influxdb/influxdb"
+	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdb/influxdb/cluster"
 	"github.com/influxdb/influxdb/models"
 )
@@ -47,6 +47,7 @@ type Service struct {
 
 	Logger  *log.Logger
 	statMap *expvar.Map
+	statKey string
 }
 
 func NewService(c Config, l *log.Logger) *Service {
@@ -59,11 +60,6 @@ func NewService(c Config, l *log.Logger) *Service {
 }
 
 func (s *Service) Open() (err error) {
-	// Configure expvar monitoring. It's OK to do this even if the service fails to open and
-	// should be done before any data could arrive for the service.
-	key := strings.Join([]string{"udp", s.config.BindAddress}, ":")
-	tags := map[string]string{"bind": s.config.BindAddress}
-	s.statMap = influxdb.NewStatistics(key, "udp", tags)
 
 	if s.config.BindAddress == "" {
 		return errors.New("bind address has to be specified in config")
@@ -84,6 +80,14 @@ func (s *Service) Open() (err error) {
 		return err
 	}
 
+	//save fully resolved and bound addr. Useful if port given was '0'.
+	s.addr = s.conn.LocalAddr().(*net.UDPAddr)
+
+	// Configure expvar monitoring. It's OK to do this even if the service fails to open and
+	// should be done before any data could arrive for the service.
+	tags := map[string]string{"bind": s.addr.String()}
+	s.statKey, s.statMap = kapacitor.NewStatistics("udp", tags)
+
 	if s.config.ReadBuffer != 0 {
 		err = s.conn.SetReadBuffer(s.config.ReadBuffer)
 		if err != nil {
@@ -91,9 +95,6 @@ func (s *Service) Open() (err error) {
 			return err
 		}
 	}
-
-	//save fully resolved and bound addr. Useful if port given was '0'.
-	s.addr = s.conn.LocalAddr().(*net.UDPAddr)
 
 	s.Logger.Printf("I! Started listening on UDP: %s", s.addr.String())
 
@@ -168,6 +169,7 @@ func (s *Service) Close() error {
 	if s.conn == nil {
 		return errors.New("Service already closed")
 	}
+	kapacitor.DeleteStatistics(s.statKey)
 
 	close(s.done)
 	s.conn.Close()
@@ -183,6 +185,6 @@ func (s *Service) Close() error {
 	return nil
 }
 
-func (s *Service) Addr() net.Addr {
+func (s *Service) Addr() *net.UDPAddr {
 	return s.addr
 }

@@ -1,6 +1,7 @@
 package influxdb
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"net"
@@ -16,7 +17,7 @@ import (
 )
 
 const (
-	// The name to give to all subscriptions
+	// Legacy name given to all subscriptions.
 	subName = "kapacitor"
 )
 
@@ -31,6 +32,8 @@ type Service struct {
 	udpBuffer      int
 	udpReadBuffer  int
 	startupTimeout time.Duration
+
+	clusterID string
 
 	PointsWriter interface {
 		WritePoints(p *cluster.WritePointsRequest) error
@@ -57,6 +60,7 @@ type subInfo struct {
 }
 
 func NewService(c Config, hostname string, l *log.Logger) *Service {
+	clusterID := kapacitor.ClusterIDVar.StringValue()
 	configs := make([]client.HTTPConfig, len(c.URLs))
 	for i, u := range c.URLs {
 		configs[i] = client.HTTPConfig{
@@ -70,14 +74,14 @@ func NewService(c Config, hostname string, l *log.Logger) *Service {
 	subs := make(map[subEntry]bool, len(c.Subscriptions))
 	for db, rps := range c.Subscriptions {
 		for _, rp := range rps {
-			se := subEntry{db, rp, subName}
+			se := subEntry{db, rp, clusterID}
 			subs[se] = true
 		}
 	}
 	exSubs := make(map[subEntry]bool, len(c.ExcludedSubscriptions))
 	for db, rps := range c.ExcludedSubscriptions {
 		for _, rp := range rps {
-			se := subEntry{db, rp, subName}
+			se := subEntry{db, rp, clusterID}
 			exSubs[se] = true
 		}
 	}
@@ -90,6 +94,7 @@ func NewService(c Config, hostname string, l *log.Logger) *Service {
 		udpBuffer:      c.UDPBuffer,
 		udpReadBuffer:  c.UDPReadBuffer,
 		startupTimeout: time.Duration(c.StartUpTimeout),
+		clusterID:      clusterID,
 	}
 }
 
@@ -179,7 +184,7 @@ func (s *Service) linkSubscriptions() error {
 					se := subEntry{
 						db:   dbname,
 						rp:   rpname,
-						name: subName,
+						name: s.clusterID,
 					}
 					allSubs = append(allSubs, se)
 				}
@@ -216,9 +221,23 @@ func (s *Service) linkSubscriptions() error {
 							si.Destinations[i] = destinations[i].(string)
 						}
 					}
-					if se.name == subName {
-						existingSubs[se] = si
+				}
+				if se.name == subName {
+					// This is an old-style subscription,
+					// drop it and recreate with new name.
+					err := s.dropSub(cli, se.name, se.db, se.rp)
+					if err != nil {
+						return err
 					}
+					se.name = s.clusterID
+					err = s.createSub(cli, se.name, se.db, se.rp, si.Mode, si.Destinations)
+					if err != nil {
+						return err
+					}
+					existingSubs[se] = si
+				}
+				if se.name == s.clusterID {
+					existingSubs[se] = si
 				}
 			}
 		}
@@ -265,19 +284,9 @@ func (s *Service) linkSubscriptions() error {
 			}
 
 			// Get port from addr
-			parts := strings.Split(addr.String(), ":")
-			port := parts[len(parts)-1]
-			destination := "udp://" + s.hostname + ":" + port
+			destination := fmt.Sprintf("udp://%s:%d", s.hostname, addr.Port)
 
-			_, err = s.execQuery(
-				cli,
-				fmt.Sprintf(`CREATE SUBSCRIPTION "%s" ON "%s"."%s" DESTINATIONS ANY '%s'`,
-					se.name,
-					se.db,
-					se.rp,
-					destination,
-				),
-			)
+			err = s.createSub(cli, se.name, se.db, se.rp, "ANY", []string{destination})
 			if err != nil {
 				return err
 			}
@@ -288,7 +297,43 @@ func (s *Service) linkSubscriptions() error {
 	return nil
 }
 
-func (s *Service) startListener(db, rp string, u url.URL) (net.Addr, error) {
+func (s *Service) createSub(cli client.Client, name, db, rp, mode string, destinations []string) (err error) {
+	var buf bytes.Buffer
+	for i, dst := range destinations {
+		if i != 0 {
+			buf.Write([]byte(", "))
+		}
+		buf.Write([]byte("'"))
+		buf.Write([]byte(dst))
+		buf.Write([]byte("'"))
+	}
+	q := fmt.Sprintf(`CREATE SUBSCRIPTION "%s" ON "%s"."%s" DESTINATIONS %s %s`,
+		name,
+		db,
+		rp,
+		strings.ToUpper(mode),
+		buf.String(),
+	)
+	_, err = s.execQuery(
+		cli,
+		q,
+	)
+	return
+
+}
+func (s *Service) dropSub(cli client.Client, name, db, rp string) (err error) {
+	_, err = s.execQuery(
+		cli,
+		fmt.Sprintf(`DROP SUBSCRIPTION "%s" ON "%s"."%s"`,
+			name,
+			db,
+			rp,
+		),
+	)
+	return
+}
+
+func (s *Service) startListener(db, rp string, u url.URL) (*net.UDPAddr, error) {
 	switch u.Scheme {
 	case "udp":
 		c := udp.Config{}
