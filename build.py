@@ -797,7 +797,7 @@ def main():
             return 1
 
     if run_get:
-        go_get(branch, update=update)
+        go_get(branch, update=update, no_stash=no_stash)
 
     if test:
         if not run_tests(race, parallel, timeout, no_vet):
