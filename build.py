@@ -636,7 +636,7 @@ def print_usage():
     print "\t --update \n\t\t- Whether dependencies should be updated prior to building."
     print "\t --test \n\t\t- Run Go tests. Will not produce a build."
     print "\t --parallel \n\t\t- Run Go tests in parallel up to the count specified."
-    print "\t --generate \n\t\t- Run `go generate` to rebuild admin UI static filesystem."
+    print "\t --generate \n\t\t- Run `go generate`."
     print "\t --timeout \n\t\t- Timeout for Go tests. Defaults to 480s."
     print "\t --clean \n\t\t- Clean the build output directory prior to creating build."
     print "\t --no-get \n\t\t- Do not run `go get` before building."
