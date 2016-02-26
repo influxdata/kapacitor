@@ -103,6 +103,19 @@ func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*
 	}
 	s.Logger.Println("I! Kapacitor hostname:", s.hostname)
 
+	// Setup IDs
+	err = s.setupIDs()
+	if err != nil {
+		return nil, err
+	}
+	// Set published vars
+	kapacitor.ClusterIDVar.Set(s.ClusterID)
+	kapacitor.ServerIDVar.Set(s.ServerID)
+	kapacitor.HostVar.Set(s.hostname)
+	kapacitor.ProductVar.Set(kapacitor.Product)
+	kapacitor.VersionVar.Set(s.buildInfo.Version)
+	s.Logger.Printf("I! ClusterID: %s ServerID: %s", s.ClusterID, s.ServerID)
+
 	// Start Task Master
 	s.TaskMaster = kapacitor.NewTaskMaster(logService)
 	if err := s.TaskMaster.Open(); err != nil {
@@ -385,19 +398,6 @@ func (s *Server) Err() <-chan error { return s.err }
 // Open opens all the services.
 func (s *Server) Open() error {
 	if err := func() error {
-		// Setup IDs
-		err := s.setupIDs()
-		if err != nil {
-			return err
-		}
-
-		// Set published vars
-		kapacitor.ClusterIDVar.Set(s.ClusterID)
-		kapacitor.ServerIDVar.Set(s.ServerID)
-		kapacitor.HostVar.Set(s.hostname)
-		kapacitor.ProductVar.Set(kapacitor.Product)
-		kapacitor.VersionVar.Set(s.buildInfo.Version)
-		s.Logger.Printf("I! ClusterID: %s ServerID: %s", s.ClusterID, s.ServerID)
 
 		// Start profiling, if set.
 		s.startProfile(s.CPUProfile, s.MemProfile)
