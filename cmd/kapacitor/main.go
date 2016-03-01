@@ -215,9 +215,10 @@ var (
 	recordFlags = flag.NewFlagSet("record", flag.ExitOnError)
 	rname       = recordFlags.String("name", "", "the name of a task. If recording a batch or stream")
 
-	rstart = recordFlags.String("start", "", "the start time for the set of queries when recording a batch.")
-	rstop  = recordFlags.String("stop", "", "the stop time for the set of queries when recording a batch. (default now)")
-	rpast  = recordFlags.String("past", "", "set start time via 'now - past'.")
+	rstart   = recordFlags.String("start", "", "the start time for the set of queries when recording a batch.")
+	rstop    = recordFlags.String("stop", "", "the stop time for the set of queries when recording a batch. (default now)")
+	rpast    = recordFlags.String("past", "", "set start time via 'now - past'.")
+	rcluster = recordFlags.String("cluster", "", "optional named InfluxDB cluster when recording query or a batch.")
 
 	rquery = recordFlags.String("query", "", "the query to record. If recording a query.")
 	rtype  = recordFlags.String("type", "", "the type of the recording to save (stream|batch). If recording a query.")
@@ -281,9 +282,11 @@ func doRecord(args []string) error {
 		v.Add("start", *rstart)
 		v.Add("stop", *rstop)
 		v.Add("past", *rpast)
+		v.Add("cluster", *rcluster)
 	case "query":
 		v.Add("query", *rquery)
 		v.Add("ttype", *rtype)
+		v.Add("cluster", *rcluster)
 	default:
 		return fmt.Errorf("Unknown record type %q, expected 'stream' or 'query'", args[0])
 	}

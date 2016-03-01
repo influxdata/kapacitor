@@ -42,7 +42,8 @@ type Service struct {
 		DelRoutes([]httpd.Route)
 	}
 	InfluxDBService interface {
-		NewClient() (client.Client, error)
+		NewDefaultClient() (client.Client, error)
+		NewNamedClient(name string) (client.Client, error)
 	}
 	TaskMaster interface {
 		NewFork(name string, dbrps []kapacitor.DBRP) (*kapacitor.Edge, error)
@@ -316,6 +317,9 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
+		// Get InfluxDB cluster
+		cluster := req.URL.Query().Get("cluster")
+
 		t, err := r.TaskStore.Load(task)
 		if err != nil {
 			httpd.HttpError(w, err.Error(), true, http.StatusNotFound)
@@ -324,7 +328,7 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 
 		doF = func() error {
 			close(started)
-			return r.doRecordBatch(rid, t, start, stop)
+			return r.doRecordBatch(rid, t, start, stop, cluster)
 		}
 	case "query":
 		query := req.URL.Query().Get("query")
@@ -344,9 +348,11 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 			httpd.HttpError(w, fmt.Sprintf("invalid type %q", typeStr), true, http.StatusBadRequest)
 			return
 		}
+		// Get InfluxDB cluster
+		cluster := req.URL.Query().Get("cluster")
 		doF = func() error {
 			close(started)
-			return r.doRecordQuery(rid, query, tt)
+			return r.doRecordQuery(rid, query, tt, cluster)
 		}
 	default:
 		httpd.HttpError(w, "invalid recording type", true, http.StatusBadRequest)
@@ -668,7 +674,7 @@ func (b batchArchive) Close() error {
 }
 
 // Record a series of batch queries defined by a batch task
-func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, start, stop time.Time) error {
+func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, start, stop time.Time, cluster string) error {
 	et, err := kapacitor.NewExecutingTask(r.TaskMaster.New(), t)
 	if err != nil {
 		return err
@@ -682,7 +688,13 @@ func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, start, stop ti
 	if r.InfluxDBService == nil {
 		return errors.New("InfluxDB not configured, cannot record batch query")
 	}
-	con, err := r.InfluxDBService.NewClient()
+
+	var con client.Client
+	if cluster != "" {
+		con, err = r.InfluxDBService.NewNamedClient(cluster)
+	} else {
+		con, err = r.InfluxDBService.NewDefaultClient()
+	}
 	if err != nil {
 		return err
 	}
@@ -722,7 +734,7 @@ func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, start, stop ti
 	return archive.Close()
 }
 
-func (r *Service) doRecordQuery(rid uuid.UUID, q string, tt kapacitor.TaskType) error {
+func (r *Service) doRecordQuery(rid uuid.UUID, q string, tt kapacitor.TaskType, cluster string) error {
 	// Parse query to determine dbrp
 	var db, rp string
 	s, err := influxql.ParseStatement(q)
@@ -742,7 +754,12 @@ func (r *Service) doRecordQuery(rid uuid.UUID, q string, tt kapacitor.TaskType) 
 		return errors.New("InfluxDB not configured, cannot record query")
 	}
 	// Query InfluxDB
-	con, err := r.InfluxDBService.NewClient()
+	var con client.Client
+	if cluster != "" {
+		con, err = r.InfluxDBService.NewNamedClient(cluster)
+	} else {
+		con, err = r.InfluxDBService.NewDefaultClient()
+	}
 	if err != nil {
 		return err
 	}

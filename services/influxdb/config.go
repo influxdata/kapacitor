@@ -1,6 +1,7 @@
 package influxdb
 
 import (
+	"errors"
 	"net/url"
 	"time"
 
@@ -16,6 +17,8 @@ const (
 
 type Config struct {
 	Enabled               bool                `toml:"enabled"`
+	Name                  string              `toml:"name"`
+	Default               bool                `toml:"default"`
 	URLs                  []string            `toml:"urls"`
 	Username              string              `toml:"username"`
 	Password              string              `toml:"password"`
@@ -29,8 +32,10 @@ type Config struct {
 
 func NewConfig() Config {
 	return Config{
-		Enabled:       true,
-		URLs:          []string{"http://localhost:8086"},
+		Enabled: true,
+		// Cannot initialize slice
+		// See: https://github.com/BurntSushi/toml/pull/68
+		//URLs:          []string{"http://localhost:8086"},
 		Username:      "",
 		Password:      "",
 		Subscriptions: make(map[string][]string),
@@ -43,6 +48,12 @@ func NewConfig() Config {
 }
 
 func (c Config) Validate() error {
+	if c.Name == "" {
+		return errors.New("influxdb cluster must be given a name")
+	}
+	if len(c.URLs) == 0 {
+		return errors.New("must specify at least one InfluxDB URL")
+	}
 	for _, u := range c.URLs {
 		_, err := url.Parse(u)
 		if err != nil {

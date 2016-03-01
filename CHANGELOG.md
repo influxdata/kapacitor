@@ -37,6 +37,28 @@ These stats are also available in the DOT output of the Kapacitor show command.
 Significant performance improvements have also been added.
 In some cases Kapacitor throughput has improved by 4X.
 
+Kapacitor can now connect to different InfluxDB clusters.
+Multiple InfluxDB config sections can be defined and one will be marked as default.
+To upgrade convert an `influxdb` config.
+
+From this:
+
+```
+[influxdb]
+  enabled = true
+  ...
+```
+
+to this:
+
+```
+[[influxdb]]
+  enabled = true
+  default = true
+  name = "localhost"
+  ...
+```
+
 Various improvements to joining features have been implemented.
 With #144 you can now join streams with differing group by dimensions.
 
@@ -50,6 +72,7 @@ With #144 you can now join streams with differing group by dimensions.
 - [#215](https://github.com/influxdata/kapacitor/issues/215): Add performance metrics to nodes for average execution times and node throughput values.
 - [#144](https://github.com/influxdata/kapacitor/issues/144): Can now join streams with differing dimensions using the join.On property.
 - [#249](https://github.com/influxdata/kapacitor/issues/249): Can now use InfluxQL functions directly instead of via the MapReduce method. Example `stream.from().count()`.
+- [#233](https://github.com/influxdata/kapacitor/issues/233): BREAKING: Now you can use multiple InfluxDB clusters. The config changes to make this possible are breaking. See notes above for changes.
 - [#302](https://github.com/influxdata/kapacitor/issues/302): Can now use .Time in alert message.
 
 
@@ -66,6 +89,7 @@ With #144 you can now join streams with differing group by dimensions.
 - [#300](https://github.com/influxdata/kapacitor/issues/300): Add OPTIONS method to /recording endpoint for deletes.
 - [#304](https://github.com/influxdata/kapacitor/issues/304): Fix panic if recording query but do not have an InfluxDB instance configured
 - [#289](https://github.com/influxdata/kapacitor/issues/289): Add better error handling to batch node.
+- [#142](https://github.com/influxdata/kapacitor/issues/142): Fixes bug when defining multiple influxdb hosts.
 
 ## v0.10.1 [2016-02-08]
 

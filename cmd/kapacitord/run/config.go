@@ -1,6 +1,7 @@
 package run
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/user"
@@ -40,7 +41,7 @@ type Config struct {
 	HTTP     httpd.Config      `toml:"http"`
 	Replay   replay.Config     `toml:"replay"`
 	Task     task_store.Config `toml:"task"`
-	InfluxDB influxdb.Config   `toml:"influxdb"`
+	InfluxDB []influxdb.Config `toml:"influxdb"`
 	Logging  logging.Config    `toml:"logging"`
 
 	Graphites []graphite.Config `toml:"graphite"`
@@ -63,6 +64,9 @@ type Config struct {
 
 	Hostname string `toml:"hostname"`
 	DataDir  string `toml:"data_dir"`
+
+	// The index of the default InfluxDB config
+	defaultInfluxDB int
 }
 
 // NewConfig returns an instance of Config with reasonable defaults.
@@ -74,7 +78,6 @@ func NewConfig() *Config {
 	c.HTTP = httpd.NewConfig()
 	c.Replay = replay.NewConfig()
 	c.Task = task_store.NewConfig()
-	c.InfluxDB = influxdb.NewConfig()
 	c.Logging = logging.NewConfig()
 
 	c.Collectd = collectd.NewConfig()
@@ -96,9 +99,25 @@ func NewConfig() *Config {
 	return c
 }
 
+// Once the config has been created and decoded, you can call this method
+// to initialize ARRAY attributes.
+// All ARRAY attributes have to be init after toml decode
+// See: https://github.com/BurntSushi/toml/pull/68
+func (c *Config) PostInit() {
+	if len(c.InfluxDB) == 0 {
+		i := influxdb.NewConfig()
+		c.InfluxDB = []influxdb.Config{i}
+		c.InfluxDB[0].Name = "default"
+		c.InfluxDB[0].URLs = []string{"http://localhost:8086"}
+	} else if len(c.InfluxDB) == 1 && c.InfluxDB[0].Name == "" {
+		c.InfluxDB[0].Name = "default"
+	}
+}
+
 // NewDemoConfig returns the config that runs when no config is specified.
 func NewDemoConfig() (*Config, error) {
 	c := NewConfig()
+	c.PostInit()
 
 	var homeDir string
 	// By default, store meta and data files in current users home directory
@@ -134,9 +153,36 @@ func (c *Config) Validate() error {
 	if err != nil {
 		return err
 	}
-	err = c.InfluxDB.Validate()
-	if err != nil {
-		return err
+	c.defaultInfluxDB = -1
+	names := make(map[string]bool, len(c.InfluxDB))
+	for i := 0; i < len(c.InfluxDB); i++ {
+		config := c.InfluxDB[i]
+		if !config.Enabled {
+			c.InfluxDB = append(c.InfluxDB[0:i], c.InfluxDB[i+1:]...)
+			i--
+			continue
+		}
+		if names[config.Name] {
+			return fmt.Errorf("duplicate name %q for influxdb configs", config.Name)
+		}
+		names[config.Name] = true
+		err = config.Validate()
+		if err != nil {
+			return err
+		}
+		if config.Default {
+			if c.defaultInfluxDB != -1 {
+				return fmt.Errorf("More than one InfluxDB default was specified: %s %s", config.Name, c.InfluxDB[c.defaultInfluxDB].Name)
+			}
+			c.defaultInfluxDB = i
+		}
+	}
+	// Set default if it is the only one
+	if len(c.InfluxDB) == 1 {
+		c.defaultInfluxDB = 0
+	}
+	if len(c.InfluxDB) > 0 && c.defaultInfluxDB == -1 {
+		return errors.New("at least one InfluxDB cluster must be marked as default.")
 	}
 	err = c.UDF.Validate()
 	if err != nil {
