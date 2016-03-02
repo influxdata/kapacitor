@@ -21,6 +21,10 @@ import (
 	imodels "github.com/influxdb/influxdb/models"
 )
 
+const (
+	statsAlertsTriggered = "alerts_triggered"
+)
+
 // The newest state change is weighted 'weightDiff' times more than oldest state change.
 const weightDiff = 1.5
 
@@ -269,6 +273,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 }
 
 func (a *AlertNode) runAlert([]byte) error {
+	a.statMap.Add(statsAlertsTriggered, 0)
 	switch a.Wants() {
 	case pipeline.StreamEdge:
 		for p, ok := a.ins[0].NextPoint(); ok; p, ok = a.ins[0].NextPoint() {
@@ -291,9 +296,7 @@ func (a *AlertNode) runAlert([]byte) error {
 				if err != nil {
 					return err
 				}
-				for _, h := range a.handlers {
-					h(ad)
-				}
+				a.handleAlert(ad)
 			}
 			a.timer.Stop()
 		}
@@ -313,9 +316,7 @@ func (a *AlertNode) runAlert([]byte) error {
 					if err != nil {
 						return err
 					}
-					for _, h := range a.handlers {
-						h(ad)
-					}
+					a.handleAlert(ad)
 					break
 				}
 			}
@@ -330,15 +331,19 @@ func (a *AlertNode) runAlert([]byte) error {
 					if err != nil {
 						return err
 					}
-					for _, h := range a.handlers {
-						h(ad)
-					}
+					a.handleAlert(ad)
 				}
 			}
 			a.timer.Stop()
 		}
 	}
 	return nil
+}
+func (a *AlertNode) handleAlert(ad *AlertData) {
+	a.statMap.Add(statsAlertsTriggered, 1)
+	for _, h := range a.handlers {
+		h(ad)
+	}
 }
 
 func (a *AlertNode) determineLevel(now time.Time, fields models.Fields, tags map[string]string) (level AlertLevel) {
