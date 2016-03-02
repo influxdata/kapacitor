@@ -157,7 +157,10 @@ func (w *writeBuffer) enqueue(bpc client.BatchPointsConfig, points []*client.Poi
 		bpc:    bpc,
 		points: points,
 	}
-	w.queue <- qe
+	select {
+	case w.queue <- qe:
+	case <-w.stopping:
+	}
 }
 
 func (w *writeBuffer) start() {
