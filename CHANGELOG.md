@@ -34,6 +34,7 @@ With #144 you can now join streams with differing group by dimensions.
 - [#213](https://github.com/influxdata/kapacitor/issues/231): Add SourceStreamNode so that yuou must always first call `.from` on the `stream` object before filtering it, so as to not create confusing to understand TICKscripts.
 - [#255](https://github.com/influxdata/kapacitor/issues/255): Add OPTIONS handler for task delete method so it can be preflighted.
 - [#258](https://github.com/influxdata/kapacitor/issues/258): Fix UDP internal metrics, change subscriptions to use clusterID.
+- [#240](https://github.com/influxdata/kapacitor/issues/240): BREAKING: Fix issues with Sensu integration. The breaking change is that the config no longer takes a `url` but rather a `host` option since the communication is raw TCP rather HTTP.
 
 ## v0.10.1 [2016-02-08]
 

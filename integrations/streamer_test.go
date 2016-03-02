@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path"
 	"reflect"
+	"sync/atomic"
 	"testing"
 	"text/template"
 	"time"
@@ -1938,7 +1940,7 @@ stream
 
 func TestStream_Alert(t *testing.T) {
 
-	requestCount := 0
+	requestCount := int32(0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ad := kapacitor.AlertData{}
 		dec := json.NewDecoder(r.Body)
@@ -1946,7 +1948,7 @@ func TestStream_Alert(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		requestCount++
+		atomic.AddInt32(&requestCount, 1)
 		expAd := kapacitor.AlertData{
 			ID:      "kapacitor/cpu/serverA",
 			Message: "kapacitor/cpu/serverA is CRITICAL",
@@ -1997,42 +1999,61 @@ stream
 
 	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second)
 
-	if requestCount != 1 {
-		t.Errorf("got %v exp %v", requestCount, 1)
+	if rc := atomic.LoadInt32(&requestCount); rc != 1 {
+		t.Errorf("got %v exp %v", rc, 1)
 	}
 }
 
 func TestStream_AlertSensu(t *testing.T) {
-	requestCount := 0
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestCount++
-		type postData struct {
-			Name   string `json:"name"`
-			Source string `json:"source"`
-			Output string `json:"output"`
-			Status int    `json:"status"`
-		}
-		pd := postData{}
-		dec := json.NewDecoder(r.Body)
-		dec.Decode(&pd)
+	requestCount := int32(0)
+	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	listen, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listen.Close()
+	go func() {
+		for {
+			conn, err := listen.Accept()
+			if err != nil {
+				t.Log(err)
+				return
+			}
+			func() {
+				defer conn.Close()
 
-		if exp := "Kapacitor"; pd.Source != exp {
-			t.Errorf("unexpected source got %s exp %s", pd.Source, exp)
-		}
+				atomic.AddInt32(&requestCount, 1)
+				type postData struct {
+					Name   string `json:"name"`
+					Source string `json:"source"`
+					Output string `json:"output"`
+					Status int    `json:"status"`
+				}
+				pd := postData{}
+				dec := json.NewDecoder(conn)
+				dec.Decode(&pd)
 
-		if exp := "kapacitor/cpu/serverA is CRITICAL"; pd.Output != exp {
-			t.Errorf("unexpected text got %s exp %s", pd.Output, exp)
-		}
+				if exp := "Kapacitor"; pd.Source != exp {
+					t.Errorf("unexpected source got %s exp %s", pd.Source, exp)
+				}
 
-		if exp := "kapacitor/cpu/serverA"; pd.Name != exp {
-			t.Errorf("unexpected text got %s exp %s", pd.Name, exp)
-		}
+				if exp := "kapacitor.cpu.serverA is CRITICAL"; pd.Output != exp {
+					t.Errorf("unexpected text got %s exp %s", pd.Output, exp)
+				}
 
-		if exp := 2; pd.Status != exp {
-			t.Errorf("unexpected status got %v exp %v", pd.Status, exp)
+				if exp := "kapacitor.cpu.serverA"; pd.Name != exp {
+					t.Errorf("unexpected text got %s exp %s", pd.Name, exp)
+				}
+
+				if exp := 2; pd.Status != exp {
+					t.Errorf("unexpected status got %v exp %v", pd.Status, exp)
+				}
+			}()
 		}
-	}))
-	defer ts.Close()
+	}()
 
 	var script = `
 stream
@@ -2044,7 +2065,7 @@ stream
 		.every(10s)
 	.mapReduce(influxql.count('value'))
 	.alert()
-		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.id('kapacitor.{{ .Name }}.{{ index .Tags "host" }}')
 		.info(lambda: "count" > 6.0)
 		.warn(lambda: "count" > 7.0)
 		.crit(lambda: "count" > 8.0)
@@ -2055,25 +2076,25 @@ stream
 	defer tm.Close()
 
 	c := sensu.NewConfig()
-	c.URL = ts.URL
+	c.Addr = listen.Addr().String()
 	c.Source = "Kapacitor"
 	sl := sensu.NewService(c, logService.NewLogger("[test_sensu] ", log.LstdFlags))
 	tm.SensuService = sl
 
-	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
+	err = fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
 	if err != nil {
 		t.Error(err)
 	}
 
-	if requestCount != 1 {
-		t.Errorf("unexpected requestCount got %d exp 1", requestCount)
+	if rc := atomic.LoadInt32(&requestCount); rc != 1 {
+		t.Errorf("unexpected requestCount got %d exp 1", rc)
 	}
 }
 
 func TestStream_AlertSlack(t *testing.T) {
-	requestCount := 0
+	requestCount := int32(0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestCount++
+		atomic.AddInt32(&requestCount, 1)
 		type postData struct {
 			Channel     string `json:"channel"`
 			Username    string `json:"username"`
@@ -2090,11 +2111,11 @@ func TestStream_AlertSlack(t *testing.T) {
 		if exp := "/test/slack/url"; r.URL.String() != exp {
 			t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
 		}
-		if requestCount == 1 {
+		if rc := atomic.LoadInt32(&requestCount); rc == 1 {
 			if exp := "#alerts"; pd.Channel != exp {
 				t.Errorf("unexpected channel got %s exp %s", pd.Channel, exp)
 			}
-		} else if requestCount == 2 {
+		} else if rc := atomic.LoadInt32(&requestCount); rc == 2 {
 			if exp := "@jim"; pd.Channel != exp {
 				t.Errorf("unexpected channel got %s exp %s", pd.Channel, exp)
 			}
@@ -2156,15 +2177,15 @@ stream
 		t.Error(err)
 	}
 
-	if requestCount != 2 {
-		t.Errorf("unexpected requestCount got %d exp 2", requestCount)
+	if rc := atomic.LoadInt32(&requestCount); rc != 2 {
+		t.Errorf("unexpected requestCount got %d exp 2", rc)
 	}
 }
 
 func TestStream_AlertHipChat(t *testing.T) {
-	requestCount := 0
+	requestCount := int32(0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestCount++
+		atomic.AddInt32(&requestCount, 1)
 		type postData struct {
 			From    string `json:"from"`
 			Message string `json:"message"`
@@ -2175,11 +2196,11 @@ func TestStream_AlertHipChat(t *testing.T) {
 		dec := json.NewDecoder(r.Body)
 		dec.Decode(&pd)
 
-		if requestCount == 1 {
+		if rc := atomic.LoadInt32(&requestCount); rc == 1 {
 			if exp := "/1234567/notification?auth_token=testtoken1234567"; r.URL.String() != exp {
 				t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
 			}
-		} else if requestCount == 2 {
+		} else if rc := atomic.LoadInt32(&requestCount); rc == 2 {
 			if exp := "/Test%20Room/notification?auth_token=testtokenTestRoom"; r.URL.String() != exp {
 				t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
 			}
@@ -2236,15 +2257,15 @@ stream
 		t.Error(err)
 	}
 
-	if requestCount != 2 {
-		t.Errorf("unexpected requestCount got %d exp 2", requestCount)
+	if rc := atomic.LoadInt32(&requestCount); rc != 2 {
+		t.Errorf("unexpected requestCount got %d exp 2", rc)
 	}
 }
 
 func TestStream_AlertAlerta(t *testing.T) {
-	requestCount := 0
+	requestCount := int32(0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestCount++
+		atomic.AddInt32(&requestCount, 1)
 		type postData struct {
 			Resource    string   `json:"resource"`
 			Event       string   `json:"event"`
@@ -2259,7 +2280,7 @@ func TestStream_AlertAlerta(t *testing.T) {
 		dec := json.NewDecoder(r.Body)
 		dec.Decode(&pd)
 
-		if requestCount == 1 {
+		if rc := atomic.LoadInt32(&requestCount); rc == 1 {
 			if exp := "/alert?api-key=testtoken1234567"; r.URL.String() != exp {
 				t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
 			}
@@ -2355,15 +2376,15 @@ stream
 		t.Error(err)
 	}
 
-	if requestCount != 2 {
-		t.Errorf("unexpected requestCount got %d exp 2", requestCount)
+	if rc := atomic.LoadInt32(&requestCount); rc != 2 {
+		t.Errorf("unexpected requestCount got %d exp 2", rc)
 	}
 }
 
 func TestStream_AlertOpsGenie(t *testing.T) {
-	requestCount := 0
+	requestCount := int32(0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestCount++
+		atomic.AddInt32(&requestCount, 1)
 
 		type postData struct {
 			ApiKey      string                 `json:"apiKey"`
@@ -2399,7 +2420,7 @@ func TestStream_AlertOpsGenie(t *testing.T) {
 		if pd.Description == nil {
 			t.Error("unexpected description got nil")
 		}
-		if requestCount == 1 {
+		if rc := atomic.LoadInt32(&requestCount); rc == 1 {
 			if exp, l := 2, len(pd.Teams); l != exp {
 				t.Errorf("unexpected teams count got %d exp %d", l, exp)
 			}
@@ -2418,7 +2439,7 @@ func TestStream_AlertOpsGenie(t *testing.T) {
 			if exp := "another_recipient"; pd.Recipients[1] != exp {
 				t.Errorf("unexpected recipients[1] got %s exp %s", pd.Recipients[1], exp)
 			}
-		} else if requestCount == 2 {
+		} else if rc := atomic.LoadInt32(&requestCount); rc == 2 {
 			if exp, l := 1, len(pd.Teams); l != exp {
 				t.Errorf("unexpected teams count got %d exp %d", l, exp)
 			}
@@ -2473,15 +2494,15 @@ stream
 		t.Error(err)
 	}
 
-	if requestCount != 2 {
-		t.Errorf("unexpected requestCount got %d exp 1", requestCount)
+	if rc := atomic.LoadInt32(&requestCount); rc != 2 {
+		t.Errorf("unexpected requestCount got %d exp 1", rc)
 	}
 }
 
 func TestStream_AlertPagerDuty(t *testing.T) {
-	requestCount := 0
+	requestCount := int32(0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestCount++
+		atomic.AddInt32(&requestCount, 1)
 		type postData struct {
 			ServiceKey  string      `json:"service_key"`
 			EventType   string      `json:"event_type"`
@@ -2547,20 +2568,20 @@ stream
 		t.Error(err)
 	}
 
-	if requestCount != 2 {
-		t.Errorf("unexpected requestCount got %d exp 1", requestCount)
+	if rc := atomic.LoadInt32(&requestCount); rc != 2 {
+		t.Errorf("unexpected requestCount got %d exp 1", rc)
 	}
 }
 
 func TestStream_AlertVictorOps(t *testing.T) {
-	requestCount := 0
+	requestCount := int32(0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestCount++
-		if requestCount == 1 {
+		atomic.AddInt32(&requestCount, 1)
+		if rc := atomic.LoadInt32(&requestCount); rc == 1 {
 			if exp, got := "/api_key/test_key", r.URL.String(); got != exp {
 				t.Errorf("unexpected VO url got %s exp %s", got, exp)
 			}
-		} else if requestCount == 2 {
+		} else if rc := atomic.LoadInt32(&requestCount); rc == 2 {
 			if exp, got := "/api_key/test_key2", r.URL.String(); got != exp {
 				t.Errorf("unexpected VO url got %s exp %s", got, exp)
 			}
@@ -2631,15 +2652,15 @@ stream
 		t.Error(err)
 	}
 
-	if requestCount != 2 {
-		t.Errorf("unexpected requestCount got %d exp 1", requestCount)
+	if rc := atomic.LoadInt32(&requestCount); rc != 2 {
+		t.Errorf("unexpected requestCount got %d exp 1", rc)
 	}
 }
 
 func TestStream_AlertTalk(t *testing.T) {
-	requestCount := 0
+	requestCount := int32(0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestCount++
+		atomic.AddInt32(&requestCount, 1)
 		type postData struct {
 			Title      string `json:"title"`
 			Text       string `json:"text"`
@@ -2695,13 +2716,13 @@ stream
 		t.Error(err)
 	}
 
-	if requestCount != 1 {
-		t.Errorf("unexpected requestCount got %d exp 1", requestCount)
+	if rc := atomic.LoadInt32(&requestCount); rc != 1 {
+		t.Errorf("unexpected requestCount got %d exp 1", rc)
 	}
 }
 
 func TestStream_AlertSigma(t *testing.T) {
-	requestCount := 0
+	requestCount := int32(0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ad := kapacitor.AlertData{}
 		dec := json.NewDecoder(r.Body)
@@ -2709,8 +2730,8 @@ func TestStream_AlertSigma(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		requestCount++
-		if requestCount == 1 {
+		atomic.AddInt32(&requestCount, 1)
+		if rc := atomic.LoadInt32(&requestCount); rc == 1 {
 			expAd := kapacitor.AlertData{
 				ID:      "cpu:nil",
 				Message: "cpu:nil is INFO",
@@ -2781,14 +2802,14 @@ stream
 
 	testStreamerNoOutput(t, "TestStream_AlertSigma", script, 13*time.Second)
 
-	if requestCount != 2 {
-		t.Errorf("got %v exp %v", requestCount, 2)
+	if rc := atomic.LoadInt32(&requestCount); rc != 2 {
+		t.Errorf("got %v exp %v", rc, 2)
 	}
 }
 
 func TestStream_AlertComplexWhere(t *testing.T) {
 
-	requestCount := 0
+	requestCount := int32(0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ad := kapacitor.AlertData{}
 		dec := json.NewDecoder(r.Body)
@@ -2796,7 +2817,7 @@ func TestStream_AlertComplexWhere(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		requestCount++
+		atomic.AddInt32(&requestCount, 1)
 		expAd := kapacitor.AlertData{
 			ID:      "cpu:nil",
 			Message: "cpu:nil is CRITICAL",
@@ -2835,16 +2856,16 @@ stream
 
 	testStreamerNoOutput(t, "TestStream_AlertComplexWhere", script, 13*time.Second)
 
-	if requestCount != 1 {
-		t.Errorf("got %v exp %v", requestCount, 1)
+	if rc := atomic.LoadInt32(&requestCount); rc != 1 {
+		t.Errorf("got %v exp %v", rc, 1)
 	}
 }
 
 func TestStream_AlertStateChangesOnly(t *testing.T) {
 
-	requestCount := 0
+	requestCount := int32(0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestCount++
+		atomic.AddInt32(&requestCount, 1)
 	}))
 	defer ts.Close()
 	var script = `
@@ -2859,16 +2880,16 @@ stream
 	testStreamerNoOutput(t, "TestStream_AlertStateChangesOnly", script, 13*time.Second)
 
 	// Only 4 points below 93 so 8 state changes.
-	if requestCount != 8 {
-		t.Errorf("got %v exp %v", requestCount, 5)
+	if rc := atomic.LoadInt32(&requestCount); rc != 8 {
+		t.Errorf("got %v exp %v", rc, 5)
 	}
 }
 
 func TestStream_AlertFlapping(t *testing.T) {
 
-	requestCount := 0
+	requestCount := int32(0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestCount++
+		atomic.AddInt32(&requestCount, 1)
 	}))
 	defer ts.Close()
 	var script = `
@@ -2887,8 +2908,8 @@ stream
 	testStreamerNoOutput(t, "TestStream_AlertFlapping", script, 13*time.Second)
 
 	// Flapping detection should drop the last alerts.
-	if requestCount != 9 {
-		t.Errorf("got %v exp %v", requestCount, 9)
+	if rc := atomic.LoadInt32(&requestCount); rc != 9 {
+		t.Errorf("got %v exp %v", rc, 9)
 	}
 }
 

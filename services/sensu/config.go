@@ -1,16 +1,14 @@
 package sensu
 
-import (
-	"net/url"
-)
+import "errors"
 
 const DefaultSource = "Kapacitor"
 
 type Config struct {
 	// Whether Sensu integration is enabled.
 	Enabled bool `toml:"enabled"`
-	// The Sensu URL.
-	URL string `toml:"url"`
+	// The Sensu client host:port address.
+	Addr string `toml:"addr"`
 	// The JIT sensu source name of the alert.
 	Source string `toml:"source"`
 }
@@ -22,9 +20,8 @@ func NewConfig() Config {
 }
 
 func (c Config) Validate() error {
-	_, err := url.Parse(c.URL)
-	if err != nil {
-		return err
+	if c.Enabled && c.Addr == "" {
+		return errors.New("must specify sensu client address")
 	}
 	return nil
 }

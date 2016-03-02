@@ -1,26 +1,28 @@
 package sensu
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net/http"
+	"net"
+	"regexp"
 
 	"github.com/influxdata/kapacitor"
 )
 
 type Service struct {
-	url    string
+	addr   string
 	source string
 	logger *log.Logger
 }
 
+var validNamePattern = regexp.MustCompile(`^[\w\.-]+$`)
+
 func NewService(c Config, l *log.Logger) *Service {
 	return &Service{
-		url:    c.URL,
+		addr:   c.Addr,
 		source: c.Source,
 		logger: l,
 	}
@@ -35,6 +37,10 @@ func (s *Service) Close() error {
 }
 
 func (s *Service) Alert(name, output string, level kapacitor.AlertLevel) error {
+	if !validNamePattern.MatchString(name) {
+		return fmt.Errorf("invalid name %q for sensu alert. Must match %v", name, validNamePattern)
+	}
+
 	var status int
 	switch level {
 	case kapacitor.OKAlert:
@@ -55,31 +61,24 @@ func (s *Service) Alert(name, output string, level kapacitor.AlertLevel) error {
 	postData["output"] = output
 	postData["status"] = status
 
-	var post bytes.Buffer
-	enc := json.NewEncoder(&post)
-	err := enc.Encode(postData)
+	addr, err := net.ResolveTCPAddr("tcp", s.addr)
 	if err != nil {
 		return err
 	}
+	conn, err := net.DialTCP("tcp", nil, addr)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
 
-	resp, err := http.Post(s.url, "application/json", &post)
+	enc := json.NewEncoder(conn)
+	err = enc.Encode(postData)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		type response struct {
-			Error string `json:"error"`
-		}
-		r := &response{Error: fmt.Sprintf("failed to understand Sensu response. code: %d content: %s", resp.StatusCode, string(body))}
-		b := bytes.NewReader(body)
-		dec := json.NewDecoder(b)
-		dec.Decode(r)
-		return errors.New(r.Error)
+	resp, err := ioutil.ReadAll(conn)
+	if string(resp) != "ok" {
+		return errors.New("sensu socket error: " + string(resp))
 	}
 	return nil
 }
