@@ -152,3 +152,10 @@ func (m *MapShardResponse) GetFields() []string {
 	}
 	return nil
 }
+
+func init() {
+	proto.RegisterType((*WriteShardRequest)(nil), "internal.WriteShardRequest")
+	proto.RegisterType((*WriteShardResponse)(nil), "internal.WriteShardResponse")
+	proto.RegisterType((*MapShardRequest)(nil), "internal.MapShardRequest")
+	proto.RegisterType((*MapShardResponse)(nil), "internal.MapShardResponse")
+}
