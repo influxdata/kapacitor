@@ -126,9 +126,9 @@ def run_generate():
 def go_get(branch, update=False, no_stash=False):
     get_command = ""
     if update:
-        get_command += "go get -u -f -d ./..."
+        get_command += "go get -t -u -f -d ./..."
     else:
-        get_command += "go get -d ./..."
+        get_command += "go get -t -d ./..."
 
     # 'go get' switches to master, so stash what we currently have
     changes = run("git status --porcelain").strip()
