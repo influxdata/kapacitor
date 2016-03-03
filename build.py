@@ -442,7 +442,7 @@ def build(version=None,
             elif arch == "armhf" or arch == "arm":
                 build_command += "GOARM=6 "
             elif arch == "arm64":
-                build_command += "GOARM=arm64 "
+                build_command += "GOARM=7 "
             else:
                 print "!! Invalid ARM architecture specifed: {}".format(arch)
                 print "Please specify either 'armel', 'armhf', or 'arm64'"
