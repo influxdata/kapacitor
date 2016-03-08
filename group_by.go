@@ -3,6 +3,7 @@ package kapacitor
 import (
 	"log"
 	"sort"
+	"time"
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
@@ -43,9 +44,24 @@ func (g *GroupByNode) runGroupBy([]byte) error {
 			}
 		}
 	default:
+		var lastTime time.Time
+		groups := make(map[models.GroupID]*models.Batch)
 		for b, ok := g.ins[0].NextBatch(); ok; b, ok = g.ins[0].NextBatch() {
 			g.timer.Start()
-			groups := make(map[models.GroupID]*models.Batch)
+			if !b.TMax.Equal(lastTime) {
+				lastTime = b.TMax
+				// Emit all groups
+				for id, group := range groups {
+					for _, child := range g.outs {
+						err := child.CollectBatch(*group)
+						if err != nil {
+							return err
+						}
+					}
+					// Remove from groups
+					delete(groups, id)
+				}
+			}
 			for _, p := range b.Points {
 				var dims []string
 				if g.allDimensions {
@@ -71,14 +87,6 @@ func (g *GroupByNode) runGroupBy([]byte) error {
 				group.Points = append(group.Points, p)
 			}
 			g.timer.Stop()
-			for _, group := range groups {
-				for _, child := range g.outs {
-					err := child.CollectBatch(*group)
-					if err != nil {
-						return err
-					}
-				}
-			}
 		}
 	}
 	return nil
