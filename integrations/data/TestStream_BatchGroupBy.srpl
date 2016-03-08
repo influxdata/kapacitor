@@ -30,10 +30,10 @@ rpname
 cpu,type=idle,host=serverB value=92.6 0000000005
 dbname
 rpname
-cpu,type=idle,host=serverA value=95.8 0000000006
+cpu,type=idle,host=serverC value=95.8 0000000005
 dbname
 rpname
-cpu,type=idle,host=serverC value=95.8 0000000006
+cpu,type=idle,host=serverA value=95.8 0000000006
 dbname
 rpname
 cpu,type=idle,host=serverA value=92.7 0000000007

@@ -540,8 +540,8 @@ func TestStream_BatchGroupBy(t *testing.T) {
 stream
 	.from().measurement('cpu')
 	.window()
-		.period(10s)
-		.every(10s)
+		.period(5s)
+		.every(5s)
 	.groupBy('host')
 	.mapReduce(influxql.count('value'))
 	.httpOut('TestStream_BatchGroupBy')
@@ -553,8 +553,8 @@ stream
 				Tags:    map[string]string{"host": "serverA"},
 				Columns: []string{"time", "count"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
-					10.0,
+					time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+					5.0,
 				}},
 			},
 			{
@@ -562,8 +562,8 @@ stream
 				Tags:    map[string]string{"host": "serverB"},
 				Columns: []string{"time", "count"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
-					9.0,
+					time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+					5.0,
 				}},
 			},
 			{
@@ -571,7 +571,7 @@ stream
 				Tags:    map[string]string{"host": "serverC"},
 				Columns: []string{"time", "count"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 					1.0,
 				}},
 			},
@@ -587,8 +587,8 @@ func TestStream_BatchGroupByAll(t *testing.T) {
 stream
 	.from().measurement('cpu')
 	.window()
-		.period(10s)
-		.every(10s)
+		.period(5s)
+		.every(5s)
 	.groupBy(*)
 	.mapReduce(influxql.count('value'))
 	.httpOut('TestStream_BatchGroupBy')
@@ -600,8 +600,8 @@ stream
 				Tags:    map[string]string{"host": "serverA", "type": "idle"},
 				Columns: []string{"time", "count"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
-					10.0,
+					time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+					5.0,
 				}},
 			},
 			{
@@ -609,8 +609,8 @@ stream
 				Tags:    map[string]string{"host": "serverB", "type": "idle"},
 				Columns: []string{"time", "count"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
-					9.0,
+					time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+					5.0,
 				}},
 			},
 			{
@@ -618,7 +618,7 @@ stream
 				Tags:    map[string]string{"host": "serverC", "type": "idle"},
 				Columns: []string{"time", "count"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 					1.0,
 				}},
 			},
