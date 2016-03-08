@@ -5,6 +5,24 @@ import "github.com/influxdata/influxdb/influxql"
 // tmpl -- go get github.com/benbjohnson/tmpl
 //go:generate tmpl -data=@../tmpldata influxql.gen.go.tmpl
 
+// An InfluxQLNode performs the available function from the InfluxQL language.
+// These function can be performed on a stream or batch edge.
+// The resulting edge is dependent on the function.
+// For a stream edge all points with the same time are accumulated into the function.
+// For a batch edge all points in the batch are accumulated into the function.
+//
+//
+// Example:
+//    stream
+//        .window()
+//            .period(10s)
+//            .every(10s)
+//        // Sum the values for each 10s window of data.
+//        .sum('value')
+//
+//
+// Note: Derivative has its own implementation as a DerivativeNode instead of as part of the
+// InfluxQL functions.
 type InfluxQLNode struct {
 	chainnode
 
@@ -48,6 +66,7 @@ func (n *InfluxQLNode) UsePointTimes() *InfluxQLNode {
 // Aggregation Functions
 //
 
+// Count the number of points.
 func (n *chainnode) Count(field string) *InfluxQLNode {
 	i := newInfluxQLNode("count", field, n.Provides(), StreamEdge, ReduceCreater{
 		CreateFloatIntegerReducer: func() (influxql.FloatPointAggregator, influxql.IntegerPointEmitter) {
@@ -63,6 +82,7 @@ func (n *chainnode) Count(field string) *InfluxQLNode {
 	return i
 }
 
+// Produce batch of only the distinct points.
 func (n *chainnode) Distinct(field string) *InfluxQLNode {
 	i := newInfluxQLNode("distinct", field, n.Provides(), BatchEdge, ReduceCreater{
 		CreateFloatBulkReducer: func() (FloatBulkPointAggregator, influxql.FloatPointEmitter) {
@@ -78,6 +98,7 @@ func (n *chainnode) Distinct(field string) *InfluxQLNode {
 	return i
 }
 
+// Compute the mean of the data.
 func (n *chainnode) Mean(field string) *InfluxQLNode {
 	i := newInfluxQLNode("mean", field, n.Provides(), StreamEdge, ReduceCreater{
 		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
@@ -93,6 +114,8 @@ func (n *chainnode) Mean(field string) *InfluxQLNode {
 	return i
 }
 
+// Compute the median of the data. Note, this method is not a selector,
+// if you want the median point use .percentile(field, 50.0).
 func (n *chainnode) Median(field string) *InfluxQLNode {
 	i := newInfluxQLNode("median", field, n.Provides(), StreamEdge, ReduceCreater{
 		CreateFloatBulkReducer: func() (FloatBulkPointAggregator, influxql.FloatPointEmitter) {
@@ -108,6 +131,7 @@ func (n *chainnode) Median(field string) *InfluxQLNode {
 	return i
 }
 
+// Compute the difference between min and max points.
 func (n *chainnode) Spread(field string) *InfluxQLNode {
 	i := newInfluxQLNode("spread", field, n.Provides(), StreamEdge, ReduceCreater{
 		CreateFloatBulkReducer: func() (FloatBulkPointAggregator, influxql.FloatPointEmitter) {
@@ -123,6 +147,7 @@ func (n *chainnode) Spread(field string) *InfluxQLNode {
 	return i
 }
 
+// Compute the sum of all values.
 func (n *chainnode) Sum(field string) *InfluxQLNode {
 	i := newInfluxQLNode("sum", field, n.Provides(), StreamEdge, ReduceCreater{
 		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
@@ -142,6 +167,7 @@ func (n *chainnode) Sum(field string) *InfluxQLNode {
 // Selection Functions
 //
 
+// Select the first point.
 func (n *chainnode) First(field string) *InfluxQLNode {
 	i := newInfluxQLNode("first", field, n.Provides(), StreamEdge, ReduceCreater{
 		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
@@ -157,6 +183,7 @@ func (n *chainnode) First(field string) *InfluxQLNode {
 	return i
 }
 
+// Select the last point.
 func (n *chainnode) Last(field string) *InfluxQLNode {
 	i := newInfluxQLNode("last", field, n.Provides(), StreamEdge, ReduceCreater{
 		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
@@ -172,6 +199,7 @@ func (n *chainnode) Last(field string) *InfluxQLNode {
 	return i
 }
 
+// Select the minimum point.
 func (n *chainnode) Min(field string) *InfluxQLNode {
 	i := newInfluxQLNode("min", field, n.Provides(), StreamEdge, ReduceCreater{
 		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
@@ -187,6 +215,7 @@ func (n *chainnode) Min(field string) *InfluxQLNode {
 	return i
 }
 
+// Select the maximum point.
 func (n *chainnode) Max(field string) *InfluxQLNode {
 	i := newInfluxQLNode("max", field, n.Provides(), StreamEdge, ReduceCreater{
 		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
@@ -202,6 +231,7 @@ func (n *chainnode) Max(field string) *InfluxQLNode {
 	return i
 }
 
+// Select a point at the given percentile. This is a selector function, no interpolation between points is performed.
 func (n *chainnode) Percentile(field string, percentile float64) *InfluxQLNode {
 	i := newInfluxQLNode("percentile", field, n.Provides(), StreamEdge, ReduceCreater{
 		CreateFloatBulkReducer: func() (FloatBulkPointAggregator, influxql.FloatPointEmitter) {
@@ -221,6 +251,7 @@ type TopBottomCallInfo struct {
 	FieldsAndTags []string
 }
 
+// Select the top `num` points for `field` and sort by any extra tags or fields.
 func (n *chainnode) Top(num int64, field string, fieldsAndTags ...string) *InfluxQLNode {
 	tags := make([]int, len(fieldsAndTags))
 	for i := range fieldsAndTags {
@@ -251,6 +282,7 @@ func (n *chainnode) Top(num int64, field string, fieldsAndTags ...string) *Influ
 	return i
 }
 
+// Select the bottom `num` points for `field` and sort by any extra tags or fields.
 func (n *chainnode) Bottom(num int64, field string, fieldsAndTags ...string) *InfluxQLNode {
 	tags := make([]int, len(fieldsAndTags))
 	for i := range fieldsAndTags {
@@ -285,6 +317,7 @@ func (n *chainnode) Bottom(num int64, field string, fieldsAndTags ...string) *In
 // Transformation Functions
 //
 
+// Compute the standard deviation.
 func (n *chainnode) Stddev(field string) *InfluxQLNode {
 	i := newInfluxQLNode("stddev", field, n.Provides(), StreamEdge, ReduceCreater{
 		CreateFloatBulkReducer: func() (FloatBulkPointAggregator, influxql.FloatPointEmitter) {
