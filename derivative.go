@@ -33,6 +33,7 @@ func (d *DerivativeNode) runDerivative([]byte) error {
 			pr, ok := previous[p.Group]
 			if !ok {
 				previous[p.Group] = p
+				d.timer.Stop()
 				continue
 			}
 
