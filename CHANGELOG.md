@@ -4,6 +4,31 @@
 
 ### Release Notes
 
+Kapacitor is now using the functions from the new query engine in InfluxDB core.
+Along with this change is a change in the TICKscript API so that using the InfluxQL functions is easier.
+Simply call the desired method directly no need to call `.mapReduce` explicitly.
+This change now hides the mapReduce aspect and handles it internally.
+Using `.mapReduce` is officially deprecated in this release and will be remove in the next major release.
+We feel that this change improves the readability of TICKscripts and exposes less implementation details
+to the end user.
+Updating your exising TICKscripts is simple.
+If previously you had code like this:
+
+```javascript
+stream.from()...
+    .window()...
+    .mapReduce(influxql.count('value'))
+```
+then update it to look like this:
+
+```javascript
+stream.from()...
+    .window()...
+    .count('value')
+```
+
+a simple regex could fix all your existing scripts.
+
 Kapacitor now exposes more internal metrics for determining the performance of a given task.
 The internal statistics includes a new measurement named `node` that contains any stats a node provides, tagged by the task, node, task type and kind of node (i.e. window vs union).
 All nodes provide an averaged execution time for the node.
@@ -24,6 +49,7 @@ With #144 you can now join streams with differing group by dimensions.
 - [#145](https://github.com/influxdata/kapacitor/issues/145): The InfluxDB Out Node now writes data to InfluxDB in buffers.
 - [#215](https://github.com/influxdata/kapacitor/issues/215): Add performance metrics to nodes for average execution times and node throughput values.
 - [#144](https://github.com/influxdata/kapacitor/issues/144): Can now join streams with differing dimensions using the join.On property.
+- [#249](https://github.com/influxdata/kapacitor/issues/249): Can now use InfluxQL functions directly instead of via the MapReduce method. Example `stream.from().count()`.
 
 
 ### Bugfixes

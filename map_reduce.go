@@ -36,6 +36,7 @@ type MapNode struct {
 }
 
 func newMapNode(et *ExecutingTask, n *pipeline.MapNode, l *log.Logger) (*MapNode, error) {
+	l.Println("W! DEPRECATED use InfluxQLNode instead")
 	f, ok := n.Map.(MapInfo)
 	if !ok {
 		return nil, fmt.Errorf("invalid map given to map node %T", n.Map)
