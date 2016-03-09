@@ -646,6 +646,7 @@ func (a *AlertNode) handlePagerDuty(pd *pipeline.PagerDutyHandler, ad *AlertData
 	err := a.et.tm.PagerDutyService.Alert(
 		ad.ID,
 		ad.Message,
+		ad.Level,
 		ad.Data,
 	)
 	if err != nil {
