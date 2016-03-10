@@ -63,6 +63,7 @@ With #144 you can now join streams with differing group by dimensions.
 - [#240](https://github.com/influxdata/kapacitor/issues/240): BREAKING: Fix issues with Sensu integration. The breaking change is that the config no longer takes a `url` but rather a `host` option since the communication is raw TCP rather HTTP.
 - [#270](https://github.com/influxdata/kapacitor/issues/270): The HTTP server will now gracefully stop.
 - [#300](https://github.com/influxdata/kapacitor/issues/300): Add OPTIONS method to /recording endpoint for deletes.
+- [#304](https://github.com/influxdata/kapacitor/issues/304): Fix panic if recording query but do not have an InfluxDB instance configured
 
 ## v0.10.1 [2016-02-08]
 
