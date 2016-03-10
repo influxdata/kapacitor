@@ -738,6 +738,9 @@ func (r *Service) doRecordQuery(rid uuid.UUID, q string, tt kapacitor.TaskType) 
 	if db == "" || rp == "" {
 		return errors.New("could not determine database and retention policy. Is the query fully qualified?")
 	}
+	if r.InfluxDBService == nil {
+		return errors.New("InfluxDB not configured, cannot record query")
+	}
 	// Query InfluxDB
 	con, err := r.InfluxDBService.NewClient()
 	if err != nil {
