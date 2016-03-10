@@ -530,6 +530,12 @@ Options:
 }
 
 func doReplay(args []string) error {
+	if *rid == "" {
+		return errors.New("must pass recording id")
+	}
+	if *rtname == "" {
+		return errors.New("must pass task name")
+	}
 
 	v := url.Values{}
 	v.Add("name", *rtname)

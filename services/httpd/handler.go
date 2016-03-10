@@ -302,7 +302,7 @@ func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user *meta.
 	}
 	h.statMap.Add(statWriteRequestBytesReceived, int64(len(b)))
 	if h.WriteTrace {
-		h.Logger.Printf("E! write body received by handler: %s", string(b))
+		h.Logger.Printf("D! write body received by handler: %s", string(b))
 	}
 
 	h.serveWriteLine(w, r, b, user)

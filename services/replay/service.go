@@ -347,7 +347,7 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// Store recording in running recordings.
-	errC := make(chan error, 1)
+	errC := make(chan error)
 	func() {
 		r.recordingsMu.Lock()
 		defer r.recordingsMu.Unlock()
@@ -361,7 +361,11 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 			// Always log an error since the user may not have requested the error.
 			r.logger.Printf("E! recording %s failed: %v", rid.String(), err)
 		}
-		errC <- err
+		select {
+		case errC <- err:
+		case <-time.After(time.Minute):
+			// Cache the error for a max duration then drop it
+		}
 		// We have finished delete from running map
 		r.recordingsMu.Lock()
 		defer r.recordingsMu.Unlock()
