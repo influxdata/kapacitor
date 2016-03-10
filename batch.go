@@ -262,7 +262,8 @@ func (b *BatchNode) doQuery() error {
 			// Connect
 			con, err := b.et.tm.InfluxDBService.NewClient()
 			if err != nil {
-				return err
+				b.logger.Println("E! failed to connect to InfluxDB:", err)
+				break
 			}
 			q := client.Query{
 				Command: b.query.String(),
@@ -271,22 +272,28 @@ func (b *BatchNode) doQuery() error {
 			// Execute query
 			resp, err := con.Query(q)
 			if err != nil {
-				return err
+				b.logger.Println("E! query failed:", err)
+				break
 			}
 
 			if err := resp.Error(); err != nil {
-				return err
+				b.logger.Println("E! query failed:", err)
+				break
 			}
 
 			// Collect batches
 			for _, res := range resp.Results {
 				batches, err := models.ResultToBatches(res)
 				if err != nil {
-					return err
+					b.logger.Println("E! failed to understand query result:", err)
+					continue
 				}
 				b.timer.Pause()
 				for _, bch := range batches {
-					b.ins[0].CollectBatch(bch)
+					err := b.ins[0].CollectBatch(bch)
+					if err != nil {
+						return err
+					}
 				}
 				b.timer.Resume()
 			}
