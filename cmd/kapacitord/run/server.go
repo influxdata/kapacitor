@@ -126,7 +126,7 @@ func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*
 	s.appendUDFService(c.UDF)
 	s.appendDeadmanService(c.Deadman)
 	s.appendSMTPService(c.SMTP)
-	s.appendHTTPDService(c.HTTP)
+	s.initHTTPDService(c.HTTP)
 	s.appendInfluxDBService(c.InfluxDB, c.Hostname)
 	s.appendTaskStoreService(c.Task)
 	s.appendReplayStoreService(c.Replay)
@@ -158,6 +158,9 @@ func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*
 	s.appendStatsService(c.Stats)
 	s.appendReportingService(c.Reporting)
 
+	// Append HTTPD Service last
+	s.appendHTTPDService()
+
 	return s, nil
 }
 
@@ -184,7 +187,7 @@ func (s *Server) appendInfluxDBService(c influxdb.Config, hostname string) {
 	}
 }
 
-func (s *Server) appendHTTPDService(c httpd.Config) {
+func (s *Server) initHTTPDService(c httpd.Config) {
 	l := s.LogService.NewLogger("[httpd] ", log.LstdFlags)
 	srv := httpd.NewService(c, l)
 
@@ -194,7 +197,10 @@ func (s *Server) appendHTTPDService(c httpd.Config) {
 
 	s.HTTPDService = srv
 	s.TaskMaster.HTTPDService = srv
-	s.Services = append(s.Services, srv)
+}
+
+func (s *Server) appendHTTPDService() {
+	s.Services = append(s.Services, s.HTTPDService)
 }
 
 func (s *Server) appendTaskStoreService(c task_store.Config) {
