@@ -61,7 +61,8 @@ With #144 you can now join streams with differing group by dimensions.
 - [#255](https://github.com/influxdata/kapacitor/issues/255): Add OPTIONS handler for task delete method so it can be preflighted.
 - [#258](https://github.com/influxdata/kapacitor/issues/258): Fix UDP internal metrics, change subscriptions to use clusterID.
 - [#240](https://github.com/influxdata/kapacitor/issues/240): BREAKING: Fix issues with Sensu integration. The breaking change is that the config no longer takes a `url` but rather a `host` option since the communication is raw TCP rather HTTP.
-- [#270](https://github.com/influxdata/kapacitor/issues/258): The HTTP server will now gracefully stop.
+- [#270](https://github.com/influxdata/kapacitor/issues/270): The HTTP server will now gracefully stop.
+- [#300](https://github.com/influxdata/kapacitor/issues/300): Add OPTIONS method to /recording endpoint for deletes.
 
 ## v0.10.1 [2016-02-08]
 

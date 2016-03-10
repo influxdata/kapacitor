@@ -81,6 +81,12 @@ func (r *Service) Open() error {
 			HandlerFunc: r.handleDelete,
 		},
 		{
+			Name:        "recording-delete",
+			Method:      "OPTIONS",
+			Pattern:     "/recording",
+			HandlerFunc: httpd.ServeOptions,
+		},
+		{
 			Name:        "record",
 			Method:      "POST",
 			Pattern:     "/record",
