@@ -582,7 +582,7 @@ func (e *Engine) Begin(writable bool) (tsdb.Tx, error) {
 	return &Tx{Tx: tx, engine: e, wal: e.WAL}, nil
 }
 
-// Stats returns internal statistics for the engine.
+// Stats returns legacy_internal statistics for the engine.
 func (e *Engine) Stats() (stats Stats, err error) {
 	err = e.db.View(func(tx *bolt.Tx) error {
 		stats.Size = tx.Size()
@@ -591,7 +591,7 @@ func (e *Engine) Stats() (stats Stats, err error) {
 	return stats, err
 }
 
-// SeriesBucketStats returns internal BoltDB stats for a series bucket.
+// SeriesBucketStats returns legacy_internal BoltDB stats for a series bucket.
 func (e *Engine) SeriesBucketStats(key string) (stats bolt.BucketStats, err error) {
 	err = e.db.View(func(tx *bolt.Tx) error {
 		bkt := tx.Bucket([]byte("points")).Bucket([]byte(key))
@@ -622,7 +622,7 @@ func (e *Engine) WriteTo(w io.Writer) (n int64, err error) {
 	return
 }
 
-// Stats represents internal engine statistics.
+// Stats represents legacy_internal engine statistics.
 type Stats struct {
 	Size int64 // BoltDB data size
 }

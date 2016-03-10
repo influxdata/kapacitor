@@ -67,7 +67,7 @@ func NewQueryExecutor(store *Store) *QueryExecutor {
 	}
 }
 
-// SetLogger sets the internal logger to the logger passed in.
+// SetLogger sets the legacy_internal logger to the logger passed in.
 func (q *QueryExecutor) SetLogger(l *log.Logger) {
 	q.Logger = l
 }
