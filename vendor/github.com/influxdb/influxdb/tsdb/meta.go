@@ -10,12 +10,12 @@ import (
 
 	"github.com/influxdb/influxdb/influxql"
 	"github.com/influxdb/influxdb/pkg/escape"
-	"github.com/influxdb/influxdb/tsdb/internal"
+	"github.com/influxdb/influxdb/tsdb/legacy_internal"
 
 	"github.com/gogo/protobuf/proto"
 )
 
-//go:generate protoc --gogo_out=. internal/meta.proto
+//go:generate protoc --gogo_out=. legacy_internal/meta.proto
 
 const (
 	maxStringLength = 64 * 1024
@@ -1255,19 +1255,19 @@ func NewSeries(key string, tags map[string]string) *Series {
 
 // MarshalBinary encodes the object to a binary format.
 func (s *Series) MarshalBinary() ([]byte, error) {
-	var pb internal.Series
+	var pb legacy_internal.Series
 	pb.Key = &s.Key
 	for k, v := range s.Tags {
 		key := k
 		value := v
-		pb.Tags = append(pb.Tags, &internal.Tag{Key: &key, Value: &value})
+		pb.Tags = append(pb.Tags, &legacy_internal.Tag{Key: &key, Value: &value})
 	}
 	return proto.Marshal(&pb)
 }
 
 // UnmarshalBinary decodes the object from a binary format.
 func (s *Series) UnmarshalBinary(buf []byte) error {
-	var pb internal.Series
+	var pb legacy_internal.Series
 	if err := proto.Unmarshal(buf, &pb); err != nil {
 		return err
 	}

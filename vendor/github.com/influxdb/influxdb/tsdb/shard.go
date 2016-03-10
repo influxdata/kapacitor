@@ -14,7 +14,7 @@ import (
 	"github.com/influxdb/influxdb"
 	"github.com/influxdb/influxdb/influxql"
 	"github.com/influxdb/influxdb/models"
-	"github.com/influxdb/influxdb/tsdb/internal"
+	"github.com/influxdb/influxdb/tsdb/legacy_internal"
 
 	"github.com/gogo/protobuf/proto"
 )
@@ -451,19 +451,19 @@ type MeasurementFields struct {
 
 // MarshalBinary encodes the object to a binary format.
 func (m *MeasurementFields) MarshalBinary() ([]byte, error) {
-	var pb internal.MeasurementFields
+	var pb legacy_internal.MeasurementFields
 	for _, f := range m.Fields {
 		id := int32(f.ID)
 		name := f.Name
 		t := int32(f.Type)
-		pb.Fields = append(pb.Fields, &internal.Field{ID: &id, Name: &name, Type: &t})
+		pb.Fields = append(pb.Fields, &legacy_internal.Field{ID: &id, Name: &name, Type: &t})
 	}
 	return proto.Marshal(&pb)
 }
 
 // UnmarshalBinary decodes the object from a binary format.
 func (m *MeasurementFields) UnmarshalBinary(buf []byte) error {
-	var pb internal.MeasurementFields
+	var pb legacy_internal.MeasurementFields
 	if err := proto.Unmarshal(buf, &pb); err != nil {
 		return err
 	}
@@ -770,7 +770,7 @@ func (f *FieldCodec) FieldByName(name string) *Field {
 }
 
 // mustMarshal encodes a value to JSON.
-// This will panic if an error occurs. This should only be used internally when
+// This will panic if an error occurs. This should only be used legacy_internally when
 // an invalid marshal will cause corruption and a panic is appropriate.
 func mustMarshalJSON(v interface{}) []byte {
 	b, err := json.Marshal(v)
@@ -781,7 +781,7 @@ func mustMarshalJSON(v interface{}) []byte {
 }
 
 // mustUnmarshalJSON decodes a value from JSON.
-// This will panic if an error occurs. This should only be used internally when
+// This will panic if an error occurs. This should only be used legacy_internally when
 // an invalid unmarshal will cause corruption and a panic is appropriate.
 func mustUnmarshalJSON(b []byte, v interface{}) {
 	if err := json.Unmarshal(b, v); err != nil {
