@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 )
 
 type Service struct {
@@ -22,11 +23,12 @@ type Service struct {
 	mu     sync.Mutex
 	wg     sync.WaitGroup
 
-	new    chan net.Conn
-	active chan net.Conn
-	idle   chan net.Conn
-	closed chan net.Conn
-	stop   chan chan struct{}
+	new             chan net.Conn
+	active          chan net.Conn
+	idle            chan net.Conn
+	closed          chan net.Conn
+	stop            chan chan struct{}
+	shutdownTimeout time.Duration
 
 	Handler *Handler
 
@@ -37,10 +39,11 @@ func NewService(c Config, l *log.Logger) *Service {
 	statMap := &expvar.Map{}
 	statMap.Init()
 	s := &Service{
-		addr:  c.BindAddress,
-		https: c.HttpsEnabled,
-		cert:  c.HttpsCertificate,
-		err:   make(chan error),
+		addr:            c.BindAddress,
+		https:           c.HttpsEnabled,
+		cert:            c.HttpsCertificate,
+		err:             make(chan error),
+		shutdownTimeout: time.Duration(c.ShutdownTimeout),
 		Handler: NewHandler(
 			c.AuthEnabled,
 			c.LogEnabled,
@@ -100,8 +103,8 @@ func (s *Service) Open() error {
 	s.stop = make(chan chan struct{})
 
 	// Begin listening for requests in a separate goroutine.
-	s.wg.Add(1)
 	go s.manage()
+
 	s.wg.Add(1)
 	go s.serve()
 	return nil
@@ -114,6 +117,7 @@ func (s *Service) Close() error {
 	defer s.mu.Unlock()
 	// First turn off KeepAlives so that new connections will not become idle
 	s.server.SetKeepAlivesEnabled(false)
+	// Signal to manage loop we are stopping
 	stopping := make(chan struct{})
 	s.stop <- stopping
 
@@ -152,11 +156,11 @@ func (s *Service) manage() {
 		close(s.active)
 		close(s.idle)
 		close(s.closed)
-		s.wg.Done()
 	}()
 
 	var stopDone chan struct{}
 	conns := map[net.Conn]http.ConnState{}
+	var timeout <-chan time.Time
 
 	for {
 		select {
@@ -194,9 +198,19 @@ func (s *Service) manage() {
 				}
 			}
 
+			timeout = time.After(s.shutdownTimeout)
+
 			// continue the loop and wait for all the ConnState updates which will
 			// eventually close(stopDone) and return from this goroutine.
+		case <-timeout:
+			s.logger.Println("E! shutdown timedout, forcefully closing all remaining connections")
+			// Connections didn't close in time.
+			// Forcefully close all connections.
+			for c := range conns {
+				c.Close()
+			}
 		}
+
 	}
 }
 
