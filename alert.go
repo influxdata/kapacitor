@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	text "text/template"
 	"time"
 
@@ -158,7 +158,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 
 	for _, log := range n.LogHandlers {
 		log := log
-		if !path.IsAbs(log.FilePath) {
+		if !filepath.IsAbs(log.FilePath) {
 			return nil, fmt.Errorf("alert log path must be absolute: %s is not absolute", log.FilePath)
 		}
 		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleLog(log, ad) })
