@@ -49,6 +49,7 @@ With #144 you can now join streams with differing group by dimensions.
 - [#145](https://github.com/influxdata/kapacitor/issues/145): The InfluxDB Out Node now writes data to InfluxDB in buffers.
 - [#215](https://github.com/influxdata/kapacitor/issues/215): Add performance metrics to nodes for average execution times and node throughput values.
 - [#144](https://github.com/influxdata/kapacitor/issues/144): Can now join streams with differing dimensions using the join.On property.
+- [#155](https://github.com/influxdata/kapacitor/pull/155): Standardized config across TICK stack.
 - [#249](https://github.com/influxdata/kapacitor/issues/249): Can now use InfluxQL functions directly instead of via the MapReduce method. Example `stream.from().count()`.
 - [#302](https://github.com/influxdata/kapacitor/issues/302): Can now use .Time in alert message.
 

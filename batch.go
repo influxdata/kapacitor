@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/gorhill/cronexpr"
+	client "github.com/influxdata/influxdb/client/v2"
+	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
-	client "github.com/influxdb/influxdb/client/v2"
-	"github.com/influxdb/influxdb/influxql"
 )
 
 type SourceBatchNode struct {

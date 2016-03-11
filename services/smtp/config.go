@@ -3,7 +3,7 @@ package smtp
 import (
 	"time"
 
-	"github.com/influxdb/influxdb/toml"
+	"github.com/influxdata/config"
 )
 
 type Config struct {
@@ -21,7 +21,7 @@ type Config struct {
 	// Default To addresses
 	To []string `toml:"to"`
 	// Close connection to SMTP server after idle timeout has elapsed
-	IdleTimeout toml.Duration `toml:"idle-timeout"`
+	IdleTimeout config.Duration `toml:"idle-timeout"`
 }
 
 func NewConfig() Config {
@@ -30,6 +30,6 @@ func NewConfig() Config {
 		Port:        25,
 		Username:    "",
 		Password:    "",
-		IdleTimeout: toml.Duration(time.Second * 30),
+		IdleTimeout: config.Duration(time.Second * 30),
 	}
 }

@@ -11,7 +11,7 @@ import (
 	"runtime"
 	"strconv"
 
-	"github.com/BurntSushi/toml"
+	cfg "github.com/influxdata/config"
 	"github.com/influxdata/kapacitor/services/logging"
 )
 
@@ -207,7 +207,7 @@ func (cmd *Command) ParseConfig(path string) (*Config, error) {
 	log.Printf("Using configuration at: %s\n", path)
 
 	config := NewConfig()
-	if _, err := toml.DecodeFile(path, &config); err != nil {
+	if err := cfg.DecodeFile(path, &config); err != nil {
 		return nil, err
 	}
 

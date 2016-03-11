@@ -30,9 +30,9 @@ import (
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
 
-	"github.com/influxdb/influxdb/services/collectd"
-	"github.com/influxdb/influxdb/services/graphite"
-	"github.com/influxdb/influxdb/services/opentsdb"
+	"github.com/influxdata/influxdb/services/collectd"
+	"github.com/influxdata/influxdb/services/graphite"
+	"github.com/influxdata/influxdb/services/opentsdb"
 )
 
 // Config represents the configuration format for the kapacitord binary.

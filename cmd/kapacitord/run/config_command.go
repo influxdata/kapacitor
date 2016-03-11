@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/BurntSushi/toml"
+	cfg "github.com/influxdata/config"
 )
 
 // PrintConfigCommand represents the command executed by "kapacitord config".
@@ -57,7 +57,7 @@ func (cmd *PrintConfigCommand) Run(args ...string) error {
 		return fmt.Errorf("%s. To generate a valid configuration file run `kapacitord config > kapacitor.generated.conf`.", err)
 	}
 
-	toml.NewEncoder(cmd.Stdout).Encode(config)
+	cfg.NewEncoder(cmd.Stdout).Encode(config)
 	fmt.Fprint(cmd.Stdout, "\n")
 
 	return nil
@@ -71,7 +71,7 @@ func (cmd *PrintConfigCommand) parseConfig(path string) (*Config, error) {
 	}
 
 	config := NewConfig()
-	if _, err := toml.DecodeFile(path, &config); err != nil {
+	if err := cfg.DecodeFile(path, &config); err != nil {
 		return nil, err
 	}
 	return config, nil

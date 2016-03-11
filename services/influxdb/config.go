@@ -4,9 +4,9 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/influxdata/influxdb/toml"
 	"github.com/influxdata/kapacitor/services/stats"
 	"github.com/influxdata/kapacitor/services/udp"
-	"github.com/influxdb/influxdb/toml"
 )
 
 const (

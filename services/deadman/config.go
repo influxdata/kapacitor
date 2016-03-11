@@ -3,12 +3,12 @@ package deadman
 import (
 	"time"
 
-	"github.com/influxdb/influxdb/toml"
+	"github.com/influxdata/config"
 )
 
 const (
 	// Default deadman's switch interval
-	DefaultInterval = toml.Duration(time.Second * 10)
+	DefaultInterval = config.Duration(time.Second * 10)
 	// Default deadman's switch threshold
 	DefaultThreshold = float64(0)
 	// Default deadman's switch id
@@ -18,11 +18,11 @@ const (
 )
 
 type Config struct {
-	Interval  toml.Duration `toml:"interval"`
-	Threshold float64       `toml:"threshold"`
-	Id        string        `toml:"id"`
-	Message   string        `toml:"message"`
-	Global    bool          `toml:"global"`
+	Interval  config.Duration `toml:"interval"`
+	Threshold float64         `toml:"threshold"`
+	Id        string          `toml:"id"`
+	Message   string          `toml:"message"`
+	Global    bool            `toml:"global"`
 }
 
 func NewConfig() Config {

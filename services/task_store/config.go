@@ -4,18 +4,18 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/influxdb/influxdb/toml"
+	"github.com/influxdata/config"
 )
 
 type Config struct {
-	Dir              string        `toml:"dir"`
-	SnapshotInterval toml.Duration `toml:"snapshot-interval"`
+	Dir              string          `toml:"dir"`
+	SnapshotInterval config.Duration `toml:"snapshot-interval"`
 }
 
 func NewConfig() Config {
 	return Config{
 		Dir:              "./tasks",
-		SnapshotInterval: toml.Duration(time.Minute),
+		SnapshotInterval: config.Duration(time.Minute),
 	}
 }
 
