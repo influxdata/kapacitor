@@ -145,7 +145,7 @@ func (n *node) Err() error {
 
 func (n *node) addChild(c Node) (*Edge, error) {
 	if n.Provides() != c.Wants() {
-		return nil, fmt.Errorf("cannot add child mismatched edges: %s -> %s", n.Provides(), c.Wants())
+		return nil, fmt.Errorf("cannot add child mismatched edges: %s:%s -> %s:%s", n.Name(), n.Provides(), c.Name(), c.Wants())
 	}
 	n.children = append(n.children, c)
 
@@ -162,7 +162,6 @@ func (n *node) addParent(p Node) {
 }
 
 func (n *node) linkChild(c Node) error {
-
 	// add child
 	edge, err := n.addChild(c)
 	if err != nil {
