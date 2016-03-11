@@ -2954,6 +2954,7 @@ stream
 		.measurement('m')
 		.precision('s')
 		.tag('key', 'value')
+		.flushInterval(1ms)
 `
 	done := make(chan error, 1)
 	var points []imodels.Point
