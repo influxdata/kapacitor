@@ -25,15 +25,20 @@ var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
 
+// This is a compile-time assertion to ensure that this generated file
+// is compatible with the proto package it is being compiled against.
+const _ = proto.GoGoProtoPackageIsVersion1
+
 type Series struct {
-	Key              *string `protobuf:"bytes,1,req,name=Key" json:"Key,omitempty"`
-	Tags             []*Tag  `protobuf:"bytes,2,rep,name=Tags" json:"Tags,omitempty"`
+	Key              *string `protobuf:"bytes,1,req,name=Key,json=key" json:"Key,omitempty"`
+	Tags             []*Tag  `protobuf:"bytes,2,rep,name=Tags,json=tags" json:"Tags,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *Series) Reset()         { *m = Series{} }
-func (m *Series) String() string { return proto.CompactTextString(m) }
-func (*Series) ProtoMessage()    {}
+func (m *Series) Reset()                    { *m = Series{} }
+func (m *Series) String() string            { return proto.CompactTextString(m) }
+func (*Series) ProtoMessage()               {}
+func (*Series) Descriptor() ([]byte, []int) { return fileDescriptorMeta, []int{0} }
 
 func (m *Series) GetKey() string {
 	if m != nil && m.Key != nil {
@@ -50,14 +55,15 @@ func (m *Series) GetTags() []*Tag {
 }
 
 type Tag struct {
-	Key              *string `protobuf:"bytes,1,req,name=Key" json:"Key,omitempty"`
-	Value            *string `protobuf:"bytes,2,req,name=Value" json:"Value,omitempty"`
+	Key              *string `protobuf:"bytes,1,req,name=Key,json=key" json:"Key,omitempty"`
+	Value            *string `protobuf:"bytes,2,req,name=Value,json=value" json:"Value,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *Tag) Reset()         { *m = Tag{} }
-func (m *Tag) String() string { return proto.CompactTextString(m) }
-func (*Tag) ProtoMessage()    {}
+func (m *Tag) Reset()                    { *m = Tag{} }
+func (m *Tag) String() string            { return proto.CompactTextString(m) }
+func (*Tag) ProtoMessage()               {}
+func (*Tag) Descriptor() ([]byte, []int) { return fileDescriptorMeta, []int{1} }
 
 func (m *Tag) GetKey() string {
 	if m != nil && m.Key != nil {
@@ -74,13 +80,14 @@ func (m *Tag) GetValue() string {
 }
 
 type MeasurementFields struct {
-	Fields           []*Field `protobuf:"bytes,1,rep,name=Fields" json:"Fields,omitempty"`
+	Fields           []*Field `protobuf:"bytes,1,rep,name=Fields,json=fields" json:"Fields,omitempty"`
 	XXX_unrecognized []byte   `json:"-"`
 }
 
-func (m *MeasurementFields) Reset()         { *m = MeasurementFields{} }
-func (m *MeasurementFields) String() string { return proto.CompactTextString(m) }
-func (*MeasurementFields) ProtoMessage()    {}
+func (m *MeasurementFields) Reset()                    { *m = MeasurementFields{} }
+func (m *MeasurementFields) String() string            { return proto.CompactTextString(m) }
+func (*MeasurementFields) ProtoMessage()               {}
+func (*MeasurementFields) Descriptor() ([]byte, []int) { return fileDescriptorMeta, []int{2} }
 
 func (m *MeasurementFields) GetFields() []*Field {
 	if m != nil {
@@ -90,15 +97,16 @@ func (m *MeasurementFields) GetFields() []*Field {
 }
 
 type Field struct {
-	ID               *int32  `protobuf:"varint,1,req,name=ID" json:"ID,omitempty"`
-	Name             *string `protobuf:"bytes,2,req,name=Name" json:"Name,omitempty"`
-	Type             *int32  `protobuf:"varint,3,req,name=Type" json:"Type,omitempty"`
+	ID               *int32  `protobuf:"varint,1,req,name=ID,json=iD" json:"ID,omitempty"`
+	Name             *string `protobuf:"bytes,2,req,name=Name,json=name" json:"Name,omitempty"`
+	Type             *int32  `protobuf:"varint,3,req,name=Type,json=type" json:"Type,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *Field) Reset()         { *m = Field{} }
-func (m *Field) String() string { return proto.CompactTextString(m) }
-func (*Field) ProtoMessage()    {}
+func (m *Field) Reset()                    { *m = Field{} }
+func (m *Field) String() string            { return proto.CompactTextString(m) }
+func (*Field) ProtoMessage()               {}
+func (*Field) Descriptor() ([]byte, []int) { return fileDescriptorMeta, []int{3} }
 
 func (m *Field) GetID() int32 {
 	if m != nil && m.ID != nil {
@@ -126,4 +134,22 @@ func init() {
 	proto.RegisterType((*Tag)(nil), "legacy_internal.Tag")
 	proto.RegisterType((*MeasurementFields)(nil), "legacy_internal.MeasurementFields")
 	proto.RegisterType((*Field)(nil), "legacy_internal.Field")
+}
+
+var fileDescriptorMeta = []byte{
+	// 218 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x6c, 0x8d, 0xcd, 0x4a, 0x04, 0x31,
+	0x10, 0x84, 0x31, 0x3f, 0x03, 0xb6, 0xe0, 0x4f, 0x58, 0x64, 0xf0, 0xb4, 0xe4, 0x34, 0x17, 0x23,
+	0xf8, 0x02, 0x1e, 0x1c, 0x04, 0x11, 0x3d, 0xc4, 0xc5, 0xab, 0x04, 0x6d, 0x97, 0x60, 0x26, 0xbb,
+	0x24, 0x19, 0x21, 0x6f, 0x6f, 0x12, 0xf1, 0x32, 0x7a, 0xab, 0xae, 0xaa, 0xae, 0x0f, 0x2e, 0x1c,
+	0x6e, 0xcd, 0x5b, 0x7e, 0xb5, 0x3e, 0x61, 0xf0, 0xc6, 0x5d, 0x4d, 0x98, 0x8c, 0xda, 0x87, 0x5d,
+	0xda, 0x89, 0x93, 0x45, 0x26, 0x47, 0xe8, 0x9e, 0x31, 0x58, 0x8c, 0xe2, 0x14, 0xe8, 0x03, 0xe6,
+	0xfe, 0x60, 0x4d, 0x86, 0x43, 0x4d, 0x3f, 0x31, 0x8b, 0x01, 0xd8, 0xc6, 0x6c, 0x63, 0x4f, 0xd6,
+	0x74, 0x38, 0xba, 0x5e, 0xa9, 0xc5, 0xaf, 0x2a, 0xa1, 0x66, 0xa9, 0x34, 0xe4, 0x25, 0xd0, 0x72,
+	0xfc, 0x33, 0xb1, 0x02, 0xfe, 0x62, 0xdc, 0x8c, 0x65, 0xa3, 0x7a, 0xfc, 0xab, 0x1e, 0xf2, 0x16,
+	0xce, 0x1e, 0xd1, 0xc4, 0x39, 0xe0, 0x84, 0x3e, 0xdd, 0x59, 0x74, 0xef, 0x51, 0x28, 0xe8, 0x7e,
+	0x54, 0xf9, 0xaf, 0xbc, 0xf3, 0x3f, 0xbc, 0x16, 0xeb, 0xee, 0xa3, 0xb5, 0xe4, 0x0d, 0xf0, 0x66,
+	0x88, 0x63, 0x20, 0xf7, 0x63, 0x83, 0x72, 0x4d, 0xec, 0x28, 0x04, 0xb0, 0x27, 0x33, 0xfd, 0x22,
+	0x99, 0x2f, 0xba, 0x7a, 0x9b, 0xbc, 0xc7, 0x9e, 0xb6, 0x16, 0x4b, 0x45, 0x7f, 0x07, 0x00, 0x00,
+	0xff, 0xff, 0xcc, 0x0c, 0xa1, 0xee, 0x28, 0x01, 0x00, 0x00,
 }
