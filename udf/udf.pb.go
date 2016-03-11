@@ -40,6 +40,10 @@ var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
 
+// This is a compile-time assertion to ensure that this generated file
+// is compatible with the proto package it is being compiled against.
+const _ = proto.GoGoProtoPackageIsVersion1
+
 type EdgeType int32
 
 const (
@@ -59,6 +63,7 @@ var EdgeType_value = map[string]int32{
 func (x EdgeType) String() string {
 	return proto.EnumName(EdgeType_name, int32(x))
 }
+func (EdgeType) EnumDescriptor() ([]byte, []int) { return fileDescriptorUdf, []int{0} }
 
 type ValueType int32
 
@@ -88,14 +93,16 @@ var ValueType_value = map[string]int32{
 func (x ValueType) String() string {
 	return proto.EnumName(ValueType_name, int32(x))
 }
+func (ValueType) EnumDescriptor() ([]byte, []int) { return fileDescriptorUdf, []int{1} }
 
 // Request that the process return information about available Options.
 type InfoRequest struct {
 }
 
-func (m *InfoRequest) Reset()         { *m = InfoRequest{} }
-func (m *InfoRequest) String() string { return proto.CompactTextString(m) }
-func (*InfoRequest) ProtoMessage()    {}
+func (m *InfoRequest) Reset()                    { *m = InfoRequest{} }
+func (m *InfoRequest) String() string            { return proto.CompactTextString(m) }
+func (*InfoRequest) ProtoMessage()               {}
+func (*InfoRequest) Descriptor() ([]byte, []int) { return fileDescriptorUdf, []int{0} }
 
 type InfoResponse struct {
 	Wants    EdgeType               `protobuf:"varint,1,opt,name=wants,proto3,enum=udf.EdgeType" json:"wants,omitempty"`
@@ -103,9 +110,10 @@ type InfoResponse struct {
 	Options  map[string]*OptionInfo `protobuf:"bytes,3,rep,name=options" json:"options,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value"`
 }
 
-func (m *InfoResponse) Reset()         { *m = InfoResponse{} }
-func (m *InfoResponse) String() string { return proto.CompactTextString(m) }
-func (*InfoResponse) ProtoMessage()    {}
+func (m *InfoResponse) Reset()                    { *m = InfoResponse{} }
+func (m *InfoResponse) String() string            { return proto.CompactTextString(m) }
+func (*InfoResponse) ProtoMessage()               {}
+func (*InfoResponse) Descriptor() ([]byte, []int) { return fileDescriptorUdf, []int{1} }
 
 func (m *InfoResponse) GetOptions() map[string]*OptionInfo {
 	if m != nil {
@@ -118,18 +126,20 @@ type OptionInfo struct {
 	ValueTypes []ValueType `protobuf:"varint,1,rep,name=valueTypes,enum=udf.ValueType" json:"valueTypes,omitempty"`
 }
 
-func (m *OptionInfo) Reset()         { *m = OptionInfo{} }
-func (m *OptionInfo) String() string { return proto.CompactTextString(m) }
-func (*OptionInfo) ProtoMessage()    {}
+func (m *OptionInfo) Reset()                    { *m = OptionInfo{} }
+func (m *OptionInfo) String() string            { return proto.CompactTextString(m) }
+func (*OptionInfo) ProtoMessage()               {}
+func (*OptionInfo) Descriptor() ([]byte, []int) { return fileDescriptorUdf, []int{2} }
 
 // Request that the process initialize itself with the provided options.
 type InitRequest struct {
 	Options []*Option `protobuf:"bytes,1,rep,name=options" json:"options,omitempty"`
 }
 
-func (m *InitRequest) Reset()         { *m = InitRequest{} }
-func (m *InitRequest) String() string { return proto.CompactTextString(m) }
-func (*InitRequest) ProtoMessage()    {}
+func (m *InitRequest) Reset()                    { *m = InitRequest{} }
+func (m *InitRequest) String() string            { return proto.CompactTextString(m) }
+func (*InitRequest) ProtoMessage()               {}
+func (*InitRequest) Descriptor() ([]byte, []int) { return fileDescriptorUdf, []int{3} }
 
 func (m *InitRequest) GetOptions() []*Option {
 	if m != nil {
@@ -143,9 +153,10 @@ type Option struct {
 	Values []*OptionValue `protobuf:"bytes,2,rep,name=values" json:"values,omitempty"`
 }
 
-func (m *Option) Reset()         { *m = Option{} }
-func (m *Option) String() string { return proto.CompactTextString(m) }
-func (*Option) ProtoMessage()    {}
+func (m *Option) Reset()                    { *m = Option{} }
+func (m *Option) String() string            { return proto.CompactTextString(m) }
+func (*Option) ProtoMessage()               {}
+func (*Option) Descriptor() ([]byte, []int) { return fileDescriptorUdf, []int{4} }
 
 func (m *Option) GetValues() []*OptionValue {
 	if m != nil {
@@ -165,9 +176,10 @@ type OptionValue struct {
 	Value isOptionValue_Value `protobuf_oneof:"value"`
 }
 
-func (m *OptionValue) Reset()         { *m = OptionValue{} }
-func (m *OptionValue) String() string { return proto.CompactTextString(m) }
-func (*OptionValue) ProtoMessage()    {}
+func (m *OptionValue) Reset()                    { *m = OptionValue{} }
+func (m *OptionValue) String() string            { return proto.CompactTextString(m) }
+func (*OptionValue) ProtoMessage()               {}
+func (*OptionValue) Descriptor() ([]byte, []int) { return fileDescriptorUdf, []int{5} }
 
 type isOptionValue_Value interface {
 	isOptionValue_Value()
@@ -238,8 +250,8 @@ func (m *OptionValue) GetDurationValue() int64 {
 }
 
 // XXX_OneofFuncs is for the internal use of the proto package.
-func (*OptionValue) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), []interface{}) {
-	return _OptionValue_OneofMarshaler, _OptionValue_OneofUnmarshaler, []interface{}{
+func (*OptionValue) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
+	return _OptionValue_OneofMarshaler, _OptionValue_OneofUnmarshaler, _OptionValue_OneofSizer, []interface{}{
 		(*OptionValue_BoolValue)(nil),
 		(*OptionValue_IntValue)(nil),
 		(*OptionValue_DoubleValue)(nil),
@@ -321,41 +333,72 @@ func _OptionValue_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Bu
 	}
 }
 
+func _OptionValue_OneofSizer(msg proto.Message) (n int) {
+	m := msg.(*OptionValue)
+	// value
+	switch x := m.Value.(type) {
+	case *OptionValue_BoolValue:
+		n += proto.SizeVarint(2<<3 | proto.WireVarint)
+		n += 1
+	case *OptionValue_IntValue:
+		n += proto.SizeVarint(3<<3 | proto.WireVarint)
+		n += proto.SizeVarint(uint64(x.IntValue))
+	case *OptionValue_DoubleValue:
+		n += proto.SizeVarint(4<<3 | proto.WireFixed64)
+		n += 8
+	case *OptionValue_StringValue:
+		n += proto.SizeVarint(5<<3 | proto.WireBytes)
+		n += proto.SizeVarint(uint64(len(x.StringValue)))
+		n += len(x.StringValue)
+	case *OptionValue_DurationValue:
+		n += proto.SizeVarint(6<<3 | proto.WireVarint)
+		n += proto.SizeVarint(uint64(x.DurationValue))
+	case nil:
+	default:
+		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
+	}
+	return n
+}
+
 // Respond to Kapacitor whether initialization was successful.
 type InitResponse struct {
 	Success bool   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
 	Error   string `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
 }
 
-func (m *InitResponse) Reset()         { *m = InitResponse{} }
-func (m *InitResponse) String() string { return proto.CompactTextString(m) }
-func (*InitResponse) ProtoMessage()    {}
+func (m *InitResponse) Reset()                    { *m = InitResponse{} }
+func (m *InitResponse) String() string            { return proto.CompactTextString(m) }
+func (*InitResponse) ProtoMessage()               {}
+func (*InitResponse) Descriptor() ([]byte, []int) { return fileDescriptorUdf, []int{6} }
 
 // Request that the process provide a snapshot of its state.
 type SnapshotRequest struct {
 }
 
-func (m *SnapshotRequest) Reset()         { *m = SnapshotRequest{} }
-func (m *SnapshotRequest) String() string { return proto.CompactTextString(m) }
-func (*SnapshotRequest) ProtoMessage()    {}
+func (m *SnapshotRequest) Reset()                    { *m = SnapshotRequest{} }
+func (m *SnapshotRequest) String() string            { return proto.CompactTextString(m) }
+func (*SnapshotRequest) ProtoMessage()               {}
+func (*SnapshotRequest) Descriptor() ([]byte, []int) { return fileDescriptorUdf, []int{7} }
 
 // Respond to Kapacitor with a serialized snapshot of the running state.
 type SnapshotResponse struct {
 	Snapshot []byte `protobuf:"bytes,1,opt,name=snapshot,proto3" json:"snapshot,omitempty"`
 }
 
-func (m *SnapshotResponse) Reset()         { *m = SnapshotResponse{} }
-func (m *SnapshotResponse) String() string { return proto.CompactTextString(m) }
-func (*SnapshotResponse) ProtoMessage()    {}
+func (m *SnapshotResponse) Reset()                    { *m = SnapshotResponse{} }
+func (m *SnapshotResponse) String() string            { return proto.CompactTextString(m) }
+func (*SnapshotResponse) ProtoMessage()               {}
+func (*SnapshotResponse) Descriptor() ([]byte, []int) { return fileDescriptorUdf, []int{8} }
 
 // Request that the process restore its state from a snapshot.
 type RestoreRequest struct {
 	Snapshot []byte `protobuf:"bytes,1,opt,name=snapshot,proto3" json:"snapshot,omitempty"`
 }
 
-func (m *RestoreRequest) Reset()         { *m = RestoreRequest{} }
-func (m *RestoreRequest) String() string { return proto.CompactTextString(m) }
-func (*RestoreRequest) ProtoMessage()    {}
+func (m *RestoreRequest) Reset()                    { *m = RestoreRequest{} }
+func (m *RestoreRequest) String() string            { return proto.CompactTextString(m) }
+func (*RestoreRequest) ProtoMessage()               {}
+func (*RestoreRequest) Descriptor() ([]byte, []int) { return fileDescriptorUdf, []int{9} }
 
 // Respond with success or failure to a RestoreRequest
 type RestoreResponse struct {
@@ -363,9 +406,10 @@ type RestoreResponse struct {
 	Error   string `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
 }
 
-func (m *RestoreResponse) Reset()         { *m = RestoreResponse{} }
-func (m *RestoreResponse) String() string { return proto.CompactTextString(m) }
-func (*RestoreResponse) ProtoMessage()    {}
+func (m *RestoreResponse) Reset()                    { *m = RestoreResponse{} }
+func (m *RestoreResponse) String() string            { return proto.CompactTextString(m) }
+func (*RestoreResponse) ProtoMessage()               {}
+func (*RestoreResponse) Descriptor() ([]byte, []int) { return fileDescriptorUdf, []int{10} }
 
 // Request that the process respond with a Keepalive to verify it is responding.
 type KeepaliveRequest struct {
@@ -374,9 +418,10 @@ type KeepaliveRequest struct {
 	Time int64 `protobuf:"varint,1,opt,name=time,proto3" json:"time,omitempty"`
 }
 
-func (m *KeepaliveRequest) Reset()         { *m = KeepaliveRequest{} }
-func (m *KeepaliveRequest) String() string { return proto.CompactTextString(m) }
-func (*KeepaliveRequest) ProtoMessage()    {}
+func (m *KeepaliveRequest) Reset()                    { *m = KeepaliveRequest{} }
+func (m *KeepaliveRequest) String() string            { return proto.CompactTextString(m) }
+func (*KeepaliveRequest) ProtoMessage()               {}
+func (*KeepaliveRequest) Descriptor() ([]byte, []int) { return fileDescriptorUdf, []int{11} }
 
 // Respond to KeepaliveRequest
 type KeepaliveResponse struct {
@@ -385,9 +430,10 @@ type KeepaliveResponse struct {
 	Time int64 `protobuf:"varint,1,opt,name=time,proto3" json:"time,omitempty"`
 }
 
-func (m *KeepaliveResponse) Reset()         { *m = KeepaliveResponse{} }
-func (m *KeepaliveResponse) String() string { return proto.CompactTextString(m) }
-func (*KeepaliveResponse) ProtoMessage()    {}
+func (m *KeepaliveResponse) Reset()                    { *m = KeepaliveResponse{} }
+func (m *KeepaliveResponse) String() string            { return proto.CompactTextString(m) }
+func (*KeepaliveResponse) ProtoMessage()               {}
+func (*KeepaliveResponse) Descriptor() ([]byte, []int) { return fileDescriptorUdf, []int{12} }
 
 // Sent from the process to Kapacitor indicating an error has occured.
 // If an ErrorResponse is received, Kapacitor will terminate the process.
@@ -395,9 +441,10 @@ type ErrorResponse struct {
 	Error string `protobuf:"bytes,1,opt,name=error,proto3" json:"error,omitempty"`
 }
 
-func (m *ErrorResponse) Reset()         { *m = ErrorResponse{} }
-func (m *ErrorResponse) String() string { return proto.CompactTextString(m) }
-func (*ErrorResponse) ProtoMessage()    {}
+func (m *ErrorResponse) Reset()                    { *m = ErrorResponse{} }
+func (m *ErrorResponse) String() string            { return proto.CompactTextString(m) }
+func (*ErrorResponse) ProtoMessage()               {}
+func (*ErrorResponse) Descriptor() ([]byte, []int) { return fileDescriptorUdf, []int{13} }
 
 // Indicates the beginning of a batch.
 // All subsequent points should be considered
@@ -414,9 +461,10 @@ type BeginBatch struct {
 	Tags  map[string]string `protobuf:"bytes,3,rep,name=tags" json:"tags,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
-func (m *BeginBatch) Reset()         { *m = BeginBatch{} }
-func (m *BeginBatch) String() string { return proto.CompactTextString(m) }
-func (*BeginBatch) ProtoMessage()    {}
+func (m *BeginBatch) Reset()                    { *m = BeginBatch{} }
+func (m *BeginBatch) String() string            { return proto.CompactTextString(m) }
+func (*BeginBatch) ProtoMessage()               {}
+func (*BeginBatch) Descriptor() ([]byte, []int) { return fileDescriptorUdf, []int{14} }
 
 func (m *BeginBatch) GetTags() map[string]string {
 	if m != nil {
@@ -440,9 +488,10 @@ type Point struct {
 	FieldsString    map[string]string  `protobuf:"bytes,10,rep,name=fieldsString" json:"fieldsString,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
-func (m *Point) Reset()         { *m = Point{} }
-func (m *Point) String() string { return proto.CompactTextString(m) }
-func (*Point) ProtoMessage()    {}
+func (m *Point) Reset()                    { *m = Point{} }
+func (m *Point) String() string            { return proto.CompactTextString(m) }
+func (*Point) ProtoMessage()               {}
+func (*Point) Descriptor() ([]byte, []int) { return fileDescriptorUdf, []int{15} }
 
 func (m *Point) GetTags() map[string]string {
 	if m != nil {
@@ -484,9 +533,10 @@ type EndBatch struct {
 	Tags  map[string]string `protobuf:"bytes,4,rep,name=tags" json:"tags,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
-func (m *EndBatch) Reset()         { *m = EndBatch{} }
-func (m *EndBatch) String() string { return proto.CompactTextString(m) }
-func (*EndBatch) ProtoMessage()    {}
+func (m *EndBatch) Reset()                    { *m = EndBatch{} }
+func (m *EndBatch) String() string            { return proto.CompactTextString(m) }
+func (*EndBatch) ProtoMessage()               {}
+func (*EndBatch) Descriptor() ([]byte, []int) { return fileDescriptorUdf, []int{16} }
 
 func (m *EndBatch) GetTags() map[string]string {
 	if m != nil {
@@ -509,9 +559,10 @@ type Request struct {
 	Message isRequest_Message `protobuf_oneof:"message"`
 }
 
-func (m *Request) Reset()         { *m = Request{} }
-func (m *Request) String() string { return proto.CompactTextString(m) }
-func (*Request) ProtoMessage()    {}
+func (m *Request) Reset()                    { *m = Request{} }
+func (m *Request) String() string            { return proto.CompactTextString(m) }
+func (*Request) ProtoMessage()               {}
+func (*Request) Descriptor() ([]byte, []int) { return fileDescriptorUdf, []int{17} }
 
 type isRequest_Message interface {
 	isRequest_Message()
@@ -615,8 +666,8 @@ func (m *Request) GetEnd() *EndBatch {
 }
 
 // XXX_OneofFuncs is for the internal use of the proto package.
-func (*Request) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), []interface{}) {
-	return _Request_OneofMarshaler, _Request_OneofUnmarshaler, []interface{}{
+func (*Request) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
+	return _Request_OneofMarshaler, _Request_OneofUnmarshaler, _Request_OneofSizer, []interface{}{
 		(*Request_Info)(nil),
 		(*Request_Init)(nil),
 		(*Request_Keepalive)(nil),
@@ -751,6 +802,57 @@ func _Request_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer
 	}
 }
 
+func _Request_OneofSizer(msg proto.Message) (n int) {
+	m := msg.(*Request)
+	// message
+	switch x := m.Message.(type) {
+	case *Request_Info:
+		s := proto.Size(x.Info)
+		n += proto.SizeVarint(1<<3 | proto.WireBytes)
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *Request_Init:
+		s := proto.Size(x.Init)
+		n += proto.SizeVarint(2<<3 | proto.WireBytes)
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *Request_Keepalive:
+		s := proto.Size(x.Keepalive)
+		n += proto.SizeVarint(3<<3 | proto.WireBytes)
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *Request_Snapshot:
+		s := proto.Size(x.Snapshot)
+		n += proto.SizeVarint(4<<3 | proto.WireBytes)
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *Request_Restore:
+		s := proto.Size(x.Restore)
+		n += proto.SizeVarint(5<<3 | proto.WireBytes)
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *Request_Begin:
+		s := proto.Size(x.Begin)
+		n += proto.SizeVarint(16<<3 | proto.WireBytes)
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *Request_Point:
+		s := proto.Size(x.Point)
+		n += proto.SizeVarint(17<<3 | proto.WireBytes)
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *Request_End:
+		s := proto.Size(x.End)
+		n += proto.SizeVarint(18<<3 | proto.WireBytes)
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case nil:
+	default:
+		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
+	}
+	return n
+}
+
 // Response message wrapper -- sent from process to Kapacitor
 type Response struct {
 	// Types that are valid to be assigned to Message:
@@ -766,9 +868,10 @@ type Response struct {
 	Message isResponse_Message `protobuf_oneof:"message"`
 }
 
-func (m *Response) Reset()         { *m = Response{} }
-func (m *Response) String() string { return proto.CompactTextString(m) }
-func (*Response) ProtoMessage()    {}
+func (m *Response) Reset()                    { *m = Response{} }
+func (m *Response) String() string            { return proto.CompactTextString(m) }
+func (*Response) ProtoMessage()               {}
+func (*Response) Descriptor() ([]byte, []int) { return fileDescriptorUdf, []int{18} }
 
 type isResponse_Message interface {
 	isResponse_Message()
@@ -883,8 +986,8 @@ func (m *Response) GetEnd() *EndBatch {
 }
 
 // XXX_OneofFuncs is for the internal use of the proto package.
-func (*Response) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), []interface{}) {
-	return _Response_OneofMarshaler, _Response_OneofUnmarshaler, []interface{}{
+func (*Response) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
+	return _Response_OneofMarshaler, _Response_OneofUnmarshaler, _Response_OneofSizer, []interface{}{
 		(*Response_Info)(nil),
 		(*Response_Init)(nil),
 		(*Response_Keepalive)(nil),
@@ -1033,6 +1136,62 @@ func _Response_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffe
 	}
 }
 
+func _Response_OneofSizer(msg proto.Message) (n int) {
+	m := msg.(*Response)
+	// message
+	switch x := m.Message.(type) {
+	case *Response_Info:
+		s := proto.Size(x.Info)
+		n += proto.SizeVarint(1<<3 | proto.WireBytes)
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *Response_Init:
+		s := proto.Size(x.Init)
+		n += proto.SizeVarint(2<<3 | proto.WireBytes)
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *Response_Keepalive:
+		s := proto.Size(x.Keepalive)
+		n += proto.SizeVarint(3<<3 | proto.WireBytes)
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *Response_Snapshot:
+		s := proto.Size(x.Snapshot)
+		n += proto.SizeVarint(4<<3 | proto.WireBytes)
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *Response_Restore:
+		s := proto.Size(x.Restore)
+		n += proto.SizeVarint(5<<3 | proto.WireBytes)
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *Response_Error:
+		s := proto.Size(x.Error)
+		n += proto.SizeVarint(6<<3 | proto.WireBytes)
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *Response_Begin:
+		s := proto.Size(x.Begin)
+		n += proto.SizeVarint(16<<3 | proto.WireBytes)
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *Response_Point:
+		s := proto.Size(x.Point)
+		n += proto.SizeVarint(17<<3 | proto.WireBytes)
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *Response_End:
+		s := proto.Size(x.End)
+		n += proto.SizeVarint(18<<3 | proto.WireBytes)
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case nil:
+	default:
+		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
+	}
+	return n
+}
+
 func init() {
 	proto.RegisterType((*InfoRequest)(nil), "udf.InfoRequest")
 	proto.RegisterType((*InfoResponse)(nil), "udf.InfoResponse")
@@ -1055,4 +1214,75 @@ func init() {
 	proto.RegisterType((*Response)(nil), "udf.Response")
 	proto.RegisterEnum("udf.EdgeType", EdgeType_name, EdgeType_value)
 	proto.RegisterEnum("udf.ValueType", ValueType_name, ValueType_value)
+}
+
+var fileDescriptorUdf = []byte{
+	// 1064 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xc4, 0x56, 0xef, 0x72, 0xdb, 0x44,
+	0x10, 0xaf, 0x2c, 0xcb, 0x96, 0xd6, 0x76, 0x22, 0x1f, 0x29, 0x88, 0x4c, 0x27, 0xd3, 0x8a, 0x69,
+	0x12, 0x02, 0x18, 0xc6, 0xe5, 0x4f, 0x87, 0xe9, 0x00, 0x31, 0x71, 0xa9, 0xa7, 0x25, 0xee, 0x28,
+	0x6e, 0xbf, 0xcb, 0xd1, 0xc5, 0xd5, 0xd4, 0x91, 0x8c, 0x24, 0x07, 0xf2, 0x0c, 0xbc, 0x03, 0x1f,
+	0x78, 0x00, 0xde, 0x8a, 0x19, 0x3e, 0xf2, 0x08, 0xdc, 0xed, 0x49, 0xa7, 0x93, 0x6d, 0xe8, 0xb4,
+	0xc3, 0x4c, 0xbf, 0xe9, 0x76, 0x7f, 0xfb, 0xef, 0x77, 0xbb, 0x7b, 0x02, 0x6b, 0x19, 0x5c, 0xf4,
+	0x16, 0x49, 0x9c, 0xc5, 0x44, 0x67, 0x9f, 0x6e, 0x07, 0x5a, 0xa3, 0xe8, 0x22, 0xf6, 0xe8, 0x4f,
+	0x4b, 0x9a, 0x66, 0xee, 0x9f, 0x1a, 0xb4, 0xc5, 0x39, 0x5d, 0xc4, 0x51, 0x4a, 0xc9, 0x07, 0x60,
+	0xfc, 0xec, 0x47, 0x59, 0xea, 0x68, 0xb7, 0xb5, 0xc3, 0xad, 0x7e, 0xa7, 0xc7, 0xed, 0x87, 0xc1,
+	0x8c, 0x4e, 0xae, 0x17, 0xd4, 0x13, 0x3a, 0xf2, 0x21, 0x98, 0xcc, 0xe5, 0x55, 0x18, 0xd0, 0xd4,
+	0xa9, 0x6d, 0xc2, 0x49, 0x35, 0xb9, 0x0f, 0xcd, 0x78, 0x91, 0x85, 0xcc, 0xb7, 0xa3, 0xdf, 0xd6,
+	0x0f, 0x5b, 0xfd, 0x3d, 0x44, 0xaa, 0x31, 0x7b, 0x63, 0x01, 0x18, 0x46, 0x59, 0x72, 0xed, 0x15,
+	0xf0, 0xdd, 0xc7, 0xd0, 0x56, 0x15, 0xc4, 0x06, 0xfd, 0x25, 0xbd, 0xc6, 0xbc, 0x2c, 0x8f, 0x7f,
+	0x92, 0xbb, 0x60, 0x5c, 0xf9, 0xf3, 0x25, 0xc5, 0x1c, 0x5a, 0xfd, 0x6d, 0xf4, 0x2c, 0x6c, 0xd0,
+	0xbf, 0xd0, 0x7e, 0x5d, 0xbb, 0xaf, 0xb9, 0x0f, 0x00, 0x4a, 0x05, 0xe9, 0x01, 0xa0, 0x8a, 0xe7,
+	0xca, 0x2b, 0xd5, 0x59, 0x05, 0x5b, 0x68, 0xfd, 0xbc, 0x10, 0x7b, 0x0a, 0xc2, 0xfd, 0x9c, 0x93,
+	0x16, 0x66, 0x39, 0x69, 0x2c, 0xae, 0xac, 0x49, 0xc3, 0x9a, 0x5a, 0x4a, 0x64, 0x59, 0x80, 0xfb,
+	0x10, 0x1a, 0x42, 0x44, 0x08, 0xd4, 0x23, 0xff, 0x92, 0xe6, 0xb9, 0xe3, 0x37, 0x39, 0x84, 0x06,
+	0x46, 0xe0, 0x0c, 0x72, 0x1f, 0xb6, 0xe2, 0x03, 0xb3, 0xf0, 0x72, 0xbd, 0xfb, 0x97, 0x06, 0x2d,
+	0x45, 0x4e, 0x5c, 0xa8, 0x67, 0x2c, 0xad, 0xfc, 0x86, 0x56, 0xf3, 0x46, 0x1d, 0xd9, 0x03, 0x6b,
+	0x1a, 0xc7, 0xf3, 0xe7, 0x92, 0x1e, 0xf3, 0xd1, 0x0d, 0xaf, 0x14, 0x91, 0x5b, 0x60, 0x86, 0x51,
+	0x26, 0xd4, 0x3a, 0x53, 0xeb, 0x4c, 0x2d, 0x25, 0x2c, 0x42, 0x2b, 0x88, 0x97, 0xd3, 0x39, 0x15,
+	0x80, 0x3a, 0x03, 0x68, 0x0c, 0xa0, 0x0a, 0x39, 0x26, 0xcd, 0x92, 0x30, 0x9a, 0x09, 0x8c, 0xc1,
+	0x4b, 0xe3, 0x18, 0x45, 0x48, 0xf6, 0xa1, 0x13, 0x2c, 0x13, 0x5f, 0xa6, 0xee, 0x34, 0xf2, 0x50,
+	0x55, 0xf1, 0xa0, 0x99, 0x5f, 0xa4, 0xfb, 0x0d, 0xef, 0x46, 0x4e, 0x74, 0xde, 0x8d, 0x0e, 0x34,
+	0xd3, 0xe5, 0xf9, 0x39, 0x4d, 0x45, 0x3f, 0x9a, 0x5e, 0x71, 0x24, 0x3b, 0x60, 0xd0, 0x24, 0x89,
+	0x13, 0x2c, 0xce, 0xf2, 0xc4, 0xc1, 0xed, 0xc2, 0xf6, 0x59, 0xe4, 0x2f, 0xd2, 0x17, 0x71, 0x71,
+	0x59, 0x6e, 0x0f, 0xec, 0x52, 0x94, 0xbb, 0xdd, 0x05, 0x33, 0xcd, 0x65, 0xe8, 0xb7, 0xed, 0xc9,
+	0xb3, 0xfb, 0x31, 0x6c, 0x31, 0x5c, 0x16, 0x27, 0xb4, 0xb8, 0xee, 0xff, 0x42, 0x1f, 0xc3, 0xb6,
+	0x44, 0xbf, 0x61, 0xce, 0xfb, 0x60, 0x3f, 0xa6, 0x74, 0xe1, 0xcf, 0xc3, 0x2b, 0x19, 0x92, 0x35,
+	0x4c, 0x16, 0xe6, 0x0d, 0xa3, 0x7b, 0xf8, 0xed, 0x1e, 0x40, 0x57, 0xc1, 0xe5, 0xc1, 0x36, 0x01,
+	0xef, 0x42, 0x67, 0xc8, 0x3d, 0x4b, 0x90, 0x8c, 0xab, 0xa9, 0x71, 0x7f, 0xd3, 0x00, 0x06, 0x74,
+	0x16, 0x46, 0x03, 0x3f, 0x3b, 0x7f, 0xb1, 0xb1, 0x47, 0x99, 0xe1, 0x2c, 0x89, 0x97, 0x8b, 0x22,
+	0x61, 0x3c, 0x90, 0x4f, 0x58, 0x4c, 0x7f, 0x56, 0xcc, 0xf3, 0xfb, 0xd8, 0x7f, 0xa5, 0xa3, 0xde,
+	0x84, 0xe9, 0xc4, 0x28, 0x23, 0x6c, 0xf7, 0x2b, 0xb0, 0xa4, 0x68, 0xc3, 0x10, 0xef, 0xa8, 0x43,
+	0x6c, 0xa9, 0x33, 0xfb, 0xab, 0x01, 0xc6, 0xd3, 0x98, 0x35, 0xe5, 0xa6, 0x2a, 0x65, 0xbe, 0x35,
+	0x25, 0x5f, 0x76, 0x53, 0x81, 0x9f, 0xf9, 0x53, 0x3f, 0x15, 0x5d, 0x6d, 0x79, 0xf2, 0xcc, 0xe6,
+	0x6d, 0x3b, 0xa1, 0x19, 0x8d, 0x78, 0xd7, 0x3d, 0x8d, 0xe7, 0xe1, 0xf9, 0x35, 0xf6, 0xb5, 0xe5,
+	0xad, 0x8a, 0xcb, 0xaa, 0x0d, 0xb5, 0xea, 0x3d, 0x80, 0x80, 0xc5, 0x8d, 0x52, 0x9c, 0xfb, 0x06,
+	0xab, 0xdd, 0xf2, 0x14, 0x09, 0xf3, 0x2f, 0x58, 0x69, 0x22, 0x2b, 0x3b, 0xc8, 0x0a, 0x66, 0xbf,
+	0x4a, 0x08, 0xf9, 0x0e, 0xda, 0x17, 0x21, 0x9d, 0x07, 0xe9, 0x09, 0x8e, 0x93, 0x63, 0xa2, 0xc5,
+	0x2d, 0xc5, 0xe2, 0xa1, 0xa2, 0x16, 0x96, 0x15, 0x0b, 0xc2, 0x28, 0x15, 0xe7, 0x51, 0x94, 0x39,
+	0x96, 0x72, 0x0d, 0xaa, 0x39, 0xd3, 0x09, 0xdb, 0x12, 0x5b, 0x86, 0x3e, 0xc3, 0x29, 0x75, 0xe0,
+	0x5f, 0x42, 0x0b, 0x75, 0x25, 0xb4, 0x10, 0xbd, 0xf1, 0x6d, 0xee, 0x7e, 0x0b, 0xdd, 0xb5, 0xb2,
+	0x5e, 0xe5, 0x40, 0x53, 0x1d, 0x3c, 0x80, 0xad, 0x6a, 0x61, 0xaf, 0xb2, 0xd6, 0x37, 0x86, 0x57,
+	0x4a, 0x7b, 0xad, 0x6e, 0xfc, 0x43, 0x03, 0x73, 0x18, 0x05, 0xaf, 0x3b, 0x2c, 0xbc, 0x75, 0x2f,
+	0xfd, 0x5f, 0xc4, 0x92, 0xf5, 0xf0, 0x9b, 0x7c, 0x94, 0xb7, 0x4a, 0x1d, 0xd9, 0x7f, 0x4f, 0x3c,
+	0x9d, 0xb9, 0xeb, 0xff, 0x6f, 0x7c, 0xfe, 0xae, 0x41, 0xb3, 0xd8, 0x27, 0xfb, 0x50, 0x0f, 0xd9,
+	0xc3, 0x87, 0x86, 0xc5, 0x53, 0xa3, 0xfc, 0x06, 0xb0, 0x8d, 0x8c, 0x7a, 0x81, 0x0b, 0xb3, 0xfc,
+	0x41, 0x2d, 0x70, 0xf2, 0xe5, 0x13, 0xb8, 0x30, 0x23, 0x5f, 0x80, 0xf5, 0xb2, 0xd8, 0x45, 0x58,
+	0x5a, 0xab, 0x7f, 0x13, 0xc1, 0xab, 0x9b, 0x8c, 0xbf, 0x3a, 0x12, 0x49, 0xfa, 0xca, 0x26, 0xad,
+	0xa3, 0x95, 0x98, 0x93, 0x95, 0x9d, 0xcd, 0xdf, 0xa2, 0x02, 0x47, 0x3e, 0x85, 0x66, 0x22, 0x36,
+	0x2c, 0xce, 0x63, 0xab, 0xff, 0x0e, 0x9a, 0x54, 0x77, 0x34, 0xb3, 0x28, 0x50, 0xe4, 0x00, 0x8c,
+	0x29, 0xdf, 0x46, 0x8e, 0xad, 0xfc, 0x15, 0x94, 0xfb, 0x89, 0x41, 0x85, 0x9e, 0xbd, 0x60, 0xc6,
+	0x82, 0xf7, 0xbc, 0xd3, 0x45, 0x20, 0x94, 0x53, 0xc0, 0x31, 0xa8, 0x22, 0x77, 0x40, 0xa7, 0x51,
+	0xe0, 0x10, 0x44, 0x74, 0x2a, 0x37, 0xc5, 0x40, 0x5c, 0x37, 0xb0, 0xa0, 0x79, 0xc9, 0xb6, 0xbb,
+	0x3f, 0xa3, 0xee, 0xef, 0x3a, 0x98, 0x72, 0xeb, 0x1e, 0x54, 0x38, 0xef, 0xae, 0xfd, 0xf6, 0x48,
+	0xd2, 0x0f, 0x2a, 0xa4, 0x77, 0x15, 0xd2, 0x55, 0x20, 0x63, 0xfd, 0xcb, 0x75, 0xd6, 0xdf, 0x5d,
+	0x65, 0x5d, 0x9a, 0x28, 0xb4, 0xdf, 0x5b, 0xa3, 0xfd, 0xe6, 0x0a, 0xed, 0xd2, 0xaa, 0xe4, 0xfd,
+	0xb3, 0x55, 0xde, 0x77, 0xaa, 0xbc, 0x4b, 0x13, 0x49, 0xfc, 0x51, 0xf1, 0xcc, 0x34, 0x10, 0x4f,
+	0x04, 0x5b, 0xea, 0x4b, 0xc4, 0x79, 0x45, 0xc8, 0x5b, 0xbc, 0xa4, 0xa3, 0x3b, 0x6c, 0x8e, 0xf3,
+	0xff, 0x54, 0x02, 0xd0, 0x38, 0x9b, 0x78, 0xc3, 0xe3, 0x1f, 0xed, 0x1b, 0xc4, 0x02, 0x63, 0x70,
+	0x3c, 0xf9, 0xfe, 0x91, 0xad, 0x1d, 0x9d, 0x80, 0x25, 0x7f, 0xa8, 0x88, 0x09, 0xf5, 0xc1, 0x78,
+	0xfc, 0x84, 0x21, 0x9a, 0xa0, 0x8f, 0x4e, 0x27, 0xb6, 0xc6, 0xcd, 0x4e, 0xc6, 0xcf, 0x06, 0x4f,
+	0x86, 0x76, 0x2d, 0x77, 0x31, 0x3a, 0xfd, 0xc1, 0xd6, 0x49, 0x1b, 0xcc, 0x93, 0x67, 0xde, 0xf1,
+	0x64, 0x34, 0x3e, 0xb5, 0xeb, 0xd3, 0x06, 0xfe, 0x76, 0xdf, 0xfb, 0x27, 0x00, 0x00, 0xff, 0xff,
+	0xbc, 0x86, 0x40, 0x00, 0x83, 0x0b, 0x00, 0x00,
 }
