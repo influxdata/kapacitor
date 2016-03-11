@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
+	client "github.com/influxdata/influxdb/client/v2"
+	"github.com/influxdata/influxdb/cluster"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/services/udp"
-	client "github.com/influxdb/influxdb/client/v2"
-	"github.com/influxdb/influxdb/cluster"
 )
 
 const (

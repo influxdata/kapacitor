@@ -7,9 +7,9 @@ import (
 	"io"
 	"time"
 
+	dbmodels "github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor/clock"
 	"github.com/influxdata/kapacitor/models"
-	dbmodels "github.com/influxdb/influxdb/models"
 )
 
 // Replay engine that can replay static data sets against a specific executor and its tasks.

@@ -16,9 +16,9 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/services/httpd"
-	"github.com/influxdb/influxdb/influxql"
 )
 
 const taskDB = "task.db"

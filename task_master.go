@@ -7,13 +7,13 @@ import (
 	"sync"
 	"time"
 
+	client "github.com/influxdata/influxdb/client/v2"
+	"github.com/influxdata/influxdb/cluster"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/tick"
 	"github.com/influxdata/kapacitor/timer"
-	client "github.com/influxdb/influxdb/client/v2"
-	"github.com/influxdb/influxdb/cluster"
 )
 
 type LogService interface {

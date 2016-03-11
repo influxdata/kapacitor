@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/influxdb/influxdb/toml"
+	"github.com/influxdata/influxdb/toml"
 )
 
 type Config struct {

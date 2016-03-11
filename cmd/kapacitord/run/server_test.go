@@ -18,13 +18,13 @@ import (
 	"testing"
 	"time"
 
+	client "github.com/influxdata/influxdb/client/v2"
+	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/influxdb/models"
+	"github.com/influxdata/influxdb/toml"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/cmd/kapacitord/run"
 	"github.com/influxdata/kapacitor/services/udf"
-	client "github.com/influxdb/influxdb/client/v2"
-	"github.com/influxdb/influxdb/influxql"
-	"github.com/influxdb/influxdb/models"
-	"github.com/influxdb/influxdb/toml"
 )
 
 func TestServer_Ping(t *testing.T) {

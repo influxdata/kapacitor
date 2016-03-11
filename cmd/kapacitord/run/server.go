@@ -12,6 +12,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/influxdb/services/collectd"
+	"github.com/influxdata/influxdb/services/graphite"
+	"github.com/influxdata/influxdb/services/meta"
+	"github.com/influxdata/influxdb/services/opentsdb"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/deadman"
@@ -33,11 +38,6 @@ import (
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/wlog"
-	"github.com/influxdb/influxdb/influxql"
-	"github.com/influxdb/influxdb/services/collectd"
-	"github.com/influxdb/influxdb/services/graphite"
-	"github.com/influxdb/influxdb/services/meta"
-	"github.com/influxdb/influxdb/services/opentsdb"
 	"github.com/twinj/uuid"
 )
 

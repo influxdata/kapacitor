@@ -7,8 +7,8 @@ import (
 	"sort"
 	"time"
 
-	client "github.com/influxdb/influxdb/client/v2"
-	"github.com/influxdb/influxdb/models"
+	client "github.com/influxdata/influxdb/client/v2"
+	"github.com/influxdata/influxdb/models"
 )
 
 // A point in batch, similar to Point but most information is
