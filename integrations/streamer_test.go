@@ -2353,7 +2353,7 @@ func TestStream_AlertAlerta(t *testing.T) {
 		if exp := "serverA"; pd.Event != exp {
 			t.Errorf("unexpected event got %s exp %s", pd.Event, exp)
 		}
-		if exp := "kapacitor/cpu/serverA is CRITICAL"; pd.Text != exp {
+		if exp := "kapacitor/cpu/serverA is CRITICAL @1971-01-01 00:00:10 +0000 UTC"; pd.Text != exp {
 			t.Errorf("unexpected text got %s exp %s", pd.Text, exp)
 		}
 	}))
@@ -2370,7 +2370,7 @@ stream
 	.mapReduce(influxql.count('value'))
 	.alert()
 		.id('{{ index .Tags "host" }}')
-		.message('kapacitor/{{ .Name }}/{{ index .Tags "host" }} is {{ .Level }}')
+		.message('kapacitor/{{ .Name }}/{{ index .Tags "host" }} is {{ .Level }} @{{.Time}}')
 		.info(lambda: "count" > 6.0)
 		.warn(lambda: "count" > 7.0)
 		.crit(lambda: "count" > 8.0)

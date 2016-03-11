@@ -384,7 +384,7 @@ func (a *AlertNode) alertData(
 	if err != nil {
 		return nil, err
 	}
-	msg, details, info, err := a.renderMessageAndDetails(id, name, group, tags, fields, level)
+	msg, details, info, err := a.renderMessageAndDetails(id, name, t, group, tags, fields, level)
 	if err != nil {
 		return nil, err
 	}
@@ -474,6 +474,7 @@ type idInfo struct {
 	// Map of tags
 	Tags map[string]string
 }
+
 type messageInfo struct {
 	idInfo
 
@@ -485,6 +486,9 @@ type messageInfo struct {
 
 	// Alert Level, one of: INFO, WARNING, CRITICAL.
 	Level string
+
+	// Time
+	Time time.Time
 }
 
 type detailsInfo struct {
@@ -512,7 +516,7 @@ func (a *AlertNode) renderID(name string, group models.GroupID, tags models.Tags
 	return id.String(), nil
 }
 
-func (a *AlertNode) renderMessageAndDetails(id, name string, group models.GroupID, tags models.Tags, fields models.Fields, level AlertLevel) (string, string, detailsInfo, error) {
+func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group models.GroupID, tags models.Tags, fields models.Fields, level AlertLevel) (string, string, detailsInfo, error) {
 	g := string(group)
 	if group == models.NilGroup {
 		g = "nil"
@@ -527,6 +531,7 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, group models.GroupI
 		ID:     id,
 		Fields: fields,
 		Level:  level.String(),
+		Time:   t,
 	}
 	var msg bytes.Buffer
 	err := a.messageTmpl.Execute(&msg, minfo)
