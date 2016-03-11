@@ -131,6 +131,7 @@ type AlertNode struct {
 	//    * Tags -- Map of tags. Use '{{ index .Tags "key" }}' to get a specific tag value.
 	//    * Level -- Alert Level, one of: INFO, WARNING, CRITICAL.
 	//    * Fields -- Map of fields. Use '{{ index .Fields "key" }}' to get a specific field value.
+	//    * Time -- The time of the point that triggered the event.
 	//
 	// Example:
 	//   stream...
