@@ -140,7 +140,10 @@ func (et *ExecutingTask) link() error {
 		// Duplicate the Edges
 		for _, p := range n.Parents() {
 			ep := et.lookup[p.ID()]
-			ep.linkChild(en)
+			err := ep.linkChild(en)
+			if err != nil {
+				return err
+			}
 		}
 		return err
 	})
