@@ -25,7 +25,6 @@ import (
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/cmd/kapacitord/run"
 	"github.com/influxdata/kapacitor/services/udf"
-	"github.com/influxdata/kapacitor/vendor/github.com/influxdata/influxdb/toml"
 )
 
 func TestServer_Ping(t *testing.T) {
@@ -955,7 +954,7 @@ func TestServer_UDFBatchAgents(t *testing.T) {
 			},
 			config: udf.FunctionConfig{
 				Prog:    filepath.Join(tdir, "outliers"),
-				Timeout: toml.Duration(time.Minute),
+				Timeout: config.Duration(time.Minute),
 			},
 		},
 		// Python
@@ -964,7 +963,7 @@ func TestServer_UDFBatchAgents(t *testing.T) {
 			config: udf.FunctionConfig{
 				Prog:    "python2",
 				Args:    []string{"-u", filepath.Join(udfDir, "agent/examples/outliers/outliers.py")},
-				Timeout: toml.Duration(time.Minute),
+				Timeout: config.Duration(time.Minute),
 				Env: map[string]string{
 					"PYTHONPATH": strings.Join(
 						[]string{filepath.Join(udfDir, "agent/py"), os.Getenv("PYTHONPATH")},
