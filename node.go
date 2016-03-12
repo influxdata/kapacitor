@@ -52,6 +52,10 @@ type Node interface {
 	nodeStatsByGroup() map[models.GroupID]nodeStats
 
 	collectedCount() int64
+
+	emittedCount() int64
+
+	stats() map[string]interface{}
 }
 
 //implementation of Node
@@ -239,11 +243,37 @@ func (n *node) edot(buf *bytes.Buffer, labels bool) {
 	}
 }
 
+// node collected count is the sum of emitted counts of parent edges
 func (n *node) collectedCount() (count int64) {
 	for _, in := range n.ins {
 		count += in.emittedCount()
 	}
 	return
+}
+
+// node emitted count is the sum of collected counts of children edges
+func (n *node) emittedCount() (count int64) {
+	for _, out := range n.outs {
+		count += out.collectedCount()
+	}
+	return
+}
+
+func (n *node) stats() map[string]interface{} {
+	stats := make(map[string]interface{})
+
+	n.statMap.Do(func(kv expvar.KeyValue) {
+		switch v := kv.Value.(type) {
+		case kexpvar.IntVar:
+			stats[kv.Key] = v.IntValue()
+		case kexpvar.FloatVar:
+			stats[kv.Key] = v.FloatValue()
+		default:
+			stats[kv.Key] = v.String()
+		}
+	})
+
+	return stats
 }
 
 // Statistics for a node
