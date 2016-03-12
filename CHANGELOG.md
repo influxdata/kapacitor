@@ -86,6 +86,7 @@ There was a breaking change to the `define` command, see [#173](https://github.c
 - [#132](https://github.com/influxdata/kapacitor/issues/132): Make is so multiple calls to `where` simply `AND` expressions together instead of replacing or creating extra nodes in the pipeline.
 - [#173](https://github.com/influxdata/kapacitor/issues/173): BREAKING: Added a `-no-reload` flag to the define command in the CLI. Now if the task is enabled define will automatically reload it unless `-no-reload` is passed.
 - [#194](https://github.com/influxdata/kapacitor/pull/194): Adds Talk integration for alerts. Thanks @wutaizeng!
+- [#320](https://github.com/influxdata/kapacitor/pull/320): Upgrade to go 1.6
 
 ### Bugfixes
 
