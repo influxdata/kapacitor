@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/influxdata/influxdb/cluster"
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/expvar"
@@ -42,7 +41,7 @@ type Service struct {
 	config Config
 
 	PointsWriter interface {
-		WritePoints(p *cluster.WritePointsRequest) error
+		WritePoints(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
 	}
 
 	Logger  *log.Logger
@@ -149,12 +148,12 @@ func (s *Service) processPackets() {
 			continue
 		}
 
-		if err := s.PointsWriter.WritePoints(&cluster.WritePointsRequest{
-			Database:         s.config.Database,
-			RetentionPolicy:  s.config.RetentionPolicy,
-			ConsistencyLevel: cluster.ConsistencyLevelOne,
-			Points:           points,
-		}); err == nil {
+		if err := s.PointsWriter.WritePoints(
+			s.config.Database,
+			s.config.RetentionPolicy,
+			models.ConsistencyLevelAll,
+			points,
+		); err == nil {
 			s.statMap.Add(statPointsTransmitted, int64(len(points)))
 		} else {
 			s.Logger.Printf("E! failed to write points to database %q: %s", s.config.Database, err)

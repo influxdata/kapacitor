@@ -8,7 +8,7 @@ import (
 	"time"
 
 	client "github.com/influxdata/influxdb/client/v2"
-	"github.com/influxdata/influxdb/cluster"
+	imodels "github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/services/httpd"
@@ -414,14 +414,14 @@ func (tm *TaskMaster) forkPoint(p models.Point) {
 	}
 }
 
-func (tm *TaskMaster) WritePoints(pts *cluster.WritePointsRequest) error {
+func (tm *TaskMaster) WritePoints(database, retentionPolicy string, consistencyLevel imodels.ConsistencyLevel, points []imodels.Point) error {
 	if tm.closed {
 		return ErrTaskMasterClosed
 	}
-	for _, mp := range pts.Points {
+	for _, mp := range points {
 		p := models.Point{
-			Database:        pts.Database,
-			RetentionPolicy: pts.RetentionPolicy,
+			Database:        database,
+			RetentionPolicy: retentionPolicy,
 			Name:            mp.Name(),
 			Group:           models.NilGroup,
 			Tags:            models.Tags(mp.Tags()),

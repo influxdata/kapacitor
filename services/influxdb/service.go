@@ -15,7 +15,7 @@ import (
 
 	"github.com/cenkalti/backoff"
 	client "github.com/influxdata/influxdb/client/v2"
-	"github.com/influxdata/influxdb/cluster"
+	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/services/udp"
 )
@@ -32,7 +32,7 @@ type Service struct {
 	clusters        map[string]*influxdb
 
 	PointsWriter interface {
-		WritePoints(p *cluster.WritePointsRequest) error
+		WritePoints(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
 	}
 	LogService interface {
 		NewLogger(string, int) *log.Logger
@@ -153,7 +153,7 @@ type influxdb struct {
 	subName   string
 
 	PointsWriter interface {
-		WritePoints(p *cluster.WritePointsRequest) error
+		WritePoints(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
 	}
 	LogService interface {
 		NewLogger(string, int) *log.Logger
