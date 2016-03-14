@@ -689,7 +689,8 @@ type AlertaHandler struct {
 	Resource string
 
 	// Alerta environment.
-	// If empty uses the environment from the configuration.
+	// Can be a template and has access to the same data as the AlertNode.Details property.
+	// Defaut is set from the configuration.
 	Environment string
 
 	// Alerta group.

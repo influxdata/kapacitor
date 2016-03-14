@@ -2334,7 +2334,7 @@ func TestStream_AlertAlerta(t *testing.T) {
 			if exp := "resource: cpu"; pd.Resource != exp {
 				t.Errorf("unexpected resource got %s exp %s", pd.Resource, exp)
 			}
-			if exp := "development"; pd.Environment != exp {
+			if exp := "serverA"; pd.Environment != exp {
 				t.Errorf("unexpected environment got %s exp %s", pd.Environment, exp)
 			}
 			if exp := "serverA"; pd.Group != exp {
@@ -2380,7 +2380,7 @@ stream
 		.alerta()
 			.token('anothertesttoken')
 			.resource('resource: {{ .Name }}')
-			.environment('development')
+			.environment('{{ index .Tags "host" }}')
 			.origin('override')
 			.group('{{ .ID }}')
 			.value('{{ index .Fields "count" | printf "%0.0f" }}')
