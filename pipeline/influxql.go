@@ -54,7 +54,7 @@ func newInfluxQLNode(method, field string, wants, provides EdgeType, reducer Red
 
 // Use the time of the selected point instead of the time of the batch.
 //
-// Only applies to selector MR functions like first, last, top, bottom, etc.
+// Only applies to selector functions like first, last, top, bottom, etc.
 // Aggregation functions always use the batch time.
 // tick:property
 func (n *InfluxQLNode) UsePointTimes() *InfluxQLNode {
