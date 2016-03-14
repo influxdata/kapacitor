@@ -64,16 +64,9 @@ If you are going to be contributing back to Kapacitor please take a second to si
 
 Installing Go
 -------------
-Kapacitor requires Go 1.5 or greater.
+Kapacitor requires Go 1.6 or greater.
 
-At Kapacitor we find gvm, a Go version manager, useful for installing Go. For instructions
-on how to install it see [the gvm page on github](https://github.com/moovweb/gvm).
-
-After installing gvm you can install and set the default go version by
-running the following:
-
-    gvm install go1.5
-    gvm use go1.5 --default
+To install go see https://golang.org/dl/
 
 Revision Control Systems
 ------------------------
@@ -89,7 +82,7 @@ Setup the project structure and fetch the repo like so:
 
     mkdir $HOME/gocodez
     export GOPATH=$HOME/gocodez
-    go get github.com/influxdb/kapacitor
+    go get github.com/influxdata/kapacitor
 
 You can add the line `export GOPATH=$HOME/gocodez` to your bash/zsh file to be set for every shell instead of having to manually run it everytime.
 
@@ -100,17 +93,17 @@ But instead of cloning the main repo, instead clone your fork. Follow the steps 
 
     export GOPATH=$HOME/gocodez
     mkdir -p $GOPATH/src/github.com/influxdb
-    cd $GOPATH/src/github.com/influxdb
+    cd $GOPATH/src/github.com/influxdata
     git clone git@github.com:<username>/kapacitor
 
-Retaining the directory structure `$GOPATH/src/github.com/influxdb` is necessary so that Go imports work correctly.
+Retaining the directory structure `$GOPATH/src/github.com/influxdata` is necessary so that Go imports work correctly.
 
 Pre-commit checks
 -------------
 
 We have a pre-commit hook to make sure code is formatted properly and vetted before you commit any changes. We strongly recommend using the pre-commit hook to guard against accidentally committing unformatted code. To use the pre-commit hook, run the following:
 
-    cd $GOPATH/src/github.com/influxdb/kapacitor
+    cd $GOPATH/src/github.com/influxdata/kapacitor
     cp .hooks/pre-commit .git/hooks/
 
 In case the commit is rejected because it's not formatted you can run
@@ -137,6 +130,7 @@ Make sure you have Go installed and the project structure as shown above. To the
 
 ```bash
 cd $GOPATH/src/github.com/influxdb/kapacitor
+go get ./...
 go build ./cmd/kapacitor
 go build ./cmd/kapacitord
 ```
@@ -145,13 +139,79 @@ Kapacitor builds two binares is named `kapacitor`, and `kapacitord`.
 To run the tests, execute the following command:
 
 ```bash
+go get -t ./...
 go test ./...
 ```
 
+Generating Code
+---------------
+
+Kapacitor uses generated code.
+The generated code is committed to the repository so normally it is not necessary to regenerate it.
+But if you modify one of the templates for code generation you must re-run the generate commands.
+
+Go provides a consistent command for generating all necessary code:
+
+```bash
+go generate ./...
+```
+
+For the generate command to succeed you will need a few dependencies installed on your system:
+
+* tmpl -- A utility used to generate code from templates. Install via `go get github.com/benbjohnson/tmpl`
+* protoc + protoc-gen-gogo -- A protobuf compiler plus the protoc-gen-gogo extension.
+    You need version 3.0.0-beta-2 of protoc.
+    To install the go plugin run `go get github.com/gogo/protobuf/protoc-gen-gogo`
+
+NOTE: Since installing dependencies can often be painful we have provided a docker container that comes with all of these dependencies installed.
+See the section below about the build script and docker.
+
+
+The Build Script
+----------------
+
+The above commands have all be encapsulated for you in a `build.py` script.
+The script has flags for testing code, building binaries and complete distribution packages.
+
+To build kapacitor use:
+
+```bash
+./build.py
+```
+
+To run the tests use:
+
+```bash
+./build.py --test
+```
+
+If you want to generate code run:
+
+```bash
+./build.py --generate
+```
+
 If you want to build packages run:
+
 ```bash
 ./build.py --packages
 ```
+
+There are many more options available see
+
+```bash
+./build.py --help
+```
+
+
+The Build Script + Docker
+-------------------------
+
+Kapacitor requires a few extra dependencies to perform certain build actions.
+Specifically to build packages or to regenerate any of the generated code you will need a few extra tools.
+A `build.sh` script is provided that will run `build.py` in a docker container with all the needed dependencies installed with correct versions.
+
+All you need is to have docker installed and then use the `./build.sh` command as if it were the `./build.py` command.
 
 
 Profiling
