@@ -2,7 +2,11 @@ package influxdb
 
 import (
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
+	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/url"
@@ -43,6 +47,14 @@ func NewService(configs []Config, defaultInfluxDB int, hostname string, l *log.L
 	var defaultInfluxDBName string
 	for i, c := range configs {
 		urls := make([]client.HTTPConfig, len(c.URLs))
+		tlsConfig, err := getTLSConfig(c.SSLCA, c.SSLCert, c.SSLKey, c.InsecureSkipVerify)
+		if err != nil {
+			// Config should have been validated already
+			panic(err)
+		}
+		if c.InsecureSkipVerify {
+			l.Printf("W! Using InsecureSkipVerify when connecting to InfluxDB @ %v this is insecure!", c.URLs)
+		}
 		for i, u := range c.URLs {
 			urls[i] = client.HTTPConfig{
 				Addr:      u,
@@ -50,6 +62,7 @@ func NewService(configs []Config, defaultInfluxDB int, hostname string, l *log.L
 				Password:  c.Password,
 				UserAgent: "Kapacitor",
 				Timeout:   time.Duration(c.Timeout),
+				TLSConfig: tlsConfig,
 			}
 		}
 		subs := make(map[subEntry]bool, len(c.Subscriptions))
@@ -444,4 +457,43 @@ func (s *influxdb) execQuery(cli client.Client, q string) (*client.Response, err
 		return nil, err
 	}
 	return resp, nil
+}
+
+// getTLSConfig creates a tls.Config object from the given certs, key, and CA files.
+// you must give the full path to the files.
+func getTLSConfig(
+	SSLCA, SSLCert, SSLKey string,
+	InsecureSkipVerify bool,
+) (*tls.Config, error) {
+	t := &tls.Config{
+		InsecureSkipVerify: InsecureSkipVerify,
+	}
+	if SSLCert != "" && SSLKey != "" {
+		cert, err := tls.LoadX509KeyPair(SSLCert, SSLKey)
+		log.Println(SSLCert, SSLKey)
+
+		if err != nil {
+			return nil, fmt.Errorf(
+				"Could not load TLS client key/certificate: %s",
+				err)
+		}
+
+		t.Certificates = []tls.Certificate{cert}
+	} else if SSLCert != "" {
+		return nil, errors.New("Must provide both key and cert files: only cert file provided.")
+	} else if SSLKey != "" {
+		return nil, errors.New("Must provide both key and cert files: only key file provided.")
+	}
+
+	if SSLCA != "" {
+		caCert, err := ioutil.ReadFile(SSLCA)
+		if err != nil {
+			return nil, fmt.Errorf("Could not load TLS CA: %s",
+				err)
+		}
+		caCertPool := x509.NewCertPool()
+		caCertPool.AppendCertsFromPEM(caCert)
+		t.RootCAs = caCertPool
+	}
+	return t, nil
 }
