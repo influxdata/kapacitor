@@ -16,12 +16,21 @@ const (
 )
 
 type Config struct {
-	Enabled               bool                `toml:"enabled"`
-	Name                  string              `toml:"name"`
-	Default               bool                `toml:"default"`
-	URLs                  []string            `toml:"urls"`
-	Username              string              `toml:"username"`
-	Password              string              `toml:"password"`
+	Enabled  bool     `toml:"enabled"`
+	Name     string   `toml:"name"`
+	Default  bool     `toml:"default"`
+	URLs     []string `toml:"urls"`
+	Username string   `toml:"username"`
+	Password string   `toml:"password"`
+	// Path to CA file
+	SSLCA string `toml:"ssl-ca"`
+	// Path to host cert file
+	SSLCert string `toml:"ssl-cert"`
+	// Path to cert key file
+	SSLKey string `toml:"ssl-key"`
+	// Use SSL but skip chain & host verification
+	InsecureSkipVerify bool `toml:"insecure-skip-verify"`
+
 	Timeout               toml.Duration       `toml:"timeout"`
 	Subscriptions         map[string][]string `toml:"subscriptions"`
 	ExcludedSubscriptions map[string][]string `toml:"excluded-subscriptions"`
@@ -56,6 +65,10 @@ func (c Config) Validate() error {
 	}
 	for _, u := range c.URLs {
 		_, err := url.Parse(u)
+		if err != nil {
+			return err
+		}
+		_, err = getTLSConfig(c.SSLCA, c.SSLCert, c.SSLKey, c.InsecureSkipVerify)
 		if err != nil {
 			return err
 		}

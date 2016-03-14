@@ -74,6 +74,7 @@ With #144 you can now join streams with differing group by dimensions.
 - [#249](https://github.com/influxdata/kapacitor/issues/249): Can now use InfluxQL functions directly instead of via the MapReduce method. Example `stream.from().count()`.
 - [#233](https://github.com/influxdata/kapacitor/issues/233): BREAKING: Now you can use multiple InfluxDB clusters. The config changes to make this possible are breaking. See notes above for changes.
 - [#302](https://github.com/influxdata/kapacitor/issues/302): Can now use .Time in alert message.
+- [#239](https://github.com/influxdata/kapacitor/issues/239): Support more detailed TLS config when connecting to an InfluxDB host.
 
 
 ### Bugfixes
