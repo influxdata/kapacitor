@@ -215,6 +215,10 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		if err != nil {
 			return nil, err
 		}
+		etmpl, err := text.New("environment").Parse(alerta.Environment)
+		if err != nil {
+			return nil, err
+		}
 		gtmpl, err := text.New("group").Parse(alerta.Group)
 		if err != nil {
 			return nil, err
@@ -224,10 +228,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 			return nil, err
 		}
 		ai := alertaHandler{
-			AlertaHandler: alerta,
-			resourceTmpl:  rtmpl,
-			groupTmpl:     gtmpl,
-			valueTmpl:     vtmpl,
+			AlertaHandler:   alerta,
+			resourceTmpl:    rtmpl,
+			environmentTmpl: etmpl,
+			groupTmpl:       gtmpl,
+			valueTmpl:       vtmpl,
 		}
 		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleAlerta(ai, ad) })
 	}
@@ -713,9 +718,10 @@ func (a *AlertNode) handleHipChat(hipchat *pipeline.HipChatHandler, ad *AlertDat
 type alertaHandler struct {
 	*pipeline.AlertaHandler
 
-	resourceTmpl *text.Template
-	valueTmpl    *text.Template
-	groupTmpl    *text.Template
+	resourceTmpl    *text.Template
+	environmentTmpl *text.Template
+	valueTmpl       *text.Template
+	groupTmpl       *text.Template
 }
 
 func (a *AlertNode) handleAlerta(alerta alertaHandler, ad *AlertData) {
@@ -752,6 +758,15 @@ func (a *AlertNode) handleAlerta(alerta alertaHandler, ad *AlertData) {
 	}
 	resource := buf.String()
 	buf.Reset()
+
+	err = alerta.environmentTmpl.Execute(&buf, ad.info)
+	if err != nil {
+		a.logger.Printf("E! failed to evaluate Alerta Environment template %s", alerta.Environment)
+		return
+	}
+	environment := buf.String()
+	buf.Reset()
+
 	err = alerta.groupTmpl.Execute(&buf, ad.info)
 	if err != nil {
 		a.logger.Printf("E! failed to evaluate Alerta Group template %s", alerta.Group)
@@ -759,12 +774,14 @@ func (a *AlertNode) handleAlerta(alerta alertaHandler, ad *AlertData) {
 	}
 	group := buf.String()
 	buf.Reset()
+
 	err = alerta.valueTmpl.Execute(&buf, ad.info)
 	if err != nil {
 		a.logger.Printf("E! failed to evaluate Alerta Value template %s", alerta.Value)
 		return
 	}
 	value := buf.String()
+
 	service := alerta.Service
 	if len(alerta.Service) == 0 {
 		service = []string{ad.info.Name}
@@ -774,7 +791,7 @@ func (a *AlertNode) handleAlerta(alerta alertaHandler, ad *AlertData) {
 		alerta.Token,
 		resource,
 		ad.ID,
-		alerta.Environment,
+		environment,
 		severity,
 		status,
 		group,
