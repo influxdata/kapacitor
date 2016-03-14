@@ -2044,7 +2044,6 @@ func TestStream_AlertSensu(t *testing.T) {
 		for {
 			conn, err := listen.Accept()
 			if err != nil {
-				t.Log(err)
 				return
 			}
 			func() {
