@@ -358,7 +358,7 @@ test value=1 0000000011
 
 func TestServer_BatchTask(t *testing.T) {
 	c := NewConfig()
-	c.InfluxDB.Enabled = true
+	c.InfluxDB[0].Enabled = true
 	count := 0
 	db := NewInfluxDB(func(q string) *client.Response {
 		if len(q) > 6 && q[:6] == "SELECT" {
@@ -384,7 +384,7 @@ func TestServer_BatchTask(t *testing.T) {
 		}
 		return nil
 	})
-	c.InfluxDB.URLs = []string{db.URL()}
+	c.InfluxDB[0].URLs = []string{db.URL()}
 	s := OpenServer(c)
 	defer s.Close()
 
@@ -441,11 +441,11 @@ batch
 
 func TestServer_InvalidBatchTask(t *testing.T) {
 	c := NewConfig()
-	c.InfluxDB.Enabled = true
+	c.InfluxDB[0].Enabled = true
 	db := NewInfluxDB(func(q string) *client.Response {
 		return nil
 	})
-	c.InfluxDB.URLs = []string{db.URL()}
+	c.InfluxDB[0].URLs = []string{db.URL()}
 	s := OpenServer(c)
 	defer s.Close()
 
@@ -603,7 +603,7 @@ test value=1 0000000012
 
 func TestServer_RecordReplayBatch(t *testing.T) {
 	c := NewConfig()
-	c.InfluxDB.Enabled = true
+	c.InfluxDB[0].Enabled = true
 	value := 0
 	db := NewInfluxDB(func(q string) *client.Response {
 		if len(q) > 6 && q[:6] == "SELECT" {
@@ -630,7 +630,7 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 		}
 		return nil
 	})
-	c.InfluxDB.URLs = []string{db.URL()}
+	c.InfluxDB[0].URLs = []string{db.URL()}
 	s := OpenServer(c)
 	defer s.Close()
 
@@ -1045,8 +1045,8 @@ func testBatchAgent(t *testing.T, c *run.Config) {
 		}
 		return nil
 	})
-	c.InfluxDB.URLs = []string{db.URL()}
-	c.InfluxDB.Enabled = true
+	c.InfluxDB[0].URLs = []string{db.URL()}
+	c.InfluxDB[0].Enabled = true
 	s := NewServer(c)
 	err := s.Open()
 	if err != nil {

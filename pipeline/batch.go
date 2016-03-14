@@ -113,6 +113,10 @@ type BatchNode struct {
 	//   - previous - reports the value of the previous window
 	//   - none - suppresses timestamps and values where the value is null
 	Fill interface{}
+
+	// The name of a configured InfluxDB cluster.
+	// If empty the default cluster will be used.
+	Cluster string
 }
 
 func newBatchNode() *BatchNode {

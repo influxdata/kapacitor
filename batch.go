@@ -260,7 +260,13 @@ func (b *BatchNode) doQuery() error {
 			b.logger.Println("D! starting next batch query:", b.query.String())
 
 			// Connect
-			con, err := b.et.tm.InfluxDBService.NewClient()
+			var con client.Client
+			var err error
+			if b.b.Cluster != "" {
+				con, err = b.et.tm.InfluxDBService.NewNamedClient(b.b.Cluster)
+			} else {
+				con, err = b.et.tm.InfluxDBService.NewDefaultClient()
+			}
 			if err != nil {
 				b.logger.Println("E! failed to connect to InfluxDB:", err)
 				break

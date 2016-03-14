@@ -74,6 +74,7 @@ func (cmd *PrintConfigCommand) parseConfig(path string) (*Config, error) {
 	if _, err := toml.DecodeFile(path, &config); err != nil {
 		return nil, err
 	}
+	config.PostInit()
 	return config, nil
 }
 

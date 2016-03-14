@@ -336,12 +336,13 @@ func (s *Server) DoReplay(name, id string) (string, error) {
 // NewConfig returns the default config with temporary paths.
 func NewConfig() *run.Config {
 	c := run.NewConfig()
+	c.PostInit()
 	c.Reporting.Enabled = false
 	c.Replay.Dir = MustTempFile()
 	c.Task.Dir = MustTempFile()
 	c.DataDir = MustTempFile()
 	c.HTTP.BindAddress = "127.0.0.1:0"
-	c.InfluxDB.Enabled = false
+	c.InfluxDB[0].Enabled = false
 	return c
 }
 

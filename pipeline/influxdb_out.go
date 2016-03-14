@@ -22,6 +22,9 @@ const DefaultFlushInterval = time.Second * 10
 type InfluxDBOutNode struct {
 	node
 
+	// The name of the InfluxDB instance to connect to.
+	// If empty the configured default will be used.
+	Cluster string
 	// The name of the database.
 	Database string
 	// The name of the retention policy.

@@ -27,11 +27,13 @@ func NewMockInfluxDBService(h http.Handler) *MockInfluxDBService {
 	}
 }
 
-func (m *MockInfluxDBService) NewClient() (client.Client, error) {
+func (m *MockInfluxDBService) NewDefaultClient() (client.Client, error) {
 	return client.NewHTTPClient(client.HTTPConfig{
 		Addr: m.ts.URL,
 	})
-
+}
+func (m *MockInfluxDBService) NewNamedClient(name string) (client.Client, error) {
+	return m.NewDefaultClient()
 }
 
 func compareResultsMetainfo(exp, got kapacitor.Result) (bool, string) {

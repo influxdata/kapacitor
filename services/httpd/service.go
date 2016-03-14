@@ -115,6 +115,10 @@ func (s *Service) Close() error {
 	defer s.logger.Println("I! Closed HTTP service")
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	// If server is not set we were never started
+	if s.server == nil {
+		return nil
+	}
 	// First turn off KeepAlives so that new connections will not become idle
 	s.server.SetKeepAlivesEnabled(false)
 	// Signal to manage loop we are stopping

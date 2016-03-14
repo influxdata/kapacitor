@@ -127,7 +127,7 @@ func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*
 	s.appendDeadmanService(c.Deadman)
 	s.appendSMTPService(c.SMTP)
 	s.initHTTPDService(c.HTTP)
-	s.appendInfluxDBService(c.InfluxDB, c.Hostname)
+	s.appendInfluxDBService(c.InfluxDB, c.defaultInfluxDB, c.Hostname)
 	s.appendTaskStoreService(c.Task)
 	s.appendReplayStoreService(c.Replay)
 	s.appendOpsGenieService(c.OpsGenie)
@@ -174,10 +174,10 @@ func (s *Server) appendSMTPService(c smtp.Config) {
 	}
 }
 
-func (s *Server) appendInfluxDBService(c influxdb.Config, hostname string) {
-	if c.Enabled {
+func (s *Server) appendInfluxDBService(c []influxdb.Config, defaultInfluxDB int, hostname string) {
+	if len(c) > 0 {
 		l := s.LogService.NewLogger("[influxdb] ", log.LstdFlags)
-		srv := influxdb.NewService(c, hostname, l)
+		srv := influxdb.NewService(c, defaultInfluxDB, hostname, l)
 		srv.PointsWriter = s.TaskMaster
 		srv.LogService = s.LogService
 

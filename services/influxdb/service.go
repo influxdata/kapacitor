@@ -18,11 +18,114 @@ import (
 
 const (
 	// Legacy name given to all subscriptions.
-	subName = "kapacitor"
+	legacySubName = "kapacitor"
+	subNamePrefix = "kapacitor-"
 )
 
 // Handles requests to write or read from an InfluxDB cluster
 type Service struct {
+	defaultInfluxDB string
+	clusters        map[string]*influxdb
+
+	PointsWriter interface {
+		WritePoints(p *cluster.WritePointsRequest) error
+	}
+	LogService interface {
+		NewLogger(string, int) *log.Logger
+	}
+	logger *log.Logger
+}
+
+func NewService(configs []Config, defaultInfluxDB int, hostname string, l *log.Logger) *Service {
+	clusterID := kapacitor.ClusterIDVar.StringValue()
+	subName := subNamePrefix + clusterID
+	clusters := make(map[string]*influxdb, len(configs))
+	var defaultInfluxDBName string
+	for i, c := range configs {
+		urls := make([]client.HTTPConfig, len(c.URLs))
+		for i, u := range c.URLs {
+			urls[i] = client.HTTPConfig{
+				Addr:      u,
+				Username:  c.Username,
+				Password:  c.Password,
+				UserAgent: "Kapacitor",
+				Timeout:   time.Duration(c.Timeout),
+			}
+		}
+		subs := make(map[subEntry]bool, len(c.Subscriptions))
+		for cluster, rps := range c.Subscriptions {
+			for _, rp := range rps {
+				se := subEntry{cluster, rp, subName}
+				subs[se] = true
+			}
+		}
+		exSubs := make(map[subEntry]bool, len(c.ExcludedSubscriptions))
+		for cluster, rps := range c.ExcludedSubscriptions {
+			for _, rp := range rps {
+				se := subEntry{cluster, rp, subName}
+				exSubs[se] = true
+			}
+		}
+		clusters[c.Name] = &influxdb{
+			configs:        urls,
+			configSubs:     subs,
+			exConfigSubs:   exSubs,
+			hostname:       hostname,
+			logger:         l,
+			udpBuffer:      c.UDPBuffer,
+			udpReadBuffer:  c.UDPReadBuffer,
+			startupTimeout: time.Duration(c.StartUpTimeout),
+			clusterID:      clusterID,
+			subName:        subName,
+		}
+		if defaultInfluxDB == i {
+			defaultInfluxDBName = c.Name
+		}
+	}
+	return &Service{
+		defaultInfluxDB: defaultInfluxDBName,
+		clusters:        clusters,
+		logger:          l,
+	}
+}
+
+func (s *Service) Open() error {
+	for _, cluster := range s.clusters {
+		cluster.PointsWriter = s.PointsWriter
+		cluster.LogService = s.LogService
+		err := cluster.Open()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Service) Close() error {
+	var lastErr error
+	for _, cluster := range s.clusters {
+		err := cluster.Close()
+		if err != nil {
+			lastErr = err
+		}
+	}
+	return lastErr
+}
+
+func (s *Service) NewDefaultClient() (client.Client, error) {
+	return s.clusters[s.defaultInfluxDB].NewClient()
+}
+
+func (s *Service) NewNamedClient(name string) (client.Client, error) {
+	cluster, ok := s.clusters[name]
+	if !ok {
+		return nil, fmt.Errorf("no such InfluxDB config %s", name)
+
+	}
+	return cluster.NewClient()
+}
+
+type influxdb struct {
 	configs        []client.HTTPConfig
 	i              int
 	configSubs     map[subEntry]bool
@@ -34,6 +137,7 @@ type Service struct {
 	startupTimeout time.Duration
 
 	clusterID string
+	subName   string
 
 	PointsWriter interface {
 		WritePoints(p *cluster.WritePointsRequest) error
@@ -49,9 +153,9 @@ type Service struct {
 }
 
 type subEntry struct {
-	db   string
-	rp   string
-	name string
+	cluster string
+	rp      string
+	name    string
 }
 
 type subInfo struct {
@@ -59,50 +163,11 @@ type subInfo struct {
 	Destinations []string
 }
 
-func NewService(c Config, hostname string, l *log.Logger) *Service {
-	clusterID := kapacitor.ClusterIDVar.StringValue()
-	configs := make([]client.HTTPConfig, len(c.URLs))
-	for i, u := range c.URLs {
-		configs[i] = client.HTTPConfig{
-			Addr:      u,
-			Username:  c.Username,
-			Password:  c.Password,
-			UserAgent: "Kapacitor",
-			Timeout:   time.Duration(c.Timeout),
-		}
-	}
-	subs := make(map[subEntry]bool, len(c.Subscriptions))
-	for db, rps := range c.Subscriptions {
-		for _, rp := range rps {
-			se := subEntry{db, rp, clusterID}
-			subs[se] = true
-		}
-	}
-	exSubs := make(map[subEntry]bool, len(c.ExcludedSubscriptions))
-	for db, rps := range c.ExcludedSubscriptions {
-		for _, rp := range rps {
-			se := subEntry{db, rp, clusterID}
-			exSubs[se] = true
-		}
-	}
-	return &Service{
-		configs:        configs,
-		configSubs:     subs,
-		exConfigSubs:   exSubs,
-		hostname:       hostname,
-		logger:         l,
-		udpBuffer:      c.UDPBuffer,
-		udpReadBuffer:  c.UDPReadBuffer,
-		startupTimeout: time.Duration(c.StartUpTimeout),
-		clusterID:      clusterID,
-	}
-}
-
-func (s *Service) Open() error {
+func (s *influxdb) Open() error {
 	return s.linkSubscriptions()
 }
 
-func (s *Service) Close() error {
+func (s *influxdb) Close() error {
 	var lastErr error
 	for _, service := range s.services {
 		err := service.Close()
@@ -113,13 +178,13 @@ func (s *Service) Close() error {
 	return lastErr
 }
 
-func (s *Service) Addr() string {
+func (s *influxdb) Addr() string {
 	config := s.configs[s.i]
 	s.i = (s.i + 1) % len(s.configs)
 	return config.Addr
 }
 
-func (s *Service) NewClient() (c client.Client, err error) {
+func (s *influxdb) NewClient() (c client.Client, err error) {
 	tries := 0
 	for tries < len(s.configs) {
 		tries++
@@ -138,7 +203,7 @@ func (s *Service) NewClient() (c client.Client, err error) {
 	return
 }
 
-func (s *Service) linkSubscriptions() error {
+func (s *influxdb) linkSubscriptions() error {
 	s.logger.Println("I! linking subscriptions")
 	b := backoff.NewExponentialBackOff()
 	b.MaxElapsedTime = s.startupTimeout
@@ -168,11 +233,11 @@ func (s *Service) linkSubscriptions() error {
 	}
 
 	if len(resp.Results) == 1 && len(resp.Results[0].Series) == 1 && len(resp.Results[0].Series[0].Values) > 0 {
-		dbs := resp.Results[0].Series[0].Values
-		for _, v := range dbs {
-			dbname := v[0].(string)
+		clusters := resp.Results[0].Series[0].Values
+		for _, v := range clusters {
+			clustername := v[0].(string)
 
-			rpResp, err := s.execQuery(cli, fmt.Sprintf(`SHOW RETENTION POLICIES ON "%s"`, dbname))
+			rpResp, err := s.execQuery(cli, fmt.Sprintf(`SHOW RETENTION POLICIES ON "%s"`, clustername))
 			if err != nil {
 				return err
 			}
@@ -182,9 +247,9 @@ func (s *Service) linkSubscriptions() error {
 					rpname := v[0].(string)
 
 					se := subEntry{
-						db:   dbname,
-						rp:   rpname,
-						name: s.clusterID,
+						cluster: clustername,
+						rp:      rpname,
+						name:    s.subName,
 					}
 					allSubs = append(allSubs, se)
 				}
@@ -203,7 +268,7 @@ func (s *Service) linkSubscriptions() error {
 		for _, series := range res.Series {
 			for _, v := range series.Values {
 				se := subEntry{
-					db: series.Name,
+					cluster: series.Name,
 				}
 				si := subInfo{}
 				for i, c := range series.Columns {
@@ -222,21 +287,30 @@ func (s *Service) linkSubscriptions() error {
 						}
 					}
 				}
-				if se.name == subName {
+				if se.name == legacySubName {
 					// This is an old-style subscription,
 					// drop it and recreate with new name.
-					err := s.dropSub(cli, se.name, se.db, se.rp)
+					err := s.dropSub(cli, se.name, se.cluster, se.rp)
 					if err != nil {
 						return err
 					}
-					se.name = s.clusterID
-					err = s.createSub(cli, se.name, se.db, se.rp, si.Mode, si.Destinations)
+					se.name = s.subName
+					err = s.createSub(cli, se.name, se.cluster, se.rp, si.Mode, si.Destinations)
 					if err != nil {
 						return err
 					}
 					existingSubs[se] = si
-				}
-				if se.name == s.clusterID {
+				} else if se.name == s.clusterID {
+					// This is an just the cluster ID
+					// drop it and recreate with new name.
+					err := s.dropSub(cli, se.name, se.cluster, se.rp)
+					se.name = s.subName
+					err = s.createSub(cli, se.name, se.cluster, se.rp, si.Mode, si.Destinations)
+					if err != nil {
+						return err
+					}
+					existingSubs[se] = si
+				} else if se.name == s.subName {
 					existingSubs[se] = si
 				}
 			}
@@ -258,7 +332,7 @@ func (s *Service) linkSubscriptions() error {
 				pair := strings.Split(u.Host, ":")
 				if pair[0] == s.hostname {
 					numSubscriptions++
-					_, err := s.startListener(se.db, se.rp, *u)
+					_, err := s.startListener(se.cluster, se.rp, *u)
 					if err != nil {
 						s.logger.Println("E! failed to start listener:", err)
 					}
@@ -278,7 +352,7 @@ func (s *Service) linkSubscriptions() error {
 			}
 
 			numSubscriptions++
-			addr, err := s.startListener(se.db, se.rp, *u)
+			addr, err := s.startListener(se.cluster, se.rp, *u)
 			if err != nil {
 				s.logger.Println("E! failed to start listener:", err)
 			}
@@ -286,7 +360,7 @@ func (s *Service) linkSubscriptions() error {
 			// Get port from addr
 			destination := fmt.Sprintf("udp://%s:%d", s.hostname, addr.Port)
 
-			err = s.createSub(cli, se.name, se.db, se.rp, "ANY", []string{destination})
+			err = s.createSub(cli, se.name, se.cluster, se.rp, "ANY", []string{destination})
 			if err != nil {
 				return err
 			}
@@ -297,7 +371,7 @@ func (s *Service) linkSubscriptions() error {
 	return nil
 }
 
-func (s *Service) createSub(cli client.Client, name, db, rp, mode string, destinations []string) (err error) {
+func (s *influxdb) createSub(cli client.Client, name, cluster, rp, mode string, destinations []string) (err error) {
 	var buf bytes.Buffer
 	for i, dst := range destinations {
 		if i != 0 {
@@ -309,7 +383,7 @@ func (s *Service) createSub(cli client.Client, name, db, rp, mode string, destin
 	}
 	q := fmt.Sprintf(`CREATE SUBSCRIPTION "%s" ON "%s"."%s" DESTINATIONS %s %s`,
 		name,
-		db,
+		cluster,
 		rp,
 		strings.ToUpper(mode),
 		buf.String(),
@@ -321,30 +395,30 @@ func (s *Service) createSub(cli client.Client, name, db, rp, mode string, destin
 	return
 
 }
-func (s *Service) dropSub(cli client.Client, name, db, rp string) (err error) {
+func (s *influxdb) dropSub(cli client.Client, name, cluster, rp string) (err error) {
 	_, err = s.execQuery(
 		cli,
 		fmt.Sprintf(`DROP SUBSCRIPTION "%s" ON "%s"."%s"`,
 			name,
-			db,
+			cluster,
 			rp,
 		),
 	)
 	return
 }
 
-func (s *Service) startListener(db, rp string, u url.URL) (*net.UDPAddr, error) {
+func (s *influxdb) startListener(cluster, rp string, u url.URL) (*net.UDPAddr, error) {
 	switch u.Scheme {
 	case "udp":
 		c := udp.Config{}
 		c.Enabled = true
 		c.BindAddress = u.Host
-		c.Database = db
+		c.Database = cluster
 		c.RetentionPolicy = rp
 		c.Buffer = s.udpBuffer
 		c.ReadBuffer = s.udpReadBuffer
 
-		l := s.LogService.NewLogger(fmt.Sprintf("[udp:%s.%s] ", db, rp), log.LstdFlags)
+		l := s.LogService.NewLogger(fmt.Sprintf("[udp:%s.%s] ", cluster, rp), log.LstdFlags)
 		service := udp.NewService(c, l)
 		service.PointsWriter = s.PointsWriter
 		err := service.Open()
@@ -352,13 +426,13 @@ func (s *Service) startListener(db, rp string, u url.URL) (*net.UDPAddr, error) 
 			return nil, err
 		}
 		s.services = append(s.services, service)
-		s.logger.Println("I! started UDP listener for", db, rp)
+		s.logger.Println("I! started UDP listener for", cluster, rp)
 		return service.Addr(), nil
 	}
 	return nil, fmt.Errorf("unsupported scheme %q", u.Scheme)
 }
 
-func (s *Service) execQuery(cli client.Client, q string) (*client.Response, error) {
+func (s *influxdb) execQuery(cli client.Client, q string) (*client.Response, error) {
 	query := client.Query{
 		Command: q,
 	}

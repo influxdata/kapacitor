@@ -231,7 +231,11 @@ func (w *writeBuffer) writeAll() {
 func (w *writeBuffer) write(bp client.BatchPoints) error {
 	var err error
 	if w.conn == nil {
-		w.conn, err = w.i.et.tm.InfluxDBService.NewClient()
+		if w.i.i.Cluster != "" {
+			w.conn, err = w.i.et.tm.InfluxDBService.NewNamedClient(w.i.i.Cluster)
+		} else {
+			w.conn, err = w.i.et.tm.InfluxDBService.NewDefaultClient()
+		}
 		if err != nil {
 			return err
 		}
