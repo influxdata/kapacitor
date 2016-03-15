@@ -35,7 +35,7 @@ type Node interface {
 	restore(snapshot []byte) error
 
 	// wait for the node to finish processing and return any errors
-	Err() error
+	Wait() error
 
 	// link specified child
 	linkChild(c Node) error
@@ -133,7 +133,7 @@ func (n *node) snapshot() (b []byte, err error) { return }
 // no-op restore
 func (n *node) restore([]byte) error { return nil }
 
-func (n *node) Err() error {
+func (n *node) Wait() error {
 	n.finishedMu.Lock()
 	defer n.finishedMu.Unlock()
 	if !n.finished {
@@ -254,10 +254,11 @@ type nodeStats struct {
 }
 
 // Return a copy of the current node statistics.
+// If if no groups have been seen yet a NilGroup will be created with zero stats.
 func (n *node) nodeStatsByGroup() (stats map[models.GroupID]nodeStats) {
 	// Get the counts for just one output.
+	stats = make(map[models.GroupID]nodeStats)
 	if len(n.outs) > 0 {
-		stats = make(map[models.GroupID]nodeStats)
 		n.outs[0].readGroupStats(func(group models.GroupID, c, e int64, tags models.Tags, dims []string) {
 			stats[group] = nodeStats{
 				Fields: models.Fields{
@@ -268,6 +269,14 @@ func (n *node) nodeStatsByGroup() (stats map[models.GroupID]nodeStats) {
 				Dimensions: dims,
 			}
 		})
+	}
+	if len(stats) == 0 {
+		// If we have no groups/stats add nil group with emitted = 0
+		stats[models.NilGroup] = nodeStats{
+			Fields: models.Fields{
+				"emitted": int64(0),
+			},
+		}
 	}
 	return
 }

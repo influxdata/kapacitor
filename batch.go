@@ -52,7 +52,7 @@ func (s *SourceBatchNode) addParentEdge(in *Edge) {
 func (s *SourceBatchNode) start([]byte) {
 }
 
-func (s *SourceBatchNode) Err() error {
+func (s *SourceBatchNode) Wait() error {
 	return nil
 }
 

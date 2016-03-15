@@ -200,7 +200,7 @@ func (et *ExecutingTask) stop() (err error) {
 	close(et.stopping)
 	et.walk(func(n Node) error {
 		n.stop()
-		e := n.Err()
+		e := n.Wait()
 		if e != nil {
 			err = e
 		}
@@ -270,10 +270,20 @@ func (et *ExecutingTask) checkDBRPs(batcher *SourceBatchNode) error {
 	return nil
 }
 
+// Stop all stats nodes
+func (et *ExecutingTask) StopStats() {
+	et.walk(func(n Node) error {
+		if s, ok := n.(*StatsNode); ok {
+			s.stopStats()
+		}
+		return nil
+	})
+}
+
 // Wait till the task finishes and return any error
-func (et *ExecutingTask) Err() error {
+func (et *ExecutingTask) Wait() error {
 	return et.rwalk(func(n Node) error {
-		return n.Err()
+		return n.Wait()
 	})
 }
 

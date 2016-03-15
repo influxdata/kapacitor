@@ -3226,8 +3226,9 @@ func fastForwardTask(
 		return err
 	}
 	tm.Drain()
+	et.StopStats()
 	// Wait till the task is finished
-	if err := et.Err(); err != nil {
+	if err := et.Wait(); err != nil {
 		return err
 	}
 	return nil

@@ -3,6 +3,7 @@ package kapacitor
 import (
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/influxdata/kapacitor/models"
@@ -14,6 +15,8 @@ type StatsNode struct {
 	s       *pipeline.StatsNode
 	en      Node
 	closing chan struct{}
+	closed  bool
+	mu      sync.Mutex
 }
 
 // Create a new  StreamNode which filters data from a source.
@@ -69,5 +72,10 @@ func (s *StatsNode) runStats([]byte) error {
 }
 
 func (s *StatsNode) stopStats() {
-	close(s.closing)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.closed {
+		s.closed = true
+		close(s.closing)
+	}
 }

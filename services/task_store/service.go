@@ -629,7 +629,7 @@ func (ts *Service) StartTask(t *kapacitor.Task) error {
 
 	go func() {
 		// Wait for task to finish
-		err := et.Err()
+		err := et.Wait()
 		// Stop task
 		ts.TaskMaster.StopTask(et.Task.Name)
 

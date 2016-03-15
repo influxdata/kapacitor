@@ -50,11 +50,17 @@ func CreatePipeline(script string, sourceEdge EdgeType, scope *tick.Scope, deadm
 	if err != nil {
 		return nil, err
 	}
-	if sourceEdge == StreamEdge && deadman.Global() {
-		src.(*SourceStreamNode).Deadman(deadman.Threshold(), deadman.Interval())
+	if deadman.Global() {
+		switch s := src.(type) {
+		case *SourceStreamNode:
+			s.Deadman(deadman.Threshold(), deadman.Interval())
+		case *SourceBatchNode:
+			s.Deadman(deadman.Threshold(), deadman.Interval())
+		default:
+			return nil, fmt.Errorf("source edge type must be either Stream or Batch not %s", sourceEdge)
+		}
 	}
 	return p, nil
-
 }
 
 func (p *Pipeline) addSource(src Node) {
