@@ -43,7 +43,7 @@ stream
     .window()
         .period(1m)
         .every(1m)
-    .mapReduce(influxql.mean('value'))
+    .mean('value')
     .eval(lambda: 100.0 - "mean")
         .as('used')
     .alert()
