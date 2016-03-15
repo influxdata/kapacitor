@@ -219,8 +219,11 @@ func (r *Service) handleReplay(w http.ResponseWriter, req *http.Request) {
 	// Drain tm so the task can finish
 	tm.Drain()
 
+	// Stop stats nodes
+	et.StopStats()
+
 	// Check for error on task
-	err = et.Err()
+	err = et.Wait()
 	if err != nil {
 		httpd.HttpError(w, "task run: "+err.Error(), true, http.StatusInternalServerError)
 		return
