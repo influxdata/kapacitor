@@ -803,6 +803,7 @@ type SensuHandler struct {
 //         .alert()
 //
 // Send alert to Slack using default channel '#general'.
+// tick:property
 func (a *AlertNode) Slack() *SlackHandler {
 	slack := &SlackHandler{
 		AlertNode: a,
