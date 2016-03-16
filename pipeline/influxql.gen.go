@@ -8,6 +8,7 @@ package pipeline
 
 import "github.com/influxdata/influxdb/influxql"
 
+//tick:ignore
 type ReduceCreater struct {
 	CreateFloatReducer     func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter)
 	CreateFloatBulkReducer func() (FloatBulkPointAggregator, influxql.FloatPointEmitter)
