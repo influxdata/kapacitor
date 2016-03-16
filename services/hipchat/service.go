@@ -87,7 +87,7 @@ func (s *Service) Alert(room, token, message string, level kapacitor.AlertLevel)
 		return err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return err
