@@ -247,6 +247,7 @@ func (n *chainnode) Percentile(field string, percentile float64) *InfluxQLNode {
 	return i
 }
 
+//tick:ignore
 type TopBottomCallInfo struct {
 	FieldsAndTags []string
 }

@@ -18,7 +18,7 @@ const defaultDetailsTmpl = "{{ json . }}"
 
 // An AlertNode can trigger an event of varying severity levels,
 // and pass the event to alert handlers. The criteria for triggering
-// an alert is specified via a [lambda expression](/kapacitor/v0.10/tick/expr/).
+// an alert is specified via a [lambda expression](/kapacitor/v0.11/tick/expr/).
 // See AlertNode.Info, AlertNode.Warn, and AlertNode.Crit below.
 //
 // Different event handlers can be configured for each AlertNode.
@@ -803,6 +803,7 @@ type SensuHandler struct {
 //         .alert()
 //
 // Send alert to Slack using default channel '#general'.
+// tick:property
 func (a *AlertNode) Slack() *SlackHandler {
 	slack := &SlackHandler{
 		AlertNode: a,

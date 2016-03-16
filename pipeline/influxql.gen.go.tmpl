@@ -2,6 +2,7 @@ package pipeline
 
 import "github.com/influxdata/influxdb/influxql"
 
+//tick:ignore
 type ReduceCreater struct {
 {{with $types := .}}
 {{range $a := $types}}

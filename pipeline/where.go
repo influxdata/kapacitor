@@ -9,7 +9,7 @@ import (
 // Example:
 // var sums = stream
 //     .groupBy('service', 'host')
-//     .mapReduce(influxdb.sum('value'))
+//     .sum('value')
 // //Watch particular host for issues.
 // sums
 //    .where(lambda: "host" == 'h001.example.com')

@@ -209,11 +209,11 @@ batch
 		.period(10s)
 		.every(10s)
 		.groupBy(time(2s), 'cpu')
-	.mapReduce(influxql.count('mean'))
+	.count('mean')
 	.window()
 		.period(20s)
 		.every(20s)
-	.mapReduce(influxql.sum('count'))
+	.sum('count')
 	.httpOut('TestBatch_SimpleMR')
 `
 
@@ -277,11 +277,11 @@ var cpu1 = batch
 
 cpu0.join(cpu1)
 	.as('cpu0', 'cpu1')
-	.mapReduce(influxql.count('cpu0.mean'))
+	.count('cpu0.mean')
 	.window()
 		.period(20s)
 		.every(20s)
-	.mapReduce(influxql.sum('count'))
+	.sum('count')
 	.httpOut('TestBatch_Join')
 `
 

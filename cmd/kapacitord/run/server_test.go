@@ -298,7 +298,7 @@ stream
 	.window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.count('value'))
+	.count('value')
 	.httpOut('count')
 `
 
@@ -399,7 +399,7 @@ batch
 	.query(' SELECT value from mydb.myrp.cpu ')
 		.period(5ms)
 		.every(5ms)
-	.mapReduce(influxql.count('value'))
+	.count('value')
 	.httpOut('count')
 `
 
@@ -460,7 +460,7 @@ batch
 	.query(' SELECT value from unknowndb.unknownrp.cpu ')
 		.period(5ms)
 		.every(5ms)
-	.mapReduce(influxql.count('value'))
+	.count('value')
 	.httpOut('count')
 `
 
@@ -506,7 +506,7 @@ stream
 	.window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.count('value'))
+	.count('value')
 	.alert()
 		.id('test-count')
 		.message('{{ .ID }} got: {{ index .Fields "count" }}')
@@ -849,7 +849,7 @@ stream
 	.window()
 		.period(11s)
 		.every(11s)
-	.mapReduce(influxql.last('mean')).as('mean')
+	.last('mean').as('mean')
 	.httpOut('moving_avg')
 `
 
@@ -1069,7 +1069,7 @@ batch
 	.outliers()
 		.field('value')
 		.scale(1.5)
-	.mapReduce(influxql.count('value'))
+	.count('value')
 	.httpOut('count')
 `
 

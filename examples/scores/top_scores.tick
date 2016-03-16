@@ -12,12 +12,12 @@ var topPlayerScores = stream
         .every(1s)
         // Align the window boundaries to be on the second.
         .align()
-    .mapReduce(influxql.last('value'))
+    .last('value')
 
 // Calculate the top 15 scores per game
 var topScores = topPlayerScores
     .groupBy('game')
-    .mapReduce(influxql.top(15, 'last', 'player'))
+    .top(15, 'last', 'player')
 
 // Expose top scores over the HTTP API at the 'top_scores' endpoint.
 // Now your app can just request the top scores from Kapacitor
@@ -39,9 +39,9 @@ topScoresSampled
 
 // Calculate the max and min of the top scores.
 var max = topScoresSampled
-    .mapReduce(influxql.max('top'))
+    .max('top')
 var min = topScoresSampled
-    .mapReduce(influxql.min('top'))
+    .min('top')
 
 // Join the max and min streams back together and calculate the gap.
 max.join(min)
