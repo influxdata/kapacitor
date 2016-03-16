@@ -16,6 +16,9 @@ type Config struct {
 	NoVerify bool `toml:"no-verify"`
 	// Whether all alerts should trigger an email.
 	Global bool `toml:"global"`
+	// Whether all alerts should automatically use stateChangesOnly mode.
+	// Only applies if global is also set.
+	StateChangesOnly bool `toml:"state-changes-only"`
 	// From address
 	From string `toml:"from"`
 	// Default To addresses

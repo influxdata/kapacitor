@@ -146,8 +146,10 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 	if len(n.EmailHandlers) == 0 && (et.tm.SMTPService != nil && et.tm.SMTPService.Global()) {
 		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleEmail(&pipeline.EmailHandler{}, ad) })
 	}
-	// If email has been configured globally only send state changes.
-	if et.tm.SMTPService != nil && et.tm.SMTPService.Global() {
+	// If email has been configured with state changes only set it.
+	if et.tm.SMTPService != nil &&
+		et.tm.SMTPService.Global() &&
+		et.tm.SMTPService.StateChangesOnly() {
 		n.IsStateChangesOnly = true
 	}
 
@@ -192,8 +194,10 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 	if len(n.SlackHandlers) == 0 && (et.tm.SlackService != nil && et.tm.SlackService.Global()) {
 		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleSlack(&pipeline.SlackHandler{}, ad) })
 	}
-	// If slack has been configured globally only send state changes.
-	if et.tm.SlackService != nil && et.tm.SlackService.Global() {
+	// If slack has been configured with state changes only set it.
+	if et.tm.SlackService != nil &&
+		et.tm.SlackService.Global() &&
+		et.tm.SlackService.StateChangesOnly() {
 		n.IsStateChangesOnly = true
 	}
 
@@ -204,8 +208,10 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 	if len(n.HipChatHandlers) == 0 && (et.tm.HipChatService != nil && et.tm.HipChatService.Global()) {
 		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleHipChat(&pipeline.HipChatHandler{}, ad) })
 	}
-	// If HipChat has been configured globally only send state changes.
-	if et.tm.HipChatService != nil && et.tm.HipChatService.Global() {
+	// If HipChat has been configured with state changes only set it.
+	if et.tm.HipChatService != nil &&
+		et.tm.HipChatService.Global() &&
+		et.tm.HipChatService.StateChangesOnly() {
 		n.IsStateChangesOnly = true
 	}
 

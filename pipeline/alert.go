@@ -367,6 +367,7 @@ type PostHandler struct {
 //       to = ["oncall@example.com"]
 //       # Set global to true so all alert trigger emails.
 //       global = true
+//       state-changes-only =  true
 //
 // Example:
 //    stream...
@@ -374,7 +375,6 @@ type PostHandler struct {
 //
 // Send email to 'oncall@example.com' from 'kapacitor@example.com'
 //
-// **NOTE**: The global option for email also implies stateChangesOnly is set on all alerts.
 // tick:property
 func (a *AlertNode) Email(to ...string) *EmailHandler {
 	em := &EmailHandler{
@@ -596,14 +596,13 @@ type PagerDutyHandler struct {
 //      room = "Test Room"
 //      token = "9hiWoDOZ9IbmHsOTeST123ABciWTIqXQVFDo63h9"
 //      global = true
+//      state-changes-only = true
 //
 // Example:
 //    stream...
 //         .alert()
 //
 // Send alert to HipChat using default room 'Test Room'.
-// **NOTE**: The global option for HipChat also implies stateChangesOnly is set on all alerts.
-// Also, the room can either be the room id (numerical) or the room name.
 // tick:property
 func (a *AlertNode) HipChat() *HipChatHandler {
 	hipchat := &HipChatHandler{
@@ -797,14 +796,13 @@ type SensuHandler struct {
 //      url = "https://hooks.slack.com/services/xxxxxxxxx/xxxxxxxxx/xxxxxxxxxxxxxxxxxxxxxxxx"
 //      channel = "#general"
 //      global = true
+//      state-changes-only = true
 //
 // Example:
 //    stream...
 //         .alert()
 //
 // Send alert to Slack using default channel '#general'.
-// **NOTE**: The global option for Slack also implies stateChangesOnly is set on all alerts.
-// tick:property
 func (a *AlertNode) Slack() *SlackHandler {
 	slack := &SlackHandler{
 		AlertNode: a,
