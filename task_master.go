@@ -49,6 +49,7 @@ type TaskMaster struct {
 	}
 	SMTPService interface {
 		Global() bool
+		StateChangesOnly() bool
 		SendMail(to []string, subject string, msg string) error
 	}
 	OpsGenieService interface {
@@ -65,10 +66,12 @@ type TaskMaster struct {
 	}
 	SlackService interface {
 		Global() bool
+		StateChangesOnly() bool
 		Alert(channel, message string, level AlertLevel) error
 	}
 	HipChatService interface {
 		Global() bool
+		StateChangesOnly() bool
 		Alert(room, token, message string, level AlertLevel) error
 	}
 	AlertaService interface {

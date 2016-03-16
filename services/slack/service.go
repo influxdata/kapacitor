@@ -13,18 +13,20 @@ import (
 )
 
 type Service struct {
-	channel string
-	url     string
-	global  bool
-	logger  *log.Logger
+	channel          string
+	url              string
+	global           bool
+	stateChangesOnly bool
+	logger           *log.Logger
 }
 
 func NewService(c Config, l *log.Logger) *Service {
 	return &Service{
-		channel: c.Channel,
-		url:     c.URL,
-		global:  c.Global,
-		logger:  l,
+		channel:          c.Channel,
+		url:              c.URL,
+		global:           c.Global,
+		stateChangesOnly: c.StateChangesOnly,
+		logger:           l,
 	}
 }
 
@@ -38,6 +40,9 @@ func (s *Service) Close() error {
 
 func (s *Service) Global() bool {
 	return s.global
+}
+func (s *Service) StateChangesOnly() bool {
+	return s.stateChangesOnly
 }
 
 // slack attachment info

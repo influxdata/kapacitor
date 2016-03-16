@@ -48,6 +48,10 @@ func (s *Service) Global() bool {
 	return s.c.Global
 }
 
+func (s *Service) StateChangesOnly() bool {
+	return s.c.StateChangesOnly
+}
+
 func (s *Service) runMailer() {
 	defer s.wg.Done()
 	var d *gomail.Dialer

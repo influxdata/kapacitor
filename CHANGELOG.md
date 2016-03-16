@@ -62,6 +62,15 @@ to this:
 Various improvements to joining features have been implemented.
 With #144 you can now join streams with differing group by dimensions.
 
+If you previously configured Email, Slack or HipChat globally now you must also set the `state-changes-only` option to true as well if you want to preserve the original behavior.
+For example:
+
+```
+[slack]
+   enable = true
+   global = true
+   state-changes-only = true
+```
 
 ### Features
 - [#236](https://github.com/influxdata/kapacitor/issues/236): Implement batched group by
@@ -92,6 +101,7 @@ With #144 you can now join streams with differing group by dimensions.
 - [#289](https://github.com/influxdata/kapacitor/issues/289): Add better error handling to batch node.
 - [#142](https://github.com/influxdata/kapacitor/issues/142): Fixes bug when defining multiple influxdb hosts.
 - [#333](https://github.com/influxdata/kapacitor/issues/333): Fixes hang when replaying with .stats node. Fixes issues with batch and stats.
+- [#340](https://github.com/influxdata/kapacitor/issues/340): BREAKING: Decouples global setting for alert handlers from the state changes only setting.
 
 ## v0.10.1 [2016-02-08]
 

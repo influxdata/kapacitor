@@ -14,20 +14,22 @@ import (
 )
 
 type Service struct {
-	room   string
-	token  string
-	url    string
-	global bool
-	logger *log.Logger
+	room             string
+	token            string
+	url              string
+	global           bool
+	stateChangesOnly bool
+	logger           *log.Logger
 }
 
 func NewService(c Config, l *log.Logger) *Service {
 	return &Service{
-		room:   c.Room,
-		token:  c.Token,
-		url:    c.URL,
-		global: c.Global,
-		logger: l,
+		room:             c.Room,
+		token:            c.Token,
+		url:              c.URL,
+		global:           c.Global,
+		stateChangesOnly: c.StateChangesOnly,
+		logger:           l,
 	}
 }
 
@@ -41,6 +43,10 @@ func (s *Service) Close() error {
 
 func (s *Service) Global() bool {
 	return s.global
+}
+
+func (s *Service) StateChangesOnly() bool {
+	return s.stateChangesOnly
 }
 
 func (s *Service) Alert(room, token, message string, level kapacitor.AlertLevel) error {
