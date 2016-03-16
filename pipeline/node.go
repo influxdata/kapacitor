@@ -359,7 +359,7 @@ func (n *chainnode) GroupBy(tag ...interface{}) *GroupByNode {
 	return g
 }
 
-// DEPRECATION WARNING: As of v0.11 you can use the new InfluxQLNode to perform map reduce functions.
+// > *DEPRECATION WARNING*: As of v0.11 you can use the new InfluxQLNode to perform map reduce functions.
 // This way of performing influxql functions will be removed in the 0.12 release.
 //
 // Perform a map-reduce operation on the data.

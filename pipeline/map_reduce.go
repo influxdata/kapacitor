@@ -7,7 +7,7 @@ type MapReduceInfo struct {
 	Edge   EdgeType
 }
 
-// DEPRECATION WARNING: As of v0.11 you can use the new InfluxQLNode to perform map reduce functions.
+// > *DEPRECATION WARNING*: As of v0.11 you can use the new InfluxQLNode to perform map reduce functions.
 // This way of performing influxql functions will be removed in the 0.12 release.
 //
 // Performs a map operation on the data stream.
@@ -38,7 +38,7 @@ func newMapNode(wants EdgeType, i interface{}) *MapNode {
 	}
 }
 
-// DEPRECATION WARNING: As of v0.11 you can use the new InfluxQLNode to perform map reduce functions.
+// > *DEPRECATION WARNING*: As of v0.11 you can use the new InfluxQLNode to perform map reduce functions.
 // This way of performing influxql functions will be removed in the 0.12 release.
 //
 // Performs a reduce operation on the data stream.
