@@ -91,6 +91,7 @@ With #144 you can now join streams with differing group by dimensions.
 - [#304](https://github.com/influxdata/kapacitor/issues/304): Fix panic if recording query but do not have an InfluxDB instance configured
 - [#289](https://github.com/influxdata/kapacitor/issues/289): Add better error handling to batch node.
 - [#142](https://github.com/influxdata/kapacitor/issues/142): Fixes bug when defining multiple influxdb hosts.
+- [#266](https://github.com/influxdata/kapacitor/issues/266): Fixes error log for HipChat that is not an error.
 - [#333](https://github.com/influxdata/kapacitor/issues/333): Fixes hang when replaying with .stats node. Fixes issues with batch and stats.
 
 ## v0.10.1 [2016-02-08]
