@@ -35,6 +35,9 @@ func TestConfig_Parse_EnvOverride(t *testing.T) {
 	// Parse configuration.
 	var c run.Config
 	if _, err := toml.Decode(`
+[influxdb]
+urls=["http://localhost:8086"]
+
 [replay]
 dir = "/tmp/replay"
 
@@ -52,6 +55,10 @@ dir = "/tmp/task"
 		t.Fatalf("failed to set env var: %v", err)
 	}
 
+	if err := os.Setenv("KAPACITOR_INFLUXDB_URLS_0", "http://localhost:18086"); err != nil {
+		t.Fatalf("failed to set env var: %v", err)
+	}
+
 	if err := c.ApplyEnvOverrides(); err != nil {
 		t.Fatalf("failed to apply env overrides: %v", err)
 	}
@@ -61,5 +68,7 @@ dir = "/tmp/task"
 		t.Fatalf("unexpected replay dir: %s", c.Replay.Dir)
 	} else if c.Task.Dir != "/var/lib/kapacitor/task" {
 		t.Fatalf("unexpected task dir: %s", c.Task.Dir)
+	} else if c.InfluxDB.URLs[0] != "http://localhost:18086" {
+		t.Fatalf("unexpected url 0: %s", c.InfluxDB.URLs[0])
 	}
 }
