@@ -97,11 +97,10 @@ func main() {
 		commandF = doHelp
 	case "record":
 		if len(args) == 0 {
-			recordFlags.Usage()
+			recordUsage()
 			os.Exit(2)
 		}
-		recordFlags.Parse(args[1:])
-		commandArgs = args[0:1]
+		commandArgs = args
 		commandF = doRecord
 	case "define":
 		defineFlags.Parse(args)
@@ -151,7 +150,9 @@ func main() {
 func init() {
 	replayFlags.Usage = replayUsage
 	defineFlags.Usage = defineUsage
-	recordFlags.Usage = recordUsage
+	recordStreamFlags.Usage = recordStreamUsage
+	recordBatchFlags.Usage = recordBatchUsage
+	recordQueryFlags.Usage = recordQueryUsage
 }
 
 // helper methods
@@ -176,7 +177,7 @@ func doHelp(args []string) error {
 		command := args[0]
 		switch command {
 		case "record":
-			recordFlags.Usage()
+			recordUsage()
 		case "define":
 			defineFlags.Usage()
 		case "replay":
@@ -212,18 +213,21 @@ func doHelp(args []string) error {
 
 // Record
 var (
-	recordFlags = flag.NewFlagSet("record", flag.ExitOnError)
-	rname       = recordFlags.String("name", "", "the name of a task. If recording a batch or stream")
+	recordStreamFlags = flag.NewFlagSet("record-stream", flag.ExitOnError)
+	rsname            = recordStreamFlags.String("name", "", "the name of a task. Uses the dbrp value for the task.")
+	rsdur             = recordStreamFlags.String("duration", "", "how long to record the data stream.")
 
-	rstart   = recordFlags.String("start", "", "the start time for the set of queries when recording a batch.")
-	rstop    = recordFlags.String("stop", "", "the stop time for the set of queries when recording a batch. (default now)")
-	rpast    = recordFlags.String("past", "", "set start time via 'now - past'.")
-	rcluster = recordFlags.String("cluster", "", "optional named InfluxDB cluster when recording query or a batch.")
+	recordBatchFlags = flag.NewFlagSet("record-batch", flag.ExitOnError)
+	rbname           = recordBatchFlags.String("name", "", "the name of a task. Uses the queries contained in the task.")
+	rbstart          = recordBatchFlags.String("start", "", "the start time for the set of queries.")
+	rbstop           = recordBatchFlags.String("stop", "", "the stop time for the set of queries (default now).")
+	rbpast           = recordBatchFlags.String("past", "", "set start time via 'now - past'.")
+	rbcluster        = recordBatchFlags.String("cluster", "", "optional named InfluxDB cluster from configuration.")
 
-	rquery = recordFlags.String("query", "", "the query to record. If recording a query.")
-	rtype  = recordFlags.String("type", "", "the type of the recording to save (stream|batch). If recording a query.")
-
-	rdur = recordFlags.String("duration", "", "how long to record the data stream. If recording a stream.")
+	recordQueryFlags = flag.NewFlagSet("record-query", flag.ExitOnError)
+	rqquery          = recordQueryFlags.String("query", "", "the query to record.")
+	rqtype           = recordQueryFlags.String("type", "", "the type of the recording to save (stream|batch).")
+	rqcluster        = recordQueryFlags.String("cluster", "", "optional named InfluxDB cluster from configuration.")
 )
 
 func recordUsage() {
@@ -233,7 +237,17 @@ func recordUsage() {
 
 	Prints the recording ID on exit.
 
-	Recordings have types like tasks. If recording a raw query you must specify the desired type.
+	See 'kapacitor help replay' for how to replay a recording.
+`
+	fmt.Fprintln(os.Stderr, u)
+}
+
+func recordStreamUsage() {
+	var u = `Usage: kapacitor record stream [options]
+
+	Record a snapshot of the live data stream.
+
+	Prints the recording ID on exit.
 
 	See 'kapacitor help replay' for how to replay a recording.
 
@@ -243,6 +257,23 @@ Examples:
 
 		This records the live data stream for 1 minute using the databases and retention policies
 		from the named task.
+
+Options:
+`
+	fmt.Fprintln(os.Stderr, u)
+	recordStreamFlags.PrintDefaults()
+}
+
+func recordBatchUsage() {
+	var u = `Usage: kapacitor record batch [options]
+
+	Record the result of a InfluxDB query from a task.
+
+	Prints the recording ID on exit.
+
+	See 'kapacitor help replay' for how to replay a recording.
+
+Examples:
 
 	$ kapacitor record batch -name cpu_idle -start 2015-09-01T00:00:00Z -stop 2015-09-02T00:00:00Z
 
@@ -256,6 +287,25 @@ Examples:
 		as many times as defined by the schedule until the queries reaches the present time.
 		The starting time for the queries is 'now - 10h' and increments by the schedule defined in the task.
 
+Options:
+`
+	fmt.Fprintln(os.Stderr, u)
+	recordBatchFlags.PrintDefaults()
+}
+
+func recordQueryUsage() {
+	var u = `Usage: kapacitor record query [options]
+
+	Record the result of a InfluxDB query.
+
+	Prints the recording ID on exit.
+
+	Recordings have types like tasks. you must specify the desired type.
+
+	See 'kapacitor help replay' for how to replay a recording.
+
+Examples:
+
 	$ kapacitor record query -query 'select value from "telegraf"."default"."cpu_idle" where time > now() - 1h and time < now()' -type stream
 
 		This records the result of the query and stores it as a stream recording. Use '-type batch' to store as batch recording.
@@ -263,32 +313,50 @@ Examples:
 Options:
 `
 	fmt.Fprintln(os.Stderr, u)
-	recordFlags.PrintDefaults()
+	recordQueryFlags.PrintDefaults()
 }
-
 func doRecord(args []string) error {
-
 	v := url.Values{}
 	v.Add("type", args[0])
 	switch args[0] {
 	case "stream":
-		v.Add("name", *rname)
-		v.Add("duration", *rdur)
+		recordStreamFlags.Parse(args[1:])
+		if *rsname == "" || *rsdur == "" {
+			recordStreamFlags.Usage()
+			return errors.New("both name and duration are required")
+		}
+		v.Add("name", *rsname)
+		v.Add("duration", *rsdur)
 	case "batch":
-		if *rstart != "" && *rpast != "" {
+		recordBatchFlags.Parse(args[1:])
+		if *rbname == "" {
+			recordBatchFlags.Usage()
+			return errors.New("name is required")
+		}
+		if *rbstart == "" && *rbpast == "" {
+			recordBatchFlags.Usage()
+			return errors.New("must set one of start or past flags.")
+		}
+		if *rbstart != "" && *rbpast != "" {
+			recordBatchFlags.Usage()
 			return errors.New("cannot set both start and past flags.")
 		}
-		v.Add("name", *rname)
-		v.Add("start", *rstart)
-		v.Add("stop", *rstop)
-		v.Add("past", *rpast)
-		v.Add("cluster", *rcluster)
+		v.Add("name", *rbname)
+		v.Add("start", *rbstart)
+		v.Add("stop", *rbstop)
+		v.Add("past", *rbpast)
+		v.Add("cluster", *rbcluster)
 	case "query":
-		v.Add("query", *rquery)
-		v.Add("ttype", *rtype)
-		v.Add("cluster", *rcluster)
+		recordQueryFlags.Parse(args[1:])
+		if *rqquery == "" || *rqtype == "" {
+			recordQueryFlags.Usage()
+			return errors.New("both query and type are required")
+		}
+		v.Add("query", *rqquery)
+		v.Add("ttype", *rqtype)
+		v.Add("cluster", *rqcluster)
 	default:
-		return fmt.Errorf("Unknown record type %q, expected 'stream' or 'query'", args[0])
+		return fmt.Errorf("Unknown record type %q, expected 'stream', 'batch' or 'query'", args[0])
 	}
 	r, err := http.Post(kapacitorEndpoint+"/record?"+v.Encode(), "application/octetstream", nil)
 	if err != nil {
