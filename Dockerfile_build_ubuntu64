@@ -60,6 +60,7 @@ RUN mkdir -p $PROJECT_DIR
 WORKDIR $PROJECT_DIR
 
 VOLUME $PROJECT_DIR
+VOLUME /root/go/src
 
 # Configure local git
 RUN git config --global user.email "support@influxdb.com"
