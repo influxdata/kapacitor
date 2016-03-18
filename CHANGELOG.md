@@ -84,6 +84,7 @@ For example:
 - [#233](https://github.com/influxdata/kapacitor/issues/233): BREAKING: Now you can use multiple InfluxDB clusters. The config changes to make this possible are breaking. See notes above for changes.
 - [#302](https://github.com/influxdata/kapacitor/issues/302): Can now use .Time in alert message.
 - [#239](https://github.com/influxdata/kapacitor/issues/239): Support more detailed TLS config when connecting to an InfluxDB host.
+- [#323](https://github.com/influxdata/kapacitor/pull/323): Stats for task execution are provided via JSON HTTP request instead of just DOT string. thanks @yosiat
 
 
 ### Bugfixes
