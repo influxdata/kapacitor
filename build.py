@@ -745,8 +745,8 @@ def main():
             return 1
 
     if nightly and rc:
-        print "!! Cannot be both nightly and a release candidate! Stopping."
-        return 1
+        # If nightly is specified, reset rc to None
+        rc = None
 
     if nightly:
         # In order to cleanly delineate nightly version, we are adding the epoch timestamp
