@@ -145,6 +145,9 @@ func SortedKeys(tags map[string]string) []string {
 }
 
 func TagsToGroupID(dims []string, tags map[string]string) GroupID {
+	if len(dims) == 0 {
+		return NilGroup
+	}
 	var buf bytes.Buffer
 	for _, d := range dims {
 		buf.Write([]byte(d))
@@ -152,7 +155,6 @@ func TagsToGroupID(dims []string, tags map[string]string) GroupID {
 		buf.Write([]byte(tags[d]))
 		buf.Write([]byte(","))
 	}
-
 	return GroupID(buf.Bytes())
 }
 
