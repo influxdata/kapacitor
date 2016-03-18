@@ -301,6 +301,40 @@ func (et *ExecutingTask) registerOutput(name string, o Output) {
 	et.outputs[name] = o
 }
 
+type ExecutionStats struct {
+	TaskStats map[string]interface{}
+	NodeStats map[string]map[string]interface{}
+}
+
+func (et *ExecutingTask) ExecutionStats() (ExecutionStats, error) {
+	executionStats := ExecutionStats{
+		TaskStats: make(map[string]interface{}),
+		NodeStats: make(map[string]map[string]interface{}),
+	}
+
+	// Fill the task stats
+	executionStats.TaskStats["throughput"] = et.getThroughput()
+
+	// Fill the nodes stats
+	err := et.walk(func(node Node) error {
+		nodeStats := node.stats()
+
+		// Add collected and emitted
+		nodeStats["collected"] = node.collectedCount()
+		nodeStats["emitted"] = node.emittedCount()
+
+		executionStats.NodeStats[node.Name()] = nodeStats
+
+		return nil
+	})
+
+	if err != nil {
+		return executionStats, err
+	}
+
+	return executionStats, nil
+}
+
 // Return a graphviz .dot formatted byte array.
 // Label edges with relavant execution information.
 func (et *ExecutingTask) EDot(labels bool) []byte {

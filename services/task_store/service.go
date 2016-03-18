@@ -49,6 +49,7 @@ type Service struct {
 		StartTask(t *kapacitor.Task) (*kapacitor.ExecutingTask, error)
 		StopTask(name string) error
 		IsExecuting(name string) bool
+		ExecutionStats(name string) (kapacitor.ExecutionStats, error)
 		ExecutingDot(name string, labels bool) string
 	}
 
@@ -684,11 +685,12 @@ func (ts *Service) Disable(name string) error {
 }
 
 type taskInfo struct {
-	Name      string
-	Type      kapacitor.TaskType
-	DBRPs     []kapacitor.DBRP
-	Enabled   bool
-	Executing bool
+	Name           string
+	Type           kapacitor.TaskType
+	DBRPs          []kapacitor.DBRP
+	Enabled        bool
+	Executing      bool
+	ExecutionStats kapacitor.ExecutionStats
 }
 
 func (ts *Service) IsEnabled(name string) (e bool) {
@@ -725,6 +727,15 @@ func (ts *Service) GetTaskInfo(tasks []string) ([]taskInfo, error) {
 				Enabled:   enabled,
 				Executing: ts.TaskMaster.IsExecuting(t.Name),
 			}
+
+			if info.Executing {
+				executionStats, err := ts.TaskMaster.ExecutionStats(t.Name)
+				if err != nil {
+					return fmt.Errorf("failed to fetch execution stats. name: %s, err: %s", t.Name, err)
+				}
+				info.ExecutionStats = executionStats
+			}
+
 			taskInfos = append(taskInfos, info)
 			return nil
 		}

@@ -369,6 +369,17 @@ func (tm *TaskMaster) IsExecuting(name string) bool {
 	return executing
 }
 
+func (tm *TaskMaster) ExecutionStats(name string) (ExecutionStats, error) {
+	tm.mu.RLock()
+	defer tm.mu.RUnlock()
+	task, executing := tm.tasks[name]
+	if !executing {
+		return ExecutionStats{}, nil
+	}
+
+	return task.ExecutionStats()
+}
+
 func (tm *TaskMaster) ExecutingDot(name string, labels bool) string {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
