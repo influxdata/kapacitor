@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"strconv"
 	"sync"
 
 	"github.com/influxdata/kapacitor/expvar"
@@ -39,6 +38,8 @@ type Edge struct {
 	logger     *log.Logger
 	aborted    chan struct{}
 	statsKey   string
+	collected  *expvar.Int
+	emitted    *expvar.Int
 	statMap    *expvar.Map
 	groupMu    sync.RWMutex
 	groupStats map[models.GroupID]*edgeStat
@@ -52,11 +53,15 @@ func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, size i
 		"type":   t.String(),
 	}
 	key, sm := NewStatistics("edges", tags)
-	sm.Add(statCollected, 0)
-	sm.Add(statEmitted, 0)
+	collected := &expvar.Int{}
+	emitted := &expvar.Int{}
+	sm.Set(statCollected, collected)
+	sm.Set(statEmitted, emitted)
 	e := &Edge{
 		statsKey:   key,
 		statMap:    sm,
+		collected:  collected,
+		emitted:    emitted,
 		aborted:    make(chan struct{}),
 		groupStats: make(map[models.GroupID]*edgeStat),
 	}
@@ -74,19 +79,11 @@ func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, size i
 }
 
 func (e *Edge) emittedCount() int64 {
-	c, err := strconv.ParseUint(e.statMap.Get(statEmitted).String(), 10, 64)
-	if err != nil {
-		panic("emitted count is not an int")
-	}
-	return int64(c)
+	return e.emitted.IntValue()
 }
 
 func (e *Edge) collectedCount() int64 {
-	c, err := strconv.ParseUint(e.statMap.Get(statCollected).String(), 10, 64)
-	if err != nil {
-		panic("collected count is not an int")
-	}
-	return int64(c)
+	return e.collected.IntValue()
 }
 
 // Stats for a given group for this edge
@@ -116,9 +113,9 @@ func (e *Edge) readGroupStats(f func(group models.GroupID, collected, emitted in
 // collect calls to the edge have finished.
 func (e *Edge) Close() {
 	e.logger.Printf(
-		"D! closing c: %s e: %s\n",
-		e.statMap.Get(statCollected),
-		e.statMap.Get(statEmitted),
+		"D! closing c: %d e: %d\n",
+		e.collected.IntValue(),
+		e.emitted.IntValue(),
 	)
 	if e.stream != nil {
 		close(e.stream)
@@ -137,9 +134,9 @@ func (e *Edge) Close() {
 func (e *Edge) Abort() {
 	close(e.aborted)
 	e.logger.Printf(
-		"I! aborting c: %s e: %s\n",
-		e.statMap.Get(statCollected),
-		e.statMap.Get(statEmitted),
+		"I! aborting c: %d e: %d\n",
+		e.collected.IntValue(),
+		e.emitted.IntValue(),
 	)
 }
 
@@ -155,8 +152,8 @@ func (e *Edge) NextPoint() (p models.Point, ok bool) {
 	case <-e.aborted:
 	case p, ok = <-e.stream:
 		if ok {
-			e.statMap.Add(statEmitted, 1)
-			e.incEmitted(&p)
+			e.emitted.Add(1)
+			e.incEmitted(p.Group, p.Tags, p.Dimensions)
 		}
 	}
 	return
@@ -167,8 +164,8 @@ func (e *Edge) NextBatch() (b models.Batch, ok bool) {
 	case <-e.aborted:
 	case b, ok = <-e.batch:
 		if ok {
-			e.statMap.Add(statEmitted, 1)
-			e.incEmitted(&b)
+			e.emitted.Add(1)
+			e.incEmitted(b.Group, b.Tags, b.PointDimensions())
 		}
 	}
 	return
@@ -179,15 +176,15 @@ func (e *Edge) NextMaps() (m *MapResult, ok bool) {
 	case <-e.aborted:
 	case m, ok = <-e.reduce:
 		if ok {
-			e.statMap.Add(statEmitted, 1)
+			e.emitted.Add(1)
 		}
 	}
 	return
 }
 
 func (e *Edge) CollectPoint(p models.Point) error {
-	e.statMap.Add(statCollected, 1)
-	e.incCollected(&p)
+	e.collected.Add(1)
+	e.incCollected(p.Group, p.Tags, p.Dimensions)
 	select {
 	case <-e.aborted:
 		return ErrAborted
@@ -197,8 +194,8 @@ func (e *Edge) CollectPoint(p models.Point) error {
 }
 
 func (e *Edge) CollectBatch(b models.Batch) error {
-	e.statMap.Add(statCollected, 1)
-	e.incCollected(&b)
+	e.collected.Add(1)
+	e.incCollected(b.Group, b.Tags, b.PointDimensions())
 	select {
 	case <-e.aborted:
 		return ErrAborted
@@ -208,7 +205,7 @@ func (e *Edge) CollectBatch(b models.Batch) error {
 }
 
 func (e *Edge) CollectMaps(m *MapResult) error {
-	e.statMap.Add(statCollected, 1)
+	e.collected.Add(1)
 	select {
 	case <-e.aborted:
 		return ErrAborted
@@ -218,33 +215,33 @@ func (e *Edge) CollectMaps(m *MapResult) error {
 }
 
 // Increment the emitted count of the group for this edge.
-func (e *Edge) incEmitted(p models.PointInterface) {
+func (e *Edge) incEmitted(group models.GroupID, tags models.Tags, dims []string) {
 	e.groupMu.Lock()
 	defer e.groupMu.Unlock()
-	if stats, ok := e.groupStats[p.PointGroup()]; ok {
+	if stats, ok := e.groupStats[group]; ok {
 		stats.emitted += 1
 	} else {
 		stats = &edgeStat{
 			emitted: 1,
-			tags:    p.PointTags(),
-			dims:    p.PointDimensions(),
+			tags:    tags,
+			dims:    dims,
 		}
-		e.groupStats[p.PointGroup()] = stats
+		e.groupStats[group] = stats
 	}
 }
 
-// Increment the  ollected count of the group for this edge.
-func (e *Edge) incCollected(p models.PointInterface) {
+// Increment the collected count of the group for this edge.
+func (e *Edge) incCollected(group models.GroupID, tags models.Tags, dims []string) {
 	e.groupMu.Lock()
 	defer e.groupMu.Unlock()
-	if stats, ok := e.groupStats[p.PointGroup()]; ok {
+	if stats, ok := e.groupStats[group]; ok {
 		stats.collected += 1
 	} else {
 		stats = &edgeStat{
 			collected: 1,
-			tags:      p.PointTags(),
-			dims:      p.PointDimensions(),
+			tags:      tags,
+			dims:      dims,
 		}
-		e.groupStats[p.PointGroup()] = stats
+		e.groupStats[group] = stats
 	}
 }

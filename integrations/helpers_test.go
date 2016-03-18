@@ -12,6 +12,7 @@ import (
 
 	client "github.com/influxdata/influxdb/client/v2"
 	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/wlog"
 )
@@ -161,3 +162,27 @@ func (d deadman) Threshold() float64      { return d.threshold }
 func (d deadman) Id() string              { return d.id }
 func (d deadman) Message() string         { return d.message }
 func (d deadman) Global() bool            { return d.global }
+
+type metaclient struct{}
+
+func (m *metaclient) WaitForLeader(d time.Duration) error {
+	return nil
+}
+
+func (m *metaclient) CreateDatabase(name string) (*meta.DatabaseInfo, error) {
+	return nil, nil
+}
+
+func (m *metaclient) Database(name string) (*meta.DatabaseInfo, error) {
+	return &meta.DatabaseInfo{
+		Name: name,
+	}, nil
+}
+
+func (m *metaclient) Authenticate(username, password string) (ui *meta.UserInfo, err error) {
+	return nil, errors.New("not authenticated")
+}
+
+func (m *metaclient) Users() ([]meta.UserInfo, error) {
+	return nil, errors.New("no user")
+}
