@@ -12,8 +12,8 @@ docker build -f Dockerfile_build_ubuntu64 -t influxdata/kapacitor-builder $DIR
 if test "${KAPACITOR_USE_BUILD_CACHE}" = "true"; then
 	# create a container that owns the /root/go/src volume used as a cache of go dependency downloads
 	# ignore failures, since this usually means the container already exists.
-	docker run --entrypoint=/bin/true --name kapacitor-builder-cache influxdata/kapacitor-builder 2>/dev/null &&
-	VOLUME_OPTIONS=--volumes-from kapacitor-builder-cache || true
+	docker run --entrypoint=/bin/true --name kapacitor-builder-cache influxdata/kapacitor-builder 2>/dev/null || true
+	VOLUME_OPTIONS="--volumes-from kapacitor-builder-cache"
 else
 	VOLUME_OPTIONS=
 fi
