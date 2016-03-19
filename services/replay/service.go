@@ -265,7 +265,7 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 		}
 
 		doF = func() error {
-			err := r.doRecordStream(rid, dur, t.DBRPs, started)
+			err := r.doRecordStream(rid, dur, t.DBRPs, t.Measurements(), started)
 			if err != nil {
 				close(started)
 			}
@@ -606,9 +606,8 @@ func (s streamWriter) Close() error {
 }
 
 // Record the stream for a duration
-func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration, dbrps []kapacitor.DBRP, started chan struct{}) error {
-	// TODO(yosi): Fix this!
-	e, err := r.TaskMaster.NewFork(rid.String(), dbrps, make([]string, 0))
+func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration, dbrps []kapacitor.DBRP, measurements []string, started chan struct{}) error {
+	e, err := r.TaskMaster.NewFork(rid.String(), dbrps, measurements)
 	if err != nil {
 		return err
 	}
