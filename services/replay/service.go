@@ -46,7 +46,7 @@ type Service struct {
 		NewNamedClient(name string) (client.Client, error)
 	}
 	TaskMaster interface {
-		NewFork(name string, dbrps []kapacitor.DBRP) (*kapacitor.Edge, error)
+		NewFork(name string, dbrps []kapacitor.DBRP, measurements []string) (*kapacitor.Edge, error)
 		DelFork(name string)
 		New() *kapacitor.TaskMaster
 		Stream(name string) (kapacitor.StreamCollector, error)
@@ -607,7 +607,8 @@ func (s streamWriter) Close() error {
 
 // Record the stream for a duration
 func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration, dbrps []kapacitor.DBRP, started chan struct{}) error {
-	e, err := r.TaskMaster.NewFork(rid.String(), dbrps)
+	// TODO(yosi): Fix this!
+	e, err := r.TaskMaster.NewFork(rid.String(), dbrps, make([]string, 0))
 	if err != nil {
 		return err
 	}

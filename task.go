@@ -44,6 +44,14 @@ func CreateDBRPMap(dbrps []DBRP) map[DBRP]bool {
 	return dbMap
 }
 
+func CreateMeasurementsMap(measurements []string) map[string]bool {
+	measurementsMap := make(map[string]bool, len(measurements))
+	for _, measurement := range measurements {
+		measurementsMap[measurement] = true
+	}
+	return measurementsMap
+}
+
 func (d DBRP) String() string {
 	return fmt.Sprintf("%q.%q", d.Database, d.RetentionPolicy)
 }
