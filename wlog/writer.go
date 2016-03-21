@@ -73,7 +73,7 @@ func LogLevel() Level {
 }
 
 // name to Level mappings
-var levels = map[string]Level{
+var StringToLevel = map[string]Level{
 	"DEBUG": DEBUG,
 	"INFO":  INFO,
 	"WARN":  WARN,
@@ -83,7 +83,7 @@ var levels = map[string]Level{
 
 // Set the log level via a string name. To set it directly use 'logLevel'.
 func SetLevelFromName(level string) error {
-	l := levels[strings.ToUpper(level)]
+	l := StringToLevel[strings.ToUpper(level)]
 	if l > 0 {
 		SetLevel(l)
 	} else {
