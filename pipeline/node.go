@@ -415,3 +415,10 @@ func (n *chainnode) Shift(shift time.Duration) *ShiftNode {
 	n.linkChild(s)
 	return s
 }
+
+// Create a node that logs all data it receives.
+func (n *chainnode) Log() *LogNode {
+	s := newLogNode(n.Provides())
+	n.linkChild(s)
+	return s
+}

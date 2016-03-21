@@ -85,6 +85,7 @@ For example:
 - [#302](https://github.com/influxdata/kapacitor/issues/302): Can now use .Time in alert message.
 - [#239](https://github.com/influxdata/kapacitor/issues/239): Support more detailed TLS config when connecting to an InfluxDB host.
 - [#323](https://github.com/influxdata/kapacitor/pull/323): Stats for task execution are provided via JSON HTTP request instead of just DOT string. thanks @yosiat
+- [#358](https://github.com/influxdata/kapacitor/issues/358): Improved logging. Adds LogNode so any data in a pipeline can be logged.
 
 
 ### Bugfixes
