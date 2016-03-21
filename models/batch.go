@@ -128,8 +128,11 @@ func ResultToBatches(res client.Result) ([]Batch, error) {
 	if res.Err != "" {
 		return nil, errors.New(res.Err)
 	}
-	batches := make([]Batch, len(res.Series))
-	for i, series := range res.Series {
+	batches := make([]Batch, 0, len(res.Series))
+	for _, series := range res.Series {
+		if len(series.Values) == 0 {
+			continue
+		}
 		groupID := TagsToGroupID(
 			SortedKeys(series.Tags),
 			series.Tags,
@@ -183,7 +186,7 @@ func ResultToBatches(res client.Result) ([]Batch, error) {
 				)
 			}
 		}
-		batches[i] = b
+		batches = append(batches, b)
 	}
 	return batches, nil
 }

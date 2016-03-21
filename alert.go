@@ -352,7 +352,7 @@ func (a *AlertNode) runAlert([]byte) error {
 }
 func (a *AlertNode) handleAlert(ad *AlertData) {
 	a.statMap.Add(statsAlertsTriggered, 1)
-	a.logger.Printf("D! %v alert triggered id:%s msg:%s data:%v", ad.Level, ad.ID, ad.Message, ad.Data)
+	a.logger.Printf("D! %v alert triggered id:%s msg:%s data:%v", ad.Level, ad.ID, ad.Message, ad.Data.Series[0])
 	for _, h := range a.handlers {
 		h(ad)
 	}
