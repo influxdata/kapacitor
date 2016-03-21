@@ -150,10 +150,10 @@ func TagsToGroupID(dims []string, tags map[string]string) GroupID {
 	}
 	var buf bytes.Buffer
 	for _, d := range dims {
-		buf.Write([]byte(d))
-		buf.Write([]byte("="))
-		buf.Write([]byte(tags[d]))
-		buf.Write([]byte(","))
+		buf.WriteString(d)
+		buf.WriteString("=")
+		buf.WriteString(tags[d])
+		buf.WriteString(",")
 	}
 	return GroupID(buf.Bytes())
 }

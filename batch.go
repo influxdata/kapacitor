@@ -269,6 +269,7 @@ func (b *BatchNode) doQuery() error {
 			}
 			if err != nil {
 				b.logger.Println("E! failed to connect to InfluxDB:", err)
+				b.timer.Stop()
 				break
 			}
 			q := client.Query{
@@ -279,11 +280,13 @@ func (b *BatchNode) doQuery() error {
 			resp, err := con.Query(q)
 			if err != nil {
 				b.logger.Println("E! query failed:", err)
+				b.timer.Stop()
 				break
 			}
 
 			if err := resp.Error(); err != nil {
 				b.logger.Println("E! query failed:", err)
+				b.timer.Stop()
 				break
 			}
 
