@@ -87,6 +87,12 @@ func (h *HTTPOutNode) runOut([]byte) error {
 			row := models.PointToRow(p)
 			h.updateResultWithRow(p.Group, row)
 			h.timer.Stop()
+			for _, child := range h.outs {
+				err := child.CollectPoint(p)
+				if err != nil {
+					return err
+				}
+			}
 		}
 	case pipeline.BatchEdge:
 		for b, ok := h.ins[0].NextBatch(); ok; b, ok = h.ins[0].NextBatch() {
@@ -94,6 +100,12 @@ func (h *HTTPOutNode) runOut([]byte) error {
 			row := models.BatchToRow(b)
 			h.updateResultWithRow(b.Group, row)
 			h.timer.Stop()
+			for _, child := range h.outs {
+				err := child.CollectBatch(b)
+				if err != nil {
+					return err
+				}
+			}
 		}
 	}
 	return nil
