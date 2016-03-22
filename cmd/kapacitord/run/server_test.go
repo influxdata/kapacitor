@@ -282,6 +282,70 @@ func TestServer_DeleteTask(t *testing.T) {
 	}
 }
 
+func TestServer_ListTasks(t *testing.T) {
+	s := OpenDefaultServer()
+	defer s.Close()
+	count := 10
+
+	ttype := "stream"
+	tick := "stream.from().measurement('test')"
+	dbrps := []kapacitor.DBRP{
+		{
+			Database:        "mydb",
+			RetentionPolicy: "myrp",
+		},
+		{
+			Database:        "otherdb",
+			RetentionPolicy: "default",
+		},
+	}
+	for i := 0; i < count; i++ {
+		name := fmt.Sprintf("testTaskName%d", i)
+		r, err := s.DefineTask(name, ttype, tick, dbrps)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r != "" {
+			t.Fatal("unexpected result", r)
+		}
+
+		if i%2 == 0 {
+			r, err = s.EnableTask(name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if r != "" {
+				t.Fatal("unexpected result", r)
+			}
+		}
+	}
+	tasks, err := s.ListTasks()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exp, got := count, len(tasks); exp != got {
+		t.Fatalf("unexpected number of tasks: exp:%d got:%d", exp, got)
+	}
+	for i, task := range tasks {
+		if exp, got := fmt.Sprintf("testTaskName%d", i), task.Name; exp != got {
+			t.Errorf("unexpected task.Name i:%d exp:%s got:%s", i, exp, got)
+		}
+		if exp, got := kapacitor.StreamTask, task.Type; exp != got {
+			t.Errorf("unexpected task.Type i:%d exp:%v got:%v", i, exp, got)
+		}
+		if !reflect.DeepEqual(task.DBRPs, dbrps) {
+			t.Fatalf("unexpected dbrps i:%d exp:%s got:%s", i, dbrps, task.DBRPs)
+		}
+		if exp, got := i%2 == 0, task.Enabled; exp != got {
+			t.Errorf("unexpected task.Enabled i:%d exp:%v got:%v", i, exp, got)
+		}
+		if exp, got := i%2 == 0, task.Executing; exp != got {
+			t.Errorf("unexpected task.Executing i:%d exp:%v got:%v", i, exp, got)
+		}
+	}
+
+}
+
 func TestServer_StreamTask(t *testing.T) {
 	s := OpenDefaultServer()
 	defer s.Close()

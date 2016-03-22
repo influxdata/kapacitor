@@ -26,6 +26,8 @@ type Node interface {
 
 	addParentEdge(*Edge)
 
+	init()
+
 	// start the node and its children
 	start(snapshot []byte)
 	stop()
@@ -88,7 +90,7 @@ func (n *node) abortParentEdges() {
 	}
 }
 
-func (n *node) start(snapshot []byte) {
+func (n *node) init() {
 	tags := map[string]string{
 		"task": n.et.Task.Name,
 		"node": n.Name(),
@@ -100,6 +102,9 @@ func (n *node) start(snapshot []byte) {
 	n.statMap.Set(statAverageExecTime, avgExecVar)
 	n.timer = n.et.tm.TimingService.NewTimer(avgExecVar)
 	n.errCh = make(chan error, 1)
+}
+
+func (n *node) start(snapshot []byte) {
 	go func() {
 		var err error
 		defer func() {
