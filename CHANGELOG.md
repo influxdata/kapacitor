@@ -1,6 +1,15 @@
 # Changelog
 
-## v0.11.0 [unreleased]
+## v0.12.0 [unreleased]
+
+### Release Notes
+
+### Features
+
+### Bugfixes
+
+
+## v0.11.0 [2016-03-22]
 
 ### Release Notes
 
