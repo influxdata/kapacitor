@@ -106,6 +106,7 @@ For example:
 - [#333](https://github.com/influxdata/kapacitor/issues/333): Fixes hang when replaying with .stats node. Fixes issues with batch and stats.
 - [#340](https://github.com/influxdata/kapacitor/issues/340): BREAKING: Decouples global setting for alert handlers from the state changes only setting.
 - [#348](https://github.com/influxdata/kapacitor/issues/348): config.go: refactor to simplify structure and fix support for array elements
+- [#362](https://github.com/influxdata/kapacitor/issues/362): Fix bug with join tolerance and batches.
 
 ## v0.10.1 [2016-02-08]
 
