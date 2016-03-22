@@ -812,14 +812,8 @@ func doList(args []string) error {
 		defer r.Body.Close()
 		// Decode valid response
 		type resp struct {
-			Error string `json:"Error"`
-			Tasks []struct {
-				Name      string
-				Type      kapacitor.TaskType
-				DBRPs     []kapacitor.DBRP
-				Enabled   bool
-				Executing bool
-			} `json:"Tasks"`
+			Error string                       `json:"Error"`
+			Tasks []task_store.TaskSummaryInfo `json:"Tasks"`
 		}
 		d := json.NewDecoder(r.Body)
 		rp := resp{}

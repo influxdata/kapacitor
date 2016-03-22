@@ -237,6 +237,29 @@ func (s *Server) GetTask(name string) (ti task_store.TaskInfo, err error) {
 	return
 }
 
+func (s *Server) ListTasks() ([]task_store.TaskSummaryInfo, error) {
+	r, err := http.Get(s.URL() + "/tasks")
+	if err != nil {
+		return nil, err
+	}
+	defer r.Body.Close()
+	if r.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code got %d exp %d", r.StatusCode, http.StatusOK)
+	}
+	// Decode valid response
+	type resp struct {
+		Error string                       `json:"Error"`
+		Tasks []task_store.TaskSummaryInfo `json:"Tasks"`
+	}
+	d := json.NewDecoder(r.Body)
+	rp := resp{}
+	d.Decode(&rp)
+	if rp.Error != "" {
+		return nil, errors.New(rp.Error)
+	}
+	return rp.Tasks, nil
+}
+
 // MustReadAll reads r. Panic on error.
 func MustReadAll(r io.Reader) []byte {
 	b, err := ioutil.ReadAll(r)

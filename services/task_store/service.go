@@ -264,14 +264,15 @@ func (ts *Service) LoadSnapshot(name string) (*kapacitor.TaskSnapshot, error) {
 }
 
 type TaskInfo struct {
-	Name       string
-	Type       kapacitor.TaskType
-	DBRPs      []kapacitor.DBRP
-	TICKscript string
-	Dot        string
-	Enabled    bool
-	Executing  bool
-	Error      string
+	Name           string
+	Type           kapacitor.TaskType
+	DBRPs          []kapacitor.DBRP
+	TICKscript     string
+	Dot            string
+	Enabled        bool
+	Executing      bool
+	Error          string
+	ExecutionStats kapacitor.ExecutionStats
 }
 
 func (ts *Service) handleTask(w http.ResponseWriter, r *http.Request) {
@@ -301,10 +302,12 @@ func (ts *Service) handleTask(w http.ResponseWriter, r *http.Request) {
 	executing := ts.TaskMaster.IsExecuting(name)
 	errMsg := raw.Error
 	dot := ""
+	stats := kapacitor.ExecutionStats{}
 	task, err := ts.Load(name)
 	if err == nil {
 		if executing {
 			dot = ts.TaskMaster.ExecutingDot(name, labels)
+			stats, _ = ts.TaskMaster.ExecutionStats(name)
 		} else {
 			dot = string(task.Dot())
 		}
@@ -313,14 +316,15 @@ func (ts *Service) handleTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	info := TaskInfo{
-		Name:       name,
-		Type:       raw.Type,
-		DBRPs:      raw.DBRPs,
-		TICKscript: raw.TICKscript,
-		Dot:        dot,
-		Enabled:    ts.IsEnabled(name),
-		Executing:  executing,
-		Error:      errMsg,
+		Name:           name,
+		Type:           raw.Type,
+		DBRPs:          raw.DBRPs,
+		TICKscript:     raw.TICKscript,
+		Dot:            dot,
+		Enabled:        ts.IsEnabled(name),
+		Executing:      executing,
+		Error:          errMsg,
+		ExecutionStats: stats,
 	}
 
 	w.Write(httpd.MarshalJSON(info, true))
@@ -333,14 +337,14 @@ func (ts *Service) handleTasks(w http.ResponseWriter, r *http.Request) {
 		tasks = strings.Split(tasksStr, ",")
 	}
 
-	infos, err := ts.GetTaskInfo(tasks)
+	infos, err := ts.GetTaskSummaryInfo(tasks)
 	if err != nil {
 		httpd.HttpError(w, err.Error(), true, http.StatusNotFound)
 		return
 	}
 
 	type response struct {
-		Tasks []taskInfo `json:"Tasks"`
+		Tasks []TaskSummaryInfo `json:"Tasks"`
 	}
 
 	w.Write(httpd.MarshalJSON(response{infos}, true))
@@ -684,7 +688,7 @@ func (ts *Service) Disable(name string) error {
 	return ts.TaskMaster.StopTask(name)
 }
 
-type taskInfo struct {
+type TaskSummaryInfo struct {
 	Name           string
 	Type           kapacitor.TaskType
 	DBRPs          []kapacitor.DBRP
@@ -702,8 +706,8 @@ func (ts *Service) IsEnabled(name string) (e bool) {
 	return
 }
 
-func (ts *Service) GetTaskInfo(tasks []string) ([]taskInfo, error) {
-	taskInfos := make([]taskInfo, 0)
+func (ts *Service) GetTaskSummaryInfo(tasks []string) ([]TaskSummaryInfo, error) {
+	taskInfos := make([]TaskSummaryInfo, 0)
 
 	err := ts.db.View(func(tx *bolt.Tx) error {
 		tb := tx.Bucket([]byte(tasksBucket))
@@ -720,7 +724,7 @@ func (ts *Service) GetTaskInfo(tasks []string) ([]taskInfo, error) {
 
 			enabled := eb != nil && eb.Get(k) != nil
 
-			info := taskInfo{
+			info := TaskSummaryInfo{
 				Name:      t.Name,
 				Type:      t.Type,
 				DBRPs:     t.DBRPs,

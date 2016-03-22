@@ -407,57 +407,61 @@ func (et *ExecutingTask) calcThroughput() {
 }
 
 // Create a  node from a given pipeline node.
-func (et *ExecutingTask) createNode(p pipeline.Node, l *log.Logger) (Node, error) {
+func (et *ExecutingTask) createNode(p pipeline.Node, l *log.Logger) (n Node, err error) {
 	switch t := p.(type) {
 	case *pipeline.StreamNode:
-		return newStreamNode(et, t, l)
+		n, err = newStreamNode(et, t, l)
 	case *pipeline.SourceStreamNode:
-		return newSourceStreamNode(et, t, l)
+		n, err = newSourceStreamNode(et, t, l)
 	case *pipeline.SourceBatchNode:
-		return newSourceBatchNode(et, t, l)
+		n, err = newSourceBatchNode(et, t, l)
 	case *pipeline.BatchNode:
-		return newBatchNode(et, t, l)
+		n, err = newBatchNode(et, t, l)
 	case *pipeline.WindowNode:
-		return newWindowNode(et, t, l)
+		n, err = newWindowNode(et, t, l)
 	case *pipeline.HTTPOutNode:
-		return newHTTPOutNode(et, t, l)
+		n, err = newHTTPOutNode(et, t, l)
 	case *pipeline.InfluxDBOutNode:
-		return newInfluxDBOutNode(et, t, l)
+		n, err = newInfluxDBOutNode(et, t, l)
 	case *pipeline.MapNode:
-		return newMapNode(et, t, l)
+		n, err = newMapNode(et, t, l)
 	case *pipeline.ReduceNode:
-		return newReduceNode(et, t, l)
+		n, err = newReduceNode(et, t, l)
 	case *pipeline.AlertNode:
-		return newAlertNode(et, t, l)
+		n, err = newAlertNode(et, t, l)
 	case *pipeline.GroupByNode:
-		return newGroupByNode(et, t, l)
+		n, err = newGroupByNode(et, t, l)
 	case *pipeline.UnionNode:
-		return newUnionNode(et, t, l)
+		n, err = newUnionNode(et, t, l)
 	case *pipeline.JoinNode:
-		return newJoinNode(et, t, l)
+		n, err = newJoinNode(et, t, l)
 	case *pipeline.EvalNode:
-		return newEvalNode(et, t, l)
+		n, err = newEvalNode(et, t, l)
 	case *pipeline.WhereNode:
-		return newWhereNode(et, t, l)
+		n, err = newWhereNode(et, t, l)
 	case *pipeline.SampleNode:
-		return newSampleNode(et, t, l)
+		n, err = newSampleNode(et, t, l)
 	case *pipeline.DerivativeNode:
-		return newDerivativeNode(et, t, l)
+		n, err = newDerivativeNode(et, t, l)
 	case *pipeline.UDFNode:
-		return newUDFNode(et, t, l)
+		n, err = newUDFNode(et, t, l)
 	case *pipeline.StatsNode:
-		return newStatsNode(et, t, l)
+		n, err = newStatsNode(et, t, l)
 	case *pipeline.ShiftNode:
-		return newShiftNode(et, t, l)
+		n, err = newShiftNode(et, t, l)
 	case *pipeline.NoOpNode:
-		return newNoOpNode(et, t, l)
+		n, err = newNoOpNode(et, t, l)
 	case *pipeline.InfluxQLNode:
-		return newInfluxQLNode(et, t, l)
+		n, err = newInfluxQLNode(et, t, l)
 	case *pipeline.LogNode:
-		return newLogNode(et, t, l)
+		n, err = newLogNode(et, t, l)
 	default:
 		return nil, fmt.Errorf("unknown pipeline node type %T", p)
 	}
+	if err == nil && n != nil {
+		n.init()
+	}
+	return n, err
 }
 
 type TaskSnapshot struct {
