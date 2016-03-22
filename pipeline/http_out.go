@@ -17,7 +17,7 @@ package pipeline
 //        .httpOut('top10')
 //
 type HTTPOutNode struct {
-	node
+	chainnode
 
 	// The relative path where the cached data is exposed
 	// tick:ignore
@@ -26,11 +26,7 @@ type HTTPOutNode struct {
 
 func newHTTPOutNode(wants EdgeType, endpoint string) *HTTPOutNode {
 	return &HTTPOutNode{
-		node: node{
-			desc:     "http_out",
-			wants:    wants,
-			provides: NoEdge,
-		},
-		Endpoint: endpoint,
+		chainnode: newBasicChainNode("http_out", wants, wants),
+		Endpoint:  endpoint,
 	}
 }

@@ -175,7 +175,8 @@ func (h *Handler) AddRoute(r Route) error {
 	handler = cors(handler)
 	handler = requestID(handler)
 
-	if h.loggingEnabled {
+	// Logs are INFO level only enable if we are logging INFOs
+	if h.loggingEnabled && wlog.LogLevel() <= wlog.INFO {
 		handler = logging(handler, r.Name, h.Logger)
 	}
 	handler = recovery(handler, r.Name, h.Logger) // make sure recovery is always last

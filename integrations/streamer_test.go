@@ -534,6 +534,36 @@ stream
 	testStreamerWithOutput(t, "TestStream_SimpleMR", script, 15*time.Second, er, nil, false)
 }
 
+func TestStream_HttpOutPassThrough(t *testing.T) {
+
+	var script = `
+stream
+	.from().measurement('cpu')
+	.where(lambda: "host" == 'serverA')
+	.window()
+		.period(10s)
+		.every(10s)
+	.mapReduce(influxql.count('value'))
+	.httpOut('unused')
+	.httpOut('TestStream_SimpleMR')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    nil,
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					10.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_SimpleMR", script, 15*time.Second, er, nil, false)
+}
+
 func TestStream_BatchGroupBy(t *testing.T) {
 
 	var script = `
