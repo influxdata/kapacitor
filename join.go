@@ -405,6 +405,7 @@ func newJoinset(
 		values:    make([]models.PointInterface, expected),
 		first:     expected,
 		time:      time,
+		tolerance: tolerance,
 		logger:    l,
 	}
 }
