@@ -48,11 +48,11 @@ type JoinNode struct {
 	//       Names[1] corresponds to the left  parent
 	//       Names[0] corresponds to the right parent
 	// tick:ignore
-	Names []string
+	Names []string `tick:"As"`
 
 	// The dimensions on which to join
 	// tick:ignore
-	Dimensions []string
+	Dimensions []string `tick:"On"`
 
 	// The name of this new joined data stream.
 	// If empty the name of the left parent is used.

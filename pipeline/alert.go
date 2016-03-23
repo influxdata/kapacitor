@@ -183,7 +183,7 @@ type AlertNode struct {
 	Crit tick.Node
 
 	//tick:ignore
-	UseFlapping bool
+	UseFlapping bool `tick:"Flapping"`
 	//tick:ignore
 	FlapLow float64
 	//tick:ignore
@@ -198,55 +198,55 @@ type AlertNode struct {
 
 	// Send alerts only on state changes.
 	// tick:ignore
-	IsStateChangesOnly bool
+	IsStateChangesOnly bool `tick:"StateChangesOnly"`
 
 	// Post the JSON alert data to the specified URL.
 	// tick:ignore
-	PostHandlers []*PostHandler
+	PostHandlers []*PostHandler `tick:"Post"`
 
 	// Email handlers
 	// tick:ignore
-	EmailHandlers []*EmailHandler
+	EmailHandlers []*EmailHandler `tick:"Email"`
 
 	// A commands to run when an alert triggers
 	// tick:ignore
-	ExecHandlers []*ExecHandler
+	ExecHandlers []*ExecHandler `tick:"Exec"`
 
 	// Log JSON alert data to file. One event per line.
 	// tick:ignore
-	LogHandlers []*LogHandler
+	LogHandlers []*LogHandler `tick:"Log"`
 
 	// Send alert to VictorOps.
 	// tick:ignore
-	VictorOpsHandlers []*VictorOpsHandler
+	VictorOpsHandlers []*VictorOpsHandler `tick:"VictorOps"`
 
 	// Send alert to PagerDuty.
 	// tick:ignore
-	PagerDutyHandlers []*PagerDutyHandler
+	PagerDutyHandlers []*PagerDutyHandler `tick:"PagerDuty"`
 
 	// Send alert to Sensu.
 	// tick:ignore
-	SensuHandlers []*SensuHandler
+	SensuHandlers []*SensuHandler `tick:"Sensu"`
 
 	// Send alert to Slack.
 	// tick:ignore
-	SlackHandlers []*SlackHandler
+	SlackHandlers []*SlackHandler `tick:"Slack"`
 
 	// Send alert to HipChat.
 	// tick:ignore
-	HipChatHandlers []*HipChatHandler
+	HipChatHandlers []*HipChatHandler `tick:"HipChat"`
 
 	// Send alert to Alerta.
 	// tick:ignore
-	AlertaHandlers []*AlertaHandler
+	AlertaHandlers []*AlertaHandler `tick:"Alerta"`
 
 	// Send alert to OpsGenie
 	// tick:ignore
-	OpsGenieHandlers []*OpsGenieHandler
+	OpsGenieHandlers []*OpsGenieHandler `tick:"OpsGenie"`
 
 	// Send alert to Talk.
 	// tick:ignore
-	TalkHandlers []*TalkHandler
+	TalkHandlers []*TalkHandler `tick:"Talk"`
 }
 
 func newAlertNode(wants EdgeType) *AlertNode {
@@ -708,7 +708,7 @@ type AlertaHandler struct {
 
 	// List of effected Services
 	// tick:ignore
-	Service []string
+	Service []string `tick:"Services"`
 }
 
 // List of effected services.
@@ -881,11 +881,11 @@ type OpsGenieHandler struct {
 
 	// OpsGenie Teams.
 	// tick:ignore
-	TeamsList []string
+	TeamsList []string `tick:"Teams"`
 
 	// OpsGenie Recipients.
 	// tick:ignore
-	RecipientsList []string
+	RecipientsList []string `tick:"Recipients"`
 }
 
 // The list of teams to be alerted. If empty defaults to the teams from the configuration.

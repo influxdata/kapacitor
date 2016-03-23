@@ -56,7 +56,7 @@ func (s *StatefulExpr) EvalBool(scope *Scope) (bool, error) {
 	return false, ErrInvalidExpr
 }
 
-func (s *StatefulExpr) EvalNum(scope *Scope) (float64, error) {
+func (s *StatefulExpr) EvalNum(scope *Scope) (interface{}, error) {
 	stck := &stack{}
 	err := s.eval(s.Node, scope, stck)
 	if err != nil {
@@ -71,10 +71,10 @@ func (s *StatefulExpr) EvalNum(scope *Scope) (float64, error) {
 				return math.NaN(), err
 			}
 		}
-		n, ok := value.(float64)
-		if ok {
-			return n, nil
-		} else {
+		switch value.(type) {
+		case float64, int64:
+			return value, nil
+		default:
 			return math.NaN(), fmt.Errorf("expression returned unexpected type %T", value)
 		}
 	}

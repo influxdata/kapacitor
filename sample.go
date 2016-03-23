@@ -26,7 +26,7 @@ func newSampleNode(et *ExecutingTask, n *pipeline.SampleNode, l *log.Logger) (*S
 		duration: n.Duration,
 	}
 	sn.node.runF = sn.runSample
-	if n.Duration == 0 && n.Count == 0 {
+	if n.Duration == 0 && n.N == 0 {
 		return nil, errors.New("invalid sample rate: must be positive integer or duration")
 	}
 	return sn, nil
@@ -74,7 +74,7 @@ func (s *SampleNode) shouldKeep(group models.GroupID, t time.Time) bool {
 		return t.Equal(keepTime)
 	} else {
 		count := s.counts[group]
-		keep := count%s.s.Count == 0
+		keep := count%s.s.N == 0
 		count++
 		s.counts[group] = count
 		return keep

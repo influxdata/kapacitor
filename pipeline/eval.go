@@ -23,13 +23,13 @@ type EvalNode struct {
 
 	// The name of the field that results from applying the expression.
 	// tick:ignore
-	AsList []string
+	AsList []string `tick:"As"`
 
 	// tick:ignore
 	Expressions []tick.Node
 
 	// tick:ignore
-	KeepFlag bool
+	KeepFlag bool `tick:"Keep"`
 	// List of fields to keep
 	// if empty and KeepFlag is true
 	// keep all fields.

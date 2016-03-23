@@ -71,11 +71,11 @@ type StreamNode struct {
 	chainnode
 	// An expression to filter the data stream.
 	// tick:ignore
-	Expression tick.Node
+	Expression tick.Node `tick:"Where"`
 
 	// The dimensions by which to group to the data.
 	// tick:ignore
-	Dimensions []interface{}
+	Dimensions []interface{} `tick:"GroupBy"`
 
 	// The database name.
 	// If empty any database will be used.

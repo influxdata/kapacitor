@@ -39,7 +39,7 @@ type InfluxQLNode struct {
 	ReduceCreater ReduceCreater
 
 	// tick:ignore
-	PointTimes bool
+	PointTimes bool `tick:"UsePointTimes"`
 }
 
 func newInfluxQLNode(method, field string, wants, provides EdgeType, reducer ReduceCreater) *InfluxQLNode {

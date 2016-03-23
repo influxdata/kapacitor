@@ -2,11 +2,11 @@ package tick_test
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/influxdata/kapacitor/tick"
-	"github.com/stretchr/testify/assert"
 )
 
 //Test structure for evaluating a DSL
@@ -23,7 +23,7 @@ type structB struct {
 }
 
 type structC struct {
-	field1  string
+	field1  string `tick:"Options"`
 	field2  float64
 	field3  time.Duration
 	AggFunc aggFunc
@@ -70,17 +70,15 @@ func aggSum(values []float64) []float64 {
 }
 
 func TestEvaluate(t *testing.T) {
-	assert := assert.New(t)
-
 	//Run a test that evaluates the DSL against the above structures.
 	script := `
-var s2 = a.structB()
+var s2 = a|structB()
 			.field1('f1')
 			.field2(42)
 
 s2.field3(15m)
 
-s2.structC()
+s2|structC()
 	.options('c', 21.5, 7h)
 	.aggFunc(influxql.agg.sum)
 `
@@ -106,24 +104,34 @@ s2.structC()
 		t.Fatal(err)
 	}
 	s2 := s2I.(*structB)
-	assert.NotNil(s2)
-	assert.Equal("f1", s2.Field1)
-	assert.Equal(int64(42), s2.Field2)
-	assert.Equal(time.Minute*15, s2.Field3)
+	exp := structB{
+		Field1: "f1",
+		Field2: 42,
+		Field3: time.Minute * 15,
+	}
 
-	s3 := s2.c
-	if assert.NotNil(s3) {
-		assert.Equal("c", s3.field1)
-		assert.Equal(21.5, s3.field2)
-		assert.Equal(time.Hour*7, s3.field3)
-		if assert.NotNil(s3.AggFunc) {
-			assert.Equal([]float64{10.0}, s3.AggFunc([]float64{5, 5}))
-		}
+	s3 := *s2.c
+	s2.c = nil
+	if !reflect.DeepEqual(*s2, exp) {
+		t.Errorf("unexpected s2 exp:%v got%v", exp, *s2)
+	}
+	c := structC{
+		field1: "c",
+		field2: 21.5,
+		field3: time.Hour * 7,
+	}
+	aggFunc := s3.AggFunc
+	s3.AggFunc = nil
+	if !reflect.DeepEqual(s3, c) {
+		t.Errorf("unexpected s3 exp:%v got%v", c, s3)
+	}
+	if exp, got := []float64{10.0}, aggFunc([]float64{5, 5}); !reflect.DeepEqual(exp, got) {
+		t.Errorf("unexpected s3.AggFunc exp:%v got%v", exp, got)
 	}
 }
 
 func TestEvaluate_DynamicMethod(t *testing.T) {
-	script := `var x = a.dynamicMethod(1,'str', 10s).sad(FALSE)`
+	script := `var x = a|dynamicMethod(1,'str', 10s).sad(FALSE)`
 
 	scope := tick.NewScope()
 	a := &structA{}
@@ -237,4 +245,24 @@ var m = !n
 		t.Errorf("unexpected m value type: exp bool got %T", x)
 	}
 
+}
+
+// Test that using the wrong chain operator fails
+func TestStrictEvaluate(t *testing.T) {
+	// Skip test until DEPRECATED syntax is removed
+	t.Skip()
+	script := `
+var s2 = a.structB()
+			.field1('f1')
+			.field2(42)
+`
+
+	scope := tick.NewScope()
+	a := &structA{}
+	scope.Set("a", a)
+
+	err := tick.Evaluate(script, scope)
+	if err == nil {
+		t.Fatal("expected error from Evaluate")
+	}
 }

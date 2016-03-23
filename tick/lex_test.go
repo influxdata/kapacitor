@@ -152,6 +152,13 @@ func TestLexer(t *testing.T) {
 				token{TokenEOF, 1, ""},
 			},
 		},
+		{
+			in: "|",
+			tokens: []token{
+				token{TokenPipe, 0, "|"},
+				token{TokenEOF, 1, ""},
+			},
+		},
 		// Keywords
 		{
 			in: "AND",
@@ -438,7 +445,7 @@ func TestLexer(t *testing.T) {
 			},
 		},
 		{
-			in: "var x = avg().parallel(4)x.groupby('cpu').window().period(10s)",
+			in: "var x = avg()|parallel(4)x.groupby('cpu')|window().period(10s)",
 			tokens: []token{
 				token{TokenVar, 0, "var"},
 				token{TokenIdent, 4, "x"},
@@ -446,7 +453,7 @@ func TestLexer(t *testing.T) {
 				token{TokenIdent, 8, "avg"},
 				token{TokenLParen, 11, "("},
 				token{TokenRParen, 12, ")"},
-				token{TokenDot, 13, "."},
+				token{TokenPipe, 13, "|"},
 				token{TokenIdent, 14, "parallel"},
 				token{TokenLParen, 22, "("},
 				token{TokenNumber, 23, "4"},
@@ -457,7 +464,7 @@ func TestLexer(t *testing.T) {
 				token{TokenLParen, 34, "("},
 				token{TokenString, 35, "'cpu'"},
 				token{TokenRParen, 40, ")"},
-				token{TokenDot, 41, "."},
+				token{TokenPipe, 41, "|"},
 				token{TokenIdent, 42, "window"},
 				token{TokenLParen, 48, "("},
 				token{TokenRParen, 49, ")"},
@@ -479,6 +486,7 @@ func TestLexer(t *testing.T) {
 				token{TokenIdent, 8, "avg"},
 				token{TokenLParen, 11, "("},
 				token{TokenRParen, 12, ")"},
+				token{TokenComment, 14, "// Comment all of this is ignored\n"},
 				token{TokenIdent, 48, "x"},
 				token{TokenDot, 49, "."},
 				token{TokenIdent, 50, "groupby"},
@@ -497,6 +505,7 @@ func TestLexer(t *testing.T) {
 				token{TokenIdent, 8, "avg"},
 				token{TokenLParen, 11, "("},
 				token{TokenRParen, 12, ")"},
+				token{TokenComment, 14, "// Comment all of this is ignored"},
 				token{TokenEOF, 47, ""},
 			},
 		},

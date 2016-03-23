@@ -42,7 +42,7 @@ type DerivativeNode struct {
 
 	// Where negative values are acceptable.
 	// tick:ignore
-	NonNegativeFlag bool
+	NonNegativeFlag bool `tick:"NonNegative"`
 }
 
 func newDerivativeNode(wants EdgeType, field string) *DerivativeNode {

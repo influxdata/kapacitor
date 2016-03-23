@@ -4,7 +4,33 @@
 
 ### Release Notes
 
+New TICKscript syntax that uses a different operator for chaining methods vs property methods.
+
+* A chaining method is a method that creates a new node in the pipeline. Uses the `|` operator.
+* A property method is a method that changes a property on a node. Uses the `.` operator.
+
+For example below the `from`, `mean`, and `alert` methods create new nodes while the other methods modify the node.
+
+```javascript
+stream
+    |from()
+        .measurement('cpu')
+        .where(lambda: "cpu" == 'cpu-total')
+    |mean('usage_idle')
+        .as('value')
+    |alert()
+        .crit(lambda: "value" < 30)
+        .log('/tmp/cpu.log')
+```
+
+With this change a new binary is provided with Kapacitor `tickfmt` which will
+format a TICKscript file according to a common standard.
+
+
 ### Features
+
+- [#299](https://github.com/influxdata/kapacitor/issues/299): Changes TICKscript chaining method operator and adds `tickfmt` binary.
+
 
 ### Bugfixes
 

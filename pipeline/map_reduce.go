@@ -64,7 +64,7 @@ type ReduceNode struct {
 	// Whether to use the max time or the
 	// time of the selected point
 	// tick:ignore
-	PointTimes bool
+	PointTimes bool `tick:"UsePointTimes"`
 
 	// The name of the field, defaults to the name of
 	// MR function used (i.e. influxql.mean -> 'mean')

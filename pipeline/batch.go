@@ -103,7 +103,7 @@ type BatchNode struct {
 
 	// The list of dimensions for the group-by clause.
 	//tick:ignore
-	Dimensions []interface{}
+	Dimensions []interface{} `tick:"GroupBy"`
 
 	// Fill the data.
 	// Options are:

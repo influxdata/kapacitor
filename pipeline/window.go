@@ -30,7 +30,7 @@ type WindowNode struct {
 	Every time.Duration
 	// Wether to align the window edges with the zero time
 	// tick:ignore
-	AlignFlag bool
+	AlignFlag bool `tick:"Align"`
 }
 
 func newWindowNode() *WindowNode {

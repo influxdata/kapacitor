@@ -7,12 +7,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestnumberNode(t *testing.T) {
+func TestNumberNode(t *testing.T) {
 	assert := assert.New(t)
 
 	type testCase struct {
 		Text    string
-		Pos     int
+		Pos     position
 		IsInt   bool
 		IsFloat bool
 		Int64   int64
@@ -21,14 +21,14 @@ func TestnumberNode(t *testing.T) {
 	}
 
 	test := func(tc testCase) {
-		n, err := newNumber(tc.Pos, tc.Text)
+		n, err := newNumber(tc.Pos, tc.Text, nil)
 		if tc.Err != nil {
 			assert.Equal(tc.Err, err)
 		} else {
 			if !assert.NotNil(n) {
 				t.FailNow()
 			}
-			assert.Equal(tc.Pos, int(n.pos))
+			assert.Equal(tc.Pos.pos, n.position.pos)
 			assert.Equal(tc.IsInt, n.IsInt)
 			assert.Equal(tc.IsFloat, n.IsFloat)
 			assert.Equal(tc.Int64, n.Int64)
@@ -39,31 +39,31 @@ func TestnumberNode(t *testing.T) {
 	cases := []testCase{
 		testCase{
 			Text:  "04",
-			Pos:   6,
+			Pos:   position{pos: 6},
 			IsInt: true,
 			Int64: 4,
 		},
 		testCase{
 			Text:  "42",
-			Pos:   5,
+			Pos:   position{pos: 5},
 			IsInt: true,
 			Int64: 42,
 		},
 		testCase{
 			Text:    "42.21",
-			Pos:     4,
+			Pos:     position{pos: 4},
 			IsFloat: true,
 			Float64: 42.21,
 		},
 		testCase{
 			Text:    "42.",
-			Pos:     3,
+			Pos:     position{pos: 3},
 			IsFloat: true,
 			Float64: 42.0,
 		},
 		testCase{
 			Text:    "0.42",
-			Pos:     2,
+			Pos:     position{pos: 2},
 			IsFloat: true,
 			Float64: 0.42,
 		},
@@ -92,11 +92,11 @@ func TestNewBinaryNode(t *testing.T) {
 	}
 
 	test := func(tc testCase) {
-		n := newBinary(tc.Operator, tc.Left, tc.Right)
+		n := newBinary(position{pos: tc.Operator.pos}, tc.Operator.typ, tc.Left, tc.Right, false, nil)
 		if !assert.NotNil(n) {
 			t.FailNow()
 		}
-		assert.Equal(tc.Operator.pos, int(n.pos))
+		assert.Equal(tc.Operator.pos, n.position.pos)
 		assert.Equal(tc.Left, n.Right)
 		assert.Equal(tc.Right, n.Left)
 		assert.Equal(tc.Operator.typ, n.Operator)
