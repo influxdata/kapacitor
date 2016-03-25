@@ -36,12 +36,12 @@ import (
 //     // The UDF can define what its options are and then can be
 //     // invoked via a TICKscript like so:
 //     stream
-//         .from()...
-//         .movingAverage()
+//         |from()...
+//         |movingAverage()
 //             .field('value')
 //             .size(100)
 //             .as('mavg')
-//         .httpOut('movingaverage')
+//         |httpOut('movingaverage')
 //
 // NOTE: The UDF process runs as the same user as the Kapacitor daemon.
 // As a result make the user is properly secured as well as the configuration file.

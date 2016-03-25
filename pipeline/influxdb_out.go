@@ -9,10 +9,10 @@ const DefaultFlushInterval = time.Second * 10
 //
 // Example:
 //    stream
-//        .eval(lambda: "errors" / "total")
+//        |eval(lambda: "errors" / "total")
 //            .as('error_percent')
 //        // Write the transformed data to InfluxDB
-//        .influxDBOut()
+//        |influxDBOut()
 //            .database('mydb')
 //            .retentionPolicy('myrp')
 //            .measurement('errors')

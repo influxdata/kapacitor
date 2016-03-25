@@ -12,8 +12,9 @@ import (
 //
 // Example:
 //     stream
-//         .from().measurement('net_rx_packets')
-//         .derivative('value')
+//         |from()
+//             .measurement('net_rx_packets')
+//         |derivative('value')
 //            .unit(1s) // default
 //            .nonNegative()
 //         ...

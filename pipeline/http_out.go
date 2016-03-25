@@ -9,12 +9,12 @@ package pipeline
 //
 // Example:
 //    stream
-//        .window()
+//        |window()
 //            .period(10s)
 //            .every(5s)
-//        .top('value', 10)
+//        |top('value', 10)
 //        //Publish the top 10 results over the last 10s updated every 5s.
-//        .httpOut('top10')
+//        |httpOut('top10')
 //
 type HTTPOutNode struct {
 	chainnode

@@ -38,15 +38,16 @@ A simple TICKscript that alerts on high cpu usage looks like this:
 
 ```javascript
 stream
-    .from().measurement('cpu_usage_idle')
-    .groupBy('host')
-    .window()
+    |from()
+        .measurement('cpu_usage_idle')
+        .groupBy('host')
+    |window()
         .period(1m)
         .every(1m)
-    .mean('value')
-    .eval(lambda: 100.0 - "mean")
+    |mean('value')
+    |eval(lambda: 100.0 - "mean")
         .as('used')
-    .alert()
+    |alert()
         .message('{{ .Level}}: {{ .Name }}/{{ index .Tags "host" }} has high cpu usage: {{ index .Fields "used" }}')
         .warn(lambda: "used" > 70.0)
         .crit(lambda: "used" > 85.0)
@@ -63,7 +64,6 @@ stream
 
         // PagerDuty
         .pagerDuty()
-
 ```
 
 Place the above script into a file `cpu_alert.tick` then run these commands to start the task:

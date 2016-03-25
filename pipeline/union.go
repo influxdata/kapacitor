@@ -6,11 +6,18 @@ package pipeline
 // without modification.
 //
 // Example:
-//    var logins = stream.from().measurement('logins')
-//    var logouts = stream.from().measurement('logouts')
-//    var frontpage = stream.from().measurement('frontpage')
+//    var logins = stream
+//        |from()
+//            .measurement('logins')
+//    var logouts = stream
+//        |from()
+//            .measurement('logouts')
+//    var frontpage = stream
+//        |from()
+//            .measurement('frontpage')
 //    // Union all user actions into a single stream
-//    logins.union(logouts, frontpage)
+//    logins
+//        |union(logouts, frontpage)
 //            .rename('user_actions')
 //        ...
 //

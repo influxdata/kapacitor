@@ -18,11 +18,11 @@ type MapReduceInfo struct {
 //
 // Example:
 //    stream
-//        .window()
+//        |window()
 //            .period(10s)
 //            .every(10s)
 //        // Sum the values for each 10s window of data.
-//        .sum('value')
+//        |sum('value')
 //        ...
 type MapNode struct {
 	chainnode
@@ -49,11 +49,11 @@ func newMapNode(wants EdgeType, i interface{}) *MapNode {
 //
 // Example:
 //    stream
-//        .window()
+//        |window()
 //            .period(10s)
 //            .every(10s)
 //        // Sum the values for each 10s window of data.
-//        .sum('value')
+//        |sum('value')
 //        ...
 type ReduceNode struct {
 	chainnode

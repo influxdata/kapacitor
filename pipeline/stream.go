@@ -33,15 +33,18 @@ func newSourceStreamNode() *SourceStreamNode {
 // Example:
 //    // Select the 'cpu' measurement from just the database 'mydb'
 //    // and retention policy 'myrp'.
-//    var cpu = stream.from()
-//                       .database('mydb')
-//                       .retentionPolicy('myrp')
-//                       .measurement('cpu')
+//    var cpu = stream
+//        |from()
+//            .database('mydb')
+//            .retentionPolicy('myrp')
+//            .measurement('cpu')
 //    // Select the 'load' measurement from any database and retention policy.
-//    var load = stream.from()
-//                        .measurement('load')
+//    var load = stream
+//        |from()
+//            .measurement('load')
 //    // Join cpu and load streams and do further processing.
-//    cpu.join(load)
+//    cpu
+//        |join(load)
 //            .as('cpu', 'load')
 //        ...
 //
@@ -56,12 +59,12 @@ func (s *SourceStreamNode) From() *StreamNode {
 //
 // Example:
 //    stream
-//        .from()
+//        |from()
 //           .database('mydb')
 //           .retentionPolicy('myrp')
 //           .measurement('mymeasurement')
 //           .where(lambda: "host" =~ /logger\d+/)
-//        .window()
+//        |window()
 //        ...
 //
 // The above example selects only data points from the database `mydb`
@@ -93,7 +96,8 @@ type StreamNode struct {
 	// Helpful to ensure data points land on specfic boundaries
 	// Example:
 	//    stream
-	//       .from().measurement('mydata')
+	//       |from()
+	//           .measurement('mydata')
 	//           .truncate(1s)
 	//
 	// All incoming data will be truncated to 1 second resolution.
@@ -114,15 +118,18 @@ func newStreamNode() *StreamNode {
 // Example:
 //    // Select the 'cpu' measurement from just the database 'mydb'
 //    // and retention policy 'myrp'.
-//    var cpu = stream.from()
-//                       .database('mydb')
-//                       .retentionPolicy('myrp')
-//                       .measurement('cpu')
+//    var cpu = stream
+//        |from()
+//            .database('mydb')
+//            .retentionPolicy('myrp')
+//            .measurement('cpu')
 //    // Select the 'load' measurement from any database and retention policy.
-//    var load = stream.from()
-//                        .measurement('load')
+//    var load = stream
+//        |from()
+//            .measurement('load')
 //    // Join cpu and load streams and do further processing.
-//    cpu.join(load)
+//    cpu
+//        |join(load)
 //            .as('cpu', 'load')
 //        ...
 //
@@ -141,32 +148,36 @@ func (s *StreamNode) From() *StreamNode {
 //
 // Example:
 //    stream
-//       .from()
+//       |from()
 //          .where(lambda: condition1)
 //          .where(lambda: condition2)
 //
 // The above is equivalent to this
 // Example:
 //    stream
-//       .from()
+//       |from()
 //          .where(lambda: condition1 AND condition2)
 //
 //
-// NOTE: Becareful to always use `.from` if you want multiple different streams.
+// NOTE: Becareful to always use `|from` if you want multiple different streams.
 //
 // Example:
-//  var data = stream.from().measurement('cpu')
-//  var total = data.where(lambda: "cpu" == 'cpu-total')
-//  var others = data.where(lambda: "cpu" != 'cpu-total')
+//  var data = stream
+//      |from()
+//          .measurement('cpu')
+//  var total = data
+//      .where(lambda: "cpu" == 'cpu-total')
+//  var others = data
+//      .where(lambda: "cpu" != 'cpu-total')
 //
 // The example above is equivalent to the example below,
 // which is obviously not what was intended.
 //
 // Example:
 //  var data = stream
-//              .from()
-//                  .measurement('cpu')
-//                  .where(lambda: "cpu" == 'cpu-total' AND "cpu" != 'cpu-total')
+//      |from()
+//          .measurement('cpu')
+//          .where(lambda: "cpu" == 'cpu-total' AND "cpu" != 'cpu-total')
 //  var total = data
 //  var others = total
 //
@@ -174,9 +185,17 @@ func (s *StreamNode) From() *StreamNode {
 // a different subset of the original stream.
 //
 // Example:
-//  var data = stream.from().measurement('cpu')
-//  var total = stream.from().measurement('cpu').where(lambda: "cpu" == 'cpu-total')
-//  var others = stream.from().measurement('cpu').where(lambda: "cpu" != 'cpu-total')
+//  var data = stream
+//      |from()
+//          .measurement('cpu')
+//  var total = stream
+//      |from()
+//          .measurement('cpu')
+//          .where(lambda: "cpu" == 'cpu-total')
+//  var others = stream
+//      |from()
+//          .measurement('cpu')
+//          .where(lambda: "cpu" != 'cpu-total')
 //
 //
 // If empty then all data points are considered to match.
@@ -198,7 +217,9 @@ func (s *StreamNode) Where(expression tick.Node) *StreamNode {
 //
 // Can pass literal * to group by all dimensions.
 // Example:
-//    .groupBy(*)
+//  stream
+//      |from()
+//          .groupBy(*)
 //
 func (s *StreamNode) GroupBy(tag ...interface{}) *StreamNode {
 	s.Dimensions = tag
