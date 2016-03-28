@@ -14,7 +14,7 @@ see [server_test.go](https://github.com/influxdata/kapacitor/blob/master/cmd/kap
 ## Agent Design
 
 The protocol for communicating with Kapacitor consists of Request and Response messages that are sent over STDIN and STDOUT of the process respectively.
-The agents wrap the communication and serialization over the sockets and expose and interface that needs to be implemented to handle each request/response.
+The agents wrap the communication and serialization over the sockets and expose an interface that needs to be implemented to handle each request/response.
 In addition to the request/response paradigm agents provide a way to stream data back to Kapacitor.
 This is not part of the request response system because your custom function is in control of when a new point or batch is sent if at all.
 
