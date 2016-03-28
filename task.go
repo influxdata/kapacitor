@@ -386,6 +386,7 @@ func (et *ExecutingTask) calcThroughput() {
 	var previous int64
 	last := time.Now()
 	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
