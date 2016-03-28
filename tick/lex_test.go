@@ -159,6 +159,13 @@ func TestLexer(t *testing.T) {
 				token{TokenEOF, 1, ""},
 			},
 		},
+		{
+			in: "@",
+			tokens: []token{
+				token{TokenAt, 0, "@"},
+				token{TokenEOF, 1, ""},
+			},
+		},
 		// Keywords
 		{
 			in: "AND",

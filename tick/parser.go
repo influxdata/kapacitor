@@ -234,11 +234,16 @@ func (p *parser) expression(c Node) (Node, Node) {
 // '|', '.' operators are left-associative.
 func (p *parser) chain(lhs Node) (Node, Node) {
 	c := p.comment()
-	if t := p.peek().typ; t == TokenDot || t == TokenPipe {
+	if t := p.peek().typ; t == TokenDot || t == TokenPipe || t == TokenAt {
 		op := p.next()
-		ft := propertyFunc
-		if op.typ == TokenPipe {
+		var ft funcType
+		switch op.typ {
+		case TokenDot:
+			ft = propertyFunc
+		case TokenPipe:
 			ft = chainFunc
+		case TokenAt:
+			ft = dynamicFunc
 		}
 		rhs := p.funcOrIdent(ft, nil)
 		return p.chain(newChain(p.position(op.pos), op.typ, lhs, rhs, c))

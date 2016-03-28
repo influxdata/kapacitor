@@ -39,7 +39,7 @@ func TestFormat(t *testing.T) {
 		},
 		{
 			script: `var x = stream()
-|udf()
+@udf()
     .option(
         // Param 1
         1,
@@ -52,7 +52,7 @@ func TestFormat(t *testing.T) {
                 )
 `,
 			exp: `var x = stream()
-    |udf()
+    @udf()
         .option(
             // Param 1
             1,

@@ -575,6 +575,7 @@ const (
 	globalFunc funcType = iota
 	chainFunc
 	propertyFunc
+	dynamicFunc
 )
 
 func (ft funcType) String() string {
@@ -585,6 +586,8 @@ func (ft funcType) String() string {
 		return "chain"
 	case propertyFunc:
 		return "property"
+	case dynamicFunc:
+		return "dynamic"
 	default:
 		return "unknown"
 	}
