@@ -14,11 +14,11 @@ import "github.com/influxdata/influxdb/influxql"
 //
 // Example:
 //    stream
-//        .window()
+//        |window()
 //            .period(10s)
 //            .every(10s)
 //        // Sum the values for each 10s window of data.
-//        .sum('value')
+//        |sum('value')
 //
 //
 // Note: Derivative has its own implementation as a DerivativeNode instead of as part of the
@@ -39,7 +39,7 @@ type InfluxQLNode struct {
 	ReduceCreater ReduceCreater
 
 	// tick:ignore
-	PointTimes bool
+	PointTimes bool `tick:"UsePointTimes"`
 }
 
 func newInfluxQLNode(method, field string, wants, provides EdgeType, reducer ReduceCreater) *InfluxQLNode {

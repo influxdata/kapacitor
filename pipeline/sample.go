@@ -8,14 +8,14 @@ import (
 // One point will be emitted every count or duration specified.
 //
 // Example:
-//    stream.
-//        .sample(3)
+//    stream
+//        |sample(3)
 //
 // Keep every third data point or batch.
 //
 // Example:
-//    stream.
-//        .sample(10s)
+//    stream
+//        |sample(10s)
 //
 // Keep only samples that land on the 10s boundary.
 // See StreamNode.Truncate, BatchNode.GroupBy time or WindowNode.Align
@@ -23,9 +23,9 @@ import (
 type SampleNode struct {
 	chainnode
 
-	// Keep every Count point or batch
+	// Keep every N point or batch
 	// tick:ignore
-	Count int64
+	N int64
 
 	// Keep one point or batch every Duration
 	// tick:ignore
@@ -33,11 +33,11 @@ type SampleNode struct {
 }
 
 func newSampleNode(wants EdgeType, rate interface{}) *SampleNode {
-	var c int64
+	var n int64
 	var d time.Duration
 	switch r := rate.(type) {
 	case int64:
-		c = r
+		n = r
 	case time.Duration:
 		d = r
 	default:
@@ -46,7 +46,7 @@ func newSampleNode(wants EdgeType, rate interface{}) *SampleNode {
 
 	return &SampleNode{
 		chainnode: newBasicChainNode("sample", wants, wants),
-		Count:     c,
+		N:         n,
 		Duration:  d,
 	}
 }

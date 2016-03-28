@@ -8,12 +8,13 @@ import (
 //
 // Example:
 // var sums = stream
-//     .groupBy('service', 'host')
-//     .sum('value')
+//     |from()
+//         .groupBy('service', 'host')
+//     |sum('value')
 // //Watch particular host for issues.
 // sums
-//    .where(lambda: "host" == 'h001.example.com')
-//    .alert()
+//    |where(lambda: "host" == 'h001.example.com')
+//    |alert()
 //        .crit(lambda: TRUE)
 //        .email().to('user@example.com')
 //

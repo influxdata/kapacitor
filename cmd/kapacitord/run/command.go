@@ -13,6 +13,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/influxdata/kapacitor/services/logging"
+	"github.com/influxdata/kapacitor/tick"
 )
 
 const logo = `
@@ -99,6 +100,10 @@ func (cmd *Command) Run(args ...string) error {
 	if err != nil {
 		return fmt.Errorf("init logging: %s", err)
 	}
+	// Initialize packages loggers
+	tick.SetLogger(cmd.logService.NewLogger("[tick] ", log.LstdFlags))
+
+	// Initialize cmd logger
 	cmd.Logger = cmd.logService.NewLogger("[run] ", log.LstdFlags)
 
 	// Mark start-up in log.,

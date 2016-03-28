@@ -4,9 +4,11 @@ package pipeline
 //
 // Example:
 //    stream.from()...
-//      .window().period(10s).every(10s)
-//      .log()
-//      .count('value')
+//      |window()
+//          .period(10s)
+//          .every(10s)
+//      |log()
+//      |count('value')
 //
 type LogNode struct {
 	chainnode

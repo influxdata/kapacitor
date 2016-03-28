@@ -7,7 +7,7 @@ package pipeline
 //
 // Example:
 //    stream
-//        .groupBy('service', 'datacenter')
+//        |groupBy('service', 'datacenter')
 //        ...
 //
 // The above example groups the data along two dimensions `service` and `datacenter`.

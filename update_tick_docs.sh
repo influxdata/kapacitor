@@ -5,14 +5,13 @@
 # of structs into property methods and chaining methods.
 
 dest=$1 # output path for the .md files
-docspath=${2-/kapacitor/v0.11/nodes}
 
 if [ -z "$dest" ]
 then
-    echo "Usage: ./update_tick_docs.sh output_path [docspath]"
+    echo "Usage: ./update_tick_docs.sh output_path"
     exit 1
 fi
 
-tickdoc $docspath ./pipeline $dest
+tickdoc -config tickdoc.conf ./pipeline $dest
 
 

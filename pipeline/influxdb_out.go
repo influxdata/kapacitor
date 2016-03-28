@@ -9,10 +9,10 @@ const DefaultFlushInterval = time.Second * 10
 //
 // Example:
 //    stream
-//        .eval(lambda: "errors" / "total")
+//        |eval(lambda: "errors" / "total")
 //            .as('error_percent')
 //        // Write the transformed data to InfluxDB
-//        .influxDBOut()
+//        |influxDBOut()
 //            .database('mydb')
 //            .retentionPolicy('myrp')
 //            .measurement('errors')
@@ -43,7 +43,7 @@ type InfluxDBOutNode struct {
 	FlushInterval time.Duration
 	// Static set of tags to add to all data points before writing them.
 	//tick:ignore
-	Tags map[string]string
+	Tags map[string]string `tick:"Tag"`
 }
 
 func newInfluxDBOutNode(wants EdgeType) *InfluxDBOutNode {

@@ -62,13 +62,13 @@ func TestStream_Derivative(t *testing.T) {
 
 	var script = `
 stream
-	.from().measurement('packets')
-	.derivative('value')
-	.window()
+	|from().measurement('packets')
+	|derivative('value')
+	|window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.mean('value'))
-	.httpOut('TestStream_Derivative')
+	|mean('value')
+	|httpOut('TestStream_Derivative')
 `
 	er := kapacitor.Result{
 		Series: imodels.Rows{
@@ -91,14 +91,14 @@ func TestStream_DerivativeUnit(t *testing.T) {
 
 	var script = `
 stream
-	.from().measurement('packets')
-	.derivative('value')
+	|from().measurement('packets')
+	|derivative('value')
 		.unit(10s)
-	.window()
+	|window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.mean('value'))
-	.httpOut('TestStream_Derivative')
+	|mean('value')
+	|httpOut('TestStream_Derivative')
 `
 	er := kapacitor.Result{
 		Series: imodels.Rows{
@@ -121,14 +121,14 @@ func TestStream_DerivativeNN(t *testing.T) {
 
 	var script = `
 stream
-	.from().measurement('packets')
-	.derivative('value')
+	|from().measurement('packets')
+	|derivative('value')
 		.nonNegative()
-	.window()
+	|window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.mean('value'))
-	.httpOut('TestStream_DerivativeNN')
+	|mean('value')
+	|httpOut('TestStream_DerivativeNN')
 `
 	er := kapacitor.Result{
 		Series: imodels.Rows{
@@ -151,13 +151,13 @@ func TestStream_DerivativeN(t *testing.T) {
 
 	var script = `
 stream
-	.from().measurement('packets')
-	.derivative('value')
-	.window()
+	|from().measurement('packets')
+	|derivative('value')
+	|window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.mean('value'))
-	.httpOut('TestStream_DerivativeNN')
+	|mean('value')
+	|httpOut('TestStream_DerivativeNN')
 `
 	er := kapacitor.Result{
 		Series: imodels.Rows{
@@ -182,16 +182,16 @@ func TestStream_WindowMissing(t *testing.T) {
 var period = 3s
 var every = 2s
 stream
-	.from()
+	|from()
 		.database('dbname')
 		.retentionPolicy('rpname')
 		.measurement('cpu')
 		.where(lambda: "host" == 'serverA')
-	.window()
+	|window()
 		.period(period)
 		.every(every)
-	.mapReduce(influxql.count('value'))
-	.httpOut('TestStream_WindowMissing')
+	|count('value')
+	|httpOut('TestStream_WindowMissing')
 `
 
 	er := kapacitor.Result{
@@ -217,17 +217,17 @@ func TestStream_WindowMissingAligned(t *testing.T) {
 var period = 3s
 var every = 2s
 stream
-	.from()
+	|from()
 		.database('dbname')
 		.retentionPolicy('rpname')
 		.measurement('cpu')
 		.where(lambda: "host" == 'serverA')
-	.window()
+	|window()
 		.period(period)
 		.every(every)
 		.align()
-	.mapReduce(influxql.count('value'))
-	.httpOut('TestStream_WindowMissing')
+	|count('value')
+	|httpOut('TestStream_WindowMissing')
 `
 
 	er := kapacitor.Result{
@@ -253,15 +253,15 @@ func TestStream_Window(t *testing.T) {
 var period = 10s
 var every = 10s
 stream
-	.from()
+	|from()
 		.database('dbname')
 		.retentionPolicy('rpname')
 		.measurement('cpu')
 		.where(lambda: "host" == 'serverA')
-	.window()
+	|window()
 		.period(period)
 		.every(every)
-	.httpOut('TestStream_Window')
+	|httpOut('TestStream_Window')
 `
 
 	nums := []float64{
@@ -307,31 +307,32 @@ func TestStream_Shift(t *testing.T) {
 var period  = 5s
 
 var data  = stream
-	.from()
+	|from()
 		.measurement('cpu')
 		.where(lambda: "host" == 'serverA')
 
 var past = data
-	.window()
+	|window()
 		.period(period)
 		.every(period)
 		.align()
-	.mapReduce(influxql.count('value'))
-	.shift(period)
+	|count('value')
+	|shift(period)
 
 var current = data
-	.window()
+	|window()
 		.period(period)
 		.every(period)
 		.align()
-	.mapReduce(influxql.count('value'))
+	|count('value')
 
-past.join(current)
-	.as('past', 'current')
-	.eval(lambda: "current.count" - "past.count")
+past
+	|join(current)
+		.as('past', 'current')
+	|eval(lambda: "current.count" - "past.count")
 		.keep()
 		.as('diff')
-	.httpOut('TestStream_Shift')
+	|httpOut('TestStream_Shift')
 `
 	er := kapacitor.Result{
 		Series: imodels.Rows{
@@ -358,31 +359,32 @@ func TestStream_ShiftBatch(t *testing.T) {
 var period  = 5s
 
 var data  = stream
-	.from()
+	|from()
 		.measurement('cpu')
 		.where(lambda: "host" == 'serverA')
 
 var past = data
-	.window()
+	|window()
 		.period(period)
 		.every(period)
 		.align()
-	.shift(period)
-	.mapReduce(influxql.count('value'))
+	|shift(period)
+	|count('value')
 
 var current = data
-	.window()
+	|window()
 		.period(period)
 		.every(period)
 		.align()
-	.mapReduce(influxql.count('value'))
+	|count('value')
 
-past.join(current)
-	.as('past', 'current')
-	.eval(lambda: "current.count" - "past.count")
+past
+	|join(current)
+		.as('past', 'current')
+	|eval(lambda: "current.count" - "past.count")
 		.keep()
 		.as('diff')
-	.httpOut('TestStream_Shift')
+	|httpOut('TestStream_Shift')
 `
 	er := kapacitor.Result{
 		Series: imodels.Rows{
@@ -409,31 +411,32 @@ func TestStream_ShiftNegative(t *testing.T) {
 var period  = 5s
 
 var data  = stream
-	.from()
+	|from()
 		.measurement('cpu')
 		.where(lambda: "host" == 'serverA')
 
 var past = data
-	.window()
+	|window()
 		.period(period)
 		.every(period)
 		.align()
-	.mapReduce(influxql.count('value'))
+	|count('value')
 
 var current = data
-	.window()
+	|window()
 		.period(period)
 		.every(period)
 		.align()
-	.mapReduce(influxql.count('value'))
-	.shift(-period)
+	|count('value')
+	|shift(-period)
 
-past.join(current)
-	.as('past', 'current')
-	.eval(lambda: "current.count" - "past.count")
+past
+	|join(current)
+		.as('past', 'current')
+	|eval(lambda: "current.count" - "past.count")
 		.keep()
 		.as('diff')
-	.httpOut('TestStream_Shift')
+	|httpOut('TestStream_Shift')
 `
 	er := kapacitor.Result{
 		Series: imodels.Rows{
@@ -460,31 +463,32 @@ func TestStream_ShiftBatchNegative(t *testing.T) {
 var period  = 5s
 
 var data  = stream
-	.from()
+	|from()
 		.measurement('cpu')
 		.where(lambda: "host" == 'serverA')
 
 var past = data
-	.window()
+	|window()
 		.period(period)
 		.every(period)
 		.align()
-	.mapReduce(influxql.count('value'))
+	|count('value')
 
 var current = data
-	.window()
+	|window()
 		.period(period)
 		.every(period)
 		.align()
-	.shift(-period)
-	.mapReduce(influxql.count('value'))
+	|shift(-period)
+	|count('value')
 
-past.join(current)
-	.as('past', 'current')
-	.eval(lambda: "current.count" - "past.count")
+past
+	|join(current)
+		.as('past', 'current')
+	|eval(lambda: "current.count" - "past.count")
 		.keep()
 		.as('diff')
-	.httpOut('TestStream_Shift')
+	|httpOut('TestStream_Shift')
 `
 	er := kapacitor.Result{
 		Series: imodels.Rows{
@@ -509,13 +513,14 @@ func TestStream_SimpleMR(t *testing.T) {
 
 	var script = `
 stream
-	.from().measurement('cpu')
-	.where(lambda: "host" == 'serverA')
-	.window()
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+	|window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.count('value'))
-	.httpOut('TestStream_SimpleMR')
+	|count('value')
+	|httpOut('TestStream_SimpleMR')
 `
 	er := kapacitor.Result{
 		Series: imodels.Rows{
@@ -538,14 +543,15 @@ func TestStream_HttpOutPassThrough(t *testing.T) {
 
 	var script = `
 stream
-	.from().measurement('cpu')
-	.where(lambda: "host" == 'serverA')
-	.window()
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+	|window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.count('value'))
-	.httpOut('unused')
-	.httpOut('TestStream_SimpleMR')
+	|count('value')
+	|httpOut('unused')
+	|httpOut('TestStream_SimpleMR')
 `
 	er := kapacitor.Result{
 		Series: imodels.Rows{
@@ -568,13 +574,14 @@ func TestStream_BatchGroupBy(t *testing.T) {
 
 	var script = `
 stream
-	.from().measurement('cpu')
-	.window()
+	|from()
+		.measurement('cpu')
+	|window()
 		.period(5s)
 		.every(5s)
-	.groupBy('host')
-	.mapReduce(influxql.count('value'))
-	.httpOut('TestStream_BatchGroupBy')
+	|groupBy('host')
+	|count('value')
+	|httpOut('TestStream_BatchGroupBy')
 `
 	er := kapacitor.Result{
 		Series: imodels.Rows{
@@ -615,13 +622,14 @@ func TestStream_BatchGroupByAll(t *testing.T) {
 
 	var script = `
 stream
-	.from().measurement('cpu')
-	.window()
+	|from()
+		.measurement('cpu')
+	|window()
 		.period(5s)
 		.every(5s)
-	.groupBy(*)
-	.mapReduce(influxql.count('value'))
-	.httpOut('TestStream_BatchGroupBy')
+	|groupBy(*)
+	|count('value')
+	|httpOut('TestStream_BatchGroupBy')
 `
 	er := kapacitor.Result{
 		Series: imodels.Rows{
@@ -662,16 +670,17 @@ func TestStream_SimpleWhere(t *testing.T) {
 
 	var script = `
 stream
-	.from().measurement('cpu')
+	|from()
+		.measurement('cpu')
 		.where(lambda: "host" == 'serverA')
 		.where(lambda: "host" != 'serverB')
-	.window()
+	|window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.count('value'))
-	.where(lambda: "count" > 0)
-	.where(lambda: "count" < 12)
-	.httpOut('TestStream_SimpleMR')
+	|count('value')
+	|where(lambda: "count" > 0)
+	|where(lambda: "count" < 12)
+	|httpOut('TestStream_SimpleMR')
 `
 	er := kapacitor.Result{
 		Series: imodels.Rows{
@@ -695,13 +704,14 @@ func TestStream_VarWhereString(t *testing.T) {
 	var script = `
 var serverStr = 'serverA'
 stream
-	.from().measurement('cpu')
-	.where(lambda: "host" == serverStr )
-	.window()
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == serverStr )
+	|window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.count('value'))
-	.httpOut('TestStream_SimpleMR')
+	|count('value')
+	|httpOut('TestStream_SimpleMR')
 `
 	er := kapacitor.Result{
 		Series: imodels.Rows{
@@ -725,13 +735,14 @@ func TestStream_VarWhereRegex(t *testing.T) {
 	var script = `
 var serverPattern = /^serverA$/
 stream
-	.from().measurement('cpu')
-	.where(lambda: "host" =~ serverPattern )
-	.window()
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" =~ serverPattern )
+	|window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.count('value'))
-	.httpOut('TestStream_SimpleMR')
+	|count('value')
+	|httpOut('TestStream_SimpleMR')
 `
 	er := kapacitor.Result{
 		Series: imodels.Rows{
@@ -754,13 +765,14 @@ func TestStream_GroupBy(t *testing.T) {
 
 	var script = `
 stream
-	.from().measurement('errors')
-	.groupBy('service')
-	.window()
+	|from()
+		.measurement('errors')
+		.groupBy('service')
+	|window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.sum('value'))
-	.httpOut('TestStream_GroupBy')
+	|sum('value')
+	|httpOut('TestStream_GroupBy')
 `
 
 	er := kapacitor.Result{
@@ -802,30 +814,33 @@ func TestStream_Join(t *testing.T) {
 
 	var script = `
 var errorCounts = stream
-			.from().measurement('errors')
-			.groupBy('service')
-			.window()
-				.period(10s)
-				.every(10s)
-				.align()
-			.mapReduce(influxql.sum('value'))
+	|from()
+		.measurement('errors')
+		.groupBy('service')
+	|window()
+		.period(10s)
+		.every(10s)
+		.align()
+	|sum('value')
 
 var viewCounts = stream
-			.from().measurement('views')
-			.groupBy('service')
-			.window()
-				.period(10s)
-				.every(10s)
-				.align()
-			.mapReduce(influxql.sum('value'))
+	|from()
+		.measurement('views')
+		.groupBy('service')
+	|window()
+		.period(10s)
+		.every(10s)
+		.align()
+	|sum('value')
 
-errorCounts.join(viewCounts)
+errorCounts
+	|join(viewCounts)
 		.as('errors', 'views')
 		.streamName('error_view')
-	.eval(lambda: "errors.sum" / "views.sum")
+	|eval(lambda: "errors.sum" / "views.sum")
 		.as('error_percent')
 		.keep()
-	.httpOut('TestStream_Join')
+	|httpOut('TestStream_Join')
 `
 
 	er := kapacitor.Result{
@@ -873,25 +888,28 @@ func TestStream_JoinTolerance(t *testing.T) {
 
 	var script = `
 var errorCounts = stream
-			.from().measurement('errors')
-			.groupBy('service')
+	|from()
+		.measurement('errors')
+		.groupBy('service')
 
 var viewCounts = stream
-			.from().measurement('views')
-			.groupBy('service')
+	|from()
+		.measurement('views')
+		.groupBy('service')
 
-errorCounts.join(viewCounts)
+errorCounts
+	|join(viewCounts)
 		.as('errors', 'views')
 		.tolerance(2s)
 		.streamName('error_view')
-	.eval(lambda: "errors.value" / "views.value")
+	|eval(lambda: "errors.value" / "views.value")
 		.as('error_percent')
-	.window()
+	|window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.mean('error_percent'))
+	|mean('error_percent')
 		.as('error_percent')
-	.httpOut('TestStream_JoinTolerance')
+	|httpOut('TestStream_JoinTolerance')
 `
 
 	er := kapacitor.Result{
@@ -932,24 +950,27 @@ errorCounts.join(viewCounts)
 func TestStream_JoinFill(t *testing.T) {
 	var script = `
 var errorCounts = stream
-			.from().measurement('errors')
-			.groupBy('service')
+	|from()
+		.measurement('errors')
+		.groupBy('service')
 
 var viewCounts = stream
-			.from().measurement('views')
-			.groupBy('service')
+	|from()
+		.measurement('views')
+		.groupBy('service')
 
-errorCounts.join(viewCounts)
+errorCounts
+	|join(viewCounts)
 		.as('errors', 'views')
 		.fill(0.0)
 		.streamName('error_view')
-	.eval(lambda:  "errors.value" + "views.value")
+	|eval(lambda:  "errors.value" + "views.value")
 		.as('error_percent')
-	.window()
+	|window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.count('error_percent'))
-	.httpOut('TestStream_JoinFill')
+	|count('error_percent')
+	|httpOut('TestStream_JoinFill')
 `
 
 	er := kapacitor.Result{
@@ -991,24 +1012,28 @@ func TestStream_JoinN(t *testing.T) {
 
 	var script = `
 var cpu = stream
-			.from().measurement('cpu')
-			.where(lambda: "cpu" == 'total')
+	|from()
+		.measurement('cpu')
+		.where(lambda: "cpu" == 'total')
 var mem = stream
-			.from().measurement('memory')
-			.where(lambda: "type" == 'free')
+	|from()
+		.measurement('memory')
+		.where(lambda: "type" == 'free')
 var disk = stream
-			.from().measurement('disk')
-			.where(lambda: "device" == 'sda')
+	|from()
+		.measurement('disk')
+		.where(lambda: "device" == 'sda')
 
-cpu.join(mem, disk)
+cpu
+	|join(mem, disk)
 		.as('cpu', 'mem', 'disk')
 		.streamName('magic')
 		.fill(0.0)
-		.window()
-			.period(10s)
-			.every(10s)
-		.mapReduce(influxql.count('cpu.value'))
-		.httpOut('TestStream_JoinN')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('cpu.value')
+	|httpOut('TestStream_JoinN')
 `
 
 	er := kapacitor.Result{
@@ -1031,31 +1056,34 @@ cpu.join(mem, disk)
 func TestStream_JoinOn(t *testing.T) {
 	var script = `
 var errorsByServiceDC = stream
-			.from().measurement('errors')
-			.groupBy('dc', 'service')
-			.window()
-				.period(10s)
-				.every(10s)
-				.align()
-			.mapReduce(influxql.sum('value'))
+	|from()
+		.measurement('errors')
+		.groupBy('dc', 'service')
+	|window()
+		.period(10s)
+		.every(10s)
+		.align()
+	|sum('value')
 
 var errorsByServiceGlobal = stream
-			.from().measurement('errors')
-			.groupBy('service')
-			.window()
-				.period(10s)
-				.every(10s)
-				.align()
-			.mapReduce(influxql.sum('value'))
+	|from()
+		.measurement('errors')
+		.groupBy('service')
+	|window()
+		.period(10s)
+		.every(10s)
+		.align()
+	|sum('value')
 
-errorsByServiceGlobal.join(errorsByServiceDC)
+errorsByServiceGlobal
+	|join(errorsByServiceDC)
 		.as('service', 'dc')
 		.on('service')
 		.streamName('dc_error_percent')
-	.eval(lambda: "dc.sum" / "service.sum")
+	|eval(lambda: "dc.sum" / "service.sum")
 		.keep()
 		.as('value')
-	.httpOut('TestStream_JoinOn')
+	|httpOut('TestStream_JoinOn')
 `
 
 	er := kapacitor.Result{
@@ -1146,31 +1174,34 @@ errorsByServiceGlobal.join(errorsByServiceDC)
 func TestStream_JoinOnGap(t *testing.T) {
 	var script = `
 var errorsByServiceDCRack = stream
-			.from().measurement('errors')
-			.groupBy('dc', 'service', 'rack')
-			.window()
-				.period(10s)
-				.every(10s)
-				.align()
-			.mapReduce(influxql.sum('value'))
+	|from()
+		.measurement('errors')
+		.groupBy('dc', 'service', 'rack')
+	|window()
+		.period(10s)
+		.every(10s)
+		.align()
+	|sum('value')
 
 var errorsByServiceGlobal = stream
-			.from().measurement('errors')
-			.groupBy('service')
-			.window()
-				.period(10s)
-				.every(10s)
-				.align()
-			.mapReduce(influxql.sum('value'))
+	|from()
+		.measurement('errors')
+		.groupBy('service')
+	|window()
+		.period(10s)
+		.every(10s)
+		.align()
+	|sum('value')
 
-errorsByServiceGlobal.join(errorsByServiceDCRack)
+errorsByServiceGlobal
+	|join(errorsByServiceDCRack)
 		.as('service', 'loc')
 		.on('service')
 		.streamName('loc_error_percent')
-	.eval(lambda: "loc.sum" / "service.sum")
+	|eval(lambda: "loc.sum" / "service.sum")
 		.keep()
 		.as('value')
-	.httpOut('TestStream_JoinOn')
+	|httpOut('TestStream_JoinOn')
 `
 
 	er := kapacitor.Result{
@@ -1328,22 +1359,26 @@ func TestStream_Union(t *testing.T) {
 
 	var script = `
 var cpu = stream
-			.from().measurement('cpu')
-			.where(lambda: "cpu" == 'total')
+	|from()
+		.measurement('cpu')
+		.where(lambda: "cpu" == 'total')
 var mem = stream
-			.from().measurement('memory')
-			.where(lambda: "type" == 'free')
+	|from()
+		.measurement('memory')
+		.where(lambda: "type" == 'free')
 var disk = stream
-			.from().measurement('disk')
-			.where(lambda: "device" == 'sda')
+	|from()
+		.measurement('disk')
+		.where(lambda: "device" == 'sda')
 
-cpu.union(mem, disk)
+cpu
+	|union(mem, disk)
 		.rename('cpu_mem_disk')
-		.window()
-			.period(10s)
-			.every(10s)
-		.mapReduce(influxql.count('value'))
-		.httpOut('TestStream_Union')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|httpOut('TestStream_Union')
 `
 
 	er := kapacitor.Result{
@@ -1374,26 +1409,28 @@ func TestStream_InfluxQL(t *testing.T) {
 
 	var scriptTmpl = `
 stream
-	.from().measurement('cpu')
-	.where(lambda: "host" == 'serverA')
-	.window()
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+	|window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.{{ .Method }}({{ .Args }}))
+	|mapReduce(influxql|{{ .Method }}({{ .Args }}))
 		{{ if .UsePointTimes }}.usePointTimes(){{ end }}
-	.httpOut('TestStream_InfluxQL')
+	|httpOut('TestStream_InfluxQL')
 `
 
 	var newScriptTmpl = `
 stream
-	.from().measurement('cpu')
-	.where(lambda: "host" == 'serverA')
-	.window()
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+	|window()
 		.period(10s)
 		.every(10s)
-	.{{ .Method }}({{ .Args }})
+	|{{ .Method }}({{ .Args }})
 		{{ if .UsePointTimes }}.usePointTimes(){{ end }}
-	.httpOut('TestStream_InfluxQL')
+	|httpOut('TestStream_InfluxQL')
 `
 	endTime := time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC)
 	testCases := []testCase{
@@ -1831,7 +1868,7 @@ stream
 			testStreamerWithOutput(
 				t,
 				"TestStream_InfluxQL",
-				string(script.Bytes()),
+				script.String(),
 				13*time.Second,
 				tc.ER,
 				nil,
@@ -1844,16 +1881,17 @@ stream
 func TestStream_CustomFunctions(t *testing.T) {
 	var script = `
 stream
-	.from().measurement('cpu')
-	.where(lambda: "host" == 'serverA')
-	.window()
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+	|window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.count('value'))
-	.customFunc()
+	|count('value')
+	|customFunc()
 		.opt1('count')
 		.opt2(FALSE, 1, 1.0, '1.0', 1s)
-	.httpOut('TestStream_CustomFunctions')
+	|httpOut('TestStream_CustomFunctions')
 `
 
 	cmd := cmd_test.NewCommandHelper()
@@ -2036,14 +2074,15 @@ var warnThreshold = 7.0
 var critThreshold = 8.0
 
 stream
-	.from().measurement('cpu')
-	.where(lambda: "host" == 'serverA')
-	.groupBy('host')
-	.window()
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.count('value'))
-	.alert()
+	|count('value')
+	|alert()
 		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
 		.details('details')
 		.info(lambda: "count" > infoThreshold)
@@ -2111,14 +2150,15 @@ func TestStream_AlertSensu(t *testing.T) {
 
 	var script = `
 stream
-	.from().measurement('cpu')
-	.where(lambda: "host" == 'serverA')
-	.groupBy('host')
-	.window()
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.count('value'))
-	.alert()
+	|count('value')
+	|alert()
 		.id('kapacitor.{{ .Name }}.{{ index .Tags "host" }}')
 		.info(lambda: "count" > 6.0)
 		.warn(lambda: "count" > 7.0)
@@ -2199,22 +2239,23 @@ func TestStream_AlertSlack(t *testing.T) {
 
 	var script = `
 stream
-	.from().measurement('cpu')
-	.where(lambda: "host" == 'serverA')
-	.groupBy('host')
-	.window()
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.count('value'))
-	.alert()
+	|count('value')
+	|alert()
 		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
 		.info(lambda: "count" > 6.0)
 		.warn(lambda: "count" > 7.0)
 		.crit(lambda: "count" > 8.0)
 		.slack()
-			.channel('#alerts')
+		.channel('#alerts')
 		.slack()
-			.channel('@jim')
+		.channel('@jim')
 `
 
 	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
@@ -2276,14 +2317,15 @@ func TestStream_AlertHipChat(t *testing.T) {
 
 	var script = `
 stream
-	.from().measurement('cpu')
-	.where(lambda: "host" == 'serverA')
-	.groupBy('host')
-	.window()
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.count('value'))
-	.alert()
+	|count('value')
+	|alert()
 		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
 		.info(lambda: "count" > 6.0)
 		.warn(lambda: "count" > 7.0)
@@ -2390,14 +2432,15 @@ func TestStream_AlertAlerta(t *testing.T) {
 
 	var script = `
 stream
-	.from().measurement('cpu')
-	.where(lambda: "host" == 'serverA')
-	.groupBy('host')
-	.window()
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.count('value'))
-	.alert()
+	|count('value')
+	|alert()
 		.id('{{ index .Tags "host" }}')
 		.message('kapacitor/{{ .Name }}/{{ index .Tags "host" }} is {{ .Level }} @{{.Time}}')
 		.info(lambda: "count" > 6.0)
@@ -2412,7 +2455,7 @@ stream
 			.environment('{{ index .Tags "host" }}')
 			.origin('override')
 			.group('{{ .ID }}')
-			.value('{{ index .Fields "count" | printf "%0.0f" }}')
+			.value('{{ index .Fields "count" }}')
 			.services('serviceA', 'serviceB')
 `
 
@@ -2515,14 +2558,15 @@ func TestStream_AlertOpsGenie(t *testing.T) {
 
 	var script = `
 stream
-	.from().measurement('cpu')
-	.where(lambda: "host" == 'serverA')
-	.groupBy('host')
-	.window()
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.count('value'))
-	.alert()
+	|count('value')
+	|alert()
 		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
 		.info(lambda: "count" > 6.0)
 		.warn(lambda: "count" > 7.0)
@@ -2591,14 +2635,15 @@ func TestStream_AlertPagerDuty(t *testing.T) {
 
 	var script = `
 stream
-	.from().measurement('cpu')
-	.where(lambda: "host" == 'serverA')
-	.groupBy('host')
-	.window()
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.count('value'))
-	.alert()
+	|count('value')
+	|alert()
 		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
 		.message('{{ .Level }} alert for {{ .ID }}')
 		.info(lambda: "count" > 6.0)
@@ -2674,14 +2719,15 @@ func TestStream_AlertVictorOps(t *testing.T) {
 
 	var script = `
 stream
-	.from().measurement('cpu')
-	.where(lambda: "host" == 'serverA')
-	.groupBy('host')
-	.window()
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.count('value'))
-	.alert()
+	|count('value')
+	|alert()
 		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
 		.info(lambda: "count" > 6.0)
 		.warn(lambda: "count" > 7.0)
@@ -2741,14 +2787,15 @@ func TestStream_AlertTalk(t *testing.T) {
 
 	var script = `
 stream
-	.from().measurement('cpu')
-	.where(lambda: "host" == 'serverA')
-	.groupBy('host')
-	.window()
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.count('value'))
-	.alert()
+	|count('value')
+	|alert()
 		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
 		.info(lambda: "count" > 6.0)
 		.warn(lambda: "count" > 7.0)
@@ -2841,12 +2888,13 @@ func TestStream_AlertSigma(t *testing.T) {
 
 	var script = `
 stream
-	.from().measurement('cpu')
-	.where(lambda: "host" == 'serverA')
-	.eval(lambda: sigma("value"))
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+	|eval(lambda: sigma("value"))
 		.as('sigma')
 		.keep()
-	.alert()
+	|alert()
 		.details('{{ .Message }}')
 		.info(lambda: "sigma" > 2.0)
 		.warn(lambda: "sigma" > 3.0)
@@ -2900,9 +2948,10 @@ func TestStream_AlertComplexWhere(t *testing.T) {
 
 	var script = `
 stream
-	.from().measurement('cpu')
-	.where(lambda: "host" == 'serverA' AND sigma("value") > 2)
-	.alert()
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA' AND sigma("value") > 2)
+	|alert()
 		.details('')
 		.crit(lambda: TRUE)
 		.post('` + ts.URL + `')
@@ -2924,8 +2973,9 @@ func TestStream_AlertStateChangesOnly(t *testing.T) {
 	defer ts.Close()
 	var script = `
 stream
-	.from().measurement('cpu')
-	.alert()
+	|from()
+		.measurement('cpu')
+	|alert()
 		.crit(lambda: "value" < 93)
 		.stateChangesOnly()
 		.post('` + ts.URL + `')
@@ -2948,9 +2998,10 @@ func TestStream_AlertFlapping(t *testing.T) {
 	defer ts.Close()
 	var script = `
 stream
-	.from().measurement('cpu')
-	.where(lambda: "host" == 'serverA')
-	.alert()
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+	|alert()
 		.info(lambda: "value" < 95)
 		.warn(lambda: "value" < 94)
 		.crit(lambda: "value" < 93)
@@ -2971,13 +3022,14 @@ func TestStream_InfluxDBOut(t *testing.T) {
 
 	var script = `
 stream
-	.from().measurement('cpu')
-	.where(lambda: "host" == 'serverA')
-	.window()
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+	|window()
 		.period(10s)
 		.every(10s)
-	.mapReduce(influxql.count('value'))
-	.influxDBOut()
+	|count('value')
+	|influxDBOut()
 		.database('db')
 		.retentionPolicy('rp')
 		.measurement('m')
@@ -3044,7 +3096,7 @@ stream
 		if p.Name() != "m" {
 			t.Errorf("got %v exp %v", p.Name(), "m")
 		}
-		if p.Fields()["count"] != 10.0 {
+		if p.Fields()["count"] != int64(10) {
 			t.Errorf("got %v exp %v", p.Fields()["count"], 10.0)
 		}
 		if len(p.Tags()) != 1 {
@@ -3064,24 +3116,26 @@ func TestStream_TopSelector(t *testing.T) {
 
 	var script = `
 var topScores = stream
-    .from().measurement('scores')
-    // Get the most recent score for each player
-    .groupBy('game', 'player')
-    .window()
+    |from()
+		.measurement('scores')
+		// Get the most recent score for each player
+		.groupBy('game', 'player')
+    |window()
         .period(2s)
         .every(2s)
         .align()
-    .mapReduce(influxql.last('value'))
+    |last('value')
     // Calculate the top 5 scores per game
-    .groupBy('game')
-    .top(5, 'last', 'player')
+    |groupBy('game')
+    |top(5, 'last', 'player')
 
 topScores
-    .httpOut('top_scores')
+    |httpOut('top_scores')
 
-topScores.sample(4s)
-    .mapReduce(influxql.count('top'))
-    .httpOut('top_scores_sampled')
+topScores
+    |sample(4s)
+    |count('top')
+    |httpOut('top_scores_sampled')
 `
 
 	tw := time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC)

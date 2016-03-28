@@ -19,15 +19,15 @@ func TestBatch_Derivative(t *testing.T) {
 
 	var script = `
 batch
-	.query('''
+	|query('''
 		SELECT sum("value") as "value"
 		FROM "telegraf"."default".packets
 ''')
 		.period(10s)
 		.every(10s)
 		.groupBy(time(2s))
-	.derivative('value')
-	.httpOut('TestBatch_Derivative')
+	|derivative('value')
+	|httpOut('TestBatch_Derivative')
 `
 
 	er := kapacitor.Result{
@@ -65,16 +65,16 @@ func TestBatch_DerivativeUnit(t *testing.T) {
 
 	var script = `
 batch
-	.query('''
+	|query('''
 		SELECT sum("value") as "value"
 		FROM "telegraf"."default".packets
 ''')
 		.period(10s)
 		.every(10s)
 		.groupBy(time(2s))
-	.derivative('value')
+	|derivative('value')
 		.unit(2s)
-	.httpOut('TestBatch_Derivative')
+	|httpOut('TestBatch_Derivative')
 `
 
 	er := kapacitor.Result{
@@ -112,15 +112,15 @@ func TestBatch_DerivativeN(t *testing.T) {
 
 	var script = `
 batch
-	.query('''
+	|query('''
 		SELECT sum("value") as "value"
 		FROM "telegraf"."default".packets
 ''')
 		.period(10s)
 		.every(10s)
 		.groupBy(time(2s))
-	.derivative('value')
-	.httpOut('TestBatch_DerivativeNN')
+	|derivative('value')
+	|httpOut('TestBatch_DerivativeNN')
 `
 
 	er := kapacitor.Result{
@@ -158,16 +158,16 @@ func TestBatch_DerivativeNN(t *testing.T) {
 
 	var script = `
 batch
-	.query('''
+	|query('''
 		SELECT sum("value") as "value"
 		FROM "telegraf"."default".packets
 ''')
 		.period(10s)
 		.every(10s)
 		.groupBy(time(2s))
-	.derivative('value')
+	|derivative('value')
 		.nonNegative()
-	.httpOut('TestBatch_DerivativeNN')
+	|httpOut('TestBatch_DerivativeNN')
 `
 
 	er := kapacitor.Result{
@@ -201,7 +201,7 @@ func TestBatch_SimpleMR(t *testing.T) {
 
 	var script = `
 batch
-	.query('''
+	|query('''
 		SELECT mean("value")
 		FROM "telegraf"."default".cpu_usage_idle
 		WHERE "host" = 'serverA'
@@ -209,12 +209,12 @@ batch
 		.period(10s)
 		.every(10s)
 		.groupBy(time(2s), 'cpu')
-	.count('mean')
-	.window()
+	|count('mean')
+	|window()
 		.period(20s)
 		.every(20s)
-	.sum('count')
-	.httpOut('TestBatch_SimpleMR')
+	|sum('count')
+	|httpOut('TestBatch_SimpleMR')
 `
 
 	er := kapacitor.Result{
@@ -256,7 +256,7 @@ func TestBatch_Join(t *testing.T) {
 
 	var script = `
 var cpu0 = batch
-	.query('''
+	|query('''
 		SELECT mean("value")
 		FROM "telegraf"."default".cpu_usage_idle
 		WHERE "cpu" = 'cpu0'
@@ -266,7 +266,7 @@ var cpu0 = batch
 		.groupBy(time(2s))
 
 var cpu1 = batch
-	.query('''
+	|query('''
 		SELECT mean("value")
 		FROM "telegraf"."default".cpu_usage_idle
 		WHERE "cpu" = 'cpu1'
@@ -275,14 +275,15 @@ var cpu1 = batch
 		.every(10s)
 		.groupBy(time(2s))
 
-cpu0.join(cpu1)
-	.as('cpu0', 'cpu1')
-	.count('cpu0.mean')
-	.window()
+cpu0
+	|join(cpu1)
+		.as('cpu0', 'cpu1')
+	|count('cpu0.mean')
+	|window()
 		.period(20s)
 		.every(20s)
-	.sum('count')
-	.httpOut('TestBatch_Join')
+	|sum('count')
+	|httpOut('TestBatch_Join')
 `
 
 	er := kapacitor.Result{
@@ -305,7 +306,7 @@ func TestBatch_JoinTolerance(t *testing.T) {
 
 	var script = `
 var cpu0 = batch
-	.query('''
+	|query('''
 		SELECT mean("value")
 		FROM "telegraf"."default".cpu_usage_idle
 		WHERE "cpu" = 'cpu0'
@@ -315,7 +316,7 @@ var cpu0 = batch
 		.groupBy(time(2s))
 
 var cpu1 = batch
-	.query('''
+	|query('''
 		SELECT mean("value")
 		FROM "telegraf"."default".cpu_usage_idle
 		WHERE "cpu" = 'cpu1'
@@ -324,15 +325,16 @@ var cpu1 = batch
 		.every(10s)
 		.groupBy(time(2s))
 
-cpu0.join(cpu1)
-	.as('cpu0', 'cpu1')
-	.tolerance(1s)
-	.count('cpu0.mean')
-	.window()
+cpu0
+	|join(cpu1)
+		.as('cpu0', 'cpu1')
+		.tolerance(1s)
+	|count('cpu0.mean')
+	|window()
 		.period(20s)
 		.every(20s)
-	.sum('count')
-	.httpOut('TestBatch_JoinTolerance')
+	|sum('count')
+	|httpOut('TestBatch_JoinTolerance')
 `
 
 	er := kapacitor.Result{

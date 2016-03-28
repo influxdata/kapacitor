@@ -19,6 +19,7 @@ import (
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/services/httpd"
+	"github.com/influxdata/kapacitor/tick"
 )
 
 const taskDB = "task.db"
@@ -472,8 +473,15 @@ func (ts *Service) handleDisable(w http.ResponseWriter, r *http.Request) {
 
 func (ts *Service) Save(task *rawTask) error {
 
+	// Format TICKscript
+	formatted, err := tick.Format(task.TICKscript)
+	if err != nil {
+		return err
+	}
+	task.TICKscript = formatted
+
 	// Validate task
-	_, err := ts.TaskMaster.NewTask(task.Name,
+	_, err = ts.TaskMaster.NewTask(task.Name,
 		task.TICKscript,
 		task.Type,
 		task.DBRPs,

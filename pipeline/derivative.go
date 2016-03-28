@@ -12,8 +12,9 @@ import (
 //
 // Example:
 //     stream
-//         .from().measurement('net_rx_packets')
-//         .derivative('value')
+//         |from()
+//             .measurement('net_rx_packets')
+//         |derivative('value')
 //            .unit(1s) // default
 //            .nonNegative()
 //         ...
@@ -42,7 +43,7 @@ type DerivativeNode struct {
 
 	// Where negative values are acceptable.
 	// tick:ignore
-	NonNegativeFlag bool
+	NonNegativeFlag bool `tick:"NonNegative"`
 }
 
 func newDerivativeNode(wants EdgeType, field string) *DerivativeNode {

@@ -130,16 +130,32 @@ func TestParseStatements(t *testing.T) {
 		{
 			script: `var x = 'str'`,
 			Root: &ListNode{
+				position: position{
+					pos:  0,
+					line: 1,
+					char: 1,
+				},
 				Nodes: []Node{
-					&BinaryNode{
-						pos:      6,
-						Operator: TokenAsgn,
+					&DeclarationNode{
+						position: position{
+							pos:  6,
+							line: 1,
+							char: 7,
+						},
 						Left: &IdentifierNode{
-							pos:   4,
+							position: position{
+								pos:  4,
+								line: 1,
+								char: 5,
+							},
 							Ident: "x",
 						},
 						Right: &StringNode{
-							pos:     8,
+							position: position{
+								pos:  8,
+								line: 1,
+								char: 9,
+							},
 							Literal: "str",
 						},
 					},
@@ -149,16 +165,32 @@ func TestParseStatements(t *testing.T) {
 		{
 			script: `var x = TRUE`,
 			Root: &ListNode{
+				position: position{
+					pos:  0,
+					line: 1,
+					char: 1,
+				},
 				Nodes: []Node{
-					&BinaryNode{
-						pos:      6,
-						Operator: TokenAsgn,
+					&DeclarationNode{
+						position: position{
+							pos:  6,
+							line: 1,
+							char: 7,
+						},
 						Left: &IdentifierNode{
-							pos:   4,
+							position: position{
+								pos:  4,
+								line: 1,
+								char: 5,
+							},
 							Ident: "x",
 						},
 						Right: &BoolNode{
-							pos:  8,
+							position: position{
+								pos:  8,
+								line: 1,
+								char: 9,
+							},
 							Bool: true,
 						},
 					},
@@ -168,19 +200,39 @@ func TestParseStatements(t *testing.T) {
 		{
 			script: `var x = !FALSE`,
 			Root: &ListNode{
+				position: position{
+					pos:  0,
+					line: 1,
+					char: 1,
+				},
 				Nodes: []Node{
-					&BinaryNode{
-						pos:      6,
-						Operator: TokenAsgn,
+					&DeclarationNode{
+						position: position{
+							pos:  6,
+							line: 1,
+							char: 7,
+						},
 						Left: &IdentifierNode{
-							pos:   4,
+							position: position{
+								pos:  4,
+								line: 1,
+								char: 5,
+							},
 							Ident: "x",
 						},
 						Right: &UnaryNode{
-							pos:      8,
+							position: position{
+								pos:  8,
+								line: 1,
+								char: 9,
+							},
 							Operator: TokenNot,
 							Node: &BoolNode{
-								pos:  9,
+								position: position{
+									pos:  9,
+									line: 1,
+									char: 10,
+								},
 								Bool: false,
 							},
 						},
@@ -191,16 +243,32 @@ func TestParseStatements(t *testing.T) {
 		{
 			script: `var x = 1`,
 			Root: &ListNode{
+				position: position{
+					pos:  0,
+					line: 1,
+					char: 1,
+				},
 				Nodes: []Node{
-					&BinaryNode{
-						pos:      6,
-						Operator: TokenAsgn,
+					&DeclarationNode{
+						position: position{
+							pos:  6,
+							line: 1,
+							char: 7,
+						},
 						Left: &IdentifierNode{
-							pos:   4,
+							position: position{
+								pos:  4,
+								line: 1,
+								char: 5,
+							},
 							Ident: "x",
 						},
 						Right: &NumberNode{
-							pos:   8,
+							position: position{
+								pos:  8,
+								line: 1,
+								char: 9,
+							},
 							IsInt: true,
 							Int64: 1,
 						},
@@ -211,19 +279,39 @@ func TestParseStatements(t *testing.T) {
 		{
 			script: `var x = -1`,
 			Root: &ListNode{
+				position: position{
+					pos:  0,
+					line: 1,
+					char: 1,
+				},
 				Nodes: []Node{
-					&BinaryNode{
-						pos:      6,
-						Operator: TokenAsgn,
+					&DeclarationNode{
+						position: position{
+							pos:  6,
+							line: 1,
+							char: 7,
+						},
 						Left: &IdentifierNode{
-							pos:   4,
+							position: position{
+								pos:  4,
+								line: 1,
+								char: 5,
+							},
 							Ident: "x",
 						},
 						Right: &UnaryNode{
-							pos:      8,
+							position: position{
+								pos:  8,
+								line: 1,
+								char: 9,
+							},
 							Operator: TokenMinus,
 							Node: &NumberNode{
-								pos:   9,
+								position: position{
+									pos:  9,
+									line: 1,
+									char: 10,
+								},
 								IsInt: true,
 								Int64: 1,
 							},
@@ -235,16 +323,32 @@ func TestParseStatements(t *testing.T) {
 		{
 			script: `var x = 1.0`,
 			Root: &ListNode{
+				position: position{
+					pos:  0,
+					line: 1,
+					char: 1,
+				},
 				Nodes: []Node{
-					&BinaryNode{
-						pos:      6,
-						Operator: TokenAsgn,
+					&DeclarationNode{
+						position: position{
+							pos:  6,
+							line: 1,
+							char: 7,
+						},
 						Left: &IdentifierNode{
-							pos:   4,
+							position: position{
+								pos:  4,
+								line: 1,
+								char: 5,
+							},
 							Ident: "x",
 						},
 						Right: &NumberNode{
-							pos:     8,
+							position: position{
+								pos:  8,
+								line: 1,
+								char: 9,
+							},
 							IsFloat: true,
 							Float64: 1.0,
 						},
@@ -255,19 +359,39 @@ func TestParseStatements(t *testing.T) {
 		{
 			script: `var x = -1.0`,
 			Root: &ListNode{
+				position: position{
+					pos:  0,
+					line: 1,
+					char: 1,
+				},
 				Nodes: []Node{
-					&BinaryNode{
-						pos:      6,
-						Operator: TokenAsgn,
+					&DeclarationNode{
+						position: position{
+							pos:  6,
+							line: 1,
+							char: 7,
+						},
 						Left: &IdentifierNode{
-							pos:   4,
+							position: position{
+								pos:  4,
+								line: 1,
+								char: 5,
+							},
 							Ident: "x",
 						},
 						Right: &UnaryNode{
-							pos:      8,
+							position: position{
+								pos:  8,
+								line: 1,
+								char: 9,
+							},
 							Operator: TokenMinus,
 							Node: &NumberNode{
-								pos:     9,
+								position: position{
+									pos:  9,
+									line: 1,
+									char: 10,
+								},
 								IsFloat: true,
 								Float64: 1.0,
 							},
@@ -279,16 +403,32 @@ func TestParseStatements(t *testing.T) {
 		{
 			script: `var x = 5h`,
 			Root: &ListNode{
+				position: position{
+					pos:  0,
+					line: 1,
+					char: 1,
+				},
 				Nodes: []Node{
-					&BinaryNode{
-						pos:      6,
-						Operator: TokenAsgn,
+					&DeclarationNode{
+						position: position{
+							pos:  6,
+							line: 1,
+							char: 7,
+						},
 						Left: &IdentifierNode{
-							pos:   4,
+							position: position{
+								pos:  4,
+								line: 1,
+								char: 5,
+							},
 							Ident: "x",
 						},
 						Right: &DurationNode{
-							pos: 8,
+							position: position{
+								pos:  8,
+								line: 1,
+								char: 9,
+							},
 							Dur: time.Hour * 5,
 						},
 					},
@@ -298,19 +438,39 @@ func TestParseStatements(t *testing.T) {
 		{
 			script: `var x = -5h`,
 			Root: &ListNode{
+				position: position{
+					pos:  0,
+					line: 1,
+					char: 1,
+				},
 				Nodes: []Node{
-					&BinaryNode{
-						pos:      6,
-						Operator: TokenAsgn,
+					&DeclarationNode{
+						position: position{
+							pos:  6,
+							line: 1,
+							char: 7,
+						},
 						Left: &IdentifierNode{
-							pos:   4,
+							position: position{
+								pos:  4,
+								line: 1,
+								char: 5,
+							},
 							Ident: "x",
 						},
 						Right: &UnaryNode{
-							pos:      8,
+							position: position{
+								pos:  8,
+								line: 1,
+								char: 9,
+							},
 							Operator: TokenMinus,
 							Node: &DurationNode{
-								pos: 9,
+								position: position{
+									pos:  9,
+									line: 1,
+									char: 10,
+								},
 								Dur: time.Hour * 5,
 							},
 						},
@@ -321,16 +481,32 @@ func TestParseStatements(t *testing.T) {
 		{
 			script: `var x = /.*\//`,
 			Root: &ListNode{
+				position: position{
+					pos:  0,
+					line: 1,
+					char: 1,
+				},
 				Nodes: []Node{
-					&BinaryNode{
-						pos:      6,
-						Operator: TokenAsgn,
+					&DeclarationNode{
+						position: position{
+							pos:  6,
+							line: 1,
+							char: 7,
+						},
 						Left: &IdentifierNode{
-							pos:   4,
+							position: position{
+								pos:  4,
+								line: 1,
+								char: 5,
+							},
 							Ident: "x",
 						},
 						Right: &RegexNode{
-							pos:   8,
+							position: position{
+								pos:  8,
+								line: 1,
+								char: 9,
+							},
 							Regex: regexp.MustCompile(".*/"),
 						},
 					},
@@ -340,23 +516,48 @@ func TestParseStatements(t *testing.T) {
 		{
 			script: `var x = a.f()`,
 			Root: &ListNode{
+				position: position{
+					pos:  0,
+					line: 1,
+					char: 1,
+				},
 				Nodes: []Node{
-					&BinaryNode{
-						pos:      6,
-						Operator: TokenAsgn,
+					&DeclarationNode{
+						position: position{
+							pos:  6,
+							line: 1,
+							char: 7,
+						},
 						Left: &IdentifierNode{
-							pos:   4,
+							position: position{
+								pos:  4,
+								line: 1,
+								char: 5,
+							},
 							Ident: "x",
 						},
-						Right: &BinaryNode{
-							pos:      9,
+						Right: &ChainNode{
+							position: position{
+								pos:  9,
+								line: 1,
+								char: 10,
+							},
 							Operator: TokenDot,
 							Left: &IdentifierNode{
-								pos:   8,
+								position: position{
+									pos:  8,
+									line: 1,
+									char: 9,
+								},
 								Ident: "a",
 							},
 							Right: &FunctionNode{
-								pos:  10,
+								position: position{
+									pos:  10,
+									line: 1,
+									char: 11,
+								},
+								Type: propertyFunc,
 								Func: "f",
 							},
 						},
@@ -368,32 +569,115 @@ func TestParseStatements(t *testing.T) {
 			script: `var x = 3m
 			var y = -x`,
 			Root: &ListNode{
+				position: position{
+					pos:  0,
+					line: 1,
+					char: 1,
+				},
 				Nodes: []Node{
-					&BinaryNode{
-						pos:      6,
-						Operator: TokenAsgn,
+					&DeclarationNode{
+						position: position{
+							pos:  6,
+							line: 1,
+							char: 7,
+						},
 						Left: &IdentifierNode{
-							pos:   4,
+							position: position{
+								pos:  4,
+								line: 1,
+								char: 5,
+							},
 							Ident: "x",
 						},
 						Right: &DurationNode{
-							pos: 8,
+							position: position{
+								pos:  8,
+								line: 1,
+								char: 9,
+							},
 							Dur: time.Minute * 3,
 						},
 					},
-					&BinaryNode{
-						pos:      20,
-						Operator: TokenAsgn,
+					&DeclarationNode{
+						position: position{
+							pos:  20,
+							line: 2,
+							char: 10,
+						},
 						Left: &IdentifierNode{
-							pos:   18,
+							position: position{
+								pos:  18,
+								line: 2,
+								char: 8,
+							},
 							Ident: "y",
 						},
 						Right: &UnaryNode{
-							pos:      22,
+							position: position{
+								pos:  22,
+								line: 2,
+								char: 12,
+							},
 							Operator: TokenMinus,
 							Node: &IdentifierNode{
-								pos:   23,
+								position: position{
+									pos:  23,
+									line: 2,
+									char: 13,
+								},
 								Ident: "x",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			script: `var x = a|b()`,
+			Root: &ListNode{
+				position: position{
+					pos:  0,
+					line: 1,
+					char: 1,
+				},
+				Nodes: []Node{
+					&DeclarationNode{
+						position: position{
+							pos:  6,
+							line: 1,
+							char: 7,
+						},
+						Left: &IdentifierNode{
+							position: position{
+								pos:  4,
+								line: 1,
+								char: 5,
+							},
+							Ident: "x",
+						},
+						Right: &ChainNode{
+							position: position{
+								pos:  9,
+								line: 1,
+								char: 10,
+							},
+							Operator: TokenPipe,
+							Left: &IdentifierNode{
+								position: position{
+									pos:  8,
+									line: 1,
+									char: 9,
+								},
+								Ident: "a",
+							},
+							Right: &FunctionNode{
+								position: position{
+									pos:  10,
+									line: 1,
+									char: 11,
+								},
+								Type: chainFunc,
+								Func: "b",
 							},
 						},
 					},
@@ -405,42 +689,393 @@ func TestParseStatements(t *testing.T) {
 			stream.where(lambda: "value" > t)
 			`,
 			Root: &ListNode{
+				position: position{
+					pos:  0,
+					line: 1,
+					char: 1,
+				},
 				Nodes: []Node{
-					&BinaryNode{
-						pos:      6,
-						Operator: TokenAsgn,
+					&DeclarationNode{
+						position: position{
+							pos:  6,
+							line: 1,
+							char: 7,
+						},
 						Left: &IdentifierNode{
-							pos:   4,
+							position: position{
+								pos:  4,
+								line: 1,
+								char: 5,
+							},
 							Ident: "t",
 						},
 						Right: &NumberNode{
-							pos:   8,
+							position: position{
+								pos:  8,
+								line: 1,
+								char: 9,
+							},
 							IsInt: true,
 							Int64: 42,
 						},
 					},
-					&BinaryNode{
-						pos:      20,
+					&ChainNode{
+						position: position{
+							pos:  20,
+							line: 2,
+							char: 10,
+						},
 						Operator: TokenDot,
 						Left: &IdentifierNode{
-							pos:   14,
+							position: position{
+								pos:  14,
+								line: 2,
+								char: 4,
+							},
 							Ident: "stream",
 						},
 						Right: &FunctionNode{
-							pos:  21,
+							position: position{
+								pos:  21,
+								line: 2,
+								char: 11,
+							},
+							Type: propertyFunc,
 							Func: "where",
 							Args: []Node{
 								&LambdaNode{
-									pos: 27,
+									position: position{
+										pos:  27,
+										line: 2,
+										char: 17,
+									},
 									Node: &BinaryNode{
-										pos:      43,
+										position: position{
+											pos:  43,
+											line: 2,
+											char: 33,
+										},
 										Operator: TokenGreater,
 										Left: &ReferenceNode{
-											pos:       35,
+											position: position{
+												pos:  35,
+												line: 2,
+												char: 25,
+											},
 											Reference: "value",
 										},
 										Right: &IdentifierNode{
-											pos:   45,
+											position: position{
+												pos:  45,
+												line: 2,
+												char: 35,
+											},
+											Ident: "t",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			script: `global(lambda: 
+// If this
+// is less than that
+(1 + 2 - 3 * 4 / 5) 
+< (sin(6))
+AND 
+// more comments.
+(TRUE OR FALSE))`,
+			Root: &ListNode{
+				position: position{
+					pos:  0,
+					line: 1,
+					char: 1,
+				},
+				Nodes: []Node{
+					&FunctionNode{
+						position: position{
+							pos:  0,
+							line: 1,
+							char: 1,
+						},
+						Func: "global",
+						Type: globalFunc,
+						Args: []Node{
+							&LambdaNode{
+								position: position{
+									pos:  7,
+									line: 1,
+									char: 8,
+								},
+								Node: &BinaryNode{
+									position: position{
+										pos:  80,
+										line: 6,
+										char: 1,
+									},
+									Operator:  TokenAnd,
+									MultiLine: true,
+									Left: &BinaryNode{
+										position: position{
+											pos:  69,
+											line: 5,
+											char: 1,
+										},
+										Operator:  TokenLess,
+										MultiLine: true,
+										Left: &BinaryNode{
+											position: position{
+												pos:  51,
+												line: 4,
+												char: 4,
+											},
+											Operator: TokenPlus,
+											Parens:   true,
+											Left: &NumberNode{
+												position: position{
+													pos:  49,
+													line: 4,
+													char: 2,
+												},
+												IsInt: true,
+												Int64: 1,
+											},
+											Right: &BinaryNode{
+												position: position{
+													pos:  55,
+													line: 4,
+													char: 8,
+												},
+												Operator: TokenMinus,
+												Left: &NumberNode{
+													position: position{
+														pos:  53,
+														line: 4,
+														char: 6,
+													},
+													IsInt: true,
+													Int64: 2,
+												},
+												Right: &BinaryNode{
+													position: position{
+														pos:  59,
+														line: 4,
+														char: 12,
+													},
+													Operator: TokenMult,
+													Left: &NumberNode{
+														position: position{
+															pos:  57,
+															line: 4,
+															char: 10,
+														},
+														IsInt: true,
+														Int64: 3,
+													},
+													Right: &BinaryNode{
+														position: position{
+															pos:  63,
+															line: 4,
+															char: 16,
+														},
+														Operator: TokenDiv,
+														Left: &NumberNode{
+															position: position{
+																pos:  61,
+																line: 4,
+																char: 14,
+															},
+															IsInt: true,
+															Int64: 4,
+														},
+														Right: &NumberNode{
+															position: position{
+																pos:  65,
+																line: 4,
+																char: 18,
+															},
+															IsInt: true,
+															Int64: 5,
+														},
+													},
+												},
+											},
+											Comment: &CommentNode{
+												position: position{
+													pos:  16,
+													line: 2,
+													char: 1,
+												},
+												Comments: []string{"If this", "is less than that"},
+											},
+										},
+										Right: &FunctionNode{
+											position: position{
+												pos:  72,
+												line: 5,
+												char: 4,
+											},
+											Type: globalFunc,
+											Func: "sin",
+											Args: []Node{&NumberNode{
+												position: position{
+													pos:  76,
+													line: 5,
+													char: 8,
+												},
+												IsInt: true,
+												Int64: 6,
+											}},
+										},
+									},
+									Right: &BinaryNode{
+										position: position{
+											pos:  109,
+											line: 8,
+											char: 7,
+										},
+										Operator: TokenOr,
+										Parens:   true,
+										Left: &BoolNode{
+											position: position{
+												pos:  104,
+												line: 8,
+												char: 2,
+											},
+											Bool: true,
+										},
+										Right: &BoolNode{
+											position: position{
+												pos:  112,
+												line: 8,
+												char: 10,
+											},
+											Bool: false,
+										},
+										Comment: &CommentNode{
+											position: position{
+												pos:  85,
+												line: 7,
+												char: 1,
+											},
+											Comments: []string{"more comments."},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			script: `// set perfect threshold
+var t = 42
+// only select data above threshold
+stream.where(lambda: "value" > t)
+			`,
+			Root: &ListNode{
+				position: position{
+					pos:  0,
+					line: 1,
+					char: 1,
+				},
+				Nodes: []Node{
+					&DeclarationNode{
+						position: position{
+							pos:  31,
+							line: 2,
+							char: 7,
+						},
+						Left: &IdentifierNode{
+							position: position{
+								pos:  29,
+								line: 2,
+								char: 5,
+							},
+							Ident: "t",
+						},
+						Right: &NumberNode{
+							position: position{
+								pos:  33,
+								line: 2,
+								char: 9,
+							},
+							IsInt: true,
+							Int64: 42,
+						},
+						Comment: &CommentNode{
+							position: position{
+								pos:  0,
+								line: 1,
+								char: 1,
+							},
+							Comments: []string{"set perfect threshold"},
+						},
+					},
+					&ChainNode{
+						position: position{
+							pos:  78,
+							line: 4,
+							char: 7,
+						},
+						Operator: TokenDot,
+						Left: &IdentifierNode{
+							position: position{
+								pos:  72,
+								line: 4,
+								char: 1,
+							},
+							Ident: "stream",
+							Comment: &CommentNode{
+								position: position{
+									pos:  36,
+									line: 3,
+									char: 1,
+								},
+								Comments: []string{"only select data above threshold"},
+							},
+						},
+						Right: &FunctionNode{
+							position: position{
+								pos:  79,
+								line: 4,
+								char: 8,
+							},
+							Type: propertyFunc,
+							Func: "where",
+							Args: []Node{
+								&LambdaNode{
+									position: position{
+										pos:  85,
+										line: 4,
+										char: 14,
+									},
+									Node: &BinaryNode{
+										position: position{
+											pos:  101,
+											line: 4,
+											char: 30,
+										},
+										Operator: TokenGreater,
+										Left: &ReferenceNode{
+											position: position{
+												pos:  93,
+												line: 4,
+												char: 22,
+											},
+											Reference: "value",
+										},
+										Right: &IdentifierNode{
+											position: position{
+												pos:  103,
+												line: 4,
+												char: 32,
+											},
 											Ident: "t",
 										},
 									},
@@ -454,81 +1089,165 @@ func TestParseStatements(t *testing.T) {
 		{
 			script: `
 var x = stream
-		.window()
+		|window()
 		.period(5m)
 		.every(1m)
-		.map(influxql.agg.mean('value'))`,
+		|map(influxql.agg.mean('value'))`,
 			Root: &ListNode{
-				pos: 1,
-				Nodes: []Node{&BinaryNode{
-					pos:      7,
-					Operator: TokenAsgn,
+				position: position{
+					pos:  1,
+					line: 2,
+					char: 1,
+				},
+				Nodes: []Node{&DeclarationNode{
+					position: position{
+						pos:  7,
+						line: 2,
+						char: 7,
+					},
 					Left: &IdentifierNode{
-						pos:   5,
+						position: position{
+							pos:  5,
+							line: 2,
+							char: 5,
+						},
 						Ident: "x",
 					},
-					Right: &BinaryNode{
-						pos:      57,
-						Operator: TokenDot,
-						Left: &BinaryNode{
-							pos:      44,
+					Right: &ChainNode{
+						position: position{
+							pos:  57,
+							line: 6,
+							char: 3,
+						},
+						Operator: TokenPipe,
+						Left: &ChainNode{
+							position: position{
+								pos:  44,
+								line: 5,
+								char: 3,
+							},
 							Operator: TokenDot,
-							Left: &BinaryNode{
-								pos:      30,
+							Left: &ChainNode{
+								position: position{
+									pos:  30,
+									line: 4,
+									char: 3,
+								},
 								Operator: TokenDot,
-								Left: &BinaryNode{
-									pos:      18,
-									Operator: TokenDot,
+								Left: &ChainNode{
+									position: position{
+										pos:  18,
+										line: 3,
+										char: 3,
+									},
+									Operator: TokenPipe,
 									Left: &IdentifierNode{
-										pos:   9,
+										position: position{
+											pos:  9,
+											line: 2,
+											char: 9,
+										},
 										Ident: "stream",
 									},
 									Right: &FunctionNode{
-										pos:  19,
+										position: position{
+											pos:  19,
+											line: 3,
+											char: 4,
+										},
+										Type: chainFunc,
 										Func: "window",
 									},
 								},
 								Right: &FunctionNode{
-									pos:  31,
+									position: position{
+										pos:  31,
+										line: 4,
+										char: 4,
+									},
+									Type: propertyFunc,
 									Func: "period",
 									Args: []Node{&DurationNode{
-										pos: 38,
+										position: position{
+											pos:  38,
+											line: 4,
+											char: 11,
+										},
 										Dur: 5 * time.Minute,
 									}},
 								},
 							},
 							Right: &FunctionNode{
-								pos:  45,
+								position: position{
+									pos:  45,
+									line: 5,
+									char: 4,
+								},
+								Type: propertyFunc,
 								Func: "every",
 								Args: []Node{&DurationNode{
-									pos: 51,
+									position: position{
+										pos:  51,
+										line: 5,
+										char: 10,
+									},
 									Dur: time.Minute,
 								}},
 							},
 						},
 						Right: &FunctionNode{
-							pos:  58,
+							position: position{
+								pos:  58,
+								line: 6,
+								char: 4,
+							},
+							Type: chainFunc,
 							Func: "map",
-							Args: []Node{&BinaryNode{
-								pos:      74,
+							Args: []Node{&ChainNode{
+								position: position{
+									pos:  74,
+									line: 6,
+									char: 20,
+								},
 								Operator: TokenDot,
-								Left: &BinaryNode{
-									pos:      70,
+								Left: &ChainNode{
+									position: position{
+										pos:  70,
+										line: 6,
+										char: 16,
+									},
 									Operator: TokenDot,
 									Left: &IdentifierNode{
-										pos:   62,
+										position: position{
+											pos:  62,
+											line: 6,
+											char: 8,
+										},
 										Ident: "influxql",
 									},
 									Right: &IdentifierNode{
-										pos:   71,
+										position: position{
+											pos:  71,
+											line: 6,
+											char: 17,
+										},
 										Ident: "agg",
 									},
 								},
 								Right: &FunctionNode{
-									pos:  75,
+									position: position{
+										pos:  75,
+										line: 6,
+										char: 21,
+									},
+									Type: propertyFunc,
 									Func: "mean",
 									Args: []Node{&StringNode{
-										pos:     80,
+										position: position{
+											pos:  80,
+											line: 6,
+											char: 26,
+										},
 										Literal: "value",
 									}},
 								},
@@ -547,7 +1266,7 @@ var x = stream
 		}
 
 		if !reflect.DeepEqual(root, tc.Root) {
-			t.Fatalf("unequal trees: \ngot %v \nexp %v", root, tc.Root)
+			t.Fatalf("unequal trees: script:%s\ngot %v \nexp %v", tc.script, root, tc.Root)
 		}
 	}
 }

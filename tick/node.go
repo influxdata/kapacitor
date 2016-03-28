@@ -5,39 +5,69 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/influxdata/influxdb/influxql"
 )
 
 type unboundFunc func(obj interface{}) (interface{}, error)
 
-type Node interface {
-	String() string
+type Position interface {
 	Position() int // byte position of start of node in full original input string
+	Line() int
+	Char() int
 }
 
-type pos int
+type Node interface {
+	Position
+	String() string
+	Format(buf *bytes.Buffer, indent string, onNewLine bool)
+}
 
-func (p pos) Position() int {
-	return int(p)
+func writeIndent(buf *bytes.Buffer, indent string, onNewLine bool) {
+	if onNewLine {
+		buf.WriteString(indent)
+	}
+}
+
+type position struct {
+	pos  int
+	line int
+	char int
+}
+
+func (p position) Position() int {
+	return p.pos
+}
+func (p position) Line() int {
+	return p.line
+}
+func (p position) Char() int {
+	return p.char
+}
+func (p position) String() string {
+	return fmt.Sprintf("%dl%dc%d", p.pos, p.line, p.char)
 }
 
 // numberNode holds a number: signed or unsigned integer or float.
 // The value is parsed and stored under all the types that can represent the value.
 // This simulates in a small amount of code the behavior of Go's ideal constants.
 type NumberNode struct {
-	pos
+	position
 	IsInt   bool    // Number has an integral value.
 	IsFloat bool    // Number has a floating-point value.
 	Int64   int64   // The integer value.
 	Float64 float64 // The floating-point value.
+	Comment Node
 }
 
 // create a new number from a text string
-func newNumber(p int, text string) (*NumberNode, error) {
+func newNumber(p position, text string, c Node) (*NumberNode, error) {
 	n := &NumberNode{
-		pos: pos(p),
+		position: p,
+		Comment:  c,
 	}
 	i, err := strconv.ParseInt(text, 10, 64)
 	if err == nil {
@@ -64,23 +94,42 @@ func newNumber(p int, text string) (*NumberNode, error) {
 
 func (n *NumberNode) String() string {
 	if n.IsInt {
-		return fmt.Sprintf("NumberNode@%d{%di}", n.pos, n.Int64)
+		return fmt.Sprintf("NumberNode@%v{%di}%v", n.position, n.Int64, n.Comment)
 	}
-	return fmt.Sprintf("NumberNode@%d{%f}", n.pos, n.Float64)
+	return fmt.Sprintf("NumberNode@%v{%f}%v", n.position, n.Float64, n.Comment)
+}
+
+func (n *NumberNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
+	if n.Comment != nil {
+		n.Comment.Format(buf, indent, onNewLine)
+		onNewLine = true
+	}
+	writeIndent(buf, indent, onNewLine)
+	if n.IsInt {
+		buf.WriteString(strconv.FormatInt(n.Int64, 10))
+	} else {
+		s := strconv.FormatFloat(n.Float64, 'f', -1, 64)
+		if strings.IndexRune(s, '.') == -1 {
+			s += ".0"
+		}
+		buf.WriteString(s)
+	}
 }
 
 // durationNode holds a number: signed or unsigned integer or float.
 // The value is parsed and stored under all the types that can represent the value.
 // This simulates in a small amount of code the behavior of Go's ideal constants.
 type DurationNode struct {
-	pos
-	Dur time.Duration //the duration
+	position
+	Dur     time.Duration //the duration
+	Comment Node
 }
 
 // create a new number from a text string
-func newDur(p int, text string) (*DurationNode, error) {
+func newDur(p position, text string, c Node) (*DurationNode, error) {
 	n := &DurationNode{
-		pos: pos(p),
+		position: p,
+		Comment:  c,
 	}
 	d, err := influxql.ParseDuration(text)
 	if err != nil {
@@ -90,95 +139,241 @@ func newDur(p int, text string) (*DurationNode, error) {
 	return n, nil
 }
 
-func (d *DurationNode) String() string {
-	return fmt.Sprintf("DurationNode@%d{%v}", d.pos, d.Dur)
+func (n *DurationNode) String() string {
+	return fmt.Sprintf("DurationNode@%v{%v}%v", n.position, n.Dur, n.Comment)
+}
+
+func (n *DurationNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
+	if n.Comment != nil {
+		n.Comment.Format(buf, indent, onNewLine)
+		onNewLine = true
+	}
+	writeIndent(buf, indent, onNewLine)
+	buf.WriteString(influxql.FormatDuration(n.Dur))
 }
 
 // boolNode holds one argument and an operator.
 type BoolNode struct {
-	pos
-	Bool bool
+	position
+	Bool    bool
+	Comment Node
 }
 
-func newBool(p int, text string) (*BoolNode, error) {
+func newBool(p position, text string, c Node) (*BoolNode, error) {
 	b, err := strconv.ParseBool(text)
 	if err != nil {
 		return nil, err
 	}
 	return &BoolNode{
-		pos:  pos(p),
-		Bool: b,
+		position: p,
+		Bool:     b,
+		Comment:  c,
 	}, nil
 }
 
-func (b *BoolNode) String() string {
-	return fmt.Sprintf("BoolNode@%d{%v}", b.pos, b.Bool)
+func (n *BoolNode) String() string {
+	return fmt.Sprintf("BoolNode@%v{%v}%v", n.position, n.Bool, n.Comment)
+}
+func (n *BoolNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
+	if n.Comment != nil {
+		n.Comment.Format(buf, indent, onNewLine)
+		onNewLine = true
+	}
+	writeIndent(buf, indent, onNewLine)
+	if n.Bool {
+		buf.WriteString(KW_True)
+	} else {
+		buf.WriteString(KW_False)
+	}
 }
 
 // unaryNode holds one argument and an operator.
 type UnaryNode struct {
-	pos
+	position
 	Node     Node
 	Operator tokenType
+	Comment  Node
 }
 
-func newUnary(operator token, n Node) *UnaryNode {
+func newUnary(p position, op tokenType, n Node, c Node) *UnaryNode {
 	return &UnaryNode{
-		pos:      pos(operator.pos),
+		position: p,
 		Node:     n,
-		Operator: operator.typ,
+		Operator: op,
+		Comment:  c,
 	}
 }
 
-func (u *UnaryNode) String() string {
-	return fmt.Sprintf("UnaryNode@%d{%s %s}", u.pos, u.Operator, u.Node)
+func (n *UnaryNode) String() string {
+	return fmt.Sprintf("UnaryNode@%v{%s %s}%v", n.position, n.Operator, n.Node, n.Comment)
+}
+
+func (n *UnaryNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
+	if n.Comment != nil {
+		n.Comment.Format(buf, indent, onNewLine)
+		onNewLine = true
+	}
+	writeIndent(buf, indent, onNewLine)
+	buf.WriteString(n.Operator.String())
+	n.Node.Format(buf, indent, false)
 }
 
 // binaryNode holds two arguments and an operator.
 type BinaryNode struct {
-	pos
-	Left     Node
-	Right    Node
-	Operator tokenType
+	position
+	Left      Node
+	Right     Node
+	Operator  tokenType
+	Comment   Node
+	Parens    bool
+	MultiLine bool
 }
 
-func newBinary(operator token, left, right Node) *BinaryNode {
+func newBinary(p position, op tokenType, left, right Node, multiLine bool, comment Node) *BinaryNode {
 	return &BinaryNode{
-		pos:      pos(operator.pos),
-		Left:     left,
-		Right:    right,
-		Operator: operator.typ,
+		position:  p,
+		Left:      left,
+		Right:     right,
+		Operator:  op,
+		MultiLine: multiLine,
+		Comment:   comment,
 	}
 }
 
-func (b *BinaryNode) String() string {
-	return fmt.Sprintf("BinaryNode@%d{%v %v %v}", b.pos, b.Left, b.Operator, b.Right)
+func (n *BinaryNode) String() string {
+	return fmt.Sprintf("BinaryNode@%v{p:%v m:%v %v %v %v}%v", n.position, n.Parens, n.MultiLine, n.Left, n.Operator, n.Right, n.Comment)
+}
+
+func (n *BinaryNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
+	if n.Comment != nil {
+		n.Comment.Format(buf, indent, onNewLine)
+		onNewLine = true
+	}
+	writeIndent(buf, indent, onNewLine)
+	if n.Parens {
+		buf.WriteByte('(')
+		indent += indentStep
+	}
+	n.Left.Format(buf, indent, false)
+	buf.WriteByte(' ')
+	buf.WriteString(n.Operator.String())
+	if n.MultiLine {
+		buf.WriteByte('\n')
+	} else {
+		buf.WriteByte(' ')
+	}
+	n.Right.Format(buf, indent, n.MultiLine)
+	if n.Parens {
+		buf.WriteByte(')')
+	}
+}
+
+type DeclarationNode struct {
+	position
+	Left    *IdentifierNode
+	Right   Node
+	Comment Node
+}
+
+func newDecl(p position, left *IdentifierNode, right Node, comment Node) *DeclarationNode {
+	return &DeclarationNode{
+		position: p,
+		Left:     left,
+		Right:    right,
+		Comment:  comment,
+	}
+}
+
+func (n *DeclarationNode) String() string {
+	return fmt.Sprintf("DeclarationNode@%v{%v %v}%v", n.position, n.Left, n.Right, n.Comment)
+}
+
+func (n *DeclarationNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
+	if n.Comment != nil {
+		n.Comment.Format(buf, indent, onNewLine)
+	}
+	buf.WriteString(KW_Var)
+	buf.WriteByte(' ')
+	n.Left.Format(buf, indent, false)
+	buf.WriteByte(' ')
+	buf.WriteString(TokenAsgn.String())
+	buf.WriteByte(' ')
+	n.Right.Format(buf, indent, false)
+}
+
+type ChainNode struct {
+	position
+	Left     Node
+	Right    Node
+	Operator tokenType
+	Comment  Node
+}
+
+func newChain(p position, op tokenType, left, right Node, comment Node) *ChainNode {
+	return &ChainNode{
+		position: p,
+		Left:     left,
+		Right:    right,
+		Operator: op,
+		Comment:  comment,
+	}
+}
+
+func (n *ChainNode) String() string {
+	return fmt.Sprintf("ChainNode@%v{%v %v %v}%v", n.position, n.Left, n.Operator, n.Right, n.Comment)
+}
+
+func (n *ChainNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
+	n.Left.Format(buf, indent, onNewLine)
+	buf.WriteByte('\n')
+	indent = indent + indentStep
+	if n.Operator == TokenDot {
+		indent = indent + indentStep
+	}
+	if n.Comment != nil {
+		n.Comment.Format(buf, indent, true)
+	}
+	buf.WriteString(indent)
+	buf.WriteString(n.Operator.String())
+	n.Right.Format(buf, indent, false)
 }
 
 //Holds the textual representation of an identifier
 type IdentifierNode struct {
-	pos
-	Ident string // The identifier
+	position
+	Ident   string // The identifier
+	Comment Node
 }
 
-func newIdent(p int, ident string) *IdentifierNode {
+func newIdent(p position, ident string, c Node) *IdentifierNode {
 	return &IdentifierNode{
-		pos:   pos(p),
-		Ident: ident,
+		position: p,
+		Ident:    ident,
+		Comment:  c,
 	}
 }
 
-func (i *IdentifierNode) String() string {
-	return fmt.Sprintf("IdentifierNode@%d{%s}", i.pos, i.Ident)
+func (n *IdentifierNode) String() string {
+	return fmt.Sprintf("IdentifierNode@%v{%s}%v", n.position, n.Ident, n.Comment)
+}
+
+func (n *IdentifierNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
+	if n.Comment != nil {
+		n.Comment.Format(buf, indent, onNewLine)
+		onNewLine = true
+	}
+	writeIndent(buf, indent, onNewLine)
+	buf.WriteString(n.Ident)
 }
 
 //Holds the textual representation of an identifier
 type ReferenceNode struct {
-	pos
+	position
 	Reference string // The field reference
+	Comment   Node
 }
 
-func newReference(p int, txt string) *ReferenceNode {
+func newReference(p position, txt string, c Node) *ReferenceNode {
 	// Remove leading and trailing quotes
 	literal := txt[1 : len(txt)-1]
 	// Unescape quotes
@@ -196,27 +391,48 @@ func newReference(p int, txt string) *ReferenceNode {
 	literal = buf.String()
 
 	return &ReferenceNode{
-		pos:       pos(p),
+		position:  p,
 		Reference: literal,
+		Comment:   c,
 	}
 }
 
-func (r *ReferenceNode) String() string {
-	return fmt.Sprintf("ReferenceNode@%d{%s}", r.pos, r.Reference)
+func (n *ReferenceNode) String() string {
+	return fmt.Sprintf("ReferenceNode@%v{%s}%v", n.position, n.Reference, n.Comment)
+}
+
+func (n *ReferenceNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
+	if n.Comment != nil {
+		n.Comment.Format(buf, indent, onNewLine)
+		onNewLine = true
+	}
+	writeIndent(buf, indent, onNewLine)
+	buf.WriteByte('"')
+	for _, c := range n.Reference {
+		if c == '"' {
+			buf.WriteByte('\\')
+		}
+		buf.WriteRune(c)
+	}
+	buf.WriteByte('"')
 }
 
 //Holds the textual representation of a string literal
 type StringNode struct {
-	pos
-	Literal string // The string literal
+	position
+	Literal      string // The string literal
+	TripleQuotes bool
+	Comment      Node
 }
 
-func newString(p int, txt string) *StringNode {
+func newString(p position, txt string, c Node) *StringNode {
 
+	tripleQuotes := false
 	// Remove leading and trailing quotes
 	var literal string
 	if len(txt) >= 6 && txt[0:3] == "'''" {
 		literal = txt[3 : len(txt)-3]
+		tripleQuotes = true
 	} else {
 		literal = txt[1 : len(txt)-1]
 		quote := txt[0]
@@ -236,22 +452,53 @@ func newString(p int, txt string) *StringNode {
 	}
 
 	return &StringNode{
-		pos:     pos(p),
-		Literal: literal,
+		position:     p,
+		Literal:      literal,
+		TripleQuotes: tripleQuotes,
+		Comment:      c,
 	}
 }
 
-func (s *StringNode) String() string {
-	return fmt.Sprintf("StringNode@%d{%s}", s.pos, s.Literal)
+func (n *StringNode) String() string {
+	return fmt.Sprintf("StringNode@%v{%s}%v", n.position, n.Literal, n.Comment)
+}
+
+func (n *StringNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
+	if n.Comment != nil {
+		n.Comment.Format(buf, indent, onNewLine)
+		onNewLine = true
+	}
+	writeIndent(buf, indent, onNewLine)
+	if n.TripleQuotes {
+		buf.WriteString("'''")
+	} else {
+		buf.WriteByte('\'')
+	}
+	if n.TripleQuotes {
+		buf.WriteString(n.Literal)
+	} else {
+		for _, c := range n.Literal {
+			if c == '\'' {
+				buf.WriteByte('\\')
+			}
+			buf.WriteRune(c)
+		}
+	}
+	if n.TripleQuotes {
+		buf.WriteString("'''")
+	} else {
+		buf.WriteByte('\'')
+	}
 }
 
 //Holds the textual representation of a regex literal
 type RegexNode struct {
-	pos
-	Regex *regexp.Regexp
+	position
+	Regex   *regexp.Regexp
+	Comment Node
 }
 
-func newRegex(p int, txt string) (*RegexNode, error) {
+func newRegex(p position, txt string, c Node) (*RegexNode, error) {
 
 	// Remove leading and trailing quotes
 	literal := txt[1 : len(txt)-1]
@@ -275,82 +522,219 @@ func newRegex(p int, txt string) (*RegexNode, error) {
 	}
 
 	return &RegexNode{
-		pos:   pos(p),
-		Regex: r,
+		position: p,
+		Regex:    r,
+		Comment:  c,
 	}, nil
 }
 
-func (s *RegexNode) String() string {
-	return fmt.Sprintf("RegexNode@%d{%v}", s.pos, s.Regex)
+func (n *RegexNode) String() string {
+	return fmt.Sprintf("RegexNode@%v{%v}%v", n.position, n.Regex, n.Comment)
+}
+
+func (n *RegexNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
+	if n.Comment != nil {
+		n.Comment.Format(buf, indent, onNewLine)
+		onNewLine = true
+	}
+	writeIndent(buf, indent, onNewLine)
+	buf.WriteByte('/')
+	buf.WriteString(n.Regex.String())
+	buf.WriteByte('/')
 }
 
 // Represents a standalone '*' token.
 type StarNode struct {
-	pos
+	position
+	Comment Node
 }
 
-func newStar(p int) *StarNode {
+func newStar(p position, c Node) *StarNode {
 	return &StarNode{
-		pos: pos(p),
+		position: p,
+		Comment:  c,
 	}
 }
 
-func (s *StarNode) String() string {
-	return fmt.Sprintf("StarNode@%d{*}", s.pos)
+func (n *StarNode) String() string {
+	return fmt.Sprintf("StarNode@%v{*}%v", n.position, n.Comment)
+}
+
+func (n *StarNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
+	if n.Comment != nil {
+		n.Comment.Format(buf, indent, onNewLine)
+		onNewLine = true
+	}
+	writeIndent(buf, indent, onNewLine)
+	buf.WriteByte('*')
+}
+
+type funcType int
+
+const (
+	globalFunc funcType = iota
+	chainFunc
+	propertyFunc
+)
+
+func (ft funcType) String() string {
+	switch ft {
+	case globalFunc:
+		return "global"
+	case chainFunc:
+		return "chain"
+	case propertyFunc:
+		return "property"
+	default:
+		return "unknown"
+	}
 }
 
 //Holds the a function call with its args
 type FunctionNode struct {
-	pos
-	Func string // The identifier
-	Args []Node
+	position
+	Type      funcType
+	Func      string // The identifier
+	Args      []Node
+	Comment   Node
+	MultiLine bool
 }
 
-func newFunc(p int, ident string, args []Node) *FunctionNode {
+func newFunc(p position, ft funcType, ident string, args []Node, multi bool, c Node) *FunctionNode {
 	return &FunctionNode{
-		pos:  pos(p),
-		Func: ident,
-		Args: args,
+		position:  p,
+		Type:      ft,
+		Func:      ident,
+		Args:      args,
+		Comment:   c,
+		MultiLine: multi,
 	}
 }
 
-func (f *FunctionNode) String() string {
-	return fmt.Sprintf("FunctionNode@%d{%s %v}", f.pos, f.Func, f.Args)
+func (n *FunctionNode) String() string {
+	return fmt.Sprintf("FunctionNode@%v{%v %s %v}%v", n.position, n.Type, n.Func, n.Args, n.Comment)
+}
+
+func (n *FunctionNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
+	if n.Comment != nil {
+		n.Comment.Format(buf, indent, onNewLine)
+		onNewLine = true
+	}
+	writeIndent(buf, indent, onNewLine)
+	buf.WriteString(n.Func)
+	buf.WriteByte('(')
+	argIndent := indent + indentStep
+	for i, arg := range n.Args {
+		if i != 0 {
+			buf.WriteByte(',')
+			if !n.MultiLine {
+				buf.WriteByte(' ')
+			}
+		}
+		if n.MultiLine {
+			buf.WriteByte('\n')
+		}
+		arg.Format(buf, argIndent, n.MultiLine)
+	}
+
+	if n.MultiLine && len(n.Args) > 0 {
+		buf.WriteByte('\n')
+		buf.WriteString(indent)
+	}
+	buf.WriteByte(')')
 }
 
 // Represents the begining of a lambda expression
 type LambdaNode struct {
-	pos
-	Node Node
+	position
+	Node    Node
+	Comment Node
 }
 
-func newLambda(p int, node Node) *LambdaNode {
+func newLambda(p position, node Node, c Node) *LambdaNode {
 	return &LambdaNode{
-		pos:  pos(p),
-		Node: node,
+		position: p,
+		Node:     node,
+		Comment:  c,
 	}
 }
 
-func (l *LambdaNode) String() string {
-	return fmt.Sprintf("LambdaNode@%d{%v}", l.pos, l.Node)
+func (n *LambdaNode) String() string {
+	return fmt.Sprintf("LambdaNode@%v{%v}%v", n.position, n.Node, n.Comment)
+}
+
+func (n *LambdaNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
+	if n.Comment != nil {
+		n.Comment.Format(buf, indent, onNewLine)
+		onNewLine = true
+	}
+	writeIndent(buf, indent, onNewLine)
+	buf.WriteString("lambda: ")
+	n.Node.Format(buf, indent, false)
 }
 
 //Holds a function call with its args
 type ListNode struct {
-	pos
+	position
 	Nodes []Node
 }
 
-func newList(p int) *ListNode {
+func newList(p position) *ListNode {
 	return &ListNode{
-		pos: pos(p),
+		position: p,
 	}
 }
 
-func (l *ListNode) Add(n Node) {
-	l.Nodes = append(l.Nodes, n)
+func (n *ListNode) Add(node Node) {
+	n.Nodes = append(n.Nodes, node)
 }
 
-func (l *ListNode) String() string {
-	return fmt.Sprintf("ListNode@%d{%v}", l.pos, l.Nodes)
+func (n *ListNode) String() string {
+	return fmt.Sprintf("ListNode@%v{%v}", n.position, n.Nodes)
+}
+
+func (n *ListNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
+	for i, node := range n.Nodes {
+		if i != 0 {
+			buf.WriteByte('\n')
+		}
+		node.Format(buf, indent, true)
+		buf.WriteByte('\n')
+	}
+}
+
+// Hold the contents of a comment
+type CommentNode struct {
+	position
+	Comments []string
+}
+
+func newComment(p position, comments []string) *CommentNode {
+	for i := range comments {
+		comments[i] = strings.TrimSpace(comments[i])
+		comments[i] = strings.TrimLeftFunc(comments[i][2:], unicode.IsSpace)
+	}
+	return &CommentNode{
+		position: p,
+		Comments: comments,
+	}
+}
+
+func (n *CommentNode) String() string {
+	return fmt.Sprintf("CommentNode@%v{%v}", n.position, n.Comments)
+}
+
+func (n *CommentNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
+	if !onNewLine {
+		buf.WriteByte('\n')
+	}
+	for _, comment := range n.Comments {
+		buf.WriteString(indent)
+		buf.WriteString("//")
+		if len(comment) > 0 {
+			buf.WriteByte(' ')
+			buf.WriteString(comment)
+		}
+		buf.WriteByte('\n')
+	}
 }

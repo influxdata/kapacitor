@@ -13,10 +13,10 @@ import (
 //
 // Example:
 //     var errors = batch
-//                      .query('SELECT value from errors')
+//                      |query('SELECT value from errors')
 //                      ...
 //     var views = batch
-//                      .query('SELECT value from views')
+//                      |query('SELECT value from views')
 //                      ...
 //
 type SourceBatchNode struct {
@@ -57,14 +57,14 @@ func (b *SourceBatchNode) dot(buf *bytes.Buffer) {
 //
 // Example:
 // batch
-//     .query('''
+//     |query('''
 //         SELECT mean("value")
 //         FROM "telegraf"."default".cpu_usage_idle
 //         WHERE "host" = 'serverA'
 //     ''')
-//     .period(1m)
-//     .every(20s)
-//     .groupBy(time(10s), 'cpu')
+//         .period(1m)
+//         .every(20s)
+//         .groupBy(time(10s), 'cpu')
 //     ...
 //
 // In the above example InfluxDB is queried every 20 seconds; the window of time returned
@@ -103,7 +103,7 @@ type BatchNode struct {
 
 	// The list of dimensions for the group-by clause.
 	//tick:ignore
-	Dimensions []interface{}
+	Dimensions []interface{} `tick:"GroupBy"`
 
 	// Fill the data.
 	// Options are:
@@ -134,7 +134,8 @@ func newBatchNode() *BatchNode {
 //
 // Example:
 //    batch
-//        .groupBy(time(10s), 'tag1', 'tag2'))
+//        |query(...)
+//            .groupBy(time(10s), 'tag1', 'tag2'))
 //
 // tick:property
 func (b *BatchNode) GroupBy(d ...interface{}) *BatchNode {

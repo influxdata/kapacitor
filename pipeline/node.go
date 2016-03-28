@@ -203,45 +203,55 @@ const intervalMarker = "INTERVAL"
 // - Expressions -- optional list of expressions to also evaluate. Useful for time of day alerting.
 //
 // Example:
-//    var data = stream.from()...
+//    var data = stream
+//        |from()...
 //    // Trigger critical alert if the throughput drops below 100 points per 10s and checked every 10s.
-//    data.deadman(100.0, 10s)
+//    data
+//        |deadman(100.0, 10s)
 //    //Do normal processing of data
-//    data....
+//    data...
 //
 // The above is equivalent to this
 // Example:
-//    var data = stream.from()...
+//    var data = stream
+//        |from()...
 //    // Trigger critical alert if the throughput drops below 100 points per 10s and checked every 10s.
-//    data.stats(10s)
-//          .derivative('collected')
-//              .unit(10s)
-//              .nonNegative()
-//          .alert()
-//              .id('node \'stream0\' in task \'{{ .TaskName }}\'')
-//              .message('{{ .ID }} is {{ if eq .Level "OK" }}alive{{ else }}dead{{ end }}: {{ index .Fields "collected" | printf "%0.3f" }} points/10s.')
-//              .crit(lamdba: "collected" <= 100.0)
+//    data
+//        |stats(10s)
+//        |derivative('collected')
+//            .unit(10s)
+//            .nonNegative()
+//        |alert()
+//            .id('node \'stream0\' in task \'{{ .TaskName }}\'')
+//            .message('{{ .ID }} is {{ if eq .Level "OK" }}alive{{ else }}dead{{ end }}: {{ index .Fields "collected" | printf "%0.3f" }} points/10s.')
+//            .crit(lamdba: "collected" <= 100.0)
 //    //Do normal processing of data
-//    data....
+//    data...
 //
 // The `id` and `message` alert properties can be configured globally via the 'deadman' configuration section.
 //
 // Since the AlertNode is the last piece it can be further modified as normal.
 // Example:
-//    var data = stream.from()...
+//    var data = stream
+//        |from()...
 //    // Trigger critical alert if the throughput drops below 100 points per 1s and checked every 10s.
-//    data.deadman(100.0, 10s).slack().channel('#dead_tasks')
+//    data
+//        |deadman(100.0, 10s)
+//            .slack()
+//            .channel('#dead_tasks')
 //    //Do normal processing of data
-//    data....
+//    data...
 //
 // You can specify additional lambda expressions to further constrain when the deadman's switch is triggered.
 // Example:
-//    var data = stream.from()...
+//    var data = stream
+//        |from()...
 //    // Trigger critical alert if the throughput drops below 100 points per 10s and checked every 10s.
 //    // Only trigger the alert if the time of day is between 8am-5pm.
-//    data.deadman(100.0, 10s, lambda: hour("time") >= 8 AND hour("time") <= 17)
+//    data
+//        |deadman(100.0, 10s, lambda: hour("time") >= 8 AND hour("time") <= 17)
 //    //Do normal processing of data
-//    data....
+//    data...
 //
 func (n *node) Deadman(threshold float64, interval time.Duration, expr ...tick.Node) *AlertNode {
 	dn := n.Stats(interval).
@@ -351,7 +361,7 @@ func (n *chainnode) Eval(expressions ...tick.Node) *EvalNode {
 //
 // Can pass literal * to group by all dimensions.
 // Example:
-//    .groupBy(*)
+//    |groupBy(*)
 //
 func (n *chainnode) GroupBy(tag ...interface{}) *GroupByNode {
 	g := newGroupByNode(n.provides, tag)

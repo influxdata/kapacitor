@@ -20,11 +20,14 @@ import (
 //
 // Example:
 //    var errors = stream
-//                   .from().measurement('errors')
+//        |from()
+//            .measurement('errors')
 //    var requests = stream
-//                   .from().measurement('requests')
+//        |from()
+//            .measurement('requests')
 //    // Join the errors and requests streams
-//    errors.join(requests)
+//    errors
+//        |join(requests)
 //            // Provide prefix names for the fields of the data points.
 //            .as('errors', 'requests')
 //            // points that are within 1 second are considered the same time.
@@ -35,7 +38,7 @@ import (
 //            .streamName('error_rate')
 //        // Both the "value" fields from each parent have been prefixed
 //        // with the respective names 'errors' and 'requests'.
-//        .eval(lambda: "errors.value" / "requests.value"))
+//        |eval(lambda: "errors.value" / "requests.value"))
 //           .as('rate')
 //        ...
 //
@@ -48,11 +51,11 @@ type JoinNode struct {
 	//       Names[1] corresponds to the left  parent
 	//       Names[0] corresponds to the right parent
 	// tick:ignore
-	Names []string
+	Names []string `tick:"As"`
 
 	// The dimensions on which to join
 	// tick:ignore
-	Dimensions []string
+	Dimensions []string `tick:"On"`
 
 	// The name of this new joined data stream.
 	// If empty the name of the left parent is used.
@@ -105,14 +108,19 @@ func (j *JoinNode) As(names ...string) *JoinNode {
 // You want to calculate the percentage of the total building power consumed by each floor.
 //
 // Example:
-//    var buidling = stream.from().measurement('building_power')
-//                         .groupBy('building')
-//    var floor = stream.from().measurement('floor_power')
-//                         .groupBy('building', 'floor')
-//    building.join(floor)
-//                .as('building', 'floor')
-//                .on('building')
-//            .eval(lambda: "floor.value" / "building.value")
+//    var buidling = stream
+//        |from()
+//            .measurement('building_power')
+//            .groupBy('building')
+//    var floor = stream
+//        |from()
+//            .measurement('floor_power')
+//            .groupBy('building', 'floor')
+//    building
+//        |join(floor)
+//            .as('building', 'floor')
+//            .on('building')
+//        |eval(lambda: "floor.value" / "building.value")
 //            ... // Values here are grouped by 'building' and 'floor'
 //
 // tick:property

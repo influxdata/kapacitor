@@ -69,7 +69,10 @@ func TestServer_DefineTask(t *testing.T) {
 			RetentionPolicy: "default",
 		},
 	}
-	tick := "stream.from().measurement('test')"
+	tick := `stream
+    |from()
+        .measurement('test')
+`
 	r, err := s.DefineTask(name, ttype, tick, dbrps)
 	if err != nil {
 		t.Fatal(err)
@@ -123,7 +126,10 @@ func TestServer_EnableTask(t *testing.T) {
 			RetentionPolicy: "default",
 		},
 	}
-	tick := "stream.from().measurement('test')"
+	tick := `stream
+    |from()
+        .measurement('test')
+`
 	r, err := s.DefineTask(name, ttype, tick, dbrps)
 	if err != nil {
 		t.Fatal(err)
@@ -192,7 +198,10 @@ func TestServer_DisableTask(t *testing.T) {
 			RetentionPolicy: "default",
 		},
 	}
-	tick := "stream.from().measurement('test')"
+	tick := `stream
+    |from()
+        .measurement('test')
+`
 	r, err := s.DefineTask(name, ttype, tick, dbrps)
 	if err != nil {
 		t.Fatal(err)
@@ -262,7 +271,10 @@ func TestServer_DeleteTask(t *testing.T) {
 			RetentionPolicy: "default",
 		},
 	}
-	tick := "stream.from().measurement('test')"
+	tick := `stream
+    |from()
+        .measurement('test')
+`
 	r, err := s.DefineTask(name, ttype, tick, dbrps)
 	if err != nil {
 		t.Fatal(err)
@@ -288,7 +300,10 @@ func TestServer_ListTasks(t *testing.T) {
 	count := 10
 
 	ttype := "stream"
-	tick := "stream.from().measurement('test')"
+	tick := `stream
+    |from()
+        .measurement('test')
+`
 	dbrps := []kapacitor.DBRP{
 		{
 			Database:        "mydb",
@@ -356,14 +371,14 @@ func TestServer_StreamTask(t *testing.T) {
 		Database:        "mydb",
 		RetentionPolicy: "myrp",
 	}}
-	tick := `
-stream
-	.from().measurement('test')
-	.window()
-		.period(10s)
-		.every(10s)
-	.count('value')
-	.httpOut('count')
+	tick := `stream
+    |from()
+        .measurement('test')
+    |window()
+        .period(10s)
+        .every(10s)
+    |count('value')
+    |httpOut('count')
 `
 
 	r, err := s.DefineTask(name, ttype, tick, dbrps)
@@ -458,13 +473,12 @@ func TestServer_BatchTask(t *testing.T) {
 		Database:        "mydb",
 		RetentionPolicy: "myrp",
 	}}
-	tick := `
-batch
-	.query(' SELECT value from mydb.myrp.cpu ')
-		.period(5ms)
-		.every(5ms)
-	.count('value')
-	.httpOut('count')
+	tick := `batch
+    |query(' SELECT value from mydb.myrp.cpu ')
+        .period(5ms)
+        .every(5ms)
+    |count('value')
+    |httpOut('count')
 `
 
 	r, err := s.DefineTask(name, ttype, tick, dbrps)
@@ -519,13 +533,12 @@ func TestServer_InvalidBatchTask(t *testing.T) {
 		Database:        "mydb",
 		RetentionPolicy: "myrp",
 	}}
-	tick := `
-batch
-	.query(' SELECT value from unknowndb.unknownrp.cpu ')
-		.period(5ms)
-		.every(5ms)
-	.count('value')
-	.httpOut('count')
+	tick := `batch
+    |query(' SELECT value from unknowndb.unknownrp.cpu ')
+        .period(5ms)
+        .every(5ms)
+    |count('value')
+    |httpOut('count')
 `
 
 	r, err := s.DefineTask(name, ttype, tick, dbrps)
@@ -564,18 +577,18 @@ func TestServer_RecordReplayStream(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(tmpDir)
-	tick := `
-stream
-	.from().measurement('test')
-	.window()
-		.period(10s)
-		.every(10s)
-	.count('value')
-	.alert()
-		.id('test-count')
-		.message('{{ .ID }} got: {{ index .Fields "count" }}')
-		.crit(lambda: TRUE)
-		.log('` + tmpDir + `/alert.log')
+	tick := `stream
+    |from()
+        .measurement('test')
+    |window()
+        .period(10s)
+        .every(10s)
+    |count('value')
+    |alert()
+        .id('test-count')
+        .message('{{ .ID }} got: {{ index .Fields "count" }}')
+        .crit(lambda: TRUE)
+        .log('` + tmpDir + `/alert.log')
 `
 
 	r, err := s.DefineTask(name, ttype, tick, dbrps)
@@ -710,16 +723,15 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(tmpDir)
-	tick := `
-batch
-	.query('SELECT value from mydb.myrp.cpu')
-		.period(2s)
-		.every(2s)
-	.alert()
-		.id('test-batch')
-		.message('{{ .ID }} got: {{ index .Fields "value" }}')
-		.crit(lambda: "value" > 2.0)
-		.log('` + tmpDir + `/alert.log')
+	tick := `batch
+    |query('SELECT value from mydb.myrp.cpu')
+        .period(2s)
+        .every(2s)
+    |alert()
+        .id('test-batch')
+        .message('{{ .ID }} got: {{ index .Fields "value" }}')
+        .crit(lambda: "value" > 2.0)
+        .log('` + tmpDir + `/alert.log')
 `
 
 	r, err := s.DefineTask(name, ttype, tick, dbrps)
@@ -902,19 +914,19 @@ func testStreamAgent(t *testing.T, c *run.Config) {
 		Database:        "mydb",
 		RetentionPolicy: "myrp",
 	}}
-	tick := `
-stream
-	.from().measurement('test')
-	.groupBy('group')
-	.movingAvg()
-		.field('value')
-		.size(10)
-		.as('mean')
-	.window()
-		.period(11s)
-		.every(11s)
-	.last('mean').as('mean')
-	.httpOut('moving_avg')
+	tick := `stream
+    |from()
+        .measurement('test')
+        .groupBy('group')
+    |movingAvg()
+        .field('value')
+        .size(10)
+        .as('mean')
+    |window()
+        .period(11s)
+        .every(11s)
+    |last('mean').as('mean')
+    |httpOut('moving_avg')
 `
 
 	r, err := s.DefineTask(name, ttype, tick, dbrps)
@@ -1124,17 +1136,16 @@ func testBatchAgent(t *testing.T, c *run.Config) {
 		Database:        "mydb",
 		RetentionPolicy: "myrp",
 	}}
-	tick := `
-batch
-	.query(' SELECT value from mydb.myrp.cpu ')
-		.period(5ms)
-		.every(5ms)
-	.groupBy('count')
-	.outliers()
-		.field('value')
-		.scale(1.5)
-	.count('value')
-	.httpOut('count')
+	tick := `batch
+    |query(' SELECT value from mydb.myrp.cpu ')
+        .period(5ms)
+        .every(5ms)
+        .groupBy('count')
+    |outliers()
+        .field('value')
+        .scale(1.5)
+    |count('value')
+    |httpOut('count')
 `
 
 	r, err := s.DefineTask(name, ttype, tick, dbrps)

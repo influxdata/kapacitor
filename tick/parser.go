@@ -29,6 +29,10 @@ func parse(text string) (Node, error) {
 	return p.Root, nil
 }
 
+func (p *parser) hasNewLine(start, end int) bool {
+	return strings.IndexRune(p.Text[start:end], '\n') != -1
+}
+
 // --------------------
 // Parsing methods
 //
@@ -112,6 +116,15 @@ func (p *parser) unexpected(tok token, expected ...tokenType) {
 	p.errorf("unexpected %s line %d char %d in \"%s\". expected: %s", tokStr, line, char, p.Text[start:stop], expectedStr)
 }
 
+func (p *parser) position(pos int) position {
+	line, char := p.lex.lineNumber(pos)
+	return position{
+		pos:  pos,
+		line: line,
+		char: char,
+	}
+}
+
 // recover is the handler that turns panics into returns from the top level of Parse.
 func (p *parser) recover(errp *error) {
 	e := recover()
@@ -155,93 +168,114 @@ func (p *parser) parse() {
 
 //parse a complete program
 func (p *parser) program() Node {
-	l := newList(p.peek().pos)
+	l := newList(p.position(p.peek().pos))
+	var s, prevc, nextc Node
 	for {
 		switch p.peek().typ {
 		case TokenEOF:
+			if prevc != nil {
+				l.Add(prevc)
+			}
 			return l
 		default:
-			s := p.statement()
+			s, nextc = p.statement(prevc)
 			l.Add(s)
 		}
+		prevc = nextc
 	}
 }
 
 //parse a statement
-func (p *parser) statement() Node {
-	var n Node
-	if p.peek().typ == TokenVar {
-		n = p.declaration()
-	} else {
-		n = p.expression()
+func (p *parser) statement(c Node) (Node, Node) {
+	if c == nil {
+		c = p.comment()
 	}
-	return n
+	switch t := p.peek().typ; t {
+	case TokenVar:
+		return p.declaration(c)
+	default:
+		return p.expression(c)
+	}
 }
 
 //parse a declaration statement
-func (p *parser) declaration() Node {
+func (p *parser) declaration(c Node) (Node, Node) {
+	if c == nil {
+		c = p.comment()
+	}
 	v := p.vr()
 	op := p.expect(TokenAsgn)
-	b := p.expression()
-	return newBinary(op, v, b)
+	b, extra := p.expression(nil)
+	return newDecl(p.position(op.pos), v, b, c), extra
 }
 
 //parse a 'var ident' expression
-func (p *parser) vr() Node {
+func (p *parser) vr() *IdentifierNode {
 	p.expect(TokenVar)
 	ident := p.expect(TokenIdent)
-	return newIdent(ident.pos, ident.val)
+	return newIdent(p.position(ident.pos), ident.val, nil)
 }
 
 //parse an expression
-func (p *parser) expression() Node {
+func (p *parser) expression(c Node) (Node, Node) {
+	if c == nil {
+		c = p.comment()
+	}
 	switch p.peek().typ {
 	case TokenIdent:
-		term := p.funcOrIdent()
+		term := p.funcOrIdent(globalFunc, c)
 		return p.chain(term)
 	default:
-		return p.primary()
+		return p.primary(c), nil
 	}
 }
 
 //parse a function or identifier invocation chain
-// '.' operator is left-associative
-func (p *parser) chain(lhs Node) Node {
-	for look := p.peek().typ; look == TokenDot; look = p.peek().typ {
+// '|', '.' operators are left-associative.
+func (p *parser) chain(lhs Node) (Node, Node) {
+	c := p.comment()
+	if t := p.peek().typ; t == TokenDot || t == TokenPipe {
 		op := p.next()
-		rhs := p.funcOrIdent()
-		lhs = newBinary(op, lhs, rhs)
+		ft := propertyFunc
+		if op.typ == TokenPipe {
+			ft = chainFunc
+		}
+		rhs := p.funcOrIdent(ft, nil)
+		return p.chain(newChain(p.position(op.pos), op.typ, lhs, rhs, c))
 	}
-	return lhs
+	return lhs, c
 }
 
-func (p *parser) funcOrIdent() (n Node) {
+func (p *parser) funcOrIdent(ft funcType, c Node) (n Node) {
 	p.next()
-	if p.peek().typ == TokenLParen {
+	if ft == chainFunc || p.peek().typ == TokenLParen {
 		p.backup()
-		n = p.function()
+		n = p.function(ft, c)
 	} else {
 		p.backup()
-		n = p.identifier()
+		n = p.identifier(c)
 	}
 	return
 }
 
 //parse an identifier
-func (p *parser) identifier() Node {
+func (p *parser) identifier(c Node) Node {
 	ident := p.expect(TokenIdent)
-	n := newIdent(ident.pos, ident.val)
+	n := newIdent(p.position(ident.pos), ident.val, c)
 	return n
 }
 
 //parse a function call
-func (p *parser) function() Node {
+func (p *parser) function(ft funcType, c Node) Node {
 	ident := p.expect(TokenIdent)
 	p.expect(TokenLParen)
 	args := p.parameters()
 	p.expect(TokenRParen)
-
-	n := newFunc(ident.pos, ident.val, args)
+	multiLine := false
+	if l := len(args); l > 0 {
+		multiLine = p.hasNewLine(ident.pos, args[l-1].Position())
+	}
+	n := newFunc(p.position(ident.pos), ft, ident.val, args, multiLine, c)
 	return n
 }
 
@@ -260,22 +294,23 @@ func (p *parser) parameters() (args []Node) {
 }
 
 func (p *parser) parameter() (n Node) {
+	c := p.comment()
 	switch p.peek().typ {
 	case TokenIdent:
-		n = p.expression()
+		n, _ = p.expression(c)
 	case TokenLambda:
 		lambda := p.next()
-		l := p.lambdaExpr()
-		n = newLambda(lambda.pos, l)
+		l := p.lambdaExpr(nil)
+		n = newLambda(p.position(lambda.pos), l, c)
 	default:
-		n = p.primary()
+		n = p.primary(c)
 	}
 	return
 }
 
 // parse the lambda expression.
-func (p *parser) lambdaExpr() Node {
-	return p.precedence(p.primary(), 0)
+func (p *parser) lambdaExpr(c Node) Node {
+	return p.precedence(p.primary(nil), 0, c)
 }
 
 // Operator Precedence parsing
@@ -299,18 +334,20 @@ var precedence = [...]int{
 
 // parse the expression considering operator precedence.
 // https://en.wikipedia.org/wiki/Operator-precedence_parser#Pseudo-code
-func (p *parser) precedence(lhs Node, minP int) Node {
+func (p *parser) precedence(lhs Node, minP int, c Node) Node {
 	look := p.peek()
-	for isOperator(look.typ) && precedence[look.typ] >= minP {
+	for isExprOperator(look.typ) && precedence[look.typ] >= minP {
 		op := p.next()
-		rhs := p.primary()
+		rhs := p.primary(nil)
 		look = p.peek()
 		// right-associative
-		for isOperator(look.typ) && precedence[look.typ] >= precedence[op.typ] {
-			rhs = p.precedence(rhs, precedence[look.typ])
+		for isExprOperator(look.typ) && precedence[look.typ] >= precedence[op.typ] {
+			rhs = p.precedence(rhs, precedence[look.typ], nil)
 			look = p.peek()
 		}
-		lhs = newBinary(op, lhs, rhs)
+
+		multiLine := p.hasNewLine(lhs.Position(), rhs.Position())
+		lhs = newBinary(p.position(op.pos), op.typ, lhs, rhs, multiLine, c)
 	}
 	return lhs
 }
@@ -322,7 +359,11 @@ func (p *parser) lfunction() Node {
 	args := p.lparameters()
 	p.expect(TokenRParen)
 
-	n := newFunc(ident.pos, ident.val, args)
+	multiLine := false
+	if l := len(args); l > 0 {
+		multiLine = p.hasNewLine(ident.pos, args[l-1].Position())
+	}
+	n := newFunc(p.position(ident.pos), globalFunc, ident.val, args, multiLine, nil)
 	return n
 }
 
@@ -341,35 +382,41 @@ func (p *parser) lparameters() (args []Node) {
 }
 
 func (p *parser) lparameter() (n Node) {
-	n = p.primary()
-	if isOperator(p.peek().typ) {
-		n = p.precedence(n, 0)
+	n = p.primary(nil)
+	if isExprOperator(p.peek().typ) {
+		n = p.precedence(n, 0, nil)
 	}
 	return
 }
 
 // parse a primary expression
-func (p *parser) primary() Node {
+func (p *parser) primary(c Node) Node {
+	if c == nil {
+		c = p.comment()
+	}
 	switch tok := p.peek(); {
 	case tok.typ == TokenLParen:
 		p.next()
-		n := p.lambdaExpr()
+		n := p.lambdaExpr(c)
+		if b, ok := n.(*BinaryNode); ok {
+			b.Parens = true
+		}
 		p.expect(TokenRParen)
 		return n
 	case tok.typ == TokenNumber:
-		return p.number()
+		return p.number(c)
 	case tok.typ == TokenString:
-		return p.string()
+		return p.string(c)
 	case tok.typ == TokenTrue, tok.typ == TokenFalse:
-		return p.boolean()
+		return p.boolean(c)
 	case tok.typ == TokenDuration:
-		return p.duration()
+		return p.duration(c)
 	case tok.typ == TokenRegex:
-		return p.regex()
+		return p.regex(c)
 	case tok.typ == TokenMult:
-		return p.star()
+		return p.star(c)
 	case tok.typ == TokenReference:
-		return p.reference()
+		return p.reference(c)
 	case tok.typ == TokenIdent:
 		p.next()
 		if p.peek().typ == TokenLParen {
@@ -377,10 +424,10 @@ func (p *parser) primary() Node {
 			return p.lfunction()
 		}
 		p.backup()
-		return p.identifier()
+		return p.identifier(c)
 	case tok.typ == TokenMinus, tok.typ == TokenNot:
 		p.next()
-		return newUnary(tok, p.primary())
+		return newUnary(p.position(tok.pos), tok.typ, p.primary(nil), c)
 	default:
 		p.unexpected(
 			tok,
@@ -400,9 +447,9 @@ func (p *parser) primary() Node {
 }
 
 //parse a duration literal
-func (p *parser) duration() Node {
+func (p *parser) duration(c Node) Node {
 	token := p.expect(TokenDuration)
-	num, err := newDur(token.pos, token.val)
+	num, err := newDur(p.position(token.pos), token.val, c)
 	if err != nil {
 		p.error(err)
 	}
@@ -410,9 +457,9 @@ func (p *parser) duration() Node {
 }
 
 //parse a number literal
-func (p *parser) number() Node {
+func (p *parser) number(c Node) Node {
 	token := p.expect(TokenNumber)
-	num, err := newNumber(token.pos, token.val)
+	num, err := newNumber(p.position(token.pos), token.val, c)
 	if err != nil {
 		p.error(err)
 	}
@@ -420,16 +467,16 @@ func (p *parser) number() Node {
 }
 
 //parse a string literal
-func (p *parser) string() Node {
+func (p *parser) string(c Node) Node {
 	token := p.expect(TokenString)
-	s := newString(token.pos, token.val)
+	s := newString(p.position(token.pos), token.val, c)
 	return s
 }
 
 //parse a regex literal
-func (p *parser) regex() Node {
+func (p *parser) regex(c Node) Node {
 	token := p.expect(TokenRegex)
-	r, err := newRegex(token.pos, token.val)
+	r, err := newRegex(p.position(token.pos), token.val, c)
 	if err != nil {
 		p.error(err)
 	}
@@ -437,23 +484,39 @@ func (p *parser) regex() Node {
 }
 
 // parse '*' literal
-func (p *parser) star() Node {
+func (p *parser) star(c Node) Node {
 	tok := p.expect(TokenMult)
-	return newStar(tok.pos)
+	return newStar(p.position(tok.pos), c)
 }
 
 //parse a reference literal
-func (p *parser) reference() Node {
+func (p *parser) reference(c Node) Node {
 	token := p.expect(TokenReference)
-	r := newReference(token.pos, token.val)
+	r := newReference(p.position(token.pos), token.val, c)
 	return r
 }
 
-func (p *parser) boolean() Node {
+func (p *parser) boolean(c Node) Node {
 	n := p.next()
-	num, err := newBool(n.pos, n.val)
+	num, err := newBool(p.position(n.pos), n.val, c)
 	if err != nil {
 		p.error(err)
 	}
 	return num
+}
+
+func (p *parser) comment() Node {
+	var comments []string
+	pos := -1
+	for p.peek().typ == TokenComment {
+		n := p.next()
+		if pos == -1 {
+			pos = n.pos
+		}
+		comments = append(comments, n.val)
+	}
+	if len(comments) > 0 {
+		return newComment(p.position(pos), comments)
+	}
+	return nil
 }

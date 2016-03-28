@@ -10,10 +10,10 @@ import (
 //
 // Example:
 //    stream
-//        .window()
+//        |window()
 //            .period(10m)
 //            .every(5m)
-//        .httpOut('recent')
+//        |httpOut('recent')
 //
 // The above windowing example emits a window to the pipeline every `5 minutes`
 // and the window contains the last `10 minutes` worth of data.
@@ -30,7 +30,7 @@ type WindowNode struct {
 	Every time.Duration
 	// Wether to align the window edges with the zero time
 	// tick:ignore
-	AlignFlag bool
+	AlignFlag bool `tick:"Align"`
 }
 
 func newWindowNode() *WindowNode {

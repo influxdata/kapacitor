@@ -11,7 +11,8 @@ The TICKscript language is an invocation chaining language used to define data p
 Notation
 -------
 
-The syntax is specified using Extended Backus-Naur Form (“EBNF”). EBNF is the same notation used in the [Go](http://golang.org/) programming language specification, which can be found [here](https://golang.org/ref/spec).
+The syntax is specified using Extended Backus-Naur Form (“EBNF”).
+EBNF is the same notation used in the [Go](http://golang.org/) programming language specification, which can be found [here](https://golang.org/ref/spec).
 
 ```
 Production  = production_name "=" [ Expression ] "." .
@@ -60,9 +61,9 @@ operator_lit       = "+" | "-" | "*" | "/" | "==" | "!=" |
 
 Program      = Statement { Statement } .
 Statement    = Declaration | Expression .
-Declaration  = "var" identifier  "=" Expression .
+Declaration  = "var" identifier "=" Expression .
 Expression   = identifier { Chain } | Function { Chain } | Primary .
-Chain        = "." Function { Chain} | "." identifier { Chain } .
+Chain        = "|" Function { Chain } | "." Function { Chain} | "." identifier { Chain } .
 Function     = identifier "(" Parameters ")" .
 Parameters   = { Parameter "," } [ Parameter ] .
 Parameter    = Expression | "lambda:" LambdaExpr | Primary .
@@ -70,10 +71,10 @@ Primary      = "(" LambdaExpr ")" | number_lit | string_lit |
                 boolean_lit | duration_lit | regex_lit | star_lit |
                 LFunc | identifier | Reference | "-" Primary | "!" Primary .
 Reference    = `"` { unicode_char } `"` .
-LambdaExpr   = Primary operator_lit Primary .
+LambdaExpr   =  Primary operator_lit Primary .
 LFunc        = identifier "(" LParameters ")"
-LParameters   = { LParameter "," } [ LParameter ] .
-LParameter    = LambdaExpr |  Primary .
+LParameters  = { LParameter "," } [ LParameter ] .
+LParameter   = LambdaExpr |  Primary .
 
 ```
 

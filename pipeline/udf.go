@@ -36,12 +36,12 @@ import (
 //     // The UDF can define what its options are and then can be
 //     // invoked via a TICKscript like so:
 //     stream
-//         .from()...
-//         .movingAverage()
+//         |from()...
+//         |movingAverage()
 //             .field('value')
 //             .size(100)
 //             .as('mavg')
-//         .httpOut('movingaverage')
+//         |httpOut('movingaverage')
 //
 // NOTE: The UDF process runs as the same user as the Kapacitor daemon.
 // As a result make the user is properly secured as well as the configuration file.
@@ -79,7 +79,7 @@ func NewUDF(
 		Timeout:   timeout,
 		options:   options,
 	}
-	udf.describer = tick.NewReflectionDescriber(udf)
+	udf.describer, _ = tick.NewReflectionDescriber(udf)
 	parent.linkChild(udf)
 	return udf
 }
@@ -90,16 +90,31 @@ func (u *UDFNode) Desc() string {
 }
 
 // tick:ignore
-func (u *UDFNode) HasMethod(name string) bool {
+func (u *UDFNode) HasChainMethod(name string) bool {
+	return u.describer.HasChainMethod(name)
+}
+
+// tick:ignore
+func (u *UDFNode) CallChainMethod(name string, args ...interface{}) (interface{}, error) {
+	return u.describer.CallChainMethod(name, args...)
+}
+
+// tick:ignore
+func (u *UDFNode) HasProperty(name string) bool {
 	_, ok := u.options[name]
 	if ok {
 		return ok
 	}
-	return u.describer.HasMethod(name)
+	return u.describer.HasProperty(name)
 }
 
 // tick:ignore
-func (u *UDFNode) CallMethod(name string, args ...interface{}) (interface{}, error) {
+func (u *UDFNode) Property(name string) interface{} {
+	return u.describer.Property(name)
+}
+
+// tick:ignore
+func (u *UDFNode) SetProperty(name string, args ...interface{}) (interface{}, error) {
 	opt, ok := u.options[name]
 	if ok {
 		if got, exp := len(args), len(opt.ValueTypes); got != exp {
@@ -135,20 +150,5 @@ func (u *UDFNode) CallMethod(name string, args ...interface{}) (interface{}, err
 		})
 		return u, nil
 	}
-	return u.describer.CallMethod(name, args...)
-}
-
-// tick:ignore
-func (u *UDFNode) HasProperty(name string) bool {
-	return u.describer.HasProperty(name)
-}
-
-// tick:ignore
-func (u *UDFNode) Property(name string) interface{} {
-	return u.describer.Property(name)
-}
-
-// tick:ignore
-func (u *UDFNode) SetProperty(name string, value interface{}) error {
-	return u.describer.SetProperty(name, value)
+	return u.describer.SetProperty(name, args...)
 }
