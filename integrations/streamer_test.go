@@ -87,6 +87,35 @@ stream
 	testStreamerWithOutput(t, "TestStream_Derivative", script, 15*time.Second, er, nil, false)
 }
 
+func TestStream_DerivativeZeroElapsed(t *testing.T) {
+
+	var script = `
+stream
+	|from().measurement('packets')
+	|derivative('value')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|httpOut('TestStream_DerivativeZeroElapsed')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "packets",
+				Tags:    nil,
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					9.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_DerivativeZeroElapsed", script, 15*time.Second, er, nil, false)
+}
+
 func TestStream_DerivativeUnit(t *testing.T) {
 
 	var script = `

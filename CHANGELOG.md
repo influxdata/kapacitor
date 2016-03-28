@@ -39,6 +39,8 @@ format a TICKscript file according to a common standard.
 
 ### Bugfixes
 
+- [#378](https://github.com/influxdata/kapacitor/issues/378): Fix issue where derivative would divide by zero.
+
 
 ## v0.11.0 [2016-03-22]
 

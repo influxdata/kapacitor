@@ -101,6 +101,10 @@ func (d *DerivativeNode) derivative(prev, curr models.Fields, prevTime, currTime
 	}
 
 	elapsed := float64(currTime.Sub(prevTime))
+	if elapsed == 0 {
+		d.logger.Printf("E! cannot perform derivative elapsed time was 0")
+		return 0, false
+	}
 	diff := f1 - f0
 	// Drop negative values for non-negative derivatives
 	if d.d.NonNegativeFlag && diff < 0 {
