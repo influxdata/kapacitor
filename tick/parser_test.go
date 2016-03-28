@@ -1257,6 +1257,84 @@ var x = stream
 				}},
 			},
 		},
+		{
+			script: `
+var x = stream
+		@dynamicFunc()
+			.property(5m)`,
+			Root: &ListNode{
+				position: position{
+					pos:  1,
+					line: 2,
+					char: 1,
+				},
+				Nodes: []Node{&DeclarationNode{
+					position: position{
+						pos:  7,
+						line: 2,
+						char: 7,
+					},
+					Left: &IdentifierNode{
+						position: position{
+							pos:  5,
+							line: 2,
+							char: 5,
+						},
+						Ident: "x",
+					},
+					Right: &ChainNode{
+						position: position{
+							pos:  36,
+							line: 4,
+							char: 4,
+						},
+						Operator: TokenDot,
+						Left: &ChainNode{
+							position: position{
+								pos:  18,
+								line: 3,
+								char: 3,
+							},
+							Operator: TokenAt,
+							Left: &IdentifierNode{
+								position: position{
+									pos:  9,
+									line: 2,
+									char: 9,
+								},
+								Ident: "stream",
+							},
+							Right: &FunctionNode{
+								position: position{
+									pos:  19,
+									line: 3,
+									char: 4,
+								},
+								Type: dynamicFunc,
+								Func: "dynamicFunc",
+							},
+						},
+						Right: &FunctionNode{
+							position: position{
+								pos:  37,
+								line: 4,
+								char: 5,
+							},
+							Type: propertyFunc,
+							Func: "property",
+							Args: []Node{&DurationNode{
+								position: position{
+									pos:  46,
+									line: 4,
+									char: 14,
+								},
+								Dur: time.Minute * 5,
+							}},
+						},
+					},
+				}},
+			},
+		},
 	}
 
 	for _, tc := range testCases {

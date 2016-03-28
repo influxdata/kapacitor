@@ -131,7 +131,7 @@ s2|structC()
 }
 
 func TestEvaluate_DynamicMethod(t *testing.T) {
-	script := `var x = a|dynamicMethod(1,'str', 10s).sad(FALSE)`
+	script := `var x = a@dynamicMethod(1,'str', 10s).sad(FALSE)`
 
 	scope := tick.NewScope()
 	a := &structA{}

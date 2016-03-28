@@ -37,7 +37,7 @@ import (
 //     // invoked via a TICKscript like so:
 //     stream
 //         |from()...
-//         |movingAverage()
+//         @movingAverage()
 //             .field('value')
 //             .size(100)
 //             .as('mavg')

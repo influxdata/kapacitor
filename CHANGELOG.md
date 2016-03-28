@@ -4,12 +4,15 @@
 
 ### Release Notes
 
-New TICKscript syntax that uses a different operator for chaining methods vs property methods.
+New TICKscript syntax that uses a different operators for chaining methods vs property methods vs UDF methods.
 
 * A chaining method is a method that creates a new node in the pipeline. Uses the `|` operator.
 * A property method is a method that changes a property on a node. Uses the `.` operator.
+* A UDF method is a method that calls out to a UDF. Uses the `@` operator.
 
-For example below the `from`, `mean`, and `alert` methods create new nodes while the other methods modify the node.
+For example below the `from`, `mean`, and `alert` methods create new nodes,
+the `detectAnomalies` method calls a UDF,
+and the other methods modify the nodes as property methods.
 
 ```javascript
 stream
@@ -18,8 +21,10 @@ stream
         .where(lambda: "cpu" == 'cpu-total')
     |mean('usage_idle')
         .as('value')
+    @detectAnomalies()
+        .field('mean')
     |alert()
-        .crit(lambda: "value" < 30)
+        .crit(lambda: "anomaly_score" > 10)
         .log('/tmp/cpu.log')
 ```
 
@@ -29,7 +34,7 @@ format a TICKscript file according to a common standard.
 
 ### Features
 
-- [#299](https://github.com/influxdata/kapacitor/issues/299): Changes TICKscript chaining method operator and adds `tickfmt` binary.
+- [#299](https://github.com/influxdata/kapacitor/issues/299): Changes TICKscript chaining method operators and adds `tickfmt` binary.
 
 
 ### Bugfixes

@@ -63,7 +63,7 @@ Program      = Statement { Statement } .
 Statement    = Declaration | Expression .
 Declaration  = "var" identifier "=" Expression .
 Expression   = identifier { Chain } | Function { Chain } | Primary .
-Chain        = "|" Function { Chain } | "." Function { Chain} | "." identifier { Chain } .
+Chain        = "@" Function | "|" Function { Chain } | "." Function { Chain} | "." identifier { Chain } .
 Function     = identifier "(" Parameters ")" .
 Parameters   = { Parameter "," } [ Parameter ] .
 Parameter    = Expression | "lambda:" LambdaExpr | Primary .

@@ -1888,7 +1888,7 @@ stream
 		.period(10s)
 		.every(10s)
 	|count('value')
-	|customFunc()
+	@customFunc()
 		.opt1('count')
 		.opt2(FALSE, 1, 1.0, '1.0', 1s)
 	|httpOut('TestStream_CustomFunctions')

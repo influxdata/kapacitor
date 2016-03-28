@@ -20,6 +20,7 @@ const (
 	TokenAsgn
 	TokenDot
 	TokenPipe
+	TokenAt
 	TokenIdent
 	TokenReference
 	TokenLambda
@@ -144,6 +145,8 @@ func (t tokenType) String() string {
 		return "."
 	case t == TokenPipe:
 		return "|"
+	case t == TokenAt:
+		return "@"
 	case t == TokenAsgn:
 		return "="
 	case t == TokenLParen:
@@ -325,6 +328,9 @@ func lexToken(l *lexer) stateFn {
 			return lexToken
 		case r == '|':
 			l.emit(TokenPipe)
+			return lexToken
+		case r == '@':
+			l.emit(TokenAt)
 			return lexToken
 		case r == ',':
 			l.emit(TokenComma)
