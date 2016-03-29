@@ -13,14 +13,12 @@ import (
 type EdgeType int
 
 const (
-	// No data is transfered
+	// No data is transferred
 	NoEdge EdgeType = iota
-	// Data is transfered immediately and one point at a time.
+	// Data is transferred immediately and one point at a time.
 	StreamEdge
-	// Data is transfered in batches as soon as it is ready.
+	// Data is transferred in batches as soon as it is ready.
 	BatchEdge
-	// Data is transfered as it is received from a map function.
-	ReduceEdge
 )
 
 type ID int
@@ -31,8 +29,6 @@ func (e EdgeType) String() string {
 		return "stream"
 	case BatchEdge:
 		return "batch"
-	case ReduceEdge:
-		return "reduce"
 	default:
 		return "unknown EdgeType"
 	}
@@ -367,28 +363,6 @@ func (n *chainnode) GroupBy(tag ...interface{}) *GroupByNode {
 	g := newGroupByNode(n.provides, tag)
 	n.linkChild(g)
 	return g
-}
-
-// > *DEPRECATION WARNING*: As of v0.11 you can use the new InfluxQLNode to perform map reduce functions.
-// This way of performing influxql functions will be removed in the 0.12 release.
-//
-// Perform a map-reduce operation on the data.
-// The built-in functions under `influxql` provide the
-// selection,aggregation, and transformation functions
-// from the InfluxQL language.
-//
-// MapReduce may be applied to either a batch or a stream edge.
-// In the case of a batch each batch is passed to the mapper independently.
-// In the case of a stream all incoming data points that have
-// the exact same time are combined into a batch and sent to the mapper.
-func (n *chainnode) MapReduce(mr MapReduceInfo) *ReduceNode {
-	var m *MapNode
-	var r *ReduceNode
-	m = newMapNode(n.Provides(), mr.Map)
-	r = newReduceNode(mr.Reduce, mr.Edge)
-	n.linkChild(m)
-	m.linkChild(r)
-	return r
 }
 
 // Create a new node that windows the stream by time.

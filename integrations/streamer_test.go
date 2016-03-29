@@ -1444,19 +1444,6 @@ stream
 	|window()
 		.period(10s)
 		.every(10s)
-	|mapReduce(influxql|{{ .Method }}({{ .Args }}))
-		{{ if .UsePointTimes }}.usePointTimes(){{ end }}
-	|httpOut('TestStream_InfluxQL')
-`
-
-	var newScriptTmpl = `
-stream
-	|from()
-		.measurement('cpu')
-		.where(lambda: "host" == 'serverA')
-	|window()
-		.period(10s)
-		.every(10s)
 	|{{ .Method }}({{ .Args }})
 		{{ if .UsePointTimes }}.usePointTimes(){{ end }}
 	|httpOut('TestStream_InfluxQL')
@@ -1875,35 +1862,22 @@ stream
 		t.Fatal(err)
 	}
 
-	newTmpl, err := template.New("script").Parse(newScriptTmpl)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tmpls := []*template.Template{tmpl, newTmpl}
-
 	for _, tc := range testCases {
-		for i, tmpl := range tmpls {
-			if tc.Method == "distinct" && i == 0 {
-				// Skip legacy test for new behavior
-				continue
-			}
-			t.Log("Method:", tc.Method, i)
-			var script bytes.Buffer
-			if tc.Args == "" {
-				tc.Args = "'value'"
-			}
-			tmpl.Execute(&script, tc)
-			testStreamerWithOutput(
-				t,
-				"TestStream_InfluxQL",
-				script.String(),
-				13*time.Second,
-				tc.ER,
-				nil,
-				false,
-			)
+		t.Log("Method:", tc.Method)
+		var script bytes.Buffer
+		if tc.Args == "" {
+			tc.Args = "'value'"
 		}
+		tmpl.Execute(&script, tc)
+		testStreamerWithOutput(
+			t,
+			"TestStream_InfluxQL",
+			script.String(),
+			13*time.Second,
+			tc.ER,
+			nil,
+			false,
+		)
 	}
 }
 
