@@ -35,6 +35,7 @@ format a TICKscript file according to a common standard.
 ### Features
 
 - [#299](https://github.com/influxdata/kapacitor/issues/299): Changes TICKscript chaining method operators and adds `tickfmt` binary.
+- [#389](https://github.com/influxdata/kapacitor/pull/389): Adds benchmarks to Kapacitor for basic use cases.
 
 
 ### Bugfixes
