@@ -250,7 +250,6 @@ func (tm *TaskMaster) waitForForks() {
 
 func (tm *TaskMaster) CreateTICKScope() *tick.Scope {
 	scope := tick.NewScope()
-	scope.Set("influxql", newInfluxQL())
 	scope.Set("time", func(d time.Duration) time.Duration { return d })
 	// Add dynamic methods to the scope for UDFs
 	if tm.UDFService != nil {
