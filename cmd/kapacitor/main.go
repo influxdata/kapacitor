@@ -2,24 +2,18 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"log"
-	"net/http"
-	"net/url"
 	"os"
-	"sort"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/dustin/go-humanize"
-	"github.com/influxdata/kapacitor"
-	"github.com/influxdata/kapacitor/services/replay"
-	"github.com/influxdata/kapacitor/services/task_store"
+	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/kapacitor/client/v1"
 )
 
 // These variables are populated via the Go linker.
@@ -34,9 +28,9 @@ var defaultURL = "http://localhost:9092"
 var mainFlags = flag.NewFlagSet("main", flag.ExitOnError)
 var kapacitordURL = mainFlags.String("url", "", "the URL http(s)://host:port of the kapacitord server. Defaults to the KAPACITOR_URL environment variable or "+defaultURL+" if not set.")
 
-var kapacitorEndpoint string
-
 var l = log.New(os.Stderr, "[run] ", log.LstdFlags)
+
+var cli *client.Client
 
 var usageStr = `
 Usage: kapacitor [options] [command] [args]
@@ -78,7 +72,12 @@ func main() {
 		url = *kapacitordURL
 	}
 
-	kapacitorEndpoint = url
+	var err error
+	cli, err = connect(url)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(4)
+	}
 
 	args := mainFlags.Args()
 
@@ -139,7 +138,7 @@ func main() {
 		usage()
 	}
 
-	err := commandF(commandArgs)
+	err = commandF(commandArgs)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(3)
@@ -163,6 +162,12 @@ type responseError struct {
 
 func (e responseError) Error() string {
 	return e.Err
+}
+
+func connect(url string) (*client.Client, error) {
+	return client.New(client.Config{
+		URL: url,
+	})
 }
 
 // Help
@@ -315,9 +320,11 @@ Options:
 	fmt.Fprintln(os.Stderr, u)
 	recordQueryFlags.PrintDefaults()
 }
+
 func doRecord(args []string) error {
-	v := url.Values{}
-	v.Add("type", args[0])
+	var rid string
+	var err error
+
 	switch args[0] {
 	case "stream":
 		recordStreamFlags.Parse(args[1:])
@@ -325,8 +332,15 @@ func doRecord(args []string) error {
 			recordStreamFlags.Usage()
 			return errors.New("both name and duration are required")
 		}
-		v.Add("name", *rsname)
-		v.Add("duration", *rsdur)
+		var duration time.Duration
+		duration, err = influxql.ParseDuration(*rsdur)
+		if err != nil {
+			return err
+		}
+		rid, err = cli.RecordStream(*rsname, duration)
+		if err != nil {
+			return err
+		}
 	case "batch":
 		recordBatchFlags.Parse(args[1:])
 		if *rbname == "" {
@@ -341,57 +355,45 @@ func doRecord(args []string) error {
 			recordBatchFlags.Usage()
 			return errors.New("cannot set both start and past flags.")
 		}
-		v.Add("name", *rbname)
-		v.Add("start", *rbstart)
-		v.Add("stop", *rbstop)
-		v.Add("past", *rbpast)
-		v.Add("cluster", *rbcluster)
+		var start, stop time.Time
+		var past time.Duration
+		if *rbstart != "" {
+			start, err = time.Parse(time.RFC3339Nano, *rbstart)
+			if err != nil {
+				return err
+			}
+		}
+		if *rbstop != "" {
+			stop, err = time.Parse(time.RFC3339Nano, *rbstop)
+			if err != nil {
+				return err
+			}
+		}
+		if *rbpast != "" {
+			past, err = influxql.ParseDuration(*rbpast)
+			if err != nil {
+				return err
+			}
+		}
+		rid, err = cli.RecordBatch(*rbname, *rbcluster, start, stop, past)
+		if err != nil {
+			return err
+		}
 	case "query":
 		recordQueryFlags.Parse(args[1:])
 		if *rqquery == "" || *rqtype == "" {
 			recordQueryFlags.Usage()
 			return errors.New("both query and type are required")
 		}
-		v.Add("query", *rqquery)
-		v.Add("ttype", *rqtype)
-		v.Add("cluster", *rqcluster)
+		rid, err = cli.RecordQuery(*rqquery, *rqtype, *rqcluster)
+		if err != nil {
+			return err
+		}
 	default:
 		return fmt.Errorf("Unknown record type %q, expected 'stream', 'batch' or 'query'", args[0])
 	}
-	r, err := http.Post(kapacitorEndpoint+"/record?"+v.Encode(), "application/octetstream", nil)
-	if err != nil {
-		return err
-	}
-	defer r.Body.Close()
 
-	// Decode valid response
-	type resp struct {
-		RecordingID string `json:"RecordingID"`
-		Error       string `json:"Error"`
-	}
-	d := json.NewDecoder(r.Body)
-	rp := resp{}
-	d.Decode(&rp)
-	if rp.Error != "" {
-		return errors.New(rp.Error)
-	}
-
-	v = url.Values{}
-	v.Add("id", rp.RecordingID)
-	r, err = http.Get(kapacitorEndpoint + "/record?" + v.Encode())
-	if err != nil {
-		return err
-	}
-	defer r.Body.Close()
-
-	d = json.NewDecoder(r.Body)
-	ri := replay.RecordingInfo{}
-	d.Decode(&ri)
-	if ri.Error != "" {
-		return errors.New(ri.Error)
-	}
-
-	fmt.Println(ri.ID)
+	fmt.Println(rid)
 	return nil
 }
 
@@ -409,7 +411,7 @@ func init() {
 	defineFlags.Var(&ddbrp, "dbrp", `a database and retention policy pair of the form "db"."rp" the quotes are optional. The flag can be specified multiple times.`)
 }
 
-type dbrps []kapacitor.DBRP
+type dbrps []client.DBRP
 
 func (d *dbrps) String() string {
 	return fmt.Sprint(*d)
@@ -418,7 +420,7 @@ func (d *dbrps) String() string {
 // Parse string of the form "db"."rp" where the quotes are optional but can include escaped quotes
 // within the strings.
 func (d *dbrps) Set(value string) error {
-	dbrp := kapacitor.DBRP{}
+	dbrp := client.DBRP{}
 	if len(value) == 0 {
 		return errors.New("dbrp cannot be empty")
 	}
@@ -505,7 +507,6 @@ Options:
 }
 
 func doDefine(args []string) error {
-
 	if *dname == "" {
 		fmt.Fprintln(os.Stderr, "Must always pass name flag.")
 		defineFlags.Usage()
@@ -514,63 +515,14 @@ func doDefine(args []string) error {
 
 	var f io.Reader
 	if *dtick != "" {
-		var err error
-		f, err = os.Open(*dtick)
+		file, err := os.Open(*dtick)
 		if err != nil {
 			return err
 		}
+		defer file.Close()
+		f = file
 	}
-	v := url.Values{}
-	v.Add("name", *dname)
-	v.Add("type", *dtype)
-	if len(ddbrp) > 0 {
-		b, err := json.Marshal(ddbrp)
-		if err != nil {
-			return err
-		}
-		v.Add("dbrps", string(b))
-	}
-	r, err := http.Post(kapacitorEndpoint+"/task?"+v.Encode(), "application/octetstream", f)
-	if err != nil {
-		return err
-	}
-	defer r.Body.Close()
-
-	// Decode valid response
-	type resp struct {
-		Error string `json:"Error"`
-	}
-	d := json.NewDecoder(r.Body)
-	rp := resp{}
-	d.Decode(&rp)
-	if rp.Error != "" {
-		return errors.New(rp.Error)
-	}
-
-	// Check if task is enabled if -no-reload was not given
-	if !*dnoReload {
-		v = url.Values{}
-		v.Add("name", *dname)
-		r, err = http.Get(kapacitorEndpoint + "/task?" + v.Encode())
-		if err != nil {
-			return err
-		}
-		defer r.Body.Close()
-		d = json.NewDecoder(r.Body)
-		ti := task_store.TaskInfo{}
-		d.Decode(&ti)
-
-		if ti.Name == "" && ti.Error != "" {
-			return errors.New(ti.Error)
-		}
-
-		// Reload task if enabled.
-		if ti.Enabled {
-			return doReload([]string{*dname})
-		}
-	}
-
-	return nil
+	return cli.Define(*dname, *dtype, ddbrp, f, !*dnoReload)
 }
 
 // Replay
@@ -608,30 +560,7 @@ func doReplay(args []string) error {
 		return errors.New("must pass task name")
 	}
 
-	v := url.Values{}
-	v.Add("name", *rtname)
-	v.Add("id", *rid)
-	v.Add("rec-time", strconv.FormatBool(*rrec))
-	if *rfast {
-		v.Add("clock", "fast")
-	}
-	r, err := http.Post(kapacitorEndpoint+"/replay?"+v.Encode(), "application/octetstream", nil)
-	if err != nil {
-		return err
-	}
-	defer r.Body.Close()
-
-	// Decode valid response
-	type resp struct {
-		Error string `json:"Error"`
-	}
-	d := json.NewDecoder(r.Body)
-	rp := resp{}
-	d.Decode(&rp)
-	if rp.Error != "" {
-		return errors.New(rp.Error)
-	}
-	return nil
+	return cli.Replay(*rtname, *rid, *rrec, *rfast)
 }
 
 // Enable
@@ -661,22 +590,9 @@ func doEnable(args []string) error {
 	}
 
 	for _, name := range args {
-		v := url.Values{}
-		v.Add("name", name)
-		r, err := http.Post(kapacitorEndpoint+"/enable?"+v.Encode(), "application/octetstream", nil)
+		err := cli.Enable(name)
 		if err != nil {
 			return err
-		}
-		defer r.Body.Close()
-		// Decode valid response
-		type resp struct {
-			Error string `json:"Error"`
-		}
-		d := json.NewDecoder(r.Body)
-		rp := resp{}
-		d.Decode(&rp)
-		if rp.Error != "" {
-			return errors.New(rp.Error)
 		}
 	}
 	return nil
@@ -710,22 +626,9 @@ func doDisable(args []string) error {
 	}
 
 	for _, name := range args {
-		v := url.Values{}
-		v.Add("name", name)
-		r, err := http.Post(kapacitorEndpoint+"/disable?"+v.Encode(), "application/octetstream", nil)
+		err := cli.Disable(name)
 		if err != nil {
 			return err
-		}
-		defer r.Body.Close()
-		// Decode valid response
-		type resp struct {
-			Error string `json:"Error"`
-		}
-		d := json.NewDecoder(r.Body)
-		rp := resp{}
-		d.Decode(&rp)
-		if rp.Error != "" {
-			return errors.New(rp.Error)
 		}
 	}
 	return nil
@@ -776,26 +679,15 @@ func showUsage() {
 }
 
 func doShow(args []string) error {
-
 	if len(args) != 1 {
 		fmt.Fprintln(os.Stderr, "Must specify one task name")
 		showUsage()
 		os.Exit(2)
 	}
 
-	v := url.Values{}
-	v.Add("name", args[0])
-	r, err := http.Get(kapacitorEndpoint + "/task?" + v.Encode())
+	ti, err := cli.Task(args[0], false)
 	if err != nil {
 		return err
-	}
-	defer r.Body.Close()
-	d := json.NewDecoder(r.Body)
-	ti := task_store.TaskInfo{}
-	d.Decode(&ti)
-
-	if ti.Name == "" && ti.Error != "" {
-		return errors.New(ti.Error)
 	}
 
 	fmt.Println("Name:", ti.Name)
@@ -832,57 +724,25 @@ func doList(args []string) error {
 
 	switch kind := args[0]; kind {
 	case "tasks":
-		tasks := strings.Join(args[1:], ",")
-		v := url.Values{}
-		v.Add("tasks", tasks)
-		r, err := http.Get(kapacitorEndpoint + "/tasks?" + v.Encode())
+		tasks, err := cli.ListTasks(args[1:])
 		if err != nil {
 			return err
-		}
-		defer r.Body.Close()
-		// Decode valid response
-		type resp struct {
-			Error string                       `json:"Error"`
-			Tasks []task_store.TaskSummaryInfo `json:"Tasks"`
-		}
-		d := json.NewDecoder(r.Body)
-		rp := resp{}
-		d.Decode(&rp)
-		if rp.Error != "" {
-			return errors.New(rp.Error)
 		}
 
 		outFmt := "%-30s%-10v%-10v%-10v%s\n"
 		fmt.Fprintf(os.Stdout, outFmt, "Name", "Type", "Enabled", "Executing", "Databases and Retention Policies")
-		for _, t := range rp.Tasks {
+		for _, t := range tasks {
 			fmt.Fprintf(os.Stdout, outFmt, t.Name, t.Type, t.Enabled, t.Executing, t.DBRPs)
 		}
 	case "recordings":
-
-		rids := strings.Join(args[1:], ",")
-		v := url.Values{}
-		v.Add("rids", rids)
-		r, err := http.Get(kapacitorEndpoint + "/recordings?" + v.Encode())
+		recordings, err := cli.ListRecordings(args[1:])
 		if err != nil {
 			return err
 		}
-		defer r.Body.Close()
-		// Decode valid response
-		type resp struct {
-			Error      string         `json:"Error"`
-			Recordings recordingInfos `json:"Recordings"`
-		}
-		d := json.NewDecoder(r.Body)
-		rp := resp{}
-		d.Decode(&rp)
-		if rp.Error != "" {
-			return errors.New(rp.Error)
-		}
-		sort.Sort(rp.Recordings)
 
 		outFmt := "%-40s%-8v%-10s%-23s\n"
 		fmt.Fprintf(os.Stdout, "%-40s%-8s%-10s%-23s\n", "ID", "Type", "Size", "Created")
-		for _, r := range rp.Recordings {
+		for _, r := range recordings {
 			fmt.Fprintf(os.Stdout, outFmt, r.ID, r.Type, humanize.Bytes(uint64(r.Size)), r.Created.Local().Format(time.RFC822))
 		}
 	default:
@@ -891,12 +751,6 @@ func doList(args []string) error {
 	return nil
 
 }
-
-type recordingInfos []replay.RecordingInfo
-
-func (r recordingInfos) Len() int           { return len(r) }
-func (r recordingInfos) Swap(i, j int)      { r[i], r[j] = r[j], r[i] }
-func (r recordingInfos) Less(i, j int) bool { return r[i].Created.Before(r[j].Created) }
 
 // Delete
 func deleteUsage() {
@@ -929,44 +783,24 @@ func doDelete(args []string) error {
 		os.Exit(2)
 	}
 
-	var baseURL string
-	var paramName string
 	switch kind := args[0]; kind {
 	case "tasks":
-		baseURL = kapacitorEndpoint + "/task?"
-		paramName = "name"
+		for _, task := range args[1:] {
+			err := cli.DeleteTask(task)
+			if err != nil {
+				return err
+			}
+		}
 	case "recordings":
-		baseURL = kapacitorEndpoint + "/recording?"
-		paramName = "rid"
+		for _, rid := range args[1:] {
+			err := cli.DeleteRecording(rid)
+			if err != nil {
+				return err
+			}
+		}
 	default:
 		return fmt.Errorf("cannot delete '%s' did you mean 'tasks' or 'recordings'?", kind)
 	}
-
-	for _, arg := range args[1:] {
-		v := url.Values{}
-		v.Add(paramName, arg)
-		req, err := http.NewRequest("DELETE", baseURL+v.Encode(), nil)
-		if err != nil {
-			return err
-		}
-		client := &http.Client{}
-		r, err := client.Do(req)
-		if err != nil {
-			return err
-		}
-		defer r.Body.Close()
-		// Decode valid response
-		type resp struct {
-			Error string `json:"Error"`
-		}
-		d := json.NewDecoder(r.Body)
-		rp := resp{}
-		d.Decode(&rp)
-		if rp.Error != "" {
-			return errors.New(rp.Error)
-		}
-	}
-
 	return nil
 }
 
@@ -985,24 +819,7 @@ func doLevel(args []string) error {
 		levelUsage()
 		os.Exit(2)
 	}
-	v := url.Values{}
-	v.Add("level", args[0])
-	r, err := http.Post(kapacitorEndpoint+"/loglevel?"+v.Encode(), "text/plain", nil)
-	if err != nil {
-		return err
-	}
-	defer r.Body.Close()
-	// Decode valid response
-	type resp struct {
-		Error string `json:"Error"`
-	}
-	d := json.NewDecoder(r.Body)
-	rp := resp{}
-	d.Decode(&rp)
-	if rp.Error != "" {
-		return errors.New(rp.Error)
-	}
-	return nil
+	return cli.LogLevel(args[0])
 }
 
 // Version

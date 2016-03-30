@@ -143,6 +143,7 @@ func (s *Service) handleList(w http.ResponseWriter, req *http.Request) {
 func (s *Service) handleDelete(w http.ResponseWriter, r *http.Request) {
 	rid := r.URL.Query().Get("rid")
 	s.Delete(rid)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (r *Service) handleReplay(w http.ResponseWriter, req *http.Request) {
@@ -235,6 +236,7 @@ func (r *Service) handleReplay(w http.ResponseWriter, req *http.Request) {
 		httpd.HttpError(w, "closing: "+err.Error(), true, http.StatusInternalServerError)
 		return
 	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
@@ -438,10 +440,10 @@ func (r *Service) handleGetRecording(w http.ResponseWriter, req *http.Request) {
 
 type RecordingInfo struct {
 	ID      string
-	Type    kapacitor.TaskType `json:",omitempty"`
-	Size    int64              `json:",omitempty"`
-	Created time.Time          `json:",omitempty"`
-	Error   string             `json:",omitempty"`
+	Type    kapacitor.TaskType
+	Size    int64
+	Created time.Time
+	Error   string `json:",omitempty"`
 }
 
 func (r *Service) GetRecordings(rids []string) ([]RecordingInfo, error) {
