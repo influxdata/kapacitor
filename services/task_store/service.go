@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -523,9 +524,9 @@ func (ts *Service) Save(task *rawTask) error {
 	return err
 }
 
-func (ts *Service) Delete(name string) error {
-
+func (ts *Service) deleteTask(name string) error {
 	ts.TaskMaster.StopTask(name)
+
 	return ts.db.Update(func(tx *bolt.Tx) error {
 		tb := tx.Bucket(tasksBucket)
 		if tb != nil {
@@ -541,6 +542,30 @@ func (ts *Service) Delete(name string) error {
 		}
 		return nil
 	})
+}
+
+func (ts *Service) Delete(pattern string) error {
+	rawTasks, err := ts.FindTasks(func(taskName string) (bool, error) {
+		matched, err := filepath.Match(pattern, taskName)
+		if err != nil {
+			return false, err
+		}
+
+		return matched, nil
+	})
+
+	if err != nil {
+		return nil
+	}
+
+	for _, rawTask := range rawTasks {
+		err = ts.deleteTask(rawTask.Name)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (ts *Service) LoadRaw(name string) (*rawTask, error) {
@@ -577,6 +602,11 @@ func (ts *Service) Load(name string) (*kapacitor.Task, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	return ts.CreateTaskFromRaw(task)
+}
+
+func (ts *Service) CreateTaskFromRaw(task *rawTask) (*kapacitor.Task, error) {
 	return ts.TaskMaster.NewTask(task.Name,
 		task.TICKscript,
 		task.Type,
@@ -585,22 +615,22 @@ func (ts *Service) Load(name string) (*kapacitor.Task, error) {
 	)
 }
 
-func (ts *Service) Enable(name string) error {
-	// Load the task
-	t, err := ts.Load(name)
+func (ts *Service) enableRawTask(rawTask *rawTask) error {
+	t, err := ts.CreateTaskFromRaw(rawTask)
 	if err != nil {
 		return err
 	}
 
-	var enabled bool
 	// Save the enabled state
+	var enabled bool
+
 	err = ts.db.Update(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucketIfNotExists(enabledBucket)
 		if err != nil {
 			return err
 		}
-		enabled = b.Get([]byte(name)) != nil
-		err = b.Put([]byte(name), []byte{})
+		enabled = b.Get([]byte(t.Name)) != nil
+		err = b.Put([]byte(t.Name), []byte{})
 		if err != nil {
 			return err
 		}
@@ -616,6 +646,31 @@ func (ts *Service) Enable(name string) error {
 	if !enabled {
 		return ts.StartTask(t)
 	}
+	return nil
+}
+
+func (ts *Service) Enable(pattern string) error {
+	// Find the matching tasks
+	rawTasks, err := ts.FindTasks(func(taskName string) (bool, error) {
+		matched, err := filepath.Match(pattern, taskName)
+		if err != nil {
+			return false, err
+		}
+
+		return matched, nil
+	})
+
+	if err != nil {
+		return nil
+	}
+
+	for _, rawTask := range rawTasks {
+		err = ts.enableRawTask(rawTask)
+		if err != nil {
+			return nil
+		}
+	}
+
 	return nil
 }
 
@@ -673,27 +728,52 @@ func (ts *Service) SaveLastError(name string, errStr string) error {
 	return nil
 }
 
-func (ts *Service) Disable(name string) error {
+func (ts *Service) Disable(pattern string) error {
+	// Find the matching tasks
+	rawTasks, err := ts.FindTasks(func(taskName string) (bool, error) {
+		matched, err := filepath.Match(pattern, taskName)
+		if err != nil {
+			return false, err
+		}
+
+		return matched, nil
+	})
+
+	if err != nil {
+		return nil
+	}
+
 	// Delete the enabled state
-	err := ts.db.Update(func(tx *bolt.Tx) error {
+	err = ts.db.Update(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucketIfNotExists(enabledBucket)
 		if err != nil {
 			return err
 		}
-		enabled := b.Get([]byte(name)) != nil
-		if enabled {
-			err = b.Delete([]byte(name))
-			if err != nil {
-				return err
+		for _, rawTask := range rawTasks {
+			enabled := b.Get([]byte(rawTask.Name)) != nil
+			if enabled {
+				err = b.Delete([]byte(rawTask.Name))
+				if err != nil {
+					return err
+				}
+				kapacitor.NumEnabledTasksVar.Add(-1)
 			}
-			kapacitor.NumEnabledTasksVar.Add(-1)
 		}
 		return nil
 	})
+
 	if err != nil {
 		return err
 	}
-	return ts.TaskMaster.StopTask(name)
+
+	for _, rawTask := range rawTasks {
+		err = ts.TaskMaster.StopTask(rawTask.Name)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 type TaskSummaryInfo struct {
@@ -712,6 +792,44 @@ func (ts *Service) IsEnabled(name string) (e bool) {
 		return nil
 	})
 	return
+}
+
+// Returns all taskInfo of task name that matches the predicate
+func (ts *Service) FindTasks(predicate func(string) (bool, error)) ([]*rawTask, error) {
+	rawTasks := make([]*rawTask, 0)
+
+	err := ts.db.View(func(tx *bolt.Tx) error {
+		tb := tx.Bucket([]byte(tasksBucket))
+		if tb == nil {
+			return nil
+		}
+
+		return tb.ForEach(func(k, v []byte) error {
+			taskName := string(k)
+			isMatched, err := predicate(taskName)
+			if err != nil {
+				return err
+			}
+			if !isMatched {
+				return nil
+			}
+
+			// Grab task info
+			t, err := ts.LoadRaw(taskName)
+			if err != nil {
+				return fmt.Errorf("found invalid task in db. name: %s, err: %s", string(k), err)
+			}
+
+			rawTasks = append(rawTasks, t)
+			return nil
+		})
+
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return rawTasks, nil
 }
 
 func (ts *Service) GetTaskSummaryInfo(tasks []string) ([]TaskSummaryInfo, error) {

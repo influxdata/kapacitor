@@ -639,6 +639,16 @@ func enableUsage() {
 	var u = `Usage: kapacitor enable [task name...]
 
 	Enable and start a task running from the live data.
+
+For example:
+
+    You can enable by specific task name.
+
+    $ kapacitor enable cpu_alert
+
+		Or, you can enable by glob:
+
+    $ kapacitor enable *_alert
 `
 	fmt.Fprintln(os.Stderr, u)
 }
@@ -678,6 +688,16 @@ func disableUsage() {
 	var u = `Usage: kapacitor disable [task name...]
 
 	Disable and stop a task running.
+
+For example:
+
+    You can disable by specific task name.
+
+    $ kapacitor disable cpu_alert
+
+		Or, you can disable by glob:
+
+    $ kapacitor disable *_alert
 `
 	fmt.Fprintln(os.Stderr, u)
 }
@@ -717,6 +737,16 @@ func reloadUsage() {
 	var u = `Usage: kapacitor reload [task name...]
 
 	Disable then enable a running task.
+
+For example:
+
+    You can reload by specific task name.
+
+    $ kapacitor reload cpu_alert
+
+		Or, you can reload by glob:
+
+    $ kapacitor reload *_alert
 `
 	fmt.Fprintln(os.Stderr, u)
 }
@@ -874,7 +904,20 @@ func deleteUsage() {
 
 	Delete a task or recording.
 
-	If a task is enabled it will be disabled and then deleted.
+	If a task is enabled it will be disabled and then deleted,
+For example:
+
+		You can delete task:
+
+    $ kapacitor delete tasks my_task
+
+		Or you can delete tasks by glob:
+
+    $ kapacitor delete tasks *_alert 
+
+		You can delete recordings:
+
+    $ kapacitor delete recordings b0a2ba8a-aeeb-45ec-bef9-1a2939963586 
 `
 	fmt.Fprintln(os.Stderr, u)
 }
