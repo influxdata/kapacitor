@@ -435,6 +435,79 @@ test value=1 0000000011
 	}
 }
 
+func TestServer_StreamTask_AllMeasurements(t *testing.T) {
+	s := OpenDefaultServer()
+	defer s.Close()
+
+	name := "testStreamTask"
+	ttype := "stream"
+	dbrps := []kapacitor.DBRP{{
+		Database:        "mydb",
+		RetentionPolicy: "myrp",
+	}}
+	tick := `stream
+    |from()
+    |window()
+        .period(10s)
+        .every(10s)
+    |count('value')
+    |httpOut('count')
+`
+
+	r, err := s.DefineTask(name, ttype, tick, dbrps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r != "" {
+		t.Fatal("unexpected result", r)
+	}
+
+	r, err = s.EnableTask(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r != "" {
+		t.Fatal("unexpected result", r)
+	}
+
+	endpoint := fmt.Sprintf("%s/task/%s/count", s.URL(), name)
+
+	// Request data before any writes and expect null responses
+	nullResponse := `{"Series":null,"Err":null}`
+	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
+	if err != nil {
+		t.Error(err)
+	}
+
+	points := `test0 value=1 0000000000
+test1 value=1 0000000001
+test0 value=1 0000000001
+test1 value=1 0000000002
+test0 value=1 0000000002
+test1 value=1 0000000003
+test0 value=1 0000000003
+test1 value=1 0000000004
+test0 value=1 0000000005
+test1 value=1 0000000005
+test0 value=1 0000000005
+test1 value=1 0000000006
+test0 value=1 0000000007
+test1 value=1 0000000008
+test0 value=1 0000000009
+test1 value=1 0000000010
+test0 value=1 0000000011
+`
+	v := url.Values{}
+	v.Add("precision", "s")
+	s.MustWrite("mydb", "myrp", points, v)
+
+	exp := `{"Series":[{"name":"test0","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}],"Err":null}`
+	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 func TestServer_BatchTask(t *testing.T) {
 	c := NewConfig()
 	c.InfluxDB[0].Enabled = true

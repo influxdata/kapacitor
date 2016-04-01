@@ -568,6 +568,34 @@ stream
 	testStreamerWithOutput(t, "TestStream_SimpleMR", script, 15*time.Second, er, nil, false)
 }
 
+func TestStream_AllMeasurements(t *testing.T) {
+
+	var script = `
+stream
+	|from()
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|httpOut('TestStream_AllMeasurements')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    nil,
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					23.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_AllMeasurements", script, 15*time.Second, er, nil, false)
+}
+
 func TestStream_HttpOutPassThrough(t *testing.T) {
 
 	var script = `
