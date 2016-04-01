@@ -7,7 +7,6 @@ import (
 	"expvar"
 	"fmt"
 	"math"
-	"sort"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -79,9 +78,8 @@ func (v *Float) Set(value float64) {
 
 // Map is a string-to-expvar.Var map variable that satisfies the expvar.Var interface.
 type Map struct {
-	mu   sync.RWMutex
-	m    map[string]expvar.Var
-	keys []string // sorted
+	mu sync.RWMutex
+	m  map[string]expvar.Var
 }
 
 func (v *Map) String() string {
@@ -106,20 +104,6 @@ func (v *Map) Init() *Map {
 	return v
 }
 
-// updateKeys updates the sorted list of keys in v.keys.
-// must be called with v.mu held.
-func (v *Map) updateKeys() {
-	if len(v.m) == len(v.keys) {
-		// No new key.
-		return
-	}
-	v.keys = v.keys[:0]
-	for k := range v.m {
-		v.keys = append(v.keys, k)
-	}
-	sort.Strings(v.keys)
-}
-
 func (v *Map) Get(key string) expvar.Var {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
@@ -130,14 +114,12 @@ func (v *Map) Set(key string, av expvar.Var) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.m[key] = av
-	v.updateKeys()
 }
 
 func (v *Map) Delete(key string) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	delete(v.m, key)
-	v.updateKeys()
 }
 
 func (v *Map) Add(key string, delta int64) {
@@ -151,7 +133,6 @@ func (v *Map) Add(key string, delta int64) {
 		if !ok {
 			av = new(Int)
 			v.m[key] = av
-			v.updateKeys()
 		}
 		v.mu.Unlock()
 	}
@@ -174,7 +155,6 @@ func (v *Map) AddFloat(key string, delta float64) {
 		if !ok {
 			av = new(Float)
 			v.m[key] = av
-			v.updateKeys()
 		}
 		v.mu.Unlock()
 	}
@@ -197,8 +177,8 @@ func (v *Map) Do(f func(expvar.KeyValue)) {
 // doLocked calls f for each entry in the map.
 // v.mu must be held for reads.
 func (v *Map) doLocked(f func(expvar.KeyValue)) {
-	for _, k := range v.keys {
-		f(expvar.KeyValue{k, v.m[k]})
+	for k, v := range v.m {
+		f(expvar.KeyValue{k, v})
 	}
 }
 
