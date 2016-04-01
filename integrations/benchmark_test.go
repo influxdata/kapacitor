@@ -79,8 +79,8 @@ func Benchmark_T10_P500_CountTask(b *testing.B) {
 }
 
 // Few tasks, many points
-func Benchmark_T10_P500000_CountTask(b *testing.B) {
-	Bench(b, 10, 500000, "dbname", "rpname", "m1", countM1Task)
+func Benchmark_T10_P50000_CountTask(b *testing.B) {
+	Bench(b, 10, 50000, "dbname", "rpname", "m1", countM1Task)
 }
 
 // Many tasks, few points
@@ -89,8 +89,8 @@ func Benchmark_T1000_P500(b *testing.B) {
 }
 
 // Many tasks, many points
-func Benchmark_T1000_P500000_CountTask(b *testing.B) {
-	Bench(b, 1000, 500000, "dbname", "rpname", "m1", countM1Task)
+func Benchmark_T1000_P50000_CountTask(b *testing.B) {
+	Bench(b, 1000, 50000, "dbname", "rpname", "m1", countM1Task)
 }
 
 // Generic Benchmark method
@@ -133,6 +133,10 @@ func Bench(b *testing.B, tasksCount, pointCount int, db, rp, measurement, tickSc
 		b.StartTimer()
 		responseRecorder := httptest.NewRecorder()
 		httpdService.Handler.ServeHTTP(responseRecorder, writeRequest)
+		if responseRecorder.Code != http.StatusNoContent {
+			b.Fatalf("failed to write test data %s", responseRecorder.Body.String())
+		}
+
 		tm.Drain()
 		for _, t := range tasks {
 			t.Wait()
@@ -177,7 +181,7 @@ func createWriteRequest(tb testing.TB, db, rp, measurement string, pointCount in
 
 	var data bytes.Buffer
 	for i := 0; i < pointCount; i++ {
-		fmt.Fprintf(&data, "%s value=%d %010d", measurement, i, i)
+		fmt.Fprintf(&data, "%s value=%d %010d\n", measurement, i, i)
 	}
 
 	reader := bytes.NewReader(data.Bytes())
