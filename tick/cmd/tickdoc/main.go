@@ -130,7 +130,7 @@ func main() {
 	}
 	sort.Strings(ordered)
 
-	r := markdown.NewRenderer()
+	r := markdown.NewRenderer(nil)
 	for i, name := range ordered {
 		var buf bytes.Buffer
 		n := nodes[name]
