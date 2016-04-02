@@ -190,9 +190,9 @@ func (e *Edge) CollectBatch(b models.Batch) error {
 // Increment the emitted count of the group for this edge.
 func (e *Edge) incEmitted(group models.GroupID, tags models.Tags, dims []string) {
 	e.groupMu.Lock()
-	defer e.groupMu.Unlock()
 	if stats, ok := e.groupStats[group]; ok {
-		stats.emitted += 1
+		stats.emitted++
+		e.groupMu.Unlock()
 	} else {
 		stats = &edgeStat{
 			emitted: 1,
@@ -200,15 +200,16 @@ func (e *Edge) incEmitted(group models.GroupID, tags models.Tags, dims []string)
 			dims:    dims,
 		}
 		e.groupStats[group] = stats
+		e.groupMu.Unlock()
 	}
 }
 
 // Increment the collected count of the group for this edge.
 func (e *Edge) incCollected(group models.GroupID, tags models.Tags, dims []string) {
 	e.groupMu.Lock()
-	defer e.groupMu.Unlock()
 	if stats, ok := e.groupStats[group]; ok {
-		stats.collected += 1
+		stats.collected++
+		e.groupMu.Unlock()
 	} else {
 		stats = &edgeStat{
 			collected: 1,
@@ -216,5 +217,6 @@ func (e *Edge) incCollected(group models.GroupID, tags models.Tags, dims []strin
 			dims:      dims,
 		}
 		e.groupStats[group] = stats
+		e.groupMu.Unlock()
 	}
 }

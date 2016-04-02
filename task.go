@@ -61,6 +61,21 @@ func (t *Task) Dot() []byte {
 	return t.Pipeline.Dot(t.Name)
 }
 
+// returns all the measurements from a StreamNode
+func (t *Task) Measurements() []string {
+	measurements := make([]string, 0)
+
+	t.Pipeline.Walk(func(node pipeline.Node) error {
+		switch streamNode := node.(type) {
+		case *pipeline.StreamNode:
+			measurements = append(measurements, streamNode.Measurement)
+		}
+		return nil
+	})
+
+	return measurements
+}
+
 // ----------------------------------
 // ExecutingTask
 
