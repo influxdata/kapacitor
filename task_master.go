@@ -428,13 +428,27 @@ func (tm *TaskMaster) forkPoint(p models.Point) {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
 
+	// Create the fork keys - which is (db, rp, measurement)
 	key := forkKey{
 		Database:        p.Database,
 		RetentionPolicy: p.RetentionPolicy,
 		Measurement:     p.Name,
 	}
 
+	// If we have empty measurement in this db,rp we need to send it all
+	// the points
+	emptyMeasurementKey := forkKey{
+		Database:        p.Database,
+		RetentionPolicy: p.RetentionPolicy,
+		Measurement:     "",
+	}
+
+	// Merge the results to the forks map
 	for _, edge := range tm.forks[key] {
+		edge.CollectPoint(p)
+	}
+
+	for _, edge := range tm.forks[emptyMeasurementKey] {
 		edge.CollectPoint(p)
 	}
 }
