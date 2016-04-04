@@ -84,14 +84,15 @@ targets = {
 
 supported_builds = {
     'darwin': [ "amd64", "i386" ],
-    'linux': [ "amd64", "i386", "armhf", "arm64", "armel" ]
+    'linux': [ "amd64", "i386", "armhf", "arm64", "armel" ],
+    'windows': [ "amd64", "i386" ]
 }
 
 supported_packages = {
     "darwin": [ "tar"],
     "linux": [ "deb", "rpm", "tar"],
-    #"windows": [ "zip" ], Windows zips are crap, bad paths etc.
-    # Need a real solution
+    # experimental
+    "windows": [ "zip" ]
 }
 
 ################
