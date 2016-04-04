@@ -35,6 +35,9 @@ type EvalNode struct {
 	// keep all fields.
 	// tick:ignore
 	KeepList []string
+
+	// tick:ignore
+	QuiteFlag bool `tick:"Quiet"`
 }
 
 func newEvalNode(e EdgeType, exprs []tick.Node) *EvalNode {
@@ -87,5 +90,12 @@ func (e *EvalNode) As(names ...string) *EvalNode {
 func (e *EvalNode) Keep(fields ...string) *EvalNode {
 	e.KeepFlag = true
 	e.KeepList = fields
+	return e
+}
+
+// Suppress errors during evaluation.
+// tick:property
+func (e *EvalNode) Quiet() *EvalNode {
+	e.QuiteFlag = true
 	return e
 }

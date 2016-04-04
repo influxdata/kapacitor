@@ -30,7 +30,7 @@ func NewQuery(q string) (*Query, error) {
 	// Add in time condition nodes
 	query.startTL = &influxql.TimeLiteral{}
 	startExpr := &influxql.BinaryExpr{
-		Op:  influxql.GT,
+		Op:  influxql.GTE,
 		LHS: &influxql.VarRef{Val: "time"},
 		RHS: query.startTL,
 	}

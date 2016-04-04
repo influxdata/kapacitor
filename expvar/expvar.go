@@ -7,6 +7,7 @@ import (
 	"expvar"
 	"fmt"
 	"math"
+	"sort"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -172,6 +173,24 @@ func (v *Map) Do(f func(expvar.KeyValue)) {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
 	v.doLocked(f)
+}
+
+// DoSorted calls f for each entry in the map in sorted order.
+// The map is locked during the iteration,
+// but existing entries may be concurrently updated.
+func (v *Map) DoSorted(f func(expvar.KeyValue)) {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
+	keys := make([]string, len(v.m))
+	i := 0
+	for key := range v.m {
+		keys[i] = key
+		i++
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		f(expvar.KeyValue{k, v.m[k]})
+	}
 }
 
 // doLocked calls f for each entry in the map.

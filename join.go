@@ -31,10 +31,6 @@ type JoinNode struct {
 	lowMark     time.Time
 	reported    map[int]bool
 	allReported bool
-
-	//timing vars
-	mpSetter *timer.MultiPartSetter
-	postVar  timer.Setter
 }
 
 // Create a new JoinNode, which takes pairs from parent streams combines them into a single point.
@@ -80,51 +76,37 @@ func newJoinNode(et *ExecutingTask, n *pipeline.JoinNode, l *log.Logger) (*JoinN
 		jn.fill = influxql.NoFill
 	}
 	jn.node.runF = jn.runJoin
-	jn.node.stopF = jn.stopJoin
 	return jn, nil
-}
-
-func (j *JoinNode) stopJoin() {
-	j.mpSetter.Stop()
 }
 
 func (j *JoinNode) runJoin([]byte) error {
 	j.groups = make(map[models.GroupID]*group)
-	wg := sync.WaitGroup{}
 
-	// Setup multi part timer to time both the
-	// 'pre' work and 'post' work.
-	avgExecVar := &durationVar{}
-	j.statMap.Set(statAverageExecTime, avgExecVar)
-	j.mpSetter = timer.NewMultiPartSetter(avgExecVar)
-	// Time work to resolve join.on dimensions.
-	pre := j.mpSetter.NewPart()
-	preVar := &MaxDuration{setter: pre}
-	// Time work to join points.
-	post := j.mpSetter.NewPart()
-	j.postVar = &MaxDuration{setter: post}
+	groupErrs := make(chan error, 1)
+	done := make(chan struct{}, len(j.ins))
 
 	for i := range j.ins {
 		// Start gorouting per parent so we do not deadlock.
 		// This way independent of the order that parents receive data
 		// we can handle it.
-		wg.Add(1)
-		t := j.et.tm.TimingService.NewTimer(preVar)
+		t := j.et.tm.TimingService.NewTimer(j.statMap.Get(statAverageExecTime).(timer.Setter))
 		go func(i int, t timer.Timer) {
-			defer wg.Done()
+			defer func() {
+				done <- struct{}{}
+			}()
 			in := j.ins[i]
 			for p, ok := in.Next(); ok; p, ok = in.Next() {
 				t.Start()
 				srcP := srcPoint{src: i, p: p}
 				if len(j.j.Dimensions) > 0 {
 					// Match points with their group based on join dimensions.
-					j.matchPoints(srcP)
+					j.matchPoints(srcP, groupErrs)
 				} else {
 					// Just send point on to group, we are not joining on specific dimensions.
 					func() {
 						j.mu.Lock()
 						defer j.mu.Unlock()
-						group := j.getGroup(p)
+						group := j.getGroup(p, groupErrs)
 						// Send current point
 						group.points <- srcP
 					}()
@@ -133,14 +115,23 @@ func (j *JoinNode) runJoin([]byte) error {
 			}
 		}(i, t)
 	}
-	wg.Wait()
+	for range j.ins {
+		select {
+		case <-done:
+		case err := <-groupErrs:
+			return err
+		}
+	}
 	// No more points are comming signal all groups to finish up.
 	for _, group := range j.groups {
 		close(group.points)
 	}
 	j.runningGroups.Wait()
 	for _, group := range j.groups {
-		group.emitAll()
+		err := group.emitAll()
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -149,7 +140,7 @@ func (j *JoinNode) runJoin([]byte) error {
 // with the less specific points as they arrive.
 //
 // Where 'more specific' means, that a point has more dimensions than the join.on dimensions.
-func (j *JoinNode) matchPoints(p srcPoint) {
+func (j *JoinNode) matchPoints(p srcPoint, groupErrs chan<- error) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 
@@ -169,7 +160,7 @@ func (j *JoinNode) matchPoints(p srcPoint) {
 		matched := false
 		for _, match := range matches {
 			if match.p.PointTime().Round(j.j.Tolerance).Equal(t) {
-				j.sendMatchPoint(p, match)
+				j.sendMatchPoint(p, match, groupErrs)
 				matched = true
 			}
 		}
@@ -203,7 +194,7 @@ func (j *JoinNode) matchPoints(p srcPoint) {
 		l := len(buf)
 		for i = 0; i < l; i++ {
 			if buf[i].p.PointTime().Round(j.j.Tolerance).Equal(t) {
-				j.sendMatchPoint(buf[i], p)
+				j.sendMatchPoint(buf[i], p, groupErrs)
 			} else {
 				break
 			}
@@ -215,13 +206,13 @@ func (j *JoinNode) matchPoints(p srcPoint) {
 
 // Add the specific tags from the specific point to the matched point
 // and then send both on to the group.
-func (j *JoinNode) sendMatchPoint(specific, matched srcPoint) {
+func (j *JoinNode) sendMatchPoint(specific, matched srcPoint, groupErrs chan<- error) {
 	np := matched.p.Copy().Setter()
 	for key, value := range specific.p.PointTags() {
 		np.SetNewDimTag(key, value)
 	}
 	np.UpdateGroup()
-	group := j.getGroup(specific.p)
+	group := j.getGroup(specific.p, groupErrs)
 	// Send current point
 	group.points <- specific
 	// Send new matched point
@@ -230,13 +221,22 @@ func (j *JoinNode) sendMatchPoint(specific, matched srcPoint) {
 }
 
 // safely get the group for the point or create one if it doesn't exist.
-func (j *JoinNode) getGroup(p models.PointInterface) *group {
+func (j *JoinNode) getGroup(p models.PointInterface, groupErrs chan<- error) *group {
 	group := j.groups[p.PointGroup()]
 	if group == nil {
 		group = newGroup(len(j.ins), j)
 		j.groups[p.PointGroup()] = group
 		j.runningGroups.Add(1)
-		go group.run()
+		go func() {
+			err := group.run()
+			if err != nil {
+				j.logger.Println("E! join group error:", err)
+				select {
+				case groupErrs <- err:
+				default:
+				}
+			}
+		}()
 	}
 	return group
 }
@@ -254,7 +254,6 @@ type group struct {
 	oldestTime time.Time
 	j          *JoinNode
 	points     chan srcPoint
-	timer      timer.Timer
 }
 
 func newGroup(i int, j *JoinNode) *group {
@@ -263,23 +262,24 @@ func newGroup(i int, j *JoinNode) *group {
 		head:   make([]time.Time, i),
 		j:      j,
 		points: make(chan srcPoint),
-		timer:  j.et.tm.TimingService.NewTimer(j.postVar),
 	}
 }
 
 // start consuming incoming points
-func (g *group) run() {
+func (g *group) run() error {
 	defer g.j.runningGroups.Done()
 	for sp := range g.points {
-		g.timer.Start()
-		g.collect(sp.src, sp.p)
-		g.timer.Stop()
+		err := g.collect(sp.src, sp.p)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // collect a point from a given parent.
 // emit the oldest set if we have collected enough data.
-func (g *group) collect(i int, p models.PointInterface) {
+func (g *group) collect(i int, p models.PointInterface) error {
 	t := p.PointTime().Round(g.j.j.Tolerance)
 	if t.Before(g.oldestTime) || g.oldestTime.IsZero() {
 		g.oldestTime = t
@@ -307,14 +307,21 @@ func (g *group) collect(i int, p models.PointInterface) {
 		}
 	}
 	if emit {
-		g.emit()
+		err := g.emit()
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // emit a set and update the oldestTime.
-func (g *group) emit() {
+func (g *group) emit() error {
 	set := g.sets[g.oldestTime]
-	g.emitJoinedSet(set)
+	err := g.emitJoinedSet(set)
+	if err != nil {
+		return err
+	}
 	delete(g.sets, g.oldestTime)
 
 	g.oldestTime = time.Time{}
@@ -323,13 +330,19 @@ func (g *group) emit() {
 			g.oldestTime = t
 		}
 	}
+	return nil
 }
 
 // emit sets until we have none left.
-func (g *group) emitAll() {
+func (g *group) emitAll() error {
+	var lastErr error
 	for len(g.sets) > 0 {
-		g.emit()
+		err := g.emit()
+		if err != nil {
+			lastErr = err
+		}
 	}
+	return lastErr
 }
 
 // emit a single joined set
@@ -341,26 +354,22 @@ func (g *group) emitJoinedSet(set *joinset) error {
 	case pipeline.StreamEdge:
 		p, ok := set.JoinIntoPoint()
 		if ok {
-			g.timer.Pause()
 			for _, out := range g.j.outs {
 				err := out.CollectPoint(p)
 				if err != nil {
 					return err
 				}
 			}
-			g.timer.Resume()
 		}
 	case pipeline.BatchEdge:
 		b, ok := set.JoinIntoBatch()
 		if ok {
-			g.timer.Pause()
 			for _, out := range g.j.outs {
 				err := out.CollectBatch(b)
 				if err != nil {
 					return err
 				}
 			}
-			g.timer.Resume()
 		}
 	}
 	return nil

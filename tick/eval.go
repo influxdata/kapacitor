@@ -400,8 +400,6 @@ type ReflectionDescriber struct {
 	properties map[string]reflect.Value
 }
 
-var structTagPattern = regexp.MustCompile(`tick:"(\w+)"`)
-
 func NewReflectionDescriber(obj interface{}) (*ReflectionDescriber, error) {
 	r := &ReflectionDescriber{
 		obj: obj,
@@ -463,10 +461,9 @@ func getProperties(desc string, rv reflect.Value, rStructType reflect.Type, chai
 			}
 			continue
 		}
-		matches := structTagPattern.FindStringSubmatch(string(property.Tag))
-		if matches != nil && matches[1] != "" {
+		methodName := property.Tag.Get("tick")
+		if methodName != "" {
 			// Property is set via a property method.
-			methodName := matches[1]
 			method := rv.MethodByName(methodName)
 			if method.IsValid() {
 				propertyMethods[methodName] = method

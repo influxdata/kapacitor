@@ -2,7 +2,6 @@ package timer
 
 import (
 	"math/rand"
-	"sync"
 	"time"
 )
 
@@ -137,69 +136,6 @@ func (m *movavg) update(value float64) float64 {
 	}
 	m.history[m.idx] = value
 	return m.avg
-}
-
-// A setter that can have distinct part or sections.
-// By using a MultiPartSetter one can time distinct sections
-// of code and have their individuals times summed
-// to form a total timed value.
-type MultiPartSetter struct {
-	mu       sync.Mutex
-	wg       sync.WaitGroup
-	stopping chan struct{}
-
-	setter     Setter
-	partValues []int64
-	updates    chan update
-}
-
-func NewMultiPartSetter(setter Setter) *MultiPartSetter {
-	mp := &MultiPartSetter{
-		setter:   setter,
-		updates:  make(chan update),
-		stopping: make(chan struct{}),
-	}
-	mp.wg.Add(1)
-	go mp.run()
-	return mp
-}
-
-// Add a new distinct part. As new timings are set
-// for this part they will contribute to the total time.
-func (mp *MultiPartSetter) NewPart() Setter {
-	mp.mu.Lock()
-	defer mp.mu.Unlock()
-
-	p := part{
-		id:       len(mp.partValues),
-		updates:  mp.updates,
-		stopping: mp.stopping,
-	}
-	mp.partValues = append(mp.partValues, 0)
-
-	return p
-}
-
-func (mp *MultiPartSetter) Stop() {
-	close(mp.stopping)
-	mp.wg.Wait()
-}
-
-func (mp *MultiPartSetter) run() {
-	defer mp.wg.Done()
-	for {
-		select {
-		case <-mp.stopping:
-			return
-		case update := <-mp.updates:
-			mp.partValues[update.part] = update.value
-			var sum int64
-			for _, v := range mp.partValues {
-				sum += v
-			}
-			mp.setter.Set(sum)
-		}
-	}
 }
 
 type update struct {

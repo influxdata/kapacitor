@@ -105,6 +105,11 @@ func (s *SourceBatchNode) collectedCount() (count int64) {
 	return
 }
 
+const (
+	statsQueryErrors   = "query_errors"
+	statsConnectErrors = "connect_errors"
+)
+
 type BatchNode struct {
 	node
 	b        *pipeline.BatchNode
@@ -160,23 +165,7 @@ func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode, l *log.Logger) (*Bat
 	}
 	switch {
 	case n.Every != 0:
-		bn.ticker = newTimeTicker(n.Every)
-	case n.Cron != "":
-		var err error
-		bn.ticker, err = newCronTicker(n.Cron)
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, errors.New("must define one of 'every' or 'cron'")
-	}
-
-	if n.Every != 0 && n.Cron != "" {
-		return nil, errors.New("must not set both 'every' and 'cron' properties")
-	}
-	switch {
-	case n.Every != 0:
-		bn.ticker = newTimeTicker(n.Every)
+		bn.ticker = newTimeTicker(n.Every, n.AlignFlag)
 	case n.Cron != "":
 		var err error
 		bn.ticker, err = newCronTicker(n.Cron)
@@ -270,6 +259,7 @@ func (b *BatchNode) doQuery() error {
 			if err != nil {
 				b.logger.Println("E! failed to connect to InfluxDB:", err)
 				b.timer.Stop()
+				b.statMap.Add(statsConnectErrors, 1)
 				break
 			}
 			q := client.Query{
@@ -281,12 +271,14 @@ func (b *BatchNode) doQuery() error {
 			if err != nil {
 				b.logger.Println("E! query failed:", err)
 				b.timer.Stop()
+				b.statMap.Add(statsQueryErrors, 1)
 				break
 			}
 
 			if err := resp.Error(); err != nil {
 				b.logger.Println("E! query failed:", err)
 				b.timer.Stop()
+				b.statMap.Add(statsQueryErrors, 1)
 				break
 			}
 
@@ -295,6 +287,7 @@ func (b *BatchNode) doQuery() error {
 				batches, err := models.ResultToBatches(res)
 				if err != nil {
 					b.logger.Println("E! failed to understand query result:", err)
+					b.statMap.Add(statsQueryErrors, 1)
 					continue
 				}
 				b.timer.Pause()
@@ -312,6 +305,8 @@ func (b *BatchNode) doQuery() error {
 }
 
 func (b *BatchNode) runBatch([]byte) error {
+	b.statMap.Add(statsQueryErrors, 0)
+	b.statMap.Add(statsConnectErrors, 0)
 	errC := make(chan error, 1)
 	go func() {
 		defer func() {
@@ -371,20 +366,61 @@ type ticker interface {
 }
 
 type timeTicker struct {
-	every  time.Duration
-	ticker *time.Ticker
-	mu     sync.Mutex
+	every     time.Duration
+	alignChan chan time.Time
+	stopping  chan struct{}
+	ticker    *time.Ticker
+	mu        sync.Mutex
+	wg        sync.WaitGroup
 }
 
-func newTimeTicker(every time.Duration) *timeTicker {
-	return &timeTicker{every: every}
+func newTimeTicker(every time.Duration, align bool) *timeTicker {
+	t := &timeTicker{
+		every: every,
+	}
+	if align {
+		t.alignChan = make(chan time.Time)
+		t.stopping = make(chan struct{})
+	}
+	return t
 }
 
 func (t *timeTicker) Start() <-chan time.Time {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.ticker = time.NewTicker(t.every)
-	return t.ticker.C
+	if t.alignChan != nil {
+		t.wg.Add(1)
+		go func() {
+			defer t.wg.Done()
+			// Sleep until we are roughly aligned
+			now := time.Now()
+			next := now.Truncate(t.every).Add(t.every)
+			after := time.NewTicker(next.Sub(now))
+			select {
+			case <-after.C:
+				after.Stop()
+			case <-t.stopping:
+				after.Stop()
+				return
+			}
+			t.ticker = time.NewTicker(t.every)
+			// Send first event since we waited for it explicitly
+			t.alignChan <- next
+			for {
+				select {
+				case <-t.stopping:
+					return
+				case now := <-t.ticker.C:
+					now = now.Truncate(t.every)
+					t.alignChan <- now
+				}
+			}
+		}()
+		return t.alignChan
+	} else {
+		t.ticker = time.NewTicker(t.every)
+		return t.ticker.C
+	}
 }
 
 func (t *timeTicker) Stop() {
@@ -393,6 +429,10 @@ func (t *timeTicker) Stop() {
 	if t.ticker != nil {
 		t.ticker.Stop()
 	}
+	if t.alignChan != nil {
+		close(t.stopping)
+	}
+	t.wg.Wait()
 }
 
 func (t *timeTicker) Next(now time.Time) time.Time {
