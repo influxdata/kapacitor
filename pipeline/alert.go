@@ -16,6 +16,9 @@ const defaultMessageTmpl = "{{ .ID }} is {{ .Level }}"
 // Default template for constructing a details message.
 const defaultDetailsTmpl = "{{ json . }}"
 
+// Default log mode for file
+const defaultLogFileMode = 0600
+
 // An AlertNode can trigger an event of varying severity levels,
 // and pass the event to alert handlers. The criteria for triggering
 // an alert is specified via a [lambda expression](/kapacitor/v0.11/tick/expr/).
@@ -428,11 +431,22 @@ type ExecHandler struct {
 // Log JSON alert data to file. One event per line.
 // Must specify the absolute path to the log file.
 // It will be created if it does not exist.
+// Example:
+//    stream
+//         |alert()
+//					.log('/tmp/alert')
+//
+// Example:
+//    stream
+//         |alert()
+//					.log('/tmp/alert')
+//					.mode(0644)
 // tick:property
 func (a *AlertNode) Log(filepath string) *LogHandler {
 	log := &LogHandler{
 		AlertNode: a,
 		FilePath:  filepath,
+		Mode:      defaultLogFileMode,
 	}
 	a.LogHandlers = append(a.LogHandlers, log)
 	return log
@@ -446,6 +460,9 @@ type LogHandler struct {
 	// It will be created if it does not exist.
 	// tick:ignore
 	FilePath string
+
+	// File's mode and permissions, default is 0600
+	Mode int64
 }
 
 // Send alert to VictorOps.

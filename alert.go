@@ -613,7 +613,7 @@ func (a *AlertNode) handleLog(l *pipeline.LogHandler, ad *AlertData) {
 		a.logger.Println("E! failed to marshal alert data json", err)
 		return
 	}
-	f, err := os.OpenFile(l.FilePath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0600)
+	f, err := os.OpenFile(l.FilePath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, os.FileMode(l.Mode))
 	if err != nil {
 		a.logger.Println("E! failed to open file for alert logging", err)
 		return
