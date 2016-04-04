@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	text "text/template"
 	"time"
 
@@ -100,6 +101,8 @@ type AlertNode struct {
 	idTmpl      *text.Template
 	messageTmpl *text.Template
 	detailsTmpl *html.Template
+
+	bufPool sync.Pool
 }
 
 // Create a new  AlertNode which caches the most recent item and exposes it over the HTTP API.
@@ -109,6 +112,13 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		a:    n,
 	}
 	an.node.runF = an.runAlert
+
+	// Create buffer pool for the templates
+	an.bufPool = sync.Pool{
+		New: func() interface{} {
+			return new(bytes.Buffer)
+		},
+	}
 
 	// Parse templates
 	an.idTmpl, err = text.New("id").Parse(n.Id)
@@ -520,8 +530,10 @@ func (a *AlertNode) renderID(name string, group models.GroupID, tags models.Tags
 		Group:    g,
 		Tags:     tags,
 	}
-	var id bytes.Buffer
-	err := a.idTmpl.Execute(&id, info)
+	id := a.bufPool.Get().(*bytes.Buffer)
+	defer a.bufPool.Put(id)
+	id.Reset()
+	err := a.idTmpl.Execute(id, info)
 	if err != nil {
 		return "", err
 	}
@@ -545,21 +557,32 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group 
 		Level:  level.String(),
 		Time:   t,
 	}
-	var msg bytes.Buffer
-	err := a.messageTmpl.Execute(&msg, minfo)
+
+	// Grab a buffer for the message template and the details template
+	tmpBuffer := a.bufPool.Get().(*bytes.Buffer)
+	defer a.bufPool.Put(tmpBuffer)
+	tmpBuffer.Reset()
+
+	err := a.messageTmpl.Execute(tmpBuffer, minfo)
 	if err != nil {
 		return "", "", detailsInfo{}, err
 	}
+
+	msg := tmpBuffer.String()
 	dinfo := detailsInfo{
 		messageInfo: minfo,
-		Message:     msg.String(),
+		Message:     msg,
 	}
-	var details bytes.Buffer
-	err = a.detailsTmpl.Execute(&details, dinfo)
+
+	// Reuse the buffer, for the details template
+	tmpBuffer.Reset()
+	err = a.detailsTmpl.Execute(tmpBuffer, dinfo)
 	if err != nil {
 		return "", "", dinfo, err
 	}
-	return msg.String(), details.String(), dinfo, nil
+
+	details := tmpBuffer.String()
+	return msg, details, dinfo, nil
 }
 
 //--------------------------------
