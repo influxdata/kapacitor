@@ -1,8 +1,6 @@
 package pipeline
 
-import (
-	"github.com/influxdata/kapacitor/tick"
-)
+import "github.com/influxdata/kapacitor/tick"
 
 // Number of previous states to remember when computing flapping percentage.
 const defaultFlapHistory = 21
