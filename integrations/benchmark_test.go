@@ -41,6 +41,16 @@ const (
 	|count('value')
 	|log()
 `
+
+	alertM1Task = `stream
+	|from()
+		.measurement('m1')
+	|alert()
+	 .id('{{ .Name }}_{{ .TaskName }}')
+		.info(lambda: "value" > 10)
+		.warn(lambda: "value" > 20)
+		.crit(lambda: "value" > 30)
+`
 )
 
 //----------------------------
@@ -91,6 +101,24 @@ func Benchmark_T1000_P500(b *testing.B) {
 // Many tasks, many points
 func Benchmark_T1000_P50000_CountTask(b *testing.B) {
 	Bench(b, 1000, 50000, "dbname", "rpname", "m1", countM1Task)
+}
+
+//----------------------------
+// Alert Task Benchmarks
+
+// Few tasks, few points
+func Benchmark_T10_P500_AlertTask(b *testing.B) {
+	Bench(b, 10, 500, "dbname", "rpname", "m1", alertM1Task)
+}
+
+// Few tasks, many points
+func Benchmark_T10_P50000_AlertTask(b *testing.B) {
+	Bench(b, 10, 50000, "dbname", "rpname", "m1", alertM1Task)
+}
+
+// Many tasks, few points
+func Benchmark_T1000_P500_AlertTask(b *testing.B) {
+	Bench(b, 1000, 500, "dbname", "rpname", "m1", alertM1Task)
 }
 
 // Generic Benchmark method
