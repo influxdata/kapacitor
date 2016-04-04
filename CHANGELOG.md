@@ -1,6 +1,14 @@
 # Changelog
 
-## v0.12.0 [unreleased]
+## v0.13.0 [unreleased]
+
+### Release Notes
+
+### Features
+
+### Bugfixes
+
+## v0.12.0 [2016-04-04]
 
 ### Release Notes
 
