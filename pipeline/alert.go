@@ -434,13 +434,13 @@ type ExecHandler struct {
 // Example:
 //    stream
 //         |alert()
-//					.log('/tmp/alert')
+//             .log('/tmp/alert')
 //
 // Example:
 //    stream
 //         |alert()
-//					.log('/tmp/alert')
-//					.mode(0644)
+//             .log('/tmp/alert')
+//             .mode(0644)
 // tick:property
 func (a *AlertNode) Log(filepath string) *LogHandler {
 	log := &LogHandler{
