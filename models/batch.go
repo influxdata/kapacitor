@@ -144,7 +144,6 @@ func ResultToBatches(res client.Result) ([]Batch, error) {
 		}
 		b.Points = make([]BatchPoint, 0, len(series.Values))
 		for _, v := range series.Values {
-			var skip bool
 			fields := make(Fields)
 			var t time.Time
 			for i, c := range series.Columns {
@@ -170,13 +169,12 @@ func ResultToBatches(res client.Result) ([]Batch, error) {
 						}
 					}
 					if value == nil {
-						skip = true
 						break
 					}
 					fields[c] = value
 				}
 			}
-			if !skip {
+			if len(fields) > 0 {
 				if t.After(b.TMax) {
 					b.TMax = t
 				}

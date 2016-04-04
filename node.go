@@ -200,7 +200,7 @@ func (n *node) edot(buf *bytes.Buffer, labels bool) {
 				n.Name(),
 			),
 		))
-		n.statMap.Do(func(kv expvar.KeyValue) {
+		n.statMap.DoSorted(func(kv expvar.KeyValue) {
 			buf.Write([]byte(
 				fmt.Sprintf("%s=%s ",
 					kv.Key,
@@ -227,7 +227,7 @@ func (n *node) edot(buf *bytes.Buffer, labels bool) {
 				n.Name(),
 			),
 		))
-		n.statMap.Do(func(kv expvar.KeyValue) {
+		n.statMap.DoSorted(func(kv expvar.KeyValue) {
 			buf.Write([]byte(
 				fmt.Sprintf("%s=\"%s\" ",
 					kv.Key,

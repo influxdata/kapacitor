@@ -84,6 +84,11 @@ type BatchNode struct {
 	// The Every property is mutually exclusive with the Cron property.
 	Every time.Duration
 
+	// Align start and end times with the Every value
+	// Does not apply if Cron is used.
+	// tick:ignore
+	AlignFlag bool `tick:"Align"`
+
 	// Define a schedule using a cron syntax.
 	//
 	// The specific cron implementation is documented here:
@@ -140,5 +145,13 @@ func newBatchNode() *BatchNode {
 // tick:property
 func (b *BatchNode) GroupBy(d ...interface{}) *BatchNode {
 	b.Dimensions = d
+	return b
+}
+
+// Align start and stop times for quiries with even boundaries of the BatchNode.Every property.
+// Does not apply if using the BatchNode.Cron property.
+// tick:property
+func (b *BatchNode) Align() *BatchNode {
+	b.AlignFlag = true
 	return b
 }
