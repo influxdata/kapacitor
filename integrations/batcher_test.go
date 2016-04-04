@@ -252,6 +252,39 @@ batch
 	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er)
 }
 
+func TestBatch_DoubleGroupBy(t *testing.T) {
+
+	var script = `
+batch
+	|query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "host" = 'serverA' AND "cpu" != 'cpu-total'
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s), 'cpu')
+	|groupBy()
+	|max('mean')
+	|httpOut('TestBatch_SimpleMR')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu_usage_idle",
+				Columns: []string{"time", "max"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 18, 0, time.UTC),
+					95.98484848485191,
+				}},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er)
+}
+
 func TestBatch_Join(t *testing.T) {
 
 	var script = `

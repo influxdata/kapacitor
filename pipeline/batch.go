@@ -3,6 +3,8 @@ package pipeline
 import (
 	"bytes"
 	"time"
+
+	"github.com/influxdata/kapacitor/tick"
 )
 
 // A node that handles creating several child BatchNodes.
@@ -72,6 +74,9 @@ func (b *SourceBatchNode) dot(buf *bytes.Buffer) {
 type BatchNode struct {
 	chainnode
 
+	// self describer
+	describer *tick.ReflectionDescriber
+
 	// The query text
 	//tick:ignore
 	QueryStr string
@@ -125,9 +130,11 @@ type BatchNode struct {
 }
 
 func newBatchNode() *BatchNode {
-	return &BatchNode{
+	b := &BatchNode{
 		chainnode: newBasicChainNode("batch", BatchEdge, BatchEdge),
 	}
+	b.describer, _ = tick.NewReflectionDescriber(b)
+	return b
 }
 
 // Group the data by a set of dimensions.
@@ -154,4 +161,42 @@ func (b *BatchNode) GroupBy(d ...interface{}) *BatchNode {
 func (b *BatchNode) Align() *BatchNode {
 	b.AlignFlag = true
 	return b
+}
+
+// Tick Describer methods
+
+//tick:ignore
+func (b *BatchNode) Desc() string {
+	return b.describer.Desc()
+}
+
+//tick:ignore
+func (b *BatchNode) HasChainMethod(name string) bool {
+	if name == "groupBy" {
+		return true
+	}
+	return b.describer.HasChainMethod(name)
+}
+
+//tick:ignore
+func (b *BatchNode) CallChainMethod(name string, args ...interface{}) (interface{}, error) {
+	if name == "groupBy" {
+		return b.chainnode.GroupBy(args...), nil
+	}
+	return b.describer.CallChainMethod(name, args...)
+}
+
+//tick:ignore
+func (b *BatchNode) HasProperty(name string) bool {
+	return b.describer.HasProperty(name)
+}
+
+//tick:ignore
+func (b *BatchNode) Property(name string) interface{} {
+	return b.describer.Property(name)
+}
+
+//tick:ignore
+func (b *BatchNode) SetProperty(name string, args ...interface{}) (interface{}, error) {
+	return b.describer.SetProperty(name, args...)
 }
