@@ -46,6 +46,7 @@ format a TICKscript file according to a common standard.
 - [#387](https://github.com/influxdata/kapacitor/issues/387): Add `.quiet()` option to EvalNode so errors can be suppressed if expected.
 - [#400](https://github.com/influxdata/kapacitor/issues/400): All query/connection errors are counted and reported in BatchNode stats.
 - [#412](https://github.com/influxdata/kapacitor/pull/412): Fix issues with batch queries dropping points because of nil fields.
+- [#413](https://github.com/influxdata/kapacitor/pull/413): Allow disambiguation between ".groupBy" and "|groupBy".
 
 
 ## v0.11.0 [2016-03-22]
