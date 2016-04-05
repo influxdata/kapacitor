@@ -90,6 +90,7 @@ func NewService(configs []Config, defaultInfluxDB int, hostname string, l *log.L
 			startupTimeout: time.Duration(c.StartUpTimeout),
 			clusterID:      clusterID,
 			subName:        subName,
+			disableSubs:    c.DisableSubscriptions,
 		}
 		if defaultInfluxDB == i {
 			defaultInfluxDBName = c.Name
@@ -148,6 +149,7 @@ type influxdb struct {
 	udpBuffer      int
 	udpReadBuffer  int
 	startupTimeout time.Duration
+	disableSubs    bool
 
 	clusterID string
 	subName   string
@@ -177,7 +179,10 @@ type subInfo struct {
 }
 
 func (s *influxdb) Open() error {
-	return s.linkSubscriptions()
+	if !s.disableSubs {
+		return s.linkSubscriptions()
+	}
+	return nil
 }
 
 func (s *influxdb) Close() error {
