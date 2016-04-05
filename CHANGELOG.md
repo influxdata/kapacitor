@@ -6,6 +6,8 @@
 
 ### Features
 
+- [#360](https://github.com/influxdata/kapacitor/pull/360): Forking tasks by measurement in order to improve performance
+
 ### Bugfixes
 
 ## v0.12.0 [2016-04-04]
