@@ -5,10 +5,18 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/gogo/protobuf/proto"
+	"github.com/golang/protobuf/proto"
 )
 
-//go:generate protoc --gogo_out=./ --python_out=./agent/py/ udf.proto
+//go:generate protoc --go_out=./ --python_out=./agent/py/ udf.proto
+
+// Interface for reading messages
+// If you have an io.Reader
+// wrap your reader in a bufio Reader
+// to stasify this interface.
+//
+// Example:
+// brr := bufio.NewReader(reader)
 type ByteReadReader interface {
 	io.Reader
 	io.ByteReader

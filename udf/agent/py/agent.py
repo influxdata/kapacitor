@@ -9,6 +9,8 @@ from threading import Lock, Thread
 from Queue import Queue
 import io
 import traceback
+import socket
+import os
 
 import logging
 logger = logging.getLogger()
@@ -75,11 +77,11 @@ class Agent(object):
         try:
             data = response.SerializeToString()
             # Write message len
-            encodeUvarint(sys.stdout, len(data))
+            encodeUvarint(self._out, len(data))
             # Write message
-            sys.stdout.write(data)
+            self._out.write(data)
             if flush:
-                sys.stdout.flush()
+                self._out.flush()
         finally:
             self._write_lock.release()
 
@@ -89,8 +91,8 @@ class Agent(object):
         while True:
             msg = 'unknown'
             try:
-                size = decodeUvarint32(sys.stdin)
-                data = sys.stdin.read(size)
+                size = decodeUvarint32(self._in)
+                data = self._in.read(size)
 
                 request.ParseFromString(data)
 
@@ -169,3 +171,29 @@ def decodeUvarint32(reader):
         shift += shiftSize
         if shift >= 32:
             raise Exception("too many bytes when decoding varint, larger than 32bit uint")
+
+class Server(object):
+    def __init__(self, socket_path, accepter):
+        self._socket_path = socket_path
+        self._listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM )
+        self._listener.bind(socket_path)
+        self._accepter = accepter
+
+    def serve(self):
+        self._listener.listen(5)
+        try:
+            while True:
+                conn, addr = self._listener.accept()
+                conn = conn.makefile()
+                thread = Thread(target=self._accepter.accept, args=(conn,addr))
+                thread.start()
+        except:
+            self.stop()
+
+    def stop(self):
+        self._listener.close()
+        try:
+            os.remove(self._socket_path)
+        except:
+            pass
+

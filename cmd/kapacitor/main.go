@@ -392,7 +392,10 @@ func doRecord(args []string) error {
 	default:
 		return fmt.Errorf("Unknown record type %q, expected 'stream', 'batch' or 'query'", args[0])
 	}
-
+	_, err = cli.Recording(rid)
+	if err != nil {
+		return err
+	}
 	fmt.Println(rid)
 	return nil
 }

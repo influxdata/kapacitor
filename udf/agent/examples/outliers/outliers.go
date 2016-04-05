@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 	"sort"
 
 	"github.com/influxdata/kapacitor/udf"
@@ -194,7 +195,7 @@ func (s *outlierState) median(data entries) (left, right int, median float64) {
 }
 
 func main() {
-	a := agent.New()
+	a := agent.New(os.Stdin, os.Stdout)
 	h := newOutlierHandler(a)
 	a.Handler = h
 

@@ -995,6 +995,163 @@ test,group=b value=0 0000000011
 	}
 }
 
+func TestServer_UDFStreamAgentsSocket(t *testing.T) {
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	udfDir := filepath.Clean(filepath.Join(dir, "../../../udf"))
+
+	tdir, err := ioutil.TempDir("", "kapacitor_server_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tdir)
+
+	agents := []struct {
+		startFunc func() *exec.Cmd
+		config    udf.FunctionConfig
+	}{
+		// Go
+		{
+			startFunc: func() *exec.Cmd {
+				cmd := exec.Command(
+					"go",
+					"build",
+					"-o",
+					filepath.Join(tdir, "echo"),
+					filepath.Join(udfDir, "agent/examples/echo/echo.go"),
+				)
+				out, err := cmd.CombinedOutput()
+				if err != nil {
+					t.Fatal(string(out))
+				}
+				cmd = exec.Command(
+					filepath.Join(tdir, "echo"),
+					"-socket",
+					filepath.Join(tdir, "echo.go.sock"),
+				)
+				cmd.Stderr = os.Stderr
+				return cmd
+			},
+			config: udf.FunctionConfig{
+				Socket:  filepath.Join(tdir, "echo.go.sock"),
+				Timeout: toml.Duration(time.Minute),
+			},
+		},
+		// Python
+		{
+			startFunc: func() *exec.Cmd {
+				cmd := exec.Command(
+					"python2",
+					"-u",
+					filepath.Join(udfDir, "agent/examples/echo/echo.py"),
+					filepath.Join(tdir, "echo.py.sock"),
+				)
+				cmd.Stderr = os.Stderr
+				env := os.Environ()
+				env = append(env, fmt.Sprintf(
+					"%s=%s",
+					"PYTHONPATH",
+					strings.Join(
+						[]string{filepath.Join(udfDir, "agent/py"), os.Getenv("PYTHONPATH")},
+						string(filepath.ListSeparator),
+					),
+				))
+				cmd.Env = env
+				return cmd
+			},
+			config: udf.FunctionConfig{
+				Socket:  filepath.Join(tdir, "echo.py.sock"),
+				Timeout: toml.Duration(time.Minute),
+			},
+		},
+	}
+	for _, agent := range agents {
+		cmd := agent.startFunc()
+		cmd.Start()
+		defer cmd.Process.Signal(os.Interrupt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		c := NewConfig()
+		c.UDF.Functions = map[string]udf.FunctionConfig{
+			"echo": agent.config,
+		}
+		testStreamAgentSocket(t, c)
+	}
+}
+
+func testStreamAgentSocket(t *testing.T, c *run.Config) {
+	s := NewServer(c)
+	err := s.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	cli := Client(s)
+
+	name := "testUDFTask"
+	ttype := "stream"
+	dbrps := []client.DBRP{{
+		Database:        "mydb",
+		RetentionPolicy: "myrp",
+	}}
+	tick := `stream
+    |from()
+        .measurement('test')
+        .groupBy('group')
+    @echo()
+    |window()
+        .period(10s)
+        .every(10s)
+    |count('value')
+    |httpOut('count')
+`
+
+	err = cli.Define(name, ttype, dbrps, strings.NewReader(tick), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = cli.Enable(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	endpoint := fmt.Sprintf("%s/task/%s/count", s.URL(), name)
+
+	// Request data before any writes and expect null responses
+	nullResponse := `{"Series":null,"Err":null}`
+	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
+	if err != nil {
+		t.Error(err)
+	}
+
+	points := `test,group=a value=1 0000000000
+test,group=a value=1 0000000001
+test,group=a value=1 0000000002
+test,group=a value=1 0000000003
+test,group=a value=1 0000000004
+test,group=a value=1 0000000005
+test,group=a value=1 0000000006
+test,group=a value=1 0000000007
+test,group=a value=1 0000000008
+test,group=a value=1 0000000009
+test,group=a value=0 0000000010
+test,group=a value=0 0000000011
+`
+	v := url.Values{}
+	v.Add("precision", "s")
+	s.MustWrite("mydb", "myrp", points, v)
+
+	exp := `{"Series":[{"name":"test","tags":{"group":"a"},"columns":["time","count"],"values":[["1970-01-01T00:00:10Z",10]]}],"Err":null}`
+	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 func TestServer_UDFBatchAgents(t *testing.T) {
 	dir, err := os.Getwd()
 	if err != nil {
