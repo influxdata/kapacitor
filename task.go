@@ -31,6 +31,22 @@ func (t TaskType) String() string {
 	}
 }
 
+func (t TaskType) MarshalText() ([]byte, error) {
+	return []byte(t.String()), nil
+}
+
+func (t *TaskType) UnmarshalText(text []byte) error {
+	switch string(text) {
+	case "stream":
+		*t = StreamTask
+	case "batch":
+		*t = BatchTask
+	default:
+		return fmt.Errorf("unknown task type %s", string(text))
+	}
+	return nil
+}
+
 type DBRP struct {
 	Database        string `json:"db"`
 	RetentionPolicy string `json:"rp"`

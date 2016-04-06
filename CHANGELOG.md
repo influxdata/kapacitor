@@ -7,6 +7,7 @@
 ### Features
 
 - [#360](https://github.com/influxdata/kapacitor/pull/360): Forking tasks by measurement in order to improve performance
+- [#386](https://github.com/influxdata/kapacitor/issues/386): Adds official Go HTTP client package.
 
 ### Bugfixes
 

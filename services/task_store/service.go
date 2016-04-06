@@ -442,6 +442,7 @@ func (ts *Service) handleSave(w http.ResponseWriter, r *http.Request) {
 		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
 		return
 	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (ts *Service) handleDelete(w http.ResponseWriter, r *http.Request) {
@@ -452,6 +453,7 @@ func (ts *Service) handleDelete(w http.ResponseWriter, r *http.Request) {
 		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
 		return
 	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (ts *Service) handleEnable(w http.ResponseWriter, r *http.Request) {
@@ -461,6 +463,7 @@ func (ts *Service) handleEnable(w http.ResponseWriter, r *http.Request) {
 		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
 		return
 	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (ts *Service) handleDisable(w http.ResponseWriter, r *http.Request) {
@@ -470,6 +473,7 @@ func (ts *Service) handleDisable(w http.ResponseWriter, r *http.Request) {
 		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
 		return
 	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (ts *Service) Save(task *rawTask) error {
