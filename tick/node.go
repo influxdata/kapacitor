@@ -191,11 +191,11 @@ func (n *BoolNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
 type UnaryNode struct {
 	position
 	Node     Node
-	Operator tokenType
+	Operator TokenType
 	Comment  Node
 }
 
-func newUnary(p position, op tokenType, n Node, c Node) *UnaryNode {
+func newUnary(p position, op TokenType, n Node, c Node) *UnaryNode {
 	return &UnaryNode{
 		position: p,
 		Node:     n,
@@ -223,13 +223,13 @@ type BinaryNode struct {
 	position
 	Left      Node
 	Right     Node
-	Operator  tokenType
+	Operator  TokenType
 	Comment   Node
 	Parens    bool
 	MultiLine bool
 }
 
-func newBinary(p position, op tokenType, left, right Node, multiLine bool, comment Node) *BinaryNode {
+func newBinary(p position, op TokenType, left, right Node, multiLine bool, comment Node) *BinaryNode {
 	return &BinaryNode{
 		position:  p,
 		Left:      left,
@@ -305,11 +305,11 @@ type ChainNode struct {
 	position
 	Left     Node
 	Right    Node
-	Operator tokenType
+	Operator TokenType
 	Comment  Node
 }
 
-func newChain(p position, op tokenType, left, right Node, comment Node) *ChainNode {
+func newChain(p position, op TokenType, left, right Node, comment Node) *ChainNode {
 	return &ChainNode{
 		position: p,
 		Left:     left,

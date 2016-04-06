@@ -148,7 +148,7 @@ func (s *StatefulExpr) eval(n Node, scope *Scope, stck *stack) (err error) {
 	return nil
 }
 
-func (s *StatefulExpr) evalUnary(op tokenType, scope *Scope, stck *stack) error {
+func (s *StatefulExpr) evalUnary(op TokenType, scope *Scope, stck *stack) error {
 	v := stck.Pop()
 	switch op {
 	case TokenMinus:
@@ -170,11 +170,11 @@ func (s *StatefulExpr) evalUnary(op tokenType, scope *Scope, stck *stack) error 
 	return nil
 }
 
-func errMismatched(op tokenType, l, r interface{}) error {
+func errMismatched(op TokenType, l, r interface{}) error {
 	return fmt.Errorf("mismatched type to binary operator. got %T %v %T. see bool(), int(), float()", l, op, r)
 }
 
-func (s *StatefulExpr) evalBinary(op tokenType, scope *Scope, stck *stack) (err error) {
+func (s *StatefulExpr) evalBinary(op TokenType, scope *Scope, stck *stack) (err error) {
 	r := stck.Pop()
 	l := stck.Pop()
 	// Resolve any references
@@ -262,7 +262,7 @@ func (s *StatefulExpr) evalBinary(op tokenType, scope *Scope, stck *stack) (err 
 	return
 }
 
-func doIntMath(op tokenType, l, r int64) (v int64, err error) {
+func doIntMath(op TokenType, l, r int64) (v int64, err error) {
 	switch op {
 	case TokenPlus:
 		v = l + r
@@ -280,7 +280,7 @@ func doIntMath(op tokenType, l, r int64) (v int64, err error) {
 	return
 }
 
-func doFloatMath(op tokenType, l, r float64) (v float64, err error) {
+func doFloatMath(op TokenType, l, r float64) (v float64, err error) {
 	switch op {
 	case TokenPlus:
 		v = l + r
@@ -296,7 +296,7 @@ func doFloatMath(op tokenType, l, r float64) (v float64, err error) {
 	return
 }
 
-func doBoolComp(op tokenType, l, r bool) (v bool, err error) {
+func doBoolComp(op TokenType, l, r bool) (v bool, err error) {
 	switch op {
 	case TokenEqual:
 		v = l == r
@@ -312,7 +312,7 @@ func doBoolComp(op tokenType, l, r bool) (v bool, err error) {
 	return
 }
 
-func doFloatComp(op tokenType, l, r float64) (v bool, err error) {
+func doFloatComp(op TokenType, l, r float64) (v bool, err error) {
 	switch op {
 	case TokenEqual:
 		v = l == r
@@ -332,7 +332,7 @@ func doFloatComp(op tokenType, l, r float64) (v bool, err error) {
 	return
 }
 
-func doStringComp(op tokenType, l, r string) (v bool, err error) {
+func doStringComp(op TokenType, l, r string) (v bool, err error) {
 	switch op {
 	case TokenEqual:
 		v = l == r
@@ -352,7 +352,7 @@ func doStringComp(op tokenType, l, r string) (v bool, err error) {
 	return
 }
 
-func doRegexComp(op tokenType, l string, r *regexp.Regexp) (v bool, err error) {
+func doRegexComp(op TokenType, l string, r *regexp.Regexp) (v bool, err error) {
 	switch op {
 	case TokenRegexEqual:
 		v = r.MatchString(l)
