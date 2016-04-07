@@ -32,6 +32,7 @@ Example UDF config for a socket based UDF.
 - [#429](https://github.com/influxdata/kapacitor/issues/429): BREAKING: Change TICKscript parser to be left-associative on equal precedence operators. For example previously this statement `(1+2-3*4/5)` was evaluated as `(1+(2-(3*(4/5))))`
     which is not the typical/expected behavior. Now using left-associative parsing the statement is evaluated as `((1+2)-((3*4)/5))`.
 - [#456](https://github.com/influxdata/kapacitor/pull/456): Fixes Alerta integration to let server set status, fix `rawData` attribute and set default severity to `indeterminate`.
+- [#425](https://github.com/influxdata/kapacitor/pull/425): BREAKING: Preserving tags on influxql simple selectors - first, last, max, min, percentile
 
 ## v0.12.0 [2016-04-04]
 

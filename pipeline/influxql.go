@@ -178,6 +178,7 @@ func (n *chainnode) First(field string) *InfluxQLNode {
 			fn := influxql.NewIntegerFuncReducer(influxql.IntegerFirstReduce)
 			return fn, fn
 		},
+		IsSimpleSelector: true,
 	})
 	n.linkChild(i)
 	return i
@@ -194,6 +195,7 @@ func (n *chainnode) Last(field string) *InfluxQLNode {
 			fn := influxql.NewIntegerFuncReducer(influxql.IntegerLastReduce)
 			return fn, fn
 		},
+		IsSimpleSelector: true,
 	})
 	n.linkChild(i)
 	return i
@@ -210,6 +212,7 @@ func (n *chainnode) Min(field string) *InfluxQLNode {
 			fn := influxql.NewIntegerFuncReducer(influxql.IntegerMinReduce)
 			return fn, fn
 		},
+		IsSimpleSelector: true,
 	})
 	n.linkChild(i)
 	return i
@@ -226,6 +229,7 @@ func (n *chainnode) Max(field string) *InfluxQLNode {
 			fn := influxql.NewIntegerFuncReducer(influxql.IntegerMaxReduce)
 			return fn, fn
 		},
+		IsSimpleSelector: true,
 	})
 	n.linkChild(i)
 	return i
@@ -242,6 +246,7 @@ func (n *chainnode) Percentile(field string, percentile float64) *InfluxQLNode {
 			fn := influxql.NewIntegerSliceFuncReducer(influxql.NewIntegerPercentileReduceSliceFunc(percentile))
 			return fn, fn
 		},
+		IsSimpleSelector: true,
 	})
 	n.linkChild(i)
 	return i

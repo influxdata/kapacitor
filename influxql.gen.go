@@ -16,9 +16,10 @@ import (
 )
 
 type floatPointAggregator struct {
-	field         string
-	topBottomInfo *pipeline.TopBottomCallInfo
-	aggregator    influxql.FloatPointAggregator
+	field            string
+	topBottomInfo    *pipeline.TopBottomCallInfo
+	isSimpleSelector bool
+	aggregator       influxql.FloatPointAggregator
 }
 
 func floatPopulateAuxFieldsAndTags(ap *influxql.FloatPoint, fieldsAndTags []string, fields models.Fields, tags models.Tags) {
@@ -44,6 +45,11 @@ func (a *floatPointAggregator) AggregateBatch(b *models.Batch) {
 			// We need to populate the Aux fields
 			floatPopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
 		}
+
+		if a.isSimpleSelector {
+			ap.Aux = []interface{}{p.Tags}
+		}
+
 		a.aggregator.AggregateFloat(ap)
 	}
 }
@@ -59,13 +65,19 @@ func (a *floatPointAggregator) AggregatePoint(p *models.Point) {
 		// We need to populate the Aux fields
 		floatPopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
 	}
+
+	if a.isSimpleSelector {
+		ap.Aux = []interface{}{p.Tags}
+	}
+
 	a.aggregator.AggregateFloat(ap)
 }
 
 type floatPointBulkAggregator struct {
-	field         string
-	topBottomInfo *pipeline.TopBottomCallInfo
-	aggregator    pipeline.FloatBulkPointAggregator
+	field            string
+	topBottomInfo    *pipeline.TopBottomCallInfo
+	isSimpleSelector bool
+	aggregator       pipeline.FloatBulkPointAggregator
 }
 
 func (a *floatPointBulkAggregator) AggregateBatch(b *models.Batch) {
@@ -80,6 +92,10 @@ func (a *floatPointBulkAggregator) AggregateBatch(b *models.Batch) {
 		if a.topBottomInfo != nil {
 			// We need to populate the Aux fields
 			floatPopulateAuxFieldsAndTags(&slice[i], a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
+		}
+
+		if a.isSimpleSelector {
+			slice[i].Aux = []interface{}{p.Tags}
 		}
 	}
 	a.aggregator.AggregateFloatBulk(slice)
@@ -96,12 +112,18 @@ func (a *floatPointBulkAggregator) AggregatePoint(p *models.Point) {
 		// We need to populate the Aux fields
 		floatPopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
 	}
+
+	if a.isSimpleSelector {
+		ap.Aux = []interface{}{p.Tags}
+	}
+
 	a.aggregator.AggregateFloat(ap)
 }
 
 type floatPointEmitter struct {
 	baseReduceContext
-	emitter influxql.FloatPointEmitter
+	emitter          influxql.FloatPointEmitter
+	isSimpleSelector bool
 }
 
 func (e *floatPointEmitter) EmitPoint() (models.Point, error) {
@@ -120,12 +142,18 @@ func (e *floatPointEmitter) EmitPoint() (models.Point, error) {
 	} else {
 		t = e.time
 	}
+
+	tags := e.tags
+	if e.isSimpleSelector {
+		tags = ap.Aux[0].(models.Tags)
+	}
+
 	return models.Point{
 		Name:       e.name,
 		Time:       t,
 		Group:      e.group,
 		Dimensions: e.dimensions,
-		Tags:       e.tags,
+		Tags:       tags,
 		Fields:     map[string]interface{}{e.as: ap.Value},
 	}, nil
 }
@@ -160,9 +188,10 @@ func (e *floatPointEmitter) EmitBatch() models.Batch {
 }
 
 type integerPointAggregator struct {
-	field         string
-	topBottomInfo *pipeline.TopBottomCallInfo
-	aggregator    influxql.IntegerPointAggregator
+	field            string
+	topBottomInfo    *pipeline.TopBottomCallInfo
+	isSimpleSelector bool
+	aggregator       influxql.IntegerPointAggregator
 }
 
 func integerPopulateAuxFieldsAndTags(ap *influxql.IntegerPoint, fieldsAndTags []string, fields models.Fields, tags models.Tags) {
@@ -188,6 +217,11 @@ func (a *integerPointAggregator) AggregateBatch(b *models.Batch) {
 			// We need to populate the Aux fields
 			integerPopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
 		}
+
+		if a.isSimpleSelector {
+			ap.Aux = []interface{}{p.Tags}
+		}
+
 		a.aggregator.AggregateInteger(ap)
 	}
 }
@@ -203,13 +237,19 @@ func (a *integerPointAggregator) AggregatePoint(p *models.Point) {
 		// We need to populate the Aux fields
 		integerPopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
 	}
+
+	if a.isSimpleSelector {
+		ap.Aux = []interface{}{p.Tags}
+	}
+
 	a.aggregator.AggregateInteger(ap)
 }
 
 type integerPointBulkAggregator struct {
-	field         string
-	topBottomInfo *pipeline.TopBottomCallInfo
-	aggregator    pipeline.IntegerBulkPointAggregator
+	field            string
+	topBottomInfo    *pipeline.TopBottomCallInfo
+	isSimpleSelector bool
+	aggregator       pipeline.IntegerBulkPointAggregator
 }
 
 func (a *integerPointBulkAggregator) AggregateBatch(b *models.Batch) {
@@ -224,6 +264,10 @@ func (a *integerPointBulkAggregator) AggregateBatch(b *models.Batch) {
 		if a.topBottomInfo != nil {
 			// We need to populate the Aux fields
 			integerPopulateAuxFieldsAndTags(&slice[i], a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
+		}
+
+		if a.isSimpleSelector {
+			slice[i].Aux = []interface{}{p.Tags}
 		}
 	}
 	a.aggregator.AggregateIntegerBulk(slice)
@@ -240,12 +284,18 @@ func (a *integerPointBulkAggregator) AggregatePoint(p *models.Point) {
 		// We need to populate the Aux fields
 		integerPopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
 	}
+
+	if a.isSimpleSelector {
+		ap.Aux = []interface{}{p.Tags}
+	}
+
 	a.aggregator.AggregateInteger(ap)
 }
 
 type integerPointEmitter struct {
 	baseReduceContext
-	emitter influxql.IntegerPointEmitter
+	emitter          influxql.IntegerPointEmitter
+	isSimpleSelector bool
 }
 
 func (e *integerPointEmitter) EmitPoint() (models.Point, error) {
@@ -264,12 +314,18 @@ func (e *integerPointEmitter) EmitPoint() (models.Point, error) {
 	} else {
 		t = e.time
 	}
+
+	tags := e.tags
+	if e.isSimpleSelector {
+		tags = ap.Aux[0].(models.Tags)
+	}
+
 	return models.Point{
 		Name:       e.name,
 		Time:       t,
 		Group:      e.group,
 		Dimensions: e.dimensions,
-		Tags:       e.tags,
+		Tags:       tags,
 		Fields:     map[string]interface{}{e.as: ap.Value},
 	}, nil
 }
@@ -362,13 +418,15 @@ func determineReduceContextCreateFn(method string, value interface{}, rc pipelin
 				a, e := rc.CreateFloatReducer()
 				return &floatReduceContext{
 					floatPointAggregator: floatPointAggregator{
-						field:         c.field,
-						topBottomInfo: rc.TopBottomCallInfo,
-						aggregator:    a,
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
 					},
 					floatPointEmitter: floatPointEmitter{
 						baseReduceContext: c,
 						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
 					},
 				}
 			}
@@ -377,13 +435,15 @@ func determineReduceContextCreateFn(method string, value interface{}, rc pipelin
 				a, e := rc.CreateFloatBulkReducer()
 				return &floatBulkReduceContext{
 					floatPointBulkAggregator: floatPointBulkAggregator{
-						field:         c.field,
-						topBottomInfo: rc.TopBottomCallInfo,
-						aggregator:    a,
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
 					},
 					floatPointEmitter: floatPointEmitter{
 						baseReduceContext: c,
 						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
 					},
 				}
 			}
@@ -393,13 +453,15 @@ func determineReduceContextCreateFn(method string, value interface{}, rc pipelin
 				a, e := rc.CreateFloatIntegerReducer()
 				return &floatIntegerReduceContext{
 					floatPointAggregator: floatPointAggregator{
-						field:         c.field,
-						topBottomInfo: rc.TopBottomCallInfo,
-						aggregator:    a,
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
 					},
 					integerPointEmitter: integerPointEmitter{
 						baseReduceContext: c,
 						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
 					},
 				}
 			}
@@ -408,13 +470,15 @@ func determineReduceContextCreateFn(method string, value interface{}, rc pipelin
 				a, e := rc.CreateFloatBulkIntegerReducer()
 				return &floatBulkIntegerReduceContext{
 					floatPointBulkAggregator: floatPointBulkAggregator{
-						field:         c.field,
-						topBottomInfo: rc.TopBottomCallInfo,
-						aggregator:    a,
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
 					},
 					integerPointEmitter: integerPointEmitter{
 						baseReduceContext: c,
 						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
 					},
 				}
 			}
@@ -431,13 +495,15 @@ func determineReduceContextCreateFn(method string, value interface{}, rc pipelin
 				a, e := rc.CreateIntegerFloatReducer()
 				return &integerFloatReduceContext{
 					integerPointAggregator: integerPointAggregator{
-						field:         c.field,
-						topBottomInfo: rc.TopBottomCallInfo,
-						aggregator:    a,
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
 					},
 					floatPointEmitter: floatPointEmitter{
 						baseReduceContext: c,
 						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
 					},
 				}
 			}
@@ -446,13 +512,15 @@ func determineReduceContextCreateFn(method string, value interface{}, rc pipelin
 				a, e := rc.CreateIntegerBulkFloatReducer()
 				return &integerBulkFloatReduceContext{
 					integerPointBulkAggregator: integerPointBulkAggregator{
-						field:         c.field,
-						topBottomInfo: rc.TopBottomCallInfo,
-						aggregator:    a,
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
 					},
 					floatPointEmitter: floatPointEmitter{
 						baseReduceContext: c,
 						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
 					},
 				}
 			}
@@ -462,13 +530,15 @@ func determineReduceContextCreateFn(method string, value interface{}, rc pipelin
 				a, e := rc.CreateIntegerReducer()
 				return &integerReduceContext{
 					integerPointAggregator: integerPointAggregator{
-						field:         c.field,
-						topBottomInfo: rc.TopBottomCallInfo,
-						aggregator:    a,
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
 					},
 					integerPointEmitter: integerPointEmitter{
 						baseReduceContext: c,
 						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
 					},
 				}
 			}
@@ -477,13 +547,15 @@ func determineReduceContextCreateFn(method string, value interface{}, rc pipelin
 				a, e := rc.CreateIntegerBulkReducer()
 				return &integerBulkReduceContext{
 					integerPointBulkAggregator: integerPointBulkAggregator{
-						field:         c.field,
-						topBottomInfo: rc.TopBottomCallInfo,
-						aggregator:    a,
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
 					},
 					integerPointEmitter: integerPointEmitter{
 						baseReduceContext: c,
 						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
 					},
 				}
 			}

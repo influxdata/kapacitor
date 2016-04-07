@@ -16,6 +16,7 @@ import (
 type {{.name}}PointAggregator struct {
 	field         string
 	topBottomInfo *pipeline.TopBottomCallInfo
+	isSimpleSelector bool
 	aggregator influxql.{{.Name}}PointAggregator
 }
 
@@ -42,6 +43,11 @@ func (a *{{.name}}PointAggregator) AggregateBatch(b *models.Batch) {
 			// We need to populate the Aux fields
 			{{.name}}PopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
 		}
+
+		if a.isSimpleSelector {
+			ap.Aux = []interface{}{ p.Tags }
+		}
+		
 		a.aggregator.Aggregate{{.Name}}(ap)
 	}
 }
@@ -57,6 +63,11 @@ func (a *{{.name}}PointAggregator) AggregatePoint(p *models.Point) {
 		// We need to populate the Aux fields
 		{{.name}}PopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
 	}
+
+	if a.isSimpleSelector {
+		ap.Aux = []interface{}{ p.Tags }
+	}
+	
 	a.aggregator.Aggregate{{.Name}}(ap)
 }
 
@@ -65,6 +76,7 @@ func (a *{{.name}}PointAggregator) AggregatePoint(p *models.Point) {
 type {{.name}}PointBulkAggregator struct {
 	field      string
 	topBottomInfo *pipeline.TopBottomCallInfo
+	isSimpleSelector bool
 	aggregator    pipeline.{{.Name}}BulkPointAggregator
 }
 
@@ -81,6 +93,10 @@ func (a *{{.name}}PointBulkAggregator) AggregateBatch(b *models.Batch) {
 			// We need to populate the Aux fields
 			{{.name}}PopulateAuxFieldsAndTags(&slice[i], a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
 		}
+
+		if a.isSimpleSelector {
+			slice[i].Aux = []interface{}{ p.Tags }
+		}
 	}
 	a.aggregator.Aggregate{{.Name}}Bulk(slice)
 }
@@ -96,12 +112,18 @@ func (a *{{.name}}PointBulkAggregator) AggregatePoint(p *models.Point) {
 		// We need to populate the Aux fields
 		{{.name}}PopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
 	}
+
+	if a.isSimpleSelector {
+		ap.Aux = []interface{}{ p.Tags }
+	}
+
 	a.aggregator.Aggregate{{.Name}}(ap)
 }
 
 type {{.name}}PointEmitter struct {
 	baseReduceContext
 	emitter influxql.{{.Name}}PointEmitter
+	isSimpleSelector bool
 }
 
 func (e *{{.name}}PointEmitter) EmitPoint() (models.Point, error) {
@@ -120,12 +142,18 @@ func (e *{{.name}}PointEmitter) EmitPoint() (models.Point, error) {
 	} else {
 		t = e.time
 	}
+
+	tags := e.tags
+	if e.isSimpleSelector {
+		tags = ap.Aux[0].(models.Tags)
+	}
+
 	return models.Point{
 		Name:       e.name,
 		Time:       t,
 		Group:      e.group,
 		Dimensions: e.dimensions,
-		Tags:       e.tags,
+		Tags:       tags,
 		Fields:     map[string]interface{}{e.as: ap.Value},
 	}, nil
 }
@@ -195,11 +223,13 @@ func determineReduceContextCreateFn(method string, value interface{}, rc pipelin
 					{{$a.name}}PointAggregator: {{$a.name}}PointAggregator{
 						field:      c.field,
 						topBottomInfo: rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
 						aggregator: a,
 					},
 					{{$e.name}}PointEmitter: {{$e.name}}PointEmitter{
 						baseReduceContext: c,
 						emitter:           e,
+						isSimpleSelector: rc.IsSimpleSelector,
 					},
 				}
 			}
@@ -210,11 +240,13 @@ func determineReduceContextCreateFn(method string, value interface{}, rc pipelin
 					{{$a.name}}PointBulkAggregator: {{$a.name}}PointBulkAggregator{
 						field:      c.field,
 						topBottomInfo: rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
 						aggregator: a,
 					},
 					{{$e.name}}PointEmitter: {{$e.name}}PointEmitter{
 						baseReduceContext: c,
 						emitter:           e,
+						isSimpleSelector: rc.IsSimpleSelector,
 					},
 				}
 			}
