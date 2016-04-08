@@ -195,7 +195,7 @@ func eval(n Node, scope *Scope, stck *stack) (err error) {
 	return nil
 }
 
-func evalUnary(p Position, op tokenType, scope *Scope, stck *stack) error {
+func evalUnary(p Position, op TokenType, scope *Scope, stck *stack) error {
 	v := stck.Pop()
 	switch op {
 	case TokenMinus:

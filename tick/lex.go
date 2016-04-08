@@ -7,14 +7,14 @@ import (
 	"unicode/utf8"
 )
 
-type tokenType int
+type TokenType int
 
 type stateFn func(*lexer) stateFn
 
 const eof = -1
 
 const (
-	TokenError tokenType = iota
+	TokenError TokenType = iota
 	TokenEOF
 	TokenVar
 	TokenAsgn
@@ -91,7 +91,7 @@ var operatorStr = [...]string{
 	TokenOr:            "OR",
 }
 
-var strToOperator map[string]tokenType
+var strToOperator map[string]TokenType
 
 const (
 	KW_And    = "AND"
@@ -102,7 +102,7 @@ const (
 	KW_Lambda = "lambda"
 )
 
-var keywords = map[string]tokenType{
+var keywords = map[string]TokenType{
 	KW_And:    TokenAnd,
 	KW_Or:     TokenOr,
 	KW_True:   TokenTrue,
@@ -112,14 +112,14 @@ var keywords = map[string]tokenType{
 }
 
 func init() {
-	strToOperator = make(map[string]tokenType, len(operatorStr))
+	strToOperator = make(map[string]TokenType, len(operatorStr))
 	for t, s := range operatorStr {
-		strToOperator[s] = tokenType(t)
+		strToOperator[s] = TokenType(t)
 	}
 }
 
-//String representation of an tokenType
-func (t tokenType) String() string {
+//String representation of an TokenType
+func (t TokenType) String() string {
 	switch {
 	case t == TokenError:
 		return "ERR"
@@ -168,23 +168,23 @@ func (t tokenType) String() string {
 }
 
 // True if token type is an operator used in mathematical or boolean expressions.
-func isExprOperator(typ tokenType) bool {
+func isExprOperator(typ TokenType) bool {
 	return typ > begin_tok_operator && typ < end_tok_operator
 }
 
 // True if token type is an operator used in mathematical expressions.
-func isMathOperator(typ tokenType) bool {
+func isMathOperator(typ TokenType) bool {
 	return typ > begin_tok_operator_math && typ < end_tok_operator_math
 }
 
 // True if token type is an operator used in comparisions.
-func isCompOperator(typ tokenType) bool {
+func isCompOperator(typ TokenType) bool {
 	return typ > begin_tok_operator_comp && typ < end_tok_operator_comp
 }
 
 // token represents a token or text string returned from the scanner.
 type token struct {
-	typ tokenType
+	typ TokenType
 	pos int
 	val string
 }
@@ -222,7 +222,7 @@ func (l *lexer) run() {
 }
 
 // emit passes an token back to the client.
-func (l *lexer) emit(t tokenType) {
+func (l *lexer) emit(t TokenType) {
 	l.tokens <- token{t, l.start, l.current()}
 	l.start = l.pos
 }

@@ -76,7 +76,7 @@ func (p *parser) error(err error) {
 }
 
 // expect consumes the next token and guarantees it has the required type.
-func (p *parser) expect(expected tokenType) token {
+func (p *parser) expect(expected TokenType) token {
 	token := p.next()
 	if token.typ != expected {
 		p.unexpected(token, expected)
@@ -85,7 +85,7 @@ func (p *parser) expect(expected tokenType) token {
 }
 
 // unexpected complains about the token and terminates processing.
-func (p *parser) unexpected(tok token, expected ...tokenType) {
+func (p *parser) unexpected(tok token, expected ...TokenType) {
 	const bufSize = 10
 	start := tok.pos - bufSize
 	if start < 0 {
