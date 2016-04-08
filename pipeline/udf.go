@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/tick"
 	"github.com/influxdata/kapacitor/udf"
 )
@@ -48,12 +47,7 @@ import (
 type UDFNode struct {
 	chainnode
 
-	desc string
-	//tick:ignore
-	Commander command.Commander
-	// tick:ignore
-	Timeout time.Duration
-
+	UDFName string
 	options map[string]*udf.OptionInfo
 
 	// Options that were set on the node
@@ -66,17 +60,26 @@ type UDFNode struct {
 func NewUDF(
 	parent Node,
 	name string,
-	commander command.Commander,
-	timeout time.Duration,
 	wants,
-	provides EdgeType,
+	provides udf.EdgeType,
 	options map[string]*udf.OptionInfo,
 ) *UDFNode {
+	var pwants, pprovides EdgeType
+	switch wants {
+	case udf.EdgeType_STREAM:
+		pwants = StreamEdge
+	case udf.EdgeType_BATCH:
+		pwants = BatchEdge
+	}
+	switch provides {
+	case udf.EdgeType_STREAM:
+		pprovides = StreamEdge
+	case udf.EdgeType_BATCH:
+		pprovides = BatchEdge
+	}
 	udf := &UDFNode{
-		chainnode: newBasicChainNode(name, wants, provides),
-		desc:      name,
-		Commander: commander,
-		Timeout:   timeout,
+		chainnode: newBasicChainNode(name, pwants, pprovides),
+		UDFName:   name,
 		options:   options,
 	}
 	udf.describer, _ = tick.NewReflectionDescriber(udf)
@@ -86,7 +89,7 @@ func NewUDF(
 
 // tick:ignore
 func (u *UDFNode) Desc() string {
-	return u.desc
+	return u.UDFName
 }
 
 // tick:ignore

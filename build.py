@@ -119,7 +119,7 @@ def package_scripts(build_root):
 
 def run_generate():
     print "Running generate..."
-    run("go get github.com/gogo/protobuf/protoc-gen-gogo")
+    run("go get github.com/golang/protobuf/protoc-gen-go")
     run("go get github.com/benbjohnson/tmpl")
     run("go generate ./...")
     print "Generate succeeded."

@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"log"
+	"os"
 
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/udf/agent"
@@ -162,7 +163,7 @@ func (a *avgHandler) Stop() {
 }
 
 func main() {
-	a := agent.New()
+	a := agent.New(os.Stdin, os.Stdout)
 	h := newMovingAvgHandler(a)
 	a.Handler = h
 

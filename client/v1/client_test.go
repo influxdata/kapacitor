@@ -461,7 +461,7 @@ func Test_Record(t *testing.T) {
 			checkRequest: func(r *http.Request) bool {
 				return r.URL.Query().Get("type") == "stream" &&
 					r.URL.Query().Get("name") == "taskname" &&
-					r.URL.Query().Get("duration") == "1m0s"
+					r.URL.Query().Get("duration") == "1m"
 			},
 		},
 		{
@@ -513,7 +513,7 @@ func Test_Record(t *testing.T) {
 
 		rid, err := tc.fnc(c)
 		if err != nil {
-			t.Fatal(err)
+			t.Fatal(tc.name, err)
 		}
 		if exp, got := "rid1", rid; got != exp {
 			t.Errorf("unexpected recording id for test %s: got: %s exp: %s", tc.name, got, exp)

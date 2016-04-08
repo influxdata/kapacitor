@@ -3,6 +3,7 @@ package integrations
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
@@ -21,8 +22,6 @@ import (
 	imodels "github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/clock"
-	cmd_test "github.com/influxdata/kapacitor/command/test"
-	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
@@ -33,6 +32,7 @@ import (
 	"github.com/influxdata/kapacitor/services/talk"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/udf"
+	"github.com/influxdata/kapacitor/udf/test"
 	"github.com/influxdata/kapacitor/wlog"
 )
 
@@ -1925,18 +1925,16 @@ stream
 	|httpOut('TestStream_CustomFunctions')
 `
 
-	cmd := cmd_test.NewCommandHelper()
 	udfService := UDFService{}
-	udfService.FunctionListFunc = func() []string {
+	udfService.ListFunc = func() []string {
 		return []string{"customFunc"}
 	}
-	udfService.FunctionInfoFunc = func(name string) (info kapacitor.UDFProcessInfo, ok bool) {
+	udfService.InfoFunc = func(name string) (info udf.Info, ok bool) {
 		if name != "customFunc" {
 			return
 		}
-		info.Commander = cmd
-		info.Wants = pipeline.StreamEdge
-		info.Provides = pipeline.StreamEdge
+		info.Wants = udf.EdgeType_STREAM
+		info.Provides = udf.EdgeType_STREAM
 		info.Options = map[string]*udf.OptionInfo{
 			"opt1": {
 				ValueTypes: []udf.ValueType{udf.ValueType_STRING},
@@ -1953,11 +1951,18 @@ stream
 		}
 		return
 	}
+	uio := udf_test.NewIO()
+	udfService.CreateFunc = func(name string, l *log.Logger, abortCallback func()) (udf.Interface, error) {
+		if name != "customFunc" {
+			return nil, fmt.Errorf("unknown function %s", name)
+		}
+		return udf_test.New(uio, l), nil
+	}
 
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		req := <-cmd.Requests
+		req := <-uio.Requests
 		i, ok := req.Message.(*udf.Request_Init)
 		if !ok {
 			t.Error("expected init message")
@@ -2015,10 +2020,10 @@ stream
 				},
 			},
 		}
-		cmd.Responses <- resp
+		uio.Responses <- resp
 
 		// read all requests and wait till the chan is closed
-		for req := range cmd.Requests {
+		for req := range uio.Requests {
 			p, ok := req.Message.(*udf.Request_Point)
 			if ok {
 				pt := p.Point
@@ -2033,13 +2038,13 @@ stream
 						},
 					},
 				}
-				cmd.Responses <- resp
+				uio.Responses <- resp
 			}
 		}
 
-		close(cmd.Responses)
+		close(uio.Responses)
 
-		if err := <-cmd.ErrC; err != nil {
+		if err := <-uio.ErrC; err != nil {
 			t.Error(err)
 		}
 	}()

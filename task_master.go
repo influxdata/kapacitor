@@ -14,14 +14,17 @@ import (
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/tick"
 	"github.com/influxdata/kapacitor/timer"
+	"github.com/influxdata/kapacitor/udf"
 )
 
 type LogService interface {
 	NewLogger(prefix string, flag int) *log.Logger
 }
+
 type UDFService interface {
-	FunctionList() []string
-	FunctionInfo(name string) (UDFProcessInfo, bool)
+	List() []string
+	Info(name string) (udf.Info, bool)
+	Create(name string, l *log.Logger, abortCallback func()) (udf.Interface, error)
 }
 
 var ErrTaskMasterClosed = errors.New("TaskMaster is closed")
@@ -264,9 +267,9 @@ func (tm *TaskMaster) CreateTICKScope() *tick.Scope {
 	scope.Set("time", func(d time.Duration) time.Duration { return d })
 	// Add dynamic methods to the scope for UDFs
 	if tm.UDFService != nil {
-		for _, f := range tm.UDFService.FunctionList() {
+		for _, f := range tm.UDFService.List() {
 			f := f
-			info, _ := tm.UDFService.FunctionInfo(f)
+			info, _ := tm.UDFService.Info(f)
 			scope.SetDynamicMethod(
 				f,
 				tick.DynamicMethod(func(self interface{}, args ...interface{}) (interface{}, error) {
@@ -277,8 +280,6 @@ func (tm *TaskMaster) CreateTICKScope() *tick.Scope {
 					udf := pipeline.NewUDF(
 						parent,
 						f,
-						info.Commander,
-						info.Timeout,
 						info.Wants,
 						info.Provides,
 						info.Options,

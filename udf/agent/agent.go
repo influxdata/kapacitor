@@ -5,13 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"sync"
 
 	"github.com/influxdata/kapacitor/udf"
 )
 
-// The Agent calls the appropriate methods on the Handler as it receives requests over STDIN.
+// The Agent calls the appropriate methods on the Handler as it receives requests over a socket.
 //
 // Returning an error from any method will cause the Agent to stop and an ErrorResponse to be sent.
 // Some *Response objects (like SnapshotResponse) allow for returning their own error within the object itself.
@@ -44,7 +43,7 @@ type Handler interface {
 
 // Go implementation of a Kapacitor UDF agent.
 // This agent is responsible for reading and writing
-// messages over STDIN and STDOUT.
+// messages over a socket.
 //
 // The Agent requires a Handler object in order to fulfill requests.
 type Agent struct {
@@ -65,10 +64,12 @@ type Agent struct {
 	Handler Handler
 }
 
-func New() *Agent {
+// Create a new Agent is the provided in/out objects.
+// To create an Agent that reads from STDIN/STDOUT of the process use New(os.Stdin, os.Stdout)
+func New(in io.ReadCloser, out io.WriteCloser) *Agent {
 	s := &Agent{
-		in:           os.Stdin,
-		out:          os.Stdout,
+		in:           in,
+		out:          out,
 		outResponses: make(chan *udf.Response),
 		responses:    make(chan *udf.Response),
 	}
@@ -110,7 +111,7 @@ func (a *Agent) Start() error {
 // Wait for the Agent to terminate.
 // The Agent will not terminate till the Responses channel is closed.
 // You will need to close this channel externally, typically in the Stop method for the Handler.
-// The Agent will terminate if STDIN is closed or an error occurs.
+// The Agent will terminate if the In reader is closed or an error occurs.
 func (a *Agent) Wait() error {
 	a.outGroup.Wait()
 	close(a.outResponses)

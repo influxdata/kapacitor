@@ -4,13 +4,30 @@
 
 ### Release Notes
 
+UDF can now be managed externally to Kapacitor via Unix sockets.
+A process or container can be launched independent of Kapacitor exposing a socket.
+On startup Kapacitor will connect to the socket and begin communication.
+
+Example UDF config for a socket based UDF.
+
+```
+[udf]
+[udf.functions]
+    [udf.functions.myCustomUDF]
+       socket = "/path/to/socket"
+       timeout = "10s"
+```
+
 ### Features
 
 - [#360](https://github.com/influxdata/kapacitor/pull/360): Forking tasks by measurement in order to improve performance
 - [#386](https://github.com/influxdata/kapacitor/issues/386): Adds official Go HTTP client package.
 - [#399](https://github.com/influxdata/kapacitor/issues/399): Allow disabling of subscriptions.
+- [#417](https://github.com/influxdata/kapacitor/issues/417): UDFs can be connected over a Unix socket. This enables UDFs from across Docker containers.
 
 ### Bugfixes
+
+- [#441](https://github.com/influxdata/kapacitor/issues/441): Fix panic in UDF code.
 
 ## v0.12.0 [2016-04-04]
 

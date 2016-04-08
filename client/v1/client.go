@@ -15,6 +15,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/influxdata/influxdb/influxql"
 )
 
 const DefaultUserAgent = "KapacitorClient"
@@ -321,7 +323,7 @@ func (c *Client) RecordStream(name string, duration time.Duration) (string, erro
 	v := url.Values{}
 	v.Add("type", "stream")
 	v.Add("name", name)
-	v.Add("duration", duration.String())
+	v.Add("duration", influxql.FormatDuration(duration))
 
 	return c.doRecord(v)
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/wlog"
 )
 
@@ -129,16 +130,21 @@ func (l *LogService) NewLogger(prefix string, flag int) *log.Logger {
 }
 
 type UDFService struct {
-	FunctionListFunc func() []string
-	FunctionInfoFunc func(name string) (kapacitor.UDFProcessInfo, bool)
+	ListFunc   func() []string
+	InfoFunc   func(name string) (udf.Info, bool)
+	CreateFunc func(name string, l *log.Logger, abortCallback func()) (udf.Interface, error)
 }
 
-func (u UDFService) FunctionList() []string {
-	return u.FunctionListFunc()
+func (u UDFService) List() []string {
+	return u.ListFunc()
 }
 
-func (u UDFService) FunctionInfo(name string) (kapacitor.UDFProcessInfo, bool) {
-	return u.FunctionInfoFunc(name)
+func (u UDFService) Info(name string) (udf.Info, bool) {
+	return u.InfoFunc(name)
+}
+
+func (u UDFService) Create(name string, l *log.Logger, abortCallback func()) (udf.Interface, error) {
+	return u.CreateFunc(name, l, abortCallback)
 }
 
 type taskStore struct{}

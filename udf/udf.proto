@@ -4,11 +4,7 @@ package udf;
 
 //------------------------------------------------------
 // RPC Messages for Kapacitor to communicate with
-// a child process for data processing.
-//
-// The Kapacitor processes will send Request messages
-// over STDIN to the child process.
-// The child process can respond over STDOUT.
+// a child process or socket for data processing.
 //
 // Messages are streamed by writing a varint header
 // that contains the length of the following message.
@@ -21,15 +17,15 @@ package udf;
 //------------------------------------------------------
 // Management messages
 //
-// *Request messages are sent to the process from Kapacitor.
-// *Response messages are sent to Kapacitor from the process.
+// *Request messages are sent to the UDF from Kapacitor.
+// *Response messages are sent to Kapacitor from the UDF.
 //
 // While there is an obvious request/response structure for communicating,
 // there is a loose coupling between request and response.
 // Meaning that ordering or synchronizing STDIN and STDOUT in anyway
 // is not necessary.
 // For example if Kapacitor requests a snapshot and the
-// process is in the middle of writing a previous response or
+// UDF is in the middle of writing a previous response or
 // data points those can continue. Eventually Kapacitor will receive
 // the snapshot response and act accordingly.
 //
@@ -38,8 +34,8 @@ package udf;
 // a KeepaliveResponse must be returned within a timeout.
 // If the timeout is reached than the process is considered dead and will be terminated/restarted.
 //
-// It is recommend to disable buffering on the STDIN and STDOUT sockets.
-// Some languages like python will automatically buffer the sockets.
+// It is recommend to disable buffering on the input and output sockets.
+// Some languages like python will automatically buffer the STDIN and STDOUT sockets.
 // To disable this behavior use the -u flag on the python interpreter.
 
 // Request that the process return information about available Options.
