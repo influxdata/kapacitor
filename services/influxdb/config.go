@@ -32,6 +32,7 @@ type Config struct {
 	InsecureSkipVerify bool `toml:"insecure-skip-verify"`
 
 	Timeout               toml.Duration       `toml:"timeout"`
+	DisableSubscriptions  bool                `toml:"disable-subscriptions"`
 	Subscriptions         map[string][]string `toml:"subscriptions"`
 	ExcludedSubscriptions map[string][]string `toml:"excluded-subscriptions"`
 	UDPBuffer             int                 `toml:"udp-buffer"`
