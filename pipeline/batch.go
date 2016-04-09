@@ -11,7 +11,7 @@ import (
 // Each call to `query` creates a child batch node that
 // can further be configured. See QueryNode
 // The `batch` variable in batch tasks is an instance of
-// a SourceBatchNode.
+// a BatchNode.
 //
 // Example:
 //     var errors = batch
@@ -21,12 +21,12 @@ import (
 //                      |query('SELECT value from views')
 //                      ...
 //
-type SourceBatchNode struct {
+type BatchNode struct {
 	node
 }
 
-func newSourceBatchNode() *SourceBatchNode {
-	return &SourceBatchNode{
+func newBatchNode() *BatchNode {
+	return &BatchNode{
 		node: node{
 			desc:     "srcbatch",
 			wants:    NoEdge,
@@ -40,7 +40,7 @@ func newSourceBatchNode() *SourceBatchNode {
 // The time conditions are added dynamically according to the period, offset and schedule.
 // The `GROUP BY` clause is added dynamically according to the dimensions
 // passed to the `groupBy` method.
-func (b *SourceBatchNode) Query(q string) *QueryNode {
+func (b *BatchNode) Query(q string) *QueryNode {
 	n := newQueryNode()
 	n.QueryStr = q
 	b.linkChild(n)
@@ -50,7 +50,7 @@ func (b *SourceBatchNode) Query(q string) *QueryNode {
 // Do not add the source batch node to the dot output
 // since its not really an edge.
 // tick:ignore
-func (b *SourceBatchNode) dot(buf *bytes.Buffer) {
+func (b *BatchNode) dot(buf *bytes.Buffer) {
 }
 
 // A QueryNode defines a source and a schedule for

@@ -15,21 +15,21 @@ import (
 	"github.com/influxdata/kapacitor/pipeline"
 )
 
-type SourceBatchNode struct {
+type BatchNode struct {
 	node
-	s   *pipeline.SourceBatchNode
+	s   *pipeline.BatchNode
 	idx int
 }
 
-func newSourceBatchNode(et *ExecutingTask, n *pipeline.SourceBatchNode, l *log.Logger) (*SourceBatchNode, error) {
-	sn := &SourceBatchNode{
+func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode, l *log.Logger) (*BatchNode, error) {
+	sn := &BatchNode{
 		node: node{Node: n, et: et, logger: l},
 		s:    n,
 	}
 	return sn, nil
 }
 
-func (s *SourceBatchNode) linkChild(c Node) error {
+func (s *BatchNode) linkChild(c Node) error {
 
 	// add child
 	if s.Provides() != c.Wants() {
@@ -43,22 +43,22 @@ func (s *SourceBatchNode) linkChild(c Node) error {
 	return nil
 }
 
-func (s *SourceBatchNode) addParentEdge(in *Edge) {
+func (s *BatchNode) addParentEdge(in *Edge) {
 	// Pass edges down to children
 	s.children[s.idx].addParentEdge(in)
 	s.idx++
 }
 
-func (s *SourceBatchNode) start([]byte) {
+func (s *BatchNode) start([]byte) {
 }
 
-func (s *SourceBatchNode) Wait() error {
+func (s *BatchNode) Wait() error {
 	return nil
 }
 
 // Return list of databases and retention policies
 // the batcher will query.
-func (s *SourceBatchNode) DBRPs() ([]DBRP, error) {
+func (s *BatchNode) DBRPs() ([]DBRP, error) {
 	var dbrps []DBRP
 	for _, b := range s.children {
 		d, err := b.(*QueryNode).DBRPs()
@@ -70,23 +70,23 @@ func (s *SourceBatchNode) DBRPs() ([]DBRP, error) {
 	return dbrps, nil
 }
 
-func (s *SourceBatchNode) Count() int {
+func (s *BatchNode) Count() int {
 	return len(s.children)
 }
 
-func (s *SourceBatchNode) Start() {
+func (s *BatchNode) Start() {
 	for _, b := range s.children {
 		b.(*QueryNode).Start()
 	}
 }
 
-func (s *SourceBatchNode) Abort() {
+func (s *BatchNode) Abort() {
 	for _, b := range s.children {
 		b.(*QueryNode).Abort()
 	}
 }
 
-func (s *SourceBatchNode) Queries(start, stop time.Time) [][]string {
+func (s *BatchNode) Queries(start, stop time.Time) [][]string {
 	queries := make([][]string, len(s.children))
 	for i, b := range s.children {
 		queries[i] = b.(*QueryNode).Queries(start, stop)
@@ -96,9 +96,9 @@ func (s *SourceBatchNode) Queries(start, stop time.Time) [][]string {
 
 // Do not add the source batch node to the dot output
 // since its not really an edge.
-func (s *SourceBatchNode) edot(*bytes.Buffer, bool) {}
+func (s *BatchNode) edot(*bytes.Buffer, bool) {}
 
-func (s *SourceBatchNode) collectedCount() (count int64) {
+func (s *BatchNode) collectedCount() (count int64) {
 	for _, child := range s.children {
 		count += child.collectedCount()
 	}

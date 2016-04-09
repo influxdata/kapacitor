@@ -249,7 +249,7 @@ func (et *ExecutingTask) StartBatching() error {
 		return ErrWrongTaskType
 	}
 
-	batcher := et.source.(*SourceBatchNode)
+	batcher := et.source.(*BatchNode)
 
 	err := et.checkDBRPs(batcher)
 	if err != nil {
@@ -266,7 +266,7 @@ func (et *ExecutingTask) BatchCount() (int, error) {
 		return 0, ErrWrongTaskType
 	}
 
-	batcher := et.source.(*SourceBatchNode)
+	batcher := et.source.(*BatchNode)
 	return batcher.Count(), nil
 }
 
@@ -276,7 +276,7 @@ func (et *ExecutingTask) BatchQueries(start, stop time.Time) ([][]string, error)
 		return nil, ErrWrongTaskType
 	}
 
-	batcher := et.source.(*SourceBatchNode)
+	batcher := et.source.(*BatchNode)
 
 	err := et.checkDBRPs(batcher)
 	if err != nil {
@@ -287,7 +287,7 @@ func (et *ExecutingTask) BatchQueries(start, stop time.Time) ([][]string, error)
 }
 
 // Check that the task allows access to DBRPs
-func (et *ExecutingTask) checkDBRPs(batcher *SourceBatchNode) error {
+func (et *ExecutingTask) checkDBRPs(batcher *BatchNode) error {
 	dbMap := CreateDBRPMap(et.Task.DBRPs)
 	dbrps, err := batcher.DBRPs()
 	if err != nil {
@@ -445,8 +445,8 @@ func (et *ExecutingTask) createNode(p pipeline.Node, l *log.Logger) (n Node, err
 		n, err = newFromNode(et, t, l)
 	case *pipeline.StreamNode:
 		n, err = newStreamNode(et, t, l)
-	case *pipeline.SourceBatchNode:
-		n, err = newSourceBatchNode(et, t, l)
+	case *pipeline.BatchNode:
+		n, err = newBatchNode(et, t, l)
 	case *pipeline.QueryNode:
 		n, err = newQueryNode(et, t, l)
 	case *pipeline.WindowNode:
