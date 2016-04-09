@@ -220,7 +220,7 @@ func (s *StreamNode) Where(expression tick.Node) *StreamNode {
 //  stream
 //      |from()
 //          .groupBy(*)
-//
+// tick:property
 func (s *StreamNode) GroupBy(tag ...interface{}) *StreamNode {
 	s.Dimensions = tag
 	return s
