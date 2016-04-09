@@ -19,7 +19,7 @@ type StatsNode struct {
 	mu      sync.Mutex
 }
 
-// Create a new  StreamNode which filters data from a source.
+// Create a new  FromNode which filters data from a source.
 func newStatsNode(et *ExecutingTask, n *pipeline.StatsNode, l *log.Logger) (*StatsNode, error) {
 	// Lookup the executing node for stats.
 	en := et.lookup[n.SourceNode.ID()]
