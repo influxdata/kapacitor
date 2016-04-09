@@ -447,8 +447,8 @@ func (et *ExecutingTask) createNode(p pipeline.Node, l *log.Logger) (n Node, err
 		n, err = newStreamNode(et, t, l)
 	case *pipeline.SourceBatchNode:
 		n, err = newSourceBatchNode(et, t, l)
-	case *pipeline.BatchNode:
-		n, err = newBatchNode(et, t, l)
+	case *pipeline.QueryNode:
+		n, err = newQueryNode(et, t, l)
 	case *pipeline.WindowNode:
 		n, err = newWindowNode(et, t, l)
 	case *pipeline.HTTPOutNode:

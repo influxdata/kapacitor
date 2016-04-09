@@ -7,9 +7,9 @@ import (
 	"github.com/influxdata/kapacitor/tick"
 )
 
-// A node that handles creating several child BatchNodes.
+// A node that handles creating several child QueryNodes.
 // Each call to `query` creates a child batch node that
-// can further be configured. See BatchNode
+// can further be configured. See QueryNode
 // The `batch` variable in batch tasks is an instance of
 // a SourceBatchNode.
 //
@@ -40,8 +40,8 @@ func newSourceBatchNode() *SourceBatchNode {
 // The time conditions are added dynamically according to the period, offset and schedule.
 // The `GROUP BY` clause is added dynamically according to the dimensions
 // passed to the `groupBy` method.
-func (b *SourceBatchNode) Query(q string) *BatchNode {
-	n := newBatchNode()
+func (b *SourceBatchNode) Query(q string) *QueryNode {
+	n := newQueryNode()
 	n.QueryStr = q
 	b.linkChild(n)
 	return n
@@ -53,7 +53,7 @@ func (b *SourceBatchNode) Query(q string) *BatchNode {
 func (b *SourceBatchNode) dot(buf *bytes.Buffer) {
 }
 
-// A BatchNode defines a source and a schedule for
+// A QueryNode defines a source and a schedule for
 // processing batch data. The data is queried from
 // an InfluxDB database and then passed into the data pipeline.
 //
@@ -71,7 +71,7 @@ func (b *SourceBatchNode) dot(buf *bytes.Buffer) {
 //
 // In the above example InfluxDB is queried every 20 seconds; the window of time returned
 // spans 1 minute and is grouped into 10 second buckets.
-type BatchNode struct {
+type QueryNode struct {
 	chainnode
 
 	// self describer
@@ -129,8 +129,8 @@ type BatchNode struct {
 	Cluster string
 }
 
-func newBatchNode() *BatchNode {
-	b := &BatchNode{
+func newQueryNode() *QueryNode {
+	b := &QueryNode{
 		chainnode: newBasicChainNode("batch", BatchEdge, BatchEdge),
 	}
 	b.describer, _ = tick.NewReflectionDescriber(b)
@@ -150,15 +150,15 @@ func newBatchNode() *BatchNode {
 //            .groupBy(time(10s), 'tag1', 'tag2'))
 //
 // tick:property
-func (b *BatchNode) GroupBy(d ...interface{}) *BatchNode {
+func (b *QueryNode) GroupBy(d ...interface{}) *QueryNode {
 	b.Dimensions = d
 	return b
 }
 
-// Align start and stop times for quiries with even boundaries of the BatchNode.Every property.
-// Does not apply if using the BatchNode.Cron property.
+// Align start and stop times for quiries with even boundaries of the QueryNode.Every property.
+// Does not apply if using the QueryNode.Cron property.
 // tick:property
-func (b *BatchNode) Align() *BatchNode {
+func (b *QueryNode) Align() *QueryNode {
 	b.AlignFlag = true
 	return b
 }
@@ -166,12 +166,12 @@ func (b *BatchNode) Align() *BatchNode {
 // Tick Describer methods
 
 //tick:ignore
-func (b *BatchNode) Desc() string {
+func (b *QueryNode) Desc() string {
 	return b.describer.Desc()
 }
 
 //tick:ignore
-func (b *BatchNode) HasChainMethod(name string) bool {
+func (b *QueryNode) HasChainMethod(name string) bool {
 	if name == "groupBy" {
 		return true
 	}
@@ -179,7 +179,7 @@ func (b *BatchNode) HasChainMethod(name string) bool {
 }
 
 //tick:ignore
-func (b *BatchNode) CallChainMethod(name string, args ...interface{}) (interface{}, error) {
+func (b *QueryNode) CallChainMethod(name string, args ...interface{}) (interface{}, error) {
 	if name == "groupBy" {
 		return b.chainnode.GroupBy(args...), nil
 	}
@@ -187,16 +187,16 @@ func (b *BatchNode) CallChainMethod(name string, args ...interface{}) (interface
 }
 
 //tick:ignore
-func (b *BatchNode) HasProperty(name string) bool {
+func (b *QueryNode) HasProperty(name string) bool {
 	return b.describer.HasProperty(name)
 }
 
 //tick:ignore
-func (b *BatchNode) Property(name string) interface{} {
+func (b *QueryNode) Property(name string) interface{} {
 	return b.describer.Property(name)
 }
 
 //tick:ignore
-func (b *BatchNode) SetProperty(name string, args ...interface{}) (interface{}, error) {
+func (b *QueryNode) SetProperty(name string, args ...interface{}) (interface{}, error) {
 	return b.describer.SetProperty(name, args...)
 }
