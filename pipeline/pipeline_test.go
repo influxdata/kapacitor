@@ -45,9 +45,9 @@ w.every(1s)
 	if exp, got := 1, len(p.sources[0].Children()); exp != got {
 		t.Errorf("unexpected number of source0 children: exp %d got %d", exp, got)
 	}
-	sn, ok := p.sources[0].Children()[0].(*StreamNode)
+	sn, ok := p.sources[0].Children()[0].(*FromNode)
 	if !ok {
-		t.Fatalf("unexpected node type: exp StreamNode got %T", p.sources[0].Children()[0])
+		t.Fatalf("unexpected node type: exp FromNode got %T", p.sources[0].Children()[0])
 	}
 	w, ok := sn.Children()[0].(*WindowNode)
 	if !ok {

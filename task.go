@@ -77,13 +77,13 @@ func (t *Task) Dot() []byte {
 	return t.Pipeline.Dot(t.Name)
 }
 
-// returns all the measurements from a StreamNode
+// returns all the measurements from a FromNode
 func (t *Task) Measurements() []string {
 	measurements := make([]string, 0)
 
 	t.Pipeline.Walk(func(node pipeline.Node) error {
 		switch streamNode := node.(type) {
-		case *pipeline.StreamNode:
+		case *pipeline.FromNode:
 			measurements = append(measurements, streamNode.Measurement)
 		}
 		return nil
@@ -441,8 +441,8 @@ func (et *ExecutingTask) calcThroughput() {
 // Create a  node from a given pipeline node.
 func (et *ExecutingTask) createNode(p pipeline.Node, l *log.Logger) (n Node, err error) {
 	switch t := p.(type) {
-	case *pipeline.StreamNode:
-		n, err = newStreamNode(et, t, l)
+	case *pipeline.FromNode:
+		n, err = newFromNode(et, t, l)
 	case *pipeline.SourceStreamNode:
 		n, err = newSourceStreamNode(et, t, l)
 	case *pipeline.SourceBatchNode:
