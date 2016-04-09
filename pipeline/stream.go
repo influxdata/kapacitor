@@ -6,17 +6,17 @@ import (
 	"github.com/influxdata/kapacitor/tick"
 )
 
-// A SourceStreamNode represents the source of data being
+// A StreamNode represents the source of data being
 // streamed to Kapacitor via any of its inputs.
 // The `stream` variable in stream tasks is an instance of
-// a SourceStreamNode.
-// SourceStreamNode.From is the method/property of this node.
-type SourceStreamNode struct {
+// a StreamNode.
+// StreamNode.From is the method/property of this node.
+type StreamNode struct {
 	node
 }
 
-func newSourceStreamNode() *SourceStreamNode {
-	return &SourceStreamNode{
+func newStreamNode() *StreamNode {
+	return &StreamNode{
 		node: node{
 			desc:     "srcstream",
 			wants:    StreamEdge,
@@ -48,13 +48,13 @@ func newSourceStreamNode() *SourceStreamNode {
 //            .as('cpu', 'load')
 //        ...
 //
-func (s *SourceStreamNode) From() *FromNode {
+func (s *StreamNode) From() *FromNode {
 	f := newFromNode()
 	s.linkChild(f)
 	return f
 }
 
-// A FromNode selects a subset of the data flowing through a SourceStreamNode.
+// A FromNode selects a subset of the data flowing through a StreamNode.
 // The stream node allows you to select which portion of the stream you want to process.
 //
 // Example:

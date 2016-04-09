@@ -443,8 +443,8 @@ func (et *ExecutingTask) createNode(p pipeline.Node, l *log.Logger) (n Node, err
 	switch t := p.(type) {
 	case *pipeline.FromNode:
 		n, err = newFromNode(et, t, l)
-	case *pipeline.SourceStreamNode:
-		n, err = newSourceStreamNode(et, t, l)
+	case *pipeline.StreamNode:
+		n, err = newStreamNode(et, t, l)
 	case *pipeline.SourceBatchNode:
 		n, err = newSourceBatchNode(et, t, l)
 	case *pipeline.BatchNode:

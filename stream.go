@@ -8,14 +8,14 @@ import (
 	"github.com/influxdata/kapacitor/tick"
 )
 
-type SourceStreamNode struct {
+type StreamNode struct {
 	node
-	s *pipeline.SourceStreamNode
+	s *pipeline.StreamNode
 }
 
-// Create a new  SourceStreamNode which copies all data to children
-func newSourceStreamNode(et *ExecutingTask, n *pipeline.SourceStreamNode, l *log.Logger) (*SourceStreamNode, error) {
-	sn := &SourceStreamNode{
+// Create a new  StreamNode which copies all data to children
+func newStreamNode(et *ExecutingTask, n *pipeline.StreamNode, l *log.Logger) (*StreamNode, error) {
+	sn := &StreamNode{
 		node: node{Node: n, et: et, logger: l},
 		s:    n,
 	}
@@ -23,7 +23,7 @@ func newSourceStreamNode(et *ExecutingTask, n *pipeline.SourceStreamNode, l *log
 	return sn, nil
 }
 
-func (s *SourceStreamNode) runSourceStream([]byte) error {
+func (s *StreamNode) runSourceStream([]byte) error {
 	for pt, ok := s.ins[0].NextPoint(); ok; pt, ok = s.ins[0].NextPoint() {
 		for _, child := range s.outs {
 			err := child.CollectPoint(pt)
