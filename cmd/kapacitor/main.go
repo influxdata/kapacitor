@@ -349,7 +349,7 @@ func doRecord(args []string) error {
 		if err != nil {
 			return err
 		}
-		rid, err = cli.RecordStream(*rsname, duration)
+		rid, err = cli.RecordStream(*rsname, duration, *rstag)
 		if err != nil {
 			return err
 		}
@@ -387,7 +387,7 @@ func doRecord(args []string) error {
 				return err
 			}
 		}
-		rid, err = cli.RecordBatch(*rbname, *rbcluster, start, stop, past)
+		rid, err = cli.RecordBatch(*rbname, *rbcluster, start, stop, past, *rbtag)
 		if err != nil {
 			return err
 		}
@@ -397,7 +397,7 @@ func doRecord(args []string) error {
 			recordQueryFlags.Usage()
 			return errors.New("both query and type are required")
 		}
-		rid, err = cli.RecordQuery(*rqquery, *rqtype, *rqcluster)
+		rid, err = cli.RecordQuery(*rqquery, *rqtype, *rqcluster, *rqtag)
 		if err != nil {
 			return err
 		}
@@ -761,8 +761,15 @@ func doList(args []string) error {
 			fmt.Fprintf(os.Stdout, outFmt, r.ID, r.Type, humanize.Bytes(uint64(r.Size)), r.Created.Local().Format(time.RFC822), "")
 		}
 	case "tags":
+		tags, err := cli.ListTags(args[1:])
+		if err != nil {
+			return err
+		}
+		outFmt := "%-32s%-40s\n"
 		fmt.Fprintf(os.Stdout, "%-32s%-40s\n", "Tag", "ID")
-		return fmt.Errorf("not implemented")
+		for _, t := range tags {
+			fmt.Fprintf(os.Stdout, outFmt, t.Tag, t.ID)
+		}
 	default:
 		return fmt.Errorf("cannot list '%s' did you mean 'tasks', 'recordings' or 'tags'?", kind)
 	}
@@ -824,7 +831,12 @@ func doDelete(args []string) error {
 			}
 		}
 	case "tags":
-		return fmt.Errorf("delete tags is not yet implemented")
+		for _, tag := range args[1:] {
+			err := cli.DeleteTag(tag)
+			if err != nil {
+				return err
+			}
+		}
 	default:
 		return fmt.Errorf("cannot delete '%s' did you mean 'tasks', 'recordings' or 'tags'?", kind)
 	}
@@ -874,6 +886,11 @@ func tagUsage() {
 }
 
 func doTag(args []string) error {
-	tagUsage()
-	return fmt.Errorf("not implemented")
+	if len(args) != 2 {
+		fmt.Fprintf(os.Stderr, "Must specify a new tag and an existing recording ID or tag.\n")
+		tagUsage()
+		os.Exit(2)
+	}
+	_, err := cli.CreateTag(args[0], args[1])
+	return err
 }
