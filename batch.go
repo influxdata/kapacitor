@@ -15,21 +15,21 @@ import (
 	"github.com/influxdata/kapacitor/pipeline"
 )
 
-type SourceBatchNode struct {
+type BatchNode struct {
 	node
-	s   *pipeline.SourceBatchNode
+	s   *pipeline.BatchNode
 	idx int
 }
 
-func newSourceBatchNode(et *ExecutingTask, n *pipeline.SourceBatchNode, l *log.Logger) (*SourceBatchNode, error) {
-	sn := &SourceBatchNode{
+func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode, l *log.Logger) (*BatchNode, error) {
+	sn := &BatchNode{
 		node: node{Node: n, et: et, logger: l},
 		s:    n,
 	}
 	return sn, nil
 }
 
-func (s *SourceBatchNode) linkChild(c Node) error {
+func (s *BatchNode) linkChild(c Node) error {
 
 	// add child
 	if s.Provides() != c.Wants() {
@@ -43,25 +43,25 @@ func (s *SourceBatchNode) linkChild(c Node) error {
 	return nil
 }
 
-func (s *SourceBatchNode) addParentEdge(in *Edge) {
+func (s *BatchNode) addParentEdge(in *Edge) {
 	// Pass edges down to children
 	s.children[s.idx].addParentEdge(in)
 	s.idx++
 }
 
-func (s *SourceBatchNode) start([]byte) {
+func (s *BatchNode) start([]byte) {
 }
 
-func (s *SourceBatchNode) Wait() error {
+func (s *BatchNode) Wait() error {
 	return nil
 }
 
 // Return list of databases and retention policies
 // the batcher will query.
-func (s *SourceBatchNode) DBRPs() ([]DBRP, error) {
+func (s *BatchNode) DBRPs() ([]DBRP, error) {
 	var dbrps []DBRP
 	for _, b := range s.children {
-		d, err := b.(*BatchNode).DBRPs()
+		d, err := b.(*QueryNode).DBRPs()
 		if err != nil {
 			return nil, err
 		}
@@ -70,35 +70,35 @@ func (s *SourceBatchNode) DBRPs() ([]DBRP, error) {
 	return dbrps, nil
 }
 
-func (s *SourceBatchNode) Count() int {
+func (s *BatchNode) Count() int {
 	return len(s.children)
 }
 
-func (s *SourceBatchNode) Start() {
+func (s *BatchNode) Start() {
 	for _, b := range s.children {
-		b.(*BatchNode).Start()
+		b.(*QueryNode).Start()
 	}
 }
 
-func (s *SourceBatchNode) Abort() {
+func (s *BatchNode) Abort() {
 	for _, b := range s.children {
-		b.(*BatchNode).Abort()
+		b.(*QueryNode).Abort()
 	}
 }
 
-func (s *SourceBatchNode) Queries(start, stop time.Time) [][]string {
+func (s *BatchNode) Queries(start, stop time.Time) [][]string {
 	queries := make([][]string, len(s.children))
 	for i, b := range s.children {
-		queries[i] = b.(*BatchNode).Queries(start, stop)
+		queries[i] = b.(*QueryNode).Queries(start, stop)
 	}
 	return queries
 }
 
 // Do not add the source batch node to the dot output
 // since its not really an edge.
-func (s *SourceBatchNode) edot(*bytes.Buffer, bool) {}
+func (s *BatchNode) edot(*bytes.Buffer, bool) {}
 
-func (s *SourceBatchNode) collectedCount() (count int64) {
+func (s *BatchNode) collectedCount() (count int64) {
 	for _, child := range s.children {
 		count += child.collectedCount()
 	}
@@ -110,9 +110,9 @@ const (
 	statsConnectErrors = "connect_errors"
 )
 
-type BatchNode struct {
+type QueryNode struct {
 	node
-	b        *pipeline.BatchNode
+	b        *pipeline.QueryNode
 	query    *Query
 	ticker   ticker
 	queryMu  sync.Mutex
@@ -121,8 +121,8 @@ type BatchNode struct {
 	aborting chan struct{}
 }
 
-func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode, l *log.Logger) (*BatchNode, error) {
-	bn := &BatchNode{
+func newQueryNode(et *ExecutingTask, n *pipeline.QueryNode, l *log.Logger) (*QueryNode, error) {
+	bn := &QueryNode{
 		node:     node{Node: n, et: et, logger: l},
 		b:        n,
 		closing:  make(chan struct{}),
@@ -181,11 +181,11 @@ func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode, l *log.Logger) (*Bat
 
 // Return list of databases and retention policies
 // the batcher will query.
-func (b *BatchNode) DBRPs() ([]DBRP, error) {
+func (b *QueryNode) DBRPs() ([]DBRP, error) {
 	return b.query.DBRPs()
 }
 
-func (b *BatchNode) Start() {
+func (b *QueryNode) Start() {
 	b.queryMu.Lock()
 	defer b.queryMu.Unlock()
 	b.queryErr = make(chan error, 1)
@@ -194,11 +194,11 @@ func (b *BatchNode) Start() {
 	}()
 }
 
-func (b *BatchNode) Abort() {
+func (b *QueryNode) Abort() {
 	close(b.aborting)
 }
 
-func (b *BatchNode) Queries(start, stop time.Time) []string {
+func (b *QueryNode) Queries(start, stop time.Time) []string {
 	now := time.Now()
 	if stop.IsZero() {
 		stop = now
@@ -224,7 +224,7 @@ func (b *BatchNode) Queries(start, stop time.Time) []string {
 }
 
 // Query InfluxDB and collect batches on batch collector.
-func (b *BatchNode) doQuery() error {
+func (b *QueryNode) doQuery() error {
 	defer b.ins[0].Close()
 
 	if b.et.tm.InfluxDBService == nil {
@@ -304,7 +304,7 @@ func (b *BatchNode) doQuery() error {
 	}
 }
 
-func (b *BatchNode) runBatch([]byte) error {
+func (b *QueryNode) runBatch([]byte) error {
 	b.statMap.Add(statsQueryErrors, 0)
 	b.statMap.Add(statsConnectErrors, 0)
 	errC := make(chan error, 1)
@@ -351,7 +351,7 @@ func (b *BatchNode) runBatch([]byte) error {
 	return err
 }
 
-func (b *BatchNode) stopBatch() {
+func (b *QueryNode) stopBatch() {
 	if b.ticker != nil {
 		b.ticker.Stop()
 	}

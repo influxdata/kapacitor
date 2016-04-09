@@ -6,17 +6,17 @@ import (
 	"github.com/influxdata/kapacitor/tick"
 )
 
-// A SourceStreamNode represents the source of data being
+// A StreamNode represents the source of data being
 // streamed to Kapacitor via any of its inputs.
 // The `stream` variable in stream tasks is an instance of
-// a SourceStreamNode.
-// SourceStreamNode.From is the method/property of this node.
-type SourceStreamNode struct {
+// a StreamNode.
+// StreamNode.From is the method/property of this node.
+type StreamNode struct {
 	node
 }
 
-func newSourceStreamNode() *SourceStreamNode {
-	return &SourceStreamNode{
+func newStreamNode() *StreamNode {
+	return &StreamNode{
 		node: node{
 			desc:     "srcstream",
 			wants:    StreamEdge,
@@ -25,7 +25,7 @@ func newSourceStreamNode() *SourceStreamNode {
 	}
 }
 
-// Creates a new StreamNode that can be further
+// Creates a new FromNode that can be further
 // filtered using the Database, RetentionPolicy, Measurement and Where properties.
 // From can be called multiple times to create multiple
 // independent forks of the data stream.
@@ -48,13 +48,13 @@ func newSourceStreamNode() *SourceStreamNode {
 //            .as('cpu', 'load')
 //        ...
 //
-func (s *SourceStreamNode) From() *StreamNode {
-	f := newStreamNode()
+func (s *StreamNode) From() *FromNode {
+	f := newFromNode()
 	s.linkChild(f)
 	return f
 }
 
-// A StreamNode selects a subset of the data flowing through a SourceStreamNode.
+// A FromNode selects a subset of the data flowing through a StreamNode.
 // The stream node allows you to select which portion of the stream you want to process.
 //
 // Example:
@@ -70,7 +70,7 @@ func (s *SourceStreamNode) From() *StreamNode {
 // The above example selects only data points from the database `mydb`
 // and retention policy `myrp` and measurement `mymeasurement` where
 // the tag `host` matches the regex `logger\d+`
-type StreamNode struct {
+type FromNode struct {
 	chainnode
 	// An expression to filter the data stream.
 	// tick:ignore
@@ -104,8 +104,8 @@ type StreamNode struct {
 	Truncate time.Duration
 }
 
-func newStreamNode() *StreamNode {
-	return &StreamNode{
+func newFromNode() *FromNode {
+	return &FromNode{
 		chainnode: newBasicChainNode("stream", StreamEdge, StreamEdge),
 	}
 }
@@ -133,8 +133,8 @@ func newStreamNode() *StreamNode {
 //            .as('cpu', 'load')
 //        ...
 //
-func (s *StreamNode) From() *StreamNode {
-	f := newStreamNode()
+func (s *FromNode) From() *FromNode {
+	f := newFromNode()
 	s.linkChild(f)
 	return f
 }
@@ -200,7 +200,7 @@ func (s *StreamNode) From() *StreamNode {
 //
 // If empty then all data points are considered to match.
 // tick:property
-func (s *StreamNode) Where(expression tick.Node) *StreamNode {
+func (s *FromNode) Where(expression tick.Node) *FromNode {
 	if s.Expression != nil {
 		s.Expression = &tick.BinaryNode{
 			Operator: tick.TokenAnd,
@@ -221,7 +221,7 @@ func (s *StreamNode) Where(expression tick.Node) *StreamNode {
 //      |from()
 //          .groupBy(*)
 //
-func (s *StreamNode) GroupBy(tag ...interface{}) *StreamNode {
+func (s *FromNode) GroupBy(tag ...interface{}) *FromNode {
 	s.Dimensions = tag
 	return s
 }
