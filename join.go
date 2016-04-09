@@ -404,6 +404,8 @@ type joinset struct {
 	tolerance time.Duration
 	values    []models.PointInterface
 
+	claims map[string]int
+
 	expected int
 	size     int
 	finished int
@@ -434,6 +436,7 @@ func newJoinset(
 		time:      time,
 		tolerance: tolerance,
 		logger:    l,
+		claims:    make(map[string]int),
 	}
 }
 
@@ -580,8 +583,33 @@ func (js *joinset) JoinIntoBatch() (models.Batch, bool) {
 	return newBatch, true
 }
 
+// outName returns the fully qualified name for field k, in stream joined stream i.
+//
+// If the specified prefix is empty, the output name is k.
+//
+// If the specified prefix contains a trailing #, the output name is the prefix
+// without the trailing # concatenated with k
+//
+// Otherwise, the output name is prefix+"."+k
+//
+// A runtime check is performed to guarantee that all output points have unique field
+// names.
 func (js *joinset) outName(i int, k string) string {
-	return js.prefixes[i] + "." + k
+	prefix := js.prefixes[i]
+	if len(prefix) == 0 {
+		prefix = ""
+	} else if prefix[len(prefix)-1] == '#' {
+		prefix = prefix[0 : len(prefix)-1]
+	} else {
+		prefix = prefix + "."
+	}
+	n := prefix + k
+	if claim, ok := js.claims[n]; ok && claim != i {
+		panic(fmt.Errorf("field %s of input %d conflicts with input %d", k, i, claim))
+	} else if !ok {
+		js.claims[n] = i
+	}
+	return n
 }
 
 type durationVar struct {
