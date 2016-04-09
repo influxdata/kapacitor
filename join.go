@@ -364,7 +364,15 @@ func (g *group) emitAll() error {
 }
 
 // emit a single joined set
-func (g *group) emitJoinedSet(set *joinset) error {
+func (g *group) emitJoinedSet(set *joinset) (err error) {
+	defer func() {
+		if p := recover(); p != nil {
+			var ok bool
+			if err, ok = p.(error); !ok {
+				panic(p)
+			}
+		}
+	}()
 	if set.name == "" {
 		set.name = set.First().PointName()
 	}
