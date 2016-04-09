@@ -137,25 +137,17 @@ func (j *JoinNode) validate() error {
 		return fmt.Errorf("a call to join.as() is required to specify the output stream prefixes.")
 	}
 
-	if len(j.Names) != len(j.Parents()) {
+	if len(j.Names) > len(j.Parents()) {
 		return fmt.Errorf("number of prefixes specified by join.as() must match the number of joined streams")
+	} else if len(j.Names) < len(j.Parents()) {
+		tmp := make([]string, len(j.Parents()))
+		copy(tmp, j.Names)
+		j.Names = tmp
 	}
-
 	for _, name := range j.Names {
-		if len(name) == 0 {
-			return fmt.Errorf("must provide a prefix name for the join node, see .as() property method")
-		}
 		if strings.ContainsRune(name, '.') {
 			return fmt.Errorf("cannot use name %s as field prefix, it contains a '.' character", name)
 		}
 	}
-	names := make(map[string]bool, len(j.Names))
-	for _, name := range j.Names {
-		if names[name] {
-			return fmt.Errorf("cannot use the same prefix name see .as() property method")
-		}
-		names[name] = true
-	}
-
 	return nil
 }
