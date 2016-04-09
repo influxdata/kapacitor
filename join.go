@@ -467,11 +467,11 @@ func (js *joinset) JoinIntoPoint() (models.Point, bool) {
 			switch js.fill {
 			case influxql.NullFill:
 				for k := range js.First().PointFields() {
-					fields[js.prefixes[i]+"."+k] = nil
+					fields[js.outName(i, k)] = nil
 				}
 			case influxql.NumberFill:
 				for k := range js.First().PointFields() {
-					fields[js.prefixes[i]+"."+k] = js.fillValue
+					fields[js.outName(i, k)] = js.fillValue
 				}
 			default:
 				// inner join no valid point possible
@@ -479,7 +479,7 @@ func (js *joinset) JoinIntoPoint() (models.Point, bool) {
 			}
 		} else {
 			for k, v := range p.PointFields() {
-				fields[js.prefixes[i]+"."+k] = v
+				fields[js.outName(i, k)] = v
 			}
 		}
 	}
@@ -554,11 +554,11 @@ func (js *joinset) JoinIntoBatch() (models.Batch, bool) {
 				switch js.fill {
 				case influxql.NullFill:
 					for _, k := range fieldNames {
-						fields[js.prefixes[i]+"."+k] = nil
+						fields[js.outName(i, k)] = nil
 					}
 				case influxql.NumberFill:
 					for _, k := range fieldNames {
-						fields[js.prefixes[i]+"."+k] = js.fillValue
+						fields[js.outName(i, k)] = js.fillValue
 					}
 				default:
 					// inner join no valid point possible
@@ -566,7 +566,7 @@ func (js *joinset) JoinIntoBatch() (models.Batch, bool) {
 				}
 			} else {
 				for k, v := range bp.Fields {
-					fields[js.prefixes[i]+"."+k] = v
+					fields[js.outName(i, k)] = v
 				}
 			}
 		}
@@ -578,6 +578,10 @@ func (js *joinset) JoinIntoBatch() (models.Batch, bool) {
 		newBatch.Points = append(newBatch.Points, bp)
 	}
 	return newBatch, true
+}
+
+func (js *joinset) outName(i int, k string) string {
+	return js.prefixes[i] + "." + k
 }
 
 type durationVar struct {
