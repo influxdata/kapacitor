@@ -51,6 +51,12 @@ type Service struct {
 		New() *kapacitor.TaskMaster
 		Stream(name string) (kapacitor.StreamCollector, error)
 	}
+	TagStore interface {
+		ValidateTagSyntax(tag string) error
+		ResolveTag(tagOrId string) (string, error)
+		CreateOrUpdateTag(tag string, id string) error
+		DeleteRecording(id string) error
+	}
 
 	recordingsMu      sync.RWMutex
 	runningRecordings map[string]<-chan error
@@ -129,6 +135,7 @@ func (s *Service) handleList(w http.ResponseWriter, req *http.Request) {
 
 	infos, err := s.GetRecordings(rids)
 	if err != nil {
+		s.logger.Printf("E! list recordings for '%s' failed: %v", ridsStr, err)
 		httpd.HttpError(w, err.Error(), true, http.StatusNotFound)
 		return
 	}
@@ -142,7 +149,11 @@ func (s *Service) handleList(w http.ResponseWriter, req *http.Request) {
 
 func (s *Service) handleDelete(w http.ResponseWriter, r *http.Request) {
 	rid := r.URL.Query().Get("rid")
-	s.Delete(rid)
+	if err := s.Delete(rid); err != nil {
+		s.logger.Printf("E! delete recordings for '%s' failed: %v", rid, err)
+		httpd.HttpError(w, err.Error(), true, http.StatusNotFound)
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -185,11 +196,16 @@ func (r *Service) handleReplay(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if id, err = r.TagStore.ResolveTag(id); err != nil {
+		httpd.HttpError(w, "replay resolve: "+err.Error(), true, http.StatusNotFound)
+		return
+	}
+
 	replay := kapacitor.NewReplay(clk)
 	var replayC <-chan error
 	switch t.Type {
 	case kapacitor.StreamTask:
-		f, err := r.FindStreamRecording(id)
+		f, err := r.FindStreamRecording(id, false)
 		if err != nil {
 			httpd.HttpError(w, "replay find: "+err.Error(), true, http.StatusNotFound)
 			return
@@ -201,7 +217,7 @@ func (r *Service) handleReplay(w http.ResponseWriter, req *http.Request) {
 		}
 		replayC = replay.ReplayStream(f, stream, recTime, precision)
 	case kapacitor.BatchTask:
-		fs, err := r.FindBatchRecording(id)
+		fs, err := r.FindBatchRecording(id, false)
 		if err != nil {
 			httpd.HttpError(w, "replay find: "+err.Error(), true, http.StatusNotFound)
 			return
@@ -246,6 +262,12 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 
 	rid := uuid.NewV4()
 	typ := req.URL.Query().Get("type")
+	tag := req.URL.Query().Get("tag")
+	if err := r.checkTag(tag); err != nil {
+		r.logger.Printf("E! record check tag '%s' failed: %v", tag, err)
+		httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
+		return
+	}
 	switch typ {
 	case "stream":
 		task := req.URL.Query().Get("name")
@@ -267,7 +289,7 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 		}
 
 		doF = func() error {
-			err := r.doRecordStream(rid, dur, t.DBRPs, t.Measurements(), started)
+			err := r.doRecordStream(rid, dur, t.DBRPs, t.Measurements(), started, tag)
 			if err != nil {
 				close(started)
 			}
@@ -333,7 +355,7 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 
 		doF = func() error {
 			close(started)
-			return r.doRecordBatch(rid, t, start, stop, cluster)
+			return r.doRecordBatch(rid, t, start, stop, cluster, tag)
 		}
 	case "query":
 		query := req.URL.Query().Get("query")
@@ -357,7 +379,7 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 		cluster := req.URL.Query().Get("cluster")
 		doF = func() error {
 			close(started)
-			return r.doRecordQuery(rid, query, tt, cluster)
+			return r.doRecordQuery(rid, query, tt, cluster, tag)
 		}
 	default:
 		httpd.HttpError(w, "invalid recording type", true, http.StatusBadRequest)
@@ -400,7 +422,14 @@ func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
 }
 
 func (r *Service) handleGetRecording(w http.ResponseWriter, req *http.Request) {
-	rid := req.URL.Query().Get("id")
+	tagOrId := req.URL.Query().Get("id")
+	var rid string
+	var err error
+	if rid, err = r.TagStore.ResolveTag(tagOrId); err != nil {
+		r.logger.Printf("E! get recording for '%s' failed: %v", tagOrId, err)
+		httpd.HttpError(w, "error resolving recording ID or tag: "+err.Error(), true, http.StatusBadRequest)
+		return
+	}
 
 	// First check if its still running
 	var errC <-chan error
@@ -427,6 +456,7 @@ func (r *Service) handleGetRecording(w http.ResponseWriter, req *http.Request) {
 	// It already finished, return its info
 	info, err := r.GetRecordings([]string{rid})
 	if err != nil {
+		r.logger.Printf("E! get recording '%s' failed: %v", rid, err)
 		httpd.HttpError(w, "error finding recording: "+err.Error(), true, http.StatusInternalServerError)
 		return
 	}
@@ -453,8 +483,10 @@ func (r *Service) GetRecordings(rids []string) ([]RecordingInfo, error) {
 	}
 
 	ids := make(map[string]bool)
-	for _, id := range rids {
-		ids[id] = true
+	for _, rid := range rids {
+		if id, err := r.TagStore.ResolveTag(rid); err != nil {
+			ids[id] = true
+		}
 	}
 
 	infos := make([]RecordingInfo, 0, len(files))
@@ -514,7 +546,7 @@ func (r *Service) find(id string, typ kapacitor.TaskType) (*os.File, error) {
 	return f, nil
 }
 
-func (r *Service) FindStreamRecording(id string) (io.ReadCloser, error) {
+func (r *Service) FindStreamRecording(id string, resolve bool) (io.ReadCloser, error) {
 	f, err := r.find(id, kapacitor.StreamTask)
 	if err != nil {
 		return nil, err
@@ -526,7 +558,7 @@ func (r *Service) FindStreamRecording(id string) (io.ReadCloser, error) {
 	return rc{gz, f}, nil
 }
 
-func (r *Service) FindBatchRecording(id string) ([]io.ReadCloser, error) {
+func (r *Service) FindBatchRecording(id string, resolve bool) ([]io.ReadCloser, error) {
 	f, err := r.find(id, kapacitor.BatchTask)
 	if err != nil {
 		return nil, err
@@ -550,11 +582,17 @@ func (r *Service) FindBatchRecording(id string) ([]io.ReadCloser, error) {
 	return rcs, nil
 }
 
-func (r *Service) Delete(id string) {
-	ps := path.Join(r.saveDir, id+streamEXT)
-	pb := path.Join(r.saveDir, id+batchEXT)
-	os.Remove(ps)
-	os.Remove(pb)
+func (r *Service) Delete(tagOrId string) error {
+	if id, err := r.TagStore.ResolveTag(tagOrId); err != nil {
+		return err
+	} else {
+		ps := path.Join(r.saveDir, id+streamEXT)
+		pb := path.Join(r.saveDir, id+batchEXT)
+		os.Remove(ps)
+		os.Remove(pb)
+		r.TagStore.DeleteRecording(id)
+	}
+	return nil
 }
 
 type rc struct {
@@ -608,7 +646,13 @@ func (s streamWriter) Close() error {
 }
 
 // Record the stream for a duration
-func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration, dbrps []kapacitor.DBRP, measurements []string, started chan struct{}) error {
+func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration, dbrps []kapacitor.DBRP, measurements []string, started chan struct{}, tag string) (err error) {
+	defer func() {
+		if err == nil {
+			err = r.createTag(rid, tag)
+		}
+	}()
+
 	e, err := r.TaskMaster.NewFork(rid.String(), dbrps, measurements)
 	if err != nil {
 		return err
@@ -678,8 +722,32 @@ func (b batchArchive) Close() error {
 	return b.f.Close()
 }
 
+// check that if a tag is specified, it has the correct syntax
+func (r *Service) checkTag(tag string) error {
+	if tag == "" {
+		return nil
+	} else {
+		return r.TagStore.ValidateTagSyntax(tag)
+	}
+}
+
+// if a tag was specified, then create or update a tag for the specified recording
+func (r *Service) createTag(rid uuid.UUID, tag string) error {
+	if tag != "" {
+		return r.TagStore.CreateOrUpdateTag(tag, rid.String())
+	}
+	return nil
+}
+
 // Record a series of batch queries defined by a batch task
-func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, start, stop time.Time, cluster string) error {
+func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, start, stop time.Time, cluster string, tag string) (err error) {
+
+	defer func() {
+		if err == nil {
+			err = r.createTag(rid, tag)
+		}
+	}()
+
 	et, err := kapacitor.NewExecutingTask(r.TaskMaster.New(), t)
 	if err != nil {
 		return err
@@ -739,7 +807,13 @@ func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, start, stop ti
 	return archive.Close()
 }
 
-func (r *Service) doRecordQuery(rid uuid.UUID, q string, tt kapacitor.TaskType, cluster string) error {
+func (r *Service) doRecordQuery(rid uuid.UUID, q string, tt kapacitor.TaskType, cluster string, tag string) (err error) {
+	defer func() {
+		if err == nil {
+			err = r.createTag(rid, tag)
+		}
+	}()
+
 	// Parse query to determine dbrp
 	var db, rp string
 	s, err := influxql.ParseStatement(q)

@@ -32,6 +32,7 @@ import (
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/stats"
+	"github.com/influxdata/kapacitor/services/tag_store"
 	"github.com/influxdata/kapacitor/services/talk"
 	"github.com/influxdata/kapacitor/services/task_store"
 	"github.com/influxdata/kapacitor/services/udf"
@@ -66,6 +67,7 @@ type Server struct {
 	LogService      logging.Interface
 	HTTPDService    *httpd.Service
 	TaskStore       *task_store.Service
+	TagStore        *tag_store.Service
 	ReplayService   *replay.Service
 	InfluxDBService *influxdb.Service
 
@@ -129,6 +131,7 @@ func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*
 	s.initHTTPDService(c.HTTP)
 	s.appendInfluxDBService(c.InfluxDB, c.defaultInfluxDB, c.Hostname)
 	s.appendTaskStoreService(c.Task)
+	s.appendTagStoreService(c.Tag)
 	s.appendReplayStoreService(c.Replay)
 	s.appendOpsGenieService(c.OpsGenie)
 	s.appendVictorOpsService(c.VictorOps)
@@ -214,6 +217,15 @@ func (s *Server) appendTaskStoreService(c task_store.Config) {
 	s.Services = append(s.Services, srv)
 }
 
+func (s *Server) appendTagStoreService(c tag_store.Config) {
+	l := s.LogService.NewLogger("[tag_store] ", log.LstdFlags)
+	srv := tag_store.NewService(c, l)
+	srv.HTTPDService = s.HTTPDService
+
+	s.TagStore = srv
+	s.Services = append(s.Services, srv)
+}
+
 func (s *Server) appendReplayStoreService(c replay.Config) {
 	l := s.LogService.NewLogger("[replay] ", log.LstdFlags)
 	srv := replay.NewService(c, l)
@@ -221,6 +233,7 @@ func (s *Server) appendReplayStoreService(c replay.Config) {
 	srv.HTTPDService = s.HTTPDService
 	srv.InfluxDBService = s.InfluxDBService
 	srv.TaskMaster = s.TaskMaster
+	srv.TagStore = s.TagStore
 
 	s.ReplayService = srv
 	s.Services = append(s.Services, srv)

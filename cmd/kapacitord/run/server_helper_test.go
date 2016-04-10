@@ -157,6 +157,7 @@ func NewConfig() *run.Config {
 	c.Reporting.Enabled = false
 	c.Replay.Dir = MustTempFile()
 	c.Task.Dir = MustTempFile()
+	c.Tag.Dir = MustTempFile()
 	c.DataDir = MustTempFile()
 	c.HTTP.BindAddress = "127.0.0.1:0"
 	c.InfluxDB[0].Enabled = false
