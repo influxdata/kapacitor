@@ -838,6 +838,8 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 	}
 }
 
+// If this test fails due to missing python dependencies, run 'INSTALL_PREFIX=/usr/local ./install-deps.sh' from the root directory of the
+// kapacitor project.
 func TestServer_UDFStreamAgents(t *testing.T) {
 	dir, err := os.Getwd()
 	if err != nil {

@@ -18,21 +18,9 @@ RUN apt-get update && apt-get install -y \
     curl
 
 # Install protobuf3
-ENV PROTO_VERSION 3.0.0-beta-2
-# Download and compile protoc
-RUN wget https://github.com/google/protobuf/archive/v${PROTO_VERSION}.tar.gz && \
-    tar xf v${PROTO_VERSION}.tar.gz && \
-    rm -f v${PROTO_VERSION}.tar.gz && \
-    cd protobuf-${PROTO_VERSION} && \
-    ./autogen.sh && \
-    ./configure --prefix=/usr && \
-    make -j $(nproc) && \
-    make check && \
-    make install
-
-# Install Python Protobuf3
-RUN cd protobuf-${PROTO_VERSION}/python && \
-    python setup.py install;
+ADD install-deps.sh /tmp/
+RUN INSTALL_PREFIX=/usr /tmp/install-deps.sh
+RUN rm /tmp/install-deps.sh
 
 # Install go
 ENV GOPATH /root/go
