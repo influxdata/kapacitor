@@ -79,7 +79,8 @@ fpm_common_args = "-f -s dir --log error \
 
 targets = {
     'kapacitor' : './cmd/kapacitor',
-    'kapacitord' : './cmd/kapacitord'
+    'kapacitord' : './cmd/kapacitord',
+    'tickfmt' : './tick/cmd/tickfmt'
 }
 
 supported_builds = {
