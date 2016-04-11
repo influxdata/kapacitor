@@ -33,7 +33,7 @@ import (
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/udf/test"
-	"github.com/influxdata/kapacitor/wlog"
+	"github.com/influxdata/wlog"
 )
 
 var httpService *httpd.Service

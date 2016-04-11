@@ -7,7 +7,7 @@ import (
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
-	"github.com/influxdata/kapacitor/wlog"
+	"github.com/influxdata/wlog"
 )
 
 func Benchmark_CollectPoint(b *testing.B) {

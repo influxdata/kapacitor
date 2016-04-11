@@ -18,7 +18,7 @@ import (
 	iclient "github.com/influxdata/influxdb/client/v2"
 	"github.com/influxdata/kapacitor/client/v1"
 	"github.com/influxdata/kapacitor/cmd/kapacitord/run"
-	"github.com/influxdata/kapacitor/wlog"
+	"github.com/influxdata/wlog"
 )
 
 // Server represents a test wrapper for run.Server.

@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/influxdata/kapacitor/pipeline"
-	"github.com/influxdata/kapacitor/wlog"
+	"github.com/influxdata/wlog"
 )
 
 type LogNode struct {
