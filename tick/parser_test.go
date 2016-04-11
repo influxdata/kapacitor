@@ -782,6 +782,127 @@ func TestParseStatements(t *testing.T) {
 		},
 		{
 			script: `global(lambda: 
+	// Test Left-Associative operators
+	// should parse as ((1+2)-(3*4)/5)
+	(1 + 2 - 3 * 4 / 5)
+)
+`,
+			Root: &ListNode{
+				position: position{
+					pos:  0,
+					line: 1,
+					char: 1,
+				},
+				Nodes: []Node{
+					&FunctionNode{
+						position: position{
+							pos:  0,
+							line: 1,
+							char: 1,
+						},
+						Func: "global",
+						Type: globalFunc,
+						Args: []Node{
+							&LambdaNode{
+								position: position{
+									pos:  7,
+									line: 1,
+									char: 8,
+								},
+								Node: &BinaryNode{
+									position: position{
+										pos:  96,
+										line: 4,
+										char: 9,
+									},
+									Operator: TokenMinus,
+									Parens:   true,
+									Left: &BinaryNode{
+										position: position{
+											pos:  92,
+											line: 4,
+											char: 5,
+										},
+										Operator: TokenPlus,
+										Left: &NumberNode{
+											position: position{
+												pos:  90,
+												line: 4,
+												char: 3,
+											},
+											IsInt: true,
+											Int64: 1,
+										},
+										Right: &NumberNode{
+											position: position{
+												pos:  94,
+												line: 4,
+												char: 7,
+											},
+											IsInt: true,
+											Int64: 2,
+										},
+									},
+									Right: &BinaryNode{
+										position: position{
+											pos:  104,
+											line: 4,
+											char: 17,
+										},
+										Operator: TokenDiv,
+										Left: &BinaryNode{
+											position: position{
+												pos:  100,
+												line: 4,
+												char: 13,
+											},
+											Operator: TokenMult,
+											Left: &NumberNode{
+												position: position{
+													pos:  98,
+													line: 4,
+													char: 11,
+												},
+												IsInt: true,
+												Int64: 3,
+											},
+											Right: &NumberNode{
+												position: position{
+													pos:  102,
+													line: 4,
+													char: 15,
+												},
+												IsInt: true,
+												Int64: 4,
+											},
+										},
+										Right: &NumberNode{
+											position: position{
+												pos:  106,
+												line: 4,
+												char: 19,
+											},
+											IsInt: true,
+											Int64: 5,
+										},
+									},
+									Comment: &CommentNode{
+										position: position{
+											pos:  17,
+											line: 2,
+											char: 2,
+										},
+										Comments: []string{"Test Left-Associative operators", "should parse as ((1+2)-(3*4)/5)"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			script: `global(lambda: 
 // If this
 // is less than that
 (1 + 2 - 3 * 4 / 5) 
@@ -829,29 +950,29 @@ AND
 										MultiLine: true,
 										Left: &BinaryNode{
 											position: position{
-												pos:  51,
+												pos:  55,
 												line: 4,
-												char: 4,
+												char: 8,
 											},
-											Operator: TokenPlus,
+											Operator: TokenMinus,
 											Parens:   true,
-											Left: &NumberNode{
+											Left: &BinaryNode{
 												position: position{
-													pos:  49,
+													pos:  51,
 													line: 4,
-													char: 2,
+													char: 4,
 												},
-												IsInt: true,
-												Int64: 1,
-											},
-											Right: &BinaryNode{
-												position: position{
-													pos:  55,
-													line: 4,
-													char: 8,
-												},
-												Operator: TokenMinus,
+												Operator: TokenPlus,
 												Left: &NumberNode{
+													position: position{
+														pos:  49,
+														line: 4,
+														char: 2,
+													},
+													IsInt: true,
+													Int64: 1,
+												},
+												Right: &NumberNode{
 													position: position{
 														pos:  53,
 														line: 4,
@@ -860,7 +981,15 @@ AND
 													IsInt: true,
 													Int64: 2,
 												},
-												Right: &BinaryNode{
+											},
+											Right: &BinaryNode{
+												position: position{
+													pos:  63,
+													line: 4,
+													char: 16,
+												},
+												Operator: TokenDiv,
+												Left: &BinaryNode{
 													position: position{
 														pos:  59,
 														line: 4,
@@ -876,32 +1005,24 @@ AND
 														IsInt: true,
 														Int64: 3,
 													},
-													Right: &BinaryNode{
+													Right: &NumberNode{
 														position: position{
-															pos:  63,
+															pos:  61,
 															line: 4,
-															char: 16,
+															char: 14,
 														},
-														Operator: TokenDiv,
-														Left: &NumberNode{
-															position: position{
-																pos:  61,
-																line: 4,
-																char: 14,
-															},
-															IsInt: true,
-															Int64: 4,
-														},
-														Right: &NumberNode{
-															position: position{
-																pos:  65,
-																line: 4,
-																char: 18,
-															},
-															IsInt: true,
-															Int64: 5,
-														},
+														IsInt: true,
+														Int64: 4,
 													},
+												},
+												Right: &NumberNode{
+													position: position{
+														pos:  65,
+														line: 4,
+														char: 18,
+													},
+													IsInt: true,
+													Int64: 5,
 												},
 											},
 											Comment: &CommentNode{
