@@ -24,6 +24,7 @@ Example UDF config for a socket based UDF.
 - [#386](https://github.com/influxdata/kapacitor/issues/386): Adds official Go HTTP client package.
 - [#399](https://github.com/influxdata/kapacitor/issues/399): Allow disabling of subscriptions.
 - [#417](https://github.com/influxdata/kapacitor/issues/417): UDFs can be connected over a Unix socket. This enables UDFs from across Docker containers.
+- [#451](https://github.com/influxdata/kapacitor/issues/451): StreamNode supports `|groupBy` and `|where` methods.
 
 ### Bugfixes
 

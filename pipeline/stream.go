@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/influxdata/kapacitor/tick"
@@ -72,6 +73,10 @@ func (s *SourceStreamNode) From() *StreamNode {
 // the tag `host` matches the regex `logger\d+`
 type StreamNode struct {
 	chainnode
+
+	// self describer
+	describer *tick.ReflectionDescriber
+
 	// An expression to filter the data stream.
 	// tick:ignore
 	Expression tick.Node `tick:"Where"`
@@ -105,9 +110,12 @@ type StreamNode struct {
 }
 
 func newStreamNode() *StreamNode {
-	return &StreamNode{
+	s := &StreamNode{
 		chainnode: newBasicChainNode("stream", StreamEdge, StreamEdge),
 	}
+	s.describer, _ = tick.NewReflectionDescriber(s)
+	return s
+
 }
 
 // Creates a new stream node that can be further
@@ -224,4 +232,53 @@ func (s *StreamNode) Where(expression tick.Node) *StreamNode {
 func (s *StreamNode) GroupBy(tag ...interface{}) *StreamNode {
 	s.Dimensions = tag
 	return s
+}
+
+// Tick Describer methods
+
+//tick:ignore
+func (s *StreamNode) Desc() string {
+	return s.describer.Desc()
+}
+
+//tick:ignore
+func (s *StreamNode) HasChainMethod(name string) bool {
+	if name == "groupBy" || name == "where" {
+		return true
+	}
+	return s.describer.HasChainMethod(name)
+}
+
+//tick:ignore
+func (s *StreamNode) CallChainMethod(name string, args ...interface{}) (interface{}, error) {
+	switch name {
+	case "groupBy":
+		return s.chainnode.GroupBy(args...), nil
+	case "where":
+		if len(args) != 1 {
+			return nil, fmt.Errorf("invalid number of args to |where() got %d exp 1", len(args))
+		}
+		expr, ok := args[0].(tick.Node)
+		if !ok {
+			return nil, fmt.Errorf("invalid arg to |where() got %T exp tick.Node", args[0])
+		}
+		return s.chainnode.Where(expr), nil
+	default:
+		return s.describer.CallChainMethod(name, args...)
+	}
+}
+
+//tick:ignore
+func (s *StreamNode) HasProperty(name string) bool {
+	return s.describer.HasProperty(name)
+}
+
+//tick:ignore
+func (s *StreamNode) Property(name string) interface{} {
+	return s.describer.Property(name)
+}
+
+//tick:ignore
+func (s *StreamNode) SetProperty(name string, args ...interface{}) (interface{}, error) {
+	return s.describer.SetProperty(name, args...)
 }

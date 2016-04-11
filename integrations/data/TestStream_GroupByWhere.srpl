@@ -1,0 +1,111 @@
+dbname
+rpname
+cpu,cpu=cpu0,host=serverA value=97.1 0000000001
+dbname
+rpname
+cpu,cpu=cpu0,host=serverB value=67.1 0000000001
+dbname
+rpname
+cpu,cpu=cpu1,host=serverA value=87.1 0000000001
+dbname
+rpname
+cpu,cpu=cpu-total,host=serverA value=97.1 0000000001
+dbname
+rpname
+cpu,cpu=cpu0,host=serverA value=91.6 0000000002
+dbname
+rpname
+cpu,cpu=cpu1,host=serverA value=82.6 0000000002
+dbname
+rpname
+cpu,cpu=cpu-total,host=serverA value=92.6 0000000002
+dbname
+rpname
+cpu,cpu=cpu0,host=serverA value=35.6 0000000003
+dbname
+rpname
+cpu,cpu=cpu1,host=serverA value=85.6 0000000003
+dbname
+rpname
+cpu,cpu=cpu-total,host=serverA value=95.6 0000000003
+dbname
+rpname
+cpu,cpu=cpu0,host=serverA value=73.1 0000000004
+dbname
+rpname
+cpu,cpu=cpu1,host=serverA value=63.1 0000000004
+dbname
+rpname
+cpu,cpu=cpu-total,host=serverA value=93.1 0000000004
+dbname
+rpname
+cpu,cpu=cpu0,host=serverA value=32.6 0000000005
+dbname
+rpname
+cpu,cpu=cpu1,host=serverA value=72.6 0000000005
+dbname
+rpname
+cpu,cpu=cpu-total,host=serverA value=92.6 0000000005
+dbname
+rpname
+cpu,cpu=cpu0,host=serverA value=94.8 0000000006
+dbname
+rpname
+cpu,cpu=cpu1,host=serverA value=25.8 0000000006
+dbname
+rpname
+cpu,cpu=cpu-total,host=serverA value=95.8 0000000006
+dbname
+rpname
+cpu,cpu=cpu0,host=serverC value=15.8 0000000007
+dbname
+rpname
+cpu,cpu=cpu1,host=serverA value=82.7 0000000007
+dbname
+rpname
+cpu,cpu=cpu-total,host=serverA value=92.7 0000000007
+dbname
+rpname
+cpu,cpu=cpu0,host=serverA value=82.7 0000000008
+dbname
+rpname
+cpu,cpu=cpu1,host=serverA value=66.0 0000000008
+dbname
+rpname
+cpu,cpu=cpu-total,host=serverA value=96.0 0000000008
+dbname
+rpname
+cpu,cpu=cpu0,host=serverA value=86.0 0000000009
+dbname
+rpname
+cpu,cpu=cpu1,host=serverA value=73.4 0000000009
+dbname
+rpname
+cpu,cpu=cpu-total,host=serverA value=93.4 0000000009
+dbname
+rpname
+cpu,cpu=cpu0,host=serverA value=73.4 0000000010
+dbname
+rpname
+cpu,cpu=cpu1,host=serverA value=85.3 0000000010
+dbname
+rpname
+cpu,cpu=cpu-total,host=serverA value=95.3 0000000010
+dbname
+rpname
+cpu,cpu=cpu0,host=serverA value=65.3 0000000011
+dbname
+rpname
+cpu,cpu=cpu1,host=serverA value=93.4 0000000011
+dbname
+rpname
+cpu,cpu=cpu-total,host=serverA value=96.4 0000000011
+dbname
+rpname
+cpu,cpu=cpu0,host=serverA value=15.1 0000000012
+dbname
+rpname
+cpu,cpu=cpu1,host=serverA value=95.1 0000000012
+dbname
+rpname
+cpu,cpu=cpu-total,host=serverA value=95.1 0000000012
