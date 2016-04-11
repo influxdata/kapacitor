@@ -867,6 +867,69 @@ stream
 	testStreamerWithOutput(t, "TestStream_GroupBy", script, 13*time.Second, er, nil, false)
 }
 
+func TestStream_GroupByWhere(t *testing.T) {
+
+	var script = `
+var serverA = stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+
+var byCpu = serverA
+	|groupBy('host', 'cpu')
+
+var total = serverA
+	|where(lambda: "cpu" == 'cpu-total')
+
+byCpu
+	|join(total)
+		.on('host')
+		.as('cpu', 'total')
+	|eval(lambda: "cpu.value" / "total.value")
+		.as('cpu_percent')
+	|window()
+		.period(10s)
+		.every(10s)
+	|mean('cpu_percent')
+	|httpOut('TestStream_GroupByWhere')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"cpu": "cpu0", "host": "serverA"},
+				Columns: []string{"time", "mean"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					0.7823116704593873,
+				}},
+			},
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"cpu": "cpu1", "host": "serverA"},
+				Columns: []string{"time", "mean"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					0.7676074281820646,
+				}},
+			},
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"cpu": "cpu-total", "host": "serverA"},
+				Columns: []string{"time", "mean"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					1.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_GroupByWhere", script, 13*time.Second, er, nil, false)
+}
+
 func TestStream_Join(t *testing.T) {
 
 	var script = `
