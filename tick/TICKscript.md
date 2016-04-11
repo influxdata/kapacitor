@@ -66,15 +66,15 @@ Expression   = identifier { Chain } | Function { Chain } | Primary .
 Chain        = "@" Function | "|" Function { Chain } | "." Function { Chain} | "." identifier { Chain } .
 Function     = identifier "(" Parameters ")" .
 Parameters   = { Parameter "," } [ Parameter ] .
-Parameter    = Expression | "lambda:" LambdaExpr | Primary .
-Primary      = "(" LambdaExpr ")" | number_lit | string_lit |
+Parameter    = Expression | "lambda:" BinaryExpr | Primary .
+Primary      = "(" BinaryExpr ")" | number_lit | string_lit |
                 boolean_lit | duration_lit | regex_lit | star_lit |
                 LFunc | identifier | Reference | "-" Primary | "!" Primary .
 Reference    = `"` { unicode_char } `"` .
-LambdaExpr   =  Primary operator_lit Primary .
+BinaryExpr   =  Primary  { operator_lit Primary} .
 LFunc        = identifier "(" LParameters ")"
 LParameters  = { LParameter "," } [ LParameter ] .
-LParameter   = LambdaExpr |  Primary .
+LParameter   = BinaryExpr |  Primary .
 
 ```
 

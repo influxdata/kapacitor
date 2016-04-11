@@ -26,6 +26,11 @@ type Node interface {
 	Format(buf *bytes.Buffer, indent string, onNewLine bool)
 }
 
+// Represents a node that can have a comment associated with it.
+type commentedNode interface {
+	SetComment(c *CommentNode)
+}
+
 func writeIndent(buf *bytes.Buffer, indent string, onNewLine bool) {
 	if onNewLine {
 		buf.WriteString(indent)
@@ -60,11 +65,11 @@ type NumberNode struct {
 	IsFloat bool    // Number has a floating-point value.
 	Int64   int64   // The integer value.
 	Float64 float64 // The floating-point value.
-	Comment Node
+	Comment *CommentNode
 }
 
 // create a new number from a text string
-func newNumber(p position, text string, c Node) (*NumberNode, error) {
+func newNumber(p position, text string, c *CommentNode) (*NumberNode, error) {
 	n := &NumberNode{
 		position: p,
 		Comment:  c,
@@ -115,6 +120,9 @@ func (n *NumberNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
 		buf.WriteString(s)
 	}
 }
+func (n *NumberNode) SetComment(c *CommentNode) {
+	n.Comment = c
+}
 
 // durationNode holds a number: signed or unsigned integer or float.
 // The value is parsed and stored under all the types that can represent the value.
@@ -122,11 +130,11 @@ func (n *NumberNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
 type DurationNode struct {
 	position
 	Dur     time.Duration //the duration
-	Comment Node
+	Comment *CommentNode
 }
 
 // create a new number from a text string
-func newDur(p position, text string, c Node) (*DurationNode, error) {
+func newDur(p position, text string, c *CommentNode) (*DurationNode, error) {
 	n := &DurationNode{
 		position: p,
 		Comment:  c,
@@ -151,15 +159,18 @@ func (n *DurationNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) 
 	writeIndent(buf, indent, onNewLine)
 	buf.WriteString(influxql.FormatDuration(n.Dur))
 }
+func (n *DurationNode) SetComment(c *CommentNode) {
+	n.Comment = c
+}
 
 // boolNode holds one argument and an operator.
 type BoolNode struct {
 	position
 	Bool    bool
-	Comment Node
+	Comment *CommentNode
 }
 
-func newBool(p position, text string, c Node) (*BoolNode, error) {
+func newBool(p position, text string, c *CommentNode) (*BoolNode, error) {
 	b, err := strconv.ParseBool(text)
 	if err != nil {
 		return nil, err
@@ -186,16 +197,19 @@ func (n *BoolNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
 		buf.WriteString(KW_False)
 	}
 }
+func (n *BoolNode) SetComment(c *CommentNode) {
+	n.Comment = c
+}
 
 // unaryNode holds one argument and an operator.
 type UnaryNode struct {
 	position
 	Node     Node
 	Operator TokenType
-	Comment  Node
+	Comment  *CommentNode
 }
 
-func newUnary(p position, op TokenType, n Node, c Node) *UnaryNode {
+func newUnary(p position, op TokenType, n Node, c *CommentNode) *UnaryNode {
 	return &UnaryNode{
 		position: p,
 		Node:     n,
@@ -217,6 +231,9 @@ func (n *UnaryNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
 	buf.WriteString(n.Operator.String())
 	n.Node.Format(buf, indent, false)
 }
+func (n *UnaryNode) SetComment(c *CommentNode) {
+	n.Comment = c
+}
 
 // binaryNode holds two arguments and an operator.
 type BinaryNode struct {
@@ -224,19 +241,19 @@ type BinaryNode struct {
 	Left      Node
 	Right     Node
 	Operator  TokenType
-	Comment   Node
+	Comment   *CommentNode
 	Parens    bool
 	MultiLine bool
 }
 
-func newBinary(p position, op TokenType, left, right Node, multiLine bool, comment Node) *BinaryNode {
+func newBinary(p position, op TokenType, left, right Node, multiLine bool, c *CommentNode) *BinaryNode {
 	return &BinaryNode{
 		position:  p,
 		Left:      left,
 		Right:     right,
 		Operator:  op,
 		MultiLine: multiLine,
-		Comment:   comment,
+		Comment:   c,
 	}
 }
 
@@ -267,20 +284,23 @@ func (n *BinaryNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
 		buf.WriteByte(')')
 	}
 }
+func (n *BinaryNode) SetComment(c *CommentNode) {
+	n.Comment = c
+}
 
 type DeclarationNode struct {
 	position
 	Left    *IdentifierNode
 	Right   Node
-	Comment Node
+	Comment *CommentNode
 }
 
-func newDecl(p position, left *IdentifierNode, right Node, comment Node) *DeclarationNode {
+func newDecl(p position, left *IdentifierNode, right Node, c *CommentNode) *DeclarationNode {
 	return &DeclarationNode{
 		position: p,
 		Left:     left,
 		Right:    right,
-		Comment:  comment,
+		Comment:  c,
 	}
 }
 
@@ -300,22 +320,25 @@ func (n *DeclarationNode) Format(buf *bytes.Buffer, indent string, onNewLine boo
 	buf.WriteByte(' ')
 	n.Right.Format(buf, indent, false)
 }
+func (n *DeclarationNode) SetComment(c *CommentNode) {
+	n.Comment = c
+}
 
 type ChainNode struct {
 	position
 	Left     Node
 	Right    Node
 	Operator TokenType
-	Comment  Node
+	Comment  *CommentNode
 }
 
-func newChain(p position, op TokenType, left, right Node, comment Node) *ChainNode {
+func newChain(p position, op TokenType, left, right Node, c *CommentNode) *ChainNode {
 	return &ChainNode{
 		position: p,
 		Left:     left,
 		Right:    right,
 		Operator: op,
-		Comment:  comment,
+		Comment:  c,
 	}
 }
 
@@ -337,15 +360,18 @@ func (n *ChainNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
 	buf.WriteString(n.Operator.String())
 	n.Right.Format(buf, indent, false)
 }
+func (n *ChainNode) SetComment(c *CommentNode) {
+	n.Comment = c
+}
 
 //Holds the textual representation of an identifier
 type IdentifierNode struct {
 	position
 	Ident   string // The identifier
-	Comment Node
+	Comment *CommentNode
 }
 
-func newIdent(p position, ident string, c Node) *IdentifierNode {
+func newIdent(p position, ident string, c *CommentNode) *IdentifierNode {
 	return &IdentifierNode{
 		position: p,
 		Ident:    ident,
@@ -365,15 +391,18 @@ func (n *IdentifierNode) Format(buf *bytes.Buffer, indent string, onNewLine bool
 	writeIndent(buf, indent, onNewLine)
 	buf.WriteString(n.Ident)
 }
+func (n *IdentifierNode) SetComment(c *CommentNode) {
+	n.Comment = c
+}
 
 //Holds the textual representation of an identifier
 type ReferenceNode struct {
 	position
 	Reference string // The field reference
-	Comment   Node
+	Comment   *CommentNode
 }
 
-func newReference(p position, txt string, c Node) *ReferenceNode {
+func newReference(p position, txt string, c *CommentNode) *ReferenceNode {
 	// Remove leading and trailing quotes
 	literal := txt[1 : len(txt)-1]
 	// Unescape quotes
@@ -416,16 +445,19 @@ func (n *ReferenceNode) Format(buf *bytes.Buffer, indent string, onNewLine bool)
 	}
 	buf.WriteByte('"')
 }
+func (n *ReferenceNode) SetComment(c *CommentNode) {
+	n.Comment = c
+}
 
 //Holds the textual representation of a string literal
 type StringNode struct {
 	position
 	Literal      string // The string literal
 	TripleQuotes bool
-	Comment      Node
+	Comment      *CommentNode
 }
 
-func newString(p position, txt string, c Node) *StringNode {
+func newString(p position, txt string, c *CommentNode) *StringNode {
 
 	tripleQuotes := false
 	// Remove leading and trailing quotes
@@ -490,15 +522,18 @@ func (n *StringNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
 		buf.WriteByte('\'')
 	}
 }
+func (n *StringNode) SetComment(c *CommentNode) {
+	n.Comment = c
+}
 
 //Holds the textual representation of a regex literal
 type RegexNode struct {
 	position
 	Regex   *regexp.Regexp
-	Comment Node
+	Comment *CommentNode
 }
 
-func newRegex(p position, txt string, c Node) (*RegexNode, error) {
+func newRegex(p position, txt string, c *CommentNode) (*RegexNode, error) {
 
 	// Remove leading and trailing quotes
 	literal := txt[1 : len(txt)-1]
@@ -543,13 +578,17 @@ func (n *RegexNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
 	buf.WriteByte('/')
 }
 
+func (n *RegexNode) SetComment(c *CommentNode) {
+	n.Comment = c
+}
+
 // Represents a standalone '*' token.
 type StarNode struct {
 	position
-	Comment Node
+	Comment *CommentNode
 }
 
-func newStar(p position, c Node) *StarNode {
+func newStar(p position, c *CommentNode) *StarNode {
 	return &StarNode{
 		position: p,
 		Comment:  c,
@@ -567,6 +606,9 @@ func (n *StarNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
 	}
 	writeIndent(buf, indent, onNewLine)
 	buf.WriteByte('*')
+}
+func (n *StarNode) SetComment(c *CommentNode) {
+	n.Comment = c
 }
 
 type funcType int
@@ -599,11 +641,11 @@ type FunctionNode struct {
 	Type      funcType
 	Func      string // The identifier
 	Args      []Node
-	Comment   Node
+	Comment   *CommentNode
 	MultiLine bool
 }
 
-func newFunc(p position, ft funcType, ident string, args []Node, multi bool, c Node) *FunctionNode {
+func newFunc(p position, ft funcType, ident string, args []Node, multi bool, c *CommentNode) *FunctionNode {
 	return &FunctionNode{
 		position:  p,
 		Type:      ft,
@@ -646,15 +688,18 @@ func (n *FunctionNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) 
 	}
 	buf.WriteByte(')')
 }
+func (n *FunctionNode) SetComment(c *CommentNode) {
+	n.Comment = c
+}
 
 // Represents the begining of a lambda expression
 type LambdaNode struct {
 	position
 	Node    Node
-	Comment Node
+	Comment *CommentNode
 }
 
-func newLambda(p position, node Node, c Node) *LambdaNode {
+func newLambda(p position, node Node, c *CommentNode) *LambdaNode {
 	return &LambdaNode{
 		position: p,
 		Node:     node,
@@ -674,6 +719,9 @@ func (n *LambdaNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
 	writeIndent(buf, indent, onNewLine)
 	buf.WriteString("lambda: ")
 	n.Node.Format(buf, indent, false)
+}
+func (n *LambdaNode) SetComment(c *CommentNode) {
+	n.Comment = c
 }
 
 //Holds a function call with its args
