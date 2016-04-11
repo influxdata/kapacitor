@@ -37,7 +37,7 @@ import (
 	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
-	"github.com/influxdata/kapacitor/wlog"
+	"github.com/influxdata/wlog"
 	"github.com/twinj/uuid"
 )
 

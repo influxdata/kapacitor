@@ -12,7 +12,7 @@ import (
 	imodels "github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/clock"
-	"github.com/influxdata/kapacitor/wlog"
+	"github.com/influxdata/wlog"
 )
 
 func TestBatch_Derivative(t *testing.T) {

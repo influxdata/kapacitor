@@ -15,7 +15,7 @@ import (
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/udf"
-	"github.com/influxdata/kapacitor/wlog"
+	"github.com/influxdata/wlog"
 )
 
 type MockInfluxDBService struct {
