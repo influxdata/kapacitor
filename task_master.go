@@ -83,7 +83,6 @@ type TaskMaster struct {
 			event,
 			environment,
 			severity,
-			status,
 			group,
 			value,
 			message,
