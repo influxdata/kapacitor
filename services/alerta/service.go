@@ -37,7 +37,7 @@ func (s *Service) Close() error {
 	return nil
 }
 
-func (s *Service) Alert(token, resource, event, environment, severity, status, group, value, message, origin string, service []string, data interface{}) error {
+func (s *Service) Alert(token, resource, event, environment, severity, group, value, message, origin string, service []string, data interface{}) error {
 	if resource == "" || event == "" {
 		return errors.New("Resource and Event are required to send an alert")
 	}
@@ -65,12 +65,11 @@ func (s *Service) Alert(token, resource, event, environment, severity, status, g
 	postData["event"] = event
 	postData["environment"] = environment
 	postData["severity"] = severity
-	postData["status"] = status
 	postData["group"] = group
 	postData["value"] = value
 	postData["text"] = message
 	postData["origin"] = origin
-	postData["data"] = data
+	postData["rawData"] = data
 	if len(service) > 0 {
 		postData["service"] = service
 	}

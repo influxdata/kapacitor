@@ -761,24 +761,18 @@ func (a *AlertNode) handleAlerta(alerta alertaHandler, ad *AlertData) {
 	}
 
 	var severity string
-	var status string
 
 	switch ad.Level {
 	case OKAlert:
 		severity = "ok"
-		status = "closed"
 	case InfoAlert:
 		severity = "informational"
-		status = "open"
 	case WarnAlert:
 		severity = "warning"
-		status = "open"
 	case CritAlert:
 		severity = "critical"
-		status = "open"
 	default:
-		severity = "unknown"
-		status = "unknown"
+		severity = "indeterminate"
 	}
 	var buf bytes.Buffer
 	err := alerta.resourceTmpl.Execute(&buf, ad.info)
@@ -823,7 +817,6 @@ func (a *AlertNode) handleAlerta(alerta alertaHandler, ad *AlertData) {
 		ad.ID,
 		environment,
 		severity,
-		status,
 		group,
 		value,
 		ad.Message,
