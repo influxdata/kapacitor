@@ -373,7 +373,7 @@ func TestStatefulExpression_EvalBool_RegexNode(t *testing.T) {
 func TestStatefulExpression_EvalBool_NotSupportedValueLeft(t *testing.T) {
 	scope := tick.NewScope()
 	scope.Set("value", []int{1, 2, 3})
-	_, err := evalBoolWithScope(t, scope, &tick.BinaryNode{
+	_, err := evalBoolWithScope(scope, &tick.BinaryNode{
 		Operator: tick.TokenEqual,
 		Left: &tick.ReferenceNode{
 			Reference: "value",
@@ -395,7 +395,7 @@ func TestStatefulExpression_EvalBool_NotSupportedValueLeft(t *testing.T) {
 }
 
 func TestStatefulExpression_EvalBool_UnknownOperator(t *testing.T) {
-	_, err := evalBool(t, &tick.BinaryNode{
+	_, err := evalBoolWithScope(tick.NewScope(), &tick.BinaryNode{
 		Operator: tick.TokenType(666),
 		Left: &tick.StringNode{
 			Literal: "value",
@@ -421,7 +421,7 @@ func TestStatefulExpression_evalBinary_ReferenceNodeDosentExist(t *testing.T) {
 	expectedError := `name "value" is undefined. Names in scope: `
 
 	// Check left side
-	_, err := evalBoolWithScope(t, emptyScope, &tick.BinaryNode{
+	_, err := evalBoolWithScope(emptyScope, &tick.BinaryNode{
 		Operator: tick.TokenEqual,
 		Left: &tick.ReferenceNode{
 			Reference: "value",
@@ -440,7 +440,7 @@ func TestStatefulExpression_evalBinary_ReferenceNodeDosentExist(t *testing.T) {
 	}
 
 	// Check right side
-	_, err = evalBoolWithScope(t, emptyScope, &tick.BinaryNode{
+	_, err = evalBoolWithScope(emptyScope, &tick.BinaryNode{
 		Operator: tick.TokenEqual,
 		Left: &tick.StringNode{
 			Literal: "yo",
@@ -466,7 +466,7 @@ func TestStatefulExpression_EvalBool_ReturnsReferenceNode(t *testing.T) {
 	boolValue := true
 
 	scope.Set("boolValue", boolValue)
-	result, err := evalBoolWithScope(t, scope, &tick.ReferenceNode{
+	result, err := evalBoolWithScope(scope, &tick.ReferenceNode{
 		Reference: "boolValue",
 	})
 
@@ -482,7 +482,7 @@ func TestStatefulExpression_EvalBool_ReturnsReferenceNode(t *testing.T) {
 	boolValue = false
 
 	scope.Set("boolValue", boolValue)
-	result, err = evalBoolWithScope(t, scope, &tick.ReferenceNode{
+	result, err = evalBoolWithScope(scope, &tick.ReferenceNode{
 		Reference: "boolValue",
 	})
 
@@ -500,7 +500,7 @@ func TestStatefulExpression_EvalBool_ReferenceNodeDosentExist(t *testing.T) {
 	expectedError := `name "value" is undefined. Names in scope: `
 
 	// Check left side
-	_, err := evalBoolWithScope(t, emptyScope, &tick.ReferenceNode{
+	_, err := evalBoolWithScope(emptyScope, &tick.ReferenceNode{
 		Reference: "value",
 	})
 
@@ -520,7 +520,7 @@ func TestStatefulExpression_EvalBool_UnexpectedTypeResult(t *testing.T) {
 	scope.Set("value", []int{1, 2, 3})
 
 	// Check left side
-	_, err := evalBoolWithScope(t, scope, &tick.ReferenceNode{
+	_, err := evalBoolWithScope(scope, &tick.ReferenceNode{
 		Reference: "value",
 	})
 
@@ -533,6 +533,7 @@ func TestStatefulExpression_EvalBool_UnexpectedTypeResult(t *testing.T) {
 	}
 }
 
+
 func runEvalBoolTests(
 	t *testing.T,
 	createNodeFn func(v interface{}) tick.Node,
@@ -541,7 +542,28 @@ func runEvalBoolTests(
 	operators []tick.TokenType,
 	expected map[keyStruct]bool,
 	errorExpectations map[keyStruct]error) {
-	for _, lhs := range leftValues {
+
+  runEvalTests(t, evalBoolWithScope, createNodeFn, leftValues, rightValues, operators, expected, errorExpectations);      
+}
+
+func evalBoolWithScope(scope *tick.Scope, n tick.Node) (bool, error) {
+    se := tick.NewStatefulExpr(n)
+    return se.EvalBool(scope)
+}
+  
+    
+
+func runEvalTests(
+	t *testing.T,
+    evalNodeFn func(scope *tick.Scope, n tick.Node) (bool, error),
+	createNodeFn func(v interface{}) tick.Node,
+	leftValues []interface{},
+	rightValues []interface{},
+	operators []tick.TokenType,
+	expected map[keyStruct]bool,
+	errorExpectations map[keyStruct]error) {
+	
+    for _, lhs := range leftValues {
 		for _, rhs := range rightValues {
 			for _, op := range operators {
 
@@ -553,7 +575,8 @@ func runEvalBoolTests(
 				}
 
 				// Test simple const values compares
-				result, err := evalBool(t, &tick.BinaryNode{
+                emptyScope := tick.NewScope()
+				result, err := evalNodeFn(emptyScope, &tick.BinaryNode{
 					Operator: op,
 					Left:     createNodeFn(lhs),
 					Right:    createNodeFn(rhs),
@@ -569,7 +592,7 @@ func runEvalBoolTests(
 				// Test left is reference while the right is const
 				scope := tick.NewScope()
 				scope.Set("value", lhs)
-				result, err = evalBoolWithScope(t, scope, &tick.BinaryNode{
+				result, err = evalNodeFn(scope, &tick.BinaryNode{
 					Operator: op,
 					Left: &tick.ReferenceNode{
 						Reference: "value",
@@ -589,11 +612,4 @@ func runEvalBoolTests(
 	}
 }
 
-func evalBool(t *testing.T, n tick.Node) (bool, error) {
-	return evalBoolWithScope(t, tick.NewScope(), n)
-}
 
-func evalBoolWithScope(t *testing.T, scope *tick.Scope, n tick.Node) (bool, error) {
-	se := tick.NewStatefulExpr(n)
-	return se.EvalBool(scope)
-}
