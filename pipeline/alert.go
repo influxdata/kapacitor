@@ -751,6 +751,7 @@ func (a *AlertNode) Alerta() *AlertaHandler {
 	alerta := &AlertaHandler{
 		AlertNode: a,
 		Resource:  defaultAlertaResource,
+		Event:     defaultAlertaEvent,
 		Group:     defaultAlertaGroup,
 	}
 	a.AlertaHandlers = append(a.AlertaHandlers, alerta)
@@ -758,6 +759,7 @@ func (a *AlertNode) Alerta() *AlertaHandler {
 }
 
 const defaultAlertaResource = "{{ .Name }}"
+const defaultAlertaEvent = "{{ .ID }}"
 const defaultAlertaGroup = "{{ .Group }}"
 
 // tick:embedded:AlertNode.Alerta
@@ -772,6 +774,11 @@ type AlertaHandler struct {
 	// Can be a template and has access to the same data as the AlertNode.Details property.
 	// Default: {{ .Name }}
 	Resource string
+
+	// Alerta event.
+	// Can be a template and has access to the same data as the AlertNode.Details property.
+	// Default: {{ .ID }}
+	Event string
 
 	// Alerta environment.
 	// Can be a template and has access to the same data as the AlertNode.Details property.
