@@ -42,7 +42,7 @@ import (
 	"text/template"
 	"unicode"
 
-	"github.com/naoina/toml"
+	"github.com/BurntSushi/toml"
 	"github.com/serenize/snaker"
 	"github.com/shurcooL/markdownfmt/markdown"
 )
@@ -150,14 +150,8 @@ func main() {
 	}
 }
 
-func decodeConfig(path string) error {
-	f, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	dec := toml.NewDecoder(f)
-	err = dec.Decode(&config)
-	if err != nil {
+func decodeConfig(path string) (err error) {
+	if _, err = toml.DecodeFile(path, &config); err != nil {
 		return err
 	}
 	config.headerTemplate, err = template.New("header").Parse(config.PageHeader)

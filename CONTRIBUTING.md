@@ -114,11 +114,6 @@ go fmt ./...
 go vet ./...
 ```
 
-To install go vet, run the following command:
-```
-go get golang.org/x/tools/cmd/vet
-```
-
 NOTE: If you have not installed mercurial, the above command will fail.  See [Revision Control Systems](#revision-control-systems) above.
 
 For more information on `go vet`, [read the GoDoc](https://godoc.org/golang.org/x/tools/cmd/vet).
@@ -143,6 +138,28 @@ go get -t ./...
 go test ./...
 ```
 
+Dependencies
+------------
+
+All dependencies should be vendored and locked
+Kapacitor uses the `github.com/govend/govend` utility to vendor dependencies.
+
+The workflow is simple:
+
+```bash
+# Download and lock all deps
+govend -l --prune
+```
+
+To update an existing dependency use:
+
+```bash
+govend -u --prune package 
+```
+
+> NOTE: The use of prune removes uneeded files from dependencies so only the minimum set of files are committed to the repo.
+
+
 Generating Code
 ---------------
 
@@ -159,9 +176,9 @@ go generate ./...
 For the generate command to succeed you will need a few dependencies installed on your system:
 
 * tmpl -- A utility used to generate code from templates. Install via `go get github.com/benbjohnson/tmpl`
-* protoc + protoc-gen-gogo -- A protobuf compiler plus the protoc-gen-gogo extension.
+* protoc + protoc-gen-go -- A protobuf compiler plus the protoc-gen-go extension.
     You need version 3.0.0-beta-2 of protoc.
-    To install the go plugin run `go get github.com/gogo/protobuf/protoc-gen-gogo`
+    To install the go plugin run `go get github.com/golang/protobuf/protoc-gen-go`
 
 NOTE: Since installing dependencies can often be painful we have provided a docker container that comes with all of these dependencies installed.
 See the section below about the build script and docker.
