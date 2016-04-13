@@ -1,7 +1,9 @@
 package tick
 
 import (
+	"errors"
 	"fmt"
+	"go/ast"
 	"log"
 	"os"
 	"reflect"
@@ -41,6 +43,12 @@ type SelfDescriber interface {
 	HasProperty(name string) bool
 	Property(name string) interface{}
 	SetProperty(name string, args ...interface{}) (interface{}, error)
+}
+
+// PartialDescriber can provide a description
+// of its chain methods that hide embedded property methods.
+type PartialDescriber interface {
+	ChainMethods() map[string]reflect.Value
 }
 
 // Parse and evaluate a given script for the scope.
@@ -268,7 +276,11 @@ func evalChain(p Position, scope *Scope, stck *stack) error {
 			describer = d
 		} else {
 			var err error
-			describer, err = NewReflectionDescriber(l)
+			var extraChainMethods map[string]reflect.Value
+			if pd, ok := l.(PartialDescriber); ok {
+				extraChainMethods = pd.ChainMethods()
+			}
+			describer, err = NewReflectionDescriber(l, extraChainMethods)
 			if err != nil {
 				return wrapError(p, err)
 			}
@@ -320,7 +332,11 @@ func evalFunc(f *FunctionNode, scope *Scope, stck *stack, args []interface{}) er
 			describer = d
 		} else {
 			var err error
-			describer, err = NewReflectionDescriber(obj)
+			var extraChainMethods map[string]reflect.Value
+			if pd, ok := obj.(PartialDescriber); ok {
+				extraChainMethods = pd.ChainMethods()
+			}
+			describer, err = NewReflectionDescriber(obj, extraChainMethods)
 			if err != nil {
 				return nil, wrapError(f, err)
 			}
@@ -390,6 +406,26 @@ func evalFunc(f *FunctionNode, scope *Scope, stck *stack, args []interface{}) er
 }
 
 // Wraps any object as a SelfDescriber using reflection.
+//
+// Uses tags on fields to determine if a method is really a PropertyMethod
+// Can disambiguate property fields and chain methods of the same name but
+// from different composed anonymous fields.
+// Cannot disambiguate property methods and chain methods of the same name.
+// See NewReflectionDescriber for providing explicit chain methods in this case.
+//
+// Example:
+//     type MyType struct {
+//         UseX `tick:"X"`
+//     }
+//     func (m *MyType) X() *MyType{
+//         m.UseX = true
+//         return m
+//     }
+//
+// UseX will be ignored as a property and the method X will become a property method.
+//
+//
+// Expects that all callable methods are pointer receiver methods.
 type ReflectionDescriber struct {
 	obj interface{}
 	// Set of chain methods
@@ -400,7 +436,36 @@ type ReflectionDescriber struct {
 	properties map[string]reflect.Value
 }
 
-func NewReflectionDescriber(obj interface{}) (*ReflectionDescriber, error) {
+// Create a NewReflectionDescriber from an object.
+// The object must be a pointer type.
+// Use the chainMethods parameter to provide a set of explicit methods
+// that should be considered chain methods even if an embedded type declares them as property methods
+//
+// Example:
+//     type MyType struct {
+//         UseX `tick:"X"`
+//     }
+//     func (m *MyType) X() *MyType{
+//         m.UseX = true
+//         return m
+//     }
+//
+//     type AnotherType struct {
+//         MyType
+//     }
+//     func (a *AnotherType) X() *YetAnotherType {
+//         // do chain method work here...
+//     }
+//
+//     // Now create NewReflectionDescriber with X as a chain method and property method
+//     at := new(AnotherType)
+//     rd := NewReflectionDescriber(at, map[string]reflect.Value{
+//         "X": reflect.ValueOf(at.X),
+//     })
+//     rd.HasProperty("x") // true
+//     rd.HasChainMethod("x") // true
+//
+func NewReflectionDescriber(obj interface{}, chainMethods map[string]reflect.Value) (*ReflectionDescriber, error) {
 	r := &ReflectionDescriber{
 		obj: obj,
 	}
@@ -408,34 +473,47 @@ func NewReflectionDescriber(obj interface{}) (*ReflectionDescriber, error) {
 	if !rv.IsValid() && rv.Kind() != reflect.Struct {
 		return nil, fmt.Errorf("object is invalid %v of type %T", obj, obj)
 	}
-	rStructType := reflect.Indirect(rv).Type()
-	rRecvType := reflect.TypeOf(r.obj)
-	// Get all methods
-	r.chainMethods = make(map[string]reflect.Value, rRecvType.NumMethod())
-	for i := 0; i < rRecvType.NumMethod(); i++ {
-		method := rRecvType.Method(i)
-		if !rv.MethodByName(method.Name).IsValid() {
-			return nil, fmt.Errorf("invalid method %s on type %T", method.Name, r.obj)
-		}
-		r.chainMethods[method.Name] = rv.MethodByName(method.Name)
-	}
 
 	// Get all properties
 	var err error
-	r.properties, r.propertyMethods, err = getProperties(r.Desc(), rv, rStructType, r.chainMethods)
+	r.properties, r.propertyMethods, err = getProperties(r.Desc(), rv)
 	if err != nil {
 		return nil, err
 	}
+
+	// Get all methods
+	r.chainMethods, err = getChainMethods(r.Desc(), rv, r.propertyMethods)
+	if err != nil {
+		return nil, err
+	}
+	for k, v := range chainMethods {
+		r.chainMethods[k] = v
+	}
+
 	return r, nil
 }
 
-// Get properties from a struct and populate properties and propertyMethods maps, while removing
-// and property methods from chainMethods.
+// Get properties from a struct and populate properties and propertyMethods maps
 // Recurses up anonymous fields.
-func getProperties(desc string, rv reflect.Value, rStructType reflect.Type, chainMethods map[string]reflect.Value) (
+func getProperties(
+	desc string,
+	rv reflect.Value,
+) (
 	map[string]reflect.Value,
 	map[string]reflect.Value,
-	error) {
+	error,
+) {
+	if rv.Kind() != reflect.Ptr {
+		return nil, nil, errors.New("cannot get properties of non pointer value")
+	}
+	element := rv.Elem()
+	if !element.IsValid() {
+		return nil, nil, errors.New("cannot get properties of nil pointer")
+	}
+	rStructType := element.Type()
+	if rStructType.Kind() != reflect.Struct {
+		return nil, nil, errors.New("cannot get properties of non struct")
+	}
 	properties := make(map[string]reflect.Value, rStructType.NumField())
 	propertyMethods := make(map[string]reflect.Value)
 	for i := 0; i < rStructType.NumField(); i++ {
@@ -443,8 +521,14 @@ func getProperties(desc string, rv reflect.Value, rStructType reflect.Type, chai
 		if property.Anonymous {
 			// Recursively get properties from anon fields
 			anonValue := reflect.Indirect(rv).Field(i)
-			anonType := reflect.Indirect(anonValue).Type()
-			props, propMethods, err := getProperties(desc, anonValue, anonType, chainMethods)
+			if anonValue.Kind() != reflect.Ptr && anonValue.CanAddr() {
+				anonValue = anonValue.Addr()
+			}
+			if anonValue.Kind() == reflect.Ptr && anonValue.IsNil() {
+				// Skip nil fields
+				continue
+			}
+			props, propMethods, err := getProperties(fmt.Sprintf("%s.%s", desc, property.Name), anonValue)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -465,10 +549,11 @@ func getProperties(desc string, rv reflect.Value, rStructType reflect.Type, chai
 		if methodName != "" {
 			// Property is set via a property method.
 			method := rv.MethodByName(methodName)
+			if !method.IsValid() && rv.CanAddr() {
+				method = rv.Addr().MethodByName(methodName)
+			}
 			if method.IsValid() {
 				propertyMethods[methodName] = method
-				// Remove property method from chainMethods.
-				delete(chainMethods, methodName)
 			} else {
 				return nil, nil, fmt.Errorf("referenced method %s for type %s is invalid", methodName, desc)
 			}
@@ -481,6 +566,53 @@ func getProperties(desc string, rv reflect.Value, rStructType reflect.Type, chai
 		}
 	}
 	return properties, propertyMethods, nil
+}
+
+func getChainMethods(desc string, rv reflect.Value, propertyMethods map[string]reflect.Value) (map[string]reflect.Value, error) {
+	if rv.Kind() != reflect.Ptr {
+		return nil, errors.New("cannot get chain methods of non pointer")
+	}
+	element := rv.Elem()
+	if !element.IsValid() {
+		return nil, errors.New("cannot get chain methods of nil pointer")
+	}
+	// Find all methods on value
+	rRecvType := rv.Type()
+	chainMethods := make(map[string]reflect.Value, rRecvType.NumMethod())
+	for i := 0; i < rRecvType.NumMethod(); i++ {
+		method := rRecvType.Method(i)
+		if !ast.IsExported(method.Name) {
+			continue
+		}
+		if !rv.MethodByName(method.Name).IsValid() {
+			return nil, fmt.Errorf("invalid method %s on type %s", method.Name, desc)
+		}
+		if _, exists := propertyMethods[method.Name]; !exists {
+			chainMethods[method.Name] = rv.MethodByName(method.Name)
+		}
+	}
+
+	// Find all methods from anonymous fields.
+	rStructType := element.Type()
+	for i := 0; i < rStructType.NumField(); i++ {
+		field := rStructType.Field(i)
+		if field.Anonymous {
+			anonValue := element.Field(i)
+			if anonValue.Kind() != reflect.Ptr && anonValue.CanAddr() {
+				anonValue = anonValue.Addr()
+			}
+			anonChainMethods, err := getChainMethods(fmt.Sprintf("%s.%s", desc, field.Name), anonValue, propertyMethods)
+			if err != nil {
+				return nil, err
+			}
+			for k, v := range anonChainMethods {
+				if _, exists := chainMethods[k]; !exists {
+					chainMethods[k] = v
+				}
+			}
+		}
+	}
+	return chainMethods, nil
 }
 
 func (r *ReflectionDescriber) Desc() string {

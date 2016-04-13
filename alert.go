@@ -318,32 +318,66 @@ func (a *AlertNode) runAlert([]byte) error {
 					return err
 				}
 				a.handleAlert(ad)
+				if a.a.LevelTag != "" || a.a.IdTag != "" {
+					p.Tags = p.Tags.Copy()
+					if a.a.LevelTag != "" {
+						p.Tags[a.a.LevelTag] = l.String()
+					}
+					if a.a.IdTag != "" {
+						p.Tags[a.a.IdTag] = ad.ID
+					}
+				}
+				if a.a.LevelField != "" || a.a.IdField != "" {
+					p.Fields = p.Fields.Copy()
+					if a.a.LevelField != "" {
+						p.Fields[a.a.LevelField] = l.String()
+					}
+					if a.a.IdField != "" {
+						p.Fields[a.a.IdField] = ad.ID
+					}
+				}
+				a.timer.Pause()
+				for _, child := range a.outs {
+					err := child.CollectPoint(p)
+					if err != nil {
+						return err
+					}
+				}
+				a.timer.Resume()
 			}
 			a.timer.Stop()
 		}
 	case pipeline.BatchEdge:
 		for b, ok := a.ins[0].NextBatch(); ok; b, ok = a.ins[0].NextBatch() {
 			a.timer.Start()
+			allOK := true
 			triggered := false
+			var l AlertLevel
+			var id string
 			for _, p := range b.Points {
-				l := a.determineLevel(p.Time, p.Fields, p.Tags)
+				l = a.determineLevel(p.Time, p.Fields, p.Tags)
 				if l > OKAlert {
-					triggered = true
+					allOK = false
 					state := a.updateState(l, b.Group)
 					if (a.a.UseFlapping && state.flapping) || (a.a.IsStateChangesOnly && !state.changed) {
 						break
 					}
+					triggered = true
 					ad, err := a.alertData(b.Name, b.Group, b.Tags, p.Fields, l, p.Time, b)
 					if err != nil {
 						return err
 					}
+					id = ad.ID
 					a.handleAlert(ad)
 					break
 				}
 			}
-			if !triggered {
+			// Check for recovery
+			if allOK {
+				l = OKAlert
 				state := a.updateState(OKAlert, b.Group)
 				if state.changed {
+					triggered = true
 					var fields models.Fields
 					if l := len(b.Points); l > 0 {
 						fields = b.Points[l-1].Fields
@@ -352,8 +386,54 @@ func (a *AlertNode) runAlert([]byte) error {
 					if err != nil {
 						return err
 					}
+					id = ad.ID
 					a.handleAlert(ad)
 				}
+			}
+			if triggered {
+				// Update tags or fields for Level property
+				if a.a.LevelTag != "" ||
+					a.a.LevelField != "" ||
+					a.a.IdTag != "" ||
+					a.a.IdField != "" {
+					for i := range b.Points {
+						if a.a.LevelTag != "" || a.a.IdTag != "" {
+							b.Points[i].Tags = b.Points[i].Tags.Copy()
+							if a.a.LevelTag != "" {
+								b.Points[i].Tags[a.a.LevelTag] = l.String()
+							}
+							if a.a.IdTag != "" {
+								b.Points[i].Tags[a.a.IdTag] = id
+							}
+						}
+						if a.a.LevelField != "" || a.a.IdField != "" {
+							b.Points[i].Fields = b.Points[i].Fields.Copy()
+							if a.a.LevelField != "" {
+								b.Points[i].Fields[a.a.LevelField] = l.String()
+							}
+							if a.a.IdField != "" {
+								b.Points[i].Fields[a.a.IdField] = id
+							}
+						}
+					}
+					if a.a.LevelTag != "" || a.a.IdTag != "" {
+						b.Tags = b.Tags.Copy()
+						if a.a.LevelTag != "" {
+							b.Tags[a.a.LevelTag] = l.String()
+						}
+						if a.a.IdTag != "" {
+							b.Tags[a.a.IdTag] = id
+						}
+					}
+				}
+				a.timer.Pause()
+				for _, child := range a.outs {
+					err := child.CollectBatch(b)
+					if err != nil {
+						return err
+					}
+				}
+				a.timer.Resume()
 			}
 			a.timer.Stop()
 		}

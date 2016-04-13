@@ -1,6 +1,10 @@
 package pipeline
 
-import "github.com/influxdata/kapacitor/tick"
+import (
+	"reflect"
+
+	"github.com/influxdata/kapacitor/tick"
+)
 
 // Number of previous states to remember when computing flapping percentage.
 const defaultFlapHistory = 21
@@ -81,7 +85,7 @@ const defaultLogFileMode = 0600
 // CRITICAL expression.
 // Each expression maintains its own state.
 type AlertNode struct {
-	node
+	chainnode
 
 	// Template for constructing a unique ID for a given alert.
 	//
@@ -205,6 +209,16 @@ type AlertNode struct {
 	// Default: 21
 	History int64
 
+	// Optional tag key to use when tagging the data with the alert level.
+	LevelTag string
+	// Optional field key to add to the data, containing the alert level as a string.
+	LevelField string
+
+	// Optional tag key to use when tagging the data with the alert ID.
+	IdTag string
+	// Optional field key to add to the data, containing the alert ID as a string.
+	IdField string
+
 	// Send alerts only on state changes.
 	// tick:ignore
 	IsStateChangesOnly bool `tick:"StateChangesOnly"`
@@ -259,16 +273,20 @@ type AlertNode struct {
 }
 
 func newAlertNode(wants EdgeType) *AlertNode {
-	return &AlertNode{
-		node: node{
-			desc:     "alert",
-			wants:    wants,
-			provides: NoEdge,
-		},
-		History: defaultFlapHistory,
-		Id:      defaultIDTmpl,
-		Message: defaultMessageTmpl,
-		Details: defaultDetailsTmpl,
+	a := &AlertNode{
+		chainnode: newBasicChainNode("alert", wants, wants),
+		History:   defaultFlapHistory,
+		Id:        defaultIDTmpl,
+		Message:   defaultMessageTmpl,
+		Details:   defaultDetailsTmpl,
+	}
+	return a
+}
+
+//tick:ignore
+func (n *AlertNode) ChainMethods() map[string]reflect.Value {
+	return map[string]reflect.Value{
+		"Log": reflect.ValueOf(n.chainnode.Log),
 	}
 }
 

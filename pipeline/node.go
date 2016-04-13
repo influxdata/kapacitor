@@ -25,6 +25,8 @@ type ID int
 
 func (e EdgeType) String() string {
 	switch e {
+	case NoEdge:
+		return "noedge"
 	case StreamEdge:
 		return "stream"
 	case BatchEdge:
