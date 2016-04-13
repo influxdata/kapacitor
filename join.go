@@ -3,7 +3,6 @@ package kapacitor
 import (
 	"fmt"
 	"log"
-	"strings"
 	"sync"
 	"time"
 
@@ -35,22 +34,6 @@ type JoinNode struct {
 
 // Create a new JoinNode, which takes pairs from parent streams combines them into a single point.
 func newJoinNode(et *ExecutingTask, n *pipeline.JoinNode, l *log.Logger) (*JoinNode, error) {
-	for _, name := range n.Names {
-		if len(name) == 0 {
-			return nil, fmt.Errorf("must provide a prefix name for the join node, see .as() property method")
-		}
-		if strings.ContainsRune(name, '.') {
-			return nil, fmt.Errorf("cannot use name %s as field prefix, it contains a '.' character", name)
-		}
-	}
-	names := make(map[string]bool, len(n.Names))
-	for _, name := range n.Names {
-		if names[name] {
-			return nil, fmt.Errorf("cannot use the same prefix name see .as() property method")
-		}
-		names[name] = true
-	}
-
 	jn := &JoinNode{
 		j:                    n,
 		node:                 node{Node: n, et: et, logger: l},
@@ -80,6 +63,7 @@ func newJoinNode(et *ExecutingTask, n *pipeline.JoinNode, l *log.Logger) (*JoinN
 }
 
 func (j *JoinNode) runJoin([]byte) error {
+
 	j.groups = make(map[models.GroupID]*group)
 
 	groupErrs := make(chan error, 1)
