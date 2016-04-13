@@ -45,7 +45,7 @@ VENDOR = "InfluxData"
 DESCRIPTION = "Time series data processing engine"
 
 # SCRIPT START
-go_vet_command = ["go", "tool", "vet", "-composites=false", "./"]
+go_vet_command = ["go", "tool", "vet", "-composites=false"]
 prereqs = [ 'git', 'go' ]
 optional_prereqs = [ 'fpm', 'rpmbuild' ]
 
@@ -122,46 +122,35 @@ def run_generate():
     print "Running generate..."
     run("go get github.com/golang/protobuf/protoc-gen-go")
     run("go get github.com/benbjohnson/tmpl")
-    run("go generate ./...")
-    print "Generate succeeded."
-    return True
+    generate_cmd = ["go", "generate"]
+    generate_cmd.extend(go_list())
+    p = subprocess.Popen(generate_cmd)
+    code = p.wait()
+    if code == 0:
+        print "Generate succeeded."
+        return True
+    else:
+        print "Generate failed."
+        return False
 
-def go_get(branch, update=False, no_stash=False):
+def go_get(branch, update=False, no_uncommitted=False):
+    run("go get github.com/govend/govend")
     get_command = ""
     if update:
-        get_command += "go get -t -u -f -d ./..."
+        get_command += "govend -v -u --prune"
     else:
-        get_command += "go get -t -d ./..."
+        get_command += "govend -v --prune"
 
-    # 'go get' switches to master, so stash what we currently have
-    changes = run("git status --porcelain").strip()
-    if len(changes) > 0:
-        if no_stash:
-            print "There are un-committed changes in your local branch, --no-stash was given, cannot continue"
+    print "Retrieving Go dependencies..."
+    sys.stdout.flush()
+    run(get_command, shell=True)
+
+    # Check for uncommitted changes if no_uncommitted was given.
+    if no_uncommitted:
+        changes = run("git status --porcelain").strip()
+        if len(changes) > 0:
+            print "There are un-committed changes in your local branch, --no-uncommited was given, cannot continue"
             return False
-
-        stash = run("git stash create -a").strip()
-        print "There are un-committed changes in your local branch, stashing them as {}".format(stash)
-        # reset to ensure we don't have any checkout issues
-        run("git reset --hard")
-
-        print "Retrieving Go dependencies (moving to master)..."
-        try:
-            run(get_command, shell=True)
-            sys.stdout.flush()
-        finally:
-            # Unstash even if go get fails so that changes are left in the stash
-            print "Moving back to branch '{}'...".format(branch)
-            run("git checkout {}".format(branch))
-
-            print "Applying previously stashed contents..."
-            run("git stash apply {}".format(stash))
-    else:
-        print "Retrieving Go dependencies..."
-        run(get_command, shell=True)
-
-        print "Moving back to branch '{}'...".format(branch)
-        run("git checkout {}".format(branch))
 
     return True
 
@@ -345,6 +334,33 @@ def upload_packages(packages, bucket_name=None, nightly=False):
     print ""
     return 0
 
+def go_list(vendor=False, relative=False):
+    """
+    Return a list of packages
+
+    If vendor is False vendor package are not included
+    If relative is True the package prefix defined by PACKAGE_URL is stripped
+    """
+    p = subprocess.Popen(["go", "list", "./..."], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out, err = p.communicate()
+    packages = out.split('\n')
+    if packages[-1] == '':
+        packages = packages[:-1]
+    if not vendor:
+        non_vendor = []
+        for p in packages:
+            if '/vendor/' not in p:
+                non_vendor.append(p)
+        packages = non_vendor
+    if relative:
+        relative_pkgs = []
+        for p in packages:
+            r = p.replace(PACKAGE_URL, '.')
+            if r != '.':
+                relative_pkgs.append(r)
+        packages = relative_pkgs
+    return packages
+
 def run_tests(race, parallel, timeout, no_vet):
     print "Running tests:"
     print "\tRace: ", race
@@ -353,7 +369,9 @@ def run_tests(race, parallel, timeout, no_vet):
     if timeout is not None:
         print "\tTimeout:", timeout
     sys.stdout.flush()
-    p = subprocess.Popen(["go", "fmt", "./..."], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    fmt_cmd = ["go", "fmt"]
+    fmt_cmd.extend(go_list())
+    p = subprocess.Popen(fmt_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = p.communicate()
     if len(out) > 0 or len(err) > 0:
         print "Code not formatted. Please use 'go fmt ./...' to fix formatting errors."
@@ -361,7 +379,9 @@ def run_tests(race, parallel, timeout, no_vet):
         print err
         return False
     if not no_vet:
-        p = subprocess.Popen(go_vet_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        vet_cmd = list(go_vet_command)
+        vet_cmd.extend(go_list(relative=True))
+        p = subprocess.Popen(vet_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = p.communicate()
         if len(out) > 0 or len(err) > 0:
             print "Go vet failed. Please run 'go vet ./...' and fix any errors."
@@ -371,15 +391,18 @@ def run_tests(race, parallel, timeout, no_vet):
     else:
         print "Skipping go vet ..."
         sys.stdout.flush()
-    test_command = "go test -v"
+    test_command = ["go","test", "-v"]
     if race:
-        test_command += " -race"
+        test_command.append("-race")
     if parallel is not None:
-        test_command += " -parallel {}".format(parallel)
+        test_command.append("-parallel")
+        test_command.append(str(parallel))
     if timeout is not None:
-        test_command += " -timeout {}".format(timeout)
-    test_command += " ./..."
-    code = os.system(test_command)
+        test_command.append("-timeout")
+        test_command.append(str(timeout))
+    test_command.extend(go_list())
+    p = subprocess.Popen(test_command)
+    code = p.wait()
     if code != 0:
         print "Tests Failed"
         return False
@@ -664,7 +687,7 @@ def main():
     run_get = True
     upload_bucket = None
     generate = False
-    no_stash = False
+    no_uncommitted = False
 
     for arg in sys.argv[1:]:
         if '--outdir' in arg:
@@ -694,8 +717,8 @@ def main():
         elif '--package' in arg:
             # Signifies that packages should be built.
             package = True
-            # If packaging do not allow stashing of local changes
-            no_stash = True
+            # If packaging do not allow uncommitted changes
+            no_uncommitted = True
         elif '--nightly' in arg:
             # Signifies that this is a nightly build.
             nightly = True
@@ -726,10 +749,9 @@ def main():
         elif '--bucket' in arg:
             # The bucket to upload the packages to, relies on boto
             upload_bucket = arg.split("=")[1]
-        elif '--no-stash' in arg:
-            # Do not stash uncommited changes
+        elif '--no-uncommited' in arg:
             # Fail if uncommited changes exist
-            no_stash = True
+            no_uncommitted = True
         elif '--generate' in arg:
             generate = True
         elif '--debug' in arg:
@@ -789,7 +811,7 @@ def main():
             return 1
 
     if run_get:
-        if not go_get(branch, update=update, no_stash=no_stash):
+        if not go_get(branch, update=update, no_uncommitted=no_uncommitted):
             return 1
 
     if test:

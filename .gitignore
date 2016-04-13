@@ -15,3 +15,9 @@ kapacitor*.zip
 *.test
 /test-logs
 *.prof
+
+# Ignore any built binaries
+/kapacitor
+/kapacitord
+/tickfmt
+/tickdoc
