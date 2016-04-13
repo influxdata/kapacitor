@@ -61,6 +61,9 @@ type Node interface {
 	// The type of output the node provides.
 	Provides() EdgeType
 
+	// Check that the definition of the node is consistent
+	validate() error
+
 	// Helper methods for walking DAG
 	tMark() bool
 	setTMark(b bool)
@@ -165,6 +168,10 @@ func (n *node) Wants() EdgeType {
 // tick:ignore
 func (n *node) Provides() EdgeType {
 	return n.provides
+}
+
+func (n *node) validate() error {
+	return nil
 }
 
 func (n *node) dot(buf *bytes.Buffer) {
