@@ -60,6 +60,12 @@ func CreatePipeline(script string, sourceEdge EdgeType, scope *tick.Scope, deadm
 			return nil, fmt.Errorf("source edge type must be either Stream or Batch not %s", sourceEdge)
 		}
 	}
+	if err = p.Walk(
+		func(n Node) error {
+			return n.validate()
+		}); err != nil {
+		return nil, err
+	}
 	return p, nil
 }
 
