@@ -122,7 +122,7 @@ type Task struct {
 	ExecutionStats ExecutionStats
 }
 
-// Infomation about a recording
+// Information about a recording
 type Recording struct {
 	ID      string
 	Type    string

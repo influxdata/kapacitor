@@ -450,7 +450,7 @@ func (d *dbrps) Set(value string) error {
 	return nil
 }
 
-// read from txt starting with begining quote until next unescaped quote.
+// read from txt starting with beginning quote until next unescaped quote.
 func parseQuotedStr(txt string) (string, int) {
 	literal := txt[1 : len(txt)-1]
 	quote := txt[0]

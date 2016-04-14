@@ -98,7 +98,7 @@ type StreamNode struct {
 	Measurement string
 
 	// Optional duration for truncating timestamps.
-	// Helpful to ensure data points land on specfic boundaries
+	// Helpful to ensure data points land on specific boundaries
 	// Example:
 	//    stream
 	//       |from()

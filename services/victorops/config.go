@@ -7,7 +7,7 @@ type Config struct {
 	Enabled bool `toml:"enabled"`
 	// The Victor Ops API key.
 	APIKey string `toml:"api-key"`
-	// The default Routing Key, can be overriden per alert.
+	// The default Routing Key, can be overridden per alert.
 	RoutingKey string `toml:"routing-key"`
 	// The Victor Ops API URL, should not need to be changed.
 	URL string `toml:"url"`

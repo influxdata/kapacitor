@@ -122,7 +122,7 @@ func (j *JoinNode) runJoin([]byte) error {
 			return err
 		}
 	}
-	// No more points are comming signal all groups to finish up.
+	// No more points are coming signal all groups to finish up.
 	for _, group := range j.groups {
 		close(group.points)
 	}
