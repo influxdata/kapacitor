@@ -6,10 +6,11 @@ import (
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/tick"
+	"github.com/influxdata/kapacitor/tick/stateful"
 )
 
-// Evaluate a given expression as a boolean predicate against a set of fields and tags
-func EvalPredicate(se *tick.StatefulExpr, now time.Time, fields models.Fields, tags models.Tags) (bool, error) {
+// EvalPredicate - Evaluate a given expression as a boolean predicate against a set of fields and tags
+func EvalPredicate(se stateful.Expression, now time.Time, fields models.Fields, tags models.Tags) (bool, error) {
 	vars, err := mergeFieldsAndTags(now, fields, tags)
 	if err != nil {
 		return false, err

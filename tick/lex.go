@@ -161,24 +161,24 @@ func (t TokenType) String() string {
 		return "TRUE"
 	case t == TokenFalse:
 		return "FALSE"
-	case isExprOperator(t):
+	case IsExprOperator(t):
 		return operatorStr[t]
 	}
 	return fmt.Sprintf("%d", t)
 }
 
 // True if token type is an operator used in mathematical or boolean expressions.
-func isExprOperator(typ TokenType) bool {
+func IsExprOperator(typ TokenType) bool {
 	return typ > begin_tok_operator && typ < end_tok_operator
 }
 
 // True if token type is an operator used in mathematical expressions.
-func isMathOperator(typ TokenType) bool {
+func IsMathOperator(typ TokenType) bool {
 	return typ > begin_tok_operator_math && typ < end_tok_operator_math
 }
 
 // True if token type is an operator used in comparisons.
-func isCompOperator(typ TokenType) bool {
+func IsCompOperator(typ TokenType) bool {
 	return typ > begin_tok_operator_comp && typ < end_tok_operator_comp
 }
 

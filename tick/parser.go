@@ -342,12 +342,12 @@ var precedence = [...]int{
 // https://en.wikipedia.org/wiki/Operator-precedence_parser#Pseudo-code
 func (p *parser) precedence(lhs Node, minP int) Node {
 	look := p.peek()
-	for isExprOperator(look.typ) && precedence[look.typ] >= minP {
+	for IsExprOperator(look.typ) && precedence[look.typ] >= minP {
 		op := p.next()
 		rhs := p.primary(nil)
 		look = p.peek()
 		// left-associative
-		for isExprOperator(look.typ) && precedence[look.typ] > precedence[op.typ] {
+		for IsExprOperator(look.typ) && precedence[look.typ] > precedence[op.typ] {
 			rhs = p.precedence(rhs, precedence[look.typ])
 			look = p.peek()
 		}
@@ -389,7 +389,7 @@ func (p *parser) lparameters() (args []Node) {
 
 func (p *parser) lparameter() (n Node) {
 	n = p.primary(nil)
-	if isExprOperator(p.peek().typ) {
+	if IsExprOperator(p.peek().typ) {
 		n = p.precedence(n, 0)
 	}
 	return

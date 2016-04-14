@@ -2,13 +2,14 @@ package kapacitor
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
-	"github.com/influxdata/kapacitor/tick"
+	"github.com/influxdata/kapacitor/tick/stateful"
 )
 
 const (
@@ -18,7 +19,7 @@ const (
 type EvalNode struct {
 	node
 	e           *pipeline.EvalNode
-	expressions []*tick.StatefulExpr
+	expressions []stateful.Expression
 	evalErrors  *expvar.Int
 }
 
@@ -32,9 +33,14 @@ func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalN
 		e:    n,
 	}
 	// Create stateful expressions
-	en.expressions = make([]*tick.StatefulExpr, len(n.Expressions))
+	en.expressions = make([]stateful.Expression, len(n.Expressions))
 	for i, expr := range n.Expressions {
-		en.expressions[i] = tick.NewStatefulExpr(expr)
+		statefulExpr, err := stateful.NewExpression(expr)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to compile %v expression: %v", i, err)
+		}
+
+		en.expressions[i] = statefulExpr
 	}
 
 	en.node.runF = en.runEval
