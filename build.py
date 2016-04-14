@@ -137,9 +137,9 @@ def go_get(branch, update=False, no_uncommitted=False):
     run("go get github.com/govend/govend")
     get_command = ""
     if update:
-        get_command += "govend -v -u --prune"
+        get_command += "{}/bin/govend -v -u --prune".format(os.environ.get("GOPATH"))
     else:
-        get_command += "govend -v --prune"
+        get_command += "{}/bin/govend -v --prune".format(os.environ.get("GOPATH"))
 
     print "Retrieving Go dependencies..."
     sys.stdout.flush()
