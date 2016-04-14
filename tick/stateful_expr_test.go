@@ -34,7 +34,7 @@ func TestStatefulExpression_EvalBool_BoolNode(t *testing.T) {
 		}
 	}
 
-	runEvalBoolTests(t, createBoolNode, leftValues, rightValues, operators, map[keyStruct]bool{
+	runEvalBoolTests(t, createBoolNode, leftValues, rightValues, operators, map[keyStruct]interface{}{
 		// Left: True, Right: True
 		keyStruct{true, true, tick.TokenEqual}:    true,
 		keyStruct{true, true, tick.TokenNotEqual}: false,
@@ -127,7 +127,7 @@ func TestStatefulExpression_EvalBool_NumberNode(t *testing.T) {
 		}
 	}
 
-	runEvalBoolTests(t, createNumberNode, leftValues, rightValues, operators, map[keyStruct]bool{
+	runEvalBoolTests(t, createNumberNode, leftValues, rightValues, operators, map[keyStruct]interface{}{
 		// Left is float64(5), Right is float64(5)
 		keyStruct{float64(5), float64(5), tick.TokenEqual}:        true,
 		keyStruct{float64(5), float64(5), tick.TokenNotEqual}:     false,
@@ -272,7 +272,7 @@ func TestStatefulExpression_EvalBool_StringNode(t *testing.T) {
 		}
 	}
 
-	runEvalBoolTests(t, createStringNode, leftValues, rightValues, operators, map[keyStruct]bool{
+	runEvalBoolTests(t, createStringNode, leftValues, rightValues, operators, map[keyStruct]interface{}{
 		// Left is "a", Right is "a"
 		keyStruct{"a", "a", tick.TokenEqual}:        true,
 		keyStruct{"a", "a", tick.TokenNotEqual}:     false,
@@ -354,7 +354,7 @@ func TestStatefulExpression_EvalBool_RegexNode(t *testing.T) {
 
 	}
 
-	runEvalBoolTests(t, createStringOrRegexNode, leftValues, rightValues, operators, map[keyStruct]bool{
+	runEvalBoolTests(t, createStringOrRegexNode, leftValues, rightValues, operators, map[keyStruct]interface{}{
 		// Left is "abc", Right is regex "(.*)c"
 		keyStruct{"abc", "R!^(.*)c$", tick.TokenRegexEqual}:    true,
 		keyStruct{"abc", "R!^(.*)c$", tick.TokenRegexNotEqual}: false,
@@ -373,7 +373,7 @@ func TestStatefulExpression_EvalBool_RegexNode(t *testing.T) {
 func TestStatefulExpression_EvalBool_NotSupportedValueLeft(t *testing.T) {
 	scope := tick.NewScope()
 	scope.Set("value", []int{1, 2, 3})
-	_, err := evalBoolWithScope(t, scope, &tick.BinaryNode{
+	_, err := evalBoolWithScope(scope, &tick.BinaryNode{
 		Operator: tick.TokenEqual,
 		Left: &tick.ReferenceNode{
 			Reference: "value",
@@ -395,7 +395,7 @@ func TestStatefulExpression_EvalBool_NotSupportedValueLeft(t *testing.T) {
 }
 
 func TestStatefulExpression_EvalBool_UnknownOperator(t *testing.T) {
-	_, err := evalBool(t, &tick.BinaryNode{
+	_, err := evalBoolWithScope(tick.NewScope(), &tick.BinaryNode{
 		Operator: tick.TokenType(666),
 		Left: &tick.StringNode{
 			Literal: "value",
@@ -421,7 +421,7 @@ func TestStatefulExpression_evalBinary_ReferenceNodeDosentExist(t *testing.T) {
 	expectedError := `name "value" is undefined. Names in scope: `
 
 	// Check left side
-	_, err := evalBoolWithScope(t, emptyScope, &tick.BinaryNode{
+	_, err := evalBoolWithScope(emptyScope, &tick.BinaryNode{
 		Operator: tick.TokenEqual,
 		Left: &tick.ReferenceNode{
 			Reference: "value",
@@ -440,7 +440,7 @@ func TestStatefulExpression_evalBinary_ReferenceNodeDosentExist(t *testing.T) {
 	}
 
 	// Check right side
-	_, err = evalBoolWithScope(t, emptyScope, &tick.BinaryNode{
+	_, err = evalBoolWithScope(emptyScope, &tick.BinaryNode{
 		Operator: tick.TokenEqual,
 		Left: &tick.StringNode{
 			Literal: "yo",
@@ -466,7 +466,7 @@ func TestStatefulExpression_EvalBool_ReturnsReferenceNode(t *testing.T) {
 	boolValue := true
 
 	scope.Set("boolValue", boolValue)
-	result, err := evalBoolWithScope(t, scope, &tick.ReferenceNode{
+	result, err := evalBoolWithScope(scope, &tick.ReferenceNode{
 		Reference: "boolValue",
 	})
 
@@ -482,7 +482,7 @@ func TestStatefulExpression_EvalBool_ReturnsReferenceNode(t *testing.T) {
 	boolValue = false
 
 	scope.Set("boolValue", boolValue)
-	result, err = evalBoolWithScope(t, scope, &tick.ReferenceNode{
+	result, err = evalBoolWithScope(scope, &tick.ReferenceNode{
 		Reference: "boolValue",
 	})
 
@@ -500,7 +500,7 @@ func TestStatefulExpression_EvalBool_ReferenceNodeDosentExist(t *testing.T) {
 	expectedError := `name "value" is undefined. Names in scope: `
 
 	// Check left side
-	_, err := evalBoolWithScope(t, emptyScope, &tick.ReferenceNode{
+	_, err := evalBoolWithScope(emptyScope, &tick.ReferenceNode{
 		Reference: "value",
 	})
 
@@ -520,7 +520,7 @@ func TestStatefulExpression_EvalBool_UnexpectedTypeResult(t *testing.T) {
 	scope.Set("value", []int{1, 2, 3})
 
 	// Check left side
-	_, err := evalBoolWithScope(t, scope, &tick.ReferenceNode{
+	_, err := evalBoolWithScope(scope, &tick.ReferenceNode{
 		Reference: "value",
 	})
 
@@ -533,43 +533,275 @@ func TestStatefulExpression_EvalBool_UnexpectedTypeResult(t *testing.T) {
 	}
 }
 
+func TestStatefulExpression_EvalNum_UnaryExpression(t *testing.T) {
+
+	scope := tick.NewScope()
+
+	se := tick.NewStatefulExpr(&tick.UnaryNode{
+		Node: &tick.NumberNode{
+			IsInt: true,
+			Int64: 4,
+		},
+		Operator: tick.TokenMinus,
+	})
+
+	result, err := se.EvalNum(scope)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if result != int64(-4) {
+		t.Errorf("unexpected result: got: %t, expected: -4", result)
+	}
+
+}
+
+func TestStatefulExpression_EvalBool_UnaryExpression(t *testing.T) {
+
+	scope := tick.NewScope()
+
+	se := tick.NewStatefulExpr(&tick.UnaryNode{
+		Node: &tick.BoolNode{
+			Bool: true,
+		},
+		Operator: tick.TokenNot,
+	})
+
+	result, err := se.EvalBool(scope)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if result {
+		t.Errorf("unexpected result: got: %t, expected: false", result)
+	}
+}
+
+func TestStatefulExpression_EvalNum_SanityCallingFunction(t *testing.T) {
+
+	scope := tick.NewScope()
+
+	se := tick.NewStatefulExpr(&tick.FunctionNode{
+		Func: "count",
+	})
+
+	result, err := se.EvalNum(scope)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if result != int64(1) {
+		t.Errorf("unexpected result: got: %t, expected: 1", result)
+	}
+
+	// Second time, to make sure that count() increases the value
+	result, err = se.EvalNum(scope)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if result != int64(2) {
+		t.Errorf("unexpected result: got: %t, expected: 2", result)
+	}
+}
+
+func TestStatefulExpression_EvalNum_NumberNode(t *testing.T) {
+	leftValues := []interface{}{float64(5), float64(10), int64(5)}
+	rightValues := []interface{}{float64(5), float64(10), int64(5), "NON_INT_VALUE"}
+
+	operators := []tick.TokenType{
+		tick.TokenPlus,
+		tick.TokenMinus,
+		tick.TokenMult,
+		tick.TokenDiv,
+		tick.TokenMod,
+	}
+
+	createNumberNode := func(v interface{}) tick.Node {
+		switch value := v.(type) {
+		case float64:
+			return &tick.NumberNode{
+				IsFloat: true,
+				Float64: value,
+			}
+		case int64:
+			return &tick.NumberNode{
+				IsInt: true,
+				Int64: value,
+			}
+		// For the error case
+		case string:
+			return &tick.StringNode{
+				Literal: value,
+			}
+		default:
+			t.Fatalf("value supplied to createNumberNode is not string/int64/float64: %t", v)
+			return nil
+		}
+	}
+
+	runEvalNumericTests(t, createNumberNode, leftValues, rightValues, operators, map[keyStruct]interface{}{
+		// Left is float64(5), Right is float64(5)
+		keyStruct{float64(5), float64(5), tick.TokenPlus}:  float64(10),
+		keyStruct{float64(5), float64(5), tick.TokenMinus}: float64(0),
+		keyStruct{float64(5), float64(5), tick.TokenMult}:  float64(25),
+		keyStruct{float64(5), float64(5), tick.TokenDiv}:   float64(1),
+
+		// Left is int64(5), Right is int64(5)
+		keyStruct{int64(5), int64(5), tick.TokenPlus}:  int64(10),
+		keyStruct{int64(5), int64(5), tick.TokenMinus}: int64(0),
+		keyStruct{int64(5), int64(5), tick.TokenMult}:  int64(25),
+		keyStruct{int64(5), int64(5), tick.TokenDiv}:   int64(1),
+		keyStruct{int64(5), int64(5), tick.TokenMod}:   int64(0),
+
+		// Left is float64(5), Right is float64(10)
+		keyStruct{float64(5), float64(10), tick.TokenPlus}:  float64(15),
+		keyStruct{float64(5), float64(10), tick.TokenMinus}: float64(-5),
+		keyStruct{float64(5), float64(10), tick.TokenMult}:  float64(50),
+		keyStruct{float64(5), float64(10), tick.TokenDiv}:   float64(0.5),
+
+		// Left is float64(10), Right is float64(5)
+		keyStruct{float64(10), float64(5), tick.TokenPlus}:  float64(15),
+		keyStruct{float64(10), float64(5), tick.TokenMinus}: float64(5),
+		keyStruct{float64(10), float64(5), tick.TokenMult}:  float64(50),
+		keyStruct{float64(10), float64(5), tick.TokenDiv}:   float64(2),
+
+		// Left is float64(10), Right is float64(10)
+		keyStruct{float64(10), float64(10), tick.TokenPlus}:  float64(20),
+		keyStruct{float64(10), float64(10), tick.TokenMinus}: float64(0),
+		keyStruct{float64(10), float64(10), tick.TokenMult}:  float64(100),
+		keyStruct{float64(10), float64(10), tick.TokenDiv}:   float64(1),
+	}, map[keyStruct]error{
+		// Modulo token where left is float
+		keyStruct{float64(5), float64(5), tick.TokenMod}:   errors.New("invalid float math operator %"),
+		keyStruct{float64(5), float64(10), tick.TokenMod}:  errors.New("invalid float math operator %"),
+		keyStruct{float64(10), float64(5), tick.TokenMod}:  errors.New("invalid float math operator %"),
+		keyStruct{float64(10), float64(10), tick.TokenMod}: errors.New("invalid float math operator %"),
+
+		// Left is int, right is float
+		keyStruct{int64(5), float64(5), tick.TokenPlus}:   errors.New("mismatched type to binary operator. got int64 + float64. see bool(), int(), float()"),
+		keyStruct{int64(5), float64(5), tick.TokenMinus}:  errors.New("mismatched type to binary operator. got int64 - float64. see bool(), int(), float()"),
+		keyStruct{int64(5), float64(5), tick.TokenMult}:   errors.New("mismatched type to binary operator. got int64 * float64. see bool(), int(), float()"),
+		keyStruct{int64(5), float64(5), tick.TokenDiv}:    errors.New("mismatched type to binary operator. got int64 / float64. see bool(), int(), float()"),
+		keyStruct{int64(5), float64(5), tick.TokenMod}:    errors.New("mismatched type to binary operator. got int64 % float64. see bool(), int(), float()"),
+		keyStruct{int64(5), float64(10), tick.TokenPlus}:  errors.New("mismatched type to binary operator. got int64 + float64. see bool(), int(), float()"),
+		keyStruct{int64(5), float64(10), tick.TokenMinus}: errors.New("mismatched type to binary operator. got int64 - float64. see bool(), int(), float()"),
+		keyStruct{int64(5), float64(10), tick.TokenMult}:  errors.New("mismatched type to binary operator. got int64 * float64. see bool(), int(), float()"),
+		keyStruct{int64(5), float64(10), tick.TokenDiv}:   errors.New("mismatched type to binary operator. got int64 / float64. see bool(), int(), float()"),
+		keyStruct{int64(5), float64(10), tick.TokenMod}:   errors.New("mismatched type to binary operator. got int64 % float64. see bool(), int(), float()"),
+
+		// Left is float, right is int
+		keyStruct{float64(5), int64(5), tick.TokenPlus}:  errors.New("mismatched type to binary operator. got float64 + int64. see bool(), int(), float()"),
+		keyStruct{float64(5), int64(5), tick.TokenMinus}: errors.New("mismatched type to binary operator. got float64 - int64. see bool(), int(), float()"),
+		keyStruct{float64(5), int64(5), tick.TokenMult}:  errors.New("mismatched type to binary operator. got float64 * int64. see bool(), int(), float()"),
+		keyStruct{float64(5), int64(5), tick.TokenDiv}:   errors.New("mismatched type to binary operator. got float64 / int64. see bool(), int(), float()"),
+		keyStruct{float64(5), int64(5), tick.TokenMod}:   errors.New("mismatched type to binary operator. got float64 % int64. see bool(), int(), float()"),
+
+		keyStruct{float64(10), int64(5), tick.TokenPlus}:  errors.New("mismatched type to binary operator. got float64 + int64. see bool(), int(), float()"),
+		keyStruct{float64(10), int64(5), tick.TokenMinus}: errors.New("mismatched type to binary operator. got float64 - int64. see bool(), int(), float()"),
+		keyStruct{float64(10), int64(5), tick.TokenMult}:  errors.New("mismatched type to binary operator. got float64 * int64. see bool(), int(), float()"),
+		keyStruct{float64(10), int64(5), tick.TokenDiv}:   errors.New("mismatched type to binary operator. got float64 / int64. see bool(), int(), float()"),
+		keyStruct{float64(10), int64(5), tick.TokenMod}:   errors.New("mismatched type to binary operator. got float64 % int64. see bool(), int(), float()"),
+
+		// Left is int64, Right is "NON_INT_VALUE"
+		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenPlus}:  errors.New("mismatched type to binary operator. got int64 + string. see bool(), int(), float()"),
+		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenMinus}: errors.New("mismatched type to binary operator. got int64 - string. see bool(), int(), float()"),
+		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenMult}:  errors.New("mismatched type to binary operator. got int64 * string. see bool(), int(), float()"),
+		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenDiv}:   errors.New("mismatched type to binary operator. got int64 / string. see bool(), int(), float()"),
+		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenMod}:   errors.New("mismatched type to binary operator. got int64 % string. see bool(), int(), float()"),
+
+		// Left is float64, Right is "NON_INT_VALUE"
+		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenPlus}:   errors.New("mismatched type to binary operator. got float64 + string. see bool(), int(), float()"),
+		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenMinus}:  errors.New("mismatched type to binary operator. got float64 - string. see bool(), int(), float()"),
+		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenMult}:   errors.New("mismatched type to binary operator. got float64 * string. see bool(), int(), float()"),
+		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenDiv}:    errors.New("mismatched type to binary operator. got float64 / string. see bool(), int(), float()"),
+		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenMod}:    errors.New("mismatched type to binary operator. got float64 % string. see bool(), int(), float()"),
+		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenPlus}:  errors.New("mismatched type to binary operator. got float64 + string. see bool(), int(), float()"),
+		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenMinus}: errors.New("mismatched type to binary operator. got float64 - string. see bool(), int(), float()"),
+		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenMult}:  errors.New("mismatched type to binary operator. got float64 * string. see bool(), int(), float()"),
+		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenDiv}:   errors.New("mismatched type to binary operator. got float64 / string. see bool(), int(), float()"),
+		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenMod}:   errors.New("mismatched type to binary operator. got float64 % string. see bool(), int(), float()"),
+	})
+}
+
+func runEvalNumericTests(
+	t *testing.T,
+	createNodeFn func(v interface{}) tick.Node,
+	leftValues []interface{},
+	rightValues []interface{},
+	operators []tick.TokenType,
+	expected map[keyStruct]interface{},
+	errorExpectations map[keyStruct]error) {
+
+	runEvalTests(t, func(scope *tick.Scope, n tick.Node) (interface{}, error) {
+		se := tick.NewStatefulExpr(n)
+		return se.EvalNum(scope)
+	}, createNodeFn, leftValues, rightValues, operators, expected, errorExpectations)
+}
+
 func runEvalBoolTests(
 	t *testing.T,
 	createNodeFn func(v interface{}) tick.Node,
 	leftValues []interface{},
 	rightValues []interface{},
 	operators []tick.TokenType,
-	expected map[keyStruct]bool,
+	expected map[keyStruct]interface{},
 	errorExpectations map[keyStruct]error) {
+
+	runEvalTests(t, evalBoolWithScope, createNodeFn, leftValues, rightValues, operators, expected, errorExpectations)
+}
+
+func evalBoolWithScope(scope *tick.Scope, n tick.Node) (interface{}, error) {
+	se := tick.NewStatefulExpr(n)
+	return se.EvalBool(scope)
+}
+
+func runEvalTests(
+	t *testing.T,
+	evalNodeFn func(scope *tick.Scope, n tick.Node) (interface{}, error),
+	createNodeFn func(v interface{}) tick.Node,
+	leftValues []interface{},
+	rightValues []interface{},
+	operators []tick.TokenType,
+	expected map[keyStruct]interface{},
+	errorExpectations map[keyStruct]error) {
+
 	for _, lhs := range leftValues {
 		for _, rhs := range rightValues {
 			for _, op := range operators {
 
 				key := keyStruct{lhs, rhs, op}
-				exp, isBoolOk := expected[key]
+				exp, isExpectedResultOk := expected[key]
 				errorExpected, isErrorOk := errorExpectations[key]
-				if !isBoolOk && !isErrorOk {
+				if !isExpectedResultOk && !isErrorOk {
 					t.Fatalf("Couldn't find an expected result/error for: lhs: %t, rhs: %t, op: %v", lhs, rhs, op)
 				}
 
 				// Test simple const values compares
-				result, err := evalBool(t, &tick.BinaryNode{
+				emptyScope := tick.NewScope()
+				result, err := evalNodeFn(emptyScope, &tick.BinaryNode{
 					Operator: op,
 					Left:     createNodeFn(lhs),
 					Right:    createNodeFn(rhs),
 				})
 
-				// Expect value can be error or bool
-				if isErrorOk && errorExpected.Error() != err.Error() {
-					t.Errorf("unexpected error result: %t %v %t\ngot: %v\nexp: %v", lhs, op, rhs, err, errorExpected)
-				} else if isBoolOk && exp != result {
-					t.Errorf("unexpected bool result: %t %v %t\ngot: %v\nexp: %v", lhs, op, rhs, result, exp)
+				// This is bool matching, but not error matching..
+				if isExpectedResultOk && !isErrorOk && err != nil {
+					t.Errorf("Got an error while evaluating: %t %v %t - %v\n", lhs, op, rhs, err)
+				} else {
+
+					// Expect value can be error or bool
+					if isErrorOk && errorExpected.Error() != err.Error() {
+						t.Errorf("unexpected error result: %t %v %t\ngot: %v\nexp: %v", lhs, op, rhs, err, errorExpected)
+					} else if isExpectedResultOk && exp != result {
+						t.Errorf("unexpected result: %t %v %t\ngot: %v\nexp: %v", lhs, op, rhs, result, exp)
+					}
 				}
 
 				// Test left is reference while the right is const
 				scope := tick.NewScope()
 				scope.Set("value", lhs)
-				result, err = evalBoolWithScope(t, scope, &tick.BinaryNode{
+				result, err = evalNodeFn(scope, &tick.BinaryNode{
 					Operator: op,
 					Left: &tick.ReferenceNode{
 						Reference: "value",
@@ -579,21 +811,12 @@ func runEvalBoolTests(
 
 				if isErrorOk && errorExpected.Error() != err.Error() {
 					t.Errorf("unexpected error result: %t %v %t\ngot: %v\nexp: %v", lhs, op, rhs, err, errorExpected)
-				} else if isBoolOk && exp != result {
-					t.Errorf("unexpected bool result: %t %v %t\ngot: %v\nexp: %v", lhs, op, rhs, result, exp)
+				} else if isExpectedResultOk && exp != result {
+					t.Errorf("unexpected result: %t %v %t\ngot: %v\nexp: %v", lhs, op, rhs, result, exp)
 				}
 
 			}
 
 		}
 	}
-}
-
-func evalBool(t *testing.T, n tick.Node) (bool, error) {
-	return evalBoolWithScope(t, tick.NewScope(), n)
-}
-
-func evalBoolWithScope(t *testing.T, scope *tick.Scope, n tick.Node) (bool, error) {
-	se := tick.NewStatefulExpr(n)
-	return se.EvalBool(scope)
 }
