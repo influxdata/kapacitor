@@ -177,6 +177,7 @@ func errMismatched(op TokenType, l, r interface{}) error {
 func (s *StatefulExpr) evalBinary(op TokenType, scope *Scope, stck *stack) (err error) {
 	r := stck.Pop()
 	l := stck.Pop()
+
 	// Resolve any references
 	if ref, ok := l.(*ReferenceNode); ok {
 		l, err = scope.Get(ref.Reference)
@@ -217,18 +218,29 @@ func (s *StatefulExpr) evalBinary(op TokenType, scope *Scope, stck *stack) (err 
 				return errMismatched(op, l, r)
 			}
 			v, err = doBoolComp(op, ln, rn)
+
+		// This is numeric comparison,
+		// The left side choose which type of comparision we will do - float or int
+
+		// type(left) == int, we will do int comparison
+		// type(left) == float, we will do float comparison
 		case int64:
-			lf := float64(ln)
-			var rf float64
 			switch rn := r.(type) {
+
+			// If both sides are int64, we will do int64 comparsion
 			case int64:
-				rf = float64(rn)
+				// Left and right are int64
+				v, err = doIntComp(op, ln, rn)
+
+			// The right side is float64, we will do float64 comparison
 			case float64:
-				rf = rn
+				lf := float64(ln)
+				var rf = rn
+				v, err = doFloatComp(op, lf, rf)
 			default:
 				return errMismatched(op, l, r)
 			}
-			v, err = doFloatComp(op, lf, rf)
+
 		case float64:
 			var rf float64
 			switch rn := r.(type) {
@@ -240,6 +252,7 @@ func (s *StatefulExpr) evalBinary(op TokenType, scope *Scope, stck *stack) (err 
 				return errMismatched(op, l, r)
 			}
 			v, err = doFloatComp(op, ln, rf)
+
 		case string:
 			rn, ok := r.(string)
 			if ok {
@@ -331,6 +344,28 @@ func doFloatComp(op TokenType, l, r float64) (v bool, err error) {
 	}
 	return
 }
+
+
+func doIntComp(op TokenType, l, r int64) (v bool, err error) {
+	switch op {
+	case TokenEqual:
+		v = l == r
+	case TokenNotEqual:
+		v = l != r
+	case TokenLess:
+		v = l < r
+	case TokenGreater:
+		v = l > r
+	case TokenLessEqual:
+		v = l <= r
+	case TokenGreaterEqual:
+		v = l >= r
+	default:
+		err = fmt.Errorf("invalid int comparison operator %v", op)
+	}
+	return
+}
+
 
 func doStringComp(op TokenType, l, r string) (v bool, err error) {
 	switch op {
