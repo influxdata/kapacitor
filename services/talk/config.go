@@ -9,7 +9,7 @@ type Config struct {
 	Enabled bool `toml:"enabled"`
 	// The Talk webhook URL, can be obtained by adding Incoming Webhook integration.
 	URL string `toml:"url"`
-	// The default authorName, can be overriden per alert.
+	// The default authorName, can be overridden per alert.
 	AuthorName string `toml:"author_name"`
 }
 

@@ -1,4 +1,4 @@
-// Tickdoc is a simple utility similiar to godoc that generates documentation from comments.
+// Tickdoc is a simple utility similar to godoc that generates documentation from comments.
 //
 // The 'tickdoc' utility understands several special comments to help it generate clean documentation.
 //

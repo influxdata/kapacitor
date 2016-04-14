@@ -510,7 +510,7 @@ func (tm *TaskMaster) newFork(taskName string, dbrps []DBRP, measurements []stri
 	for _, key := range forkKeys(dbrps, measurements) {
 		tm.taskToForkKeys[taskName] = append(tm.taskToForkKeys[taskName], key)
 
-		// Add the task to the tasksMap if it dosen't exists
+		// Add the task to the tasksMap if it doesn't exists
 		tasksMap, ok := tm.forks[key]
 		if !ok {
 			tasksMap = make(map[string]*Edge, 0)

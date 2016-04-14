@@ -99,7 +99,7 @@ func (j *JoinNode) As(names ...string) *JoinNode {
 	return j
 }
 
-// Join on specfic dimensions.
+// Join on specific dimensions.
 // For example given two measurements:
 //
 // 1. building_power -- tagged by building, value is the total power consumed by the building.

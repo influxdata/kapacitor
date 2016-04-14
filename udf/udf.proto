@@ -127,7 +127,7 @@ message KeepaliveResponse {
     int64 time = 1;
 }
 
-// Sent from the process to Kapacitor indicating an error has occured.
+// Sent from the process to Kapacitor indicating an error has occurred.
 // If an ErrorResponse is received, Kapacitor will terminate the process.
 message ErrorResponse {
     string error = 1;

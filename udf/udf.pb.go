@@ -435,7 +435,7 @@ func (m *KeepaliveResponse) String() string            { return proto.CompactTex
 func (*KeepaliveResponse) ProtoMessage()               {}
 func (*KeepaliveResponse) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{12} }
 
-// Sent from the process to Kapacitor indicating an error has occured.
+// Sent from the process to Kapacitor indicating an error has occurred.
 // If an ErrorResponse is received, Kapacitor will terminate the process.
 type ErrorResponse struct {
 	Error string `protobuf:"bytes,1,opt,name=error" json:"error,omitempty"`

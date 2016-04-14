@@ -692,7 +692,7 @@ func (n *FunctionNode) SetComment(c *CommentNode) {
 	n.Comment = c
 }
 
-// Represents the begining of a lambda expression
+// Represents the beginning of a lambda expression
 type LambdaNode struct {
 	position
 	Node    Node

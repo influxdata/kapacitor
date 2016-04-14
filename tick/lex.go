@@ -177,7 +177,7 @@ func isMathOperator(typ TokenType) bool {
 	return typ > begin_tok_operator_math && typ < end_tok_operator_math
 }
 
-// True if token type is an operator used in comparisions.
+// True if token type is an operator used in comparisons.
 func isCompOperator(typ TokenType) bool {
 	return typ > begin_tok_operator_comp && typ < end_tok_operator_comp
 }

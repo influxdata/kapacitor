@@ -8,9 +8,9 @@ type Config struct {
 	Enabled bool `toml:"enabled"`
 	// The OpsGenie API key.
 	APIKey string `toml:"api-key"`
-	// The default Teams, can be overriden per alert.
+	// The default Teams, can be overridden per alert.
 	Teams []string `toml:"teams"`
-	// The default Teams, can be overriden per alert.
+	// The default Teams, can be overridden per alert.
 	Recipients []string `toml:"recipients"`
 	// The OpsGenie API URL, should not need to be changed.
 	URL string `toml:"url"`

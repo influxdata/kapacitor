@@ -110,7 +110,7 @@ func (n *node) start(snapshot []byte) {
 		defer func() {
 			// Always close children edges
 			n.closeChildEdges()
-			// Propogate error up
+			// Propagate error up
 			if err != nil {
 				// Handle panic in runF
 				r := recover()

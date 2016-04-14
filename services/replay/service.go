@@ -230,7 +230,7 @@ func (r *Service) handleReplay(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Call close explicity to check for error
+	// Call close explicitly to check for error
 	err = tm.Close()
 	if err != nil {
 		httpd.HttpError(w, "closing: "+err.Error(), true, http.StatusInternalServerError)

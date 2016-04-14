@@ -109,7 +109,7 @@ func compareResultsIgnoreSeriesOrder(exp, got kapacitor.Result) (bool, string) {
 }
 
 func compareAlertData(exp, got kapacitor.AlertData) (bool, string) {
-	// Pull out Result for comparision
+	// Pull out Result for comparison
 	expData := kapacitor.Result(exp.Data)
 	exp.Data = influxql.Result{}
 	gotData := kapacitor.Result(got.Data)
