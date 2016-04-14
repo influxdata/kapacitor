@@ -1650,7 +1650,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "min"},
 						Values: [][]interface{}{[]interface{}{
 							time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
@@ -1666,7 +1666,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "min"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -1683,7 +1683,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "max"},
 						Values: [][]interface{}{[]interface{}{
 							time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
@@ -1699,7 +1699,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "max"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -1748,7 +1748,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "first"},
 						Values: [][]interface{}{[]interface{}{
 							time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
@@ -1764,7 +1764,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "first"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -1781,7 +1781,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "last"},
 						Values: [][]interface{}{[]interface{}{
 							time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
@@ -1797,7 +1797,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "last"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -1814,7 +1814,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
 						Columns: []string{"time", "percentile"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -3209,6 +3209,35 @@ stream
 			t.Errorf("times are not equal exp %s got %s", tm, p.Time())
 		}
 	}
+}
+
+func TestStream_SelectorsPreserveTags(t *testing.T) {
+
+	var script = `
+stream
+	|from().measurement('cpu')
+	.where(lambda: "host" == 'serverA')
+	|window()
+		.period(10s)
+		.every(10s)
+	|last('value')
+	|httpOut('TestStream_SimpleMR')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverA", "type": "idle"},
+				Columns: []string{"time", "last"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					95.3,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_SimpleMR", script, 15*time.Second, er, nil, false)
 }
 
 func TestStream_TopSelector(t *testing.T) {

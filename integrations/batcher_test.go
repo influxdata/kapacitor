@@ -273,6 +273,7 @@ batch
 		Series: imodels.Rows{
 			{
 				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"cpu": "cpu1"},
 				Columns: []string{"time", "max"},
 				Values: [][]interface{}{[]interface{}{
 					time.Date(1971, 1, 1, 0, 0, 18, 0, time.UTC),
