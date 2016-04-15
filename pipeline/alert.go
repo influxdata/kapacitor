@@ -219,6 +219,10 @@ type AlertNode struct {
 	// Optional field key to add to the data, containing the alert ID as a string.
 	IdField string
 
+	// Indicates an alert should trigger only if all points in a batch match the criteria
+	// tick:ignore
+	AllFlag bool `tick:"All"`
+
 	// Send alerts only on state changes.
 	// tick:ignore
 	IsStateChangesOnly bool `tick:"StateChangesOnly"`
@@ -288,6 +292,14 @@ func (n *AlertNode) ChainMethods() map[string]reflect.Value {
 	return map[string]reflect.Value{
 		"Log": reflect.ValueOf(n.chainnode.Log),
 	}
+}
+
+// Indicates an alert should trigger only if all points in a batch match the criteria
+// Does not apply to stream alerts.
+// tick:property
+func (n *AlertNode) All() *AlertNode {
+	n.AllFlag = true
+	return n
 }
 
 // Only sends events where the state changed.
