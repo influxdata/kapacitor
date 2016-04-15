@@ -350,47 +350,50 @@ func (a *AlertNode) runAlert([]byte) error {
 	case pipeline.BatchEdge:
 		for b, ok := a.ins[0].NextBatch(); ok; b, ok = a.ins[0].NextBatch() {
 			a.timer.Start()
-			allOK := true
-			triggered := false
-			var l AlertLevel
-			var id string
-			for _, p := range b.Points {
-				l = a.determineLevel(p.Time, p.Fields, p.Tags)
-				if l > OKAlert {
-					allOK = false
-					state := a.updateState(l, b.Group)
-					if (a.a.UseFlapping && state.flapping) || (a.a.IsStateChangesOnly && !state.changed) {
-						break
-					}
-					triggered = true
-					ad, err := a.alertData(b.Name, b.Group, b.Tags, p.Fields, l, p.Time, b)
-					if err != nil {
-						return err
-					}
-					id = ad.ID
-					a.handleAlert(ad)
-					break
+			// Keep track of lowest level for any point
+			lowestLevel := CritAlert
+			// Keep track of highest level and point
+			highestLevel := OKAlert
+			var highestPoint *models.BatchPoint
+
+			for i, p := range b.Points {
+				l := a.determineLevel(p.Time, p.Fields, p.Tags)
+				if l < lowestLevel {
+					lowestLevel = l
+				}
+				if l > highestLevel {
+					highestLevel = l
+					highestPoint = &b.Points[i]
 				}
 			}
-			// Check for recovery
-			if allOK {
-				l = OKAlert
-				state := a.updateState(OKAlert, b.Group)
-				if state.changed {
-					triggered = true
-					var fields models.Fields
-					if l := len(b.Points); l > 0 {
-						fields = b.Points[l-1].Fields
-					}
-					ad, err := a.alertData(b.Name, b.Group, b.Tags, fields, OKAlert, b.TMax, b)
-					if err != nil {
-						return err
-					}
-					id = ad.ID
-					a.handleAlert(ad)
-				}
+
+			// Default the determined level to lowest.
+			l := lowestLevel
+			// Update determined level to highest if we don't care about all
+			if !a.a.AllFlag {
+				l = highestLevel
 			}
-			if triggered {
+
+			// Update state
+			state := a.updateState(l, b.Group)
+			// Trigger alert if:
+			//  l == OK and state.changed (aka recovery)
+			//    OR
+			//  l != OK and flapping/statechanges checkout
+			if state.changed && l == OKAlert ||
+				(l != OKAlert &&
+					!((a.a.UseFlapping && state.flapping) ||
+						(a.a.IsStateChangesOnly && !state.changed))) {
+				// Create alert Data
+				t := highestPoint.Time
+				if a.a.AllFlag || l == OKAlert {
+					t = b.TMax
+				}
+				ad, err := a.alertData(b.Name, b.Group, b.Tags, highestPoint.Fields, l, t, b)
+				if err != nil {
+					return err
+				}
+				a.handleAlert(ad)
 				// Update tags or fields for Level property
 				if a.a.LevelTag != "" ||
 					a.a.LevelField != "" ||
@@ -403,7 +406,7 @@ func (a *AlertNode) runAlert([]byte) error {
 								b.Points[i].Tags[a.a.LevelTag] = l.String()
 							}
 							if a.a.IdTag != "" {
-								b.Points[i].Tags[a.a.IdTag] = id
+								b.Points[i].Tags[a.a.IdTag] = ad.ID
 							}
 						}
 						if a.a.LevelField != "" || a.a.IdField != "" {
@@ -412,7 +415,7 @@ func (a *AlertNode) runAlert([]byte) error {
 								b.Points[i].Fields[a.a.LevelField] = l.String()
 							}
 							if a.a.IdField != "" {
-								b.Points[i].Fields[a.a.IdField] = id
+								b.Points[i].Fields[a.a.IdField] = ad.ID
 							}
 						}
 					}
@@ -422,7 +425,7 @@ func (a *AlertNode) runAlert([]byte) error {
 							b.Tags[a.a.LevelTag] = l.String()
 						}
 						if a.a.IdTag != "" {
-							b.Tags[a.a.IdTag] = id
+							b.Tags[a.a.IdTag] = ad.ID
 						}
 					}
 				}

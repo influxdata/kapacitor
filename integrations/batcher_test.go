@@ -285,6 +285,85 @@ batch
 
 	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er)
 }
+
+func TestBatch_AlertAll(t *testing.T) {
+	var script = `
+batch
+	|query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "host" = 'serverA' AND "cpu" != 'cpu-total'
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s), 'cpu')
+	|alert()
+		.all()
+		.crit(lambda:"mean" > 92)
+	|httpOut('TestBatch_SimpleMR')
+`
+
+	// Expect no result since the condition is not met.
+	er := kapacitor.Result{Series: imodels.Rows{}}
+
+	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er)
+
+	script = `
+batch
+	|query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "host" = 'serverA' AND "cpu" != 'cpu-total'
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s), 'cpu')
+	|alert()
+		.all()
+		.crit(lambda:"mean" > 90)
+		.levelField('level')
+	|httpOut('TestBatch_SimpleMR')
+`
+
+	er = kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"cpu": "cpu1"},
+				Columns: []string{"time", "level", "mean"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 20, 0, time.UTC),
+						"CRITICAL",
+						96.49999999996908,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 22, 0, time.UTC),
+						"CRITICAL",
+						93.46464646468584,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 24, 0, time.UTC),
+						"CRITICAL",
+						95.00950095007724,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 26, 0, time.UTC),
+						"CRITICAL",
+						92.99999999998636,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+						"CRITICAL",
+						90.99999999998545,
+					},
+				},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er)
+}
 func TestBatch_AlertLevelField(t *testing.T) {
 
 	var script = `
