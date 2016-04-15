@@ -997,6 +997,8 @@ test,group=b value=0 0000000011
 	}
 }
 
+// If this test fails due to missing python dependencies, run 'INSTALL_PREFIX=/usr/local ./install-deps.sh' from the root directory of the
+// kapacitor project.
 func TestServer_UDFStreamAgentsSocket(t *testing.T) {
 	dir, err := os.Getwd()
 	if err != nil {
@@ -1154,6 +1156,8 @@ test,group=a value=0 0000000011
 	}
 }
 
+// If this test fails due to missing python dependencies, run 'INSTALL_PREFIX=/usr/local ./install-deps.sh' from the root directory of the
+// kapacitor project.
 func TestServer_UDFBatchAgents(t *testing.T) {
 	dir, err := os.Getwd()
 	if err != nil {

@@ -1,7 +1,11 @@
 #!/bin/bash
 
-# this script installs the python dependencies required to
+# this script installs the protobuf dependencies required to
 # run the kapacitor tests locally.
+# Specifically it install the protoc compiler, the python libraries and the python protoc plugin.
+# If more langauges are added as officially supported they should also be installed here.
+# Since protobuf-3.0.0-beta-2 is still in beta we need to install from source since packages are not readily available.
+
 
 set -e
 
