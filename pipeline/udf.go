@@ -82,7 +82,7 @@ func NewUDF(
 		UDFName:   name,
 		options:   options,
 	}
-	udf.describer, _ = tick.NewReflectionDescriber(udf)
+	udf.describer, _ = tick.NewReflectionDescriber(udf, nil)
 	parent.linkChild(udf)
 	return udf
 }

@@ -18,6 +18,27 @@ Example UDF config for a socket based UDF.
        timeout = "10s"
 ```
 
+Alert data can now be consumed directly from within TICKscripts.
+For example, let's say we want to store all data that triggered an alert in InfluxDB with a tag `level` containing the level string value (i.e CRITICAL).
+
+```javascript
+...
+    |alert()
+        .warn(...)
+        .crit(...)
+        .levelTag('level')
+        // and/or use a field
+        //.levelField('level')
+        // Also tag the data with the alert ID
+        .idTag('id')
+        // and/or use a field
+        //.idField('id')
+    |influxDBOut()
+        .database('alerts')
+        ...
+```
+
+
 ### Features
 
 - [#360](https://github.com/influxdata/kapacitor/pull/360): Forking tasks by measurement in order to improve performance
@@ -25,6 +46,7 @@ Example UDF config for a socket based UDF.
 - [#399](https://github.com/influxdata/kapacitor/issues/399): Allow disabling of subscriptions.
 - [#417](https://github.com/influxdata/kapacitor/issues/417): UDFs can be connected over a Unix socket. This enables UDFs from across Docker containers.
 - [#451](https://github.com/influxdata/kapacitor/issues/451): StreamNode supports `|groupBy` and `|where` methods.
+- [#93](https://github.com/influxdata/kapacitor/issues/93): AlertNode now outputs data to child nodes. The output data can have either a tag or field indicating the alert level.
 
 ### Bugfixes
 

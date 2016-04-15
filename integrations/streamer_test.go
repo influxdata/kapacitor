@@ -2184,13 +2184,35 @@ stream
 	|alert()
 		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
 		.details('details')
+		.idField('id')
+		.idTag('id')
+		.levelField('level')
+		.levelTag('level')
 		.info(lambda: "count" > infoThreshold)
 		.warn(lambda: "count" > warnThreshold)
 		.crit(lambda: "count" > critThreshold)
 		.post('` + ts.URL + `')
+	|log()
+	|httpOut('TestStream_Alert')
 `
 
-	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second)
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverA", "level": "CRITICAL", "id": "kapacitor/cpu/serverA"},
+				Columns: []string{"time", "count", "id", "level"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					10.0,
+					"kapacitor/cpu/serverA",
+					"CRITICAL",
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Alert", script, 13*time.Second, er, nil, false)
 
 	if rc := atomic.LoadInt32(&requestCount); rc != 1 {
 		t.Errorf("got %v exp %v", rc, 1)

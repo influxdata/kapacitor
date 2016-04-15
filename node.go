@@ -156,6 +156,9 @@ func (n *node) addChild(c Node) (*Edge, error) {
 	if n.Provides() != c.Wants() {
 		return nil, fmt.Errorf("cannot add child mismatched edges: %s:%s -> %s:%s", n.Name(), n.Provides(), c.Name(), c.Wants())
 	}
+	if n.Provides() == pipeline.NoEdge {
+		return nil, fmt.Errorf("cannot add child no edge expected: %s:%s -> %s:%s", n.Name(), n.Provides(), c.Name(), c.Wants())
+	}
 	n.children = append(n.children, c)
 
 	edge := newEdge(n.et.Task.Name, n.Name(), c.Name(), n.Provides(), defaultEdgeBufferSize, n.et.tm.LogService)
