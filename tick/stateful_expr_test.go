@@ -533,6 +533,107 @@ func TestStatefulExpression_EvalBool_UnexpectedTypeResult(t *testing.T) {
 	}
 }
 
+func TestStatefulExpression_EvalBool_ReferenceNodeDosentExistInBinaryNode(t *testing.T) {
+	emptyScope := tick.NewScope()
+	expectedError := `name "value" is undefined. Names in scope: `
+
+	// Check left side
+	_, err := evalBoolWithScope(emptyScope, &tick.BinaryNode{
+		Operator: tick.TokenGreater,
+		Left: &tick.ReferenceNode{
+			Reference: "value",
+		},
+		Right: &tick.NumberNode{
+			IsInt: true,
+			Int64: int64(0),
+		},
+	})
+
+	if err != nil && (err.Error() != expectedError) {
+		t.Errorf("Unexpected error result: \ngot: %v\nexpected: %v", err.Error(), expectedError)
+	}
+
+	if err == nil {
+		t.Error("Unexpected error result: but didn't got any error")
+	}
+}
+
+func TestStatefulExpression_EvalBool_ReferenceNodeValueChanges(t *testing.T) {
+	scope := tick.NewScope()
+
+	scope.Set("value", float64(20))
+	se := tick.NewStatefulExpr(&tick.BinaryNode{
+		Operator: tick.TokenGreater,
+		Left: &tick.ReferenceNode{
+			Reference: "value",
+		},
+		Right: &tick.NumberNode{
+			IsFloat: true,
+			Float64: float64(10),
+		},
+	})
+
+	result, err := se.EvalBool(scope)
+
+	if err != nil {
+		t.Error("Got an error while evaluating expression:", err)
+	}
+
+	if !result {
+		t.Errorf("Unexpected result: got=%t, expected=true", result)
+	}
+
+	// Now change to value to 5
+	scope.Set("value", float64(5))
+	result, err = se.EvalBool(scope)
+
+	if err != nil {
+		t.Error("Got an error while evaluating expression:", err)
+	}
+
+	if result {
+		t.Errorf("Unexpected result: got=%t, expected=false", result)
+	}
+}
+
+func TestStatefulExpression_EvalBool_ReferenceNodeTypeChanges(t *testing.T) {
+	scope := tick.NewScope()
+
+	scope.Set("value", float64(20))
+	se := tick.NewStatefulExpr(&tick.BinaryNode{
+		Operator: tick.TokenGreater,
+		Left: &tick.ReferenceNode{
+			Reference: "value",
+		},
+		Right: &tick.NumberNode{
+			IsFloat: true,
+			Float64: float64(10),
+		},
+	})
+
+	result, err := se.EvalBool(scope)
+
+	if err != nil {
+		t.Error("Got an error while evaluating expression:", err)
+	}
+
+	if !result {
+		t.Errorf("Unexpected result: got=%t, expected=true", result)
+	}
+
+	// Now change to value to int64 from float64
+	scope.Set("value", int64(5))
+	result, err = se.EvalBool(scope)
+
+	if err != nil {
+		t.Error("Got an error while evaluating expression:", err)
+	}
+
+	if result {
+		t.Errorf("Unexpected result: got=%t, expected=false", result)
+	}
+}
+
 func TestStatefulExpression_EvalNum_UnaryExpression(t *testing.T) {
 
 	scope := tick.NewScope()
@@ -568,6 +669,63 @@ func TestStatefulExpression_EvalBool_UnaryExpression(t *testing.T) {
 	})
 
 	result, err := se.EvalBool(scope)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if result {
+		t.Errorf("unexpected result: got: %t, expected: false", result)
+	}
+}
+
+func TestStatefulExpression_EvalBool_TwoLevelsDeepBinary(t *testing.T) {
+
+	scope := tick.NewScope()
+
+	// passing
+	scope.Set("a", int64(11))
+	scope.Set("b", int64(5))
+
+	// a > 10 and b < 10
+	se := tick.NewStatefulExpr(&tick.BinaryNode{
+		Operator: tick.TokenAnd,
+
+		Left: &tick.BinaryNode{
+			Operator: tick.TokenGreater,
+			Left: &tick.ReferenceNode{
+				Reference: "a",
+			},
+			Right: &tick.NumberNode{
+				IsInt: true,
+				Int64: 10,
+			},
+		},
+
+		Right: &tick.BinaryNode{
+			Operator: tick.TokenLess,
+			Left: &tick.ReferenceNode{
+				Reference: "b",
+			},
+			Right: &tick.NumberNode{
+				IsInt: true,
+				Int64: 10,
+			},
+		},
+	})
+
+	result, err := se.EvalBool(scope)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !result {
+		t.Errorf("unexpected result: got: %t, expected: true", result)
+	}
+
+	// fail
+	scope.Set("a", int64(6))
+
+	result, err = se.EvalBool(scope)
 	if err != nil {
 		t.Error(err)
 	}
