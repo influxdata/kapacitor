@@ -1,6 +1,10 @@
 package pipeline
 
-import "github.com/influxdata/influxdb/influxql"
+import (
+	"time"
+
+	"github.com/influxdata/influxdb/influxql"
+)
 
 // tmpl -- go get github.com/benbjohnson/tmpl
 //go:generate tmpl -data=@../tmpldata influxql.gen.go.tmpl
@@ -85,12 +89,12 @@ func (n *chainnode) Count(field string) *InfluxQLNode {
 // Produce batch of only the distinct points.
 func (n *chainnode) Distinct(field string) *InfluxQLNode {
 	i := newInfluxQLNode("distinct", field, n.Provides(), BatchEdge, ReduceCreater{
-		CreateFloatBulkReducer: func() (FloatBulkPointAggregator, influxql.FloatPointEmitter) {
-			fn := influxql.NewFloatSliceFuncReducer(influxql.FloatDistinctReduceSlice)
+		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
+			fn := influxql.NewFloatDistinctReducer()
 			return fn, fn
 		},
-		CreateIntegerBulkReducer: func() (IntegerBulkPointAggregator, influxql.IntegerPointEmitter) {
-			fn := influxql.NewIntegerSliceFuncReducer(influxql.IntegerDistinctReduceSlice)
+		CreateIntegerReducer: func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter) {
+			fn := influxql.NewIntegerDistinctReducer()
 			return fn, fn
 		},
 	})
@@ -334,6 +338,23 @@ func (n *chainnode) Stddev(field string) *InfluxQLNode {
 			fn := influxql.NewIntegerSliceFuncFloatReducer(influxql.IntegerStddevReduceSlice)
 			return fn, fn
 		},
+	})
+	n.linkChild(i)
+	return i
+}
+
+// Compute the elapsed time between points
+func (n *chainnode) Elapsed(field string, unit time.Duration) *InfluxQLNode {
+	i := newInfluxQLNode("elapsed", field, n.Provides(), n.Provides(), ReduceCreater{
+		CreateFloatIntegerReducer: func() (influxql.FloatPointAggregator, influxql.IntegerPointEmitter) {
+			fn := influxql.NewFloatElapsedReducer(influxql.Interval{Duration: unit})
+			return fn, fn
+		},
+		CreateIntegerReducer: func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter) {
+			fn := influxql.NewIntegerElapsedReducer(influxql.Interval{Duration: unit})
+			return fn, fn
+		},
+		IsStreamTransformation: true,
 	})
 	n.linkChild(i)
 	return i

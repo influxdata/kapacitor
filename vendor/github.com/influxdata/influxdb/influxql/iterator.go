@@ -415,6 +415,41 @@ func DrainIterator(itr Iterator) {
 	}
 }
 
+// DrainIterators reads all points from all iterators.
+func DrainIterators(itrs []Iterator) {
+	for {
+		var hasData bool
+
+		for _, itr := range itrs {
+			switch itr := itr.(type) {
+			case FloatIterator:
+				if p := itr.Next(); p != nil {
+					hasData = true
+				}
+			case IntegerIterator:
+				if p := itr.Next(); p != nil {
+					hasData = true
+				}
+			case StringIterator:
+				if p := itr.Next(); p != nil {
+					hasData = true
+				}
+			case BooleanIterator:
+				if p := itr.Next(); p != nil {
+					hasData = true
+				}
+			default:
+				panic(fmt.Sprintf("unsupported iterator type for draining: %T", itr))
+			}
+		}
+
+		// Exit once all iterators return a nil point.
+		if !hasData {
+			break
+		}
+	}
+}
+
 // NewReaderIterator returns an iterator that streams from a reader.
 func NewReaderIterator(r io.Reader, typ DataType, stats IteratorStats) (Iterator, error) {
 	switch typ {
@@ -748,6 +783,16 @@ func (opt IteratorOptions) DerivativeInterval() Interval {
 	}
 
 	return Interval{Duration: time.Second}
+}
+
+// ElapsedInterval returns the time interval for the elapsed function.
+func (opt IteratorOptions) ElapsedInterval() Interval {
+	// Use the interval on the elapsed() call, if specified.
+	if expr, ok := opt.Expr.(*Call); ok && len(expr.Args) == 2 {
+		return Interval{Duration: expr.Args[1].(*DurationLiteral).Val}
+	}
+
+	return Interval{Duration: time.Nanosecond}
 }
 
 // MarshalBinary encodes opt into a binary format.

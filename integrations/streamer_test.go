@@ -205,6 +205,36 @@ stream
 	testStreamerWithOutput(t, "TestStream_DerivativeNN", script, 15*time.Second, er, nil, false)
 }
 
+func TestStream_Elapsed(t *testing.T) {
+
+	var script = `
+stream
+	|from()
+		.measurement('packets')
+	|elapsed('value', 1s)
+	|window()
+		.period(10s)
+		.every(10s)
+	|max('elapsed')
+	|httpOut('TestStream_Elapsed')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "packets",
+				Tags:    nil,
+				Columns: []string{"time", "max"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
+					4.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Elapsed", script, 15*time.Second, er, nil, false)
+}
+
 func TestStream_WindowMissing(t *testing.T) {
 
 	var script = `

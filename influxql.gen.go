@@ -129,7 +129,7 @@ type floatPointEmitter struct {
 func (e *floatPointEmitter) EmitPoint() (models.Point, error) {
 	slice := e.emitter.Emit()
 	if len(slice) != 1 {
-		return models.Point{}, fmt.Errorf("unexpected result from InfluxQL function, got %d points expected 1", len(slice))
+		return models.Point{}, ErrEmptyEmit
 	}
 	ap := slice[0]
 	var t time.Time
@@ -301,7 +301,7 @@ type integerPointEmitter struct {
 func (e *integerPointEmitter) EmitPoint() (models.Point, error) {
 	slice := e.emitter.Emit()
 	if len(slice) != 1 {
-		return models.Point{}, fmt.Errorf("unexpected result from InfluxQL function, got %d points expected 1", len(slice))
+		return models.Point{}, ErrEmptyEmit
 	}
 	ap := slice[0]
 	var t time.Time

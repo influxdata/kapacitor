@@ -352,7 +352,7 @@ func TestServer_StreamTask(t *testing.T) {
 	endpoint := fmt.Sprintf("%s/task/%s/count", s.URL(), name)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{"Series":null,"Err":null}`
+	nullResponse := `{"Series":null,"Messages":null,"Err":null}`
 	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -380,7 +380,7 @@ test value=1 0000000011
 	v.Add("precision", "s")
 	s.MustWrite("mydb", "myrp", points, v)
 
-	exp := `{"Series":[{"name":"test","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}],"Err":null}`
+	exp := `{"Series":[{"name":"test","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}],"Messages":null,"Err":null}`
 	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -419,7 +419,7 @@ func TestServer_StreamTask_AllMeasurements(t *testing.T) {
 	endpoint := fmt.Sprintf("%s/task/%s/count", s.URL(), name)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{"Series":null,"Err":null}`
+	nullResponse := `{"Series":null,"Messages":null,"Err":null}`
 	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -447,7 +447,7 @@ test0 value=1 0000000011
 	v.Add("precision", "s")
 	s.MustWrite("mydb", "myrp", points, v)
 
-	exp := `{"Series":[{"name":"test0","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}],"Err":null}`
+	exp := `{"Series":[{"name":"test0","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}],"Messages":null,"Err":null}`
 	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -513,7 +513,7 @@ func TestServer_BatchTask(t *testing.T) {
 
 	endpoint := fmt.Sprintf("%s/task/%s/count", s.URL(), name)
 
-	exp := `{"Series":[{"name":"cpu","columns":["time","count"],"values":[["1971-01-01T00:00:01.002Z",2]]}],"Err":null}`
+	exp := `{"Series":[{"name":"cpu","columns":["time","count"],"values":[["1971-01-01T00:00:01.002Z",2]]}],"Messages":null,"Err":null}`
 	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -955,7 +955,7 @@ func testStreamAgent(t *testing.T, c *run.Config) {
 	endpoint := fmt.Sprintf("%s/task/%s/moving_avg", s.URL(), name)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{"Series":null,"Err":null}`
+	nullResponse := `{"Series":null,"Messages":null,"Err":null}`
 	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -990,7 +990,7 @@ test,group=b value=0 0000000011
 	v.Add("precision", "s")
 	s.MustWrite("mydb", "myrp", points, v)
 
-	exp := `{"Series":[{"name":"test","tags":{"group":"a"},"columns":["time","mean"],"values":[["1970-01-01T00:00:11Z",0.9]]},{"name":"test","tags":{"group":"b"},"columns":["time","mean"],"values":[["1970-01-01T00:00:11Z",1.9]]}],"Err":null}`
+	exp := `{"Series":[{"name":"test","tags":{"group":"a"},"columns":["time","mean"],"values":[["1970-01-01T00:00:11Z",0.9]]},{"name":"test","tags":{"group":"b"},"columns":["time","mean"],"values":[["1970-01-01T00:00:11Z",1.9]]}],"Messages":null,"Err":null}`
 	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -1126,7 +1126,7 @@ func testStreamAgentSocket(t *testing.T, c *run.Config) {
 	endpoint := fmt.Sprintf("%s/task/%s/count", s.URL(), name)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{"Series":null,"Err":null}`
+	nullResponse := `{"Series":null,"Messages":null,"Err":null}`
 	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -1149,7 +1149,7 @@ test,group=a value=0 0000000011
 	v.Add("precision", "s")
 	s.MustWrite("mydb", "myrp", points, v)
 
-	exp := `{"Series":[{"name":"test","tags":{"group":"a"},"columns":["time","count"],"values":[["1970-01-01T00:00:10Z",10]]}],"Err":null}`
+	exp := `{"Series":[{"name":"test","tags":{"group":"a"},"columns":["time","count"],"values":[["1970-01-01T00:00:10Z",10]]}],"Messages":null,"Err":null}`
 	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -1328,7 +1328,7 @@ func testBatchAgent(t *testing.T, c *run.Config) {
 	}
 
 	endpoint := fmt.Sprintf("%s/task/%s/count", s.URL(), name)
-	exp := `{"Series":[{"name":"cpu","tags":{"count":"1"},"columns":["time","count"],"values":[["1971-01-01T00:00:00.02Z",5]]},{"name":"cpu","tags":{"count":"0"},"columns":["time","count"],"values":[["1971-01-01T00:00:00.02Z",5]]}],"Err":null}`
+	exp := `{"Series":[{"name":"cpu","tags":{"count":"1"},"columns":["time","count"],"values":[["1971-01-01T00:00:00.02Z",5]]},{"name":"cpu","tags":{"count":"0"},"columns":["time","count"],"values":[["1971-01-01T00:00:00.02Z",5]]}],"Messages":null,"Err":null}`
 	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*50)
 	if err != nil {
 		t.Error(err)

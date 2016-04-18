@@ -22,8 +22,9 @@ type ReduceCreater struct {
 	CreateIntegerReducer     func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter)
 	CreateIntegerBulkReducer func() (IntegerBulkPointAggregator, influxql.IntegerPointEmitter)
 
-	TopBottomCallInfo *TopBottomCallInfo
-	IsSimpleSelector  bool
+	TopBottomCallInfo      *TopBottomCallInfo
+	IsSimpleSelector       bool
+	IsStreamTransformation bool
 }
 
 type FloatBulkPointAggregator interface {

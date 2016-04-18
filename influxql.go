@@ -1,6 +1,7 @@
 package kapacitor
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -14,16 +15,20 @@ import (
 
 type createReduceContextFunc func(c baseReduceContext) reduceContext
 
+var ErrEmptyEmit = errors.New("error call to emit produced no results")
+
 type InfluxQLNode struct {
 	node
-	n        *pipeline.InfluxQLNode
-	createFn createReduceContextFunc
+	n                      *pipeline.InfluxQLNode
+	createFn               createReduceContextFunc
+	isStreamTransformation bool
 }
 
 func newInfluxQLNode(et *ExecutingTask, n *pipeline.InfluxQLNode, l *log.Logger) (*InfluxQLNode, error) {
 	m := &InfluxQLNode{
 		node: node{Node: n, et: et, logger: l},
 		n:    n,
+		isStreamTransformation: n.ReduceCreater.IsStreamTransformation,
 	}
 	m.node.runF = m.runInfluxQLs
 	return m, nil
@@ -79,7 +84,7 @@ func (n *InfluxQLNode) runStreamInfluxQL() error {
 				dimensions: p.Dimensions,
 				tags:       p.PointTags(),
 				time:       p.Time,
-				pointTimes: n.n.PointTimes,
+				pointTimes: n.n.PointTimes || n.isStreamTransformation,
 			}
 
 			createFn, err := n.getCreateFn(p.Fields[c.field])
@@ -89,22 +94,32 @@ func (n *InfluxQLNode) runStreamInfluxQL() error {
 
 			context = createFn(c)
 			contexts[p.Group] = context
-			context.AggregatePoint(&p)
 
-		} else if p.Time.Equal(context.Time()) {
+		}
+		if n.isStreamTransformation {
 			context.AggregatePoint(&p)
-			// advance to next point
 			p, ok = n.ins[0].NextPoint()
-		} else {
+
 			err := n.emit(context)
-			if err != nil {
+			if err != nil && err != ErrEmptyEmit {
 				return err
 			}
+		} else {
+			if p.Time.Equal(context.Time()) {
+				context.AggregatePoint(&p)
+				// advance to next point
+				p, ok = n.ins[0].NextPoint()
+			} else {
+				err := n.emit(context)
+				if err != nil {
+					return err
+				}
 
-			// Nil out reduced point
-			contexts[p.Group] = nil
-			// do not advance,
-			// go through loop again to initialize new iterator.
+				// Nil out reduced point
+				contexts[p.Group] = nil
+				// do not advance,
+				// go through loop again to initialize new iterator.
+			}
 		}
 	}
 	return nil

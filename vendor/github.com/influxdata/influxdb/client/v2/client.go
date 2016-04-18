@@ -123,6 +123,7 @@ func NewHTTPClient(conf HTTPConfig) (Client, error) {
 			Timeout:   conf.Timeout,
 			Transport: tr,
 		},
+		transport: tr,
 	}, nil
 }
 
@@ -172,6 +173,7 @@ func (c *client) Ping(timeout time.Duration) (time.Duration, string, error) {
 
 // Close releases the client's resources.
 func (c *client) Close() error {
+	c.transport.CloseIdleConnections()
 	return nil
 }
 
@@ -221,6 +223,7 @@ type client struct {
 	password   string
 	useragent  string
 	httpClient *http.Client
+	transport  *http.Transport
 }
 
 type udpclient struct {
@@ -516,10 +519,17 @@ func (r *Response) Error() error {
 	return nil
 }
 
+// Message represents a user message.
+type Message struct {
+	Level string
+	Text  string
+}
+
 // Result represents a resultset returned from a single statement.
 type Result struct {
-	Series []models.Row
-	Err    string `json:"error,omitempty"`
+	Series   []models.Row
+	Messages []*Message
+	Err      string `json:"error,omitempty"`
 }
 
 func (uc *udpclient) Query(q Query) (*Response, error) {
