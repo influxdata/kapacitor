@@ -505,7 +505,7 @@ func (tm *TaskMaster) newFork(taskName string, dbrps []DBRP, measurements []stri
 		return nil, ErrTaskMasterClosed
 	}
 
-	e := newEdge(taskName, "stream", "srcstream0", pipeline.StreamEdge, defaultEdgeBufferSize, tm.LogService)
+	e := newEdge(taskName, "stream", "stream0", pipeline.StreamEdge, defaultEdgeBufferSize, tm.LogService)
 
 	for _, key := range forkKeys(dbrps, measurements) {
 		tm.taskToForkKeys[taskName] = append(tm.taskToForkKeys[taskName], key)

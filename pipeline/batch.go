@@ -6,11 +6,11 @@ import (
 	"time"
 )
 
-// A node that handles creating several child BatchNodes.
+// A node that handles creating several child QueryNodes.
 // Each call to `query` creates a child batch node that
-// can further be configured. See BatchNode
+// can further be configured. See QueryNode
 // The `batch` variable in batch tasks is an instance of
-// a SourceBatchNode.
+// a BatchNode.
 //
 // Example:
 //     var errors = batch
@@ -20,14 +20,14 @@ import (
 //                      |query('SELECT value from views')
 //                      ...
 //
-type SourceBatchNode struct {
+type BatchNode struct {
 	node
 }
 
-func newSourceBatchNode() *SourceBatchNode {
-	return &SourceBatchNode{
+func newBatchNode() *BatchNode {
+	return &BatchNode{
 		node: node{
-			desc:     "srcbatch",
+			desc:     "batch",
 			wants:    NoEdge,
 			provides: BatchEdge,
 		},
@@ -39,8 +39,8 @@ func newSourceBatchNode() *SourceBatchNode {
 // The time conditions are added dynamically according to the period, offset and schedule.
 // The `GROUP BY` clause is added dynamically according to the dimensions
 // passed to the `groupBy` method.
-func (b *SourceBatchNode) Query(q string) *BatchNode {
-	n := newBatchNode()
+func (b *BatchNode) Query(q string) *QueryNode {
+	n := newQueryNode()
 	n.QueryStr = q
 	b.linkChild(n)
 	return n
@@ -49,10 +49,10 @@ func (b *SourceBatchNode) Query(q string) *BatchNode {
 // Do not add the source batch node to the dot output
 // since its not really an edge.
 // tick:ignore
-func (b *SourceBatchNode) dot(buf *bytes.Buffer) {
+func (b *BatchNode) dot(buf *bytes.Buffer) {
 }
 
-// A BatchNode defines a source and a schedule for
+// A QueryNode defines a source and a schedule for
 // processing batch data. The data is queried from
 // an InfluxDB database and then passed into the data pipeline.
 //
@@ -70,7 +70,7 @@ func (b *SourceBatchNode) dot(buf *bytes.Buffer) {
 //
 // In the above example InfluxDB is queried every 20 seconds; the window of time returned
 // spans 1 minute and is grouped into 10 second buckets.
-type BatchNode struct {
+type QueryNode struct {
 	chainnode
 
 	// The query text
@@ -125,15 +125,15 @@ type BatchNode struct {
 	Cluster string
 }
 
-func newBatchNode() *BatchNode {
-	b := &BatchNode{
-		chainnode: newBasicChainNode("batch", BatchEdge, BatchEdge),
+func newQueryNode() *QueryNode {
+	b := &QueryNode{
+		chainnode: newBasicChainNode("query", BatchEdge, BatchEdge),
 	}
 	return b
 }
 
 //tick:ignore
-func (n *BatchNode) ChainMethods() map[string]reflect.Value {
+func (n *QueryNode) ChainMethods() map[string]reflect.Value {
 	return map[string]reflect.Value{
 		"GroupBy": reflect.ValueOf(n.chainnode.GroupBy),
 	}
@@ -152,15 +152,15 @@ func (n *BatchNode) ChainMethods() map[string]reflect.Value {
 //            .groupBy(time(10s), 'tag1', 'tag2'))
 //
 // tick:property
-func (b *BatchNode) GroupBy(d ...interface{}) *BatchNode {
+func (b *QueryNode) GroupBy(d ...interface{}) *QueryNode {
 	b.Dimensions = d
 	return b
 }
 
-// Align start and stop times for quiries with even boundaries of the BatchNode.Every property.
-// Does not apply if using the BatchNode.Cron property.
+// Align start and stop times for quiries with even boundaries of the QueryNode.Every property.
+// Does not apply if using the QueryNode.Cron property.
 // tick:property
-func (b *BatchNode) Align() *BatchNode {
+func (b *QueryNode) Align() *QueryNode {
 	b.AlignFlag = true
 	return b
 }
