@@ -105,7 +105,9 @@ func (s *Server) Write(db, rp, body string, params url.Values) (results string, 
 	resp, err := http.Post(s.URL()+"/write?"+params.Encode(), "", strings.NewReader(body))
 	if err != nil {
 		return "", err
-	} else if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		return "", fmt.Errorf("invalid status code: code=%d, body=%s", resp.StatusCode, MustReadAll(resp.Body))
 	}
 	return string(MustReadAll(resp.Body)), nil
@@ -118,6 +120,7 @@ func (s *Server) HTTPGetRetry(url, exp string, retries int, sleep time.Duration)
 		if err != nil {
 			return err
 		}
+		defer resp.Body.Close()
 		r = string(MustReadAll(resp.Body))
 		if r == exp {
 			break

@@ -6,6 +6,8 @@
 
 package influxql
 
+import "sort"
+
 // FloatPointAggregator aggregates points to produce a single point.
 type FloatPointAggregator interface {
 	AggregateFloat(p *FloatPoint)
@@ -253,6 +255,66 @@ func (r *FloatSliceFuncBooleanReducer) AggregateFloatBulk(points []FloatPoint) {
 
 func (r *FloatSliceFuncBooleanReducer) Emit() []BooleanPoint {
 	return r.fn(r.points)
+}
+
+// FloatDistinctReducer returns the distinct points in a series.
+type FloatDistinctReducer struct {
+	m map[float64]FloatPoint
+}
+
+// NewFloatDistinctReducer creates a new FloatDistinctReducer.
+func NewFloatDistinctReducer() *FloatDistinctReducer {
+	return &FloatDistinctReducer{m: make(map[float64]FloatPoint)}
+}
+
+// AggregateFloat aggregates a point into the reducer.
+func (r *FloatDistinctReducer) AggregateFloat(p *FloatPoint) {
+	if _, ok := r.m[p.Value]; !ok {
+		r.m[p.Value] = *p
+	}
+}
+
+// Emit emits the distinct points that have been aggregated into the reducer.
+func (r *FloatDistinctReducer) Emit() []FloatPoint {
+	points := make([]FloatPoint, 0, len(r.m))
+	for _, p := range r.m {
+		points = append(points, FloatPoint{Time: p.Time, Value: p.Value})
+	}
+	sort.Sort(floatPoints(points))
+	return points
+}
+
+// FloatElapsedReducer calculates the elapsed of the aggregated points.
+type FloatElapsedReducer struct {
+	unitConversion int64
+	prev           FloatPoint
+	curr           FloatPoint
+}
+
+// NewFloatElapsedReducer creates a new FloatElapsedReducer.
+func NewFloatElapsedReducer(interval Interval) *FloatElapsedReducer {
+	return &FloatElapsedReducer{
+		unitConversion: int64(interval.Duration),
+		prev:           FloatPoint{Nil: true},
+		curr:           FloatPoint{Nil: true},
+	}
+}
+
+// AggregateFloat aggregates a point into the reducer and updates the current window.
+func (r *FloatElapsedReducer) AggregateFloat(p *FloatPoint) {
+	r.prev = r.curr
+	r.curr = *p
+}
+
+// Emit emits the elapsed of the reducer at the current point.
+func (r *FloatElapsedReducer) Emit() []IntegerPoint {
+	if !r.prev.Nil {
+		elapsed := (r.curr.Time - r.prev.Time) / r.unitConversion
+		return []IntegerPoint{
+			{Time: r.curr.Time, Value: elapsed},
+		}
+	}
+	return nil
 }
 
 // IntegerPointAggregator aggregates points to produce a single point.
@@ -504,6 +566,66 @@ func (r *IntegerSliceFuncBooleanReducer) Emit() []BooleanPoint {
 	return r.fn(r.points)
 }
 
+// IntegerDistinctReducer returns the distinct points in a series.
+type IntegerDistinctReducer struct {
+	m map[int64]IntegerPoint
+}
+
+// NewIntegerDistinctReducer creates a new IntegerDistinctReducer.
+func NewIntegerDistinctReducer() *IntegerDistinctReducer {
+	return &IntegerDistinctReducer{m: make(map[int64]IntegerPoint)}
+}
+
+// AggregateInteger aggregates a point into the reducer.
+func (r *IntegerDistinctReducer) AggregateInteger(p *IntegerPoint) {
+	if _, ok := r.m[p.Value]; !ok {
+		r.m[p.Value] = *p
+	}
+}
+
+// Emit emits the distinct points that have been aggregated into the reducer.
+func (r *IntegerDistinctReducer) Emit() []IntegerPoint {
+	points := make([]IntegerPoint, 0, len(r.m))
+	for _, p := range r.m {
+		points = append(points, IntegerPoint{Time: p.Time, Value: p.Value})
+	}
+	sort.Sort(integerPoints(points))
+	return points
+}
+
+// IntegerElapsedReducer calculates the elapsed of the aggregated points.
+type IntegerElapsedReducer struct {
+	unitConversion int64
+	prev           IntegerPoint
+	curr           IntegerPoint
+}
+
+// NewIntegerElapsedReducer creates a new IntegerElapsedReducer.
+func NewIntegerElapsedReducer(interval Interval) *IntegerElapsedReducer {
+	return &IntegerElapsedReducer{
+		unitConversion: int64(interval.Duration),
+		prev:           IntegerPoint{Nil: true},
+		curr:           IntegerPoint{Nil: true},
+	}
+}
+
+// AggregateInteger aggregates a point into the reducer and updates the current window.
+func (r *IntegerElapsedReducer) AggregateInteger(p *IntegerPoint) {
+	r.prev = r.curr
+	r.curr = *p
+}
+
+// Emit emits the elapsed of the reducer at the current point.
+func (r *IntegerElapsedReducer) Emit() []IntegerPoint {
+	if !r.prev.Nil {
+		elapsed := (r.curr.Time - r.prev.Time) / r.unitConversion
+		return []IntegerPoint{
+			{Time: r.curr.Time, Value: elapsed},
+		}
+	}
+	return nil
+}
+
 // StringPointAggregator aggregates points to produce a single point.
 type StringPointAggregator interface {
 	AggregateString(p *StringPoint)
@@ -753,6 +875,66 @@ func (r *StringSliceFuncBooleanReducer) Emit() []BooleanPoint {
 	return r.fn(r.points)
 }
 
+// StringDistinctReducer returns the distinct points in a series.
+type StringDistinctReducer struct {
+	m map[string]StringPoint
+}
+
+// NewStringDistinctReducer creates a new StringDistinctReducer.
+func NewStringDistinctReducer() *StringDistinctReducer {
+	return &StringDistinctReducer{m: make(map[string]StringPoint)}
+}
+
+// AggregateString aggregates a point into the reducer.
+func (r *StringDistinctReducer) AggregateString(p *StringPoint) {
+	if _, ok := r.m[p.Value]; !ok {
+		r.m[p.Value] = *p
+	}
+}
+
+// Emit emits the distinct points that have been aggregated into the reducer.
+func (r *StringDistinctReducer) Emit() []StringPoint {
+	points := make([]StringPoint, 0, len(r.m))
+	for _, p := range r.m {
+		points = append(points, StringPoint{Time: p.Time, Value: p.Value})
+	}
+	sort.Sort(stringPoints(points))
+	return points
+}
+
+// StringElapsedReducer calculates the elapsed of the aggregated points.
+type StringElapsedReducer struct {
+	unitConversion int64
+	prev           StringPoint
+	curr           StringPoint
+}
+
+// NewStringElapsedReducer creates a new StringElapsedReducer.
+func NewStringElapsedReducer(interval Interval) *StringElapsedReducer {
+	return &StringElapsedReducer{
+		unitConversion: int64(interval.Duration),
+		prev:           StringPoint{Nil: true},
+		curr:           StringPoint{Nil: true},
+	}
+}
+
+// AggregateString aggregates a point into the reducer and updates the current window.
+func (r *StringElapsedReducer) AggregateString(p *StringPoint) {
+	r.prev = r.curr
+	r.curr = *p
+}
+
+// Emit emits the elapsed of the reducer at the current point.
+func (r *StringElapsedReducer) Emit() []IntegerPoint {
+	if !r.prev.Nil {
+		elapsed := (r.curr.Time - r.prev.Time) / r.unitConversion
+		return []IntegerPoint{
+			{Time: r.curr.Time, Value: elapsed},
+		}
+	}
+	return nil
+}
+
 // BooleanPointAggregator aggregates points to produce a single point.
 type BooleanPointAggregator interface {
 	AggregateBoolean(p *BooleanPoint)
@@ -1000,4 +1182,64 @@ func (r *BooleanSliceFuncReducer) AggregateBooleanBulk(points []BooleanPoint) {
 
 func (r *BooleanSliceFuncReducer) Emit() []BooleanPoint {
 	return r.fn(r.points)
+}
+
+// BooleanDistinctReducer returns the distinct points in a series.
+type BooleanDistinctReducer struct {
+	m map[bool]BooleanPoint
+}
+
+// NewBooleanDistinctReducer creates a new BooleanDistinctReducer.
+func NewBooleanDistinctReducer() *BooleanDistinctReducer {
+	return &BooleanDistinctReducer{m: make(map[bool]BooleanPoint)}
+}
+
+// AggregateBoolean aggregates a point into the reducer.
+func (r *BooleanDistinctReducer) AggregateBoolean(p *BooleanPoint) {
+	if _, ok := r.m[p.Value]; !ok {
+		r.m[p.Value] = *p
+	}
+}
+
+// Emit emits the distinct points that have been aggregated into the reducer.
+func (r *BooleanDistinctReducer) Emit() []BooleanPoint {
+	points := make([]BooleanPoint, 0, len(r.m))
+	for _, p := range r.m {
+		points = append(points, BooleanPoint{Time: p.Time, Value: p.Value})
+	}
+	sort.Sort(booleanPoints(points))
+	return points
+}
+
+// BooleanElapsedReducer calculates the elapsed of the aggregated points.
+type BooleanElapsedReducer struct {
+	unitConversion int64
+	prev           BooleanPoint
+	curr           BooleanPoint
+}
+
+// NewBooleanElapsedReducer creates a new BooleanElapsedReducer.
+func NewBooleanElapsedReducer(interval Interval) *BooleanElapsedReducer {
+	return &BooleanElapsedReducer{
+		unitConversion: int64(interval.Duration),
+		prev:           BooleanPoint{Nil: true},
+		curr:           BooleanPoint{Nil: true},
+	}
+}
+
+// AggregateBoolean aggregates a point into the reducer and updates the current window.
+func (r *BooleanElapsedReducer) AggregateBoolean(p *BooleanPoint) {
+	r.prev = r.curr
+	r.curr = *p
+}
+
+// Emit emits the elapsed of the reducer at the current point.
+func (r *BooleanElapsedReducer) Emit() []IntegerPoint {
+	if !r.prev.Nil {
+		elapsed := (r.curr.Time - r.prev.Time) / r.unitConversion
+		return []IntegerPoint{
+			{Time: r.curr.Time, Value: elapsed},
+		}
+	}
+	return nil
 }

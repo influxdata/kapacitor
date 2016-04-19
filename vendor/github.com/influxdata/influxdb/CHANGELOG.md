@@ -4,19 +4,46 @@
 
 - [#6237](https://github.com/influxdata/influxdb/issues/6237): Enable continuous integration testing on Windows platform via AppVeyor. Thanks @mvadu
 - [#6263](https://github.com/influxdata/influxdb/pull/6263): Reduce UDP Service allocation size.
+- [#6228](https://github.com/influxdata/influxdb/pull/6228): Support for multiple listeners for collectd and OpenTSDB inputs.
+- [#6292](https://github.com/influxdata/influxdb/issues/6292): Allow percentile to be used as a selector.
+- [#5707](https://github.com/influxdata/influxdb/issues/5707): Return a deprecated message when IF NOT EXISTS is used.
+- [#6334](https://github.com/influxdata/influxdb/pull/6334): Allow environment variables to be set per input type.
+- [#6394](https://github.com/influxdata/influxdb/pull/6394): Allow time math with integer timestamps.
+- [#3247](https://github.com/influxdata/influxdb/issues/3247): Implement derivatives across intervals for aggregate queries.
+- [#3166](https://github.com/influxdata/influxdb/issues/3166): Sort the series keys inside of a tag set so output is deterministic.
+- [#1856](https://github.com/influxdata/influxdb/issues/1856): Add `elapsed` function that returns the time delta between subsequent points.
 
 ### Bugfixes
 
-- [#6206](https://github.com/influxdata/influxdb/issues/6206): Handle nil values from the tsm1 cursor correctly.
-- [#6248](https://github.com/influxdata/influxdb/issues/6248): Panic using incorrectly quoted "queries" field key.
-- [#6257](https://github.com/influxdata/influxdb/issues/6257): CreateShardGroup was incrementing meta data index even when it was idempotent.
-- [#6223](https://github.com/influxdata/influxdb/issues/6223): Failure to start/run on Windows. Thanks @mvadu
-- [#6229](https://github.com/influxdata/influxdb/issues/6229): Fixed aggregate queries with no GROUP BY to include the end time.
 - [#6283](https://github.com/influxdata/influxdb/pull/6283): Fix GROUP BY tag to produce consistent results when a series has no tags.
 - [#3773](https://github.com/influxdata/influxdb/issues/3773): Support empty tags for all WHERE equality operations.
 - [#6270](https://github.com/influxdata/influxdb/issues/6270): tsm1 query engine alloc reduction
 - [#6271](https://github.com/influxdata/influxdb/issues/6271): Fixed deadlock in tsm1 file store.
 - [#6287](https://github.com/influxdata/influxdb/issues/6287): Fix data race in Influx Client.
+- [#6252](https://github.com/influxdata/influxdb/pull/6252): Remove TSDB listener accept message @simnv
+- [#6202](https://github.com/influxdata/influxdb/pull/6202): Check default SHARD DURATION when recreating the same database.
+- [#6296](https://github.com/influxdata/influxdb/issues/6296): Allow the implicit time field to be renamed again.
+- [#6379](https://github.com/influxdata/influxdb/issues/6379): Validate the first argument to percentile() is a variable.
+- [#6294](https://github.com/influxdata/influxdb/issues/6294): Fix panic running influx_inspect info.
+- [#6382](https://github.com/influxdata/influxdb/pull/6382): Removed dead code from the old query engine.
+- [#6383](https://github.com/influxdata/influxdb/pull/6383): Recover from a panic during query execution.
+- [#3369](https://github.com/influxdata/influxdb/issues/3369): Detect when a timer literal will overflow or underflow the query engine.
+- [#6398](https://github.com/influxdata/influxdb/issues/6398): Fix CREATE RETENTION POLICY parsing so it doesn't consume tokens it shouldn't.
+- [#6413](https://github.com/influxdata/influxdb/pull/6413): Prevent goroutine leak from persistent http connections. Thanks @aaronknister.
+- [#6414](https://github.com/influxdata/influxdb/pull/6414): Send "Connection: close" header for queries.
+- [#6425](https://github.com/influxdata/influxdb/pull/6425): Close idle tcp connections in HTTP client to prevent tcp conn leak.
+
+## v0.12.1 [2016-04-08]
+
+### Bugfixes
+
+- [#6225](https://github.com/influxdata/influxdb/pull/6225): Refresh admin assets.
+- [#6206](https://github.com/influxdata/influxdb/issues/6206): Handle nil values from the tsm1 cursor correctly.
+- [#6190](https://github.com/influxdata/influxdb/pull/6190): Fix race on measurementFields.
+- [#6248](https://github.com/influxdata/influxdb/issues/6248): Panic using incorrectly quoted "queries" field key.
+- [#6257](https://github.com/influxdata/influxdb/issues/6257): CreateShardGroup was incrementing meta data index even when it was idempotent.
+- [#6223](https://github.com/influxdata/influxdb/issues/6223): Failure to start/run on Windows. Thanks @mvadu
+- [#6229](https://github.com/influxdata/influxdb/issues/6229): Fixed aggregate queries with no GROUP BY to include the end time.
 
 ## v0.12.0 [2016-04-05]
 ### Release Notes

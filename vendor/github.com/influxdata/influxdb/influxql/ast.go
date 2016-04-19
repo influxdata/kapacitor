@@ -903,6 +903,9 @@ type SelectStatement struct {
 	// The value to fill empty aggregate buckets with, if any
 	FillValue interface{}
 
+	// Renames the implicit time field name.
+	TimeAlias string
+
 	// Removes the "time" column from the output.
 	OmitTime bool
 
@@ -966,6 +969,14 @@ func (s *SelectStatement) HasSimpleCount() bool {
 // TimeAscending returns true if the time field is sorted in chronological order.
 func (s *SelectStatement) TimeAscending() bool {
 	return len(s.SortFields) == 0 || s.SortFields[0].Ascending
+}
+
+// TimeFieldName returns the name of the time field.
+func (s *SelectStatement) TimeFieldName() string {
+	if s.TimeAlias != "" {
+		return s.TimeAlias
+	}
+	return "time"
 }
 
 // Clone returns a deep copy of the statement.
@@ -1133,6 +1144,7 @@ func (s *SelectStatement) RewriteTimeFields() {
 		switch expr := s.Fields[i].Expr.(type) {
 		case *VarRef:
 			if expr.Val == "time" {
+				s.TimeAlias = s.Fields[i].Alias
 				s.Fields = append(s.Fields[:i], s.Fields[i+1:]...)
 			}
 		}
@@ -1169,7 +1181,7 @@ func (s *SelectStatement) ColumnNames() []string {
 	columnNames := make([]string, len(columnFields)+offset)
 	if !s.OmitTime {
 		// Add the implicit time if requested.
-		columnNames[0] = "time"
+		columnNames[0] = s.TimeFieldName()
 	}
 
 	// Keep track of the encountered column names.
@@ -1403,12 +1415,12 @@ func (s *SelectStatement) validSelectWithAggregate() error {
 			numAggregates++
 		}
 	}
-	// For TOP, BOTTOM, MAX, MIN, FIRST, LAST (selector functions) it is ok to ask for fields and tags
+	// For TOP, BOTTOM, MAX, MIN, FIRST, LAST, PERCENTILE (selector functions) it is ok to ask for fields and tags
 	// but only if one function is specified.  Combining multiple functions and fields and tags is not currently supported
 	onlySelectors := true
 	for k := range calls {
 		switch k {
-		case "top", "bottom", "max", "min", "first", "last":
+		case "top", "bottom", "max", "min", "first", "last", "percentile":
 		default:
 			onlySelectors = false
 			break
@@ -1464,6 +1476,13 @@ func (s *SelectStatement) validPercentileAggr(expr *Call) error {
 		return fmt.Errorf("invalid number of arguments for %s, expected %d, got %d", expr.Name, exp, got)
 	}
 
+	switch expr.Args[0].(type) {
+	case *VarRef:
+		// do nothing
+	default:
+		return fmt.Errorf("expected field argument in percentile()")
+	}
+
 	switch expr.Args[1].(type) {
 	case *IntegerLiteral, *NumberLiteral:
 		return nil
@@ -1476,7 +1495,7 @@ func (s *SelectStatement) validateAggregates(tr targetRequirement) error {
 	for _, f := range s.Fields {
 		for _, expr := range walkFunctionCalls(f.Expr) {
 			switch expr.Name {
-			case "derivative", "non_negative_derivative", "difference", "moving_average":
+			case "derivative", "non_negative_derivative", "difference", "moving_average", "elapsed":
 				if err := s.validSelectWithAggregate(); err != nil {
 					return err
 				}
@@ -1484,6 +1503,17 @@ func (s *SelectStatement) validateAggregates(tr targetRequirement) error {
 				case "derivative", "non_negative_derivative":
 					if min, max, got := 1, 2, len(expr.Args); got > max || got < min {
 						return fmt.Errorf("invalid number of arguments for %s, expected at least %d but no more than %d, got %d", expr.Name, min, max, got)
+					}
+				case "elapsed":
+					if min, max, got := 1, 2, len(expr.Args); got > max || got < min {
+						return fmt.Errorf("invalid number of arguments for %s, expected at least %d but no more than %d, got %d", expr.Name, min, max, got)
+					}
+					// If a duration arg is passed, make sure it's a duration
+					if len(expr.Args) == 2 {
+						// Second must be a duration .e.g (1h)
+						if _, ok := expr.Args[1].(*DurationLiteral); !ok {
+							return errors.New("elapsed requires a duration argument")
+						}
 					}
 				case "difference":
 					if got := len(expr.Args); got != 1 {
@@ -1719,7 +1749,7 @@ func (s *SelectStatement) validateDerivative() error {
 		return fmt.Errorf("derivative requires a field argument")
 	}
 
-	// If a duration arg is pased, make sure it's a duration
+	// If a duration arg is passed, make sure it's a duration
 	if len(derivativeCall.Args) == 2 {
 		// Second must be a duration .e.g (1h)
 		if _, ok := derivativeCall.Args[1].(*DurationLiteral); !ok {
@@ -3469,6 +3499,11 @@ func timeExprValue(ref Expr, lit Expr) (t time.Time, err error) {
 	if ref, ok := ref.(*VarRef); ok && strings.ToLower(ref.Val) == "time" {
 		switch lit := lit.(type) {
 		case *TimeLiteral:
+			if lit.Val.After(time.Unix(0, MaxTime)) {
+				return time.Time{}, fmt.Errorf("time %s overflows time literal", lit.Val.Format(time.RFC3339))
+			} else if lit.Val.Before(time.Unix(0, MinTime)) {
+				return time.Time{}, fmt.Errorf("time %s underflows time literal", lit.Val.Format(time.RFC3339))
+			}
 			return lit.Val, nil
 		case *DurationLiteral:
 			return time.Unix(0, int64(lit.Val)).UTC(), nil
@@ -4062,6 +4097,14 @@ func reduceBinaryExprIntegerLHS(op Token, lhs *IntegerLiteral, rhs Expr) Expr {
 			return &BooleanLiteral{Val: lhs.Val < rhs.Val}
 		case LTE:
 			return &BooleanLiteral{Val: lhs.Val <= rhs.Val}
+		}
+	case *DurationLiteral:
+		// Treat the integer as a timestamp.
+		switch op {
+		case ADD:
+			return &TimeLiteral{Val: time.Unix(0, lhs.Val).Add(rhs.Val)}
+		case SUB:
+			return &TimeLiteral{Val: time.Unix(0, lhs.Val).Add(-rhs.Val)}
 		}
 	case *nilLiteral:
 		return &BooleanLiteral{Val: false}

@@ -197,6 +197,39 @@ batch
 	testBatcherWithOutput(t, "TestBatch_DerivativeNN", script, 21*time.Second, er)
 }
 
+func TestBatch_Elapsed(t *testing.T) {
+
+	var script = `
+batch
+	|query('''
+		SELECT "value"
+		FROM "telegraf"."default".packets
+''')
+		.period(10s)
+		.every(10s)
+	|elapsed('value', 1ms)
+	|httpOut('TestBatch_Elapsed')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "packets",
+				Tags:    nil,
+				Columns: []string{"time", "elapsed"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+						2000.0,
+					},
+				},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_Elapsed", script, 21*time.Second, er)
+}
+
 func TestBatch_SimpleMR(t *testing.T) {
 
 	var script = `

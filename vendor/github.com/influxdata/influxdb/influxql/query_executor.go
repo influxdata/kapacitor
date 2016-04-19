@@ -79,6 +79,9 @@ type ExecutionContext struct {
 	// The requested maximum number of points to return in each result.
 	ChunkSize int
 
+	// Hold the query executor's logger.
+	Log *log.Logger
+
 	// A channel that is closed when the query is interrupted.
 	InterruptCh <-chan struct{}
 }
@@ -153,6 +156,7 @@ func (e *QueryExecutor) ExecuteQuery(query *Query, database string, chunkSize in
 
 func (e *QueryExecutor) executeQuery(query *Query, database string, chunkSize int, closing <-chan struct{}, results chan *Result) {
 	defer close(results)
+	defer e.recover(query, results)
 
 	e.statMap.Add(statQueriesActive, 1)
 	defer func(start time.Time) {
@@ -176,6 +180,7 @@ func (e *QueryExecutor) executeQuery(query *Query, database string, chunkSize in
 		Results:     results,
 		Database:    database,
 		ChunkSize:   chunkSize,
+		Log:         logger,
 		InterruptCh: task.closing,
 	}
 
@@ -265,6 +270,15 @@ loop:
 		results <- &Result{
 			StatementID: i,
 			Err:         ErrNotExecuted,
+		}
+	}
+}
+
+func (e *QueryExecutor) recover(query *Query, results chan *Result) {
+	if err := recover(); err != nil {
+		results <- &Result{
+			StatementID: -1,
+			Err:         fmt.Errorf("%s [panic:%s]", query.String(), err),
 		}
 	}
 }

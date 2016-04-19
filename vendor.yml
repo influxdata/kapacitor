@@ -12,11 +12,11 @@ vendors:
 - path: github.com/gogo/protobuf
   rev: 4f262e4b0f3a6cea646e15798109335551e21756
 - path: github.com/golang/protobuf
-  rev: f0a097ddac24fb00e07d2ac17f8671423f3ea47c
+  rev: 2ebff28ac76fb19e2d25e5ddd4885708dfdd5611
 - path: github.com/gorhill/cronexpr
   rev: f0984319b44273e83de132089ae42b1810f4933b
 - path: github.com/influxdata/influxdb
-  rev: 93a76eecb6d7575225a68235667de68ed906222b
+  rev: 7def8bc0c98c04080ed649d3eb31fb00baf68482
 - path: github.com/influxdata/wlog
   rev: 7c63b0a71ef8300adc255344d275e10e5c3a71ec
 - path: github.com/influxdb/usage-client
@@ -38,13 +38,13 @@ vendors:
 - path: github.com/shurcooL/sanitized_anchor_name
   rev: 10ef21a441db47d8b13ebcc5fd2310f636973c77
 - path: github.com/stretchr/testify
-  rev: bcd9e3389dd03b0b668d11f4d462a6af6c2dfd60
+  rev: c5d7a69bf8a2c9c374798160849c071093e41dd1
 - path: github.com/twinj/uuid
   rev: 89173bcdda19db0eb88aef1e1cb1cb2505561d31
 - path: golang.org/x/crypto
-  rev: 1777f3ba8c1fed80fcaec3317e3aaa4f627764d2
+  rev: 2f6fccd33b9b1fc23ebb73ad4890698820f7174d
 - path: golang.org/x/sys
-  rev: 9eef40adf05b951699605195b829612bd7b69952
+  rev: f64b50fbea64174967a8882830d621a18ee1548e
 - path: gopkg.in/alexcesaro/quotedprintable.v3
   rev: 2caba252f4dc53eaf6b553000885530023f54623
 - path: gopkg.in/gomail.v2
