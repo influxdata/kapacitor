@@ -807,21 +807,57 @@ func (r *Service) doRecordQuery(rid uuid.UUID, q string, tt kapacitor.TaskType, 
 			c.Close()
 			return err
 		}
-		for _, batch := range batches {
-			switch tt {
-			case kapacitor.StreamTask:
-				for _, bp := range batch.Points {
-					p := models.Point{
-						Name:            batch.Name,
-						Database:        db,
-						RetentionPolicy: rp,
-						Tags:            bp.Tags,
-						Fields:          bp.Fields,
-						Time:            bp.Time,
-					}
-					kapacitor.WritePointForRecording(w, p, precision)
+		switch tt {
+		case kapacitor.StreamTask:
+			// Write points in order across batches
+
+			// Find earliest time of first points
+			current := time.Time{}
+			for _, batch := range batches {
+				if len(batch.Points) > 0 &&
+					(current.IsZero() ||
+						batch.Points[0].Time.Before(current)) {
+					current = batch.Points[0].Time
 				}
-			case kapacitor.BatchTask:
+			}
+
+			finishedCount := 0
+			batchCount := len(batches)
+			for finishedCount != batchCount {
+				next := time.Time{}
+				for b := range batches {
+					l := len(batches[b].Points)
+					if l == 0 {
+						finishedCount++
+						continue
+					}
+					i := 0
+					for ; i < l; i++ {
+						bp := batches[b].Points[i]
+						if bp.Time.After(current) {
+							if next.IsZero() || bp.Time.Before(next) {
+								next = bp.Time
+							}
+							break
+						}
+						// Write point
+						p := models.Point{
+							Name:            batches[b].Name,
+							Database:        db,
+							RetentionPolicy: rp,
+							Tags:            bp.Tags,
+							Fields:          bp.Fields,
+							Time:            bp.Time,
+						}
+						kapacitor.WritePointForRecording(w, p, precision)
+					}
+					// Remove written points
+					batches[b].Points = batches[b].Points[i:]
+				}
+				current = next
+			}
+		case kapacitor.BatchTask:
+			for _, batch := range batches {
 				kapacitor.WriteBatchForRecording(w, batch)
 			}
 		}
