@@ -44,11 +44,12 @@ Commands:
 	disable  stop running a task.
 	reload   reload a running task with an updated task definition.
 	push     publish a task definition to another Kapacitor instance. Not implemented yet.
-	delete   delete a task or a recording.
-	list     list information about tasks or recordings.
+	delete   delete a task, recording or tag.
+	list     list information about tasks, recordings or tags.
 	show     display detailed information about a task.
 	help     get help for a command.
 	level    sets the logging level on the kapacitord server.
+	tag      tag a recording with a symbolic name.
 	version  displays the Kapacitor version info.
 
 Options:
@@ -133,6 +134,9 @@ func main() {
 	case "version":
 		commandArgs = args
 		commandF = doVersion
+	case "tag":
+		commandArgs = args
+		commandF = doTag
 	default:
 		fmt.Fprintln(os.Stderr, "Unknown command", command)
 		usage()
@@ -205,6 +209,8 @@ func doHelp(args []string) error {
 			helpUsage()
 		case "version":
 			versionUsage()
+		case "tag":
+			tagUsage()
 		default:
 			fmt.Fprintln(os.Stderr, "Unknown command", command)
 			usage()
@@ -221,6 +227,7 @@ var (
 	recordStreamFlags = flag.NewFlagSet("record-stream", flag.ExitOnError)
 	rsname            = recordStreamFlags.String("name", "", "the name of a task. Uses the dbrp value for the task.")
 	rsdur             = recordStreamFlags.String("duration", "", "how long to record the data stream.")
+	rstag             = recordStreamFlags.String("tag", "", "a symbolic tag to associate with the recording")
 
 	recordBatchFlags = flag.NewFlagSet("record-batch", flag.ExitOnError)
 	rbname           = recordBatchFlags.String("name", "", "the name of a task. Uses the queries contained in the task.")
@@ -228,11 +235,13 @@ var (
 	rbstop           = recordBatchFlags.String("stop", "", "the stop time for the set of queries (default now).")
 	rbpast           = recordBatchFlags.String("past", "", "set start time via 'now - past'.")
 	rbcluster        = recordBatchFlags.String("cluster", "", "optional named InfluxDB cluster from configuration.")
+	rbtag            = recordBatchFlags.String("tag", "", "a symbolic tag to associate with the recording")
 
 	recordQueryFlags = flag.NewFlagSet("record-query", flag.ExitOnError)
 	rqquery          = recordQueryFlags.String("query", "", "the query to record.")
 	rqtype           = recordQueryFlags.String("type", "", "the type of the recording to save (stream|batch).")
 	rqcluster        = recordQueryFlags.String("cluster", "", "optional named InfluxDB cluster from configuration.")
+	rqtag            = recordQueryFlags.String("tag", "", "a symbolic tag to associate with the recording")
 )
 
 func recordUsage() {
@@ -258,10 +267,10 @@ func recordStreamUsage() {
 
 Examples:
 
-	$ kapacitor record stream -name mem_free -duration 1m
+	$ kapacitor record stream -name mem_free -duration 1m -tag one-minute
 
 		This records the live data stream for 1 minute using the databases and retention policies
-		from the named task.
+		from the named task. The recording is tagged with the symbolic name, one-minute.
 
 Options:
 `
@@ -286,11 +295,13 @@ Examples:
 		as many times as defined by the schedule until the queries reaches the stop time.
 		starting at time 'start' and incrementing by the schedule defined in the task.
 
-	$ kapacitor record batch -name cpu_idle -past 10h
+	$ kapacitor record batch -name cpu_idle -past 10h -tag last-10-hours
 
 		This records the result of the query defined in task 'cpu_idle' and runs the query
 		as many times as defined by the schedule until the queries reaches the present time.
 		The starting time for the queries is 'now - 10h' and increments by the schedule defined in the task.
+
+		The recording is tagged with the symbolic name last-10-hours for ease of use later.
 
 Options:
 `
@@ -311,9 +322,10 @@ func recordQueryUsage() {
 
 Examples:
 
-	$ kapacitor record query -query 'select value from "telegraf"."default"."cpu_idle" where time > now() - 1h and time < now()' -type stream
+	$ kapacitor record query -tag last-hour -query 'select value from "telegraf"."default"."cpu_idle" where time > now() - 1h and time < now()' -type stream
 
-		This records the result of the query and stores it as a stream recording. Use '-type batch' to store as batch recording.
+		This records the result of the query and stores it as a stream recording. Use '-type batch' to store as batch recording. The recording
+		is tagged with the symbolic name 'last-hour'.
 
 Options:
 `
@@ -337,7 +349,7 @@ func doRecord(args []string) error {
 		if err != nil {
 			return err
 		}
-		rid, err = cli.RecordStream(*rsname, duration)
+		rid, err = cli.RecordStream(*rsname, duration, *rstag)
 		if err != nil {
 			return err
 		}
@@ -375,7 +387,7 @@ func doRecord(args []string) error {
 				return err
 			}
 		}
-		rid, err = cli.RecordBatch(*rbname, *rbcluster, start, stop, past)
+		rid, err = cli.RecordBatch(*rbname, *rbcluster, start, stop, past, *rbtag)
 		if err != nil {
 			return err
 		}
@@ -385,7 +397,7 @@ func doRecord(args []string) error {
 			recordQueryFlags.Usage()
 			return errors.New("both query and type are required")
 		}
-		rid, err = cli.RecordQuery(*rqquery, *rqtype, *rqcluster)
+		rid, err = cli.RecordQuery(*rqquery, *rqtype, *rqcluster, *rqtag)
 		if err != nil {
 			return err
 		}
@@ -535,7 +547,7 @@ func doDefine(args []string) error {
 var (
 	replayFlags = flag.NewFlagSet("replay", flag.ExitOnError)
 	rtname      = replayFlags.String("name", "", "the task name")
-	rid         = replayFlags.String("id", "", "the recording ID")
+	rid         = replayFlags.String("id", "", "the recording ID or recording tag")
 	rfast       = replayFlags.Bool("fast", false, "If set, replay the data as fast as possible. If not set, replay the data in real time.")
 	rrec        = replayFlags.Bool("rec-time", false, "If set, use the times saved in the recording instead of present times.")
 )
@@ -710,12 +722,12 @@ func doShow(args []string) error {
 // List
 
 func listUsage() {
-	var u = `Usage: kapacitor list (tasks|recordings) [task name|recording ID]...
+	var u = `Usage: kapacitor list (tasks|recordings|tags) [task name|recording ID|recording tag]...
 
-List tasks or recordings and their current state.
+List tasks, recordings or tags and their current state.
 
-If no tasks are given then all tasks are listed. Same for recordings.
-If a set of task names or recordings IDs is provided only those entries will be listed.
+If no tasks are given then all tasks are listed. Same for recordings and tags.
+If a set of task names, recordings IDs or tags is provided only those entries will be listed.
 `
 	fmt.Fprintln(os.Stderr, u)
 }
@@ -723,7 +735,7 @@ If a set of task names or recordings IDs is provided only those entries will be 
 func doList(args []string) error {
 
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "Must specify 'tasks' or 'recordings'")
+		fmt.Fprintln(os.Stderr, "Must specify 'tasks', 'recordings' or 'tags'")
 		listUsage()
 		os.Exit(2)
 	}
@@ -746,13 +758,23 @@ func doList(args []string) error {
 			return err
 		}
 
-		outFmt := "%-40s%-8v%-10s%-23s\n"
-		fmt.Fprintf(os.Stdout, "%-40s%-8s%-10s%-23s\n", "ID", "Type", "Size", "Created")
+		outFmt := "%-40s%-8v%-10s%-23s%-32s\n"
+		fmt.Fprintf(os.Stdout, "%-40s%-8s%-10s%-23s%-32s\n", "ID", "Type", "Size", "Created", "Tags")
 		for _, r := range recordings {
-			fmt.Fprintf(os.Stdout, outFmt, r.ID, r.Type, humanize.Bytes(uint64(r.Size)), r.Created.Local().Format(time.RFC822))
+			fmt.Fprintf(os.Stdout, outFmt, r.ID, r.Type, humanize.Bytes(uint64(r.Size)), r.Created.Local().Format(time.RFC822), "")
+		}
+	case "tags":
+		tags, err := cli.ListTags(args[1:])
+		if err != nil {
+			return err
+		}
+		outFmt := "%-32s%-40s\n"
+		fmt.Fprintf(os.Stdout, "%-32s%-40s\n", "Tag", "ID")
+		for _, t := range tags {
+			fmt.Fprintf(os.Stdout, outFmt, t.Tag, t.ID)
 		}
 	default:
-		return fmt.Errorf("cannot list '%s' did you mean 'tasks' or 'recordings'?", kind)
+		return fmt.Errorf("cannot list '%s' did you mean 'tasks', 'recordings' or 'tags'?", kind)
 	}
 	return nil
 
@@ -760,31 +782,38 @@ func doList(args []string) error {
 
 // Delete
 func deleteUsage() {
-	var u = `Usage: kapacitor delete (tasks|recordings) [task name|recording ID]...
+	var u = `Usage: kapacitor delete (tasks|recordings|tags) [task name|recording ID|recording tag]...
 
-	Delete a task or recording.
+	Delete a task, recording or tag.
 
-	If a task is enabled it will be disabled and then deleted,
-For example:
+	If a task is enabled it will be disabled and then deleted.
 
-		You can delete task:
+	You can delete tasks:
 
-    $ kapacitor delete tasks my_task
+		$ kapacitor delete tasks my_task
 
-		Or you can delete tasks by glob:
+	Or you can delete tasks by glob:
 
-    $ kapacitor delete tasks *_alert 
+		$ kapacitor delete tasks *_alert
 
-		You can delete recordings:
+	You can delete recordings by ID or by tag:
 
-    $ kapacitor delete recordings b0a2ba8a-aeeb-45ec-bef9-1a2939963586 
+		$ kapacitor delete recordings b0a2ba8a-aeeb-45ec-bef9-1a2939963586
+		$ kapacitor delete recordings my-tagged-recording
+
+	You can delete tags:
+
+		$ kapacitor delete tags my-tagged-recording
+
+	Deleting a recording also deletes any associated tag, but deleting a tag does not delete
+	the associated recording
 `
 	fmt.Fprintln(os.Stderr, u)
 }
 
 func doDelete(args []string) error {
 	if len(args) < 2 {
-		fmt.Fprintln(os.Stderr, "Must pass at least one task name or recording ID")
+		fmt.Fprintln(os.Stderr, "Must pass at least one task name, recording ID or recording tag")
 		deleteUsage()
 		os.Exit(2)
 	}
@@ -804,8 +833,15 @@ func doDelete(args []string) error {
 				return err
 			}
 		}
+	case "tags":
+		for _, tag := range args[1:] {
+			err := cli.DeleteTag(tag)
+			if err != nil {
+				return err
+			}
+		}
 	default:
-		return fmt.Errorf("cannot delete '%s' did you mean 'tasks' or 'recordings'?", kind)
+		return fmt.Errorf("cannot delete '%s' did you mean 'tasks', 'recordings' or 'tags'?", kind)
 	}
 	return nil
 }
@@ -840,4 +876,24 @@ func versionUsage() {
 func doVersion(args []string) error {
 	fmt.Fprintf(os.Stdout, "Kapacitor %s (git: %s %s)\n", version, branch, commit)
 	return nil
+}
+
+// Tag
+func tagUsage() {
+	var u = `Usage: kapacitor tag [tag] [recording ID|recording tag]
+
+	Associates a symbolic tag with an existing recording as specified by an existing
+	recording ID or recording tag.
+`
+	fmt.Fprintln(os.Stderr, u)
+}
+
+func doTag(args []string) error {
+	if len(args) != 2 {
+		fmt.Fprintf(os.Stderr, "Must specify a new tag and an existing recording ID or tag.\n")
+		tagUsage()
+		os.Exit(2)
+	}
+	_, err := cli.CreateTag(args[0], args[1])
+	return err
 }

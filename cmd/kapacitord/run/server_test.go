@@ -626,7 +626,7 @@ test value=1 0000000012
 	rid := make(chan string, 1)
 	started := make(chan struct{})
 	go func() {
-		id, err := cli.RecordStream(name, 10*time.Second)
+		id, err := cli.RecordStream(name, 10*time.Second, "")
 		close(started)
 		_, err = cli.Recording(id)
 		if err != nil {
@@ -747,7 +747,7 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	id, err := cli.RecordBatch(name, "", time.Time{}, time.Time{}, time.Second*8)
+	id, err := cli.RecordBatch(name, "", time.Time{}, time.Time{}, time.Second*8, "")
 	if err != nil {
 		t.Fatal(err)
 	}

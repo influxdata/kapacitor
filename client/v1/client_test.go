@@ -67,21 +67,21 @@ func Test_ReportsErrors(t *testing.T) {
 		{
 			name: "RecordStream",
 			fnc: func(c *client.Client) error {
-				_, err := c.RecordStream("", 0)
+				_, err := c.RecordStream("", 0, "")
 				return err
 			},
 		},
 		{
 			name: "RecordBatch",
 			fnc: func(c *client.Client) error {
-				_, err := c.RecordBatch("", "", time.Time{}, time.Time{}, 0)
+				_, err := c.RecordBatch("", "", time.Time{}, time.Time{}, 0, "")
 				return err
 			},
 		},
 		{
 			name: "RecordQuery",
 			fnc: func(c *client.Client) error {
-				_, err := c.RecordQuery("", "", "")
+				_, err := c.RecordQuery("", "", "", "")
 				return err
 			},
 		},
@@ -456,7 +456,7 @@ func Test_Record(t *testing.T) {
 		{
 			name: "RecordStream",
 			fnc: func(c *client.Client) (string, error) {
-				return c.RecordStream("taskname", time.Minute)
+				return c.RecordStream("taskname", time.Minute, "")
 			},
 			checkRequest: func(r *http.Request) bool {
 				return r.URL.Query().Get("type") == "stream" &&
@@ -473,6 +473,7 @@ func Test_Record(t *testing.T) {
 					time.Date(2016, 3, 31, 10, 24, 55, 526388889, time.UTC),
 					time.Date(2016, 3, 31, 11, 24, 55, 526388889, time.UTC),
 					time.Hour*5,
+					"",
 				)
 			},
 			checkRequest: func(r *http.Request) bool {
@@ -487,7 +488,7 @@ func Test_Record(t *testing.T) {
 		{
 			name: "RecordQuery",
 			fnc: func(c *client.Client) (string, error) {
-				return c.RecordQuery("queryStr", "stream", "cluster")
+				return c.RecordQuery("queryStr", "stream", "cluster", "")
 			},
 			checkRequest: func(r *http.Request) bool {
 				return r.URL.Query().Get("type") == "query" &&

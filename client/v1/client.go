@@ -129,6 +129,13 @@ type Recording struct {
 	Size    int64
 	Created time.Time
 	Error   string
+	Tags    []string
+}
+
+// Tag is a symbolic name for a recording identifier.
+type Tag struct {
+	Tag string
+	ID  string
 }
 
 // Set of recordings sorted by created date.
@@ -290,6 +297,36 @@ func (c *Client) ListRecordings(rids []string) (Recordings, error) {
 	return r.Recordings, nil
 }
 
+// List tags
+func (c *Client) ListTags(names []string) ([]Tag, error) {
+	tags := strings.Join(names, ",")
+	v := url.Values{}
+	v.Add("tags", tags)
+
+	u := *c.url
+	u.Path = "tags"
+	u.RawQuery = v.Encode()
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Response type
+	type response struct {
+		Error string `json:"Error"`
+		Tags  []Tag  `json:"Tags"`
+	}
+
+	r := &response{}
+
+	_, err = c.do(req, r, http.StatusOK)
+	if err != nil {
+		return nil, err
+	}
+	return r.Tags, nil
+}
+
 // Perform the record requests.
 func (c *Client) doRecord(v url.Values) (string, error) {
 	u := *c.url
@@ -319,22 +356,24 @@ func (c *Client) doRecord(v url.Values) (string, error) {
 
 // Record the stream for a task.
 // Returns once the recording is started.
-func (c *Client) RecordStream(name string, duration time.Duration) (string, error) {
+func (c *Client) RecordStream(name string, duration time.Duration, tag string) (string, error) {
 	v := url.Values{}
 	v.Add("type", "stream")
 	v.Add("name", name)
 	v.Add("duration", influxql.FormatDuration(duration))
+	v.Add("tag", tag)
 
 	return c.doRecord(v)
 }
 
 // Record the batch queries for a task.
 // Returns once the recording is started.
-func (c *Client) RecordBatch(name, cluster string, start, stop time.Time, past time.Duration) (string, error) {
+func (c *Client) RecordBatch(name, cluster string, start, stop time.Time, past time.Duration, tag string) (string, error) {
 	v := url.Values{}
 	v.Add("type", "batch")
 	v.Add("name", name)
 	v.Add("cluster", cluster)
+	v.Add("tag", tag)
 	if !start.IsZero() {
 		v.Add("start", start.Format(time.RFC3339Nano))
 	}
@@ -349,12 +388,13 @@ func (c *Client) RecordBatch(name, cluster string, start, stop time.Time, past t
 // Record the results of a query.
 // The recordingType must be one of "stream", or "batch".
 // Returns once the recording is started.
-func (c *Client) RecordQuery(query, recordingType, cluster string) (string, error) {
+func (c *Client) RecordQuery(query, recordingType, cluster string, tag string) (string, error) {
 	v := url.Values{}
 	v.Add("type", "query")
 	v.Add("query", query)
 	v.Add("cluster", cluster)
 	v.Add("ttype", recordingType)
+	v.Add("tag", tag)
 
 	return c.doRecord(v)
 }
@@ -382,6 +422,29 @@ func (c *Client) Recording(rid string) (Recording, error) {
 		return r, err
 	}
 	return r, nil
+}
+
+// Create a tag for the specified recording id.
+func (c *Client) CreateTag(tag string, id string) (Tag, error) {
+	t := Tag{}
+	v := url.Values{}
+	v.Add("id", id)
+	v.Add("tag", tag)
+
+	u := *c.url
+	u.Path = "tag"
+	u.RawQuery = v.Encode()
+
+	req, err := http.NewRequest("POST", u.String(), nil)
+	if err != nil {
+		return t, err
+	}
+
+	_, err = c.do(req, &t, http.StatusOK)
+	if err != nil {
+		return t, err
+	}
+	return t, nil
 }
 
 // Replay a recording for a task.
@@ -520,6 +583,24 @@ func (c *Client) DeleteRecording(rid string) error {
 
 	u := *c.url
 	u.Path = "recording"
+	u.RawQuery = v.Encode()
+
+	req, err := http.NewRequest("DELETE", u.String(), nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.do(req, nil, http.StatusNoContent)
+	return err
+}
+
+// Delete a tag.
+func (c *Client) DeleteTag(tag string) error {
+	v := url.Values{}
+	v.Add("tag", tag)
+
+	u := *c.url
+	u.Path = "tag"
 	u.RawQuery = v.Encode()
 
 	req, err := http.NewRequest("DELETE", u.String(), nil)
