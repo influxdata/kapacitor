@@ -1,14 +1,18 @@
 package integrations
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/influxdata/influxdb/influxql"
 	imodels "github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/clock"
@@ -513,6 +517,134 @@ batch
 	}
 
 	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er)
+}
+
+func TestBatch_AlertStateChangesOnly(t *testing.T) {
+	requestCount := int32(0)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ad := kapacitor.AlertData{}
+		dec := json.NewDecoder(r.Body)
+		err := dec.Decode(&ad)
+		if err != nil {
+			t.Fatal(err)
+		}
+		atomic.AddInt32(&requestCount, 1)
+		if rc := atomic.LoadInt32(&requestCount); rc == 1 {
+			expAd := kapacitor.AlertData{
+				ID:      "cpu_usage_idle:cpu=cpu-total,",
+				Message: "cpu_usage_idle:cpu=cpu-total, is CRITICAL",
+				Time:    time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+				Level:   kapacitor.CritAlert,
+			}
+			ad.Data = influxql.Result{}
+			if eq, msg := compareAlertData(expAd, ad); !eq {
+				t.Error(msg)
+			}
+		} else {
+			expAd := kapacitor.AlertData{
+				ID:      "cpu_usage_idle:cpu=cpu-total,",
+				Message: "cpu_usage_idle:cpu=cpu-total, is OK",
+				Time:    time.Date(1971, 1, 1, 0, 0, 38, 0, time.UTC),
+				Level:   kapacitor.OKAlert,
+			}
+			ad.Data = influxql.Result{}
+			if eq, msg := compareAlertData(expAd, ad); !eq {
+				t.Error(msg)
+			}
+		}
+	}))
+	defer ts.Close()
+	var script = `
+batch
+	|query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "host" = 'serverA' AND "cpu" != 'cpu-total'
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s), 'cpu')
+	|alert()
+		.crit(lambda:"mean" > 90)
+		.stateChangesOnly()
+		.levelField('level')
+		.details('')
+		.post('` + ts.URL + `')
+`
+	clock, et, replayErr, tm := testBatcher(t, "TestBatch_AlertStateChangesOnly", script)
+	defer tm.Close()
+
+	err := fastForwardTask(clock, et, replayErr, tm, 40*time.Second)
+	if err != nil {
+		t.Error(err)
+	}
+	if exp, rc := 2, int(atomic.LoadInt32(&requestCount)); rc != exp {
+		t.Errorf("got %v exp %v", rc, exp)
+	}
+}
+
+func TestBatch_AlertStateChangesOnlyExpired(t *testing.T) {
+	requestCount := int32(0)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ad := kapacitor.AlertData{}
+		dec := json.NewDecoder(r.Body)
+		err := dec.Decode(&ad)
+		if err != nil {
+			t.Fatal(err)
+		}
+		atomic.AddInt32(&requestCount, 1)
+		if rc := atomic.LoadInt32(&requestCount); rc < 3 {
+			expAd := kapacitor.AlertData{
+				ID:      "cpu_usage_idle:cpu=cpu-total,",
+				Message: "cpu_usage_idle:cpu=cpu-total, is CRITICAL",
+				Time:    time.Date(1971, 1, 1, 0, 0, int(rc-1)*20, 0, time.UTC),
+				Level:   kapacitor.CritAlert,
+			}
+			ad.Data = influxql.Result{}
+			if eq, msg := compareAlertData(expAd, ad); !eq {
+				t.Error(msg)
+			}
+		} else {
+			expAd := kapacitor.AlertData{
+				ID:      "cpu_usage_idle:cpu=cpu-total,",
+				Message: "cpu_usage_idle:cpu=cpu-total, is OK",
+				Time:    time.Date(1971, 1, 1, 0, 0, 38, 0, time.UTC),
+				Level:   kapacitor.OKAlert,
+			}
+			ad.Data = influxql.Result{}
+			if eq, msg := compareAlertData(expAd, ad); !eq {
+				t.Error(msg)
+			}
+		}
+	}))
+	defer ts.Close()
+	var script = `
+batch
+	|query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "host" = 'serverA' AND "cpu" != 'cpu-total'
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s), 'cpu')
+	|alert()
+		.crit(lambda:"mean" > 90)
+		.stateChangesOnly(15s)
+		.levelField('level')
+		.details('')
+		.post('` + ts.URL + `')
+`
+	clock, et, replayErr, tm := testBatcher(t, "TestBatch_AlertStateChangesOnly", script)
+	defer tm.Close()
+
+	err := fastForwardTask(clock, et, replayErr, tm, 40*time.Second)
+	if err != nil {
+		t.Error(err)
+	}
+	if exp, rc := 3, int(atomic.LoadInt32(&requestCount)); rc != exp {
+		t.Errorf("got %v exp %v", rc, exp)
+	}
 }
 
 func TestBatch_Join(t *testing.T) {

@@ -300,8 +300,8 @@ func (a *AlertNode) runAlert([]byte) error {
 		for p, ok := a.ins[0].NextPoint(); ok; p, ok = a.ins[0].NextPoint() {
 			a.timer.Start()
 			l := a.determineLevel(p.Time, p.Fields, p.Tags)
-			state := a.updateState(l, p.Group)
-			if (a.a.UseFlapping && state.flapping) || (a.a.IsStateChangesOnly && !state.changed) {
+			state := a.updateState(p.Time, l, p.Group)
+			if (a.a.UseFlapping && state.flapping) || (a.a.IsStateChangesOnly && !state.changed && !state.expired) {
 				a.timer.Stop()
 				continue
 			}
@@ -317,6 +317,7 @@ func (a *AlertNode) runAlert([]byte) error {
 				if err != nil {
 					return err
 				}
+				state.lastAlert = p.Time
 				a.handleAlert(ad)
 				if a.a.LevelTag != "" || a.a.IdTag != "" {
 					p.Tags = p.Tags.Copy()
@@ -361,7 +362,7 @@ func (a *AlertNode) runAlert([]byte) error {
 				if l < lowestLevel {
 					lowestLevel = l
 				}
-				if l > highestLevel {
+				if l > highestLevel || highestPoint == nil {
 					highestLevel = l
 					highestPoint = &b.Points[i]
 				}
@@ -373,9 +374,14 @@ func (a *AlertNode) runAlert([]byte) error {
 			if !a.a.AllFlag {
 				l = highestLevel
 			}
+			// Create alert Data
+			t := highestPoint.Time
+			if a.a.AllFlag || l == OKAlert {
+				t = b.TMax
+			}
 
 			// Update state
-			state := a.updateState(l, b.Group)
+			state := a.updateState(t, l, b.Group)
 			// Trigger alert if:
 			//  l == OK and state.changed (aka recovery)
 			//    OR
@@ -383,16 +389,12 @@ func (a *AlertNode) runAlert([]byte) error {
 			if state.changed && l == OKAlert ||
 				(l != OKAlert &&
 					!((a.a.UseFlapping && state.flapping) ||
-						(a.a.IsStateChangesOnly && !state.changed))) {
-				// Create alert Data
-				t := highestPoint.Time
-				if a.a.AllFlag || l == OKAlert {
-					t = b.TMax
-				}
+						(a.a.IsStateChangesOnly && !state.changed && !state.expired))) {
 				ad, err := a.alertData(b.Name, b.Group, b.Tags, highestPoint.Fields, l, t, b)
 				if err != nil {
 					return err
 				}
+				state.lastAlert = t
 				a.handleAlert(ad)
 				// Update tags or fields for Level property
 				if a.a.LevelTag != "" ||
@@ -506,10 +508,12 @@ func (a *AlertNode) alertData(
 }
 
 type alertState struct {
-	history  []AlertLevel
-	idx      int
-	flapping bool
-	changed  bool
+	history   []AlertLevel
+	idx       int
+	flapping  bool
+	changed   bool
+	lastAlert time.Time
+	expired   bool
 }
 
 func (a *alertState) addEvent(level AlertLevel) {
@@ -542,7 +546,7 @@ func (a *alertState) percentChange() float64 {
 	return p
 }
 
-func (a *AlertNode) updateState(level AlertLevel, group models.GroupID) *alertState {
+func (a *AlertNode) updateState(t time.Time, level AlertLevel, group models.GroupID) *alertState {
 	state, ok := a.states[group]
 	if !ok {
 		state = &alertState{
@@ -560,7 +564,7 @@ func (a *AlertNode) updateState(level AlertLevel, group models.GroupID) *alertSt
 			state.flapping = true
 		}
 	}
-
+	state.expired = !state.changed && a.a.StateChangesOnlyDuration != 0 && t.Sub(state.lastAlert) >= a.a.StateChangesOnlyDuration
 	return state
 }
 

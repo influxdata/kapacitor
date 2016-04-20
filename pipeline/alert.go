@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"reflect"
+	"time"
 
 	"github.com/influxdata/kapacitor/tick"
 )
@@ -227,6 +228,10 @@ type AlertNode struct {
 	// tick:ignore
 	IsStateChangesOnly bool `tick:"StateChangesOnly"`
 
+	// Maximum interval to ignore non state changed events
+	// tick:ignore
+	StateChangesOnlyDuration time.Duration
+
 	// Post the JSON alert data to the specified URL.
 	// tick:ignore
 	PostHandlers []*PostHandler `tick:"Post"`
@@ -325,9 +330,30 @@ func (n *AlertNode) All() *AlertNode {
 // 6 times for each 10s period where the condition was met and once more
 // for the recovery.
 //
+// An optional maximum interval duration can be provided.
+// An event will not be ignore (aka trigger an alert) if more than the maximum interval has elapsed
+// since the last alert.
+//
+// Example:
+//   stream
+//       |from()
+//           .measurement('cpu')
+//       |window()
+//            .period(10s)
+//            .every(10s)
+//       |alert()
+//           .crit(lambda: "value" > 10)
+//           .stateChangesOnly(10m)
+//           .slack()
+//
+// The abvove usage will only trigger alerts to slack on state changes or at least every 10 minutes.
+//
 // tick:property
-func (a *AlertNode) StateChangesOnly() *AlertNode {
+func (a *AlertNode) StateChangesOnly(maxInterval ...time.Duration) *AlertNode {
 	a.IsStateChangesOnly = true
+	if len(maxInterval) == 1 {
+		a.StateChangesOnlyDuration = maxInterval[0]
+	}
 	return a
 }
 
