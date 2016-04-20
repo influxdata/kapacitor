@@ -3139,6 +3139,60 @@ stream
 		t.Errorf("got %v exp %v", rc, 5)
 	}
 }
+func TestStream_AlertStateChangesOnlyExpired(t *testing.T) {
+
+	requestCount := int32(0)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ad := kapacitor.AlertData{}
+		dec := json.NewDecoder(r.Body)
+		err := dec.Decode(&ad)
+		if err != nil {
+			t.Fatal(err)
+		}
+		atomic.AddInt32(&requestCount, 1)
+		if rc := atomic.LoadInt32(&requestCount); rc < 6 {
+			expAd := kapacitor.AlertData{
+				ID:      "cpu:nil",
+				Message: "cpu:nil is CRITICAL",
+				Time:    time.Date(1971, 1, 1, 0, 0, int(rc)*2-1, 0, time.UTC),
+				Level:   kapacitor.CritAlert,
+			}
+			ad.Data = influxql.Result{}
+			if eq, msg := compareAlertData(expAd, ad); !eq {
+				t.Error(msg)
+			}
+		} else {
+			expAd := kapacitor.AlertData{
+				ID:      "cpu:nil",
+				Message: "cpu:nil is OK",
+				Time:    time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+				Level:   kapacitor.OKAlert,
+			}
+			ad.Data = influxql.Result{}
+			if eq, msg := compareAlertData(expAd, ad); !eq {
+				t.Error(msg)
+			}
+		}
+	}))
+	defer ts.Close()
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+	|alert()
+		.crit(lambda: "value" < 97)
+		.details('')
+		.stateChangesOnly(2s)
+		.post('` + ts.URL + `')
+`
+
+	testStreamerNoOutput(t, "TestStream_AlertStateChangesOnlyExpired", script, 13*time.Second)
+
+	// 9 points below 97 once per second so 5 alerts + 1 recovery
+	if exp, rc := 6, int(atomic.LoadInt32(&requestCount)); rc != exp {
+		t.Errorf("got %v exp %v", rc, exp)
+	}
+}
 
 func TestStream_AlertFlapping(t *testing.T) {
 
