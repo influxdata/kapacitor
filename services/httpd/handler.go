@@ -31,17 +31,21 @@ const (
 	statPointsWrittenFail         = "points_written_fail" // Number of points that failed to be written
 )
 
+const BasePath = "/kapacitor/v1"
+
 type Route struct {
 	Name        string
 	Method      string
 	Pattern     string
 	HandlerFunc interface{}
+	noJSON      bool
 }
 
 // Handler represents an HTTP handler for the Kapacitor API server.
 type Handler struct {
 	methodMux             map[string]*ServeMux
 	requireAuthentication bool
+	allowGzip             bool
 	Version               string
 
 	MetaClient interface {
@@ -61,86 +65,135 @@ type Handler struct {
 }
 
 // NewHandler returns a new instance of handler with routes.
-func NewHandler(requireAuthentication, loggingEnabled, writeTrace bool, statMap *expvar.Map, l *log.Logger) *Handler {
+func NewHandler(requireAuthentication, loggingEnabled, writeTrace, allowGzip bool, statMap *expvar.Map, l *log.Logger) *Handler {
 	h := &Handler{
 		methodMux:             make(map[string]*ServeMux),
 		requireAuthentication: requireAuthentication,
+		allowGzip:             allowGzip,
 		Logger:                l,
 		loggingEnabled:        loggingEnabled,
 		WriteTrace:            writeTrace,
 		statMap:               statMap,
 	}
 
-	h.AddRoutes([]Route{
+	allowedMethods := []string{
+		"GET",
+		"POST",
+		"PATCH",
+		"DELETE",
+		"HEAD",
+		"OPTIONS",
+	}
+
+	for _, method := range allowedMethods {
+		h.methodMux[method] = NewServeMux()
+		route := Route{
+			// Catch all 404
+			Name:        "404",
+			Method:      method,
+			Pattern:     "/",
+			HandlerFunc: h.serve404,
+		}
+		h.addRawRoute(route)
+	}
+
+	h.addRawRoutes([]Route{
 		{
 			// Ping
 			Name:        "ping",
 			Method:      "GET",
-			Pattern:     "/ping",
+			Pattern:     BasePath + "/ping",
 			HandlerFunc: h.servePing,
 		},
 		{
 			// Ping
 			Name:        "ping-head",
 			Method:      "HEAD",
-			Pattern:     "/ping",
+			Pattern:     BasePath + "/ping",
 			HandlerFunc: h.servePing,
-		},
-		{
-			// Satisfy CORS checks.
-			Name:        "write",
-			Method:      "OPTIONS",
-			Pattern:     "/write",
-			HandlerFunc: ServeOptions,
 		},
 		{
 			// Data-ingest route.
 			Name:        "write",
 			Method:      "POST",
+			Pattern:     BasePath + "/write",
+			HandlerFunc: h.serveWrite,
+		},
+		{
+			// Satisfy CORS checks.
+			Name:        "write",
+			Method:      "OPTIONS",
+			Pattern:     BasePath + "/write",
+			HandlerFunc: ServeOptions,
+		},
+		{
+			// Data-ingest route for /write endpoint without base path
+			Name:        "write-raw",
+			Method:      "POST",
 			Pattern:     "/write",
 			HandlerFunc: h.serveWrite,
+		},
+		{
+			// Satisfy CORS checks.
+			Name:        "write-raw",
+			Method:      "OPTIONS",
+			Pattern:     "/write",
+			HandlerFunc: ServeOptions,
 		},
 		{
 			// Display current API routes
 			Name:        "routes",
 			Method:      "GET",
-			Pattern:     "/:routes",
+			Pattern:     BasePath + "/:routes",
 			HandlerFunc: h.serveRoutes,
 		},
 		{
-			// Display current log level
+			// Change current log level
 			Name:        "log-level",
 			Method:      "POST",
-			Pattern:     "/loglevel",
+			Pattern:     BasePath + "/loglevel",
 			HandlerFunc: h.serveLogLevel,
 		},
 		{
-			// Catch all 404
-			Name:        "404",
+			Name:        "pprof",
 			Method:      "GET",
-			Pattern:     "/",
-			HandlerFunc: h.serve404,
+			Pattern:     BasePath + "/debug/pprof/",
+			HandlerFunc: pprof.Index,
+			noJSON:      true,
 		},
 		{
-			// Catch all 404
-			Name:        "404",
-			Method:      "POST",
-			Pattern:     "/",
-			HandlerFunc: h.serve404,
+			Name:        "pprof/cmdline",
+			Method:      "GET",
+			Pattern:     BasePath + "/debug/pprof/cmdline",
+			HandlerFunc: pprof.Cmdline,
+			noJSON:      true,
 		},
 		{
-			// Catch all 404
-			Name:        "404",
-			Method:      "DELETE",
-			Pattern:     "/",
-			HandlerFunc: h.serve404,
+			Name:        "pprof/profile",
+			Method:      "GET",
+			Pattern:     BasePath + "/debug/pprof/profile",
+			HandlerFunc: pprof.Profile,
+			noJSON:      true,
 		},
 		{
-			// Catch all 404
-			Name:        "404",
-			Method:      "HEAD",
-			Pattern:     "/",
-			HandlerFunc: h.serve404,
+			Name:        "pprof/symbol",
+			Method:      "GET",
+			Pattern:     BasePath + "/debug/pprof/symbol",
+			HandlerFunc: pprof.Symbol,
+			noJSON:      true,
+		},
+		{
+			Name:        "pprof/trace",
+			Method:      "GET",
+			Pattern:     BasePath + "/debug/pprof/trace",
+			HandlerFunc: pprof.Trace,
+			noJSON:      true,
+		},
+		{
+			Name:        "debug/vars",
+			Method:      "GET",
+			Pattern:     BasePath + "/debug/vars",
+			HandlerFunc: serveExpvar,
 		},
 	})
 
@@ -158,6 +211,25 @@ func (h *Handler) AddRoutes(routes []Route) error {
 }
 
 func (h *Handler) AddRoute(r Route) error {
+	if len(r.Pattern) > 0 && r.Pattern[0] != '/' {
+		return fmt.Errorf("route patterns must begin with a '/' %s", r.Pattern)
+	}
+	r.Pattern = BasePath + r.Pattern
+	return h.addRawRoute(r)
+}
+
+func (h *Handler) addRawRoutes(routes []Route) error {
+	for _, r := range routes {
+		err := h.addRawRoute(r)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Add a route without prepending the BasePath
+func (h *Handler) addRawRoute(r Route) error {
 	var handler http.Handler
 	// If it's a handler func that requires authorization, wrap it in authorization
 	if hf, ok := r.HandlerFunc.(func(http.ResponseWriter, *http.Request, *meta.UserInfo)); ok {
@@ -169,8 +241,12 @@ func (h *Handler) AddRoute(r Route) error {
 	}
 
 	// Set basic handlers for all requests
-	handler = jsonContent(handler)
-	handler = gzipFilter(handler)
+	if !r.noJSON {
+		handler = jsonContent(handler)
+	}
+	if h.allowGzip {
+		handler = gzipFilter(handler)
+	}
 	handler = versionHeader(handler, h)
 	handler = cors(handler)
 	handler = requestID(handler)
@@ -183,8 +259,7 @@ func (h *Handler) AddRoute(r Route) error {
 
 	mux, ok := h.methodMux[r.Method]
 	if !ok {
-		mux = NewServeMux()
-		h.methodMux[r.Method] = mux
+		return fmt.Errorf("unsupported method %q", r.Method)
 	}
 	return mux.Handle(r.Pattern, handler)
 }
@@ -197,6 +272,12 @@ func (h *Handler) DelRoutes(routes []Route) {
 
 // Delete a route from the handler. No-op if route does not exist.
 func (h *Handler) DelRoute(r Route) {
+	r.Pattern = BasePath + r.Pattern
+	h.delRawRoute(r)
+}
+
+// Delete a route from the handler. No-op if route does not exist.
+func (h *Handler) delRawRoute(r Route) {
 	mux, ok := h.methodMux[r.Method]
 	if ok {
 		mux.Deregister(r.Pattern)
@@ -206,29 +287,14 @@ func (h *Handler) DelRoute(r Route) {
 // ServeHTTP responds to HTTP request to the handler.
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.statMap.Add(statRequest, 1)
-
-	// FIXME(benbjohnson): Add pprof enabled flag.
-	if strings.HasPrefix(r.URL.Path, "/debug/pprof") {
-		switch r.URL.Path {
-		case "/debug/pprof/cmdline":
-			pprof.Cmdline(w, r)
-		case "/debug/pprof/profile":
-			pprof.Profile(w, r)
-		case "/debug/pprof/symbol":
-			pprof.Symbol(w, r)
-		default:
-			pprof.Index(w, r)
-		}
-	} else if strings.HasPrefix(r.URL.Path, "/debug/vars") {
-		serveExpvar(w, r)
+	method := r.Method
+	if method == "" {
+		method = "GET"
+	}
+	if mux, ok := h.methodMux[method]; ok {
+		mux.ServeHTTP(w, r)
 	} else {
-		method := r.Method
-		if method == "" {
-			method = "GET"
-		}
-		if mux, ok := h.methodMux[method]; ok {
-			mux.ServeHTTP(w, r)
-		}
+		h.serve404(w, r)
 	}
 }
 
@@ -510,7 +576,7 @@ func cors(inner http.Handler) http.Handler {
 				`GET`,
 				`OPTIONS`,
 				`POST`,
-				`PUT`,
+				`PATCH`,
 			}, ", "))
 
 			w.Header().Set(`Access-Control-Allow-Headers`, strings.Join([]string{

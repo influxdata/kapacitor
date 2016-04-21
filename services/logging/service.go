@@ -13,6 +13,7 @@ import (
 type Interface interface {
 	NewLogger(prefix string, flag int) *log.Logger
 	NewStaticLevelLogger(prefix string, flag int, l wlog.Level) *log.Logger
+	NewStaticLevelWriter(l wlog.Level) io.Writer
 }
 
 type Service struct {
@@ -69,6 +70,10 @@ func (s *Service) NewLogger(prefix string, flag int) *log.Logger {
 
 func (s *Service) NewStaticLevelLogger(prefix string, flag int, l wlog.Level) *log.Logger {
 	return log.New(wlog.NewStaticLevelWriter(s.f, l), prefix, flag)
+}
+
+func (s *Service) NewStaticLevelWriter(l wlog.Level) io.Writer {
+	return wlog.NewStaticLevelWriter(s.f, l)
 }
 
 type nopCloser struct {

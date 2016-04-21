@@ -4,39 +4,35 @@ import (
 	"bytes"
 	"encoding/gob"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/boltdb/bolt"
-	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/client/v1"
 	"github.com/influxdata/kapacitor/services/httpd"
+	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/influxdata/kapacitor/tick"
-)
-
-const taskDB = "task.db"
-
-var (
-	tasksBucket    = []byte("tasks")
-	enabledBucket  = []byte("enabled")
-	snapshotBucket = []byte("snapshots")
+	"github.com/pkg/errors"
+	"github.com/twinj/uuid"
 )
 
 type Service struct {
-	dbpath           string
-	db               *bolt.DB
+	oldDBDir         string
+	tasks            TaskDAO
+	snapshots        SnapshotDAO
 	routes           []httpd.Route
 	snapshotInterval time.Duration
-	HTTPDService     interface {
+	StorageService   interface {
+		Store(namespace string) storage.Interface
+	}
+	HTTPDService interface {
 		AddRoutes([]httpd.Route) error
 		DelRoutes([]httpd.Route)
 	}
@@ -66,71 +62,68 @@ type taskStore struct {
 
 func NewService(conf Config, l *log.Logger) *Service {
 	return &Service{
-		dbpath:           path.Join(conf.Dir, taskDB),
 		snapshotInterval: time.Duration(conf.SnapshotInterval),
 		logger:           l,
+		oldDBDir:         conf.Dir,
 	}
 }
 
-func (ts *Service) Open() error {
-	err := os.MkdirAll(path.Dir(ts.dbpath), 0755)
-	if err != nil {
-		return err
-	}
+// The storage namespace for all task data.
+const taskNamespace = "task_store"
 
-	// Open db
-	db, err := bolt.Open(ts.dbpath, 0600, nil)
+func (ts *Service) Open() error {
+	// Create DAO
+	store := ts.StorageService.Store(taskNamespace)
+	ts.tasks = newTaskKV(store)
+	ts.snapshots = newSnapshotKV(store)
+
+	// Perform migration to new storage service.
+	err := ts.migrate()
 	if err != nil {
 		return err
 	}
-	ts.db = db
 
 	// Define API routes
 	ts.routes = []httpd.Route{
 		{
-			Name:        "task-show",
+			Name:        "task",
 			Method:      "GET",
-			Pattern:     "/task",
+			Pattern:     "/tasks/",
 			HandlerFunc: ts.handleTask,
 		},
 		{
-			Name:        "task-list",
-			Method:      "GET",
-			Pattern:     "/tasks",
-			HandlerFunc: ts.handleTasks,
-		},
-		{
-			Name:        "task-save",
-			Method:      "POST",
-			Pattern:     "/task",
-			HandlerFunc: ts.handleSave,
-		},
-		{
-			Name:        "task-delete",
+			Name:        "deleteTask",
 			Method:      "DELETE",
-			Pattern:     "/task",
-			HandlerFunc: ts.handleDelete,
+			Pattern:     "/tasks/",
+			HandlerFunc: ts.handleDeleteTask,
 		},
 		{
 			// Satisfy CORS checks.
-			Name:        "task-delete",
+			Name:        "/tasks/-cors",
 			Method:      "OPTIONS",
-			Pattern:     "/task",
+			Pattern:     "/tasks/",
 			HandlerFunc: httpd.ServeOptions,
 		},
 		{
-			Name:        "task-enable",
-			Method:      "POST",
-			Pattern:     "/enable",
-			HandlerFunc: ts.handleEnable,
+			Name:        "updateTask",
+			Method:      "PATCH",
+			Pattern:     "/tasks/",
+			HandlerFunc: ts.handleUpdateTask,
 		},
 		{
-			Name:        "task-disable",
+			Name:        "listTasks",
+			Method:      "GET",
+			Pattern:     "/tasks",
+			HandlerFunc: ts.handleListTasks,
+		},
+		{
+			Name:        "createTask",
 			Method:      "POST",
-			Pattern:     "/disable",
-			HandlerFunc: ts.handleDisable,
+			Pattern:     "/tasks",
+			HandlerFunc: ts.handleCreateTask,
 		},
 	}
+
 	err = ts.HTTPDService.AddRoutes(ts.routes)
 	if err != nil {
 		return err
@@ -140,135 +133,232 @@ func (ts *Service) Open() error {
 	numEnabledTasks := int64(0)
 
 	// Count all tasks
-	err = ts.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(tasksBucket))
-		if b == nil {
-			return nil
+	offset := 0
+	limit := 100
+	kapacitor.NumEnabledTasksVar.Set(0)
+	for {
+		tasks, err := ts.tasks.List("*", offset, limit)
+		if err != nil {
+			return err
 		}
-		return b.ForEach(func(k, v []byte) error {
+		for _, task := range tasks {
 			numTasks++
-			return nil
-		})
-	})
-	if err != nil {
-		return err
-	}
-
-	// Get enabled tasks
-	enabledTasks := make([]string, 0)
-	err = ts.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(enabledBucket))
-		if b == nil {
-			return nil
+			if task.Status == Enabled {
+				ts.logger.Println("D! starting enabled task on startup", task.ID)
+				err = ts.startTask(task)
+				if err != nil {
+					ts.logger.Printf("E! error starting enabled task %s, err: %s\n", task.ID, err)
+				} else {
+					ts.logger.Println("D! started task during startup", task.ID)
+					numEnabledTasks++
+				}
+			}
 		}
-		return b.ForEach(func(k, v []byte) error {
-			enabledTasks = append(enabledTasks, string(k))
-			return nil
-		})
-	})
-	if err != nil {
-		return err
-	}
-
-	// Start each enabled task
-	for _, name := range enabledTasks {
-		ts.logger.Println("D! starting enabled task on startup", name)
-		t, err := ts.Load(name)
-		if err != nil {
-			ts.logger.Printf("E! error loading enabled task %s, err: %s\n", name, err)
-			return nil
+		if len(tasks) != limit {
+			break
 		}
-		err = ts.StartTask(t)
-		if err != nil {
-			ts.logger.Printf("E! error starting enabled task %s, err: %s\n", name, err)
-		} else {
-			ts.logger.Println("D! started task during startup", name)
-			numEnabledTasks++
-		}
+		offset += limit
 	}
 
 	// Set expvars
 	kapacitor.NumTasksVar.Set(numTasks)
-	kapacitor.NumEnabledTasksVar.Set(numEnabledTasks)
+
+	return nil
+}
+
+// Migrate data from previous task.db to new storage service.
+// This process will return any errors and stop the TaskStore from opening
+// thus stopping the entire Kapacitor startup.
+// This way Kapacitor will not be able to startup without successfully migrating
+// to the new scheme.
+//
+// This process is idempotent and can be attempted multiple times until success is achieved.
+func (ts *Service) migrate() error {
+	if ts.oldDBDir == "" {
+		return nil
+	}
+
+	tasksBucket := []byte("tasks")
+	enabledBucket := []byte("enabled")
+	snapshotBucket := []byte("snapshots")
+
+	// Connect to old boltdb
+	db, err := bolt.Open(filepath.Join(ts.oldDBDir, "task.db"), 0600, &bolt.Options{ReadOnly: true})
+	if err != nil {
+		ts.logger.Println("W! could not open old boltd for task_store. Not performing migration. Remove the `task_store.dir` configuration to disable migration.")
+		return nil
+	}
+
+	// Old task format
+	type rawTask struct {
+		// The name of the task.
+		Name string
+		// The TICKscript for the task.
+		TICKscript string
+		// Last error the task had either while defining or executing.
+		Error string
+		// The task type (stream|batch).
+		Type kapacitor.TaskType
+		// The DBs and RPs the task is allowed to access.
+		DBRPs            []kapacitor.DBRP
+		SnapshotInterval time.Duration
+	}
+
+	// Migrate all tasks
+	err = db.View(func(tx *bolt.Tx) error {
+		tasks := tx.Bucket([]byte(tasksBucket))
+		if tasks == nil {
+			return nil
+		}
+		enables := tx.Bucket([]byte(enabledBucket))
+		return tasks.ForEach(func(k, v []byte) error {
+			r := bytes.NewReader(v)
+			dec := gob.NewDecoder(r)
+			task := &rawTask{}
+			err = dec.Decode(task)
+			if err != nil {
+				ts.logger.Println("E! corrupt data in old task_store boltdb tasks:", err)
+				return nil
+			}
+
+			var typ TaskType
+			switch task.Type {
+			case kapacitor.StreamTask:
+				typ = StreamTask
+			case kapacitor.BatchTask:
+				typ = BatchTask
+			}
+
+			dbrps := make([]DBRP, len(task.DBRPs))
+			for i, dbrp := range task.DBRPs {
+				dbrps[i] = DBRP{
+					Database:        dbrp.Database,
+					RetentionPolicy: dbrp.RetentionPolicy,
+				}
+			}
+
+			status := Disabled
+			if enables != nil {
+				data := enables.Get(k)
+				if data != nil {
+					status = Enabled
+				}
+			}
+
+			newTask := Task{
+				ID:         task.Name,
+				Type:       typ,
+				DBRPs:      dbrps,
+				TICKscript: task.TICKscript,
+				Error:      task.Error,
+				Status:     status,
+			}
+			// Try and create the task in the new store.
+			err = ts.tasks.Create(newTask)
+			if err != nil {
+				if err != ErrTaskExists {
+					// Failed to migrate task stop process
+					return err
+				} else {
+					ts.logger.Printf("D! task %s has already been migrated skipping", task.Name)
+				}
+			} else {
+				ts.logger.Printf("D! task %s was migrated to new storage service", task.Name)
+			}
+			return nil
+		})
+	})
+	if err != nil {
+		return errors.Wrap(err, "migrating tasks")
+	}
+
+	// Migrate all snapshots
+	err = db.View(func(tx *bolt.Tx) error {
+		snapshots := tx.Bucket([]byte(snapshotBucket))
+		if snapshots == nil {
+			return nil
+		}
+		return snapshots.ForEach(func(k, v []byte) error {
+			r := bytes.NewReader(v)
+			dec := gob.NewDecoder(r)
+			snapshot := &kapacitor.TaskSnapshot{}
+			err = dec.Decode(snapshot)
+			if err != nil {
+				ts.logger.Println("E! corrupt data in old task_store boltdb snapshots:", err)
+				return nil
+			}
+
+			newSnapshot := &Snapshot{
+				NodeSnapshots: snapshot.NodeSnapshots,
+			}
+			id := string(k)
+			if exists, err := ts.snapshots.Exists(id); err == nil {
+				if !exists {
+					err := ts.snapshots.Put(string(k), newSnapshot)
+					if err != nil {
+						// Failed to migrate snapshot stop process.
+						return err
+					}
+					ts.logger.Printf("D! snapshot %s was migrated to new storage service", id)
+				} else {
+					ts.logger.Printf("D! snapshot %s skipped, already migrated to new storage service", id)
+				}
+			} else if err != nil {
+				return err
+			}
+			return nil
+		})
+	})
+	if err != nil {
+		return errors.Wrap(err, "migrating snapshots")
+	}
 	return nil
 }
 
 func (ts *Service) Close() error {
 	ts.HTTPDService.DelRoutes(ts.routes)
-	if ts.db != nil {
-		return ts.db.Close()
-	}
 	return nil
 }
 
-func (ts *Service) SaveSnapshot(name string, snapshot *kapacitor.TaskSnapshot) error {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	err := enc.Encode(snapshot)
-	if err != nil {
-		return fmt.Errorf("failed to encode task snapshot %s %v", name, err)
-	}
-
-	err = ts.db.Update(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists(snapshotBucket)
-		if err != nil {
-			return err
-		}
-
-		return b.Put([]byte(name), buf.Bytes())
-	})
-	if err != nil {
-		return err
-	}
-	return nil
-}
-func (ts *Service) HasSnapshot(name string) bool {
-	err := ts.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket(snapshotBucket)
-		if b == nil {
-			return fmt.Errorf("no snapshot found for task %s", name)
-		}
-
-		data := b.Get([]byte(name))
-		if data == nil {
-			return fmt.Errorf("no snapshot found for task %s", name)
-		}
-		return nil
-	})
-	return err == nil
-}
-
-func (ts *Service) LoadSnapshot(name string) (*kapacitor.TaskSnapshot, error) {
-	var data []byte
-	err := ts.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket(snapshotBucket)
-		if b == nil {
-			return fmt.Errorf("no snapshot found for task %s", name)
-		}
-
-		data = b.Get([]byte(name))
-		if data == nil {
-			return fmt.Errorf("no snapshot found for task %s", name)
-		}
-		return nil
-	})
+func (ts *Service) Load(id string) (*kapacitor.Task, error) {
+	t, err := ts.tasks.Get(id)
 	if err != nil {
 		return nil, err
 	}
-	buf := bytes.NewBuffer(data)
-	dec := gob.NewDecoder(buf)
-	snapshot := &kapacitor.TaskSnapshot{}
-	err = dec.Decode(snapshot)
+	return ts.newKapacitorTask(t)
+}
+
+func (ts *Service) SaveSnapshot(id string, snapshot *kapacitor.TaskSnapshot) error {
+	s := &Snapshot{
+		NodeSnapshots: snapshot.NodeSnapshots,
+	}
+	return ts.snapshots.Put(id, s)
+}
+
+func (ts *Service) HasSnapshot(id string) bool {
+	exists, err := ts.snapshots.Exists(id)
+	if err != nil {
+		ts.logger.Println("E! error checking for snapshot", err)
+		return false
+	}
+	return exists
+}
+
+func (ts *Service) LoadSnapshot(id string) (*kapacitor.TaskSnapshot, error) {
+	snapshot, err := ts.snapshots.Get(id)
 	if err != nil {
 		return nil, err
 	}
-	return snapshot, nil
+	s := &kapacitor.TaskSnapshot{
+		NodeSnapshots: snapshot.NodeSnapshots,
+	}
+	return s, nil
 }
 
 type TaskInfo struct {
 	Name           string
 	Type           kapacitor.TaskType
-	DBRPs          []kapacitor.DBRP
+	DBRPs          []DBRP
 	TICKscript     string
 	Dot            string
 	Enabled        bool
@@ -278,42 +368,21 @@ type TaskInfo struct {
 }
 
 func (ts *Service) handleTask(w http.ResponseWriter, r *http.Request) {
-	name := r.URL.Query().Get("name")
-	if name == "" {
-		httpd.HttpError(w, "must pass task name", true, http.StatusBadRequest)
+	_, id := path.Split(r.URL.Path)
+	if id == "" {
+		httpd.HttpError(w, "must specify task id on path", true, http.StatusBadRequest)
 		return
 	}
-	labels := false
-	labelsStr := r.URL.Query().Get("labels")
-	if labelsStr != "" {
-		var err error
-		labels, err = strconv.ParseBool(labelsStr)
-		if err != nil {
-			httpd.HttpError(w, "invalid labels value:", true, http.StatusBadRequest)
-			return
-		}
 
-	}
-
-	skipFormat := false
-	skipFormatStr := r.URL.Query().Get("skip-format")
-	if skipFormatStr != "" {
-		var err error
-		skipFormat, err = strconv.ParseBool(skipFormatStr)
-		if err != nil {
-			httpd.HttpError(w, "invalid skip-format value:", true, http.StatusBadRequest)
-			return
-		}
-
-	}
-
-	raw, err := ts.LoadRaw(name)
+	raw, err := ts.tasks.Get(id)
 	if err != nil {
 		httpd.HttpError(w, err.Error(), true, http.StatusNotFound)
 		return
 	}
 
-	if !skipFormat {
+	scriptFormat := r.URL.Query().Get("script-format")
+	switch scriptFormat {
+	case "", "formatted":
 		// Format TICKscript
 		formatted, err := tick.Format(raw.TICKscript)
 		if err == nil {
@@ -321,17 +390,38 @@ func (ts *Service) handleTask(w http.ResponseWriter, r *http.Request) {
 			// Otherwise a change in syntax may prevent task retrieval.
 			raw.TICKscript = formatted
 		}
+	case "raw":
+	default:
+		httpd.HttpError(w, fmt.Sprintf("invalid script-format parameter %q", scriptFormat), true, http.StatusBadRequest)
+		return
 	}
 
-	executing := ts.TaskMaster.IsExecuting(name)
+	dotView := r.URL.Query().Get("dot-view")
+	switch dotView {
+	case "":
+		dotView = "attributes"
+	case "attributes":
+	case "labels":
+	default:
+		httpd.HttpError(w, fmt.Sprintf("invalid dot-view parameter %q", dotView), true, http.StatusBadRequest)
+		return
+	}
+
+	executing := ts.TaskMaster.IsExecuting(id)
 	errMsg := raw.Error
 	dot := ""
-	stats := kapacitor.ExecutionStats{}
-	task, err := ts.Load(name)
+	stats := client.ExecutionStats{}
+	task, err := ts.newKapacitorTask(raw)
 	if err == nil {
 		if executing {
-			dot = ts.TaskMaster.ExecutingDot(name, labels)
-			stats, _ = ts.TaskMaster.ExecutionStats(name)
+			dot = ts.TaskMaster.ExecutingDot(id, dotView == "labels")
+			s, err := ts.TaskMaster.ExecutionStats(id)
+			if err != nil {
+				ts.logger.Printf("E! failed to retrieve stats for task %s: %v", id, err)
+			} else {
+				stats.TaskStats = s.TaskStats
+				stats.NodeStats = s.NodeStats
+			}
 		} else {
 			dot = string(task.Dot())
 		}
@@ -339,13 +429,43 @@ func (ts *Service) handleTask(w http.ResponseWriter, r *http.Request) {
 		errMsg = err.Error()
 	}
 
-	info := TaskInfo{
-		Name:           name,
-		Type:           raw.Type,
-		DBRPs:          raw.DBRPs,
+	var status client.TaskStatus
+	switch raw.Status {
+	case Disabled:
+		status = client.Disabled
+	case Enabled:
+		status = client.Enabled
+	default:
+		httpd.HttpError(w, fmt.Sprintf("invalid task status recorded in db %v", raw.Status), true, http.StatusInternalServerError)
+		return
+	}
+
+	var typ client.TaskType
+	switch raw.Type {
+	case StreamTask:
+		typ = client.StreamTask
+	case BatchTask:
+		typ = client.BatchTask
+	default:
+		httpd.HttpError(w, fmt.Sprintf("invalid task type recorded in db %v", raw.Type), true, http.StatusInternalServerError)
+		return
+	}
+
+	dbrps := make([]client.DBRP, len(raw.DBRPs))
+	for i, dbrp := range raw.DBRPs {
+		dbrps[i] = client.DBRP{
+			Database:        dbrp.Database,
+			RetentionPolicy: dbrp.RetentionPolicy,
+		}
+	}
+
+	info := client.Task{
+		ID:             id,
+		Type:           typ,
+		DBRPs:          dbrps,
 		TICKscript:     raw.TICKscript,
 		Dot:            dot,
-		Enabled:        ts.IsEnabled(name),
+		Status:         status,
 		Executing:      executing,
 		Error:          errMsg,
 		ExecutionStats: stats,
@@ -354,352 +474,414 @@ func (ts *Service) handleTask(w http.ResponseWriter, r *http.Request) {
 	w.Write(httpd.MarshalJSON(info, true))
 }
 
-func (ts *Service) handleTasks(w http.ResponseWriter, r *http.Request) {
-	tasksStr := r.URL.Query().Get("tasks")
-	var tasks []string
-	if tasksStr != "" {
-		tasks = strings.Split(tasksStr, ",")
+var allFields = []string{
+	"link",
+	"id",
+	"type",
+	"dbrps",
+	"script",
+	"dot",
+	"status",
+	"executing",
+	"error",
+	"stats",
+}
+
+func (ts *Service) taskLink(id string) client.Link {
+	return client.Link{Relation: client.Self, Href: path.Join(httpd.BasePath, "tasks", id)}
+}
+
+func (ts *Service) handleListTasks(w http.ResponseWriter, r *http.Request) {
+
+	pattern := r.URL.Query().Get("pattern")
+	fields := r.URL.Query()["fields"]
+	if len(fields) == 0 {
+		fields = allFields
+	} else {
+		// Always return ID field
+		fields = append(fields, "id", "link")
 	}
 
-	infos, err := ts.GetTaskSummaryInfo(tasks)
-	if err != nil {
-		httpd.HttpError(w, err.Error(), true, http.StatusNotFound)
+	scriptFormat := r.URL.Query().Get("script-format")
+	switch scriptFormat {
+	case "formatted":
+	case "raw":
+	default:
+		httpd.HttpError(w, fmt.Sprintf("invalid script-format parameter %q", scriptFormat), true, http.StatusBadRequest)
 		return
+	}
+
+	dotView := r.URL.Query().Get("dot-view")
+	switch dotView {
+	case "attributes":
+	case "labels":
+	default:
+		httpd.HttpError(w, fmt.Sprintf("invalid dot-view parameter %q", dotView), true, http.StatusBadRequest)
+		return
+	}
+
+	offsetStr := r.URL.Query().Get("offset")
+	offset, err := strconv.ParseInt(offsetStr, 10, 64)
+	if err != nil {
+		httpd.HttpError(w, fmt.Sprintf("invalid offset parameter %q must be an integer: %s", offsetStr, err), true, http.StatusBadRequest)
+	}
+
+	limitStr := r.URL.Query().Get("limit")
+	limit, err := strconv.ParseInt(limitStr, 10, 64)
+	if err != nil {
+		httpd.HttpError(w, fmt.Sprintf("invalid limit parameter %q must be an integer: %s", limitStr, err), true, http.StatusBadRequest)
+	}
+	if limit == 0 {
+		limit = 100
+	}
+
+	rawTasks, err := ts.tasks.List(pattern, int(offset), int(limit))
+	tasks := make([]map[string]interface{}, len(rawTasks))
+
+	for i, task := range rawTasks {
+		tasks[i] = make(map[string]interface{}, len(fields))
+		executing := ts.TaskMaster.IsExecuting(task.ID)
+		for _, field := range fields {
+			var value interface{}
+			switch field {
+			case "id":
+				value = task.ID
+			case "link":
+				value = ts.taskLink(task.ID)
+			case "type":
+				switch task.Type {
+				case StreamTask:
+					value = client.StreamTask
+				case BatchTask:
+					value = client.BatchTask
+				}
+			case "dbrps":
+				dbrps := make([]client.DBRP, len(task.DBRPs))
+				for i, dbrp := range task.DBRPs {
+					dbrps[i] = client.DBRP{
+						Database:        dbrp.Database,
+						RetentionPolicy: dbrp.RetentionPolicy,
+					}
+				}
+				value = dbrps
+			case "script":
+				value = task.TICKscript
+				if scriptFormat == "formatted" {
+					formatted, err := tick.Format(task.TICKscript)
+					if err == nil {
+						// Only format if it succeeded.
+						// Otherwise a change in syntax may prevent task retrieval.
+						value = formatted
+					}
+				}
+			case "executing":
+				value = executing
+			case "dot":
+				if executing {
+					value = ts.TaskMaster.ExecutingDot(task.ID, dotView == "labels")
+				} else {
+					kt, err := ts.newKapacitorTask(task)
+					if err != nil {
+						break
+					}
+					value = string(kt.Dot())
+				}
+			case "stats":
+				if executing {
+					s, err := ts.TaskMaster.ExecutionStats(task.ID)
+					if err != nil {
+						ts.logger.Printf("E! failed to retrieve stats for task %s: %v", task.ID, err)
+					} else {
+						value = client.ExecutionStats{
+							TaskStats: s.TaskStats,
+							NodeStats: s.NodeStats,
+						}
+					}
+				}
+			case "error":
+				value = task.Error
+			case "status":
+				switch task.Status {
+				case Disabled:
+					value = client.Disabled
+				case Enabled:
+					value = client.Enabled
+				}
+			}
+			tasks[i][field] = value
+		}
 	}
 
 	type response struct {
-		Tasks []TaskSummaryInfo `json:"Tasks"`
+		Tasks []map[string]interface{} `json:"tasks"`
 	}
 
-	w.Write(httpd.MarshalJSON(response{infos}, true))
+	w.Write(httpd.MarshalJSON(response{tasks}, true))
 }
 
-type rawTask struct {
-	// The name of the task.
-	Name string
-	// The TICKscript for the task.
-	TICKscript string
-	// Last error the task had either while defining or executing.
-	Error string
-	// The task type (stream|batch).
-	Type kapacitor.TaskType
-	// The DBs and RPs the task is allowed to access.
-	DBRPs            []kapacitor.DBRP
-	SnapshotInterval time.Duration
-}
+var validTaskID = regexp.MustCompile(`^[-\w]+$`)
 
-func (ts *Service) handleSave(w http.ResponseWriter, r *http.Request) {
-	name := r.URL.Query().Get("name")
-	newTask := &rawTask{
-		Name:             name,
-		SnapshotInterval: ts.snapshotInterval,
+func (ts *Service) handleCreateTask(w http.ResponseWriter, r *http.Request) {
+	task := client.CreateTaskOptions{}
+	dec := json.NewDecoder(r.Body)
+	err := dec.Decode(&task)
+	if err != nil {
+		httpd.HttpError(w, "invalid JSON", true, http.StatusBadRequest)
+		return
+	}
+	if task.ID == "" {
+		task.ID = uuid.NewV4().String()
+	}
+	if !validTaskID.MatchString(task.ID) {
+		httpd.HttpError(w, fmt.Sprintf("task ID must match %v %q", validTaskID, task.ID), true, http.StatusBadRequest)
+		return
+	}
+
+	newTask := Task{
+		ID: task.ID,
 	}
 
 	// Check for existing task
-	raw, err := ts.LoadRaw(name)
-	exists := err == nil
-	if exists {
-		newTask = raw
+	_, err = ts.tasks.Get(task.ID)
+	if err == nil {
+		httpd.HttpError(w, "task already exists", true, http.StatusBadRequest)
+		return
 	}
 
-	// Get task type
-	ttStr := r.URL.Query().Get("type")
-	switch ttStr {
-	case "stream":
-		newTask.Type = kapacitor.StreamTask
-	case "batch":
-		newTask.Type = kapacitor.BatchTask
+	// Set task type
+	switch task.Type {
+	case client.StreamTask:
+		newTask.Type = StreamTask
+	case client.BatchTask:
+		newTask.Type = BatchTask
 	default:
-		if !exists {
-			if ttStr == "" {
-				httpd.HttpError(w, fmt.Sprintf("no task with name %q exists cannot infer type.", name), true, http.StatusBadRequest)
-			} else {
-				httpd.HttpError(w, fmt.Sprintf("unknown type %q", ttStr), true, http.StatusBadRequest)
-			}
-			return
-		}
-	}
-
-	// Get tick script
-	tick, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
-		return
-	}
-	if len(tick) > 0 {
-		newTask.TICKscript = string(tick)
-	} else if !exists {
-		httpd.HttpError(w, fmt.Sprintf("must provide TICKscript via POST data."), true, http.StatusBadRequest)
+		httpd.HttpError(w, fmt.Sprintf("unknown type %q", task.Type), true, http.StatusBadRequest)
 		return
 	}
 
-	// Get dbrps
-	dbrpsStr := r.URL.Query().Get("dbrps")
-	if dbrpsStr != "" {
-		dbrps := make([]kapacitor.DBRP, 0)
-		err = json.Unmarshal([]byte(dbrpsStr), &dbrps)
-		if err != nil {
-			httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
-			return
+	// Set tick script
+	newTask.TICKscript = task.TICKscript
+	if newTask.TICKscript == "" {
+		httpd.HttpError(w, fmt.Sprintf("must provide TICKscript"), true, http.StatusBadRequest)
+		return
+	}
+
+	// Set dbrps
+	newTask.DBRPs = make([]DBRP, len(task.DBRPs))
+	for i, dbrp := range task.DBRPs {
+		newTask.DBRPs[i] = DBRP{
+			Database:        dbrp.Database,
+			RetentionPolicy: dbrp.RetentionPolicy,
 		}
-		newTask.DBRPs = dbrps
-	} else if !exists {
+	}
+	if len(newTask.DBRPs) == 0 {
 		httpd.HttpError(w, fmt.Sprintf("must provide at least one database and retention policy."), true, http.StatusBadRequest)
 		return
 	}
 
-	// Get snapshot interval
-	snapshotIntervalStr := r.URL.Query().Get("snapshot")
-	if snapshotIntervalStr != "" {
-		snapshotInterval, err := influxql.ParseDuration(snapshotIntervalStr)
+	// Set status
+	switch task.Status {
+	case client.Enabled:
+		newTask.Status = Enabled
+	case client.Disabled:
+		newTask.Status = Disabled
+	default:
+		httpd.HttpError(w, fmt.Sprintf("invalid status field %q", task.Status), true, http.StatusBadRequest)
+		return
+	}
+
+	// Validate task
+	ktask, err := ts.newKapacitorTask(newTask)
+	if err != nil {
+		httpd.HttpError(w, "invalid TICKscript: "+err.Error(), true, http.StatusBadRequest)
+		return
+	}
+
+	err = ts.tasks.Create(newTask)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
+		return
+	}
+	if newTask.Status == Enabled {
+		err = ts.startTask(newTask)
 		if err != nil {
-			httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
+			httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
 			return
 		}
-		newTask.SnapshotInterval = snapshotInterval
 	}
+	w.WriteHeader(http.StatusOK)
 
-	err = ts.Save(newTask)
-	if err != nil {
-		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (ts *Service) handleDelete(w http.ResponseWriter, r *http.Request) {
-	name := r.URL.Query().Get("name")
-
-	err := ts.Delete(name)
-	if err != nil {
-		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (ts *Service) handleEnable(w http.ResponseWriter, r *http.Request) {
-	name := r.URL.Query().Get("name")
-	err := ts.Enable(name)
-	if err != nil {
-		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (ts *Service) handleDisable(w http.ResponseWriter, r *http.Request) {
-	name := r.URL.Query().Get("name")
-	err := ts.Disable(name)
-	if err != nil {
-		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (ts *Service) Save(task *rawTask) error {
-	// Validate task
-	_, err := ts.TaskMaster.NewTask(task.Name,
-		task.TICKscript,
-		task.Type,
-		task.DBRPs,
-		task.SnapshotInterval,
-	)
-	if err != nil {
-		return fmt.Errorf("invalid task: %s", err)
-	}
-
-	// Write 0 snapshot interval if it is the default.
-	// This way if the default changes the task will change too.
-	if task.SnapshotInterval == ts.snapshotInterval {
-		task.SnapshotInterval = 0
-	}
-
-	var buf bytes.Buffer
-
-	enc := gob.NewEncoder(&buf)
-	err = enc.Encode(task)
-	if err != nil {
-		return err
-	}
-
-	err = ts.db.Update(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists(tasksBucket)
+	executing := ts.TaskMaster.IsExecuting(newTask.ID)
+	dot := ""
+	stats := client.ExecutionStats{}
+	if executing {
+		dot = ts.TaskMaster.ExecutingDot(newTask.ID, false)
+		s, err := ts.TaskMaster.ExecutionStats(newTask.ID)
 		if err != nil {
-			return err
+			ts.logger.Printf("E! failed to retrieve stats for task %s: %v", newTask.ID, err)
+		} else {
+			stats.TaskStats = s.TaskStats
+			stats.NodeStats = s.NodeStats
 		}
-		exists := b.Get([]byte(task.Name)) != nil
-		err = b.Put([]byte(task.Name), buf.Bytes())
-		if err != nil {
-			return err
-		}
-		if !exists {
-			kapacitor.NumTasksVar.Add(1)
-		}
-		return nil
-	})
-	return err
+	} else {
+		dot = string(ktask.Dot())
+	}
+
+	t := client.Task{
+		Link:           ts.taskLink(newTask.ID),
+		ID:             newTask.ID,
+		Type:           task.Type,
+		DBRPs:          task.DBRPs,
+		TICKscript:     task.TICKscript,
+		Status:         task.Status,
+		Dot:            dot,
+		Executing:      executing,
+		ExecutionStats: stats,
+	}
+	w.Write(httpd.MarshalJSON(t, true))
 }
 
-func (ts *Service) deleteTask(name string) error {
-	ts.TaskMaster.StopTask(name)
+func (ts *Service) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
+	_, id := path.Split(r.URL.Path)
+	task := client.UpdateTaskOptions{}
+	dec := json.NewDecoder(r.Body)
+	err := dec.Decode(&task)
+	if err != nil {
+		httpd.HttpError(w, "invalid JSON", true, http.StatusBadRequest)
+		return
+	}
 
-	return ts.db.Update(func(tx *bolt.Tx) error {
-		tb := tx.Bucket(tasksBucket)
-		if tb != nil {
-			exists := tb.Get([]byte(name)) != nil
-			if exists {
-				tb.Delete([]byte(name))
-				kapacitor.NumTasksVar.Add(-1)
+	// Check for existing task
+	existing, err := ts.tasks.Get(id)
+	if err != nil {
+		httpd.HttpError(w, "task does not exist, cannot update", true, http.StatusNotFound)
+		return
+	}
+
+	// Set task type
+	switch task.Type {
+	case client.StreamTask:
+		existing.Type = StreamTask
+	case client.BatchTask:
+		existing.Type = BatchTask
+	}
+
+	// Set tick script
+	if task.TICKscript != "" {
+		existing.TICKscript = task.TICKscript
+	}
+
+	// Set dbrps
+	if len(task.DBRPs) > 0 {
+		existing.DBRPs = make([]DBRP, len(task.DBRPs))
+		for i, dbrp := range task.DBRPs {
+			existing.DBRPs[i] = DBRP{
+				Database:        dbrp.Database,
+				RetentionPolicy: dbrp.RetentionPolicy,
 			}
 		}
-		eb := tx.Bucket(enabledBucket)
-		if eb != nil {
-			eb.Delete([]byte(name))
+	}
+
+	// Set status
+	previousStatus := existing.Status
+	switch task.Status {
+	case client.Enabled:
+		existing.Status = Enabled
+	case client.Disabled:
+		existing.Status = Disabled
+	}
+	statusChanged := previousStatus != existing.Status
+
+	// Validate task
+	_, err = ts.newKapacitorTask(existing)
+	if err != nil {
+		httpd.HttpError(w, "invalid TICKscript: "+err.Error(), true, http.StatusBadRequest)
+		return
+	}
+
+	err = ts.tasks.Replace(existing)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
+		return
+	}
+
+	if statusChanged {
+		// Enable/Disable task
+		switch existing.Status {
+		case Enabled:
+			err = ts.startTask(existing)
+			if err != nil {
+				httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
+				return
+			}
+		case Disabled:
+			ts.stopTask(existing.ID)
 		}
-		return nil
-	})
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
-func (ts *Service) Delete(pattern string) error {
-	rawTasks, err := ts.FindTasks(func(taskName string) (bool, error) {
-		matched, err := filepath.Match(pattern, taskName)
-		if err != nil {
-			return false, err
-		}
+func (ts *Service) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
+	_, id := path.Split(r.URL.Path)
 
-		return matched, nil
-	})
-
+	err := ts.deleteTask(id)
 	if err != nil {
-		return nil
+		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
+		return
 	}
-
-	for _, rawTask := range rawTasks {
-		err = ts.deleteTask(rawTask.Name)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	w.WriteHeader(http.StatusNoContent)
 }
 
-func (ts *Service) LoadRaw(name string) (*rawTask, error) {
-	var data []byte
-	err := ts.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket(tasksBucket)
-		if b == nil {
-			return errors.New("no tasks bucket")
+func (ts *Service) deleteTask(id string) error {
+	task, err := ts.tasks.Get(id)
+	if err != nil {
+		if err == ErrNoTaskExists {
+			return nil
 		}
-		data = b.Get([]byte(name))
-		return nil
-	})
-	if err != nil {
-		return nil, err
+		return err
 	}
-	if len(data) == 0 {
-		return nil, fmt.Errorf("unknown task %s", name)
+	if task.Status == Enabled {
+		ts.stopTask(id)
 	}
-	buf := bytes.NewBuffer(data)
-	dec := gob.NewDecoder(buf)
-	task := &rawTask{}
-	err = dec.Decode(task)
-	if task.SnapshotInterval == 0 {
-		task.SnapshotInterval = ts.snapshotInterval
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	return task, nil
-}
-func (ts *Service) Load(name string) (*kapacitor.Task, error) {
-	task, err := ts.LoadRaw(name)
-	if err != nil {
-		return nil, err
-	}
-
-	return ts.CreateTaskFromRaw(task)
+	return ts.tasks.Delete(id)
 }
 
-func (ts *Service) CreateTaskFromRaw(task *rawTask) (*kapacitor.Task, error) {
-	return ts.TaskMaster.NewTask(task.Name,
+func (ts *Service) newKapacitorTask(task Task) (*kapacitor.Task, error) {
+	dbrps := make([]kapacitor.DBRP, len(task.DBRPs))
+	for i, dbrp := range task.DBRPs {
+		dbrps[i] = kapacitor.DBRP{
+			Database:        dbrp.Database,
+			RetentionPolicy: dbrp.RetentionPolicy,
+		}
+	}
+	var tt kapacitor.TaskType
+	switch task.Type {
+	case StreamTask:
+		tt = kapacitor.StreamTask
+	case BatchTask:
+		tt = kapacitor.BatchTask
+	}
+	return ts.TaskMaster.NewTask(task.ID,
 		task.TICKscript,
-		task.Type,
-		task.DBRPs,
-		task.SnapshotInterval,
+		tt,
+		dbrps,
+		ts.snapshotInterval,
 	)
 }
 
-func (ts *Service) enableRawTask(rawTask *rawTask) error {
-	t, err := ts.CreateTaskFromRaw(rawTask)
+func (ts *Service) startTask(task Task) error {
+	t, err := ts.newKapacitorTask(task)
 	if err != nil {
 		return err
 	}
-
-	// Save the enabled state
-	var enabled bool
-
-	err = ts.db.Update(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists(enabledBucket)
-		if err != nil {
-			return err
-		}
-		enabled = b.Get([]byte(t.Name)) != nil
-		err = b.Put([]byte(t.Name), []byte{})
-		if err != nil {
-			return err
-		}
-		if !enabled {
-			kapacitor.NumEnabledTasksVar.Add(1)
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-
-	if !enabled {
-		return ts.StartTask(t)
-	}
-	return nil
-}
-
-func (ts *Service) Enable(pattern string) error {
-	// Find the matching tasks
-	rawTasks, err := ts.FindTasks(func(taskName string) (bool, error) {
-		matched, err := filepath.Match(pattern, taskName)
-		if err != nil {
-			return false, err
-		}
-
-		return matched, nil
-	})
-
-	if err != nil {
-		return nil
-	}
-
-	for _, rawTask := range rawTasks {
-		err = ts.enableRawTask(rawTask)
-		if err != nil {
-			return nil
-		}
-	}
-
-	return nil
-}
-
-func (ts *Service) StartTask(t *kapacitor.Task) error {
 	// Starting task, remove last error
-	ts.SaveLastError(t.Name, "")
+	ts.saveLastError(t.ID, "")
 
 	// Start the task
 	et, err := ts.TaskMaster.StartTask(t)
 	if err != nil {
-		ts.SaveLastError(t.Name, err.Error())
+		ts.saveLastError(t.ID, err.Error())
 		return err
 	}
 
@@ -707,202 +889,43 @@ func (ts *Service) StartTask(t *kapacitor.Task) error {
 	if t.Type == kapacitor.BatchTask {
 		err := et.StartBatching()
 		if err != nil {
-			ts.SaveLastError(t.Name, err.Error())
-			ts.TaskMaster.StopTask(t.Name)
+			ts.saveLastError(t.ID, err.Error())
+			ts.stopTask(t.ID)
 			return err
 		}
 	}
+
+	kapacitor.NumEnabledTasksVar.Add(1)
 
 	go func() {
 		// Wait for task to finish
 		err := et.Wait()
 		// Stop task
-		ts.TaskMaster.StopTask(et.Task.Name)
+		ts.stopTask(t.ID)
 
 		if err != nil {
-			ts.logger.Printf("E! task %s finished with error: %s", et.Task.Name, err)
+			ts.logger.Printf("E! task %s finished with error: %s", et.Task.ID, err)
 			// Save last error from task.
-			err = ts.SaveLastError(t.Name, err.Error())
+			err = ts.saveLastError(t.ID, err.Error())
 			if err != nil {
-				ts.logger.Println("E! failed to save last error for task", et.Task.Name)
+				ts.logger.Println("E! failed to save last error for task", et.Task.ID)
 			}
 		}
 	}()
 	return nil
 }
 
+func (ts *Service) stopTask(id string) {
+	kapacitor.NumEnabledTasksVar.Add(-1)
+	ts.TaskMaster.StopTask(id)
+}
+
 // Save last error from task.
-func (ts *Service) SaveLastError(name string, errStr string) error {
-
-	raw, err := ts.LoadRaw(name)
+func (ts *Service) saveLastError(id string, errStr string) error {
+	task, err := ts.tasks.Get(id)
 	if err != nil {
 		return err
 	}
-	raw.Error = errStr
-	err = ts.Save(raw)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (ts *Service) Disable(pattern string) error {
-	// Find the matching tasks
-	rawTasks, err := ts.FindTasks(func(taskName string) (bool, error) {
-		matched, err := filepath.Match(pattern, taskName)
-		if err != nil {
-			return false, err
-		}
-
-		return matched, nil
-	})
-
-	if err != nil {
-		return nil
-	}
-
-	// Delete the enabled state
-	err = ts.db.Update(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists(enabledBucket)
-		if err != nil {
-			return err
-		}
-		for _, rawTask := range rawTasks {
-			enabled := b.Get([]byte(rawTask.Name)) != nil
-			if enabled {
-				err = b.Delete([]byte(rawTask.Name))
-				if err != nil {
-					return err
-				}
-				kapacitor.NumEnabledTasksVar.Add(-1)
-			}
-		}
-		return nil
-	})
-
-	if err != nil {
-		return err
-	}
-
-	for _, rawTask := range rawTasks {
-		err = ts.TaskMaster.StopTask(rawTask.Name)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-type TaskSummaryInfo struct {
-	Name           string
-	Type           kapacitor.TaskType
-	DBRPs          []kapacitor.DBRP
-	Enabled        bool
-	Executing      bool
-	ExecutionStats kapacitor.ExecutionStats
-}
-
-func (ts *Service) IsEnabled(name string) (e bool) {
-	ts.db.View(func(tx *bolt.Tx) error {
-		eb := tx.Bucket([]byte(enabledBucket))
-		e = eb != nil && eb.Get([]byte(name)) != nil
-		return nil
-	})
-	return
-}
-
-// Returns all taskInfo of task name that matches the predicate
-func (ts *Service) FindTasks(predicate func(string) (bool, error)) ([]*rawTask, error) {
-	rawTasks := make([]*rawTask, 0)
-
-	err := ts.db.View(func(tx *bolt.Tx) error {
-		tb := tx.Bucket([]byte(tasksBucket))
-		if tb == nil {
-			return nil
-		}
-
-		return tb.ForEach(func(k, v []byte) error {
-			taskName := string(k)
-			isMatched, err := predicate(taskName)
-			if err != nil {
-				return err
-			}
-			if !isMatched {
-				return nil
-			}
-
-			// Grab task info
-			t, err := ts.LoadRaw(taskName)
-			if err != nil {
-				return fmt.Errorf("found invalid task in db. name: %s, err: %s", string(k), err)
-			}
-
-			rawTasks = append(rawTasks, t)
-			return nil
-		})
-
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return rawTasks, nil
-}
-
-func (ts *Service) GetTaskSummaryInfo(tasks []string) ([]TaskSummaryInfo, error) {
-	taskInfos := make([]TaskSummaryInfo, 0)
-
-	err := ts.db.View(func(tx *bolt.Tx) error {
-		tb := tx.Bucket([]byte(tasksBucket))
-		if tb == nil {
-			return nil
-		}
-		eb := tx.Bucket([]byte(enabledBucket))
-		// Grab task info
-		f := func(k, v []byte) error {
-			t, err := ts.LoadRaw(string(k))
-			if err != nil {
-				return fmt.Errorf("found invalid task in db. name: %s, err: %s", string(k), err)
-			}
-
-			enabled := eb != nil && eb.Get(k) != nil
-
-			info := TaskSummaryInfo{
-				Name:      t.Name,
-				Type:      t.Type,
-				DBRPs:     t.DBRPs,
-				Enabled:   enabled,
-				Executing: ts.TaskMaster.IsExecuting(t.Name),
-			}
-
-			if info.Executing {
-				executionStats, err := ts.TaskMaster.ExecutionStats(t.Name)
-				if err != nil {
-					return fmt.Errorf("failed to fetch execution stats. name: %s, err: %s", t.Name, err)
-				}
-				info.ExecutionStats = executionStats
-			}
-
-			taskInfos = append(taskInfos, info)
-			return nil
-		}
-
-		if len(tasks) == 0 {
-			return tb.ForEach(f)
-		} else {
-			for _, tn := range tasks {
-				err := f([]byte(tn), []byte{})
-				if err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return taskInfos, nil
+	task.Error = errStr
+	return ts.tasks.Replace(task)
 }

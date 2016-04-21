@@ -16,8 +16,8 @@ func TestConfig_Parse(t *testing.T) {
 [replay]
 dir = "/tmp/replay"
 
-[task]
-dir = "/tmp/task"
+[storage]
+boltdb = "/tmp/kapacitor.db"
 `, &c); err != nil {
 		t.Fatal(err)
 	}
@@ -25,8 +25,8 @@ dir = "/tmp/task"
 	// Validate configuration.
 	if c.Replay.Dir != "/tmp/replay" {
 		t.Fatalf("unexpected replay dir: %s", c.Replay.Dir)
-	} else if c.Task.Dir != "/tmp/task" {
-		t.Fatalf("unexpected task dir: %s", c.Task.Dir)
+	} else if c.Storage.BoltDBPath != "/tmp/kapacitor.db" {
+		t.Fatalf("unexpected storage boltdb-path: %s", c.Storage.BoltDBPath)
 	}
 }
 
@@ -41,8 +41,8 @@ urls=["http://localhost:8086"]
 [replay]
 dir = "/tmp/replay"
 
-[task]
-dir = "/tmp/task"
+[storage]
+boltdb = "/tmp/kapacitor.db"
 `, &c); err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +51,7 @@ dir = "/tmp/task"
 		t.Fatalf("failed to set env var: %v", err)
 	}
 
-	if err := os.Setenv("KAPACITOR_TASK_DIR", "/var/lib/kapacitor/task"); err != nil {
+	if err := os.Setenv("KAPACITOR_STORAGE_BOLTDB", "/var/lib/kapacitor/kapacitor.db"); err != nil {
 		t.Fatalf("failed to set env var: %v", err)
 	}
 
@@ -66,8 +66,8 @@ dir = "/tmp/task"
 	// Validate configuration.
 	if c.Replay.Dir != "/var/lib/kapacitor/replay" {
 		t.Fatalf("unexpected replay dir: %s", c.Replay.Dir)
-	} else if c.Task.Dir != "/var/lib/kapacitor/task" {
-		t.Fatalf("unexpected task dir: %s", c.Task.Dir)
+	} else if c.Storage.BoltDBPath != "/var/lib/kapacitor/kapacitor.db" {
+		t.Fatalf("unexpected storage boltdb-path: %s", c.Storage.BoltDBPath)
 	} else if c.InfluxDB[0].URLs[0] != "http://localhost:18086" {
 		t.Fatalf("unexpected url 0: %s", c.InfluxDB[0].URLs[0])
 	}

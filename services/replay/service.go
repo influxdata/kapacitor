@@ -3,25 +3,29 @@ package replay
 import (
 	"archive/zip"
 	"compress/gzip"
-	"errors"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	client "github.com/influxdata/influxdb/client/v2"
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor"
+	kclient "github.com/influxdata/kapacitor/client/v1"
 	"github.com/influxdata/kapacitor/clock"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/services/httpd"
+	"github.com/influxdata/kapacitor/services/storage"
+	"github.com/pkg/errors"
 	"github.com/twinj/uuid"
 )
 
@@ -30,12 +34,22 @@ const batchEXT = ".brpl"
 
 const precision = "n"
 
+var validID = regexp.MustCompile(`^[-\w]+$`)
+
 // Handles recording, starting, and waiting on replays
 type Service struct {
-	saveDir   string
-	routes    []httpd.Route
+	saveDir string
+
+	recordings RecordingDAO
+	replays    ReplayDAO
+
+	routes []httpd.Route
+
+	StorageService interface {
+		Store(namespace string) storage.Interface
+	}
 	TaskStore interface {
-		Load(name string) (*kapacitor.Task, error)
+		Load(id string) (*kapacitor.Task, error)
 	}
 	HTTPDService interface {
 		AddRoutes([]httpd.Route) error
@@ -52,67 +66,160 @@ type Service struct {
 		Stream(name string) (kapacitor.StreamCollector, error)
 	}
 
-	recordingsMu      sync.RWMutex
-	runningRecordings map[string]<-chan error
-
 	logger *log.Logger
 }
 
 // Create a new replay master.
 func NewService(conf Config, l *log.Logger) *Service {
 	return &Service{
-		saveDir:           conf.Dir,
-		logger:            l,
-		runningRecordings: make(map[string]<-chan error),
+		saveDir: conf.Dir,
+		logger:  l,
 	}
 }
 
+// The storage namespace for all recording data.
+const recordingNamespace = "recording_store"
+const replayNamespace = "replay_store"
+
 func (r *Service) Open() error {
-	r.routes = []httpd.Route{
-		{
-			Name:        "recordings",
-			Method:      "GET",
-			Pattern:     "/recordings",
-			HandlerFunc: r.handleList,
-		},
-		{
-			Name:        "recording-delete",
-			Method:      "DELETE",
-			Pattern:     "/recording",
-			HandlerFunc: r.handleDelete,
-		},
-		{
-			Name:        "recording-delete",
-			Method:      "OPTIONS",
-			Pattern:     "/recording",
-			HandlerFunc: httpd.ServeOptions,
-		},
-		{
-			Name:        "record",
-			Method:      "POST",
-			Pattern:     "/record",
-			HandlerFunc: r.handleRecord,
-		},
-		{
-			Name:        "record",
-			Method:      "GET",
-			Pattern:     "/record",
-			HandlerFunc: r.handleGetRecording,
-		},
-		{
-			Name:        "replay",
-			Method:      "POST",
-			Pattern:     "/replay",
-			HandlerFunc: r.handleReplay,
-		},
-	}
+	// Create DAO
+	r.recordings = newRecordingKV(r.StorageService.Store(recordingNamespace))
+	r.replays = newReplayKV(r.StorageService.Store(replayNamespace))
 
 	err := os.MkdirAll(r.saveDir, 0755)
 	if err != nil {
 		return err
 	}
 
+	err = r.migrate()
+	if err != nil {
+		return err
+	}
+
+	// Setup routes
+	r.routes = []httpd.Route{
+		{
+			Name:        "recording",
+			Method:      "GET",
+			Pattern:     "/recordings/",
+			HandlerFunc: r.handleRecording,
+		},
+		{
+			Name:        "deleteRecording",
+			Method:      "DELETE",
+			Pattern:     "/recordings/",
+			HandlerFunc: r.handleDeleteRecording,
+		},
+		{
+			Name:        "/recordings/-cors",
+			Method:      "OPTIONS",
+			Pattern:     "/recordings/",
+			HandlerFunc: httpd.ServeOptions,
+		},
+		{
+			Name:        "listRecordings",
+			Method:      "GET",
+			Pattern:     "/recordings",
+			HandlerFunc: r.handleListRecordings,
+		},
+		{
+			Name:        "createRecording",
+			Method:      "POST",
+			Pattern:     "/recordings/stream",
+			HandlerFunc: r.handleRecordStream,
+		},
+		{
+			Name:        "createRecording",
+			Method:      "POST",
+			Pattern:     "/recordings/batch",
+			HandlerFunc: r.handleRecordBatch,
+		},
+		{
+			Name:        "createRecording",
+			Method:      "POST",
+			Pattern:     "/recordings/query",
+			HandlerFunc: r.handleRecordQuery,
+		},
+		{
+			Name:        "replay",
+			Method:      "GET",
+			Pattern:     "/replays/",
+			HandlerFunc: r.handleReplay,
+		},
+		{
+			Name:        "deleteReplay",
+			Method:      "DELETE",
+			Pattern:     "/replays/",
+			HandlerFunc: r.handleDeleteReplay,
+		},
+		{
+			Name:        "/replays/-cors",
+			Method:      "OPTIONS",
+			Pattern:     "/replays/",
+			HandlerFunc: httpd.ServeOptions,
+		},
+		{
+			Name:        "listReplays",
+			Method:      "GET",
+			Pattern:     "/replays",
+			HandlerFunc: r.handleListReplays,
+		},
+		{
+			Name:        "createReplay",
+			Method:      "POST",
+			Pattern:     "/replays",
+			HandlerFunc: r.handleCreateReplay,
+		},
+	}
+
 	return r.HTTPDService.AddRoutes(r.routes)
+}
+
+func (r *Service) migrate() error {
+	// Find all recordings and store their metadata into the new storage service.
+	files, err := ioutil.ReadDir(r.saveDir)
+	if err != nil {
+		return errors.Wrap(err, "migrating recording metadata")
+	}
+	for _, info := range files {
+		if info.IsDir() {
+			continue
+		}
+		name := info.Name()
+		i := strings.LastIndex(name, ".")
+		ext := name[i:]
+		id := name[:i]
+
+		var typ RecordingType
+		switch ext {
+		case streamEXT:
+			typ = StreamRecording
+		case batchEXT:
+			typ = BatchRecording
+		default:
+			r.logger.Println("E! unknown file in replay dir", name)
+			continue
+		}
+		recording := Recording{
+			ID:       id,
+			Type:     typ,
+			Size:     info.Size(),
+			Date:     info.ModTime().UTC(),
+			Status:   Finished,
+			Progress: 1.0,
+		}
+		err = r.recordings.Create(recording)
+		if err != nil {
+			if err == ErrRecordingExists {
+				r.logger.Printf("D! skipping recording %s, metadata already migrated", id)
+			} else {
+				return errors.Wrap(err, "creating recording metadata")
+			}
+		} else {
+			r.logger.Printf("D! recording %s metadata migrated", id)
+		}
+	}
+	return nil
 }
 
 func (r *Service) Close() error {
@@ -120,101 +227,611 @@ func (r *Service) Close() error {
 	return nil
 }
 
-func (s *Service) handleList(w http.ResponseWriter, req *http.Request) {
-	ridsStr := req.URL.Query().Get("rids")
-	var rids []string
-	if ridsStr != "" {
-		rids = strings.Split(ridsStr, ",")
+func recordingLink(id string) kclient.Link {
+	return kclient.Link{Relation: kclient.Self, Href: path.Join(httpd.BasePath, "recordings", id)}
+}
+
+func convertRecording(recording Recording) kclient.Recording {
+	var typ kclient.TaskType
+	switch recording.Type {
+	case StreamRecording:
+		typ = kclient.StreamTask
+	case BatchRecording:
+		typ = kclient.BatchTask
+	}
+	var status kclient.Status
+	switch recording.Status {
+	case Failed:
+		status = kclient.Failed
+	case Running:
+		status = kclient.Running
+	case Finished:
+		status = kclient.Finished
+	}
+	return kclient.Recording{
+		Link:     recordingLink(recording.ID),
+		ID:       recording.ID,
+		Type:     typ,
+		Size:     recording.Size,
+		Date:     recording.Date,
+		Error:    recording.Error,
+		Status:   status,
+		Progress: recording.Progress,
+	}
+}
+
+func replayLink(id string) kclient.Link {
+	return kclient.Link{Relation: kclient.Self, Href: path.Join(httpd.BasePath, "replays", id)}
+}
+
+func convertReplay(replay Replay) kclient.Replay {
+	var clk kclient.Clock
+	switch replay.Clock {
+	case Real:
+		clk = kclient.Real
+	case Fast:
+		clk = kclient.Fast
+	}
+	var status kclient.Status
+	switch replay.Status {
+	case Failed:
+		status = kclient.Failed
+	case Running:
+		status = kclient.Running
+	case Finished:
+		status = kclient.Finished
+	}
+	return kclient.Replay{
+		Link:          replayLink(replay.ID),
+		ID:            replay.ID,
+		Recording:     replay.RecordingID,
+		Task:          replay.TaskID,
+		RecordingTime: replay.RecordingTime,
+		Clock:         clk,
+		Date:          replay.Date,
+		Error:         replay.Error,
+		Status:        status,
+		Progress:      replay.Progress,
+	}
+}
+
+var allRecordingFields = []string{
+	"link",
+	"id",
+	"type",
+	"size",
+	"date",
+	"error",
+	"status",
+	"progress",
+}
+
+func (s *Service) handleListRecordings(w http.ResponseWriter, r *http.Request) {
+	pattern := r.URL.Query().Get("pattern")
+	fields := r.URL.Query()["fields"]
+	if len(fields) == 0 {
+		fields = allRecordingFields
+	} else {
+		// Always return ID field
+		fields = append(fields, "id", "link")
 	}
 
-	infos, err := s.GetRecordings(rids)
+	offsetStr := r.URL.Query().Get("offset")
+	offset, err := strconv.ParseInt(offsetStr, 10, 64)
+	if err != nil {
+		httpd.HttpError(w, fmt.Sprintf("invalid offset parameter %q must be an integer: %s", offsetStr, err), true, http.StatusBadRequest)
+	}
+
+	limitStr := r.URL.Query().Get("limit")
+	limit, err := strconv.ParseInt(limitStr, 10, 64)
+	if err != nil {
+		httpd.HttpError(w, fmt.Sprintf("invalid limit parameter %q must be an integer: %s", limitStr, err), true, http.StatusBadRequest)
+	}
+	if limit == 0 {
+		limit = 100
+	}
+
+	recordings, err := s.recordings.List(pattern, int(offset), int(limit))
+
+	rs := make([]map[string]interface{}, len(recordings))
+	for i, recording := range recordings {
+		rs[i] = make(map[string]interface{}, len(fields))
+		for _, field := range fields {
+			var value interface{}
+			switch field {
+			case "id":
+				value = recording.ID
+			case "link":
+				value = recordingLink(recording.ID)
+			case "type":
+				switch recording.Type {
+				case StreamRecording:
+					value = kclient.StreamTask
+				case BatchRecording:
+					value = kclient.BatchTask
+				}
+			case "size":
+				value = recording.Size
+			case "date":
+				value = recording.Date
+			case "error":
+				value = recording.Error
+			case "status":
+				switch recording.Status {
+				case Failed:
+					value = kclient.Failed
+				case Running:
+					value = kclient.Running
+				case Finished:
+					value = kclient.Finished
+				}
+			case "progress":
+				value = recording.Progress
+			}
+			rs[i][field] = value
+		}
+	}
+	type response struct {
+		Recordings []map[string]interface{} `json:"recordings"`
+	}
+	w.Write(httpd.MarshalJSON(response{Recordings: rs}, true))
+}
+
+func (r *Service) handleRecording(w http.ResponseWriter, req *http.Request) {
+	_, rid := path.Split(req.URL.Path)
+
+	recording, err := r.recordings.Get(rid)
+	if err != nil {
+		httpd.HttpError(w, "error finding recording: "+err.Error(), true, http.StatusInternalServerError)
+		return
+	}
+	if recording.Status == Running {
+		w.WriteHeader(http.StatusAccepted)
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
+
+	w.Write(httpd.MarshalJSON(convertRecording(recording), true))
+}
+func (s *Service) handleDeleteRecording(w http.ResponseWriter, r *http.Request) {
+	_, rid := path.Split(r.URL.Path)
+	recording, err := s.recordings.Get(rid)
+	if err == ErrNoRecordingExists {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
+		return
+	}
+	err = s.recordings.Delete(rid)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
+		return
+	}
+	ds, err := parseDataSourceURL(recording.DataURL)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
+		return
+	}
+
+	err = ds.Remove()
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (r *Service) handleRecordStream(w http.ResponseWriter, req *http.Request) {
+	var opt kclient.RecordStreamOptions
+	dec := json.NewDecoder(req.Body)
+	err := dec.Decode(&opt)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
+		return
+	}
+	if opt.ID == "" {
+		opt.ID = uuid.NewV4().String()
+	}
+	if !validID.MatchString(opt.ID) {
+		httpd.HttpError(w, fmt.Sprintf("recording ID must match %v %q", validID, opt.ID), true, http.StatusBadRequest)
+		return
+	}
+	t, err := r.TaskStore.Load(opt.Task)
 	if err != nil {
 		httpd.HttpError(w, err.Error(), true, http.StatusNotFound)
 		return
 	}
-
-	type response struct {
-		Recordings []RecordingInfo `json:"Recordings"`
+	dataUrl := url.URL{
+		Scheme: "file",
+		Path:   path.Join(r.saveDir, opt.ID+streamEXT),
 	}
 
-	w.Write(httpd.MarshalJSON(response{infos}, true))
+	recording := Recording{
+		ID:      opt.ID,
+		DataURL: dataUrl.String(),
+		Type:    StreamRecording,
+		Date:    time.Now(),
+		Status:  Running,
+	}
+	err = r.recordings.Create(recording)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
+		return
+	}
+
+	// Spawn routine to perform actual recording.
+	go func(recording Recording) {
+		ds, _ := parseDataSourceURL(dataUrl.String())
+		err := r.doRecordStream(opt.ID, ds, opt.Stop, t.DBRPs, t.Measurements())
+		r.updateRecordingResult(recording, ds, err)
+	}(recording)
+
+	w.WriteHeader(http.StatusCreated)
+	w.Write(httpd.MarshalJSON(convertRecording(recording), true))
 }
 
-func (s *Service) handleDelete(w http.ResponseWriter, r *http.Request) {
-	rid := r.URL.Query().Get("rid")
-	s.Delete(rid)
-	w.WriteHeader(http.StatusNoContent)
+func (r *Service) handleRecordBatch(w http.ResponseWriter, req *http.Request) {
+	var opt kclient.RecordBatchOptions
+	dec := json.NewDecoder(req.Body)
+	err := dec.Decode(&opt)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
+		return
+	}
+	if opt.ID == "" {
+		opt.ID = uuid.NewV4().String()
+	}
+	if !validID.MatchString(opt.ID) {
+		httpd.HttpError(w, fmt.Sprintf("recording ID must match %v %q", validID, opt.ID), true, http.StatusBadRequest)
+		return
+	}
+
+	if opt.Start.IsZero() {
+		httpd.HttpError(w, "must provide start time", true, http.StatusBadRequest)
+		return
+	}
+	if opt.Stop.IsZero() {
+		opt.Stop = time.Now()
+	}
+
+	t, err := r.TaskStore.Load(opt.Task)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusNotFound)
+		return
+	}
+	dataUrl := url.URL{
+		Scheme: "file",
+		Path:   path.Join(r.saveDir, opt.ID+batchEXT),
+	}
+
+	recording := Recording{
+		ID:      opt.ID,
+		DataURL: dataUrl.String(),
+		Type:    BatchRecording,
+		Date:    time.Now(),
+		Status:  Running,
+	}
+	err = r.recordings.Create(recording)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
+		return
+	}
+
+	go func(recording Recording) {
+		ds, _ := parseDataSourceURL(dataUrl.String())
+		err := r.doRecordBatch(opt.ID, ds, t, opt.Start, opt.Stop, opt.Cluster)
+		r.updateRecordingResult(recording, ds, err)
+	}(recording)
+
+	w.WriteHeader(http.StatusCreated)
+	w.Write(httpd.MarshalJSON(convertRecording(recording), true))
+}
+
+func (r *Service) handleRecordQuery(w http.ResponseWriter, req *http.Request) {
+	var opt kclient.RecordQueryOptions
+	dec := json.NewDecoder(req.Body)
+	err := dec.Decode(&opt)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
+		return
+	}
+	if opt.ID == "" {
+		opt.ID = uuid.NewV4().String()
+	}
+	if !validID.MatchString(opt.ID) {
+		httpd.HttpError(w, fmt.Sprintf("recording ID must match %v %q", validID, opt.ID), true, http.StatusBadRequest)
+		return
+	}
+	if opt.Query == "" {
+		httpd.HttpError(w, "must provide query", true, http.StatusBadRequest)
+		return
+	}
+	var dataPath string
+	var typ RecordingType
+	switch opt.Type {
+	case kclient.StreamTask:
+		dataPath = path.Join(r.saveDir, opt.ID+streamEXT)
+		typ = StreamRecording
+	case kclient.BatchTask:
+		dataPath = path.Join(r.saveDir, opt.ID+batchEXT)
+		typ = BatchRecording
+	}
+
+	dataUrl := url.URL{
+		Scheme: "file",
+		Path:   dataPath,
+	}
+
+	recording := Recording{
+		ID:      opt.ID,
+		DataURL: dataUrl.String(),
+		Type:    typ,
+		Date:    time.Now(),
+		Status:  Running,
+	}
+	err = r.recordings.Create(recording)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
+		return
+	}
+
+	go func(recording Recording) {
+		ds, _ := parseDataSourceURL(dataUrl.String())
+		err := r.doRecordQuery(opt.ID, ds, opt.Query, typ, opt.Cluster)
+		r.updateRecordingResult(recording, ds, err)
+	}(recording)
+
+	w.WriteHeader(http.StatusCreated)
+	w.Write(httpd.MarshalJSON(convertRecording(recording), true))
+}
+
+func (r *Service) updateRecordingResult(recording Recording, ds DataSource, err error) {
+	recording.Status = Finished
+	if err != nil {
+		recording.Status = Failed
+		recording.Error = err.Error()
+	}
+	recording.Date = time.Now()
+	recording.Progress = 1.0
+	recording.Size, err = ds.Size()
+	if err != nil {
+		r.logger.Println("E! failed to determine size of recording", recording.ID, err)
+	}
+
+	err = r.recordings.Replace(recording)
+	if err != nil {
+		r.logger.Println("E! failed to save recording info", recording.ID, err)
+	}
 }
 
 func (r *Service) handleReplay(w http.ResponseWriter, req *http.Request) {
-	name := req.URL.Query().Get("name")
-	id := req.URL.Query().Get("id")
-	clockTyp := req.URL.Query().Get("clock")
-	recTimeStr := req.URL.Query().Get("rec-time")
-	var recTime bool
-	if recTimeStr != "" {
-		var err error
-		recTime, err = strconv.ParseBool(recTimeStr)
-		if err != nil {
-			httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
-			return
-		}
+	_, id := path.Split(req.URL.Path)
+	replay, err := r.replays.Get(id)
+	if err != nil {
+		httpd.HttpError(w, "could not find replay: "+err.Error(), true, http.StatusNotFound)
+		return
+	}
+	if replay.Status == Running {
+		w.WriteHeader(http.StatusAccepted)
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
+	w.Write(httpd.MarshalJSON(convertReplay(replay), true))
+}
+
+func (r *Service) handleDeleteReplay(w http.ResponseWriter, req *http.Request) {
+	_, id := path.Split(req.URL.Path)
+	//TODO: Cancel running replays
+	r.replays.Delete(id)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+var allReplayFields = []string{
+	"link",
+	"id",
+	"recording",
+	"task",
+	"recording-time",
+	"clock",
+	"date",
+	"error",
+	"status",
+	"progress",
+}
+
+func (s *Service) handleListReplays(w http.ResponseWriter, r *http.Request) {
+	pattern := r.URL.Query().Get("pattern")
+	fields := r.URL.Query()["fields"]
+	if len(fields) == 0 {
+		fields = allReplayFields
+	} else {
+		// Always return ID field
+		fields = append(fields, "id", "link")
 	}
 
-	t, err := r.TaskStore.Load(name)
+	offsetStr := r.URL.Query().Get("offset")
+	offset, err := strconv.ParseInt(offsetStr, 10, 64)
+	if err != nil {
+		httpd.HttpError(w, fmt.Sprintf("invalid offset parameter %q must be an integer: %s", offsetStr, err), true, http.StatusBadRequest)
+	}
+
+	limitStr := r.URL.Query().Get("limit")
+	limit, err := strconv.ParseInt(limitStr, 10, 64)
+	if err != nil {
+		httpd.HttpError(w, fmt.Sprintf("invalid limit parameter %q must be an integer: %s", limitStr, err), true, http.StatusBadRequest)
+	}
+	if limit == 0 {
+		limit = 100
+	}
+
+	replays, err := s.replays.List(pattern, int(offset), int(limit))
+
+	rs := make([]map[string]interface{}, len(replays))
+	for i, replay := range replays {
+		rs[i] = make(map[string]interface{}, len(fields))
+		for _, field := range fields {
+			var value interface{}
+			switch field {
+			case "id":
+				value = replay.ID
+			case "link":
+				value = replayLink(replay.ID)
+			case "recording":
+				value = replay.RecordingID
+			case "task":
+				value = replay.TaskID
+			case "recording-time":
+				value = replay.RecordingTime
+			case "clock":
+				switch replay.Clock {
+				case Fast:
+					value = kclient.Fast
+				case Real:
+					value = kclient.Real
+				}
+			case "date":
+				value = replay.Date
+			case "error":
+				value = replay.Error
+			case "status":
+				switch replay.Status {
+				case Failed:
+					value = kclient.Failed
+				case Running:
+					value = kclient.Running
+				case Finished:
+					value = kclient.Finished
+				}
+			case "progress":
+				value = replay.Progress
+			}
+			rs[i][field] = value
+		}
+	}
+	type response struct {
+		Replays []map[string]interface{} `json:"replays"`
+	}
+	w.Write(httpd.MarshalJSON(response{Replays: rs}, true))
+}
+
+func (r *Service) handleCreateReplay(w http.ResponseWriter, req *http.Request) {
+	var opt kclient.CreateReplayOptions
+	// Default clock to the Fast clock
+	opt.Clock = kclient.Fast
+	dec := json.NewDecoder(req.Body)
+	err := dec.Decode(&opt)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
+		return
+	}
+	if opt.ID == "" {
+		opt.ID = uuid.NewV4().String()
+	}
+	if !validID.MatchString(opt.ID) {
+		httpd.HttpError(w, fmt.Sprintf("replay ID must match %v %q", validID, opt.ID), true, http.StatusBadRequest)
+		return
+	}
+
+	t, err := r.TaskStore.Load(opt.Task)
 	if err != nil {
 		httpd.HttpError(w, "task load: "+err.Error(), true, http.StatusNotFound)
 		return
 	}
-
-	var clk clock.Clock
-	switch clockTyp {
-	case "", "wall":
-		clk = clock.Wall()
-	case "fast":
-		clk = clock.Fast()
+	recording, err := r.recordings.Get(opt.Recording)
+	if err != nil {
+		httpd.HttpError(w, "recording not found: "+err.Error(), true, http.StatusNotFound)
+		return
 	}
 
+	var clk clock.Clock
+	var clockType Clock
+	switch opt.Clock {
+	case kclient.Real:
+		clk = clock.Wall()
+		clockType = Real
+	case kclient.Fast:
+		clk = clock.Fast()
+		clockType = Fast
+	default:
+		httpd.HttpError(w, fmt.Sprintf("invalid clock type %v", opt.Clock), true, http.StatusBadRequest)
+		return
+	}
+
+	// Successfully started replay
+	replay := Replay{
+		ID:            opt.ID,
+		RecordingID:   opt.Recording,
+		TaskID:        opt.Task,
+		RecordingTime: opt.RecordingTime,
+		Clock:         clockType,
+		Date:          time.Now(),
+		Status:        Running,
+	}
+	r.replays.Create(replay)
+
+	go func(replay Replay) {
+		err := r.doReplay(t, recording, clk, opt.RecordingTime)
+		replay.Status = Finished
+		if err != nil {
+			replay.Status = Failed
+			replay.Error = err.Error()
+		}
+		replay.Progress = 1.0
+		replay.Date = time.Now()
+		err = r.replays.Replace(replay)
+		if err != nil {
+			r.logger.Println("E! failed to save replay results:", err)
+		}
+	}(replay)
+
+	w.WriteHeader(http.StatusCreated)
+	w.Write(httpd.MarshalJSON(convertReplay(replay), true))
+}
+
+func (r *Service) doReplay(task *kapacitor.Task, recording Recording, clk clock.Clock, recTime bool) error {
 	// Create new isolated task master
 	tm := r.TaskMaster.New()
 	tm.Open()
 	defer tm.Close()
-	et, err := tm.StartTask(t)
+	et, err := tm.StartTask(task)
 	if err != nil {
-		httpd.HttpError(w, "task start: "+err.Error(), true, http.StatusBadRequest)
-		return
+		return errors.Wrap(err, "task start")
+	}
+
+	dataSource, err := parseDataSourceURL(recording.DataURL)
+	if err != nil {
+		return errors.Wrap(err, "load data source")
 	}
 
 	replay := kapacitor.NewReplay(clk)
 	var replayC <-chan error
-	switch t.Type {
+	switch task.Type {
 	case kapacitor.StreamTask:
-		f, err := r.FindStreamRecording(id)
+		f, err := dataSource.StreamReader()
 		if err != nil {
-			httpd.HttpError(w, "replay find: "+err.Error(), true, http.StatusNotFound)
-			return
+			return errors.Wrap(err, "data source open")
 		}
-		stream, err := tm.Stream(id)
+		stream, err := tm.Stream(recording.ID)
 		if err != nil {
-			httpd.HttpError(w, "stream start: "+err.Error(), true, http.StatusInternalServerError)
-			return
+			return errors.Wrap(err, "stream start")
 		}
 		replayC = replay.ReplayStream(f, stream, recTime, precision)
 	case kapacitor.BatchTask:
-		fs, err := r.FindBatchRecording(id)
+		fs, err := dataSource.BatchReaders()
 		if err != nil {
-			httpd.HttpError(w, "replay find: "+err.Error(), true, http.StatusNotFound)
-			return
+			return errors.Wrap(err, "data source open")
 		}
-		batches := tm.BatchCollectors(name)
+		batches := tm.BatchCollectors(task.ID)
 		replayC = replay.ReplayBatch(fs, batches, recTime)
 	}
 
 	// Check for error on replay
 	err = <-replayC
 	if err != nil {
-		httpd.HttpError(w, "replay: "+err.Error(), true, http.StatusInternalServerError)
-		return
+		return errors.Wrap(err, "replay")
 	}
 
 	// Drain tm so the task can finish
@@ -226,368 +843,15 @@ func (r *Service) handleReplay(w http.ResponseWriter, req *http.Request) {
 	// Check for error on task
 	err = et.Wait()
 	if err != nil {
-		httpd.HttpError(w, "task run: "+err.Error(), true, http.StatusInternalServerError)
-		return
+		return errors.Wrap(err, "task run")
 	}
 
 	// Call close explicitly to check for error
 	err = tm.Close()
 	if err != nil {
-		httpd.HttpError(w, "closing: "+err.Error(), true, http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (r *Service) handleRecord(w http.ResponseWriter, req *http.Request) {
-	type doFunc func() error
-	var doF doFunc
-	started := make(chan struct{})
-
-	rid := uuid.NewV4()
-	typ := req.URL.Query().Get("type")
-	switch typ {
-	case "stream":
-		task := req.URL.Query().Get("name")
-		if task == "" {
-			httpd.HttpError(w, "no task specified", true, http.StatusBadRequest)
-			return
-		}
-		t, err := r.TaskStore.Load(task)
-		if err != nil {
-			httpd.HttpError(w, err.Error(), true, http.StatusNotFound)
-			return
-		}
-
-		durStr := req.URL.Query().Get("duration")
-		dur, err := influxql.ParseDuration(durStr)
-		if err != nil {
-			httpd.HttpError(w, "invalid duration string: "+err.Error(), true, http.StatusBadRequest)
-			return
-		}
-
-		doF = func() error {
-			err := r.doRecordStream(rid, dur, t.DBRPs, t.Measurements(), started)
-			if err != nil {
-				close(started)
-			}
-			return err
-		}
-
-	case "batch":
-		var err error
-
-		// Determine start time.
-		var start time.Time
-		startStr := req.URL.Query().Get("start")
-		pastStr := req.URL.Query().Get("past")
-		if startStr != "" && pastStr != "" {
-			httpd.HttpError(w, "must not pass both 'start' and 'past' parameters", true, http.StatusBadRequest)
-			return
-		}
-
-		now := time.Now()
-
-		switch {
-		case startStr != "":
-			start, err = time.Parse(time.RFC3339, startStr)
-			if err != nil {
-				httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
-				return
-			}
-		case pastStr != "":
-			diff, err := influxql.ParseDuration(pastStr)
-			if err != nil {
-				httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
-				return
-			}
-			start = now.Add(-1 * diff)
-		}
-
-		// Get stop time, if present
-		stop := now
-		stopStr := req.URL.Query().Get("stop")
-		if stopStr != "" {
-			stop, err = time.Parse(time.RFC3339, stopStr)
-			if err != nil {
-				httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
-				return
-			}
-		}
-
-		// Get task
-		task := req.URL.Query().Get("name")
-		if task == "" {
-			httpd.HttpError(w, "no task specified", true, http.StatusBadRequest)
-			return
-		}
-
-		// Get InfluxDB cluster
-		cluster := req.URL.Query().Get("cluster")
-
-		t, err := r.TaskStore.Load(task)
-		if err != nil {
-			httpd.HttpError(w, err.Error(), true, http.StatusNotFound)
-			return
-		}
-
-		doF = func() error {
-			close(started)
-			return r.doRecordBatch(rid, t, start, stop, cluster)
-		}
-	case "query":
-		query := req.URL.Query().Get("query")
-		if query == "" {
-			httpd.HttpError(w, "must pass query parameter", true, http.StatusBadRequest)
-			return
-		}
-
-		typeStr := req.URL.Query().Get("ttype")
-		var tt kapacitor.TaskType
-		switch typeStr {
-		case "stream":
-			tt = kapacitor.StreamTask
-		case "batch":
-			tt = kapacitor.BatchTask
-		default:
-			httpd.HttpError(w, fmt.Sprintf("invalid type %q", typeStr), true, http.StatusBadRequest)
-			return
-		}
-		// Get InfluxDB cluster
-		cluster := req.URL.Query().Get("cluster")
-		doF = func() error {
-			close(started)
-			return r.doRecordQuery(rid, query, tt, cluster)
-		}
-	default:
-		httpd.HttpError(w, "invalid recording type", true, http.StatusBadRequest)
-		return
-	}
-	// Store recording in running recordings.
-	errC := make(chan error)
-	func() {
-		r.recordingsMu.Lock()
-		defer r.recordingsMu.Unlock()
-		r.runningRecordings[rid.String()] = errC
-	}()
-
-	// Spawn routine to perform actual recording.
-	go func() {
-		err := doF()
-		if err != nil {
-			// Always log an error since the user may not have requested the error.
-			r.logger.Printf("E! recording %s failed: %v", rid.String(), err)
-		}
-		select {
-		case errC <- err:
-		case <-time.After(time.Minute):
-			// Cache the error for a max duration then drop it
-		}
-		// We have finished delete from running map
-		r.recordingsMu.Lock()
-		defer r.recordingsMu.Unlock()
-		delete(r.runningRecordings, rid.String())
-	}()
-
-	// Wait till the goroutine for doing the recording has actually started
-	<-started
-
-	// Respond with the recording ID
-	type response struct {
-		RecordingID string `json:"RecordingID"`
-	}
-	w.Write(httpd.MarshalJSON(response{rid.String()}, true))
-}
-
-func (r *Service) handleGetRecording(w http.ResponseWriter, req *http.Request) {
-	rid := req.URL.Query().Get("id")
-
-	// First check if its still running
-	var errC <-chan error
-	var running bool
-	func() {
-		r.recordingsMu.RLock()
-		defer r.recordingsMu.RUnlock()
-		errC, running = r.runningRecordings[rid]
-	}()
-
-	if running {
-		// It is still running wait for it to finish
-		err := <-errC
-		if err != nil {
-			info := RecordingInfo{
-				ID:    rid,
-				Error: err.Error(),
-			}
-			w.Write(httpd.MarshalJSON(info, true))
-			return
-		}
-	}
-
-	// It already finished, return its info
-	info, err := r.GetRecordings([]string{rid})
-	if err != nil {
-		httpd.HttpError(w, "error finding recording: "+err.Error(), true, http.StatusInternalServerError)
-		return
-	}
-	if len(info) != 1 {
-		httpd.HttpError(w, "recording not found", true, http.StatusNotFound)
-		return
-	}
-
-	w.Write(httpd.MarshalJSON(info[0], true))
-}
-
-type RecordingInfo struct {
-	ID      string
-	Type    kapacitor.TaskType
-	Size    int64
-	Created time.Time
-	Error   string `json:",omitempty"`
-}
-
-func (r *Service) GetRecordings(rids []string) ([]RecordingInfo, error) {
-	files, err := ioutil.ReadDir(r.saveDir)
-	if err != nil {
-		return nil, err
-	}
-
-	ids := make(map[string]bool)
-	for _, id := range rids {
-		ids[id] = true
-	}
-
-	infos := make([]RecordingInfo, 0, len(files))
-
-	for _, info := range files {
-		if info.IsDir() {
-			continue
-		}
-		name := info.Name()
-		i := strings.LastIndex(name, ".")
-		ext := name[i:]
-		id := name[:i]
-		if len(ids) > 0 && !ids[id] {
-			continue
-		}
-		var typ kapacitor.TaskType
-		switch ext {
-		case streamEXT:
-			typ = kapacitor.StreamTask
-		case batchEXT:
-			typ = kapacitor.BatchTask
-		default:
-			continue
-		}
-		rinfo := RecordingInfo{
-			ID:      id,
-			Type:    typ,
-			Size:    info.Size(),
-			Created: info.ModTime().UTC(),
-		}
-		infos = append(infos, rinfo)
-	}
-	return infos, nil
-}
-
-func (r *Service) find(id string, typ kapacitor.TaskType) (*os.File, error) {
-	var ext string
-	var other string
-	switch typ {
-	case kapacitor.StreamTask:
-		ext = streamEXT
-		other = batchEXT
-	case kapacitor.BatchTask:
-		ext = batchEXT
-		other = streamEXT
-	default:
-		return nil, fmt.Errorf("unknown task type %q", typ)
-	}
-	p := path.Join(r.saveDir, id+ext)
-	f, err := os.Open(p)
-	if err != nil {
-		if _, err := os.Stat(path.Join(r.saveDir, id+other)); err == nil {
-			return nil, fmt.Errorf("found recording of wrong type, check task type matches recording.")
-		}
-		return nil, err
-	}
-	return f, nil
-}
-
-func (r *Service) FindStreamRecording(id string) (io.ReadCloser, error) {
-	f, err := r.find(id, kapacitor.StreamTask)
-	if err != nil {
-		return nil, err
-	}
-	gz, err := gzip.NewReader(f)
-	if err != nil {
-		return nil, err
-	}
-	return rc{gz, f}, nil
-}
-
-func (r *Service) FindBatchRecording(id string) ([]io.ReadCloser, error) {
-	f, err := r.find(id, kapacitor.BatchTask)
-	if err != nil {
-		return nil, err
-	}
-	stat, err := f.Stat()
-	if err != nil {
-		return nil, err
-	}
-	archive, err := zip.NewReader(f, stat.Size())
-	if err != nil {
-		return nil, err
-	}
-	rcs := make([]io.ReadCloser, len(archive.File))
-	for i, file := range archive.File {
-		rc, err := file.Open()
-		if err != nil {
-			return nil, err
-		}
-		rcs[i] = rc
-	}
-	return rcs, nil
-}
-
-func (r *Service) Delete(id string) {
-	ps := path.Join(r.saveDir, id+streamEXT)
-	pb := path.Join(r.saveDir, id+batchEXT)
-	os.Remove(ps)
-	os.Remove(pb)
-}
-
-type rc struct {
-	r io.ReadCloser
-	c io.Closer
-}
-
-func (r rc) Read(p []byte) (int, error) {
-	return r.r.Read(p)
-}
-
-func (r rc) Close() error {
-	err := r.r.Close()
-	if err != nil {
-		return err
-	}
-	err = r.c.Close()
-	if err != nil {
-		return err
+		return errors.Wrap(err, "task master close")
 	}
 	return nil
-}
-
-// create new stream writer
-func (r *Service) newStreamWriter(rid uuid.UUID) (io.WriteCloser, error) {
-	rpath := path.Join(r.saveDir, rid.String()+streamEXT)
-	f, err := os.Create(rpath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to save recording: %s", err)
-	}
-	gz := gzip.NewWriter(f)
-	sw := streamWriter{f: f, gz: gz}
-	return sw, nil
 }
 
 // wrap gzipped writer and underlying file
@@ -608,12 +872,12 @@ func (s streamWriter) Close() error {
 }
 
 // Record the stream for a duration
-func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration, dbrps []kapacitor.DBRP, measurements []string, started chan struct{}) error {
-	e, err := r.TaskMaster.NewFork(rid.String(), dbrps, measurements)
+func (r *Service) doRecordStream(id string, dataSource DataSource, stop time.Time, dbrps []kapacitor.DBRP, measurements []string) error {
+	e, err := r.TaskMaster.NewFork(id, dbrps, measurements)
 	if err != nil {
 		return err
 	}
-	sw, err := r.newStreamWriter(rid)
+	sw, err := dataSource.StreamWriter()
 	if err != nil {
 		return err
 	}
@@ -621,17 +885,12 @@ func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration, dbrps []kapac
 
 	done := make(chan struct{})
 	go func() {
-		close(started)
-		start := time.Time{}
 		closed := false
 		for p, ok := e.NextPoint(); ok; p, ok = e.NextPoint() {
 			if closed {
 				continue
 			}
-			if start.IsZero() {
-				start = p.Time
-			}
-			if p.Time.Sub(start) > dur {
+			if p.Time.After(stop) {
 				closed = true
 				close(done)
 				//continue to read any data already on the edge, but just drop it.
@@ -642,19 +901,8 @@ func (r *Service) doRecordStream(rid uuid.UUID, dur time.Duration, dbrps []kapac
 	}()
 	<-done
 	e.Abort()
-	r.TaskMaster.DelFork(rid.String())
+	r.TaskMaster.DelFork(id)
 	return nil
-}
-
-// open an archive for writing batch recordings
-func (r *Service) newBatchArchive(rid uuid.UUID) (*batchArchive, error) {
-	rpath := path.Join(r.saveDir, rid.String()+batchEXT)
-	f, err := os.Create(rpath)
-	if err != nil {
-		return nil, err
-	}
-	archive := zip.NewWriter(f)
-	return &batchArchive{f: f, archive: archive}, nil
 }
 
 // wrap the underlying file and archive
@@ -664,7 +912,7 @@ type batchArchive struct {
 }
 
 // create new file in archive from batch index
-func (b batchArchive) Create(idx int) (io.Writer, error) {
+func (b batchArchive) Archive(idx int) (io.Writer, error) {
 	return b.archive.Create(strconv.FormatInt(int64(idx), 10))
 }
 
@@ -679,7 +927,7 @@ func (b batchArchive) Close() error {
 }
 
 // Record a series of batch queries defined by a batch task
-func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, start, stop time.Time, cluster string) error {
+func (r *Service) doRecordBatch(id string, dataSource DataSource, t *kapacitor.Task, start, stop time.Time, cluster string) error {
 	et, err := kapacitor.NewExecutingTask(r.TaskMaster.New(), t)
 	if err != nil {
 		return err
@@ -704,13 +952,13 @@ func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, start, stop ti
 		return err
 	}
 
-	archive, err := r.newBatchArchive(rid)
+	archiver, err := dataSource.BatchArchiver()
 	if err != nil {
 		return err
 	}
 
 	for batchIdx, queries := range batches {
-		w, err := archive.Create(batchIdx)
+		w, err := archiver.Archive(batchIdx)
 		if err != nil {
 			return err
 		}
@@ -736,10 +984,10 @@ func (r *Service) doRecordBatch(rid uuid.UUID, t *kapacitor.Task, start, stop ti
 			}
 		}
 	}
-	return archive.Close()
+	return archiver.Close()
 }
 
-func (r *Service) doRecordQuery(rid uuid.UUID, q string, tt kapacitor.TaskType, cluster string) error {
+func (r *Service) doRecordQuery(id string, dataSource DataSource, q string, typ RecordingType, cluster string) error {
 	// Parse query to determine dbrp
 	var db, rp string
 	s, err := influxql.ParseStatement(q)
@@ -781,24 +1029,24 @@ func (r *Service) doRecordQuery(rid uuid.UUID, q string, tt kapacitor.TaskType, 
 	// Open appropriate writer
 	var w io.Writer
 	var c io.Closer
-	switch tt {
-	case kapacitor.StreamTask:
-		sw, err := r.newStreamWriter(rid)
+	switch typ {
+	case StreamRecording:
+		sw, err := dataSource.StreamWriter()
 		if err != nil {
 			return err
 		}
 		w = sw
 		c = sw
-	case kapacitor.BatchTask:
-		archive, err := r.newBatchArchive(rid)
+	case BatchRecording:
+		archiver, err := dataSource.BatchArchiver()
 		if err != nil {
 			return err
 		}
-		w, err = archive.Create(0)
+		w, err = archiver.Archive(0)
 		if err != nil {
 			return err
 		}
-		c = archive
+		c = archiver
 	}
 	// Write results to writer
 	for _, res := range resp.Results {
@@ -807,8 +1055,8 @@ func (r *Service) doRecordQuery(rid uuid.UUID, q string, tt kapacitor.TaskType, 
 			c.Close()
 			return err
 		}
-		switch tt {
-		case kapacitor.StreamTask:
+		switch typ {
+		case StreamRecording:
 			// Write points in order across batches
 
 			// Find earliest time of first points
@@ -856,11 +1104,127 @@ func (r *Service) doRecordQuery(rid uuid.UUID, q string, tt kapacitor.TaskType, 
 				}
 				current = next
 			}
-		case kapacitor.BatchTask:
+		case BatchRecording:
 			for _, batch := range batches {
 				kapacitor.WriteBatchForRecording(w, batch)
 			}
 		}
 	}
 	return c.Close()
+}
+
+type BatchArchiver interface {
+	io.Closer
+	Archive(idx int) (io.Writer, error)
+}
+
+type DataSource interface {
+	Size() (int64, error)
+	Remove() error
+	StreamWriter() (io.WriteCloser, error)
+	StreamReader() (io.ReadCloser, error)
+	BatchArchiver() (BatchArchiver, error)
+	BatchReaders() ([]io.ReadCloser, error)
+}
+
+type fileSource string
+
+func parseDataSourceURL(rawurl string) (DataSource, error) {
+	u, err := url.Parse(rawurl)
+	if err != nil {
+		return nil, err
+	}
+	switch u.Scheme {
+	case "file":
+		return fileSource(u.Path), nil
+	default:
+		return nil, fmt.Errorf("unsupported data source scheme %s", u.Scheme)
+	}
+}
+
+func (s fileSource) Size() (int64, error) {
+	info, err := os.Stat(string(s))
+	if err != nil {
+		return -1, err
+	}
+	return info.Size(), nil
+}
+
+func (s fileSource) Remove() error {
+	return os.Remove(string(s))
+}
+
+func (s fileSource) StreamWriter() (io.WriteCloser, error) {
+	f, err := os.Create(string(s))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create recording file: %s", err)
+	}
+	gz := gzip.NewWriter(f)
+	sw := streamWriter{f: f, gz: gz}
+	return sw, nil
+}
+
+func (s fileSource) StreamReader() (io.ReadCloser, error) {
+	f, err := os.Open(string(s))
+	if err != nil {
+		return nil, err
+	}
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		return nil, err
+	}
+	return rc{gz, f}, nil
+}
+
+func (s fileSource) BatchArchiver() (BatchArchiver, error) {
+	f, err := os.Create(string(s))
+	if err != nil {
+		return nil, err
+	}
+	archive := zip.NewWriter(f)
+	return &batchArchive{f: f, archive: archive}, nil
+}
+func (s fileSource) BatchReaders() ([]io.ReadCloser, error) {
+	f, err := os.Open(string(s))
+	if err != nil {
+		return nil, err
+	}
+	stat, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	archive, err := zip.NewReader(f, stat.Size())
+	if err != nil {
+		return nil, err
+	}
+	rcs := make([]io.ReadCloser, len(archive.File))
+	for i, file := range archive.File {
+		rc, err := file.Open()
+		if err != nil {
+			return nil, err
+		}
+		rcs[i] = rc
+	}
+	return rcs, nil
+}
+
+type rc struct {
+	r io.ReadCloser
+	c io.Closer
+}
+
+func (r rc) Read(p []byte) (int, error) {
+	return r.r.Read(p)
+}
+
+func (r rc) Close() error {
+	err := r.r.Close()
+	if err != nil {
+		return err
+	}
+	err = r.c.Close()
+	if err != nil {
+		return err
+	}
+	return nil
 }

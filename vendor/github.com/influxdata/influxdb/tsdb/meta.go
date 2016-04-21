@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/pkg/escape"
 	internal "github.com/influxdata/influxdb/tsdb/internal"
 
@@ -54,6 +54,16 @@ func NewDatabaseIndex(name string) *DatabaseIndex {
 func (d *DatabaseIndex) Series(key string) *Series {
 	d.mu.RLock()
 	s := d.series[key]
+	d.mu.RUnlock()
+	return s
+}
+
+func (d *DatabaseIndex) SeriesKeys() []string {
+	d.mu.RLock()
+	s := make([]string, len(d.series))
+	for k := range d.series {
+		s = append(s, k)
+	}
 	d.mu.RUnlock()
 	return s
 }
@@ -160,6 +170,47 @@ func (d *DatabaseIndex) AssignShard(k string, shardID uint64) {
 	ss := d.Series(k)
 	if ss != nil {
 		ss.AssignShard(shardID)
+	}
+}
+
+// UnassignShard updates the index to indicate that series k does not exist in
+// the given shardID
+func (d *DatabaseIndex) UnassignShard(k string, shardID uint64) {
+	ss := d.Series(k)
+	if ss != nil {
+		if ss.Assigned(shardID) {
+			// Remove the shard from any series
+			ss.UnassignShard(shardID)
+
+			// If this series no longer has shards assigned, remove the series
+			if ss.ShardN() == 0 {
+
+				// Remove the series the measurements
+				ss.measurement.DropSeries(ss)
+
+				// If the measurement no longer has any series, remove it as well
+				if !ss.measurement.HasSeries() {
+					d.mu.Lock()
+					d.dropMeasurement(ss.measurement.Name)
+					d.mu.Unlock()
+				}
+
+				// Remove the series key from the series index
+				d.mu.Lock()
+				delete(d.series, k)
+				d.statMap.Add(statDatabaseSeries, int64(-1))
+				d.mu.Unlock()
+			}
+		}
+	}
+}
+
+// RemoveShard removes all references to shardID from any series or measurements
+// in the index.  If the shard was the only owner of data for the series, the series
+// is removed from the index.
+func (d *DatabaseIndex) RemoveShard(shardID uint64) {
+	for _, k := range d.SeriesKeys() {
+		d.UnassignShard(k, shardID)
 	}
 }
 
@@ -364,11 +415,15 @@ func (d *DatabaseIndex) Measurements() Measurements {
 	return measurements
 }
 
-// DropMeasurement removes the measurement and all of its underlying series from the database index
+// DropMeasurement removes the measurement and all of its underlying
+// series from the database index
 func (d *DatabaseIndex) DropMeasurement(name string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	d.dropMeasurement(name)
+}
 
+func (d *DatabaseIndex) dropMeasurement(name string) {
 	m := d.measurements[name]
 	if m == nil {
 		return
@@ -388,17 +443,30 @@ func (d *DatabaseIndex) DropSeries(keys []string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	var nDeleted int64
+	var (
+		mToDelete = map[string]struct{}{}
+		nDeleted  int64
+	)
+
 	for _, k := range keys {
 		series := d.series[k]
 		if series == nil {
 			continue
 		}
-		series.measurement.DropSeries(series.id)
+		series.measurement.DropSeries(series)
 		delete(d.series, k)
 		nDeleted++
+
+		// If there are no more series in the measurement then we'll
+		// remove it.
+		if len(series.measurement.seriesByID) == 0 {
+			mToDelete[series.measurement.Name] = struct{}{}
+		}
 	}
 
+	for mname := range mToDelete {
+		d.dropMeasurement(mname)
+	}
 	d.statMap.Add(statDatabaseSeries, -nDeleted)
 }
 
@@ -531,7 +599,8 @@ func (m *Measurement) AddSeries(s *Series) bool {
 }
 
 // DropSeries will remove a series from the measurementIndex.
-func (m *Measurement) DropSeries(seriesID uint64) {
+func (m *Measurement) DropSeries(series *Series) {
+	seriesID := series.id
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -540,37 +609,24 @@ func (m *Measurement) DropSeries(seriesID uint64) {
 	}
 	delete(m.seriesByID, seriesID)
 
-	var ids []uint64
-	for _, id := range m.seriesIDs {
-		if id != seriesID {
-			ids = append(ids, id)
-		}
-	}
+	ids := filter(m.seriesIDs, seriesID)
 	m.seriesIDs = ids
 
-	// remove this series id to the tag index on the measurement
+	// remove this series id from the tag index on the measurement
 	// s.seriesByTagKeyValue is defined as map[string]map[string]SeriesIDs
-	for k, v := range m.seriesByTagKeyValue {
-		values := v
-		for kk, vv := range values {
-			var ids []uint64
-			for _, id := range vv {
-				if id != seriesID {
-					ids = append(ids, id)
-				}
-			}
-			// Check to see if we have any ids, if not, remove the key
-			if len(ids) == 0 {
-				delete(values, kk)
-			} else {
-				values[kk] = ids
-			}
-		}
-		// If we have no values, then we delete the key
-		if len(values) == 0 {
-			delete(m.seriesByTagKeyValue, k)
+	for k, v := range series.Tags {
+		values := m.seriesByTagKeyValue[k][v]
+		ids := filter(values, seriesID)
+		// Check to see if we have any ids, if not, remove the key
+		if len(ids) == 0 {
+			delete(m.seriesByTagKeyValue[k], v)
 		} else {
-			m.seriesByTagKeyValue[k] = values
+			m.seriesByTagKeyValue[k][v] = ids
+		}
+
+		// If we have no values, then we delete the key
+		if len(m.seriesByTagKeyValue[k]) == 0 {
+			delete(m.seriesByTagKeyValue, k)
 		}
 	}
 
@@ -747,6 +803,15 @@ func mergeSeriesFilters(op influxql.Token, ids SeriesIDs, lfilters, rfilters Fil
 // idsForExpr will return a collection of series ids and a filter expression that should
 // be used to filter points from those series.
 func (m *Measurement) idsForExpr(n *influxql.BinaryExpr) (SeriesIDs, influxql.Expr, error) {
+	// If this binary expression has another binary expression, then this
+	// is some expression math and we should just pass it to the underlying query.
+	if _, ok := n.LHS.(*influxql.BinaryExpr); ok {
+		return m.seriesIDs, n, nil
+	} else if _, ok := n.RHS.(*influxql.BinaryExpr); ok {
+		return m.seriesIDs, n, nil
+	}
+
+	// Retrieve the variable reference from the correct side of the expression.
 	name, ok := n.LHS.(*influxql.VarRef)
 	value := n.RHS
 	if !ok {
@@ -1377,11 +1442,24 @@ func (s *Series) AssignShard(shardID uint64) {
 	s.mu.Unlock()
 }
 
+func (s *Series) UnassignShard(shardID uint64) {
+	s.mu.Lock()
+	delete(s.shardIDs, shardID)
+	s.mu.Unlock()
+}
+
 func (s *Series) Assigned(shardID uint64) bool {
 	s.mu.RLock()
 	b := s.shardIDs[shardID]
 	s.mu.RUnlock()
 	return b
+}
+
+func (s *Series) ShardN() int {
+	s.mu.RLock()
+	n := len(s.shardIDs)
+	s.mu.RUnlock()
+	return n
 }
 
 // MarshalBinary encodes the object to a binary format.
@@ -1724,12 +1802,24 @@ func (s stringSet) intersect(o stringSet) stringSet {
 	return ns
 }
 
+// filter removes v from a if it exists.  a must be sorted in ascending
+// order.
+func filter(a []uint64, v uint64) []uint64 {
+	// binary search for v
+	i := sort.Search(len(a), func(i int) bool { return a[i] >= v })
+	if i >= len(a) || a[i] != v {
+		return a
+	}
+
+	// we found it, so shift the right half down one, overwriting v's position.
+	copy(a[i:], a[i+1:])
+	return a[:len(a)-1]
+}
+
 // MeasurementFromSeriesKey returns the name of the measurement from a key that
 // contains a measurement name.
 func MeasurementFromSeriesKey(key string) string {
-	idx := strings.Index(key, ",")
-	if idx == -1 {
-		return key
-	}
-	return key[:idx]
+	// Ignoring the error because the func returns "missing fields"
+	k, _, _ := models.ParseKey(key)
+	return escape.UnescapeString(k)
 }

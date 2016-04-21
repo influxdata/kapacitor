@@ -151,31 +151,31 @@ func (c *Client) ClusterID() uint64 {
 }
 
 // Database returns info for the requested database.
-func (c *Client) Database(name string) (*DatabaseInfo, error) {
+func (c *Client) Database(name string) *DatabaseInfo {
 	c.mu.RLock()
 	data := c.cacheData.Clone()
 	c.mu.RUnlock()
 
 	for _, d := range data.Databases {
 		if d.Name == name {
-			return &d, nil
+			return &d
 		}
 	}
 
-	return nil, influxdb.ErrDatabaseNotFound(name)
+	return nil
 }
 
 // Databases returns a list of all database infos.
-func (c *Client) Databases() ([]DatabaseInfo, error) {
+func (c *Client) Databases() []DatabaseInfo {
 	c.mu.RLock()
 	data := c.cacheData.Clone()
 	c.mu.RUnlock()
 
 	dbs := data.Databases
 	if dbs == nil {
-		return []DatabaseInfo{}, nil
+		return []DatabaseInfo{}
 	}
-	return dbs, nil
+	return dbs
 }
 
 // CreateDatabase creates a database or returns it if it already exists
@@ -957,10 +957,12 @@ func (c *Client) MarshalBinary() ([]byte, error) {
 	return c.cacheData.MarshalBinary()
 }
 
-func (c *Client) SetLogger(l *log.Logger) {
+// SetLogOutput sets the writer to which all logs are written. It must not be
+// called after Open is called.
+func (c *Client) SetLogOutput(w io.Writer) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.logger = l
+	c.logger = log.New(w, "[metaclient] ", log.LstdFlags)
 }
 
 func (c *Client) updateAuthCache() {

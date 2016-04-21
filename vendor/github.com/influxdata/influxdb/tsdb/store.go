@@ -42,6 +42,9 @@ type Store struct {
 	EngineOptions EngineOptions
 	Logger        *log.Logger
 
+	// logOutput is where output from the underlying databases will go.
+	logOutput io.Writer
+
 	closing chan struct{}
 	wg      sync.WaitGroup
 	opened  bool
@@ -57,6 +60,17 @@ func NewStore(path string) *Store {
 		path:          path,
 		EngineOptions: opts,
 		Logger:        log.New(os.Stderr, "[store] ", log.LstdFlags),
+		logOutput:     os.Stderr,
+	}
+}
+
+// SetLogOutput sets the writer to which all logs are written. It must not be
+// called after Open is called.
+func (s *Store) SetLogOutput(w io.Writer) {
+	s.Logger = log.New(w, "[store] ", log.LstdFlags)
+	s.logOutput = w
+	for _, s := range s.shards {
+		s.SetLogOutput(w)
 	}
 }
 
@@ -158,6 +172,7 @@ func (s *Store) loadShards() error {
 					}
 
 					shard := NewShard(shardID, s.databaseIndexes[db], path, walPath, s.EngineOptions)
+					shard.SetLogOutput(s.logOutput)
 
 					err = shard.Open()
 					if err != nil {
@@ -283,6 +298,7 @@ func (s *Store) CreateShard(database, retentionPolicy string, shardID uint64) er
 
 	path := filepath.Join(s.path, database, retentionPolicy, strconv.FormatUint(shardID, 10))
 	shard := NewShard(shardID, db, path, walPath, s.EngineOptions)
+	shard.SetLogOutput(s.logOutput)
 	if err := shard.Open(); err != nil {
 		return err
 	}
@@ -525,6 +541,12 @@ func (s *Store) DeleteSeries(database string, sources []influxql.Source, conditi
 	}
 	sources = a
 
+	// Determine deletion time range.
+	min, max, err := influxql.TimeRangeAsEpochNano(condition)
+	if err != nil {
+		return err
+	}
+
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -557,7 +579,7 @@ func (s *Store) DeleteSeries(database string, sources []influxql.Source, conditi
 			// Check for unsupported field filters.
 			// Any remaining filters means there were fields (e.g., `WHERE value = 1.2`).
 			if filters.Len() > 0 {
-				return errors.New("DROP SERIES doesn't support fields in WHERE clause")
+				return errors.New("fields not supported in WHERE clause during deletion")
 			}
 		} else {
 			// No WHERE clause so get all series IDs for this measurement.
@@ -570,18 +592,16 @@ func (s *Store) DeleteSeries(database string, sources []influxql.Source, conditi
 	}
 
 	// delete the raw series data
-	if err := s.deleteSeries(database, seriesKeys); err != nil {
+	if err := s.deleteSeries(database, seriesKeys, min, max); err != nil {
 		return err
 	}
-
-	// remove them from the index
-	db.DropSeries(seriesKeys)
 
 	return nil
 }
 
-func (s *Store) deleteSeries(database string, seriesKeys []string) error {
-	if _, ok := s.databaseIndexes[database]; !ok {
+func (s *Store) deleteSeries(database string, seriesKeys []string, min, max int64) error {
+	db := s.databaseIndexes[database]
+	if db == nil {
 		return influxql.ErrDatabaseNotFound(database)
 	}
 
@@ -589,10 +609,24 @@ func (s *Store) deleteSeries(database string, seriesKeys []string) error {
 		if sh.database != database {
 			continue
 		}
-		if err := sh.DeleteSeries(seriesKeys); err != nil {
+		if err := sh.DeleteSeriesRange(seriesKeys, min, max); err != nil {
 			return err
 		}
+
+		// The keys we passed in may be fully deleted from the shard, if so,
+		// we need to remove the shard from all the meta data indexes
+		existing, err := sh.ContainsSeries(seriesKeys)
+		if err != nil {
+			return err
+		}
+
+		for k, exists := range existing {
+			if !exists {
+				db.UnassignShard(k, sh.id)
+			}
+		}
 	}
+
 	return nil
 }
 

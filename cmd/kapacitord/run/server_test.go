@@ -28,6 +28,7 @@ import (
 
 func TestServer_Ping(t *testing.T) {
 	s, cli := OpenDefaultServer()
+	t.Log(s.URL())
 	defer s.Close()
 	_, version, err := cli.Ping()
 	if err != nil {
@@ -38,12 +39,12 @@ func TestServer_Ping(t *testing.T) {
 	}
 }
 
-func TestServer_DefineTask(t *testing.T) {
+func TestServer_CreateTask(t *testing.T) {
 	s, cli := OpenDefaultServer()
 	defer s.Close()
 
-	name := "testTaskName"
-	ttype := "stream"
+	id := "testTaskID"
+	ttype := client.StreamTask
 	dbrps := []client.DBRP{
 		{
 			Database:        "mydb",
@@ -58,12 +59,18 @@ func TestServer_DefineTask(t *testing.T) {
     |from()
         .measurement('test')
 `
-	err := cli.Define(name, ttype, dbrps, strings.NewReader(tick), false)
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ti, err := cli.Task(name, false, false)
+	ti, err := cli.Task(task.Link, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,14 +78,14 @@ func TestServer_DefineTask(t *testing.T) {
 	if ti.Error != "" {
 		t.Fatal(ti.Error)
 	}
-	if ti.Name != name {
-		t.Fatalf("unexpected name got %s exp %s", ti.Name, name)
+	if ti.ID != id {
+		t.Fatalf("unexpected id got %s exp %s", ti.ID, id)
 	}
-	if ti.Type != "stream" {
-		t.Fatalf("unexpected type got %s exp %s", ti.Type, "stream")
+	if ti.Type != client.StreamTask {
+		t.Fatalf("unexpected type got %v exp %v", ti.Type, client.StreamTask)
 	}
-	if ti.Enabled != false {
-		t.Fatalf("unexpected enabled got %v exp %v", ti.Enabled, false)
+	if ti.Status != client.Disabled {
+		t.Fatalf("unexpected status got %v exp %v", ti.Status, client.Disabled)
 	}
 	if !reflect.DeepEqual(ti.DBRPs, dbrps) {
 		t.Fatalf("unexpected dbrps got %s exp %s", ti.DBRPs, dbrps)
@@ -86,9 +93,9 @@ func TestServer_DefineTask(t *testing.T) {
 	if ti.TICKscript != tick {
 		t.Fatalf("unexpected TICKscript got %s exp %s", ti.TICKscript, tick)
 	}
-	dot := "digraph testTaskName {\nstream0 -> from1;\n}"
+	dot := "digraph testTaskID {\nstream0 -> from1;\n}"
 	if ti.Dot != dot {
-		t.Fatalf("unexpected dot got %s exp %s", ti.Dot, dot)
+		t.Fatalf("unexpected dot\ngot\n%s\nexp\n%s\n", ti.Dot, dot)
 	}
 }
 
@@ -96,8 +103,8 @@ func TestServer_EnableTask(t *testing.T) {
 	s, cli := OpenDefaultServer()
 	defer s.Close()
 
-	name := "testTaskName"
-	ttype := "stream"
+	id := "testTaskID"
+	ttype := client.StreamTask
 	dbrps := []client.DBRP{
 		{
 			Database:        "mydb",
@@ -112,17 +119,25 @@ func TestServer_EnableTask(t *testing.T) {
     |from()
         .measurement('test')
 `
-	err := cli.Define(name, ttype, dbrps, strings.NewReader(tick), false)
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = cli.Enable(name)
+	err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+		Status: client.Enabled,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ti, err := cli.Task(name, false, false)
+	ti, err := cli.Task(task.Link, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,14 +145,17 @@ func TestServer_EnableTask(t *testing.T) {
 	if ti.Error != "" {
 		t.Fatal(ti.Error)
 	}
-	if ti.Name != name {
-		t.Fatalf("unexpected name got %s exp %s", ti.Name, name)
+	if ti.ID != id {
+		t.Fatalf("unexpected id got %s exp %s", ti.ID, id)
 	}
-	if ti.Type != "stream" {
-		t.Fatalf("unexpected type got %s exp %s", ti.Type, "stream")
+	if ti.Type != client.StreamTask {
+		t.Fatalf("unexpected type got %v exp %v", ti.Type, client.StreamTask)
 	}
-	if ti.Enabled != true {
-		t.Fatalf("unexpected enabled got %v exp %v", ti.Enabled, true)
+	if ti.Status != client.Enabled {
+		t.Fatalf("unexpected status got %v exp %v", ti.Status, client.Enabled)
+	}
+	if ti.Executing != true {
+		t.Fatalf("unexpected executing got %v exp %v", ti.Executing, true)
 	}
 	if !reflect.DeepEqual(ti.DBRPs, dbrps) {
 		t.Fatalf("unexpected dbrps got %s exp %s", ti.DBRPs, dbrps)
@@ -145,7 +163,7 @@ func TestServer_EnableTask(t *testing.T) {
 	if ti.TICKscript != tick {
 		t.Fatalf("unexpected TICKscript got %s exp %s", ti.TICKscript, tick)
 	}
-	dot := `digraph testTaskName {
+	dot := `digraph testTaskID {
 graph [throughput="0.00 points/s"];
 
 stream0 [avg_exec_time_ns="0" ];
@@ -154,16 +172,16 @@ stream0 -> from1 [processed="0"];
 from1 [avg_exec_time_ns="0" ];
 }`
 	if ti.Dot != dot {
-		t.Fatalf("unexpected dot got\n%s exp\n%s", ti.Dot, dot)
+		t.Fatalf("unexpected dot\ngot\n%s\nexp\n%s\n", ti.Dot, dot)
 	}
 }
 
-func TestServer_DisableTask(t *testing.T) {
+func TestServer_EnableTaskOnCreate(t *testing.T) {
 	s, cli := OpenDefaultServer()
 	defer s.Close()
 
-	name := "testTaskName"
-	ttype := "stream"
+	id := "testTaskID"
+	ttype := client.StreamTask
 	dbrps := []client.DBRP{
 		{
 			Database:        "mydb",
@@ -178,22 +196,18 @@ func TestServer_DisableTask(t *testing.T) {
     |from()
         .measurement('test')
 `
-	err := cli.Define(name, ttype, dbrps, strings.NewReader(tick), false)
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Enabled,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = cli.Enable(name)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = cli.Disable(name)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ti, err := cli.Task(name, false, false)
+	ti, err := cli.Task(task.Link, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -201,14 +215,17 @@ func TestServer_DisableTask(t *testing.T) {
 	if ti.Error != "" {
 		t.Fatal(ti.Error)
 	}
-	if ti.Name != name {
-		t.Fatalf("unexpected name got %s exp %s", ti.Name, name)
+	if ti.ID != id {
+		t.Fatalf("unexpected id got %s exp %s", ti.ID, id)
 	}
-	if ti.Type != "stream" {
-		t.Fatalf("unexpected type got %s exp %s", ti.Type, "stream")
+	if ti.Type != client.StreamTask {
+		t.Fatalf("unexpected type got %v exp %v", ti.Type, client.StreamTask)
 	}
-	if ti.Enabled != false {
-		t.Fatalf("unexpected enabled got %v exp %v", ti.Enabled, false)
+	if ti.Status != client.Enabled {
+		t.Fatalf("unexpected status got %v exp %v", ti.Status, client.Enabled)
+	}
+	if ti.Executing != true {
+		t.Fatalf("unexpected executing got %v exp %v", ti.Executing, true)
 	}
 	if !reflect.DeepEqual(ti.DBRPs, dbrps) {
 		t.Fatalf("unexpected dbrps got %s exp %s", ti.DBRPs, dbrps)
@@ -216,18 +233,25 @@ func TestServer_DisableTask(t *testing.T) {
 	if ti.TICKscript != tick {
 		t.Fatalf("unexpected TICKscript got %s exp %s", ti.TICKscript, tick)
 	}
-	dot := "digraph testTaskName {\nstream0 -> from1;\n}"
+	dot := `digraph testTaskID {
+graph [throughput="0.00 points/s"];
+
+stream0 [avg_exec_time_ns="0" ];
+stream0 -> from1 [processed="0"];
+
+from1 [avg_exec_time_ns="0" ];
+}`
 	if ti.Dot != dot {
-		t.Fatalf("unexpected dot got %s exp %s", ti.Dot, dot)
+		t.Fatalf("unexpected dot\ngot\n%s\nexp\n%s\n", ti.Dot, dot)
 	}
 }
 
-func TestServer_DeleteTask(t *testing.T) {
+func TestServer_DisableTask(t *testing.T) {
 	s, cli := OpenDefaultServer()
 	defer s.Close()
 
-	name := "testTaskName"
-	ttype := "stream"
+	id := "testTaskID"
+	ttype := client.StreamTask
 	dbrps := []client.DBRP{
 		{
 			Database:        "mydb",
@@ -242,17 +266,97 @@ func TestServer_DeleteTask(t *testing.T) {
     |from()
         .measurement('test')
 `
-	err := cli.Define(name, ttype, dbrps, strings.NewReader(tick), false)
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = cli.DeleteTask(name)
+	err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+		Status: client.Enabled,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ti, err := cli.Task(name, false, false)
+	err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+		Status: client.Disabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ti, err := cli.Task(task.Link, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ti.Error != "" {
+		t.Fatal(ti.Error)
+	}
+	if ti.ID != id {
+		t.Fatalf("unexpected id got %s exp %s", ti.ID, id)
+	}
+	if ti.Type != client.StreamTask {
+		t.Fatalf("unexpected type got %v exp %v", ti.Type, client.StreamTask)
+	}
+	if ti.Status != client.Disabled {
+		t.Fatalf("unexpected status got %v exp %v", ti.Status, client.Disabled)
+	}
+	if !reflect.DeepEqual(ti.DBRPs, dbrps) {
+		t.Fatalf("unexpected dbrps got %s exp %s", ti.DBRPs, dbrps)
+	}
+	if ti.TICKscript != tick {
+		t.Fatalf("unexpected TICKscript got %s exp %s", ti.TICKscript, tick)
+	}
+	dot := "digraph testTaskID {\nstream0 -> from1;\n}"
+	if ti.Dot != dot {
+		t.Fatalf("unexpected dot\ngot\n%s\nexp\n%s\n", ti.Dot, dot)
+	}
+}
+
+func TestServer_DeleteTask(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	id := "testTaskID"
+	ttype := client.StreamTask
+	dbrps := []client.DBRP{
+		{
+			Database:        "mydb",
+			RetentionPolicy: "myrp",
+		},
+		{
+			Database:        "otherdb",
+			RetentionPolicy: "default",
+		},
+	}
+	tick := `stream
+    |from()
+        .measurement('test')
+`
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = cli.DeleteTask(task.Link)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ti, err := cli.Task(task.Link, nil)
 	if err == nil {
 		t.Fatal("unexpected task:", ti)
 	}
@@ -263,7 +367,85 @@ func TestServer_ListTasks(t *testing.T) {
 	defer s.Close()
 	count := 10
 
-	ttype := "stream"
+	ttype := client.StreamTask
+	tick := `stream
+    |from()
+        .measurement('test')
+`
+
+	dbrps := []client.DBRP{
+		{
+			Database:        "mydb",
+			RetentionPolicy: "myrp",
+		},
+		{
+			Database:        "otherdb",
+			RetentionPolicy: "default",
+		},
+	}
+	for i := 0; i < count; i++ {
+		id := fmt.Sprintf("testTaskID%d", i)
+		status := client.Disabled
+		if i%2 == 0 {
+			status = client.Enabled
+		}
+		_, err := cli.CreateTask(client.CreateTaskOptions{
+			ID:         id,
+			Type:       ttype,
+			DBRPs:      dbrps,
+			TICKscript: tick,
+			Status:     status,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	tasks, err := cli.ListTasks(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exp, got := count, len(tasks); exp != got {
+		t.Fatalf("unexpected number of tasks: exp:%d got:%d", exp, got)
+	}
+	for i, task := range tasks {
+		if exp, got := fmt.Sprintf("testTaskID%d", i), task.ID; exp != got {
+			t.Errorf("unexpected task.ID i:%d exp:%s got:%s", i, exp, got)
+		}
+		if exp, got := client.StreamTask, task.Type; exp != got {
+			t.Errorf("unexpected task.Type i:%d exp:%v got:%v", i, exp, got)
+		}
+		if !reflect.DeepEqual(task.DBRPs, dbrps) {
+			t.Fatalf("unexpected dbrps i:%d exp:%s got:%s", i, dbrps, task.DBRPs)
+		}
+		exp := client.Disabled
+		if i%2 == 0 {
+			exp = client.Enabled
+		}
+		if got := task.Status; exp != got {
+			t.Errorf("unexpected task.Status i:%d exp:%v got:%v", i, exp, got)
+		}
+		if exp, got := i%2 == 0, task.Executing; exp != got {
+			t.Errorf("unexpected task.Executing i:%d exp:%v got:%v", i, exp, got)
+		}
+		if exp, got := true, len(task.Dot) != 0; exp != got {
+			t.Errorf("unexpected task.Dot i:%d exp:\n%v\ngot:\n%v\n", i, exp, got)
+		}
+		if exp, got := tick, task.TICKscript; exp != got {
+			t.Errorf("unexpected task.TICKscript i:%d exp:%v got:%v", i, exp, got)
+		}
+		if exp, got := "", task.Error; exp != got {
+			t.Errorf("unexpected task.Error i:%d exp:%v got:%v", i, exp, got)
+		}
+	}
+
+}
+
+func TestServer_ListTasks_Fields(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+	count := 100
+
+	ttype := client.StreamTask
 	tick := `stream
     |from()
         .measurement('test')
@@ -279,41 +461,55 @@ func TestServer_ListTasks(t *testing.T) {
 		},
 	}
 	for i := 0; i < count; i++ {
-		name := fmt.Sprintf("testTaskName%d", i)
-		err := cli.Define(name, ttype, dbrps, strings.NewReader(tick), false)
+		id := fmt.Sprintf("testTaskID%d", i)
+		_, err := cli.CreateTask(client.CreateTaskOptions{
+			ID:         id,
+			Type:       ttype,
+			DBRPs:      dbrps,
+			TICKscript: tick,
+			Status:     client.Enabled,
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
-
-		if i%2 == 0 {
-			err = cli.Enable(name)
-			if err != nil {
-				t.Fatal(err)
-			}
-		}
 	}
-	tasks, err := cli.ListTasks(nil)
+	tasks, err := cli.ListTasks(&client.ListTasksOptions{
+		Pattern: "testTaskID1*",
+		Fields:  []string{"type", "status"},
+		Offset:  1,
+		Limit:   5,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if exp, got := count, len(tasks); exp != got {
+	if exp, got := 5, len(tasks); exp != got {
 		t.Fatalf("unexpected number of tasks: exp:%d got:%d", exp, got)
 	}
 	for i, task := range tasks {
-		if exp, got := fmt.Sprintf("testTaskName%d", i), task.Name; exp != got {
-			t.Errorf("unexpected task.Name i:%d exp:%s got:%s", i, exp, got)
+		if exp, got := fmt.Sprintf("testTaskID1%d", i), task.ID; exp != got {
+			t.Errorf("unexpected task.ID i:%d exp:%s got:%s", i, exp, got)
 		}
-		if exp, got := "stream", task.Type; exp != got {
+		if exp, got := client.StreamTask, task.Type; exp != got {
 			t.Errorf("unexpected task.Type i:%d exp:%v got:%v", i, exp, got)
 		}
-		if !reflect.DeepEqual(task.DBRPs, dbrps) {
-			t.Fatalf("unexpected dbrps i:%d exp:%s got:%s", i, dbrps, task.DBRPs)
+		if exp, got := client.Enabled, task.Status; exp != got {
+			t.Errorf("unexpected task.Status i:%d exp:%v got:%v", i, exp, got)
 		}
-		if exp, got := i%2 == 0, task.Enabled; exp != got {
-			t.Errorf("unexpected task.Enabled i:%d exp:%v got:%v", i, exp, got)
+		// We didn't request these fields so they should be default zero values
+		if exp, got := 0, len(task.DBRPs); exp != got {
+			t.Fatalf("unexpected dbrps i:%d exp:%d got:%d", i, exp, got)
 		}
-		if exp, got := i%2 == 0, task.Executing; exp != got {
+		if exp, got := false, task.Executing; exp != got {
 			t.Errorf("unexpected task.Executing i:%d exp:%v got:%v", i, exp, got)
+		}
+		if exp, got := "", task.Dot; exp != got {
+			t.Errorf("unexpected task.Dot i:%d exp:%v got:%v", i, exp, got)
+		}
+		if exp, got := "", task.TICKscript; exp != got {
+			t.Errorf("unexpected task.TICKscript i:%d exp:%v got:%v", i, exp, got)
+		}
+		if exp, got := "", task.Error; exp != got {
+			t.Errorf("unexpected task.Error i:%d exp:%v got:%v", i, exp, got)
 		}
 	}
 
@@ -323,8 +519,8 @@ func TestServer_StreamTask(t *testing.T) {
 	s, cli := OpenDefaultServer()
 	defer s.Close()
 
-	name := "testStreamTask"
-	ttype := "stream"
+	id := "testStreamTask"
+	ttype := client.StreamTask
 	dbrps := []client.DBRP{{
 		Database:        "mydb",
 		RetentionPolicy: "myrp",
@@ -339,20 +535,28 @@ func TestServer_StreamTask(t *testing.T) {
     |httpOut('count')
 `
 
-	err := cli.Define(name, ttype, dbrps, strings.NewReader(tick), false)
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = cli.Enable(name)
+	err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+		Status: client.Enabled,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	endpoint := fmt.Sprintf("%s/task/%s/count", s.URL(), name)
+	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), id)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{"Series":null,"Messages":null,"Err":null}`
+	nullResponse := `{}`
 	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -380,7 +584,7 @@ test value=1 0000000011
 	v.Add("precision", "s")
 	s.MustWrite("mydb", "myrp", points, v)
 
-	exp := `{"Series":[{"name":"test","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}],"Messages":null,"Err":null}`
+	exp := `{"series":[{"name":"test","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}]}`
 	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -391,8 +595,8 @@ func TestServer_StreamTask_AllMeasurements(t *testing.T) {
 	s, cli := OpenDefaultServer()
 	defer s.Close()
 
-	name := "testStreamTask"
-	ttype := "stream"
+	id := "testStreamTask"
+	ttype := client.StreamTask
 	dbrps := []client.DBRP{{
 		Database:        "mydb",
 		RetentionPolicy: "myrp",
@@ -406,20 +610,28 @@ func TestServer_StreamTask_AllMeasurements(t *testing.T) {
     |httpOut('count')
 `
 
-	err := cli.Define(name, ttype, dbrps, strings.NewReader(tick), false)
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = cli.Enable(name)
+	err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+		Status: client.Enabled,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	endpoint := fmt.Sprintf("%s/task/%s/count", s.URL(), name)
+	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), id)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{"Series":null,"Messages":null,"Err":null}`
+	nullResponse := `{}`
 	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -447,7 +659,7 @@ test0 value=1 0000000011
 	v.Add("precision", "s")
 	s.MustWrite("mydb", "myrp", points, v)
 
-	exp := `{"Series":[{"name":"test0","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}],"Messages":null,"Err":null}`
+	exp := `{"series":[{"name":"test0","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}]}`
 	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -487,8 +699,8 @@ func TestServer_BatchTask(t *testing.T) {
 	defer s.Close()
 	cli := Client(s)
 
-	name := "testBatchTask"
-	ttype := "batch"
+	id := "testBatchTask"
+	ttype := client.BatchTask
 	dbrps := []client.DBRP{{
 		Database:        "mydb",
 		RetentionPolicy: "myrp",
@@ -501,24 +713,34 @@ func TestServer_BatchTask(t *testing.T) {
     |httpOut('count')
 `
 
-	err := cli.Define(name, ttype, dbrps, strings.NewReader(tick), false)
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = cli.Enable(name)
+	err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+		Status: client.Enabled,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	endpoint := fmt.Sprintf("%s/task/%s/count", s.URL(), name)
+	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), id)
 
-	exp := `{"Series":[{"name":"cpu","columns":["time","count"],"values":[["1971-01-01T00:00:01.002Z",2]]}],"Messages":null,"Err":null}`
+	exp := `{"series":[{"name":"cpu","columns":["time","count"],"values":[["1971-01-01T00:00:01.002Z",2]]}]}`
 	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
 	}
-	err = cli.Disable(name)
+	err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+		Status: client.Disabled,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -539,8 +761,8 @@ func TestServer_InvalidBatchTask(t *testing.T) {
 	defer s.Close()
 	cli := Client(s)
 
-	name := "testInvalidBatchTask"
-	ttype := "batch"
+	id := "testInvalidBatchTask"
+	ttype := client.BatchTask
 	dbrps := []client.DBRP{{
 		Database:        "mydb",
 		RetentionPolicy: "myrp",
@@ -553,18 +775,26 @@ func TestServer_InvalidBatchTask(t *testing.T) {
     |httpOut('count')
 `
 
-	err := cli.Define(name, ttype, dbrps, strings.NewReader(tick), false)
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = cli.Enable(name)
+	err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+		Status: client.Enabled,
+	})
 	expErr := `batch query is not allowed to request data from "unknowndb"."unknownrp"`
 	if err != nil && err.Error() != expErr {
 		t.Fatalf("unexpected err: got %v exp %s", err, expErr)
 	}
 
-	err = cli.DeleteTask(name)
+	err = cli.DeleteTask(task.Link)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -574,8 +804,8 @@ func TestServer_RecordReplayStream(t *testing.T) {
 	s, cli := OpenDefaultServer()
 	defer s.Close()
 
-	name := "testStreamTask"
-	ttype := "stream"
+	id := "testStreamTask"
+	ttype := client.StreamTask
 	dbrps := []client.DBRP{{
 		Database:        "mydb",
 		RetentionPolicy: "myrp",
@@ -600,10 +830,28 @@ func TestServer_RecordReplayStream(t *testing.T) {
         .log('` + tmpDir + `/alert.log')
 `
 
-	err = cli.Define(name, ttype, dbrps, strings.NewReader(tick), false)
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
+	recording, err := cli.RecordStream(client.RecordStreamOptions{
+		ID:   "recordingid",
+		Task: task.ID,
+		Stop: time.Date(1970, 1, 1, 0, 0, 10, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exp, got := "/kapacitor/v1/recordings/recordingid", recording.Link.Href; exp != got {
+		t.Errorf("unexpected recording.Link.Href got %s exp %s", got, exp)
+	}
+
 	points := `test value=1 0000000000
 test value=1 0000000001
 test value=1 0000000001
@@ -623,26 +871,57 @@ test value=1 0000000010
 test value=1 0000000011
 test value=1 0000000012
 `
-	rid := make(chan string, 1)
-	started := make(chan struct{})
-	go func() {
-		id, err := cli.RecordStream(name, 10*time.Second)
-		close(started)
-		_, err = cli.Recording(id)
-		if err != nil {
-			t.Fatal(err)
-		}
-		rid <- id
-	}()
-	<-started
 	v := url.Values{}
 	v.Add("precision", "s")
 	s.MustWrite("mydb", "myrp", points, v)
-	id := <-rid
 
-	err = cli.Replay(name, id, true, true)
+	retry := 0
+	for recording.Status == client.Running {
+		time.Sleep(100 * time.Millisecond)
+		recording, err = cli.Recording(recording.Link)
+		if err != nil {
+			t.Fatal(err)
+		}
+		retry++
+		if retry > 10 {
+			t.Fatal("failed to finish recording")
+		}
+	}
+	if recording.Status != client.Finished || recording.Error != "" {
+		t.Errorf("recording failed: %s", recording.Error)
+	}
+
+	replay, err := cli.CreateReplay(client.CreateReplayOptions{
+		ID:            "replayid",
+		Task:          id,
+		Recording:     recording.ID,
+		Clock:         client.Fast,
+		RecordingTime: true,
+	})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if exp, got := "/kapacitor/v1/replays/replayid", replay.Link.Href; exp != got {
+		t.Errorf("unexpected replay.Link.Href got %s exp %s", got, exp)
+	}
+	if exp, got := id, replay.Task; exp != got {
+		t.Errorf("unexpected replay.Task got %s exp %s", got, exp)
+	}
+
+	retry = 0
+	for replay.Status == client.Running {
+		time.Sleep(100 * time.Millisecond)
+		replay, err = cli.Replay(replay.Link)
+		if err != nil {
+			t.Fatal(err)
+		}
+		retry++
+		if retry > 10 {
+			t.Fatal("failed to finish replay")
+		}
+	}
+	if replay.Status != client.Finished || replay.Error != "" {
+		t.Errorf("replay failed: %s", replay.Error)
 	}
 
 	f, err := os.Open(path.Join(tmpDir, "alert.log"))
@@ -683,6 +962,36 @@ test value=1 0000000012
 	if !reflect.DeepEqual(exp, got) {
 		t.Errorf("unexpected alert log:\ngot %v\nexp %v", got, exp)
 	}
+
+	recordings, err := cli.ListRecordings(nil)
+	if exp, got := 1, len(recordings); exp != got {
+		t.Fatalf("unexpected recordings list:\ngot %v\nexp %v", got, exp)
+	}
+
+	err = cli.DeleteRecording(recordings[0].Link)
+	if err != nil {
+		t.Error(err)
+	}
+
+	recordings, err = cli.ListRecordings(nil)
+	if exp, got := 0, len(recordings); exp != got {
+		t.Errorf("unexpected recordings list:\ngot %v\nexp %v", got, exp)
+	}
+
+	replays, err := cli.ListReplays(nil)
+	if exp, got := 1, len(replays); exp != got {
+		t.Fatalf("unexpected replays list:\ngot %v\nexp %v", got, exp)
+	}
+
+	err = cli.DeleteReplay(replays[0].Link)
+	if err != nil {
+		t.Error(err)
+	}
+
+	replays, err = cli.ListReplays(nil)
+	if exp, got := 0, len(replays); exp != got {
+		t.Errorf("unexpected replays list:\ngot %v\nexp %v", got, exp)
+	}
 }
 
 func TestServer_RecordReplayBatch(t *testing.T) {
@@ -719,8 +1028,8 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 	defer s.Close()
 	cli := Client(s)
 
-	name := "testBatchTask"
-	ttype := "batch"
+	id := "testBatchTask"
+	ttype := client.BatchTask
 	dbrps := []client.DBRP{{
 		Database:        "mydb",
 		RetentionPolicy: "myrp",
@@ -742,24 +1051,68 @@ func TestServer_RecordReplayBatch(t *testing.T) {
         .log('` + tmpDir + `/alert.log')
 `
 
-	err = cli.Define(name, ttype, dbrps, strings.NewReader(tick), false)
+	_, err = cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	id, err := cli.RecordBatch(name, "", time.Time{}, time.Time{}, time.Second*8)
+	recording, err := cli.RecordBatch(client.RecordBatchOptions{
+		ID:    "recordingid",
+		Task:  id,
+		Start: time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+		Stop:  time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+	})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if exp, got := "/kapacitor/v1/recordings/recordingid", recording.Link.Href; exp != got {
+		t.Errorf("unexpected recording.Link.Href got %s exp %s", got, exp)
 	}
 	// Wait for recording to finish.
-	_, err = cli.Recording(id)
+	retry := 0
+	for recording.Status == client.Running {
+		time.Sleep(100 * time.Millisecond)
+		recording, err = cli.Recording(recording.Link)
+		if err != nil {
+			t.Fatal(err)
+		}
+		retry++
+		if retry > 10 {
+			t.Fatal("failed to perfom recording")
+		}
+	}
+
+	replay, err := cli.CreateReplay(client.CreateReplayOptions{
+		Task:          id,
+		Recording:     recording.ID,
+		Clock:         client.Fast,
+		RecordingTime: true,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
+	if exp, got := id, replay.Task; exp != got {
+		t.Errorf("unexpected replay.Task got %s exp %s", got, exp)
+	}
 
-	err = cli.Replay(name, id, true, true)
-	if err != nil {
-		t.Fatal(err)
+	// Wait for replay to finish.
+	retry = 0
+	for replay.Status == client.Running {
+		time.Sleep(100 * time.Millisecond)
+		replay, err = cli.Replay(replay.Link)
+		if err != nil {
+			t.Fatal(err)
+		}
+		retry++
+		if retry > 10 {
+			t.Fatal("failed to perfom replay")
+		}
 	}
 
 	f, err := os.Open(path.Join(tmpDir, "alert.log"))
@@ -835,6 +1188,289 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 		t.Errorf("unexpected alert log:\ngot %v\nexp %v", got, exp)
 		t.Errorf("unexpected alert log:\ngot %v\nexp %v", got[0].Data.Series[0], exp[0].Data.Series[0])
 		t.Errorf("unexpected alert log:\ngot %v\nexp %v", got[1].Data.Series[0], exp[1].Data.Series[0])
+	}
+
+	recordings, err := cli.ListRecordings(nil)
+	if exp, got := 1, len(recordings); exp != got {
+		t.Fatalf("unexpected recordings list:\ngot %v\nexp %v", got, exp)
+	}
+
+	err = cli.DeleteRecording(recordings[0].Link)
+	if err != nil {
+		t.Error(err)
+	}
+
+	recordings, err = cli.ListRecordings(nil)
+	if exp, got := 0, len(recordings); exp != got {
+		t.Errorf("unexpected recordings list:\ngot %v\nexp %v", got, exp)
+	}
+
+	replays, err := cli.ListReplays(nil)
+	if exp, got := 1, len(replays); exp != got {
+		t.Fatalf("unexpected replays list:\ngot %v\nexp %v", got, exp)
+	}
+
+	err = cli.DeleteReplay(replays[0].Link)
+	if err != nil {
+		t.Error(err)
+	}
+
+	replays, err = cli.ListReplays(nil)
+	if exp, got := 0, len(replays); exp != got {
+		t.Errorf("unexpected replays list:\ngot %v\nexp %v", got, exp)
+	}
+}
+func TestServer_RecordReplayQuery(t *testing.T) {
+	c := NewConfig()
+	c.InfluxDB[0].Enabled = true
+	db := NewInfluxDB(func(q string) *iclient.Response {
+		if len(q) > 6 && q[:6] == "SELECT" {
+			r := &iclient.Response{
+				Results: []iclient.Result{{
+					Series: []models.Row{
+						{
+							Name:    "cpu",
+							Columns: []string{"time", "value"},
+							Values: [][]interface{}{
+								{
+									time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339Nano),
+									0.0,
+								},
+								{
+									time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC).Format(time.RFC3339Nano),
+									1.0,
+								},
+							},
+						},
+						{
+							Name:    "cpu",
+							Columns: []string{"time", "value"},
+							Values: [][]interface{}{
+								{
+									time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC).Format(time.RFC3339Nano),
+									2.0,
+								},
+								{
+									time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC).Format(time.RFC3339Nano),
+									3.0,
+								},
+							},
+						},
+						{
+							Name:    "cpu",
+							Columns: []string{"time", "value"},
+							Values: [][]interface{}{
+								{
+									time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC).Format(time.RFC3339Nano),
+									4.0,
+								},
+								{
+									time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC).Format(time.RFC3339Nano),
+									5.0,
+								},
+							},
+						},
+					},
+				}},
+			}
+			return r
+		}
+		return nil
+	})
+	c.InfluxDB[0].URLs = []string{db.URL()}
+	s := OpenServer(c)
+	defer s.Close()
+	cli := Client(s)
+
+	id := "testBatchTask"
+	ttype := client.BatchTask
+	dbrps := []client.DBRP{{
+		Database:        "mydb",
+		RetentionPolicy: "myrp",
+	}}
+
+	tmpDir, err := ioutil.TempDir("", "testBatchTaskRecording")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+	tick := `batch
+    |query('SELECT value from mydb.myrp.cpu')
+        .period(2s)
+        .every(2s)
+    |alert()
+        .id('test-batch')
+        .message('{{ .ID }} got: {{ index .Fields "value" }}')
+        .crit(lambda: "value" > 2.0)
+        .log('` + tmpDir + `/alert.log')
+`
+
+	_, err = cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	recording, err := cli.RecordQuery(client.RecordQueryOptions{
+		ID:    "recordingid",
+		Query: "SELECT value from mydb.myrp.cpu",
+		Type:  client.BatchTask,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exp, got := "/kapacitor/v1/recordings/recordingid", recording.Link.Href; exp != got {
+		t.Errorf("unexpected recording.Link.Href got %s exp %s", got, exp)
+	}
+	// Wait for recording to finish.
+	retry := 0
+	for recording.Status == client.Running {
+		time.Sleep(100 * time.Millisecond)
+		recording, err = cli.Recording(recording.Link)
+		if err != nil {
+			t.Fatal(err)
+		}
+		retry++
+		if retry > 10 {
+			t.Fatal("failed to perfom recording")
+		}
+	}
+
+	replay, err := cli.CreateReplay(client.CreateReplayOptions{
+		Task:          id,
+		Recording:     recording.ID,
+		Clock:         client.Fast,
+		RecordingTime: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exp, got := id, replay.Task; exp != got {
+		t.Errorf("unexpected replay.Task got %s exp %s", got, exp)
+	}
+
+	// Wait for replay to finish.
+	retry = 0
+	for replay.Status == client.Running {
+		time.Sleep(100 * time.Millisecond)
+		replay, err = cli.Replay(replay.Link)
+		if err != nil {
+			t.Fatal(err)
+		}
+		retry++
+		if retry > 10 {
+			t.Fatal("failed to perfom replay")
+		}
+	}
+
+	f, err := os.Open(path.Join(tmpDir, "alert.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	type response struct {
+		ID      string          `json:"id"`
+		Message string          `json:"message"`
+		Time    time.Time       `json:"time"`
+		Level   string          `json:"level"`
+		Data    influxql.Result `json:"data"`
+	}
+	exp := []response{
+		{
+			ID:      "test-batch",
+			Message: "test-batch got: 3",
+			Time:    time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+			Level:   "CRITICAL",
+			Data: influxql.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC).Format(time.RFC3339Nano),
+								2.0,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC).Format(time.RFC3339Nano),
+								3.0,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			ID:      "test-batch",
+			Message: "test-batch got: 4",
+			Time:    time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+			Level:   "CRITICAL",
+			Data: influxql.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC).Format(time.RFC3339Nano),
+								4.0,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC).Format(time.RFC3339Nano),
+								5.0,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	scanner := bufio.NewScanner(f)
+	got := make([]response, 0)
+	g := response{}
+	for scanner.Scan() {
+		json.Unmarshal(scanner.Bytes(), &g)
+		got = append(got, g)
+	}
+	if !reflect.DeepEqual(exp, got) {
+		t.Errorf("unexpected alert log:\ngot %v\nexp %v", got, exp)
+		t.Errorf("unexpected alert log:\ngot %v\nexp %v", got[0].Data.Series[0], exp[0].Data.Series[0])
+		t.Errorf("unexpected alert log:\ngot %v\nexp %v", got[1].Data.Series[0], exp[1].Data.Series[0])
+	}
+
+	recordings, err := cli.ListRecordings(nil)
+	if exp, got := 1, len(recordings); exp != got {
+		t.Fatalf("unexpected recordings list:\ngot %v\nexp %v", got, exp)
+	}
+
+	err = cli.DeleteRecording(recordings[0].Link)
+	if err != nil {
+		t.Error(err)
+	}
+
+	recordings, err = cli.ListRecordings(nil)
+	if exp, got := 0, len(recordings); exp != got {
+		t.Errorf("unexpected recordings list:\ngot %v\nexp %v", got, exp)
+	}
+
+	replays, err := cli.ListReplays(nil)
+	if exp, got := 1, len(replays); exp != got {
+		t.Fatalf("unexpected replays list:\ngot %v\nexp %v", got, exp)
+	}
+
+	err = cli.DeleteReplay(replays[0].Link)
+	if err != nil {
+		t.Error(err)
+	}
+
+	replays, err = cli.ListReplays(nil)
+	if exp, got := 0, len(replays); exp != got {
+		t.Errorf("unexpected replays list:\ngot %v\nexp %v", got, exp)
 	}
 }
 
@@ -921,8 +1557,8 @@ func testStreamAgent(t *testing.T, c *run.Config) {
 	defer s.Close()
 	cli := Client(s)
 
-	name := "testUDFTask"
-	ttype := "stream"
+	id := "testUDFTask"
+	ttype := client.StreamTask
 	dbrps := []client.DBRP{{
 		Database:        "mydb",
 		RetentionPolicy: "myrp",
@@ -942,20 +1578,28 @@ func testStreamAgent(t *testing.T, c *run.Config) {
     |httpOut('moving_avg')
 `
 
-	err = cli.Define(name, ttype, dbrps, strings.NewReader(tick), false)
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = cli.Enable(name)
+	err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+		Status: client.Enabled,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	endpoint := fmt.Sprintf("%s/task/%s/moving_avg", s.URL(), name)
+	endpoint := fmt.Sprintf("%s/tasks/%s/moving_avg", s.URL(), id)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{"Series":null,"Messages":null,"Err":null}`
+	nullResponse := `{}`
 	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -990,7 +1634,7 @@ test,group=b value=0 0000000011
 	v.Add("precision", "s")
 	s.MustWrite("mydb", "myrp", points, v)
 
-	exp := `{"Series":[{"name":"test","tags":{"group":"a"},"columns":["time","mean"],"values":[["1970-01-01T00:00:11Z",0.9]]},{"name":"test","tags":{"group":"b"},"columns":["time","mean"],"values":[["1970-01-01T00:00:11Z",1.9]]}],"Messages":null,"Err":null}`
+	exp := `{"series":[{"name":"test","tags":{"group":"a"},"columns":["time","mean"],"values":[["1970-01-01T00:00:11Z",0.9]]},{"name":"test","tags":{"group":"b"},"columns":["time","mean"],"values":[["1970-01-01T00:00:11Z",1.9]]}]}`
 	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -1095,8 +1739,8 @@ func testStreamAgentSocket(t *testing.T, c *run.Config) {
 	defer s.Close()
 	cli := Client(s)
 
-	name := "testUDFTask"
-	ttype := "stream"
+	id := "testUDFTask"
+	ttype := client.StreamTask
 	dbrps := []client.DBRP{{
 		Database:        "mydb",
 		RetentionPolicy: "myrp",
@@ -1113,20 +1757,28 @@ func testStreamAgentSocket(t *testing.T, c *run.Config) {
     |httpOut('count')
 `
 
-	err = cli.Define(name, ttype, dbrps, strings.NewReader(tick), false)
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = cli.Enable(name)
+	err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+		Status: client.Enabled,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	endpoint := fmt.Sprintf("%s/task/%s/count", s.URL(), name)
+	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), id)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{"Series":null,"Messages":null,"Err":null}`
+	nullResponse := `{}`
 	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -1149,7 +1801,7 @@ test,group=a value=0 0000000011
 	v.Add("precision", "s")
 	s.MustWrite("mydb", "myrp", points, v)
 
-	exp := `{"Series":[{"name":"test","tags":{"group":"a"},"columns":["time","count"],"values":[["1970-01-01T00:00:10Z",10]]}],"Messages":null,"Err":null}`
+	exp := `{"series":[{"name":"test","tags":{"group":"a"},"columns":["time","count"],"values":[["1970-01-01T00:00:10Z",10]]}]}`
 	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -1299,8 +1951,8 @@ func testBatchAgent(t *testing.T, c *run.Config) {
 	defer s.Close()
 	cli := Client(s)
 
-	name := "testUDFTask"
-	ttype := "batch"
+	id := "testUDFTask"
+	ttype := client.BatchTask
 	dbrps := []client.DBRP{{
 		Database:        "mydb",
 		RetentionPolicy: "myrp",
@@ -1317,23 +1969,33 @@ func testBatchAgent(t *testing.T, c *run.Config) {
     |httpOut('count')
 `
 
-	err = cli.Define(name, ttype, dbrps, strings.NewReader(tick), false)
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = cli.Enable(name)
+	err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+		Status: client.Enabled,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	endpoint := fmt.Sprintf("%s/task/%s/count", s.URL(), name)
-	exp := `{"Series":[{"name":"cpu","tags":{"count":"1"},"columns":["time","count"],"values":[["1971-01-01T00:00:00.02Z",5]]},{"name":"cpu","tags":{"count":"0"},"columns":["time","count"],"values":[["1971-01-01T00:00:00.02Z",5]]}],"Messages":null,"Err":null}`
+	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), id)
+	exp := `{"series":[{"name":"cpu","tags":{"count":"1"},"columns":["time","count"],"values":[["1971-01-01T00:00:00.02Z",5]]},{"name":"cpu","tags":{"count":"0"},"columns":["time","count"],"values":[["1971-01-01T00:00:00.02Z",5]]}]}`
 	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*50)
 	if err != nil {
 		t.Error(err)
 	}
-	err = cli.Disable(name)
+	err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+		Status: client.Disabled,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

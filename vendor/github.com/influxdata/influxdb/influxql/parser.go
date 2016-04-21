@@ -126,8 +126,6 @@ func (p *Parser) parseShowStatement() (Statement, error) {
 		return p.parseGrantsForUserStatement()
 	case DATABASES:
 		return p.parseShowDatabasesStatement()
-	case SERVERS:
-		return p.parseShowServersStatement()
 	case FIELD:
 		tok, pos, lit := p.scanIgnoreWhitespace()
 		if tok == KEYS {
@@ -181,7 +179,6 @@ func (p *Parser) parseShowStatement() (Statement, error) {
 		"QUERIES",
 		"RETENTION",
 		"SERIES",
-		"SERVERS",
 		"TAG",
 		"USERS",
 		"STATS",
@@ -225,8 +222,6 @@ func (p *Parser) parseDropStatement() (Statement, error) {
 	switch tok {
 	case CONTINUOUS:
 		return p.parseDropContinuousQueryStatement()
-	case DATA, META:
-		return p.parseDropServerStatement(tok)
 	case DATABASE:
 		return p.parseDropDatabaseStatement()
 	case MEASUREMENT:
@@ -245,7 +240,7 @@ func (p *Parser) parseDropStatement() (Statement, error) {
 	case USER:
 		return p.parseDropUserStatement()
 	default:
-		return nil, newParseError(tokstr(tok, lit), []string{"CONTINUOUS", "DATA", "MEASUREMENT", "META", "RETENTION", "SERIES", "SHARD", "SUBSCRIPTION", "USER"}, pos)
+		return nil, newParseError(tokstr(tok, lit), []string{"CONTINUOUS", "MEASUREMENT", "RETENTION", "SERIES", "SHARD", "SUBSCRIPTION", "USER"}, pos)
 	}
 }
 
@@ -998,33 +993,34 @@ func (p *Parser) parseTarget(tr targetRequirement) (*Target, error) {
 	return t, nil
 }
 
-// parseDeleteStatement parses a delete string and returns a DeleteStatement.
+// parseDeleteStatement parses a string and returns a delete statement.
 // This function assumes the DELETE token has already been consumed.
-func (p *Parser) parseDeleteStatement() (*DeleteStatement, error) {
-	// TODO remove and do not skip test once we wire up DELETE FROM.
-	// See issues https://github.com/influxdata/influxdb/issues/1647
-	// and https://github.com/influxdata/influxdb/issues/4404
-	return nil, errors.New("DELETE FROM is currently not supported. Use DROP SERIES or DROP MEASUREMENT instead")
-	//stmt := &DeleteStatement{}
+func (p *Parser) parseDeleteStatement() (Statement, error) {
+	stmt := &DeleteSeriesStatement{}
+	var err error
 
-	//// Parse source
-	//if tok, pos, lit := p.scanIgnoreWhitespace(); tok != FROM {
-	//	return nil, newParseError(tokstr(tok, lit), []string{"FROM"}, pos)
-	//}
-	//source, err := p.parseSource()
-	//if err != nil {
-	//	return nil, err
-	//}
-	//stmt.Source = source
+	tok, pos, lit := p.scanIgnoreWhitespace()
 
-	//// Parse condition: "WHERE EXPR".
-	//condition, err := p.parseCondition()
-	//if err != nil {
-	//	return nil, err
-	//}
-	//stmt.Condition = condition
+	if tok == FROM {
+		// Parse source.
+		if stmt.Sources, err = p.parseSources(); err != nil {
+			return nil, err
+		}
+	} else {
+		p.unscan()
+	}
 
-	//return stmt, nil
+	// Parse condition: "WHERE EXPR".
+	if stmt.Condition, err = p.parseCondition(); err != nil {
+		return nil, err
+	}
+
+	// If they didn't provide a FROM or a WHERE, this query is invalid
+	if stmt.Condition == nil && stmt.Sources == nil {
+		return nil, newParseError(tokstr(tok, lit), []string{"FROM", "WHERE"}, pos)
+	}
+
+	return stmt, nil
 }
 
 // parseShowSeriesStatement parses a string and returns a ShowSeriesStatement.
@@ -1380,29 +1376,6 @@ func (p *Parser) parseDropShardStatement() (*DropShardStatement, error) {
 	return stmt, nil
 }
 
-// parseDropServerStatement parses a string and returns a DropServerStatement.
-// This function assumes the "DROP <META|DATA>" tokens have already been consumed.
-func (p *Parser) parseDropServerStatement(tok Token) (*DropServerStatement, error) {
-	// Parse the SERVER token
-	if tok, pos, lit := p.scanIgnoreWhitespace(); tok != SERVER {
-		return nil, newParseError(tokstr(tok, lit), []string{"SERVER"}, pos)
-	}
-
-	s := &DropServerStatement{}
-	var err error
-
-	if tok == META {
-		s.Meta = true
-	}
-
-	// Parse the server's ID.
-	if s.NodeID, err = p.parseUInt64(); err != nil {
-		return nil, err
-	}
-
-	return s, nil
-}
-
 // parseShowContinuousQueriesStatement parses a string and returns a ShowContinuousQueriesStatement.
 // This function assumes the "SHOW CONTINUOUS" tokens have already been consumed.
 func (p *Parser) parseShowContinuousQueriesStatement() (*ShowContinuousQueriesStatement, error) {
@@ -1413,13 +1386,6 @@ func (p *Parser) parseShowContinuousQueriesStatement() (*ShowContinuousQueriesSt
 		return nil, newParseError(tokstr(tok, lit), []string{"QUERIES"}, pos)
 	}
 
-	return stmt, nil
-}
-
-// parseShowServersStatement parses a string and returns a ShowServersStatement.
-// This function assumes the "SHOW SERVERS" tokens have already been consumed.
-func (p *Parser) parseShowServersStatement() (*ShowServersStatement, error) {
-	stmt := &ShowServersStatement{}
 	return stmt, nil
 }
 

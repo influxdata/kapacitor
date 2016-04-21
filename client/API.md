@@ -1,11 +1,20 @@
 # Kapacitor API Reference Documentation
 
+* [General Information](#general-information)
+* [Writing Data](#writing-data)
+* [Tasks](#tasks)
+* [Recordings](#recordings)
+* [Replays](#replays)
+* [Miscellaneous](#miscellaneous)
+
+## General Information
+
 Kapacitor provides an HTTP API on port 9092 by default.
 With the API you can control which tasks are executing, query status of tasks and manage recordings etc.
 
 Each section below defines the available API endpoints and there inputs and outputs.
 
-All requests are versioned and namespaced using the root path `/kapacitor/v1/`.
+All requests are versioned and namespaced using the base path `/kapacitor/v1/`.
 
 ### Response Codes
 
@@ -13,7 +22,7 @@ All requests can return these response codes:
 
 | HTTP Response Code | Meaning                                                                                                                                                             |
 | ------------------ | -------                                                                                                                                                             |
-| 2xx                | The request was a success the content is dependent on the request.                                                                                                  |
+| 2xx                | The request was a success, content is dependent on the request.                                                                                                     |
 | 4xx                | Invalid request, refer to error for what it wrong with the request. Repeating the request will continue to return the same error.                                   |
 | 5xx                | The server was unable to process the request, refer to the error for a reason. Repeating the request may result in a success if the server issue has been resolved. |
 
@@ -36,6 +45,12 @@ Query parameters are used only for GET requests and all other requests expect pa
 
 >NOTE: The /kapacitor/v1/write endpoint is the one exception to this rule since Kapacitor is compatible with the InfluxDB /write endpoint.
 
+
+### Links
+
+When creating resources in Kapacitor the API server will return a `link` object with an `href` of the resource.
+Clients should not need to perform path manipulation in most cases and can use the links provided from previous calls.
+
 ## Writing Data
 
 Kapacitor can accept writes over HTTP using the line protocol.
@@ -46,7 +61,8 @@ This endpoint is identical in nature to the InfluxDB write endpoint.
 | db              | Database name for the writes.         |
 | rp              | Retention policy name for the writes. |
 
->NOTE: Kapacitor scopes all points by their database and retention policy. This means you MUST specify the `rp` for writes or Kapacitor will not know which retention policy to use.
+>NOTE: Kapacitor scopes all points by their database and retention policy.
+This means you MUST specify the `rp` for writes or Kapacitor will not know which retention policy to use.
 
 #### Example
 
@@ -104,8 +120,16 @@ Response with task id and link.
 
 ```
 {
+    "link" : {"rel": "self", "href": "/kapacitor/v1/tasks/TASK_ID"},
     "id" : "TASK_ID",
-    "link" : {"rel": "self", "href": "/kapacitor/v1/tasks/TASK_ID"}
+    "type" : "stream",
+    "dbrps" : [{"db": "DATABASE_NAME", "rp" : "RP_NAME"}],
+    "script" : "stream\n    |from()\n        .measurement('cpu')\n",
+    "dot" : "digraph TASK_ID { ... }",
+    "status" : "enabled",
+    "executing" : true,
+    "error" : "",
+    "stats" : {}
 }
 ```
 
@@ -162,10 +186,11 @@ Response with task id and link.
 
 #### Response
 
-| Code | Meaning                                     |
-| ---- | -------                                     |
-| 200  | Success, contains id and link for new task. |
-| 404  | Task does not exist                         |
+| Code | Meaning                                  |
+| ---- | -------                                  |
+| 200  | Task created, contains task information. |
+| 204  | Task updated, no content                 |
+| 404  | Task does not exist                      |
 
 ### Get Task
 
@@ -248,9 +273,9 @@ DELETE /kapacitor/v1/tasks/TASK_ID
 
 #### Response
 
-| Code | Meaning             |
-| ---- | -------             |
-| 204  | Success             |
+| Code | Meaning |
+| ---- | ------- |
+| 204  | Success |
 
 >NOTE: Deleting a non-existent task is not an error and will return a 204 success.
 
@@ -262,7 +287,7 @@ To get information about several tasks make a GET request to the `/kapacitor/v1/
 | Query Parameter | Default    | Purpose                                                                                                                                           |
 | --------------- | -------    | -------                                                                                                                                           |
 | pattern         |            | Filter results based on the pattern. Uses standard shell glob matching, see [this](https://golang.org/pkg/path/filepath/#Match) for more details. |
-| fields          |            | List of fields to return. If empty returns all fields. Fields `id` and `link` are always returned.                                              |
+| fields          |            | List of fields to return. If empty returns all fields. Fields `id` and `link` are always returned.                                                |
 | dot-view        | attributes | One of `labels` or `attributes`. Labels is less readable but will correctly render with all the information contained in labels.                  |
 | script-format   | formatted  | One of `formatted` or `raw`. Raw will return the script identical to how it was defined. Formatted will first format the script.                  |
 | offset          | 0          | Offset count for paginating through tasks.                                                                                                        |
@@ -280,7 +305,7 @@ GET /kapacitor/v1/tasks
 {
     "tasks" : [
         {
-            "link" : "/kapacitor/v1/tasks/TASK_ID",
+            "link" : {"rel":"self", "href":"/kapacitor/v1/tasks/TASK_ID"},
             "id" : "TASK_ID",
             "type" : "stream",
             "dbrps" : [{"db": "DATABASE_NAME", "rp" : "RP_NAME"}],
@@ -292,7 +317,7 @@ GET /kapacitor/v1/tasks
             "stats" : {}
         },
         {
-            "link" : "/kapacitor/v1/tasks/ANOTHER_TASK_ID",
+            "link" : {"rel":"self", "href":"/kapacitor/v1/tasks/ANOTHER_TASK_ID"},
             "id" : "ANOTHER_TASK_ID",
             "type" : "stream",
             "dbrps" : [{"db": "DATABASE_NAME", "rp" : "RP_NAME"}],
@@ -317,7 +342,7 @@ GET /kapacitor/v1/task?pattern=TASK*
 {
     "tasks" : [
         {
-            "link" : "/kapacitor/v1/tasks/TASK_ID",
+            "link" : {"rel":"self", "href":"/kapacitor/v1/tasks/TASK_ID"},
             "id" : "TASK_ID",
             "type" : "stream",
             "dbrps" : [{"db": "DATABASE_NAME", "rp" : "RP_NAME"}],
@@ -342,14 +367,14 @@ GET /kapacitor/v1/tasks?fields=status&fields=executing&fields=error
 {
     "tasks" : [
         {
-            "link" : "/kapacitor/v1/tasks/TASK_ID",
+            "link" : {"rel":"self", "href":"/kapacitor/v1/tasks/TASK_ID"},
             "id" : "TASK_ID",
             "status" : "enabled",
             "executing" : true,
             "error" : "",
         },
         {
-            "link" : "/kapacitor/v1/tasks/ANOTHER_TASK_ID",
+            "link" : {"rel":"self", "href":"/kapacitor/v1/tasks/ANOTHER_TASK_ID"},
             "id" : "ANOTHER_TASK_ID",
             "status" : "disabled",
             "executing" : true,
@@ -361,11 +386,60 @@ GET /kapacitor/v1/tasks?fields=status&fields=executing&fields=error
 
 #### Response
 
-| Code | Meaning                |
-| ---- | -------                |
-| 200  | Success                |
+| Code | Meaning |
+| ---- | ------- |
+| 200  | Success |
 
 >NOTE: If the pattern does not match any tasks an empty list will be returned, with a 200 success.
+
+### Custom Task HTTP Endpoints
+
+In TICKscript it is possible to expose a cache of recent data via the [HTTPOut](https://docs.influxdata.com/kapacitor/latest/nodes/http_out_node/) node.
+The data is available at the path `/kapacitor/v1/tasks/TASK_ID/ENDPOINT_NAME`.
+
+### Example
+
+For the TICKscript:
+
+```go
+stream
+    |from()
+        .measurement('cpu')
+    |window()
+        .period(60s)
+        .every(60s)
+    |httpOut('mycustom_endpoint')
+```
+
+```
+GET /kapacitor/v1/tasks/TASK_ID/mycustom_endpoint
+```
+
+```
+{
+    "series": [
+        {
+            "name": "cpu",
+            "columns": [
+                "time",
+                "value"
+            ],
+            "values": [
+                [
+                    "2015-01-29T21:55:43.702900257Z",
+                    55
+                ],
+                [
+                    "2015-01-29T21:56:43.702900257Z",
+                    42
+                ],
+            ]
+        }
+    ]
+}
+```
+
+The output is the same as a query for data to [InfluxDB](https://docs.influxdata.com/influxdb/latest/guides/querying_data/).
 
 ## Recordings
 
@@ -476,7 +550,13 @@ All recordings are assigned an ID which is returned in this format with a link.
 ```
 {
     "link" : {"rel": "self", "href": "/kapacitor/v1/recordings/e24db07d-1646-4bb3-a445-828f5049bea0"},
-    "id" : "e24db07d-1646-4bb3-a445-828f5049bea0"
+    "id" : "e24db07d-1646-4bb3-a445-828f5049bea0",
+    "type" : "stream",
+    "size" : 0,
+    "date" : "2006-01-02T15:04:05Z07:00",
+    "error" : "",
+    "status" : "running",
+    "progress" : 0
 }
 ```
 
@@ -490,15 +570,13 @@ In order to determine when a recording has finished you must make a GET request 
 
 A recording has these read only properties.
 
-| Property | Description                                                                               |
-| -------- | -----------                                                                               |
-| id       | A unique identifier for the recording.                                                    |
-| type     | One of `stream` or `batch`. A recording cannot be replayed to a task of a different type. |
-| size     | Size of the recording on disk in bytes.                                                   |
-| date     | Date the recording finished.                                                              |
-| error    | Any error encountered when creating the recording.                                        |
-| status   | One of `recording` or `finished`.                                                           |
-| progress | Number between 0 and 1 indicating the approximate progress of the recording.              |
+| Property | Description                                                                  |
+| -------- | -----------                                                                  |
+| size     | Size of the recording on disk in bytes.                                      |
+| date     | Date the recording finished.                                                 |
+| error    | Any error encountered when creating the recording.                           |
+| status   | One of `recording` or `finished`.                                            |
+| progress | Number between 0 and 1 indicating the approximate progress of the recording. |
 
 
 #### Example
@@ -539,11 +617,30 @@ GET /kapacitor/v1/recordings/e24db07d-1646-4bb3-a445-828f5049bea0
 }
 ```
 
+Or if the recording fails.
+
+```
+GET /kapacitor/v1/recordings/e24db07d-1646-4bb3-a445-828f5049bea0
+```
+
+```
+{
+    "link" : {"rel": "self", "href": "/kapacitor/v1/recordings/e24db07d-1646-4bb3-a445-828f5049bea0"},
+    "id" : "e24db07d-1646-4bb3-a445-828f5049bea0",
+    "type" : "stream",
+    "size" : 1980353,
+    "date" : "2006-01-02T15:04:05Z07:00",
+    "error" : "error message explaining failure",
+    "status" : "failed",
+    "progress" : 1
+}
+```
+
 #### Response
 
 | Code | Meaning                                            |
 | ---- | -------                                            |
-| 200  | Success, the recording is finished.                |
+| 200  | Success, the recording is no longer running.       |
 | 202  | Success, the recording exists but is not finished. |
 | 404  | No such recording exists.                          |
 
@@ -557,9 +654,9 @@ DELETE /kapacitor/v1/recordings/RECORDING_ID
 
 #### Response
 
-| Code | Meaning             |
-| ---- | -------             |
-| 204  | Success             |
+| Code | Meaning |
+| ---- | ------- |
+| 204  | Success |
 
 >NOTE: Deleting a non-existent recording is not an error and will return a 204 success.
 
@@ -568,10 +665,12 @@ DELETE /kapacitor/v1/recordings/RECORDING_ID
 To list all recordings make a GET request to the `/kapacitor/v1/recordings` endpoint.
 Recordings are sorted by date.
 
-| Query Parameter | Default | Purpose                                    |
-| --------------- | ------- | -------                                    |
-| offset          | 0       | Offset count for paginating through tasks. |
-| limit           | 100     | Maximum number of tasks to return.         |
+| Query Parameter | Default | Purpose                                                                                                                                           |
+| --------------- | ------- | -------                                                                                                                                           |
+| pattern         |         | Filter results based on the pattern. Uses standard shell glob matching, see [this](https://golang.org/pkg/path/filepath/#Match) for more details. |
+| fields          |         | List of fields to return. If empty returns all fields. Fields `id` and `link` are always returned.                                                |
+| offset          | 0       | Offset count for paginating through tasks.                                                                                                        |
+| limit           | 100     | Maximum number of tasks to return.                                                                                                                |
 
 #### Example
 
@@ -621,7 +720,7 @@ To replay a recording make a POST request to `/kapacitor/v1/replays/`
 
 | Parameter      | Default | Purpose                                                                                                                                                                                                                                          |
 | ----------     | ------- | -------                                                                                                                                                                                                                                          |
-| id             |         | Unique identifier for the replay. If empty a random ID is chosen.                                                                                                                                                                                |
+| id             | random  | Unique identifier for the replay. If empty a random ID is chosen.                                                                                                                                                                                |
 | task           |         | ID of task.                                                                                                                                                                                                                                      |
 | recording      |         | ID of recording.                                                                                                                                                                                                                                 |
 | recording-time | false   | If true, use the times in the recording, otherwise adjust times relative to the current time.                                                                                                                                                    |
@@ -651,7 +750,6 @@ POST /kapacitor/v1/replays/
 }
 ```
 
-
 Replay a recording using a custom ID.
 
 ```
@@ -671,13 +769,19 @@ The request returns once the replay is started and provides a replay ID and link
 {
     "link" : {"rel": "self", "href": "/kapacitor/v1/replays/ad95677b-096b-40c8-82a8-912706f41d4c"},
     "id" : "ad95677b-096b-40c8-82a8-912706f41d4c",
+    "task" : "TASK_ID",
+    "recording" : "RECORDING_ID",
+    "clock" : "fast",
+    "recording-time" : false,
+    "status" : "running",
+    "progress" : 0,
+    "error" : ""
 }
 ```
 
-| Code | Meaning                                         |
-| ---- | -------                                         |
-| 201  | Success, replay has started.                    |
-| 404  | The specified task or recording does not exist. |
+| Code | Meaning                      |
+| ---- | -------                      |
+| 201  | Success, replay has started. |
 
 ### Waiting for a Replay
 
@@ -734,14 +838,61 @@ GET /kapacitor/v1/replays/ad95677b-096b-40c8-82a8-912706f41d4c
 }
 ```
 
+Or if the replay fails.
+
+```
+GET /kapacitor/v1/replays/ad95677b-096b-40c8-82a8-912706f41d4c
+```
+
+```
+{
+    "link" : {"rel": "self", "href": "/kapacitor/v1/replays/ad95677b-096b-40c8-82a8-912706f41d4c"},
+    "id" : "ad95677b-096b-40c8-82a8-912706f41d4c",
+    "task" : "TASK_ID",
+    "recording" : "RECORDING_ID",
+    "clock" : "fast",
+    "recording-time" : false,
+    "status" : "failed",
+    "progress" : 1,
+    "error" : "error message explaining failure"
+}
+```
+
+#### Response
+
+| Code | Meaning                                         |
+| ---- | -------                                         |
+| 200  | Success, replay is no longer running.           |
+| 202  | Success, the replay exists but is not finished. |
+| 404  | No such replay exists.                          |
+
+### Delete Replay
+
+To delete a replay make a DELETE request to the `/kapacitor/v1/replays/REPLAY_ID` endpoint.
+
+```
+DELETE /kapacitor/v1/replays/REPLAY_ID
+```
+
+#### Response
+
+| Code | Meaning |
+| ---- | ------- |
+| 204  | Success |
+
+>NOTE: Deleting a non-existent replay is not an error and will return a 204 success.
+
+
 ### List Replays
 
 You can list replays for a given recording by making a GET request to `/kapacitor/v1/replays`.
 
-| Query Parameter | Default | Purpose                                    |
-| --------------- | ------- | -------                                    |
-| offset          | 0       | Offset count for paginating through tasks. |
-| limit           | 100     | Maximum number of tasks to return.         |
+| Query Parameter | Default | Purpose                                                                                                                                           |
+| --------------- | ------- | -------                                                                                                                                           |
+| pattern         |         | Filter results based on the pattern. Uses standard shell glob matching, see [this](https://golang.org/pkg/path/filepath/#Match) for more details. |
+| fields          |         | List of fields to return. If empty returns all fields. Fields `id` and `link` are always returned.                                                |
+| offset          | 0       | Offset count for paginating through tasks.                                                                                                        |
+| limit           | 100     | Maximum number of tasks to return.                                                                                                                |
 
 #### Example
 
@@ -811,4 +962,22 @@ These can be accessed at the `/kapacitor/v1/debug/vars` endpoint.
 
 ```
 GET /kapacitor/v1/debug/vars
+```
+
+### Debug Pprof
+
+Kapacitor also the standard Go [net/http/pprof](https://golang.org/pkg/net/http/pprof/) endpoints.
+
+```
+GET /kapacitor/v1/debug/pprof/...
+```
+
+>NOTE: Not all of these endpoints return JSON content.
+
+### Routes
+
+Displays available routes for the API
+
+```
+GET /kapacitor/v1/:routes
 ```

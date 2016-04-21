@@ -17,7 +17,7 @@ import (
 type HTTPOutNode struct {
 	node
 	c              *pipeline.HTTPOutNode
-	result         influxql.Result
+	result         *influxql.Result
 	groupSeriesIdx map[models.GroupID]int
 	endpoint       string
 	routes         []httpd.Route
@@ -30,6 +30,7 @@ func newHTTPOutNode(et *ExecutingTask, n *pipeline.HTTPOutNode, l *log.Logger) (
 		node:           node{Node: n, et: et, logger: l},
 		c:              n,
 		groupSeriesIdx: make(map[models.GroupID]int),
+		result:         new(influxql.Result),
 	}
 	et.registerOutput(hn.c.Endpoint, hn)
 	hn.node.runF = hn.runOut
@@ -59,7 +60,7 @@ func (h *HTTPOutNode) runOut([]byte) error {
 		}
 	}
 
-	p := path.Join("/task", h.et.Task.Name, h.c.Endpoint)
+	p := path.Join("/tasks/", h.et.Task.ID, h.c.Endpoint)
 
 	r := []httpd.Route{{
 		Name:        h.Name(),
