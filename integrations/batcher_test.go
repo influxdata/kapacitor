@@ -519,6 +519,64 @@ batch
 	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er)
 }
 
+func TestBatch_AlertDuration(t *testing.T) {
+
+	var script = `
+batch
+	|query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "host" = 'serverA' AND "cpu" != 'cpu-total'
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s), 'cpu')
+	|alert()
+		.crit(lambda:"mean" > 95)
+		.durationField('duration')
+	|httpOut('TestBatch_SimpleMR')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"cpu": "cpu1"},
+				Columns: []string{"time", "duration", "mean"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 20, 0, time.UTC),
+						float64(14 * time.Second),
+						96.49999999996908,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 22, 0, time.UTC),
+						float64(14 * time.Second),
+						93.46464646468584,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 24, 0, time.UTC),
+						float64(14 * time.Second),
+						95.00950095007724,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 26, 0, time.UTC),
+						float64(14 * time.Second),
+						92.99999999998636,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+						float64(14 * time.Second),
+						90.99999999998545,
+					},
+				},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er)
+}
+
 func TestBatch_AlertStateChangesOnly(t *testing.T) {
 	requestCount := int32(0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -542,14 +600,15 @@ func TestBatch_AlertStateChangesOnly(t *testing.T) {
 			}
 		} else {
 			expAd := kapacitor.AlertData{
-				ID:      "cpu_usage_idle:cpu=cpu-total,",
-				Message: "cpu_usage_idle:cpu=cpu-total, is OK",
-				Time:    time.Date(1971, 1, 1, 0, 0, 38, 0, time.UTC),
-				Level:   kapacitor.OKAlert,
+				ID:       "cpu_usage_idle:cpu=cpu-total,",
+				Message:  "cpu_usage_idle:cpu=cpu-total, is OK",
+				Time:     time.Date(1971, 1, 1, 0, 0, 38, 0, time.UTC),
+				Duration: 38 * time.Second,
+				Level:    kapacitor.OKAlert,
 			}
 			ad.Data = influxql.Result{}
 			if eq, msg := compareAlertData(expAd, ad); !eq {
-				t.Error(msg)
+				t.Errorf("unexpected alert data for request: %d %s", rc, msg)
 			}
 		}
 	}))
@@ -592,29 +651,30 @@ func TestBatch_AlertStateChangesOnlyExpired(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		// We don't care about the data for this test
+		ad.Data = influxql.Result{}
+		var expAd kapacitor.AlertData
 		atomic.AddInt32(&requestCount, 1)
-		if rc := atomic.LoadInt32(&requestCount); rc < 3 {
-			expAd := kapacitor.AlertData{
-				ID:      "cpu_usage_idle:cpu=cpu-total,",
-				Message: "cpu_usage_idle:cpu=cpu-total, is CRITICAL",
-				Time:    time.Date(1971, 1, 1, 0, 0, int(rc-1)*20, 0, time.UTC),
-				Level:   kapacitor.CritAlert,
-			}
-			ad.Data = influxql.Result{}
-			if eq, msg := compareAlertData(expAd, ad); !eq {
-				t.Error(msg)
+		rc := atomic.LoadInt32(&requestCount)
+		if rc < 3 {
+			expAd = kapacitor.AlertData{
+				ID:       "cpu_usage_idle:cpu=cpu-total,",
+				Message:  "cpu_usage_idle:cpu=cpu-total, is CRITICAL",
+				Time:     time.Date(1971, 1, 1, 0, 0, int(rc-1)*20, 0, time.UTC),
+				Duration: time.Duration(rc-1) * 20 * time.Second,
+				Level:    kapacitor.CritAlert,
 			}
 		} else {
-			expAd := kapacitor.AlertData{
-				ID:      "cpu_usage_idle:cpu=cpu-total,",
-				Message: "cpu_usage_idle:cpu=cpu-total, is OK",
-				Time:    time.Date(1971, 1, 1, 0, 0, 38, 0, time.UTC),
-				Level:   kapacitor.OKAlert,
+			expAd = kapacitor.AlertData{
+				ID:       "cpu_usage_idle:cpu=cpu-total,",
+				Message:  "cpu_usage_idle:cpu=cpu-total, is OK",
+				Time:     time.Date(1971, 1, 1, 0, 0, 38, 0, time.UTC),
+				Duration: 38 * time.Second,
+				Level:    kapacitor.OKAlert,
 			}
-			ad.Data = influxql.Result{}
-			if eq, msg := compareAlertData(expAd, ad); !eq {
-				t.Error(msg)
-			}
+		}
+		if eq, msg := compareAlertData(expAd, ad); !eq {
+			t.Errorf("unexpected alert data for request: %d %s", rc, msg)
 		}
 	}))
 	defer ts.Close()

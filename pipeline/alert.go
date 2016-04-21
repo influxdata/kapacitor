@@ -54,6 +54,7 @@ const defaultLogFileMode = 0600
 //    * Message -- the alert message, user defined.
 //    * Details -- the alert details, user defined HTML content.
 //    * Time -- the time the alert occurred.
+//    * Duration -- the duration of the alert in nanoseconds.
 //    * Level -- one of OK, INFO, WARNING or CRITICAL.
 //    * Data -- influxql.Result containing the data that triggered the alert.
 //
@@ -214,6 +215,10 @@ type AlertNode struct {
 	LevelTag string
 	// Optional field key to add to the data, containing the alert level as a string.
 	LevelField string
+
+	// Optional field key to add the alert duration to the data.
+	// The duration is always in units of nanoseconds.
+	DurationField string
 
 	// Optional tag key to use when tagging the data with the alert ID.
 	IdTag string
