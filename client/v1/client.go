@@ -234,13 +234,17 @@ func (c *Client) ListTasks(names []string) ([]TaskSummary, error) {
 // If dotLabels is true then the DOT string returned
 // will use label attributes for the stats on the nodes and edges
 // making it more useful to graph.
-func (c *Client) Task(name string, dotLabels bool) (Task, error) {
+// Using skipFormat will skip the formatting step when returning the TICKscript contents.
+func (c *Client) Task(name string, dotLabels, skipFormat bool) (Task, error) {
 	task := Task{}
 
 	v := url.Values{}
 	v.Add("name", name)
 	if dotLabels {
 		v.Add("labels", "true")
+	}
+	if skipFormat {
+		v.Add("skip-format", "true")
 	}
 
 	u := *c.url

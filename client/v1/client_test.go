@@ -53,7 +53,7 @@ func Test_ReportsErrors(t *testing.T) {
 		{
 			name: "Task",
 			fnc: func(c *client.Client) error {
-				_, err := c.Task("", false)
+				_, err := c.Task("", false, false)
 				return err
 			},
 		},
@@ -315,7 +315,7 @@ func Test_Task(t *testing.T) {
 	}
 	defer s.Close()
 
-	task, err := c.Task("t1", false)
+	task, err := c.Task("t1", false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -367,7 +367,7 @@ func Test_Task_Labels(t *testing.T) {
 	}
 	defer s.Close()
 
-	task, err := c.Task("t1", true)
+	task, err := c.Task("t1", true, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -382,6 +382,55 @@ func Test_Task_Labels(t *testing.T) {
     |from()
         .measurement('cpu')
 `,
+		Dot:            "digraph t1 {\n}",
+		Enabled:        true,
+		Executing:      false,
+		Error:          "",
+		ExecutionStats: client.ExecutionStats{},
+	}
+	if !reflect.DeepEqual(exp, task) {
+		t.Errorf("unexpected task:\ngot:\n%v\nexp:\n%v", task, exp)
+	}
+}
+
+func Test_Task_SkipFormat(t *testing.T) {
+	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/task" && r.Method == "GET" &&
+			r.URL.Query().Get("name") == "t1" &&
+			r.URL.Query().Get("skip-format") == "true" {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, `{
+	"Name":"t1",
+	"Type":"stream",
+	"DBRPs":[{"db":"db","rp":"rp"}],
+	"TICKscript":"stream|from().measurement('cpu')",
+	"Dot": "digraph t1 {\n}",
+	"Enabled" : true,
+	"Executing" : false,
+	"Error": ""
+}`)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "request: %v", r)
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	task, err := c.Task("t1", false, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp := client.Task{
+		Name: "t1",
+		Type: "stream",
+		DBRPs: []client.DBRP{{
+			Database:        "db",
+			RetentionPolicy: "rp",
+		}},
+		TICKscript:     "stream|from().measurement('cpu')",
 		Dot:            "digraph t1 {\n}",
 		Enabled:        true,
 		Executing:      false,

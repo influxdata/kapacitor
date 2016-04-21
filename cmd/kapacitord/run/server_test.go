@@ -63,7 +63,7 @@ func TestServer_DefineTask(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ti, err := cli.Task(name, false)
+	ti, err := cli.Task(name, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +122,7 @@ func TestServer_EnableTask(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ti, err := cli.Task(name, false)
+	ti, err := cli.Task(name, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,7 +193,7 @@ func TestServer_DisableTask(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ti, err := cli.Task(name, false)
+	ti, err := cli.Task(name, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,7 +252,7 @@ func TestServer_DeleteTask(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ti, err := cli.Task(name, false)
+	ti, err := cli.Task(name, false, false)
 	if err == nil {
 		t.Fatal("unexpected task:", ti)
 	}

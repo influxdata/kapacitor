@@ -50,6 +50,7 @@ For example, let's say we want to store all data that triggered an alert in Infl
 - [#281](https://github.com/influxdata/kapacitor/issues/281): AlertNode now has an `.all()` property that specifies that all points in a batch must match the criteria in order to trigger an alert.
 - [#384](https://github.com/influxdata/kapacitor/issues/384): Add `elapsed` function to compute the time difference between subsequent points.
 - [#230](https://github.com/influxdata/kapacitor/issues/230): Alert.StateChangesOnly now accepts optional duration arg. An alert will be triggered for every interval even if the state has not changed.
+- [#426](https://github.com/influxdata/kapacitor/issues/426): Add `skip-format` query parameter to the `GET /task` endpoint so that returned TICKscript content is left unmodified from the user input.
 
 
 ### Bugfixes
