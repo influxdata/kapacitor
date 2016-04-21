@@ -691,7 +691,7 @@ func doShow(args []string) error {
 		os.Exit(2)
 	}
 
-	ti, err := cli.Task(args[0], false)
+	ti, err := cli.Task(args[0], false, false)
 	if err != nil {
 		return err
 	}

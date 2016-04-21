@@ -295,10 +295,32 @@ func (ts *Service) handleTask(w http.ResponseWriter, r *http.Request) {
 
 	}
 
+	skipFormat := false
+	skipFormatStr := r.URL.Query().Get("skip-format")
+	if skipFormatStr != "" {
+		var err error
+		skipFormat, err = strconv.ParseBool(skipFormatStr)
+		if err != nil {
+			httpd.HttpError(w, "invalid skip-format value:", true, http.StatusBadRequest)
+			return
+		}
+
+	}
+
 	raw, err := ts.LoadRaw(name)
 	if err != nil {
 		httpd.HttpError(w, err.Error(), true, http.StatusNotFound)
 		return
+	}
+
+	if !skipFormat {
+		// Format TICKscript
+		formatted, err := tick.Format(raw.TICKscript)
+		if err == nil {
+			// Only format if it succeeded.
+			// Otherwise a change in syntax may prevent task retrieval.
+			raw.TICKscript = formatted
+		}
 	}
 
 	executing := ts.TaskMaster.IsExecuting(name)
@@ -477,16 +499,8 @@ func (ts *Service) handleDisable(w http.ResponseWriter, r *http.Request) {
 }
 
 func (ts *Service) Save(task *rawTask) error {
-
-	// Format TICKscript
-	formatted, err := tick.Format(task.TICKscript)
-	if err != nil {
-		return err
-	}
-	task.TICKscript = formatted
-
 	// Validate task
-	_, err = ts.TaskMaster.NewTask(task.Name,
+	_, err := ts.TaskMaster.NewTask(task.Name,
 		task.TICKscript,
 		task.Type,
 		task.DBRPs,
