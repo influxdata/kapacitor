@@ -80,12 +80,13 @@ func (l *AlertLevel) UnmarshalText(text []byte) error {
 }
 
 type AlertData struct {
-	ID      string          `json:"id"`
-	Message string          `json:"message"`
-	Details string          `json:"details"`
-	Time    time.Time       `json:"time"`
-	Level   AlertLevel      `json:"level"`
-	Data    influxql.Result `json:"data"`
+	ID       string          `json:"id"`
+	Message  string          `json:"message"`
+	Details  string          `json:"details"`
+	Time     time.Time       `json:"time"`
+	Duration time.Duration   `json:"duration"`
+	Level    AlertLevel      `json:"level"`
+	Data     influxql.Result `json:"data"`
 
 	// Info for custom templates
 	info detailsInfo
@@ -313,11 +314,12 @@ func (a *AlertNode) runAlert([]byte) error {
 					Tags:   p.Tags,
 					Points: []models.BatchPoint{models.BatchPointFromPoint(p)},
 				}
-				ad, err := a.alertData(p.Name, p.Group, p.Tags, p.Fields, l, p.Time, batch)
+				state.triggered(p.Time)
+				duration := state.duration()
+				ad, err := a.alertData(p.Name, p.Group, p.Tags, p.Fields, l, p.Time, duration, batch)
 				if err != nil {
 					return err
 				}
-				state.lastAlert = p.Time
 				a.handleAlert(ad)
 				if a.a.LevelTag != "" || a.a.IdTag != "" {
 					p.Tags = p.Tags.Copy()
@@ -328,13 +330,16 @@ func (a *AlertNode) runAlert([]byte) error {
 						p.Tags[a.a.IdTag] = ad.ID
 					}
 				}
-				if a.a.LevelField != "" || a.a.IdField != "" {
+				if a.a.LevelField != "" || a.a.IdField != "" || a.a.DurationField != "" {
 					p.Fields = p.Fields.Copy()
 					if a.a.LevelField != "" {
 						p.Fields[a.a.LevelField] = l.String()
 					}
 					if a.a.IdField != "" {
 						p.Fields[a.a.IdField] = ad.ID
+					}
+					if a.a.DurationField != "" {
+						p.Fields[a.a.DurationField] = int64(duration)
 					}
 				}
 				a.timer.Pause()
@@ -390,17 +395,19 @@ func (a *AlertNode) runAlert([]byte) error {
 				(l != OKAlert &&
 					!((a.a.UseFlapping && state.flapping) ||
 						(a.a.IsStateChangesOnly && !state.changed && !state.expired))) {
-				ad, err := a.alertData(b.Name, b.Group, b.Tags, highestPoint.Fields, l, t, b)
+				state.triggered(t)
+				duration := state.duration()
+				ad, err := a.alertData(b.Name, b.Group, b.Tags, highestPoint.Fields, l, t, duration, b)
 				if err != nil {
 					return err
 				}
-				state.lastAlert = t
 				a.handleAlert(ad)
 				// Update tags or fields for Level property
 				if a.a.LevelTag != "" ||
 					a.a.LevelField != "" ||
 					a.a.IdTag != "" ||
-					a.a.IdField != "" {
+					a.a.IdField != "" ||
+					a.a.DurationField != "" {
 					for i := range b.Points {
 						if a.a.LevelTag != "" || a.a.IdTag != "" {
 							b.Points[i].Tags = b.Points[i].Tags.Copy()
@@ -411,13 +418,16 @@ func (a *AlertNode) runAlert([]byte) error {
 								b.Points[i].Tags[a.a.IdTag] = ad.ID
 							}
 						}
-						if a.a.LevelField != "" || a.a.IdField != "" {
+						if a.a.LevelField != "" || a.a.IdField != "" || a.a.DurationField != "" {
 							b.Points[i].Fields = b.Points[i].Fields.Copy()
 							if a.a.LevelField != "" {
 								b.Points[i].Fields[a.a.LevelField] = l.String()
 							}
 							if a.a.IdField != "" {
 								b.Points[i].Fields[a.a.IdField] = ad.ID
+							}
+							if a.a.DurationField != "" {
+								b.Points[i].Fields[a.a.DurationField] = int64(duration)
 							}
 						}
 					}
@@ -485,6 +495,7 @@ func (a *AlertNode) alertData(
 	fields models.Fields,
 	level AlertLevel,
 	t time.Time,
+	d time.Duration,
 	b models.Batch,
 ) (*AlertData, error) {
 	id, err := a.renderID(name, group, tags)
@@ -496,32 +507,58 @@ func (a *AlertNode) alertData(
 		return nil, err
 	}
 	ad := &AlertData{
-		ID:      id,
-		Message: msg,
-		Details: details,
-		Time:    t,
-		Level:   level,
-		Data:    a.batchToResult(b),
-		info:    info,
+		ID:       id,
+		Message:  msg,
+		Details:  details,
+		Time:     t,
+		Duration: d,
+		Level:    level,
+		Data:     a.batchToResult(b),
+		info:     info,
 	}
 	return ad, nil
 }
 
 type alertState struct {
-	history   []AlertLevel
-	idx       int
-	flapping  bool
-	changed   bool
-	lastAlert time.Time
-	expired   bool
+	history  []AlertLevel
+	idx      int
+	flapping bool
+	changed  bool
+	// Time when first alert was triggered
+	firstTriggered time.Time
+	// Time when last alert was triggered.
+	// Note: Alerts are not triggered for every event.
+	lastTriggered time.Time
+	expired       bool
 }
 
+// Return the duration of the current alert state.
+func (a *alertState) duration() time.Duration {
+	return a.lastTriggered.Sub(a.firstTriggered)
+}
+
+// Record that the alert was triggered at time t.
+func (a *alertState) triggered(t time.Time) {
+	a.lastTriggered = t
+	// Check if we are being triggered for first time since an OKAlert
+	// If so reset firstTriggered time
+	p := a.idx - 1
+	if p == -1 {
+		p = len(a.history) - 1
+	}
+	if a.history[p] == OKAlert {
+		a.firstTriggered = t
+	}
+}
+
+// Record an event in the alert history.
 func (a *alertState) addEvent(level AlertLevel) {
 	a.changed = a.history[a.idx] != level
 	a.idx = (a.idx + 1) % len(a.history)
 	a.history[a.idx] = level
 }
 
+// Compute the percentage change in the alert history.
 func (a *alertState) percentChange() float64 {
 	l := len(a.history)
 	changes := 0.0
@@ -564,7 +601,7 @@ func (a *AlertNode) updateState(t time.Time, level AlertLevel, group models.Grou
 			state.flapping = true
 		}
 	}
-	state.expired = !state.changed && a.a.StateChangesOnlyDuration != 0 && t.Sub(state.lastAlert) >= a.a.StateChangesOnlyDuration
+	state.expired = !state.changed && a.a.StateChangesOnlyDuration != 0 && t.Sub(state.lastTriggered) >= a.a.StateChangesOnlyDuration
 	return state
 }
 
