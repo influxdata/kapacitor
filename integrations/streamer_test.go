@@ -957,7 +957,7 @@ byCpu
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_GroupByWhere", script, 13*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_GroupByWhere", script, 13*time.Second, er, nil, true)
 }
 
 func TestStream_Join(t *testing.T) {
