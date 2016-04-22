@@ -16,6 +16,11 @@ kapacitor*.zip
 /test-logs
 *.prof
 
+# Intellij
+.idea/
+*.iml
+*.iws
+
 # Ignore any built binaries
 /kapacitor
 /kapacitord
