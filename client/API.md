@@ -388,15 +388,17 @@ A recording ID is returned to later identify the recording.
 
 ##### Stream
 
-| Parameter | Purpose                                                             |
-| --------- | -------                                                             |
-| task      | ID of a task, used to only record data for the DBRPs of the task. |
-| stop      | Record stream data until stop date.                                 |
+| Parameter | Purpose                                                                    |
+| --------- | -------                                                                    |
+| id        | Unique identifier for the recording. If empty a random one will be chosen. |
+| task      | ID of a task, used to only record data for the DBRPs of the task.          |
+| stop      | Record stream data until stop date.                                        |
 
 ##### Batch
 
 | Parameter | Purpose                                                                                                          |
 | --------- | -------                                                                                                          |
+| id        | Unique identifier for the recording. If empty a random one will be chosen.                                       |
 | task      | ID of a task, records the results of the queries defined in the task.                                            |
 | start     | Earliest date for which data will be recorded. RFC3339Nano formatted.                                            |
 | stop      | Latest date for which data will be recorded. If not specified uses the current time. RFC3339Nano formatted data. |
@@ -404,11 +406,12 @@ A recording ID is returned to later identify the recording.
 
 ##### Query
 
-| Parameter | Purpose                                                                   |
-| --------- | -------                                                                   |
-| type      | Type of recording, `stream` or `batch`.                                   |
-| query     | Query to execute.                                                         |
-| cluster   | Name of a configured InfluxDB cluster. If empty uses the default cluster. |
+| Parameter | Purpose                                                                    |
+| --------- | -------                                                                    |
+| id        | Unique identifier for the recording. If empty a random one will be chosen. |
+| type      | Type of recording, `stream` or `batch`.                                    |
+| query     | Query to execute.                                                          |
+| cluster   | Name of a configured InfluxDB cluster. If empty uses the default cluster.  |
 
 >NOTE: A recording itself is typed as either a stream or batch recording and can only be replayed to a task of a corresponding type.
 Therefore when you record the result of a raw query you must specify the type recording you wish to create.
@@ -451,6 +454,17 @@ Create a recording using the `query` method specifying a `batch` type.
 ```
 POST /kapacitor/v1/recording/query
 {
+    "query" : "SELECT mean(usage_idle) FROM cpu WHERE time > now() - 1h GROUP BY time(10m)",
+    "type" : "batch"
+}
+```
+
+Create a recording with a custom ID.
+
+```
+POST /kapacitor/v1/recording/query
+{
+    "id" : "MY_RECORDING_ID",
     "query" : "SELECT mean(usage_idle) FROM cpu WHERE time > now() - 1h GROUP BY time(10m)",
     "type" : "batch"
 }
@@ -633,6 +647,18 @@ POST /kapacitor/v1/replays/
     "recording" : "RECORDING_ID",
     "clock" : "real",
     "recording-time" : true,
+}
+```
+
+
+Replay a recording using a custom ID.
+
+```
+POST /kapacitor/v1/replays/
+{
+    "id" : "MY_REPLAY_ID",
+    "task" : "TASK_ID",
+    "recording" : "RECORDING_ID"
 }
 ```
 
