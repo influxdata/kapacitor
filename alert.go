@@ -913,7 +913,15 @@ func (a *AlertNode) handleAlerta(alerta alertaHandler, ad *AlertData) {
 	resource := buf.String()
 	buf.Reset()
 
-	err = alerta.eventTmpl.Execute(&buf, ad.info)
+	type eventData struct {
+		idInfo
+		ID string
+	}
+	data := eventData{
+		idInfo: ad.info.messageInfo.idInfo,
+		ID:     ad.ID,
+	}
+	err = alerta.eventTmpl.Execute(&buf, data)
 	if err != nil {
 		a.logger.Printf("E! failed to evaluate Alerta Event template %s", alerta.Event)
 		return

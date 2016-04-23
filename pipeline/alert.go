@@ -776,7 +776,7 @@ type AlertaHandler struct {
 	Resource string
 
 	// Alerta event.
-	// Can be a template and has access to the same data as the AlertNode.Details property.
+	// Can be a template and has access to the same data as the idInfo property.
 	// Default: {{ .ID }}
 	Event string
 
