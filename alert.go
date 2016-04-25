@@ -232,6 +232,10 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		if err != nil {
 			return nil, err
 		}
+		evtmpl, err := text.New("event").Parse(alerta.Event)
+		if err != nil {
+			return nil, err
+		}
 		etmpl, err := text.New("environment").Parse(alerta.Environment)
 		if err != nil {
 			return nil, err
@@ -247,6 +251,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		ai := alertaHandler{
 			AlertaHandler:   alerta,
 			resourceTmpl:    rtmpl,
+			eventTmpl:       evtmpl,
 			environmentTmpl: etmpl,
 			groupTmpl:       gtmpl,
 			valueTmpl:       vtmpl,
@@ -873,6 +878,7 @@ type alertaHandler struct {
 	*pipeline.AlertaHandler
 
 	resourceTmpl    *text.Template
+	eventTmpl       *text.Template
 	environmentTmpl *text.Template
 	valueTmpl       *text.Template
 	groupTmpl       *text.Template
@@ -907,6 +913,22 @@ func (a *AlertNode) handleAlerta(alerta alertaHandler, ad *AlertData) {
 	resource := buf.String()
 	buf.Reset()
 
+	type eventData struct {
+		idInfo
+		ID string
+	}
+	data := eventData{
+		idInfo: ad.info.messageInfo.idInfo,
+		ID:     ad.ID,
+	}
+	err = alerta.eventTmpl.Execute(&buf, data)
+	if err != nil {
+		a.logger.Printf("E! failed to evaluate Alerta Event template %s", alerta.Event)
+		return
+	}
+	event := buf.String()
+	buf.Reset()
+
 	err = alerta.environmentTmpl.Execute(&buf, ad.info)
 	if err != nil {
 		a.logger.Printf("E! failed to evaluate Alerta Environment template %s", alerta.Environment)
@@ -938,7 +960,7 @@ func (a *AlertNode) handleAlerta(alerta alertaHandler, ad *AlertData) {
 	err = a.et.tm.AlertaService.Alert(
 		alerta.Token,
 		resource,
-		ad.ID,
+		event,
 		environment,
 		severity,
 		group,

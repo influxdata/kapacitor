@@ -2707,6 +2707,9 @@ func TestStream_AlertAlerta(t *testing.T) {
 			if exp := "cpu"; pd.Resource != exp {
 				t.Errorf("unexpected resource got %s exp %s", pd.Resource, exp)
 			}
+			if exp := "serverA"; pd.Event != exp {
+				t.Errorf("unexpected event got %s exp %s", pd.Event, exp)
+			}
 			if exp := "production"; pd.Environment != exp {
 				t.Errorf("unexpected environment got %s exp %s", pd.Environment, exp)
 			}
@@ -2726,8 +2729,11 @@ func TestStream_AlertAlerta(t *testing.T) {
 			if exp := "/alert?api-key=anothertesttoken"; r.URL.String() != exp {
 				t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
 			}
-			if exp := "resource: cpu"; pd.Resource != exp {
+			if exp := "resource: serverA"; pd.Resource != exp {
 				t.Errorf("unexpected resource got %s exp %s", pd.Resource, exp)
+			}
+			if exp := "event: TestStream_Alert"; pd.Event != exp {
+				t.Errorf("unexpected event got %s exp %s", pd.Event, exp)
 			}
 			if exp := "serverA"; pd.Environment != exp {
 				t.Errorf("unexpected environment got %s exp %s", pd.Environment, exp)
@@ -2744,9 +2750,6 @@ func TestStream_AlertAlerta(t *testing.T) {
 			if exp := "override"; pd.Origin != exp {
 				t.Errorf("unexpected origin got %s exp %s", pd.Origin, exp)
 			}
-		}
-		if exp := "serverA"; pd.Event != exp {
-			t.Errorf("unexpected event got %s exp %s", pd.Event, exp)
 		}
 		if exp := "kapacitor/cpu/serverA is CRITICAL @1971-01-01 00:00:10 +0000 UTC"; pd.Text != exp {
 			t.Errorf("unexpected text got %s exp %s", pd.Text, exp)
@@ -2775,7 +2778,8 @@ stream
 			.environment('production')
 		.alerta()
 			.token('anothertesttoken')
-			.resource('resource: {{ .Name }}')
+			.resource('resource: {{ index .Tags "host" }}')
+			.event('event: {{ .TaskName }}')
 			.environment('{{ index .Tags "host" }}')
 			.origin('override')
 			.group('{{ .ID }}')

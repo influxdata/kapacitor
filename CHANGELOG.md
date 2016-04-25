@@ -53,6 +53,7 @@ For example, let's say we want to store all data that triggered an alert in Infl
 - [#426](https://github.com/influxdata/kapacitor/issues/426): Add `skip-format` query parameter to the `GET /task` endpoint so that returned TICKscript content is left unmodified from the user input.
 - [#388](https://github.com/influxdata/kapacitor/issues/388): The duration of an alert is now tracked and exposed as part of the alert data as well as can be set as a field via `.durationField('duration')`.
 - [#486](https://github.com/influxdata/kapacitor/pull/486): Default config file location.
+- [#461](https://github.com/influxdata/kapacitor/pull/461): Make Alerta `event` property configurable.
 
 ### Bugfixes
 
