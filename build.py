@@ -35,7 +35,7 @@ DEFAULT_CONFIG = "etc/kapacitor/kapacitor.conf"
 PREINST_SCRIPT = None
 
 # Default AWS S3 bucket for uploads
-DEFAULT_BUCKET = "kapacitor"
+DEFAULT_BUCKET = "dl.influxdata.com/kapacitor/artifacts"
 
 # META-PACKAGE VARIABLES
 PACKAGE_LICENSE = "MIT"
@@ -396,11 +396,16 @@ def upload_packages(packages, bucket_name=None, overwrite=False):
     try:
         import boto
         from boto.s3.key import Key
+        from boto.s3.connection import OrdinaryCallingFormat
+        logging.getLogger("boto").setLevel(logging.WARNING)
     except ImportError:
         logging.warn("Cannot upload packages without 'boto' Python library!")
         return False
-    logging.info("Connecting to S3.")
-    c = boto.connect_s3()
+    logging.info("Connecting to AWS S3...")
+    # Up the number of attempts to 10 from default of 1
+    boto.config.add_section("Boto")
+    boto.config.set("Boto", "metadata_service_num_attempts", "10")
+    c = boto.connect_s3(calling_format=OrdinaryCallingFormat())
     if bucket_name is None:
         bucket_name = DEFAULT_BUCKET
     bucket = c.get_bucket(bucket_name.split('/')[0])
@@ -413,6 +418,7 @@ def upload_packages(packages, bucket_name=None, overwrite=False):
                                 os.path.basename(p))
         else:
             name = os.path.basename(p)
+        logging.debug("Using key: {}".format(name))
         if bucket.get_key(name) is None or overwrite:
             logging.info("Uploading file {}".format(name))
             k = Key(bucket)
@@ -423,7 +429,7 @@ def upload_packages(packages, bucket_name=None, overwrite=False):
                 n = k.set_contents_from_filename(p, replace=False)
             k.make_public()
         else:
-            logging.warn("Not uploading file {}, as it already exists in the target bucket.")
+            logging.warn("Not uploading file {}, as it already exists in the target bucket.".format(name))
     return True
 
 def go_list(vendor=False, relative=False):
@@ -584,7 +590,7 @@ def package(build_output, version, nightly=False, rc=None, iteration=1, static=F
     outfiles = []
     tmp_build_dir = create_temp_dir()
     logging.debug("Packaging for build output: {}".format(build_output))
-    logging.debug("Storing temporary build data at location: {}".format(tmp_build_dir))
+    logging.info("Using temporary directory: {}".format(tmp_build_dir))
     try:
         for platform in build_output:
             # Create top-level folder displaying which platform (linux, etc)
@@ -635,10 +641,16 @@ def package(build_output, version, nightly=False, rc=None, iteration=1, static=F
                     # since they may be modified below.
                     package_version = version
                     package_iteration = iteration
+                    if "static_" in arch:
+                        # Remove the "static_" from the displayed arch on the package
+                        package_arch = arch.replace("static_", "")
+                    else:
+                        package_arch = arch
                     if not release and not nightly:
                         # For non-release builds, just use the commit hash as the version
-                        package_version = "{}-{}".format(version,
-                                                         get_current_commit(short=True))
+                        package_version = "{}~{}.{}".format(version,
+                                                            get_current_branch(),
+                                                            get_current_commit(short=True))
                         package_iteration = "0"
                     package_build_root = build_root
                     current_location = build_output[platform][arch]
@@ -655,24 +667,22 @@ def package(build_output, version, nightly=False, rc=None, iteration=1, static=F
                             if static or "static_" in arch:
                                 name = '{}-static-nightly_{}_{}'.format(name,
                                                                         platform,
-                                                                        arch)
+                                                                        package_arch)
                             else:
                                 name = '{}-nightly_{}_{}'.format(name,
                                                                  platform,
-                                                                 arch)
+                                                                 package_arch)
                         else:
                             if static or "static_" in arch:
-                                name = '{}-{}-{}-static_{}_{}'.format(name,
-                                                                      package_version,
-                                                                      package_iteration,
-                                                                      platform,
-                                                                      arch)
+                                name = '{}-{}-static_{}_{}'.format(name,
+                                                                   package_version,
+                                                                   platform,
+                                                                   package_arch)
                             else:
-                                name = '{}-{}-{}_{}_{}'.format(name,
-                                                               package_version,
-                                                               package_iteration,
-                                                               platform,
-                                                               arch)
+                                name = '{}-{}_{}_{}'.format(name,
+                                                            package_version,
+                                                            platform,
+                                                            package_arch)
 
                         current_location = os.path.join(os.getcwd(), current_location)
                         if package_type == 'tar':
@@ -681,23 +691,19 @@ def package(build_output, version, nightly=False, rc=None, iteration=1, static=F
                             run("mv {}.tar.gz {}".format(os.path.join(build_root, name), current_location), shell=True)
                             outfile = os.path.join(current_location, name + ".tar.gz")
                             outfiles.append(outfile)
-                            logging.info("MD5({}) = {}".format(outfile.split('/')[-1:][0],
-                                                               generate_md5_from_file(outfile)))
                         elif package_type == 'zip':
                             zip_command = "cd {} && zip -r {}.zip ./*".format(build_root, name)
                             run(zip_command, shell=True)
                             run("mv {}.zip {}".format(os.path.join(build_root, name), current_location), shell=True)
                             outfile = os.path.join(current_location, name + ".zip")
                             outfiles.append(outfile)
-                            logging.info("MD5({}) = {}".format(outfile.split('/')[-1:][0],
-                                                               generate_md5_from_file(outfile)))
                     elif package_type not in ['zip', 'tar'] and static or "static_" in arch:
                         logging.info("Skipping package type '{}' for static builds.".format(package_type))
                     else:
                         fpm_command = "fpm {} --name {} -a {} -t {} --version {} --iteration {} -C {} -p {} ".format(
                             fpm_common_args,
                             name,
-                            arch,
+                            package_arch,
                             package_type,
                             package_version,
                             package_iteration,
@@ -713,15 +719,20 @@ def package(build_output, version, nightly=False, rc=None, iteration=1, static=F
                         if outfile is None:
                             logging.warn("Could not determine output from packaging output!")
                         else:
-                            # Strip nightly version (the unix epoch) from filename
-                            if nightly and package_type in [ 'deb', 'rpm' ]:
-                                new_outfile = outfile.replace("{}-{}".format(version, iteration), "nightly")
+                            if nightly:
+                                # Strip nightly version from package name
+                                new_outfile = outfile.replace("{}-{}".format(package_version, package_iteration), "nightly")
+                                os.rename(outfile, new_outfile)
+                                outfile = new_outfile
+                            else:
+                                # Strip iteration from package name
+                                if package_type == 'rpm':
+                                    # rpm's convert any dashes to underscores
+                                    package_version = package_version.replace("-", "_")
+                                new_outfile = outfile.replace("{}-{}".format(package_version, package_iteration), package_version)
                                 os.rename(outfile, new_outfile)
                                 outfile = new_outfile
                             outfiles.append(os.path.join(os.getcwd(), outfile))
-                            # Display MD5 hash for generated package
-                            logging.info("MD5({}) = {}".format(outfile.split('/')[-1:][0],
-                                                               generate_md5_from_file(outfile)))
         logging.debug("Produced package files: {}".format(outfiles))
         return outfiles
     finally:
@@ -730,9 +741,6 @@ def package(build_output, version, nightly=False, rc=None, iteration=1, static=F
 
 def main(args):
     global PACKAGE_NAME
-
-    if args.version is None:
-        args.version = get_current_version()
 
     if args.nightly and args.rc:
         logging.error("Cannot be both a nightly and a release candidate.")
@@ -788,7 +796,6 @@ def main(args):
     if args.test:
         if not run_tests(args.race, args.parallel, args.timeout, args.no_vet):
             return 1
-        return 0
 
     platforms = []
     single_build = True
@@ -824,9 +831,6 @@ def main(args):
                 return 1
             build_output.get(platform).update( { arch : od } )
 
-    if orig_branch != get_current_branch():
-        run("git checkout {}".format(orig_branch))
-
     # Build packages
     if args.package:
         if not check_path_for("fpm"):
@@ -853,7 +857,16 @@ def main(args):
             logging.debug("Files staged for upload: {}".format(packages))
             if args.nightly:
                 args.upload_overwrite = True
-            upload_packages(packages, bucket_name=args.bucket, overwrite=args.upload_overwrite)
+            if not upload_packages(packages, bucket_name=args.bucket, overwrite=args.upload_overwrite):
+                return 1
+        logging.info("Packages created:")
+        for p in packages:
+            logging.info("{} (MD5={})".format(p.split('/')[-1:][0],
+                                              generate_md5_from_file(p)))
+    if orig_branch != get_current_branch():
+        logging.info("Moving back to original git branch: {}".format(args.branch))
+        run("git checkout {}".format(orig_branch))
+
     return 0
 
 if __name__ == '__main__':
@@ -900,6 +913,7 @@ if __name__ == '__main__':
     parser.add_argument('--version',
                         metavar='<version>',
                         type=str,
+                        default=get_current_version(),
                         help='Version information to apply to build output (ex: 0.12.0)')
     parser.add_argument('--rc',
                         metavar='<release candidate>',
@@ -965,9 +979,6 @@ if __name__ == '__main__':
     parser.add_argument('--sign',
                         action='store_true',
                         help='Create GPG detached signatures for packages (when package is specified)')
-    parser.add_argument('--archive-output',
-                        action='store_true',
-                        help='Use verbose naming (including branch and commit) in package output')
     parser.add_argument('--test',
                         action='store_true',
                         help='Run tests (does not produce build output)')
