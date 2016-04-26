@@ -165,7 +165,6 @@ Response with task id and link.
 | Code | Meaning                                     |
 | ---- | -------                                     |
 | 200  | Success, contains id and link for new task. |
-| 204  | Success                                     |
 | 404  | Task does not exist                         |
 
 ### Get Task
@@ -368,7 +367,7 @@ GET /kapacitor/v1/tasks?fields=status&fields=executing&fields=error
 
 >NOTE: If the pattern does not match any tasks an empty list will be returned, with a 200 success.
 
-## Replays and Recordings
+## Recordings
 
 Kapacitor can save recordings of data and replay them against a specified task.
 
@@ -498,7 +497,7 @@ A recording has these read only properties.
 | size     | Size of the recording on disk in bytes.                                                   |
 | date     | Date the recording finished.                                                              |
 | error    | Any error encountered when creating the recording.                                        |
-| status   | One of `running` or `finished`.                                                           |
+| status   | One of `recording` or `finished`.                                                           |
 | progress | Number between 0 and 1 indicating the approximate progress of the recording.              |
 
 
@@ -614,7 +613,9 @@ GET /kapacitor/v1/recordings
 | 200  | Success |
 
 
-### Replay Recording
+## Replays
+
+### Replaying a recording
 
 To replay a recording make a POST request to `/kapacitor/v1/replays/`
 
@@ -686,8 +687,9 @@ A replay has these read only properties in addition to the properties listed [ab
 
 | Property | Description                                                               |
 | -------- | -----------                                                               |
-| status   | One of `running` or `finished`.                                           |
+| status   | One of `replaying` or `finished`.                                           |
 | progress | Number between 0 and 1 indicating the approximate progress of the replay. |
+| error    | Any error that occured while perfoming the replay                         |
 
 
 #### Example
@@ -707,7 +709,8 @@ GET /kapacitor/v1/replays/ad95677b-096b-40c8-82a8-912706f41d4c
     "clock" : "fast",
     "recording-time" : false,
     "status" : "running",
-    "progress" : 0.57
+    "progress" : 0.57,
+    "error" : ""
 }
 ```
 
@@ -726,7 +729,8 @@ GET /kapacitor/v1/replays/ad95677b-096b-40c8-82a8-912706f41d4c
     "clock" : "fast",
     "recording-time" : false,
     "status" : "finished",
-    "progress" : 1
+    "progress" : 1,
+    "error" : ""
 }
 ```
 
@@ -756,7 +760,8 @@ GET /kapacitor/v1/replays
             "clock" : "fast",
             "recording-time" : false,
             "status" : "finished",
-            "progress" : 1
+            "progress" : 1,
+            "error" : ""
         },
         {
             "link" : {"rel": "self", "href": "/kapacitor/v1/replays/be33f0a1-0272-4019-8662-c730706dac7d"},
@@ -766,7 +771,8 @@ GET /kapacitor/v1/replays
             "clock" : "fast",
             "recording-time" : false,
             "status" : "finished",
-            "progress" : 1
+            "progress" : 1,
+            "error" : ""
         }
     ]
 }
