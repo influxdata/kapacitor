@@ -78,11 +78,11 @@ Define a task using a JSON object with the following options:
 
 | Property | Purpose                                                                |
 | -------- | -------                                                                |
-| id       | Unique identifier for the task. If empty a random ID will be chosen. |
+| id       | Unique identifier for the task. If empty a random ID will be chosen.   |
 | type     | The task type: `stream` or `batch`.                                    |
 | dbrps    | List of database retention policy pairs the task is allowed to access. |
 | script   | The content of the script.                                             |
-| enabled  | Whether the task is enabled or disabled.                               |
+| status   | One of `enabled` or `disabled`.                                        |
 
 When using PATCH, if any option is missing it will be left unmodified.
 
@@ -126,7 +126,7 @@ Enable an existing task.
 ```
 PATCH /kapacitor/v1/tasks/TASK_ID
 {
-    "enabled" : true,
+    "status" : "enabled",
 }
 ```
 
@@ -135,7 +135,7 @@ Disable an existing task.
 ```
 PATCH /kapacitor/v1/tasks/TASK_ID
 {
-    "enabled" : false,
+    "status" : "disabled",
 }
 ```
 
@@ -145,9 +145,9 @@ Define a new task that is enabled on creation.
 POST /kapacitor/v1/tasks/TASK_ID
 {
     "type" : "stream",
-    "dbrps": [{"db": "DATABASE_NAME", "rp" : "RP_NAME"}],
-    "script": "stream\n    |from()\n        .measurement('cpu')\n"
-    "enabled" true,
+    "dbrps" : [{"db": "DATABASE_NAME", "rp" : "RP_NAME"}],
+    "script" : "stream\n    |from()\n        .measurement('cpu')\n",
+    "status" : "enabled"
 }
 ```
 
@@ -200,13 +200,13 @@ GET /kapacitor/v1/tasks/TASK_ID
     "link" : {"rel": "self", "href": "/kapacitor/v1/tasks/TASK_ID"},
     "id" : "TASK_ID",
     "type" : "stream",
-    "dbrps": [{"db": "DATABASE_NAME", "rp" : "RP_NAME"}],
-    "script": "stream\n    |from()\n        .measurement('cpu')\n",
+    "dbrps" : [{"db": "DATABASE_NAME", "rp" : "RP_NAME"}],
+    "script" : "stream\n    |from()\n        .measurement('cpu')\n",
     "dot" : "digraph TASK_ID { ... }",
-    "enabled" : true,
+    "status" : "enabled",
     "executing" : true,
     "error" : "",
-    "stats": {}
+    "stats" : {}
 }
 ```
 
@@ -221,13 +221,13 @@ GET /kapacitor/v1/tasks/TASK_ID?dot-view=labels&script-format=raw
     "link" : {"rel": "self", "href": "/kapacitor/v1/tasks/TASK_ID"},
     "id" : "TASK_ID",
     "type" : "stream",
-    "dbrps": [{"db": "DATABASE_NAME", "rp" : "RP_NAME"}],
-    "script": "stream|from().measurement('cpu')",
+    "dbrps" : [{"db": "DATABASE_NAME", "rp" : "RP_NAME"}],
+    "script" : "stream|from().measurement('cpu')",
     "dot" : "digraph TASK_ID { ... }",
-    "enabled" : true,
+    "status" : "enabled",
     "executing" : true,
     "error" : "",
-    "stats": {}
+    "stats" : {}
 }
 ```
 
@@ -284,25 +284,25 @@ GET /kapacitor/v1/tasks
             "link" : "/kapacitor/v1/tasks/TASK_ID",
             "id" : "TASK_ID",
             "type" : "stream",
-            "dbrps": [{"db": "DATABASE_NAME", "rp" : "RP_NAME"}],
-            "script": "stream|from().measurement('cpu')",
+            "dbrps" : [{"db": "DATABASE_NAME", "rp" : "RP_NAME"}],
+            "script" : "stream|from().measurement('cpu')",
             "dot" : "digraph TASK_ID { ... }",
-            "enabled" : true,
+            "status" : "enabled",
             "executing" : true,
             "error" : "",
-            "stats": {}
+            "stats" : {}
         },
         {
             "link" : "/kapacitor/v1/tasks/ANOTHER_TASK_ID",
             "id" : "ANOTHER_TASK_ID",
             "type" : "stream",
-            "dbrps": [{"db": "DATABASE_NAME", "rp" : "RP_NAME"}],
-            "script": "stream|from().measurement('cpu')",
+            "dbrps" : [{"db": "DATABASE_NAME", "rp" : "RP_NAME"}],
+            "script" : "stream|from().measurement('cpu')",
             "dot" : "digraph ANOTHER_TASK_ID{ ... }",
-            "enabled" : true,
+            "status" : "disabled",
             "executing" : true,
             "error" : "",
-            "stats": {}
+            "stats" : {}
         }
     ]
 }
@@ -321,22 +321,22 @@ GET /kapacitor/v1/task?pattern=TASK*
             "link" : "/kapacitor/v1/tasks/TASK_ID",
             "id" : "TASK_ID",
             "type" : "stream",
-            "dbrps": [{"db": "DATABASE_NAME", "rp" : "RP_NAME"}],
-            "script": "stream|from().measurement('cpu')",
+            "dbrps" : [{"db": "DATABASE_NAME", "rp" : "RP_NAME"}],
+            "script" : "stream|from().measurement('cpu')",
             "dot" : "digraph TASK_ID { ... }",
-            "enabled" : true,
+            "status" : "enabled:,
             "executing" : true,
             "error" : "",
-            "stats": {}
+            "stats" : {}
         }
     ]
 }
 ```
 
-Get all tasks, but only the enabled, executing and error fields.
+Get all tasks, but only the status, executing and error fields.
 
 ```
-GET /kapacitor/v1/tasks?fields=enabled&fields=executing&fields=error
+GET /kapacitor/v1/tasks?fields=status&fields=executing&fields=error
 ```
 
 ```
@@ -345,14 +345,14 @@ GET /kapacitor/v1/tasks?fields=enabled&fields=executing&fields=error
         {
             "link" : "/kapacitor/v1/tasks/TASK_ID",
             "id" : "TASK_ID",
-            "enabled" : true,
+            "status" : "enabled",
             "executing" : true,
             "error" : "",
         },
         {
             "link" : "/kapacitor/v1/tasks/ANOTHER_TASK_ID",
             "id" : "ANOTHER_TASK_ID",
-            "enabled" : true,
+            "status" : "disabled",
             "executing" : true,
             "error" : "",
         }
