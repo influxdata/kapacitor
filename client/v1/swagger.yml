@@ -467,6 +467,8 @@ definitions:
     type: object
     description: A task
     properties:
+      link:
+        $ref: '#/definitions/Link'
       id:
         description: Task ID
         type: string
@@ -525,6 +527,8 @@ definitions:
   Recording:
     type: object
     properties:
+      link:
+        $ref: '#/definitions/Link'
       id:
         type: string
       type:
@@ -552,6 +556,8 @@ definitions:
   Replay:
     type: object
     properties:
+      link:
+        $ref: '#/definitions/Link'
       id:
         type: string
       task:
@@ -582,11 +588,20 @@ definitions:
   Error:
     type: object
     description: Generic error object
+    readOnly: true
     properties:
-      code:
-        type: integer
-        format: int32
-      message:
+      error:
         type: string
         description: Detailed description of an error
-    required: [code, message]
+  Link:
+    type: object
+    readOnly: true
+    description: URI of resource.
+    properties:
+      rel:
+        type: string
+      href:
+        type: string
+        format: url
+    required: [rel, href]
+
