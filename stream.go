@@ -1,11 +1,12 @@
 package kapacitor
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
-	"github.com/influxdata/kapacitor/tick"
+	"github.com/influxdata/kapacitor/tick/stateful"
 )
 
 type StreamNode struct {
@@ -38,7 +39,7 @@ func (s *StreamNode) runSourceStream([]byte) error {
 type FromNode struct {
 	node
 	s             *pipeline.FromNode
-	expression    *tick.StatefulExpr
+	expression    stateful.Expression
 	dimensions    []string
 	allDimensions bool
 	db            string
@@ -59,7 +60,12 @@ func newFromNode(et *ExecutingTask, n *pipeline.FromNode, l *log.Logger) (*FromN
 	sn.allDimensions, sn.dimensions = determineDimensions(n.Dimensions)
 
 	if n.Expression != nil {
-		sn.expression = tick.NewStatefulExpr(n.Expression)
+		expr, err := stateful.NewExpression(n.Expression)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to compile from expression: %v", err)
+		}
+
+		sn.expression = expr
 	}
 
 	return sn, nil
