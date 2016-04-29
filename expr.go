@@ -10,11 +10,14 @@ import (
 )
 
 // EvalPredicate - Evaluate a given expression as a boolean predicate against a set of fields and tags
-func EvalPredicate(se stateful.Expression, now time.Time, fields models.Fields, tags models.Tags) (bool, error) {
-	vars, err := mergeFieldsAndTags(now, fields, tags)
+func EvalPredicate(se stateful.Expression, scopePool stateful.ScopePool, now time.Time, fields models.Fields, tags models.Tags) (bool, error) {
+	vars := scopePool.Get()
+	defer scopePool.Put(vars)
+	err := fillScope(vars, scopePool.ReferenceVariables(), now, fields, tags)
 	if err != nil {
 		return false, err
 	}
+
 	b, err := se.EvalBool(vars)
 	if err != nil {
 		return false, err
@@ -22,17 +25,30 @@ func EvalPredicate(se stateful.Expression, now time.Time, fields models.Fields, 
 	return b, nil
 }
 
-func mergeFieldsAndTags(now time.Time, fields models.Fields, tags models.Tags) (*tick.Scope, error) {
-	scope := tick.NewScope()
-	scope.Set("time", now.Local())
-	for k, v := range fields {
-		if _, ok := tags[k]; ok {
-			return nil, fmt.Errorf("cannot have field and tags with same name %q", k)
+// fillScope - given a scope and reference variables, we fill the exact variables from the now, fields and tags.
+func fillScope(vars *tick.Scope, referenceVariables []string, now time.Time, fields models.Fields, tags models.Tags) error {
+	for _, refVariableName := range referenceVariables {
+		if refVariableName == "time" {
+			vars.Set("time", now.Local())
+			continue
 		}
-		scope.Set(k, v)
+
+		// Support the error with tags/fields collison
+		var fieldValue interface{}
+		var isFieldExists bool
+
+		if fieldValue, isFieldExists = fields[refVariableName]; isFieldExists {
+			vars.Set(refVariableName, fieldValue)
+		}
+
+		if tagValue, ok := tags[refVariableName]; ok {
+			if isFieldExists {
+				return fmt.Errorf("cannot have field and tags with same name %q", refVariableName)
+			}
+
+			vars.Set(refVariableName, tagValue)
+		}
 	}
-	for k, v := range tags {
-		scope.Set(k, v)
-	}
-	return scope, nil
+
+	return nil
 }

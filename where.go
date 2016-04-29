@@ -12,9 +12,11 @@ import (
 
 type WhereNode struct {
 	node
-	w           *pipeline.WhereNode
-	endpoint    string
+	w        *pipeline.WhereNode
+	endpoint string
+
 	expressions map[models.GroupID]stateful.Expression
+	scopePools  map[models.GroupID]stateful.ScopePool
 }
 
 // Create a new WhereNode which filters down the batch or stream by a condition
@@ -23,6 +25,7 @@ func newWhereNode(et *ExecutingTask, n *pipeline.WhereNode, l *log.Logger) (wn *
 		node:        node{Node: n, et: et, logger: l},
 		w:           n,
 		expressions: make(map[models.GroupID]stateful.Expression),
+		scopePools:  make(map[models.GroupID]stateful.ScopePool),
 	}
 	wn.runF = wn.runWhere
 	if n.Expression == nil {
@@ -37,6 +40,8 @@ func (w *WhereNode) runWhere(snapshot []byte) error {
 		for p, ok := w.ins[0].NextPoint(); ok; p, ok = w.ins[0].NextPoint() {
 			w.timer.Start()
 			expr := w.expressions[p.Group]
+			scopePool := w.scopePools[p.Group]
+
 			if expr == nil {
 				compiledExpr, err := stateful.NewExpression(w.w.Expression)
 				if err != nil {
@@ -45,8 +50,11 @@ func (w *WhereNode) runWhere(snapshot []byte) error {
 
 				expr = compiledExpr
 				w.expressions[p.Group] = expr
+
+				scopePool = stateful.NewScopePool(stateful.FindReferenceVariables(w.w.Expression))
+				w.scopePools[p.Group] = scopePool
 			}
-			if pass, err := EvalPredicate(expr, p.Time, p.Fields, p.Tags); pass {
+			if pass, err := EvalPredicate(expr, scopePool, p.Time, p.Fields, p.Tags); pass {
 				w.timer.Pause()
 				for _, child := range w.outs {
 					err := child.CollectPoint(p)
@@ -64,6 +72,8 @@ func (w *WhereNode) runWhere(snapshot []byte) error {
 		for b, ok := w.ins[0].NextBatch(); ok; b, ok = w.ins[0].NextBatch() {
 			w.timer.Start()
 			expr := w.expressions[b.Group]
+			scopePool := w.scopePools[b.Group]
+
 			if expr == nil {
 				compiledExpr, err := stateful.NewExpression(w.w.Expression)
 				if err != nil {
@@ -72,10 +82,13 @@ func (w *WhereNode) runWhere(snapshot []byte) error {
 
 				expr = compiledExpr
 				w.expressions[b.Group] = expr
+
+				scopePool = stateful.NewScopePool(stateful.FindReferenceVariables(w.w.Expression))
+				w.scopePools[b.Group] = scopePool
 			}
 			for i := 0; i < len(b.Points); {
 				p := b.Points[i]
-				if pass, err := EvalPredicate(expr, p.Time, p.Fields, p.Tags); !pass {
+				if pass, err := EvalPredicate(expr, scopePool, p.Time, p.Fields, p.Tags); !pass {
 					if err != nil {
 						w.logger.Println("E! error while evaluating WHERE expression:", err)
 					}
