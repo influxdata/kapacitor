@@ -38,7 +38,7 @@ import (
 //            .streamName('error_rate')
 //        // Both the "value" fields from each parent have been prefixed
 //        // with the respective names 'errors' and 'requests'.
-//        |eval(lambda: "errors.value" / "requests.value"))
+//        |eval(lambda: "errors.value" / "requests.value")
 //           .as('rate')
 //        ...
 //
