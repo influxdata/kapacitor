@@ -54,6 +54,7 @@ For example, let's say we want to store all data that triggered an alert in Infl
 - [#388](https://github.com/influxdata/kapacitor/issues/388): The duration of an alert is now tracked and exposed as part of the alert data as well as can be set as a field via `.durationField('duration')`.
 - [#486](https://github.com/influxdata/kapacitor/pull/486): Default config file location.
 - [#461](https://github.com/influxdata/kapacitor/pull/461): Make Alerta `event` property configurable.
+- [#491](https://github.com/influxdata/kapacitor/pull/491): BREAKING: Rewriting stateful expression in order to improve performance, the only breaking change is: short circuit evaluation for booleans - for example: ``lambda: "bool_value" && (count() > 100)`` if "bool_value" is false, we won't evaluate "count".
 
 ### Bugfixes
 

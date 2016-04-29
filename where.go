@@ -2,18 +2,19 @@ package kapacitor
 
 import (
 	"errors"
+	"fmt"
 	"log"
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
-	"github.com/influxdata/kapacitor/tick"
+	"github.com/influxdata/kapacitor/tick/stateful"
 )
 
 type WhereNode struct {
 	node
 	w           *pipeline.WhereNode
 	endpoint    string
-	expressions map[models.GroupID]*tick.StatefulExpr
+	expressions map[models.GroupID]stateful.Expression
 }
 
 // Create a new WhereNode which filters down the batch or stream by a condition
@@ -21,7 +22,7 @@ func newWhereNode(et *ExecutingTask, n *pipeline.WhereNode, l *log.Logger) (wn *
 	wn = &WhereNode{
 		node:        node{Node: n, et: et, logger: l},
 		w:           n,
-		expressions: make(map[models.GroupID]*tick.StatefulExpr),
+		expressions: make(map[models.GroupID]stateful.Expression),
 	}
 	wn.runF = wn.runWhere
 	if n.Expression == nil {
@@ -37,7 +38,12 @@ func (w *WhereNode) runWhere(snapshot []byte) error {
 			w.timer.Start()
 			expr := w.expressions[p.Group]
 			if expr == nil {
-				expr = tick.NewStatefulExpr(w.w.Expression)
+				compiledExpr, err := stateful.NewExpression(w.w.Expression)
+				if err != nil {
+					return fmt.Errorf("Failed to compile expression in where clause: %v", err)
+				}
+
+				expr = compiledExpr
 				w.expressions[p.Group] = expr
 			}
 			if pass, err := EvalPredicate(expr, p.Time, p.Fields, p.Tags); pass {
@@ -59,7 +65,12 @@ func (w *WhereNode) runWhere(snapshot []byte) error {
 			w.timer.Start()
 			expr := w.expressions[b.Group]
 			if expr == nil {
-				expr = tick.NewStatefulExpr(w.w.Expression)
+				compiledExpr, err := stateful.NewExpression(w.w.Expression)
+				if err != nil {
+					return fmt.Errorf("Failed to compile expression in where clause: %v", err)
+				}
+
+				expr = compiledExpr
 				w.expressions[b.Group] = expr
 			}
 			for i := 0; i < len(b.Points); {

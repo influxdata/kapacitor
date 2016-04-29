@@ -19,7 +19,7 @@ import (
 	imodels "github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
-	"github.com/influxdata/kapacitor/tick"
+	"github.com/influxdata/kapacitor/tick/stateful"
 )
 
 const (
@@ -97,7 +97,7 @@ type AlertNode struct {
 	a           *pipeline.AlertNode
 	endpoint    string
 	handlers    []AlertHandler
-	levels      []*tick.StatefulExpr
+	levels      []stateful.Expression
 	states      map[models.GroupID]*alertState
 	idTmpl      *text.Template
 	messageTmpl *text.Template
@@ -273,16 +273,32 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 	}
 
 	// Parse level expressions
-	an.levels = make([]*tick.StatefulExpr, CritAlert+1)
+	an.levels = make([]stateful.Expression, CritAlert+1)
+
 	if n.Info != nil {
-		an.levels[InfoAlert] = tick.NewStatefulExpr(n.Info)
+		statefulExpression, expressionCompileError := stateful.NewExpression(n.Info)
+		if expressionCompileError != nil {
+			return nil, fmt.Errorf("Failed to compile stateful expression for info: %s", expressionCompileError)
+		}
+		an.levels[InfoAlert] = statefulExpression
 	}
+
 	if n.Warn != nil {
-		an.levels[WarnAlert] = tick.NewStatefulExpr(n.Warn)
+		statefulExpression, expressionCompileError := stateful.NewExpression(n.Warn)
+		if expressionCompileError != nil {
+			return nil, fmt.Errorf("Failed to compile stateful expression for warn: %s", expressionCompileError)
+		}
+		an.levels[WarnAlert] = statefulExpression
 	}
+
 	if n.Crit != nil {
-		an.levels[CritAlert] = tick.NewStatefulExpr(n.Crit)
+		statefulExpression, expressionCompileError := stateful.NewExpression(n.Crit)
+		if expressionCompileError != nil {
+			return nil, fmt.Errorf("Failed to compile stateful expression for crit: %s", expressionCompileError)
+		}
+		an.levels[CritAlert] = statefulExpression
 	}
+
 	// Setup states
 	if n.History < 2 {
 		n.History = 2
