@@ -131,7 +131,7 @@ fi
 case $ENVIRONMENT_INDEX in
     0)
         # 64 bit tests
-        run_test_docker Dockerfile_build_ubuntu64 test_64bit --debug --test --generate --no-uncommitted --upload --package
+        run_test_docker Dockerfile_build_ubuntu64 test_64bit --debug --test --generate --no-uncommitted
         rc=$?
         ;;
     1)
