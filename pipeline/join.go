@@ -1,6 +1,8 @@
 package pipeline
 
 import (
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -127,4 +129,33 @@ func (j *JoinNode) As(names ...string) *JoinNode {
 func (j *JoinNode) On(dims ...string) *JoinNode {
 	j.Dimensions = dims
 	return j
+}
+
+// Validate that the as() specification is consistent with the number of join arms.
+func (j *JoinNode) validate() error {
+	if len(j.Names) == 0 {
+		return fmt.Errorf("a call to join.as() is required to specify the output stream prefixes.")
+	}
+
+	if len(j.Names) != len(j.Parents()) {
+		return fmt.Errorf("number of prefixes specified by join.as() must match the number of joined streams")
+	}
+
+	for _, name := range j.Names {
+		if len(name) == 0 {
+			return fmt.Errorf("must provide a prefix name for the join node, see .as() property method")
+		}
+		if strings.ContainsRune(name, '.') {
+			return fmt.Errorf("cannot use name %s as field prefix, it contains a '.' character", name)
+		}
+	}
+	names := make(map[string]bool, len(j.Names))
+	for _, name := range j.Names {
+		if names[name] {
+			return fmt.Errorf("cannot use the same prefix name see .as() property method")
+		}
+		names[name] = true
+	}
+
+	return nil
 }
