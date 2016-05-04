@@ -671,7 +671,7 @@ func (a *AlertNode) renderID(name string, group models.GroupID, tags models.Tags
 	}
 	info := idInfo{
 		Name:     name,
-		TaskName: a.et.Task.Name,
+		TaskName: a.et.Task.ID,
 		Group:    g,
 		Tags:     tags,
 	}
@@ -693,7 +693,7 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group 
 	minfo := messageInfo{
 		idInfo: idInfo{
 			Name:     name,
-			TaskName: a.et.Task.Name,
+			TaskName: a.et.Task.ID,
 			Group:    g,
 			Tags:     tags,
 		},

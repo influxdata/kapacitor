@@ -32,6 +32,7 @@ import (
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/stats"
+	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/influxdata/kapacitor/services/talk"
 	"github.com/influxdata/kapacitor/services/task_store"
 	"github.com/influxdata/kapacitor/services/udf"
@@ -65,6 +66,7 @@ type Server struct {
 
 	LogService      logging.Interface
 	HTTPDService    *httpd.Service
+	StorageService  *storage.Service
 	TaskStore       *task_store.Service
 	ReplayService   *replay.Service
 	InfluxDBService *influxdb.Service
@@ -128,8 +130,9 @@ func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*
 	s.appendSMTPService(c.SMTP)
 	s.initHTTPDService(c.HTTP)
 	s.appendInfluxDBService(c.InfluxDB, c.defaultInfluxDB, c.Hostname)
+	s.appendStorageService(c.Storage)
 	s.appendTaskStoreService(c.Task)
-	s.appendReplayStoreService(c.Replay)
+	s.appendReplayService(c.Replay)
 	s.appendOpsGenieService(c.OpsGenie)
 	s.appendVictorOpsService(c.VictorOps)
 	s.appendPagerDutyService(c.PagerDuty)
@@ -162,6 +165,14 @@ func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*
 	s.appendHTTPDService()
 
 	return s, nil
+}
+
+func (s *Server) appendStorageService(c storage.Config) {
+	l := s.LogService.NewLogger("[storage] ", log.LstdFlags)
+	srv := storage.NewService(c, l)
+
+	s.StorageService = srv
+	s.Services = append(s.Services, srv)
 }
 
 func (s *Server) appendSMTPService(c smtp.Config) {
@@ -206,6 +217,7 @@ func (s *Server) appendHTTPDService() {
 func (s *Server) appendTaskStoreService(c task_store.Config) {
 	l := s.LogService.NewLogger("[task_store] ", log.LstdFlags)
 	srv := task_store.NewService(c, l)
+	srv.StorageService = s.StorageService
 	srv.HTTPDService = s.HTTPDService
 	srv.TaskMaster = s.TaskMaster
 
@@ -214,9 +226,10 @@ func (s *Server) appendTaskStoreService(c task_store.Config) {
 	s.Services = append(s.Services, srv)
 }
 
-func (s *Server) appendReplayStoreService(c replay.Config) {
+func (s *Server) appendReplayService(c replay.Config) {
 	l := s.LogService.NewLogger("[replay] ", log.LstdFlags)
 	srv := replay.NewService(c, l)
+	srv.StorageService = s.StorageService
 	srv.TaskStore = s.TaskStore
 	srv.HTTPDService = s.HTTPDService
 	srv.InfluxDBService = s.InfluxDBService
@@ -317,9 +330,10 @@ func (s *Server) appendCollectdService(c collectd.Config) {
 	if !c.Enabled {
 		return
 	}
-	l := s.LogService.NewStaticLevelLogger("[collectd] ", log.LstdFlags, wlog.INFO)
 	srv := collectd.NewService(c)
-	srv.SetLogger(l)
+	w := s.LogService.NewStaticLevelWriter(wlog.INFO)
+	srv.SetLogOutput(w)
+
 	srv.MetaClient = s.MetaClient
 	srv.PointsWriter = s.TaskMaster
 	s.Services = append(s.Services, srv)
@@ -329,12 +343,13 @@ func (s *Server) appendOpenTSDBService(c opentsdb.Config) error {
 	if !c.Enabled {
 		return nil
 	}
-	l := s.LogService.NewStaticLevelLogger("[opentsdb] ", log.LstdFlags, wlog.INFO)
 	srv, err := opentsdb.NewService(c)
 	if err != nil {
 		return err
 	}
-	srv.SetLogger(l)
+	w := s.LogService.NewStaticLevelWriter(wlog.INFO)
+	srv.SetLogOutput(w)
+
 	srv.PointsWriter = s.TaskMaster
 	srv.MetaClient = s.MetaClient
 	s.Services = append(s.Services, srv)
@@ -345,12 +360,12 @@ func (s *Server) appendGraphiteService(c graphite.Config) error {
 	if !c.Enabled {
 		return nil
 	}
-	l := s.LogService.NewStaticLevelLogger("[graphite] ", log.LstdFlags, wlog.INFO)
 	srv, err := graphite.NewService(c)
 	if err != nil {
 		return err
 	}
-	srv.SetLogger(l)
+	w := s.LogService.NewStaticLevelWriter(wlog.INFO)
+	srv.SetLogOutput(w)
 
 	srv.PointsWriter = s.TaskMaster
 	srv.MetaClient = s.MetaClient

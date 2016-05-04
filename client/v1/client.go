@@ -7,19 +7,33 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"sort"
+	"path"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/influxdata/influxdb/influxql"
 )
 
 const DefaultUserAgent = "KapacitorClient"
+
+// These are the constant enpoints for the API.
+// The server will always return a `link` to resources,
+// so path manipulation should not be necessary.
+// The only exception is if you only have an ID for a resource
+// then use the appropriate *Link methods.
+
+const basePath = "/kapacitor/v1"
+const pingPath = basePath + "/ping"
+const logLevelPath = basePath + "/loglevel"
+const tasksPath = basePath + "/tasks"
+const recordingsPath = basePath + "/recordings"
+const recordStreamPath = basePath + "/recordings/stream"
+const recordBatchPath = basePath + "/recordings/batch"
+const recordQueryPath = basePath + "/recordings/query"
+const replaysPath = basePath + "/replays"
 
 // HTTP configuration for connecting to Kapacitor
 type Config struct {
@@ -82,6 +96,54 @@ func New(conf Config) (*Client, error) {
 	}, nil
 }
 
+type Relation int
+
+const (
+	Self Relation = iota
+	Next
+	Previous
+)
+
+func (r Relation) MarshalText() ([]byte, error) {
+	switch r {
+	case Self:
+		return []byte("self"), nil
+	case Next:
+		return []byte("next"), nil
+	case Previous:
+		return []byte("prev"), nil
+	default:
+		return nil, fmt.Errorf("unknown Relation %d", r)
+	}
+}
+
+func (r *Relation) UnmarshalText(text []byte) error {
+	switch s := string(text); s {
+	case "self":
+		*r = Self
+	case "next":
+		*r = Next
+	case "prev":
+		*r = Previous
+	default:
+		return fmt.Errorf("unknown Relation %s", s)
+	}
+	return nil
+}
+
+func (r Relation) String() string {
+	s, err := r.MarshalText()
+	if err != nil {
+		return err.Error()
+	}
+	return string(s)
+}
+
+type Link struct {
+	Relation Relation `json:"rel"`
+	Href     string   `json:"href"`
+}
+
 type DBRP struct {
 	Database        string `json:"db"`
 	RetentionPolicy string `json:"rp"`
@@ -94,49 +156,202 @@ func (d DBRP) String() string {
 // Statistics about the execution of a task.
 type ExecutionStats struct {
 	// Summary stats about the entire task
-	TaskStats map[string]float64
+	TaskStats map[string]interface{} `json:"task-stats"`
 	// Stats for each node in the task
-	NodeStats map[string]map[string]float64
+	NodeStats map[string]map[string]interface{} `json:"node-stats"`
 }
 
-// Summary information about a task
-type TaskSummary struct {
-	Name           string
-	Type           string
-	DBRPs          []DBRP
-	Enabled        bool
-	Executing      bool
-	ExecutionStats ExecutionStats
+type TaskType int
+
+const (
+	StreamTask TaskType = 1
+	BatchTask  TaskType = 2
+)
+
+func (tt TaskType) MarshalText() ([]byte, error) {
+	switch tt {
+	case StreamTask:
+		return []byte("stream"), nil
+	case BatchTask:
+		return []byte("batch"), nil
+	default:
+		return nil, fmt.Errorf("unknown TaskType %d", tt)
+	}
 }
 
-// Complete information about a task
+func (tt *TaskType) UnmarshalText(text []byte) error {
+	switch s := string(text); s {
+	case "stream":
+		*tt = StreamTask
+	case "batch":
+		*tt = BatchTask
+	default:
+		return fmt.Errorf("unknown TaskType %s", s)
+	}
+	return nil
+}
+func (tt TaskType) String() string {
+	s, err := tt.MarshalText()
+	if err != nil {
+		return err.Error()
+	}
+	return string(s)
+}
+
+type TaskStatus int
+
+const (
+	Disabled TaskStatus = 1
+	Enabled  TaskStatus = 2
+)
+
+func (ts TaskStatus) MarshalText() ([]byte, error) {
+	switch ts {
+	case Disabled:
+		return []byte("disabled"), nil
+	case Enabled:
+		return []byte("enabled"), nil
+	default:
+		return nil, fmt.Errorf("unknown TaskStatus %d", ts)
+	}
+}
+
+func (ts *TaskStatus) UnmarshalText(text []byte) error {
+	switch s := string(text); s {
+	case "enabled":
+		*ts = Enabled
+	case "disabled":
+		*ts = Disabled
+	default:
+		return fmt.Errorf("unknown TaskStatus %s", s)
+	}
+	return nil
+}
+
+func (ts TaskStatus) String() string {
+	s, err := ts.MarshalText()
+	if err != nil {
+		return err.Error()
+	}
+	return string(s)
+}
+
+type Status int
+
+const (
+	Failed Status = iota
+	Running
+	Finished
+)
+
+func (s Status) MarshalText() ([]byte, error) {
+	switch s {
+	case Running:
+		return []byte("running"), nil
+	case Finished:
+		return []byte("finished"), nil
+	default:
+		return nil, fmt.Errorf("unknown Status %d", s)
+	}
+}
+
+func (s *Status) UnmarshalText(text []byte) error {
+	switch t := string(text); t {
+	case "running":
+		*s = Running
+	case "finished":
+		*s = Finished
+	default:
+		return fmt.Errorf("unknown Status %s", t)
+	}
+	return nil
+}
+
+func (s Status) String() string {
+	t, err := s.MarshalText()
+	if err != nil {
+		return err.Error()
+	}
+	return string(t)
+}
+
+type Clock int
+
+const (
+	Fast Clock = iota
+	Real
+)
+
+func (c Clock) MarshalText() ([]byte, error) {
+	switch c {
+	case Fast:
+		return []byte("fast"), nil
+	case Real:
+		return []byte("real"), nil
+	default:
+		return nil, fmt.Errorf("unknown Clock %d", c)
+	}
+}
+
+func (c *Clock) UnmarshalText(text []byte) error {
+	switch s := string(text); s {
+	case "fast":
+		*c = Fast
+	case "real":
+		*c = Real
+	default:
+		return fmt.Errorf("unknown Clock %s", s)
+	}
+	return nil
+}
+
+func (c Clock) String() string {
+	s, err := c.MarshalText()
+	if err != nil {
+		return err.Error()
+	}
+	return string(s)
+}
+
+// A Task plus its read-only attributes.
 type Task struct {
-	Name           string
-	Type           string
-	DBRPs          []DBRP
-	TICKscript     string
-	Dot            string
-	Enabled        bool
-	Executing      bool
-	Error          string
-	ExecutionStats ExecutionStats
+	Link           Link           `json:"link"`
+	ID             string         `json:"id"`
+	Type           TaskType       `json:"type"`
+	DBRPs          []DBRP         `json:"dbrps"`
+	TICKscript     string         `json:"script"`
+	Dot            string         `json:"dot"`
+	Status         TaskStatus     `json:"status"`
+	Executing      bool           `json:"executing"`
+	Error          string         `json:"error"`
+	ExecutionStats ExecutionStats `json:"stats"`
 }
 
-// Information about a recording
+// Information about a recording.
 type Recording struct {
-	ID      string
-	Type    string
-	Size    int64
-	Created time.Time
-	Error   string
+	Link     Link      `json:"link"`
+	ID       string    `json:"id"`
+	Type     TaskType  `json:"type"`
+	Size     int64     `json:"size"`
+	Date     time.Time `json:"date"`
+	Error    string    `json:"error"`
+	Status   Status    `json:"status"`
+	Progress float64   `json:"progress"`
 }
 
-// Set of recordings sorted by created date.
-type Recordings []Recording
-
-func (r Recordings) Len() int           { return len(r) }
-func (r Recordings) Swap(i, j int)      { r[i], r[j] = r[j], r[i] }
-func (r Recordings) Less(i, j int) bool { return r[i].Created.Before(r[j].Created) }
+// Information about a replay.
+type Replay struct {
+	Link          Link      `json:"link"`
+	ID            string    `json:"id"`
+	Task          string    `json:"task"`
+	Recording     string    `json:"recording"`
+	RecordingTime bool      `json:"recording-time"`
+	Clock         Clock     `json:"clock"`
+	Date          time.Time `json:"date"`
+	Error         string    `json:"error"`
+	Status        Status    `json:"status"`
+	Progress      float64   `json:"progress"`
+}
 
 // Perform the request.
 // If result is not nil the response body is JSON decoded into result.
@@ -162,7 +377,7 @@ func (c *Client) do(req *http.Request, result interface{}, codes ...int) (*http.
 			return nil, err
 		}
 		type errResp struct {
-			Error string `json:"Error"`
+			Error string `json:"error"`
 		}
 		d := json.NewDecoder(bytes.NewReader(body))
 		rp := errResp{}
@@ -170,11 +385,14 @@ func (c *Client) do(req *http.Request, result interface{}, codes ...int) (*http.
 		if rp.Error != "" {
 			return nil, errors.New(rp.Error)
 		}
-		return nil, fmt.Errorf("invalid repsonse: code %d: body: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("invalid response: code %d: body: %s", resp.StatusCode, string(body))
 	}
 	if result != nil {
 		d := json.NewDecoder(resp.Body)
-		d.Decode(result)
+		err := d.Decode(result)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode JSON: %v", err)
+		}
 	}
 	return resp, nil
 }
@@ -184,7 +402,7 @@ func (c *Client) do(req *http.Request, result interface{}, codes ...int) (*http.
 func (c *Client) Ping() (time.Duration, string, error) {
 	now := time.Now()
 	u := *c.url
-	u.Path = "ping"
+	u.Path = pingPath
 
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
@@ -199,57 +417,116 @@ func (c *Client) Ping() (time.Duration, string, error) {
 	return time.Since(now), version, nil
 }
 
-// Get summary information about tasks.
-// If names list is empty all tasks are returned.
-func (c *Client) ListTasks(names []string) ([]TaskSummary, error) {
-	tasks := strings.Join(names, ",")
-	v := url.Values{}
-	v.Add("tasks", tasks)
-
-	u := *c.url
-	u.Path = "tasks"
-	u.RawQuery = v.Encode()
-
-	req, err := http.NewRequest("GET", u.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	// Response type
-	type response struct {
-		Error string        `json:"Error"`
-		Tasks []TaskSummary `json:"Tasks"`
-	}
-
-	r := &response{}
-
-	_, err = c.do(req, r, http.StatusOK)
-	if err != nil {
-		return nil, err
-	}
-	return r.Tasks, nil
+func (c *Client) TaskLink(id string) Link {
+	return Link{Relation: Self, Href: path.Join(tasksPath, id)}
 }
 
-// Get detailed information about a task.
-// If dotLabels is true then the DOT string returned
-// will use label attributes for the stats on the nodes and edges
-// making it more useful to graph.
-// Using skipFormat will skip the formatting step when returning the TICKscript contents.
-func (c *Client) Task(name string, dotLabels, skipFormat bool) (Task, error) {
-	task := Task{}
+type CreateTaskOptions struct {
+	ID         string     `json:"id,omitempty"`
+	Type       TaskType   `json:"type,omitempty"`
+	DBRPs      []DBRP     `json:"dbrps,omitempty"`
+	TICKscript string     `json:"script,omitempty"`
+	Status     TaskStatus `json:"status,omitempty"`
+}
 
-	v := url.Values{}
-	v.Add("name", name)
-	if dotLabels {
-		v.Add("labels", "true")
-	}
-	if skipFormat {
-		v.Add("skip-format", "true")
+// Create a new task.
+// Errors if the task already exists.
+func (c *Client) CreateTask(opt CreateTaskOptions) (Task, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	err := enc.Encode(opt)
+	if err != nil {
+		return Task{}, err
 	}
 
 	u := *c.url
-	u.Path = "task"
-	u.RawQuery = v.Encode()
+	u.Path = tasksPath
+
+	req, err := http.NewRequest("POST", u.String(), &buf)
+	if err != nil {
+		return Task{}, err
+	}
+
+	t := Task{}
+	_, err = c.do(req, &t, http.StatusOK)
+	return t, err
+}
+
+type UpdateTaskOptions struct {
+	Type       TaskType   `json:"type,omitempty"`
+	DBRPs      []DBRP     `json:"dbrps,omitempty"`
+	TICKscript string     `json:"script,omitempty"`
+	Status     TaskStatus `json:"status,omitempty"`
+}
+
+// Update an existing task.
+// Only fields that are not their default value will be updated.
+func (c *Client) UpdateTask(link Link, opt UpdateTaskOptions) error {
+	if link.Href == "" {
+		return fmt.Errorf("invalid link %v", link)
+	}
+
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	err := enc.Encode(opt)
+	if err != nil {
+		return err
+	}
+
+	u := *c.url
+	u.Path = link.Href
+
+	req, err := http.NewRequest("PATCH", u.String(), &buf)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.do(req, nil, http.StatusNoContent)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type TaskOptions struct {
+	DotView      string
+	ScriptFormat string
+}
+
+func (o *TaskOptions) Default() {
+	if o.DotView == "" {
+		o.DotView = "attributes"
+	}
+	if o.ScriptFormat == "" {
+		o.ScriptFormat = "formatted"
+	}
+}
+
+func (o *TaskOptions) Values() *url.Values {
+	v := &url.Values{}
+	v.Set("dot-view", o.DotView)
+	v.Set("script-format", o.ScriptFormat)
+	return v
+}
+
+// Get information about a task.
+// Options can be nil and the default options will be used.
+// By default the DOT content will use attributes for stats. Use DotView="labels" to generate a purley labels based DOT content, which can accurately be rendered but is less readable.
+// By default the TICKscript contents are formatted, use ScriptFormat="raw" to return the TICKscript unmodified.
+func (c *Client) Task(link Link, opt *TaskOptions) (Task, error) {
+	task := Task{}
+	if link.Href == "" {
+		return task, fmt.Errorf("invalid link %v", link)
+	}
+
+	if opt == nil {
+		opt = new(TaskOptions)
+	}
+	opt.Default()
+
+	u := *c.url
+	u.Path = link.Href
+	u.RawQuery = opt.Values().Encode()
 
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
@@ -263,25 +540,69 @@ func (c *Client) Task(name string, dotLabels, skipFormat bool) (Task, error) {
 	return task, nil
 }
 
-// Get information about recordings.
-// If rids is empty than all recordings are returned.
-func (c *Client) ListRecordings(rids []string) (Recordings, error) {
-	ids := strings.Join(rids, ",")
-	v := url.Values{}
-	v.Add("rids", ids)
+// Delete a task.
+func (c *Client) DeleteTask(link Link) error {
+	if link.Href == "" {
+		return fmt.Errorf("invalid link %v", link)
+	}
 
 	u := *c.url
-	u.Path = "recordings"
-	u.RawQuery = v.Encode()
+	u.Path = link.Href
+
+	req, err := http.NewRequest("DELETE", u.String(), nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.do(req, nil, http.StatusNoContent)
+	return err
+}
+
+type ListTasksOptions struct {
+	TaskOptions
+	Pattern string
+	Fields  []string
+	Offset  int
+	Limit   int
+}
+
+func (o *ListTasksOptions) Default() {
+	o.TaskOptions.Default()
+	if o.Limit == 0 {
+		o.Limit = 100
+	}
+}
+
+func (o *ListTasksOptions) Values() *url.Values {
+	v := o.TaskOptions.Values()
+	v.Set("pattern", o.Pattern)
+	for _, field := range o.Fields {
+		v.Add("fields", field)
+	}
+	v.Set("offset", strconv.FormatInt(int64(o.Offset), 10))
+	v.Set("limit", strconv.FormatInt(int64(o.Limit), 10))
+	return v
+}
+
+// Get tasks.
+func (c *Client) ListTasks(opt *ListTasksOptions) ([]Task, error) {
+	if opt == nil {
+		opt = new(ListTasksOptions)
+	}
+	opt.Default()
+
+	u := *c.url
+	u.Path = tasksPath
+	u.RawQuery = opt.Values().Encode()
 
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return nil, err
 	}
-	// Decode valid response
+
+	// Response type
 	type response struct {
-		Error      string     `json:"Error"`
-		Recordings Recordings `json:"Recordings"`
+		Tasks []Task `json:"tasks"`
 	}
 
 	r := &response{}
@@ -290,241 +611,161 @@ func (c *Client) ListRecordings(rids []string) (Recordings, error) {
 	if err != nil {
 		return nil, err
 	}
-	sort.Sort(r.Recordings)
-	return r.Recordings, nil
+	return r.Tasks, nil
 }
 
-// Perform the record requests.
-func (c *Client) doRecord(v url.Values) (string, error) {
+func (c *Client) TaskOutput(link Link, name string) (*influxql.Result, error) {
 	u := *c.url
-	u.Path = "record"
-	u.RawQuery = v.Encode()
+	u.Path = path.Join(link.Href, name)
 
-	req, err := http.NewRequest("POST", u.String(), nil)
+	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-
-	// Decode valid response
-	type response struct {
-		RecordingID string `json:"RecordingID"`
-		Error       string `json:"Error"`
-	}
-
-	r := &response{}
-
+	r := &influxql.Result{}
 	_, err = c.do(req, r, http.StatusOK)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return r.RecordingID, nil
-
-}
-
-// Record the stream for a task.
-// Returns once the recording is started.
-func (c *Client) RecordStream(name string, duration time.Duration) (string, error) {
-	v := url.Values{}
-	v.Add("type", "stream")
-	v.Add("name", name)
-	v.Add("duration", influxql.FormatDuration(duration))
-
-	return c.doRecord(v)
-}
-
-// Record the batch queries for a task.
-// Returns once the recording is started.
-func (c *Client) RecordBatch(name, cluster string, start, stop time.Time, past time.Duration) (string, error) {
-	v := url.Values{}
-	v.Add("type", "batch")
-	v.Add("name", name)
-	v.Add("cluster", cluster)
-	if !start.IsZero() {
-		v.Add("start", start.Format(time.RFC3339Nano))
-	}
-	if !stop.IsZero() {
-		v.Add("stop", stop.Format(time.RFC3339Nano))
-	}
-	v.Add("past", past.String())
-
-	return c.doRecord(v)
-}
-
-// Record the results of a query.
-// The recordingType must be one of "stream", or "batch".
-// Returns once the recording is started.
-func (c *Client) RecordQuery(query, recordingType, cluster string) (string, error) {
-	v := url.Values{}
-	v.Add("type", "query")
-	v.Add("query", query)
-	v.Add("cluster", cluster)
-	v.Add("ttype", recordingType)
-
-	return c.doRecord(v)
+	return r, nil
 }
 
 // Get information about a recording.
-// If the recording is currently being recorded then
-// this method blocks until it is finished.
-func (c *Client) Recording(rid string) (Recording, error) {
+func (c *Client) Recording(link Link) (Recording, error) {
 	r := Recording{}
-
-	v := url.Values{}
-	v.Add("id", rid)
+	if link.Href == "" {
+		return r, fmt.Errorf("invalid link %v", link)
+	}
 
 	u := *c.url
-	u.Path = "record"
-	u.RawQuery = v.Encode()
+	u.Path = link.Href
 
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return r, err
 	}
 
-	_, err = c.do(req, &r, http.StatusOK)
+	_, err = c.do(req, &r, http.StatusOK, http.StatusAccepted)
 	if err != nil {
 		return r, err
 	}
 	return r, nil
 }
 
-// Replay a recording for a task.
-func (c *Client) Replay(name, rid string, recordingTime, fast bool) error {
-	v := url.Values{}
-	v.Add("name", name)
-	v.Add("id", rid)
-	v.Add("rec-time", strconv.FormatBool(recordingTime))
-	if fast {
-		v.Add("clock", "fast")
+func (c *Client) RecordingLink(id string) Link {
+	return Link{Relation: Self, Href: path.Join(recordingsPath, id)}
+}
+
+type RecordStreamOptions struct {
+	ID   string    `json:"id,omitempty"`
+	Task string    `json:"task"`
+	Stop time.Time `json:"stop"`
+}
+
+// Record the stream for a task.
+// Returns once the recording is started.
+func (c *Client) RecordStream(opt RecordStreamOptions) (Recording, error) {
+	r := Recording{}
+
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	err := enc.Encode(opt)
+	if err != nil {
+		return r, err
 	}
 
 	u := *c.url
-	u.Path = "replay"
-	u.RawQuery = v.Encode()
+	u.Path = recordStreamPath
 
-	req, err := http.NewRequest("POST", u.String(), nil)
+	req, err := http.NewRequest("POST", u.String(), &buf)
 	if err != nil {
-		return err
+		return r, err
 	}
 
-	_, err = c.do(req, nil, http.StatusNoContent)
+	_, err = c.do(req, &r, http.StatusCreated)
 	if err != nil {
-		return err
+		return r, err
 	}
-	return nil
+	return r, nil
 }
 
-// Define a task.
-// Name is always required.
-// The other options are only modified if not empty or nil.
-func (c *Client) Define(name, taskType string, dbrps []DBRP, tickScript io.Reader, reload bool) error {
-	v := url.Values{}
-	v.Add("name", name)
-	v.Add("type", taskType)
-	if len(dbrps) > 0 {
-		b, err := json.Marshal(dbrps)
-		if err != nil {
-			return err
-		}
-		v.Add("dbrps", string(b))
+type RecordBatchOptions struct {
+	ID      string    `json:"id,omitempty"`
+	Task    string    `json:"task"`
+	Start   time.Time `json:"start"`
+	Stop    time.Time `json:"stop"`
+	Cluster string    `json:"cluster,omitempty"`
+}
+
+// Record the batch queries for a task.
+// Returns once the recording is started.
+func (c *Client) RecordBatch(opt RecordBatchOptions) (Recording, error) {
+	r := Recording{}
+
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	err := enc.Encode(opt)
+	if err != nil {
+		return r, err
 	}
 
 	u := *c.url
-	u.Path = "task"
-	u.RawQuery = v.Encode()
+	u.Path = recordBatchPath
 
-	req, err := http.NewRequest("POST", u.String(), tickScript)
+	req, err := http.NewRequest("POST", u.String(), &buf)
 	if err != nil {
-		return err
+		return r, err
 	}
 
-	_, err = c.do(req, nil, http.StatusNoContent)
+	_, err = c.do(req, &r, http.StatusCreated)
 	if err != nil {
-		return err
+		return r, err
 	}
-	if reload {
-		tasks, err := c.ListTasks([]string{name})
-		if err != nil {
-			return err
-		}
-		if len(tasks) == 1 && tasks[0].Enabled {
-			return c.Reload(name)
-		}
-	}
-	return nil
+	return r, nil
 }
 
-// Enable a task.
-func (c *Client) Enable(name string) error {
-	v := url.Values{}
-	v.Add("name", name)
+type RecordQueryOptions struct {
+	ID      string   `json:"id,omitempty"`
+	Query   string   `json:"query"`
+	Type    TaskType `json:"type"`
+	Cluster string   `json:"cluster,omitempty"`
+}
+
+// Record the results of a query.
+// The recordingType must be one of "stream", or "batch".
+// Returns once the recording is started.
+func (c *Client) RecordQuery(opt RecordQueryOptions) (Recording, error) {
+	r := Recording{}
+
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	err := enc.Encode(opt)
+	if err != nil {
+		return r, err
+	}
 
 	u := *c.url
-	u.Path = "enable"
-	u.RawQuery = v.Encode()
+	u.Path = recordQueryPath
 
-	req, err := http.NewRequest("POST", u.String(), nil)
+	req, err := http.NewRequest("POST", u.String(), &buf)
 	if err != nil {
-		return err
+		return r, err
 	}
 
-	_, err = c.do(req, nil, http.StatusNoContent)
-	return err
-}
-
-// Disable a task.
-func (c *Client) Disable(name string) error {
-	v := url.Values{}
-	v.Add("name", name)
-
-	u := *c.url
-	u.Path = "disable"
-	u.RawQuery = v.Encode()
-
-	req, err := http.NewRequest("POST", u.String(), nil)
+	_, err = c.do(req, &r, http.StatusCreated)
 	if err != nil {
-		return err
+		return r, err
 	}
-
-	_, err = c.do(req, nil, http.StatusNoContent)
-	return err
-}
-
-// Reload a task, aka disable/enable.
-func (c *Client) Reload(name string) error {
-	err := c.Disable(name)
-	if err != nil {
-		return err
-	}
-	return c.Enable(name)
-}
-
-// Delete a task.
-func (c *Client) DeleteTask(name string) error {
-	v := url.Values{}
-	v.Add("name", name)
-
-	u := *c.url
-	u.Path = "task"
-	u.RawQuery = v.Encode()
-
-	req, err := http.NewRequest("DELETE", u.String(), nil)
-	if err != nil {
-		return err
-	}
-
-	_, err = c.do(req, nil, http.StatusNoContent)
-	return err
+	return r, nil
 }
 
 // Delete a recording.
-func (c *Client) DeleteRecording(rid string) error {
-	v := url.Values{}
-	v.Add("rid", rid)
-
+func (c *Client) DeleteRecording(link Link) error {
+	if link.Href == "" {
+		return fmt.Errorf("invalid link %v", link)
+	}
 	u := *c.url
-	u.Path = "recording"
-	u.RawQuery = v.Encode()
+	u.Path = link.Href
 
 	req, err := http.NewRequest("DELETE", u.String(), nil)
 	if err != nil {
@@ -533,19 +774,218 @@ func (c *Client) DeleteRecording(rid string) error {
 
 	_, err = c.do(req, nil, http.StatusNoContent)
 	return err
+}
+
+type ListRecordingsOptions struct {
+	Pattern string
+	Fields  []string
+	Offset  int
+	Limit   int
+}
+
+func (o *ListRecordingsOptions) Default() {
+	if o.Limit == 0 {
+		o.Limit = 100
+	}
+}
+
+func (o *ListRecordingsOptions) Values() *url.Values {
+	v := &url.Values{}
+	v.Set("pattern", o.Pattern)
+	for _, field := range o.Fields {
+		v.Add("fields", field)
+	}
+	v.Set("offset", strconv.FormatInt(int64(o.Offset), 10))
+	v.Set("limit", strconv.FormatInt(int64(o.Limit), 10))
+	return v
+}
+
+// Get information about recordings.
+// If rids is empty than all recordings are returned.
+func (c *Client) ListRecordings(opt *ListRecordingsOptions) ([]Recording, error) {
+	if opt == nil {
+		opt = new(ListRecordingsOptions)
+	}
+	opt.Default()
+	u := *c.url
+	u.Path = recordingsPath
+	u.RawQuery = opt.Values().Encode()
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	// Decode valid response
+	type response struct {
+		Recordings []Recording `json:"recordings"`
+	}
+
+	r := &response{}
+
+	_, err = c.do(req, r, http.StatusOK)
+	if err != nil {
+		return nil, err
+	}
+	return r.Recordings, nil
+}
+
+func (c *Client) ReplayLink(id string) Link {
+	return Link{Relation: Self, Href: path.Join(replaysPath, id)}
+}
+
+type CreateReplayOptions struct {
+	ID            string `json:"id"`
+	Recording     string `json:"recording"`
+	Task          string `json:"task"`
+	RecordingTime bool   `json:"recording-time"`
+	Clock         Clock  `json:"clock"`
+}
+
+func (o *CreateReplayOptions) Default() {
+}
+
+// Replay a recording for a task.
+func (c *Client) CreateReplay(opt CreateReplayOptions) (Replay, error) {
+	r := Replay{}
+
+	opt.Default()
+
+	u := *c.url
+	u.Path = replaysPath
+
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	err := enc.Encode(opt)
+	if err != nil {
+		return r, err
+	}
+
+	req, err := http.NewRequest("POST", u.String(), &buf)
+	if err != nil {
+		return r, err
+	}
+
+	_, err = c.do(req, &r, http.StatusCreated)
+	if err != nil {
+		return r, err
+	}
+	return r, nil
+}
+
+// Return the replay information
+func (c *Client) Replay(link Link) (Replay, error) {
+	r := Replay{}
+	if link.Href == "" {
+		return r, fmt.Errorf("invalid link %v", link)
+	}
+
+	u := *c.url
+	u.Path = link.Href
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return r, err
+	}
+
+	_, err = c.do(req, &r, http.StatusOK, http.StatusAccepted)
+	if err != nil {
+		return r, err
+	}
+	return r, nil
+}
+
+// Delete a replay. This will cancel a running replay.
+func (c *Client) DeleteReplay(link Link) error {
+	if link.Href == "" {
+		return fmt.Errorf("invalid link %v", link)
+	}
+	u := *c.url
+	u.Path = link.Href
+
+	req, err := http.NewRequest("DELETE", u.String(), nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.do(req, nil, http.StatusNoContent)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type ListReplaysOptions struct {
+	Pattern string
+	Fields  []string
+	Offset  int
+	Limit   int
+}
+
+func (o *ListReplaysOptions) Default() {
+	if o.Limit == 0 {
+		o.Limit = 100
+	}
+}
+
+func (o *ListReplaysOptions) Values() *url.Values {
+	v := &url.Values{}
+	v.Set("pattern", o.Pattern)
+	for _, field := range o.Fields {
+		v.Add("fields", field)
+	}
+	v.Set("offset", strconv.FormatInt(int64(o.Offset), 10))
+	v.Set("limit", strconv.FormatInt(int64(o.Limit), 10))
+	return v
+}
+
+// Get information about replays.
+// If rids is empty than all replays are returned.
+func (c *Client) ListReplays(opt *ListReplaysOptions) ([]Replay, error) {
+	if opt == nil {
+		opt = new(ListReplaysOptions)
+	}
+	opt.Default()
+	u := *c.url
+	u.Path = replaysPath
+	u.RawQuery = opt.Values().Encode()
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	// Decode valid response
+	type response struct {
+		Replays []Replay `json:"replays"`
+	}
+
+	r := &response{}
+
+	_, err = c.do(req, r, http.StatusOK)
+	if err != nil {
+		return nil, err
+	}
+	return r.Replays, nil
+}
+
+type LogLevelOptions struct {
+	Level string `json:"level"`
 }
 
 // Set the logging level.
 // Level must be one of DEBUG, INFO, WARN, ERROR, or OFF
 func (c *Client) LogLevel(level string) error {
-	v := url.Values{}
-	v.Add("level", level)
-
 	u := *c.url
-	u.Path = "loglevel"
-	u.RawQuery = v.Encode()
+	u.Path = logLevelPath
 
-	req, err := http.NewRequest("POST", u.String(), nil)
+	opt := LogLevelOptions{Level: level}
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	err := enc.Encode(opt)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("POST", u.String(), &buf)
 	if err != nil {
 		return err
 	}

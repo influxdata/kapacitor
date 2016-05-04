@@ -79,7 +79,7 @@ func Client(s *Server) *client.Client {
 func (s *Server) Close() {
 	s.Server.Close()
 	os.RemoveAll(s.Config.Replay.Dir)
-	os.RemoveAll(s.Config.Task.Dir)
+	os.Remove(s.Config.Storage.BoltDBPath)
 	os.RemoveAll(s.Config.DataDir)
 }
 
@@ -159,16 +159,18 @@ func NewConfig() *run.Config {
 	c.PostInit()
 	c.Reporting.Enabled = false
 	c.Replay.Dir = MustTempFile()
-	c.Task.Dir = MustTempFile()
+	c.Storage.BoltDBPath = MustTempFile()
 	c.DataDir = MustTempFile()
 	c.HTTP.BindAddress = "127.0.0.1:0"
+	//c.HTTP.BindAddress = "127.0.0.1:9092"
+	//c.HTTP.GZIP = false
 	c.InfluxDB[0].Enabled = false
 	return c
 }
 
 // MustTempFile returns a path to a temporary file.
 func MustTempFile() string {
-	f, err := ioutil.TempFile("", "influxd-")
+	f, err := ioutil.TempFile("", "kapacitord-")
 	if err != nil {
 		panic(err)
 	}
@@ -193,6 +195,10 @@ func (l *LogService) NewLogger(prefix string, flag int) *log.Logger {
 
 func (l *LogService) NewStaticLevelLogger(prefix string, flag int, level wlog.Level) *log.Logger {
 	return log.New(wlog.NewStaticLevelWriter(os.Stderr, level), prefix, flag)
+}
+
+func (l *LogService) NewStaticLevelWriter(level wlog.Level) io.Writer {
+	return wlog.NewStaticLevelWriter(os.Stderr, level)
 }
 
 type queryFunc func(q string) *iclient.Response

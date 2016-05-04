@@ -58,7 +58,9 @@ func (u *UDFNode) stopUDF() {
 	defer u.mu.Unlock()
 	if !u.stopped {
 		u.stopped = true
-		u.udf.Abort(errNodeAborted)
+		if u.udf != nil {
+			u.udf.Abort(errNodeAborted)
+		}
 	}
 }
 

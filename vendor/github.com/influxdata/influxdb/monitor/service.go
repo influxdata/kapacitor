@@ -3,6 +3,7 @@ package monitor // import "github.com/influxdata/influxdb/monitor"
 import (
 	"expvar"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"runtime"
@@ -85,6 +86,7 @@ func New(c Config) *Monitor {
 // for identification purpose.
 func (m *Monitor) Open() error {
 	m.Logger.Printf("Starting monitor system")
+	m.done = make(chan struct{})
 
 	// Self-register various stats and diagnostics.
 	m.RegisterDiagnosticsClient("build", &build{
@@ -99,7 +101,6 @@ func (m *Monitor) Open() error {
 
 	// If enabled, record stats in a InfluxDB system.
 	if m.storeEnabled {
-
 		// Start periodic writes to system.
 		m.wg.Add(1)
 		go m.storeStatistics()
@@ -112,13 +113,19 @@ func (m *Monitor) Open() error {
 func (m *Monitor) Close() {
 	m.Logger.Println("shutting down monitor system")
 	close(m.done)
+
 	m.wg.Wait()
 	m.done = nil
+	m.DeregisterDiagnosticsClient("build")
+	m.DeregisterDiagnosticsClient("runtime")
+	m.DeregisterDiagnosticsClient("network")
+	m.DeregisterDiagnosticsClient("system")
 }
 
-// SetLogger sets the internal logger to the logger passed in.
-func (m *Monitor) SetLogger(l *log.Logger) {
-	m.Logger = l
+// SetLogOutput sets the writer to which all logs are written. It must not be
+// called after Open is called.
+func (m *Monitor) SetLogOutput(w io.Writer) {
+	m.Logger = log.New(w, "[monitor] ", log.LstdFlags)
 }
 
 // RegisterDiagnosticsClient registers a diagnostics client with the given name and tags.

@@ -79,6 +79,9 @@ type ExecutionContext struct {
 	// The requested maximum number of points to return in each result.
 	ChunkSize int
 
+	// If this query is being executed in a read-only context.
+	ReadOnly bool
+
 	// Hold the query executor's logger.
 	Log *log.Logger
 
@@ -105,12 +108,16 @@ type QueryExecutor struct {
 	// Query execution timeout.
 	QueryTimeout time.Duration
 
+	// Log queries if they are slower than this time.
+	// If zero, slow queries will never be logged.
+	LogQueriesAfter time.Duration
+
 	// Maximum number of concurrent queries.
 	MaxConcurrentQueries int
 
-	// Output of all logging.
+	// Logger to use for all logging.
 	// Defaults to discarding all log output.
-	LogOutput io.Writer
+	Logger *log.Logger
 
 	// Used for managing and tracking running queries.
 	queries  map[uint64]*QueryTask
@@ -126,7 +133,7 @@ type QueryExecutor struct {
 func NewQueryExecutor() *QueryExecutor {
 	return &QueryExecutor{
 		QueryTimeout: DefaultQueryTimeout,
-		LogOutput:    ioutil.Discard,
+		Logger:       log.New(ioutil.Discard, "[query] ", log.LstdFlags),
 		queries:      make(map[uint64]*QueryTask),
 		nextID:       1,
 		statMap:      influxdb.NewStatistics("queryExecutor", "queryExecutor", nil),
@@ -147,14 +154,20 @@ func (e *QueryExecutor) Close() error {
 	return nil
 }
 
+// SetLogOutput sets the writer to which all logs are written. It must not be
+// called after Open is called.
+func (e *QueryExecutor) SetLogOutput(w io.Writer) {
+	e.Logger = log.New(w, "[query] ", log.LstdFlags)
+}
+
 // ExecuteQuery executes each statement within a query.
-func (e *QueryExecutor) ExecuteQuery(query *Query, database string, chunkSize int, closing chan struct{}) <-chan *Result {
+func (e *QueryExecutor) ExecuteQuery(query *Query, database string, chunkSize int, readonly bool, closing chan struct{}) <-chan *Result {
 	results := make(chan *Result)
-	go e.executeQuery(query, database, chunkSize, closing, results)
+	go e.executeQuery(query, database, chunkSize, readonly, closing, results)
 	return results
 }
 
-func (e *QueryExecutor) executeQuery(query *Query, database string, chunkSize int, closing <-chan struct{}, results chan *Result) {
+func (e *QueryExecutor) executeQuery(query *Query, database string, chunkSize int, readonly bool, closing <-chan struct{}, results chan *Result) {
 	defer close(results)
 	defer e.recover(query, results)
 
@@ -171,8 +184,6 @@ func (e *QueryExecutor) executeQuery(query *Query, database string, chunkSize in
 	}
 	defer e.killQuery(qid)
 
-	logger := e.logger()
-
 	// Setup the execution context that will be used when executing statements.
 	ctx := ExecutionContext{
 		QueryID:     qid,
@@ -180,7 +191,8 @@ func (e *QueryExecutor) executeQuery(query *Query, database string, chunkSize in
 		Results:     results,
 		Database:    database,
 		ChunkSize:   chunkSize,
-		Log:         logger,
+		ReadOnly:    readonly,
+		Log:         e.Logger,
 		InterruptCh: task.closing,
 	}
 
@@ -214,7 +226,7 @@ loop:
 		}
 
 		// Log each normalized statement.
-		logger.Println(stmt.String())
+		e.Logger.Println(stmt.String())
 
 		// Handle a query management queries specially so they don't go
 		// to the underlying statement executor.
@@ -232,9 +244,15 @@ loop:
 			}
 			continue loop
 		case *KillQueryStatement:
+			var messages []*Message
+			if ctx.ReadOnly {
+				messages = append(messages, ReadOnlyWarning(stmt.String()))
+			}
+
 			err := e.executeKillQueryStatement(stmt)
 			results <- &Result{
 				StatementID: i,
+				Messages:    messages,
 				Err:         err,
 			}
 
@@ -314,10 +332,6 @@ func (e *QueryExecutor) executeShowQueriesStatement(q *ShowQueriesStatement) (mo
 	}}, nil
 }
 
-func (e *QueryExecutor) logger() *log.Logger {
-	return log.New(e.LogOutput, "[query] ", log.LstdFlags)
-}
-
 func (e *QueryExecutor) query(qid uint64) (*QueryTask, bool) {
 	e.mu.RLock()
 	query, ok := e.queries[qid]
@@ -355,6 +369,20 @@ func (e *QueryExecutor) attachQuery(q *Query, database string, interrupt <-chan 
 	e.queries[qid] = query
 
 	go e.waitForQuery(qid, query.closing, interrupt, query.monitorCh)
+	if e.LogQueriesAfter != 0 {
+		go query.monitor(func(closing <-chan struct{}) error {
+			t := time.NewTimer(e.LogQueriesAfter)
+			defer t.Stop()
+
+			select {
+			case <-t.C:
+				e.Logger.Printf("Detected slow query: %s (qid: %d, database: %s, threshold: %s)",
+					query.query, qid, query.database, e.LogQueriesAfter)
+			case <-closing:
+			}
+			return nil
+		})
+	}
 	e.nextID++
 	return qid, query, nil
 }

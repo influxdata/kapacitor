@@ -100,10 +100,8 @@ paths:
           schema:
             $ref: '#/definitions/Task'
       responses:
-        '200':
-          description: Task ID
-          schema:
-            $ref: '#/definitions/Task'
+        '204':
+          description: Update succeeded
         default:
           description: A processing or an unexpected error.
           schema:
@@ -220,8 +218,8 @@ paths:
               - task
               - stop
       responses:
-        '200':
-          description: Recording ID
+        '201':
+          description: Recording Started
           schema:
             $ref: '#/definitions/Recording'
         default:
@@ -257,8 +255,8 @@ paths:
               - task
               - start
       responses:
-        '200':
-          description: Recording ID
+        '201':
+          description: Recording Started
           schema:
             $ref: '#/definitions/Recording'
         default:
@@ -291,8 +289,8 @@ paths:
               - type
               - query
       responses:
-        '200':
-          description: Recording ID
+        '201':
+          description: Recording Started
           schema:
             $ref: '#/definitions/Recording'
         default:
@@ -327,7 +325,11 @@ paths:
           required: true
       responses:
         '200':
-          description: Recording information
+          description: Recording finished
+          schema:
+            $ref: '#/definitions/Recording'
+        '202':
+          description: Recording running
           schema:
             $ref: '#/definitions/Recording'
         default:
@@ -406,8 +408,12 @@ paths:
               - task
               - recording
       responses:
-        '200':
-          description: Replay ID
+        '201':
+          description: Replay Started
+          schema:
+            $ref: '#/definitions/Replay'
+        '202':
+          description: Replay running
           schema:
             $ref: '#/definitions/Replay'
         default:
@@ -442,7 +448,7 @@ paths:
           required: true
       responses:
         '200':
-          description: Task information
+          description: Replay information
           schema:
             $ref: '#/definitions/Replay'
         default:
@@ -533,6 +539,9 @@ definitions:
         type: string
       type:
         type: string
+      size:
+        type: integer
+        format: int64
       date:
         type: string
         format: dateTime
@@ -593,6 +602,7 @@ definitions:
       error:
         type: string
         description: Detailed description of an error
+    required: [error]
   Link:
     type: object
     readOnly: true

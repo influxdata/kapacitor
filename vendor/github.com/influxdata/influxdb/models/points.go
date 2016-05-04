@@ -139,9 +139,17 @@ func ParsePointsString(buf string) ([]Point, error) {
 
 // ParseKey returns the measurement name and tags from a point.
 func ParseKey(buf string) (string, Tags, error) {
-	_, keyBuf, err := scanKey([]byte(buf), 0)
-	tags := parseTags([]byte(buf))
-	return string(keyBuf), tags, err
+	// Ignore the error because scanMeasurement returns "missing fields" which we ignore
+	// when just parsing a key
+	state, i, _ := scanMeasurement([]byte(buf), 0)
+
+	var tags Tags
+	if state == tagKeyState {
+		tags = parseTags([]byte(buf))
+		// scanMeasurement returns the location of the comma if there are tags, strip that off
+		return string(buf[:i-1]), tags, nil
+	}
+	return string(buf[:i]), tags, nil
 }
 
 // ParsePointsWithPrecision is similar to ParsePoints, but allows the
@@ -1062,6 +1070,10 @@ func escapeStringField(in string) string {
 // unescapeStringField returns a copy of in with any escaped double-quotes
 // or backslashes unescaped
 func unescapeStringField(in string) string {
+	if strings.IndexByte(in, '\\') == -1 {
+		return in
+	}
+
 	var out []byte
 	i := 0
 	for {
@@ -1421,17 +1433,14 @@ func parseNumber(val []byte) (interface{}, error) {
 }
 
 func newFieldsFromBinary(buf []byte) Fields {
-	fields := Fields{}
+	fields := make(Fields, 8)
 	var (
 		i              int
 		name, valueBuf []byte
 		value          interface{}
 		err            error
 	)
-	for {
-		if i >= len(buf) {
-			break
-		}
+	for i < len(buf) {
 
 		i, name = scanTo(buf, i, '=')
 		name = escape.Unescape(name)

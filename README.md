@@ -71,7 +71,7 @@ Place the above script into a file `cpu_alert.tick` then run these commands to s
 ```sh
 # Define the task (assumes cpu data is in db 'telegraf')
 kapacitor define \
-    -name cpu_alert \
+    cpu_alert \
     -type stream \
     -dbrp telegraf.default \
     -tick ./cpu_alert.tick

@@ -25,6 +25,7 @@ import (
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/stats"
+	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/influxdata/kapacitor/services/talk"
 	"github.com/influxdata/kapacitor/services/task_store"
 	"github.com/influxdata/kapacitor/services/udf"
@@ -40,6 +41,7 @@ import (
 type Config struct {
 	HTTP     httpd.Config      `toml:"http"`
 	Replay   replay.Config     `toml:"replay"`
+	Storage  storage.Config    `toml:"storage"`
 	Task     task_store.Config `toml:"task"`
 	InfluxDB []influxdb.Config `toml:"influxdb"`
 	Logging  logging.Config    `toml:"logging"`
@@ -76,6 +78,7 @@ func NewConfig() *Config {
 	}
 
 	c.HTTP = httpd.NewConfig()
+	c.Storage = storage.NewConfig()
 	c.Replay = replay.NewConfig()
 	c.Task = task_store.NewConfig()
 	c.Logging = logging.NewConfig()
@@ -132,6 +135,7 @@ func NewDemoConfig() (*Config, error) {
 
 	c.Replay.Dir = filepath.Join(homeDir, ".kapacitor", c.Replay.Dir)
 	c.Task.Dir = filepath.Join(homeDir, ".kapacitor", c.Task.Dir)
+	c.Storage.BoltDBPath = filepath.Join(homeDir, ".kapacitor", c.Storage.BoltDBPath)
 	c.DataDir = filepath.Join(homeDir, ".kapacitor", c.DataDir)
 
 	return c, nil
@@ -146,6 +150,10 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("must configure valid data dir")
 	}
 	err := c.Replay.Validate()
+	if err != nil {
+		return err
+	}
+	err = c.Storage.Validate()
 	if err != nil {
 		return err
 	}

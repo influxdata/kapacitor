@@ -38,9 +38,9 @@ type TaskMaster struct {
 		URL() string
 	}
 	TaskStore interface {
-		SaveSnapshot(name string, snapshot *TaskSnapshot) error
-		HasSnapshot(name string) bool
-		LoadSnapshot(name string) (*TaskSnapshot, error)
+		SaveSnapshot(id string, snapshot *TaskSnapshot) error
+		HasSnapshot(id string) bool
+		LoadSnapshot(id string) (*TaskSnapshot, error)
 	}
 	DeadmanService pipeline.DeadmanService
 
@@ -105,13 +105,13 @@ type TaskMaster struct {
 	writePointsIn StreamCollector
 
 	// Forks of incoming streams
-	// We are mapping from (db, rp, measurement) to map of task names to their edges
+	// We are mapping from (db, rp, measurement) to map of task ids to their edges
 	// The outer map (from dbrp&measurement) is for fast access on forkPoint
 	// While the inner map is for handling fork deletions better (see taskToForkKeys)
 	forks map[forkKey]map[string]*Edge
 
 	// Task to fork keys is map to help in deletes, in deletes
-	// we have only the task name, and they are called after the task is deleted from TaskMaster.tasks
+	// we have only the task id, and they are called after the task is deleted from TaskMaster.tasks
 	taskToForkKeys map[string][]forkKey
 
 	// Set of incoming batches
@@ -190,7 +190,7 @@ func (tm *TaskMaster) StopTasks() {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
 	for _, et := range tm.tasks {
-		tm.stopTask(et.Task.Name)
+		tm.stopTask(et.Task.ID)
 	}
 }
 
@@ -203,7 +203,7 @@ func (tm *TaskMaster) Close() error {
 	}
 	tm.closed = true
 	for _, et := range tm.tasks {
-		tm.stopTask(et.Task.Name)
+		tm.stopTask(et.Task.ID)
 	}
 	tm.logger.Println("I! closed")
 	return nil
@@ -215,21 +215,21 @@ func (tm *TaskMaster) Drain() {
 	defer tm.mu.Unlock()
 
 	// TODO(yosia): handle this thing ;)
-	for name, _ := range tm.taskToForkKeys {
-		tm.delFork(name)
+	for id, _ := range tm.taskToForkKeys {
+		tm.delFork(id)
 	}
 }
 
 // Create a new task in the context of a TaskMaster
 func (tm *TaskMaster) NewTask(
-	name,
+	id,
 	script string,
 	tt TaskType,
 	dbrps []DBRP,
 	snapshotInterval time.Duration,
 ) (*Task, error) {
 	t := &Task{
-		Name:             name,
+		ID:               id,
 		Type:             tt,
 		DBRPs:            dbrps,
 		SnapshotInterval: snapshotInterval,
@@ -297,7 +297,7 @@ func (tm *TaskMaster) StartTask(t *Task) (*ExecutingTask, error) {
 	if tm.closed {
 		return nil, errors.New("task master is closed cannot start a task")
 	}
-	tm.logger.Println("D! Starting task:", t.Name)
+	tm.logger.Println("D! Starting task:", t.ID)
 	et, err := NewExecutingTask(tm, t)
 	if err != nil {
 		return nil, err
@@ -306,7 +306,7 @@ func (tm *TaskMaster) StartTask(t *Task) (*ExecutingTask, error) {
 	var ins []*Edge
 	switch et.Task.Type {
 	case StreamTask:
-		e, err := tm.newFork(et.Task.Name, et.Task.DBRPs, et.Task.Measurements())
+		e, err := tm.newFork(et.Task.ID, et.Task.DBRPs, et.Task.Measurements())
 		if err != nil {
 			return nil, err
 		}
@@ -318,15 +318,15 @@ func (tm *TaskMaster) StartTask(t *Task) (*ExecutingTask, error) {
 		}
 		ins = make([]*Edge, count)
 		for i := 0; i < count; i++ {
-			in := newEdge(t.Name, "batch", fmt.Sprintf("batch%d", i), pipeline.BatchEdge, defaultEdgeBufferSize, tm.LogService)
+			in := newEdge(t.ID, "batch", fmt.Sprintf("batch%d", i), pipeline.BatchEdge, defaultEdgeBufferSize, tm.LogService)
 			ins[i] = in
-			tm.batches[t.Name] = append(tm.batches[t.Name], in)
+			tm.batches[t.ID] = append(tm.batches[t.ID], in)
 		}
 	}
 
 	var snapshot *TaskSnapshot
-	if tm.TaskStore.HasSnapshot(t.Name) {
-		snapshot, err = tm.TaskStore.LoadSnapshot(t.Name)
+	if tm.TaskStore.HasSnapshot(t.ID) {
+		snapshot, err = tm.TaskStore.LoadSnapshot(t.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -337,52 +337,52 @@ func (tm *TaskMaster) StartTask(t *Task) (*ExecutingTask, error) {
 		return nil, err
 	}
 
-	tm.tasks[et.Task.Name] = et
-	tm.logger.Println("I! Started task:", t.Name)
+	tm.tasks[et.Task.ID] = et
+	tm.logger.Println("I! Started task:", t.ID)
 	tm.logger.Println("D!", string(t.Dot()))
 
 	return et, nil
 }
 
-func (tm *TaskMaster) BatchCollectors(name string) []BatchCollector {
-	return tm.batches[name]
+func (tm *TaskMaster) BatchCollectors(id string) []BatchCollector {
+	return tm.batches[id]
 }
 
-func (tm *TaskMaster) StopTask(name string) error {
+func (tm *TaskMaster) StopTask(id string) error {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
-	return tm.stopTask(name)
+	return tm.stopTask(id)
 }
 
 // internal stopTask function. The caller must have acquired
 // the lock in order to call this function
-func (tm *TaskMaster) stopTask(name string) (err error) {
-	if et, ok := tm.tasks[name]; ok {
-		delete(tm.tasks, name)
+func (tm *TaskMaster) stopTask(id string) (err error) {
+	if et, ok := tm.tasks[id]; ok {
+		delete(tm.tasks, id)
 		if et.Task.Type == StreamTask {
-			tm.delFork(name)
+			tm.delFork(id)
 		}
 		err = et.stop()
 		if err != nil {
-			tm.logger.Println("E! Stopped task:", name, err)
+			tm.logger.Println("E! Stopped task:", id, err)
 		} else {
-			tm.logger.Println("I! Stopped task:", name)
+			tm.logger.Println("I! Stopped task:", id)
 		}
 	}
 	return
 }
 
-func (tm *TaskMaster) IsExecuting(name string) bool {
+func (tm *TaskMaster) IsExecuting(id string) bool {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
-	_, executing := tm.tasks[name]
+	_, executing := tm.tasks[id]
 	return executing
 }
 
-func (tm *TaskMaster) ExecutionStats(name string) (ExecutionStats, error) {
+func (tm *TaskMaster) ExecutionStats(id string) (ExecutionStats, error) {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
-	task, executing := tm.tasks[name]
+	task, executing := tm.tasks[id]
 	if !executing {
 		return ExecutionStats{}, nil
 	}
@@ -390,10 +390,10 @@ func (tm *TaskMaster) ExecutionStats(name string) (ExecutionStats, error) {
 	return task.ExecutionStats()
 }
 
-func (tm *TaskMaster) ExecutingDot(name string, labels bool) string {
+func (tm *TaskMaster) ExecutingDot(id string, labels bool) string {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
-	et, executing := tm.tasks[name]
+	et, executing := tm.tasks[id]
 	if executing {
 		return string(et.EDot(labels))
 	}
@@ -526,24 +526,24 @@ func (tm *TaskMaster) newFork(taskName string, dbrps []DBRP, measurements []stri
 	return e, nil
 }
 
-func (tm *TaskMaster) DelFork(name string) {
+func (tm *TaskMaster) DelFork(id string) {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
-	tm.delFork(name)
+	tm.delFork(id)
 }
 
 // internal delFork function, must have lock to call
-func (tm *TaskMaster) delFork(name string) {
+func (tm *TaskMaster) delFork(id string) {
 
 	// mark if we already closed the edge because the edge is replicated
 	// by it's fork keys (db,rp,measurement)
 	isEdgeClosed := false
 
 	// Find the fork keys
-	for _, key := range tm.taskToForkKeys[name] {
+	for _, key := range tm.taskToForkKeys[id] {
 
 		// check if the edge exists
-		edge, ok := tm.forks[key][name]
+		edge, ok := tm.forks[key][id]
 		if ok {
 
 			// Only close the edge if we are already didn't closed it
@@ -553,23 +553,23 @@ func (tm *TaskMaster) delFork(name string) {
 			}
 
 			// remove the task in fork map
-			delete(tm.forks[key], name)
+			delete(tm.forks[key], id)
 		}
 	}
 
-	// remove mapping from task name to it's keys
-	delete(tm.taskToForkKeys, name)
+	// remove mapping from task id to it's keys
+	delete(tm.taskToForkKeys, id)
 }
 
-func (tm *TaskMaster) SnapshotTask(name string) (*TaskSnapshot, error) {
+func (tm *TaskMaster) SnapshotTask(id string) (*TaskSnapshot, error) {
 	tm.mu.RLock()
-	et, ok := tm.tasks[name]
+	et, ok := tm.tasks[id]
 	tm.mu.RUnlock()
 
 	if ok {
 		return et.Snapshot()
 	}
-	return nil, fmt.Errorf("task %s is not running or does not exist", name)
+	return nil, fmt.Errorf("task %s is not running or does not exist", id)
 }
 
 type noOpTimingService struct{}

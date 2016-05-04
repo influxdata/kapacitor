@@ -19,6 +19,10 @@ type Config struct {
 	HttpsEnabled     bool          `toml:"https-enabled"`
 	HttpsCertificate string        `toml:"https-certificate"`
 	ShutdownTimeout  toml.Duration `toml:"shutdown-timeout"`
+
+	// Enable gzipped encoding
+	// NOTE: this is ignored in toml since it is only consumed by the tests
+	GZIP bool `toml:"-"`
 }
 
 func NewConfig() Config {
@@ -27,5 +31,6 @@ func NewConfig() Config {
 		LogEnabled:       true,
 		HttpsCertificate: "/etc/ssl/kapacitor.pem",
 		ShutdownTimeout:  DefaultShutdownTimeout,
+		GZIP:             true,
 	}
 }

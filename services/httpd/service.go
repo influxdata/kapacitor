@@ -48,6 +48,7 @@ func NewService(c Config, l *log.Logger) *Service {
 			c.AuthEnabled,
 			c.LogEnabled,
 			c.WriteTracing,
+			c.GZIP,
 			statMap,
 			l,
 		),
@@ -241,9 +242,9 @@ func (s *Service) Addr() net.Addr {
 func (s *Service) URL() string {
 	if s.ln != nil {
 		if s.https {
-			return "https://" + s.Addr().String()
+			return "https://" + s.Addr().String() + BasePath
 		}
-		return "http://" + s.Addr().String()
+		return "http://" + s.Addr().String() + BasePath
 	}
 	return ""
 }

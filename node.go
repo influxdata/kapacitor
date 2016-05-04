@@ -92,7 +92,7 @@ func (n *node) abortParentEdges() {
 
 func (n *node) init() {
 	tags := map[string]string{
-		"task": n.et.Task.Name,
+		"task": n.et.Task.ID,
 		"node": n.Name(),
 		"type": n.et.Task.Type.String(),
 		"kind": n.Desc(),
@@ -161,7 +161,7 @@ func (n *node) addChild(c Node) (*Edge, error) {
 	}
 	n.children = append(n.children, c)
 
-	edge := newEdge(n.et.Task.Name, n.Name(), c.Name(), n.Provides(), defaultEdgeBufferSize, n.et.tm.LogService)
+	edge := newEdge(n.et.Task.ID, n.Name(), c.Name(), n.Provides(), defaultEdgeBufferSize, n.et.tm.LogService)
 	if edge == nil {
 		return nil, fmt.Errorf("unknown edge type %s", n.Provides())
 	}

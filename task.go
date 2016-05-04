@@ -64,9 +64,9 @@ func (d DBRP) String() string {
 	return fmt.Sprintf("%q.%q", d.Database, d.RetentionPolicy)
 }
 
-// The complete definition of a task, its name, pipeline and type.
+// The complete definition of a task, its id, pipeline and type.
 type Task struct {
-	Name             string
+	ID               string
 	Pipeline         *pipeline.Pipeline
 	Type             TaskType
 	DBRPs            []DBRP
@@ -74,7 +74,7 @@ type Task struct {
 }
 
 func (t *Task) Dot() []byte {
-	return t.Pipeline.Dot(t.Name)
+	return t.Pipeline.Dot(t.ID)
 }
 
 // returns all the measurements from a FromNode
@@ -115,7 +115,7 @@ type ExecutingTask struct {
 
 // Create a new  task from a defined kapacitor.
 func NewExecutingTask(tm *TaskMaster, t *Task) (*ExecutingTask, error) {
-	l := tm.LogService.NewLogger(fmt.Sprintf("[task:%s] ", t.Name), log.LstdFlags)
+	l := tm.LogService.NewLogger(fmt.Sprintf("[task:%s] ", t.ID), log.LstdFlags)
 	et := &ExecutingTask{
 		tm:      tm,
 		Task:    t,
@@ -158,7 +158,7 @@ func (et *ExecutingTask) link() error {
 	// Walk Pipeline and create equivalent executing nodes
 	err := et.Task.Pipeline.Walk(func(n pipeline.Node) error {
 		l := et.tm.LogService.NewLogger(
-			fmt.Sprintf("[%s:%s] ", et.Task.Name, n.Name()),
+			fmt.Sprintf("[%s:%s] ", et.Task.ID, n.Name()),
 			log.LstdFlags,
 		)
 		en, err := et.createNode(n, l)
@@ -373,7 +373,7 @@ func (et *ExecutingTask) EDot(labels bool) []byte {
 	var buf bytes.Buffer
 
 	buf.Write([]byte("digraph "))
-	buf.Write([]byte(et.Task.Name))
+	buf.Write([]byte(et.Task.ID))
 	buf.Write([]byte(" {\n"))
 	// Write graph attributes
 	unit := "points"
@@ -529,7 +529,7 @@ func (et *ExecutingTask) runSnapshotter() {
 		case <-ticker.C:
 			snapshot, err := et.Snapshot()
 			if err != nil {
-				et.logger.Println("E! failed to snapshot task", et.Task.Name, err)
+				et.logger.Println("E! failed to snapshot task", et.Task.ID, err)
 				break
 			}
 			size := 0
@@ -538,9 +538,9 @@ func (et *ExecutingTask) runSnapshotter() {
 			}
 			// Only save the snapshot if it has content
 			if size > 0 {
-				err = et.tm.TaskStore.SaveSnapshot(et.Task.Name, snapshot)
+				err = et.tm.TaskStore.SaveSnapshot(et.Task.ID, snapshot)
 				if err != nil {
-					et.logger.Println("E! failed to save task snapshot", et.Task.Name, err)
+					et.logger.Println("E! failed to save task snapshot", et.Task.ID, err)
 				}
 			}
 		case <-et.stopping:
