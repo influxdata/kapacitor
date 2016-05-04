@@ -58,6 +58,7 @@ For example, let's say we want to store all data that triggered an alert in Infl
 
 ### Bugfixes
 
+- [#499](https://github.com/influxdata/kapacitor/issues/499): Fix panic in InfluxQL nodes if field is missing or incorrect type.
 - [#441](https://github.com/influxdata/kapacitor/issues/441): Fix panic in UDF code.
 - [#429](https://github.com/influxdata/kapacitor/issues/429): BREAKING: Change TICKscript parser to be left-associative on equal precedence operators. For example previously this statement `(1+2-3*4/5)` was evaluated as `(1+(2-(3*(4/5))))`
     which is not the typical/expected behavior. Now using left-associative parsing the statement is evaluated as `((1+2)-((3*4)/5))`.
