@@ -245,6 +245,7 @@ func (ts *Service) migrate() error {
 				}
 			}
 
+			now := time.Now()
 			newTask := Task{
 				ID:         task.Name,
 				Type:       typ,
@@ -252,6 +253,11 @@ func (ts *Service) migrate() error {
 				TICKscript: task.TICKscript,
 				Error:      task.Error,
 				Status:     status,
+				Created:    now,
+				Modified:   now,
+			}
+			if newTask.Status == Enabled {
+				newTask.LastEnabled = now
 			}
 			// Try and create the task in the new store.
 			err = ts.tasks.Create(newTask)
@@ -469,6 +475,9 @@ func (ts *Service) handleTask(w http.ResponseWriter, r *http.Request) {
 		Executing:      executing,
 		Error:          errMsg,
 		ExecutionStats: stats,
+		Created:        raw.Created,
+		Modified:       raw.Modified,
+		LastEnabled:    raw.LastEnabled,
 	}
 
 	w.Write(httpd.MarshalJSON(info, true))
@@ -485,6 +494,9 @@ var allFields = []string{
 	"executing",
 	"error",
 	"stats",
+	"created",
+	"modified",
+	"last-enabled",
 }
 
 func (ts *Service) taskLink(id string) client.Link {
@@ -607,6 +619,15 @@ func (ts *Service) handleListTasks(w http.ResponseWriter, r *http.Request) {
 				case Enabled:
 					value = client.Enabled
 				}
+			case "created":
+				value = task.Created
+			case "modified":
+				value = task.Modified
+			case "last-enabled":
+				value = task.LastEnabled
+			default:
+				httpd.HttpError(w, fmt.Sprintf("unsupported field %q", field), true, http.StatusBadRequest)
+				return
 			}
 			tasks[i][field] = value
 		}
@@ -695,6 +716,13 @@ func (ts *Service) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		httpd.HttpError(w, "invalid TICKscript: "+err.Error(), true, http.StatusBadRequest)
 		return
+	}
+
+	now := time.Now()
+	newTask.Created = now
+	newTask.Modified = now
+	if newTask.Status == Enabled {
+		newTask.LastEnabled = now
 	}
 
 	err = ts.tasks.Create(newTask)
@@ -799,6 +827,11 @@ func (ts *Service) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	now := time.Now()
+	existing.Modified = now
+	if statusChanged && existing.Status == Enabled {
+		existing.LastEnabled = now
+	}
 	err = ts.tasks.Replace(existing)
 	if err != nil {
 		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)

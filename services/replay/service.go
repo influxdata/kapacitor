@@ -367,6 +367,9 @@ func (s *Service) handleListRecordings(w http.ResponseWriter, r *http.Request) {
 				}
 			case "progress":
 				value = recording.Progress
+			default:
+				httpd.HttpError(w, fmt.Sprintf("unsupported field %q", field), true, http.StatusBadRequest)
+				return
 			}
 			rs[i][field] = value
 		}
@@ -707,6 +710,9 @@ func (s *Service) handleListReplays(w http.ResponseWriter, r *http.Request) {
 				}
 			case "progress":
 				value = replay.Progress
+			default:
+				httpd.HttpError(w, fmt.Sprintf("unsupported field %q", field), true, http.StatusBadRequest)
+				return
 			}
 			rs[i][field] = value
 		}

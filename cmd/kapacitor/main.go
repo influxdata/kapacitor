@@ -608,9 +608,6 @@ func doDefine(args []string) error {
 	if err != nil {
 		return err
 	}
-	if task.Error != "" {
-		return errors.New(task.Error)
-	}
 
 	if !*dnoReload && task.Status == client.Enabled {
 		err := cli.UpdateTask(l, client.UpdateTaskOptions{Status: client.Disabled})
@@ -875,6 +872,9 @@ func doShow(args []string) error {
 	fmt.Println("Type:", ti.Type)
 	fmt.Println("Status:", ti.Status)
 	fmt.Println("Executing:", ti.Executing)
+	fmt.Println("Created:", ti.Created.Format(time.RFC822))
+	fmt.Println("Modified:", ti.Modified.Format(time.RFC822))
+	fmt.Println("LastEnabled:", ti.LastEnabled.Format(time.RFC822))
 	fmt.Println("Databases Retention Policies:", ti.DBRPs)
 	fmt.Printf("TICKscript:\n%s\n\n", ti.TICKscript)
 	fmt.Printf("DOT:\n%s\n", ti.Dot)
