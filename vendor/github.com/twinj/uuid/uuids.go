@@ -22,6 +22,7 @@ package uuid
  ***************/
 
 import (
+	"bytes"
 	"encoding"
 	"encoding/hex"
 	"errors"
@@ -29,7 +30,6 @@ import (
 	"hash"
 	"regexp"
 	"strings"
-	"bytes"
 )
 
 const (
@@ -107,7 +107,6 @@ func New(pData []byte) UUID {
 	o.Unmarshal(pData[:length])
 	return o
 }
-
 
 // Creates a UUID from a hex string
 // Will panic if hex string is invalid - will panic even with hyphens and brackets
@@ -196,8 +195,8 @@ type UniqueName interface {
 type Format string
 
 const (
-	Clean  Format = "%x%x%x%x%x%x"
-	Curly  Format = "{%x%x%x%x%x%x}"
+	Clean   Format = "%x%x%x%x%x%x"
+	Curly   Format = "{%x%x%x%x%x%x}"
 	Bracket Format = "(%x%x%x%x%x%x)"
 
 	// This is the default format.
@@ -231,7 +230,7 @@ func SwitchFormatUpperCase(pFormat Format) {
 
 // Compares whether each UUID is the same
 func Equal(p1 UUID, p2 UUID) bool {
-	return 	bytes.Equal(p1.Bytes(), p2.Bytes())
+	return bytes.Equal(p1.Bytes(), p2.Bytes())
 }
 
 // Format a UUID into a human readable string which matches the given Format
@@ -293,4 +292,3 @@ func formatter(pUUID UUID, pFormat string) string {
 	b := pUUID.Bytes()
 	return fmt.Sprintf(pFormat, b[0:4], b[4:6], b[6:8], b[8:9], b[9:10], b[10:pUUID.Size()])
 }
-

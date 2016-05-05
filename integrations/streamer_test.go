@@ -3046,12 +3046,12 @@ func TestStream_AlertVictorOps(t *testing.T) {
 			}
 		}
 		type postData struct {
-			MessageType       string      `json:"message_type"`
-			EntityID          string      `json:"entity_id"`
-			StateMessage      string      `json:"state_message"`
-			Timestamp         int         `json:"timestamp"`
-			MonitoringTool    string      `json:"monitoring_tool"`
-			Data              interface{} `json:"data"`
+			MessageType    string      `json:"message_type"`
+			EntityID       string      `json:"entity_id"`
+			StateMessage   string      `json:"state_message"`
+			Timestamp      int         `json:"timestamp"`
+			MonitoringTool string      `json:"monitoring_tool"`
+			Data           interface{} `json:"data"`
 		}
 		pd := postData{}
 		dec := json.NewDecoder(r.Body)
@@ -3063,7 +3063,7 @@ func TestStream_AlertVictorOps(t *testing.T) {
 			t.Errorf("unexpected entity id got %s exp %s", pd.EntityID, exp)
 		}
 		if exp := "kapacitor/cpu/serverA is CRITICAL"; pd.StateMessage != exp {
-			t.Errorf("unexpected entity id got %s exp %s", pd.StateMessage, exp)
+			t.Errorf("unexpected state message got %s exp %s", pd.StateMessage, exp)
 		}
 		if exp := "kapacitor"; pd.MonitoringTool != exp {
 			t.Errorf("unexpected monitoring tool got %s exp %s", pd.MonitoringTool, exp)
