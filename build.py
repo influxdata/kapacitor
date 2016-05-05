@@ -133,8 +133,9 @@ def package_scripts(build_root, config_only=False):
     """
     if config_only:
         logging.info("Copying configuration to build directory.")
-        shutil.copyfile(DEFAULT_CONFIG, os.path.join(build_root, "influxdb.conf"))
-        os.chmod(os.path.join(build_root, "influxdb.conf"), 0o644)
+        conf_name = os.path.basename(DEFAULT_CONFIG)
+        shutil.copyfile(DEFAULT_CONFIG, os.path.join(build_root, conf_name))
+        os.chmod(os.path.join(build_root, conf_name), 0o644)
     else:
         logging.info("Copying scripts and configuration to build directory")
         shutil.copy(INIT_SCRIPT, os.path.join(build_root, SCRIPT_DIR[1:], INIT_SCRIPT.split('/')[1]))
