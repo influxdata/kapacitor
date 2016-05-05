@@ -325,6 +325,9 @@ type Task struct {
 	Executing      bool           `json:"executing"`
 	Error          string         `json:"error"`
 	ExecutionStats ExecutionStats `json:"stats"`
+	Created        time.Time      `json:"created"`
+	Modified       time.Time      `json:"modified"`
+	LastEnabled    time.Time      `json:"last-enabled,omitempty"`
 }
 
 // Information about a recording.

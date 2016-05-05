@@ -504,6 +504,21 @@ definitions:
       error:
         description: Any error the task may have encountered while executing
         readOnly: true
+      created:
+        type: string
+        format: dateTime
+        description: Date task was first created
+        readOnly: true
+      modified:
+        type: string
+        format: dateTime
+        description: Date task was last modified
+        readOnly: true
+      last-enabled:
+        type: string
+        format: dateTime
+        description: Date task was last enabled
+        readOnly: true
       stats:
         type: object
         description: Statisitcs about the task execution

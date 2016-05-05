@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"path"
+	"time"
 
 	"github.com/influxdata/kapacitor/services/storage"
 )
@@ -86,6 +87,12 @@ type Task struct {
 	Error string
 	// Status of the task
 	Status Status
+	// Created Date
+	Created time.Time
+	// The time the task was last modified
+	Modified time.Time
+	// The time the task was last changed to status Enabled.
+	LastEnabled time.Time
 }
 
 type DBRP struct {

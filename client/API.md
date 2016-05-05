@@ -129,6 +129,8 @@ Response with task id and link.
     "status" : "enabled",
     "executing" : true,
     "error" : "",
+    "created": "2006-01-02T15:04:05Z07:00",
+    "modified": "2006-01-02T15:04:05Z07:00",
     "stats" : {}
 }
 ```
@@ -204,12 +206,15 @@ To get information about a task make a GET request to the `/kapacitor/v1/tasks/T
 
 A task has these read only properties in addition to the properties listed [above](#define-task).
 
-| Property  | Description                                                                                                                     |
-| --------  | -----------                                                                                                                     |
-| dot       | [GraphViz DOT](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) syntax formatted representation of the task DAG. |
-| executing | Whether the task is currently executing.                                                                                        |
-| error     | Any error encountered when executing the task.                                                                                  |
-| stats     | Map of statistics about a task.                                                                                                 |
+| Property     | Description                                                                                                                     |
+| --------     | -----------                                                                                                                     |
+| dot          | [GraphViz DOT](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) syntax formatted representation of the task DAG. |
+| executing    | Whether the task is currently executing.                                                                                        |
+| error        | Any error encountered when executing the task.                                                                                  |
+| stats        | Map of statistics about a task.                                                                                                 |
+| created      | Date the task was first created                                                                                                 |
+| modified     | Date the task was last modified                                                                                                 |
+| last-enabled | Date the task was last set to status `enabled`                                                                                  |
 
 #### Example
 
@@ -230,6 +235,9 @@ GET /kapacitor/v1/tasks/TASK_ID
     "status" : "enabled",
     "executing" : true,
     "error" : "",
+    "created": "2006-01-02T15:04:05Z07:00",
+    "modified": "2006-01-02T15:04:05Z07:00",
+    "last-enabled": "2006-01-03T15:04:05Z07:00",
     "stats" : {}
 }
 ```
@@ -251,6 +259,9 @@ GET /kapacitor/v1/tasks/TASK_ID?dot-view=labels&script-format=raw
     "status" : "enabled",
     "executing" : true,
     "error" : "",
+    "created": "2006-01-02T15:04:05Z07:00",
+    "modified": "2006-01-02T15:04:05Z07:00",
+    "last-enabled": "2006-01-03T15:04:05Z07:00",
     "stats" : {}
 }
 ```
