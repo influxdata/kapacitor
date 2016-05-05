@@ -24,7 +24,10 @@ func (d deadman) Global() bool            { return d.global }
 
 func TestTICK_To_Pipeline_MultiLine(t *testing.T) {
 	var tickScript = `
-var w = stream.from().window()
+var w = stream
+	|from()
+	|window()
+
 w.period(10s)
 w.every(1s)
 `
