@@ -33,13 +33,21 @@ func floatPopulateAuxFieldsAndTags(ap *influxql.FloatPoint, fieldsAndTags []stri
 	}
 }
 
-func (a *floatPointAggregator) AggregateBatch(b *models.Batch) {
+func (a *floatPointAggregator) AggregateBatch(b *models.Batch) error {
 	for _, p := range b.Points {
+		value, ok := p.Fields[a.field]
+		if !ok {
+			return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
+		}
+		typed, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("field %s has wrong type: got %T exp float64", a.field, value)
+		}
 		ap := &influxql.FloatPoint{
 			Name:  b.Name,
 			Tags:  influxql.NewTags(p.Tags),
 			Time:  p.Time.UnixNano(),
-			Value: p.Fields[a.field].(float64),
+			Value: typed,
 		}
 		if a.topBottomInfo != nil {
 			// We need to populate the Aux fields
@@ -52,14 +60,23 @@ func (a *floatPointAggregator) AggregateBatch(b *models.Batch) {
 
 		a.aggregator.AggregateFloat(ap)
 	}
+	return nil
 }
 
-func (a *floatPointAggregator) AggregatePoint(p *models.Point) {
+func (a *floatPointAggregator) AggregatePoint(p *models.Point) error {
+	value, ok := p.Fields[a.field]
+	if !ok {
+		return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
+	}
+	typed, ok := value.(float64)
+	if !ok {
+		return fmt.Errorf("field %s has wrong type: got %T exp float64", a.field, value)
+	}
 	ap := &influxql.FloatPoint{
 		Name:  p.Name,
 		Tags:  influxql.NewTags(p.Tags),
 		Time:  p.Time.UnixNano(),
-		Value: p.Fields[a.field].(float64),
+		Value: typed,
 	}
 	if a.topBottomInfo != nil {
 		// We need to populate the Aux fields
@@ -71,6 +88,7 @@ func (a *floatPointAggregator) AggregatePoint(p *models.Point) {
 	}
 
 	a.aggregator.AggregateFloat(ap)
+	return nil
 }
 
 type floatPointBulkAggregator struct {
@@ -80,14 +98,22 @@ type floatPointBulkAggregator struct {
 	aggregator       pipeline.FloatBulkPointAggregator
 }
 
-func (a *floatPointBulkAggregator) AggregateBatch(b *models.Batch) {
+func (a *floatPointBulkAggregator) AggregateBatch(b *models.Batch) error {
 	slice := make([]influxql.FloatPoint, len(b.Points))
 	for i, p := range b.Points {
+		value, ok := p.Fields[a.field]
+		if !ok {
+			return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
+		}
+		typed, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("field %s has wrong type: got %T exp float64", a.field, value)
+		}
 		slice[i] = influxql.FloatPoint{
 			Name:  b.Name,
 			Tags:  influxql.NewTags(p.Tags),
 			Time:  p.Time.UnixNano(),
-			Value: p.Fields[a.field].(float64),
+			Value: typed,
 		}
 		if a.topBottomInfo != nil {
 			// We need to populate the Aux fields
@@ -99,14 +125,23 @@ func (a *floatPointBulkAggregator) AggregateBatch(b *models.Batch) {
 		}
 	}
 	a.aggregator.AggregateFloatBulk(slice)
+	return nil
 }
 
-func (a *floatPointBulkAggregator) AggregatePoint(p *models.Point) {
+func (a *floatPointBulkAggregator) AggregatePoint(p *models.Point) error {
+	value, ok := p.Fields[a.field]
+	if !ok {
+		return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
+	}
+	typed, ok := value.(float64)
+	if !ok {
+		return fmt.Errorf("field %s has wrong type: got %T exp float64", a.field, value)
+	}
 	ap := &influxql.FloatPoint{
 		Name:  p.Name,
 		Tags:  influxql.NewTags(p.Tags),
 		Time:  p.Time.UnixNano(),
-		Value: p.Fields[a.field].(float64),
+		Value: typed,
 	}
 	if a.topBottomInfo != nil {
 		// We need to populate the Aux fields
@@ -118,6 +153,7 @@ func (a *floatPointBulkAggregator) AggregatePoint(p *models.Point) {
 	}
 
 	a.aggregator.AggregateFloat(ap)
+	return nil
 }
 
 type floatPointEmitter struct {
@@ -205,13 +241,21 @@ func integerPopulateAuxFieldsAndTags(ap *influxql.IntegerPoint, fieldsAndTags []
 	}
 }
 
-func (a *integerPointAggregator) AggregateBatch(b *models.Batch) {
+func (a *integerPointAggregator) AggregateBatch(b *models.Batch) error {
 	for _, p := range b.Points {
+		value, ok := p.Fields[a.field]
+		if !ok {
+			return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
+		}
+		typed, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("field %s has wrong type: got %T exp int64", a.field, value)
+		}
 		ap := &influxql.IntegerPoint{
 			Name:  b.Name,
 			Tags:  influxql.NewTags(p.Tags),
 			Time:  p.Time.UnixNano(),
-			Value: p.Fields[a.field].(int64),
+			Value: typed,
 		}
 		if a.topBottomInfo != nil {
 			// We need to populate the Aux fields
@@ -224,14 +268,23 @@ func (a *integerPointAggregator) AggregateBatch(b *models.Batch) {
 
 		a.aggregator.AggregateInteger(ap)
 	}
+	return nil
 }
 
-func (a *integerPointAggregator) AggregatePoint(p *models.Point) {
+func (a *integerPointAggregator) AggregatePoint(p *models.Point) error {
+	value, ok := p.Fields[a.field]
+	if !ok {
+		return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
+	}
+	typed, ok := value.(int64)
+	if !ok {
+		return fmt.Errorf("field %s has wrong type: got %T exp int64", a.field, value)
+	}
 	ap := &influxql.IntegerPoint{
 		Name:  p.Name,
 		Tags:  influxql.NewTags(p.Tags),
 		Time:  p.Time.UnixNano(),
-		Value: p.Fields[a.field].(int64),
+		Value: typed,
 	}
 	if a.topBottomInfo != nil {
 		// We need to populate the Aux fields
@@ -243,6 +296,7 @@ func (a *integerPointAggregator) AggregatePoint(p *models.Point) {
 	}
 
 	a.aggregator.AggregateInteger(ap)
+	return nil
 }
 
 type integerPointBulkAggregator struct {
@@ -252,14 +306,22 @@ type integerPointBulkAggregator struct {
 	aggregator       pipeline.IntegerBulkPointAggregator
 }
 
-func (a *integerPointBulkAggregator) AggregateBatch(b *models.Batch) {
+func (a *integerPointBulkAggregator) AggregateBatch(b *models.Batch) error {
 	slice := make([]influxql.IntegerPoint, len(b.Points))
 	for i, p := range b.Points {
+		value, ok := p.Fields[a.field]
+		if !ok {
+			return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
+		}
+		typed, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("field %s has wrong type: got %T exp int64", a.field, value)
+		}
 		slice[i] = influxql.IntegerPoint{
 			Name:  b.Name,
 			Tags:  influxql.NewTags(p.Tags),
 			Time:  p.Time.UnixNano(),
-			Value: p.Fields[a.field].(int64),
+			Value: typed,
 		}
 		if a.topBottomInfo != nil {
 			// We need to populate the Aux fields
@@ -271,14 +333,23 @@ func (a *integerPointBulkAggregator) AggregateBatch(b *models.Batch) {
 		}
 	}
 	a.aggregator.AggregateIntegerBulk(slice)
+	return nil
 }
 
-func (a *integerPointBulkAggregator) AggregatePoint(p *models.Point) {
+func (a *integerPointBulkAggregator) AggregatePoint(p *models.Point) error {
+	value, ok := p.Fields[a.field]
+	if !ok {
+		return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
+	}
+	typed, ok := value.(int64)
+	if !ok {
+		return fmt.Errorf("field %s has wrong type: got %T exp int64", a.field, value)
+	}
 	ap := &influxql.IntegerPoint{
 		Name:  p.Name,
 		Tags:  influxql.NewTags(p.Tags),
 		Time:  p.Time.UnixNano(),
-		Value: p.Fields[a.field].(int64),
+		Value: typed,
 	}
 	if a.topBottomInfo != nil {
 		// We need to populate the Aux fields
@@ -290,6 +361,7 @@ func (a *integerPointBulkAggregator) AggregatePoint(p *models.Point) {
 	}
 
 	a.aggregator.AggregateInteger(ap)
+	return nil
 }
 
 type integerPointEmitter struct {

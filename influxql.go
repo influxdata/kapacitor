@@ -46,8 +46,8 @@ func (n *InfluxQLNode) runInfluxQLs([]byte) error {
 }
 
 type reduceContext interface {
-	AggregatePoint(p *models.Point)
-	AggregateBatch(b *models.Batch)
+	AggregatePoint(p *models.Point) error
+	AggregateBatch(b *models.Batch) error
 	EmitPoint() (models.Point, error)
 	EmitBatch() models.Batch
 	Time() time.Time
@@ -97,22 +97,28 @@ func (n *InfluxQLNode) runStreamInfluxQL() error {
 
 		}
 		if n.isStreamTransformation {
-			context.AggregatePoint(&p)
+			err := context.AggregatePoint(&p)
+			if err != nil {
+				n.logger.Println("E! failed to aggregate point:", err)
+			}
 			p, ok = n.ins[0].NextPoint()
 
-			err := n.emit(context)
+			err = n.emit(context)
 			if err != nil && err != ErrEmptyEmit {
-				return err
+				n.logger.Println("E! failed to emit stream:", err)
 			}
 		} else {
 			if p.Time.Equal(context.Time()) {
-				context.AggregatePoint(&p)
+				err := context.AggregatePoint(&p)
+				if err != nil {
+					n.logger.Println("E! failed to aggregate point:", err)
+				}
 				// advance to next point
 				p, ok = n.ins[0].NextPoint()
 			} else {
 				err := n.emit(context)
 				if err != nil {
-					return err
+					n.logger.Println("E! failed to emit stream:", err)
 				}
 
 				// Nil out reduced point
@@ -149,10 +155,13 @@ func (n *InfluxQLNode) runBatchInfluxQL() error {
 		}
 
 		context := createFn(c)
-		context.AggregateBatch(&b)
+		err = context.AggregateBatch(&b)
+		if err != nil {
+			n.logger.Println("E! failed to aggregate batch:", err)
+		}
 		err = n.emit(context)
 		if err != nil {
-			return err
+			n.logger.Println("E! failed to emit batch:", err)
 		}
 	}
 	return nil
