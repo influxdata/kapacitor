@@ -1667,23 +1667,23 @@ func TestServer_UDFStreamAgentsSocket(t *testing.T) {
 					"go",
 					"build",
 					"-o",
-					filepath.Join(tdir, "echo"),
-					filepath.Join(udfDir, "agent/examples/echo/echo.go"),
+					filepath.Join(tdir, "mirror"),
+					filepath.Join(udfDir, "agent/examples/mirror/mirror.go"),
 				)
 				out, err := cmd.CombinedOutput()
 				if err != nil {
 					t.Fatal(string(out))
 				}
 				cmd = exec.Command(
-					filepath.Join(tdir, "echo"),
+					filepath.Join(tdir, "mirror"),
 					"-socket",
-					filepath.Join(tdir, "echo.go.sock"),
+					filepath.Join(tdir, "mirror.go.sock"),
 				)
 				cmd.Stderr = os.Stderr
 				return cmd
 			},
 			config: udf.FunctionConfig{
-				Socket:  filepath.Join(tdir, "echo.go.sock"),
+				Socket:  filepath.Join(tdir, "mirror.go.sock"),
 				Timeout: toml.Duration(time.Minute),
 			},
 		},
@@ -1693,8 +1693,8 @@ func TestServer_UDFStreamAgentsSocket(t *testing.T) {
 				cmd := exec.Command(
 					"python2",
 					"-u",
-					filepath.Join(udfDir, "agent/examples/echo/echo.py"),
-					filepath.Join(tdir, "echo.py.sock"),
+					filepath.Join(udfDir, "agent/examples/mirror/mirror.py"),
+					filepath.Join(tdir, "mirror.py.sock"),
 				)
 				cmd.Stderr = os.Stderr
 				env := os.Environ()
@@ -1710,7 +1710,7 @@ func TestServer_UDFStreamAgentsSocket(t *testing.T) {
 				return cmd
 			},
 			config: udf.FunctionConfig{
-				Socket:  filepath.Join(tdir, "echo.py.sock"),
+				Socket:  filepath.Join(tdir, "mirror.py.sock"),
 				Timeout: toml.Duration(time.Minute),
 			},
 		},
@@ -1724,7 +1724,7 @@ func TestServer_UDFStreamAgentsSocket(t *testing.T) {
 		}
 		c := NewConfig()
 		c.UDF.Functions = map[string]udf.FunctionConfig{
-			"echo": agent.config,
+			"mirror": agent.config,
 		}
 		testStreamAgentSocket(t, c)
 	}
@@ -1749,7 +1749,7 @@ func testStreamAgentSocket(t *testing.T, c *run.Config) {
     |from()
         .measurement('test')
         .groupBy('group')
-    @echo()
+    @mirror()
     |window()
         .period(10s)
         .every(10s)

@@ -9,8 +9,8 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s:%(nam
 logger = logging.getLogger()
 
 
-# Echos all points it receives back to Kapacitor
-class EchoHandler(Handler):
+# Mirrors all points it receives back to Kapacitor
+class MirrorHandler(Handler):
     def __init__(self, agent):
         self._agent = agent
 
@@ -53,7 +53,7 @@ class accepter(object):
     def accept(self, conn, addr):
         self._count += 1
         a = Agent(conn, conn)
-        h = EchoHandler(a)
+        h = MirrorHandler(a)
         a.handler = h
 
         logger.info("Starting Agent for connection %d", self._count)
@@ -62,7 +62,7 @@ class accepter(object):
         logger.info("Agent finished connection %d",self._count)
 
 if __name__ == '__main__':
-    path = "/tmp/echo.sock"
+    path = "/tmp/mirror.sock"
     if len(sys.argv) == 2:
         path = sys.argv[1]
     server = Server(path, accepter())

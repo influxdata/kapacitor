@@ -12,17 +12,17 @@ import (
 	"github.com/influxdata/kapacitor/udf/agent"
 )
 
-// Echos all points it receives back to Kapacitor
-type echoHandler struct {
+// Mirrors all points it receives back to Kapacitor
+type mirrorHandler struct {
 	agent *agent.Agent
 }
 
-func newEchoHandler(agent *agent.Agent) *echoHandler {
-	return &echoHandler{agent: agent}
+func newMirrorHandler(agent *agent.Agent) *mirrorHandler {
+	return &mirrorHandler{agent: agent}
 }
 
 // Return the InfoResponse. Describing the properties of this UDF agent.
-func (*echoHandler) Info() (*udf.InfoResponse, error) {
+func (*mirrorHandler) Info() (*udf.InfoResponse, error) {
 	info := &udf.InfoResponse{
 		Wants:    udf.EdgeType_STREAM,
 		Provides: udf.EdgeType_STREAM,
@@ -32,7 +32,7 @@ func (*echoHandler) Info() (*udf.InfoResponse, error) {
 }
 
 // Initialze the handler based of the provided options.
-func (o *echoHandler) Init(r *udf.InitRequest) (*udf.InitResponse, error) {
+func (o *mirrorHandler) Init(r *udf.InitRequest) (*udf.InitResponse, error) {
 	init := &udf.InitResponse{
 		Success: true,
 		Error:   "",
@@ -41,23 +41,23 @@ func (o *echoHandler) Init(r *udf.InitRequest) (*udf.InitResponse, error) {
 }
 
 // Create a snapshot of the running state of the process.
-func (o *echoHandler) Snaphost() (*udf.SnapshotResponse, error) {
+func (o *mirrorHandler) Snaphost() (*udf.SnapshotResponse, error) {
 	return &udf.SnapshotResponse{}, nil
 }
 
 // Restore a previous snapshot.
-func (o *echoHandler) Restore(req *udf.RestoreRequest) (*udf.RestoreResponse, error) {
+func (o *mirrorHandler) Restore(req *udf.RestoreRequest) (*udf.RestoreResponse, error) {
 	return &udf.RestoreResponse{
 		Success: true,
 	}, nil
 }
 
 // Start working with the next batch
-func (o *echoHandler) BeginBatch(begin *udf.BeginBatch) error {
+func (o *mirrorHandler) BeginBatch(begin *udf.BeginBatch) error {
 	return errors.New("batching not supported")
 }
 
-func (o *echoHandler) Point(p *udf.Point) error {
+func (o *mirrorHandler) Point(p *udf.Point) error {
 	// Send back the point we just received
 	o.agent.Responses <- &udf.Response{
 		Message: &udf.Response_Point{
@@ -67,12 +67,12 @@ func (o *echoHandler) Point(p *udf.Point) error {
 	return nil
 }
 
-func (o *echoHandler) EndBatch(end *udf.EndBatch) error {
+func (o *mirrorHandler) EndBatch(end *udf.EndBatch) error {
 	return nil
 }
 
 // Stop the handler gracefully.
-func (o *echoHandler) Stop() {
+func (o *mirrorHandler) Stop() {
 	close(o.agent.Responses)
 }
 
@@ -86,7 +86,7 @@ func (acc *accpeter) Accept(conn net.Conn) {
 	count := acc.count
 	acc.count++
 	a := agent.New(conn, conn)
-	h := newEchoHandler(a)
+	h := newMirrorHandler(a)
 	a.Handler = h
 
 	log.Println("Starting agent for connection", count)
@@ -100,7 +100,7 @@ func (acc *accpeter) Accept(conn net.Conn) {
 	}()
 }
 
-var socketPath = flag.String("socket", "/tmp/echo.sock", "Where to create the unix socket")
+var socketPath = flag.String("socket", "/tmp/mirror.sock", "Where to create the unix socket")
 
 func main() {
 	flag.Parse()
