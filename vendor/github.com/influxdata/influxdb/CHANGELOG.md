@@ -1,5 +1,9 @@
 ## v0.13.0 [unreleased]
 
+### Release Notes
+
+With this release InfluxDB is moving to Go v1.6.
+
 ### Features
 
 - [#6213](https://github.com/influxdata/influxdb/pull/6213): Make logging output location more programmatically configurable.
@@ -23,6 +27,9 @@
 - [#6290](https://github.com/influxdata/influxdb/issues/6290): Add POST /query endpoint and warning messages for using GET with write operations.
 - [#6494](https://github.com/influxdata/influxdb/issues/6494): Support booleans for min() and max().
 - [#2074](https://github.com/influxdata/influxdb/issues/2074): Support offset argument in the GROUP BY time(...) call.
+- [#6533](https://github.com/influxdata/influxdb/issues/6533): Optimize SHOW SERIES
+- [#6534](https://github.com/influxdata/influxdb/pull/6534): Move to Go v1.6.2 (over Go v1.4.3)
+- [#6522](https://github.com/influxdata/influxdb/pull/6522): Dump TSM files to line protocol
 
 ### Bugfixes
 
@@ -55,6 +62,8 @@
 - [#6505](https://github.com/influxdata/influxdb/issues/6505): Add regex literal to InfluxQL spec for FROM clause.
 - [#5890](https://github.com/influxdata/influxdb/issues/5890): Return the time with a selector when there is no group by interval.
 - [#6496](https://github.com/influxdata/influxdb/issues/6496): Fix parsing escaped series key when loading database index
+- [#6495](https://github.com/influxdata/influxdb/issues/6495): Fix aggregate returns when data is missing from some shards.
+- [#6439](https://github.com/influxdata/influxdb/issues/6439): Overwriting points returning old values
 
 ## v0.12.2 [2016-04-20]
 

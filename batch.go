@@ -248,6 +248,7 @@ func (b *QueryNode) doQuery() error {
 		return errors.New("InfluxDB not configured, cannot query InfluxDB for batch query")
 	}
 
+	var con client.Client
 	tickC := b.ticker.Start()
 	for {
 		select {
@@ -265,19 +266,19 @@ func (b *QueryNode) doQuery() error {
 
 			b.logger.Println("D! starting next batch query:", b.query.String())
 
-			// Connect
-			var con client.Client
 			var err error
-			if b.b.Cluster != "" {
-				con, err = b.et.tm.InfluxDBService.NewNamedClient(b.b.Cluster)
-			} else {
-				con, err = b.et.tm.InfluxDBService.NewDefaultClient()
-			}
-			if err != nil {
-				b.logger.Println("E! failed to connect to InfluxDB:", err)
-				b.timer.Stop()
-				b.connectErrors.Add(1)
-				break
+			if con == nil {
+				if b.b.Cluster != "" {
+					con, err = b.et.tm.InfluxDBService.NewNamedClient(b.b.Cluster)
+				} else {
+					con, err = b.et.tm.InfluxDBService.NewDefaultClient()
+				}
+				if err != nil {
+					b.logger.Println("E! failed to connect to InfluxDB:", err)
+					b.timer.Stop()
+					b.connectErrors.Add(1)
+					break
+				}
 			}
 			q := client.Query{
 				Command: b.query.String(),
@@ -287,13 +288,15 @@ func (b *QueryNode) doQuery() error {
 			resp, err := con.Query(q)
 			if err != nil {
 				b.logger.Println("E! query failed:", err)
-				b.timer.Stop()
 				b.queryErrors.Add(1)
+				// Get a new connection
+				con = nil
+				b.timer.Stop()
 				break
 			}
 
 			if err := resp.Error(); err != nil {
-				b.logger.Println("E! query failed:", err)
+				b.logger.Println("E! query returned error response:", err)
 				b.timer.Stop()
 				b.queryErrors.Add(1)
 				break

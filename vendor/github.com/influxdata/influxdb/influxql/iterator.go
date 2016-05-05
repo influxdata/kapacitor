@@ -117,8 +117,10 @@ func (a Iterators) cast() interface{} {
 // interval.
 func NewMergeIterator(inputs []Iterator, opt IteratorOptions) Iterator {
 	inputs = Iterators(inputs).filterNonNil()
-	if len(inputs) == 0 {
-		return &nilFloatIterator{}
+	if n := len(inputs); n == 0 {
+		return nil
+	} else if n == 1 {
+		return inputs[0]
 	}
 
 	// Aggregate functions can use a more relaxed sorting so that points
@@ -145,7 +147,7 @@ func NewMergeIterator(inputs []Iterator, opt IteratorOptions) Iterator {
 func NewSortedMergeIterator(inputs []Iterator, opt IteratorOptions) Iterator {
 	inputs = Iterators(inputs).filterNonNil()
 	if len(inputs) == 0 {
-		return &nilFloatIterator{}
+		return nil
 	}
 
 	switch inputs := Iterators(inputs).cast().(type) {
@@ -535,26 +537,29 @@ func (a IteratorCreators) CreateIterator(opt IteratorOptions) (Iterator, error) 
 	// Merge into a single iterator.
 	if opt.MergeSorted() {
 		itr := NewSortedMergeIterator(itrs, opt)
-		if opt.InterruptCh != nil {
+		if itr != nil && opt.InterruptCh != nil {
 			itr = NewInterruptIterator(itr, opt.InterruptCh)
 		}
 		return itr, nil
 	}
 
 	itr := NewMergeIterator(itrs, opt)
-	if opt.Expr != nil {
-		if expr, ok := opt.Expr.(*Call); ok && expr.Name == "count" {
-			opt.Expr = &Call{
-				Name: "sum",
-				Args: expr.Args,
+	if itr != nil {
+		if opt.Expr != nil {
+			if expr, ok := opt.Expr.(*Call); ok && expr.Name == "count" {
+				opt.Expr = &Call{
+					Name: "sum",
+					Args: expr.Args,
+				}
 			}
 		}
-	}
 
-	if opt.InterruptCh != nil {
-		itr = NewInterruptIterator(itr, opt.InterruptCh)
+		if opt.InterruptCh != nil {
+			itr = NewInterruptIterator(itr, opt.InterruptCh)
+		}
+		return NewCallIterator(itr, opt)
 	}
-	return NewCallIterator(itr, opt)
+	return nil, nil
 }
 
 // FieldDimensions returns unique fields and dimensions from multiple iterator creators.
@@ -1169,6 +1174,55 @@ func decodeIteratorStats(pb *internal.IteratorStats) IteratorStats {
 		SeriesN: int(pb.GetSeriesN()),
 		PointN:  int(pb.GetPointN()),
 	}
+}
+
+// floatFastDedupeIterator outputs unique points where the point has a single aux field.
+type floatFastDedupeIterator struct {
+	input FloatIterator
+	m     map[fastDedupeKey]struct{} // lookup of points already sent
+}
+
+// newFloatFastDedupeIterator returns a new instance of floatFastDedupeIterator.
+func newFloatFastDedupeIterator(input FloatIterator) *floatFastDedupeIterator {
+	return &floatFastDedupeIterator{
+		input: input,
+		m:     make(map[fastDedupeKey]struct{}),
+	}
+}
+
+// Stats returns stats from the input iterator.
+func (itr *floatFastDedupeIterator) Stats() IteratorStats { return itr.input.Stats() }
+
+// Close closes the iterator and all child iterators.
+func (itr *floatFastDedupeIterator) Close() error { return itr.input.Close() }
+
+// Next returns the next unique point from the input iterator.
+func (itr *floatFastDedupeIterator) Next() (*FloatPoint, error) {
+	for {
+		// Read next point.
+		// Skip if there are not any aux fields.
+		p, err := itr.input.Next()
+		if p == nil || err != nil {
+			return nil, err
+		} else if len(p.Aux) == 0 {
+			continue
+		}
+
+		// If the point has already been output then move to the next point.
+		key := fastDedupeKey{p.Name, p.Aux[0]}
+		if _, ok := itr.m[key]; ok {
+			continue
+		}
+
+		// Otherwise mark it as emitted and return point.
+		itr.m[key] = struct{}{}
+		return p, nil
+	}
+}
+
+type fastDedupeKey struct {
+	name  string
+	value interface{}
 }
 
 type reverseStringSlice []string
