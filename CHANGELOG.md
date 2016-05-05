@@ -105,6 +105,7 @@ For example, let's say we want to store all data that triggered an alert in Infl
 - [#461](https://github.com/influxdata/kapacitor/pull/461): Make Alerta `event` property configurable.
 - [#491](https://github.com/influxdata/kapacitor/pull/491): BREAKING: Rewriting stateful expression in order to improve performance, the only breaking change is: short circuit evaluation for booleans - for example: ``lambda: "bool_value" && (count() > 100)`` if "bool_value" is false, we won't evaluate "count".
 - [#504](https://github.com/influxdata/kapacitor/pull/504): BREAKING: Many changes to the API and underlying storage system. This release requires a special upgrade process.
+- [#511](https://github.com/influxdata/kapacitor/pull/511): Adds DefaultNode for providing default values for missing fields or tags.
 
 ### Bugfixes
 

@@ -289,6 +289,43 @@ batch
 	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er)
 }
 
+func TestBatch_Default(t *testing.T) {
+
+	var script = `
+batch
+	|query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "host" = 'serverA' AND "cpu" = 'cpu-total'
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s))
+	|default()
+		.field('mean', 90.0)
+		.tag('dc', 'sfc')
+	|groupBy('dc')
+	|sum('mean')
+	|httpOut('TestBatch_Default')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"dc": "sfc"},
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+					444.0,
+				}},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_Default", script, 30*time.Second, er)
+}
+
 func TestBatch_DoubleGroupBy(t *testing.T) {
 
 	var script = `

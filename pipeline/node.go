@@ -415,3 +415,10 @@ func (n *chainnode) Log() *LogNode {
 	n.linkChild(s)
 	return s
 }
+
+// Create a node that can set defaults for missing tags or fields.
+func (n *chainnode) Default() *DefaultNode {
+	s := newDefaultNode(n.Provides())
+	n.linkChild(s)
+	return s
+}
