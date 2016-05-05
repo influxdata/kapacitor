@@ -45,7 +45,7 @@ func (s *Service) Alert(routingKey, messageType, message, entityID string, t tim
 	voData := make(map[string]interface{})
 	voData["message_type"] = messageType
 	voData["entity_id"] = entityID
-	voData["entity_display_name"] = message
+	voData["state_message"] = message
 	voData["timestamp"] = t.Unix()
 	voData["monitoring_tool"] = kapacitor.Product
 	if details != nil {
