@@ -249,8 +249,6 @@ var m = !n
 
 // Test that using the wrong chain operator fails
 func TestStrictEvaluate(t *testing.T) {
-	// Skip test until DEPRECATED syntax is removed
-	t.Skip()
 	script := `
 var s2 = a.structB()
 			.field1('f1')

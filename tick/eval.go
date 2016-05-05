@@ -361,23 +361,10 @@ func evalFunc(f *FunctionNode, scope *Scope, stck *stack, args []interface{}) er
 				return o, wrapError(f, err)
 			}
 			if describer.HasChainMethod(name) {
-				getLogger().Printf("W! DEPRECATED Syntax line %d char %d: found  use of '.' as chaining method. Please adopt new syntax 'node|%s(..)'.", f.Line(), f.Char(), name)
-				o, err := describer.CallChainMethod(name, args...)
-				return o, wrapError(f, err)
+				return nil, errorf(f, "no property method %q on %T, but chaining method does exist. Use '|' operator instead: 'node|%s(..)'.", name, obj, name)
 			}
-			// Uncomment for 0.13 release, to finish deprecation of old syntax
-			//if describer.HasChainMethod(name) {
-			//	return nil, errorf(f, "no property method %q on %T, but chaining method does exist. Use '|' operator instead: 'node|%s(..)'.", name, obj, name)
-			//}
 			if dm := scope.DynamicMethod(name); dm != nil {
-				// Uncomment for 0.13 release, to finish deprecation of old syntax
-				//return nil, errorf(f, "no property method %q on %T, but dynamic method does exist. Use '@' operator instead: 'node@%s(..)'.", name, obj, name)
-				getLogger().Printf("W! DEPRECATED Syntax line %d char %d: found use of '.' as dynamic method. Please adopt new syntax 'node@%s(...)'.", f.Line(), f.Char(), name)
-				ret, err := dm(obj, args...)
-				if err != nil {
-					return nil, err
-				}
-				return ret, nil
+				return nil, errorf(f, "no property method %q on %T, but dynamic method does exist. Use '@' operator instead: 'node@%s(..)'.", name, obj, name)
 			}
 		case dynamicFunc:
 			// Check for dynamic method.
