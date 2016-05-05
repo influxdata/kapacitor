@@ -286,6 +286,11 @@ def get_current_version():
     # Remove leading 'v'
     if version_tag[0] == 'v':
         version_tag = version_tag[1:]
+    # Replace any '-'/'_' with '~'
+    if '-' in version_tag:
+        version_tag = version_tag.replace("-","~")
+    if '_' in version_tag:
+        version_tag = version_tag.replace("_","~")
     return version_tag
 
 def get_current_commit(short=False):
