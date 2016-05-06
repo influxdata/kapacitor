@@ -233,7 +233,7 @@ type srcPoint struct {
 
 // handles emitting joined sets once enough data has arrived from parents.
 type group struct {
-	sets       map[time.Time]*joinset
+	sets       map[time.Time][]*joinset
 	head       []time.Time
 	oldestTime time.Time
 	j          *JoinNode
@@ -242,7 +242,7 @@ type group struct {
 
 func newGroup(i int, j *JoinNode) *group {
 	return &group{
-		sets:   make(map[time.Time]*joinset),
+		sets:   make(map[time.Time][]*joinset),
 		head:   make([]time.Time, i),
 		j:      j,
 		points: make(chan srcPoint),
@@ -269,44 +269,78 @@ func (g *group) collect(i int, p models.PointInterface) error {
 		g.oldestTime = t
 	}
 
-	set := g.sets[t]
-	if set == nil {
-		set = newJoinset(g.j.j.StreamName, g.j.fill, g.j.fillValue, g.j.j.Names, g.j.j.Tolerance, t, g.j.logger)
-		g.sets[t] = set
+	var set *joinset
+	sets := g.sets[t]
+	if len(sets) == 0 {
+		set = newJoinset(
+			g.j.j.StreamName,
+			g.j.fill,
+			g.j.fillValue,
+			g.j.j.Names,
+			g.j.j.Tolerance,
+			t,
+			g.j.logger,
+		)
+		sets = append(sets, set)
+		g.sets[t] = sets
 	}
-	set.Add(i, p)
+	for j := 0; j < len(sets); j++ {
+		if !sets[j].Has(i) {
+			set = sets[j]
+			break
+		}
+	}
+	if set == nil {
+		set = newJoinset(
+			g.j.j.StreamName,
+			g.j.fill,
+			g.j.fillValue,
+			g.j.j.Names,
+			g.j.j.Tolerance,
+			t,
+			g.j.logger,
+		)
+		sets = append(sets, set)
+		g.sets[t] = sets
+	}
+	set.Set(i, p)
 
 	// Update head
 	g.head[i] = t
 
-	// Check if all parents have been read past the oldestTime.
-	// If so we can emit the set.
-	emit := true
+	onlyReadySets := false
 	for _, t := range g.head {
 		if !t.After(g.oldestTime) {
-			// Still posible to get more data
-			// need to wait for more points
-			emit = false
+			onlyReadySets = true
 			break
 		}
 	}
-	if emit {
-		err := g.emit()
-		if err != nil {
-			return err
-		}
+	err := g.emit(onlyReadySets)
+	if err != nil {
+		return err
 	}
 	return nil
 }
 
 // emit a set and update the oldestTime.
-func (g *group) emit() error {
-	set := g.sets[g.oldestTime]
-	err := g.emitJoinedSet(set)
-	if err != nil {
-		return err
+func (g *group) emit(onlyReadySets bool) error {
+	sets := g.sets[g.oldestTime]
+	i := 0
+	for ; i < len(sets); i++ {
+		if sets[i].Ready() || !onlyReadySets {
+			err := g.emitJoinedSet(sets[i])
+			if err != nil {
+				return err
+			}
+		} else {
+			break
+		}
 	}
-	delete(g.sets, g.oldestTime)
+	if i == len(sets) {
+		delete(g.sets, g.oldestTime)
+	} else {
+		g.sets[g.oldestTime] = sets[i:]
+	}
 
 	g.oldestTime = time.Time{}
 	for t := range g.sets {
@@ -321,7 +355,7 @@ func (g *group) emit() error {
 func (g *group) emitAll() error {
 	var lastErr error
 	for len(g.sets) > 0 {
-		err := g.emit()
+		err := g.emit(false)
 		if err != nil {
 			lastErr = err
 		}
@@ -403,8 +437,16 @@ func newJoinset(
 	}
 }
 
+func (js *joinset) Ready() bool {
+	return js.size == js.expected
+}
+
+func (js *joinset) Has(i int) bool {
+	return js.values[i] != nil
+}
+
 // add a point to the set from a given parent index.
-func (js *joinset) Add(i int, v models.PointInterface) {
+func (js *joinset) Set(i int, v models.PointInterface) {
 	if i < js.first {
 		js.first = i
 	}

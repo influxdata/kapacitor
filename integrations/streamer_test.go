@@ -1084,13 +1084,9 @@ errorCounts
 		.as('errors', 'views')
 		.tolerance(2s)
 		.streamName('error_view')
-	|eval(lambda: "errors.value" / "views.value")
-		.as('error_percent')
 	|window()
 		.period(10s)
 		.every(10s)
-	|mean('error_percent')
-		.as('error_percent')
 	|httpOut('TestStream_JoinTolerance')
 `
 
@@ -1099,29 +1095,118 @@ errorCounts
 			{
 				Name:    "error_view",
 				Tags:    map[string]string{"service": "cartA"},
-				Columns: []string{"time", "error_percent"},
-				Values: [][]interface{}{[]interface{}{
-					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
-					0.01,
-				}},
+				Columns: []string{"time", "errors.value", "views.value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						7.0,
+						700.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						9.0,
+						900.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						3.0,
+						300.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						11.0,
+						1100.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						12.0,
+						1200.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+						6.0,
+						600.0,
+					},
+				},
 			},
 			{
 				Name:    "error_view",
 				Tags:    map[string]string{"service": "login"},
-				Columns: []string{"time", "error_percent"},
-				Values: [][]interface{}{[]interface{}{
-					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
-					0.01,
-				}},
+				Columns: []string{"time", "errors.value", "views.value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						9.0,
+						900.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						5.0,
+						500.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						9.0,
+						900.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						2.0,
+						200.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						7.0,
+						700.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+						10.0,
+						1000.0,
+					},
+				},
 			},
 			{
 				Name:    "error_view",
 				Tags:    map[string]string{"service": "front"},
-				Columns: []string{"time", "error_percent"},
-				Values: [][]interface{}{[]interface{}{
-					time.Date(1971, 1, 1, 0, 0, 12, 0, time.UTC),
-					0.01,
-				}},
+				Columns: []string{"time", "errors.value", "views.value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						2.0,
+						200.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						9.0,
+						900.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						7.0,
+						700.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						5.0,
+						500.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						4.0,
+						400.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+						6.0,
+						600.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+						4.0,
+						400.0,
+					},
+				},
 			},
 		},
 	}
@@ -1226,7 +1311,7 @@ cpu
 				Columns: []string{"time", "count"},
 				Values: [][]interface{}{[]interface{}{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
-					9.0,
+					10.0,
 				}},
 			},
 		},
