@@ -18,7 +18,7 @@ rpname
 errors,service=front,dc=A value=2 0000000001
 dbname
 rpname
-views,service=front,dc=A value=200 0000000002
+views,service=front,dc=A value=200 0000000001
 dbname
 rpname
 errors,service=cartA,dc=B value=9 0000000002
@@ -27,13 +27,13 @@ rpname
 views,service=cartA,dc=B value=900 0000000002
 dbname
 rpname
-errors,service=login,dc=A value=5 0000000003
+errors,service=login,dc=A value=5 0000000002
 dbname
 rpname
-views,service=login,dc=A value=500 0000000003
+views,service=login,dc=A value=500 0000000002
 dbname
 rpname
-errors,service=front,dc=B value=9 0000000003
+errors,service=front,dc=B value=9 0000000002
 dbname
 rpname
 views,service=front,dc=B value=900 0000000003
@@ -51,10 +51,10 @@ rpname
 views,service=login,dc=B value=900 0000000004
 dbname
 rpname
-errors,service=front,dc=A value=2 0000000005
+errors,service=front,dc=A value=7 0000000005
 dbname
 rpname
-views,service=front,dc=A value=200 0000000005
+views,service=front,dc=A value=700 0000000005
 dbname
 rpname
 errors,service=login,dc=B value=2 0000000005
@@ -69,10 +69,10 @@ rpname
 views,service=front,dc=A value=500 0000000006
 dbname
 rpname
-errors,service=cartA,dc=B value=9 0000000006
+errors,service=cartA,dc=B value=11 0000000006
 dbname
 rpname
-views,service=cartA,dc=B value=900 0000000006
+views,service=cartA,dc=B value=1100 0000000006
 dbname
 rpname
 errors,service=login,dc=C value=7 0000000006
@@ -87,10 +87,10 @@ rpname
 views,service=front,dc=A value=400 0000000007
 dbname
 rpname
-errors,service=cartA,dc=B value=8 0000000007
+errors,service=cartA,dc=B value=12 0000000007
 dbname
 rpname
-views,service=cartA,dc=B value=800 0000000007
+views,service=cartA,dc=B value=1200 0000000007
 dbname
 rpname
 errors,service=front,dc=A value=6 0000000008
