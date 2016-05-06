@@ -239,9 +239,23 @@ func (*boolean) Call(args ...interface{}) (v interface{}, err error) {
 	case string:
 		v, err = strconv.ParseBool(a)
 	case int64:
-		v = a == 1
+		switch a {
+		case 0:
+			v = false
+		case 1:
+			v = true
+		default:
+			err = fmt.Errorf("cannot convert %v to boolean", a)
+		}
 	case float64:
-		v = a == 1.0
+		switch a {
+		case 0:
+			v = false
+		case 1:
+			v = true
+		default:
+			err = fmt.Errorf("cannot convert %v to boolean", a)
+		}
 	default:
 		err = fmt.Errorf("cannot convert %T to boolean", a)
 	}
