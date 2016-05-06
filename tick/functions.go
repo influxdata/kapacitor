@@ -27,6 +27,7 @@ func init() {
 	statelessFuncs["bool"] = &boolean{}
 	statelessFuncs["int"] = &integer{}
 	statelessFuncs["float"] = &float{}
+	statelessFuncs["string"] = &str{}
 
 	// Math functions
 	statelessFuncs["abs"] = newMath1("abs", math.Abs)
@@ -237,6 +238,10 @@ func (*boolean) Call(args ...interface{}) (v interface{}, err error) {
 		v = a
 	case string:
 		v, err = strconv.ParseBool(a)
+	case int64:
+		v = a == 1
+	case float64:
+		v = a == 1.0
 	default:
 		err = fmt.Errorf("cannot convert %T to boolean", a)
 	}
@@ -261,6 +266,12 @@ func (*integer) Call(args ...interface{}) (v interface{}, err error) {
 		v = int64(a)
 	case string:
 		v, err = strconv.ParseInt(a, 10, 64)
+	case bool:
+		if a {
+			v = int64(1)
+		} else {
+			v = int64(0)
+		}
 	default:
 		err = fmt.Errorf("cannot convert %T to integer", a)
 	}
@@ -285,8 +296,40 @@ func (*float) Call(args ...interface{}) (v interface{}, err error) {
 		v = a
 	case string:
 		v, err = strconv.ParseFloat(a, 64)
+	case bool:
+		if a {
+			v = float64(1)
+		} else {
+			v = float64(0)
+		}
 	default:
 		err = fmt.Errorf("cannot convert %T to float", a)
+	}
+	return
+}
+
+type str struct {
+}
+
+func (*str) Reset() {
+}
+
+// Converts the value to a str
+func (*str) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 1 {
+		return 0, errors.New("str expects exactly one argument")
+	}
+	switch a := args[0].(type) {
+	case int64:
+		v = strconv.FormatInt(a, 64)
+	case float64:
+		v = strconv.FormatFloat(a, 'f', -1, 64)
+	case bool:
+		v = strconv.FormatBool(a)
+	case string:
+		v = a
+	default:
+		err = fmt.Errorf("cannot convert %T to string", a)
 	}
 	return
 }
