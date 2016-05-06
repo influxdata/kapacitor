@@ -1,0 +1,81 @@
+dbname
+rpname
+cpu,type=idle,host=serverA value=98i 0000000001
+dbname
+rpname
+cpu,type=idle,host=serverB value=97i 0000000001
+dbname
+rpname
+disk,type=sda,host=serverB value=39i 0000000001
+dbname
+rpname
+cpu,type=idle,host=serverA value=91i 0000000002
+dbname
+rpname
+cpu,type=idle,host=serverB value=91i 0000000002
+dbname
+rpname
+cpu,type=idle,host=serverA value=95i 0000000003
+dbname
+rpname
+cpu,type=idle,host=serverB value=95i 0000000003
+dbname
+rpname
+cpu,type=idle,host=serverA value=93i 0000000004
+dbname
+rpname
+cpu,type=idle,host=serverB value=93i 0000000004
+dbname
+rpname
+cpu,type=idle,host=serverA value=92i 0000000005
+dbname
+rpname
+cpu,type=idle,host=serverB value=92i 0000000005
+dbname
+rpname
+cpu,type=idle,host=serverA value=95i 0000000006
+dbname
+rpname
+cpu,type=idle,host=serverB value=95i 0000000006
+dbname
+rpname
+cpu,type=idle,host=serverC value=95i 0000000006
+dbname
+rpname
+cpu,type=idle,host=serverA value=92i 0000000007
+dbname
+rpname
+cpu,type=idle,host=serverB value=92i 0000000007
+dbname
+rpname
+cpu,type=idle,host=serverA value=96i 0000000008
+dbname
+rpname
+cpu,type=idle,host=serverB value=96i 0000000008
+dbname
+rpname
+cpu,type=idle,host=serverA value=93i 0000000009
+dbname
+rpname
+cpu,type=idle,host=serverB value=93i 0000000009
+dbname
+rpname
+disk,type=sda,host=serverB value=42i 0000000009
+dbname
+rpname
+cpu,type=idle,host=serverA value=95i 0000000010
+dbname
+rpname
+cpu,type=idle,host=serverB value=95i 0000000010
+dbname
+rpname
+cpu,type=idle,host=serverA value=96i 0000000011
+dbname
+rpname
+cpu,type=idle,host=serverB value=96i 0000000011
+dbname
+rpname
+cpu,type=idle,host=serverA value=95i 0000000012
+dbname
+rpname
+cpu,type=idle,host=serverB value=95i 0000000012

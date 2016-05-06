@@ -1665,7 +1665,7 @@ cpu
 	testStreamerWithOutput(t, "TestStream_Union", script, 15*time.Second, er, nil, false)
 }
 
-func TestStream_InfluxQL(t *testing.T) {
+func TestStream_InfluxQL_Float(t *testing.T) {
 
 	type testCase struct {
 		Method        string
@@ -1684,7 +1684,7 @@ stream
 		.every(10s)
 	|{{ .Method }}({{ .Args }})
 		{{ if .UsePointTimes }}.usePointTimes(){{ end }}
-	|httpOut('TestStream_InfluxQL')
+	|httpOut('TestStream_InfluxQL_Float')
 `
 	endTime := time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC)
 	testCases := []testCase{
@@ -2109,7 +2109,779 @@ stream
 		tmpl.Execute(&script, tc)
 		testStreamerWithOutput(
 			t,
-			"TestStream_InfluxQL",
+			"TestStream_InfluxQL_Float",
+			script.String(),
+			13*time.Second,
+			tc.ER,
+			nil,
+			false,
+		)
+	}
+}
+
+func TestStream_InfluxQL_Integer(t *testing.T) {
+	type testCase struct {
+		Method        string
+		Args          string
+		ER            kapacitor.Result
+		UsePointTimes bool
+	}
+
+	var scriptTmpl = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+	|window()
+		.period(10s)
+		.every(10s)
+	|{{ .Method }}({{ .Args }})
+		{{ if .UsePointTimes }}.usePointTimes(){{ end }}
+	|httpOut('TestStream_InfluxQL_Integer')
+`
+	endTime := time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC)
+	testCases := []testCase{
+		testCase{
+			Method: "sum",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    nil,
+						Columns: []string{"time", "sum"},
+						Values: [][]interface{}{[]interface{}{
+							endTime,
+							940.0,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method: "count",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    nil,
+						Columns: []string{"time", "count"},
+						Values: [][]interface{}{[]interface{}{
+							endTime,
+							10.0,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method: "distinct",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    nil,
+						Columns: []string{"time", "distinct"},
+						Values: [][]interface{}{
+							{
+								endTime,
+								98.0,
+							},
+							{
+								endTime,
+								91.0,
+							},
+							{
+								endTime,
+								95.0,
+							},
+							{
+								endTime,
+								93.0,
+							},
+							{
+								endTime,
+								92.0,
+							},
+							{
+								endTime,
+								96.0,
+							},
+						},
+					},
+				},
+			},
+		},
+		testCase{
+			Method: "mean",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    nil,
+						Columns: []string{"time", "mean"},
+						Values: [][]interface{}{[]interface{}{
+							endTime,
+							94.0,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method: "median",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    nil,
+						Columns: []string{"time", "median"},
+						Values: [][]interface{}{[]interface{}{
+							endTime,
+							94.0,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method:        "min",
+			UsePointTimes: true,
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
+						Columns: []string{"time", "min"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+							91.0,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method: "min",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
+						Columns: []string{"time", "min"},
+						Values: [][]interface{}{[]interface{}{
+							endTime,
+							91.0,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method:        "max",
+			UsePointTimes: true,
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
+						Columns: []string{"time", "max"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+							98.0,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method: "max",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
+						Columns: []string{"time", "max"},
+						Values: [][]interface{}{[]interface{}{
+							endTime,
+							98.0,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method: "spread",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    nil,
+						Columns: []string{"time", "spread"},
+						Values: [][]interface{}{[]interface{}{
+							endTime,
+							7.0,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method: "stddev",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    nil,
+						Columns: []string{"time", "stddev"},
+						Values: [][]interface{}{[]interface{}{
+							endTime,
+							2.160246899469287,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method:        "first",
+			UsePointTimes: true,
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
+						Columns: []string{"time", "first"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+							98.0,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method: "first",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
+						Columns: []string{"time", "first"},
+						Values: [][]interface{}{[]interface{}{
+							endTime,
+							98.0,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method:        "last",
+			UsePointTimes: true,
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
+						Columns: []string{"time", "last"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
+							95.0,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method: "last",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
+						Columns: []string{"time", "last"},
+						Values: [][]interface{}{[]interface{}{
+							endTime,
+							95.0,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method: "percentile",
+			Args:   "'value', 50.0",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
+						Columns: []string{"time", "percentile"},
+						Values: [][]interface{}{[]interface{}{
+							endTime,
+							93.0,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method:        "top",
+			UsePointTimes: true,
+			Args:          "2, 'value'",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    nil,
+						Columns: []string{"time", "host", "top", "type"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+								"serverA",
+								98.0,
+								"idle",
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+								"serverA",
+								96.0,
+								"idle",
+							},
+						},
+					},
+				},
+			},
+		},
+		testCase{
+			Method: "top",
+			Args:   "2, 'value'",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    nil,
+						Columns: []string{"time", "host", "top", "type"},
+						Values: [][]interface{}{
+							{
+								endTime,
+								"serverA",
+								98.0,
+								"idle",
+							},
+							{
+								endTime,
+								"serverA",
+								96.0,
+								"idle",
+							},
+						},
+					},
+				},
+			},
+		},
+		testCase{
+			Method:        "bottom",
+			UsePointTimes: true,
+			Args:          "3, 'value'",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    nil,
+						Columns: []string{"time", "bottom", "host", "type"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+								91.0,
+								"serverA",
+								"idle",
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+								92.0,
+								"serverA",
+								"idle",
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+								92.0,
+								"serverA",
+								"idle",
+							},
+						},
+					},
+				},
+			},
+		},
+		testCase{
+			Method: "bottom",
+			Args:   "3, 'value'",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    nil,
+						Columns: []string{"time", "bottom", "host", "type"},
+						Values: [][]interface{}{
+							{
+								endTime,
+								91.0,
+								"serverA",
+								"idle",
+							},
+							{
+								endTime,
+								92.0,
+								"serverA",
+								"idle",
+							},
+							{
+								endTime,
+								92.0,
+								"serverA",
+								"idle",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	tmpl, err := template.New("script").Parse(scriptTmpl)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range testCases {
+		t.Log("Method:", tc.Method)
+		var script bytes.Buffer
+		if tc.Args == "" {
+			tc.Args = "'value'"
+		}
+		tmpl.Execute(&script, tc)
+		testStreamerWithOutput(
+			t,
+			"TestStream_InfluxQL_Integer",
+			script.String(),
+			13*time.Second,
+			tc.ER,
+			nil,
+			false,
+		)
+	}
+}
+func TestStream_InfluxQL_String(t *testing.T) {
+	type testCase struct {
+		Method        string
+		Args          string
+		ER            kapacitor.Result
+		UsePointTimes bool
+	}
+
+	var scriptTmpl = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+	|window()
+		.period(10s)
+		.every(10s)
+	|{{ .Method }}({{ .Args }})
+		{{ if .UsePointTimes }}.usePointTimes(){{ end }}
+	|httpOut('TestStream_InfluxQL_String')
+`
+	endTime := time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC)
+	testCases := []testCase{
+		testCase{
+			Method: "count",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    nil,
+						Columns: []string{"time", "count"},
+						Values: [][]interface{}{[]interface{}{
+							endTime,
+							10.0,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method: "distinct",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    nil,
+						Columns: []string{"time", "distinct"},
+						Values: [][]interface{}{
+							{
+								endTime,
+								"98",
+							},
+							{
+								endTime,
+								"91",
+							},
+							{
+								endTime,
+								"95",
+							},
+							{
+								endTime,
+								"93",
+							},
+							{
+								endTime,
+								"92",
+							},
+							{
+								endTime,
+								"96",
+							},
+						},
+					},
+				},
+			},
+		},
+		testCase{
+			Method:        "first",
+			UsePointTimes: true,
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
+						Columns: []string{"time", "first"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+							"98",
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method: "first",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
+						Columns: []string{"time", "first"},
+						Values: [][]interface{}{[]interface{}{
+							endTime,
+							"98",
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method:        "last",
+			UsePointTimes: true,
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
+						Columns: []string{"time", "last"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
+							"95",
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method: "last",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
+						Columns: []string{"time", "last"},
+						Values: [][]interface{}{[]interface{}{
+							endTime,
+							"95",
+						}},
+					},
+				},
+			},
+		},
+	}
+
+	tmpl, err := template.New("script").Parse(scriptTmpl)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range testCases {
+		t.Log("Method:", tc.Method)
+		var script bytes.Buffer
+		if tc.Args == "" {
+			tc.Args = "'value'"
+		}
+		tmpl.Execute(&script, tc)
+		testStreamerWithOutput(
+			t,
+			"TestStream_InfluxQL_String",
+			script.String(),
+			13*time.Second,
+			tc.ER,
+			nil,
+			false,
+		)
+	}
+}
+
+func TestStream_InfluxQL_Boolean(t *testing.T) {
+	type testCase struct {
+		Method        string
+		Args          string
+		ER            kapacitor.Result
+		UsePointTimes bool
+	}
+
+	var scriptTmpl = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+	|window()
+		.period(10s)
+		.every(10s)
+	|{{ .Method }}({{ .Args }})
+		{{ if .UsePointTimes }}.usePointTimes(){{ end }}
+	|httpOut('TestStream_InfluxQL_Boolean')
+`
+	endTime := time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC)
+	testCases := []testCase{
+		testCase{
+			Method: "count",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    nil,
+						Columns: []string{"time", "count"},
+						Values: [][]interface{}{[]interface{}{
+							endTime,
+							10.0,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method: "distinct",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    nil,
+						Columns: []string{"time", "distinct"},
+						Values: [][]interface{}{
+							{
+								endTime,
+								false,
+							},
+							{
+								endTime,
+								true,
+							},
+						},
+					},
+				},
+			},
+		},
+		testCase{
+			Method:        "first",
+			UsePointTimes: true,
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
+						Columns: []string{"time", "first"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+							false,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method: "first",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
+						Columns: []string{"time", "first"},
+						Values: [][]interface{}{[]interface{}{
+							endTime,
+							false,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method:        "last",
+			UsePointTimes: true,
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
+						Columns: []string{"time", "last"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
+							true,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method: "last",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA", "type": "idle"},
+						Columns: []string{"time", "last"},
+						Values: [][]interface{}{[]interface{}{
+							endTime,
+							true,
+						}},
+					},
+				},
+			},
+		},
+	}
+
+	tmpl, err := template.New("script").Parse(scriptTmpl)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range testCases {
+		t.Log("Method:", tc.Method)
+		var script bytes.Buffer
+		if tc.Args == "" {
+			tc.Args = "'value'"
+		}
+		tmpl.Execute(&script, tc)
+		testStreamerWithOutput(
+			t,
+			"TestStream_InfluxQL_Boolean",
 			script.String(),
 			13*time.Second,
 			tc.ER,

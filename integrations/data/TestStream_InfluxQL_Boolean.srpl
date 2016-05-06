@@ -1,0 +1,81 @@
+dbname
+rpname
+cpu,type=idle,host=serverA value=false 0000000001
+dbname
+rpname
+cpu,type=idle,host=serverB value=true 0000000001
+dbname
+rpname
+disk,type=sda,host=serverB value=false 0000000001
+dbname
+rpname
+cpu,type=idle,host=serverA value=true 0000000002
+dbname
+rpname
+cpu,type=idle,host=serverB value=true 0000000002
+dbname
+rpname
+cpu,type=idle,host=serverA value=true 0000000003
+dbname
+rpname
+cpu,type=idle,host=serverB value=false 0000000003
+dbname
+rpname
+cpu,type=idle,host=serverA value=true 0000000004
+dbname
+rpname
+cpu,type=idle,host=serverB value=false 0000000004
+dbname
+rpname
+cpu,type=idle,host=serverA value=false 0000000005
+dbname
+rpname
+cpu,type=idle,host=serverB value=true 0000000005
+dbname
+rpname
+cpu,type=idle,host=serverA value=false 0000000006
+dbname
+rpname
+cpu,type=idle,host=serverB value=false 0000000006
+dbname
+rpname
+cpu,type=idle,host=serverC value=true 0000000006
+dbname
+rpname
+cpu,type=idle,host=serverA value=false 0000000007
+dbname
+rpname
+cpu,type=idle,host=serverB value=true 0000000007
+dbname
+rpname
+cpu,type=idle,host=serverA value=false 0000000008
+dbname
+rpname
+cpu,type=idle,host=serverB value=false 0000000008
+dbname
+rpname
+cpu,type=idle,host=serverA value=true 0000000009
+dbname
+rpname
+cpu,type=idle,host=serverB value=false 0000000009
+dbname
+rpname
+disk,type=sda,host=serverB value=true 0000000009
+dbname
+rpname
+cpu,type=idle,host=serverA value=true 0000000010
+dbname
+rpname
+cpu,type=idle,host=serverB value=false 0000000010
+dbname
+rpname
+cpu,type=idle,host=serverA value=false 0000000011
+dbname
+rpname
+cpu,type=idle,host=serverB value=true 0000000011
+dbname
+rpname
+cpu,type=idle,host=serverA value=false 0000000012
+dbname
+rpname
+cpu,type=idle,host=serverB value=true 0000000012

@@ -81,6 +81,14 @@ func (n *chainnode) Count(field string) *InfluxQLNode {
 			fn := influxql.NewIntegerFuncReducer(influxql.IntegerCountReduce)
 			return fn, fn
 		},
+		CreateStringIntegerReducer: func() (influxql.StringPointAggregator, influxql.IntegerPointEmitter) {
+			fn := influxql.NewStringFuncIntegerReducer(influxql.StringCountReduce)
+			return fn, fn
+		},
+		CreateBooleanIntegerReducer: func() (influxql.BooleanPointAggregator, influxql.IntegerPointEmitter) {
+			fn := influxql.NewBooleanFuncIntegerReducer(influxql.BooleanCountReduce)
+			return fn, fn
+		},
 	})
 	n.linkChild(i)
 	return i
@@ -95,6 +103,14 @@ func (n *chainnode) Distinct(field string) *InfluxQLNode {
 		},
 		CreateIntegerReducer: func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter) {
 			fn := influxql.NewIntegerDistinctReducer()
+			return fn, fn
+		},
+		CreateStringReducer: func() (influxql.StringPointAggregator, influxql.StringPointEmitter) {
+			fn := influxql.NewStringDistinctReducer()
+			return fn, fn
+		},
+		CreateBooleanReducer: func() (influxql.BooleanPointAggregator, influxql.BooleanPointEmitter) {
+			fn := influxql.NewBooleanDistinctReducer()
 			return fn, fn
 		},
 	})
@@ -182,6 +198,14 @@ func (n *chainnode) First(field string) *InfluxQLNode {
 			fn := influxql.NewIntegerFuncReducer(influxql.IntegerFirstReduce)
 			return fn, fn
 		},
+		CreateStringReducer: func() (influxql.StringPointAggregator, influxql.StringPointEmitter) {
+			fn := influxql.NewStringFuncReducer(influxql.StringFirstReduce)
+			return fn, fn
+		},
+		CreateBooleanReducer: func() (influxql.BooleanPointAggregator, influxql.BooleanPointEmitter) {
+			fn := influxql.NewBooleanFuncReducer(influxql.BooleanFirstReduce)
+			return fn, fn
+		},
 		IsSimpleSelector: true,
 	})
 	n.linkChild(i)
@@ -197,6 +221,14 @@ func (n *chainnode) Last(field string) *InfluxQLNode {
 		},
 		CreateIntegerReducer: func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter) {
 			fn := influxql.NewIntegerFuncReducer(influxql.IntegerLastReduce)
+			return fn, fn
+		},
+		CreateStringReducer: func() (influxql.StringPointAggregator, influxql.StringPointEmitter) {
+			fn := influxql.NewStringFuncReducer(influxql.StringLastReduce)
+			return fn, fn
+		},
+		CreateBooleanReducer: func() (influxql.BooleanPointAggregator, influxql.BooleanPointEmitter) {
+			fn := influxql.NewBooleanFuncReducer(influxql.BooleanLastReduce)
 			return fn, fn
 		},
 		IsSimpleSelector: true,
@@ -352,6 +384,14 @@ func (n *chainnode) Elapsed(field string, unit time.Duration) *InfluxQLNode {
 		},
 		CreateIntegerReducer: func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter) {
 			fn := influxql.NewIntegerElapsedReducer(influxql.Interval{Duration: unit})
+			return fn, fn
+		},
+		CreateStringIntegerReducer: func() (influxql.StringPointAggregator, influxql.IntegerPointEmitter) {
+			fn := influxql.NewStringElapsedReducer(influxql.Interval{Duration: unit})
+			return fn, fn
+		},
+		CreateBooleanIntegerReducer: func() (influxql.BooleanPointAggregator, influxql.IntegerPointEmitter) {
+			fn := influxql.NewBooleanElapsedReducer(influxql.Interval{Duration: unit})
 			return fn, fn
 		},
 		IsStreamTransformation: true,
