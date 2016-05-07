@@ -40,6 +40,7 @@ type FromNode struct {
 	node
 	s             *pipeline.FromNode
 	expression    stateful.Expression
+	scopePool     stateful.ScopePool
 	dimensions    []string
 	allDimensions bool
 	db            string
@@ -66,6 +67,7 @@ func newFromNode(et *ExecutingTask, n *pipeline.FromNode, l *log.Logger) (*FromN
 		}
 
 		sn.expression = expr
+		sn.scopePool = stateful.NewScopePool(stateful.FindReferenceVariables(n.Expression))
 	}
 
 	return sn, nil
@@ -104,7 +106,7 @@ func (s *FromNode) matches(p models.Point) bool {
 		return false
 	}
 	if s.expression != nil {
-		if pass, err := EvalPredicate(s.expression, p.Time, p.Fields, p.Tags); err != nil {
+		if pass, err := EvalPredicate(s.expression, s.scopePool, p.Time, p.Fields, p.Tags); err != nil {
 			s.logger.Println("E! error while evaluating WHERE expression:", err)
 			return false
 		} else {

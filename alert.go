@@ -98,6 +98,7 @@ type AlertNode struct {
 	endpoint    string
 	handlers    []AlertHandler
 	levels      []stateful.Expression
+	scopePools  []stateful.ScopePool
 	states      map[models.GroupID]*alertState
 	idTmpl      *text.Template
 	messageTmpl *text.Template
@@ -274,13 +275,16 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 
 	// Parse level expressions
 	an.levels = make([]stateful.Expression, CritAlert+1)
+	an.scopePools = make([]stateful.ScopePool, CritAlert+1)
 
 	if n.Info != nil {
 		statefulExpression, expressionCompileError := stateful.NewExpression(n.Info)
 		if expressionCompileError != nil {
 			return nil, fmt.Errorf("Failed to compile stateful expression for info: %s", expressionCompileError)
 		}
+
 		an.levels[InfoAlert] = statefulExpression
+		an.scopePools[InfoAlert] = stateful.NewScopePool(stateful.FindReferenceVariables(n.Info))
 	}
 
 	if n.Warn != nil {
@@ -289,6 +293,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 			return nil, fmt.Errorf("Failed to compile stateful expression for warn: %s", expressionCompileError)
 		}
 		an.levels[WarnAlert] = statefulExpression
+		an.scopePools[WarnAlert] = stateful.NewScopePool(stateful.FindReferenceVariables(n.Warn))
 	}
 
 	if n.Crit != nil {
@@ -297,6 +302,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 			return nil, fmt.Errorf("Failed to compile stateful expression for crit: %s", expressionCompileError)
 		}
 		an.levels[CritAlert] = statefulExpression
+		an.scopePools[CritAlert] = stateful.NewScopePool(stateful.FindReferenceVariables(n.Crit))
 	}
 
 	// Setup states
@@ -489,7 +495,7 @@ func (a *AlertNode) determineLevel(now time.Time, fields models.Fields, tags map
 		if se == nil {
 			continue
 		}
-		if pass, err := EvalPredicate(se, now, fields, tags); pass {
+		if pass, err := EvalPredicate(se, a.scopePools[l], now, fields, tags); pass {
 			level = AlertLevel(l)
 		} else if err != nil {
 			a.logger.Println("E! error evaluating expression:", err)

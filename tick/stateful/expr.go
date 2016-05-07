@@ -91,3 +91,38 @@ func (se *expression) EvalNum(scope *tick.Scope) (interface{}, error) {
 		return nil, fmt.Errorf("expression returned unexpected type %s", returnType)
 	}
 }
+
+func FindReferenceVariables(nodes ...tick.Node) []string {
+
+	variablesSet := make(map[string]bool, 0)
+
+	for _, node := range nodes {
+		buildReferenceVariablesSet(node, variablesSet)
+	}
+
+	variables := make([]string, 0, len(variablesSet))
+
+	for variable := range variablesSet {
+		variables = append(variables, variable)
+	}
+
+	return variables
+}
+
+// util method for findReferenceVariables, we are passing the itemsSet and not returning it
+// so we will won't to merge the maps
+func buildReferenceVariablesSet(n tick.Node, itemsSet map[string]bool) {
+	switch node := n.(type) {
+	case *tick.ReferenceNode:
+		itemsSet[node.Reference] = true
+	case *tick.UnaryNode:
+		buildReferenceVariablesSet(node.Node, itemsSet)
+	case *tick.BinaryNode:
+		buildReferenceVariablesSet(node.Left, itemsSet)
+		buildReferenceVariablesSet(node.Right, itemsSet)
+	case *tick.FunctionNode:
+		for _, arg := range node.Args {
+			buildReferenceVariablesSet(arg, itemsSet)
+		}
+	}
+}

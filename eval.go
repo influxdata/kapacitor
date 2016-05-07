@@ -20,6 +20,7 @@ type EvalNode struct {
 	node
 	e           *pipeline.EvalNode
 	expressions []stateful.Expression
+	scopePool   stateful.ScopePool
 	evalErrors  *expvar.Int
 }
 
@@ -43,6 +44,7 @@ func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalN
 		en.expressions[i] = statefulExpr
 	}
 
+	en.scopePool = stateful.NewScopePool(stateful.FindReferenceVariables(n.Expressions...))
 	en.node.runF = en.runEval
 	return en, nil
 }
@@ -82,7 +84,10 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 }
 
 func (e *EvalNode) eval(now time.Time, fields models.Fields, tags map[string]string) models.Fields {
-	vars, err := mergeFieldsAndTags(now, fields, tags)
+	vars := e.scopePool.Get()
+	defer e.scopePool.Put(vars)
+	err := fillScope(vars, e.scopePool.ReferenceVariables(), now, fields, tags)
+
 	if err != nil {
 		e.logger.Println("E!", err)
 		return nil
