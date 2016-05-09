@@ -786,4 +786,23 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 
 		return resultContainer{Int64Value: left % right, IsInt64Value: true}, nil
 	},
+
+	// -----------------------------------------
+	//	String concatenation func
+
+	operationKey{operator: tick.TokenPlus, leftType: TString, rightType: TString}: func(scope *tick.Scope, executionState ExecutionState, leftNode, rightNode NodeEvaluator) (resultContainer, *ErrSide) {
+		var left string
+		var right string
+		var err error
+
+		if left, err = leftNode.EvalString(scope, executionState); err != nil {
+			return emptyResultContainer, &ErrSide{error: err, IsLeftSide: true}
+		}
+
+		if right, err = rightNode.EvalString(scope, executionState); err != nil {
+			return emptyResultContainer, &ErrSide{error: err, IsRightSide: true}
+		}
+
+		return resultContainer{StringValue: left + right, IsStringValue: true}, nil
+	},
 }

@@ -26,7 +26,7 @@ func TestExpression_EvalNum_KeepsFunctionsState(t *testing.T) {
 	// first
 	scope := tick.NewScope()
 	scope.Set("value", float64(97.1))
-	result, err := se.EvalNum(scope)
+	result, err := se.Eval(scope)
 	if err != nil {
 		t.Errorf("First: Got unexpected error: %v", err)
 	}
@@ -37,7 +37,7 @@ func TestExpression_EvalNum_KeepsFunctionsState(t *testing.T) {
 
 	// second
 	scope.Set("value", float64(92.6))
-	result, err = se.EvalNum(scope)
+	result, err = se.Eval(scope)
 	if err != nil {
 		t.Errorf("Second: Got unexpected error: %v", err)
 	}
@@ -139,27 +139,6 @@ func TestExpression_Eval_NodeAndEvalTypeNotMatching(t *testing.T) {
 
 	if err != nil && err.Error() != expectedError.Error() {
 		t.Errorf("EvalBool: Got unexpected error:\nexpected: %v\ngot: %v", expectedError, err)
-	}
-
-	// Test EvalNum against BinaryNode that returns bool result
-	se = mustCompileExpression(t, &tick.BinaryNode{
-		Operator: tick.TokenOr,
-		Left: &tick.BoolNode{
-			Bool: true,
-		},
-		Right: &tick.BoolNode{
-			Bool: false,
-		},
-	})
-
-	numResult, err := se.EvalNum(tick.NewScope())
-	expectedError = errors.New("expression returned unexpected type boolean")
-	if err == nil {
-		t.Errorf("EvalNum: Expected error result, but got result: %v", numResult)
-	}
-
-	if err != nil && err.Error() != expectedError.Error() {
-		t.Errorf("EvalNum: Got unexpected error:\nexpected: %v\ngot: %v", expectedError, err)
 	}
 }
 
@@ -718,7 +697,7 @@ func TestExpression_EvalNum_ReferenceNodeDosentExist(t *testing.T) {
 		Reference: "value",
 	})
 
-	result, err := se.EvalNum(emptyScope)
+	result, err := se.Eval(emptyScope)
 
 	if err != nil && (err.Error() != expectedError) {
 		t.Errorf("Unexpected error result: \ngot: %v\nexpected: %v", err.Error(), expectedError)
@@ -771,6 +750,53 @@ func TestExpression_EvalBool_ReferenceNodeDosentExistInBinaryNode(t *testing.T) 
 
 	if err == nil {
 		t.Error("Unexpected error result: but didn't got any error")
+	}
+}
+
+func TestExpression_EvalString_StringConcat(t *testing.T) {
+	se, err := stateful.NewExpression(&tick.BinaryNode{
+		Operator: tick.TokenPlus,
+		Left: &tick.StringNode{
+			Literal: "left",
+		},
+		Right: &tick.StringNode{
+			Literal: "right",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	scope := tick.NewScope()
+	result, err := se.EvalString(scope)
+	if err != nil {
+		t.Fatal("unexpected error EvalString:", err)
+	}
+	if exp := "leftright"; exp != result {
+		t.Errorf("unexpected EvalString results: got %s exp %s", result, exp)
+	}
+}
+
+func TestExpression_EvalString_StringConcatReferenceNode(t *testing.T) {
+	se, err := stateful.NewExpression(&tick.BinaryNode{
+		Operator: tick.TokenPlus,
+		Left: &tick.StringNode{
+			Literal: "left",
+		},
+		Right: &tick.ReferenceNode{
+			Reference: "value",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	scope := tick.NewScope()
+	scope.Set("value", "right")
+	result, err := se.EvalString(scope)
+	if err != nil {
+		t.Fatal("unexpected error EvalString:", err)
+	}
+	if exp := "leftright"; exp != result {
+		t.Errorf("unexpected EvalString results: got %s exp %s", result, exp)
 	}
 }
 
@@ -1205,7 +1231,7 @@ func runCompiledNumericTests(
 
 	runCompiledEvalTests(t, func(t *testing.T, scope *tick.Scope, n tick.Node) (interface{}, error) {
 		se := mustCompileExpression(t, n)
-		return se.EvalNum(scope)
+		return se.Eval(scope)
 	}, createNodeFn, leftValues, rightValues, operators, expected, errorExpectations)
 }
 
@@ -1262,7 +1288,7 @@ func runCompiledEvalTests(
 
 					// Expect value can be error or bool
 					if isErrorOk && errorExpected.Error() != err.Error() {
-						t.Errorf("unexpected error result: %t %v %t\ngot: %v\nexp: %v", lhs, op, rhs, err, errorExpected)
+						t.Errorf("unexpected error result: %v %v %v\ngot: %v\nexp: %v", lhs, op, rhs, err, errorExpected)
 					} else if isExpectedResultOk && exp != result {
 						t.Errorf("unexpected result: %t %v %t\ngot: %v\nexp: %v", lhs, op, rhs, result, exp)
 					}
@@ -1283,7 +1309,7 @@ func runCompiledEvalTests(
 					if err == nil {
 						t.Errorf("reference test: expected an error but got result: %t %v %t\nresult: %t\nerr: %v", lhs, op, rhs, result, err)
 					} else if errorExpected.Error() != err.Error() {
-						t.Errorf("reference test: unexpected error result: %t %v %t\ngot: %v\nexp: %v", lhs, op, rhs, err, errorExpected)
+						t.Errorf("reference test: unexpected error result: %v %v %v\ngot: %v\nexp: %v", lhs, op, rhs, err, errorExpected)
 					}
 				} else if isExpectedResultOk && exp != result {
 					t.Errorf("reference test: unexpected bool result: %t %v %t\ngot: %t\nexp: %t", lhs, op, rhs, result, exp)

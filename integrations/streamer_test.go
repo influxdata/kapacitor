@@ -598,6 +598,35 @@ stream
 	testStreamerWithOutput(t, "TestStream_SimpleMR", script, 15*time.Second, er, nil, false)
 }
 
+func TestStream_EvalAllTypes(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('types')
+		|eval(lambda: "str" + 'suffix', lambda: !"bool", lambda: "int" + 14, lambda: "float" * 2.0)
+		.as( 'str', 'bool', 'int', 'float')
+	|httpOut('TestStream_EvalAllTypes')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "types",
+				Tags:    nil,
+				Columns: []string{"time", "bool", "float", "int", "str"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					true,
+					84.0,
+					19.0,
+					"bobsuffix",
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_EvalAllTypes", script, 2*time.Second, er, nil, false)
+}
+
 func TestStream_Default(t *testing.T) {
 	var script = `
 stream

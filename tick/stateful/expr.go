@@ -16,7 +16,7 @@ type Expression interface {
 	EvalString(scope *tick.Scope) (string, error)
 	EvalBool(scope *tick.Scope) (bool, error)
 
-	EvalNum(scope *tick.Scope) (interface{}, error)
+	Eval(scope *tick.Scope) (interface{}, error)
 }
 
 type expression struct {
@@ -62,33 +62,39 @@ func (se *expression) EvalString(scope *tick.Scope) (string, error) {
 	return se.nodeEvaluator.EvalString(scope, se.executionState)
 }
 
-func (se *expression) EvalNum(scope *tick.Scope) (interface{}, error) {
-	returnType, err := se.nodeEvaluator.Type(scope, CreateExecutionState())
+func (se *expression) Eval(scope *tick.Scope) (interface{}, error) {
+	typ, err := se.nodeEvaluator.Type(scope, CreateExecutionState())
 	if err != nil {
 		return nil, err
 	}
 
-	switch returnType {
+	switch typ {
 	case TInt64:
 		result, err := se.EvalInt(scope)
 		if err != nil {
-			// Making sure we return consistently nil on errors, and not zero values.
 			return nil, err
 		}
-
 		return result, err
-
 	case TFloat64:
 		result, err := se.EvalFloat(scope)
 		if err != nil {
-			// Making sure we return consistently nil on errors, and not zero values.
 			return nil, err
 		}
-
 		return result, err
-
+	case TString:
+		result, err := se.EvalString(scope)
+		if err != nil {
+			return nil, err
+		}
+		return result, err
+	case TBool:
+		result, err := se.EvalBool(scope)
+		if err != nil {
+			return nil, err
+		}
+		return result, err
 	default:
-		return nil, fmt.Errorf("expression returned unexpected type %s", returnType)
+		return nil, fmt.Errorf("expression returned unexpected type %s", typ)
 	}
 }
 
