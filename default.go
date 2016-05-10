@@ -3,13 +3,22 @@ package kapacitor
 import (
 	"log"
 
+	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+)
+
+const (
+	statsFieldsDefaulted = "fields_defaulted"
+	statsTagsDefaulted   = "tags_defaulted"
 )
 
 type DefaultNode struct {
 	node
 	d *pipeline.DefaultNode
+
+	fieldsDefaulted *expvar.Int
+	tagsDefaulted   *expvar.Int
 }
 
 // Create a new  DefaultNode which applies a transformation func to each point in a stream and returns a single point.
@@ -23,6 +32,11 @@ func newDefaultNode(et *ExecutingTask, n *pipeline.DefaultNode, l *log.Logger) (
 }
 
 func (e *DefaultNode) runDefault(snapshot []byte) error {
+	e.fieldsDefaulted = &expvar.Int{}
+	e.tagsDefaulted = &expvar.Int{}
+
+	e.statMap.Set(statsFieldsDefaulted, e.fieldsDefaulted)
+	e.statMap.Set(statsTagsDefaulted, e.tagsDefaulted)
 	switch e.Provides() {
 	case pipeline.StreamEdge:
 		for p, ok := e.ins[0].NextPoint(); ok; p, ok = e.ins[0].NextPoint() {
@@ -63,6 +77,7 @@ func (d *DefaultNode) setDefaults(fields models.Fields, tags models.Tags) (model
 				newFields = newFields.Copy()
 				fieldsCopied = true
 			}
+			d.fieldsDefaulted.Add(1)
 			newFields[field] = value
 		}
 	}
@@ -74,6 +89,7 @@ func (d *DefaultNode) setDefaults(fields models.Fields, tags models.Tags) (model
 				newTags = newTags.Copy()
 				tagsCopied = true
 			}
+			d.tagsDefaulted.Add(1)
 			newTags[tag] = value
 		}
 	}

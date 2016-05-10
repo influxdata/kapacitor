@@ -109,6 +109,7 @@ For example, let's say we want to store all data that triggered an alert in Infl
 - [#504](https://github.com/influxdata/kapacitor/pull/504): BREAKING: Many changes to the API and underlying storage system. This release requires a special upgrade process.
 - [#511](https://github.com/influxdata/kapacitor/pull/511): Adds DefaultNode for providing default values for missing fields or tags.
 - [#285](https://github.com/influxdata/kapacitor/pull/285): Track created,modified and last enabled dates on tasks.
+- [#533](https://github.com/influxdata/kapacitor/pull/533): Add useful statistics for nodes.
 
 ### Bugfixes
 

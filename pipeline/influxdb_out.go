@@ -19,6 +19,11 @@ const DefaultFlushInterval = time.Second * 10
 //            .tag('kapacitor', 'true')
 //            .tag('version', '0.2')
 //
+// Available Statistics:
+//
+//    * points_written -- number of points written to InfluxDB
+//    * write_errors -- number of errors attempting to write to InfluxDB
+//
 type InfluxDBOutNode struct {
 	node
 

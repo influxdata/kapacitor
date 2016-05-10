@@ -17,6 +17,7 @@ import (
 
 	"github.com/influxdata/influxdb/influxql"
 	imodels "github.com/influxdata/influxdb/models"
+	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick/stateful"
@@ -24,6 +25,10 @@ import (
 
 const (
 	statsAlertsTriggered = "alerts_triggered"
+	statsOKsTriggered    = "oks_triggered"
+	statsInfosTriggered  = "infos_triggered"
+	statsWarnsTriggered  = "warns_triggered"
+	statsCritsTriggered  = "crits_triggered"
 )
 
 // The newest state change is weighted 'weightDiff' times more than oldest state change.
@@ -103,6 +108,12 @@ type AlertNode struct {
 	idTmpl      *text.Template
 	messageTmpl *text.Template
 	detailsTmpl *html.Template
+
+	alertsTriggered *expvar.Int
+	oksTriggered    *expvar.Int
+	infosTriggered  *expvar.Int
+	warnsTriggered  *expvar.Int
+	critsTriggered  *expvar.Int
 
 	bufPool sync.Pool
 }
@@ -322,7 +333,21 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 }
 
 func (a *AlertNode) runAlert([]byte) error {
-	a.statMap.Add(statsAlertsTriggered, 0)
+	a.alertsTriggered = &expvar.Int{}
+	a.statMap.Set(statsAlertsTriggered, a.alertsTriggered)
+
+	a.oksTriggered = &expvar.Int{}
+	a.statMap.Set(statsOKsTriggered, a.oksTriggered)
+
+	a.infosTriggered = &expvar.Int{}
+	a.statMap.Set(statsInfosTriggered, a.infosTriggered)
+
+	a.warnsTriggered = &expvar.Int{}
+	a.statMap.Set(statsWarnsTriggered, a.warnsTriggered)
+
+	a.critsTriggered = &expvar.Int{}
+	a.statMap.Set(statsCritsTriggered, a.critsTriggered)
+
 	switch a.Wants() {
 	case pipeline.StreamEdge:
 		for p, ok := a.ins[0].NextPoint(); ok; p, ok = a.ins[0].NextPoint() {
@@ -483,7 +508,17 @@ func (a *AlertNode) runAlert([]byte) error {
 	return nil
 }
 func (a *AlertNode) handleAlert(ad *AlertData) {
-	a.statMap.Add(statsAlertsTriggered, 1)
+	a.alertsTriggered.Add(1)
+	switch ad.Level {
+	case OKAlert:
+		a.oksTriggered.Add(1)
+	case InfoAlert:
+		a.infosTriggered.Add(1)
+	case WarnAlert:
+		a.warnsTriggered.Add(1)
+	case CritAlert:
+		a.critsTriggered.Add(1)
+	}
 	a.logger.Printf("D! %v alert triggered id:%s msg:%s data:%v", ad.Level, ad.ID, ad.Message, ad.Data.Series[0])
 	for _, h := range a.handlers {
 		h(ad)
