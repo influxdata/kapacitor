@@ -246,6 +246,8 @@ const (
 
 func (s Status) MarshalText() ([]byte, error) {
 	switch s {
+	case Failed:
+		return []byte("failed"), nil
 	case Running:
 		return []byte("running"), nil
 	case Finished:
@@ -257,6 +259,8 @@ func (s Status) MarshalText() ([]byte, error) {
 
 func (s *Status) UnmarshalText(text []byte) error {
 	switch t := string(text); t {
+	case "failed":
+		*s = Failed
 	case "running":
 		*s = Running
 	case "finished":
