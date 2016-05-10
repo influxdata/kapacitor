@@ -42,6 +42,9 @@ func (v ValueType) String() string {
 }
 
 func valueTypeOf(t reflect.Type) ValueType {
+	if t == nil {
+		return InvalidType
+	}
 	switch t.Kind() {
 	case reflect.Float64:
 		return TFloat64

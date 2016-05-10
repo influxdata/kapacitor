@@ -1,6 +1,7 @@
 package stateful
 
 import (
+	"fmt"
 	"reflect"
 	"regexp"
 
@@ -16,6 +17,9 @@ func (n *EvalReferenceNode) getReferenceValue(scope *tick.Scope, executionState 
 	value, err := scope.Get(n.Node.Reference)
 	if err != nil {
 		return nil, err
+	}
+	if value == nil {
+		return nil, fmt.Errorf("referenced value %q is nil.", n.Node.Reference)
 	}
 
 	return value, nil

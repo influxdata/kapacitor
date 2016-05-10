@@ -628,6 +628,51 @@ func TestExpression_EvalBool_ReferenceNodeDosentExist(t *testing.T) {
 	}
 }
 
+func TestExpression_EvalBool_ReferenceNodeNil(t *testing.T) {
+	scope := tick.NewScope()
+	scope.Set("value", nil)
+
+	expectedError := `referenced value "value" is nil.`
+
+	// Check left side
+	_, err := evalCompiledBoolWithScope(t, scope, &tick.BinaryNode{
+		Operator: tick.TokenEqual,
+		Left: &tick.ReferenceNode{
+			Reference: "value",
+		},
+		Right: &tick.StringNode{
+			Literal: "yo",
+		},
+	})
+
+	if err != nil && (err.Error() != expectedError) {
+		t.Errorf("Unexpected error result: \ngot: %v\nexpected: %v", err.Error(), expectedError)
+	}
+
+	if err == nil {
+		t.Error("Unexpected error result: but didn't got any error")
+	}
+
+	// Check right side
+	_, err = evalCompiledBoolWithScope(t, scope, &tick.BinaryNode{
+		Operator: tick.TokenEqual,
+		Left: &tick.StringNode{
+			Literal: "yo",
+		},
+		Right: &tick.ReferenceNode{
+			Reference: "value",
+		},
+	})
+
+	if err != nil && (err.Error() != expectedError) {
+		t.Errorf("Unexpected error result: \ngot: %v\nexpected: %v", err.Error(), expectedError)
+	}
+
+	if err == nil {
+		t.Error("Unexpected error result: but didn't got any error")
+	}
+}
+
 func TestExpression_EvalBool_ReturnsReferenceNode(t *testing.T) {
 	scope := tick.NewScope()
 

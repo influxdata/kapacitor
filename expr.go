@@ -36,17 +36,21 @@ func fillScope(vars *tick.Scope, referenceVariables []string, now time.Time, fie
 		// Support the error with tags/fields collison
 		var fieldValue interface{}
 		var isFieldExists bool
+		var tagValue interface{}
+		var isTagExists bool
 
 		if fieldValue, isFieldExists = fields[refVariableName]; isFieldExists {
 			vars.Set(refVariableName, fieldValue)
 		}
 
-		if tagValue, ok := tags[refVariableName]; ok {
+		if tagValue, isTagExists = tags[refVariableName]; isTagExists {
 			if isFieldExists {
 				return fmt.Errorf("cannot have field and tags with same name %q", refVariableName)
 			}
-
 			vars.Set(refVariableName, tagValue)
+		}
+		if !isFieldExists && !isTagExists {
+			return fmt.Errorf("no field or tag exists for %s", refVariableName)
 		}
 	}
 
