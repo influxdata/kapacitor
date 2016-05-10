@@ -87,9 +87,10 @@ func (e *EvalNode) eval(now time.Time, fields models.Fields, tags map[string]str
 	vars := e.scopePool.Get()
 	defer e.scopePool.Put(vars)
 	err := fillScope(vars, e.scopePool.ReferenceVariables(), now, fields, tags)
-
 	if err != nil {
-		e.logger.Println("E!", err)
+		if !e.e.QuiteFlag {
+			e.logger.Println("E!", err)
+		}
 		return nil
 	}
 	for i, expr := range e.expressions {
