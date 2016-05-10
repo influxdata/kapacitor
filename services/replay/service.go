@@ -96,6 +96,11 @@ func (r *Service) Open() error {
 		return err
 	}
 
+	// Mark all running replays or recordings as failed since
+	// we are just starting and they cannot possibly be still running
+	r.markFailedRecordings()
+	r.markFailedReplays()
+
 	// Setup routes
 	r.routes = []httpd.Route{
 		{
@@ -220,6 +225,56 @@ func (r *Service) migrate() error {
 		}
 	}
 	return nil
+}
+
+func (r *Service) markFailedRecordings() {
+	limit := 100
+	offset := 0
+	for {
+		recordings, err := r.recordings.List("", offset, limit)
+		if err != nil {
+			r.logger.Println("E! failed to retrieve recordings:", err)
+		}
+		for _, recording := range recordings {
+			if recording.Status == Running {
+				recording.Status = Failed
+				recording.Error = "unexpected Kapacitor shutdown"
+				err := r.recordings.Replace(recording)
+				if err != nil {
+					r.logger.Println("E! failed to set recording status to failed:", err)
+				}
+			}
+		}
+		if len(recordings) != limit {
+			break
+		}
+		offset += limit
+	}
+}
+
+func (r *Service) markFailedReplays() {
+	limit := 100
+	offset := 0
+	for {
+		replays, err := r.replays.List("", offset, limit)
+		if err != nil {
+			r.logger.Println("E! failed to retrieve replays:", err)
+		}
+		for _, replay := range replays {
+			if replay.Status == Running {
+				replay.Status = Failed
+				replay.Error = "unexpected Kapacitor shutdown"
+				err := r.replays.Replace(replay)
+				if err != nil {
+					r.logger.Println("E! failed to set replay status to failed:", err)
+				}
+			}
+		}
+		if len(replays) != limit {
+			break
+		}
+		offset += limit
+	}
 }
 
 func (r *Service) Close() error {
