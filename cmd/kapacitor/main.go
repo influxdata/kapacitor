@@ -37,19 +37,20 @@ Usage: kapacitor [options] [command] [args]
 
 Commands:
 
-	record   Record the result of a query or a snapshot of the current stream data.
-	define   Create/update a task.
-	replay   Replay a recording to a task.
-	enable   Enable and start running a task with live data.
-	disable  Stop running a task.
-	reload   Reload a running task with an updated task definition.
-	push     Publish a task definition to another Kapacitor instance. Not implemented yet.
-	delete   Delete a task or a recording.
-	list     List information about tasks or recordings.
-	show     Display detailed information about a task.
-	help     Prints help for a command.
-	level    Sets the logging level on the kapacitord server.
-	version  Displays the Kapacitor version info.
+	record      Record the result of a query or a snapshot of the current stream data.
+	define      Create/update a task.
+	replay      Replay a recording to a task.
+	replay-live Replay data against a task without recording it.
+	enable      Enable and start running a task with live data.
+	disable     Stop running a task.
+	reload      Reload a running task with an updated task definition.
+	push        Publish a task definition to another Kapacitor instance. Not implemented yet.
+	delete      Delete a task or a recording.
+	list        List information about tasks or recordings.
+	show        Display detailed information about a task.
+	help        Prints help for a command.
+	level       Sets the logging level on the kapacitord server.
+	version     Displays the Kapacitor version info.
 
 Options:
 `
@@ -108,6 +109,13 @@ func main() {
 		replayFlags.Parse(args)
 		commandArgs = replayFlags.Args()
 		commandF = doReplay
+	case "replay-live":
+		if len(args) == 0 {
+			replayLiveUsage()
+			os.Exit(2)
+		}
+		commandArgs = args
+		commandF = doReplayLive
 	case "enable":
 		commandArgs = args
 		commandF = doEnable
@@ -148,9 +156,13 @@ func main() {
 func init() {
 	replayFlags.Usage = replayUsage
 	defineFlags.Usage = defineUsage
+
 	recordStreamFlags.Usage = recordStreamUsage
 	recordBatchFlags.Usage = recordBatchUsage
 	recordQueryFlags.Usage = recordQueryUsage
+
+	replayLiveBatchFlags.Usage = replayLiveBatchUsage
+	replayLiveQueryFlags.Usage = replayLiveQueryUsage
 }
 
 // helper methods
@@ -218,26 +230,26 @@ func doHelp(args []string) error {
 // Record
 var (
 	recordStreamFlags = flag.NewFlagSet("record-stream", flag.ExitOnError)
-	rstask            = recordStreamFlags.String("task", "", "The ID of a task. Uses the dbrp value for the task.")
-	rsdur             = recordStreamFlags.String("duration", "", "How long to record the data stream.")
-	rsnowait          = recordStreamFlags.Bool("no-wait", false, "Do not wait for the recording to finish.")
-	rsid              = recordStreamFlags.String("recording-id", "", "The ID to give to this recording. If not set an random ID is chosen.")
+	rsTask            = recordStreamFlags.String("task", "", "The ID of a task. Uses the dbrp value for the task.")
+	rsDur             = recordStreamFlags.String("duration", "", "How long to record the data stream.")
+	rsNowait          = recordStreamFlags.Bool("no-wait", false, "Do not wait for the recording to finish.")
+	rsId              = recordStreamFlags.String("recording-id", "", "The ID to give to this recording. If not set an random ID is chosen.")
 
 	recordBatchFlags = flag.NewFlagSet("record-batch", flag.ExitOnError)
-	rbtask           = recordBatchFlags.String("task", "", "The ID of a task. Uses the queries contained in the task.")
-	rbstart          = recordBatchFlags.String("start", "", "The start time for the set of queries.")
-	rbstop           = recordBatchFlags.String("stop", "", "The stop time for the set of queries (default now).")
-	rbpast           = recordBatchFlags.String("past", "", "Set start time via 'now - past'.")
-	rbcluster        = recordBatchFlags.String("cluster", "", "Optional named InfluxDB cluster from configuration.")
-	rbnowait         = recordBatchFlags.Bool("no-wait", false, "Do not wait for the recording to finish.")
-	rbid             = recordBatchFlags.String("recording-id", "", "The ID to give to this recording. If not set an random ID is chosen.")
+	rbTask           = recordBatchFlags.String("task", "", "The ID of a task. Uses the queries contained in the task.")
+	rbStart          = recordBatchFlags.String("start", "", "The start time for the set of queries.")
+	rbStop           = recordBatchFlags.String("stop", "", "The stop time for the set of queries (default now).")
+	rbPast           = recordBatchFlags.String("past", "", "Set start time via 'now - past'.")
+	rbCluster        = recordBatchFlags.String("cluster", "", "Optional named InfluxDB cluster from configuration.")
+	rbNowait         = recordBatchFlags.Bool("no-wait", false, "Do not wait for the recording to finish.")
+	rbId             = recordBatchFlags.String("recording-id", "", "The ID to give to this recording. If not set an random ID is chosen.")
 
 	recordQueryFlags = flag.NewFlagSet("record-query", flag.ExitOnError)
-	rqquery          = recordQueryFlags.String("query", "", "The query to record.")
-	rqtype           = recordQueryFlags.String("type", "", "The type of the recording to save (stream|batch).")
-	rqcluster        = recordQueryFlags.String("cluster", "", "Optional named InfluxDB cluster from configuration.")
-	rqnowait         = recordQueryFlags.Bool("no-wait", false, "Do not wait for the recording to finish.")
-	rqid             = recordQueryFlags.String("recording-id", "", "The ID to give to this recording. If not set an random ID is chosen.")
+	rqQuery          = recordQueryFlags.String("query", "", "The query to record.")
+	rqType           = recordQueryFlags.String("type", "", "The type of the recording to save (stream|batch).")
+	rqCluster        = recordQueryFlags.String("cluster", "", "Optional named InfluxDB cluster from configuration.")
+	rqNowait         = recordQueryFlags.Bool("no-wait", false, "Do not wait for the recording to finish.")
+	rqId             = recordQueryFlags.String("recording-id", "", "The ID to give to this recording. If not set an random ID is chosen.")
 )
 
 func recordUsage() {
@@ -287,14 +299,14 @@ Examples:
 
 	$ kapacitor record batch -task cpu_idle -start 2015-09-01T00:00:00Z -stop 2015-09-02T00:00:00Z
 
-		This records the result of the query defined in task 'cpu_idle' and runs the query as many times
-		as many times as defined by the schedule until the queries reaches the stop time.
-		starting at time 'start' and incrementing by the schedule defined in the task.
+		This records the result of the query defined in task 'cpu_idle' and runs the query
+		until the queries reaches the stop time, starting at time 'start' and incrementing
+		by the schedule defined in the task.
 
 	$ kapacitor record batch -task cpu_idle -past 10h
 
 		This records the result of the query defined in task 'cpu_idle' and runs the query
-		as many times as defined by the schedule until the queries reaches the present time.
+		until the queries reaches the present time.
 		The starting time for the queries is 'now - 10h' and increments by the schedule defined in the task.
 
 Options:
@@ -335,19 +347,19 @@ func doRecord(args []string) error {
 	switch args[0] {
 	case "stream":
 		recordStreamFlags.Parse(args[1:])
-		if *rstask == "" || *rsdur == "" {
+		if *rsTask == "" || *rsDur == "" {
 			recordStreamFlags.Usage()
 			return errors.New("both task and duration are required")
 		}
 		var duration time.Duration
-		duration, err = influxql.ParseDuration(*rsdur)
+		duration, err = influxql.ParseDuration(*rsDur)
 		if err != nil {
 			return err
 		}
-		noWait = *rsnowait
+		noWait = *rsNowait
 		recording, err = cli.RecordStream(client.RecordStreamOptions{
-			ID:   *rsid,
-			Task: *rstask,
+			ID:   *rsId,
+			Task: *rsTask,
 			Stop: time.Now().Add(duration),
 		})
 		if err != nil {
@@ -355,43 +367,43 @@ func doRecord(args []string) error {
 		}
 	case "batch":
 		recordBatchFlags.Parse(args[1:])
-		if *rbtask == "" {
+		if *rbTask == "" {
 			recordBatchFlags.Usage()
 			return errors.New("task is required")
 		}
-		if *rbstart == "" && *rbpast == "" {
+		if *rbStart == "" && *rbPast == "" {
 			recordBatchFlags.Usage()
 			return errors.New("must set one of start or past flags.")
 		}
-		if *rbstart != "" && *rbpast != "" {
+		if *rbStart != "" && *rbPast != "" {
 			recordBatchFlags.Usage()
 			return errors.New("cannot set both start and past flags.")
 		}
 		start, stop := time.Time{}, time.Now()
-		if *rbstart != "" {
-			start, err = time.Parse(time.RFC3339Nano, *rbstart)
+		if *rbStart != "" {
+			start, err = time.Parse(time.RFC3339Nano, *rbStart)
 			if err != nil {
 				return err
 			}
 		}
-		if *rbstop != "" {
-			stop, err = time.Parse(time.RFC3339Nano, *rbstop)
+		if *rbStop != "" {
+			stop, err = time.Parse(time.RFC3339Nano, *rbStop)
 			if err != nil {
 				return err
 			}
 		}
-		if *rbpast != "" {
-			past, err := influxql.ParseDuration(*rbpast)
+		if *rbPast != "" {
+			past, err := influxql.ParseDuration(*rbPast)
 			if err != nil {
 				return err
 			}
 			start = stop.Add(-1 * past)
 		}
-		noWait = *rbnowait
+		noWait = *rbNowait
 		recording, err = cli.RecordBatch(client.RecordBatchOptions{
-			ID:      *rbid,
-			Task:    *rbtask,
-			Cluster: *rbcluster,
+			ID:      *rbId,
+			Task:    *rbTask,
+			Cluster: *rbCluster,
 			Start:   start,
 			Stop:    stop,
 		})
@@ -400,23 +412,23 @@ func doRecord(args []string) error {
 		}
 	case "query":
 		recordQueryFlags.Parse(args[1:])
-		if *rqquery == "" || *rqtype == "" {
+		if *rqQuery == "" || *rqType == "" {
 			recordQueryFlags.Usage()
 			return errors.New("both query and type are required")
 		}
 		var typ client.TaskType
-		switch *rqtype {
+		switch *rqType {
 		case "stream":
 			typ = client.StreamTask
 		case "batch":
 			typ = client.BatchTask
 		}
-		noWait = *rqnowait
+		noWait = *rqNowait
 		recording, err = cli.RecordQuery(client.RecordQueryOptions{
-			ID:      *rqid,
-			Query:   *rqquery,
+			ID:      *rqId,
+			Query:   *rqQuery,
 			Type:    typ,
-			Cluster: *rqcluster,
+			Cluster: *rqCluster,
 		})
 		if err != nil {
 			return err
@@ -676,6 +688,191 @@ func doReplay(args []string) error {
 		return err
 	}
 	if *rnowait {
+		fmt.Println(replay.ID)
+		return nil
+	}
+	for replay.Status == client.Running {
+		time.Sleep(500 * time.Millisecond)
+		replay, err = cli.Replay(replay.Link)
+		if err != nil {
+			return err
+		}
+	}
+	fmt.Println(replay.ID)
+	if replay.Status == client.Failed {
+		if replay.Error == "" {
+			replay.Error = "replay failed: unknown reason"
+		}
+		return errors.New(replay.Error)
+	}
+	return nil
+}
+
+// Replay Live
+var (
+	replayLiveBatchFlags = flag.NewFlagSet("replay-live-batch", flag.ExitOnError)
+	rlbTask              = replayLiveBatchFlags.String("task", "", "The task ID.")
+	rlbReal              = replayLiveBatchFlags.Bool("real-clock", false, "If set, replay the data in real time. If not set replay data as fast as possible.")
+	rlbRec               = replayLiveBatchFlags.Bool("rec-time", false, "If set, use the times saved in the recording instead of present times.")
+	rlbNowait            = replayLiveBatchFlags.Bool("no-wait", false, "Do not wait for the replay to finish.")
+	rlbId                = replayLiveBatchFlags.String("replay-id", "", "The ID to give to this replay. If not set a random ID is chosen.")
+	rlbStart             = replayLiveBatchFlags.String("start", "", "The start time for the set of queries.")
+	rlbStop              = replayLiveBatchFlags.String("stop", "", "The stop time for the set of queries (default now).")
+	rlbPast              = replayLiveBatchFlags.String("past", "", "Set start time via 'now - past'.")
+	rlbCluster           = replayLiveBatchFlags.String("cluster", "", "Optional named InfluxDB cluster from configuration.")
+
+	replayLiveQueryFlags = flag.NewFlagSet("replay-live-query", flag.ExitOnError)
+	rlqTask              = replayLiveQueryFlags.String("task", "", "The task ID.")
+	rlqReal              = replayLiveQueryFlags.Bool("real-clock", false, "If set, replay the data in real time. If not set replay data as fast as possible.")
+	rlqRec               = replayLiveQueryFlags.Bool("rec-time", false, "If set, use the times saved in the recording instead of present times.")
+	rlqNowait            = replayLiveQueryFlags.Bool("no-wait", false, "Do not wait for the replay to finish.")
+	rlqId                = replayLiveQueryFlags.String("replay-id", "", "The ID to give to this replay. If not set a random ID is chosen.")
+	rlqQuery             = replayLiveQueryFlags.String("query", "", "The query to replay.")
+	rlqCluster           = replayLiveQueryFlags.String("cluster", "", "Optional named InfluxDB cluster from configuration.")
+)
+
+func replayLiveUsage() {
+	var u = `Usage: kapacitor replay-live <batch|query> [options]
+
+Replay data to a task directly without saving a recording.
+
+The command is a hybrid of the 'kapacitor record batch|query' and 'kapacitor replay' commands.
+
+See either 'kapacitor replay-live batch' or 'kapacitor replay-live query' for more details
+Examples:
+
+	$ kapacitor replay-live batch -task cpu_idle -start 2015-09-01T00:00:00Z -stop 2015-09-02T00:00:00Z
+
+		This replays the result of the query defined in task 'cpu_idle' and runs the query
+		until the queries reaches the stop time, starting at time 'start' and incrementing
+		by the schedule defined in the task.
+
+	$ kapacitor replay-liave batch -task cpu_idle -past 10h
+
+		This replays the result of the query defined in task 'cpu_idle' and runs the query
+		until the queries reaches the present time.
+		The starting time for the queries is 'now - 10h' and increments by the schedule defined in the task.
+`
+	fmt.Fprintln(os.Stderr, u)
+}
+
+func replayLiveBatchUsage() {
+	var u = `Usage: kapacitor replay-live batch [options]
+
+Replay data from the queries in a batch task against the task.
+
+This is similar to 'kapacitor record batch ...' but without saving a recording.
+
+Examples:
+
+	$ kapacitor replay-live query -task cpu_alert -rec-time -query 'select value from "telegraf"."default"."cpu_idle" where time > now() - 1h and time < now()'
+
+		This replays the result of the query against the cpu_alert task.
+
+
+Options:
+`
+	fmt.Fprintln(os.Stderr, u)
+	replayLiveBatchFlags.PrintDefaults()
+}
+
+func replayLiveQueryUsage() {
+	var u = `Usage: kapacitor replay-live query [options]
+
+Replay the result of a querty against a task.
+
+This is similar to 'kapacitor record query...' but without saving a recording.
+
+Options:
+`
+	fmt.Fprintln(os.Stderr, u)
+	replayLiveQueryFlags.PrintDefaults()
+}
+
+func doReplayLive(args []string) error {
+	var replay client.Replay
+	var err error
+
+	noWait := false
+
+	switch args[0] {
+	case "batch":
+		replayLiveBatchFlags.Parse(args[1:])
+		if *rlbTask == "" {
+			replayLiveBatchFlags.Usage()
+			return errors.New("task is required")
+		}
+		if *rlbStart == "" && *rlbPast == "" {
+			replayLiveBatchFlags.Usage()
+			return errors.New("must set one of start or past flags.")
+		}
+		if *rlbStart != "" && *rlbPast != "" {
+			replayLiveBatchFlags.Usage()
+			return errors.New("cannot set both start and past flags.")
+		}
+		start, stop := time.Time{}, time.Now()
+		if *rlbStart != "" {
+			start, err = time.Parse(time.RFC3339Nano, *rlbStart)
+			if err != nil {
+				return err
+			}
+		}
+		if *rlbStop != "" {
+			stop, err = time.Parse(time.RFC3339Nano, *rlbStop)
+			if err != nil {
+				return err
+			}
+		}
+		if *rlbPast != "" {
+			past, err := influxql.ParseDuration(*rlbPast)
+			if err != nil {
+				return err
+			}
+			start = stop.Add(-1 * past)
+		}
+		noWait = *rlbNowait
+		clk := client.Fast
+		if *rlbReal {
+			clk = client.Real
+		}
+		replay, err = cli.ReplayBatch(client.ReplayBatchOptions{
+			ID:            *rlbId,
+			Task:          *rlbTask,
+			Start:         start,
+			Stop:          stop,
+			Cluster:       *rlbCluster,
+			RecordingTime: *rlbRec,
+			Clock:         clk,
+		})
+		if err != nil {
+			return err
+		}
+	case "query":
+		replayLiveQueryFlags.Parse(args[1:])
+		if *rlqQuery == "" || *rlqTask == "" {
+			recordQueryFlags.Usage()
+			return errors.New("both query and task are required")
+		}
+		noWait = *rlqNowait
+		clk := client.Fast
+		if *rlqReal {
+			clk = client.Real
+		}
+		replay, err = cli.ReplayQuery(client.ReplayQueryOptions{
+			ID:            *rlqId,
+			Task:          *rlqTask,
+			Query:         *rlqQuery,
+			Cluster:       *rlqCluster,
+			RecordingTime: *rlqRec,
+			Clock:         clk,
+		})
+		if err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("Unknown replay-live type %q, expected 'batch' or 'query'", args[0])
+	}
+	if noWait {
 		fmt.Println(replay.ID)
 		return nil
 	}

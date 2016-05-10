@@ -881,10 +881,6 @@ func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.Ex
 		t.Fatal("could not find any data files for", name)
 	}
 
-	// Use 1971 so that we don't get true negatives on Epoch 0 collisions
-	c := clock.New(time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC))
-	r := kapacitor.NewReplay(c)
-
 	//Start the task
 	et, err := tm.StartTask(task)
 	if err != nil {
@@ -893,10 +889,12 @@ func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.Ex
 
 	// Replay test data to executor
 	batches := tm.BatchCollectors(name)
-	replayErr := r.ReplayBatch(allData, batches, false)
+	// Use 1971 so that we don't get true negatives on Epoch 0 collisions
+	c := clock.New(time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC))
+	replayErr := kapacitor.ReplayBatchFromIO(c, allData, batches, false)
 
 	t.Log(string(et.Task.Dot()))
-	return r.Setter, et, replayErr, tm
+	return c, et, replayErr, tm
 }
 
 func testBatcherWithOutput(

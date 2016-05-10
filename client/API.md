@@ -544,7 +544,7 @@ POST /kapacitor/v1/recordings/query
 Create a recording using the `query` method specifying a `batch` type.
 
 ```
-POST /kapacitor/v1/recording/query
+POST /kapacitor/v1/recordings/query
 {
     "query" : "SELECT mean(usage_idle) FROM cpu WHERE time > now() - 1h GROUP BY time(10m)",
     "type" : "batch"
@@ -554,7 +554,7 @@ POST /kapacitor/v1/recording/query
 Create a recording with a custom ID.
 
 ```
-POST /kapacitor/v1/recording/query
+POST /kapacitor/v1/recordings/query
 {
     "id" : "MY_RECORDING_ID",
     "query" : "SELECT mean(usage_idle) FROM cpu WHERE time > now() - 1h GROUP BY time(10m)",
@@ -801,6 +801,102 @@ The request returns once the replay is started and provides a replay ID and link
 | Code | Meaning                      |
 | ---- | -------                      |
 | 201  | Success, replay has started. |
+
+### Replay data without Recording
+
+It is also possible to replay data directly without recording it first.
+This is done by issuing a request similar to either a `batch` or `query` recording
+but instead of storing the data it is immediately replayed against a task.
+Using a `stream` recording for immediately replaying against a task is equivalent to enabling the task
+and so is not supported.
+
+| Method | Description                                        |
+| ------ | -----------                                        |
+| batch  | Replay the results of the queries in a batch task. |
+| query  | Replay the results of an explicit query.           |
+
+
+##### Batch
+
+| Parameter      | Default | Purpose                                                                                                                                                                                                                                          |
+| ---------      | ------- | -------                                                                                                                                                                                                                                          |
+| id             | random  | Unique identifier for the replay. If empty a random one will be chosen.                                                                                                                                                                          |
+| task           |         | ID of a task, replays the results of the queries defined in the task against the task.                                                                                                                                                                            |
+| start          |         | Earliest date for which data will be replayed. RFC3339Nano formatted.                                                                                                                                                                            |
+| stop           | now     | Latest date for which data will be replayed. If not specified uses the current time. RFC3339Nano formatted data.                                                                                                                                 |
+| cluster        |         | Name of a configured InfluxDB cluster. If empty uses the default cluster.                                                                                                                                                                        |
+| recording-time | false   | If true, use the times in the recording, otherwise adjust times relative to the current time.                                                                                                                                                    |
+| clock          | fast    | One of `fast` or `real`. If `real` wait for real time to pass corresponding with the time in the recordings. If `fast` replay data without delay. For example, if clock is `real` then a stream recording of duration 5m will take 5m to replay. |
+
+##### Query
+
+| Parameter      | Default | Purpose                                                                                                                                                                                                                                          |
+| ---------      | ------- | -------                                                                                                                                                                                                                                          |
+| id             | random  | Unique identifier for the replay. If empty a random one will be chosen.                                                                                                                                                                          |
+| task           |         | ID of a task, replays the results of the queries against the task.                                                                                                                                                                               |
+| query          |         | Query to execute.                                                                                                                                                                                                                                |
+| cluster        |         | Name of a configured InfluxDB cluster. If empty uses the default cluster.                                                                                                                                                                        |
+| recording-time | false   | If true, use the times in the recording, otherwise adjust times relative to the current time.                                                                                                                                                    |
+| clock          | fast    | One of `fast` or `real`. If `real` wait for real time to pass corresponding with the time in the recordings. If `fast` replay data without delay. For example, if clock is `real` then a stream recording of duration 5m will take 5m to replay. |
+
+#### Example
+
+Perform a replay using the `batch` method specifying a start time.
+
+```
+POST /kapacitor/v1/replays/batch
+{
+    "task" : "TASK_ID",
+    "start" : "2006-01-02T15:04:05Z07:00"
+}
+```
+
+Replay the results of the query against the task.
+
+```
+POST /kapacitor/v1/replays/query
+{
+    "task" : "TASK_ID",
+    "query" : "SELECT mean(usage_idle) FROM cpu WHERE time > now() - 1h GROUP BY time(10m)",
+}
+```
+
+Create a replay with a custom ID.
+
+```
+POST /kapacitor/v1/replays/query
+{
+    "id" : "MY_REPLAY_ID",
+    "task" : "TASK_ID",
+    "query" : "SELECT mean(usage_idle) FROM cpu WHERE time > now() - 1h GROUP BY time(10m)",
+}
+```
+
+#### Response
+
+All replays are assigned an ID which is returned in this format with a link.
+
+```
+{
+    "link" : {"rel": "self", "href": "/kapacitor/v1/replays/e24db07d-1646-4bb3-a445-828f5049bea0"},
+    "id" : "e24db07d-1646-4bb3-a445-828f5049bea0",
+    "task" : "TASK_ID",
+    "recording" : "",
+    "clock" : "fast",
+    "recording-time" : false,
+    "status" : "running",
+    "progress" : 0.57,
+    "error" : ""
+}
+```
+
+>NOTE: For a replay created in this manner the `recording` ID will be empty since no recording was used or created.
+
+
+| Code | Meaning                          |
+| ---- | -------                          |
+| 201  | Success, the replay has started. |
+
 
 ### Waiting for a Replay
 

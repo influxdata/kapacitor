@@ -43,6 +43,8 @@ const (
 
 	replaysPath         = "/replays"
 	replaysPathAnchored = "/replays/"
+	replayBatchPath     = replaysPath + "/batch"
+	replayQueryPath     = replaysPath + "/query"
 )
 
 var validID = regexp.MustCompile(`^[-\._\p{L}0-9]+$`)
@@ -185,6 +187,18 @@ func (s *Service) Open() error {
 			Method:      "POST",
 			Pattern:     replaysPath,
 			HandlerFunc: s.handleCreateReplay,
+		},
+		{
+			Name:        "replayBatch",
+			Method:      "POST",
+			Pattern:     replayBatchPath,
+			HandlerFunc: s.handleReplayBatch,
+		},
+		{
+			Name:        "replayQuery",
+			Method:      "POST",
+			Pattern:     replayQueryPath,
+			HandlerFunc: s.handleReplayQuery,
 		},
 	}
 
@@ -623,7 +637,7 @@ func (s *Service) handleRecordBatch(w http.ResponseWriter, req *http.Request) {
 
 	go func(recording Recording) {
 		ds, _ := parseDataSourceURL(dataUrl.String())
-		err := s.doRecordBatch(opt.ID, ds, t, opt.Start, opt.Stop, opt.Cluster)
+		err := s.doRecordBatch(ds, t, opt.Start, opt.Stop, opt.Cluster)
 		s.updateRecordingResult(recording, ds, err)
 	}(recording)
 
@@ -676,7 +690,7 @@ func (s *Service) handleRecordQuery(w http.ResponseWriter, req *http.Request) {
 
 	go func(recording Recording) {
 		ds, _ := parseDataSourceURL(dataUrl.String())
-		err := s.doRecordQuery(opt.ID, ds, opt.Query, typ, opt.Cluster)
+		err := s.doRecordQuery(ds, opt.Query, typ, opt.Cluster)
 		s.updateRecordingResult(recording, ds, err)
 	}(recording)
 
@@ -700,6 +714,19 @@ func (s *Service) updateRecordingResult(recording Recording, ds DataSource, err 
 	err = s.recordings.Replace(recording)
 	if err != nil {
 		s.logger.Println("E! failed to save recording info", recording.ID, err)
+	}
+}
+func (r *Service) updateReplayResult(replay Replay, err error) {
+	replay.Status = Finished
+	if err != nil {
+		replay.Status = Failed
+		replay.Error = err.Error()
+	}
+	replay.Progress = 1.0
+	replay.Date = time.Now()
+	err = r.replays.Replace(replay)
+	if err != nil {
+		r.logger.Println("E! failed to save replay results:", err)
 	}
 }
 
@@ -884,65 +911,248 @@ func (s *Service) handleCreateReplay(w http.ResponseWriter, req *http.Request) {
 	s.replays.Create(replay)
 
 	go func(replay Replay) {
-		err := s.doReplay(t, recording, clk, opt.RecordingTime)
-		replay.Status = Finished
-		if err != nil {
-			replay.Status = Failed
-			replay.Error = err.Error()
-		}
-		replay.Progress = 1.0
-		replay.Date = time.Now()
-		err = s.replays.Replace(replay)
-		if err != nil {
-			s.logger.Println("E! failed to save replay results:", err)
-		}
+		err := s.doReplayFromRecording(t, recording, clk, opt.RecordingTime)
+		s.updateReplayResult(replay, err)
 	}(replay)
 
 	w.WriteHeader(http.StatusCreated)
 	w.Write(httpd.MarshalJSON(convertReplay(replay), true))
 }
 
-func (s *Service) doReplay(task *kapacitor.Task, recording Recording, clk clock.Clock, recTime bool) error {
+func (s *Service) handleReplayBatch(w http.ResponseWriter, req *http.Request) {
+	var opt kclient.ReplayBatchOptions
+	// Default clock to the Fast clock
+	opt.Clock = kclient.Fast
+	dec := json.NewDecoder(req.Body)
+	err := dec.Decode(&opt)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
+		return
+	}
+	if opt.ID == "" {
+		opt.ID = uuid.NewV4().String()
+	}
+	if !validID.MatchString(opt.ID) {
+		httpd.HttpError(w, fmt.Sprintf("replay ID must match %v %q", validID, opt.ID), true, http.StatusBadRequest)
+		return
+	}
+
+	t, err := s.TaskStore.Load(opt.Task)
+	if err != nil {
+		httpd.HttpError(w, "task load: "+err.Error(), true, http.StatusNotFound)
+		return
+	}
+
+	var clk clock.Clock
+	var clockType Clock
+	switch opt.Clock {
+	case kclient.Real:
+		clk = clock.Wall()
+		clockType = Real
+	case kclient.Fast:
+		clk = clock.Fast()
+		clockType = Fast
+	default:
+		httpd.HttpError(w, fmt.Sprintf("invalid clock type %v", opt.Clock), true, http.StatusBadRequest)
+		return
+	}
+	if t.Type == kapacitor.StreamTask {
+		httpd.HttpError(w, fmt.Sprintf("cannot replay batch against stream task: %s", opt.Task), true, http.StatusBadRequest)
+		return
+	}
+
+	// Successfully started replay
+	replay := Replay{
+		ID:            opt.ID,
+		TaskID:        opt.Task,
+		RecordingTime: opt.RecordingTime,
+		Clock:         clockType,
+		Date:          time.Now(),
+		Status:        Running,
+	}
+	err = s.replays.Create(replay)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
+		return
+	}
+
+	go func(replay Replay) {
+		err := s.doLiveBatchReplay(t, clk, opt.RecordingTime, opt.Start, opt.Stop, opt.Cluster)
+		s.updateReplayResult(replay, err)
+	}(replay)
+
+	w.WriteHeader(http.StatusCreated)
+	w.Write(httpd.MarshalJSON(convertReplay(replay), true))
+}
+
+func (r *Service) handleReplayQuery(w http.ResponseWriter, req *http.Request) {
+	var opt kclient.ReplayQueryOptions
+	dec := json.NewDecoder(req.Body)
+	err := dec.Decode(&opt)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
+		return
+	}
+	if opt.ID == "" {
+		opt.ID = uuid.NewV4().String()
+	}
+	if !validID.MatchString(opt.ID) {
+		httpd.HttpError(w, fmt.Sprintf("recording ID must match %v %q", validID, opt.ID), true, http.StatusBadRequest)
+		return
+	}
+	if opt.Query == "" {
+		httpd.HttpError(w, "must provide query", true, http.StatusBadRequest)
+		return
+	}
+
+	t, err := r.TaskStore.Load(opt.Task)
+	if err != nil {
+		httpd.HttpError(w, "task load: "+err.Error(), true, http.StatusNotFound)
+		return
+	}
+
+	var clk clock.Clock
+	var clockType Clock
+	switch opt.Clock {
+	case kclient.Real:
+		clk = clock.Wall()
+		clockType = Real
+	case kclient.Fast:
+		clk = clock.Fast()
+		clockType = Fast
+	default:
+		httpd.HttpError(w, fmt.Sprintf("invalid clock type %v", opt.Clock), true, http.StatusBadRequest)
+		return
+	}
+
+	replay := Replay{
+		ID:            opt.ID,
+		TaskID:        opt.Task,
+		RecordingTime: opt.RecordingTime,
+		Clock:         clockType,
+		Date:          time.Now(),
+		Status:        Running,
+	}
+	err = r.replays.Create(replay)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
+		return
+	}
+
+	go func(replay Replay) {
+		err := r.doLiveQueryReplay(replay.ID, t, clk, opt.RecordingTime, opt.Query, opt.Cluster)
+		r.updateReplayResult(replay, err)
+	}(replay)
+
+	w.WriteHeader(http.StatusCreated)
+	w.Write(httpd.MarshalJSON(convertReplay(replay), true))
+}
+
+func (r *Service) doReplayFromRecording(task *kapacitor.Task, recording Recording, clk clock.Clock, recTime bool) error {
+	dataSource, err := parseDataSourceURL(recording.DataURL)
+	if err != nil {
+		return errors.Wrap(err, "load data source")
+	}
+	runReplay := func(tm *kapacitor.TaskMaster) error {
+		var replayC <-chan error
+		switch task.Type {
+		case kapacitor.StreamTask:
+			f, err := dataSource.StreamReader()
+			if err != nil {
+				return errors.Wrap(err, "data source open")
+			}
+			stream, err := tm.Stream(recording.ID)
+			if err != nil {
+				return errors.Wrap(err, "stream start")
+			}
+			replayC = kapacitor.ReplayStreamFromIO(clk, f, stream, recTime, precision)
+		case kapacitor.BatchTask:
+			fs, err := dataSource.BatchReaders()
+			if err != nil {
+				return errors.Wrap(err, "data source open")
+			}
+			collectors := tm.BatchCollectors(task.ID)
+			replayC = kapacitor.ReplayBatchFromIO(clk, fs, collectors, recTime)
+		}
+		return <-replayC
+	}
+	return r.doReplay(task, runReplay)
+
+}
+
+func (r *Service) doLiveBatchReplay(task *kapacitor.Task, clk clock.Clock, recTime bool, start, stop time.Time, cluster string) error {
+	runReplay := func(tm *kapacitor.TaskMaster) error {
+		sources, recordErrC, err := r.startRecordBatch(task, start, stop, cluster)
+		if err != nil {
+			return err
+		}
+		collectors := tm.BatchCollectors(task.ID)
+		replayErrC := kapacitor.ReplayBatchFromChan(clk, sources, collectors, recTime)
+		for i := 0; i < 2; i++ {
+			var err error
+			select {
+			case err = <-replayErrC:
+			case err = <-recordErrC:
+			}
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	return r.doReplay(task, runReplay)
+}
+
+func (r *Service) doLiveQueryReplay(id string, task *kapacitor.Task, clk clock.Clock, recTime bool, query, cluster string) error {
+	runReplay := func(tm *kapacitor.TaskMaster) error {
+		var replayErrC <-chan error
+		runErrC := make(chan error, 1)
+		switch task.Type {
+		case kapacitor.StreamTask:
+			source := make(chan models.Point)
+			go func() {
+				runErrC <- r.runQueryStream(source, query, cluster)
+			}()
+			stream, err := tm.Stream(id)
+			if err != nil {
+				return errors.Wrap(err, "stream start")
+			}
+			replayErrC = kapacitor.ReplayStreamFromChan(clk, source, stream, recTime)
+		case kapacitor.BatchTask:
+			source := make(chan models.Batch)
+			go func() {
+				runErrC <- r.runQueryBatch(source, query, cluster)
+			}()
+			collectors := tm.BatchCollectors(task.ID)
+			replayErrC = kapacitor.ReplayBatchFromChan(clk, []<-chan models.Batch{source}, collectors, recTime)
+		}
+		for i := 0; i < 2; i++ {
+			var err error
+			select {
+			case err = <-runErrC:
+			case err = <-replayErrC:
+			}
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	return r.doReplay(task, runReplay)
+}
+
+func (r *Service) doReplay(task *kapacitor.Task, runReplay func(tm *kapacitor.TaskMaster) error) error {
 	// Create new isolated task master
-	tm := s.TaskMaster.New()
+	tm := r.TaskMaster.New()
 	tm.Open()
 	defer tm.Close()
 	et, err := tm.StartTask(task)
 	if err != nil {
 		return errors.Wrap(err, "task start")
 	}
-
-	dataSource, err := parseDataSourceURL(recording.DataURL)
+	err = runReplay(tm)
 	if err != nil {
-		return errors.Wrap(err, "load data source")
-	}
-
-	replay := kapacitor.NewReplay(clk)
-	var replayC <-chan error
-	switch task.Type {
-	case kapacitor.StreamTask:
-		f, err := dataSource.StreamReader()
-		if err != nil {
-			return errors.Wrap(err, "data source open")
-		}
-		stream, err := tm.Stream(recording.ID)
-		if err != nil {
-			return errors.Wrap(err, "stream start")
-		}
-		replayC = replay.ReplayStream(f, stream, recTime, precision)
-	case kapacitor.BatchTask:
-		fs, err := dataSource.BatchReaders()
-		if err != nil {
-			return errors.Wrap(err, "data source open")
-		}
-		batches := tm.BatchCollectors(task.ID)
-		replayC = replay.ReplayBatch(fs, batches, recTime)
-	}
-
-	// Check for error on replay
-	err = <-replayC
-	if err != nil {
-		return errors.Wrap(err, "replay")
+		return errors.Wrap(err, "running replay")
 	}
 
 	// Drain tm so the task can finish
@@ -1038,19 +1248,41 @@ func (b batchArchive) Close() error {
 }
 
 // Record a series of batch queries defined by a batch task
-func (s *Service) doRecordBatch(id string, dataSource DataSource, t *kapacitor.Task, start, stop time.Time, cluster string) error {
-	et, err := kapacitor.NewExecutingTask(s.TaskMaster.New(), t)
+func (s *Service) doRecordBatch(dataSource DataSource, t *kapacitor.Task, start, stop time.Time, cluster string) error {
+	sources, recordErrC, err := s.startRecordBatch(t, start, stop, cluster)
 	if err != nil {
 		return err
+	}
+	saveErrC := make(chan error, 1)
+	go func() {
+		saveErrC <- s.saveBatchRecording(dataSource, sources)
+	}()
+	for i := 0; i < 2; i++ {
+		var err error
+		select {
+		case err = <-saveErrC:
+		case err = <-recordErrC:
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Service) startRecordBatch(t *kapacitor.Task, start, stop time.Time, cluster string) ([]<-chan models.Batch, <-chan error, error) {
+	et, err := kapacitor.NewExecutingTask(s.TaskMaster.New(), t)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	batches, err := et.BatchQueries(start, stop)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	if s.InfluxDBService == nil {
-		return errors.New("InfluxDB not configured, cannot record batch query")
+		return nil, nil, errors.New("InfluxDB not configured, cannot record batch query")
 	}
 
 	var con client.Client
@@ -1060,62 +1292,240 @@ func (s *Service) doRecordBatch(id string, dataSource DataSource, t *kapacitor.T
 		con, err = s.InfluxDBService.NewDefaultClient()
 	}
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
+	sources := make([]<-chan models.Batch, len(batches))
+	errors := make(chan error, len(batches))
+
+	for batchIdx, queries := range batches {
+		source := make(chan models.Batch)
+		sources[batchIdx] = source
+		go func(queries []string) {
+			defer close(source)
+			for _, q := range queries {
+				query := client.Query{
+					Command: q,
+				}
+				resp, err := con.Query(query)
+				if err != nil {
+					errors <- err
+					return
+				}
+				if err := resp.Error(); err != nil {
+					errors <- err
+					return
+				}
+				for _, res := range resp.Results {
+					batches, err := models.ResultToBatches(res)
+					if err != nil {
+						errors <- err
+						return
+					}
+					for _, b := range batches {
+						source <- b
+					}
+				}
+			}
+			errors <- nil
+		}(queries)
+	}
+	errC := make(chan error, 1)
+	go func() {
+		for i := 0; i < cap(errors); i++ {
+			err := <-errors
+			if err != nil {
+				errC <- err
+				return
+			}
+		}
+		errC <- nil
+	}()
+	return sources, errC, nil
+}
+
+func (r *Service) saveBatchRecording(dataSource DataSource, sources []<-chan models.Batch) error {
 	archiver, err := dataSource.BatchArchiver()
 	if err != nil {
 		return err
 	}
 
-	for batchIdx, queries := range batches {
+	for batchIdx, batches := range sources {
 		w, err := archiver.Archive(batchIdx)
 		if err != nil {
 			return err
 		}
-		for _, q := range queries {
-			query := client.Query{
-				Command: q,
-			}
-			resp, err := con.Query(query)
-			if err != nil {
-				return err
-			}
-			if err := resp.Error(); err != nil {
-				return err
-			}
-			for _, res := range resp.Results {
-				batches, err := models.ResultToBatches(res)
-				if err != nil {
-					return err
-				}
-				for _, b := range batches {
-					kapacitor.WriteBatchForRecording(w, b)
-				}
-			}
+		for b := range batches {
+			kapacitor.WriteBatchForRecording(w, b)
 		}
 	}
 	return archiver.Close()
 }
 
-func (s *Service) doRecordQuery(id string, dataSource DataSource, q string, typ RecordingType, cluster string) error {
-	// Parse query to determine dbrp
-	var db, rp string
-	stmt, err := influxql.ParseStatement(q)
+func (r *Service) doRecordQuery(dataSource DataSource, q string, typ RecordingType, cluster string) error {
+	errC := make(chan error, 2)
+	switch typ {
+	case StreamRecording:
+		points := make(chan models.Point)
+		go func() {
+			errC <- r.runQueryStream(points, q, cluster)
+		}()
+		go func() {
+			errC <- r.saveStreamQuery(dataSource, points, precision)
+		}()
+	case BatchRecording:
+		batches := make(chan models.Batch)
+		go func() {
+			errC <- r.runQueryBatch(batches, q, cluster)
+		}()
+		go func() {
+			errC <- r.saveBatchQuery(dataSource, batches)
+		}()
+	}
+	for i := 0; i < cap(errC); i++ {
+		err := <-errC
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *Service) runQueryStream(source chan<- models.Point, q, cluster string) error {
+	defer close(source)
+	dbrp, resp, err := r.execQuery(q, cluster)
 	if err != nil {
 		return err
 	}
-	if slct, ok := stmt.(*influxql.SelectStatement); ok && len(slct.Sources) == 1 {
-		if m, ok := slct.Sources[0].(*influxql.Measurement); ok {
-			db = m.Database
-			rp = m.RetentionPolicy
+	// Write results to sources
+	for _, res := range resp.Results {
+		batches, err := models.ResultToBatches(res)
+		if err != nil {
+			return err
+		}
+		// Write points in order across batches
+
+		// Find earliest time of first points
+		current := time.Time{}
+		for _, batch := range batches {
+			if len(batch.Points) > 0 &&
+				(current.IsZero() ||
+					batch.Points[0].Time.Before(current)) {
+				current = batch.Points[0].Time
+			}
+		}
+
+		finishedCount := 0
+		batchCount := len(batches)
+		for finishedCount != batchCount {
+			next := time.Time{}
+			for b := range batches {
+				l := len(batches[b].Points)
+				if l == 0 {
+					finishedCount++
+					continue
+				}
+				i := 0
+				for ; i < l; i++ {
+					bp := batches[b].Points[i]
+					if bp.Time.After(current) {
+						if next.IsZero() || bp.Time.Before(next) {
+							next = bp.Time
+						}
+						break
+					}
+					// Write point
+					p := models.Point{
+						Name:            batches[b].Name,
+						Database:        dbrp.Database,
+						RetentionPolicy: dbrp.RetentionPolicy,
+						Tags:            bp.Tags,
+						Fields:          bp.Fields,
+						Time:            bp.Time,
+					}
+					source <- p
+				}
+				// Remove written points
+				batches[b].Points = batches[b].Points[i:]
+			}
+			current = next
 		}
 	}
-	if db == "" || rp == "" {
-		return errors.New("could not determine database and retention policy. Is the query fully qualified?")
+	return nil
+}
+
+func (r *Service) runQueryBatch(source chan<- models.Batch, q string, cluster string) error {
+	defer close(source)
+	_, resp, err := r.execQuery(q, cluster)
+	if err != nil {
+		return err
+	}
+	// Write results to sources
+	for _, res := range resp.Results {
+		batches, err := models.ResultToBatches(res)
+		if err != nil {
+			return err
+		}
+		for _, batch := range batches {
+			source <- batch
+		}
+	}
+	return nil
+}
+
+func (r *Service) saveBatchQuery(dataSource DataSource, batches <-chan models.Batch) error {
+	archiver, err := dataSource.BatchArchiver()
+	if err != nil {
+		return err
+	}
+	w, err := archiver.Archive(0)
+	if err != nil {
+		return err
+	}
+
+	for batch := range batches {
+		err := kapacitor.WriteBatchForRecording(w, batch)
+		if err != nil {
+			return err
+		}
+	}
+
+	return archiver.Close()
+}
+
+func (s *Service) saveStreamQuery(dataSource DataSource, points <-chan models.Point, precision string) error {
+	sw, err := dataSource.StreamWriter()
+	if err != nil {
+		return err
+	}
+	for point := range points {
+		err := kapacitor.WritePointForRecording(sw, point, precision)
+		if err != nil {
+			return err
+		}
+	}
+
+	return sw.Close()
+}
+
+func (s *Service) execQuery(q, cluster string) (kapacitor.DBRP, *client.Response, error) {
+	// Parse query to determine dbrp
+	dbrp := kapacitor.DBRP{}
+	stmt, err := influxql.ParseStatement(q)
+	if err != nil {
+		return dbrp, nil, err
+	}
+	if slct, ok := stmt.(*influxql.SelectStatement); ok && len(slct.Sources) == 1 {
+		if m, ok := slct.Sources[0].(*influxql.Measurement); ok {
+			dbrp.Database = m.Database
+			dbrp.RetentionPolicy = m.RetentionPolicy
+		}
+	}
+	if dbrp.Database == "" || dbrp.RetentionPolicy == "" {
+		return dbrp, nil, errors.New("could not determine database and retention policy. Is the query fully qualified?")
 	}
 	if s.InfluxDBService == nil {
-		return errors.New("InfluxDB not configured, cannot record query")
+		return dbrp, nil, errors.New("InfluxDB not configured, cannot record query")
 	}
 	// Query InfluxDB
 	var con client.Client
@@ -1125,103 +1535,19 @@ func (s *Service) doRecordQuery(id string, dataSource DataSource, q string, typ 
 		con, err = s.InfluxDBService.NewDefaultClient()
 	}
 	if err != nil {
-		return err
+		return dbrp, nil, err
 	}
 	query := client.Query{
 		Command: q,
 	}
 	resp, err := con.Query(query)
 	if err != nil {
-		return err
+		return dbrp, nil, err
 	}
 	if err := resp.Error(); err != nil {
-		return err
+		return dbrp, nil, err
 	}
-	// Open appropriate writer
-	var w io.Writer
-	var c io.Closer
-	switch typ {
-	case StreamRecording:
-		sw, err := dataSource.StreamWriter()
-		if err != nil {
-			return err
-		}
-		w = sw
-		c = sw
-	case BatchRecording:
-		archiver, err := dataSource.BatchArchiver()
-		if err != nil {
-			return err
-		}
-		w, err = archiver.Archive(0)
-		if err != nil {
-			return err
-		}
-		c = archiver
-	}
-	// Write results to writer
-	for _, res := range resp.Results {
-		batches, err := models.ResultToBatches(res)
-		if err != nil {
-			c.Close()
-			return err
-		}
-		switch typ {
-		case StreamRecording:
-			// Write points in order across batches
-
-			// Find earliest time of first points
-			current := time.Time{}
-			for _, batch := range batches {
-				if len(batch.Points) > 0 &&
-					(current.IsZero() ||
-						batch.Points[0].Time.Before(current)) {
-					current = batch.Points[0].Time
-				}
-			}
-
-			finishedCount := 0
-			batchCount := len(batches)
-			for finishedCount != batchCount {
-				next := time.Time{}
-				for b := range batches {
-					l := len(batches[b].Points)
-					if l == 0 {
-						finishedCount++
-						continue
-					}
-					i := 0
-					for ; i < l; i++ {
-						bp := batches[b].Points[i]
-						if bp.Time.After(current) {
-							if next.IsZero() || bp.Time.Before(next) {
-								next = bp.Time
-							}
-							break
-						}
-						// Write point
-						p := models.Point{
-							Name:            batches[b].Name,
-							Database:        db,
-							RetentionPolicy: rp,
-							Tags:            bp.Tags,
-							Fields:          bp.Fields,
-							Time:            bp.Time,
-						}
-						kapacitor.WritePointForRecording(w, p, precision)
-					}
-					// Remove written points
-					batches[b].Points = batches[b].Points[i:]
-				}
-				current = next
-			}
-		case BatchRecording:
-			for _, batch := range batches {
-				kapacitor.WriteBatchForRecording(w, batch)
-			}
-		}
-	}
-	return c.Close()
+	return dbrp, resp, nil
 }
 
 type BatchArchiver interface {

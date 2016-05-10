@@ -129,6 +129,20 @@ func Test_ReportsErrors(t *testing.T) {
 			},
 		},
 		{
+			name: "ReplayBatch",
+			fnc: func(c *client.Client) error {
+				_, err := c.ReplayBatch(client.ReplayBatchOptions{})
+				return err
+			},
+		},
+		{
+			name: "ReplayQuery",
+			fnc: func(c *client.Client) error {
+				_, err := c.ReplayQuery(client.ReplayQueryOptions{})
+				return err
+			},
+		},
+		{
 			name: "DeleteReplay",
 			fnc: func(c *client.Client) error {
 				err := c.DeleteReplay(c.ReplayLink(""))
@@ -839,7 +853,7 @@ func Test_RecordQuery(t *testing.T) {
 		body, _ := ioutil.ReadAll(r.Body)
 		json.Unmarshal(body, &opts)
 		if r.URL.Path == "/kapacitor/v1/recordings/query" && r.Method == "POST" &&
-			opts.Query == "SELECT * FROM allthetings" &&
+			opts.Query == "SELECT * FROM allthethings" &&
 			opts.Type == client.StreamTask &&
 			opts.Cluster == "mycluster" {
 			w.WriteHeader(http.StatusCreated)
@@ -855,7 +869,7 @@ func Test_RecordQuery(t *testing.T) {
 	defer s.Close()
 
 	r, err := c.RecordQuery(client.RecordQueryOptions{
-		Query:   "SELECT * FROM allthetings",
+		Query:   "SELECT * FROM allthethings",
 		Cluster: "mycluster",
 		Type:    client.StreamTask,
 	})
@@ -1193,6 +1207,84 @@ func Test_CreateReplay(t *testing.T) {
 		Task:      "taskname",
 		Recording: "recording",
 		Clock:     client.Fast,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exp, got := "/kapacitor/v1/replays/replayid", string(replay.Link.Href); exp != got {
+		t.Errorf("unexpected replay.Link.Href got %s exp %s", got, exp)
+	}
+}
+
+func Test_ReplayBatch(t *testing.T) {
+	stop := time.Now().UTC()
+	start := stop.Add(-24 * time.Hour)
+	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var opts client.ReplayBatchOptions
+		body, _ := ioutil.ReadAll(r.Body)
+		json.Unmarshal(body, &opts)
+		if r.URL.Path == "/kapacitor/v1/replays/batch" && r.Method == "POST" &&
+			opts.Task == "taskname" &&
+			opts.Start == start &&
+			opts.Stop == stop &&
+			opts.RecordingTime == true &&
+			opts.Clock == client.Real {
+			w.WriteHeader(http.StatusCreated)
+			fmt.Fprintf(w, `{"link":{"rel":"self","href":"/kapacitor/v1/replays/replayid"}}`)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "request: %v", r)
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	replay, err := c.ReplayBatch(client.ReplayBatchOptions{
+		Task:          "taskname",
+		Start:         start,
+		Stop:          stop,
+		Cluster:       "mycluster",
+		Clock:         client.Real,
+		RecordingTime: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exp, got := "/kapacitor/v1/replays/replayid", string(replay.Link.Href); exp != got {
+		t.Errorf("unexpected replay.Link.Href got %s exp %s", got, exp)
+	}
+}
+
+func Test_ReplayQuery(t *testing.T) {
+	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var opts client.ReplayQueryOptions
+		body, _ := ioutil.ReadAll(r.Body)
+		json.Unmarshal(body, &opts)
+		if r.URL.Path == "/kapacitor/v1/replays/query" && r.Method == "POST" &&
+			opts.Task == "taskname" &&
+			opts.Query == "SELECT * FROM allthethings" &&
+			opts.Cluster == "mycluster" &&
+			opts.RecordingTime == false &&
+			opts.Clock == client.Fast {
+			w.WriteHeader(http.StatusCreated)
+			fmt.Fprintf(w, `{"link":{"rel":"self","href":"/kapacitor/v1/replays/replayid"}}`)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "request: %v", r)
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	replay, err := c.ReplayQuery(client.ReplayQueryOptions{
+		Task:    "taskname",
+		Query:   "SELECT * FROM allthethings",
+		Cluster: "mycluster",
+		Clock:   client.Fast,
 	})
 	if err != nil {
 		t.Fatal(err)
