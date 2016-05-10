@@ -11,10 +11,11 @@
 Changes to how and where task data is store have been made.
 In order to safely upgrade to version 0.13 you need to follow these steps:
 
-1. Update all TICKscripts to use the new `|` and `@` operators. Once Kapacitor no longer issues any `DEPRECATION` warnings you are ready to begin the upgrade.
+1. Upgrade InfluxDB to version 0.13 first.
+2. Update all TICKscripts to use the new `|` and `@` operators. Once Kapacitor no longer issues any `DEPRECATION` warnings you are ready to begin the upgrade.
 The upgrade will work without this step but tasks using the old syntax cannot be enabled, until modified to use the new syntax.
-2. Upgrade the Kapacitor binary.
-3. Configure new database location. By default the location `/var/lib/kapacitor/kapacitor.db` is chosen for package installs or `./kapacitor.db` for manual installs.
+3. Upgrade the Kapacitor binary/package.
+4. Configure new database location. By default the location `/var/lib/kapacitor/kapacitor.db` is chosen for package installs or `./kapacitor.db` for manual installs.
 Do **not** remove the configuration for the location of the old task.db database file since it is still needed to do the migration.
 
     ```
@@ -22,7 +23,7 @@ Do **not** remove the configuration for the location of the old task.db database
     boltdb = "/var/lib/kapacitor/kapacitor.db"
     ```
 
-4. Restart Kapacitor. At this point Kapacitor will migrate all existing data to the new database file.
+5. Restart Kapacitor. At this point Kapacitor will migrate all existing data to the new database file.
 If any errors occur Kapacitor will log them and fail to startup. This way if Kapacitor starts up you can be sure the migration was a success and can continue normal operation.
 The old database is opened in read only mode so that existing data cannot be corrupted.
 Its recommended to start Kapacitor in debug logging mode for the migration so you can follow the details of the migration process.

@@ -98,11 +98,18 @@ func buildAuxIterators(fields Fields, ic IteratorCreator, opt IteratorOptions) (
 	input, err := ic.CreateIterator(opt)
 	if err != nil {
 		return nil, err
+	} else if input == nil {
+		input = &nilFloatIterator{}
 	}
 
 	// Filter out duplicate rows, if required.
 	if opt.Dedupe {
-		input = NewDedupeIterator(input)
+		// If there is no group by and it's a single field then fast dedupe.
+		if itr, ok := input.(FloatIterator); ok && len(fields) == 1 && len(opt.Dimensions) == 0 {
+			input = newFloatFastDedupeIterator(itr)
+		} else {
+			input = NewDedupeIterator(input)
+		}
 	}
 
 	// Apply limit & offset.
@@ -226,7 +233,13 @@ func buildExprIterator(expr Expr, ic IteratorCreator, opt IteratorOptions, selec
 
 	switch expr := expr.(type) {
 	case *VarRef:
-		return ic.CreateIterator(opt)
+		itr, err := ic.CreateIterator(opt)
+		if err != nil {
+			return nil, err
+		} else if itr == nil {
+			itr = &nilFloatIterator{}
+		}
+		return itr, nil
 	case *Call:
 		// FIXME(benbjohnson): Validate that only calls with 1 arg are passed to IC.
 
@@ -291,9 +304,22 @@ func buildExprIterator(expr Expr, ic IteratorCreator, opt IteratorOptions, selec
 							return newCountIterator(input, opt)
 						}
 					}
-					return ic.CreateIterator(opt)
+
+					itr, err := ic.CreateIterator(opt)
+					if err != nil {
+						return nil, err
+					} else if itr == nil {
+						itr = &nilFloatIterator{}
+					}
+					return itr, nil
 				case "min", "max", "sum", "first", "last", "mean":
-					return ic.CreateIterator(opt)
+					itr, err := ic.CreateIterator(opt)
+					if err != nil {
+						return nil, err
+					} else if itr == nil {
+						itr = &nilFloatIterator{}
+					}
+					return itr, nil
 				case "median":
 					input, err := buildExprIterator(expr.Args[0].(*VarRef), ic, opt, false)
 					if err != nil {
