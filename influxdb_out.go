@@ -6,18 +6,23 @@ import (
 	"time"
 
 	client "github.com/influxdata/influxdb/client/v2"
+	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 )
 
 const (
 	statsInfluxDBPointsWritten = "points_written"
+	statsInfluxDBWriteErrors   = "write_errors"
 )
 
 type InfluxDBOutNode struct {
 	node
 	i  *pipeline.InfluxDBOutNode
 	wb *writeBuffer
+
+	pointsWritten *expvar.Int
+	writeErrors   *expvar.Int
 }
 
 func newInfluxDBOutNode(et *ExecutingTask, n *pipeline.InfluxDBOutNode, l *log.Logger) (*InfluxDBOutNode, error) {
@@ -33,7 +38,12 @@ func newInfluxDBOutNode(et *ExecutingTask, n *pipeline.InfluxDBOutNode, l *log.L
 }
 
 func (i *InfluxDBOutNode) runOut([]byte) error {
-	i.statMap.Add(statsInfluxDBPointsWritten, 0)
+	i.pointsWritten = &expvar.Int{}
+	i.writeErrors = &expvar.Int{}
+
+	i.statMap.Set(statsInfluxDBPointsWritten, i.pointsWritten)
+	i.statMap.Set(statsInfluxDBWriteErrors, i.writeErrors)
+
 	// Start the write buffer
 	i.wb.start()
 
@@ -222,6 +232,7 @@ func (w *writeBuffer) writeAll() {
 	for bpc, bp := range w.buffer {
 		err := w.write(bp)
 		if err != nil {
+			w.i.writeErrors.Add(1)
 			w.i.logger.Println("E! failed to write points to InfluxDB:", err)
 		}
 		delete(w.buffer, bpc)
@@ -240,6 +251,6 @@ func (w *writeBuffer) write(bp client.BatchPoints) error {
 			return err
 		}
 	}
-	w.i.statMap.Add(statsInfluxDBPointsWritten, int64(len(bp.Points())))
+	w.i.pointsWritten.Add(int64(len(bp.Points())))
 	return w.conn.Write(bp)
 }

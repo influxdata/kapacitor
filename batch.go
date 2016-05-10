@@ -11,8 +11,16 @@ import (
 	"github.com/gorhill/cronexpr"
 	client "github.com/influxdata/influxdb/client/v2"
 	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+)
+
+const (
+	statsQueryErrors    = "query_errors"
+	statsConnectErrors  = "connect_errors"
+	statsBatchesQueried = "batches_queried"
+	statsPointsQueried  = "points_queried"
 )
 
 type BatchNode struct {
@@ -105,11 +113,6 @@ func (s *BatchNode) collectedCount() (count int64) {
 	return
 }
 
-const (
-	statsQueryErrors   = "query_errors"
-	statsConnectErrors = "connect_errors"
-)
-
 type QueryNode struct {
 	node
 	b        *pipeline.QueryNode
@@ -119,6 +122,11 @@ type QueryNode struct {
 	queryErr chan error
 	closing  chan struct{}
 	aborting chan struct{}
+
+	queryErrors    *expvar.Int
+	connectErrors  *expvar.Int
+	batchesQueried *expvar.Int
+	pointsQueried  *expvar.Int
 }
 
 func newQueryNode(et *ExecutingTask, n *pipeline.QueryNode, l *log.Logger) (*QueryNode, error) {
@@ -226,6 +234,15 @@ func (b *QueryNode) Queries(start, stop time.Time) []string {
 // Query InfluxDB and collect batches on batch collector.
 func (b *QueryNode) doQuery() error {
 	defer b.ins[0].Close()
+	b.queryErrors = &expvar.Int{}
+	b.connectErrors = &expvar.Int{}
+	b.batchesQueried = &expvar.Int{}
+	b.pointsQueried = &expvar.Int{}
+
+	b.statMap.Set(statsQueryErrors, b.queryErrors)
+	b.statMap.Set(statsConnectErrors, b.connectErrors)
+	b.statMap.Set(statsBatchesQueried, b.batchesQueried)
+	b.statMap.Set(statsPointsQueried, b.pointsQueried)
 
 	if b.et.tm.InfluxDBService == nil {
 		return errors.New("InfluxDB not configured, cannot query InfluxDB for batch query")
@@ -259,7 +276,7 @@ func (b *QueryNode) doQuery() error {
 			if err != nil {
 				b.logger.Println("E! failed to connect to InfluxDB:", err)
 				b.timer.Stop()
-				b.statMap.Add(statsConnectErrors, 1)
+				b.connectErrors.Add(1)
 				break
 			}
 			q := client.Query{
@@ -271,14 +288,14 @@ func (b *QueryNode) doQuery() error {
 			if err != nil {
 				b.logger.Println("E! query failed:", err)
 				b.timer.Stop()
-				b.statMap.Add(statsQueryErrors, 1)
+				b.queryErrors.Add(1)
 				break
 			}
 
 			if err := resp.Error(); err != nil {
 				b.logger.Println("E! query failed:", err)
 				b.timer.Stop()
-				b.statMap.Add(statsQueryErrors, 1)
+				b.queryErrors.Add(1)
 				break
 			}
 
@@ -287,17 +304,19 @@ func (b *QueryNode) doQuery() error {
 				batches, err := models.ResultToBatches(res)
 				if err != nil {
 					b.logger.Println("E! failed to understand query result:", err)
-					b.statMap.Add(statsQueryErrors, 1)
+					b.queryErrors.Add(1)
 					continue
 				}
-				b.timer.Pause()
 				for _, bch := range batches {
+					b.batchesQueried.Add(1)
+					b.pointsQueried.Add(int64(len(bch.Points)))
+					b.timer.Pause()
 					err := b.ins[0].CollectBatch(bch)
 					if err != nil {
 						return err
 					}
+					b.timer.Resume()
 				}
-				b.timer.Resume()
 			}
 			b.timer.Stop()
 		}
@@ -305,8 +324,6 @@ func (b *QueryNode) doQuery() error {
 }
 
 func (b *QueryNode) runBatch([]byte) error {
-	b.statMap.Add(statsQueryErrors, 0)
-	b.statMap.Add(statsConnectErrors, 0)
 	errC := make(chan error, 1)
 	go func() {
 		defer func() {

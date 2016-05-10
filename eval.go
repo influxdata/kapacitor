@@ -21,7 +21,8 @@ type EvalNode struct {
 	e           *pipeline.EvalNode
 	expressions []stateful.Expression
 	scopePool   stateful.ScopePool
-	evalErrors  *expvar.Int
+
+	evalErrors *expvar.Int
 }
 
 // Create a new  EvalNode which applies a transformation func to each point in a stream and returns a single point.
