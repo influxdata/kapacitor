@@ -275,8 +275,10 @@ func (b *QueryNode) doQuery() error {
 				}
 				if err != nil {
 					b.logger.Println("E! failed to connect to InfluxDB:", err)
-					b.timer.Stop()
 					b.connectErrors.Add(1)
+					// Ensure connection is nil
+					con = nil
+					b.timer.Stop()
 					break
 				}
 			}
@@ -297,8 +299,8 @@ func (b *QueryNode) doQuery() error {
 
 			if err := resp.Error(); err != nil {
 				b.logger.Println("E! query returned error response:", err)
-				b.timer.Stop()
 				b.queryErrors.Add(1)
+				b.timer.Stop()
 				break
 			}
 
