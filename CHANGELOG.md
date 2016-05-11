@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.14.0 [unreleased]
+
+### Release Notes
+
+### Features
+
+
+### Bugfixes
+
+- [#537](https://github.com/influxdata/kapacitor/issue/537): Fix panic in alert node when batch is empty.
+
 ## v0.13.0 [2016-05-11]
 
 ### Release Notes

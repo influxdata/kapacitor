@@ -408,6 +408,10 @@ func (a *AlertNode) runAlert([]byte) error {
 	case pipeline.BatchEdge:
 		for b, ok := a.ins[0].NextBatch(); ok; b, ok = a.ins[0].NextBatch() {
 			a.timer.Start()
+			if len(b.Points) == 0 {
+				a.timer.Stop()
+				continue
+			}
 			// Keep track of lowest level for any point
 			lowestLevel := CritAlert
 			// Keep track of highest level and point
