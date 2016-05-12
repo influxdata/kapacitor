@@ -9,7 +9,6 @@
 
 ### Bugfixes
 
-- [#537](https://github.com/influxdata/kapacitor/issue/537): Fix panic in alert node when batch is empty.
 
 ## v0.13.0 [2016-05-11]
 
@@ -134,6 +133,7 @@ For example, let's say we want to store all data that triggered an alert in Infl
 - [#423](https://github.com/influxdata/kapacitor/issues/423): Recording stream queries with group by now correctly saves data in time order not group by order.
 - [#331](https://github.com/influxdata/kapacitor/issues/331): Fix panic when missing `.as()` for JoinNode.
 - [#523](https://github.com/influxdata/kapacitor/pull/523): JoinNode will now emit join sets as soon as they are ready. If multiple joinable sets arrive in the same tolerance window than each will be emitted (previously the first points were dropped).
+- [#537](https://github.com/influxdata/kapacitor/issue/537): Fix panic in alert node when batch is empty.
 
 ## v0.12.0 [2016-04-04]
 
