@@ -16,9 +16,11 @@
 >**Breaking changes may require special upgrade steps from versions <= 0.12, please read the 0.13.0 release notes**
 
 Along with the API changes of 0.13.0, validation logic was added to task IDs, but this was not well documented.
+This minor release remedies that.
+
 All IDs (tasks, recordings, replays) must match this regex `^[-\._\p{L}0-9]+$`, which is essentially numbers, unicode letters, '-', '.' and '_'.
 
-If you have existings tasks which do not match this pattern they should continue to function normally.
+If you have existing tasks which do not match this pattern they should continue to function normally.
 
 ### Features
 

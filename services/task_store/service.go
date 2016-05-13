@@ -384,7 +384,6 @@ func (ts *Service) handleTask(w http.ResponseWriter, r *http.Request) {
 		httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
 		return
 	}
-	ts.logger.Println("D! handleTask", r.URL.Path, id)
 
 	raw, err := ts.tasks.Get(id)
 	if err != nil {
