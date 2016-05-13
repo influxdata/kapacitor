@@ -9,7 +9,7 @@
 
 ### Bugfixes
 
-## v0.13.1 [unreleased]
+## v0.13.1 [2016-05-13]
 
 ### Release Notes
 
