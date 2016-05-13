@@ -51,6 +51,14 @@ Query parameters are used only for GET requests and all other requests expect pa
 When creating resources in Kapacitor the API server will return a `link` object with an `href` of the resource.
 Clients should not need to perform path manipulation in most cases and can use the links provided from previous calls.
 
+### IDs
+
+The API allows the client to specify IDs for the various resources.
+This way you can control the meaning of the IDs.
+If you do not specify an ID a random UUID will be generated for the resource.
+
+All IDs must match this regex `^[-\._\p{L}0-9]+$`, which is essentially numbers, unicode letters, '-', '.' and '_'.
+
 ## Writing Data
 
 Kapacitor can accept writes over HTTP using the line protocol.
@@ -107,7 +115,7 @@ When using PATCH, if any option is missing it will be left unmodified.
 Create a new task with ID TASK_ID.
 
 ```
-POST /kapacitor/v1/tasks/
+POST /kapacitor/v1/tasks
 {
     "id" : "TASK_ID",
     "type" : "stream",

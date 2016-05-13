@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -1443,9 +1444,32 @@ func TestServer_RecordReplayQuery(t *testing.T) {
 		t.Errorf("unexpected alert log:\ngot %v\nexp %v", got[1].Data.Series[0], exp[1].Data.Series[0])
 	}
 
+	// ------------
+	// Test List/Delete Recordings/Replays
+
 	recordings, err := cli.ListRecordings(nil)
 	if exp, got := 1, len(recordings); exp != got {
 		t.Fatalf("unexpected recordings list:\ngot %v\nexp %v", got, exp)
+	}
+
+	// Test List Recordings via direct default URL
+	resp, err := http.Get(s.URL() + "/recordings")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if exp, got := http.StatusOK, resp.StatusCode; exp != got {
+		t.Errorf("unexpected status code, got %d exp %d", got, exp)
+	}
+	// Response type
+	type recResponse struct {
+		Recordings []client.Recording `json:"recordings"`
+	}
+	dec := json.NewDecoder(resp.Body)
+	recR := recResponse{}
+	dec.Decode(&recR)
+	if exp, got := 1, len(recR.Recordings); exp != got {
+		t.Fatalf("unexpected recordings count, got %d exp %d", got, exp)
 	}
 
 	err = cli.DeleteRecording(recordings[0].Link)
@@ -1461,6 +1485,26 @@ func TestServer_RecordReplayQuery(t *testing.T) {
 	replays, err := cli.ListReplays(nil)
 	if exp, got := 1, len(replays); exp != got {
 		t.Fatalf("unexpected replays list:\ngot %v\nexp %v", got, exp)
+	}
+
+	// Test List Replays via direct default URL
+	resp, err = http.Get(s.URL() + "/replays")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if exp, got := http.StatusOK, resp.StatusCode; exp != got {
+		t.Errorf("unexpected status code, got %d exp %d", got, exp)
+	}
+	// Response type
+	type repResponse struct {
+		Replays []client.Replay `json:"replays"`
+	}
+	dec = json.NewDecoder(resp.Body)
+	repR := repResponse{}
+	dec.Decode(&repR)
+	if exp, got := 1, len(repR.Replays); exp != got {
+		t.Fatalf("unexpected replays count, got %d exp %d", got, exp)
 	}
 
 	err = cli.DeleteReplay(replays[0].Link)
@@ -2002,5 +2046,421 @@ func testBatchAgent(t *testing.T, c *run.Config) {
 
 	if count == 0 {
 		t.Error("unexpected query count", count)
+	}
+}
+
+func TestServer_CreateTask_Defaults(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	baseURL := s.URL()
+
+	body := `
+{
+    "id" : "TASK_ID",
+    "type" : "stream",
+    "dbrps": [{"db": "DATABASE_NAME", "rp" : "RP_NAME"}],
+    "script": "stream\n    |from()\n        .measurement('cpu')\n"
+}`
+	resp, err := http.Post(baseURL+"/tasks", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if exp, got := http.StatusOK, resp.StatusCode; exp != got {
+		t.Errorf("unexpected status code, got %d exp %d", got, exp)
+	}
+
+	id := "TASK_ID"
+	tick := "stream\n    |from()\n        .measurement('cpu')\n"
+	dbrps := []client.DBRP{
+		{
+			Database:        "DATABASE_NAME",
+			RetentionPolicy: "RP_NAME",
+		},
+	}
+	ti, err := cli.Task(cli.TaskLink(id), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ti.Error != "" {
+		t.Fatal(ti.Error)
+	}
+	if ti.ID != id {
+		t.Fatalf("unexpected id got %s exp %s", ti.ID, id)
+	}
+	if ti.Type != client.StreamTask {
+		t.Fatalf("unexpected type got %v exp %v", ti.Type, client.StreamTask)
+	}
+	if ti.Status != client.Disabled {
+		t.Fatalf("unexpected status got %v exp %v", ti.Status, client.Disabled)
+	}
+	if !reflect.DeepEqual(ti.DBRPs, dbrps) {
+		t.Fatalf("unexpected dbrps got %s exp %s", ti.DBRPs, dbrps)
+	}
+	if ti.TICKscript != tick {
+		t.Fatalf("unexpected TICKscript got %s exp %s", ti.TICKscript, tick)
+	}
+	dot := "digraph TASK_ID {\nstream0 -> from1;\n}"
+	if ti.Dot != dot {
+		t.Fatalf("unexpected dot\ngot\n%s\nexp\n%s\n", ti.Dot, dot)
+	}
+}
+
+func TestServer_ListTask_Defaults(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	baseURL := s.URL()
+	dbrps := []client.DBRP{{
+		Database:        "mydb",
+		RetentionPolicy: "myrp",
+	}}
+	id := "task_id"
+	tick := "stream\n    |from()\n"
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       client.StreamTask,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := http.Get(baseURL + "/tasks")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if exp, got := http.StatusOK, resp.StatusCode; exp != got {
+		t.Errorf("unexpected status code, got %d exp %d", got, exp)
+	}
+	// Response type
+	type response struct {
+		Tasks []client.Task `json:"tasks"`
+	}
+	dec := json.NewDecoder(resp.Body)
+	tasks := response{}
+	dec.Decode(&tasks)
+	if exp, got := 1, len(tasks.Tasks); exp != got {
+		t.Fatalf("unexpected tasks count, got %d exp %d", got, exp)
+	}
+
+	task = tasks.Tasks[0]
+	if task.ID != id {
+		t.Fatalf("unexpected id got %s exp %s", task.ID, id)
+	}
+	if task.Type != client.StreamTask {
+		t.Fatalf("unexpected type got %v exp %v", task.Type, client.StreamTask)
+	}
+	if task.Status != client.Disabled {
+		t.Fatalf("unexpected status got %v exp %v", task.Status, client.Disabled)
+	}
+	if !reflect.DeepEqual(task.DBRPs, dbrps) {
+		t.Fatalf("unexpected dbrps got %s exp %s", task.DBRPs, dbrps)
+	}
+	if task.TICKscript != tick {
+		t.Fatalf("unexpected TICKscript got %s exp %s", task.TICKscript, tick)
+	}
+	dot := "digraph task_id {\nstream0 -> from1;\n}"
+	if task.Dot != dot {
+		t.Fatalf("unexpected dot\ngot\n%s\nexp\n%s\n", task.Dot, dot)
+	}
+}
+
+func TestServer_CreateTask_ValidIDs(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	testCases := []struct {
+		id    string
+		valid bool
+	}{
+		{
+			id:    "task_id",
+			valid: true,
+		},
+		{
+			id:    "task_id7",
+			valid: true,
+		},
+		{
+			id:    "task.id7",
+			valid: true,
+		},
+		{
+			id:    "task-id7",
+			valid: true,
+		},
+		{
+			id:    "tásk7",
+			valid: true,
+		},
+		{
+			id:    "invalid id",
+			valid: false,
+		},
+		{
+			id:    "invalid*id",
+			valid: false,
+		},
+		{
+			id:    "task/id7",
+			valid: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		id := tc.id
+		ttype := client.StreamTask
+		dbrps := []client.DBRP{
+			{
+				Database:        "mydb",
+				RetentionPolicy: "myrp",
+			},
+		}
+		tick := `stream
+    |from()
+        .measurement('test')
+`
+		task, err := cli.CreateTask(client.CreateTaskOptions{
+			ID:         id,
+			Type:       ttype,
+			DBRPs:      dbrps,
+			TICKscript: tick,
+			Status:     client.Disabled,
+		})
+		if !tc.valid {
+			exp := fmt.Sprintf("task ID must contain only letters, numbers, '-', '.' and '_'. %q", id)
+			if err.Error() != exp {
+				t.Errorf("unexpected error: got %s exp %s", err.Error(), exp)
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		ti, err := cli.Task(task.Link, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if ti.Error != "" {
+			t.Fatal(ti.Error)
+		}
+		if ti.ID != id {
+			t.Fatalf("unexpected id got %s exp %s", ti.ID, id)
+		}
+		if ti.Type != client.StreamTask {
+			t.Fatalf("unexpected type got %v exp %v", ti.Type, client.StreamTask)
+		}
+		if ti.Status != client.Disabled {
+			t.Fatalf("unexpected status got %v exp %v", ti.Status, client.Disabled)
+		}
+		if !reflect.DeepEqual(ti.DBRPs, dbrps) {
+			t.Fatalf("unexpected dbrps got %s exp %s", ti.DBRPs, dbrps)
+		}
+		if ti.TICKscript != tick {
+			t.Fatalf("unexpected TICKscript got %s exp %s", ti.TICKscript, tick)
+		}
+		dot := "digraph " + id + " {\nstream0 -> from1;\n}"
+		if ti.Dot != dot {
+			t.Fatalf("unexpected dot\ngot\n%s\nexp\n%s\n", ti.Dot, dot)
+		}
+	}
+}
+
+func TestServer_CreateRecording_ValidIDs(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+	ttype := client.StreamTask
+	dbrps := []client.DBRP{
+		{
+			Database:        "mydb",
+			RetentionPolicy: "myrp",
+		},
+	}
+	tick := `stream
+    |from()
+        .measurement('test')
+`
+	_, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         "task_id",
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testCases := []struct {
+		id    string
+		valid bool
+	}{
+		{
+			id:    "recording_id",
+			valid: true,
+		},
+		{
+			id:    "recording_id7",
+			valid: true,
+		},
+		{
+			id:    "recording.id7",
+			valid: true,
+		},
+		{
+			id:    "recording-id7",
+			valid: true,
+		},
+		{
+			id:    "récording7",
+			valid: true,
+		},
+		{
+			id:    "invalid id",
+			valid: false,
+		},
+		{
+			id:    "invalid*id",
+			valid: false,
+		},
+		{
+			id:    "recording/id7",
+			valid: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		id := tc.id
+		recording, err := cli.RecordStream(client.RecordStreamOptions{
+			ID:   id,
+			Task: "task_id",
+			Stop: time.Date(1970, 1, 1, 0, 0, 10, 0, time.UTC),
+		})
+		if !tc.valid {
+			exp := fmt.Sprintf("recording ID must contain only letters, numbers, '-', '.' and '_'. %q", id)
+			if err.Error() != exp {
+				t.Errorf("unexpected error: got %s exp %s", err.Error(), exp)
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		recording, err = cli.Recording(recording.Link)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if exp, got := id, recording.ID; got != exp {
+			t.Errorf("unexpected recording ID got %s exp %s", got, exp)
+		}
+	}
+}
+
+func TestServer_CreateReplay_ValidIDs(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+	ttype := client.StreamTask
+	dbrps := []client.DBRP{
+		{
+			Database:        "mydb",
+			RetentionPolicy: "myrp",
+		},
+	}
+	tick := `stream
+    |from()
+        .measurement('test')
+`
+
+	_, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         "task_id",
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = cli.RecordStream(client.RecordStreamOptions{
+		ID:   "recording_id",
+		Task: "task_id",
+		Stop: time.Date(1970, 1, 1, 0, 0, 10, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testCases := []struct {
+		id    string
+		valid bool
+	}{
+		{
+			id:    "replay_id",
+			valid: true,
+		},
+		{
+			id:    "replay_id7",
+			valid: true,
+		},
+		{
+			id:    "replay.id7",
+			valid: true,
+		},
+		{
+			id:    "replay-id7",
+			valid: true,
+		},
+		{
+			id:    "réplay7",
+			valid: true,
+		},
+		{
+			id:    "invalid id",
+			valid: false,
+		},
+		{
+			id:    "invalid*id",
+			valid: false,
+		},
+		{
+			id:    "replay/id7",
+			valid: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		id := tc.id
+		replay, err := cli.CreateReplay(client.CreateReplayOptions{
+			ID:            id,
+			Task:          "task_id",
+			Recording:     "recording_id",
+			Clock:         client.Fast,
+			RecordingTime: true,
+		})
+		if !tc.valid {
+			exp := fmt.Sprintf("replay ID must contain only letters, numbers, '-', '.' and '_'. %q", id)
+			if err.Error() != exp {
+				t.Errorf("unexpected error: got %s exp %s", err.Error(), exp)
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		replay, err = cli.Replay(replay.Link)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if exp, got := id, replay.ID; got != exp {
+			t.Errorf("unexpected replay ID got %s exp %s", got, exp)
+		}
 	}
 }
