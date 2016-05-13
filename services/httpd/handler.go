@@ -470,7 +470,7 @@ func HttpError(w http.ResponseWriter, err string, pretty bool, code int) {
 	w.WriteHeader(code)
 
 	type errResponse struct {
-		Error string
+		Error string `json:"error"`
 	}
 
 	response := errResponse{Error: err}

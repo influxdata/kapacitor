@@ -23,6 +23,11 @@ import (
 	"github.com/twinj/uuid"
 )
 
+const (
+	tasksPath         = "/tasks"
+	tasksPathAnchored = "/tasks/"
+)
+
 type Service struct {
 	oldDBDir         string
 	tasks            TaskDAO
@@ -88,38 +93,38 @@ func (ts *Service) Open() error {
 		{
 			Name:        "task",
 			Method:      "GET",
-			Pattern:     "/tasks/",
+			Pattern:     tasksPathAnchored,
 			HandlerFunc: ts.handleTask,
 		},
 		{
 			Name:        "deleteTask",
 			Method:      "DELETE",
-			Pattern:     "/tasks/",
+			Pattern:     tasksPathAnchored,
 			HandlerFunc: ts.handleDeleteTask,
 		},
 		{
 			// Satisfy CORS checks.
 			Name:        "/tasks/-cors",
 			Method:      "OPTIONS",
-			Pattern:     "/tasks/",
+			Pattern:     tasksPathAnchored,
 			HandlerFunc: httpd.ServeOptions,
 		},
 		{
 			Name:        "updateTask",
 			Method:      "PATCH",
-			Pattern:     "/tasks/",
+			Pattern:     tasksPathAnchored,
 			HandlerFunc: ts.handleUpdateTask,
 		},
 		{
 			Name:        "listTasks",
 			Method:      "GET",
-			Pattern:     "/tasks",
+			Pattern:     tasksPath,
 			HandlerFunc: ts.handleListTasks,
 		},
 		{
 			Name:        "createTask",
 			Method:      "POST",
-			Pattern:     "/tasks",
+			Pattern:     tasksPath,
 			HandlerFunc: ts.handleCreateTask,
 		},
 	}
@@ -374,11 +379,12 @@ type TaskInfo struct {
 }
 
 func (ts *Service) handleTask(w http.ResponseWriter, r *http.Request) {
-	_, id := path.Split(r.URL.Path)
-	if id == "" {
-		httpd.HttpError(w, "must specify task id on path", true, http.StatusBadRequest)
+	id, err := ts.taskIDFromPath(r.URL.Path)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
 		return
 	}
+	ts.logger.Println("D! handleTask", r.URL.Path, id)
 
 	raw, err := ts.tasks.Get(id)
 	if err != nil {
@@ -499,8 +505,18 @@ var allFields = []string{
 	"last-enabled",
 }
 
+const tasksBasePathAnchored = httpd.BasePath + tasksPathAnchored
+
+func (ts *Service) taskIDFromPath(path string) (string, error) {
+	if len(path) <= len(tasksBasePathAnchored) {
+		return "", errors.New("must specify task id on path")
+	}
+	id := path[len(tasksBasePathAnchored):]
+	return id, nil
+}
+
 func (ts *Service) taskLink(id string) client.Link {
-	return client.Link{Relation: client.Self, Href: path.Join(httpd.BasePath, "tasks", id)}
+	return client.Link{Relation: client.Self, Href: path.Join(httpd.BasePath, tasksPath, id)}
 }
 
 func (ts *Service) handleListTasks(w http.ResponseWriter, r *http.Request) {
@@ -516,6 +532,8 @@ func (ts *Service) handleListTasks(w http.ResponseWriter, r *http.Request) {
 
 	scriptFormat := r.URL.Query().Get("script-format")
 	switch scriptFormat {
+	case "":
+		scriptFormat = "formatted"
 	case "formatted":
 	case "raw":
 	default:
@@ -525,6 +543,8 @@ func (ts *Service) handleListTasks(w http.ResponseWriter, r *http.Request) {
 
 	dotView := r.URL.Query().Get("dot-view")
 	switch dotView {
+	case "":
+		dotView = "attributes"
 	case "attributes":
 	case "labels":
 	default:
@@ -532,19 +552,23 @@ func (ts *Service) handleListTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var err error
+	offset := int64(0)
 	offsetStr := r.URL.Query().Get("offset")
-	offset, err := strconv.ParseInt(offsetStr, 10, 64)
-	if err != nil {
-		httpd.HttpError(w, fmt.Sprintf("invalid offset parameter %q must be an integer: %s", offsetStr, err), true, http.StatusBadRequest)
+	if offsetStr != "" {
+		offset, err = strconv.ParseInt(offsetStr, 10, 64)
+		if err != nil {
+			httpd.HttpError(w, fmt.Sprintf("invalid offset parameter %q must be an integer: %s", offsetStr, err), true, http.StatusBadRequest)
+		}
 	}
 
+	limit := int64(100)
 	limitStr := r.URL.Query().Get("limit")
-	limit, err := strconv.ParseInt(limitStr, 10, 64)
-	if err != nil {
-		httpd.HttpError(w, fmt.Sprintf("invalid limit parameter %q must be an integer: %s", limitStr, err), true, http.StatusBadRequest)
-	}
-	if limit == 0 {
-		limit = 100
+	if limitStr != "" {
+		limit, err = strconv.ParseInt(limitStr, 10, 64)
+		if err != nil {
+			httpd.HttpError(w, fmt.Sprintf("invalid limit parameter %q must be an integer: %s", limitStr, err), true, http.StatusBadRequest)
+		}
 	}
 
 	rawTasks, err := ts.tasks.List(pattern, int(offset), int(limit))
@@ -640,7 +664,7 @@ func (ts *Service) handleListTasks(w http.ResponseWriter, r *http.Request) {
 	w.Write(httpd.MarshalJSON(response{tasks}, true))
 }
 
-var validTaskID = regexp.MustCompile(`^[-\w]+$`)
+var validTaskID = regexp.MustCompile(`^[-\._\p{L}0-9]+$`)
 
 func (ts *Service) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	task := client.CreateTaskOptions{}
@@ -654,7 +678,7 @@ func (ts *Service) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 		task.ID = uuid.NewV4().String()
 	}
 	if !validTaskID.MatchString(task.ID) {
-		httpd.HttpError(w, fmt.Sprintf("task ID must match %v %q", validTaskID, task.ID), true, http.StatusBadRequest)
+		httpd.HttpError(w, fmt.Sprintf("task ID must contain only letters, numbers, '-', '.' and '_'. %q", task.ID), true, http.StatusBadRequest)
 		return
 	}
 
@@ -665,7 +689,7 @@ func (ts *Service) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	// Check for existing task
 	_, err = ts.tasks.Get(task.ID)
 	if err == nil {
-		httpd.HttpError(w, "task already exists", true, http.StatusBadRequest)
+		httpd.HttpError(w, fmt.Sprintf("task %s already exists", task.ID), true, http.StatusBadRequest)
 		return
 	}
 
@@ -707,8 +731,8 @@ func (ts *Service) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	case client.Disabled:
 		newTask.Status = Disabled
 	default:
-		httpd.HttpError(w, fmt.Sprintf("invalid status field %q", task.Status), true, http.StatusBadRequest)
-		return
+		task.Status = client.Disabled
+		newTask.Status = Disabled
 	}
 
 	// Validate task
@@ -765,15 +789,22 @@ func (ts *Service) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 		Dot:            dot,
 		Executing:      executing,
 		ExecutionStats: stats,
+		Created:        newTask.Created,
+		Modified:       newTask.Modified,
+		LastEnabled:    newTask.LastEnabled,
 	}
 	w.Write(httpd.MarshalJSON(t, true))
 }
 
 func (ts *Service) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
-	_, id := path.Split(r.URL.Path)
+	id, err := ts.taskIDFromPath(r.URL.Path)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
+		return
+	}
 	task := client.UpdateTaskOptions{}
 	dec := json.NewDecoder(r.Body)
-	err := dec.Decode(&task)
+	err = dec.Decode(&task)
 	if err != nil {
 		httpd.HttpError(w, "invalid JSON", true, http.StatusBadRequest)
 		return
@@ -856,9 +887,13 @@ func (ts *Service) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (ts *Service) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
-	_, id := path.Split(r.URL.Path)
+	id, err := ts.taskIDFromPath(r.URL.Path)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
+		return
+	}
 
-	err := ts.deleteTask(id)
+	err = ts.deleteTask(id)
 	if err != nil {
 		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
 		return

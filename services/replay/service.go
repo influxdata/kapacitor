@@ -34,7 +34,18 @@ const batchEXT = ".brpl"
 
 const precision = "n"
 
-var validID = regexp.MustCompile(`^[-\w]+$`)
+const (
+	recordingsPath         = "/recordings"
+	recordingsPathAnchored = "/recordings/"
+	recordStreamPath       = recordingsPath + "/stream"
+	recordBatchPath        = recordingsPath + "/batch"
+	recordQueryPath        = recordingsPath + "/query"
+
+	replaysPath         = "/replays"
+	replaysPathAnchored = "/replays/"
+)
+
+var validID = regexp.MustCompile(`^[-\._\p{L}0-9]+$`)
 
 // Handles recording, starting, and waiting on replays
 type Service struct {
@@ -81,108 +92,108 @@ func NewService(conf Config, l *log.Logger) *Service {
 const recordingNamespace = "recording_store"
 const replayNamespace = "replay_store"
 
-func (r *Service) Open() error {
+func (s *Service) Open() error {
 	// Create DAO
-	r.recordings = newRecordingKV(r.StorageService.Store(recordingNamespace))
-	r.replays = newReplayKV(r.StorageService.Store(replayNamespace))
+	s.recordings = newRecordingKV(s.StorageService.Store(recordingNamespace))
+	s.replays = newReplayKV(s.StorageService.Store(replayNamespace))
 
-	err := os.MkdirAll(r.saveDir, 0755)
+	err := os.MkdirAll(s.saveDir, 0755)
 	if err != nil {
 		return err
 	}
 
-	err = r.migrate()
+	err = s.migrate()
 	if err != nil {
 		return err
 	}
 
 	// Mark all running replays or recordings as failed since
 	// we are just starting and they cannot possibly be still running
-	r.markFailedRecordings()
-	r.markFailedReplays()
+	s.markFailedRecordings()
+	s.markFailedReplays()
 
 	// Setup routes
-	r.routes = []httpd.Route{
+	s.routes = []httpd.Route{
 		{
 			Name:        "recording",
 			Method:      "GET",
-			Pattern:     "/recordings/",
-			HandlerFunc: r.handleRecording,
+			Pattern:     recordingsPathAnchored,
+			HandlerFunc: s.handleRecording,
 		},
 		{
 			Name:        "deleteRecording",
 			Method:      "DELETE",
-			Pattern:     "/recordings/",
-			HandlerFunc: r.handleDeleteRecording,
+			Pattern:     recordingsPathAnchored,
+			HandlerFunc: s.handleDeleteRecording,
 		},
 		{
 			Name:        "/recordings/-cors",
 			Method:      "OPTIONS",
-			Pattern:     "/recordings/",
+			Pattern:     recordingsPathAnchored,
 			HandlerFunc: httpd.ServeOptions,
 		},
 		{
 			Name:        "listRecordings",
 			Method:      "GET",
-			Pattern:     "/recordings",
-			HandlerFunc: r.handleListRecordings,
+			Pattern:     recordingsPath,
+			HandlerFunc: s.handleListRecordings,
 		},
 		{
 			Name:        "createRecording",
 			Method:      "POST",
-			Pattern:     "/recordings/stream",
-			HandlerFunc: r.handleRecordStream,
+			Pattern:     recordStreamPath,
+			HandlerFunc: s.handleRecordStream,
 		},
 		{
 			Name:        "createRecording",
 			Method:      "POST",
-			Pattern:     "/recordings/batch",
-			HandlerFunc: r.handleRecordBatch,
+			Pattern:     recordBatchPath,
+			HandlerFunc: s.handleRecordBatch,
 		},
 		{
 			Name:        "createRecording",
 			Method:      "POST",
-			Pattern:     "/recordings/query",
-			HandlerFunc: r.handleRecordQuery,
+			Pattern:     recordQueryPath,
+			HandlerFunc: s.handleRecordQuery,
 		},
 		{
 			Name:        "replay",
 			Method:      "GET",
-			Pattern:     "/replays/",
-			HandlerFunc: r.handleReplay,
+			Pattern:     replaysPathAnchored,
+			HandlerFunc: s.handleReplay,
 		},
 		{
 			Name:        "deleteReplay",
 			Method:      "DELETE",
-			Pattern:     "/replays/",
-			HandlerFunc: r.handleDeleteReplay,
+			Pattern:     replaysPathAnchored,
+			HandlerFunc: s.handleDeleteReplay,
 		},
 		{
 			Name:        "/replays/-cors",
 			Method:      "OPTIONS",
-			Pattern:     "/replays/",
+			Pattern:     replaysPathAnchored,
 			HandlerFunc: httpd.ServeOptions,
 		},
 		{
 			Name:        "listReplays",
 			Method:      "GET",
-			Pattern:     "/replays",
-			HandlerFunc: r.handleListReplays,
+			Pattern:     replaysPath,
+			HandlerFunc: s.handleListReplays,
 		},
 		{
 			Name:        "createReplay",
 			Method:      "POST",
-			Pattern:     "/replays",
-			HandlerFunc: r.handleCreateReplay,
+			Pattern:     replaysPath,
+			HandlerFunc: s.handleCreateReplay,
 		},
 	}
 
-	return r.HTTPDService.AddRoutes(r.routes)
+	return s.HTTPDService.AddRoutes(s.routes)
 }
 
-func (r *Service) migrate() error {
+func (s *Service) migrate() error {
 	// Find all recordings and store their metadata into the new storage service.
-	files, err := ioutil.ReadDir(r.saveDir)
+	files, err := ioutil.ReadDir(s.saveDir)
 	if err != nil {
 		return errors.Wrap(err, "migrating recording metadata")
 	}
@@ -202,7 +213,7 @@ func (r *Service) migrate() error {
 		case batchEXT:
 			typ = BatchRecording
 		default:
-			r.logger.Println("E! unknown file in replay dir", name)
+			s.logger.Println("E! unknown file in replay dir", name)
 			continue
 		}
 		recording := Recording{
@@ -213,35 +224,35 @@ func (r *Service) migrate() error {
 			Status:   Finished,
 			Progress: 1.0,
 		}
-		err = r.recordings.Create(recording)
+		err = s.recordings.Create(recording)
 		if err != nil {
 			if err == ErrRecordingExists {
-				r.logger.Printf("D! skipping recording %s, metadata already migrated", id)
+				s.logger.Printf("D! skipping recording %s, metadata already migrated", id)
 			} else {
 				return errors.Wrap(err, "creating recording metadata")
 			}
 		} else {
-			r.logger.Printf("D! recording %s metadata migrated", id)
+			s.logger.Printf("D! recording %s metadata migrated", id)
 		}
 	}
 	return nil
 }
 
-func (r *Service) markFailedRecordings() {
+func (s *Service) markFailedRecordings() {
 	limit := 100
 	offset := 0
 	for {
-		recordings, err := r.recordings.List("", offset, limit)
+		recordings, err := s.recordings.List("", offset, limit)
 		if err != nil {
-			r.logger.Println("E! failed to retrieve recordings:", err)
+			s.logger.Println("E! failed to retrieve recordings:", err)
 		}
 		for _, recording := range recordings {
 			if recording.Status == Running {
 				recording.Status = Failed
 				recording.Error = "unexpected Kapacitor shutdown"
-				err := r.recordings.Replace(recording)
+				err := s.recordings.Replace(recording)
 				if err != nil {
-					r.logger.Println("E! failed to set recording status to failed:", err)
+					s.logger.Println("E! failed to set recording status to failed:", err)
 				}
 			}
 		}
@@ -252,21 +263,21 @@ func (r *Service) markFailedRecordings() {
 	}
 }
 
-func (r *Service) markFailedReplays() {
+func (s *Service) markFailedReplays() {
 	limit := 100
 	offset := 0
 	for {
-		replays, err := r.replays.List("", offset, limit)
+		replays, err := s.replays.List("", offset, limit)
 		if err != nil {
-			r.logger.Println("E! failed to retrieve replays:", err)
+			s.logger.Println("E! failed to retrieve replays:", err)
 		}
 		for _, replay := range replays {
 			if replay.Status == Running {
 				replay.Status = Failed
 				replay.Error = "unexpected Kapacitor shutdown"
-				err := r.replays.Replace(replay)
+				err := s.replays.Replace(replay)
 				if err != nil {
-					r.logger.Println("E! failed to set replay status to failed:", err)
+					s.logger.Println("E! failed to set replay status to failed:", err)
 				}
 			}
 		}
@@ -277,11 +288,20 @@ func (r *Service) markFailedReplays() {
 	}
 }
 
-func (r *Service) Close() error {
-	r.HTTPDService.DelRoutes(r.routes)
+func (s *Service) Close() error {
+	s.HTTPDService.DelRoutes(s.routes)
 	return nil
 }
 
+const recordingsBasePathAnchored = httpd.BasePath + recordingsPathAnchored
+
+func (s *Service) recordingIDFromPath(path string) (string, error) {
+	if len(path) <= len(recordingsBasePathAnchored) {
+		return "", errors.New("must specify recording id on path")
+	}
+	id := path[len(recordingsBasePathAnchored):]
+	return id, nil
+}
 func recordingLink(id string) kclient.Link {
 	return kclient.Link{Relation: kclient.Self, Href: path.Join(httpd.BasePath, "recordings", id)}
 }
@@ -315,6 +335,15 @@ func convertRecording(recording Recording) kclient.Recording {
 	}
 }
 
+const replaysBasePathAnchored = httpd.BasePath + replaysPathAnchored
+
+func (s *Service) replayIDFromPath(path string) (string, error) {
+	if len(path) <= len(replaysBasePathAnchored) {
+		return "", errors.New("must specify replay id on path")
+	}
+	id := path[len(replaysBasePathAnchored):]
+	return id, nil
+}
 func replayLink(id string) kclient.Link {
 	return kclient.Link{Relation: kclient.Self, Href: path.Join(httpd.BasePath, "replays", id)}
 }
@@ -371,19 +400,23 @@ func (s *Service) handleListRecordings(w http.ResponseWriter, r *http.Request) {
 		fields = append(fields, "id", "link")
 	}
 
+	var err error
+	offset := int64(0)
 	offsetStr := r.URL.Query().Get("offset")
-	offset, err := strconv.ParseInt(offsetStr, 10, 64)
-	if err != nil {
-		httpd.HttpError(w, fmt.Sprintf("invalid offset parameter %q must be an integer: %s", offsetStr, err), true, http.StatusBadRequest)
+	if offsetStr != "" {
+		offset, err = strconv.ParseInt(offsetStr, 10, 64)
+		if err != nil {
+			httpd.HttpError(w, fmt.Sprintf("invalid offset parameter %q must be an integer: %s", offsetStr, err), true, http.StatusBadRequest)
+		}
 	}
 
+	limit := int64(100)
 	limitStr := r.URL.Query().Get("limit")
-	limit, err := strconv.ParseInt(limitStr, 10, 64)
-	if err != nil {
-		httpd.HttpError(w, fmt.Sprintf("invalid limit parameter %q must be an integer: %s", limitStr, err), true, http.StatusBadRequest)
-	}
-	if limit == 0 {
-		limit = 100
+	if limitStr != "" {
+		limit, err = strconv.ParseInt(limitStr, 10, 64)
+		if err != nil {
+			httpd.HttpError(w, fmt.Sprintf("invalid limit parameter %q must be an integer: %s", limitStr, err), true, http.StatusBadRequest)
+		}
 	}
 
 	recordings, err := s.recordings.List(pattern, int(offset), int(limit))
@@ -435,10 +468,14 @@ func (s *Service) handleListRecordings(w http.ResponseWriter, r *http.Request) {
 	w.Write(httpd.MarshalJSON(response{Recordings: rs}, true))
 }
 
-func (r *Service) handleRecording(w http.ResponseWriter, req *http.Request) {
-	_, rid := path.Split(req.URL.Path)
+func (s *Service) handleRecording(w http.ResponseWriter, r *http.Request) {
+	rid, err := s.recordingIDFromPath(r.URL.Path)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
+		return
+	}
 
-	recording, err := r.recordings.Get(rid)
+	recording, err := s.recordings.Get(rid)
 	if err != nil {
 		httpd.HttpError(w, "error finding recording: "+err.Error(), true, http.StatusInternalServerError)
 		return
@@ -451,8 +488,13 @@ func (r *Service) handleRecording(w http.ResponseWriter, req *http.Request) {
 
 	w.Write(httpd.MarshalJSON(convertRecording(recording), true))
 }
+
 func (s *Service) handleDeleteRecording(w http.ResponseWriter, r *http.Request) {
-	_, rid := path.Split(r.URL.Path)
+	rid, err := s.recordingIDFromPath(r.URL.Path)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
+		return
+	}
 	recording, err := s.recordings.Get(rid)
 	if err == ErrNoRecordingExists {
 		w.WriteHeader(http.StatusNoContent)
@@ -482,9 +524,16 @@ func (s *Service) handleDeleteRecording(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (r *Service) handleRecordStream(w http.ResponseWriter, req *http.Request) {
+func (s *Service) dataURLFromID(id, ext string) url.URL {
+	return url.URL{
+		Scheme: "file",
+		Path:   path.Join(s.saveDir, id+ext),
+	}
+}
+
+func (s *Service) handleRecordStream(w http.ResponseWriter, r *http.Request) {
 	var opt kclient.RecordStreamOptions
-	dec := json.NewDecoder(req.Body)
+	dec := json.NewDecoder(r.Body)
 	err := dec.Decode(&opt)
 	if err != nil {
 		httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
@@ -494,18 +543,15 @@ func (r *Service) handleRecordStream(w http.ResponseWriter, req *http.Request) {
 		opt.ID = uuid.NewV4().String()
 	}
 	if !validID.MatchString(opt.ID) {
-		httpd.HttpError(w, fmt.Sprintf("recording ID must match %v %q", validID, opt.ID), true, http.StatusBadRequest)
+		httpd.HttpError(w, fmt.Sprintf("recording ID must contain only letters, numbers, '-', '.' and '_'. %q", opt.ID), true, http.StatusBadRequest)
 		return
 	}
-	t, err := r.TaskStore.Load(opt.Task)
+	t, err := s.TaskStore.Load(opt.Task)
 	if err != nil {
 		httpd.HttpError(w, err.Error(), true, http.StatusNotFound)
 		return
 	}
-	dataUrl := url.URL{
-		Scheme: "file",
-		Path:   path.Join(r.saveDir, opt.ID+streamEXT),
-	}
+	dataUrl := s.dataURLFromID(opt.ID, streamEXT)
 
 	recording := Recording{
 		ID:      opt.ID,
@@ -514,7 +560,7 @@ func (r *Service) handleRecordStream(w http.ResponseWriter, req *http.Request) {
 		Date:    time.Now(),
 		Status:  Running,
 	}
-	err = r.recordings.Create(recording)
+	err = s.recordings.Create(recording)
 	if err != nil {
 		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
 		return
@@ -523,15 +569,15 @@ func (r *Service) handleRecordStream(w http.ResponseWriter, req *http.Request) {
 	// Spawn routine to perform actual recording.
 	go func(recording Recording) {
 		ds, _ := parseDataSourceURL(dataUrl.String())
-		err := r.doRecordStream(opt.ID, ds, opt.Stop, t.DBRPs, t.Measurements())
-		r.updateRecordingResult(recording, ds, err)
+		err := s.doRecordStream(opt.ID, ds, opt.Stop, t.DBRPs, t.Measurements())
+		s.updateRecordingResult(recording, ds, err)
 	}(recording)
 
 	w.WriteHeader(http.StatusCreated)
 	w.Write(httpd.MarshalJSON(convertRecording(recording), true))
 }
 
-func (r *Service) handleRecordBatch(w http.ResponseWriter, req *http.Request) {
+func (s *Service) handleRecordBatch(w http.ResponseWriter, req *http.Request) {
 	var opt kclient.RecordBatchOptions
 	dec := json.NewDecoder(req.Body)
 	err := dec.Decode(&opt)
@@ -543,7 +589,7 @@ func (r *Service) handleRecordBatch(w http.ResponseWriter, req *http.Request) {
 		opt.ID = uuid.NewV4().String()
 	}
 	if !validID.MatchString(opt.ID) {
-		httpd.HttpError(w, fmt.Sprintf("recording ID must match %v %q", validID, opt.ID), true, http.StatusBadRequest)
+		httpd.HttpError(w, fmt.Sprintf("recording ID must contain only letters, numbers, '-', '.' and '_'. %q", opt.ID), true, http.StatusBadRequest)
 		return
 	}
 
@@ -555,15 +601,12 @@ func (r *Service) handleRecordBatch(w http.ResponseWriter, req *http.Request) {
 		opt.Stop = time.Now()
 	}
 
-	t, err := r.TaskStore.Load(opt.Task)
+	t, err := s.TaskStore.Load(opt.Task)
 	if err != nil {
 		httpd.HttpError(w, err.Error(), true, http.StatusNotFound)
 		return
 	}
-	dataUrl := url.URL{
-		Scheme: "file",
-		Path:   path.Join(r.saveDir, opt.ID+batchEXT),
-	}
+	dataUrl := s.dataURLFromID(opt.ID, batchEXT)
 
 	recording := Recording{
 		ID:      opt.ID,
@@ -572,7 +615,7 @@ func (r *Service) handleRecordBatch(w http.ResponseWriter, req *http.Request) {
 		Date:    time.Now(),
 		Status:  Running,
 	}
-	err = r.recordings.Create(recording)
+	err = s.recordings.Create(recording)
 	if err != nil {
 		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
 		return
@@ -580,15 +623,15 @@ func (r *Service) handleRecordBatch(w http.ResponseWriter, req *http.Request) {
 
 	go func(recording Recording) {
 		ds, _ := parseDataSourceURL(dataUrl.String())
-		err := r.doRecordBatch(opt.ID, ds, t, opt.Start, opt.Stop, opt.Cluster)
-		r.updateRecordingResult(recording, ds, err)
+		err := s.doRecordBatch(opt.ID, ds, t, opt.Start, opt.Stop, opt.Cluster)
+		s.updateRecordingResult(recording, ds, err)
 	}(recording)
 
 	w.WriteHeader(http.StatusCreated)
 	w.Write(httpd.MarshalJSON(convertRecording(recording), true))
 }
 
-func (r *Service) handleRecordQuery(w http.ResponseWriter, req *http.Request) {
+func (s *Service) handleRecordQuery(w http.ResponseWriter, req *http.Request) {
 	var opt kclient.RecordQueryOptions
 	dec := json.NewDecoder(req.Body)
 	err := dec.Decode(&opt)
@@ -600,27 +643,22 @@ func (r *Service) handleRecordQuery(w http.ResponseWriter, req *http.Request) {
 		opt.ID = uuid.NewV4().String()
 	}
 	if !validID.MatchString(opt.ID) {
-		httpd.HttpError(w, fmt.Sprintf("recording ID must match %v %q", validID, opt.ID), true, http.StatusBadRequest)
+		httpd.HttpError(w, fmt.Sprintf("recording ID must contain only letters, numbers, '-', '.' and '_'. %q", opt.ID), true, http.StatusBadRequest)
 		return
 	}
 	if opt.Query == "" {
 		httpd.HttpError(w, "must provide query", true, http.StatusBadRequest)
 		return
 	}
-	var dataPath string
+	var dataUrl url.URL
 	var typ RecordingType
 	switch opt.Type {
 	case kclient.StreamTask:
-		dataPath = path.Join(r.saveDir, opt.ID+streamEXT)
+		dataUrl = s.dataURLFromID(opt.ID, streamEXT)
 		typ = StreamRecording
 	case kclient.BatchTask:
-		dataPath = path.Join(r.saveDir, opt.ID+batchEXT)
+		dataUrl = s.dataURLFromID(opt.ID, batchEXT)
 		typ = BatchRecording
-	}
-
-	dataUrl := url.URL{
-		Scheme: "file",
-		Path:   dataPath,
 	}
 
 	recording := Recording{
@@ -630,7 +668,7 @@ func (r *Service) handleRecordQuery(w http.ResponseWriter, req *http.Request) {
 		Date:    time.Now(),
 		Status:  Running,
 	}
-	err = r.recordings.Create(recording)
+	err = s.recordings.Create(recording)
 	if err != nil {
 		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
 		return
@@ -638,15 +676,15 @@ func (r *Service) handleRecordQuery(w http.ResponseWriter, req *http.Request) {
 
 	go func(recording Recording) {
 		ds, _ := parseDataSourceURL(dataUrl.String())
-		err := r.doRecordQuery(opt.ID, ds, opt.Query, typ, opt.Cluster)
-		r.updateRecordingResult(recording, ds, err)
+		err := s.doRecordQuery(opt.ID, ds, opt.Query, typ, opt.Cluster)
+		s.updateRecordingResult(recording, ds, err)
 	}(recording)
 
 	w.WriteHeader(http.StatusCreated)
 	w.Write(httpd.MarshalJSON(convertRecording(recording), true))
 }
 
-func (r *Service) updateRecordingResult(recording Recording, ds DataSource, err error) {
+func (s *Service) updateRecordingResult(recording Recording, ds DataSource, err error) {
 	recording.Status = Finished
 	if err != nil {
 		recording.Status = Failed
@@ -656,18 +694,22 @@ func (r *Service) updateRecordingResult(recording Recording, ds DataSource, err 
 	recording.Progress = 1.0
 	recording.Size, err = ds.Size()
 	if err != nil {
-		r.logger.Println("E! failed to determine size of recording", recording.ID, err)
+		s.logger.Println("E! failed to determine size of recording", recording.ID, err)
 	}
 
-	err = r.recordings.Replace(recording)
+	err = s.recordings.Replace(recording)
 	if err != nil {
-		r.logger.Println("E! failed to save recording info", recording.ID, err)
+		s.logger.Println("E! failed to save recording info", recording.ID, err)
 	}
 }
 
-func (r *Service) handleReplay(w http.ResponseWriter, req *http.Request) {
-	_, id := path.Split(req.URL.Path)
-	replay, err := r.replays.Get(id)
+func (s *Service) handleReplay(w http.ResponseWriter, req *http.Request) {
+	id, err := s.replayIDFromPath(req.URL.Path)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
+		return
+	}
+	replay, err := s.replays.Get(id)
 	if err != nil {
 		httpd.HttpError(w, "could not find replay: "+err.Error(), true, http.StatusNotFound)
 		return
@@ -680,10 +722,14 @@ func (r *Service) handleReplay(w http.ResponseWriter, req *http.Request) {
 	w.Write(httpd.MarshalJSON(convertReplay(replay), true))
 }
 
-func (r *Service) handleDeleteReplay(w http.ResponseWriter, req *http.Request) {
-	_, id := path.Split(req.URL.Path)
+func (s *Service) handleDeleteReplay(w http.ResponseWriter, req *http.Request) {
+	id, err := s.replayIDFromPath(req.URL.Path)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
+		return
+	}
 	//TODO: Cancel running replays
-	r.replays.Delete(id)
+	s.replays.Delete(id)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -710,19 +756,23 @@ func (s *Service) handleListReplays(w http.ResponseWriter, r *http.Request) {
 		fields = append(fields, "id", "link")
 	}
 
+	var err error
+	offset := int64(0)
 	offsetStr := r.URL.Query().Get("offset")
-	offset, err := strconv.ParseInt(offsetStr, 10, 64)
-	if err != nil {
-		httpd.HttpError(w, fmt.Sprintf("invalid offset parameter %q must be an integer: %s", offsetStr, err), true, http.StatusBadRequest)
+	if offsetStr != "" {
+		offset, err = strconv.ParseInt(offsetStr, 10, 64)
+		if err != nil {
+			httpd.HttpError(w, fmt.Sprintf("invalid offset parameter %q must be an integer: %s", offsetStr, err), true, http.StatusBadRequest)
+		}
 	}
 
+	limit := int64(100)
 	limitStr := r.URL.Query().Get("limit")
-	limit, err := strconv.ParseInt(limitStr, 10, 64)
-	if err != nil {
-		httpd.HttpError(w, fmt.Sprintf("invalid limit parameter %q must be an integer: %s", limitStr, err), true, http.StatusBadRequest)
-	}
-	if limit == 0 {
-		limit = 100
+	if limitStr != "" {
+		limit, err = strconv.ParseInt(limitStr, 10, 64)
+		if err != nil {
+			httpd.HttpError(w, fmt.Sprintf("invalid limit parameter %q must be an integer: %s", limitStr, err), true, http.StatusBadRequest)
+		}
 	}
 
 	replays, err := s.replays.List(pattern, int(offset), int(limit))
@@ -778,7 +828,7 @@ func (s *Service) handleListReplays(w http.ResponseWriter, r *http.Request) {
 	w.Write(httpd.MarshalJSON(response{Replays: rs}, true))
 }
 
-func (r *Service) handleCreateReplay(w http.ResponseWriter, req *http.Request) {
+func (s *Service) handleCreateReplay(w http.ResponseWriter, req *http.Request) {
 	var opt kclient.CreateReplayOptions
 	// Default clock to the Fast clock
 	opt.Clock = kclient.Fast
@@ -792,16 +842,16 @@ func (r *Service) handleCreateReplay(w http.ResponseWriter, req *http.Request) {
 		opt.ID = uuid.NewV4().String()
 	}
 	if !validID.MatchString(opt.ID) {
-		httpd.HttpError(w, fmt.Sprintf("replay ID must match %v %q", validID, opt.ID), true, http.StatusBadRequest)
+		httpd.HttpError(w, fmt.Sprintf("replay ID must contain only letters, numbers, '-', '.' and '_'. %q", opt.ID), true, http.StatusBadRequest)
 		return
 	}
 
-	t, err := r.TaskStore.Load(opt.Task)
+	t, err := s.TaskStore.Load(opt.Task)
 	if err != nil {
 		httpd.HttpError(w, "task load: "+err.Error(), true, http.StatusNotFound)
 		return
 	}
-	recording, err := r.recordings.Get(opt.Recording)
+	recording, err := s.recordings.Get(opt.Recording)
 	if err != nil {
 		httpd.HttpError(w, "recording not found: "+err.Error(), true, http.StatusNotFound)
 		return
@@ -831,10 +881,10 @@ func (r *Service) handleCreateReplay(w http.ResponseWriter, req *http.Request) {
 		Date:          time.Now(),
 		Status:        Running,
 	}
-	r.replays.Create(replay)
+	s.replays.Create(replay)
 
 	go func(replay Replay) {
-		err := r.doReplay(t, recording, clk, opt.RecordingTime)
+		err := s.doReplay(t, recording, clk, opt.RecordingTime)
 		replay.Status = Finished
 		if err != nil {
 			replay.Status = Failed
@@ -842,9 +892,9 @@ func (r *Service) handleCreateReplay(w http.ResponseWriter, req *http.Request) {
 		}
 		replay.Progress = 1.0
 		replay.Date = time.Now()
-		err = r.replays.Replace(replay)
+		err = s.replays.Replace(replay)
 		if err != nil {
-			r.logger.Println("E! failed to save replay results:", err)
+			s.logger.Println("E! failed to save replay results:", err)
 		}
 	}(replay)
 
@@ -852,9 +902,9 @@ func (r *Service) handleCreateReplay(w http.ResponseWriter, req *http.Request) {
 	w.Write(httpd.MarshalJSON(convertReplay(replay), true))
 }
 
-func (r *Service) doReplay(task *kapacitor.Task, recording Recording, clk clock.Clock, recTime bool) error {
+func (s *Service) doReplay(task *kapacitor.Task, recording Recording, clk clock.Clock, recTime bool) error {
 	// Create new isolated task master
-	tm := r.TaskMaster.New()
+	tm := s.TaskMaster.New()
 	tm.Open()
 	defer tm.Close()
 	et, err := tm.StartTask(task)
@@ -933,8 +983,8 @@ func (s streamWriter) Close() error {
 }
 
 // Record the stream for a duration
-func (r *Service) doRecordStream(id string, dataSource DataSource, stop time.Time, dbrps []kapacitor.DBRP, measurements []string) error {
-	e, err := r.TaskMaster.NewFork(id, dbrps, measurements)
+func (s *Service) doRecordStream(id string, dataSource DataSource, stop time.Time, dbrps []kapacitor.DBRP, measurements []string) error {
+	e, err := s.TaskMaster.NewFork(id, dbrps, measurements)
 	if err != nil {
 		return err
 	}
@@ -962,7 +1012,7 @@ func (r *Service) doRecordStream(id string, dataSource DataSource, stop time.Tim
 	}()
 	<-done
 	e.Abort()
-	r.TaskMaster.DelFork(id)
+	s.TaskMaster.DelFork(id)
 	return nil
 }
 
@@ -988,8 +1038,8 @@ func (b batchArchive) Close() error {
 }
 
 // Record a series of batch queries defined by a batch task
-func (r *Service) doRecordBatch(id string, dataSource DataSource, t *kapacitor.Task, start, stop time.Time, cluster string) error {
-	et, err := kapacitor.NewExecutingTask(r.TaskMaster.New(), t)
+func (s *Service) doRecordBatch(id string, dataSource DataSource, t *kapacitor.Task, start, stop time.Time, cluster string) error {
+	et, err := kapacitor.NewExecutingTask(s.TaskMaster.New(), t)
 	if err != nil {
 		return err
 	}
@@ -999,15 +1049,15 @@ func (r *Service) doRecordBatch(id string, dataSource DataSource, t *kapacitor.T
 		return err
 	}
 
-	if r.InfluxDBService == nil {
+	if s.InfluxDBService == nil {
 		return errors.New("InfluxDB not configured, cannot record batch query")
 	}
 
 	var con client.Client
 	if cluster != "" {
-		con, err = r.InfluxDBService.NewNamedClient(cluster)
+		con, err = s.InfluxDBService.NewNamedClient(cluster)
 	} else {
-		con, err = r.InfluxDBService.NewDefaultClient()
+		con, err = s.InfluxDBService.NewDefaultClient()
 	}
 	if err != nil {
 		return err
@@ -1048,14 +1098,14 @@ func (r *Service) doRecordBatch(id string, dataSource DataSource, t *kapacitor.T
 	return archiver.Close()
 }
 
-func (r *Service) doRecordQuery(id string, dataSource DataSource, q string, typ RecordingType, cluster string) error {
+func (s *Service) doRecordQuery(id string, dataSource DataSource, q string, typ RecordingType, cluster string) error {
 	// Parse query to determine dbrp
 	var db, rp string
-	s, err := influxql.ParseStatement(q)
+	stmt, err := influxql.ParseStatement(q)
 	if err != nil {
 		return err
 	}
-	if slct, ok := s.(*influxql.SelectStatement); ok && len(slct.Sources) == 1 {
+	if slct, ok := stmt.(*influxql.SelectStatement); ok && len(slct.Sources) == 1 {
 		if m, ok := slct.Sources[0].(*influxql.Measurement); ok {
 			db = m.Database
 			rp = m.RetentionPolicy
@@ -1064,15 +1114,15 @@ func (r *Service) doRecordQuery(id string, dataSource DataSource, q string, typ 
 	if db == "" || rp == "" {
 		return errors.New("could not determine database and retention policy. Is the query fully qualified?")
 	}
-	if r.InfluxDBService == nil {
+	if s.InfluxDBService == nil {
 		return errors.New("InfluxDB not configured, cannot record query")
 	}
 	// Query InfluxDB
 	var con client.Client
 	if cluster != "" {
-		con, err = r.InfluxDBService.NewNamedClient(cluster)
+		con, err = s.InfluxDBService.NewNamedClient(cluster)
 	} else {
-		con, err = r.InfluxDBService.NewDefaultClient()
+		con, err = s.InfluxDBService.NewDefaultClient()
 	}
 	if err != nil {
 		return err
