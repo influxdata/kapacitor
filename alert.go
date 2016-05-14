@@ -779,13 +779,17 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group 
 // Alert handlers
 
 func (a *AlertNode) handlePost(post *pipeline.PostHandler, ad *AlertData) {
-	b, err := json.Marshal(ad)
+	bodyBuffer := a.bufPool.Get().(*bytes.Buffer)
+	defer a.bufPool.Put(bodyBuffer)
+	bodyBuffer.Reset()
+
+	err := json.NewEncoder(bodyBuffer).Encode(ad)
 	if err != nil {
 		a.logger.Println("E! failed to marshal alert data json", err)
 		return
 	}
-	buf := bytes.NewBuffer(b)
-	_, err = http.Post(post.URL, "application/json", buf)
+
+	_, err = http.Post(post.URL, "application/json", bodyBuffer)
 	if err != nil {
 		a.logger.Println("E! failed to POST batch", err)
 	}
