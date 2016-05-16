@@ -1,4 +1,4 @@
-# Kapacitor [![Circle CI](https://circleci.com/gh/influxdata/kapacitor/tree/master.svg?style=svg&circle-token=78c97422cf89526309e502a290c230e8a463229f)](https://circleci.com/gh/influxdata/kapacitor/tree/master)
+# Kapacitor [![Circle CI](https://circleci.com/gh/influxdata/kapacitor/tree/master.svg?style=svg&circle-token=78c97422cf89526309e502a290c230e8a463229f)](https://circleci.com/gh/influxdata/kapacitor/tree/master) [![Docker pulls](https://img.shields.io/docker/pulls/library/kapacitor.svg)](https://hub.docker.com/_/kapacitor/)
 Open source framework for processing, monitoring, and alerting on time series data
 
 # Installation
