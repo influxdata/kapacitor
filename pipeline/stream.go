@@ -104,6 +104,17 @@ type FromNode struct {
 	//
 	// All incoming data will be truncated to 1 second resolution.
 	Truncate time.Duration
+
+	// Optional duration for rounding timestamps.
+	// Helpful to ensure data points land on specific boundaries
+	// Example:
+	//    stream
+	//       |from()
+	//           .measurement('mydata')
+	//           .round(1s)
+	//
+	// All incoming data will be rounded to the nearest 1 second boundary.
+	Round time.Duration
 }
 
 func newFromNode() *FromNode {

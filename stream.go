@@ -80,6 +80,9 @@ func (s *FromNode) runStream([]byte) error {
 			if s.s.Truncate != 0 {
 				pt.Time = pt.Time.Truncate(s.s.Truncate)
 			}
+			if s.s.Round != 0 {
+				pt.Time = pt.Time.Round(s.s.Round)
+			}
 			pt = setGroupOnPoint(pt, s.allDimensions, s.dimensions)
 			s.timer.Pause()
 			for _, child := range s.outs {
