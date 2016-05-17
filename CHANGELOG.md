@@ -5,6 +5,7 @@
 ### Release Notes
 
 ### Features
+- [#82](https://github.com/influxdata/kapacitor/issues/82): Multiple services for PagerDuty alert
 
 
 ### Bugfixes

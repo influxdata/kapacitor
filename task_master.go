@@ -65,7 +65,7 @@ type TaskMaster struct {
 	}
 	PagerDutyService interface {
 		Global() bool
-		Alert(incidentKey, desc string, level AlertLevel, details interface{}) error
+		Alert(serviceKey, incidentKey, desc string, level AlertLevel, details interface{}) error
 	}
 	SlackService interface {
 		Global() bool
