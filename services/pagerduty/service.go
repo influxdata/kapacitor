@@ -43,7 +43,7 @@ func (s *Service) Global() bool {
 	return s.global
 }
 
-func (s *Service) Alert(incidentKey, desc string, level kapacitor.AlertLevel, details interface{}) error {
+func (s *Service) Alert(serviceKey, incidentKey, desc string, level kapacitor.AlertLevel, details interface{}) error {
 	var eventType string
 	switch level {
 	case kapacitor.WarnAlert, kapacitor.CritAlert:
@@ -55,7 +55,11 @@ func (s *Service) Alert(incidentKey, desc string, level kapacitor.AlertLevel, de
 	}
 
 	pData := make(map[string]string)
-	pData["service_key"] = s.serviceKey
+	if serviceKey == "" {
+		pData["service_key"] = s.serviceKey
+	} else {
+		pData["service_key"] = serviceKey
+	}
 	pData["event_type"] = eventType
 	pData["description"] = desc
 	pData["incident_key"] = incidentKey

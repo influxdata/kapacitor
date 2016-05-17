@@ -3057,8 +3057,14 @@ func TestStream_AlertPagerDuty(t *testing.T) {
 		pd := postData{}
 		dec := json.NewDecoder(r.Body)
 		dec.Decode(&pd)
-		if exp := "service_key"; pd.ServiceKey != exp {
-			t.Errorf("unexpected service key got %s exp %s", pd.ServiceKey, exp)
+		if rc := atomic.LoadInt32(&requestCount); rc == 1 {
+			if exp := "service_key"; pd.ServiceKey != exp {
+				t.Errorf("unexpected service key got %s exp %s", pd.ServiceKey, exp)
+			}
+		} else if rc := atomic.LoadInt32(&requestCount); rc == 2 {
+			if exp := "test_override_key"; pd.ServiceKey != exp {
+				t.Errorf("unexpected service key got %s exp %s", pd.ServiceKey, exp)
+			}
 		}
 		if exp := "trigger"; pd.EventType != exp {
 			t.Errorf("unexpected event type got %s exp %s", pd.EventType, exp)
@@ -3096,6 +3102,7 @@ stream
 		.crit(lambda: "count" > 8.0)
 		.pagerDuty()
 		.pagerDuty()
+			.serviceKey('test_override_key')
 `
 
 	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)

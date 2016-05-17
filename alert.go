@@ -878,6 +878,7 @@ func (a *AlertNode) handlePagerDuty(pd *pipeline.PagerDutyHandler, ad *AlertData
 		return
 	}
 	err := a.et.tm.PagerDutyService.Alert(
+		pd.ServiceKey,
 		ad.ID,
 		ad.Message,
 		ad.Level,

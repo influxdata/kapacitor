@@ -646,6 +646,10 @@ func (a *AlertNode) PagerDuty() *PagerDutyHandler {
 // tick:embedded:AlertNode.PagerDuty
 type PagerDutyHandler struct {
 	*AlertNode
+
+	// The service key to use for the alert.
+	// Defaults to the value in the configuration if empty.
+	ServiceKey string
 }
 
 // Send the alert to HipChat.
