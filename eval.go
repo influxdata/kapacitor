@@ -18,9 +18,10 @@ const (
 
 type EvalNode struct {
 	node
-	e           *pipeline.EvalNode
-	expressions []stateful.Expression
-	scopePool   stateful.ScopePool
+	e                  *pipeline.EvalNode
+	expressions        []stateful.Expression
+	expressionsByGroup map[models.GroupID][]stateful.Expression
+	scopePool          stateful.ScopePool
 
 	evalErrors *expvar.Int
 }
@@ -31,8 +32,9 @@ func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalN
 		return nil, errors.New("must provide one name per expression via the 'As' property")
 	}
 	en := &EvalNode{
-		node: node{Node: n, et: et, logger: l},
-		e:    n,
+		node:               node{Node: n, et: et, logger: l},
+		e:                  n,
+		expressionsByGroup: make(map[models.GroupID][]stateful.Expression),
 	}
 	// Create stateful expressions
 	en.expressions = make([]stateful.Expression, len(n.Expressions))
@@ -58,7 +60,7 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 		var err error
 		for p, ok := e.ins[0].NextPoint(); ok; p, ok = e.ins[0].NextPoint() {
 			e.timer.Start()
-			p.Fields, err = e.eval(p.Time, p.Fields, p.Tags)
+			p.Fields, err = e.eval(p.Time, p.Group, p.Fields, p.Tags)
 			if err != nil {
 				e.evalErrors.Add(1)
 				if !e.e.QuiteFlag {
@@ -82,7 +84,7 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 			e.timer.Start()
 			for i := 0; i < len(b.Points); {
 				p := b.Points[i]
-				b.Points[i].Fields, err = e.eval(p.Time, p.Fields, p.Tags)
+				b.Points[i].Fields, err = e.eval(p.Time, b.Group, p.Fields, p.Tags)
 				if err != nil {
 					e.evalErrors.Add(1)
 					if !e.e.QuiteFlag {
@@ -106,14 +108,22 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 	return nil
 }
 
-func (e *EvalNode) eval(now time.Time, fields models.Fields, tags map[string]string) (models.Fields, error) {
+func (e *EvalNode) eval(now time.Time, group models.GroupID, fields models.Fields, tags map[string]string) (models.Fields, error) {
 	vars := e.scopePool.Get()
 	defer e.scopePool.Put(vars)
 	err := fillScope(vars, e.scopePool.ReferenceVariables(), now, fields, tags)
 	if err != nil {
 		return nil, err
 	}
-	for i, expr := range e.expressions {
+	expressions, ok := e.expressionsByGroup[group]
+	if !ok {
+		expressions = make([]stateful.Expression, len(e.expressions))
+		for i, exp := range e.expressions {
+			expressions[i] = exp.CopyReset()
+		}
+		e.expressionsByGroup[group] = expressions
+	}
+	for i, expr := range expressions {
 		v, err := expr.Eval(vars)
 		if err != nil {
 			return nil, err

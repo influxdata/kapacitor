@@ -1,0 +1,12 @@
+dbname
+rpname
+types,group=A value=42 0000000001
+dbname
+rpname
+types,group=B value=42 0000000001
+dbname
+rpname
+types,group=A value=24 0000000002
+dbname
+rpname
+types,group=B value=24 0000000002

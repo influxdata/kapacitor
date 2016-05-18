@@ -17,6 +17,9 @@ type Expression interface {
 	EvalBool(scope *tick.Scope) (bool, error)
 
 	Eval(scope *tick.Scope) (interface{}, error)
+
+	// Return a copy of the expression but with a Reset state.
+	CopyReset() Expression
 }
 
 type expression struct {
@@ -40,6 +43,13 @@ func NewExpression(node tick.Node) (Expression, error) {
 		nodeEvaluator:  nodeEvaluator,
 		executionState: CreateExecutionState(),
 	}, nil
+}
+
+func (se *expression) CopyReset() Expression {
+	return &expression{
+		nodeEvaluator:  se.nodeEvaluator,
+		executionState: CreateExecutionState(),
+	}
 }
 
 func (se *expression) Reset() {
