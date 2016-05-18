@@ -5,10 +5,13 @@
 ### Release Notes
 
 ### Features
+
 - [#82](https://github.com/influxdata/kapacitor/issues/82): Multiple services for PagerDuty alert
 
 
 ### Bugfixes
+
+- [#540](https://github.com/influxdata/kapacitor/issues/540): Fixes bug with log level API endpoint.
 
 ## v0.13.1 [2016-05-13]
 

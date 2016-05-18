@@ -18,6 +18,7 @@ import (
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/influxdb/uuid"
+	"github.com/influxdata/kapacitor/client/v1"
 	"github.com/influxdata/wlog"
 )
 
@@ -300,11 +301,19 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // serveLogLevel sets the log level of the server
 func (h *Handler) serveLogLevel(w http.ResponseWriter, r *http.Request) {
-	l := r.URL.Query().Get("level")
-	err := wlog.SetLevelFromName(l)
+	var opt client.LogLevelOptions
+	dec := json.NewDecoder(r.Body)
+	err := dec.Decode(&opt)
+	if err != nil {
+		HttpError(w, "invalid json: "+err.Error(), true, http.StatusBadRequest)
+		return
+	}
+	err = wlog.SetLevelFromName(opt.Level)
 	if err != nil {
 		HttpError(w, err.Error(), true, http.StatusBadRequest)
+		return
 	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // serveRoutes returns a list of all routs and their methods
