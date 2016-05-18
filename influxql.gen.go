@@ -491,7 +491,7 @@ func (a *stringPointAggregator) AggregateBatch(b *models.Batch) error {
 		}
 
 		if a.isSimpleSelector {
-			ap.Aux = []interface{}{p.Tags}
+			ap.Aux = []interface{}{p.Tags, p.Fields}
 		}
 
 		a.aggregator.AggregateString(ap)
@@ -520,7 +520,7 @@ func (a *stringPointAggregator) AggregatePoint(p *models.Point) error {
 	}
 
 	if a.isSimpleSelector {
-		ap.Aux = []interface{}{p.Tags}
+		ap.Aux = []interface{}{p.Tags, p.Fields}
 	}
 
 	a.aggregator.AggregateString(ap)
@@ -557,7 +557,7 @@ func (a *stringPointBulkAggregator) AggregateBatch(b *models.Batch) error {
 		}
 
 		if a.isSimpleSelector {
-			slice[i].Aux = []interface{}{p.Tags}
+			slice[i].Aux = []interface{}{p.Tags, p.Fields}
 		}
 	}
 	a.aggregator.AggregateStringBulk(slice)
@@ -585,7 +585,7 @@ func (a *stringPointBulkAggregator) AggregatePoint(p *models.Point) error {
 	}
 
 	if a.isSimpleSelector {
-		ap.Aux = []interface{}{p.Tags}
+		ap.Aux = []interface{}{p.Tags, p.Fields}
 	}
 
 	a.aggregator.AggregateString(ap)
@@ -615,9 +615,19 @@ func (e *stringPointEmitter) EmitPoint() (models.Point, error) {
 		t = e.time
 	}
 
-	tags := e.tags
+	var fields models.Fields
+	var tags models.Tags
 	if e.isSimpleSelector {
 		tags = ap.Aux[0].(models.Tags)
+		fields = ap.Aux[1].(models.Fields)
+		if e.as != e.field {
+			fields = fields.Copy()
+			fields[e.as] = fields[e.field]
+			delete(fields, e.field)
+		}
+	} else {
+		tags = e.tags
+		fields = map[string]interface{}{e.as: ap.Value}
 	}
 
 	return models.Point{
@@ -626,7 +636,7 @@ func (e *stringPointEmitter) EmitPoint() (models.Point, error) {
 		Group:      e.group,
 		Dimensions: e.dimensions,
 		Tags:       tags,
-		Fields:     map[string]interface{}{e.as: ap.Value},
+		Fields:     fields,
 	}, nil
 }
 
@@ -699,7 +709,7 @@ func (a *booleanPointAggregator) AggregateBatch(b *models.Batch) error {
 		}
 
 		if a.isSimpleSelector {
-			ap.Aux = []interface{}{p.Tags}
+			ap.Aux = []interface{}{p.Tags, p.Fields}
 		}
 
 		a.aggregator.AggregateBoolean(ap)
@@ -728,7 +738,7 @@ func (a *booleanPointAggregator) AggregatePoint(p *models.Point) error {
 	}
 
 	if a.isSimpleSelector {
-		ap.Aux = []interface{}{p.Tags}
+		ap.Aux = []interface{}{p.Tags, p.Fields}
 	}
 
 	a.aggregator.AggregateBoolean(ap)
@@ -765,7 +775,7 @@ func (a *booleanPointBulkAggregator) AggregateBatch(b *models.Batch) error {
 		}
 
 		if a.isSimpleSelector {
-			slice[i].Aux = []interface{}{p.Tags}
+			slice[i].Aux = []interface{}{p.Tags, p.Fields}
 		}
 	}
 	a.aggregator.AggregateBooleanBulk(slice)
@@ -793,7 +803,7 @@ func (a *booleanPointBulkAggregator) AggregatePoint(p *models.Point) error {
 	}
 
 	if a.isSimpleSelector {
-		ap.Aux = []interface{}{p.Tags}
+		ap.Aux = []interface{}{p.Tags, p.Fields}
 	}
 
 	a.aggregator.AggregateBoolean(ap)
@@ -823,9 +833,19 @@ func (e *booleanPointEmitter) EmitPoint() (models.Point, error) {
 		t = e.time
 	}
 
-	tags := e.tags
+	var fields models.Fields
+	var tags models.Tags
 	if e.isSimpleSelector {
 		tags = ap.Aux[0].(models.Tags)
+		fields = ap.Aux[1].(models.Fields)
+		if e.as != e.field {
+			fields = fields.Copy()
+			fields[e.as] = fields[e.field]
+			delete(fields, e.field)
+		}
+	} else {
+		tags = e.tags
+		fields = map[string]interface{}{e.as: ap.Value}
 	}
 
 	return models.Point{
@@ -834,7 +854,7 @@ func (e *booleanPointEmitter) EmitPoint() (models.Point, error) {
 		Group:      e.group,
 		Dimensions: e.dimensions,
 		Tags:       tags,
-		Fields:     map[string]interface{}{e.as: ap.Value},
+		Fields:     fields,
 	}, nil
 }
 
