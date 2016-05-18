@@ -7,6 +7,7 @@
 ### Features
 
 - [#82](https://github.com/influxdata/kapacitor/issues/82): Multiple services for PagerDuty alert
+- [#558](https://github.com/influxdata/kapacitor/pull/558): Preserve fields as well as tags on selector InfluxQL functions.
 
 
 ### Bugfixes

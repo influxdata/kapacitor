@@ -3619,7 +3619,7 @@ stream
 	}
 }
 
-func TestStream_SelectorsPreserveTags(t *testing.T) {
+func TestStream_Selectors(t *testing.T) {
 
 	var script = `
 stream
@@ -3629,23 +3629,24 @@ stream
 		.period(10s)
 		.every(10s)
 	|last('value')
-	|httpOut('TestStream_SimpleMR')
+	|httpOut('TestStream_Selectors')
 `
 	er := kapacitor.Result{
 		Series: imodels.Rows{
 			{
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA", "type": "idle"},
-				Columns: []string{"time", "last"},
+				Columns: []string{"time", "another", "last"},
 				Values: [][]interface{}{[]interface{}{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					5.0,
 					95.3,
 				}},
 			},
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_SimpleMR", script, 15*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_Selectors", script, 15*time.Second, er, nil, false)
 }
 
 func TestStream_TopSelector(t *testing.T) {
