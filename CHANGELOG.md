@@ -5,10 +5,13 @@
 ### Release Notes
 
 ### Features
+
 - [#82](https://github.com/influxdata/kapacitor/issues/82): Multiple services for PagerDuty alert
 
 
 ### Bugfixes
+
+- [#540](https://github.com/influxdata/kapacitor/issues/540): Fixes bug with log level API endpoint.
 
 ## v0.13.1 [2016-05-13]
 
@@ -31,7 +34,6 @@ If you have existing tasks which do not match this pattern they should continue 
 - [#545](https://github.com/influxdata/kapacitor/issues/545): Fixes inconsistancy with API docs for creating a task.
 - [#544](https://github.com/influxdata/kapacitor/issues/544): Fixes issues with existings tasks and invalid names.
 - [#543](https://github.com/influxdata/kapacitor/issues/543): Fixes default values not being set correctly in API calls.
-- [#540](https://github.com/influxdata/kapacitor/issues/540): Fixes bug with log level API endpoint.
 
 
 ## v0.13.0 [2016-05-11]
