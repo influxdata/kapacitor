@@ -957,7 +957,7 @@ func (ts *Service) startTask(task Task) error {
 		err := et.StartBatching()
 		if err != nil {
 			ts.saveLastError(t.ID, err.Error())
-			ts.stopTask(t.ID)
+			ts.TaskMaster.StopTask(t.ID)
 			return err
 		}
 	}

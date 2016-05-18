@@ -34,6 +34,8 @@ const recordStreamPath = basePath + "/recordings/stream"
 const recordBatchPath = basePath + "/recordings/batch"
 const recordQueryPath = basePath + "/recordings/query"
 const replaysPath = basePath + "/replays"
+const replayBatchPath = basePath + "/replays/batch"
+const replayQueryPath = basePath + "/replays/query"
 
 // HTTP configuration for connecting to Kapacitor
 type Config struct {
@@ -866,6 +868,77 @@ func (c *Client) CreateReplay(opt CreateReplayOptions) (Replay, error) {
 	if err != nil {
 		return r, err
 	}
+
+	req, err := http.NewRequest("POST", u.String(), &buf)
+	if err != nil {
+		return r, err
+	}
+
+	_, err = c.do(req, &r, http.StatusCreated)
+	if err != nil {
+		return r, err
+	}
+	return r, nil
+}
+
+type ReplayBatchOptions struct {
+	ID            string    `json:"id,omitempty"`
+	Task          string    `json:"task"`
+	Start         time.Time `json:"start"`
+	Stop          time.Time `json:"stop"`
+	Cluster       string    `json:"cluster,omitempty"`
+	RecordingTime bool      `json:"recording-time"`
+	Clock         Clock     `json:"clock"`
+}
+
+// Replay a query against a task.
+func (c *Client) ReplayBatch(opt ReplayBatchOptions) (Replay, error) {
+	r := Replay{}
+
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	err := enc.Encode(opt)
+	if err != nil {
+		return r, err
+	}
+
+	u := *c.url
+	u.Path = replayBatchPath
+
+	req, err := http.NewRequest("POST", u.String(), &buf)
+	if err != nil {
+		return r, err
+	}
+
+	_, err = c.do(req, &r, http.StatusCreated)
+	if err != nil {
+		return r, err
+	}
+	return r, nil
+}
+
+type ReplayQueryOptions struct {
+	ID            string `json:"id,omitempty"`
+	Task          string `json:"task"`
+	Query         string `json:"query"`
+	Cluster       string `json:"cluster,omitempty"`
+	RecordingTime bool   `json:"recording-time"`
+	Clock         Clock  `json:"clock"`
+}
+
+// Replay a query against a task.
+func (c *Client) ReplayQuery(opt ReplayQueryOptions) (Replay, error) {
+	r := Replay{}
+
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	err := enc.Encode(opt)
+	if err != nil {
+		return r, err
+	}
+
+	u := *c.url
+	u.Path = replayQueryPath
 
 	req, err := http.NewRequest("POST", u.String(), &buf)
 	if err != nil {

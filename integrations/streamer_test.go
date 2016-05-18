@@ -3812,10 +3812,6 @@ func testStreamer(
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Use 1971 so that we don't get true negatives on Epoch 0 collisions
-	c := clock.New(time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC))
-	r := kapacitor.NewReplay(c)
-
 	//Start the task
 	et, err := tm.StartTask(task)
 	if err != nil {
@@ -3827,10 +3823,13 @@ func testStreamer(
 	if err != nil {
 		t.Fatal(err)
 	}
-	replayErr := r.ReplayStream(data, stream, false, "s")
+	// Use 1971 so that we don't get true negatives on Epoch 0 collisions
+	c := clock.New(time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC))
+
+	replayErr := kapacitor.ReplayStreamFromIO(c, data, stream, false, "s")
 
 	t.Log(string(et.Task.Dot()))
-	return r.Setter, et, replayErr, tm
+	return c, et, replayErr, tm
 }
 
 func fastForwardTask(

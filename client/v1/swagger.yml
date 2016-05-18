@@ -455,6 +455,91 @@ paths:
           description: A processing or an unexpected error.
           schema:
             $ref: '#/definitions/Error'
+  /replays/batch:
+    post:
+      summary: Replay a batch directly without creating a recording.
+      tags: [replays]
+      operationId: replayBatch
+      parameters:
+        - name: id
+          in: body
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+                description: Replay ID
+              task:
+                type: string
+                description: ID of task
+              start:
+                type: string
+                format: dateTime
+              stop:
+                type: string
+                format: dateTime
+              cluster:
+                type: string
+              recording-time:
+                type: boolean
+                default: false
+              clock:
+                type: string
+                pattern: (fast|real)
+                default: fast
+            required:
+              - task
+              - start
+      responses:
+        '201':
+          description: Replay Started
+          schema:
+            $ref: '#/definitions/Replay'
+        default:
+          description: A processing or an unexpected error.
+          schema:
+            $ref: '#/definitions/Error'
+  /replays/query:
+    post:
+      summary: Replay data from a query directly without creating a recording.
+      tags: [recordings]
+      operationId: replayQuery
+      parameters:
+        - name: id
+          in: body
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+                description: Replay ID
+              task:
+                type: string
+                description: ID of task
+              query:
+                type: string
+              cluster:
+                type: string
+              recording-time:
+                type: boolean
+                default: false
+              clock:
+                type: string
+                pattern: (fast|real)
+                default: fast
+            required:
+              - task
+              - query
+      responses:
+        '201':
+          description: Replay Started
+          schema:
+            $ref: '#/definitions/Replay'
+        default:
+          description: A processing or an unexpected error.
+          schema:
+            $ref: '#/definitions/Error'
+
 
 
 definitions:

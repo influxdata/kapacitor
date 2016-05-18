@@ -1221,6 +1221,198 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 		t.Errorf("unexpected replays list:\ngot %v\nexp %v", got, exp)
 	}
 }
+func TestServer_ReplayBatch(t *testing.T) {
+	c := NewConfig()
+	c.InfluxDB[0].Enabled = true
+	value := 0
+	db := NewInfluxDB(func(q string) *iclient.Response {
+		if len(q) > 6 && q[:6] == "SELECT" {
+			r := &iclient.Response{
+				Results: []iclient.Result{{
+					Series: []models.Row{{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, value, 0, time.UTC).Format(time.RFC3339Nano),
+								float64(value),
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, value+1, 0, time.UTC).Format(time.RFC3339Nano),
+								float64(value + 1),
+							},
+						},
+					}},
+				}},
+			}
+			value += 2
+			return r
+		}
+		return nil
+	})
+	c.InfluxDB[0].URLs = []string{db.URL()}
+	s := OpenServer(c)
+	defer s.Close()
+	cli := Client(s)
+
+	id := "testBatchTask"
+	ttype := client.BatchTask
+	dbrps := []client.DBRP{{
+		Database:        "mydb",
+		RetentionPolicy: "myrp",
+	}}
+
+	tmpDir, err := ioutil.TempDir("", "testBatchTaskRecording")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+	tick := `batch
+    |query('SELECT value from mydb.myrp.cpu')
+        .period(2s)
+        .every(2s)
+    |alert()
+        .id('test-batch')
+        .message('{{ .ID }} got: {{ index .Fields "value" }}')
+        .crit(lambda: "value" > 2.0)
+        .log('` + tmpDir + `/alert.log')
+`
+
+	_, err = cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	replay, err := cli.ReplayBatch(client.ReplayBatchOptions{
+		ID:            "replayid",
+		Task:          id,
+		Start:         time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+		Stop:          time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+		Clock:         client.Fast,
+		RecordingTime: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exp, got := "/kapacitor/v1/replays/replayid", replay.Link.Href; exp != got {
+		t.Errorf("unexpected replay.Link.Href got %s exp %s", got, exp)
+	}
+	// Wait for replay to finish.
+	retry := 0
+	for replay.Status == client.Running {
+		time.Sleep(100 * time.Millisecond)
+		replay, err = cli.Replay(replay.Link)
+		if err != nil {
+			t.Fatal(err)
+		}
+		retry++
+		if retry > 10 {
+			t.Fatal("failed to perfom replay")
+		}
+	}
+
+	f, err := os.Open(path.Join(tmpDir, "alert.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	type response struct {
+		ID      string          `json:"id"`
+		Message string          `json:"message"`
+		Time    time.Time       `json:"time"`
+		Level   string          `json:"level"`
+		Data    influxql.Result `json:"data"`
+	}
+	exp := []response{
+		{
+			ID:      "test-batch",
+			Message: "test-batch got: 3",
+			Time:    time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+			Level:   "CRITICAL",
+			Data: influxql.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC).Format(time.RFC3339Nano),
+								2.0,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC).Format(time.RFC3339Nano),
+								3.0,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			ID:      "test-batch",
+			Message: "test-batch got: 4",
+			Time:    time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+			Level:   "CRITICAL",
+			Data: influxql.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC).Format(time.RFC3339Nano),
+								4.0,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC).Format(time.RFC3339Nano),
+								5.0,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	scanner := bufio.NewScanner(f)
+	got := make([]response, 0)
+	g := response{}
+	for scanner.Scan() {
+		json.Unmarshal(scanner.Bytes(), &g)
+		got = append(got, g)
+	}
+	if !reflect.DeepEqual(exp, got) {
+		t.Errorf("unexpected alert log:\ngot %v\nexp %v", got, exp)
+		t.Errorf("unexpected alert log:\ngot %v\nexp %v", got[0].Data.Series[0], exp[0].Data.Series[0])
+		t.Errorf("unexpected alert log:\ngot %v\nexp %v", got[1].Data.Series[0], exp[1].Data.Series[0])
+	}
+
+	recordings, err := cli.ListRecordings(nil)
+	if exp, got := 0, len(recordings); exp != got {
+		t.Fatalf("unexpected recordings list:\ngot %v\nexp %v", got, exp)
+	}
+
+	replays, err := cli.ListReplays(nil)
+	if exp, got := 1, len(replays); exp != got {
+		t.Fatalf("unexpected replays list:\ngot %v\nexp %v", got, exp)
+	}
+
+	err = cli.DeleteReplay(replays[0].Link)
+	if err != nil {
+		t.Error(err)
+	}
+
+	replays, err = cli.ListReplays(nil)
+	if exp, got := 0, len(replays); exp != got {
+		t.Errorf("unexpected replays list:\ngot %v\nexp %v", got, exp)
+	}
+}
+
 func TestServer_RecordReplayQuery(t *testing.T) {
 	c := NewConfig()
 	c.InfluxDB[0].Enabled = true
@@ -1505,6 +1697,225 @@ func TestServer_RecordReplayQuery(t *testing.T) {
 	dec.Decode(&repR)
 	if exp, got := 1, len(repR.Replays); exp != got {
 		t.Fatalf("unexpected replays count, got %d exp %d", got, exp)
+	}
+
+	err = cli.DeleteReplay(replays[0].Link)
+	if err != nil {
+		t.Error(err)
+	}
+
+	replays, err = cli.ListReplays(nil)
+	if exp, got := 0, len(replays); exp != got {
+		t.Errorf("unexpected replays list:\ngot %v\nexp %v", got, exp)
+	}
+}
+
+func TestServer_ReplayQuery(t *testing.T) {
+	c := NewConfig()
+	c.InfluxDB[0].Enabled = true
+	db := NewInfluxDB(func(q string) *iclient.Response {
+		if len(q) > 6 && q[:6] == "SELECT" {
+			r := &iclient.Response{
+				Results: []iclient.Result{{
+					Series: []models.Row{
+						{
+							Name:    "cpu",
+							Columns: []string{"time", "value"},
+							Values: [][]interface{}{
+								{
+									time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339Nano),
+									0.0,
+								},
+								{
+									time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC).Format(time.RFC3339Nano),
+									1.0,
+								},
+							},
+						},
+						{
+							Name:    "cpu",
+							Columns: []string{"time", "value"},
+							Values: [][]interface{}{
+								{
+									time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC).Format(time.RFC3339Nano),
+									2.0,
+								},
+								{
+									time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC).Format(time.RFC3339Nano),
+									3.0,
+								},
+							},
+						},
+						{
+							Name:    "cpu",
+							Columns: []string{"time", "value"},
+							Values: [][]interface{}{
+								{
+									time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC).Format(time.RFC3339Nano),
+									4.0,
+								},
+								{
+									time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC).Format(time.RFC3339Nano),
+									5.0,
+								},
+							},
+						},
+					},
+				}},
+			}
+			return r
+		}
+		return nil
+	})
+	c.InfluxDB[0].URLs = []string{db.URL()}
+	s := OpenServer(c)
+	defer s.Close()
+	cli := Client(s)
+
+	id := "testBatchTask"
+	ttype := client.BatchTask
+	dbrps := []client.DBRP{{
+		Database:        "mydb",
+		RetentionPolicy: "myrp",
+	}}
+
+	tmpDir, err := ioutil.TempDir("", "testBatchTaskRecording")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+	tick := `batch
+    |query('SELECT value from mydb.myrp.cpu')
+        .period(2s)
+        .every(2s)
+    |alert()
+        .id('test-batch')
+        .message('{{ .ID }} got: {{ index .Fields "value" }}')
+        .crit(lambda: "value" > 2.0)
+        .log('` + tmpDir + `/alert.log')
+`
+
+	_, err = cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	replay, err := cli.ReplayQuery(client.ReplayQueryOptions{
+		ID:            "replayid",
+		Query:         "SELECT value from mydb.myrp.cpu",
+		Task:          id,
+		Clock:         client.Fast,
+		RecordingTime: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exp, got := "/kapacitor/v1/replays/replayid", replay.Link.Href; exp != got {
+		t.Errorf("unexpected replay.Link.Href got %s exp %s", got, exp)
+	}
+	// Wait for replay to finish.
+	retry := 0
+	for replay.Status == client.Running {
+		time.Sleep(100 * time.Millisecond)
+		replay, err = cli.Replay(replay.Link)
+		if err != nil {
+			t.Fatal(err)
+		}
+		retry++
+		if retry > 10 {
+			t.Fatal("failed to perfom replay")
+		}
+	}
+
+	f, err := os.Open(path.Join(tmpDir, "alert.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	type response struct {
+		ID      string          `json:"id"`
+		Message string          `json:"message"`
+		Time    time.Time       `json:"time"`
+		Level   string          `json:"level"`
+		Data    influxql.Result `json:"data"`
+	}
+	exp := []response{
+		{
+			ID:      "test-batch",
+			Message: "test-batch got: 3",
+			Time:    time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+			Level:   "CRITICAL",
+			Data: influxql.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC).Format(time.RFC3339Nano),
+								2.0,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC).Format(time.RFC3339Nano),
+								3.0,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			ID:      "test-batch",
+			Message: "test-batch got: 4",
+			Time:    time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+			Level:   "CRITICAL",
+			Data: influxql.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC).Format(time.RFC3339Nano),
+								4.0,
+							},
+							{
+								time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC).Format(time.RFC3339Nano),
+								5.0,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	scanner := bufio.NewScanner(f)
+	got := make([]response, 0)
+	g := response{}
+	for scanner.Scan() {
+		json.Unmarshal(scanner.Bytes(), &g)
+		got = append(got, g)
+	}
+	if !reflect.DeepEqual(exp, got) {
+		t.Errorf("unexpected alert log:\ngot %v\nexp %v", got, exp)
+		t.Errorf("unexpected alert log:\ngot %v\nexp %v", got[0].Data.Series[0], exp[0].Data.Series[0])
+		t.Errorf("unexpected alert log:\ngot %v\nexp %v", got[1].Data.Series[0], exp[1].Data.Series[0])
+	}
+
+	recordings, err := cli.ListRecordings(nil)
+	if exp, got := 0, len(recordings); exp != got {
+		t.Fatalf("unexpected recordings list:\ngot %v\nexp %v", got, exp)
+	}
+
+	replays, err := cli.ListReplays(nil)
+	if exp, got := 1, len(replays); exp != got {
+		t.Fatalf("unexpected replays list:\ngot %v\nexp %v", got, exp)
 	}
 
 	err = cli.DeleteReplay(replays[0].Link)
