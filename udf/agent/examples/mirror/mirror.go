@@ -32,7 +32,7 @@ func (*mirrorHandler) Info() (*udf.InfoResponse, error) {
 }
 
 // Initialze the handler based of the provided options.
-func (o *mirrorHandler) Init(r *udf.InitRequest) (*udf.InitResponse, error) {
+func (*mirrorHandler) Init(r *udf.InitRequest) (*udf.InitResponse, error) {
 	init := &udf.InitResponse{
 		Success: true,
 		Error:   "",
@@ -41,25 +41,25 @@ func (o *mirrorHandler) Init(r *udf.InitRequest) (*udf.InitResponse, error) {
 }
 
 // Create a snapshot of the running state of the process.
-func (o *mirrorHandler) Snaphost() (*udf.SnapshotResponse, error) {
+func (*mirrorHandler) Snaphost() (*udf.SnapshotResponse, error) {
 	return &udf.SnapshotResponse{}, nil
 }
 
 // Restore a previous snapshot.
-func (o *mirrorHandler) Restore(req *udf.RestoreRequest) (*udf.RestoreResponse, error) {
+func (*mirrorHandler) Restore(req *udf.RestoreRequest) (*udf.RestoreResponse, error) {
 	return &udf.RestoreResponse{
 		Success: true,
 	}, nil
 }
 
 // Start working with the next batch
-func (o *mirrorHandler) BeginBatch(begin *udf.BeginBatch) error {
+func (*mirrorHandler) BeginBatch(begin *udf.BeginBatch) error {
 	return errors.New("batching not supported")
 }
 
-func (o *mirrorHandler) Point(p *udf.Point) error {
+func (h *mirrorHandler) Point(p *udf.Point) error {
 	// Send back the point we just received
-	o.agent.Responses <- &udf.Response{
+	h.agent.Responses <- &udf.Response{
 		Message: &udf.Response_Point{
 			Point: p,
 		},
@@ -67,22 +67,22 @@ func (o *mirrorHandler) Point(p *udf.Point) error {
 	return nil
 }
 
-func (o *mirrorHandler) EndBatch(end *udf.EndBatch) error {
+func (*mirrorHandler) EndBatch(end *udf.EndBatch) error {
 	return nil
 }
 
 // Stop the handler gracefully.
-func (o *mirrorHandler) Stop() {
-	close(o.agent.Responses)
+func (h *mirrorHandler) Stop() {
+	close(h.agent.Responses)
 }
 
-type accpeter struct {
+type accepter struct {
 	count int64
 }
 
 // Create a new agent/handler for each new connection.
 // Count and log each new connection and termination.
-func (acc *accpeter) Accept(conn net.Conn) {
+func (acc *accepter) Accept(conn net.Conn) {
 	count := acc.count
 	acc.count++
 	a := agent.New(conn, conn)
@@ -116,7 +116,7 @@ func main() {
 	}
 
 	// Create server that listens on the socket
-	s := agent.NewServer(l, &accpeter{})
+	s := agent.NewServer(l, &accepter{})
 
 	// Setup signal handler to stop Server on various signals
 	s.StopOnSignals(os.Interrupt, syscall.SIGTERM)
