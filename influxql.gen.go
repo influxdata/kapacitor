@@ -451,6 +451,442 @@ func (e *integerPointEmitter) EmitBatch() models.Batch {
 	return b
 }
 
+type stringPointAggregator struct {
+	field            string
+	topBottomInfo    *pipeline.TopBottomCallInfo
+	isSimpleSelector bool
+	aggregator       influxql.StringPointAggregator
+}
+
+func stringPopulateAuxFieldsAndTags(ap *influxql.StringPoint, fieldsAndTags []string, fields models.Fields, tags models.Tags) {
+	ap.Aux = make([]interface{}, len(fieldsAndTags))
+	for i, name := range fieldsAndTags {
+		if f, ok := fields[name]; ok {
+			ap.Aux[i] = f
+		} else {
+			ap.Aux[i] = tags[name]
+		}
+	}
+}
+
+func (a *stringPointAggregator) AggregateBatch(b *models.Batch) error {
+	for _, p := range b.Points {
+		value, ok := p.Fields[a.field]
+		if !ok {
+			return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
+		}
+		typed, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("field %s has wrong type: got %T exp string", a.field, value)
+		}
+		ap := &influxql.StringPoint{
+			Name:  b.Name,
+			Tags:  influxql.NewTags(p.Tags),
+			Time:  p.Time.UnixNano(),
+			Value: typed,
+		}
+		if a.topBottomInfo != nil {
+			// We need to populate the Aux fields
+			stringPopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
+		}
+
+		if a.isSimpleSelector {
+			ap.Aux = []interface{}{p.Tags, p.Fields}
+		}
+
+		a.aggregator.AggregateString(ap)
+	}
+	return nil
+}
+
+func (a *stringPointAggregator) AggregatePoint(p *models.Point) error {
+	value, ok := p.Fields[a.field]
+	if !ok {
+		return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
+	}
+	typed, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("field %s has wrong type: got %T exp string", a.field, value)
+	}
+	ap := &influxql.StringPoint{
+		Name:  p.Name,
+		Tags:  influxql.NewTags(p.Tags),
+		Time:  p.Time.UnixNano(),
+		Value: typed,
+	}
+	if a.topBottomInfo != nil {
+		// We need to populate the Aux fields
+		stringPopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
+	}
+
+	if a.isSimpleSelector {
+		ap.Aux = []interface{}{p.Tags, p.Fields}
+	}
+
+	a.aggregator.AggregateString(ap)
+	return nil
+}
+
+type stringPointBulkAggregator struct {
+	field            string
+	topBottomInfo    *pipeline.TopBottomCallInfo
+	isSimpleSelector bool
+	aggregator       pipeline.StringBulkPointAggregator
+}
+
+func (a *stringPointBulkAggregator) AggregateBatch(b *models.Batch) error {
+	slice := make([]influxql.StringPoint, len(b.Points))
+	for i, p := range b.Points {
+		value, ok := p.Fields[a.field]
+		if !ok {
+			return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
+		}
+		typed, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("field %s has wrong type: got %T exp string", a.field, value)
+		}
+		slice[i] = influxql.StringPoint{
+			Name:  b.Name,
+			Tags:  influxql.NewTags(p.Tags),
+			Time:  p.Time.UnixNano(),
+			Value: typed,
+		}
+		if a.topBottomInfo != nil {
+			// We need to populate the Aux fields
+			stringPopulateAuxFieldsAndTags(&slice[i], a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
+		}
+
+		if a.isSimpleSelector {
+			slice[i].Aux = []interface{}{p.Tags, p.Fields}
+		}
+	}
+	a.aggregator.AggregateStringBulk(slice)
+	return nil
+}
+
+func (a *stringPointBulkAggregator) AggregatePoint(p *models.Point) error {
+	value, ok := p.Fields[a.field]
+	if !ok {
+		return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
+	}
+	typed, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("field %s has wrong type: got %T exp string", a.field, value)
+	}
+	ap := &influxql.StringPoint{
+		Name:  p.Name,
+		Tags:  influxql.NewTags(p.Tags),
+		Time:  p.Time.UnixNano(),
+		Value: typed,
+	}
+	if a.topBottomInfo != nil {
+		// We need to populate the Aux fields
+		stringPopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
+	}
+
+	if a.isSimpleSelector {
+		ap.Aux = []interface{}{p.Tags, p.Fields}
+	}
+
+	a.aggregator.AggregateString(ap)
+	return nil
+}
+
+type stringPointEmitter struct {
+	baseReduceContext
+	emitter          influxql.StringPointEmitter
+	isSimpleSelector bool
+}
+
+func (e *stringPointEmitter) EmitPoint() (models.Point, error) {
+	slice := e.emitter.Emit()
+	if len(slice) != 1 {
+		return models.Point{}, ErrEmptyEmit
+	}
+	ap := slice[0]
+	var t time.Time
+	if e.pointTimes {
+		if ap.Time == influxql.ZeroTime {
+			t = e.time
+		} else {
+			t = time.Unix(0, ap.Time).UTC()
+		}
+	} else {
+		t = e.time
+	}
+
+	var fields models.Fields
+	var tags models.Tags
+	if e.isSimpleSelector {
+		tags = ap.Aux[0].(models.Tags)
+		fields = ap.Aux[1].(models.Fields)
+		if e.as != e.field {
+			fields = fields.Copy()
+			fields[e.as] = fields[e.field]
+			delete(fields, e.field)
+		}
+	} else {
+		tags = e.tags
+		fields = map[string]interface{}{e.as: ap.Value}
+	}
+
+	return models.Point{
+		Name:       e.name,
+		Time:       t,
+		Group:      e.group,
+		Dimensions: e.dimensions,
+		Tags:       tags,
+		Fields:     fields,
+	}, nil
+}
+
+func (e *stringPointEmitter) EmitBatch() models.Batch {
+	slice := e.emitter.Emit()
+	b := models.Batch{
+		Name:   e.name,
+		TMax:   e.time,
+		Group:  e.group,
+		Tags:   e.tags,
+		Points: make([]models.BatchPoint, len(slice)),
+	}
+	var t time.Time
+	for i, ap := range slice {
+		if e.pointTimes {
+			if ap.Time == influxql.ZeroTime {
+				t = e.time
+			} else {
+				t = time.Unix(0, ap.Time).UTC()
+			}
+		} else {
+			t = e.time
+		}
+		b.Points[i] = models.BatchPoint{
+			Time:   t,
+			Tags:   ap.Tags.KeyValues(),
+			Fields: map[string]interface{}{e.as: ap.Value},
+		}
+	}
+	return b
+}
+
+type booleanPointAggregator struct {
+	field            string
+	topBottomInfo    *pipeline.TopBottomCallInfo
+	isSimpleSelector bool
+	aggregator       influxql.BooleanPointAggregator
+}
+
+func booleanPopulateAuxFieldsAndTags(ap *influxql.BooleanPoint, fieldsAndTags []string, fields models.Fields, tags models.Tags) {
+	ap.Aux = make([]interface{}, len(fieldsAndTags))
+	for i, name := range fieldsAndTags {
+		if f, ok := fields[name]; ok {
+			ap.Aux[i] = f
+		} else {
+			ap.Aux[i] = tags[name]
+		}
+	}
+}
+
+func (a *booleanPointAggregator) AggregateBatch(b *models.Batch) error {
+	for _, p := range b.Points {
+		value, ok := p.Fields[a.field]
+		if !ok {
+			return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
+		}
+		typed, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("field %s has wrong type: got %T exp bool", a.field, value)
+		}
+		ap := &influxql.BooleanPoint{
+			Name:  b.Name,
+			Tags:  influxql.NewTags(p.Tags),
+			Time:  p.Time.UnixNano(),
+			Value: typed,
+		}
+		if a.topBottomInfo != nil {
+			// We need to populate the Aux fields
+			booleanPopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
+		}
+
+		if a.isSimpleSelector {
+			ap.Aux = []interface{}{p.Tags, p.Fields}
+		}
+
+		a.aggregator.AggregateBoolean(ap)
+	}
+	return nil
+}
+
+func (a *booleanPointAggregator) AggregatePoint(p *models.Point) error {
+	value, ok := p.Fields[a.field]
+	if !ok {
+		return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
+	}
+	typed, ok := value.(bool)
+	if !ok {
+		return fmt.Errorf("field %s has wrong type: got %T exp bool", a.field, value)
+	}
+	ap := &influxql.BooleanPoint{
+		Name:  p.Name,
+		Tags:  influxql.NewTags(p.Tags),
+		Time:  p.Time.UnixNano(),
+		Value: typed,
+	}
+	if a.topBottomInfo != nil {
+		// We need to populate the Aux fields
+		booleanPopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
+	}
+
+	if a.isSimpleSelector {
+		ap.Aux = []interface{}{p.Tags, p.Fields}
+	}
+
+	a.aggregator.AggregateBoolean(ap)
+	return nil
+}
+
+type booleanPointBulkAggregator struct {
+	field            string
+	topBottomInfo    *pipeline.TopBottomCallInfo
+	isSimpleSelector bool
+	aggregator       pipeline.BooleanBulkPointAggregator
+}
+
+func (a *booleanPointBulkAggregator) AggregateBatch(b *models.Batch) error {
+	slice := make([]influxql.BooleanPoint, len(b.Points))
+	for i, p := range b.Points {
+		value, ok := p.Fields[a.field]
+		if !ok {
+			return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
+		}
+		typed, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("field %s has wrong type: got %T exp bool", a.field, value)
+		}
+		slice[i] = influxql.BooleanPoint{
+			Name:  b.Name,
+			Tags:  influxql.NewTags(p.Tags),
+			Time:  p.Time.UnixNano(),
+			Value: typed,
+		}
+		if a.topBottomInfo != nil {
+			// We need to populate the Aux fields
+			booleanPopulateAuxFieldsAndTags(&slice[i], a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
+		}
+
+		if a.isSimpleSelector {
+			slice[i].Aux = []interface{}{p.Tags, p.Fields}
+		}
+	}
+	a.aggregator.AggregateBooleanBulk(slice)
+	return nil
+}
+
+func (a *booleanPointBulkAggregator) AggregatePoint(p *models.Point) error {
+	value, ok := p.Fields[a.field]
+	if !ok {
+		return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
+	}
+	typed, ok := value.(bool)
+	if !ok {
+		return fmt.Errorf("field %s has wrong type: got %T exp bool", a.field, value)
+	}
+	ap := &influxql.BooleanPoint{
+		Name:  p.Name,
+		Tags:  influxql.NewTags(p.Tags),
+		Time:  p.Time.UnixNano(),
+		Value: typed,
+	}
+	if a.topBottomInfo != nil {
+		// We need to populate the Aux fields
+		booleanPopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
+	}
+
+	if a.isSimpleSelector {
+		ap.Aux = []interface{}{p.Tags, p.Fields}
+	}
+
+	a.aggregator.AggregateBoolean(ap)
+	return nil
+}
+
+type booleanPointEmitter struct {
+	baseReduceContext
+	emitter          influxql.BooleanPointEmitter
+	isSimpleSelector bool
+}
+
+func (e *booleanPointEmitter) EmitPoint() (models.Point, error) {
+	slice := e.emitter.Emit()
+	if len(slice) != 1 {
+		return models.Point{}, ErrEmptyEmit
+	}
+	ap := slice[0]
+	var t time.Time
+	if e.pointTimes {
+		if ap.Time == influxql.ZeroTime {
+			t = e.time
+		} else {
+			t = time.Unix(0, ap.Time).UTC()
+		}
+	} else {
+		t = e.time
+	}
+
+	var fields models.Fields
+	var tags models.Tags
+	if e.isSimpleSelector {
+		tags = ap.Aux[0].(models.Tags)
+		fields = ap.Aux[1].(models.Fields)
+		if e.as != e.field {
+			fields = fields.Copy()
+			fields[e.as] = fields[e.field]
+			delete(fields, e.field)
+		}
+	} else {
+		tags = e.tags
+		fields = map[string]interface{}{e.as: ap.Value}
+	}
+
+	return models.Point{
+		Name:       e.name,
+		Time:       t,
+		Group:      e.group,
+		Dimensions: e.dimensions,
+		Tags:       tags,
+		Fields:     fields,
+	}, nil
+}
+
+func (e *booleanPointEmitter) EmitBatch() models.Batch {
+	slice := e.emitter.Emit()
+	b := models.Batch{
+		Name:   e.name,
+		TMax:   e.time,
+		Group:  e.group,
+		Tags:   e.tags,
+		Points: make([]models.BatchPoint, len(slice)),
+	}
+	var t time.Time
+	for i, ap := range slice {
+		if e.pointTimes {
+			if ap.Time == influxql.ZeroTime {
+				t = e.time
+			} else {
+				t = time.Unix(0, ap.Time).UTC()
+			}
+		} else {
+			t = e.time
+		}
+		b.Points[i] = models.BatchPoint{
+			Time:   t,
+			Tags:   ap.Tags.KeyValues(),
+			Fields: map[string]interface{}{e.as: ap.Value},
+		}
+	}
+	return b
+}
+
 // floatReduceContext uses composition to implement the reduceContext interface
 type floatReduceContext struct {
 	floatPointAggregator
@@ -475,6 +911,30 @@ type floatBulkIntegerReduceContext struct {
 	integerPointEmitter
 }
 
+// floatStringReduceContext uses composition to implement the reduceContext interface
+type floatStringReduceContext struct {
+	floatPointAggregator
+	stringPointEmitter
+}
+
+// floatBulkStringReduceContext uses composition to implement the reduceContext interface
+type floatBulkStringReduceContext struct {
+	floatPointBulkAggregator
+	stringPointEmitter
+}
+
+// floatBooleanReduceContext uses composition to implement the reduceContext interface
+type floatBooleanReduceContext struct {
+	floatPointAggregator
+	booleanPointEmitter
+}
+
+// floatBulkBooleanReduceContext uses composition to implement the reduceContext interface
+type floatBulkBooleanReduceContext struct {
+	floatPointBulkAggregator
+	booleanPointEmitter
+}
+
 // integerFloatReduceContext uses composition to implement the reduceContext interface
 type integerFloatReduceContext struct {
 	integerPointAggregator
@@ -497,6 +957,126 @@ type integerReduceContext struct {
 type integerBulkReduceContext struct {
 	integerPointBulkAggregator
 	integerPointEmitter
+}
+
+// integerStringReduceContext uses composition to implement the reduceContext interface
+type integerStringReduceContext struct {
+	integerPointAggregator
+	stringPointEmitter
+}
+
+// integerBulkStringReduceContext uses composition to implement the reduceContext interface
+type integerBulkStringReduceContext struct {
+	integerPointBulkAggregator
+	stringPointEmitter
+}
+
+// integerBooleanReduceContext uses composition to implement the reduceContext interface
+type integerBooleanReduceContext struct {
+	integerPointAggregator
+	booleanPointEmitter
+}
+
+// integerBulkBooleanReduceContext uses composition to implement the reduceContext interface
+type integerBulkBooleanReduceContext struct {
+	integerPointBulkAggregator
+	booleanPointEmitter
+}
+
+// stringFloatReduceContext uses composition to implement the reduceContext interface
+type stringFloatReduceContext struct {
+	stringPointAggregator
+	floatPointEmitter
+}
+
+// stringBulkFloatReduceContext uses composition to implement the reduceContext interface
+type stringBulkFloatReduceContext struct {
+	stringPointBulkAggregator
+	floatPointEmitter
+}
+
+// stringIntegerReduceContext uses composition to implement the reduceContext interface
+type stringIntegerReduceContext struct {
+	stringPointAggregator
+	integerPointEmitter
+}
+
+// stringBulkIntegerReduceContext uses composition to implement the reduceContext interface
+type stringBulkIntegerReduceContext struct {
+	stringPointBulkAggregator
+	integerPointEmitter
+}
+
+// stringReduceContext uses composition to implement the reduceContext interface
+type stringReduceContext struct {
+	stringPointAggregator
+	stringPointEmitter
+}
+
+// stringBulkReduceContext uses composition to implement the reduceContext interface
+type stringBulkReduceContext struct {
+	stringPointBulkAggregator
+	stringPointEmitter
+}
+
+// stringBooleanReduceContext uses composition to implement the reduceContext interface
+type stringBooleanReduceContext struct {
+	stringPointAggregator
+	booleanPointEmitter
+}
+
+// stringBulkBooleanReduceContext uses composition to implement the reduceContext interface
+type stringBulkBooleanReduceContext struct {
+	stringPointBulkAggregator
+	booleanPointEmitter
+}
+
+// booleanFloatReduceContext uses composition to implement the reduceContext interface
+type booleanFloatReduceContext struct {
+	booleanPointAggregator
+	floatPointEmitter
+}
+
+// booleanBulkFloatReduceContext uses composition to implement the reduceContext interface
+type booleanBulkFloatReduceContext struct {
+	booleanPointBulkAggregator
+	floatPointEmitter
+}
+
+// booleanIntegerReduceContext uses composition to implement the reduceContext interface
+type booleanIntegerReduceContext struct {
+	booleanPointAggregator
+	integerPointEmitter
+}
+
+// booleanBulkIntegerReduceContext uses composition to implement the reduceContext interface
+type booleanBulkIntegerReduceContext struct {
+	booleanPointBulkAggregator
+	integerPointEmitter
+}
+
+// booleanStringReduceContext uses composition to implement the reduceContext interface
+type booleanStringReduceContext struct {
+	booleanPointAggregator
+	stringPointEmitter
+}
+
+// booleanBulkStringReduceContext uses composition to implement the reduceContext interface
+type booleanBulkStringReduceContext struct {
+	booleanPointBulkAggregator
+	stringPointEmitter
+}
+
+// booleanReduceContext uses composition to implement the reduceContext interface
+type booleanReduceContext struct {
+	booleanPointAggregator
+	booleanPointEmitter
+}
+
+// booleanBulkReduceContext uses composition to implement the reduceContext interface
+type booleanBulkReduceContext struct {
+	booleanPointBulkAggregator
+	booleanPointEmitter
 }
 
 func determineReduceContextCreateFn(method string, value interface{}, rc pipeline.ReduceCreater) (fn createReduceContextFunc, err error) {
@@ -568,6 +1148,76 @@ func determineReduceContextCreateFn(method string, value interface{}, rc pipelin
 						aggregator:       a,
 					},
 					integerPointEmitter: integerPointEmitter{
+						baseReduceContext: c,
+						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
+					},
+				}
+			}
+
+		case rc.CreateFloatStringReducer != nil:
+			fn = func(c baseReduceContext) reduceContext {
+				a, e := rc.CreateFloatStringReducer()
+				return &floatStringReduceContext{
+					floatPointAggregator: floatPointAggregator{
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
+					},
+					stringPointEmitter: stringPointEmitter{
+						baseReduceContext: c,
+						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
+					},
+				}
+			}
+		case rc.CreateFloatBulkStringReducer != nil:
+			fn = func(c baseReduceContext) reduceContext {
+				a, e := rc.CreateFloatBulkStringReducer()
+				return &floatBulkStringReduceContext{
+					floatPointBulkAggregator: floatPointBulkAggregator{
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
+					},
+					stringPointEmitter: stringPointEmitter{
+						baseReduceContext: c,
+						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
+					},
+				}
+			}
+
+		case rc.CreateFloatBooleanReducer != nil:
+			fn = func(c baseReduceContext) reduceContext {
+				a, e := rc.CreateFloatBooleanReducer()
+				return &floatBooleanReduceContext{
+					floatPointAggregator: floatPointAggregator{
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
+					},
+					booleanPointEmitter: booleanPointEmitter{
+						baseReduceContext: c,
+						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
+					},
+				}
+			}
+		case rc.CreateFloatBulkBooleanReducer != nil:
+			fn = func(c baseReduceContext) reduceContext {
+				a, e := rc.CreateFloatBulkBooleanReducer()
+				return &floatBulkBooleanReduceContext{
+					floatPointBulkAggregator: floatPointBulkAggregator{
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
+					},
+					booleanPointEmitter: booleanPointEmitter{
 						baseReduceContext: c,
 						emitter:           e,
 						isSimpleSelector:  rc.IsSimpleSelector,
@@ -652,8 +1302,372 @@ func determineReduceContextCreateFn(method string, value interface{}, rc pipelin
 				}
 			}
 
+		case rc.CreateIntegerStringReducer != nil:
+			fn = func(c baseReduceContext) reduceContext {
+				a, e := rc.CreateIntegerStringReducer()
+				return &integerStringReduceContext{
+					integerPointAggregator: integerPointAggregator{
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
+					},
+					stringPointEmitter: stringPointEmitter{
+						baseReduceContext: c,
+						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
+					},
+				}
+			}
+		case rc.CreateIntegerBulkStringReducer != nil:
+			fn = func(c baseReduceContext) reduceContext {
+				a, e := rc.CreateIntegerBulkStringReducer()
+				return &integerBulkStringReduceContext{
+					integerPointBulkAggregator: integerPointBulkAggregator{
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
+					},
+					stringPointEmitter: stringPointEmitter{
+						baseReduceContext: c,
+						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
+					},
+				}
+			}
+
+		case rc.CreateIntegerBooleanReducer != nil:
+			fn = func(c baseReduceContext) reduceContext {
+				a, e := rc.CreateIntegerBooleanReducer()
+				return &integerBooleanReduceContext{
+					integerPointAggregator: integerPointAggregator{
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
+					},
+					booleanPointEmitter: booleanPointEmitter{
+						baseReduceContext: c,
+						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
+					},
+				}
+			}
+		case rc.CreateIntegerBulkBooleanReducer != nil:
+			fn = func(c baseReduceContext) reduceContext {
+				a, e := rc.CreateIntegerBulkBooleanReducer()
+				return &integerBulkBooleanReduceContext{
+					integerPointBulkAggregator: integerPointBulkAggregator{
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
+					},
+					booleanPointEmitter: booleanPointEmitter{
+						baseReduceContext: c,
+						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
+					},
+				}
+			}
+
 		default:
 			err = fmt.Errorf("cannot apply %s to int64 field", method)
+		}
+
+	case string:
+		switch {
+
+		case rc.CreateStringFloatReducer != nil:
+			fn = func(c baseReduceContext) reduceContext {
+				a, e := rc.CreateStringFloatReducer()
+				return &stringFloatReduceContext{
+					stringPointAggregator: stringPointAggregator{
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
+					},
+					floatPointEmitter: floatPointEmitter{
+						baseReduceContext: c,
+						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
+					},
+				}
+			}
+		case rc.CreateStringBulkFloatReducer != nil:
+			fn = func(c baseReduceContext) reduceContext {
+				a, e := rc.CreateStringBulkFloatReducer()
+				return &stringBulkFloatReduceContext{
+					stringPointBulkAggregator: stringPointBulkAggregator{
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
+					},
+					floatPointEmitter: floatPointEmitter{
+						baseReduceContext: c,
+						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
+					},
+				}
+			}
+
+		case rc.CreateStringIntegerReducer != nil:
+			fn = func(c baseReduceContext) reduceContext {
+				a, e := rc.CreateStringIntegerReducer()
+				return &stringIntegerReduceContext{
+					stringPointAggregator: stringPointAggregator{
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
+					},
+					integerPointEmitter: integerPointEmitter{
+						baseReduceContext: c,
+						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
+					},
+				}
+			}
+		case rc.CreateStringBulkIntegerReducer != nil:
+			fn = func(c baseReduceContext) reduceContext {
+				a, e := rc.CreateStringBulkIntegerReducer()
+				return &stringBulkIntegerReduceContext{
+					stringPointBulkAggregator: stringPointBulkAggregator{
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
+					},
+					integerPointEmitter: integerPointEmitter{
+						baseReduceContext: c,
+						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
+					},
+				}
+			}
+
+		case rc.CreateStringReducer != nil:
+			fn = func(c baseReduceContext) reduceContext {
+				a, e := rc.CreateStringReducer()
+				return &stringReduceContext{
+					stringPointAggregator: stringPointAggregator{
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
+					},
+					stringPointEmitter: stringPointEmitter{
+						baseReduceContext: c,
+						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
+					},
+				}
+			}
+		case rc.CreateStringBulkReducer != nil:
+			fn = func(c baseReduceContext) reduceContext {
+				a, e := rc.CreateStringBulkReducer()
+				return &stringBulkReduceContext{
+					stringPointBulkAggregator: stringPointBulkAggregator{
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
+					},
+					stringPointEmitter: stringPointEmitter{
+						baseReduceContext: c,
+						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
+					},
+				}
+			}
+
+		case rc.CreateStringBooleanReducer != nil:
+			fn = func(c baseReduceContext) reduceContext {
+				a, e := rc.CreateStringBooleanReducer()
+				return &stringBooleanReduceContext{
+					stringPointAggregator: stringPointAggregator{
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
+					},
+					booleanPointEmitter: booleanPointEmitter{
+						baseReduceContext: c,
+						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
+					},
+				}
+			}
+		case rc.CreateStringBulkBooleanReducer != nil:
+			fn = func(c baseReduceContext) reduceContext {
+				a, e := rc.CreateStringBulkBooleanReducer()
+				return &stringBulkBooleanReduceContext{
+					stringPointBulkAggregator: stringPointBulkAggregator{
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
+					},
+					booleanPointEmitter: booleanPointEmitter{
+						baseReduceContext: c,
+						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
+					},
+				}
+			}
+
+		default:
+			err = fmt.Errorf("cannot apply %s to string field", method)
+		}
+
+	case bool:
+		switch {
+
+		case rc.CreateBooleanFloatReducer != nil:
+			fn = func(c baseReduceContext) reduceContext {
+				a, e := rc.CreateBooleanFloatReducer()
+				return &booleanFloatReduceContext{
+					booleanPointAggregator: booleanPointAggregator{
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
+					},
+					floatPointEmitter: floatPointEmitter{
+						baseReduceContext: c,
+						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
+					},
+				}
+			}
+		case rc.CreateBooleanBulkFloatReducer != nil:
+			fn = func(c baseReduceContext) reduceContext {
+				a, e := rc.CreateBooleanBulkFloatReducer()
+				return &booleanBulkFloatReduceContext{
+					booleanPointBulkAggregator: booleanPointBulkAggregator{
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
+					},
+					floatPointEmitter: floatPointEmitter{
+						baseReduceContext: c,
+						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
+					},
+				}
+			}
+
+		case rc.CreateBooleanIntegerReducer != nil:
+			fn = func(c baseReduceContext) reduceContext {
+				a, e := rc.CreateBooleanIntegerReducer()
+				return &booleanIntegerReduceContext{
+					booleanPointAggregator: booleanPointAggregator{
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
+					},
+					integerPointEmitter: integerPointEmitter{
+						baseReduceContext: c,
+						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
+					},
+				}
+			}
+		case rc.CreateBooleanBulkIntegerReducer != nil:
+			fn = func(c baseReduceContext) reduceContext {
+				a, e := rc.CreateBooleanBulkIntegerReducer()
+				return &booleanBulkIntegerReduceContext{
+					booleanPointBulkAggregator: booleanPointBulkAggregator{
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
+					},
+					integerPointEmitter: integerPointEmitter{
+						baseReduceContext: c,
+						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
+					},
+				}
+			}
+
+		case rc.CreateBooleanStringReducer != nil:
+			fn = func(c baseReduceContext) reduceContext {
+				a, e := rc.CreateBooleanStringReducer()
+				return &booleanStringReduceContext{
+					booleanPointAggregator: booleanPointAggregator{
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
+					},
+					stringPointEmitter: stringPointEmitter{
+						baseReduceContext: c,
+						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
+					},
+				}
+			}
+		case rc.CreateBooleanBulkStringReducer != nil:
+			fn = func(c baseReduceContext) reduceContext {
+				a, e := rc.CreateBooleanBulkStringReducer()
+				return &booleanBulkStringReduceContext{
+					booleanPointBulkAggregator: booleanPointBulkAggregator{
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
+					},
+					stringPointEmitter: stringPointEmitter{
+						baseReduceContext: c,
+						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
+					},
+				}
+			}
+
+		case rc.CreateBooleanReducer != nil:
+			fn = func(c baseReduceContext) reduceContext {
+				a, e := rc.CreateBooleanReducer()
+				return &booleanReduceContext{
+					booleanPointAggregator: booleanPointAggregator{
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
+					},
+					booleanPointEmitter: booleanPointEmitter{
+						baseReduceContext: c,
+						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
+					},
+				}
+			}
+		case rc.CreateBooleanBulkReducer != nil:
+			fn = func(c baseReduceContext) reduceContext {
+				a, e := rc.CreateBooleanBulkReducer()
+				return &booleanBulkReduceContext{
+					booleanPointBulkAggregator: booleanPointBulkAggregator{
+						field:            c.field,
+						topBottomInfo:    rc.TopBottomCallInfo,
+						isSimpleSelector: rc.IsSimpleSelector,
+						aggregator:       a,
+					},
+					booleanPointEmitter: booleanPointEmitter{
+						baseReduceContext: c,
+						emitter:           e,
+						isSimpleSelector:  rc.IsSimpleSelector,
+					},
+				}
+			}
+
+		default:
+			err = fmt.Errorf("cannot apply %s to bool field", method)
 		}
 
 	default:

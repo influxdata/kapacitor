@@ -46,7 +46,7 @@ func runDynamicTestCase(t *testing.T, tc testCase) {
 
 		if expectation.IsEvalNum {
 			evaluationType = "EvalNum"
-			result, err = se.EvalNum(scope)
+			result, err = se.Eval(scope)
 		}
 
 		if err != nil {

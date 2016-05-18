@@ -55,9 +55,19 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 	e.statMap.Set(statsEvalErrors, e.evalErrors)
 	switch e.Provides() {
 	case pipeline.StreamEdge:
+		var err error
 		for p, ok := e.ins[0].NextPoint(); ok; p, ok = e.ins[0].NextPoint() {
 			e.timer.Start()
-			p.Fields = e.eval(p.Time, p.Fields, p.Tags)
+			p.Fields, err = e.eval(p.Time, p.Fields, p.Tags)
+			if err != nil {
+				e.evalErrors.Add(1)
+				if !e.e.QuiteFlag {
+					e.logger.Println("E!", err)
+				}
+				e.timer.Stop()
+				// Skip bad point
+				continue
+			}
 			e.timer.Stop()
 			for _, child := range e.outs {
 				err := child.CollectPoint(p)
@@ -67,10 +77,22 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 			}
 		}
 	case pipeline.BatchEdge:
+		var err error
 		for b, ok := e.ins[0].NextBatch(); ok; b, ok = e.ins[0].NextBatch() {
 			e.timer.Start()
-			for i, p := range b.Points {
-				b.Points[i].Fields = e.eval(p.Time, p.Fields, p.Tags)
+			for i := 0; i < len(b.Points); {
+				p := b.Points[i]
+				b.Points[i].Fields, err = e.eval(p.Time, p.Fields, p.Tags)
+				if err != nil {
+					e.evalErrors.Add(1)
+					if !e.e.QuiteFlag {
+						e.logger.Println("E!", err)
+					}
+					// Remove bad point
+					b.Points = append(b.Points[:i], b.Points[i+1:]...)
+				} else {
+					i++
+				}
 			}
 			e.timer.Stop()
 			for _, child := range e.outs {
@@ -84,40 +106,31 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 	return nil
 }
 
-func (e *EvalNode) eval(now time.Time, fields models.Fields, tags map[string]string) models.Fields {
+func (e *EvalNode) eval(now time.Time, fields models.Fields, tags map[string]string) (models.Fields, error) {
 	vars := e.scopePool.Get()
 	defer e.scopePool.Put(vars)
 	err := fillScope(vars, e.scopePool.ReferenceVariables(), now, fields, tags)
 	if err != nil {
-		if !e.e.QuiteFlag {
-			e.logger.Println("E!", err)
-		}
-		return nil
+		return nil, err
 	}
 	for i, expr := range e.expressions {
-		if v, err := expr.EvalNum(vars); err == nil {
-			name := e.e.AsList[i]
-			vars.Set(name, v)
-		} else {
-			e.evalErrors.Add(1)
-			if !e.e.QuiteFlag {
-				e.logger.Println("E!", err)
-			}
+		v, err := expr.Eval(vars)
+		if err != nil {
+			return nil, err
 		}
+		name := e.e.AsList[i]
+		vars.Set(name, v)
 	}
 	var newFields models.Fields
 	if e.e.KeepFlag {
 		if l := len(e.e.KeepList); l != 0 {
 			newFields = make(models.Fields, l)
 			for _, f := range e.e.KeepList {
-				if v, err := vars.Get(f); err == nil {
-					newFields[f] = v
-				} else {
-					e.evalErrors.Add(1)
-					if !e.e.QuiteFlag {
-						e.logger.Println("E!", err)
-					}
+				v, err := vars.Get(f)
+				if err != nil {
+					return nil, err
 				}
+				newFields[f] = v
 			}
 		} else {
 			newFields = make(models.Fields, len(fields)+len(e.e.AsList))
@@ -125,28 +138,22 @@ func (e *EvalNode) eval(now time.Time, fields models.Fields, tags map[string]str
 				newFields[f] = v
 			}
 			for _, f := range e.e.AsList {
-				if v, err := vars.Get(f); err == nil {
-					newFields[f] = v
-				} else {
-					e.evalErrors.Add(1)
-					if !e.e.QuiteFlag {
-						e.logger.Println("E!", err)
-					}
+				v, err := vars.Get(f)
+				if err != nil {
+					return nil, err
 				}
+				newFields[f] = v
 			}
 		}
 	} else {
 		newFields = make(models.Fields, len(e.e.AsList))
 		for _, f := range e.e.AsList {
-			if v, err := vars.Get(f); err == nil {
-				newFields[f] = v
-			} else {
-				e.evalErrors.Add(1)
-				if !e.e.QuiteFlag {
-					e.logger.Println("E!", err)
-				}
+			v, err := vars.Get(f)
+			if err != nil {
+				return nil, err
 			}
+			newFields[f] = v
 		}
 	}
-	return newFields
+	return newFields, nil
 }

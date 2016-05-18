@@ -102,6 +102,13 @@ func getConstantNodeType(n tick.Node) ValueType {
 		}
 
 	case *tick.BinaryNode:
+		if node.Operator == tick.TokenPlus {
+			leftType := getConstantNodeType(node.Left)
+			rightType := getConstantNodeType(node.Right)
+			if leftType == TString || rightType == TString {
+				return TString
+			}
+		}
 		if tick.IsCompOperator(node.Operator) {
 			return TBool
 		}

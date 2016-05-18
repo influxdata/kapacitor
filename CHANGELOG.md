@@ -20,6 +20,7 @@ kapacitor replay-live query -task cpu_alert -query 'SELECT usage_idle FROM teleg
 ### Features
 
 - [#283](https://github.com/influxdata/kapacitor/issues/283): Add live replays.
+- [#500](https://github.com/influxdata/kapacitor/issues/500): Support Float,Integer,String and Boolean types.
 - [#82](https://github.com/influxdata/kapacitor/issues/82): Multiple services for PagerDuty alert
 - [#558](https://github.com/influxdata/kapacitor/pull/558): Preserve fields as well as tags on selector InfluxQL functions.
 

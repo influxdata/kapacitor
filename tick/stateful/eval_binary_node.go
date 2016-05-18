@@ -19,6 +19,9 @@ type resultContainer struct {
 
 	IsFloat64Value bool
 	Float64Value   float64
+
+	IsStringValue bool
+	StringValue   string
 }
 
 // this function shouldn't be used! only for throwing details error messages!
@@ -110,8 +113,17 @@ func (n *EvalBinaryNode) EvalRegex(scope *tick.Scope, executionState ExecutionSt
 	return nil, ErrTypeGuardFailed{RequestedType: TRegex, ActualType: n.returnType}
 }
 
-func (n *EvalBinaryNode) EvalString(scope *tick.Scope, executionState ExecutionState) (string, error) {
-	return "", ErrTypeGuardFailed{RequestedType: TString, ActualType: n.returnType}
+func (e *EvalBinaryNode) EvalString(scope *tick.Scope, executionState ExecutionState) (string, error) {
+	result, err := e.eval(scope, executionState)
+	if err != nil {
+		return "", err.error
+	}
+
+	if result.IsStringValue {
+		return result.StringValue, nil
+	}
+
+	return "", fmt.Errorf("expression returned unexpected type %T", result.value())
 }
 
 // EvalBool executes the expression based on eval bool
