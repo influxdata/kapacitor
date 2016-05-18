@@ -87,6 +87,29 @@ Or for a stream task with use a query directly:
 kapacitor replay-live query -task cpu_alert -query 'SELECT usage_idle FROM telegraf."default".cpu WHERE time > now() - 10h'
 ```
 
+#### HTTP based subscriptions
+
+Now InfluxDB and Kapacitor support HTTP/S based subscriptions.
+This means that Kapacitor need only listen on a single port for the HTTP service, greatly simplifying configuration and setup.
+
+In order to start using HTTP subscriptions change the `subscription-protocol` option for your configured InfluxDB clusters.
+
+For example:
+
+```
+[[influxdb]]
+  enabled = true
+  urls = ["http://localhost:8086",]
+  subscription-protocol = "http"
+  # or to use https
+  #subscription-protocol = "https"
+```
+
+On startup Kapacitor will detect the change and recreate the subscriptions in InfluxDB to use the HTTP protocol.
+
+>NOTE: While HTTP itself is a TCP transport such that packet loss shouldn't be an issue, if Kapacitor starts to slow down for whatever reason, InfluxDB will drop the subscription writes to Kapacitor.
+In order to know if subscription writes are being dropped you should monitor the measurement `_internal.monitor.subscriber` for the field `writeFailures`.
+
 
 ### Features
 
@@ -95,6 +118,7 @@ kapacitor replay-live query -task cpu_alert -query 'SELECT usage_idle FROM teleg
 - [#82](https://github.com/influxdata/kapacitor/issues/82): Multiple services for PagerDuty alert.
 - [#558](https://github.com/influxdata/kapacitor/pull/558): Preserve fields as well as tags on selector InfluxQL functions.
 - [#259](https://github.com/influxdata/kapacitor/issues/259): Template Tasks have been added.
+- [#562](https://github.com/influxdata/kapacitor/pull/562): HTTP based subscriptions.
 
 
 ### Bugfixes
