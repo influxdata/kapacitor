@@ -475,8 +475,6 @@ func getTLSConfig(
 	}
 	if SSLCert != "" && SSLKey != "" {
 		cert, err := tls.LoadX509KeyPair(SSLCert, SSLKey)
-		log.Println(SSLCert, SSLKey)
-
 		if err != nil {
 			return nil, fmt.Errorf(
 				"Could not load TLS client key/certificate: %s",

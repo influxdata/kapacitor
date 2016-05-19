@@ -53,6 +53,11 @@ func (s *Service) Open() error {
 		s.f = f
 	}
 
+	// Configure default logger
+	log.SetPrefix("[log] ")
+	log.SetFlags(log.LstdFlags)
+	log.SetOutput(wlog.NewWriter(s.f))
+
 	wlog.SetLevelFromName(s.c.Level)
 	return nil
 }
