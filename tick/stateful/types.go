@@ -109,7 +109,7 @@ func getConstantNodeType(n tick.Node) ValueType {
 				return TString
 			}
 		}
-		if tick.IsCompOperator(node.Operator) {
+		if tick.IsCompOperator(node.Operator) || tick.IsLogicalOperator(node.Operator) {
 			return TBool
 		}
 
