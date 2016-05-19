@@ -28,6 +28,7 @@ kapacitor replay-live query -task cpu_alert -query 'SELECT usage_idle FROM teleg
 ### Bugfixes
 
 - [#540](https://github.com/influxdata/kapacitor/issues/540): Fixes bug with log level API endpoint.
+- [#521](https://github.com/influxdata/kapacitor/issues/521): EvalNode now honors groups.
 
 ## v0.13.1 [2016-05-13]
 

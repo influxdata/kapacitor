@@ -603,7 +603,7 @@ func TestStream_EvalAllTypes(t *testing.T) {
 stream
 	|from()
 		.measurement('types')
-		|eval(lambda: "str" + 'suffix', lambda: !"bool", lambda: "int" + 14, lambda: "float" * 2.0)
+	|eval(lambda: "str" + 'suffix', lambda: !"bool", lambda: "int" + 14, lambda: "float" * 2.0)
 		.as( 'str', 'bool', 'int', 'float')
 	|httpOut('TestStream_EvalAllTypes')
 `
@@ -625,6 +625,46 @@ stream
 	}
 
 	testStreamerWithOutput(t, "TestStream_EvalAllTypes", script, 2*time.Second, er, nil, false)
+}
+
+func TestStream_EvalGroups(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('types')
+		.groupBy('group')
+	|eval(lambda: count())
+		.as('count')
+	|httpOut('TestStream_EvalGroups')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "types",
+				Tags:    map[string]string{"group": "A"},
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+						2.0,
+					},
+				},
+			},
+			{
+				Name:    "types",
+				Tags:    map[string]string{"group": "B"},
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+						2.0,
+					},
+				},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_EvalGroups", script, 3*time.Second, er, nil, false)
 }
 
 func TestStream_Default(t *testing.T) {
