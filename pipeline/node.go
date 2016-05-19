@@ -223,13 +223,13 @@ const intervalMarker = "INTERVAL"
 //    // Trigger critical alert if the throughput drops below 100 points per 10s and checked every 10s.
 //    data
 //        |stats(10s)
-//        |derivative('collected')
+//        |derivative('emitted')
 //            .unit(10s)
 //            .nonNegative()
 //        |alert()
 //            .id('node \'stream0\' in task \'{{ .TaskName }}\'')
-//            .message('{{ .ID }} is {{ if eq .Level "OK" }}alive{{ else }}dead{{ end }}: {{ index .Fields "collected" | printf "%0.3f" }} points/10s.')
-//            .crit(lamdba: "collected" <= 100.0)
+//            .message('{{ .ID }} is {{ if eq .Level "OK" }}alive{{ else }}dead{{ end }}: {{ index .Fields "emitted" | printf "%0.3f" }} points/10s.')
+//            .crit(lamdba: "emitted" <= 100.0)
 //    //Do normal processing of data
 //    data...
 //
