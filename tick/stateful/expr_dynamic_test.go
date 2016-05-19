@@ -29,7 +29,7 @@ type testCase struct {
 // runDyanmicTestCase is when we want to change the "dyanmism" of
 // a node - type change or value change
 func runDynamicTestCase(t *testing.T, tc testCase) {
-	se := mustCompileExpression(t, tc.Node)
+	se := mustCompileExpression(tc.Node)
 
 	for i, expectation := range tc.Expectations {
 		scope := tick.NewScope()
@@ -111,7 +111,7 @@ func TestExpression_BinaryNode_DynamicTestCases(t *testing.T) {
 			{
 				IsEvalNum:      true,
 				Value:          int64(5),
-				ExpectedError:  errors.New("mismatched type to binary operator. got int64 + float64. see bool(), int(), float()"),
+				ExpectedError:  errors.New("mismatched type to binary operator. got int64 + float64. see bool(), int(), float(), string()"),
 				ExpectedResult: nil,
 			},
 		},
@@ -141,6 +141,55 @@ func TestExpression_BinaryNode_DynamicTestCases(t *testing.T) {
 			{
 				IsEvalBool:     true,
 				Value:          int64(5),
+				ExpectedError:  nil,
+				ExpectedResult: false,
+			},
+		},
+	})
+
+	runDynamicTestCase(t, testCase{
+		Title: "BinaryNode - Nested BinaryNodes can determine correct type",
+
+		Node: &tick.BinaryNode{
+			Operator: tick.TokenAnd,
+			Left: &tick.BinaryNode{
+				Operator: tick.TokenLess,
+				Left: &tick.ReferenceNode{
+					Reference: "value",
+				},
+				Right: &tick.NumberNode{
+					IsFloat: true,
+					Float64: float64(10),
+				},
+			},
+			Right: &tick.BinaryNode{
+				Operator: tick.TokenGreater,
+				Left: &tick.ReferenceNode{
+					Reference: "value",
+				},
+				Right: &tick.NumberNode{
+					IsFloat: true,
+					Float64: float64(7),
+				},
+			},
+		},
+
+		Expectations: []valueExpectation{
+			{
+				IsEvalBool:     true,
+				Value:          float64(8),
+				ExpectedError:  nil,
+				ExpectedResult: true,
+			},
+			{
+				IsEvalBool:     true,
+				Value:          int64(5),
+				ExpectedError:  nil,
+				ExpectedResult: false,
+			},
+			{
+				IsEvalBool:     true,
+				Value:          int64(11),
 				ExpectedError:  nil,
 				ExpectedResult: false,
 			},

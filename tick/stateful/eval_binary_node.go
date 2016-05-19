@@ -75,6 +75,9 @@ type EvalBinaryNode struct {
 }
 
 func NewEvalBinaryNode(node *tick.BinaryNode) (*EvalBinaryNode, error) {
+	if !tick.IsExprOperator(node.Operator) {
+		return nil, fmt.Errorf("unknown binary operator %v", node.Operator)
+	}
 	expression := &EvalBinaryNode{
 		operator:   node.Operator,
 		returnType: getConstantNodeType(node),
@@ -99,7 +102,10 @@ func NewEvalBinaryNode(node *tick.BinaryNode) (*EvalBinaryNode, error) {
 		expression.leftSideType = getConstantNodeType(node.Left)
 		expression.rightSideType = getConstantNodeType(node.Right)
 
-		expression.evaluationFn = expression.findEvaluationFn(expression.leftSideType, expression.rightSideType)
+		expression.evaluationFn = expression.lookupEvaluationFn()
+		if expression.evaluationFn == nil {
+			return nil, expression.determineError(nil, ExecutionState{})
+		}
 	}
 
 	return expression, nil
@@ -178,7 +184,7 @@ func (e *EvalBinaryNode) EvalInt(scope *tick.Scope, executionState ExecutionStat
 
 func (e *EvalBinaryNode) eval(scope *tick.Scope, executionState ExecutionState) (resultContainer, *ErrSide) {
 	if e.evaluationFn == nil {
-		err := e.determineError(scope, executionState, e.operator, e.leftSideEvaluator, e.rightSideEvaluator)
+		err := e.determineError(scope, executionState)
 		return boolFalseResultContainer, &ErrSide{error: err}
 	}
 
@@ -200,10 +206,10 @@ func (e *EvalBinaryNode) eval(scope *tick.Scope, executionState ExecutionState) 
 				e.rightSideType = typeGuardErr.ActualType
 			}
 
-			// re-find the evaluation fn
-			e.evaluationFn = e.findEvaluationFn(e.leftSideType, e.rightSideType)
+			// redefine the evaluation fn
+			e.evaluationFn = e.lookupEvaluationFn()
 
-			// recurse (so we handle nil evaluationFn, and etc)
+			// try again
 			return e.eval(scope, executionState)
 		}
 	}
@@ -236,61 +242,62 @@ func (e *EvalBinaryNode) evaluateDynamicNode(scope *tick.Scope, executionState E
 	e.leftSideType = leftSideType
 	e.rightSideType = rightSideType
 
-	e.evaluationFn = e.findEvaluationFn(e.leftSideType, e.rightSideType)
+	e.evaluationFn = e.lookupEvaluationFn()
 
 	return e.eval(scope, executionState)
 }
 
-func (e *EvalBinaryNode) determineError(scope *tick.Scope, executionState ExecutionState, operator tick.TokenType, left, right NodeEvaluator) error {
+func (e *EvalBinaryNode) determineError(scope *tick.Scope, executionState ExecutionState) error {
 	// Validate the evaluation parameters:
 	//  *) not support types like arrays
 	//  *) not comparison operator
 	//  *) invalid operator for the given type
 
-	typeExecutionState := CreateExecutionState()
+	if scope != nil {
+		typeExecutionState := CreateExecutionState()
+		leftValueType, err := e.leftSideEvaluator.Type(scope, typeExecutionState)
+		if err != nil {
+			return fmt.Errorf("can't get the type of the left node: %s", err)
+		}
+		e.leftSideType = leftValueType
 
-	leftValueType, err := left.Type(scope, typeExecutionState)
-	if err != nil {
-		return fmt.Errorf("Can't get the type of the left node: %s", err)
-	}
-	leftTypeName := leftValueType.String()
+		if leftValueType == InvalidType {
+			return errors.New("left value is invalid value type")
+		}
 
-	if leftValueType == InvalidType {
-		return errors.New("left value is invalid value type")
-	}
+		rightValueType, err := e.rightSideEvaluator.Type(scope, typeExecutionState)
+		if err != nil {
+			return fmt.Errorf("can't get the type of the right node: %s", err)
+		}
+		e.rightSideType = rightValueType
 
-	rightValueType, err := right.Type(scope, typeExecutionState)
-	if err != nil {
-		return fmt.Errorf("Can't get the type of the right node: %s", err)
-	}
-	rightTypeName := rightValueType.String()
-
-	if rightValueType == InvalidType {
-		return errors.New("right value is invalid value type")
-	}
-
-	err = isValidOperator(e.operator, leftValueType, rightValueType)
-	if err != nil {
-		return err
+		if rightValueType == InvalidType {
+			return errors.New("right value is invalid value type")
+		}
 	}
 
-	return fmt.Errorf("mismatched type to binary operator. got %s %v %s. see bool(), int(), float()", leftTypeName, e.operator, rightTypeName)
+	if !typeToBinaryOperators[e.leftSideType][e.operator] {
+		return fmt.Errorf("invalid %s operator %v for type %s", operatorKind(e.operator), e.operator, e.leftSideType)
+	} else if !typeToBinaryOperators[e.leftSideType][e.operator] {
+		return fmt.Errorf("invalid %s operator %v for type %s", operatorKind(e.operator), e.operator, e.rightSideType)
+	}
+
+	return fmt.Errorf("mismatched type to binary operator. got %s %v %s. see bool(), int(), float(), string()", e.leftSideType, e.operator, e.rightSideType)
 }
 
-func (e *EvalBinaryNode) findEvaluationFn(leftType, rightType ValueType) evaluationFn {
-	return evaluationFuncs[operationKey{operator: e.operator, leftType: leftType, rightType: rightType}]
+func (e *EvalBinaryNode) lookupEvaluationFn() evaluationFn {
+	return evaluationFuncs[operationKey{operator: e.operator, leftType: e.leftSideType, rightType: e.rightSideType}]
 }
 
-// Type to comparison operator - for comparison operator validation (see: isValidBinaryOperator)
-// The key is value type where the value is set of TokenType
 var typeToBinaryOperators = (func() map[ValueType]map[tick.TokenType]bool {
 	// This map is built at "runtime" because we don't to have tight coupling
 	// every time we had new "comparison operator" / "math operator" to update this map
 	// and the performance cost is neglibile for doing so.
 
-	result := make(map[ValueType]map[tick.TokenType]bool, 0)
+	result := make(map[ValueType]map[tick.TokenType]bool)
 
 	for opKey := range evaluationFuncs {
+		// Left
 		typeSet, exists := result[opKey.leftType]
 
 		if !exists {
@@ -299,43 +306,29 @@ var typeToBinaryOperators = (func() map[ValueType]map[tick.TokenType]bool {
 		}
 
 		typeSet[opKey.operator] = true
-		result[opKey.leftType] = typeSet
+
+		// Right
+		typeSet, exists = result[opKey.rightType]
+
+		if !exists {
+			result[opKey.rightType] = make(map[tick.TokenType]bool, 0)
+			typeSet = result[opKey.rightType]
+		}
+
+		typeSet[opKey.operator] = true
 	}
 
 	return result
 })()
 
-// isValidOperator returns whether the operator and left/right nodes are valid for comparison, if not
-// false will be returned with correct error message
-func isValidOperator(operator tick.TokenType, leftNodeType, rightNodeType ValueType) error {
-	if !tick.IsExprOperator(operator) {
-		return fmt.Errorf("return: unknown operator %v", operator)
-	}
-
-	var nodeType ValueType
-
-	// Only for TRegex we determine the validity of the operator by the right node
-	if rightNodeType == TRegex {
-		nodeType = rightNodeType
-	} else {
-		nodeType = leftNodeType
-	}
-
-	isValid := typeToBinaryOperators[nodeType][operator]
-	if !isValid {
-		return fmt.Errorf("invalid %s %s operator %v", nodeType.String(), operatorType(operator), operator)
-	}
-
-	return nil
-}
-
-func operatorType(operator tick.TokenType) string {
-	if tick.IsMathOperator(operator) {
+func operatorKind(operator tick.TokenType) string {
+	switch {
+	case tick.IsMathOperator(operator):
 		return "math"
-	}
-
-	if tick.IsCompOperator(operator) {
+	case tick.IsCompOperator(operator):
 		return "comparison"
+	case tick.IsLogicalOperator(operator):
+		return "logical"
 	}
 
 	// Actually, we shouldn't get here.. because this function is called only

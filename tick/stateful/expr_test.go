@@ -2,8 +2,8 @@ package stateful_test
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
-	"strings"
 	"testing"
 	"time"
 
@@ -18,7 +18,7 @@ type keyStruct struct {
 }
 
 func TestExpression_EvalNum_KeepsFunctionsState(t *testing.T) {
-	se := mustCompileExpression(t, &tick.FunctionNode{
+	se := mustCompileExpression(&tick.FunctionNode{
 		Func: "sigma",
 		Args: []tick.Node{&tick.ReferenceNode{Reference: "value"}},
 	})
@@ -119,7 +119,7 @@ func TestExpression_Eval_NotSupportedNode(t *testing.T) {
 
 func TestExpression_Eval_NodeAndEvalTypeNotMatching(t *testing.T) {
 	// Test EvalBool against BinaryNode that returns math result
-	se := mustCompileExpression(t, &tick.BinaryNode{
+	se := mustCompileExpression(&tick.BinaryNode{
 		Operator: tick.TokenPlus,
 		Left: &tick.NumberNode{
 			IsFloat: true,
@@ -150,14 +150,17 @@ func TestExpression_EvalBool_BoolNode(t *testing.T) {
 	operators := []tick.TokenType{tick.TokenEqual, tick.TokenNotEqual, tick.TokenAnd, tick.TokenOr, tick.TokenLess}
 
 	createBoolNode := func(v interface{}) tick.Node {
-		if strValue, isString := v.(string); isString {
-			return &tick.StringNode{
-				Literal: strValue,
+		switch value := v.(type) {
+		case bool:
+			return &tick.BoolNode{
+				Bool: value,
 			}
-		}
-
-		return &tick.BoolNode{
-			Bool: v.(bool),
+		case string:
+			return &tick.StringNode{
+				Literal: value,
+			}
+		default:
+			panic(fmt.Sprintf("unexpected type %T", v))
 		}
 	}
 
@@ -187,40 +190,38 @@ func TestExpression_EvalBool_BoolNode(t *testing.T) {
 		keyStruct{false, false, tick.TokenOr}:       false,
 	}, map[keyStruct]error{
 		// Check invalid bool operator
-		keyStruct{true, true, tick.TokenLess}:   errors.New("invalid boolean comparison operator <"),
-		keyStruct{true, false, tick.TokenLess}:  errors.New("invalid boolean comparison operator <"),
-		keyStruct{false, true, tick.TokenLess}:  errors.New("invalid boolean comparison operator <"),
-		keyStruct{false, false, tick.TokenLess}: errors.New("invalid boolean comparison operator <"),
+		keyStruct{true, true, tick.TokenLess}:   errors.New("invalid comparison operator < for type boolean"),
+		keyStruct{true, false, tick.TokenLess}:  errors.New("invalid comparison operator < for type boolean"),
+		keyStruct{false, true, tick.TokenLess}:  errors.New("invalid comparison operator < for type boolean"),
+		keyStruct{false, false, tick.TokenLess}: errors.New("invalid comparison operator < for type boolean"),
 
 		// (Redundant test case)
-		keyStruct{true, "NON_BOOL_VALUE", tick.TokenLess}:  errors.New("invalid boolean comparison operator <"),
-		keyStruct{true, "NON_BOOL_VALUE", tick.TokenLess}:  errors.New("invalid boolean comparison operator <"),
-		keyStruct{false, "NON_BOOL_VALUE", tick.TokenLess}: errors.New("invalid boolean comparison operator <"),
-		keyStruct{false, "NON_BOOL_VALUE", tick.TokenLess}: errors.New("invalid boolean comparison operator <"),
+		keyStruct{true, "NON_BOOL_VALUE", tick.TokenLess}:  errors.New("invalid comparison operator < for type boolean"),
+		keyStruct{false, "NON_BOOL_VALUE", tick.TokenLess}: errors.New("invalid comparison operator < for type boolean"),
 
 		// Left: True, Right: "NON_BOOL_VALUE"
-		keyStruct{true, "NON_BOOL_VALUE", tick.TokenEqual}:    errors.New("mismatched type to binary operator. got boolean == string. see bool(), int(), float()"),
-		keyStruct{true, "NON_BOOL_VALUE", tick.TokenNotEqual}: errors.New("mismatched type to binary operator. got boolean != string. see bool(), int(), float()"),
-		keyStruct{true, "NON_BOOL_VALUE", tick.TokenAnd}:      errors.New("mismatched type to binary operator. got boolean AND string. see bool(), int(), float()"),
-		keyStruct{true, "NON_BOOL_VALUE", tick.TokenOr}:       errors.New("mismatched type to binary operator. got boolean OR string. see bool(), int(), float()"),
+		keyStruct{true, "NON_BOOL_VALUE", tick.TokenEqual}:    errors.New("mismatched type to binary operator. got boolean == string. see bool(), int(), float(), string()"),
+		keyStruct{true, "NON_BOOL_VALUE", tick.TokenNotEqual}: errors.New("mismatched type to binary operator. got boolean != string. see bool(), int(), float(), string()"),
+		keyStruct{true, "NON_BOOL_VALUE", tick.TokenAnd}:      errors.New("mismatched type to binary operator. got boolean AND string. see bool(), int(), float(), string()"),
+		keyStruct{true, "NON_BOOL_VALUE", tick.TokenOr}:       errors.New("mismatched type to binary operator. got boolean OR string. see bool(), int(), float(), string()"),
 
 		// Left: False, Right: "NON_BOOL_VALUE"
-		keyStruct{false, "NON_BOOL_VALUE", tick.TokenEqual}:    errors.New("mismatched type to binary operator. got boolean == string. see bool(), int(), float()"),
-		keyStruct{false, "NON_BOOL_VALUE", tick.TokenNotEqual}: errors.New("mismatched type to binary operator. got boolean != string. see bool(), int(), float()"),
-		keyStruct{false, "NON_BOOL_VALUE", tick.TokenAnd}:      errors.New("mismatched type to binary operator. got boolean AND string. see bool(), int(), float()"),
-		keyStruct{false, "NON_BOOL_VALUE", tick.TokenOr}:       errors.New("mismatched type to binary operator. got boolean OR string. see bool(), int(), float()"),
+		keyStruct{false, "NON_BOOL_VALUE", tick.TokenEqual}:    errors.New("mismatched type to binary operator. got boolean == string. see bool(), int(), float(), string()"),
+		keyStruct{false, "NON_BOOL_VALUE", tick.TokenNotEqual}: errors.New("mismatched type to binary operator. got boolean != string. see bool(), int(), float(), string()"),
+		keyStruct{false, "NON_BOOL_VALUE", tick.TokenAnd}:      errors.New("mismatched type to binary operator. got boolean AND string. see bool(), int(), float(), string()"),
+		keyStruct{false, "NON_BOOL_VALUE", tick.TokenOr}:       errors.New("mismatched type to binary operator. got boolean OR string. see bool(), int(), float(), string()"),
 
 		// Left: "NON_BOOL_VALUE", Right: True
-		keyStruct{"NON_BOOL_VALUE", true, tick.TokenEqual}:    errors.New("mismatched type to binary operator. got string == bool. see bool(), int(), float()"),
-		keyStruct{"NON_BOOL_VALUE", true, tick.TokenNotEqual}: errors.New("mismatched type to binary operator. got string != bool. see bool(), int(), float()"),
-		keyStruct{"NON_BOOL_VALUE", true, tick.TokenAnd}:      errors.New("mismatched type to binary operator. got string AND bool. see bool(), int(), float()"),
-		keyStruct{"NON_BOOL_VALUE", true, tick.TokenOr}:       errors.New("mismatched type to binary operator. got string OR bool. see bool(), int(), float()"),
+		keyStruct{"NON_BOOL_VALUE", true, tick.TokenEqual}:    errors.New("mismatched type to binary operator. got string == bool. see bool(), int(), float(), string()"),
+		keyStruct{"NON_BOOL_VALUE", true, tick.TokenNotEqual}: errors.New("mismatched type to binary operator. got string != bool. see bool(), int(), float(), string()"),
+		keyStruct{"NON_BOOL_VALUE", true, tick.TokenAnd}:      errors.New("mismatched type to binary operator. got string AND bool. see bool(), int(), float(), string()"),
+		keyStruct{"NON_BOOL_VALUE", true, tick.TokenOr}:       errors.New("invalid comparison operator OR for type string"),
 
 		// Left: "NON_BOOL_VALUE", Right: False
-		keyStruct{"NON_BOOL_VALUE", false, tick.TokenEqual}:    errors.New("mismatched type to binary operator. got string == bool. see bool(), int(), float()"),
-		keyStruct{"NON_BOOL_VALUE", false, tick.TokenNotEqual}: errors.New("mismatched type to binary operator. got string != bool. see bool(), int(), float()"),
-		keyStruct{"NON_BOOL_VALUE", false, tick.TokenAnd}:      errors.New("mismatched type to binary operator. got string AND bool. see bool(), int(), float()"),
-		keyStruct{"NON_BOOL_VALUE", false, tick.TokenOr}:       errors.New("mismatched type to binary operator. got string OR bool. see bool(), int(), float()"),
+		keyStruct{"NON_BOOL_VALUE", false, tick.TokenEqual}:    errors.New("mismatched type to binary operator. got string == bool. see bool(), int(), float(), string()"),
+		keyStruct{"NON_BOOL_VALUE", false, tick.TokenNotEqual}: errors.New("mismatched type to binary operator. got string != bool. see bool(), int(), float(), string()"),
+		keyStruct{"NON_BOOL_VALUE", false, tick.TokenAnd}:      errors.New("mismatched type to binary operator. got string AND bool. see bool(), int(), float(), string()"),
+		keyStruct{"NON_BOOL_VALUE", false, tick.TokenOr}:       errors.New("invalid comparison operator OR for type string"),
 	})
 
 }
@@ -336,44 +337,44 @@ func TestExpression_EvalBool_NumberNode(t *testing.T) {
 		keyStruct{int64(5), int64(5), tick.TokenLessEqual}:    true,
 	}, map[keyStruct]error{
 		// Invalid operator
-		keyStruct{float64(5), float64(5), tick.TokenOr}:   errors.New("invalid float64 comparison operator OR"),
-		keyStruct{float64(5), float64(10), tick.TokenOr}:  errors.New("invalid float64 comparison operator OR"),
-		keyStruct{float64(5), int64(5), tick.TokenOr}:     errors.New("invalid float64 comparison operator OR"),
-		keyStruct{float64(10), float64(5), tick.TokenOr}:  errors.New("invalid float64 comparison operator OR"),
-		keyStruct{float64(10), float64(10), tick.TokenOr}: errors.New("invalid float64 comparison operator OR"),
-		keyStruct{float64(10), int64(5), tick.TokenOr}:    errors.New("invalid float64 comparison operator OR"),
-		keyStruct{int64(5), float64(5), tick.TokenOr}:     errors.New("invalid int64 comparison operator OR"),
-		keyStruct{int64(5), float64(10), tick.TokenOr}:    errors.New("invalid int64 comparison operator OR"),
-		keyStruct{int64(5), int64(5), tick.TokenOr}:       errors.New("invalid int64 comparison operator OR"),
+		keyStruct{float64(5), float64(5), tick.TokenOr}:   errors.New("invalid logical operator OR for type float64"),
+		keyStruct{float64(5), float64(10), tick.TokenOr}:  errors.New("invalid logical operator OR for type float64"),
+		keyStruct{float64(5), int64(5), tick.TokenOr}:     errors.New("invalid logical operator OR for type float64"),
+		keyStruct{float64(10), float64(5), tick.TokenOr}:  errors.New("invalid logical operator OR for type float64"),
+		keyStruct{float64(10), float64(10), tick.TokenOr}: errors.New("invalid logical operator OR for type float64"),
+		keyStruct{float64(10), int64(5), tick.TokenOr}:    errors.New("invalid logical operator OR for type float64"),
+		keyStruct{int64(5), float64(5), tick.TokenOr}:     errors.New("invalid logical operator OR for type int64"),
+		keyStruct{int64(5), float64(10), tick.TokenOr}:    errors.New("invalid logical operator OR for type int64"),
+		keyStruct{int64(5), int64(5), tick.TokenOr}:       errors.New("invalid logical operator OR for type int64"),
 
 		// (Redundant case)
-		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenOr}:  errors.New("invalid float64 comparison operator OR"),
-		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenOr}: errors.New("invalid float64 comparison operator OR"),
-		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenOr}:    errors.New("invalid int64 comparison operator OR"),
+		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenOr}:  errors.New("invalid logical operator OR for type float64"),
+		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenOr}: errors.New("invalid logical operator OR for type float64"),
+		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenOr}:    errors.New("invalid logical operator OR for type int64"),
 
 		// Left is float64(5), Right is "NON_INT_VALUE"
-		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenEqual}:        errors.New("mismatched type to binary operator. got float64 == string. see bool(), int(), float()"),
-		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenNotEqual}:     errors.New("mismatched type to binary operator. got float64 != string. see bool(), int(), float()"),
-		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenGreater}:      errors.New("mismatched type to binary operator. got float64 > string. see bool(), int(), float()"),
-		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenGreaterEqual}: errors.New("mismatched type to binary operator. got float64 >= string. see bool(), int(), float()"),
-		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenLess}:         errors.New("mismatched type to binary operator. got float64 < string. see bool(), int(), float()"),
-		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenLessEqual}:    errors.New("mismatched type to binary operator. got float64 <= string. see bool(), int(), float()"),
+		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenEqual}:        errors.New("mismatched type to binary operator. got float64 == string. see bool(), int(), float(), string()"),
+		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenNotEqual}:     errors.New("mismatched type to binary operator. got float64 != string. see bool(), int(), float(), string()"),
+		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenGreater}:      errors.New("mismatched type to binary operator. got float64 > string. see bool(), int(), float(), string()"),
+		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenGreaterEqual}: errors.New("mismatched type to binary operator. got float64 >= string. see bool(), int(), float(), string()"),
+		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenLess}:         errors.New("mismatched type to binary operator. got float64 < string. see bool(), int(), float(), string()"),
+		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenLessEqual}:    errors.New("mismatched type to binary operator. got float64 <= string. see bool(), int(), float(), string()"),
 
 		// (Redundant case) Left is float64(10), Right is "NON_INT_VALUE"
-		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenEqual}:        errors.New("mismatched type to binary operator. got float64 == string. see bool(), int(), float()"),
-		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenNotEqual}:     errors.New("mismatched type to binary operator. got float64 != string. see bool(), int(), float()"),
-		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenGreater}:      errors.New("mismatched type to binary operator. got float64 > string. see bool(), int(), float()"),
-		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenGreaterEqual}: errors.New("mismatched type to binary operator. got float64 >= string. see bool(), int(), float()"),
-		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenLess}:         errors.New("mismatched type to binary operator. got float64 < string. see bool(), int(), float()"),
-		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenLessEqual}:    errors.New("mismatched type to binary operator. got float64 <= string. see bool(), int(), float()"),
+		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenEqual}:        errors.New("mismatched type to binary operator. got float64 == string. see bool(), int(), float(), string()"),
+		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenNotEqual}:     errors.New("mismatched type to binary operator. got float64 != string. see bool(), int(), float(), string()"),
+		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenGreater}:      errors.New("mismatched type to binary operator. got float64 > string. see bool(), int(), float(), string()"),
+		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenGreaterEqual}: errors.New("mismatched type to binary operator. got float64 >= string. see bool(), int(), float(), string()"),
+		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenLess}:         errors.New("mismatched type to binary operator. got float64 < string. see bool(), int(), float(), string()"),
+		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenLessEqual}:    errors.New("mismatched type to binary operator. got float64 <= string. see bool(), int(), float(), string()"),
 
 		// Left is int64(5), Right is "NON_INT_VALUE"
-		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenEqual}:        errors.New("mismatched type to binary operator. got int64 == string. see bool(), int(), float()"),
-		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenNotEqual}:     errors.New("mismatched type to binary operator. got int64 != string. see bool(), int(), float()"),
-		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenGreater}:      errors.New("mismatched type to binary operator. got int64 > string. see bool(), int(), float()"),
-		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenGreaterEqual}: errors.New("mismatched type to binary operator. got int64 >= string. see bool(), int(), float()"),
-		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenLess}:         errors.New("mismatched type to binary operator. got int64 < string. see bool(), int(), float()"),
-		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenLessEqual}:    errors.New("mismatched type to binary operator. got int64 <= string. see bool(), int(), float()"),
+		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenEqual}:        errors.New("mismatched type to binary operator. got int64 == string. see bool(), int(), float(), string()"),
+		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenNotEqual}:     errors.New("mismatched type to binary operator. got int64 != string. see bool(), int(), float(), string()"),
+		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenGreater}:      errors.New("mismatched type to binary operator. got int64 > string. see bool(), int(), float(), string()"),
+		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenGreaterEqual}: errors.New("mismatched type to binary operator. got int64 >= string. see bool(), int(), float(), string()"),
+		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenLess}:         errors.New("mismatched type to binary operator. got int64 < string. see bool(), int(), float(), string()"),
+		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenLessEqual}:    errors.New("mismatched type to binary operator. got int64 <= string. see bool(), int(), float(), string()"),
 	})
 }
 
@@ -433,67 +434,74 @@ func TestExpression_EvalBool_StringNode(t *testing.T) {
 		keyStruct{"b", "b", tick.TokenLessEqual}:    true,
 	}, map[keyStruct]error{
 		// Invalid operator
-		keyStruct{"a", "a", tick.TokenOr}: errors.New("invalid string comparison operator OR"),
-		keyStruct{"a", "b", tick.TokenOr}: errors.New("invalid string comparison operator OR"),
-		keyStruct{"b", "a", tick.TokenOr}: errors.New("invalid string comparison operator OR"),
-		keyStruct{"b", "b", tick.TokenOr}: errors.New("invalid string comparison operator OR"),
+		keyStruct{"a", "a", tick.TokenOr}: errors.New("invalid logical operator OR for type string"),
+		keyStruct{"a", "b", tick.TokenOr}: errors.New("invalid logical operator OR for type string"),
+		keyStruct{"b", "a", tick.TokenOr}: errors.New("invalid logical operator OR for type string"),
+		keyStruct{"b", "b", tick.TokenOr}: errors.New("invalid logical operator OR for type string"),
 
-		keyStruct{"a", int64(123), tick.TokenOr}: errors.New("invalid string comparison operator OR"),
-		keyStruct{"b", int64(123), tick.TokenOr}: errors.New("invalid string comparison operator OR"),
+		keyStruct{"a", int64(123), tick.TokenOr}: errors.New("invalid logical operator OR for type string"),
+		keyStruct{"b", int64(123), tick.TokenOr}: errors.New("invalid logical operator OR for type string"),
 
 		// Left is "a", Right is int64(123)
-		keyStruct{"a", int64(123), tick.TokenEqual}:        errors.New("mismatched type to binary operator. got string == int64. see bool(), int(), float()"),
-		keyStruct{"a", int64(123), tick.TokenNotEqual}:     errors.New("mismatched type to binary operator. got string != int64. see bool(), int(), float()"),
-		keyStruct{"a", int64(123), tick.TokenGreater}:      errors.New("mismatched type to binary operator. got string > int64. see bool(), int(), float()"),
-		keyStruct{"a", int64(123), tick.TokenGreaterEqual}: errors.New("mismatched type to binary operator. got string >= int64. see bool(), int(), float()"),
-		keyStruct{"a", int64(123), tick.TokenLess}:         errors.New("mismatched type to binary operator. got string < int64. see bool(), int(), float()"),
-		keyStruct{"a", int64(123), tick.TokenLessEqual}:    errors.New("mismatched type to binary operator. got string <= int64. see bool(), int(), float()"),
+		keyStruct{"a", int64(123), tick.TokenEqual}:        errors.New("mismatched type to binary operator. got string == int64. see bool(), int(), float(), string()"),
+		keyStruct{"a", int64(123), tick.TokenNotEqual}:     errors.New("mismatched type to binary operator. got string != int64. see bool(), int(), float(), string()"),
+		keyStruct{"a", int64(123), tick.TokenGreater}:      errors.New("mismatched type to binary operator. got string > int64. see bool(), int(), float(), string()"),
+		keyStruct{"a", int64(123), tick.TokenGreaterEqual}: errors.New("mismatched type to binary operator. got string >= int64. see bool(), int(), float(), string()"),
+		keyStruct{"a", int64(123), tick.TokenLess}:         errors.New("mismatched type to binary operator. got string < int64. see bool(), int(), float(), string()"),
+		keyStruct{"a", int64(123), tick.TokenLessEqual}:    errors.New("mismatched type to binary operator. got string <= int64. see bool(), int(), float(), string()"),
 
 		// Left is "b", Right is int64(123)
-		keyStruct{"b", int64(123), tick.TokenEqual}:        errors.New("mismatched type to binary operator. got string == int64. see bool(), int(), float()"),
-		keyStruct{"b", int64(123), tick.TokenNotEqual}:     errors.New("mismatched type to binary operator. got string != int64. see bool(), int(), float()"),
-		keyStruct{"b", int64(123), tick.TokenGreater}:      errors.New("mismatched type to binary operator. got string > int64. see bool(), int(), float()"),
-		keyStruct{"b", int64(123), tick.TokenGreaterEqual}: errors.New("mismatched type to binary operator. got string >= int64. see bool(), int(), float()"),
-		keyStruct{"b", int64(123), tick.TokenLess}:         errors.New("mismatched type to binary operator. got string < int64. see bool(), int(), float()"),
-		keyStruct{"b", int64(123), tick.TokenLessEqual}:    errors.New("mismatched type to binary operator. got string <= int64. see bool(), int(), float()"),
+		keyStruct{"b", int64(123), tick.TokenEqual}:        errors.New("mismatched type to binary operator. got string == int64. see bool(), int(), float(), string()"),
+		keyStruct{"b", int64(123), tick.TokenNotEqual}:     errors.New("mismatched type to binary operator. got string != int64. see bool(), int(), float(), string()"),
+		keyStruct{"b", int64(123), tick.TokenGreater}:      errors.New("mismatched type to binary operator. got string > int64. see bool(), int(), float(), string()"),
+		keyStruct{"b", int64(123), tick.TokenGreaterEqual}: errors.New("mismatched type to binary operator. got string >= int64. see bool(), int(), float(), string()"),
+		keyStruct{"b", int64(123), tick.TokenLess}:         errors.New("mismatched type to binary operator. got string < int64. see bool(), int(), float(), string()"),
+		keyStruct{"b", int64(123), tick.TokenLessEqual}:    errors.New("mismatched type to binary operator. got string <= int64. see bool(), int(), float(), string()"),
 	})
 }
 
 func TestExpression_EvalBool_RegexNode(t *testing.T) {
-	leftValues := []interface{}{"abc", "cba"}
+	pattern := regexp.MustCompile(`^(.*)c$`)
+
+	leftValues := []interface{}{"abc", "cba", pattern}
 
 	// Right values are regex, but we are supplying strings because the keyStruct and maps don't play nice together
-	// so we mark regex with prefix of "R!" and createStringOrRegexNode will convert it to regex
-	rightValues := []interface{}{"R!^(.*)c$"}
+	// so we mark regex with prefix of regexp.MustCompile(``) and createStringOrRegexNode will convert it to regex
+	rightValues := []interface{}{pattern}
 	operators := []tick.TokenType{tick.TokenRegexEqual, tick.TokenRegexNotEqual, tick.TokenEqual}
 
 	createStringOrRegexNode := func(v interface{}) tick.Node {
-		stringValue := v.(string)
-		if strings.Index(stringValue, "R!") == 0 {
-			return &tick.RegexNode{
-				Regex: regexp.MustCompile(strings.TrimPrefix(stringValue, "R!")),
+		switch value := v.(type) {
+		case string:
+			return &tick.StringNode{
+				Literal: value,
 			}
+		case *regexp.Regexp:
+			return &tick.RegexNode{
+				Regex: value,
+			}
+		default:
+			panic(fmt.Sprintf("unexpected type %T", v))
 		}
-
-		return &tick.StringNode{
-			Literal: stringValue,
-		}
-
 	}
 
 	runCompiledEvalBoolTests(t, createStringOrRegexNode, leftValues, rightValues, operators, map[keyStruct]interface{}{
 		// Left is "abc", Right is regex "(.*)c"
-		keyStruct{"abc", "R!^(.*)c$", tick.TokenRegexEqual}:    true,
-		keyStruct{"abc", "R!^(.*)c$", tick.TokenRegexNotEqual}: false,
+		keyStruct{"abc", pattern, tick.TokenRegexEqual}:    true,
+		keyStruct{"abc", pattern, tick.TokenRegexNotEqual}: false,
 
 		// Left is "cba", Right is regex "(.*)c"
-		keyStruct{"cba", "R!^(.*)c$", tick.TokenRegexEqual}:    false,
-		keyStruct{"cba", "R!^(.*)c$", tick.TokenRegexNotEqual}: true,
+		keyStruct{"cba", pattern, tick.TokenRegexEqual}:    false,
+		keyStruct{"cba", pattern, tick.TokenRegexNotEqual}: true,
 	},
 		map[keyStruct]error{
 			// Errors for invalid operators
-			keyStruct{"abc", "R!^(.*)c$", tick.TokenEqual}: errors.New("invalid regex comparison operator =="),
-			keyStruct{"cba", "R!^(.*)c$", tick.TokenEqual}: errors.New("invalid regex comparison operator =="),
+			keyStruct{"abc", pattern, tick.TokenEqual}:           errors.New("mismatched type to binary operator. got string == regex. see bool(), int(), float(), string()"),
+			keyStruct{"cba", pattern, tick.TokenEqual}:           errors.New("mismatched type to binary operator. got string == regex. see bool(), int(), float(), string()"),
+			keyStruct{pattern, "cba", tick.TokenEqual}:           errors.New("invalid comparison operator == for type regex"),
+			keyStruct{pattern, pattern, tick.TokenRegexEqual}:    errors.New("mismatched type to binary operator. got regex =~ regex. see bool(), int(), float(), string()"),
+			keyStruct{pattern, pattern, tick.TokenRegexNotEqual}: errors.New("mismatched type to binary operator. got regex !~ regex. see bool(), int(), float(), string()"),
+			keyStruct{pattern, pattern, tick.TokenEqual}:         errors.New("invalid comparison operator == for type regex"),
 		})
 }
 
@@ -543,7 +551,7 @@ func TestExpression_EvalBool_NotSupportedValueLeft(t *testing.T) {
 }
 
 func TestExpression_EvalBool_UnknownOperator(t *testing.T) {
-	_, err := evalCompiledBoolWithScope(t, tick.NewScope(), &tick.BinaryNode{
+	node := &tick.BinaryNode{
 		Operator: tick.TokenType(666),
 		Left: &tick.StringNode{
 			Literal: "value",
@@ -551,16 +559,14 @@ func TestExpression_EvalBool_UnknownOperator(t *testing.T) {
 		Right: &tick.StringNode{
 			Literal: "yo",
 		},
-	})
-
-	expectedError := "return: unknown operator 666"
-
-	if err != nil && (err.Error() != expectedError) {
-		t.Errorf("Unexpected error result: \ngot: %v\nexpected: %v", err.Error(), expectedError)
 	}
-
+	expectedError := "unknown binary operator 666"
+	_, err := stateful.NewExpression(node)
 	if err == nil {
-		t.Error("Unexpected error result: but didn't got any error")
+		t.Fatal("Unexpected error result: but didn't got any error")
+	}
+	if got := err.Error(); got != expectedError {
+		t.Errorf("Unexpected error result: \ngot: %v\nexpected: %v", got, expectedError)
 	}
 }
 
@@ -693,7 +699,7 @@ func TestExpression_EvalNum_ReferenceNodeDosentExist(t *testing.T) {
 	expectedError := `name "value" is undefined. Names in scope: `
 
 	// Check left side
-	se := mustCompileExpression(t, &tick.ReferenceNode{
+	se := mustCompileExpression(&tick.ReferenceNode{
 		Reference: "value",
 	})
 
@@ -803,7 +809,7 @@ func TestExpression_EvalString_StringConcatReferenceNode(t *testing.T) {
 func TestExpression_EvalNum_BinaryNodeWithUnary(t *testing.T) {
 
 	// -"value" < 0 , yes, of course, this is always true..
-	se := mustCompileExpression(t, &tick.BinaryNode{
+	se := mustCompileExpression(&tick.BinaryNode{
 		Operator: tick.TokenLess,
 		Left: &tick.UnaryNode{
 			Operator: tick.TokenMinus,
@@ -834,7 +840,7 @@ func TestExpression_EvalBool_BinaryNodeWithBoolUnaryNode(t *testing.T) {
 
 	emptyScope := tick.NewScope()
 
-	se := mustCompileExpression(t, &tick.BinaryNode{
+	se := mustCompileExpression(&tick.BinaryNode{
 		Operator: tick.TokenEqual,
 		Left: &tick.UnaryNode{
 			Operator: tick.TokenNot,
@@ -857,7 +863,7 @@ func TestExpression_EvalBool_BinaryNodeWithBoolUnaryNode(t *testing.T) {
 	}
 
 	// now with ref
-	se = mustCompileExpression(t, &tick.BinaryNode{
+	se = mustCompileExpression(&tick.BinaryNode{
 		Operator: tick.TokenEqual,
 		Left: &tick.UnaryNode{
 			Operator: tick.TokenNot,
@@ -888,7 +894,7 @@ func TestExpression_EvalBool_BinaryNodeWithNumericUnaryNode(t *testing.T) {
 
 	scope := tick.NewScope()
 
-	se := mustCompileExpression(t, &tick.BinaryNode{
+	se := mustCompileExpression(&tick.BinaryNode{
 		Operator: tick.TokenLess,
 		Left: &tick.UnaryNode{
 			Operator: tick.TokenMinus,
@@ -923,7 +929,7 @@ func TestExpression_EvalBool_TwoLevelsDeepBinary(t *testing.T) {
 	scope.Set("b", int64(5))
 
 	// a > 10 and b < 10
-	se := mustCompileExpression(t, &tick.BinaryNode{
+	se := mustCompileExpression(&tick.BinaryNode{
 		Operator: tick.TokenAnd,
 
 		Left: &tick.BinaryNode{
@@ -980,7 +986,7 @@ func TestExpression_EvalBool_TwoLevelsDeepBinaryWithEvalNum_Int64(t *testing.T) 
 	scope.Set("b", int64(5))
 
 	// a > 10 and b < 10
-	se := mustCompileExpression(t, &tick.BinaryNode{
+	se := mustCompileExpression(&tick.BinaryNode{
 		Operator: tick.TokenAnd,
 
 		Left: &tick.BinaryNode{
@@ -1045,7 +1051,7 @@ func TestExpression_EvalBool_TwoLevelsDeepBinaryWithEvalNum_Float64(t *testing.T
 	scope.Set("b", float64(5))
 
 	// a > 10 and b < 10
-	se := mustCompileExpression(t, &tick.BinaryNode{
+	se := mustCompileExpression(&tick.BinaryNode{
 		Operator: tick.TokenAnd,
 
 		Left: &tick.BinaryNode{
@@ -1169,54 +1175,54 @@ func TestExpression_EvalNum_NumberNode(t *testing.T) {
 		keyStruct{float64(10), float64(10), tick.TokenDiv}:   float64(1),
 	}, map[keyStruct]error{
 		// Modulo token where left is float
-		keyStruct{float64(5), float64(5), tick.TokenMod}:       errors.New("invalid float64 math operator %"),
-		keyStruct{float64(5), float64(10), tick.TokenMod}:      errors.New("invalid float64 math operator %"),
-		keyStruct{float64(10), float64(5), tick.TokenMod}:      errors.New("invalid float64 math operator %"),
-		keyStruct{float64(10), float64(10), tick.TokenMod}:     errors.New("invalid float64 math operator %"),
-		keyStruct{float64(5), int64(5), tick.TokenMod}:         errors.New("invalid float64 math operator %"),
-		keyStruct{float64(10), int64(5), tick.TokenMod}:        errors.New("invalid float64 math operator %"),
-		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenMod}: errors.New("invalid float64 math operator %"),
-		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenMod}:  errors.New("invalid float64 math operator %"),
+		keyStruct{float64(5), float64(5), tick.TokenMod}:       errors.New("invalid math operator % for type float64"),
+		keyStruct{float64(5), float64(10), tick.TokenMod}:      errors.New("invalid math operator % for type float64"),
+		keyStruct{float64(10), float64(5), tick.TokenMod}:      errors.New("invalid math operator % for type float64"),
+		keyStruct{float64(10), float64(10), tick.TokenMod}:     errors.New("invalid math operator % for type float64"),
+		keyStruct{float64(5), int64(5), tick.TokenMod}:         errors.New("invalid math operator % for type float64"),
+		keyStruct{float64(10), int64(5), tick.TokenMod}:        errors.New("invalid math operator % for type float64"),
+		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenMod}: errors.New("invalid math operator % for type float64"),
+		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenMod}:  errors.New("invalid math operator % for type float64"),
 
 		// Left is int, right is float
-		keyStruct{int64(5), float64(5), tick.TokenPlus}:   errors.New("mismatched type to binary operator. got int64 + float64. see bool(), int(), float()"),
-		keyStruct{int64(5), float64(5), tick.TokenMinus}:  errors.New("mismatched type to binary operator. got int64 - float64. see bool(), int(), float()"),
-		keyStruct{int64(5), float64(5), tick.TokenMult}:   errors.New("mismatched type to binary operator. got int64 * float64. see bool(), int(), float()"),
-		keyStruct{int64(5), float64(5), tick.TokenDiv}:    errors.New("mismatched type to binary operator. got int64 / float64. see bool(), int(), float()"),
-		keyStruct{int64(5), float64(5), tick.TokenMod}:    errors.New("mismatched type to binary operator. got int64 % float64. see bool(), int(), float()"),
-		keyStruct{int64(5), float64(10), tick.TokenPlus}:  errors.New("mismatched type to binary operator. got int64 + float64. see bool(), int(), float()"),
-		keyStruct{int64(5), float64(10), tick.TokenMinus}: errors.New("mismatched type to binary operator. got int64 - float64. see bool(), int(), float()"),
-		keyStruct{int64(5), float64(10), tick.TokenMult}:  errors.New("mismatched type to binary operator. got int64 * float64. see bool(), int(), float()"),
-		keyStruct{int64(5), float64(10), tick.TokenDiv}:   errors.New("mismatched type to binary operator. got int64 / float64. see bool(), int(), float()"),
-		keyStruct{int64(5), float64(10), tick.TokenMod}:   errors.New("mismatched type to binary operator. got int64 % float64. see bool(), int(), float()"),
+		keyStruct{int64(5), float64(5), tick.TokenPlus}:   errors.New("mismatched type to binary operator. got int64 + float64. see bool(), int(), float(), string()"),
+		keyStruct{int64(5), float64(5), tick.TokenMinus}:  errors.New("mismatched type to binary operator. got int64 - float64. see bool(), int(), float(), string()"),
+		keyStruct{int64(5), float64(5), tick.TokenMult}:   errors.New("mismatched type to binary operator. got int64 * float64. see bool(), int(), float(), string()"),
+		keyStruct{int64(5), float64(5), tick.TokenDiv}:    errors.New("mismatched type to binary operator. got int64 / float64. see bool(), int(), float(), string()"),
+		keyStruct{int64(5), float64(5), tick.TokenMod}:    errors.New("mismatched type to binary operator. got int64 % float64. see bool(), int(), float(), string()"),
+		keyStruct{int64(5), float64(10), tick.TokenPlus}:  errors.New("mismatched type to binary operator. got int64 + float64. see bool(), int(), float(), string()"),
+		keyStruct{int64(5), float64(10), tick.TokenMinus}: errors.New("mismatched type to binary operator. got int64 - float64. see bool(), int(), float(), string()"),
+		keyStruct{int64(5), float64(10), tick.TokenMult}:  errors.New("mismatched type to binary operator. got int64 * float64. see bool(), int(), float(), string()"),
+		keyStruct{int64(5), float64(10), tick.TokenDiv}:   errors.New("mismatched type to binary operator. got int64 / float64. see bool(), int(), float(), string()"),
+		keyStruct{int64(5), float64(10), tick.TokenMod}:   errors.New("mismatched type to binary operator. got int64 % float64. see bool(), int(), float(), string()"),
 
 		// Left is float, right is int
-		keyStruct{float64(5), int64(5), tick.TokenPlus}:  errors.New("mismatched type to binary operator. got float64 + int64. see bool(), int(), float()"),
-		keyStruct{float64(5), int64(5), tick.TokenMinus}: errors.New("mismatched type to binary operator. got float64 - int64. see bool(), int(), float()"),
-		keyStruct{float64(5), int64(5), tick.TokenMult}:  errors.New("mismatched type to binary operator. got float64 * int64. see bool(), int(), float()"),
-		keyStruct{float64(5), int64(5), tick.TokenDiv}:   errors.New("mismatched type to binary operator. got float64 / int64. see bool(), int(), float()"),
+		keyStruct{float64(5), int64(5), tick.TokenPlus}:  errors.New("mismatched type to binary operator. got float64 + int64. see bool(), int(), float(), string()"),
+		keyStruct{float64(5), int64(5), tick.TokenMinus}: errors.New("mismatched type to binary operator. got float64 - int64. see bool(), int(), float(), string()"),
+		keyStruct{float64(5), int64(5), tick.TokenMult}:  errors.New("mismatched type to binary operator. got float64 * int64. see bool(), int(), float(), string()"),
+		keyStruct{float64(5), int64(5), tick.TokenDiv}:   errors.New("mismatched type to binary operator. got float64 / int64. see bool(), int(), float(), string()"),
 
-		keyStruct{float64(10), int64(5), tick.TokenPlus}:  errors.New("mismatched type to binary operator. got float64 + int64. see bool(), int(), float()"),
-		keyStruct{float64(10), int64(5), tick.TokenMinus}: errors.New("mismatched type to binary operator. got float64 - int64. see bool(), int(), float()"),
-		keyStruct{float64(10), int64(5), tick.TokenMult}:  errors.New("mismatched type to binary operator. got float64 * int64. see bool(), int(), float()"),
-		keyStruct{float64(10), int64(5), tick.TokenDiv}:   errors.New("mismatched type to binary operator. got float64 / int64. see bool(), int(), float()"),
+		keyStruct{float64(10), int64(5), tick.TokenPlus}:  errors.New("mismatched type to binary operator. got float64 + int64. see bool(), int(), float(), string()"),
+		keyStruct{float64(10), int64(5), tick.TokenMinus}: errors.New("mismatched type to binary operator. got float64 - int64. see bool(), int(), float(), string()"),
+		keyStruct{float64(10), int64(5), tick.TokenMult}:  errors.New("mismatched type to binary operator. got float64 * int64. see bool(), int(), float(), string()"),
+		keyStruct{float64(10), int64(5), tick.TokenDiv}:   errors.New("mismatched type to binary operator. got float64 / int64. see bool(), int(), float(), string()"),
 
 		// Left is int64, Right is "NON_INT_VALUE"
-		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenPlus}:  errors.New("mismatched type to binary operator. got int64 + string. see bool(), int(), float()"),
-		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenMinus}: errors.New("mismatched type to binary operator. got int64 - string. see bool(), int(), float()"),
-		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenMult}:  errors.New("mismatched type to binary operator. got int64 * string. see bool(), int(), float()"),
-		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenDiv}:   errors.New("mismatched type to binary operator. got int64 / string. see bool(), int(), float()"),
-		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenMod}:   errors.New("mismatched type to binary operator. got int64 % string. see bool(), int(), float()"),
+		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenPlus}:  errors.New("mismatched type to binary operator. got int64 + string. see bool(), int(), float(), string()"),
+		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenMinus}: errors.New("mismatched type to binary operator. got int64 - string. see bool(), int(), float(), string()"),
+		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenMult}:  errors.New("mismatched type to binary operator. got int64 * string. see bool(), int(), float(), string()"),
+		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenDiv}:   errors.New("mismatched type to binary operator. got int64 / string. see bool(), int(), float(), string()"),
+		keyStruct{int64(5), "NON_INT_VALUE", tick.TokenMod}:   errors.New("mismatched type to binary operator. got int64 % string. see bool(), int(), float(), string()"),
 
 		// Left is float64, Right is "NON_INT_VALUE"
-		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenPlus}:   errors.New("mismatched type to binary operator. got float64 + string. see bool(), int(), float()"),
-		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenMinus}:  errors.New("mismatched type to binary operator. got float64 - string. see bool(), int(), float()"),
-		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenMult}:   errors.New("mismatched type to binary operator. got float64 * string. see bool(), int(), float()"),
-		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenDiv}:    errors.New("mismatched type to binary operator. got float64 / string. see bool(), int(), float()"),
-		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenPlus}:  errors.New("mismatched type to binary operator. got float64 + string. see bool(), int(), float()"),
-		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenMinus}: errors.New("mismatched type to binary operator. got float64 - string. see bool(), int(), float()"),
-		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenMult}:  errors.New("mismatched type to binary operator. got float64 * string. see bool(), int(), float()"),
-		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenDiv}:   errors.New("mismatched type to binary operator. got float64 / string. see bool(), int(), float()"),
+		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenPlus}:   errors.New("mismatched type to binary operator. got float64 + string. see bool(), int(), float(), string()"),
+		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenMinus}:  errors.New("mismatched type to binary operator. got float64 - string. see bool(), int(), float(), string()"),
+		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenMult}:   errors.New("mismatched type to binary operator. got float64 * string. see bool(), int(), float(), string()"),
+		keyStruct{float64(5), "NON_INT_VALUE", tick.TokenDiv}:    errors.New("mismatched type to binary operator. got float64 / string. see bool(), int(), float(), string()"),
+		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenPlus}:  errors.New("mismatched type to binary operator. got float64 + string. see bool(), int(), float(), string()"),
+		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenMinus}: errors.New("mismatched type to binary operator. got float64 - string. see bool(), int(), float(), string()"),
+		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenMult}:  errors.New("mismatched type to binary operator. got float64 * string. see bool(), int(), float(), string()"),
+		keyStruct{float64(10), "NON_INT_VALUE", tick.TokenDiv}:   errors.New("mismatched type to binary operator. got float64 / string. see bool(), int(), float(), string()"),
 	})
 }
 
@@ -1230,7 +1236,10 @@ func runCompiledNumericTests(
 	errorExpectations map[keyStruct]error) {
 
 	runCompiledEvalTests(t, func(t *testing.T, scope *tick.Scope, n tick.Node) (interface{}, error) {
-		se := mustCompileExpression(t, n)
+		se, err := stateful.NewExpression(n)
+		if err != nil {
+			return nil, err
+		}
 		return se.Eval(scope)
 	}, createNodeFn, leftValues, rightValues, operators, expected, errorExpectations)
 }
@@ -1248,7 +1257,10 @@ func runCompiledEvalBoolTests(
 }
 
 func evalCompiledBoolWithScope(t *testing.T, scope *tick.Scope, n tick.Node) (interface{}, error) {
-	se := mustCompileExpression(t, n)
+	se, err := stateful.NewExpression(n)
+	if err != nil {
+		return nil, err
+	}
 	return se.EvalBool(scope)
 }
 
@@ -1266,11 +1278,12 @@ func runCompiledEvalTests(
 		for _, rhs := range rightValues {
 			for _, op := range operators {
 
+				t.Log("testing", lhs, op, rhs)
 				key := keyStruct{lhs, rhs, op}
 				exp, isExpectedResultOk := expected[key]
 				errorExpected, isErrorOk := errorExpectations[key]
 				if !isExpectedResultOk && !isErrorOk {
-					t.Fatalf("Couldn't find an expected result/error for: lhs: %t, rhs: %t, op: %v", lhs, rhs, op)
+					t.Fatalf("Couldn't find an expected result/error for: lhs: %v, rhs: %v, op: %v", lhs, rhs, op)
 				}
 
 				// Test simple const values compares
@@ -1283,14 +1296,14 @@ func runCompiledEvalTests(
 
 				// This is bool matching, but not error matching..
 				if isExpectedResultOk && !isErrorOk && err != nil {
-					t.Errorf("Got an error while evaluating: %t %v %t - %v\n", lhs, op, rhs, err)
+					t.Errorf("Got an error while evaluating: %v %v %v -- %T %v %T -- %v\n", lhs, op, rhs, lhs, op, rhs, err)
 				} else {
 
 					// Expect value can be error or bool
 					if isErrorOk && errorExpected.Error() != err.Error() {
 						t.Errorf("unexpected error result: %v %v %v\ngot: %v\nexp: %v", lhs, op, rhs, err, errorExpected)
 					} else if isExpectedResultOk && exp != result {
-						t.Errorf("unexpected result: %t %v %t\ngot: %v\nexp: %v", lhs, op, rhs, result, exp)
+						t.Errorf("unexpected result: %v %v %v\ngot: %v\nexp: %v", lhs, op, rhs, result, exp)
 					}
 				}
 
@@ -1307,12 +1320,12 @@ func runCompiledEvalTests(
 
 				if isErrorOk {
 					if err == nil {
-						t.Errorf("reference test: expected an error but got result: %t %v %t\nresult: %t\nerr: %v", lhs, op, rhs, result, err)
+						t.Errorf("reference test: expected an error but got result: %v %v %v\nresult: %v\nerr: %v", lhs, op, rhs, result, err)
 					} else if errorExpected.Error() != err.Error() {
 						t.Errorf("reference test: unexpected error result: %v %v %v\ngot: %v\nexp: %v", lhs, op, rhs, err, errorExpected)
 					}
 				} else if isExpectedResultOk && exp != result {
-					t.Errorf("reference test: unexpected bool result: %t %v %t\ngot: %t\nexp: %t", lhs, op, rhs, result, exp)
+					t.Errorf("reference test: unexpected bool result: %v %v %v\ngot: %v\nexp: %v", lhs, op, rhs, result, exp)
 				}
 
 			}
@@ -1321,10 +1334,10 @@ func runCompiledEvalTests(
 	}
 }
 
-func mustCompileExpression(t *testing.T, node tick.Node) stateful.Expression {
+func mustCompileExpression(node tick.Node) stateful.Expression {
 	se, err := stateful.NewExpression(node)
 	if err != nil {
-		t.Fatalf("Failed to compile expression: %v", err)
+		panic(fmt.Sprintf("Failed to compile expression: %v", err))
 	}
 
 	return se
