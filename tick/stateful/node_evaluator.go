@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"time"
 
 	"github.com/influxdata/kapacitor/tick"
 )
@@ -31,6 +32,7 @@ type NodeEvaluator interface {
 	EvalString(scope *tick.Scope, executionState ExecutionState) (string, error)
 	EvalBool(scope *tick.Scope, executionState ExecutionState) (bool, error)
 	EvalRegex(scope *tick.Scope, executionState ExecutionState) (*regexp.Regexp, error)
+	EvalTime(scope *tick.Scope, executionState ExecutionState) (time.Time, error)
 
 	// Type returns the type of ValueType
 	Type(scope ReadOnlyScope, executionState ExecutionState) (ValueType, error)

@@ -2,6 +2,7 @@ package stateful
 
 import (
 	"regexp"
+	"time"
 
 	"github.com/influxdata/kapacitor/tick"
 )
@@ -32,4 +33,7 @@ func (n *EvalStringNode) EvalBool(scope *tick.Scope, executionState ExecutionSta
 
 func (n *EvalStringNode) EvalRegex(scope *tick.Scope, executionState ExecutionState) (*regexp.Regexp, error) {
 	return nil, ErrTypeGuardFailed{RequestedType: TRegex, ActualType: TString}
+}
+func (n *EvalStringNode) EvalTime(scope *tick.Scope, executionState ExecutionState) (time.Time, error) {
+	return time.Time{}, ErrTypeGuardFailed{RequestedType: TTime, ActualType: TString}
 }
