@@ -185,6 +185,7 @@ func createTasks(tm *kapacitor.TaskMaster, count int, tickScript string, dbrps [
 			kapacitor.StreamTask,
 			dbrps,
 			0,
+			nil,
 		)
 		if err != nil {
 			panic(err)

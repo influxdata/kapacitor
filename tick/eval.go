@@ -3,17 +3,19 @@ package tick
 import (
 	"errors"
 	"fmt"
-	"go/ast"
+	goast "go/ast"
 	"log"
 	"os"
 	"reflect"
-	"regexp"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/influxdata/kapacitor/tick/ast"
+	"github.com/influxdata/kapacitor/tick/stateful"
 )
 
 var mu sync.Mutex
@@ -28,6 +30,14 @@ func SetLogger(l *log.Logger) {
 	mu.Lock()
 	defer mu.Unlock()
 	logger = l
+}
+
+type unboundFunc func(obj interface{}) (interface{}, error)
+
+type Var struct {
+	Value       interface{}
+	Type        ast.ValueType
+	Description string
 }
 
 // Interface for interacting with objects.
@@ -52,9 +62,9 @@ type PartialDescriber interface {
 }
 
 // Parse and evaluate a given script for the scope.
-// This evaluation method uses reflection to call
-// methods on objects within the scope.
-func Evaluate(script string, scope *Scope) (err error) {
+// Returns a set of default vars.
+// If a set of predefined vars is provided, they may effect the default var values.
+func Evaluate(script string, scope *stateful.Scope, predefinedVars map[string]Var, ignoreMissingVars bool) (_ map[string]Var, err error) {
 	defer func(errP *error) {
 		r := recover()
 		if r == ErrEmptyStack {
@@ -67,22 +77,28 @@ func Evaluate(script string, scope *Scope) (err error) {
 
 	}(&err)
 
-	root, err := parse(script)
+	root, err := ast.Parse(script)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Use a stack machine to evaluate the AST
 	stck := &stack{}
-	return eval(root, scope, stck)
+	// Collect any defined defaultVars
+	defaultVars := make(map[string]Var)
+	err = eval(root, scope, stck, predefinedVars, defaultVars, ignoreMissingVars)
+	if err != nil {
+		return nil, err
+	}
+	return defaultVars, nil
 }
 
-func errorf(p Position, fmtStr string, args ...interface{}) error {
+func errorf(p ast.Position, fmtStr string, args ...interface{}) error {
 	lineStr := fmt.Sprintf("line %d char %d: %s", p.Line(), p.Char(), fmtStr)
 	return fmt.Errorf(lineStr, args...)
 }
 
-func wrapError(p Position, err error) error {
+func wrapError(p ast.Position, err error) error {
 	if err == nil {
 		return nil
 	}
@@ -90,66 +106,92 @@ func wrapError(p Position, err error) error {
 }
 
 // Evaluate a node using a stack machine in a given scope
-func eval(n Node, scope *Scope, stck *stack) (err error) {
+func eval(n ast.Node, scope *stateful.Scope, stck *stack, predefinedVars, defaultVars map[string]Var, ignoreMissingVars bool) (err error) {
 	switch node := n.(type) {
-	case *BoolNode:
+	case *ast.BoolNode:
 		stck.Push(node.Bool)
-	case *NumberNode:
+	case *ast.NumberNode:
 		if node.IsInt {
 			stck.Push(node.Int64)
 		} else {
 			stck.Push(node.Float64)
 		}
-	case *DurationNode:
+	case *ast.DurationNode:
 		stck.Push(node.Dur)
-	case *StringNode:
+	case *ast.StringNode:
 		stck.Push(node.Literal)
-	case *RegexNode:
+	case *ast.RegexNode:
 		stck.Push(node.Regex)
-	case *UnaryNode:
-		err = eval(node.Node, scope, stck)
+	case *ast.UnaryNode:
+		err = eval(node.Node, scope, stck, predefinedVars, defaultVars, ignoreMissingVars)
 		if err != nil {
 			return
 		}
-		err := evalUnary(node, node.Operator, scope, stck)
+		err = evalUnary(node, node.Operator, scope, stck)
+		if err != nil {
+			return
+		}
+	case *ast.BinaryNode:
+		// Switch over to using the stateful expressions for evaluating a BinaryNode
+		n, err := resolveIdents(node, scope)
 		if err != nil {
 			return err
 		}
-	case *LambdaNode:
-		// Catch panic from resolveIdents and return as error.
-		err = func() (e error) {
-			defer func(ep *error) {
-				err := recover()
+		expr, err := stateful.NewExpression(n)
+		if err != nil {
+			return err
+		}
+		value, err := expr.Eval(stateful.NewScope())
+		if err != nil {
+			return err
+		}
+		stck.Push(value)
+	case *ast.LambdaNode:
+		node.Expression, err = resolveIdents(node.Expression, scope)
+		if err != nil {
+			return
+		}
+		stck.Push(node)
+	case *ast.ListNode:
+		nodes := make([]interface{}, len(node.Nodes))
+		for i, n := range node.Nodes {
+			err = eval(n, scope, stck, predefinedVars, defaultVars, ignoreMissingVars)
+			if err != nil {
+				return
+			}
+			a := stck.Pop()
+			switch typed := a.(type) {
+			case *ast.IdentifierNode:
+				// Resolve identifier
+				a, err = scope.Get(typed.Ident)
 				if err != nil {
-					*ep = err.(error)
+					return err
 				}
-			}(&e)
-			node.Node = resolveIdents(node.Node, scope)
-			return e
-		}()
+			}
+
+			nodes[i] = a
+		}
+		stck.Push(nodes)
+	case *ast.TypeDeclarationNode:
+		err = evalTypeDeclaration(node, scope, predefinedVars, defaultVars, ignoreMissingVars)
 		if err != nil {
 			return
 		}
-		stck.Push(node.Node)
-	case *DeclarationNode:
-		err = eval(node.Left, scope, stck)
+	case *ast.DeclarationNode:
+		err = eval(node.Right, scope, stck, predefinedVars, defaultVars, ignoreMissingVars)
 		if err != nil {
 			return
 		}
-		err = eval(node.Right, scope, stck)
+		err = evalDeclaration(node, scope, stck, predefinedVars, defaultVars)
 		if err != nil {
 			return
 		}
-		err = evalDeclaration(scope, stck)
+	case *ast.ChainNode:
+		err = eval(node.Left, scope, stck, predefinedVars, defaultVars, ignoreMissingVars)
 		if err != nil {
 			return
 		}
-	case *ChainNode:
-		err = eval(node.Left, scope, stck)
-		if err != nil {
-			return
-		}
-		err = eval(node.Right, scope, stck)
+		err = eval(node.Right, scope, stck, predefinedVars, defaultVars, ignoreMissingVars)
 		if err != nil {
 			return
 		}
@@ -157,16 +199,16 @@ func eval(n Node, scope *Scope, stck *stack) (err error) {
 		if err != nil {
 			return
 		}
-	case *FunctionNode:
+	case *ast.FunctionNode:
 		args := make([]interface{}, len(node.Args))
 		for i, arg := range node.Args {
-			err = eval(arg, scope, stck)
+			err = eval(arg, scope, stck, predefinedVars, defaultVars, ignoreMissingVars)
 			if err != nil {
 				return
 			}
 			a := stck.Pop()
 			switch typed := a.(type) {
-			case *IdentifierNode:
+			case *ast.IdentifierNode:
 				// Resolve identifier
 				a, err = scope.Get(typed.Ident)
 				if err != nil {
@@ -186,15 +228,19 @@ func eval(n Node, scope *Scope, stck *stack) (err error) {
 		if err != nil {
 			return
 		}
-	case *ListNode:
+	case *ast.ProgramNode:
 		for _, n := range node.Nodes {
-			err = eval(n, scope, stck)
+			err = eval(n, scope, stck, predefinedVars, defaultVars, ignoreMissingVars)
 			if err != nil {
 				return
 			}
 			// Pop unused result
 			if stck.Len() > 0 {
-				stck.Pop()
+				ret := stck.Pop()
+				if f, ok := ret.(unboundFunc); ok {
+					// Call global function
+					f(nil)
+				}
 			}
 		}
 	default:
@@ -203,11 +249,11 @@ func eval(n Node, scope *Scope, stck *stack) (err error) {
 	return nil
 }
 
-func evalUnary(p Position, op TokenType, scope *Scope, stck *stack) error {
+func evalUnary(p ast.Position, op ast.TokenType, scope *stateful.Scope, stck *stack) error {
 	v := stck.Pop()
 	switch op {
-	case TokenMinus:
-		if ident, ok := v.(*IdentifierNode); ok {
+	case ast.TokenMinus:
+		if ident, ok := v.(*ast.IdentifierNode); ok {
 			value, err := scope.Get(ident.Ident)
 			if err != nil {
 				return err
@@ -224,8 +270,8 @@ func evalUnary(p Position, op TokenType, scope *Scope, stck *stack) error {
 		default:
 			return errorf(p, "invalid arugument to '-' %v", v)
 		}
-	case TokenNot:
-		if ident, ok := v.(*IdentifierNode); ok {
+	case ast.TokenNot:
+		if ident, ok := v.(*ast.IdentifierNode); ok {
 			value, err := scope.Get(ident.Ident)
 			if err != nil {
 				return err
@@ -241,19 +287,150 @@ func evalUnary(p Position, op TokenType, scope *Scope, stck *stack) error {
 	return nil
 }
 
-func evalDeclaration(scope *Scope, stck *stack) error {
-	r := stck.Pop()
-	l := stck.Pop()
-	i := l.(*IdentifierNode)
-	scope.Set(i.Ident, r)
+func evalTypeDeclaration(node *ast.TypeDeclarationNode, scope *stateful.Scope, predefinedVars, defaultVars map[string]Var, ignoreMissingVars bool) error {
+	var actualType ast.ValueType
+	switch node.Type.Ident {
+	case "int":
+		actualType = ast.TInt
+	case "float":
+		actualType = ast.TFloat
+	case "bool":
+		actualType = ast.TBool
+	case "string":
+		actualType = ast.TString
+	case "regex":
+		actualType = ast.TRegex
+	case "duration":
+		actualType = ast.TDuration
+	case "lambda":
+		actualType = ast.TLambda
+	case "list":
+		actualType = ast.TList
+	case "star":
+		actualType = ast.TStar
+	default:
+		return fmt.Errorf("invalid var type %q", node.Type.Ident)
+	}
+	name := node.Node.Ident
+	desc := ""
+	if node.Comment != nil {
+		desc = node.Comment.CommentString()
+	}
+	defaultVars[name] = Var{
+		Type:        actualType,
+		Value:       nil,
+		Description: desc,
+	}
+
+	if predefinedValue, ok := predefinedVars[name]; ok {
+		if predefinedValue.Type != actualType {
+			return fmt.Errorf("invalid type supplied for %s, got %v exp %v", name, predefinedValue.Type, actualType)
+		}
+		v, err := convertVarToValue(Var{Value: predefinedValue.Value, Type: actualType})
+		if err != nil {
+			return err
+		}
+		scope.Set(name, v)
+	} else if ignoreMissingVars {
+		// Set zero value on scope, so execution can continue
+		scope.Set(name, ast.ZeroValue(actualType))
+	} else {
+		return fmt.Errorf("missing value for var %q.", name)
+	}
+
 	return nil
 }
 
-func evalChain(p Position, scope *Scope, stck *stack) error {
+func convertVarToValue(v Var) (interface{}, error) {
+	value := v.Value
+	if v.Type == ast.TList {
+		values, ok := value.([]Var)
+		if !ok {
+			return nil, fmt.Errorf("var has type list but value is type %T", value)
+		}
+
+		list := make([]interface{}, len(values))
+		for i := range values {
+			list[i] = values[i].Value
+		}
+		value = list
+	}
+	return value, nil
+}
+
+func convertValueToVar(value interface{}, typ ast.ValueType, desc string) (Var, error) {
+	varValue := value
+	if typ == ast.TList {
+		values, ok := value.([]interface{})
+		if !ok {
+			return Var{}, fmt.Errorf("var has type list but value is type %T", value)
+		}
+
+		list := make([]Var, len(values))
+		for i := range values {
+			typ := ast.TypeOf(values[i])
+			list[i] = Var{
+				Type:  typ,
+				Value: values[i],
+			}
+		}
+		varValue = list
+	}
+	return Var{
+		Type:        typ,
+		Value:       varValue,
+		Description: desc,
+	}, nil
+}
+
+func evalDeclaration(node *ast.DeclarationNode, scope *stateful.Scope, stck *stack, predefinedVars, defaultVars map[string]Var) error {
+	name := node.Left.Ident
+	if v, _ := scope.Get(name); v != nil {
+		return fmt.Errorf("attempted to redefine %s, vars are immutable", name)
+	}
+	value := stck.Pop()
+	if i, ok := value.(*ast.IdentifierNode); ok {
+		// Resolve identifier
+		v, err := scope.Get(i.Ident)
+		if err != nil {
+			return err
+		}
+		value = v
+	}
+	actualType := ast.TypeOf(value)
+	// Populate set of default vars
+	if actualType != ast.InvalidType {
+		desc := ""
+		if node.Comment != nil {
+			desc = node.Comment.CommentString()
+		}
+
+		v, err := convertValueToVar(value, actualType, desc)
+		if err != nil {
+			return err
+		}
+		defaultVars[name] = v
+	}
+	// Populate scope, first check for predefined var
+	if predefinedValue, ok := predefinedVars[name]; ok {
+		if predefinedValue.Type != actualType {
+			return fmt.Errorf("invalid type supplied for %s, got %v exp %v", name, predefinedValue.Type, actualType)
+		}
+		v, err := convertVarToValue(Var{Value: predefinedValue.Value, Type: actualType})
+		if err != nil {
+			return err
+		}
+		value = v
+	}
+	scope.Set(name, value)
+	return nil
+}
+
+func evalChain(p ast.Position, scope *stateful.Scope, stck *stack) error {
 	r := stck.Pop()
 	l := stck.Pop()
 	// Resolve identifier
-	if left, ok := l.(*IdentifierNode); ok {
+	if left, ok := l.(*ast.IdentifierNode); ok {
 		var err error
 		l, err = scope.Get(left.Ident)
 		if err != nil {
@@ -267,7 +444,7 @@ func evalChain(p Position, scope *Scope, stck *stack) error {
 			return err
 		}
 		stck.Push(ret)
-	case *IdentifierNode:
+	case *ast.IdentifierNode:
 		name := right.Ident
 
 		//Lookup field by name of left object
@@ -296,7 +473,13 @@ func evalChain(p Position, scope *Scope, stck *stack) error {
 	return nil
 }
 
-func evalFunc(f *FunctionNode, scope *Scope, stck *stack, args []interface{}) error {
+func evalFunc(f *ast.FunctionNode, scope *stateful.Scope, stck *stack, args []interface{}) error {
+	// If the first and only arg is a list use it as the list of args
+	if len(args) == 1 {
+		if a, ok := args[0].([]interface{}); ok {
+			args = a
+		}
+	}
 	rec := func(obj interface{}, errp *error) {
 		e := recover()
 		if e != nil {
@@ -311,7 +494,7 @@ func evalFunc(f *FunctionNode, scope *Scope, stck *stack, args []interface{}) er
 		//Setup recover method if there is a panic during the method call
 		defer rec(obj, &err)
 
-		if f.Type == globalFunc {
+		if f.Type == ast.GlobalFunc {
 			if obj != nil {
 				return nil, fmt.Errorf("line %d char%d: calling global function on object %T", f.Line(), f.Char(), obj)
 			}
@@ -344,7 +527,7 @@ func evalFunc(f *FunctionNode, scope *Scope, stck *stack, args []interface{}) er
 
 		// Call correct type of function
 		switch f.Type {
-		case chainFunc:
+		case ast.ChainFunc:
 			if describer.HasChainMethod(name) {
 				o, err := describer.CallChainMethod(name, args...)
 				return o, wrapError(f, err)
@@ -355,7 +538,7 @@ func evalFunc(f *FunctionNode, scope *Scope, stck *stack, args []interface{}) er
 			if dm := scope.DynamicMethod(name); dm != nil {
 				return nil, errorf(f, "no chaining method %q on %T, but dynamic method does exist. Use '@' operator instead: 'node@%s(..)'.", name, obj, name)
 			}
-		case propertyFunc:
+		case ast.PropertyFunc:
 			if describer.HasProperty(name) {
 				o, err := describer.SetProperty(name, args...)
 				return o, wrapError(f, err)
@@ -366,7 +549,7 @@ func evalFunc(f *FunctionNode, scope *Scope, stck *stack, args []interface{}) er
 			if dm := scope.DynamicMethod(name); dm != nil {
 				return nil, errorf(f, "no property method %q on %T, but dynamic method does exist. Use '@' operator instead: 'node@%s(..)'.", name, obj, name)
 			}
-		case dynamicFunc:
+		case ast.DynamicFunc:
 			// Check for dynamic method.
 			if dm := scope.DynamicMethod(name); dm != nil {
 				ret, err := dm(obj, args...)
@@ -568,7 +751,7 @@ func getChainMethods(desc string, rv reflect.Value, propertyMethods map[string]r
 	chainMethods := make(map[string]reflect.Value, rRecvType.NumMethod())
 	for i := 0; i < rRecvType.NumMethod(); i++ {
 		method := rRecvType.Method(i)
-		if !ast.IsExported(method.Name) {
+		if !goast.IsExported(method.Name) {
 			continue
 		}
 		if !rv.MethodByName(method.Name).IsValid() {
@@ -693,67 +876,43 @@ func capilatizeFirst(s string) string {
 // Resolve all identifiers immediately in the tree with their value from the scope.
 // This operation is performed in place.
 // Panics if the scope value does not exist or if the value cannot be expressed as a literal.
-func resolveIdents(n Node, scope *Scope) Node {
+func resolveIdents(n ast.Node, scope *stateful.Scope) (_ ast.Node, err error) {
 	switch node := n.(type) {
-	case *IdentifierNode:
+	case *ast.IdentifierNode:
 		v, err := scope.Get(node.Ident)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
-		return valueToLiteralNode(node.position, v)
-	case *UnaryNode:
-		node.Node = resolveIdents(node.Node, scope)
-	case *BinaryNode:
-		node.Left = resolveIdents(node.Left, scope)
-		node.Right = resolveIdents(node.Right, scope)
-	case *FunctionNode:
+		lit, err := ast.ValueToLiteralNode(node, v)
+		if err != nil {
+			return nil, err
+		}
+		return lit, nil
+	case *ast.UnaryNode:
+		node.Node, err = resolveIdents(node.Node, scope)
+		if err != nil {
+			return nil, err
+		}
+	case *ast.BinaryNode:
+		node.Left, err = resolveIdents(node.Left, scope)
+		if err != nil {
+			return nil, err
+		}
+		node.Right, err = resolveIdents(node.Right, scope)
+	case *ast.FunctionNode:
 		for i, arg := range node.Args {
-			node.Args[i] = resolveIdents(arg, scope)
+			node.Args[i], err = resolveIdents(arg, scope)
+			if err != nil {
+				return nil, err
+			}
 		}
-	case *ListNode:
+	case *ast.ProgramNode:
 		for i, n := range node.Nodes {
-			node.Nodes[i] = resolveIdents(n, scope)
+			node.Nodes[i], err = resolveIdents(n, scope)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
-	return n
-}
-
-// Convert raw value to literal node, for all supported basic types.
-func valueToLiteralNode(p position, v interface{}) Node {
-	switch value := v.(type) {
-	case bool:
-		return &BoolNode{
-			position: p,
-			Bool:     value,
-		}
-	case int64:
-		return &NumberNode{
-			position: p,
-			IsInt:    true,
-			Int64:    value,
-		}
-	case float64:
-		return &NumberNode{
-			position: p,
-			IsFloat:  true,
-			Float64:  value,
-		}
-	case time.Duration:
-		return &DurationNode{
-			position: p,
-			Dur:      value,
-		}
-	case string:
-		return &StringNode{
-			position: p,
-			Literal:  value,
-		}
-	case *regexp.Regexp:
-		return &RegexNode{
-			position: p,
-			Regex:    value,
-		}
-	default:
-		panic(errorf(p, "unsupported literal type %T", v))
-	}
+	return n, nil
 }

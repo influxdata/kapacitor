@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/influxdata/kapacitor/tick"
+	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/tick/stateful"
 )
 
@@ -34,16 +34,16 @@ func TestScopePool_Sanity(t *testing.T) {
 func TestExpression_RefernceVariables(t *testing.T) {
 
 	type expectation struct {
-		node         tick.Node
+		node         ast.Node
 		refVariables []string
 	}
 
 	expectations := []expectation{
-		{node: &tick.NumberNode{IsFloat: true}, refVariables: make([]string, 0)},
-		{node: &tick.BoolNode{}, refVariables: make([]string, 0)},
+		{node: &ast.NumberNode{IsFloat: true}, refVariables: make([]string, 0)},
+		{node: &ast.BoolNode{}, refVariables: make([]string, 0)},
 
-		{node: &tick.ReferenceNode{Reference: "yosi"}, refVariables: []string{"yosi"}},
-		{node: &tick.BinaryNode{Left: &tick.ReferenceNode{Reference: "value"}, Right: &tick.NumberNode{IsInt: true}}, refVariables: []string{"value"}},
+		{node: &ast.ReferenceNode{Reference: "yosi"}, refVariables: []string{"yosi"}},
+		{node: &ast.BinaryNode{Left: &ast.ReferenceNode{Reference: "value"}, Right: &ast.NumberNode{IsInt: true}}, refVariables: []string{"value"}},
 	}
 
 	for i, expect := range expectations {

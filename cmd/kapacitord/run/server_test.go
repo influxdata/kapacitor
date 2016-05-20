@@ -513,7 +513,197 @@ func TestServer_ListTasks_Fields(t *testing.T) {
 			t.Errorf("unexpected task.Error i:%d exp:%v got:%v", i, exp, got)
 		}
 	}
+}
 
+func TestServer_CreateTemplate(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	id := "testTemplateID"
+	ttype := client.StreamTask
+	tick := `var x = 5
+
+stream
+    |from()
+        .measurement('test')
+`
+	template, err := cli.CreateTemplate(client.CreateTemplateOptions{
+		ID:         id,
+		Type:       ttype,
+		TICKscript: tick,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ti, err := cli.Template(template.Link, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ti.Error != "" {
+		t.Fatal(ti.Error)
+	}
+	if ti.ID != id {
+		t.Fatalf("unexpected id got %s exp %s", ti.ID, id)
+	}
+	if ti.Type != client.StreamTask {
+		t.Fatalf("unexpected type got %v exp %v", ti.Type, client.StreamTask)
+	}
+	if ti.TICKscript != tick {
+		t.Fatalf("unexpected TICKscript got\n%s\nexp\n%s\n", ti.TICKscript, tick)
+	}
+	dot := "digraph testTemplateID {\nstream0 -> from1;\n}"
+	if ti.Dot != dot {
+		t.Fatalf("unexpected dot\ngot\n%s\nexp\n%s\n", ti.Dot, dot)
+	}
+	vars := client.Vars{"x": {Value: int64(5), Type: client.VarInt}}
+	if !reflect.DeepEqual(vars, ti.Vars) {
+		t.Fatalf("unexpected vars\ngot\n%s\nexp\n%s\n", ti.Vars, vars)
+	}
+}
+
+func TestServer_DeleteTemplate(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	id := "testTemplateID"
+	ttype := client.StreamTask
+	tick := `stream
+    |from()
+        .measurement('test')
+`
+	template, err := cli.CreateTemplate(client.CreateTemplateOptions{
+		ID:         id,
+		Type:       ttype,
+		TICKscript: tick,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = cli.DeleteTemplate(template.Link)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ti, err := cli.Template(template.Link, nil)
+	if err == nil {
+		t.Fatal("unexpected template:", ti)
+	}
+}
+
+func TestServer_CreateTaskFromTemplate(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	id := "testTemplateID"
+	ttype := client.StreamTask
+	tick := `// Configurable measurement
+var measurement = 'test'
+
+stream
+    |from()
+        .measurement(measurement)
+`
+	template, err := cli.CreateTemplate(client.CreateTemplateOptions{
+		ID:         id,
+		Type:       ttype,
+		TICKscript: tick,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	templateInfo, err := cli.Template(template.Link, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if templateInfo.Error != "" {
+		t.Fatal(templateInfo.Error)
+	}
+	if templateInfo.ID != id {
+		t.Fatalf("unexpected template.id got %s exp %s", templateInfo.ID, id)
+	}
+	if templateInfo.Type != client.StreamTask {
+		t.Fatalf("unexpected template.type got %v exp %v", templateInfo.Type, client.StreamTask)
+	}
+	if templateInfo.TICKscript != tick {
+		t.Fatalf("unexpected template.TICKscript got %s exp %s", templateInfo.TICKscript, tick)
+	}
+	dot := "digraph testTemplateID {\nstream0 -> from1;\n}"
+	if templateInfo.Dot != dot {
+		t.Fatalf("unexpected template.dot\ngot\n%s\nexp\n%s\n", templateInfo.Dot, dot)
+	}
+	expVars := client.Vars{
+		"measurement": {
+			Value:       "test",
+			Type:        client.VarString,
+			Description: "Configurable measurement",
+		},
+	}
+	if got, exp := templateInfo.Vars, expVars; !reflect.DeepEqual(exp, got) {
+		t.Errorf("unexpected template vars: got %v exp %v", got, exp)
+	}
+
+	dbrps := []client.DBRP{
+		{
+			Database:        "mydb",
+			RetentionPolicy: "myrp",
+		},
+		{
+			Database:        "otherdb",
+			RetentionPolicy: "default",
+		},
+	}
+	vars := client.Vars{
+		"measurement": {
+			Value: "another_measurement",
+			Type:  client.VarString,
+		},
+	}
+
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         "taskid",
+		TemplateID: id,
+		DBRPs:      dbrps,
+		Vars:       vars,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	taskInfo, err := cli.Task(task.Link, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if taskInfo.Error != "" {
+		t.Fatal(taskInfo.Error)
+	}
+	if taskInfo.ID != "taskid" {
+		t.Fatalf("unexpected task.id got %s exp %s", taskInfo.ID, "taskid")
+	}
+	if taskInfo.Type != client.StreamTask {
+		t.Fatalf("unexpected task.type got %v exp %v", taskInfo.Type, client.StreamTask)
+	}
+	if taskInfo.TICKscript != tick {
+		t.Fatalf("unexpected task.TICKscript got %s exp %s", taskInfo.TICKscript, tick)
+	}
+	dot = "digraph taskid {\nstream0 -> from1;\n}"
+	if taskInfo.Dot != dot {
+		t.Fatalf("unexpected task.dot\ngot\n%s\nexp\n%s\n", taskInfo.Dot, dot)
+	}
+	if taskInfo.Status != client.Disabled {
+		t.Fatalf("unexpected task.status got %v exp %v", taskInfo.Status, client.Disabled)
+	}
+	if !reflect.DeepEqual(taskInfo.DBRPs, dbrps) {
+		t.Fatalf("unexpected task.dbrps got %s exp %s", taskInfo.DBRPs, dbrps)
+	}
+	if !reflect.DeepEqual(taskInfo.Vars, vars) {
+		t.Fatalf("unexpected task.vars got %s exp %s", taskInfo.Vars, vars)
+	}
 }
 
 func TestServer_StreamTask(t *testing.T) {
@@ -589,6 +779,606 @@ test value=1 0000000011
 	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
+	}
+}
+
+func TestServer_StreamTemplateTask(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	templateId := "testStreamTemplate"
+	taskId := "testStreamTask"
+	ttype := client.StreamTask
+	dbrps := []client.DBRP{{
+		Database:        "mydb",
+		RetentionPolicy: "myrp",
+	}}
+	tick := `
+var field = 'nonexistent'
+stream
+    |from()
+        .measurement('test')
+    |window()
+        .period(10s)
+        .every(10s)
+    |count(field)
+    |httpOut('count')
+`
+	if _, err := cli.CreateTemplate(client.CreateTemplateOptions{
+		ID:         templateId,
+		Type:       ttype,
+		TICKscript: tick,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         taskId,
+		TemplateID: templateId,
+		DBRPs:      dbrps,
+		Status:     client.Enabled,
+		Vars: client.Vars{
+			"field": {
+				Value: "value",
+				Type:  client.VarString,
+			},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), taskId)
+
+	// Request data before any writes and expect null responses
+	nullResponse := `{}`
+	if err := s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5); err != nil {
+		t.Error(err)
+	}
+
+	points := `test value=1 0000000000
+test value=1 0000000001
+test value=1 0000000001
+test value=1 0000000002
+test value=1 0000000002
+test value=1 0000000003
+test value=1 0000000003
+test value=1 0000000004
+test value=1 0000000005
+test value=1 0000000005
+test value=1 0000000005
+test value=1 0000000006
+test value=1 0000000007
+test value=1 0000000008
+test value=1 0000000009
+test value=1 0000000010
+test value=1 0000000011
+`
+	v := url.Values{}
+	v.Add("precision", "s")
+	s.MustWrite("mydb", "myrp", points, v)
+
+	exp := `{"series":[{"name":"test","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}]}`
+	if err := s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5); err != nil {
+		t.Error(err)
+	}
+}
+func TestServer_StreamTemplateTask_MissingVar(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	templateId := "testStreamTemplate"
+	taskId := "testStreamTask"
+	ttype := client.StreamTask
+	dbrps := []client.DBRP{{
+		Database:        "mydb",
+		RetentionPolicy: "myrp",
+	}}
+	tick := `
+var field string
+stream
+    |from()
+        .measurement('test')
+    |window()
+        .period(10s)
+        .every(10s)
+    |count(field)
+    |httpOut('count')
+`
+	if _, err := cli.CreateTemplate(client.CreateTemplateOptions{
+		ID:         templateId,
+		Type:       ttype,
+		TICKscript: tick,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         taskId,
+		TemplateID: templateId,
+		DBRPs:      dbrps,
+		Status:     client.Enabled,
+	}); err == nil {
+		t.Error("expected error for missing task vars")
+	} else if exp, got := "invalid TICKscript: missing value for var \"field\".", err.Error(); got != exp {
+		t.Errorf("unexpected error message: got %s exp %s", got, exp)
+	}
+}
+func TestServer_StreamTemplateTask_AllTypes(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	templateId := "testStreamTemplate"
+	taskId := "testStreamTask"
+	ttype := client.StreamTask
+	dbrps := []client.DBRP{{
+		Database:        "mydb",
+		RetentionPolicy: "myrp",
+	}}
+	tick := `
+var bool bool
+var count_threshold int
+var value_threshold float
+var window duration
+var field string
+var tagMatch regex
+var match lambda
+var eval lambda
+var groups list
+var secondGroup list
+stream
+    |from()
+        .measurement('test')
+        .where(lambda: match AND "tag" =~ tagMatch AND bool AND "value" >= value_threshold)
+        .groupBy(groups)
+        |log().prefix('FROM')
+    |window()
+        .period(window)
+        .every(window)
+        |log().prefix('WINDOW')
+    |count(field)
+        |log().prefix('COUNT')
+    |groupBy(secondGroup)
+    |sum('count')
+        .as('count')
+        |log().prefix('SUM')
+    |where(lambda: "count" >= count_threshold)
+        |log().prefix('WHERE')
+    |eval(eval)
+        .as('count')
+    |httpOut('count')
+`
+	if _, err := cli.CreateTemplate(client.CreateTemplateOptions{
+		ID:         templateId,
+		Type:       ttype,
+		TICKscript: tick,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         taskId,
+		TemplateID: templateId,
+		DBRPs:      dbrps,
+		Status:     client.Enabled,
+		Vars: client.Vars{
+			"bool": {
+				Value: true,
+				Type:  client.VarBool,
+			},
+			"count_threshold": {
+				Value: int64(1),
+				Type:  client.VarInt,
+			},
+			"value_threshold": {
+				Value: float64(1.0),
+				Type:  client.VarFloat,
+			},
+			"window": {
+				Value: 10 * time.Second,
+				Type:  client.VarDuration,
+			},
+			"field": {
+				Value: "value",
+				Type:  client.VarString,
+			},
+			"tagMatch": {
+				Value: "^a.*",
+				Type:  client.VarRegex,
+			},
+			"match": {
+				Value: `"value" == 1.0`,
+				Type:  client.VarLambda,
+			},
+			"eval": {
+				Value: `"count" * 2`,
+				Type:  client.VarLambda,
+			},
+			"groups": {
+				Value: []client.Var{client.Var{Type: client.VarStar}},
+				Type:  client.VarList,
+			},
+			"secondGroup": {
+				Value: []client.Var{client.Var{Value: "tag", Type: client.VarString}},
+				Type:  client.VarList,
+			},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), taskId)
+
+	// Request data before any writes and expect null responses
+	nullResponse := `{}`
+	if err := s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5); err != nil {
+		t.Error(err)
+	}
+
+	points := `test,tag=abc,other=a value=1 0000000000
+test,tag=abc,other=b value=1 0000000000
+test,tag=abc,other=a value=1 0000000001
+test,tag=bbc,other=b value=1 0000000001
+test,tag=abc,other=a value=1 0000000002
+test,tag=abc,other=a value=0 0000000002
+test,tag=abc,other=b value=1 0000000003
+test,tag=abc,other=a value=1 0000000003
+test,tag=abc,other=a value=1 0000000004
+test,tag=abc,other=b value=1 0000000005
+test,tag=abc,other=a value=1 0000000005
+test,tag=bbc,other=a value=1 0000000005
+test,tag=abc,other=b value=1 0000000006
+test,tag=abc,other=a value=1 0000000007
+test,tag=abc,other=b value=0 0000000008
+test,tag=abc,other=a value=1 0000000009
+test,tag=abc,other=a value=1 0000000010
+test,tag=abc,other=a value=1 0000000011
+test,tag=abc,other=b value=1 0000000011
+test,tag=bbc,other=a value=1 0000000011
+test,tag=bbc,other=b value=1 0000000011
+test,tag=abc,other=a value=1 0000000021
+`
+	v := url.Values{}
+	v.Add("precision", "s")
+	s.MustWrite("mydb", "myrp", points, v)
+
+	exp := `{"series":[{"name":"test","tags":{"tag":"abc"},"columns":["time","count"],"values":[["1970-01-01T00:00:10Z",24]]}]}`
+	if err := s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestServer_StreamTemplateTaskFromUpdate(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	templateId := "testStreamTemplate"
+	taskId := "testStreamTask"
+	ttype := client.StreamTask
+	dbrps := []client.DBRP{{
+		Database:        "mydb",
+		RetentionPolicy: "myrp",
+	}}
+	tick := `
+var field = 'nonexistent'
+stream
+    |from()
+        .measurement('test')
+    |window()
+        .period(10s)
+        .every(10s)
+    |count(field)
+    |httpOut('count')
+`
+	if _, err := cli.CreateTemplate(client.CreateTemplateOptions{
+		ID:         templateId,
+		Type:       ttype,
+		TICKscript: tick,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         taskId,
+		TemplateID: templateId,
+		DBRPs:      dbrps,
+		Status:     client.Disabled,
+		Vars: client.Vars{
+			"field": {
+				Value: "value",
+				Type:  client.VarString,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+		Status: client.Enabled,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), taskId)
+
+	// Request data before any writes and expect null responses
+	nullResponse := `{}`
+	if err := s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5); err != nil {
+		t.Error(err)
+	}
+
+	points := `test value=1 0000000000
+test value=1 0000000001
+test value=1 0000000001
+test value=1 0000000002
+test value=1 0000000002
+test value=1 0000000003
+test value=1 0000000003
+test value=1 0000000004
+test value=1 0000000005
+test value=1 0000000005
+test value=1 0000000005
+test value=1 0000000006
+test value=1 0000000007
+test value=1 0000000008
+test value=1 0000000009
+test value=1 0000000010
+test value=1 0000000011
+`
+	v := url.Values{}
+	v.Add("precision", "s")
+	s.MustWrite("mydb", "myrp", points, v)
+
+	exp := `{"series":[{"name":"test","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}]}`
+	if err := s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5); err != nil {
+		t.Error(err)
+	}
+}
+func TestServer_StreamTemplateTask_UpdateTemplate(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	templateId := "testStreamTemplate"
+	taskId := "testStreamTask"
+	ttype := client.StreamTask
+	dbrps := []client.DBRP{{
+		Database:        "mydb",
+		RetentionPolicy: "myrp",
+	}}
+	tickWrong := `
+stream
+    |from()
+        .measurement('test')
+    |window()
+        .period(10s)
+        .every(10s)
+    |count('wrong')
+    |httpOut('count')
+`
+	tickCorrect := `
+var field string
+stream
+    |from()
+        .measurement('test')
+    |window()
+        .period(10s)
+        .every(10s)
+    |count(field)
+    |httpOut('count')
+`
+	template, err := cli.CreateTemplate(client.CreateTemplateOptions{
+		ID:         templateId,
+		Type:       ttype,
+		TICKscript: tickWrong,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err = cli.CreateTask(client.CreateTaskOptions{
+		ID:         taskId,
+		TemplateID: templateId,
+		DBRPs:      dbrps,
+		Status:     client.Enabled,
+		Vars: client.Vars{
+			"field": {
+				Value: "value",
+				Type:  client.VarString,
+			},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := cli.UpdateTemplate(template.Link, client.UpdateTemplateOptions{
+		TICKscript: tickCorrect,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), taskId)
+
+	// Request data before any writes and expect null responses
+	nullResponse := `{}`
+	if err := s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5); err != nil {
+		t.Error(err)
+	}
+
+	points := `test value=1 0000000000
+test value=1 0000000001
+test value=1 0000000001
+test value=1 0000000002
+test value=1 0000000002
+test value=1 0000000003
+test value=1 0000000003
+test value=1 0000000004
+test value=1 0000000005
+test value=1 0000000005
+test value=1 0000000005
+test value=1 0000000006
+test value=1 0000000007
+test value=1 0000000008
+test value=1 0000000009
+test value=1 0000000010
+test value=1 0000000011
+`
+	v := url.Values{}
+	v.Add("precision", "s")
+	s.MustWrite("mydb", "myrp", points, v)
+
+	exp := `{"series":[{"name":"test","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}]}`
+	if err := s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5); err != nil {
+		t.Error(err)
+	}
+}
+func TestServer_StreamTemplateTask_UpdateTemplate_Rollback(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	templateId := "testStreamTemplate"
+	taskId := "testStreamTask"
+	ttype := client.StreamTask
+	dbrps := []client.DBRP{{
+		Database:        "mydb",
+		RetentionPolicy: "myrp",
+	}}
+	tickCorrect := `
+var field string
+stream
+    |from()
+        .measurement('test')
+    |window()
+        .period(10s)
+        .every(10s)
+    |count(field)
+    |httpOut('count')
+`
+	tickNewVar := `
+var field string
+var period duration
+stream
+    |from()
+        .measurement('test')
+    |window()
+        .period(period)
+        .every(period)
+    |count(field)
+    |httpOut('count')
+`
+	template, err := cli.CreateTemplate(client.CreateTemplateOptions{
+		ID:         templateId,
+		Type:       ttype,
+		TICKscript: tickCorrect,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create several tasks
+	count := 5
+	tasks := make([]client.Task, count)
+	for i := 0; i < count; i++ {
+		if task, err := cli.CreateTask(client.CreateTaskOptions{
+			ID:         fmt.Sprintf("%s-%d", taskId, i),
+			TemplateID: templateId,
+			DBRPs:      dbrps,
+			Status:     client.Enabled,
+			Vars: client.Vars{
+				"field": {
+					Value: "value",
+					Type:  client.VarString,
+				},
+			},
+		}); err != nil {
+			t.Fatal(err)
+		} else {
+			tasks[i] = task
+		}
+	}
+
+	if err := cli.UpdateTemplate(template.Link, client.UpdateTemplateOptions{
+		TICKscript: tickNewVar,
+	}); err == nil {
+		t.Error("expected error for breaking template update, got nil")
+	} else if got, exp := err.Error(), `error reloading associated task testStreamTask-0: missing value for var "period".`; exp != got {
+		t.Errorf("unexpected error for breaking template update, got %s exp %s", got, exp)
+	}
+
+	// Get all tasks and make sure their TICKscript has the original value
+	for _, task := range tasks {
+		if gotTask, err := cli.Task(task.Link, &client.TaskOptions{ScriptFormat: "raw"}); err != nil {
+			t.Fatal(err)
+		} else if got, exp := gotTask.TICKscript, tickCorrect; got != exp {
+			t.Errorf("unexpected task TICKscript:\ngot\n%s\nexp\n%s\n", got, exp)
+		}
+	}
+
+	// Update all tasks with new var
+	for _, task := range tasks {
+		if err := cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+			Vars: client.Vars{
+				"field": {
+					Value: "value",
+					Type:  client.VarString,
+				},
+				"period": {
+					Value: 10 * time.Second,
+					Type:  client.VarDuration,
+				},
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Now update template should succeed since the tasks are updated too.
+	if err := cli.UpdateTemplate(template.Link, client.UpdateTemplateOptions{
+		TICKscript: tickNewVar,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, task := range tasks {
+		taskId := task.ID
+		endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), taskId)
+
+		// Request data before any writes and expect null responses
+		nullResponse := `{}`
+		if err := s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5); err != nil {
+			t.Error(err)
+		}
+	}
+
+	points := `test value=1 0000000000
+test value=1 0000000001
+test value=1 0000000001
+test value=1 0000000002
+test value=1 0000000002
+test value=1 0000000003
+test value=1 0000000003
+test value=1 0000000004
+test value=1 0000000005
+test value=1 0000000005
+test value=1 0000000005
+test value=1 0000000006
+test value=1 0000000007
+test value=1 0000000008
+test value=1 0000000009
+test value=1 0000000010
+test value=1 0000000011
+`
+	v := url.Values{}
+	v.Add("precision", "s")
+	s.MustWrite("mydb", "myrp", points, v)
+
+	for _, task := range tasks {
+		taskId := task.ID
+		endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), taskId)
+
+		exp := `{"series":[{"name":"test","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}]}`
+		if err := s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5); err != nil {
+			t.Error(err)
+		}
 	}
 }
 

@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/influxdata/kapacitor/tick"
+	"github.com/influxdata/kapacitor/tick/ast"
 )
 
 // Number of previous states to remember when computing flapping percentage.
@@ -198,13 +198,13 @@ type AlertNode struct {
 
 	// Filter expression for the INFO alert level.
 	// An empty value indicates the level is invalid and is skipped.
-	Info tick.Node
+	Info *ast.LambdaNode
 	// Filter expression for the WARNING alert level.
 	// An empty value indicates the level is invalid and is skipped.
-	Warn tick.Node
+	Warn *ast.LambdaNode
 	// Filter expression for the CRITICAL alert level.
 	// An empty value indicates the level is invalid and is skipped.
-	Crit tick.Node
+	Crit *ast.LambdaNode
 
 	//tick:ignore
 	UseFlapping bool `tick:"Flapping"`

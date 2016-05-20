@@ -3,10 +3,14 @@ package tick_test
 import (
 	"fmt"
 	"reflect"
+	"regexp"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/influxdata/kapacitor/tick"
+	"github.com/influxdata/kapacitor/tick/ast"
+	"github.com/influxdata/kapacitor/tick/stateful"
 )
 
 //Test structure for evaluating a DSL
@@ -83,7 +87,7 @@ s2|structC()
 	.aggFunc(influxql.agg.sum)
 `
 
-	scope := tick.NewScope()
+	scope := stateful.NewScope()
 	a := &structA{}
 	scope.Set("a", a)
 
@@ -94,7 +98,7 @@ s2|structC()
 	}
 	scope.Set("influxql", i)
 
-	err := tick.Evaluate(script, scope)
+	_, err := tick.Evaluate(script, scope, nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +137,7 @@ s2|structC()
 func TestEvaluate_DynamicMethod(t *testing.T) {
 	script := `var x = a@dynamicMethod(1,'str', 10s).sad(FALSE)`
 
-	scope := tick.NewScope()
+	scope := stateful.NewScope()
 	a := &structA{}
 	scope.Set("a", a)
 
@@ -151,7 +155,7 @@ func TestEvaluate_DynamicMethod(t *testing.T) {
 	}
 	scope.SetDynamicMethod("dynamicMethod", dm)
 
-	err := tick.Evaluate(script, scope)
+	_, err := tick.Evaluate(script, scope, nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,17 +186,21 @@ func TestEvaluate_DynamicMethod(t *testing.T) {
 	}
 }
 
-func TestEvaluate_Vars(t *testing.T) {
+func TestValidateTemplate_Vars(t *testing.T) {
 	script := `
 var x = 3m
 var y = -x
 
-var n = TRUE 
-var m = !n 
+var n = TRUE
+var m = !n
+
+var z = x + y
+
+var a string
 `
 
-	scope := tick.NewScope()
-	err := tick.Evaluate(script, scope)
+	scope := stateful.NewScope()
+	vars, err := tick.Evaluate(script, scope, nil, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,7 +226,7 @@ var m = !n
 			t.Errorf("unexpected y value: exp %v got %v", exp, got)
 		}
 	} else {
-		t.Errorf("unexpected y value type: exp time.Duration got %T", x)
+		t.Errorf("unexpected y value type: exp time.Duration got %T", y)
 	}
 
 	n, err := scope.Get("n")
@@ -245,6 +253,533 @@ var m = !n
 		t.Errorf("unexpected m value type: exp bool got %T", x)
 	}
 
+	z, err := scope.Get("z")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if value, ok := z.(time.Duration); ok {
+		if exp, got := time.Duration(0), value; exp != got {
+			t.Errorf("unexpected z value: exp %v got %v", exp, got)
+		}
+	} else {
+		t.Errorf("unexpected z value type: exp time.Duration got %T", z)
+	}
+
+	expVars := map[string]tick.Var{
+		"a": {
+			Value: nil,
+			Type:  ast.TString,
+		},
+		"x": {
+			Value: 3 * time.Minute,
+			Type:  ast.TDuration,
+		},
+		"y": {
+			Value: -3 * time.Minute,
+			Type:  ast.TDuration,
+		},
+		"z": {
+			Value: time.Duration(0),
+			Type:  ast.TDuration,
+		},
+		"n": {
+			Value: true,
+			Type:  ast.TBool,
+		},
+		"m": {
+			Value: false,
+			Type:  ast.TBool,
+		},
+	}
+	if !reflect.DeepEqual(expVars, vars) {
+		t.Errorf("unexpected vars: got %v exp %v", vars, expVars)
+	}
+}
+func TestEvaluate_Vars_PreDefined(t *testing.T) {
+	script := `
+var str = 'this is a string'
+var strZero string
+
+var strList = [ 'string list', str, *]
+var strListZero list
+
+var star = *
+var starZero star
+
+var int = 8
+var intZero int
+
+var float = 3.14
+var floatZero float
+
+var duration = 5m
+var durationZero duration
+
+var regex = /.*/
+var regexZero regex
+
+var boolean = TRUE
+var booleanZero bool
+
+var lambda = lambda: "value" > 0
+var lambdaZero lambda
+`
+	lambda := &ast.LambdaNode{
+		Expression: &ast.BinaryNode{
+			Operator: ast.TokenGreater,
+			Left: &ast.ReferenceNode{
+				Reference: "value",
+			},
+			Right: &ast.NumberNode{
+				IsInt: true,
+				Int64: 0,
+			},
+		},
+	}
+	definedVars := map[string]tick.Var{
+		"str": {
+			Value: "asdf",
+			Type:  ast.TString,
+		},
+		"strZero": {
+			Value: "qwerty",
+			Type:  ast.TString,
+		},
+		"strList": {
+			Value: []tick.Var{
+				{
+					Value: "a",
+					Type:  ast.TString,
+				},
+				{
+					Value: "b",
+					Type:  ast.TString,
+				},
+				{
+					Value: "c",
+					Type:  ast.TString,
+				},
+			},
+			Type: ast.TList,
+		},
+		"strListZero": {
+			Value: []tick.Var{
+				{
+					Value: &ast.StarNode{},
+					Type:  ast.TStar,
+				},
+			},
+			Type: ast.TList,
+		},
+		"star": {
+			Value: &ast.StarNode{},
+			Type:  ast.TStar,
+		},
+		"starZero": {
+			Value: &ast.StarNode{},
+			Type:  ast.TStar,
+		},
+		"int": {
+			Value: int64(42),
+			Type:  ast.TInt,
+		},
+		"intZero": {
+			Value: int64(6 * 9),
+			Type:  ast.TInt,
+		},
+		"float": {
+			Value: float64(42),
+			Type:  ast.TFloat,
+		},
+		"floatZero": {
+			Value: float64(6 * 9),
+			Type:  ast.TFloat,
+		},
+		"duration": {
+			Value: 5 * time.Hour,
+			Type:  ast.TDuration,
+		},
+		"durationZero": {
+			Value: time.Minute,
+			Type:  ast.TDuration,
+		},
+		"regex": {
+			Value: regexp.MustCompile(`^asdf.*qwerty$`),
+			Type:  ast.TRegex,
+		},
+		"regexZero": {
+			Value: regexp.MustCompile(`^.*$`),
+			Type:  ast.TRegex,
+		},
+		"boolean": {
+			Value: false,
+			Type:  ast.TBool,
+		},
+		"booleanZero": {
+			Value: true,
+			Type:  ast.TBool,
+		},
+		"lambda": {
+			Value: lambda,
+			Type:  ast.TLambda,
+		},
+		"lambdaZero": {
+			Value: lambda,
+			Type:  ast.TLambda,
+		},
+	}
+
+	scope := stateful.NewScope()
+	_, err := tick.Evaluate(script, scope, definedVars, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expScope := map[string]interface{}{
+		"str":          "asdf",
+		"strZero":      "qwerty",
+		"strList":      []interface{}{"a", "b", "c"},
+		"strListZero":  []interface{}{&ast.StarNode{}},
+		"star":         &ast.StarNode{},
+		"starZero":     &ast.StarNode{},
+		"int":          int64(42),
+		"intZero":      int64(6 * 9),
+		"float":        float64(42),
+		"floatZero":    float64(6 * 9),
+		"duration":     5 * time.Hour,
+		"durationZero": time.Minute,
+		"regex":        regexp.MustCompile(`^asdf.*qwerty$`),
+		"regexZero":    regexp.MustCompile(`^.*$`),
+		"boolean":      false,
+		"booleanZero":  true,
+		"lambda":       lambda,
+		"lambdaZero":   lambda,
+	}
+
+	for name, value := range expScope {
+		if got, err := scope.Get(name); err != nil {
+			t.Errorf("unexpected error for %s: %s", name, err)
+		} else if !equal(got, value) {
+			t.Errorf("unexpected %s value: \ngot\n%v\ngot type: %T\nexp\n%v\nexp type: %T", name, got, got, value, value)
+		}
+	}
+
+}
+
+func TestEvaluate_Vars_ErrorWrongType(t *testing.T) {
+	script := `
+var x = 3m
+`
+	definedVars := map[string]tick.Var{
+		"x": {
+			Value: "5m",
+			Type:  ast.TString,
+		},
+	}
+
+	scope := stateful.NewScope()
+	_, err := tick.Evaluate(script, scope, definedVars, false)
+	if err == nil {
+		t.Fatal("expected error for invalid var type")
+	}
+}
+func TestEvaluate_Vars_ErrorMissingValue(t *testing.T) {
+	script := `
+var x duration
+`
+	scope := stateful.NewScope()
+	if _, err := tick.Evaluate(script, scope, nil, false); err == nil {
+		t.Fatal("expected error for missing var type")
+	}
+
+	if _, err := tick.Evaluate(script, scope, nil, true); err != nil {
+		t.Fatal("uexpected error missing var should be ignored")
+	}
+}
+
+func equal(got, e interface{}) bool {
+	switch exp := e.(type) {
+	case []interface{}:
+		gotL, ok := got.([]interface{})
+		if !ok {
+			return false
+		}
+		if len(gotL) != len(exp) {
+			return false
+		}
+		for i := range exp {
+			if !equal(exp[i], gotL[i]) {
+				return false
+			}
+		}
+		return true
+	case tick.Var:
+		gotV, ok := got.(tick.Var)
+		if !ok {
+			return false
+		}
+		return exp.Type == gotV.Type && equal(exp.Value, gotV.Value)
+	case []tick.Var:
+		gotL, ok := got.([]tick.Var)
+		if !ok {
+			return false
+		}
+		if len(gotL) != len(exp) {
+			return false
+		}
+		for i := range exp {
+			if !equal(exp[i], gotL[i]) {
+				return false
+			}
+		}
+		return true
+	case ast.Node:
+		return exp.Equal(got)
+	default:
+		return reflect.DeepEqual(exp, got)
+	}
+}
+
+func TestEvaluate_Vars_AllTypes(t *testing.T) {
+	script := `
+var str = 'this is a string'
+var strA = str + ' concat'
+var strZero string
+var strCopy = str
+
+var strList = [ 'string list', str, strA, strCopy, *]
+var strListZero list
+var strListCopy = strList
+
+var star = *
+var starZero star
+var starCopy = star
+
+var integer = 42
+var intergerMath = (integer * 2) - ( 6 * 9 ) + (36 / 3)
+var intZero int
+var integerCopy= integer
+
+var float = 3.14
+var tastyPie = float * 42.0
+var floatZero float
+var floatCopy = float
+
+var intFloat = int(sqrt(float)) * 3
+
+var duration = 5m
+var later = duration + 1m
+var durationZero duration
+var durationCopy = duration
+
+var regex = /.*/
+var regexZero regex
+var regexCopy = regex
+
+var boolean = TRUE
+var f = boolean AND FALSE
+var booleanZero bool
+var booleanCopy = boolean
+
+var lambda = lambda: "value" > 0
+var l = lambda: lambda OR "value" < -100
+var lambdaZero lambda
+var lambdaCopy = lambda
+`
+
+	scope := stateful.NewScope()
+	vars, err := tick.Evaluate(script, scope, nil, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expLambda := &ast.LambdaNode{
+		Expression: &ast.BinaryNode{
+			Operator: ast.TokenGreater,
+			Left: &ast.ReferenceNode{
+				Reference: "value",
+			},
+			Right: &ast.NumberNode{
+				IsInt: true,
+				Int64: 0,
+			},
+		},
+	}
+	expNestedLambda := &ast.LambdaNode{
+		Expression: &ast.BinaryNode{
+			Operator: ast.TokenOr,
+			Left:     expLambda,
+			Right: &ast.BinaryNode{
+				Operator: ast.TokenLess,
+				Left: &ast.ReferenceNode{
+					Reference: "value",
+				},
+				Right: &ast.UnaryNode{
+					Operator: ast.TokenMinus,
+					Node: &ast.NumberNode{
+						IsInt: true,
+						Int64: 100,
+					},
+				},
+			},
+		},
+	}
+
+	expStrList := []interface{}{
+		"string list",
+		"this is a string",
+		"this is a string concat",
+		"this is a string",
+		&ast.StarNode{},
+	}
+	expStrVarList := tick.Var{
+		Value: []tick.Var{
+			{Value: "string list", Type: ast.TString},
+			{Value: "this is a string", Type: ast.TString},
+			{Value: "this is a string concat", Type: ast.TString},
+			{Value: "this is a string", Type: ast.TString},
+			{Value: &ast.StarNode{}, Type: ast.TStar},
+		},
+		Type: ast.TList,
+	}
+
+	expScope := map[string]interface{}{
+		"str":          "this is a string",
+		"strCopy":      "this is a string",
+		"strA":         "this is a string concat",
+		"strZero":      "",
+		"strList":      expStrList,
+		"strListCopy":  expStrList,
+		"strListZero":  []interface{}(nil),
+		"star":         &ast.StarNode{},
+		"starZero":     (*ast.StarNode)(nil),
+		"starCopy":     &ast.StarNode{},
+		"integer":      int64(42),
+		"integerCopy":  int64(42),
+		"intergerMath": int64(42),
+		"intZero":      int64(0),
+		"float":        3.14,
+		"floatCopy":    3.14,
+		"tastyPie":     3.14 * 42.0,
+		"intFloat":     int64(3),
+		"floatZero":    float64(0),
+		"duration":     5 * time.Minute,
+		"durationCopy": 5 * time.Minute,
+		"later":        6 * time.Minute,
+		"durationZero": time.Duration(0),
+		"regex":        regexp.MustCompile(".*"),
+		"regexCopy":    regexp.MustCompile(".*"),
+		"regexZero":    (*regexp.Regexp)(nil),
+		"boolean":      true,
+		"booleanCopy":  true,
+		"f":            false,
+		"booleanZero":  false,
+		"lambda":       expLambda,
+		"lambdaCopy":   expLambda,
+		"l":            expNestedLambda,
+		"lambdaZero":   (*ast.LambdaNode)(nil),
+	}
+	expVars := map[string]tick.Var{
+		"strList":     expStrVarList,
+		"strListCopy": expStrVarList,
+	}
+
+	for name, value := range expScope {
+		if got, err := scope.Get(name); err != nil {
+			t.Errorf("unexpected error for %s: %s", name, err)
+		} else if !equal(got, value) {
+			t.Errorf("unexpected %s value: \ngot\n%v\ngot type: %T\nexp\n%v\nexp type: %T", name, got, got, value, value)
+		}
+		expVar, ok := expVars[name]
+		if !ok {
+			typ := ast.TypeOf(value)
+			if strings.Contains(name, "Zero") {
+				value = interface{}(nil)
+			}
+			expVar = tick.Var{
+				Type:  typ,
+				Value: value,
+			}
+		}
+		if got, exp := vars[name].Value, expVar.Value; !equal(exp, got) {
+			t.Errorf("unexpected %s var value:\ngot\n%v\nexp\n%v\n", name, got, exp)
+		}
+		if got, exp := vars[name].Type, expVar.Type; got != exp {
+			t.Errorf("unexpected %s var type: got %v exp %v", name, got, exp)
+		}
+	}
+}
+
+func TestEvaluate_Vars_Immutable(t *testing.T) {
+	script := `
+var x = 3m
+var x = 2m
+`
+
+	scope := stateful.NewScope()
+	_, err := tick.Evaluate(script, scope, nil, false)
+	if exp, got := "attempted to redefine x, vars are immutable", err.Error(); exp != got {
+		t.Errorf("unexpected error message: got %s exp %s", got, exp)
+	}
+
+	x, err := scope.Get("x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if value, ok := x.(time.Duration); ok {
+		if exp, got := time.Minute*3, value; exp != got {
+			t.Errorf("unexpected x value: exp %v got %v", exp, got)
+		}
+	} else {
+		t.Errorf("unexpected x value type: exp time.Duration got %T", x)
+	}
+}
+
+func TestEvaluate_Vars_TypeConversion(t *testing.T) {
+	script := `
+var d = 5m
+var messageDuration = '{{ .ID }} has crossed threshold: ' + string(d)
+
+var x = 5
+var messageInt = '{{ .ID }} has crossed threshold: ' + string(x)
+
+var y = 1.0 / 3.0
+var messageFloat = '{{ .ID }} has crossed threshold: ' + string(y)
+
+var z = FALSE
+var messageBool = '{{ .ID }} is: ' + string(z)
+
+`
+
+	scope := stateful.NewScope()
+	vars, err := tick.Evaluate(script, scope, nil, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	exp := map[string]interface{}{
+		"d":               5 * time.Minute,
+		"messageDuration": "{{ .ID }} has crossed threshold: 5m",
+		"x":               int64(5),
+		"messageInt":      "{{ .ID }} has crossed threshold: 5",
+		"y":               1.0 / 3.0,
+		"messageFloat":    "{{ .ID }} has crossed threshold: 0.3333333333333333",
+		"z":               false,
+		"messageBool":     "{{ .ID }} is: false",
+	}
+
+	for name, value := range exp {
+		if got, err := scope.Get(name); err != nil {
+			t.Errorf("unexpected error for %s: %s", name, err)
+		} else if !reflect.DeepEqual(got, value) {
+			t.Errorf("unexpected %s value: got %v exp %v", name, got, value)
+		}
+		if got, exp := vars[name].Value, value; !reflect.DeepEqual(got, exp) {
+			t.Errorf("unexpected %s vars value: got %v exp %v", name, got, value)
+		}
+		if got, exp := vars[name].Type, ast.TypeOf(value); got != exp {
+			t.Errorf("unexpected %s vars type: got %v exp %v", name, got, exp)
+		}
+	}
 }
 
 // Test that using the wrong chain operator fails
@@ -255,13 +790,41 @@ var s2 = a.structB()
 			.field2(42)
 `
 
-	scope := tick.NewScope()
+	scope := stateful.NewScope()
 	a := &structA{}
 	scope.Set("a", a)
 
-	err := tick.Evaluate(script, scope)
+	_, err := tick.Evaluate(script, scope, nil, false)
 	if err == nil {
 		t.Fatal("expected error from Evaluate")
+	}
+}
+
+func TestEvaluate_ListVars(t *testing.T) {
+	script := `
+var strList = [ 'host', 'dc', 'service' ]
+f(strList)
+`
+
+	called := false
+	f := func(a, b, c string) {
+		called = true
+		got := []string{a, b, c}
+		exp := []string{"host", "dc", "service"}
+		if !reflect.DeepEqual(got, exp) {
+			t.Errorf("unexpected func args got %v exp %v", got, exp)
+		}
+	}
+	scope := stateful.NewScope()
+	scope.Set("f", f)
+
+	vars, err := tick.Evaluate(script, scope, nil, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(vars)
+	if !called {
+		t.Fatal("expected function to be called")
 	}
 }
 

@@ -60,14 +60,14 @@ func newFromNode(et *ExecutingTask, n *pipeline.FromNode, l *log.Logger) (*FromN
 	sn.node.runF = sn.runStream
 	sn.allDimensions, sn.dimensions = determineDimensions(n.Dimensions)
 
-	if n.Expression != nil {
-		expr, err := stateful.NewExpression(n.Expression)
+	if n.Lambda != nil {
+		expr, err := stateful.NewExpression(n.Lambda.Expression)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to compile from expression: %v", err)
 		}
 
 		sn.expression = expr
-		sn.scopePool = stateful.NewScopePool(stateful.FindReferenceVariables(n.Expression))
+		sn.scopePool = stateful.NewScopePool(stateful.FindReferenceVariables(n.Lambda.Expression))
 	}
 
 	return sn, nil

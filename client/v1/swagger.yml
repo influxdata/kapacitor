@@ -152,6 +152,133 @@ paths:
           description: A processing or an unexpected error.
           schema:
             $ref: '#/definitions/Error'
+  /templates:
+    get:
+      summary: Get information on all templates
+      tags: [templates]
+      operationId: listTemplates
+      parameters:
+        - name: pattern
+          in: query
+          description: Glob style pattern to match template IDs
+          required: false
+          type: string
+        - name: fields
+          in: query
+          description: List of fields to return
+          required: false
+          type: array
+          items:
+            type: string
+          collectionFormat: multi
+        - name: script-format
+          in: query
+          description: One of `formatted` or `raw`. Raw will return the script identical to how it was defined. Formatted will first format the script.
+          required: true
+          type: string
+          pattern: (formatted|raw)
+        - name: offset
+          in: query
+          description: Offset count for paginating through templates.
+          type: integer
+          format: int32
+          required: false
+          default: 0
+        - name: limit
+          in: query
+          description: Maximum number of templates to return.
+          type: integer
+          format: int32
+          required: false
+          default: 20
+      responses:
+        '200':
+          description: List of templates
+          schema:
+            $ref: '#/definitions/Templates'
+        default:
+          description: A processing or an unexpected error.
+          schema:
+            $ref: '#/definitions/Error'
+    post:
+      summary: Create a new template
+      tags: [templates]
+      operationId: createTemplate
+      parameters:
+        - name: template
+          in: body
+          schema:
+            $ref: '#/definitions/Template'
+      responses:
+        '200':
+          description: Template ID
+          schema:
+            $ref: '#/definitions/Template'
+        default:
+          description: A processing or an unexpected error.
+          schema:
+            $ref: '#/definitions/Error'
+  /templates/{id}:
+    patch:
+      summary: Update an existing template
+      tags: [templates]
+      operationId: updateTemplate
+      parameters:
+        - name: id
+          in: path
+          type: string
+          required: true
+        - name: template
+          in: body
+          schema:
+            $ref: '#/definitions/Template'
+      responses:
+        '204':
+          description: Update succeeded
+        default:
+          description: A processing or an unexpected error.
+          schema:
+            $ref: '#/definitions/Error'
+    delete:
+      summary: Delete an existing template
+      tags: [templates]
+      operationId: deleteTemplate
+      parameters:
+        - name: id
+          in: path
+          type: string
+          required: true
+      responses:
+        '204':
+          description: Template deleted
+        default:
+          description: A processing or an unexpected error.
+          schema:
+            $ref: '#/definitions/Error'
+    get:
+      summary: Get an existing template
+      tags: [templates]
+      operationId: template
+      parameters:
+        - name: id
+          in: path
+          type: string
+          required: true
+        - name: script-format
+          in: query
+          description: One of `formatted` or `raw`. Raw will return the script identical to how it was defined. Formatted will first format the script.
+          required: true
+          type: string
+          pattern: (formatted|raw)
+      responses:
+        '200':
+          description: Template information
+          schema:
+            $ref: '#/definitions/Template'
+        default:
+          description: A processing or an unexpected error.
+          schema:
+            $ref: '#/definitions/Error'
   /recordings:
     get:
       summary: Get information on all recordings
@@ -604,6 +731,11 @@ definitions:
         format: dateTime
         description: Date task was last enabled
         readOnly: true
+      vars:
+        type: object
+        description: Set of vars to overwrite any TICKscript vars.
+        additionalProperties:
+          $ref: "#/definitions/Var"
       stats:
         type: object
         description: Statisitcs about the task execution
@@ -630,6 +762,62 @@ definitions:
         type: array
         items:
           $ref: "#/definitions/Task"
+  Template:
+    type: object
+    description: A template
+    properties:
+      link:
+        $ref: '#/definitions/Link'
+      id:
+        description: Template ID
+        type: string
+      type:
+        description: Template type, one of 'stream' or 'batch'
+        type: string
+      script:
+        description: TICKscript content
+        type: string
+      vars:
+        description: Set of variables from the TICKscript with their type and default value.
+        type: object
+        additionalProperties:
+          $ref: "#/definitions/Var"
+      dot:
+        description: Graphviz DOT syntax representation of the template DAG
+        type: string
+        readOnly: true
+      error:
+        description: Any error the template may have encountered while executing
+        readOnly: true
+      created:
+        type: string
+        format: dateTime
+        description: Date template was first created
+        readOnly: true
+      modified:
+        type: string
+        format: dateTime
+        description: Date template was last modified
+        readOnly: true
+  Templates:
+    type: object
+    description: List of templates
+    properties:
+      templates:
+        type: array
+        items:
+          $ref: "#/definitions/Template"
+  Var:
+    type: object
+    description: A variable to be set on a task
+    properties:
+      value:
+        type: any
+        description: Must be either a string, bool, numeric or a list of Var objects.
+      type:
+        type: string
+      description:
+        type: string
   Recording:
     type: object
     properties:

@@ -2,11 +2,13 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -37,20 +39,22 @@ Usage: kapacitor [options] [command] [args]
 
 Commands:
 
-	record      Record the result of a query or a snapshot of the current stream data.
-	define      Create/update a task.
-	replay      Replay a recording to a task.
-	replay-live Replay data against a task without recording it.
-	enable      Enable and start running a task with live data.
-	disable     Stop running a task.
-	reload      Reload a running task with an updated task definition.
-	push        Publish a task definition to another Kapacitor instance. Not implemented yet.
-	delete      Delete a task or a recording.
-	list        List information about tasks or recordings.
-	show        Display detailed information about a task.
-	help        Prints help for a command.
-	level       Sets the logging level on the kapacitord server.
-	version     Displays the Kapacitor version info.
+	record          Record the result of a query or a snapshot of the current stream data.
+	define          Create/update a task.
+	define-template Create/update a template.
+	replay          Replay a recording to a task.
+	replay-live     Replay data against a task without recording it.
+	enable          Enable and start running a task with live data.
+	disable         Stop running a task.
+	reload          Reload a running task with an updated task definition.
+	push            Publish a task definition to another Kapacitor instance. Not implemented yet.
+	delete          Delete tasks, templates, recordings or replays.
+	list            List information about tasks, templates, recordings or replays.
+	show            Display detailed information about a task.
+	show-template   Display detailed information about a template.
+	help            Prints help for a command.
+	level           Sets the logging level on the kapacitord server.
+	version         Displays the Kapacitor version info.
 
 Options:
 `
@@ -105,6 +109,9 @@ func main() {
 	case "define":
 		commandArgs = args
 		commandF = doDefine
+	case "define-template":
+		commandArgs = args
+		commandF = doDefineTemplate
 	case "replay":
 		replayFlags.Parse(args)
 		commandArgs = replayFlags.Args()
@@ -134,6 +141,9 @@ func main() {
 	case "show":
 		commandArgs = args
 		commandF = doShow
+	case "show-template":
+		commandArgs = args
+		commandF = doShowTemplate
 	case "level":
 		commandArgs = args
 		commandF = doLevel
@@ -156,6 +166,7 @@ func main() {
 func init() {
 	replayFlags.Usage = replayUsage
 	defineFlags.Usage = defineUsage
+	defineTemplateFlags.Usage = defineTemplateUsage
 
 	recordStreamFlags.Usage = recordStreamUsage
 	recordBatchFlags.Usage = recordBatchUsage
@@ -196,6 +207,8 @@ func doHelp(args []string) error {
 			recordUsage()
 		case "define":
 			defineFlags.Usage()
+		case "define-template":
+			defineTemplateFlags.Usage()
 		case "replay":
 			replayFlags.Usage()
 		case "enable":
@@ -210,6 +223,8 @@ func doHelp(args []string) error {
 			listUsage()
 		case "show":
 			showUsage()
+		case "show-template":
+			showTemplateUsage()
 		case "level":
 			levelUsage()
 		case "help":
@@ -462,6 +477,8 @@ var (
 	defineFlags = flag.NewFlagSet("define", flag.ExitOnError)
 	dtick       = defineFlags.String("tick", "", "Path to the TICKscript")
 	dtype       = defineFlags.String("type", "", "The task type (stream|batch)")
+	dtemplate   = defineFlags.String("template-id", "", "Optional template ID")
+	dvars       = defineFlags.String("vars", "", "Optional path to a JSON vars file")
 	dnoReload   = defineFlags.Bool("no-reload", false, "Do not reload the task even if it is enabled")
 	ddbrp       = make(dbrps, 0)
 )
@@ -543,7 +560,7 @@ func defineUsage() {
 
 For example:
 
-	You can define a task for the first time with all the flags.
+	You must define a task for the first time with all the flags.
 
 		$ kapacitor define my_task -tick path/to/TICKscript -type stream -dbrp mydb.myrp
 
@@ -596,24 +613,41 @@ func doDefine(args []string) error {
 		ttype = client.BatchTask
 	}
 
+	vars := make(client.Vars)
+	if *dvars != "" {
+		f, err := os.Open(*dvars)
+		if err != nil {
+			return errors.Wrapf(err, "faild to open file %s", *dvars)
+		}
+		defer f.Close()
+		dec := json.NewDecoder(f)
+		if err := dec.Decode(&vars); err != nil {
+			return errors.Wrapf(err, "invalid JSON in file %s", *dvars)
+		}
+	}
+
 	l := cli.TaskLink(id)
 	task, _ := cli.Task(l, nil)
 	var err error
 	if task.ID == "" {
 		_, err = cli.CreateTask(client.CreateTaskOptions{
 			ID:         id,
+			TemplateID: *dtemplate,
 			Type:       ttype,
 			DBRPs:      ddbrp,
 			TICKscript: script,
+			Vars:       vars,
 			Status:     client.Disabled,
 		})
 	} else {
 		err = cli.UpdateTask(
 			l,
 			client.UpdateTaskOptions{
+				TemplateID: *dtemplate,
 				Type:       ttype,
 				DBRPs:      ddbrp,
 				TICKscript: script,
+				Vars:       vars,
 			},
 		)
 	}
@@ -632,6 +666,98 @@ func doDefine(args []string) error {
 		}
 	}
 	return nil
+}
+
+// DefineTemplate
+var (
+	defineTemplateFlags = flag.NewFlagSet("define-template", flag.ExitOnError)
+	dtTick              = defineTemplateFlags.String("tick", "", "Path to the TICKscript")
+	dtType              = defineTemplateFlags.String("type", "", "The template type (stream|batch)")
+)
+
+func defineTemplateUsage() {
+	var u = `Usage: kapacitor define-template <template ID> [options]
+
+	Create or update a template.
+
+	A template is defined via a TICKscript that defines the data processing pipeline of the template.
+
+	If an option is absent it will be left unmodified.
+
+	NOTE: Updating a template will reload all associated tasks.
+
+For example:
+
+	You must define a template for the first time with all the flags.
+
+		$ kapacitor define-template my_template -tick path/to/TICKscript -type stream
+
+	Later you can change a single property of the template by referencing its name
+	and only providing the single option you wish to modify.
+
+		$ kapacitor define-template my_template -tick path/to/TICKscript
+
+	or
+
+		$ kapacitor define-template my_template -type batch
+
+Options:
+
+`
+	fmt.Fprintln(os.Stderr, u)
+	defineTemplateFlags.PrintDefaults()
+}
+
+func doDefineTemplate(args []string) error {
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, "Must provide a template ID.")
+		defineTemplateFlags.Usage()
+		os.Exit(2)
+	}
+	defineTemplateFlags.Parse(args[1:])
+	id := args[0]
+
+	var script string
+	if *dtTick != "" {
+		file, err := os.Open(*dtTick)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		data, err := ioutil.ReadAll(file)
+		if err != nil {
+			return err
+		}
+		script = string(data)
+	}
+
+	var ttype client.TaskType
+	switch *dtType {
+	case "stream":
+		ttype = client.StreamTask
+	case "batch":
+		ttype = client.BatchTask
+	}
+
+	l := cli.TemplateLink(id)
+	template, _ := cli.Template(l, nil)
+	var err error
+	if template.ID == "" {
+		_, err = cli.CreateTemplate(client.CreateTemplateOptions{
+			ID:         id,
+			Type:       ttype,
+			TICKscript: script,
+		})
+	} else {
+		err = cli.UpdateTemplate(
+			l,
+			client.UpdateTemplateOptions{
+				Type:       ttype,
+				TICKscript: script,
+			},
+		)
+	}
+	return err
 }
 
 // Replay
@@ -1059,31 +1185,131 @@ func doShow(args []string) error {
 		os.Exit(2)
 	}
 
-	ti, err := cli.Task(cli.TaskLink(args[0]), nil)
+	t, err := cli.Task(cli.TaskLink(args[0]), nil)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("ID:", ti.ID)
-	fmt.Println("Error:", ti.Error)
-	fmt.Println("Type:", ti.Type)
-	fmt.Println("Status:", ti.Status)
-	fmt.Println("Executing:", ti.Executing)
-	fmt.Println("Created:", ti.Created.Format(time.RFC822))
-	fmt.Println("Modified:", ti.Modified.Format(time.RFC822))
-	fmt.Println("LastEnabled:", ti.LastEnabled.Format(time.RFC822))
-	fmt.Println("Databases Retention Policies:", ti.DBRPs)
-	fmt.Printf("TICKscript:\n%s\n\n", ti.TICKscript)
-	fmt.Printf("DOT:\n%s\n", ti.Dot)
+	fmt.Println("ID:", t.ID)
+	fmt.Println("Error:", t.Error)
+	fmt.Println("Template:", t.TemplateID)
+	fmt.Println("Type:", t.Type)
+	fmt.Println("Status:", t.Status)
+	fmt.Println("Executng:", t.Executing)
+	fmt.Println("Created:", t.Created.Format(time.RFC822))
+	fmt.Println("Modified:", t.Modified.Format(time.RFC822))
+	fmt.Println("LastEnabled:", t.LastEnabled.Format(time.RFC822))
+	fmt.Println("Databases Retenton Policies:", t.DBRPs)
+	fmt.Printf("TICKscript:\n%s\n", t.TICKscript)
+	if len(t.Vars) > 0 {
+		fmt.Println("Vars:")
+		varOutFmt := "%-30s%-10v%-40v\n"
+		fmt.Printf(varOutFmt, "Name", "Type", "Value")
+		vars := make([]string, 0, len(t.Vars))
+		for name := range t.Vars {
+			vars = append(vars, name)
+		}
+		sort.Strings(vars)
+		for _, name := range vars {
+			v := t.Vars[name]
+			value := v.Value
+			if list, ok := v.Value.([]client.Var); ok {
+				var err error
+				value, err = varListToStr(list)
+				if err != nil {
+					return errors.Wrapf(err, "invalid var %s", name)
+				}
+			}
+			fmt.Printf(varOutFmt, name, v.Type, value)
+		}
+	}
+	fmt.Printf("DOT:\n%s\n", t.Dot)
+
+	return nil
+}
+
+func varListToStr(list []client.Var) (string, error) {
+	values := make([]string, len(list))
+	for i := range list {
+		var str string
+		switch list[i].Type {
+		case client.VarString:
+			s, ok := list[i].Value.(string)
+			if !ok {
+				return "", errors.New("non string value in string var")
+			}
+			str = s
+		case client.VarStar:
+			str = "*"
+		default:
+			return "", fmt.Errorf("lists can only contain strings or a star, got %s", list[i].Type)
+		}
+		values[i] = str
+	}
+	return "[" + strings.Join(values, ", ") + "]", nil
+}
+
+// Show Template
+
+func showTemplateUsage() {
+	var u = `Usage: kapacitor show-template [template ID]
+
+	Show details about a specific template.
+`
+	fmt.Fprintln(os.Stderr, u)
+}
+
+func doShowTemplate(args []string) error {
+	if len(args) != 1 {
+		fmt.Fprintln(os.Stderr, "Must specify one template ID")
+		showUsage()
+		os.Exit(2)
+	}
+
+	t, err := cli.Template(cli.TemplateLink(args[0]), nil)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("ID:", t.ID)
+	fmt.Println("Error:", t.Error)
+	fmt.Println("Type:", t.Type)
+	fmt.Println("Created:", t.Created.Format(time.RFC822))
+	fmt.Println("Modified:", t.Modified.Format(time.RFC822))
+	fmt.Printf("TICKscript:\n%s\n", t.TICKscript)
+	fmt.Println("Vars:")
+	varOutFmt := "%-30s%-10v%-40v%-40s\n"
+	fmt.Printf(varOutFmt, "Name", "Type", "Default Value", "Description")
+	vars := make([]string, 0, len(t.Vars))
+	for name := range t.Vars {
+		vars = append(vars, name)
+	}
+	sort.Strings(vars)
+	for _, name := range vars {
+		v := t.Vars[name]
+		value := v.Value
+		if v.Value == nil {
+			value = "<required>"
+		}
+		if list, ok := v.Value.([]client.Var); ok {
+			var err error
+			value, err = varListToStr(list)
+			if err != nil {
+				return errors.Wrapf(err, "invalid var %s", name)
+			}
+		}
+		fmt.Printf(varOutFmt, name, v.Type, value, v.Description)
+	}
+	fmt.Printf("DOT:\n%s\n", t.Dot)
 	return nil
 }
 
 // List
 
 func listUsage() {
-	var u = `Usage: kapacitor list (tasks|recordings|replays) [(task|recording|replay) ID or pattern]
+	var u = `Usage: kapacitor list (tasks|templates|recordings|replays) [(task|template|recording|replay) ID or pattern]
 
-List tasks, recordings, or replays and their current state.
+List tasks, templates, recordings, or replays and their current state.
 
 If no ID or pattern is given then all items will be listed.
 `
@@ -1131,6 +1357,34 @@ func doList(args []string) error {
 				fmt.Fprintf(os.Stdout, outFmt, t.ID, t.Type, t.Status, t.Executing, t.DBRPs)
 			}
 			if len(tasks) != limit {
+				break
+			}
+			offset += limit
+		}
+	case "templates":
+		outFmt := "%-30s%-10v%-40v\n"
+		fmt.Fprintf(os.Stdout, outFmt, "ID", "Type", "Vars")
+		offset := 0
+		for {
+			templates, err := cli.ListTemplates(&client.ListTemplatesOptions{
+				Pattern: pattern,
+				Fields:  []string{"type", "vars"},
+				Offset:  offset,
+				Limit:   limit,
+			})
+			if err != nil {
+				return err
+			}
+
+			for _, t := range templates {
+				vars := make([]string, 0, len(t.Vars))
+				for name := range t.Vars {
+					vars = append(vars, name)
+				}
+				sort.Strings(vars)
+				fmt.Fprintf(os.Stdout, outFmt, t.ID, t.Type, strings.Join(vars, ","))
+			}
+			if len(templates) != limit {
 				break
 			}
 			offset += limit
@@ -1190,11 +1444,11 @@ func doList(args []string) error {
 
 // Delete
 func deleteUsage() {
-	var u = `Usage: kapacitor delete (tasks|recordings|replays) [task|recording|replay ID]...
+	var u = `Usage: kapacitor delete (tasks|templates|recordings|replays) [task|templates|recording|replay ID]...
 
-	Delete a task or recording.
+	Delete a tasks, templates, recordings or replays.
 
-	If a task is enabled it will be disabled and then deleted,
+	If a task is enabled it will be disabled and then deleted.
 
 For example:
 
@@ -1240,6 +1494,28 @@ func doDelete(args []string) error {
 					}
 				}
 				if len(tasks) != limit {
+					break
+				}
+			}
+		}
+	case "templates":
+		for _, pattern := range args[1:] {
+			for {
+				templates, err := cli.ListTemplates(&client.ListTemplatesOptions{
+					Pattern: pattern,
+					Fields:  []string{"link"},
+					Limit:   limit,
+				})
+				if err != nil {
+					return err
+				}
+				for _, template := range templates {
+					err := cli.DeleteTemplate(template.Link)
+					if err != nil {
+						return err
+					}
+				}
+				if len(templates) != limit {
 					break
 				}
 			}

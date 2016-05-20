@@ -4,6 +4,77 @@
 
 ### Release Notes
 
+#### Template Tasks
+
+The ability to create and use template tasks has been added.
+you can define a template for a task and reuse that template across multiple tasks.
+
+A simple example:
+
+```go
+// Which measurement to consume
+var measurement string
+// Optional where filter
+var where_filter = lambda: TRUE
+// Optional list of group by dimensions
+var groups = [*]
+// Which field to process
+var field string
+// Warning criteria, has access to 'mean' field
+var warn lambda
+// Critical criteria, has access to 'mean' field
+var crit lambda
+// How much data to window
+var window = 5m
+// The slack channel for alerts
+var slack_channel = '#alerts'
+
+stream
+    |from()
+        .measurement(measurement)
+        .where(where_filter)
+        .groupBy(groups)
+    |window()
+        .period(window)
+        .every(window)
+    |mean(field)
+    |alert()
+         .warn(warn)
+         .crit(crit)
+         .slack()
+         .channel(slack_channel)
+```
+
+Then you can define the template like so:
+
+```
+kapacitor define-template generic_mean_alert -tick path/to/above/script.tick -type stream
+```
+
+Next define a task that uses the template:
+
+```
+kapacitor define cpu_alert -template-id generic_mean_alert -vars cpu_vars.json -dbrp telegraf.default
+```
+
+Where `cpu_vars.json` would like like this:
+
+```json
+{
+    "measurement": {"type" : "string", "value" : "cpu" },
+    "where_filter": {"type": "lambda", "value": "\"cpu\" == 'cpu-total'"},
+    "groups": {"type": "list", "value": [{"type":"string", "value":"host"},{"type":"string", "value":"dc"}]},
+    "field": {"type" : "string", "value" : "usage_idle" },
+    "warn": {"type" : "lambda", "value" : " \"mean\" < 30.0" },
+    "crit": {"type" : "lambda", "value" : " \"mean\" < 10.0" },
+    "window": {"type" : "duration", "value" : "1m" },
+    "slack_channel": {"type" : "string", "value" : "#alerts_testing" }
+}
+```
+
+
+#### Live Replays
+
 With this release you can now replay data directly against a task from InfluxDB without having to first create a recording.
 Replay the queries defined in the batch task `cpu_alert` for the past 10 hours.
 ```sh
@@ -23,6 +94,7 @@ kapacitor replay-live query -task cpu_alert -query 'SELECT usage_idle FROM teleg
 - [#500](https://github.com/influxdata/kapacitor/issues/500): Support Float,Integer,String and Boolean types.
 - [#82](https://github.com/influxdata/kapacitor/issues/82): Multiple services for PagerDuty alert.
 - [#558](https://github.com/influxdata/kapacitor/pull/558): Preserve fields as well as tags on selector InfluxQL functions.
+- [#259](https://github.com/influxdata/kapacitor/issues/259): Template Tasks have been added.
 
 
 ### Bugfixes

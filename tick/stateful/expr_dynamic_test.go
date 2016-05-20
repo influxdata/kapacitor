@@ -4,7 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/influxdata/kapacitor/tick"
+	"github.com/influxdata/kapacitor/tick/ast"
+	"github.com/influxdata/kapacitor/tick/stateful"
 )
 
 type valueExpectation struct {
@@ -21,7 +22,7 @@ type testCase struct {
 	Title string
 
 	// Node which the test is evaluated upon, must contain ReferenceNode with ref to "value"
-	Node tick.Node
+	Node ast.Node
 
 	Expectations []valueExpectation
 }
@@ -32,7 +33,7 @@ func runDynamicTestCase(t *testing.T, tc testCase) {
 	se := mustCompileExpression(tc.Node)
 
 	for i, expectation := range tc.Expectations {
-		scope := tick.NewScope()
+		scope := stateful.NewScope()
 		scope.Set("value", expectation.Value)
 
 		var result interface{}
@@ -70,12 +71,12 @@ func TestExpression_BinaryNode_DynamicTestCases(t *testing.T) {
 	runDynamicTestCase(t, testCase{
 		Title: "BinaryNode - EvalBool supports numeric type changes",
 
-		Node: &tick.BinaryNode{
-			Operator: tick.TokenGreater,
-			Left: &tick.ReferenceNode{
+		Node: &ast.BinaryNode{
+			Operator: ast.TokenGreater,
+			Left: &ast.ReferenceNode{
 				Reference: "value",
 			},
-			Right: &tick.NumberNode{
+			Right: &ast.NumberNode{
 				IsFloat: true,
 				Float64: float64(10),
 			},
@@ -90,12 +91,12 @@ func TestExpression_BinaryNode_DynamicTestCases(t *testing.T) {
 	runDynamicTestCase(t, testCase{
 		Title: "BinaryNode - EvalNum supports numeric type changes",
 
-		Node: &tick.BinaryNode{
-			Operator: tick.TokenPlus,
-			Left: &tick.ReferenceNode{
+		Node: &ast.BinaryNode{
+			Operator: ast.TokenPlus,
+			Left: &ast.ReferenceNode{
 				Reference: "value",
 			},
-			Right: &tick.NumberNode{
+			Right: &ast.NumberNode{
 				IsFloat: true,
 				Float64: float64(10),
 			},
@@ -111,7 +112,7 @@ func TestExpression_BinaryNode_DynamicTestCases(t *testing.T) {
 			{
 				IsEvalNum:      true,
 				Value:          int64(5),
-				ExpectedError:  errors.New("mismatched type to binary operator. got int64 + float64. see bool(), int(), float(), string()"),
+				ExpectedError:  errors.New("mismatched type to binary operator. got int + float. see bool(), int(), float(), string(), duration()"),
 				ExpectedResult: nil,
 			},
 		},
@@ -120,12 +121,12 @@ func TestExpression_BinaryNode_DynamicTestCases(t *testing.T) {
 	runDynamicTestCase(t, testCase{
 		Title: "BinaryNode - EvalNum supports numeric value changes",
 
-		Node: &tick.BinaryNode{
-			Operator: tick.TokenGreater,
-			Left: &tick.ReferenceNode{
+		Node: &ast.BinaryNode{
+			Operator: ast.TokenGreater,
+			Left: &ast.ReferenceNode{
 				Reference: "value",
 			},
-			Right: &tick.NumberNode{
+			Right: &ast.NumberNode{
 				IsFloat: true,
 				Float64: float64(10),
 			},
@@ -150,24 +151,24 @@ func TestExpression_BinaryNode_DynamicTestCases(t *testing.T) {
 	runDynamicTestCase(t, testCase{
 		Title: "BinaryNode - Nested BinaryNodes can determine correct type",
 
-		Node: &tick.BinaryNode{
-			Operator: tick.TokenAnd,
-			Left: &tick.BinaryNode{
-				Operator: tick.TokenLess,
-				Left: &tick.ReferenceNode{
+		Node: &ast.BinaryNode{
+			Operator: ast.TokenAnd,
+			Left: &ast.BinaryNode{
+				Operator: ast.TokenLess,
+				Left: &ast.ReferenceNode{
 					Reference: "value",
 				},
-				Right: &tick.NumberNode{
+				Right: &ast.NumberNode{
 					IsFloat: true,
 					Float64: float64(10),
 				},
 			},
-			Right: &tick.BinaryNode{
-				Operator: tick.TokenGreater,
-				Left: &tick.ReferenceNode{
+			Right: &ast.BinaryNode{
+				Operator: ast.TokenGreater,
+				Left: &ast.ReferenceNode{
 					Reference: "value",
 				},
-				Right: &tick.NumberNode{
+				Right: &ast.NumberNode{
 					IsFloat: true,
 					Float64: float64(7),
 				},
@@ -202,9 +203,9 @@ func TestExpression_UnaryNode_DyanmicTestCases(t *testing.T) {
 	runDynamicTestCase(t, testCase{
 		Title: "UnaryNode - EvalNum supports numeric type changes",
 
-		Node: &tick.UnaryNode{
-			Operator: tick.TokenMinus,
-			Node: &tick.ReferenceNode{
+		Node: &ast.UnaryNode{
+			Operator: ast.TokenMinus,
+			Node: &ast.ReferenceNode{
 				Reference: "value",
 			},
 		},
@@ -228,9 +229,9 @@ func TestExpression_UnaryNode_DyanmicTestCases(t *testing.T) {
 	runDynamicTestCase(t, testCase{
 		Title: "UnaryNode - EvalBool supports boolean value changes",
 
-		Node: &tick.UnaryNode{
-			Operator: tick.TokenNot,
-			Node: &tick.ReferenceNode{
+		Node: &ast.UnaryNode{
+			Operator: ast.TokenNot,
+			Node: &ast.ReferenceNode{
 				Reference: "value",
 			},
 		},

@@ -4,15 +4,16 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
-	"github.com/influxdata/kapacitor/tick"
+	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/tick/stateful"
 )
 
 func TestEvalUnaryNode_InvalidOperator(t *testing.T) {
-	evaluator, err := stateful.NewEvalUnaryNode(&tick.UnaryNode{
-		Operator: tick.TokenAnd,
-		Node:     &tick.BoolNode{Bool: true},
+	evaluator, err := stateful.NewEvalUnaryNode(&ast.UnaryNode{
+		Operator: ast.TokenAnd,
+		Node:     &ast.BoolNode{Bool: true},
 	})
 
 	expectedError := errors.New("Invalid unary operator: \"AND\"")
@@ -28,12 +29,12 @@ func TestEvalUnaryNode_InvalidOperator(t *testing.T) {
 }
 
 func TestEvalUnaryNode_InvalidNode(t *testing.T) {
-	evaluator, err := stateful.NewEvalUnaryNode(&tick.UnaryNode{
-		Operator: tick.TokenMinus,
-		Node:     &tick.CommentNode{},
+	evaluator, err := stateful.NewEvalUnaryNode(&ast.UnaryNode{
+		Operator: ast.TokenMinus,
+		Node:     &ast.CommentNode{},
 	})
 
-	expectedError := errors.New("Failed to handle node: Given node type is not valid evaluation node: *tick.CommentNode")
+	expectedError := errors.New("Failed to handle node: Given node type is not valid evaluation node: *ast.CommentNode")
 
 	if err == nil && evaluator != nil {
 		t.Error("Expected an error, but got nil error and evaluator")
@@ -46,9 +47,9 @@ func TestEvalUnaryNode_InvalidNode(t *testing.T) {
 }
 
 func TestEvalUnaryNode_EvalBool_Sanity(t *testing.T) {
-	evaluator, err := stateful.NewEvalUnaryNode(&tick.UnaryNode{
-		Operator: tick.TokenNot,
-		Node: &tick.BoolNode{
+	evaluator, err := stateful.NewEvalUnaryNode(&ast.UnaryNode{
+		Operator: ast.TokenNot,
+		Node: &ast.BoolNode{
 			Bool: false,
 		},
 	})
@@ -57,7 +58,7 @@ func TestEvalUnaryNode_EvalBool_Sanity(t *testing.T) {
 		t.Fatalf("Failed to compile unary node: %v", err)
 	}
 
-	result, err := evaluator.EvalBool(tick.NewScope(), stateful.CreateExecutionState())
+	result, err := evaluator.EvalBool(stateful.NewScope(), stateful.CreateExecutionState())
 	if err != nil {
 		t.Errorf("Got unexpected error: %v", err)
 	}
@@ -68,9 +69,9 @@ func TestEvalUnaryNode_EvalBool_Sanity(t *testing.T) {
 }
 
 func TestEvalUnaryNode_EvalFloat64_Sanity(t *testing.T) {
-	evaluator, err := stateful.NewEvalUnaryNode(&tick.UnaryNode{
-		Operator: tick.TokenMinus,
-		Node: &tick.NumberNode{
+	evaluator, err := stateful.NewEvalUnaryNode(&ast.UnaryNode{
+		Operator: ast.TokenMinus,
+		Node: &ast.NumberNode{
 			IsFloat: true,
 			Float64: float64(12),
 		},
@@ -80,7 +81,7 @@ func TestEvalUnaryNode_EvalFloat64_Sanity(t *testing.T) {
 		t.Fatalf("Failed to compile unary node: %v", err)
 	}
 
-	result, err := evaluator.EvalFloat(tick.NewScope(), stateful.CreateExecutionState())
+	result, err := evaluator.EvalFloat(stateful.NewScope(), stateful.CreateExecutionState())
 	if err != nil {
 		t.Errorf("Got unexpected error: %v", err)
 	}
@@ -91,9 +92,9 @@ func TestEvalUnaryNode_EvalFloat64_Sanity(t *testing.T) {
 }
 
 func TestEvalUnaryNode_EvalInt64_Sanity(t *testing.T) {
-	evaluator, err := stateful.NewEvalUnaryNode(&tick.UnaryNode{
-		Operator: tick.TokenMinus,
-		Node: &tick.NumberNode{
+	evaluator, err := stateful.NewEvalUnaryNode(&ast.UnaryNode{
+		Operator: ast.TokenMinus,
+		Node: &ast.NumberNode{
 			IsInt: true,
 			Int64: int64(12),
 		},
@@ -103,7 +104,7 @@ func TestEvalUnaryNode_EvalInt64_Sanity(t *testing.T) {
 		t.Fatalf("Failed to compile unary node: %v", err)
 	}
 
-	result, err := evaluator.EvalInt(tick.NewScope(), stateful.CreateExecutionState())
+	result, err := evaluator.EvalInt(stateful.NewScope(), stateful.CreateExecutionState())
 	if err != nil {
 		t.Errorf("Got unexpected error: %v", err)
 	}
@@ -113,10 +114,32 @@ func TestEvalUnaryNode_EvalInt64_Sanity(t *testing.T) {
 	}
 }
 
+func TestEvalUnaryNode_EvalDuration_Sanity(t *testing.T) {
+	evaluator, err := stateful.NewEvalUnaryNode(&ast.UnaryNode{
+		Operator: ast.TokenMinus,
+		Node: &ast.DurationNode{
+			Dur: 12 * time.Hour,
+		},
+	})
+
+	if err != nil {
+		t.Fatalf("Failed to compile unary node: %v", err)
+	}
+
+	result, err := evaluator.EvalDuration(stateful.NewScope(), stateful.CreateExecutionState())
+	if err != nil {
+		t.Errorf("Got unexpected error: %v", err)
+	}
+
+	if got, exp := result, -12*time.Hour; got != exp {
+		t.Errorf("unexpected result: got: %T(%v), expected: %s", got, got, exp)
+	}
+}
+
 func TestEvalUnaryNode_EvalString_UnexpectedReturnType(t *testing.T) {
-	evaluator, err := stateful.NewEvalUnaryNode(&tick.UnaryNode{
-		Operator: tick.TokenNot,
-		Node: &tick.BoolNode{
+	evaluator, err := stateful.NewEvalUnaryNode(&ast.UnaryNode{
+		Operator: ast.TokenNot,
+		Node: &ast.BoolNode{
 			Bool: false,
 		},
 	})
@@ -125,9 +148,9 @@ func TestEvalUnaryNode_EvalString_UnexpectedReturnType(t *testing.T) {
 		t.Fatalf("Failed to compile unary node: %v", err)
 	}
 
-	result, err := evaluator.EvalString(tick.NewScope(), stateful.CreateExecutionState())
+	result, err := evaluator.EvalString(stateful.NewScope(), stateful.CreateExecutionState())
 
-	expectedError := errors.New("expression returned unexpected type boolean")
+	expectedError := errors.New("TypeGuard: expression returned unexpected type boolean, expected string")
 
 	if err == nil && result != "" {
 		t.Errorf("Expected an error, but got nil error and result: %v", result)
@@ -140,9 +163,9 @@ func TestEvalUnaryNode_EvalString_UnexpectedReturnType(t *testing.T) {
 }
 
 func TestEvalUnaryNode_EvalInt64_FailedToEvaluateNode(t *testing.T) {
-	evaluator, err := stateful.NewEvalUnaryNode(&tick.UnaryNode{
-		Operator: tick.TokenMinus,
-		Node: &tick.BoolNode{
+	evaluator, err := stateful.NewEvalUnaryNode(&ast.UnaryNode{
+		Operator: ast.TokenMinus,
+		Node: &ast.BoolNode{
 			Bool: false,
 		},
 	})
@@ -151,9 +174,9 @@ func TestEvalUnaryNode_EvalInt64_FailedToEvaluateNode(t *testing.T) {
 		t.Fatalf("Failed to compile unary node: %v", err)
 	}
 
-	result, err := evaluator.EvalInt(tick.NewScope(), stateful.CreateExecutionState())
+	result, err := evaluator.EvalInt(stateful.NewScope(), stateful.CreateExecutionState())
 
-	expectedError := errors.New("expression returned unexpected type boolean")
+	expectedError := errors.New("TypeGuard: expression returned unexpected type boolean, expected int")
 
 	if err == nil && result != int64(0) {
 		t.Errorf("Expected an error, but got nil error and result: %v", result)
@@ -166,9 +189,9 @@ func TestEvalUnaryNode_EvalInt64_FailedToEvaluateNode(t *testing.T) {
 }
 
 func TestEvalUnaryNode_EvalFloat64_FailedToEvaluateNode(t *testing.T) {
-	evaluator, err := stateful.NewEvalUnaryNode(&tick.UnaryNode{
-		Operator: tick.TokenMinus,
-		Node: &tick.ReferenceNode{
+	evaluator, err := stateful.NewEvalUnaryNode(&ast.UnaryNode{
+		Operator: ast.TokenMinus,
+		Node: &ast.ReferenceNode{
 			Reference: "value",
 		},
 	})
@@ -177,7 +200,7 @@ func TestEvalUnaryNode_EvalFloat64_FailedToEvaluateNode(t *testing.T) {
 		t.Fatalf("Failed to compile unary node: %v", err)
 	}
 
-	result, err := evaluator.EvalFloat(tick.NewScope(), stateful.CreateExecutionState())
+	result, err := evaluator.EvalFloat(stateful.NewScope(), stateful.CreateExecutionState())
 
 	expectedError := errors.New("name \"value\" is undefined. Names in scope:")
 

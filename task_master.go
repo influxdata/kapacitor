@@ -13,6 +13,7 @@ import (
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/tick"
+	"github.com/influxdata/kapacitor/tick/stateful"
 	"github.com/influxdata/kapacitor/timer"
 	"github.com/influxdata/kapacitor/udf"
 )
@@ -220,6 +221,33 @@ func (tm *TaskMaster) Drain() {
 	}
 }
 
+// Create a new template in the context of a TaskMaster
+func (tm *TaskMaster) NewTemplate(
+	id,
+	script string,
+	tt TaskType,
+) (*Template, error) {
+	t := &Template{
+		id: id,
+	}
+	scope := tm.CreateTICKScope()
+
+	var srcEdge pipeline.EdgeType
+	switch tt {
+	case StreamTask:
+		srcEdge = pipeline.StreamEdge
+	case BatchTask:
+		srcEdge = pipeline.BatchEdge
+	}
+
+	tp, err := pipeline.CreateTemplatePipeline(script, srcEdge, scope, tm.DeadmanService)
+	if err != nil {
+		return nil, err
+	}
+	t.tp = tp
+	return t, nil
+}
+
 // Create a new task in the context of a TaskMaster
 func (tm *TaskMaster) NewTask(
 	id,
@@ -227,6 +255,7 @@ func (tm *TaskMaster) NewTask(
 	tt TaskType,
 	dbrps []DBRP,
 	snapshotInterval time.Duration,
+	vars map[string]tick.Var,
 ) (*Task, error) {
 	t := &Task{
 		ID:               id,
@@ -244,7 +273,7 @@ func (tm *TaskMaster) NewTask(
 		srcEdge = pipeline.BatchEdge
 	}
 
-	p, err := pipeline.CreatePipeline(script, srcEdge, scope, tm.DeadmanService)
+	p, err := pipeline.CreatePipeline(script, srcEdge, scope, tm.DeadmanService, vars)
 	if err != nil {
 		return nil, err
 	}
@@ -261,8 +290,8 @@ func (tm *TaskMaster) waitForForks() {
 	tm.wg.Wait()
 }
 
-func (tm *TaskMaster) CreateTICKScope() *tick.Scope {
-	scope := tick.NewScope()
+func (tm *TaskMaster) CreateTICKScope() *stateful.Scope {
+	scope := stateful.NewScope()
 	scope.Set("time", func(d time.Duration) time.Duration { return d })
 	// Add dynamic methods to the scope for UDFs
 	if tm.UDFService != nil {
@@ -271,7 +300,7 @@ func (tm *TaskMaster) CreateTICKScope() *tick.Scope {
 			info, _ := tm.UDFService.Info(f)
 			scope.SetDynamicMethod(
 				f,
-				tick.DynamicMethod(func(self interface{}, args ...interface{}) (interface{}, error) {
+				stateful.DynamicMethod(func(self interface{}, args ...interface{}) (interface{}, error) {
 					parent, ok := self.(pipeline.Node)
 					if !ok {
 						return nil, fmt.Errorf("cannot call %s on %T", f, self)

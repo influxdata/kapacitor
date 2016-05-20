@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb/influxql"
+	"github.com/pkg/errors"
 )
 
 const DefaultUserAgent = "KapacitorClient"
@@ -29,6 +29,7 @@ const basePath = "/kapacitor/v1"
 const pingPath = basePath + "/ping"
 const logLevelPath = basePath + "/loglevel"
 const tasksPath = basePath + "/tasks"
+const templatesPath = basePath + "/templates"
 const recordingsPath = basePath + "/recordings"
 const recordStreamPath = basePath + "/recordings/stream"
 const recordBatchPath = basePath + "/recordings/batch"
@@ -319,13 +320,177 @@ func (c Clock) String() string {
 	return string(s)
 }
 
+type VarType int
+
+const (
+	VarUnknown VarType = iota
+	VarBool
+	VarInt
+	VarFloat
+	VarString
+	VarRegex
+	VarDuration
+	VarLambda
+	VarList
+	VarStar
+)
+
+func (vt VarType) MarshalText() ([]byte, error) {
+	switch vt {
+	case VarBool:
+		return []byte("bool"), nil
+	case VarInt:
+		return []byte("int"), nil
+	case VarFloat:
+		return []byte("float"), nil
+	case VarString:
+		return []byte("string"), nil
+	case VarRegex:
+		return []byte("regex"), nil
+	case VarDuration:
+		return []byte("duration"), nil
+	case VarLambda:
+		return []byte("lambda"), nil
+	case VarList:
+		return []byte("list"), nil
+	case VarStar:
+		return []byte("star"), nil
+	default:
+		return nil, fmt.Errorf("unknown VarType %d", vt)
+	}
+}
+
+func (vt *VarType) UnmarshalText(text []byte) error {
+	switch s := string(text); s {
+	case "bool":
+		*vt = VarBool
+	case "int":
+		*vt = VarInt
+	case "float":
+		*vt = VarFloat
+	case "string":
+		*vt = VarString
+	case "regex":
+		*vt = VarRegex
+	case "duration":
+		*vt = VarDuration
+	case "lambda":
+		*vt = VarLambda
+	case "list":
+		*vt = VarList
+	case "star":
+		*vt = VarStar
+	default:
+		return fmt.Errorf("unknown VarType %s", s)
+	}
+	return nil
+}
+
+func (vt VarType) String() string {
+	s, err := vt.MarshalText()
+	if err != nil {
+		return err.Error()
+	}
+	return string(s)
+}
+
+type Vars map[string]Var
+
+func (vs *Vars) UnmarshalJSON(b []byte) error {
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.UseNumber()
+	data := make(map[string]Var)
+	err := dec.Decode(&data)
+	if err != nil {
+		return err
+	}
+	*vs = make(Vars)
+	for name, v := range data {
+		if v.Value != nil {
+			switch v.Type {
+			case VarDuration:
+				switch value := v.Value.(type) {
+				case json.Number:
+					i, err := value.Int64()
+					if err != nil {
+						return errors.Wrapf(err, "invalid var %v", v)
+					}
+					v.Value = time.Duration(i)
+				case string:
+					d, err := influxql.ParseDuration(value)
+					if err != nil {
+						return errors.Wrapf(err, "invalid duration string for var %s", v)
+					}
+					v.Value = d
+				default:
+					return fmt.Errorf("invalid var %v: expected int or string value", v)
+				}
+			case VarInt:
+				n, ok := v.Value.(json.Number)
+				if !ok {
+					return fmt.Errorf("invalid var %v: expected int value", v)
+				}
+				v.Value, err = n.Int64()
+				if err != nil {
+					return errors.Wrapf(err, "invalid var %v", v)
+				}
+			case VarFloat:
+				n, ok := v.Value.(json.Number)
+				if !ok {
+					return fmt.Errorf("invalid var %v: expected float value", v)
+				}
+				v.Value, err = n.Float64()
+				if err != nil {
+					return errors.Wrapf(err, "invalid var %v", v)
+				}
+			case VarList:
+				values, ok := v.Value.([]interface{})
+				if !ok {
+					return fmt.Errorf("invalid var %v: expected list of vars", v)
+				}
+				vars := make([]Var, len(values))
+				for i := range values {
+					m, ok := values[i].(map[string]interface{})
+					if !ok {
+						return fmt.Errorf("invalid var %v: expected list of vars", v)
+					}
+					if typeText, ok := m["type"]; ok {
+						err := vars[i].Type.UnmarshalText([]byte(typeText.(string)))
+						if err != nil {
+							return err
+						}
+					} else {
+						return fmt.Errorf("invalid var %v: expected list type key in object", v)
+					}
+					if value, ok := m["value"]; ok {
+						vars[i].Value = value
+					} else {
+						return fmt.Errorf("invalid var %v: expected list value key in object", v)
+					}
+				}
+				v.Value = vars
+			}
+		}
+		(*vs)[name] = v
+	}
+	return nil
+}
+
+type Var struct {
+	Type        VarType     `json:"type"`
+	Value       interface{} `json:"value"`
+	Description string      `json:"description"`
+}
+
 // A Task plus its read-only attributes.
 type Task struct {
 	Link           Link           `json:"link"`
 	ID             string         `json:"id"`
+	TemplateID     string         `json:"template-id"`
 	Type           TaskType       `json:"type"`
 	DBRPs          []DBRP         `json:"dbrps"`
 	TICKscript     string         `json:"script"`
+	Vars           Vars           `json:"vars"`
 	Dot            string         `json:"dot"`
 	Status         TaskStatus     `json:"status"`
 	Executing      bool           `json:"executing"`
@@ -334,6 +499,19 @@ type Task struct {
 	Created        time.Time      `json:"created"`
 	Modified       time.Time      `json:"modified"`
 	LastEnabled    time.Time      `json:"last-enabled,omitempty"`
+}
+
+// A Template plus its read-only attributes.
+type Template struct {
+	Link       Link      `json:"link"`
+	ID         string    `json:"id"`
+	Type       TaskType  `json:"type"`
+	TICKscript string    `json:"script"`
+	Vars       Vars      `json:"vars"`
+	Dot        string    `json:"dot"`
+	Error      string    `json:"error"`
+	Created    time.Time `json:"created"`
+	Modified   time.Time `json:"modified"`
 }
 
 // Information about a recording.
@@ -430,12 +608,18 @@ func (c *Client) TaskLink(id string) Link {
 	return Link{Relation: Self, Href: path.Join(tasksPath, id)}
 }
 
+func (c *Client) TemplateLink(id string) Link {
+	return Link{Relation: Self, Href: path.Join(templatesPath, id)}
+}
+
 type CreateTaskOptions struct {
 	ID         string     `json:"id,omitempty"`
+	TemplateID string     `json:"template-id,omitempty"`
 	Type       TaskType   `json:"type,omitempty"`
 	DBRPs      []DBRP     `json:"dbrps,omitempty"`
 	TICKscript string     `json:"script,omitempty"`
 	Status     TaskStatus `json:"status,omitempty"`
+	Vars       Vars       `json:"vars,omitempty"`
 }
 
 // Create a new task.
@@ -462,10 +646,12 @@ func (c *Client) CreateTask(opt CreateTaskOptions) (Task, error) {
 }
 
 type UpdateTaskOptions struct {
+	TemplateID string     `json:"template-id,omitempty"`
 	Type       TaskType   `json:"type,omitempty"`
 	DBRPs      []DBRP     `json:"dbrps,omitempty"`
 	TICKscript string     `json:"script,omitempty"`
 	Status     TaskStatus `json:"status,omitempty"`
+	Vars       Vars       `json:"vars,omitempty"`
 }
 
 // Update an existing task.
@@ -637,6 +823,189 @@ func (c *Client) TaskOutput(link Link, name string) (*influxql.Result, error) {
 		return nil, err
 	}
 	return r, nil
+}
+
+type CreateTemplateOptions struct {
+	ID         string   `json:"id,omitempty"`
+	Type       TaskType `json:"type,omitempty"`
+	TICKscript string   `json:"script,omitempty"`
+}
+
+// Create a new template.
+// Errors if the template already exists.
+func (c *Client) CreateTemplate(opt CreateTemplateOptions) (Template, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	err := enc.Encode(opt)
+	if err != nil {
+		return Template{}, err
+	}
+
+	u := *c.url
+	u.Path = templatesPath
+
+	req, err := http.NewRequest("POST", u.String(), &buf)
+	if err != nil {
+		return Template{}, err
+	}
+
+	t := Template{}
+	_, err = c.do(req, &t, http.StatusOK)
+	return t, err
+}
+
+type UpdateTemplateOptions struct {
+	Type       TaskType `json:"type,omitempty"`
+	TICKscript string   `json:"script,omitempty"`
+}
+
+// Update an existing template.
+// Only fields that are not their default value will be updated.
+func (c *Client) UpdateTemplate(link Link, opt UpdateTemplateOptions) error {
+	if link.Href == "" {
+		return fmt.Errorf("invalid link %v", link)
+	}
+
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	err := enc.Encode(opt)
+	if err != nil {
+		return err
+	}
+
+	u := *c.url
+	u.Path = link.Href
+
+	req, err := http.NewRequest("PATCH", u.String(), &buf)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.do(req, nil, http.StatusNoContent)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type TemplateOptions struct {
+	ScriptFormat string
+}
+
+func (o *TemplateOptions) Default() {
+	if o.ScriptFormat == "" {
+		o.ScriptFormat = "formatted"
+	}
+}
+
+func (o *TemplateOptions) Values() *url.Values {
+	v := &url.Values{}
+	v.Set("script-format", o.ScriptFormat)
+	return v
+}
+
+// Get information about a template.
+// Options can be nil and the default options will be used.
+// By default the TICKscript contents are formatted, use ScriptFormat="raw" to return the TICKscript unmodified.
+func (c *Client) Template(link Link, opt *TemplateOptions) (Template, error) {
+	template := Template{}
+	if link.Href == "" {
+		return template, fmt.Errorf("invalid link %v", link)
+	}
+
+	if opt == nil {
+		opt = new(TemplateOptions)
+	}
+	opt.Default()
+
+	u := *c.url
+	u.Path = link.Href
+	u.RawQuery = opt.Values().Encode()
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return template, err
+	}
+
+	_, err = c.do(req, &template, http.StatusOK)
+	if err != nil {
+		return template, err
+	}
+	return template, nil
+}
+
+// Delete a template.
+func (c *Client) DeleteTemplate(link Link) error {
+	if link.Href == "" {
+		return fmt.Errorf("invalid link %v", link)
+	}
+
+	u := *c.url
+	u.Path = link.Href
+
+	req, err := http.NewRequest("DELETE", u.String(), nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.do(req, nil, http.StatusNoContent)
+	return err
+}
+
+type ListTemplatesOptions struct {
+	TemplateOptions
+	Pattern string
+	Fields  []string
+	Offset  int
+	Limit   int
+}
+
+func (o *ListTemplatesOptions) Default() {
+	o.TemplateOptions.Default()
+	if o.Limit == 0 {
+		o.Limit = 100
+	}
+}
+
+func (o *ListTemplatesOptions) Values() *url.Values {
+	v := o.TemplateOptions.Values()
+	v.Set("pattern", o.Pattern)
+	for _, field := range o.Fields {
+		v.Add("fields", field)
+	}
+	v.Set("offset", strconv.FormatInt(int64(o.Offset), 10))
+	v.Set("limit", strconv.FormatInt(int64(o.Limit), 10))
+	return v
+}
+
+// Get templates.
+func (c *Client) ListTemplates(opt *ListTemplatesOptions) ([]Template, error) {
+	if opt == nil {
+		opt = new(ListTemplatesOptions)
+	}
+	opt.Default()
+
+	u := *c.url
+	u.Path = templatesPath
+	u.RawQuery = opt.Values().Encode()
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Response type
+	type response struct {
+		Templates []Template `json:"templates"`
+	}
+
+	r := &response{}
+
+	_, err = c.do(req, r, http.StatusOK)
+	if err != nil {
+		return nil, err
+	}
+	return r.Templates, nil
 }
 
 // Get information about a recording.

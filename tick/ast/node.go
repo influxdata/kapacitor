@@ -1,4 +1,4 @@
-package tick
+package ast
 
 import (
 	"bytes"
@@ -12,7 +12,8 @@ import (
 	"github.com/influxdata/influxdb/influxql"
 )
 
-type unboundFunc func(obj interface{}) (interface{}, error)
+// Indent string for formatted TICKscripts
+const indentStep = "    "
 
 type Position interface {
 	Position() int // byte position of start of node in full original input string
@@ -24,6 +25,8 @@ type Node interface {
 	Position
 	String() string
 	Format(buf *bytes.Buffer, indent string, onNewLine bool)
+	// Report whether to nodes are functionally equal, ignoring position and comments
+	Equal(interface{}) bool
 }
 
 // Represents a node that can have a comment associated with it.
@@ -124,6 +127,16 @@ func (n *NumberNode) SetComment(c *CommentNode) {
 	n.Comment = c
 }
 
+func (n *NumberNode) Equal(o interface{}) bool {
+	if on, ok := o.(*NumberNode); ok {
+		return n.IsInt == on.IsInt &&
+			n.IsFloat == on.IsFloat &&
+			n.Int64 == on.Int64 &&
+			n.Float64 == on.Float64
+	}
+	return false
+}
+
 // durationNode holds a number: signed or unsigned integer or float.
 // The value is parsed and stored under all the types that can represent the value.
 // This simulates in a small amount of code the behavior of Go's ideal constants.
@@ -163,6 +176,13 @@ func (n *DurationNode) SetComment(c *CommentNode) {
 	n.Comment = c
 }
 
+func (n *DurationNode) Equal(o interface{}) bool {
+	if on, ok := o.(*DurationNode); ok {
+		return n.Dur == on.Dur
+	}
+	return false
+}
+
 // boolNode holds one argument and an operator.
 type BoolNode struct {
 	position
@@ -200,6 +220,12 @@ func (n *BoolNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
 func (n *BoolNode) SetComment(c *CommentNode) {
 	n.Comment = c
 }
+func (n *BoolNode) Equal(o interface{}) bool {
+	if on, ok := o.(*BoolNode); ok {
+		return n.Bool == on.Bool
+	}
+	return false
+}
 
 // unaryNode holds one argument and an operator.
 type UnaryNode struct {
@@ -233,6 +259,13 @@ func (n *UnaryNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
 }
 func (n *UnaryNode) SetComment(c *CommentNode) {
 	n.Comment = c
+}
+
+func (n *UnaryNode) Equal(o interface{}) bool {
+	if on, ok := o.(*UnaryNode); ok {
+		return n.Operator == on.Operator && n.Node.Equal(on.Node)
+	}
+	return false
 }
 
 // binaryNode holds two arguments and an operator.
@@ -288,6 +321,15 @@ func (n *BinaryNode) SetComment(c *CommentNode) {
 	n.Comment = c
 }
 
+func (n *BinaryNode) Equal(o interface{}) bool {
+	if on, ok := o.(*BinaryNode); ok {
+		return n.Operator == on.Operator &&
+			n.Left.Equal(on.Left) &&
+			n.Right.Equal(on.Right)
+	}
+	return false
+}
+
 type DeclarationNode struct {
 	position
 	Left    *IdentifierNode
@@ -322,6 +364,55 @@ func (n *DeclarationNode) Format(buf *bytes.Buffer, indent string, onNewLine boo
 }
 func (n *DeclarationNode) SetComment(c *CommentNode) {
 	n.Comment = c
+}
+func (n *DeclarationNode) Equal(o interface{}) bool {
+	if on, ok := o.(*DeclarationNode); ok {
+		return n.Left.Equal(on.Left) &&
+			n.Right.Equal(on.Right)
+	}
+	return false
+}
+
+type TypeDeclarationNode struct {
+	position
+	Node    *IdentifierNode
+	Type    *IdentifierNode
+	Comment *CommentNode
+}
+
+func newTypeDecl(p position, node, typeIdent *IdentifierNode, c *CommentNode) *TypeDeclarationNode {
+	return &TypeDeclarationNode{
+		position: p,
+		Node:     node,
+		Type:     typeIdent,
+		Comment:  c,
+	}
+}
+
+func (n *TypeDeclarationNode) String() string {
+	return fmt.Sprintf("TypeDeclarationNode@%v{%v %v}%v", n.position, n.Node, n.Type, n.Comment)
+}
+
+func (n *TypeDeclarationNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
+	if n.Comment != nil {
+		n.Comment.Format(buf, indent, onNewLine)
+	}
+	buf.WriteString(KW_Var)
+	buf.WriteByte(' ')
+	n.Node.Format(buf, indent, false)
+	buf.WriteByte(' ')
+	n.Type.Format(buf, indent, false)
+}
+
+func (n *TypeDeclarationNode) SetComment(c *CommentNode) {
+	n.Comment = c
+}
+func (n *TypeDeclarationNode) Equal(o interface{}) bool {
+	if on, ok := o.(*TypeDeclarationNode); ok {
+		return n.Node.Equal(on.Node) &&
+			n.Type.Equal(on.Type)
+	}
+	return false
 }
 
 type ChainNode struct {
@@ -363,6 +454,14 @@ func (n *ChainNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
 func (n *ChainNode) SetComment(c *CommentNode) {
 	n.Comment = c
 }
+func (n *ChainNode) Equal(o interface{}) bool {
+	if on, ok := o.(*ChainNode); ok {
+		return n.Operator == on.Operator &&
+			n.Left.Equal(on.Left) &&
+			n.Right.Equal(on.Right)
+	}
+	return false
+}
 
 //Holds the textual representation of an identifier
 type IdentifierNode struct {
@@ -393,6 +492,12 @@ func (n *IdentifierNode) Format(buf *bytes.Buffer, indent string, onNewLine bool
 }
 func (n *IdentifierNode) SetComment(c *CommentNode) {
 	n.Comment = c
+}
+func (n *IdentifierNode) Equal(o interface{}) bool {
+	if on, ok := o.(*IdentifierNode); ok {
+		return n.Ident == on.Ident
+	}
+	return false
 }
 
 //Holds the textual representation of an identifier
@@ -447,6 +552,12 @@ func (n *ReferenceNode) Format(buf *bytes.Buffer, indent string, onNewLine bool)
 }
 func (n *ReferenceNode) SetComment(c *CommentNode) {
 	n.Comment = c
+}
+func (n *ReferenceNode) Equal(o interface{}) bool {
+	if on, ok := o.(*ReferenceNode); ok {
+		return n.Reference == on.Reference
+	}
+	return false
 }
 
 //Holds the textual representation of a string literal
@@ -526,6 +637,67 @@ func (n *StringNode) SetComment(c *CommentNode) {
 	n.Comment = c
 }
 
+func (n *StringNode) Equal(o interface{}) bool {
+	if on, ok := o.(*StringNode); ok {
+		return n.Literal == on.Literal
+	}
+	return false
+}
+
+//Holds the list of other nodes
+type ListNode struct {
+	position
+	Nodes   []Node
+	Comment *CommentNode
+}
+
+func newList(p position, nodes []Node, c *CommentNode) *ListNode {
+	return &ListNode{
+		position: p,
+		Nodes:    nodes,
+		Comment:  c,
+	}
+}
+
+func (n *ListNode) String() string {
+	return fmt.Sprintf("ListNode@%v{%v}%v", n.position, n.Nodes, n.Comment)
+}
+
+func (n *ListNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
+	if n.Comment != nil {
+		n.Comment.Format(buf, indent, onNewLine)
+		onNewLine = true
+	}
+	writeIndent(buf, indent, onNewLine)
+	buf.WriteByte('[')
+	for i, sn := range n.Nodes {
+		if i != 0 {
+			buf.WriteString(", ")
+		}
+		sn.Format(buf, indent, onNewLine)
+
+	}
+	buf.WriteByte(']')
+}
+func (n *ListNode) SetComment(c *CommentNode) {
+	n.Comment = c
+}
+
+func (n *ListNode) Equal(o interface{}) bool {
+	if on, ok := o.(*ListNode); ok {
+		if len(n.Nodes) != len(on.Nodes) {
+			return false
+		}
+		for i := range n.Nodes {
+			if !n.Nodes[i].Equal(on.Nodes[i]) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
 //Holds the textual representation of a regex literal
 type RegexNode struct {
 	position
@@ -581,6 +753,12 @@ func (n *RegexNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
 func (n *RegexNode) SetComment(c *CommentNode) {
 	n.Comment = c
 }
+func (n *RegexNode) Equal(o interface{}) bool {
+	if on, ok := o.(*RegexNode); ok {
+		return n.Regex.String() == on.Regex.String()
+	}
+	return false
+}
 
 // Represents a standalone '*' token.
 type StarNode struct {
@@ -611,24 +789,29 @@ func (n *StarNode) SetComment(c *CommentNode) {
 	n.Comment = c
 }
 
-type funcType int
+func (n *StarNode) Equal(o interface{}) bool {
+	_, ok := o.(*StarNode)
+	return ok
+}
+
+type FuncType int
 
 const (
-	globalFunc funcType = iota
-	chainFunc
-	propertyFunc
-	dynamicFunc
+	GlobalFunc FuncType = iota
+	ChainFunc
+	PropertyFunc
+	DynamicFunc
 )
 
-func (ft funcType) String() string {
+func (ft FuncType) String() string {
 	switch ft {
-	case globalFunc:
+	case GlobalFunc:
 		return "global"
-	case chainFunc:
+	case ChainFunc:
 		return "chain"
-	case propertyFunc:
+	case PropertyFunc:
 		return "property"
-	case dynamicFunc:
+	case DynamicFunc:
 		return "dynamic"
 	default:
 		return "unknown"
@@ -638,14 +821,14 @@ func (ft funcType) String() string {
 //Holds the a function call with its args
 type FunctionNode struct {
 	position
-	Type      funcType
+	Type      FuncType
 	Func      string // The identifier
 	Args      []Node
 	Comment   *CommentNode
 	MultiLine bool
 }
 
-func newFunc(p position, ft funcType, ident string, args []Node, multi bool, c *CommentNode) *FunctionNode {
+func newFunc(p position, ft FuncType, ident string, args []Node, multi bool, c *CommentNode) *FunctionNode {
 	return &FunctionNode{
 		position:  p,
 		Type:      ft,
@@ -691,24 +874,38 @@ func (n *FunctionNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) 
 func (n *FunctionNode) SetComment(c *CommentNode) {
 	n.Comment = c
 }
+func (n *FunctionNode) Equal(o interface{}) bool {
+	if on, ok := o.(*FunctionNode); ok {
+		if n.Type != on.Type || n.Func != on.Func || len(n.Args) != len(on.Args) {
+			return false
+		}
+		for i := range n.Args {
+			if !n.Args[i].Equal(on.Args[i]) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
 
 // Represents the beginning of a lambda expression
 type LambdaNode struct {
 	position
-	Node    Node
-	Comment *CommentNode
+	Expression Node
+	Comment    *CommentNode
 }
 
 func newLambda(p position, node Node, c *CommentNode) *LambdaNode {
 	return &LambdaNode{
-		position: p,
-		Node:     node,
-		Comment:  c,
+		position:   p,
+		Expression: node,
+		Comment:    c,
 	}
 }
 
 func (n *LambdaNode) String() string {
-	return fmt.Sprintf("LambdaNode@%v{%v}%v", n.position, n.Node, n.Comment)
+	return fmt.Sprintf("LambdaNode@%v{%v}%v", n.position, n.Expression, n.Comment)
 }
 
 func (n *LambdaNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
@@ -718,33 +915,48 @@ func (n *LambdaNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
 	}
 	writeIndent(buf, indent, onNewLine)
 	buf.WriteString("lambda: ")
-	n.Node.Format(buf, indent, false)
+	n.Expression.Format(buf, indent, false)
 }
 func (n *LambdaNode) SetComment(c *CommentNode) {
 	n.Comment = c
 }
+func (n *LambdaNode) Equal(o interface{}) bool {
+	if on, ok := o.(*LambdaNode); ok {
+		return (n == nil && on == nil) || n.Expression.Equal(on.Expression)
+	}
+	return false
+}
+
+func (n *LambdaNode) ExpressionString() string {
+	if n.Expression == nil {
+		return ""
+	}
+	var buf bytes.Buffer
+	n.Expression.Format(&buf, "", true)
+	return buf.String()
+}
 
 //Holds a function call with its args
-type ListNode struct {
+type ProgramNode struct {
 	position
 	Nodes []Node
 }
 
-func newList(p position) *ListNode {
-	return &ListNode{
+func newProgram(p position) *ProgramNode {
+	return &ProgramNode{
 		position: p,
 	}
 }
 
-func (n *ListNode) Add(node Node) {
+func (n *ProgramNode) Add(node Node) {
 	n.Nodes = append(n.Nodes, node)
 }
 
-func (n *ListNode) String() string {
-	return fmt.Sprintf("ListNode@%v{%v}", n.position, n.Nodes)
+func (n *ProgramNode) String() string {
+	return fmt.Sprintf("ProgramNode@%v{%v}", n.position, n.Nodes)
 }
 
-func (n *ListNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
+func (n *ProgramNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
 	for i, node := range n.Nodes {
 		if i != 0 {
 			buf.WriteByte('\n')
@@ -752,6 +964,21 @@ func (n *ListNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
 		node.Format(buf, indent, true)
 		buf.WriteByte('\n')
 	}
+}
+
+func (n *ProgramNode) Equal(o interface{}) bool {
+	if on, ok := o.(*ProgramNode); ok {
+		if len(n.Nodes) != len(on.Nodes) {
+			return false
+		}
+		for i := range n.Nodes {
+			if !n.Nodes[i].Equal(on.Nodes[i]) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }
 
 // Hold the contents of a comment
@@ -788,4 +1015,14 @@ func (n *CommentNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
 		}
 		buf.WriteByte('\n')
 	}
+}
+
+func (n *CommentNode) CommentString() string {
+	return strings.Join(n.Comments, "\n")
+}
+
+func (n *CommentNode) Equal(o interface{}) bool {
+	// We only care about functional equivalence so actual comment contents do not matter.
+	_, ok := o.(*CommentNode)
+	return ok
 }

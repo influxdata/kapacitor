@@ -289,31 +289,31 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 	an.scopePools = make([]stateful.ScopePool, CritAlert+1)
 
 	if n.Info != nil {
-		statefulExpression, expressionCompileError := stateful.NewExpression(n.Info)
+		statefulExpression, expressionCompileError := stateful.NewExpression(n.Info.Expression)
 		if expressionCompileError != nil {
 			return nil, fmt.Errorf("Failed to compile stateful expression for info: %s", expressionCompileError)
 		}
 
 		an.levels[InfoAlert] = statefulExpression
-		an.scopePools[InfoAlert] = stateful.NewScopePool(stateful.FindReferenceVariables(n.Info))
+		an.scopePools[InfoAlert] = stateful.NewScopePool(stateful.FindReferenceVariables(n.Info.Expression))
 	}
 
 	if n.Warn != nil {
-		statefulExpression, expressionCompileError := stateful.NewExpression(n.Warn)
+		statefulExpression, expressionCompileError := stateful.NewExpression(n.Warn.Expression)
 		if expressionCompileError != nil {
 			return nil, fmt.Errorf("Failed to compile stateful expression for warn: %s", expressionCompileError)
 		}
 		an.levels[WarnAlert] = statefulExpression
-		an.scopePools[WarnAlert] = stateful.NewScopePool(stateful.FindReferenceVariables(n.Warn))
+		an.scopePools[WarnAlert] = stateful.NewScopePool(stateful.FindReferenceVariables(n.Warn.Expression))
 	}
 
 	if n.Crit != nil {
-		statefulExpression, expressionCompileError := stateful.NewExpression(n.Crit)
+		statefulExpression, expressionCompileError := stateful.NewExpression(n.Crit.Expression)
 		if expressionCompileError != nil {
 			return nil, fmt.Errorf("Failed to compile stateful expression for crit: %s", expressionCompileError)
 		}
 		an.levels[CritAlert] = statefulExpression
-		an.scopePools[CritAlert] = stateful.NewScopePool(stateful.FindReferenceVariables(n.Crit))
+		an.scopePools[CritAlert] = stateful.NewScopePool(stateful.FindReferenceVariables(n.Crit.Expression))
 	}
 
 	// Setup states

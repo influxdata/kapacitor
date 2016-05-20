@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/influxdata/kapacitor/tick"
+	"github.com/influxdata/kapacitor/tick/stateful"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -34,8 +34,8 @@ w.every(1s)
 
 	d := deadman{}
 
-	scope := tick.NewScope()
-	p, err := CreatePipeline(tickScript, StreamEdge, scope, d)
+	scope := stateful.NewScope()
+	p, err := CreatePipeline(tickScript, StreamEdge, scope, d, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

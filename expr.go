@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor/models"
-	"github.com/influxdata/kapacitor/tick"
 	"github.com/influxdata/kapacitor/tick/stateful"
 )
 
@@ -26,7 +25,7 @@ func EvalPredicate(se stateful.Expression, scopePool stateful.ScopePool, now tim
 }
 
 // fillScope - given a scope and reference variables, we fill the exact variables from the now, fields and tags.
-func fillScope(vars *tick.Scope, referenceVariables []string, now time.Time, fields models.Fields, tags models.Tags) error {
+func fillScope(vars *stateful.Scope, referenceVariables []string, now time.Time, fields models.Fields, tags models.Tags) error {
 	for _, refVariableName := range referenceVariables {
 		if refVariableName == "time" {
 			vars.Set("time", now.Local())

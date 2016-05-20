@@ -55,26 +55,30 @@ string_lit          = `'` { unicode_char } `'` .
 star_lit            = "*"
 regex_lit           = `/` { unicode_char } `/` .
 
-operator_lit       = "+" | "-" | "*" | "/" | "==" | "!=" |
-                     "<" | "<=" | ">" | ">=" | "=~" | "!~" |
-                     "AND" | "OR" .
+operator_lit        = "+" | "-" | "*" | "/" | "==" | "!=" |
+                      "<" | "<=" | ">" | ">=" | "=~" | "!~" |
+                      "!" | "AND" | "OR" .
 
-Program      = Statement { Statement } .
-Statement    = Declaration | Expression .
-Declaration  = "var" identifier "=" Expression .
-Expression   = identifier { Chain } | Function { Chain } | Primary .
-Chain        = "@" Function | "|" Function { Chain } | "." Function { Chain} | "." identifier { Chain } .
-Function     = identifier "(" Parameters ")" .
-Parameters   = { Parameter "," } [ Parameter ] .
-Parameter    = Expression | "lambda:" BinaryExpr | Primary .
-Primary      = "(" BinaryExpr ")" | number_lit | string_lit |
-                boolean_lit | duration_lit | regex_lit | star_lit |
-                LFunc | identifier | Reference | "-" Primary | "!" Primary .
-Reference    = `"` { unicode_char } `"` .
-BinaryExpr   =  Primary  { operator_lit Primary} .
-LFunc        = identifier "(" LParameters ")"
-LParameters  = { LParameter "," } [ LParameter ] .
-LParameter   = BinaryExpr |  Primary .
+Program           = Statement { Statement } .
+Statement         = TypeDeclaration | Declaration | Expression .
+TypeDeclaration   = "var" identifier identifier .
+Declaration       = "var" identifier "=" Expression .
+Expression        = identifier { Chain } | Function { Chain } | PrimaryExpr | StringList .
+Chain             = "@" Function | "|" Function { Chain } | "." Function { Chain} | "." identifier { Chain } .
+PrimaryExpr       = Primary { operator_lit Primary} .
+Function          = identifier "(" Parameters ")" .
+Parameters        = { Parameter "," } [ Parameter ] .
+Parameter         = Expression | "lambda:" PrimaryExpr | PrimaryExpr .
+Primary           = "(" PrimaryExpr ")" | number_lit | string_lit |
+                     boolean_lit | duration_lit | regex_lit | star_lit |
+                     PrimaryFuncFunc | identifier | Reference | "-" Primary | "!" Primary .
+Reference         = `"` { unicode_char } `"` .
+PrimaryFunc       = identifier "(" PrimaryParameters ")"
+PrimaryParameters = { PrimaryParameter "," } [ PrimaryParameter ] .
+PrimaryParameter  = PrimaryExpr .
+StringList        = "[" StringListItems "]" .
+StringListItems   = { StringListItem "," } [ StringListItem ]
+StringListItem    = string_lit | identifier | star_lit .
 
 ```
 
