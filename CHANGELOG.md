@@ -21,7 +21,7 @@ kapacitor replay-live query -task cpu_alert -query 'SELECT usage_idle FROM teleg
 
 - [#283](https://github.com/influxdata/kapacitor/issues/283): Add live replays.
 - [#500](https://github.com/influxdata/kapacitor/issues/500): Support Float,Integer,String and Boolean types.
-- [#82](https://github.com/influxdata/kapacitor/issues/82): Multiple services for PagerDuty alert
+- [#82](https://github.com/influxdata/kapacitor/issues/82): Multiple services for PagerDuty alert.
 - [#558](https://github.com/influxdata/kapacitor/pull/558): Preserve fields as well as tags on selector InfluxQL functions.
 
 
@@ -30,6 +30,7 @@ kapacitor replay-live query -task cpu_alert -query 'SELECT usage_idle FROM teleg
 - [#540](https://github.com/influxdata/kapacitor/issues/540): Fixes bug with log level API endpoint.
 - [#521](https://github.com/influxdata/kapacitor/issues/521): EvalNode now honors groups.
 - [#561](https://github.com/influxdata/kapacitor/issues/561): Fixes bug when lambda expressions would return error about types with nested binary expressions.
+- [#555](https://github.com/influxdata/kapacitor/issues/555): Fixes bug where "time" functions didn't work in lambda expressions.
 
 ## v0.13.1 [2016-05-13]
 

@@ -1,8 +1,8 @@
 package stateful
 
 import (
-	"reflect"
 	"regexp"
+	"time"
 
 	"github.com/influxdata/kapacitor/tick"
 )
@@ -16,6 +16,7 @@ const (
 	TString
 	TBool
 	TRegex
+	TTime
 )
 
 const TNumeric = TFloat64 & TInt64
@@ -36,29 +37,31 @@ func (v ValueType) String() string {
 		return "boolean"
 	case TRegex:
 		return "regex"
+	case TTime:
+		return "time"
 	}
 
 	return "invalid type"
 }
 
-func valueTypeOf(t reflect.Type) ValueType {
-	if t == nil {
+func valueTypeOf(v interface{}) ValueType {
+	if v == nil {
 		return InvalidType
 	}
-	switch t.Kind() {
-	case reflect.Float64:
+	switch v.(type) {
+	case float64:
 		return TFloat64
-	case reflect.Int64:
+	case int64:
 		return TInt64
-	case reflect.String:
+	case string:
 		return TString
-	case reflect.Bool:
+	case bool:
 		return TBool
+	case *regexp.Regexp:
+		return TRegex
+	case time.Time:
+		return TTime
 	default:
-		// This is not primitive type.. so it must be regex
-		if t == reflect.TypeOf((*regexp.Regexp)(nil)) {
-			return TRegex
-		}
 		return InvalidType
 	}
 }

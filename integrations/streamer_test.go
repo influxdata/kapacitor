@@ -667,6 +667,53 @@ stream
 	testStreamerWithOutput(t, "TestStream_EvalGroups", script, 3*time.Second, er, nil, false)
 }
 
+func TestStream_Eval_Time(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('types')
+		.groupBy('group')
+	|log()
+	|eval(lambda: hour("time"))
+		.as('hour')
+	|httpOut('TestStream_Eval_Time')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "types",
+				Tags:    map[string]string{"group": "A"},
+				Columns: []string{"time", "hour"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 1, 0, 0, 0, time.UTC),
+						6.0,
+					},
+				},
+			},
+			{
+				Name:    "types",
+				Tags:    map[string]string{"group": "B"},
+				Columns: []string{"time", "hour"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 1, 0, 0, 0, time.UTC),
+						6.0,
+					},
+				},
+			},
+		},
+	}
+
+	// The hour function is local time zone specific
+	// set a fixed zone for testing.
+	local := time.Local
+	time.Local = time.FixedZone("test", 5*60*60)
+	testStreamerWithOutput(t, "TestStream_Eval_Time", script, 2*time.Hour, er, nil, false)
+	// Restore the normal local timezone.
+	time.Local = local
+}
+
 func TestStream_Default(t *testing.T) {
 	var script = `
 stream

@@ -2,8 +2,8 @@ package stateful
 
 import (
 	"fmt"
-	"reflect"
 	"regexp"
+	"time"
 
 	"github.com/influxdata/kapacitor/tick"
 )
@@ -40,7 +40,7 @@ func (n *EvalFunctionNode) Type(scope ReadOnlyScope, executionState ExecutionSta
 
 	// We can't cache here the result (although it's very tempting ;))
 	// because can't trust function to return always the same consistent type
-	return valueTypeOf(reflect.TypeOf(result)), nil
+	return valueTypeOf(result), nil
 }
 
 // callFunction - core method for evaluating function where all NodeEvaluator methods should use
@@ -79,7 +79,20 @@ func (n *EvalFunctionNode) EvalRegex(scope *tick.Scope, executionState Execution
 		return regexValue, nil
 	}
 
-	return nil, ErrTypeGuardFailed{RequestedType: TRegex, ActualType: valueTypeOf(reflect.TypeOf(refValue))}
+	return nil, ErrTypeGuardFailed{RequestedType: TRegex, ActualType: valueTypeOf(refValue)}
+}
+
+func (n *EvalFunctionNode) EvalTime(scope *tick.Scope, executionState ExecutionState) (time.Time, error) {
+	refValue, err := n.callFunction(scope, executionState)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	if timeValue, isTime := refValue.(time.Time); isTime {
+		return timeValue, nil
+	}
+
+	return time.Time{}, ErrTypeGuardFailed{RequestedType: TTime, ActualType: valueTypeOf(refValue)}
 }
 
 func (n *EvalFunctionNode) EvalString(scope *tick.Scope, executionState ExecutionState) (string, error) {
@@ -92,7 +105,7 @@ func (n *EvalFunctionNode) EvalString(scope *tick.Scope, executionState Executio
 		return stringValue, nil
 	}
 
-	return "", ErrTypeGuardFailed{RequestedType: TString, ActualType: valueTypeOf(reflect.TypeOf(refValue))}
+	return "", ErrTypeGuardFailed{RequestedType: TString, ActualType: valueTypeOf(refValue)}
 }
 
 func (n *EvalFunctionNode) EvalFloat(scope *tick.Scope, executionState ExecutionState) (float64, error) {
@@ -105,7 +118,7 @@ func (n *EvalFunctionNode) EvalFloat(scope *tick.Scope, executionState Execution
 		return float64Value, nil
 	}
 
-	return float64(0), ErrTypeGuardFailed{RequestedType: TFloat64, ActualType: valueTypeOf(reflect.TypeOf(refValue))}
+	return float64(0), ErrTypeGuardFailed{RequestedType: TFloat64, ActualType: valueTypeOf(refValue)}
 }
 
 func (n *EvalFunctionNode) EvalInt(scope *tick.Scope, executionState ExecutionState) (int64, error) {
@@ -118,7 +131,7 @@ func (n *EvalFunctionNode) EvalInt(scope *tick.Scope, executionState ExecutionSt
 		return int64Value, nil
 	}
 
-	return int64(0), ErrTypeGuardFailed{RequestedType: TInt64, ActualType: valueTypeOf(reflect.TypeOf(refValue))}
+	return int64(0), ErrTypeGuardFailed{RequestedType: TInt64, ActualType: valueTypeOf(refValue)}
 }
 
 func (n *EvalFunctionNode) EvalBool(scope *tick.Scope, executionState ExecutionState) (bool, error) {
@@ -131,7 +144,7 @@ func (n *EvalFunctionNode) EvalBool(scope *tick.Scope, executionState ExecutionS
 		return boolValue, nil
 	}
 
-	return false, ErrTypeGuardFailed{RequestedType: TBool, ActualType: valueTypeOf(reflect.TypeOf(refValue))}
+	return false, ErrTypeGuardFailed{RequestedType: TBool, ActualType: valueTypeOf(refValue)}
 }
 
 // eval - generic evaluation until we have reflection/introspection capabillities so we can know the type of args
@@ -153,6 +166,8 @@ func eval(n NodeEvaluator, scope *tick.Scope, executionState ExecutionState) (in
 		return n.EvalString(scope, executionState)
 	case TRegex:
 		return n.EvalRegex(scope, executionState)
+	case TTime:
+		return n.EvalTime(scope, executionState)
 	default:
 		return nil, fmt.Errorf("expression returned unexpected type %s", retType)
 	}

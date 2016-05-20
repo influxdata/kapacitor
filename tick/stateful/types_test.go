@@ -2,7 +2,6 @@ package stateful
 
 import (
 	"errors"
-	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -26,7 +25,7 @@ func Test_valueTypeOf(t *testing.T) {
 	}
 
 	for _, expect := range expectations {
-		result := valueTypeOf(reflect.TypeOf(expect.value))
+		result := valueTypeOf(expect.value)
 
 		if result != expect.valueType {
 			t.Errorf("Got unexpected result for valueTypeOf(%T):\ngot: %s\nexpected: %s", expect.value, result, expect.valueType)

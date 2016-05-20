@@ -2,8 +2,8 @@ package stateful
 
 import (
 	"fmt"
-	"reflect"
 	"regexp"
+	"time"
 
 	"github.com/influxdata/kapacitor/tick"
 )
@@ -31,7 +31,7 @@ func (n *EvalReferenceNode) Type(scope ReadOnlyScope, executionState ExecutionSt
 		return InvalidType, err
 	}
 
-	return valueTypeOf(reflect.TypeOf(value)), nil
+	return valueTypeOf(value), nil
 }
 
 func (n *EvalReferenceNode) EvalRegex(scope *tick.Scope, executionState ExecutionState) (*regexp.Regexp, error) {
@@ -44,7 +44,20 @@ func (n *EvalReferenceNode) EvalRegex(scope *tick.Scope, executionState Executio
 		return regexValue, nil
 	}
 
-	return nil, ErrTypeGuardFailed{RequestedType: TRegex, ActualType: valueTypeOf(reflect.TypeOf(refValue))}
+	return nil, ErrTypeGuardFailed{RequestedType: TRegex, ActualType: valueTypeOf(refValue)}
+}
+
+func (n *EvalReferenceNode) EvalTime(scope *tick.Scope, executionState ExecutionState) (time.Time, error) {
+	refValue, err := n.getReferenceValue(scope, executionState)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	if timeValue, isTime := refValue.(time.Time); isTime {
+		return timeValue, nil
+	}
+
+	return time.Time{}, ErrTypeGuardFailed{RequestedType: TTime, ActualType: valueTypeOf(refValue)}
 }
 
 func (n *EvalReferenceNode) EvalString(scope *tick.Scope, executionState ExecutionState) (string, error) {
@@ -57,7 +70,7 @@ func (n *EvalReferenceNode) EvalString(scope *tick.Scope, executionState Executi
 		return stringValue, nil
 	}
 
-	return "", ErrTypeGuardFailed{RequestedType: TString, ActualType: valueTypeOf(reflect.TypeOf(refValue))}
+	return "", ErrTypeGuardFailed{RequestedType: TString, ActualType: valueTypeOf(refValue)}
 }
 
 func (n *EvalReferenceNode) EvalFloat(scope *tick.Scope, executionState ExecutionState) (float64, error) {
@@ -70,7 +83,7 @@ func (n *EvalReferenceNode) EvalFloat(scope *tick.Scope, executionState Executio
 		return float64Value, nil
 	}
 
-	return float64(0), ErrTypeGuardFailed{RequestedType: TFloat64, ActualType: valueTypeOf(reflect.TypeOf(refValue))}
+	return float64(0), ErrTypeGuardFailed{RequestedType: TFloat64, ActualType: valueTypeOf(refValue)}
 }
 
 func (n *EvalReferenceNode) EvalInt(scope *tick.Scope, executionState ExecutionState) (int64, error) {
@@ -83,7 +96,7 @@ func (n *EvalReferenceNode) EvalInt(scope *tick.Scope, executionState ExecutionS
 		return int64Value, nil
 	}
 
-	return int64(0), ErrTypeGuardFailed{RequestedType: TInt64, ActualType: valueTypeOf(reflect.TypeOf(refValue))}
+	return int64(0), ErrTypeGuardFailed{RequestedType: TInt64, ActualType: valueTypeOf(refValue)}
 }
 
 func (n *EvalReferenceNode) EvalBool(scope *tick.Scope, executionState ExecutionState) (bool, error) {
@@ -96,5 +109,5 @@ func (n *EvalReferenceNode) EvalBool(scope *tick.Scope, executionState Execution
 		return boolValue, nil
 	}
 
-	return false, ErrTypeGuardFailed{RequestedType: TBool, ActualType: valueTypeOf(reflect.TypeOf(refValue))}
+	return false, ErrTypeGuardFailed{RequestedType: TBool, ActualType: valueTypeOf(refValue)}
 }
