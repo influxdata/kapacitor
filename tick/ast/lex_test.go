@@ -249,8 +249,7 @@ func TestLexer(t *testing.T) {
 		{
 			in: ".421",
 			tokens: []token{
-				token{TokenDot, 0, "."},
-				token{TokenNumber, 1, "421"},
+				token{TokenNumber, 0, ".421"},
 				token{TokenEOF, 4, ""},
 			},
 		},
@@ -267,28 +266,6 @@ func TestLexer(t *testing.T) {
 			tokens: []token{
 				token{TokenDuration, 0, "42s"},
 				token{TokenEOF, 3, ""},
-			},
-		},
-		{
-			in: "42.21m",
-			tokens: []token{
-				token{TokenDuration, 0, "42.21m"},
-				token{TokenEOF, 6, ""},
-			},
-		},
-		{
-			in: ".421h",
-			tokens: []token{
-				token{TokenDot, 0, "."},
-				token{TokenDuration, 1, "421h"},
-				token{TokenEOF, 5, ""},
-			},
-		},
-		{
-			in: "0.421s",
-			tokens: []token{
-				token{TokenDuration, 0, "0.421s"},
-				token{TokenEOF, 6, ""},
 			},
 		},
 		{

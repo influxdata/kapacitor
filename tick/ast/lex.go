@@ -324,9 +324,9 @@ func lexToken(l *lexer) stateFn {
 		case isOperatorChar(r):
 			l.backup()
 			return lexOperator
-		case unicode.IsDigit(r), r == '-':
+		case unicode.IsDigit(r), r == '-', r == '.':
 			l.backup()
-			return lexNumberOrDuration
+			return lexNumberOrDurationOrDot
 		case unicode.IsLetter(r):
 			return lexIdentOrKeyword
 		case r == '"':
@@ -347,9 +347,6 @@ func lexToken(l *lexer) stateFn {
 			return lexToken
 		case r == ']':
 			l.emit(TokenRSBracket)
-			return lexToken
-		case r == '.':
-			l.emit(TokenDot)
 			return lexToken
 		case r == '|':
 			l.emit(TokenPipe)
@@ -473,18 +470,23 @@ func isDurUnit(r rune) bool {
 	return strings.IndexRune(durationUnits, r) != -1
 }
 
-func lexNumberOrDuration(l *lexer) stateFn {
+func lexNumberOrDurationOrDot(l *lexer) stateFn {
 	foundDecimal := false
+	first := true
 	for {
 		switch r := l.next(); {
 		case r == '.':
+			if first && !unicode.IsDigit(l.peek()) {
+				l.emit(TokenDot)
+				return lexToken
+			}
 			if foundDecimal {
 				return l.errorf("multiple decimals in number")
 			}
 			foundDecimal = true
 		case unicode.IsDigit(r):
 			//absorb
-		case isDurUnit(r):
+		case !foundDecimal && isDurUnit(r):
 			if r == 'm' && l.peek() == 's' {
 				l.next()
 			}
@@ -495,6 +497,7 @@ func lexNumberOrDuration(l *lexer) stateFn {
 			l.emit(TokenNumber)
 			return lexToken
 		}
+		first = false
 	}
 }
 

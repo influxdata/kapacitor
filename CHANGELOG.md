@@ -104,6 +104,7 @@ kapacitor replay-live query -task cpu_alert -query 'SELECT usage_idle FROM teleg
 - [#561](https://github.com/influxdata/kapacitor/issues/561): Fixes bug when lambda expressions would return error about types with nested binary expressions.
 - [#555](https://github.com/influxdata/kapacitor/issues/555): Fixes bug where "time" functions didn't work in lambda expressions.
 - [#570](https://github.com/influxdata/kapacitor/issues/570): Removes panic in SMTP service on failed close connection.
+- [#587](https://github.com/influxdata/kapacitor/issues/587): Allow number literals without leading zeros.
 
 ## v0.13.1 [2016-05-13]
 
