@@ -26,7 +26,7 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalBool(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		// Short circuit evaluation
@@ -35,7 +35,7 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		}
 
 		if right, err = rightNode.EvalBool(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left && right, IsBoolValue: true}, nil
@@ -48,7 +48,7 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalBool(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		// Short circuit evaluation
@@ -57,7 +57,7 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		}
 
 		if right, err = rightNode.EvalBool(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left || right, IsBoolValue: true}, nil
@@ -70,11 +70,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalBool(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalBool(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left == right, IsBoolValue: true}, nil
@@ -86,11 +86,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalBool(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalBool(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left != right, IsBoolValue: true}, nil
@@ -102,11 +102,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalFloat(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalFloat(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left < right, IsBoolValue: true}, nil
@@ -119,11 +119,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalInt(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalInt(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left <= right, IsBoolValue: true}, nil
@@ -136,11 +136,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalInt(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalFloat(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: float64(left) != right, IsBoolValue: true}, nil
@@ -153,11 +153,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalInt(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalInt(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left >= right, IsBoolValue: true}, nil
@@ -170,11 +170,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalFloat(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalFloat(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left == right, IsBoolValue: true}, nil
@@ -187,11 +187,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalInt(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalInt(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left != right, IsBoolValue: true}, nil
@@ -204,11 +204,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalFloat(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalFloat(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left != right, IsBoolValue: true}, nil
@@ -221,11 +221,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalFloat(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalFloat(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left <= right, IsBoolValue: true}, nil
@@ -238,11 +238,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalInt(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalInt(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left == right, IsBoolValue: true}, nil
@@ -255,11 +255,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalInt(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalInt(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left > right, IsBoolValue: true}, nil
@@ -272,11 +272,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalFloat(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalInt(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left > float64(right), IsBoolValue: true}, nil
@@ -289,11 +289,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalFloat(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalInt(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left >= float64(right), IsBoolValue: true}, nil
@@ -306,11 +306,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalFloat(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalInt(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left == float64(right), IsBoolValue: true}, nil
@@ -323,11 +323,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalInt(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalFloat(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: float64(left) <= right, IsBoolValue: true}, nil
@@ -340,11 +340,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalInt(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalFloat(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: float64(left) == right, IsBoolValue: true}, nil
@@ -357,11 +357,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalFloat(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalInt(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left != float64(right), IsBoolValue: true}, nil
@@ -374,11 +374,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalFloat(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalInt(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left < float64(right), IsBoolValue: true}, nil
@@ -391,11 +391,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalInt(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalInt(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left < right, IsBoolValue: true}, nil
@@ -408,11 +408,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalFloat(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalFloat(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left >= right, IsBoolValue: true}, nil
@@ -425,11 +425,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalFloat(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalFloat(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left > right, IsBoolValue: true}, nil
@@ -442,11 +442,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalFloat(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalInt(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left <= float64(right), IsBoolValue: true}, nil
@@ -459,11 +459,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalInt(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalFloat(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: float64(left) >= right, IsBoolValue: true}, nil
@@ -476,11 +476,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalInt(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalFloat(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: float64(left) > right, IsBoolValue: true}, nil
@@ -493,11 +493,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalInt(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalFloat(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: float64(left) < right, IsBoolValue: true}, nil
@@ -510,11 +510,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalString(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalString(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left > right, IsBoolValue: true}, nil
@@ -527,11 +527,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalString(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalString(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left >= right, IsBoolValue: true}, nil
@@ -544,11 +544,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalString(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalString(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left < right, IsBoolValue: true}, nil
@@ -561,11 +561,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalString(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalString(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left <= right, IsBoolValue: true}, nil
@@ -578,11 +578,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalString(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalString(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left == right, IsBoolValue: true}, nil
@@ -595,11 +595,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalString(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalString(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: left != right, IsBoolValue: true}, nil
@@ -612,11 +612,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalString(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalRegex(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: !right.MatchString(left), IsBoolValue: true}, nil
@@ -629,11 +629,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalString(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalRegex(scope, executionState); err != nil {
-			return boolFalseResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return boolFalseResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{BoolValue: right.MatchString(left), IsBoolValue: true}, nil
@@ -649,11 +649,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalFloat(scope, executionState); err != nil {
-			return emptyResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return emptyResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalFloat(scope, executionState); err != nil {
-			return emptyResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return emptyResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{Float64Value: left + right, IsFloat64Value: true}, nil
@@ -665,11 +665,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalFloat(scope, executionState); err != nil {
-			return emptyResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return emptyResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalFloat(scope, executionState); err != nil {
-			return emptyResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return emptyResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{Float64Value: left - right, IsFloat64Value: true}, nil
@@ -681,11 +681,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalFloat(scope, executionState); err != nil {
-			return emptyResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return emptyResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalFloat(scope, executionState); err != nil {
-			return emptyResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return emptyResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{Float64Value: left * right, IsFloat64Value: true}, nil
@@ -697,11 +697,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalFloat(scope, executionState); err != nil {
-			return emptyResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return emptyResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalFloat(scope, executionState); err != nil {
-			return emptyResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return emptyResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{Float64Value: left / right, IsFloat64Value: true}, nil
@@ -713,11 +713,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalInt(scope, executionState); err != nil {
-			return emptyResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return emptyResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalInt(scope, executionState); err != nil {
-			return emptyResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return emptyResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{Int64Value: left + right, IsInt64Value: true}, nil
@@ -729,11 +729,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalInt(scope, executionState); err != nil {
-			return emptyResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return emptyResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalInt(scope, executionState); err != nil {
-			return emptyResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return emptyResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{Int64Value: left - right, IsInt64Value: true}, nil
@@ -745,11 +745,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalInt(scope, executionState); err != nil {
-			return emptyResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return emptyResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalInt(scope, executionState); err != nil {
-			return emptyResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return emptyResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{Int64Value: left * right, IsInt64Value: true}, nil
@@ -761,11 +761,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalInt(scope, executionState); err != nil {
-			return emptyResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return emptyResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalInt(scope, executionState); err != nil {
-			return emptyResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return emptyResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{Int64Value: left / right, IsInt64Value: true}, nil
@@ -777,11 +777,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalInt(scope, executionState); err != nil {
-			return emptyResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return emptyResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalInt(scope, executionState); err != nil {
-			return emptyResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return emptyResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{Int64Value: left % right, IsInt64Value: true}, nil
@@ -796,11 +796,11 @@ var evaluationFuncs = map[operationKey]evaluationFn{
 		var err error
 
 		if left, err = leftNode.EvalString(scope, executionState); err != nil {
-			return emptyResultContainer, &ErrSide{error: err, IsLeftSide: true}
+			return emptyResultContainer, &ErrSide{error: err, IsLeft: true}
 		}
 
 		if right, err = rightNode.EvalString(scope, executionState); err != nil {
-			return emptyResultContainer, &ErrSide{error: err, IsRightSide: true}
+			return emptyResultContainer, &ErrSide{error: err, IsRight: true}
 		}
 
 		return resultContainer{StringValue: left + right, IsStringValue: true}, nil

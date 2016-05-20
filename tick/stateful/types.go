@@ -109,7 +109,7 @@ func getConstantNodeType(n tick.Node) ValueType {
 				return TString
 			}
 		}
-		if tick.IsCompOperator(node.Operator) {
+		if tick.IsCompOperator(node.Operator) || tick.IsLogicalOperator(node.Operator) {
 			return TBool
 		}
 
@@ -145,18 +145,15 @@ func isDynamicNode(n tick.Node) bool {
 	switch node := n.(type) {
 	case *tick.ReferenceNode:
 		return true
-
 	case *tick.FunctionNode:
 		return true
-
 	case *tick.UnaryNode:
-		// unary if dynamic only if it's childs are dynamic
 		return isDynamicNode(node.Node)
-
+	case *tick.BinaryNode:
+		return isDynamicNode(node.Left) || isDynamicNode(node.Right)
 	default:
 		return false
 	}
-
 }
 
 // findNodeTypes returns the aggregative type of the nodes (it handles corner case like TNumeric)

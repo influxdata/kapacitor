@@ -29,6 +29,7 @@ kapacitor replay-live query -task cpu_alert -query 'SELECT usage_idle FROM teleg
 
 - [#540](https://github.com/influxdata/kapacitor/issues/540): Fixes bug with log level API endpoint.
 - [#521](https://github.com/influxdata/kapacitor/issues/521): EvalNode now honors groups.
+- [#561](https://github.com/influxdata/kapacitor/issues/561): Fixes bug when lambda expressions would return error about types with nested binary expressions.
 
 ## v0.13.1 [2016-05-13]
 

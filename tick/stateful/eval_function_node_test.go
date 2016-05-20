@@ -283,7 +283,7 @@ func TestEvalFunctionNode_ComplexNodes(t *testing.T) {
 func TestStatefulExpression_Integration_EvalBool_SanityCallingFunction(t *testing.T) {
 	scope := tick.NewScope()
 
-	se := mustCompileExpression(t, &tick.BinaryNode{
+	se := mustCompileExpression(&tick.BinaryNode{
 		Operator: tick.TokenEqual,
 		Left: &tick.FunctionNode{
 			Func: "count",

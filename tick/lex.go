@@ -51,11 +51,18 @@ const (
 	//end mathematical operators
 	end_tok_operator_math
 
-	// begin comparison operators
-	begin_tok_operator_comp
+	// begin logical operators
+	begin_tok_operator_logic
 
 	TokenAnd
 	TokenOr
+
+	// end logical operators
+	end_tok_operator_logic
+
+	// begin comparison operators
+	begin_tok_operator_comp
+
 	TokenEqual
 	TokenNotEqual
 	TokenLess
@@ -180,6 +187,10 @@ func IsMathOperator(typ TokenType) bool {
 // True if token type is an operator used in comparisons.
 func IsCompOperator(typ TokenType) bool {
 	return typ > begin_tok_operator_comp && typ < end_tok_operator_comp
+}
+
+func IsLogicalOperator(typ TokenType) bool {
+	return typ > begin_tok_operator_logic && typ < end_tok_operator_logic
 }
 
 // token represents a token or text string returned from the scanner.
