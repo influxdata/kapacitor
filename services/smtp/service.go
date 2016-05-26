@@ -88,7 +88,7 @@ func (s *Service) runMailer() {
 		case <-time.After(time.Duration(s.c.IdleTimeout)):
 			if open {
 				if err := conn.Close(); err != nil {
-					panic(err)
+					s.logger.Println("E! error closing connection to SMTP server:", err)
 				}
 				open = false
 			}
