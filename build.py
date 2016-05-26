@@ -764,12 +764,12 @@ def main(args):
         logging.info("Moving to git commit: {}".format(args.commit))
         run("git checkout {}".format(args.commit))
 
-    if not args.no_get:
-        if not go_get(args.branch, update=args.update, no_uncommitted=args.no_uncommitted):
-            return 1
-
     if args.generate:
         if not run_generate():
+            return 1
+
+    if not args.no_get:
+        if not go_get(args.branch, update=args.update, no_uncommitted=args.no_uncommitted):
             return 1
 
     if args.test:
