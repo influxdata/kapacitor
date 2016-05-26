@@ -17,6 +17,7 @@ const (
 	literalBeg
 	// IDENT and the following are InfluxQL literal tokens.
 	IDENT       // main
+	BOUNDPARAM  // $param
 	NUMBER      // 12345.67
 	INTEGER     // 12345
 	DURATIONVAL // 13h
@@ -49,12 +50,13 @@ const (
 	GTE      // >=
 	operatorEnd
 
-	LPAREN    // (
-	RPAREN    // )
-	COMMA     // ,
-	COLON     // :
-	SEMICOLON // ;
-	DOT       // .
+	LPAREN      // (
+	RPAREN      // )
+	COMMA       // ,
+	COLON       // :
+	DOUBLECOLON // ::
+	SEMICOLON   // ;
+	DOT         // .
 
 	keywordBeg
 	// ALL and the following are InfluxQL Keywords
@@ -83,7 +85,6 @@ const (
 	EXPLAIN
 	FIELD
 	FOR
-	FORCE
 	FROM
 	GRANT
 	GRANTS
@@ -92,7 +93,6 @@ const (
 	IF
 	IN
 	INF
-	INNER
 	INSERT
 	INTO
 	KEY
@@ -171,12 +171,13 @@ var tokens = [...]string{
 	GT:       ">",
 	GTE:      ">=",
 
-	LPAREN:    "(",
-	RPAREN:    ")",
-	COMMA:     ",",
-	COLON:     ":",
-	SEMICOLON: ";",
-	DOT:       ".",
+	LPAREN:      "(",
+	RPAREN:      ")",
+	COMMA:       ",",
+	COLON:       ":",
+	DOUBLECOLON: "::",
+	SEMICOLON:   ";",
+	DOT:         ".",
 
 	ALL:           "ALL",
 	ALTER:         "ALTER",
@@ -203,7 +204,6 @@ var tokens = [...]string{
 	EXPLAIN:       "EXPLAIN",
 	FIELD:         "FIELD",
 	FOR:           "FOR",
-	FORCE:         "FORCE",
 	FROM:          "FROM",
 	GRANT:         "GRANT",
 	GRANTS:        "GRANTS",
@@ -212,7 +212,6 @@ var tokens = [...]string{
 	IF:            "IF",
 	IN:            "IN",
 	INF:           "INF",
-	INNER:         "INNER",
 	INSERT:        "INSERT",
 	INTO:          "INTO",
 	KEY:           "KEY",

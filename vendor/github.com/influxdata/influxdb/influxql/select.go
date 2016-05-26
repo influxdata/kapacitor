@@ -38,11 +38,11 @@ func Select(stmt *SelectStatement, ic IteratorCreator, sopt *SelectOptions) ([]I
 	}
 
 	// Determine auxiliary fields to be selected.
-	opt.Aux = make([]string, 0, len(info.refs))
+	opt.Aux = make([]VarRef, 0, len(info.refs))
 	for ref := range info.refs {
-		opt.Aux = append(opt.Aux, ref.Val)
+		opt.Aux = append(opt.Aux, *ref)
 	}
-	sort.Strings(opt.Aux)
+	sort.Sort(VarRefs(opt.Aux))
 
 	// If there are multiple auxilary fields and no calls then construct an aux iterator.
 	if len(info.calls) == 0 && len(info.refs) > 0 {
@@ -55,7 +55,7 @@ func Select(stmt *SelectStatement, ic IteratorCreator, sopt *SelectOptions) ([]I
 		if call.Name == "top" || call.Name == "bottom" {
 			for i := 1; i < len(call.Args)-1; i++ {
 				ref := call.Args[i].(*VarRef)
-				opt.Aux = append(opt.Aux, ref.Val)
+				opt.Aux = append(opt.Aux, *ref)
 				extraFields++
 			}
 		}
@@ -117,14 +117,8 @@ func buildAuxIterators(fields Fields, ic IteratorCreator, opt IteratorOptions) (
 		input = NewLimitIterator(input, opt)
 	}
 
-	seriesKeys, err := ic.SeriesKeys(opt)
-	if err != nil {
-		input.Close()
-		return nil, err
-	}
-
 	// Wrap in an auxilary iterator to separate the fields.
-	aitr := NewAuxIterator(input, seriesKeys, opt)
+	aitr := NewAuxIterator(input, opt)
 
 	// Generate iterators for each field.
 	itrs := make([]Iterator, len(fields))
@@ -133,7 +127,7 @@ func buildAuxIterators(fields Fields, ic IteratorCreator, opt IteratorOptions) (
 			expr := Reduce(f.Expr, nil)
 			switch expr := expr.(type) {
 			case *VarRef:
-				itrs[i] = aitr.Iterator(expr.Val)
+				itrs[i] = aitr.Iterator(expr.Val, expr.Type)
 			case *BinaryExpr:
 				itr, err := buildExprIterator(expr, aitr, opt, false)
 				if err != nil {
@@ -188,14 +182,9 @@ func buildFieldIterators(fields Fields, ic IteratorCreator, opt IteratorOptions,
 			return nil
 		}
 
-		seriesKeys, err := ic.SeriesKeys(opt)
-		if err != nil {
-			return err
-		}
-
 		// Build the aux iterators. Previous validation should ensure that only one
 		// call was present so we build an AuxIterator from that input.
-		aitr := NewAuxIterator(input, seriesKeys, opt)
+		aitr := NewAuxIterator(input, opt)
 		for i, f := range fields {
 			if itrs[i] != nil {
 				itrs[i] = aitr
@@ -254,6 +243,23 @@ func buildExprIterator(expr Expr, ic IteratorCreator, opt IteratorOptions, selec
 				return nil, err
 			}
 			return NewIntervalIterator(input, opt), nil
+		case "holt_winters", "holt_winters_with_fit":
+			input, err := buildExprIterator(expr.Args[0], ic, opt, selector)
+			if err != nil {
+				return nil, err
+			}
+			h := expr.Args[1].(*IntegerLiteral)
+			m := expr.Args[2].(*IntegerLiteral)
+
+			includeFitData := "holt_winters_with_fit" == expr.Name
+
+			interval := opt.Interval.Duration
+			// Redifine interval to be unbounded to capture all aggregate results
+			opt.StartTime = MinTime
+			opt.EndTime = MaxTime
+			opt.Interval = Interval{}
+
+			return newHoltWintersIterator(input, opt, int(h.Val), int(m.Val), includeFitData, interval)
 		case "derivative", "non_negative_derivative", "difference", "moving_average", "elapsed":
 			if !opt.Interval.IsZero() {
 				if opt.Ascending {
@@ -348,8 +354,8 @@ func buildExprIterator(expr Expr, ic IteratorCreator, opt IteratorOptions, selec
 						// This section is O(n^2), but for what should be a low value.
 						for i := 1; i < len(expr.Args)-1; i++ {
 							ref := expr.Args[i].(*VarRef)
-							for index, name := range opt.Aux {
-								if name == ref.Val {
+							for index, aux := range opt.Aux {
+								if aux.Val == ref.Val {
 									tags = append(tags, index)
 									break
 								}
@@ -372,8 +378,8 @@ func buildExprIterator(expr Expr, ic IteratorCreator, opt IteratorOptions, selec
 						// This section is O(n^2), but for what should be a low value.
 						for i := 1; i < len(expr.Args)-1; i++ {
 							ref := expr.Args[i].(*VarRef)
-							for index, name := range opt.Aux {
-								if name == ref.Val {
+							for index, aux := range opt.Aux {
+								if aux.Val == ref.Val {
 									tags = append(tags, index)
 									break
 								}

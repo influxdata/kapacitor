@@ -48,7 +48,7 @@ VENDOR = "InfluxData"
 DESCRIPTION = "Distributed time-series database."
 
 prereqs = [ 'git', 'go' ]
-go_vet_command = "go tool vet -composites=true ./"
+go_vet_command = "go tool vet -example=false ./"
 optional_prereqs = [ 'fpm', 'rpmbuild', 'gpg' ]
 
 fpm_common_args = "-f -s dir --log error \
@@ -125,7 +125,7 @@ def create_package_fs(build_root):
         os.makedirs(os.path.join(build_root, d))
         os.chmod(os.path.join(build_root, d), 0o755)
 
-def package_scripts(build_root, config_only=False):
+def package_scripts(build_root, config_only=False, windows=False):
     """Copy the necessary scripts and configuration files to the package
     filesystem.
     """
@@ -191,8 +191,7 @@ def run_tests(race, parallel, timeout, no_vet):
         logging.error("{}".format(out))
         return False
     if not no_vet:
-        logging.info("Installing 'go vet' tool...")
-        run("go install golang.org/x/tools/cmd/vet")
+        logging.info("Running 'go vet'...")
         out = run(go_vet_command)
         if len(out) > 0:
             logging.error("Go vet failed. Please run 'go vet ./...' and fix any errors.")
@@ -479,7 +478,6 @@ def build(version=None,
 
     logging.info("Using version '{}' for build.".format(version))
 
-    tmp_build_dir = create_temp_dir()
     for target, path in targets.items():
         logging.info("Building target: {}".format(target))
         build_command = ""
@@ -593,10 +591,12 @@ def package(build_output, pkg_name, version, nightly=False, iteration=1, static=
                 os.makedirs(build_root)
 
                 # Copy packaging scripts to build directory
-                if platform == "windows" or static or "static_" in arch:
+                if platform == "windows":
                     # For windows and static builds, just copy
                     # binaries to root of package (no other scripts or
                     # directories)
+                    package_scripts(build_root, config_only=True, windows=True)
+                elif static or "static_" in arch:
                     package_scripts(build_root, config_only=True)
                 else:
                     create_package_fs(build_root)
@@ -836,7 +836,7 @@ def main(args):
             logging.info("{} (MD5={})".format(p.split('/')[-1:][0],
                                               generate_md5_from_file(p)))
     if orig_branch != get_current_branch():
-        logging.info("Moving back to original git branch: {}".format(args.branch))
+        logging.info("Moving back to original git branch: {}".format(orig_branch))
         run("git checkout {}".format(orig_branch))
 
     return 0

@@ -105,6 +105,19 @@ func (d *DatabaseIndex) MeasurementSeriesCounts() (nMeasurements int, nSeries in
 	return
 }
 
+// SeriesShardN returns the series count for a shard.
+func (d *DatabaseIndex) SeriesShardN(shardID uint64) int {
+	var n int
+	d.mu.RLock()
+	for _, s := range d.series {
+		if s.Assigned(shardID) {
+			n++
+		}
+	}
+	d.mu.RUnlock()
+	return n
+}
+
 // CreateSeriesIndexIfNotExists adds the series for the given measurement to the index and sets its ID or returns the existing series object
 func (d *DatabaseIndex) CreateSeriesIndexIfNotExists(measurementName string, series *Series) *Series {
 	d.mu.RLock()
@@ -192,6 +205,7 @@ func (d *DatabaseIndex) UnassignShard(k string, shardID uint64) {
 				if !ss.measurement.HasSeries() {
 					d.mu.Lock()
 					d.dropMeasurement(ss.measurement.Name)
+					d.statMap.Add(statDatabaseMeasurements, int64(-1))
 					d.mu.Unlock()
 				}
 
@@ -233,6 +247,10 @@ func (d *DatabaseIndex) TagsForSeries(key string) map[string]string {
 // is true) against when there are no measurements because the expression
 // wasn't evaluated (when the bool is false).
 func (d *DatabaseIndex) measurementsByExpr(expr influxql.Expr) (Measurements, bool, error) {
+	if expr == nil {
+		return nil, false, nil
+	}
+
 	switch e := expr.(type) {
 	case *influxql.BinaryExpr:
 		switch e.Op {
@@ -360,7 +378,7 @@ func (d *DatabaseIndex) measurementsByTagFilters(filters []*TagFilter) Measureme
 					tagMatch = true
 				}
 			} else {
-				// Else, the operator is regex and we have to check all tag
+				// Else, the operator is a regex and we have to check all tag
 				// values against the regular expression.
 				for tagVal := range tagVals {
 					if f.Regex.MatchString(tagVal) {
@@ -840,11 +858,11 @@ func (m *Measurement) idsForExpr(n *influxql.BinaryExpr) (SeriesIDs, influxql.Ex
 
 	// For fields, return all series IDs from this measurement and return
 	// the expression passed in, as the filter.
-	if name.Val != "_name" && m.hasField(name.Val) {
+	if name.Val != "_name" && ((name.Type == influxql.Unknown && m.hasField(name.Val)) || name.Type == influxql.AnyField || (name.Type != influxql.Tag && name.Type != influxql.Unknown)) {
 		return m.seriesIDs, n, nil
 	} else if value, ok := value.(*influxql.VarRef); ok {
 		// Check if the RHS is a variable and if it is a field.
-		if value.Val != "_name" && m.hasField(value.Val) {
+		if value.Val != "_name" && ((value.Type == influxql.Unknown && m.hasField(value.Val)) || name.Type == influxql.AnyField || (value.Type != influxql.Tag && value.Type != influxql.Unknown)) {
 			return m.seriesIDs, n, nil
 		}
 	}
