@@ -53,6 +53,12 @@ func (s *Scanner) Scan() (tok Token, pos Pos, lit string) {
 			return s.scanNumber()
 		}
 		return DOT, pos, ""
+	case '$':
+		tok, _, lit := s.scanIdent()
+		if tok == IDENT {
+			tok = BOUNDPARAM
+		}
+		return tok, pos, lit
 	case '+', '-':
 		return s.scanNumber()
 	case '*':
@@ -95,6 +101,10 @@ func (s *Scanner) Scan() (tok Token, pos Pos, lit string) {
 	case ';':
 		return SEMICOLON, pos, ""
 	case ':':
+		if ch1, _ := s.r.read(); ch1 == ':' {
+			return DOUBLECOLON, pos, ""
+		}
+		s.r.unread()
 		return COLON, pos, ""
 	}
 

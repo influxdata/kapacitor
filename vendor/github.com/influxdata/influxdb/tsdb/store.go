@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -131,7 +132,7 @@ func (s *Store) loadShards() error {
 		err error
 	}
 
-	throttle := newthrottle(4)
+	throttle := newthrottle(runtime.GOMAXPROCS(0))
 
 	resC := make(chan *res)
 	var n int
@@ -308,6 +309,17 @@ func (s *Store) CreateShard(database, retentionPolicy string, shardID uint64) er
 	return nil
 }
 
+// CreateShardSnapShot will create a hard link to the underlying shard and return a path
+// The caller is responsible for cleaning up (removing) the file path returned
+func (s *Store) CreateShardSnapshot(id uint64) (string, error) {
+	sh := s.Shard(id)
+	if sh == nil {
+		return "", ErrShardNotFound
+	}
+
+	return sh.CreateSnapshot()
+}
+
 // DeleteShard removes a shard from disk.
 func (s *Store) DeleteShard(shardID uint64) error {
 	s.mu.Lock()
@@ -351,19 +363,41 @@ func (s *Store) ShardIteratorCreator(id uint64) influxql.IteratorCreator {
 
 // DeleteDatabase will close all shards associated with a database and remove the directory and files from disk.
 func (s *Store) DeleteDatabase(name string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	type resp struct {
+		shardID uint64
+		err     error
+	}
 
+	s.mu.RLock()
+	responses := make(chan resp, len(s.shards))
+	var wg sync.WaitGroup
 	// Close and delete all shards on the database.
 	for shardID, sh := range s.shards {
 		if sh.database == name {
-			// Delete the shard from disk.
-			if err := s.deleteShard(shardID); err != nil {
-				return err
-			}
+			wg.Add(1)
+			shardID, sh := shardID, sh // scoped copies of loop variables
+			go func() {
+				defer wg.Done()
+				err := sh.Close()
+				responses <- resp{shardID, err}
+			}()
 		}
 	}
+	s.mu.RUnlock()
+	wg.Wait()
+	close(responses)
 
+	for r := range responses {
+		if r.err != nil {
+			return r.err
+		}
+		s.mu.Lock()
+		delete(s.shards, r.shardID)
+		s.mu.Unlock()
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if err := os.RemoveAll(filepath.Join(s.path, name)); err != nil {
 		return err
 	}
@@ -521,6 +555,22 @@ func (s *Store) BackupShard(id uint64, since time.Time, w io.Writer) error {
 	return shard.engine.Backup(w, path, since)
 }
 
+// RestoreShard restores a backup from r to a given shard.
+// This will only overwrite files included in the backup.
+func (s *Store) RestoreShard(id uint64, r io.Reader) error {
+	shard := s.Shard(id)
+	if shard == nil {
+		return fmt.Errorf("shard %d doesn't exist on this server", id)
+	}
+
+	path, err := relativePath(s.path, shard.path)
+	if err != nil {
+		return err
+	}
+
+	return shard.Restore(r, path)
+}
+
 // ShardRelativePath will return the relative path to the shard. i.e. <database>/<retention>/<id>
 func (s *Store) ShardRelativePath(id uint64) (string, error) {
 	shard := s.Shard(id)
@@ -637,8 +687,8 @@ func (s *Store) ExpandSources(sources influxql.Sources) (influxql.Sources, error
 
 // IteratorCreators returns a set of all local shards as iterator creators.
 func (s *Store) IteratorCreators() influxql.IteratorCreators {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	a := make(influxql.IteratorCreators, 0, len(s.shards))
 	for _, sh := range s.shards {
