@@ -198,13 +198,13 @@ func (ts *Service) Open() error {
 		for _, task := range tasks {
 			numTasks++
 			if task.Status == Enabled {
+				numEnabledTasks++
 				ts.logger.Println("D! starting enabled task on startup", task.ID)
 				err = ts.startTask(task)
 				if err != nil {
 					ts.logger.Printf("E! error starting enabled task %s, err: %s\n", task.ID, err)
 				} else {
 					ts.logger.Println("D! started task during startup", task.ID)
-					numEnabledTasks++
 				}
 			}
 		}
@@ -216,6 +216,7 @@ func (ts *Service) Open() error {
 
 	// Set expvars
 	kapacitor.NumTasksVar.Set(numTasks)
+	kapacitor.NumEnabledTasksVar.Set(numEnabledTasks)
 
 	return nil
 }
@@ -861,7 +862,12 @@ func (ts *Service) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
 		return
 	}
+	// Count new task
+	kapacitor.NumTasksVar.Add(1)
 	if newTask.Status == Enabled {
+		//Count new enabled task
+		kapacitor.NumEnabledTasksVar.Add(1)
+		// Start task
 		err = ts.startTask(newTask)
 		if err != nil {
 			httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
@@ -904,6 +910,7 @@ func (ts *Service) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Write(httpd.MarshalJSON(t, true))
 }
+
 func (ts *Service) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 	id, err := ts.taskIDFromPath(r.URL.Path)
 	if err != nil {
@@ -1019,12 +1026,14 @@ func (ts *Service) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 		// Enable/Disable task
 		switch existing.Status {
 		case Enabled:
+			kapacitor.NumEnabledTasksVar.Add(1)
 			err = ts.startTask(existing)
 			if err != nil {
 				httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
 				return
 			}
 		case Disabled:
+			kapacitor.NumEnabledTasksVar.Add(-1)
 			ts.stopTask(existing.ID)
 		}
 	}
@@ -1790,15 +1799,15 @@ func (ts *Service) startTask(task Task) error {
 		}
 	}
 
-	kapacitor.NumEnabledTasksVar.Add(1)
-
 	go func() {
 		// Wait for task to finish
 		err := et.Wait()
-		// Stop task
-		ts.stopTask(t.ID)
+		ts.logger.Printf("D! task %s finished", et.Task.ID)
 
 		if err != nil {
+			// Stop task
+			ts.TaskMaster.StopTask(t.ID)
+
 			ts.logger.Printf("E! task %s finished with error: %s", et.Task.ID, err)
 			// Save last error from task.
 			err = ts.saveLastError(t.ID, err.Error())
@@ -1811,7 +1820,6 @@ func (ts *Service) startTask(task Task) error {
 }
 
 func (ts *Service) stopTask(id string) {
-	kapacitor.NumEnabledTasksVar.Add(-1)
 	ts.TaskMaster.StopTask(id)
 }
 
