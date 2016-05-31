@@ -910,7 +910,6 @@ func (ts *Service) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Write(httpd.MarshalJSON(t, true))
 }
-
 func (ts *Service) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 	id, err := ts.taskIDFromPath(r.URL.Path)
 	if err != nil {
