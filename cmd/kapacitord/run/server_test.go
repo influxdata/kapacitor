@@ -363,6 +363,129 @@ func TestServer_DeleteTask(t *testing.T) {
 	}
 }
 
+func TestServer_TaskNums(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	id := "testTaskID"
+	ttype := client.StreamTask
+	dbrps := []client.DBRP{
+		{
+			Database:        "mydb",
+			RetentionPolicy: "myrp",
+		},
+	}
+	tick := `stream
+    |from()
+        .measurement('test')
+`
+
+	// Create a bunch of tasks with every 3rd task enabled
+	count := 1000
+	enabled := 0
+	tasks := make([]client.Task, count)
+	for i := 0; i < count; i++ {
+		status := client.Disabled
+		if i%3 == 0 {
+			enabled++
+			status = client.Enabled
+		}
+		task, err := cli.CreateTask(client.CreateTaskOptions{
+			ID:         fmt.Sprintf("%s-%d", id, i),
+			Type:       ttype,
+			DBRPs:      dbrps,
+			TICKscript: tick,
+			Status:     status,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		tasks[i] = task
+	}
+	if stats, err := s.Stats(); err != nil {
+		t.Fatal(err)
+	} else {
+		if got, exp := stats.NumTasks, count; got != exp {
+			t.Errorf("unexpected num_tasks got %d exp %d", got, exp)
+		}
+		if got, exp := stats.NumEnabledTasks, enabled; got != exp {
+			t.Errorf("unexpected num_enabled_tasks got %d exp %d", got, exp)
+		}
+	}
+
+	// Enable a bunch of tasks
+	for i, task := range tasks {
+		if i%2 == 0 && task.Status != client.Enabled {
+			enabled++
+			tasks[i].Status = client.Enabled
+			if err := cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+				Status: client.Enabled,
+			}); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	if stats, err := s.Stats(); err != nil {
+		t.Fatal(err)
+	} else {
+		if got, exp := stats.NumTasks, count; got != exp {
+			t.Errorf("unexpected num_tasks got %d exp %d", got, exp)
+		}
+		if got, exp := stats.NumEnabledTasks, enabled; got != exp {
+			t.Errorf("unexpected num_enabled_tasks got %d exp %d", got, exp)
+		}
+	}
+
+	// Disable a bunch of tasks
+	for i, task := range tasks {
+		if i%5 == 0 && task.Status != client.Disabled {
+			enabled--
+			tasks[i].Status = client.Disabled
+			if err := cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+				Status: client.Disabled,
+			}); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	if stats, err := s.Stats(); err != nil {
+		t.Fatal(err)
+	} else {
+		if got, exp := stats.NumTasks, count; got != exp {
+			t.Errorf("unexpected num_tasks got %d exp %d", got, exp)
+		}
+		if got, exp := stats.NumEnabledTasks, enabled; got != exp {
+			t.Errorf("unexpected num_enabled_tasks got %d exp %d", got, exp)
+		}
+	}
+
+	// Delete a bunch of tasks
+	for i, task := range tasks {
+		if i%6 == 0 {
+			count--
+			if task.Status == client.Enabled {
+				enabled--
+			}
+			if err := cli.DeleteTask(task.Link); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	if stats, err := s.Stats(); err != nil {
+		t.Fatal(err)
+	} else {
+		if got, exp := stats.NumTasks, count; got != exp {
+			t.Errorf("unexpected num_tasks got %d exp %d", got, exp)
+		}
+		if got, exp := stats.NumEnabledTasks, enabled; got != exp {
+			t.Errorf("unexpected num_enabled_tasks got %d exp %d", got, exp)
+		}
+	}
+
+}
 func TestServer_ListTasks(t *testing.T) {
 	s, cli := OpenDefaultServer()
 	defer s.Close()
