@@ -153,6 +153,22 @@ func (s *Server) MustWrite(db, rp, body string, params url.Values) string {
 	return results
 }
 
+type stats struct {
+	NumEnabledTasks int `json:"num_enabled_tasks"`
+	NumTasks        int `json:"num_tasks"`
+}
+
+func (s *Server) Stats() (stats, error) {
+	stats := stats{}
+	resp, err := http.Get(s.URL() + "/debug/vars")
+	if err != nil {
+		return stats, err
+	}
+	dec := json.NewDecoder(resp.Body)
+	err = dec.Decode(&stats)
+	return stats, err
+}
+
 // NewConfig returns the default config with temporary paths.
 func NewConfig() *run.Config {
 	c := run.NewConfig()

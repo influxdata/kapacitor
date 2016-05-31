@@ -1309,7 +1309,9 @@ func (ts *Service) deleteTask(id string) error {
 		}
 		return err
 	}
+	kapacitor.NumTasksVar.Add(-1)
 	if task.Status == Enabled {
+		kapacitor.NumEnabledTasksVar.Add(-1)
 		ts.stopTask(id)
 	}
 	return ts.tasks.Delete(id)
