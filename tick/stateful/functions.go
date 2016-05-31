@@ -87,7 +87,7 @@ func init() {
 
 // Return set of built-in Funcs
 func NewFunctions() Funcs {
-	funcs := make(Funcs, len(statelessFuncs)+2)
+	funcs := make(Funcs, len(statelessFuncs)+3)
 	for n, f := range statelessFuncs {
 		funcs[n] = f
 	}
@@ -95,6 +95,7 @@ func NewFunctions() Funcs {
 	// Statefull functions -- need new instance
 	funcs["sigma"] = &sigma{}
 	funcs["count"] = &count{}
+	funcs["spread"] = &spread{min: math.Inf(+1), max: math.Inf(-1)}
 
 	return funcs
 }
@@ -445,6 +446,37 @@ func (s *sigma) Call(args ...interface{}) (interface{}, error) {
 		return float64(0), nil
 	}
 	return math.Abs(x-s.mean) / math.Sqrt(s.variance), nil
+}
+
+type spread struct {
+	min float64
+	max float64
+}
+
+func (s *spread) Reset() {
+	s.min = math.Inf(+1)
+	s.max = math.Inf(-1)
+}
+
+// Computes the running range of all values
+func (s *spread) Call(args ...interface{}) (interface{}, error) {
+	if len(args) != 1 {
+		return 0, errors.New("spread expects exactly one argument")
+	}
+	x, ok := args[0].(float64)
+	if !ok {
+		return nil, ErrNotFloat
+	}
+
+	if x < s.min {
+		s.min = x
+	}
+
+	if x > s.max {
+		s.max = x
+	}
+
+	return s.max - s.min, nil
 }
 
 type minute struct {
