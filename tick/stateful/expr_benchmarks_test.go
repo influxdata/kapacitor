@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/influxdata/kapacitor/tick"
+	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/tick/stateful"
 )
 
@@ -24,10 +24,10 @@ import (
 
 func Benchmark_EvalBool_OneOperator_UnaryNode_BoolNode(b *testing.B) {
 
-	emptyScope := tick.NewScope()
-	benchmarkEvalBool(b, emptyScope, &tick.UnaryNode{
-		Operator: tick.TokenNot,
-		Node: &tick.BoolNode{
+	emptyScope := stateful.NewScope()
+	benchmarkEvalBool(b, emptyScope, &ast.UnaryNode{
+		Operator: ast.TokenNot,
+		Node: &ast.BoolNode{
 			Bool: false,
 		},
 	})
@@ -35,12 +35,12 @@ func Benchmark_EvalBool_OneOperator_UnaryNode_BoolNode(b *testing.B) {
 
 func Benchmark_EvalBool_OneOperator_UnaryNode_ReferenceNode(b *testing.B) {
 
-	scope := tick.NewScope()
+	scope := stateful.NewScope()
 	scope.Set("value", bool(false))
 
-	benchmarkEvalBool(b, scope, &tick.UnaryNode{
-		Operator: tick.TokenNot,
-		Node: &tick.ReferenceNode{
+	benchmarkEvalBool(b, scope, &ast.UnaryNode{
+		Operator: ast.TokenNot,
+		Node: &ast.ReferenceNode{
 			Reference: "value",
 		},
 	})
@@ -48,14 +48,14 @@ func Benchmark_EvalBool_OneOperator_UnaryNode_ReferenceNode(b *testing.B) {
 
 func Benchmark_EvalBool_OneOperator_NumberFloat64_NumberFloat64(b *testing.B) {
 
-	emptyScope := tick.NewScope()
-	benchmarkEvalBool(b, emptyScope, &tick.BinaryNode{
-		Operator: tick.TokenGreater,
-		Left: &tick.NumberNode{
+	emptyScope := stateful.NewScope()
+	benchmarkEvalBool(b, emptyScope, &ast.BinaryNode{
+		Operator: ast.TokenGreater,
+		Left: &ast.NumberNode{
 			IsFloat: true,
 			Float64: float64(20),
 		},
-		Right: &tick.NumberNode{
+		Right: &ast.NumberNode{
 			IsFloat: true,
 			Float64: float64(10),
 		},
@@ -64,14 +64,14 @@ func Benchmark_EvalBool_OneOperator_NumberFloat64_NumberFloat64(b *testing.B) {
 
 func Benchmark_EvalBool_OneOperator_NumberFloat64_NumberInt64(b *testing.B) {
 
-	emptyScope := tick.NewScope()
-	benchmarkEvalBool(b, emptyScope, &tick.BinaryNode{
-		Operator: tick.TokenGreater,
-		Left: &tick.NumberNode{
+	emptyScope := stateful.NewScope()
+	benchmarkEvalBool(b, emptyScope, &ast.BinaryNode{
+		Operator: ast.TokenGreater,
+		Left: &ast.NumberNode{
 			IsFloat: true,
 			Float64: float64(20),
 		},
-		Right: &tick.NumberNode{
+		Right: &ast.NumberNode{
 			IsInt: true,
 			Int64: int64(10),
 		},
@@ -79,14 +79,14 @@ func Benchmark_EvalBool_OneOperator_NumberFloat64_NumberInt64(b *testing.B) {
 }
 
 func Benchmark_EvalBool_OneOperator_NumberInt64_NumberInt64(b *testing.B) {
-	emptyScope := tick.NewScope()
-	benchmarkEvalBool(b, emptyScope, &tick.BinaryNode{
-		Operator: tick.TokenGreater,
-		Left: &tick.NumberNode{
+	emptyScope := stateful.NewScope()
+	benchmarkEvalBool(b, emptyScope, &ast.BinaryNode{
+		Operator: ast.TokenGreater,
+		Left: &ast.NumberNode{
 			IsInt: true,
 			Int64: int64(20),
 		},
-		Right: &tick.NumberNode{
+		Right: &ast.NumberNode{
 			IsInt: true,
 			Int64: int64(10),
 		},
@@ -95,18 +95,18 @@ func Benchmark_EvalBool_OneOperator_NumberInt64_NumberInt64(b *testing.B) {
 
 func Benchmark_EvalBool_OneOperator_UnaryNode(b *testing.B) {
 
-	scope := tick.NewScope()
+	scope := stateful.NewScope()
 	scope.Set("value", bool(true))
 
-	benchmarkEvalBool(b, scope, &tick.BinaryNode{
-		Operator: tick.TokenEqual,
-		Left: &tick.UnaryNode{
-			Operator: tick.TokenNot,
-			Node: &tick.BoolNode{
+	benchmarkEvalBool(b, scope, &ast.BinaryNode{
+		Operator: ast.TokenEqual,
+		Left: &ast.UnaryNode{
+			Operator: ast.TokenNot,
+			Node: &ast.BoolNode{
 				Bool: false,
 			},
 		},
-		Right: &tick.ReferenceNode{
+		Right: &ast.ReferenceNode{
 			Reference: "value",
 		},
 	})
@@ -114,15 +114,15 @@ func Benchmark_EvalBool_OneOperator_UnaryNode(b *testing.B) {
 
 func Benchmark_EvalBool_OneOperator_ReferenceNodeFloat64_NumberFloat64(b *testing.B) {
 
-	scope := tick.NewScope()
+	scope := stateful.NewScope()
 	scope.Set("value", float64(20))
 
-	benchmarkEvalBool(b, scope, &tick.BinaryNode{
-		Operator: tick.TokenGreater,
-		Left: &tick.ReferenceNode{
+	benchmarkEvalBool(b, scope, &ast.BinaryNode{
+		Operator: ast.TokenGreater,
+		Left: &ast.ReferenceNode{
 			Reference: "value",
 		},
-		Right: &tick.NumberNode{
+		Right: &ast.NumberNode{
 			IsFloat: true,
 			Float64: float64(10),
 		},
@@ -131,15 +131,15 @@ func Benchmark_EvalBool_OneOperator_ReferenceNodeFloat64_NumberFloat64(b *testin
 
 func Benchmark_EvalBool_OneOperator_ReferenceNodeFloat64_NumberInt64(b *testing.B) {
 
-	scope := tick.NewScope()
+	scope := stateful.NewScope()
 	scope.Set("value", float64(20))
 
-	benchmarkEvalBool(b, scope, &tick.BinaryNode{
-		Operator: tick.TokenGreater,
-		Left: &tick.ReferenceNode{
+	benchmarkEvalBool(b, scope, &ast.BinaryNode{
+		Operator: ast.TokenGreater,
+		Left: &ast.ReferenceNode{
 			Reference: "value",
 		},
-		Right: &tick.NumberNode{
+		Right: &ast.NumberNode{
 			IsInt: true,
 			Int64: int64(10),
 		},
@@ -148,15 +148,15 @@ func Benchmark_EvalBool_OneOperator_ReferenceNodeFloat64_NumberInt64(b *testing.
 
 func Benchmark_EvalBool_OneOperator_ReferenceNodeFloat64_ReferenceNodeFloat64(b *testing.B) {
 
-	scope := tick.NewScope()
+	scope := stateful.NewScope()
 	scope.Set("l", float64(20))
 	scope.Set("r", float64(10))
-	benchmarkEvalBool(b, scope, &tick.BinaryNode{
-		Operator: tick.TokenGreater,
-		Left: &tick.ReferenceNode{
+	benchmarkEvalBool(b, scope, &ast.BinaryNode{
+		Operator: ast.TokenGreater,
+		Left: &ast.ReferenceNode{
 			Reference: "l",
 		},
-		Right: &tick.ReferenceNode{
+		Right: &ast.ReferenceNode{
 			Reference: "r",
 		},
 	})
@@ -164,18 +164,18 @@ func Benchmark_EvalBool_OneOperator_ReferenceNodeFloat64_ReferenceNodeFloat64(b 
 
 func Benchmark_EvalBool_OneOperatorWith11ScopeItem_ReferenceNodeFloat64_NumberFloat64(b *testing.B) {
 
-	scope := tick.NewScope()
+	scope := stateful.NewScope()
 	scope.Set("value", float64(20))
 	for i := 0; i < 10; i++ {
 		scope.Set(fmt.Sprintf("value_%v", i), float64(i))
 	}
 
-	benchmarkEvalBool(b, scope, &tick.BinaryNode{
-		Operator: tick.TokenGreater,
-		Left: &tick.ReferenceNode{
+	benchmarkEvalBool(b, scope, &ast.BinaryNode{
+		Operator: ast.TokenGreater,
+		Left: &ast.ReferenceNode{
 			Reference: "value",
 		},
-		Right: &tick.NumberNode{
+		Right: &ast.NumberNode{
 			IsFloat: true,
 			Float64: float64(10),
 		},
@@ -184,7 +184,7 @@ func Benchmark_EvalBool_OneOperatorWith11ScopeItem_ReferenceNodeFloat64_NumberFl
 
 func Benchmark_EvalBool_OneOperatorValueChanges_ReferenceNodeFloat64_NumberFloat64(b *testing.B) {
 
-	scope := tick.NewScope()
+	scope := stateful.NewScope()
 	initialValue := float64(20)
 
 	scope.Set("value", initialValue)
@@ -192,12 +192,12 @@ func Benchmark_EvalBool_OneOperatorValueChanges_ReferenceNodeFloat64_NumberFloat
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	se, err := stateful.NewExpression(&tick.BinaryNode{
-		Operator: tick.TokenGreater,
-		Left: &tick.ReferenceNode{
+	se, err := stateful.NewExpression(&ast.BinaryNode{
+		Operator: ast.TokenGreater,
+		Left: &ast.ReferenceNode{
 			Reference: "value",
 		},
-		Right: &tick.NumberNode{
+		Right: &ast.NumberNode{
 			IsFloat: true,
 			Float64: float64(10),
 		},
@@ -236,16 +236,16 @@ func Benchmark_EvalBool_OneOperatorValueChanges_ReferenceNodeFloat64_NumberFloat
 
 func Benchmark_EvalBool_OneOperator_ReferenceNodeInt64_ReferenceNodeInt64(b *testing.B) {
 
-	scope := tick.NewScope()
+	scope := stateful.NewScope()
 	scope.Set("l", int64(20))
 	scope.Set("r", int64(10))
 
-	benchmarkEvalBool(b, scope, &tick.BinaryNode{
-		Operator: tick.TokenGreater,
-		Left: &tick.ReferenceNode{
+	benchmarkEvalBool(b, scope, &ast.BinaryNode{
+		Operator: ast.TokenGreater,
+		Left: &ast.ReferenceNode{
 			Reference: "l",
 		},
-		Right: &tick.ReferenceNode{
+		Right: &ast.ReferenceNode{
 			Reference: "r",
 		},
 	})
@@ -253,18 +253,18 @@ func Benchmark_EvalBool_OneOperator_ReferenceNodeInt64_ReferenceNodeInt64(b *tes
 
 func Benchmark_EvalBool_OneOperatorWith11ScopeItem_ReferenceNodeInt64_NumberInt64(b *testing.B) {
 
-	scope := tick.NewScope()
+	scope := stateful.NewScope()
 	scope.Set("value", int64(20))
 	for i := 0; i < 10; i++ {
 		scope.Set(fmt.Sprintf("value_%v", i), int64(i))
 	}
 
-	benchmarkEvalBool(b, scope, &tick.BinaryNode{
-		Operator: tick.TokenGreater,
-		Left: &tick.ReferenceNode{
+	benchmarkEvalBool(b, scope, &ast.BinaryNode{
+		Operator: ast.TokenGreater,
+		Left: &ast.ReferenceNode{
 			Reference: "value",
 		},
-		Right: &tick.NumberNode{
+		Right: &ast.NumberNode{
 			IsInt: true,
 			Int64: int64(10),
 		},
@@ -272,30 +272,30 @@ func Benchmark_EvalBool_OneOperatorWith11ScopeItem_ReferenceNodeInt64_NumberInt6
 }
 
 func Benchmark_EvalBool_TwoLevelDeep(b *testing.B) {
-	scope := tick.NewScope()
+	scope := stateful.NewScope()
 	scope.Set("a", float64(11))
 	scope.Set("b", float64(8))
 
-	benchmarkEvalBool(b, scope, &tick.BinaryNode{
-		Operator: tick.TokenAnd,
+	benchmarkEvalBool(b, scope, &ast.BinaryNode{
+		Operator: ast.TokenAnd,
 
-		Left: &tick.BinaryNode{
-			Operator: tick.TokenGreater,
-			Left: &tick.ReferenceNode{
+		Left: &ast.BinaryNode{
+			Operator: ast.TokenGreater,
+			Left: &ast.ReferenceNode{
 				Reference: "a",
 			},
-			Right: &tick.NumberNode{
+			Right: &ast.NumberNode{
 				IsFloat: true,
 				Float64: 10,
 			},
 		},
 
-		Right: &tick.BinaryNode{
-			Operator: tick.TokenLess,
-			Left: &tick.ReferenceNode{
+		Right: &ast.BinaryNode{
+			Operator: ast.TokenLess,
+			Left: &ast.ReferenceNode{
 				Reference: "b",
 			},
-			Right: &tick.NumberNode{
+			Right: &ast.NumberNode{
 				IsFloat: true,
 				Float64: 10,
 			},
@@ -305,7 +305,7 @@ func Benchmark_EvalBool_TwoLevelDeep(b *testing.B) {
 
 func Benchmark_EvalBool_OneOperatorValueChanges_ReferenceNodeInt64_NumberInt64(b *testing.B) {
 
-	scope := tick.NewScope()
+	scope := stateful.NewScope()
 	initialValue := int64(20)
 
 	scope.Set("value", initialValue)
@@ -313,12 +313,12 @@ func Benchmark_EvalBool_OneOperatorValueChanges_ReferenceNodeInt64_NumberInt64(b
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	se, err := stateful.NewExpression(&tick.BinaryNode{
-		Operator: tick.TokenGreater,
-		Left: &tick.ReferenceNode{
+	se, err := stateful.NewExpression(&ast.BinaryNode{
+		Operator: ast.TokenGreater,
+		Left: &ast.ReferenceNode{
 			Reference: "value",
 		},
-		Right: &tick.NumberNode{
+		Right: &ast.NumberNode{
 			IsInt: true,
 			Int64: int64(10),
 		},
@@ -357,7 +357,7 @@ func Benchmark_EvalBool_OneOperatorValueChanges_ReferenceNodeInt64_NumberInt64(b
 
 var evalBoolResult bool
 
-func benchmarkEvalBool(b *testing.B, scope *tick.Scope, node tick.Node) {
+func benchmarkEvalBool(b *testing.B, scope *stateful.Scope, node ast.Node) {
 	b.ReportAllocs()
 	b.ResetTimer()
 

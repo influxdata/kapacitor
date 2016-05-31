@@ -7,7 +7,7 @@ import (
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
-	"github.com/influxdata/kapacitor/tick"
+	"github.com/influxdata/kapacitor/tick/ast"
 )
 
 type GroupByNode struct {
@@ -93,14 +93,12 @@ func (g *GroupByNode) runGroupBy([]byte) error {
 }
 
 func determineDimensions(dimensions []interface{}) (allDimensions bool, realDimensions []string) {
-DIMS:
 	for _, dim := range dimensions {
 		switch d := dim.(type) {
 		case string:
 			realDimensions = append(realDimensions, d)
-		case *tick.StarNode:
+		case *ast.StarNode:
 			allDimensions = true
-			break DIMS
 		}
 	}
 	sort.Strings(realDimensions)

@@ -1,8 +1,6 @@
 package pipeline
 
-import (
-	"github.com/influxdata/kapacitor/tick"
-)
+import "github.com/influxdata/kapacitor/tick/ast"
 
 // The WhereNode filters the data stream by a given expression.
 //
@@ -22,22 +20,22 @@ type WhereNode struct {
 	chainnode
 	// The expression predicate.
 	// tick:ignore
-	Expression tick.Node
+	Lambda *ast.LambdaNode
 }
 
-func newWhereNode(wants EdgeType, predicate tick.Node) *WhereNode {
+func newWhereNode(wants EdgeType, predicate *ast.LambdaNode) *WhereNode {
 	return &WhereNode{
-		chainnode:  newBasicChainNode("where", wants, wants),
-		Expression: predicate,
+		chainnode: newBasicChainNode("where", wants, wants),
+		Lambda:    predicate,
 	}
 }
 
 // And another expression onto the existing expression.
-func (w *WhereNode) Where(expression tick.Node) *WhereNode {
-	w.Expression = &tick.BinaryNode{
-		Operator: tick.TokenAnd,
-		Left:     w.Expression,
-		Right:    expression,
+func (w *WhereNode) Where(lambda *ast.LambdaNode) *WhereNode {
+	w.Lambda.Expression = &ast.BinaryNode{
+		Operator: ast.TokenAnd,
+		Left:     w.Lambda.Expression,
+		Right:    lambda.Expression,
 	}
 	return w
 }

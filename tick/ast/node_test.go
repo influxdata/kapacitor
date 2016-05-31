@@ -1,4 +1,4 @@
-package tick
+package ast
 
 import (
 	"fmt"

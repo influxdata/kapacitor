@@ -678,6 +678,7 @@ stream
 		.as('hour')
 	|httpOut('TestStream_Eval_Time')
 `
+	hour := float64(time.Date(1971, 1, 1, 1, 0, 0, 0, time.UTC).Local().Hour())
 	er := kapacitor.Result{
 		Series: imodels.Rows{
 			{
@@ -687,7 +688,7 @@ stream
 				Values: [][]interface{}{
 					{
 						time.Date(1971, 1, 1, 1, 0, 0, 0, time.UTC),
-						6.0,
+						hour,
 					},
 				},
 			},
@@ -698,20 +699,14 @@ stream
 				Values: [][]interface{}{
 					{
 						time.Date(1971, 1, 1, 1, 0, 0, 0, time.UTC),
-						6.0,
+						hour,
 					},
 				},
 			},
 		},
 	}
 
-	// The hour function is local time zone specific
-	// set a fixed zone for testing.
-	local := time.Local
-	time.Local = time.FixedZone("test", 5*60*60)
 	testStreamerWithOutput(t, "TestStream_Eval_Time", script, 2*time.Hour, er, nil, false)
-	// Restore the normal local timezone.
-	time.Local = local
 }
 
 func TestStream_Default(t *testing.T) {
@@ -4686,7 +4681,7 @@ func testStreamer(
 	tm.Open()
 
 	//Create the task
-	task, err := tm.NewTask(name, script, kapacitor.StreamTask, dbrps, 0)
+	task, err := tm.NewTask(name, script, kapacitor.StreamTask, dbrps, 0, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

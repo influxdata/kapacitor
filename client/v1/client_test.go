@@ -80,6 +80,41 @@ func Test_ReportsErrors(t *testing.T) {
 			},
 		},
 		{
+			name: "CreateTemplate",
+			fnc: func(c *client.Client) error {
+				_, err := c.CreateTemplate(client.CreateTemplateOptions{})
+				return err
+			},
+		},
+		{
+			name: "UpdateTemplate",
+			fnc: func(c *client.Client) error {
+				err := c.UpdateTemplate(c.TemplateLink(""), client.UpdateTemplateOptions{})
+				return err
+			},
+		},
+		{
+			name: "DeleteTemplate",
+			fnc: func(c *client.Client) error {
+				err := c.DeleteTemplate(c.TemplateLink(""))
+				return err
+			},
+		},
+		{
+			name: "Template",
+			fnc: func(c *client.Client) error {
+				_, err := c.Template(c.TemplateLink(""), nil)
+				return err
+			},
+		},
+		{
+			name: "ListTemplates",
+			fnc: func(c *client.Client) error {
+				_, err := c.ListTemplates(nil)
+				return err
+			},
+		},
+		{
 			name: "RecordStream",
 			fnc: func(c *client.Client) error {
 				_, err := c.RecordStream(client.RecordStreamOptions{})
@@ -236,6 +271,7 @@ func Test_Task(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, `{
 	"link": {"rel":"self", "href":"/kapacitor/v1/tasks/t1"},
+	"id": "t1",
 	"type":"stream",
 	"dbrps":[{"db":"db","rp":"rp"}],
 	"script":"stream\n    |from()\n        .measurement('cpu')\n",
@@ -260,6 +296,7 @@ func Test_Task(t *testing.T) {
 	}
 	exp := client.Task{
 		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/tasks/t1"},
+		ID:   "t1",
 		Type: client.StreamTask,
 		DBRPs: []client.DBRP{{
 			Database:        "db",
@@ -288,6 +325,7 @@ func Test_Task_Labels(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, `{
 	"link": {"rel":"self", "href":"/kapacitor/v1/tasks/t1"},
+	"id": "t1",
 	"type":"stream",
 	"dbrps":[{"db":"db","rp":"rp"}],
 	"script":"stream\n    |from()\n        .measurement('cpu')\n",
@@ -312,6 +350,7 @@ func Test_Task_Labels(t *testing.T) {
 	}
 	exp := client.Task{
 		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/tasks/t1"},
+		ID:   "t1",
 		Type: client.StreamTask,
 		DBRPs: []client.DBRP{{
 			Database:        "db",
@@ -340,6 +379,7 @@ func Test_Task_RawFormat(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, `{
 	"link": {"rel":"self", "href":"/kapacitor/v1/tasks/t1"},
+	"id": "t1",
 	"type":"stream",
 	"dbrps":[{"db":"db","rp":"rp"}],
 	"script":"stream|from().measurement('cpu')",
@@ -364,6 +404,7 @@ func Test_Task_RawFormat(t *testing.T) {
 	}
 	exp := client.Task{
 		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/tasks/t1"},
+		ID:   "t1",
 		Type: client.StreamTask,
 		DBRPs: []client.DBRP{{
 			Database:        "db",
@@ -386,7 +427,10 @@ func Test_CreateTask(t *testing.T) {
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var task client.CreateTaskOptions
 		body, _ := ioutil.ReadAll(r.Body)
-		json.Unmarshal(body, &task)
+		err := json.Unmarshal(body, &task)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		if r.URL.Path == "/kapacitor/v1/tasks" && r.Method == "POST" {
 			exp := client.CreateTaskOptions{
@@ -395,13 +439,19 @@ func Test_CreateTask(t *testing.T) {
 				DBRPs:      []client.DBRP{{Database: "dbname", RetentionPolicy: "rpname"}},
 				TICKscript: tickScript,
 				Status:     client.Disabled,
+				Vars: client.Vars{
+					"var1": {
+						Value: true,
+						Type:  client.VarBool,
+					},
+				},
 			}
 			if !reflect.DeepEqual(exp, task) {
 				w.WriteHeader(http.StatusBadRequest)
 				fmt.Fprintf(w, "unexpected CreateTask body: got:\n%v\nexp:\n%v\n", task, exp)
 			} else {
 				w.WriteHeader(http.StatusOK)
-				fmt.Fprint(w, `{"link": {"rel":"self", "href":"/kapacitor/v1/tasks/taskname"}}`)
+				fmt.Fprint(w, `{"link": {"rel":"self", "href":"/kapacitor/v1/tasks/taskname"}, "id":"taskname"}`)
 			}
 		} else {
 			w.WriteHeader(http.StatusBadRequest)
@@ -419,9 +469,18 @@ func Test_CreateTask(t *testing.T) {
 		DBRPs:      []client.DBRP{{Database: "dbname", RetentionPolicy: "rpname"}},
 		TICKscript: tickScript,
 		Status:     client.Disabled,
+		Vars: client.Vars{
+			"var1": {
+				Value: true,
+				Type:  client.VarBool,
+			},
+		},
 	})
 	if got, exp := string(task.Link.Href), "/kapacitor/v1/tasks/taskname"; got != exp {
 		t.Errorf("unexpected task link got %s exp %s", got, exp)
+	}
+	if got, exp := task.ID, "taskname"; got != exp {
+		t.Errorf("unexpected task ID got %s exp %s", got, exp)
 	}
 	if err != nil {
 		t.Fatal(err)
@@ -433,12 +492,25 @@ func Test_UpdateTask(t *testing.T) {
 		var task client.UpdateTaskOptions
 		task.Status = client.Enabled
 		body, _ := ioutil.ReadAll(r.Body)
-		json.Unmarshal(body, &task)
+		err := json.Unmarshal(body, &task)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		if r.URL.Path == "/kapacitor/v1/tasks/taskname" && r.Method == "PATCH" {
 			exp := client.UpdateTaskOptions{
 				DBRPs:  []client.DBRP{{Database: "newdb", RetentionPolicy: "rpname"}},
 				Status: client.Enabled,
+				Vars: client.Vars{
+					"var1": {
+						Value: int64(42),
+						Type:  client.VarInt,
+					},
+					"var2": {
+						Value: float64(42),
+						Type:  client.VarFloat,
+					},
+				},
 			}
 			if !reflect.DeepEqual(exp, task) {
 				w.WriteHeader(http.StatusBadRequest)
@@ -460,6 +532,16 @@ func Test_UpdateTask(t *testing.T) {
 		c.TaskLink("taskname"),
 		client.UpdateTaskOptions{
 			DBRPs: []client.DBRP{{Database: "newdb", RetentionPolicy: "rpname"}},
+			Vars: client.Vars{
+				"var1": {
+					Value: int64(42),
+					Type:  client.VarInt,
+				},
+				"var2": {
+					Value: float64(42),
+					Type:  client.VarFloat,
+				},
+			},
 		},
 	)
 	if err != nil {
@@ -575,6 +657,7 @@ func Test_ListTasks(t *testing.T) {
 "tasks":[
 	{
 		"link": {"rel":"self", "href":"/kapacitor/v1/tasks/t1"},
+		"id": "t1",
 		"type":"stream",
 		"dbrps":[{"db":"db","rp":"rp"}],
 		"status" : "disabled",
@@ -582,6 +665,7 @@ func Test_ListTasks(t *testing.T) {
 	},
 	{
 		"link": {"rel":"self", "href":"/kapacitor/v1/tasks/t2"},
+		"id": "t2",
 		"type":"batch",
 		"dbrps":[{"db":"db","rp":"rp"}],
 		"status" : "enabled",
@@ -616,6 +700,7 @@ func Test_ListTasks(t *testing.T) {
 	exp := []client.Task{
 		{
 			Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/tasks/t1"},
+			ID:   "t1",
 			Type: client.StreamTask,
 			DBRPs: []client.DBRP{{
 				Database:        "db",
@@ -627,6 +712,7 @@ func Test_ListTasks(t *testing.T) {
 		},
 		{
 			Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/tasks/t2"},
+			ID:   "t2",
 			Type: client.BatchTask,
 			DBRPs: []client.DBRP{{
 				Database:        "db",
@@ -669,12 +755,14 @@ func Test_ListTasks_Options(t *testing.T) {
 "tasks":[
 	{
 		"link": {"rel":"self", "href":"/kapacitor/v1/tasks/t1"},
+		"id": "t1",
 		"status" : "enabled",
 		"executing" : false,
 		"error": "failed"
 	},
 	{
 		"link": {"rel":"self", "href":"/kapacitor/v1/tasks/t2"},
+		"id": "t2",
 		"status" : "enabled",
 		"executing" : true,
 		"error": ""
@@ -701,12 +789,14 @@ func Test_ListTasks_Options(t *testing.T) {
 	exp := []client.Task{
 		{
 			Link:      client.Link{Relation: client.Self, Href: "/kapacitor/v1/tasks/t1"},
+			ID:        "t1",
 			Status:    client.Enabled,
 			Executing: false,
 			Error:     "failed",
 		},
 		{
 			Link:      client.Link{Relation: client.Self, Href: "/kapacitor/v1/tasks/t2"},
+			ID:        "t2",
 			Status:    client.Enabled,
 			Executing: true,
 			Error:     "",
@@ -778,6 +868,311 @@ func Test_TaskOutput(t *testing.T) {
 	}
 }
 
+func Test_Template(t *testing.T) {
+	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/kapacitor/v1/templates/t1" && r.Method == "GET" &&
+			r.URL.Query().Get("script-format") == "formatted" {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, `{
+	"link": {"rel":"self", "href":"/kapacitor/v1/templates/t1"},
+	"type":"stream",
+	"script":"var x = 5\nstream\n    |from()\n        .measurement('cpu')\n",
+    "vars": {"x":{"value": 5, "type":"int"}},
+	"dot": "digraph t1 {}",
+	"error": ""
+}`)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "request: %v", r)
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	template, err := c.Template(c.TemplateLink("t1"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp := client.Template{
+		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/templates/t1"},
+		Type: client.StreamTask,
+		TICKscript: `var x = 5
+stream
+    |from()
+        .measurement('cpu')
+`,
+		Dot:   "digraph t1 {}",
+		Error: "",
+		Vars: client.Vars{
+			"x": {
+				Type:  client.VarInt,
+				Value: int64(5),
+			},
+		},
+	}
+	if !reflect.DeepEqual(exp, template) {
+		t.Errorf("unexpected template:\ngot:\n%v\nexp:\n%v", template, exp)
+	}
+}
+
+func Test_Template_RawFormat(t *testing.T) {
+	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/kapacitor/v1/templates/t1" && r.Method == "GET" &&
+			r.URL.Query().Get("script-format") == "raw" {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, `{
+	"link": {"rel":"self", "href":"/kapacitor/v1/templates/t1"},
+	"type":"stream",
+	"script":"stream|from().measurement('cpu')",
+	"dot": "digraph t1 {\n}",
+	"error": ""
+}`)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "request: %v", r)
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	template, err := c.Template(c.TemplateLink("t1"), &client.TemplateOptions{ScriptFormat: "raw"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp := client.Template{
+		Link:       client.Link{Relation: client.Self, Href: "/kapacitor/v1/templates/t1"},
+		Type:       client.StreamTask,
+		TICKscript: "stream|from().measurement('cpu')",
+		Dot:        "digraph t1 {\n}",
+		Error:      "",
+	}
+	if !reflect.DeepEqual(exp, template) {
+		t.Errorf("unexpected template:\ngot:\n%v\nexp:\n%v", template, exp)
+	}
+}
+
+func Test_CreateTemplate(t *testing.T) {
+	tickScript := "stream|from().measurement('cpu')"
+	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var template client.CreateTemplateOptions
+		body, _ := ioutil.ReadAll(r.Body)
+		json.Unmarshal(body, &template)
+
+		if r.URL.Path == "/kapacitor/v1/templates" && r.Method == "POST" {
+			exp := client.CreateTemplateOptions{
+				ID:         "templatename",
+				Type:       client.StreamTask,
+				TICKscript: tickScript,
+			}
+			if !reflect.DeepEqual(exp, template) {
+				w.WriteHeader(http.StatusBadRequest)
+				fmt.Fprintf(w, "unexpected CreateTemplate body: got:\n%v\nexp:\n%v\n", template, exp)
+			} else {
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprint(w, `{"link": {"rel":"self", "href":"/kapacitor/v1/templates/templatename"}, "id":"templatename"}`)
+			}
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "request: %v", r)
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	template, err := c.CreateTemplate(client.CreateTemplateOptions{
+		ID:         "templatename",
+		Type:       client.StreamTask,
+		TICKscript: tickScript,
+	})
+	if got, exp := string(template.Link.Href), "/kapacitor/v1/templates/templatename"; got != exp {
+		t.Errorf("unexpected template link got %s exp %s", got, exp)
+	}
+	if got, exp := template.ID, "templatename"; got != exp {
+		t.Errorf("unexpected template ID got %s exp %s", got, exp)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func Test_UpdateTemplate(t *testing.T) {
+	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var template client.UpdateTemplateOptions
+		body, _ := ioutil.ReadAll(r.Body)
+		json.Unmarshal(body, &template)
+
+		if r.URL.Path == "/kapacitor/v1/templates/templatename" && r.Method == "PATCH" {
+			exp := client.UpdateTemplateOptions{
+				Type: client.BatchTask,
+			}
+			if !reflect.DeepEqual(exp, template) {
+				w.WriteHeader(http.StatusBadRequest)
+				fmt.Fprintf(w, "unexpected UpdateTemplate body: got:\n%v\nexp:\n%v\n", template, exp)
+			} else {
+				w.WriteHeader(http.StatusNoContent)
+			}
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "request: %v", r)
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	err = c.UpdateTemplate(
+		c.TemplateLink("templatename"),
+		client.UpdateTemplateOptions{
+			Type: client.BatchTask,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func Test_DeleteTemplate(t *testing.T) {
+	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/kapacitor/v1/templates/templatename" && r.Method == "DELETE" {
+			w.WriteHeader(http.StatusNoContent)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "request: %v", r)
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	err = c.DeleteTemplate(c.TemplateLink("templatename"))
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func Test_ListTemplates(t *testing.T) {
+	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/kapacitor/v1/templates" && r.Method == "GET" &&
+			r.URL.Query().Get("pattern") == "" &&
+			r.URL.Query().Get("fields") == "" &&
+			r.URL.Query().Get("script-format") == "formatted" &&
+			r.URL.Query().Get("offset") == "0" &&
+			r.URL.Query().Get("limit") == "100" {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, `{
+"templates":[
+	{
+		"link": {"rel":"self", "href":"/kapacitor/v1/templates/t1"},
+		"id": "t1",
+		"type":"stream",
+		"script": "stream|from()"
+	},
+	{
+		"link": {"rel":"self", "href":"/kapacitor/v1/templates/t2"},
+		"id": "t2",
+		"type":"batch",
+		"script": "batch|query()"
+	}
+]}`)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "request: %v", r)
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	templates, err := c.ListTemplates(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp := []client.Template{
+		{
+			Link:       client.Link{Relation: client.Self, Href: "/kapacitor/v1/templates/t1"},
+			ID:         "t1",
+			Type:       client.StreamTask,
+			TICKscript: "stream|from()",
+		},
+		{
+			Link:       client.Link{Relation: client.Self, Href: "/kapacitor/v1/templates/t2"},
+			ID:         "t2",
+			Type:       client.BatchTask,
+			TICKscript: "batch|query()",
+		},
+	}
+	if !reflect.DeepEqual(exp, templates) {
+		t.Errorf("unexpected template list: got:\n%v\nexp:\n%v", templates, exp)
+	}
+}
+
+func Test_ListTemplates_Options(t *testing.T) {
+	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/kapacitor/v1/templates" && r.Method == "GET" &&
+			r.URL.Query().Get("pattern") == "t*" &&
+			len(r.URL.Query()["fields"]) == 1 &&
+			r.URL.Query()["fields"][0] == "type" &&
+			r.URL.Query().Get("script-format") == "formatted" &&
+			r.URL.Query().Get("offset") == "100" &&
+			r.URL.Query().Get("limit") == "100" {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, `{
+"templates":[
+	{
+		"link": {"rel":"self", "href":"/kapacitor/v1/templates/t1"},
+		"id": "t1",
+		"type":"stream"
+	},
+	{
+		"link": {"rel":"self", "href":"/kapacitor/v1/templates/t2"},
+		"id": "t2",
+		"type":"batch"
+	}
+]}`)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "request: %v", r)
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	templates, err := c.ListTemplates(&client.ListTemplatesOptions{
+		Pattern: "t*",
+		Fields:  []string{"type"},
+		Offset:  100,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp := []client.Template{
+		{
+			Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/templates/t1"},
+			ID:   "t1",
+			Type: client.StreamTask,
+		},
+		{
+			Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/templates/t2"},
+			ID:   "t2",
+			Type: client.BatchTask,
+		},
+	}
+	if !reflect.DeepEqual(exp, templates) {
+		t.Errorf("unexpected template list: got:\n%v\nexp:\n%v", templates, exp)
+	}
+}
+
 func Test_RecordStream(t *testing.T) {
 	stop := time.Now().Add(time.Minute).UTC()
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -823,7 +1218,7 @@ func Test_RecordBatch(t *testing.T) {
 			opts.Stop == stop &&
 			opts.Cluster == "" {
 			w.WriteHeader(http.StatusCreated)
-			fmt.Fprintf(w, `{"link": {"rel":"self", "href":"/kapacitor/v1/recordings/rid1"}}`)
+			fmt.Fprintf(w, `{"link": {"rel":"self", "href":"/kapacitor/v1/recordings/rid1"}, "id":"rid1"}`)
 		} else {
 			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprintf(w, "request: %v", r)
@@ -843,7 +1238,10 @@ func Test_RecordBatch(t *testing.T) {
 		t.Fatal(err)
 	}
 	if exp, got := "/kapacitor/v1/recordings/rid1", string(r.Link.Href); got != exp {
-		t.Errorf("unexpected recording id for test: got: %s exp: %s", got, exp)
+		t.Errorf("unexpected recording link for test: got: %s exp: %s", got, exp)
+	}
+	if exp, got := "rid1", r.ID; got != exp {
+		t.Errorf("unexpected recording ID for test: got: %s exp: %s", got, exp)
 	}
 }
 
@@ -857,7 +1255,7 @@ func Test_RecordQuery(t *testing.T) {
 			opts.Type == client.StreamTask &&
 			opts.Cluster == "mycluster" {
 			w.WriteHeader(http.StatusCreated)
-			fmt.Fprintf(w, `{"link": {"rel":"self", "href":"/kapacitor/v1/recordings/rid1"}}`)
+			fmt.Fprintf(w, `{"link": {"rel":"self", "href":"/kapacitor/v1/recordings/rid1"},"id":"rid1"}`)
 		} else {
 			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprintf(w, "request: %v body: %s", r, string(body))
@@ -879,6 +1277,9 @@ func Test_RecordQuery(t *testing.T) {
 	if exp, got := "/kapacitor/v1/recordings/rid1", string(r.Link.Href); got != exp {
 		t.Errorf("unexpected recording id for test: got: %s exp: %s", got, exp)
 	}
+	if exp, got := "rid1", r.ID; got != exp {
+		t.Errorf("unexpected recording ID for test: got: %s exp: %s", got, exp)
+	}
 }
 
 func Test_Recording(t *testing.T) {
@@ -887,6 +1288,7 @@ func Test_Recording(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, `{
 	"link": {"rel":"self", "href":"/kapacitor/v1/recordings/rid1"},
+	"id": "rid1",
 	"type":"batch",
 	"size": 42,
 	"date" : "2016-03-31T11:24:55.526388889Z",
@@ -910,6 +1312,7 @@ func Test_Recording(t *testing.T) {
 	}
 	exp := client.Recording{
 		Link:     client.Link{Relation: client.Self, Href: "/kapacitor/v1/recordings/rid1"},
+		ID:       "rid1",
 		Type:     client.BatchTask,
 		Size:     42,
 		Date:     time.Date(2016, 3, 31, 11, 24, 55, 526388889, time.UTC),
@@ -927,6 +1330,7 @@ func Test_RecordingRunning(t *testing.T) {
 			w.WriteHeader(http.StatusAccepted)
 			fmt.Fprintf(w, `{
 	"link": {"rel":"self", "href":"/kapacitor/v1/recordings/rid1"},
+	"id": "rid1",
 	"type":"batch",
 	"size": 42,
 	"date" : "2016-03-31T11:24:55.526388889Z",
@@ -950,6 +1354,7 @@ func Test_RecordingRunning(t *testing.T) {
 	}
 	exp := client.Recording{
 		Link:     client.Link{Relation: client.Self, Href: "/kapacitor/v1/recordings/rid1"},
+		ID:       "rid1",
 		Type:     client.BatchTask,
 		Size:     42,
 		Date:     time.Date(2016, 3, 31, 11, 24, 55, 526388889, time.UTC),
@@ -972,6 +1377,7 @@ func Test_ListRecordings(t *testing.T) {
 "recordings":[
 	{
 		"link": {"rel":"self", "href":"/kapacitor/v1/recordings/rid1"},
+		"id": "rid1",
 		"type":"batch",
 		"size": 42,
 		"date" : "2016-03-31T11:24:55.526388889Z",
@@ -981,6 +1387,7 @@ func Test_ListRecordings(t *testing.T) {
 	},
 	{
 		"link": {"rel":"self", "href":"/kapacitor/v1/recordings/rid2"},
+		"id": "rid2",
 		"type":"stream",
 		"size": 4200,
 		"date" : "2016-03-31T10:24:55.526388889Z",
@@ -1006,6 +1413,7 @@ func Test_ListRecordings(t *testing.T) {
 	exp := []client.Recording{
 		{
 			Link:     client.Link{Relation: client.Self, Href: "/kapacitor/v1/recordings/rid1"},
+			ID:       "rid1",
 			Type:     client.BatchTask,
 			Size:     42,
 			Date:     time.Date(2016, 3, 31, 11, 24, 55, 526388889, time.UTC),
@@ -1014,6 +1422,7 @@ func Test_ListRecordings(t *testing.T) {
 		},
 		{
 			Link:     client.Link{Relation: client.Self, Href: "/kapacitor/v1/recordings/rid2"},
+			ID:       "rid2",
 			Type:     client.StreamTask,
 			Size:     4200,
 			Date:     time.Date(2016, 3, 31, 10, 24, 55, 526388889, time.UTC),
@@ -1041,6 +1450,7 @@ func Test_ListRecordings_Filter(t *testing.T) {
 "recordings":[
 	{
 		"link": {"rel":"self", "href":"/kapacitor/v1/recordings/rid1"},
+		"id": "rid1",
 		"error": "",
 		"status": "running",
 		"progress": 0.67
@@ -1067,6 +1477,7 @@ func Test_ListRecordings_Filter(t *testing.T) {
 	exp := []client.Recording{
 		{
 			Link:     client.Link{Relation: client.Self, Href: "/kapacitor/v1/recordings/rid1"},
+			ID:       "rid1",
 			Status:   client.Running,
 			Progress: 0.67,
 		},
@@ -1101,6 +1512,7 @@ func Test_Replay(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, `{
 		"link": {"rel":"self", "href":"/kapacitor/v1/replays/replayid"},
+		"id": "replayid",
 		"task": "taskid",
 		"recording": "recordingid",
 		"recording-time":false,
@@ -1125,6 +1537,7 @@ func Test_Replay(t *testing.T) {
 	}
 	exp := client.Replay{
 		Link:          client.Link{Relation: client.Self, Href: "/kapacitor/v1/replays/replayid"},
+		ID:            "replayid",
 		Task:          "taskid",
 		Recording:     "recordingid",
 		RecordingTime: false,
@@ -1144,6 +1557,7 @@ func Test_ReplayRunning(t *testing.T) {
 			w.WriteHeader(http.StatusAccepted)
 			fmt.Fprintf(w, `{
 		"link": {"rel":"self", "href":"/kapacitor/v1/replays/replayid"},
+		"id": "replayid",
 		"task": "taskid",
 		"recording": "recordingid",
 		"recording-time":false,
@@ -1168,6 +1582,7 @@ func Test_ReplayRunning(t *testing.T) {
 	}
 	exp := client.Replay{
 		Link:          client.Link{Relation: client.Self, Href: "/kapacitor/v1/replays/replayid"},
+		ID:            "replayid",
 		Task:          "taskid",
 		Recording:     "recordingid",
 		RecordingTime: false,
@@ -1192,7 +1607,7 @@ func Test_CreateReplay(t *testing.T) {
 			opts.RecordingTime == false &&
 			opts.Clock == client.Fast {
 			w.WriteHeader(http.StatusCreated)
-			fmt.Fprintf(w, `{"link":{"rel":"self","href":"/kapacitor/v1/replays/replayid"}}`)
+			fmt.Fprintf(w, `{"link":{"rel":"self","href":"/kapacitor/v1/replays/replayid"}, "id":"replayid"}`)
 		} else {
 			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprintf(w, "request: %v", r)
@@ -1214,6 +1629,9 @@ func Test_CreateReplay(t *testing.T) {
 	if exp, got := "/kapacitor/v1/replays/replayid", string(replay.Link.Href); exp != got {
 		t.Errorf("unexpected replay.Link.Href got %s exp %s", got, exp)
 	}
+	if exp, got := "replayid", replay.ID; exp != got {
+		t.Errorf("unexpected replay.ID got %s exp %s", got, exp)
+	}
 }
 
 func Test_ReplayBatch(t *testing.T) {
@@ -1230,7 +1648,7 @@ func Test_ReplayBatch(t *testing.T) {
 			opts.RecordingTime == true &&
 			opts.Clock == client.Real {
 			w.WriteHeader(http.StatusCreated)
-			fmt.Fprintf(w, `{"link":{"rel":"self","href":"/kapacitor/v1/replays/replayid"}}`)
+			fmt.Fprintf(w, `{"link":{"rel":"self","href":"/kapacitor/v1/replays/replayid"}, "id":"replayid"}`)
 		} else {
 			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprintf(w, "request: %v", r)
@@ -1255,6 +1673,9 @@ func Test_ReplayBatch(t *testing.T) {
 	if exp, got := "/kapacitor/v1/replays/replayid", string(replay.Link.Href); exp != got {
 		t.Errorf("unexpected replay.Link.Href got %s exp %s", got, exp)
 	}
+	if exp, got := "replayid", replay.ID; exp != got {
+		t.Errorf("unexpected replay.ID got %s exp %s", got, exp)
+	}
 }
 
 func Test_ReplayQuery(t *testing.T) {
@@ -1269,7 +1690,7 @@ func Test_ReplayQuery(t *testing.T) {
 			opts.RecordingTime == false &&
 			opts.Clock == client.Fast {
 			w.WriteHeader(http.StatusCreated)
-			fmt.Fprintf(w, `{"link":{"rel":"self","href":"/kapacitor/v1/replays/replayid"}}`)
+			fmt.Fprintf(w, `{"link":{"rel":"self","href":"/kapacitor/v1/replays/replayid"}, "id":"replayid"}`)
 		} else {
 			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprintf(w, "request: %v", r)
@@ -1291,6 +1712,9 @@ func Test_ReplayQuery(t *testing.T) {
 	}
 	if exp, got := "/kapacitor/v1/replays/replayid", string(replay.Link.Href); exp != got {
 		t.Errorf("unexpected replay.Link.Href got %s exp %s", got, exp)
+	}
+	if exp, got := "replayid", replay.ID; exp != got {
+		t.Errorf("unexpected replay.ID got %s exp %s", got, exp)
 	}
 }
 
@@ -1325,6 +1749,7 @@ func Test_ListReplays(t *testing.T) {
 "replays":[
 	{
 		"link": {"rel":"self", "href":"/kapacitor/v1/replays/rpid1"},
+		"id": "rpid1",
 		"task": "taskid",
 		"recording" : "recordingid",
 		"clock": "fast",
@@ -1335,6 +1760,7 @@ func Test_ListReplays(t *testing.T) {
 	},
 	{
 		"link": {"rel":"self", "href":"/kapacitor/v1/replays/rpid2"},
+		"id": "rpid2",
 		"task": "taskid2",
 		"recording" : "recordingid2",
 		"clock": "real",
@@ -1361,6 +1787,7 @@ func Test_ListReplays(t *testing.T) {
 	exp := []client.Replay{
 		{
 			Link:          client.Link{Relation: client.Self, Href: "/kapacitor/v1/replays/rpid1"},
+			ID:            "rpid1",
 			Task:          "taskid",
 			Recording:     "recordingid",
 			Clock:         client.Fast,
@@ -1370,6 +1797,7 @@ func Test_ListReplays(t *testing.T) {
 		},
 		{
 			Link:          client.Link{Relation: client.Self, Href: "/kapacitor/v1/replays/rpid2"},
+			ID:            "rpid2",
 			Task:          "taskid2",
 			Recording:     "recordingid2",
 			Clock:         client.Real,
@@ -1398,6 +1826,7 @@ func Test_ListReplays_Filter(t *testing.T) {
 "replays":[
 	{
 		"link": {"rel":"self", "href":"/kapacitor/v1/replays/rpid1"},
+		"id": "rpid1",
 		"error": "",
 		"status": "running",
 		"progress": 0.67
@@ -1424,6 +1853,7 @@ func Test_ListReplays_Filter(t *testing.T) {
 	exp := []client.Replay{
 		{
 			Link:     client.Link{Relation: client.Self, Href: "/kapacitor/v1/replays/rpid1"},
+			ID:       "rpid1",
 			Status:   client.Running,
 			Progress: 0.67,
 		},

@@ -1,16 +1,14 @@
 package stateful
 
-import "github.com/influxdata/kapacitor/tick"
-
 // ExecutionState is auxiliary struct for data/context that needs to be passed
 // to evaluation functions
 type ExecutionState struct {
-	Funcs tick.Funcs
+	Funcs Funcs
 }
 
 func CreateExecutionState() ExecutionState {
 	return ExecutionState{
-		Funcs: tick.NewFunctions(),
+		Funcs: NewFunctions(),
 	}
 }
 

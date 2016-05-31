@@ -9,6 +9,7 @@ import (
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/tick/stateful"
 )
 
@@ -28,7 +29,7 @@ type EvalNode struct {
 
 // Create a new  EvalNode which applies a transformation func to each point in a stream and returns a single point.
 func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalNode, error) {
-	if len(n.AsList) != len(n.Expressions) {
+	if len(n.AsList) != len(n.Lambdas) {
 		return nil, errors.New("must provide one name per expression via the 'As' property")
 	}
 	en := &EvalNode{
@@ -37,17 +38,18 @@ func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalN
 		expressionsByGroup: make(map[models.GroupID][]stateful.Expression),
 	}
 	// Create stateful expressions
-	en.expressions = make([]stateful.Expression, len(n.Expressions))
-	for i, expr := range n.Expressions {
-		statefulExpr, err := stateful.NewExpression(expr)
+	en.expressions = make([]stateful.Expression, len(n.Lambdas))
+	expressions := make([]ast.Node, len(n.Lambdas))
+	for i, lambda := range n.Lambdas {
+		expressions[i] = lambda.Expression
+		statefulExpr, err := stateful.NewExpression(lambda.Expression)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to compile %v expression: %v", i, err)
 		}
-
 		en.expressions[i] = statefulExpr
 	}
 
-	en.scopePool = stateful.NewScopePool(stateful.FindReferenceVariables(n.Expressions...))
+	en.scopePool = stateful.NewScopePool(stateful.FindReferenceVariables(expressions...))
 	en.node.runF = en.runEval
 	return en, nil
 }

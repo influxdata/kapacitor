@@ -1,4 +1,4 @@
-package tick
+package ast
 
 import (
 	"fmt"
@@ -29,6 +29,8 @@ const (
 	TokenDuration
 	TokenLParen
 	TokenRParen
+	TokenLSBracket
+	TokenRSBracket
 	TokenComma
 	TokenNot
 	TokenTrue
@@ -140,6 +142,8 @@ func (t TokenType) String() string {
 		return "reference"
 	case t == TokenDuration:
 		return "duration"
+	case t == TokenLambda:
+		return "lambda"
 	case t == TokenNumber:
 		return "number"
 	case t == TokenString:
@@ -160,6 +164,10 @@ func (t TokenType) String() string {
 		return "("
 	case t == TokenRParen:
 		return ")"
+	case t == TokenLSBracket:
+		return "["
+	case t == TokenRSBracket:
+		return "]"
 	case t == TokenComma:
 		return ","
 	case t == TokenNot:
@@ -334,6 +342,12 @@ func lexToken(l *lexer) stateFn {
 		case r == ')':
 			l.emit(TokenRParen)
 			return lexToken
+		case r == '[':
+			l.emit(TokenLSBracket)
+			return lexToken
+		case r == ']':
+			l.emit(TokenRSBracket)
+			return lexToken
 		case r == '.':
 			l.emit(TokenDot)
 			return lexToken
@@ -429,9 +443,12 @@ func lexIdentOrKeyword(l *lexer) stateFn {
 			l.backup()
 			if t := keywords[l.current()]; t > 0 {
 				if t == TokenLambda && l.next() != ':' {
-					return l.errorf("missing ':' on lambda keyword")
+					// 'lambda' is a valid identifier.
+					l.backup()
+					l.emit(TokenIdent)
+				} else {
+					l.emit(t)
 				}
-				l.emit(t)
 			} else {
 				l.emit(TokenIdent)
 			}

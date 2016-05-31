@@ -5,16 +5,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/influxdata/kapacitor/tick"
+	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/tick/stateful"
 )
 
 func TestEvalFunctionNode_InvalidNodeAsArgument(t *testing.T) {
-	evaluator, err := stateful.NewEvalFunctionNode(&tick.FunctionNode{
-		Args: []tick.Node{&tick.CommentNode{}},
+	evaluator, err := stateful.NewEvalFunctionNode(&ast.FunctionNode{
+		Args: []ast.Node{&ast.CommentNode{}},
 	})
 
-	expectedError := errors.New("Failed to handle 1 argument: Given node type is not valid evaluation node: *tick.CommentNode")
+	expectedError := errors.New("Failed to handle 1 argument: Given node type is not valid evaluation node: *ast.CommentNode")
 
 	if err == nil && evaluator != nil {
 		t.Error("Expected an error, but go nil error and evaluator")
@@ -28,10 +28,10 @@ func TestEvalFunctionNode_InvalidNodeAsArgument(t *testing.T) {
 
 func TestEvalFunctionNode_FailedToEvaluateArgumentNodes(t *testing.T) {
 	// bool("value"), where in our case "value" won't exist
-	evaluator, err := stateful.NewEvalFunctionNode(&tick.FunctionNode{
+	evaluator, err := stateful.NewEvalFunctionNode(&ast.FunctionNode{
 		Func: "bool",
-		Args: []tick.Node{
-			&tick.ReferenceNode{Reference: "value"},
+		Args: []ast.Node{
+			&ast.ReferenceNode{Reference: "value"},
 		},
 	})
 
@@ -39,7 +39,7 @@ func TestEvalFunctionNode_FailedToEvaluateArgumentNodes(t *testing.T) {
 		t.Fatalf("Failed to create node evaluator: %v", err)
 	}
 
-	result, err := evaluator.EvalBool(tick.NewScope(), stateful.CreateExecutionState())
+	result, err := evaluator.EvalBool(stateful.NewScope(), stateful.CreateExecutionState())
 
 	expectedError := errors.New("Failed to handle 1 argument: name \"value\" is undefined. Names in scope:")
 	if err == nil {
@@ -53,16 +53,16 @@ func TestEvalFunctionNode_FailedToEvaluateArgumentNodes(t *testing.T) {
 }
 
 func TestEvalFunctionNode_UndefinedFunction(t *testing.T) {
-	evaluator, err := stateful.NewEvalFunctionNode(&tick.FunctionNode{
+	evaluator, err := stateful.NewEvalFunctionNode(&ast.FunctionNode{
 		Func: "yosi_the_king",
-		Args: []tick.Node{},
+		Args: []ast.Node{},
 	})
 
 	if err != nil {
 		t.Fatalf("Failed to create node evaluator: %v", err)
 	}
 
-	result, err := evaluator.EvalBool(tick.NewScope(), stateful.CreateExecutionState())
+	result, err := evaluator.EvalBool(stateful.NewScope(), stateful.CreateExecutionState())
 
 	expectedError := errors.New("undefined function: \"yosi_the_king\"")
 	if err == nil {
@@ -76,16 +76,16 @@ func TestEvalFunctionNode_UndefinedFunction(t *testing.T) {
 }
 
 func TestEvalFunctionNode_AryMismatch(t *testing.T) {
-	evaluator, err := stateful.NewEvalFunctionNode(&tick.FunctionNode{
+	evaluator, err := stateful.NewEvalFunctionNode(&ast.FunctionNode{
 		Func: "sigma",
-		Args: []tick.Node{&tick.BoolNode{Bool: true}},
+		Args: []ast.Node{&ast.BoolNode{Bool: true}},
 	})
 
 	if err != nil {
 		t.Fatalf("Failed to create node evaluator: %v", err)
 	}
 
-	result, err := evaluator.EvalFloat(tick.NewScope(), stateful.CreateExecutionState())
+	result, err := evaluator.EvalFloat(stateful.NewScope(), stateful.CreateExecutionState())
 
 	expectedError := errors.New("error calling \"sigma\": value is not a float")
 	if err == nil {
@@ -99,16 +99,16 @@ func TestEvalFunctionNode_AryMismatch(t *testing.T) {
 }
 
 func TestEvalFunctionNode_EvalBool_Sanity(t *testing.T) {
-	evaluator, err := stateful.NewEvalFunctionNode(&tick.FunctionNode{
+	evaluator, err := stateful.NewEvalFunctionNode(&ast.FunctionNode{
 		Func: "bool",
-		Args: []tick.Node{&tick.StringNode{Literal: "true"}},
+		Args: []ast.Node{&ast.StringNode{Literal: "true"}},
 	})
 
 	if err != nil {
 		t.Fatalf("Failed to create node evaluator: %v", err)
 	}
 
-	result, err := evaluator.EvalBool(tick.NewScope(), stateful.CreateExecutionState())
+	result, err := evaluator.EvalBool(stateful.NewScope(), stateful.CreateExecutionState())
 	if err != nil {
 		t.Errorf("Expected a result, but got error - %v", err)
 		return
@@ -120,16 +120,16 @@ func TestEvalFunctionNode_EvalBool_Sanity(t *testing.T) {
 }
 
 func TestEvalFunctionNode_EvalInt64_Sanity(t *testing.T) {
-	evaluator, err := stateful.NewEvalFunctionNode(&tick.FunctionNode{
+	evaluator, err := stateful.NewEvalFunctionNode(&ast.FunctionNode{
 		Func: "count",
-		Args: []tick.Node{},
+		Args: []ast.Node{},
 	})
 
 	if err != nil {
 		t.Fatalf("Failed to create node evaluator: %v", err)
 	}
 
-	result, err := evaluator.EvalInt(tick.NewScope(), stateful.CreateExecutionState())
+	result, err := evaluator.EvalInt(stateful.NewScope(), stateful.CreateExecutionState())
 	if err != nil {
 		t.Errorf("Expected a result, but got error - %v", err)
 		return
@@ -141,9 +141,9 @@ func TestEvalFunctionNode_EvalInt64_Sanity(t *testing.T) {
 }
 
 func TestEvalFunctionNode_EvalInt64_KeepConsistentState(t *testing.T) {
-	evaluator, err := stateful.NewEvalFunctionNode(&tick.FunctionNode{
+	evaluator, err := stateful.NewEvalFunctionNode(&ast.FunctionNode{
 		Func: "count",
-		Args: []tick.Node{},
+		Args: []ast.Node{},
 	})
 
 	if err != nil {
@@ -153,7 +153,7 @@ func TestEvalFunctionNode_EvalInt64_KeepConsistentState(t *testing.T) {
 	executionState := stateful.CreateExecutionState()
 
 	// first evaluation
-	result, err := evaluator.EvalInt(tick.NewScope(), executionState)
+	result, err := evaluator.EvalInt(stateful.NewScope(), executionState)
 	if err != nil {
 		t.Errorf("first evaluation: Expected a result, but got error - %v", err)
 		return
@@ -164,7 +164,7 @@ func TestEvalFunctionNode_EvalInt64_KeepConsistentState(t *testing.T) {
 	}
 
 	// second evaluation
-	result, err = evaluator.EvalInt(tick.NewScope(), executionState)
+	result, err = evaluator.EvalInt(stateful.NewScope(), executionState)
 	if err != nil {
 		t.Errorf("second evaluation: Expected a result, but got error - %v", err)
 		return
@@ -176,9 +176,9 @@ func TestEvalFunctionNode_EvalInt64_KeepConsistentState(t *testing.T) {
 }
 
 func TestEvalFunctionNode_EvalInt64_Reset(t *testing.T) {
-	evaluator, err := stateful.NewEvalFunctionNode(&tick.FunctionNode{
+	evaluator, err := stateful.NewEvalFunctionNode(&ast.FunctionNode{
 		Func: "count",
-		Args: []tick.Node{},
+		Args: []ast.Node{},
 	})
 
 	if err != nil {
@@ -188,7 +188,7 @@ func TestEvalFunctionNode_EvalInt64_Reset(t *testing.T) {
 	executionState := stateful.CreateExecutionState()
 
 	// first evaluation
-	result, err := evaluator.EvalInt(tick.NewScope(), executionState)
+	result, err := evaluator.EvalInt(stateful.NewScope(), executionState)
 	if err != nil {
 		t.Errorf("first evaluation: Expected a result, but got error - %v", err)
 		return
@@ -204,7 +204,7 @@ func TestEvalFunctionNode_EvalInt64_Reset(t *testing.T) {
 	}
 
 	// second evaluation
-	result, err = evaluator.EvalInt(tick.NewScope(), executionState)
+	result, err = evaluator.EvalInt(stateful.NewScope(), executionState)
 	if err != nil {
 		t.Errorf("second evaluation (after reset): Expected a result, but got error - %v", err)
 		return
@@ -216,10 +216,10 @@ func TestEvalFunctionNode_EvalInt64_Reset(t *testing.T) {
 }
 
 func TestEvalFunctionNode_EvalFloat64_Sanity(t *testing.T) {
-	evaluator, err := stateful.NewEvalFunctionNode(&tick.FunctionNode{
+	evaluator, err := stateful.NewEvalFunctionNode(&ast.FunctionNode{
 		Func: "abs",
-		Args: []tick.Node{
-			&tick.NumberNode{
+		Args: []ast.Node{
+			&ast.NumberNode{
 				IsFloat: true,
 				Float64: float64(-1),
 			},
@@ -230,7 +230,7 @@ func TestEvalFunctionNode_EvalFloat64_Sanity(t *testing.T) {
 		t.Fatalf("Failed to create node evaluator: %v", err)
 	}
 
-	result, err := evaluator.EvalFloat(tick.NewScope(), stateful.CreateExecutionState())
+	result, err := evaluator.EvalFloat(stateful.NewScope(), stateful.CreateExecutionState())
 	if err != nil {
 		t.Errorf("Expected a result, but got error - %v", err)
 		return
@@ -243,20 +243,20 @@ func TestEvalFunctionNode_EvalFloat64_Sanity(t *testing.T) {
 
 func TestEvalFunctionNode_ComplexNodes(t *testing.T) {
 	// pow("x" * 2, -"y") => pow(4, -1)
-	evaluator, err := stateful.NewEvalFunctionNode(&tick.FunctionNode{
+	evaluator, err := stateful.NewEvalFunctionNode(&ast.FunctionNode{
 		Func: "pow",
-		Args: []tick.Node{
+		Args: []ast.Node{
 			// "x" * 2
-			&tick.BinaryNode{
-				Operator: tick.TokenMult,
-				Left:     &tick.ReferenceNode{Reference: "x"},
-				Right:    &tick.NumberNode{IsFloat: true, Float64: float64(2)},
+			&ast.BinaryNode{
+				Operator: ast.TokenMult,
+				Left:     &ast.ReferenceNode{Reference: "x"},
+				Right:    &ast.NumberNode{IsFloat: true, Float64: float64(2)},
 			},
 
 			// -"y"
-			&tick.UnaryNode{
-				Operator: tick.TokenMinus,
-				Node:     &tick.ReferenceNode{Reference: "y"},
+			&ast.UnaryNode{
+				Operator: ast.TokenMinus,
+				Node:     &ast.ReferenceNode{Reference: "y"},
 			},
 		},
 	})
@@ -265,7 +265,7 @@ func TestEvalFunctionNode_ComplexNodes(t *testing.T) {
 		t.Fatalf("Failed to create node evaluator: %v", err)
 	}
 
-	scope := tick.NewScope()
+	scope := stateful.NewScope()
 	scope.Set("x", float64(2))
 	scope.Set("y", float64(1))
 
@@ -281,14 +281,14 @@ func TestEvalFunctionNode_ComplexNodes(t *testing.T) {
 }
 
 func TestStatefulExpression_Integration_EvalBool_SanityCallingFunction(t *testing.T) {
-	scope := tick.NewScope()
+	scope := stateful.NewScope()
 
-	se := mustCompileExpression(&tick.BinaryNode{
-		Operator: tick.TokenEqual,
-		Left: &tick.FunctionNode{
+	se := mustCompileExpression(&ast.BinaryNode{
+		Operator: ast.TokenEqual,
+		Left: &ast.FunctionNode{
 			Func: "count",
 		},
-		Right: &tick.NumberNode{
+		Right: &ast.NumberNode{
 			IsInt: true,
 			Int64: 1,
 		},

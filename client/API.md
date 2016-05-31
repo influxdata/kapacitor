@@ -3,6 +3,7 @@
 * [General Information](#general-information)
 * [Writing Data](#writing-data)
 * [Tasks](#tasks)
+* [Templates](#templates)
 * [Recordings](#recordings)
 * [Replays](#replays)
 * [Miscellaneous](#miscellaneous)
@@ -100,15 +101,48 @@ If a task already exists then use the `PATCH` method to modify any property of t
 
 Define a task using a JSON object with the following options:
 
-| Property | Purpose                                                                |
-| -------- | -------                                                                |
-| id       | Unique identifier for the task. If empty a random ID will be chosen.   |
-| type     | The task type: `stream` or `batch`.                                    |
-| dbrps    | List of database retention policy pairs the task is allowed to access. |
-| script   | The content of the script.                                             |
-| status   | One of `enabled` or `disabled`.                                        |
+| Property    | Purpose                                                                                   |
+| --------    | -------                                                                                   |
+| id          | Unique identifier for the task. If empty a random ID will be chosen.                      |
+| template-id | An optional ID of a template to use instead of specifying a TICKscript and type directly. |
+| type        | The task type: `stream` or `batch`.                                                       |
+| dbrps       | List of database retention policy pairs the task is allowed to access.                    |
+| script      | The content of the script.                                                                |
+| status      | One of `enabled` or `disabled`.                                                           |
+| vars        | A set of vars for overwriting any defined vars in the TICKscript.                         |
 
 When using PATCH, if any option is missing it will be left unmodified.
+
+##### Vars
+
+The vars object has the form:
+
+```
+{
+    "field_name" : {
+        "value": <VALUE>,
+        "type": <TYPE>
+    },
+    "another_field" : {
+        "value": <VALUE>,
+        "type": <TYPE>
+    }
+}
+```
+
+The following is a table of valid types and example values.
+
+| Type     | Example Value                    | Description                                                                                             |
+| ----     | -------------                    | -----------                                                                                             |
+| bool     | true                             | "true" or "false"                                                                                       |
+| int      | 42                               | Any integer value                                                                                       |
+| float    | 2.5 or 67                        | Any numeric value                                                                                       |
+| duration | "1s" or 1000000000               | Any integer value interpretted in nanoseconds or an influxql duration string, (i.e. 10000000000 is 10s) |
+| string   | "a string"                       | Any string value                                                                                        |
+| regex    | "^abc.*xyz"                      | Any string value that represents a valid Go regular expression https://golang.org/pkg/regexp/           |
+| lambda   | "\"value\" > 5"                  | Any string that is a valid TICKscript lambda expression                                                 |
+| star     | ""                               | No value is required, a star type var represents the literal `*` in TICKscript (i.e. `.groupBy(*)`)     |
+| list     | [{"type": TYPE, "value": VALUE}] | A list of var objects. Currently lists may only contain string or star vars                             |
 
 #### Example
 
@@ -120,7 +154,13 @@ POST /kapacitor/v1/tasks
     "id" : "TASK_ID",
     "type" : "stream",
     "dbrps": [{"db": "DATABASE_NAME", "rp" : "RP_NAME"}],
-    "script": "stream\n    |from()\n        .measurement('cpu')\n"
+    "script": "stream\n    |from()\n        .measurement('cpu')\n",
+    "vars" : {
+        "var1": {
+            "value": 42,
+            "type": "float"
+        }
+    }
 }
 ```
 
@@ -134,6 +174,12 @@ Response with task id and link.
     "dbrps" : [{"db": "DATABASE_NAME", "rp" : "RP_NAME"}],
     "script" : "stream\n    |from()\n        .measurement('cpu')\n",
     "dot" : "digraph TASK_ID { ... }",
+    "vars" : {
+        "var1": {
+            "value": 42,
+            "type": "float"
+        }
+    },
     "status" : "enabled",
     "executing" : true,
     "error" : "",
@@ -153,6 +199,7 @@ PATCH /kapacitor/v1/tasks/TASK_ID
 ```
 
 >NOTE: Setting any DBRP will overwrite all stored DBRPs.
+Setting any Vars will overwrite all stored Vars.
 
 
 Enable an existing task.
@@ -459,6 +506,256 @@ GET /kapacitor/v1/tasks/TASK_ID/mycustom_endpoint
 ```
 
 The output is the same as a query for data to [InfluxDB](https://docs.influxdata.com/influxdb/latest/guides/querying_data/).
+
+
+## Templates
+
+You can also define a task templates.
+A task template is defined by a template TICKscript, and a task type.
+
+
+### Define Templates
+
+To define a template POST to the `/kapacitor/v1/templates/` endpoint.
+If a template already exists then use the `PATCH` method to modify any property of the template.
+
+Define a template using a JSON object with the following options:
+
+| Property | Purpose                                                                  |
+| -------- | -------                                                                  |
+| id       | Unique identifier for the template. If empty a random ID will be chosen. |
+| type     | The template type: `stream` or `batch`.                                  |
+| script   | The content of the script.                                               |
+
+When using PATCH, if any option is missing it will be left unmodified.
+
+
+#### Updating Templates
+
+When updating an existing template all associated tasks are reloaded with the new template definition.
+The first error if any is returned when reloading associated tasks.
+If an error occurs, any task that was updated to the new definition is reverted to the old definition.
+This ensures that all associated tasks for a template either succeed or fail together.
+
+As a result, you will not be able to update a template if it introduces a breaking change in the TICKscript.
+In order to update a template in a breaking way you have two options:
+
+1. Create a new template and reassign each task to the new template updating the task vars as needed.
+2. If the breaking change is forward compatible (i.e. adds a new required var), first update each task with the needed vars,
+then update the template once all tasks are ready.
+
+
+#### Example
+
+Create a new template with ID TEMPLATE_ID.
+
+```
+POST /kapacitor/v1/templates
+{
+    "id" : "TEMPLATE_ID",
+    "type" : "stream",
+    "script": "stream\n    |from()\n        .measurement('cpu')\n"
+}
+```
+
+Response with template id and link.
+
+```
+{
+    "link" : {"rel": "self", "href": "/kapacitor/v1/templates/TASK_ID"},
+    "id" : "TASK_ID",
+    "type" : "stream",
+    "script" : "stream\n    |from()\n        .measurement('cpu')\n",
+    "dot" : "digraph TASK_ID { ... }",
+    "error" : "",
+    "created": "2006-01-02T15:04:05Z07:00",
+    "modified": "2006-01-02T15:04:05Z07:00",
+}
+```
+
+Modify only the script of the template.
+
+```
+PATCH /kapacitor/v1/templates/TEMPLATE_ID
+{
+    "script": "stream|from().measurement('mem')"
+}
+```
+
+#### Response
+
+| Code | Meaning                                          |
+| ---- | -------                                          |
+| 200  | Template created, contains template information. |
+| 204  | Template updated, no content                     |
+| 404  | Template does not exist                          |
+
+### Get Template
+
+To get information about a template make a GET request to the `/kapacitor/v1/templates/TEMPLATE_ID` endpoint.
+
+| Query Parameter | Default    | Purpose                                                                                                                          |
+| --------------- | -------    | -------                                                                                                                          |
+| script-format   | formatted  | One of `formatted` or `raw`. Raw will return the script identical to how it was defined. Formatted will first format the script. |
+
+
+A template has these read only properties in addition to the properties listed [above](#define-template).
+
+| Property | Description                                                                                                                                                                                                         |
+| -------- | -----------                                                                                                                                                                                                         |
+| vars     | Set of named vars from the TICKscript with their type, default values and description.                                                                                                                                           |
+| dot      | [GraphViz DOT](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) syntax formatted representation of the template DAG. NOTE: lables vs attributes does not matter since a template is never executing. |
+| error    | Any error encountered when reading the template.                                                                                                                                                                    |
+| created  | Date the template was first created                                                                                                                                                                                 |
+| modified | Date the template was last modified                                                                                                                                                                                 |
+
+#### Example
+
+Get information about a template using defaults.
+
+```
+GET /kapacitor/v1/templates/TEMPLATE_ID
+```
+
+```
+{
+    "link" : {"rel": "self", "href": "/kapacitor/v1/templates/TEMPLATE_ID"},
+    "id" : "TASK_ID",
+    "type" : "stream",
+    "script" : "var x = 5\nstream\n    |from()\n        .measurement('cpu')\n",
+    "vars": {"x":{"value": 5, "type":"int", "description": "threshold value"}},
+    "dot" : "digraph TASK_ID { ... }",
+    "error" : "",
+    "created": "2006-01-02T15:04:05Z07:00",
+    "modified": "2006-01-02T15:04:05Z07:00",
+}
+```
+
+#### Response
+
+| Code | Meaning                 |
+| ---- | -------                 |
+| 200  | Success                 |
+| 404  | Template does not exist |
+
+
+### Delete Template
+
+To delete a template make a DELETE request to the `/kapacitor/v1/templates/TEMPLATE_ID` endpoint.
+
+>NOTE:Deleting a template renders all associated tasks as orphans. The current state of the orphaned tasks will be left unmodified,
+but orphaned tasks will not be able to be enabled.
+
+```
+DELETE /kapacitor/v1/templates/TEMPLATE_ID
+```
+
+#### Response
+
+| Code | Meaning |
+| ---- | ------- |
+| 204  | Success |
+
+>NOTE: Deleting a non-existent template is not an error and will return a 204 success.
+
+
+### List Templates
+
+To get information about several templates make a GET request to the `/kapacitor/v1/templates` endpoint.
+
+| Query Parameter | Default    | Purpose                                                                                                                                           |
+| --------------- | -------    | -------                                                                                                                                           |
+| pattern         |            | Filter results based on the pattern. Uses standard shell glob matching, see [this](https://golang.org/pkg/path/filepath/#Match) for more details. |
+| fields          |            | List of fields to return. If empty returns all fields. Fields `id` and `link` are always returned.                                                |
+| script-format   | formatted  | One of `formatted` or `raw`. Raw will return the script identical to how it was defined. Formatted will first format the script.                  |
+| offset          | 0          | Offset count for paginating through templates.                                                                                                        |
+| limit           | 100        | Maximum number of templates to return.                                                                                                                |
+
+#### Example
+
+Get all templates.
+
+```
+GET /kapacitor/v1/templates
+```
+
+```
+{
+    "templates" : [
+        {
+            "link" : {"rel":"self", "href":"/kapacitor/v1/templates/TEMPLATE_ID"},
+            "id" : "TEMPLATE_ID",
+            "type" : "stream",
+            "script" : "stream|from().measurement('cpu')",
+            "dot" : "digraph TEMPLATE_ID { ... }",
+            "error" : ""
+        },
+        {
+            "link" : {"rel":"self", "href":"/kapacitor/v1/templates/ANOTHER_TEMPLATE_ID"},
+            "id" : "ANOTHER_TEMPLATE_ID",
+            "type" : "stream",
+            "script" : "stream|from().measurement('cpu')",
+            "dot" : "digraph ANOTHER_TEMPLATE_ID{ ... }",
+            "error" : ""
+        }
+    ]
+}
+```
+
+Optionally specify a glob `pattern` to list only matching templates.
+
+```
+GET /kapacitor/v1/template?pattern=TEMPLATE*
+```
+
+```
+{
+    "templates" : [
+        {
+            "link" : {"rel":"self", "href":"/kapacitor/v1/templates/TEMPLATE_ID"},
+            "id" : "TEMPLATE_ID",
+            "type" : "stream",
+            "script" : "stream|from().measurement('cpu')",
+            "dot" : "digraph TEMPLATE_ID { ... }",
+            "error" : ""
+        }
+    ]
+}
+```
+
+Get all templates, but only the script and error fields.
+
+```
+GET /kapacitor/v1/templates?fields=status&fields=executing&fields=error
+```
+
+```
+{
+    "templates" : [
+        {
+            "link" : {"rel":"self", "href":"/kapacitor/v1/templates/TEMPLATE_ID"},
+            "id" : "TEMPLATE_ID",
+            "script" : "stream|from().measurement('cpu')",
+            "error" : ""
+        },
+        {
+            "link" : {"rel":"self", "href":"/kapacitor/v1/templates/ANOTHER_TEMPLATE_ID"},
+            "id" : "ANOTHER_TEMPLATE_ID",
+            "script" : "stream|from().measurement('cpu')",
+            "error" : ""
+        }
+    ]
+}
+```
+
+#### Response
+
+| Code | Meaning |
+| ---- | ------- |
+| 200  | Success |
+
+>NOTE: If the pattern does not match any templates an empty list will be returned, with a 200 success.
+
 
 ## Recordings
 

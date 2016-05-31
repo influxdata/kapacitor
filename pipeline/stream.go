@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/influxdata/kapacitor/tick"
+	"github.com/influxdata/kapacitor/tick/ast"
 )
 
 // A StreamNode represents the source of data being
@@ -76,7 +76,7 @@ type FromNode struct {
 
 	// An expression to filter the data stream.
 	// tick:ignore
-	Expression tick.Node `tick:"Where"`
+	Lambda *ast.LambdaNode `tick:"Where"`
 
 	// The dimensions by which to group to the data.
 	// tick:ignore
@@ -221,15 +221,15 @@ func (s *FromNode) From() *FromNode {
 //
 // If empty then all data points are considered to match.
 // tick:property
-func (s *FromNode) Where(expression tick.Node) *FromNode {
-	if s.Expression != nil {
-		s.Expression = &tick.BinaryNode{
-			Operator: tick.TokenAnd,
-			Left:     s.Expression,
-			Right:    expression,
+func (s *FromNode) Where(lambda *ast.LambdaNode) *FromNode {
+	if s.Lambda != nil {
+		s.Lambda.Expression = &ast.BinaryNode{
+			Operator: ast.TokenAnd,
+			Left:     s.Lambda.Expression,
+			Right:    lambda.Expression,
 		}
 	} else {
-		s.Expression = expression
+		s.Lambda = lambda
 	}
 	return s
 }
@@ -245,4 +245,8 @@ func (s *FromNode) Where(expression tick.Node) *FromNode {
 func (s *FromNode) GroupBy(tag ...interface{}) *FromNode {
 	s.Dimensions = tag
 	return s
+}
+
+func (s *FromNode) validate() error {
+	return validateDimensions(s.Dimensions)
 }

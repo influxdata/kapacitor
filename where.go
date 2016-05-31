@@ -28,7 +28,7 @@ func newWhereNode(et *ExecutingTask, n *pipeline.WhereNode, l *log.Logger) (wn *
 		scopePools:  make(map[models.GroupID]stateful.ScopePool),
 	}
 	wn.runF = wn.runWhere
-	if n.Expression == nil {
+	if n.Lambda == nil {
 		return nil, errors.New("nil expression passed to WhereNode")
 	}
 	return
@@ -43,7 +43,7 @@ func (w *WhereNode) runWhere(snapshot []byte) error {
 			scopePool := w.scopePools[p.Group]
 
 			if expr == nil {
-				compiledExpr, err := stateful.NewExpression(w.w.Expression)
+				compiledExpr, err := stateful.NewExpression(w.w.Lambda.Expression)
 				if err != nil {
 					return fmt.Errorf("Failed to compile expression in where clause: %v", err)
 				}
@@ -51,7 +51,7 @@ func (w *WhereNode) runWhere(snapshot []byte) error {
 				expr = compiledExpr
 				w.expressions[p.Group] = expr
 
-				scopePool = stateful.NewScopePool(stateful.FindReferenceVariables(w.w.Expression))
+				scopePool = stateful.NewScopePool(stateful.FindReferenceVariables(w.w.Lambda.Expression))
 				w.scopePools[p.Group] = scopePool
 			}
 			if pass, err := EvalPredicate(expr, scopePool, p.Time, p.Fields, p.Tags); pass {
@@ -75,7 +75,7 @@ func (w *WhereNode) runWhere(snapshot []byte) error {
 			scopePool := w.scopePools[b.Group]
 
 			if expr == nil {
-				compiledExpr, err := stateful.NewExpression(w.w.Expression)
+				compiledExpr, err := stateful.NewExpression(w.w.Lambda.Expression)
 				if err != nil {
 					return fmt.Errorf("Failed to compile expression in where clause: %v", err)
 				}
@@ -83,7 +83,7 @@ func (w *WhereNode) runWhere(snapshot []byte) error {
 				expr = compiledExpr
 				w.expressions[b.Group] = expr
 
-				scopePool = stateful.NewScopePool(stateful.FindReferenceVariables(w.w.Expression))
+				scopePool = stateful.NewScopePool(stateful.FindReferenceVariables(w.w.Lambda.Expression))
 				w.scopePools[b.Group] = scopePool
 			}
 			for i := 0; i < len(b.Points); {

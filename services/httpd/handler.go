@@ -455,7 +455,11 @@ func MarshalJSON(v interface{}, pretty bool) []byte {
 	}
 
 	if err != nil {
-		return []byte(err.Error())
+		type errResponse struct {
+			Error string `json:"error"`
+		}
+		er := errResponse{Error: err.Error()}
+		b, _ = json.Marshal(er)
 	}
 	return b
 }

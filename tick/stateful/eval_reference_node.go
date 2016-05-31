@@ -5,15 +5,15 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/influxdata/kapacitor/tick"
+	"github.com/influxdata/kapacitor/tick/ast"
 )
 
 type EvalReferenceNode struct {
-	Node *tick.ReferenceNode
+	Node *ast.ReferenceNode
 }
 
 // getReferenceValue - core method for evaluating function where all NodeEvaluator methods should use
-func (n *EvalReferenceNode) getReferenceValue(scope *tick.Scope, executionState ExecutionState) (interface{}, error) {
+func (n *EvalReferenceNode) getReferenceValue(scope *Scope, executionState ExecutionState) (interface{}, error) {
 	value, err := scope.Get(n.Node.Reference)
 	if err != nil {
 		return nil, err
@@ -25,16 +25,20 @@ func (n *EvalReferenceNode) getReferenceValue(scope *tick.Scope, executionState 
 	return value, nil
 }
 
-func (n *EvalReferenceNode) Type(scope ReadOnlyScope, executionState ExecutionState) (ValueType, error) {
-	value, err := n.getReferenceValue(scope.(*tick.Scope), executionState)
+func (n *EvalReferenceNode) Type(scope ReadOnlyScope, executionState ExecutionState) (ast.ValueType, error) {
+	value, err := n.getReferenceValue(scope.(*Scope), executionState)
 	if err != nil {
-		return InvalidType, err
+		return ast.InvalidType, err
 	}
 
-	return valueTypeOf(value), nil
+	return ast.TypeOf(value), nil
 }
 
-func (n *EvalReferenceNode) EvalRegex(scope *tick.Scope, executionState ExecutionState) (*regexp.Regexp, error) {
+func (n *EvalReferenceNode) IsDynamic() bool {
+	return true
+}
+
+func (n *EvalReferenceNode) EvalRegex(scope *Scope, executionState ExecutionState) (*regexp.Regexp, error) {
 	refValue, err := n.getReferenceValue(scope, executionState)
 	if err != nil {
 		return nil, err
@@ -44,10 +48,10 @@ func (n *EvalReferenceNode) EvalRegex(scope *tick.Scope, executionState Executio
 		return regexValue, nil
 	}
 
-	return nil, ErrTypeGuardFailed{RequestedType: TRegex, ActualType: valueTypeOf(refValue)}
+	return nil, ErrTypeGuardFailed{RequestedType: ast.TRegex, ActualType: ast.TypeOf(refValue)}
 }
 
-func (n *EvalReferenceNode) EvalTime(scope *tick.Scope, executionState ExecutionState) (time.Time, error) {
+func (n *EvalReferenceNode) EvalTime(scope *Scope, executionState ExecutionState) (time.Time, error) {
 	refValue, err := n.getReferenceValue(scope, executionState)
 	if err != nil {
 		return time.Time{}, err
@@ -57,10 +61,23 @@ func (n *EvalReferenceNode) EvalTime(scope *tick.Scope, executionState Execution
 		return timeValue, nil
 	}
 
-	return time.Time{}, ErrTypeGuardFailed{RequestedType: TTime, ActualType: valueTypeOf(refValue)}
+	return time.Time{}, ErrTypeGuardFailed{RequestedType: ast.TTime, ActualType: ast.TypeOf(refValue)}
 }
 
-func (n *EvalReferenceNode) EvalString(scope *tick.Scope, executionState ExecutionState) (string, error) {
+func (n *EvalReferenceNode) EvalDuration(scope *Scope, executionState ExecutionState) (time.Duration, error) {
+	refValue, err := n.getReferenceValue(scope, executionState)
+	if err != nil {
+		return 0, err
+	}
+
+	if durValue, isDuration := refValue.(time.Duration); isDuration {
+		return durValue, nil
+	}
+
+	return 0, ErrTypeGuardFailed{RequestedType: ast.TDuration, ActualType: ast.TypeOf(refValue)}
+}
+
+func (n *EvalReferenceNode) EvalString(scope *Scope, executionState ExecutionState) (string, error) {
 	refValue, err := n.getReferenceValue(scope, executionState)
 	if err != nil {
 		return "", err
@@ -70,10 +87,10 @@ func (n *EvalReferenceNode) EvalString(scope *tick.Scope, executionState Executi
 		return stringValue, nil
 	}
 
-	return "", ErrTypeGuardFailed{RequestedType: TString, ActualType: valueTypeOf(refValue)}
+	return "", ErrTypeGuardFailed{RequestedType: ast.TString, ActualType: ast.TypeOf(refValue)}
 }
 
-func (n *EvalReferenceNode) EvalFloat(scope *tick.Scope, executionState ExecutionState) (float64, error) {
+func (n *EvalReferenceNode) EvalFloat(scope *Scope, executionState ExecutionState) (float64, error) {
 	refValue, err := n.getReferenceValue(scope, executionState)
 	if err != nil {
 		return float64(0), err
@@ -83,10 +100,10 @@ func (n *EvalReferenceNode) EvalFloat(scope *tick.Scope, executionState Executio
 		return float64Value, nil
 	}
 
-	return float64(0), ErrTypeGuardFailed{RequestedType: TFloat64, ActualType: valueTypeOf(refValue)}
+	return float64(0), ErrTypeGuardFailed{RequestedType: ast.TFloat, ActualType: ast.TypeOf(refValue)}
 }
 
-func (n *EvalReferenceNode) EvalInt(scope *tick.Scope, executionState ExecutionState) (int64, error) {
+func (n *EvalReferenceNode) EvalInt(scope *Scope, executionState ExecutionState) (int64, error) {
 	refValue, err := n.getReferenceValue(scope, executionState)
 	if err != nil {
 		return int64(0), err
@@ -96,10 +113,10 @@ func (n *EvalReferenceNode) EvalInt(scope *tick.Scope, executionState ExecutionS
 		return int64Value, nil
 	}
 
-	return int64(0), ErrTypeGuardFailed{RequestedType: TInt64, ActualType: valueTypeOf(refValue)}
+	return int64(0), ErrTypeGuardFailed{RequestedType: ast.TInt, ActualType: ast.TypeOf(refValue)}
 }
 
-func (n *EvalReferenceNode) EvalBool(scope *tick.Scope, executionState ExecutionState) (bool, error) {
+func (n *EvalReferenceNode) EvalBool(scope *Scope, executionState ExecutionState) (bool, error) {
 	refValue, err := n.getReferenceValue(scope, executionState)
 	if err != nil {
 		return false, err
@@ -109,5 +126,5 @@ func (n *EvalReferenceNode) EvalBool(scope *tick.Scope, executionState Execution
 		return boolValue, nil
 	}
 
-	return false, ErrTypeGuardFailed{RequestedType: TBool, ActualType: valueTypeOf(refValue)}
+	return false, ErrTypeGuardFailed{RequestedType: ast.TBool, ActualType: ast.TypeOf(refValue)}
 }

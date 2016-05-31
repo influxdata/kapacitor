@@ -1,17 +1,13 @@
 package stateful
 
-import (
-	"sync"
+import "sync"
 
-	"github.com/influxdata/kapacitor/tick"
-)
-
-// ScopePool - pooling mechanism for tick.Scope
+// ScopePool - pooling mechanism for Scope
 // The idea behind scope pool is to pool scopes and to put them only
 // the needed variables for execution.
 type ScopePool interface {
-	Get() *tick.Scope
-	Put(scope *tick.Scope)
+	Get() *Scope
+	Put(scope *Scope)
 
 	ReferenceVariables() []string
 }
@@ -29,7 +25,7 @@ func NewScopePool(referenceVariables []string) ScopePool {
 
 	scopePool.pool = sync.Pool{
 		New: func() interface{} {
-			scope := tick.NewScope()
+			scope := NewScope()
 			for _, refVariable := range scopePool.referenceVariables {
 				scope.Set(refVariable, nil)
 			}
@@ -47,11 +43,11 @@ func (s *scopePool) ReferenceVariables() []string {
 
 // Get - returns a scope from a pool with the needed reference variables
 // (with nil values/old values) in the scope
-func (s *scopePool) Get() *tick.Scope {
-	return s.pool.Get().(*tick.Scope)
+func (s *scopePool) Get() *Scope {
+	return s.pool.Get().(*Scope)
 }
 
 // Put - put used scope back to the pool
-func (s *scopePool) Put(scope *tick.Scope) {
+func (s *scopePool) Put(scope *Scope) {
 	s.pool.Put(scope)
 }

@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb/influxql"
-	"github.com/influxdata/kapacitor/tick"
+	"github.com/influxdata/kapacitor/tick/ast"
 )
 
 type Query struct {
@@ -119,7 +119,7 @@ func (q *Query) Dimensions(dims []interface{}) error {
 						Val: dim,
 					},
 				})
-		case *tick.StarNode:
+		case *ast.StarNode:
 			q.stmt.Dimensions = append(q.stmt.Dimensions,
 				&influxql.Dimension{
 					Expr: &influxql.Wildcard{},

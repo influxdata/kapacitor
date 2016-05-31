@@ -1,4 +1,4 @@
-package tick
+package stateful
 
 import (
 	"fmt"
