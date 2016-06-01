@@ -2,6 +2,7 @@ package influxdb
 
 import (
 	"errors"
+	"fmt"
 	"net/url"
 	"time"
 
@@ -13,6 +14,8 @@ import (
 const (
 	// Maximum time to try and connect to InfluxDB during startup.
 	DefaultStartUpTimeout = time.Minute * 5
+
+	DefaultSubscriptionProtocol = "http"
 )
 
 type Config struct {
@@ -33,8 +36,10 @@ type Config struct {
 
 	Timeout               toml.Duration       `toml:"timeout"`
 	DisableSubscriptions  bool                `toml:"disable-subscriptions"`
+	SubscriptionProtocol  string              `toml:"subscription-protocol"`
 	Subscriptions         map[string][]string `toml:"subscriptions"`
 	ExcludedSubscriptions map[string][]string `toml:"excluded-subscriptions"`
+	UDPBind               string              `toml:"udp-bind"`
 	UDPBuffer             int                 `toml:"udp-buffer"`
 	UDPReadBuffer         int                 `toml:"udp-read-buffer"`
 	StartUpTimeout        toml.Duration       `toml:"startup-timeout"`
@@ -52,8 +57,9 @@ func NewConfig() Config {
 		ExcludedSubscriptions: map[string][]string{
 			stats.DefaultDatabse: []string{stats.DefaultRetentionPolicy},
 		},
-		UDPBuffer:      udp.DefaultBuffer,
-		StartUpTimeout: toml.Duration(DefaultStartUpTimeout),
+		UDPBuffer:            udp.DefaultBuffer,
+		StartUpTimeout:       toml.Duration(DefaultStartUpTimeout),
+		SubscriptionProtocol: DefaultSubscriptionProtocol,
 	}
 }
 
@@ -73,6 +79,11 @@ func (c Config) Validate() error {
 		if err != nil {
 			return err
 		}
+	}
+	switch c.SubscriptionProtocol {
+	case "http", "https", "udp":
+	default:
+		return fmt.Errorf("invalid subscription protocol, must be one of 'udp', 'http' or 'https', got %s", c.SubscriptionProtocol)
 	}
 	return nil
 }

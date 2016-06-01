@@ -1671,20 +1671,20 @@ func (ts *Service) updateAllAssociatedTasks(old, new Template) error {
 			task, err := ts.tasks.Get(taskId)
 			if err != nil {
 				if err != ErrNoTaskExists {
-					log.Printf("E! error rolling back associated task %s: %s", taskId, err)
+					ts.logger.Printf("E! error rolling back associated task %s: %s", taskId, err)
 				}
 				continue
 			}
 			task.TICKscript = old.TICKscript
 			task.Type = old.Type
 			if err := ts.tasks.Replace(task); err != nil {
-				log.Printf("E! error rolling back associated task %s: %s", taskId, err)
+				ts.logger.Printf("E! error rolling back associated task %s: %s", taskId, err)
 			}
 			if task.Status == Enabled {
 				ts.stopTask(taskId)
 				err := ts.startTask(task)
 				if err != nil {
-					log.Printf("E! error rolling back associated task %s: %s", taskId, err)
+					ts.logger.Printf("E! error rolling back associated task %s: %s", taskId, err)
 				}
 			}
 		}

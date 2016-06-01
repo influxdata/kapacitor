@@ -157,6 +157,10 @@ func (c *Config) Validate() error {
 	if err != nil {
 		return err
 	}
+	err = c.HTTP.Validate()
+	if err != nil {
+		return err
+	}
 	err = c.Task.Validate()
 	if err != nil {
 		return err

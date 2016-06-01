@@ -10,6 +10,7 @@ import (
 	"log"
 	"net"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -40,7 +41,7 @@ type Service struct {
 	logger *log.Logger
 }
 
-func NewService(configs []Config, defaultInfluxDB int, hostname string, l *log.Logger) *Service {
+func NewService(configs []Config, defaultInfluxDB, httpPort int, hostname string, l *log.Logger) *Service {
 	clusterID := kapacitor.ClusterIDVar.StringValue()
 	subName := subNamePrefix + clusterID
 	clusters := make(map[string]*influxdb, len(configs))
@@ -84,13 +85,16 @@ func NewService(configs []Config, defaultInfluxDB int, hostname string, l *log.L
 			configSubs:     subs,
 			exConfigSubs:   exSubs,
 			hostname:       hostname,
+			httpPort:       httpPort,
 			logger:         l,
+			udpBind:        c.UDPBind,
 			udpBuffer:      c.UDPBuffer,
 			udpReadBuffer:  c.UDPReadBuffer,
 			startupTimeout: time.Duration(c.StartUpTimeout),
 			clusterID:      clusterID,
 			subName:        subName,
 			disableSubs:    c.DisableSubscriptions,
+			protocol:       c.SubscriptionProtocol,
 		}
 		if defaultInfluxDB == i {
 			defaultInfluxDBName = c.Name
@@ -145,7 +149,10 @@ type influxdb struct {
 	configSubs     map[subEntry]bool
 	exConfigSubs   map[subEntry]bool
 	hostname       string
+	httpPort       int
 	logger         *log.Logger
+	protocol       string
+	udpBind        string
 	udpBuffer      int
 	udpReadBuffer  int
 	startupTimeout time.Duration
@@ -329,7 +336,34 @@ func (s *influxdb) linkSubscriptions() error {
 					}
 					existingSubs[se] = si
 				} else if se.name == s.subName {
-					existingSubs[se] = si
+					if len(si.Destinations) == 0 {
+						s.logger.Println("E! found subscription without any destinations:", se)
+						continue
+					}
+					u, err := url.Parse(si.Destinations[0])
+					if err != nil {
+						s.logger.Println("E! found subscription with invalid destinations:", si)
+						continue
+					}
+					host, port, err := net.SplitHostPort(u.Host)
+					if err != nil {
+						s.logger.Println("E! found subscription with invalid destinations:", si)
+						continue
+					}
+					pn, err := strconv.ParseInt(port, 10, 64)
+					if err != nil {
+						s.logger.Println("E! found subscription with invalid destinations:", si)
+						continue
+					}
+					// Check if the hostname, port or protocol have changed
+					if host != s.hostname ||
+						u.Scheme != s.protocol ||
+						((u.Scheme == "http" || u.Scheme == "https") && int(pn) != s.httpPort) {
+						// Something changed, drop the sub and let it get recreated
+						s.dropSub(cli, se.name, se.cluster, se.rp)
+					} else {
+						existingSubs[se] = si
+					}
 				}
 			}
 		}
@@ -347,12 +381,14 @@ func (s *influxdb) linkSubscriptions() error {
 					s.logger.Println("E! invalid URL in subscription destinations:", err)
 					continue
 				}
-				pair := strings.Split(u.Host, ":")
-				if pair[0] == s.hostname {
+				host, port, err := net.SplitHostPort(u.Host)
+				if host == s.hostname {
 					numSubscriptions++
-					_, err := s.startListener(se.cluster, se.rp, *u)
-					if err != nil {
-						s.logger.Println("E! failed to start listener:", err)
+					if u.Scheme == "udp" {
+						_, err := s.startUDPListener(se.cluster, se.rp, port)
+						if err != nil {
+							s.logger.Println("E! failed to start UDP listener:", err)
+						}
 					}
 					startedSubs[se] = true
 					break
@@ -364,19 +400,19 @@ func (s *influxdb) linkSubscriptions() error {
 	for _, se := range allSubs {
 		// If we have been configured to subscribe and the subscription is not started yet.
 		if (s.configSubs[se] || all) && !startedSubs[se] && !s.exConfigSubs[se] {
-			u, err := url.Parse("udp://:0")
-			if err != nil {
-				return fmt.Errorf("could not create valid destination url, is hostname correct? err: %s", err)
+			var destination string
+			switch s.protocol {
+			case "http", "https":
+				destination = fmt.Sprintf("%s://%s:%d", s.protocol, s.hostname, s.httpPort)
+			case "udp":
+				addr, err := s.startUDPListener(se.cluster, se.rp, "0")
+				if err != nil {
+					s.logger.Println("E! failed to start UDP listener:", err)
+				}
+				destination = fmt.Sprintf("udp://%s:%d", s.hostname, addr.Port)
 			}
 
 			numSubscriptions++
-			addr, err := s.startListener(se.cluster, se.rp, *u)
-			if err != nil {
-				s.logger.Println("E! failed to start listener:", err)
-			}
-
-			// Get port from addr
-			destination := fmt.Sprintf("udp://%s:%d", s.hostname, addr.Port)
 
 			err = s.createSub(cli, se.name, se.cluster, se.rp, "ANY", []string{destination})
 			if err != nil {
@@ -425,29 +461,25 @@ func (s *influxdb) dropSub(cli client.Client, name, cluster, rp string) (err err
 	return
 }
 
-func (s *influxdb) startListener(cluster, rp string, u url.URL) (*net.UDPAddr, error) {
-	switch u.Scheme {
-	case "udp":
-		c := udp.Config{}
-		c.Enabled = true
-		c.BindAddress = u.Host
-		c.Database = cluster
-		c.RetentionPolicy = rp
-		c.Buffer = s.udpBuffer
-		c.ReadBuffer = s.udpReadBuffer
+func (s *influxdb) startUDPListener(cluster, rp, port string) (*net.UDPAddr, error) {
+	c := udp.Config{}
+	c.Enabled = true
+	c.BindAddress = fmt.Sprintf("%s:%s", s.udpBind, port)
+	c.Database = cluster
+	c.RetentionPolicy = rp
+	c.Buffer = s.udpBuffer
+	c.ReadBuffer = s.udpReadBuffer
 
-		l := s.LogService.NewLogger(fmt.Sprintf("[udp:%s.%s] ", cluster, rp), log.LstdFlags)
-		service := udp.NewService(c, l)
-		service.PointsWriter = s.PointsWriter
-		err := service.Open()
-		if err != nil {
-			return nil, err
-		}
-		s.services = append(s.services, service)
-		s.logger.Println("I! started UDP listener for", cluster, rp)
-		return service.Addr(), nil
+	l := s.LogService.NewLogger(fmt.Sprintf("[udp:%s.%s] ", cluster, rp), log.LstdFlags)
+	service := udp.NewService(c, l)
+	service.PointsWriter = s.PointsWriter
+	err := service.Open()
+	if err != nil {
+		return nil, err
 	}
-	return nil, fmt.Errorf("unsupported scheme %q", u.Scheme)
+	s.services = append(s.services, service)
+	s.logger.Println("I! started UDP listener for", cluster, rp)
+	return service.Addr(), nil
 }
 
 func (s *influxdb) execQuery(cli client.Client, q string) (*client.Response, error) {
