@@ -105,6 +105,7 @@ kapacitor replay-live query -task cpu_alert -query 'SELECT usage_idle FROM teleg
 - [#555](https://github.com/influxdata/kapacitor/issues/555): Fixes bug where "time" functions didn't work in lambda expressions.
 - [#570](https://github.com/influxdata/kapacitor/issues/570): Removes panic in SMTP service on failed close connection.
 - [#587](https://github.com/influxdata/kapacitor/issues/587): Allow number literals without leading zeros.
+- [#584](https://github.com/influxdata/kapacitor/issues/584): Do not block during startup to send usage stats.
 
 ## v0.13.1 [2016-05-13]
 

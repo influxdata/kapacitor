@@ -60,15 +60,22 @@ func (s *Service) Open() error {
 	s.tags["os"] = runtime.GOOS
 
 	// Send report on startup
-	err := s.sendUsageReport()
-	if err != nil {
-		s.logger.Println("E! error while sending usage report on startup:", err)
-	}
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		err := s.sendUsageReport()
+		if err != nil {
+			s.logger.Println("E! error while sending usage report on startup:", err)
+		}
+	}()
 
 	// Send periodic anonymous usage stats
 	s.usageTicker = time.NewTicker(reportingInterval)
 	s.wg.Add(1)
-	go s.usage()
+	go func() {
+		defer s.wg.Done()
+		s.usage()
+	}()
 	return nil
 }
 
@@ -87,7 +94,6 @@ func (s *Service) Close() error {
 }
 
 func (s *Service) usage() {
-	defer s.wg.Done()
 	for {
 		select {
 		case <-s.closing:
