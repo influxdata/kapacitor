@@ -289,6 +289,114 @@ batch
 	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er)
 }
 
+func TestBatch_CountEmptyBatch(t *testing.T) {
+
+	var script = `
+batch
+	|query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "host" = 'serverA'
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy('cpu')
+	|log().prefix('QUERY')
+	|where(lambda: "mean" < 10)
+	|log().prefix('WHERE')
+	|count('mean')
+	|httpOut('TestBatch_CountEmptyBatch')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"cpu": "cpu-total"},
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+					0.0,
+				}},
+			},
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"cpu": "cpu0"},
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+					0.0,
+				}},
+			},
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"cpu": "cpu1"},
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+					0.0,
+				}},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_CountEmptyBatch", script, 30*time.Second, er)
+}
+
+func TestBatch_SumEmptyBatch(t *testing.T) {
+
+	var script = `
+batch
+	|query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "host" = 'serverA'
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy('cpu')
+	|log().prefix('QUERY')
+	|where(lambda: "mean" < 10)
+	|log().prefix('WHERE')
+	|sum('mean')
+	|httpOut('TestBatch_CountEmptyBatch')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"cpu": "cpu-total"},
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+					0.0,
+				}},
+			},
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"cpu": "cpu0"},
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+					0.0,
+				}},
+			},
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"cpu": "cpu1"},
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+					0.0,
+				}},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_CountEmptyBatch", script, 30*time.Second, er)
+}
+
 func TestBatch_Default(t *testing.T) {
 
 	var script = `

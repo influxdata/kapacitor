@@ -264,7 +264,7 @@ func (s *Store) ShardN() int {
 }
 
 // CreateShard creates a shard with the given id and retention policy on a database.
-func (s *Store) CreateShard(database, retentionPolicy string, shardID uint64) error {
+func (s *Store) CreateShard(database, retentionPolicy string, shardID uint64, enabled bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -300,6 +300,8 @@ func (s *Store) CreateShard(database, retentionPolicy string, shardID uint64) er
 	path := filepath.Join(s.path, database, retentionPolicy, strconv.FormatUint(shardID, 10))
 	shard := NewShard(shardID, db, path, walPath, s.EngineOptions)
 	shard.SetLogOutput(s.logOutput)
+	shard.EnableOnOpen = enabled
+
 	if err := shard.Open(); err != nil {
 		return err
 	}
@@ -318,6 +320,16 @@ func (s *Store) CreateShardSnapshot(id uint64) (string, error) {
 	}
 
 	return sh.CreateSnapshot()
+}
+
+// SetShardEnabled enables or disables a shard for read and writes
+func (s *Store) SetShardEnabled(shardID uint64, enabled bool) error {
+	sh := s.Shard(shardID)
+	if sh == nil {
+		return ErrShardNotFound
+	}
+	sh.SetEnabled(enabled)
+	return nil
 }
 
 // DeleteShard removes a shard from disk.

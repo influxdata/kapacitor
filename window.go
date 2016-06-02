@@ -58,7 +58,10 @@ func (w *WindowNode) runWindow([]byte) error {
 			// Send window to all children
 			w.timer.Pause()
 			for _, child := range w.outs {
-				child.CollectBatch(points)
+				err := child.CollectBatch(points)
+				if err != nil {
+					return err
+				}
 			}
 			w.timer.Resume()
 		}

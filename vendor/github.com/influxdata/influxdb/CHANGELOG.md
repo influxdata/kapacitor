@@ -34,7 +34,7 @@
 - [#6235](https://github.com/influxdata/influxdb/issues/6235): Fix measurement field panic in tsm1 engine.
 - [#6663](https://github.com/influxdata/influxdb/issues/6663): Fixing panic in SHOW FIELD KEYS.
 - [#6624](https://github.com/influxdata/influxdb/issues/6624): Ensure clients requesting gzip encoded bodies don't receive empty body
-- [#6652](https://github.com/influxdata/influxdb/issues/6652): Fix panic: interface conversion: tsm1.Value is *tsm1.StringValue, not *tsm1.FloatValue
+- [#6652](https://github.com/influxdata/influxdb/issues/6652): Fix panic: interface conversion: tsm1.Value is \*tsm1.StringValue, not \*tsm1.FloatValue
 - [#6406](https://github.com/influxdata/influxdb/issues/6406): Max index entries exceeded
 - [#6557](https://github.com/influxdata/influxdb/issues/6557): Overwriting points on large series can cause memory spikes during compactions
 - [#6611](https://github.com/influxdata/influxdb/issues/6611): Queries slow down hundreds times after overwriting points
@@ -46,6 +46,13 @@
 - [#6701](https://github.com/influxdata/influxdb/issues/6701): Filter out sources that do not match the shard database/retention policy.
 - [#6683](https://github.com/influxdata/influxdb/issues/6683): Fix compaction planning re-compacting large TSM files
 - [#6693](https://github.com/influxdata/influxdb/pull/6693): Truncate the shard group end time if it exceeds MaxNanoTime.
+- [#6672](https://github.com/influxdata/influxdb/issues/6672): Accept points with trailing whitespace.
+- [#6599](https://github.com/influxdata/influxdb/issues/6599): Ensure that future points considered in SHOW queries.
+- [#6720](https://github.com/influxdata/influxdb/issues/6720): Concurrent map read write panic. Thanks @arussellsaw
+- [#6727](https://github.com/influxdata/influxdb/issues/6727): queries with strings that look like dates end up with date types, not string types
+- [#6250](https://github.com/influxdata/influxdb/issues/6250): Slow startup time
+- [#6753](https://github.com/influxdata/influxdb/issues/6753): Prevent panic if there are no values.
+- [#6685](https://github.com/influxdata/influxdb/issues/6685): Batch SELECT INTO / CQ writes
 
 ## v0.13.0 [2016-05-12]
 

@@ -313,6 +313,7 @@ func (b *QueryNode) doQuery() error {
 					continue
 				}
 				for _, bch := range batches {
+					bch.TMax = stop
 					b.batchesQueried.Add(1)
 					b.pointsQueried.Add(int64(len(bch.Points)))
 					b.timer.Pause()
