@@ -13,7 +13,8 @@ import (
 
 const (
 	// Maximum time to try and connect to InfluxDB during startup.
-	DefaultStartUpTimeout = time.Minute * 5
+	DefaultStartUpTimeout           = time.Minute * 5
+	DefaultSubscriptionSyncInterval = time.Minute * 1
 
 	DefaultSubscriptionProtocol = "http"
 )
@@ -34,15 +35,16 @@ type Config struct {
 	// Use SSL but skip chain & host verification
 	InsecureSkipVerify bool `toml:"insecure-skip-verify"`
 
-	Timeout               toml.Duration       `toml:"timeout"`
-	DisableSubscriptions  bool                `toml:"disable-subscriptions"`
-	SubscriptionProtocol  string              `toml:"subscription-protocol"`
-	Subscriptions         map[string][]string `toml:"subscriptions"`
-	ExcludedSubscriptions map[string][]string `toml:"excluded-subscriptions"`
-	UDPBind               string              `toml:"udp-bind"`
-	UDPBuffer             int                 `toml:"udp-buffer"`
-	UDPReadBuffer         int                 `toml:"udp-read-buffer"`
-	StartUpTimeout        toml.Duration       `toml:"startup-timeout"`
+	Timeout                  toml.Duration       `toml:"timeout"`
+	DisableSubscriptions     bool                `toml:"disable-subscriptions"`
+	SubscriptionProtocol     string              `toml:"subscription-protocol"`
+	Subscriptions            map[string][]string `toml:"subscriptions"`
+	ExcludedSubscriptions    map[string][]string `toml:"excluded-subscriptions"`
+	UDPBind                  string              `toml:"udp-bind"`
+	UDPBuffer                int                 `toml:"udp-buffer"`
+	UDPReadBuffer            int                 `toml:"udp-read-buffer"`
+	StartUpTimeout           toml.Duration       `toml:"startup-timeout"`
+	SubscriptionSyncInterval toml.Duration       `toml:"subscriptions-retry-interval"`
 }
 
 func NewConfig() Config {
@@ -57,9 +59,10 @@ func NewConfig() Config {
 		ExcludedSubscriptions: map[string][]string{
 			stats.DefaultDatabse: []string{stats.DefaultRetentionPolicy},
 		},
-		UDPBuffer:            udp.DefaultBuffer,
-		StartUpTimeout:       toml.Duration(DefaultStartUpTimeout),
-		SubscriptionProtocol: DefaultSubscriptionProtocol,
+		UDPBuffer:                udp.DefaultBuffer,
+		StartUpTimeout:           toml.Duration(DefaultStartUpTimeout),
+		SubscriptionProtocol:     DefaultSubscriptionProtocol,
+		SubscriptionSyncInterval: toml.Duration(DefaultSubscriptionSyncInterval),
 	}
 }
 
@@ -72,6 +75,9 @@ func (c *Config) SetDefaultValues() {
 	}
 	if c.SubscriptionProtocol == "" {
 		c.SubscriptionProtocol = DefaultSubscriptionProtocol
+	}
+	if c.SubscriptionSyncInterval == toml.Duration(0) {
+		c.SubscriptionSyncInterval = toml.Duration(DefaultSubscriptionSyncInterval)
 	}
 }
 
