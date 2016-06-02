@@ -19,6 +19,44 @@ import (
 	"github.com/influxdata/wlog"
 )
 
+func TestBatch_InvalidQuery(t *testing.T) {
+
+	// Create a new execution env
+	tm := kapacitor.NewTaskMaster(logService)
+	tm.HTTPDService = httpService
+	tm.TaskStore = taskStore{}
+	tm.DeadmanService = deadman{}
+	tm.Open()
+	defer tm.Close()
+
+	testCases := []struct {
+		script string
+		err    string
+	}{
+		{
+			script: `batch|query('SELECT value FROM db.rp.m; DROP DATABASE _internal').every(1s)`,
+			err:    "query must be a single select statement, got 2 statements",
+		},
+		{
+			script: `batch|query('DROP DATABASE _internal').every(1s)`,
+			err:    `query is not a select statement "DROP DATABASE _internal"`,
+		},
+	}
+
+	for _, tc := range testCases {
+		task, err := tm.NewTask("invalid", tc.script, kapacitor.BatchTask, dbrps, 0, nil)
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+		if _, err := tm.StartTask(task); err == nil {
+			t.Errorf("expected error for invalid query %s", task.Dot())
+		} else if got := err.Error(); got != tc.err {
+			t.Errorf("unexpected error got %s exp %s", got, tc.err)
+		}
+	}
+}
+
 func TestBatch_Derivative(t *testing.T) {
 
 	var script = `

@@ -14,15 +14,18 @@ type Query struct {
 	stmt    *influxql.SelectStatement
 }
 
-func NewQuery(q string) (*Query, error) {
+func NewQuery(queryString string) (*Query, error) {
 	query := &Query{}
 	// Parse and validate query
-	stmt, err := influxql.ParseStatement(q)
+	q, err := influxql.ParseQuery(queryString)
 	if err != nil {
 		return nil, err
 	}
+	if l := len(q.Statements); l != 1 {
+		return nil, fmt.Errorf("query must be a single select statement, got %d statements", l)
+	}
 	var ok bool
-	query.stmt, ok = stmt.(*influxql.SelectStatement)
+	query.stmt, ok = q.Statements[0].(*influxql.SelectStatement)
 	if !ok {
 		return nil, fmt.Errorf("query is not a select statement %q", q)
 	}
