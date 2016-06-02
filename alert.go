@@ -146,8 +146,16 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 
 	an.detailsTmpl, err = html.New("details").Funcs(html.FuncMap{
 		"json": func(v interface{}) html.JS {
-			a, _ := json.Marshal(v)
-			return html.JS(a)
+
+			tmpBuffer := an.bufPool.Get().(*bytes.Buffer)
+			defer func() {
+				tmpBuffer.Reset()
+				an.bufPool.Put(tmpBuffer)
+			}()
+
+			json.NewEncoder(tmpBuffer).Encode(v)
+
+			return html.JS(tmpBuffer.String())
 		},
 	}).Parse(n.Details)
 	if err != nil {
@@ -721,8 +729,11 @@ func (a *AlertNode) renderID(name string, group models.GroupID, tags models.Tags
 		Tags:     tags,
 	}
 	id := a.bufPool.Get().(*bytes.Buffer)
-	defer a.bufPool.Put(id)
-	id.Reset()
+	defer func() {
+		id.Reset()
+		a.bufPool.Put(id)
+	}()
+
 	err := a.idTmpl.Execute(id, info)
 	if err != nil {
 		return "", err
@@ -750,7 +761,10 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group 
 
 	// Grab a buffer for the message template and the details template
 	tmpBuffer := a.bufPool.Get().(*bytes.Buffer)
-	defer a.bufPool.Put(tmpBuffer)
+	defer func() {
+		tmpBuffer.Reset()
+		a.bufPool.Put(tmpBuffer)
+	}()
 	tmpBuffer.Reset()
 
 	err := a.messageTmpl.Execute(tmpBuffer, minfo)
@@ -780,8 +794,10 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group 
 
 func (a *AlertNode) handlePost(post *pipeline.PostHandler, ad *AlertData) {
 	bodyBuffer := a.bufPool.Get().(*bytes.Buffer)
-	defer a.bufPool.Put(bodyBuffer)
-	bodyBuffer.Reset()
+	defer func() {
+		bodyBuffer.Reset()
+		a.bufPool.Put(bodyBuffer)
+	}()
 
 	err := json.NewEncoder(bodyBuffer).Encode(ad)
 	if err != nil {
