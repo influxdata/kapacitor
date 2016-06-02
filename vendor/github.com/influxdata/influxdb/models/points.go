@@ -29,6 +29,7 @@ var (
 
 	ErrPointMustHaveAField  = errors.New("point without fields is unsupported")
 	ErrInvalidNumber        = errors.New("invalid number")
+	ErrInvalidPoint         = errors.New("point is invalid")
 	ErrMaxKeyLengthExceeded = errors.New("max key length exceeded")
 )
 
@@ -234,7 +235,6 @@ func parsePoint(buf []byte, defaultTime time.Time, precision string) (Point, err
 
 	// scan the last block which is an optional integer timestamp
 	pos, ts, err := scanTime(buf, pos)
-
 	if err != nil {
 		return nil, err
 	}
@@ -256,6 +256,15 @@ func parsePoint(buf []byte, defaultTime time.Time, precision string) (Point, err
 		pt.time, err = SafeCalcTime(ts, precision)
 		if err != nil {
 			return nil, err
+		}
+
+		// Determine if there are illegal non-whitespace characters after the
+		// timestamp block.
+		for pos < len(buf) {
+			if buf[pos] != ' ' {
+				return nil, ErrInvalidPoint
+			}
+			pos++
 		}
 	}
 	return pt, nil
@@ -634,32 +643,34 @@ func scanFields(buf []byte, i int) (int, []byte, error) {
 	return i, buf[start:i], nil
 }
 
-// scanTime scans buf, starting at i for the time section of a point.  It returns
-// the ending position and the byte slice of the fields within buf and error if the
-// timestamp is not in the correct numeric format
+// scanTime scans buf, starting at i for the time section of a point. It
+// returns the ending position and the byte slice of the timestamp within buf
+// and and error if the timestamp is not in the correct numeric format.
 func scanTime(buf []byte, i int) (int, []byte, error) {
 	start := skipWhitespace(buf, i)
 	i = start
+
 	for {
 		// reached the end of buf?
 		if i >= len(buf) {
 			break
 		}
 
-		// Timestamps should be integers, make sure they are so we don't need to actually
-		// parse the timestamp until needed
-		if buf[i] < '0' || buf[i] > '9' {
-			// Handle negative timestamps
-			if i == start && buf[i] == '-' {
-				i++
-				continue
-			}
-			return i, buf[start:i], fmt.Errorf("bad timestamp")
+		// Reached end of block or trailing whitespace?
+		if buf[i] == '\n' || buf[i] == ' ' {
+			break
 		}
 
-		// reached end of block?
-		if buf[i] == '\n' {
-			break
+		// Handle negative timestamps
+		if i == start && buf[i] == '-' {
+			i++
+			continue
+		}
+
+		// Timestamps should be integers, make sure they are so we don't need
+		// to actually  parse the timestamp until needed.
+		if buf[i] < '0' || buf[i] > '9' {
+			return i, buf[start:i], fmt.Errorf("bad timestamp")
 		}
 		i++
 	}
@@ -1029,6 +1040,10 @@ func escapeTag(in []byte) []byte {
 }
 
 func unescapeTag(in []byte) []byte {
+	if bytes.IndexByte(in, '\\') == -1 {
+		return in
+	}
+
 	for b, esc := range tagEscapeCodes {
 		if bytes.IndexByte(in, b) != -1 {
 			in = bytes.Replace(in, esc, []byte{b}, -1)
@@ -1205,7 +1220,8 @@ func (p *point) Tags() Tags {
 }
 
 func parseTags(buf []byte) Tags {
-	tags := map[string]string{}
+	tags := make(map[string]string, bytes.Count(buf, []byte(",")))
+	hasEscape := bytes.IndexByte(buf, '\\') != -1
 
 	if len(buf) != 0 {
 		pos, name := scanTo(buf, 0, ',')
@@ -1228,7 +1244,11 @@ func parseTags(buf []byte) Tags {
 				continue
 			}
 
-			tags[string(unescapeTag(key))] = string(unescapeTag(value))
+			if hasEscape {
+				tags[string(unescapeTag(key))] = string(unescapeTag(value))
+			} else {
+				tags[string(key)] = string(value)
+			}
 
 			i++
 		}

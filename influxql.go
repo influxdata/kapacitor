@@ -1,13 +1,13 @@
 package kapacitor
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"time"
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/pkg/errors"
 )
 
 // tmpl -- go get github.com/benbjohnson/tmpl
@@ -132,12 +132,8 @@ func (n *InfluxQLNode) runStreamInfluxQL() error {
 }
 
 func (n *InfluxQLNode) runBatchInfluxQL() error {
+	var exampleValue interface{}
 	for b, ok := n.ins[0].NextBatch(); ok; b, ok = n.ins[0].NextBatch() {
-		// Skip empty batches
-		if len(b.Points) == 0 {
-			continue
-		}
-
 		// Create new base context
 		c := baseReduceContext{
 			as:         n.n.As,
@@ -149,7 +145,19 @@ func (n *InfluxQLNode) runBatchInfluxQL() error {
 			time:       b.TMax,
 			pointTimes: n.n.PointTimes,
 		}
-		createFn, err := n.getCreateFn(b.Points[0].Fields[c.field])
+		if len(b.Points) == 0 {
+			if !n.n.ReduceCreater.IsEmptyOK {
+				// If the reduce does not handle empty batches continue
+				continue
+			}
+			if exampleValue == nil {
+				// If we have no points and have never seen a point assume float64
+				exampleValue = float64(0)
+			}
+		} else {
+			exampleValue = b.Points[0].Fields[c.field]
+		}
+		createFn, err := n.getCreateFn(exampleValue)
 		if err != nil {
 			return err
 		}
@@ -173,7 +181,7 @@ func (n *InfluxQLNode) getCreateFn(value interface{}) (createReduceContextFunc, 
 	}
 	createFn, err := determineReduceContextCreateFn(n.n.Method, value, n.n.ReduceCreater)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "invalid influxql func %s with field %s", n.n.Method, n.n.Field)
 	}
 	n.createFn = createFn
 	return n.createFn, nil

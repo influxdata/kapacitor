@@ -119,6 +119,7 @@ In order to know if subscription writes are being dropped you should monitor the
 - [#558](https://github.com/influxdata/kapacitor/pull/558): Preserve fields as well as tags on selector InfluxQL functions.
 - [#259](https://github.com/influxdata/kapacitor/issues/259): Template Tasks have been added.
 - [#562](https://github.com/influxdata/kapacitor/pull/562): HTTP based subscriptions.
+- [#595](https://github.com/influxdata/kapacitor/pull/595): Support counting and summing empty batches to 0.
 
 
 ### Bugfixes

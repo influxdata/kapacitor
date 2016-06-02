@@ -4,19 +4,19 @@ vendors:
 - path: github.com/boltdb/bolt
   rev: dfb21201d9270c1082d5fb0f07f500311ff72f18
 - path: github.com/cenkalti/backoff
-  rev: c29158af31815ccc31ca29c86c121bc39e00d3d8
+  rev: a6030178a585d5972d4d33ce61f4a1fa40eaaed0
 - path: github.com/davecgh/go-spew
   rev: 5215b55f46b2b919f50a1df0eaa5886afe4e3b3d
 - path: github.com/dustin/go-humanize
-  rev: f3565c9525600a911af3bd34f8b535ea81b2a9e0
+  rev: 88e58c26e9fe8ac578a0d76a68e32838acf17a8d
 - path: github.com/gogo/protobuf
-  rev: c18eea6ad611eecf94a9ba38471f59706199409e
+  rev: 7883e1468d48d969e1c3ce4bcde89b6a7dd4adc4
 - path: github.com/golang/protobuf
-  rev: 9e6977f30c91c78396e719e164e57f9287fff42c
+  rev: 3b06fc7a4cad73efce5fe6217ab6c33e7231ab4a
 - path: github.com/gorhill/cronexpr
   rev: f0984319b44273e83de132089ae42b1810f4933b
 - path: github.com/influxdata/influxdb
-  rev: 5163e74093a979f2bdc8033aecd7884159b54d1a
+  rev: 6e0c5698c1dc33064a1aeb59d0caf8fa88c2edb8
 - path: github.com/influxdata/wlog
   rev: 7c63b0a71ef8300adc255344d275e10e5c3a71ec
 - path: github.com/influxdb/usage-client
@@ -30,7 +30,7 @@ vendors:
 - path: github.com/pmezard/go-difflib
   rev: 792786c7400a136282c1664665ae0a8db921c6c2
 - path: github.com/russross/blackfriday
-  rev: 2004188462c3946efefbdcd91aa83e49b4175bfb
+  rev: 1d6b8e9301e720b08a8938b8c25c018285885438
 - path: github.com/serenize/snaker
   rev: 8824b61eca66d308fcb2d515287d3d7a28dba8d6
 - path: github.com/shurcooL/go
@@ -42,11 +42,11 @@ vendors:
 - path: github.com/stretchr/testify
   rev: 8d64eb7173c7753d6419fd4a9caf057398611364
 - path: github.com/twinj/uuid
-  rev: 89173bcdda19db0eb88aef1e1cb1cb2505561d31
+  rev: 1ec75364d0b109a59493653451144657b8b0698d
 - path: golang.org/x/crypto
   rev: 5bcd134fee4dd1475da17714aac19c0aa0142e2f
 - path: golang.org/x/sys
-  rev: d4feaf1a7e61e1d9e79e6c4e76c6349e9cab0a03
+  rev: 076b546753157f758b316e59bcb51e6807c04057
 - path: gopkg.in/alexcesaro/quotedprintable.v3
   rev: 2caba252f4dc53eaf6b553000885530023f54623
 - path: gopkg.in/gomail.v2

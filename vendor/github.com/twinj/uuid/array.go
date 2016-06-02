@@ -11,58 +11,58 @@ const (
 )
 
 // A clean UUID type for simpler UUID versions
-type Array [length]byte
+type array [length]byte
 
-func (Array) Size() int {
+func (array) Size() int {
 	return length
 }
 
-func (o Array) Version() int {
+func (o array) Version() int {
 	return int(o[versionIndex]) >> 4
 }
 
-func (o *Array) setVersion(pVersion int) {
-	o[versionIndex] &= 0x0F
-	o[versionIndex] |= byte(pVersion) << 4
+func (o *array) setVersion(pVersion byte) {
+	o[versionIndex] &= 0x0f
+	o[versionIndex] |= pVersion << 4
 }
 
-func (o *Array) Variant() byte {
+func (o *array) Variant() byte {
 	return variant(o[variantIndex])
 }
 
-func (o *Array) setVariant(pVariant byte) {
+func (o *array) setVariant(pVariant byte) {
 	setVariant(&o[variantIndex], pVariant)
 }
 
-func (o *Array) Unmarshal(pData []byte) {
+func (o *array) Unmarshal(pData []byte) {
 	copy(o[:], pData)
 }
 
-func (o *Array) Bytes() []byte {
+func (o *array) Bytes() []byte {
 	return o[:]
 }
 
-func (o Array) String() string {
-	return formatter(&o, format)
+func (o array) String() string {
+	return formatter(&o, generator.format)
 }
 
-func (o Array) Format(pFormat string) string {
+func (o array) Format(pFormat string) string {
 	return formatter(&o, pFormat)
 }
 
 // Set the three most significant bits (bits 0, 1 and 2) of the
 // sequenceHiAndVariant equivalent in the array to ReservedRFC4122.
-func (o *Array) setRFC4122Variant() {
+func (o *array) setRFC4122Variant() {
 	o[variantIndex] &= 0x3F
 	o[variantIndex] |= ReservedRFC4122
 }
 
 // Marshals the UUID bytes into a slice
-func (o *Array) MarshalBinary() ([]byte, error) {
+func (o *array) MarshalBinary() ([]byte, error) {
 	return o.Bytes(), nil
 }
 
 // Un-marshals the data bytes into the UUID.
-func (o *Array) UnmarshalBinary(pData []byte) error {
+func (o *array) UnmarshalBinary(pData []byte) error {
 	return UnmarshalBinary(o, pData)
 }

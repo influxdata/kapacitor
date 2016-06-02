@@ -61,6 +61,7 @@ type ReduceCreater struct {
 	TopBottomCallInfo      *TopBottomCallInfo
 	IsSimpleSelector       bool
 	IsStreamTransformation bool
+	IsEmptyOK              bool
 }
 
 type FloatBulkPointAggregator interface {

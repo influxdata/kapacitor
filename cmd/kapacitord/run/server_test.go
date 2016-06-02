@@ -1584,9 +1584,37 @@ func TestServer_BatchTask(t *testing.T) {
 	c := NewConfig()
 	c.InfluxDB[0].Enabled = true
 	count := 0
+	stopTimeC := make(chan time.Time, 1)
+
 	db := NewInfluxDB(func(q string) *iclient.Response {
-		if len(q) > 6 && q[:6] == "SELECT" {
-			count++
+		stmt, err := influxql.ParseStatement(q)
+		if err != nil {
+			return &iclient.Response{Err: err.Error()}
+		}
+		slct, ok := stmt.(*influxql.SelectStatement)
+		if !ok {
+			return nil
+		}
+		cond, ok := slct.Condition.(*influxql.BinaryExpr)
+		if !ok {
+			return &iclient.Response{Err: "expected select condition to be binary expression"}
+		}
+		stopTimeExpr, ok := cond.RHS.(*influxql.BinaryExpr)
+		if !ok {
+			return &iclient.Response{Err: "expected select condition rhs to be binary expression"}
+		}
+		stopTL, ok := stopTimeExpr.RHS.(*influxql.StringLiteral)
+		if !ok {
+			return &iclient.Response{Err: "expected select condition rhs to be string literal"}
+		}
+		count++
+		switch count {
+		case 1:
+			stopTime, err := time.Parse(time.RFC3339Nano, stopTL.Val)
+			if err != nil {
+				return &iclient.Response{Err: err.Error()}
+			}
+			stopTimeC <- stopTime
 			return &iclient.Response{
 				Results: []iclient.Result{{
 					Series: []models.Row{{
@@ -1594,19 +1622,28 @@ func TestServer_BatchTask(t *testing.T) {
 						Columns: []string{"time", "value"},
 						Values: [][]interface{}{
 							{
-								time.Date(1971, 1, 1, 0, 0, 1, int(time.Millisecond), time.UTC).Format(time.RFC3339Nano),
+								stopTime.Add(-time.Millisecond).Format(time.RFC3339Nano),
 								1.0,
 							},
 							{
-								time.Date(1971, 1, 1, 0, 0, 1, 2*int(time.Millisecond), time.UTC).Format(time.RFC3339Nano),
+								stopTime.Add(-2 * time.Millisecond).Format(time.RFC3339Nano),
 								1.0,
 							},
 						},
 					}},
 				}},
 			}
+		default:
+			return &iclient.Response{
+				Results: []iclient.Result{{
+					Series: []models.Row{{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values:  [][]interface{}{},
+					}},
+				}},
+			}
 		}
-		return nil
 	})
 	c.InfluxDB[0].URLs = []string{db.URL()}
 	s := OpenServer(c)
@@ -1620,10 +1657,12 @@ func TestServer_BatchTask(t *testing.T) {
 		RetentionPolicy: "myrp",
 	}}
 	tick := `batch
-    |query(' SELECT value from mydb.myrp.cpu ')
+    |query('SELECT value from mydb.myrp.cpu')
         .period(5ms)
         .every(5ms)
+        .align()
     |count('value')
+    |where(lambda: "count" == 2)
     |httpOut('count')
 `
 
@@ -1647,20 +1686,23 @@ func TestServer_BatchTask(t *testing.T) {
 
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), id)
 
-	exp := `{"series":[{"name":"cpu","columns":["time","count"],"values":[["1971-01-01T00:00:01.002Z",2]]}]}`
-	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
-	if err != nil {
-		t.Error(err)
-	}
-	err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
-		Status: client.Disabled,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if count == 0 {
-		t.Error("unexpected query count", count)
+	timeout := time.NewTicker(100 * time.Millisecond)
+	defer timeout.Stop()
+	select {
+	case <-timeout.C:
+		t.Fatal("timedout waiting for query")
+	case stopTime := <-stopTimeC:
+		exp := fmt.Sprintf(`{"series":[{"name":"cpu","columns":["time","count"],"values":[["%s",2]]}]}`, stopTime.Local().Format(time.RFC3339Nano))
+		err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
+		if err != nil {
+			t.Error(err)
+		}
+		err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+			Status: client.Disabled,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
@@ -3252,9 +3294,36 @@ func TestServer_UDFBatchAgents(t *testing.T) {
 
 func testBatchAgent(t *testing.T, c *run.Config) {
 	count := 0
+	stopTimeC := make(chan time.Time, 2)
 	db := NewInfluxDB(func(q string) *iclient.Response {
-		if len(q) > 6 && q[:6] == "SELECT" {
-			count++
+		stmt, err := influxql.ParseStatement(q)
+		if err != nil {
+			return &iclient.Response{Err: err.Error()}
+		}
+		slct, ok := stmt.(*influxql.SelectStatement)
+		if !ok {
+			return nil
+		}
+		cond, ok := slct.Condition.(*influxql.BinaryExpr)
+		if !ok {
+			return &iclient.Response{Err: "expected select condition to be binary expression"}
+		}
+		stopTimeExpr, ok := cond.RHS.(*influxql.BinaryExpr)
+		if !ok {
+			return &iclient.Response{Err: "expected select condition rhs to be binary expression"}
+		}
+		stopTL, ok := stopTimeExpr.RHS.(*influxql.StringLiteral)
+		if !ok {
+			return &iclient.Response{Err: "expected select condition rhs to be string literal"}
+		}
+		count++
+		switch count {
+		case 1, 2:
+			stopTime, err := time.Parse(time.RFC3339Nano, stopTL.Val)
+			if err != nil {
+				return &iclient.Response{Err: err.Error()}
+			}
+			stopTimeC <- stopTime
 			data := []float64{
 				5,
 				6,
@@ -3289,7 +3358,7 @@ func testBatchAgent(t *testing.T, c *run.Config) {
 			values := make([][]interface{}, len(data))
 			for i, value := range data {
 				values[i] = []interface{}{
-					time.Date(1971, 1, 1, 0, 0, 0, (i+1)*int(time.Millisecond), time.UTC).Format(time.RFC3339Nano),
+					stopTime.Add(time.Duration(i-len(data)) * time.Millisecond).Format(time.RFC3339Nano),
 					value,
 				}
 			}
@@ -3306,8 +3375,9 @@ func testBatchAgent(t *testing.T, c *run.Config) {
 					}},
 				}},
 			}
+		default:
+			return nil
 		}
-		return nil
 	})
 	c.InfluxDB[0].URLs = []string{db.URL()}
 	c.InfluxDB[0].Enabled = true
@@ -3355,8 +3425,23 @@ func testBatchAgent(t *testing.T, c *run.Config) {
 		t.Fatal(err)
 	}
 
+	stopTimes := make([]time.Time, 2)
+	for i := range stopTimes {
+		timeout := time.NewTicker(100 * time.Millisecond)
+		defer timeout.Stop()
+		select {
+		case <-timeout.C:
+			t.Fatal("timedout waiting for query")
+		case stopTime := <-stopTimeC:
+			stopTimes[i] = stopTime
+		}
+	}
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), id)
-	exp := `{"series":[{"name":"cpu","tags":{"count":"1"},"columns":["time","count"],"values":[["1971-01-01T00:00:00.02Z",5]]},{"name":"cpu","tags":{"count":"0"},"columns":["time","count"],"values":[["1971-01-01T00:00:00.02Z",5]]}]}`
+	exp := fmt.Sprintf(
+		`{"series":[{"name":"cpu","tags":{"count":"1"},"columns":["time","count"],"values":[["%s",5]]},{"name":"cpu","tags":{"count":"0"},"columns":["time","count"],"values":[["%s",5]]}]}`,
+		stopTimes[0].Format(time.RFC3339Nano),
+		stopTimes[1].Format(time.RFC3339Nano),
+	)
 	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*50)
 	if err != nil {
 		t.Error(err)
@@ -3366,10 +3451,6 @@ func testBatchAgent(t *testing.T, c *run.Config) {
 	})
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	if count == 0 {
-		t.Error("unexpected query count", count)
 	}
 }
 

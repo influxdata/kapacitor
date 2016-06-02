@@ -7,131 +7,279 @@ package uuid
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/binary"
+	"fmt"
 	"log"
-	seed "math/rand"
 	"net"
+	"os"
 	"sync"
 )
 
-
 // **************************************************** State
 
-func SetupCustomStateSaver(pSaver StateSaver) {
-	state.Lock()
-	pSaver.Init(&state)
-	state.init()
-	state.Unlock()
+var (
+	posixUID = uint32(os.Getuid())
+	posixGID = uint32(os.Getgid())
+)
+
+// Run this method before any calls to NewV1 or NewV2 to save the state to
+// YOu must implement the uuid.Saver interface and are completely responsible
+// for the non violable storage of the state
+func SetupSaver(pStateStorage Saver) {
+	generator.Do(func() {
+		defer generator.init()
+		generator.Lock()
+		defer generator.Unlock()
+		generator.Saver = pStateStorage
+	})
 }
 
-// Holds package information about the current
-// state of the UUID generator
-type State struct {
+// Use this interface to setup a non volatile store within your system
+// if you wish to have  v1 and 2 UUIDs based on your node id and constant time
+// it is highly recommended to implement this
+// You could use FileSystemStorage, the default is to generate random sequences
+type Saver interface {
+	// Read is run once, use this to setup your UUID state machine
+	// Read should also return the UUID state from the non volatile store
+	Read() (error, Store)
 
-	// A flag which informs whether to
-	// randomly create a node id
-	randomNode bool
+	// Save saves the state to the non volatile store and is called only if
+	Save(*Store)
+}
 
-	// A flag which informs whether to
-	// randomly create the sequence
-	randomSequence bool
-
+// The storage data to ensure continuous running of the UUID generator between restarts
+type Store struct {
 	// the last time UUID was saved
-	past Timestamp
+	Timestamp
 
-	// the next time the state will be saved
-	next Timestamp
+	// an iterated value to help ensure different
+	// values across the same domain
+	Sequence
 
 	// the last node which saved a UUID
-	node []byte
+	Node
+}
 
-	// An iterated value to help ensure different
-	// values across the same domain
-	sequence uint16
+func (o Store) String() string {
+	return fmt.Sprint(o.Timestamp, o.Sequence, o.Node)
+}
 
+type Generator struct {
 	sync.Mutex
+	sync.Once
 
-	// save state interface
-	saver StateSaver
+	Saver
+	*Store
+
+	next func() Timestamp
+	node func() Node
+
+	format string
 }
 
-// Changes the state with current data
-// Compares the current found node to the last node stored,
-// If they are the same or randomSequence is already set due
-// to an earlier read issue then the sequence is randomly generated
-// else if there is an issue with the time the sequence is incremented
-func (o *State) read(pNow Timestamp, pNode net.HardwareAddr) {
-	if bytes.Equal([]byte(pNode), o.node) || o.randomSequence {
-		o.sequence = uint16(seed.Int()) & 0x3FFF
-	} else if pNow < o.past {
-		o.sequence++
+// Generate a new RFC4122 version 1 UUID
+// based on a 60 bit timestamp and node id
+func (o *Generator) NewV1() UUID {
+	store := o.read()
+
+	id := new(uuid)
+
+	id.timeLow = uint32(store.Timestamp & 0xffffffff)
+	id.timeMid = uint16((store.Timestamp >> 32) & 0xffff)
+	id.timeHiAndVersion = uint16((store.Timestamp >> 48) & 0x0fff)
+	id.timeHiAndVersion |= uint16(1 << 12)
+	id.sequenceLow = byte(store.Sequence & 0xff)
+	id.sequenceHiAndVariant = byte((store.Sequence & 0x3f00) >> 8)
+	id.sequenceHiAndVariant |= ReservedRFC4122
+
+	id.node = make([]byte, len(store.Node))
+
+	copy(id.node[:], store.Node)
+	id.size = length
+
+	return id
+}
+
+// Generate a new DCE version 2 UUID
+// based on a 60 bit timestamp and node id
+func (o *Generator) NewV2() UUID {
+	//store := o.read()
+
+	id := new(uuid)
+
+	//switch pDomain {
+	//	case DomainPerson:
+	//		binary.BigEndian.PutUint32(u[0:], posixUID)
+	//	case DomainGroup:
+	//	binary.BigEndian.PutUint32(u[0:], posixGID)
+	//}
+	//
+	//o.timeLow = uint32(now & 0xffffffff)
+	//o.timeMid = uint16((now >> 32) & 0xffff)
+	//o.timeHiAndVersion = uint16((now >> 48) & 0x0fff)
+	//o.timeHiAndVersion |= uint16(1 << 12)
+	//o.sequenceLow = byte(sequence & 0xff)
+	//o.sequenceHiAndVariant = byte((sequence & 0x3f00) >> 8)
+	//o.sequenceHiAndVariant |= ReservedRFC4122
+	//o.node = make([]byte, len(node))
+	//copy(o.node[:], node)
+	//o.size = length
+
+	return id
+}
+
+func (o *Generator) read() *Store {
+
+	// From a system-wide shared stable store (e.g., a file), read the
+	// UUID generator state: the values of the timestamp, clock sequence,
+	// and node ID used to generate the last UUID.
+	o.Do(o.init)
+
+	// Save the state (current timestamp, clock sequence, and node ID)
+	// back to the stable store
+	defer o.save()
+
+	// Obtain a lock
+	o.Lock()
+	defer o.Unlock()
+
+	// Get the current time as a 60-bit count of 100-nanosecond intervals
+	// since 00:00:00.00, 15 October 1582.
+	now := o.next()
+
+	// If the last timestamp is later than
+	// the current timestamp, increment the clock sequence value.
+	if now < o.Timestamp {
+		o.Sequence++
 	}
-	o.past = pNow
-	o.node = pNode
+
+	// Update the timestamp
+	o.Timestamp = now
+
+	return o.Store
 }
 
-func (o *State) persist() {
-	if o.saver != nil {
-		o.saver.Save(o)
-	}
-}
+func (o *Generator) init() {
+	// From a system-wide shared stable store (e.g., a file), read the
+	// UUID generator state: the values of the timestamp, clock sequence,
+	// and node ID used to generate the last UUID.
+	var (
+		storage Store
+		err     error
+	)
 
-// Initialises the UUID state when the package is first loaded
-// it first attempts to decode the file state into State
-// if this file does not exist it will create the file and do a flush
-// of the random state which gets loaded at package runtime
-// second it will attempt to resolve the current hardware address nodeId
-// thirdly it will check the state of the clock
-func (o *State) init() {
-	if o.saver != nil {
-		intfcs, err := net.Interfaces()
+	// Save the state (current timestamp, clock sequence, and node ID)
+	// back to the stable store.
+	defer o.save()
+
+	o.Lock()
+	defer o.Unlock()
+
+	if o.Saver != nil {
+		err, storage = o.Read()
+
 		if err != nil {
-			log.Println("uuid.State.init: address error: will generate random node id instead", err)
-			return
+			o.Saver = nil
 		}
-		a := getHardwareAddress(intfcs)
-		if a == nil {
-			log.Println("uuid.State.init: address error: will generate random node id instead", err)
-			return
+	}
+
+	// Get the current time as a 60-bit count of 100-nanosecond intervals
+	// since 00:00:00.00, 15 October 1582.
+	now := o.next()
+
+	//  Get the current node ID.
+	node := o.node()
+
+	// If the state was unavailable (e.g., non-existent or corrupted), or
+	// the saved node ID is different than the current node ID, generate
+	// a random clock sequence value.
+	if o.Saver == nil || !bytes.Equal(storage.Node, node) {
+
+		// 4.1.5.  Clock Sequence https://www.ietf.org/rfc/rfc4122.txt
+		//
+		// For UUID version 1, the clock sequence is used to help avoid
+		// duplicates that could arise when the clock is set backwards in time
+		// or if the node ID changes.
+		//
+		// If the clock is set backwards, or might have been set backwards
+		// (e.g., while the system was powered off), and the UUID generator can
+		// not be sure that no UUIDs were generated with timestamps larger than
+		// the value to which the clock was set, then the clock sequence has to
+		// be changed.  If the previous value of the clock sequence is known, it
+		// can just be incremented; otherwise it should be set to a random or
+		// high-quality pseudo-random value.
+
+		// The clock sequence MUST be originally (i.e., once in the lifetime of
+		// a system) initialized to a random number to minimize the correlation
+		// across systems.  This provides maximum protection against node
+		// identifiers that may move or switch from system to system rapidly.
+		// The initial value MUST NOT be correlated to the node identifier.
+		// TODO write test for when random
+		err := binary.Read(rand.Reader, binary.LittleEndian, &storage.Sequence)
+		if err != nil {
+			log.Println("uuid.Generator.init error:", err)
+		} else {
+			log.Printf("uuid.Generator.init initialised random sequence: [%d]", storage.Sequence)
 		}
-		// Don't use random as we have a real address
-		o.randomSequence = false
-		if bytes.Equal([]byte(a), state.node) {
-			state.sequence++
-		}
-		state.node = a
-		state.randomNode = false
+
+		// If the state was available, but the saved timestamp is later than
+		// the current timestamp, increment the clock sequence value.
+
+	} else if now < storage.Timestamp {
+		storage.Sequence++
+	}
+
+	storage.Timestamp = now;
+	storage.Node = node
+
+	o.Store = &storage
+}
+
+func (o *Generator) save() {
+	if o.Saver != nil {
+		go func(pState *Generator) {
+			pState.Lock()
+			defer pState.Unlock()
+			pState.Save(pState.Store)
+		}(o)
 	}
 }
 
-func getHardwareAddress(pInterfaces []net.Interface) net.HardwareAddr {
-	for _, inter := range pInterfaces {
-		// Initially I could multicast out the Flags to get
-		// whether the interface was up but started failing
-		if (inter.Flags & (1 << net.FlagUp)) != 0 {
-			//if inter.Flags.String() != "0" {
-			if addrs, err := inter.Addrs(); err == nil {
-				for _, addr := range addrs {
-					if addr.String() != "0.0.0.0" && !bytes.Equal([]byte(inter.HardwareAddr), make([]byte, len(inter.HardwareAddr))) {
-						return inter.HardwareAddr
+func getHardwareAddress() (node Node) {
+	interfaces, err := net.Interfaces()
+	if err == nil {
+		for _, i := range interfaces {
+			// Initially I could multi-cast out the Flags to get
+			// whether the interface was up but started failing
+			if (i.Flags & (1 << net.FlagUp)) != 0 {
+				//if inter.Flags.String() != "0" {
+				if addrs, err := i.Addrs(); err == nil {
+					for _, a := range addrs {
+						if a.String() != "0.0.0.0" && !bytes.Equal(i.HardwareAddr, make([]byte, len(i.HardwareAddr))) {
+							// Don't use random as we have a real address
+							node = Node(i.HardwareAddr)
+							log.Println("uuid.getHardwareAddress:", node)
+
+							return
+						}
 					}
 				}
 			}
 		}
 	}
-	return nil
+	log.Println("uuid.getHardwareAddress: address error: will generate random node id instead", err)
+
+	// TODO write test for when random
+	node = make([]byte, 6)
+
+	if _, err := rand.Read(node); err != nil {
+		log.Panicln("uuid.getHardwareAddress: could not get cryto random bytes", err)
+	}
+
+	log.Println("uuid.getHardwareAddress: generated node", node)
+
+	// Mark as randomly generated
+	node[0] |= 0x01
+	return
 }
-
-// *********************************************** StateSaver interface
-
-// Use this interface to setup a custom state saver if you wish to have
-// v1 UUIDs based on your node id and constant time.
-type StateSaver interface {
-	// Init is run if Setup() is false
-	// Init should setup the system to save the state
-	Init(*State)
-
-	// Save saves the state and is called only if const V1Save and
-	// Setup() is true
-	Save(*State)
-}
-

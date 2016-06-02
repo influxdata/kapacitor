@@ -14,6 +14,7 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/timer"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -121,6 +122,7 @@ func (n *node) start(snapshot []byte) {
 				}
 				n.abortParentEdges()
 				n.logger.Println("E!", err)
+				err = errors.Wrap(err, n.Name())
 			}
 			n.errCh <- err
 		}()

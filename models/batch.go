@@ -130,9 +130,6 @@ func ResultToBatches(res client.Result) ([]Batch, error) {
 	}
 	batches := make([]Batch, 0, len(res.Series))
 	for _, series := range res.Series {
-		if len(series.Values) == 0 {
-			continue
-		}
 		groupID := TagsToGroupID(
 			SortedKeys(series.Tags),
 			series.Tags,
