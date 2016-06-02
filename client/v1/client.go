@@ -28,6 +28,7 @@ const DefaultUserAgent = "KapacitorClient"
 const basePath = "/kapacitor/v1"
 const pingPath = basePath + "/ping"
 const logLevelPath = basePath + "/loglevel"
+const debugVarsPath = basePath + "/debug/vars"
 const tasksPath = basePath + "/tasks"
 const templatesPath = basePath + "/templates"
 const recordingsPath = basePath + "/recordings"
@@ -538,6 +539,10 @@ type Replay struct {
 	Error         string    `json:"error"`
 	Status        Status    `json:"status"`
 	Progress      float64   `json:"progress"`
+}
+
+func (c *Client) URL() string {
+	return c.url.String()
 }
 
 // Perform the request.
@@ -1441,4 +1446,38 @@ func (c *Client) LogLevel(level string) error {
 
 	_, err = c.do(req, nil, http.StatusNoContent)
 	return err
+}
+
+type DebugVars struct {
+	ClusterID        string                 `json:"cluster_id"`
+	ServerID         string                 `json:"server_id"`
+	Host             string                 `json:"host"`
+	Stats            map[string]Stat        `json:"kapacitor"`
+	Cmdline          []string               `json:"cmdline"`
+	NumEnabledTasks  int                    `json:"num_enabled_tasks"`
+	NumSubscriptions int                    `json:"num_subscriptions"`
+	NumTasks         int                    `json:"num_tasks"`
+	Memstats         map[string]interface{} `json:"memstats"`
+	Version          string                 `json:"version"`
+}
+
+type Stat struct {
+	Name   string                 `json:"name"`
+	Tags   map[string]string      `json:"tags"`
+	Values map[string]interface{} `json:"values"`
+}
+
+// Get all Kapacitor vars
+func (c *Client) DebugVars() (DebugVars, error) {
+	u := *c.url
+	u.Path = debugVarsPath
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return DebugVars{}, err
+	}
+
+	vars := DebugVars{}
+	_, err = c.do(req, &vars, http.StatusOK)
+	return vars, err
 }

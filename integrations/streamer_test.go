@@ -4673,7 +4673,7 @@ func testStreamer(
 	}
 
 	// Create a new execution env
-	tm := kapacitor.NewTaskMaster(logService)
+	tm := kapacitor.NewTaskMaster("testStreamer", logService)
 	tm.HTTPDService = httpService
 	tm.UDFService = udfService
 	tm.TaskStore = taskStore{}

@@ -121,6 +121,7 @@ In order to know if subscription writes are being dropped you should monitor the
 - [#562](https://github.com/influxdata/kapacitor/pull/562): HTTP based subscriptions.
 - [#595](https://github.com/influxdata/kapacitor/pull/595): Support counting and summing empty batches to 0.
 - [#596](https://github.com/influxdata/kapacitor/pull/596): Support new group by time offset i.e. time(30s, 5s)
+- [#416](https://github.com/influxdata/kapacitor/issues/416): Track ingress counts by database, retention policy, and measurement. Expose stats via cli.
 
 
 ### Bugfixes

@@ -233,10 +233,16 @@ func (n *node) edot(buf *bytes.Buffer, labels bool) {
 			),
 		))
 		n.statMap.DoSorted(func(kv expvar.KeyValue) {
+			var s string
+			if sv, ok := kv.Value.(kexpvar.StringVar); ok {
+				s = sv.StringValue()
+			} else {
+				s = kv.Value.String()
+			}
 			buf.Write([]byte(
 				fmt.Sprintf("%s=\"%s\" ",
 					kv.Key,
-					kv.Value.String(),
+					s,
 				),
 			))
 		})
@@ -329,6 +335,10 @@ type MaxDuration struct {
 }
 
 func (v *MaxDuration) String() string {
+	return `"` + v.StringValue() + `"`
+}
+
+func (v *MaxDuration) StringValue() string {
 	return time.Duration(v.IntValue()).String()
 }
 

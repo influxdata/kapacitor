@@ -22,7 +22,7 @@ type FloatVar interface {
 }
 
 type StringVar interface {
-	StringValue() float64
+	StringValue() string
 }
 
 // Int is a 64-bit integer variable that satisfies the expvar.Var interface.
