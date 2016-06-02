@@ -292,7 +292,7 @@ func (tm *TaskMaster) waitForForks() {
 
 func (tm *TaskMaster) CreateTICKScope() *stateful.Scope {
 	scope := stateful.NewScope()
-	scope.Set("time", func(d time.Duration) time.Duration { return d })
+	scope.Set("time", groupByTime)
 	// Add dynamic methods to the scope for UDFs
 	if tm.UDFService != nil {
 		for _, f := range tm.UDFService.List() {
