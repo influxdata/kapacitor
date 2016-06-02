@@ -63,6 +63,18 @@ func NewConfig() Config {
 	}
 }
 
+func (c *Config) SetDefaultValues() {
+	if c.UDPBuffer == 0 {
+		c.UDPBuffer = udp.DefaultBuffer
+	}
+	if c.StartUpTimeout == toml.Duration(0) {
+		c.StartUpTimeout = toml.Duration(DefaultStartUpTimeout)
+	}
+	if c.SubscriptionProtocol == "" {
+		c.SubscriptionProtocol = DefaultSubscriptionProtocol
+	}
+}
+
 func (c Config) Validate() error {
 	if c.Name == "" {
 		return errors.New("influxdb cluster must be given a name")

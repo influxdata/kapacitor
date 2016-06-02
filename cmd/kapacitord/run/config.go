@@ -115,6 +115,11 @@ func (c *Config) PostInit() {
 	} else if len(c.InfluxDB) == 1 && c.InfluxDB[0].Name == "" {
 		c.InfluxDB[0].Name = "default"
 	}
+	// Set default Values
+	for i, influx := range c.InfluxDB {
+		influx.SetDefaultValues()
+		c.InfluxDB[i] = influx
+	}
 }
 
 // NewDemoConfig returns the config that runs when no config is specified.
