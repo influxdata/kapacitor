@@ -151,12 +151,26 @@ func (n *QueryNode) ChainMethods() map[string]reflect.Value {
 //
 // This property adds a `GROUP BY` clause to the query
 // so all the normal behaviors when quering InfluxDB with a `GROUP BY` apply.
-// More details: https://influxdb.com/docs/v0.9/query_language/data_exploration.html#the-group-by-clause
 //
 // Example:
 //    batch
 //        |query(...)
 //            .groupBy(time(10s), 'tag1', 'tag2'))
+//            .align()
+//
+// A group by time offset is also possible
+//
+// Example:
+//    batch
+//        |query(...)
+//            .groupBy(time(10s, -5s), 'tag1', 'tag2'))
+//            .align()
+//            .offset(5s)
+//
+// It is recommended to use QueryNode.Align and QueryNode.Offset in conjunction with
+// group by time dimensions so that the time bounds match up with the group by intervals.
+//
+// NOTE: Since QueryNode.Offset is inherently a negative property the second "offset" argument to the "time" function is negative to match.
 //
 // tick:property
 func (b *QueryNode) GroupBy(d ...interface{}) *QueryNode {

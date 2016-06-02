@@ -124,6 +124,21 @@ func (q *Query) Dimensions(dims []interface{}) error {
 				&influxql.Dimension{
 					Expr: &influxql.Wildcard{},
 				})
+		case TimeDimension:
+			q.stmt.Dimensions = append(q.stmt.Dimensions,
+				&influxql.Dimension{
+					Expr: &influxql.Call{
+						Name: "time",
+						Args: []influxql.Expr{
+							&influxql.DurationLiteral{
+								Val: dim.Length,
+							},
+							&influxql.DurationLiteral{
+								Val: dim.Offset,
+							},
+						},
+					},
+				})
 
 		default:
 			return fmt.Errorf("invalid dimension type:%T, must be string or time.Duration", d)
@@ -140,4 +155,23 @@ func (q *Query) Fill(option influxql.FillOption, value interface{}) {
 
 func (q *Query) String() string {
 	return q.stmt.String()
+}
+
+type TimeDimension struct {
+	Length time.Duration
+	Offset time.Duration
+}
+
+func groupByTime(length time.Duration, offset ...time.Duration) (TimeDimension, error) {
+	var o time.Duration
+	if l := len(offset); l == 1 {
+		o = offset[0]
+
+	} else if l != 0 {
+		return TimeDimension{}, fmt.Errorf("time() function expects 1 or 2 args, got %d", l+1)
+	}
+	return TimeDimension{
+		Length: length,
+		Offset: o,
+	}, nil
 }
