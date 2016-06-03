@@ -115,16 +115,15 @@ In order to know if subscription writes are being dropped you should monitor the
 
 - [#283](https://github.com/influxdata/kapacitor/issues/283): Add live replays.
 - [#500](https://github.com/influxdata/kapacitor/issues/500): Support Float,Integer,String and Boolean types.
-- [#82](https://github.com/influxdata/kapacitor/issues/82): Multiple services for PagerDuty alert.
+- [#82](https://github.com/influxdata/kapacitor/issues/82): Multiple services for PagerDuty alert. thanks @savagegus!
 - [#558](https://github.com/influxdata/kapacitor/pull/558): Preserve fields as well as tags on selector InfluxQL functions.
 - [#259](https://github.com/influxdata/kapacitor/issues/259): Template Tasks have been added.
 - [#562](https://github.com/influxdata/kapacitor/pull/562): HTTP based subscriptions.
 - [#595](https://github.com/influxdata/kapacitor/pull/595): Support counting and summing empty batches to 0.
 - [#596](https://github.com/influxdata/kapacitor/pull/596): Support new group by time offset i.e. time(30s, 5s)
 - [#416](https://github.com/influxdata/kapacitor/issues/416): Track ingress counts by database, retention policy, and measurement. Expose stats via cli.
-- [#586](https://github.com/influxdata/kapacitor/pull/586): Add spread stateful function.
-
-- [#600](https://github.com/influxdata/kapacitor/pull/600): Add close http response after handler laert post
+- [#586](https://github.com/influxdata/kapacitor/pull/586): Add spread stateful function. thanks @upccup!
+- [#600](https://github.com/influxdata/kapacitor/pull/600): Add close http response after handler laert post, thanks @jsvisa!
 
 ### Bugfixes
 
