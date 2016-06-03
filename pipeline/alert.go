@@ -473,7 +473,16 @@ type EmailHandler struct {
 
 	// List of email recipients.
 	// tick:ignore
-	ToList []string
+	ToList []string `tick:"To"`
+}
+
+// Define the To addresses for the email alert.
+// Multiple calls append to the existing list of addresses.
+// If empty uses the addresses from the configuration.
+// tick:property
+func (h *EmailHandler) To(to ...string) *EmailHandler {
+	h.ToList = append(h.ToList, to...)
+	return h
 }
 
 // Execute a command whenever an alert is triggered and pass the alert data over STDIN in JSON format.
