@@ -110,6 +110,47 @@ On startup Kapacitor will detect the change and recreate the subscriptions in In
 >NOTE: While HTTP itself is a TCP transport such that packet loss shouldn't be an issue, if Kapacitor starts to slow down for whatever reason, InfluxDB will drop the subscription writes to Kapacitor.
 In order to know if subscription writes are being dropped you should monitor the measurement `_internal.monitor.subscriber` for the field `writeFailures`.
 
+#### Holt-Winters Forecasting
+
+This release contains an new Holt Winters InfluxQL function.
+
+With this forecasting method one can now define an alert based off forecasted future values.
+
+For example, the following TICKscript will take the last 30 days of disk usage stats and using holt-winters forecast the next 7 days.
+If the forecasted value crosses a threshold an alert is triggered.
+
+The result is now Kapacitor will alert you 7 days in advance of a disk filling up.
+This assumes a slow growth but by changing the vars in the script you could check for shorter growth intervals.
+
+```
+// The interval on which to aggregate the disk usage
+var growth_interval = 1d
+// The number of `growth_interval`s to forecast into the future
+var forecast_count = 7
+// The amount of historical data to use for the fit
+var history = 30d
+
+// The critical threshold on used_percent
+var threshold = 90.0
+
+batch
+    |query('''
+    SELECT max(used_percent) as used_percent
+    FROM "telegraf"."default"."disk"
+''')
+        .period(history)
+        .every(growth_interval)
+        .align()
+        .groupBy(time(growth_interval), *)
+    |holtWinters('used_percent', forecast_count, 0, growth_interval)
+        .as('used_percent')
+    |max('used_percent')
+        .as('used_percent')
+    |alert()
+         // Trigger alert if the forecasted disk usage is greater than threshold
+        .crit(lambda: "used_percent" > threshold)
+```
+
 
 ### Features
 
@@ -124,6 +165,7 @@ In order to know if subscription writes are being dropped you should monitor the
 - [#416](https://github.com/influxdata/kapacitor/issues/416): Track ingress counts by database, retention policy, and measurement. Expose stats via cli.
 - [#586](https://github.com/influxdata/kapacitor/pull/586): Add spread stateful function. thanks @upccup!
 - [#600](https://github.com/influxdata/kapacitor/pull/600): Add close http response after handler laert post, thanks @jsvisa!
+- [#606](https://github.com/influxdata/kapacitor/pull/606): Add Holt-Winters forecasting method.
 
 ### Bugfixes
 
