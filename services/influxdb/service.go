@@ -80,21 +80,24 @@ func NewService(configs []Config, defaultInfluxDB, httpPort int, hostname string
 				exSubs[se] = true
 			}
 		}
+		runningSubs := make(map[subEntry]bool, len(c.Subscriptions))
 		clusters[c.Name] = &influxdb{
-			configs:        urls,
-			configSubs:     subs,
-			exConfigSubs:   exSubs,
-			hostname:       hostname,
-			httpPort:       httpPort,
-			logger:         l,
-			udpBind:        c.UDPBind,
-			udpBuffer:      c.UDPBuffer,
-			udpReadBuffer:  c.UDPReadBuffer,
-			startupTimeout: time.Duration(c.StartUpTimeout),
-			clusterID:      clusterID,
-			subName:        subName,
-			disableSubs:    c.DisableSubscriptions,
-			protocol:       c.SubscriptionProtocol,
+			configs:                  urls,
+			configSubs:               subs,
+			exConfigSubs:             exSubs,
+			hostname:                 hostname,
+			httpPort:                 httpPort,
+			logger:                   l,
+			udpBind:                  c.UDPBind,
+			udpBuffer:                c.UDPBuffer,
+			udpReadBuffer:            c.UDPReadBuffer,
+			startupTimeout:           time.Duration(c.StartUpTimeout),
+			subscriptionSyncInterval: time.Duration(c.SubscriptionSyncInterval),
+			clusterID:                clusterID,
+			subName:                  subName,
+			disableSubs:              c.DisableSubscriptions,
+			protocol:                 c.SubscriptionProtocol,
+			runningSubs:              runningSubs,
 		}
 		if defaultInfluxDB == i {
 			defaultInfluxDBName = c.Name
@@ -144,22 +147,25 @@ func (s *Service) NewNamedClient(name string) (client.Client, error) {
 }
 
 type influxdb struct {
-	configs        []client.HTTPConfig
-	i              int
-	configSubs     map[subEntry]bool
-	exConfigSubs   map[subEntry]bool
-	hostname       string
-	httpPort       int
-	logger         *log.Logger
-	protocol       string
-	udpBind        string
-	udpBuffer      int
-	udpReadBuffer  int
-	startupTimeout time.Duration
-	disableSubs    bool
+	configs                  []client.HTTPConfig
+	i                        int
+	configSubs               map[subEntry]bool
+	exConfigSubs             map[subEntry]bool
+	hostname                 string
+	httpPort                 int
+	logger                   *log.Logger
+	protocol                 string
+	udpBind                  string
+	udpBuffer                int
+	udpReadBuffer            int
+	startupTimeout           time.Duration
+	subscriptionSyncInterval time.Duration
+	disableSubs              bool
+	runningSubs              map[subEntry]bool
 
-	clusterID string
-	subName   string
+	clusterID     string
+	subName       string
+	subSyncTicker *time.Ticker
 
 	PointsWriter interface {
 		WritePoints(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
@@ -187,13 +193,25 @@ type subInfo struct {
 
 func (s *influxdb) Open() error {
 	if !s.disableSubs {
-		return s.linkSubscriptions()
+		err := s.linkSubscriptions()
+		if s.subscriptionSyncInterval != 0 {
+			s.subSyncTicker = time.NewTicker(s.subscriptionSyncInterval)
+			go func() {
+				for _ = range s.subSyncTicker.C {
+					s.linkSubscriptions()
+				}
+			}()
+		}
+		return err
 	}
 	return nil
 }
 
 func (s *influxdb) Close() error {
 	var lastErr error
+	if s.subscriptionSyncInterval != 0 {
+		s.subSyncTicker.Stop()
+	}
 	for _, service := range s.services {
 		err := service.Close()
 		if err != nil {
@@ -229,7 +247,7 @@ func (s *influxdb) NewClient() (c client.Client, err error) {
 }
 
 func (s *influxdb) linkSubscriptions() error {
-	s.logger.Println("I! linking subscriptions")
+	s.logger.Println("D! linking subscriptions")
 	b := backoff.NewExponentialBackOff()
 	b.MaxElapsedTime = s.startupTimeout
 	ticker := backoff.NewTicker(b)
@@ -373,7 +391,7 @@ func (s *influxdb) linkSubscriptions() error {
 	startedSubs := make(map[subEntry]bool)
 	all := len(s.configSubs) == 0
 	for se, si := range existingSubs {
-		if (s.configSubs[se] || all) && !s.exConfigSubs[se] {
+		if (s.configSubs[se] || all) && !s.exConfigSubs[se] && !s.runningSubs[se] {
 			// Check if this kapacitor instance is in the list of hosts
 			for _, dest := range si.Destinations {
 				u, err := url.Parse(dest)
@@ -391,6 +409,7 @@ func (s *influxdb) linkSubscriptions() error {
 						}
 					}
 					startedSubs[se] = true
+					s.runningSubs[se] = true
 					break
 				}
 			}
@@ -399,7 +418,7 @@ func (s *influxdb) linkSubscriptions() error {
 	// create and start any new subscriptions
 	for _, se := range allSubs {
 		// If we have been configured to subscribe and the subscription is not started yet.
-		if (s.configSubs[se] || all) && !startedSubs[se] && !s.exConfigSubs[se] {
+		if (s.configSubs[se] || all) && !startedSubs[se] && !s.exConfigSubs[se] && !s.runningSubs[se] {
 			var destination string
 			switch s.protocol {
 			case "http", "https":
@@ -418,6 +437,7 @@ func (s *influxdb) linkSubscriptions() error {
 			if err != nil {
 				return err
 			}
+			s.runningSubs[se] = true
 		}
 	}
 
