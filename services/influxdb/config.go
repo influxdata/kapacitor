@@ -44,7 +44,7 @@ type Config struct {
 	UDPBuffer                int                 `toml:"udp-buffer"`
 	UDPReadBuffer            int                 `toml:"udp-read-buffer"`
 	StartUpTimeout           toml.Duration       `toml:"startup-timeout"`
-	SubscriptionSyncInterval toml.Duration       `toml:"subscriptions-retry-interval"`
+	SubscriptionSyncInterval toml.Duration       `toml:"subscriptions-sync-interval"`
 }
 
 func NewConfig() Config {
@@ -70,7 +70,7 @@ func (c *Config) SetDefaultValues() {
 	if c.UDPBuffer == 0 {
 		c.UDPBuffer = udp.DefaultBuffer
 	}
-	if c.StartUpTimeout == toml.Duration(0) {
+	if c.StartUpTimeout == 0 {
 		c.StartUpTimeout = toml.Duration(DefaultStartUpTimeout)
 	}
 	if c.SubscriptionProtocol == "" {
