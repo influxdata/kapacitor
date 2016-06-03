@@ -466,27 +466,11 @@ func (d *templateKV) Delete(id string) error {
 }
 
 func (d *templateKV) AssociateTask(templateId, taskId string) error {
-	key := d.templateDataKey(templateId)
-	exists, err := d.store.Exists(key)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		return ErrNoTemplateExists
-	}
 	akey := d.templateTaskAssociationKey(templateId, taskId)
 	return d.store.Put(akey, []byte(taskId))
 }
 
 func (d *templateKV) DisassociateTask(templateId, taskId string) error {
-	key := d.templateDataKey(templateId)
-	exists, err := d.store.Exists(key)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		return ErrNoTemplateExists
-	}
 	akey := d.templateTaskAssociationKey(templateId, taskId)
 	return d.store.Delete(akey)
 }

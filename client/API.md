@@ -246,7 +246,6 @@ Response with task id and link.
 | Code | Meaning                                  |
 | ---- | -------                                  |
 | 200  | Task created, contains task information. |
-| 204  | Task updated, no content                 |
 | 404  | Task does not exist                      |
 
 ### Get Task
@@ -587,7 +586,6 @@ PATCH /kapacitor/v1/templates/TEMPLATE_ID
 | Code | Meaning                                          |
 | ---- | -------                                          |
 | 200  | Template created, contains template information. |
-| 204  | Template updated, no content                     |
 | 404  | Template does not exist                          |
 
 ### Get Template
