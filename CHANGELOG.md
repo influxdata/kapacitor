@@ -121,7 +121,7 @@ In order to know if subscription writes are being dropped you should monitor the
 - [#562](https://github.com/influxdata/kapacitor/pull/562): HTTP based subscriptions.
 - [#595](https://github.com/influxdata/kapacitor/pull/595): Support counting and summing empty batches to 0.
 - [#596](https://github.com/influxdata/kapacitor/pull/596): Support new group by time offset i.e. time(30s, 5s)
-
+- [#600](https://github.com/influxdata/kapacitor/pull/600): Add close http response after handler laert post
 
 ### Bugfixes
 
