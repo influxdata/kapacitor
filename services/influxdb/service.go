@@ -80,6 +80,7 @@ func NewService(configs []Config, defaultInfluxDB, httpPort int, hostname string
 				exSubs[se] = true
 			}
 		}
+		runningSubs := make(map[subEntry]bool, len(c.Subscriptions))
 		clusters[c.Name] = &influxdb{
 			configs:                  urls,
 			configSubs:               subs,
@@ -96,6 +97,7 @@ func NewService(configs []Config, defaultInfluxDB, httpPort int, hostname string
 			subName:                  subName,
 			disableSubs:              c.DisableSubscriptions,
 			protocol:                 c.SubscriptionProtocol,
+			runningSubs:              runningSubs,
 		}
 		if defaultInfluxDB == i {
 			defaultInfluxDBName = c.Name
@@ -192,7 +194,7 @@ type subInfo struct {
 func (s *influxdb) Open() error {
 	if !s.disableSubs {
 		err := s.linkSubscriptions()
-		if s.subscriptionSyncInterval != time.Duration(0) {
+		if s.subscriptionSyncInterval != 0 {
 			s.subSyncTicker = time.NewTicker(s.subscriptionSyncInterval)
 			go func() {
 				for _ = range s.subSyncTicker.C {
@@ -207,7 +209,7 @@ func (s *influxdb) Open() error {
 
 func (s *influxdb) Close() error {
 	var lastErr error
-	if s.subscriptionSyncInterval != time.Duration(0) {
+	if s.subscriptionSyncInterval != 0 {
 		s.subSyncTicker.Stop()
 	}
 	for _, service := range s.services {
