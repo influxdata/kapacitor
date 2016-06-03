@@ -112,6 +112,38 @@ func (a Iterators) cast() interface{} {
 	return a
 }
 
+// Merge combines all iterators into a single iterator.
+// A sorted merge iterator or a merge iterator can be used based on opt.
+func (a Iterators) Merge(opt IteratorOptions) (Iterator, error) {
+	// Merge into a single iterator.
+	if opt.MergeSorted() {
+		itr := NewSortedMergeIterator(a, opt)
+		if itr != nil && opt.InterruptCh != nil {
+			itr = NewInterruptIterator(itr, opt.InterruptCh)
+		}
+		return itr, nil
+	}
+
+	itr := NewMergeIterator(a, opt)
+	if itr == nil {
+		return nil, nil
+	}
+
+	if opt.Expr != nil {
+		if expr, ok := opt.Expr.(*Call); ok && expr.Name == "count" {
+			opt.Expr = &Call{
+				Name: "sum",
+				Args: expr.Args,
+			}
+		}
+	}
+
+	if opt.InterruptCh != nil {
+		itr = NewInterruptIterator(itr, opt.InterruptCh)
+	}
+	return NewCallIterator(itr, opt)
+}
+
 // NewMergeIterator returns an iterator to merge itrs into one.
 // Inputs must either be merge iterators or only contain a single name/tag in
 // sorted order. The iterator will output all points by window, name/tag, then
@@ -578,32 +610,7 @@ func (a IteratorCreators) CreateIterator(opt IteratorOptions) (Iterator, error) 
 		return nil, err
 	}
 
-	// Merge into a single iterator.
-	if opt.MergeSorted() {
-		itr := NewSortedMergeIterator(itrs, opt)
-		if itr != nil && opt.InterruptCh != nil {
-			itr = NewInterruptIterator(itr, opt.InterruptCh)
-		}
-		return itr, nil
-	}
-
-	itr := NewMergeIterator(itrs, opt)
-	if itr != nil {
-		if opt.Expr != nil {
-			if expr, ok := opt.Expr.(*Call); ok && expr.Name == "count" {
-				opt.Expr = &Call{
-					Name: "sum",
-					Args: expr.Args,
-				}
-			}
-		}
-
-		if opt.InterruptCh != nil {
-			itr = NewInterruptIterator(itr, opt.InterruptCh)
-		}
-		return NewCallIterator(itr, opt)
-	}
-	return nil, nil
+	return Iterators(itrs).Merge(opt)
 }
 
 // FieldDimensions returns unique fields and dimensions from multiple iterator creators.
@@ -1259,7 +1266,11 @@ func (itr *floatFastDedupeIterator) Next() (*FloatPoint, error) {
 		}
 
 		// If the point has already been output then move to the next point.
-		key := fastDedupeKey{p.Name, p.Aux[0]}
+		key := fastDedupeKey{name: p.Name}
+		key.values[0] = p.Aux[0]
+		if len(p.Aux) > 1 {
+			key.values[1] = p.Aux[1]
+		}
 		if _, ok := itr.m[key]; ok {
 			continue
 		}
@@ -1271,8 +1282,8 @@ func (itr *floatFastDedupeIterator) Next() (*FloatPoint, error) {
 }
 
 type fastDedupeKey struct {
-	name  string
-	value interface{}
+	name   string
+	values [2]interface{}
 }
 
 type reverseStringSlice []string

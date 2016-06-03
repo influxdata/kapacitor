@@ -8,7 +8,7 @@ vendors:
 - path: github.com/davecgh/go-spew
   rev: 5215b55f46b2b919f50a1df0eaa5886afe4e3b3d
 - path: github.com/dustin/go-humanize
-  rev: 88e58c26e9fe8ac578a0d76a68e32838acf17a8d
+  rev: 499693e27ee0d14ffab67c31ad065fdb3d34ea75
 - path: github.com/gogo/protobuf
   rev: 7883e1468d48d969e1c3ce4bcde89b6a7dd4adc4
 - path: github.com/golang/protobuf
@@ -16,7 +16,7 @@ vendors:
 - path: github.com/gorhill/cronexpr
   rev: f0984319b44273e83de132089ae42b1810f4933b
 - path: github.com/influxdata/influxdb
-  rev: 6e0c5698c1dc33064a1aeb59d0caf8fa88c2edb8
+  rev: 128b07e352a324c90b48d386cad4efb75f56a0d0
 - path: github.com/influxdata/wlog
   rev: 7c63b0a71ef8300adc255344d275e10e5c3a71ec
 - path: github.com/influxdb/usage-client
@@ -42,7 +42,7 @@ vendors:
 - path: github.com/stretchr/testify
   rev: 8d64eb7173c7753d6419fd4a9caf057398611364
 - path: github.com/twinj/uuid
-  rev: 1ec75364d0b109a59493653451144657b8b0698d
+  rev: 5a4b9dcb2a5e9eaba079cd853d275582fc764505
 - path: golang.org/x/crypto
   rev: 5bcd134fee4dd1475da17714aac19c0aa0142e2f
 - path: golang.org/x/sys

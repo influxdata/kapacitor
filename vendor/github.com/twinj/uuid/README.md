@@ -1,11 +1,11 @@
 Go UUID implementation
 ========================
 
-[![Build Status]()](https://ci.appveyor.com/api/projects/status/github/twinj/uuid?branch=master&svg=true)
+[![Build Status](https://ci.appveyor.com/api/projects/status/github/twinj/uuid?branch=master&svg=true)](https://ci.appveyor.com/project/twinj/uuid)
 [![Build Status](https://travis-ci.org/twinj/uuid.png?branch=master)](https://travis-ci.org/twinj/uuid)
 [![GoDoc](http://godoc.org/github.com/twinj/uuid?status.png)](http://godoc.org/github.com/twinj/uuid)
 
-This package provides RFC 4122 compliant UUIDs.
+This package provides RFC 4122 and DCE 1.1 compliant UUIDs.
 It will generate the following:
 
 * Version 1: based on a Timestamp and MAC address as Node id
@@ -15,33 +15,32 @@ It will generate the following:
 * Version 5: based on SHA-1 hash
 * Your own implementations
 
-Functions NewV1, NewV3, NewV4, NewV5, New, NewHex and Parse() for generating versions 1, 3, 4
-and 5 UUIDs are as specified in [RFC 4122](http://www.ietf.org/rfc/rfc4122.txt).
+Functions NewV1, NewV2, NewV3, NewV4, NewV5, New, NewHex and Parse() for generating version 1, 2, 3, 4
+and 5 UUIDs
 
 # Requirements
 
-Go 1.6, 1.5, 1.4, 1.3, 1.2.
+Any supported version of Go.
 
 # Design considerations
 
 * Ensure UUIDs are unique across a use case
-    Proper test coverage has determined that the UUID timestamp spinner works correctly
-* the generator should work on all app servers.
+    Proper test coverage has determined that the UUID timestamp spinner works correctly, cross multiple clock resolutions
+* Generator should work on all app servers.
     No Os locking threads or file system dependant storage.
     Saver interface exists for the user to provide their own Saver implementations
     for V1 and V2 UUIDs. The interface could theoretically be applied to your own UUID implementation.
     Have provided a saver which works on a standard OS environment.
-    New implementations for app servers which stop
-* UUIDs
+* Allow user implementations
 
 # Future considerations
 
-* allows open ended user implementations
-* allow open ended generation of UUID via various node id's
+* length and format should not be an issue
+*
 
 # Recent Changes
 
-* Improved file system Saver interface, breaking changes, however.
+* Improved file system Saver interface, breaking changes.
     To use a saver make sure you pass it in via the uuid.SetupSaver(Saver) method before a UUID is generated, so as to take affect.
 * Removed use of OS Thread locking and runtime package requirement
 * Changed String() output to CleanHyphen to match the canonical standard
@@ -64,7 +63,7 @@ Use the `go` tool:
 See [documentation and examples](http://godoc.org/github.com/twinj/uuid)
 for more information.
 
-	uuid.SetupSaver(config)
+	uuid.SetupSaver(...)
 
 	u1 := uuid.NewV1()
 
@@ -83,16 +82,19 @@ for more information.
 
 	uuid.SwitchFormat(uuid.BracketHyphen)
 
+## Links
+
+[RFC 4122](http://www.ietf.org/rfc/rfc4122.txt)
+[DCE 1.1: Authentication and Security Services](http://pubs.opengroup.org/onlinepubs/9629399/apdxa.htm)
+
 ## Copyright
 
 This is a derivative work
 
-Orginal version from
+Original version from
 Copyright (C) 2011 by Krzysztof Kowalik <chris@nu7hat.ch>.
 See [COPYING](https://github.com/nu7hatch/gouuid/tree/master/COPYING)
 file for details.
-
-Also see: Algorithm details in [RFC 4122](http://www.ietf.org/rfc/rfc4122.txt).
 
 Copyright (C) 2014 twinj@github.com
 See [LICENSE](https://github.com/twinj/uuid/tree/master/LICENSE)

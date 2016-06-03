@@ -16,13 +16,12 @@ install:
   - set PATH=%GOPATH%\bin;c:\go\bin;%PATH%
   - go version
   - go env
+  - go get -t -v ./...
 
 # to run your custom scripts instead of automatic MSBuild
 build_script:
   - go vet ./...
   - gofmt -s -l .
-#  - golint github.com/twinj/uuid...
-#  - deadcode
   - go test -short -v
   - go test -short -race -v
 
