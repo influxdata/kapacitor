@@ -805,10 +805,19 @@ func (a *AlertNode) handlePost(post *pipeline.PostHandler, ad *AlertData) {
 		return
 	}
 
-	_, err = http.Post(post.URL, "application/json", bodyBuffer)
+	resp, err := http.Post(post.URL, "application/json", bodyBuffer)
 	if err != nil {
 		a.logger.Println("E! failed to POST batch", err)
+		return
 	}
+
+	if resp == nil {
+		a.logger.Println("E! failed to POST batch response is nil")
+		return
+	}
+	// close http response otherwise tcp socket will be 'ESTABLISHED' in a long time
+	defer resp.Body.Close()
+	return
 }
 
 func (a *AlertNode) handleEmail(email *pipeline.EmailHandler, ad *AlertData) {
