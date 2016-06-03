@@ -166,6 +166,8 @@ batch
 - [#586](https://github.com/influxdata/kapacitor/pull/586): Add spread stateful function. thanks @upccup!
 - [#600](https://github.com/influxdata/kapacitor/pull/600): Add close http response after handler laert post, thanks @jsvisa!
 - [#606](https://github.com/influxdata/kapacitor/pull/606): Add Holt-Winters forecasting method.
+- [#605](https://github.com/influxdata/kapacitor/pull/605): BREAKING: StatsNode for batch edge now count the number of points in a batch instead of count batches as a whole.
+    This is only breaking if you have a deadman switch configured on a batch edge.
 
 ### Bugfixes
 
