@@ -123,6 +123,7 @@ In order to know if subscription writes are being dropped you should monitor the
 - [#596](https://github.com/influxdata/kapacitor/pull/596): Support new group by time offset i.e. time(30s, 5s)
 - [#416](https://github.com/influxdata/kapacitor/issues/416): Track ingress counts by database, retention policy, and measurement. Expose stats via cli.
 
+- [#600](https://github.com/influxdata/kapacitor/pull/600): Add close http response after handler laert post
 
 ### Bugfixes
 
