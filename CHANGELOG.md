@@ -119,6 +119,7 @@ In order to know if subscription writes are being dropped you should monitor the
 - [#558](https://github.com/influxdata/kapacitor/pull/558): Preserve fields as well as tags on selector InfluxQL functions.
 - [#259](https://github.com/influxdata/kapacitor/issues/259): Template Tasks have been added.
 - [#562](https://github.com/influxdata/kapacitor/pull/562): HTTP based subscriptions.
+- [#586](https://github.com/influxdata/kapacitor/pull/586): Add spread stateful function.
 
 
 ### Bugfixes
@@ -496,8 +497,8 @@ See note on a breaking change in the HTTP API below. #163
 - [#153](https://github.com/influxdata/kapacitor/issues/153): Fix panic if referencing non existant field in MapReduce function.
 - [#138](https://github.com/influxdata/kapacitor/issues/138): Change over to influxdata github org.
 - [#164](https://github.com/influxdata/kapacitor/issues/164): Update imports etc from InfluxDB as per the new meta store/client changes.
-- [#163](https://github.com/influxdata/kapacitor/issues/163): BREAKING CHANGE: Removed the 'api/v1' pathing from the HTTP API so that Kapacitor is 
-    path compatible with InfluxDB. While this is a breaking change the kapacitor cli has been updated accordingly and you will not experience any distruptions unless you 
+- [#163](https://github.com/influxdata/kapacitor/issues/163): BREAKING CHANGE: Removed the 'api/v1' pathing from the HTTP API so that Kapacitor is
+    path compatible with InfluxDB. While this is a breaking change the kapacitor cli has been updated accordingly and you will not experience any distruptions unless you
     were calling the HTTP API directly.
 - [#147](https://github.com/influxdata/kapacitor/issues/147): Compress .tar archives from builds.
 
