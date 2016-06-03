@@ -147,7 +147,7 @@ func (e *Edge) NextPoint() (p models.Point, ok bool) {
 	case p, ok = <-e.stream:
 		if ok {
 			e.emitted.Add(1)
-			e.incEmitted(p.Group, p.Tags, p.Dimensions)
+			e.incEmitted(p.Group, p.Tags, p.Dimensions, 1)
 		}
 	}
 	return
@@ -159,7 +159,7 @@ func (e *Edge) NextBatch() (b models.Batch, ok bool) {
 	case b, ok = <-e.batch:
 		if ok {
 			e.emitted.Add(1)
-			e.incEmitted(b.Group, b.Tags, b.PointDimensions())
+			e.incEmitted(b.Group, b.Tags, b.PointDimensions(), int64(len(b.Points)))
 		}
 	}
 	return
@@ -167,7 +167,7 @@ func (e *Edge) NextBatch() (b models.Batch, ok bool) {
 
 func (e *Edge) CollectPoint(p models.Point) error {
 	e.collected.Add(1)
-	e.incCollected(p.Group, p.Tags, p.Dimensions)
+	e.incCollected(p.Group, p.Tags, p.Dimensions, 1)
 	select {
 	case <-e.aborted:
 		return ErrAborted
@@ -178,7 +178,7 @@ func (e *Edge) CollectPoint(p models.Point) error {
 
 func (e *Edge) CollectBatch(b models.Batch) error {
 	e.collected.Add(1)
-	e.incCollected(b.Group, b.Tags, b.PointDimensions())
+	e.incCollected(b.Group, b.Tags, b.PointDimensions(), int64(len(b.Points)))
 	select {
 	case <-e.aborted:
 		return ErrAborted
@@ -188,17 +188,17 @@ func (e *Edge) CollectBatch(b models.Batch) error {
 }
 
 // Increment the emitted count of the group for this edge.
-func (e *Edge) incEmitted(group models.GroupID, tags models.Tags, dims []string) {
+func (e *Edge) incEmitted(group models.GroupID, tags models.Tags, dims []string, count int64) {
 	// we are "manually" calling Unlock() and not using defer, because this method is called
 	// in hot locations (NextPoint/CollectPoint) and defer have some performance penalty
 	e.groupMu.Lock()
 
 	if stats, ok := e.groupStats[group]; ok {
-		stats.emitted++
+		stats.emitted += count
 		e.groupMu.Unlock()
 	} else {
 		stats = &edgeStat{
-			emitted: 1,
+			emitted: count,
 			tags:    tags,
 			dims:    dims,
 		}
@@ -208,17 +208,17 @@ func (e *Edge) incEmitted(group models.GroupID, tags models.Tags, dims []string)
 }
 
 // Increment the collected count of the group for this edge.
-func (e *Edge) incCollected(group models.GroupID, tags models.Tags, dims []string) {
+func (e *Edge) incCollected(group models.GroupID, tags models.Tags, dims []string, count int64) {
 	// we are "manually" calling Unlock() and not using defer, because this method is called
 	// in hot locations (NextPoint/CollectPoint) and defer have some performance penalty
 	e.groupMu.Lock()
 
 	if stats, ok := e.groupStats[group]; ok {
-		stats.collected++
+		stats.collected += count
 		e.groupMu.Unlock()
 	} else {
 		stats = &edgeStat{
-			collected: 1,
+			collected: count,
 			tags:      tags,
 			dims:      dims,
 		}
