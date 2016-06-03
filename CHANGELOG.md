@@ -168,6 +168,10 @@ batch
 - [#606](https://github.com/influxdata/kapacitor/pull/606): Add Holt-Winters forecasting method.
 - [#605](https://github.com/influxdata/kapacitor/pull/605): BREAKING: StatsNode for batch edge now count the number of points in a batch instead of count batches as a whole.
     This is only breaking if you have a deadman switch configured on a batch edge.
+- [#598](https://github.com/influxdata/kapacitor/pull/598): BREAKING: Change StatsNode to expire groups after X number of points with zero value.
+    This allows for the deadman's switch to expire groups that will never return.
+    This change is only breaking if you relied on the deadman to continually alert on zero values.
+    Now the deadman will alert for only the first X zero values and then stop, effectively setting .stateChangesOnly() for alert node.
 
 ### Bugfixes
 

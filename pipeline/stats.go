@@ -1,6 +1,13 @@
 package pipeline
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
+
+const (
+	DefaultExpireCount = int64(1)
+)
 
 // A StatsNode emits internal statistics about the another node at a given interval.
 //
@@ -40,12 +47,25 @@ type StatsNode struct {
 	SourceNode Node
 	// tick:ignore
 	Interval time.Duration
+	// Expire a group after seeing ExpireCount points with a zero value.
+	// An expired group no longer reports stats until a new point
+	// arrives at the source node with that group.
+	// Setting ExpireCount to zero disables expiring groups.
+	ExpireCount int64
 }
 
 func newStatsNode(n Node, interval time.Duration) *StatsNode {
 	return &StatsNode{
-		chainnode:  newBasicChainNode("stats", StreamEdge, StreamEdge),
-		SourceNode: n,
-		Interval:   interval,
+		chainnode:   newBasicChainNode("stats", StreamEdge, StreamEdge),
+		SourceNode:  n,
+		Interval:    interval,
+		ExpireCount: DefaultExpireCount,
 	}
+}
+
+func (n *StatsNode) validate() error {
+	if n.ExpireCount < 0 {
+		return fmt.Errorf("expireCount must be >= 0, got %d", n.ExpireCount)
+	}
+	return nil
 }

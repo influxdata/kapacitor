@@ -17,6 +17,9 @@ type StatsNode struct {
 	closing chan struct{}
 	closed  bool
 	mu      sync.Mutex
+
+	expireCount int
+	zeros       map[models.GroupID]int
 }
 
 // Create a new  FromNode which filters data from a source.
@@ -27,10 +30,12 @@ func newStatsNode(et *ExecutingTask, n *pipeline.StatsNode, l *log.Logger) (*Sta
 		return nil, fmt.Errorf("no node found for %s", n.SourceNode.Name())
 	}
 	sn := &StatsNode{
-		node:    node{Node: n, et: et, logger: l},
-		s:       n,
-		en:      en,
-		closing: make(chan struct{}),
+		node:        node{Node: n, et: et, logger: l},
+		s:           n,
+		en:          en,
+		expireCount: int(n.ExpireCount),
+		closing:     make(chan struct{}),
+		zeros:       make(map[models.GroupID]int),
 	}
 	sn.node.runF = sn.runStats
 	sn.node.stopF = sn.stopStats
@@ -44,6 +49,7 @@ func (s *StatsNode) runStats([]byte) error {
 		Name: "stats",
 		Tags: map[string]string{"node": s.en.Name()},
 	}
+	expiredGroups := make([]models.GroupID, 0)
 	for {
 		select {
 		case <-s.closing:
@@ -57,6 +63,14 @@ func (s *StatsNode) runStats([]byte) error {
 				point.Group = group
 				point.Dimensions = stat.Dimensions
 				point.Tags = stat.Tags
+
+				if stat.IsZero {
+					s.zeros[group]++
+					if s.zeros[group] == s.expireCount {
+						expiredGroups = append(expiredGroups, group)
+						delete(s.zeros, group)
+					}
+				}
 				s.timer.Pause()
 				for _, out := range s.outs {
 					err := out.CollectPoint(point)
@@ -65,6 +79,10 @@ func (s *StatsNode) runStats([]byte) error {
 					}
 				}
 				s.timer.Resume()
+			}
+			if len(expiredGroups) > 0 {
+				s.en.expireGroups(expiredGroups)
+				expiredGroups = expiredGroups[0:0]
 			}
 			s.timer.Stop()
 		}
