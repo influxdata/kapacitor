@@ -53,6 +53,7 @@ type Node interface {
 	edot(buf *bytes.Buffer, labels bool)
 
 	nodeStatsByGroup() map[models.GroupID]nodeStats
+	expireGroups(groups []models.GroupID)
 
 	collectedCount() int64
 
@@ -64,21 +65,22 @@ type Node interface {
 //implementation of Node
 type node struct {
 	pipeline.Node
-	et         *ExecutingTask
-	parents    []Node
-	children   []Node
-	runF       func(snapshot []byte) error
-	stopF      func()
-	errCh      chan error
-	err        error
-	finishedMu sync.Mutex
-	finished   bool
-	ins        []*Edge
-	outs       []*Edge
-	logger     *log.Logger
-	timer      timer.Timer
-	statsKey   string
-	statMap    *kexpvar.Map
+	et              *ExecutingTask
+	parents         []Node
+	children        []Node
+	runF            func(snapshot []byte) error
+	stopF           func()
+	errCh           chan error
+	err             error
+	finishedMu      sync.Mutex
+	finished        bool
+	ins             []*Edge
+	outs            []*Edge
+	logger          *log.Logger
+	timer           timer.Timer
+	statsKey        string
+	statMap         *kexpvar.Map
+	previousEmitted map[models.GroupID]int64
 }
 
 func (n *node) addParentEdge(e *Edge) {
@@ -103,6 +105,7 @@ func (n *node) init() {
 	n.statMap.Set(statAverageExecTime, avgExecVar)
 	n.timer = n.et.tm.TimingService.NewTimer(avgExecVar)
 	n.errCh = make(chan error, 1)
+	n.previousEmitted = make(map[models.GroupID]int64)
 }
 
 func (n *node) start(snapshot []byte) {
@@ -297,6 +300,16 @@ type nodeStats struct {
 	Fields     models.Fields
 	Tags       models.Tags
 	Dimensions []string
+	IsZero     bool
+}
+
+func (n *node) expireGroups(groups []models.GroupID) {
+	for _, out := range n.outs {
+		out.expireGroups(groups)
+	}
+	for _, group := range groups {
+		delete(n.previousEmitted, group)
+	}
 }
 
 // Return a copy of the current node statistics.
@@ -313,7 +326,9 @@ func (n *node) nodeStatsByGroup() (stats map[models.GroupID]nodeStats) {
 				},
 				Tags:       tags,
 				Dimensions: dims,
+				IsZero:     c == n.previousEmitted[group],
 			}
+			n.previousEmitted[group] = c
 		})
 	}
 	if len(stats) == 0 {

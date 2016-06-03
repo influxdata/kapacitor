@@ -91,6 +91,14 @@ type edgeStat struct {
 	dims      []string
 }
 
+func (e *Edge) expireGroups(groups []models.GroupID) {
+	e.groupMu.Lock()
+	defer e.groupMu.Unlock()
+	for _, group := range groups {
+		delete(e.groupStats, group)
+	}
+}
+
 // Get a snapshot of the current group statistics for this edge
 func (e *Edge) readGroupStats(f func(group models.GroupID, collected, emitted int64, tags models.Tags, dims []string)) {
 	e.groupMu.RLock()

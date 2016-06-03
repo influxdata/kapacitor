@@ -1208,6 +1208,24 @@ var evaluationFuncs = map[operationKey]*evaluationFnInfo{
 		},
 		returnType: ast.TDuration,
 	},
+	operationKey{operator: ast.TokenDiv, leftType: ast.TDuration, rightType: ast.TDuration}: {
+		f: func(scope *Scope, executionState ExecutionState, leftNode, rightNode NodeEvaluator) (resultContainer, *ErrSide) {
+			var left time.Duration
+			var right time.Duration
+			var err error
+
+			if left, err = leftNode.EvalDuration(scope, executionState); err != nil {
+				return emptyResultContainer, &ErrSide{error: err, IsLeft: true}
+			}
+
+			if right, err = rightNode.EvalDuration(scope, executionState); err != nil {
+				return emptyResultContainer, &ErrSide{error: err, IsRight: true}
+			}
+
+			return resultContainer{Int64Value: int64(left / right), IsInt64Value: true}, nil
+		},
+		returnType: ast.TInt,
+	},
 
 	// -----------------------------------------
 	//	String concatenation func
