@@ -54,7 +54,7 @@ kapacitor define-template generic_mean_alert -tick path/to/above/script.tick -ty
 Next define a task that uses the template:
 
 ```
-kapacitor define cpu_alert -template-id generic_mean_alert -vars cpu_vars.json -dbrp telegraf.default
+kapacitor define cpu_alert -template generic_mean_alert -vars cpu_vars.json -dbrp telegraf.default
 ```
 
 Where `cpu_vars.json` would like like this:
@@ -168,6 +168,8 @@ batch
 - [#606](https://github.com/influxdata/kapacitor/pull/606): Add Holt-Winters forecasting method.
 - [#605](https://github.com/influxdata/kapacitor/pull/605): BREAKING: StatsNode for batch edge now count the number of points in a batch instead of count batches as a whole.
     This is only breaking if you have a deadman switch configured on a batch edge.
+- [#611](https://github.com/influxdata/kapacitor/pull/611): Adds bash completion to the kapacitor CLI tool.
+
 
 ### Bugfixes
 
