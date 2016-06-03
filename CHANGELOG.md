@@ -135,6 +135,7 @@ In order to know if subscription writes are being dropped you should monitor the
 - [#587](https://github.com/influxdata/kapacitor/issues/587): Allow number literals without leading zeros.
 - [#584](https://github.com/influxdata/kapacitor/issues/584): Do not block during startup to send usage stats.
 - [#553](https://github.com/influxdata/kapacitor/issues/553): Periodically check if new InfluxDB DBRPs have been created.
+- [#602](https://github.com/influxdata/kapacitor/issues/602): Fix missing To property on email alert handler.
 
 ## v0.13.1 [2016-05-13]
 
