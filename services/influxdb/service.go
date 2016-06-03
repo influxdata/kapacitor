@@ -247,7 +247,7 @@ func (s *influxdb) NewClient() (c client.Client, err error) {
 }
 
 func (s *influxdb) linkSubscriptions() error {
-	s.logger.Println("I! linking subscriptions")
+	s.logger.Println("D! linking subscriptions")
 	b := backoff.NewExponentialBackOff()
 	b.MaxElapsedTime = s.startupTimeout
 	ticker := backoff.NewTicker(b)
