@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"sort"
 	"strings"
@@ -52,9 +54,11 @@ Commands:
 	list            List information about tasks, templates, recordings or replays.
 	show            Display detailed information about a task.
 	show-template   Display detailed information about a template.
-	help            Prints help for a command.
 	level           Sets the logging level on the kapacitord server.
+	stats           Display various stats about Kapacitor.
 	version         Displays the Kapacitor version info.
+	vars            Print debug vars in JSON format.
+	help            Prints help for a command.
 
 Options:
 `
@@ -147,9 +151,15 @@ func main() {
 	case "level":
 		commandArgs = args
 		commandF = doLevel
+	case "stats":
+		commandArgs = args
+		commandF = doStats
 	case "version":
 		commandArgs = args
 		commandF = doVersion
+	case "vars":
+		commandArgs = args
+		commandF = doVars
 	default:
 		fmt.Fprintln(os.Stderr, "Unknown command", command)
 		usage()
@@ -229,8 +239,12 @@ func doHelp(args []string) error {
 			levelUsage()
 		case "help":
 			helpUsage()
+		case "stats":
+			statsUsage()
 		case "version":
 			versionUsage()
+		case "vars":
+			varsUsage()
 		default:
 			fmt.Fprintln(os.Stderr, "Unknown command", command)
 			usage()
@@ -1588,6 +1602,63 @@ func doLevel(args []string) error {
 	return cli.LogLevel(args[0])
 }
 
+// Stats
+func statsUsage() {
+	var u = `Usage: kapacitor stats <general|ingress>
+
+	Print stats about a certain aspect of Kapacitor.
+
+	general - Display summary stats about Kapacitor.
+	ingress - Display stats about the data Kapacitor is receiving by database, retention policy and measurement.
+`
+	fmt.Fprintln(os.Stderr, u)
+}
+
+func doStats(args []string) error {
+	if len(args) != 1 {
+		statsUsage()
+		return errors.New("must provide a stats category")
+	}
+	vars, err := cli.DebugVars()
+	if err != nil {
+		return err
+	}
+	switch args[0] {
+	case "general":
+		outFmtNum := "%-30s%-30d\n"
+		outFmtStr := "%-30s%-30s\n"
+		fmt.Fprintf(os.Stdout, outFmtStr, "ClusterID:", vars.ClusterID)
+		fmt.Fprintf(os.Stdout, outFmtStr, "ServerID:", vars.ServerID)
+		fmt.Fprintf(os.Stdout, outFmtStr, "Host:", vars.Host)
+		fmt.Fprintf(os.Stdout, outFmtNum, "Tasks:", vars.NumTasks)
+		fmt.Fprintf(os.Stdout, outFmtNum, "Enabled Tasks:", vars.NumEnabledTasks)
+		fmt.Fprintf(os.Stdout, outFmtNum, "Subscriptions:", vars.NumSubscriptions)
+		fmt.Fprintf(os.Stdout, outFmtStr, "Version:", vars.Version)
+	case "ingress":
+		outFmt := "%-30s%-30s%-30s%-20.0f\n"
+		fmt.Fprintf(os.Stdout, "%-30s%-30s%-30s%-20s\n", "Database", "Retention Policy", "Measurement", "Points Received")
+		for _, stat := range vars.Stats {
+			if stat.Name != "ingress" || stat.Tags["task_master"] != "main" {
+				continue
+			}
+			var pr float64
+			if i, ok := stat.Values["points_received"].(float64); ok {
+				pr = i
+			}
+			fmt.Fprintf(
+				os.Stdout,
+				outFmt,
+				stat.Tags["database"],
+				stat.Tags["retention_policy"],
+				stat.Tags["measurement"],
+				pr,
+			)
+		}
+	}
+
+	return nil
+}
+
 // Version
 func versionUsage() {
 	var u = `Usage: kapacitor version
@@ -1599,5 +1670,24 @@ func versionUsage() {
 
 func doVersion(args []string) error {
 	fmt.Fprintf(os.Stdout, "Kapacitor %s (git: %s %s)\n", version, branch, commit)
+	return nil
+}
+
+// Vars
+func varsUsage() {
+	var u = `Usage: kapacitor vars
+
+	Print debug vars in JSON format.
+`
+	fmt.Fprintln(os.Stderr, u)
+}
+
+func doVars(args []string) error {
+	r, err := http.Get(cli.URL() + "/kapacitor/v1/debug/vars")
+	if err != nil {
+		return err
+	}
+	defer r.Body.Close()
+	io.Copy(os.Stdout, r.Body)
 	return nil
 }

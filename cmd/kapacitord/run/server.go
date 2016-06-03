@@ -119,7 +119,7 @@ func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*
 	s.Logger.Printf("I! ClusterID: %s ServerID: %s", s.ClusterID, s.ServerID)
 
 	// Start Task Master
-	s.TaskMaster = kapacitor.NewTaskMaster(logService)
+	s.TaskMaster = kapacitor.NewTaskMaster("main", logService)
 	if err := s.TaskMaster.Open(); err != nil {
 		return nil, err
 	}

@@ -75,7 +75,7 @@ type Service struct {
 	TaskMaster interface {
 		NewFork(name string, dbrps []kapacitor.DBRP, measurements []string) (*kapacitor.Edge, error)
 		DelFork(name string)
-		New() *kapacitor.TaskMaster
+		New(name string) *kapacitor.TaskMaster
 		Stream(name string) (kapacitor.StreamCollector, error)
 	}
 
@@ -911,7 +911,7 @@ func (s *Service) handleCreateReplay(w http.ResponseWriter, req *http.Request) {
 	s.replays.Create(replay)
 
 	go func(replay Replay) {
-		err := s.doReplayFromRecording(t, recording, clk, opt.RecordingTime)
+		err := s.doReplayFromRecording(opt.ID, t, recording, clk, opt.RecordingTime)
 		s.updateReplayResult(replay, err)
 	}(replay)
 
@@ -977,7 +977,7 @@ func (s *Service) handleReplayBatch(w http.ResponseWriter, req *http.Request) {
 	}
 
 	go func(replay Replay) {
-		err := s.doLiveBatchReplay(t, clk, opt.RecordingTime, opt.Start, opt.Stop, opt.Cluster)
+		err := s.doLiveBatchReplay(opt.ID, t, clk, opt.RecordingTime, opt.Start, opt.Stop, opt.Cluster)
 		s.updateReplayResult(replay, err)
 	}(replay)
 
@@ -1048,7 +1048,7 @@ func (r *Service) handleReplayQuery(w http.ResponseWriter, req *http.Request) {
 	w.Write(httpd.MarshalJSON(convertReplay(replay), true))
 }
 
-func (r *Service) doReplayFromRecording(task *kapacitor.Task, recording Recording, clk clock.Clock, recTime bool) error {
+func (r *Service) doReplayFromRecording(id string, task *kapacitor.Task, recording Recording, clk clock.Clock, recTime bool) error {
 	dataSource, err := parseDataSourceURL(recording.DataURL)
 	if err != nil {
 		return errors.Wrap(err, "load data source")
@@ -1076,11 +1076,11 @@ func (r *Service) doReplayFromRecording(task *kapacitor.Task, recording Recordin
 		}
 		return <-replayC
 	}
-	return r.doReplay(task, runReplay)
+	return r.doReplay(id, task, runReplay)
 
 }
 
-func (r *Service) doLiveBatchReplay(task *kapacitor.Task, clk clock.Clock, recTime bool, start, stop time.Time, cluster string) error {
+func (r *Service) doLiveBatchReplay(id string, task *kapacitor.Task, clk clock.Clock, recTime bool, start, stop time.Time, cluster string) error {
 	runReplay := func(tm *kapacitor.TaskMaster) error {
 		sources, recordErrC, err := r.startRecordBatch(task, start, stop, cluster)
 		if err != nil {
@@ -1100,7 +1100,7 @@ func (r *Service) doLiveBatchReplay(task *kapacitor.Task, clk clock.Clock, recTi
 		}
 		return nil
 	}
-	return r.doReplay(task, runReplay)
+	return r.doReplay(id, task, runReplay)
 }
 
 func (r *Service) doLiveQueryReplay(id string, task *kapacitor.Task, clk clock.Clock, recTime bool, query, cluster string) error {
@@ -1138,12 +1138,12 @@ func (r *Service) doLiveQueryReplay(id string, task *kapacitor.Task, clk clock.C
 		}
 		return nil
 	}
-	return r.doReplay(task, runReplay)
+	return r.doReplay(id, task, runReplay)
 }
 
-func (r *Service) doReplay(task *kapacitor.Task, runReplay func(tm *kapacitor.TaskMaster) error) error {
+func (r *Service) doReplay(id string, task *kapacitor.Task, runReplay func(tm *kapacitor.TaskMaster) error) error {
 	// Create new isolated task master
-	tm := r.TaskMaster.New()
+	tm := r.TaskMaster.New(id)
 	tm.Open()
 	defer tm.Close()
 	et, err := tm.StartTask(task)
@@ -1271,7 +1271,8 @@ func (s *Service) doRecordBatch(dataSource DataSource, t *kapacitor.Task, start,
 }
 
 func (s *Service) startRecordBatch(t *kapacitor.Task, start, stop time.Time, cluster string) ([]<-chan models.Batch, <-chan error, error) {
-	et, err := kapacitor.NewExecutingTask(s.TaskMaster.New(), t)
+	// We do not open the task master so it does not need to be closed
+	et, err := kapacitor.NewExecutingTask(s.TaskMaster.New(""), t)
 	if err != nil {
 		return nil, nil, err
 	}

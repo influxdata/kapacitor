@@ -1053,7 +1053,7 @@ func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.Ex
 	}
 
 	// Create a new execution env
-	tm := kapacitor.NewTaskMaster(logService)
+	tm := kapacitor.NewTaskMaster("testBatcher", logService)
 	tm.HTTPDService = httpService
 	tm.TaskStore = taskStore{}
 	tm.DeadmanService = deadman{}

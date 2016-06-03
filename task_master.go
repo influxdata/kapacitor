@@ -9,6 +9,7 @@ import (
 
 	client "github.com/influxdata/influxdb/client/v2"
 	imodels "github.com/influxdata/influxdb/models"
+	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/services/httpd"
@@ -16,6 +17,10 @@ import (
 	"github.com/influxdata/kapacitor/tick/stateful"
 	"github.com/influxdata/kapacitor/timer"
 	"github.com/influxdata/kapacitor/udf"
+)
+
+const (
+	statPointsReceived = "points_received"
 )
 
 type LogService interface {
@@ -33,6 +38,9 @@ var ErrTaskMasterOpen = errors.New("TaskMaster is open")
 
 // An execution framework for  a set of tasks.
 type TaskMaster struct {
+	// Unique name for this task master instance
+	name string
+
 	HTTPDService interface {
 		AddRoutes([]httpd.Route) error
 		DelRoutes([]httpd.Route)
@@ -111,6 +119,9 @@ type TaskMaster struct {
 	// While the inner map is for handling fork deletions better (see taskToForkKeys)
 	forks map[forkKey]map[string]*Edge
 
+	// Stats for number of points each fork has received
+	forkStats map[forkKey]*expvar.Int
+
 	// Task to fork keys is map to help in deletes, in deletes
 	// we have only the task id, and they are called after the task is deleted from TaskMaster.tasks
 	taskToForkKeys map[string][]forkKey
@@ -136,22 +147,24 @@ type forkKey struct {
 }
 
 // Create a new Executor with a given clock.
-func NewTaskMaster(l LogService) *TaskMaster {
+func NewTaskMaster(name string, l LogService) *TaskMaster {
 	return &TaskMaster{
+		name:           name,
 		forks:          make(map[forkKey]map[string]*Edge),
+		forkStats:      make(map[forkKey]*expvar.Int),
 		taskToForkKeys: make(map[string][]forkKey),
 		batches:        make(map[string][]BatchCollector),
 		tasks:          make(map[string]*ExecutingTask),
 		LogService:     l,
-		logger:         l.NewLogger("[task_master] ", log.LstdFlags),
+		logger:         l.NewLogger(fmt.Sprintf("[task_master:%s] ", name), log.LstdFlags),
 		closed:         true,
 		TimingService:  noOpTimingService{},
 	}
 }
 
 // Returns a new TaskMaster instance with the same services as the current one.
-func (tm *TaskMaster) New() *TaskMaster {
-	n := NewTaskMaster(tm.LogService)
+func (tm *TaskMaster) New(name string) *TaskMaster {
+	n := NewTaskMaster(name, tm.LogService)
 	n.HTTPDService = tm.HTTPDService
 	n.UDFService = tm.UDFService
 	n.DeadmanService = tm.DeadmanService
@@ -439,7 +452,7 @@ func (tm *TaskMaster) stream(name string) (StreamCollector, error) {
 	if tm.closed {
 		return nil, ErrTaskMasterClosed
 	}
-	in := newEdge("TASK_MASTER", name, "stream", pipeline.StreamEdge, defaultEdgeBufferSize, tm.LogService)
+	in := newEdge(fmt.Sprintf("task_master:%s", tm.name), name, "stream", pipeline.StreamEdge, defaultEdgeBufferSize, tm.LogService)
 	tm.drained = false
 	tm.wg.Add(1)
 	go tm.runForking(in)
@@ -480,6 +493,23 @@ func (tm *TaskMaster) forkPoint(p models.Point) {
 	for _, edge := range tm.forks[emptyMeasurementKey] {
 		edge.CollectPoint(p)
 	}
+
+	c, ok := tm.forkStats[key]
+	if !ok {
+		// Create statistics
+		c = &expvar.Int{}
+		tm.forkStats[key] = c
+
+		tags := map[string]string{
+			"task_master":      tm.name,
+			"database":         key.Database,
+			"retention_policy": key.RetentionPolicy,
+			"measurement":      key.Measurement,
+		}
+		_, statMap := NewStatistics("ingress", tags)
+		statMap.Set(statPointsReceived, c)
+	}
+	c.Add(1)
 }
 
 func (tm *TaskMaster) WritePoints(database, retentionPolicy string, consistencyLevel imodels.ConsistencyLevel, points []imodels.Point) error {
