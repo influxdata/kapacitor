@@ -489,7 +489,7 @@ var (
 	defineFlags = flag.NewFlagSet("define", flag.ExitOnError)
 	dtick       = defineFlags.String("tick", "", "Path to the TICKscript")
 	dtype       = defineFlags.String("type", "", "The task type (stream|batch)")
-	dtemplate   = defineFlags.String("template-id", "", "Optional template ID")
+	dtemplate   = defineFlags.String("template", "", "Optional template ID")
 	dvars       = defineFlags.String("vars", "", "Optional path to a JSON vars file")
 	dnoReload   = defineFlags.Bool("no-reload", false, "Do not reload the task even if it is enabled")
 	ddbrp       = make(dbrps, 0)
@@ -876,19 +876,6 @@ Replay data to a task directly without saving a recording.
 The command is a hybrid of the 'kapacitor record batch|query' and 'kapacitor replay' commands.
 
 See either 'kapacitor replay-live batch' or 'kapacitor replay-live query' for more details
-Examples:
-
-	$ kapacitor replay-live batch -task cpu_idle -start 2015-09-01T00:00:00Z -stop 2015-09-02T00:00:00Z
-
-		This replays the result of the query defined in task 'cpu_idle' and runs the query
-		until the queries reaches the stop time, starting at time 'start' and incrementing
-		by the schedule defined in the task.
-
-	$ kapacitor replay-liave batch -task cpu_idle -past 10h
-
-		This replays the result of the query defined in task 'cpu_idle' and runs the query
-		until the queries reaches the present time.
-		The starting time for the queries is 'now - 10h' and increments by the schedule defined in the task.
 `
 	fmt.Fprintln(os.Stderr, u)
 }
@@ -902,10 +889,17 @@ This is similar to 'kapacitor record batch ...' but without saving a recording.
 
 Examples:
 
-	$ kapacitor replay-live query -task cpu_alert -rec-time -query 'select value from "telegraf"."default"."cpu_idle" where time > now() - 1h and time < now()'
+	$ kapacitor replay-live batch -task cpu_idle -start 2015-09-01T00:00:00Z -stop 2015-09-02T00:00:00Z
 
-		This replays the result of the query against the cpu_alert task.
+		This replays the result of the query defined in task 'cpu_idle' and runs the query
+		until the queries reaches the stop time, starting at time 'start' and incrementing
+		by the schedule defined in the task.
 
+	$ kapacitor replay-live batch -task cpu_idle -past 10h
+
+		This replays the result of the query defined in task 'cpu_idle' and runs the query
+		until the queries reaches the present time.
+		The starting time for the queries is 'now - 10h' and increments by the schedule defined in the task.
 
 Options:
 `
@@ -919,6 +913,13 @@ func replayLiveQueryUsage() {
 Replay the result of a querty against a task.
 
 This is similar to 'kapacitor record query...' but without saving a recording.
+
+Examples:
+
+	$ kapacitor replay-live query -task cpu_alert -rec-time -query 'select value from "telegraf"."default"."cpu_idle" where time > now() - 1h and time < now()'
+
+		This replays the result of the query against the cpu_alert task.
+
 
 Options:
 `
@@ -986,7 +987,7 @@ func doReplayLive(args []string) error {
 	case "query":
 		replayLiveQueryFlags.Parse(args[1:])
 		if *rlqQuery == "" || *rlqTask == "" {
-			recordQueryFlags.Usage()
+			replayLiveQueryFlags.Usage()
 			return errors.New("both query and task are required")
 		}
 		noWait = *rlqNowait
@@ -1317,7 +1318,7 @@ func doShowTemplate(args []string) error {
 // List
 
 func listUsage() {
-	var u = `Usage: kapacitor list (tasks|templates|recordings|replays) [(task|template|recording|replay) ID or pattern]
+	var u = `Usage: kapacitor list (tasks|templates|recordings|replays) [ID or pattern]...
 
 List tasks, templates, recordings, or replays and their current state.
 
@@ -1327,22 +1328,17 @@ If no ID or pattern is given then all items will be listed.
 }
 
 func doList(args []string) error {
-
 	if len(args) == 0 {
 		fmt.Fprintln(os.Stderr, "Must specify 'tasks', 'recordings', or 'replays'")
 		listUsage()
 		os.Exit(2)
 	}
 
-	if len(args) > 2 {
-		fmt.Fprintln(os.Stderr, "Invalid usage of list")
-		listUsage()
-		os.Exit(2)
-	}
-
-	var pattern string
-	if len(args) == 2 {
-		pattern = args[1]
+	var patterns []string
+	if len(args) >= 2 {
+		patterns = args[1:]
+	} else {
+		patterns = []string{""}
 	}
 
 	limit := 100
@@ -1351,99 +1347,107 @@ func doList(args []string) error {
 	case "tasks":
 		outFmt := "%-30s%-10v%-10v%-10v%s\n"
 		fmt.Fprintf(os.Stdout, outFmt, "ID", "Type", "Status", "Executing", "Databases and Retention Policies")
-		offset := 0
-		for {
-			tasks, err := cli.ListTasks(&client.ListTasksOptions{
-				Pattern: pattern,
-				Fields:  []string{"type", "status", "executing", "dbrps"},
-				Offset:  offset,
-				Limit:   limit,
-			})
-			if err != nil {
-				return err
-			}
+		for _, pattern := range patterns {
+			offset := 0
+			for {
+				tasks, err := cli.ListTasks(&client.ListTasksOptions{
+					Pattern: pattern,
+					Fields:  []string{"type", "status", "executing", "dbrps"},
+					Offset:  offset,
+					Limit:   limit,
+				})
+				if err != nil {
+					return err
+				}
 
-			for _, t := range tasks {
-				fmt.Fprintf(os.Stdout, outFmt, t.ID, t.Type, t.Status, t.Executing, t.DBRPs)
+				for _, t := range tasks {
+					fmt.Fprintf(os.Stdout, outFmt, t.ID, t.Type, t.Status, t.Executing, t.DBRPs)
+				}
+				if len(tasks) != limit {
+					break
+				}
+				offset += limit
 			}
-			if len(tasks) != limit {
-				break
-			}
-			offset += limit
 		}
 	case "templates":
 		outFmt := "%-30s%-10v%-40v\n"
 		fmt.Fprintf(os.Stdout, outFmt, "ID", "Type", "Vars")
-		offset := 0
-		for {
-			templates, err := cli.ListTemplates(&client.ListTemplatesOptions{
-				Pattern: pattern,
-				Fields:  []string{"type", "vars"},
-				Offset:  offset,
-				Limit:   limit,
-			})
-			if err != nil {
-				return err
-			}
-
-			for _, t := range templates {
-				vars := make([]string, 0, len(t.Vars))
-				for name := range t.Vars {
-					vars = append(vars, name)
+		for _, pattern := range patterns {
+			offset := 0
+			for {
+				templates, err := cli.ListTemplates(&client.ListTemplatesOptions{
+					Pattern: pattern,
+					Fields:  []string{"type", "vars"},
+					Offset:  offset,
+					Limit:   limit,
+				})
+				if err != nil {
+					return err
 				}
-				sort.Strings(vars)
-				fmt.Fprintf(os.Stdout, outFmt, t.ID, t.Type, strings.Join(vars, ","))
+
+				for _, t := range templates {
+					vars := make([]string, 0, len(t.Vars))
+					for name := range t.Vars {
+						vars = append(vars, name)
+					}
+					sort.Strings(vars)
+					fmt.Fprintf(os.Stdout, outFmt, t.ID, t.Type, strings.Join(vars, ","))
+				}
+				if len(templates) != limit {
+					break
+				}
+				offset += limit
 			}
-			if len(templates) != limit {
-				break
-			}
-			offset += limit
 		}
 	case "recordings":
 		outFmt := "%-40s%-8v%-10s%-10s%-23s\n"
 		fmt.Fprintf(os.Stdout, outFmt, "ID", "Type", "Status", "Size", "Date")
-		offset := 0
-		for {
-			recordings, err := cli.ListRecordings(&client.ListRecordingsOptions{
-				Pattern: pattern,
-				Fields:  []string{"type", "size", "date", "status"},
-				Offset:  offset,
-				Limit:   limit,
-			})
-			if err != nil {
-				return err
-			}
+		for _, pattern := range patterns {
+			offset := 0
+			for {
+				recordings, err := cli.ListRecordings(&client.ListRecordingsOptions{
+					Pattern: pattern,
+					Fields:  []string{"type", "size", "date", "status"},
+					Offset:  offset,
+					Limit:   limit,
+				})
+				if err != nil {
+					return err
+				}
 
-			for _, r := range recordings {
-				fmt.Fprintf(os.Stdout, outFmt, r.ID, r.Type, r.Status, humanize.Bytes(uint64(r.Size)), r.Date.Local().Format(time.RFC822))
+				for _, r := range recordings {
+					fmt.Fprintf(os.Stdout, outFmt, r.ID, r.Type, r.Status, humanize.Bytes(uint64(r.Size)), r.Date.Local().Format(time.RFC822))
+				}
+				if len(recordings) != limit {
+					break
+				}
+				offset += limit
 			}
-			if len(recordings) != limit {
-				break
-			}
-			offset += limit
 		}
 	case "replays":
 		outFmt := "%-40v%-20v%-40v%-9v%-8v%-23v\n"
 		fmt.Fprintf(os.Stdout, outFmt, "ID", "Task", "Recording", "Status", "Clock", "Date")
-		offset := 0
-		for {
-			replays, err := cli.ListReplays(&client.ListReplaysOptions{
-				Pattern: pattern,
-				Fields:  []string{"task", "recording", "status", "clock", "date"},
-				Offset:  offset,
-				Limit:   limit,
-			})
-			if err != nil {
-				return err
-			}
+		for _, pattern := range patterns {
+			offset := 0
+			for {
+				replays, err := cli.ListReplays(&client.ListReplaysOptions{
+					Pattern: pattern,
+					Fields:  []string{"task", "recording", "status", "clock", "date"},
+					Offset:  offset,
+					Limit:   limit,
+				})
+				if err != nil {
+					return err
+				}
 
-			for _, r := range replays {
-				fmt.Fprintf(os.Stdout, outFmt, r.ID, r.Task, r.Recording, r.Status, r.Clock, r.Date.Local().Format(time.RFC822))
+				for _, r := range replays {
+					fmt.Fprintf(os.Stdout, outFmt, r.ID, r.Task, r.Recording, r.Status, r.Clock, r.Date.Local().Format(time.RFC822))
+				}
+				if len(replays) != limit {
+					break
+				}
+				offset += limit
 			}
-			if len(replays) != limit {
-				break
-			}
-			offset += limit
 		}
 	default:
 		return fmt.Errorf("cannot list '%s' did you mean 'tasks', 'recordings' or 'replays'?", kind)

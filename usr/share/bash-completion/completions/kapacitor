@@ -1,0 +1,180 @@
+
+# Bash completion for the kapacitor command.
+_kapacitor()
+{
+    local cur prev words
+
+    COMPREPLY=()
+    cur=${COMP_WORDS[COMP_CWORD]}
+    prev=${COMP_WORDS[COMP_CWORD-1]}
+
+    case "${COMP_WORDS[1]}" in
+        record)
+            case "${COMP_WORDS[2]}" in
+                batch)
+                    case "$prev" in
+                        -task)
+                            words=$(_kapacitor_list tasks "$cur")
+                            ;;
+                        *)
+                            words='-no-wait -past -recording-id -start -stop -task'
+                            ;;
+                    esac
+                    ;;
+                stream)
+                    case "$prev" in
+                        -task)
+                            words=$(_kapacitor_list tasks "$cur")
+                            ;;
+                        *)
+                            words='-duration -no-wait -recording-id -task'
+                            ;;
+                    esac
+                    ;;
+                query)
+                    words='-query -type -cluster -no-wait -recording-id'
+                    ;;
+                *)
+                    words='batch stream query'
+                    ;;
+            esac
+            ;;
+        define)
+            if [[ -z "${COMP_WORDS[2]}" || ("$cur" = "${COMP_WORDS[2]}" && -z "${COMP_WORDS[3]}") ]]
+            then
+                words=$(_kapacitor_list tasks "$cur")
+            else
+                case "$prev" in
+                    -dbrp)
+                        words=$(_kapacitor_dbrps)
+                        ;;
+                    -tick)
+                        COMPREPLY=($(compgen -o filenames -A file -X '!*.tick' -- "$cur"))
+                        ;;
+                    -type)
+                        words='batch stream'
+                        ;;
+                    -template)
+                        words=$(_kapacitor_list templates "$cur")
+                        ;;
+                    -vars)
+                        COMPREPLY=($(compgen -o filenames -A file -- "$cur"))
+                        ;;
+                    *)
+                        words='-dbrp -no-reload -tick -type -template -vars'
+                        ;;
+                esac
+            fi
+            ;;
+        define-template)
+            if [[ -z "${COMP_WORDS[2]}" || ("$cur" = "${COMP_WORDS[2]}" && -z "${COMP_WORDS[3]}") ]]
+            then
+                words=$(_kapacitor_list templates "$cur")
+            else
+                case "$prev" in
+                    -tick)
+                        COMPREPLY=($(compgen -o filenames -A file -X '!*.tick' -- "$cur"))
+                        ;;
+                    -type)
+                        words='batch stream'
+                        ;;
+                    *)
+                        words='-tick -type'
+                        ;;
+                esac
+            fi
+            ;;
+        replay)
+            case "$prev" in
+                -recording)
+                    words=$(_kapacitor_list recordings "$cur")
+                    ;;
+                -task)
+                    words=$(_kapacitor_list tasks "$cur")
+                    ;;
+                *)
+                    words='-no-wait -real-clock -rec-time -recording -replay-id -task'
+                    ;;
+            esac
+            ;;
+        replay-live)
+            case "${COMP_WORDS[2]}" in
+                batch)
+                    case "$prev" in
+                        -task)
+                            words=$(_kapacitor_list tasks "$cur")
+                            ;;
+                        *)
+                            words='-no-wait -past -real-clock -rec-time -replay-id -start -stop -task'
+                            ;;
+                    esac
+                    ;;
+                query)
+                    case "$prev" in
+                        -task)
+                            words=$(_kapacitor_list tasks "$cur")
+                            ;;
+                        *)
+                            words='-cluster -no-wait -real-clock -rec-time -replay-id -query -task'
+                            ;;
+                    esac
+                    ;;
+                *)
+                    words='batch query'
+                    ;;
+            esac
+            ;;
+        enable|disable|reload|show)
+            words=$(_kapacitor_list tasks "$cur")
+            ;;
+        delete|list)
+            case "${COMP_WORDS[2]}" in
+                tasks|templates|recordings|replays)
+                    words=$(_kapacitor_list "${COMP_WORDS[2]}" "$cur")
+                    ;;
+                *)
+                    words='tasks templates recordings replays'
+                    ;;
+            esac
+            ;;
+        show-template)
+            words=$(_kapacitor_list templates "$cur")
+            ;;
+        level)
+            words='debug info warn error'
+            ;;
+        stats)
+            case "${COMP_WORDS[2]}" in
+                ingress|general)
+                    ;;
+                *)
+                    words='general ingress'
+                    ;;
+            esac
+            ;;
+        *)
+            words='record define define-template replay replay-live enable disable \
+                reload delete list show show-template level stats version vars help'
+            ;;
+    esac
+    if [ -z "$COMPREPLY" ]
+    then
+        COMPREPLY=($(compgen -W "$words" -- "$cur"))
+    fi
+
+    return 0
+}
+
+_kapacitor_list()
+{
+    # List a certain kind of object and return a set of IDs
+    kapacitor list "$1" "$2*" 2>/dev/null | awk 'NR>1 {print $1}' 2>/dev/null
+}
+
+_kapacitor_dbrps()
+{
+    # Determine set of DBRPs from the ingress stats
+    kapacitor stats ingress 2>/dev/null | awk 'NR>1 {printf "%s.%s\n", $1, $2}' 2>/dev/null
+}
+
+complete -F _kapacitor kapacitor
