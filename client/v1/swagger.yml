@@ -376,8 +376,6 @@ paths:
               stop:
                 type: string
                 format: dateTime
-              cluster:
-                type: string
             required:
               - task
               - start
@@ -605,8 +603,6 @@ paths:
               stop:
                 type: string
                 format: dateTime
-              cluster:
-                type: string
               recording-time:
                 type: boolean
                 default: false

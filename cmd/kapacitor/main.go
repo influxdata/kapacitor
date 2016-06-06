@@ -269,7 +269,6 @@ var (
 	rbStart          = recordBatchFlags.String("start", "", "The start time for the set of queries.")
 	rbStop           = recordBatchFlags.String("stop", "", "The stop time for the set of queries (default now).")
 	rbPast           = recordBatchFlags.String("past", "", "Set start time via 'now - past'.")
-	rbCluster        = recordBatchFlags.String("cluster", "", "Optional named InfluxDB cluster from configuration.")
 	rbNowait         = recordBatchFlags.Bool("no-wait", false, "Do not wait for the recording to finish.")
 	rbId             = recordBatchFlags.String("recording-id", "", "The ID to give to this recording. If not set an random ID is chosen.")
 
@@ -430,11 +429,10 @@ func doRecord(args []string) error {
 		}
 		noWait = *rbNowait
 		recording, err = cli.RecordBatch(client.RecordBatchOptions{
-			ID:      *rbId,
-			Task:    *rbTask,
-			Cluster: *rbCluster,
-			Start:   start,
-			Stop:    stop,
+			ID:    *rbId,
+			Task:  *rbTask,
+			Start: start,
+			Stop:  stop,
 		})
 		if err != nil {
 			return err
@@ -859,7 +857,6 @@ var (
 	rlbStart             = replayLiveBatchFlags.String("start", "", "The start time for the set of queries.")
 	rlbStop              = replayLiveBatchFlags.String("stop", "", "The stop time for the set of queries (default now).")
 	rlbPast              = replayLiveBatchFlags.String("past", "", "Set start time via 'now - past'.")
-	rlbCluster           = replayLiveBatchFlags.String("cluster", "", "Optional named InfluxDB cluster from configuration.")
 
 	replayLiveQueryFlags = flag.NewFlagSet("replay-live-query", flag.ExitOnError)
 	rlqTask              = replayLiveQueryFlags.String("task", "", "The task ID.")
@@ -980,7 +977,6 @@ func doReplayLive(args []string) error {
 			Task:          *rlbTask,
 			Start:         start,
 			Stop:          stop,
-			Cluster:       *rlbCluster,
 			RecordingTime: *rlbRec,
 			Clock:         clk,
 		})

@@ -637,7 +637,7 @@ func (s *Service) handleRecordBatch(w http.ResponseWriter, req *http.Request) {
 
 	go func(recording Recording) {
 		ds, _ := parseDataSourceURL(dataUrl.String())
-		err := s.doRecordBatch(ds, t, opt.Start, opt.Stop, opt.Cluster)
+		err := s.doRecordBatch(ds, t, opt.Start, opt.Stop)
 		s.updateRecordingResult(recording, ds, err)
 	}(recording)
 
@@ -977,7 +977,7 @@ func (s *Service) handleReplayBatch(w http.ResponseWriter, req *http.Request) {
 	}
 
 	go func(replay Replay) {
-		err := s.doLiveBatchReplay(opt.ID, t, clk, opt.RecordingTime, opt.Start, opt.Stop, opt.Cluster)
+		err := s.doLiveBatchReplay(opt.ID, t, clk, opt.RecordingTime, opt.Start, opt.Stop)
 		s.updateReplayResult(replay, err)
 	}(replay)
 
@@ -1080,9 +1080,9 @@ func (r *Service) doReplayFromRecording(id string, task *kapacitor.Task, recordi
 
 }
 
-func (r *Service) doLiveBatchReplay(id string, task *kapacitor.Task, clk clock.Clock, recTime bool, start, stop time.Time, cluster string) error {
+func (r *Service) doLiveBatchReplay(id string, task *kapacitor.Task, clk clock.Clock, recTime bool, start, stop time.Time) error {
 	runReplay := func(tm *kapacitor.TaskMaster) error {
-		sources, recordErrC, err := r.startRecordBatch(task, start, stop, cluster)
+		sources, recordErrC, err := r.startRecordBatch(task, start, stop)
 		if err != nil {
 			return err
 		}
@@ -1248,8 +1248,8 @@ func (b batchArchive) Close() error {
 }
 
 // Record a series of batch queries defined by a batch task
-func (s *Service) doRecordBatch(dataSource DataSource, t *kapacitor.Task, start, stop time.Time, cluster string) error {
-	sources, recordErrC, err := s.startRecordBatch(t, start, stop, cluster)
+func (s *Service) doRecordBatch(dataSource DataSource, t *kapacitor.Task, start, stop time.Time) error {
+	sources, recordErrC, err := s.startRecordBatch(t, start, stop)
 	if err != nil {
 		return err
 	}
@@ -1270,7 +1270,7 @@ func (s *Service) doRecordBatch(dataSource DataSource, t *kapacitor.Task, start,
 	return nil
 }
 
-func (s *Service) startRecordBatch(t *kapacitor.Task, start, stop time.Time, cluster string) ([]<-chan models.Batch, <-chan error, error) {
+func (s *Service) startRecordBatch(t *kapacitor.Task, start, stop time.Time) ([]<-chan models.Batch, <-chan error, error) {
 	// We do not open the task master so it does not need to be closed
 	et, err := kapacitor.NewExecutingTask(s.TaskMaster.New(""), t)
 	if err != nil {
@@ -1286,24 +1286,28 @@ func (s *Service) startRecordBatch(t *kapacitor.Task, start, stop time.Time, clu
 		return nil, nil, errors.New("InfluxDB not configured, cannot record batch query")
 	}
 
-	var con client.Client
-	if cluster != "" {
-		con, err = s.InfluxDBService.NewNamedClient(cluster)
-	} else {
-		con, err = s.InfluxDBService.NewDefaultClient()
-	}
-	if err != nil {
-		return nil, nil, err
-	}
-
 	sources := make([]<-chan models.Batch, len(batches))
 	errors := make(chan error, len(batches))
 
-	for batchIdx, queries := range batches {
+	for batchIndex, batchQueries := range batches {
 		source := make(chan models.Batch)
-		sources[batchIdx] = source
-		go func(queries []string) {
+		sources[batchIndex] = source
+		go func(cluster string, queries []string) {
 			defer close(source)
+
+			// Connect to the cluster
+			var con client.Client
+			var err error
+			if cluster != "" {
+				con, err = s.InfluxDBService.NewNamedClient(cluster)
+			} else {
+				con, err = s.InfluxDBService.NewDefaultClient()
+			}
+			if err != nil {
+				errors <- err
+				return
+			}
+			// Run queries
 			for _, q := range queries {
 				query := client.Query{
 					Command: q,
@@ -1329,7 +1333,7 @@ func (s *Service) startRecordBatch(t *kapacitor.Task, start, stop time.Time, clu
 				}
 			}
 			errors <- nil
-		}(queries)
+		}(batchQueries.Cluster, batchQueries.Queries)
 	}
 	errC := make(chan error, 1)
 	go func() {

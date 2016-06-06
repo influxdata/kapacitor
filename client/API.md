@@ -791,7 +791,6 @@ A recording ID is returned to later identify the recording.
 | task      | ID of a task, records the results of the queries defined in the task.                                            |
 | start     | Earliest date for which data will be recorded. RFC3339Nano formatted.                                            |
 | stop      | Latest date for which data will be recorded. If not specified uses the current time. RFC3339Nano formatted data. |
-| cluster   | Name of a configured InfluxDB cluster. If empty uses the default cluster.                                        |
 
 ##### Query
 
@@ -1121,7 +1120,6 @@ and so is not supported.
 | task           |         | ID of a task, replays the results of the queries defined in the task against the task.                                                                                                                                                                            |
 | start          |         | Earliest date for which data will be replayed. RFC3339Nano formatted.                                                                                                                                                                            |
 | stop           | now     | Latest date for which data will be replayed. If not specified uses the current time. RFC3339Nano formatted data.                                                                                                                                 |
-| cluster        |         | Name of a configured InfluxDB cluster. If empty uses the default cluster.                                                                                                                                                                        |
 | recording-time | false   | If true, use the times in the recording, otherwise adjust times relative to the current time.                                                                                                                                                    |
 | clock          | fast    | One of `fast` or `real`. If `real` wait for real time to pass corresponding with the time in the recordings. If `fast` replay data without delay. For example, if clock is `real` then a stream recording of duration 5m will take 5m to replay. |
 

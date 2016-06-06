@@ -1073,11 +1073,10 @@ func (c *Client) RecordStream(opt RecordStreamOptions) (Recording, error) {
 }
 
 type RecordBatchOptions struct {
-	ID      string    `json:"id,omitempty"`
-	Task    string    `json:"task"`
-	Start   time.Time `json:"start"`
-	Stop    time.Time `json:"stop"`
-	Cluster string    `json:"cluster,omitempty"`
+	ID    string    `json:"id,omitempty"`
+	Task  string    `json:"task"`
+	Start time.Time `json:"start"`
+	Stop  time.Time `json:"stop"`
 }
 
 // Record the batch queries for a task.
@@ -1260,7 +1259,6 @@ type ReplayBatchOptions struct {
 	Task          string    `json:"task"`
 	Start         time.Time `json:"start"`
 	Stop          time.Time `json:"stop"`
-	Cluster       string    `json:"cluster,omitempty"`
 	RecordingTime bool      `json:"recording-time"`
 	Clock         Clock     `json:"clock"`
 }

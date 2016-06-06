@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cenkalti/backoff"
@@ -178,6 +179,8 @@ type influxdb struct {
 		Open() error
 		Close() error
 	}
+
+	mu sync.Mutex
 }
 
 type subEntry struct {
@@ -192,6 +195,8 @@ type subInfo struct {
 }
 
 func (s *influxdb) Open() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if !s.disableSubs {
 		err := s.linkSubscriptions()
 		if s.subscriptionSyncInterval != 0 {
@@ -208,10 +213,14 @@ func (s *influxdb) Open() error {
 }
 
 func (s *influxdb) Close() error {
-	var lastErr error
-	if s.subscriptionSyncInterval != 0 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.subSyncTicker != nil {
 		s.subSyncTicker.Stop()
 	}
+
+	var lastErr error
 	for _, service := range s.services {
 		err := service.Close()
 		if err != nil {
