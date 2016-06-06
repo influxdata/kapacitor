@@ -185,6 +185,7 @@ func (p *Pipeline) Dot(name string) []byte {
 	return buf.Bytes()
 }
 
+//tick:ignore
 type TemplatePipeline struct {
 	p    *Pipeline
 	vars map[string]tick.Var
