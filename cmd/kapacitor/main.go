@@ -652,7 +652,7 @@ func doDefine(args []string) error {
 			Status:     client.Disabled,
 		})
 	} else {
-		err = cli.UpdateTask(
+		_, err = cli.UpdateTask(
 			l,
 			client.UpdateTaskOptions{
 				TemplateID: *dtemplate,
@@ -668,11 +668,11 @@ func doDefine(args []string) error {
 	}
 
 	if !*dnoReload && task.Status == client.Enabled {
-		err := cli.UpdateTask(l, client.UpdateTaskOptions{Status: client.Disabled})
+		_, err := cli.UpdateTask(l, client.UpdateTaskOptions{Status: client.Disabled})
 		if err != nil {
 			return err
 		}
-		err = cli.UpdateTask(l, client.UpdateTaskOptions{Status: client.Enabled})
+		_, err = cli.UpdateTask(l, client.UpdateTaskOptions{Status: client.Enabled})
 		if err != nil {
 			return err
 		}
@@ -761,7 +761,7 @@ func doDefineTemplate(args []string) error {
 			TICKscript: script,
 		})
 	} else {
-		err = cli.UpdateTemplate(
+		_, err = cli.UpdateTemplate(
 			l,
 			client.UpdateTemplateOptions{
 				Type:       ttype,
@@ -1070,7 +1070,7 @@ func doEnable(args []string) error {
 				return errors.Wrap(err, "listing tasks")
 			}
 			for _, task := range tasks {
-				err := cli.UpdateTask(
+				_, err := cli.UpdateTask(
 					task.Link,
 					client.UpdateTaskOptions{Status: client.Enabled},
 				)
@@ -1128,7 +1128,7 @@ func doDisable(args []string) error {
 				return errors.Wrap(err, "listing tasks")
 			}
 			for _, task := range tasks {
-				err := cli.UpdateTask(
+				_, err := cli.UpdateTask(
 					task.Link,
 					client.UpdateTaskOptions{Status: client.Disabled},
 				)

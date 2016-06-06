@@ -100,8 +100,10 @@ paths:
           schema:
             $ref: '#/definitions/Task'
       responses:
-        '204':
+        '200':
           description: Update succeeded
+          schema:
+            $ref: '#/definitions/Task'
         default:
           description: A processing or an unexpected error.
           schema:
@@ -233,8 +235,10 @@ paths:
           schema:
             $ref: '#/definitions/Template'
       responses:
-        '204':
+        '200':
           description: Update succeeded
+          schema:
+            $ref: '#/definitions/Template'
         default:
           description: A processing or an unexpected error.
           schema:
