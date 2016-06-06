@@ -651,6 +651,7 @@ func (c *Client) CreateTask(opt CreateTaskOptions) (Task, error) {
 }
 
 type UpdateTaskOptions struct {
+	ID         string     `json:"id,omitempty"`
 	TemplateID string     `json:"template-id,omitempty"`
 	Type       TaskType   `json:"type,omitempty"`
 	DBRPs      []DBRP     `json:"dbrps,omitempty"`
@@ -661,16 +662,17 @@ type UpdateTaskOptions struct {
 
 // Update an existing task.
 // Only fields that are not their default value will be updated.
-func (c *Client) UpdateTask(link Link, opt UpdateTaskOptions) error {
+func (c *Client) UpdateTask(link Link, opt UpdateTaskOptions) (Task, error) {
+	t := Task{}
 	if link.Href == "" {
-		return fmt.Errorf("invalid link %v", link)
+		return t, fmt.Errorf("invalid link %v", link)
 	}
 
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	err := enc.Encode(opt)
 	if err != nil {
-		return err
+		return t, err
 	}
 
 	u := *c.url
@@ -678,14 +680,14 @@ func (c *Client) UpdateTask(link Link, opt UpdateTaskOptions) error {
 
 	req, err := http.NewRequest("PATCH", u.String(), &buf)
 	if err != nil {
-		return err
+		return t, err
 	}
 
-	_, err = c.do(req, nil, http.StatusNoContent)
+	_, err = c.do(req, &t, http.StatusOK)
 	if err != nil {
-		return err
+		return t, err
 	}
-	return nil
+	return t, nil
 }
 
 type TaskOptions struct {
@@ -860,22 +862,24 @@ func (c *Client) CreateTemplate(opt CreateTemplateOptions) (Template, error) {
 }
 
 type UpdateTemplateOptions struct {
+	ID         string   `json:"id,omitempty"`
 	Type       TaskType `json:"type,omitempty"`
 	TICKscript string   `json:"script,omitempty"`
 }
 
 // Update an existing template.
 // Only fields that are not their default value will be updated.
-func (c *Client) UpdateTemplate(link Link, opt UpdateTemplateOptions) error {
+func (c *Client) UpdateTemplate(link Link, opt UpdateTemplateOptions) (Template, error) {
+	t := Template{}
 	if link.Href == "" {
-		return fmt.Errorf("invalid link %v", link)
+		return t, fmt.Errorf("invalid link %v", link)
 	}
 
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	err := enc.Encode(opt)
 	if err != nil {
-		return err
+		return t, err
 	}
 
 	u := *c.url
@@ -883,14 +887,14 @@ func (c *Client) UpdateTemplate(link Link, opt UpdateTemplateOptions) error {
 
 	req, err := http.NewRequest("PATCH", u.String(), &buf)
 	if err != nil {
-		return err
+		return t, err
 	}
 
-	_, err = c.do(req, nil, http.StatusNoContent)
+	_, err = c.do(req, &t, http.StatusOK)
 	if err != nil {
-		return err
+		return t, err
 	}
-	return nil
+	return t, nil
 }
 
 type TemplateOptions struct {

@@ -183,6 +183,8 @@ batch
 - [#553](https://github.com/influxdata/kapacitor/issues/553): Periodically check if new InfluxDB DBRPs have been created.
 - [#602](https://github.com/influxdata/kapacitor/issues/602): Fix missing To property on email alert handler.
 - [#581](https://github.com/influxdata/kapacitor/issues/581): Record/Replay batch tasks get cluster info from task not API.
+- [#613](https://github.com/influxdata/kapacitor/issues/613): BREAKING: Allow the ID of templates and tasks to be updated via the PATCH method.
+    The breaking change is that now PATCH request return a 200 with the template or task definition, where before they returned 204.
 
 ## v0.13.1 [2016-05-13]
 

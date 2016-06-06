@@ -54,7 +54,7 @@ func Test_ReportsErrors(t *testing.T) {
 		{
 			name: "UpdateTask",
 			fnc: func(c *client.Client) error {
-				err := c.UpdateTask(c.TaskLink(""), client.UpdateTaskOptions{})
+				_, err := c.UpdateTask(c.TaskLink(""), client.UpdateTaskOptions{})
 				return err
 			},
 		},
@@ -89,7 +89,7 @@ func Test_ReportsErrors(t *testing.T) {
 		{
 			name: "UpdateTemplate",
 			fnc: func(c *client.Client) error {
-				err := c.UpdateTemplate(c.TemplateLink(""), client.UpdateTemplateOptions{})
+				_, err := c.UpdateTemplate(c.TemplateLink(""), client.UpdateTemplateOptions{})
 				return err
 			},
 		},
@@ -516,7 +516,8 @@ func Test_UpdateTask(t *testing.T) {
 				w.WriteHeader(http.StatusBadRequest)
 				fmt.Fprintf(w, "unexpected UpdateTask body: got:\n%v\nexp:\n%v\n", task, exp)
 			} else {
-				w.WriteHeader(http.StatusNoContent)
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprint(w, `{"link": {"rel":"self", "href":"/kapacitor/v1/tasks/taskname"}, "id":"taskname"}`)
 			}
 		} else {
 			w.WriteHeader(http.StatusBadRequest)
@@ -528,7 +529,7 @@ func Test_UpdateTask(t *testing.T) {
 	}
 	defer s.Close()
 
-	err = c.UpdateTask(
+	task, err := c.UpdateTask(
 		c.TaskLink("taskname"),
 		client.UpdateTaskOptions{
 			DBRPs: []client.DBRP{{Database: "newdb", RetentionPolicy: "rpname"}},
@@ -547,6 +548,9 @@ func Test_UpdateTask(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if got, exp := task.Link.Href, "/kapacitor/v1/tasks/taskname"; got != exp {
+		t.Errorf("unexpected link.Href got %s exp %s", got, exp)
+	}
 }
 
 func Test_UpdateTask_Enable(t *testing.T) {
@@ -563,7 +567,8 @@ func Test_UpdateTask_Enable(t *testing.T) {
 				w.WriteHeader(http.StatusBadRequest)
 				fmt.Fprintf(w, "unexpected UpdateTask body: got:\n%v\nexp:\n%v\n", task, exp)
 			} else {
-				w.WriteHeader(http.StatusNoContent)
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprint(w, `{"link": {"rel":"self", "href":"/kapacitor/v1/tasks/taskname"}, "id":"taskname", "status": "enabled"}`)
 			}
 		} else {
 			w.WriteHeader(http.StatusBadRequest)
@@ -575,7 +580,7 @@ func Test_UpdateTask_Enable(t *testing.T) {
 	}
 	defer s.Close()
 
-	err = c.UpdateTask(
+	task, err := c.UpdateTask(
 		c.TaskLink("taskname"),
 		client.UpdateTaskOptions{
 			Status: client.Enabled,
@@ -583,6 +588,12 @@ func Test_UpdateTask_Enable(t *testing.T) {
 	)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if got, exp := task.Link.Href, "/kapacitor/v1/tasks/taskname"; got != exp {
+		t.Errorf("unexpected link.Href got %s exp %s", got, exp)
+	}
+	if got, exp := task.Status, client.Enabled; got != exp {
+		t.Errorf("unexpected task.Status got %s exp %s", got, exp)
 	}
 }
 
@@ -601,7 +612,8 @@ func Test_UpdateTask_Disable(t *testing.T) {
 				w.WriteHeader(http.StatusBadRequest)
 				fmt.Fprintf(w, "unexpected UpdateTask body: got:\n%v\nexp:\n%v\n", task, exp)
 			} else {
-				w.WriteHeader(http.StatusNoContent)
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprint(w, `{"link": {"rel":"self", "href":"/kapacitor/v1/tasks/taskname"}, "id":"taskname", "status": "disabled"}`)
 			}
 		} else {
 			w.WriteHeader(http.StatusBadRequest)
@@ -613,13 +625,19 @@ func Test_UpdateTask_Disable(t *testing.T) {
 	}
 	defer s.Close()
 
-	err = c.UpdateTask(
+	task, err := c.UpdateTask(
 		c.TaskLink("taskname"),
 		client.UpdateTaskOptions{
 			Status: client.Disabled,
 		})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if got, exp := task.Link.Href, "/kapacitor/v1/tasks/taskname"; got != exp {
+		t.Errorf("unexpected link.Href got %s exp %s", got, exp)
+	}
+	if got, exp := task.Status, client.Disabled; got != exp {
+		t.Errorf("unexpected task.Status got %s exp %s", got, exp)
 	}
 }
 
@@ -990,14 +1008,14 @@ func Test_CreateTemplate(t *testing.T) {
 		Type:       client.StreamTask,
 		TICKscript: tickScript,
 	})
-	if got, exp := string(template.Link.Href), "/kapacitor/v1/templates/templatename"; got != exp {
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, exp := template.Link.Href, "/kapacitor/v1/templates/templatename"; got != exp {
 		t.Errorf("unexpected template link got %s exp %s", got, exp)
 	}
 	if got, exp := template.ID, "templatename"; got != exp {
 		t.Errorf("unexpected template ID got %s exp %s", got, exp)
-	}
-	if err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -1015,7 +1033,8 @@ func Test_UpdateTemplate(t *testing.T) {
 				w.WriteHeader(http.StatusBadRequest)
 				fmt.Fprintf(w, "unexpected UpdateTemplate body: got:\n%v\nexp:\n%v\n", template, exp)
 			} else {
-				w.WriteHeader(http.StatusNoContent)
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprint(w, `{"link": {"rel":"self", "href":"/kapacitor/v1/templates/templatename"}, "id":"templatename"}`)
 			}
 		} else {
 			w.WriteHeader(http.StatusBadRequest)
@@ -1027,7 +1046,7 @@ func Test_UpdateTemplate(t *testing.T) {
 	}
 	defer s.Close()
 
-	err = c.UpdateTemplate(
+	template, err := c.UpdateTemplate(
 		c.TemplateLink("templatename"),
 		client.UpdateTemplateOptions{
 			Type: client.BatchTask,
@@ -1035,6 +1054,12 @@ func Test_UpdateTemplate(t *testing.T) {
 	)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if got, exp := template.Link.Href, "/kapacitor/v1/templates/templatename"; got != exp {
+		t.Errorf("unexpected template link got %s exp %s", got, exp)
+	}
+	if got, exp := template.ID, "templatename"; got != exp {
+		t.Errorf("unexpected template ID got %s exp %s", got, exp)
 	}
 }
 

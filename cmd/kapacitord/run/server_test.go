@@ -131,7 +131,7 @@ func TestServer_EnableTask(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+	_, err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
 		Status: client.Enabled,
 	})
 	if err != nil {
@@ -278,14 +278,14 @@ func TestServer_DisableTask(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+	_, err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
 		Status: client.Enabled,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+	_, err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
 		Status: client.Disabled,
 	})
 	if err != nil {
@@ -418,7 +418,7 @@ func TestServer_TaskNums(t *testing.T) {
 		if i%2 == 0 && task.Status != client.Enabled {
 			enabled++
 			tasks[i].Status = client.Enabled
-			if err := cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+			if _, err := cli.UpdateTask(task.Link, client.UpdateTaskOptions{
 				Status: client.Enabled,
 			}); err != nil {
 				t.Fatal(err)
@@ -442,7 +442,7 @@ func TestServer_TaskNums(t *testing.T) {
 		if i%5 == 0 && task.Status != client.Disabled {
 			enabled--
 			tasks[i].Status = client.Disabled
-			if err := cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+			if _, err := cli.UpdateTask(task.Link, client.UpdateTaskOptions{
 				Status: client.Disabled,
 			}); err != nil {
 				t.Fatal(err)
@@ -685,6 +685,157 @@ stream
 		t.Fatalf("unexpected vars\ngot\n%s\nexp\n%s\n", ti.Vars, vars)
 	}
 }
+func TestServer_UpdateTemplateID(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	id := "testTemplateID"
+	ttype := client.StreamTask
+	tick := `var x = 5
+
+stream
+    |from()
+        .measurement('test')
+`
+	template, err := cli.CreateTemplate(client.CreateTemplateOptions{
+		ID:         id,
+		Type:       ttype,
+		TICKscript: tick,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ti, err := cli.Template(template.Link, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ti.Error != "" {
+		t.Fatal(ti.Error)
+	}
+	if ti.ID != id {
+		t.Fatalf("unexpected id got %s exp %s", ti.ID, id)
+	}
+	if ti.Type != client.StreamTask {
+		t.Fatalf("unexpected type got %v exp %v", ti.Type, client.StreamTask)
+	}
+	if ti.TICKscript != tick {
+		t.Fatalf("unexpected TICKscript got\n%s\nexp\n%s\n", ti.TICKscript, tick)
+	}
+	dot := "digraph testTemplateID {\nstream0 -> from1;\n}"
+	if ti.Dot != dot {
+		t.Fatalf("unexpected dot\ngot\n%s\nexp\n%s\n", ti.Dot, dot)
+	}
+	vars := client.Vars{"x": {Value: int64(5), Type: client.VarInt}}
+	if !reflect.DeepEqual(vars, ti.Vars) {
+		t.Fatalf("unexpected vars\ngot\n%s\nexp\n%s\n", ti.Vars, vars)
+	}
+
+	newID := "newTemplateID"
+	template, err = cli.UpdateTemplate(template.Link, client.UpdateTemplateOptions{
+		ID: newID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got, exp := template.Link.Href, "/kapacitor/v1/templates/newTemplateID"; got != exp {
+		t.Fatalf("unexpected template link got %s exp %s", got, exp)
+	}
+
+	ti, err = cli.Template(template.Link, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ti.Error != "" {
+		t.Fatal(ti.Error)
+	}
+	if ti.ID != newID {
+		t.Fatalf("unexpected id got %s exp %s", ti.ID, newID)
+	}
+	if ti.Type != client.StreamTask {
+		t.Fatalf("unexpected type got %v exp %v", ti.Type, client.StreamTask)
+	}
+	if ti.TICKscript != tick {
+		t.Fatalf("unexpected TICKscript got\n%s\nexp\n%s\n", ti.TICKscript, tick)
+	}
+	dot = "digraph newTemplateID {\nstream0 -> from1;\n}"
+	if ti.Dot != dot {
+		t.Fatalf("unexpected dot\ngot\n%s\nexp\n%s\n", ti.Dot, dot)
+	}
+	if !reflect.DeepEqual(vars, ti.Vars) {
+		t.Fatalf("unexpected vars\ngot\n%s\nexp\n%s\n", ti.Vars, vars)
+	}
+}
+func TestServer_UpdateTemplateID_WithTasks(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	id := "testTemplateID"
+	ttype := client.StreamTask
+	tick := `var x = 5
+
+stream
+    |from()
+        .measurement('test')
+`
+	dbrps := []client.DBRP{
+		{
+			Database:        "mydb",
+			RetentionPolicy: "myrp",
+		},
+		{
+			Database:        "otherdb",
+			RetentionPolicy: "default",
+		},
+	}
+
+	template, err := cli.CreateTemplate(client.CreateTemplateOptions{
+		ID:         id,
+		Type:       ttype,
+		TICKscript: tick,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count := 100
+	tasks := make([]client.Task, count)
+	for i := 0; i < count; i++ {
+		task, err := cli.CreateTask(client.CreateTaskOptions{
+			TemplateID: template.ID,
+			DBRPs:      dbrps,
+			Status:     client.Enabled,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		tasks[i] = task
+	}
+
+	newID := "newTemplateID"
+	template, err = cli.UpdateTemplate(template.Link, client.UpdateTemplateOptions{
+		ID: newID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, task := range tasks {
+		got, err := cli.Task(task.Link, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.TemplateID != newID {
+			t.Errorf("unexpected task TemplateID got %s exp %s", got.TemplateID, newID)
+		}
+		if got.TICKscript != tick {
+			t.Errorf("unexpected task TICKscript got %s exp %s", got.TICKscript, tick)
+		}
+	}
+}
 
 func TestServer_DeleteTemplate(t *testing.T) {
 	s, cli := OpenDefaultServer()
@@ -860,7 +1011,7 @@ func TestServer_StreamTask(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+	_, err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
 		Status: client.Enabled,
 	})
 	if err != nil {
@@ -1216,7 +1367,7 @@ stream
 		t.Fatal(err)
 	}
 
-	if err := cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+	if _, err := cli.UpdateTask(task.Link, client.UpdateTaskOptions{
 		Status: client.Enabled,
 	}); err != nil {
 		t.Fatal(err)
@@ -1313,7 +1464,7 @@ stream
 		t.Fatal(err)
 	}
 
-	if err := cli.UpdateTemplate(template.Link, client.UpdateTemplateOptions{
+	if _, err := cli.UpdateTemplate(template.Link, client.UpdateTemplateOptions{
 		TICKscript: tickCorrect,
 	}); err != nil {
 		t.Fatal(err)
@@ -1419,7 +1570,7 @@ stream
 		}
 	}
 
-	if err := cli.UpdateTemplate(template.Link, client.UpdateTemplateOptions{
+	if _, err := cli.UpdateTemplate(template.Link, client.UpdateTemplateOptions{
 		TICKscript: tickNewVar,
 	}); err == nil {
 		t.Error("expected error for breaking template update, got nil")
@@ -1438,7 +1589,7 @@ stream
 
 	// Update all tasks with new var
 	for _, task := range tasks {
-		if err := cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+		if _, err := cli.UpdateTask(task.Link, client.UpdateTaskOptions{
 			Vars: client.Vars{
 				"field": {
 					Value: "value",
@@ -1455,7 +1606,7 @@ stream
 	}
 
 	// Now update template should succeed since the tasks are updated too.
-	if err := cli.UpdateTemplate(template.Link, client.UpdateTemplateOptions{
+	if _, err := cli.UpdateTemplate(template.Link, client.UpdateTemplateOptions{
 		TICKscript: tickNewVar,
 	}); err != nil {
 		t.Fatal(err)
@@ -1505,6 +1656,103 @@ test value=1 0000000011
 	}
 }
 
+func TestServer_UpdateTaskID(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	id := "testTaskID"
+	ttype := client.StreamTask
+	dbrps := []client.DBRP{
+		{
+			Database:        "mydb",
+			RetentionPolicy: "myrp",
+		},
+		{
+			Database:        "otherdb",
+			RetentionPolicy: "default",
+		},
+	}
+	tick := `stream
+    |from()
+        .measurement('test')
+`
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ti, err := cli.Task(task.Link, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ti.Error != "" {
+		t.Fatal(ti.Error)
+	}
+	if ti.ID != id {
+		t.Fatalf("unexpected id got %s exp %s", ti.ID, id)
+	}
+	if ti.Type != client.StreamTask {
+		t.Fatalf("unexpected type got %v exp %v", ti.Type, client.StreamTask)
+	}
+	if ti.Status != client.Disabled {
+		t.Fatalf("unexpected status got %v exp %v", ti.Status, client.Disabled)
+	}
+	if !reflect.DeepEqual(ti.DBRPs, dbrps) {
+		t.Fatalf("unexpected dbrps got %s exp %s", ti.DBRPs, dbrps)
+	}
+	if ti.TICKscript != tick {
+		t.Fatalf("unexpected TICKscript got %s exp %s", ti.TICKscript, tick)
+	}
+	dot := "digraph testTaskID {\nstream0 -> from1;\n}"
+	if ti.Dot != dot {
+		t.Fatalf("unexpected dot\ngot\n%s\nexp\n%s\n", ti.Dot, dot)
+	}
+
+	newID := "newTaskID"
+	task, err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+		ID: newID,
+	})
+
+	if got, exp := task.Link.Href, "/kapacitor/v1/tasks/newTaskID"; got != exp {
+		t.Fatalf("unexpected task link got %s exp %s", got, exp)
+	}
+
+	ti, err = cli.Task(task.Link, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ti.Error != "" {
+		t.Fatal(ti.Error)
+	}
+	if ti.ID != newID {
+		t.Fatalf("unexpected id got %s exp %s", ti.ID, newID)
+	}
+	if ti.Type != client.StreamTask {
+		t.Fatalf("unexpected type got %v exp %v", ti.Type, client.StreamTask)
+	}
+	if ti.Status != client.Disabled {
+		t.Fatalf("unexpected status got %v exp %v", ti.Status, client.Disabled)
+	}
+	if !reflect.DeepEqual(ti.DBRPs, dbrps) {
+		t.Fatalf("unexpected dbrps got %s exp %s", ti.DBRPs, dbrps)
+	}
+	if ti.TICKscript != tick {
+		t.Fatalf("unexpected TICKscript got %s exp %s", ti.TICKscript, tick)
+	}
+	dot = "digraph newTaskID {\nstream0 -> from1;\n}"
+	if ti.Dot != dot {
+		t.Fatalf("unexpected dot\ngot\n%s\nexp\n%s\n", ti.Dot, dot)
+	}
+}
+
 func TestServer_StreamTask_AllMeasurements(t *testing.T) {
 	s, cli := OpenDefaultServer()
 	defer s.Close()
@@ -1535,7 +1783,7 @@ func TestServer_StreamTask_AllMeasurements(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+	_, err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
 		Status: client.Enabled,
 	})
 	if err != nil {
@@ -1677,7 +1925,7 @@ func TestServer_BatchTask(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+	_, err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
 		Status: client.Enabled,
 	})
 	if err != nil {
@@ -1697,7 +1945,7 @@ func TestServer_BatchTask(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+		_, err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
 			Status: client.Disabled,
 		})
 		if err != nil {
@@ -1742,7 +1990,7 @@ func TestServer_InvalidBatchTask(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+	_, err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
 		Status: client.Enabled,
 	})
 	expErr := `batch query is not allowed to request data from "unknowndb"."unknownrp"`
@@ -2999,7 +3247,7 @@ func testStreamAgent(t *testing.T, c *run.Config) {
 		t.Fatal(err)
 	}
 
-	err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+	_, err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
 		Status: client.Enabled,
 	})
 	if err != nil {
@@ -3178,7 +3426,7 @@ func testStreamAgentSocket(t *testing.T, c *run.Config) {
 		t.Fatal(err)
 	}
 
-	err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+	_, err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
 		Status: client.Enabled,
 	})
 	if err != nil {
@@ -3418,7 +3666,7 @@ func testBatchAgent(t *testing.T, c *run.Config) {
 		t.Fatal(err)
 	}
 
-	err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+	_, err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
 		Status: client.Enabled,
 	})
 	if err != nil {
@@ -3446,7 +3694,7 @@ func testBatchAgent(t *testing.T, c *run.Config) {
 	if err != nil {
 		t.Error(err)
 	}
-	err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+	_, err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
 		Status: client.Disabled,
 	})
 	if err != nil {
