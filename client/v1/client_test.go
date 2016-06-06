@@ -1215,8 +1215,7 @@ func Test_RecordBatch(t *testing.T) {
 		if r.URL.Path == "/kapacitor/v1/recordings/batch" && r.Method == "POST" &&
 			opts.Task == "taskname" &&
 			opts.Start == start &&
-			opts.Stop == stop &&
-			opts.Cluster == "" {
+			opts.Stop == stop {
 			w.WriteHeader(http.StatusCreated)
 			fmt.Fprintf(w, `{"link": {"rel":"self", "href":"/kapacitor/v1/recordings/rid1"}, "id":"rid1"}`)
 		} else {
@@ -1663,7 +1662,6 @@ func Test_ReplayBatch(t *testing.T) {
 		Task:          "taskname",
 		Start:         start,
 		Stop:          stop,
-		Cluster:       "mycluster",
 		Clock:         client.Real,
 		RecordingTime: true,
 	})

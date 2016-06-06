@@ -94,10 +94,19 @@ func (s *BatchNode) Abort() {
 	}
 }
 
-func (s *BatchNode) Queries(start, stop time.Time) [][]string {
-	queries := make([][]string, len(s.children))
+type BatchQueries struct {
+	Queries []string
+	Cluster string
+}
+
+func (s *BatchNode) Queries(start, stop time.Time) []BatchQueries {
+	queries := make([]BatchQueries, len(s.children))
 	for i, b := range s.children {
-		queries[i] = b.(*QueryNode).Queries(start, stop)
+		qn := b.(*QueryNode)
+		queries[i] = BatchQueries{
+			Queries: qn.Queries(start, stop),
+			Cluster: qn.Cluster(),
+		}
 	}
 	return queries
 }
@@ -204,6 +213,10 @@ func (b *QueryNode) Start() {
 
 func (b *QueryNode) Abort() {
 	close(b.aborting)
+}
+
+func (b *QueryNode) Cluster() string {
+	return b.b.Cluster
 }
 
 func (b *QueryNode) Queries(start, stop time.Time) []string {

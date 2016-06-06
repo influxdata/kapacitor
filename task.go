@@ -271,7 +271,7 @@ func (et *ExecutingTask) BatchCount() (int, error) {
 }
 
 // Get the next `num` batch queries that the batcher will run starting at time `start`.
-func (et *ExecutingTask) BatchQueries(start, stop time.Time) ([][]string, error) {
+func (et *ExecutingTask) BatchQueries(start, stop time.Time) ([]BatchQueries, error) {
 	if et.Task.Type != BatchTask {
 		return nil, ErrWrongTaskType
 	}
