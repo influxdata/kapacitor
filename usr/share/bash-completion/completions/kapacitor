@@ -40,7 +40,7 @@ _kapacitor()
             esac
             ;;
         define)
-            if [[ -z "${COMP_WORDS[2]}" || "$cur" = "${COMP_WORDS[2]}" ]]
+            if [[ -z "${COMP_WORDS[2]}" || ("$cur" = "${COMP_WORDS[2]}" && -z "${COMP_WORDS[3]}") ]]
             then
                 words=$(_kapacitor_list tasks "$cur")
             else
@@ -49,7 +49,7 @@ _kapacitor()
                         words=$(_kapacitor_dbrps)
                         ;;
                     -tick)
-                        words=$(ls *.tick)
+                        COMPREPLY=($(compgen -o filenames -A file -X '!*.tick' -- "$cur"))
                         ;;
                     -type)
                         words='batch stream'
@@ -58,7 +58,7 @@ _kapacitor()
                         words=$(_kapacitor_list templates "$cur")
                         ;;
                     -vars)
-                        words=$(ls *.json *.vars)
+                        COMPREPLY=($(compgen -o filenames -A file -- "$cur"))
                         ;;
                     *)
                         words='-dbrp -no-reload -tick -type -template -vars'
@@ -67,13 +67,13 @@ _kapacitor()
             fi
             ;;
         define-template)
-            if [[ -z "${COMP_WORDS[2]}" || "$cur" = "${COMP_WORDS[2]}" ]]
+            if [[ -z "${COMP_WORDS[2]}" || ("$cur" = "${COMP_WORDS[2]}" && -z "${COMP_WORDS[3]}") ]]
             then
                 words=$(_kapacitor_list templates "$cur")
             else
                 case "$prev" in
                     -tick)
-                        words=$(ls *.tick)
+                        COMPREPLY=($(compgen -o filenames -A file -X '!*.tick' -- "$cur"))
                         ;;
                     -type)
                         words='batch stream'
@@ -157,7 +157,10 @@ _kapacitor()
                 reload delete list show show-template level stats version vars help'
             ;;
     esac
-    COMPREPLY=($(compgen -W "$words" -- "$cur"))
+    if [ -z "$COMPREPLY" ]
+    then
+        COMPREPLY=($(compgen -W "$words" -- "$cur"))
+    fi
 
     return 0
 }
@@ -165,13 +168,13 @@ _kapacitor()
 _kapacitor_list()
 {
     # List a certain kind of object and return a set of IDs
-    kapacitor list "$1" "$2*" 2>/dev/null | awk 'NR>1 {print $1}'
+    kapacitor list "$1" "$2*" 2>/dev/null | awk 'NR>1 {print $1}' 2>/dev/null
 }
 
 _kapacitor_dbrps()
 {
     # Determine set of DBRPs from the ingress stats
-    kapacitor stats ingress 2>/dev/null | awk 'NR>1 {printf "%s.%s\n", $1, $2}'
+    kapacitor stats ingress 2>/dev/null | awk 'NR>1 {printf "%s.%s\n", $1, $2}' 2>/dev/null
 }
 
 complete -F _kapacitor kapacitor

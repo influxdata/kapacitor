@@ -31,6 +31,7 @@ SYSTEMD_SCRIPT = "scripts/kapacitor.service"
 POSTINST_SCRIPT = "scripts/post-install.sh"
 POSTUNINST_SCRIPT = "scripts/post-uninstall.sh"
 LOGROTATE_CONFIG = "etc/logrotate.d/kapacitor"
+BASH_COMPLETION_SH = "usr/share/bash-completion/completions/kapacitor"
 DEFAULT_CONFIG = "etc/kapacitor/kapacitor.conf"
 PREINST_SCRIPT = None
 
@@ -68,6 +69,7 @@ fpm_common_args = "-f -s dir --log error \
         MAINTAINER,
         DEFAULT_CONFIG,
         LOGROTATE_CONFIG,
+        BASH_COMPLETION_SH,
         ' --directories '.join([
                          LOG_DIR[1:],
                          DATA_DIR[1:],
@@ -126,6 +128,7 @@ def create_package_fs(build_root):
     os.makedirs(os.path.join(build_root, SCRIPT_DIR[1:]))
     os.makedirs(os.path.join(build_root, os.path.dirname(DEFAULT_CONFIG)))
     os.makedirs(os.path.join(build_root, os.path.dirname(LOGROTATE_CONFIG)))
+    os.makedirs(os.path.join(build_root, os.path.dirname(BASH_COMPLETION_SH)))
 
 def package_scripts(build_root, config_only=False):
     """Copy the necessary scripts and configuration files to the package
@@ -141,6 +144,7 @@ def package_scripts(build_root, config_only=False):
         shutil.copy(INIT_SCRIPT, os.path.join(build_root, SCRIPT_DIR[1:], INIT_SCRIPT.split('/')[1]))
         shutil.copy(SYSTEMD_SCRIPT, os.path.join(build_root, SCRIPT_DIR[1:], SYSTEMD_SCRIPT.split('/')[1]))
         shutil.copy(LOGROTATE_CONFIG, os.path.join(build_root, LOGROTATE_CONFIG))
+        shutil.copy(BASH_COMPLETION_SH, os.path.join(build_root, BASH_COMPLETION_SH))
         shutil.copy(DEFAULT_CONFIG, os.path.join(build_root, DEFAULT_CONFIG))
 
 def run_generate():
