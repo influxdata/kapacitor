@@ -122,7 +122,7 @@ If the forecasted value crosses a threshold an alert is triggered.
 The result is now Kapacitor will alert you 7 days in advance of a disk filling up.
 This assumes a slow growth but by changing the vars in the script you could check for shorter growth intervals.
 
-```
+```go
 // The interval on which to aggregate the disk usage
 var growth_interval = 1d
 // The number of `growth_interval`s to forecast into the future
