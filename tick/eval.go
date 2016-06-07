@@ -239,7 +239,10 @@ func eval(n ast.Node, scope *stateful.Scope, stck *stack, predefinedVars, defaul
 				ret := stck.Pop()
 				if f, ok := ret.(unboundFunc); ok {
 					// Call global function
-					f(nil)
+					_, err := f(nil)
+					if err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -483,9 +486,9 @@ func evalFunc(f *ast.FunctionNode, scope *stateful.Scope, stck *stack, args []in
 	rec := func(obj interface{}, errp *error) {
 		e := recover()
 		if e != nil {
-			*errp = fmt.Errorf("line %d char%d: error calling func %q on obj %T: %v", f.Line(), f.Char(), f.Func, obj, e)
-			if strings.Contains((*errp).Error(), "*tick.ReferenceNode") && strings.Contains((*errp).Error(), "type string") {
-				*errp = fmt.Errorf("line %d char%d: cannot assign *tick.ReferenceNode to type string, did you use double quotes instead of single quotes?", f.Line(), f.Char())
+			*errp = fmt.Errorf("line %d char %d: error calling func %q on obj %T: %v", f.Line(), f.Char(), f.Func, obj, e)
+			if strings.Contains((*errp).Error(), "*ast.ReferenceNode") && strings.Contains((*errp).Error(), "type string") {
+				*errp = fmt.Errorf("line %d char %d: cannot assign *ast.ReferenceNode to type string, did you use double quotes instead of single quotes?", f.Line(), f.Char())
 			}
 
 		}
@@ -496,12 +499,12 @@ func evalFunc(f *ast.FunctionNode, scope *stateful.Scope, stck *stack, args []in
 
 		if f.Type == ast.GlobalFunc {
 			if obj != nil {
-				return nil, fmt.Errorf("line %d char%d: calling global function on object %T", f.Line(), f.Char(), obj)
+				return nil, fmt.Errorf("line %d char %d: calling global function on object %T", f.Line(), f.Char(), obj)
 			}
 			// Object is nil, check for func in scope
 			fnc, _ := scope.Get(f.Func)
 			if fnc == nil {
-				return nil, fmt.Errorf("line %d char%d: no global function %q defined", f.Line(), f.Char(), f.Func)
+				return nil, fmt.Errorf("line %d char %d: no global function %q defined", f.Line(), f.Char(), f.Func)
 			}
 			method := reflect.ValueOf(fnc)
 			o, err := callMethodReflection(method, args)

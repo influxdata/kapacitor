@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.0.0-beta2 [unreleased]
+
+### Release Notes
+
+### Features
+
+### Bugfixes
+
+- [#621](https://github.com/influxdata/kapacitor/pull/621): Fix obscure error about single vs double quotes.
+
+
 ## v1.0.0-beta1 [2016-06-06]
 
 ### Release Notes

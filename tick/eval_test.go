@@ -1,6 +1,7 @@
 package tick_test
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -807,24 +808,43 @@ f(strList)
 `
 
 	called := false
-	f := func(a, b, c string) {
+	f := func(a, b, c string) interface{} {
 		called = true
 		got := []string{a, b, c}
 		exp := []string{"host", "dc", "service"}
 		if !reflect.DeepEqual(got, exp) {
 			t.Errorf("unexpected func args got %v exp %v", got, exp)
 		}
+		return nil
 	}
 	scope := stateful.NewScope()
 	scope.Set("f", f)
 
-	vars, err := tick.Evaluate(script, scope, nil, false)
+	_, err := tick.Evaluate(script, scope, nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log(vars)
 	if !called {
 		t.Fatal("expected function to be called")
+	}
+}
+
+func TestEvaluate_StringQuotesError(t *testing.T) {
+	script := `
+f("asdf")
+`
+
+	f := func(got string) (interface{}, error) {
+		return nil, errors.New("function should not be called")
+	}
+	scope := stateful.NewScope()
+	scope.Set("f", f)
+
+	_, err := tick.Evaluate(script, scope, nil, false)
+	if err == nil {
+		t.Fatal("expected error from invalid string call")
+	} else if got, exp := err.Error(), "line 2 char 1: cannot assign *ast.ReferenceNode to type string, did you use double quotes instead of single quotes?"; got != exp {
+		t.Errorf("unexpected error string: \ngot\n%s\nexp\n%s\n", got, exp)
 	}
 }
 
