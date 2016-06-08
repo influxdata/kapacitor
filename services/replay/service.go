@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -104,7 +105,7 @@ func (s *Service) Open() error {
 		return err
 	}
 
-	err = s.migrate()
+	err = s.syncRecordingMetadata()
 	if err != nil {
 		return err
 	}
@@ -205,11 +206,15 @@ func (s *Service) Open() error {
 	return s.HTTPDService.AddRoutes(s.routes)
 }
 
-func (s *Service) migrate() error {
+// Synchronize the stored metadata with what is found on the filesystem.
+func (s *Service) syncRecordingMetadata() error {
+	// NOTE: This is useful beyond legacy migration logic as it allows one to drop a shared
+	// recording file in the replays dir and for it to be auto discovered on restart.
+
 	// Find all recordings and store their metadata into the new storage service.
 	files, err := ioutil.ReadDir(s.saveDir)
 	if err != nil {
-		return errors.Wrap(err, "migrating recording metadata")
+		return errors.Wrap(err, "syncing recording metadata")
 	}
 	for _, info := range files {
 		if info.IsDir() {
@@ -230,23 +235,39 @@ func (s *Service) migrate() error {
 			s.logger.Println("E! unknown file in replay dir", name)
 			continue
 		}
+		dataUrl := url.URL{
+			Scheme: "file",
+			Path:   filepath.Join(s.saveDir, info.Name()),
+		}
 		recording := Recording{
 			ID:       id,
+			DataURL:  dataUrl.String(),
 			Type:     typ,
 			Size:     info.Size(),
 			Date:     info.ModTime().UTC(),
 			Status:   Finished,
 			Progress: 1.0,
 		}
-		err = s.recordings.Create(recording)
-		if err != nil {
-			if err == ErrRecordingExists {
-				s.logger.Printf("D! skipping recording %s, metadata already migrated", id)
-			} else {
+		existing, err := s.recordings.Get(id)
+		if err == ErrNoRecordingExists {
+			err := s.recordings.Create(recording)
+			if err != nil {
 				return errors.Wrap(err, "creating recording metadata")
 			}
-		} else {
-			s.logger.Printf("D! recording %s metadata migrated", id)
+			s.logger.Printf("D! recording %s metadata synced", id)
+		} else if err != nil {
+			return errors.Wrap(err, "checking for existing recording metadata")
+		} else if err == nil {
+			if existing.DataURL == "" {
+				// Fix missing DataURLs
+				err := s.recordings.Replace(recording)
+				if err != nil {
+					return errors.Wrap(err, "updating recording metadata")
+				}
+				s.logger.Printf("D! recording %s data url fixed", id)
+			} else {
+				s.logger.Printf("D! skipping recording %s, metadata already correct", id)
+			}
 		}
 	}
 	return nil
@@ -541,7 +562,7 @@ func (s *Service) handleDeleteRecording(w http.ResponseWriter, r *http.Request) 
 func (s *Service) dataURLFromID(id, ext string) url.URL {
 	return url.URL{
 		Scheme: "file",
-		Path:   path.Join(s.saveDir, id+ext),
+		Path:   filepath.Join(s.saveDir, id+ext),
 	}
 }
 
