@@ -9,6 +9,7 @@
 ### Bugfixes
 
 - [#621](https://github.com/influxdata/kapacitor/pull/621): Fix obscure error about single vs double quotes.
+- [#623](https://github.com/influxdata/kapacitor/pull/623): Fix issues with recording metadata missing data url.
 
 
 ## v1.0.0-beta1 [2016-06-06]
