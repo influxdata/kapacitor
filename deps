@@ -9,7 +9,9 @@ deps() {
 
     # Get the current package
     package=$(go list .)
-    allDeps=$(go list -f '{{ join .Deps "\n"}}' ./...)
+    # Get the sub packages excluding vendored packages
+    packages=$(go list ./... | grep -v "^$package/vendor")
+    allDeps=$(go list -f '{{ join .Deps "\n"}}' $packages)
 
     for dep in $allDeps
     do
@@ -24,7 +26,7 @@ deps() {
         then
             if [[ "$dep" =~ ^$package/vendor ]]
             then
-                # Rewrite vendored deps are normal deps
+                # Rewrite vendored deps as normal deps
                 dep=${dep/$package\/vendor\//}
             else
                 continue
