@@ -1,3 +1,10 @@
+__kapacitor_filter_ticks()
+{
+#$1=cmd
+#$2=word
+#$3=prev
+	return 0
+}
 
 # Bash completion for the kapacitor command.
 _kapacitor()
@@ -49,7 +56,10 @@ _kapacitor()
                         words=$(_kapacitor_dbrps)
                         ;;
                     -tick)
-                        COMPREPLY=($(compgen -o filenames -A file -X '!*.tick' -- "$cur"))
+                        COMPREPLY=($(compgen -o filenames -A file -X '!*.tick' -S ' ' -- "$cur") )
+                        didi=$(compgen -d -S '/' -- "$cur")
+                        COMPREPLY=(${COMPREPLY[@]:-} $didi )
+                        compopt -o nospace
                         ;;
                     -type)
                         words='batch stream'
