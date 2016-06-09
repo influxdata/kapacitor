@@ -69,7 +69,7 @@ func (s *Service) Create(
 	if conf.Socket != "" {
 		// Create socket UDF
 		return kapacitor.NewUDFSocket(
-			kapacitor.NewSocket(conf.Socket),
+			kapacitor.NewSocketConn(conf.Socket),
 			l,
 			time.Duration(conf.Timeout),
 			abortCallback,
@@ -115,10 +115,10 @@ func (s *Service) loadUDFInfo(name string) (udf.Info, error) {
 	if err != nil {
 		return udf.Info{}, err
 	}
+	defer u.Close()
 	info, err := u.Info()
 	if err != nil {
 		return udf.Info{}, err
 	}
-	u.Close()
 	return info, nil
 }

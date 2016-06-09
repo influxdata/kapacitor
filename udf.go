@@ -2,7 +2,6 @@ package kapacitor
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -15,6 +14,7 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/udf"
+	"github.com/pkg/errors"
 )
 
 // User defined function
@@ -387,13 +387,17 @@ func (s *UDFSocket) Open() error {
 	)
 	return s.server.Start()
 }
+
 func (s *UDFSocket) Close() error {
-	err := s.server.Stop()
-	if err != nil {
+	if err := s.server.Stop(); err != nil {
+		// Always close the socket
 		s.socket.Close()
-		return err
+		return errors.Wrap(err, "stopping UDF server")
 	}
-	return s.socket.Close()
+	if err := s.socket.Close(); err != nil {
+		return errors.Wrap(err, "closing UDF socket connection")
+	}
+	return nil
 }
 
 func (s *UDFSocket) Abort(err error)                  { s.server.Abort(err) }
@@ -411,7 +415,7 @@ type socket struct {
 	conn *net.UnixConn
 }
 
-func NewSocket(path string) Socket {
+func NewSocketConn(path string) Socket {
 	return &socket{
 		path: path,
 	}
@@ -443,8 +447,18 @@ func (s *socket) Close() error {
 	return s.conn.Close()
 }
 
+type unixCloser struct {
+	*net.UnixConn
+}
+
+func (u unixCloser) Close() error {
+	// Only close the write end of the socket connection.
+	// The socket connection as a whole will be closed later.
+	return u.CloseWrite()
+}
+
 func (s *socket) In() io.WriteCloser {
-	return s.conn
+	return unixCloser{s.conn}
 }
 
 func (s *socket) Out() io.Reader {
