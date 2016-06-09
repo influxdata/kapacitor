@@ -17,7 +17,7 @@ func TestDecodeSimple(t *testing.T) {
 age = 250
 andrew = "gallant"
 kait = "brady"
-now = 1987-07-05T05:45:00Z 
+now = 1987-07-05T05:45:00Z
 yesOrNo = true
 pi = 3.14
 colors = [
@@ -67,7 +67,7 @@ cauchy = "cat 2"
 			{"cyan", "magenta", "yellow", "black"},
 		},
 		My: map[string]cats{
-			"Cats": cats{Plato: "cat 1", Cauchy: "cat 2"},
+			"Cats": {Plato: "cat 1", Cauchy: "cat 2"},
 		},
 	}
 	if !reflect.DeepEqual(val, answer) {
@@ -119,6 +119,23 @@ func TestDecodeEmbedded(t *testing.T) {
 	}
 }
 
+func TestDecodeIgnoredFields(t *testing.T) {
+	type simple struct {
+		Number int `toml:"-"`
+	}
+	const input = `
+Number = 123
+- = 234
+`
+	var s simple
+	if _, err := Decode(input, &s); err != nil {
+		t.Fatal(err)
+	}
+	if s.Number != 0 {
+		t.Errorf("got: %d; want 0", s.Number)
+	}
+}
+
 func TestTableArrays(t *testing.T) {
 	var tomlTableArrays = `
 [[albums]]
@@ -132,7 +149,7 @@ name = "Born to Run"
 
 [[albums]]
 name = "Born in the USA"
-  
+
   [[albums.songs]]
   name = "Glory Days"
 
@@ -285,6 +302,43 @@ Description = "da base"
 	}
 }
 
+func TestDecodeBadTimestamp(t *testing.T) {
+	var x struct {
+		T time.Time
+	}
+	for _, s := range []string{
+		"T = 123", "T = 2006-01-50T00:00:00Z", "T = 2006-01-30T00:00:00",
+	} {
+		if _, err := Decode(s, &x); err == nil {
+			t.Errorf("Expected invalid DateTime error for %q", s)
+		}
+	}
+}
+
+func TestDecodeMultilineStrings(t *testing.T) {
+	var x struct {
+		S string
+	}
+	const s0 = `s = """
+a b \n c
+d e f
+"""`
+	if _, err := Decode(s0, &x); err != nil {
+		t.Fatal(err)
+	}
+	if want := "a b \n c\nd e f\n"; x.S != want {
+		t.Errorf("got: %q; want: %q", x.S, want)
+	}
+	const s1 = `s = """a b c\
+"""`
+	if _, err := Decode(s1, &x); err != nil {
+		t.Fatal(err)
+	}
+	if want := "a b c"; x.S != want {
+		t.Errorf("got: %q; want: %q", x.S, want)
+	}
+}
+
 type sphere struct {
 	Center [3]float64
 	Radius float64
@@ -349,6 +403,213 @@ func TestDecodeSizedInts(t *testing.T) {
 	}
 }
 
+func TestUnmarshaler(t *testing.T) {
+
+	var tomlBlob = `
+[dishes.hamboogie]
+name = "Hamboogie with fries"
+price = 10.99
+
+[[dishes.hamboogie.ingredients]]
+name = "Bread Bun"
+
+[[dishes.hamboogie.ingredients]]
+name = "Lettuce"
+
+[[dishes.hamboogie.ingredients]]
+name = "Real Beef Patty"
+
+[[dishes.hamboogie.ingredients]]
+name = "Tomato"
+
+[dishes.eggsalad]
+name = "Egg Salad with rice"
+price = 3.99
+
+[[dishes.eggsalad.ingredients]]
+name = "Egg"
+
+[[dishes.eggsalad.ingredients]]
+name = "Mayo"
+
+[[dishes.eggsalad.ingredients]]
+name = "Rice"
+`
+	m := &menu{}
+	if _, err := Decode(tomlBlob, m); err != nil {
+		log.Fatal(err)
+	}
+
+	if len(m.Dishes) != 2 {
+		t.Log("two dishes should be loaded with UnmarshalTOML()")
+		t.Errorf("expected %d but got %d", 2, len(m.Dishes))
+	}
+
+	eggSalad := m.Dishes["eggsalad"]
+	if _, ok := interface{}(eggSalad).(dish); !ok {
+		t.Errorf("expected a dish")
+	}
+
+	if eggSalad.Name != "Egg Salad with rice" {
+		t.Errorf("expected the dish to be named 'Egg Salad with rice'")
+	}
+
+	if len(eggSalad.Ingredients) != 3 {
+		t.Log("dish should be loaded with UnmarshalTOML()")
+		t.Errorf("expected %d but got %d", 3, len(eggSalad.Ingredients))
+	}
+
+	found := false
+	for _, i := range eggSalad.Ingredients {
+		if i.Name == "Rice" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("Rice was not loaded in UnmarshalTOML()")
+	}
+
+	// test on a value - must be passed as *
+	o := menu{}
+	if _, err := Decode(tomlBlob, &o); err != nil {
+		log.Fatal(err)
+	}
+
+}
+
+type menu struct {
+	Dishes map[string]dish
+}
+
+func (m *menu) UnmarshalTOML(p interface{}) error {
+	m.Dishes = make(map[string]dish)
+	data, _ := p.(map[string]interface{})
+	dishes := data["dishes"].(map[string]interface{})
+	for n, v := range dishes {
+		if d, ok := v.(map[string]interface{}); ok {
+			nd := dish{}
+			nd.UnmarshalTOML(d)
+			m.Dishes[n] = nd
+		} else {
+			return fmt.Errorf("not a dish")
+		}
+	}
+	return nil
+}
+
+type dish struct {
+	Name        string
+	Price       float32
+	Ingredients []ingredient
+}
+
+func (d *dish) UnmarshalTOML(p interface{}) error {
+	data, _ := p.(map[string]interface{})
+	d.Name, _ = data["name"].(string)
+	d.Price, _ = data["price"].(float32)
+	ingredients, _ := data["ingredients"].([]map[string]interface{})
+	for _, e := range ingredients {
+		n, _ := interface{}(e).(map[string]interface{})
+		name, _ := n["name"].(string)
+		i := ingredient{name}
+		d.Ingredients = append(d.Ingredients, i)
+	}
+	return nil
+}
+
+type ingredient struct {
+	Name string
+}
+
+func TestDecodeSlices(t *testing.T) {
+	type T struct {
+		S []string
+	}
+	for i, tt := range []struct {
+		v     T
+		input string
+		want  T
+	}{
+		{T{}, "", T{}},
+		{T{[]string{}}, "", T{[]string{}}},
+		{T{[]string{"a", "b"}}, "", T{[]string{"a", "b"}}},
+		{T{}, "S = []", T{[]string{}}},
+		{T{[]string{}}, "S = []", T{[]string{}}},
+		{T{[]string{"a", "b"}}, "S = []", T{[]string{}}},
+		{T{}, `S = ["x"]`, T{[]string{"x"}}},
+		{T{[]string{}}, `S = ["x"]`, T{[]string{"x"}}},
+		{T{[]string{"a", "b"}}, `S = ["x"]`, T{[]string{"x"}}},
+	} {
+		if _, err := Decode(tt.input, &tt.v); err != nil {
+			t.Errorf("[%d] %s", i, err)
+			continue
+		}
+		if !reflect.DeepEqual(tt.v, tt.want) {
+			t.Errorf("[%d] got %#v; want %#v", i, tt.v, tt.want)
+		}
+	}
+}
+
+func TestDecodePrimitive(t *testing.T) {
+	type S struct {
+		P Primitive
+	}
+	type T struct {
+		S []int
+	}
+	slicep := func(s []int) *[]int { return &s }
+	arrayp := func(a [2]int) *[2]int { return &a }
+	mapp := func(m map[string]int) *map[string]int { return &m }
+	for i, tt := range []struct {
+		v     interface{}
+		input string
+		want  interface{}
+	}{
+		// slices
+		{slicep(nil), "", slicep(nil)},
+		{slicep([]int{}), "", slicep([]int{})},
+		{slicep([]int{1, 2, 3}), "", slicep([]int{1, 2, 3})},
+		{slicep(nil), "P = [1,2]", slicep([]int{1, 2})},
+		{slicep([]int{}), "P = [1,2]", slicep([]int{1, 2})},
+		{slicep([]int{1, 2, 3}), "P = [1,2]", slicep([]int{1, 2})},
+
+		// arrays
+		{arrayp([2]int{2, 3}), "", arrayp([2]int{2, 3})},
+		{arrayp([2]int{2, 3}), "P = [3,4]", arrayp([2]int{3, 4})},
+
+		// maps
+		{mapp(nil), "", mapp(nil)},
+		{mapp(map[string]int{}), "", mapp(map[string]int{})},
+		{mapp(map[string]int{"a": 1}), "", mapp(map[string]int{"a": 1})},
+		{mapp(nil), "[P]\na = 2", mapp(map[string]int{"a": 2})},
+		{mapp(map[string]int{}), "[P]\na = 2", mapp(map[string]int{"a": 2})},
+		{mapp(map[string]int{"a": 1, "b": 3}), "[P]\na = 2", mapp(map[string]int{"a": 2, "b": 3})},
+
+		// structs
+		{&T{nil}, "[P]", &T{nil}},
+		{&T{[]int{}}, "[P]", &T{[]int{}}},
+		{&T{[]int{1, 2, 3}}, "[P]", &T{[]int{1, 2, 3}}},
+		{&T{nil}, "[P]\nS = [1,2]", &T{[]int{1, 2}}},
+		{&T{[]int{}}, "[P]\nS = [1,2]", &T{[]int{1, 2}}},
+		{&T{[]int{1, 2, 3}}, "[P]\nS = [1,2]", &T{[]int{1, 2}}},
+	} {
+		var s S
+		md, err := Decode(tt.input, &s)
+		if err != nil {
+			t.Errorf("[%d] Decode error: %s", i, err)
+			continue
+		}
+		if err := md.PrimitiveDecode(s.P, tt.v); err != nil {
+			t.Errorf("[%d] PrimitiveDecode error: %s", i, err)
+			continue
+		}
+		if !reflect.DeepEqual(tt.v, tt.want) {
+			t.Errorf("[%d] got %#v; want %#v", i, tt.v, tt.want)
+		}
+	}
+}
+
 func ExampleMetaData_PrimitiveDecode() {
 	var md MetaData
 	var err error
@@ -360,7 +621,7 @@ ranking = ["Springsteen", "J Geils"]
 started = 1973
 albums = ["Greetings", "WIESS", "Born to Run", "Darkness"]
 
-[bands.J Geils]
+[bands."J Geils"]
 started = 1970
 albums = ["The J. Geils Band", "Full House", "Blow Your Face Out"]
 `
@@ -434,7 +695,7 @@ ip = "10.0.0.2"
 	}
 
 	type server struct {
-		IP     string       `toml:"ip"`
+		IP     string       `toml:"ip,omitempty"`
 		Config serverConfig `toml:"config"`
 	}
 
@@ -537,4 +798,295 @@ key3 = "value3"
 	fmt.Printf("Undecoded keys: %q\n", md.Undecoded())
 	// Output:
 	// Undecoded keys: ["key2"]
+}
+
+// Example UnmarshalTOML shows how to implement a struct type that knows how to
+// unmarshal itself. The struct must take full responsibility for mapping the
+// values passed into the struct. The method may be used with interfaces in a
+// struct in cases where the actual type is not known until the data is
+// examined.
+func Example_unmarshalTOML() {
+
+	var blob = `
+[[parts]]
+type = "valve"
+id = "valve-1"
+size = 1.2
+rating = 4
+
+[[parts]]
+type = "valve"
+id = "valve-2"
+size = 2.1
+rating = 5
+
+[[parts]]
+type = "pipe"
+id = "pipe-1"
+length = 2.1
+diameter = 12
+
+[[parts]]
+type = "cable"
+id = "cable-1"
+length = 12
+rating = 3.1
+`
+	o := &order{}
+	err := Unmarshal([]byte(blob), o)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(len(o.parts))
+
+	for _, part := range o.parts {
+		fmt.Println(part.Name())
+	}
+
+	// Code to implement UmarshalJSON.
+
+	// type order struct {
+	// 	// NOTE `order.parts` is a private slice of type `part` which is an
+	// 	// interface and may only be loaded from toml using the
+	// 	// UnmarshalTOML() method of the Umarshaler interface.
+	// 	parts parts
+	// }
+
+	// func (o *order) UnmarshalTOML(data interface{}) error {
+
+	// 	// NOTE the example below contains detailed type casting to show how
+	// 	// the 'data' is retrieved. In operational use, a type cast wrapper
+	// 	// may be prefered e.g.
+	// 	//
+	// 	// func AsMap(v interface{}) (map[string]interface{}, error) {
+	// 	// 		return v.(map[string]interface{})
+	// 	// }
+	// 	//
+	// 	// resulting in:
+	// 	// d, _ := AsMap(data)
+	// 	//
+
+	// 	d, _ := data.(map[string]interface{})
+	// 	parts, _ := d["parts"].([]map[string]interface{})
+
+	// 	for _, p := range parts {
+
+	// 		typ, _ := p["type"].(string)
+	// 		id, _ := p["id"].(string)
+
+	// 		// detect the type of part and handle each case
+	// 		switch p["type"] {
+	// 		case "valve":
+
+	// 			size := float32(p["size"].(float64))
+	// 			rating := int(p["rating"].(int64))
+
+	// 			valve := &valve{
+	// 				Type:   typ,
+	// 				ID:     id,
+	// 				Size:   size,
+	// 				Rating: rating,
+	// 			}
+
+	// 			o.parts = append(o.parts, valve)
+
+	// 		case "pipe":
+
+	// 			length := float32(p["length"].(float64))
+	// 			diameter := int(p["diameter"].(int64))
+
+	// 			pipe := &pipe{
+	// 				Type:     typ,
+	// 				ID:       id,
+	// 				Length:   length,
+	// 				Diameter: diameter,
+	// 			}
+
+	// 			o.parts = append(o.parts, pipe)
+
+	// 		case "cable":
+
+	// 			length := int(p["length"].(int64))
+	// 			rating := float32(p["rating"].(float64))
+
+	// 			cable := &cable{
+	// 				Type:   typ,
+	// 				ID:     id,
+	// 				Length: length,
+	// 				Rating: rating,
+	// 			}
+
+	// 			o.parts = append(o.parts, cable)
+
+	// 		}
+	// 	}
+
+	// 	return nil
+	// }
+
+	// type parts []part
+
+	// type part interface {
+	// 	Name() string
+	// }
+
+	// type valve struct {
+	// 	Type   string
+	// 	ID     string
+	// 	Size   float32
+	// 	Rating int
+	// }
+
+	// func (v *valve) Name() string {
+	// 	return fmt.Sprintf("VALVE: %s", v.ID)
+	// }
+
+	// type pipe struct {
+	// 	Type     string
+	// 	ID       string
+	// 	Length   float32
+	// 	Diameter int
+	// }
+
+	// func (p *pipe) Name() string {
+	// 	return fmt.Sprintf("PIPE: %s", p.ID)
+	// }
+
+	// type cable struct {
+	// 	Type   string
+	// 	ID     string
+	// 	Length int
+	// 	Rating float32
+	// }
+
+	// func (c *cable) Name() string {
+	// 	return fmt.Sprintf("CABLE: %s", c.ID)
+	// }
+
+	// Output:
+	// 4
+	// VALVE: valve-1
+	// VALVE: valve-2
+	// PIPE: pipe-1
+	// CABLE: cable-1
+
+}
+
+type order struct {
+	// NOTE `order.parts` is a private slice of type `part` which is an
+	// interface and may only be loaded from toml using the UnmarshalTOML()
+	// method of the Umarshaler interface.
+	parts parts
+}
+
+func (o *order) UnmarshalTOML(data interface{}) error {
+
+	// NOTE the example below contains detailed type casting to show how
+	// the 'data' is retrieved. In operational use, a type cast wrapper
+	// may be prefered e.g.
+	//
+	// func AsMap(v interface{}) (map[string]interface{}, error) {
+	// 		return v.(map[string]interface{})
+	// }
+	//
+	// resulting in:
+	// d, _ := AsMap(data)
+	//
+
+	d, _ := data.(map[string]interface{})
+	parts, _ := d["parts"].([]map[string]interface{})
+
+	for _, p := range parts {
+
+		typ, _ := p["type"].(string)
+		id, _ := p["id"].(string)
+
+		// detect the type of part and handle each case
+		switch p["type"] {
+		case "valve":
+
+			size := float32(p["size"].(float64))
+			rating := int(p["rating"].(int64))
+
+			valve := &valve{
+				Type:   typ,
+				ID:     id,
+				Size:   size,
+				Rating: rating,
+			}
+
+			o.parts = append(o.parts, valve)
+
+		case "pipe":
+
+			length := float32(p["length"].(float64))
+			diameter := int(p["diameter"].(int64))
+
+			pipe := &pipe{
+				Type:     typ,
+				ID:       id,
+				Length:   length,
+				Diameter: diameter,
+			}
+
+			o.parts = append(o.parts, pipe)
+
+		case "cable":
+
+			length := int(p["length"].(int64))
+			rating := float32(p["rating"].(float64))
+
+			cable := &cable{
+				Type:   typ,
+				ID:     id,
+				Length: length,
+				Rating: rating,
+			}
+
+			o.parts = append(o.parts, cable)
+
+		}
+	}
+
+	return nil
+}
+
+type parts []part
+
+type part interface {
+	Name() string
+}
+
+type valve struct {
+	Type   string
+	ID     string
+	Size   float32
+	Rating int
+}
+
+func (v *valve) Name() string {
+	return fmt.Sprintf("VALVE: %s", v.ID)
+}
+
+type pipe struct {
+	Type     string
+	ID       string
+	Length   float32
+	Diameter int
+}
+
+func (p *pipe) Name() string {
+	return fmt.Sprintf("PIPE: %s", p.ID)
+}
+
+type cable struct {
+	Type   string
+	ID     string
+	Length int
+	Rating float32
+}
+
+func (c *cable) Name() string {
+	return fmt.Sprintf("CABLE: %s", c.ID)
 }

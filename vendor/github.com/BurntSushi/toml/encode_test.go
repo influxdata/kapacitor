@@ -336,6 +336,10 @@ ArrayOfMixedSlices = [[1, 2], ["a", "b"]]
 			}{struct{ *Embedded }{&Embedded{1}}},
 			wantOutput: "[_struct]\n  _int = 1\n",
 		},
+		"embedded non-struct": {
+			input:      struct{ NonStruct }{5},
+			wantOutput: "NonStruct = 5\n",
+		},
 		"array of tables": {
 			input: struct {
 				Structs []*struct{ Int int } `toml:"struct"`
@@ -349,7 +353,7 @@ ArrayOfMixedSlices = [[1, 2], ["a", "b"]]
 				"map": map[string]interface{}{
 					"zero": 5,
 					"arr": []map[string]int{
-						map[string]int{
+						{
 							"friend": 5,
 						},
 					},
@@ -372,10 +376,6 @@ ArrayOfMixedSlices = [[1, 2], ["a", "b"]]
 		"(error) map no string key": {
 			input:     map[int]string{1: ""},
 			wantError: errNonString,
-		},
-		"(error) anonymous non-struct": {
-			input:     struct{ NonStruct }{5},
-			wantError: errAnonNonStruct,
 		},
 		"(error) empty key name": {
 			input:     map[string]int{"": 1},
@@ -453,6 +453,90 @@ func TestEncodeArrayHashWithNormalHashOrder(t *testing.T) {
 	}
 	expected := "V = 1\n\n[A]\n  V = 2\n\n[[B]]\n  V = 3\n"
 	encodeExpected(t, "array hash with normal hash order", val, expected, nil)
+}
+
+func TestEncodeWithOmitEmpty(t *testing.T) {
+	type simple struct {
+		Bool   bool              `toml:"bool,omitempty"`
+		String string            `toml:"string,omitempty"`
+		Array  [0]byte           `toml:"array,omitempty"`
+		Slice  []int             `toml:"slice,omitempty"`
+		Map    map[string]string `toml:"map,omitempty"`
+	}
+
+	var v simple
+	encodeExpected(t, "fields with omitempty are omitted when empty", v, "", nil)
+	v = simple{
+		Bool:   true,
+		String: " ",
+		Slice:  []int{2, 3, 4},
+		Map:    map[string]string{"foo": "bar"},
+	}
+	expected := `bool = true
+string = " "
+slice = [2, 3, 4]
+
+[map]
+  foo = "bar"
+`
+	encodeExpected(t, "fields with omitempty are not omitted when non-empty",
+		v, expected, nil)
+}
+
+func TestEncodeWithOmitZero(t *testing.T) {
+	type simple struct {
+		Number   int     `toml:"number,omitzero"`
+		Real     float64 `toml:"real,omitzero"`
+		Unsigned uint    `toml:"unsigned,omitzero"`
+	}
+
+	value := simple{0, 0.0, uint(0)}
+	expected := ""
+
+	encodeExpected(t, "simple with omitzero, all zero", value, expected, nil)
+
+	value.Number = 10
+	value.Real = 20
+	value.Unsigned = 5
+	expected = `number = 10
+real = 20.0
+unsigned = 5
+`
+	encodeExpected(t, "simple with omitzero, non-zero", value, expected, nil)
+}
+
+func TestEncodeOmitemptyWithEmptyName(t *testing.T) {
+	type simple struct {
+		S []int `toml:",omitempty"`
+	}
+	v := simple{[]int{1, 2, 3}}
+	expected := "S = [1, 2, 3]\n"
+	encodeExpected(t, "simple with omitempty, no name, non-empty field",
+		v, expected, nil)
+}
+
+func TestEncodeAnonymousStructPointerField(t *testing.T) {
+	type Sub struct{}
+	type simple struct {
+		*Sub
+	}
+
+	value := simple{}
+	expected := ""
+	encodeExpected(t, "nil anonymous struct pointer field", value, expected, nil)
+
+	value = simple{Sub: &Sub{}}
+	expected = ""
+	encodeExpected(t, "non-nil anonymous struct pointer field", value, expected, nil)
+}
+
+func TestEncodeIgnoredFields(t *testing.T) {
+	type simple struct {
+		Number int `toml:"-"`
+	}
+	value := simple{}
+	expected := ""
+	encodeExpected(t, "ignored field", value, expected, nil)
 }
 
 func encodeExpected(
