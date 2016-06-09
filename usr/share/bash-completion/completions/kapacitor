@@ -1,11 +1,3 @@
-__kapacitor_filter_ticks()
-{
-#$1=cmd
-#$2=word
-#$3=prev
-	return 0
-}
-
 # Bash completion for the kapacitor command.
 _kapacitor()
 {
@@ -56,10 +48,7 @@ _kapacitor()
                         words=$(_kapacitor_dbrps)
                         ;;
                     -tick)
-                        COMPREPLY=($(compgen -o filenames -A file -X '!*.tick' -S ' ' -- "$cur") )
-                        didi=$(compgen -d -S '/' -- "$cur")
-                        COMPREPLY=(${COMPREPLY[@]:-} $didi )
-                        compopt -o nospace
+			_kapacitor_tick_files "${cur}"
                         ;;
                     -type)
                         words='batch stream'
@@ -68,7 +57,12 @@ _kapacitor()
                         words=$(_kapacitor_list templates "$cur")
                         ;;
                     -vars)
-                        COMPREPLY=($(compgen -o filenames -A file -- "$cur"))
+			local didi
+                        COMPREPLY=($(compgen -o filenames -A file -X '*/' -S ' ' -- "$cur") )
+                        didi=$(compgen -d -S '/' -- "$cur")
+                        COMPREPLY=(${COMPREPLY[@]:-} $didi )
+                        compopt -o nospace
+                        #COMPREPLY=($(compgen -o filenames -A file -- "$cur"))
                         ;;
                     *)
                         words='-dbrp -no-reload -tick -type -template -vars'
@@ -173,6 +167,22 @@ _kapacitor()
     fi
 
     return 0
+}
+
+_kapacitor_tick_files()
+{
+	local c i=0 didi cur="$1"
+        COMPREPLY=($(compgen -o filenames -f -X '!*.tick' -- "$cur") )
+        didi=$(compgen -d -- "$cur")
+        COMPREPLY=(${COMPREPLY[@]:-} $didi )
+	for c in "${COMPREPLY[@]}"; do
+		if [ -d "${c}" ]; then
+			COMPREPLY[i++]="${c}/";
+		else
+			COMPREPLY[i++]="${c} ";
+		fi
+	done
+        compopt -o nospace
 }
 
 _kapacitor_list()
