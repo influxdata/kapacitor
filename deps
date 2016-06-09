@@ -5,20 +5,32 @@ DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 cd $DIR
 
 deps() {
-    # What is our current package
-    package=$(go list .)
+    local package allDeps
 
+    # Get the current package
+    package=$(go list .)
     allDeps=$(go list -f '{{ join .Deps "\n"}}' ./...)
 
     for dep in $allDeps
     do
-        # Skip standard lib deps and
-        # packages within the current $package
+        # Skip standard lib deps
         paths=(${dep//\// })
-        if [[ "${paths[0]}" =~ .*\..* && ! "$dep" =~ ^$package ]]
+        if ! [[ "${paths[0]}" =~ .*\..* ]]
         then
-            echo $dep
+            continue
         fi
+        # Skip deps from within current package
+        if [[ "$dep" =~ ^$package ]]
+        then
+            if [[ "$dep" =~ ^$package/vendor ]]
+            then
+                # Rewrite vendored deps are normal deps
+                dep=${dep/$package\/vendor\//}
+            else
+                continue
+            fi
+        fi
+        echo $dep
     done
 }
 
