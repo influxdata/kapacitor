@@ -27,7 +27,7 @@ deps() {
             if [[ "$dep" =~ ^$package/vendor ]]
             then
                 # Rewrite vendored deps as normal deps
-                dep=${dep/$package\/vendor\//}
+                dep="${dep/$package\/vendor\//} vendored"
             else
                 continue
             fi
