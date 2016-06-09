@@ -165,17 +165,16 @@ def run_generate():
         return False
 
 def go_get(branch, update=False, no_uncommitted=False):
-    """Retrieve build dependencies or restore pinned dependencies.
     """
-    #run("go get github.com/govend/govend")
-    get_command = ""
-    #if update:
-    #    get_command += "{}/bin/govend -v -u --prune".format(os.environ.get("GOPATH"))
-    #else:
-    #    get_command += "{}/bin/govend -v --prune".format(os.environ.get("GOPATH"))
+    Retrieve build dependencies or restore pinned dependencies.
+    """
+    get_command = ["go", "get", "-t", "-d", "-v"]
+    if update:
+        get_command.append("-u")
+    get_command.extend(go_list())
 
     logging.info("Retrieving Go dependencies...")
-    run(get_command, shell=True)
+    run(" ".join(get_command))
 
     # Check for uncommitted changes if no_uncommitted was given.
     if no_uncommitted:
