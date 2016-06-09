@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# Make sure we are in the dir of the script
+DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+cd $DIR
+
+deps() {
+    # What is our current package
+    package=$(go list .)
+
+    allDeps=$(go list -f '{{ join .Deps "\n"}}' ./...)
+
+    for dep in $allDeps
+    do
+        # Skip standard lib deps and
+        # packages within the current $package
+        paths=(${dep//\// })
+        if [[ "${paths[0]}" =~ .*\..* && ! "$dep" =~ ^$package ]]
+        then
+            echo $dep
+        fi
+    done
+}
+
+
+deps | sort -u
+

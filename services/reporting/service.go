@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor"
-	"github.com/influxdb/usage-client/v1"
+	"github.com/influxdata/usage-client/v1"
 )
 
 const reportingInterval = time.Hour * 12
