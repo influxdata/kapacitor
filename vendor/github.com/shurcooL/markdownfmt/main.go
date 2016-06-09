@@ -11,10 +11,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/shurcooL/markdownfmt/markdown"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 var (
@@ -58,7 +58,10 @@ func processFile(filename string, in io.Reader, out io.Writer, stdin bool) error
 		return err
 	}
 
-	res, err := markdown.Process(filename, src, nil)
+	stdout := int(os.Stdout.Fd())
+	res, err := markdown.Process(filename, src, &markdown.Options{
+		Terminal: !*write && terminal.IsTerminal(stdout),
+	})
 	if err != nil {
 		return err
 	}
@@ -106,8 +109,6 @@ func walkDir(path string) {
 }
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-
 	// call markdownfmtMain in a separate function
 	// so that it can use defer and have them
 	// run before the exit.
