@@ -1,0 +1,17 @@
+machine:
+  environment:
+    IMPORT_PATH: "github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
+    GOPATH: "$HOME/.go_workspace"
+
+dependencies:
+  override:
+    - mkdir -p "$GOPATH/src/$IMPORT_PATH"
+    - rsync -azC --delete ./ --include=".git" "$GOPATH/src/$IMPORT_PATH/"
+  post:
+    - cd "$GOPATH/src/$IMPORT_PATH" && git branch --set-upstream-to="origin/$CIRCLE_BRANCH" && go get -u -f -t ./...
+
+test:
+  pre:
+    - go vet ./...
+  override:
+    - go test ./... -race
