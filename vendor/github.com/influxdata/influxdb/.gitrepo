@@ -1,0 +1,11 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = http://github.com/influxdata/influxdb.git
+	branch = master
+	commit = c8e90fa4eea9bcc8c35df47834fa490834969733
+	parent = a2b6f4a8c7f55ea9fc259e0f28498ef34f77b03c
+	cmdver = 0.3.0

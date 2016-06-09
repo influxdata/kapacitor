@@ -1,4 +1,4 @@
-## v1.0.0 [unreleased]
+## v1.0.0-beta1 [2016-06-07]
 
 ### Release Notes
 
@@ -21,6 +21,8 @@
 - [#5906](https://github.com/influxdata/influxdb/issues/5906): Dynamically update the documentation link in the admin UI.
 - [#6686](https://github.com/influxdata/influxdb/pull/6686): Optimize timestamp run-length decoding
 - [#6713](https://github.com/influxdata/influxdb/pull/6713): Reduce allocations during query parsing.
+- [#3733](https://github.com/influxdata/influxdb/issues/3733): Modify the default retention policy name and make it configurable.
+- [#5655](https://github.com/influxdata/influxdb/issues/5655): Support specifying a retention policy for the graphite service.
 
 ### Bugfixes
 
@@ -53,6 +55,8 @@
 - [#6250](https://github.com/influxdata/influxdb/issues/6250): Slow startup time
 - [#6753](https://github.com/influxdata/influxdb/issues/6753): Prevent panic if there are no values.
 - [#6685](https://github.com/influxdata/influxdb/issues/6685): Batch SELECT INTO / CQ writes
+- [#6756](https://github.com/influxdata/influxdb/issues/6756): Set X-Influxdb-Version header on every request (even 404 requests).
+- [#6760](https://github.com/influxdata/influxdb/issues/6760): Prevent panic in concurrent auth cache write
 
 ## v0.13.0 [2016-05-12]
 

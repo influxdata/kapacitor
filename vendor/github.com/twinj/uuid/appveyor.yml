@@ -20,8 +20,8 @@ install:
 
 # to run your custom scripts instead of automatic MSBuild
 build_script:
-  - go vet ./...
-  - gofmt -s -l .
+  - go vet -x ./...
+  - gofmt -s -l -e.
   - go test -short -v
   - go test -short -race -v
 

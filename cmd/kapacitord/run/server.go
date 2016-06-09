@@ -10,7 +10,6 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"strings"
-	"time"
 
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/services/collectd"
@@ -71,7 +70,7 @@ type Server struct {
 	ReplayService   *replay.Service
 	InfluxDBService *influxdb.Service
 
-	MetaClient    *metaclient
+	MetaClient    *kapacitor.NoopMetaClient
 	QueryExecutor *queryexecutor
 
 	Services []Service
@@ -99,7 +98,7 @@ func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*
 		hostname:      c.Hostname,
 		err:           make(chan error),
 		LogService:    logService,
-		MetaClient:    &metaclient{},
+		MetaClient:    &kapacitor.NoopMetaClient{},
 		QueryExecutor: &queryexecutor{},
 		Logger:        l,
 	}
@@ -582,26 +581,6 @@ type tcpaddr struct{ host string }
 
 func (a *tcpaddr) Network() string { return "tcp" }
 func (a *tcpaddr) String() string  { return a.host }
-
-type metaclient struct{}
-
-func (m *metaclient) WaitForLeader(d time.Duration) error {
-	return nil
-}
-func (m *metaclient) CreateDatabase(name string) (*meta.DatabaseInfo, error) {
-	return nil, nil
-}
-func (m *metaclient) Database(name string) (*meta.DatabaseInfo, error) {
-	return &meta.DatabaseInfo{
-		Name: name,
-	}, nil
-}
-func (m *metaclient) Authenticate(username, password string) (ui *meta.UserInfo, err error) {
-	return nil, errors.New("not authenticated")
-}
-func (m *metaclient) Users() ([]meta.UserInfo, error) {
-	return nil, errors.New("no user")
-}
 
 type queryexecutor struct{}
 

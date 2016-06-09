@@ -1,0 +1,24 @@
+github.com/boltdb/bolt
+github.com/BurntSushi/toml
+github.com/cenkalti/backoff
+github.com/dustin/go-humanize
+github.com/gogo/protobuf
+github.com/golang/protobuf
+github.com/gorhill/cronexpr
+github.com/influxdata/influxdb
+github.com/influxdata/usage-client
+github.com/kimor79/gollectd
+github.com/mattn/go-runewidth
+github.com/pkg/errors
+github.com/russross/blackfriday
+github.com/serenize/snaker
+github.com/shurcooL/go
+github.com/shurcooL/markdownfmt
+github.com/shurcooL/sanitized_anchor_name
+github.com/twinj/uuid
+golang.org/x/crypto master
+gopkg.in/gomail.v2
+# Generate deps
+github.com/benbjohnson/tmpl
+# Testing deps
+github.com/stretchr/testify

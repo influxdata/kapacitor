@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# Make sure we are in the dir of the script
+DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+cd $DIR
+
+# List all dependent packages and whether they have been vendored.
+deps() {
+    local package packages allDeps paths
+
+    # Get the current package
+    package=$(go list .)
+    # Get the sub packages excluding vendored packages
+    packages=$(go list ./... | grep -v "^$package/vendor")
+    allDeps=$(go list -f '{{ join .Deps "\n"}}' $packages)
+
+    for dep in $allDeps
+    do
+        # Skip standard lib deps
+        paths=(${dep//\// })
+        if ! [[ "${paths[0]}" =~ .*\..* ]]
+        then
+            continue
+        fi
+        # Skip deps from within current package
+        if [[ "$dep" =~ ^$package ]]
+        then
+            if [[ "$dep" =~ ^$package/vendor ]]
+            then
+                # Rewrite vendored deps as normal deps
+                dep="v ${dep/$package\/vendor\//}"
+            else
+                continue
+            fi
+        else
+            dep="n $dep"
+        fi
+
+        echo $dep
+    done
+}
+
+
+# Deduplicate and sort the output
+deps | sort -k 2 -u
+

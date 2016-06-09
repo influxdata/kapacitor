@@ -1,9 +1,13 @@
 Go UUID implementation
 ========================
 
+[![license](http://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/twinj/uuid/master/LICENSE)
+[![GoDoc](http://godoc.org/github.com/twinj/uuid?status.png)](http://godoc.org/github.com/twinj/uuid)
 [![Build Status](https://ci.appveyor.com/api/projects/status/github/twinj/uuid?branch=master&svg=true)](https://ci.appveyor.com/project/twinj/uuid)
 [![Build Status](https://travis-ci.org/twinj/uuid.png?branch=master)](https://travis-ci.org/twinj/uuid)
-[![GoDoc](http://godoc.org/github.com/twinj/uuid?status.png)](http://godoc.org/github.com/twinj/uuid)
+
+**This project is currently pre 1.0.0**
+
 
 This package provides RFC 4122 and DCE 1.1 compliant UUIDs.
 It will generate the following:
@@ -35,18 +39,20 @@ Any supported version of Go.
 
 # Future considerations
 
-* length and format should not be an issue
-*
+* length and format of UUID should not be an issue
+* using new cryptographic technology should not be an issue
+* improve support for sequential UUIDs merged with cryptographic nodes
 
 # Recent Changes
 
+* Improved builds and 100% test coverage
+* Library overhaul to cleanup exports that are not useful for a user
 * Improved file system Saver interface, breaking changes.
     To use a saver make sure you pass it in via the uuid.SetupSaver(Saver) method before a UUID is generated, so as to take affect.
 * Removed use of OS Thread locking and runtime package requirement
 * Changed String() output to CleanHyphen to match the canonical standard
 * Removed default non volatile store and replaced with Saver interface
 * Added formatting support for user defined formats
-* Added support for Google App Engine
 * Variant type bits are now set correctly
 * Variant type can now be retrieved more efficiently
 * New tests for variant setting to confirm correctness
@@ -84,8 +90,8 @@ for more information.
 
 ## Links
 
-[RFC 4122](http://www.ietf.org/rfc/rfc4122.txt)
-[DCE 1.1: Authentication and Security Services](http://pubs.opengroup.org/onlinepubs/9629399/apdxa.htm)
+* [RFC 4122](http://www.ietf.org/rfc/rfc4122.txt)
+* [DCE 1.1: Authentication and Security Services](http://pubs.opengroup.org/onlinepubs/9629399/apdxa.htm)
 
 ## Copyright
 

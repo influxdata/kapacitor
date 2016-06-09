@@ -11,6 +11,9 @@ import (
 
 const (
 	gregorianToUNIXOffset = 122192928e9
+
+	// set the following to the number of 100ns ticks of the actual
+	// resolution of your system's clock
 	defaultSpinResolution = 1024
 )
 
@@ -66,11 +69,6 @@ func (o Timestamp) Add(pDuration time.Duration) Timestamp {
 // Returns the timestamp as modified by the duration
 func (o Timestamp) Sub(pDuration time.Duration) Timestamp {
 	return o - Timestamp(pDuration/100)
-}
-
-// Returns the timestamp as modified by the duration
-func (o Timestamp) Duration() time.Duration {
-	return time.Duration(Now() - o)
 }
 
 // Converts UUID Timestamp to time.Time and then calls the Stringer

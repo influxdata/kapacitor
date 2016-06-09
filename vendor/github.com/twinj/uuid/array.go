@@ -10,6 +10,8 @@ const (
 	versionIndex = 6
 )
 
+var _ UUID = &array{}
+
 // A clean UUID type for simpler UUID versions
 type array [length]byte
 
@@ -18,51 +20,47 @@ func (array) Size() int {
 }
 
 func (o array) Version() int {
-	return int(o[versionIndex]) >> 4
+	return int(o[versionIndex] >> 4)
 }
 
-func (o *array) setVersion(pVersion byte) {
+func (o array) Variant() uint8 {
+	return variant(o[variantIndex])
+}
+
+func (o *array) Unmarshal(pData []byte) {
+	copy(o[:], pData[:length])
+}
+
+func (o array) Bytes() []byte {
+	return o[:]
+}
+
+func (o array) MarshalBinary() ([]byte, error) {
+	return o.Bytes(), nil
+}
+
+func (o *array) UnmarshalBinary(pData []byte) error {
+	return UnmarshalBinary(o, pData)
+}
+
+func (o array) String() string {
+	return formatter(&o, generator.Fmt)
+}
+
+// ****************************************************
+
+func (o *array) setVersion(pVersion uint8) {
 	o[versionIndex] &= 0x0f
 	o[versionIndex] |= pVersion << 4
 }
 
-func (o *array) Variant() byte {
-	return variant(o[variantIndex])
-}
-
-func (o *array) setVariant(pVariant byte) {
+func (o *array) setVariant(pVariant uint8) {
 	setVariant(&o[variantIndex], pVariant)
-}
-
-func (o *array) Unmarshal(pData []byte) {
-	copy(o[:], pData)
-}
-
-func (o *array) Bytes() []byte {
-	return o[:]
-}
-
-func (o array) String() string {
-	return formatter(&o, generator.format)
-}
-
-func (o array) Format(pFormat string) string {
-	return formatter(&o, pFormat)
 }
 
 // Set the three most significant bits (bits 0, 1 and 2) of the
 // sequenceHiAndVariant equivalent in the array to ReservedRFC4122.
 func (o *array) setRFC4122Variant() {
-	o[variantIndex] &= 0x3F
+	o[variantIndex] &= variantSet
 	o[variantIndex] |= ReservedRFC4122
-}
-
-// Marshals the UUID bytes into a slice
-func (o *array) MarshalBinary() ([]byte, error) {
-	return o.Bytes(), nil
-}
-
-// Un-marshals the data bytes into the UUID.
-func (o *array) UnmarshalBinary(pData []byte) error {
-	return UnmarshalBinary(o, pData)
 }

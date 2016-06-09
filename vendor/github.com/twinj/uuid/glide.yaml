@@ -1,0 +1,10 @@
+package: github.com/twinj/uuid
+licence: MIT
+owners:
+- name: Daniel Kemp
+  email: daniel.kemp@live.com.au
+import:
+- package: github.com/stretchr/testify
+  subpackages:
+  - assert
+
