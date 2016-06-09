@@ -57,12 +57,7 @@ _kapacitor()
                         words=$(_kapacitor_list templates "$cur")
                         ;;
                     -vars)
-			local didi
-                        COMPREPLY=($(compgen -o filenames -A file -X '*/' -S ' ' -- "$cur") )
-                        didi=$(compgen -d -S '/' -- "$cur")
-                        COMPREPLY=(${COMPREPLY[@]:-} $didi )
-                        compopt -o nospace
-                        #COMPREPLY=($(compgen -o filenames -A file -- "$cur"))
+			_kapacitor_json_files "${cur}"
                         ;;
                     *)
                         words='-dbrp -no-reload -tick -type -template -vars'
@@ -169,12 +164,10 @@ _kapacitor()
     return 0
 }
 
-_kapacitor_tick_files()
+_kapacitor_files_add_postfix()
 {
-	local c i=0 didi cur="$1"
-        COMPREPLY=($(compgen -o filenames -f -X '!*.tick' -- "$cur") )
-        didi=$(compgen -d -- "$cur")
-        COMPREPLY=(${COMPREPLY[@]:-} $didi )
+	#Add a slash (directories) or space (files except directories) after name
+	local c i=0
 	for c in "${COMPREPLY[@]}"; do
 		if [ -d "${c}" ]; then
 			COMPREPLY[i++]="${c}/";
@@ -183,6 +176,24 @@ _kapacitor_tick_files()
 		fi
 	done
         compopt -o nospace
+}
+
+_kapacitor_tick_files()
+{
+	local didi cur="$1"
+        COMPREPLY=($(compgen -o filenames -f -X '!*.tick' -- "$cur") )
+        didi=$(compgen -d -- "$cur")
+        COMPREPLY=(${COMPREPLY[@]:-} $didi )
+	_kapacitor_files_add_postfix
+}
+
+_kapacitor_json_files()
+{
+	local didi cur="$1"
+        COMPREPLY=($(compgen -o filenames -f -X '!*.json' -- "$cur") )
+        didi=$(compgen -d -- "$cur")
+        COMPREPLY=(${COMPREPLY[@]:-} $didi )
+	_kapacitor_files_add_postfix
 }
 
 _kapacitor_list()
