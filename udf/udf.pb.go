@@ -1218,6 +1218,8 @@ func init() {
 	proto.RegisterEnum("udf.ValueType", ValueType_name, ValueType_value)
 }
 
+func init() { proto.RegisterFile("udf.proto", fileDescriptor0) }
+
 var fileDescriptor0 = []byte{
 	// 1064 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xc4, 0x56, 0xef, 0x72, 0xdb, 0x44,
