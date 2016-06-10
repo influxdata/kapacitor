@@ -67,10 +67,13 @@ func redactPassword(r *http.Request) {
 	}
 }
 
-// Common Log Format: http://en.wikipedia.org/wiki/Common_Log_Format
-
 // buildLogLine creates a common log format
-// in addition to the common fields, we also append referrer, user agent and request ID
+// in addition to the common fields, we also append referrer, user agent,
+// request ID and response time (microseconds)
+//  ie, in apache mod_log_config terms:
+//     %h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-agent}i\"" %L %D
+//
+// Common Log Format: http://en.wikipedia.org/wiki/Common_Log_Format
 func buildLogLine(l *responseLogger, r *http.Request, start time.Time) string {
 
 	redactPassword(r)
@@ -94,15 +97,17 @@ func buildLogLine(l *responseLogger, r *http.Request, start time.Time) string {
 		"-",
 		detect(username, "-"),
 		fmt.Sprintf("[%s]", start.Format("02/Jan/2006:15:04:05 -0700")),
-		r.Method,
+		`"` + r.Method,
 		uri,
-		r.Proto,
+		r.Proto + `"`,
 		detect(strconv.Itoa(l.Status()), "-"),
 		strconv.Itoa(l.Size()),
-		detect(referer, "-"),
-		detect(userAgent, "-"),
+		`"` + detect(referer, "-") + `"`,
+		`"` + detect(userAgent, "-") + `"`,
 		r.Header.Get("Request-Id"),
-		fmt.Sprintf("%s", time.Since(start)),
+		// response time, report in microseconds because this is consistent
+		// with apache's %D parameter in mod_log_config
+		strconv.FormatInt(time.Since(start).Nanoseconds()/1000, 10),
 	}
 
 	return strings.Join(fields, " ")

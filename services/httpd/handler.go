@@ -19,6 +19,7 @@ import (
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/influxdb/uuid"
 	"github.com/influxdata/kapacitor/client/v1"
+	"github.com/influxdata/kapacitor/services/logging"
 	"github.com/influxdata/wlog"
 )
 
@@ -58,21 +59,32 @@ type Handler struct {
 		WritePoints(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
 	}
 
-	Logger         *log.Logger
-	loggingEnabled bool // Log every HTTP access.
-	WriteTrace     bool // Detailed logging of write path
-	statMap        *expvar.Map
+	// Normal wlog logger
+	logger *log.Logger
+	// Detailed logging of write path
+	// Uses normal logger
+	writeTrace bool
+
+	// Common log format logger.
+	// This logger does not use log levels with wlog.
+	// Its simply a binary on off from the config.
+	clfLogger *log.Logger
+	// Log every HTTP access.
+	loggingEnabled bool
+
+	statMap *expvar.Map
 }
 
 // NewHandler returns a new instance of handler with routes.
-func NewHandler(requireAuthentication, loggingEnabled, writeTrace, allowGzip bool, statMap *expvar.Map, l *log.Logger) *Handler {
+func NewHandler(requireAuthentication, loggingEnabled, writeTrace, allowGzip bool, statMap *expvar.Map, l *log.Logger, li logging.Interface) *Handler {
 	h := &Handler{
 		methodMux:             make(map[string]*ServeMux),
 		requireAuthentication: requireAuthentication,
 		allowGzip:             allowGzip,
-		Logger:                l,
+		logger:                l,
+		writeTrace:            writeTrace,
+		clfLogger:             li.NewRawLogger("[httpd] ", 0),
 		loggingEnabled:        loggingEnabled,
-		WriteTrace:            writeTrace,
 		statMap:               statMap,
 	}
 
@@ -251,11 +263,10 @@ func (h *Handler) addRawRoute(r Route) error {
 	handler = cors(handler)
 	handler = requestID(handler)
 
-	// Logs are INFO level only enable if we are logging INFOs
-	if h.loggingEnabled && wlog.LogLevel() <= wlog.INFO {
-		handler = logging(handler, r.Name, h.Logger)
+	if h.loggingEnabled {
+		handler = logHandler(handler, r.Name, h.clfLogger)
 	}
-	handler = recovery(handler, r.Name, h.Logger) // make sure recovery is always last
+	handler = recovery(handler, r.Name, h.logger) // make sure recovery is always last
 
 	mux, ok := h.methodMux[r.Method]
 	if !ok {
@@ -368,15 +379,15 @@ func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user *meta.
 
 	b, err := ioutil.ReadAll(body)
 	if err != nil {
-		if h.WriteTrace {
-			h.Logger.Print("E! write handler unable to read bytes from request body")
+		if h.writeTrace {
+			h.logger.Print("E! write handler unable to read bytes from request body")
 		}
 		h.writeError(w, influxql.Result{Err: err}, http.StatusBadRequest)
 		return
 	}
 	h.statMap.Add(statWriteRequestBytesReceived, int64(len(b)))
-	if h.WriteTrace {
-		h.Logger.Printf("D! write body received by handler: %s", string(b))
+	if h.writeTrace {
+		h.logger.Printf("D! write body received by handler: %s", string(b))
 	}
 
 	h.serveWriteLine(w, r, b, user)
@@ -612,13 +623,12 @@ func requestID(inner http.Handler) http.Handler {
 	})
 }
 
-func logging(inner http.Handler, name string, weblog *log.Logger) http.Handler {
+func logHandler(inner http.Handler, name string, weblog *log.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		l := &responseLogger{w: w}
 		inner.ServeHTTP(l, r)
-		logLine := "I! " + buildLogLine(l, r, start)
-		weblog.Println(logLine)
+		weblog.Println(buildLogLine(l, r, start))
 	})
 }
 

@@ -3,6 +3,7 @@ package integrations
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -126,6 +127,17 @@ type LogService struct{}
 
 func (l *LogService) NewLogger(prefix string, flag int) *log.Logger {
 	return wlog.New(os.Stderr, prefix, flag)
+}
+func (l *LogService) NewRawLogger(prefix string, flag int) *log.Logger {
+	return log.New(os.Stderr, prefix, flag)
+}
+
+func (l *LogService) NewStaticLevelLogger(prefix string, flag int, level wlog.Level) *log.Logger {
+	return log.New(wlog.NewStaticLevelWriter(os.Stderr, level), prefix, flag)
+}
+
+func (l *LogService) NewStaticLevelWriter(level wlog.Level) io.Writer {
+	return wlog.NewStaticLevelWriter(os.Stderr, level)
 }
 
 type UDFService struct {

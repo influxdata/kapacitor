@@ -51,7 +51,7 @@ func init() {
 	// create API server
 	config := httpd.NewConfig()
 	config.BindAddress = ":0" // Choose port dynamically
-	httpService = httpd.NewService(config, logService.NewLogger("[http] ", log.LstdFlags))
+	httpService = httpd.NewService(config, logService.NewLogger("[http] ", log.LstdFlags), logService)
 	err := httpService.Open()
 	if err != nil {
 		panic(err)
