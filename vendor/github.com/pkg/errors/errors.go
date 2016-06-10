@@ -21,15 +21,6 @@
 //              return errors.Wrap(err, "read failed")
 //      }
 //
-// Retrieving the stack trace of an error or wrapper
-//
-// New, Errorf, Wrap, and Wrapf record a stack trace at the point they are
-// invoked. This information can be retrieved with the following interface.
-//
-//     type Stack interface {
-//             Stack() []uintptr
-//     }
-//
 // Retrieving the cause of an error
 //
 // Using errors.Wrap constructs a stack of errors, adding context to the
@@ -51,54 +42,86 @@
 //     default:
 //             // unknown error
 //     }
+//
+// Retrieving the stack trace of an error or wrapper
+//
+// New, Errorf, Wrap, and Wrapf record a stack trace at the point they are
+// invoked. This information can be retrieved with the following interface.
+//
+//     type Stacktrace interface {
+//             Stacktrace() []Frame
+//     }
 package errors
 
 import (
-	"errors"
 	"fmt"
 	"io"
-	"runtime"
-	"strings"
 )
 
-// stack represents a stack of programm counters.
-type stack []uintptr
+// _error is an error implementation returned by New and Errorf
+// that implements its own fmt.Formatter.
+type _error struct {
+	msg string
+	*stack
+}
 
-func (s *stack) Stack() []uintptr { return *s }
+func (e _error) Error() string { return e.msg }
 
-func (s *stack) Location() (string, int) {
-	return location((*s)[0] - 1)
+func (e _error) Format(s fmt.State, verb rune) {
+	switch verb {
+	case 'v':
+		if s.Flag('+') {
+			fmt.Fprintf(s, "%+v: ", e.Stacktrace()[0])
+		}
+		fallthrough
+	case 's':
+		io.WriteString(s, e.msg)
+	}
 }
 
 // New returns an error that formats as the given text.
 func New(text string) error {
-	return struct {
-		error
-		*stack
-	}{
-		errors.New(text),
+	return _error{
+		text,
+		callers(),
+	}
+}
+
+// Errorf formats according to a format specifier and returns the string
+// as a value that satisfies error.
+func Errorf(format string, args ...interface{}) error {
+	return _error{
+		fmt.Sprintf(format, args...),
 		callers(),
 	}
 }
 
 type cause struct {
-	cause   error
-	message string
+	cause error
+	msg   string
 }
 
-func (c cause) Error() string   { return c.Message() + ": " + c.Cause().Error() }
-func (c cause) Cause() error    { return c.cause }
-func (c cause) Message() string { return c.message }
+func (c cause) Error() string { return fmt.Sprintf("%s: %v", c.msg, c.Cause()) }
+func (c cause) Cause() error  { return c.cause }
 
-// Errorf formats according to a format specifier and returns the string
-// as a value that satisfies error.
-func Errorf(format string, args ...interface{}) error {
-	return struct {
-		error
-		*stack
-	}{
-		fmt.Errorf(format, args...),
-		callers(),
+// wrapper is an error implementation returned by Wrap and Wrapf
+// that implements its own fmt.Formatter.
+type wrapper struct {
+	cause
+	*stack
+}
+
+func (w wrapper) Format(s fmt.State, verb rune) {
+	switch verb {
+	case 'v':
+		if s.Flag('+') {
+			fmt.Fprintf(s, "%+v\n", w.Cause())
+			fmt.Fprintf(s, "%+v: %s", w.Stacktrace()[0], w.msg)
+			return
+		}
+		fallthrough
+	case 's':
+		io.WriteString(s, w.Error())
 	}
 }
 
@@ -108,15 +131,12 @@ func Wrap(err error, message string) error {
 	if err == nil {
 		return nil
 	}
-	return struct {
-		cause
-		*stack
-	}{
-		cause{
-			cause:   err,
-			message: message,
+	return wrapper{
+		cause: cause{
+			cause: err,
+			msg:   message,
 		},
-		callers(),
+		stack: callers(),
 	}
 }
 
@@ -126,20 +146,13 @@ func Wrapf(err error, format string, args ...interface{}) error {
 	if err == nil {
 		return nil
 	}
-	return struct {
-		cause
-		*stack
-	}{
-		cause{
-			cause:   err,
-			message: fmt.Sprintf(format, args...),
+	return wrapper{
+		cause: cause{
+			cause: err,
+			msg:   fmt.Sprintf(format, args...),
 		},
-		callers(),
+		stack: callers(),
 	}
-}
-
-type causer interface {
-	Cause() error
 }
 
 // Cause returns the underlying cause of the error, if possible.
@@ -154,6 +167,10 @@ type causer interface {
 // be returned. If the error is nil, nil will be returned without further
 // investigation.
 func Cause(err error) error {
+	type causer interface {
+		Cause() error
+	}
+
 	for err != nil {
 		cause, ok := err.(causer)
 		if !ok {
@@ -166,94 +183,14 @@ func Cause(err error) error {
 
 // Fprint prints the error to the supplied writer.
 // If the error implements the Causer interface described in Cause
-// Print will recurse into the error's cause.
-// If the error implements the inteface:
-//
-//     type Location interface {
-//            Location() (file string, line int)
-//     }
-//
-// Print will also print the file and line of the error.
+// Fprint will recurse into the error's cause.
+// Fprint will also print the file and line of the error.
 // If err is nil, nothing is printed.
+//
+// Deprecated: Fprint will be removed in version 0.7.
 func Fprint(w io.Writer, err error) {
-	type location interface {
-		Location() (string, int)
+	if err == nil {
+		return
 	}
-	type message interface {
-		Message() string
-	}
-
-	for err != nil {
-		if err, ok := err.(location); ok {
-			file, line := err.Location()
-			fmt.Fprintf(w, "%s:%d: ", file, line)
-		}
-		switch err := err.(type) {
-		case message:
-			fmt.Fprintln(w, err.Message())
-		default:
-			fmt.Fprintln(w, err.Error())
-		}
-
-		cause, ok := err.(causer)
-		if !ok {
-			break
-		}
-		err = cause.Cause()
-	}
-}
-
-func callers() *stack {
-	const depth = 32
-	var pcs [depth]uintptr
-	n := runtime.Callers(3, pcs[:])
-	var st stack = pcs[0:n]
-	return &st
-}
-
-// location returns the source file and line matching pc.
-func location(pc uintptr) (string, int) {
-	fn := runtime.FuncForPC(pc)
-	if fn == nil {
-		return "unknown", 0
-	}
-
-	// Here we want to get the source file path relative to the compile time
-	// GOPATH. As of Go 1.6.x there is no direct way to know the compiled
-	// GOPATH at runtime, but we can infer the number of path segments in the
-	// GOPATH. We note that fn.Name() returns the function name qualified by
-	// the import path, which does not include the GOPATH. Thus we can trim
-	// segments from the beginning of the file path until the number of path
-	// separators remaining is one more than the number of path separators in
-	// the function name. For example, given:
-	//
-	//    GOPATH     /home/user
-	//    file       /home/user/src/pkg/sub/file.go
-	//    fn.Name()  pkg/sub.Type.Method
-	//
-	// We want to produce:
-	//
-	//    pkg/sub/file.go
-	//
-	// From this we can easily see that fn.Name() has one less path separator
-	// than our desired output. We count separators from the end of the file
-	// path until it finds two more than in the function name and then move
-	// one character forward to preserve the initial path segment without a
-	// leading separator.
-	const sep = "/"
-	goal := strings.Count(fn.Name(), sep) + 2
-	file, line := fn.FileLine(pc)
-	i := len(file)
-	for n := 0; n < goal; n++ {
-		i = strings.LastIndex(file[:i], sep)
-		if i == -1 {
-			// not enough separators found, set i so that the slice expression
-			// below leaves file unmodified
-			i = -len(sep)
-			break
-		}
-	}
-	// get back to 0 or trim the leading separator
-	file = file[i+len(sep):]
-	return file, line
+	fmt.Fprintf(w, "%+v\n", err)
 }

@@ -23,7 +23,7 @@ const (
 	DefaultConsistencyLevel = "one"
 
 	// DefaultSeparator is the default join character to use when joining multiple
-	// measurment parts in a template.
+	// measurement parts in a template.
 	DefaultSeparator = "."
 
 	// DefaultBatchSize is the default write batch size.
@@ -54,6 +54,7 @@ type Config struct {
 	Enabled          bool          `toml:"enabled"`
 	BindAddress      string        `toml:"bind-address"`
 	Database         string        `toml:"database"`
+	RetentionPolicy  string        `toml:"retention-policy"`
 	Protocol         string        `toml:"protocol"`
 	BatchSize        int           `toml:"batch-size"`
 	BatchPending     int           `toml:"batch-pending"`

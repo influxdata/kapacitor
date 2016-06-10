@@ -1,7 +1,7 @@
 package reporting
 
 import (
-	"github.com/influxdb/usage-client/v1"
+	client "github.com/influxdata/usage-client/v1"
 )
 
 type Config struct {

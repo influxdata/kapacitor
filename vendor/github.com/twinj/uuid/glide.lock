@@ -1,0 +1,12 @@
+hash: f911e013eca32434aa211cdcf343b438bb417cbf31571d3d72c2c1f5cb960414
+updated: 2016-06-05T02:30:40.1280097+10:00
+imports:
+- name: github.com/stretchr/testify
+  version: 8d64eb7173c7753d6419fd4a9caf057398611364
+  subpackages:
+  - assert
+- name: github.com/twinj/uuid
+  version: 54014829338a362f3071461e05e890f51443520f
+  subpackages:
+  - github.com\twinj\uuid
+devImports: []

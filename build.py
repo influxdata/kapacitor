@@ -151,8 +151,8 @@ def run_generate():
     """Run 'go generate' to rebuild any static assets.
     """
     logging.info("Running generate...")
-    run("go get github.com/golang/protobuf/protoc-gen-go")
-    run("go get github.com/benbjohnson/tmpl")
+    run("go install ./vendor/github.com/golang/protobuf/protoc-gen-go")
+    run("go install ./vendor/github.com/benbjohnson/tmpl")
     generate_cmd = ["go", "generate"]
     generate_cmd.extend(go_list())
     p = subprocess.Popen(generate_cmd)
@@ -165,17 +165,11 @@ def run_generate():
         return False
 
 def go_get(branch, update=False, no_uncommitted=False):
-    """Retrieve build dependencies or restore pinned dependencies.
     """
-    run("go get github.com/govend/govend")
-    get_command = ""
-    if update:
-        get_command += "{}/bin/govend -v -u --prune".format(os.environ.get("GOPATH"))
-    else:
-        get_command += "{}/bin/govend -v --prune".format(os.environ.get("GOPATH"))
-
-    logging.info("Retrieving Go dependencies...")
-    run(get_command, shell=True)
+    Retrieve build dependencies or restore pinned dependencies.
+    """
+    # All Kapacitor deps should be vendored so do not go get them
+    logging.info("Pretending to retrieve Go dependencies...")
 
     # Check for uncommitted changes if no_uncommitted was given.
     if no_uncommitted:

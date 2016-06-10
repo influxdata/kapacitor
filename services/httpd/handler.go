@@ -50,7 +50,6 @@ type Handler struct {
 	Version               string
 
 	MetaClient interface {
-		Database(name string) (*meta.DatabaseInfo, error)
 		Authenticate(username, password string) (ui *meta.UserInfo, err error)
 		Users() ([]meta.UserInfo, error)
 	}
@@ -403,14 +402,6 @@ func (h *Handler) serveWriteLine(w http.ResponseWriter, r *http.Request, body []
 	database := r.FormValue("db")
 	if database == "" {
 		h.writeError(w, influxql.Result{Err: fmt.Errorf("database is required")}, http.StatusBadRequest)
-		return
-	}
-
-	if di, err := h.MetaClient.Database(database); err != nil {
-		h.writeError(w, influxql.Result{Err: fmt.Errorf("metastore database error: %s", err)}, http.StatusInternalServerError)
-		return
-	} else if di == nil {
-		h.writeError(w, influxql.Result{Err: fmt.Errorf("database not found: %q", database)}, http.StatusNotFound)
 		return
 	}
 

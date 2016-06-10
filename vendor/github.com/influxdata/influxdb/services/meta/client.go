@@ -76,6 +76,7 @@ func NewClient(config *Config) *Client {
 		cacheData: &Data{
 			ClusterID: uint64(uint64(rand.Int63())),
 			Index:     1,
+			DefaultRetentionPolicyName: config.DefaultRetentionPolicyName,
 		},
 		closing:             make(chan struct{}),
 		changed:             make(chan struct{}),
@@ -196,12 +197,11 @@ func (c *Client) CreateDatabase(name string) (*DatabaseInfo, error) {
 	// create default retention policy
 	if c.retentionAutoCreate {
 		if err := data.CreateRetentionPolicy(name, &RetentionPolicyInfo{
-			Name:     "default",
 			ReplicaN: 1,
 		}); err != nil {
 			return nil, err
 		}
-		if err := data.SetDefaultRetentionPolicy(name, "default"); err != nil {
+		if err := data.SetDefaultRetentionPolicy(name, ""); err != nil {
 			return nil, err
 		}
 	}
@@ -569,19 +569,19 @@ func (c *Client) AdminUserExists() bool {
 }
 
 func (c *Client) Authenticate(username, password string) (*UserInfo, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	data := c.cacheData.Clone()
-
 	// Find user.
-	userInfo := data.User(username)
+	c.mu.RLock()
+	userInfo := c.cacheData.User(username)
+	c.mu.RUnlock()
 	if userInfo == nil {
 		return nil, ErrUserNotFound
 	}
 
 	// Check the local auth cache first.
-	if au, ok := c.authCache[username]; ok {
+	c.mu.RLock()
+	au, ok := c.authCache[username]
+	c.mu.RUnlock()
+	if ok {
 		// verify the password using the cached salt and hash
 		if bytes.Equal(c.hashWithSalt(au.salt, password), au.hash) {
 			return userInfo, nil
@@ -600,8 +600,9 @@ func (c *Client) Authenticate(username, password string) (*UserInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	c.mu.Lock()
 	c.authCache[username] = authUser{salt: salt, hash: hashed, bhash: userInfo.Hash}
-
+	c.mu.Unlock()
 	return userInfo, nil
 }
 

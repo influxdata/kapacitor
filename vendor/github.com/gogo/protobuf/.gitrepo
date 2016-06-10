@@ -1,0 +1,11 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = http://github.com/gogo/protobuf.git
+	branch = master
+	commit = 318371cbef6bab80e8d1c69b470fffa79eebfb54
+	parent = b28ebd2c48bdc0103d2d5442cb1c76f0f4145923
+	cmdver = 0.3.0
