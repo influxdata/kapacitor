@@ -12,6 +12,7 @@ import (
 // Interface for creating new loggers
 type Interface interface {
 	NewLogger(prefix string, flag int) *log.Logger
+	NewRawLogger(prefix string, flag int) *log.Logger
 	NewStaticLevelLogger(prefix string, flag int, l wlog.Level) *log.Logger
 	NewStaticLevelWriter(l wlog.Level) io.Writer
 }
@@ -72,7 +73,9 @@ func (s *Service) Close() error {
 func (s *Service) NewLogger(prefix string, flag int) *log.Logger {
 	return wlog.New(s.f, prefix, flag)
 }
-
+func (s *Service) NewRawLogger(prefix string, flag int) *log.Logger {
+	return log.New(s.f, prefix, flag)
+}
 func (s *Service) NewStaticLevelLogger(prefix string, flag int, l wlog.Level) *log.Logger {
 	return log.New(wlog.NewStaticLevelWriter(s.f, l), prefix, flag)
 }

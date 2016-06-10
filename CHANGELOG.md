@@ -6,6 +6,8 @@
 
 ### Features
 
+- [#636](https://github.com/influxdata/kapacitor/pull/636): Change HTTP logs to be in Common Log format.
+
 ### Bugfixes
 
 - [#621](https://github.com/influxdata/kapacitor/pull/621): Fix obscure error about single vs double quotes.

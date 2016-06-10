@@ -205,7 +205,7 @@ func (s *Server) appendInfluxDBService(c []influxdb.Config, defaultInfluxDB, htt
 
 func (s *Server) initHTTPDService(c httpd.Config) {
 	l := s.LogService.NewLogger("[httpd] ", log.LstdFlags)
-	srv := httpd.NewService(c, l)
+	srv := httpd.NewService(c, l, s.LogService)
 
 	srv.Handler.MetaClient = s.MetaClient
 	srv.Handler.PointsWriter = s.TaskMaster
