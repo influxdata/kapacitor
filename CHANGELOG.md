@@ -12,7 +12,10 @@
 
 - [#621](https://github.com/influxdata/kapacitor/pull/621): Fix obscure error about single vs double quotes.
 - [#623](https://github.com/influxdata/kapacitor/pull/623): Fix issues with recording metadata missing data url.
-- [#631](https://github.com/influxdata/kapacitor/pull/631): Fix issues with using iterative lambda expressions in an EvalNode.
+- [#631](https://github.com/influxdata/kapacitor/issue/631): Fix issues with using iterative lambda expressions in an EvalNode.
+- [#628](https://github.com/influxdata/kapacitor/issue/628): BREAKING: Change `kapacitord config` to not search default location for configuration files but rather require the `-config` option.
+    Since the `kapacitord run` command behaves this way they should be consistent.
+    Fix issue with `kapacitord config > kapacitor.conf` when the output file was a default location for the config.
 
 
 ## v1.0.0-beta1 [2016-06-06]
