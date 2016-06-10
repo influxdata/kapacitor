@@ -902,12 +902,20 @@ func (ts *Service) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 	}
 	if original.ID != updated.ID {
 		// Task ID changed delete and re-create.
-		if err := ts.tasks.Delete(original.ID); err != nil {
-			ts.logger.Printf("E! failed to delete old task definition during ID change: old ID: %s new ID: %s, %s", original.ID, updated.ID, err.Error())
-		}
 		if err := ts.tasks.Create(updated); err != nil {
 			httpd.HttpError(w, fmt.Sprintf("failed to create new task during ID change: %s", err.Error()), true, http.StatusInternalServerError)
 			return
+		}
+		if err := ts.tasks.Delete(original.ID); err != nil {
+			ts.logger.Printf("E! failed to delete old task definition during ID change: old ID: %s new ID: %s, %s", original.ID, updated.ID, err.Error())
+		}
+		if original.Status == Enabled && updated.Status == Enabled {
+			// Stop task and start it under new name
+			ts.stopTask(original.ID)
+			if err := ts.startTask(updated); err != nil {
+				httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
+				return
+			}
 		}
 	} else {
 		if err := ts.tasks.Replace(updated); err != nil {
@@ -928,7 +936,7 @@ func (ts *Service) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 			}
 		case Disabled:
 			kapacitor.NumEnabledTasksVar.Add(-1)
-			ts.stopTask(updated.ID)
+			ts.stopTask(original.ID)
 		}
 	}
 
@@ -1641,10 +1649,10 @@ func (ts *Service) handleUpdateTemplate(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Update all associated tasks
-	err = ts.updateAllAssociatedTasks(original, updated)
+	// Get associated tasks
+	taskIds, err := ts.templates.ListAssociatedTasks(original.ID)
 	if err != nil {
-		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
+		httpd.HttpError(w, fmt.Sprintf("error getting associated tasks for template %s: %s", original.ID, err.Error()), true, http.StatusInternalServerError)
 		return
 	}
 
@@ -1653,12 +1661,12 @@ func (ts *Service) handleUpdateTemplate(w http.ResponseWriter, r *http.Request) 
 	updated.Modified = now
 
 	if original.ID != updated.ID {
-		if err := ts.templates.Delete(original.ID); err != nil {
-			ts.logger.Printf("E! failed to delete old template during ID change, old ID: %s new ID: %s, %s", original.ID, updated.ID, err.Error())
-		}
 		if err := ts.templates.Create(updated); err != nil {
 			httpd.HttpError(w, fmt.Sprintf("failed to create new template for ID change: %s", err.Error()), true, http.StatusInternalServerError)
 			return
+		}
+		if err := ts.templates.Delete(original.ID); err != nil {
+			ts.logger.Printf("E! failed to delete old template during ID change, old ID: %s new ID: %s, %s", original.ID, updated.ID, err.Error())
 		}
 	} else {
 		if err := ts.templates.Replace(updated); err != nil {
@@ -1667,23 +1675,27 @@ func (ts *Service) handleUpdateTemplate(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	// Update all associated tasks
+	err = ts.updateAllAssociatedTasks(original, updated, taskIds)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
+		return
+	}
+
 	// Return template definition
 	t, err := ts.convertTemplate(updated, "formatted")
 	if err != nil {
 		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
 		return
 	}
+
 	w.WriteHeader(http.StatusOK)
 	w.Write(httpd.MarshalJSON(t, true))
 }
 
 // Update all associated tasks. Return the first error if any.
 // Rollsback all updated tasks if an error occurs.
-func (ts *Service) updateAllAssociatedTasks(old, new Template) error {
-	taskIds, err := ts.templates.ListAssociatedTasks(old.ID)
-	if err != nil {
-		return errors.Wrapf(err, "error getting associated tasks for template %s", old.ID)
-	}
+func (ts *Service) updateAllAssociatedTasks(old, new Template, taskIds []string) error {
 	var i int
 	// Setup rollback function
 	defer func() {
