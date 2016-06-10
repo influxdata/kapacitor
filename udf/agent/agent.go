@@ -92,7 +92,7 @@ func (a *Agent) Start() error {
 		if err != nil {
 			a.outResponses <- &udf.Response{
 				Message: &udf.Response_Error{
-					Error: &udf.ErrorResponse{err.Error()},
+					Error: &udf.ErrorResponse{Error: err.Error()},
 				},
 			}
 		}
@@ -103,7 +103,10 @@ func (a *Agent) Start() error {
 	}()
 
 	a.outGroup.Add(1)
-	go a.forwardResponses()
+	go func() {
+		defer a.outGroup.Done()
+		a.forwardResponses()
+	}()
 
 	return nil
 }
@@ -229,7 +232,6 @@ func (a *Agent) writeLoop() error {
 }
 
 func (a *Agent) forwardResponses() {
-	defer a.outGroup.Done()
 	for r := range a.responses {
 		a.outResponses <- r
 	}
