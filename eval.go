@@ -22,6 +22,7 @@ type EvalNode struct {
 	e                  *pipeline.EvalNode
 	expressions        []stateful.Expression
 	expressionsByGroup map[models.GroupID][]stateful.Expression
+	refVarList         [][]string
 	scopePool          stateful.ScopePool
 
 	evalErrors *expvar.Int
@@ -39,6 +40,7 @@ func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalN
 	}
 	// Create stateful expressions
 	en.expressions = make([]stateful.Expression, len(n.Lambdas))
+	en.refVarList = make([][]string, len(n.Lambdas))
 	expressions := make([]ast.Node, len(n.Lambdas))
 	for i, lambda := range n.Lambdas {
 		expressions[i] = lambda.Expression
@@ -47,9 +49,12 @@ func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalN
 			return nil, fmt.Errorf("Failed to compile %v expression: %v", i, err)
 		}
 		en.expressions[i] = statefulExpr
+		refVars := stateful.FindReferenceVariables(lambda.Expression)
+		en.refVarList[i] = refVars
 	}
-
+	// Create a single pool for the combination of all expressions
 	en.scopePool = stateful.NewScopePool(stateful.FindReferenceVariables(expressions...))
+
 	en.node.runF = en.runEval
 	return en, nil
 }
@@ -113,10 +118,6 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 func (e *EvalNode) eval(now time.Time, group models.GroupID, fields models.Fields, tags map[string]string) (models.Fields, error) {
 	vars := e.scopePool.Get()
 	defer e.scopePool.Put(vars)
-	err := fillScope(vars, e.scopePool.ReferenceVariables(), now, fields, tags)
-	if err != nil {
-		return nil, err
-	}
 	expressions, ok := e.expressionsByGroup[group]
 	if !ok {
 		expressions = make([]stateful.Expression, len(e.expressions))
@@ -126,6 +127,10 @@ func (e *EvalNode) eval(now time.Time, group models.GroupID, fields models.Field
 		e.expressionsByGroup[group] = expressions
 	}
 	for i, expr := range expressions {
+		err := fillScope(vars, e.refVarList[i], now, fields, tags)
+		if err != nil {
+			return nil, err
+		}
 		v, err := expr.Eval(vars)
 		if err != nil {
 			return nil, err

@@ -49,7 +49,9 @@ func fillScope(vars *stateful.Scope, referenceVariables []string, now time.Time,
 			vars.Set(refVariableName, tagValue)
 		}
 		if !isFieldExists && !isTagExists {
-			return fmt.Errorf("no field or tag exists for %s", refVariableName)
+			if !vars.Has(refVariableName) {
+				return fmt.Errorf("no field or tag exists for %s", refVariableName)
+			}
 		}
 	}
 
