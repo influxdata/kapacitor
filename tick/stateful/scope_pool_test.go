@@ -11,23 +11,34 @@ import (
 func TestScopePool_Sanity(t *testing.T) {
 	n := stateful.NewScopePool([]string{"value"})
 
-	// first
 	scope := n.Get()
 
-	_, existsErr := scope.Get("value")
-
-	if existsErr != nil {
-		t.Errorf("First: Expected \"value\" to exist in the scope, but go an error: %v", existsErr)
+	if scope.Has("value") {
+		t.Errorf("First: expected scope to not have a value set")
+	}
+	value := 42
+	scope.Set("value", value)
+	if !scope.Has("value") {
+		t.Errorf("First: expected scope to have a value set")
+	}
+	if v, err := scope.Get("value"); err != nil || v != value {
+		t.Errorf("First: unexpected scope value got %v exp %v", v, value)
 	}
 
-	// second, after put
 	n.Put(scope)
 
+	// Scope should be empty now
 	scope = n.Get()
-	_, existsErr = scope.Get("value")
-
-	if existsErr != nil {
-		t.Errorf("Second: Expected \"value\" to exist in the scope, but go an error: %v", existsErr)
+	if scope.Has("value") {
+		t.Errorf("Second: expected scope to not have a value set")
+	}
+	value = 24
+	scope.Set("value", value)
+	if !scope.Has("value") {
+		t.Errorf("Second: expected scope to have a value set")
+	}
+	if v, err := scope.Get("value"); err != nil || v != value {
+		t.Errorf("Second: unexpected scope value got %v exp %v", v, value)
 	}
 }
 

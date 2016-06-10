@@ -598,7 +598,7 @@ stream
 	testStreamerWithOutput(t, "TestStream_SimpleMR", script, 15*time.Second, er, nil, false)
 }
 
-func TestStream_EvalAllTypes(t *testing.T) {
+func TestStream_Eval_AllTypes(t *testing.T) {
 	var script = `
 stream
 	|from()
@@ -625,6 +625,93 @@ stream
 	}
 
 	testStreamerWithOutput(t, "TestStream_EvalAllTypes", script, 2*time.Second, er, nil, false)
+}
+
+func TestStream_Eval_KeepAll(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('types')
+	|eval(lambda: "value0" + "value1", lambda: "value0" - "value1")
+		.as( 'pos', 'neg')
+		.keep()
+	|httpOut('TestStream_Eval_Keep')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "types",
+				Tags:    nil,
+				Columns: []string{"time", "neg", "pos", "value0", "value1"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					-1.0,
+					1.0,
+					0.0,
+					1.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Eval_Keep", script, 2*time.Second, er, nil, false)
+}
+
+func TestStream_Eval_KeepSome(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('types')
+	|eval(lambda: "value0" + "value1", lambda: "value0" - "value1")
+		.as( 'pos', 'neg')
+		.keep('value0', 'pos', 'neg')
+	|httpOut('TestStream_Eval_Keep')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "types",
+				Tags:    nil,
+				Columns: []string{"time", "neg", "pos", "value0"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					-1.0,
+					1.0,
+					0.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Eval_Keep", script, 2*time.Second, er, nil, false)
+}
+
+func TestStream_Eval_KeepSomeWithHidden(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('types')
+	|eval(lambda: "value0" + "value1", lambda: "pos" - "value1")
+		.as( 'pos', 'zero')
+		.keep('value0', 'zero')
+	|httpOut('TestStream_Eval_Keep')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "types",
+				Tags:    nil,
+				Columns: []string{"time", "value0", "zero"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					0.0,
+					0.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Eval_Keep", script, 2*time.Second, er, nil, false)
 }
 
 func TestStream_EvalGroups(t *testing.T) {
