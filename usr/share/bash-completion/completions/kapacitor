@@ -72,7 +72,7 @@ _kapacitor()
             else
                 case "$prev" in
                     -tick)
-                        COMPREPLY=($(compgen -o filenames -A file -X '!*.tick' -- "$cur"))
+			_kapacitor_tick_files "${cur}"
                         ;;
                     -type)
                         words='batch stream'
