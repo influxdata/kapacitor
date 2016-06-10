@@ -16,6 +16,7 @@
 - [#628](https://github.com/influxdata/kapacitor/issue/628): BREAKING: Change `kapacitord config` to not search default location for configuration files but rather require the `-config` option.
     Since the `kapacitord run` command behaves this way they should be consistent.
     Fix issue with `kapacitord config > kapacitor.conf` when the output file was a default location for the config.
+- [#626](https://github.com/influxdata/kapacitor/issue/626): Fix issues when changing the ID of an enabled task.
 
 
 ## v1.0.0-beta1 [2016-06-06]
