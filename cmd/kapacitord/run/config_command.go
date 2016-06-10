@@ -37,8 +37,7 @@ func (cmd *PrintConfigCommand) Run(args ...string) error {
 	}
 
 	// Parse config from path.
-	opt := Options{ConfigPath: *configPath}
-	config, err := cmd.parseConfig(opt.GetConfigPath())
+	config, err := cmd.parseConfig(*configPath)
 	if err != nil {
 		return fmt.Errorf("parse config: %s", err)
 	}
