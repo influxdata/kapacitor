@@ -1171,6 +1171,16 @@ func (r *Service) doReplay(id string, task *kapacitor.Task, runReplay func(tm *k
 	if err != nil {
 		return errors.Wrap(err, "task start")
 	}
+
+	// This will force the task to stop or do nothing if it already stopped.
+	defer func() {
+		for _, b := range tm.BatchCollectors(task.ID) {
+			b.Close()
+		}
+		tm.StopTasks()
+	}()
+
+	// Run the replay
 	err = runReplay(tm)
 	if err != nil {
 		return errors.Wrap(err, "running replay")
