@@ -22,6 +22,7 @@ import (
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/influxdb"
+	"github.com/influxdata/kapacitor/services/jira"
 	"github.com/influxdata/kapacitor/services/logging"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
@@ -144,6 +145,7 @@ func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*
 	s.appendOpsGenieService(c.OpsGenie)
 	s.appendVictorOpsService(c.VictorOps)
 	s.appendPagerDutyService(c.PagerDuty)
+	s.appendJiraService(c.Jira)
 	s.appendHipChatService(c.HipChat)
 	s.appendAlertaService(c.Alerta)
 	s.appendSlackService(c.Slack)
@@ -290,6 +292,16 @@ func (s *Server) appendPagerDutyService(c pagerduty.Config) {
 		srv := pagerduty.NewService(c, l)
 		srv.HTTPDService = s.HTTPDService
 		s.TaskMaster.PagerDutyService = srv
+
+		s.Services = append(s.Services, srv)
+	}
+}
+
+func (s *Server) appendJiraService(c jira.Config) {
+	if c.Enabled {
+		l := s.LogService.NewLogger("[jira] ", log.LstdFlags)
+		srv := jira.NewService(c, l)
+		s.TaskMaster.JiraService = srv
 
 		s.Services = append(s.Services, srv)
 	}

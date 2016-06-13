@@ -293,6 +293,10 @@ type AlertNode struct {
 	// Send alert to Talk.
 	// tick:ignore
 	TalkHandlers []*TalkHandler `tick:"Talk"`
+
+	// Send alert to Jira.
+	// tick:ignore
+	JiraHandlers []*JiraHandler `tick:"Jira"`
 }
 
 func newAlertNode(wants EdgeType) *AlertNode {
@@ -731,6 +735,65 @@ type HipChatHandler struct {
 	// HipChat authentication token.
 	// If empty uses the token from the configuration.
 	Token string
+}
+
+// Send the alert to JIRA.
+//
+// Example:
+//    [jira]
+//      enabled = true
+//      url = ""
+//      username = ""
+//      password = ""
+//      project = ""
+//      issue_type = ""
+//      priority_warn = ""
+//      priority_crit = ""
+//      global = false
+//
+// Example:
+//    stream
+//         |alert()
+//             .jira()
+//
+//
+// If the 'jira' section in the configuration has the option: global = true
+// then all alerts are sent to JIRA without the need to explicitly state it
+// in the TICKscript.
+//
+// Example:
+//    [jira]
+//      enabled = true
+//      url = "https://your.jira.host"
+//      username = "test-username"
+//      password = "test-password"
+//      project = "TEST"
+//      issue_type = "Bug"
+//      priority_warn = "Normal"
+//      priority_crit = "Urgent"
+//      global = true
+//
+// Example:
+//    stream
+//         |alert()
+//             .jira()
+//
+// Send alert to JIRA using project 'TEST'.
+// tick:property
+
+func (a *AlertNode) Jira() *JiraHandler {
+	jira := &JiraHandler{
+		AlertNode: a,
+	}
+	a.JiraHandlers = append(a.JiraHandlers, jira)
+	return jira
+}
+
+// tick:embedded:AlertNode.Jira
+type JiraHandler struct {
+	*AlertNode
+
+	Project string
 }
 
 // Send the alert to Alerta.

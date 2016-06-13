@@ -213,6 +213,14 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		an.handlers = append(an.handlers, func(ad *AlertData) { an.handlePagerDuty(&pipeline.PagerDutyHandler{}, ad) })
 	}
 
+	for _, jira := range n.JiraHandlers {
+		jira := jira
+		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleJira(jira, ad) })
+	}
+	if len(n.JiraHandlers) == 0 && (et.tm.JiraService != nil && et.tm.JiraService.Global()) {
+		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleJira(&pipeline.JiraHandler{}, ad) })
+	}
+
 	for _, sensu := range n.SensuHandlers {
 		sensu := sensu
 		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleSensu(sensu, ad) })
@@ -912,6 +920,23 @@ func (a *AlertNode) handlePagerDuty(pd *pipeline.PagerDutyHandler, ad *AlertData
 	)
 	if err != nil {
 		a.logger.Println("E! failed to send alert data to PagerDuty:", err)
+		return
+	}
+}
+
+func (a *AlertNode) handleJira(jira *pipeline.JiraHandler, ad *AlertData) {
+	if a.et.tm.JiraService == nil {
+		a.logger.Println("E! failed to send JIRA alert. JIRA is not enabled")
+		return
+	}
+	err := a.et.tm.JiraService.Alert(
+		ad.ID,
+		ad.Message,
+		ad.Level,
+		ad.Data,
+	)
+	if err != nil {
+		a.logger.Println("E! failed to send alert data to JIRA:", err)
 		return
 	}
 }
