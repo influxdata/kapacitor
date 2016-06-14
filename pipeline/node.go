@@ -239,7 +239,7 @@ const intervalMarker = "INTERVAL"
 // Example:
 //    var data = stream
 //        |from()...
-//    // Trigger critical alert if the throughput drops below 100 points per 1s and checked every 10s.
+//    // Trigger critical alert if the throughput drops below 100 points per 10s and checked every 10s.
 //    data
 //        |deadman(100.0, 10s)
 //            .slack()
