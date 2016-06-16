@@ -753,9 +753,9 @@ type HipChatHandler struct {
 //      username = ""
 //      password = ""
 //      project = ""
-//      issue_type = ""
-//      priority_warn = ""
-//      priority_crit = ""
+//      issue-type = ""
+//      priority-warn = ""
+//      priority-crit = ""
 //      global = false
 //
 // Example:
@@ -775,9 +775,9 @@ type HipChatHandler struct {
 //      username = "test-username"
 //      password = "test-password"
 //      project = "TEST"
-//      issue_type = "Bug"
-//      priority_warn = "Normal"
-//      priority_crit = "Urgent"
+//      issue-type = "Bug"
+//      priority-warn = "Normal"
+//      priority-crit = "Urgent"
 //      global = true
 //
 // Example:
@@ -792,9 +792,9 @@ type HipChatHandler struct {
 //         |alert()
 //             .jira()
 //             .project('TEST2')
-//             .issue_type('Bug2')
-//             .priority_warn('Normal2')
-//             .priority_crit('Urgent2')
+//             .issueType('Bug2')
+//             .priorityWarn('Normal2')
+//             .priorityCrit('Urgent2')
 //
 // Send alerts to JIRA where:
 //  - project: 'TEST2'
@@ -821,15 +821,15 @@ type JiraHandler struct {
 
 	// JIRA issue type in which to post messages.
 	// If empty uses the issue type from the configuration.
-	Issue_type string
+	IssueType string
 
 	// JIRA warning priority in which to post messages.
 	// If empty uses the warning priority from the configuration.
-	Priority_warn string
+	PriorityWarn string
 
 	// JIRA critical priority in which to post messages.
 	// If empty uses the critical priority from the configuration.
-	Priority_crit string
+	PriorityCrit string
 }
 
 // Send the alert to Alerta.

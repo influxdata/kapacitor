@@ -931,9 +931,9 @@ func (a *AlertNode) handleJira(jira *pipeline.JiraHandler, ad *AlertData) {
 	}
 	err := a.et.tm.JiraService.Alert(
 		jira.Project,
-		jira.Issue_type,
-		jira.Priority_warn,
-		jira.Priority_crit,
+		jira.IssueType,
+		jira.PriorityWarn,
+		jira.PriorityCrit,
 		ad.ID,
 		ad.Message,
 		ad.Level,

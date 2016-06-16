@@ -4206,7 +4206,7 @@ func TestStream_AlertJira(t *testing.T) {
 		atomic.AddInt32(&requestCount, 1)
 		type postData struct {
 			Fields struct {
-				Issuetype struct {
+				IssueType struct {
 					Name string `json:"name"`
 				} `json:"issuetype"`
 				Project struct {
@@ -4226,24 +4226,24 @@ func TestStream_AlertJira(t *testing.T) {
 			if exp, got := "/rest/api/2/issue", r.URL.String(); got != exp {
 				t.Errorf("unexpected JIRA REST API url got %s exp %s", got, exp)
 			}
-			if exp := "priority_crit"; jr.Fields.Priority.Name != exp {
+			if exp := "priority-crit"; jr.Fields.Priority.Name != exp {
 				t.Errorf("unexpected Priority got %s exp %s", jr.Fields.Priority.Name, exp)
 			}
 			if exp := "project"; jr.Fields.Project.Key != exp {
 				t.Errorf("unexpected project name got %s exp %s", jr.Fields.Project.Key, exp)
 			}
-			if exp := "issue_type"; jr.Fields.Issuetype.Name != exp {
-				t.Errorf("unexpected issue type got %s exp %s", jr.Fields.Issuetype.Name, exp)
+			if exp := "issue-type"; jr.Fields.IssueType.Name != exp {
+				t.Errorf("unexpected issue type got %s exp %s", jr.Fields.IssueType.Name, exp)
 			}
 		} else if rc := atomic.LoadInt32(&requestCount); rc == 2 {
-			if exp := "priority_crit2"; jr.Fields.Priority.Name != exp {
+			if exp := "priority-crit2"; jr.Fields.Priority.Name != exp {
 				t.Errorf("unexpected Priority got %s exp %s", jr.Fields.Priority.Name, exp)
 			}
 			if exp := "project2"; jr.Fields.Project.Key != exp {
 				t.Errorf("unexpected project name got %s exp %s", jr.Fields.Project.Key, exp)
 			}
-			if exp := "issue_type2"; jr.Fields.Issuetype.Name != exp {
-				t.Errorf("unexpected issue type got %s exp %s", jr.Fields.Issuetype.Name, exp)
+			if exp := "issue-type2"; jr.Fields.IssueType.Name != exp {
+				t.Errorf("unexpected issue type got %s exp %s", jr.Fields.IssueType.Name, exp)
 			}
 		}
 		if exp := "[kapacitor] - kapacitor/cpu/serverA"; jr.Fields.Summary != exp {
@@ -4275,11 +4275,11 @@ stream
 		.warn(lambda: "count" > 7.0)
 		.crit(lambda: "count" > 8.0)
 		.jira()
-    .jira()
-      .project('project2')
-      .issue_type('issue_type2')
-      .priority_warn('priority_warn2')
-      .priority_crit('priority_crit2')
+		.jira()
+			.project('project2')
+			.issueType('issue-type2')
+			.priorityWarn('priority-warn2')
+			.priorityCrit('priority-crit2')
 `
 
 	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
@@ -4290,9 +4290,9 @@ stream
 	c.Username = "username"
 	c.Password = "password"
 	c.Project = "project"
-	c.Issue_type = "issue_type"
-	c.Priority_warn = "priority_warn"
-	c.Priority_crit = "priority_crit"
+	c.IssueType = "issue-type"
+	c.PriorityWarn = "priority-warn"
+	c.PriorityCrit = "priority-crit"
 	jr := jira.NewService(c, logService.NewLogger("[test_jira] ", log.LstdFlags))
 	tm.JiraService = jr
 

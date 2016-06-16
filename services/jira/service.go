@@ -12,28 +12,28 @@ import (
 )
 
 type Service struct {
-	url           string
-	username      string
-	password      string
-	project       string
-	issue_type    string
-	priority_warn string
-	priority_crit string
-	global        bool
-	logger        *log.Logger
+	url          string
+	username     string
+	password     string
+	project      string
+	issueType    string
+	priorityWarn string
+	priorityCrit string
+	global       bool
+	logger       *log.Logger
 }
 
 func NewService(c Config, l *log.Logger) *Service {
 	return &Service{
-		url:           c.URL,
-		username:      c.Username,
-		password:      c.Password,
-		project:       c.Project,
-		issue_type:    c.Issue_type,
-		priority_warn: c.Priority_warn,
-		priority_crit: c.Priority_crit,
-		global:        c.Global,
-		logger:        l,
+		url:          c.URL,
+		username:     c.Username,
+		password:     c.Password,
+		project:      c.Project,
+		issueType:    c.IssueType,
+		priorityWarn: c.PriorityWarn,
+		priorityCrit: c.PriorityCrit,
+		global:       c.Global,
+		logger:       l,
 	}
 }
 
@@ -49,36 +49,36 @@ func (s *Service) Global() bool {
 	return s.global
 }
 
-func (s *Service) Alert(project, issue_type, priority_warn, priority_crit, entityID, message string, level kapacitor.AlertLevel, details interface{}) error {
+func (s *Service) Alert(project, issueType, priorityWarn, priorityCrit, entityID, message string, level kapacitor.AlertLevel, details interface{}) error {
 	var priority string
 	switch level {
 	case kapacitor.WarnAlert:
-		priority = priority_warn
+		priority = priorityWarn
 		if priority == "" {
-			priority = s.priority_warn
+			priority = s.priorityWarn
 		}
 	case kapacitor.CritAlert:
-		priority = priority_crit
+		priority = priorityCrit
 		if priority == "" {
-			priority = s.priority_crit
+			priority = s.priorityCrit
 		}
 	case kapacitor.InfoAlert:
 		return fmt.Errorf("AlertLevel 'info' is currently ignored by the JIRA service")
 	default:
-		priority = s.priority_warn
+		priority = s.priorityWarn
 	}
 	if project == "" {
 		project = s.project
 	}
-	if issue_type == "" {
-		issue_type = s.issue_type
+	if issueType == "" {
+		issueType = s.issueType
 	}
 
 	postData := make(map[string]interface{})
 	postIssueFields := make(map[string]interface{})
 
 	postIssueType := make(map[string]interface{})
-	postIssueType["name"] = issue_type
+	postIssueType["name"] = issueType
 
 	postProject := make(map[string]interface{})
 	postProject["key"] = project

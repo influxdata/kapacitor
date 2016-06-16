@@ -12,11 +12,11 @@ type Config struct {
 	// JIRA project
 	Project string `toml:"project"`
 	// Issue type
-	Issue_type string `toml:"issue_type"`
+	IssueType string `toml:"issue-type"`
 	// Warning level priority
-	Priority_warn string `toml:"priority_warn"`
+	PriorityWarn string `toml:"priority-warn"`
 	// Critical level priority
-	Priority_crit string `toml:"priority_crit"`
+	PriorityCrit string `toml:"priority-crit"`
 	// Whether every alert should automatically go to JIRA
 	Global bool `toml:"global"`
 }
