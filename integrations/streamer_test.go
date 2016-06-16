@@ -26,6 +26,7 @@ import (
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
+	"github.com/influxdata/kapacitor/services/jira"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/sensu"
@@ -4188,6 +4189,112 @@ stream
 	pd := pagerduty.NewService(c, logService.NewLogger("[test_pd] ", log.LstdFlags))
 	pd.HTTPDService = tm.HTTPDService
 	tm.PagerDutyService = pd
+
+	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if rc := atomic.LoadInt32(&requestCount); rc != 2 {
+		t.Errorf("unexpected requestCount got %d exp 1", rc)
+	}
+}
+
+func TestStream_AlertJira(t *testing.T) {
+	requestCount := int32(0)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&requestCount, 1)
+		type postData struct {
+			Fields struct {
+				Issuetype struct {
+					Name string `json:"name"`
+				} `json:"issuetype"`
+				Project struct {
+					Key string `json:"key"`
+				} `json:"project"`
+				Priority struct {
+					Name string `json:"name"`
+				} `json:"priority"`
+				Summary     string `json:"summary"`
+				Description string `json:"description"`
+			} `json:"fields"`
+		}
+		jr := postData{}
+		dec := json.NewDecoder(r.Body)
+		dec.Decode(&jr)
+		if rc := atomic.LoadInt32(&requestCount); rc == 1 {
+			if exp, got := "/rest/api/2/issue", r.URL.String(); got != exp {
+				t.Errorf("unexpected JIRA REST API url got %s exp %s", got, exp)
+			}
+			if exp := "priority_crit"; jr.Fields.Priority.Name != exp {
+				t.Errorf("unexpected Priority got %s exp %s", jr.Fields.Priority.Name, exp)
+			}
+			if exp := "project"; jr.Fields.Project.Key != exp {
+				t.Errorf("unexpected project name got %s exp %s", jr.Fields.Project.Key, exp)
+			}
+			if exp := "issue_type"; jr.Fields.Issuetype.Name != exp {
+				t.Errorf("unexpected issue type got %s exp %s", jr.Fields.Issuetype.Name, exp)
+			}
+		} else if rc := atomic.LoadInt32(&requestCount); rc == 2 {
+			if exp := "priority_crit2"; jr.Fields.Priority.Name != exp {
+				t.Errorf("unexpected Priority got %s exp %s", jr.Fields.Priority.Name, exp)
+			}
+			if exp := "project2"; jr.Fields.Project.Key != exp {
+				t.Errorf("unexpected project name got %s exp %s", jr.Fields.Project.Key, exp)
+			}
+			if exp := "issue_type2"; jr.Fields.Issuetype.Name != exp {
+				t.Errorf("unexpected issue type got %s exp %s", jr.Fields.Issuetype.Name, exp)
+			}
+		}
+		if exp := "[kapacitor] - kapacitor/cpu/serverA"; jr.Fields.Summary != exp {
+			t.Errorf("unexpected summary type got %s exp %s", jr.Fields.Summary, exp)
+		}
+		if len(jr.Fields.Description) == 0 {
+			t.Error("unexpected description type got empty string")
+		}
+		if len(r.URL.String()) == 0 {
+			t.Errorf("unexpected JIRA REST API url got empty string")
+		}
+	}))
+	defer ts.Close()
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.message('{{ .Level }} alert for {{ .ID }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.jira()
+    .jira()
+      .project('project2')
+      .issue_type('issue_type2')
+      .priority_warn('priority_warn2')
+      .priority_crit('priority_crit2')
+`
+
+	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
+	defer tm.Close()
+
+	c := jira.NewConfig()
+	c.URL = ts.URL
+	c.Username = "username"
+	c.Password = "password"
+	c.Project = "project"
+	c.Issue_type = "issue_type"
+	c.Priority_warn = "priority_warn"
+	c.Priority_crit = "priority_crit"
+	jr := jira.NewService(c, logService.NewLogger("[test_jira] ", log.LstdFlags))
+	tm.JiraService = jr
 
 	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
 	if err != nil {

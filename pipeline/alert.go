@@ -28,7 +28,7 @@ const defaultLogFileMode = 0600
 // See AlertNode.Info, AlertNode.Warn, and AlertNode.Crit below.
 //
 // Different event handlers can be configured for each AlertNode.
-// Some handlers like Email, HipChat, Sensu, Slack, OpsGenie, VictorOps, PagerDuty and Talk have a configuration
+// Some handlers like Email, HipChat, Sensu, Slack, OpsGenie, VictorOps, Jira, PagerDuty and Talk have a configuration
 // option 'global' that indicates that all alerts implicitly use the handler.
 //
 // Available event handlers:
@@ -45,6 +45,7 @@ const defaultLogFileMode = 0600
 //    * VictorOps -- Send alert to VictorOps.
 //    * PagerDuty -- Send alert to PagerDuty.
 //    * Talk -- Post alert message to Talk client.
+//    * Jira -- Post alert message to JIRA.
 //
 // See below for more details on configuring each handler.
 //
@@ -739,6 +740,12 @@ type HipChatHandler struct {
 
 // Send the alert to JIRA.
 //
+// By default JIRA should accept API calls without any additional modifications
+// or settings.
+//
+// More information about JIRA REST API you can find in official documentation
+// https://docs.atlassian.com/jira/REST/latest/
+//
 // Example:
 //    [jira]
 //      enabled = true
@@ -778,9 +785,24 @@ type HipChatHandler struct {
 //         |alert()
 //             .jira()
 //
-// Send alert to JIRA using project 'TEST'.
-// tick:property
+// Send alerts to JIRA project in the configuration file.
+//
+// Example:
+//    stream
+//         |alert()
+//             .jira()
+//             .project('TEST2')
+//             .issue_type('Bug2')
+//             .priority_warn('Normal2')
+//             .priority_crit('Urgent2')
+//
+// Send alerts to JIRA where:
+//  - project: 'TEST2'
+//  - issue type: 'Bug2'
+//  - warning priority: 'Normal2'
+//  - critical priority: 'Urgent2'
 
+// tick:property
 func (a *AlertNode) Jira() *JiraHandler {
 	jira := &JiraHandler{
 		AlertNode: a,
@@ -793,7 +815,21 @@ func (a *AlertNode) Jira() *JiraHandler {
 type JiraHandler struct {
 	*AlertNode
 
+	// JIRA project in which to post messages.
+	// If empty uses the project from the configuration.
 	Project string
+
+	// JIRA issue type in which to post messages.
+	// If empty uses the issue type from the configuration.
+	Issue_type string
+
+	// JIRA warning priority in which to post messages.
+	// If empty uses the warning priority from the configuration.
+	Priority_warn string
+
+	// JIRA critical priority in which to post messages.
+	// If empty uses the critical priority from the configuration.
+	Priority_crit string
 }
 
 // Send the alert to Alerta.
