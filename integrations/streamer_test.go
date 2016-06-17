@@ -4543,12 +4543,51 @@ stream
 		done <- err
 	}))
 
-	clock, et, replayErr, tm := testStreamer(t, "TestStream_InfluxDBOut", script, nil)
+	name := "TestStream_InfluxDBOut"
+
+	// Create a new execution env
+	tm := kapacitor.NewTaskMaster("testStreamer", logService)
+	tm.HTTPDService = httpService
+	tm.TaskStore = taskStore{}
+	tm.DeadmanService = deadman{}
 	tm.InfluxDBService = influxdb
+	tm.Open()
+
+	//Create the task
+	task, err := tm.NewTask(name, script, kapacitor.StreamTask, dbrps, 0, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Load test data
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.Open(path.Join(dir, "data", name+".srpl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	//Start the task
+	et, err := tm.StartTask(task)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Replay test data to executor
+	stream, err := tm.Stream(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Use 1971 so that we don't get true negatives on Epoch 0 collisions
+	c := clock.New(time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC))
+
+	replayErr := kapacitor.ReplayStreamFromIO(c, data, stream, false, "s")
+
+	t.Log(string(et.Task.Dot()))
 	defer tm.Close()
 
-	err := fastForwardTask(clock, et, replayErr, tm, 15*time.Second)
-	if err != nil {
+	if err := fastForwardTask(c, et, replayErr, tm, 15*time.Second); err != nil {
 		t.Error(err)
 	}
 

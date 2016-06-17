@@ -401,8 +401,11 @@ func (tm *TaskMaster) StopTask(id string) error {
 func (tm *TaskMaster) stopTask(id string) (err error) {
 	if et, ok := tm.tasks[id]; ok {
 		delete(tm.tasks, id)
-		if et.Task.Type == StreamTask {
+		switch et.Task.Type {
+		case StreamTask:
 			tm.delFork(id)
+		case BatchTask:
+			delete(tm.batches, id)
 		}
 		err = et.stop()
 		if err != nil {
