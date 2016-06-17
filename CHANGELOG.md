@@ -1,13 +1,13 @@
 # Changelog
 
-## v1.0.0-beta2 [unreleased]
+## v1.0.0-beta2 [2016-06-17]
 
 ### Release Notes
 
 ### Features
 
 - [#636](https://github.com/influxdata/kapacitor/pull/636): Change HTTP logs to be in Common Log format.
-- [#](https://github.com/influxdata/kapacitor/pull/): Add optional replay ID to the task API so that you can get information about a task inside a running replay.
+- [#652](https://github.com/influxdata/kapacitor/pull/652): Add optional replay ID to the task API so that you can get information about a task inside a running replay.
 
 ### Bugfixes
 
