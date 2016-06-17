@@ -19,6 +19,9 @@
 - [#626](https://github.com/influxdata/kapacitor/issue/626): Fix issues when changing the ID of an enabled task.
 - [#624](https://github.com/influxdata/kapacitor/pull/624): Fix issues where you could get a read error on a closed UDF socket.
 - [#651](https://github.com/influxdata/kapacitor/pull/651): Fix issues where an error during a batch replay would hang because the task wouldn't stop.
+- [#650](https://github.com/influxdata/kapacitor/pull/650): BREAKING: The default retention policy name was changed to `autogen` in InfluxDB.
+    This changes Kapacitor to use `autogen` for the default retention policy for the stats.
+    You may need to update your task DBRPs to use `autogen` instead of `default`.
 
 
 ## v1.0.0-beta1 [2016-06-06]
