@@ -256,6 +256,7 @@ To get information about a task make a GET request to the `/kapacitor/v1/tasks/T
 | --------------- | -------    | -------                                                                                                                          |
 | dot-view        | attributes | One of `labels` or `attributes`. Labels is less readable but will correctly render with all the information contained in labels. |
 | script-format   | formatted  | One of `formatted` or `raw`. Raw will return the script identical to how it was defined. Formatted will first format the script. |
+| replay-id       |            | Optional ID of a running replay. The returned task information will be in the context of the task for the running replay.        |
 
 
 A task has these read only properties in addition to the properties listed [above](#define-task).

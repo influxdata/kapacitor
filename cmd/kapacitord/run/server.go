@@ -61,7 +61,8 @@ type Server struct {
 
 	err chan error
 
-	TaskMaster *kapacitor.TaskMaster
+	TaskMaster       *kapacitor.TaskMaster
+	TaskMasterLookup *kapacitor.TaskMasterLookup
 
 	LogService      logging.Interface
 	HTTPDService    *httpd.Service
@@ -118,7 +119,9 @@ func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*
 	s.Logger.Printf("I! ClusterID: %s ServerID: %s", s.ClusterID, s.ServerID)
 
 	// Start Task Master
-	s.TaskMaster = kapacitor.NewTaskMaster("main", logService)
+	s.TaskMasterLookup = kapacitor.NewTaskMasterLookup()
+	s.TaskMaster = kapacitor.NewTaskMaster(kapacitor.MainTaskMaster, logService)
+	s.TaskMasterLookup.Set(s.TaskMaster)
 	if err := s.TaskMaster.Open(); err != nil {
 		return nil, err
 	}
@@ -224,7 +227,7 @@ func (s *Server) appendTaskStoreService(c task_store.Config) {
 	srv := task_store.NewService(c, l)
 	srv.StorageService = s.StorageService
 	srv.HTTPDService = s.HTTPDService
-	srv.TaskMaster = s.TaskMaster
+	srv.TaskMasterLookup = s.TaskMasterLookup
 
 	s.TaskStore = srv
 	s.TaskMaster.TaskStore = srv
@@ -239,6 +242,7 @@ func (s *Server) appendReplayService(c replay.Config) {
 	srv.HTTPDService = s.HTTPDService
 	srv.InfluxDBService = s.InfluxDBService
 	srv.TaskMaster = s.TaskMaster
+	srv.TaskMasterLookup = s.TaskMasterLookup
 
 	s.ReplayService = srv
 	s.Services = append(s.Services, srv)
