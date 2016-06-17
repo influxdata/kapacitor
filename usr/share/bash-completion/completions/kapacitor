@@ -123,7 +123,18 @@ _kapacitor()
                     ;;
             esac
             ;;
-        enable|disable|reload|show)
+        show)
+            case "$prev" in
+                -replay)
+                    words=$(_kapacitor_list replays "$cur")
+                    ;;
+                *)
+                    words=$(_kapacitor_list tasks "$cur")
+                    words+=' -replay'
+                    ;;
+            esac
+            ;;
+        enable|disable|reload)
             words=$(_kapacitor_list tasks "$cur")
             ;;
         delete|list)

@@ -693,6 +693,7 @@ func (c *Client) UpdateTask(link Link, opt UpdateTaskOptions) (Task, error) {
 type TaskOptions struct {
 	DotView      string
 	ScriptFormat string
+	ReplayID     string
 }
 
 func (o *TaskOptions) Default() {
@@ -708,6 +709,7 @@ func (o *TaskOptions) Values() *url.Values {
 	v := &url.Values{}
 	v.Set("dot-view", o.DotView)
 	v.Set("script-format", o.ScriptFormat)
+	v.Set("replay-id", o.ReplayID)
 	return v
 }
 

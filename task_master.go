@@ -21,6 +21,7 @@ import (
 
 const (
 	statPointsReceived = "points_received"
+	MainTaskMaster     = "main"
 )
 
 type LogService interface {
@@ -38,8 +39,8 @@ var ErrTaskMasterOpen = errors.New("TaskMaster is open")
 
 // An execution framework for  a set of tasks.
 type TaskMaster struct {
-	// Unique name for this task master instance
-	name string
+	// Unique id for this task master instance
+	id string
 
 	HTTPDService interface {
 		AddRoutes([]httpd.Route) error
@@ -147,24 +148,24 @@ type forkKey struct {
 }
 
 // Create a new Executor with a given clock.
-func NewTaskMaster(name string, l LogService) *TaskMaster {
+func NewTaskMaster(id string, l LogService) *TaskMaster {
 	return &TaskMaster{
-		name:           name,
+		id:             id,
 		forks:          make(map[forkKey]map[string]*Edge),
 		forkStats:      make(map[forkKey]*expvar.Int),
 		taskToForkKeys: make(map[string][]forkKey),
 		batches:        make(map[string][]BatchCollector),
 		tasks:          make(map[string]*ExecutingTask),
 		LogService:     l,
-		logger:         l.NewLogger(fmt.Sprintf("[task_master:%s] ", name), log.LstdFlags),
+		logger:         l.NewLogger(fmt.Sprintf("[task_master:%s] ", id), log.LstdFlags),
 		closed:         true,
 		TimingService:  noOpTimingService{},
 	}
 }
 
 // Returns a new TaskMaster instance with the same services as the current one.
-func (tm *TaskMaster) New(name string) *TaskMaster {
-	n := NewTaskMaster(name, tm.LogService)
+func (tm *TaskMaster) New(id string) *TaskMaster {
+	n := NewTaskMaster(id, tm.LogService)
 	n.HTTPDService = tm.HTTPDService
 	n.UDFService = tm.UDFService
 	n.DeadmanService = tm.DeadmanService
@@ -455,7 +456,7 @@ func (tm *TaskMaster) stream(name string) (StreamCollector, error) {
 	if tm.closed {
 		return nil, ErrTaskMasterClosed
 	}
-	in := newEdge(fmt.Sprintf("task_master:%s", tm.name), name, "stream", pipeline.StreamEdge, defaultEdgeBufferSize, tm.LogService)
+	in := newEdge(fmt.Sprintf("task_master:%s", tm.id), name, "stream", pipeline.StreamEdge, defaultEdgeBufferSize, tm.LogService)
 	tm.drained = false
 	tm.wg.Add(1)
 	go tm.runForking(in)
@@ -504,7 +505,7 @@ func (tm *TaskMaster) forkPoint(p models.Point) {
 		tm.forkStats[key] = c
 
 		tags := map[string]string{
-			"task_master":      tm.name,
+			"task_master":      tm.id,
 			"database":         key.Database,
 			"retention_policy": key.RetentionPolicy,
 			"measurement":      key.Measurement,
@@ -638,4 +639,37 @@ type noOpTimingService struct{}
 
 func (noOpTimingService) NewTimer(timer.Setter) timer.Timer {
 	return timer.NewNoOp()
+}
+
+type TaskMasterLookup struct {
+	sync.Mutex
+	taskMasters map[string]*TaskMaster
+}
+
+func NewTaskMasterLookup() *TaskMasterLookup {
+	return &TaskMasterLookup{
+		taskMasters: make(map[string]*TaskMaster),
+	}
+}
+
+func (tml *TaskMasterLookup) Get(id string) *TaskMaster {
+	tml.Lock()
+	defer tml.Unlock()
+	return tml.taskMasters[id]
+}
+
+func (tml *TaskMasterLookup) Main() *TaskMaster {
+	return tml.Get(MainTaskMaster)
+}
+
+func (tml *TaskMasterLookup) Set(tm *TaskMaster) {
+	tml.Lock()
+	defer tml.Unlock()
+	tml.taskMasters[tm.id] = tm
+}
+
+func (tml *TaskMasterLookup) Delete(tm *TaskMaster) {
+	tml.Lock()
+	defer tml.Unlock()
+	delete(tml.taskMasters, tm.id)
 }

@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dustin/go-humanize"
+	humanize "github.com/dustin/go-humanize"
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor/client/v1"
 	"github.com/pkg/errors"
@@ -143,7 +143,8 @@ func main() {
 		commandArgs = args
 		commandF = doList
 	case "show":
-		commandArgs = args
+		showFlags.Parse(args)
+		commandArgs = showFlags.Args()
 		commandF = doShow
 	case "show-template":
 		commandArgs = args
@@ -177,6 +178,7 @@ func init() {
 	replayFlags.Usage = replayUsage
 	defineFlags.Usage = defineUsage
 	defineTemplateFlags.Usage = defineTemplateUsage
+	showFlags.Usage = showUsage
 
 	recordStreamFlags.Usage = recordStreamUsage
 	recordBatchFlags.Usage = recordBatchUsage
@@ -1180,13 +1182,20 @@ func doReload(args []string) error {
 }
 
 // Show
+var (
+	showFlags = flag.NewFlagSet("show", flag.ExitOnError)
+	sReplayId = showFlags.String("replay", "", "Optional replay ID. If set the task information is in the context of the running replay.")
+)
 
 func showUsage() {
-	var u = `Usage: kapacitor show [task ID]
+	var u = `Usage: kapacitor show [-replay] [task ID]
 
 	Show details about a specific task.
+
+Options:
 `
 	fmt.Fprintln(os.Stderr, u)
+	showFlags.PrintDefaults()
 }
 
 func doShow(args []string) error {
@@ -1196,7 +1205,10 @@ func doShow(args []string) error {
 		os.Exit(2)
 	}
 
-	t, err := cli.Task(cli.TaskLink(args[0]), nil)
+	t, err := cli.Task(
+		cli.TaskLink(args[0]),
+		&client.TaskOptions{ReplayID: *sReplayId},
+	)
 	if err != nil {
 		return err
 	}

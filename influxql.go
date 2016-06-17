@@ -72,6 +72,7 @@ func (c *baseReduceContext) Time() time.Time {
 func (n *InfluxQLNode) runStreamInfluxQL() error {
 	contexts := make(map[models.GroupID]reduceContext)
 	for p, ok := n.ins[0].NextPoint(); ok; {
+		n.timer.Start()
 		context := contexts[p.Group]
 		// Fisrt point in window
 		if context == nil {
@@ -127,6 +128,7 @@ func (n *InfluxQLNode) runStreamInfluxQL() error {
 				// go through loop again to initialize new iterator.
 			}
 		}
+		n.timer.Stop()
 	}
 	return nil
 }
@@ -134,6 +136,7 @@ func (n *InfluxQLNode) runStreamInfluxQL() error {
 func (n *InfluxQLNode) runBatchInfluxQL() error {
 	var exampleValue interface{}
 	for b, ok := n.ins[0].NextBatch(); ok; b, ok = n.ins[0].NextBatch() {
+		n.timer.Start()
 		// Create new base context
 		c := baseReduceContext{
 			as:         n.n.As,
@@ -148,6 +151,7 @@ func (n *InfluxQLNode) runBatchInfluxQL() error {
 		if len(b.Points) == 0 {
 			if !n.n.ReduceCreater.IsEmptyOK {
 				// If the reduce does not handle empty batches continue
+				n.timer.Stop()
 				continue
 			}
 			if exampleValue == nil {
@@ -171,6 +175,7 @@ func (n *InfluxQLNode) runBatchInfluxQL() error {
 		if err != nil {
 			n.logger.Println("E! failed to emit batch:", err)
 		}
+		n.timer.Stop()
 	}
 	return nil
 }
@@ -194,20 +199,24 @@ func (n *InfluxQLNode) emit(context reduceContext) error {
 		if err != nil {
 			return err
 		}
+		n.timer.Pause()
 		for _, out := range n.outs {
 			err := out.CollectPoint(p)
 			if err != nil {
 				return err
 			}
 		}
+		n.timer.Resume()
 	case pipeline.BatchEdge:
 		b := context.EmitBatch()
+		n.timer.Pause()
 		for _, out := range n.outs {
 			err := out.CollectBatch(b)
 			if err != nil {
 				return err
 			}
 		}
+		n.timer.Resume()
 	}
 	return nil
 }
