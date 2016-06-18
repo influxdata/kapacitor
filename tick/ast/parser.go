@@ -359,15 +359,7 @@ func (p *parser) parameters() (args []Node) {
 }
 
 func (p *parser) parameter() (n Node) {
-	switch p.peek().typ {
-	case TokenIdent:
-		n = p.expression()
-	case TokenLambda:
-		n = p.lambda()
-	default:
-		n = p.primary()
-	}
-	return
+	return p.expression()
 }
 
 //parse a string list

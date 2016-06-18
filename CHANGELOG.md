@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.0.0-beta2 [unreleased]
+
+### Release Notes
+
+### Features
+
+### Bugfixes
+
+- [#656](https://github.com/influxdata/kapacitor/pull/656): Fix issues where an expression could not be passed as a function parameter in TICKscript.
+
 ## v1.0.0-beta2 [2016-06-17]
 
 ### Release Notes

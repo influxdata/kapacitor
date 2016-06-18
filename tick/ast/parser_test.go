@@ -677,6 +677,80 @@ func TestParseStatements(t *testing.T) {
 			},
 		},
 		{
+			script: `f('first ' + string(5m) + 'third')`,
+			Root: &ProgramNode{
+				position: position{
+					pos:  0,
+					line: 1,
+					char: 1,
+				},
+				Nodes: []Node{
+					&FunctionNode{
+						position: position{
+							pos:  0,
+							line: 1,
+							char: 1,
+						},
+						Type: GlobalFunc,
+						Func: "f",
+						Args: []Node{
+							&BinaryNode{
+								position: position{
+									pos:  24,
+									line: 1,
+									char: 25,
+								},
+								Operator: TokenPlus,
+								Left: &BinaryNode{
+									position: position{
+										pos:  11,
+										line: 1,
+										char: 12,
+									},
+									Operator: TokenPlus,
+									Left: &StringNode{
+										position: position{
+											pos:  2,
+											line: 1,
+											char: 3,
+										},
+										Literal: "first ",
+									},
+									Right: &FunctionNode{
+										position: position{
+											pos:  13,
+											line: 1,
+											char: 14,
+										},
+										Type: GlobalFunc,
+										Func: "string",
+										Args: []Node{
+											&DurationNode{
+												position: position{
+													pos:  20,
+													line: 1,
+													char: 21,
+												},
+												Dur: 5 * time.Minute,
+											},
+										},
+									},
+								},
+								Right: &StringNode{
+									position: position{
+										pos:  26,
+										line: 1,
+										char: 27,
+									},
+									Literal: "third",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			script: `var x = 5
 var y = x * 2`,
 			Root: &ProgramNode{
