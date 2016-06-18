@@ -224,9 +224,22 @@ func (e *floatPointEmitter) EmitBatch() models.Batch {
 		} else {
 			t = e.time
 		}
+		var tags models.Tags
+		if l := len(ap.Tags.KeyValues()); l > 0 {
+			// Merge batch and point specific tags
+			tags = make(models.Tags, len(e.tags)+l)
+			for k, v := range e.tags {
+				tags[k] = v
+			}
+			for k, v := range ap.Tags.KeyValues() {
+				tags[k] = v
+			}
+		} else {
+			tags = e.tags
+		}
 		b.Points[i] = models.BatchPoint{
 			Time:   t,
-			Tags:   ap.Tags.KeyValues(),
+			Tags:   tags,
 			Fields: map[string]interface{}{e.as: ap.Value},
 		}
 	}
@@ -442,9 +455,22 @@ func (e *integerPointEmitter) EmitBatch() models.Batch {
 		} else {
 			t = e.time
 		}
+		var tags models.Tags
+		if l := len(ap.Tags.KeyValues()); l > 0 {
+			// Merge batch and point specific tags
+			tags = make(models.Tags, len(e.tags)+l)
+			for k, v := range e.tags {
+				tags[k] = v
+			}
+			for k, v := range ap.Tags.KeyValues() {
+				tags[k] = v
+			}
+		} else {
+			tags = e.tags
+		}
 		b.Points[i] = models.BatchPoint{
 			Time:   t,
-			Tags:   ap.Tags.KeyValues(),
+			Tags:   tags,
 			Fields: map[string]interface{}{e.as: ap.Value},
 		}
 	}
@@ -660,9 +686,22 @@ func (e *stringPointEmitter) EmitBatch() models.Batch {
 		} else {
 			t = e.time
 		}
+		var tags models.Tags
+		if l := len(ap.Tags.KeyValues()); l > 0 {
+			// Merge batch and point specific tags
+			tags = make(models.Tags, len(e.tags)+l)
+			for k, v := range e.tags {
+				tags[k] = v
+			}
+			for k, v := range ap.Tags.KeyValues() {
+				tags[k] = v
+			}
+		} else {
+			tags = e.tags
+		}
 		b.Points[i] = models.BatchPoint{
 			Time:   t,
-			Tags:   ap.Tags.KeyValues(),
+			Tags:   tags,
 			Fields: map[string]interface{}{e.as: ap.Value},
 		}
 	}
@@ -878,9 +917,22 @@ func (e *booleanPointEmitter) EmitBatch() models.Batch {
 		} else {
 			t = e.time
 		}
+		var tags models.Tags
+		if l := len(ap.Tags.KeyValues()); l > 0 {
+			// Merge batch and point specific tags
+			tags = make(models.Tags, len(e.tags)+l)
+			for k, v := range e.tags {
+				tags[k] = v
+			}
+			for k, v := range ap.Tags.KeyValues() {
+				tags[k] = v
+			}
+		} else {
+			tags = e.tags
+		}
 		b.Points[i] = models.BatchPoint{
 			Time:   t,
-			Tags:   ap.Tags.KeyValues(),
+			Tags:   tags,
 			Fields: map[string]interface{}{e.as: ap.Value},
 		}
 	}
