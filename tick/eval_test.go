@@ -848,6 +848,25 @@ f("asdf")
 	}
 }
 
+func TestEvaluate_Func_Expression_Parameter(t *testing.T) {
+	script := `
+f('asdf' + string(10) + 'qwerty')
+`
+
+	f := func(got string) (interface{}, error) {
+		if exp := "asdf10qwerty"; got != exp {
+			t.Errorf("unexpected arg to function: got %s exp %s", got, exp)
+		}
+		return nil, nil
+	}
+	scope := stateful.NewScope()
+	scope.Set("f", f)
+
+	if _, err := tick.Evaluate(script, scope, nil, false); err != nil {
+		t.Fatal(err)
+	}
+}
+
 //------------------------------------
 // Types for TestReflectionDescriber
 //
