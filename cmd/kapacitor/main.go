@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,9 +29,11 @@ var (
 )
 
 var defaultURL = "http://localhost:9092"
+var defaultSkipVerify = false
 
 var mainFlags = flag.NewFlagSet("main", flag.ExitOnError)
 var kapacitordURL = mainFlags.String("url", "", "The URL http(s)://host:port of the kapacitord server. Defaults to the KAPACITOR_URL environment variable or "+defaultURL+" if not set.")
+var skipVerify = mainFlags.Bool("skipVerify", false, "Disable SSL verification (note, this is insecure). Defaults to the KAPACITOR_UNSAFE_SSL environment variable or "+strconv.FormatBool(defaultSkipVerify)+" if not set.")
 
 var l = log.New(os.Stderr, "[run] ", log.LstdFlags)
 
@@ -73,6 +76,19 @@ func main() {
 
 	mainFlags.Parse(os.Args[1:])
 
+	skipSSL := defaultSkipVerify
+	if skipVerifyEnv := os.Getenv("KAPACITOR_UNSAFE_SSL"); skipVerifyEnv != "" {
+		var err error
+		skipSSL, err = strconv.ParseBool(skipVerifyEnv)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}
+	if *skipVerify != false {
+		skipSSL = *skipVerify
+	}
+
 	url := defaultURL
 	if urlEnv := os.Getenv("KAPACITOR_URL"); urlEnv != "" {
 		url = urlEnv
@@ -82,7 +98,7 @@ func main() {
 	}
 
 	var err error
-	cli, err = connect(url)
+	cli, err = connect(url, skipSSL)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(4)
@@ -198,9 +214,10 @@ func (e responseError) Error() string {
 	return e.Err
 }
 
-func connect(url string) (*client.Client, error) {
+func connect(url string, skipSSL bool) (*client.Client, error) {
 	return client.New(client.Config{
-		URL: url,
+		URL:                url,
+		InsecureSkipVerify: skipSSL,
 	})
 }
 
