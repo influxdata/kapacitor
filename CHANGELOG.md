@@ -7,6 +7,7 @@
 ### Features
 
 - [#662](https://github.com/influxdata/kapacitor/pull/662): Add `-skipVerify` flag to `kapacitor` CLI tool to skip SSL verification.
+- [#644](https://github.com/influxdata/kapacitor/pull/644): JIRA plugin for kapacitor (@ljagiello)
 
 ### Bugfixes
 
@@ -21,7 +22,6 @@
 
 - [#636](https://github.com/influxdata/kapacitor/pull/636): Change HTTP logs to be in Common Log format.
 - [#652](https://github.com/influxdata/kapacitor/pull/652): Add optional replay ID to the task API so that you can get information about a task inside a running replay.
-- [#644](https://github.com/influxdata/kapacitor/pull/644): JIRA plugin for kapacitor (@ljagiello)
 
 ### Bugfixes
 

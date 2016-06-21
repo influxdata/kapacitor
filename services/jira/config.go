@@ -13,6 +13,8 @@ type Config struct {
 	Project string `toml:"project"`
 	// Issue type
 	IssueType string `toml:"issue-type"`
+	// Issue final status
+	IssueFinalStatus string `toml:"issue-final-status"`
 	// Warning level priority
 	PriorityWarn string `toml:"priority-warn"`
 	// Critical level priority

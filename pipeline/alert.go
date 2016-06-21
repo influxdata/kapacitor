@@ -754,6 +754,7 @@ type HipChatHandler struct {
 //      password = ""
 //      project = ""
 //      issue-type = ""
+//      issue-final-status = ""
 //      priority-warn = ""
 //      priority-crit = ""
 //      global = false
@@ -776,6 +777,7 @@ type HipChatHandler struct {
 //      password = "test-password"
 //      project = "TEST"
 //      issue-type = "Bug"
+//      issue-final-status = "Done"
 //      priority-warn = "Normal"
 //      priority-crit = "Urgent"
 //      global = true
@@ -793,12 +795,14 @@ type HipChatHandler struct {
 //             .jira()
 //             .project('TEST2')
 //             .issueType('Bug2')
+//             .issueFinalStatus('Done2')
 //             .priorityWarn('Normal2')
 //             .priorityCrit('Urgent2')
 //
 // Send alerts to JIRA where:
 //  - project: 'TEST2'
 //  - issue type: 'Bug2'
+//  - issue final status: 'Done2'
 //  - warning priority: 'Normal2'
 //  - critical priority: 'Urgent2'
 
@@ -822,6 +826,10 @@ type JiraHandler struct {
 	// JIRA issue type in which to post messages.
 	// If empty uses the issue type from the configuration.
 	IssueType string
+
+	// JIRA issue final status in which issue ends.
+	// If empty uses the issue final status from the configuration.
+	IssueFinalStatus string
 
 	// JIRA warning priority in which to post messages.
 	// If empty uses the warning priority from the configuration.

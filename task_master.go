@@ -79,7 +79,7 @@ type TaskMaster struct {
 	}
 	JiraService interface {
 		Global() bool
-		Alert(project, issueType, priorityWarn, priorityCrit, entityID, message string, level AlertLevel, details interface{}) error
+		Alert(project, issueType, issueFinalStatus, priorityWarn, priorityCrit, entityID, message string, level AlertLevel, details interface{}) error
 	}
 	SlackService interface {
 		Global() bool
