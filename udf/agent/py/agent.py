@@ -65,6 +65,8 @@ class Agent(object):
     # The Agent will terminate if STDIN is closed or an error occurs
     def wait(self):
         self._thread.join()
+        self._in.close()
+        self._out.close()
 
     # Write a response to STDOUT.
     # This method is thread safe.

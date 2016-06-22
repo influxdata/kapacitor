@@ -145,6 +145,10 @@ paths:
           required: true
           type: string
           pattern: (formatted|raw)
+        - name: replay-id
+          in: query
+          description: Optional ID of a running replay. The returned task information will be in the context of the task for the running replay.
+          type: string
       responses:
         '200':
           description: Task information

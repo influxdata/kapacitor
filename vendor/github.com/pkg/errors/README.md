@@ -1,4 +1,4 @@
-# errors [![Travis-CI](https://travis-ci.org/pkg/errors.svg)](https://travis-ci.org/pkg/errors) [![GoDoc](https://godoc.org/github.com/pkg/errors?status.svg)](http://godoc.org/github.com/pkg/errors) [![Report card](https://goreportcard.com/badge/github.com/pkg/errors)](https://goreportcard.com/report/github.com/pkg/errors)
+# errors [![Travis-CI](https://travis-ci.org/pkg/errors.svg)](https://travis-ci.org/pkg/errors) [![AppVeyor](https://ci.appveyor.com/api/projects/status/b98mptawhudj53ep/branch/master?svg=true)](https://ci.appveyor.com/project/davecheney/errors/branch/master) [![GoDoc](https://godoc.org/github.com/pkg/errors?status.svg)](http://godoc.org/github.com/pkg/errors) [![Report card](https://goreportcard.com/badge/github.com/pkg/errors)](https://goreportcard.com/report/github.com/pkg/errors)
 
 Package errors provides simple error handling primitives.
 
@@ -24,13 +24,22 @@ if err != nil {
 `New`, `Errorf`, `Wrap`, and `Wrapf` record a stack trace at the point they are invoked.
 This information can be retrieved with the following interface.
 ```go
-type Stack interface {
-        Stack() []uintptr
+type Stacktrace interface {
+        Stacktrace() []Frame
 }
 ```
+The `Frame` type represents a call site in the stacktrace.
+`Frame` supports the `fmt.Formatter` interface that can be used for printing information about the stacktrace of this error. For example
+```
+if err, ok := err.(Stacktrace); ok {
+        fmt.Printf("%+s:%d", err.Stacktrace())
+}
+```
+See [the documentation for `Frame.Format`](https://godoc.org/github.com/pkg/errors#Frame_Format) for more details.
+
 ## Retrieving the cause of an error
 
-Using `errors.Wrap` constructs a stack of errors, adding context to the preceding error. Depending on the nature of the error it may be necessary to recurse the operation of errors.Wrap to retrieve the original error for inspection. Any error value which implements this interface can be inspected by `errors.Cause`.
+Using `errors.Wrap` constructs a stack of errors, adding context to the preceding error. Depending on the nature of the error it may be necessary to reverse the operation of errors.Wrap to retrieve the original error for inspection. Any error value which implements this interface can be inspected by `errors.Cause`.
 ```go
 type causer interface {
         Cause() error
@@ -56,4 +65,4 @@ Before proposing a change, please discuss your change by raising an issue.
 
 ## Licence
 
-MIT
+BSD-2-Clause

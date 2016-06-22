@@ -35,6 +35,7 @@ func NewServer(c *run.Config) *Server {
 		Commit:  "testCommit",
 		Branch:  "testBranch",
 	}
+	c.HTTP.LogEnabled = testing.Verbose()
 	ls := &LogService{}
 	srv, err := run.NewServer(c, buildInfo, ls)
 	if err != nil {
@@ -207,6 +208,9 @@ type LogService struct{}
 
 func (l *LogService) NewLogger(prefix string, flag int) *log.Logger {
 	return wlog.New(os.Stderr, prefix, flag)
+}
+func (l *LogService) NewRawLogger(prefix string, flag int) *log.Logger {
+	return log.New(os.Stderr, prefix, flag)
 }
 
 func (l *LogService) NewStaticLevelLogger(prefix string, flag int, level wlog.Level) *log.Logger {

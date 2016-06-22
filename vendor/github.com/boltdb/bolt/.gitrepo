@@ -1,0 +1,11 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = http://github.com/boltdb/bolt.git
+	branch = master
+	commit = 05e441d7b3ded9164c5b912521504e7711dd0ba2
+	parent = 99c9d17eb5416a4fdce216714d4585bb0847a582
+	cmdver = 0.3.0

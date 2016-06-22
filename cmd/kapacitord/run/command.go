@@ -251,28 +251,3 @@ type Options struct {
 	LogFile    string
 	LogLevel   string
 }
-
-// GetConfigPath returns the config path from the options.
-// It will return a path by searching in this order:
-//   1. The CLI option in ConfigPath
-//   2. The environment variable KAPACITOR_CONFIG_PATH
-//   3. The first influxdb.conf file on the path:
-//        - ~/.kapacitor
-//        - /etc/kapacitor
-func (opt *Options) GetConfigPath() string {
-	if opt.ConfigPath != "" {
-		return opt.ConfigPath
-	} else if envVar := os.Getenv("KAPACITOR_CONFIG_PATH"); envVar != "" {
-		return envVar
-	}
-
-	for _, path := range []string{
-		os.ExpandEnv("${HOME}/.kapacitor/kapacitor.conf"),
-		"/etc/kapacitor/kapacitor.conf",
-	} {
-		if _, err := os.Stat(path); err == nil {
-			return path
-		}
-	}
-	return ""
-}

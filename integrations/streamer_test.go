@@ -51,7 +51,7 @@ func init() {
 	// create API server
 	config := httpd.NewConfig()
 	config.BindAddress = ":0" // Choose port dynamically
-	httpService = httpd.NewService(config, logService.NewLogger("[http] ", log.LstdFlags))
+	httpService = httpd.NewService(config, logService.NewLogger("[http] ", log.LstdFlags), logService)
 	err := httpService.Open()
 	if err != nil {
 		panic(err)
@@ -598,7 +598,7 @@ stream
 	testStreamerWithOutput(t, "TestStream_SimpleMR", script, 15*time.Second, er, nil, false)
 }
 
-func TestStream_EvalAllTypes(t *testing.T) {
+func TestStream_Eval_AllTypes(t *testing.T) {
 	var script = `
 stream
 	|from()
@@ -625,6 +625,93 @@ stream
 	}
 
 	testStreamerWithOutput(t, "TestStream_EvalAllTypes", script, 2*time.Second, er, nil, false)
+}
+
+func TestStream_Eval_KeepAll(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('types')
+	|eval(lambda: "value0" + "value1", lambda: "value0" - "value1")
+		.as( 'pos', 'neg')
+		.keep()
+	|httpOut('TestStream_Eval_Keep')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "types",
+				Tags:    nil,
+				Columns: []string{"time", "neg", "pos", "value0", "value1"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					-1.0,
+					1.0,
+					0.0,
+					1.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Eval_Keep", script, 2*time.Second, er, nil, false)
+}
+
+func TestStream_Eval_KeepSome(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('types')
+	|eval(lambda: "value0" + "value1", lambda: "value0" - "value1")
+		.as( 'pos', 'neg')
+		.keep('value0', 'pos', 'neg')
+	|httpOut('TestStream_Eval_Keep')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "types",
+				Tags:    nil,
+				Columns: []string{"time", "neg", "pos", "value0"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					-1.0,
+					1.0,
+					0.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Eval_Keep", script, 2*time.Second, er, nil, false)
+}
+
+func TestStream_Eval_KeepSomeWithHidden(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('types')
+	|eval(lambda: "value0" + "value1", lambda: "pos" - "value1")
+		.as( 'pos', 'zero')
+		.keep('value0', 'zero')
+	|httpOut('TestStream_Eval_Keep')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "types",
+				Tags:    nil,
+				Columns: []string{"time", "value0", "zero"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					0.0,
+					0.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Eval_Keep", script, 2*time.Second, er, nil, false)
 }
 
 func TestStream_EvalGroups(t *testing.T) {
@@ -4456,12 +4543,51 @@ stream
 		done <- err
 	}))
 
-	clock, et, replayErr, tm := testStreamer(t, "TestStream_InfluxDBOut", script, nil)
+	name := "TestStream_InfluxDBOut"
+
+	// Create a new execution env
+	tm := kapacitor.NewTaskMaster("testStreamer", logService)
+	tm.HTTPDService = httpService
+	tm.TaskStore = taskStore{}
+	tm.DeadmanService = deadman{}
 	tm.InfluxDBService = influxdb
+	tm.Open()
+
+	//Create the task
+	task, err := tm.NewTask(name, script, kapacitor.StreamTask, dbrps, 0, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Load test data
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.Open(path.Join(dir, "data", name+".srpl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	//Start the task
+	et, err := tm.StartTask(task)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Replay test data to executor
+	stream, err := tm.Stream(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Use 1971 so that we don't get true negatives on Epoch 0 collisions
+	c := clock.New(time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC))
+
+	replayErr := kapacitor.ReplayStreamFromIO(c, data, stream, false, "s")
+
+	t.Log(string(et.Task.Dot()))
 	defer tm.Close()
 
-	err := fastForwardTask(clock, et, replayErr, tm, 15*time.Second)
-	if err != nil {
+	if err := fastForwardTask(c, et, replayErr, tm, 15*time.Second); err != nil {
 		t.Error(err)
 	}
 

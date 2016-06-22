@@ -126,9 +126,9 @@ func Bench(b *testing.B, tasksCount, pointCount int, db, rp, measurement, tickSc
 	// Setup HTTPD service
 	config := httpd.NewConfig()
 	config.BindAddress = ":0" // Choose port dynamically
-	httpdService := httpd.NewService(config, logService.NewLogger("[http] ", log.LstdFlags))
+	httpdService := httpd.NewService(config, logService.NewLogger("[http] ", log.LstdFlags), logService)
 
-	httpdService.Handler.MetaClient = &metaclient{}
+	httpdService.Handler.MetaClient = &kapacitor.NoopMetaClient{}
 	err := httpdService.Open()
 	if err != nil {
 		b.Fatal(err)

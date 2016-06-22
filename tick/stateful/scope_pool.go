@@ -27,7 +27,7 @@ func NewScopePool(referenceVariables []string) ScopePool {
 		New: func() interface{} {
 			scope := NewScope()
 			for _, refVariable := range scopePool.referenceVariables {
-				scope.Set(refVariable, nil)
+				scope.Set(refVariable, empty)
 			}
 
 			return scope
@@ -49,5 +49,6 @@ func (s *scopePool) Get() *Scope {
 
 // Put - put used scope back to the pool
 func (s *scopePool) Put(scope *Scope) {
+	scope.Reset()
 	s.pool.Put(scope)
 }

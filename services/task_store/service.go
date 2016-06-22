@@ -46,25 +46,11 @@ type Service struct {
 		AddRoutes([]httpd.Route) error
 		DelRoutes([]httpd.Route)
 	}
-	TaskMaster interface {
-		NewTask(
-			name,
-			script string,
-			tt kapacitor.TaskType,
-			dbrps []kapacitor.DBRP,
-			snapshotInterval time.Duration,
-			vars map[string]tick.Var,
-		) (*kapacitor.Task, error)
-		NewTemplate(
-			name,
-			script string,
-			tt kapacitor.TaskType,
-		) (*kapacitor.Template, error)
-		StartTask(t *kapacitor.Task) (*kapacitor.ExecutingTask, error)
-		StopTask(name string) error
-		IsExecuting(name string) bool
-		ExecutionStats(name string) (kapacitor.ExecutionStats, error)
-		ExecutingDot(name string, labels bool) string
+	TaskMasterLookup interface {
+		Main() *kapacitor.TaskMaster
+		Get(string) *kapacitor.TaskMaster
+		Set(*kapacitor.TaskMaster)
+		Delete(*kapacitor.TaskMaster)
 	}
 
 	logger *log.Logger
@@ -461,8 +447,21 @@ func (ts *Service) handleTask(w http.ResponseWriter, r *http.Request) {
 		httpd.HttpError(w, fmt.Sprintf("invalid dot-view parameter %q", dotView), true, http.StatusBadRequest)
 		return
 	}
+	tmID := r.URL.Query().Get("replay-id")
+	if tmID == "" {
+		tmID = kapacitor.MainTaskMaster
+	}
+	tm := ts.TaskMasterLookup.Get(tmID)
+	if tm == nil {
+		httpd.HttpError(w, fmt.Sprintf("no running replay with ID: %s", tmID), true, http.StatusBadRequest)
+		return
+	}
+	if tmID != kapacitor.MainTaskMaster && !tm.IsExecuting(raw.ID) {
+		httpd.HttpError(w, fmt.Sprintf("replay %s is not for task: %s", tmID, raw.ID), true, http.StatusBadRequest)
+		return
+	}
 
-	t, err := ts.convertTask(raw, scriptFormat, dotView)
+	t, err := ts.convertTask(raw, scriptFormat, dotView, tm)
 	if err != nil {
 		httpd.HttpError(w, fmt.Sprintf("invalid task stored in db: %s", err.Error()), true, http.StatusInternalServerError)
 		return
@@ -556,9 +555,11 @@ func (ts *Service) handleListTasks(w http.ResponseWriter, r *http.Request) {
 	rawTasks, err := ts.tasks.List(pattern, int(offset), int(limit))
 	tasks := make([]map[string]interface{}, len(rawTasks))
 
+	tm := ts.TaskMasterLookup.Main()
+
 	for i, task := range rawTasks {
 		tasks[i] = make(map[string]interface{}, len(fields))
-		executing := ts.TaskMaster.IsExecuting(task.ID)
+		executing := tm.IsExecuting(task.ID)
 		for _, field := range fields {
 			var value interface{}
 			switch field {
@@ -596,7 +597,7 @@ func (ts *Service) handleListTasks(w http.ResponseWriter, r *http.Request) {
 				value = executing
 			case "dot":
 				if executing {
-					value = ts.TaskMaster.ExecutingDot(task.ID, dotView == "labels")
+					value = tm.ExecutingDot(task.ID, dotView == "labels")
 				} else {
 					kt, err := ts.newKapacitorTask(task)
 					if err != nil {
@@ -606,7 +607,7 @@ func (ts *Service) handleListTasks(w http.ResponseWriter, r *http.Request) {
 				}
 			case "stats":
 				if executing {
-					s, err := ts.TaskMaster.ExecutionStats(task.ID)
+					s, err := tm.ExecutionStats(task.ID)
 					if err != nil {
 						ts.logger.Printf("E! failed to retrieve stats for task %s: %v", task.ID, err)
 					} else {
@@ -781,7 +782,7 @@ func (ts *Service) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return task info
-	t, err := ts.convertTask(newTask, "formatted", "attributes")
+	t, err := ts.convertTask(newTask, "formatted", "attributes", ts.TaskMasterLookup.Main())
 	if err != nil {
 		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
 		return
@@ -902,12 +903,20 @@ func (ts *Service) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 	}
 	if original.ID != updated.ID {
 		// Task ID changed delete and re-create.
-		if err := ts.tasks.Delete(original.ID); err != nil {
-			ts.logger.Printf("E! failed to delete old task definition during ID change: old ID: %s new ID: %s, %s", original.ID, updated.ID, err.Error())
-		}
 		if err := ts.tasks.Create(updated); err != nil {
 			httpd.HttpError(w, fmt.Sprintf("failed to create new task during ID change: %s", err.Error()), true, http.StatusInternalServerError)
 			return
+		}
+		if err := ts.tasks.Delete(original.ID); err != nil {
+			ts.logger.Printf("E! failed to delete old task definition during ID change: old ID: %s new ID: %s, %s", original.ID, updated.ID, err.Error())
+		}
+		if original.Status == Enabled && updated.Status == Enabled {
+			// Stop task and start it under new name
+			ts.stopTask(original.ID)
+			if err := ts.startTask(updated); err != nil {
+				httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
+				return
+			}
 		}
 	} else {
 		if err := ts.tasks.Replace(updated); err != nil {
@@ -928,11 +937,11 @@ func (ts *Service) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 			}
 		case Disabled:
 			kapacitor.NumEnabledTasksVar.Add(-1)
-			ts.stopTask(updated.ID)
+			ts.stopTask(original.ID)
 		}
 	}
 
-	t, err := ts.convertTask(updated, "formatted", "attributes")
+	t, err := ts.convertTask(updated, "formatted", "attributes", ts.TaskMasterLookup.Main())
 	if err != nil {
 		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
 		return
@@ -941,7 +950,7 @@ func (ts *Service) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 	w.Write(httpd.MarshalJSON(t, true))
 }
 
-func (ts *Service) convertTask(t Task, scriptFormat, dotView string) (client.Task, error) {
+func (ts *Service) convertTask(t Task, scriptFormat, dotView string, tm *kapacitor.TaskMaster) (client.Task, error) {
 	script := t.TICKscript
 	if scriptFormat == "formatted" {
 		// Format TICKscript
@@ -953,15 +962,15 @@ func (ts *Service) convertTask(t Task, scriptFormat, dotView string) (client.Tas
 		}
 	}
 
-	executing := ts.TaskMaster.IsExecuting(t.ID)
+	executing := tm.IsExecuting(t.ID)
 	errMsg := t.Error
 	dot := ""
 	stats := client.ExecutionStats{}
 	task, err := ts.newKapacitorTask(t)
 	if err == nil {
 		if executing {
-			dot = ts.TaskMaster.ExecutingDot(t.ID, dotView == "labels")
-			s, err := ts.TaskMaster.ExecutionStats(t.ID)
+			dot = tm.ExecutingDot(t.ID, dotView == "labels")
+			s, err := tm.ExecutionStats(t.ID)
 			if err != nil {
 				ts.logger.Printf("E! failed to retrieve stats for task %s: %v", t.ID, err)
 			} else {
@@ -1641,10 +1650,10 @@ func (ts *Service) handleUpdateTemplate(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Update all associated tasks
-	err = ts.updateAllAssociatedTasks(original, updated)
+	// Get associated tasks
+	taskIds, err := ts.templates.ListAssociatedTasks(original.ID)
 	if err != nil {
-		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
+		httpd.HttpError(w, fmt.Sprintf("error getting associated tasks for template %s: %s", original.ID, err.Error()), true, http.StatusInternalServerError)
 		return
 	}
 
@@ -1653,12 +1662,12 @@ func (ts *Service) handleUpdateTemplate(w http.ResponseWriter, r *http.Request) 
 	updated.Modified = now
 
 	if original.ID != updated.ID {
-		if err := ts.templates.Delete(original.ID); err != nil {
-			ts.logger.Printf("E! failed to delete old template during ID change, old ID: %s new ID: %s, %s", original.ID, updated.ID, err.Error())
-		}
 		if err := ts.templates.Create(updated); err != nil {
 			httpd.HttpError(w, fmt.Sprintf("failed to create new template for ID change: %s", err.Error()), true, http.StatusInternalServerError)
 			return
+		}
+		if err := ts.templates.Delete(original.ID); err != nil {
+			ts.logger.Printf("E! failed to delete old template during ID change, old ID: %s new ID: %s, %s", original.ID, updated.ID, err.Error())
 		}
 	} else {
 		if err := ts.templates.Replace(updated); err != nil {
@@ -1667,23 +1676,27 @@ func (ts *Service) handleUpdateTemplate(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	// Update all associated tasks
+	err = ts.updateAllAssociatedTasks(original, updated, taskIds)
+	if err != nil {
+		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
+		return
+	}
+
 	// Return template definition
 	t, err := ts.convertTemplate(updated, "formatted")
 	if err != nil {
 		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
 		return
 	}
+
 	w.WriteHeader(http.StatusOK)
 	w.Write(httpd.MarshalJSON(t, true))
 }
 
 // Update all associated tasks. Return the first error if any.
 // Rollsback all updated tasks if an error occurs.
-func (ts *Service) updateAllAssociatedTasks(old, new Template) error {
-	taskIds, err := ts.templates.ListAssociatedTasks(old.ID)
-	if err != nil {
-		return errors.Wrapf(err, "error getting associated tasks for template %s", old.ID)
-	}
+func (ts *Service) updateAllAssociatedTasks(old, new Template, taskIds []string) error {
 	var i int
 	// Setup rollback function
 	defer func() {
@@ -1782,7 +1795,7 @@ func (ts *Service) newKapacitorTask(task Task) (*kapacitor.Task, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ts.TaskMaster.NewTask(task.ID,
+	return ts.TaskMasterLookup.Main().NewTask(task.ID,
 		task.TICKscript,
 		tt,
 		dbrps,
@@ -1799,7 +1812,7 @@ func (ts *Service) templateTask(template Template) (*kapacitor.Template, error) 
 	case BatchTask:
 		tt = kapacitor.BatchTask
 	}
-	t, err := ts.TaskMaster.NewTemplate(template.ID,
+	t, err := ts.TaskMasterLookup.Main().NewTemplate(template.ID,
 		template.TICKscript,
 		tt,
 	)
@@ -1817,8 +1830,9 @@ func (ts *Service) startTask(task Task) error {
 	// Starting task, remove last error
 	ts.saveLastError(t.ID, "")
 
+	tm := ts.TaskMasterLookup.Main()
 	// Start the task
-	et, err := ts.TaskMaster.StartTask(t)
+	et, err := tm.StartTask(t)
 	if err != nil {
 		ts.saveLastError(t.ID, err.Error())
 		return err
@@ -1829,7 +1843,7 @@ func (ts *Service) startTask(task Task) error {
 		err := et.StartBatching()
 		if err != nil {
 			ts.saveLastError(t.ID, err.Error())
-			ts.TaskMaster.StopTask(t.ID)
+			tm.StopTask(t.ID)
 			return err
 		}
 	}
@@ -1841,7 +1855,7 @@ func (ts *Service) startTask(task Task) error {
 
 		if err != nil {
 			// Stop task
-			ts.TaskMaster.StopTask(t.ID)
+			tm.StopTask(t.ID)
 
 			ts.logger.Printf("E! task %s finished with error: %s", et.Task.ID, err)
 			// Save last error from task.
@@ -1855,7 +1869,7 @@ func (ts *Service) startTask(task Task) error {
 }
 
 func (ts *Service) stopTask(id string) {
-	ts.TaskMaster.StopTask(id)
+	ts.TaskMasterLookup.Main().StopTask(id)
 }
 
 // Save last error from task.

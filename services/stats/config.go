@@ -8,7 +8,7 @@ import (
 
 const (
 	DefaultDatabse                 = "_kapacitor"
-	DefaultRetentionPolicy         = "default"
+	DefaultRetentionPolicy         = "autogen"
 	DefaultStatsInterval           = toml.Duration(10 * time.Second)
 	DefaultTimingSampleRate        = 0.10
 	DefaultTimingMovingAverageSize = 1000

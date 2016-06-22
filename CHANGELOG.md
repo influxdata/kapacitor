@@ -8,8 +8,31 @@
 
 ### Bugfixes
 
+- [#656](https://github.com/influxdata/kapacitor/pull/656): Fix issues where an expression could not be passed as a function parameter in TICKscript.
+
+## v1.0.0-beta2 [2016-06-17]
+
+### Release Notes
+
+### Features
+
+- [#636](https://github.com/influxdata/kapacitor/pull/636): Change HTTP logs to be in Common Log format.
+- [#652](https://github.com/influxdata/kapacitor/pull/652): Add optional replay ID to the task API so that you can get information about a task inside a running replay.
+
+### Bugfixes
+
 - [#621](https://github.com/influxdata/kapacitor/pull/621): Fix obscure error about single vs double quotes.
 - [#623](https://github.com/influxdata/kapacitor/pull/623): Fix issues with recording metadata missing data url.
+- [#631](https://github.com/influxdata/kapacitor/issue/631): Fix issues with using iterative lambda expressions in an EvalNode.
+- [#628](https://github.com/influxdata/kapacitor/issue/628): BREAKING: Change `kapacitord config` to not search default location for configuration files but rather require the `-config` option.
+    Since the `kapacitord run` command behaves this way they should be consistent.
+    Fix issue with `kapacitord config > kapacitor.conf` when the output file was a default location for the config.
+- [#626](https://github.com/influxdata/kapacitor/issue/626): Fix issues when changing the ID of an enabled task.
+- [#624](https://github.com/influxdata/kapacitor/pull/624): Fix issues where you could get a read error on a closed UDF socket.
+- [#651](https://github.com/influxdata/kapacitor/pull/651): Fix issues where an error during a batch replay would hang because the task wouldn't stop.
+- [#650](https://github.com/influxdata/kapacitor/pull/650): BREAKING: The default retention policy name was changed to `autogen` in InfluxDB.
+    This changes Kapacitor to use `autogen` for the default retention policy for the stats.
+    You may need to update your task DBRPs to use `autogen` instead of `default`.
 
 
 ## v1.0.0-beta1 [2016-06-06]

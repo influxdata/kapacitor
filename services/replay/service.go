@@ -73,6 +73,11 @@ type Service struct {
 		NewDefaultClient() (client.Client, error)
 		NewNamedClient(name string) (client.Client, error)
 	}
+	TaskMasterLookup interface {
+		Get(string) *kapacitor.TaskMaster
+		Set(*kapacitor.TaskMaster)
+		Delete(*kapacitor.TaskMaster)
+	}
 	TaskMaster interface {
 		NewFork(name string, dbrps []kapacitor.DBRP, measurements []string) (*kapacitor.Edge, error)
 		DelFork(name string)
@@ -1165,12 +1170,25 @@ func (r *Service) doLiveQueryReplay(id string, task *kapacitor.Task, clk clock.C
 func (r *Service) doReplay(id string, task *kapacitor.Task, runReplay func(tm *kapacitor.TaskMaster) error) error {
 	// Create new isolated task master
 	tm := r.TaskMaster.New(id)
+	r.TaskMasterLookup.Set(tm)
+	defer r.TaskMasterLookup.Delete(tm)
+
 	tm.Open()
 	defer tm.Close()
 	et, err := tm.StartTask(task)
 	if err != nil {
 		return errors.Wrap(err, "task start")
 	}
+
+	// This will force the task to stop or do nothing if it already stopped.
+	defer func() {
+		for _, b := range tm.BatchCollectors(task.ID) {
+			b.Close()
+		}
+		tm.StopTasks()
+	}()
+
+	// Run the replay
 	err = runReplay(tm)
 	if err != nil {
 		return errors.Wrap(err, "running replay")

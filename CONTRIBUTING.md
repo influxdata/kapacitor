@@ -141,23 +141,58 @@ go test ./...
 Dependencies
 ------------
 
-All dependencies should be vendored and locked
-Kapacitor uses the `github.com/govend/govend` utility to vendor dependencies.
+Kapacitor vendors all dependencies.
+Kapacitor does not use a dependency manager tool, but rather uses git subrepos to place
+dependencies in the vendor directory.
+This give complete control over how dependency are managed and keeps the workflow simple.
+A few helper scripts are provided to make this process fast and easy.
 
-The workflow is simple:
+To manage the subrepo you must first install [git-subrepo](https://github.com/ingydotnet/git-subrepo#installation).
 
-```bash
-# Download and lock all deps
-govend -l --prune
+First list all dependencies, including dependencies of dependencies.
+
+```
+./list-deps
 ```
 
-To update an existing dependency use:
+To add a new dependency add a new entry to the `vendor.list` file, of the form:
 
-```bash
-govend -u --prune package 
+```
+<package> [branch]
 ```
 
-> NOTE: The use of prune removes uneeded files from dependencies so only the minimum set of files are committed to the repo.
+The `branch` column is optional.
+If `branch` is left empty the default branch will be used.
+
+For example, to add the `github.com/influxdata/foo/bar` dependency add this line to the `vendor.list`.
+
+```
+github.com/influxdata/foo https://github.com/influxdata/foo.git
+```
+
+Notice that `bar` part of the path was left off since its a subdirectory of the repo.
+
+Commit this change then run:
+
+```
+./vendor.sh github.com/influxdata/foo
+```
+
+This will add the subrepo for the git repo under `vendor/github.com/influxdata/foo`.
+
+Later to update the dependency use the same command.
+
+```
+./vendor.sh github.com/influxdata/foo
+```
+
+Or to update all dependencies at once use
+
+```
+./vendor.sh
+```
+
+These scripts are really simple, we may formalize them later but currently simplicity is key.
 
 
 Generating Code

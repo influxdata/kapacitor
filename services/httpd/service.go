@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/influxdata/kapacitor/services/logging"
 )
 
 type Service struct {
@@ -35,7 +37,7 @@ type Service struct {
 	logger *log.Logger
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, l *log.Logger, li logging.Interface) *Service {
 	statMap := &expvar.Map{}
 	statMap.Init()
 	s := &Service{
@@ -51,10 +53,11 @@ func NewService(c Config, l *log.Logger) *Service {
 			c.GZIP,
 			statMap,
 			l,
+			li,
 		),
 		logger: l,
 	}
-	s.Handler.Logger = s.logger
+	s.Handler.logger = s.logger
 	return s
 }
 

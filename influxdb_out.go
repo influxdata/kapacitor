@@ -1,6 +1,7 @@
 package kapacitor
 
 import (
+	"errors"
 	"log"
 	"sync"
 	"time"
@@ -26,6 +27,9 @@ type InfluxDBOutNode struct {
 }
 
 func newInfluxDBOutNode(et *ExecutingTask, n *pipeline.InfluxDBOutNode, l *log.Logger) (*InfluxDBOutNode, error) {
+	if et.tm.InfluxDBService == nil {
+		return nil, errors.New("no InfluxDB cluster configured cannot use the InfluxDBOutNode")
+	}
 	in := &InfluxDBOutNode{
 		node: node{Node: n, et: et, logger: l},
 		i:    n,

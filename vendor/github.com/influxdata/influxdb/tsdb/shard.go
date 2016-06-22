@@ -1377,7 +1377,7 @@ func NewTagValuesIterator(sh *Shard, opt influxql.IteratorOptions) (influxql.Ite
 	var series []*Series
 	keys := newStringSet()
 	for _, mm := range mms {
-		ss, ok, err := mm.tagKeysByExpr(opt.Condition)
+		ss, ok, err := mm.TagKeysByExpr(opt.Condition)
 		if err != nil {
 			return nil, err
 		} else if !ok {
