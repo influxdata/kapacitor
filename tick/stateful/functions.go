@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/dustin/go-humanize"
 	"github.com/influxdata/influxdb/influxql"
 )
 
@@ -83,6 +84,9 @@ func init() {
 	statelessFuncs["day"] = &day{}
 	statelessFuncs["month"] = &month{}
 	statelessFuncs["year"] = &year{}
+
+	// Humanize functions
+	statelessFuncs["humanBytes"] = &humanBytes{}
 }
 
 // Return set of built-in Funcs
@@ -595,6 +599,28 @@ func (*year) Call(args ...interface{}) (v interface{}, err error) {
 		v = int64(a.Year())
 	default:
 		err = fmt.Errorf("cannot convert %T to time.Time", a)
+	}
+	return
+}
+
+type humanBytes struct {
+}
+
+func (*humanBytes) Reset() {
+
+}
+
+func (*humanBytes) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 1 {
+		return 0, errors.New("humanBytes expects exactly one argument")
+	}
+	switch a := args[0].(type) {
+	case float64:
+		v = humanize.Bytes(uint64(a))
+	case int64:
+		v = humanize.Bytes(uint64(a))
+	default:
+		err = fmt.Errorf("cannot convert %T to humanBytes", a)
 	}
 	return
 }
