@@ -31,6 +31,7 @@ import (
 	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/talk"
+	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/udf/test"
@@ -3782,6 +3783,105 @@ stream
 	c.Channel = "#channel"
 	sl := slack.NewService(c, logService.NewLogger("[test_slack] ", log.LstdFlags))
 	tm.SlackService = sl
+
+	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if rc := atomic.LoadInt32(&requestCount); rc != 2 {
+		t.Errorf("unexpected requestCount got %d exp 2", rc)
+	}
+}
+
+func TestStream_AlertTelegram(t *testing.T) {
+	requestCount := int32(0)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&requestCount, 1)
+		type postData struct {
+			ChatId                string `json:"chat_id"`
+			Text                  string `json:"text"`
+			ParseMode             string `json:"parse_mode"`
+			DisableWebPagePreview bool   `json:"disable_web_page_preview"`
+			DisableNotification   bool   `json:"disable_notification"`
+		}
+		pd := postData{}
+		dec := json.NewDecoder(r.Body)
+		dec.Decode(&pd)
+
+		if exp := "/botTOKEN:AUTH/sendMessage"; r.URL.String() != exp {
+			t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
+		}
+
+		if rc := atomic.LoadInt32(&requestCount); rc == 1 {
+			if exp := "12345678"; pd.ChatId != exp {
+				t.Errorf("unexpected recipient got %s exp %s", pd.ChatId, exp)
+			}
+			if exp := "HTML"; pd.ParseMode != exp {
+				t.Errorf("unexpected recipient got %s exp %s", pd.ParseMode, exp)
+			}
+			if exp := true; pd.DisableWebPagePreview != exp {
+				t.Errorf("unexpected DisableWebPagePreview got %t exp %t", pd.DisableWebPagePreview, exp)
+			}
+			if exp := true; pd.DisableNotification != exp {
+				t.Errorf("unexpected DisableNotification got %t exp %t", pd.DisableNotification, exp)
+			}
+
+		} else if rc := atomic.LoadInt32(&requestCount); rc == 2 {
+			if exp := "87654321"; pd.ChatId != exp {
+				t.Errorf("unexpected recipient got %s exp %s", pd.ChatId, exp)
+			}
+			if exp := ""; pd.ParseMode != exp {
+				t.Errorf("unexpected recipient got '%s' exp '%s'", pd.ParseMode, exp)
+			}
+			if exp := true; pd.DisableWebPagePreview != exp {
+				t.Errorf("unexpected DisableWebPagePreview got %t exp %t", pd.DisableWebPagePreview, exp)
+			}
+			if exp := false; pd.DisableNotification != exp {
+				t.Errorf("unexpected DisableNotification got %t exp %t", pd.DisableNotification, exp)
+			}
+		}
+
+		if exp := "kapacitor/cpu/serverA is CRITICAL"; pd.Text != exp {
+			t.Errorf("unexpected text got %s exp %s", pd.Text, exp)
+		}
+	}))
+	defer ts.Close()
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.telegram()
+			.chatId('12345678')
+                	.disableNotification()
+                	.parseMode('HTML')
+                .telegram()
+                	.chatId('87654321')
+`
+
+	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
+	defer tm.Close()
+
+	c := telegram.NewConfig()
+	c.URL = ts.URL + "/bot"
+	c.Token = "TOKEN:AUTH"
+	c.ChatId = "123456789"
+	c.DisableWebPagePreview = true
+	c.DisableNotification = false
+	tl := telegram.NewService(c, logService.NewLogger("[test_telegram] ", log.LstdFlags))
+	tm.TelegramService = tl
 
 	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
 	if err != nil {
