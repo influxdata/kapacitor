@@ -6,6 +6,8 @@
 
 ### Features
 
+- [#662](https://github.com/influxdata/kapacitor/pull/662): Add `-skipVerify` flag to `kapacitor` CLI tool to skip SSL verification.
+
 ### Bugfixes
 
 - [#656](https://github.com/influxdata/kapacitor/pull/656): Fix issues where an expression could not be passed as a function parameter in TICKscript.
