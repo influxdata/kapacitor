@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.0.0-beta2 [unreleased]
+## v1.0.0-beta3 [unreleased]
 
 ### Release Notes
 
@@ -9,6 +9,7 @@
 ### Bugfixes
 
 - [#656](https://github.com/influxdata/kapacitor/pull/656): Fix issues where an expression could not be passed as a function parameter in TICKscript.
+- [#627](https://github.com/influxdata/kapacitor/issue/327): Fix where InfluxQL functions that returned a batch could drop tags.
 
 ## v1.0.0-beta2 [2016-06-17]
 

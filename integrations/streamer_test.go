@@ -22,6 +22,7 @@ import (
 	imodels "github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/clock"
+	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
@@ -203,6 +204,126 @@ stream
 	}
 
 	testStreamerWithOutput(t, "TestStream_DerivativeNN", script, 15*time.Second, er, nil, false)
+}
+
+func TestStream_HoltWinters(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('packets')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|holtWinters('value', 3, 0, 1s)
+	|where(lambda: "host" == 'serverA')
+	|httpOut('TestStream_HoltWinters')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "packets",
+				Tags:    models.Tags{"host": "serverA"},
+				Columns: []string{"time", "holtWinters"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+						1009.324690106368,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
+						1009.7524349889708,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 12, 0, time.UTC),
+						1010.105056042826,
+					},
+				},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_HoltWinters", script, 15*time.Second, er, nil, false)
+}
+
+func TestStream_HoltWintersWithFit(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('packets')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|holtWintersWithFit('value', 3, 0, 1s)
+	|where(lambda: "host" == 'serverA')
+	|httpOut('TestStream_HoltWinters')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "packets",
+				Tags:    models.Tags{"host": "serverA"},
+				Columns: []string{"time", "holtWinters"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						1000.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+						1000.7349380776699,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						1001.8935462884633,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+						1003.1750039651934,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						1004.4245269000132,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+						1005.5685498251902,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						1006.5782508658309,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+						1007.4488388165385,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+						1008.1877681696025,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
+						1008.8080773333872,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+						1009.324690106368,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
+						1009.7524349889708,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 12, 0, time.UTC),
+						1010.105056042826,
+					},
+				},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_HoltWinters", script, 15*time.Second, er, nil, false)
 }
 
 func TestStream_Elapsed(t *testing.T) {
@@ -1877,6 +1998,7 @@ stream
 	|from()
 		.measurement('cpu')
 		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
 	|window()
 		.period(10s)
 		.every(10s)
@@ -1892,7 +2014,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "sum"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -1908,7 +2030,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "count"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -1924,7 +2046,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "distinct"},
 						Values: [][]interface{}{
 							{
@@ -1962,7 +2084,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "mean"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -1978,7 +2100,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "median"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -2060,7 +2182,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "spread"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -2076,7 +2198,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "stddev"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -2177,18 +2299,16 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
-						Columns: []string{"time", "host", "top", "type"},
+						Tags:    models.Tags{"host": "serverA"},
+						Columns: []string{"time", "top", "type"},
 						Values: [][]interface{}{
 							{
 								time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
-								"serverA",
 								98.0,
 								"idle",
 							},
 							{
 								time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
-								"serverA",
 								96.0,
 								"idle",
 							},
@@ -2204,18 +2324,16 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
-						Columns: []string{"time", "host", "top", "type"},
+						Tags:    models.Tags{"host": "serverA"},
+						Columns: []string{"time", "top", "type"},
 						Values: [][]interface{}{
 							{
 								endTime,
-								"serverA",
 								98.0,
 								"idle",
 							},
 							{
 								endTime,
-								"serverA",
 								96.0,
 								"idle",
 							},
@@ -2232,25 +2350,22 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
-						Columns: []string{"time", "bottom", "host", "type"},
+						Tags:    models.Tags{"host": "serverA"},
+						Columns: []string{"time", "bottom", "type"},
 						Values: [][]interface{}{
 							{
 								time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
 								91.0,
-								"serverA",
 								"idle",
 							},
 							{
 								time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 								92.0,
-								"serverA",
 								"idle",
 							},
 							{
 								time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
 								92.0,
-								"serverA",
 								"idle",
 							},
 						},
@@ -2265,25 +2380,22 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
-						Columns: []string{"time", "bottom", "host", "type"},
+						Tags:    models.Tags{"host": "serverA"},
+						Columns: []string{"time", "bottom", "type"},
 						Values: [][]interface{}{
 							{
 								endTime,
 								91.0,
-								"serverA",
 								"idle",
 							},
 							{
 								endTime,
 								92.0,
-								"serverA",
 								"idle",
 							},
 							{
 								endTime,
 								92.0,
-								"serverA",
 								"idle",
 							},
 						},
@@ -2330,6 +2442,7 @@ stream
 	|from()
 		.measurement('cpu')
 		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
 	|window()
 		.period(10s)
 		.every(10s)
@@ -2345,7 +2458,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "sum"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -2361,7 +2474,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "count"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -2377,7 +2490,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "distinct"},
 						Values: [][]interface{}{
 							{
@@ -2415,7 +2528,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "mean"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -2431,7 +2544,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "median"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -2513,7 +2626,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "spread"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -2529,7 +2642,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "stddev"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -2630,18 +2743,16 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
-						Columns: []string{"time", "host", "top", "type"},
+						Tags:    models.Tags{"host": "serverA"},
+						Columns: []string{"time", "top", "type"},
 						Values: [][]interface{}{
 							{
 								time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
-								"serverA",
 								98.0,
 								"idle",
 							},
 							{
 								time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
-								"serverA",
 								96.0,
 								"idle",
 							},
@@ -2657,18 +2768,16 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
-						Columns: []string{"time", "host", "top", "type"},
+						Tags:    models.Tags{"host": "serverA"},
+						Columns: []string{"time", "top", "type"},
 						Values: [][]interface{}{
 							{
 								endTime,
-								"serverA",
 								98.0,
 								"idle",
 							},
 							{
 								endTime,
-								"serverA",
 								96.0,
 								"idle",
 							},
@@ -2685,25 +2794,22 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
-						Columns: []string{"time", "bottom", "host", "type"},
+						Tags:    models.Tags{"host": "serverA"},
+						Columns: []string{"time", "bottom", "type"},
 						Values: [][]interface{}{
 							{
 								time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
 								91.0,
-								"serverA",
 								"idle",
 							},
 							{
 								time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 								92.0,
-								"serverA",
 								"idle",
 							},
 							{
 								time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
 								92.0,
-								"serverA",
 								"idle",
 							},
 						},
@@ -2718,25 +2824,22 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
-						Columns: []string{"time", "bottom", "host", "type"},
+						Tags:    models.Tags{"host": "serverA"},
+						Columns: []string{"time", "bottom", "type"},
 						Values: [][]interface{}{
 							{
 								endTime,
 								91.0,
-								"serverA",
 								"idle",
 							},
 							{
 								endTime,
 								92.0,
-								"serverA",
 								"idle",
 							},
 							{
 								endTime,
 								92.0,
-								"serverA",
 								"idle",
 							},
 						},
@@ -2782,6 +2885,7 @@ stream
 	|from()
 		.measurement('cpu')
 		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
 	|window()
 		.period(10s)
 		.every(10s)
@@ -2797,7 +2901,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "count"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -2813,7 +2917,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "distinct"},
 						Values: [][]interface{}{
 							{
@@ -2950,6 +3054,7 @@ stream
 	|from()
 		.measurement('cpu')
 		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
 	|window()
 		.period(10s)
 		.every(10s)
@@ -2965,7 +3070,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "count"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -2981,7 +3086,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "distinct"},
 						Values: [][]interface{}{
 							{
