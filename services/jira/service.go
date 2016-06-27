@@ -132,12 +132,12 @@ func (s *Service) Alert(project, issueType, issueFinalStatus, priorityWarn, prio
 	resp, err := s.RequestPost("POST", "/rest/api/2/search", searchData)
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		panic(err.Error())
+		return err
 	}
 
 	err = json.Unmarshal(body, &response)
 	if err != nil {
-		return fmt.Errorf(err.Error())
+		return err
 	}
 	if response.Total > 0 {
 		if level >= kapacitor.WarnAlert {
@@ -147,7 +147,7 @@ func (s *Service) Alert(project, issueType, issueFinalStatus, priorityWarn, prio
 				postComment["body"] = "Update: " + message
 				_, err := s.RequestPost("POST", issueUrl, postComment)
 				if err != nil {
-					panic(err.Error())
+					return err
 				}
 
 				issueUrl = "/rest/api/2/issue/" + id.ID
@@ -161,7 +161,7 @@ func (s *Service) Alert(project, issueType, issueFinalStatus, priorityWarn, prio
 				postUpdate["update"] = postPriority
 				_, err = s.RequestPost("PUT", issueUrl, postUpdate)
 				if err != nil {
-					panic(err.Error())
+					return err
 				}
 			}
 		} else {
@@ -169,15 +169,15 @@ func (s *Service) Alert(project, issueType, issueFinalStatus, priorityWarn, prio
 				issueUrl := "/rest/api/2/issue/" + id.ID + "/transitions"
 				resp, err := s.RequestPost("GET", issueUrl, nil)
 				if err != nil {
-					panic(err.Error())
+					return err
 				}
 				body, err := ioutil.ReadAll(resp.Body)
 				if err != nil {
-					panic(err.Error())
+					return err
 				}
 				err = json.Unmarshal(body, &response)
 				if err != nil {
-					panic(err.Error())
+					return err
 				}
 				var finalTransitionID string
 				for _, id := range response.Transitions {
@@ -202,7 +202,7 @@ func (s *Service) Alert(project, issueType, issueFinalStatus, priorityWarn, prio
 
 				_, err = s.RequestPost("POST", issueUrl, postClose)
 				if err != nil {
-					panic(err.Error())
+					return err
 				}
 			}
 		}
