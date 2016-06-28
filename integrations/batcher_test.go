@@ -100,7 +100,7 @@ batch
 		},
 	}
 
-	testBatcherWithOutput(t, "TestBatch_Derivative", script, 21*time.Second, er)
+	testBatcherWithOutput(t, "TestBatch_Derivative", script, 21*time.Second, er, false)
 }
 
 func TestBatch_DerivativeUnit(t *testing.T) {
@@ -147,7 +147,7 @@ batch
 		},
 	}
 
-	testBatcherWithOutput(t, "TestBatch_Derivative", script, 21*time.Second, er)
+	testBatcherWithOutput(t, "TestBatch_Derivative", script, 21*time.Second, er, false)
 }
 
 func TestBatch_DerivativeN(t *testing.T) {
@@ -193,7 +193,7 @@ batch
 		},
 	}
 
-	testBatcherWithOutput(t, "TestBatch_DerivativeNN", script, 21*time.Second, er)
+	testBatcherWithOutput(t, "TestBatch_DerivativeNN", script, 21*time.Second, er, false)
 }
 
 func TestBatch_DerivativeNN(t *testing.T) {
@@ -236,7 +236,7 @@ batch
 		},
 	}
 
-	testBatcherWithOutput(t, "TestBatch_DerivativeNN", script, 21*time.Second, er)
+	testBatcherWithOutput(t, "TestBatch_DerivativeNN", script, 21*time.Second, er, false)
 }
 
 func TestBatch_Elapsed(t *testing.T) {
@@ -269,7 +269,7 @@ batch
 		},
 	}
 
-	testBatcherWithOutput(t, "TestBatch_Elapsed", script, 21*time.Second, er)
+	testBatcherWithOutput(t, "TestBatch_Elapsed", script, 21*time.Second, er, false)
 }
 
 func TestBatch_SimpleMR(t *testing.T) {
@@ -324,7 +324,7 @@ batch
 		},
 	}
 
-	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er)
+	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er, false)
 }
 func TestBatch_CountEmptyBatch(t *testing.T) {
 	var script = `
@@ -376,7 +376,7 @@ batch
 		},
 	}
 
-	testBatcherWithOutput(t, "TestBatch_CountEmptyBatch", script, 30*time.Second, er)
+	testBatcherWithOutput(t, "TestBatch_CountEmptyBatch", script, 30*time.Second, er, false)
 }
 
 func TestBatch_SumEmptyBatch(t *testing.T) {
@@ -430,7 +430,7 @@ batch
 		},
 	}
 
-	testBatcherWithOutput(t, "TestBatch_CountEmptyBatch", script, 30*time.Second, er)
+	testBatcherWithOutput(t, "TestBatch_CountEmptyBatch", script, 30*time.Second, er, false)
 }
 
 func TestBatch_GroupBy_TimeOffset(t *testing.T) {
@@ -485,7 +485,7 @@ batch
 		},
 	}
 
-	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er)
+	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er, false)
 }
 
 func TestBatch_Default(t *testing.T) {
@@ -522,7 +522,7 @@ batch
 		},
 	}
 
-	testBatcherWithOutput(t, "TestBatch_Default", script, 30*time.Second, er)
+	testBatcherWithOutput(t, "TestBatch_Default", script, 30*time.Second, er, false)
 }
 
 func TestBatch_DoubleGroupBy(t *testing.T) {
@@ -556,7 +556,7 @@ batch
 		},
 	}
 
-	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er)
+	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er, false)
 }
 
 func TestBatch_AlertAll(t *testing.T) {
@@ -579,7 +579,7 @@ batch
 	// Expect no result since the condition is not met.
 	er := kapacitor.Result{Series: imodels.Rows{}}
 
-	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er)
+	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er, false)
 
 	script = `
 batch
@@ -635,7 +635,7 @@ batch
 		},
 	}
 
-	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er)
+	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er, false)
 }
 func TestBatch_AlertLevelField(t *testing.T) {
 
@@ -698,7 +698,7 @@ batch
 		},
 	}
 
-	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er)
+	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er, false)
 }
 
 func TestBatch_AlertLevelTag(t *testing.T) {
@@ -752,7 +752,7 @@ batch
 		},
 	}
 
-	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er)
+	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er, false)
 }
 
 func TestBatch_AlertDuration(t *testing.T) {
@@ -810,7 +810,7 @@ batch
 		},
 	}
 
-	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er)
+	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er, false)
 }
 
 func TestBatch_AlertStateChangesOnly(t *testing.T) {
@@ -990,7 +990,7 @@ cpu0
 		},
 	}
 
-	testBatcherWithOutput(t, "TestBatch_Join", script, 30*time.Second, er)
+	testBatcherWithOutput(t, "TestBatch_Join", script, 30*time.Second, er, false)
 }
 
 func TestBatch_JoinTolerance(t *testing.T) {
@@ -1041,7 +1041,123 @@ cpu0
 		},
 	}
 
-	testBatcherWithOutput(t, "TestBatch_JoinTolerance", script, 30*time.Second, er)
+	testBatcherWithOutput(t, "TestBatch_JoinTolerance", script, 30*time.Second, er, false)
+}
+
+func TestBatch_JoinOn(t *testing.T) {
+
+	var script = `
+var errorsByServiceGlobal = batch
+	|query('''
+		SELECT sum("value")
+		FROM "telegraf"."default".errors
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(5s),'service')
+
+var errorsByServiceDC = batch
+	|query('''
+		SELECT first("value") as value
+		FROM "telegraf"."default".errors
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(5s),'dc', 'service')
+
+errorsByServiceGlobal
+	|join(errorsByServiceDC)
+		.as('service', 'dc')
+		.on('service')
+		.streamName('dc_error_percent')
+	|eval(lambda: "dc.value" / "service.sum")
+		.keep()
+		.as('value')
+	|httpOut('TestBatch_JoinOn')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "dc_error_percent",
+				Tags:    map[string]string{"dc": "slc", "service": "cart"},
+				Columns: []string{"time", "dc.value", "service.sum", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						8.0,
+						11.0,
+						8.0 / 11.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+						3.0,
+						10.0,
+						3.0 / 10.0,
+					},
+				},
+			},
+			{
+				Name:    "dc_error_percent",
+				Tags:    map[string]string{"dc": "nyc", "service": "cart"},
+				Columns: []string{"time", "dc.value", "service.sum", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						3.0,
+						11.0,
+						3.0 / 11.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+						7.0,
+						10.0,
+						7.0 / 10.0,
+					},
+				},
+			},
+			{
+				Name:    "dc_error_percent",
+				Tags:    map[string]string{"dc": "slc", "service": "login"},
+				Columns: []string{"time", "dc.value", "service.sum", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						4.0,
+						13.0,
+						4.0 / 13.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+						2.0,
+						8.0,
+						2.0 / 8.0,
+					},
+				},
+			},
+			{
+				Name:    "dc_error_percent",
+				Tags:    map[string]string{"dc": "nyc", "service": "login"},
+				Columns: []string{"time", "dc.value", "service.sum", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						9.0,
+						13.0,
+						9.0 / 13.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+						6.0,
+						8.0,
+						6.0 / 8.0,
+					},
+				},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_JoinOn", script, 30*time.Second, er, true)
 }
 
 // Helper test function for batcher
@@ -1102,7 +1218,7 @@ func testBatcherWithOutput(
 	script string,
 	duration time.Duration,
 	er kapacitor.Result,
-	ignoreOrder ...bool,
+	ignoreOrder bool,
 ) {
 	clock, et, replayErr, tm := testBatcher(t, name, script)
 	defer tm.Close()
@@ -1125,7 +1241,13 @@ func testBatcherWithOutput(
 
 	// Assert we got the expected result
 	result := kapacitor.ResultFromJSON(resp.Body)
-	if eq, msg := compareResults(er, result); !eq {
-		t.Error(msg)
+	if ignoreOrder {
+		if eq, msg := compareResultsIgnoreSeriesOrder(er, result); !eq {
+			t.Error(msg)
+		}
+	} else {
+		if eq, msg := compareResults(er, result); !eq {
+			t.Error(msg)
+		}
 	}
 }

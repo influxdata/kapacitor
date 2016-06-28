@@ -1,0 +1,4 @@
+{"name":"errors","tags":{"dc":"slc","service":"cart"},"points":[{"fields":{"value":8},"time":"2015-10-30T00:00:00Z"},{"fields":{"value":3},"time":"2015-10-30T00:00:05Z"}]}
+{"name":"errors","tags":{"dc":"nyc","service":"cart"},"points":[{"fields":{"value":3},"time":"2015-10-30T00:00:00Z"},{"fields":{"value":7},"time":"2015-10-30T00:00:05Z"}]}
+{"name":"errors","tags":{"dc":"slc","service":"login"},"points":[{"fields":{"value":4},"time":"2015-10-30T00:00:00Z"},{"fields":{"value":2},"time":"2015-10-30T00:00:05Z"}]}
+{"name":"errors","tags":{"dc":"nyc","service":"login"},"points":[{"fields":{"value":9},"time":"2015-10-30T00:00:00Z"},{"fields":{"value":6},"time":"2015-10-30T00:00:05Z"}]}
