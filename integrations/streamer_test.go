@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path"
+	"path/filepath"
 	"reflect"
 	"sync/atomic"
 	"testing"
@@ -3353,7 +3354,6 @@ stream
 }
 
 func TestStream_Alert(t *testing.T) {
-
 	requestCount := int32(0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ad := kapacitor.AlertData{}
@@ -3415,7 +3415,6 @@ stream
 		.warn(lambda: "count" > warnThreshold)
 		.crit(lambda: "count" > critThreshold)
 		.post('` + ts.URL + `')
-	|log()
 	|httpOut('TestStream_Alert')
 `
 
@@ -4346,6 +4345,64 @@ stream
 
 	if rc := atomic.LoadInt32(&requestCount); rc != 1 {
 		t.Errorf("unexpected requestCount got %d exp 1", rc)
+	}
+}
+func TestStream_AlertLog(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "TestStream_AlertLog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+	normalPath := filepath.Join(tmpDir, "normal.log")
+	modePath := filepath.Join(tmpDir, "mode.log")
+	var script = fmt.Sprintf(`
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor.{{ .Name }}.{{ index .Tags "host" }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.log('%s')
+		.log('%s')
+			.mode(0644)
+`, normalPath, modePath)
+
+	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
+	defer tm.Close()
+
+	err = fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
+	if err != nil {
+		t.Error(err)
+	}
+
+	normal, err := os.Open(normalPath)
+	if err != nil {
+		t.Fatalf("missing log file for alert %v", err)
+	}
+	defer normal.Close()
+	if stat, err := normal.Stat(); err != nil {
+		t.Fatal(err)
+	} else if exp, got := os.FileMode(0600), stat.Mode(); exp != got {
+		t.Errorf("unexpected normal file mode: got %v exp %v", got, exp)
+	}
+
+	mode, err := os.Open(modePath)
+	if err != nil {
+		t.Fatalf("missing log file for alert %v", err)
+	}
+	defer mode.Close()
+	if stat, err := mode.Stat(); err != nil {
+		t.Fatal(err)
+	} else if exp, got := os.FileMode(0644), stat.Mode(); exp != got {
+		t.Errorf("unexpected normal file mode: got %v exp %v", got, exp)
 	}
 }
 

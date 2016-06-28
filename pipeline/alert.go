@@ -1,6 +1,8 @@
 package pipeline
 
 import (
+	"fmt"
+	"os"
 	"reflect"
 	"time"
 
@@ -306,6 +308,15 @@ func newAlertNode(wants EdgeType) *AlertNode {
 	return a
 }
 
+func (n *AlertNode) validate() error {
+	for _, lh := range n.LogHandlers {
+		if err := lh.validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 //tick:ignore
 func (n *AlertNode) ChainMethods() map[string]reflect.Value {
 	return map[string]reflect.Value{
@@ -539,7 +550,15 @@ type LogHandler struct {
 	FilePath string
 
 	// File's mode and permissions, default is 0600
+	// NOTE: The leading 0 is required to interpret the value as an octal integer.
 	Mode int64
+}
+
+func (h *LogHandler) validate() error {
+	if os.FileMode(h.Mode).Perm()&0200 == 0 {
+		return fmt.Errorf("invalid file mode %o, must be user writable", h.Mode)
+	}
+	return nil
 }
 
 // Send alert to VictorOps.
