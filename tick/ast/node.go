@@ -2,6 +2,7 @@ package ast
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -59,6 +60,11 @@ func (p position) String() string {
 	return fmt.Sprintf("%dl%dc%d", p.pos, p.line, p.char)
 }
 
+const (
+	octal   = 8
+	decimal = 10
+)
+
 // numberNode holds a number: signed or unsigned integer or float.
 // The value is parsed and stored under all the types that can represent the value.
 // This simulates in a small amount of code the behavior of Go's ideal constants.
@@ -68,6 +74,7 @@ type NumberNode struct {
 	IsFloat bool    // Number has a floating-point value.
 	Int64   int64   // The integer value.
 	Float64 float64 // The floating-point value.
+	Base    int     // The base of an integer value.
 	Comment *CommentNode
 }
 
@@ -77,23 +84,37 @@ func newNumber(p position, text string, c *CommentNode) (*NumberNode, error) {
 		position: p,
 		Comment:  c,
 	}
-	i, err := strconv.ParseInt(text, 10, 64)
-	if err == nil {
-		n.IsInt = true
-		n.Int64 = i
-		if n.Int64 < 0 {
-			panic("parser should not allow for negative number nodes")
-		}
-	} else {
+
+	if text == "" {
+		return nil, errors.New("invalid number literal, empty string")
+	}
+
+	if s := strings.IndexRune(text, '.'); s != -1 {
 		f, err := strconv.ParseFloat(text, 64)
 		if err == nil {
 			n.IsFloat = true
 			n.Float64 = f
 			if n.Float64 < 0 {
-				panic("parser should not allow for negative number nodes")
+				return nil, errors.New("parser should not allow for negative number nodes")
 			}
 		}
+	} else {
+		if text[0] == '0' && len(text) > 1 {
+			// We have an octal number
+			n.Base = octal
+		} else {
+			n.Base = decimal
+		}
+		i, err := strconv.ParseInt(text, n.Base, 64)
+		if err == nil {
+			n.IsInt = true
+			n.Int64 = i
+		}
+		if n.Int64 < 0 {
+			return nil, errors.New("parser should not allow for negative number nodes")
+		}
 	}
+
 	if !n.IsInt && !n.IsFloat {
 		return nil, fmt.Errorf("illegal number syntax: %q", text)
 	}
@@ -102,9 +123,9 @@ func newNumber(p position, text string, c *CommentNode) (*NumberNode, error) {
 
 func (n *NumberNode) String() string {
 	if n.IsInt {
-		return fmt.Sprintf("NumberNode@%v{%di}%v", n.position, n.Int64, n.Comment)
+		return fmt.Sprintf("NumberNode@%v{%di,b%d}%v", n.position, n.Int64, n.Base, n.Comment)
 	}
-	return fmt.Sprintf("NumberNode@%v{%f}%v", n.position, n.Float64, n.Comment)
+	return fmt.Sprintf("NumberNode@%v{%f,b%d}%v", n.position, n.Float64, n.Base, n.Comment)
 }
 
 func (n *NumberNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
@@ -114,7 +135,10 @@ func (n *NumberNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
 	}
 	writeIndent(buf, indent, onNewLine)
 	if n.IsInt {
-		buf.WriteString(strconv.FormatInt(n.Int64, 10))
+		if n.Base == octal {
+			buf.WriteByte('0')
+		}
+		buf.WriteString(strconv.FormatInt(n.Int64, n.Base))
 	} else {
 		s := strconv.FormatFloat(n.Float64, 'f', -1, 64)
 		if strings.IndexRune(s, '.') == -1 {
@@ -143,6 +167,7 @@ func (n *NumberNode) Equal(o interface{}) bool {
 type DurationNode struct {
 	position
 	Dur     time.Duration //the duration
+	Literal string
 	Comment *CommentNode
 }
 
@@ -151,6 +176,7 @@ func newDur(p position, text string, c *CommentNode) (*DurationNode, error) {
 	n := &DurationNode{
 		position: p,
 		Comment:  c,
+		Literal:  text,
 	}
 	d, err := influxql.ParseDuration(text)
 	if err != nil {
@@ -161,7 +187,7 @@ func newDur(p position, text string, c *CommentNode) (*DurationNode, error) {
 }
 
 func (n *DurationNode) String() string {
-	return fmt.Sprintf("DurationNode@%v{%v}%v", n.position, n.Dur, n.Comment)
+	return fmt.Sprintf("DurationNode@%v{%v,%q}%v", n.position, n.Dur, n.Literal, n.Comment)
 }
 
 func (n *DurationNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
@@ -170,7 +196,7 @@ func (n *DurationNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) 
 		onNewLine = true
 	}
 	writeIndent(buf, indent, onNewLine)
-	buf.WriteString(influxql.FormatDuration(n.Dur))
+	buf.WriteString(n.Literal)
 }
 func (n *DurationNode) SetComment(c *CommentNode) {
 	n.Comment = c

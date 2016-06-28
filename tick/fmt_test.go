@@ -16,6 +16,26 @@ func TestFormat(t *testing.T) {
 			exp:    "var x = 1\n",
 		},
 		{
+			script: `var x=1.0`,
+			exp:    "var x = 1.0\n",
+		},
+		{
+			script: `var x=01`,
+			exp:    "var x = 01\n",
+		},
+		{
+			script: `var x=0600`,
+			exp:    "var x = 0600\n",
+		},
+		{
+			script: `var x=1m`,
+			exp:    "var x = 1m\n",
+		},
+		{
+			script: `var x=60s`,
+			exp:    "var x = 60s\n",
+		},
+		{
 			script: `var x=stream()|window().period(10s).every(10s)`,
 			exp: `var x = stream()
     |window()
