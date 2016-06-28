@@ -7,6 +7,7 @@
 ### Features
 
 - [#662](https://github.com/influxdata/kapacitor/pull/662): Add `-skipVerify` flag to `kapacitor` CLI tool to skip SSL verification.
+- [#644](https://github.com/influxdata/kapacitor/pull/644): JIRA plugin for kapacitor (@ljagiello)
 
 ### Bugfixes
 

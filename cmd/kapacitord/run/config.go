@@ -16,6 +16,7 @@ import (
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/influxdb"
+	"github.com/influxdata/kapacitor/services/jira"
 	"github.com/influxdata/kapacitor/services/logging"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
@@ -63,6 +64,7 @@ type Config struct {
 	UDF       udf.Config        `toml:"udf"`
 	Deadman   deadman.Config    `toml:"deadman"`
 	Talk      talk.Config       `toml:"talk"`
+	Jira      jira.Config       `toml:"jira"`
 
 	Hostname string `toml:"hostname"`
 	DataDir  string `toml:"data_dir"`
@@ -98,6 +100,7 @@ func NewConfig() *Config {
 	c.UDF = udf.NewConfig()
 	c.Deadman = deadman.NewConfig()
 	c.Talk = talk.NewConfig()
+	c.Jira = jira.NewConfig()
 
 	return c
 }

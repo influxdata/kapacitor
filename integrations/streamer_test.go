@@ -27,6 +27,7 @@ import (
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
+	"github.com/influxdata/kapacitor/services/jira"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/sensu"
@@ -4187,6 +4188,95 @@ stream
 	pd := pagerduty.NewService(c, logService.NewLogger("[test_pd] ", log.LstdFlags))
 	pd.HTTPDService = tm.HTTPDService
 	tm.PagerDutyService = pd
+
+	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if rc := atomic.LoadInt32(&requestCount); rc != 2 {
+		t.Errorf("unexpected requestCount got %d exp 1", rc)
+	}
+}
+
+func TestStream_AlertJira(t *testing.T) {
+	requestCount := int32(0)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&requestCount, 1)
+		type postData struct {
+			Fields struct {
+				IssueType struct {
+					Name string `json:"name"`
+				} `json:"issuetype"`
+				Project struct {
+					Key string `json:"key"`
+				} `json:"project"`
+				Priority struct {
+					Name string `json:"name"`
+				} `json:"priority"`
+				Summary     string `json:"summary"`
+				Description string `json:"description"`
+			} `json:"fields"`
+			Response struct {
+				Total int `json:"total"`
+			}
+		}
+		jr := postData{}
+		dec := json.NewDecoder(r.Body)
+		dec.Decode(&jr)
+		if rc := atomic.LoadInt32(&requestCount); rc == 1 {
+			if exp, got := "/rest/api/2/search", r.URL.String(); got != exp {
+				t.Errorf("unexpected JIRA REST API url got %s exp %s", got, exp)
+			}
+			if exp := 0; jr.Response.Total != exp {
+				t.Errorf("unexpected Priority got %d exp %d", jr.Response.Total, exp)
+			}
+		}
+		if len(r.URL.String()) == 0 {
+			t.Errorf("unexpected JIRA REST API url got empty string")
+		}
+	}))
+	defer ts.Close()
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.message('{{ .Level }} alert for {{ .ID }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.jira()
+		.jira()
+			.project('project2')
+			.issueType('issue-type2')
+			.issueFinalStatus('issue-final-status2')
+			.priorityWarn('priority-warn2')
+			.priorityCrit('priority-crit2')
+`
+
+	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
+	defer tm.Close()
+
+	c := jira.NewConfig()
+	c.URL = ts.URL
+	c.Username = "username"
+	c.Password = "password"
+	c.Project = "project"
+	c.IssueType = "issue-type"
+	c.IssueFinalStatus = "issue-final-status"
+	c.PriorityWarn = "priority-warn"
+	c.PriorityCrit = "priority-crit"
+	jr := jira.NewService(c, logService.NewLogger("[test_jira] ", log.LstdFlags))
+	tm.JiraService = jr
 
 	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
 	if err != nil {

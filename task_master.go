@@ -77,6 +77,10 @@ type TaskMaster struct {
 		Global() bool
 		Alert(serviceKey, incidentKey, desc string, level AlertLevel, details interface{}) error
 	}
+	JiraService interface {
+		Global() bool
+		Alert(project, issueType, issueFinalStatus, priorityWarn, priorityCrit, entityID, message string, level AlertLevel, details interface{}) error
+	}
 	SlackService interface {
 		Global() bool
 		StateChangesOnly() bool
@@ -175,6 +179,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.OpsGenieService = tm.OpsGenieService
 	n.VictorOpsService = tm.VictorOpsService
 	n.PagerDutyService = tm.PagerDutyService
+	n.JiraService = tm.JiraService
 	n.SlackService = tm.SlackService
 	n.HipChatService = tm.HipChatService
 	n.AlertaService = tm.AlertaService

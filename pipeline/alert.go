@@ -30,7 +30,7 @@ const defaultLogFileMode = 0600
 // See AlertNode.Info, AlertNode.Warn, and AlertNode.Crit below.
 //
 // Different event handlers can be configured for each AlertNode.
-// Some handlers like Email, HipChat, Sensu, Slack, OpsGenie, VictorOps, PagerDuty and Talk have a configuration
+// Some handlers like Email, HipChat, Sensu, Slack, OpsGenie, VictorOps, Jira, PagerDuty and Talk have a configuration
 // option 'global' that indicates that all alerts implicitly use the handler.
 //
 // Available event handlers:
@@ -47,6 +47,7 @@ const defaultLogFileMode = 0600
 //    * VictorOps -- Send alert to VictorOps.
 //    * PagerDuty -- Send alert to PagerDuty.
 //    * Talk -- Post alert message to Talk client.
+//    * Jira -- Post alert message to JIRA.
 //
 // See below for more details on configuring each handler.
 //
@@ -295,6 +296,10 @@ type AlertNode struct {
 	// Send alert to Talk.
 	// tick:ignore
 	TalkHandlers []*TalkHandler `tick:"Talk"`
+
+	// Send alert to Jira.
+	// tick:ignore
+	JiraHandlers []*JiraHandler `tick:"Jira"`
 }
 
 func newAlertNode(wants EdgeType) *AlertNode {
@@ -750,6 +755,108 @@ type HipChatHandler struct {
 	// HipChat authentication token.
 	// If empty uses the token from the configuration.
 	Token string
+}
+
+// Send the alert to JIRA.
+//
+// By default JIRA should accept API calls without any additional modifications
+// or settings.
+//
+// More information about JIRA REST API you can find in official documentation
+// https://docs.atlassian.com/jira/REST/latest/
+//
+// Example:
+//    [jira]
+//      enabled = true
+//      url = ""
+//      username = ""
+//      password = ""
+//      project = ""
+//      issue-type = ""
+//      issue-final-status = ""
+//      priority-warn = ""
+//      priority-crit = ""
+//      global = false
+//
+// Example:
+//    stream
+//         |alert()
+//             .jira()
+//
+//
+// If the 'jira' section in the configuration has the option: global = true
+// then all alerts are sent to JIRA without the need to explicitly state it
+// in the TICKscript.
+//
+// Example:
+//    [jira]
+//      enabled = true
+//      url = "https://your.jira.host"
+//      username = "test-username"
+//      password = "test-password"
+//      project = "TEST"
+//      issue-type = "Bug"
+//      issue-final-status = "Done"
+//      priority-warn = "Normal"
+//      priority-crit = "Urgent"
+//      global = true
+//
+// Example:
+//    stream
+//         |alert()
+//             .jira()
+//
+// Send alerts to JIRA project in the configuration file.
+//
+// Example:
+//    stream
+//         |alert()
+//             .jira()
+//             .project('TEST2')
+//             .issueType('Bug2')
+//             .issueFinalStatus('Done2')
+//             .priorityWarn('Normal2')
+//             .priorityCrit('Urgent2')
+//
+// Send alerts to JIRA where:
+//  - project: 'TEST2'
+//  - issue type: 'Bug2'
+//  - issue final status: 'Done2'
+//  - warning priority: 'Normal2'
+//  - critical priority: 'Urgent2'
+
+// tick:property
+func (a *AlertNode) Jira() *JiraHandler {
+	jira := &JiraHandler{
+		AlertNode: a,
+	}
+	a.JiraHandlers = append(a.JiraHandlers, jira)
+	return jira
+}
+
+// tick:embedded:AlertNode.Jira
+type JiraHandler struct {
+	*AlertNode
+
+	// JIRA project in which to post messages.
+	// If empty uses the project from the configuration.
+	Project string
+
+	// JIRA issue type in which to post messages.
+	// If empty uses the issue type from the configuration.
+	IssueType string
+
+	// JIRA issue final status in which issue ends.
+	// If empty uses the issue final status from the configuration.
+	IssueFinalStatus string
+
+	// JIRA warning priority in which to post messages.
+	// If empty uses the warning priority from the configuration.
+	PriorityWarn string
+
+	// JIRA critical priority in which to post messages.
+	// If empty uses the critical priority from the configuration.
+	PriorityCrit string
 }
 
 // Send the alert to Alerta.
