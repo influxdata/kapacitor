@@ -200,7 +200,7 @@ func (j *JoinNode) sendMatchPoint(specific, matched srcPoint, groupErrs chan<- e
 	// Send current point
 	group.points <- specific
 	// Send new matched point
-	matched.p = np
+	matched.p = np.Interface()
 	group.points <- matched
 }
 
@@ -520,7 +520,11 @@ func (js *joinset) JoinIntoBatch() (models.Batch, bool) {
 				empty[i] = true
 				continue
 			}
-			b := batch.(models.Batch)
+			b, ok := batch.(models.Batch)
+			if !ok {
+				js.logger.Printf("E! invalid join data got %T expected models.Batch", batch)
+				return models.Batch{}, false
+			}
 			if indexes[i] == len(b.Points) {
 				emptyCount++
 				empty[i] = true

@@ -35,6 +35,7 @@ type PointSetter interface {
 	PointInterface
 	SetNewDimTag(key string, value string)
 	UpdateGroup()
+	Interface() PointInterface
 }
 
 // Represents a single data point
@@ -91,6 +92,10 @@ func (p Point) Copy() PointInterface {
 
 func (p Point) Setter() PointSetter {
 	return &p
+}
+
+func (p *Point) Interface() PointInterface {
+	return *p
 }
 
 func (p *Point) SetNewDimTag(key string, value string) {
