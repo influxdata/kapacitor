@@ -14,7 +14,7 @@
 - [#627](https://github.com/influxdata/kapacitor/issue/627): Fix where InfluxQL functions that returned a batch could drop tags.
 - [#674](https://github.com/influxdata/kapacitor/issue/674): Fix panic with Join On and batches.
 - [#665](https://github.com/influxdata/kapacitor/issue/665): BREAKING: Fix file mode not being correct for Alert.Log files.
-	Breaking change is that integers numbers prefixed a 0 in TICKscript are interpreted as octal numbers.
+	Breaking change is that integers numbers prefixed with a 0 in TICKscript are interpreted as octal numbers.
 
 ## v1.0.0-beta2 [2016-06-17]
 
