@@ -82,6 +82,11 @@ type TaskMaster struct {
 		StateChangesOnly() bool
 		Alert(channel, message string, level AlertLevel) error
 	}
+	TelegramService interface {
+		Global() bool
+		StateChangesOnly() bool
+		Alert(chatId, parseMode, message string, disableWebPagePreview, disableNotification bool) error
+	}
 	HipChatService interface {
 		Global() bool
 		StateChangesOnly() bool
@@ -181,6 +186,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.SensuService = tm.SensuService
 	n.TalkService = tm.TalkService
 	n.TimingService = tm.TimingService
+	n.TelegramService = tm.TelegramService
 	return n
 }
 

@@ -7,6 +7,8 @@
 ### Features
 
 - [#662](https://github.com/influxdata/kapacitor/pull/662): Add `-skipVerify` flag to `kapacitor` CLI tool to skip SSL verification.
+- [#680](https://github.com/influxdata/kapacitor/pull/680): Add Telegram Alerting option
+
 
 ### Bugfixes
 

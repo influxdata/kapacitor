@@ -30,7 +30,7 @@ const defaultLogFileMode = 0600
 // See AlertNode.Info, AlertNode.Warn, and AlertNode.Crit below.
 //
 // Different event handlers can be configured for each AlertNode.
-// Some handlers like Email, HipChat, Sensu, Slack, OpsGenie, VictorOps, PagerDuty and Talk have a configuration
+// Some handlers like Email, HipChat, Sensu, Slack, OpsGenie, VictorOps, PagerDuty, Telegram and Talk have a configuration
 // option 'global' that indicates that all alerts implicitly use the handler.
 //
 // Available event handlers:
@@ -47,6 +47,7 @@ const defaultLogFileMode = 0600
 //    * VictorOps -- Send alert to VictorOps.
 //    * PagerDuty -- Send alert to PagerDuty.
 //    * Talk -- Post alert message to Talk client.
+//    * Telegram -- Post alert message to Telegram client.
 //
 // See below for more details on configuring each handler.
 //
@@ -279,6 +280,10 @@ type AlertNode struct {
 	// Send alert to Slack.
 	// tick:ignore
 	SlackHandlers []*SlackHandler `tick:"Slack"`
+
+	// Send alert to Telegram.
+	// tick:ignore
+	TelegramHandlers []*TelegramHandler `tick:"Telegram"`
 
 	// Send alert to HipChat.
 	// tick:ignore
@@ -953,6 +958,97 @@ type SlackHandler struct {
 	// Slack channel in which to post messages.
 	// If empty uses the channel from the configuration.
 	Channel string
+}
+
+// Send the alert to Telegram.
+// To allow Kapacitor to post to Telegram,
+//
+// Example:
+//    [telegram]
+//      enabled = true
+//      token = "123456789:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+//      chat-id = "xxxxxxxxx"
+//      parse-mode = "Markdown"
+//	disable-web-page-preview = true
+//	disable-notification = false
+//
+// In order to not post a message every alert interval
+// use AlertNode.StateChangesOnly so that only events
+// where the alert changed state are posted to the chat-id.
+//
+// Example:
+//    stream
+//         |alert()
+//             .telegram()
+//
+// Send alerts to Telegram chat-id in the configuration file.
+//
+// Example:
+//    stream
+//         |alert()
+//             .telegram()
+//             .chatId('xxxxxxx')
+//
+// Send alerts to Telegram user/group 'xxxxxx'
+//
+// If the 'telegram' section in the configuration has the option: global = true
+// then all alerts are sent to Telegram without the need to explicitly state it
+// in the TICKscript.
+//
+// Example:
+//    [telegram]
+//      enabled = true
+//      token = "123456789:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+//      chat-id = "xxxxxxxxx"
+//      global = true
+//      state-changes-only = true
+//
+// Example:
+//    stream
+//         |alert()
+//
+// Send alert to Telegram using default chat-id 'xxxxxxxx'.
+// tick:property
+func (a *AlertNode) Telegram() *TelegramHandler {
+	telegram := &TelegramHandler{
+		AlertNode: a,
+	}
+	a.TelegramHandlers = append(a.TelegramHandlers, telegram)
+	return telegram
+}
+
+// tick:embedded:AlertNode.Telegram
+type TelegramHandler struct {
+	*AlertNode
+
+	// Telegram user/group ID to post messages to.
+	// If empty uses the chati-d from the configuration.
+	ChatId string
+	// Parse node, defaults to Mardown
+	// If empty uses the parse-mode from the configuration.
+	ParseMode string
+	// Web Page preview
+	// If empty uses the disable-web-page-preview from the configuration.
+	// tick:ignore
+	IsDisableWebPagePreview bool `tick:"DisableWebPagePreview"`
+	// Disables Notification
+	// If empty uses the disable-notification from the configuration.
+	// tick:ignore
+	IsDisableNotification bool `tick:"DisableNotification"`
+}
+
+// Disables the Notification. If empty defaults to the configuration.
+// tick:property
+func (tel *TelegramHandler) DisableNotification() *TelegramHandler {
+	tel.IsDisableNotification = true
+	return tel
+}
+
+// Disables the WebPagePreview. If empty defaults to the configuration.
+// tick:property
+func (tel *TelegramHandler) DisableWebPagePreview() *TelegramHandler {
+	tel.IsDisableWebPagePreview = true
+	return tel
 }
 
 // Send alert to OpsGenie.

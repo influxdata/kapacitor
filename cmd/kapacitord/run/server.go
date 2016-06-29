@@ -34,6 +34,7 @@ import (
 	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/influxdata/kapacitor/services/talk"
 	"github.com/influxdata/kapacitor/services/task_store"
+	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
@@ -144,6 +145,7 @@ func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*
 	s.appendOpsGenieService(c.OpsGenie)
 	s.appendVictorOpsService(c.VictorOps)
 	s.appendPagerDutyService(c.PagerDuty)
+	s.appendTelegramService(c.Telegram)
 	s.appendHipChatService(c.HipChat)
 	s.appendAlertaService(c.Alerta)
 	s.appendSlackService(c.Slack)
@@ -310,6 +312,16 @@ func (s *Server) appendSlackService(c slack.Config) {
 		l := s.LogService.NewLogger("[slack] ", log.LstdFlags)
 		srv := slack.NewService(c, l)
 		s.TaskMaster.SlackService = srv
+
+		s.Services = append(s.Services, srv)
+	}
+}
+
+func (s *Server) appendTelegramService(c telegram.Config) {
+	if c.Enabled {
+		l := s.LogService.NewLogger("[telegram] ", log.LstdFlags)
+		srv := telegram.NewService(c, l)
+		s.TaskMaster.TelegramService = srv
 
 		s.Services = append(s.Services, srv)
 	}

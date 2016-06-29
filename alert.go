@@ -232,6 +232,20 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		n.IsStateChangesOnly = true
 	}
 
+	for _, telegram := range n.TelegramHandlers {
+		telegram := telegram
+		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleTelegram(telegram, ad) })
+	}
+	if len(n.TelegramHandlers) == 0 && (et.tm.TelegramService != nil && et.tm.TelegramService.Global()) {
+		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleTelegram(&pipeline.TelegramHandler{}, ad) })
+	}
+	// If telegram has been configured with state changes only set it.
+	if et.tm.TelegramService != nil &&
+		et.tm.TelegramService.Global() &&
+		et.tm.TelegramService.StateChangesOnly() {
+		n.IsStateChangesOnly = true
+	}
+
 	for _, hipchat := range n.HipChatHandlers {
 		hipchat := hipchat
 		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleHipChat(hipchat, ad) })
@@ -945,6 +959,24 @@ func (a *AlertNode) handleSlack(slack *pipeline.SlackHandler, ad *AlertData) {
 	)
 	if err != nil {
 		a.logger.Println("E! failed to send alert data to Slack:", err)
+		return
+	}
+}
+
+func (a *AlertNode) handleTelegram(telegram *pipeline.TelegramHandler, ad *AlertData) {
+	if a.et.tm.TelegramService == nil {
+		a.logger.Println("E! failed to send Telegram message. Telegram is not enabled")
+		return
+	}
+	err := a.et.tm.TelegramService.Alert(
+		telegram.ChatId,
+		telegram.ParseMode,
+		ad.Message,
+		telegram.IsDisableWebPagePreview,
+		telegram.IsDisableNotification,
+	)
+	if err != nil {
+		a.logger.Println("E! failed to send alert data to Telegram:", err)
 		return
 	}
 }
