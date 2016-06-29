@@ -447,7 +447,7 @@ func (t *timeTicker) Start() <-chan time.Time {
 				case <-t.stopping:
 					return
 				case now := <-t.ticker.C:
-					now = now.Truncate(t.every)
+					now = now.Round(t.every)
 					t.alignChan <- now
 				}
 			}
