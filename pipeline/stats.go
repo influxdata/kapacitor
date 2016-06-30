@@ -40,6 +40,9 @@ type StatsNode struct {
 	SourceNode Node
 	// tick:ignore
 	Interval time.Duration
+
+	// tick:ignore
+	AlignFlag bool `tick:"Align"`
 }
 
 func newStatsNode(n Node, interval time.Duration) *StatsNode {
@@ -48,4 +51,11 @@ func newStatsNode(n Node, interval time.Duration) *StatsNode {
 		SourceNode: n,
 		Interval:   interval,
 	}
+}
+
+// Round times to the StatsNode.Interval value.
+// tick:property
+func (n *StatsNode) Align() *StatsNode {
+	n.AlignFlag = true
+	return n
 }

@@ -17,6 +17,7 @@
 - [#674](https://github.com/influxdata/kapacitor/issue/674): Fix panic with Join On and batches.
 - [#665](https://github.com/influxdata/kapacitor/issue/665): BREAKING: Fix file mode not being correct for Alert.Log files.
 	Breaking change is that integers numbers prefixed with a 0 in TICKscript are interpreted as octal numbers.
+- [#667](https://github.com/influxdata/kapacitor/issue/667): Align deadman timestamps to interval.
 
 ## v1.0.0-beta2 [2016-06-17]
 

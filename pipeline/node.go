@@ -223,6 +223,7 @@ const intervalMarker = "INTERVAL"
 //    // Trigger critical alert if the throughput drops below 100 points per 10s and checked every 10s.
 //    data
 //        |stats(10s)
+//            .align()
 //        |derivative('emitted')
 //            .unit(10s)
 //            .nonNegative()
@@ -259,7 +260,7 @@ const intervalMarker = "INTERVAL"
 //    data...
 //
 func (n *node) Deadman(threshold float64, interval time.Duration, expr ...*ast.LambdaNode) *AlertNode {
-	dn := n.Stats(interval).
+	dn := n.Stats(interval).Align().
 		Derivative("emitted").NonNegative()
 	dn.Unit = interval
 
