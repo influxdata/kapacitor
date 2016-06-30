@@ -8,6 +8,8 @@
 
 - [#662](https://github.com/influxdata/kapacitor/pull/662): Add `-skipVerify` flag to `kapacitor` CLI tool to skip SSL verification.
 - [#680](https://github.com/influxdata/kapacitor/pull/680): Add Telegram Alerting option
+- [#46](https://github.com/influxdata/kapacitor/issue/46): Can now create combinations of points within the same stream.
+	This is kind of like join but instead joining a stream with itself.
 
 
 ### Bugfixes

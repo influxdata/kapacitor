@@ -1313,6 +1313,186 @@ byCpu
 	testStreamerWithOutput(t, "TestStream_GroupByWhere", script, 13*time.Second, er, nil, true)
 }
 
+func TestStream_Combine_All(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('request_latency')
+		.groupBy('dc')
+	|combine(lambda: TRUE, lambda: TRUE)
+		.as('first', 'second')
+		.tolerance(1s)
+		.delimiter('.')
+	|groupBy('first.service', 'second.service', 'dc')
+	|eval(lambda: "first.value" / "second.value")
+		.as('ratio')
+    |httpOut('TestStream_Combine')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "A", "second.service": "log", "first.service": "auth"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					7.0 / 6.0,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "A", "second.service": "cart", "first.service": "auth"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					7.0 / 8.0,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "A", "second.service": "cart", "first.service": "log"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					6.0 / 8.0,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "B", "second.service": "log", "first.service": "auth"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					7.5 / 6.5,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "B", "second.service": "cart", "first.service": "auth"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					7.5 / 8.5,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "B", "second.service": "cart", "first.service": "log"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					6.5 / 8.5,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Combine", script, 13*time.Second, er, nil, true)
+}
+
+func TestStream_Combine_Filtered(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('request_latency')
+		.groupBy('dc')
+	|combine(lambda: "service" == 'auth', lambda: TRUE)
+		.as('auth', 'other')
+		.tolerance(1s)
+		.delimiter('.')
+	|groupBy('other.service','dc')
+	|eval(lambda: "auth.value" / "other.value")
+		.as('ratio')
+    |httpOut('TestStream_Combine')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "A", "other.service": "log", "auth.service": "auth"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					7.0 / 6.0,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "A", "other.service": "cart", "auth.service": "auth"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					7.0 / 8.0,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "B", "other.service": "log", "auth.service": "auth"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					7.5 / 6.5,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "B", "other.service": "cart", "auth.service": "auth"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					7.5 / 8.5,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Combine", script, 13*time.Second, er, nil, true)
+}
+
+func TestStream_Combine_All_Triples(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('request_latency')
+		.groupBy('dc')
+	|combine(lambda: TRUE, lambda: TRUE, lambda: TRUE)
+		.as('first', 'second', 'third')
+		.tolerance(1s)
+		.delimiter('.')
+	|groupBy('first.service', 'second.service', 'third.service', 'dc')
+	|eval(lambda: "first.value" + "second.value" + "third.value")
+		.as('sum')
+    |httpOut('TestStream_Combine')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "A", "first.service": "auth", "second.service": "log", "third.service": "cart"},
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					2100.0,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "B", "first.service": "auth", "second.service": "log", "third.service": "cart"},
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					2250.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Combine", script, 13*time.Second, er, nil, true)
+}
+
 func TestStream_Join(t *testing.T) {
 
 	var script = `
