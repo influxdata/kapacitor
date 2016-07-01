@@ -463,6 +463,8 @@ func (et *ExecutingTask) createNode(p pipeline.Node, l *log.Logger) (n Node, err
 		n, err = newUnionNode(et, t, l)
 	case *pipeline.JoinNode:
 		n, err = newJoinNode(et, t, l)
+	case *pipeline.FlattenNode:
+		n, err = newFlattenNode(et, t, l)
 	case *pipeline.EvalNode:
 		n, err = newEvalNode(et, t, l)
 	case *pipeline.WhereNode:
