@@ -354,6 +354,13 @@ func (n *chainnode) Join(others ...Node) *JoinNode {
 	return j
 }
 
+// Combine this node with itself. The data is combine on timestamp.
+func (n *chainnode) Combine(expressions ...*ast.LambdaNode) *CombineNode {
+	c := newCombineNode(n.provides, expressions)
+	n.linkChild(c)
+	return c
+}
+
 // Create an eval node that will evaluate the given transformation function to each data point.
 //  A list of expressions may be provided and will be evaluated in the order they are given
 // and results of previous expressions are made available to later expressions.

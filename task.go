@@ -485,6 +485,8 @@ func (et *ExecutingTask) createNode(p pipeline.Node, l *log.Logger) (n Node, err
 		n, err = newLogNode(et, t, l)
 	case *pipeline.DefaultNode:
 		n, err = newDefaultNode(et, t, l)
+	case *pipeline.CombineNode:
+		n, err = newCombineNode(et, t, l)
 	default:
 		return nil, fmt.Errorf("unknown pipeline node type %T", p)
 	}

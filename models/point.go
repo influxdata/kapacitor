@@ -203,3 +203,11 @@ func (d Dimensions) Copy() Dimensions {
 	copy(cd, d)
 	return cd
 }
+
+func (d Dimensions) ToSet() map[string]bool {
+	set := make(map[string]bool, len(d))
+	for _, dim := range d {
+		set[dim] = true
+	}
+	return set
+}

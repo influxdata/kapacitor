@@ -943,6 +943,192 @@ batch
 	}
 }
 
+func TestBatch_Combine_All(t *testing.T) {
+	var script = `
+batch
+	|query('SELECT value FROM "telegraf"."default"."request_latency"')
+		.period(10s)
+		.every(10s)
+		.groupBy('dc','service')
+	|groupBy('dc')
+	|combine(lambda: TRUE, lambda: TRUE)
+		.as('first', 'second')
+		.tolerance(5s)
+		.delimiter('.')
+	|groupBy('first.service', 'second.service', 'dc')
+	|eval(lambda: "first.value" / "second.value")
+		.as('ratio')
+    |httpOut('TestBatch_Combine')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "A", "first.service": "cart", "second.service": "auth"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 15, 0, time.UTC),
+					3.0 / 2.0,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "A", "first.service": "cart", "second.service": "log"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 15, 0, time.UTC),
+					3.0 / 1.0,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "A", "first.service": "auth", "second.service": "log"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 15, 0, time.UTC),
+					2.0 / 1.0,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "B", "first.service": "cart", "second.service": "auth"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 15, 0, time.UTC),
+					7.0 / 6.0,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "B", "first.service": "cart", "second.service": "log"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 15, 0, time.UTC),
+					7.0 / 4.0,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "B", "first.service": "auth", "second.service": "log"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 15, 0, time.UTC),
+					6.0 / 4.0,
+				}},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_Combine", script, 40*time.Second, er, true)
+}
+
+func TestBatch_Combine_Filtered(t *testing.T) {
+	var script = `
+batch
+	|query('SELECT value FROM "telegraf"."default"."request_latency"')
+		.period(10s)
+		.every(10s)
+		.groupBy('dc','service')
+	|groupBy('dc')
+	|combine(lambda: "service" == 'auth', lambda: TRUE)
+		.as('auth', 'other')
+		.tolerance(5s)
+		.delimiter('.')
+	|groupBy('auth.service', 'other.service', 'dc')
+	|eval(lambda: "auth.value" / "other.value")
+		.as('ratio')
+    |httpOut('TestBatch_Combine')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "A", "other.service": "log", "auth.service": "auth"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 15, 0, time.UTC),
+					2.0 / 1.0,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "A", "other.service": "cart", "auth.service": "auth"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 15, 0, time.UTC),
+					2.0 / 3.0,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "B", "other.service": "log", "auth.service": "auth"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 15, 0, time.UTC),
+					6.0 / 4.0,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "B", "other.service": "cart", "auth.service": "auth"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 15, 0, time.UTC),
+					6.0 / 7.0,
+				}},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_Combine", script, 30*time.Second, er, true)
+}
+
+func TestBatch_Combine_All_Triples(t *testing.T) {
+	var script = `
+batch
+	|query('SELECT value FROM "telegraf"."default"."request_latency"')
+		.period(10s)
+		.every(10s)
+		.groupBy('dc','service')
+	|groupBy('dc')
+	|combine(lambda: TRUE, lambda: TRUE, lambda: TRUE)
+		.as('first', 'second','third')
+		.tolerance(5s)
+		.delimiter('.')
+	|groupBy('first.service', 'second.service', 'third.service', 'dc')
+	|eval(lambda: "first.value" + "second.value" + "third.value")
+		.as('sum')
+    |httpOut('TestBatch_Combine')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "A", "first.service": "cart", "second.service": "auth", "third.service": "log"},
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 15, 0, time.UTC),
+					6.0,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "B", "first.service": "cart", "second.service": "auth", "third.service": "log"},
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 15, 0, time.UTC),
+					17.0,
+				}},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_Combine", script, 30*time.Second, er, true)
+}
+
 func TestBatch_Join(t *testing.T) {
 
 	var script = `
