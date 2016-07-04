@@ -79,6 +79,10 @@ func (b Batch) Setter() PointSetter {
 	return &b
 }
 
+func (b *Batch) Interface() PointInterface {
+	return *b
+}
+
 func (b *Batch) SetNewDimTag(key string, value string) {
 	b.Tags[key] = value
 	for _, p := range b.Points {
@@ -86,7 +90,9 @@ func (b *Batch) SetNewDimTag(key string, value string) {
 	}
 }
 
-func (b *Batch) UpdateGroup() {}
+func (b *Batch) UpdateGroup() {
+	b.Group = TagsToGroupID(b.PointDimensions(), b.Tags)
+}
 
 func BatchToRow(b Batch) (row *models.Row) {
 	row = &models.Row{

@@ -223,13 +223,14 @@ const intervalMarker = "INTERVAL"
 //    // Trigger critical alert if the throughput drops below 100 points per 10s and checked every 10s.
 //    data
 //        |stats(10s)
+//            .align()
 //        |derivative('emitted')
 //            .unit(10s)
 //            .nonNegative()
 //        |alert()
 //            .id('node \'stream0\' in task \'{{ .TaskName }}\'')
 //            .message('{{ .ID }} is {{ if eq .Level "OK" }}alive{{ else }}dead{{ end }}: {{ index .Fields "emitted" | printf "%0.3f" }} points/10s.')
-//            .crit(lamdba: "emitted" <= 100.0)
+//            .crit(lambda: "emitted" <= 100.0)
 //    //Do normal processing of data
 //    data...
 //
@@ -259,7 +260,7 @@ const intervalMarker = "INTERVAL"
 //    data...
 //
 func (n *node) Deadman(threshold float64, interval time.Duration, expr ...*ast.LambdaNode) *AlertNode {
-	dn := n.Stats(interval).
+	dn := n.Stats(interval).Align().
 		Derivative("emitted").NonNegative()
 	dn.Unit = interval
 
@@ -351,6 +352,13 @@ func (n *chainnode) Join(others ...Node) *JoinNode {
 	others = append([]Node{n}, others...)
 	j := newJoinNode(n.provides, others)
 	return j
+}
+
+// Combine this node with itself. The data is combine on timestamp.
+func (n *chainnode) Combine(expressions ...*ast.LambdaNode) *CombineNode {
+	c := newCombineNode(n.provides, expressions)
+	n.linkChild(c)
+	return c
 }
 
 // Create an eval node that will evaluate the given transformation function to each data point.

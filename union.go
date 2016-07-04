@@ -33,10 +33,6 @@ func newUnionNode(et *ExecutingTask, n *pipeline.UnionNode, l *log.Logger) (*Uni
 func (u *UnionNode) runUnion([]byte) error {
 	union := make(chan srcPoint)
 	u.rename = u.u.Rename
-	if u.rename == "" {
-		//the calling node is always the last node
-		u.rename = u.parents[len(u.parents)-1].Name()
-	}
 	// Spawn goroutine for each parent
 	errors := make(chan error, len(u.ins))
 	for i, in := range u.ins {
@@ -155,7 +151,9 @@ func (u *UnionNode) emit(v models.PointInterface) error {
 	switch u.Provides() {
 	case pipeline.StreamEdge:
 		p := v.(models.Point)
-		p.Name = u.rename
+		if u.rename != "" {
+			p.Name = u.rename
+		}
 		for _, child := range u.outs {
 			err := child.CollectPoint(p)
 			if err != nil {
@@ -164,7 +162,9 @@ func (u *UnionNode) emit(v models.PointInterface) error {
 		}
 	case pipeline.BatchEdge:
 		b := v.(models.Batch)
-		b.Name = u.rename
+		if u.rename != "" {
+			b.Name = u.rename
+		}
 		for _, child := range u.outs {
 			err := child.CollectBatch(b)
 			if err != nil {

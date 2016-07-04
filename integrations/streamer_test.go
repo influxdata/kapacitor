@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path"
+	"path/filepath"
 	"reflect"
 	"sync/atomic"
 	"testing"
@@ -22,6 +23,7 @@ import (
 	imodels "github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/clock"
+	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
@@ -30,6 +32,7 @@ import (
 	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/talk"
+	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/udf/test"
@@ -203,6 +206,126 @@ stream
 	}
 
 	testStreamerWithOutput(t, "TestStream_DerivativeNN", script, 15*time.Second, er, nil, false)
+}
+
+func TestStream_HoltWinters(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('packets')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|holtWinters('value', 3, 0, 1s)
+	|where(lambda: "host" == 'serverA')
+	|httpOut('TestStream_HoltWinters')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "packets",
+				Tags:    models.Tags{"host": "serverA"},
+				Columns: []string{"time", "holtWinters"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+						1009.324690106368,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
+						1009.7524349889708,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 12, 0, time.UTC),
+						1010.105056042826,
+					},
+				},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_HoltWinters", script, 15*time.Second, er, nil, false)
+}
+
+func TestStream_HoltWintersWithFit(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('packets')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|holtWintersWithFit('value', 3, 0, 1s)
+	|where(lambda: "host" == 'serverA')
+	|httpOut('TestStream_HoltWinters')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "packets",
+				Tags:    models.Tags{"host": "serverA"},
+				Columns: []string{"time", "holtWinters"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						1000.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+						1000.7349380776699,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						1001.8935462884633,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+						1003.1750039651934,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						1004.4245269000132,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+						1005.5685498251902,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						1006.5782508658309,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+						1007.4488388165385,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+						1008.1877681696025,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
+						1008.8080773333872,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+						1009.324690106368,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
+						1009.7524349889708,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 12, 0, time.UTC),
+						1010.105056042826,
+					},
+				},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_HoltWinters", script, 15*time.Second, er, nil, false)
 }
 
 func TestStream_Elapsed(t *testing.T) {
@@ -1190,6 +1313,186 @@ byCpu
 	testStreamerWithOutput(t, "TestStream_GroupByWhere", script, 13*time.Second, er, nil, true)
 }
 
+func TestStream_Combine_All(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('request_latency')
+		.groupBy('dc')
+	|combine(lambda: TRUE, lambda: TRUE)
+		.as('first', 'second')
+		.tolerance(1s)
+		.delimiter('.')
+	|groupBy('first.service', 'second.service', 'dc')
+	|eval(lambda: "first.value" / "second.value")
+		.as('ratio')
+    |httpOut('TestStream_Combine')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "A", "second.service": "log", "first.service": "auth"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					7.0 / 6.0,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "A", "second.service": "cart", "first.service": "auth"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					7.0 / 8.0,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "A", "second.service": "cart", "first.service": "log"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					6.0 / 8.0,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "B", "second.service": "log", "first.service": "auth"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					7.5 / 6.5,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "B", "second.service": "cart", "first.service": "auth"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					7.5 / 8.5,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "B", "second.service": "cart", "first.service": "log"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					6.5 / 8.5,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Combine", script, 13*time.Second, er, nil, true)
+}
+
+func TestStream_Combine_Filtered(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('request_latency')
+		.groupBy('dc')
+	|combine(lambda: "service" == 'auth', lambda: TRUE)
+		.as('auth', 'other')
+		.tolerance(1s)
+		.delimiter('.')
+	|groupBy('other.service','dc')
+	|eval(lambda: "auth.value" / "other.value")
+		.as('ratio')
+    |httpOut('TestStream_Combine')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "A", "other.service": "log", "auth.service": "auth"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					7.0 / 6.0,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "A", "other.service": "cart", "auth.service": "auth"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					7.0 / 8.0,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "B", "other.service": "log", "auth.service": "auth"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					7.5 / 6.5,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "B", "other.service": "cart", "auth.service": "auth"},
+				Columns: []string{"time", "ratio"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					7.5 / 8.5,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Combine", script, 13*time.Second, er, nil, true)
+}
+
+func TestStream_Combine_All_Triples(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('request_latency')
+		.groupBy('dc')
+	|combine(lambda: TRUE, lambda: TRUE, lambda: TRUE)
+		.as('first', 'second', 'third')
+		.tolerance(1s)
+		.delimiter('.')
+	|groupBy('first.service', 'second.service', 'third.service', 'dc')
+	|eval(lambda: "first.value" + "second.value" + "third.value")
+		.as('sum')
+    |httpOut('TestStream_Combine')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "A", "first.service": "auth", "second.service": "log", "third.service": "cart"},
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					2100.0,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "B", "first.service": "auth", "second.service": "log", "third.service": "cart"},
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					2250.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Combine", script, 13*time.Second, er, nil, true)
+}
+
 func TestStream_Join(t *testing.T) {
 
 	var script = `
@@ -1877,6 +2180,7 @@ stream
 	|from()
 		.measurement('cpu')
 		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
 	|window()
 		.period(10s)
 		.every(10s)
@@ -1892,7 +2196,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "sum"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -1908,7 +2212,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "count"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -1924,7 +2228,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "distinct"},
 						Values: [][]interface{}{
 							{
@@ -1962,7 +2266,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "mean"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -1978,7 +2282,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "median"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -2060,7 +2364,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "spread"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -2076,7 +2380,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "stddev"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -2177,18 +2481,16 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
-						Columns: []string{"time", "host", "top", "type"},
+						Tags:    models.Tags{"host": "serverA"},
+						Columns: []string{"time", "top", "type"},
 						Values: [][]interface{}{
 							{
 								time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
-								"serverA",
 								98.0,
 								"idle",
 							},
 							{
 								time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
-								"serverA",
 								96.0,
 								"idle",
 							},
@@ -2204,18 +2506,16 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
-						Columns: []string{"time", "host", "top", "type"},
+						Tags:    models.Tags{"host": "serverA"},
+						Columns: []string{"time", "top", "type"},
 						Values: [][]interface{}{
 							{
 								endTime,
-								"serverA",
 								98.0,
 								"idle",
 							},
 							{
 								endTime,
-								"serverA",
 								96.0,
 								"idle",
 							},
@@ -2232,25 +2532,22 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
-						Columns: []string{"time", "bottom", "host", "type"},
+						Tags:    models.Tags{"host": "serverA"},
+						Columns: []string{"time", "bottom", "type"},
 						Values: [][]interface{}{
 							{
 								time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
 								91.0,
-								"serverA",
 								"idle",
 							},
 							{
 								time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 								92.0,
-								"serverA",
 								"idle",
 							},
 							{
 								time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
 								92.0,
-								"serverA",
 								"idle",
 							},
 						},
@@ -2265,25 +2562,22 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
-						Columns: []string{"time", "bottom", "host", "type"},
+						Tags:    models.Tags{"host": "serverA"},
+						Columns: []string{"time", "bottom", "type"},
 						Values: [][]interface{}{
 							{
 								endTime,
 								91.0,
-								"serverA",
 								"idle",
 							},
 							{
 								endTime,
 								92.0,
-								"serverA",
 								"idle",
 							},
 							{
 								endTime,
 								92.0,
-								"serverA",
 								"idle",
 							},
 						},
@@ -2330,6 +2624,7 @@ stream
 	|from()
 		.measurement('cpu')
 		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
 	|window()
 		.period(10s)
 		.every(10s)
@@ -2345,7 +2640,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "sum"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -2361,7 +2656,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "count"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -2377,7 +2672,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "distinct"},
 						Values: [][]interface{}{
 							{
@@ -2415,7 +2710,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "mean"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -2431,7 +2726,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "median"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -2513,7 +2808,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "spread"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -2529,7 +2824,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "stddev"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -2630,18 +2925,16 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
-						Columns: []string{"time", "host", "top", "type"},
+						Tags:    models.Tags{"host": "serverA"},
+						Columns: []string{"time", "top", "type"},
 						Values: [][]interface{}{
 							{
 								time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
-								"serverA",
 								98.0,
 								"idle",
 							},
 							{
 								time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
-								"serverA",
 								96.0,
 								"idle",
 							},
@@ -2657,18 +2950,16 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
-						Columns: []string{"time", "host", "top", "type"},
+						Tags:    models.Tags{"host": "serverA"},
+						Columns: []string{"time", "top", "type"},
 						Values: [][]interface{}{
 							{
 								endTime,
-								"serverA",
 								98.0,
 								"idle",
 							},
 							{
 								endTime,
-								"serverA",
 								96.0,
 								"idle",
 							},
@@ -2685,25 +2976,22 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
-						Columns: []string{"time", "bottom", "host", "type"},
+						Tags:    models.Tags{"host": "serverA"},
+						Columns: []string{"time", "bottom", "type"},
 						Values: [][]interface{}{
 							{
 								time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
 								91.0,
-								"serverA",
 								"idle",
 							},
 							{
 								time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 								92.0,
-								"serverA",
 								"idle",
 							},
 							{
 								time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
 								92.0,
-								"serverA",
 								"idle",
 							},
 						},
@@ -2718,25 +3006,22 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
-						Columns: []string{"time", "bottom", "host", "type"},
+						Tags:    models.Tags{"host": "serverA"},
+						Columns: []string{"time", "bottom", "type"},
 						Values: [][]interface{}{
 							{
 								endTime,
 								91.0,
-								"serverA",
 								"idle",
 							},
 							{
 								endTime,
 								92.0,
-								"serverA",
 								"idle",
 							},
 							{
 								endTime,
 								92.0,
-								"serverA",
 								"idle",
 							},
 						},
@@ -2782,6 +3067,7 @@ stream
 	|from()
 		.measurement('cpu')
 		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
 	|window()
 		.period(10s)
 		.every(10s)
@@ -2797,7 +3083,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "count"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -2813,7 +3099,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "distinct"},
 						Values: [][]interface{}{
 							{
@@ -2950,6 +3236,7 @@ stream
 	|from()
 		.measurement('cpu')
 		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
 	|window()
 		.period(10s)
 		.every(10s)
@@ -2965,7 +3252,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "count"},
 						Values: [][]interface{}{[]interface{}{
 							endTime,
@@ -2981,7 +3268,7 @@ stream
 				Series: imodels.Rows{
 					{
 						Name:    "cpu",
-						Tags:    nil,
+						Tags:    models.Tags{"host": "serverA"},
 						Columns: []string{"time", "distinct"},
 						Values: [][]interface{}{
 							{
@@ -3248,7 +3535,6 @@ stream
 }
 
 func TestStream_Alert(t *testing.T) {
-
 	requestCount := int32(0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ad := kapacitor.AlertData{}
@@ -3310,7 +3596,6 @@ stream
 		.warn(lambda: "count" > warnThreshold)
 		.crit(lambda: "count" > critThreshold)
 		.post('` + ts.URL + `')
-	|log()
 	|httpOut('TestStream_Alert')
 `
 
@@ -3677,6 +3962,105 @@ stream
 	c.Channel = "#channel"
 	sl := slack.NewService(c, logService.NewLogger("[test_slack] ", log.LstdFlags))
 	tm.SlackService = sl
+
+	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if rc := atomic.LoadInt32(&requestCount); rc != 2 {
+		t.Errorf("unexpected requestCount got %d exp 2", rc)
+	}
+}
+
+func TestStream_AlertTelegram(t *testing.T) {
+	requestCount := int32(0)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&requestCount, 1)
+		type postData struct {
+			ChatId                string `json:"chat_id"`
+			Text                  string `json:"text"`
+			ParseMode             string `json:"parse_mode"`
+			DisableWebPagePreview bool   `json:"disable_web_page_preview"`
+			DisableNotification   bool   `json:"disable_notification"`
+		}
+		pd := postData{}
+		dec := json.NewDecoder(r.Body)
+		dec.Decode(&pd)
+
+		if exp := "/botTOKEN:AUTH/sendMessage"; r.URL.String() != exp {
+			t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
+		}
+
+		if rc := atomic.LoadInt32(&requestCount); rc == 1 {
+			if exp := "12345678"; pd.ChatId != exp {
+				t.Errorf("unexpected recipient got %s exp %s", pd.ChatId, exp)
+			}
+			if exp := "HTML"; pd.ParseMode != exp {
+				t.Errorf("unexpected recipient got %s exp %s", pd.ParseMode, exp)
+			}
+			if exp := true; pd.DisableWebPagePreview != exp {
+				t.Errorf("unexpected DisableWebPagePreview got %t exp %t", pd.DisableWebPagePreview, exp)
+			}
+			if exp := true; pd.DisableNotification != exp {
+				t.Errorf("unexpected DisableNotification got %t exp %t", pd.DisableNotification, exp)
+			}
+
+		} else if rc := atomic.LoadInt32(&requestCount); rc == 2 {
+			if exp := "87654321"; pd.ChatId != exp {
+				t.Errorf("unexpected recipient got %s exp %s", pd.ChatId, exp)
+			}
+			if exp := ""; pd.ParseMode != exp {
+				t.Errorf("unexpected recipient got '%s' exp '%s'", pd.ParseMode, exp)
+			}
+			if exp := true; pd.DisableWebPagePreview != exp {
+				t.Errorf("unexpected DisableWebPagePreview got %t exp %t", pd.DisableWebPagePreview, exp)
+			}
+			if exp := false; pd.DisableNotification != exp {
+				t.Errorf("unexpected DisableNotification got %t exp %t", pd.DisableNotification, exp)
+			}
+		}
+
+		if exp := "kapacitor/cpu/serverA is CRITICAL"; pd.Text != exp {
+			t.Errorf("unexpected text got %s exp %s", pd.Text, exp)
+		}
+	}))
+	defer ts.Close()
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.telegram()
+			.chatId('12345678')
+                	.disableNotification()
+                	.parseMode('HTML')
+                .telegram()
+                	.chatId('87654321')
+`
+
+	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
+	defer tm.Close()
+
+	c := telegram.NewConfig()
+	c.URL = ts.URL + "/bot"
+	c.Token = "TOKEN:AUTH"
+	c.ChatId = "123456789"
+	c.DisableWebPagePreview = true
+	c.DisableNotification = false
+	tl := telegram.NewService(c, logService.NewLogger("[test_telegram] ", log.LstdFlags))
+	tm.TelegramService = tl
 
 	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
 	if err != nil {
@@ -4241,6 +4625,64 @@ stream
 
 	if rc := atomic.LoadInt32(&requestCount); rc != 1 {
 		t.Errorf("unexpected requestCount got %d exp 1", rc)
+	}
+}
+func TestStream_AlertLog(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "TestStream_AlertLog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+	normalPath := filepath.Join(tmpDir, "normal.log")
+	modePath := filepath.Join(tmpDir, "mode.log")
+	var script = fmt.Sprintf(`
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor.{{ .Name }}.{{ index .Tags "host" }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.log('%s')
+		.log('%s')
+			.mode(0644)
+`, normalPath, modePath)
+
+	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
+	defer tm.Close()
+
+	err = fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
+	if err != nil {
+		t.Error(err)
+	}
+
+	normal, err := os.Open(normalPath)
+	if err != nil {
+		t.Fatalf("missing log file for alert %v", err)
+	}
+	defer normal.Close()
+	if stat, err := normal.Stat(); err != nil {
+		t.Fatal(err)
+	} else if exp, got := os.FileMode(0600), stat.Mode(); exp != got {
+		t.Errorf("unexpected normal file mode: got %v exp %v", got, exp)
+	}
+
+	mode, err := os.Open(modePath)
+	if err != nil {
+		t.Fatalf("missing log file for alert %v", err)
+	}
+	defer mode.Close()
+	if stat, err := mode.Stat(); err != nil {
+		t.Fatal(err)
+	} else if exp, got := os.FileMode(0644), stat.Mode(); exp != got {
+		t.Errorf("unexpected normal file mode: got %v exp %v", got, exp)
 	}
 }
 

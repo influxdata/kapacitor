@@ -1,0 +1,2 @@
+{"name":"errors","tags":{"service":"cart"},"points":[{"fields":{"sum":11},"time":"2015-10-30T00:00:00Z"},{"fields":{"sum":10},"time":"2015-10-30T00:00:05Z"}]}
+{"name":"errors","tags":{"service":"login"},"points":[{"fields":{"sum":13},"time":"2015-10-30T00:00:00Z"},{"fields":{"sum":8},"time":"2015-10-30T00:00:05Z"}]}

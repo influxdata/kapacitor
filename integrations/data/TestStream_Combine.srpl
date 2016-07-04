@@ -1,0 +1,36 @@
+dbname
+rpname
+request_latency,service=auth,dc=A value=700 0000000001
+dbname
+rpname
+request_latency,service=log,dc=A value=600 0000000001
+dbname
+rpname
+request_latency,service=cart,dc=A value=800 0000000001
+dbname
+rpname
+request_latency,service=auth,dc=B value=750 0000000001
+dbname
+rpname
+request_latency,service=log,dc=B value=650 0000000001
+dbname
+rpname
+request_latency,service=cart,dc=B value=850 0000000001
+dbname
+rpname
+request_latency,service=auth,dc=A value=500 0000000002
+dbname
+rpname
+request_latency,service=log,dc=A value=700 0000000002
+dbname
+rpname
+request_latency,service=cart,dc=A value=300 0000000002
+dbname
+rpname
+request_latency,service=auth,dc=B value=850 0000000002
+dbname
+rpname
+request_latency,service=log,dc=B value=450 0000000002
+dbname
+rpname
+request_latency,service=cart,dc=B value=950 0000000002

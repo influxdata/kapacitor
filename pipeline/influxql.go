@@ -413,7 +413,7 @@ func (n *chainnode) HoltWintersWithFit(field string, h, m int64, interval time.D
 }
 
 func (n *chainnode) holtWinters(field string, h, m int64, interval time.Duration, includeFitData bool) *InfluxQLNode {
-	i := newInfluxQLNode("holt_winters", field, n.Provides(), BatchEdge, ReduceCreater{
+	i := newInfluxQLNode("holtWinters", field, n.Provides(), BatchEdge, ReduceCreater{
 		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
 			fn := influxql.NewFloatHoltWintersReducer(int(h), int(m), includeFitData, interval)
 			return fn, fn
@@ -423,6 +423,8 @@ func (n *chainnode) holtWinters(field string, h, m int64, interval time.Duration
 			return fn, fn
 		},
 	})
+	// Always use point times for Holt Winters
+	i.PointTimes = true
 	n.linkChild(i)
 	return i
 }

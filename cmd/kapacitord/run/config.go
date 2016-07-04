@@ -28,6 +28,7 @@ import (
 	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/influxdata/kapacitor/services/talk"
 	"github.com/influxdata/kapacitor/services/task_store"
+	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
@@ -56,6 +57,7 @@ type Config struct {
 	PagerDuty pagerduty.Config  `toml:"pagerduty"`
 	Sensu     sensu.Config      `toml:"sensu"`
 	Slack     slack.Config      `toml:"slack"`
+	Telegram  telegram.Config   `toml:"telegram"`
 	HipChat   hipchat.Config    `toml:"hipchat"`
 	Alerta    alerta.Config     `toml:"alerta"`
 	Reporting reporting.Config  `toml:"reporting"`
@@ -91,6 +93,7 @@ func NewConfig() *Config {
 	c.PagerDuty = pagerduty.NewConfig()
 	c.Sensu = sensu.NewConfig()
 	c.Slack = slack.NewConfig()
+	c.Telegram = telegram.NewConfig()
 	c.HipChat = hipchat.NewConfig()
 	c.Alerta = alerta.NewConfig()
 	c.Reporting = reporting.NewConfig()
