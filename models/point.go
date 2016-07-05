@@ -211,3 +211,10 @@ func (d Dimensions) ToSet() map[string]bool {
 	}
 	return set
 }
+
+// Simple container for point data.
+type RawPoint struct {
+	Time   time.Time
+	Fields Fields
+	Tags   Tags
+}

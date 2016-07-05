@@ -57,7 +57,7 @@ type FlattenNode struct {
 
 func newFlattenNode(e EdgeType, parents []Node) *FlattenNode {
 	f := &FlattenNode{
-		chainnode: newBasicChainNode("flatten", e, e),
+		chainnode: newBasicChainNode("flatten", e, StreamEdge),
 		Delimiter: defaultFlattenDelimiter,
 	}
 	return f
