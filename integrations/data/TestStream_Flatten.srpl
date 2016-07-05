@@ -1,0 +1,72 @@
+dbname
+rpname
+request_latency,service=auth,host=server01,dc=A value=700 0000000001
+dbname
+rpname
+request_latency,service=auth,host=server02,dc=A value=702 0000000001
+dbname
+rpname
+request_latency,service=log,host=server01,dc=A value=600 0000000001
+dbname
+rpname
+request_latency,service=log,host=server02,dc=A value=602 0000000001
+dbname
+rpname
+request_latency,service=cart,host=server01,dc=A value=800 0000000001
+dbname
+rpname
+request_latency,service=cart,host=server02,dc=A value=802 0000000001
+dbname
+rpname
+request_latency,service=auth,host=server01,dc=B value=750 0000000001
+dbname
+rpname
+request_latency,service=auth,host=server02,dc=B value=752 0000000001
+dbname
+rpname
+request_latency,service=log,host=server01,dc=B value=650 0000000001
+dbname
+rpname
+request_latency,service=log,host=server02,dc=B value=652 0000000001
+dbname
+rpname
+request_latency,service=cart,host=server01,dc=B value=850 0000000001
+dbname
+rpname
+request_latency,service=cart,host=server02,dc=B value=852 0000000001
+dbname
+rpname
+request_latency,service=auth,host=server01,dc=A value=500 0000000002
+dbname
+rpname
+request_latency,service=auth,host=server02,dc=A value=502 0000000002
+dbname
+rpname
+request_latency,service=log,host=server01,dc=A value=700 0000000002
+dbname
+rpname
+request_latency,service=log,host=server02,dc=A value=702 0000000002
+dbname
+rpname
+request_latency,service=cart,host=server01,dc=A value=300 0000000002
+dbname
+rpname
+request_latency,service=cart,host=server02,dc=A value=302 0000000002
+dbname
+rpname
+request_latency,service=auth,host=server01,dc=B value=850 0000000002
+dbname
+rpname
+request_latency,service=auth,host=server02,dc=B value=852 0000000002
+dbname
+rpname
+request_latency,service=log,host=server01,dc=B value=450 0000000002
+dbname
+rpname
+request_latency,service=log,host=server02,dc=B value=452 0000000002
+dbname
+rpname
+request_latency,service=cart,host=server01,dc=B value=950 0000000002
+dbname
+rpname
+request_latency,service=cart,host=server02,dc=B value=952 0000000002

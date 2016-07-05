@@ -943,6 +943,66 @@ batch
 	}
 }
 
+func TestBatch_Flatten(t *testing.T) {
+	var script = `
+batch
+	|query('SELECT value FROM "telegraf"."default"."request_latency"')
+		.period(10s)
+		.every(10s)
+		.groupBy('dc','service')
+	|groupBy('dc')
+	|flatten()
+		.on('service')
+		.tolerance(5s)
+    |httpOut('TestBatch_Flatten')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "A"},
+				Columns: []string{"time", "auth.value", "cart.value", "log.value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+						4.0,
+						8.0,
+						7.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 15, 0, time.UTC),
+						2.0,
+						3.0,
+						1.0,
+					},
+				},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "B"},
+				Columns: []string{"time", "auth.value", "cart.value", "log.value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+						9.0,
+						3.0,
+						5.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 15, 0, time.UTC),
+						6.0,
+						7.0,
+						4.0,
+					},
+				},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_Flatten", script, 40*time.Second, er, true)
+}
+
 func TestBatch_Combine_All(t *testing.T) {
 	var script = `
 batch
