@@ -1,4 +1,5 @@
-package run
+// Provides a server type for starting and configuring a Kapacitor server.
+package server
 
 import (
 	"errors"
@@ -73,7 +74,7 @@ type Server struct {
 	InfluxDBService *influxdb.Service
 
 	MetaClient    *kapacitor.NoopMetaClient
-	QueryExecutor *queryexecutor
+	QueryExecutor *Queryexecutor
 
 	Services []Service
 
@@ -87,21 +88,21 @@ type Server struct {
 	Logger *log.Logger
 }
 
-// NewServer returns a new instance of Server built from a config.
-func NewServer(c *Config, buildInfo *BuildInfo, logService logging.Interface) (*Server, error) {
+// New returns a new instance of Server built from a config.
+func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server, error) {
 	err := c.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("%s. To generate a valid configuration file run `kapacitord config > kapacitor.generated.conf`.", err)
 	}
 	l := logService.NewLogger("[srv] ", log.LstdFlags)
 	s := &Server{
-		buildInfo:     *buildInfo,
+		buildInfo:     buildInfo,
 		dataDir:       c.DataDir,
 		hostname:      c.Hostname,
 		err:           make(chan error),
 		LogService:    logService,
 		MetaClient:    &kapacitor.NoopMetaClient{},
-		QueryExecutor: &queryexecutor{},
+		QueryExecutor: &Queryexecutor{},
 		Logger:        l,
 	}
 	s.Logger.Println("I! Kapacitor hostname:", s.hostname)
@@ -598,11 +599,11 @@ type tcpaddr struct{ host string }
 func (a *tcpaddr) Network() string { return "tcp" }
 func (a *tcpaddr) String() string  { return a.host }
 
-type queryexecutor struct{}
+type Queryexecutor struct{}
 
-func (qe *queryexecutor) Authorize(u *meta.UserInfo, q *influxql.Query, db string) error {
+func (qe *Queryexecutor) Authorize(u *meta.UserInfo, q *influxql.Query, db string) error {
 	return nil
 }
-func (qe *queryexecutor) ExecuteQuery(q *influxql.Query, db string, chunkSize int) (<-chan *influxql.Result, error) {
+func (qe *Queryexecutor) ExecuteQuery(q *influxql.Query, db string, chunkSize int) (<-chan *influxql.Result, error) {
 	return nil, errors.New("cannot execute queries against Kapacitor")
 }

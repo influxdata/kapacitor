@@ -12,6 +12,7 @@ import (
 	"strconv"
 
 	"github.com/BurntSushi/toml"
+	"github.com/influxdata/kapacitor/server"
 	"github.com/influxdata/kapacitor/services/logging"
 	"github.com/influxdata/kapacitor/tick"
 )
@@ -41,7 +42,7 @@ type Command struct {
 	Stdout io.Writer
 	Stderr io.Writer
 
-	Server     *Server
+	Server     *server.Server
 	Logger     *log.Logger
 	logService *logging.Service
 }
@@ -108,7 +109,7 @@ func (cmd *Command) Run(args ...string) error {
 
 	// Mark start-up in log.,
 	cmd.Logger.Printf("I! Kapacitor starting, version %s, branch %s, commit %s", cmd.Version, cmd.Branch, cmd.Commit)
-	cmd.Logger.Printf("I! Go version %s, GOMAXPROCS set to %d", runtime.Version(), runtime.GOMAXPROCS(0))
+	cmd.Logger.Printf("I! Go version %s", runtime.Version())
 
 	// Write the PID file.
 	if err := cmd.writePIDFile(options.PIDFile); err != nil {
@@ -116,8 +117,8 @@ func (cmd *Command) Run(args ...string) error {
 	}
 
 	// Create server from config and start it.
-	buildInfo := &BuildInfo{Version: cmd.Version, Commit: cmd.Commit, Branch: cmd.Branch}
-	s, err := NewServer(config, buildInfo, cmd.logService)
+	buildInfo := server.BuildInfo{Version: cmd.Version, Commit: cmd.Commit, Branch: cmd.Branch}
+	s, err := server.New(config, buildInfo, cmd.logService)
 	if err != nil {
 		return fmt.Errorf("create server: %s", err)
 	}
@@ -202,16 +203,16 @@ func (cmd *Command) writePIDFile(path string) error {
 
 // ParseConfig parses the config at path.
 // Returns a demo configuration if path is blank.
-func (cmd *Command) ParseConfig(path string) (*Config, error) {
+func (cmd *Command) ParseConfig(path string) (*server.Config, error) {
 	// Use demo configuration if no config path is specified.
 	if path == "" {
 		log.Println("no configuration provided, using default settings")
-		return NewDemoConfig()
+		return server.NewDemoConfig()
 	}
 
 	log.Printf("Using configuration at: %s\n", path)
 
-	config := NewConfig()
+	config := server.NewConfig()
 	if _, err := toml.DecodeFile(path, &config); err != nil {
 		return nil, err
 	}
