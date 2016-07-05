@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/BurntSushi/toml"
+	"github.com/influxdata/kapacitor/server"
 )
 
 // PrintConfigCommand represents the command executed by "kapacitord config".
@@ -65,12 +66,12 @@ func (cmd *PrintConfigCommand) Run(args ...string) error {
 
 // ParseConfig parses the config at path.
 // Returns a demo configuration if path is blank.
-func (cmd *PrintConfigCommand) parseConfig(path string) (*Config, error) {
+func (cmd *PrintConfigCommand) parseConfig(path string) (*server.Config, error) {
 	if path == "" {
-		return NewDemoConfig()
+		return server.NewDemoConfig()
 	}
 
-	config := NewConfig()
+	config := server.NewConfig()
 	if _, err := toml.DecodeFile(path, &config); err != nil {
 		return nil, err
 	}

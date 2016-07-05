@@ -1,5 +1,5 @@
 // This package is a set of convenience helpers and structs to make integration testing easier
-package run_test
+package server_test
 
 import (
 	"encoding/json"
@@ -17,27 +17,27 @@ import (
 
 	iclient "github.com/influxdata/influxdb/client/v2"
 	"github.com/influxdata/kapacitor/client/v1"
-	"github.com/influxdata/kapacitor/cmd/kapacitord/run"
+	"github.com/influxdata/kapacitor/server"
 	"github.com/influxdata/wlog"
 )
 
-// Server represents a test wrapper for run.Server.
+// Server represents a test wrapper for server.Server.
 type Server struct {
-	*run.Server
-	Config *run.Config
+	*server.Server
+	Config *server.Config
 }
 
 // NewServer returns a new instance of Server.
-func NewServer(c *run.Config) *Server {
+func NewServer(c *server.Config) *Server {
 	configureLogging()
-	buildInfo := &run.BuildInfo{
+	buildInfo := server.BuildInfo{
 		Version: "testServer",
 		Commit:  "testCommit",
 		Branch:  "testBranch",
 	}
 	c.HTTP.LogEnabled = testing.Verbose()
 	ls := &LogService{}
-	srv, err := run.NewServer(c, buildInfo, ls)
+	srv, err := server.New(c, buildInfo, ls)
 	if err != nil {
 		panic(err)
 	}
@@ -57,7 +57,7 @@ func OpenDefaultServer() (*Server, *client.Client) {
 }
 
 // OpenServer opens a test server.
-func OpenServer(c *run.Config) *Server {
+func OpenServer(c *server.Config) *Server {
 	s := NewServer(c)
 	if err := s.Open(); err != nil {
 		panic(err.Error())
@@ -171,8 +171,8 @@ func (s *Server) Stats() (stats, error) {
 }
 
 // NewConfig returns the default config with temporary paths.
-func NewConfig() *run.Config {
-	c := run.NewConfig()
+func NewConfig() *server.Config {
+	c := server.NewConfig()
 	c.PostInit()
 	c.Reporting.Enabled = false
 	c.Replay.Dir = MustTempFile()

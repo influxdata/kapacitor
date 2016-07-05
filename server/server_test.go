@@ -1,4 +1,4 @@
-package run_test
+package server_test
 
 import (
 	"bufio"
@@ -23,9 +23,16 @@ import (
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/toml"
 	"github.com/influxdata/kapacitor/client/v1"
-	"github.com/influxdata/kapacitor/cmd/kapacitord/run"
+	"github.com/influxdata/kapacitor/server"
 	"github.com/influxdata/kapacitor/services/udf"
 )
+
+var udfDir string
+
+func init() {
+	dir, _ := os.Getwd()
+	udfDir = filepath.Clean(filepath.Join(dir, "../udf"))
+}
 
 func TestServer_Ping(t *testing.T) {
 	s, cli := OpenDefaultServer()
@@ -3502,12 +3509,6 @@ func TestServer_ReplayQuery(t *testing.T) {
 // If this test fails due to missing python dependencies, run 'INSTALL_PREFIX=/usr/local ./install-deps.sh' from the root directory of the
 // kapacitor project.
 func TestServer_UDFStreamAgents(t *testing.T) {
-	dir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	udfDir := filepath.Clean(filepath.Join(dir, "../../../udf"))
-
 	tdir, err := ioutil.TempDir("", "kapacitor_server_test")
 	if err != nil {
 		t.Fatal(err)
@@ -3573,7 +3574,7 @@ func TestServer_UDFStreamAgents(t *testing.T) {
 	}
 }
 
-func testStreamAgent(t *testing.T, c *run.Config) {
+func testStreamAgent(t *testing.T, c *server.Config) {
 	s := NewServer(c)
 	err := s.Open()
 	if err != nil {
@@ -3669,12 +3670,6 @@ test,group=b value=0 0000000011
 // If this test fails due to missing python dependencies, run 'INSTALL_PREFIX=/usr/local ./install-deps.sh' from the root directory of the
 // kapacitor project.
 func TestServer_UDFStreamAgentsSocket(t *testing.T) {
-	dir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	udfDir := filepath.Clean(filepath.Join(dir, "../../../udf"))
-
 	tdir, err := ioutil.TempDir("", "kapacitor_server_test")
 	if err != nil {
 		t.Fatal(err)
@@ -3755,7 +3750,7 @@ func TestServer_UDFStreamAgentsSocket(t *testing.T) {
 	}
 }
 
-func testStreamAgentSocket(t *testing.T, c *run.Config) {
+func testStreamAgentSocket(t *testing.T, c *server.Config) {
 	s := NewServer(c)
 	err := s.Open()
 	if err != nil {
@@ -3836,12 +3831,6 @@ test,group=a value=0 0000000011
 // If this test fails due to missing python dependencies, run 'INSTALL_PREFIX=/usr/local ./install-deps.sh' from the root directory of the
 // kapacitor project.
 func TestServer_UDFBatchAgents(t *testing.T) {
-	dir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	udfDir := filepath.Clean(filepath.Join(dir, "../../../udf"))
-
 	tdir, err := ioutil.TempDir("", "kapacitor_server_test")
 	if err != nil {
 		t.Fatal(err)
@@ -3907,7 +3896,7 @@ func TestServer_UDFBatchAgents(t *testing.T) {
 	}
 }
 
-func testBatchAgent(t *testing.T, c *run.Config) {
+func testBatchAgent(t *testing.T, c *server.Config) {
 	count := 0
 	stopTimeC := make(chan time.Time, 2)
 	db := NewInfluxDB(func(q string) *iclient.Response {

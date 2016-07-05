@@ -1,17 +1,17 @@
-package run_test
+package server_test
 
 import (
 	"os"
 	"testing"
 
 	"github.com/BurntSushi/toml"
-	"github.com/influxdata/kapacitor/cmd/kapacitord/run"
+	"github.com/influxdata/kapacitor/server"
 )
 
 // Ensure the configuration can be parsed.
 func TestConfig_Parse(t *testing.T) {
 	// Parse configuration.
-	var c run.Config
+	var c server.Config
 	if _, err := toml.Decode(`
 [replay]
 dir = "/tmp/replay"
@@ -33,7 +33,7 @@ boltdb = "/tmp/kapacitor.db"
 // Ensure the configuration can be parsed.
 func TestConfig_Parse_EnvOverride(t *testing.T) {
 	// Parse configuration.
-	var c run.Config
+	var c server.Config
 	if _, err := toml.Decode(`
 [[influxdb]]
 urls=["http://localhost:8086"]
