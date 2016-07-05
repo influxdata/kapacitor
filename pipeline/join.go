@@ -6,6 +6,10 @@ import (
 	"time"
 )
 
+const (
+	defaultJoinDelimiter = "."
+)
+
 // Joins the data from any number of nodes.
 // As each data point is received from a parent node it is paired
 // with the next data points from the other parent nodes with a
@@ -59,6 +63,10 @@ type JoinNode struct {
 	// tick:ignore
 	Dimensions []string `tick:"On"`
 
+	// The delimiter for the field name prefixes.
+	// Can be the empty string.
+	Delimiter string
+
 	// The name of this new joined data stream.
 	// If empty the name of the left parent is used.
 	StreamName string
@@ -82,6 +90,7 @@ type JoinNode struct {
 func newJoinNode(e EdgeType, parents []Node) *JoinNode {
 	j := &JoinNode{
 		chainnode: newBasicChainNode("join", e, e),
+		Delimiter: defaultJoinDelimiter,
 	}
 	for _, n := range parents {
 		n.linkChild(j)
@@ -145,8 +154,8 @@ func (j *JoinNode) validate() error {
 		if len(name) == 0 {
 			return fmt.Errorf("must provide a prefix name for the join node, see .as() property method")
 		}
-		if strings.ContainsRune(name, '.') {
-			return fmt.Errorf("cannot use name %s as field prefix, it contains a '.' character", name)
+		if j.Delimiter != "" && strings.Contains(name, j.Delimiter) {
+			return fmt.Errorf("cannot use name %s as field prefix, it contains the delimiter %q	", name, j.Delimiter)
 		}
 	}
 	names := make(map[string]bool, len(j.Names))

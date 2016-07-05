@@ -1238,6 +1238,106 @@ cpu0
 
 	testBatcherWithOutput(t, "TestBatch_Join", script, 30*time.Second, er, false)
 }
+func TestBatch_Join_Delimiter(t *testing.T) {
+
+	var script = `
+var cpu0 = batch
+	|query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "cpu" = 'cpu0'
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s))
+
+var cpu1 = batch
+	|query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "cpu" = 'cpu1'
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s))
+
+cpu0
+	|join(cpu1)
+		.as('cpu0', 'cpu1')
+		.delimiter('~')
+	|count('cpu0~mean')
+	|window()
+		.period(20s)
+		.every(20s)
+	|sum('count')
+	|httpOut('TestBatch_Join')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu_usage_idle",
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+					10.0,
+				}},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_Join", script, 30*time.Second, er, false)
+}
+func TestBatch_Join_DelimiterEmpty(t *testing.T) {
+
+	var script = `
+var cpu0 = batch
+	|query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "cpu" = 'cpu0'
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s))
+
+var cpu1 = batch
+	|query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "cpu" = 'cpu1'
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s))
+
+cpu0
+	|join(cpu1)
+		.as('cpu0', 'cpu1')
+		.delimiter('')
+	|count('cpu0mean')
+	|window()
+		.period(20s)
+		.every(20s)
+	|sum('count')
+	|httpOut('TestBatch_Join')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu_usage_idle",
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+					10.0,
+				}},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_Join", script, 30*time.Second, er, false)
+}
 
 func TestBatch_JoinTolerance(t *testing.T) {
 
