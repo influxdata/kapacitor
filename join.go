@@ -277,6 +277,7 @@ func (g *group) collect(i int, p models.PointInterface) error {
 			g.j.fill,
 			g.j.fillValue,
 			g.j.j.Names,
+			g.j.j.Delimiter,
 			g.j.j.Tolerance,
 			t,
 			g.j.logger,
@@ -296,6 +297,7 @@ func (g *group) collect(i int, p models.PointInterface) error {
 			g.j.fill,
 			g.j.fillValue,
 			g.j.j.Names,
+			g.j.j.Delimiter,
 			g.j.j.Tolerance,
 			t,
 			g.j.logger,
@@ -399,6 +401,7 @@ type joinset struct {
 	fill      influxql.FillOption
 	fillValue interface{}
 	prefixes  []string
+	delimiter string
 
 	time      time.Time
 	tolerance time.Duration
@@ -418,6 +421,7 @@ func newJoinset(
 	fill influxql.FillOption,
 	fillValue interface{},
 	prefixes []string,
+	delimiter string,
 	tolerance time.Duration,
 	time time.Time,
 	l *log.Logger,
@@ -428,6 +432,7 @@ func newJoinset(
 		fill:      fill,
 		fillValue: fillValue,
 		prefixes:  prefixes,
+		delimiter: delimiter,
 		expected:  expected,
 		values:    make([]models.PointInterface, expected),
 		first:     expected,
@@ -467,11 +472,11 @@ func (js *joinset) JoinIntoPoint() (models.Point, bool) {
 			switch js.fill {
 			case influxql.NullFill:
 				for k := range js.First().PointFields() {
-					fields[js.prefixes[i]+"."+k] = nil
+					fields[js.prefixes[i]+js.delimiter+k] = nil
 				}
 			case influxql.NumberFill:
 				for k := range js.First().PointFields() {
-					fields[js.prefixes[i]+"."+k] = js.fillValue
+					fields[js.prefixes[i]+js.delimiter+k] = js.fillValue
 				}
 			default:
 				// inner join no valid point possible
@@ -479,7 +484,7 @@ func (js *joinset) JoinIntoPoint() (models.Point, bool) {
 			}
 		} else {
 			for k, v := range p.PointFields() {
-				fields[js.prefixes[i]+"."+k] = v
+				fields[js.prefixes[i]+js.delimiter+k] = v
 			}
 		}
 	}
@@ -558,11 +563,11 @@ func (js *joinset) JoinIntoBatch() (models.Batch, bool) {
 				switch js.fill {
 				case influxql.NullFill:
 					for _, k := range fieldNames {
-						fields[js.prefixes[i]+"."+k] = nil
+						fields[js.prefixes[i]+js.delimiter+k] = nil
 					}
 				case influxql.NumberFill:
 					for _, k := range fieldNames {
-						fields[js.prefixes[i]+"."+k] = js.fillValue
+						fields[js.prefixes[i]+js.delimiter+k] = js.fillValue
 					}
 				default:
 					// inner join no valid point possible
@@ -570,7 +575,7 @@ func (js *joinset) JoinIntoBatch() (models.Batch, bool) {
 				}
 			} else {
 				for k, v := range bp.Fields {
-					fields[js.prefixes[i]+"."+k] = v
+					fields[js.prefixes[i]+js.delimiter+k] = v
 				}
 			}
 		}

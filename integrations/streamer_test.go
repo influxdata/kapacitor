@@ -1615,6 +1615,155 @@ errorCounts
 	testStreamerWithOutput(t, "TestStream_Join", script, 13*time.Second, er, nil, true)
 }
 
+func TestStream_Join_Delimiter(t *testing.T) {
+
+	var script = `
+var errorCounts = stream
+	|from()
+		.measurement('errors')
+		.groupBy('service')
+	|window()
+		.period(10s)
+		.every(10s)
+		.align()
+	|sum('value')
+
+var viewCounts = stream
+	|from()
+		.measurement('views')
+		.groupBy('service')
+	|window()
+		.period(10s)
+		.every(10s)
+		.align()
+	|sum('value')
+
+errorCounts
+	|join(viewCounts)
+		.as('errors', 'views')
+		.delimiter('#')
+		.streamName('error_view')
+	|eval(lambda: "errors#sum" / "views#sum")
+		.as('error_percent')
+		.keep()
+	|httpOut('TestStream_Join')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "error_view",
+				Tags:    map[string]string{"service": "cartA"},
+				Columns: []string{"time", "error_percent", "errors#sum", "views#sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					0.01,
+					47.0,
+					4700.0,
+				}},
+			},
+			{
+				Name:    "error_view",
+				Tags:    map[string]string{"service": "login"},
+				Columns: []string{"time", "error_percent", "errors#sum", "views#sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					0.01,
+					45.0,
+					4500.0,
+				}},
+			},
+			{
+				Name:    "error_view",
+				Tags:    map[string]string{"service": "front"},
+				Columns: []string{"time", "error_percent", "errors#sum", "views#sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					0.01,
+					32.0,
+					3200.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Join", script, 13*time.Second, er, nil, true)
+}
+func TestStream_Join_DelimiterEmpty(t *testing.T) {
+
+	var script = `
+var errorCounts = stream
+	|from()
+		.measurement('errors')
+		.groupBy('service')
+	|window()
+		.period(10s)
+		.every(10s)
+		.align()
+	|sum('value')
+
+var viewCounts = stream
+	|from()
+		.measurement('views')
+		.groupBy('service')
+	|window()
+		.period(10s)
+		.every(10s)
+		.align()
+	|sum('value')
+
+errorCounts
+	|join(viewCounts)
+		.as('errors', 'views')
+		.delimiter('')
+		.streamName('error_view')
+	|eval(lambda: "errorssum" / "viewssum")
+		.as('error_percent')
+		.keep()
+	|httpOut('TestStream_Join')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "error_view",
+				Tags:    map[string]string{"service": "cartA"},
+				Columns: []string{"time", "error_percent", "errorssum", "viewssum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					0.01,
+					47.0,
+					4700.0,
+				}},
+			},
+			{
+				Name:    "error_view",
+				Tags:    map[string]string{"service": "login"},
+				Columns: []string{"time", "error_percent", "errorssum", "viewssum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					0.01,
+					45.0,
+					4500.0,
+				}},
+			},
+			{
+				Name:    "error_view",
+				Tags:    map[string]string{"service": "front"},
+				Columns: []string{"time", "error_percent", "errorssum", "viewssum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					0.01,
+					32.0,
+					3200.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Join", script, 13*time.Second, er, nil, true)
+}
+
 func TestStream_JoinTolerance(t *testing.T) {
 
 	var script = `

@@ -13,6 +13,7 @@
 - [#669](https://github.com/influxdata/kapacitor/pull/669): Add size function for humanize byte size. thanks @jsvisa!
 - [#697](https://github.com/influxdata/kapacitor/pull/697): Can now flatten a set of points into a single points creating dynamcially named fields.
 
+- [#698](https://github.com/influxdata/kapacitor/pull/698): Join delimiter can be specified.
 
 ### Bugfixes
 
