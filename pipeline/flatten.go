@@ -37,7 +37,6 @@ const (
 //
 // Since flattening points creates dynamically named fields in general it is expected
 // that the resultant data is passed to a UDF or similar for custom processing.
-// tick:property
 type FlattenNode struct {
 	chainnode
 
