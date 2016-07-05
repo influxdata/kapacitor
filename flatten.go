@@ -105,7 +105,6 @@ func (n *FlattenNode) runFlatten([]byte) error {
 	case pipeline.BatchEdge:
 		allBuffers := make(map[models.GroupID]*flattenBatchBuffer)
 		for b, ok := n.ins[0].NextBatch(); ok; b, ok = n.ins[0].NextBatch() {
-			log.Println("D! batch", b)
 			n.timer.Start()
 			t := b.TMax.Round(n.f.Tolerance)
 			currentBuf, ok := allBuffers[b.Group]
@@ -119,9 +118,7 @@ func (n *FlattenNode) runFlatten([]byte) error {
 				}
 				allBuffers[b.Group] = currentBuf
 			}
-			log.Println("D! buf", currentBuf)
 			if !t.Equal(currentBuf.Time) {
-				log.Println("D! emit", currentBuf.Time)
 				// Flatten/Emit old buffer
 				times := make(timeList, 0, len(currentBuf.Points))
 				for t := range currentBuf.Points {
@@ -146,7 +143,6 @@ func (n *FlattenNode) runFlatten([]byte) error {
 					}
 					delete(currentBuf.Points, t)
 				}
-				log.Println("D! flatBatch", flatBatch)
 				n.timer.Pause()
 				for _, out := range n.outs {
 					err := out.CollectBatch(flatBatch)
