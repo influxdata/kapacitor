@@ -31,16 +31,17 @@ import (
 //    errors
 //        |join(requests)
 //            // Provide prefix names for the fields of the data points.
-//            .as('errors', 'requests')
+//            .as('errors', '#')
 //            // points that are within 1 second are considered the same time.
 //            .tolerance(1s)
 //            // fill missing values with 0, implies outer join.
 //            .fill(0.0)
 //            // name the resulting stream
 //            .streamName('error_rate')
-//        // Both the "value" fields from each parent have been prefixed
-//        // with the respective names 'errors' and 'requests'.
-//        |eval(lambda: "errors.value" / "requests.value")
+//        // The "value" field from the errors parent has been
+//        // prefixed with 'errors.' but the "value" field from the requests parent has
+//        // been copied without prepending an additional prefix.
+//        |eval(lambda: "errors.value" / "value"))
 //           .as('rate')
 //        ...
 //
@@ -90,10 +91,22 @@ func newJoinNode(e EdgeType, parents []Node) *JoinNode {
 }
 
 // Prefix names for all fields from the respective nodes.
+//
 // Each field from the parent nodes will be prefixed with the provided name and a '.'.
 // See the example above.
 //
 // The names cannot have a dot '.' character.
+//
+// If a prefix is not specified or is empty, then field names from parent nodes
+// will be copied without attaching a prefix.
+//
+// If a prefix contains a trailing '#' character, then the prefix
+// upto, but not including the trailing '#' character is prepended to the field name
+// from the parent node without adding the '.' character after the prefix.
+//
+// It is the callers responsibility to ensure that when these rules are applied
+// the collection of output field names does not contain any duplicate names. Failure
+// to ensure this will result in a runtime error.
 //
 // tick:property
 func (j *JoinNode) As(names ...string) *JoinNode {
@@ -137,25 +150,17 @@ func (j *JoinNode) validate() error {
 		return fmt.Errorf("a call to join.as() is required to specify the output stream prefixes.")
 	}
 
-	if len(j.Names) != len(j.Parents()) {
+	if len(j.Names) > len(j.Parents()) {
 		return fmt.Errorf("number of prefixes specified by join.as() must match the number of joined streams")
+	} else if len(j.Names) < len(j.Parents()) {
+		tmp := make([]string, len(j.Parents()))
+		copy(tmp, j.Names)
+		j.Names = tmp
 	}
-
 	for _, name := range j.Names {
-		if len(name) == 0 {
-			return fmt.Errorf("must provide a prefix name for the join node, see .as() property method")
-		}
 		if strings.ContainsRune(name, '.') {
 			return fmt.Errorf("cannot use name %s as field prefix, it contains a '.' character", name)
 		}
 	}
-	names := make(map[string]bool, len(j.Names))
-	for _, name := range j.Names {
-		if names[name] {
-			return fmt.Errorf("cannot use the same prefix name see .as() property method")
-		}
-		names[name] = true
-	}
-
 	return nil
 }

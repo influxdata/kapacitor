@@ -364,7 +364,15 @@ func (g *group) emitAll() error {
 }
 
 // emit a single joined set
-func (g *group) emitJoinedSet(set *joinset) error {
+func (g *group) emitJoinedSet(set *joinset) (err error) {
+	defer func() {
+		if p := recover(); p != nil {
+			var ok bool
+			if err, ok = p.(error); !ok {
+				panic(p)
+			}
+		}
+	}()
 	if set.name == "" {
 		set.name = set.First().PointName()
 	}
@@ -404,6 +412,8 @@ type joinset struct {
 	tolerance time.Duration
 	values    []models.PointInterface
 
+	claims map[string]int
+
 	expected int
 	size     int
 	finished int
@@ -434,6 +444,7 @@ func newJoinset(
 		time:      time,
 		tolerance: tolerance,
 		logger:    l,
+		claims:    make(map[string]int),
 	}
 }
 
@@ -467,11 +478,11 @@ func (js *joinset) JoinIntoPoint() (models.Point, bool) {
 			switch js.fill {
 			case influxql.NullFill:
 				for k := range js.First().PointFields() {
-					fields[js.prefixes[i]+"."+k] = nil
+					fields[js.outName(i, k)] = nil
 				}
 			case influxql.NumberFill:
 				for k := range js.First().PointFields() {
-					fields[js.prefixes[i]+"."+k] = js.fillValue
+					fields[js.outName(i, k)] = js.fillValue
 				}
 			default:
 				// inner join no valid point possible
@@ -479,7 +490,7 @@ func (js *joinset) JoinIntoPoint() (models.Point, bool) {
 			}
 		} else {
 			for k, v := range p.PointFields() {
-				fields[js.prefixes[i]+"."+k] = v
+				fields[js.outName(i, k)] = v
 			}
 		}
 	}
@@ -558,11 +569,11 @@ func (js *joinset) JoinIntoBatch() (models.Batch, bool) {
 				switch js.fill {
 				case influxql.NullFill:
 					for _, k := range fieldNames {
-						fields[js.prefixes[i]+"."+k] = nil
+						fields[js.outName(i, k)] = nil
 					}
 				case influxql.NumberFill:
 					for _, k := range fieldNames {
-						fields[js.prefixes[i]+"."+k] = js.fillValue
+						fields[js.outName(i, k)] = js.fillValue
 					}
 				default:
 					// inner join no valid point possible
@@ -570,7 +581,7 @@ func (js *joinset) JoinIntoBatch() (models.Batch, bool) {
 				}
 			} else {
 				for k, v := range bp.Fields {
-					fields[js.prefixes[i]+"."+k] = v
+					fields[js.outName(i, k)] = v
 				}
 			}
 		}
@@ -582,6 +593,35 @@ func (js *joinset) JoinIntoBatch() (models.Batch, bool) {
 		newBatch.Points = append(newBatch.Points, bp)
 	}
 	return newBatch, true
+}
+
+// outName returns the fully qualified name for field k, in stream joined stream i.
+//
+// If the specified prefix is empty, the output name is k.
+//
+// If the specified prefix contains a trailing #, the output name is the prefix
+// without the trailing # concatenated with k
+//
+// Otherwise, the output name is prefix+"."+k
+//
+// A runtime check is performed to guarantee that all output points have unique field
+// names.
+func (js *joinset) outName(i int, k string) string {
+	prefix := js.prefixes[i]
+	if len(prefix) == 0 {
+		prefix = ""
+	} else if prefix[len(prefix)-1] == '#' {
+		prefix = prefix[0 : len(prefix)-1]
+	} else {
+		prefix = prefix + "."
+	}
+	n := prefix + k
+	if claim, ok := js.claims[n]; ok && claim != i {
+		panic(fmt.Errorf("field %s of input %d conflicts with input %d", k, i, claim))
+	} else if !ok {
+		js.claims[n] = i
+	}
+	return n
 }
 
 type durationVar struct {
