@@ -361,6 +361,13 @@ func (n *chainnode) Combine(expressions ...*ast.LambdaNode) *CombineNode {
 	return c
 }
 
+// Flatten points with similar times into a single point.
+func (n *chainnode) Flatten() *FlattenNode {
+	f := newFlattenNode(n.provides)
+	n.linkChild(f)
+	return f
+}
+
 // Create an eval node that will evaluate the given transformation function to each data point.
 //  A list of expressions may be provided and will be evaluated in the order they are given
 // and results of previous expressions are made available to later expressions.

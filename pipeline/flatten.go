@@ -55,9 +55,9 @@ type FlattenNode struct {
 	Tolerance time.Duration
 }
 
-func newFlattenNode(e EdgeType, parents []Node) *FlattenNode {
+func newFlattenNode(e EdgeType) *FlattenNode {
 	f := &FlattenNode{
-		chainnode: newBasicChainNode("flatten", e, StreamEdge),
+		chainnode: newBasicChainNode("flatten", e, e),
 		Delimiter: defaultFlattenDelimiter,
 	}
 	return f

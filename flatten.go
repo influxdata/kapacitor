@@ -31,7 +31,7 @@ func newFlattenNode(et *ExecutingTask, n *pipeline.FlattenNode, l *log.Logger) (
 	return fn, nil
 }
 
-type flattenBuffer struct {
+type flattenStreamBuffer struct {
 	Time       time.Time
 	Name       string
 	Group      models.GroupID
@@ -40,16 +40,24 @@ type flattenBuffer struct {
 	Points     []models.RawPoint
 }
 
+type flattenBatchBuffer struct {
+	Time   time.Time
+	Name   string
+	Group  models.GroupID
+	Tags   models.Tags
+	Points map[time.Time][]models.RawPoint
+}
+
 func (n *FlattenNode) runFlatten([]byte) error {
 	switch n.Wants() {
 	case pipeline.StreamEdge:
-		flattenBuffers := make(map[models.GroupID]*flattenBuffer)
+		flattenBuffers := make(map[models.GroupID]*flattenStreamBuffer)
 		for p, ok := n.ins[0].NextPoint(); ok; p, ok = n.ins[0].NextPoint() {
 			n.timer.Start()
 			t := p.Time.Round(n.f.Tolerance)
 			currentBuf, ok := flattenBuffers[p.Group]
 			if !ok {
-				currentBuf = &flattenBuffer{
+				currentBuf = &flattenStreamBuffer{
 					Time:       t,
 					Name:       p.Name,
 					Group:      p.Group,
@@ -66,61 +74,93 @@ func (n *FlattenNode) runFlatten([]byte) error {
 			if t.Equal(currentBuf.Time) {
 				currentBuf.Points = append(currentBuf.Points, rp)
 			} else {
-				if err := n.flattenBuffer(currentBuf); err != nil {
+				if fields, err := n.flatten(currentBuf.Points); err != nil {
 					return err
+				} else {
+					// Emit point
+					flatP := models.Point{
+						Time:       currentBuf.Time,
+						Name:       currentBuf.Name,
+						Group:      currentBuf.Group,
+						Dimensions: currentBuf.Dimensions,
+						Tags:       currentBuf.Tags,
+						Fields:     fields,
+					}
+					n.timer.Pause()
+					for _, out := range n.outs {
+						err := out.CollectPoint(flatP)
+						if err != nil {
+							return err
+						}
+					}
+					n.timer.Resume()
 				}
+				// Update currentBuf with new time and initial point
 				currentBuf.Time = t
-				currentBuf.Name = p.Name
-				currentBuf.Group = p.Group
-				currentBuf.Dimensions = p.Dimensions
 				currentBuf.Points = currentBuf.Points[0:1]
 				currentBuf.Points[0] = rp
 			}
 			n.timer.Stop()
 		}
 	case pipeline.BatchEdge:
-		allBuffers := make(map[models.GroupID]map[time.Time]*flattenBuffer)
-		groupTimes := make(map[models.GroupID]time.Time)
+		allBuffers := make(map[models.GroupID]*flattenBatchBuffer)
 		for b, ok := n.ins[0].NextBatch(); ok; b, ok = n.ins[0].NextBatch() {
+			log.Println("D! batch", b)
 			n.timer.Start()
 			t := b.TMax.Round(n.f.Tolerance)
-			flattenBuffers, ok := allBuffers[b.Group]
+			currentBuf, ok := allBuffers[b.Group]
 			if !ok {
-				flattenBuffers = make(map[time.Time]*flattenBuffer)
-				allBuffers[b.Group] = flattenBuffers
-				groupTimes[b.Group] = t
+				currentBuf = &flattenBatchBuffer{
+					Time:   t,
+					Name:   b.Name,
+					Group:  b.Group,
+					Tags:   b.Tags,
+					Points: make(map[time.Time][]models.RawPoint),
+				}
+				allBuffers[b.Group] = currentBuf
 			}
-			groupTime := groupTimes[b.Group]
-			if !t.Equal(groupTime) {
-				// Set new groupTime
-				groupTimes[b.Group] = t
-				// Combine/Emit all old flattenBuffers
-				times := make(timeList, 0, len(flattenBuffers))
-				for t := range flattenBuffers {
+			log.Println("D! buf", currentBuf)
+			if !t.Equal(currentBuf.Time) {
+				log.Println("D! emit", currentBuf.Time)
+				// Flatten/Emit old buffer
+				times := make(timeList, 0, len(currentBuf.Points))
+				for t := range currentBuf.Points {
 					times = append(times, t)
 				}
 				sort.Sort(times)
+				flatBatch := models.Batch{
+					TMax:  currentBuf.Time,
+					Name:  currentBuf.Name,
+					Group: currentBuf.Group,
+					Tags:  currentBuf.Tags,
+				}
 				for _, t := range times {
-					if err := n.flattenBuffer(flattenBuffers[t]); err != nil {
+					if fields, err := n.flatten(currentBuf.Points[t]); err != nil {
+						return err
+					} else {
+						flatBatch.Points = append(flatBatch.Points, models.BatchPoint{
+							Time:   t,
+							Tags:   currentBuf.Tags,
+							Fields: fields,
+						})
+					}
+					delete(currentBuf.Points, t)
+				}
+				log.Println("D! flatBatch", flatBatch)
+				n.timer.Pause()
+				for _, out := range n.outs {
+					err := out.CollectBatch(flatBatch)
+					if err != nil {
 						return err
 					}
-					delete(flattenBuffers, t)
 				}
+				n.timer.Resume()
+				// Update currentBuf with new time
+				currentBuf.Time = t
 			}
 			for _, p := range b.Points {
 				t := p.Time.Round(n.f.Tolerance)
-				currentBuf, ok := flattenBuffers[t]
-				if !ok {
-					currentBuf = &flattenBuffer{
-						Time:       t,
-						Name:       b.Name,
-						Group:      b.Group,
-						Dimensions: b.PointDimensions(),
-						Tags:       b.Tags,
-					}
-					flattenBuffers[t] = currentBuf
-				}
-				currentBuf.Points = append(currentBuf.Points, models.RawPoint{
+				currentBuf.Points[t] = append(currentBuf.Points[t], models.RawPoint{
 					Time:   t,
 					Fields: p.Fields,
 					Tags:   p.Tags,
@@ -133,21 +173,15 @@ func (n *FlattenNode) runFlatten([]byte) error {
 
 }
 
-func (n *FlattenNode) flattenBuffer(buf *flattenBuffer) error {
-	if len(buf.Points) == 0 {
-		return nil
-	}
-	flatP := models.Point{
-		Name:       buf.Name,
-		Group:      buf.Group,
-		Dimensions: buf.Dimensions,
-		Time:       buf.Time,
-		Tags:       buf.Tags,
+func (n *FlattenNode) flatten(points []models.RawPoint) (models.Fields, error) {
+	fields := make(models.Fields)
+	if len(points) == 0 {
+		return fields, nil
 	}
 	fieldPrefix := n.bufPool.Get().(*bytes.Buffer)
 	defer n.bufPool.Put(fieldPrefix)
 POINTS:
-	for _, p := range buf.Points {
+	for _, p := range points {
 		for _, tag := range n.f.Dimensions {
 			if v, ok := p.Tags[tag]; ok {
 				fieldPrefix.WriteString(v)
@@ -160,19 +194,10 @@ POINTS:
 		l := fieldPrefix.Len()
 		for fname, value := range p.Fields {
 			fieldPrefix.WriteString(fname)
-			flatP.Fields[fieldPrefix.String()] = value
+			fields[fieldPrefix.String()] = value
 			fieldPrefix.Truncate(l)
 		}
 		fieldPrefix.Reset()
 	}
-	// Emit point
-	n.timer.Pause()
-	for _, out := range n.outs {
-		err := out.CollectPoint(flatP)
-		if err != nil {
-			return err
-		}
-	}
-	n.timer.Resume()
-	return nil
+	return fields, nil
 }
