@@ -57,13 +57,60 @@ type Config struct {
 	// TLSConfig allows the user to set their own TLS config for the HTTP
 	// Client. If set, this option overrides InsecureSkipVerify.
 	TLSConfig *tls.Config
+
+	// Optional credentials for authenticating with the server.
+	Credentials *Credentials
+}
+
+// AuthenticationMethod defines the type of authentication used.
+type AuthenticationMethod int
+
+// Supported authentication methods.
+const (
+	_ AuthenticationMethod = iota
+	UserAuthentication
+	BearerAuthentication
+)
+
+// Set of credentials depending on the authentication method
+type Credentials struct {
+	Method AuthenticationMethod
+
+	// UserAuthentication fields
+
+	Username string
+	Password string
+
+	// BearerAuthentication fields
+
+	Token string
+}
+
+func (c Credentials) Validate() error {
+	switch c.Method {
+	case UserAuthentication:
+		if c.Username == "" {
+			return errors.New("missing username")
+		}
+		if c.Password == "" {
+			return errors.New("missing password")
+		}
+	case BearerAuthentication:
+		if c.Token == "" {
+			return errors.New("missing token")
+		}
+	default:
+		return errors.New("missing authentication method")
+	}
+	return nil
 }
 
 // Basic HTTP client
 type Client struct {
-	url        *url.URL
-	userAgent  string
-	httpClient *http.Client
+	url         *url.URL
+	userAgent   string
+	httpClient  *http.Client
+	credentials *Credentials
 }
 
 // Create a new client.
@@ -82,6 +129,12 @@ func New(conf Config) (*Client, error) {
 		)
 	}
 
+	if conf.Credentials != nil {
+		if err := conf.Credentials.Validate(); err != nil {
+			return nil, errors.Wrap(err, "invalid credentials")
+		}
+	}
+
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: conf.InsecureSkipVerify,
@@ -97,6 +150,7 @@ func New(conf Config) (*Client, error) {
 			Timeout:   conf.Timeout,
 			Transport: tr,
 		},
+		credentials: conf.Credentials,
 	}, nil
 }
 
@@ -550,6 +604,16 @@ func (c *Client) URL() string {
 // Codes is a list of valid response codes.
 func (c *Client) do(req *http.Request, result interface{}, codes ...int) (*http.Response, error) {
 	req.Header.Set("User-Agent", c.userAgent)
+	if c.credentials != nil {
+		switch c.credentials.Method {
+		case UserAuthentication:
+			req.SetBasicAuth(c.credentials.Username, c.credentials.Password)
+		case BearerAuthentication:
+			req.Header.Set("Authorization", "Bearer "+c.credentials.Token)
+		default:
+			return nil, errors.New("unknown authentication method set")
+		}
+	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err

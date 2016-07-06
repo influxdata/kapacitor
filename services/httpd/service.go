@@ -54,6 +54,7 @@ func NewService(c Config, l *log.Logger, li logging.Interface) *Service {
 			statMap,
 			l,
 			li,
+			c.SharedSecret,
 		),
 		logger: l,
 	}

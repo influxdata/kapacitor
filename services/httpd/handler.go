@@ -3,6 +3,7 @@ package httpd
 import (
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"expvar"
 	"fmt"
 	"io"
@@ -13,11 +14,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/models"
-	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/influxdb/uuid"
+	"github.com/influxdata/kapacitor/auth"
 	"github.com/influxdata/kapacitor/client/v1"
 	"github.com/influxdata/kapacitor/services/logging"
 	"github.com/influxdata/wlog"
@@ -31,9 +33,21 @@ const (
 	statWriteRequestBytesReceived = "write_req_bytes"     // Sum of all bytes in write requests
 	statPointsWrittenOK           = "points_written_ok"   // Number of points written OK
 	statPointsWrittenFail         = "points_written_fail" // Number of points that failed to be written
+	statAuthFail                  = "auth_fail"           // Number of requests that failed to authenticate
 )
 
 const BasePath = "/kapacitor/v1"
+
+// AuthenticationMethod defines the type of authentication used.
+type AuthenticationMethod int
+
+// Supported authentication methods.
+const (
+	UserAuthentication AuthenticationMethod = iota
+	BearerAuthentication
+)
+
+type AuthorizationHandler func(http.ResponseWriter, *http.Request, auth.User)
 
 type Route struct {
 	Name        string
@@ -45,15 +59,16 @@ type Route struct {
 
 // Handler represents an HTTP handler for the Kapacitor API server.
 type Handler struct {
-	methodMux             map[string]*ServeMux
-	requireAuthentication bool
-	allowGzip             bool
-	Version               string
+	methodMux map[string]*ServeMux
 
-	MetaClient interface {
-		Authenticate(username, password string) (ui *meta.UserInfo, err error)
-		Users() ([]meta.UserInfo, error)
-	}
+	requireAuthentication bool
+	sharedSecret          string
+
+	allowGzip bool
+
+	Version string
+
+	AuthService auth.Interface
 
 	PointsWriter interface {
 		WritePoints(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
@@ -76,10 +91,20 @@ type Handler struct {
 }
 
 // NewHandler returns a new instance of handler with routes.
-func NewHandler(requireAuthentication, loggingEnabled, writeTrace, allowGzip bool, statMap *expvar.Map, l *log.Logger, li logging.Interface) *Handler {
+func NewHandler(
+	requireAuthentication,
+	loggingEnabled,
+	writeTrace,
+	allowGzip bool,
+	statMap *expvar.Map,
+	l *log.Logger,
+	li logging.Interface,
+	sharedSecret string,
+) *Handler {
 	h := &Handler{
 		methodMux:             make(map[string]*ServeMux),
 		requireAuthentication: requireAuthentication,
+		sharedSecret:          sharedSecret,
 		allowGzip:             allowGzip,
 		logger:                l,
 		writeTrace:            writeTrace,
@@ -243,13 +268,17 @@ func (h *Handler) addRawRoutes(routes []Route) error {
 // Add a route without prepending the BasePath
 func (h *Handler) addRawRoute(r Route) error {
 	var handler http.Handler
-	// If it's a handler func that requires authorization, wrap it in authorization
-	if hf, ok := r.HandlerFunc.(func(http.ResponseWriter, *http.Request, *meta.UserInfo)); ok {
-		handler = authenticate(hf, h, h.requireAuthentication)
+	// If it's a handler func that requires special authorization, wrap it in authentication only.
+	if hf, ok := r.HandlerFunc.(func(http.ResponseWriter, *http.Request, auth.User)); ok {
+		handler = authenticate(authorizeForward(hf), h, h.requireAuthentication)
 	}
-	// This is a normal handler signature and does not require authorization
+
+	// This is a normal handler signature so perform standard authentication/authorization.
 	if hf, ok := r.HandlerFunc.(func(http.ResponseWriter, *http.Request)); ok {
-		handler = http.HandlerFunc(hf)
+		handler = authenticate(authorize(hf), h, h.requireAuthentication)
+	}
+	if handler == nil {
+		return errors.New("route does not have valid handler function")
 	}
 
 	// Set basic handlers for all requests
@@ -362,7 +391,7 @@ func (h *Handler) servePing(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user *meta.UserInfo) {
+func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user auth.User) {
 	h.statMap.Add(statWriteRequest, 1)
 
 	// Handle gzip decoding of the body
@@ -394,7 +423,7 @@ func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user *meta.
 }
 
 // serveWriteLine receives incoming series data in line protocol format and writes it to the database.
-func (h *Handler) serveWriteLine(w http.ResponseWriter, r *http.Request, body []byte, user *meta.UserInfo) {
+func (h *Handler) serveWriteLine(w http.ResponseWriter, r *http.Request, body []byte, user auth.User) {
 	precision := r.FormValue("precision")
 	if precision == "" {
 		precision = "n"
@@ -416,13 +445,8 @@ func (h *Handler) serveWriteLine(w http.ResponseWriter, r *http.Request, body []
 		return
 	}
 
-	if h.requireAuthentication && user == nil {
-		h.writeError(w, influxql.Result{Err: fmt.Errorf("user is required to write to database %q", database)}, http.StatusUnauthorized)
-		return
-	}
-
-	if h.requireAuthentication && !user.Authorize(influxql.WritePrivilege, database) {
-		h.writeError(w, influxql.Result{Err: fmt.Errorf("%q user is not authorized to write to database %q", user.Name, database)}, http.StatusUnauthorized)
+	if !user.AuthorizeDB(influxql.WritePrivilege, database) {
+		h.writeError(w, influxql.Result{Err: fmt.Errorf("%q user is not authorized to write to database %q", user.Name(), database)}, http.StatusUnauthorized)
 		return
 	}
 
@@ -505,35 +529,171 @@ func resultError(w http.ResponseWriter, result influxql.Result, code int) {
 
 // Filters and filter helpers
 
-// parseCredentials returns the username and password encoded in
-// a request. The credentials may be present as URL query params, or as
-// a Basic Authentication header.
-// as params: http://127.0.0.1/query?u=username&p=password
-// as basic auth: http://username:password@127.0.0.1
-func parseCredentials(r *http.Request) (string, string, error) {
-	q := r.URL.Query()
-
-	if u, p := q.Get("u"), q.Get("p"); u != "" && p != "" {
-		return u, p, nil
-	}
-	if u, p, ok := r.BasicAuth(); ok {
-		return u, p, nil
-	}
-	return "", "", fmt.Errorf("unable to parse Basic Auth credentials")
-}
-
 // authenticate wraps a handler and ensures that if user credentials are passed in
 // an attempt is made to authenticate that user. If authentication fails, an error is returned.
-// NOT IMPLEMENTED YET
-func authenticate(inner func(http.ResponseWriter, *http.Request, *meta.UserInfo), h *Handler, requireAuthentication bool) http.Handler {
+func authenticate(inner AuthorizationHandler, h *Handler, requireAuthentication bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Return early if we are not authenticating
 		if !requireAuthentication {
-			inner(w, r, nil)
+			inner(w, r, auth.AdminUser)
 			return
 		}
-		panic("Authentication not implemented")
+
+		var user auth.User
+
+		creds, err := parseCredentials(r)
+		if err != nil {
+			h.statMap.Add(statAuthFail, 1)
+			HttpError(w, err.Error(), false, http.StatusUnauthorized)
+			return
+		}
+
+		switch creds.Method {
+		case UserAuthentication:
+			if creds.Username == "" {
+				h.statMap.Add(statAuthFail, 1)
+				HttpError(w, "username required", false, http.StatusUnauthorized)
+				return
+			}
+
+			user, err = h.AuthService.Authenticate(creds.Username, creds.Password)
+			if err != nil {
+				h.statMap.Add(statAuthFail, 1)
+				HttpError(w, "authorization failed", false, http.StatusUnauthorized)
+				return
+			}
+		case BearerAuthentication:
+			keyLookupFn := func(token *jwt.Token) (interface{}, error) {
+				// Check for expected signing method.
+				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+				}
+				return []byte(h.sharedSecret), nil
+			}
+
+			// Parse and validate the token.
+			token, err := jwt.Parse(creds.Token, keyLookupFn)
+			if err != nil {
+				HttpError(w, fmt.Sprintf("invalid token: %s", err.Error()), false, http.StatusUnauthorized)
+				return
+			} else if !token.Valid {
+				HttpError(w, "invalid token", false, http.StatusUnauthorized)
+				return
+			}
+			claims, ok := token.Claims.(jwt.MapClaims)
+			if !ok {
+				// This should not be possible, but just in case.
+				HttpError(w, "invalid claims type", false, http.StatusUnauthorized)
+				return
+			}
+
+			// The exp claim is validated internally as long as it exists and is non-zero.
+			// Make sure a non-zero expiration was set on the token.
+			if exp, ok := claims["exp"].(float64); !ok || exp <= 0.0 {
+				HttpError(w, "token expiration required", false, http.StatusUnauthorized)
+				return
+			}
+
+			// Get the username from the token.
+			username, ok := claims["username"].(string)
+			if !ok {
+				HttpError(w, "username in token must be a string", false, http.StatusUnauthorized)
+				return
+			} else if username == "" {
+				HttpError(w, "token must contain a username", false, http.StatusUnauthorized)
+				return
+			}
+
+			if user, err = h.AuthService.User(username); err != nil {
+				HttpError(w, err.Error(), false, http.StatusUnauthorized)
+				return
+			}
+		default:
+			HttpError(w, "unsupported authentication", false, http.StatusUnauthorized)
+		}
+		inner(w, r, user)
 	})
+}
+
+// Check if user is authorized to perform request.
+func authorizeRequest(r *http.Request, user auth.User) (bool, error) {
+	// Now that we have a user authorize the request
+	action := auth.Action{
+		Resource: r.URL.Path,
+		Method:   r.Method,
+	}
+	return user.AuthorizeAction(action)
+}
+
+// Authorize the request and call normal inner handler.
+func authorize(inner http.HandlerFunc) AuthorizationHandler {
+	return func(w http.ResponseWriter, r *http.Request, user auth.User) {
+		if authorized, err := authorizeRequest(r, user); !authorized {
+			HttpError(w, err.Error(), false, http.StatusForbidden)
+			return
+		}
+		inner(w, r)
+	}
+}
+
+// Authorize the request and forward user to inner handler.
+func authorizeForward(inner AuthorizationHandler) AuthorizationHandler {
+	return func(w http.ResponseWriter, r *http.Request, user auth.User) {
+		if authorized, err := authorizeRequest(r, user); !authorized {
+			HttpError(w, err.Error(), false, http.StatusForbidden)
+			return
+		}
+		inner(w, r, user)
+	}
+}
+
+type credentials struct {
+	Method   AuthenticationMethod
+	Username string
+	Password string
+	Token    string
+}
+
+// parseCredentials parses a request and returns the authentication credentials.
+// The credentials may be present as URL query params, or as a Basic
+// Authentication header.
+// As params: http://127.0.0.1/query?u=username&p=password
+// As basic auth: http://username:password@127.0.0.1
+// As Bearer token in Authorization header: Bearer <JWT_TOKEN_BLOB>
+func parseCredentials(r *http.Request) (credentials, error) {
+	q := r.URL.Query()
+
+	// Check for the HTTP Authorization header.
+	if s := r.Header.Get("Authorization"); s != "" {
+		// Check for Bearer token.
+		strs := strings.Split(s, " ")
+		if len(strs) == 2 && strs[0] == "Bearer" {
+			return credentials{
+				Method: BearerAuthentication,
+				Token:  strs[1],
+			}, nil
+		}
+
+		// Check for basic auth.
+		if u, p, ok := r.BasicAuth(); ok {
+			return credentials{
+				Method:   UserAuthentication,
+				Username: u,
+				Password: p,
+			}, nil
+		}
+	}
+
+	// Check for username and password in URL params.
+	if u, p := q.Get("u"), q.Get("p"); u != "" && p != "" {
+		return credentials{
+			Method:   UserAuthentication,
+			Username: u,
+			Password: p,
+		}, nil
+	}
+
+	return credentials{}, fmt.Errorf("unable to parse authentication credentials")
 }
 
 type gzipResponseWriter struct {

@@ -18,12 +18,14 @@ import (
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/influxdb/services/opentsdb"
 	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/auth"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/deadman"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/influxdb"
 	"github.com/influxdata/kapacitor/services/logging"
+	"github.com/influxdata/kapacitor/services/noauth"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/replay"
@@ -67,6 +69,7 @@ type Server struct {
 	TaskMasterLookup *kapacitor.TaskMasterLookup
 
 	LogService      logging.Interface
+	AuthService     auth.Interface
 	HTTPDService    *httpd.Service
 	StorageService  *storage.Service
 	TaskStore       *task_store.Service
@@ -138,6 +141,7 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	s.appendUDFService(c.UDF)
 	s.appendDeadmanService(c.Deadman)
 	s.appendSMTPService(c.SMTP)
+	s.appendAuthService()
 	s.initHTTPDService(c.HTTP)
 	s.appendInfluxDBService(c.InfluxDB, c.defaultInfluxDB, httpPort, c.Hostname)
 	s.appendStorageService(c.Storage)
@@ -209,11 +213,19 @@ func (s *Server) appendInfluxDBService(c []influxdb.Config, defaultInfluxDB, htt
 	}
 }
 
+func (s *Server) appendAuthService() {
+	l := s.LogService.NewLogger("[noauth] ", log.LstdFlags)
+	srv := noauth.NewService(l)
+
+	s.AuthService = srv
+	s.Services = append(s.Services, srv)
+}
+
 func (s *Server) initHTTPDService(c httpd.Config) {
 	l := s.LogService.NewLogger("[httpd] ", log.LstdFlags)
 	srv := httpd.NewService(c, l, s.LogService)
 
-	srv.Handler.MetaClient = s.MetaClient
+	srv.Handler.AuthService = s.AuthService
 	srv.Handler.PointsWriter = s.TaskMaster
 	srv.Handler.Version = s.buildInfo.Version
 
