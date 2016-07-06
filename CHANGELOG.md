@@ -14,6 +14,7 @@
 - [#697](https://github.com/influxdata/kapacitor/pull/697): Can now flatten a set of points into a single points creating dynamcially named fields.
 
 - [#698](https://github.com/influxdata/kapacitor/pull/698): Join delimiter can be specified.
+- [#695](https://github.com/influxdata/kapacitor/pull/695): Bash completion filters by enabled disabled status. Thanks @bbczeuz!
 
 ### Bugfixes
 

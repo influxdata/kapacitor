@@ -134,8 +134,14 @@ _kapacitor()
                     ;;
             esac
             ;;
-        enable|disable|reload)
+        reload)
             words=$(_kapacitor_list tasks "$cur")
+            ;;
+        enable)
+            words=$(_kapacitor_list_filtered tasks "$cur" "\$3 == \"disabled\"")
+            ;;
+        disable)
+            words=$(_kapacitor_list_filtered tasks "$cur" "\$3 == \"enabled\"")
             ;;
         delete|list)
             case "${COMP_WORDS[2]}" in
@@ -211,6 +217,14 @@ _kapacitor_list()
 {
     # List a certain kind of object and return a set of IDs
     kapacitor list "$1" "$2*" 2>/dev/null | awk 'NR>1 {print $1}' 2>/dev/null
+}
+
+_kapacitor_list_filtered()
+{
+    # List a certain kind of object and return a filtered set of IDs ($3: AWK 'if' test)
+    awkcode='NR>1 {if ('"$3"') print $1}'
+    kapacitor list "$1" "$2*" 2>/dev/null | awk "$awkcode" 2>/dev/null
+
 }
 
 _kapacitor_dbrps()
