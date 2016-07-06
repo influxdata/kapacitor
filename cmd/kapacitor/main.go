@@ -1235,11 +1235,11 @@ func doShow(args []string) error {
 	fmt.Println("Template:", t.TemplateID)
 	fmt.Println("Type:", t.Type)
 	fmt.Println("Status:", t.Status)
-	fmt.Println("Executng:", t.Executing)
+	fmt.Println("Executing:", t.Executing)
 	fmt.Println("Created:", t.Created.Format(time.RFC822))
 	fmt.Println("Modified:", t.Modified.Format(time.RFC822))
 	fmt.Println("LastEnabled:", t.LastEnabled.Format(time.RFC822))
-	fmt.Println("Databases Retenton Policies:", t.DBRPs)
+	fmt.Println("Databases Retention Policies:", t.DBRPs)
 	fmt.Printf("TICKscript:\n%s\n", t.TICKscript)
 	if len(t.Vars) > 0 {
 		fmt.Println("Vars:")
