@@ -217,6 +217,44 @@ def run_tests(race, parallel, timeout, no_vet):
     logging.debug("Test output:\n{}".format(output.encode('ascii', 'ignore')))
     return True
 
+def package_udfs(version, dist_dir):
+    """
+    Create packages for UDF agents
+    """
+    logging.info("Packaging UDF agents")
+    packages = package_python_udf(version, dist_dir)
+    return packages
+
+def package_python_udf(version, dist_dir):
+    """
+    Bundle python sources for UDF agent
+    """
+    logging.debug("Packaging python UDF agent")
+
+    # Update python package version
+    version_file = './udf/agent/py/kapacitor/udf/agent/__init__.py'
+    with open(version_file, 'w') as f:
+        f.write('VERSION = "{}"\n'.format(version))
+
+    # Create tar of python sources
+    fname = "python-kapacitor_udf_agent-{}.tar.gz".format(version)
+    outfile = os.path.join(dist_dir, fname)
+
+    tar_cmd = ['tar', '-cz', '-C', './udf/agent/py', '-f']
+    tar_cmd.append(outfile)
+    exclude_list = ['*.pyc', '*.pyo', '__pycache__']
+    for e in exclude_list:
+        tar_cmd.append('--exclude='+e)
+    tar_cmd.append('./')
+    p = subprocess.Popen(tar_cmd)
+    code = p.wait()
+    if code != 0:
+        logging.error("Python UDF tar failed.")
+        sys.exit(1)
+
+    return [outfile]
+
+
 ################
 #### All Kapacitor-specific content above this line
 ################
@@ -734,6 +772,11 @@ def main(args):
                                        datetime.utcnow().strftime("%Y%m%d%H%M"))
         args.iteration = 0
 
+    # Validate version
+    if not re.match(r'^[-\d\w\.]+', args.version):
+        logging.error("Invalid version {}".format(args.version))
+        return 1
+
     # Pre-build checks
     check_environ()
     if not check_prereqs():
@@ -819,6 +862,10 @@ def main(args):
                            iteration=args.iteration,
                            static=args.static,
                            release=args.release)
+
+        if args.package_udfs:
+            packages += package_udfs(args.version, args.outdir)
+
         if args.sign:
             logging.debug("Generating GPG signatures for packages: {}".format(packages))
             sigs = [] # retain signatures so they can be uploaded with packages
@@ -839,6 +886,8 @@ def main(args):
         for p in packages:
             logging.info("{} (MD5={})".format(p.split('/')[-1:][0],
                                               generate_md5_from_file(p)))
+
+
     if orig_branch != get_current_branch():
         logging.info("Moving back to original git branch: {}".format(args.branch))
         run("git checkout {}".format(orig_branch))
@@ -917,6 +966,9 @@ if __name__ == '__main__':
     parser.add_argument('--package',
                         action='store_true',
                         help='Package binary output')
+    parser.add_argument('--package-udfs',
+                        action='store_true',
+                        help='Package UDF agents')
     parser.add_argument('--release',
                         action='store_true',
                         help='Mark build output as release')

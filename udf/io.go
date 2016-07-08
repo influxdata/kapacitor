@@ -8,7 +8,7 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-//go:generate protoc --go_out=./ --python_out=./agent/py/ udf.proto
+//go:generate protoc --go_out=./ --python_out=./agent/py/kapacitor/udf/agent/ udf.proto
 
 // Interface for reading messages
 // If you have an io.Reader
