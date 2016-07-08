@@ -232,12 +232,12 @@ def package_python_udf(version, dist_dir):
     logging.debug("Packaging python UDF agent")
 
     # Update python package version
-    version_file = './udf/agent/py/kapacitor/udf/agent/__init__.py'
+    version_file = './udf/agent/py/kapacitor/udf/__init__.py'
     with open(version_file, 'w') as f:
         f.write('VERSION = "{}"\n'.format(version))
 
     # Create tar of python sources
-    fname = "python-kapacitor_udf_agent-{}.tar.gz".format(version)
+    fname = "python-kapacitor_udf-{}.tar.gz".format(version)
     outfile = os.path.join(dist_dir, fname)
 
     tar_cmd = ['tar', '-cz', '-C', './udf/agent/py', '-f']
@@ -251,6 +251,11 @@ def package_python_udf(version, dist_dir):
     if code != 0:
         logging.error("Python UDF tar failed.")
         sys.exit(1)
+
+    # Revert version file
+    version_file = './udf/agent/py/kapacitor/udf/__init__.py'
+    with open(version_file, 'w') as f:
+        f.write('VERSION = ""\n')
 
     return [outfile]
 
