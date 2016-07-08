@@ -1,12 +1,10 @@
 package auth
 
 import (
+	"errors"
 	"fmt"
+	"log"
 	"path"
-	"strings"
-
-	"github.com/influxdata/influxdb/influxql"
-	"github.com/pkg/errors"
 )
 
 // Interface for authenticating and retrieving users.
@@ -15,7 +13,10 @@ type Interface interface {
 	User(username string) (User, error)
 }
 
-type Privilege int
+// ErrAuthenticate is returned when authentication fails.
+var ErrAuthenticate = errors.New("authentication failed")
+
+type Privilege uint
 
 const (
 	NoPrivileges Privilege = 1 << iota
@@ -27,10 +28,21 @@ const (
 	AllPrivileges
 )
 
+var PrivilegeList []Privilege
+
+func init() {
+	p := Privilege(0)
+	for i := uint(0); p < AllPrivileges; i++ {
+		p = 1 << i
+		PrivilegeList = append(PrivilegeList, p)
+	}
+	log.Println(PrivilegeList)
+}
+
 func (p Privilege) String() string {
 	switch p {
 	case NoPrivileges:
-		return "NO_PRIVILEGES"
+		return "none"
 	case ReadPrivilege:
 		return "read"
 	case WritePrivilege:
@@ -38,98 +50,105 @@ func (p Privilege) String() string {
 	case DeletePrivilege:
 		return "delete"
 	case AllPrivileges:
-		return "ALL_PRIVILEGES"
+		return "all"
 	default:
-		return "UNKNOWN_PRIVILEGE"
+		return "unknown"
 	}
 }
 
 type Action struct {
-	Resource string
-	Method   string
+	Resource  string
+	Privilege Privilege
 }
 
-func (a Action) RequiredPrivilege() (Privilege, error) {
-	switch m := strings.ToUpper(a.Method); m {
-	case "HEAD", "OPTIONS":
-		return NoPrivileges, nil
-	case "GET":
-		return ReadPrivilege, nil
-	case "POST", "PATCH":
-		return WritePrivilege, nil
-	case "DELETE":
-		return DeletePrivilege, nil
-	default:
-		return AllPrivileges, fmt.Errorf("unknown method %q", m)
-	}
-}
-
+// This structure is designed to be immutable, to avoid bugs/exploits where
+// the user could be modified by external code.
+// For this reason all fields are private and methods are value receivers.
 type User struct {
 	name  string
 	admin bool
+	hash  []byte
 	// Map of resource -> Bitmask of Privileges
-	actionPrivileges map[string]Privilege
-	// Map of databas -> influxql.Privilege
-	dbPrivileges map[string]influxql.Privilege
+	privileges map[string]Privilege
 }
 
 // Create a user with the given privileges.
-func NewUser(name string, actionPrivileges map[string]Privilege, dbPrivileges map[string]influxql.Privilege) User {
-	// Clean privileges
-	for resource, privilege := range actionPrivileges {
+func NewUser(name string, hash []byte, admin bool, privileges map[string][]Privilege) User {
+	ps := make(map[string]Privilege, len(privileges))
+	// Clean resources and convert to bitmask
+	for resource, privileges := range privileges {
 		clean := path.Clean(resource)
-		if clean != resource {
-			delete(actionPrivileges, resource)
-			actionPrivileges[clean] = privilege
+		mask := Privilege(0)
+		for _, p := range privileges {
+			mask |= p
 		}
+		ps[clean] = mask
 	}
+	// Make our own copy of the hash
+	h := make([]byte, len(hash))
+	copy(h, hash)
 	return User{
-		name:             name,
-		actionPrivileges: actionPrivileges,
-		dbPrivileges:     dbPrivileges,
-	}
-}
-
-// Create a super user.
-func NewAdminUser(name string) User {
-	return User{
-		name:  name,
-		admin: true,
+		name:       name,
+		admin:      admin,
+		hash:       h,
+		privileges: ps,
 	}
 }
 
 // This user has all privileges for all resources.
-var AdminUser = NewAdminUser("ADMIN_USER")
+var AdminUser = NewUser("ADMIN_USER", nil, true, nil)
 
 // Determine wether the user is authorized to take the action.
 func (u User) Name() string {
 	return u.name
 }
 
-// Determine wether the user is authorized to take the action.
-func (u User) AuthorizeAction(action Action) (bool, error) {
-	rp, err := action.RequiredPrivilege()
-	if err != nil {
-		return false, errors.Wrap(err, "cannot authorize invalid action")
+// Report whether the user is an Admin user
+func (u User) IsAdmin() bool {
+	return u.admin
+}
+
+// Return a copy of the user's password hash
+func (u User) Hash() []byte {
+	hash := make([]byte, len(u.hash))
+	copy(hash, u.hash)
+	return hash
+}
+
+// Return a copy of the privileges the user has.
+func (u User) Privileges() map[string][]Privilege {
+	privileges := make(map[string][]Privilege)
+	for r, ps := range u.privileges {
+		for _, p := range PrivilegeList {
+			if ps&p != 0 {
+				privileges[r] = append(privileges[r], p)
+			}
+		}
 	}
-	if rp == NoPrivileges || u.admin {
-		return true, nil
+	return privileges
+}
+
+// Determine wether the user is authorized to take the action.
+// Returns nil if the action is authorized, otherwise returns an error describing the needed permissions.
+func (u User) AuthorizeAction(action Action) error {
+	if action.Privilege == NoPrivileges || u.admin {
+		return nil
 	}
 	// Find a matching resource of the form /path/to/resource
 	// where if the resource is /a/b/c and the user has permision to /a/b
 	// then it is considered valid.
 	if !path.IsAbs(action.Resource) {
-		return false, fmt.Errorf("invalid action resource: %q, must be an absolute path", action.Resource)
+		return fmt.Errorf("invalid action resource: %q, must be an absolute path", action.Resource)
 	}
-	if len(u.actionPrivileges) > 0 {
+	if len(u.privileges) > 0 {
 		// Clean path to prevent path traversal like /a/b/../d when user has access to /a/b
 		resource := path.Clean(action.Resource)
 		for {
-			if p, ok := u.actionPrivileges[resource]; ok {
+			if p, ok := u.privileges[resource]; ok {
 				// Found matching resource
-				authorized := p&rp != 0 || p == AllPrivileges
+				authorized := p&action.Privilege != 0 || p == AllPrivileges
 				if authorized {
-					return true, nil
+					return nil
 				} else {
 					break
 				}
@@ -141,17 +160,9 @@ func (u User) AuthorizeAction(action Action) (bool, error) {
 			resource = path.Dir(resource)
 		}
 	}
-	return false, fmt.Errorf("user %s does not have \"%v\" privilege for resource %q", u.name, rp, action.Resource)
+	return fmt.Errorf("user %s does not have \"%v\" privilege for resource %q", u.name, action.Privilege, action.Resource)
 }
 
-// Authorize returns true if the user is authorized and false if not.
-func (u User) AuthorizeDB(privilege influxql.Privilege, database string) bool {
-	if u.admin {
-		return true
-	}
-	if len(u.dbPrivileges) == 0 {
-		return false
-	}
-	p, ok := u.dbPrivileges[database]
-	return ok && (p == privilege || p == influxql.AllPrivileges)
+func DatabaseResource(database string) string {
+	return "/databases/" + database
 }

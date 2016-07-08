@@ -35,5 +35,5 @@ func (s *Service) Authenticate(username, password string) (auth.User, error) {
 // Return a user will all privileges and given username.
 func (s *Service) User(username string) (auth.User, error) {
 	s.logger.Println("W! using noauth auth backend. Faked authentication for user", username)
-	return auth.NewAdminUser(username), nil
+	return auth.NewUser(username, nil, true, nil), nil
 }

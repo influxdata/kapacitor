@@ -445,7 +445,11 @@ func (h *Handler) serveWriteLine(w http.ResponseWriter, r *http.Request, body []
 		return
 	}
 
-	if !user.AuthorizeDB(influxql.WritePrivilege, database) {
+	action := auth.Action{
+		Resource:  auth.DatabaseResource(database),
+		Privilege: auth.WritePrivilege,
+	}
+	if err := user.AuthorizeAction(action); err != nil {
 		h.writeError(w, influxql.Result{Err: fmt.Errorf("%q user is not authorized to write to database %q", user.Name(), database)}, http.StatusUnauthorized)
 		return
 	}
@@ -615,12 +619,32 @@ func authenticate(inner AuthorizationHandler, h *Handler, requireAuthentication 
 	})
 }
 
+// Map an HTTP method to an auth.Privilege.
+func requiredPrivilegeForHTTPMethod(method string) (auth.Privilege, error) {
+	switch m := strings.ToUpper(method); m {
+	case "HEAD", "OPTIONS":
+		return auth.NoPrivileges, nil
+	case "GET":
+		return auth.ReadPrivilege, nil
+	case "POST", "PATCH":
+		return auth.WritePrivilege, nil
+	case "DELETE":
+		return auth.DeletePrivilege, nil
+	default:
+		return auth.AllPrivileges, fmt.Errorf("unknown method %q", m)
+	}
+}
+
 // Check if user is authorized to perform request.
-func authorizeRequest(r *http.Request, user auth.User) (bool, error) {
+func authorizeRequest(r *http.Request, user auth.User) error {
 	// Now that we have a user authorize the request
+	rp, err := requiredPrivilegeForHTTPMethod(r.Method)
+	if err != nil {
+		return err
+	}
 	action := auth.Action{
-		Resource: r.URL.Path,
-		Method:   r.Method,
+		Resource:  strings.TrimPrefix(r.URL.Path, BasePath),
+		Privilege: rp,
 	}
 	return user.AuthorizeAction(action)
 }
@@ -628,7 +652,7 @@ func authorizeRequest(r *http.Request, user auth.User) (bool, error) {
 // Authorize the request and call normal inner handler.
 func authorize(inner http.HandlerFunc) AuthorizationHandler {
 	return func(w http.ResponseWriter, r *http.Request, user auth.User) {
-		if authorized, err := authorizeRequest(r, user); !authorized {
+		if err := authorizeRequest(r, user); err != nil {
 			HttpError(w, err.Error(), false, http.StatusForbidden)
 			return
 		}
@@ -639,7 +663,7 @@ func authorize(inner http.HandlerFunc) AuthorizationHandler {
 // Authorize the request and forward user to inner handler.
 func authorizeForward(inner AuthorizationHandler) AuthorizationHandler {
 	return func(w http.ResponseWriter, r *http.Request, user auth.User) {
-		if authorized, err := authorizeRequest(r, user); !authorized {
+		if err := authorizeRequest(r, user); err != nil {
 			HttpError(w, err.Error(), false, http.StatusForbidden)
 			return
 		}
