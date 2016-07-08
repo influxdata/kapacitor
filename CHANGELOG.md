@@ -15,6 +15,7 @@
 
 - [#698](https://github.com/influxdata/kapacitor/pull/698): Join delimiter can be specified.
 - [#695](https://github.com/influxdata/kapacitor/pull/695): Bash completion filters by enabled disabled status. Thanks @bbczeuz!
+- [#706](https://github.com/influxdata/kapacitor/pull/706): Package UDF agents
 
 ### Bugfixes
 
