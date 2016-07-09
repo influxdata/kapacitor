@@ -1,6 +1,14 @@
 # Changelog
 
-## v1.0.0-beta3 [unreleased]
+## v1.0.0-beta4 [unreleased]
+
+### Release Notes
+
+### Features
+
+### Bugfixes
+
+## v1.0.0-beta3 [2016-07-09]
 
 ### Release Notes
 
