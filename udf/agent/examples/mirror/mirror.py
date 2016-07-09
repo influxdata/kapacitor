@@ -1,7 +1,7 @@
 import sys
 import json
-from agent import Agent, Handler, Server
-import udf_pb2
+from kapacitor.udf.agent import Agent, Handler, Server
+from kapacitor.udf import udf_pb2
 import signal
 
 import logging

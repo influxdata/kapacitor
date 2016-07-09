@@ -1,7 +1,7 @@
 import sys
 import json
-from agent import Agent, Handler
-import udf_pb2
+from kapacitor.udf.agent import Agent, Handler
+from kapacitor.udf import udf_pb2
 
 import logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s:%(name)s: %(message)s')
