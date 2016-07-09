@@ -148,10 +148,14 @@ message ErrorResponse {
 // All the meta data but tmax is provided,
 // since tmax may not be known at
 // the beginning of a batch.
+//
+// Size is the number of points in the batch.
+// If size is 0 then the batch has an undetermined size.
 message BeginBatch {
     string             name  = 1;
     string             group = 2;
     map<string,string> tags  = 3;
+    int64              size  = 4;
 }
 
 // Message containing information about a single data point.

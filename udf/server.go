@@ -547,6 +547,7 @@ func (s *Server) writeBatch(b models.Batch) error {
 			Name:  b.Name,
 			Group: string(b.Group),
 			Tags:  b.Tags,
+			Size:  int64(len(b.Points)),
 		}},
 	}
 	err := s.writeRequest(req)
@@ -648,7 +649,9 @@ func (s *Server) handleResponse(response *Response) error {
 		s.logger.Println("E!", msg.Error.Error)
 		return errors.New(msg.Error.Error)
 	case *Response_Begin:
-		s.batch = &models.Batch{}
+		s.batch = &models.Batch{
+			Points: make([]models.BatchPoint, 0, msg.Begin.Size),
+		}
 	case *Response_Point:
 		if s.batch != nil {
 			pt := models.BatchPoint{

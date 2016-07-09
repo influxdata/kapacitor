@@ -14,6 +14,7 @@ type outlierHandler struct {
 	field string
 	scale float64
 	state *outlierState
+	begin *udf.BeginBatch
 
 	agent *agent.Agent
 }
@@ -77,13 +78,9 @@ func (o *outlierHandler) Restore(req *udf.RestoreRequest) (*udf.RestoreResponse,
 // Start working with the next batch
 func (o *outlierHandler) BeginBatch(begin *udf.BeginBatch) error {
 	o.state.reset()
-	// Send BeginBatch response to Kapacitor
-	// We always send a batch back for every batch we receive
-	o.agent.Responses <- &udf.Response{
-		Message: &udf.Response_Begin{
-			Begin: begin,
-		},
-	}
+
+	// Keep begin batch for later
+	o.begin = begin
 
 	return nil
 }
@@ -97,6 +94,15 @@ func (o *outlierHandler) Point(p *udf.Point) error {
 func (o *outlierHandler) EndBatch(end *udf.EndBatch) error {
 	// Get outliers
 	outliers := o.state.outliers(o.scale)
+
+	// Send BeginBatch response to Kapacitor
+	// with count of outliers
+	o.begin.Size = int64(len(outliers))
+	o.agent.Responses <- &udf.Response{
+		Message: &udf.Response_Begin{
+			Begin: o.begin,
+		},
+	}
 
 	// Send outliers as part of batch
 	for _, outlier := range outliers {
