@@ -17,6 +17,7 @@ import (
 
 	"github.com/cenkalti/backoff"
 	client "github.com/influxdata/influxdb/client/v2"
+	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/services/udp"
@@ -279,7 +280,7 @@ func (s *influxdb) linkSubscriptions() error {
 
 	// Get all databases and retention policies
 	var allSubs []subEntry
-	resp, err := s.execQuery(cli, "SHOW DATABASES")
+	resp, err := s.execQuery(cli, &influxql.ShowDatabasesStatement{})
 	if err != nil {
 		return err
 	}
@@ -289,7 +290,9 @@ func (s *influxdb) linkSubscriptions() error {
 		for _, v := range clusters {
 			clustername := v[0].(string)
 
-			rpResp, err := s.execQuery(cli, fmt.Sprintf(`SHOW RETENTION POLICIES ON "%s"`, clustername))
+			rpResp, err := s.execQuery(cli, &influxql.ShowRetentionPoliciesStatement{
+				Database: clustername,
+			})
 			if err != nil {
 				return err
 			}
@@ -311,7 +314,7 @@ func (s *influxdb) linkSubscriptions() error {
 	}
 
 	// Get all existing subscriptions
-	resp, err = s.execQuery(cli, "SHOW SUBSCRIPTIONS")
+	resp, err = s.execQuery(cli, &influxql.ShowSubscriptionsStatement{})
 	if err != nil {
 		return err
 	}
@@ -464,16 +467,15 @@ func (s *influxdb) createSub(cli client.Client, name, cluster, rp, mode string, 
 		buf.Write([]byte(dst))
 		buf.Write([]byte("'"))
 	}
-	q := fmt.Sprintf(`CREATE SUBSCRIPTION "%s" ON "%s"."%s" DESTINATIONS %s %s`,
-		name,
-		cluster,
-		rp,
-		strings.ToUpper(mode),
-		buf.String(),
-	)
 	_, err = s.execQuery(
 		cli,
-		q,
+		&influxql.CreateSubscriptionStatement{
+			Name:            name,
+			Database:        cluster,
+			RetentionPolicy: rp,
+			Destinations:    destinations,
+			Mode:            strings.ToUpper(mode),
+		},
 	)
 	return
 
@@ -481,11 +483,11 @@ func (s *influxdb) createSub(cli client.Client, name, cluster, rp, mode string, 
 func (s *influxdb) dropSub(cli client.Client, name, cluster, rp string) (err error) {
 	_, err = s.execQuery(
 		cli,
-		fmt.Sprintf(`DROP SUBSCRIPTION "%s" ON "%s"."%s"`,
-			name,
-			cluster,
-			rp,
-		),
+		&influxql.DropSubscriptionStatement{
+			Name:            name,
+			Database:        cluster,
+			RetentionPolicy: rp,
+		},
 	)
 	return
 }
@@ -511,9 +513,9 @@ func (s *influxdb) startUDPListener(cluster, rp, port string) (*net.UDPAddr, err
 	return service.Addr(), nil
 }
 
-func (s *influxdb) execQuery(cli client.Client, q string) (*client.Response, error) {
+func (s *influxdb) execQuery(cli client.Client, q influxql.Statement) (*client.Response, error) {
 	query := client.Query{
-		Command: q,
+		Command: q.String(),
 	}
 	resp, err := cli.Query(query)
 	if err != nil {
