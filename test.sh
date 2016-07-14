@@ -146,9 +146,8 @@ case $ENVIRONMENT_INDEX in
         rc=$?
         ;;
     3)
-        # 64 bit tests on golang go1.6
-        GO_CHECKOUT=go1.6rc2
-        run_test_docker Dockerfile_build_ubuntu64_git test_64bit_go1.6 --debug --test --generate --no-uncommitted
+        GO_CHECKOUT=HEAD
+        run_test_docker Dockerfile_build_ubuntu64_git test_64bit_gotip --debug --test --generate --no-uncommitted
         rc=$?
         ;;
     "save")
