@@ -389,6 +389,10 @@ def get_go_version():
     matches = re.search('go version go(\S+)', out)
     if matches is not None:
         return matches.groups()[0].strip()
+    else:
+        parts = out.split()
+        if len(parts) >= 3:
+            return parts[2]
     return None
 
 def check_path_for(b):
