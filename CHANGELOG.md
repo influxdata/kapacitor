@@ -8,6 +8,8 @@
 
 ### Bugfixes
 
+- [#710](https://github.com/influxdata/kapacitor/pull/662): Fix infinite loop when parsing unterminated regex in TICKscript.
+
 ## v1.0.0-beta3 [2016-07-09]
 
 ### Release Notes

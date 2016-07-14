@@ -577,6 +577,8 @@ func lexRegex(l *lexer) stateFn {
 		case r == '/':
 			l.emit(TokenRegex)
 			return lexToken
+		case r == eof:
+			return l.errorf("unterminated regex")
 		default:
 			//absorb
 		}
