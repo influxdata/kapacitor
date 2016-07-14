@@ -240,7 +240,7 @@ def package_python_udf(version, dist_dir):
     fname = "python-kapacitor_udf-{}.tar.gz".format(version)
     outfile = os.path.join(dist_dir, fname)
 
-    tar_cmd = ['tar', '-cz', '-C', './udf/agent/py', '-f']
+    tar_cmd = ['tar', '-cz', '-C', './udf/agent/py', '--transform', 's/^./kapacitor_udf-{}/'.format(version), '-f']
     tar_cmd.append(outfile)
     exclude_list = ['*.pyc', '*.pyo', '__pycache__']
     for e in exclude_list:
