@@ -3,7 +3,6 @@ package auth
 import (
 	"errors"
 	"fmt"
-	"log"
 	"path"
 )
 
@@ -36,7 +35,6 @@ func init() {
 		p = 1 << i
 		PrivilegeList = append(PrivilegeList, p)
 	}
-	log.Println(PrivilegeList)
 }
 
 func (p Privilege) String() string {
