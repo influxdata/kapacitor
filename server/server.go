@@ -41,7 +41,6 @@ import (
 	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
-	"github.com/influxdata/wlog"
 	"github.com/twinj/uuid"
 )
 
@@ -365,7 +364,7 @@ func (s *Server) appendCollectdService(c collectd.Config) {
 		return
 	}
 	srv := collectd.NewService(c)
-	w := s.LogService.NewStaticLevelWriter(wlog.INFO)
+	w := s.LogService.NewStaticLevelWriter(logging.INFO)
 	srv.SetLogOutput(w)
 
 	srv.MetaClient = s.MetaClient
@@ -381,7 +380,7 @@ func (s *Server) appendOpenTSDBService(c opentsdb.Config) error {
 	if err != nil {
 		return err
 	}
-	w := s.LogService.NewStaticLevelWriter(wlog.INFO)
+	w := s.LogService.NewStaticLevelWriter(logging.INFO)
 	srv.SetLogOutput(w)
 
 	srv.PointsWriter = s.TaskMaster
@@ -398,7 +397,7 @@ func (s *Server) appendGraphiteService(c graphite.Config) error {
 	if err != nil {
 		return err
 	}
-	w := s.LogService.NewStaticLevelWriter(wlog.INFO)
+	w := s.LogService.NewStaticLevelWriter(logging.INFO)
 	srv.SetLogOutput(w)
 
 	srv.PointsWriter = s.TaskMaster

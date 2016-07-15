@@ -14,6 +14,7 @@ import (
 	client "github.com/influxdata/influxdb/client/v2"
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/services/logging"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/wlog"
 )
@@ -132,12 +133,12 @@ func (l *LogService) NewRawLogger(prefix string, flag int) *log.Logger {
 	return log.New(os.Stderr, prefix, flag)
 }
 
-func (l *LogService) NewStaticLevelLogger(prefix string, flag int, level wlog.Level) *log.Logger {
-	return log.New(wlog.NewStaticLevelWriter(os.Stderr, level), prefix, flag)
+func (l *LogService) NewStaticLevelLogger(prefix string, flag int, level logging.Level) *log.Logger {
+	return log.New(wlog.NewStaticLevelWriter(os.Stderr, wlog.Level(level)), prefix, flag)
 }
 
-func (l *LogService) NewStaticLevelWriter(level wlog.Level) io.Writer {
-	return wlog.NewStaticLevelWriter(os.Stderr, level)
+func (l *LogService) NewStaticLevelWriter(level logging.Level) io.Writer {
+	return wlog.NewStaticLevelWriter(os.Stderr, wlog.Level(level))
 }
 
 type UDFService struct {
