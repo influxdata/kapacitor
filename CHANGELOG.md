@@ -6,6 +6,8 @@
 
 ### Features
 
+- [#702](https://github.com/influxdata/kapacitor/pull/702): Add plumbing for authentication backends.
+
 ### Bugfixes
 
 - [#710](https://github.com/influxdata/kapacitor/pull/662): Fix infinite loop when parsing unterminated regex in TICKscript.
@@ -27,7 +29,6 @@
 - [#695](https://github.com/influxdata/kapacitor/pull/695): Bash completion filters by enabled disabled status. Thanks @bbczeuz!
 - [#706](https://github.com/influxdata/kapacitor/pull/706): Package UDF agents
 - [#707](https://github.com/influxdata/kapacitor/pull/707): Add size field to BeginBatch struct of UDF protocol. Provides hint as to size of incoming batch.
-- [#702](https://github.com/influxdata/kapacitor/pull/702): Add plumbing for authentication backends.
 
 ### Bugfixes
 
