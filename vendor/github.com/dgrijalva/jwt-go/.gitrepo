@@ -1,0 +1,11 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/dgrijalva/jwt-go.git
+	branch = v3.0.0
+	commit = d2709f9f1f31ebcda9651b03077758c1f3a0018c
+	parent = 592409c1c2399e73ff2e8335e0c4b90561211c5f
+	cmdver = 0.3.0

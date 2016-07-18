@@ -25,6 +25,7 @@ import (
 
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/services/httpd"
+	"github.com/influxdata/kapacitor/services/noauth"
 )
 
 const (
@@ -128,7 +129,7 @@ func Bench(b *testing.B, tasksCount, pointCount int, db, rp, measurement, tickSc
 	config.BindAddress = ":0" // Choose port dynamically
 	httpdService := httpd.NewService(config, logService.NewLogger("[http] ", log.LstdFlags), logService)
 
-	httpdService.Handler.MetaClient = &kapacitor.NoopMetaClient{}
+	httpdService.Handler.AuthService = noauth.NewService(logService.NewLogger("[noauth] ", log.LstdFlags))
 	err := httpdService.Open()
 	if err != nil {
 		b.Fatal(err)

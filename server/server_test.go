@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dgrijalva/jwt-go"
 	iclient "github.com/influxdata/influxdb/client/v2"
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/models"
@@ -36,7 +37,165 @@ func init() {
 
 func TestServer_Ping(t *testing.T) {
 	s, cli := OpenDefaultServer()
-	t.Log(s.URL())
+	defer s.Close()
+	_, version, err := cli.Ping()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version != "testServer" {
+		t.Fatal("unexpected version", version)
+	}
+}
+func TestServer_Authenticate_Fail(t *testing.T) {
+	conf := NewConfig()
+	conf.HTTP.AuthEnabled = true
+	s := OpenServer(conf)
+	cli, err := client.New(client.Config{
+		URL: s.URL(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	_, _, err = cli.Ping()
+	if err == nil {
+		t.Error("expected authentication error")
+	} else if exp, got := "unable to parse authentication credentials", err.Error(); got != exp {
+		t.Errorf("unexpected error message: got %q exp %q", got, exp)
+	}
+}
+
+func TestServer_Authenticate_User(t *testing.T) {
+	conf := NewConfig()
+	conf.HTTP.AuthEnabled = true
+	s := OpenServer(conf)
+	cli, err := client.New(client.Config{
+		URL: s.URL(),
+		Credentials: &client.Credentials{
+			Method:   client.UserAuthentication,
+			Username: "bob",
+			Password: "bob's secure password",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	_, version, err := cli.Ping()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version != "testServer" {
+		t.Fatal("unexpected version", version)
+	}
+}
+
+func TestServer_Authenticate_Bearer_Fail(t *testing.T) {
+	secret := "secret"
+	// Create a new token object, specifying signing method and the claims
+	// you would like it to contain.
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, jwt.MapClaims{
+		"username": "bob",
+		"exp":      time.Now().Add(10 * time.Second).Unix(),
+	})
+
+	// Sign and get the complete encoded token as a string using the secret
+	tokenString, err := token.SignedString([]byte(secret))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	conf := NewConfig()
+	conf.HTTP.AuthEnabled = true
+	// Use a different secret so the token is invalid
+	conf.HTTP.SharedSecret = secret + "extra secret"
+	s := OpenServer(conf)
+	cli, err := client.New(client.Config{
+		URL: s.URL(),
+		Credentials: &client.Credentials{
+			Method: client.BearerAuthentication,
+			Token:  tokenString,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	_, _, err = cli.Ping()
+	if err == nil {
+		t.Error("expected authentication error")
+	} else if exp, got := "invalid token: signature is invalid", err.Error(); got != exp {
+		t.Errorf("unexpected error message: got %q exp %q", got, exp)
+	}
+}
+
+func TestServer_Authenticate_Bearer_Expired(t *testing.T) {
+	secret := "secret"
+	// Create a new token object, specifying signing method and the claims
+	// you would like it to contain.
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, jwt.MapClaims{
+		"username": "bob",
+		"exp":      time.Now().Add(-10 * time.Second).Unix(),
+	})
+
+	// Sign and get the complete encoded token as a string using the secret
+	tokenString, err := token.SignedString([]byte(secret))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	conf := NewConfig()
+	conf.HTTP.AuthEnabled = true
+	conf.HTTP.SharedSecret = secret
+	s := OpenServer(conf)
+	cli, err := client.New(client.Config{
+		URL: s.URL(),
+		Credentials: &client.Credentials{
+			Method: client.BearerAuthentication,
+			Token:  tokenString,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	_, _, err = cli.Ping()
+	if err == nil {
+		t.Error("expected authentication error")
+	} else if exp, got := "invalid token: Token is expired", err.Error(); got != exp {
+		t.Errorf("unexpected error message: got %q exp %q", got, exp)
+	}
+}
+
+func TestServer_Authenticate_Bearer(t *testing.T) {
+	secret := "secret"
+	// Create a new token object, specifying signing method and the claims
+	// you would like it to contain.
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, jwt.MapClaims{
+		"username": "bob",
+		"exp":      time.Now().Add(10 * time.Second).Unix(),
+	})
+
+	// Sign and get the complete encoded token as a string using the secret
+	tokenString, err := token.SignedString([]byte(secret))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	conf := NewConfig()
+	conf.HTTP.AuthEnabled = true
+	conf.HTTP.SharedSecret = secret
+	s := OpenServer(conf)
+	cli, err := client.New(client.Config{
+		URL: s.URL(),
+		Credentials: &client.Credentials{
+			Method: client.BearerAuthentication,
+			Token:  tokenString,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer s.Close()
 	_, version, err := cli.Ping()
 	if err != nil {

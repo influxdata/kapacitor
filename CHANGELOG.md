@@ -6,6 +6,8 @@
 
 ### Features
 
+- [#702](https://github.com/influxdata/kapacitor/pull/702): Add plumbing for authentication backends.
+
 ### Bugfixes
 
 - [#710](https://github.com/influxdata/kapacitor/pull/710): Fix infinite loop when parsing unterminated regex in TICKscript.

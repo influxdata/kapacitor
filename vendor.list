@@ -1,6 +1,7 @@
 github.com/boltdb/bolt
 github.com/BurntSushi/toml
 github.com/cenkalti/backoff
+github.com/dgrijalva/jwt-go v3.0.0
 github.com/dustin/go-humanize
 github.com/gogo/protobuf
 github.com/golang/protobuf
