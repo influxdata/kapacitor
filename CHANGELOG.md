@@ -8,8 +8,9 @@
 
 ### Bugfixes
 
-- [#710](https://github.com/influxdata/kapacitor/pull/662): Fix infinite loop when parsing unterminated regex in TICKscript.
+- [#710](https://github.com/influxdata/kapacitor/pull/710): Fix infinite loop when parsing unterminated regex in TICKscript.
 - [#711](https://github.com/influxdata/kapacitor/issue/711): Fix where database name with quotes breaks subscription startup logic.
+- [#719](https://github.com/influxdata/kapacitor/pull/719): Fix panic on replay.
 
 ## v1.0.0-beta3 [2016-07-09]
 
