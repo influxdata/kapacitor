@@ -58,9 +58,8 @@ type BuildInfo struct {
 // It is built using a Config and it manages the startup and shutdown of all
 // services in the proper order.
 type Server struct {
-	buildInfo BuildInfo
-	dataDir   string
-	hostname  string
+	dataDir  string
+	hostname string
 
 	config *Config
 
@@ -81,6 +80,7 @@ type Server struct {
 
 	Services []Service
 
+	BuildInfo BuildInfo
 	ClusterID string
 	ServerID  string
 
@@ -101,7 +101,7 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	l := logService.NewLogger("[srv] ", log.LstdFlags)
 	s := &Server{
 		config:        c,
-		buildInfo:     buildInfo,
+		BuildInfo:     buildInfo,
 		dataDir:       c.DataDir,
 		hostname:      c.Hostname,
 		err:           make(chan error),
@@ -122,7 +122,7 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	kapacitor.ServerIDVar.Set(s.ServerID)
 	kapacitor.HostVar.Set(s.hostname)
 	kapacitor.ProductVar.Set(kapacitor.Product)
-	kapacitor.VersionVar.Set(s.buildInfo.Version)
+	kapacitor.VersionVar.Set(s.BuildInfo.Version)
 	s.Logger.Printf("I! ClusterID: %s ServerID: %s", s.ClusterID, s.ServerID)
 
 	// Start Task Master
@@ -175,10 +175,10 @@ func (s *Server) AppendInfluxDBService() error {
 
 func (s *Server) InitHTTPDService() {
 	l := s.LogService.NewLogger("[httpd] ", log.LstdFlags)
-	srv := httpd.NewService(s.config.HTTP, l, s.LogService)
+	srv := httpd.NewService(s.config.HTTP, s.hostname, l, s.LogService)
 
 	srv.Handler.PointsWriter = s.TaskMaster
-	srv.Handler.Version = s.buildInfo.Version
+	srv.Handler.Version = s.BuildInfo.Version
 
 	s.HTTPDService = srv
 	s.TaskMaster.HTTPDService = srv
