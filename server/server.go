@@ -78,7 +78,10 @@ type Server struct {
 	MetaClient    *kapacitor.NoopMetaClient
 	QueryExecutor *Queryexecutor
 
+	// List of services in startup order
 	Services []Service
+	// Map of service name to index in Services list
+	ServicesByName map[string]int
 
 	BuildInfo BuildInfo
 	ClusterID string
@@ -100,15 +103,16 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	}
 	l := logService.NewLogger("[srv] ", log.LstdFlags)
 	s := &Server{
-		config:        c,
-		BuildInfo:     buildInfo,
-		dataDir:       c.DataDir,
-		hostname:      c.Hostname,
-		err:           make(chan error),
-		LogService:    logService,
-		MetaClient:    &kapacitor.NoopMetaClient{},
-		QueryExecutor: &Queryexecutor{},
-		Logger:        l,
+		config:         c,
+		BuildInfo:      buildInfo,
+		dataDir:        c.DataDir,
+		hostname:       c.Hostname,
+		err:            make(chan error),
+		LogService:     logService,
+		MetaClient:     &kapacitor.NoopMetaClient{},
+		QueryExecutor:  &Queryexecutor{},
+		Logger:         l,
+		ServicesByName: make(map[string]int),
 	}
 	s.Logger.Println("I! Kapacitor hostname:", s.hostname)
 
@@ -132,29 +136,78 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	if err := s.TaskMaster.Open(); err != nil {
 		return nil, err
 	}
+
+	// Append Kapacitor services.
+	s.appendUDFService()
+	s.appendDeadmanService()
+	s.appendSMTPService()
+	s.InitHTTPDService()
+	if err := s.appendInfluxDBService(); err != nil {
+		return nil, errors.Wrap(err, "influxdb service")
+	}
+	s.appendStorageService()
+	s.appendTaskStoreService()
+	s.appendReplayService()
+	s.appendAuthService()
+
+	// Append Alert integration services
+	s.appendOpsGenieService()
+	s.appendVictorOpsService()
+	s.appendPagerDutyService()
+	s.appendTelegramService()
+	s.appendHipChatService()
+	s.appendAlertaService()
+	s.appendSlackService()
+	s.appendSensuService()
+	s.appendTalkService()
+
+	// Append InfluxDB input services
+	s.appendCollectdService()
+	s.appendUDPServices()
+	if err := s.appendOpenTSDBService(); err != nil {
+		return nil, errors.Wrap(err, "opentsdb service")
+	}
+	if err := s.appendGraphiteServices(); err != nil {
+		return nil, errors.Wrap(err, "graphite service")
+	}
+
+	// Append StatsService and ReportingService after other services so all stats are ready
+	// to be reported
+	s.appendStatsService()
+	s.appendReportingService()
+
+	// Append HTTPD Service last so that the API is not listening till everything else succeeded.
+	s.appendHTTPDService()
+
 	return s, nil
 }
 
-func (s *Server) AppendStorageService() {
+func (s *Server) AppendService(name string, srv Service) {
+	i := len(s.Services)
+	s.Services = append(s.Services, srv)
+	s.ServicesByName[name] = i
+}
+
+func (s *Server) appendStorageService() {
 	l := s.LogService.NewLogger("[storage] ", log.LstdFlags)
 	srv := storage.NewService(s.config.Storage, l)
 
 	s.StorageService = srv
-	s.Services = append(s.Services, srv)
+	s.AppendService("storage", srv)
 }
 
-func (s *Server) AppendSMTPService() {
+func (s *Server) appendSMTPService() {
 	c := s.config.SMTP
 	if c.Enabled {
 		l := s.LogService.NewLogger("[smtp] ", log.LstdFlags)
 		srv := smtp.NewService(c, l)
 
 		s.TaskMaster.SMTPService = srv
-		s.Services = append(s.Services, srv)
+		s.AppendService("smtp", srv)
 	}
 }
 
-func (s *Server) AppendInfluxDBService() error {
+func (s *Server) appendInfluxDBService() error {
 	c := s.config.InfluxDB
 	if len(c) > 0 {
 		l := s.LogService.NewLogger("[influxdb] ", log.LstdFlags)
@@ -168,7 +221,7 @@ func (s *Server) AppendInfluxDBService() error {
 
 		s.InfluxDBService = srv
 		s.TaskMaster.InfluxDBService = srv
-		s.Services = append(s.Services, srv)
+		s.AppendService("influxdb", srv)
 	}
 	return nil
 }
@@ -184,11 +237,11 @@ func (s *Server) InitHTTPDService() {
 	s.TaskMaster.HTTPDService = srv
 }
 
-func (s *Server) AppendHTTPDService() {
-	s.Services = append(s.Services, s.HTTPDService)
+func (s *Server) appendHTTPDService() {
+	s.AppendService("httpd", s.HTTPDService)
 }
 
-func (s *Server) AppendTaskStoreService() {
+func (s *Server) appendTaskStoreService() {
 	l := s.LogService.NewLogger("[task_store] ", log.LstdFlags)
 	srv := task_store.NewService(s.config.Task, l)
 	srv.StorageService = s.StorageService
@@ -197,10 +250,10 @@ func (s *Server) AppendTaskStoreService() {
 
 	s.TaskStore = srv
 	s.TaskMaster.TaskStore = srv
-	s.Services = append(s.Services, srv)
+	s.AppendService("task_store", srv)
 }
 
-func (s *Server) AppendReplayService() {
+func (s *Server) appendReplayService() {
 	l := s.LogService.NewLogger("[replay] ", log.LstdFlags)
 	srv := replay.NewService(s.config.Replay, l)
 	srv.StorageService = s.StorageService
@@ -211,57 +264,57 @@ func (s *Server) AppendReplayService() {
 	srv.TaskMasterLookup = s.TaskMasterLookup
 
 	s.ReplayService = srv
-	s.Services = append(s.Services, srv)
+	s.AppendService("replay", srv)
 }
 
-func (s *Server) AppendDeadmanService() {
+func (s *Server) appendDeadmanService() {
 	l := s.LogService.NewLogger("[deadman] ", log.LstdFlags)
 	srv := deadman.NewService(s.config.Deadman, l)
 
 	s.TaskMaster.DeadmanService = srv
-	s.Services = append(s.Services, srv)
+	s.AppendService("deadman", srv)
 }
 
-func (s *Server) AppendUDFService() {
+func (s *Server) appendUDFService() {
 	l := s.LogService.NewLogger("[udf] ", log.LstdFlags)
 	srv := udf.NewService(s.config.UDF, l)
 
 	s.TaskMaster.UDFService = srv
-	s.Services = append(s.Services, srv)
+	s.AppendService("udf", srv)
 }
 
-func (s *Server) AppendAuthService() {
+func (s *Server) appendAuthService() {
 	l := s.LogService.NewLogger("[noauth] ", log.LstdFlags)
 	srv := noauth.NewService(l)
 
 	s.AuthService = srv
 	s.HTTPDService.Handler.AuthService = srv
-	s.Services = append(s.Services, srv)
+	s.AppendService("auth", srv)
 }
 
-func (s *Server) AppendOpsGenieService() {
+func (s *Server) appendOpsGenieService() {
 	c := s.config.OpsGenie
 	if c.Enabled {
 		l := s.LogService.NewLogger("[opsgenie] ", log.LstdFlags)
 		srv := opsgenie.NewService(c, l)
 		s.TaskMaster.OpsGenieService = srv
 
-		s.Services = append(s.Services, srv)
+		s.AppendService("opsgenie", srv)
 	}
 }
 
-func (s *Server) AppendVictorOpsService() {
+func (s *Server) appendVictorOpsService() {
 	c := s.config.VictorOps
 	if c.Enabled {
 		l := s.LogService.NewLogger("[victorops] ", log.LstdFlags)
 		srv := victorops.NewService(c, l)
 		s.TaskMaster.VictorOpsService = srv
 
-		s.Services = append(s.Services, srv)
+		s.AppendService("victorops", srv)
 	}
 }
 
-func (s *Server) AppendPagerDutyService() {
+func (s *Server) appendPagerDutyService() {
 	c := s.config.PagerDuty
 	if c.Enabled {
 		l := s.LogService.NewLogger("[pagerduty] ", log.LstdFlags)
@@ -269,77 +322,77 @@ func (s *Server) AppendPagerDutyService() {
 		srv.HTTPDService = s.HTTPDService
 		s.TaskMaster.PagerDutyService = srv
 
-		s.Services = append(s.Services, srv)
+		s.AppendService("pagerduty", srv)
 	}
 }
 
-func (s *Server) AppendSensuService() {
+func (s *Server) appendSensuService() {
 	c := s.config.Sensu
 	if c.Enabled {
 		l := s.LogService.NewLogger("[sensu] ", log.LstdFlags)
 		srv := sensu.NewService(c, l)
 		s.TaskMaster.SensuService = srv
 
-		s.Services = append(s.Services, srv)
+		s.AppendService("sensu", srv)
 	}
 }
 
-func (s *Server) AppendSlackService() {
+func (s *Server) appendSlackService() {
 	c := s.config.Slack
 	if c.Enabled {
 		l := s.LogService.NewLogger("[slack] ", log.LstdFlags)
 		srv := slack.NewService(c, l)
 		s.TaskMaster.SlackService = srv
 
-		s.Services = append(s.Services, srv)
+		s.AppendService("slack", srv)
 	}
 }
 
-func (s *Server) AppendTelegramService() {
+func (s *Server) appendTelegramService() {
 	c := s.config.Telegram
 	if c.Enabled {
 		l := s.LogService.NewLogger("[telegram] ", log.LstdFlags)
 		srv := telegram.NewService(c, l)
 		s.TaskMaster.TelegramService = srv
 
-		s.Services = append(s.Services, srv)
+		s.AppendService("telegram", srv)
 	}
 }
 
-func (s *Server) AppendHipChatService() {
+func (s *Server) appendHipChatService() {
 	c := s.config.HipChat
 	if c.Enabled {
 		l := s.LogService.NewLogger("[hipchat] ", log.LstdFlags)
 		srv := hipchat.NewService(c, l)
 		s.TaskMaster.HipChatService = srv
 
-		s.Services = append(s.Services, srv)
+		s.AppendService("hipchat", srv)
 	}
 }
 
-func (s *Server) AppendAlertaService() {
+func (s *Server) appendAlertaService() {
 	c := s.config.Alerta
 	if c.Enabled {
 		l := s.LogService.NewLogger("[alerta] ", log.LstdFlags)
 		srv := alerta.NewService(c, l)
 		s.TaskMaster.AlertaService = srv
 
-		s.Services = append(s.Services, srv)
+		s.AppendService("alerta", srv)
 	}
 }
 
-func (s *Server) AppendTalkService() {
+func (s *Server) appendTalkService() {
 	c := s.config.Talk
 	if c.Enabled {
 		l := s.LogService.NewLogger("[talk] ", log.LstdFlags)
 		srv := talk.NewService(c, l)
 		s.TaskMaster.TalkService = srv
 
-		s.Services = append(s.Services, srv)
+		s.AppendService("talk", srv)
 	}
 }
 
-func (s *Server) AppendCollectdService() {
+func (s *Server) appendCollectdService() {
 	c := s.config.Collectd
 	if !c.Enabled {
 		return
@@ -350,10 +403,10 @@ func (s *Server) AppendCollectdService() {
 
 	srv.MetaClient = s.MetaClient
 	srv.PointsWriter = s.TaskMaster
-	s.Services = append(s.Services, srv)
+	s.AppendService("collectd", srv)
 }
 
-func (s *Server) AppendOpenTSDBService() error {
+func (s *Server) appendOpenTSDBService() error {
 	c := s.config.OpenTSDB
 	if !c.Enabled {
 		return nil
@@ -367,12 +420,12 @@ func (s *Server) AppendOpenTSDBService() error {
 
 	srv.PointsWriter = s.TaskMaster
 	srv.MetaClient = s.MetaClient
-	s.Services = append(s.Services, srv)
+	s.AppendService("opentsdb", srv)
 	return nil
 }
 
-func (s *Server) AppendGraphiteServices() error {
-	for _, c := range s.config.Graphites {
+func (s *Server) appendGraphiteServices() error {
+	for i, c := range s.config.Graphites {
 		if !c.Enabled {
 			continue
 		}
@@ -385,24 +438,24 @@ func (s *Server) AppendGraphiteServices() error {
 
 		srv.PointsWriter = s.TaskMaster
 		srv.MetaClient = s.MetaClient
-		s.Services = append(s.Services, srv)
+		s.AppendService(fmt.Sprintf("graphite%d", i), srv)
 	}
 	return nil
 }
 
-func (s *Server) AppendUDPServices() {
-	for _, c := range s.config.UDPs {
+func (s *Server) appendUDPServices() {
+	for i, c := range s.config.UDPs {
 		if !c.Enabled {
 			continue
 		}
 		l := s.LogService.NewLogger("[udp] ", log.LstdFlags)
 		srv := udp.NewService(c, l)
 		srv.PointsWriter = s.TaskMaster
-		s.Services = append(s.Services, srv)
+		s.AppendService(fmt.Sprintf("udp%d", i), srv)
 	}
 }
 
-func (s *Server) AppendStatsService() {
+func (s *Server) appendStatsService() {
 	c := s.config.Stats
 	if c.Enabled {
 		l := s.LogService.NewLogger("[stats] ", log.LstdFlags)
@@ -410,114 +463,36 @@ func (s *Server) AppendStatsService() {
 		srv.TaskMaster = s.TaskMaster
 
 		s.TaskMaster.TimingService = srv
-		s.Services = append(s.Services, srv)
+		s.AppendService("stats", srv)
 	}
 }
 
-func (s *Server) AppendReportingService() {
+func (s *Server) appendReportingService() {
 	c := s.config.Reporting
 	if c.Enabled {
 		l := s.LogService.NewLogger("[reporting] ", log.LstdFlags)
 		srv := reporting.NewService(c, l)
 
-		s.Services = append(s.Services, srv)
+		s.AppendService("reporting", srv)
 	}
 }
 
 // Err returns an error channel that multiplexes all out of band errors received from all services.
 func (s *Server) Err() <-chan error { return s.err }
 
-type ServiceProvider interface {
-	AppendUDFService()
-	AppendDeadmanService()
-	AppendSMTPService()
-	AppendAuthService()
-	InitHTTPDService()
-	AppendInfluxDBService() error
-	AppendStorageService()
-	AppendTaskStoreService()
-	AppendReplayService()
-	AppendOpsGenieService()
-	AppendVictorOpsService()
-	AppendPagerDutyService()
-	AppendTelegramService()
-	AppendHipChatService()
-	AppendAlertaService()
-	AppendSlackService()
-	AppendSensuService()
-	AppendTalkService()
-	AppendCollectdService()
-	AppendUDPServices()
-	AppendOpenTSDBService() error
-	AppendGraphiteServices() error
-	AppendStatsService()
-	AppendReportingService()
-	AppendHTTPDService()
-}
-
-// Append all services
-func DoAppendServices(s ServiceProvider) error {
-	// Append Kapacitor services.
-	s.AppendUDFService()
-	s.AppendDeadmanService()
-	s.AppendSMTPService()
-	s.InitHTTPDService()
-	if err := s.AppendInfluxDBService(); err != nil {
-		return errors.Wrap(err, "influxdb service")
-	}
-	s.AppendStorageService()
-	s.AppendTaskStoreService()
-	s.AppendReplayService()
-	s.AppendAuthService()
-
-	// Append Alert integration services
-	s.AppendOpsGenieService()
-	s.AppendVictorOpsService()
-	s.AppendPagerDutyService()
-	s.AppendTelegramService()
-	s.AppendHipChatService()
-	s.AppendAlertaService()
-	s.AppendSlackService()
-	s.AppendSensuService()
-	s.AppendTalkService()
-
-	// Append InfluxDB input services
-	s.AppendCollectdService()
-	s.AppendUDPServices()
-	if err := s.AppendOpenTSDBService(); err != nil {
-		return errors.Wrap(err, "opentsdb service")
-	}
-	if err := s.AppendGraphiteServices(); err != nil {
-		return errors.Wrap(err, "graphite service")
-	}
-
-	// Append StatsService and ReportingService after other services so all stats are ready
-	// to be reported
-	s.AppendStatsService()
-	s.AppendReportingService()
-
-	// Append HTTPD Service last so that the API is not listening till everything else succeeded.
-	s.AppendHTTPDService()
-
-	return nil
-}
-
 // Open opens all the services.
 func (s *Server) Open() error {
-	if err := DoAppendServices(s); err != nil {
-		return err
-	}
-	if err := s.StartServices(); err != nil {
+	if err := s.startServices(); err != nil {
 		s.Close()
 		return err
 	}
 
-	go s.WatchServices()
+	go s.watchServices()
 
 	return nil
 }
 
-func (s *Server) StartServices() error {
+func (s *Server) startServices() error {
 	// Start profiling, if set.
 	s.startProfile(s.CPUProfile, s.MemProfile)
 	for _, service := range s.Services {
@@ -531,7 +506,7 @@ func (s *Server) StartServices() error {
 }
 
 // Watch if something dies
-func (s *Server) WatchServices() {
+func (s *Server) watchServices() {
 	var err error
 	select {
 	case err = <-s.HTTPDService.Err():
