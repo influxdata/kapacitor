@@ -182,7 +182,7 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	return s, nil
 }
 
-func (s *Server) appendService(name string, srv Service) {
+func (s *Server) AppendService(name string, srv Service) {
 	i := len(s.Services)
 	s.Services = append(s.Services, srv)
 	s.ServicesByName[name] = i
@@ -193,7 +193,7 @@ func (s *Server) appendStorageService() {
 	srv := storage.NewService(s.config.Storage, l)
 
 	s.StorageService = srv
-	s.appendService("storage", srv)
+	s.AppendService("storage", srv)
 }
 
 func (s *Server) appendSMTPService() {
@@ -203,7 +203,7 @@ func (s *Server) appendSMTPService() {
 		srv := smtp.NewService(c, l)
 
 		s.TaskMaster.SMTPService = srv
-		s.appendService("smtp", srv)
+		s.AppendService("smtp", srv)
 	}
 }
 
@@ -221,7 +221,7 @@ func (s *Server) appendInfluxDBService() error {
 
 		s.InfluxDBService = srv
 		s.TaskMaster.InfluxDBService = srv
-		s.appendService("influxdb", srv)
+		s.AppendService("influxdb", srv)
 	}
 	return nil
 }
@@ -238,7 +238,7 @@ func (s *Server) InitHTTPDService() {
 }
 
 func (s *Server) appendHTTPDService() {
-	s.appendService("httpd", s.HTTPDService)
+	s.AppendService("httpd", s.HTTPDService)
 }
 
 func (s *Server) appendTaskStoreService() {
@@ -250,7 +250,7 @@ func (s *Server) appendTaskStoreService() {
 
 	s.TaskStore = srv
 	s.TaskMaster.TaskStore = srv
-	s.appendService("task_store", srv)
+	s.AppendService("task_store", srv)
 }
 
 func (s *Server) appendReplayService() {
@@ -264,7 +264,7 @@ func (s *Server) appendReplayService() {
 	srv.TaskMasterLookup = s.TaskMasterLookup
 
 	s.ReplayService = srv
-	s.appendService("replay", srv)
+	s.AppendService("replay", srv)
 }
 
 func (s *Server) appendDeadmanService() {
@@ -272,7 +272,7 @@ func (s *Server) appendDeadmanService() {
 	srv := deadman.NewService(s.config.Deadman, l)
 
 	s.TaskMaster.DeadmanService = srv
-	s.appendService("deadman", srv)
+	s.AppendService("deadman", srv)
 }
 
 func (s *Server) appendUDFService() {
@@ -280,7 +280,7 @@ func (s *Server) appendUDFService() {
 	srv := udf.NewService(s.config.UDF, l)
 
 	s.TaskMaster.UDFService = srv
-	s.appendService("udf", srv)
+	s.AppendService("udf", srv)
 }
 
 func (s *Server) appendAuthService() {
@@ -289,7 +289,7 @@ func (s *Server) appendAuthService() {
 
 	s.AuthService = srv
 	s.HTTPDService.Handler.AuthService = srv
-	s.appendService("auth", srv)
+	s.AppendService("auth", srv)
 }
 
 func (s *Server) appendOpsGenieService() {
@@ -299,7 +299,7 @@ func (s *Server) appendOpsGenieService() {
 		srv := opsgenie.NewService(c, l)
 		s.TaskMaster.OpsGenieService = srv
 
-		s.appendService("opsgenie", srv)
+		s.AppendService("opsgenie", srv)
 	}
 }
 
@@ -310,7 +310,7 @@ func (s *Server) appendVictorOpsService() {
 		srv := victorops.NewService(c, l)
 		s.TaskMaster.VictorOpsService = srv
 
-		s.appendService("victorops", srv)
+		s.AppendService("victorops", srv)
 	}
 }
 
@@ -322,7 +322,7 @@ func (s *Server) appendPagerDutyService() {
 		srv.HTTPDService = s.HTTPDService
 		s.TaskMaster.PagerDutyService = srv
 
-		s.appendService("pagerduty", srv)
+		s.AppendService("pagerduty", srv)
 	}
 }
 
@@ -333,7 +333,7 @@ func (s *Server) appendSensuService() {
 		srv := sensu.NewService(c, l)
 		s.TaskMaster.SensuService = srv
 
-		s.appendService("sensu", srv)
+		s.AppendService("sensu", srv)
 	}
 }
 
@@ -344,7 +344,7 @@ func (s *Server) appendSlackService() {
 		srv := slack.NewService(c, l)
 		s.TaskMaster.SlackService = srv
 
-		s.appendService("slack", srv)
+		s.AppendService("slack", srv)
 	}
 }
 
@@ -355,7 +355,7 @@ func (s *Server) appendTelegramService() {
 		srv := telegram.NewService(c, l)
 		s.TaskMaster.TelegramService = srv
 
-		s.appendService("telegram", srv)
+		s.AppendService("telegram", srv)
 	}
 }
 
@@ -366,7 +366,7 @@ func (s *Server) appendHipChatService() {
 		srv := hipchat.NewService(c, l)
 		s.TaskMaster.HipChatService = srv
 
-		s.appendService("hipchat", srv)
+		s.AppendService("hipchat", srv)
 	}
 }
 
@@ -377,7 +377,7 @@ func (s *Server) appendAlertaService() {
 		srv := alerta.NewService(c, l)
 		s.TaskMaster.AlertaService = srv
 
-		s.appendService("alerta", srv)
+		s.AppendService("alerta", srv)
 	}
 }
 
@@ -388,7 +388,7 @@ func (s *Server) appendTalkService() {
 		srv := talk.NewService(c, l)
 		s.TaskMaster.TalkService = srv
 
-		s.appendService("talk", srv)
+		s.AppendService("talk", srv)
 	}
 }
 
@@ -403,7 +403,7 @@ func (s *Server) appendCollectdService() {
 
 	srv.MetaClient = s.MetaClient
 	srv.PointsWriter = s.TaskMaster
-	s.appendService("collectd", srv)
+	s.AppendService("collectd", srv)
 }
 
 func (s *Server) appendOpenTSDBService() error {
@@ -420,7 +420,7 @@ func (s *Server) appendOpenTSDBService() error {
 
 	srv.PointsWriter = s.TaskMaster
 	srv.MetaClient = s.MetaClient
-	s.appendService("opentsdb", srv)
+	s.AppendService("opentsdb", srv)
 	return nil
 }
 
@@ -438,7 +438,7 @@ func (s *Server) appendGraphiteServices() error {
 
 		srv.PointsWriter = s.TaskMaster
 		srv.MetaClient = s.MetaClient
-		s.appendService(fmt.Sprintf("graphite%d", i), srv)
+		s.AppendService(fmt.Sprintf("graphite%d", i), srv)
 	}
 	return nil
 }
@@ -451,7 +451,7 @@ func (s *Server) appendUDPServices() {
 		l := s.LogService.NewLogger("[udp] ", log.LstdFlags)
 		srv := udp.NewService(c, l)
 		srv.PointsWriter = s.TaskMaster
-		s.appendService(fmt.Sprintf("udp%d", i), srv)
+		s.AppendService(fmt.Sprintf("udp%d", i), srv)
 	}
 }
 
@@ -463,7 +463,7 @@ func (s *Server) appendStatsService() {
 		srv.TaskMaster = s.TaskMaster
 
 		s.TaskMaster.TimingService = srv
-		s.appendService("stats", srv)
+		s.AppendService("stats", srv)
 	}
 }
 
@@ -473,7 +473,7 @@ func (s *Server) appendReportingService() {
 		l := s.LogService.NewLogger("[reporting] ", log.LstdFlags)
 		srv := reporting.NewService(c, l)
 
-		s.appendService("reporting", srv)
+		s.AppendService("reporting", srv)
 	}
 }
 
