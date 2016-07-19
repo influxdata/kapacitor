@@ -13,6 +13,9 @@
 - [#710](https://github.com/influxdata/kapacitor/pull/710): Fix infinite loop when parsing unterminated regex in TICKscript.
 - [#711](https://github.com/influxdata/kapacitor/issue/711): Fix where database name with quotes breaks subscription startup logic.
 - [#719](https://github.com/influxdata/kapacitor/pull/719): Fix panic on replay.
+- [#723](https://github.com/influxdata/kapacitor/pull/723): BREAKING: Search for valid configuration on startup in ~/.kapacitor and /etc/kapacitor/.
+    This is so that the -config CLI flag is not required if the configuration is found in a standard location.
+    The configuration file being used is always logged to STDERR.
 
 ## v1.0.0-beta3 [2016-07-09]
 

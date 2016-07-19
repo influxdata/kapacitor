@@ -70,7 +70,7 @@ func (cmd *Command) Run(args ...string) error {
 	fmt.Print(logo)
 
 	// Parse config
-	config, err := cmd.ParseConfig(options.ConfigPath)
+	config, err := cmd.ParseConfig(FindConfigPath(options.ConfigPath))
 	if err != nil {
 		return fmt.Errorf("parse config: %s", err)
 	}
@@ -206,11 +206,11 @@ func (cmd *Command) writePIDFile(path string) error {
 func (cmd *Command) ParseConfig(path string) (*server.Config, error) {
 	// Use demo configuration if no config path is specified.
 	if path == "" {
-		log.Println("no configuration provided, using default settings")
+		log.Println("No configuration provided, using default settings")
 		return server.NewDemoConfig()
 	}
 
-	log.Printf("Using configuration at: %s\n", path)
+	log.Println("Using configuration at:", path)
 
 	config := server.NewConfig()
 	if _, err := toml.DecodeFile(path, &config); err != nil {
