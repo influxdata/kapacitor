@@ -152,10 +152,11 @@ message ErrorResponse {
 // Size is the number of points in the batch.
 // If size is 0 then the batch has an undetermined size.
 message BeginBatch {
-    string             name  = 1;
-    string             group = 2;
-    map<string,string> tags  = 3;
-    int64              size  = 4;
+    string             name   = 1;
+    string             group  = 2;
+    map<string,string> tags   = 3;
+    int64              size   = 4;
+    bool               byName = 5;
 }
 
 // Message containing information about a single data point.
@@ -171,6 +172,7 @@ message Point {
     map<string,double> fieldsDouble    = 8;
     map<string,int64>  fieldsInt       = 9;
     map<string,string> fieldsString    = 10;
+    bool               byName          = 11;
 }
 
 // Indicates the end of a batch and contains
@@ -179,10 +181,11 @@ message Point {
 // ease of use with the addition of tmax since it
 // may not be know at BeginBatch.
 message EndBatch {
-    string             name  = 1;
-    string             group = 2;
-    int64              tmax  = 3;
-    map<string,string> tags  = 4;
+    string             name   = 1;
+    string             group  = 2;
+    int64              tmax   = 3;
+    map<string,string> tags   = 4;
+    bool               byName = 5;
 }
 
 //-----------------------------------------------------------

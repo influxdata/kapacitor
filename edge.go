@@ -88,11 +88,11 @@ type edgeStat struct {
 	collected int64
 	emitted   int64
 	tags      models.Tags
-	dims      []string
+	dims      models.Dimensions
 }
 
 // Get a snapshot of the current group statistics for this edge
-func (e *Edge) readGroupStats(f func(group models.GroupID, collected, emitted int64, tags models.Tags, dims []string)) {
+func (e *Edge) readGroupStats(f func(group models.GroupID, collected, emitted int64, tags models.Tags, dims models.Dimensions)) {
 	e.groupMu.RLock()
 	defer e.groupMu.RUnlock()
 	for group, stats := range e.groupStats {
@@ -188,7 +188,7 @@ func (e *Edge) CollectBatch(b models.Batch) error {
 }
 
 // Increment the emitted count of the group for this edge.
-func (e *Edge) incEmitted(group models.GroupID, tags models.Tags, dims []string, count int64) {
+func (e *Edge) incEmitted(group models.GroupID, tags models.Tags, dims models.Dimensions, count int64) {
 	// we are "manually" calling Unlock() and not using defer, because this method is called
 	// in hot locations (NextPoint/CollectPoint) and defer have some performance penalty
 	e.groupMu.Lock()
@@ -208,7 +208,7 @@ func (e *Edge) incEmitted(group models.GroupID, tags models.Tags, dims []string,
 }
 
 // Increment the collected count of the group for this edge.
-func (e *Edge) incCollected(group models.GroupID, tags models.Tags, dims []string, count int64) {
+func (e *Edge) incCollected(group models.GroupID, tags models.Tags, dims models.Dimensions, count int64) {
 	// we are "manually" calling Unlock() and not using defer, because this method is called
 	// in hot locations (NextPoint/CollectPoint) and defer have some performance penalty
 	e.groupMu.Lock()

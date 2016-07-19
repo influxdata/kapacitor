@@ -137,8 +137,16 @@ func (j *JoinNode) matchPoints(p srcPoint, groupErrs chan<- error) {
 		j.lowMark = t
 	}
 
-	groupId := models.TagsToGroupID(j.j.Dimensions, p.p.PointTags())
-	if len(p.p.PointDimensions()) > len(j.j.Dimensions) {
+	groupId := models.ToGroupID(
+		p.p.PointName(),
+		p.p.PointTags(),
+		models.Dimensions{
+			ByName:   p.p.PointDimensions().ByName,
+			TagNames: j.j.Dimensions,
+		},
+	)
+
+	if len(p.p.PointDimensions().TagNames) > len(j.j.Dimensions) {
 		// We have a specific point, find its cached match and send both to group
 		matches := j.matchGroupsBuffer[groupId]
 		matched := false
@@ -503,10 +511,11 @@ func (js *joinset) JoinIntoPoint() (models.Point, bool) {
 // join all batches the set into a single batch
 func (js *joinset) JoinIntoBatch() (models.Batch, bool) {
 	newBatch := models.Batch{
-		Name:  js.name,
-		Group: js.First().PointGroup(),
-		Tags:  js.First().PointTags(),
-		TMax:  js.time,
+		Name:   js.name,
+		Group:  js.First().PointGroup(),
+		Tags:   js.First().PointTags(),
+		ByName: js.First().PointDimensions().ByName,
+		TMax:   js.time,
 	}
 	empty := make([]bool, js.expected)
 	emptyCount := 0

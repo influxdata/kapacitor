@@ -26,6 +26,7 @@ type DefaultNode struct {
 	Fields map[string]interface{} `tick:"Field"`
 
 	// Set of tags to default
+	// tick:ignore
 	Tags map[string]string `tick:"Tag"`
 }
 

@@ -126,10 +126,11 @@ func (n *FlattenNode) runFlatten([]byte) error {
 				}
 				sort.Sort(times)
 				flatBatch := models.Batch{
-					TMax:  currentBuf.Time,
-					Name:  currentBuf.Name,
-					Group: currentBuf.Group,
-					Tags:  currentBuf.Tags,
+					TMax:   currentBuf.Time,
+					Name:   currentBuf.Name,
+					Group:  currentBuf.Group,
+					ByName: b.ByName,
+					Tags:   currentBuf.Tags,
 				}
 				for _, t := range times {
 					if fields, err := n.flatten(currentBuf.Points[t]); err != nil {

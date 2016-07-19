@@ -482,7 +482,8 @@ func (s *Server) writePoint(pt models.Point) error {
 		Database:        pt.Database,
 		RetentionPolicy: pt.RetentionPolicy,
 		Group:           string(pt.Group),
-		Dimensions:      pt.Dimensions,
+		Dimensions:      pt.Dimensions.TagNames,
+		ByName:          pt.Dimensions.ByName,
 		Tags:            pt.Tags,
 		FieldsDouble:    floats,
 		FieldsInt:       ints,
@@ -544,10 +545,11 @@ func (s *Server) typeMapsToFields(
 func (s *Server) writeBatch(b models.Batch) error {
 	req := &Request{
 		Message: &Request_Begin{&BeginBatch{
-			Name:  b.Name,
-			Group: string(b.Group),
-			Tags:  b.Tags,
-			Size:  int64(len(b.Points)),
+			Name:   b.Name,
+			Group:  string(b.Group),
+			Tags:   b.Tags,
+			Size:   int64(len(b.Points)),
+			ByName: b.ByName,
 		}},
 	}
 	err := s.writeRequest(req)
@@ -650,6 +652,7 @@ func (s *Server) handleResponse(response *Response) error {
 		return errors.New(msg.Error.Error)
 	case *Response_Begin:
 		s.batch = &models.Batch{
+			ByName: msg.Begin.ByName,
 			Points: make([]models.BatchPoint, 0, msg.Begin.Size),
 		}
 	case *Response_Point:
@@ -671,7 +674,7 @@ func (s *Server) handleResponse(response *Response) error {
 				Database:        msg.Point.Database,
 				RetentionPolicy: msg.Point.RetentionPolicy,
 				Group:           models.GroupID(msg.Point.Group),
-				Dimensions:      msg.Point.Dimensions,
+				Dimensions:      models.Dimensions{ByName: msg.Point.ByName, TagNames: msg.Point.Dimensions},
 				Tags:            msg.Point.Tags,
 				Fields: s.typeMapsToFields(
 					msg.Point.FieldsString,

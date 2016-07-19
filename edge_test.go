@@ -11,18 +11,19 @@ import (
 )
 
 func Benchmark_CollectPoint(b *testing.B) {
+	name := "point"
 	b.ReportAllocs()
 	ls := &logService{}
 	e := newEdge("BCollectPoint", "parent", "child", pipeline.StreamEdge, defaultEdgeBufferSize, ls)
 	p := models.Point{
-		Name: "point",
+		Name: name,
 		Tags: models.Tags{
 			"tag1": "value1",
 			"tag2": "value2",
 			"tag3": "value3",
 			"tag4": "value4",
 		},
-		Group: models.NilGroup,
+		Group: models.ToGroupID(name, nil, models.Dimensions{}),
 		Fields: models.Fields{
 			"field1": 42,
 			"field2": 4.2,

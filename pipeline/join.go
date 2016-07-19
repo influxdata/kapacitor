@@ -119,7 +119,7 @@ func (j *JoinNode) As(names ...string) *JoinNode {
 // You want to calculate the percentage of the total building power consumed by each floor.
 //
 // Example:
-//    var buidling = stream
+//    var building = stream
 //        |from()
 //            .measurement('building_power')
 //            .groupBy('building')

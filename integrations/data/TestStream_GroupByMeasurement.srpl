@@ -1,0 +1,90 @@
+dbname
+rpname
+errors,service=cartA,dc=A value=7 0000000001
+dbname
+rpname
+errors,service=login,dc=B value=9 0000000001
+dbname
+rpname
+disk,service=sda,dc=B value=390   0000000001
+dbname
+rpname
+errors,service=front,dc=A value=2 0000000002
+dbname
+rpname
+errors,service=cartA,dc=B value=9 0000000002
+dbname
+rpname
+errors,service=login,dc=A value=5 0000000003
+dbname
+rpname
+errors,service=front,dc=B value=9 0000000003
+dbname
+rpname
+errors,service=cartA,dc=A value=3 0000000004
+dbname
+rpname
+errors,service=login,dc=B value=9 0000000004
+dbname
+rpname
+errors,service=front,dc=A value=2 0000000005
+dbname
+rpname
+errors,service=login,dc=B value=2 0000000005
+dbname
+rpname
+errors,service=front,dc=A value=5 0000000006
+dbname
+rpname
+errors,service=cartA,dc=B value=9 0000000006
+dbname
+rpname
+errors,service=login,dc=C value=7 0000000006
+dbname
+rpname
+errors,service=front,dc=A value=4 0000000007
+dbname
+rpname
+errors,service=cartA,dc=B value=8 0000000007
+dbname
+rpname
+errors,service=front,dc=A value=6 0000000008
+dbname
+rpname
+errors,service=cartA,dc=B value=6 0000000008
+dbname
+rpname
+errors,service=login,dc=A value=10 0000000009
+dbname
+rpname
+errors,service=front,dc=B value=4 0000000009
+dbname
+rpname
+disk,service=sda,dc=B value=420  0000000009
+dbname
+rpname
+errors,service=cartA,dc=A value=5 0000000010
+dbname
+rpname
+errors,service=login,dc=B value=3 0000000010
+dbname
+rpname
+errors,service=cartA,dc=A value=5 0000000011
+dbname
+rpname
+errors,service=login,dc=B value=6 0000000011
+dbname
+rpname
+disk,service=sda,dc=B value=423  00000000011
+dbname
+rpname
+errors,service=cartA,dc=A value=8 0000000012
+dbname
+rpname
+errors,service=front,dc=A value=9 0000000012
+dbname
+rpname
+errors,service=login,dc=B value=5 0000000012
+dbname
+rpname
+disk,service=sda,dc=B value=423  00000000012

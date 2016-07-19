@@ -32,8 +32,8 @@ func (w *WindowNode) runWindow([]byte) error {
 		w.timer.Start()
 		wnd := windows[p.Group]
 		if wnd == nil {
-			tags := make(map[string]string, len(p.Dimensions))
-			for _, dim := range p.Dimensions {
+			tags := make(map[string]string, len(p.Dimensions.TagNames))
+			for _, dim := range p.Dimensions.TagNames {
 				tags[dim] = p.Tags[dim]
 			}
 			nextEmit := p.Time.Add(w.w.Every)
@@ -48,6 +48,7 @@ func (w *WindowNode) runWindow([]byte) error {
 				every:    w.w.Every,
 				name:     p.Name,
 				group:    p.Group,
+				byName:   p.Dimensions.ByName,
 				tags:     tags,
 				logger:   w.logger,
 			}
@@ -79,6 +80,7 @@ type window struct {
 	every    time.Duration
 	name     string
 	group    models.GroupID
+	byName   bool
 	tags     map[string]string
 	logger   *log.Logger
 }
@@ -92,6 +94,7 @@ func (w *window) emit(now time.Time) models.Batch {
 	batch.Group = w.group
 	batch.Tags = w.tags
 	batch.TMax = w.nextEmit
+	batch.ByName = w.byName
 
 	// Determine next emit time.
 	// This is dependent on the current time not the last time we emitted.

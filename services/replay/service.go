@@ -1331,7 +1331,7 @@ func (s *Service) startRecordBatch(t *kapacitor.Task, start, stop time.Time) ([]
 	for batchIndex, batchQueries := range batches {
 		source := make(chan models.Batch)
 		sources[batchIndex] = source
-		go func(cluster string, queries []string) {
+		go func(cluster string, queries []string, groupByName bool) {
 			defer close(source)
 
 			// Connect to the cluster
@@ -1361,7 +1361,7 @@ func (s *Service) startRecordBatch(t *kapacitor.Task, start, stop time.Time) ([]
 					return
 				}
 				for _, res := range resp.Results {
-					batches, err := models.ResultToBatches(res)
+					batches, err := models.ResultToBatches(res, groupByName)
 					if err != nil {
 						errors <- err
 						return
@@ -1372,7 +1372,7 @@ func (s *Service) startRecordBatch(t *kapacitor.Task, start, stop time.Time) ([]
 				}
 			}
 			errors <- nil
-		}(batchQueries.Cluster, batchQueries.Queries)
+		}(batchQueries.Cluster, batchQueries.Queries, batchQueries.GroupByMeasurement)
 	}
 	errC := make(chan error, 1)
 	go func() {
@@ -1443,7 +1443,7 @@ func (r *Service) runQueryStream(source chan<- models.Point, q, cluster string) 
 	}
 	// Write results to sources
 	for _, res := range resp.Results {
-		batches, err := models.ResultToBatches(res)
+		batches, err := models.ResultToBatches(res, false)
 		if err != nil {
 			return err
 		}
@@ -1506,7 +1506,7 @@ func (r *Service) runQueryBatch(source chan<- models.Batch, q string, cluster st
 	}
 	// Write results to sources
 	for _, res := range resp.Results {
-		batches, err := models.ResultToBatches(res)
+		batches, err := models.ResultToBatches(res, false)
 		if err != nil {
 			return err
 		}

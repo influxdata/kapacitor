@@ -59,6 +59,7 @@ func (i *InfluxDBOutNode) runOut([]byte) error {
 				Name:   p.Name,
 				Group:  p.Group,
 				Tags:   p.Tags,
+				ByName: p.Dimensions.ByName,
 				Points: []models.BatchPoint{models.BatchPointFromPoint(p)},
 			}
 			err := i.write(p.Database, p.RetentionPolicy, batch)

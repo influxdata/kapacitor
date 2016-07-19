@@ -160,6 +160,7 @@ type {{.name}}PointEmitter struct {
 	baseReduceContext
 	emitter influxql.{{.Name}}PointEmitter
 	isSimpleSelector bool
+    byName bool
 }
 
 func (e *{{.name}}PointEmitter) EmitPoint() (models.Point, error) {
@@ -210,6 +211,7 @@ func (e *{{.name}}PointEmitter) EmitBatch() models.Batch {
 		Name:   e.name,
 		TMax:   e.time,
 		Group:  e.group,
+		ByName: e.dimensions.ByName,
 		Tags:   e.tags,
 		Points: make([]models.BatchPoint, len(slice)),
 	}

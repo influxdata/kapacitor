@@ -1,0 +1,21 @@
+dbname
+rpname
+building_power,building=shack value=30 0000000001
+dbname
+rpname
+floor_power,building=shack,floor=1 value=7 0000000001
+dbname
+rpname
+floor_power,building=shack,floor=2 value=11 0000000001
+dbname
+rpname
+floor_power,building=shack,floor=3 value=12 0000000001
+dbname
+rpname
+building_power,building=hut value=40 0000000001
+dbname
+rpname
+floor_power,building=hut,floor=1 value=19 0000000001
+dbname
+rpname
+floor_power,building=hut,floor=2 value=21 0000000001

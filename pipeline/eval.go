@@ -1,6 +1,10 @@
 package pipeline
 
-import "github.com/influxdata/kapacitor/tick/ast"
+import (
+	"fmt"
+
+	"github.com/influxdata/kapacitor/tick/ast"
+)
 
 // Evaluates expressions on each data point it receives.
 // A list of expressions may be provided and will be evaluated in the order they are given
@@ -27,6 +31,10 @@ type EvalNode struct {
 	// tick:ignore
 	AsList []string `tick:"As"`
 
+	// The names of the expressions that should be converted to tags.
+	// tick:ignore
+	TagsList []string `tick:"Tags"`
+
 	// tick:ignore
 	Lambdas []*ast.LambdaNode
 
@@ -50,6 +58,26 @@ func newEvalNode(e EdgeType, exprs []*ast.LambdaNode) *EvalNode {
 	return n
 }
 
+func (e *EvalNode) validate() error {
+	if asLen, lambdaLen := len(e.AsList), len(e.Lambdas); asLen != lambdaLen {
+		return fmt.Errorf("must specify same number of expressions and .as() names: got %d as names, and %d expressions.", asLen, lambdaLen)
+	}
+	// Validate tag names exist in As names list.
+	for _, tag := range e.TagsList {
+		found := false
+		for _, as := range e.AsList {
+			if tag == as {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("invalid tag name %q, name is not present is .as() names", tag)
+		}
+	}
+	return nil
+}
+
 // List of names for each expression.
 // The expressions are evaluated in order and the result
 // of a previous expression will be available in later expressions
@@ -66,6 +94,38 @@ func newEvalNode(e EdgeType, exprs []*ast.LambdaNode) *EvalNode {
 // tick:property
 func (e *EvalNode) As(names ...string) *EvalNode {
 	e.AsList = names
+	return e
+}
+
+// Convert the result of an expression into a tag.
+// The result must be a string.
+// Use the `string()` expression function to convert types.
+//
+//
+// Example:
+//    stream
+//        |eval(lambda: string(floor("value" / 10.0)))
+//            .as('value_bucket')
+//            .tags('value_bucket')
+//
+// The above example calculates a named bucket from the field `value`.
+// Then the `value_bucket` result is set as a tag 'value_bucket' on the point, instead of as a field.
+//
+// Example:
+//    stream
+//        |eval(lambda: string(floor("value" / 10.0)))
+//            .as('value_bucket')
+//            .tags('value_bucket')
+//            .keep('value') // keep the original field `value` as well
+//
+// The above example calculates a named bucket from the field `value`.
+// Then the `value_bucket` result is set as a tag 'value_bucket' on the point, instead of as a field.
+// The field `value` is also preserved on the point because of the `keep` property.
+// Tags are always kept since creating a tag implies you want to keep it.
+//
+// tick:property
+func (e *EvalNode) Tags(names ...string) *EvalNode {
+	e.TagsList = names
 	return e
 }
 

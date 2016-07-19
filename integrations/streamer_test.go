@@ -837,6 +837,119 @@ stream
 	testStreamerWithOutput(t, "TestStream_Eval_Keep", script, 2*time.Second, er, nil, false)
 }
 
+func TestStream_Eval_Tags(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('types')
+	|eval(lambda: string("value"))
+		.as('value')
+		.tags('value')
+	|groupBy('value')
+	|httpOut('TestStream_Eval_Tags')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "types",
+				Tags:    map[string]string{"value": "0"},
+				Columns: []string{"time"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+				}},
+			},
+			{
+				Name:    "types",
+				Tags:    map[string]string{"value": "1"},
+				Columns: []string{"time"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Eval_Tags", script, 2*time.Second, er, nil, true)
+}
+
+func TestStream_Eval_Tags_Keep(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('types')
+	|eval(lambda: string("value"))
+		.as('value')
+		.tags('value')
+		.keep()
+	|groupBy('value')
+	|httpOut('TestStream_Eval_Tags')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "types",
+				Tags:    map[string]string{"value": "0"},
+				Columns: []string{"time", "another", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					2.0,
+					"0",
+				}},
+			},
+			{
+				Name:    "types",
+				Tags:    map[string]string{"value": "1"},
+				Columns: []string{"time", "another", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					2.0,
+					"1",
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Eval_Tags", script, 2*time.Second, er, nil, true)
+}
+
+func TestStream_Eval_Tags_KeepSome(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('types')
+	|eval(lambda: string("value"))
+		.as('value_tag')
+		.tags('value_tag')
+		.keep('value')
+	|groupBy('value_tag')
+	|httpOut('TestStream_Eval_Tags')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "types",
+				Tags:    map[string]string{"value_tag": "0"},
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					0.0,
+				}},
+			},
+			{
+				Name:    "types",
+				Tags:    map[string]string{"value_tag": "1"},
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					1.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Eval_Tags", script, 2*time.Second, er, nil, true)
+}
+
 func TestStream_EvalGroups(t *testing.T) {
 	var script = `
 stream
@@ -883,7 +996,6 @@ stream
 	|from()
 		.measurement('types')
 		.groupBy('group')
-	|log()
 	|eval(lambda: hour("time"))
 		.as('hour')
 	|httpOut('TestStream_Eval_Time')
@@ -949,6 +1061,52 @@ stream
 	}
 
 	testStreamerWithOutput(t, "TestStream_Default", script, 15*time.Second, er, nil, false)
+}
+
+func TestStream_Delete(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+	|delete()
+		.field('anothervalue')
+		.tag('type')
+	|groupBy(*)
+	|httpOut('TestStream_Delete')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverA"},
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					9.0,
+				}},
+			},
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverB"},
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					6.0,
+				}},
+			},
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverC"},
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					3.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Delete", script, 15*time.Second, er, nil, true)
 }
 
 func TestStream_AllMeasurements(t *testing.T) {
@@ -1311,6 +1469,64 @@ byCpu
 	}
 
 	testStreamerWithOutput(t, "TestStream_GroupByWhere", script, 13*time.Second, er, nil, true)
+}
+
+func TestStream_GroupByMeasurement(t *testing.T) {
+
+	var script = `
+stream
+	|from()
+		.groupBy('service')
+		.groupByMeasurement()
+	|window()
+		.period(10s)
+		.every(10s)
+	|sum('value')
+	|httpOut('TestStream_GroupByMeasurement')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "errors",
+				Tags:    map[string]string{"service": "cartA"},
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					47.0,
+				}},
+			},
+			{
+				Name:    "errors",
+				Tags:    map[string]string{"service": "login"},
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					45.0,
+				}},
+			},
+			{
+				Name:    "errors",
+				Tags:    map[string]string{"service": "front"},
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
+					32.0,
+				}},
+			},
+			{
+				Name:    "disk",
+				Tags:    map[string]string{"service": "sda"},
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					810.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_GroupByMeasurement", script, 13*time.Second, er, nil, true)
 }
 
 func TestStream_Flatten(t *testing.T) {
@@ -2320,25 +2536,100 @@ errorsByServiceGlobal
 	testStreamerWithOutput(t, "TestStream_JoinOn", script, 13*time.Second, er, nil, true)
 }
 
+func TestStream_JoinOn_AcrossMeasurement(t *testing.T) {
+	var script = `
+var building = stream
+    |from()
+        .measurement('building_power')
+        .groupBy('building')
+
+var floor = stream
+    |from()
+        .measurement('floor_power')
+        .groupBy('building', 'floor')
+
+building
+    |join(floor)
+        .as('building', 'floor')
+        .on('building')
+        .streamName('power_floor_percentage')
+    |eval(lambda: "floor.value" / "building.value")
+        .as('value')
+    |httpOut('TestStream_JoinOn_AcrossMeasurement')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "power_floor_percentage",
+				Tags:    map[string]string{"building": "shack", "floor": "1"},
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					7.0 / 30.0,
+				}},
+			},
+			{
+				Name:    "power_floor_percentage",
+				Tags:    map[string]string{"building": "shack", "floor": "2"},
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					11.0 / 30.0,
+				}},
+			},
+			{
+				Name:    "power_floor_percentage",
+				Tags:    map[string]string{"building": "shack", "floor": "3"},
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					12.0 / 30.0,
+				}},
+			},
+			{
+				Name:    "power_floor_percentage",
+				Tags:    map[string]string{"building": "hut", "floor": "1"},
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					19.0 / 40.0,
+				}},
+			},
+			{
+				Name:    "power_floor_percentage",
+				Tags:    map[string]string{"building": "hut", "floor": "2"},
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					21.0 / 40.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_JoinOn_AcrossMeasurement", script, 13*time.Second, er, nil, true)
+}
+
 func TestStream_Union(t *testing.T) {
 
 	var script = `
-var cpu = stream
+var cpuT = stream
 	|from()
 		.measurement('cpu')
 		.where(lambda: "cpu" == 'total')
-var mem = stream
+var cpu0 = stream
 	|from()
-		.measurement('memory')
-		.where(lambda: "type" == 'free')
-var disk = stream
+		.measurement('cpu')
+		.where(lambda: "cpu" == '0')
+var cpu1 = stream
 	|from()
-		.measurement('disk')
-		.where(lambda: "device" == 'sda')
+		.measurement('cpu')
+		.where(lambda: "cpu" == '1')
 
-cpu
-	|union(mem, disk)
-		.rename('cpu_mem_disk')
+cpuT
+	|union(cpu0, cpu1)
+		.rename('cpu_all')
 	|window()
 		.period(10s)
 		.every(10s)
@@ -2349,12 +2640,12 @@ cpu
 	er := kapacitor.Result{
 		Series: imodels.Rows{
 			{
-				Name:    "cpu_mem_disk",
+				Name:    "cpu_all",
 				Tags:    nil,
 				Columns: []string{"time", "count"},
 				Values: [][]interface{}{[]interface{}{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
-					24.0,
+					20.0,
 				}},
 			},
 		},
@@ -4381,7 +4672,7 @@ func TestStream_AlertAlerta(t *testing.T) {
 			if exp := "production"; pd.Environment != exp {
 				t.Errorf("unexpected environment got %s exp %s", pd.Environment, exp)
 			}
-			if exp := "host=serverA,"; pd.Group != exp {
+			if exp := "host=serverA"; pd.Group != exp {
 				t.Errorf("unexpected group got %s exp %s", pd.Group, exp)
 			}
 			if exp := ""; pd.Value != exp {
