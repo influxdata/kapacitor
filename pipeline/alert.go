@@ -82,13 +82,10 @@ const defaultLogFileMode = 0600
 //           .email().to('oncall@example.com')
 //
 //
-// It is assumed that each successive level filters a subset
-// of the previous level. As a result, the filter will only be applied if
-// a data point passed the previous level.
-// In the above example, if value = 15 then the INFO and
-// WARNING expressions would be evaluated, but not the
-// CRITICAL expression.
 // Each expression maintains its own state.
+// The order of execution for the expressions is not considered to be deterministic.
+// For each point an expression may or may not be evaluated.
+// If no expression is true then the alert is considered to be in the OK state.
 //
 // Available Statistics:
 //

@@ -16,6 +16,9 @@
 - [#723](https://github.com/influxdata/kapacitor/pull/723): BREAKING: Search for valid configuration on startup in ~/.kapacitor and /etc/kapacitor/.
     This is so that the -config CLI flag is not required if the configuration is found in a standard location.
     The configuration file being used is always logged to STDERR.
+- [#298](https://github.com/influxdata/kapacitor/issue/298): BREAKING: Change alert level evaluation so each level is independent and not required to be a subset of the previous level.
+    The breaking change is that expression evaluation order changed.
+    As a result stateful expressions that relied on that order are broken.
 
 ## v1.0.0-beta3 [2016-07-09]
 
