@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -20,6 +21,8 @@ type Service struct {
 	https bool
 	cert  string
 	err   chan error
+
+	externalURL string
 
 	server *http.Server
 	mu     sync.Mutex
@@ -37,14 +40,23 @@ type Service struct {
 	logger *log.Logger
 }
 
-func NewService(c Config, l *log.Logger, li logging.Interface) *Service {
+func NewService(c Config, hostname string, l *log.Logger, li logging.Interface) *Service {
 	statMap := &expvar.Map{}
 	statMap.Init()
+	port, _ := c.Port()
+	u := url.URL{
+		Host:   fmt.Sprintf("%s:%d", hostname, port),
+		Scheme: "http",
+	}
+	if c.HttpsEnabled {
+		u.Scheme = "https"
+	}
 	s := &Service{
 		addr:            c.BindAddress,
 		https:           c.HttpsEnabled,
 		cert:            c.HttpsCertificate,
-		err:             make(chan error),
+		externalURL:     u.String(),
+		err:             make(chan error, 1),
 		shutdownTimeout: time.Duration(c.ShutdownTimeout),
 		Handler: NewHandler(
 			c.AuthEnabled,
@@ -54,6 +66,7 @@ func NewService(c Config, l *log.Logger, li logging.Interface) *Service {
 			statMap,
 			l,
 			li,
+			c.SharedSecret,
 		),
 		logger: l,
 	}
@@ -251,6 +264,13 @@ func (s *Service) URL() string {
 	}
 	return ""
 }
+
+// URL that should resolve externally to the server HTTP endpoint.
+// It is possible that the URL does not resolve correctly  if the hostname config setting is incorrect.
+func (s *Service) ExternalURL() string {
+	return s.externalURL
+}
+
 func (s *Service) AddRoutes(routes []Route) error {
 	return s.Handler.AddRoutes(routes)
 }

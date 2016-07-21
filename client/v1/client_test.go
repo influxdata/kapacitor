@@ -2,6 +2,7 @@ package client_test
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -16,10 +17,12 @@ import (
 )
 
 func newClient(handler http.Handler) (*httptest.Server, *client.Client, error) {
+	return newClientWithConfig(handler, client.Config{})
+}
+
+func newClientWithConfig(handler http.Handler, config client.Config) (*httptest.Server, *client.Client, error) {
 	ts := httptest.NewServer(handler)
-	config := client.Config{
-		URL: ts.URL,
-	}
+	config.URL = ts.URL
 	cli, err := client.New(config)
 	return ts, cli, err
 }
@@ -1908,5 +1911,109 @@ func Test_LogLevel(t *testing.T) {
 	err = c.LogLevel("DEBUG")
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func Test_Bad_Creds(t *testing.T) {
+	testCases := []struct {
+		creds *client.Credentials
+		err   error
+	}{
+		{
+			creds: &client.Credentials{
+				Method: client.UserAuthentication,
+			},
+			err: errors.New("invalid credentials: missing username"),
+		},
+		{
+			creds: &client.Credentials{
+				Method:   client.UserAuthentication,
+				Username: "bob",
+			},
+			err: errors.New("invalid credentials: missing password"),
+		},
+		{
+			creds: &client.Credentials{
+				Method: client.BearerAuthentication,
+			},
+			err: errors.New("invalid credentials: missing token"),
+		},
+	}
+	for _, tc := range testCases {
+		if _, err := client.New(
+			client.Config{
+				URL:         "http://localhost",
+				Credentials: tc.creds,
+			},
+		); err == nil {
+			t.Error("expected credential error")
+		} else if exp, got := tc.err.Error(), err.Error(); got != exp {
+			t.Errorf("unexpected error message: got %q exp %q", got, exp)
+		}
+	}
+}
+
+func Test_UserAuthentication(t *testing.T) {
+	s, c, err := newClientWithConfig(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		u, p, auth := r.BasicAuth()
+		if r.URL.Path == "/kapacitor/v1/ping" && r.Method == "GET" &&
+			auth &&
+			u == "bob" &&
+			p == "don't look" {
+			w.Header().Set("X-Kapacitor-Version", "versionStr")
+			w.WriteHeader(http.StatusNoContent)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "request: %v", r)
+		}
+	}), client.Config{
+		Credentials: &client.Credentials{
+			Method:   client.UserAuthentication,
+			Username: "bob",
+			Password: "don't look",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	_, version, err := c.Ping()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exp, got := "versionStr", version; exp != got {
+		t.Errorf("unexpected version: got: %s exp: %s", got, exp)
+	}
+}
+
+func Test_BearerAuthentication(t *testing.T) {
+	s, c, err := newClientWithConfig(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		auth := r.Header.Get("Authorization")
+		if r.URL.Path == "/kapacitor/v1/ping" && r.Method == "GET" &&
+			auth == "Bearer myfake.token" {
+			w.Header().Set("X-Kapacitor-Version", "versionStr")
+			w.WriteHeader(http.StatusNoContent)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "request: %v", r)
+		}
+	}), client.Config{
+		Credentials: &client.Credentials{
+			Method: client.BearerAuthentication,
+			Token:  "myfake.token",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	_, version, err := c.Ping()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exp, got := "versionStr", version; exp != got {
+		t.Errorf("unexpected version: got: %s exp: %s", got, exp)
 	}
 }

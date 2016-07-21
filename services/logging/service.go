@@ -9,12 +9,23 @@ import (
 	"github.com/influxdata/wlog"
 )
 
+type Level wlog.Level
+
+const (
+	_ Level = iota
+	DEBUG
+	INFO
+	WARN
+	ERROR
+	OFF
+)
+
 // Interface for creating new loggers
 type Interface interface {
 	NewLogger(prefix string, flag int) *log.Logger
 	NewRawLogger(prefix string, flag int) *log.Logger
-	NewStaticLevelLogger(prefix string, flag int, l wlog.Level) *log.Logger
-	NewStaticLevelWriter(l wlog.Level) io.Writer
+	NewStaticLevelLogger(prefix string, flag int, l Level) *log.Logger
+	NewStaticLevelWriter(l Level) io.Writer
 }
 
 type Service struct {
@@ -73,15 +84,17 @@ func (s *Service) Close() error {
 func (s *Service) NewLogger(prefix string, flag int) *log.Logger {
 	return wlog.New(s.f, prefix, flag)
 }
+
 func (s *Service) NewRawLogger(prefix string, flag int) *log.Logger {
 	return log.New(s.f, prefix, flag)
 }
-func (s *Service) NewStaticLevelLogger(prefix string, flag int, l wlog.Level) *log.Logger {
-	return log.New(wlog.NewStaticLevelWriter(s.f, l), prefix, flag)
+
+func (s *Service) NewStaticLevelLogger(prefix string, flag int, l Level) *log.Logger {
+	return log.New(wlog.NewStaticLevelWriter(s.f, wlog.Level(l)), prefix, flag)
 }
 
-func (s *Service) NewStaticLevelWriter(l wlog.Level) io.Writer {
-	return wlog.NewStaticLevelWriter(s.f, l)
+func (s *Service) NewStaticLevelWriter(l Level) io.Writer {
+	return wlog.NewStaticLevelWriter(s.f, wlog.Level(l))
 }
 
 type nopCloser struct {

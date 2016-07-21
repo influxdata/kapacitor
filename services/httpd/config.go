@@ -23,6 +23,7 @@ type Config struct {
 	HttpsEnabled     bool          `toml:"https-enabled"`
 	HttpsCertificate string        `toml:"https-certificate"`
 	ShutdownTimeout  toml.Duration `toml:"shutdown-timeout"`
+	SharedSecret     string        `toml:"shared-secret"`
 
 	// Enable gzipped encoding
 	// NOTE: this is ignored in toml since it is only consumed by the tests

@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"os"
 
 	"github.com/BurntSushi/toml"
@@ -38,7 +39,7 @@ func (cmd *PrintConfigCommand) Run(args ...string) error {
 	}
 
 	// Parse config from path.
-	config, err := cmd.parseConfig(*configPath)
+	config, err := cmd.parseConfig(FindConfigPath(*configPath))
 	if err != nil {
 		return fmt.Errorf("parse config: %s", err)
 	}
@@ -64,14 +65,47 @@ func (cmd *PrintConfigCommand) Run(args ...string) error {
 	return nil
 }
 
+// FindConfigPath returns the config path specified or searches for a valid config path.
+// It will return a path by searching in this order:
+//   1. The given configPath
+//   2. The environment variable KAPACITOR_CONFIG_PATH
+//   3. The first non empty kapacitor.conf file in the path:
+//        - ~/.kapacitor/
+//        - /etc/kapacitor/
+func FindConfigPath(configPath string) string {
+	if configPath != "" {
+		if configPath == os.DevNull {
+			return ""
+		}
+		return configPath
+	} else if envVar := os.Getenv("KAPACITOR_CONFIG_PATH"); envVar != "" {
+		return envVar
+	}
+
+	for _, path := range []string{
+		os.ExpandEnv("${HOME}/.kapacitor/kapacitor.conf"),
+		"/etc/kapacitor/kapacitor.conf",
+	} {
+		if fi, err := os.Stat(path); err == nil && fi.Size() != 0 {
+			return path
+		}
+	}
+	return ""
+}
+
 // ParseConfig parses the config at path.
 // Returns a demo configuration if path is blank.
 func (cmd *PrintConfigCommand) parseConfig(path string) (*server.Config, error) {
-	if path == "" {
-		return server.NewDemoConfig()
+	config, err := server.NewDemoConfig()
+	if err != nil {
+		config = server.NewConfig()
 	}
 
-	config := server.NewConfig()
+	if path == "" {
+		return config, nil
+	}
+
+	log.Println("Merging with configuration at:", path)
 	if _, err := toml.DecodeFile(path, &config); err != nil {
 		return nil, err
 	}

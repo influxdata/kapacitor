@@ -2,7 +2,6 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -18,12 +17,14 @@ import (
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/influxdb/services/opentsdb"
 	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/auth"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/deadman"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/influxdb"
 	"github.com/influxdata/kapacitor/services/logging"
+	"github.com/influxdata/kapacitor/services/noauth"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/replay"
@@ -39,7 +40,7 @@ import (
 	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
-	"github.com/influxdata/wlog"
+	"github.com/pkg/errors"
 	"github.com/twinj/uuid"
 )
 
@@ -57,16 +58,17 @@ type BuildInfo struct {
 // It is built using a Config and it manages the startup and shutdown of all
 // services in the proper order.
 type Server struct {
-	buildInfo BuildInfo
-	dataDir   string
-	hostname  string
+	dataDir  string
+	hostname string
+
+	config *Config
 
 	err chan error
 
 	TaskMaster       *kapacitor.TaskMaster
 	TaskMasterLookup *kapacitor.TaskMasterLookup
 
-	LogService      logging.Interface
+	AuthService     auth.Interface
 	HTTPDService    *httpd.Service
 	StorageService  *storage.Service
 	TaskStore       *task_store.Service
@@ -76,8 +78,12 @@ type Server struct {
 	MetaClient    *kapacitor.NoopMetaClient
 	QueryExecutor *Queryexecutor
 
+	// List of services in startup order
 	Services []Service
+	// Map of service name to index in Services list
+	ServicesByName map[string]int
 
+	BuildInfo BuildInfo
 	ClusterID string
 	ServerID  string
 
@@ -85,7 +91,8 @@ type Server struct {
 	CPUProfile string
 	MemProfile string
 
-	Logger *log.Logger
+	LogService logging.Interface
+	Logger     *log.Logger
 }
 
 // New returns a new instance of Server built from a config.
@@ -96,14 +103,16 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	}
 	l := logService.NewLogger("[srv] ", log.LstdFlags)
 	s := &Server{
-		buildInfo:     buildInfo,
-		dataDir:       c.DataDir,
-		hostname:      c.Hostname,
-		err:           make(chan error),
-		LogService:    logService,
-		MetaClient:    &kapacitor.NoopMetaClient{},
-		QueryExecutor: &Queryexecutor{},
-		Logger:        l,
+		config:         c,
+		BuildInfo:      buildInfo,
+		dataDir:        c.DataDir,
+		hostname:       c.Hostname,
+		err:            make(chan error),
+		LogService:     logService,
+		MetaClient:     &kapacitor.NoopMetaClient{},
+		QueryExecutor:  &Queryexecutor{},
+		Logger:         l,
+		ServicesByName: make(map[string]int),
 	}
 	s.Logger.Println("I! Kapacitor hostname:", s.hostname)
 
@@ -117,7 +126,7 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	kapacitor.ServerIDVar.Set(s.ServerID)
 	kapacitor.HostVar.Set(s.hostname)
 	kapacitor.ProductVar.Set(kapacitor.Product)
-	kapacitor.VersionVar.Set(s.buildInfo.Version)
+	kapacitor.VersionVar.Set(s.BuildInfo.Version)
 	s.Logger.Printf("I! ClusterID: %s ServerID: %s", s.ClusterID, s.ServerID)
 
 	// Start Task Master
@@ -128,118 +137,125 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 		return nil, err
 	}
 
-	// Determine HTTP port
-	httpPort, err := c.HTTP.Port()
-	if err != nil {
-		return nil, err
-	}
-
 	// Append Kapacitor services.
-	s.appendUDFService(c.UDF)
-	s.appendDeadmanService(c.Deadman)
-	s.appendSMTPService(c.SMTP)
-	s.initHTTPDService(c.HTTP)
-	s.appendInfluxDBService(c.InfluxDB, c.defaultInfluxDB, httpPort, c.Hostname)
-	s.appendStorageService(c.Storage)
-	s.appendTaskStoreService(c.Task)
-	s.appendReplayService(c.Replay)
-	s.appendOpsGenieService(c.OpsGenie)
-	s.appendVictorOpsService(c.VictorOps)
-	s.appendPagerDutyService(c.PagerDuty)
-	s.appendTelegramService(c.Telegram)
-	s.appendHipChatService(c.HipChat)
-	s.appendAlertaService(c.Alerta)
-	s.appendSlackService(c.Slack)
-	s.appendSensuService(c.Sensu)
-	s.appendTalkService(c.Talk)
+	s.appendUDFService()
+	s.appendDeadmanService()
+	s.appendSMTPService()
+	s.InitHTTPDService()
+	if err := s.appendInfluxDBService(); err != nil {
+		return nil, errors.Wrap(err, "influxdb service")
+	}
+	s.appendStorageService()
+	s.appendTaskStoreService()
+	s.appendReplayService()
+	s.appendAuthService()
 
-	// Append InfluxDB services
-	s.appendCollectdService(c.Collectd)
-	if err := s.appendOpenTSDBService(c.OpenTSDB); err != nil {
-		return nil, err
+	// Append Alert integration services
+	s.appendOpsGenieService()
+	s.appendVictorOpsService()
+	s.appendPagerDutyService()
+	s.appendTelegramService()
+	s.appendHipChatService()
+	s.appendAlertaService()
+	s.appendSlackService()
+	s.appendSensuService()
+	s.appendTalkService()
+
+	// Append InfluxDB input services
+	s.appendCollectdService()
+	s.appendUDPServices()
+	if err := s.appendOpenTSDBService(); err != nil {
+		return nil, errors.Wrap(err, "opentsdb service")
 	}
-	for _, g := range c.UDPs {
-		s.appendUDPService(g)
-	}
-	for _, g := range c.Graphites {
-		if err := s.appendGraphiteService(g); err != nil {
-			return nil, err
-		}
+	if err := s.appendGraphiteServices(); err != nil {
+		return nil, errors.Wrap(err, "graphite service")
 	}
 
-	// append StatsService and ReportingService last so all stats are ready
+	// Append StatsService and ReportingService after other services so all stats are ready
 	// to be reported
-	s.appendStatsService(c.Stats)
-	s.appendReportingService(c.Reporting)
+	s.appendStatsService()
+	s.appendReportingService()
 
-	// Append HTTPD Service last
+	// Append HTTPD Service last so that the API is not listening till everything else succeeded.
 	s.appendHTTPDService()
 
 	return s, nil
 }
 
-func (s *Server) appendStorageService(c storage.Config) {
-	l := s.LogService.NewLogger("[storage] ", log.LstdFlags)
-	srv := storage.NewService(c, l)
-
-	s.StorageService = srv
+func (s *Server) AppendService(name string, srv Service) {
+	i := len(s.Services)
 	s.Services = append(s.Services, srv)
+	s.ServicesByName[name] = i
 }
 
-func (s *Server) appendSMTPService(c smtp.Config) {
+func (s *Server) appendStorageService() {
+	l := s.LogService.NewLogger("[storage] ", log.LstdFlags)
+	srv := storage.NewService(s.config.Storage, l)
+
+	s.StorageService = srv
+	s.AppendService("storage", srv)
+}
+
+func (s *Server) appendSMTPService() {
+	c := s.config.SMTP
 	if c.Enabled {
 		l := s.LogService.NewLogger("[smtp] ", log.LstdFlags)
 		srv := smtp.NewService(c, l)
 
 		s.TaskMaster.SMTPService = srv
-		s.Services = append(s.Services, srv)
+		s.AppendService("smtp", srv)
 	}
 }
 
-func (s *Server) appendInfluxDBService(c []influxdb.Config, defaultInfluxDB, httpPort int, hostname string) {
+func (s *Server) appendInfluxDBService() error {
+	c := s.config.InfluxDB
 	if len(c) > 0 {
 		l := s.LogService.NewLogger("[influxdb] ", log.LstdFlags)
-		srv := influxdb.NewService(c, defaultInfluxDB, httpPort, hostname, l)
+		httpPort, err := s.config.HTTP.Port()
+		if err != nil {
+			return errors.Wrap(err, "failed to get http port")
+		}
+		srv := influxdb.NewService(c, s.config.defaultInfluxDB, httpPort, s.config.Hostname, l)
 		srv.PointsWriter = s.TaskMaster
 		srv.LogService = s.LogService
 
 		s.InfluxDBService = srv
 		s.TaskMaster.InfluxDBService = srv
-		s.Services = append(s.Services, srv)
+		s.AppendService("influxdb", srv)
 	}
+	return nil
 }
 
-func (s *Server) initHTTPDService(c httpd.Config) {
+func (s *Server) InitHTTPDService() {
 	l := s.LogService.NewLogger("[httpd] ", log.LstdFlags)
-	srv := httpd.NewService(c, l, s.LogService)
+	srv := httpd.NewService(s.config.HTTP, s.hostname, l, s.LogService)
 
-	srv.Handler.MetaClient = s.MetaClient
 	srv.Handler.PointsWriter = s.TaskMaster
-	srv.Handler.Version = s.buildInfo.Version
+	srv.Handler.Version = s.BuildInfo.Version
 
 	s.HTTPDService = srv
 	s.TaskMaster.HTTPDService = srv
 }
 
 func (s *Server) appendHTTPDService() {
-	s.Services = append(s.Services, s.HTTPDService)
+	s.AppendService("httpd", s.HTTPDService)
 }
 
-func (s *Server) appendTaskStoreService(c task_store.Config) {
+func (s *Server) appendTaskStoreService() {
 	l := s.LogService.NewLogger("[task_store] ", log.LstdFlags)
-	srv := task_store.NewService(c, l)
+	srv := task_store.NewService(s.config.Task, l)
 	srv.StorageService = s.StorageService
 	srv.HTTPDService = s.HTTPDService
 	srv.TaskMasterLookup = s.TaskMasterLookup
 
 	s.TaskStore = srv
 	s.TaskMaster.TaskStore = srv
-	s.Services = append(s.Services, srv)
+	s.AppendService("task_store", srv)
 }
 
-func (s *Server) appendReplayService(c replay.Config) {
+func (s *Server) appendReplayService() {
 	l := s.LogService.NewLogger("[replay] ", log.LstdFlags)
-	srv := replay.NewService(c, l)
+	srv := replay.NewService(s.config.Replay, l)
 	srv.StorageService = s.StorageService
 	srv.TaskStore = s.TaskStore
 	srv.HTTPDService = s.HTTPDService
@@ -248,120 +264,150 @@ func (s *Server) appendReplayService(c replay.Config) {
 	srv.TaskMasterLookup = s.TaskMasterLookup
 
 	s.ReplayService = srv
-	s.Services = append(s.Services, srv)
+	s.AppendService("replay", srv)
 }
 
-func (s *Server) appendDeadmanService(c deadman.Config) {
+func (s *Server) appendDeadmanService() {
 	l := s.LogService.NewLogger("[deadman] ", log.LstdFlags)
-	srv := deadman.NewService(c, l)
+	srv := deadman.NewService(s.config.Deadman, l)
 
 	s.TaskMaster.DeadmanService = srv
-	s.Services = append(s.Services, srv)
+	s.AppendService("deadman", srv)
 }
 
-func (s *Server) appendUDFService(c udf.Config) {
+func (s *Server) appendUDFService() {
 	l := s.LogService.NewLogger("[udf] ", log.LstdFlags)
-	srv := udf.NewService(c, l)
+	srv := udf.NewService(s.config.UDF, l)
 
 	s.TaskMaster.UDFService = srv
-	s.Services = append(s.Services, srv)
+	s.AppendService("udf", srv)
 }
 
-func (s *Server) appendOpsGenieService(c opsgenie.Config) {
+func (s *Server) appendAuthService() {
+	l := s.LogService.NewLogger("[noauth] ", log.LstdFlags)
+	srv := noauth.NewService(l)
+
+	s.AuthService = srv
+	s.HTTPDService.Handler.AuthService = srv
+	s.AppendService("auth", srv)
+}
+
+func (s *Server) appendOpsGenieService() {
+	c := s.config.OpsGenie
 	if c.Enabled {
 		l := s.LogService.NewLogger("[opsgenie] ", log.LstdFlags)
 		srv := opsgenie.NewService(c, l)
 		s.TaskMaster.OpsGenieService = srv
 
-		s.Services = append(s.Services, srv)
+		s.AppendService("opsgenie", srv)
 	}
 }
 
-func (s *Server) appendVictorOpsService(c victorops.Config) {
+func (s *Server) appendVictorOpsService() {
+	c := s.config.VictorOps
 	if c.Enabled {
 		l := s.LogService.NewLogger("[victorops] ", log.LstdFlags)
 		srv := victorops.NewService(c, l)
 		s.TaskMaster.VictorOpsService = srv
 
-		s.Services = append(s.Services, srv)
+		s.AppendService("victorops", srv)
 	}
 }
 
-func (s *Server) appendPagerDutyService(c pagerduty.Config) {
+func (s *Server) appendPagerDutyService() {
+	c := s.config.PagerDuty
 	if c.Enabled {
 		l := s.LogService.NewLogger("[pagerduty] ", log.LstdFlags)
 		srv := pagerduty.NewService(c, l)
 		srv.HTTPDService = s.HTTPDService
 		s.TaskMaster.PagerDutyService = srv
 
-		s.Services = append(s.Services, srv)
+		s.AppendService("pagerduty", srv)
 	}
 }
 
-func (s *Server) appendSensuService(c sensu.Config) {
+func (s *Server) appendSensuService() {
+	c := s.config.Sensu
 	if c.Enabled {
 		l := s.LogService.NewLogger("[sensu] ", log.LstdFlags)
 		srv := sensu.NewService(c, l)
 		s.TaskMaster.SensuService = srv
 
-		s.Services = append(s.Services, srv)
+		s.AppendService("sensu", srv)
 	}
 }
 
-func (s *Server) appendSlackService(c slack.Config) {
+func (s *Server) appendSlackService() {
+	c := s.config.Slack
 	if c.Enabled {
 		l := s.LogService.NewLogger("[slack] ", log.LstdFlags)
 		srv := slack.NewService(c, l)
 		s.TaskMaster.SlackService = srv
 
-		s.Services = append(s.Services, srv)
+		s.AppendService("slack", srv)
 	}
 }
 
-func (s *Server) appendTelegramService(c telegram.Config) {
+func (s *Server) appendTelegramService() {
+	c := s.config.Telegram
 	if c.Enabled {
 		l := s.LogService.NewLogger("[telegram] ", log.LstdFlags)
 		srv := telegram.NewService(c, l)
 		s.TaskMaster.TelegramService = srv
 
-		s.Services = append(s.Services, srv)
+		s.AppendService("telegram", srv)
 	}
 }
 
-func (s *Server) appendHipChatService(c hipchat.Config) {
+func (s *Server) appendHipChatService() {
+	c := s.config.HipChat
 	if c.Enabled {
 		l := s.LogService.NewLogger("[hipchat] ", log.LstdFlags)
 		srv := hipchat.NewService(c, l)
 		s.TaskMaster.HipChatService = srv
 
-		s.Services = append(s.Services, srv)
+		s.AppendService("hipchat", srv)
 	}
 }
 
-func (s *Server) appendAlertaService(c alerta.Config) {
+func (s *Server) appendAlertaService() {
+	c := s.config.Alerta
 	if c.Enabled {
 		l := s.LogService.NewLogger("[alerta] ", log.LstdFlags)
 		srv := alerta.NewService(c, l)
 		s.TaskMaster.AlertaService = srv
 
-		s.Services = append(s.Services, srv)
+		s.AppendService("alerta", srv)
 	}
 }
 
-func (s *Server) appendCollectdService(c collectd.Config) {
+func (s *Server) appendTalkService() {
+	c := s.config.Talk
+	if c.Enabled {
+		l := s.LogService.NewLogger("[talk] ", log.LstdFlags)
+		srv := talk.NewService(c, l)
+		s.TaskMaster.TalkService = srv
+
+		s.AppendService("talk", srv)
+	}
+}
+
+func (s *Server) appendCollectdService() {
+	c := s.config.Collectd
 	if !c.Enabled {
 		return
 	}
 	srv := collectd.NewService(c)
-	w := s.LogService.NewStaticLevelWriter(wlog.INFO)
+	w := s.LogService.NewStaticLevelWriter(logging.INFO)
 	srv.SetLogOutput(w)
 
 	srv.MetaClient = s.MetaClient
 	srv.PointsWriter = s.TaskMaster
-	s.Services = append(s.Services, srv)
+	s.AppendService("collectd", srv)
 }
 
-func (s *Server) appendOpenTSDBService(c opentsdb.Config) error {
+func (s *Server) appendOpenTSDBService() error {
+	c := s.config.OpenTSDB
 	if !c.Enabled {
 		return nil
 	}
@@ -369,69 +415,65 @@ func (s *Server) appendOpenTSDBService(c opentsdb.Config) error {
 	if err != nil {
 		return err
 	}
-	w := s.LogService.NewStaticLevelWriter(wlog.INFO)
+	w := s.LogService.NewStaticLevelWriter(logging.INFO)
 	srv.SetLogOutput(w)
 
 	srv.PointsWriter = s.TaskMaster
 	srv.MetaClient = s.MetaClient
-	s.Services = append(s.Services, srv)
+	s.AppendService("opentsdb", srv)
 	return nil
 }
 
-func (s *Server) appendGraphiteService(c graphite.Config) error {
-	if !c.Enabled {
-		return nil
-	}
-	srv, err := graphite.NewService(c)
-	if err != nil {
-		return err
-	}
-	w := s.LogService.NewStaticLevelWriter(wlog.INFO)
-	srv.SetLogOutput(w)
+func (s *Server) appendGraphiteServices() error {
+	for i, c := range s.config.Graphites {
+		if !c.Enabled {
+			continue
+		}
+		srv, err := graphite.NewService(c)
+		if err != nil {
+			return errors.Wrap(err, "creating new graphite service")
+		}
+		w := s.LogService.NewStaticLevelWriter(logging.INFO)
+		srv.SetLogOutput(w)
 
-	srv.PointsWriter = s.TaskMaster
-	srv.MetaClient = s.MetaClient
-	s.Services = append(s.Services, srv)
+		srv.PointsWriter = s.TaskMaster
+		srv.MetaClient = s.MetaClient
+		s.AppendService(fmt.Sprintf("graphite%d", i), srv)
+	}
 	return nil
 }
 
-func (s *Server) appendUDPService(c udp.Config) {
-	if !c.Enabled {
-		return
+func (s *Server) appendUDPServices() {
+	for i, c := range s.config.UDPs {
+		if !c.Enabled {
+			continue
+		}
+		l := s.LogService.NewLogger("[udp] ", log.LstdFlags)
+		srv := udp.NewService(c, l)
+		srv.PointsWriter = s.TaskMaster
+		s.AppendService(fmt.Sprintf("udp%d", i), srv)
 	}
-	l := s.LogService.NewLogger("[udp] ", log.LstdFlags)
-	srv := udp.NewService(c, l)
-	srv.PointsWriter = s.TaskMaster
-	s.Services = append(s.Services, srv)
 }
 
-func (s *Server) appendStatsService(c stats.Config) {
+func (s *Server) appendStatsService() {
+	c := s.config.Stats
 	if c.Enabled {
 		l := s.LogService.NewLogger("[stats] ", log.LstdFlags)
 		srv := stats.NewService(c, l)
 		srv.TaskMaster = s.TaskMaster
 
 		s.TaskMaster.TimingService = srv
-		s.Services = append(s.Services, srv)
+		s.AppendService("stats", srv)
 	}
 }
 
-func (s *Server) appendReportingService(c reporting.Config) {
+func (s *Server) appendReportingService() {
+	c := s.config.Reporting
 	if c.Enabled {
 		l := s.LogService.NewLogger("[reporting] ", log.LstdFlags)
 		srv := reporting.NewService(c, l)
 
-		s.Services = append(s.Services, srv)
-	}
-}
-
-func (s *Server) appendTalkService(c talk.Config) {
-	if c.Enabled {
-		l := s.LogService.NewLogger("[talk] ", log.LstdFlags)
-		srv := talk.NewService(c, l)
-		s.TaskMaster.TalkService = srv
-
-		s.Services = append(s.Services, srv)
+		s.AppendService("reporting", srv)
 	}
 }
 
@@ -440,35 +482,36 @@ func (s *Server) Err() <-chan error { return s.err }
 
 // Open opens all the services.
 func (s *Server) Open() error {
-	if err := func() error {
-
-		// Start profiling, if set.
-		s.startProfile(s.CPUProfile, s.MemProfile)
-
-		for _, service := range s.Services {
-			s.Logger.Printf("D! opening service: %T", service)
-			if err := service.Open(); err != nil {
-				return fmt.Errorf("open service %T: %s", service, err)
-			}
-			s.Logger.Printf("D! opened service: %T", service)
-		}
-		return nil
-
-	}(); err != nil {
+	if err := s.startServices(); err != nil {
 		s.Close()
 		return err
 	}
 
-	go func() {
-		// Watch if something dies
-		var err error
-		select {
-		case err = <-s.HTTPDService.Err():
-		}
-		s.err <- err
-	}()
+	go s.watchServices()
 
 	return nil
+}
+
+func (s *Server) startServices() error {
+	// Start profiling, if set.
+	s.startProfile(s.CPUProfile, s.MemProfile)
+	for _, service := range s.Services {
+		s.Logger.Printf("D! opening service: %T", service)
+		if err := service.Open(); err != nil {
+			return fmt.Errorf("open service %T: %s", service, err)
+		}
+		s.Logger.Printf("D! opened service: %T", service)
+	}
+	return nil
+}
+
+// Watch if something dies
+func (s *Server) watchServices() {
+	var err error
+	select {
+	case err = <-s.HTTPDService.Err():
+	}
+	s.err <- err
 }
 
 // Close shuts down the meta and data stores and all services.

@@ -173,11 +173,17 @@ func replayBatchFromChan(clck clock.Clock, batches <-chan models.Batch, collecto
 	defer collector.Close()
 
 	// Find relative times
-	start := time.Time{}
+	var start, tmax time.Time
 	var diff time.Duration
 	zero := clck.Zero()
 
 	for b := range batches {
+		if len(b.Points) == 0 {
+			// Emit empty batch
+			b.TMax = tmax
+			collector.CollectBatch(b)
+			continue
+		}
 		if start.IsZero() {
 			start = b.Points[0].Time
 			diff = zero.Sub(start)
@@ -193,6 +199,7 @@ func replayBatchFromChan(clck clock.Clock, batches <-chan models.Batch, collecto
 		}
 		clck.Until(lastTime)
 		b.TMax = b.Points[len(b.Points)-1].Time
+		tmax = b.TMax
 		collector.CollectBatch(b)
 	}
 	return nil
