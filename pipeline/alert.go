@@ -337,7 +337,7 @@ func (n *AlertNode) ChainMethods() map[string]reflect.Value {
 	}
 }
 
-// Indicates an alert should trigger only if all points in a batch match the criteria
+// Indicates an alert should trigger only if all points in a batch match the criteria.
 // Does not apply to stream alerts.
 // tick:property
 func (n *AlertNode) All() *AlertNode {
