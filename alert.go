@@ -116,6 +116,8 @@ type AlertNode struct {
 	critsTriggered  *expvar.Int
 
 	bufPool sync.Pool
+
+	level_resets []stateful.Expression
 }
 
 // Create a new  AlertNode which caches the most recent item and exposes it over the HTTP API.
@@ -310,6 +312,8 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 	an.levels = make([]stateful.Expression, CritAlert+1)
 	an.scopePools = make([]stateful.ScopePool, CritAlert+1)
 
+	an.level_resets = make([]stateful.Expression, CritAlert+1)
+
 	if n.Info != nil {
 		statefulExpression, expressionCompileError := stateful.NewExpression(n.Info.Expression)
 		if expressionCompileError != nil {
@@ -327,6 +331,13 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		}
 		an.levels[WarnAlert] = statefulExpression
 		an.scopePools[WarnAlert] = stateful.NewScopePool(stateful.FindReferenceVariables(n.Warn.Expression))
+		if n.Warn_reset != nil {
+			statefulExpression, expressionCompileError := stateful.NewExpression(n.Warn_reset.Expression)
+			if expressionCompileError != nil {
+				return nil, fmt.Errorf("Failed to compile stateful expression for Warn_reset: %s", expressionCompileError)
+			}
+			an.level_resets[WarnAlert] = statefulExpression
+		}
 	}
 
 	if n.Crit != nil {
@@ -336,6 +347,13 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		}
 		an.levels[CritAlert] = statefulExpression
 		an.scopePools[CritAlert] = stateful.NewScopePool(stateful.FindReferenceVariables(n.Crit.Expression))
+		if n.Crit_reset != nil {
+			statefulExpression, expressionCompileError := stateful.NewExpression(n.Crit_reset.Expression)
+			if expressionCompileError != nil {
+				return nil, fmt.Errorf("Failed to compile stateful expression for crit_reset: %s", expressionCompileError)
+			}
+			an.level_resets[CritAlert] = statefulExpression
+		}
 	}
 
 	// Setup states
@@ -557,7 +575,17 @@ func (a *AlertNode) determineLevel(now time.Time, fields models.Fields, tags map
 			continue
 		}
 		if pass, err := EvalPredicate(se, a.scopePools[l], now, fields, tags); pass {
-			level = AlertLevel(l)
+			lrse := a.level_resets[l]
+			if lrse != nil {
+				if pass, err := EvalPredicate(lrse, a.scopePools[l], now, fields, tags); pass {
+					level = AlertLevel(l)
+				} else if err != nil {
+					a.logger.Println("E! error evaluating expression:", err)
+					return
+				}
+			} else {
+				level = AlertLevel(l)
+			}
 		} else if err != nil {
 			a.logger.Println("E! error evaluating expression:", err)
 			return
