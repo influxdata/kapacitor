@@ -209,6 +209,14 @@ type AlertNode struct {
 	// An empty value indicates the level is invalid and is skipped.
 	Crit *ast.LambdaNode
 
+	// Filter expression for reseting the WARNING alert level to OK.
+	// An empty value indicates the level is invalid and is skipped.
+	Warn_reset *ast.LambdaNode
+
+	// Filter expression for reseting the CRITICAL alert level to OK.
+	// An empty value indicates the level is invalid and is skipped.
+	Crit_reset *ast.LambdaNode
+
 	//tick:ignore
 	UseFlapping bool `tick:"Flapping"`
 	//tick:ignore
@@ -329,7 +337,7 @@ func (n *AlertNode) ChainMethods() map[string]reflect.Value {
 	}
 }
 
-// Indicates an alert should trigger only if all points in a batch match the criteria
+// Indicates an alert should trigger only if all points in a batch match the criteria.
 // Does not apply to stream alerts.
 // tick:property
 func (n *AlertNode) All() *AlertNode {
