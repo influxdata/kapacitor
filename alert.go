@@ -580,16 +580,17 @@ func (a *AlertNode) determineLevel(now time.Time, fields models.Fields, tags map
 			a.logger.Printf("E! error evaluating expression for level %v: %s", AlertLevel(l), err)
 			continue
 		} else if pass {
-			lrse := a.level_resets[l]
-			if lrse != nil {
-				if pass, err := EvalPredicate(lrse, a.scopePools[l], now, fields, tags); err != nil {
-					a.logger.Printf("E! error evaluating expression for level %v reset : %s", AlertLevel(l), err)
-					continue
-				} else if pass {
-					return AlertLevel(l)
-				}
-			} else {
 				return AlertLevel(l)
+			} else {
+				lrse := a.level_resets[l]
+				if lrse != nil {
+					if pass, err := EvalPredicate(lrse, a.scopePools[l], now, fields, tags); err != nil {
+						a.logger.Printf("E! error evaluating expression for level %v reset : %s", AlertLevel(l), err)
+						continue
+					} else if pass {
+						return AlertLevel(l)
+					}
+				}
 			}
 		}
 	}
