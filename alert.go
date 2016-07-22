@@ -551,21 +551,20 @@ func (a *AlertNode) handleAlert(ad *AlertData) {
 	}
 }
 
-func (a *AlertNode) determineLevel(now time.Time, fields models.Fields, tags map[string]string) (level AlertLevel) {
-	for l, se := range a.levels {
+func (a *AlertNode) determineLevel(now time.Time, fields models.Fields, tags map[string]string) AlertLevel {
+	for l := len(a.levels) - 1; l >= 0; l-- {
+		se := a.levels[l]
 		if se == nil {
 			continue
 		}
-		if pass, err := EvalPredicate(se, a.scopePools[l], now, fields, tags); pass {
-			level = AlertLevel(l)
-		} else if err != nil {
-			a.logger.Println("E! error evaluating expression:", err)
-			return
-		} else {
-			return
+		if pass, err := EvalPredicate(se, a.scopePools[l], now, fields, tags); err != nil {
+			a.logger.Printf("E! error evaluating expression for level %v: %s", AlertLevel(l), err)
+			continue
+		} else if pass {
+			return AlertLevel(l)
 		}
 	}
-	return
+	return OKAlert
 }
 
 func (a *AlertNode) batchToResult(b models.Batch) influxql.Result {
