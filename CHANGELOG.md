@@ -65,6 +65,7 @@ stream
     Also allows for grouping by measurement.
     The breaking change is that the group ID format has changed to allow for the measurement name.
 - [#759](https://github.com/influxdata/kapacitor/pull/759): Add mechanism for token based subscription auth.
+- [#745](https://github.com/influxdata/kapacitor/pull/745): Add if function for tick script, for example: `if("value" > 6, 1, 2)`.
 
 ### Bugfixes
 
