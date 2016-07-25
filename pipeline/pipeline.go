@@ -122,6 +122,15 @@ func (p *Pipeline) assignID(n Node) error {
 	return nil
 }
 
+// The number of nodes in the pipeline.
+// tick:ignore
+func (p *Pipeline) Len() int {
+	if p.sorted == nil {
+		p.sort()
+	}
+	return len(p.sorted)
+}
+
 // Walks the entire pipeline and calls func f on each node exactly once.
 // f will be called on a node n only after all of its parents have already had f called.
 // tick:ignore
