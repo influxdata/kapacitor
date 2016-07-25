@@ -121,7 +121,6 @@ func (se *expression) Eval(scope *Scope) (interface{}, error) {
 }
 
 func FindReferenceVariables(nodes ...ast.Node) []string {
-
 	variablesSet := make(map[string]bool, 0)
 
 	for _, node := range nodes {

@@ -68,6 +68,7 @@ stream
     The breaking change is that expression evaluation order changed.
     As a result stateful expressions that relied on that order are broken.
 - [#749](https://github.com/influxdata/kapacitor/issues/749): Fix issue with tasks with empty DAG.
+- [#718](https://github.com/influxdata/kapacitor/issues/718): Fix broken extra expressions for deadman's switch.
 
 ## v1.0.0-beta3 [2016-07-09]
 

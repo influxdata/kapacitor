@@ -32,7 +32,7 @@ func fillScope(vars *stateful.Scope, referenceVariables []string, now time.Time,
 			continue
 		}
 
-		// Support the error with tags/fields collison
+		// Support the error with tags/fields collision
 		var fieldValue interface{}
 		var isFieldExists bool
 		var tagValue interface{}

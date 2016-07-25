@@ -280,7 +280,7 @@ func (n *node) Deadman(threshold float64, interval time.Duration, expr ...*ast.L
 		critExpr = &ast.BinaryNode{
 			Operator: ast.TokenAnd,
 			Left:     critExpr,
-			Right:    e,
+			Right:    e.Expression,
 		}
 	}
 	an.Crit = &ast.LambdaNode{Expression: critExpr}
