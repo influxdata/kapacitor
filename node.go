@@ -296,7 +296,7 @@ func (n *node) stats() map[string]interface{} {
 type nodeStats struct {
 	Fields     models.Fields
 	Tags       models.Tags
-	Dimensions []string
+	Dimensions models.Dimensions
 }
 
 // Return a copy of the current node statistics.
@@ -305,7 +305,7 @@ func (n *node) nodeStatsByGroup() (stats map[models.GroupID]nodeStats) {
 	// Get the counts for just one output.
 	stats = make(map[models.GroupID]nodeStats)
 	if len(n.outs) > 0 {
-		n.outs[0].readGroupStats(func(group models.GroupID, c, e int64, tags models.Tags, dims []string) {
+		n.outs[0].readGroupStats(func(group models.GroupID, c, e int64, tags models.Tags, dims models.Dimensions) {
 			stats[group] = nodeStats{
 				Fields: models.Fields{
 					// A node's emitted count is the collected count of its output.
@@ -318,7 +318,7 @@ func (n *node) nodeStatsByGroup() (stats map[models.GroupID]nodeStats) {
 	}
 	if len(stats) == 0 {
 		// If we have no groups/stats add nil group with emitted = 0
-		stats[models.NilGroup] = nodeStats{
+		stats[""] = nodeStats{
 			Fields: models.Fields{
 				"emitted": int64(0),
 			},

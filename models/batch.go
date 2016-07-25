@@ -32,8 +32,9 @@ func BatchPointFromPoint(p Point) BatchPoint {
 
 type Batch struct {
 	Name   string       `json:"name,omitempty"`
-	Group  GroupID      `json:"-"`
-	TMax   time.Time    `json:"-"`
+	TMax   time.Time    `json:"tmax,omitempty"`
+	Group  GroupID      `json:"group,omitempty"`
+	ByName bool         `json:"byname,omitempty"`
 	Tags   Tags         `json:"tags,omitempty"`
 	Points []BatchPoint `json:"points,omitempty"`
 }
@@ -60,7 +61,10 @@ func (b Batch) PointTags() Tags {
 }
 
 func (b Batch) PointDimensions() Dimensions {
-	return SortedKeys(b.Tags)
+	return Dimensions{
+		ByName:   b.ByName,
+		TagNames: SortedKeys(b.Tags),
+	}
 }
 
 func (b Batch) Copy() PointInterface {
@@ -91,7 +95,7 @@ func (b *Batch) SetNewDimTag(key string, value string) {
 }
 
 func (b *Batch) UpdateGroup() {
-	b.Group = TagsToGroupID(b.PointDimensions(), b.Tags)
+	b.Group = ToGroupID(b.Name, b.Tags, b.PointDimensions())
 }
 
 func BatchToRow(b Batch) (row *models.Row) {
@@ -130,15 +134,24 @@ func BatchToRow(b Batch) (row *models.Row) {
 	return
 }
 
-func ResultToBatches(res client.Result) ([]Batch, error) {
+func ResultToBatches(res client.Result, groupByName bool) ([]Batch, error) {
 	if res.Err != "" {
 		return nil, errors.New(res.Err)
 	}
 	batches := make([]Batch, 0, len(res.Series))
+	dims := Dimensions{
+		ByName: groupByName,
+	}
 	for _, series := range res.Series {
-		groupID := TagsToGroupID(
-			SortedKeys(series.Tags),
+		var name string
+		if groupByName {
+			name = series.Name
+		}
+		dims.TagNames = SortedKeys(series.Tags)
+		groupID := ToGroupID(
+			name,
 			series.Tags,
+			dims,
 		)
 		b := Batch{
 			Name:  series.Name,

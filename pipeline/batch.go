@@ -118,6 +118,10 @@ type QueryNode struct {
 	//tick:ignore
 	Dimensions []interface{} `tick:"GroupBy"`
 
+	// Whether to include the measurement in the group ID.
+	// tick:ignore
+	GroupByMeasurementFlag bool `tick:"GroupByMeasurement"`
+
 	// Fill the data.
 	// Options are:
 	//
@@ -176,6 +180,24 @@ func (n *QueryNode) ChainMethods() map[string]reflect.Value {
 func (b *QueryNode) GroupBy(d ...interface{}) *QueryNode {
 	b.Dimensions = d
 	return b
+}
+
+// If set will include the measurement name in the group ID.
+// Along with any other group by dimensions.
+//
+// Example:
+// batch
+//      |query('SELECT sum("value") FROM "telegraf"."autogen"./process_.*/')
+//          .groupByMeasurement()
+//          .groupBy('host')
+//
+// The above example selects data from several measurements matching `/process_.*/ and
+// then each point is grouped by the host tag and measurement name.
+// Thus keeping measurements in their own groups.
+// tick:property
+func (n *QueryNode) GroupByMeasurement() *QueryNode {
+	n.GroupByMeasurementFlag = true
+	return n
 }
 
 // Align start and stop times for quiries with even boundaries of the QueryNode.Every property.

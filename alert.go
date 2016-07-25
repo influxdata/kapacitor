@@ -385,6 +385,7 @@ func (a *AlertNode) runAlert([]byte) error {
 				batch := models.Batch{
 					Name:   p.Name,
 					Group:  p.Group,
+					ByName: p.Dimensions.ByName,
 					Tags:   p.Tags,
 					Points: []models.BatchPoint{models.BatchPointFromPoint(p)},
 				}

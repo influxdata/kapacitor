@@ -74,6 +74,9 @@ func newFromNode(et *ExecutingTask, n *pipeline.FromNode, l *log.Logger) (*FromN
 }
 
 func (s *FromNode) runStream([]byte) error {
+	dims := models.Dimensions{
+		ByName: s.s.GroupByMeasurementFlag,
+	}
 	for pt, ok := s.ins[0].NextPoint(); ok; pt, ok = s.ins[0].NextPoint() {
 		s.timer.Start()
 		if s.matches(pt) {
@@ -83,7 +86,8 @@ func (s *FromNode) runStream([]byte) error {
 			if s.s.Round != 0 {
 				pt.Time = pt.Time.Round(s.s.Round)
 			}
-			pt = setGroupOnPoint(pt, s.allDimensions, s.dimensions)
+			dims.TagNames = s.dimensions
+			pt = setGroupOnPoint(pt, s.allDimensions, dims)
 			s.timer.Pause()
 			for _, child := range s.outs {
 				err := child.CollectPoint(pt)

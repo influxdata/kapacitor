@@ -437,3 +437,10 @@ func (n *chainnode) Default() *DefaultNode {
 	n.linkChild(s)
 	return s
 }
+
+// Create a node that can delete tags or fields.
+func (n *chainnode) Delete() *DeleteNode {
+	s := newDeleteNode(n.Provides())
+	n.linkChild(s)
+	return s
+}

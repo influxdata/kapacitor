@@ -160,6 +160,7 @@ type floatPointEmitter struct {
 	baseReduceContext
 	emitter          influxql.FloatPointEmitter
 	isSimpleSelector bool
+	byName           bool
 }
 
 func (e *floatPointEmitter) EmitPoint() (models.Point, error) {
@@ -210,6 +211,7 @@ func (e *floatPointEmitter) EmitBatch() models.Batch {
 		Name:   e.name,
 		TMax:   e.time,
 		Group:  e.group,
+		ByName: e.dimensions.ByName,
 		Tags:   e.tags,
 		Points: make([]models.BatchPoint, len(slice)),
 	}
@@ -391,6 +393,7 @@ type integerPointEmitter struct {
 	baseReduceContext
 	emitter          influxql.IntegerPointEmitter
 	isSimpleSelector bool
+	byName           bool
 }
 
 func (e *integerPointEmitter) EmitPoint() (models.Point, error) {
@@ -441,6 +444,7 @@ func (e *integerPointEmitter) EmitBatch() models.Batch {
 		Name:   e.name,
 		TMax:   e.time,
 		Group:  e.group,
+		ByName: e.dimensions.ByName,
 		Tags:   e.tags,
 		Points: make([]models.BatchPoint, len(slice)),
 	}
@@ -622,6 +626,7 @@ type stringPointEmitter struct {
 	baseReduceContext
 	emitter          influxql.StringPointEmitter
 	isSimpleSelector bool
+	byName           bool
 }
 
 func (e *stringPointEmitter) EmitPoint() (models.Point, error) {
@@ -672,6 +677,7 @@ func (e *stringPointEmitter) EmitBatch() models.Batch {
 		Name:   e.name,
 		TMax:   e.time,
 		Group:  e.group,
+		ByName: e.dimensions.ByName,
 		Tags:   e.tags,
 		Points: make([]models.BatchPoint, len(slice)),
 	}
@@ -853,6 +859,7 @@ type booleanPointEmitter struct {
 	baseReduceContext
 	emitter          influxql.BooleanPointEmitter
 	isSimpleSelector bool
+	byName           bool
 }
 
 func (e *booleanPointEmitter) EmitPoint() (models.Point, error) {
@@ -903,6 +910,7 @@ func (e *booleanPointEmitter) EmitBatch() models.Batch {
 		Name:   e.name,
 		TMax:   e.time,
 		Group:  e.group,
+		ByName: e.dimensions.ByName,
 		Tags:   e.tags,
 		Points: make([]models.BatchPoint, len(slice)),
 	}

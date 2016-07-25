@@ -4,9 +4,57 @@
 
 ### Release Notes
 
+#### Group By Fields
+
+Kapacitor now supports grouping by fields.
+First convert a field into a tag using the EvalNode.
+Then group by the new tag.
+
+Example:
+
+```go
+stream
+    |from()
+        .measurement('alerts')
+    // Convert field 'level' to tag.
+    |eval(lambda: string("level"))
+        .as('level')
+        .tags('level')
+    // Group by new tag 'level'.
+    |groupBy('alert', 'level')
+    |...
+```
+
+Note the field `level` is now removed from the point since `.keep` was not used.
+See the [docs](https://docs.influxdata.com/kapacitor/v1.0/nodes/eval_node/#tags) for more details on how `.tags` works.
+
+
+#### Delete Fields or Tags
+
+In companion with being able to create new tags, you can now delete tags or fields.
+
+
+Example:
+
+```go
+stream
+    |from()
+        .measurement('alerts')
+    |delete()
+        // Remove the field `extra` and tag `uuid` from all points.
+        .field('extra')
+        .tag('uuid')
+    |...
+```
+
+
+
 ### Features
 
 - [#702](https://github.com/influxdata/kapacitor/pull/702): Add plumbing for authentication backends.
+- [#624](https://github.com/influxdata/kapacitor/issue/624): BREAKING: Add ability to GroupBy fields. First use EvalNode to create a tag from a field and then group by the new tag.
+    Also allows for grouping by measurement.
+    The breaking change is that the group ID format has changed to allow for the measurement name.
 
 ### Bugfixes
 

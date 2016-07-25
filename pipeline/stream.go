@@ -82,6 +82,10 @@ type FromNode struct {
 	// tick:ignore
 	Dimensions []interface{} `tick:"GroupBy"`
 
+	// Whether to include the measurement in the group ID.
+	// tick:ignore
+	GroupByMeasurementFlag bool `tick:"GroupByMeasurement"`
+
 	// The database name.
 	// If empty any database will be used.
 	Database string
@@ -245,6 +249,25 @@ func (s *FromNode) Where(lambda *ast.LambdaNode) *FromNode {
 func (s *FromNode) GroupBy(tag ...interface{}) *FromNode {
 	s.Dimensions = tag
 	return s
+}
+
+// If set will include the measurement name in the group ID.
+// Along with any other group by dimensions.
+//
+// Example:
+// stream
+//      |from()
+//          .database('mydb')
+//          .groupByMeasurement()
+//          .groupBy('host')
+//
+// The above example selects all measurements from the database 'mydb' and
+// then each point is grouped by the host tag and measurement name.
+// Thus keeping measurements in their own groups.
+// tick:property
+func (n *FromNode) GroupByMeasurement() *FromNode {
+	n.GroupByMeasurementFlag = true
+	return n
 }
 
 func (s *FromNode) validate() error {

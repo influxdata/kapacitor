@@ -24,6 +24,7 @@ type EvalNode struct {
 	expressionsByGroup map[models.GroupID][]stateful.Expression
 	refVarList         [][]string
 	scopePool          stateful.ScopePool
+	tags               map[string]bool
 
 	evalErrors *expvar.Int
 }
@@ -55,6 +56,14 @@ func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalN
 	// Create a single pool for the combination of all expressions
 	en.scopePool = stateful.NewScopePool(stateful.FindReferenceVariables(expressions...))
 
+	// Create map of tags
+	if l := len(n.TagsList); l > 0 {
+		en.tags = make(map[string]bool, l)
+		for _, tag := range n.TagsList {
+			en.tags[tag] = true
+		}
+	}
+
 	en.node.runF = en.runEval
 	return en, nil
 }
@@ -67,7 +76,7 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 		var err error
 		for p, ok := e.ins[0].NextPoint(); ok; p, ok = e.ins[0].NextPoint() {
 			e.timer.Start()
-			p.Fields, err = e.eval(p.Time, p.Group, p.Fields, p.Tags)
+			p.Fields, p.Tags, err = e.eval(p.Time, p.Group, p.Fields, p.Tags)
 			if err != nil {
 				e.evalErrors.Add(1)
 				if !e.e.QuiteFlag {
@@ -91,7 +100,7 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 			e.timer.Start()
 			for i := 0; i < len(b.Points); {
 				p := b.Points[i]
-				b.Points[i].Fields, err = e.eval(p.Time, b.Group, p.Fields, p.Tags)
+				b.Points[i].Fields, b.Points[i].Tags, err = e.eval(p.Time, b.Group, p.Fields, p.Tags)
 				if err != nil {
 					e.evalErrors.Add(1)
 					if !e.e.QuiteFlag {
@@ -115,7 +124,7 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 	return nil
 }
 
-func (e *EvalNode) eval(now time.Time, group models.GroupID, fields models.Fields, tags map[string]string) (models.Fields, error) {
+func (e *EvalNode) eval(now time.Time, group models.GroupID, fields models.Fields, tags models.Tags) (models.Fields, models.Tags, error) {
 	vars := e.scopePool.Get()
 	defer e.scopePool.Put(vars)
 	expressions, ok := e.expressionsByGroup[group]
@@ -129,14 +138,29 @@ func (e *EvalNode) eval(now time.Time, group models.GroupID, fields models.Field
 	for i, expr := range expressions {
 		err := fillScope(vars, e.refVarList[i], now, fields, tags)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		v, err := expr.Eval(vars)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		name := e.e.AsList[i]
 		vars.Set(name, v)
+	}
+	newTags := tags
+	if len(e.tags) > 0 {
+		newTags = newTags.Copy()
+		for tag := range e.tags {
+			v, err := vars.Get(tag)
+			if err != nil {
+				return nil, nil, err
+			}
+			if s, ok := v.(string); !ok {
+				return nil, nil, fmt.Errorf("result of a tag expression must be of type string, got %T", v)
+			} else {
+				newTags[tag] = s
+			}
+		}
 	}
 	var newFields models.Fields
 	if e.e.KeepFlag {
@@ -145,7 +169,7 @@ func (e *EvalNode) eval(now time.Time, group models.GroupID, fields models.Field
 			for _, f := range e.e.KeepList {
 				v, err := vars.Get(f)
 				if err != nil {
-					return nil, err
+					return nil, nil, err
 				}
 				newFields[f] = v
 			}
@@ -157,20 +181,23 @@ func (e *EvalNode) eval(now time.Time, group models.GroupID, fields models.Field
 			for _, f := range e.e.AsList {
 				v, err := vars.Get(f)
 				if err != nil {
-					return nil, err
+					return nil, nil, err
 				}
 				newFields[f] = v
 			}
 		}
 	} else {
-		newFields = make(models.Fields, len(e.e.AsList))
+		newFields = make(models.Fields, len(e.e.AsList)-len(e.tags))
 		for _, f := range e.e.AsList {
+			if e.tags[f] {
+				continue
+			}
 			v, err := vars.Get(f)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			newFields[f] = v
 		}
 	}
-	return newFields, nil
+	return newFields, newTags, nil
 }

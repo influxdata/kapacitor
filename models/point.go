@@ -11,7 +11,6 @@ import (
 type GroupID string
 type Fields map[string]interface{}
 type Tags map[string]string
-type Dimensions []string
 
 const (
 	NilGroup GroupID = ""
@@ -36,6 +35,11 @@ type PointSetter interface {
 	SetNewDimTag(key string, value string)
 	UpdateGroup()
 	Interface() PointInterface
+}
+
+type Dimensions struct {
+	ByName   bool
+	TagNames []string
 }
 
 // Represents a single data point
@@ -71,8 +75,8 @@ func (p Point) PointFields() Fields {
 }
 
 func (p Point) PointTags() Tags {
-	tags := make(Tags, len(p.Dimensions))
-	for _, dim := range p.Dimensions {
+	tags := make(Tags, len(p.Dimensions.TagNames))
+	for _, dim := range p.Dimensions.TagNames {
 		tags[dim] = p.Tags[dim]
 	}
 	return tags
@@ -101,19 +105,19 @@ func (p *Point) Interface() PointInterface {
 func (p *Point) SetNewDimTag(key string, value string) {
 	p.Tags[key] = value
 	// Only add dim if it does not exist.
-	for _, dim := range p.Dimensions {
-		if dim == value {
+	for _, dim := range p.Dimensions.TagNames {
+		if dim == key {
 			// Key exists we are done.
 			return
 		}
 	}
 	// Key doesn't exist add it.
-	p.Dimensions = append(p.Dimensions, key)
+	p.Dimensions.TagNames = append(p.Dimensions.TagNames, key)
 }
 
 func (p *Point) UpdateGroup() {
-	sort.Strings(p.Dimensions)
-	p.Group = TagsToGroupID(p.Dimensions, p.Tags)
+	sort.Strings(p.Dimensions.TagNames)
+	p.Group = ToGroupID(p.Name, p.Tags, p.Dimensions)
 }
 
 // Returns byte array of a line protocol representation of the point
@@ -149,16 +153,27 @@ func SortedKeys(tags map[string]string) []string {
 	return a
 }
 
-func TagsToGroupID(dims []string, tags map[string]string) GroupID {
-	if len(dims) == 0 {
+func ToGroupID(name string, tags map[string]string, dims Dimensions) GroupID {
+	if len(dims.TagNames) == 0 {
+		if dims.ByName {
+			return GroupID(name)
+		}
 		return NilGroup
 	}
 	var buf bytes.Buffer
-	for _, d := range dims {
+	if dims.ByName {
+		buf.WriteString(name)
+		// Add delimiter that is not allowed in name.
+		buf.WriteRune('\n')
+	}
+	for i, d := range dims.TagNames {
+		if i != 0 {
+			buf.WriteRune(',')
+		}
 		buf.WriteString(d)
-		buf.WriteString("=")
+		buf.WriteRune('=')
 		buf.WriteString(tags[d])
-		buf.WriteString(",")
+
 	}
 	return GroupID(buf.Bytes())
 }
@@ -199,14 +214,14 @@ func (t Tags) Copy() Tags {
 }
 
 func (d Dimensions) Copy() Dimensions {
-	cd := make([]string, len(d))
-	copy(cd, d)
-	return cd
+	tags := make([]string, len(d.TagNames))
+	copy(tags, d.TagNames)
+	return Dimensions{ByName: d.ByName, TagNames: tags}
 }
 
 func (d Dimensions) ToSet() map[string]bool {
-	set := make(map[string]bool, len(d))
-	for _, dim := range d {
+	set := make(map[string]bool, len(d.TagNames))
+	for _, dim := range d.TagNames {
 		set[dim] = true
 	}
 	return set

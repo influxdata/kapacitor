@@ -25,6 +25,10 @@ type GroupByNode struct {
 	//The dimensions by which to group to the data.
 	// tick:ignore
 	Dimensions []interface{}
+
+	// Whether to include the measurement in the group ID.
+	// tick:ignore
+	ByMeasurementFlag bool `tick:"ByMeasurement"`
 }
 
 func newGroupByNode(wants EdgeType, dims []interface{}) *GroupByNode {
@@ -33,6 +37,7 @@ func newGroupByNode(wants EdgeType, dims []interface{}) *GroupByNode {
 		Dimensions: dims,
 	}
 }
+
 func (n *GroupByNode) validate() error {
 	return validateDimensions(n.Dimensions)
 }
@@ -55,4 +60,27 @@ func validateDimensions(dimensions []interface{}) error {
 		return errors.New("cannot group by both '*' and named dimensions.")
 	}
 	return nil
+}
+
+// If set will include the measurement name in the group ID.
+// Along with any other group by dimensions.
+//
+// Example:
+//     ...
+//     |groupBy('host')
+//         .byMeasurement()
+//
+// The above example groups points by their host tag and measurement name.
+//
+// If you want to remove the measurement name from the group ID,
+// then groupBy all existing dimensions but without specifying 'byMeasurement'.
+//
+// Example:
+//    |groupBy(*)
+//
+// The above removes the group by measurement name if any.
+// tick:property
+func (n *GroupByNode) ByMeasurement() *GroupByNode {
+	n.ByMeasurementFlag = true
+	return n
 }

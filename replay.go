@@ -180,7 +180,13 @@ func replayBatchFromChan(clck clock.Clock, batches <-chan models.Batch, collecto
 	for b := range batches {
 		if len(b.Points) == 0 {
 			// Emit empty batch
-			b.TMax = tmax
+			if b.TMax.IsZero() {
+				// Set tmax to last batch if not set.
+				b.TMax = tmax
+			} else {
+				b.TMax = b.TMax.UTC()
+				tmax = b.TMax
+			}
 			collector.CollectBatch(b)
 			continue
 		}
@@ -198,7 +204,11 @@ func replayBatchFromChan(clck clock.Clock, batches <-chan models.Batch, collecto
 			lastTime = b.Points[len(b.Points)-1].Time.Add(diff).UTC()
 		}
 		clck.Until(lastTime)
-		b.TMax = b.Points[len(b.Points)-1].Time
+		if b.TMax.IsZero() {
+			b.TMax = b.Points[len(b.Points)-1].Time
+		} else {
+			b.TMax = b.TMax.UTC()
+		}
 		tmax = b.TMax
 		collector.CollectBatch(b)
 	}
@@ -221,7 +231,16 @@ func readBatchFromIO(data io.ReadCloser, batches chan<- models.Batch) error {
 			// do nothing
 			continue
 		}
-		b.Group = models.TagsToGroupID(models.SortedKeys(b.Tags), b.Tags)
+		if b.Group == "" {
+			b.Group = models.ToGroupID(
+				b.Name,
+				b.Tags,
+				models.Dimensions{
+					ByName:   b.ByName,
+					TagNames: models.SortedKeys(b.Tags),
+				},
+			)
+		}
 		// Add tags to all points
 		if len(b.Tags) > 0 {
 			for i := range b.Points {
