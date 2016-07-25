@@ -297,6 +297,11 @@ func (tm *TaskMaster) NewTask(
 	if err != nil {
 		return nil, err
 	}
+	// A task will always have a stream or batch node.
+	// If it doesn't have anything more then the task does nothing with the data.
+	if p.Len() <= 1 {
+		return nil, fmt.Errorf("task does nothing")
+	}
 	t.Pipeline = p
 	return t, nil
 }

@@ -11,14 +11,15 @@
 ### Bugfixes
 
 - [#710](https://github.com/influxdata/kapacitor/pull/710): Fix infinite loop when parsing unterminated regex in TICKscript.
-- [#711](https://github.com/influxdata/kapacitor/issue/711): Fix where database name with quotes breaks subscription startup logic.
+- [#711](https://github.com/influxdata/kapacitor/issues/711): Fix where database name with quotes breaks subscription startup logic.
 - [#719](https://github.com/influxdata/kapacitor/pull/719): Fix panic on replay.
 - [#723](https://github.com/influxdata/kapacitor/pull/723): BREAKING: Search for valid configuration on startup in ~/.kapacitor and /etc/kapacitor/.
     This is so that the -config CLI flag is not required if the configuration is found in a standard location.
     The configuration file being used is always logged to STDERR.
-- [#298](https://github.com/influxdata/kapacitor/issue/298): BREAKING: Change alert level evaluation so each level is independent and not required to be a subset of the previous level.
+- [#298](https://github.com/influxdata/kapacitor/issues/298): BREAKING: Change alert level evaluation so each level is independent and not required to be a subset of the previous level.
     The breaking change is that expression evaluation order changed.
     As a result stateful expressions that relied on that order are broken.
+- [#749](https://github.com/influxdata/kapacitor/issues/749): Fix issue with tasks with empty DAG.
 
 ## v1.0.0-beta3 [2016-07-09]
 
@@ -28,7 +29,7 @@
 
 - [#662](https://github.com/influxdata/kapacitor/pull/662): Add `-skipVerify` flag to `kapacitor` CLI tool to skip SSL verification.
 - [#680](https://github.com/influxdata/kapacitor/pull/680): Add Telegram Alerting option
-- [#46](https://github.com/influxdata/kapacitor/issue/46): Can now create combinations of points within the same stream.
+- [#46](https://github.com/influxdata/kapacitor/issues/46): Can now create combinations of points within the same stream.
 	This is kind of like join but instead joining a stream with itself.
 - [#669](https://github.com/influxdata/kapacitor/pull/669): Add size function for humanize byte size. thanks @jsvisa!
 - [#697](https://github.com/influxdata/kapacitor/pull/697): Can now flatten a set of points into a single points creating dynamcially named fields.
@@ -40,11 +41,11 @@
 ### Bugfixes
 
 - [#656](https://github.com/influxdata/kapacitor/pull/656): Fix issues where an expression could not be passed as a function parameter in TICKscript.
-- [#627](https://github.com/influxdata/kapacitor/issue/627): Fix where InfluxQL functions that returned a batch could drop tags.
-- [#674](https://github.com/influxdata/kapacitor/issue/674): Fix panic with Join On and batches.
-- [#665](https://github.com/influxdata/kapacitor/issue/665): BREAKING: Fix file mode not being correct for Alert.Log files.
+- [#627](https://github.com/influxdata/kapacitor/issues/627): Fix where InfluxQL functions that returned a batch could drop tags.
+- [#674](https://github.com/influxdata/kapacitor/issues/674): Fix panic with Join On and batches.
+- [#665](https://github.com/influxdata/kapacitor/issues/665): BREAKING: Fix file mode not being correct for Alert.Log files.
 	Breaking change is that integers numbers prefixed with a 0 in TICKscript are interpreted as octal numbers.
-- [#667](https://github.com/influxdata/kapacitor/issue/667): Align deadman timestamps to interval.
+- [#667](https://github.com/influxdata/kapacitor/issues/667): Align deadman timestamps to interval.
 
 ## v1.0.0-beta2 [2016-06-17]
 
@@ -59,11 +60,11 @@
 
 - [#621](https://github.com/influxdata/kapacitor/pull/621): Fix obscure error about single vs double quotes.
 - [#623](https://github.com/influxdata/kapacitor/pull/623): Fix issues with recording metadata missing data url.
-- [#631](https://github.com/influxdata/kapacitor/issue/631): Fix issues with using iterative lambda expressions in an EvalNode.
-- [#628](https://github.com/influxdata/kapacitor/issue/628): BREAKING: Change `kapacitord config` to not search default location for configuration files but rather require the `-config` option.
+- [#631](https://github.com/influxdata/kapacitor/issues/631): Fix issues with using iterative lambda expressions in an EvalNode.
+- [#628](https://github.com/influxdata/kapacitor/issues/628): BREAKING: Change `kapacitord config` to not search default location for configuration files but rather require the `-config` option.
     Since the `kapacitord run` command behaves this way they should be consistent.
     Fix issue with `kapacitord config > kapacitor.conf` when the output file was a default location for the config.
-- [#626](https://github.com/influxdata/kapacitor/issue/626): Fix issues when changing the ID of an enabled task.
+- [#626](https://github.com/influxdata/kapacitor/issues/626): Fix issues when changing the ID of an enabled task.
 - [#624](https://github.com/influxdata/kapacitor/pull/624): Fix issues where you could get a read error on a closed UDF socket.
 - [#651](https://github.com/influxdata/kapacitor/pull/651): Fix issues where an error during a batch replay would hang because the task wouldn't stop.
 - [#650](https://github.com/influxdata/kapacitor/pull/650): BREAKING: The default retention policy name was changed to `autogen` in InfluxDB.
@@ -403,7 +404,7 @@ For example, let's say we want to store all data that triggered an alert in Infl
 - [#423](https://github.com/influxdata/kapacitor/issues/423): Recording stream queries with group by now correctly saves data in time order not group by order.
 - [#331](https://github.com/influxdata/kapacitor/issues/331): Fix panic when missing `.as()` for JoinNode.
 - [#523](https://github.com/influxdata/kapacitor/pull/523): JoinNode will now emit join sets as soon as they are ready. If multiple joinable sets arrive in the same tolerance window than each will be emitted (previously the first points were dropped).
-- [#537](https://github.com/influxdata/kapacitor/issue/537): Fix panic in alert node when batch is empty.
+- [#537](https://github.com/influxdata/kapacitor/issues/537): Fix panic in alert node when batch is empty.
 
 ## v0.12.0 [2016-04-04]
 
