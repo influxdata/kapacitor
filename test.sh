@@ -7,7 +7,7 @@
 #      0: normal 64bit tests
 #      1: race enabled 64bit tests
 #      2: normal 32bit tests
-#      3: normal 64bit tests against Go 1.6beta2
+#      3: normal 64bit tests against Go tip
 #      save: build the docker images and save them to DOCKER_SAVE_DIR. Do not run tests.
 #      count: print the number of test environments
 #      *: to run all tests in parallel containers
@@ -147,7 +147,7 @@ case $ENVIRONMENT_INDEX in
         ;;
     3)
         GO_CHECKOUT=HEAD
-        run_test_docker Dockerfile_build_ubuntu64_git test_64bit_gotip --debug --test --generate --no-uncommitted
+        run_test_docker Dockerfile_build_ubuntu64_git test_64bit_gotip --debug --test --generate
         rc=$?
         ;;
     "save")
