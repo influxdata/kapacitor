@@ -98,6 +98,19 @@ func (b *Batch) UpdateGroup() {
 	b.Group = ToGroupID(b.Name, b.Tags, b.PointDimensions())
 }
 
+func (b *Batch) SetFields(fields Fields) {
+	for i := range b.Points {
+		b.Points[i].Fields = fields
+	}
+}
+
+func (b *Batch) SetTime(t time.Time) {
+	b.TMax = t
+	for i := range b.Points {
+		b.Points[i].Time = t
+	}
+}
+
 func BatchToRow(b Batch) (row *models.Row) {
 	row = &models.Row{
 		Name: b.Name,

@@ -1,0 +1,10 @@
+{"name":"maintlock","tags":{"host":"A"},"points":[
+    {
+        "fields":{"count":0},
+        "time":"2016-01-01T00:00:00Z"
+    },
+    {
+        "fields":{"count":1},
+        "time":"2016-01-01T00:00:03Z"
+    }
+]}

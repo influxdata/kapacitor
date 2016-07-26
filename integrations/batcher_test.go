@@ -520,6 +520,7 @@ batch
 
 	testBatcherWithOutput(t, "TestBatch_Default", script, 30*time.Second, er, false)
 }
+
 func TestBatch_Delete(t *testing.T) {
 
 	var script = `
@@ -1583,6 +1584,111 @@ cpu0
 	testBatcherWithOutput(t, "TestBatch_JoinTolerance", script, 30*time.Second, er, false)
 }
 
+func TestBatch_Join_NoFill(t *testing.T) {
+
+	var script = `
+var cpu0 = batch
+	|query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "cpu" = 'cpu0'
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s))
+
+var cpu1 = batch
+	|query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "cpu" = 'cpu1'
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s))
+
+cpu0
+	|join(cpu1)
+		.as('cpu0', 'cpu1')
+	|eval(lambda: "cpu0.mean" + "cpu1.mean")
+		.as('cpu')
+	|sum('cpu')
+	|window()
+		.period(20s)
+		.every(20s)
+	|sum('sum')
+	|httpOut('TestBatch_Join_Fill')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu_usage_idle",
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+					876.0,
+				}},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_Join_Fill", script, 30*time.Second, er, false)
+}
+
+func TestBatch_Join_Fill_Num(t *testing.T) {
+
+	var script = `
+var cpu0 = batch
+	|query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "cpu" = 'cpu0'
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s))
+
+var cpu1 = batch
+	|query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "cpu" = 'cpu1'
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s))
+
+cpu0
+	|join(cpu1)
+		.as('cpu0', 'cpu1')
+		.fill(100.0)
+	|eval(lambda: "cpu0.mean" + "cpu1.mean")
+		.as('cpu')
+	|sum('cpu')
+	|window()
+		.period(20s)
+		.every(20s)
+	|sum('sum')
+	|httpOut('TestBatch_Join_Fill')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu_usage_idle",
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+					1178.0,
+				}},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_Join_Fill", script, 30*time.Second, er, false)
+}
+
 func TestBatch_JoinOn(t *testing.T) {
 
 	var script = `
@@ -1697,6 +1803,182 @@ errorsByServiceGlobal
 	}
 
 	testBatcherWithOutput(t, "TestBatch_JoinOn", script, 30*time.Second, er, true)
+}
+
+func TestBatch_JoinOn_Fill_Num(t *testing.T) {
+
+	var script = `
+var maintlock = batch
+    |query('SELECT count FROM "db"."rp"."maintlock"')
+        .period(10s)
+        .every(10s)
+        .groupBy('host')
+        .align()
+
+batch
+    |query('SELECT count FROM "telegraf"."default"."disk"')
+        .period(10s)
+        .every(10s)
+        .groupBy('host', 'path')
+        .align()
+    |join(maintlock)
+        .as('disk', 'maintlock')
+        .on('host')
+        .fill(0.0)
+        .tolerance(1s)
+    |default()
+        .field('maintlock.count', 0)
+    |httpOut('TestBatch_JoinOn_Fill')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "disk",
+				Tags:    map[string]string{"host": "A", "path": "/"},
+				Columns: []string{"time", "disk.used_percent", "maintlock.count"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						50.0,
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+						60.0,
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						70.0,
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+						80.0,
+						1.0,
+					},
+				},
+			},
+			{
+				Name:    "disk",
+				Tags:    map[string]string{"host": "A", "path": "/tmp"},
+				Columns: []string{"time", "disk.used_percent", "maintlock.count"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						40.0,
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+						30.0,
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						20.0,
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+						10.0,
+						1.0,
+					},
+				},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_JoinOn_Fill", script, 30*time.Second, er, true)
+}
+
+func TestBatch_JoinOn_Fill_Null(t *testing.T) {
+
+	var script = `
+var maintlock = batch
+    |query('SELECT count FROM "db"."rp"."maintlock"')
+        .period(10s)
+        .every(10s)
+        .groupBy('host')
+        .align()
+
+batch
+    |query('SELECT count FROM "telegraf"."default"."disk"')
+        .period(10s)
+        .every(10s)
+        .groupBy('host', 'path')
+        .align()
+    |join(maintlock)
+        .as('disk', 'maintlock')
+        .on('host')
+        .fill('null')
+        .tolerance(1s)
+    |default()
+        .field('maintlock.count', 0)
+    |httpOut('TestBatch_JoinOn_Fill')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "disk",
+				Tags:    map[string]string{"host": "A", "path": "/"},
+				Columns: []string{"time", "disk.used_percent", "maintlock.count"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						50.0,
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+						60.0,
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						70.0,
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+						80.0,
+						1.0,
+					},
+				},
+			},
+			{
+				Name:    "disk",
+				Tags:    map[string]string{"host": "A", "path": "/tmp"},
+				Columns: []string{"time", "disk.used_percent", "maintlock.count"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						40.0,
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+						30.0,
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						20.0,
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+						10.0,
+						1.0,
+					},
+				},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_JoinOn_Fill", script, 30*time.Second, er, true)
 }
 
 // Helper test function for batcher

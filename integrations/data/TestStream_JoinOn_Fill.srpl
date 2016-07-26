@@ -1,0 +1,39 @@
+dbname
+rpname
+maintlock,host=A count=0 0000000000
+dbname
+rpname
+disk,host=A,path=/ used_percent=50 0000000000
+dbname
+rpname
+disk,host=A,path=/tmp used_percent=40 0000000000
+dbname
+rpname
+disk,host=A,path=/ used_percent=60 0000000001
+dbname
+rpname
+disk,host=A,path=/tmp used_percent=30 0000000001
+dbname
+rpname
+disk,host=A,path=/ used_percent=70 0000000002
+dbname
+rpname
+disk,host=A,path=/tmp used_percent=20 0000000002
+dbname
+rpname
+maintlock,host=A count=1 0000000003
+dbname
+rpname
+disk,host=A,path=/ used_percent=80 0000000003
+dbname
+rpname
+disk,host=A,path=/tmp used_percent=10 0000000003
+dbname
+rpname
+maintlock,host=A count=0 0000000004
+dbname
+rpname
+disk,host=A,path=/ used_percent=90 0000000004
+dbname
+rpname
+disk,host=A,path=/tmp used_percent=00 0000000004

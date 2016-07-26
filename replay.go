@@ -219,11 +219,10 @@ func replayBatchFromChan(clck clock.Clock, batches <-chan models.Batch, collecto
 func readBatchFromIO(data io.ReadCloser, batches chan<- models.Batch) error {
 	defer close(batches)
 	defer data.Close()
-
-	in := bufio.NewScanner(data)
-	for in.Scan() {
+	dec := json.NewDecoder(data)
+	for dec.More() {
 		var b models.Batch
-		err := json.Unmarshal(in.Bytes(), &b)
+		err := dec.Decode(&b)
 		if err != nil {
 			return err
 		}

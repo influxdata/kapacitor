@@ -69,6 +69,9 @@ stream
     As a result stateful expressions that relied on that order are broken.
 - [#749](https://github.com/influxdata/kapacitor/issues/749): Fix issue with tasks with empty DAG.
 - [#718](https://github.com/influxdata/kapacitor/issues/718): Fix broken extra expressions for deadman's switch.
+- [#752](https://github.com/influxdata/kapacitor/issues/752): Fix various bugs relating to the `fill` operation on a JoinNode.
+    Fill with batches and fill when using the `on` property were broken.
+    Also changes the DefaultNode set defaults for nil fields.
 
 ## v1.0.0-beta3 [2016-07-09]
 
