@@ -117,7 +117,7 @@ type AlertNode struct {
 
 	bufPool sync.Pool
 
-	level_resets []stateful.Expression
+	levelResets []stateful.Expression
 }
 
 // Create a new  AlertNode which caches the most recent item and exposes it over the HTTP API.
@@ -312,7 +312,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 	an.levels = make([]stateful.Expression, CritAlert+1)
 	an.scopePools = make([]stateful.ScopePool, CritAlert+1)
 
-	an.level_resets = make([]stateful.Expression, CritAlert+1)
+	an.levelResets = make([]stateful.Expression, CritAlert+1)
 
 	if n.Info != nil {
 		statefulExpression, expressionCompileError := stateful.NewExpression(n.Info.Expression)
@@ -322,6 +322,13 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 
 		an.levels[InfoAlert] = statefulExpression
 		an.scopePools[InfoAlert] = stateful.NewScopePool(stateful.FindReferenceVariables(n.Info.Expression))
+		if n.InfoReset != nil {
+			lstatefulExpression, lexpressionCompileError := stateful.NewExpression(n.InfoReset.Expression)
+			if lexpressionCompileError != nil {
+				return nil, fmt.Errorf("Failed to compile stateful expression for infoReset: %s", lexpressionCompileError)
+			}
+			an.levelResets[InfoAlert] = lstatefulExpression
+		}
 	}
 
 	if n.Warn != nil {
@@ -331,12 +338,12 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		}
 		an.levels[WarnAlert] = statefulExpression
 		an.scopePools[WarnAlert] = stateful.NewScopePool(stateful.FindReferenceVariables(n.Warn.Expression))
-		if n.Warn_reset != nil {
-			statefulExpression, expressionCompileError := stateful.NewExpression(n.Warn_reset.Expression)
-			if expressionCompileError != nil {
-				return nil, fmt.Errorf("Failed to compile stateful expression for warn_reset: %s", expressionCompileError)
+		if n.WarnReset != nil {
+			lstatefulExpression, lexpressionCompileError := stateful.NewExpression(n.WarnReset.Expression)
+			if lexpressionCompileError != nil {
+				return nil, fmt.Errorf("Failed to compile stateful expression for warnReset: %s", lexpressionCompileError)
 			}
-			an.level_resets[WarnAlert] = statefulExpression
+			an.levelResets[WarnAlert] = lstatefulExpression
 		}
 	}
 
@@ -347,12 +354,12 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		}
 		an.levels[CritAlert] = statefulExpression
 		an.scopePools[CritAlert] = stateful.NewScopePool(stateful.FindReferenceVariables(n.Crit.Expression))
-		if n.Crit_reset != nil {
-			statefulExpression, expressionCompileError := stateful.NewExpression(n.Crit_reset.Expression)
-			if expressionCompileError != nil {
-				return nil, fmt.Errorf("Failed to compile stateful expression for crit_reset: %s", expressionCompileError)
+		if n.CritReset != nil {
+			lstatefulExpression, lexpressionCompileError := stateful.NewExpression(n.CritReset.Expression)
+			if lexpressionCompileError != nil {
+				return nil, fmt.Errorf("Failed to compile stateful expression for critReset: %s", lexpressionCompileError)
 			}
-			an.level_resets[CritAlert] = statefulExpression
+			an.levelResets[CritAlert] = lstatefulExpression
 		}
 	}
 
@@ -582,12 +589,14 @@ func (a *AlertNode) determineLevel(now time.Time, fields models.Fields, tags map
 		} else if pass {
 			return AlertLevel(l)
 		} else {
-			lrse := a.level_resets[l]
+			lrse := a.levelResets[l]
 			if lrse != nil {
 				if pass, err := EvalPredicate(lrse, a.scopePools[l], now, fields, tags); err != nil {
 					a.logger.Printf("E! error evaluating expression for level %v reset : %s", AlertLevel(l), err)
 					continue
 				} else if pass {
+					continue
+				} else {
 					return AlertLevel(l)
 				}
 			}

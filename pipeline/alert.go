@@ -206,10 +206,12 @@ type AlertNode struct {
 	// An empty value indicates the level is invalid and is skipped.
 	Crit *ast.LambdaNode
 
-	// Filter expression for reseting the WARNING alert level to OK.
-	Warn_reset *ast.LambdaNode
-	// Filter expression for reseting the CRITICAL alert level to OK.
-	Crit_reset *ast.LambdaNode
+	// Filter expression for reseting the INFO alert level to lower level.
+	InfoReset *ast.LambdaNode
+	// Filter expression for reseting the WARNING alert level to lower level.
+	WarnReset *ast.LambdaNode
+	// Filter expression for reseting the CRITICAL alert level to lower level.
+	CritReset *ast.LambdaNode
 
 	//tick:ignore
 	UseFlapping bool `tick:"Flapping"`
