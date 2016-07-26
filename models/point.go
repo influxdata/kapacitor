@@ -34,8 +34,6 @@ type PointSetter interface {
 	PointInterface
 	SetNewDimTag(key string, value string)
 	UpdateGroup()
-	SetFields(fields Fields)
-	SetTime(t time.Time)
 	Interface() PointInterface
 }
 
@@ -120,14 +118,6 @@ func (p *Point) SetNewDimTag(key string, value string) {
 func (p *Point) UpdateGroup() {
 	sort.Strings(p.Dimensions.TagNames)
 	p.Group = ToGroupID(p.Name, p.Tags, p.Dimensions)
-}
-
-func (p *Point) SetTime(t time.Time) {
-	p.Time = t
-}
-
-func (p *Point) SetFields(fields Fields) {
-	p.Fields = fields
 }
 
 // Returns byte array of a line protocol representation of the point
