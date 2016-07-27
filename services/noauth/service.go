@@ -37,3 +37,17 @@ func (s *Service) User(username string) (auth.User, error) {
 	s.logger.Println("W! using noauth auth backend. Faked authentication for user", username)
 	return auth.NewUser(username, nil, true, nil), nil
 }
+
+// Return a user will all privileges.
+func (s *Service) SubscriptionUser(token string) (auth.User, error) {
+	s.logger.Println("W! using noauth auth backend. Faked authentication for subscription user token")
+	return auth.NewUser("subscription-user", nil, true, nil), nil
+}
+
+func (s *Service) GrantSubscriptionAccess(token, db, rp string) error {
+	return nil
+}
+
+func (s *Service) RevokeSubscriptionAccess(token string) error {
+	return nil
+}
