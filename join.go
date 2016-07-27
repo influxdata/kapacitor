@@ -147,87 +147,93 @@ func (j *JoinNode) matchPoints(p srcPoint, groupErrs chan<- error) {
 			TagNames: j.j.Dimensions,
 		},
 	)
+	// Update current srcGroup lowMark
 	srcG := srcGroup{src: p.src, groupId: groupId}
 	j.lowMarks[srcG] = t
 
-	if len(p.p.PointDimensions().TagNames) > len(j.j.Dimensions) {
-		// We have a specific point, find its cached match and send both to group
-		matches := j.matchGroupsBuffer[groupId]
-		matched := false
-		oldestMatch := time.Time{}
-		for _, match := range matches {
-			pt := match.p.PointTime().Round(j.j.Tolerance)
-			if pt.Equal(t) {
-				j.sendMatchPoint(p, match, groupErrs)
-				matched = true
-			}
-			if oldestMatch.IsZero() || pt.Before(oldestMatch) {
-				oldestMatch = pt
+	// Determine lowMark, the oldest time per parent per group.
+	var lowMark time.Time
+	if j.allReported {
+		for s := 0; s < len(j.ins); s++ {
+			sg := srcGroup{src: s, groupId: groupId}
+			if lm := j.lowMarks[sg]; lowMark.IsZero() || lm.Before(lowMark) {
+				lowMark = lm
 			}
 		}
-		if !matched {
-			// If specific point doesn't have match, send it by itself.
-			if t.Before(oldestMatch) {
-				// Send all cached specific point that won't match anymore.
-				var i int
-				buf := j.specificGroupsBuffer[groupId]
-				l := len(buf)
-				for i = 0; i < l; i++ {
-					st := buf[i].p.PointTime().Round(j.j.Tolerance)
-					if st.Before(oldestMatch) {
-						// Send point by itself since it won't get a match.
-						j.sendSpecificPoint(buf[i], groupErrs)
-					} else {
-						break
-					}
-				}
-				// Remove all sent points.
-				j.specificGroupsBuffer[groupId] = buf[i:]
+	}
 
-				// Send point by itself since it won't get a match.
-				j.sendSpecificPoint(p, groupErrs)
-			} else {
-				// Cache this point for when its match arrives.
-				j.specificGroupsBuffer[groupId] = append(j.specificGroupsBuffer[groupId], p)
-			}
-		}
-
-		// Purge cached match points
-		if j.allReported {
-			lowMark := time.Time{}
-			for s := 0; s < len(j.ins); s++ {
-				sg := srcGroup{src: s, groupId: groupId}
-				if lm := j.lowMarks[sg]; lowMark.IsZero() || lm.Before(lowMark) {
-					lowMark = lm
-				}
-			}
-			matches := j.matchGroupsBuffer[groupId]
-			var i int
-			l := len(matches)
-			for i = 0; i < l; i++ {
-				mt := matches[i].p.PointTime().Round(j.j.Tolerance)
-				if !mt.Before(lowMark) {
-					break
-				}
-			}
-			// Remove any unneeded cached match points.
-			j.matchGroupsBuffer[groupId] = matches[i:]
-		}
-
-	} else {
-		// Cache match point.
-		j.matchGroupsBuffer[groupId] = append(j.matchGroupsBuffer[groupId], p)
-
-		// Send all specific points, that match, to the group.
+	// Check for cached specific points that can now be sent alone.
+	if j.allReported {
+		// Send all cached specific point that won't match anymore.
 		var i int
 		buf := j.specificGroupsBuffer[groupId]
 		l := len(buf)
 		for i = 0; i < l; i++ {
 			st := buf[i].p.PointTime().Round(j.j.Tolerance)
-			if st.Before(t) {
+			if st.Before(lowMark) {
 				// Send point by itself since it won't get a match.
 				j.sendSpecificPoint(buf[i], groupErrs)
-			} else if st.Equal(t) {
+			} else {
+				break
+			}
+		}
+		// Remove all sent points.
+		j.specificGroupsBuffer[groupId] = buf[i:]
+	}
+
+	if len(p.p.PointDimensions().TagNames) > len(j.j.Dimensions) {
+		// We have a specific point and three options:
+		// 1. Find the cached match point and send both to group.
+		// 2. Cache the specific point for later.
+		// 3. Send the specific point alone if it is no longer possible that a match will arrive.
+
+		// Search for a match.
+		// Also purge any old match points.
+		matches := j.matchGroupsBuffer[groupId]
+		matched := false
+		var i int
+		l := len(matches)
+		for i = 0; i < l; i++ {
+			match := matches[i]
+			pt := match.p.PointTime().Round(j.j.Tolerance)
+			if pt.Equal(t) {
+				// Option 1, send both points
+				j.sendMatchPoint(p, match, groupErrs)
+				matched = true
+			}
+			if !pt.Before(lowMark) {
+				break
+			}
+		}
+		if j.allReported {
+			// Can't trust lowMark until all parents have reported.
+			// Remove any unneeded match points.
+			j.matchGroupsBuffer[groupId] = matches[i:]
+		}
+
+		// If the point didn't match that leaves us with options 2 and 3.
+		if !matched {
+			if j.allReported && t.Before(lowMark) {
+				// Option 3
+				// Send this specific point by itself since it won't get a match.
+				j.sendSpecificPoint(p, groupErrs)
+			} else {
+				// Option 2
+				// Cache this point for when its match arrives.
+				j.specificGroupsBuffer[groupId] = append(j.specificGroupsBuffer[groupId], p)
+			}
+		}
+	} else {
+		// Cache match point.
+		j.matchGroupsBuffer[groupId] = append(j.matchGroupsBuffer[groupId], p)
+
+		// Send all specific points that match, to the group.
+		var i int
+		buf := j.specificGroupsBuffer[groupId]
+		l := len(buf)
+		for i = 0; i < l; i++ {
+			st := buf[i].p.PointTime().Round(j.j.Tolerance)
+			if st.Equal(t) {
 				j.sendMatchPoint(buf[i], p, groupErrs)
 			} else {
 				break
