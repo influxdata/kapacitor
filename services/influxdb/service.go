@@ -2,10 +2,12 @@ package influxdb
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
+	"encoding/base64"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -21,12 +23,16 @@ import (
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/services/udp"
+	"github.com/pkg/errors"
 )
 
 const (
 	// Legacy name given to all subscriptions.
 	legacySubName = "kapacitor"
 	subNamePrefix = "kapacitor-"
+
+	// Size in bytes of a token for subscription authentication
+	tokenSize = 64
 )
 
 // Handles requests to write or read from an InfluxDB cluster
@@ -40,10 +46,15 @@ type Service struct {
 	LogService interface {
 		NewLogger(string, int) *log.Logger
 	}
+
+	AuthService interface {
+		GrantSubscriptionAccess(token, db, rp string) error
+		RevokeSubscriptionAccess(token string) error
+	}
 	logger *log.Logger
 }
 
-func NewService(configs []Config, defaultInfluxDB, httpPort int, hostname string, l *log.Logger) *Service {
+func NewService(configs []Config, defaultInfluxDB, httpPort int, hostname string, useTokens bool, l *log.Logger) *Service {
 	clusterID := kapacitor.ClusterIDVar.StringValue()
 	subName := subNamePrefix + clusterID
 	clusters := make(map[string]*influxdb, len(configs))
@@ -100,6 +111,7 @@ func NewService(configs []Config, defaultInfluxDB, httpPort int, hostname string
 			disableSubs:              c.DisableSubscriptions,
 			protocol:                 c.SubscriptionProtocol,
 			runningSubs:              runningSubs,
+			useTokens:                useTokens,
 		}
 		if defaultInfluxDB == i {
 			defaultInfluxDBName = c.Name
@@ -116,6 +128,7 @@ func (s *Service) Open() error {
 	for _, cluster := range s.clusters {
 		cluster.PointsWriter = s.PointsWriter
 		cluster.LogService = s.LogService
+		cluster.AuthService = s.AuthService
 		err := cluster.Open()
 		if err != nil {
 			return err
@@ -164,6 +177,7 @@ type influxdb struct {
 	subscriptionSyncInterval time.Duration
 	disableSubs              bool
 	runningSubs              map[subEntry]bool
+	useTokens                bool
 
 	clusterID     string
 	subName       string
@@ -174,6 +188,10 @@ type influxdb struct {
 	}
 	LogService interface {
 		NewLogger(string, int) *log.Logger
+	}
+	AuthService interface {
+		GrantSubscriptionAccess(token, db, rp string) error
+		RevokeSubscriptionAccess(token string) error
 	}
 
 	services []interface {
@@ -388,7 +406,12 @@ func (s *influxdb) linkSubscriptions() error {
 					// Check if the hostname, port or protocol have changed
 					if host != s.hostname ||
 						u.Scheme != s.protocol ||
-						((u.Scheme == "http" || u.Scheme == "https") && int(pn) != s.httpPort) {
+						((u.Scheme == "http" || u.Scheme == "https") && int(pn) != s.httpPort) ||
+						(s.useTokens && u.User == nil) {
+						// Remove access for changing subscriptions.
+						if u.User != nil {
+							s.AuthService.RevokeSubscriptionAccess(u.User.Username())
+						}
 						// Something changed, drop the sub and let it get recreated
 						s.dropSub(cli, se.name, se.cluster, se.rp)
 					} else {
@@ -434,7 +457,20 @@ func (s *influxdb) linkSubscriptions() error {
 			var destination string
 			switch s.protocol {
 			case "http", "https":
-				destination = fmt.Sprintf("%s://%s:%d", s.protocol, s.hostname, s.httpPort)
+				if s.useTokens {
+					// Generate token
+					token, err := s.generateRandomToken()
+					if err != nil {
+						return errors.Wrap(err, "generating token")
+					}
+					err = s.AuthService.GrantSubscriptionAccess(token, se.cluster, se.rp)
+					if err != nil {
+						return err
+					}
+					destination = fmt.Sprintf("%s://%s@%s:%d", s.protocol, token, s.hostname, s.httpPort)
+				} else {
+					destination = fmt.Sprintf("%s://%s:%d", s.protocol, s.hostname, s.httpPort)
+				}
 			case "udp":
 				addr, err := s.startUDPListener(se.cluster, se.rp, "0")
 				if err != nil {
@@ -455,6 +491,14 @@ func (s *influxdb) linkSubscriptions() error {
 
 	kapacitor.NumSubscriptionsVar.Set(numSubscriptions)
 	return nil
+}
+
+func (s *influxdb) generateRandomToken() (string, error) {
+	tokenBytes := make([]byte, tokenSize)
+	if _, err := io.ReadFull(rand.Reader, tokenBytes); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(tokenBytes), nil
 }
 
 func (s *influxdb) createSub(cli client.Client, name, cluster, rp, mode string, destinations []string) (err error) {

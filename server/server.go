@@ -142,13 +142,13 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	s.appendDeadmanService()
 	s.appendSMTPService()
 	s.InitHTTPDService()
+	s.appendStorageService()
+	s.appendAuthService()
 	if err := s.appendInfluxDBService(); err != nil {
 		return nil, errors.Wrap(err, "influxdb service")
 	}
-	s.appendStorageService()
 	s.appendTaskStoreService()
 	s.appendReplayService()
-	s.appendAuthService()
 
 	// Append Alert integration services
 	s.appendOpsGenieService()
@@ -215,9 +215,10 @@ func (s *Server) appendInfluxDBService() error {
 		if err != nil {
 			return errors.Wrap(err, "failed to get http port")
 		}
-		srv := influxdb.NewService(c, s.config.defaultInfluxDB, httpPort, s.config.Hostname, l)
+		srv := influxdb.NewService(c, s.config.defaultInfluxDB, httpPort, s.config.Hostname, s.config.HTTP.AuthEnabled, l)
 		srv.PointsWriter = s.TaskMaster
 		srv.LogService = s.LogService
+		srv.AuthService = s.AuthService
 
 		s.InfluxDBService = srv
 		s.TaskMaster.InfluxDBService = srv

@@ -45,6 +45,7 @@ type AuthenticationMethod int
 const (
 	UserAuthentication AuthenticationMethod = iota
 	BearerAuthentication
+	SubscriptionAuthentication
 )
 
 type AuthorizationHandler func(http.ResponseWriter, *http.Request, auth.User)
@@ -612,6 +613,11 @@ func authenticate(inner AuthorizationHandler, h *Handler, requireAuthentication 
 				HttpError(w, err.Error(), false, http.StatusUnauthorized)
 				return
 			}
+		case SubscriptionAuthentication:
+			if user, err = h.AuthService.SubscriptionUser(creds.Token); err != nil {
+				HttpError(w, err.Error(), false, http.StatusUnauthorized)
+				return
+			}
 		default:
 			HttpError(w, "unsupported authentication", false, http.StatusUnauthorized)
 		}
@@ -684,6 +690,7 @@ type credentials struct {
 // As params: http://127.0.0.1/query?u=username&p=password
 // As basic auth: http://username:password@127.0.0.1
 // As Bearer token in Authorization header: Bearer <JWT_TOKEN_BLOB>
+// As simple acccess token in InfluxDB-Access-Token: <TOKEN>
 func parseCredentials(r *http.Request) (credentials, error) {
 	q := r.URL.Query()
 
@@ -706,6 +713,13 @@ func parseCredentials(r *http.Request) (credentials, error) {
 				Password: p,
 			}, nil
 		}
+	} else if s := r.Header.Get("InfluxDB-Access-Token"); s != "" {
+		// Check for the HTTP InfluxDB-Access-Token header.
+		return credentials{
+			Method: SubscriptionAuthentication,
+			Token:  s,
+		}, nil
+
 	}
 
 	// Check for username and password in URL params.

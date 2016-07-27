@@ -10,6 +10,9 @@ import (
 type Interface interface {
 	Authenticate(username, password string) (User, error)
 	User(username string) (User, error)
+	SubscriptionUser(token string) (User, error)
+	GrantSubscriptionAccess(token, db, rp string) error
+	RevokeSubscriptionAccess(token string) error
 }
 
 // ErrAuthenticate is returned when authentication fails.
