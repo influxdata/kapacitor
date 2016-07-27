@@ -26,8 +26,9 @@ type JoinNode struct {
 	matchGroupsBuffer map[models.GroupID][]srcPoint
 	// Buffer for caching specific points until their match arrivces.
 	specificGroupsBuffer map[models.GroupID][]srcPoint
-	// Represents the lower bound of times from each parent.
-	lowMark     time.Time
+	// Represents the lower bound of times per group per parent
+	lowMarks map[srcGroup]time.Time
+
 	reported    map[int]bool
 	allReported bool
 }
@@ -39,6 +40,7 @@ func newJoinNode(et *ExecutingTask, n *pipeline.JoinNode, l *log.Logger) (*JoinN
 		node:                 node{Node: n, et: et, logger: l},
 		matchGroupsBuffer:    make(map[models.GroupID][]srcPoint),
 		specificGroupsBuffer: make(map[models.GroupID][]srcPoint),
+		lowMarks:             make(map[srcGroup]time.Time),
 		reported:             make(map[int]bool),
 	}
 	// Set fill
@@ -125,6 +127,9 @@ func (j *JoinNode) runJoin([]byte) error {
 //
 // Where 'more specific' means, that a point has more dimensions than the join.on dimensions.
 func (j *JoinNode) matchPoints(p srcPoint, groupErrs chan<- error) {
+	// Specific points may be sent to the joinset without a matching point, but not the other way around.
+	// This is because the specific points have the needed specific tag data.
+	// The joinset will later handle the fill inner/outer join operations.
 	j.mu.Lock()
 	defer j.mu.Unlock()
 
@@ -133,9 +138,6 @@ func (j *JoinNode) matchPoints(p srcPoint, groupErrs chan<- error) {
 		j.allReported = len(j.reported) == len(j.ins)
 	}
 	t := p.p.PointTime().Round(j.j.Tolerance)
-	if j.lowMark.IsZero() || t.Before(j.lowMark) {
-		j.lowMark = t
-	}
 
 	groupId := models.ToGroupID(
 		p.p.PointName(),
@@ -145,47 +147,93 @@ func (j *JoinNode) matchPoints(p srcPoint, groupErrs chan<- error) {
 			TagNames: j.j.Dimensions,
 		},
 	)
+	// Update current srcGroup lowMark
+	srcG := srcGroup{src: p.src, groupId: groupId}
+	j.lowMarks[srcG] = t
 
-	if len(p.p.PointDimensions().TagNames) > len(j.j.Dimensions) {
-		// We have a specific point, find its cached match and send both to group
-		matches := j.matchGroupsBuffer[groupId]
-		matched := false
-		for _, match := range matches {
-			if match.p.PointTime().Round(j.j.Tolerance).Equal(t) {
-				j.sendMatchPoint(p, match, groupErrs)
-				matched = true
+	// Determine lowMark, the oldest time per parent per group.
+	var lowMark time.Time
+	if j.allReported {
+		for s := 0; s < len(j.ins); s++ {
+			sg := srcGroup{src: s, groupId: groupId}
+			if lm := j.lowMarks[sg]; lowMark.IsZero() || lm.Before(lowMark) {
+				lowMark = lm
 			}
 		}
-		if !matched {
-			// Cache this point for when its match arrives
-			j.specificGroupsBuffer[groupId] = append(j.specificGroupsBuffer[groupId], p)
-		}
+	}
 
-		// Purge cached match points
-		if j.allReported {
-			for id, cached := range j.matchGroupsBuffer {
-				var i int
-				l := len(cached)
-				for i = 0; i < l; i++ {
-					if !cached[i].p.PointTime().Round(j.j.Tolerance).Before(j.lowMark) {
-						break
-					}
-				}
-				j.matchGroupsBuffer[id] = cached[i:]
-			}
-		}
-
-	} else {
-
-		// Cache match point.
-		j.matchGroupsBuffer[groupId] = append(j.matchGroupsBuffer[groupId], p)
-
-		// Send all specific points, that match, to the group.
+	// Check for cached specific points that can now be sent alone.
+	if j.allReported {
+		// Send all cached specific point that won't match anymore.
 		var i int
 		buf := j.specificGroupsBuffer[groupId]
 		l := len(buf)
 		for i = 0; i < l; i++ {
-			if buf[i].p.PointTime().Round(j.j.Tolerance).Equal(t) {
+			st := buf[i].p.PointTime().Round(j.j.Tolerance)
+			if st.Before(lowMark) {
+				// Send point by itself since it won't get a match.
+				j.sendSpecificPoint(buf[i], groupErrs)
+			} else {
+				break
+			}
+		}
+		// Remove all sent points.
+		j.specificGroupsBuffer[groupId] = buf[i:]
+	}
+
+	if len(p.p.PointDimensions().TagNames) > len(j.j.Dimensions) {
+		// We have a specific point and three options:
+		// 1. Find the cached match point and send both to group.
+		// 2. Cache the specific point for later.
+		// 3. Send the specific point alone if it is no longer possible that a match will arrive.
+
+		// Search for a match.
+		// Also purge any old match points.
+		matches := j.matchGroupsBuffer[groupId]
+		matched := false
+		var i int
+		l := len(matches)
+		for i = 0; i < l; i++ {
+			match := matches[i]
+			pt := match.p.PointTime().Round(j.j.Tolerance)
+			if pt.Equal(t) {
+				// Option 1, send both points
+				j.sendMatchPoint(p, match, groupErrs)
+				matched = true
+			}
+			if !pt.Before(lowMark) {
+				break
+			}
+		}
+		if j.allReported {
+			// Can't trust lowMark until all parents have reported.
+			// Remove any unneeded match points.
+			j.matchGroupsBuffer[groupId] = matches[i:]
+		}
+
+		// If the point didn't match that leaves us with options 2 and 3.
+		if !matched {
+			if j.allReported && t.Before(lowMark) {
+				// Option 3
+				// Send this specific point by itself since it won't get a match.
+				j.sendSpecificPoint(p, groupErrs)
+			} else {
+				// Option 2
+				// Cache this point for when its match arrives.
+				j.specificGroupsBuffer[groupId] = append(j.specificGroupsBuffer[groupId], p)
+			}
+		}
+	} else {
+		// Cache match point.
+		j.matchGroupsBuffer[groupId] = append(j.matchGroupsBuffer[groupId], p)
+
+		// Send all specific points that match, to the group.
+		var i int
+		buf := j.specificGroupsBuffer[groupId]
+		l := len(buf)
+		for i = 0; i < l; i++ {
+			st := buf[i].p.PointTime().Round(j.j.Tolerance)
+			if st.Equal(t) {
 				j.sendMatchPoint(buf[i], p, groupErrs)
 			} else {
 				break
@@ -212,6 +260,13 @@ func (j *JoinNode) sendMatchPoint(specific, matched srcPoint, groupErrs chan<- e
 	group.points <- matched
 }
 
+// Send only the specific point to the group
+func (j *JoinNode) sendSpecificPoint(specific srcPoint, groupErrs chan<- error) {
+	group := j.getGroup(specific.p, groupErrs)
+	// Send current point
+	group.points <- specific
+}
+
 // safely get the group for the point or create one if it doesn't exist.
 func (j *JoinNode) getGroup(p models.PointInterface, groupErrs chan<- error) *group {
 	group := j.groups[p.PointGroup()]
@@ -231,6 +286,12 @@ func (j *JoinNode) getGroup(p models.PointInterface, groupErrs chan<- error) *gr
 		}()
 	}
 	return group
+}
+
+// A groupId and its parent
+type srcGroup struct {
+	src     int
+	groupId models.GroupID
 }
 
 // represents an incoming data point and which parent it came from
@@ -521,6 +582,8 @@ func (js *joinset) JoinIntoBatch() (models.Batch, bool) {
 	emptyCount := 0
 	indexes := make([]int, js.expected)
 	var fieldNames []string
+
+BATCH_POINT:
 	for emptyCount < js.expected {
 		set := make([]*models.BatchPoint, js.expected)
 		setTime := time.Time{}
@@ -549,7 +612,19 @@ func (js *joinset) JoinIntoBatch() (models.Batch, bool) {
 			if setTime.IsZero() {
 				setTime = t
 			}
-			if t.Equal(setTime) {
+			if t.Before(setTime) {
+				// We need to backup
+				setTime = t
+				for j := range set {
+					if set[j] != nil {
+						indexes[j]--
+					}
+					set[j] = nil
+				}
+				set[i] = &bp
+				indexes[i]++
+				count = 1
+			} else if t.Equal(setTime) {
 				if fieldNames == nil {
 					for k := range bp.Fields {
 						fieldNames = append(fieldNames, k)
@@ -580,7 +655,7 @@ func (js *joinset) JoinIntoBatch() (models.Batch, bool) {
 					}
 				default:
 					// inner join no valid point possible
-					return models.Batch{}, false
+					continue BATCH_POINT
 				}
 			} else {
 				for k, v := range bp.Fields {

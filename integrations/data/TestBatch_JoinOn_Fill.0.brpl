@@ -1,0 +1,34 @@
+{"name":"disk","tags":{"host":"A","path":"/"},"points":[
+    {
+        "fields":{"used_percent":50},
+        "time":"2016-01-01T00:00:00Z"
+    },
+    {
+        "fields":{"used_percent":60},
+        "time":"2016-01-01T00:00:01Z"
+    },
+    {
+        "fields":{"used_percent":70},
+        "time":"2016-01-01T00:00:02Z"
+    },
+    {
+        "fields":{"used_percent":80},
+        "time":"2016-01-01T00:00:03Z"
+    }]}
+{"name":"disk","tags":{"host":"A","path":"/tmp"},"points":[
+    {
+        "fields":{"used_percent":40},
+        "time":"2016-01-01T00:00:00Z"
+    },
+    {
+        "fields":{"used_percent":30},
+        "time":"2016-01-01T00:00:01Z"
+    },
+    {
+        "fields":{"used_percent":20},
+        "time":"2016-01-01T00:00:02Z"
+    },
+    {
+        "fields":{"used_percent":10},
+        "time":"2016-01-01T00:00:03Z"
+    }]}

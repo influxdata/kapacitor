@@ -72,7 +72,7 @@ func (d *DefaultNode) setDefaults(fields models.Fields, tags models.Tags) (model
 	newFields := fields
 	fieldsCopied := false
 	for field, value := range d.d.Fields {
-		if _, ok := fields[field]; !ok {
+		if v := fields[field]; v == nil {
 			if !fieldsCopied {
 				newFields = newFields.Copy()
 				fieldsCopied = true

@@ -2128,7 +2128,7 @@ errorCounts
 	testStreamerWithOutput(t, "TestStream_JoinTolerance", script, 13*time.Second, er, nil, true)
 }
 
-func TestStream_JoinFill(t *testing.T) {
+func TestStream_Join_Fill_Null(t *testing.T) {
 	var script = `
 var errorCounts = stream
 	|from()
@@ -2143,15 +2143,18 @@ var viewCounts = stream
 errorCounts
 	|join(viewCounts)
 		.as('errors', 'views')
-		.fill(0.0)
+		.fill('null')
 		.streamName('error_view')
+	|default()
+		.field('errors.value', 0.0)
+		.field('views.value', 0.0)
 	|eval(lambda:  "errors.value" + "views.value")
 		.as('error_percent')
 	|window()
 		.period(10s)
 		.every(10s)
 	|count('error_percent')
-	|httpOut('TestStream_JoinFill')
+	|httpOut('TestStream_Join_Fill')
 `
 
 	er := kapacitor.Result{
@@ -2186,7 +2189,68 @@ errorCounts
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_JoinFill", script, 13*time.Second, er, nil, true)
+	testStreamerWithOutput(t, "TestStream_Join_Fill", script, 13*time.Second, er, nil, true)
+}
+
+func TestStream_Join_Fill_Num(t *testing.T) {
+	var script = `
+var errorCounts = stream
+	|from()
+		.measurement('errors')
+		.groupBy('service')
+
+var viewCounts = stream
+	|from()
+		.measurement('views')
+		.groupBy('service')
+
+errorCounts
+	|join(viewCounts)
+		.as('errors', 'views')
+		.fill(0.0)
+		.streamName('error_view')
+	|eval(lambda:  "errors.value" + "views.value")
+		.as('error_percent')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('error_percent')
+	|httpOut('TestStream_Join_Fill')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "error_view",
+				Tags:    map[string]string{"service": "cartA"},
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					7.0,
+				}},
+			},
+			{
+				Name:    "error_view",
+				Tags:    map[string]string{"service": "login"},
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					7.0,
+				}},
+			},
+			{
+				Name:    "error_view",
+				Tags:    map[string]string{"service": "front"},
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					8.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Join_Fill", script, 13*time.Second, er, nil, true)
 }
 
 func TestStream_JoinN(t *testing.T) {
@@ -2609,6 +2673,181 @@ building
 	}
 
 	testStreamerWithOutput(t, "TestStream_JoinOn_AcrossMeasurement", script, 13*time.Second, er, nil, true)
+}
+
+func TestStream_JoinOn_Fill_Num(t *testing.T) {
+	var script = `
+var maintlock = stream
+    |from()
+        .measurement('maintlock')
+        .groupBy('host')
+
+stream
+    |from()
+        .measurement('disk')
+        .groupBy('host', 'path')
+    |join(maintlock)
+        .as('disk', 'maintlock')
+        .on('host')
+        .fill(0.0)
+        .tolerance(1s)
+        .streamName('disk')
+    |default()
+        .field('maintlock.count', 0)
+    |window()
+        .period(4s)
+        .every(4s)
+    |httpOut('TestStream_JoinOn_Fill')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "disk",
+				Tags:    map[string]string{"host": "A", "path": "/"},
+				Columns: []string{"time", "disk.used_percent", "maintlock.count"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						50.0,
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+						60.0,
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						70.0,
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+						80.0,
+						1.0,
+					},
+				},
+			},
+			{
+				Name:    "disk",
+				Tags:    map[string]string{"host": "A", "path": "/tmp"},
+				Columns: []string{"time", "disk.used_percent", "maintlock.count"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						40.0,
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+						30.0,
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						20.0,
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+						10.0,
+						1.0,
+					},
+				},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_JoinOn_Fill", script, 13*time.Second, er, nil, true)
+}
+
+func TestStream_JoinOn_Fill_Null(t *testing.T) {
+	var script = `
+var maintlock = stream
+    |from()
+        .measurement('maintlock')
+        .groupBy('host')
+
+stream
+    |from()
+        .measurement('disk')
+        .groupBy('host', 'path')
+    |join(maintlock)
+        .as('disk', 'maintlock')
+        .on('host')
+        .fill('null')
+        .tolerance(1s)
+        .streamName('disk')
+    |default()
+        .field('maintlock.count', 0)
+        .field('disk.used_percent', 0)
+    |window()
+        .period(4s)
+        .every(4s)
+    |httpOut('TestStream_JoinOn_Fill')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "disk",
+				Tags:    map[string]string{"host": "A", "path": "/"},
+				Columns: []string{"time", "disk.used_percent", "maintlock.count"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						50.0,
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+						60.0,
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						70.0,
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+						80.0,
+						1.0,
+					},
+				},
+			},
+			{
+				Name:    "disk",
+				Tags:    map[string]string{"host": "A", "path": "/tmp"},
+				Columns: []string{"time", "disk.used_percent", "maintlock.count"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						40.0,
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+						30.0,
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						20.0,
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+						10.0,
+						1.0,
+					},
+				},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_JoinOn_Fill", script, 13*time.Second, er, nil, true)
 }
 
 func TestStream_Union(t *testing.T) {
