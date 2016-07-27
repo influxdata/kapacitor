@@ -55,6 +55,7 @@ stream
 - [#624](https://github.com/influxdata/kapacitor/issue/624): BREAKING: Add ability to GroupBy fields. First use EvalNode to create a tag from a field and then group by the new tag.
     Also allows for grouping by measurement.
     The breaking change is that the group ID format has changed to allow for the measurement name.
+- [#759](https://github.com/influxdata/kapacitor/pull/759): Add mechanism for token based subscription auth.
 
 ### Bugfixes
 
