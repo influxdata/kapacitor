@@ -4349,6 +4349,212 @@ stream
 	}
 }
 
+func TestStream_Alert_WithReset(t *testing.T) {
+	requestCount := int32(0)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ad := kapacitor.AlertData{}
+		dec := json.NewDecoder(r.Body)
+		err := dec.Decode(&ad)
+		if err != nil {
+			t.Fatal(err)
+		}
+		atomic.AddInt32(&requestCount, 1)
+		rc := atomic.LoadInt32(&requestCount)
+		var expAd kapacitor.AlertData
+		switch rc {
+		case 1:
+			expAd = kapacitor.AlertData{
+				ID:      "kapacitor/cpu/serverA",
+				Message: "kapacitor/cpu/serverA is CRITICAL",
+				Details: "details",
+				Time:    time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+				Level:   kapacitor.CritAlert,
+				Data: influxql.Result{
+					Series: imodels.Rows{
+						{
+							Name:    "cpu",
+							Tags:    map[string]string{"host": "serverA", "type": "usage"},
+							Columns: []string{"time", "value"},
+							Values: [][]interface{}{[]interface{}{
+								time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+								85.1,
+							}},
+						},
+					},
+				},
+			}
+		case 2:
+			expAd = kapacitor.AlertData{
+				ID:       "kapacitor/cpu/serverA",
+				Message:  "kapacitor/cpu/serverA is CRITICAL",
+				Details:  "details",
+				Time:     time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+				Duration: time.Second,
+				Level:    kapacitor.CritAlert,
+				Data: influxql.Result{
+					Series: imodels.Rows{
+						{
+							Name:    "cpu",
+							Tags:    map[string]string{"host": "serverA", "type": "usage"},
+							Columns: []string{"time", "value"},
+							Values: [][]interface{}{[]interface{}{
+								time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+								57.6,
+							}},
+						},
+					},
+				},
+			}
+		case 3:
+			expAd = kapacitor.AlertData{
+				ID:       "kapacitor/cpu/serverA",
+				Message:  "kapacitor/cpu/serverA is INFO",
+				Details:  "details",
+				Time:     time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+				Duration: 2 * time.Second,
+				Level:    kapacitor.InfoAlert,
+				Data: influxql.Result{
+					Series: imodels.Rows{
+						{
+							Name:    "cpu",
+							Tags:    map[string]string{"host": "serverA", "type": "usage"},
+							Columns: []string{"time", "value"},
+							Values: [][]interface{}{[]interface{}{
+								time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+								45.6,
+							}},
+						},
+					},
+				},
+			}
+		case 4:
+			expAd = kapacitor.AlertData{
+				ID:       "kapacitor/cpu/serverA",
+				Message:  "kapacitor/cpu/serverA is WARNING",
+				Details:  "details",
+				Time:     time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+				Duration: 3 * time.Second,
+				Level:    kapacitor.WarnAlert,
+				Data: influxql.Result{
+					Series: imodels.Rows{
+						{
+							Name:    "cpu",
+							Tags:    map[string]string{"host": "serverA", "type": "usage"},
+							Columns: []string{"time", "value"},
+							Values: [][]interface{}{[]interface{}{
+								time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+								63.1,
+							}},
+						},
+					},
+				},
+			}
+		case 5:
+			expAd = kapacitor.AlertData{
+				ID:       "kapacitor/cpu/serverA",
+				Message:  "kapacitor/cpu/serverA is WARNING",
+				Details:  "details",
+				Time:     time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+				Duration: 4 * time.Second,
+				Level:    kapacitor.WarnAlert,
+				Data: influxql.Result{
+					Series: imodels.Rows{
+						{
+							Name:    "cpu",
+							Tags:    map[string]string{"host": "serverA", "type": "usage"},
+							Columns: []string{"time", "value"},
+							Values: [][]interface{}{[]interface{}{
+								time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+								52.6,
+							}},
+						},
+					},
+				},
+			}
+		case 6:
+			expAd = kapacitor.AlertData{
+				ID:       "kapacitor/cpu/serverA",
+				Message:  "kapacitor/cpu/serverA is OK",
+				Details:  "details",
+				Time:     time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+				Duration: 5 * time.Second,
+				Level:    kapacitor.OKAlert,
+				Data: influxql.Result{
+					Series: imodels.Rows{
+						{
+							Name:    "cpu",
+							Tags:    map[string]string{"host": "serverA", "type": "usage"},
+							Columns: []string{"time", "value"},
+							Values: [][]interface{}{[]interface{}{
+								time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+								20.8,
+							}},
+						},
+					},
+				},
+			}
+		}
+
+		if eq, msg := compareAlertData(expAd, ad); !eq {
+			t.Errorf("unexpected alert data for request: %d %s", rc, msg)
+		}
+	}))
+	defer ts.Close()
+
+	var script = `
+var infoThreshold = 40.0
+var warnThreshold = 60.0
+var critThreshold = 80.0
+
+var infoResetThreshold = 10.0
+var warnResetThreshold = 30.0
+var critResetThreshold = 50.0
+
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.details('details')
+		.idField('id')
+		.idTag('id')
+		.levelField('level')
+		.levelTag('level')
+		.info(lambda: "value" > infoThreshold)
+		.infoReset(lambda: "value" < infoResetThreshold)
+		.warn(lambda: "value" > warnThreshold)
+		.warnReset(lambda: "value" < warnResetThreshold)
+		.crit(lambda: "value" > critThreshold)
+		.critReset(lambda: "value" < critResetThreshold)
+		.post('` + ts.URL + `')
+	|httpOut('TestStream_Alert_WithReset')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverA", "level": "OK", "id": "kapacitor/cpu/serverA", "type": "usage"},
+				Columns: []string{"time", "id", "level", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+					"kapacitor/cpu/serverA",
+					"OK",
+					20.8,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Alert_WithReset", script, 13*time.Second, er, nil, false)
+
+	if rc := atomic.LoadInt32(&requestCount); rc != 6 {
+		t.Errorf("got %v exp %v", rc, 1)
+	}
+}
+
 func TestStream_AlertDuration(t *testing.T) {
 	requestCount := int32(0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
