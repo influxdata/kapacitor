@@ -12,6 +12,7 @@ type Interface interface {
 	User(username string) (User, error)
 	SubscriptionUser(token string) (User, error)
 	GrantSubscriptionAccess(token, db, rp string) error
+	ListSubscriptionTokens() ([]string, error)
 	RevokeSubscriptionAccess(token string) error
 }
 
@@ -162,6 +163,10 @@ func (u User) AuthorizeAction(action Action) error {
 		}
 	}
 	return fmt.Errorf("user %s does not have \"%v\" privilege for resource %q", u.name, action.Privilege, action.Resource)
+}
+
+func APIResource(p string) string {
+	return path.Join("/api", p)
 }
 
 func DatabaseResource(database string) string {

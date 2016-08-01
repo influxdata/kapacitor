@@ -36,7 +36,12 @@ const (
 	statAuthFail                  = "auth_fail"           // Number of requests that failed to authenticate
 )
 
-const BasePath = "/kapacitor/v1"
+const (
+	// Root path for the API
+	BasePath = "/kapacitor/v1"
+	// Name of the special user for subscriptions
+	SubscriptionUser = "~subscriber"
+)
 
 // AuthenticationMethod defines the type of authentication used.
 type AuthenticationMethod int
@@ -649,7 +654,7 @@ func authorizeRequest(r *http.Request, user auth.User) error {
 		return err
 	}
 	action := auth.Action{
-		Resource:  strings.TrimPrefix(r.URL.Path, BasePath),
+		Resource:  auth.APIResource(strings.TrimPrefix(r.URL.Path, BasePath)),
 		Privilege: rp,
 	}
 	return user.AuthorizeAction(action)
@@ -707,18 +712,19 @@ func parseCredentials(r *http.Request) (credentials, error) {
 
 		// Check for basic auth.
 		if u, p, ok := r.BasicAuth(); ok {
+			// Check for special subscription username
+			if u == SubscriptionUser {
+				return credentials{
+					Method: SubscriptionAuthentication,
+					Token:  p,
+				}, nil
+			}
 			return credentials{
 				Method:   UserAuthentication,
 				Username: u,
 				Password: p,
 			}, nil
 		}
-	} else if s := r.Header.Get("InfluxDB-Access-Token"); s != "" {
-		// Check for the HTTP InfluxDB-Access-Token header.
-		return credentials{
-			Method: SubscriptionAuthentication,
-			Token:  s,
-		}, nil
 
 	}
 
