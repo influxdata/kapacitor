@@ -13,8 +13,8 @@ import (
 
 const (
 	// Maximum time to try and connect to InfluxDB during startup.
-	DefaultStartUpTimeout           = time.Minute * 5
-	DefaultSubscriptionSyncInterval = time.Minute * 1
+	DefaultStartUpTimeout           = 5 * time.Minute
+	DefaultSubscriptionSyncInterval = 1 * time.Minute
 
 	DefaultSubscriptionProtocol = "http"
 )

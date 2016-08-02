@@ -18,10 +18,10 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
-	client "github.com/influxdata/influxdb/client/v2"
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/pkg/errors"
@@ -39,7 +39,7 @@ const (
 // Handles requests to write or read from an InfluxDB cluster
 type Service struct {
 	defaultInfluxDB string
-	clusters        map[string]*influxdb
+	clusters        map[string]*influxdbCluster
 
 	PointsWriter interface {
 		WritePoints(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
@@ -47,7 +47,9 @@ type Service struct {
 	LogService interface {
 		NewLogger(string, int) *log.Logger
 	}
-
+	ClientCreator interface {
+		Create(influxdb.HTTPConfig) (influxdb.Client, error)
+	}
 	AuthService interface {
 		GrantSubscriptionAccess(token, db, rp string) error
 		ListSubscriptionTokens() ([]string, error)
@@ -59,10 +61,10 @@ type Service struct {
 func NewService(configs []Config, defaultInfluxDB, httpPort int, hostname string, useTokens bool, l *log.Logger) *Service {
 	clusterID := kapacitor.ClusterIDVar.StringValue()
 	subName := subNamePrefix + clusterID
-	clusters := make(map[string]*influxdb, len(configs))
+	clusters := make(map[string]*influxdbCluster, len(configs))
 	var defaultInfluxDBName string
 	for i, c := range configs {
-		urls := make([]client.HTTPConfig, len(c.URLs))
+		urls := make([]influxdb.HTTPConfig, len(c.URLs))
 		tlsConfig, err := getTLSConfig(c.SSLCA, c.SSLCert, c.SSLKey, c.InsecureSkipVerify)
 		if err != nil {
 			// Config should have been validated already
@@ -71,14 +73,21 @@ func NewService(configs []Config, defaultInfluxDB, httpPort int, hostname string
 		if c.InsecureSkipVerify {
 			l.Printf("W! Using InsecureSkipVerify when connecting to InfluxDB @ %v this is insecure!", c.URLs)
 		}
+		var credentials *influxdb.Credentials
+		if c.Username != "" {
+			credentials = &influxdb.Credentials{
+				Method:   influxdb.UserAuthentication,
+				Username: c.Username,
+				Password: c.Password,
+			}
+		}
 		for i, u := range c.URLs {
-			urls[i] = client.HTTPConfig{
-				Addr:      u,
-				Username:  c.Username,
-				Password:  c.Password,
-				UserAgent: "Kapacitor",
-				Timeout:   time.Duration(c.Timeout),
-				TLSConfig: tlsConfig,
+			urls[i] = influxdb.HTTPConfig{
+				URL:         u,
+				Credentials: credentials,
+				UserAgent:   "Kapacitor",
+				Timeout:     time.Duration(c.Timeout),
+				TLSConfig:   tlsConfig,
 			}
 		}
 		subs := make(map[subEntry]bool, len(c.Subscriptions))
@@ -96,7 +105,7 @@ func NewService(configs []Config, defaultInfluxDB, httpPort int, hostname string
 			}
 		}
 		runningSubs := make(map[subEntry]bool, len(c.Subscriptions))
-		clusters[c.Name] = &influxdb{
+		clusters[c.Name] = &influxdbCluster{
 			configs:                  urls,
 			configSubs:               subs,
 			exConfigSubs:             exSubs,
@@ -131,6 +140,7 @@ func (s *Service) Open() error {
 		cluster.PointsWriter = s.PointsWriter
 		cluster.LogService = s.LogService
 		cluster.AuthService = s.AuthService
+		cluster.ClientCreator = s.ClientCreator
 		err := cluster.Open()
 		if err != nil {
 			return err
@@ -150,11 +160,11 @@ func (s *Service) Close() error {
 	return lastErr
 }
 
-func (s *Service) NewDefaultClient() (client.Client, error) {
+func (s *Service) NewDefaultClient() (influxdb.Client, error) {
 	return s.clusters[s.defaultInfluxDB].NewClient()
 }
 
-func (s *Service) NewNamedClient(name string) (client.Client, error) {
+func (s *Service) NewNamedClient(name string) (influxdb.Client, error) {
 	cluster, ok := s.clusters[name]
 	if !ok {
 		return nil, fmt.Errorf("no such InfluxDB config %s", name)
@@ -163,8 +173,8 @@ func (s *Service) NewNamedClient(name string) (client.Client, error) {
 	return cluster.NewClient()
 }
 
-type influxdb struct {
-	configs                  []client.HTTPConfig
+type influxdbCluster struct {
+	configs                  []influxdb.HTTPConfig
 	i                        int
 	configSubs               map[subEntry]bool
 	exConfigSubs             map[subEntry]bool
@@ -191,6 +201,9 @@ type influxdb struct {
 	LogService interface {
 		NewLogger(string, int) *log.Logger
 	}
+	ClientCreator interface {
+		Create(influxdb.HTTPConfig) (influxdb.Client, error)
+	}
 	AuthService interface {
 		GrantSubscriptionAccess(token, db, rp string) error
 		ListSubscriptionTokens() ([]string, error)
@@ -216,7 +229,7 @@ type subInfo struct {
 	Destinations []string
 }
 
-func (s *influxdb) Open() error {
+func (s *influxdbCluster) Open() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if !s.disableSubs {
@@ -234,7 +247,7 @@ func (s *influxdb) Open() error {
 	return nil
 }
 
-func (s *influxdb) Close() error {
+func (s *influxdbCluster) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -252,19 +265,19 @@ func (s *influxdb) Close() error {
 	return lastErr
 }
 
-func (s *influxdb) Addr() string {
+func (s *influxdbCluster) Addr() string {
 	config := s.configs[s.i]
 	s.i = (s.i + 1) % len(s.configs)
-	return config.Addr
+	return config.URL
 }
 
-func (s *influxdb) NewClient() (c client.Client, err error) {
+func (s *influxdbCluster) NewClient() (c influxdb.Client, err error) {
 	tries := 0
 	for tries < len(s.configs) {
 		tries++
 		config := s.configs[s.i]
 		s.i = (s.i + 1) % len(s.configs)
-		c, err = client.NewHTTPClient(config)
+		c, err = s.ClientCreator.Create(config)
 		if err != nil {
 			continue
 		}
@@ -277,13 +290,13 @@ func (s *influxdb) NewClient() (c client.Client, err error) {
 	return
 }
 
-func (s *influxdb) linkSubscriptions() error {
+func (s *influxdbCluster) linkSubscriptions() error {
 	s.logger.Println("D! linking subscriptions")
 	b := backoff.NewExponentialBackOff()
 	b.MaxElapsedTime = s.startupTimeout
 	ticker := backoff.NewTicker(b)
 	var err error
-	var cli client.Client
+	var cli influxdb.Client
 	for range ticker.C {
 		cli, err = s.NewClient()
 		if err != nil {
@@ -532,7 +545,7 @@ func (s *influxdb) linkSubscriptions() error {
 	return nil
 }
 
-func (s *influxdb) generateRandomToken() (string, error) {
+func (s *influxdbCluster) generateRandomToken() (string, error) {
 	tokenBytes := make([]byte, tokenSize)
 	if _, err := io.ReadFull(rand.Reader, tokenBytes); err != nil {
 		return "", err
@@ -540,7 +553,7 @@ func (s *influxdb) generateRandomToken() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(tokenBytes), nil
 }
 
-func (s *influxdb) createSub(cli client.Client, name, cluster, rp, mode string, destinations []string) (err error) {
+func (s *influxdbCluster) createSub(cli influxdb.Client, name, cluster, rp, mode string, destinations []string) (err error) {
 	var buf bytes.Buffer
 	for i, dst := range destinations {
 		if i != 0 {
@@ -563,7 +576,7 @@ func (s *influxdb) createSub(cli client.Client, name, cluster, rp, mode string, 
 	return
 
 }
-func (s *influxdb) dropSub(cli client.Client, name, cluster, rp string) (err error) {
+func (s *influxdbCluster) dropSub(cli influxdb.Client, name, cluster, rp string) (err error) {
 	_, err = s.execQuery(
 		cli,
 		&influxql.DropSubscriptionStatement{
@@ -575,7 +588,7 @@ func (s *influxdb) dropSub(cli client.Client, name, cluster, rp string) (err err
 	return
 }
 
-func (s *influxdb) startUDPListener(cluster, rp, port string) (*net.UDPAddr, error) {
+func (s *influxdbCluster) startUDPListener(cluster, rp, port string) (*net.UDPAddr, error) {
 	c := udp.Config{}
 	c.Enabled = true
 	c.BindAddress = fmt.Sprintf("%s:%s", s.udpBind, port)
@@ -596,8 +609,8 @@ func (s *influxdb) startUDPListener(cluster, rp, port string) (*net.UDPAddr, err
 	return service.Addr(), nil
 }
 
-func (s *influxdb) execQuery(cli client.Client, q influxql.Statement) (*client.Response, error) {
-	query := client.Query{
+func (s *influxdbCluster) execQuery(cli influxdb.Client, q influxql.Statement) (*influxdb.Response, error) {
+	query := influxdb.Query{
 		Command: q.String(),
 	}
 	resp, err := cli.Query(query)

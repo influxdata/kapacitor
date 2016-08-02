@@ -7,8 +7,8 @@ import (
 	"sort"
 	"time"
 
-	client "github.com/influxdata/influxdb/client/v2"
 	"github.com/influxdata/influxdb/models"
+	"github.com/influxdata/kapacitor/influxdb"
 )
 
 // A point in batch, similar to Point but most information is
@@ -134,7 +134,7 @@ func BatchToRow(b Batch) (row *models.Row) {
 	return
 }
 
-func ResultToBatches(res client.Result, groupByName bool) ([]Batch, error) {
+func ResultToBatches(res influxdb.Result, groupByName bool) ([]Batch, error) {
 	if res.Err != "" {
 		return nil, errors.New(res.Err)
 	}

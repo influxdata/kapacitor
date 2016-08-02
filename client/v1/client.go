@@ -714,6 +714,7 @@ func (c *Client) CreateTask(opt CreateTaskOptions) (Task, error) {
 	if err != nil {
 		return Task{}, err
 	}
+	req.Header.Set("Content-Type", "application/json")
 
 	t := Task{}
 	_, err = c.Do(req, &t, http.StatusOK)
@@ -752,6 +753,7 @@ func (c *Client) UpdateTask(link Link, opt UpdateTaskOptions) (Task, error) {
 	if err != nil {
 		return t, err
 	}
+	req.Header.Set("Content-Type", "application/json")
 
 	_, err = c.Do(req, &t, http.StatusOK)
 	if err != nil {
@@ -927,6 +929,7 @@ func (c *Client) CreateTemplate(opt CreateTemplateOptions) (Template, error) {
 	if err != nil {
 		return Template{}, err
 	}
+	req.Header.Set("Content-Type", "application/json")
 
 	t := Template{}
 	_, err = c.Do(req, &t, http.StatusOK)
@@ -961,6 +964,7 @@ func (c *Client) UpdateTemplate(link Link, opt UpdateTemplateOptions) (Template,
 	if err != nil {
 		return t, err
 	}
+	req.Header.Set("Content-Type", "application/json")
 
 	_, err = c.Do(req, &t, http.StatusOK)
 	if err != nil {
@@ -1140,6 +1144,7 @@ func (c *Client) RecordStream(opt RecordStreamOptions) (Recording, error) {
 	if err != nil {
 		return r, err
 	}
+	req.Header.Set("Content-Type", "application/json")
 
 	_, err = c.Do(req, &r, http.StatusCreated)
 	if err != nil {
@@ -1174,6 +1179,7 @@ func (c *Client) RecordBatch(opt RecordBatchOptions) (Recording, error) {
 	if err != nil {
 		return r, err
 	}
+	req.Header.Set("Content-Type", "application/json")
 
 	_, err = c.Do(req, &r, http.StatusCreated)
 	if err != nil {
@@ -1209,6 +1215,7 @@ func (c *Client) RecordQuery(opt RecordQueryOptions) (Recording, error) {
 	if err != nil {
 		return r, err
 	}
+	req.Header.Set("Content-Type", "application/json")
 
 	_, err = c.Do(req, &r, http.StatusCreated)
 	if err != nil {
@@ -1322,6 +1329,7 @@ func (c *Client) CreateReplay(opt CreateReplayOptions) (Replay, error) {
 	if err != nil {
 		return r, err
 	}
+	req.Header.Set("Content-Type", "application/json")
 
 	_, err = c.Do(req, &r, http.StatusCreated)
 	if err != nil {
@@ -1357,6 +1365,7 @@ func (c *Client) ReplayBatch(opt ReplayBatchOptions) (Replay, error) {
 	if err != nil {
 		return r, err
 	}
+	req.Header.Set("Content-Type", "application/json")
 
 	_, err = c.Do(req, &r, http.StatusCreated)
 	if err != nil {
@@ -1392,6 +1401,7 @@ func (c *Client) ReplayQuery(opt ReplayQueryOptions) (Replay, error) {
 	if err != nil {
 		return r, err
 	}
+	req.Header.Set("Content-Type", "application/json")
 
 	_, err = c.Do(req, &r, http.StatusCreated)
 	if err != nil {
@@ -1517,6 +1527,7 @@ func (c *Client) LogLevel(level string) error {
 	if err != nil {
 		return err
 	}
+	req.Header.Set("Content-Type", "application/json")
 
 	_, err = c.Do(req, nil, http.StatusNoContent)
 	return err
