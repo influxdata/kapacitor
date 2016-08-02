@@ -48,6 +48,10 @@ func (s *Service) GrantSubscriptionAccess(token, db, rp string) error {
 	return nil
 }
 
+func (s *Service) ListSubscriptionTokens() ([]string, error) {
+	return nil, nil
+}
+
 func (s *Service) RevokeSubscriptionAccess(token string) error {
 	return nil
 }

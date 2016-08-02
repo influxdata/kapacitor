@@ -22,6 +22,7 @@ import (
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/pkg/errors"
 )
@@ -49,6 +50,7 @@ type Service struct {
 
 	AuthService interface {
 		GrantSubscriptionAccess(token, db, rp string) error
+		ListSubscriptionTokens() ([]string, error)
 		RevokeSubscriptionAccess(token string) error
 	}
 	logger *log.Logger
@@ -191,6 +193,7 @@ type influxdb struct {
 	}
 	AuthService interface {
 		GrantSubscriptionAccess(token, db, rp string) error
+		ListSubscriptionTokens() ([]string, error)
 		RevokeSubscriptionAccess(token string) error
 	}
 
@@ -295,6 +298,18 @@ func (s *influxdb) linkSubscriptions() error {
 	}
 
 	numSubscriptions := int64(0)
+
+	var revokeTokens map[string]bool
+	if s.useTokens {
+		tokens, err := s.AuthService.ListSubscriptionTokens()
+		if err != nil {
+			return errors.Wrap(err, "getting existing subscription tokens")
+		}
+		revokeTokens = make(map[string]bool, len(tokens))
+		for _, token := range tokens {
+			revokeTokens[token] = true
+		}
+	}
 
 	// Get all databases and retention policies
 	var allSubs []subEntry
@@ -407,15 +422,23 @@ func (s *influxdb) linkSubscriptions() error {
 					if host != s.hostname ||
 						u.Scheme != s.protocol ||
 						((u.Scheme == "http" || u.Scheme == "https") && int(pn) != s.httpPort) ||
-						(s.useTokens && u.User == nil) {
+						(s.useTokens && (u.User == nil || u.User.Username() != httpd.SubscriptionUser)) {
 						// Remove access for changing subscriptions.
 						if u.User != nil {
-							s.AuthService.RevokeSubscriptionAccess(u.User.Username())
+							if p, ok := u.User.Password(); ok {
+								s.AuthService.RevokeSubscriptionAccess(p)
+							}
 						}
 						// Something changed, drop the sub and let it get recreated
 						s.dropSub(cli, se.name, se.cluster, se.rp)
 					} else {
 						existingSubs[se] = si
+						// Do not revoke tokens that are still in use
+						if u.User != nil {
+							if t, ok := u.User.Password(); ok {
+								revokeTokens[t] = false
+							}
+						}
 					}
 				}
 			}
@@ -467,9 +490,18 @@ func (s *influxdb) linkSubscriptions() error {
 					if err != nil {
 						return err
 					}
-					destination = fmt.Sprintf("%s://%s@%s:%d", s.protocol, token, s.hostname, s.httpPort)
+					u := url.URL{
+						Scheme: s.protocol,
+						User:   url.UserPassword(httpd.SubscriptionUser, token),
+						Host:   fmt.Sprintf("%s:%d", s.hostname, s.httpPort),
+					}
+					destination = u.String()
 				} else {
-					destination = fmt.Sprintf("%s://%s:%d", s.protocol, s.hostname, s.httpPort)
+					u := url.URL{
+						Scheme: s.protocol,
+						Host:   fmt.Sprintf("%s:%d", s.hostname, s.httpPort),
+					}
+					destination = u.String()
 				}
 			case "udp":
 				addr, err := s.startUDPListener(se.cluster, se.rp, "0")
@@ -486,6 +518,13 @@ func (s *influxdb) linkSubscriptions() error {
 				return err
 			}
 			s.runningSubs[se] = true
+		}
+	}
+
+	// revoke any extra tokens
+	for t, revoke := range revokeTokens {
+		if revoke {
+			s.AuthService.RevokeSubscriptionAccess(t)
 		}
 	}
 
