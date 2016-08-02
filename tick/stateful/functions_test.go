@@ -385,6 +385,7 @@ func Test_String(t *testing.T) {
 		t.Errorf("unexpected error from call to string() got %s exp %s", got, expErr)
 	}
 }
+
 func Test_Duration(t *testing.T) {
 	f := &duration{}
 
@@ -483,5 +484,65 @@ func Test_Duration(t *testing.T) {
 		} else {
 			t.Errorf("expected duration result from duration(%v) got %T", tc.args, result)
 		}
+	}
+}
+
+func Test_If(t *testing.T) {
+	f := &ifFunc{}
+
+	testCases := []struct {
+		args []interface{}
+		exp  interface{}
+		err  error
+	}{
+		// Error cases
+		{
+			args: []interface{}{true},
+			err:  errors.New("if expects exactly three arguments"),
+		},
+		{
+			args: []interface{}{true, 6},
+			err:  errors.New("if expects exactly three arguments"),
+		},
+		{
+			args: []interface{}{12, 6, false},
+			err:  errors.New("first argument to if must be a condition with type of bool - got int"),
+		},
+
+		// Simple if
+		{
+			args: []interface{}{true, 1, 2},
+			exp:  1,
+		},
+		{
+			args: []interface{}{false, 1, 2},
+			exp:  2,
+		},
+
+		// multiple types
+		{
+			args: []interface{}{false, 1, "1"},
+			err:  errors.New("Different return types are not supported - second argument is int and third argument is string"),
+		},
+	}
+
+	for _, tc := range testCases {
+		result, err := f.Call(tc.args...)
+		if tc.err != nil {
+			if err == nil {
+				t.Errorf("expected error from if(%v)\ngot: nil\nexp: exp %s", tc.args, tc.err)
+			} else if got, exp := err.Error(), tc.err.Error(); got != exp {
+				t.Errorf("unexpected error from if(%v)\ngot: %s\nexp: %s", tc.args, got, exp)
+			}
+			continue
+		} else if err != nil {
+			t.Errorf("unexpected error from if(%v) %s", tc.args, err)
+			continue
+		}
+
+		if result != tc.exp {
+			t.Errorf("unexpected result from if(%v)\ngot: %+v\nexp: %+v", tc.args, result, tc.exp)
+		}
+
 	}
 }
