@@ -18,6 +18,7 @@ import (
 	"github.com/influxdata/influxdb/services/opentsdb"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/auth"
+	iclient "github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/deadman"
 	"github.com/influxdata/kapacitor/services/hipchat"
@@ -219,6 +220,7 @@ func (s *Server) appendInfluxDBService() error {
 		srv.PointsWriter = s.TaskMaster
 		srv.LogService = s.LogService
 		srv.AuthService = s.AuthService
+		srv.ClientCreator = iclient.ClientCreator{}
 
 		s.InfluxDBService = srv
 		s.TaskMaster.InfluxDBService = srv

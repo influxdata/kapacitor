@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/gorhill/cronexpr"
-	client "github.com/influxdata/influxdb/client/v2"
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor/expvar"
+	"github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 )
@@ -269,7 +269,7 @@ func (b *QueryNode) doQuery() error {
 		return errors.New("InfluxDB not configured, cannot query InfluxDB for batch query")
 	}
 
-	var con client.Client
+	var con influxdb.Client
 	tickC := b.ticker.Start()
 	for {
 		select {
@@ -303,7 +303,7 @@ func (b *QueryNode) doQuery() error {
 					break
 				}
 			}
-			q := client.Query{
+			q := influxdb.Query{
 				Command: b.query.String(),
 			}
 

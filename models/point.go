@@ -3,6 +3,7 @@ package models
 import (
 	"bytes"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/influxdata/influxdb/models"
@@ -120,21 +121,6 @@ func (p *Point) UpdateGroup() {
 	p.Group = ToGroupID(p.Name, p.Tags, p.Dimensions)
 }
 
-// Returns byte array of a line protocol representation of the point
-func (p Point) Bytes(precision string) []byte {
-	mp, err := models.NewPoint(
-		p.Name,
-		map[string]string(p.Tags),
-		map[string]interface{}(p.Fields),
-		p.Time,
-	)
-	if err != nil {
-		panic(err)
-	}
-
-	return []byte(mp.PrecisionString(precision))
-}
-
 func SortedFields(fields Fields) []string {
 	a := make([]string, 0, len(fields))
 	for k := range fields {
@@ -176,6 +162,33 @@ func ToGroupID(name string, tags map[string]string, dims Dimensions) GroupID {
 
 	}
 	return GroupID(buf.Bytes())
+}
+
+// Returns byte array of a line protocol representation of the point
+func (p Point) Bytes(precision string) []byte {
+	key := models.MakeKey([]byte(p.Name), models.Tags(p.Tags))
+	fields := models.Fields(p.Fields).MarshalBinary()
+	kl := len(key)
+	fl := len(fields)
+	var bytes []byte
+
+	if p.Time.IsZero() {
+		bytes = make([]byte, fl+kl+1)
+		copy(bytes, key)
+		bytes[kl] = ' '
+		copy(bytes[kl+1:], fields)
+	} else {
+		timeStr := strconv.FormatInt(p.Time.UnixNano()/models.GetPrecisionMultiplier(precision), 10)
+		tl := len(timeStr)
+		bytes = make([]byte, fl+kl+tl+2)
+		copy(bytes, key)
+		bytes[kl] = ' '
+		copy(bytes[kl+1:], fields)
+		bytes[kl+fl+1] = ' '
+		copy(bytes[kl+fl+2:], []byte(timeStr))
+	}
+
+	return bytes
 }
 
 func PointToRow(p Point) (row *models.Row) {

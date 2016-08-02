@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	client "github.com/influxdata/influxdb/client/v2"
 	"github.com/influxdata/kapacitor/expvar"
+	"github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 )
@@ -98,12 +98,11 @@ func (i *InfluxDBOutNode) write(db, rp string, batch models.Batch) error {
 		name = batch.Name
 	}
 
-	var err error
-	points := make([]*client.Point, len(batch.Points))
+	points := make([]influxdb.Point, len(batch.Points))
 	for j, p := range batch.Points {
-		var tags models.Tags
+		var tags map[string]string
 		if len(i.i.Tags) > 0 {
-			tags = make(models.Tags, len(p.Tags)+len(i.i.Tags))
+			tags = make(map[string]string, len(p.Tags)+len(i.i.Tags))
 			for k, v := range p.Tags {
 				tags[k] = v
 			}
@@ -113,17 +112,14 @@ func (i *InfluxDBOutNode) write(db, rp string, batch models.Batch) error {
 		} else {
 			tags = p.Tags
 		}
-		points[j], err = client.NewPoint(
-			name,
-			tags,
-			p.Fields,
-			p.Time,
-		)
-		if err != nil {
-			return err
+		points[j] = influxdb.Point{
+			Name:   name,
+			Tags:   tags,
+			Fields: p.Fields,
+			Time:   p.Time,
 		}
 	}
-	bpc := client.BatchPointsConfig{
+	bpc := influxdb.BatchPointsConfig{
 		Database:         db,
 		RetentionPolicy:  rp,
 		WriteConsistency: i.i.WriteConsistency,
@@ -138,21 +134,21 @@ type writeBuffer struct {
 	flushInterval time.Duration
 	errC          chan error
 	queue         chan queueEntry
-	buffer        map[client.BatchPointsConfig]client.BatchPoints
+	buffer        map[influxdb.BatchPointsConfig]influxdb.BatchPoints
 
 	flushing chan struct{}
 	flushed  chan struct{}
 
 	stopping chan struct{}
 	wg       sync.WaitGroup
-	conn     client.Client
+	conn     influxdb.Client
 
 	i *InfluxDBOutNode
 }
 
 type queueEntry struct {
-	bpc    client.BatchPointsConfig
-	points []*client.Point
+	bpc    influxdb.BatchPointsConfig
+	points []influxdb.Point
 }
 
 func newWriteBuffer(size int, flushInterval time.Duration) *writeBuffer {
@@ -162,12 +158,12 @@ func newWriteBuffer(size int, flushInterval time.Duration) *writeBuffer {
 		flushing:      make(chan struct{}),
 		flushed:       make(chan struct{}),
 		queue:         make(chan queueEntry),
-		buffer:        make(map[client.BatchPointsConfig]client.BatchPoints),
+		buffer:        make(map[influxdb.BatchPointsConfig]influxdb.BatchPoints),
 		stopping:      make(chan struct{}),
 	}
 }
 
-func (w *writeBuffer) enqueue(bpc client.BatchPointsConfig, points []*client.Point) {
+func (w *writeBuffer) enqueue(bpc influxdb.BatchPointsConfig, points []influxdb.Point) {
 	qe := queueEntry{
 		bpc:    bpc,
 		points: points,
@@ -204,7 +200,7 @@ func (w *writeBuffer) run() {
 			// Read incoming points off queue
 			bp, ok := w.buffer[qe.bpc]
 			if !ok {
-				bp, err = client.NewBatchPoints(qe.bpc)
+				bp, err = influxdb.NewBatchPoints(qe.bpc)
 				if err != nil {
 					w.i.logger.Println("E! failed to write points to InfluxDB:", err)
 					break
@@ -244,7 +240,7 @@ func (w *writeBuffer) writeAll() {
 	}
 }
 
-func (w *writeBuffer) write(bp client.BatchPoints) error {
+func (w *writeBuffer) write(bp influxdb.BatchPoints) error {
 	var err error
 	if w.conn == nil {
 		if w.i.i.Cluster != "" {

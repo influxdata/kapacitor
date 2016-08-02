@@ -11,9 +11,9 @@ import (
 	"reflect"
 	"time"
 
-	client "github.com/influxdata/influxdb/client/v2"
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/services/logging"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/wlog"
@@ -30,12 +30,12 @@ func NewMockInfluxDBService(h http.Handler) *MockInfluxDBService {
 	}
 }
 
-func (m *MockInfluxDBService) NewDefaultClient() (client.Client, error) {
-	return client.NewHTTPClient(client.HTTPConfig{
-		Addr: m.ts.URL,
+func (m *MockInfluxDBService) NewDefaultClient() (influxdb.Client, error) {
+	return influxdb.NewHTTPClient(influxdb.HTTPConfig{
+		URL: m.ts.URL,
 	})
 }
-func (m *MockInfluxDBService) NewNamedClient(name string) (client.Client, error) {
+func (m *MockInfluxDBService) NewNamedClient(name string) (influxdb.Client, error) {
 	return m.NewDefaultClient()
 }
 
