@@ -11,6 +11,7 @@
 - [#783](https://github.com/influxdata/kapacitor/pull/783): Fix panic when revoking tokens not already defined.
 - [#784](https://github.com/influxdata/kapacitor/pull/784): Fix several issues with comment formatting in TICKscript.
 
+- [#772](https://github.com/influxdata/kapacitor/issues/772): Delete task snapshot data when a task is deleted.
 
 ## v1.0.0-beta4 [2016-07-27]
 
