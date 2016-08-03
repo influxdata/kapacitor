@@ -1,0 +1,44 @@
+// disk_alert_stream
+
+// metric: used_percent
+// available_fields: free","inodes_free","inodes_total","inodes_used","total","used"
+
+// TELEGRAF CONFIGURATION
+// [[inputs.disk]]
+//   ignore_fs = ["tmpfs", "devtmpfs"]
+
+// DEFINE: kapacitor define disk_alert_stream -type stream -tick disk/disk_alert_stream.tick -dbrp telegraf.autogen
+// ENABLE: kapacitor enable disk_alert_stream
+
+// Parameters
+var info = 75 
+var warn = 85
+var crit = 92
+var period = 10s
+var every = 10s
+
+// Dataframe
+var data = stream
+  |from()
+    .database('telegraf')
+    .retentionPolicy('autogen')
+    .measurement('mem')
+    .groupBy('host')
+  |window()
+    .period(period)
+    .every(every)
+  |mean('used_percent')
+    .as('stat')
+
+// Thresholds
+var alert = data
+  |alert()
+    .id('{{ index .Tags "host"}}/disk_used:')
+    .message('{{ .ID }}{{ index .Fields "stat" }}')
+    .info(lambda: "stat" > info)
+    .warn(lambda: "stat" > warn)
+    .crit(lambda: "stat" > crit)
+
+// Alert
+alert
+  .log('/tmp/mem_alert_log.txt')
