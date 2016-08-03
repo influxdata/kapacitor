@@ -1,4 +1,4 @@
-/var/log/kapacitor/kapacitor.err {
+/var/log/kapacitor/kapacitor.log {
     daily
     rotate 7
     missingok
