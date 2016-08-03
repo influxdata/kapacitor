@@ -1,0 +1,49 @@
+// netstat_alert_stream
+
+// metric: 'tcp_established'
+// available_fields:  "tcp_close","tcp_close_wait","tcp_closing","tcp_established","tcp_fin_wait1","tcp_fin_wait2","tcp_last_ack","tcp_listen","tcp_none","tcp_syn_recv","cp_syn_sent","tcp_time_wait","udp_socket","tcp_listen"
+
+// TELEGRAF CONFIGURATION
+// [[inputs.netstat]]
+
+// DEFINE: kapacitor define netstat_alert_stream -type stream -tick netstat/netstat_alert_stream.tick -dbrp telegraf.autogen
+// ENABLE: kapacitor enable netstat_alert_stream
+
+// Parameters
+var info = 20
+var warn = 40
+var crit = 60
+var infoSig = 2.5
+var warnSig = 3
+var critSig = 3.5
+var period = 10s
+var every = 10s
+
+// Dataframe
+var data = stream
+  |from()
+    .database('telegraf')
+    .retentionPolicy('autogen')
+    .measurement('netstat')
+    .groupBy('host')
+  |window()
+    .period(period)
+    .every(every)
+  |mean('tcp_established')
+    .as('stat')
+    
+// Thresholds
+var alert = data
+  |eval(lambda: sigma("stat"))
+    .as('sigma')
+    .keep()
+  |alert()
+    .id('{{ index .Tags "host"}}/tcp_conns')
+    .message('{{ .ID }}:{{ index .Fields "stat" }}')
+    .info(lambda: "stat" > info OR "sigma" > infoSig)
+    .warn(lambda: "stat" > warn OR "sigma" > warnSig)
+    .crit(lambda: "stat" > crit OR "sigma" > critSig)
+
+// Alert
+alert
+  .log('/tmp/netstat_alert_stream_log.txt')
