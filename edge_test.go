@@ -10,7 +10,7 @@ import (
 	"github.com/influxdata/wlog"
 )
 
-func Benchmark_CollectPoint(b *testing.B) {
+func BenchmarkCollectPoint(b *testing.B) {
 	name := "point"
 	b.ReportAllocs()
 	ls := &logService{}

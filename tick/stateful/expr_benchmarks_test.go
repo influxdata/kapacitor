@@ -19,10 +19,10 @@ import (
 	isolation performance overhead of reference node
 
     Test name format:
-        Benchmark_{Evaluation type: EvalBool or EvalNum}_{Type: OneOperator, TwoOperator}_{LeftNode}_{RightNode}
+        Benchmark{Evaluation type: EvalBool or EvalNum}_{Type: OneOperator, TwoOperator}_{LeftNode}_{RightNode}
 */
 
-func Benchmark_EvalBool_OneOperator_UnaryNode_BoolNode(b *testing.B) {
+func BenchmarkEvalBool_OneOperator_UnaryNode_BoolNode(b *testing.B) {
 
 	emptyScope := stateful.NewScope()
 	benchmarkEvalBool(b, emptyScope, &ast.UnaryNode{
@@ -33,7 +33,7 @@ func Benchmark_EvalBool_OneOperator_UnaryNode_BoolNode(b *testing.B) {
 	})
 }
 
-func Benchmark_EvalBool_OneOperator_UnaryNode_ReferenceNode(b *testing.B) {
+func BenchmarkEvalBool_OneOperator_UnaryNode_ReferenceNode(b *testing.B) {
 
 	scope := stateful.NewScope()
 	scope.Set("value", bool(false))
@@ -46,7 +46,7 @@ func Benchmark_EvalBool_OneOperator_UnaryNode_ReferenceNode(b *testing.B) {
 	})
 }
 
-func Benchmark_EvalBool_OneOperator_NumberFloat64_NumberFloat64(b *testing.B) {
+func BenchmarkEvalBool_OneOperator_NumberFloat64_NumberFloat64(b *testing.B) {
 
 	emptyScope := stateful.NewScope()
 	benchmarkEvalBool(b, emptyScope, &ast.BinaryNode{
@@ -62,7 +62,7 @@ func Benchmark_EvalBool_OneOperator_NumberFloat64_NumberFloat64(b *testing.B) {
 	})
 }
 
-func Benchmark_EvalBool_OneOperator_NumberFloat64_NumberInt64(b *testing.B) {
+func BenchmarkEvalBool_OneOperator_NumberFloat64_NumberInt64(b *testing.B) {
 
 	emptyScope := stateful.NewScope()
 	benchmarkEvalBool(b, emptyScope, &ast.BinaryNode{
@@ -78,7 +78,7 @@ func Benchmark_EvalBool_OneOperator_NumberFloat64_NumberInt64(b *testing.B) {
 	})
 }
 
-func Benchmark_EvalBool_OneOperator_NumberInt64_NumberInt64(b *testing.B) {
+func BenchmarkEvalBool_OneOperator_NumberInt64_NumberInt64(b *testing.B) {
 	emptyScope := stateful.NewScope()
 	benchmarkEvalBool(b, emptyScope, &ast.BinaryNode{
 		Operator: ast.TokenGreater,
@@ -93,7 +93,7 @@ func Benchmark_EvalBool_OneOperator_NumberInt64_NumberInt64(b *testing.B) {
 	})
 }
 
-func Benchmark_EvalBool_OneOperator_UnaryNode(b *testing.B) {
+func BenchmarkEvalBool_OneOperator_UnaryNode(b *testing.B) {
 
 	scope := stateful.NewScope()
 	scope.Set("value", bool(true))
@@ -112,7 +112,7 @@ func Benchmark_EvalBool_OneOperator_UnaryNode(b *testing.B) {
 	})
 }
 
-func Benchmark_EvalBool_OneOperator_ReferenceNodeFloat64_NumberFloat64(b *testing.B) {
+func BenchmarkEvalBool_OneOperator_ReferenceNodeFloat64_NumberFloat64(b *testing.B) {
 
 	scope := stateful.NewScope()
 	scope.Set("value", float64(20))
@@ -129,7 +129,7 @@ func Benchmark_EvalBool_OneOperator_ReferenceNodeFloat64_NumberFloat64(b *testin
 	})
 }
 
-func Benchmark_EvalBool_OneOperator_ReferenceNodeFloat64_NumberInt64(b *testing.B) {
+func BenchmarkEvalBool_OneOperator_ReferenceNodeFloat64_NumberInt64(b *testing.B) {
 
 	scope := stateful.NewScope()
 	scope.Set("value", float64(20))
@@ -146,7 +146,7 @@ func Benchmark_EvalBool_OneOperator_ReferenceNodeFloat64_NumberInt64(b *testing.
 	})
 }
 
-func Benchmark_EvalBool_OneOperator_ReferenceNodeFloat64_ReferenceNodeFloat64(b *testing.B) {
+func BenchmarkEvalBool_OneOperator_ReferenceNodeFloat64_ReferenceNodeFloat64(b *testing.B) {
 
 	scope := stateful.NewScope()
 	scope.Set("l", float64(20))
@@ -162,7 +162,7 @@ func Benchmark_EvalBool_OneOperator_ReferenceNodeFloat64_ReferenceNodeFloat64(b 
 	})
 }
 
-func Benchmark_EvalBool_OneOperatorWith11ScopeItem_ReferenceNodeFloat64_NumberFloat64(b *testing.B) {
+func BenchmarkEvalBool_OneOperatorWith11ScopeItem_ReferenceNodeFloat64_NumberFloat64(b *testing.B) {
 
 	scope := stateful.NewScope()
 	scope.Set("value", float64(20))
@@ -182,7 +182,7 @@ func Benchmark_EvalBool_OneOperatorWith11ScopeItem_ReferenceNodeFloat64_NumberFl
 	})
 }
 
-func Benchmark_EvalBool_OneOperatorValueChanges_ReferenceNodeFloat64_NumberFloat64(b *testing.B) {
+func BenchmarkEvalBool_OneOperatorValueChanges_ReferenceNodeFloat64_NumberFloat64(b *testing.B) {
 
 	scope := stateful.NewScope()
 	initialValue := float64(20)
@@ -234,7 +234,7 @@ func Benchmark_EvalBool_OneOperatorValueChanges_ReferenceNodeFloat64_NumberFloat
 	evalBoolResult = result
 }
 
-func Benchmark_EvalBool_OneOperator_ReferenceNodeInt64_ReferenceNodeInt64(b *testing.B) {
+func BenchmarkEvalBool_OneOperator_ReferenceNodeInt64_ReferenceNodeInt64(b *testing.B) {
 
 	scope := stateful.NewScope()
 	scope.Set("l", int64(20))
@@ -251,7 +251,7 @@ func Benchmark_EvalBool_OneOperator_ReferenceNodeInt64_ReferenceNodeInt64(b *tes
 	})
 }
 
-func Benchmark_EvalBool_OneOperatorWith11ScopeItem_ReferenceNodeInt64_NumberInt64(b *testing.B) {
+func BenchmarkEvalBool_OneOperatorWith11ScopeItem_ReferenceNodeInt64_NumberInt64(b *testing.B) {
 
 	scope := stateful.NewScope()
 	scope.Set("value", int64(20))
@@ -271,7 +271,7 @@ func Benchmark_EvalBool_OneOperatorWith11ScopeItem_ReferenceNodeInt64_NumberInt6
 	})
 }
 
-func Benchmark_EvalBool_TwoLevelDeep(b *testing.B) {
+func BenchmarkEvalBool_TwoLevelDeep(b *testing.B) {
 	scope := stateful.NewScope()
 	scope.Set("a", float64(11))
 	scope.Set("b", float64(8))
@@ -303,7 +303,7 @@ func Benchmark_EvalBool_TwoLevelDeep(b *testing.B) {
 	})
 }
 
-func Benchmark_EvalBool_OneOperatorValueChanges_ReferenceNodeInt64_NumberInt64(b *testing.B) {
+func BenchmarkEvalBool_OneOperatorValueChanges_ReferenceNodeInt64_NumberInt64(b *testing.B) {
 
 	scope := stateful.NewScope()
 	initialValue := int64(20)
