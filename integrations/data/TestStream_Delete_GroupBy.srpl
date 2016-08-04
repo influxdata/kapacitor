@@ -1,0 +1,27 @@
+dbname
+rpname
+cpu,type=idle,host=serverA value=9,anothervalue=4.2 0000000001
+dbname
+rpname
+cpu,type=system,host=serverB value=6,anothervalue=24 0000000001
+dbname
+rpname
+cpu,type=user,host=serverC value=3,anothervalue=42 0000000001
+dbname
+rpname
+cpu,type=system,host=serverA value=9,anothervalue=4.2 0000000002
+dbname
+rpname
+cpu,type=user,host=serverB value=6,anothervalue=24 0000000002
+dbname
+rpname
+cpu,type=idle,host=serverC value=3,anothervalue=42 0000000002
+dbname
+rpname
+cpu,type=system,host=serverA value=9,anothervalue=4.2 0000000003
+dbname
+rpname
+cpu,type=user,host=serverB value=6,anothervalue=24 0000000003
+dbname
+rpname
+cpu,type=idle,host=serverC value=3,anothervalue=42 0000000003

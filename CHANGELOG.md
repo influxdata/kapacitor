@@ -10,6 +10,7 @@
 
 - [#783](https://github.com/influxdata/kapacitor/pull/783): Fix panic when revoking tokens not already defined.
 - [#784](https://github.com/influxdata/kapacitor/pull/784): Fix several issues with comment formatting in TICKscript.
+- [#786](https://github.com/influxdata/kapacitor/issues/786): Deleting tags now updates the group by dimensions if needed.
 
 
 ## v1.0.0-beta4 [2016-07-27]

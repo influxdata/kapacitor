@@ -19,6 +19,8 @@ type DeleteNode struct {
 
 	fieldsDeleted *expvar.Int
 	tagsDeleted   *expvar.Int
+
+	tags map[string]bool
 }
 
 // Create a new  DeleteNode which applies a transformation func to each point in a stream and returns a single point.
@@ -26,6 +28,10 @@ func newDeleteNode(et *ExecutingTask, n *pipeline.DeleteNode, l *log.Logger) (*D
 	dn := &DeleteNode{
 		node: node{Node: n, et: et, logger: l},
 		d:    n,
+		tags: make(map[string]bool),
+	}
+	for _, tag := range n.Tags {
+		dn.tags[tag] = true
 	}
 	dn.node.runF = dn.runDelete
 	return dn, nil
@@ -42,6 +48,24 @@ func (e *DeleteNode) runDelete(snapshot []byte) error {
 		for p, ok := e.ins[0].NextPoint(); ok; p, ok = e.ins[0].NextPoint() {
 			e.timer.Start()
 			p.Fields, p.Tags = e.doDeletes(p.Fields, p.Tags)
+			// Check if we deleted a group by dimension
+			updateDims := false
+			for _, dim := range p.Dimensions.TagNames {
+				if !e.tags[dim] {
+					updateDims = true
+					break
+				}
+			}
+			if updateDims {
+				newDims := make([]string, 0, len(p.Dimensions.TagNames))
+				for _, dim := range p.Dimensions.TagNames {
+					if !e.tags[dim] {
+						newDims = append(newDims, dim)
+					}
+				}
+				p.Dimensions.TagNames = newDims
+				p.Group = models.ToGroupID(p.Name, p.Tags, p.Dimensions)
+			}
 			e.timer.Stop()
 			for _, child := range e.outs {
 				err := child.CollectPoint(p)
@@ -55,6 +79,11 @@ func (e *DeleteNode) runDelete(snapshot []byte) error {
 			e.timer.Start()
 			for i := range b.Points {
 				b.Points[i].Fields, b.Points[i].Tags = e.doDeletes(b.Points[i].Fields, b.Points[i].Tags)
+			}
+			_, newTags := e.doDeletes(nil, b.Tags)
+			if len(newTags) != len(b.Tags) {
+				b.Tags = newTags
+				b.Group = models.ToGroupID(b.Name, b.Tags, b.PointDimensions())
 			}
 			e.timer.Stop()
 			for _, child := range e.outs {
