@@ -312,16 +312,13 @@ func (s *influxdbCluster) linkSubscriptions() error {
 
 	numSubscriptions := int64(0)
 
-	var revokeTokens map[string]bool
-	if s.useTokens {
-		tokens, err := s.AuthService.ListSubscriptionTokens()
-		if err != nil {
-			return errors.Wrap(err, "getting existing subscription tokens")
-		}
-		revokeTokens = make(map[string]bool, len(tokens))
-		for _, token := range tokens {
-			revokeTokens[token] = true
-		}
+	tokens, err := s.AuthService.ListSubscriptionTokens()
+	if err != nil {
+		return errors.Wrap(err, "getting existing subscription tokens")
+	}
+	revokeTokens := make(map[string]bool, len(tokens))
+	for _, token := range tokens {
+		revokeTokens[token] = true
 	}
 
 	// Get all databases and retention policies
