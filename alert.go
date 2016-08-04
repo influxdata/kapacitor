@@ -591,29 +591,28 @@ func (a *AlertNode) handleAlert(ad *AlertData) {
 }
 
 func (a *AlertNode) determineLevel(now time.Time, fields models.Fields, tags map[string]string, currentLevel AlertLevel) AlertLevel {
-	// Evaluate reset expression of current level if it exists
-	if cse := a.levelResets[currentLevel]; cse != nil {
-		if pass, err := EvalPredicate(cse, a.lrScopePools[currentLevel], now, fields, tags); err != nil {
+	if higherLevel, err := a.findFirstMatchLevel(CritAlert, currentLevel-1, now, fields, tags); err == nil {
+		return higherLevel
+	}
+	if rse := a.levelResets[currentLevel]; rse != nil {
+		if pass, err := EvalPredicate(rse, a.lrScopePools[currentLevel], now, fields, tags); err != nil {
 			a.logger.Printf("E! error evaluating reset expression for current level %v: %s", currentLevel, err)
 		} else if !pass {
-			for l := len(a.levels) - 1; l >= 0; l-- {
-				se := a.levels[l]
-				if se == nil {
-					continue
-				}
-				if pass, err := EvalPredicate(se, a.scopePools[l], now, fields, tags); err != nil {
-					a.logger.Printf("E! error evaluating expression for level %v: %s", AlertLevel(l), err)
-					continue
-				} else if pass {
-					if currentLevel < AlertLevel(l) {
-						return AlertLevel(l)
-					}
-				}
-			}
 			return currentLevel
+		} else {
+			if newLevel, err := a.findFirstMatchLevel(currentLevel-1, OKAlert, now, fields, tags); err == nil {
+				return newLevel
+			}
 		}
 	}
-	for l := len(a.levels) - 1; l >= 0; l-- {
+	return OKAlert
+}
+
+func (a *AlertNode) findFirstMatchLevel(start AlertLevel, stop AlertLevel, now time.Time, fields models.Fields, tags map[string]string) (AlertLevel, error) {
+	if stop < OKAlert {
+		stop = OKAlert
+	}
+	for l := start; l > stop; l-- {
 		se := a.levels[l]
 		if se == nil {
 			continue
@@ -622,10 +621,10 @@ func (a *AlertNode) determineLevel(now time.Time, fields models.Fields, tags map
 			a.logger.Printf("E! error evaluating expression for level %v: %s", AlertLevel(l), err)
 			continue
 		} else if pass {
-			return AlertLevel(l)
+			return AlertLevel(l), nil
 		}
 	}
-	return OKAlert
+	return OKAlert, errors.New("No match found")
 }
 
 func (a *AlertNode) batchToResult(b models.Batch) influxql.Result {
