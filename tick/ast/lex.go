@@ -592,7 +592,18 @@ func lexComment(l *lexer) stateFn {
 
 	for {
 		switch r := l.next(); {
-		case r == '\n' || r == eof:
+		case r == '\n':
+			// consume a contiguous block of spaces except newlines.
+			n := l.next()
+			for ; n != '\n' && isSpace(n); n = l.next() {
+			}
+			if n == '/' {
+				// We still have more comment lines
+				continue
+			}
+			l.backup()
+			fallthrough
+		case r == eof:
 			l.emit(TokenComment)
 			return lexToken
 		}

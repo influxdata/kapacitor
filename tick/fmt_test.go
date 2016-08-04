@@ -131,6 +131,53 @@ AND
 `,
 		},
 		{
+			script: `// Preserve comments spacing
+
+// Comment block 1
+// still 1
+
+// Comment block 2
+// still 2
+
+// Preserve per line spacing
+//     indented
+//fix this line
+//
+
+
+var x = stream
+	|from()
+		//.measurement('mem')
+		.measurement('cpu')
+
+// This should be its own comment block
+x |alert()
+	
+
+`,
+			exp: `// Preserve comments spacing
+
+// Comment block 1
+// still 1
+
+// Comment block 2
+// still 2
+
+// Preserve per line spacing
+//     indented
+// fix this line
+//
+var x = stream
+    |from()
+        // .measurement('mem')
+        .measurement('cpu')
+
+// This should be its own comment block
+x
+    |alert()
+`,
+		},
+		{
 			script: `// Comment all the things
 var 
 x = 
