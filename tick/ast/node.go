@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/influxdata/influxdb/influxql"
 )
@@ -1013,14 +1012,31 @@ type CommentNode struct {
 	Comments []string
 }
 
-func newComment(p position, comments []string) *CommentNode {
-	for i := range comments {
-		comments[i] = strings.TrimSpace(comments[i])
-		comments[i] = strings.TrimLeftFunc(comments[i][2:], unicode.IsSpace)
+func newComment(p position, commentTokens []string) *CommentNode {
+	allLines := make([]string, 0, len(commentTokens))
+	for i, commentToken := range commentTokens {
+		if i != 0 {
+			allLines = append(allLines, "\n")
+		}
+		comments := strings.Split(commentToken, "\n")
+		for _, comment := range comments {
+			comment = strings.TrimSpace(comment)
+			if comment == "" {
+				continue
+			}
+			line := strings.TrimPrefix(
+				strings.TrimPrefix(
+					comment,
+					"//",
+				),
+				" ",
+			)
+			allLines = append(allLines, line)
+		}
 	}
 	return &CommentNode{
 		position: p,
-		Comments: comments,
+		Comments: allLines,
 	}
 }
 
@@ -1033,6 +1049,10 @@ func (n *CommentNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
 		buf.WriteByte('\n')
 	}
 	for _, comment := range n.Comments {
+		if comment == "\n" {
+			buf.WriteByte('\n')
+			continue
+		}
 		buf.WriteString(indent)
 		buf.WriteString("//")
 		if len(comment) > 0 {

@@ -9,6 +9,7 @@
 ### Bugfixes
 
 - [#783](https://github.com/influxdata/kapacitor/pull/783): Fix panic when revoking tokens not already defined.
+- [#784](https://github.com/influxdata/kapacitor/pull/784): Fix several issues with comment formatting in TICKscript.
 
 
 ## v1.0.0-beta4 [2016-07-27]
