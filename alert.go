@@ -599,11 +599,10 @@ func (a *AlertNode) determineLevel(now time.Time, fields models.Fields, tags map
 			a.logger.Printf("E! error evaluating reset expression for current level %v: %s", currentLevel, err)
 		} else if !pass {
 			return currentLevel
-		} else {
-			if newLevel, err := a.findFirstMatchLevel(currentLevel-1, OKAlert, now, fields, tags); err == nil {
-				return newLevel
-			}
 		}
+	}
+	if newLevel, err := a.findFirstMatchLevel(currentLevel-1, OKAlert, now, fields, tags); err == nil {
+		return newLevel
 	}
 	return OKAlert
 }
