@@ -1301,6 +1301,10 @@ func (ts *Service) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (ts *Service) deleteTask(id string) error {
+	// Delete associated snapshot
+	ts.snapshots.Delete(id)
+
+	// Delete task object
 	task, err := ts.tasks.Get(id)
 	if err != nil {
 		if err == ErrNoTaskExists {

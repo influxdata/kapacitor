@@ -78,10 +78,12 @@ type TemplateDAO interface {
 // Data access object for Snapshot data.
 type SnapshotDAO interface {
 	// Load a saved snapshot.
-	// ErrNoSnapshotExists will be returned if HasSnapshot returns false.
+	// ErrNoSnapshotExists will be returned if the snapshot does not exist.
 	Get(id string) (*Snapshot, error)
 	// Save a snapshot.
 	Put(id string, snapshot *Snapshot) error
+	// Delete a snapshot
+	Delete(id string) error
 	// Whether a snapshot exists in the store.
 	Exists(id string) (bool, error)
 }
@@ -561,6 +563,11 @@ func (d *snapshotKV) Put(id string, snapshot *Snapshot) error {
 		return err
 	}
 	return d.store.Put(key, data)
+}
+
+func (d *snapshotKV) Delete(id string) error {
+	key := d.snapshotDataKey(id)
+	return d.store.Delete(key)
 }
 
 func (d *snapshotKV) Exists(id string) (bool, error) {
