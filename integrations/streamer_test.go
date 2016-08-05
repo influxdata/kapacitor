@@ -1109,6 +1109,57 @@ stream
 	testStreamerWithOutput(t, "TestStream_Delete", script, 15*time.Second, er, nil, true)
 }
 
+func TestStream_Delete_GroupBy(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.groupBy('host', 'type')
+	|delete()
+		.field('anothervalue')
+		.tag('type')
+	|window()
+		.period(2s)
+		.every(2s)
+	|sum('value')
+		.as('value')
+	|httpOut('TestStream_Delete_GroupBy')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverA"},
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+					18.0,
+				}},
+			},
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverB"},
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+					12.0,
+				}},
+			},
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverC"},
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+					6.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Delete_GroupBy", script, 15*time.Second, er, nil, true)
+}
+
 func TestStream_AllMeasurements(t *testing.T) {
 
 	var script = `

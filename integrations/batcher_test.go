@@ -528,7 +528,7 @@ batch
 	|query('''
 		SELECT mean("value")
 		FROM "telegraf"."default".cpu_usage_idle
-		WHERE "host" = 'serverA' AND "cpu" = 'cpu-total'
+		WHERE "cpu" = 'cpu-total'
 ''')
 		.period(10s)
 		.every(10s)
@@ -559,6 +559,43 @@ batch
 	}
 
 	testBatcherWithOutput(t, "TestBatch_Delete", script, 30*time.Second, er, false)
+}
+func TestBatch_Delete_GroupBy(t *testing.T) {
+
+	var script = `
+batch
+	|query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "cpu" = 'cpu-total'
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s), 'dc')
+	|delete()
+		.field('mean')
+		.tag('dc')
+	|default()
+		.field('mean', 10.0)
+	|sum('mean')
+	|httpOut('TestBatch_Delete_GroupBy')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    nil,
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 18, 0, time.UTC),
+					50.0,
+				}},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_Delete_GroupBy", script, 30*time.Second, er, false)
 }
 
 func TestBatch_DoubleGroupBy(t *testing.T) {

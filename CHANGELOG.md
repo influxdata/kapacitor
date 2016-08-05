@@ -10,6 +10,7 @@
 
 - [#783](https://github.com/influxdata/kapacitor/pull/783): Fix panic when revoking tokens not already defined.
 - [#784](https://github.com/influxdata/kapacitor/pull/784): Fix several issues with comment formatting in TICKscript.
+- [#786](https://github.com/influxdata/kapacitor/issues/786): Deleting tags now updates the group by dimensions if needed.
 
 - [#772](https://github.com/influxdata/kapacitor/issues/772): Delete task snapshot data when a task is deleted.
 
