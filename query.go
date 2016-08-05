@@ -6,6 +6,7 @@ import (
 
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor/tick/ast"
+	"github.com/pkg/errors"
 )
 
 type Query struct {
@@ -19,7 +20,7 @@ func NewQuery(queryString string) (*Query, error) {
 	// Parse and validate query
 	q, err := influxql.ParseQuery(queryString)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to parse InfluxQL query")
 	}
 	if l := len(q.Statements); l != 1 {
 		return nil, fmt.Errorf("query must be a single select statement, got %d statements", l)
