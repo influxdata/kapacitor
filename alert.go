@@ -405,8 +405,8 @@ func (a *AlertNode) runAlert([]byte) error {
 		for p, ok := a.ins[0].NextPoint(); ok; p, ok = a.ins[0].NextPoint() {
 			a.timer.Start()
 			var currentLevel AlertLevel
-			if _, ok := a.states[p.Group]; ok {
-				currentLevel = a.states[p.Group].currentLevel()
+			if state, ok := a.states[p.Group]; ok {
+				currentLevel = state.currentLevel()
 			}
 			l := a.determineLevel(p.Time, p.Fields, p.Tags, currentLevel)
 			state := a.updateState(p.Time, l, p.Group)
@@ -477,8 +477,8 @@ func (a *AlertNode) runAlert([]byte) error {
 
 			for i, p := range b.Points {
 				var currentLevel AlertLevel
-				if _, ok := a.states[b.Group]; ok {
-					currentLevel = a.states[b.Group].currentLevel()
+				if state, ok := a.states[b.Group]; ok {
+					currentLevel = state.currentLevel()
 				}
 				l := a.determineLevel(p.Time, p.Fields, p.Tags, currentLevel)
 				if l < lowestLevel {
