@@ -4,7 +4,31 @@
 
 ### Release Notes
 
+#### Alert reset expressions
+
+Kapacitor now supports alert reset expressions.
+This helps keep an alert state from being lowered in severity until its reset expression evaluated successfully.
+
+Example:
+
+```go
+stream
+    |from()
+      .measurement('cpu')
+      .where(lambda: "host" == 'serverA')
+      .groupBy('host')
+    |alert()
+      .info(lambda: "value" > 60)
+      .infoReset(lambda: "value" < 10)
+      .warn(lambda: "value" > 70)
+      .warnReset(lambda: "value" < 20)
+      .crit(lambda: "value" > 80)
+      .critReset(lambda: "value" < 30)
+```
+
 ### Features
+
+- [#740](https://github.com/influxdata/kapacitor/pull/740): Support reset expressions to prevent an alert from being lowered in severity
 
 ### Bugfixes
 
@@ -96,7 +120,7 @@ stream
 - [#662](https://github.com/influxdata/kapacitor/pull/662): Add `-skipVerify` flag to `kapacitor` CLI tool to skip SSL verification.
 - [#680](https://github.com/influxdata/kapacitor/pull/680): Add Telegram Alerting option
 - [#46](https://github.com/influxdata/kapacitor/issues/46): Can now create combinations of points within the same stream.
-	This is kind of like join but instead joining a stream with itself.
+  This is kind of like join but instead joining a stream with itself.
 - [#669](https://github.com/influxdata/kapacitor/pull/669): Add size function for humanize byte size. thanks @jsvisa!
 - [#697](https://github.com/influxdata/kapacitor/pull/697): Can now flatten a set of points into a single points creating dynamcially named fields.
 - [#698](https://github.com/influxdata/kapacitor/pull/698): Join delimiter can be specified.
@@ -110,7 +134,7 @@ stream
 - [#627](https://github.com/influxdata/kapacitor/issues/627): Fix where InfluxQL functions that returned a batch could drop tags.
 - [#674](https://github.com/influxdata/kapacitor/issues/674): Fix panic with Join On and batches.
 - [#665](https://github.com/influxdata/kapacitor/issues/665): BREAKING: Fix file mode not being correct for Alert.Log files.
-	Breaking change is that integers numbers prefixed with a 0 in TICKscript are interpreted as octal numbers.
+  Breaking change is that integers numbers prefixed with a 0 in TICKscript are interpreted as octal numbers.
 - [#667](https://github.com/influxdata/kapacitor/issues/667): Align deadman timestamps to interval.
 
 ## v1.0.0-beta2 [2016-06-17]
