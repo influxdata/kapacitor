@@ -213,8 +213,7 @@ def run_tests(race, parallel, timeout, no_vet):
         test_command += " -timeout {}".format(timeout)
     test_command += " {}".format(' '.join(go_list()))
     logging.info("Running tests...")
-    output = run(test_command)
-    logging.debug("Test output:\n{}".format(output.encode('ascii', 'ignore')))
+    output = run(test_command, printOutput=logging.getLogger().getEffectiveLevel() == logging.DEBUG)
     return True
 
 def package_udfs(version, dist_dir):
@@ -264,18 +263,28 @@ def package_python_udf(version, dist_dir):
 #### All Kapacitor-specific content above this line
 ################
 
-def run(command, allow_failure=False, shell=False):
-    """Run shell command (convenience wrapper around subprocess).
+def run(command, allow_failure=False, shell=False, printOutput=False):
+    """
+    Run shell command (convenience wrapper around subprocess).
+
+    If printOutput is True then the output is sent to STDOUT and not returned
     """
     out = None
     logging.debug("{}".format(command))
     try:
-        if shell:
-            out = subprocess.check_output(command, stderr=subprocess.STDOUT, shell=shell)
-        else:
-            out = subprocess.check_output(command.split(), stderr=subprocess.STDOUT)
-        out = out.decode('utf-8').strip()
-        # logging.debug("Command output: {}".format(out))
+        cmd = command
+        if not shell:
+            cmd = command.split()
+
+        stdout = subprocess.PIPE
+        stderr = subprocess.STDOUT
+        if printOutput:
+            stdout = None
+
+        p = subprocess.Popen(cmd, shell=shell, stdout=stdout, stderr=stderr)
+        out, _ = p.communicate()
+        if out is not None:
+            out = out.decode('utf-8').strip()
     except subprocess.CalledProcessError as e:
         if allow_failure:
             logging.warn("Command '{}' failed with error: {}".format(command, e.output))
