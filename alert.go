@@ -424,6 +424,11 @@ func (a *AlertNode) runAlert([]byte) error {
 					Points: []models.BatchPoint{models.BatchPointFromPoint(p)},
 				}
 				state.triggered(p.Time)
+				// Suppress the recovery event.
+				if a.a.NoRecoveriesFlag && l == OKAlert {
+					a.timer.Stop()
+					continue
+				}
 				duration := state.duration()
 				ad, err := a.alertData(p.Name, p.Group, p.Tags, p.Fields, l, p.Time, duration, batch)
 				if err != nil {
@@ -513,6 +518,12 @@ func (a *AlertNode) runAlert([]byte) error {
 					!((a.a.UseFlapping && state.flapping) ||
 						(a.a.IsStateChangesOnly && !state.changed && !state.expired))) {
 				state.triggered(t)
+				// Suppress the recovery event.
+				if a.a.NoRecoveriesFlag && l == OKAlert {
+					a.timer.Stop()
+					continue
+				}
+
 				duration := state.duration()
 				ad, err := a.alertData(b.Name, b.Group, b.Tags, highestPoint.Fields, l, t, duration, b)
 				if err != nil {
@@ -572,6 +583,7 @@ func (a *AlertNode) runAlert([]byte) error {
 	}
 	return nil
 }
+
 func (a *AlertNode) handleAlert(ad *AlertData) {
 	a.alertsTriggered.Add(1)
 	switch ad.Level {
