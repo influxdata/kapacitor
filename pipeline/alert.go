@@ -88,7 +88,7 @@ const defaultLogFileMode = 0600
 // If no expression is true then the alert is considered to be in the OK state.
 //
 // Kapacitor supports alert reset expressions.
-// This way when an alert enters a state, it can only be evaluated for less severity state if its reset expression evaluated successfully.
+// This way when an alert enters a state, it can only be lowered in severity if its reset expression evaluates to true.
 //
 // Example:
 //   stream
@@ -98,11 +98,16 @@ const defaultLogFileMode = 0600
 //           .groupBy('host')
 //       |alert()
 //           .info(lambda: "value" > 60)
-//           .infoReset(lambda: "value" < 10)
+//           .infoReset(lambda: "value" < 50)
 //           .warn(lambda: "value" > 70)
-//           .warnReset(lambda: "value" < 20)
+//           .warnReset(lambda: "value" < 60)
 //           .crit(lambda: "value" > 80)
-//           .critReset(lambda: "value" < 30)
+//           .critReset(lambda: "value" < 70)
+//
+// For example given the following values:
+//     61 73 64 85 62 56 47
+// The corresponding alert states are:
+//     INFO WARNING WARNING CRITICAL INFO INFO OK
 //
 // Available Statistics:
 //
