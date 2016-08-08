@@ -87,6 +87,28 @@ const defaultLogFileMode = 0600
 // For each point an expression may or may not be evaluated.
 // If no expression is true then the alert is considered to be in the OK state.
 //
+// Kapacitor supports alert reset expressions.
+// This way when an alert enters a state, it can only be lowered in severity if its reset expression evaluates to true.
+//
+// Example:
+//   stream
+//       |from()
+//           .measurement('cpu')
+//           .where(lambda: "host" == 'serverA')
+//           .groupBy('host')
+//       |alert()
+//           .info(lambda: "value" > 60)
+//           .infoReset(lambda: "value" < 50)
+//           .warn(lambda: "value" > 70)
+//           .warnReset(lambda: "value" < 60)
+//           .crit(lambda: "value" > 80)
+//           .critReset(lambda: "value" < 70)
+//
+// For example given the following values:
+//     61 73 64 85 62 56 47
+// The corresponding alert states are:
+//     INFO WARNING WARNING CRITICAL INFO INFO OK
+//
 // Available Statistics:
 //
 //    * alerts_triggered -- Total number of alerts triggered
@@ -205,6 +227,13 @@ type AlertNode struct {
 	// Filter expression for the CRITICAL alert level.
 	// An empty value indicates the level is invalid and is skipped.
 	Crit *ast.LambdaNode
+
+	// Filter expression for reseting the INFO alert level to lower level.
+	InfoReset *ast.LambdaNode
+	// Filter expression for reseting the WARNING alert level to lower level.
+	WarnReset *ast.LambdaNode
+	// Filter expression for reseting the CRITICAL alert level to lower level.
+	CritReset *ast.LambdaNode
 
 	//tick:ignore
 	UseFlapping bool `tick:"Flapping"`
