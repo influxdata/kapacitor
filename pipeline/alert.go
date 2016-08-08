@@ -267,6 +267,9 @@ type AlertNode struct {
 	// tick:ignore
 	AllFlag bool `tick:"All"`
 
+	// Do not send recovery events.
+	NoRecoveriesFlag bool `tick:"NoRecoveries"`
+
 	// Send alerts only on state changes.
 	// tick:ignore
 	IsStateChangesOnly bool `tick:"StateChangesOnly"`
@@ -360,6 +363,13 @@ func (n *AlertNode) ChainMethods() map[string]reflect.Value {
 // tick:property
 func (n *AlertNode) All() *AlertNode {
 	n.AllFlag = true
+	return n
+}
+
+// Do not send recovery alerts.
+// tick:property
+func (n *AlertNode) NoRecoveries() *AlertNode {
+	n.NoRecoveriesFlag = true
 	return n
 }
 
