@@ -1,0 +1,44 @@
+// net_udp_buffer_overflow_alert
+
+// metric: net_udp_rcvbuferrors
+// available_fields: "bytes_recv","bytes_sent","packets_recv","packets_sent","err_in","err_out","drop_in","drop_out"
+// NOTE: More fields are available when running the `[[inputs.net]]` plugin on linux. 
+// This plugin uses one of those fields
+
+// TELEGRAF CONFIGURATION
+// [[inputs.net]]
+
+// DEFINE: kapacitor define net_udp_buffer_overflow_alert -type stream -tick net/net_udp_buffer_overflow_alert.tick -dbrp telegraf.autogen
+// ENABLE: kapacitor enable net_udp_buffer_overflow_alert
+
+// Parameters
+var warn = 1000
+var crit = 10000
+var period = 1m
+var every = 1m 
+var unit = 1s
+
+// Dataframe
+var data = stream
+  |from()
+    .measurement('net_udp_rcvbuferrors')
+    .groupBy('host')
+  |derivative('value')
+    .unit(unit)
+    .nonNegative()
+  |window()
+    .period(period)
+    .every(every)
+  |max('value')
+  
+// Thresholds
+var alert = data
+  |alert()
+    .id('{{ index .Tags "host"}}/udp_drops')
+    .message('{{ .ID }}:{{ index .Fields "max" }}')
+    .warn(lambda: "max" > warn)
+    .crit(lambda: "max" > crit)
+
+// Alert
+alert
+  .log('/tmp/net_alert_log.txt')

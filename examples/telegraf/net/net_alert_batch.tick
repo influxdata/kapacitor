@@ -1,0 +1,67 @@
+// net_alert_batch
+
+// metric: err_in, err_out, drop_in, drop_out
+// available_fields: "bytes_recv","bytes_sent","packets_recv","packets_sent"
+// NOTE: More fields are available with the `[[inputs.net]]` plugin on linux
+
+// TELEGRAF CONFIGURATION
+// [[inputs.net]]
+
+// DEFINE: kapacitor define net_alert_batch -type batch -tick net/net_alert_batch.tick -dbrp telegraf.autogen
+// ENABLE: kapacitor enable net_alert_batch
+
+// Parameters
+var info = 1
+var warn = 2
+var crit = 3
+var period = 10s
+var every = 10s
+var unit = 1s
+
+// Dataframe
+var rawdata = batch
+  |query('''SELECT err_in, err_out, drop_in, drop_out FROM "telegraf"."autogen"."net" ''')
+    .period(period)
+    .every(every)
+    .groupBy('host', 'interface')
+
+var err_in = rawdata
+  |derivative('err_in')
+    .as('value')
+    .nonNegative()
+    .unit(unit)
+
+var err_out = rawdata
+  |derivative('err_out')
+    .as('value')
+    .nonNegative()
+    .unit(unit)
+
+var drop_in = rawdata
+  |derivative('drop_in')
+    .as('value')
+    .nonNegative()
+    .unit(unit)
+
+var drop_out = rawdata
+  |derivative('drop_out')
+    .as('value')
+    .nonNegative()
+    .unit(unit)
+
+var data = err_in
+  |join(err_out, drop_in, drop_out)
+    .as('err_in', 'err_out', 'drop_in', 'drop_out')
+    
+// Thresholds
+var alert = data
+  |alert()
+    .id('{{ index .Tags "host"}}/net_stats')
+    .message('{{ .ID }}: err_in:{{ index .Fields "err_in.value" }} err_out:{{ index .Fields "err_out.value" }} drop_in:{{ index .Fields "drop_in.value" }} drop_out:{{ index .Fields "drop_out.value" }}')
+    .info(lambda: "err_in.value" > info OR "err_out.value" > info OR "drop_in.value" > info OR "drop_out.value" > info)
+    .warn(lambda: "err_in.value" > warn OR "err_out.value" > warn OR "drop_in.value" > warn OR "drop_out.value" > warn)
+    .crit(lambda: "err_in.value" > crit OR "err_out.value" > crit OR "drop_in.value" > crit OR "drop_out.value" > crit)
+  
+// Alert  
+alert
+  .log('/tmp/net_alert_log.txt')

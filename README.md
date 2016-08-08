@@ -28,7 +28,7 @@ kapacitord config
 # Getting Started
 
 This README gives you a high level overview of what Kapacitor is and what its like to use it. As well as some details of how it works.
-To get started using Kapacitor see [this guide](https://docs.influxdata.com/kapacitor/latest/introduction/getting_started/).
+To get started using Kapacitor see [this guide](https://docs.influxdata.com/kapacitor/latest/introduction/getting_started/). After you finish the getting started exercise you can check out the [TICKscripts](https://github.com/influxdata/kapacitor/tree/master/examples/telegraf) for different Telegraf plugins.
 
 # Basic Example
 
@@ -79,4 +79,4 @@ kapacitor define \
 kapacitor enable cpu_alert
 ```
 
-For more complete examples see the [documentation](https://docs.influxdata.com/kapacitor/latest/examples/)
+For more complete examples see the [documentation](https://docs.influxdata.com/kapacitor/latest/examples/).

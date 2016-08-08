@@ -1,0 +1,49 @@
+// mem_alert_stream
+
+// metric: used_percent
+// available_fields: "active","available","available_percent","buffered","cached","free","inactive","total","used"
+
+// TELEGRAF CONFIGURATION
+// [[inputs.mem]]
+
+// DEFINE: kapacitor define mem_alert_stream -type stream -tick mem/mem_alert_stream.tick -dbrp telegraf.autogen
+// ENABLE: kapacitor enable mem_alert_stream
+
+// Parameters
+var info = 70
+var warn = 85
+var crit = 92
+var infoSig = 2.5
+var warnSig = 3
+var critSig = 3.5
+var period = 10s
+var every = 10s
+
+// Dataframe
+var data = stream
+  |from()
+    .database('telegraf')
+    .retentionPolicy('autogen')
+    .measurement('mem')
+    .groupBy('host')
+  |window()
+    .period(period)
+    .every(every)
+  |mean('used_percent')
+    .as('stat')
+    
+// Thresholds
+var alert = data
+  |eval(lambda: sigma("stat"))
+    .as('sigma')
+    .keep()
+  |alert()
+    .id('{{ index .Tags "host"}}/mem_used')
+    .message('{{ .ID }}:{{ index .Fields "stat" }}')
+    .info(lambda: "stat" > info OR "sigma" > infoSig)
+    .warn(lambda: "stat" > warn OR "sigma" > warnSig)
+    .crit(lambda: "stat" > crit OR "sigma" > critSig)
+
+// Alert
+alert
+  .log('/tmp/mem_alert_log.txt')
