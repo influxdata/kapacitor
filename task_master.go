@@ -483,7 +483,12 @@ func (tm *TaskMaster) runForking(in *Edge) {
 
 func (tm *TaskMaster) forkPoint(p models.Point) {
 	tm.mu.RLock()
-	defer tm.mu.RUnlock()
+	locked := true
+	defer func() {
+		if locked {
+			tm.mu.RUnlock()
+		}
+	}()
 
 	// Create the fork keys - which is (db, rp, measurement)
 	key := forkKey{
@@ -511,9 +516,20 @@ func (tm *TaskMaster) forkPoint(p models.Point) {
 
 	c, ok := tm.forkStats[key]
 	if !ok {
-		// Create statistics
-		c = &expvar.Int{}
-		tm.forkStats[key] = c
+		// Release read lock
+		tm.mu.RUnlock()
+		locked = false
+
+		// Get write lock
+		tm.mu.Lock()
+		// Now with write lock check again
+		c, ok = tm.forkStats[key]
+		if !ok {
+			// Create statistics
+			c = &expvar.Int{}
+			tm.forkStats[key] = c
+		}
+		tm.mu.Unlock()
 
 		tags := map[string]string{
 			"task_master":      tm.id,
