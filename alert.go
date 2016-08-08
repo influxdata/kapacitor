@@ -591,9 +591,7 @@ func (a *AlertNode) handleAlert(ad *AlertData) {
 }
 
 func (a *AlertNode) determineLevel(now time.Time, fields models.Fields, tags map[string]string, currentLevel AlertLevel) AlertLevel {
-	if higherLevel, err := a.findFirstMatchLevel(CritAlert, currentLevel-1, now, fields, tags); err != nil {
-		a.logger.Printf("D! find first match level from %s to %s: %s", CritAlert, currentLevel-1, err)
-	} else {
+	if higherLevel, found := a.findFirstMatchLevel(CritAlert, currentLevel-1, now, fields, tags); found {
 		return higherLevel
 	}
 	if rse := a.levelResets[currentLevel]; rse != nil {
@@ -603,15 +601,13 @@ func (a *AlertNode) determineLevel(now time.Time, fields models.Fields, tags map
 			return currentLevel
 		}
 	}
-	if newLevel, err := a.findFirstMatchLevel(currentLevel, OKAlert, now, fields, tags); err != nil {
-		a.logger.Printf("D! find first match level from %s to %s: %s", currentLevel, OKAlert, err)
-	} else {
+	if newLevel, found := a.findFirstMatchLevel(currentLevel, OKAlert, now, fields, tags); found {
 		return newLevel
 	}
 	return OKAlert
 }
 
-func (a *AlertNode) findFirstMatchLevel(start AlertLevel, stop AlertLevel, now time.Time, fields models.Fields, tags map[string]string) (AlertLevel, error) {
+func (a *AlertNode) findFirstMatchLevel(start AlertLevel, stop AlertLevel, now time.Time, fields models.Fields, tags map[string]string) (AlertLevel, bool) {
 	if stop < OKAlert {
 		stop = OKAlert
 	}
@@ -624,10 +620,10 @@ func (a *AlertNode) findFirstMatchLevel(start AlertLevel, stop AlertLevel, now t
 			a.logger.Printf("E! error evaluating expression for level %v: %s", AlertLevel(l), err)
 			continue
 		} else if pass {
-			return AlertLevel(l), nil
+			return AlertLevel(l), true
 		}
 	}
-	return OKAlert, errors.New("no match found")
+	return OKAlert, false
 }
 
 func (a *AlertNode) batchToResult(b models.Batch) influxql.Result {
