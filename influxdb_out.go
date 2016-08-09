@@ -252,6 +252,10 @@ func (w *writeBuffer) write(bp influxdb.BatchPoints) error {
 			return err
 		}
 	}
+	err = w.conn.Write(bp)
+	if err != nil {
+		return err
+	}
 	w.i.pointsWritten.Add(int64(len(bp.Points())))
-	return w.conn.Write(bp)
+	return nil
 }
