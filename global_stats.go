@@ -93,6 +93,11 @@ func NewStatistics(name string, tags map[string]string) (string, *kexpvar.Map) {
 		value.Set(v)
 		tagsVar.Set(k, value)
 	}
+	// Always add ID tags
+	tagsVar.Set(ClusterIDVarName, ClusterIDVar)
+	tagsVar.Set(ServerIDVarName, ServerIDVar)
+	tagsVar.Set(HostVarName, HostVar)
+
 	m.Set("tags", tagsVar)
 
 	// Create and set the values entry used for actual stats.
