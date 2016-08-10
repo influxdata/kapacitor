@@ -1,9 +1,9 @@
 package auth
 
 import (
-	"errors"
 	"fmt"
 	"path"
+	"strings"
 )
 
 // Interface for authenticating and retrieving users.
@@ -15,10 +15,6 @@ type Interface interface {
 	ListSubscriptionTokens() ([]string, error)
 	RevokeSubscriptionAccess(token string) error
 }
-
-// ErrAuthenticate is returned when authentication fails.
-var ErrAuthenticate = errors.New("authentication failed")
-
 type Privilege uint
 
 const (
@@ -162,13 +158,59 @@ func (u User) AuthorizeAction(action Action) error {
 			resource = path.Dir(resource)
 		}
 	}
-	return fmt.Errorf("user %s does not have \"%v\" privilege for resource %q", u.name, action.Privilege, action.Resource)
+	return authError{
+		username: u.name,
+		action:   action,
+	}
 }
 
+// All auth errors are of this type.
+type authError struct {
+	username string
+	action   Action
+}
+
+func (e authError) Error() string {
+	return fmt.Sprintf("user %s does not have \"%v\" privilege for resource %q", e.username, e.action.Privilege, e.action.Resource)
+}
+
+func (e authError) MissingPrivlege() Privilege {
+	return e.action.Privilege
+}
+
+const (
+	databaseRootResource = "/database"
+	apiRootResource      = "/api"
+
+	cleanSuffix = "_clean"
+	dirtySuffix = "_dirty"
+)
+
 func APIResource(p string) string {
-	return path.Join("/api", p)
+	return path.Join(apiRootResource, p)
 }
 
 func DatabaseResource(database string) string {
-	return "/databases/" + database
+	// Map the database name to a path element name.
+	//  1. Replace all '/' with '_'.
+	//  2. Mark whether the database name was clean or dirty.
+	//
+	// This transformation has two important properties:
+	//  1. The resulting name will be considered a single path element.
+	//  2. The transformation is a one-to-one function.
+	//
+	// Examples:
+	//     db/name -> db_name_dirty
+	//     db_name -> db_name_clean
+	if database == "" {
+		return databaseRootResource
+	}
+
+	db := strings.Replace(database, "/", "_", -1)
+	if db == database {
+		db += cleanSuffix
+	} else {
+		db += dirtySuffix
+	}
+	return path.Join(databaseRootResource, db)
 }

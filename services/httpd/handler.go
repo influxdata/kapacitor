@@ -646,6 +646,11 @@ func requiredPrivilegeForHTTPMethod(method string) (auth.Privilege, error) {
 	}
 }
 
+// Auth error behavior which indicates the missing privilege required to take an action.
+type missingPrivilege interface {
+	MissingPrivlege() auth.Privilege
+}
+
 // Check if user is authorized to perform request.
 func authorizeRequest(r *http.Request, user auth.User) error {
 	// Now that we have a user authorize the request
@@ -657,7 +662,15 @@ func authorizeRequest(r *http.Request, user auth.User) error {
 		Resource:  auth.APIResource(strings.TrimPrefix(r.URL.Path, BasePath)),
 		Privilege: rp,
 	}
-	return user.AuthorizeAction(action)
+	err = user.AuthorizeAction(action)
+	if err != nil {
+		if mp, ok := err.(missingPrivilege); ok {
+			return fmt.Errorf("user %s does not have \"%v\" privilege for API endpoint %q", user.Name(), mp.MissingPrivlege(), r.URL.Path)
+		} else {
+			return err
+		}
+	}
+	return nil
 }
 
 // Authorize the request and call normal inner handler.
