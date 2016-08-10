@@ -488,7 +488,7 @@ func (s *influxdbCluster) linkSubscriptions() error {
 						}
 						// Something changed, drop the sub and let it get recreated
 						s.dropSub(cli, se.name, se.cluster, se.rp)
-						s.runningSubs[se] = false
+						s.closeSub(se)
 					} else {
 						existingSubs[se] = si
 						// Do not revoke tokens that are still in use
@@ -591,16 +591,10 @@ func (s *influxdbCluster) linkSubscriptions() error {
 			continue
 		}
 		if _, exists := existingSubs[se]; !exists {
-			// Close the service and stop tracking it.
-			if service, ok := s.services[se]; ok {
-				s.logger.Println("D! deleting service for", se)
-				err := service.Close()
-				if err != nil {
-					s.logger.Printf("E! failed to close service for %v: %s", se, err)
-				}
+			err := s.closeSub(se)
+			if err != nil {
+				s.logger.Printf("E! failed to close service for %v: %s", se, err)
 			}
-			delete(s.runningSubs, se)
-			delete(s.services, se)
 		}
 	}
 
@@ -613,6 +607,17 @@ func (s *influxdbCluster) linkSubscriptions() error {
 
 	kapacitor.NumSubscriptionsVar.Set(numSubscriptions)
 	return nil
+}
+
+// Close the service and stop tracking it.
+func (s *influxdbCluster) closeSub(se subEntry) (err error) {
+	if service, ok := s.services[se]; ok {
+		s.logger.Println("D! closing service for", se)
+		err = service.Close()
+	}
+	delete(s.runningSubs, se)
+	delete(s.services, se)
+	return
 }
 
 func (s *influxdbCluster) generateRandomToken() (string, error) {
