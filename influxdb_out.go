@@ -233,7 +233,6 @@ func (w *writeBuffer) writeAll() {
 	for bpc, bp := range w.buffer {
 		err := w.write(bp)
 		if err != nil {
-			w.i.writeErrors.Add(1)
 			w.i.logger.Println("E! failed to write points to InfluxDB:", err)
 		}
 		delete(w.buffer, bpc)
@@ -249,11 +248,13 @@ func (w *writeBuffer) write(bp influxdb.BatchPoints) error {
 			w.conn, err = w.i.et.tm.InfluxDBService.NewDefaultClient()
 		}
 		if err != nil {
+			w.i.writeErrors.Add(1)
 			return err
 		}
 	}
 	err = w.conn.Write(bp)
 	if err != nil {
+		w.i.writeErrors.Add(1)
 		return err
 	}
 	w.i.pointsWritten.Add(int64(len(bp.Points())))
