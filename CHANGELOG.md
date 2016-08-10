@@ -38,7 +38,9 @@ The corresponding alert states are:
 
 - [#740](https://github.com/influxdata/kapacitor/pull/740): Support reset expressions to prevent an alert from being lowered in severity. Thanks @minhdanh!
 - [#670](https://github.com/influxdata/kapacitor/issues/670): Add ability to supress OK recovery alert events.
-- [#](https://github.com/influxdata/kapacitor/pull/): Add API endpoint for refreshing subscriptions.
+- [#804](https://github.com/influxdata/kapacitor/pull/804): Add API endpoint for refreshing subscriptions.
+    Also fixes issue where subs were not relinked if the sub was deleted.
+    UDP listen ports are closed when a database is dropped.
 
 ### Bugfixes
 
