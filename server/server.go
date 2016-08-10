@@ -217,6 +217,7 @@ func (s *Server) appendInfluxDBService() error {
 			return errors.Wrap(err, "failed to get http port")
 		}
 		srv := influxdb.NewService(c, s.config.defaultInfluxDB, httpPort, s.config.Hostname, s.config.HTTP.AuthEnabled, l)
+		srv.HTTPDService = s.HTTPDService
 		srv.PointsWriter = s.TaskMaster
 		srv.LogService = s.LogService
 		srv.AuthService = s.AuthService

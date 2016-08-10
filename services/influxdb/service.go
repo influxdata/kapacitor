@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -34,18 +35,27 @@ const (
 
 	// Size in bytes of a token for subscription authentication
 	tokenSize = 64
+
+	// API endpoint paths
+	subscriptionsPath         = "/subscriptions"
+	subscriptionsPathAnchored = "/subscriptions/"
 )
 
 // Handles requests to write or read from an InfluxDB cluster
 type Service struct {
 	defaultInfluxDB string
 	clusters        map[string]*influxdbCluster
+	routes          []httpd.Route
 
 	PointsWriter interface {
 		WritePoints(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
 	}
 	LogService interface {
 		NewLogger(string, int) *log.Logger
+	}
+	HTTPDService interface {
+		AddRoutes([]httpd.Route) error
+		DelRoutes([]httpd.Route)
 	}
 	ClientCreator interface {
 		Create(influxdb.HTTPConfig) (influxdb.Client, error)
@@ -146,10 +156,38 @@ func (s *Service) Open() error {
 			return err
 		}
 	}
+
+	// Define API routes
+	s.routes = []httpd.Route{
+		{
+			Name:        "subscriptions",
+			Method:      "POST",
+			Pattern:     subscriptionsPath,
+			HandlerFunc: s.handleSubscriptions,
+		},
+	}
+
+	err := s.HTTPDService.AddRoutes(s.routes)
+	if err != nil {
+		return errors.Wrap(err, "adding API routes")
+	}
 	return nil
 }
 
+// Refresh the subscriptions linking for all clusters.
+func (s *Service) handleSubscriptions(w http.ResponseWriter, r *http.Request) {
+	for _, cluster := range s.clusters {
+		err := cluster.linkSubscriptions()
+		if err != nil {
+			httpd.HttpError(w, fmt.Sprintf("failed to link subscriptions: %s", err.Error()), true, http.StatusInternalServerError)
+			return
+		}
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *Service) Close() error {
+	s.HTTPDService.DelRoutes(s.routes)
 	var lastErr error
 	for _, cluster := range s.clusters {
 		err := cluster.Close()

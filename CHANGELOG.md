@@ -38,6 +38,7 @@ The corresponding alert states are:
 
 - [#740](https://github.com/influxdata/kapacitor/pull/740): Support reset expressions to prevent an alert from being lowered in severity. Thanks @minhdanh!
 - [#670](https://github.com/influxdata/kapacitor/issues/670): Add ability to supress OK recovery alert events.
+- [#](https://github.com/influxdata/kapacitor/pull/): Add API endpoint for refreshing subscriptions.
 
 ### Bugfixes
 
