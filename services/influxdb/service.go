@@ -337,6 +337,8 @@ func (s *influxdbCluster) linkSubscriptions() error {
 	if s.disableSubs {
 		return nil
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.logger.Println("D! linking subscriptions for cluster", s.name)
 	b := backoff.NewExponentialBackOff()
 	b.MaxElapsedTime = s.startupTimeout
@@ -586,6 +588,7 @@ func (s *influxdbCluster) linkSubscriptions() error {
 			}
 		}
 	}
+	// Close any subs for dbs that have been dropped
 	for se, running := range s.runningSubs {
 		if !running {
 			continue
