@@ -11,9 +11,11 @@
 // ENABLE: kapacitor enable zookeeper_data_size_batch
 
 // Parameters
-var info = 100000000 // 100MB
-var warn = 1000000000 // 1GB 
-var crit = 10000000000 // 10GB
+var mb = 1024 * 1024
+var gb = 1024 * mb
+var info = 100 * mb
+var warn = 1 * gb
+var crit = 10 * gb
 var infoSig = 2.5
 var warnSig = 3
 var critSig = 3.5
