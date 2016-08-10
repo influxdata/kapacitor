@@ -116,6 +116,7 @@ func NewService(configs []Config, defaultInfluxDB, httpPort int, hostname string
 		}
 		runningSubs := make(map[subEntry]bool, len(c.Subscriptions))
 		clusters[c.Name] = &influxdbCluster{
+			name:                     c.Name,
 			configs:                  urls,
 			configSubs:               subs,
 			exConfigSubs:             exSubs,
@@ -212,6 +213,7 @@ func (s *Service) NewNamedClient(name string) (influxdb.Client, error) {
 }
 
 type influxdbCluster struct {
+	name                     string
 	configs                  []influxdb.HTTPConfig
 	i                        int
 	configSubs               map[subEntry]bool
@@ -329,7 +331,7 @@ func (s *influxdbCluster) NewClient() (c influxdb.Client, err error) {
 }
 
 func (s *influxdbCluster) linkSubscriptions() error {
-	s.logger.Println("D! linking subscriptions")
+	s.logger.Println("D! linking subscriptions for cluster", s.name)
 	b := backoff.NewExponentialBackOff()
 	b.MaxElapsedTime = s.startupTimeout
 	ticker := backoff.NewTicker(b)
