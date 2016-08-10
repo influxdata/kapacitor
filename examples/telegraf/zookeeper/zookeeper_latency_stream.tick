@@ -1,0 +1,50 @@
+// zookeeper_latency_stream
+
+// metric: avg_latency
+// available_fields: "approximate_data_size","ephemerals_count","max_file_descriptor_count","max_latency","min_latency","num_alive_connections","open_file_descriptor_count","outstanding_requests","packets_received","packets_sent","version","watch_count","znode_count" 
+
+// TELEGRAF CONFIGURATION
+// [[inputs.zookeeper]]
+//   servers = [":2181"]
+
+// DEFINE: kapacitor define zookeeper_latency_stream -type stream -tick zookeeper/zookeeper_latency_stream.tick -dbrp telegraf.autogen
+// ENABLE: kapacitor enable zookeeper_latency_stream
+
+// Parameters
+var info = 8 // ms
+var warn = 12 // ms 
+var crit = 15 // ms
+var infoSig = 2.5
+var warnSig = 3
+var critSig = 3.5
+var period = 10s
+var every = 10s
+
+// Dataframe
+var data = stream
+  |from()
+    .database('telegraf')
+    .retentionPolicy('autogen')
+    .measurement('zookeeper')
+    .groupBy('host')
+  |window()
+    .period(period)
+    .every(every)
+  |mean('avg_latency')
+    .as('stat')
+    
+// Thresholds
+var alert = data
+  |eval(lambda: sigma("stat"))
+    .as('sigma')
+    .keep()
+  |alert()
+    .id('{{ index .Tags "host"}}/approximate_data_size')
+    .message('{{ .ID }}:{{ index .Fields "stat" }}')
+    .info(lambda: "stat" > info OR "sigma" > infoSig)
+    .warn(lambda: "stat" > warn OR "sigma" > warnSig)
+    .crit(lambda: "stat" > crit OR "sigma" > critSig)
+
+// Alert
+alert
+  .log('/tmp/zookeeper_latency_stream_log.txt')

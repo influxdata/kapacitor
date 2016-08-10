@@ -7,7 +7,7 @@
 // [inputs.{plugin}]
 //   # full configuration
 
-// DEFINE: kapacitor define {alert_name} -type batch -tick {plugin}/{alert_name}.tick -dbrp telegraf.autogen
+// DEFINE: kapacitor define {alert_name} -type stream -tick {plugin}/{alert_name}.tick -dbrp telegraf.autogen
 // ENABLE: kapacitor enable {alert_name}
 
 // Parameters
@@ -31,7 +31,7 @@ var data = stream
     .period(period)
     .every(every)
   |mean({alert_metric})
-    .as("stat")
+    .as('stat')
     
 // Thresholds
 var alert = data
