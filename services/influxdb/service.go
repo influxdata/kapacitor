@@ -115,6 +115,7 @@ func NewService(configs []Config, defaultInfluxDB, httpPort int, hostname string
 			}
 		}
 		runningSubs := make(map[subEntry]bool, len(c.Subscriptions))
+		services := make(map[subEntry]openCloser, len(c.Subscriptions))
 		clusters[c.Name] = &influxdbCluster{
 			name:                     c.Name,
 			configs:                  urls,
@@ -133,7 +134,9 @@ func NewService(configs []Config, defaultInfluxDB, httpPort int, hostname string
 			disableSubs:              c.DisableSubscriptions,
 			protocol:                 c.SubscriptionProtocol,
 			runningSubs:              runningSubs,
-			useTokens:                useTokens,
+			services:                 services,
+			// Do not use tokens for non http protocols
+			useTokens: useTokens && (c.SubscriptionProtocol == "http" || c.SubscriptionProtocol == "https"),
 		}
 		if defaultInfluxDB == i {
 			defaultInfluxDBName = c.Name
@@ -250,12 +253,14 @@ type influxdbCluster struct {
 		RevokeSubscriptionAccess(token string) error
 	}
 
-	services []interface {
-		Open() error
-		Close() error
-	}
+	services map[subEntry]openCloser
 
 	mu sync.Mutex
+}
+
+type openCloser interface {
+	Open() error
+	Close() error
 }
 
 type subEntry struct {
@@ -273,7 +278,6 @@ func (s *influxdbCluster) Open() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if !s.disableSubs {
-		err := s.linkSubscriptions()
 		if s.subscriptionSyncInterval != 0 {
 			s.subSyncTicker = time.NewTicker(s.subscriptionSyncInterval)
 			go func() {
@@ -282,9 +286,8 @@ func (s *influxdbCluster) Open() error {
 				}
 			}()
 		}
-		return err
 	}
-	return nil
+	return s.linkSubscriptions()
 }
 
 func (s *influxdbCluster) Close() error {
@@ -331,6 +334,9 @@ func (s *influxdbCluster) NewClient() (c influxdb.Client, err error) {
 }
 
 func (s *influxdbCluster) linkSubscriptions() error {
+	if s.disableSubs {
+		return nil
+	}
 	s.logger.Println("D! linking subscriptions for cluster", s.name)
 	b := backoff.NewExponentialBackOff()
 	b.MaxElapsedTime = s.startupTimeout
@@ -471,8 +477,9 @@ func (s *influxdbCluster) linkSubscriptions() error {
 					// Check if the hostname, port or protocol have changed
 					if host != s.hostname ||
 						u.Scheme != s.protocol ||
-						((u.Scheme == "http" || u.Scheme == "https") && int(pn) != s.httpPort) ||
-						(s.useTokens && (u.User == nil || u.User.Username() != httpd.SubscriptionUser)) {
+						((u.Scheme == "http" || u.Scheme == "https") &&
+							(int(pn) != s.httpPort ||
+								(s.useTokens && (u.User == nil || u.User.Username() != httpd.SubscriptionUser)))) {
 						// Remove access for changing subscriptions.
 						if u.User != nil {
 							if p, ok := u.User.Password(); ok {
@@ -481,6 +488,7 @@ func (s *influxdbCluster) linkSubscriptions() error {
 						}
 						// Something changed, drop the sub and let it get recreated
 						s.dropSub(cli, se.name, se.cluster, se.rp)
+						s.runningSubs[se] = false
 					} else {
 						existingSubs[se] = si
 						// Do not revoke tokens that are still in use
@@ -496,7 +504,6 @@ func (s *influxdbCluster) linkSubscriptions() error {
 	}
 
 	// Compare to configured list
-	startedSubs := make(map[subEntry]bool)
 	all := len(s.configSubs) == 0
 	for se, si := range existingSubs {
 		if (s.configSubs[se] || all) && !s.exConfigSubs[se] && !s.runningSubs[se] {
@@ -511,12 +518,11 @@ func (s *influxdbCluster) linkSubscriptions() error {
 				if host == s.hostname {
 					numSubscriptions++
 					if u.Scheme == "udp" {
-						_, err := s.startUDPListener(se.cluster, se.rp, port)
+						_, err := s.startUDPListener(se, port)
 						if err != nil {
 							s.logger.Println("E! failed to start UDP listener:", err)
 						}
 					}
-					startedSubs[se] = true
 					s.runningSubs[se] = true
 					break
 				}
@@ -524,9 +530,11 @@ func (s *influxdbCluster) linkSubscriptions() error {
 		}
 	}
 	// create and start any new subscriptions
+	// stop any removed subscriptions
 	for _, se := range allSubs {
+		_, exists := existingSubs[se]
 		// If we have been configured to subscribe and the subscription is not started yet.
-		if (s.configSubs[se] || all) && !startedSubs[se] && !s.exConfigSubs[se] && !s.runningSubs[se] {
+		if (s.configSubs[se] || all) && !s.exConfigSubs[se] && !(s.runningSubs[se] && exists) {
 			var destination string
 			switch s.protocol {
 			case "http", "https":
@@ -554,7 +562,7 @@ func (s *influxdbCluster) linkSubscriptions() error {
 					destination = u.String()
 				}
 			case "udp":
-				addr, err := s.startUDPListener(se.cluster, se.rp, "0")
+				addr, err := s.startUDPListener(se, "0")
 				if err != nil {
 					s.logger.Println("E! failed to start UDP listener:", err)
 				}
@@ -563,11 +571,36 @@ func (s *influxdbCluster) linkSubscriptions() error {
 
 			numSubscriptions++
 
-			err = s.createSub(cli, se.name, se.cluster, se.rp, "ANY", []string{destination})
+			mode := "ANY"
+			destinations := []string{destination}
+			err = s.createSub(cli, se.name, se.cluster, se.rp, mode, destinations)
 			if err != nil {
 				return err
 			}
+			// Mark as running
 			s.runningSubs[se] = true
+			// Add info to exiting set
+			existingSubs[se] = subInfo{
+				Mode:         mode,
+				Destinations: destinations,
+			}
+		}
+	}
+	for se, running := range s.runningSubs {
+		if !running {
+			continue
+		}
+		if _, exists := existingSubs[se]; !exists {
+			// Close the service and stop tracking it.
+			if service, ok := s.services[se]; ok {
+				s.logger.Println("D! deleting service for", se)
+				err := service.Close()
+				if err != nil {
+					s.logger.Printf("E! failed to close service for %v: %s", se, err)
+				}
+			}
+			delete(s.runningSubs, se)
+			delete(s.services, se)
 		}
 	}
 
@@ -590,7 +623,7 @@ func (s *influxdbCluster) generateRandomToken() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(tokenBytes), nil
 }
 
-func (s *influxdbCluster) createSub(cli influxdb.Client, name, cluster, rp, mode string, destinations []string) (err error) {
+func (s *influxdbCluster) createSub(cli influxdb.Client, name, cluster, rp, mode string, destinations []string) error {
 	var buf bytes.Buffer
 	for i, dst := range destinations {
 		if i != 0 {
@@ -600,7 +633,7 @@ func (s *influxdbCluster) createSub(cli influxdb.Client, name, cluster, rp, mode
 		buf.Write([]byte(dst))
 		buf.Write([]byte("'"))
 	}
-	_, err = s.execQuery(
+	_, err := s.execQuery(
 		cli,
 		&influxql.CreateSubscriptionStatement{
 			Name:            name,
@@ -610,7 +643,7 @@ func (s *influxdbCluster) createSub(cli influxdb.Client, name, cluster, rp, mode
 			Mode:            strings.ToUpper(mode),
 		},
 	)
-	return
+	return errors.Wrapf(err, "creating sub %s for db %q and rp %q", name, cluster, rp)
 
 }
 func (s *influxdbCluster) dropSub(cli influxdb.Client, name, cluster, rp string) (err error) {
@@ -625,24 +658,24 @@ func (s *influxdbCluster) dropSub(cli influxdb.Client, name, cluster, rp string)
 	return
 }
 
-func (s *influxdbCluster) startUDPListener(cluster, rp, port string) (*net.UDPAddr, error) {
+func (s *influxdbCluster) startUDPListener(se subEntry, port string) (*net.UDPAddr, error) {
 	c := udp.Config{}
 	c.Enabled = true
 	c.BindAddress = fmt.Sprintf("%s:%s", s.udpBind, port)
-	c.Database = cluster
-	c.RetentionPolicy = rp
+	c.Database = se.cluster
+	c.RetentionPolicy = se.rp
 	c.Buffer = s.udpBuffer
 	c.ReadBuffer = s.udpReadBuffer
 
-	l := s.LogService.NewLogger(fmt.Sprintf("[udp:%s.%s] ", cluster, rp), log.LstdFlags)
+	l := s.LogService.NewLogger(fmt.Sprintf("[udp:%s.%s] ", se.cluster, se.rp), log.LstdFlags)
 	service := udp.NewService(c, l)
 	service.PointsWriter = s.PointsWriter
 	err := service.Open()
 	if err != nil {
 		return nil, err
 	}
-	s.services = append(s.services, service)
-	s.logger.Println("I! started UDP listener for", cluster, rp)
+	s.services[se] = service
+	s.logger.Println("I! started UDP listener for", se.cluster, se.rp)
 	return service.Addr(), nil
 }
 
