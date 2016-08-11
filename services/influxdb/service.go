@@ -276,7 +276,6 @@ type subInfo struct {
 
 func (s *influxdbCluster) Open() error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if !s.disableSubs {
 		if s.subscriptionSyncInterval != 0 {
 			s.subSyncTicker = time.NewTicker(s.subscriptionSyncInterval)
@@ -287,6 +286,8 @@ func (s *influxdbCluster) Open() error {
 			}()
 		}
 	}
+	// Release lock so we can call linkSubscriptions.
+	s.mu.Unlock()
 	return s.linkSubscriptions()
 }
 
