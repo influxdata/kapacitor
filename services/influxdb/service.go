@@ -65,7 +65,8 @@ type Service struct {
 		ListSubscriptionTokens() ([]string, error)
 		RevokeSubscriptionAccess(token string) error
 	}
-	logger *log.Logger
+	RandReader io.Reader
+	logger     *log.Logger
 }
 
 func NewService(configs []Config, defaultInfluxDB, httpPort int, hostname string, useTokens bool, l *log.Logger) *Service {
@@ -75,11 +76,8 @@ func NewService(configs []Config, defaultInfluxDB, httpPort int, hostname string
 	var defaultInfluxDBName string
 	for i, c := range configs {
 		urls := make([]influxdb.HTTPConfig, len(c.URLs))
-		tlsConfig, err := getTLSConfig(c.SSLCA, c.SSLCert, c.SSLKey, c.InsecureSkipVerify)
-		if err != nil {
-			// Config should have been validated already
-			panic(err)
-		}
+		// Config should have been validated already, ignore error
+		tlsConfig, _ := getTLSConfig(c.SSLCA, c.SSLCert, c.SSLKey, c.InsecureSkipVerify)
 		if c.InsecureSkipVerify {
 			l.Printf("W! Using InsecureSkipVerify when connecting to InfluxDB @ %v this is insecure!", c.URLs)
 		}
@@ -117,7 +115,7 @@ func NewService(configs []Config, defaultInfluxDB, httpPort int, hostname string
 		runningSubs := make(map[subEntry]bool, len(c.Subscriptions))
 		services := make(map[subEntry]openCloser, len(c.Subscriptions))
 		clusters[c.Name] = &influxdbCluster{
-			name:                     c.Name,
+			clusterName:              c.Name,
 			configs:                  urls,
 			configSubs:               subs,
 			exConfigSubs:             exSubs,
@@ -146,6 +144,7 @@ func NewService(configs []Config, defaultInfluxDB, httpPort int, hostname string
 		defaultInfluxDB: defaultInfluxDBName,
 		clusters:        clusters,
 		logger:          l,
+		RandReader:      rand.Reader,
 	}
 }
 
@@ -155,6 +154,7 @@ func (s *Service) Open() error {
 		cluster.LogService = s.LogService
 		cluster.AuthService = s.AuthService
 		cluster.ClientCreator = s.ClientCreator
+		cluster.randReader = s.RandReader
 		err := cluster.Open()
 		if err != nil {
 			return err
@@ -175,19 +175,51 @@ func (s *Service) Open() error {
 	if err != nil {
 		return errors.Wrap(err, "adding API routes")
 	}
-	return nil
+	// Revoke any tokens for removed clusters.
+	err = s.revokeClusterTokens()
+	return errors.Wrap(err, "revoking old cluster tokens")
 }
 
 // Refresh the subscriptions linking for all clusters.
 func (s *Service) handleSubscriptions(w http.ResponseWriter, r *http.Request) {
-	for _, cluster := range s.clusters {
-		err := cluster.linkSubscriptions()
-		if err != nil {
-			httpd.HttpError(w, fmt.Sprintf("failed to link subscriptions: %s", err.Error()), true, http.StatusInternalServerError)
-			return
-		}
+	err := s.LinkSubscriptions()
+	if err != nil {
+		httpd.HttpError(w, fmt.Sprintf("failed to link subscriptions: %s", err.Error()), true, http.StatusInternalServerError)
+		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// Trigger a linkSubscriptions event for all clusters
+func (s *Service) LinkSubscriptions() error {
+	for clusterName, cluster := range s.clusters {
+		err := cluster.linkSubscriptions()
+		if err != nil {
+			return errors.Wrapf(err, "linking cluster %s", clusterName)
+		}
+	}
+	return nil
+}
+
+// Revoke tokens that are not associated with any current cluster.
+func (s *Service) revokeClusterTokens() error {
+	// revoke any extra tokens
+	tokens, err := s.AuthService.ListSubscriptionTokens()
+	if err != nil {
+		return errors.Wrap(err, "getting existing subscription tokens")
+	}
+	// Check all tokens against configured clusters
+	for _, token := range tokens {
+		clusterName, _, err := splitToken(token)
+		if err != nil {
+			// Revoke invalid token
+			s.AuthService.RevokeSubscriptionAccess(token)
+		} else if _, ok := s.clusters[clusterName]; !ok {
+			// Revoke token for old non existant cluster
+			s.AuthService.RevokeSubscriptionAccess(token)
+		}
+	}
+	return nil
 }
 
 func (s *Service) Close() error {
@@ -216,7 +248,7 @@ func (s *Service) NewNamedClient(name string) (influxdb.Client, error) {
 }
 
 type influxdbCluster struct {
-	name                     string
+	clusterName              string
 	configs                  []influxdb.HTTPConfig
 	i                        int
 	configSubs               map[subEntry]bool
@@ -237,6 +269,7 @@ type influxdbCluster struct {
 	clusterID     string
 	subName       string
 	subSyncTicker *time.Ticker
+	services      map[subEntry]openCloser
 
 	PointsWriter interface {
 		WritePoints(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
@@ -253,7 +286,7 @@ type influxdbCluster struct {
 		RevokeSubscriptionAccess(token string) error
 	}
 
-	services map[subEntry]openCloser
+	randReader io.Reader
 
 	mu sync.Mutex
 }
@@ -264,9 +297,9 @@ type openCloser interface {
 }
 
 type subEntry struct {
-	cluster string
-	rp      string
-	name    string
+	db   string
+	rp   string
+	name string
 }
 
 type subInfo struct {
@@ -340,7 +373,7 @@ func (s *influxdbCluster) linkSubscriptions() error {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.logger.Println("D! linking subscriptions for cluster", s.name)
+	s.logger.Println("D! linking subscriptions for cluster", s.clusterName)
 	b := backoff.NewExponentialBackOff()
 	b.MaxElapsedTime = s.startupTimeout
 	ticker := backoff.NewTicker(b)
@@ -361,15 +394,6 @@ func (s *influxdbCluster) linkSubscriptions() error {
 
 	numSubscriptions := int64(0)
 
-	tokens, err := s.AuthService.ListSubscriptionTokens()
-	if err != nil {
-		return errors.Wrap(err, "getting existing subscription tokens")
-	}
-	revokeTokens := make(map[string]bool, len(tokens))
-	for _, token := range tokens {
-		revokeTokens[token] = true
-	}
-
 	// Get all databases and retention policies
 	var allSubs []subEntry
 	resp, err := s.execQuery(cli, &influxql.ShowDatabasesStatement{})
@@ -378,12 +402,13 @@ func (s *influxdbCluster) linkSubscriptions() error {
 	}
 
 	if len(resp.Results) == 1 && len(resp.Results[0].Series) == 1 && len(resp.Results[0].Series[0].Values) > 0 {
-		clusters := resp.Results[0].Series[0].Values
-		for _, v := range clusters {
-			clustername := v[0].(string)
+		dbs := resp.Results[0].Series[0].Values
+		fmt.Println("dbs", dbs)
+		for _, v := range dbs {
+			db := v[0].(string)
 
 			rpResp, err := s.execQuery(cli, &influxql.ShowRetentionPoliciesStatement{
-				Database: clustername,
+				Database: db,
 			})
 			if err != nil {
 				return err
@@ -394,28 +419,30 @@ func (s *influxdbCluster) linkSubscriptions() error {
 					rpname := v[0].(string)
 
 					se := subEntry{
-						cluster: clustername,
-						rp:      rpname,
-						name:    s.subName,
+						db:   db,
+						rp:   rpname,
+						name: s.subName,
 					}
 					allSubs = append(allSubs, se)
 				}
 			}
-
 		}
 	}
+
+	fmt.Println("allSubs", allSubs)
 
 	// Get all existing subscriptions
 	resp, err = s.execQuery(cli, &influxql.ShowSubscriptionsStatement{})
 	if err != nil {
 		return err
 	}
+	// Populate a set of existing subscriptions
 	existingSubs := make(map[subEntry]subInfo)
 	for _, res := range resp.Results {
 		for _, series := range res.Series {
 			for _, v := range series.Values {
 				se := subEntry{
-					cluster: series.Name,
+					db: series.Name,
 				}
 				si := subInfo{}
 				for i, c := range series.Columns {
@@ -437,12 +464,12 @@ func (s *influxdbCluster) linkSubscriptions() error {
 				if se.name == legacySubName {
 					// This is an old-style subscription,
 					// drop it and recreate with new name.
-					err := s.dropSub(cli, se.name, se.cluster, se.rp)
+					err := s.dropSub(cli, se.name, se.db, se.rp)
 					if err != nil {
 						return err
 					}
 					se.name = s.subName
-					err = s.createSub(cli, se.name, se.cluster, se.rp, si.Mode, si.Destinations)
+					err = s.createSub(cli, se.name, se.db, se.rp, si.Mode, si.Destinations)
 					if err != nil {
 						return err
 					}
@@ -450,63 +477,30 @@ func (s *influxdbCluster) linkSubscriptions() error {
 				} else if se.name == s.clusterID {
 					// This is an just the cluster ID
 					// drop it and recreate with new name.
-					err := s.dropSub(cli, se.name, se.cluster, se.rp)
+					err := s.dropSub(cli, se.name, se.db, se.rp)
 					se.name = s.subName
-					err = s.createSub(cli, se.name, se.cluster, se.rp, si.Mode, si.Destinations)
+					err = s.createSub(cli, se.name, se.db, se.rp, si.Mode, si.Destinations)
 					if err != nil {
 						return err
 					}
 					existingSubs[se] = si
 				} else if se.name == s.subName {
-					if len(si.Destinations) == 0 {
-						s.logger.Println("E! found subscription without any destinations:", se)
-						continue
-					}
-					u, err := url.Parse(si.Destinations[0])
-					if err != nil {
-						s.logger.Println("E! found subscription with invalid destinations:", si)
-						continue
-					}
-					host, port, err := net.SplitHostPort(u.Host)
-					if err != nil {
-						s.logger.Println("E! found subscription with invalid destinations:", si)
-						continue
-					}
-					pn, err := strconv.ParseInt(port, 10, 64)
-					if err != nil {
-						s.logger.Println("E! found subscription with invalid destinations:", si)
-						continue
-					}
-					// Check if the hostname, port or protocol have changed
-					if host != s.hostname ||
-						u.Scheme != s.protocol ||
-						((u.Scheme == "http" || u.Scheme == "https") &&
-							(int(pn) != s.httpPort ||
-								(s.useTokens && (u.User == nil || u.User.Username() != httpd.SubscriptionUser)))) {
-						// Remove access for changing subscriptions.
-						if u.User != nil {
-							if p, ok := u.User.Password(); ok {
-								s.AuthService.RevokeSubscriptionAccess(p)
-							}
-						}
-						// Something changed, drop the sub and let it get recreated
-						s.dropSub(cli, se.name, se.cluster, se.rp)
+					// Check if the something has changed or is invalid.
+					if s.changedOrInvalid(se, si) {
+						// Something changed or is invalid, drop the sub and let it get recreated
+						fmt.Println("something changed", se, si)
+						s.dropSub(cli, se.name, se.db, se.rp)
 						s.closeSub(se)
 					} else {
+						fmt.Println("found existing", se, si)
 						existingSubs[se] = si
-						// Do not revoke tokens that are still in use
-						if u.User != nil {
-							if t, ok := u.User.Password(); ok {
-								revokeTokens[t] = false
-							}
-						}
 					}
 				}
 			}
 		}
 	}
 
-	// Compare to configured list
+	// Compare existing subs to configured list
 	all := len(s.configSubs) == 0
 	for se, si := range existingSubs {
 		if (s.configSubs[se] || all) && !s.exConfigSubs[se] && !s.runningSubs[se] {
@@ -547,7 +541,7 @@ func (s *influxdbCluster) linkSubscriptions() error {
 					if err != nil {
 						return errors.Wrap(err, "generating token")
 					}
-					err = s.AuthService.GrantSubscriptionAccess(token, se.cluster, se.rp)
+					err = s.AuthService.GrantSubscriptionAccess(token, se.db, se.rp)
 					if err != nil {
 						return err
 					}
@@ -576,19 +570,51 @@ func (s *influxdbCluster) linkSubscriptions() error {
 
 			mode := "ANY"
 			destinations := []string{destination}
-			err = s.createSub(cli, se.name, se.cluster, se.rp, mode, destinations)
+			err = s.createSub(cli, se.name, se.db, se.rp, mode, destinations)
 			if err != nil {
 				return err
 			}
 			// Mark as running
 			s.runningSubs[se] = true
-			// Add info to exiting set
+			// Update exiting set
 			existingSubs[se] = subInfo{
 				Mode:         mode,
 				Destinations: destinations,
 			}
 		}
 	}
+
+	// revoke any extra tokens
+	tokens, err := s.AuthService.ListSubscriptionTokens()
+	if err != nil {
+		return errors.Wrap(err, "getting existing subscription tokens")
+	}
+	// populate set of existing tokens.
+	existingTokens := make(map[string]bool, len(existingSubs))
+	if s.useTokens {
+		for _, si := range existingSubs {
+			u, err := url.Parse(si.Destinations[0])
+			if err != nil || u.User == nil {
+				continue
+			}
+			if t, ok := u.User.Password(); ok {
+				existingTokens[t] = true
+			}
+		}
+	}
+	// Check all tokens against existing tokens
+	for _, token := range tokens {
+		clusterName, _, err := splitToken(token)
+		// Skip invalid token or token from another cluster
+		if err != nil || clusterName != s.clusterName {
+			continue
+		}
+		// If the token is not part of the existing set we need to revoke
+		if !existingTokens[token] {
+			s.AuthService.RevokeSubscriptionAccess(token)
+		}
+	}
+
 	// Close any subs for dbs that have been dropped
 	for se, running := range s.runningSubs {
 		if !running {
@@ -602,15 +628,61 @@ func (s *influxdbCluster) linkSubscriptions() error {
 		}
 	}
 
-	// revoke any extra tokens
-	for t, revoke := range revokeTokens {
-		if revoke {
-			s.AuthService.RevokeSubscriptionAccess(t)
-		}
-	}
-
 	kapacitor.NumSubscriptionsVar.Set(numSubscriptions)
 	return nil
+}
+
+// Determine whether a subscription has differing values from the config.
+func (s *influxdbCluster) changedOrInvalid(se subEntry, si subInfo) bool {
+	// Validate destinations
+	if len(si.Destinations) == 0 {
+		return true
+	}
+	u, err := url.Parse(si.Destinations[0])
+	if err != nil {
+		return true
+	}
+	if u.Scheme != s.protocol {
+		return true
+	}
+
+	host, port, err := net.SplitHostPort(u.Host)
+	if err != nil {
+		return true
+	}
+	if host != s.hostname {
+		return true
+	}
+
+	// Further checks for HTTP protocols
+	if u.Scheme == "http" || u.Scheme == "https" {
+		// Check the port
+		pn, err := strconv.ParseInt(port, 10, 64)
+		if err != nil {
+			return true
+		}
+		if int(pn) != s.httpPort {
+			return true
+		}
+		// Further checks for the user token
+		if !s.useTokens && u.User != nil {
+			return true
+		}
+		if s.useTokens {
+			if u.User == nil || u.User.Username() != httpd.SubscriptionUser {
+				return true
+			}
+			t, ok := u.User.Password()
+			if !ok {
+				return true
+			}
+			clusterName, _, err := splitToken(t)
+			if err != nil || clusterName != s.clusterName {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // Close the service and stop tracking it.
@@ -624,9 +696,33 @@ func (s *influxdbCluster) closeSub(se subEntry) (err error) {
 	return
 }
 
+const (
+	// Delimiter used to separate cluster name and token data in a token.
+	tokenDelimiter = ';'
+)
+
+// Split a token into its cluster name and token data.
+func splitToken(token string) (string, string, error) {
+	raw, err := base64.RawURLEncoding.DecodeString(token)
+	if err != nil {
+		return "", "", errors.Wrap(err, "base64 decode")
+	}
+	rawStr := string(raw)
+	i := strings.IndexRune(rawStr, tokenDelimiter)
+	if i <= 0 {
+		return "", "", errors.New("invalid token")
+	}
+	return rawStr[:i], rawStr[i+1:], nil
+}
+
+// Generate a token tagged with the cluster name.
+// <clustername>;<token>
 func (s *influxdbCluster) generateRandomToken() (string, error) {
-	tokenBytes := make([]byte, tokenSize)
-	if _, err := io.ReadFull(rand.Reader, tokenBytes); err != nil {
+	l := len(s.clusterName)
+	tokenBytes := make([]byte, l+tokenSize+1)
+	copy(tokenBytes[:l], []byte(s.clusterName))
+	tokenBytes[l] = tokenDelimiter
+	if _, err := io.ReadFull(s.randReader, tokenBytes[l+1:]); err != nil {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(tokenBytes), nil
@@ -671,12 +767,12 @@ func (s *influxdbCluster) startUDPListener(se subEntry, port string) (*net.UDPAd
 	c := udp.Config{}
 	c.Enabled = true
 	c.BindAddress = fmt.Sprintf("%s:%s", s.udpBind, port)
-	c.Database = se.cluster
+	c.Database = se.db
 	c.RetentionPolicy = se.rp
 	c.Buffer = s.udpBuffer
 	c.ReadBuffer = s.udpReadBuffer
 
-	l := s.LogService.NewLogger(fmt.Sprintf("[udp:%s.%s] ", se.cluster, se.rp), log.LstdFlags)
+	l := s.LogService.NewLogger(fmt.Sprintf("[udp:%s.%s] ", se.db, se.rp), log.LstdFlags)
 	service := udp.NewService(c, l)
 	service.PointsWriter = s.PointsWriter
 	err := service.Open()
@@ -684,7 +780,7 @@ func (s *influxdbCluster) startUDPListener(se subEntry, port string) (*net.UDPAd
 		return nil, err
 	}
 	s.services[se] = service
-	s.logger.Println("I! started UDP listener for", se.cluster, se.rp)
+	s.logger.Println("I! started UDP listener for", se.db, se.rp)
 	return service.Addr(), nil
 }
 
