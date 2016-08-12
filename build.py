@@ -176,6 +176,7 @@ def go_get(branch, update=False, no_uncommitted=False):
         changes = run("git status --porcelain").strip()
         if len(changes) > 0:
             logging.error("There are un-committed changes in your local branch, --no-uncommited was given, cannot continue")
+            logging.debug("Changes\n" + changes)
             return False
 
     return True
@@ -398,6 +399,10 @@ def get_go_version():
     matches = re.search('go version go(\S+)', out)
     if matches is not None:
         return matches.groups()[0].strip()
+    else:
+        parts = out.split()
+        if len(parts) >= 3:
+            return parts[2]
     return None
 
 def check_path_for(b):
