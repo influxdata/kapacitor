@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"regexp"
 	"time"
 
 	"github.com/influxdata/influxdb/toml"
@@ -81,9 +82,14 @@ func (c *Config) SetDefaultValues() {
 	}
 }
 
+var validNamePattern = regexp.MustCompile(`^[-\._\p{L}0-9]+$`)
+
 func (c Config) Validate() error {
 	if c.Name == "" {
 		return errors.New("influxdb cluster must be given a name")
+	}
+	if !validNamePattern.MatchString(c.Name) {
+		return errors.New("influxdb cluster name must contain only numbers, letters or '.', '-', and '_' characters")
 	}
 	if len(c.URLs) == 0 {
 		return errors.New("must specify at least one InfluxDB URL")
