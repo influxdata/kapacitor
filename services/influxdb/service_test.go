@@ -22,8 +22,8 @@ import (
 var ls = logSerivce{}
 
 const (
-	testClusterID = "test-kclusterid"
-	testSubName   = "kapacitor-" + testClusterID
+	testKapacitorClusterID = "test-kclusterid"
+	testSubName            = "kapacitor-" + testKapacitorClusterID
 
 	randomTokenData = "test random data that is 64 bytes long xxxxxxxxxxxxxxxxxxxxxxxxx"
 	testClusterName = "testcluster0"
@@ -36,7 +36,7 @@ const (
 )
 
 func init() {
-	kapacitor.ClusterIDVar.Set(testClusterID)
+	kapacitor.ClusterIDVar.Set(testKapacitorClusterID)
 	if len(randomTokenData) != tokenSize {
 		panic(fmt.Sprintf("invalid randomTokenData: got %d exp %d", len(randomTokenData), tokenSize))
 	}

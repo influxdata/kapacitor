@@ -49,6 +49,7 @@ The corresponding alert states are:
 - [#786](https://github.com/influxdata/kapacitor/issues/786): Deleting tags now updates the group by dimensions if needed.
 - [#772](https://github.com/influxdata/kapacitor/issues/772): Delete task snapshot data when a task is deleted.
 - [#797](https://github.com/influxdata/kapacitor/issues/797): Fix panic from race condition in task master.
+- [#811](https://github.com/influxdata/kapacitor/pull/811): Fix bug where subscriptions + tokens would not work with more than one InfluxDB cluster.
 
 ## v1.0.0-beta4 [2016-07-27]
 

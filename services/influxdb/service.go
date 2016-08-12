@@ -403,7 +403,6 @@ func (s *influxdbCluster) linkSubscriptions() error {
 
 	if len(resp.Results) == 1 && len(resp.Results[0].Series) == 1 && len(resp.Results[0].Series[0].Values) > 0 {
 		dbs := resp.Results[0].Series[0].Values
-		fmt.Println("dbs", dbs)
 		for _, v := range dbs {
 			db := v[0].(string)
 
@@ -428,8 +427,6 @@ func (s *influxdbCluster) linkSubscriptions() error {
 			}
 		}
 	}
-
-	fmt.Println("allSubs", allSubs)
 
 	// Get all existing subscriptions
 	resp, err = s.execQuery(cli, &influxql.ShowSubscriptionsStatement{})
@@ -488,11 +485,9 @@ func (s *influxdbCluster) linkSubscriptions() error {
 					// Check if the something has changed or is invalid.
 					if s.changedOrInvalid(se, si) {
 						// Something changed or is invalid, drop the sub and let it get recreated
-						fmt.Println("something changed", se, si)
 						s.dropSub(cli, se.name, se.db, se.rp)
 						s.closeSub(se)
 					} else {
-						fmt.Println("found existing", se, si)
 						existingSubs[se] = si
 					}
 				}
