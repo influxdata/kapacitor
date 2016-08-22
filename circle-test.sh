@@ -13,6 +13,7 @@ cd $DIR
 export OUTPUT_DIR="$CIRCLE_ARTIFACTS"
 # Don't delete the container since CircleCI doesn't have permission to do so.
 export DOCKER_RM="false"
+export NO_UNCOMMITTED=true
 
 # Get number of test environments.
 count=$(./test.sh count)

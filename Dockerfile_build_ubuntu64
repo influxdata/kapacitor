@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y \
     python-software-properties \
     software-properties-common \
     wget \
+    unzip \
     git \
     mercurial \
     make \
@@ -27,14 +28,22 @@ RUN apt-get update && apt-get install -y \
 
 RUN gem install fpm
 
-# Install protobuf3
-ADD install-deps.sh /tmp/
-RUN INSTALL_PREFIX=/usr /tmp/install-deps.sh
-RUN rm /tmp/install-deps.sh
+# Install protobuf3 protoc binary
+ENV PROTO_VERSION 3.0.0
+RUN wget https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protoc-${PROTO_VERSION}-linux-x86_64.zip \
+    && unzip -j protoc-${PROTO_VERSION}-linux-x86_64.zip bin/protoc -d /bin \
+    rm protoc-${PROTO_VERSION}-linux-x86_64.zip
+
+# Install protobuf3 python library
+RUN wget https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protobuf-python-${PROTO_VERSION}.tar.gz \
+    && tar -xf protobuf-python-${PROTO_VERSION}.tar.gz \
+    && cd /protobuf-${PROTO_VERSION}/python \
+    && python setup.py install \
+    && rm -rf /protobuf-${PROTO_VERSION} protobuf-python-${PROTO_VERSION}.tar.gz
 
 # Install go
 ENV GOPATH /root/go
-ENV GO_VERSION 1.6.2
+ENV GO_VERSION 1.6.3
 ENV GO_ARCH amd64
 RUN wget https://storage.googleapis.com/golang/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz; \
    tar -C /usr/local/ -xf /go${GO_VERSION}.linux-${GO_ARCH}.tar.gz ; \
