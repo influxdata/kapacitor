@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.0.0-beta5 [unreleased]
+## v1.0.0-rc1 [2016-08-22]
 
 ### Release Notes
 
