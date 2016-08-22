@@ -50,6 +50,7 @@ The corresponding alert states are:
 - [#772](https://github.com/influxdata/kapacitor/issues/772): Delete task snapshot data when a task is deleted.
 - [#797](https://github.com/influxdata/kapacitor/issues/797): Fix panic from race condition in task master.
 - [#811](https://github.com/influxdata/kapacitor/pull/811): Fix bug where subscriptions + tokens would not work with more than one InfluxDB cluster.
+- [#812](https://github.com/influxdata/kapacitor/issues/812): Upgrade to use protobuf version 3.0.0
 
 ## v1.0.0-beta4 [2016-07-27]
 

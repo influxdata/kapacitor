@@ -7,6 +7,7 @@ MAINTAINER support@influxdb.com
 
 RUN apt-get update && apt-get install -y \
     wget \
+    unzip \
     git \
     mercurial \
     build-essential \
@@ -17,14 +18,22 @@ RUN apt-get update && apt-get install -y \
     zip \
     curl
 
-# Install protobuf3
-ADD install-deps.sh /tmp/
-RUN INSTALL_PREFIX=/usr /tmp/install-deps.sh
-RUN rm /tmp/install-deps.sh
+# Install protobuf3 protoc binary
+ENV PROTO_VERSION 3.0.0
+RUN wget https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protoc-${PROTO_VERSION}-linux-x86_32.zip\
+    && unzip -j protoc-${PROTO_VERSION}-linux-x86_32.zip bin/protoc -d /bin \
+    rm protoc-${PROTO_VERSION}-linux-x86_64.zip
+
+# Install protobuf3 python library
+RUN wget https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protobuf-python-${PROTO_VERSION}.tar.gz \
+    && tar -xf protobuf-python-${PROTO_VERSION}.tar.gz \
+    && cd /protobuf-${PROTO_VERSION}/python \
+    && python setup.py install \
+    && rm -rf /protobuf-${PROTO_VERSION} protobuf-python-${PROTO_VERSION}.tar.gz
 
 # Install go
 ENV GOPATH /root/go
-ENV GO_VERSION 1.6.2
+ENV GO_VERSION 1.6.3
 ENV GO_ARCH 386
 RUN wget https://storage.googleapis.com/golang/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz; \
    tar -C /usr/local/ -xf /go${GO_VERSION}.linux-${GO_ARCH}.tar.gz ; \
