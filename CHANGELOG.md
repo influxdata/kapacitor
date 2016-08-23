@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.0.0-rc2 [unreleased]
+
+### Release Notes
+
+
+### Features
+
+
+### Bugfixes
+
+- [#763](https://github.com/influxdata/kapacitor/issues/763): Fix NaNs begin returned from the `sigma` stateful function.
+
 ## v1.0.0-rc1 [2016-08-22]
 
 ### Release Notes
