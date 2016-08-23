@@ -79,7 +79,7 @@ const defaultLogFileMode = 0600
 //           .crit(lambda: "value" > 30)
 //           .post("http://example.com/api/alert")
 //           .post("http://another.example.com/api/alert")
-//           .email().to('oncall@example.com')
+//           .email('oncall@example.com')
 //
 //
 // Each expression maintains its own state.
@@ -268,6 +268,7 @@ type AlertNode struct {
 	AllFlag bool `tick:"All"`
 
 	// Do not send recovery events.
+	// tick:ignore
 	NoRecoveriesFlag bool `tick:"NoRecoveries"`
 
 	// Send alerts only on state changes.
@@ -454,7 +455,7 @@ func (a *AlertNode) Post(url string) *PostHandler {
 	return post
 }
 
-// tick:embedded:AlertNode.Email
+// tick:embedded:AlertNode.Post
 type PostHandler struct {
 	*AlertNode
 
@@ -531,6 +532,25 @@ type EmailHandler struct {
 // Define the To addresses for the email alert.
 // Multiple calls append to the existing list of addresses.
 // If empty uses the addresses from the configuration.
+//
+// Example:
+//    |alert()
+//       .id('{{ .Name }}')
+//       // Email subject
+//       .meassage('{{ .ID }}:{{ .Level }}')
+//       //Email body as HTML
+//       .details('''
+//<h1>{{ .ID }}</h1>
+//<b>{{ .Message }}</b>
+//Value: {{ index .Fields "value" }}
+//''')
+//       .email('admin@example.com')
+//         .to('oncall@example.com')
+//         .to('support@example.com')
+//
+// All three email addresses will receive the alert message.
+//
+// Passing addresses to the `email` property directly or using the `email.to` property is the same.
 // tick:property
 func (h *EmailHandler) To(to ...string) *EmailHandler {
 	h.ToList = append(h.ToList, to...)
@@ -888,6 +908,7 @@ type AlertaHandler struct {
 
 // List of effected services.
 // If not specified defaults to the Name of the stream.
+// tick:property
 func (a *AlertaHandler) Services(service ...string) *AlertaHandler {
 	a.Service = service
 	return a
