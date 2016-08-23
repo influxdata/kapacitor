@@ -450,7 +450,7 @@ func (s *sigma) Call(args ...interface{}) (interface{}, error) {
 	s.m2 = s.m2 + delta*(x-s.mean)
 	s.variance = s.m2 / (s.n - 1)
 
-	if s.n < 2 {
+	if s.n < 2 || s.variance == 0 {
 		return float64(0), nil
 	}
 	return math.Abs(x-s.mean) / math.Sqrt(s.variance), nil
