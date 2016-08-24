@@ -3168,6 +3168,22 @@ stream
 			},
 		},
 		testCase{
+			Method: "mode",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    models.Tags{"host": "serverA"},
+						Columns: []string{"time", "mode"},
+						Values: [][]interface{}{[]interface{}{
+							endTime,
+							95.0,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
 			Method:        "min",
 			UsePointTimes: true,
 			ER: kapacitor.Result{
@@ -3606,6 +3622,22 @@ stream
 						Values: [][]interface{}{[]interface{}{
 							endTime,
 							94.0,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method: "mode",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    models.Tags{"host": "serverA"},
+						Columns: []string{"time", "mode"},
+						Values: [][]interface{}{[]interface{}{
+							endTime,
+							95.0,
 						}},
 					},
 				},
@@ -6864,10 +6896,7 @@ stream
 		if len(p.Tags()) != 1 {
 			t.Errorf("got %v exp %v", len(p.Tags()), 1)
 		}
-		if got, exp := string(p.Tags()[0].Key), "key"; got != exp {
-			t.Errorf("got %s exp %s", got, exp)
-		}
-		if got, exp := string(p.Tags()[0].Value), "value"; got != exp {
+		if got, exp := p.Tags()["key"], "value"; got != exp {
 			t.Errorf("got %s exp %s", got, exp)
 		}
 		tm := time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC)

@@ -152,6 +152,22 @@ func (n *chainnode) Median(field string) *InfluxQLNode {
 	return i
 }
 
+// Compute the mode of the data.
+func (n *chainnode) Mode(field string) *InfluxQLNode {
+	i := newInfluxQLNode("mode", field, n.Provides(), StreamEdge, ReduceCreater{
+		CreateFloatBulkReducer: func() (FloatBulkPointAggregator, influxql.FloatPointEmitter) {
+			fn := influxql.NewFloatSliceFuncReducer(influxql.FloatModeReduceSlice)
+			return fn, fn
+		},
+		CreateIntegerBulkReducer: func() (IntegerBulkPointAggregator, influxql.IntegerPointEmitter) {
+			fn := influxql.NewIntegerSliceFuncReducer(influxql.IntegerModeReduceSlice)
+			return fn, fn
+		},
+	})
+	n.linkChild(i)
+	return i
+}
+
 // Compute the difference between min and max points.
 func (n *chainnode) Spread(field string) *InfluxQLNode {
 	i := newInfluxQLNode("spread", field, n.Provides(), StreamEdge, ReduceCreater{
