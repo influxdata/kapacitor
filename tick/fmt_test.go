@@ -36,6 +36,14 @@ func TestFormat(t *testing.T) {
 			exp:    "var x = 60s\n",
 		},
 		{
+			script: `var x= /.*/`,
+			exp:    "var x = /.*/\n",
+		},
+		{
+			script: `var x= /^\/root\//`,
+			exp:    "var x = /^\\/root\\//\n",
+		},
+		{
 			script: `var x=stream()|window().period(10s).every(10s)`,
 			exp: `var x = stream()
     |window()

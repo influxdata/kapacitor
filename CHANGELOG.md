@@ -11,6 +11,7 @@
 ### Bugfixes
 
 - [#763](https://github.com/influxdata/kapacitor/issues/763): Fix NaNs begin returned from the `sigma` stateful function.
+- [#468](https://github.com/influxdata/kapacitor/issues/468): Fix tickfmt munging escaped slashes in regexes.
 
 ## v1.0.0-rc1 [2016-08-22]
 
