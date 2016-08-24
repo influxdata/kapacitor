@@ -146,13 +146,21 @@ func (j *JoinNode) As(names ...string) *JoinNode {
 	return j
 }
 
-// Join on specific dimensions.
+// Join on a subset of the group by dimensions.
+// This is a special case where you want a single point from one parent to join with multiple
+// points from a different parent.
+//
 // For example given two measurements:
 //
 // 1. building_power -- tagged by building, value is the total power consumed by the building.
-// 2. floor_power -- tagged by building and floor, values is the total power consumed by the floor.
+// 2. floor_power -- tagged by building and floor, values are the total power consumed by each floor.
 //
 // You want to calculate the percentage of the total building power consumed by each floor.
+// Since you only have one point per building you need it to join multiple times with
+// the points from each floor. By defining the `on` dimensions as `building` we are saying
+// that we want points that only have the building tag to be joined with more specifc points that
+// more tags, in this case the `floor` tag. In other words while we have points with tags building and floor
+// we only want to join on the building tag.
 //
 // Example:
 //    var building = stream
