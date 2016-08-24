@@ -223,8 +223,9 @@ PATCH /kapacitor/v1/tasks/TASK_ID
 Define a new task that is enabled on creation.
 
 ```
-POST /kapacitor/v1/tasks/TASK_ID
+POST /kapacitor/v1/tasks
 {
+    "id" : "TASK_ID",
     "type" : "stream",
     "dbrps" : [{"db": "DATABASE_NAME", "rp" : "RP_NAME"}],
     "script" : "stream\n    |from()\n        .measurement('cpu')\n",
