@@ -96,7 +96,7 @@ A task is defined by its id, type, TICKscript, and list of database retention po
 
 ### Define Task
 
-To define a task POST to the `/kapacitor/v1/tasks/` endpoint.
+To define a task POST to the `/kapacitor/v1/tasks` endpoint.
 If a task already exists then use the `PATCH` method to modify any property of the task.
 
 Define a task using a JSON object with the following options:
@@ -517,7 +517,7 @@ A task template is defined by a template TICKscript, and a task type.
 
 ### Define Templates
 
-To define a template POST to the `/kapacitor/v1/templates/` endpoint.
+To define a template POST to the `/kapacitor/v1/templates` endpoint.
 If a template already exists then use the `PATCH` method to modify any property of the template.
 
 Define a template using a JSON object with the following options:
