@@ -78,15 +78,13 @@ func TestMetaClient_CreateDatabaseWithRetentionPolicy(t *testing.T) {
 	defer os.RemoveAll(d)
 	defer c.Close()
 
-	duration := 1 * time.Hour
-	replicaN := 1
-	spec := meta.RetentionPolicySpec{
+	rpi := meta.RetentionPolicyInfo{
 		Name:               "rp0",
-		Duration:           &duration,
-		ReplicaN:           &replicaN,
+		Duration:           1 * time.Hour,
+		ReplicaN:           1,
 		ShardGroupDuration: 2 * time.Hour,
 	}
-	if _, err := c.CreateDatabaseWithRetentionPolicy("db0", &spec); err != nil {
+	if _, err := c.CreateDatabaseWithRetentionPolicy("db0", &rpi); err != nil {
 		t.Fatal(err)
 	}
 
@@ -110,42 +108,29 @@ func TestMetaClient_CreateDatabaseWithRetentionPolicy(t *testing.T) {
 
 	// Recreating the exact same database with retention policy is not
 	// an error.
-	if _, err := c.CreateDatabaseWithRetentionPolicy("db0", &spec); err != nil {
+	if _, err := c.CreateDatabaseWithRetentionPolicy("db0", &rpi); err != nil {
 		t.Fatal(err)
 	}
 
 	// If the rp's duration is different, an error should be returned.
-	spec2 := spec
-	duration2 := *spec.Duration + time.Minute
-	spec2.Duration = &duration2
-	if _, err := c.CreateDatabaseWithRetentionPolicy("db0", &spec2); err != meta.ErrRetentionPolicyConflict {
+	rpi2 := rpi
+	rpi2.Duration = rpi.Duration + time.Minute
+	if _, err := c.CreateDatabaseWithRetentionPolicy("db0", &rpi2); err != meta.ErrRetentionPolicyConflict {
 		t.Fatalf("got %v, but expected %v", err, meta.ErrRetentionPolicyConflict)
 	}
 
 	// If the rp's replica is different, an error should be returned.
-	spec2 = spec
-	replica2 := *spec.ReplicaN + 1
-	spec2.ReplicaN = &replica2
-	if _, err := c.CreateDatabaseWithRetentionPolicy("db0", &spec2); err != meta.ErrRetentionPolicyConflict {
+	rpi2 = rpi
+	rpi2.ReplicaN = rpi.ReplicaN + 1
+	if _, err := c.CreateDatabaseWithRetentionPolicy("db0", &rpi2); err != meta.ErrRetentionPolicyConflict {
 		t.Fatalf("got %v, but expected %v", err, meta.ErrRetentionPolicyConflict)
 	}
 
 	// If the rp's shard group duration is different, an error should be returned.
-	spec2 = spec
-	spec2.ShardGroupDuration = spec.ShardGroupDuration + time.Minute
-	if _, err := c.CreateDatabaseWithRetentionPolicy("db0", &spec2); err != meta.ErrRetentionPolicyConflict {
+	rpi2 = rpi
+	rpi2.ShardGroupDuration = rpi.ShardGroupDuration + time.Minute
+	if _, err := c.CreateDatabaseWithRetentionPolicy("db0", &rpi2); err != meta.ErrRetentionPolicyConflict {
 		t.Fatalf("got %v, but expected %v", err, meta.ErrRetentionPolicyConflict)
-	}
-
-	// If create database is used by itself, no error should be returned and
-	// the default retention policy should not be changed.
-	if dbi, err := c.CreateDatabase("db0"); err != nil {
-		t.Fatalf("got %v, but expected %v", err, nil)
-	} else if dbi.DefaultRetentionPolicy != "rp0" {
-		t.Fatalf("got %v, but expected %v", dbi.DefaultRetentionPolicy, "rp0")
-	} else if got, exp := len(dbi.RetentionPolicies), 1; got != exp {
-		// Ensure no additional retention policies were created.
-		t.Fatalf("got %v, but expected %v", got, exp)
 	}
 }
 
@@ -243,12 +228,7 @@ func TestMetaClient_CreateRetentionPolicy(t *testing.T) {
 		ShardGroupDuration: time.Hour,
 	}
 
-	if _, err := c.CreateRetentionPolicy("db0", &meta.RetentionPolicySpec{
-		Name:               rp0.Name,
-		ReplicaN:           &rp0.ReplicaN,
-		Duration:           &rp0.Duration,
-		ShardGroupDuration: rp0.ShardGroupDuration,
-	}); err != nil {
+	if _, err := c.CreateRetentionPolicy("db0", &rp0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -260,12 +240,7 @@ func TestMetaClient_CreateRetentionPolicy(t *testing.T) {
 	}
 
 	// Create the same policy.  Should not error.
-	if _, err := c.CreateRetentionPolicy("db0", &meta.RetentionPolicySpec{
-		Name:               rp0.Name,
-		ReplicaN:           &rp0.ReplicaN,
-		Duration:           &rp0.Duration,
-		ShardGroupDuration: rp0.ShardGroupDuration,
-	}); err != nil {
+	if _, err := c.CreateRetentionPolicy("db0", &rp0); err != nil {
 		t.Fatal(err)
 	} else if actual, err = c.RetentionPolicy("db0", "rp0"); err != nil {
 		t.Fatal(err)
@@ -278,12 +253,7 @@ func TestMetaClient_CreateRetentionPolicy(t *testing.T) {
 	rp1 := rp0
 	rp1.Duration = 2 * rp0.Duration
 
-	_, got := c.CreateRetentionPolicy("db0", &meta.RetentionPolicySpec{
-		Name:               rp1.Name,
-		ReplicaN:           &rp1.ReplicaN,
-		Duration:           &rp1.Duration,
-		ShardGroupDuration: rp1.ShardGroupDuration,
-	})
+	_, got := c.CreateRetentionPolicy("db0", &rp1)
 	if exp := meta.ErrRetentionPolicyExists; got != exp {
 		t.Fatalf("got error %v, expected error %v", got, exp)
 	}
@@ -293,12 +263,7 @@ func TestMetaClient_CreateRetentionPolicy(t *testing.T) {
 	rp1 = rp0
 	rp1.ReplicaN = rp0.ReplicaN + 1
 
-	_, got = c.CreateRetentionPolicy("db0", &meta.RetentionPolicySpec{
-		Name:               rp1.Name,
-		ReplicaN:           &rp1.ReplicaN,
-		Duration:           &rp1.Duration,
-		ShardGroupDuration: rp1.ShardGroupDuration,
-	})
+	_, got = c.CreateRetentionPolicy("db0", &rp1)
 	if exp := meta.ErrRetentionPolicyExists; got != exp {
 		t.Fatalf("got error %v, expected error %v", got, exp)
 	}
@@ -308,12 +273,7 @@ func TestMetaClient_CreateRetentionPolicy(t *testing.T) {
 	rp1 = rp0
 	rp1.ShardGroupDuration = 2 * rp0.ShardGroupDuration
 
-	_, got = c.CreateRetentionPolicy("db0", &meta.RetentionPolicySpec{
-		Name:               rp1.Name,
-		ReplicaN:           &rp1.ReplicaN,
-		Duration:           &rp1.Duration,
-		ShardGroupDuration: rp1.ShardGroupDuration,
-	})
+	_, got = c.CreateRetentionPolicy("db0", &rp1)
 	if exp := meta.ErrRetentionPolicyExists; got != exp {
 		t.Fatalf("got error %v, expected error %v", got, exp)
 	}
@@ -326,12 +286,10 @@ func TestMetaClient_SetDefaultRetentionPolicy(t *testing.T) {
 	defer os.RemoveAll(d)
 	defer c.Close()
 
-	duration := 1 * time.Hour
-	replicaN := 1
-	if _, err := c.CreateDatabaseWithRetentionPolicy("db0", &meta.RetentionPolicySpec{
+	if _, err := c.CreateDatabaseWithRetentionPolicy("db0", &meta.RetentionPolicyInfo{
 		Name:     "rp0",
-		Duration: &duration,
-		ReplicaN: &replicaN,
+		Duration: 1 * time.Hour,
+		ReplicaN: 1,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -378,12 +336,10 @@ func TestMetaClient_DropRetentionPolicy(t *testing.T) {
 		t.Fatalf("db name wrong: %s", db.Name)
 	}
 
-	duration := 1 * time.Hour
-	replicaN := 1
-	if _, err := c.CreateRetentionPolicy("db0", &meta.RetentionPolicySpec{
+	if _, err := c.CreateRetentionPolicy("db0", &meta.RetentionPolicyInfo{
 		Name:     "rp0",
-		Duration: &duration,
-		ReplicaN: &replicaN,
+		Duration: 1 * time.Hour,
+		ReplicaN: 1,
 	}); err != nil {
 		t.Fatal(err)
 	}

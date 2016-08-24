@@ -57,8 +57,8 @@ type Service struct {
 	addr    net.Addr
 
 	// expvar-based stats.
-	stats       *Statistics
-	defaultTags models.StatisticTags
+	stats    *Statistics
+	statTags models.Tags
 }
 
 // NewService returns a new instance of the collectd service.
@@ -67,10 +67,10 @@ func NewService(c Config) *Service {
 		// Use defaults where necessary.
 		Config: c.WithDefaults(),
 
-		Logger:      log.New(os.Stderr, "[collectd] ", log.LstdFlags),
-		err:         make(chan error),
-		stats:       &Statistics{},
-		defaultTags: models.StatisticTags{"bind": c.BindAddress},
+		Logger:   log.New(os.Stderr, "[collectd] ", log.LstdFlags),
+		err:      make(chan error),
+		stats:    &Statistics{},
+		statTags: map[string]string{"bind": c.BindAddress},
 	}
 
 	return &s
@@ -226,7 +226,7 @@ type Statistics struct {
 func (s *Service) Statistics(tags map[string]string) []models.Statistic {
 	return []models.Statistic{{
 		Name: "collectd",
-		Tags: s.defaultTags.Merge(tags),
+		Tags: s.statTags.Merge(tags),
 		Values: map[string]interface{}{
 			statPointsReceived:       atomic.LoadInt64(&s.stats.PointsReceived),
 			statBytesReceived:        atomic.LoadInt64(&s.stats.BytesReceived),
@@ -360,9 +360,8 @@ func (s *Service) UnmarshalCollectd(packet *gollectd.Packet) []models.Point {
 		if packet.TypeInstance != "" {
 			tags["type_instance"] = packet.TypeInstance
 		}
-
+		p, err := models.NewPoint(name, tags, fields, timestamp)
 		// Drop invalid points
-		p, err := models.NewPoint(name, models.NewTags(tags), fields, timestamp)
 		if err != nil {
 			s.Logger.Printf("Dropping point %v: %v", name, err)
 			atomic.AddInt64(&s.stats.InvalidDroppedPoints, 1)

@@ -2,7 +2,6 @@ package tsm1 // import "github.com/influxdata/influxdb/tsdb/engine/tsm1"
 
 import (
 	"archive/tar"
-	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -339,9 +338,8 @@ func (e *Engine) LoadMetadataIndex(shardID uint64, index *tsdb.DatabaseIndex) er
 
 	// Save reference to index for iterator creation.
 	e.index = index
-	e.FileStore.dereferencer = index
 
-	if err := e.FileStore.WalkKeys(func(key []byte, typ byte) error {
+	if err := e.FileStore.WalkKeys(func(key string, typ byte) error {
 		fieldType, err := tsmFieldTypeToInfluxQLDataType(typ)
 		if err != nil {
 			return err
@@ -367,7 +365,7 @@ func (e *Engine) LoadMetadataIndex(shardID uint64, index *tsdb.DatabaseIndex) er
 			continue
 		}
 
-		if err := e.addToIndexFromKey(shardID, []byte(key), fieldType, index); err != nil {
+		if err := e.addToIndexFromKey(shardID, key, fieldType, index); err != nil {
 			return err
 		}
 	}
@@ -524,9 +522,9 @@ func (e *Engine) readFileFromBackup(tr *tar.Reader, shardRelativePath string) er
 
 // addToIndexFromKey will pull the measurement name, series key, and field name from a composite key and add it to the
 // database index and measurement fields
-func (e *Engine) addToIndexFromKey(shardID uint64, key []byte, fieldType influxql.DataType, index *tsdb.DatabaseIndex) error {
+func (e *Engine) addToIndexFromKey(shardID uint64, key string, fieldType influxql.DataType, index *tsdb.DatabaseIndex) error {
 	seriesKey, field := SeriesAndFieldFromCompositeKey(key)
-	measurement := tsdb.MeasurementFromSeriesKey(string(seriesKey))
+	measurement := tsdb.MeasurementFromSeriesKey(seriesKey)
 
 	m := index.CreateMeasurementIndexIfNotExists(measurement)
 	m.SetFieldName(field)
@@ -542,7 +540,7 @@ func (e *Engine) addToIndexFromKey(shardID uint64, key []byte, fieldType influxq
 	}
 
 	// Have we already indexed this series?
-	ss := index.SeriesBytes(seriesKey)
+	ss := index.Series(seriesKey)
 	if ss != nil {
 		// Add this shard to the existing series
 		ss.AssignShard(shardID)
@@ -553,7 +551,7 @@ func (e *Engine) addToIndexFromKey(shardID uint64, key []byte, fieldType influxq
 	// fields (in line protocol format) in the series key
 	_, tags, _ := models.ParseKey(seriesKey)
 
-	s := tsdb.NewSeries(string(seriesKey), tags)
+	s := tsdb.NewSeries(seriesKey, tags)
 	index.CreateSeriesIndexIfNotExists(measurement, s)
 	s.AssignShard(shardID)
 
@@ -595,14 +593,14 @@ func (e *Engine) ContainsSeries(keys []string) (map[string]bool, error) {
 	}
 
 	for _, k := range e.Cache.Keys() {
-		seriesKey, _ := SeriesAndFieldFromCompositeKey([]byte(k))
-		keyMap[string(seriesKey)] = true
+		seriesKey, _ := SeriesAndFieldFromCompositeKey(k)
+		keyMap[seriesKey] = true
 	}
 
-	if err := e.FileStore.WalkKeys(func(k []byte, _ byte) error {
+	if err := e.FileStore.WalkKeys(func(k string, _ byte) error {
 		seriesKey, _ := SeriesAndFieldFromCompositeKey(k)
-		if _, ok := keyMap[string(seriesKey)]; ok {
-			keyMap[string(seriesKey)] = true
+		if _, ok := keyMap[seriesKey]; ok {
+			keyMap[seriesKey] = true
 		}
 		return nil
 	}); err != nil {
@@ -640,14 +638,14 @@ func (e *Engine) DeleteSeriesRange(seriesKeys []string, min, max int64) error {
 
 	deleteKeys := make([]string, 0, len(seriesKeys))
 	// go through the keys in the file store
-	if err := e.FileStore.WalkKeys(func(k []byte, _ byte) error {
+	if err := e.FileStore.WalkKeys(func(k string, _ byte) error {
 		seriesKey, _ := SeriesAndFieldFromCompositeKey(k)
 
 		// Keep track if we've added this key since WalkKeys can return keys
 		// we've seen before
-		if v, ok := keyMap[string(seriesKey)]; ok && v == 0 {
-			deleteKeys = append(deleteKeys, string(k))
-			keyMap[string(seriesKey)] += 1
+		if v, ok := keyMap[seriesKey]; ok && v == 0 {
+			deleteKeys = append(deleteKeys, k)
+			keyMap[seriesKey] += 1
 		}
 		return nil
 	}); err != nil {
@@ -667,8 +665,8 @@ func (e *Engine) DeleteSeriesRange(seriesKeys []string, min, max int64) error {
 	e.Cache.RLock()
 	s := e.Cache.Store()
 	for k, _ := range s {
-		seriesKey, _ := SeriesAndFieldFromCompositeKey([]byte(k))
-		if _, ok := keyMap[string(seriesKey)]; ok {
+		seriesKey, _ := SeriesAndFieldFromCompositeKey(k)
+		if _, ok := keyMap[seriesKey]; ok {
 			walKeys = append(walKeys, k)
 		}
 	}
@@ -1279,7 +1277,7 @@ func (e *Engine) createTagSetGroupIterators(ref *influxql.VarRef, mm *tsdb.Measu
 
 // createVarRefSeriesIterator creates an iterator for a variable reference for a series.
 func (e *Engine) createVarRefSeriesIterator(ref *influxql.VarRef, mm *tsdb.Measurement, seriesKey string, t *influxql.TagSet, filter influxql.Expr, conditionFields []influxql.VarRef, opt influxql.IteratorOptions) (influxql.Iterator, error) {
-	tags := influxql.NewTags(e.index.TagsForSeries(seriesKey).Map())
+	tags := influxql.NewTags(e.index.TagsForSeries(seriesKey))
 
 	// Create options specific for this series.
 	itrOpt := opt
@@ -1498,11 +1496,11 @@ func tsmFieldTypeToInfluxQLDataType(typ byte) (influxql.DataType, error) {
 	}
 }
 
-func SeriesAndFieldFromCompositeKey(key []byte) ([]byte, string) {
-	sep := bytes.Index(key, []byte(keyFieldSeparator))
+func SeriesAndFieldFromCompositeKey(key string) (string, string) {
+	sep := strings.Index(key, keyFieldSeparator)
 	if sep == -1 {
 		// No field???
 		return key, ""
 	}
-	return key[:sep], string(key[sep+len(keyFieldSeparator):])
+	return key[:sep], key[sep+len(keyFieldSeparator):]
 }

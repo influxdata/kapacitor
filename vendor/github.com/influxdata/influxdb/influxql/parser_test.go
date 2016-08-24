@@ -1635,8 +1635,9 @@ func TestParser_ParseStatement(t *testing.T) {
 			s: `CREATE DATABASE testdb WITH DURATION 24h`,
 			stmt: &influxql.CreateDatabaseStatement{
 				Name: "testdb",
-				RetentionPolicyCreate:   true,
-				RetentionPolicyDuration: duration(24 * time.Hour),
+				RetentionPolicyCreate:      true,
+				RetentionPolicyDuration:    24 * time.Hour,
+				RetentionPolicyReplication: 1,
 			},
 		},
 		{
@@ -1644,6 +1645,8 @@ func TestParser_ParseStatement(t *testing.T) {
 			stmt: &influxql.CreateDatabaseStatement{
 				Name: "testdb",
 				RetentionPolicyCreate:             true,
+				RetentionPolicyDuration:           0,
+				RetentionPolicyReplication:        1,
 				RetentionPolicyShardGroupDuration: 30 * time.Minute,
 			},
 		},
@@ -1652,15 +1655,18 @@ func TestParser_ParseStatement(t *testing.T) {
 			stmt: &influxql.CreateDatabaseStatement{
 				Name: "testdb",
 				RetentionPolicyCreate:      true,
-				RetentionPolicyReplication: intptr(2),
+				RetentionPolicyDuration:    0,
+				RetentionPolicyReplication: 2,
 			},
 		},
 		{
 			s: `CREATE DATABASE testdb WITH NAME test_name`,
 			stmt: &influxql.CreateDatabaseStatement{
 				Name: "testdb",
-				RetentionPolicyCreate: true,
-				RetentionPolicyName:   "test_name",
+				RetentionPolicyCreate:      true,
+				RetentionPolicyDuration:    0,
+				RetentionPolicyReplication: 1,
+				RetentionPolicyName:        "test_name",
 			},
 		},
 		{
@@ -1668,8 +1674,8 @@ func TestParser_ParseStatement(t *testing.T) {
 			stmt: &influxql.CreateDatabaseStatement{
 				Name: "testdb",
 				RetentionPolicyCreate:      true,
-				RetentionPolicyDuration:    duration(24 * time.Hour),
-				RetentionPolicyReplication: intptr(2),
+				RetentionPolicyDuration:    24 * time.Hour,
+				RetentionPolicyReplication: 2,
 				RetentionPolicyName:        "test_name",
 			},
 		},
@@ -1678,8 +1684,8 @@ func TestParser_ParseStatement(t *testing.T) {
 			stmt: &influxql.CreateDatabaseStatement{
 				Name: "testdb",
 				RetentionPolicyCreate:             true,
-				RetentionPolicyDuration:           duration(24 * time.Hour),
-				RetentionPolicyReplication:        intptr(2),
+				RetentionPolicyDuration:           24 * time.Hour,
+				RetentionPolicyReplication:        2,
 				RetentionPolicyName:               "test_name",
 				RetentionPolicyShardGroupDuration: 10 * time.Minute,
 			},
@@ -2038,6 +2044,7 @@ func TestParser_ParseStatement(t *testing.T) {
 		{s: `SELECT last(max(value)) FROM myseries`, err: `expected field argument in last()`},
 		{s: `SELECT mean(max(value)) FROM myseries`, err: `expected field argument in mean()`},
 		{s: `SELECT median(max(value)) FROM myseries`, err: `expected field argument in median()`},
+		{s: `SELECT mode(max(value)) FROM myseries`, err: `expected field argument in mode()`},
 		{s: `SELECT stddev(max(value)) FROM myseries`, err: `expected field argument in stddev()`},
 		{s: `SELECT spread(max(value)) FROM myseries`, err: `expected field argument in spread()`},
 		{s: `SELECT top() FROM myseries`, err: `invalid number of arguments for top, expected at least 2, got 0`},
@@ -2540,10 +2547,6 @@ func TestParseDuration(t *testing.T) {
 		{s: `2h`, d: 2 * time.Hour},
 		{s: `2d`, d: 2 * 24 * time.Hour},
 		{s: `2w`, d: 2 * 7 * 24 * time.Hour},
-		{s: `1h30m`, d: time.Hour + 30*time.Minute},
-		{s: `30ms3000u`, d: 30*time.Millisecond + 3000*time.Microsecond},
-		{s: `-5s`, d: -5 * time.Second},
-		{s: `-5m30s`, d: -5*time.Minute - 30*time.Second},
 
 		{s: ``, err: "invalid duration"},
 		{s: `3`, err: "invalid duration"},
@@ -2809,12 +2812,4 @@ func mustParseDuration(s string) time.Duration {
 		panic(err)
 	}
 	return d
-}
-
-func duration(v time.Duration) *time.Duration {
-	return &v
-}
-
-func intptr(v int) *int {
-	return &v
 }

@@ -463,10 +463,10 @@ type CreateDatabaseStatement struct {
 	RetentionPolicyCreate bool
 
 	// RetentionPolicyDuration indicates retention duration for the new database
-	RetentionPolicyDuration *time.Duration
+	RetentionPolicyDuration time.Duration
 
 	// RetentionPolicyReplication indicates retention replication for the new database
-	RetentionPolicyReplication *int
+	RetentionPolicyReplication int
 
 	// RetentionPolicyName indicates retention name for the new database
 	RetentionPolicyName string
@@ -481,23 +481,16 @@ func (s *CreateDatabaseStatement) String() string {
 	_, _ = buf.WriteString("CREATE DATABASE ")
 	_, _ = buf.WriteString(QuoteIdent(s.Name))
 	if s.RetentionPolicyCreate {
-		_, _ = buf.WriteString(" WITH")
-		if s.RetentionPolicyDuration != nil {
-			_, _ = buf.WriteString(" DURATION ")
-			_, _ = buf.WriteString(s.RetentionPolicyDuration.String())
-		}
-		if s.RetentionPolicyReplication != nil {
-			_, _ = buf.WriteString(" REPLICATION ")
-			_, _ = buf.WriteString(strconv.Itoa(*s.RetentionPolicyReplication))
-		}
+		_, _ = buf.WriteString(" WITH DURATION ")
+		_, _ = buf.WriteString(s.RetentionPolicyDuration.String())
+		_, _ = buf.WriteString(" REPLICATION ")
+		_, _ = buf.WriteString(strconv.Itoa(s.RetentionPolicyReplication))
 		if s.RetentionPolicyShardGroupDuration > 0 {
 			_, _ = buf.WriteString(" SHARD DURATION ")
 			_, _ = buf.WriteString(s.RetentionPolicyShardGroupDuration.String())
 		}
-		if s.RetentionPolicyName != "" {
-			_, _ = buf.WriteString(" NAME ")
-			_, _ = buf.WriteString(QuoteIdent(s.RetentionPolicyName))
-		}
+		_, _ = buf.WriteString(" NAME ")
+		_, _ = buf.WriteString(QuoteIdent(s.RetentionPolicyName))
 	}
 
 	return buf.String()
@@ -1164,7 +1157,7 @@ func (s *SelectStatement) RewriteFields(ic IteratorCreator) (*SelectStatement, e
 
 				// Add additional types for certain functions.
 				switch call.Name {
-				case "count", "first", "last", "distinct", "elapsed":
+				case "count", "first", "last", "distinct", "elapsed", "mode":
 					supportedTypes[String] = struct{}{}
 					supportedTypes[Boolean] = struct{}{}
 				case "stddev":
@@ -3222,7 +3215,7 @@ func (c *Call) Fields() []string {
 			}
 		}
 		return keys
-	case "min", "max", "first", "last", "sum", "mean":
+	case "min", "max", "first", "last", "sum", "mean", "mode":
 		// maintain the order the user specified in the query
 		keyMap := make(map[string]struct{})
 		keys := []string{}

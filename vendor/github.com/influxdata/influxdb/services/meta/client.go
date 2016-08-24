@@ -187,11 +187,12 @@ func (c *Client) CreateDatabase(name string) (*DatabaseInfo, error) {
 
 	// create default retention policy
 	if c.retentionAutoCreate {
-		rpi := DefaultRetentionPolicyInfo()
-		if err := data.CreateRetentionPolicy(name, rpi); err != nil {
+		if err := data.CreateRetentionPolicy(name, &RetentionPolicyInfo{
+			ReplicaN: 1,
+		}); err != nil {
 			return nil, err
 		}
-		if err := data.SetDefaultRetentionPolicy(name, rpi.Name); err != nil {
+		if err := data.SetDefaultRetentionPolicy(name, ""); err != nil {
 			return nil, err
 		}
 	}
@@ -206,48 +207,42 @@ func (c *Client) CreateDatabase(name string) (*DatabaseInfo, error) {
 }
 
 // CreateDatabaseWithRetentionPolicy creates a database with the specified retention policy.
-func (c *Client) CreateDatabaseWithRetentionPolicy(name string, spec *RetentionPolicySpec) (*DatabaseInfo, error) {
+func (c *Client) CreateDatabaseWithRetentionPolicy(name string, rpi *RetentionPolicyInfo) (*DatabaseInfo, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	data := c.cacheData.Clone()
 
-	if spec.Duration != nil && *spec.Duration < MinRetentionPolicyDuration && *spec.Duration != 0 {
+	if rpi.Duration < MinRetentionPolicyDuration && rpi.Duration != 0 {
 		return nil, ErrRetentionPolicyDurationTooLow
 	}
 
+	if db := data.Database(name); db != nil {
+		// Check if the retention policy already exists. If it does and matches
+		// the desired retention policy, exit with no error.
+		if rp := db.RetentionPolicy(rpi.Name); rp != nil {
+			// Normalise ShardDuration before comparing to any existing retention policies.
+			rpi.ShardGroupDuration = normalisedShardDuration(rpi.ShardGroupDuration, rpi.Duration)
+			if rp.ReplicaN != rpi.ReplicaN || rp.Duration != rpi.Duration || rp.ShardGroupDuration != rpi.ShardGroupDuration {
+				return nil, ErrRetentionPolicyConflict
+			}
+			return db, nil
+		}
+	}
+
+	if err := data.CreateDatabase(name); err != nil {
+		return nil, err
+	}
+
+	if err := data.CreateRetentionPolicy(name, rpi); err != nil {
+		return nil, err
+	}
+
+	if err := data.SetDefaultRetentionPolicy(name, rpi.Name); err != nil {
+		return nil, err
+	}
+
 	db := data.Database(name)
-	if db == nil {
-		if err := data.CreateDatabase(name); err != nil {
-			return nil, err
-		}
-		db = data.Database(name)
-	}
-
-	rpi := spec.NewRetentionPolicyInfo()
-	if rp := db.RetentionPolicy(rpi.Name); rp == nil {
-		if err := data.CreateRetentionPolicy(name, rpi); err != nil {
-			return nil, err
-		}
-	} else if !spec.Matches(rp) {
-		// Verify that the retention policy with this name matches
-		// the one already created.
-		return nil, ErrRetentionPolicyConflict
-	}
-
-	// If no default retention policy has been set, set it to the retention
-	// policy we just created. If the default is different from what we are
-	// trying to create, record it as a conflict and abandon with an error.
-	if db.DefaultRetentionPolicy == "" {
-		if err := data.SetDefaultRetentionPolicy(name, rpi.Name); err != nil {
-			return nil, err
-		}
-	} else if rpi.Name != db.DefaultRetentionPolicy {
-		return nil, ErrRetentionPolicyConflict
-	}
-
-	// Refresh the database info.
-	db = data.Database(name)
 
 	if err := c.commit(data); err != nil {
 		return nil, err
@@ -275,18 +270,22 @@ func (c *Client) DropDatabase(name string) error {
 }
 
 // CreateRetentionPolicy creates a retention policy on the specified database.
-func (c *Client) CreateRetentionPolicy(database string, spec *RetentionPolicySpec) (*RetentionPolicyInfo, error) {
+func (c *Client) CreateRetentionPolicy(database string, rpi *RetentionPolicyInfo) (*RetentionPolicyInfo, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	data := c.cacheData.Clone()
 
-	if spec.Duration != nil && *spec.Duration < MinRetentionPolicyDuration && *spec.Duration != 0 {
+	if rpi.Duration < MinRetentionPolicyDuration && rpi.Duration != 0 {
 		return nil, ErrRetentionPolicyDurationTooLow
 	}
 
-	rp := spec.NewRetentionPolicyInfo()
-	if err := data.CreateRetentionPolicy(database, rp); err != nil {
+	if err := data.CreateRetentionPolicy(database, rpi); err != nil {
+		return nil, err
+	}
+
+	rp, err := data.RetentionPolicy(database, rpi.Name)
+	if err != nil {
 		return nil, err
 	}
 

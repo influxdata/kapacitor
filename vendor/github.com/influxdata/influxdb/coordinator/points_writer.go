@@ -83,7 +83,7 @@ type WritePointsRequest struct {
 // AddPoint adds a point to the WritePointRequest with field key 'value'
 func (w *WritePointsRequest) AddPoint(name string, value interface{}, timestamp time.Time, tags map[string]string) {
 	pt, err := models.NewPoint(
-		name, models.NewTags(tags), map[string]interface{}{"value": value}, timestamp,
+		name, tags, map[string]interface{}{"value": value}, timestamp,
 	)
 	if err != nil {
 		return

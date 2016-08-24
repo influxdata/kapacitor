@@ -6,7 +6,6 @@ import (
 	"sort"
 	"sync"
 	"sync/atomic"
-	"unsafe"
 
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/models"
@@ -34,8 +33,7 @@ type DatabaseIndex struct {
 
 	name string // name of the database represented by this index
 
-	stats       *IndexStatistics
-	defaultTags models.StatisticTags
+	stats *IndexStatistics
 }
 
 // NewDatabaseIndex returns a new initialized DatabaseIndex.
@@ -45,7 +43,6 @@ func NewDatabaseIndex(name string) *DatabaseIndex {
 		series:       make(map[string]*Series),
 		name:         name,
 		stats:        &IndexStatistics{},
-		defaultTags:  models.StatisticTags{"database": name},
 	}
 }
 
@@ -59,7 +56,7 @@ type IndexStatistics struct {
 func (d *DatabaseIndex) Statistics(tags map[string]string) []models.Statistic {
 	return []models.Statistic{{
 		Name: "database",
-		Tags: d.defaultTags.Merge(tags),
+		Tags: models.Tags(map[string]string{"database": d.name}).Merge(tags),
 		Values: map[string]interface{}{
 			statDatabaseSeries:       atomic.LoadInt64(&d.stats.NumSeries),
 			statDatabaseMeasurements: atomic.LoadInt64(&d.stats.NumMeasurements),
@@ -71,14 +68,6 @@ func (d *DatabaseIndex) Statistics(tags map[string]string) []models.Statistic {
 func (d *DatabaseIndex) Series(key string) *Series {
 	d.mu.RLock()
 	s := d.series[key]
-	d.mu.RUnlock()
-	return s
-}
-
-// SeriesBytes returns a series by key.
-func (d *DatabaseIndex) SeriesBytes(key []byte) *Series {
-	d.mu.RLock()
-	s := d.series[string(key)]
 	d.mu.RUnlock()
 	return s
 }
@@ -236,6 +225,7 @@ func (d *DatabaseIndex) UnassignShard(k string, shardID uint64) {
 				if !ss.measurement.HasSeries() {
 					d.mu.Lock()
 					d.dropMeasurement(ss.measurement.Name)
+					atomic.AddInt64(&d.stats.NumMeasurements, -1)
 					d.mu.Unlock()
 				}
 
@@ -259,7 +249,7 @@ func (d *DatabaseIndex) RemoveShard(shardID uint64) {
 }
 
 // TagsForSeries returns the tag map for the passed in series
-func (d *DatabaseIndex) TagsForSeries(key string) models.Tags {
+func (d *DatabaseIndex) TagsForSeries(key string) map[string]string {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
@@ -525,16 +515,6 @@ func (d *DatabaseIndex) DropSeries(keys []string) {
 	atomic.AddInt64(&d.stats.NumSeries, -nDeleted)
 }
 
-// Dereference removes all references to data within b and moves them to the heap.
-func (d *DatabaseIndex) Dereference(b []byte) {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-
-	for _, s := range d.series {
-		s.Dereference(b)
-	}
-}
-
 // Measurement represents a collection of time series in a database. It also contains in memory
 // structures for indexing tags. Exported functions are goroutine safe while un-exported functions
 // assume the caller will use the appropriate locks
@@ -667,13 +647,13 @@ func (m *Measurement) AddSeries(s *Series) bool {
 	}
 
 	// add this series id to the tag index on the measurement
-	for _, t := range s.Tags {
-		valueMap := m.seriesByTagKeyValue[string(t.Key)]
+	for k, v := range s.Tags {
+		valueMap := m.seriesByTagKeyValue[k]
 		if valueMap == nil {
 			valueMap = make(map[string]SeriesIDs)
-			m.seriesByTagKeyValue[string(t.Key)] = valueMap
+			m.seriesByTagKeyValue[k] = valueMap
 		}
-		ids := valueMap[string(t.Value)]
+		ids := valueMap[v]
 		ids = append(ids, s.id)
 
 		// most of the time the series ID will be higher than all others because it's a new
@@ -681,7 +661,7 @@ func (m *Measurement) AddSeries(s *Series) bool {
 		if len(ids) > 1 && ids[len(ids)-1] < ids[len(ids)-2] {
 			sort.Sort(ids)
 		}
-		valueMap[string(t.Value)] = ids
+		valueMap[v] = ids
 	}
 
 	return true
@@ -703,19 +683,19 @@ func (m *Measurement) DropSeries(series *Series) {
 
 	// remove this series id from the tag index on the measurement
 	// s.seriesByTagKeyValue is defined as map[string]map[string]SeriesIDs
-	for _, t := range series.Tags {
-		values := m.seriesByTagKeyValue[string(t.Key)][string(t.Value)]
+	for k, v := range series.Tags {
+		values := m.seriesByTagKeyValue[k][v]
 		ids := filter(values, seriesID)
 		// Check to see if we have any ids, if not, remove the key
 		if len(ids) == 0 {
-			delete(m.seriesByTagKeyValue[string(t.Key)], string(t.Value))
+			delete(m.seriesByTagKeyValue[k], v)
 		} else {
-			m.seriesByTagKeyValue[string(t.Key)][string(t.Value)] = ids
+			m.seriesByTagKeyValue[k][v] = ids
 		}
 
 		// If we have no values, then we delete the key
-		if len(m.seriesByTagKeyValue[string(t.Key)]) == 0 {
-			delete(m.seriesByTagKeyValue, string(t.Key))
+		if len(m.seriesByTagKeyValue[k]) == 0 {
+			delete(m.seriesByTagKeyValue, k)
 		}
 	}
 
@@ -778,7 +758,7 @@ func (m *Measurement) TagSets(dimensions []string, condition influxql.Expr) ([]*
 
 		// Build the TagSet for this series.
 		for _, dim := range dimensions {
-			tags[dim] = s.Tags.GetString(dim)
+			tags[dim] = s.Tags[dim]
 		}
 
 		// Convert the TagSet to a string, so it can be added to a map allowing TagSets to be handled
@@ -1443,50 +1423,38 @@ func (a Measurements) union(other Measurements) Measurements {
 type Series struct {
 	mu          sync.RWMutex
 	Key         string
-	Tags        models.Tags
+	Tags        map[string]string
 	id          uint64
 	measurement *Measurement
-	shardIDs    []uint64 // shards that have this series defined
+	shardIDs    map[uint64]bool // shards that have this series defined
 }
 
 // NewSeries returns an initialized series struct
-func NewSeries(key string, tags models.Tags) *Series {
+func NewSeries(key string, tags map[string]string) *Series {
 	return &Series{
-		Key:  key,
-		Tags: tags,
+		Key:      key,
+		Tags:     tags,
+		shardIDs: make(map[uint64]bool),
 	}
 }
 
 func (s *Series) AssignShard(shardID uint64) {
 	s.mu.Lock()
-	if !s.assigned(shardID) {
-		s.shardIDs = append(s.shardIDs, shardID)
-		sort.Sort(uint64Slice(s.shardIDs))
-	}
+	s.shardIDs[shardID] = true
 	s.mu.Unlock()
 }
 
 func (s *Series) UnassignShard(shardID uint64) {
 	s.mu.Lock()
-	for i, v := range s.shardIDs {
-		if v == shardID {
-			s.shardIDs = append(s.shardIDs[:i], s.shardIDs[i+1:]...)
-			break
-		}
-	}
+	delete(s.shardIDs, shardID)
 	s.mu.Unlock()
 }
 
 func (s *Series) Assigned(shardID uint64) bool {
 	s.mu.RLock()
-	b := s.assigned(shardID)
+	b := s.shardIDs[shardID]
 	s.mu.RUnlock()
 	return b
-}
-
-func (s *Series) assigned(shardID uint64) bool {
-	i := sort.Search(len(s.shardIDs), func(i int) bool { return s.shardIDs[i] >= shardID })
-	return i < len(s.shardIDs) && s.shardIDs[i] == shardID
 }
 
 func (s *Series) ShardN() int {
@@ -1496,36 +1464,6 @@ func (s *Series) ShardN() int {
 	return n
 }
 
-// Dereference removes references to a byte slice.
-func (s *Series) Dereference(b []byte) {
-	s.mu.Lock()
-
-	min := uintptr(unsafe.Pointer(&b[0]))
-	max := min + uintptr(len(b))
-
-	for i := range s.Tags {
-		deref(&s.Tags[i].Key, min, max)
-		deref(&s.Tags[i].Value, min, max)
-	}
-
-	s.mu.Unlock()
-}
-
-func deref(v *[]byte, min, max uintptr) {
-	vv := *v
-
-	// Ignore if value is not within range.
-	ptr := uintptr(unsafe.Pointer(&vv[0]))
-	if ptr < min || ptr > max {
-		return
-	}
-
-	// Otherwise copy to the heap.
-	buf := make([]byte, len(vv))
-	copy(buf, vv)
-	*v = buf
-}
-
 // MarshalBinary encodes the object to a binary format.
 func (s *Series) MarshalBinary() ([]byte, error) {
 	s.mu.RLock()
@@ -1533,8 +1471,10 @@ func (s *Series) MarshalBinary() ([]byte, error) {
 
 	var pb internal.Series
 	pb.Key = &s.Key
-	for _, t := range s.Tags {
-		pb.Tags = append(pb.Tags, &internal.Tag{Key: proto.String(string(t.Key)), Value: proto.String(string(t.Value))})
+	for k, v := range s.Tags {
+		key := k
+		value := v
+		pb.Tags = append(pb.Tags, &internal.Tag{Key: &key, Value: &value})
 	}
 	return proto.Marshal(&pb)
 }
@@ -1549,9 +1489,9 @@ func (s *Series) UnmarshalBinary(buf []byte) error {
 		return err
 	}
 	s.Key = pb.GetKey()
-	s.Tags = make(models.Tags, len(pb.Tags))
-	for i, t := range pb.Tags {
-		s.Tags[i] = models.Tag{Key: []byte(t.GetKey()), Value: []byte(t.GetValue())}
+	s.Tags = make(map[string]string, len(pb.Tags))
+	for _, t := range pb.Tags {
+		s.Tags[t.GetKey()] = t.GetValue()
 	}
 	return nil
 }
@@ -1781,7 +1721,7 @@ func (m *Measurement) tagValuesByKeyAndSeriesID(tagKeys []string, ids SeriesIDs)
 		// Iterate the tag keys we're interested in and collect values
 		// from this series, if they exist.
 		for _, tagKey := range tagKeys {
-			if tagVal := s.Tags.GetString(tagKey); tagVal != "" {
+			if tagVal, ok := s.Tags[tagKey]; ok {
 				if _, ok = tagValues[tagKey]; !ok {
 					tagValues[tagKey] = newStringSet()
 				}
@@ -1870,12 +1810,6 @@ func filter(a []uint64, v uint64) []uint64 {
 // contains a measurement name.
 func MeasurementFromSeriesKey(key string) string {
 	// Ignoring the error because the func returns "missing fields"
-	k, _, _ := models.ParseKey([]byte(key))
+	k, _, _ := models.ParseKey(key)
 	return escape.UnescapeString(k)
 }
-
-type uint64Slice []uint64
-
-func (a uint64Slice) Len() int           { return len(a) }
-func (a uint64Slice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a uint64Slice) Less(i, j int) bool { return a[i] < a[j] }

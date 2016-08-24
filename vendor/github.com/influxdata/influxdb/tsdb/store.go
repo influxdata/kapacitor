@@ -929,13 +929,13 @@ func (s *Store) TagValues(database string, cond influxql.Expr) ([]TagValues, err
 		// Loop over all keys for each series.
 		m := make(map[KeyValue]struct{}, len(ss))
 		for _, series := range ss {
-			for _, t := range series.Tags {
+			for key, value := range series.Tags {
 				if !ok {
 					// nop
-				} else if _, exists := keySet[string(t.Key)]; !exists {
+				} else if _, exists := keySet[key]; !exists {
 					continue
 				}
-				m[KeyValue{string(t.Key), string(t.Value)}] = struct{}{}
+				m[KeyValue{key, value}] = struct{}{}
 			}
 		}
 

@@ -59,9 +59,9 @@ type Service struct {
 	batcher *tsdb.PointBatcher
 	parser  *Parser
 
-	logger      *log.Logger
-	stats       *Statistics
-	defaultTags models.StatisticTags
+	logger   *log.Logger
+	stats    *Statistics
+	statTags models.Tags
 
 	tcpConnectionsMu sync.Mutex
 	tcpConnections   map[string]*tcpConnection
@@ -83,8 +83,8 @@ type Service struct {
 	}
 	MetaClient interface {
 		CreateDatabase(name string) (*meta.DatabaseInfo, error)
-		CreateDatabaseWithRetentionPolicy(name string, spec *meta.RetentionPolicySpec) (*meta.DatabaseInfo, error)
-		CreateRetentionPolicy(database string, spec *meta.RetentionPolicySpec) (*meta.RetentionPolicyInfo, error)
+		CreateDatabaseWithRetentionPolicy(name string, rpi *meta.RetentionPolicyInfo) (*meta.DatabaseInfo, error)
+		CreateRetentionPolicy(database string, rpi *meta.RetentionPolicyInfo) (*meta.RetentionPolicyInfo, error)
 		Database(name string) *meta.DatabaseInfo
 		RetentionPolicy(database, name string) (*meta.RetentionPolicyInfo, error)
 	}
@@ -106,7 +106,7 @@ func NewService(c Config) (*Service, error) {
 		batchTimeout:    time.Duration(d.BatchTimeout),
 		logger:          log.New(os.Stderr, fmt.Sprintf("[graphite] %s ", d.BindAddress), log.LstdFlags),
 		stats:           &Statistics{},
-		defaultTags:     models.StatisticTags{"proto": d.Protocol, "bind": d.BindAddress},
+		statTags:        map[string]string{"proto": d.Protocol, "bind": d.BindAddress},
 		tcpConnections:  make(map[string]*tcpConnection),
 		done:            make(chan struct{}),
 		diagsKey:        strings.Join([]string{"graphite", d.Protocol, d.BindAddress}, ":"),
@@ -139,14 +139,14 @@ func (s *Service) Open() error {
 
 	if db := s.MetaClient.Database(s.database); db != nil {
 		if rp, _ := s.MetaClient.RetentionPolicy(s.database, s.retentionPolicy); rp == nil {
-			spec := meta.RetentionPolicySpec{Name: s.retentionPolicy}
-			if _, err := s.MetaClient.CreateRetentionPolicy(s.database, &spec); err != nil {
+			rpi := meta.NewRetentionPolicyInfo(s.retentionPolicy)
+			if _, err := s.MetaClient.CreateRetentionPolicy(s.database, rpi); err != nil {
 				s.logger.Printf("Failed to ensure target retention policy %s exists: %s", s.database, err.Error())
 			}
 		}
 	} else {
-		spec := meta.RetentionPolicySpec{Name: s.retentionPolicy}
-		if _, err := s.MetaClient.CreateDatabaseWithRetentionPolicy(s.database, &spec); err != nil {
+		rpi := meta.NewRetentionPolicyInfo(s.retentionPolicy)
+		if _, err := s.MetaClient.CreateDatabaseWithRetentionPolicy(s.database, rpi); err != nil {
 			s.logger.Printf("Failed to ensure target database %s exists: %s", s.database, err.Error())
 			return err
 		}
@@ -234,7 +234,7 @@ type Statistics struct {
 func (s *Service) Statistics(tags map[string]string) []models.Statistic {
 	return []models.Statistic{{
 		Name: "graphite",
-		Tags: s.defaultTags.Merge(tags),
+		Tags: s.statTags.Merge(tags),
 		Values: map[string]interface{}{
 			statPointsReceived:      atomic.LoadInt64(&s.stats.PointsReceived),
 			statBytesReceived:       atomic.LoadInt64(&s.stats.BytesReceived),

@@ -73,8 +73,8 @@ type Service struct {
 	LogPointErrors bool
 	Logger         *log.Logger
 
-	stats       *Statistics
-	defaultTags models.StatisticTags
+	stats    *Statistics
+	statTags models.Tags
 }
 
 // NewService returns a new instance of Service.
@@ -96,7 +96,7 @@ func NewService(c Config) (*Service, error) {
 		Logger:          log.New(os.Stderr, "[opentsdb] ", log.LstdFlags),
 		LogPointErrors:  d.LogPointErrors,
 		stats:           &Statistics{},
-		defaultTags:     models.StatisticTags{"bind": d.BindAddress},
+		statTags:        map[string]string{"bind": d.BindAddress},
 	}
 	return s, nil
 }
@@ -202,7 +202,7 @@ type Statistics struct {
 func (s *Service) Statistics(tags map[string]string) []models.Statistic {
 	return []models.Statistic{{
 		Name: "opentsdb",
-		Tags: s.defaultTags.Merge(tags),
+		Tags: s.statTags,
 		Values: map[string]interface{}{
 			statHTTPConnectionsHandled:   atomic.LoadInt64(&s.stats.HTTPConnectionsHandled),
 			statTelnetConnectionsActive:  atomic.LoadInt64(&s.stats.ActiveTelnetConnections),
@@ -381,7 +381,7 @@ func (s *Service) handleTelnetConn(conn net.Conn) {
 		}
 		fields["value"] = fv
 
-		pt, err := models.NewPoint(measurement, models.NewTags(tags), fields, t)
+		pt, err := models.NewPoint(measurement, tags, fields, t)
 		if err != nil {
 			atomic.AddInt64(&s.stats.TelnetBadFloat, 1)
 			if s.LogPointErrors {

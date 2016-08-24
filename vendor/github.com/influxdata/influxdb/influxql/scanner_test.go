@@ -108,7 +108,7 @@ func TestScanner_Scan(t *testing.T) {
 		{s: `10h`, tok: influxql.DURATIONVAL, lit: `10h`},
 		{s: `10d`, tok: influxql.DURATIONVAL, lit: `10d`},
 		{s: `10w`, tok: influxql.DURATIONVAL, lit: `10w`},
-		{s: `10x`, tok: influxql.DURATIONVAL, lit: `10x`}, // non-duration unit, but scanned as a duration value
+		{s: `10x`, tok: influxql.INTEGER, lit: `10`}, // non-duration unit
 
 		// Keywords
 		{s: `ALL`, tok: influxql.ALL},
