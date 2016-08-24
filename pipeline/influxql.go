@@ -419,6 +419,24 @@ func (n *chainnode) Difference(field string) *InfluxQLNode {
 	return i
 }
 
+// Compute a moving average of the last window points.
+// No points are emitted until the window is full.
+func (n *chainnode) MovingAverage(field string, window int64) *InfluxQLNode {
+	i := newInfluxQLNode("movingAverage", field, n.Provides(), n.Provides(), ReduceCreater{
+		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
+			fn := influxql.NewFloatMovingAverageReducer(int(window))
+			return fn, fn
+		},
+		CreateIntegerFloatReducer: func() (influxql.IntegerPointAggregator, influxql.FloatPointEmitter) {
+			fn := influxql.NewIntegerMovingAverageReducer(int(window))
+			return fn, fn
+		},
+		IsStreamTransformation: true,
+	})
+	n.linkChild(i)
+	return i
+}
+
 // Compute the holt-winters forecast of a data set.
 func (n *chainnode) HoltWinters(field string, h, m int64, interval time.Duration) *InfluxQLNode {
 	return n.holtWinters(field, h, m, interval, false)
