@@ -152,8 +152,8 @@ func (j *JoinNode) As(names ...string) *JoinNode {
 //
 // For example given two measurements:
 //
-// 1. building_power -- tagged by building, value is the total power consumed by the building.
-// 2. floor_power -- tagged by building and floor, values are the total power consumed by each floor.
+// 1. building_power (a single value) -- tagged by building, value is the total power consumed by the building.
+// 2. floor_power (multiple values) -- tagged by building and floor, values are the total power consumed by each floor.
 //
 // You want to calculate the percentage of the total building power consumed by each floor.
 // Since you only have one point per building you need it to join multiple times with
