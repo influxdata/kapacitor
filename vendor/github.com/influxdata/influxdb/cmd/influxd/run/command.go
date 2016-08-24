@@ -95,10 +95,6 @@ func (cmd *Command) Run(args ...string) error {
 		return fmt.Errorf("apply env config: %v", err)
 	}
 
-	if options.Hostname != "" {
-		config.Hostname = options.Hostname
-	}
-
 	// Validate the configuration.
 	if err := config.Validate(); err != nil {
 		return fmt.Errorf("%s. To generate a valid configuration file run `influxd config > influxdb.generated.conf`", err)
@@ -156,7 +152,8 @@ func (cmd *Command) ParseFlags(args ...string) (Options, error) {
 	fs := flag.NewFlagSet("", flag.ContinueOnError)
 	fs.StringVar(&options.ConfigPath, "config", "", "")
 	fs.StringVar(&options.PIDFile, "pidfile", "", "")
-	fs.StringVar(&options.Hostname, "hostname", "", "")
+	// Ignore hostname option.
+	_ = fs.String("hostname", "", "")
 	fs.StringVar(&options.CPUProfile, "cpuprofile", "", "")
 	fs.StringVar(&options.MemProfile, "memprofile", "", "")
 	fs.Usage = func() { fmt.Fprintln(cmd.Stderr, usage) }
@@ -207,33 +204,29 @@ func (cmd *Command) ParseConfig(path string) (*Config, error) {
 	return config, nil
 }
 
-var usage = `usage: run [flags]
+var usage = `Runs the InfluxDB server.
 
-run starts the InfluxDB server. If this is the first time running the command
-then a new cluster will be initialized unless the -join argument is used.
+Usage: influxd run [flags]
 
-        -config <path>
-                          Set the path to the configuration file.
-
-        -hostname <name>
-                          Override the hostname, the 'hostname' configuration
-                          option will be overridden.
-
-        -pidfile <path>
-                          Write process ID to a file.
-
-        -cpuprofile <path>
-                          Write CPU profiling information to a file.
-
-        -memprofile <path>
-                          Write memory usage information to a file.
+    -config <path>
+            Set the path to the configuration file.
+            This defaults to the environment variable INFLUXDB_CONFIG_PATH,
+            ~/.influxdb/influxdb.conf, or /etc/influxdb/influxdb.conf if a file
+            is present at any of these locations.
+            Disable the automatic loading of a configuration file using
+            the null device (such as /dev/null).
+    -pidfile <path>
+            Write process ID to a file.
+    -cpuprofile <path>
+            Write CPU profiling information to a file.
+    -memprofile <path>
+            Write memory usage information to a file.
 `
 
 // Options represents the command line options that can be parsed.
 type Options struct {
 	ConfigPath string
 	PIDFile    string
-	Hostname   string
 	CPUProfile string
 	MemProfile string
 }
@@ -247,6 +240,9 @@ type Options struct {
 //        - /etc/influxdb
 func (opt *Options) GetConfigPath() string {
 	if opt.ConfigPath != "" {
+		if opt.ConfigPath == os.DevNull {
+			return ""
+		}
 		return opt.ConfigPath
 	} else if envVar := os.Getenv("INFLUXDB_CONFIG_PATH"); envVar != "" {
 		return envVar

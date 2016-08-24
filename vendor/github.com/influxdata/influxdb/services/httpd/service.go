@@ -2,17 +2,19 @@ package httpd // import "github.com/influxdata/influxdb/services/httpd"
 
 import (
 	"crypto/tls"
-	"expvar"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
 	"os"
+	"path"
+	"runtime"
 	"strings"
+	"syscall"
 	"time"
 
-	"github.com/influxdata/influxdb"
+	"github.com/influxdata/influxdb/models"
 )
 
 // statistics gathered by the httpd package.
@@ -47,29 +49,28 @@ type Service struct {
 	limit int
 	err   chan error
 
+	unixSocket         bool
+	bindSocket         string
+	unixSocketListener net.Listener
+
 	Handler *Handler
 
-	Logger  *log.Logger
-	statMap *expvar.Map
+	Logger *log.Logger
 }
 
 // NewService returns a new instance of Service.
 func NewService(c Config) *Service {
-	// Configure expvar monitoring. It's OK to do this even if the service fails to open and
-	// should be done before any data could arrive for the service.
-	key := strings.Join([]string{"httpd", c.BindAddress}, ":")
-	tags := map[string]string{"bind": c.BindAddress}
-	statMap := influxdb.NewStatistics(key, "httpd", tags)
-
 	s := &Service{
-		addr:    c.BindAddress,
-		https:   c.HTTPSEnabled,
-		cert:    c.HTTPSCertificate,
-		key:     c.HTTPSPrivateKey,
-		limit:   c.MaxConnectionLimit,
-		err:     make(chan error),
-		Handler: NewHandler(c, statMap),
-		Logger:  log.New(os.Stderr, "[httpd] ", log.LstdFlags),
+		addr:       c.BindAddress,
+		https:      c.HTTPSEnabled,
+		cert:       c.HTTPSCertificate,
+		key:        c.HTTPSPrivateKey,
+		limit:      c.MaxConnectionLimit,
+		err:        make(chan error),
+		unixSocket: c.UnixSocketEnabled,
+		bindSocket: c.BindSocket,
+		Handler:    NewHandler(c),
+		Logger:     log.New(os.Stderr, "[httpd] ", log.LstdFlags),
 	}
 	if s.key == "" {
 		s.key = s.cert
@@ -109,6 +110,29 @@ func (s *Service) Open() error {
 		s.ln = listener
 	}
 
+	// Open unix socket listener.
+	if s.unixSocket {
+		if runtime.GOOS == "windows" {
+			return fmt.Errorf("unable to use unix socket on windows")
+		}
+		if err := os.MkdirAll(path.Dir(s.bindSocket), 0777); err != nil {
+			return err
+		}
+		if err := syscall.Unlink(s.bindSocket); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+
+		listener, err := net.Listen("unix", s.bindSocket)
+		if err != nil {
+			return err
+		}
+
+		s.Logger.Println("Listening on unix socket:", listener.Addr().String())
+		s.unixSocketListener = listener
+
+		go s.serveUnixSocket()
+	}
+
 	// Enforce a connection limit if one has been given.
 	if s.limit > 0 {
 		s.ln = LimitListener(s.ln, s.limit)
@@ -128,14 +152,21 @@ func (s *Service) Open() error {
 	}
 
 	// Begin listening for requests in a separate goroutine.
-	go s.serve()
+	go s.serveTCP()
 	return nil
 }
 
 // Close closes the underlying listener.
 func (s *Service) Close() error {
 	if s.ln != nil {
-		return s.ln.Close()
+		if err := s.ln.Close(); err != nil {
+			return err
+		}
+	}
+	if s.unixSocketListener != nil {
+		if err := s.unixSocketListener.Close(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -159,11 +190,26 @@ func (s *Service) Addr() net.Addr {
 	return nil
 }
 
+// Statistics returns statistics for periodic monitoring.
+func (s *Service) Statistics(tags map[string]string) []models.Statistic {
+	return s.Handler.Statistics(models.NewTags(map[string]string{"bind": s.addr}).Merge(tags).Map())
+}
+
+// serveTCP serves the handler from the TCP listener.
+func (s *Service) serveTCP() {
+	s.serve(s.ln)
+}
+
+// serveUnixSocket serves the handler from the unix socket listener.
+func (s *Service) serveUnixSocket() {
+	s.serve(s.unixSocketListener)
+}
+
 // serve serves the handler from the listener.
-func (s *Service) serve() {
+func (s *Service) serve(listener net.Listener) {
 	// The listener was closed so exit
 	// See https://github.com/golang/go/issues/4373
-	err := http.Serve(s.ln, s.Handler)
+	err := http.Serve(listener, s.Handler)
 	if err != nil && !strings.Contains(err.Error(), "closed") {
 		s.err <- fmt.Errorf("listener failed: addr=%s, err=%s", s.Addr(), err)
 	}

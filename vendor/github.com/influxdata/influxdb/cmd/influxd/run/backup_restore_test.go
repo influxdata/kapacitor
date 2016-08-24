@@ -10,7 +10,6 @@ import (
 
 	"github.com/influxdata/influxdb/cmd/influxd/backup"
 	"github.com/influxdata/influxdb/cmd/influxd/restore"
-	"github.com/influxdata/influxdb/cmd/influxd/run"
 )
 
 func TestServer_BackupAndRestore(t *testing.T) {
@@ -35,7 +34,7 @@ func TestServer_BackupAndRestore(t *testing.T) {
 		s := OpenServer(config)
 		defer s.Close()
 
-		if err := s.CreateDatabaseAndRetentionPolicy(db, newRetentionPolicyInfo(rp, 1, 0)); err != nil {
+		if err := s.CreateDatabaseAndRetentionPolicy(db, newRetentionPolicySpec(rp, 1, 0)); err != nil {
 			t.Fatal(err)
 		}
 		if err := s.MetaClient.SetDefaultRetentionPolicy(db, rp); err != nil {
@@ -59,7 +58,11 @@ func TestServer_BackupAndRestore(t *testing.T) {
 
 		// now backup
 		cmd := backup.NewCommand()
-		hostAddress, _ := run.DefaultHost(run.DefaultHostname, config.BindAddress)
+		_, port, err := net.SplitHostPort(config.BindAddress)
+		if err != nil {
+			t.Fatal(err)
+		}
+		hostAddress := net.JoinHostPort("localhost", port)
 		if err := cmd.Run("-host", hostAddress, "-database", "mydb", backupDir); err != nil {
 			t.Fatalf("error backing up: %s, hostAddress: %s", err.Error(), hostAddress)
 		}

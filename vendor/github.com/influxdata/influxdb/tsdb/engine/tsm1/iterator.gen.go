@@ -16,12 +16,14 @@ import (
 )
 
 type cursor interface {
+	close() error
 	next() (t int64, v interface{})
 }
 
 // cursorAt provides a bufferred cursor interface.
 // This required for literal value cursors which don't have a time value.
 type cursorAt interface {
+	close() error
 	peek() (k int64, v interface{})
 	nextAt(seek int64) interface{}
 }
@@ -44,6 +46,12 @@ type bufCursor struct {
 // newBufCursor returns a bufferred wrapper for cur.
 func newBufCursor(cur cursor, ascending bool) *bufCursor {
 	return &bufCursor{cur: cur, ascending: ascending}
+}
+
+func (c *bufCursor) close() error {
+	err := c.cur.close()
+	c.cur = nil
+	return err
 }
 
 // next returns the buffer, if filled. Otherwise returns the next key/value from the cursor.
@@ -228,7 +236,22 @@ func (itr *floatIterator) Stats() influxql.IteratorStats {
 }
 
 // Close closes the iterator.
-func (itr *floatIterator) Close() error { return nil }
+func (itr *floatIterator) Close() error {
+	for _, c := range itr.aux {
+		c.close()
+	}
+	itr.aux = nil
+	for _, c := range itr.conds.curs {
+		c.close()
+	}
+	itr.conds.curs = nil
+	if itr.cur != nil {
+		err := itr.cur.close()
+		itr.cur = nil
+		return err
+	}
+	return nil
+}
 
 // floatLimitIterator
 type floatLimitIterator struct {
@@ -333,6 +356,16 @@ func (c *floatAscendingCursor) peekTSM() (t int64, v float64) {
 
 	item := c.tsm.values[c.tsm.pos]
 	return item.UnixNano(), item.value
+}
+
+// close closes the cursor and any dependent cursors.
+func (c *floatAscendingCursor) close() error {
+	c.tsm.keyCursor.Close()
+	c.tsm.keyCursor = nil
+	c.tsm.buf = nil
+	c.cache.values = nil
+	c.tsm.values = nil
+	return nil
 }
 
 // next returns the next key/value for the cursor.
@@ -447,6 +480,16 @@ func (c *floatDescendingCursor) peekTSM() (t int64, v float64) {
 	return item.UnixNano(), item.value
 }
 
+// close closes the cursor and any dependent cursors.
+func (c *floatDescendingCursor) close() error {
+	c.tsm.keyCursor.Close()
+	c.tsm.keyCursor = nil
+	c.tsm.buf = nil
+	c.cache.values = nil
+	c.tsm.values = nil
+	return nil
+}
+
 // next returns the next key/value for the cursor.
 func (c *floatDescendingCursor) next() (int64, interface{}) { return c.nextFloat() }
 
@@ -505,6 +548,7 @@ type floatLiteralCursor struct {
 	value float64
 }
 
+func (c *floatLiteralCursor) close() error                   { return nil }
 func (c *floatLiteralCursor) peek() (t int64, v interface{}) { return tsdb.EOF, c.value }
 func (c *floatLiteralCursor) next() (t int64, v interface{}) { return tsdb.EOF, c.value }
 func (c *floatLiteralCursor) nextAt(seek int64) interface{}  { return c.value }
@@ -513,6 +557,7 @@ func (c *floatLiteralCursor) nextAt(seek int64) interface{}  { return c.value }
 // It doesn't not have a time value so it can only be used with nextAt().
 type floatNilLiteralCursor struct{}
 
+func (c *floatNilLiteralCursor) close() error                   { return nil }
 func (c *floatNilLiteralCursor) peek() (t int64, v interface{}) { return tsdb.EOF, (*float64)(nil) }
 func (c *floatNilLiteralCursor) next() (t int64, v interface{}) { return tsdb.EOF, (*float64)(nil) }
 func (c *floatNilLiteralCursor) nextAt(seek int64) interface{}  { return (*float64)(nil) }
@@ -638,7 +683,22 @@ func (itr *integerIterator) Stats() influxql.IteratorStats {
 }
 
 // Close closes the iterator.
-func (itr *integerIterator) Close() error { return nil }
+func (itr *integerIterator) Close() error {
+	for _, c := range itr.aux {
+		c.close()
+	}
+	itr.aux = nil
+	for _, c := range itr.conds.curs {
+		c.close()
+	}
+	itr.conds.curs = nil
+	if itr.cur != nil {
+		err := itr.cur.close()
+		itr.cur = nil
+		return err
+	}
+	return nil
+}
 
 // integerLimitIterator
 type integerLimitIterator struct {
@@ -743,6 +803,16 @@ func (c *integerAscendingCursor) peekTSM() (t int64, v int64) {
 
 	item := c.tsm.values[c.tsm.pos]
 	return item.UnixNano(), item.value
+}
+
+// close closes the cursor and any dependent cursors.
+func (c *integerAscendingCursor) close() error {
+	c.tsm.keyCursor.Close()
+	c.tsm.keyCursor = nil
+	c.tsm.buf = nil
+	c.cache.values = nil
+	c.tsm.values = nil
+	return nil
 }
 
 // next returns the next key/value for the cursor.
@@ -857,6 +927,16 @@ func (c *integerDescendingCursor) peekTSM() (t int64, v int64) {
 	return item.UnixNano(), item.value
 }
 
+// close closes the cursor and any dependent cursors.
+func (c *integerDescendingCursor) close() error {
+	c.tsm.keyCursor.Close()
+	c.tsm.keyCursor = nil
+	c.tsm.buf = nil
+	c.cache.values = nil
+	c.tsm.values = nil
+	return nil
+}
+
 // next returns the next key/value for the cursor.
 func (c *integerDescendingCursor) next() (int64, interface{}) { return c.nextInteger() }
 
@@ -915,6 +995,7 @@ type integerLiteralCursor struct {
 	value int64
 }
 
+func (c *integerLiteralCursor) close() error                   { return nil }
 func (c *integerLiteralCursor) peek() (t int64, v interface{}) { return tsdb.EOF, c.value }
 func (c *integerLiteralCursor) next() (t int64, v interface{}) { return tsdb.EOF, c.value }
 func (c *integerLiteralCursor) nextAt(seek int64) interface{}  { return c.value }
@@ -923,6 +1004,7 @@ func (c *integerLiteralCursor) nextAt(seek int64) interface{}  { return c.value 
 // It doesn't not have a time value so it can only be used with nextAt().
 type integerNilLiteralCursor struct{}
 
+func (c *integerNilLiteralCursor) close() error                   { return nil }
 func (c *integerNilLiteralCursor) peek() (t int64, v interface{}) { return tsdb.EOF, (*int64)(nil) }
 func (c *integerNilLiteralCursor) next() (t int64, v interface{}) { return tsdb.EOF, (*int64)(nil) }
 func (c *integerNilLiteralCursor) nextAt(seek int64) interface{}  { return (*int64)(nil) }
@@ -1048,7 +1130,22 @@ func (itr *stringIterator) Stats() influxql.IteratorStats {
 }
 
 // Close closes the iterator.
-func (itr *stringIterator) Close() error { return nil }
+func (itr *stringIterator) Close() error {
+	for _, c := range itr.aux {
+		c.close()
+	}
+	itr.aux = nil
+	for _, c := range itr.conds.curs {
+		c.close()
+	}
+	itr.conds.curs = nil
+	if itr.cur != nil {
+		err := itr.cur.close()
+		itr.cur = nil
+		return err
+	}
+	return nil
+}
 
 // stringLimitIterator
 type stringLimitIterator struct {
@@ -1153,6 +1250,16 @@ func (c *stringAscendingCursor) peekTSM() (t int64, v string) {
 
 	item := c.tsm.values[c.tsm.pos]
 	return item.UnixNano(), item.value
+}
+
+// close closes the cursor and any dependent cursors.
+func (c *stringAscendingCursor) close() error {
+	c.tsm.keyCursor.Close()
+	c.tsm.keyCursor = nil
+	c.tsm.buf = nil
+	c.cache.values = nil
+	c.tsm.values = nil
+	return nil
 }
 
 // next returns the next key/value for the cursor.
@@ -1267,6 +1374,16 @@ func (c *stringDescendingCursor) peekTSM() (t int64, v string) {
 	return item.UnixNano(), item.value
 }
 
+// close closes the cursor and any dependent cursors.
+func (c *stringDescendingCursor) close() error {
+	c.tsm.keyCursor.Close()
+	c.tsm.keyCursor = nil
+	c.tsm.buf = nil
+	c.cache.values = nil
+	c.tsm.values = nil
+	return nil
+}
+
 // next returns the next key/value for the cursor.
 func (c *stringDescendingCursor) next() (int64, interface{}) { return c.nextString() }
 
@@ -1325,6 +1442,7 @@ type stringLiteralCursor struct {
 	value string
 }
 
+func (c *stringLiteralCursor) close() error                   { return nil }
 func (c *stringLiteralCursor) peek() (t int64, v interface{}) { return tsdb.EOF, c.value }
 func (c *stringLiteralCursor) next() (t int64, v interface{}) { return tsdb.EOF, c.value }
 func (c *stringLiteralCursor) nextAt(seek int64) interface{}  { return c.value }
@@ -1333,6 +1451,7 @@ func (c *stringLiteralCursor) nextAt(seek int64) interface{}  { return c.value }
 // It doesn't not have a time value so it can only be used with nextAt().
 type stringNilLiteralCursor struct{}
 
+func (c *stringNilLiteralCursor) close() error                   { return nil }
 func (c *stringNilLiteralCursor) peek() (t int64, v interface{}) { return tsdb.EOF, (*string)(nil) }
 func (c *stringNilLiteralCursor) next() (t int64, v interface{}) { return tsdb.EOF, (*string)(nil) }
 func (c *stringNilLiteralCursor) nextAt(seek int64) interface{}  { return (*string)(nil) }
@@ -1458,7 +1577,22 @@ func (itr *booleanIterator) Stats() influxql.IteratorStats {
 }
 
 // Close closes the iterator.
-func (itr *booleanIterator) Close() error { return nil }
+func (itr *booleanIterator) Close() error {
+	for _, c := range itr.aux {
+		c.close()
+	}
+	itr.aux = nil
+	for _, c := range itr.conds.curs {
+		c.close()
+	}
+	itr.conds.curs = nil
+	if itr.cur != nil {
+		err := itr.cur.close()
+		itr.cur = nil
+		return err
+	}
+	return nil
+}
 
 // booleanLimitIterator
 type booleanLimitIterator struct {
@@ -1563,6 +1697,16 @@ func (c *booleanAscendingCursor) peekTSM() (t int64, v bool) {
 
 	item := c.tsm.values[c.tsm.pos]
 	return item.UnixNano(), item.value
+}
+
+// close closes the cursor and any dependent cursors.
+func (c *booleanAscendingCursor) close() error {
+	c.tsm.keyCursor.Close()
+	c.tsm.keyCursor = nil
+	c.tsm.buf = nil
+	c.cache.values = nil
+	c.tsm.values = nil
+	return nil
 }
 
 // next returns the next key/value for the cursor.
@@ -1677,6 +1821,16 @@ func (c *booleanDescendingCursor) peekTSM() (t int64, v bool) {
 	return item.UnixNano(), item.value
 }
 
+// close closes the cursor and any dependent cursors.
+func (c *booleanDescendingCursor) close() error {
+	c.tsm.keyCursor.Close()
+	c.tsm.keyCursor = nil
+	c.tsm.buf = nil
+	c.cache.values = nil
+	c.tsm.values = nil
+	return nil
+}
+
 // next returns the next key/value for the cursor.
 func (c *booleanDescendingCursor) next() (int64, interface{}) { return c.nextBoolean() }
 
@@ -1735,6 +1889,7 @@ type booleanLiteralCursor struct {
 	value bool
 }
 
+func (c *booleanLiteralCursor) close() error                   { return nil }
 func (c *booleanLiteralCursor) peek() (t int64, v interface{}) { return tsdb.EOF, c.value }
 func (c *booleanLiteralCursor) next() (t int64, v interface{}) { return tsdb.EOF, c.value }
 func (c *booleanLiteralCursor) nextAt(seek int64) interface{}  { return c.value }
@@ -1743,6 +1898,7 @@ func (c *booleanLiteralCursor) nextAt(seek int64) interface{}  { return c.value 
 // It doesn't not have a time value so it can only be used with nextAt().
 type booleanNilLiteralCursor struct{}
 
+func (c *booleanNilLiteralCursor) close() error                   { return nil }
 func (c *booleanNilLiteralCursor) peek() (t int64, v interface{}) { return tsdb.EOF, (*bool)(nil) }
 func (c *booleanNilLiteralCursor) next() (t int64, v interface{}) { return tsdb.EOF, (*bool)(nil) }
 func (c *booleanNilLiteralCursor) nextAt(seek int64) interface{}  { return (*bool)(nil) }

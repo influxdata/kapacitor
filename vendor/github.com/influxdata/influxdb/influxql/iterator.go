@@ -23,7 +23,7 @@ const (
 
 	// MaxTime is used as the maximum time value when computing an unbounded range.
 	// This time is 2262-04-11 23:47:16.854775806 +0000 UTC
-	MaxTime = models.MaxNanoTime - 1
+	MaxTime = models.MaxNanoTime
 )
 
 // Iterator represents a generic interface for all Iterators.
@@ -514,6 +514,7 @@ func (a auxIteratorFields) sendError(err error) {
 
 // DrainIterator reads all points from an iterator.
 func DrainIterator(itr Iterator) {
+	defer itr.Close()
 	switch itr := itr.(type) {
 	case FloatIterator:
 		for p, _ := itr.Next(); p != nil; p, _ = itr.Next() {
@@ -534,6 +535,7 @@ func DrainIterator(itr Iterator) {
 
 // DrainIterators reads all points from all iterators.
 func DrainIterators(itrs []Iterator) {
+	defer Iterators(itrs).Close()
 	for {
 		var hasData bool
 
@@ -618,6 +620,8 @@ func (a IteratorCreators) CreateIterator(opt IteratorOptions) (Iterator, error) 
 			itr, err := ic.CreateIterator(opt)
 			if err != nil {
 				return err
+			} else if itr == nil {
+				continue
 			}
 			itrs = append(itrs, itr)
 		}
@@ -625,6 +629,10 @@ func (a IteratorCreators) CreateIterator(opt IteratorOptions) (Iterator, error) 
 	}(); err != nil {
 		Iterators(itrs).Close()
 		return nil, err
+	}
+
+	if len(itrs) == 0 {
+		return nil, nil
 	}
 
 	return Iterators(itrs).Merge(opt)
@@ -686,6 +694,91 @@ func (a IteratorCreators) ExpandSources(sources Sources) (Sources, error) {
 	}
 
 	return sorted, nil
+}
+
+// lazyIteratorCreators represents a list of iterator creators that are lazily created.
+type lazyIteratorCreators IteratorCreators
+
+// NewLazyIteratorCreator returns an iterator creator for that creates iterators lazily.
+func NewLazyIteratorCreator(a []IteratorCreator) IteratorCreator {
+	return lazyIteratorCreators(a)
+}
+
+func (a lazyIteratorCreators) CreateIterator(opt IteratorOptions) (Iterator, error) {
+	for {
+		if len(a) == 0 {
+			return nil, nil
+		}
+
+		// Create first iterator to determine data type.
+		itr, err := a[0].CreateIterator(opt)
+		if err != nil {
+			return nil, err
+		} else if itr == nil {
+			a = a[1:]
+			continue
+		} else if len(a) == 1 {
+			return Iterators{itr}.Merge(opt)
+		}
+
+		// All additional iterators need to be the same type.
+		switch itr := itr.(type) {
+		case FloatIterator:
+			itrs := make([]FloatIterator, len(a))
+			itrs[0] = itr
+			for i := 1; i < len(itrs); i++ {
+				ic := a[i]
+				itrs[i] = &lazyFloatIterator{
+					fn: func() (Iterator, error) { return ic.CreateIterator(opt) },
+				}
+			}
+			return Iterators{NewMultiFloatIterator(itrs)}.Merge(opt)
+
+		case IntegerIterator:
+			itrs := make([]IntegerIterator, len(a))
+			itrs[0] = itr
+			for i := 1; i < len(itrs); i++ {
+				ic := a[i]
+				itrs[i] = &lazyIntegerIterator{
+					fn: func() (Iterator, error) { return ic.CreateIterator(opt) },
+				}
+			}
+			return Iterators{NewMultiIntegerIterator(itrs)}.Merge(opt)
+
+		case StringIterator:
+			itrs := make([]StringIterator, len(a))
+			itrs[0] = itr
+			for i := 1; i < len(itrs); i++ {
+				ic := a[i]
+				itrs[i] = &lazyStringIterator{
+					fn: func() (Iterator, error) { return ic.CreateIterator(opt) },
+				}
+			}
+			return Iterators{NewMultiStringIterator(itrs)}.Merge(opt)
+
+		case BooleanIterator:
+			itrs := make([]BooleanIterator, len(a))
+			itrs[0] = itr
+			for i := 1; i < len(itrs); i++ {
+				ic := a[i]
+				itrs[i] = &lazyBooleanIterator{
+					fn: func() (Iterator, error) { return ic.CreateIterator(opt) },
+				}
+			}
+			return Iterators{NewMultiBooleanIterator(itrs)}.Merge(opt)
+
+		default:
+			panic(fmt.Sprintf("unsupported iterator type for lazy iteration: %T", itr))
+		}
+	}
+}
+
+func (a lazyIteratorCreators) FieldDimensions(sources Sources) (fields map[string]DataType, dimensions map[string]struct{}, err error) {
+	return IteratorCreators(a).FieldDimensions(sources)
+}
+
+func (a lazyIteratorCreators) ExpandSources(sources Sources) (Sources, error) {
+	return IteratorCreators(a).ExpandSources(sources)
 }
 
 // IteratorOptions is an object passed to CreateIterator to specify creation options.
@@ -768,7 +861,7 @@ func newIteratorOptionsStmt(stmt *SelectStatement, sopt *SelectOptions) (opt Ite
 	if interval < 0 {
 		interval = 0
 	} else if interval > 0 {
-		opt.Interval.Offset, err = stmt.GroupByOffset(&opt)
+		opt.Interval.Offset, err = stmt.GroupByOffset()
 		if err != nil {
 			return opt, err
 		}

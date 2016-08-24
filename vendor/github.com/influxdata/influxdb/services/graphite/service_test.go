@@ -39,7 +39,7 @@ func Test_ServerGraphiteTCP(t *testing.T) {
 
 			pt, _ := models.NewPoint(
 				"cpu",
-				map[string]string{},
+				models.NewTags(map[string]string{}),
 				map[string]interface{}{"value": 23.456},
 				time.Unix(now.Unix(), 0))
 
@@ -115,7 +115,7 @@ func Test_ServerGraphiteUDP(t *testing.T) {
 
 			pt, _ := models.NewPoint(
 				"cpu",
-				map[string]string{},
+				models.NewTags(map[string]string{}),
 				map[string]interface{}{"value": 23.456},
 				time.Unix(now.Unix(), 0))
 			if database != "graphitedb" {
@@ -176,11 +176,11 @@ func (d *DatabaseCreator) CreateDatabase(name string) (*meta.DatabaseInfo, error
 	return nil, nil
 }
 
-func (d *DatabaseCreator) CreateRetentionPolicy(database string, rpi *meta.RetentionPolicyInfo) (*meta.RetentionPolicyInfo, error) {
+func (d *DatabaseCreator) CreateRetentionPolicy(database string, spec *meta.RetentionPolicySpec) (*meta.RetentionPolicyInfo, error) {
 	return nil, nil
 }
 
-func (d *DatabaseCreator) CreateDatabaseWithRetentionPolicy(name string, rpi *meta.RetentionPolicyInfo) (*meta.DatabaseInfo, error) {
+func (d *DatabaseCreator) CreateDatabaseWithRetentionPolicy(name string, spec *meta.RetentionPolicySpec) (*meta.DatabaseInfo, error) {
 	d.Created = true
 	return nil, nil
 }

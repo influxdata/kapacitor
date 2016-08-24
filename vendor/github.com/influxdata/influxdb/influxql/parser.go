@@ -32,6 +32,7 @@ func NewParser(r io.Reader) *Parser {
 	return &Parser{s: newBufScanner(r)}
 }
 
+// SetParams sets the parameters that will be used for any bound parameter substitutions.
 func (p *Parser) SetParams(params map[string]interface{}) {
 	p.params = params
 }
@@ -306,7 +307,17 @@ func (p *Parser) parseKillQueryStatement() (*KillQueryStatement, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &KillQueryStatement{QueryID: qid}, nil
+
+	var host string
+	if tok, _, _ := p.scanIgnoreWhitespace(); tok == ON {
+		host, err = p.parseIdent()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		p.unscan()
+	}
+	return &KillQueryStatement{QueryID: qid, Host: host}, nil
 }
 
 // parseCreateSubscriptionStatement parses a string and returns a CreatesubScriptionStatement.
@@ -1208,7 +1219,7 @@ func (p *Parser) parseShowTagValuesStatement() (*ShowTagValuesStatement, error) 
 	}
 
 	// Parse required WITH KEY.
-	if stmt.TagKeys, err = p.parseTagKeys(); err != nil {
+	if stmt.Op, stmt.TagKeyExpr, err = p.parseTagKeyExpr(); err != nil {
 		return nil, err
 	}
 
@@ -1236,44 +1247,52 @@ func (p *Parser) parseShowTagValuesStatement() (*ShowTagValuesStatement, error) 
 }
 
 // parseTagKeys parses a string and returns a list of tag keys.
-func (p *Parser) parseTagKeys() ([]string, error) {
+func (p *Parser) parseTagKeyExpr() (Token, Literal, error) {
 	var err error
 
 	// Parse required WITH KEY tokens.
 	if err := p.parseTokens([]Token{WITH, KEY}); err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 
-	var tagKeys []string
-
-	// Parse required IN or EQ token.
-	if tok, pos, lit := p.scanIgnoreWhitespace(); tok == IN {
+	// Parse required IN, EQ, or EQREGEX token.
+	tok, pos, lit := p.scanIgnoreWhitespace()
+	if tok == IN {
 		// Parse required ( token.
 		if tok, pos, lit = p.scanIgnoreWhitespace(); tok != LPAREN {
-			return nil, newParseError(tokstr(tok, lit), []string{"("}, pos)
+			return 0, nil, newParseError(tokstr(tok, lit), []string{"("}, pos)
 		}
 
 		// Parse tag key list.
+		var tagKeys []string
 		if tagKeys, err = p.parseIdentList(); err != nil {
-			return nil, err
+			return 0, nil, err
 		}
 
 		// Parse required ) token.
 		if tok, pos, lit = p.scanIgnoreWhitespace(); tok != RPAREN {
-			return nil, newParseError(tokstr(tok, lit), []string{")"}, pos)
+			return 0, nil, newParseError(tokstr(tok, lit), []string{")"}, pos)
 		}
-	} else if tok == EQ {
+		return IN, &ListLiteral{Vals: tagKeys}, nil
+	} else if tok == EQ || tok == NEQ {
 		// Parse required tag key.
 		ident, err := p.parseIdent()
 		if err != nil {
-			return nil, err
+			return 0, nil, err
 		}
-		tagKeys = append(tagKeys, ident)
-	} else {
-		return nil, newParseError(tokstr(tok, lit), []string{"IN", "="}, pos)
+		return tok, &StringLiteral{Val: ident}, nil
+	} else if tok == EQREGEX || tok == NEQREGEX {
+		re, err := p.parseRegex()
+		if err != nil {
+			return 0, nil, err
+		} else if re == nil {
+			// parseRegex can return an empty type, but we need it to be present
+			tok, pos, lit := p.scanIgnoreWhitespace()
+			return 0, nil, newParseError(tokstr(tok, lit), []string{"regex"}, pos)
+		}
+		return tok, re, nil
 	}
-
-	return tagKeys, nil
+	return 0, nil, newParseError(tokstr(tok, lit), []string{"IN", "=", "=~"}, pos)
 }
 
 // parseShowUsersStatement parses a string and returns a ShowUsersStatement.
@@ -1501,16 +1520,6 @@ func (p *Parser) parseCreateContinuousQueryStatement() (*CreateContinuousQuerySt
 func (p *Parser) parseCreateDatabaseStatement() (*CreateDatabaseStatement, error) {
 	stmt := &CreateDatabaseStatement{}
 
-	// Look for "IF NOT EXISTS"
-	if tok, _, _ := p.scanIgnoreWhitespace(); tok == IF {
-		if err := p.parseTokens([]Token{NOT, EXISTS}); err != nil {
-			return nil, err
-		}
-		stmt.IfNotExists = true
-	} else {
-		p.unscan()
-	}
-
 	// Parse the name of the database to be created.
 	lit, err := p.parseIdent()
 	if err != nil {
@@ -1532,31 +1541,28 @@ func (p *Parser) parseCreateDatabaseStatement() (*CreateDatabaseStatement, error
 		stmt.RetentionPolicyCreate = true
 
 		// Look for "DURATION"
-		var rpDuration time.Duration // default is forever
 		if err := p.parseTokens([]Token{DURATION}); err != nil {
 			p.unscan()
 		} else {
-			rpDuration, err = p.parseDuration()
+			rpDuration, err := p.parseDuration()
 			if err != nil {
 				return nil, err
 			}
+			stmt.RetentionPolicyDuration = &rpDuration
 		}
-		stmt.RetentionPolicyDuration = rpDuration
 
 		// Look for "REPLICATION"
-		var rpReplication = 1 // default is 1
 		if err := p.parseTokens([]Token{REPLICATION}); err != nil {
 			p.unscan()
 		} else {
-			rpReplication, err = p.parseInt(1, math.MaxInt32)
+			rpReplication, err := p.parseInt(1, math.MaxInt32)
 			if err != nil {
 				return nil, err
 			}
+			stmt.RetentionPolicyReplication = &rpReplication
 		}
-		stmt.RetentionPolicyReplication = rpReplication
 
 		// Look for "SHARD"
-		var rpShardGroupDuration time.Duration
 		if err := p.parseTokens([]Token{SHARD}); err != nil {
 			p.unscan()
 		} else {
@@ -1565,11 +1571,10 @@ func (p *Parser) parseCreateDatabaseStatement() (*CreateDatabaseStatement, error
 			if tok != DURATION {
 				return nil, newParseError(tokstr(tok, lit), []string{"DURATION"}, pos)
 			}
-			rpShardGroupDuration, err = p.parseDuration()
+			stmt.RetentionPolicyShardGroupDuration, err = p.parseDuration()
 			if err != nil {
 				return nil, err
 			}
-			stmt.RetentionPolicyShardGroupDuration = rpShardGroupDuration
 		}
 
 		// Look for "NAME"
@@ -1591,16 +1596,6 @@ func (p *Parser) parseCreateDatabaseStatement() (*CreateDatabaseStatement, error
 // This function assumes the DROP DATABASE tokens have already been consumed.
 func (p *Parser) parseDropDatabaseStatement() (*DropDatabaseStatement, error) {
 	stmt := &DropDatabaseStatement{}
-
-	// Look for "IF EXISTS"
-	if tok, _, _ := p.scanIgnoreWhitespace(); tok == IF {
-		if err := p.parseTokens([]Token{EXISTS}); err != nil {
-			return nil, err
-		}
-		stmt.IfExists = true
-	} else {
-		p.unscan()
-	}
 
 	// Parse the name of the database to be dropped.
 	lit, err := p.parseIdent()
@@ -2072,24 +2067,23 @@ func (p *Parser) parseDimension() (*Dimension, error) {
 // parseFill parses the fill call and its options.
 func (p *Parser) parseFill() (FillOption, interface{}, error) {
 	// Parse the expression first.
+	tok, _, lit := p.scanIgnoreWhitespace()
+	p.unscan()
+	if tok != IDENT || strings.ToLower(lit) != "fill" {
+		return NullFill, nil, nil
+	}
+
 	expr, err := p.ParseExpr()
 	if err != nil {
-		p.unscan()
-		return NullFill, nil, nil
+		return NullFill, nil, err
 	}
-	lit, ok := expr.(*Call)
+	fill, ok := expr.(*Call)
 	if !ok {
-		p.unscan()
-		return NullFill, nil, nil
-	}
-	if strings.ToLower(lit.Name) != "fill" {
-		p.unscan()
-		return NullFill, nil, nil
-	}
-	if len(lit.Args) != 1 {
+		return NullFill, nil, errors.New("fill must be a function call")
+	} else if len(fill.Args) != 1 {
 		return NullFill, nil, errors.New("fill requires an argument, e.g.: 0, null, none, previous")
 	}
-	switch lit.Args[0].String() {
+	switch fill.Args[0].String() {
 	case "null":
 		return NullFill, nil, nil
 	case "none":
@@ -2097,7 +2091,7 @@ func (p *Parser) parseFill() (FillOption, interface{}, error) {
 	case "previous":
 		return PreviousFill, nil, nil
 	default:
-		switch num := lit.Args[0].(type) {
+		switch num := fill.Args[0].(type) {
 		case *IntegerLiteral:
 			return NumberFill, num.Val, nil
 		case *NumberLiteral:
@@ -2569,6 +2563,9 @@ func (p *Parser) consumeWhitespace() {
 func (p *Parser) unscan() { p.s.Unscan() }
 
 // ParseDuration parses a time duration from a string.
+// This is needed instead of time.ParseDuration because this will support
+// the full syntax that InfluxQL supports for specifying durations
+// including weeks and days.
 func ParseDuration(s string) (time.Duration, error) {
 	// Return an error if the string is blank or one character
 	if len(s) < 2 {
@@ -2578,41 +2575,66 @@ func ParseDuration(s string) (time.Duration, error) {
 	// Split string into individual runes.
 	a := split(s)
 
-	// Extract the unit of measure.
-	// If the last two characters are "ms" then parse as milliseconds.
-	// Otherwise just use the last character as the unit of measure.
-	var num, uom string
-	if len(s) > 2 && s[len(s)-2:] == "ms" {
-		num, uom = string(a[:len(a)-2]), "ms"
-	} else {
-		num, uom = string(a[:len(a)-1]), string(a[len(a)-1:])
+	// Start with a zero duration.
+	var d time.Duration
+	i := 0
+
+	// Check for a negative.
+	isNegative := false
+	if a[i] == '-' {
+		isNegative = true
+		i++
 	}
 
-	// Parse the numeric part.
-	n, err := strconv.ParseInt(num, 10, 64)
-	if err != nil {
-		return 0, ErrInvalidDuration
-	}
+	// Parsing loop.
+	for i < len(a) {
+		// Find the number portion.
+		start := i
+		for ; i < len(a) && isDigit(a[i]); i++ {
+			// Scan for the digits.
+		}
 
-	// Multiply by the unit of measure.
-	switch uom {
-	case "u", "µ":
-		return time.Duration(n) * time.Microsecond, nil
-	case "ms":
-		return time.Duration(n) * time.Millisecond, nil
-	case "s":
-		return time.Duration(n) * time.Second, nil
-	case "m":
-		return time.Duration(n) * time.Minute, nil
-	case "h":
-		return time.Duration(n) * time.Hour, nil
-	case "d":
-		return time.Duration(n) * 24 * time.Hour, nil
-	case "w":
-		return time.Duration(n) * 7 * 24 * time.Hour, nil
-	default:
-		return 0, ErrInvalidDuration
+		// Check if we reached the end of the string prematurely.
+		if i >= len(a) || i == start {
+			return 0, ErrInvalidDuration
+		}
+
+		// Parse the numeric part.
+		n, err := strconv.ParseInt(string(a[start:i]), 10, 64)
+		if err != nil {
+			return 0, ErrInvalidDuration
+		}
+
+		// Extract the unit of measure.
+		// If the last two characters are "ms" then parse as milliseconds.
+		// Otherwise just use the last character as the unit of measure.
+		switch a[i] {
+		case 'u', 'µ':
+			d += time.Duration(n) * time.Microsecond
+		case 'm':
+			if i+1 < len(a) && a[i+1] == 's' {
+				d += time.Duration(n) * time.Millisecond
+				i += 2
+				continue
+			}
+			d += time.Duration(n) * time.Minute
+		case 's':
+			d += time.Duration(n) * time.Second
+		case 'h':
+			d += time.Duration(n) * time.Hour
+		case 'd':
+			d += time.Duration(n) * 24 * time.Hour
+		case 'w':
+			d += time.Duration(n) * 7 * 24 * time.Hour
+		default:
+			return 0, ErrInvalidDuration
+		}
+		i++
 	}
+	if isNegative {
+		d = -d
+	}
+	return d, nil
 }
 
 // FormatDuration formats a duration to a string.

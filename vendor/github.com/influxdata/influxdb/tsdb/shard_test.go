@@ -1,6 +1,8 @@
 package tsdb_test
 
 import (
+	"bytes"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
@@ -45,7 +47,7 @@ func TestShardWriteAndIndex(t *testing.T) {
 
 	pt := models.MustNewPoint(
 		"cpu",
-		map[string]string{"host": "server"},
+		models.Tags{{Key: []byte("host"), Value: []byte("server")}},
 		map[string]interface{}{"value": 1.0},
 		time.Unix(1, 2),
 	)
@@ -67,7 +69,7 @@ func TestShardWriteAndIndex(t *testing.T) {
 		}
 
 		seriesTags := index.Series(string(pt.Key())).Tags
-		if len(seriesTags) != len(pt.Tags()) || pt.Tags()["host"] != seriesTags["host"] {
+		if len(seriesTags) != len(pt.Tags()) || pt.Tags().GetString("host") != seriesTags.GetString("host") {
 			t.Fatalf("tags weren't properly saved to series index: %v, %v", pt.Tags(), seriesTags)
 		}
 		if !reflect.DeepEqual(index.Measurement("cpu").TagKeys(), []string{"host"}) {
@@ -96,6 +98,160 @@ func TestShardWriteAndIndex(t *testing.T) {
 	}
 }
 
+func TestMaxSeriesLimit(t *testing.T) {
+	tmpDir, _ := ioutil.TempDir("", "shard_test")
+	defer os.RemoveAll(tmpDir)
+	tmpShard := path.Join(tmpDir, "shard")
+	tmpWal := path.Join(tmpDir, "wal")
+
+	index := tsdb.NewDatabaseIndex("db")
+	opts := tsdb.NewEngineOptions()
+	opts.Config.WALDir = filepath.Join(tmpDir, "wal")
+	opts.Config.MaxSeriesPerDatabase = 1000
+
+	sh := tsdb.NewShard(1, index, tmpShard, tmpWal, opts)
+
+	if err := sh.Open(); err != nil {
+		t.Fatalf("error opening shard: %s", err.Error())
+	}
+
+	// Writing 1K series should succeed.
+	points := []models.Point{}
+
+	for i := 0; i < 1000; i++ {
+		pt := models.MustNewPoint(
+			"cpu",
+			models.Tags{{Key: []byte("host"), Value: []byte(fmt.Sprintf("server%d", i))}},
+			map[string]interface{}{"value": 1.0},
+			time.Unix(1, 2),
+		)
+		points = append(points, pt)
+	}
+
+	err := sh.WritePoints(points)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	// Writing one more series should exceed the series limit.
+	pt := models.MustNewPoint(
+		"cpu",
+		models.Tags{{Key: []byte("host"), Value: []byte("server9999")}},
+		map[string]interface{}{"value": 1.0},
+		time.Unix(1, 2),
+	)
+
+	err = sh.WritePoints([]models.Point{pt})
+	if err == nil {
+		t.Fatal("expected error")
+	} else if err.Error() != "max series per database exceeded: cpu,host=server9999" {
+		t.Fatalf("unexpected error message:\n\texp = max series per database exceeded: cpu,host=server9999\n\tgot = %s", err.Error())
+	}
+
+	sh.Close()
+}
+
+func TestWriteTimeTag(t *testing.T) {
+	tmpDir, _ := ioutil.TempDir("", "shard_test")
+	defer os.RemoveAll(tmpDir)
+	tmpShard := path.Join(tmpDir, "shard")
+	tmpWal := path.Join(tmpDir, "wal")
+
+	index := tsdb.NewDatabaseIndex("db")
+	opts := tsdb.NewEngineOptions()
+	opts.Config.WALDir = filepath.Join(tmpDir, "wal")
+
+	sh := tsdb.NewShard(1, index, tmpShard, tmpWal, opts)
+	if err := sh.Open(); err != nil {
+		t.Fatalf("error opening shard: %s", err.Error())
+	}
+	defer sh.Close()
+
+	pt := models.MustNewPoint(
+		"cpu",
+		models.NewTags(map[string]string{}),
+		map[string]interface{}{"time": 1.0},
+		time.Unix(1, 2),
+	)
+
+	buf := bytes.NewBuffer(nil)
+	sh.SetLogOutput(buf)
+	if err := sh.WritePoints([]models.Point{pt}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	} else if got, exp := buf.String(), "dropping field 'time'"; !strings.Contains(got, exp) {
+		t.Fatalf("unexpected log message: %s", strings.TrimSpace(got))
+	}
+
+	m := index.Measurement("cpu")
+	if m != nil {
+		t.Fatal("unexpected cpu measurement")
+	}
+
+	pt = models.MustNewPoint(
+		"cpu",
+		models.NewTags(map[string]string{}),
+		map[string]interface{}{"value": 1.0, "time": 1.0},
+		time.Unix(1, 2),
+	)
+
+	buf = bytes.NewBuffer(nil)
+	sh.SetLogOutput(buf)
+	if err := sh.WritePoints([]models.Point{pt}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	} else if got, exp := buf.String(), "dropping field 'time'"; !strings.Contains(got, exp) {
+		t.Fatalf("unexpected log message: %s", strings.TrimSpace(got))
+	}
+
+	m = index.Measurement("cpu")
+	if m == nil {
+		t.Fatal("expected cpu measurement")
+	}
+
+	if got, exp := len(m.FieldNames()), 1; got != exp {
+		t.Fatalf("invalid number of field names: got=%v exp=%v", got, exp)
+	}
+}
+
+func TestWriteTimeField(t *testing.T) {
+	tmpDir, _ := ioutil.TempDir("", "shard_test")
+	defer os.RemoveAll(tmpDir)
+	tmpShard := path.Join(tmpDir, "shard")
+	tmpWal := path.Join(tmpDir, "wal")
+
+	index := tsdb.NewDatabaseIndex("db")
+	opts := tsdb.NewEngineOptions()
+	opts.Config.WALDir = filepath.Join(tmpDir, "wal")
+
+	sh := tsdb.NewShard(1, index, tmpShard, tmpWal, opts)
+	if err := sh.Open(); err != nil {
+		t.Fatalf("error opening shard: %s", err.Error())
+	}
+	defer sh.Close()
+
+	pt := models.MustNewPoint(
+		"cpu",
+		models.NewTags(map[string]string{"time": "now"}),
+		map[string]interface{}{"value": 1.0},
+		time.Unix(1, 2),
+	)
+
+	buf := bytes.NewBuffer(nil)
+	sh.SetLogOutput(buf)
+	if err := sh.WritePoints([]models.Point{pt}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	} else if got, exp := buf.String(), "dropping tag 'time'"; !strings.Contains(got, exp) {
+		t.Fatalf("unexpected log message: %s", strings.TrimSpace(got))
+	}
+
+	key := models.MakeKey([]byte("cpu"), nil)
+	series := index.Series(string(key))
+	if series == nil {
+		t.Fatal("expected series")
+	} else if len(series.Tags) != 0 {
+		t.Fatalf("unexpected number of tags: got=%v exp=%v", len(series.Tags), 0)
+	}
+}
+
 func TestShardWriteAddNewField(t *testing.T) {
 	tmpDir, _ := ioutil.TempDir("", "shard_test")
 	defer os.RemoveAll(tmpDir)
@@ -114,7 +270,7 @@ func TestShardWriteAddNewField(t *testing.T) {
 
 	pt := models.MustNewPoint(
 		"cpu",
-		map[string]string{"host": "server"},
+		models.NewTags(map[string]string{"host": "server"}),
 		map[string]interface{}{"value": 1.0},
 		time.Unix(1, 2),
 	)
@@ -126,7 +282,7 @@ func TestShardWriteAddNewField(t *testing.T) {
 
 	pt = models.MustNewPoint(
 		"cpu",
-		map[string]string{"host": "server"},
+		models.NewTags(map[string]string{"host": "server"}),
 		map[string]interface{}{"value": 1.0, "value2": 2.0},
 		time.Unix(1, 2),
 	)
@@ -140,7 +296,7 @@ func TestShardWriteAddNewField(t *testing.T) {
 		t.Fatalf("series wasn't in index")
 	}
 	seriesTags := index.Series(string(pt.Key())).Tags
-	if len(seriesTags) != len(pt.Tags()) || pt.Tags()["host"] != seriesTags["host"] {
+	if len(seriesTags) != len(pt.Tags()) || pt.Tags().GetString("host") != seriesTags.GetString("host") {
 		t.Fatalf("tags weren't properly saved to series index: %v, %v", pt.Tags(), seriesTags)
 	}
 	if !reflect.DeepEqual(index.Measurement("cpu").TagKeys(), []string{"host"}) {
@@ -172,7 +328,7 @@ func TestShard_Close_RemoveIndex(t *testing.T) {
 
 	pt := models.MustNewPoint(
 		"cpu",
-		map[string]string{"host": "server"},
+		models.NewTags(map[string]string{"host": "server"}),
 		map[string]interface{}{"value": 1.0},
 		time.Unix(1, 2),
 	)
@@ -365,7 +521,7 @@ func TestShard_Disabled_WriteQuery(t *testing.T) {
 
 	pt := models.MustNewPoint(
 		"cpu",
-		map[string]string{"host": "server"},
+		models.NewTags(map[string]string{"host": "server"}),
 		map[string]interface{}{"value": 1.0},
 		time.Unix(1, 2),
 	)
@@ -403,6 +559,115 @@ func BenchmarkWritePoints_NewSeries_100K(b *testing.B) { benchmarkWritePoints(b,
 func BenchmarkWritePoints_NewSeries_250K(b *testing.B) { benchmarkWritePoints(b, 80, 5, 5, 1) }
 func BenchmarkWritePoints_NewSeries_500K(b *testing.B) { benchmarkWritePoints(b, 160, 5, 5, 1) }
 func BenchmarkWritePoints_NewSeries_1M(b *testing.B)   { benchmarkWritePoints(b, 320, 5, 5, 1) }
+
+// Fix measurement and tag key cardinalities and vary tag value cardinality
+func BenchmarkWritePoints_NewSeries_1_Measurement_1_TagKey_100_TagValues(b *testing.B) {
+	benchmarkWritePoints(b, 1, 1, 100, 1)
+}
+func BenchmarkWritePoints_NewSeries_1_Measurement_1_TagKey_500_TagValues(b *testing.B) {
+	benchmarkWritePoints(b, 1, 1, 500, 1)
+}
+func BenchmarkWritePoints_NewSeries_1_Measurement_1_TagKey_1000_TagValues(b *testing.B) {
+	benchmarkWritePoints(b, 1, 1, 1000, 1)
+}
+func BenchmarkWritePoints_NewSeries_1_Measurement_1_TagKey_5000_TagValues(b *testing.B) {
+	benchmarkWritePoints(b, 1, 1, 5000, 1)
+}
+func BenchmarkWritePoints_NewSeries_1_Measurement_1_TagKey_10000_TagValues(b *testing.B) {
+	benchmarkWritePoints(b, 1, 1, 10000, 1)
+}
+func BenchmarkWritePoints_NewSeries_1_Measurement_1_TagKey_50000_TagValues(b *testing.B) {
+	benchmarkWritePoints(b, 1, 1, 50000, 1)
+}
+func BenchmarkWritePoints_NewSeries_1_Measurement_1_TagKey_100000_TagValues(b *testing.B) {
+	benchmarkWritePoints(b, 1, 1, 100000, 1)
+}
+func BenchmarkWritePoints_NewSeries_1_Measurement_1_TagKey_500000_TagValues(b *testing.B) {
+	benchmarkWritePoints(b, 1, 1, 500000, 1)
+}
+func BenchmarkWritePoints_NewSeries_1_Measurement_1_TagKey_1000000_TagValues(b *testing.B) {
+	benchmarkWritePoints(b, 1, 1, 1000000, 1)
+}
+
+// Fix tag key and tag values cardinalities and vary measurement cardinality
+func BenchmarkWritePoints_NewSeries_100_Measurements_1_TagKey_1_TagValue(b *testing.B) {
+	benchmarkWritePoints(b, 100, 1, 1, 1)
+}
+func BenchmarkWritePoints_NewSeries_500_Measurements_1_TagKey_1_TagValue(b *testing.B) {
+	benchmarkWritePoints(b, 500, 1, 1, 1)
+}
+func BenchmarkWritePoints_NewSeries_1000_Measurement_1_TagKey_1_TagValue(b *testing.B) {
+	benchmarkWritePoints(b, 1000, 1, 1, 1)
+}
+
+func BenchmarkWritePoints_NewSeries_5000_Measurement_1_TagKey_1_TagValue(b *testing.B) {
+	benchmarkWritePoints(b, 5000, 1, 1, 1)
+}
+func BenchmarkWritePoints_NewSeries_10000_Measurement_1_TagKey_1_TagValue(b *testing.B) {
+	benchmarkWritePoints(b, 10000, 1, 1, 1)
+}
+func BenchmarkWritePoints_NewSeries_50000_Measurement_1_TagKey_1_TagValue(b *testing.B) {
+	benchmarkWritePoints(b, 50000, 1, 1, 1)
+}
+func BenchmarkWritePoints_NewSeries_100000_Measurement_1_TagKey_1_TagValue(b *testing.B) {
+	benchmarkWritePoints(b, 100000, 1, 1, 1)
+}
+func BenchmarkWritePoints_NewSeries_500000_Measurement_1_TagKey_1_TagValue(b *testing.B) {
+	benchmarkWritePoints(b, 500000, 1, 1, 1)
+}
+func BenchmarkWritePoints_NewSeries_1000000_Measurement_1_TagKey_1_TagValue(b *testing.B) {
+	benchmarkWritePoints(b, 1000000, 1, 1, 1)
+}
+
+// Fix measurement and tag values cardinalities and vary tag key cardinality
+func BenchmarkWritePoints_NewSeries_1_Measurement_2_TagKeys_1_TagValue(b *testing.B) {
+	benchmarkWritePoints(b, 1, 1<<1, 1, 1)
+}
+func BenchmarkWritePoints_NewSeries_1_Measurements_4_TagKeys_1_TagValue(b *testing.B) {
+	benchmarkWritePoints(b, 1, 1<<2, 1, 1)
+}
+func BenchmarkWritePoints_NewSeries_1_Measurements_8_TagKeys_1_TagValue(b *testing.B) {
+	benchmarkWritePoints(b, 1, 1<<3, 1, 1)
+}
+func BenchmarkWritePoints_NewSeries_1_Measurement_16_TagKeys_1_TagValue(b *testing.B) {
+	benchmarkWritePoints(b, 1, 1<<4, 1, 1)
+}
+func BenchmarkWritePoints_NewSeries_1_Measurement_32_TagKeys_1_TagValue(b *testing.B) {
+	benchmarkWritePoints(b, 1, 1<<5, 1, 1)
+}
+func BenchmarkWritePoints_NewSeries_1_Measurement_64_TagKeys_1_TagValue(b *testing.B) {
+	benchmarkWritePoints(b, 1, 1<<6, 1, 1)
+
+}
+func BenchmarkWritePoints_NewSeries_1_Measurement_128_TagKeys_1_TagValue(b *testing.B) {
+	benchmarkWritePoints(b, 1, 1<<7, 1, 1)
+}
+func BenchmarkWritePoints_NewSeries_1_Measurement_256_TagKeys_1_TagValue(b *testing.B) {
+	benchmarkWritePoints(b, 1, 1<<8, 1, 1)
+}
+func BenchmarkWritePoints_NewSeries_1_Measurement_512_TagKeys_1_TagValue(b *testing.B) {
+	benchmarkWritePoints(b, 1, 1<<9, 1, 1)
+}
+func BenchmarkWritePoints_NewSeries_1_Measurement_1024_TagKeys_1_TagValue(b *testing.B) {
+	benchmarkWritePoints(b, 1, 1<<10, 1, 1)
+}
+
+// Fix series cardinality and vary tag keys and value cardinalities
+func BenchmarkWritePoints_NewSeries_1_Measurement_1_TagKey_65536_TagValue(b *testing.B) {
+	benchmarkWritePoints(b, 1, 1, 1<<16, 1)
+}
+func BenchmarkWritePoints_NewSeries_1_Measurement_2_TagKeys_256_TagValue(b *testing.B) {
+	benchmarkWritePoints(b, 1, 2, 1<<8, 1)
+}
+func BenchmarkWritePoints_NewSeries_1_Measurement_4_TagKeys_16_TagValue(b *testing.B) {
+	benchmarkWritePoints(b, 1, 4, 1<<4, 1)
+}
+func BenchmarkWritePoints_NewSeries_1_Measurement_8_TagKeys_4_TagValue(b *testing.B) {
+	benchmarkWritePoints(b, 1, 8, 1<<2, 1)
+}
+func BenchmarkWritePoints_NewSeries_1_Measurement_16_TagKeys_2_TagValue(b *testing.B) {
+	benchmarkWritePoints(b, 1, 16, 1<<1, 1)
+}
 
 func BenchmarkWritePoints_ExistingSeries_1K(b *testing.B) {
 	benchmarkWritePointsExistingSeries(b, 38, 3, 3, 1)

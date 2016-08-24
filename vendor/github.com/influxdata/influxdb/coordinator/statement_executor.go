@@ -7,7 +7,6 @@ import (
 	"io"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/influxdata/influxdb"
@@ -18,6 +17,8 @@ import (
 	"github.com/influxdata/influxdb/tsdb"
 )
 
+var ErrDatabaseNameRequired = errors.New("database name required")
+
 type pointsWriter interface {
 	WritePointsInto(*IntoWriteRequest) error
 }
@@ -25,6 +26,9 @@ type pointsWriter interface {
 // StatementExecutor executes a statement in the query.
 type StatementExecutor struct {
 	MetaClient MetaClient
+
+	// TaskManager holds the StatementExecutor that handles task-related commands.
+	TaskManager influxql.StatementExecutor
 
 	// TSDB storage for local node.
 	TSDBStore TSDBStore
@@ -41,10 +45,10 @@ type StatementExecutor struct {
 	MaxSelectBucketsN int
 }
 
-func (e *StatementExecutor) ExecuteStatement(stmt influxql.Statement, ctx *influxql.ExecutionContext) error {
+func (e *StatementExecutor) ExecuteStatement(stmt influxql.Statement, ctx influxql.ExecutionContext) error {
 	// Select statements are handled separately so that they can be streamed.
 	if stmt, ok := stmt.(*influxql.SelectStatement); ok {
-		return e.executeSelectStatement(stmt, ctx)
+		return e.executeSelectStatement(stmt, &ctx)
 	}
 
 	var rows models.Rows
@@ -64,13 +68,6 @@ func (e *StatementExecutor) ExecuteStatement(stmt influxql.Statement, ctx *influ
 	case *influxql.CreateDatabaseStatement:
 		if ctx.ReadOnly {
 			messages = append(messages, influxql.ReadOnlyWarning(stmt.String()))
-		}
-		if stmt.IfNotExists {
-			ctx.Log.Println("WARNING: IF NOT EXISTS is deprecated as of v0.13.0 and will be removed in a future release")
-			messages = append(messages, &influxql.Message{
-				Level: influxql.WarningLevel,
-				Text:  "IF NOT EXISTS is deprecated as of v0.13.0 and will be removed in a future release",
-			})
 		}
 		err = e.executeCreateDatabaseStatement(stmt)
 	case *influxql.CreateRetentionPolicyStatement:
@@ -98,13 +95,6 @@ func (e *StatementExecutor) ExecuteStatement(stmt influxql.Statement, ctx *influ
 	case *influxql.DropDatabaseStatement:
 		if ctx.ReadOnly {
 			messages = append(messages, influxql.ReadOnlyWarning(stmt.String()))
-		}
-		if stmt.IfExists {
-			ctx.Log.Println("WARNING: IF EXISTS is deprecated as of v0.13.0 and will be removed in a future release")
-			messages = append(messages, &influxql.Message{
-				Level: influxql.WarningLevel,
-				Text:  "IF EXISTS is deprecated as of v0.13.0 and will be removed in a future release",
-			})
 		}
 		err = e.executeDropDatabaseStatement(stmt)
 	case *influxql.DropMeasurementStatement:
@@ -165,6 +155,8 @@ func (e *StatementExecutor) ExecuteStatement(stmt influxql.Statement, ctx *influ
 		rows, err = e.executeShowDiagnosticsStatement(stmt)
 	case *influxql.ShowGrantsForUserStatement:
 		rows, err = e.executeShowGrantsForUserStatement(stmt)
+	case *influxql.ShowMeasurementsStatement:
+		return e.executeShowMeasurementsStatement(stmt, &ctx)
 	case *influxql.ShowRetentionPoliciesStatement:
 		rows, err = e.executeShowRetentionPoliciesStatement(stmt)
 	case *influxql.ShowShardsStatement:
@@ -175,6 +167,8 @@ func (e *StatementExecutor) ExecuteStatement(stmt influxql.Statement, ctx *influ
 		rows, err = e.executeShowStatsStatement(stmt)
 	case *influxql.ShowSubscriptionsStatement:
 		rows, err = e.executeShowSubscriptionsStatement(stmt)
+	case *influxql.ShowTagValuesStatement:
+		return e.executeShowTagValues(stmt, &ctx)
 	case *influxql.ShowUsersStatement:
 		rows, err = e.executeShowUsersStatement(stmt)
 	case *influxql.SetPasswordUserStatement:
@@ -182,6 +176,9 @@ func (e *StatementExecutor) ExecuteStatement(stmt influxql.Statement, ctx *influ
 			messages = append(messages, influxql.ReadOnlyWarning(stmt.String()))
 		}
 		err = e.executeSetPasswordUserStatement(stmt)
+	case *influxql.ShowQueriesStatement, *influxql.KillQueryStatement:
+		// Send query related statements to the task manager.
+		return e.TaskManager.ExecuteStatement(stmt, ctx)
 	default:
 		return influxql.ErrInvalidQuery
 	}
@@ -255,28 +252,33 @@ func (e *StatementExecutor) executeCreateDatabaseStatement(stmt *influxql.Create
 		return err
 	}
 
-	rpi := meta.NewRetentionPolicyInfo(stmt.RetentionPolicyName)
-	rpi.Duration = stmt.RetentionPolicyDuration
-	rpi.ReplicaN = stmt.RetentionPolicyReplication
-	rpi.ShardGroupDuration = stmt.RetentionPolicyShardGroupDuration
-	_, err := e.MetaClient.CreateDatabaseWithRetentionPolicy(stmt.Name, rpi)
+	spec := meta.RetentionPolicySpec{
+		Name:               stmt.RetentionPolicyName,
+		Duration:           stmt.RetentionPolicyDuration,
+		ReplicaN:           stmt.RetentionPolicyReplication,
+		ShardGroupDuration: stmt.RetentionPolicyShardGroupDuration,
+	}
+	_, err := e.MetaClient.CreateDatabaseWithRetentionPolicy(stmt.Name, &spec)
 	return err
 }
 
 func (e *StatementExecutor) executeCreateRetentionPolicyStatement(stmt *influxql.CreateRetentionPolicyStatement) error {
-	rpi := meta.NewRetentionPolicyInfo(stmt.Name)
-	rpi.Duration = stmt.Duration
-	rpi.ReplicaN = stmt.Replication
-	rpi.ShardGroupDuration = stmt.ShardGroupDuration
+	spec := meta.RetentionPolicySpec{
+		Name:               stmt.Name,
+		Duration:           &stmt.Duration,
+		ReplicaN:           &stmt.Replication,
+		ShardGroupDuration: stmt.ShardGroupDuration,
+	}
 
 	// Create new retention policy.
-	if _, err := e.MetaClient.CreateRetentionPolicy(stmt.Database, rpi); err != nil {
+	rp, err := e.MetaClient.CreateRetentionPolicy(stmt.Database, &spec)
+	if err != nil {
 		return err
 	}
 
 	// If requested, set new policy as the default.
 	if stmt.Default {
-		if err := e.MetaClient.SetDefaultRetentionPolicy(stmt.Database, stmt.Name); err != nil {
+		if err := e.MetaClient.SetDefaultRetentionPolicy(stmt.Database, rp.Name); err != nil {
 			return err
 		}
 	}
@@ -404,104 +406,9 @@ func (e *StatementExecutor) executeSetPasswordUserStatement(q *influxql.SetPassw
 }
 
 func (e *StatementExecutor) executeSelectStatement(stmt *influxql.SelectStatement, ctx *influxql.ExecutionContext) error {
-	// Handle SHOW TAG VALUES separately so it can be optimized.
-	// https://github.com/influxdata/influxdb/issues/6233
-	if source, ok := stmt.Sources[0].(*influxql.Measurement); ok && source.Name == "_tags" {
-		// Use the optimized version only if we have direct access to the database.
-		if store, ok := e.TSDBStore.(LocalTSDBStore); ok {
-			return e.executeShowTagValues(stmt, ctx, store)
-		}
-	}
-
-	// It is important to "stamp" this time so that everywhere we evaluate `now()` in the statement is EXACTLY the same `now`
-	now := time.Now().UTC()
-	opt := influxql.SelectOptions{InterruptCh: ctx.InterruptCh}
-
-	// Replace instances of "now()" with the current time, and check the resultant times.
-	nowValuer := influxql.NowValuer{Now: now}
-	stmt.Condition = influxql.Reduce(stmt.Condition, &nowValuer)
-	// Replace instances of "now()" with the current time in the dimensions.
-	for _, d := range stmt.Dimensions {
-		d.Expr = influxql.Reduce(d.Expr, &nowValuer)
-	}
-
-	var err error
-	opt.MinTime, opt.MaxTime, err = influxql.TimeRange(stmt.Condition)
+	itrs, stmt, err := e.createIterators(stmt, ctx)
 	if err != nil {
 		return err
-	}
-
-	if opt.MaxTime.IsZero() {
-		// In the case that we're executing a meta query where the user cannot
-		// specify a time condition, then we expand the default max time
-		// to the maximum possible value, to ensure that data where all points
-		// are in the future are returned.
-		if influxql.Sources(stmt.Sources).HasSystemSource() {
-			opt.MaxTime = time.Unix(0, influxql.MaxTime).UTC()
-		} else {
-			opt.MaxTime = now
-		}
-	}
-	if opt.MinTime.IsZero() {
-		opt.MinTime = time.Unix(0, 0)
-	}
-
-	// Convert DISTINCT into a call.
-	stmt.RewriteDistinct()
-
-	// Remove "time" from fields list.
-	stmt.RewriteTimeFields()
-
-	// Create an iterator creator based on the shards in the cluster.
-	ic, err := e.iteratorCreator(stmt, &opt)
-	if err != nil {
-		return err
-	}
-
-	// Expand regex sources to their actual source names.
-	if stmt.Sources.HasRegex() {
-		sources, err := ic.ExpandSources(stmt.Sources)
-		if err != nil {
-			return err
-		}
-		stmt.Sources = sources
-	}
-
-	// Rewrite wildcards, if any exist.
-	tmp, err := stmt.RewriteFields(ic)
-	if err != nil {
-		return err
-	}
-	stmt = tmp
-
-	if e.MaxSelectBucketsN > 0 && !stmt.IsRawQuery {
-		interval, err := stmt.GroupByInterval()
-		if err != nil {
-			return err
-		}
-
-		if interval > 0 {
-			// Determine the start and end time matched to the interval (may not match the actual times).
-			min := opt.MinTime.Truncate(interval)
-			max := opt.MaxTime.Truncate(interval).Add(interval)
-
-			// Determine the number of buckets by finding the time span and dividing by the interval.
-			buckets := int64(max.Sub(min)) / int64(interval)
-			if int(buckets) > e.MaxSelectBucketsN {
-				return fmt.Errorf("max select bucket count exceeded: %d buckets", buckets)
-			}
-		}
-	}
-
-	// Create a set of iterators from a selection.
-	itrs, err := influxql.Select(stmt, ic, &opt)
-	if err != nil {
-		return err
-	}
-
-	if e.MaxSelectPointN > 0 {
-		monitor := influxql.PointLimitMonitor(itrs, influxql.DefaultStatsInterval, e.MaxSelectPointN)
-		ctx.Query.Monitor(monitor)
 	}
 
 	// Generate a row emitter from the iterator set.
@@ -509,12 +416,6 @@ func (e *StatementExecutor) executeSelectStatement(stmt *influxql.SelectStatemen
 	em.Columns = stmt.ColumnNames()
 	em.OmitTime = stmt.OmitTime
 	defer em.Close()
-
-	// Calculate initial stats across all iterators.
-	stats := influxql.Iterators(itrs).Stats()
-	if e.MaxSelectSeriesN > 0 && stats.SeriesN > e.MaxSelectSeriesN {
-		return fmt.Errorf("max select series count exceeded: %d series", stats.SeriesN)
-	}
 
 	// Emit rows to the results channel.
 	var writeN int64
@@ -597,6 +498,104 @@ func (e *StatementExecutor) executeSelectStatement(stmt *influxql.SelectStatemen
 	return nil
 }
 
+func (e *StatementExecutor) createIterators(stmt *influxql.SelectStatement, ctx *influxql.ExecutionContext) ([]influxql.Iterator, *influxql.SelectStatement, error) {
+	// It is important to "stamp" this time so that everywhere we evaluate `now()` in the statement is EXACTLY the same `now`
+	now := time.Now().UTC()
+	opt := influxql.SelectOptions{
+		InterruptCh: ctx.InterruptCh,
+		NodeID:      ctx.ExecutionOptions.NodeID,
+		MaxSeriesN:  e.MaxSelectSeriesN,
+	}
+
+	// Replace instances of "now()" with the current time, and check the resultant times.
+	nowValuer := influxql.NowValuer{Now: now}
+	stmt.Condition = influxql.Reduce(stmt.Condition, &nowValuer)
+	// Replace instances of "now()" with the current time in the dimensions.
+	for _, d := range stmt.Dimensions {
+		d.Expr = influxql.Reduce(d.Expr, &nowValuer)
+	}
+
+	var err error
+	opt.MinTime, opt.MaxTime, err = influxql.TimeRange(stmt.Condition)
+	if err != nil {
+		return nil, stmt, err
+	}
+
+	if opt.MaxTime.IsZero() {
+		// In the case that we're executing a meta query where the user cannot
+		// specify a time condition, then we expand the default max time
+		// to the maximum possible value, to ensure that data where all points
+		// are in the future are returned.
+		if influxql.Sources(stmt.Sources).HasSystemSource() {
+			opt.MaxTime = time.Unix(0, influxql.MaxTime).UTC()
+		} else {
+			opt.MaxTime = now
+		}
+	}
+	if opt.MinTime.IsZero() {
+		opt.MinTime = time.Unix(0, 0)
+	}
+
+	// Convert DISTINCT into a call.
+	stmt.RewriteDistinct()
+
+	// Remove "time" from fields list.
+	stmt.RewriteTimeFields()
+
+	// Create an iterator creator based on the shards in the cluster.
+	ic, err := e.iteratorCreator(stmt, &opt)
+	if err != nil {
+		return nil, stmt, err
+	}
+
+	// Expand regex sources to their actual source names.
+	if stmt.Sources.HasRegex() {
+		sources, err := ic.ExpandSources(stmt.Sources)
+		if err != nil {
+			return nil, stmt, err
+		}
+		stmt.Sources = sources
+	}
+
+	// Rewrite wildcards, if any exist.
+	tmp, err := stmt.RewriteFields(ic)
+	if err != nil {
+		return nil, stmt, err
+	}
+	stmt = tmp
+
+	if e.MaxSelectBucketsN > 0 && !stmt.IsRawQuery {
+		interval, err := stmt.GroupByInterval()
+		if err != nil {
+			return nil, stmt, err
+		}
+
+		if interval > 0 {
+			// Determine the start and end time matched to the interval (may not match the actual times).
+			min := opt.MinTime.Truncate(interval)
+			max := opt.MaxTime.Truncate(interval).Add(interval)
+
+			// Determine the number of buckets by finding the time span and dividing by the interval.
+			buckets := int64(max.Sub(min)) / int64(interval)
+			if int(buckets) > e.MaxSelectBucketsN {
+				return nil, stmt, fmt.Errorf("max select bucket count exceeded: %d buckets", buckets)
+			}
+		}
+	}
+
+	// Create a set of iterators from a selection.
+	itrs, err := influxql.Select(stmt, ic, &opt)
+	if err != nil {
+		return nil, stmt, err
+	}
+
+	if e.MaxSelectPointN > 0 {
+		monitor := influxql.PointLimitMonitor(itrs, influxql.DefaultStatsInterval, e.MaxSelectPointN)
+		ctx.Query.Monitor(monitor)
+	}
+	return itrs, stmt, nil
+}
+
 // iteratorCreator returns a new instance of IteratorCreator based on stmt.
 func (e *StatementExecutor) iteratorCreator(stmt *influxql.SelectStatement, opt *influxql.SelectOptions) (influxql.IteratorCreator, error) {
 	// Retrieve a list of shard IDs.
@@ -604,131 +603,13 @@ func (e *StatementExecutor) iteratorCreator(stmt *influxql.SelectStatement, opt 
 	if err != nil {
 		return nil, err
 	}
-	return e.TSDBStore.IteratorCreator(shards)
-}
 
-func (e *StatementExecutor) executeShowTagValues(stmt *influxql.SelectStatement, ctx *influxql.ExecutionContext, store LocalTSDBStore) error {
-	if stmt.Condition == nil {
-		return errors.New("a condition is required")
+	// Reverse shards if in descending order.
+	if !stmt.TimeAscending() {
+		shards = meta.ShardInfos(shards).Reverse()
 	}
 
-	source := stmt.Sources[0].(*influxql.Measurement)
-	index := store.DatabaseIndex(source.Database)
-	if index == nil {
-		ctx.Results <- &influxql.Result{StatementID: ctx.StatementID, Series: make([]*models.Row, 0)}
-		return nil
-	}
-
-	measurementExpr := influxql.CloneExpr(stmt.Condition)
-	measurementExpr = influxql.Reduce(influxql.RewriteExpr(measurementExpr, func(e influxql.Expr) influxql.Expr {
-		switch e := e.(type) {
-		case *influxql.BinaryExpr:
-			switch e.Op {
-			case influxql.EQ, influxql.NEQ, influxql.EQREGEX, influxql.NEQREGEX:
-				tag, ok := e.LHS.(*influxql.VarRef)
-				if !ok || tag.Val != "_name" {
-					return nil
-				}
-			}
-		}
-		return e
-	}), nil)
-
-	mms, ok, err := index.MeasurementsByExpr(measurementExpr)
-	if err != nil {
-		return err
-	} else if !ok {
-		mms = index.Measurements()
-		sort.Sort(mms)
-	}
-
-	// If there are no measurements, return immediately.
-	if len(mms) == 0 {
-		ctx.Results <- &influxql.Result{StatementID: ctx.StatementID, Series: make([]*models.Row, 0)}
-		return nil
-	}
-
-	filterExpr := influxql.CloneExpr(stmt.Condition)
-	filterExpr = influxql.Reduce(influxql.RewriteExpr(filterExpr, func(e influxql.Expr) influxql.Expr {
-		switch e := e.(type) {
-		case *influxql.BinaryExpr:
-			switch e.Op {
-			case influxql.EQ, influxql.NEQ, influxql.EQREGEX, influxql.NEQREGEX:
-				tag, ok := e.LHS.(*influxql.VarRef)
-				if !ok || strings.HasPrefix(tag.Val, "_") {
-					return nil
-				}
-			}
-		}
-		return e
-	}), nil)
-
-	var emitted bool
-	columns := stmt.ColumnNames()
-	for _, mm := range mms {
-		ids, err := mm.SeriesIDsAllOrByExpr(filterExpr)
-		if err != nil {
-			return err
-		}
-		ss := mm.SeriesByIDSlice(ids)
-
-		// Determine a list of keys from condition.
-		keySet, ok, err := mm.TagKeysByExpr(stmt.Condition)
-		if err != nil {
-			return err
-		}
-
-		// Loop over all keys for each series.
-		m := make(map[keyValue]struct{}, len(ss))
-		for _, series := range ss {
-			for key, value := range series.Tags {
-				if !ok {
-					// nop
-				} else if _, exists := keySet[key]; !exists {
-					continue
-				}
-				m[keyValue{key, value}] = struct{}{}
-			}
-		}
-
-		// Move to next series if no key/values match.
-		if len(m) == 0 {
-			continue
-		}
-
-		// Sort key/value set.
-		a := make([]keyValue, 0, len(m))
-		for kv := range m {
-			a = append(a, kv)
-		}
-		sort.Sort(keyValues(a))
-
-		// Convert to result values.
-		slab := make([]interface{}, len(a)*2)
-		values := make([][]interface{}, len(a))
-		for i, elem := range a {
-			slab[i*2], slab[i*2+1] = elem.key, elem.value
-			values[i] = slab[i*2 : i*2+2]
-		}
-
-		// Send result to client.
-		ctx.Results <- &influxql.Result{
-			StatementID: ctx.StatementID,
-			Series: []*models.Row{&models.Row{
-				Name:    mm.Name,
-				Columns: columns,
-				Values:  values,
-			}},
-		}
-		emitted = true
-	}
-
-	// Always emit at least one row.
-	if !emitted {
-		ctx.Results <- &influxql.Result{StatementID: ctx.StatementID, Series: make([]*models.Row, 0)}
-	}
-
-	return nil
+	return e.TSDBStore.IteratorCreator(shards, opt)
 }
 
 func (e *StatementExecutor) executeShowContinuousQueriesStatement(stmt *influxql.ShowContinuousQueriesStatement) (models.Rows, error) {
@@ -794,6 +675,57 @@ func (e *StatementExecutor) executeShowGrantsForUserStatement(q *influxql.ShowGr
 		row.Values = append(row.Values, []interface{}{d, p.String()})
 	}
 	return []*models.Row{row}, nil
+}
+
+func (e *StatementExecutor) executeShowMeasurementsStatement(q *influxql.ShowMeasurementsStatement, ctx *influxql.ExecutionContext) error {
+	if ctx.Database == "" {
+		return ErrDatabaseNameRequired
+	}
+
+	measurements, err := e.TSDBStore.Measurements(ctx.Database, q.Condition)
+	if err != nil || len(measurements) == 0 {
+		ctx.Results <- &influxql.Result{
+			StatementID: ctx.StatementID,
+			Err:         err,
+		}
+		return nil
+	}
+
+	if q.Offset > 0 {
+		if q.Offset >= len(measurements) {
+			measurements = nil
+		} else {
+			measurements = measurements[q.Offset:]
+		}
+	}
+
+	if q.Limit > 0 {
+		if q.Limit < len(measurements) {
+			measurements = measurements[:q.Limit]
+		}
+	}
+
+	values := make([][]interface{}, len(measurements))
+	for i, m := range measurements {
+		values[i] = []interface{}{m}
+	}
+
+	if len(values) == 0 {
+		ctx.Results <- &influxql.Result{
+			StatementID: ctx.StatementID,
+		}
+		return nil
+	}
+
+	ctx.Results <- &influxql.Result{
+		StatementID: ctx.StatementID,
+		Series: []*models.Row{{
+			Name:    "measurements",
+			Columns: []string{"name"},
+			Values:  values,
+		}},
+	}
+	return nil
 }
 
 func (e *StatementExecutor) executeShowRetentionPoliciesStatement(q *influxql.ShowRetentionPoliciesStatement) (models.Rows, error) {
@@ -915,6 +847,67 @@ func (e *StatementExecutor) executeShowSubscriptionsStatement(stmt *influxql.Sho
 		}
 	}
 	return rows, nil
+}
+
+func (e *StatementExecutor) executeShowTagValues(q *influxql.ShowTagValuesStatement, ctx *influxql.ExecutionContext) error {
+	if ctx.Database == "" {
+		return ErrDatabaseNameRequired
+	}
+
+	tagValues, err := e.TSDBStore.TagValues(ctx.Database, q.Condition)
+	if err != nil {
+		ctx.Results <- &influxql.Result{
+			StatementID: ctx.StatementID,
+			Err:         err,
+		}
+		return nil
+	}
+
+	emitted := false
+	for _, m := range tagValues {
+		values := m.Values
+
+		if q.Offset > 0 {
+			if q.Offset >= len(values) {
+				values = nil
+			} else {
+				values = values[q.Offset:]
+			}
+		}
+
+		if q.Limit > 0 {
+			if q.Limit < len(values) {
+				values = values[:q.Limit]
+			}
+		}
+
+		if len(values) == 0 {
+			continue
+		}
+
+		row := &models.Row{
+			Name:    m.Measurement,
+			Columns: []string{"key", "value"},
+			Values:  make([][]interface{}, len(values)),
+		}
+		for i, v := range values {
+			row.Values[i] = []interface{}{v.Key, v.Value}
+		}
+
+		ctx.Results <- &influxql.Result{
+			StatementID: ctx.StatementID,
+			Series:      []*models.Row{row},
+		}
+		emitted = true
+	}
+
+	// Ensure at least one result is emitted.
+	if !emitted {
+		ctx.Results <- &influxql.Result{
+			StatementID: ctx.StatementID,
+		}
+	}
+	return nil
 }
 
 func (e *StatementExecutor) executeShowUsersStatement(q *influxql.ShowUsersStatement) (models.Rows, error) {
@@ -1062,7 +1055,7 @@ func convertRowToPoints(measurementName string, row *models.Row) ([]models.Point
 			}
 		}
 
-		p, err := models.NewPoint(measurementName, row.Tags, vals, v[timeIndex].(time.Time))
+		p, err := models.NewPoint(measurementName, models.NewTags(row.Tags), vals, v[timeIndex].(time.Time))
 		if err != nil {
 			// Drop points that can't be stored
 			continue
@@ -1102,7 +1095,7 @@ func (e *StatementExecutor) normalizeMeasurement(m *influxql.Measurement, defaul
 
 	// The database must now be specified by this point.
 	if m.Database == "" {
-		return errors.New("database name required")
+		return ErrDatabaseNameRequired
 	}
 
 	// Find database.
@@ -1142,19 +1135,22 @@ type TSDBStore interface {
 	DeleteRetentionPolicy(database, name string) error
 	DeleteSeries(database string, sources []influxql.Source, condition influxql.Expr) error
 	DeleteShard(id uint64) error
-	IteratorCreator(shards []meta.ShardInfo) (influxql.IteratorCreator, error)
+	IteratorCreator(shards []meta.ShardInfo, opt *influxql.SelectOptions) (influxql.IteratorCreator, error)
+
+	Measurements(database string, cond influxql.Expr) ([]string, error)
+	TagValues(database string, cond influxql.Expr) ([]tsdb.TagValues, error)
 }
 
 type LocalTSDBStore struct {
 	*tsdb.Store
 }
 
-func (s LocalTSDBStore) IteratorCreator(shards []meta.ShardInfo) (influxql.IteratorCreator, error) {
+func (s LocalTSDBStore) IteratorCreator(shards []meta.ShardInfo, opt *influxql.SelectOptions) (influxql.IteratorCreator, error) {
 	shardIDs := make([]uint64, len(shards))
 	for i, sh := range shards {
 		shardIDs[i] = sh.ID
 	}
-	return s.Store.IteratorCreator(shardIDs)
+	return s.Store.IteratorCreator(shardIDs, opt)
 }
 
 // ShardIteratorCreator is an interface for creating an IteratorCreator to access a specific shard.
@@ -1231,26 +1227,4 @@ func (s stringSet) intersect(o stringSet) stringSet {
 		}
 	}
 	return ns
-}
-
-type uint64Slice []uint64
-
-func (a uint64Slice) Len() int           { return len(a) }
-func (a uint64Slice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a uint64Slice) Less(i, j int) bool { return a[i] < a[j] }
-
-type keyValue struct {
-	key, value string
-}
-
-type keyValues []keyValue
-
-func (a keyValues) Len() int      { return len(a) }
-func (a keyValues) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-func (a keyValues) Less(i, j int) bool {
-	ki, kj := a[i].key, a[j].key
-	if ki == kj {
-		return a[i].value < a[j].value
-	}
-	return ki < kj
 }

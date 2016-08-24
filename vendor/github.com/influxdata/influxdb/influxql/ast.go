@@ -39,7 +39,8 @@ const (
 )
 
 var (
-	// Invalid timestamp string used to compare against time field
+	// ErrInvalidTime is returned when the timestamp string used to
+	// compare against time field is invalid.
 	ErrInvalidTime = errors.New("invalid timestamp string")
 )
 
@@ -63,6 +64,7 @@ func InspectDataType(v interface{}) DataType {
 	}
 }
 
+// InspectDataTypes returns all of the data types for an interface slice.
 func InspectDataTypes(a []interface{}) []DataType {
 	dta := make([]DataType, len(a))
 	for i, v := range a {
@@ -158,6 +160,7 @@ func (*nilLiteral) node()      {}
 func (*NumberLiteral) node()   {}
 func (*ParenExpr) node()       {}
 func (*RegexLiteral) node()    {}
+func (*ListLiteral) node()     {}
 func (*SortField) node()       {}
 func (SortFields) node()       {}
 func (Sources) node()          {}
@@ -273,6 +276,7 @@ func (*nilLiteral) expr()      {}
 func (*NumberLiteral) expr()   {}
 func (*ParenExpr) expr()       {}
 func (*RegexLiteral) expr()    {}
+func (*ListLiteral) expr()     {}
 func (*StringLiteral) expr()   {}
 func (*TimeLiteral) expr()     {}
 func (*VarRef) expr()          {}
@@ -290,6 +294,7 @@ func (*IntegerLiteral) literal()  {}
 func (*nilLiteral) literal()      {}
 func (*NumberLiteral) literal()   {}
 func (*RegexLiteral) literal()    {}
+func (*ListLiteral) literal()     {}
 func (*StringLiteral) literal()   {}
 func (*TimeLiteral) literal()     {}
 
@@ -454,18 +459,14 @@ type CreateDatabaseStatement struct {
 	// Name of the database to be created.
 	Name string
 
-	// IfNotExists indicates whether to return without error if the database
-	// already exists.
-	IfNotExists bool
-
 	// RetentionPolicyCreate indicates whether the user explicitly wants to create a retention policy
 	RetentionPolicyCreate bool
 
 	// RetentionPolicyDuration indicates retention duration for the new database
-	RetentionPolicyDuration time.Duration
+	RetentionPolicyDuration *time.Duration
 
 	// RetentionPolicyReplication indicates retention replication for the new database
-	RetentionPolicyReplication int
+	RetentionPolicyReplication *int
 
 	// RetentionPolicyName indicates retention name for the new database
 	RetentionPolicyName string
@@ -478,21 +479,25 @@ type CreateDatabaseStatement struct {
 func (s *CreateDatabaseStatement) String() string {
 	var buf bytes.Buffer
 	_, _ = buf.WriteString("CREATE DATABASE ")
-	if s.IfNotExists {
-		_, _ = buf.WriteString("IF NOT EXISTS ")
-	}
 	_, _ = buf.WriteString(QuoteIdent(s.Name))
 	if s.RetentionPolicyCreate {
-		_, _ = buf.WriteString(" WITH DURATION ")
-		_, _ = buf.WriteString(s.RetentionPolicyDuration.String())
-		_, _ = buf.WriteString(" REPLICATION ")
-		_, _ = buf.WriteString(strconv.Itoa(s.RetentionPolicyReplication))
+		_, _ = buf.WriteString(" WITH")
+		if s.RetentionPolicyDuration != nil {
+			_, _ = buf.WriteString(" DURATION ")
+			_, _ = buf.WriteString(s.RetentionPolicyDuration.String())
+		}
+		if s.RetentionPolicyReplication != nil {
+			_, _ = buf.WriteString(" REPLICATION ")
+			_, _ = buf.WriteString(strconv.Itoa(*s.RetentionPolicyReplication))
+		}
 		if s.RetentionPolicyShardGroupDuration > 0 {
 			_, _ = buf.WriteString(" SHARD DURATION ")
 			_, _ = buf.WriteString(s.RetentionPolicyShardGroupDuration.String())
 		}
-		_, _ = buf.WriteString(" NAME ")
-		_, _ = buf.WriteString(QuoteIdent(s.RetentionPolicyName))
+		if s.RetentionPolicyName != "" {
+			_, _ = buf.WriteString(" NAME ")
+			_, _ = buf.WriteString(QuoteIdent(s.RetentionPolicyName))
+		}
 	}
 
 	return buf.String()
@@ -507,19 +512,12 @@ func (s *CreateDatabaseStatement) RequiredPrivileges() (ExecutionPrivileges, err
 type DropDatabaseStatement struct {
 	// Name of the database to be dropped.
 	Name string
-
-	// IfExists indicates whether to return without error if the database
-	// does not exists.
-	IfExists bool
 }
 
 // String returns a string representation of the drop database statement.
 func (s *DropDatabaseStatement) String() string {
 	var buf bytes.Buffer
 	_, _ = buf.WriteString("DROP DATABASE ")
-	if s.IfExists {
-		_, _ = buf.WriteString("IF EXISTS ")
-	}
 	_, _ = buf.WriteString(QuoteIdent(s.Name))
 	return buf.String()
 }
@@ -682,15 +680,28 @@ func (s *GrantAdminStatement) RequiredPrivileges() (ExecutionPrivileges, error) 
 	return ExecutionPrivileges{{Admin: true, Name: "", Privilege: AllPrivileges}}, nil
 }
 
+// KillQueryStatement represents a command for killing a query.
 type KillQueryStatement struct {
 	// The query to kill.
 	QueryID uint64
+
+	// The host to delegate the kill to.
+	Host string
 }
 
+// String returns a string representation of the kill query statement.
 func (s *KillQueryStatement) String() string {
-	return fmt.Sprintf("KILL QUERY %d", s.QueryID)
+	var buf bytes.Buffer
+	_, _ = buf.WriteString("KILL QUERY ")
+	_, _ = buf.WriteString(strconv.FormatUint(s.QueryID, 10))
+	if s.Host != "" {
+		_, _ = buf.WriteString(" ON ")
+		_, _ = buf.WriteString(QuoteIdent(s.Host))
+	}
+	return buf.String()
 }
 
+// RequiredPrivileges returns the privilege required to execute a KillQueryStatement.
 func (s *KillQueryStatement) RequiredPrivileges() (ExecutionPrivileges, error) {
 	return ExecutionPrivileges{{Admin: true, Name: "", Privilege: AllPrivileges}}, nil
 }
@@ -978,20 +989,13 @@ func (s *SelectStatement) TimeFieldName() string {
 
 // Clone returns a deep copy of the statement.
 func (s *SelectStatement) Clone() *SelectStatement {
-	clone := &SelectStatement{
-		Fields:     make(Fields, 0, len(s.Fields)),
-		Dimensions: make(Dimensions, 0, len(s.Dimensions)),
-		Sources:    cloneSources(s.Sources),
-		SortFields: make(SortFields, 0, len(s.SortFields)),
-		Condition:  CloneExpr(s.Condition),
-		Limit:      s.Limit,
-		Offset:     s.Offset,
-		SLimit:     s.SLimit,
-		SOffset:    s.SOffset,
-		Fill:       s.Fill,
-		FillValue:  s.FillValue,
-		IsRawQuery: s.IsRawQuery,
-	}
+	clone := *s
+	clone.Fields = make(Fields, 0, len(s.Fields))
+	clone.Dimensions = make(Dimensions, 0, len(s.Dimensions))
+	clone.Sources = cloneSources(s.Sources)
+	clone.SortFields = make(SortFields, 0, len(s.SortFields))
+	clone.Condition = CloneExpr(s.Condition)
+
 	if s.Target != nil {
 		clone.Target = &Target{
 			Measurement: &Measurement{
@@ -1011,7 +1015,7 @@ func (s *SelectStatement) Clone() *SelectStatement {
 	for _, f := range s.SortFields {
 		clone.SortFields = append(clone.SortFields, &SortField{Name: f.Name, Ascending: f.Ascending})
 	}
-	return clone
+	return &clone
 }
 
 func cloneSources(sources Sources) Sources {
@@ -1122,6 +1126,68 @@ func (s *SelectStatement) RewriteFields(ic IteratorCreator) (*SelectStatement, e
 						continue
 					}
 					rwFields = append(rwFields, &Field{Expr: &VarRef{Val: ref.Val, Type: ref.Type}})
+				}
+			case *Call:
+				// Clone a template that we can modify and use for new fields.
+				template := CloneExpr(expr).(*Call)
+
+				// Search for the call with a wildcard by continuously descending until
+				// we no longer have a call.
+				call := template
+				for len(call.Args) > 0 {
+					arg, ok := call.Args[0].(*Call)
+					if !ok {
+						break
+					}
+					call = arg
+				}
+
+				// Check if this field value is a wildcard.
+				if len(call.Args) == 0 {
+					rwFields = append(rwFields, f)
+					continue
+				}
+
+				wc, ok := call.Args[0].(*Wildcard)
+				if ok && wc.Type == TAG {
+					return s, fmt.Errorf("unable to use tag wildcard in %s()", call.Name)
+				} else if !ok {
+					rwFields = append(rwFields, f)
+					continue
+				}
+
+				// All types that can expand wildcards support float and integer.
+				supportedTypes := map[DataType]struct{}{
+					Float:   struct{}{},
+					Integer: struct{}{},
+				}
+
+				// Add additional types for certain functions.
+				switch call.Name {
+				case "count", "first", "last", "distinct", "elapsed":
+					supportedTypes[String] = struct{}{}
+					supportedTypes[Boolean] = struct{}{}
+				case "stddev":
+					supportedTypes[String] = struct{}{}
+				case "min", "max":
+					supportedTypes[Boolean] = struct{}{}
+				}
+
+				for _, ref := range fields {
+					// Do not expand tags within a function call. It likely won't do anything
+					// anyway and will be the wrong thing in 99% of cases.
+					if ref.Type == Tag {
+						continue
+					} else if _, ok := supportedTypes[ref.Type]; !ok {
+						continue
+					}
+
+					// Make a new expression and replace the wildcard within this cloned expression.
+					call.Args[0] = &VarRef{Val: ref.Val, Type: ref.Type}
+					rwFields = append(rwFields, &Field{
+						Expr:  CloneExpr(template),
+						Alias: fmt.Sprintf("%s_%s", f.Name(), ref.Val),
+					})
 				}
 			default:
 				rwFields = append(rwFields, f)
@@ -1247,7 +1313,7 @@ func (s *SelectStatement) ColumnNames() []string {
 				count++
 			}
 		}
-		names[name] += 1
+		names[name]++
 		columnNames[i+offset] = name
 	}
 	return columnNames
@@ -1346,15 +1412,17 @@ func (s *SelectStatement) HasWildcard() bool {
 }
 
 // HasFieldWildcard returns whether or not the select statement has at least 1 wildcard in the fields
-func (s *SelectStatement) HasFieldWildcard() bool {
-	for _, f := range s.Fields {
-		_, ok := f.Expr.(*Wildcard)
-		if ok {
-			return true
+func (s *SelectStatement) HasFieldWildcard() (hasWildcard bool) {
+	WalkFunc(s.Fields, func(n Node) {
+		if hasWildcard {
+			return
 		}
-	}
-
-	return false
+		_, ok := n.(*Wildcard)
+		if ok {
+			hasWildcard = true
+		}
+	})
+	return hasWildcard
 }
 
 // HasDimensionWildcard returns whether or not the select statement has
@@ -1611,7 +1679,7 @@ func (s *SelectStatement) validateAggregates(tr targetRequirement) error {
 						}
 
 						switch fc := c.Args[0].(type) {
-						case *VarRef:
+						case *VarRef, *Wildcard:
 							// do nothing
 						case *Call:
 							if fc.Name != "distinct" || expr.Name != "count" {
@@ -1675,7 +1743,7 @@ func (s *SelectStatement) validateAggregates(tr targetRequirement) error {
 					return fmt.Errorf("invalid number of arguments for %s, expected %d, got %d", expr.Name, exp, got)
 				}
 				switch fc := expr.Args[0].(type) {
-				case *VarRef:
+				case *VarRef, *Wildcard:
 					// do nothing
 				case *Call:
 					if fc.Name != "distinct" || expr.Name != "count" {
@@ -1785,7 +1853,7 @@ func (s *SelectStatement) GroupByInterval() (time.Duration, error) {
 }
 
 // GroupByOffset extracts the time interval offset, if specified.
-func (s *SelectStatement) GroupByOffset(opt *IteratorOptions) (time.Duration, error) {
+func (s *SelectStatement) GroupByOffset() (time.Duration, error) {
 	interval, err := s.GroupByInterval()
 	if err != nil {
 		return 0, err
@@ -2524,7 +2592,7 @@ func (s *DropMeasurementStatement) RequiredPrivileges() (ExecutionPrivileges, er
 	return ExecutionPrivileges{{Admin: true, Name: "", Privilege: AllPrivileges}}, nil
 }
 
-// SowQueriesStatement represents a command for listing all running queries.
+// ShowQueriesStatement represents a command for listing all running queries.
 type ShowQueriesStatement struct{}
 
 // String returns a string representation of the show queries statement.
@@ -2759,8 +2827,11 @@ type ShowTagValuesStatement struct {
 	// Data source that fields are extracted from.
 	Sources Sources
 
-	// Tag key(s) to pull values from.
-	TagKeys []string
+	// Operation to use when selecting tag key(s).
+	Op Token
+
+	// Literal to compare the tag key(s) with.
+	TagKeyExpr Literal
 
 	// An expression evaluated on data point.
 	Condition Expr
@@ -2785,14 +2856,10 @@ func (s *ShowTagValuesStatement) String() string {
 		_, _ = buf.WriteString(" FROM ")
 		_, _ = buf.WriteString(s.Sources.String())
 	}
-	_, _ = buf.WriteString(" WITH KEY IN (")
-	for idx, tagKey := range s.TagKeys {
-		if idx != 0 {
-			_, _ = buf.WriteString(", ")
-		}
-		_, _ = buf.WriteString(QuoteIdent(tagKey))
-	}
-	_, _ = buf.WriteString(")")
+	_, _ = buf.WriteString(" WITH KEY ")
+	_, _ = buf.WriteString(s.Op.String())
+	_, _ = buf.WriteString(" ")
+	_, _ = buf.WriteString(s.TagKeyExpr.String())
 	if s.Condition != nil {
 		_, _ = buf.WriteString(" WHERE ")
 		_, _ = buf.WriteString(s.Condition.String())
@@ -3054,7 +3121,7 @@ func encodeMeasurement(mm *Measurement) *internal.Measurement {
 		IsTarget:        proto.Bool(mm.IsTarget),
 	}
 	if mm.Regex != nil {
-		pb.Regex = proto.String(mm.Regex.String())
+		pb.Regex = proto.String(mm.Regex.Val.String())
 	}
 	return pb
 }
@@ -3094,6 +3161,7 @@ func (r *VarRef) String() string {
 	return buf.String()
 }
 
+// VarRefs represents a slice of VarRef types.
 type VarRefs []VarRef
 
 func (a VarRefs) Len() int { return len(a) }
@@ -3104,6 +3172,8 @@ func (a VarRefs) Less(i, j int) bool {
 	return a[i].Type < a[j].Type
 }
 func (a VarRefs) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+
+// Strings returns a slice of the variable names.
 func (a VarRefs) Strings() []string {
 	s := make([]string, len(a))
 	for i, ref := range a {
@@ -3237,6 +3307,25 @@ func isFalseLiteral(expr Expr) bool {
 	return false
 }
 
+// ListLiteral represents a list of strings literal.
+type ListLiteral struct {
+	Vals []string
+}
+
+// String returns a string representation of the literal.
+func (s *ListLiteral) String() string {
+	var buf bytes.Buffer
+	_, _ = buf.WriteString("(")
+	for idx, tagKey := range s.Vals {
+		if idx != 0 {
+			_, _ = buf.WriteString(", ")
+		}
+		_, _ = buf.WriteString(QuoteIdent(tagKey))
+	}
+	_, _ = buf.WriteString(")")
+	return buf.String()
+}
+
 // StringLiteral represents a string literal.
 type StringLiteral struct {
 	Val string
@@ -3328,6 +3417,8 @@ func (v *binaryExprValidator) Visit(n Node) Visitor {
 	return v
 }
 
+// BinaryExprName returns the name of a binary expression by concatenating
+// the variables in the binary expression with underscores.
 func BinaryExprName(expr *BinaryExpr) string {
 	v := binaryExprNameVisitor{}
 	Walk(&v, expr)
@@ -3436,7 +3527,7 @@ func CloneExpr(expr Expr) Expr {
 	case *VarRef:
 		return &VarRef{Val: expr.Val, Type: expr.Type}
 	case *Wildcard:
-		return &Wildcard{}
+		return &Wildcard{Type: expr.Type}
 	}
 	panic("unreachable")
 }

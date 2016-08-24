@@ -5,11 +5,11 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"errors"
-	"expvar"
 	"io"
 	"log"
 	"net"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/influxdata/influxdb"
@@ -27,7 +27,7 @@ type Handler struct {
 
 	Logger *log.Logger
 
-	statMap *expvar.Map
+	stats *Statistics
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -111,10 +111,12 @@ func (h *Handler) servePut(w http.ResponseWriter, r *http.Request) {
 			ts = time.Unix(p.Time/1000, (p.Time%1000)*1000)
 		}
 
-		pt, err := models.NewPoint(p.Metric, p.Tags, map[string]interface{}{"value": p.Value}, ts)
+		pt, err := models.NewPoint(p.Metric, models.NewTags(p.Tags), map[string]interface{}{"value": p.Value}, ts)
 		if err != nil {
 			h.Logger.Printf("Dropping point %v: %v", p.Metric, err)
-			h.statMap.Add(statDroppedPointsInvalid, 1)
+			if h.stats != nil {
+				atomic.AddInt64(&h.stats.InvalidDroppedPoints, 1)
+			}
 			continue
 		}
 		points = append(points, pt)
