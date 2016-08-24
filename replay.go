@@ -93,12 +93,16 @@ func readPointsFromIO(data io.ReadCloser, points chan<- models.Point, precision 
 			return err
 		}
 		mp := mps[0]
+		tags := make(models.Tags, len(mp.Tags()))
+		for _, t := range mp.Tags() {
+			tags[string(t.Key)] = string(t.Value)
+		}
 		p := models.Point{
 			Database:        db,
 			RetentionPolicy: rp,
 			Name:            mp.Name(),
 			Group:           models.NilGroup,
-			Tags:            models.Tags(mp.Tags()),
+			Tags:            tags,
 			Fields:          models.Fields(mp.Fields()),
 			Time:            mp.Time().UTC(),
 		}

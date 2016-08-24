@@ -358,6 +358,36 @@ stream
 	testStreamerWithOutput(t, "TestStream_Elapsed", script, 15*time.Second, er, nil, false)
 }
 
+func TestStream_Difference(t *testing.T) {
+
+	var script = `
+stream
+	|from()
+		.measurement('packets')
+	|difference('value')
+	|window()
+		.period(10s)
+		.every(10s)
+	|max('difference')
+	|httpOut('TestStream_Difference')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "packets",
+				Tags:    nil,
+				Columns: []string{"time", "max"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
+					5.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Difference", script, 15*time.Second, er, nil, false)
+}
+
 func TestStream_WindowMissing(t *testing.T) {
 
 	var script = `
@@ -6767,8 +6797,11 @@ stream
 		if len(p.Tags()) != 1 {
 			t.Errorf("got %v exp %v", len(p.Tags()), 1)
 		}
-		if p.Tags()["key"] != "value" {
-			t.Errorf("got %s exp %s", p.Tags()["key"], "value")
+		if got, exp := string(p.Tags()[0].Key), "key"; got != exp {
+			t.Errorf("got %s exp %s", got, exp)
+		}
+		if got, exp := string(p.Tags()[0].Value), "value"; got != exp {
+			t.Errorf("got %s exp %s", got, exp)
 		}
 		tm := time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC)
 		if !tm.Equal(p.Time()) {

@@ -548,12 +548,16 @@ func (tm *TaskMaster) WritePoints(database, retentionPolicy string, consistencyL
 		return ErrTaskMasterClosed
 	}
 	for _, mp := range points {
+		tags := make(models.Tags, len(mp.Tags()))
+		for _, t := range mp.Tags() {
+			tags[string(t.Key)] = string(t.Value)
+		}
 		p := models.Point{
 			Database:        database,
 			RetentionPolicy: retentionPolicy,
 			Name:            mp.Name(),
 			Group:           models.NilGroup,
-			Tags:            models.Tags(mp.Tags()),
+			Tags:            tags,
 			Fields:          models.Fields(mp.Fields()),
 			Time:            mp.Time(),
 		}

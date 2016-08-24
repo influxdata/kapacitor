@@ -402,6 +402,23 @@ func (n *chainnode) Elapsed(field string, unit time.Duration) *InfluxQLNode {
 	return i
 }
 
+// Compute the difference between points independent of elapsed time.
+func (n *chainnode) Difference(field string) *InfluxQLNode {
+	i := newInfluxQLNode("difference", field, n.Provides(), n.Provides(), ReduceCreater{
+		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
+			fn := influxql.NewFloatDifferenceReducer()
+			return fn, fn
+		},
+		CreateIntegerReducer: func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter) {
+			fn := influxql.NewIntegerDifferenceReducer()
+			return fn, fn
+		},
+		IsStreamTransformation: true,
+	})
+	n.linkChild(i)
+	return i
+}
+
 // Compute the holt-winters forecast of a data set.
 func (n *chainnode) HoltWinters(field string, h, m int64, interval time.Duration) *InfluxQLNode {
 	return n.holtWinters(field, h, m, interval, false)

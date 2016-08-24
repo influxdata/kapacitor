@@ -166,7 +166,11 @@ func ToGroupID(name string, tags map[string]string, dims Dimensions) GroupID {
 
 // Returns byte array of a line protocol representation of the point
 func (p Point) Bytes(precision string) []byte {
-	key := models.MakeKey([]byte(p.Name), models.Tags(p.Tags))
+	tags := make(models.Tags, 0, len(p.Tags))
+	for k, v := range p.Tags {
+		tags = append(tags, models.Tag{Key: []byte(k), Value: []byte(v)})
+	}
+	key := models.MakeKey([]byte(p.Name), tags)
 	fields := models.Fields(p.Fields).MarshalBinary()
 	kl := len(key)
 	fl := len(fields)

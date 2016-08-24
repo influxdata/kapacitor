@@ -455,7 +455,11 @@ type Point struct {
 
 // Returns byte array of a line protocol representation of the point
 func (p Point) Bytes(precision string) []byte {
-	key := imodels.MakeKey([]byte(p.Name), imodels.Tags(p.Tags))
+	tags := make(imodels.Tags, 0, len(p.Tags))
+	for k, v := range p.Tags {
+		tags = append(tags, imodels.Tag{Key: []byte(k), Value: []byte(v)})
+	}
+	key := imodels.MakeKey([]byte(p.Name), tags)
 	fields := imodels.Fields(p.Fields).MarshalBinary()
 	kl := len(key)
 	fl := len(fields)
