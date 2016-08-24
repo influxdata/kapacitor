@@ -727,6 +727,7 @@ func (n *ListNode) Equal(o interface{}) bool {
 type RegexNode struct {
 	position
 	Regex   *regexp.Regexp
+	Literal string
 	Comment *CommentNode
 }
 
@@ -746,9 +747,9 @@ func newRegex(p position, txt string, c *CommentNode) (*RegexNode, error) {
 		}
 	}
 	buf.Write([]byte(literal[last:]))
-	literal = buf.String()
+	unescaped := buf.String()
 
-	r, err := regexp.Compile(literal)
+	r, err := regexp.Compile(unescaped)
 	if err != nil {
 		return nil, err
 	}
@@ -756,6 +757,7 @@ func newRegex(p position, txt string, c *CommentNode) (*RegexNode, error) {
 	return &RegexNode{
 		position: p,
 		Regex:    r,
+		Literal:  literal,
 		Comment:  c,
 	}, nil
 }
@@ -771,7 +773,7 @@ func (n *RegexNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
 	}
 	writeIndent(buf, indent, onNewLine)
 	buf.WriteByte('/')
-	buf.WriteString(n.Regex.String())
+	buf.WriteString(n.Literal)
 	buf.WriteByte('/')
 }
 
