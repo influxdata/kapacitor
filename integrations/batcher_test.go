@@ -261,6 +261,18 @@ batch
 				Columns: []string{"time", "elapsed"},
 				Values: [][]interface{}{
 					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						2000.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						2000.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						2000.0,
+					},
+					{
 						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 						2000.0,
 					},
@@ -270,6 +282,97 @@ batch
 	}
 
 	testBatcherWithOutput(t, "TestBatch_Elapsed", script, 21*time.Second, er, false)
+}
+
+func TestBatch_Difference(t *testing.T) {
+
+	var script = `
+batch
+	|query('''
+		SELECT "value"
+		FROM "telegraf"."default".packets
+''')
+		.period(10s)
+		.every(10s)
+	|difference('value')
+	|log()
+	|httpOut('TestBatch_Difference')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "packets",
+				Tags:    nil,
+				Columns: []string{"time", "difference"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						5.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						3.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						1.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+						-5.0,
+					},
+				},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_Difference", script, 21*time.Second, er, false)
+}
+
+func TestBatch_MovingAverage(t *testing.T) {
+
+	var script = `
+batch
+	|query('''
+		SELECT "value"
+		FROM "telegraf"."default".packets
+''')
+		.period(10s)
+		.every(10s)
+	|movingAverage('value', 2)
+	|httpOut('TestBatch_MovingAverage')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "packets",
+				Tags:    nil,
+				Columns: []string{"time", "movingAverage"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						1002.5,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						1006.5,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						1008.5,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+						1006.5,
+					},
+				},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_MovingAverage", script, 21*time.Second, er, false)
 }
 
 func TestBatch_SimpleMR(t *testing.T) {

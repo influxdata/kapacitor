@@ -146,7 +146,7 @@ func (n *InfluxQLNode) runBatchInfluxQL() error {
 			dimensions: b.PointDimensions(),
 			tags:       b.Tags,
 			time:       b.TMax,
-			pointTimes: n.n.PointTimes,
+			pointTimes: n.n.PointTimes || n.isStreamTransformation,
 		}
 		if len(b.Points) == 0 {
 			if !n.n.ReduceCreater.IsEmptyOK {
@@ -167,13 +167,46 @@ func (n *InfluxQLNode) runBatchInfluxQL() error {
 		}
 
 		context := createFn(c)
-		err = context.AggregateBatch(&b)
-		if err != nil {
-			n.logger.Println("E! failed to aggregate batch:", err)
-		}
-		err = n.emit(context)
-		if err != nil {
-			n.logger.Println("E! failed to emit batch:", err)
+		if n.isStreamTransformation {
+			// We have a stream transformation, so treat the batch as if it were a stream
+			// Create a new batch for emitting
+			eb := b
+			eb.Points = make([]models.BatchPoint, 0, len(b.Points))
+			for _, bp := range b.Points {
+				p := models.Point{
+					Name:   b.Name,
+					Time:   bp.Time,
+					Fields: bp.Fields,
+					Tags:   bp.Tags,
+				}
+				if err := context.AggregatePoint(&p); err != nil {
+					n.logger.Println("E! failed to aggregate batch point:", err)
+				}
+				if ep, err := context.EmitPoint(); err != nil && err != ErrEmptyEmit {
+					n.logger.Println("E! failed to emit batch point:", err)
+				} else if err != ErrEmptyEmit {
+					eb.Points = append(eb.Points, models.BatchPoint{
+						Time:   ep.Time,
+						Fields: ep.Fields,
+						Tags:   ep.Tags,
+					})
+				}
+			}
+			// Emit the complete batch
+			n.timer.Pause()
+			for _, out := range n.outs {
+				if err := out.CollectBatch(eb); err != nil {
+					n.logger.Println("E! failed to emit batch points:", err)
+				}
+			}
+			n.timer.Resume()
+		} else {
+			if err := context.AggregateBatch(&b); err != nil {
+				n.logger.Println("E! failed to aggregate batch:", err)
+			}
+			if err := n.emit(context); err != nil {
+				n.logger.Println("E! failed to emit batch:", err)
+			}
 		}
 		n.timer.Stop()
 	}
