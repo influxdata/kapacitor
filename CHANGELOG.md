@@ -7,6 +7,7 @@
 
 ### Features
 
+- [#827](https://github.com/influxdata/kapacitor/issues/827): Bring Kapacitor up to parody with available InfluxQL functions in 1.0
 
 ### Bugfixes
 
