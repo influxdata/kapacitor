@@ -1,4 +1,6 @@
-// Copyright (c) 2013, Vastech SA (PTY) LTD. All rights reserved.
+// Protocol Buffers for Go with Gadgets
+//
+// Copyright (c) 2013, The GoGo Authors. All rights reserved.
 // http://github.com/gogo/protobuf
 //
 // Redistribution and use in source and binary forms, with or without
@@ -698,9 +700,6 @@ func (p *unmarshal) field(file *generator.FileDescriptor, msg *generator.Descrip
 			p.P(`var keykey uint64`)
 			p.decodeVarint("keykey", "uint64")
 			p.mapField("mapkey", m.KeyAliasField)
-			p.P(`var valuekey uint64`)
-			p.decodeVarint("valuekey", "uint64")
-			p.mapField("mapvalue", m.ValueAliasField)
 			p.P(`if m.`, fieldname, ` == nil {`)
 			p.In()
 			p.P(`m.`, fieldname, ` = make(`, m.GoType, `)`)
@@ -719,7 +718,19 @@ func (p *unmarshal) field(file *generator.FileDescriptor, msg *generator.Descrip
 			if valuegoTyp != valuegoAliasTyp {
 				v = `((` + valuegoAliasTyp + `)(` + v + `))`
 			}
+			p.P(`if iNdEx < postIndex {`)
+			p.In()
+			p.P(`var valuekey uint64`)
+			p.decodeVarint("valuekey", "uint64")
+			p.mapField("mapvalue", m.ValueAliasField)
 			p.P(s, ` = `, v)
+			p.Out()
+			p.P(`} else {`)
+			p.In()
+			p.P(`var mapvalue `, valuegoAliasTyp)
+			p.P(s, ` = mapvalue`)
+			p.Out()
+			p.P(`}`)
 		} else if repeated {
 			if nullable {
 				p.P(`m.`, fieldname, ` = append(m.`, fieldname, `, &`, msgname, `{})`)

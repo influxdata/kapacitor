@@ -22,6 +22,7 @@ do
     then
         continue
     fi
+    echo "Vendoring $package"
 
     # Determine an upstream branch
     branch=${spec[1]}
@@ -33,7 +34,7 @@ do
 
     if [ -d "$dir" ]
     then
-        git subrepo pull "$dir" $barg
+        git subrepo clone --force "$uri" "$dir" $barg
     else
         git subrepo clone "$uri" "$dir" $barg
     fi

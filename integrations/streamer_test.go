@@ -358,6 +358,103 @@ stream
 	testStreamerWithOutput(t, "TestStream_Elapsed", script, 15*time.Second, er, nil, false)
 }
 
+func TestStream_Difference(t *testing.T) {
+
+	var script = `
+stream
+	|from()
+		.measurement('packets')
+	|difference('value')
+	|window()
+		.period(10s)
+		.every(10s)
+	|max('difference')
+	|httpOut('TestStream_Difference')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "packets",
+				Tags:    nil,
+				Columns: []string{"time", "max"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
+					5.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Difference", script, 15*time.Second, er, nil, false)
+}
+
+func TestStream_MovingAverage(t *testing.T) {
+
+	var script = `
+stream
+	|from()
+		.measurement('packets')
+	|movingAverage('value', 4)
+	|window()
+		.period(10s)
+		.every(10s)
+	|httpOut('TestStream_MovingAverage')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "packets",
+				Tags:    nil,
+				Columns: []string{"time", "movingAverage"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+						1001.5,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						1005.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+						1008.5,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						1012.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+						1015.5,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+						1016.5,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
+						1017.5,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+						1018.5,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
+						1019.5,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 12, 0, time.UTC),
+						1020.5,
+					},
+				},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_MovingAverage", script, 16*time.Second, er, nil, false)
+}
+
 func TestStream_WindowMissing(t *testing.T) {
 
 	var script = `
@@ -3071,6 +3168,22 @@ stream
 			},
 		},
 		testCase{
+			Method: "mode",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    models.Tags{"host": "serverA"},
+						Columns: []string{"time", "mode"},
+						Values: [][]interface{}{[]interface{}{
+							endTime,
+							95.0,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
 			Method:        "min",
 			UsePointTimes: true,
 			ER: kapacitor.Result{
@@ -3509,6 +3622,22 @@ stream
 						Values: [][]interface{}{[]interface{}{
 							endTime,
 							94.0,
+						}},
+					},
+				},
+			},
+		},
+		testCase{
+			Method: "mode",
+			ER: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    models.Tags{"host": "serverA"},
+						Columns: []string{"time", "mode"},
+						Values: [][]interface{}{[]interface{}{
+							endTime,
+							95.0,
 						}},
 					},
 				},
@@ -6767,8 +6896,8 @@ stream
 		if len(p.Tags()) != 1 {
 			t.Errorf("got %v exp %v", len(p.Tags()), 1)
 		}
-		if p.Tags()["key"] != "value" {
-			t.Errorf("got %s exp %s", p.Tags()["key"], "value")
+		if got, exp := p.Tags()["key"], "value"; got != exp {
+			t.Errorf("got %s exp %s", got, exp)
 		}
 		tm := time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC)
 		if !tm.Equal(p.Time()) {

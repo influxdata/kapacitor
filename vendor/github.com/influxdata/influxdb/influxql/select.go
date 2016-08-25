@@ -15,9 +15,16 @@ type SelectOptions struct {
 	// The upper bound for a select call.
 	MaxTime time.Time
 
+	// Node to exclusively read from.
+	// If zero, all nodes are used.
+	NodeID uint64
+
 	// An optional channel that, if closed, signals that the select should be
 	// interrupted.
 	InterruptCh <-chan struct{}
+
+	// Maximum number of concurrent series.
+	MaxSeriesN int
 }
 
 // Select executes stmt against ic and returns a list of iterators to stream from.
@@ -336,6 +343,12 @@ func buildExprIterator(expr Expr, ic IteratorCreator, opt IteratorOptions, selec
 						return nil, err
 					}
 					return newMedianIterator(input, opt)
+				case "mode":
+					input, err := buildExprIterator(expr.Args[0].(*VarRef), ic, opt, false)
+					if err != nil {
+						return nil, err
+					}
+					return NewModeIterator(input, opt)
 				case "stddev":
 					input, err := buildExprIterator(expr.Args[0].(*VarRef), ic, opt, false)
 					if err != nil {

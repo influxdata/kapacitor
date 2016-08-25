@@ -1129,6 +1129,15 @@ func TestParser_ParseStatement(t *testing.T) {
 			},
 		},
 
+		// KILL QUERY 4 ON localhost
+		{
+			s: `KILL QUERY 4 ON localhost`,
+			stmt: &influxql.KillQueryStatement{
+				QueryID: 4,
+				Host:    "localhost",
+			},
+		},
+
 		// SHOW RETENTION POLICIES
 		{
 			s: `SHOW RETENTION POLICIES ON mydb`,
@@ -1250,8 +1259,9 @@ func TestParser_ParseStatement(t *testing.T) {
 			skip: true,
 			s:    `SHOW TAG VALUES FROM src WITH KEY = region WHERE region = 'uswest' ORDER BY ASC, field1, field2 DESC LIMIT 10`,
 			stmt: &influxql.ShowTagValuesStatement{
-				Sources: []influxql.Source{&influxql.Measurement{Name: "src"}},
-				TagKeys: []string{"region"},
+				Sources:    []influxql.Source{&influxql.Measurement{Name: "src"}},
+				Op:         influxql.EQ,
+				TagKeyExpr: &influxql.StringLiteral{Val: "region"},
 				Condition: &influxql.BinaryExpr{
 					Op:  influxql.EQ,
 					LHS: &influxql.VarRef{Val: "region"},
@@ -1270,8 +1280,9 @@ func TestParser_ParseStatement(t *testing.T) {
 		{
 			s: `SHOW TAG VALUES FROM cpu WITH KEY IN (region, host) WHERE region = 'uswest'`,
 			stmt: &influxql.ShowTagValuesStatement{
-				Sources: []influxql.Source{&influxql.Measurement{Name: "cpu"}},
-				TagKeys: []string{"region", "host"},
+				Sources:    []influxql.Source{&influxql.Measurement{Name: "cpu"}},
+				Op:         influxql.IN,
+				TagKeyExpr: &influxql.ListLiteral{Vals: []string{"region", "host"}},
 				Condition: &influxql.BinaryExpr{
 					Op:  influxql.EQ,
 					LHS: &influxql.VarRef{Val: "region"},
@@ -1284,8 +1295,9 @@ func TestParser_ParseStatement(t *testing.T) {
 		{
 			s: `SHOW TAG VALUES FROM cpu WITH KEY IN (region,service,host)WHERE region = 'uswest'`,
 			stmt: &influxql.ShowTagValuesStatement{
-				Sources: []influxql.Source{&influxql.Measurement{Name: "cpu"}},
-				TagKeys: []string{"region", "service", "host"},
+				Sources:    []influxql.Source{&influxql.Measurement{Name: "cpu"}},
+				Op:         influxql.IN,
+				TagKeyExpr: &influxql.ListLiteral{Vals: []string{"region", "service", "host"}},
 				Condition: &influxql.BinaryExpr{
 					Op:  influxql.EQ,
 					LHS: &influxql.VarRef{Val: "region"},
@@ -1298,7 +1310,8 @@ func TestParser_ParseStatement(t *testing.T) {
 		{
 			s: `SHOW TAG VALUES WITH KEY = host WHERE region = 'uswest'`,
 			stmt: &influxql.ShowTagValuesStatement{
-				TagKeys: []string{"host"},
+				Op:         influxql.EQ,
+				TagKeyExpr: &influxql.StringLiteral{Val: "host"},
 				Condition: &influxql.BinaryExpr{
 					Op:  influxql.EQ,
 					LHS: &influxql.VarRef{Val: "region"},
@@ -1316,7 +1329,8 @@ func TestParser_ParseStatement(t *testing.T) {
 						Regex: &influxql.RegexLiteral{Val: regexp.MustCompile(`[cg]pu`)},
 					},
 				},
-				TagKeys: []string{"host"},
+				Op:         influxql.EQ,
+				TagKeyExpr: &influxql.StringLiteral{Val: "host"},
 			},
 		},
 
@@ -1324,12 +1338,22 @@ func TestParser_ParseStatement(t *testing.T) {
 		{
 			s: `SHOW TAG VALUES WITH KEY = "host" WHERE region = 'uswest'`,
 			stmt: &influxql.ShowTagValuesStatement{
-				TagKeys: []string{`host`},
+				Op:         influxql.EQ,
+				TagKeyExpr: &influxql.StringLiteral{Val: `host`},
 				Condition: &influxql.BinaryExpr{
 					Op:  influxql.EQ,
 					LHS: &influxql.VarRef{Val: "region"},
 					RHS: &influxql.StringLiteral{Val: "uswest"},
 				},
+			},
+		},
+
+		// SHOW TAG VALUES WITH KEY =~ /<regex>/
+		{
+			s: `SHOW TAG VALUES WITH KEY =~ /(host|region)/`,
+			stmt: &influxql.ShowTagValuesStatement{
+				Op:         influxql.EQREGEX,
+				TagKeyExpr: &influxql.RegexLiteral{Val: regexp.MustCompile(`(host|region)`)},
 			},
 		},
 
@@ -1603,24 +1627,14 @@ func TestParser_ParseStatement(t *testing.T) {
 		{
 			s: `CREATE DATABASE testdb`,
 			stmt: &influxql.CreateDatabaseStatement{
-				Name:                  "testdb",
-				IfNotExists:           false,
-				RetentionPolicyCreate: false,
-			},
-		},
-		{
-			s: `CREATE DATABASE IF NOT EXISTS testdb`,
-			stmt: &influxql.CreateDatabaseStatement{
-				Name:                  "testdb",
-				IfNotExists:           true,
+				Name: "testdb",
 				RetentionPolicyCreate: false,
 			},
 		},
 		{
 			s: `CREATE DATABASE testdb WITH DURATION 24h`,
 			stmt: &influxql.CreateDatabaseStatement{
-				Name:                       "testdb",
-				IfNotExists:                false,
+				Name: "testdb",
 				RetentionPolicyCreate:      true,
 				RetentionPolicyDuration:    24 * time.Hour,
 				RetentionPolicyReplication: 1,
@@ -1629,8 +1643,7 @@ func TestParser_ParseStatement(t *testing.T) {
 		{
 			s: `CREATE DATABASE testdb WITH SHARD DURATION 30m`,
 			stmt: &influxql.CreateDatabaseStatement{
-				Name:                              "testdb",
-				IfNotExists:                       false,
+				Name: "testdb",
 				RetentionPolicyCreate:             true,
 				RetentionPolicyDuration:           0,
 				RetentionPolicyReplication:        1,
@@ -1638,30 +1651,9 @@ func TestParser_ParseStatement(t *testing.T) {
 			},
 		},
 		{
-			s: `CREATE DATABASE IF NOT EXISTS testdb WITH DURATION 24h`,
-			stmt: &influxql.CreateDatabaseStatement{
-				Name:                       "testdb",
-				IfNotExists:                true,
-				RetentionPolicyCreate:      true,
-				RetentionPolicyDuration:    24 * time.Hour,
-				RetentionPolicyReplication: 1,
-			},
-		},
-		{
 			s: `CREATE DATABASE testdb WITH REPLICATION 2`,
 			stmt: &influxql.CreateDatabaseStatement{
-				Name:                       "testdb",
-				IfNotExists:                false,
-				RetentionPolicyCreate:      true,
-				RetentionPolicyDuration:    0,
-				RetentionPolicyReplication: 2,
-			},
-		},
-		{
-			s: `CREATE DATABASE IF NOT EXISTS testdb WITH REPLICATION 2`,
-			stmt: &influxql.CreateDatabaseStatement{
-				Name:                       "testdb",
-				IfNotExists:                true,
+				Name: "testdb",
 				RetentionPolicyCreate:      true,
 				RetentionPolicyDuration:    0,
 				RetentionPolicyReplication: 2,
@@ -1670,19 +1662,7 @@ func TestParser_ParseStatement(t *testing.T) {
 		{
 			s: `CREATE DATABASE testdb WITH NAME test_name`,
 			stmt: &influxql.CreateDatabaseStatement{
-				Name:                       "testdb",
-				IfNotExists:                false,
-				RetentionPolicyCreate:      true,
-				RetentionPolicyDuration:    0,
-				RetentionPolicyReplication: 1,
-				RetentionPolicyName:        "test_name",
-			},
-		},
-		{
-			s: `CREATE DATABASE IF NOT EXISTS testdb WITH NAME test_name`,
-			stmt: &influxql.CreateDatabaseStatement{
-				Name:                       "testdb",
-				IfNotExists:                true,
+				Name: "testdb",
 				RetentionPolicyCreate:      true,
 				RetentionPolicyDuration:    0,
 				RetentionPolicyReplication: 1,
@@ -1692,19 +1672,7 @@ func TestParser_ParseStatement(t *testing.T) {
 		{
 			s: `CREATE DATABASE testdb WITH DURATION 24h REPLICATION 2 NAME test_name`,
 			stmt: &influxql.CreateDatabaseStatement{
-				Name:                       "testdb",
-				IfNotExists:                false,
-				RetentionPolicyCreate:      true,
-				RetentionPolicyDuration:    24 * time.Hour,
-				RetentionPolicyReplication: 2,
-				RetentionPolicyName:        "test_name",
-			},
-		},
-		{
-			s: `CREATE DATABASE IF NOT EXISTS testdb WITH DURATION 24h REPLICATION 2 NAME test_name`,
-			stmt: &influxql.CreateDatabaseStatement{
-				Name:                       "testdb",
-				IfNotExists:                true,
+				Name: "testdb",
 				RetentionPolicyCreate:      true,
 				RetentionPolicyDuration:    24 * time.Hour,
 				RetentionPolicyReplication: 2,
@@ -1714,20 +1682,7 @@ func TestParser_ParseStatement(t *testing.T) {
 		{
 			s: `CREATE DATABASE testdb WITH DURATION 24h REPLICATION 2 SHARD DURATION 10m NAME test_name `,
 			stmt: &influxql.CreateDatabaseStatement{
-				Name:                              "testdb",
-				IfNotExists:                       false,
-				RetentionPolicyCreate:             true,
-				RetentionPolicyDuration:           24 * time.Hour,
-				RetentionPolicyReplication:        2,
-				RetentionPolicyName:               "test_name",
-				RetentionPolicyShardGroupDuration: 10 * time.Minute,
-			},
-		},
-		{
-			s: `CREATE DATABASE IF NOT EXISTS testdb WITH DURATION 24h REPLICATION 2 SHARD DURATION 10m NAME test_name`,
-			stmt: &influxql.CreateDatabaseStatement{
-				Name:                              "testdb",
-				IfNotExists:                       true,
+				Name: "testdb",
 				RetentionPolicyCreate:             true,
 				RetentionPolicyDuration:           24 * time.Hour,
 				RetentionPolicyReplication:        2,
@@ -1774,15 +1729,7 @@ func TestParser_ParseStatement(t *testing.T) {
 		{
 			s: `DROP DATABASE testdb`,
 			stmt: &influxql.DropDatabaseStatement{
-				Name:     "testdb",
-				IfExists: false,
-			},
-		},
-		{
-			s: `DROP DATABASE IF EXISTS testdb`,
-			stmt: &influxql.DropDatabaseStatement{
-				Name:     "testdb",
-				IfExists: true,
+				Name: "testdb",
 			},
 		},
 
@@ -2097,6 +2044,7 @@ func TestParser_ParseStatement(t *testing.T) {
 		{s: `SELECT last(max(value)) FROM myseries`, err: `expected field argument in last()`},
 		{s: `SELECT mean(max(value)) FROM myseries`, err: `expected field argument in mean()`},
 		{s: `SELECT median(max(value)) FROM myseries`, err: `expected field argument in median()`},
+		{s: `SELECT mode(max(value)) FROM myseries`, err: `expected field argument in mode()`},
 		{s: `SELECT stddev(max(value)) FROM myseries`, err: `expected field argument in stddev()`},
 		{s: `SELECT spread(max(value)) FROM myseries`, err: `expected field argument in spread()`},
 		{s: `SELECT top() FROM myseries`, err: `invalid number of arguments for top, expected at least 2, got 0`},
@@ -2205,6 +2153,7 @@ func TestParser_ParseStatement(t *testing.T) {
 		{s: `SELECT count(foo + sum(bar)) FROM cpu`, err: `expected field argument in count()`},
 		{s: `SELECT (count(foo + sum(bar))) FROM cpu`, err: `expected field argument in count()`},
 		{s: `SELECT sum(value) + count(foo + sum(bar)) FROM cpu`, err: `binary expressions cannot mix aggregates and raw fields`},
+		{s: `SELECT mean(value) FROM cpu FILL + value`, err: `fill must be a function call`},
 		// See issues https://github.com/influxdata/influxdb/issues/1647
 		// and https://github.com/influxdata/influxdb/issues/4404
 		//{s: `DELETE`, err: `found EOF, expected FROM at line 1, char 8`},
@@ -2245,16 +2194,7 @@ func TestParser_ParseStatement(t *testing.T) {
 		{s: `CREATE DATABASE "testdb" WITH REPLICATION`, err: `found EOF, expected integer at line 1, char 43`},
 		{s: `CREATE DATABASE "testdb" WITH NAME`, err: `found EOF, expected identifier at line 1, char 36`},
 		{s: `CREATE DATABASE "testdb" WITH SHARD`, err: `found EOF, expected DURATION at line 1, char 37`},
-		{s: `CREATE DATABASE IF`, err: `found EOF, expected NOT at line 1, char 20`},
-		{s: `CREATE DATABASE IF NOT`, err: `found EOF, expected EXISTS at line 1, char 24`},
-		{s: `CREATE DATABASE IF NOT EXISTS`, err: `found EOF, expected identifier at line 1, char 31`},
-		{s: `CREATE DATABASE IF NOT EXISTS "testdb" WITH`, err: `found EOF, expected DURATION, NAME, REPLICATION, SHARD at line 1, char 45`},
-		{s: `CREATE DATABASE IF NOT EXISTS "testdb" WITH DURATION`, err: `found EOF, expected duration at line 1, char 54`},
-		{s: `CREATE DATABASE IF NOT EXISTS "testdb" WITH REPLICATION`, err: `found EOF, expected integer at line 1, char 57`},
-		{s: `CREATE DATABASE IF NOT EXISTS "testdb" WITH NAME`, err: `found EOF, expected identifier at line 1, char 50`},
 		{s: `DROP DATABASE`, err: `found EOF, expected identifier at line 1, char 15`},
-		{s: `DROP DATABASE IF`, err: `found EOF, expected EXISTS at line 1, char 18`},
-		{s: `DROP DATABASE IF EXISTS`, err: `found EOF, expected identifier at line 1, char 25`},
 		{s: `DROP RETENTION`, err: `found EOF, expected POLICY at line 1, char 16`},
 		{s: `DROP RETENTION POLICY`, err: `found EOF, expected identifier at line 1, char 23`},
 		{s: `DROP RETENTION POLICY "1h.cpu"`, err: `found EOF, expected ON at line 1, char 31`},
@@ -2312,6 +2252,7 @@ func TestParser_ParseStatement(t *testing.T) {
 		{s: `GRANT ALL PRIVILEGES TO`, err: `found EOF, expected identifier at line 1, char 25`},
 		{s: `KILL`, err: `found EOF, expected QUERY at line 1, char 6`},
 		{s: `KILL QUERY 10s`, err: `found 10s, expected integer at line 1, char 12`},
+		{s: `KILL QUERY 4 ON 'host'`, err: `found host, expected identifier at line 1, char 16`},
 		{s: `REVOKE`, err: `found EOF, expected READ, WRITE, ALL [PRIVILEGES] at line 1, char 8`},
 		{s: `REVOKE BOGUS`, err: `found BOGUS, expected READ, WRITE, ALL [PRIVILEGES] at line 1, char 8`},
 		{s: `REVOKE READ`, err: `found EOF, expected ON at line 1, char 13`},

@@ -3,8 +3,6 @@ package meta
 import (
 	"errors"
 	"time"
-
-	"github.com/influxdata/influxdb/toml"
 )
 
 const (
@@ -13,30 +11,21 @@ const (
 
 	// DefaultLoggingEnabled determines if log messages are printed for the meta service
 	DefaultLoggingEnabled = true
-
-	// DefaultRetentionPolicyName is the default retention policy name.
-	DefaultRetentionPolicyName = "autogen"
 )
 
 // Config represents the meta configuration.
 type Config struct {
 	Dir string `toml:"dir"`
 
-	RetentionAutoCreate        bool   `toml:"retention-autocreate"`
-	DefaultRetentionPolicyName string `toml:"default-retention-policy-name"`
-	LoggingEnabled             bool   `toml:"logging-enabled"`
-	PprofEnabled               bool   `toml:"pprof-enabled"`
-
-	LeaseDuration toml.Duration `toml:"lease-duration"`
+	RetentionAutoCreate bool `toml:"retention-autocreate"`
+	LoggingEnabled      bool `toml:"logging-enabled"`
 }
 
 // NewConfig builds a new configuration with default values.
 func NewConfig() *Config {
 	return &Config{
-		RetentionAutoCreate:        true,
-		DefaultRetentionPolicyName: DefaultRetentionPolicyName,
-		LeaseDuration:              toml.Duration(DefaultLeaseDuration),
-		LoggingEnabled:             DefaultLoggingEnabled,
+		RetentionAutoCreate: true,
+		LoggingEnabled:      DefaultLoggingEnabled,
 	}
 }
 

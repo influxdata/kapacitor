@@ -4,8 +4,8 @@
 ; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
 ;
 [subrepo]
-	remote = http://github.com/influxdata/influxdb.git
-	branch = master
-	commit = c8e90fa4eea9bcc8c35df47834fa490834969733
-	parent = a2b6f4a8c7f55ea9fc259e0f28498ef34f77b03c
+	remote = https://github.com/influxdata/influxdb.git
+	branch = 1.0
+	commit = 5130cd703bbf5876c0cbc6273e01c2404b289dd6
+	parent = b382f601e381065c27b4bcf62fb15cc348bf5777
 	cmdver = 0.3.0

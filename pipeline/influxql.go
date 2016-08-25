@@ -152,6 +152,22 @@ func (n *chainnode) Median(field string) *InfluxQLNode {
 	return i
 }
 
+// Compute the mode of the data.
+func (n *chainnode) Mode(field string) *InfluxQLNode {
+	i := newInfluxQLNode("mode", field, n.Provides(), StreamEdge, ReduceCreater{
+		CreateFloatBulkReducer: func() (FloatBulkPointAggregator, influxql.FloatPointEmitter) {
+			fn := influxql.NewFloatSliceFuncReducer(influxql.FloatModeReduceSlice)
+			return fn, fn
+		},
+		CreateIntegerBulkReducer: func() (IntegerBulkPointAggregator, influxql.IntegerPointEmitter) {
+			fn := influxql.NewIntegerSliceFuncReducer(influxql.IntegerModeReduceSlice)
+			return fn, fn
+		},
+	})
+	n.linkChild(i)
+	return i
+}
+
 // Compute the difference between min and max points.
 func (n *chainnode) Spread(field string) *InfluxQLNode {
 	i := newInfluxQLNode("spread", field, n.Provides(), StreamEdge, ReduceCreater{
@@ -394,6 +410,41 @@ func (n *chainnode) Elapsed(field string, unit time.Duration) *InfluxQLNode {
 		},
 		CreateBooleanIntegerReducer: func() (influxql.BooleanPointAggregator, influxql.IntegerPointEmitter) {
 			fn := influxql.NewBooleanElapsedReducer(influxql.Interval{Duration: unit})
+			return fn, fn
+		},
+		IsStreamTransformation: true,
+	})
+	n.linkChild(i)
+	return i
+}
+
+// Compute the difference between points independent of elapsed time.
+func (n *chainnode) Difference(field string) *InfluxQLNode {
+	i := newInfluxQLNode("difference", field, n.Provides(), n.Provides(), ReduceCreater{
+		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
+			fn := influxql.NewFloatDifferenceReducer()
+			return fn, fn
+		},
+		CreateIntegerReducer: func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter) {
+			fn := influxql.NewIntegerDifferenceReducer()
+			return fn, fn
+		},
+		IsStreamTransformation: true,
+	})
+	n.linkChild(i)
+	return i
+}
+
+// Compute a moving average of the last window points.
+// No points are emitted until the window is full.
+func (n *chainnode) MovingAverage(field string, window int64) *InfluxQLNode {
+	i := newInfluxQLNode("movingAverage", field, n.Provides(), n.Provides(), ReduceCreater{
+		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
+			fn := influxql.NewFloatMovingAverageReducer(int(window))
+			return fn, fn
+		},
+		CreateIntegerFloatReducer: func() (influxql.IntegerPointAggregator, influxql.FloatPointEmitter) {
+			fn := influxql.NewIntegerMovingAverageReducer(int(window))
 			return fn, fn
 		},
 		IsStreamTransformation: true,

@@ -1311,7 +1311,7 @@ func TestRequiredFieldEnforcement(t *testing.T) {
 	_, err := Marshal(pb)
 	if err == nil {
 		t.Error("marshal: expected error, got nil")
-	} else if strings.Index(err.Error(), "Label") < 0 {
+	} else if _, ok := err.(*RequiredNotSetError); !ok || !strings.Contains(err.Error(), "Label") {
 		t.Errorf("marshal: bad error type: %v", err)
 	}
 
@@ -1322,16 +1322,42 @@ func TestRequiredFieldEnforcement(t *testing.T) {
 	err = Unmarshal(buf, pb)
 	if err == nil {
 		t.Error("unmarshal: expected error, got nil")
-	} else if strings.Index(err.Error(), "{Unknown}") < 0 {
+	} else if _, ok := err.(*RequiredNotSetError); !ok || !strings.Contains(err.Error(), "{Unknown}") {
+		t.Errorf("unmarshal: bad error type: %v", err)
+	}
+}
+
+// Verify that absent required fields in groups cause Marshal/Unmarshal to return errors.
+func TestRequiredFieldEnforcementGroups(t *testing.T) {
+	pb := &GoTestRequiredGroupField{Group: &GoTestRequiredGroupField_Group{}}
+	if _, err := Marshal(pb); err == nil {
+		t.Error("marshal: expected error, got nil")
+	} else if _, ok := err.(*RequiredNotSetError); !ok || !strings.Contains(err.Error(), "Group.Field") {
+		t.Errorf("marshal: bad error type: %v", err)
+	}
+
+	buf := []byte{11, 12}
+	if err := Unmarshal(buf, pb); err == nil {
+		t.Error("unmarshal: expected error, got nil")
+	} else if _, ok := err.(*RequiredNotSetError); !ok || !strings.Contains(err.Error(), "Group.{Unknown}") {
 		t.Errorf("unmarshal: bad error type: %v", err)
 	}
 }
 
 func TestTypedNilMarshal(t *testing.T) {
 	// A typed nil should return ErrNil and not crash.
-	_, err := Marshal((*GoEnum)(nil))
-	if err != ErrNil {
-		t.Errorf("Marshal: got err %v, want ErrNil", err)
+	{
+		var m *GoEnum
+		if _, err := Marshal(m); err != ErrNil {
+			t.Errorf("Marshal(%#v): got %v, want ErrNil", m, err)
+		}
+	}
+
+	{
+		m := &Communique{Union: &Communique_Msg{nil}}
+		if _, err := Marshal(m); err == nil || err == ErrNil {
+			t.Errorf("Marshal(%#v): got %v, want errOneofHasNil", m, err)
+		}
 	}
 }
 
@@ -1813,42 +1839,42 @@ func TestRequiredNotSetError(t *testing.T) {
 		"b8067f" // field 103, encoding 0, 0x7f zigzag64
 
 	o := old()
-	bytes, err := Marshal(pb)
+	mbytes, err := Marshal(pb)
 	if _, ok := err.(*RequiredNotSetError); !ok {
 		fmt.Printf("marshal-1 err = %v, want *RequiredNotSetError", err)
-		o.DebugPrint("", bytes)
+		o.DebugPrint("", mbytes)
 		t.Fatalf("expected = %s", expected)
 	}
 	if strings.Index(err.Error(), "RequiredField.Label") < 0 {
 		t.Errorf("marshal-1 wrong err msg: %v", err)
 	}
-	if !equal(bytes, expected, t) {
-		o.DebugPrint("neq 1", bytes)
+	if !equal(mbytes, expected, t) {
+		o.DebugPrint("neq 1", mbytes)
 		t.Fatalf("expected = %s", expected)
 	}
 
 	// Now test Unmarshal by recreating the original buffer.
 	pbd := new(GoTest)
-	err = Unmarshal(bytes, pbd)
+	err = Unmarshal(mbytes, pbd)
 	if _, ok := err.(*RequiredNotSetError); !ok {
 		t.Fatalf("unmarshal err = %v, want *RequiredNotSetError", err)
-		o.DebugPrint("", bytes)
+		o.DebugPrint("", mbytes)
 		t.Fatalf("string = %s", expected)
 	}
 	if strings.Index(err.Error(), "RequiredField.{Unknown}") < 0 {
 		t.Errorf("unmarshal wrong err msg: %v", err)
 	}
-	bytes, err = Marshal(pbd)
+	mbytes, err = Marshal(pbd)
 	if _, ok := err.(*RequiredNotSetError); !ok {
 		t.Errorf("marshal-2 err = %v, want *RequiredNotSetError", err)
-		o.DebugPrint("", bytes)
+		o.DebugPrint("", mbytes)
 		t.Fatalf("string = %s", expected)
 	}
 	if strings.Index(err.Error(), "RequiredField.Label") < 0 {
 		t.Errorf("marshal-2 wrong err msg: %v", err)
 	}
-	if !equal(bytes, expected, t) {
-		o.DebugPrint("neq 2", bytes)
+	if !equal(mbytes, expected, t) {
+		o.DebugPrint("neq 2", mbytes)
 		t.Fatalf("string = %s", expected)
 	}
 }
@@ -1947,14 +1973,88 @@ func TestMapFieldRoundTrips(t *testing.T) {
 }
 
 func TestMapFieldWithNil(t *testing.T) {
-	m := &MessageWithMap{
+	m1 := &MessageWithMap{
 		MsgMapping: map[int64]*FloatingPoint{
 			1: nil,
 		},
 	}
-	b, err := Marshal(m)
-	if err == nil {
-		t.Fatalf("Marshal of bad map should have failed, got these bytes: %v", b)
+	b, err := Marshal(m1)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	m2 := new(MessageWithMap)
+	if err := Unmarshal(b, m2); err != nil {
+		t.Fatalf("Unmarshal: %v, got these bytes: %v", err, b)
+	}
+	if v, ok := m2.MsgMapping[1]; !ok {
+		t.Error("msg_mapping[1] not present")
+	} else if v != nil {
+		t.Errorf("msg_mapping[1] not nil: %v", v)
+	}
+}
+
+func TestMapFieldWithNilBytes(t *testing.T) {
+	m1 := &MessageWithMap{
+		ByteMapping: map[bool][]byte{
+			false: {},
+			true:  nil,
+		},
+	}
+	n := Size(m1)
+	b, err := Marshal(m1)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	if n != len(b) {
+		t.Errorf("Size(m1) = %d; want len(Marshal(m1)) = %d", n, len(b))
+	}
+	m2 := new(MessageWithMap)
+	if err := Unmarshal(b, m2); err != nil {
+		t.Fatalf("Unmarshal: %v, got these bytes: %v", err, b)
+	}
+	if v, ok := m2.ByteMapping[false]; !ok {
+		t.Error("byte_mapping[false] not present")
+	} else if len(v) != 0 {
+		t.Errorf("byte_mapping[false] not empty: %#v", v)
+	}
+	if v, ok := m2.ByteMapping[true]; !ok {
+		t.Error("byte_mapping[true] not present")
+	} else if len(v) != 0 {
+		t.Errorf("byte_mapping[true] not empty: %#v", v)
+	}
+}
+
+func TestDecodeMapFieldMissingKey(t *testing.T) {
+	b := []byte{
+		0x0A, 0x03, // message, tag 1 (name_mapping), of length 3 bytes
+		// no key
+		0x12, 0x01, 0x6D, // string value of length 1 byte, value "m"
+	}
+	got := &MessageWithMap{}
+	err := Unmarshal(b, got)
+	if err != nil {
+		t.Fatalf("failed to marshal map with missing key: %v", err)
+	}
+	want := &MessageWithMap{NameMapping: map[int32]string{0: "m"}}
+	if !Equal(got, want) {
+		t.Errorf("Unmarshaled map with no key was not as expected. got: %v, want %v", got, want)
+	}
+}
+
+func TestDecodeMapFieldMissingValue(t *testing.T) {
+	b := []byte{
+		0x0A, 0x02, // message, tag 1 (name_mapping), of length 2 bytes
+		0x08, 0x01, // varint key, value 1
+		// no value
+	}
+	got := &MessageWithMap{}
+	err := Unmarshal(b, got)
+	if err != nil {
+		t.Fatalf("failed to marshal map with missing value: %v", err)
+	}
+	want := &MessageWithMap{NameMapping: map[int32]string{1: ""}}
+	if !Equal(got, want) {
+		t.Errorf("Unmarshaled map with no value was not as expected. got: %v, want %v", got, want)
 	}
 }
 

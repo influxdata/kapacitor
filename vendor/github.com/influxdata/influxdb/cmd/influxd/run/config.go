@@ -1,6 +1,7 @@
 package run
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -31,12 +32,8 @@ import (
 )
 
 const (
-	// DefaultBindAddress is the default address for raft, cluster, snapshot, etc..
+	// DefaultBindAddress is the default address for various RPC services.
 	DefaultBindAddress = ":8088"
-
-	// DefaultHostname is the default hostname used if we are unable to determine
-	// the hostname from the system
-	DefaultHostname = "localhost"
 )
 
 // Config represents the configuration format for the influxd binary.
@@ -63,12 +60,6 @@ type Config struct {
 
 	// BindAddress is the address that all TCP services use (Raft, Snapshot, Cluster, etc.)
 	BindAddress string `toml:"bind-address"`
-
-	// Hostname is the hostname portion to use when registering local
-	// addresses.  This hostname must be resolvable from other nodes.
-	Hostname string `toml:"hostname"`
-
-	Join string `toml:"join"`
 }
 
 // NewConfig returns an instance of Config with reasonable defaults.
@@ -120,12 +111,20 @@ func NewDemoConfig() (*Config, error) {
 	return c, nil
 }
 
+// trimBOM trims the Byte-Order-Marks from the beginning of the file.
+// this is for Windows compatability only.
+// see https://github.com/influxdata/telegraf/issues/1378
+func trimBOM(f []byte) []byte {
+	return bytes.TrimPrefix(f, []byte("\xef\xbb\xbf"))
+}
+
 // FromTomlFile loads the config from a TOML file.
 func (c *Config) FromTomlFile(fpath string) error {
 	bs, err := ioutil.ReadFile(fpath)
 	if err != nil {
 		return err
 	}
+	bs = trimBOM(bs)
 	return c.FromToml(string(bs))
 }
 

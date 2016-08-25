@@ -32,6 +32,7 @@ func NewParser(r io.Reader) *Parser {
 	return &Parser{s: newBufScanner(r)}
 }
 
+// SetParams sets the parameters that will be used for any bound parameter substitutions.
 func (p *Parser) SetParams(params map[string]interface{}) {
 	p.params = params
 }
@@ -306,7 +307,17 @@ func (p *Parser) parseKillQueryStatement() (*KillQueryStatement, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &KillQueryStatement{QueryID: qid}, nil
+
+	var host string
+	if tok, _, _ := p.scanIgnoreWhitespace(); tok == ON {
+		host, err = p.parseIdent()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		p.unscan()
+	}
+	return &KillQueryStatement{QueryID: qid, Host: host}, nil
 }
 
 // parseCreateSubscriptionStatement parses a string and returns a CreatesubScriptionStatement.
@@ -1208,7 +1219,7 @@ func (p *Parser) parseShowTagValuesStatement() (*ShowTagValuesStatement, error) 
 	}
 
 	// Parse required WITH KEY.
-	if stmt.TagKeys, err = p.parseTagKeys(); err != nil {
+	if stmt.Op, stmt.TagKeyExpr, err = p.parseTagKeyExpr(); err != nil {
 		return nil, err
 	}
 
@@ -1236,44 +1247,52 @@ func (p *Parser) parseShowTagValuesStatement() (*ShowTagValuesStatement, error) 
 }
 
 // parseTagKeys parses a string and returns a list of tag keys.
-func (p *Parser) parseTagKeys() ([]string, error) {
+func (p *Parser) parseTagKeyExpr() (Token, Literal, error) {
 	var err error
 
 	// Parse required WITH KEY tokens.
 	if err := p.parseTokens([]Token{WITH, KEY}); err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 
-	var tagKeys []string
-
-	// Parse required IN or EQ token.
-	if tok, pos, lit := p.scanIgnoreWhitespace(); tok == IN {
+	// Parse required IN, EQ, or EQREGEX token.
+	tok, pos, lit := p.scanIgnoreWhitespace()
+	if tok == IN {
 		// Parse required ( token.
 		if tok, pos, lit = p.scanIgnoreWhitespace(); tok != LPAREN {
-			return nil, newParseError(tokstr(tok, lit), []string{"("}, pos)
+			return 0, nil, newParseError(tokstr(tok, lit), []string{"("}, pos)
 		}
 
 		// Parse tag key list.
+		var tagKeys []string
 		if tagKeys, err = p.parseIdentList(); err != nil {
-			return nil, err
+			return 0, nil, err
 		}
 
 		// Parse required ) token.
 		if tok, pos, lit = p.scanIgnoreWhitespace(); tok != RPAREN {
-			return nil, newParseError(tokstr(tok, lit), []string{")"}, pos)
+			return 0, nil, newParseError(tokstr(tok, lit), []string{")"}, pos)
 		}
-	} else if tok == EQ {
+		return IN, &ListLiteral{Vals: tagKeys}, nil
+	} else if tok == EQ || tok == NEQ {
 		// Parse required tag key.
 		ident, err := p.parseIdent()
 		if err != nil {
-			return nil, err
+			return 0, nil, err
 		}
-		tagKeys = append(tagKeys, ident)
-	} else {
-		return nil, newParseError(tokstr(tok, lit), []string{"IN", "="}, pos)
+		return tok, &StringLiteral{Val: ident}, nil
+	} else if tok == EQREGEX || tok == NEQREGEX {
+		re, err := p.parseRegex()
+		if err != nil {
+			return 0, nil, err
+		} else if re == nil {
+			// parseRegex can return an empty type, but we need it to be present
+			tok, pos, lit := p.scanIgnoreWhitespace()
+			return 0, nil, newParseError(tokstr(tok, lit), []string{"regex"}, pos)
+		}
+		return tok, re, nil
 	}
-
-	return tagKeys, nil
+	return 0, nil, newParseError(tokstr(tok, lit), []string{"IN", "=", "=~"}, pos)
 }
 
 // parseShowUsersStatement parses a string and returns a ShowUsersStatement.
@@ -1501,16 +1520,6 @@ func (p *Parser) parseCreateContinuousQueryStatement() (*CreateContinuousQuerySt
 func (p *Parser) parseCreateDatabaseStatement() (*CreateDatabaseStatement, error) {
 	stmt := &CreateDatabaseStatement{}
 
-	// Look for "IF NOT EXISTS"
-	if tok, _, _ := p.scanIgnoreWhitespace(); tok == IF {
-		if err := p.parseTokens([]Token{NOT, EXISTS}); err != nil {
-			return nil, err
-		}
-		stmt.IfNotExists = true
-	} else {
-		p.unscan()
-	}
-
 	// Parse the name of the database to be created.
 	lit, err := p.parseIdent()
 	if err != nil {
@@ -1591,16 +1600,6 @@ func (p *Parser) parseCreateDatabaseStatement() (*CreateDatabaseStatement, error
 // This function assumes the DROP DATABASE tokens have already been consumed.
 func (p *Parser) parseDropDatabaseStatement() (*DropDatabaseStatement, error) {
 	stmt := &DropDatabaseStatement{}
-
-	// Look for "IF EXISTS"
-	if tok, _, _ := p.scanIgnoreWhitespace(); tok == IF {
-		if err := p.parseTokens([]Token{EXISTS}); err != nil {
-			return nil, err
-		}
-		stmt.IfExists = true
-	} else {
-		p.unscan()
-	}
 
 	// Parse the name of the database to be dropped.
 	lit, err := p.parseIdent()
@@ -2072,24 +2071,23 @@ func (p *Parser) parseDimension() (*Dimension, error) {
 // parseFill parses the fill call and its options.
 func (p *Parser) parseFill() (FillOption, interface{}, error) {
 	// Parse the expression first.
+	tok, _, lit := p.scanIgnoreWhitespace()
+	p.unscan()
+	if tok != IDENT || strings.ToLower(lit) != "fill" {
+		return NullFill, nil, nil
+	}
+
 	expr, err := p.ParseExpr()
 	if err != nil {
-		p.unscan()
-		return NullFill, nil, nil
+		return NullFill, nil, err
 	}
-	lit, ok := expr.(*Call)
+	fill, ok := expr.(*Call)
 	if !ok {
-		p.unscan()
-		return NullFill, nil, nil
-	}
-	if strings.ToLower(lit.Name) != "fill" {
-		p.unscan()
-		return NullFill, nil, nil
-	}
-	if len(lit.Args) != 1 {
+		return NullFill, nil, errors.New("fill must be a function call")
+	} else if len(fill.Args) != 1 {
 		return NullFill, nil, errors.New("fill requires an argument, e.g.: 0, null, none, previous")
 	}
-	switch lit.Args[0].String() {
+	switch fill.Args[0].String() {
 	case "null":
 		return NullFill, nil, nil
 	case "none":
@@ -2097,7 +2095,7 @@ func (p *Parser) parseFill() (FillOption, interface{}, error) {
 	case "previous":
 		return PreviousFill, nil, nil
 	default:
-		switch num := lit.Args[0].(type) {
+		switch num := fill.Args[0].(type) {
 		case *IntegerLiteral:
 			return NumberFill, num.Val, nil
 		case *NumberLiteral:

@@ -2,8 +2,10 @@ package tsm1_test
 
 import (
 	"fmt"
+	"io/ioutil"
 	"math"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/influxdata/influxdb/tsdb/engine/tsm1"
@@ -1171,6 +1173,75 @@ func TestTSMReader_File_ReadAll(t *testing.T) {
 	}
 }
 
+func TestTSMReader_FuzzCrashes(t *testing.T) {
+	cases := []string{
+		"",
+		"\x16\xd1\x16\xd1\x01\x10\x14X\xfb\x03\xac~\x80\xf0\x00\x00\x00I^K" +
+			"_\xf0\x00\x00\x00D424259389w\xf0\x00\x00\x00" +
+			"o\x93\bO\x10?\xf0\x00\x00\x00\x00\b\x00\xc2_\xff\xd8\x0fX^" +
+			"/\xbf\xe8\x00\x00\x00\x00\x00\x01\x00\bctr#!~#n\x00" +
+			"\x00\x01\x14X\xfb\xb0\x03\xac~\x80\x14X\xfb\xb1\x00\xd4ܥ\x00\x00" +
+			"\x00\x00\x00\x00\x00\x05\x00\x00\x00@\x00\x00\x00\x00\x00\x00\x00E",
+		"\x16\xd1\x16\xd1\x01\x80'Z\\\x00\v)\x00\x00\x00\x00;\x9a\xca\x00" +
+			"\x01\x05\x10?\xf0\x00\x00\x00\x00\x00\x00\xc2_\xff\xd6\x1d\xd4&\xed\v" +
+			"\xc5\xf7\xfb\xc0\x00\x00\x00\x00\x00 \x00\x06a#!~#v\x00\x00" +
+			"\x01\x00\x00\x00\x00;\x9a\xca\x00\x00\x00\x00\x01*\x05\xf2\x00\x00\x00\x00" +
+			"\x00\x00\x00\x00\x00\x00\x00\x00\x002",
+		"\x16\xd1\x16\xd1\x01\x80\xf0\x00\x00\x00I^K_\xf0\x00\x00\x00D7" +
+			"\nw\xf0\x00\x00\x00o\x93\bO\x10?\xf0\x00\x00\x00\x00\x00\x00\xc2" +
+			"_\xff\x14X\xfb\xb0\x03\xac~\x80\x14X\xfb\xb1\x00\xd4ܥ\x00\x00" +
+			"\x00\x00\x00\x00\x00\x05\x00\x00\x00@\x00\x00\x00\x00\x00\x00\x00E",
+		"\x16\xd1\x16\xd1\x01000000000000000" +
+			"00000000000000000000" +
+			"0000000000\x00\x000\x00\x0100000" +
+			"000\x00\x00\x00\x00\x00\x00\x002",
+		"\x16\xd1\x16\xd1\x01",
+		"\x16\xd1\x16\xd1\x01\x00\x00o\x93\bO\x10?\xf0\x00\x00\x00\x00X^" +
+			"/\xbf\xe8\x00\x00\x00\x00\x00\x01\x00\bctr#!~#n\x00" +
+			"\x00\x01\x14X\xfb\xb0\x03\xac~\x80\x14X\xfb\xb1\x00\xd4ܥ\x00\x00" +
+			"\x00\x00\x00\x00\x00\x05\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00E",
+	}
+
+	for _, c := range cases {
+		func() {
+			dir := MustTempDir()
+			defer os.RemoveAll(dir)
+
+			filename := filepath.Join(dir, "x.tsm")
+			if err := ioutil.WriteFile(filename, []byte(c), 0600); err != nil {
+				t.Fatalf("exp no error, got %s", err)
+			}
+			defer os.RemoveAll(dir)
+
+			f, err := os.Open(filename)
+			if err != nil {
+				t.Fatalf("exp no error, got %s", err)
+			}
+			defer f.Close()
+
+			r, err := tsm1.NewTSMReader(f)
+			if err != nil {
+				return
+			}
+			defer r.Close()
+
+			iter := r.BlockIterator()
+			for iter.Next() {
+				key, _, _, _, _, err := iter.Read()
+				if err != nil {
+					return
+				}
+
+				_, _ = r.Type(key)
+
+				if _, err = r.ReadAll(key); err != nil {
+					return
+				}
+			}
+		}()
+	}
+}
+
 func TestTSMReader_File_Read(t *testing.T) {
 	dir := MustTempDir()
 	defer os.RemoveAll(dir)
@@ -1245,6 +1316,102 @@ func TestTSMReader_File_Read(t *testing.T) {
 
 	if exp, got := count, len(data); exp != got {
 		t.Fatalf("read values count mismatch: exp %v, got %v", exp, got)
+	}
+}
+
+func TestTSMReader_References(t *testing.T) {
+	dir := MustTempDir()
+	defer os.RemoveAll(dir)
+	f := MustTempFile(dir)
+	defer f.Close()
+
+	w, err := tsm1.NewTSMWriter(f)
+	if err != nil {
+		t.Fatalf("unexpected error creating writer: %v", err)
+	}
+
+	var data = []struct {
+		key    string
+		values []tsm1.Value
+	}{
+		{"float", []tsm1.Value{
+			tsm1.NewValue(1, 1.0)},
+		},
+		{"int", []tsm1.Value{
+			tsm1.NewValue(1, int64(1))},
+		},
+		{"bool", []tsm1.Value{
+			tsm1.NewValue(1, true)},
+		},
+		{"string", []tsm1.Value{
+			tsm1.NewValue(1, "foo")},
+		},
+	}
+	for _, d := range data {
+		if err := w.Write(d.key, d.values); err != nil {
+			t.Fatalf("unexpected error writing: %v", err)
+		}
+	}
+
+	if err := w.WriteIndex(); err != nil {
+		t.Fatalf("unexpected error writing index: %v", err)
+	}
+
+	if err := w.Close(); err != nil {
+		t.Fatalf("unexpected error closing: %v", err)
+	}
+
+	f, err = os.Open(f.Name())
+	if err != nil {
+		t.Fatalf("unexpected error open file: %v", err)
+	}
+
+	r, err := tsm1.NewTSMReader(f)
+	if err != nil {
+		t.Fatalf("unexpected error created reader: %v", err)
+	}
+	defer r.Close()
+
+	r.Ref()
+
+	if err := r.Close(); err != tsm1.ErrFileInUse {
+		t.Fatalf("expected error closing reader: %v", err)
+	}
+
+	if err := r.Remove(); err != tsm1.ErrFileInUse {
+		t.Fatalf("expected error removing reader: %v", err)
+	}
+
+	var count int
+	for _, d := range data {
+		readValues, err := r.Read(d.key, d.values[0].UnixNano())
+		if err != nil {
+			t.Fatalf("unexpected error readin: %v", err)
+		}
+
+		if exp, got := len(d.values), len(readValues); exp != got {
+			t.Fatalf("read values length mismatch: exp %v, got %v", exp, len(readValues))
+		}
+
+		for i, v := range d.values {
+			if v.Value() != readValues[i].Value() {
+				t.Fatalf("read value mismatch(%d): exp %v, got %d", i, v.Value(), readValues[i].Value())
+			}
+		}
+		count++
+	}
+
+	if exp, got := count, len(data); exp != got {
+		t.Fatalf("read values count mismatch: exp %v, got %v", exp, got)
+	}
+	r.Unref()
+
+	if err := r.Close(); err != nil {
+		t.Fatalf("unexpected error closing reader: %v", err)
+	}
+
+	if err := r.Remove(); err != nil {
+		t.Fatalf("unexpected error removing reader: %v", err)
 	}
 }
 

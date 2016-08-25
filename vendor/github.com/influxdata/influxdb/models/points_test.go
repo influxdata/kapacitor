@@ -896,10 +896,28 @@ func TestParsePointWithTags(t *testing.T) {
 			models.Fields{"value": 1.0}, time.Unix(1, 0)))
 }
 
-func TestParsPointWithDuplicateTags(t *testing.T) {
-	_, err := models.ParsePoints([]byte(`cpu,host=serverA,host=serverB value=1i 1000000000`))
-	if err == nil {
-		t.Fatalf(`ParsePoint() expected error. got nil`)
+func TestParsePointWithDuplicateTags(t *testing.T) {
+	for i, tt := range []struct {
+		line string
+		err  string
+	}{
+		{
+			line: `cpu,host=serverA,host=serverB value=1i 1000000000`,
+			err:  `unable to parse 'cpu,host=serverA,host=serverB value=1i 1000000000': duplicate tags`,
+		},
+		{
+			line: `cpu,b=2,b=1,c=3 value=1i 1000000000`,
+			err:  `unable to parse 'cpu,b=2,b=1,c=3 value=1i 1000000000': duplicate tags`,
+		},
+		{
+			line: `cpu,b=2,c=3,b=1 value=1i 1000000000`,
+			err:  `unable to parse 'cpu,b=2,c=3,b=1 value=1i 1000000000': duplicate tags`,
+		},
+	} {
+		_, err := models.ParsePointsString(tt.line)
+		if err == nil || tt.err != err.Error() {
+			t.Errorf("%d. ParsePoint() expected error '%s'. got '%s'", i, tt.err, err)
+		}
 	}
 }
 
@@ -1195,7 +1213,7 @@ func TestParsePointNegativeTimestamp(t *testing.T) {
 }
 
 func TestParsePointMaxTimestamp(t *testing.T) {
-	test(t, `cpu value=1 9223372036854775807`,
+	test(t, fmt.Sprintf(`cpu value=1 %d`, models.MaxNanoTime),
 		NewTestPoint(
 			"cpu",
 			models.Tags{},
@@ -1844,5 +1862,11 @@ func TestNewPointsRejectsMaxKey(t *testing.T) {
 
 	if _, err := models.ParsePointsString(fmt.Sprintf("%v value=1", key)); err == nil {
 		t.Fatalf("parse point with max key. got: nil, expected: error")
+	}
+}
+
+func TestParseKeyEmpty(t *testing.T) {
+	if _, _, err := models.ParseKey(""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
