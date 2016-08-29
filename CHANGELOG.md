@@ -1,9 +1,8 @@
 # Changelog
 
-## v1.0.0-rc2 [unreleased]
+## v1.0.0-rc2 [2016-08-29]
 
 ### Release Notes
-
 
 ### Features
 
