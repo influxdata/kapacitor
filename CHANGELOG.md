@@ -8,7 +8,7 @@
 
 ### Bugfixes
 
-- [#842](https://github.com/influxdata/kapacitor/issues/42): Fix side-effecting modification in batch WhereNode.
+- [#842](https://github.com/influxdata/kapacitor/issues/842): Fix side-effecting modification in batch WhereNode.
 
 ## v1.0.0-rc2 [2016-08-29]
 
