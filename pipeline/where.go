@@ -29,13 +29,3 @@ func newWhereNode(wants EdgeType, predicate *ast.LambdaNode) *WhereNode {
 		Lambda:    predicate,
 	}
 }
-
-// And another expression onto the existing expression.
-func (w *WhereNode) Where(lambda *ast.LambdaNode) *WhereNode {
-	w.Lambda.Expression = &ast.BinaryNode{
-		Operator: ast.TokenAnd,
-		Left:     w.Lambda.Expression,
-		Right:    lambda.Expression,
-	}
-	return w
-}
