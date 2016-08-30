@@ -39,9 +39,12 @@ func newWindowNode() *WindowNode {
 	}
 }
 
-// Wether to align the window edges with the zero time.
-// If not aligned the window starts and ends relative to the
-// first data point it receives.
+// If the `align` property is not used to modify the `window` node, then the
+// window alignment is assumed to start at the time of the first data point it receives. 
+// If `align` property is used to modify the `window` node, the window time edges 
+// will be truncated to the `every` property (For example, if a data point's time 
+// is 12:06 and the `every` property is `5m` then the data point's window will range 
+// from 12:05 to 12:10).
 // tick:property
 func (w *WindowNode) Align() *WindowNode {
 	w.AlignFlag = true
