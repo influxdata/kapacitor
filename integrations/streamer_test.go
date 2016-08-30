@@ -1445,6 +1445,44 @@ stream
 	testStreamerWithOutput(t, "TestStream_SimpleMR", script, 15*time.Second, er, nil, false)
 }
 
+func TestStream_Where_NoSideEffect(t *testing.T) {
+
+	var script = `
+var data = stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.where(lambda: "host" != 'serverB')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|where(lambda: "count" > 0)
+
+// Unused where clause should not side-effect
+data
+	|where(lambda: FALSE)
+
+data
+	|httpOut('TestStream_SimpleMR')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    nil,
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					10.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_SimpleMR", script, 15*time.Second, er, nil, false)
+}
+
 func TestStream_VarWhereString(t *testing.T) {
 
 	var script = `

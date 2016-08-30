@@ -86,15 +86,14 @@ func (w *WhereNode) runWhere(snapshot []byte) error {
 				scopePool = stateful.NewScopePool(stateful.FindReferenceVariables(w.w.Lambda.Expression))
 				w.scopePools[b.Group] = scopePool
 			}
-			for i := 0; i < len(b.Points); {
-				p := b.Points[i]
-				if pass, err := EvalPredicate(expr, scopePool, p.Time, p.Fields, p.Tags); !pass {
+			points := b.Points
+			b.Points = make([]models.BatchPoint, 0, len(b.Points))
+			for _, p := range points {
+				if pass, err := EvalPredicate(expr, scopePool, p.Time, p.Fields, p.Tags); pass {
 					if err != nil {
 						w.logger.Println("E! error while evaluating WHERE expression:", err)
 					}
-					b.Points = append(b.Points[:i], b.Points[i+1:]...)
-				} else {
-					i++
+					b.Points = append(b.Points, p)
 				}
 			}
 			w.timer.Stop()
