@@ -236,7 +236,7 @@ const intervalMarker = "INTERVAL"
 //
 // The `id` and `message` alert properties can be configured globally via the 'deadman' configuration section.
 //
-// Since the AlertNode is the last piece it can be further modified as normal.
+// Since the AlertNode is the last piece it can be further modified as usual.
 // Example:
 //    var data = stream
 //        |from()...
@@ -318,8 +318,8 @@ func (n *chainnode) Where(expression *ast.LambdaNode) *WhereNode {
 // Create an http output node that caches the most recent data it has received.
 // The cached data is available at the given endpoint.
 // The endpoint is the relative path from the API endpoint of the running task.
-// For example if the task endpoint is at "/api/v1/task/<task_name>" and endpoint is
-// "top10", then the data can be requested from "/api/v1/task/<task_name>/top10".
+// For example if the task endpoint is at `/api/v1/task/<task_name>` and endpoint is
+// `top10`, then the data can be requested from `/api/v1/task/<task_name>/top10`.
 func (n *chainnode) HttpOut(endpoint string) *HTTPOutNode {
 	h := newHTTPOutNode(n.provides, endpoint)
 	n.linkChild(h)
@@ -369,8 +369,8 @@ func (n *chainnode) Flatten() *FlattenNode {
 }
 
 // Create an eval node that will evaluate the given transformation function to each data point.
-//  A list of expressions may be provided and will be evaluated in the order they are given
-// and results of previous expressions are made available to later expressions.
+// A list of expressions may be provided and will be evaluated in the order they are given.
+// The results are available to later expressions.
 func (n *chainnode) Eval(expressions ...*ast.LambdaNode) *EvalNode {
 	e := newEvalNode(n.provides, expressions)
 	n.linkChild(e)
