@@ -12,8 +12,8 @@ import (
 // An InfluxQLNode performs the available function from the InfluxQL language.
 // These function can be performed on a stream or batch edge.
 // The resulting edge is dependent on the function.
-// For a stream edge all points with the same time are accumulated into the function.
-// For a batch edge all points in the batch are accumulated into the function.
+// For a stream edge, all points with the same time are accumulated into the function.
+// For a batch edge, all points in the batch are accumulated into the function.
 //
 //
 // Example:
@@ -168,7 +168,7 @@ func (n *chainnode) Mode(field string) *InfluxQLNode {
 	return i
 }
 
-// Compute the difference between min and max points.
+// Compute the difference between `min` and `max` points.
 func (n *chainnode) Spread(field string) *InfluxQLNode {
 	i := newInfluxQLNode("spread", field, n.Provides(), StreamEdge, ReduceCreater{
 		CreateFloatBulkReducer: func() (FloatBulkPointAggregator, influxql.FloatPointEmitter) {

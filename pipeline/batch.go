@@ -156,17 +156,23 @@ func (n *QueryNode) ChainMethods() map[string]reflect.Value {
 // This property adds a `GROUP BY` clause to the query
 // so all the normal behaviors when quering InfluxDB with a `GROUP BY` apply.
 //
+// Use group by time when your period is longer than your group by time interval.
+//
 // Example:
 //    batch
 //        |query(...)
+//            .period(1m)
+//            .every(1m)
 //            .groupBy(time(10s), 'tag1', 'tag2'))
 //            .align()
 //
-// A group by time offset is also possible
+// A group by time offset is also possible.
 //
 // Example:
 //    batch
 //        |query(...)
+//            .period(1m)
+//            .every(1m)
 //            .groupBy(time(10s, -5s), 'tag1', 'tag2'))
 //            .align()
 //            .offset(5s)
