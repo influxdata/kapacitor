@@ -136,7 +136,7 @@ func (n *chainnode) Mean(field string) *InfluxQLNode {
 }
 
 // Compute the median of the data. Note, this method is not a selector,
-// if you want the median point use .percentile(field, 50.0).
+// if you want the median point use `.percentile(field, 50.0)`.
 func (n *chainnode) Median(field string) *InfluxQLNode {
 	i := newInfluxQLNode("median", field, n.Provides(), StreamEdge, ReduceCreater{
 		CreateFloatBulkReducer: func() (FloatBulkPointAggregator, influxql.FloatPointEmitter) {
