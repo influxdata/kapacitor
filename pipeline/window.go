@@ -45,7 +45,7 @@ func newWindowNode() *WindowNode {
 
 // If the `align` property is not used to modify the `window` node, then the
 // window alignment is assumed to start at the time of the first data point it receives. 
-// If `align` property is used to modify the `window` node, the window time edges 
+// If `align` property is set, the window time edges 
 // will be truncated to the `every` property (For example, if a data point's time 
 // is 12:06 and the `every` property is `5m` then the data point's window will range 
 // from 12:05 to 12:10).
