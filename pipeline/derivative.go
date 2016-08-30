@@ -7,8 +7,9 @@ import (
 // Compute the derivative of a stream or batch.
 // The derivative is computed on a single field
 // and behaves similarly to the InfluxQL derivative
-// function. Deriviative is not a MapReduce function
-// and as a result is not part of the normal influxql functions.
+// function. Kapacitor has its own implementation
+// of the derivative function, and, as a result, is
+// not part of the normal InfluxQL functions.
 //
 // Example:
 //     stream
