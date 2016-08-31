@@ -354,7 +354,7 @@ func (n *chainnode) Join(others ...Node) *JoinNode {
 	return j
 }
 
-// Combine this node with itself. The data is combine on timestamp.
+// Combine this node with itself. The data is combined on timestamp.
 func (n *chainnode) Combine(expressions ...*ast.LambdaNode) *CombineNode {
 	c := newCombineNode(n.provides, expressions)
 	n.linkChild(c)
