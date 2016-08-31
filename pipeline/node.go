@@ -13,11 +13,11 @@ import (
 type EdgeType int
 
 const (
-	// No data is transferred
+	// No data are transferred.
 	NoEdge EdgeType = iota
-	// Data is transferred immediately and one point at a time.
+	// Data are transferred immediately and one point at a time.
 	StreamEdge
-	// Data is transferred in batches as soon as it is ready.
+	// Data are transferred in batches as soon as the data are ready.
 	BatchEdge
 )
 
@@ -316,7 +316,7 @@ func (n *chainnode) Where(expression *ast.LambdaNode) *WhereNode {
 }
 
 // Create an HTTP output node that caches the most recent data it has received.
-// The cached data is available at the given endpoint.
+// The cached data are available at the given endpoint.
 // The endpoint is the relative path from the API endpoint of the running task.
 // For example, if the task endpoint is at `/kapacitor/v1/tasks/<task_id>` and endpoint is
 // `top10`, then the data can be requested from `/kapacitor/v1/tasks/<task_id>/top10`.
@@ -347,14 +347,14 @@ func (n *chainnode) Union(node ...Node) *UnionNode {
 	return u
 }
 
-// Join this node with other nodes. The data is joined on timestamp.
+// Join this node with other nodes. The data are joined on timestamp.
 func (n *chainnode) Join(others ...Node) *JoinNode {
 	others = append([]Node{n}, others...)
 	j := newJoinNode(n.provides, others)
 	return j
 }
 
-// Combine this node with itself. The data is combined on timestamp.
+// Combine this node with itself. The data are combined on timestamp.
 func (n *chainnode) Combine(expressions ...*ast.LambdaNode) *CombineNode {
 	c := newCombineNode(n.provides, expressions)
 	n.linkChild(c)
