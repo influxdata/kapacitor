@@ -1,4 +1,4 @@
-FROM 32bit/ubuntu:14.04
+FROM 32bit/ubuntu:16.04
 
 # This dockerfile capabable  of the the minumum required
 # to run the tests and nothing else.
