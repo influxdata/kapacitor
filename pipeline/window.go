@@ -22,8 +22,8 @@ import (
 //        |httpOut('recent')
 //
 // his example emits the last `10 minute` period  every `5 minutes` to the pipeline's `httpOut` node.
-// Because `every` is less than `period`, each time the window is emitted it contains `5 minutes` of 
-// new data and `5 minutes` of the previous period's data. 
+// Because `every` is less than `period`, each time the window is emitted it contains `5 minutes` of
+// new data and `5 minutes` of the previous period's data.
 //
 // NOTE: Because no `align` property is defined, the `window` edge is defined relative to the first data point.
 type WindowNode struct {
@@ -44,10 +44,10 @@ func newWindowNode() *WindowNode {
 }
 
 // If the `align` property is not used to modify the `window` node, then the
-// window alignment is assumed to start at the time of the first data point it receives. 
-// If `align` property is set, the window time edges 
-// will be truncated to the `every` property (For example, if a data point's time 
-// is 12:06 and the `every` property is `5m` then the data point's window will range 
+// window alignment is assumed to start at the time of the first data point it receives.
+// If `align` property is set, the window time edges
+// will be truncated to the `every` property (For example, if a data point's time
+// is 12:06 and the `every` property is `5m` then the data point's window will range
 // from 12:05 to 12:10).
 // tick:property
 func (w *WindowNode) Align() *WindowNode {
