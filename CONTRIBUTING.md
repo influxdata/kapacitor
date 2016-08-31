@@ -80,19 +80,19 @@ Getting the source
 ------
 Setup the project structure and fetch the repo like so:
 
-    mkdir $HOME/gocodez
-    export GOPATH=$HOME/gocodez
+    mkdir $HOME/go
+    export GOPATH=$HOME/go
     go get github.com/influxdata/kapacitor
 
-You can add the line `export GOPATH=$HOME/gocodez` to your bash/zsh file to be set for every shell instead of having to manually run it everytime.
+You can add the line `export GOPATH=$HOME/go` to your bash/zsh file to be set for every shell instead of having to manually run it everytime.
 
 Cloning a fork
 -------------
 If you wish to work with fork of Kapacitor, your own fork for example, you must still follow the directory structure above.
 But instead of cloning the main repo, instead clone your fork. Follow the steps below to work with a fork:
 
-    export GOPATH=$HOME/gocodez
-    mkdir -p $GOPATH/src/github.com/influxdb
+    export GOPATH=$HOME/go
+    mkdir -p $GOPATH/src/github.com/influxdata
     cd $GOPATH/src/github.com/influxdata
     git clone git@github.com:<username>/kapacitor
 
@@ -124,8 +124,7 @@ Build and Test
 Make sure you have Go installed and the project structure as shown above. To then build the project, execute the following commands:
 
 ```bash
-cd $GOPATH/src/github.com/influxdb/kapacitor
-go get ./...
+cd $GOPATH/src/github.com/influxdata/kapacitor
 go build ./cmd/kapacitor
 go build ./cmd/kapacitord
 ```
@@ -134,8 +133,7 @@ Kapacitor builds two binares is named `kapacitor`, and `kapacitord`.
 To run the tests, execute the following command:
 
 ```bash
-go get -t ./...
-go test ./...
+go test $(go list ./... | grep -v /vendor/)
 ```
 
 Dependencies
