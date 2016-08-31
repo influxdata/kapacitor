@@ -4,9 +4,15 @@ import (
 	"time"
 )
 
-// Windows data over time.
-// A window has a length defined by `period`
-// and a frequency at which it emits the window to the pipeline.
+// A `window` node caches data within a moving time range.
+// The `period` property of `window` defines the time range covered by `window`.
+//
+// The `every` property of `window` defines the frequency at which the window
+// is emitted to the next node in the pipeline.
+//
+//The `align` property of `window` defines how to align the window edges.
+//(By default, the edges are defined relative to the first data point the `window`
+//node receives.)
 //
 // Example:
 //    stream
@@ -15,13 +21,11 @@ import (
 //            .every(5m)
 //        |httpOut('recent')
 //
-// The above windowing example emits a window to the pipeline every `5 minutes`
-// and the window contains the last `10 minutes` worth of data.
-// As a result each time the window is emitted it contains half new data and half old data.
+// his example emits the last `10 minute` period  every `5 minutes` to the pipeline's `httpOut` node.
+// Because `every` is less than `period`, each time the window is emitted it contains `5 minutes` of 
+// new data and `5 minutes` of the previous period's data. 
 //
-// NOTE: Time for a window (or any node) is implemented by inspecting the times on the incoming data points.
-// As a result if the incoming data stream stops then no more windows will be emitted because time is no longer
-// increasing for the window node.
+// NOTE: Because no `align` property is defined, the `window` edge is defined relative to the first data point.
 type WindowNode struct {
 	chainnode
 	// The period, or length in time, of the window.
@@ -39,9 +43,12 @@ func newWindowNode() *WindowNode {
 	}
 }
 
-// Wether to align the window edges with the zero time.
-// If not aligned the window starts and ends relative to the
-// first data point it receives.
+// If the `align` property is not used to modify the `window` node, then the
+// window alignment is assumed to start at the time of the first data point it receives. 
+// If `align` property is set, the window time edges 
+// will be truncated to the `every` property (For example, if a data point's time 
+// is 12:06 and the `every` property is `5m` then the data point's window will range 
+// from 12:05 to 12:10).
 // tick:property
 func (w *WindowNode) Align() *WindowNode {
 	w.AlignFlag = true
