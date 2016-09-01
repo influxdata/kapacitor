@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.0.0-rc3 [unreleased]
+## v1.0.0-rc3 [2016-09-01]
 
 ### Release Notes
 
@@ -157,7 +157,7 @@ stream
 ### Features
 
 - [#662](https://github.com/influxdata/kapacitor/pull/662): Add `-skipVerify` flag to `kapacitor` CLI tool to skip SSL verification.
-- [#680](https://github.com/influxdata/kapacitor/pull/680): Add Telegram Alerting option
+- [#680](https://github.com/influxdata/kapacitor/pull/680): Add Telegram Alerting option, thanks @burdandrei!
 - [#46](https://github.com/influxdata/kapacitor/issues/46): Can now create combinations of points within the same stream.
   This is kind of like join but instead joining a stream with itself.
 - [#669](https://github.com/influxdata/kapacitor/pull/669): Add size function for humanize byte size. thanks @jsvisa!
