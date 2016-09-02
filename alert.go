@@ -7,6 +7,7 @@ import (
 	"fmt"
 	html "html/template"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -85,16 +86,32 @@ func (l *AlertLevel) UnmarshalText(text []byte) error {
 }
 
 type AlertData struct {
-	ID       string          `json:"id"`
-	Message  string          `json:"message"`
-	Details  string          `json:"details"`
-	Time     time.Time       `json:"time"`
-	Duration time.Duration   `json:"duration"`
-	Level    AlertLevel      `json:"level"`
-	Data     influxql.Result `json:"data"`
-
+	ID       string          `json:"-"`
+	Message  string          `json:"-"`
+	Details  string          `json:"-"`
+	Time     time.Time       `json:"Date"`
+	Duration time.Duration   `json:"-"`
+	Level    AlertLevel      `json:"-"`
+	Data     influxql.Result `json:"-"`
+	Host     string
+	Source   string
+	SourceInstance string
+	ObjectName string
+	InstanceName string
+	CounterName string
+	SampleValue string
+	KPI string
+	ThresholdOperator string
+	Average string
+	
 	// Info for custom templates
 	info detailsInfo
+}
+
+type Message struct {
+	tag   string
+	time  time.Time
+	record *AlertData
 }
 
 type AlertNode struct {
@@ -171,6 +188,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 	for _, post := range n.PostHandlers {
 		post := post
 		an.handlers = append(an.handlers, func(ad *AlertData) { an.handlePost(post, ad) })
+	}
+
+	for _, tcp := range n.TcpHandlers {
+		tcp := tcp
+		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleTcp(tcp, ad) })
 	}
 
 	for _, email := range n.EmailHandlers {
@@ -660,10 +682,20 @@ func (a *AlertNode) alertData(
 	if err != nil {
 		return nil, err
 	}
-	msg, details, info, err := a.renderMessageAndDetails(id, name, t, group, tags, fields, level)
+	msg, details, info, host, objName, err := a.renderMessageAndDetails(id, name, t, group, tags, fields, level)
 	if err != nil {
 		return nil, err
 	}
+
+	var cn string
+	var sv string
+	// f := fields.(map[string]interface{})
+	for fKey, fValue := range fields {
+		cn = fKey
+		sv = fmt.Sprintf("%v", fValue)
+		break
+	}
+	
 	ad := &AlertData{
 		ID:       id,
 		Message:  msg,
@@ -672,7 +704,17 @@ func (a *AlertNode) alertData(
 		Duration: d,
 		Level:    level,
 		Data:     a.batchToResult(b),
+		Host:     host,
 		info:     info,
+		Source:   "Influx",
+		SourceInstance: "Not Applicable",
+		ObjectName: objName,
+		InstanceName: details,
+		CounterName: cn,
+		SampleValue: sv,
+		KPI: "Not Applicable",
+		ThresholdOperator: "Not Applicable",
+		Average: "Not Applicable",
 	}
 	return ad, nil
 }
@@ -830,7 +872,7 @@ func (a *AlertNode) renderID(name string, group models.GroupID, tags models.Tags
 	return id.String(), nil
 }
 
-func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group models.GroupID, tags models.Tags, fields models.Fields, level AlertLevel) (string, string, detailsInfo, error) {
+func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group models.GroupID, tags models.Tags, fields models.Fields, level AlertLevel) (string, string, detailsInfo, string, string, error) {
 	g := string(group)
 	if group == models.NilGroup {
 		g = "nil"
@@ -858,7 +900,7 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group 
 
 	err := a.messageTmpl.Execute(tmpBuffer, minfo)
 	if err != nil {
-		return "", "", detailsInfo{}, err
+		return "", "", detailsInfo{}, "", "", err
 	}
 
 	msg := tmpBuffer.String()
@@ -871,11 +913,37 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group 
 	tmpBuffer.Reset()
 	err = a.detailsTmpl.Execute(tmpBuffer, dinfo)
 	if err != nil {
-		return "", "", dinfo, err
+		return "", "", dinfo, "", "", err
 	}
 
 	details := tmpBuffer.String()
-	return msg, details, dinfo, nil
+	// Reuse the buffer (again), for the host template
+	tmpBuffer.Reset()
+
+	hostTmpl, err := text.New("host").Parse("{{ index .Tags \"host\" }}")
+	if err != nil {
+		return "", "", dinfo, "", "", err
+	}
+
+	err = hostTmpl.Execute(tmpBuffer, minfo)
+	if err != nil {
+		return "", "", dinfo, "", "", err
+	}
+	host := tmpBuffer.String()
+
+	tmpBuffer.Reset()
+	objTmpl, err := text.New("objName").Parse("{{ .TaskName }}")
+	if err != nil {
+		return "", "", dinfo, host, "", err
+	}
+
+	err = objTmpl.Execute(tmpBuffer, minfo)
+	if err != nil {
+		return "", "", dinfo, host, "", err
+	}
+	
+	objName := tmpBuffer.String()
+	return msg, details, dinfo, host, objName, nil
 }
 
 //--------------------------------
@@ -907,6 +975,36 @@ func (a *AlertNode) handlePost(post *pipeline.PostHandler, ad *AlertData) {
 
 	// close http response otherwise tcp socket will be 'ESTABLISHED' in a long time
 	defer resp.Body.Close()
+	return
+}
+
+func (a *AlertNode) handleTcp(tcp *pipeline.TcpHandler, ad *AlertData) {
+	buf := a.bufPool.Get().(*bytes.Buffer)
+	defer func() {
+		buf.Reset()
+		a.bufPool.Put(buf)
+	}()
+
+	var l []interface{}
+	l = append(l, "azure.fwd.influxperf")
+	l = append(l, ad.Time.Unix())
+	l = append(l, ad)
+	err := json.NewEncoder(buf).Encode(l)
+	if err != nil {
+		a.logger.Println("E! failed to marshal alert data json", err)
+		return
+	}
+
+	conn, err := net.Dial("tcp", tcp.Address)
+	if err != nil {
+		a.logger.Println("E! failed to connect", err)
+		return
+	}
+	defer conn.Close()
+
+	buf.WriteByte('\n')
+	conn.Write(buf.Bytes())
+
 	return
 }
 

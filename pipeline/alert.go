@@ -37,6 +37,7 @@ const defaultLogFileMode = 0600
 //
 //    * log -- log alert data to file.
 //    * post -- HTTP POST data to a specified URL.
+//    * tcp -- Send data to a specified address via raw TCP.
 //    * email -- Send and email with alert data.
 //    * exec -- Execute a command passing alert data over STDIN.
 //    * HipChat -- Post alert message to HipChat room.
@@ -79,6 +80,7 @@ const defaultLogFileMode = 0600
 //           .crit(lambda: "value" > 30)
 //           .post("http://example.com/api/alert")
 //           .post("http://another.example.com/api/alert")
+//           .tcp("exampleendpoint.com:5678")
 //           .email('oncall@example.com')
 //
 //
@@ -283,6 +285,10 @@ type AlertNode struct {
 	// tick:ignore
 	PostHandlers []*PostHandler `tick:"Post"`
 
+	// Send the JSON alert data to the specified endpoint via TCP.
+	// tick:ignore
+	TcpHandlers []*TcpHandler `tick:"Tcp"`
+
 	// Email handlers
 	// tick:ignore
 	EmailHandlers []*EmailHandler `tick:"Email"`
@@ -462,6 +468,25 @@ type PostHandler struct {
 	// The POST URL.
 	// tick:ignore
 	URL string
+}
+
+// Send JSON alert data to a specified address over TCP.
+// tick:property
+func (a *AlertNode) Tcp(address string) *TcpHandler {
+	tcp := &TcpHandler{
+		AlertNode: a,
+		Address:   address,
+	}
+	a.TcpHandlers = append(a.TcpHandlers, tcp)
+	return tcp
+}
+
+// tick:embedded:AlertNode.Tcp
+type TcpHandler struct {
+	*AlertNode
+
+	// The endpoint address.
+	Address string
 }
 
 // Email the alert data.

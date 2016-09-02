@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.0.1 [unreleased]
+
+### Release Notes
+
+### Features
+
+- [#873](https://github.com/influxdata/kapacitor/pull/873): Add TCP alert handler
+
+### Bugfixes
+
 ## v1.0.0 [2016-09-02]
 
 ### Release Notes
