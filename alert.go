@@ -7,6 +7,7 @@ import (
 	"fmt"
 	html "html/template"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -171,6 +172,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 	for _, post := range n.PostHandlers {
 		post := post
 		an.handlers = append(an.handlers, func(ad *AlertData) { an.handlePost(post, ad) })
+	}
+
+	for _, tcp := range n.TcpHandlers {
+		tcp := tcp
+		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleTcp(tcp, ad) })
 	}
 
 	for _, email := range n.EmailHandlers {
@@ -907,6 +913,32 @@ func (a *AlertNode) handlePost(post *pipeline.PostHandler, ad *AlertData) {
 
 	// close http response otherwise tcp socket will be 'ESTABLISHED' in a long time
 	defer resp.Body.Close()
+	return
+}
+
+func (a *AlertNode) handleTcp(tcp *pipeline.TcpHandler, ad *AlertData) {
+	buf := a.bufPool.Get().(*bytes.Buffer)
+	defer func() {
+		buf.Reset()
+		a.bufPool.Put(buf)
+	}()
+
+	err := json.NewEncoder(buf).Encode(ad)
+	if err != nil {
+		a.logger.Println("E! failed to marshal alert data json", err)
+		return
+	}
+
+	conn, err := net.Dial("tcp", tcp.Address)
+	if err != nil {
+		a.logger.Println("E! failed to connect", err)
+		return
+	}
+	defer conn.Close()
+
+	buf.WriteByte("\n")
+	conn.Write(buf.Bytes())
+
 	return
 }
 
