@@ -93,6 +93,10 @@ type AlertData struct {
 	Duration time.Duration   `json:"duration"`
 	Level    AlertLevel      `json:"level"`
 	Data     influxql.Result `json:"data"`
+	Source   string
+	Host     string
+	SampleValue influxql.Result
+	CounterName string
 
 	// Info for custom templates
 	info detailsInfo
@@ -666,10 +670,11 @@ func (a *AlertNode) alertData(
 	if err != nil {
 		return nil, err
 	}
-	msg, details, info, err := a.renderMessageAndDetails(id, name, t, group, tags, fields, level)
+	msg, details, info, host, err := a.renderMessageAndDetails(id, name, t, group, tags, fields, level)
 	if err != nil {
 		return nil, err
 	}
+	
 	ad := &AlertData{
 		ID:       id,
 		Message:  msg,
@@ -678,6 +683,10 @@ func (a *AlertNode) alertData(
 		Duration: d,
 		Level:    level,
 		Data:     a.batchToResult(b),
+		Source:   "Kapacitor",
+		Host:     host,
+		CounterName: name,
+		SampleValue:     a.batchToResult(b),
 		info:     info,
 	}
 	return ad, nil
@@ -836,7 +845,7 @@ func (a *AlertNode) renderID(name string, group models.GroupID, tags models.Tags
 	return id.String(), nil
 }
 
-func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group models.GroupID, tags models.Tags, fields models.Fields, level AlertLevel) (string, string, detailsInfo, error) {
+func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group models.GroupID, tags models.Tags, fields models.Fields, level AlertLevel) (string, string, detailsInfo, string, error) {
 	g := string(group)
 	if group == models.NilGroup {
 		g = "nil"
@@ -864,7 +873,7 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group 
 
 	err := a.messageTmpl.Execute(tmpBuffer, minfo)
 	if err != nil {
-		return "", "", detailsInfo{}, err
+		return "", "", detailsInfo{}, "", err
 	}
 
 	msg := tmpBuffer.String()
@@ -877,11 +886,25 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group 
 	tmpBuffer.Reset()
 	err = a.detailsTmpl.Execute(tmpBuffer, dinfo)
 	if err != nil {
-		return "", "", dinfo, err
+		return "", "", dinfo, "", err
 	}
 
 	details := tmpBuffer.String()
-	return msg, details, dinfo, nil
+	// Reuse the buffer (again), for the host template
+	tmpBuffer.Reset()
+
+  hostTmpl, err := text.New("host").Parse("{{ index .Tags \"host\" }}")
+	if err != nil {
+		return "", "", dinfo, "", err
+	}
+
+	err = hostTmpl.Execute(tmpBuffer, minfo)
+	if err != nil {
+		return "", "", dinfo, "", err
+	}
+
+	host := tmpBuffer.String()
+	return msg, details, dinfo, host, nil
 }
 
 //--------------------------------
