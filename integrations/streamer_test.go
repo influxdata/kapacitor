@@ -4536,6 +4536,7 @@ stream
 		.idField('id')
 		.idTag('id')
 		.levelField('level')
+		.messageField('msg')
 		.levelTag('level')
 		.info(lambda: "count" > infoThreshold)
 		.warn(lambda: "count" > warnThreshold)
@@ -4549,12 +4550,13 @@ stream
 			{
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA", "level": "CRITICAL", "id": "kapacitor/cpu/serverA"},
-				Columns: []string{"time", "count", "id", "level"},
+				Columns: []string{"time", "count", "id", "level", "msg"},
 				Values: [][]interface{}{[]interface{}{
 					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 					10.0,
 					"kapacitor/cpu/serverA",
 					"CRITICAL",
+					"kapacitor/cpu/serverA is CRITICAL",
 				}},
 			},
 		},

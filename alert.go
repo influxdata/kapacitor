@@ -450,10 +450,13 @@ func (a *AlertNode) runAlert([]byte) error {
 						p.Tags[a.a.IdTag] = ad.ID
 					}
 				}
-				if a.a.LevelField != "" || a.a.IdField != "" || a.a.DurationField != "" {
+				if a.a.LevelField != "" || a.a.IdField != "" || a.a.DurationField != "" || a.a.MessageField != "" {
 					p.Fields = p.Fields.Copy()
 					if a.a.LevelField != "" {
 						p.Fields[a.a.LevelField] = l.String()
+					}
+					if a.a.MessageField != "" {
+						p.Fields[a.a.MessageField] = ad.Message
 					}
 					if a.a.IdField != "" {
 						p.Fields[a.a.IdField] = ad.ID
@@ -541,7 +544,8 @@ func (a *AlertNode) runAlert([]byte) error {
 					a.a.LevelField != "" ||
 					a.a.IdTag != "" ||
 					a.a.IdField != "" ||
-					a.a.DurationField != "" {
+					a.a.DurationField != "" ||
+					a.a.MessageField != "" {
 					for i := range b.Points {
 						if a.a.LevelTag != "" || a.a.IdTag != "" {
 							b.Points[i].Tags = b.Points[i].Tags.Copy()
@@ -552,10 +556,13 @@ func (a *AlertNode) runAlert([]byte) error {
 								b.Points[i].Tags[a.a.IdTag] = ad.ID
 							}
 						}
-						if a.a.LevelField != "" || a.a.IdField != "" || a.a.DurationField != "" {
+						if a.a.LevelField != "" || a.a.IdField != "" || a.a.DurationField != "" || a.a.MessageField != "" {
 							b.Points[i].Fields = b.Points[i].Fields.Copy()
 							if a.a.LevelField != "" {
 								b.Points[i].Fields[a.a.LevelField] = l.String()
+							}
+							if a.a.MessageField != "" {
+								b.Points[i].Fields[a.a.MessageField] = ad.Message
 							}
 							if a.a.IdField != "" {
 								b.Points[i].Fields[a.a.IdField] = ad.ID

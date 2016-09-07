@@ -256,6 +256,9 @@ type AlertNode struct {
 	// Optional field key to add to the data, containing the alert level as a string.
 	LevelField string
 
+	// Optional field key to add to the data, containing the alert message.
+	MessageField string
+
 	// Optional field key to add the alert duration to the data.
 	// The duration is always in units of nanoseconds.
 	DurationField string
