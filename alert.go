@@ -95,7 +95,7 @@ type AlertData struct {
 	Data        influxql.Result `json:"data"`
 	Source      string
 	Host        string
-	SampleValue influxql.Result
+	SampleValue string
 	CounterName string
 
 	// Info for custom templates
