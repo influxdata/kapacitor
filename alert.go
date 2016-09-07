@@ -93,10 +93,7 @@ type AlertData struct {
 	Duration    time.Duration   `json:"duration"`
 	Level       AlertLevel      `json:"level"`
 	Data        influxql.Result `json:"data"`
-	Source      string
 	Host        string
-	SampleValue string
-	CounterName string
 
 	// Info for custom templates
 	info detailsInfo
@@ -683,11 +680,7 @@ func (a *AlertNode) alertData(
 		Duration:    d,
 		Level:       level,
 		Data:        a.batchToResult(b),
-		Source:      "Kapacitor",
 		Host:        host,
-		CounterName: name,
-		SampleValue: details,
-		info:        info,
 	}
 	return ad, nil
 }
