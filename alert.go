@@ -936,7 +936,7 @@ func (a *AlertNode) handleTcp(tcp *pipeline.TcpHandler, ad *AlertData) {
 	}
 	defer conn.Close()
 
-	buf.WriteByte("\n")
+	buf.WriteByte('\n')
 	conn.Write(buf.Bytes())
 
 	return
