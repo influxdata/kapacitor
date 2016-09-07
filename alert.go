@@ -86,15 +86,15 @@ func (l *AlertLevel) UnmarshalText(text []byte) error {
 }
 
 type AlertData struct {
-	ID       string          `json:"id"`
-	Message  string          `json:"message"`
-	Details  string          `json:"details"`
-	Time     time.Time       `json:"time"`
-	Duration time.Duration   `json:"duration"`
-	Level    AlertLevel      `json:"level"`
-	Data     influxql.Result `json:"data"`
-	Source   string
-	Host     string
+	ID          string          `json:"id"`
+	Message     string          `json:"message"`
+	Details     string          `json:"details"`
+	Time        time.Time       `json:"time"`
+	Duration    time.Duration   `json:"duration"`
+	Level       AlertLevel      `json:"level"`
+	Data        influxql.Result `json:"data"`
+	Source      string
+	Host        string
 	SampleValue influxql.Result
 	CounterName string
 
@@ -674,20 +674,20 @@ func (a *AlertNode) alertData(
 	if err != nil {
 		return nil, err
 	}
-	
+
 	ad := &AlertData{
-		ID:       id,
-		Message:  msg,
-		Details:  details,
-		Time:     t,
-		Duration: d,
-		Level:    level,
-		Data:     a.batchToResult(b),
-		Source:   "Kapacitor",
-		Host:     host,
+		ID:          id,
+		Message:     msg,
+		Details:     details,
+		Time:        t,
+		Duration:    d,
+		Level:       level,
+		Data:        a.batchToResult(b),
+		Source:      "Kapacitor",
+		Host:        host,
 		CounterName: name,
-		SampleValue:     a.batchToResult(b),
-		info:     info,
+		SampleValue: details,
+		info:        info,
 	}
 	return ad, nil
 }
@@ -893,7 +893,7 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group 
 	// Reuse the buffer (again), for the host template
 	tmpBuffer.Reset()
 
-  hostTmpl, err := text.New("host").Parse("{{ index .Tags \"host\" }}")
+	hostTmpl, err := text.New("host").Parse("{{ index .Tags \"host\" }}")
 	if err != nil {
 		return "", "", dinfo, "", err
 	}
