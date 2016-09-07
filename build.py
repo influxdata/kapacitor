@@ -285,13 +285,13 @@ def run(command, allow_failure=False, shell=False, printOutput=False):
         out, _ = p.communicate()
         if out is not None:
             out = out.decode('utf-8').strip()
-    except subprocess.CalledProcessError as e:
-        if allow_failure:
-            logging.warn("Command '{}' failed with error: {}".format(command, e.output))
-            return None
-        else:
-            logging.error("Command '{}' failed with error: {}".format(command, e.output))
-            sys.exit(1)
+        if p.returncode != 0:
+            if allow_failure:
+                logging.warn("Command '{}' failed with error: {}".format(command, out))
+                return None
+            else:
+                logging.error("Command '{}' failed with error: {}".format(command, out))
+                sys.exit(1)
     except OSError as e:
         if allow_failure:
             logging.warn("Command '{}' failed with error: {}".format(command, e))
