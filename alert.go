@@ -86,14 +86,14 @@ func (l *AlertLevel) UnmarshalText(text []byte) error {
 }
 
 type AlertData struct {
-	ID          string          `json:"id"`
-	Message     string          `json:"message"`
-	Details     string          `json:"details"`
-	Time        time.Time       `json:"time"`
-	Duration    time.Duration   `json:"duration"`
-	Level       AlertLevel      `json:"level"`
-	Data        influxql.Result `json:"data"`
-	Host        string
+	ID       string          `json:"id"`
+	Message  string          `json:"message"`
+	Details  string          `json:"details"`
+	Time     time.Time       `json:"time"`
+	Duration time.Duration   `json:"duration"`
+	Level    AlertLevel      `json:"level"`
+	Data     influxql.Result `json:"data"`
+	Host     string
 
 	// Info for custom templates
 	info detailsInfo
@@ -673,14 +673,15 @@ func (a *AlertNode) alertData(
 	}
 
 	ad := &AlertData{
-		ID:          id,
-		Message:     msg,
-		Details:     details,
-		Time:        t,
-		Duration:    d,
-		Level:       level,
-		Data:        a.batchToResult(b),
-		Host:        host,
+		ID:       id,
+		Message:  msg,
+		Details:  details,
+		Time:     t,
+		Duration: d,
+		Level:    level,
+		Data:     a.batchToResult(b),
+		Host:     host,
+		info:     info,
 	}
 	return ad, nil
 }
@@ -952,7 +953,7 @@ func (a *AlertNode) handleTcp(tcp *pipeline.TcpHandler, ad *AlertData) {
 	}
 	defer conn.Close()
 
-	buf.WriteByte("\n")
+	buf.WriteByte('\n')
 	conn.Write(buf.Bytes())
 
 	return
