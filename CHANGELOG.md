@@ -7,6 +7,7 @@
 ### Features
 
 - [#873](https://github.com/influxdata/kapacitor/pull/873): Add TCP alert handler
+- [#869](https://github.com/influxdata/kapacitor/issues/869): Add ability to set alert message as a field
 
 ### Bugfixes
 
