@@ -6945,6 +6945,125 @@ stream
 		}
 	}
 }
+func TestStream_InfluxDBOut_CreateDatabase(t *testing.T) {
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'nonexistant')
+	|influxDBOut()
+		.create()
+		.database('db')
+`
+
+	done := make(chan error, 1)
+	var createQuery string
+
+	influxdb := NewMockInfluxDBService(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/ping" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		createQuery = r.URL.Query().Get("q")
+		done <- nil
+	}))
+
+	name := "TestStream_InfluxDBOut"
+
+	// Create a new execution env
+	tm := kapacitor.NewTaskMaster("testStreamer", logService)
+	tm.HTTPDService = httpService
+	tm.TaskStore = taskStore{}
+	tm.DeadmanService = deadman{}
+	tm.InfluxDBService = influxdb
+	tm.Open()
+
+	//Create the task
+	task, err := tm.NewTask(name, script, kapacitor.StreamTask, dbrps, 0, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	//Start the task
+	et, err := tm.StartTask(task)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log(string(et.Task.Dot()))
+	defer tm.Close()
+
+	// Wait till we received a request
+	if e := <-done; e != nil {
+		t.Error(e)
+	}
+
+	expCreateQuery := `CREATE DATABASE db`
+	if createQuery != expCreateQuery {
+		t.Errorf("unexpected create database query: got %q exp: %q", createQuery, expCreateQuery)
+	}
+}
+func TestStream_InfluxDBOut_CreateDatabaseAndRP(t *testing.T) {
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'nonexistant')
+	|influxDBOut()
+		.create()
+		.database('db')
+		.retentionPolicy('rp')
+`
+
+	done := make(chan error, 1)
+	var createQuery string
+
+	influxdb := NewMockInfluxDBService(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/ping" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		createQuery = r.URL.Query().Get("q")
+		done <- nil
+	}))
+
+	name := "TestStream_InfluxDBOut"
+
+	// Create a new execution env
+	tm := kapacitor.NewTaskMaster("testStreamer", logService)
+	tm.HTTPDService = httpService
+	tm.TaskStore = taskStore{}
+	tm.DeadmanService = deadman{}
+	tm.InfluxDBService = influxdb
+	tm.Open()
+
+	//Create the task
+	task, err := tm.NewTask(name, script, kapacitor.StreamTask, dbrps, 0, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	//Start the task
+	et, err := tm.StartTask(task)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log(string(et.Task.Dot()))
+	defer tm.Close()
+
+	// Wait till we received a request
+	if e := <-done; e != nil {
+		t.Error(e)
+	}
+
+	expCreateQuery := `CREATE DATABASE db WITH NAME rp`
+	if createQuery != expCreateQuery {
+		t.Errorf("unexpected create database query: got %q exp: %q", createQuery, expCreateQuery)
+	}
+}
 
 func TestStream_Selectors(t *testing.T) {
 

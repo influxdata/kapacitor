@@ -47,8 +47,11 @@ type InfluxDBOutNode struct {
 	// Default: 10s
 	FlushInterval time.Duration
 	// Static set of tags to add to all data points before writing them.
-	//tick:ignore
+	// tick:ignore
 	Tags map[string]string `tick:"Tag"`
+	// Create the specified database and retention policy
+	// tick:ignore
+	CreateFlag bool `tick:"Create"`
 }
 
 func newInfluxDBOutNode(wants EdgeType) *InfluxDBOutNode {
@@ -70,5 +73,19 @@ func newInfluxDBOutNode(wants EdgeType) *InfluxDBOutNode {
 // tick:property
 func (i *InfluxDBOutNode) Tag(key, value string) *InfluxDBOutNode {
 	i.Tags[key] = value
+	return i
+}
+
+// Create indicates that both the database and retention policy
+// will be created, when the task is started.
+// If the retention policy name is empty than no
+// retention policy will be specified and
+// the default retention policy name will be created.
+//
+// If the database already exists nothing happens.
+//
+// tick:property
+func (i *InfluxDBOutNode) Create() *InfluxDBOutNode {
+	i.CreateFlag = true
 	return i
 }

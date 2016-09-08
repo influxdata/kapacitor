@@ -1,11 +1,13 @@
 package kapacitor
 
 import (
+	"bytes"
 	"errors"
 	"log"
 	"sync"
 	"time"
 
+	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/models"
@@ -50,6 +52,34 @@ func (i *InfluxDBOutNode) runOut([]byte) error {
 
 	// Start the write buffer
 	i.wb.start()
+
+	// Create the database and retention policy
+	if i.i.CreateFlag {
+		var err error
+		var conn influxdb.Client
+		if i.i.Cluster != "" {
+			conn, err = i.et.tm.InfluxDBService.NewNamedClient(i.i.Cluster)
+		} else {
+			conn, err = i.et.tm.InfluxDBService.NewDefaultClient()
+		}
+		if err != nil {
+			i.logger.Printf("E! failed to connect to InfluxDB cluster %q to create database", i.i.Cluster)
+		} else {
+			var createDb bytes.Buffer
+			createDb.WriteString("CREATE DATABASE ")
+			createDb.WriteString(influxql.QuoteIdent(i.i.Database))
+			if i.i.RetentionPolicy != "" {
+				createDb.WriteString(" WITH NAME ")
+				createDb.WriteString(influxql.QuoteIdent(i.i.RetentionPolicy))
+			}
+			resp, err := conn.Query(influxdb.Query{Command: createDb.String()})
+			if err != nil {
+				i.logger.Printf("E! failed to create database %q on cluster %q: %v", i.i.Database, i.i.Cluster, err)
+			} else if resp.Err != "" {
+				i.logger.Printf("E! failed to create database %q on cluster %q: %s", i.i.Database, i.i.Cluster, resp.Err)
+			}
+		}
+	}
 
 	switch i.Wants() {
 	case pipeline.StreamEdge:
