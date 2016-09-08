@@ -89,7 +89,7 @@ type AlertData struct {
 	ID       string          `json:"id"`
 	Message  string          `json:"message"`
 	Details  string          `json:"details"`
-	Time     time.Time       `json:"time"`
+	Time     time.Time       `json:"-"`
 	Duration time.Duration   `json:"duration"`
 	Level    AlertLevel      `json:"level"`
 	Data     influxql.Result `json:"data"`
@@ -97,6 +97,12 @@ type AlertData struct {
 
 	// Info for custom templates
 	info detailsInfo
+}
+
+type Message struct {
+	tag   string
+	time  time.Time
+	record *AlertData
 }
 
 type AlertNode struct {
@@ -940,7 +946,11 @@ func (a *AlertNode) handleTcp(tcp *pipeline.TcpHandler, ad *AlertData) {
 		a.bufPool.Put(buf)
 	}()
 
-	err := json.NewEncoder(buf).Encode(ad)
+	var l []interface{}
+	l = append(l, "azure.fwd.influxperf")
+	l = append(l, ad.Time.Unix())
+	l = append(l, ad)
+	err := json.NewEncoder(buf).Encode(l)
 	if err != nil {
 		a.logger.Println("E! failed to marshal alert data json", err)
 		return
