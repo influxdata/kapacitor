@@ -78,6 +78,7 @@ func (i *InfluxDBOutNode) runOut([]byte) error {
 			} else if resp.Err != "" {
 				i.logger.Printf("E! failed to create database %q on cluster %q: %s", i.i.Database, i.i.Cluster, resp.Err)
 			}
+			conn.Close()
 		}
 	}
 
