@@ -8,6 +8,8 @@
 
 - [#873](https://github.com/influxdata/kapacitor/pull/873): Add TCP alert handler
 - [#869](https://github.com/influxdata/kapacitor/issues/869): Add ability to set alert message as a field
+- [#854](https://github.com/influxdata/kapacitor/issues/854): Add `.create` property to InfluxDBOut node, which when set will create the database
+    and retention policy on task start.
 
 ### Bugfixes
 
