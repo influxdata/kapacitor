@@ -31,6 +31,7 @@ import (
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/udp"
+	"github.com/influxdata/kapacitor/services/vars"
 	"github.com/influxdata/kapacitor/services/victorops"
 
 	"github.com/influxdata/influxdb/services/collectd"
@@ -65,6 +66,7 @@ type Config struct {
 	UDF       udf.Config        `toml:"udf"`
 	Deadman   deadman.Config    `toml:"deadman"`
 	Talk      talk.Config       `toml:"talk"`
+	Vars      vars.Config       `toml:"vars"`
 
 	Hostname string `toml:"hostname"`
 	DataDir  string `toml:"data_dir"`
@@ -101,6 +103,7 @@ func NewConfig() *Config {
 	c.UDF = udf.NewConfig()
 	c.Deadman = deadman.NewConfig()
 	c.Talk = talk.NewConfig()
+	c.Vars = vars.NewConfig()
 
 	return c
 }
@@ -225,10 +228,10 @@ func (c *Config) Validate() error {
 }
 
 func (c *Config) ApplyEnvOverrides() error {
-	return c.applyEnvOverrides("KAPACITOR", "", reflect.ValueOf(c))
+	return applyEnvOverrides("KAPACITOR", "", reflect.ValueOf(c))
 }
 
-func (c *Config) applyEnvOverrides(prefix string, fieldDesc string, spec reflect.Value) error {
+func applyEnvOverrides(prefix string, fieldDesc string, spec reflect.Value) error {
 	// If we have a pointer, dereference it
 	s := spec
 	if spec.Kind() == reflect.Ptr {
@@ -237,7 +240,7 @@ func (c *Config) applyEnvOverrides(prefix string, fieldDesc string, spec reflect
 
 	var value string
 
-	if s.Kind() != reflect.Struct {
+	if k := s.Kind(); k != reflect.Struct && k != reflect.Map {
 		value = os.Getenv(prefix)
 		// Skip any fields we don't have a value to set
 		if value == "" {
@@ -287,12 +290,14 @@ func (c *Config) applyEnvOverrides(prefix string, fieldDesc string, spec reflect
 		}
 		s.SetFloat(floatValue)
 	case reflect.Struct:
-		c.applyEnvOverridesToStruct(prefix, s)
+		applyEnvOverridesToStruct(prefix, s)
+	case reflect.Map:
+		applyEnvOverridesToMap(prefix, s)
 	}
 	return nil
 }
 
-func (c *Config) applyEnvOverridesToStruct(prefix string, s reflect.Value) error {
+func applyEnvOverridesToStruct(prefix string, s reflect.Value) error {
 	typeOfSpec := s.Type()
 	for i := 0; i < s.NumField(); i++ {
 		f := s.Field(i)
@@ -315,12 +320,42 @@ func (c *Config) applyEnvOverridesToStruct(prefix string, s reflect.Value) error
 			// e.g. GRAPHITE_0
 			if f.Kind() == reflect.Slice || f.Kind() == reflect.Array {
 				for i := 0; i < f.Len(); i++ {
-					if err := c.applyEnvOverrides(fmt.Sprintf("%s_%d", key, i), fieldName, f.Index(i)); err != nil {
+					if err := applyEnvOverrides(fmt.Sprintf("%s_%d", key, i), fieldName, f.Index(i)); err != nil {
 						return err
 					}
 				}
-			} else if err := c.applyEnvOverrides(key, fieldName, f); err != nil {
+			} else if err := applyEnvOverrides(key, fieldName, f); err != nil {
 				return err
+			}
+		}
+	}
+	return nil
+}
+
+func applyEnvOverridesToMap(prefix string, s reflect.Value) error {
+	typeOfMap := s.Type()
+	// Must be a non nil map[string]string or we can't do anything.
+	if s.IsNil() {
+		return errors.New("cannot apply env to nil map")
+	}
+	if typeOfMap.Key().Kind() != reflect.String ||
+		typeOfMap.Elem().Kind() != reflect.String {
+		return errors.New("map is not a map[string]string")
+	}
+	// Update prefix to expect underscore separator
+	prefix += "_"
+	// Get all env vars
+	env := os.Environ()
+	for _, v := range env {
+		parts := strings.SplitN(v, "=", 2)
+		if l := len(parts); l > 0 {
+			key := parts[0]
+			var value string
+			if l == 2 {
+				value = parts[1]
+			}
+			if strings.HasPrefix(key, prefix) {
+				s.SetMapIndex(reflect.ValueOf(strings.TrimPrefix(key, prefix)), reflect.ValueOf(value))
 			}
 		}
 	}

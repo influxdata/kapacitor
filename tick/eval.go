@@ -392,9 +392,16 @@ func evalDeclaration(node *ast.DeclarationNode, scope *stateful.Scope, stck *sta
 		return fmt.Errorf("attempted to redefine %s, vars are immutable", name)
 	}
 	value := stck.Pop()
-	if i, ok := value.(*ast.IdentifierNode); ok {
+	switch n := value.(type) {
+	case *ast.IdentifierNode:
 		// Resolve identifier
-		v, err := scope.Get(i.Ident)
+		v, err := scope.Get(n.Ident)
+		if err != nil {
+			return err
+		}
+		value = v
+	case unboundFunc:
+		v, err := n(nil)
 		if err != nil {
 			return err
 		}

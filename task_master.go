@@ -114,6 +114,10 @@ type TaskMaster struct {
 	TimingService interface {
 		NewTimer(timer.Setter) timer.Timer
 	}
+	VarsService interface {
+		Get(string) string
+	}
+
 	LogService LogService
 
 	// Incoming streams
@@ -187,6 +191,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.TalkService = tm.TalkService
 	n.TimingService = tm.TimingService
 	n.TelegramService = tm.TelegramService
+	n.VarsService = tm.VarsService
 	return n
 }
 
@@ -318,6 +323,7 @@ func (tm *TaskMaster) waitForForks() {
 func (tm *TaskMaster) CreateTICKScope() *stateful.Scope {
 	scope := stateful.NewScope()
 	scope.Set("time", groupByTime)
+	scope.Set("configVar", tm.VarsService.Get)
 	// Add dynamic methods to the scope for UDFs
 	if tm.UDFService != nil {
 		for _, f := range tm.UDFService.List() {
