@@ -41,6 +41,8 @@ type Config struct {
 	SubscriptionProtocol     string              `toml:"subscription-protocol"`
 	Subscriptions            map[string][]string `toml:"subscriptions"`
 	ExcludedSubscriptions    map[string][]string `toml:"excluded-subscriptions"`
+	KapacitorHostname        string              `toml:"kapacitor-hostname"`
+	HTTPPort                 int                 `toml:"http-port"`
 	UDPBind                  string              `toml:"udp-bind"`
 	UDPBuffer                int                 `toml:"udp-buffer"`
 	UDPReadBuffer            int                 `toml:"udp-read-buffer"`
