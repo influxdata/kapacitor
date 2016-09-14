@@ -547,7 +547,7 @@ func TestServer_TaskNums(t *testing.T) {
 `
 
 	// Create a bunch of tasks with every 3rd task enabled
-	count := 1000
+	count := 100
 	enabled := 0
 	tasks := make([]client.Task, count)
 	for i := 0; i < count; i++ {
