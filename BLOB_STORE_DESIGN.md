@@ -33,7 +33,7 @@ However you use the blob store within your UDF is up to you.
 
 ## Design
 
-The blob store will use content addressable IDs an be exposed via the HTTP API of Kapacitor.
+The blob store will use content addressable IDs(i.e. shasum of the content) and be exposed via the HTTP API of Kapacitor.
 
 Blobs can be created, named and deleted.
 Creating a blob will accept only the content of the blob data and return the ID of the blob.
