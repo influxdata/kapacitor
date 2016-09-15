@@ -175,10 +175,12 @@ func TestExpression_EvalDuration(t *testing.T) {
 		// Left is time.Duration(5), Right is time.Duration(5)
 		keyStruct{time.Duration(5), time.Duration(5), ast.TokenPlus}:  time.Duration(10),
 		keyStruct{time.Duration(5), time.Duration(5), ast.TokenMinus}: time.Duration(0),
+		keyStruct{time.Duration(5), time.Duration(5), ast.TokenDiv}:   int64(1),
 
 		// Left is time.Duration(5), Right is time.Duration(10)
 		keyStruct{time.Duration(5), time.Duration(10), ast.TokenPlus}:  time.Duration(15),
 		keyStruct{time.Duration(5), time.Duration(10), ast.TokenMinus}: time.Duration(-5),
+		keyStruct{time.Duration(5), time.Duration(10), ast.TokenDiv}:   int64(0),
 
 		// Left is time.Duration(5), Right is int64(2)
 		keyStruct{time.Duration(5), int64(2), ast.TokenMult}: time.Duration(10),
@@ -191,10 +193,12 @@ func TestExpression_EvalDuration(t *testing.T) {
 		// Left is time.Duration(10), Right is time.Duration(5)
 		keyStruct{time.Duration(10), time.Duration(5), ast.TokenPlus}:  time.Duration(15),
 		keyStruct{time.Duration(10), time.Duration(5), ast.TokenMinus}: time.Duration(5),
+		keyStruct{time.Duration(10), time.Duration(5), ast.TokenDiv}:   int64(2),
 
 		// Left is time.Duration(10), Right is time.Duration(10)
 		keyStruct{time.Duration(10), time.Duration(10), ast.TokenPlus}:  time.Duration(20),
 		keyStruct{time.Duration(10), time.Duration(10), ast.TokenMinus}: time.Duration(0),
+		keyStruct{time.Duration(10), time.Duration(10), ast.TokenDiv}:   int64(1),
 
 		// Left is time.Duration(10), Right is int64(2)
 		keyStruct{time.Duration(10), int64(2), ast.TokenMult}: time.Duration(20),
@@ -235,13 +239,9 @@ func TestExpression_EvalDuration(t *testing.T) {
 
 		// Muiltiply Divide durations
 		keyStruct{time.Duration(5), time.Duration(5), ast.TokenMult}:   errors.New("mismatched type to binary operator. got duration * duration. see bool(), int(), float(), string(), duration()"),
-		keyStruct{time.Duration(5), time.Duration(5), ast.TokenDiv}:    errors.New("mismatched type to binary operator. got duration / duration. see bool(), int(), float(), string(), duration()"),
 		keyStruct{time.Duration(5), time.Duration(10), ast.TokenMult}:  errors.New("mismatched type to binary operator. got duration * duration. see bool(), int(), float(), string(), duration()"),
-		keyStruct{time.Duration(5), time.Duration(10), ast.TokenDiv}:   errors.New("mismatched type to binary operator. got duration / duration. see bool(), int(), float(), string(), duration()"),
 		keyStruct{time.Duration(10), time.Duration(10), ast.TokenMult}: errors.New("mismatched type to binary operator. got duration * duration. see bool(), int(), float(), string(), duration()"),
-		keyStruct{time.Duration(10), time.Duration(10), ast.TokenDiv}:  errors.New("mismatched type to binary operator. got duration / duration. see bool(), int(), float(), string(), duration()"),
 		keyStruct{time.Duration(10), time.Duration(5), ast.TokenMult}:  errors.New("mismatched type to binary operator. got duration * duration. see bool(), int(), float(), string(), duration()"),
-		keyStruct{time.Duration(10), time.Duration(5), ast.TokenDiv}:   errors.New("mismatched type to binary operator. got duration / duration. see bool(), int(), float(), string(), duration()"),
 
 		// Add/Subtract duration with int/float
 		keyStruct{time.Duration(5), int64(2), ast.TokenPlus}:       errors.New("mismatched type to binary operator. got duration + int. see bool(), int(), float(), string(), duration()"),
@@ -1502,6 +1502,9 @@ func runCompiledEvalTests(
 				errorExpected, isErrorOk := errorExpectations[key]
 				if !isExpectedResultOk && !isErrorOk {
 					t.Fatalf("Couldn't find an expected result/error for: lhs: %v, rhs: %v, op: %v", lhs, rhs, op)
+				}
+				if isExpectedResultOk && isErrorOk {
+					t.Fatalf("Found both an expected result and an expected error for: lhs: %v, rhs: %v, op: %v", lhs, rhs, op)
 				}
 
 				// Test simple const values compares
