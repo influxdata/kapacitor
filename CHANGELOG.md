@@ -16,6 +16,7 @@
 
 - [#889](https://github.com/influxdata/kapacitor/issues/889): Some typo in the default config file
 - [#914](https://github.com/influxdata/kapacitor/pull/914): Change |log() output to be in JSON format so its self documenting structure.
+- [#915](https://github.com/influxdata/kapacitor/pull/915): Fix issue with TMax and the Holt-Winters method.
 
 ## v1.0.0 [2016-09-02]
 
