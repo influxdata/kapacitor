@@ -204,11 +204,10 @@ func replayBatchFromChan(clck clock.Clock, batches <-chan models.Batch, collecto
 			lastTime = b.Points[len(b.Points)-1].Time.Add(diff).UTC()
 		}
 		clck.Until(lastTime)
-		if b.TMax.IsZero() {
-			b.TMax = b.Points[len(b.Points)-1].Time
-		} else {
-			b.TMax = b.TMax.UTC()
+		if lpt := b.Points[len(b.Points)-1].Time; b.TMax.Before(lpt) {
+			b.TMax = lpt
 		}
+		b.TMax = b.TMax.UTC()
 		tmax = b.TMax
 		collector.CollectBatch(b)
 	}

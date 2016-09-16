@@ -244,6 +244,9 @@ func (e *{{.name}}PointEmitter) EmitBatch() models.Batch {
 			Tags:   tags,
 			Fields: map[string]interface{}{e.as: ap.Value},
 		}
+		if t.After(b.TMax) {
+			b.TMax = t
+		}
 	}
 	return b
 }

@@ -241,8 +241,9 @@ func (b *QueryNode) Queries(start, stop time.Time) []string {
 		if start.IsZero() || start.After(stop) {
 			break
 		}
-		b.query.Start(start)
-		qstop := start.Add(b.b.Period)
+		qstart := start.Add(-1 * b.b.Offset)
+		b.query.Start(qstart)
+		qstop := qstart.Add(b.b.Period)
 		if qstop.After(now) {
 			break
 		}
@@ -411,6 +412,7 @@ type ticker interface {
 
 type timeTicker struct {
 	every     time.Duration
+	align     bool
 	alignChan chan time.Time
 	stopping  chan struct{}
 	ticker    *time.Ticker
@@ -420,6 +422,7 @@ type timeTicker struct {
 
 func newTimeTicker(every time.Duration, align bool) *timeTicker {
 	t := &timeTicker{
+		align: align,
 		every: every,
 	}
 	if align {
@@ -480,7 +483,11 @@ func (t *timeTicker) Stop() {
 }
 
 func (t *timeTicker) Next(now time.Time) time.Time {
-	return now.Add(t.every)
+	next := now.Add(t.every)
+	if t.align {
+		next = next.Round(t.every)
+	}
+	return next
 }
 
 type cronTicker struct {
