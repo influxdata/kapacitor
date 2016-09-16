@@ -1,6 +1,8 @@
 package kapacitor
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -32,10 +34,14 @@ func newLogNode(et *ExecutingTask, n *pipeline.LogNode, l *log.Logger) (*LogNode
 
 func (s *LogNode) runLog([]byte) error {
 	key := fmt.Sprintf("%c! %s", wlog.ReverseLevels[s.level], s.prefix)
+	var buf bytes.Buffer
+	env := json.NewEncoder(&buf)
 	switch s.Wants() {
 	case pipeline.StreamEdge:
 		for p, ok := s.ins[0].NextPoint(); ok; p, ok = s.ins[0].NextPoint() {
-			s.logger.Println(key, p)
+			buf.Reset()
+			env.Encode(p)
+			s.logger.Println(key, buf.String())
 			for _, child := range s.outs {
 				err := child.CollectPoint(p)
 				if err != nil {
@@ -45,7 +51,9 @@ func (s *LogNode) runLog([]byte) error {
 		}
 	case pipeline.BatchEdge:
 		for b, ok := s.ins[0].NextBatch(); ok; b, ok = s.ins[0].NextBatch() {
-			s.logger.Println(key, b)
+			buf.Reset()
+			env.Encode(b)
+			s.logger.Println(key, buf.String())
 			for _, child := range s.outs {
 				err := child.CollectBatch(b)
 				if err != nil {
