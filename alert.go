@@ -86,15 +86,21 @@ func (l *AlertLevel) UnmarshalText(text []byte) error {
 }
 
 type AlertData struct {
-	ID       string          `json:"id"`
-	Message  string          `json:"message"`
-	Details  string          `json:"details"`
-	Time     time.Time       `json:"-"`
-	Duration time.Duration   `json:"duration"`
-	Level    AlertLevel      `json:"level"`
-	Data     influxql.Result `json:"data"`
+	ID       string          `json:"-"`
+	Message  string          `json:"-"`
+	Details  string          `json:"-"`
+	Time     time.Time       `json:"Date"`
+	Duration time.Duration   `json:"-"`
+	Level    AlertLevel      `json:"-"`
+	Data     influxql.Result `json:"-"`
 	Host     string
-
+	Source   string
+	SourceInstance string
+	ObjectName string
+	InstanceName string
+	CounterName string
+	Samplevalue string
+	
 	// Info for custom templates
 	info detailsInfo
 }
@@ -678,6 +684,21 @@ func (a *AlertNode) alertData(
 		return nil, err
 	}
 
+	var cn string
+	var sv string
+	var isString bool
+	f := fields.(map[string]interface{})
+	for fKey, fValue := range f {
+		cn = fKey
+		if val, isString := fValue.(string); isString {
+			sv = val
+		} else {
+			sv = ""
+		}
+		
+		break
+	}
+	
 	ad := &AlertData{
 		ID:       id,
 		Message:  msg,
@@ -688,6 +709,12 @@ func (a *AlertNode) alertData(
 		Data:     a.batchToResult(b),
 		Host:     host,
 		info:     info,
+		Source:   "Influx",
+		SourceInstance: "InfluxCorpDomain",
+		ObjectName: name,
+		InstanceName: details,
+		CounterName: cn,
+		SampleValue: sv,
 	}
 	return ad, nil
 }
