@@ -1331,7 +1331,7 @@ func (s *Service) startRecordBatch(t *kapacitor.Task, start, stop time.Time) ([]
 	for batchIndex, batchQueries := range batches {
 		source := make(chan models.Batch)
 		sources[batchIndex] = source
-		go func(cluster string, queries []string, groupByName bool) {
+		go func(cluster string, queries []*kapacitor.Query, groupByName bool) {
 			defer close(source)
 
 			// Connect to the cluster
@@ -1349,7 +1349,7 @@ func (s *Service) startRecordBatch(t *kapacitor.Task, start, stop time.Time) ([]
 			// Run queries
 			for _, q := range queries {
 				query := influxdb.Query{
-					Command: q,
+					Command: q.String(),
 				}
 				resp, err := con.Query(query)
 				if err != nil {
@@ -1367,6 +1367,8 @@ func (s *Service) startRecordBatch(t *kapacitor.Task, start, stop time.Time) ([]
 						return
 					}
 					for _, b := range batches {
+						// Set stop time based off query bounds
+						b.TMax = q.StopTime()
 						source <- b
 					}
 				}

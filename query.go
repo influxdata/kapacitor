@@ -83,13 +83,69 @@ func (q *Query) DBRPs() ([]DBRP, error) {
 }
 
 // Set the start time of the query
-func (q *Query) Start(s time.Time) {
+func (q *Query) StartTime() time.Time {
+	return q.startTL.Val
+}
+
+// Set the stop time of the query
+func (q *Query) StopTime() time.Time {
+	return q.stopTL.Val
+}
+
+// Set the start time of the query
+func (q *Query) SetStartTime(s time.Time) {
 	q.startTL.Val = s
 }
 
 // Set the stop time of the query
-func (q *Query) Stop(s time.Time) {
+func (q *Query) SetStopTime(s time.Time) {
 	q.stopTL.Val = s
+}
+
+// Deep clone this query
+func (q *Query) Clone() (*Query, error) {
+	n := &Query{
+		stmt: q.stmt.Clone(),
+	}
+	// Find the start/stop time literals
+	var err error
+	influxql.WalkFunc(n.stmt.Condition, func(qlNode influxql.Node) {
+		if bn, ok := qlNode.(*influxql.BinaryExpr); ok {
+			switch bn.Op {
+			case influxql.GTE:
+				if vf, ok := bn.LHS.(*influxql.VarRef); !ok || vf.Val != "time" {
+					return
+				}
+				if tl, ok := bn.RHS.(*influxql.TimeLiteral); ok {
+					// We have a "time" >= 'time literal'
+					if n.startTL == nil {
+						n.startTL = tl
+					} else {
+						err = errors.New("invalid query, found multiple start time conditions")
+					}
+				}
+			case influxql.LT:
+				if vf, ok := bn.LHS.(*influxql.VarRef); !ok || vf.Val != "time" {
+					return
+				}
+				if tl, ok := bn.RHS.(*influxql.TimeLiteral); ok {
+					// We have a "time" < 'time literal'
+					if n.stopTL == nil {
+						n.stopTL = tl
+					} else {
+						err = errors.New("invalid query, found multiple stop time conditions")
+					}
+				}
+			}
+		}
+	})
+	if n.startTL == nil {
+		err = errors.New("invalid query, missing start time condition")
+	}
+	if n.stopTL == nil {
+		err = errors.New("invalid query, missing stop time condition")
+	}
+	return n, err
 }
 
 // Set the dimensions on the query

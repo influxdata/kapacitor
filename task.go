@@ -282,8 +282,7 @@ func (et *ExecutingTask) BatchQueries(start, stop time.Time) ([]BatchQueries, er
 	if err != nil {
 		return nil, err
 	}
-
-	return batcher.Queries(start, stop), nil
+	return batcher.Queries(start, stop)
 }
 
 // Check that the task allows access to DBRPs
