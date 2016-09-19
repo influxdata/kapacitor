@@ -244,6 +244,9 @@ func (e *floatPointEmitter) EmitBatch() models.Batch {
 			Tags:   tags,
 			Fields: map[string]interface{}{e.as: ap.Value},
 		}
+		if t.After(b.TMax) {
+			b.TMax = t
+		}
 	}
 	return b
 }
@@ -476,6 +479,9 @@ func (e *integerPointEmitter) EmitBatch() models.Batch {
 			Time:   t,
 			Tags:   tags,
 			Fields: map[string]interface{}{e.as: ap.Value},
+		}
+		if t.After(b.TMax) {
+			b.TMax = t
 		}
 	}
 	return b
@@ -710,6 +716,9 @@ func (e *stringPointEmitter) EmitBatch() models.Batch {
 			Tags:   tags,
 			Fields: map[string]interface{}{e.as: ap.Value},
 		}
+		if t.After(b.TMax) {
+			b.TMax = t
+		}
 	}
 	return b
 }
@@ -942,6 +951,9 @@ func (e *booleanPointEmitter) EmitBatch() models.Batch {
 			Time:   t,
 			Tags:   tags,
 			Fields: map[string]interface{}{e.as: ap.Value},
+		}
+		if t.After(b.TMax) {
+			b.TMax = t
 		}
 	}
 	return b

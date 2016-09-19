@@ -95,22 +95,26 @@ func (s *BatchNode) Abort() {
 }
 
 type BatchQueries struct {
-	Queries            []string
+	Queries            []*Query
 	Cluster            string
 	GroupByMeasurement bool
 }
 
-func (s *BatchNode) Queries(start, stop time.Time) []BatchQueries {
+func (s *BatchNode) Queries(start, stop time.Time) ([]BatchQueries, error) {
 	queries := make([]BatchQueries, len(s.children))
 	for i, b := range s.children {
 		qn := b.(*QueryNode)
+		qs, err := qn.Queries(start, stop)
+		if err != nil {
+			return nil, err
+		}
 		queries[i] = BatchQueries{
-			Queries:            qn.Queries(start, stop),
+			Queries:            qs,
 			Cluster:            qn.Cluster(),
 			GroupByMeasurement: qn.GroupByMeasurement(),
 		}
 	}
-	return queries
+	return queries, nil
 }
 
 // Do not add the source batch node to the dot output
@@ -227,7 +231,7 @@ func (b *QueryNode) Cluster() string {
 	return b.b.Cluster
 }
 
-func (b *QueryNode) Queries(start, stop time.Time) []string {
+func (b *QueryNode) Queries(start, stop time.Time) ([]*Query, error) {
 	now := time.Now()
 	if stop.IsZero() {
 		stop = now
@@ -235,21 +239,26 @@ func (b *QueryNode) Queries(start, stop time.Time) []string {
 	// Crons are sensitive to timezones.
 	// Make sure we are using local time.
 	start = start.Local()
-	queries := make([]string, 0)
+	queries := make([]*Query, 0)
 	for {
 		start = b.ticker.Next(start)
 		if start.IsZero() || start.After(stop) {
 			break
 		}
-		b.query.Start(start)
-		qstop := start.Add(b.b.Period)
+		qstart := start.Add(-1 * b.b.Offset)
+		q, err := b.query.Clone()
+		if err != nil {
+			return nil, err
+		}
+		q.SetStartTime(qstart)
+		qstop := qstart.Add(b.b.Period)
 		if qstop.After(now) {
 			break
 		}
-		b.query.Stop(qstop)
-		queries = append(queries, b.query.String())
+		q.SetStopTime(qstop)
+		queries = append(queries, q)
 	}
-	return queries
+	return queries, nil
 }
 
 // Query InfluxDB and collect batches on batch collector.
@@ -282,8 +291,8 @@ func (b *QueryNode) doQuery() error {
 
 			// Update times for query
 			stop := now.Add(-1 * b.b.Offset)
-			b.query.Start(stop.Add(-1 * b.b.Period))
-			b.query.Stop(stop)
+			b.query.SetStartTime(stop.Add(-1 * b.b.Period))
+			b.query.SetStopTime(stop)
 
 			b.logger.Println("D! starting next batch query:", b.query.String())
 
@@ -411,6 +420,7 @@ type ticker interface {
 
 type timeTicker struct {
 	every     time.Duration
+	align     bool
 	alignChan chan time.Time
 	stopping  chan struct{}
 	ticker    *time.Ticker
@@ -420,6 +430,7 @@ type timeTicker struct {
 
 func newTimeTicker(every time.Duration, align bool) *timeTicker {
 	t := &timeTicker{
+		align: align,
 		every: every,
 	}
 	if align {
@@ -480,7 +491,11 @@ func (t *timeTicker) Stop() {
 }
 
 func (t *timeTicker) Next(now time.Time) time.Time {
-	return now.Add(t.every)
+	next := now.Add(t.every)
+	if t.align {
+		next = next.Round(t.every)
+	}
+	return next
 }
 
 type cronTicker struct {
