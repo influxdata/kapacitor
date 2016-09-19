@@ -1,12 +1,38 @@
 # Kapacitor Alerting
 
+Kapacitor enables a user to define and trigger alerts.
+Alerts can be sent to various backend handlers.
 
-Kapacitor should expose the current state of all alerts
-Kapacitor should allow alerts to be throttled/aggregated and sent to varying alert handlers without having to modify all tasks.
+## Alert State
 
-## Implementation
+Kapacitor exposes the state of all the alerts via its HTTP API.
+See the API docs for more details.
 
-Add new alert handler to AlertNode called `alertEvent`(TBD), which send the alert data struct to an internal pub/sub system. The current handlers will not be removed to allow existing TICKscripts to work as they are today. This enables users to quickly get started creating alerts as a single TICKscript is capable of defining alerts.
+
+## Two ways to work with alerts
+
+### Direct Alerts
+
+If you already have a system that manages your alerts then you can define your alerts directly in your TICKscripts.
+This allows you to send alerts as they are triggered to any of the various alert handlers.
+
+
+### Alert Events Subsystem
+
+If you want to have more fine grained control over your alerts then an alert subsystem is available.
+The alert subsystem allows you to various different actions with your alerts:
+
+* Aggregate Alerts into a single alert containing summary information.
+* Rate limit alerts
+* Easily manage which handlers handle which alerts without modifying your Kapacitor tasks.
+
+This subsystem is based on an event model.
+When Kapacitor triggers an alert instead of directly sending it to the handlers, it is first sent to this subsystem as an event.
+Then different handlers can listen for different events and take appropriate actions.
+
+#### Using the Alert Event Subsystem
+
+Add an alert handler called `alertEvent`, either globally in the config or on a task by task basis.
 
 Example TICKscript:
 
@@ -21,32 +47,15 @@ stream
     |alert()
         .warn(lambda: "mean" > 70)
         .crit(lambda: "mean" > 80)
-        // Send this alert to the pub/sub system (not currently implemented)
+        // Send this alert to the alert event subsystem (not currently implemented)
         .alertEvent()
         // Send this alert directly to slack. (works today)
         .slack()
 ```
 
 Then alert handlers can be configured to subscribe to the events.
-These alert handlers will be configured via the API, and will use a definition file to describe what the handler will do with the alert data.
-
-There are two proposed formats for the alert handler definition files:
-
-1. Use the TICKscript syntax but a new API for defining the alert handler
-
-```go
-alert
-    |from('cpu', 'mem')
-    |groupBy('id')
-    |aggregate()
-        .interval(1m)
-    |groupBy()
-    |throttle()
-        .max(10, 5m)
-    |pub('throttled_agged')
-```
-
-2. Use yaml to define the alert handler.
+These alert handlers will be configured via the API.
+Use yaml/json to define the alert handlers.
 
 ```yaml
 alert:
@@ -64,9 +73,21 @@ alert:
          serviceKey: XXX
 ```
 
-By using TICKscript the syntax remains familiar and there is no need for users to also know YAML. But it could be very confusing to a user to keep the Task TICKscript API separate from the Alert TICKscript API.
+```json
+{
+    "alert" : [
+        {"events": ["cpu", "mem"]},
+        {"aggregate": {"groupBy":"id","internal":"1m"}},
+        {"throttle": {"count":10,"every":"5m"}},
+        {"publish": ["throttled_aggreated"]},
+        {"pagerDuty": {"serviceKey":"XXX"}}
+    ]
+}
+```
 
-By using YAML, the user needs to know YAML, but the domain is clearly separated from Tasks. Using YAML for defining a sequence of tasks is not without precedent (see Ansible). YAML is familiar to the DevOps user base, most users will not need to learn it as they already have.
 
-In either case we want the file format to be self contained, so that it is easily shareable and can be placed in version control.
+#### Implementation
+
+The underlying implementation will be a basic publish/subscribe system.
+Various subscriber can be defined via the above definitions which can in turn publish back to the internal system or send alerts to third parties.
 
