@@ -99,7 +99,10 @@ type AlertData struct {
 	ObjectName string
 	InstanceName string
 	CounterName string
-	Samplevalue string
+	SampleValue string
+	KPI string
+	ThresholdOperator string
+	Average string
 	
 	// Info for custom templates
 	info detailsInfo
@@ -679,23 +682,17 @@ func (a *AlertNode) alertData(
 	if err != nil {
 		return nil, err
 	}
-	msg, details, info, host, err := a.renderMessageAndDetails(id, name, t, group, tags, fields, level)
+	msg, details, info, host, objName, err := a.renderMessageAndDetails(id, name, t, group, tags, fields, level)
 	if err != nil {
 		return nil, err
 	}
 
 	var cn string
 	var sv string
-	var isString bool
-	f := fields.(map[string]interface{})
-	for fKey, fValue := range f {
+	// f := fields.(map[string]interface{})
+	for fKey, fValue := range fields {
 		cn = fKey
-		if val, isString := fValue.(string); isString {
-			sv = val
-		} else {
-			sv = ""
-		}
-		
+		sv = fmt.Sprintf("%v", fValue)
 		break
 	}
 	
@@ -710,11 +707,14 @@ func (a *AlertNode) alertData(
 		Host:     host,
 		info:     info,
 		Source:   "Influx",
-		SourceInstance: "InfluxCorpDomain",
-		ObjectName: name,
+		SourceInstance: "Not Applicable",
+		ObjectName: objName,
 		InstanceName: details,
 		CounterName: cn,
 		SampleValue: sv,
+		KPI: "Not Applicable",
+		ThresholdOperator: "Not Applicable",
+		Average: "Not Applicable",
 	}
 	return ad, nil
 }
@@ -872,7 +872,7 @@ func (a *AlertNode) renderID(name string, group models.GroupID, tags models.Tags
 	return id.String(), nil
 }
 
-func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group models.GroupID, tags models.Tags, fields models.Fields, level AlertLevel) (string, string, detailsInfo, string, error) {
+func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group models.GroupID, tags models.Tags, fields models.Fields, level AlertLevel) (string, string, detailsInfo, string, string, error) {
 	g := string(group)
 	if group == models.NilGroup {
 		g = "nil"
@@ -900,7 +900,7 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group 
 
 	err := a.messageTmpl.Execute(tmpBuffer, minfo)
 	if err != nil {
-		return "", "", detailsInfo{}, "", err
+		return "", "", detailsInfo{}, "", "", err
 	}
 
 	msg := tmpBuffer.String()
@@ -913,7 +913,7 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group 
 	tmpBuffer.Reset()
 	err = a.detailsTmpl.Execute(tmpBuffer, dinfo)
 	if err != nil {
-		return "", "", dinfo, "", err
+		return "", "", dinfo, "", "", err
 	}
 
 	details := tmpBuffer.String()
@@ -922,16 +922,28 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group 
 
 	hostTmpl, err := text.New("host").Parse("{{ index .Tags \"host\" }}")
 	if err != nil {
-		return "", "", dinfo, "", err
+		return "", "", dinfo, "", "", err
 	}
 
 	err = hostTmpl.Execute(tmpBuffer, minfo)
 	if err != nil {
-		return "", "", dinfo, "", err
+		return "", "", dinfo, "", "", err
+	}
+	host := tmpBuffer.String()
+
+	tmpBuffer.Reset()
+	objTmpl, err := text.New("objName").Parse("{{ .TaskName }}")
+	if err != nil {
+		return "", "", dinfo, host, "", err
 	}
 
-	host := tmpBuffer.String()
-	return msg, details, dinfo, host, nil
+	err = objTmpl.Execute(tmpBuffer, minfo)
+	if err != nil {
+		return "", "", dinfo, host, "", err
+	}
+	
+	objName := tmpBuffer.String()
+	return msg, details, dinfo, host, objName, nil
 }
 
 //--------------------------------
