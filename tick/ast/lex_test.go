@@ -42,94 +42,120 @@ func TestLexer(t *testing.T) {
 			},
 		},
 		{
-			in: "+",
+			in: "a + b",
 			tokens: []token{
-				token{TokenPlus, 0, "+"},
-				token{TokenEOF, 1, ""},
+				token{TokenIdent, 0, "a"},
+				token{TokenPlus, 2, "+"},
+				token{TokenIdent, 4, "b"},
+				token{TokenEOF, 5, ""},
 			},
 		},
 		{
-			in: "-",
+			in: "a - b",
 			tokens: []token{
-				token{TokenMinus, 0, "-"},
-				token{TokenEOF, 1, ""},
+				token{TokenIdent, 0, "a"},
+				token{TokenMinus, 2, "-"},
+				token{TokenIdent, 4, "b"},
+				token{TokenEOF, 5, ""},
 			},
 		},
 		{
-			in: "*",
+			in: "a * b",
 			tokens: []token{
-				token{TokenMult, 0, "*"},
-				token{TokenEOF, 1, ""},
+				token{TokenIdent, 0, "a"},
+				token{TokenMult, 2, "*"},
+				token{TokenIdent, 4, "b"},
+				token{TokenEOF, 5, ""},
 			},
 		},
 		{
-			in: "/",
+			in: "a / b",
 			tokens: []token{
-				token{TokenDiv, 0, "/"},
-				token{TokenEOF, 1, ""},
+				token{TokenIdent, 0, "a"},
+				token{TokenDiv, 2, "/"},
+				token{TokenIdent, 4, "b"},
+				token{TokenEOF, 5, ""},
 			},
 		},
 		{
-			in: "=",
+			in: "a = b",
 			tokens: []token{
-				token{TokenAsgn, 0, "="},
-				token{TokenEOF, 1, ""},
+				token{TokenIdent, 0, "a"},
+				token{TokenAsgn, 2, "="},
+				token{TokenIdent, 4, "b"},
+				token{TokenEOF, 5, ""},
 			},
 		},
 		{
-			in: "==",
+			in: "a == b",
 			tokens: []token{
-				token{TokenEqual, 0, "=="},
-				token{TokenEOF, 2, ""},
+				token{TokenIdent, 0, "a"},
+				token{TokenEqual, 2, "=="},
+				token{TokenIdent, 5, "b"},
+				token{TokenEOF, 6, ""},
 			},
 		},
 		{
-			in: "!=",
+			in: "a != b",
 			tokens: []token{
-				token{TokenNotEqual, 0, "!="},
-				token{TokenEOF, 2, ""},
+				token{TokenIdent, 0, "a"},
+				token{TokenNotEqual, 2, "!="},
+				token{TokenIdent, 5, "b"},
+				token{TokenEOF, 6, ""},
 			},
 		},
 		{
-			in: ">",
+			in: "a > b",
 			tokens: []token{
-				token{TokenGreater, 0, ">"},
-				token{TokenEOF, 1, ""},
+				token{TokenIdent, 0, "a"},
+				token{TokenGreater, 2, ">"},
+				token{TokenIdent, 4, "b"},
+				token{TokenEOF, 5, ""},
 			},
 		},
 		{
-			in: ">=",
+			in: "a >= b",
 			tokens: []token{
-				token{TokenGreaterEqual, 0, ">="},
-				token{TokenEOF, 2, ""},
+				token{TokenIdent, 0, "a"},
+				token{TokenGreaterEqual, 2, ">="},
+				token{TokenIdent, 5, "b"},
+				token{TokenEOF, 6, ""},
 			},
 		},
 		{
-			in: "<",
+			in: "a < b",
 			tokens: []token{
-				token{TokenLess, 0, "<"},
-				token{TokenEOF, 1, ""},
+				token{TokenIdent, 0, "a"},
+				token{TokenLess, 2, "<"},
+				token{TokenIdent, 4, "b"},
+				token{TokenEOF, 5, ""},
 			},
 		},
 		{
-			in: "<=",
+			in: "a <= b",
 			tokens: []token{
-				token{TokenLessEqual, 0, "<="},
-				token{TokenEOF, 2, ""},
+				token{TokenIdent, 0, "a"},
+				token{TokenLessEqual, 2, "<="},
+				token{TokenIdent, 5, "b"},
+				token{TokenEOF, 6, ""},
 			},
 		},
 		{
-			in: "=~",
+			in: "a =~ b",
 			tokens: []token{
-				token{TokenRegexEqual, 0, "=~"},
-				token{TokenEOF, 2, ""},
+				token{TokenIdent, 0, "a"},
+				token{TokenRegexEqual, 2, "=~"},
+				token{TokenIdent, 5, "b"},
+				token{TokenEOF, 6, ""},
 			},
 		},
 		{
-			in: "!~",
+			in: "a !~ b",
 			tokens: []token{
-				token{TokenRegexNotEqual, 0, "!~"},
-				token{TokenEOF, 2, ""},
+				token{TokenIdent, 0, "a"},
+				token{TokenRegexNotEqual, 2, "!~"},
+				token{TokenIdent, 5, "b"},
+				token{TokenEOF, 6, ""},
 			},
 		},
 		{
@@ -397,37 +423,26 @@ func TestLexer(t *testing.T) {
 				token{TokenEOF, 9, ""},
 			},
 		},
-		// Regex -- can only be lexed within context
+		// Regex
 		{
-			in: `=~ //`,
+			in: `/.*/`,
 			tokens: []token{
-				token{TokenRegexEqual, 0, "=~"},
-				token{TokenRegex, 3, "//"},
-				token{TokenEOF, 5, ""},
-			},
-		},
-		{
-			in: `!~ //`,
-			tokens: []token{
-				token{TokenRegexNotEqual, 0, "!~"},
-				token{TokenRegex, 3, "//"},
-				token{TokenEOF, 5, ""},
-			},
-		},
-		{
-			in: `= //`,
-			tokens: []token{
-				token{TokenAsgn, 0, "="},
-				token{TokenRegex, 2, "//"},
+				token{TokenRegex, 0, "/.*/"},
 				token{TokenEOF, 4, ""},
 			},
 		},
 		{
-			in: `= /^((.*)[a-z]+\S{0,2})|cat\/\/$/`,
+			in: `/^abc$/`,
 			tokens: []token{
-				token{TokenAsgn, 0, "="},
-				token{TokenRegex, 2, `/^((.*)[a-z]+\S{0,2})|cat\/\/$/`},
-				token{TokenEOF, 33, ""},
+				token{TokenRegex, 0, "/^abc$/"},
+				token{TokenEOF, 7, ""},
+			},
+		},
+		{
+			in: `/^((.*)[a-z]+\S{0,2})|cat\/\/$/`,
+			tokens: []token{
+				token{TokenRegex, 0, `/^((.*)[a-z]+\S{0,2})|cat\/\/$/`},
+				token{TokenEOF, 31, ""},
 			},
 		},
 

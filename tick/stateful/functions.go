@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/dustin/go-humanize"
@@ -78,6 +80,30 @@ func init() {
 	statelessFuncs["y1"] = newMath1("y1", math.Y1)
 	statelessFuncs["yn"] = newMathIF("yn", math.Yn)
 
+	// String functions
+	statelessFuncs["strContains"] = newString2Bool("strContains", strings.Contains)
+	statelessFuncs["strContainsAny"] = newString2Bool("strContainsAny", strings.ContainsAny)
+	statelessFuncs["strCount"] = newString2Int("strCount", strings.Count)
+	statelessFuncs["strHasPrefix"] = newString2Bool("strHasPrefix", strings.HasPrefix)
+	statelessFuncs["strHasSuffix"] = newString2Bool("strHasSuffix", strings.HasSuffix)
+	statelessFuncs["strIndex"] = newString2Int("strIndex", strings.Index)
+	statelessFuncs["strIndexAny"] = newString2Int("strIndexAny", strings.IndexAny)
+	statelessFuncs["strLastIndex"] = newString2Int("strLastIndex", strings.LastIndex)
+	statelessFuncs["strLastIndexAny"] = newString2Int("strLastIndexAny", strings.LastIndexAny)
+	statelessFuncs["strReplace"] = &strReplace{}
+	statelessFuncs["strSubstring"] = &strSubstring{}
+	statelessFuncs["strToLower"] = newString1String("strToLower", strings.ToLower)
+	statelessFuncs["strToUpper"] = newString1String("strToUpper", strings.ToUpper)
+	statelessFuncs["strTrim"] = newString2String("strTrim", strings.Trim)
+	statelessFuncs["strTrimLeft"] = newString2String("strTrimLeft", strings.TrimLeft)
+	statelessFuncs["strTrimPrefix"] = newString2String("strTrimPrefix", strings.TrimPrefix)
+	statelessFuncs["strTrimRight"] = newString2String("strTrimRight", strings.TrimRight)
+	statelessFuncs["strTrimSpace"] = newString1String("strTrimSpace", strings.TrimSpace)
+	statelessFuncs["strTrimSuffix"] = newString2String("strTrimSuffix", strings.TrimSuffix)
+
+	// Regex functions
+	statelessFuncs["regexReplace"] = &regexReplace{}
+
 	// Time functions
 	statelessFuncs["minute"] = &minute{}
 	statelessFuncs["hour"] = &hour{}
@@ -121,7 +147,6 @@ func newMath1(name string, f math1Func) *math1 {
 	}
 }
 
-// Converts the value to a boolean
 func (m *math1) Call(args ...interface{}) (v interface{}, err error) {
 	if len(args) != 1 {
 		return 0, errors.New(m.name + " expects exactly one argument")
@@ -150,7 +175,6 @@ func newMath2(name string, f math2Func) *math2 {
 	}
 }
 
-// Converts the value to a boolean
 func (m *math2) Call(args ...interface{}) (v interface{}, err error) {
 	if len(args) != 2 {
 		return 0, errors.New(m.name + " expects exactly two arguments")
@@ -184,7 +208,6 @@ func newMathI(name string, f mathIFunc) *mathI {
 	}
 }
 
-// Converts the value to a boolean
 func (m *mathI) Call(args ...interface{}) (v interface{}, err error) {
 	if len(args) != 1 {
 		return 0, errors.New(m.name + " expects exactly two arguments")
@@ -213,7 +236,6 @@ func newMathIF(name string, f mathIFFunc) *mathIF {
 	}
 }
 
-// Converts the value to a boolean
 func (m *mathIF) Call(args ...interface{}) (v interface{}, err error) {
 	if len(args) != 2 {
 		return 0, errors.New(m.name + " expects exactly two arguments")
@@ -233,6 +255,232 @@ func (m *mathIF) Call(args ...interface{}) (v interface{}, err error) {
 }
 
 func (m *mathIF) Reset() {}
+
+type string2BoolFunc func(string, string) bool
+type string2Bool struct {
+	name string
+	f    string2BoolFunc
+}
+
+func newString2Bool(name string, f string2BoolFunc) *string2Bool {
+	return &string2Bool{
+		name: name,
+		f:    f,
+	}
+}
+
+func (m *string2Bool) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 2 {
+		return 0, errors.New(m.name + " expects exactly two arguments")
+	}
+	a0, ok := args[0].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as first arg to %s, must be string", args[0], m.name)
+		return
+	}
+	a1, ok := args[1].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as second arg to %s, must be string", args[1], m.name)
+		return
+	}
+	v = m.f(a0, a1)
+	return
+}
+
+func (m *string2Bool) Reset() {}
+
+type string2IntFunc func(string, string) int
+type string2Int struct {
+	name string
+	f    string2IntFunc
+}
+
+func newString2Int(name string, f string2IntFunc) *string2Int {
+	return &string2Int{
+		name: name,
+		f:    f,
+	}
+}
+
+func (m *string2Int) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 2 {
+		return 0, errors.New(m.name + " expects exactly two arguments")
+	}
+	a0, ok := args[0].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as first arg to %s, must be string", args[0], m.name)
+		return
+	}
+	a1, ok := args[1].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as second arg to %s, must be string", args[1], m.name)
+		return
+	}
+	v = int64(m.f(a0, a1))
+	return
+}
+
+func (m *string2Int) Reset() {}
+
+type string2StringFunc func(string, string) string
+type string2String struct {
+	name string
+	f    string2StringFunc
+}
+
+func newString2String(name string, f string2StringFunc) *string2String {
+	return &string2String{
+		name: name,
+		f:    f,
+	}
+}
+
+func (m *string2String) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 2 {
+		return 0, errors.New(m.name + " expects exactly two arguments")
+	}
+	a0, ok := args[0].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as first arg to %s, must be string", args[0], m.name)
+		return
+	}
+	a1, ok := args[1].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as second arg to %s, must be string", args[1], m.name)
+		return
+	}
+	v = m.f(a0, a1)
+	return
+}
+
+func (m *string2String) Reset() {}
+
+type string1StringFunc func(string) string
+type string1String struct {
+	name string
+	f    string1StringFunc
+}
+
+func newString1String(name string, f string1StringFunc) *string1String {
+	return &string1String{
+		name: name,
+		f:    f,
+	}
+}
+
+func (m *string1String) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 1 {
+		return 0, errors.New(m.name + " expects exactly one argument")
+	}
+	a0, ok := args[0].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as first arg to %s, must be string", args[0], m.name)
+		return
+	}
+	v = m.f(a0)
+	return
+}
+
+func (m *string1String) Reset() {}
+
+type strReplace struct {
+}
+
+func (m *strReplace) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 4 {
+		return 0, errors.New("strReplace expects exactly four arguments")
+	}
+	str, ok := args[0].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as first arg to strReplace, must be string", args[0])
+		return
+	}
+	old, ok := args[1].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as second arg to strReplace, must be string", args[1])
+		return
+	}
+	new, ok := args[2].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as third arg to strReplace, must be string", args[2])
+		return
+	}
+	n, ok := args[3].(int64)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as fourth arg to strReplace, must be int", args[3])
+		return
+	}
+	v = strings.Replace(str, old, new, int(n))
+	return
+}
+
+func (m *strReplace) Reset() {}
+
+type strSubstring struct {
+}
+
+func (m *strSubstring) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 3 {
+		return 0, errors.New("strSubstring expects exactly three arguments")
+	}
+	str, ok := args[0].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as first arg to strSubstring, must be string", args[0])
+		return
+	}
+	start, ok := args[1].(int64)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as second arg to strSubstring, must be int", args[1])
+		return
+	}
+	stop, ok := args[2].(int64)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as third arg to strSubstring, must be int", args[2])
+		return
+	}
+	if start < 0 {
+		return nil, fmt.Errorf("found negative index for strSubstring: %d", start)
+	}
+	if stop < 0 {
+		return nil, fmt.Errorf("found negative index for strSubstring: %d", stop)
+	}
+	if int(stop) >= len(str) {
+		return nil, fmt.Errorf("stop index too large for string in strSubstring: %d", stop)
+	}
+
+	v = str[start:stop]
+	return
+}
+
+func (m *strSubstring) Reset() {}
+
+type regexReplace struct {
+}
+
+func (m *regexReplace) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 3 {
+		return 0, errors.New("regexReplace expects exactly three arguments")
+	}
+	pattern, ok := args[0].(*regexp.Regexp)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as first arg to regexReplace, must be regex", args[0])
+		return
+	}
+	src, ok := args[1].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as second arg to regexReplace, must be string", args[1])
+		return
+	}
+	repl, ok := args[2].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as third arg to regexReplace, must be string", args[2])
+		return
+	}
+	v = pattern.ReplaceAllString(src, repl)
+	return
+}
+
+func (m *regexReplace) Reset() {}
 
 type boolean struct {
 }
