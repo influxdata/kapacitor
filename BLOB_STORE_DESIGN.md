@@ -3,11 +3,15 @@
 The blob store is a mechanism to store arbitrary data in Kapacitor.
 The data stored is immutable and opaque to Kapacitor.
 
-Data is stored as blobs.
-A naming system is used to refer various blobs within the store.
-Names can be modified and the history of a name/blob associations are recorded.
+Data is stored as blobs where each blob has a unique ID.
+A tagging system is used to refer various blobs within the store.
+A blob may be tagged with a given name.
+A blob may be retrieved by its ID or a tag name.
+When retrieving a blob via a tag name, the most recently associated blob is returned for that tag.
+Tags may be updated, meaning they can be modified to point at a different blob.
+The history of a tag to blob associations are preserved.
 
-There are no specific limits on the size of a blob, and blobs can be streamed via chunks in and out of the store.
+There are no specific limits on the size of a blob, and blobs can be streamed in and out of the store.
 
 ## Uses
 
@@ -40,6 +44,4 @@ Creating a blob will accept only the content of the blob data and return the ID 
 Naming a blob associates a specified name to the content of the blob.
 A naming history is recorded, allowing the users to determine the "version" history for a given name.
 Deleting a blob removes it from the store.
-
-Blobs will use a chunked/framed transport so that the size of blobs need not be overly constrained by available memory.
 
