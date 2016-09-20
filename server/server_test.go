@@ -2403,11 +2403,11 @@ func TestServer_BatchTask(t *testing.T) {
 						Columns: []string{"time", "value"},
 						Values: [][]interface{}{
 							{
-								stopTime.Add(-time.Millisecond).Format(time.RFC3339Nano),
+								stopTime.Add(-2 * time.Millisecond).Format(time.RFC3339Nano),
 								1.0,
 							},
 							{
-								stopTime.Add(-2 * time.Millisecond).Format(time.RFC3339Nano),
+								stopTime.Add(-1 * time.Millisecond).Format(time.RFC3339Nano),
 								1.0,
 							},
 						},

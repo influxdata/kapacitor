@@ -10,9 +10,10 @@ import (
 )
 
 type Query struct {
-	startTL *influxql.TimeLiteral
-	stopTL  *influxql.TimeLiteral
-	stmt    *influxql.SelectStatement
+	startTL         *influxql.TimeLiteral
+	stopTL          *influxql.TimeLiteral
+	stmt            *influxql.SelectStatement
+	isGroupedByTime bool
 }
 
 func NewQuery(queryString string) (*Query, error) {
@@ -205,7 +206,12 @@ func (q *Query) Dimensions(dims []interface{}) error {
 		}
 	}
 
+	q.isGroupedByTime = hasTime
 	return nil
+}
+
+func (q *Query) IsGroupedByTime() bool {
+	return q.isGroupedByTime
 }
 
 func (q *Query) Fill(option influxql.FillOption, value interface{}) {

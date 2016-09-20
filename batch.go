@@ -238,23 +238,23 @@ func (b *QueryNode) Queries(start, stop time.Time) ([]*Query, error) {
 	}
 	// Crons are sensitive to timezones.
 	// Make sure we are using local time.
-	start = start.Local()
+	current := start.Local()
 	queries := make([]*Query, 0)
 	for {
-		start = b.ticker.Next(start)
-		if start.IsZero() || start.After(stop) {
+		current = b.ticker.Next(current)
+		if current.IsZero() || current.After(stop) {
 			break
 		}
-		qstart := start.Add(-1 * b.b.Offset)
+		qstop := current.Add(-1 * b.b.Offset)
+		if qstop.After(now) {
+			break
+		}
+
 		q, err := b.query.Clone()
 		if err != nil {
 			return nil, err
 		}
-		q.SetStartTime(qstart)
-		qstop := qstart.Add(b.b.Period)
-		if qstop.After(now) {
-			break
-		}
+		q.SetStartTime(qstop.Add(-1 * b.b.Period))
 		q.SetStopTime(qstop)
 		queries = append(queries, q)
 	}
@@ -343,7 +343,10 @@ func (b *QueryNode) doQuery() error {
 					continue
 				}
 				for _, bch := range batches {
-					bch.TMax = stop
+					// Set stop time based off query bounds
+					if bch.TMax.IsZero() || !b.query.IsGroupedByTime() {
+						bch.TMax = stop
+					}
 					b.batchesQueried.Add(1)
 					b.pointsQueried.Add(int64(len(bch.Points)))
 					b.timer.Pause()
