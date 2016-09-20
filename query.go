@@ -10,9 +10,10 @@ import (
 )
 
 type Query struct {
-	startTL *influxql.TimeLiteral
-	stopTL  *influxql.TimeLiteral
-	stmt    *influxql.SelectStatement
+	startTL         *influxql.TimeLiteral
+	stopTL          *influxql.TimeLiteral
+	stmt            *influxql.SelectStatement
+	isGroupedByTime bool
 }
 
 func NewQuery(queryString string) (*Query, error) {
@@ -105,7 +106,8 @@ func (q *Query) SetStopTime(s time.Time) {
 // Deep clone this query
 func (q *Query) Clone() (*Query, error) {
 	n := &Query{
-		stmt: q.stmt.Clone(),
+		stmt:            q.stmt.Clone(),
+		isGroupedByTime: q.isGroupedByTime,
 	}
 	// Find the start/stop time literals
 	var err error
@@ -185,6 +187,11 @@ func (q *Query) Dimensions(dims []interface{}) error {
 					Expr: &influxql.Wildcard{},
 				})
 		case TimeDimension:
+			if hasTime {
+				return fmt.Errorf("groupBy cannot have more than one time dimension")
+			}
+			// Add time dimension
+			hasTime = true
 			q.stmt.Dimensions = append(q.stmt.Dimensions,
 				&influxql.Dimension{
 					Expr: &influxql.Call{
@@ -205,7 +212,12 @@ func (q *Query) Dimensions(dims []interface{}) error {
 		}
 	}
 
+	q.isGroupedByTime = hasTime
 	return nil
+}
+
+func (q *Query) IsGroupedByTime() bool {
+	return q.isGroupedByTime
 }
 
 func (q *Query) Fill(option influxql.FillOption, value interface{}) {
