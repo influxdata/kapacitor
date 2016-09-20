@@ -2,6 +2,7 @@ package stateful
 
 import (
 	"errors"
+	"regexp"
 	"testing"
 	"time"
 )
@@ -545,4 +546,350 @@ func Test_If(t *testing.T) {
 		}
 
 	}
+}
+
+func Test_StatelessFuncs(t *testing.T) {
+
+	testCases := []struct {
+		name string
+		args []interface{}
+		exp  interface{}
+		err  error
+	}{
+		{
+			name: "strContains",
+			args: []interface{}{"aabbc", "bc"},
+			exp:  true,
+		},
+		{
+			name: "strContains",
+			args: []interface{}{"aabbc", "bx"},
+			exp:  false,
+		},
+		{
+			name: "strContains",
+			args: []interface{}{""},
+			err:  errors.New("strContains expects exactly two arguments"),
+		},
+		{
+			name: "strContainsAny",
+			args: []interface{}{"aabbc", "bx"},
+			exp:  true,
+		},
+		{
+			name: "strContainsAny",
+			args: []interface{}{"aabbc", "xy"},
+			exp:  false,
+		},
+		{
+			name: "strContainsAny",
+			args: []interface{}{""},
+			err:  errors.New("strContainsAny expects exactly two arguments"),
+		},
+		{
+			name: "strCount",
+			args: []interface{}{"aababc", "a"},
+			exp:  int64(3),
+		},
+		{
+			name: "strCount",
+			args: []interface{}{"aabbc", "x"},
+			exp:  int64(0),
+		},
+		{
+			name: "strCount",
+			args: []interface{}{""},
+			err:  errors.New("strCount expects exactly two arguments"),
+		},
+		{
+			name: "strHasPrefix",
+			args: []interface{}{"aababc", "aab"},
+			exp:  true,
+		},
+		{
+			name: "strHasPrefix",
+			args: []interface{}{"aabbc", "aax"},
+			exp:  false,
+		},
+		{
+			name: "strHasPrefix",
+			args: []interface{}{""},
+			err:  errors.New("strHasPrefix expects exactly two arguments"),
+		},
+		{
+			name: "strHasSuffix",
+			args: []interface{}{"aababc", "bc"},
+			exp:  true,
+		},
+		{
+			name: "strHasSuffix",
+			args: []interface{}{"aabbc", "xbc"},
+			exp:  false,
+		},
+		{
+			name: "strHasSuffix",
+			args: []interface{}{""},
+			err:  errors.New("strHasSuffix expects exactly two arguments"),
+		},
+		{
+			name: "strIndex",
+			args: []interface{}{"aababc", "ba"},
+			exp:  int64(2),
+		},
+		{
+			name: "strIndex",
+			args: []interface{}{"aabbc", "xbc"},
+			exp:  int64(-1),
+		},
+		{
+			name: "strIndex",
+			args: []interface{}{""},
+			err:  errors.New("strIndex expects exactly two arguments"),
+		},
+		{
+			name: "strIndexAny",
+			args: []interface{}{"aababc", "bax"},
+			exp:  int64(0),
+		},
+		{
+			name: "strIndexAny",
+			args: []interface{}{"aabbc", "xy"},
+			exp:  int64(-1),
+		},
+		{
+			name: "strIndexAny",
+			args: []interface{}{""},
+			err:  errors.New("strIndexAny expects exactly two arguments"),
+		},
+		{
+			name: "strLastIndex",
+			args: []interface{}{"aababa", "ba"},
+			exp:  int64(4),
+		},
+		{
+			name: "strLastIndex",
+			args: []interface{}{"aabbc", "xbc"},
+			exp:  int64(-1),
+		},
+		{
+			name: "strLastIndex",
+			args: []interface{}{""},
+			err:  errors.New("strLastIndex expects exactly two arguments"),
+		},
+		{
+			name: "strLastIndexAny",
+			args: []interface{}{"aababc", "bax"},
+			exp:  int64(4),
+		},
+		{
+			name: "strLastIndexAny",
+			args: []interface{}{"aabbc", "xy"},
+			exp:  int64(-1),
+		},
+		{
+			name: "strLastIndexAny",
+			args: []interface{}{""},
+			err:  errors.New("strLastIndexAny expects exactly two arguments"),
+		},
+		{
+			name: "strReplace",
+			args: []interface{}{"abxyzc", "xyz", "", int64(1)},
+			exp:  "abc",
+		},
+		{
+			name: "strReplace",
+			args: []interface{}{"abxaza", "a", "z", int64(-1)},
+			exp:  "zbxzzz",
+		},
+		{
+			name: "strReplace",
+			args: []interface{}{"", "", ""},
+			err:  errors.New("strReplace expects exactly four arguments"),
+		},
+		{
+			name: "strSubstring",
+			args: []interface{}{"abcdefg", int64(1), int64(5)},
+			exp:  "bcde",
+		},
+		{
+			name: "strSubstring",
+			args: []interface{}{""},
+			err:  errors.New("strSubstring expects exactly three arguments"),
+		},
+		{
+			name: "strSubstring",
+			args: []interface{}{"abcdefg", int64(0), int64(10)},
+			err:  errors.New("stop index too large for string in strSubstring: 10"),
+		},
+		{
+			name: "strSubstring",
+			args: []interface{}{"abcdefg", int64(-1), int64(3)},
+			err:  errors.New("found negative index for strSubstring: -1"),
+		},
+		{
+			name: "strSubstring",
+			args: []interface{}{"abcdefg", int64(0), int64(-3)},
+			err:  errors.New("found negative index for strSubstring: -3"),
+		},
+		{
+			name: "strToLower",
+			args: []interface{}{"ABC"},
+			exp:  "abc",
+		},
+		{
+			name: "strToLower",
+			args: []interface{}{"abc"},
+			exp:  "abc",
+		},
+		{
+			name: "strToLower",
+			args: []interface{}{"", "", ""},
+			err:  errors.New("strToLower expects exactly one argument"),
+		},
+		{
+			name: "strToUpper",
+			args: []interface{}{"ABC"},
+			exp:  "ABC",
+		},
+		{
+			name: "strToUpper",
+			args: []interface{}{"abc"},
+			exp:  "ABC",
+		},
+		{
+			name: "strToUpper",
+			args: []interface{}{"", "", ""},
+			err:  errors.New("strToUpper expects exactly one argument"),
+		},
+		{
+			name: "strTrim",
+			args: []interface{}{"abba", "a"},
+			exp:  "bb",
+		},
+		{
+			name: "strTrim",
+			args: []interface{}{"aabbaa", "a"},
+			exp:  "bb",
+		},
+		{
+			name: "strTrim",
+			args: []interface{}{""},
+			err:  errors.New("strTrim expects exactly two arguments"),
+		},
+		{
+			name: "strTrimLeft",
+			args: []interface{}{"abba", "a"},
+			exp:  "bba",
+		},
+		{
+			name: "strTrimLeft",
+			args: []interface{}{"aabbaa", "a"},
+			exp:  "bbaa",
+		},
+		{
+			name: "strTrimLeft",
+			args: []interface{}{""},
+			err:  errors.New("strTrimLeft expects exactly two arguments"),
+		},
+		{
+			name: "strTrimPrefix",
+			args: []interface{}{"abba", "a"},
+			exp:  "bba",
+		},
+		{
+			name: "strTrimPrefix",
+			args: []interface{}{"aabbaa", "a"},
+			exp:  "abbaa",
+		},
+		{
+			name: "strTrimPrefix",
+			args: []interface{}{""},
+			err:  errors.New("strTrimPrefix expects exactly two arguments"),
+		},
+		{
+			name: "strTrimRight",
+			args: []interface{}{"abba", "a"},
+			exp:  "abb",
+		},
+		{
+			name: "strTrimRight",
+			args: []interface{}{"aabbaa", "a"},
+			exp:  "aabb",
+		},
+		{
+			name: "strTrimRight",
+			args: []interface{}{""},
+			err:  errors.New("strTrimRight expects exactly two arguments"),
+		},
+		{
+			name: "strTrimSuffix",
+			args: []interface{}{"abba", "a"},
+			exp:  "abb",
+		},
+		{
+			name: "strTrimSuffix",
+			args: []interface{}{"aabbaa", "a"},
+			exp:  "aabba",
+		},
+		{
+			name: "strTrimSuffix",
+			args: []interface{}{""},
+			err:  errors.New("strTrimSuffix expects exactly two arguments"),
+		},
+		{
+			name: "regexReplace",
+			args: []interface{}{regexp.MustCompile("a(x*)b"), "-ab-axxb-", "T"},
+			exp:  "-T-T-",
+		},
+		{
+			name: "regexReplace",
+			args: []interface{}{regexp.MustCompile("a(x*)b"), "-ab-axxb-", "$1"},
+			exp:  "--xx-",
+		},
+		{
+			name: "regexReplace",
+			args: []interface{}{regexp.MustCompile("a(x*)b"), "-ab-axxb-", "$1W"},
+			exp:  "---",
+		},
+		{
+			name: "regexReplace",
+			args: []interface{}{regexp.MustCompile("a(x*)b"), "-ab-axxb-", "${1}W"},
+			exp:  "-W-xxW-",
+		},
+		{
+			name: "regexReplace",
+			args: []interface{}{regexp.MustCompile("a(?P<middle>x*)b"), "-ab-axxb-", "${middle}W"},
+			exp:  "-W-xxW-",
+		},
+		{
+			name: "regexReplace",
+			args: []interface{}{""},
+			err:  errors.New("regexReplace expects exactly three arguments"),
+		},
+	}
+
+	for _, tc := range testCases {
+		f, ok := statelessFuncs[tc.name]
+		if !ok {
+			t.Fatalf("unknown function %s", tc.name)
+		}
+		result, err := f.Call(tc.args...)
+		if tc.err != nil {
+			if err == nil {
+				t.Errorf("%s: expected error got: nil exp: %s", tc.name, tc.err)
+			} else if got, exp := err.Error(), tc.err.Error(); got != exp {
+				t.Errorf("%s: unexpected error\ngot:\n%s\nexp:\n%s", tc.name, got, exp)
+			}
+			continue
+		} else if err != nil {
+			t.Errorf("%s: unexpected error: %s", tc.name, err)
+			continue
+		}
+
+		if result != tc.exp {
+			t.Errorf("%s: unexpected result\ngot: %+v\nexp: %+v", tc.name, result, tc.exp)
+		}
+
+	}
+
 }

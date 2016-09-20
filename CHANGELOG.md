@@ -11,6 +11,7 @@
 - [#854](https://github.com/influxdata/kapacitor/issues/854): Add `.create` property to InfluxDBOut node, which when set will create the database
     and retention policy on task start.
 - [#909](https://github.com/influxdata/kapacitor/pull/909): Allow duration / duration in TICKscript.
+- [#777](https://github.com/influxdata/kapacitor/issues/777): Add support for string manipulation functions.
 
 ### Bugfixes
 

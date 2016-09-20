@@ -37,6 +37,7 @@ const (
 	TokenFalse
 	TokenRegex
 	TokenComment
+	TokenStar
 
 	// begin operator tokens
 	begin_tok_operator
@@ -152,6 +153,8 @@ func (t TokenType) String() string {
 		return "regex"
 	case t == TokenComment:
 		return "//"
+	case t == TokenStar:
+		return "*"
 	case t == TokenDot:
 		return "."
 	case t == TokenPipe:
@@ -321,9 +324,9 @@ func (l *lexer) expect(r rune) bool {
 func lexToken(l *lexer) stateFn {
 	for {
 		switch r := l.next(); {
-		case isOperatorChar(r):
+		case isUnaryOperatorChar(r):
 			l.backup()
-			return lexOperator
+			return lexUnaryOperator
 		case unicode.IsDigit(r), r == '-', r == '.':
 			l.backup()
 			return lexNumberOrDurationOrDot
@@ -341,7 +344,7 @@ func lexToken(l *lexer) stateFn {
 			return lexToken
 		case r == ')':
 			l.emit(TokenRParen)
-			return lexToken
+			return tryLexBinaryOperator
 		case r == '[':
 			l.emit(TokenLSBracket)
 			return lexToken
@@ -357,23 +360,47 @@ func lexToken(l *lexer) stateFn {
 		case r == ',':
 			l.emit(TokenComma)
 			return lexToken
+		case r == '*':
+			l.emit(TokenStar)
+			return lexToken
+		case r == '/':
+			if l.peek() == '/' {
+				l.backup()
+				return lexComment
+			}
+			l.backup()
+			return lexRegex
 		case r == eof:
 			l.emit(TokenEOF)
 			return nil
 		default:
-			l.errorf("unknown state")
+			l.errorf("unknown state, last char: %q", r)
 			return nil
 		}
 	}
 }
 
-const operatorChars = "+-*/><!=%"
+const unaryOperatorChars = "-!"
 
-func isOperatorChar(r rune) bool {
-	return strings.IndexRune(operatorChars, r) != -1
+func isUnaryOperatorChar(r rune) bool {
+	return strings.IndexRune(unaryOperatorChars, r) != -1
 }
 
-func lexOperator(l *lexer) stateFn {
+func lexUnaryOperator(l *lexer) stateFn {
+	for {
+		switch c := l.next(); c {
+		case '-', '!':
+			op := strToOperator[l.current()]
+			l.emit(op)
+			return lexToken
+		default:
+			return l.errorf("unexpected unary operator char %q", c)
+		}
+	}
+}
+
+func tryLexBinaryOperator(l *lexer) stateFn {
+	l.ignoreSpace()
 	for {
 		switch l.next() {
 		case '+', '-', '*', '%':
@@ -427,7 +454,12 @@ func lexOperator(l *lexer) stateFn {
 				}
 			}
 			return lexToken
+		default:
+			// We didn't find an operator, bounce back up to lexToken
+			l.backup()
+			return lexToken
 		}
+
 	}
 }
 
@@ -449,7 +481,7 @@ func lexIdentOrKeyword(l *lexer) stateFn {
 			} else {
 				l.emit(TokenIdent)
 			}
-			return lexToken
+			return tryLexBinaryOperator
 		}
 	}
 }
@@ -491,11 +523,11 @@ func lexNumberOrDurationOrDot(l *lexer) stateFn {
 				l.next()
 			}
 			l.emit(TokenDuration)
-			return lexToken
+			return tryLexBinaryOperator
 		default:
 			l.backup()
 			l.emit(TokenNumber)
-			return lexToken
+			return tryLexBinaryOperator
 		}
 		first = false
 	}
@@ -510,7 +542,7 @@ func lexReference(l *lexer) stateFn {
 			}
 		case '"':
 			l.emit(TokenReference)
-			return lexToken
+			return tryLexBinaryOperator
 		case eof:
 			return l.errorf("unterminated field reference")
 		}
@@ -533,7 +565,7 @@ func lexSingleOrTripleString(l *lexer) stateFn {
 					l.next()
 				} else {
 					l.emit(TokenString)
-					return lexToken
+					return tryLexBinaryOperator
 				}
 			}
 			if (count == 1 && l.peek() != '\'') || count == 3 {
@@ -549,7 +581,7 @@ func lexSingleOrTripleString(l *lexer) stateFn {
 						count--
 						if count == 0 {
 							l.emit(TokenString)
-							return lexToken
+							return tryLexBinaryOperator
 						}
 					case r == eof:
 						return l.errorf("unterminated string")

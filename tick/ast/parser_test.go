@@ -1067,6 +1067,69 @@ var y = x * 2`,
 			},
 		},
 		{
+			script: `var x = a.f(/.*/)`,
+			Root: &ProgramNode{
+				position: position{
+					pos:  0,
+					line: 1,
+					char: 1,
+				},
+				Nodes: []Node{
+					&DeclarationNode{
+						position: position{
+							pos:  0,
+							line: 1,
+							char: 1,
+						},
+						Left: &IdentifierNode{
+							position: position{
+								pos:  4,
+								line: 1,
+								char: 5,
+							},
+							Ident: "x",
+						},
+						Right: &ChainNode{
+							position: position{
+								pos:  9,
+								line: 1,
+								char: 10,
+							},
+							Operator: TokenDot,
+							Left: &IdentifierNode{
+								position: position{
+									pos:  8,
+									line: 1,
+									char: 9,
+								},
+								Ident: "a",
+							},
+							Right: &FunctionNode{
+								position: position{
+									pos:  10,
+									line: 1,
+									char: 11,
+								},
+								Type: PropertyFunc,
+								Func: "f",
+								Args: []Node{
+									&RegexNode{
+										position: position{
+											pos:  12,
+											line: 1,
+											char: 13,
+										},
+										Regex:   regexp.MustCompile(".*"),
+										Literal: `.*`,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			script: `var x = int(sqrt(16.0)) + 4`,
 			Root: &ProgramNode{
 				position: position{

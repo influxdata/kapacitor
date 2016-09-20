@@ -387,10 +387,10 @@ func (p *parser) stringItem() (n Node) {
 		n = p.identifier()
 	case TokenString:
 		n = p.string()
-	case TokenMult:
+	case TokenStar:
 		n = p.star()
 	default:
-		p.unexpected(t, TokenIdent, TokenString, TokenMult)
+		p.unexpected(t, TokenIdent, TokenString, TokenStar)
 	}
 	return
 }
@@ -508,7 +508,7 @@ func (p *parser) primary() Node {
 		return p.duration()
 	case tok.typ == TokenRegex:
 		return p.regex()
-	case tok.typ == TokenMult:
+	case tok.typ == TokenStar:
 		return p.star()
 	case tok.typ == TokenReference:
 		return p.reference()
@@ -580,7 +580,7 @@ func (p *parser) regex() Node {
 
 // parse '*' literal
 func (p *parser) star() Node {
-	tok := p.expect(TokenMult)
+	tok := p.expect(TokenStar)
 	return newStar(p.position(tok.pos), p.consumeComment())
 }
 

@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/dustin/go-humanize"
@@ -28,11 +30,11 @@ var statelessFuncs Funcs
 func init() {
 	statelessFuncs = make(Funcs)
 	// Conversion functions
-	statelessFuncs["bool"] = &boolean{}
-	statelessFuncs["int"] = &integer{}
-	statelessFuncs["float"] = &float{}
-	statelessFuncs["string"] = &str{}
-	statelessFuncs["duration"] = &duration{}
+	statelessFuncs["bool"] = boolean{}
+	statelessFuncs["int"] = integer{}
+	statelessFuncs["float"] = float{}
+	statelessFuncs["string"] = str{}
+	statelessFuncs["duration"] = duration{}
 
 	// Math functions
 	statelessFuncs["abs"] = newMath1("abs", math.Abs)
@@ -78,19 +80,43 @@ func init() {
 	statelessFuncs["y1"] = newMath1("y1", math.Y1)
 	statelessFuncs["yn"] = newMathIF("yn", math.Yn)
 
+	// String functions
+	statelessFuncs["strContains"] = newString2Bool("strContains", strings.Contains)
+	statelessFuncs["strContainsAny"] = newString2Bool("strContainsAny", strings.ContainsAny)
+	statelessFuncs["strCount"] = newString2Int("strCount", strings.Count)
+	statelessFuncs["strHasPrefix"] = newString2Bool("strHasPrefix", strings.HasPrefix)
+	statelessFuncs["strHasSuffix"] = newString2Bool("strHasSuffix", strings.HasSuffix)
+	statelessFuncs["strIndex"] = newString2Int("strIndex", strings.Index)
+	statelessFuncs["strIndexAny"] = newString2Int("strIndexAny", strings.IndexAny)
+	statelessFuncs["strLastIndex"] = newString2Int("strLastIndex", strings.LastIndex)
+	statelessFuncs["strLastIndexAny"] = newString2Int("strLastIndexAny", strings.LastIndexAny)
+	statelessFuncs["strReplace"] = strReplace{}
+	statelessFuncs["strSubstring"] = strSubstring{}
+	statelessFuncs["strToLower"] = newString1String("strToLower", strings.ToLower)
+	statelessFuncs["strToUpper"] = newString1String("strToUpper", strings.ToUpper)
+	statelessFuncs["strTrim"] = newString2String("strTrim", strings.Trim)
+	statelessFuncs["strTrimLeft"] = newString2String("strTrimLeft", strings.TrimLeft)
+	statelessFuncs["strTrimPrefix"] = newString2String("strTrimPrefix", strings.TrimPrefix)
+	statelessFuncs["strTrimRight"] = newString2String("strTrimRight", strings.TrimRight)
+	statelessFuncs["strTrimSpace"] = newString1String("strTrimSpace", strings.TrimSpace)
+	statelessFuncs["strTrimSuffix"] = newString2String("strTrimSuffix", strings.TrimSuffix)
+
+	// Regex functions
+	statelessFuncs["regexReplace"] = regexReplace{}
+
 	// Time functions
-	statelessFuncs["minute"] = &minute{}
-	statelessFuncs["hour"] = &hour{}
-	statelessFuncs["weekday"] = &weekday{}
-	statelessFuncs["day"] = &day{}
-	statelessFuncs["month"] = &month{}
-	statelessFuncs["year"] = &year{}
+	statelessFuncs["minute"] = minute{}
+	statelessFuncs["hour"] = hour{}
+	statelessFuncs["weekday"] = weekday{}
+	statelessFuncs["day"] = day{}
+	statelessFuncs["month"] = month{}
+	statelessFuncs["year"] = year{}
 
 	// Humanize functions
-	statelessFuncs["humanBytes"] = &humanBytes{}
+	statelessFuncs["humanBytes"] = humanBytes{}
 
 	// Conditionals
-	statelessFuncs["if"] = &ifFunc{}
+	statelessFuncs["if"] = ifFunc{}
 }
 
 // Return set of built-in Funcs
@@ -114,15 +140,14 @@ type math1 struct {
 	f    math1Func
 }
 
-func newMath1(name string, f math1Func) *math1 {
-	return &math1{
+func newMath1(name string, f math1Func) math1 {
+	return math1{
 		name: name,
 		f:    f,
 	}
 }
 
-// Converts the value to a boolean
-func (m *math1) Call(args ...interface{}) (v interface{}, err error) {
+func (m math1) Call(args ...interface{}) (v interface{}, err error) {
 	if len(args) != 1 {
 		return 0, errors.New(m.name + " expects exactly one argument")
 	}
@@ -135,7 +160,7 @@ func (m *math1) Call(args ...interface{}) (v interface{}, err error) {
 	return
 }
 
-func (m *math1) Reset() {}
+func (m math1) Reset() {}
 
 type math2Func func(float64, float64) float64
 type math2 struct {
@@ -143,15 +168,14 @@ type math2 struct {
 	f    math2Func
 }
 
-func newMath2(name string, f math2Func) *math2 {
-	return &math2{
+func newMath2(name string, f math2Func) math2 {
+	return math2{
 		name: name,
 		f:    f,
 	}
 }
 
-// Converts the value to a boolean
-func (m *math2) Call(args ...interface{}) (v interface{}, err error) {
+func (m math2) Call(args ...interface{}) (v interface{}, err error) {
 	if len(args) != 2 {
 		return 0, errors.New(m.name + " expects exactly two arguments")
 	}
@@ -169,7 +193,7 @@ func (m *math2) Call(args ...interface{}) (v interface{}, err error) {
 	return
 }
 
-func (m *math2) Reset() {}
+func (m math2) Reset() {}
 
 type mathIFunc func(int) float64
 type mathI struct {
@@ -177,15 +201,14 @@ type mathI struct {
 	f    mathIFunc
 }
 
-func newMathI(name string, f mathIFunc) *mathI {
-	return &mathI{
+func newMathI(name string, f mathIFunc) mathI {
+	return mathI{
 		name: name,
 		f:    f,
 	}
 }
 
-// Converts the value to a boolean
-func (m *mathI) Call(args ...interface{}) (v interface{}, err error) {
+func (m mathI) Call(args ...interface{}) (v interface{}, err error) {
 	if len(args) != 1 {
 		return 0, errors.New(m.name + " expects exactly two arguments")
 	}
@@ -198,7 +221,7 @@ func (m *mathI) Call(args ...interface{}) (v interface{}, err error) {
 	return
 }
 
-func (m *mathI) Reset() {}
+func (m mathI) Reset() {}
 
 type mathIFFunc func(int, float64) float64
 type mathIF struct {
@@ -206,15 +229,14 @@ type mathIF struct {
 	f    mathIFFunc
 }
 
-func newMathIF(name string, f mathIFFunc) *mathIF {
-	return &mathIF{
+func newMathIF(name string, f mathIFFunc) mathIF {
+	return mathIF{
 		name: name,
 		f:    f,
 	}
 }
 
-// Converts the value to a boolean
-func (m *mathIF) Call(args ...interface{}) (v interface{}, err error) {
+func (m mathIF) Call(args ...interface{}) (v interface{}, err error) {
 	if len(args) != 2 {
 		return 0, errors.New(m.name + " expects exactly two arguments")
 	}
@@ -232,16 +254,242 @@ func (m *mathIF) Call(args ...interface{}) (v interface{}, err error) {
 	return
 }
 
-func (m *mathIF) Reset() {}
+func (m mathIF) Reset() {}
+
+type string2BoolFunc func(string, string) bool
+type string2Bool struct {
+	name string
+	f    string2BoolFunc
+}
+
+func newString2Bool(name string, f string2BoolFunc) string2Bool {
+	return string2Bool{
+		name: name,
+		f:    f,
+	}
+}
+
+func (m string2Bool) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 2 {
+		return 0, errors.New(m.name + " expects exactly two arguments")
+	}
+	a0, ok := args[0].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as first arg to %s, must be string", args[0], m.name)
+		return
+	}
+	a1, ok := args[1].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as second arg to %s, must be string", args[1], m.name)
+		return
+	}
+	v = m.f(a0, a1)
+	return
+}
+
+func (m string2Bool) Reset() {}
+
+type string2IntFunc func(string, string) int
+type string2Int struct {
+	name string
+	f    string2IntFunc
+}
+
+func newString2Int(name string, f string2IntFunc) string2Int {
+	return string2Int{
+		name: name,
+		f:    f,
+	}
+}
+
+func (m string2Int) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 2 {
+		return 0, errors.New(m.name + " expects exactly two arguments")
+	}
+	a0, ok := args[0].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as first arg to %s, must be string", args[0], m.name)
+		return
+	}
+	a1, ok := args[1].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as second arg to %s, must be string", args[1], m.name)
+		return
+	}
+	v = int64(m.f(a0, a1))
+	return
+}
+
+func (m string2Int) Reset() {}
+
+type string2StringFunc func(string, string) string
+type string2String struct {
+	name string
+	f    string2StringFunc
+}
+
+func newString2String(name string, f string2StringFunc) string2String {
+	return string2String{
+		name: name,
+		f:    f,
+	}
+}
+
+func (m string2String) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 2 {
+		return 0, errors.New(m.name + " expects exactly two arguments")
+	}
+	a0, ok := args[0].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as first arg to %s, must be string", args[0], m.name)
+		return
+	}
+	a1, ok := args[1].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as second arg to %s, must be string", args[1], m.name)
+		return
+	}
+	v = m.f(a0, a1)
+	return
+}
+
+func (m string2String) Reset() {}
+
+type string1StringFunc func(string) string
+type string1String struct {
+	name string
+	f    string1StringFunc
+}
+
+func newString1String(name string, f string1StringFunc) string1String {
+	return string1String{
+		name: name,
+		f:    f,
+	}
+}
+
+func (m string1String) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 1 {
+		return 0, errors.New(m.name + " expects exactly one argument")
+	}
+	a0, ok := args[0].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as first arg to %s, must be string", args[0], m.name)
+		return
+	}
+	v = m.f(a0)
+	return
+}
+
+func (m string1String) Reset() {}
+
+type strReplace struct {
+}
+
+func (m strReplace) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 4 {
+		return 0, errors.New("strReplace expects exactly four arguments")
+	}
+	str, ok := args[0].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as first arg to strReplace, must be string", args[0])
+		return
+	}
+	old, ok := args[1].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as second arg to strReplace, must be string", args[1])
+		return
+	}
+	new, ok := args[2].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as third arg to strReplace, must be string", args[2])
+		return
+	}
+	n, ok := args[3].(int64)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as fourth arg to strReplace, must be int", args[3])
+		return
+	}
+	v = strings.Replace(str, old, new, int(n))
+	return
+}
+
+func (m strReplace) Reset() {}
+
+type strSubstring struct {
+}
+
+func (m strSubstring) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 3 {
+		return 0, errors.New("strSubstring expects exactly three arguments")
+	}
+	str, ok := args[0].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as first arg to strSubstring, must be string", args[0])
+		return
+	}
+	start, ok := args[1].(int64)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as second arg to strSubstring, must be int", args[1])
+		return
+	}
+	stop, ok := args[2].(int64)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as third arg to strSubstring, must be int", args[2])
+		return
+	}
+	if start < 0 {
+		return nil, fmt.Errorf("found negative index for strSubstring: %d", start)
+	}
+	if stop < 0 {
+		return nil, fmt.Errorf("found negative index for strSubstring: %d", stop)
+	}
+	if int(stop) >= len(str) {
+		return nil, fmt.Errorf("stop index too large for string in strSubstring: %d", stop)
+	}
+
+	v = str[start:stop]
+	return
+}
+
+func (m strSubstring) Reset() {}
+
+type regexReplace struct {
+}
+
+func (m regexReplace) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 3 {
+		return 0, errors.New("regexReplace expects exactly three arguments")
+	}
+	pattern, ok := args[0].(*regexp.Regexp)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as first arg to regexReplace, must be regex", args[0])
+		return
+	}
+	src, ok := args[1].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as second arg to regexReplace, must be string", args[1])
+		return
+	}
+	repl, ok := args[2].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as third arg to regexReplace, must be string", args[2])
+		return
+	}
+	v = pattern.ReplaceAllString(src, repl)
+	return
+}
+
+func (m regexReplace) Reset() {}
 
 type boolean struct {
 }
 
-func (*boolean) Reset() {
+func (boolean) Reset() {
 }
 
 // Converts the value to a boolean
-func (*boolean) Call(args ...interface{}) (v interface{}, err error) {
+func (boolean) Call(args ...interface{}) (v interface{}, err error) {
 	if len(args) != 1 {
 		return 0, errors.New("bool expects exactly one argument")
 	}
@@ -277,11 +525,11 @@ func (*boolean) Call(args ...interface{}) (v interface{}, err error) {
 type integer struct {
 }
 
-func (*integer) Reset() {
+func (integer) Reset() {
 }
 
 // Converts the value to a integer
-func (*integer) Call(args ...interface{}) (v interface{}, err error) {
+func (integer) Call(args ...interface{}) (v interface{}, err error) {
 	if len(args) != 1 {
 		return 0, errors.New("int expects exactly one argument")
 	}
@@ -309,11 +557,11 @@ func (*integer) Call(args ...interface{}) (v interface{}, err error) {
 type float struct {
 }
 
-func (*float) Reset() {
+func (float) Reset() {
 }
 
 // Converts the value to a float
-func (*float) Call(args ...interface{}) (v interface{}, err error) {
+func (float) Call(args ...interface{}) (v interface{}, err error) {
 	if len(args) != 1 {
 		return 0, errors.New("float expects exactly one argument")
 	}
@@ -339,11 +587,11 @@ func (*float) Call(args ...interface{}) (v interface{}, err error) {
 type str struct {
 }
 
-func (*str) Reset() {
+func (str) Reset() {
 }
 
 // Converts the value to a str
-func (*str) Call(args ...interface{}) (v interface{}, err error) {
+func (str) Call(args ...interface{}) (v interface{}, err error) {
 	if len(args) != 1 {
 		return 0, errors.New("string expects exactly one argument")
 	}
@@ -367,11 +615,11 @@ func (*str) Call(args ...interface{}) (v interface{}, err error) {
 type duration struct {
 }
 
-func (*duration) Reset() {
+func (duration) Reset() {
 }
 
 // Converts the value to a duration in the given units
-func (*duration) Call(args ...interface{}) (v interface{}, err error) {
+func (duration) Call(args ...interface{}) (v interface{}, err error) {
 	if len(args) != 1 && len(args) != 2 {
 		return time.Duration(0), errors.New("duration expects one or two arguments duration(value, unit) where unit is optional depending on the type of value.")
 	}
@@ -490,11 +738,11 @@ func (s *spread) Call(args ...interface{}) (interface{}, error) {
 type minute struct {
 }
 
-func (*minute) Reset() {
+func (minute) Reset() {
 }
 
 // Return the minute within the hour for the given time, within the range [0,59].
-func (*minute) Call(args ...interface{}) (v interface{}, err error) {
+func (minute) Call(args ...interface{}) (v interface{}, err error) {
 	if len(args) != 1 {
 		return 0, errors.New("minute expects exactly one argument")
 	}
@@ -510,11 +758,11 @@ func (*minute) Call(args ...interface{}) (v interface{}, err error) {
 type hour struct {
 }
 
-func (*hour) Reset() {
+func (hour) Reset() {
 }
 
 // Return the hour within the day for the given time, within the range [0,23].
-func (*hour) Call(args ...interface{}) (v interface{}, err error) {
+func (hour) Call(args ...interface{}) (v interface{}, err error) {
 	if len(args) != 1 {
 		return 0, errors.New("hour expects exactly one argument")
 	}
@@ -530,11 +778,11 @@ func (*hour) Call(args ...interface{}) (v interface{}, err error) {
 type weekday struct {
 }
 
-func (*weekday) Reset() {
+func (weekday) Reset() {
 }
 
 // Return the weekday within the week for the given time, within the range [0,6] where 0 is Sunday.
-func (*weekday) Call(args ...interface{}) (v interface{}, err error) {
+func (weekday) Call(args ...interface{}) (v interface{}, err error) {
 	if len(args) != 1 {
 		return 0, errors.New("weekday expects exactly one argument")
 	}
@@ -550,11 +798,11 @@ func (*weekday) Call(args ...interface{}) (v interface{}, err error) {
 type day struct {
 }
 
-func (*day) Reset() {
+func (day) Reset() {
 }
 
 // Return the day within the month for the given time, within the range [1,31] depending on the month.
-func (*day) Call(args ...interface{}) (v interface{}, err error) {
+func (day) Call(args ...interface{}) (v interface{}, err error) {
 	if len(args) != 1 {
 		return 0, errors.New("day expects exactly one argument")
 	}
@@ -570,11 +818,11 @@ func (*day) Call(args ...interface{}) (v interface{}, err error) {
 type month struct {
 }
 
-func (*month) Reset() {
+func (month) Reset() {
 }
 
 // Return the month within the year for the given time, within the range [1,12].
-func (*month) Call(args ...interface{}) (v interface{}, err error) {
+func (month) Call(args ...interface{}) (v interface{}, err error) {
 	if len(args) != 1 {
 		return 0, errors.New("month expects exactly one argument")
 	}
@@ -590,11 +838,11 @@ func (*month) Call(args ...interface{}) (v interface{}, err error) {
 type year struct {
 }
 
-func (*year) Reset() {
+func (year) Reset() {
 }
 
 // Return the year for the given time.
-func (*year) Call(args ...interface{}) (v interface{}, err error) {
+func (year) Call(args ...interface{}) (v interface{}, err error) {
 	if len(args) != 1 {
 		return 0, errors.New("year expects exactly one argument")
 	}
@@ -610,11 +858,11 @@ func (*year) Call(args ...interface{}) (v interface{}, err error) {
 type humanBytes struct {
 }
 
-func (*humanBytes) Reset() {
+func (humanBytes) Reset() {
 
 }
 
-func (*humanBytes) Call(args ...interface{}) (v interface{}, err error) {
+func (humanBytes) Call(args ...interface{}) (v interface{}, err error) {
 	if len(args) != 1 {
 		return 0, errors.New("humanBytes expects exactly one argument")
 	}
@@ -632,11 +880,11 @@ func (*humanBytes) Call(args ...interface{}) (v interface{}, err error) {
 type ifFunc struct {
 }
 
-func (*ifFunc) Reset() {
+func (ifFunc) Reset() {
 
 }
 
-func (*ifFunc) Call(args ...interface{}) (interface{}, error) {
+func (ifFunc) Call(args ...interface{}) (interface{}, error) {
 	if len(args) != 3 {
 		return nil, errors.New("if expects exactly three arguments")
 	}
