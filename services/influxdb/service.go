@@ -114,13 +114,21 @@ func NewService(configs []Config, defaultInfluxDB, httpPort int, hostname string
 		}
 		runningSubs := make(map[subEntry]bool, len(c.Subscriptions))
 		services := make(map[subEntry]openCloser, len(c.Subscriptions))
+		port := httpPort
+		if c.HTTPPort != 0 {
+			port = c.HTTPPort
+		}
+		host := hostname
+		if c.KapacitorHostname != "" {
+			host = c.KapacitorHostname
+		}
 		clusters[c.Name] = &influxdbCluster{
 			clusterName:              c.Name,
 			configs:                  urls,
 			configSubs:               subs,
 			exConfigSubs:             exSubs,
-			hostname:                 hostname,
-			httpPort:                 httpPort,
+			hostname:                 host,
+			httpPort:                 port,
 			logger:                   l,
 			udpBind:                  c.UDPBind,
 			udpBuffer:                c.UDPBuffer,
