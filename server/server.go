@@ -38,6 +38,7 @@ import (
 	"github.com/influxdata/kapacitor/services/servicetest"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
+	"github.com/influxdata/kapacitor/services/snmptrap"
 	"github.com/influxdata/kapacitor/services/stats"
 	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/influxdata/kapacitor/services/talk"
@@ -185,6 +186,11 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	s.appendOpsGenieService()
 	s.appendPagerDutyService()
 	s.appendSMTPService()
+	s.appendTelegramService()
+	s.appendHipChatService()
+	s.appendAlertaService()
+	s.appendSlackService()
+	s.appendSnmpTrapService()
 	s.appendSensuService()
 	s.appendSlackService()
 	s.appendTalkService()
@@ -442,6 +448,16 @@ func (s *Server) appendSlackService() {
 
 	s.SetDynamicService("slack", srv)
 	s.AppendService("slack", srv)
+}
+
+func (s *Server) appendSnmpTrapService() {
+	c := s.config.SnmpTrap
+	l := s.LogService.NewLogger("[snmptrap] ", log.LstdFlags)
+	srv := snmptrap.NewService(c, l)
+	s.TaskMaster.SnmpTrapService = srv
+
+	s.SetDynamicService("snmptrap", srv)
+	s.AppendService("snmptrap", srv)
 }
 
 func (s *Server) appendTelegramService() {

@@ -45,6 +45,7 @@ import (
 	"github.com/influxdata/kapacitor/services/slack/slacktest"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/smtp/smtptest"
+	"github.com/influxdata/kapacitor/services/snmptrap"
 	"github.com/influxdata/kapacitor/services/storage/storagetest"
 	"github.com/influxdata/kapacitor/services/talk"
 	"github.com/influxdata/kapacitor/services/talk/talktest"
@@ -55,6 +56,7 @@ import (
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/udf/test"
 	"github.com/influxdata/wlog"
+	"github.com/k-sone/snmpgo"
 )
 
 var logService = loggingtest.New()
@@ -8722,4 +8724,80 @@ func compareListIgnoreOrder(got, exp []interface{}, cmpF func(got, exp interface
 	}
 	return nil
 
+}
+
+// SNMPTrap
+
+type TrapListener struct {
+	data string
+}
+
+func (l *TrapListener) OnTRAP(trap *snmpgo.TrapRequest) {
+	l.data = trap.Pdu.String()
+}
+
+func NewTrapListener(data *string) *TrapListener {
+	return &TrapListener{*data}
+}
+
+func TestStream_AlertSnmpTrap(t *testing.T) {
+	trapData := ""
+	server, err := snmpgo.NewTrapServer(snmpgo.ServerArguments{
+		LocalAddr: "127.0.0.1:9162",
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	// V2c
+	err = server.AddSecurity(&snmpgo.SecurityEntry{
+		Version:   snmpgo.V2c,
+		Community: "public",
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	go server.Serve(NewTrapListener(&trapData))
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.snmptrap('1.1.1')
+        .data('1.1.1.2', 's', 'SNMP ALERT')
+`
+
+	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
+	defer tm.Close()
+
+	c := snmptrap.NewConfig()
+	c.Enabled = true
+	c.TargetIp = "127.0.0.1"
+	c.TargetPort = 9162
+	c.Community = "public"
+	c.Version = "2c"
+	st := snmptrap.NewService(c, logService.NewLogger("[test_snmptrap] ", log.LstdFlags))
+	tm.SnmpTrapService = st
+
+	err = fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Stop server
+	server.Close()
+
+	if trapData == "" {
+		t.Errorf("No SNMP Trap data received")
+	}
 }

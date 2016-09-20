@@ -99,6 +99,11 @@ type TaskMaster struct {
 		StateChangesOnly() bool
 		Handler(slack.HandlerConfig, *log.Logger) alert.Handler
 	}
+	SnmpTrapService interface {
+		Global() bool
+		StateChangesOnly() bool
+		Alert(trapOid string, dataList [][3]string, level AlertLevel) error
+	}
 	TelegramService interface {
 		Global() bool
 		StateChangesOnly() bool
@@ -199,6 +204,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.PagerDutyService = tm.PagerDutyService
 	n.SlackService = tm.SlackService
 	n.TelegramService = tm.TelegramService
+	n.SnmpTrapService = tm.SnmpTrapService
 	n.HipChatService = tm.HipChatService
 	n.AlertaService = tm.AlertaService
 	n.SensuService = tm.SensuService

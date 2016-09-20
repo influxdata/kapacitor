@@ -336,6 +336,10 @@ type AlertNode struct {
 	// Send alert to Talk.
 	// tick:ignore
 	TalkHandlers []*TalkHandler `tick:"Talk"`
+
+	// Send alert using SNMPtraps.
+	// tick:ignore
+	SnmpTrapHandlers []*SnmpTrapHandler `tick:"SnmpTrap"`
 }
 
 func newAlertNode(wants EdgeType) *AlertNode {
@@ -1234,4 +1238,77 @@ func (a *AlertNode) Talk() *TalkHandler {
 // tick:embedded:AlertNode.Talk
 type TalkHandler struct {
 	*AlertNode
+}
+
+// Send the alert using SNMP traps.
+// To allow Kapacitor to post SNMP traps,
+//
+// Example:
+//    [snmptrap]
+//      enabled = true
+//      target-ip = "127.0.0.1"
+//      target-port = 9162
+//      community = "public"
+//      version = "2c"
+//      state-changes-only = false
+//
+// In order to not post a message every alert interval
+// use AlertNode.StateChangesOnly so that only events
+// where the alert changed state are posted to the channel.
+//
+// Example:
+//    stream
+//         |alert()
+//             .snmpTrap()
+//             .data('1.3.6.1.2.1.1.7', 'i', '{{ index .Field "value" }}')
+//
+// Send alerts to `target-ip:target-port` on OID '1.3.6.1.2.1.1.7'
+//
+// tick:property
+func (a *AlertNode) SnmpTrap(trapOid string, dataList ...[3]string) *SnmpTrapHandler {
+	snmpTrap := &SnmpTrapHandler{
+		AlertNode: a,
+		TrapOid:   trapOid,
+		DataList:  dataList,
+	}
+	a.SnmpTrapHandlers = append(a.SnmpTrapHandlers, snmpTrap)
+	return snmpTrap
+}
+
+// SNMPTrap AlertHandler
+// tick:embedded:AlertNode.SnmpTrap
+type SnmpTrapHandler struct {
+	*AlertNode
+
+	TrapOid string
+	// List of trap data.
+	// tick:ignore
+	DataList [][3]string `tick:"Data"`
+}
+
+// Define Data for SNMP Trap alert.
+// Multiple calls append to the existing list of data.
+//
+// Example:
+//    |alert()
+//       .id('{{ .Name }}')
+//       // Email subject
+//       .meassage('{{ .ID }}:{{ .Level }}')
+//       //Email body as HTML
+//       .details('''
+//<h1>{{ .ID }}</h1>
+//<b>{{ .Message }}</b>
+//Value: {{ index .Fields "value" }}
+//''')
+//       .snmpTrap('1.3.6.1.4.1.1')
+//          .data('1.3.6.1.4.1.1.5', 's', '{{ .Level }}' )
+//          .data('1.3.6.1.4.1.1.6', 's', '50' )
+//          .data('1.3.6.1.4.1..1.7', 's', '{{ index .Fields "used_percent" }}' )
+//
+// tick:property
+func (h *SnmpTrapHandler) Data(oid, rawType, value string) *SnmpTrapHandler {
+	// TODO check element validity
+	data := [3]string{oid, rawType, value}
+	h.DataList = append(h.DataList, data)
+	return h
 }

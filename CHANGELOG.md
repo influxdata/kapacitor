@@ -144,6 +144,7 @@ See the API docs for more details.
 - [#909](https://github.com/influxdata/kapacitor/pull/909): Allow duration / duration in TICKscript.
 - [#777](https://github.com/influxdata/kapacitor/issues/777): Add support for string manipulation functions.
 - [#886](https://github.com/influxdata/kapacitor/issues/886): Add ability to set specific HTTP port and hostname per configured InfluxDB cluster.
+- [#923](https://github.com/influxdata/kapacitor/pull/929): Add SNMP trap service for alerting
 
 ### Bugfixes
 

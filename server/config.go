@@ -28,6 +28,7 @@ import (
 	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
+	"github.com/influxdata/kapacitor/services/snmptrap"
 	"github.com/influxdata/kapacitor/services/stats"
 	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/influxdata/kapacitor/services/talk"
@@ -70,6 +71,7 @@ type Config struct {
 	Talk      talk.Config      `toml:"talk" override:"talk"`
 	Telegram  telegram.Config  `toml:"telegram" override:"telegram"`
 	VictorOps victorops.Config `toml:"victorops" override:"victorops"`
+	SnmpTrap  snmptrap.Config  `toml:"snmptrap" override:"snmptrap"`
 
 	// Third-party integrations
 	Kubernetes k8s.Config `toml:"kubernetes" override:"kubernetes"`
@@ -115,6 +117,7 @@ func NewConfig() *Config {
 	c.Sensu = sensu.NewConfig()
 	c.Slack = slack.NewConfig()
 	c.Talk = talk.NewConfig()
+	c.SnmpTrap = snmptrap.NewConfig()
 	c.Telegram = telegram.NewConfig()
 	c.VictorOps = victorops.NewConfig()
 
@@ -226,6 +229,9 @@ func (c *Config) Validate() error {
 		return err
 	}
 	if err := c.Slack.Validate(); err != nil {
+		return err
+	}
+	if err := c.SnmpTrap.Validate(); err != nil {
 		return err
 	}
 	if err := c.Talk.Validate(); err != nil {
