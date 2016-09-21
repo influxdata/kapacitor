@@ -70,7 +70,6 @@ func NewService(c Config, hostname string, l *log.Logger, li logging.Interface) 
 		),
 		logger: l,
 	}
-	s.Handler.logger = s.logger
 	return s
 }
 

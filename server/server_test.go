@@ -25,7 +25,12 @@ import (
 	"github.com/influxdata/influxdb/toml"
 	"github.com/influxdata/kapacitor/client/v1"
 	"github.com/influxdata/kapacitor/server"
+	"github.com/influxdata/kapacitor/services/opsgenie"
+	"github.com/influxdata/kapacitor/services/pagerduty"
+	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/udf"
+	"github.com/influxdata/kapacitor/services/victorops"
+	"github.com/pkg/errors"
 )
 
 var udfDir string
@@ -4629,6 +4634,794 @@ func TestServer_CreateReplay_ValidIDs(t *testing.T) {
 
 		if exp, got := id, replay.ID; got != exp {
 			t.Errorf("unexpected replay ID got %s exp %s", got, exp)
+		}
+	}
+}
+
+func TestServer_UpdateConfig(t *testing.T) {
+	type updateAction struct {
+		element      string
+		updateAction client.ConfigUpdateAction
+		expSection   client.ConfigSection
+		expElement   client.ConfigElement
+	}
+	testCases := []struct {
+		section           string
+		element           string
+		setDefaults       func(*server.Config)
+		expDefaultSection client.ConfigSection
+		expDefaultElement client.ConfigElement
+		updates           []updateAction
+	}{
+		{
+			section: "influxdb",
+			element: "default",
+			setDefaults: func(c *server.Config) {
+				c.InfluxDB[0].Username = "bob"
+				c.InfluxDB[0].Password = "secret"
+			},
+			expDefaultSection: client.ConfigSection{client.ConfigElement{
+				"default":                     false,
+				"disable-subscriptions":       false,
+				"enabled":                     false,
+				"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
+				"http-port":                   float64(0),
+				"insecure-skip-verify":        false,
+				"kapacitor-hostname":          "",
+				"name":                        "default",
+				"password":                    true,
+				"ssl-ca":                      "",
+				"ssl-cert":                    "",
+				"ssl-key":                     "",
+				"startup-timeout":             "5m0s",
+				"subscription-protocol":       "http",
+				"subscriptions":               map[string]interface{}{},
+				"subscriptions-sync-interval": "1m0s",
+				"timeout":                     "0",
+				"udp-bind":                    "",
+				"udp-buffer":                  float64(1e3),
+				"udp-read-buffer":             float64(0),
+				"urls":                        []interface{}{"http://localhost:8086"},
+				"username":                    "bob",
+			}},
+			expDefaultElement: client.ConfigElement{
+				"default":                     false,
+				"disable-subscriptions":       false,
+				"enabled":                     false,
+				"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
+				"http-port":                   float64(0),
+				"insecure-skip-verify":        false,
+				"kapacitor-hostname":          "",
+				"name":                        "default",
+				"password":                    true,
+				"ssl-ca":                      "",
+				"ssl-cert":                    "",
+				"ssl-key":                     "",
+				"startup-timeout":             "5m0s",
+				"subscription-protocol":       "http",
+				"subscriptions":               map[string]interface{}{},
+				"subscriptions-sync-interval": "1m0s",
+				"timeout":                     "0",
+				"udp-bind":                    "",
+				"udp-buffer":                  float64(1e3),
+				"udp-read-buffer":             float64(0),
+				"urls":                        []interface{}{"http://localhost:8086"},
+				"username":                    "bob",
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"default":               true,
+							"subscription-protocol": "https",
+							"subscriptions":         map[string][]string{"_internal": []string{"monitor"}},
+						},
+					},
+					expSection: client.ConfigSection{client.ConfigElement{
+						"default":                     true,
+						"disable-subscriptions":       false,
+						"enabled":                     false,
+						"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
+						"http-port":                   float64(0),
+						"insecure-skip-verify":        false,
+						"kapacitor-hostname":          "",
+						"name":                        "default",
+						"password":                    true,
+						"ssl-ca":                      "",
+						"ssl-cert":                    "",
+						"ssl-key":                     "",
+						"startup-timeout":             "5m0s",
+						"subscription-protocol":       "https",
+						"subscriptions":               map[string]interface{}{"_internal": []interface{}{"monitor"}},
+						"subscriptions-sync-interval": "1m0s",
+						"timeout":                     "0",
+						"udp-bind":                    "",
+						"udp-buffer":                  float64(1e3),
+						"udp-read-buffer":             float64(0),
+						"urls":                        []interface{}{"http://localhost:8086"},
+						"username":                    "bob",
+					}},
+					expElement: client.ConfigElement{
+						"default":                     true,
+						"disable-subscriptions":       false,
+						"enabled":                     false,
+						"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
+						"http-port":                   float64(0),
+						"insecure-skip-verify":        false,
+						"kapacitor-hostname":          "",
+						"name":                        "default",
+						"password":                    true,
+						"ssl-ca":                      "",
+						"ssl-cert":                    "",
+						"ssl-key":                     "",
+						"startup-timeout":             "5m0s",
+						"subscription-protocol":       "https",
+						"subscriptions":               map[string]interface{}{"_internal": []interface{}{"monitor"}},
+						"subscriptions-sync-interval": "1m0s",
+						"timeout":                     "0",
+						"udp-bind":                    "",
+						"udp-buffer":                  float64(1e3),
+						"udp-read-buffer":             float64(0),
+						"urls":                        []interface{}{"http://localhost:8086"},
+						"username":                    "bob",
+					},
+				},
+				{
+					updateAction: client.ConfigUpdateAction{
+						Add: map[string]interface{}{
+							"name": "new",
+						},
+					},
+					expSection: client.ConfigSection{
+						client.ConfigElement{
+							"default":                     true,
+							"disable-subscriptions":       false,
+							"enabled":                     false,
+							"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
+							"http-port":                   float64(0),
+							"insecure-skip-verify":        false,
+							"kapacitor-hostname":          "",
+							"name":                        "default",
+							"password":                    true,
+							"ssl-ca":                      "",
+							"ssl-cert":                    "",
+							"ssl-key":                     "",
+							"startup-timeout":             "5m0s",
+							"subscription-protocol":       "https",
+							"subscriptions":               map[string]interface{}{"_internal": []interface{}{"monitor"}},
+							"subscriptions-sync-interval": "1m0s",
+							"timeout":                     "0",
+							"udp-bind":                    "",
+							"udp-buffer":                  float64(1e3),
+							"udp-read-buffer":             float64(0),
+							"urls":                        []interface{}{"http://localhost:8086"},
+							"username":                    "bob",
+						},
+						client.ConfigElement{
+							"default":                     false,
+							"disable-subscriptions":       false,
+							"enabled":                     true,
+							"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
+							"http-port":                   float64(0),
+							"insecure-skip-verify":        false,
+							"kapacitor-hostname":          "",
+							"name":                        "new",
+							"password":                    false,
+							"ssl-ca":                      "",
+							"ssl-cert":                    "",
+							"ssl-key":                     "",
+							"startup-timeout":             "5m0s",
+							"subscription-protocol":       "http",
+							"subscriptions":               map[string]interface{}{},
+							"subscriptions-sync-interval": "1m0s",
+							"timeout":                     "0",
+							"udp-bind":                    "",
+							"udp-buffer":                  float64(1e3),
+							"udp-read-buffer":             float64(0),
+							"urls":                        []interface{}{"http://localhost:8086"},
+							"username":                    "",
+						},
+					},
+					element: "new",
+					expElement: client.ConfigElement{
+						"default":                     false,
+						"disable-subscriptions":       false,
+						"enabled":                     true,
+						"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
+						"http-port":                   float64(0),
+						"insecure-skip-verify":        false,
+						"kapacitor-hostname":          "",
+						"name":                        "new",
+						"password":                    false,
+						"ssl-ca":                      "",
+						"ssl-cert":                    "",
+						"ssl-key":                     "",
+						"startup-timeout":             "5m0s",
+						"subscription-protocol":       "http",
+						"subscriptions":               map[string]interface{}{},
+						"subscriptions-sync-interval": "1m0s",
+						"timeout":                     "0",
+						"udp-bind":                    "",
+						"udp-buffer":                  float64(1e3),
+						"udp-read-buffer":             float64(0),
+						"urls":                        []interface{}{"http://localhost:8086"},
+						"username":                    "",
+					},
+				},
+			},
+		},
+		{
+			section: "alerta",
+			setDefaults: func(c *server.Config) {
+				c.Alerta.URL = "http://alerta.example.com"
+			},
+			expDefaultSection: client.ConfigSection{client.ConfigElement{
+				"enabled":     false,
+				"environment": "",
+				"origin":      "",
+				"token":       false,
+				"url":         "http://alerta.example.com",
+			}},
+			expDefaultElement: client.ConfigElement{
+				"enabled":     false,
+				"environment": "",
+				"origin":      "",
+				"token":       false,
+				"url":         "http://alerta.example.com",
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"token":  "token",
+							"origin": "kapacitor",
+						},
+					},
+					expSection: client.ConfigSection{client.ConfigElement{
+						"enabled":     false,
+						"environment": "",
+						"origin":      "kapacitor",
+						"token":       true,
+						"url":         "http://alerta.example.com",
+					}},
+					expElement: client.ConfigElement{
+						"enabled":     false,
+						"environment": "",
+						"origin":      "kapacitor",
+						"token":       true,
+						"url":         "http://alerta.example.com",
+					},
+				},
+			},
+		},
+		{
+			section: "hipchat",
+			setDefaults: func(c *server.Config) {
+				c.HipChat.URL = "http://hipchat.example.com"
+			},
+			expDefaultSection: client.ConfigSection{client.ConfigElement{
+				"enabled":            false,
+				"global":             false,
+				"room":               "",
+				"state-changes-only": false,
+				"token":              false,
+				"url":                "http://hipchat.example.com",
+			}},
+			expDefaultElement: client.ConfigElement{
+				"enabled":            false,
+				"global":             false,
+				"room":               "",
+				"state-changes-only": false,
+				"token":              false,
+				"url":                "http://hipchat.example.com",
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"token": "token",
+							"room":  "kapacitor",
+						},
+					},
+					expSection: client.ConfigSection{client.ConfigElement{
+						"enabled":            false,
+						"global":             false,
+						"room":               "kapacitor",
+						"state-changes-only": false,
+						"token":              true,
+						"url":                "http://hipchat.example.com",
+					}},
+					expElement: client.ConfigElement{
+						"enabled":            false,
+						"global":             false,
+						"room":               "kapacitor",
+						"state-changes-only": false,
+						"token":              true,
+						"url":                "http://hipchat.example.com",
+					},
+				},
+			},
+		},
+		{
+			section: "opsgenie",
+			setDefaults: func(c *server.Config) {
+				c.OpsGenie.URL = "http://opsgenie.example.com"
+			},
+			expDefaultSection: client.ConfigSection{client.ConfigElement{
+				"api-key":      false,
+				"enabled":      false,
+				"global":       false,
+				"recipients":   nil,
+				"recovery_url": opsgenie.DefaultOpsGenieRecoveryURL,
+				"teams":        nil,
+				"url":          "http://opsgenie.example.com",
+			}},
+			expDefaultElement: client.ConfigElement{
+				"api-key":      false,
+				"enabled":      false,
+				"global":       false,
+				"recipients":   nil,
+				"recovery_url": opsgenie.DefaultOpsGenieRecoveryURL,
+				"teams":        nil,
+				"url":          "http://opsgenie.example.com",
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"api-key": "token",
+							"global":  true,
+							"teams":   []string{"teamA", "teamB"},
+						},
+					},
+					expSection: client.ConfigSection{client.ConfigElement{
+						"api-key":      true,
+						"enabled":      false,
+						"global":       true,
+						"recipients":   nil,
+						"recovery_url": opsgenie.DefaultOpsGenieRecoveryURL,
+						"teams":        []interface{}{"teamA", "teamB"},
+						"url":          "http://opsgenie.example.com",
+					}},
+					expElement: client.ConfigElement{
+						"api-key":      true,
+						"enabled":      false,
+						"global":       true,
+						"recipients":   nil,
+						"recovery_url": opsgenie.DefaultOpsGenieRecoveryURL,
+						"teams":        []interface{}{"teamA", "teamB"},
+						"url":          "http://opsgenie.example.com",
+					},
+				},
+			},
+		},
+		{
+			section: "pagerduty",
+			setDefaults: func(c *server.Config) {
+				c.PagerDuty.ServiceKey = "secret"
+			},
+			expDefaultSection: client.ConfigSection{client.ConfigElement{
+				"enabled":     false,
+				"global":      false,
+				"service-key": true,
+				"url":         pagerduty.DefaultPagerDutyAPIURL,
+			}},
+			expDefaultElement: client.ConfigElement{
+				"enabled":     false,
+				"global":      false,
+				"service-key": true,
+				"url":         pagerduty.DefaultPagerDutyAPIURL,
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"service-key": "",
+							"enabled":     true,
+						},
+					},
+					expSection: client.ConfigSection{client.ConfigElement{
+						"enabled":     true,
+						"global":      false,
+						"service-key": false,
+						"url":         pagerduty.DefaultPagerDutyAPIURL,
+					}},
+					expElement: client.ConfigElement{
+						"enabled":     true,
+						"global":      false,
+						"service-key": false,
+						"url":         pagerduty.DefaultPagerDutyAPIURL,
+					},
+				},
+			},
+		},
+		{
+			section: "smtp",
+			setDefaults: func(c *server.Config) {
+				c.SMTP.Host = "smtp.example.com"
+			},
+			expDefaultSection: client.ConfigSection{client.ConfigElement{
+				"enabled":            false,
+				"from":               "",
+				"global":             false,
+				"host":               "smtp.example.com",
+				"idle-timeout":       "30s",
+				"no-verify":          false,
+				"password":           false,
+				"port":               float64(25),
+				"state-changes-only": false,
+				"to":                 nil,
+				"username":           "",
+			}},
+			expDefaultElement: client.ConfigElement{
+				"enabled":            false,
+				"from":               "",
+				"global":             false,
+				"host":               "smtp.example.com",
+				"idle-timeout":       "30s",
+				"no-verify":          false,
+				"password":           false,
+				"port":               float64(25),
+				"state-changes-only": false,
+				"to":                 nil,
+				"username":           "",
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"idle-timeout": "1m0s",
+							"global":       true,
+							"password":     "secret",
+						},
+					},
+					expSection: client.ConfigSection{client.ConfigElement{
+						"enabled":            false,
+						"from":               "",
+						"global":             true,
+						"host":               "smtp.example.com",
+						"idle-timeout":       "1m0s",
+						"no-verify":          false,
+						"password":           true,
+						"port":               float64(25),
+						"state-changes-only": false,
+						"to":                 nil,
+						"username":           "",
+					}},
+					expElement: client.ConfigElement{
+						"enabled":            false,
+						"from":               "",
+						"global":             true,
+						"host":               "smtp.example.com",
+						"idle-timeout":       "1m0s",
+						"no-verify":          false,
+						"password":           true,
+						"port":               float64(25),
+						"state-changes-only": false,
+						"to":                 nil,
+						"username":           "",
+					},
+				},
+			},
+		},
+		{
+			section: "sensu",
+			setDefaults: func(c *server.Config) {
+				c.Sensu.Addr = "sensu.example.com:3000"
+			},
+			expDefaultSection: client.ConfigSection{client.ConfigElement{
+				"addr":    "sensu.example.com:3000",
+				"enabled": false,
+				"source":  "Kapacitor",
+			}},
+			expDefaultElement: client.ConfigElement{
+				"addr":    "sensu.example.com:3000",
+				"enabled": false,
+				"source":  "Kapacitor",
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"addr":    "sensu.local:3000",
+							"enabled": true,
+							"source":  "",
+						},
+					},
+					expSection: client.ConfigSection{client.ConfigElement{
+						"addr":    "sensu.local:3000",
+						"enabled": true,
+						"source":  "",
+					}},
+					expElement: client.ConfigElement{
+						"addr":    "sensu.local:3000",
+						"enabled": true,
+						"source":  "",
+					},
+				},
+			},
+		},
+		{
+			section: "slack",
+			setDefaults: func(c *server.Config) {
+				c.Slack.Global = true
+			},
+			expDefaultSection: client.ConfigSection{client.ConfigElement{
+				"channel":            "",
+				"enabled":            false,
+				"global":             true,
+				"state-changes-only": false,
+				"url":                false,
+			}},
+			expDefaultElement: client.ConfigElement{
+				"channel":            "",
+				"enabled":            false,
+				"global":             true,
+				"state-changes-only": false,
+				"url":                false,
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"enabled": true,
+							"global":  false,
+							"channel": "#general",
+							"url":     "http://slack.example.com/secret-token",
+						},
+					},
+					expSection: client.ConfigSection{client.ConfigElement{
+						"channel":            "#general",
+						"enabled":            true,
+						"global":             false,
+						"state-changes-only": false,
+						"url":                true,
+					}},
+					expElement: client.ConfigElement{
+						"channel":            "#general",
+						"enabled":            true,
+						"global":             false,
+						"state-changes-only": false,
+						"url":                true,
+					},
+				},
+			},
+		},
+		{
+			section: "talk",
+			setDefaults: func(c *server.Config) {
+				c.Talk.AuthorName = "Kapacitor"
+			},
+			expDefaultSection: client.ConfigSection{client.ConfigElement{
+				"enabled":     false,
+				"url":         false,
+				"author_name": "Kapacitor",
+			}},
+			expDefaultElement: client.ConfigElement{
+				"enabled":     false,
+				"url":         false,
+				"author_name": "Kapacitor",
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"enabled": true,
+							"url":     "http://talk.example.com/secret-token",
+						},
+					},
+					expSection: client.ConfigSection{client.ConfigElement{
+						"enabled":     true,
+						"url":         true,
+						"author_name": "Kapacitor",
+					}},
+					expElement: client.ConfigElement{
+						"enabled":     true,
+						"url":         true,
+						"author_name": "Kapacitor",
+					},
+				},
+			},
+		},
+		{
+			section: "telegram",
+			setDefaults: func(c *server.Config) {
+				c.Telegram.ChatId = "kapacitor"
+			},
+			expDefaultSection: client.ConfigSection{client.ConfigElement{
+				"chat-id":                  "kapacitor",
+				"disable-notification":     false,
+				"disable-web-page-preview": false,
+				"enabled":                  false,
+				"global":                   false,
+				"parse-mode":               "",
+				"state-changes-only":       false,
+				"token":                    false,
+				"url":                      telegram.DefaultTelegramURL,
+			}},
+			expDefaultElement: client.ConfigElement{},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"enabled": true,
+							"token":   "token",
+						},
+					},
+					expSection: client.ConfigSection{client.ConfigElement{
+						"chat-id":                  "kapacitor",
+						"disable-notification":     false,
+						"disable-web-page-preview": false,
+						"enabled":                  true,
+						"global":                   false,
+						"parse-mode":               "",
+						"state-changes-only":       false,
+						"token":                    true,
+						"url":                      telegram.DefaultTelegramURL,
+					}},
+					expElement: client.ConfigElement{
+						"chat-id":                  "kapacitor",
+						"disable-notification":     false,
+						"disable-web-page-preview": false,
+						"enabled":                  true,
+						"global":                   false,
+						"parse-mode":               "",
+						"state-changes-only":       false,
+						"token":                    true,
+						"url":                      telegram.DefaultTelegramURL,
+					},
+				},
+			},
+		},
+		{
+			section: "victorops",
+			setDefaults: func(c *server.Config) {
+				c.VictorOps.RoutingKey = "test"
+				c.VictorOps.APIKey = "secret"
+			},
+			expDefaultSection: client.ConfigSection{client.ConfigElement{
+				"api-key":     true,
+				"enabled":     false,
+				"global":      false,
+				"routing-key": "test",
+				"url":         victorops.DefaultVictorOpsAPIURL,
+			}},
+			expDefaultElement: client.ConfigElement{
+				"api-key":     true,
+				"enabled":     false,
+				"global":      false,
+				"routing-key": "test",
+				"url":         victorops.DefaultVictorOpsAPIURL,
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"api-key": "",
+							"global":  true,
+						},
+					},
+					expSection: client.ConfigSection{client.ConfigElement{
+						"api-key":     false,
+						"enabled":     false,
+						"global":      true,
+						"routing-key": "test",
+						"url":         victorops.DefaultVictorOpsAPIURL,
+					}},
+					expElement: client.ConfigElement{
+						"api-key":     false,
+						"enabled":     false,
+						"global":      true,
+						"routing-key": "test",
+						"url":         victorops.DefaultVictorOpsAPIURL,
+					},
+				},
+			},
+		},
+	}
+
+	compareElements := func(got, exp client.ConfigElement) error {
+		for k, v := range exp {
+			if g, ok := got[k]; !ok {
+				return fmt.Errorf("missing option %q", k)
+			} else if !reflect.DeepEqual(g, v) {
+				return fmt.Errorf("unexpected config option %q got %#v exp %#v types: got %T exp %T", k, g, v, g, v)
+			}
+		}
+		for k := range got {
+			if v, ok := exp[k]; !ok {
+				return fmt.Errorf("extra option %q with value %#v", k, v)
+			}
+		}
+		return nil
+	}
+	compareSections := func(got, exp client.ConfigSection) error {
+		if len(got) != len(exp) {
+			return fmt.Errorf("sections are different lengths, got %d exp %d", len(got), len(exp))
+		}
+		for i := range exp {
+			if err := compareElements(got[i], exp[i]); err != nil {
+				return errors.Wrapf(err, "section element %d are not equal", i)
+			}
+		}
+		return nil
+	}
+
+	validate := func(
+		cli *client.Client,
+		section,
+		element string,
+		expSection client.ConfigSection,
+		expElement client.ConfigElement,
+	) error {
+		// Get all sections
+		if sections, err := cli.ConfigSections(); err != nil {
+			return err
+		} else {
+			if err := compareSections(sections[section], expSection); err != nil {
+				return fmt.Errorf("%s: %v", section, err)
+			}
+		}
+		// Get the specific section
+		sectionLink := cli.ConfigSectionLink(section)
+		if got, err := cli.ConfigSection(sectionLink); err != nil {
+			return err
+		} else {
+			if err := compareSections(got, expSection); err != nil {
+				return fmt.Errorf("%s: %v", section, err)
+			}
+		}
+		if element != "" {
+			elementLink := cli.ConfigElementLink(section, element)
+			// Get the specific element
+			if got, err := cli.ConfigElement(elementLink); err != nil {
+				return err
+			} else {
+				if err := compareElements(got, expElement); err != nil {
+					return fmt.Errorf("%s/%s: %v", section, element, err)
+				}
+			}
+		}
+		return nil
+	}
+
+	for _, tc := range testCases {
+		// Create default config
+		c := NewConfig()
+		if tc.setDefaults != nil {
+			tc.setDefaults(c)
+		}
+		s := OpenServer(c)
+		cli := Client(s)
+		defer s.Close()
+
+		if err := validate(cli, tc.section, tc.element, tc.expDefaultSection, tc.expDefaultElement); err != nil {
+			t.Errorf("unexpected defaults for %s/%s: %v", tc.section, tc.element, err)
+		}
+
+		for i, ua := range tc.updates {
+			element := tc.element
+			if ua.element != "" {
+				element = ua.element
+			}
+
+			link := cli.ConfigSectionLink(tc.section)
+			if element != "" {
+				link = cli.ConfigElementLink(tc.section, tc.element)
+			}
+
+			if len(ua.updateAction.Add) > 0 ||
+				len(ua.updateAction.Remove) > 0 {
+				link = cli.ConfigSectionLink(tc.section)
+			}
+
+			// Add an override
+			if err := cli.ConfigUpdate(link, ua.updateAction); err != nil {
+				t.Fatal(err)
+			}
+			if err := validate(cli, tc.section, element, ua.expSection, ua.expElement); err != nil {
+				t.Errorf("unexpected update result %d for %s/%s: %v", i, tc.section, element, err)
+			}
 		}
 	}
 }

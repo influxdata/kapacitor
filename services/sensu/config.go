@@ -21,7 +21,7 @@ func NewConfig() Config {
 
 func (c Config) Validate() error {
 	if c.Enabled && c.Addr == "" {
-		return errors.New("must specify sensu client address")
+		return errors.New("must specify client address")
 	}
 	return nil
 }

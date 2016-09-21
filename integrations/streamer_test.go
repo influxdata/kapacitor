@@ -28,6 +28,7 @@ import (
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
+	"github.com/influxdata/kapacitor/services/logging/loggingtest"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/sensu"
@@ -41,7 +42,7 @@ import (
 )
 
 var httpService *httpd.Service
-var logService = &LogService{}
+var logService = loggingtest.New()
 
 var dbrps = []kapacitor.DBRP{
 	{

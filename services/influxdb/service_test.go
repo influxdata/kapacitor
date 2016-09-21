@@ -1058,7 +1058,7 @@ func NewDefaultTestConfigs(clusters []string) []influxdb.Config {
 func NewTestService(configs []influxdb.Config, hostname string, useTokens bool) (*influxdb.Service, *authService, *clientCreator) {
 	httpPort := 9092
 	l := ls.NewLogger("[test-influxdb] ", log.LstdFlags)
-	s := influxdb.NewService(configs, 0, httpPort, hostname, useTokens, l)
+	s := influxdb.NewService(configs, httpPort, hostname, useTokens, l)
 	s.LogService = ls
 	s.HTTPDService = httpdService{}
 	as := &authService{}

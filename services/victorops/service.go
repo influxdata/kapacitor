@@ -8,12 +8,14 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/influxdata/kapacitor"
 )
 
 type Service struct {
+	mu         sync.RWMutex
 	routingKey string
 	url        string
 	global     bool
@@ -37,11 +39,31 @@ func (s *Service) Close() error {
 	return nil
 }
 
+func (s *Service) Update(newConfig []interface{}) error {
+	if l := len(newConfig); l != 1 {
+		return fmt.Errorf("expected only one new config object, got %d", l)
+	}
+	if c, ok := newConfig[0].(Config); !ok {
+		return fmt.Errorf("expected config object to be of type %T, got %T", c, newConfig[0])
+	} else {
+		s.mu.Lock()
+		s.routingKey = c.RoutingKey
+		s.url = c.URL + "/" + c.APIKey + "/"
+		s.global = c.Global
+		s.mu.Unlock()
+	}
+	return nil
+}
+
 func (s *Service) Global() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	return s.global
 }
 
 func (s *Service) Alert(routingKey, messageType, message, entityID string, t time.Time, details interface{}) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	voData := make(map[string]interface{})
 	voData["message_type"] = messageType
 	voData["entity_id"] = entityID

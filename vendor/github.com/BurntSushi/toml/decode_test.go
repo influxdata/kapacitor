@@ -77,42 +77,52 @@ cauchy = "cat 2"
 func TestDecodeEmbedded(t *testing.T) {
 	type Dog struct{ Name string }
 	type Age int
+	type cat struct{ Name string }
 
-	tests := map[string]struct {
+	for _, test := range []struct {
+		label       string
 		input       string
 		decodeInto  interface{}
 		wantDecoded interface{}
 	}{
-		"embedded struct": {
+		{
+			label:       "embedded struct",
 			input:       `Name = "milton"`,
 			decodeInto:  &struct{ Dog }{},
 			wantDecoded: &struct{ Dog }{Dog{"milton"}},
 		},
-		"embedded non-nil pointer to struct": {
+		{
+			label:       "embedded non-nil pointer to struct",
 			input:       `Name = "milton"`,
 			decodeInto:  &struct{ *Dog }{},
 			wantDecoded: &struct{ *Dog }{&Dog{"milton"}},
 		},
-		"embedded nil pointer to struct": {
+		{
+			label:       "embedded nil pointer to struct",
 			input:       ``,
 			decodeInto:  &struct{ *Dog }{},
 			wantDecoded: &struct{ *Dog }{nil},
 		},
-		"embedded int": {
+		{
+			label:       "unexported embedded struct",
+			input:       `Name = "socks"`,
+			decodeInto:  &struct{ cat }{},
+			wantDecoded: &struct{ cat }{cat{"socks"}},
+		},
+		{
+			label:       "embedded int",
 			input:       `Age = -5`,
 			decodeInto:  &struct{ Age }{},
 			wantDecoded: &struct{ Age }{-5},
 		},
-	}
-
-	for label, test := range tests {
+	} {
 		_, err := Decode(test.input, test.decodeInto)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !reflect.DeepEqual(test.wantDecoded, test.decodeInto) {
 			t.Errorf("%s: want decoded == %+v, got %+v",
-				label, test.wantDecoded, test.decodeInto)
+				test.label, test.wantDecoded, test.decodeInto)
 		}
 	}
 }
@@ -531,7 +541,7 @@ func TestDecodeFloats(t *testing.T) {
 			continue
 		}
 		if x.N != tt.want {
-			t.Errorf("Decode(%q): got %d; want %d", input, x.N, tt.want)
+			t.Errorf("Decode(%q): got %f; want %f", input, x.N, tt.want)
 		}
 	}
 }
@@ -573,7 +583,7 @@ func TestDecodeBadValues(t *testing.T) {
 		v    interface{}
 		want string
 	}{
-		{3, "non-pointer type"},
+		{3, "non-pointer int"},
 		{(*int)(nil), "nil"},
 	} {
 		_, err := Decode(`x = 3`, tt.v)
@@ -1043,7 +1053,7 @@ rating = 3.1
 
 	// 	// NOTE the example below contains detailed type casting to show how
 	// 	// the 'data' is retrieved. In operational use, a type cast wrapper
-	// 	// may be prefered e.g.
+	// 	// may be preferred e.g.
 	// 	//
 	// 	// func AsMap(v interface{}) (map[string]interface{}, error) {
 	// 	// 		return v.(map[string]interface{})
@@ -1170,7 +1180,7 @@ func (o *order) UnmarshalTOML(data interface{}) error {
 
 	// NOTE the example below contains detailed type casting to show how
 	// the 'data' is retrieved. In operational use, a type cast wrapper
-	// may be prefered e.g.
+	// may be preferred e.g.
 	//
 	// func AsMap(v interface{}) (map[string]interface{}, error) {
 	// 		return v.(map[string]interface{})

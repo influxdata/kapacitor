@@ -6,6 +6,7 @@
 * [Templates](#templates)
 * [Recordings](#recordings)
 * [Replays](#replays)
+* [Configuration](#configuration)
 * [Miscellaneous](#miscellaneous)
 
 ## General Information
@@ -1310,7 +1311,7 @@ You can list replays for a given recording by making a GET request to `/kapacito
 GET /kapacitor/v1/replays
 ```
 
-```
+```json
 {
     "replays" [
         {
@@ -1339,6 +1340,227 @@ GET /kapacitor/v1/replays
 }
 ```
 
+## Configuration
+
+You can set configuration overrides via the API for certain sections of the config.
+The overrides set via the API always take precedent over what may exist in the configuration file.
+The sections available for overriding include the InfluxDB clusters and the alert handler sections.
+
+>NOTE: The intent of the API is to allow for dynamic configuration of sensitive credentials without requiring that the Kapacitor process be restarted.
+As such, it is recommended to use either the configuration file or the API to manage these configuration sections, but not both.
+This will help to eliminate any confusion about the source of authority for the configuration values.
+
+
+The paths for the configuration sections are as follows:
+
+`/kapacitor/v1/config/<section name>[/<entry name>]`
+
+Example:
+
+```
+/kapacitor/v1/config/smtp
+/kapacitor/v1/config/influxdb/localhost
+/kapacitor/v1/config/influxdb/remote
+```
+
+The optional `entry name` path element corresponds to a specific item from a list of entries.
+
+For example the above paths correspond to the following configuration sections:
+
+```
+[smtp]
+    # SMTP config here
+
+[[influxdb]]
+    name = "localhost"
+    # InfluxDB config here for the "localhost" cluster
+
+[[influxdb]]
+    name = "remote"
+    # InfluxDB config here for the "remote" cluster
+```
+
+
+### Retrieving the current configuration
+
+To retrieve the current configuration perform a GET request to the desired path.
+The returned configuration will be the merged values from the configuration file and what has been stored in the overrides.
+The returned content will be JSON encoded version of the configuration objects.
+
+All sensitive information will not be returned in the request body.
+Instead a boolean value will be in its place indicating whether the value is empty or not.
+
+#### Example
+
+Retrieve all the configuration sections which can be overridden.
+
+```
+GET /kapacitor/v1/config
+```
+
+```json
+{
+    "influxdb": [
+        {
+            "name": "localhost",
+            "urls": ["http://localhost:8086"],
+            "default": true,
+            "username": "",
+            "password": false
+        },
+        {
+            "name": "remote",
+            "urls": ["http://influxdb.example.com:8086"],
+            "default": false,
+            "username": "jim",
+            "password": true
+        }
+    ],
+    "smtp": [{
+        "enabled": true,
+        "host": "smtp.example.com",
+        "port": 587,
+        "username": "bob",
+        "password": true,
+        "no-verify": false,
+        "global": false,
+        "to": [ "oncall@example.com"],
+        "from": "kapacitor@example.com",
+        "idle-timeout": "30s"
+    }]
+}
+```
+
+
+Retrieve only the SMTP section.
+
+```
+GET /kapacitor/v1/config/smtp
+```
+
+```json
+{
+    "enabled": true,
+    "host": "smtp.example.com",
+    "port": 587,
+    "username": "bob",
+    "password": true,
+    "no-verify": false,
+    "global": false,
+    "to": ["oncall@example.com"],
+    "from": "kapacitor@example.com",
+    "idle-timeout": "30s"
+}
+```
+
+>NOTE: The password value is not returned, but the `true` value indicates that a non empty password has been set.
+
+#### Response
+
+| Code | Meaning |
+| ---- | ------- |
+| 200  | Success |
+
+### Overriding the configuration
+
+To override a value in the configuration make a POST request to the desired path.
+The request should contain a JSON object describing what should be modified.
+
+Use the following top level actions:
+
+| Key    | Description                                        |
+| ---    | -----------                                        |
+| set    | Set the value in the configuration overrides.      |
+| delete | Delete the value from the configuration overrides. |
+| add    | Add a new entry to a list configuration section.   |
+| remove | Remove an entry from a list configuration section. |
+
+Configuration options not specified in the request will be left unmodified.
+
+#### Example
+
+To disable the SMTP alert handler:
+
+```
+POST /kapacitor/v1/config/smtp
+{
+    "set":{
+        "enabled": false
+    }
+}
+```
+
+To delete the override for the SMTP alert handler:
+
+```
+POST /kapacitor/v1/config/smtp
+{
+    "delete":[
+        "enabled"
+    ]
+}
+```
+
+Actions can be combined in a single request.
+Enable the SMTP handler, set its host and remove the port override.
+
+```
+POST /kapacitor/v1/config/smtp
+{
+    "set":{
+        "enabled": true,
+        "host": "smtp.example.com"
+    },
+    "delete":[
+        "port"
+    ]
+}
+```
+
+Add a new InfluxDB cluster:
+
+```
+POST /kapacitor/v1/config/influxdb
+{
+    "add":{
+        "name": "example",
+        "urls": ["https://influxdb.example.com:8086"],
+        "default": true,
+        "disable-subscriptions": true
+    }
+}
+```
+
+Remove an existing InfluxDB cluster override:
+
+```
+POST /kapacitor/v1/config/influxdb
+{
+    "remove":[
+        "example"
+    ]
+}
+```
+
+>NOTE: Only the overrides can be removed, this means that InfluxDB clusters that exist in the configuration cannot be removed.
+
+Modify an existing InfluxDB cluster:
+
+```
+POST /kapacitor/v1/config/influxdb/example
+{
+    "set":{
+        "disable-subscriptions": false,
+    ]
+}
+```
+
+#### Response
+
+| Code | Meaning                                                   |
+| ---- | -------                                                   |
+| 200  | Success                                                   |
+| 404  | The specified configuration section/option does not exist |
 
 ## Miscellaneous
 

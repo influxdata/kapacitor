@@ -3,11 +3,9 @@ package integrations
 import (
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"reflect"
 	"time"
 
@@ -15,9 +13,7 @@ import (
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/influxdb"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
-	"github.com/influxdata/kapacitor/services/logging"
 	"github.com/influxdata/kapacitor/udf"
-	"github.com/influxdata/wlog"
 )
 
 type MockInfluxDBService struct {
@@ -123,23 +119,6 @@ func compareAlertData(exp, got kapacitor.AlertData) (bool, string) {
 	}
 
 	return compareResults(expData, gotData)
-}
-
-type LogService struct{}
-
-func (l *LogService) NewLogger(prefix string, flag int) *log.Logger {
-	return wlog.New(os.Stderr, prefix, flag)
-}
-func (l *LogService) NewRawLogger(prefix string, flag int) *log.Logger {
-	return log.New(os.Stderr, prefix, flag)
-}
-
-func (l *LogService) NewStaticLevelLogger(prefix string, flag int, level logging.Level) *log.Logger {
-	return log.New(wlog.NewStaticLevelWriter(os.Stderr, wlog.Level(level)), prefix, flag)
-}
-
-func (l *LogService) NewStaticLevelWriter(level logging.Level) io.Writer {
-	return wlog.NewStaticLevelWriter(os.Stderr, wlog.Level(level))
 }
 
 type UDFService struct {

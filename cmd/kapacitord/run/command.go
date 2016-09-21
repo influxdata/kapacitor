@@ -216,7 +216,6 @@ func (cmd *Command) ParseConfig(path string) (*server.Config, error) {
 	if _, err := toml.DecodeFile(path, &config); err != nil {
 		return nil, err
 	}
-	config.PostInit()
 
 	return config, nil
 }

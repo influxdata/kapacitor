@@ -1,5 +1,11 @@
 package telegram
 
+import (
+	"net/url"
+
+	"github.com/pkg/errors"
+)
+
 const DefaultTelegramURL = "https://api.telegram.org/bot"
 const DefaultTelegramLinksPreviewDisable = false
 const DefaultTelegramNotificationDisable = false
@@ -10,7 +16,7 @@ type Config struct {
 	// The Telegram Bot URL, should not need to be changed.
 	URL string `toml:"url"`
 	// The Telegram Bot Token, can be obtained From @BotFather.
-	Token string `toml:"token"`
+	Token string `toml:"token" override:",redact"`
 	// The default channel, can be overridden per alert.
 	ChatId string `toml:"chat-id"`
 	// Send Markdown or HTML, if you want Telegram apps to show bold, italic, fixed-width text or inline URLs in your bot's message.
@@ -32,4 +38,19 @@ func NewConfig() Config {
 		DisableWebPagePreview: DefaultTelegramLinksPreviewDisable,
 		DisableNotification:   DefaultTelegramNotificationDisable,
 	}
+}
+
+func (c Config) Validate() error {
+	if c.Enabled {
+		if c.URL == "" {
+			return errors.New("must specify url")
+		}
+		if c.Token == "" {
+			return errors.New("must specify token")
+		}
+	}
+	if _, err := url.Parse(c.URL); err != nil {
+		return errors.Wrapf(err, "invalid url %q", c.URL)
+	}
+	return nil
 }

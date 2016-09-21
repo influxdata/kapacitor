@@ -26,7 +26,7 @@ type Config struct {
 	Default  bool     `toml:"default"`
 	URLs     []string `toml:"urls"`
 	Username string   `toml:"username"`
-	Password string   `toml:"password"`
+	Password string   `toml:"password" override:",redact"`
 	// Path to CA file
 	SSLCA string `toml:"ssl-ca"`
 	// Path to host cert file
@@ -51,37 +51,23 @@ type Config struct {
 }
 
 func NewConfig() Config {
-	return Config{
-		Enabled: true,
-		// Cannot initialize slice
-		// See: https://github.com/BurntSushi/toml/pull/68
-		//URLs:          []string{"http://localhost:8086"},
-		Username:      "",
-		Password:      "",
-		Subscriptions: make(map[string][]string),
-		ExcludedSubscriptions: map[string][]string{
-			stats.DefaultDatabse: []string{stats.DefaultRetentionPolicy},
-		},
-		UDPBuffer:                udp.DefaultBuffer,
-		StartUpTimeout:           toml.Duration(DefaultStartUpTimeout),
-		SubscriptionProtocol:     DefaultSubscriptionProtocol,
-		SubscriptionSyncInterval: toml.Duration(DefaultSubscriptionSyncInterval),
-	}
+	c := &Config{}
+	c.SetDefaults()
+	return *c
 }
 
-func (c *Config) SetDefaultValues() {
-	if c.UDPBuffer == 0 {
-		c.UDPBuffer = udp.DefaultBuffer
+func (c *Config) SetDefaults() {
+	c.Enabled = true
+	c.Name = "default"
+	c.URLs = []string{"http://localhost:8086"}
+	c.Subscriptions = make(map[string][]string)
+	c.ExcludedSubscriptions = map[string][]string{
+		stats.DefaultDatabse: []string{stats.DefaultRetentionPolicy},
 	}
-	if c.StartUpTimeout == 0 {
-		c.StartUpTimeout = toml.Duration(DefaultStartUpTimeout)
-	}
-	if c.SubscriptionProtocol == "" {
-		c.SubscriptionProtocol = DefaultSubscriptionProtocol
-	}
-	if c.SubscriptionSyncInterval == toml.Duration(0) {
-		c.SubscriptionSyncInterval = toml.Duration(DefaultSubscriptionSyncInterval)
-	}
+	c.UDPBuffer = udp.DefaultBuffer
+	c.StartUpTimeout = toml.Duration(DefaultStartUpTimeout)
+	c.SubscriptionProtocol = DefaultSubscriptionProtocol
+	c.SubscriptionSyncInterval = toml.Duration(DefaultSubscriptionSyncInterval)
 }
 
 var validNamePattern = regexp.MustCompile(`^[-\._\p{L}0-9]+$`)

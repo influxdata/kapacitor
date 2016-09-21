@@ -26,6 +26,7 @@ import (
 
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/services/httpd"
+	"github.com/influxdata/kapacitor/services/logging/loggingtest"
 	"github.com/influxdata/kapacitor/services/noauth"
 )
 
@@ -196,7 +197,7 @@ func Bench(b *testing.B, tasksCount, pointCount, expectedProcessedCount int, tic
 	for i := 0; i < b.N; i++ {
 		// Do not time setup
 		b.StopTimer()
-		tm := kapacitor.NewTaskMaster("bench", &LogService{})
+		tm := kapacitor.NewTaskMaster("bench", loggingtest.New())
 		tm.HTTPDService = httpdService
 		tm.UDFService = nil
 		tm.TaskStore = taskStore{}

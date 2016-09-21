@@ -69,12 +69,16 @@ type Service struct {
 	logger     *log.Logger
 }
 
-func NewService(configs []Config, defaultInfluxDB, httpPort int, hostname string, useTokens bool, l *log.Logger) *Service {
+func NewService(configs []Config, httpPort int, hostname string, useTokens bool, l *log.Logger) *Service {
 	clusterID := kapacitor.ClusterIDVar.StringValue()
 	subName := subNamePrefix + clusterID
 	clusters := make(map[string]*influxdbCluster, len(configs))
 	var defaultInfluxDBName string
-	for i, c := range configs {
+	for _, c := range configs {
+		if !c.Enabled {
+			// Skip disabled configs
+			continue
+		}
 		urls := make([]influxdb.HTTPConfig, len(c.URLs))
 		// Config should have been validated already, ignore error
 		tlsConfig, _ := getTLSConfig(c.SSLCA, c.SSLCert, c.SSLKey, c.InsecureSkipVerify)
@@ -144,7 +148,7 @@ func NewService(configs []Config, defaultInfluxDB, httpPort int, hostname string
 			// Do not use tokens for non http protocols
 			useTokens: useTokens && (c.SubscriptionProtocol == "http" || c.SubscriptionProtocol == "https"),
 		}
-		if defaultInfluxDB == i {
+		if c.Default {
 			defaultInfluxDBName = c.Name
 		}
 	}

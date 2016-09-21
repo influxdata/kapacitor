@@ -46,33 +46,35 @@ type Config struct {
 	Storage    storage.Config    `toml:"storage"`
 	Task       task_store.Config `toml:"task"`
 	InfluxDB   []influxdb.Config `toml:"influxdb"`
+	InfluxDB   []influxdb.Config `toml:"influxdb" override:"influxdb,element-key=name"`
 	Logging    logging.Config    `toml:"logging"`
 	Kubernetes k8s.Config        `toml:"kubernetes"`
 
+	// Input services
 	Graphites []graphite.Config `toml:"graphite"`
 	Collectd  collectd.Config   `toml:"collectd"`
 	OpenTSDB  opentsdb.Config   `toml:"opentsdb"`
 	UDPs      []udp.Config      `toml:"udp"`
-	SMTP      smtp.Config       `toml:"smtp"`
-	OpsGenie  opsgenie.Config   `toml:"opsgenie"`
-	VictorOps victorops.Config  `toml:"victorops"`
-	PagerDuty pagerduty.Config  `toml:"pagerduty"`
-	Sensu     sensu.Config      `toml:"sensu"`
-	Slack     slack.Config      `toml:"slack"`
-	Telegram  telegram.Config   `toml:"telegram"`
-	HipChat   hipchat.Config    `toml:"hipchat"`
-	Alerta    alerta.Config     `toml:"alerta"`
-	Reporting reporting.Config  `toml:"reporting"`
-	Stats     stats.Config      `toml:"stats"`
-	UDF       udf.Config        `toml:"udf"`
-	Deadman   deadman.Config    `toml:"deadman"`
-	Talk      talk.Config       `toml:"talk"`
+
+	// Alert handlers
+	Alerta    alerta.Config    `toml:"alerta" override:"alerta"`
+	HipChat   hipchat.Config   `toml:"hipchat" override:"hipchat"`
+	OpsGenie  opsgenie.Config  `toml:"opsgenie" override:"opsgenie"`
+	PagerDuty pagerduty.Config `toml:"pagerduty" override:"pagerduty"`
+	SMTP      smtp.Config      `toml:"smtp" override:"smtp"`
+	Sensu     sensu.Config     `toml:"sensu" override:"sensu"`
+	Slack     slack.Config     `toml:"slack" override:"slack"`
+	Talk      talk.Config      `toml:"talk" override:"talk"`
+	Telegram  telegram.Config  `toml:"telegram" override:"telegram"`
+	VictorOps victorops.Config `toml:"victorops" override:"victorops"`
+
+	Reporting reporting.Config `toml:"reporting"`
+	Stats     stats.Config     `toml:"stats"`
+	UDF       udf.Config       `toml:"udf"`
+	Deadman   deadman.Config   `toml:"deadman"`
 
 	Hostname string `toml:"hostname"`
 	DataDir  string `toml:"data_dir"`
-
-	// The index of the default InfluxDB config
-	defaultInfluxDB int
 }
 
 // NewConfig returns an instance of Config with reasonable defaults.
@@ -85,53 +87,35 @@ func NewConfig() *Config {
 	c.Storage = storage.NewConfig()
 	c.Replay = replay.NewConfig()
 	c.Task = task_store.NewConfig()
+	c.InfluxDB = []influxdb.Config{influxdb.NewConfig()}
 	c.Logging = logging.NewConfig()
 	c.Kubernetes = k8s.NewConfig()
 
 	c.Collectd = collectd.NewConfig()
 	c.OpenTSDB = opentsdb.NewConfig()
-	c.SMTP = smtp.NewConfig()
+
+	c.Alerta = alerta.NewConfig()
+	c.HipChat = hipchat.NewConfig()
 	c.OpsGenie = opsgenie.NewConfig()
-	c.VictorOps = victorops.NewConfig()
 	c.PagerDuty = pagerduty.NewConfig()
+	c.SMTP = smtp.NewConfig()
 	c.Sensu = sensu.NewConfig()
 	c.Slack = slack.NewConfig()
+	c.Talk = talk.NewConfig()
 	c.Telegram = telegram.NewConfig()
-	c.HipChat = hipchat.NewConfig()
-	c.Alerta = alerta.NewConfig()
+	c.VictorOps = victorops.NewConfig()
+
 	c.Reporting = reporting.NewConfig()
 	c.Stats = stats.NewConfig()
 	c.UDF = udf.NewConfig()
 	c.Deadman = deadman.NewConfig()
-	c.Talk = talk.NewConfig()
 
 	return c
-}
-
-// Once the config has been created and decoded, you can call this method
-// to initialize ARRAY attributes.
-// All ARRAY attributes have to be init after toml decode
-// See: https://github.com/BurntSushi/toml/pull/68
-func (c *Config) PostInit() {
-	if len(c.InfluxDB) == 0 {
-		i := influxdb.NewConfig()
-		c.InfluxDB = []influxdb.Config{i}
-		c.InfluxDB[0].Name = "default"
-		c.InfluxDB[0].URLs = []string{"http://localhost:8086"}
-	} else if len(c.InfluxDB) == 1 && c.InfluxDB[0].Name == "" {
-		c.InfluxDB[0].Name = "default"
-	}
-	// Set default Values
-	for i, influx := range c.InfluxDB {
-		influx.SetDefaultValues()
-		c.InfluxDB[i] = influx
-	}
 }
 
 // NewDemoConfig returns the config that runs when no config is specified.
 func NewDemoConfig() (*Config, error) {
 	c := NewConfig()
-	c.PostInit()
 
 	var homeDir string
 	// By default, store meta and data files in current users home directory
@@ -160,69 +144,97 @@ func (c *Config) Validate() error {
 	if c.DataDir == "" {
 		return fmt.Errorf("must configure valid data dir")
 	}
-	err := c.Replay.Validate()
-	if err != nil {
+	if err := c.Replay.Validate(); err != nil {
 		return err
 	}
-	err = c.Storage.Validate()
-	if err != nil {
+	if err := c.Storage.Validate(); err != nil {
 		return err
 	}
-	err = c.HTTP.Validate()
-	if err != nil {
+	if err := c.HTTP.Validate(); err != nil {
 		return err
 	}
-	err = c.Task.Validate()
-	if err != nil {
+	if err := c.Task.Validate(); err != nil {
 		return err
 	}
-	c.defaultInfluxDB = -1
+	// Validate the set of InfluxDB configs.
+	// All names should be unique.
 	names := make(map[string]bool, len(c.InfluxDB))
-	for i := 0; i < len(c.InfluxDB); i++ {
-		config := c.InfluxDB[i]
-		if !config.Enabled {
-			c.InfluxDB = append(c.InfluxDB[0:i], c.InfluxDB[i+1:]...)
-			i--
-			continue
-		}
+	// Should be exactly one default if at least one configs is enabled.
+	defaultInfluxDB := -1
+	numEnabled := 0
+	for i, config := range c.InfluxDB {
 		if names[config.Name] {
 			return fmt.Errorf("duplicate name %q for influxdb configs", config.Name)
 		}
 		names[config.Name] = true
-		err = config.Validate()
-		if err != nil {
+		if err := config.Validate(); err != nil {
 			return err
 		}
-		if config.Default {
-			if c.defaultInfluxDB != -1 {
-				return fmt.Errorf("More than one InfluxDB default was specified: %s %s", config.Name, c.InfluxDB[c.defaultInfluxDB].Name)
+		if config.Enabled && config.Default {
+			if defaultInfluxDB != -1 {
+				return fmt.Errorf("More than one InfluxDB default was specified: %s %s", config.Name, c.InfluxDB[defaultInfluxDB].Name)
 			}
-			c.defaultInfluxDB = i
+			defaultInfluxDB = i
+		}
+		if config.Enabled {
+			numEnabled++
 		}
 	}
 	// Set default if it is the only one
-	if len(c.InfluxDB) == 1 {
-		c.defaultInfluxDB = 0
+	if numEnabled == 1 {
+		for i, config := range c.InfluxDB {
+			if config.Enabled {
+				defaultInfluxDB = 0
+				c.InfluxDB[i].Default = true
+				break
+			}
+		}
 	}
-	if len(c.InfluxDB) > 0 && c.defaultInfluxDB == -1 {
-		return errors.New("at least one InfluxDB cluster must be marked as default.")
+	if numEnabled > 0 && defaultInfluxDB == -1 {
+		return errors.New("at least one of the enabled InfluxDB clusters must be marked as default.")
 	}
-	err = c.UDF.Validate()
-	if err != nil {
-		return err
-	}
-	err = c.Sensu.Validate()
-	if err != nil {
-		return err
-	}
-	err = c.Talk.Validate()
-	if err != nil {
-		return err
-	}
+
+	// Validate inputs
 	for _, g := range c.Graphites {
 		if err := g.Validate(); err != nil {
 			return fmt.Errorf("invalid graphite config: %v", err)
 		}
+	}
+
+	// Validate alert handlers
+	if err := c.Alerta.Validate(); err != nil {
+		return err
+	}
+	if err := c.HipChat.Validate(); err != nil {
+		return err
+	}
+	if err := c.OpsGenie.Validate(); err != nil {
+		return err
+	}
+	if err := c.PagerDuty.Validate(); err != nil {
+		return err
+	}
+	if err := c.SMTP.Validate(); err != nil {
+		return err
+	}
+	if err := c.Sensu.Validate(); err != nil {
+		return err
+	}
+	if err := c.Slack.Validate(); err != nil {
+		return err
+	}
+	if err := c.Talk.Validate(); err != nil {
+		return err
+	}
+	if err := c.Telegram.Validate(); err != nil {
+		return err
+	}
+	if err := c.VictorOps.Validate(); err != nil {
+		return err
+	}
+
+	if err := c.UDF.Validate(); err != nil {
+		return err
 	}
 	return nil
 }
