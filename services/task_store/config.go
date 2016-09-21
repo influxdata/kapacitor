@@ -6,6 +6,10 @@ import (
 	"github.com/influxdata/influxdb/toml"
 )
 
+const (
+	DefaultDir = "./tasks"
+)
+
 type Config struct {
 	// Deprecated, only needed to find old db and migrate
 	Dir              string        `toml:"dir"`
@@ -14,7 +18,7 @@ type Config struct {
 
 func NewConfig() Config {
 	return Config{
-		Dir:              "./tasks",
+		Dir:              DefaultDir,
 		SnapshotInterval: toml.Duration(time.Minute),
 	}
 }

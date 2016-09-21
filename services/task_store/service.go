@@ -62,11 +62,15 @@ type taskStore struct {
 	TICKScript string
 }
 
-func NewService(conf Config, l *log.Logger) *Service {
+func NewService(conf Config, l *log.Logger, dataDir string) *Service {
+	dir := conf.Dir
+	if !filepath.IsAbs(dir) {
+		dir = filepath.Join(dataDir, dir)
+	}
 	return &Service{
 		snapshotInterval: time.Duration(conf.SnapshotInterval),
 		logger:           l,
-		oldDBDir:         conf.Dir,
+		oldDBDir:         dir,
 	}
 }
 

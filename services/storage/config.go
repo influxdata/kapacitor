@@ -2,6 +2,10 @@ package storage
 
 import "fmt"
 
+const (
+	DefaultBoltDBPath = "./kapacitor.db"
+)
+
 type Config struct {
 	// Path to a boltdb database file.
 	BoltDBPath string `toml:"boltdb"`
@@ -9,7 +13,7 @@ type Config struct {
 
 func NewConfig() Config {
 	return Config{
-		BoltDBPath: "./kapacitor.db",
+		BoltDBPath: DefaultBoltDBPath,
 	}
 }
 

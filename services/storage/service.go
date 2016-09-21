@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"path/filepath"
 	"sync"
 
 	"github.com/boltdb/bolt"
@@ -20,9 +21,13 @@ type Service struct {
 	logger *log.Logger
 }
 
-func NewService(conf Config, l *log.Logger) *Service {
+func NewService(conf Config, l *log.Logger, dataDir string) *Service {
+	dbpath := conf.BoltDBPath
+	if !filepath.IsAbs(dbpath) {
+		dbpath = filepath.Join(dataDir, dbpath)
+	}
 	return &Service{
-		dbpath: conf.BoltDBPath,
+		dbpath: dbpath,
 		logger: l,
 		stores: make(map[string]Interface),
 	}

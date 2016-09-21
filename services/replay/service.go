@@ -89,9 +89,13 @@ type Service struct {
 }
 
 // Create a new replay master.
-func NewService(conf Config, l *log.Logger) *Service {
+func NewService(conf Config, l *log.Logger, dataDir string) *Service {
+	saveDir := conf.Dir
+	if !filepath.IsAbs(saveDir) {
+		saveDir = filepath.Join(dataDir, saveDir)
+	}
 	return &Service{
-		saveDir: conf.Dir,
+		saveDir: saveDir,
 		logger:  l,
 	}
 }
