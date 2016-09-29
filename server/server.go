@@ -547,9 +547,7 @@ func (s *Server) setupIDs() error {
 	}
 	if clusterID == "" {
 		clusterID = uuid.NewV4().String()
-		if err := s.writeID(clusterIDPath, clusterID); err != nil {
-			return errors.Wrap(err, "failed to save cluster ID")
-		}
+		s.writeID(clusterIDPath, clusterID)
 	}
 	s.ClusterID = clusterID
 
@@ -560,9 +558,7 @@ func (s *Server) setupIDs() error {
 	}
 	if serverID == "" {
 		serverID = uuid.NewV4().String()
-		if err := s.writeID(serverIDPath, serverID); err != nil {
-			return errors.Wrap(err, "failed to save server ID")
-		}
+		s.writeID(serverIDPath, serverID)
 	}
 	s.ServerID = serverID
 
