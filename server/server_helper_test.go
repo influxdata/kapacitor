@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -176,9 +177,9 @@ func NewConfig() *server.Config {
 	c := server.NewConfig()
 	c.PostInit()
 	c.Reporting.Enabled = false
-	c.Replay.Dir = MustTempFile()
-	c.Storage.BoltDBPath = MustTempFile()
-	c.DataDir = MustTempFile()
+	c.Replay.Dir = MustTempDir()
+	c.Storage.BoltDBPath = filepath.Join(MustTempDir(), "bolt.db")
+	c.DataDir = MustTempDir()
 	c.HTTP.BindAddress = "127.0.0.1:0"
 	//c.HTTP.BindAddress = "127.0.0.1:9092"
 	//c.HTTP.GZIP = false
@@ -186,15 +187,12 @@ func NewConfig() *server.Config {
 	return c
 }
 
-// MustTempFile returns a path to a temporary file.
-func MustTempFile() string {
-	f, err := ioutil.TempFile("", "kapacitord-")
+func MustTempDir() string {
+	d, err := ioutil.TempDir("", "kapacitord-")
 	if err != nil {
 		panic(err)
 	}
-	f.Close()
-	os.Remove(f.Name())
-	return f.Name()
+	return d
 }
 
 func configureLogging() {
