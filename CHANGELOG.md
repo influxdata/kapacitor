@@ -9,7 +9,7 @@
 
 ### Bugfixes
 
-- [#](https://github.com/influxdata/kapacitor/pull/): Fix bug where errors to save cluster/server ID files were ignored.
+- [#949](https://github.com/influxdata/kapacitor/pull/949): Fix bug where errors to save cluster/server ID files were ignored.
 
 ## v1.0.1 [2016-09-26]
 
