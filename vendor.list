@@ -1,5 +1,5 @@
-github.com/boltdb/bolt
 github.com/BurntSushi/toml
+github.com/boltdb/bolt
 github.com/cenkalti/backoff
 github.com/dgrijalva/jwt-go v3.0.0
 github.com/dustin/go-humanize
@@ -10,6 +10,8 @@ github.com/influxdata/influxdb 1.0
 github.com/influxdata/usage-client
 github.com/kimor79/gollectd
 github.com/mattn/go-runewidth
+github.com/mitchellh/copystructure
+github.com/mitchellh/reflectwalk
 github.com/pkg/errors
 github.com/russross/blackfriday
 github.com/serenize/snaker
