@@ -1,0 +1,11 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/mitchellh/reflectwalk.git
+	branch = master
+	commit = 0c9480f65513be815a88d6076a3d8d95d4274236
+	parent = 0e69be47a532a3bf9e43ddc6a14a879735d02d5f
+	cmdver = 0.3.0
