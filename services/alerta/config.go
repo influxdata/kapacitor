@@ -8,15 +8,15 @@ import (
 
 type Config struct {
 	// Whether Alerta integration is enabled.
-	Enabled bool `toml:"enabled"`
+	Enabled bool `toml:"enabled" override:"enabled"`
 	// The Alerta URL.
-	URL string `toml:"url"`
+	URL string `toml:"url" override:"url"`
 	// The authentication token for this notification, can be overridden per alert.
-	Token string `toml:"token" override:",redact"`
+	Token string `toml:"token" override:"token,redact"`
 	// The environment in which to raise the alert.
-	Environment string `toml:"environment"`
+	Environment string `toml:"environment" override:"environment"`
 	// The origin of the alert.
-	Origin string `toml:"origin"`
+	Origin string `toml:"origin" override:"origin"`
 }
 
 func NewConfig() Config {

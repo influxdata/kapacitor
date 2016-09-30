@@ -6,11 +6,11 @@ const DefaultSource = "Kapacitor"
 
 type Config struct {
 	// Whether Sensu integration is enabled.
-	Enabled bool `toml:"enabled"`
+	Enabled bool `toml:"enabled" override:"enabled"`
 	// The Sensu client host:port address.
-	Addr string `toml:"addr"`
+	Addr string `toml:"addr" override:"addr"`
 	// The JIT sensu source name of the alert.
-	Source string `toml:"source"`
+	Source string `toml:"source" override:"source"`
 }
 
 func NewConfig() Config {

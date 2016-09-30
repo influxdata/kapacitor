@@ -10,12 +10,12 @@ import (
 )
 
 type Config struct {
-	Enabled    bool     `toml:"enabled"`
-	InCluster  bool     `toml:"in-cluster"`
-	APIServers []string `toml:"api-servers"`
-	Token      string   `toml:"token"`
-	CAPath     string   `toml:"ca-path"`
-	Namespace  string   `toml:"namespace"`
+	Enabled    bool     `toml:"enabled" override:"enabled"`
+	InCluster  bool     `toml:"in-cluster" override:"in-cluster"`
+	APIServers []string `toml:"api-servers" override:"api-servers"`
+	Token      string   `toml:"token" override:"token,redact"`
+	CAPath     string   `toml:"ca-path" override:"ca-path"`
+	Namespace  string   `toml:"namespace" override:"namespace"`
 }
 
 func NewConfig() Config {

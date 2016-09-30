@@ -4,15 +4,40 @@
 
 ### Release Notes
 
+New K8sAutoscale node that allows you to auotmatically scale Kubernetes deployments driven by any metrics Kapacitor consumes.
+For example, to scale a deployment `myapp` based off requests per second:
+
+```
+// The target requests per second per host
+var target = 100.0
+
+stream
+    |from()
+        .measurement('requests')
+        .where(lambda: "deployment" == 'myapp')
+    // Compute the moving average of the last 5 minutes
+    |movingAverage('requests', 5*60)
+        .as('mean_requests_per_second')
+    |k8sAutoscale()
+        .resourceName('app')
+        .kind('deployments')
+        .min(4)
+        .max(100)
+        // Compute the desired number of replicas based on target.
+        .replicas(lambda: int(ceil("mean_requests_per_second" / target)))
+```
+
+
+New API endpoints have been added to be able to configure InfluxDB clusters and alert handlers dynamically without needing to restart the Kapacitor daemon.
+See the API docs for more details.
+
 ### Features
 
-### Bugfixes
-
-- [#980](https://github.com/influxdata/kapacitor/pull/980): Upgrade to using go 1.7
 - [#931](https://github.com/influxdata/kapacitor/issues/931): Add a Kubernetes autoscaler node. You can now autoscale your Kubernetes deployments via Kapacitor.
+- [#928](https://github.com/influxdata/kapacitor/issues/928): Add new API endpoint for dynamically overriding sections of the configuration.
+- [#980](https://github.com/influxdata/kapacitor/pull/980): Upgrade to using go 1.7
 
 ### Bugfixes
-
 
 ## v1.0.2 [2016-10-06]
 
@@ -453,7 +478,6 @@ All IDs (tasks, recordings, replays) must match this regex `^[-\._\p{L}0-9]+$`, 
 If you have existing tasks which do not match this pattern they should continue to function normally.
 
 ### Features
-
 
 ### Bugfixes
 

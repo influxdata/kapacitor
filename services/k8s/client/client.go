@@ -12,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 
 	"github.com/pkg/errors"
 )
@@ -49,6 +50,7 @@ type Client interface {
 	// Scales returns an interface for interactive with Scale resources.
 	// If namespace is empty the default client namespace will be used.
 	Scales(namespace string) ScalesInterface
+	Update(c Config) error
 }
 
 // httpClient is a lightweight HTTP client for k8s resources.
@@ -56,12 +58,11 @@ type Client interface {
 // so as to make replacing this client with an official client simpler
 // once https://github.com/kubernetes/kubernetes/issues/5660 is fixed
 type httpClient struct {
-	mu         sync.Mutex
-	urls       []*url.URL
-	namespace  string
-	client     *http.Client
-	current    int
-	authHeader string
+	mu     sync.RWMutex
+	config Config
+	urls   []url.URL
+	client *http.Client
+	index  int32
 }
 
 func NewConfigInCluster() (Config, error) {
@@ -97,53 +98,81 @@ func NewConfigInCluster() (Config, error) {
 	return config, nil
 }
 
-func NewInCluster() (Client, error) {
-	config, err := NewConfigInCluster()
+func New(c Config) (Client, error) {
+	if c.Namespace == "" {
+		c.Namespace = NamespaceDefault
+	}
+	urls, err := parseURLs(c.URLs)
 	if err != nil {
 		return nil, err
 	}
-	return New(config)
-}
-
-func New(c Config) (Client, error) {
-	if len(c.URLs) == 0 {
-		return nil, fmt.Errorf("must provide at least one URL")
-	}
-	urls := make([]*url.URL, len(c.URLs))
-	for i := range c.URLs {
-		u, err := url.Parse(c.URLs[i])
-		if err != nil {
-			return nil, errors.Wrapf(err, "invalid url %q", c.URLs[i])
-		}
-		urls[i] = u
-	}
-	tr := &http.Transport{
-		TLSClientConfig: c.TLSConfig,
-	}
 	return &httpClient{
-		urls: urls,
+		config: c,
+		urls:   urls,
 		client: &http.Client{
-			Transport: tr,
+			Transport: &http.Transport{
+				TLSClientConfig: c.TLSConfig,
+			},
 		},
-		namespace:  c.Namespace,
-		authHeader: fmt.Sprintf("Bearer %s", c.Token),
 	}, nil
 }
 
-func (c *httpClient) nextURL() *url.URL {
+func (c *httpClient) pickURL(urls []url.URL) url.URL {
+	i := atomic.LoadInt32(&c.index)
+	i = (i + 1) % int32(len(urls))
+	atomic.StoreInt32(&c.index, i)
+	return urls[i]
+}
+
+func parseURLs(urlStrs []string) ([]url.URL, error) {
+	urls := make([]url.URL, len(urlStrs))
+	for i, urlStr := range urlStrs {
+		u, err := url.Parse(urlStr)
+		if err != nil {
+			return nil, errors.Wrapf(err, "invalid url %q", urlStr)
+		}
+		urls[i] = *u
+	}
+	return urls, nil
+}
+
+func (c *httpClient) Update(new Config) error {
 	c.mu.Lock()
-	u := c.urls[c.current]
-	c.current = (c.current + 1) % len(c.urls)
-	c.mu.Unlock()
-	return u
+	defer c.mu.Unlock()
+
+	old := c.config
+	c.config = new
+	if c.config.Namespace == "" {
+		c.config.Namespace = NamespaceDefault
+	}
+	// Replace urls
+	urls, err := parseURLs(new.URLs)
+	if err != nil {
+		return err
+	}
+	c.urls = urls
+
+	if old.TLSConfig != new.TLSConfig {
+		c.client = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: new.TLSConfig,
+			},
+		}
+	}
+	return nil
 }
 
 func (c *httpClient) Do(r http.Request) (*http.Response, error) {
-	u := c.nextURL()
+	c.mu.RLock()
+	config := c.config
+	u := c.pickURL(c.urls)
+	client := c.client
+	c.mu.RUnlock()
+
 	r.URL.Host = u.Host
 	r.URL.Scheme = u.Scheme
-	r.Header.Set("Authorization", c.authHeader)
-	resp, err := c.client.Do(&r)
+	r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", config.Token))
+	resp, err := client.Do(&r)
 	return resp, errors.Wrap(err, "k8s client request failed")
 }
 
@@ -219,11 +248,10 @@ type Scales struct {
 
 func (c *httpClient) Scales(namespace string) ScalesInterface {
 	if namespace == "" {
-		if c.namespace != "" {
-			namespace = c.namespace
-		} else {
-			namespace = NamespaceDefault
-		}
+		c.mu.RLock()
+		config := c.config
+		c.mu.RUnlock()
+		namespace = config.Namespace
 	}
 	return Scales{c: c, namespace: namespace}
 }

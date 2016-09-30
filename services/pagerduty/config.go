@@ -10,13 +10,13 @@ const DefaultPagerDutyAPIURL = "https://events.pagerduty.com/generic/2010-04-15/
 
 type Config struct {
 	// Whether PagerDuty integration is enabled.
-	Enabled bool `toml:"enabled"`
+	Enabled bool `toml:"enabled" override:"enabled"`
 	// The PagerDuty API URL, should not need to be changed.
-	URL string `toml:"url"`
+	URL string `toml:"url" override:"url"`
 	// The PagerDuty service key.
-	ServiceKey string `toml:"service-key" override:",redact"`
+	ServiceKey string `toml:"service-key" override:"service-key,redact"`
 	// Whether every alert should automatically go to PagerDuty
-	Global bool `toml:"global"`
+	Global bool `toml:"global" override:"global"`
 }
 
 func NewConfig() Config {

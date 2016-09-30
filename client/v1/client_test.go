@@ -202,6 +202,34 @@ func Test_ReportsErrors(t *testing.T) {
 			},
 		},
 		{
+			name: "ConfigSections",
+			fnc: func(c *client.Client) error {
+				_, err := c.ConfigSections()
+				return err
+			},
+		},
+		{
+			name: "ConfigSection",
+			fnc: func(c *client.Client) error {
+				_, err := c.ConfigSection(c.ConfigSectionLink(""))
+				return err
+			},
+		},
+		{
+			name: "ConfigElement",
+			fnc: func(c *client.Client) error {
+				_, err := c.ConfigElement(c.ConfigElementLink("", ""))
+				return err
+			},
+		},
+		{
+			name: "ConfigUpdate",
+			fnc: func(c *client.Client) error {
+				err := c.ConfigUpdate(c.ConfigSectionLink(""), client.ConfigUpdateAction{})
+				return err
+			},
+		},
+		{
 			name: "LogLevel",
 			fnc: func(c *client.Client) error {
 				err := c.LogLevel("")
@@ -1886,6 +1914,294 @@ func Test_ListReplays_Filter(t *testing.T) {
 	}
 	if !reflect.DeepEqual(exp, tasks) {
 		t.Errorf("unexpected replay list:\ngot:\n%v\nexp:\n%v", tasks, exp)
+	}
+}
+
+func Test_ConfigUpdate(t *testing.T) {
+	expUpdate := client.ConfigUpdateAction{
+		Set: map[string]interface{}{
+			"option": "new value",
+		},
+	}
+	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var update client.ConfigUpdateAction
+		body, _ := ioutil.ReadAll(r.Body)
+		json.Unmarshal(body, &update)
+		if r.URL.Path == "/kapacitor/v1/config/section" && r.Method == "POST" &&
+			reflect.DeepEqual(update, expUpdate) {
+			w.WriteHeader(http.StatusNoContent)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "request: %v", r)
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	if err := c.ConfigUpdate(c.ConfigSectionLink("section"), expUpdate); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func Test_ConfigUpdate_Element(t *testing.T) {
+	expUpdate := client.ConfigUpdateAction{
+		Set: map[string]interface{}{
+			"option": "new value",
+		},
+	}
+	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var update client.ConfigUpdateAction
+		body, _ := ioutil.ReadAll(r.Body)
+		json.Unmarshal(body, &update)
+		if r.URL.Path == "/kapacitor/v1/config/section/element" && r.Method == "POST" &&
+			reflect.DeepEqual(update, expUpdate) {
+			w.WriteHeader(http.StatusNoContent)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "request: %v", r)
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	if err := c.ConfigUpdate(c.ConfigElementLink("section", "element"), expUpdate); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func Test_ConfigSections(t *testing.T) {
+	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/kapacitor/v1/config" && r.Method == "GET" {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, `{
+	"link": {"rel":"self", "href":"/kapacitor/v1/config"},
+	"sections":{
+		"sectionA": {
+			"link": {"rel":"self", "href":"/kapacitor/v1/config/sectionA"},
+			"elements": [
+				{
+					"link": {"rel":"self", "href":"/kapacitor/v1/config/sectionA/A"},
+					"options" :{
+						"name": "A",
+						"optionA": "o1",
+						"optionB": "o2",
+						"optionC": "o3",
+						"optionD": "o4"
+					}
+				},
+				{
+					"link": {"rel":"self", "href":"/kapacitor/v1/config/sectionA/B"},
+					"options" :{
+						"name": "B",
+						"optionA": "o5",
+						"optionB": "o6",
+						"optionC": "o7",
+						"optionD": "o8"
+					}
+				}
+			]
+		},
+		"sectionB": {
+			"link": {"rel":"self", "href":"/kapacitor/v1/config/sectionB"},
+			"elements" :[
+				{
+					"link": {"rel":"self", "href":"/kapacitor/v1/config/sectionB/X"},
+					"options" :{
+						"name": "X",
+						"optionA": "o1",
+						"optionB": "o2",
+						"optionC": "o3",
+						"optionD": "o4"
+					}
+				},
+				{
+					"link": {"rel":"self", "href":"/kapacitor/v1/config/sectionB/Y"},
+					"options" :{
+						"name": "Y",
+						"optionH": "o5",
+						"optionJ": "o6",
+						"optionK": "o7",
+						"optionL": "o8"
+					}
+				}
+			]
+		},
+		"sectionC": {
+			"link": {"rel":"self", "href":"/kapacitor/v1/config/sectionC"},
+			"elements" :[{
+				"link": {"rel":"self", "href":"/kapacitor/v1/config/sectionC/"},
+				"options" :{
+					"optionA": "o1",
+					"optionB": "o2",
+					"optionC": "o3",
+					"optionD": "o4"
+				}
+			}]
+		}
+	}
+}`)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "request: %v", r)
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	sections, err := c.ConfigSections()
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp := client.ConfigSections{
+		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config"},
+		Sections: map[string]client.ConfigSection{
+			"sectionA": client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/sectionA"},
+				Elements: []client.ConfigElement{
+					{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/sectionA/A"},
+						Options: map[string]interface{}{
+							"name":    "A",
+							"optionA": "o1",
+							"optionB": "o2",
+							"optionC": "o3",
+							"optionD": "o4",
+						},
+					},
+					{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/sectionA/B"},
+						Options: map[string]interface{}{
+							"name":    "B",
+							"optionA": "o5",
+							"optionB": "o6",
+							"optionC": "o7",
+							"optionD": "o8",
+						},
+					},
+				},
+			},
+			"sectionB": client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/sectionB"},
+				Elements: []client.ConfigElement{
+					{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/sectionB/X"},
+						Options: map[string]interface{}{
+							"name":    "X",
+							"optionA": "o1",
+							"optionB": "o2",
+							"optionC": "o3",
+							"optionD": "o4",
+						},
+					},
+					{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/sectionB/Y"},
+						Options: map[string]interface{}{
+							"name":    "Y",
+							"optionH": "o5",
+							"optionJ": "o6",
+							"optionK": "o7",
+							"optionL": "o8",
+						},
+					},
+				},
+			},
+			"sectionC": client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/sectionC"},
+				Elements: []client.ConfigElement{
+					{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/sectionC/"},
+						Options: map[string]interface{}{
+							"optionA": "o1",
+							"optionB": "o2",
+							"optionC": "o3",
+							"optionD": "o4",
+						},
+					},
+				},
+			},
+		},
+	}
+	if !reflect.DeepEqual(exp, sections) {
+		t.Errorf("unexpected config section:\ngot:\n%v\nexp:\n%v", sections, exp)
+	}
+}
+
+func Test_ConfigSection(t *testing.T) {
+	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/kapacitor/v1/config/section" && r.Method == "GET" {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, `{
+	"link": {"rel":"self", "href":"/kapacitor/v1/config/section"},
+	"elements" : [
+		{
+			"link": {"rel":"self", "href":"/kapacitor/v1/config/section/A"},
+			"options": {
+				"name": "A",
+				"optionA": "o1",
+				"optionB": "o2",
+				"optionC": "o3",
+				"optionD": "o4"
+			}
+		},
+		{
+			"link": {"rel":"self", "href":"/kapacitor/v1/config/section/B"},
+			"options": {
+				"name": "B",
+				"optionA": "o5",
+				"optionB": "o6",
+				"optionC": "o7",
+				"optionD": "o8"
+			}
+		}
+	]
+}`)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "request: %v", r)
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	section, err := c.ConfigSection(c.ConfigSectionLink("section"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp := client.ConfigSection{
+		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/section"},
+		Elements: []client.ConfigElement{
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/section/A"},
+				Options: map[string]interface{}{
+					"name":    "A",
+					"optionA": "o1",
+					"optionB": "o2",
+					"optionC": "o3",
+					"optionD": "o4",
+				},
+			},
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/section/B"},
+				Options: map[string]interface{}{
+					"name":    "B",
+					"optionA": "o5",
+					"optionB": "o6",
+					"optionC": "o7",
+					"optionD": "o8",
+				},
+			},
+		},
+	}
+	if !reflect.DeepEqual(exp, section) {
+		t.Errorf("unexpected config section:\ngot:\n%v\nexp:\n%v", section, exp)
 	}
 }
 

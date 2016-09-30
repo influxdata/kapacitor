@@ -31,22 +31,32 @@ type OverrideDAO interface {
 }
 
 //--------------------------------------------------------------------
-// The following structures are stored in a database via gob encoding.
+// The following structures are stored in a database via JSON encoding.
 // Changes to the structures could break existing data.
 //
 // Many of these structures are exact copies of structures found elsewhere,
 // this is intentional so that all structures stored in the database are
 // defined here and nowhere else. So as to not accidentally change
-// the gob serialization format in incompatible ways.
+// the JSON serialization format in incompatible ways.
+
+// version is the current version of the Override structure.
+const version = 1
 
 type Override struct {
 	// Unique identifier for the override
-	ID string
+	ID string `json:"id"`
 
 	// Map of key value pairs of option overrides.
-	Options map[string]interface{}
+	Options map[string]interface{} `json:"options"`
 
-	Create bool
+	Create bool `json:"create"`
+}
+
+// versionWrapper wraps a structure with a version so that changes
+// to the structure can be properly decoded.
+type versionWrapper struct {
+	Version int              `json:"version"`
+	Value   *json.RawMessage `json:"value"`
 }
 
 const (
@@ -68,21 +78,34 @@ func newOverrideKV(store storage.Interface) *overrideKV {
 	}
 }
 
-func (d *overrideKV) encodeOverride(o Override) ([]byte, error) {
-	var buf bytes.Buffer
-	// Using JSON encoding since gob doesn't handle arbitrary interfaces well,
-	// and this data is shipped over the wire via JSON so we know it will work.
-	enc := json.NewEncoder(&buf)
-	err := enc.Encode(o)
-	return buf.Bytes(), err
+func encodeOverride(o Override) ([]byte, error) {
+	raw, err := json.Marshal(o)
+	if err != nil {
+		return nil, err
+	}
+	rawCopy := make(json.RawMessage, len(raw))
+	copy(rawCopy, raw)
+	wrapper := versionWrapper{
+		Version: version,
+		Value:   &rawCopy,
+	}
+	return json.Marshal(wrapper)
 }
 
-func (d *overrideKV) decodeOverride(data []byte) (Override, error) {
+func decodeOverride(data []byte) (Override, error) {
+	var wrapper versionWrapper
+	err := json.Unmarshal(data, &wrapper)
+	if err != nil {
+		return Override{}, err
+	}
 	var override Override
-	dec := json.NewDecoder(bytes.NewReader(data))
+	if wrapper.Value == nil {
+		return Override{}, errors.New("empty override")
+	}
+	dec := json.NewDecoder(bytes.NewReader(*wrapper.Value))
 	// Do not convert all nums to float64, rather use json.Number which is a Stringer
 	dec.UseNumber()
-	err := dec.Decode(&override)
+	err = dec.Decode(&override)
 	return override, err
 }
 
@@ -114,13 +137,13 @@ func (d *overrideKV) Get(id string) (Override, error) {
 	if err != nil {
 		return Override{}, err
 	}
-	return d.decodeOverride(kv.Value)
+	return decodeOverride(kv.Value)
 }
 
 func (d *overrideKV) Set(o Override) error {
 	key := d.overrideDataKey(o.ID)
 
-	data, err := d.encodeOverride(o)
+	data, err := encodeOverride(o)
 	if err != nil {
 		return err
 	}

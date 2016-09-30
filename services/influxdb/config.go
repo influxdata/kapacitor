@@ -21,46 +21,45 @@ const (
 )
 
 type Config struct {
-	Enabled  bool     `toml:"enabled"`
-	Name     string   `toml:"name"`
-	Default  bool     `toml:"default"`
-	URLs     []string `toml:"urls"`
-	Username string   `toml:"username"`
-	Password string   `toml:"password" override:",redact"`
+	Enabled  bool     `toml:"enabled" override:"enabled"`
+	Name     string   `toml:"name" override:"name"`
+	Default  bool     `toml:"default" override:"default"`
+	URLs     []string `toml:"urls" override:"urls"`
+	Username string   `toml:"username" override:"username"`
+	Password string   `toml:"password" override:"password,redact"`
 	// Path to CA file
-	SSLCA string `toml:"ssl-ca"`
+	SSLCA string `toml:"ssl-ca" override:"ssl-ca"`
 	// Path to host cert file
-	SSLCert string `toml:"ssl-cert"`
+	SSLCert string `toml:"ssl-cert" override:"ssl-cert"`
 	// Path to cert key file
-	SSLKey string `toml:"ssl-key"`
+	SSLKey string `toml:"ssl-key" override:"ssl-key"`
 	// Use SSL but skip chain & host verification
-	InsecureSkipVerify bool `toml:"insecure-skip-verify"`
+	InsecureSkipVerify bool `toml:"insecure-skip-verify" override:"insecure-skip-verify"`
 
-	Timeout                  toml.Duration       `toml:"timeout"`
-	DisableSubscriptions     bool                `toml:"disable-subscriptions"`
-	SubscriptionProtocol     string              `toml:"subscription-protocol"`
-	Subscriptions            map[string][]string `toml:"subscriptions"`
-	ExcludedSubscriptions    map[string][]string `toml:"excluded-subscriptions"`
-	KapacitorHostname        string              `toml:"kapacitor-hostname"`
-	HTTPPort                 int                 `toml:"http-port"`
-	UDPBind                  string              `toml:"udp-bind"`
-	UDPBuffer                int                 `toml:"udp-buffer"`
-	UDPReadBuffer            int                 `toml:"udp-read-buffer"`
-	StartUpTimeout           toml.Duration       `toml:"startup-timeout"`
-	SubscriptionSyncInterval toml.Duration       `toml:"subscriptions-sync-interval"`
+	Timeout                  toml.Duration       `toml:"timeout" override:"timeout"`
+	DisableSubscriptions     bool                `toml:"disable-subscriptions" override:"disable-subscriptions"`
+	SubscriptionProtocol     string              `toml:"subscription-protocol" override:"subscription-protocol"`
+	Subscriptions            map[string][]string `toml:"subscriptions" override:"subscriptions"`
+	ExcludedSubscriptions    map[string][]string `toml:"excluded-subscriptions" override:"excluded-subscriptions"`
+	KapacitorHostname        string              `toml:"kapacitor-hostname" override:"kapacitor-hostname"`
+	HTTPPort                 int                 `toml:"http-port" override:"http-port"`
+	UDPBind                  string              `toml:"udp-bind" override:"udp-bind"`
+	UDPBuffer                int                 `toml:"udp-buffer" override:"udp-buffer"`
+	UDPReadBuffer            int                 `toml:"udp-read-buffer" override:"udp-read-buffer"`
+	StartUpTimeout           toml.Duration       `toml:"startup-timeout" override:"startup-timeout"`
+	SubscriptionSyncInterval toml.Duration       `toml:"subscriptions-sync-interval" override:"subscriptions-sync-interval"`
 }
 
 func NewConfig() Config {
 	c := &Config{}
-	c.SetDefaults()
+	c.Init()
+	c.Enabled = true
 	return *c
 }
 
-func (c *Config) SetDefaults() {
-	c.Enabled = true
+func (c *Config) Init() {
 	c.Name = "default"
 	c.URLs = []string{"http://localhost:8086"}
-	c.Subscriptions = make(map[string][]string)
 	c.ExcludedSubscriptions = map[string][]string{
 		stats.DefaultDatabse: []string{stats.DefaultRetentionPolicy},
 	}
@@ -68,6 +67,21 @@ func (c *Config) SetDefaults() {
 	c.StartUpTimeout = toml.Duration(DefaultStartUpTimeout)
 	c.SubscriptionProtocol = DefaultSubscriptionProtocol
 	c.SubscriptionSyncInterval = toml.Duration(DefaultSubscriptionSyncInterval)
+}
+
+func (c *Config) ApplyConditionalDefaults() {
+	if c.UDPBuffer == 0 {
+		c.UDPBuffer = udp.DefaultBuffer
+	}
+	if c.StartUpTimeout == 0 {
+		c.StartUpTimeout = toml.Duration(DefaultStartUpTimeout)
+	}
+	if c.SubscriptionProtocol == "" {
+		c.SubscriptionProtocol = DefaultSubscriptionProtocol
+	}
+	if c.SubscriptionSyncInterval == toml.Duration(0) {
+		c.SubscriptionSyncInterval = toml.Duration(DefaultSubscriptionSyncInterval)
+	}
 }
 
 var validNamePattern = regexp.MustCompile(`^[-\._\p{L}0-9]+$`)
@@ -95,7 +109,7 @@ func (c Config) Validate() error {
 	switch c.SubscriptionProtocol {
 	case "http", "https", "udp":
 	default:
-		return fmt.Errorf("invalid subscription protocol, must be one of 'udp', 'http' or 'https', got %s", c.SubscriptionProtocol)
+		return fmt.Errorf("invalid subscription protocol, must be one of 'udp', 'http' or 'https', got %q: %v", c.SubscriptionProtocol, c)
 	}
 	return nil
 }

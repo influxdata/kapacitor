@@ -693,7 +693,11 @@ func (c *Client) ConfigSectionLink(section string) Link {
 }
 
 func (c *Client) ConfigElementLink(section, element string) Link {
-	return Link{Relation: Self, Href: path.Join(configPath, section, element)}
+	href := path.Join(configPath, section, element)
+	if element == "" {
+		href += "/"
+	}
+	return Link{Relation: Self, Href: href}
 }
 
 type CreateTaskOptions struct {
@@ -1521,7 +1525,7 @@ type ConfigUpdateAction struct {
 	Remove []string               `json:"remove,omitempty"`
 }
 
-// ConfigUpdate performs a given ConfigUpdateAction
+// ConfigUpdate performs a given ConfigUpdateAction against a given section or element.
 func (c *Client) ConfigUpdate(link Link, action ConfigUpdateAction) error {
 	if link.Href == "" {
 		return fmt.Errorf("invalid link %v", link)
@@ -1546,24 +1550,35 @@ func (c *Client) ConfigUpdate(link Link, action ConfigUpdateAction) error {
 	return err
 }
 
-type ConfigSections map[string]ConfigSection
-type ConfigSection []ConfigElement
-type ConfigElement map[string]interface{}
+type ConfigSections struct {
+	Link     Link                     `json:"link"`
+	Sections map[string]ConfigSection `json:"sections"`
+}
 
-// ConfigSection returns the running configuration for a section.
+type ConfigSection struct {
+	Link     Link            `json:"link"`
+	Elements []ConfigElement `json:"elements"`
+}
+
+type ConfigElement struct {
+	Link    Link                   `json:"link"`
+	Options map[string]interface{} `json:"options"`
+}
+
+// ConfigSections returns all the running configuration sections that can be modified.
 func (c *Client) ConfigSections() (ConfigSections, error) {
 	u := *c.url
 	u.Path = configPath
 
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
-		return nil, err
+		return ConfigSections{}, err
 	}
 
 	sections := ConfigSections{}
 	_, err = c.Do(req, &sections, http.StatusOK)
 	if err != nil {
-		return nil, err
+		return ConfigSections{}, err
 	}
 	return sections, nil
 }
@@ -1571,7 +1586,7 @@ func (c *Client) ConfigSections() (ConfigSections, error) {
 // ConfigSection returns the running configuration for a section.
 func (c *Client) ConfigSection(link Link) (ConfigSection, error) {
 	if link.Href == "" {
-		return nil, fmt.Errorf("invalid link %v", link)
+		return ConfigSection{}, fmt.Errorf("invalid link %v", link)
 	}
 
 	u := *c.url
@@ -1579,21 +1594,21 @@ func (c *Client) ConfigSection(link Link) (ConfigSection, error) {
 
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
-		return nil, err
+		return ConfigSection{}, err
 	}
 
 	section := ConfigSection{}
 	_, err = c.Do(req, &section, http.StatusOK)
 	if err != nil {
-		return nil, err
+		return ConfigSection{}, err
 	}
 	return section, nil
 }
 
-// ConfigElement returns the running configuration for a section and element.
+// ConfigElement returns the running configuration for a given section and element.
 func (c *Client) ConfigElement(link Link) (ConfigElement, error) {
 	if link.Href == "" {
-		return nil, fmt.Errorf("invalid link %v", link)
+		return ConfigElement{}, fmt.Errorf("invalid link %v", link)
 	}
 
 	u := *c.url
@@ -1601,13 +1616,13 @@ func (c *Client) ConfigElement(link Link) (ConfigElement, error) {
 
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
-		return nil, err
+		return ConfigElement{}, err
 	}
 
 	element := ConfigElement{}
 	_, err = c.Do(req, &element, http.StatusOK)
 	if err != nil {
-		return nil, err
+		return ConfigElement{}, err
 	}
 	return element, nil
 }

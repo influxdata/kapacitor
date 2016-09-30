@@ -70,7 +70,6 @@ type Service struct {
 		DelRoutes([]httpd.Route)
 	}
 	InfluxDBService interface {
-		NewDefaultClient() (influxdb.Client, error)
 		NewNamedClient(name string) (influxdb.Client, error)
 	}
 	TaskMasterLookup interface {
@@ -1335,13 +1334,7 @@ func (s *Service) startRecordBatch(t *kapacitor.Task, start, stop time.Time) ([]
 			defer close(source)
 
 			// Connect to the cluster
-			var con influxdb.Client
-			var err error
-			if cluster != "" {
-				con, err = s.InfluxDBService.NewNamedClient(cluster)
-			} else {
-				con, err = s.InfluxDBService.NewDefaultClient()
-			}
+			cli, err := s.InfluxDBService.NewNamedClient(cluster)
 			if err != nil {
 				errors <- err
 				return
@@ -1351,12 +1344,8 @@ func (s *Service) startRecordBatch(t *kapacitor.Task, start, stop time.Time) ([]
 				query := influxdb.Query{
 					Command: q.String(),
 				}
-				resp, err := con.Query(query)
+				resp, err := cli.Query(query)
 				if err != nil {
-					errors <- err
-					return
-				}
-				if err := resp.Error(); err != nil {
 					errors <- err
 					return
 				}
@@ -1576,24 +1565,16 @@ func (s *Service) execQuery(q, cluster string) (kapacitor.DBRP, *influxdb.Respon
 		return dbrp, nil, errors.New("InfluxDB not configured, cannot record query")
 	}
 	// Query InfluxDB
-	var con influxdb.Client
-	if cluster != "" {
-		con, err = s.InfluxDBService.NewNamedClient(cluster)
-	} else {
-		con, err = s.InfluxDBService.NewDefaultClient()
-	}
+	con, err := s.InfluxDBService.NewNamedClient(cluster)
 	if err != nil {
-		return dbrp, nil, err
+		return dbrp, nil, errors.Wrap(err, "failed to get InfluxDB client")
 	}
 	query := influxdb.Query{
 		Command: q,
 	}
 	resp, err := con.Query(query)
 	if err != nil {
-		return dbrp, nil, err
-	}
-	if err := resp.Error(); err != nil {
-		return dbrp, nil, err
+		return dbrp, nil, errors.Wrap(err, "InfluxDB query failed")
 	}
 	return dbrp, resp, nil
 }

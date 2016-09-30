@@ -112,17 +112,18 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	}
 	l := logService.NewLogger("[srv] ", log.LstdFlags)
 	s := &Server{
-		config:         c,
-		BuildInfo:      buildInfo,
-		dataDir:        c.DataDir,
-		hostname:       c.Hostname,
-		err:            make(chan error),
-		configUpdates:  make(chan config.ConfigUpdate, 100),
-		LogService:     logService,
-		MetaClient:     &kapacitor.NoopMetaClient{},
-		QueryExecutor:  &Queryexecutor{},
-		Logger:         l,
-		ServicesByName: make(map[string]int),
+		config:          c,
+		BuildInfo:       buildInfo,
+		dataDir:         c.DataDir,
+		hostname:        c.Hostname,
+		err:             make(chan error),
+		configUpdates:   make(chan config.ConfigUpdate, 100),
+		LogService:      logService,
+		MetaClient:      &kapacitor.NoopMetaClient{},
+		QueryExecutor:   &Queryexecutor{},
+		Logger:          l,
+		ServicesByName:  make(map[string]int),
+		DynamicServices: make(map[string]Updater),
 	}
 	s.Logger.Println("I! Kapacitor hostname:", s.hostname)
 
@@ -149,35 +150,40 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	}
 
 	// Append Kapacitor services.
+	s.initHTTPDService()
+	s.appendStorageService()
+	s.appendAuthService()
 	s.appendUDFService()
 	s.appendDeadmanService()
-	s.appendSMTPService()
-	s.InitHTTPDService()
-	s.appendStorageService()
-	s.appendConfigOverrideService(c)
-	s.appendAuthService()
+
+	// Append config override service before any dynamic services
+	s.appendConfigOverrideService()
+
 	if err := s.appendInfluxDBService(); err != nil {
 		return nil, errors.Wrap(err, "influxdb service")
 	}
+	// Append these after InfluxDB because they depend on it
 	s.appendTaskStoreService()
 	s.appendReplayService()
 
+	// Append Alert integration services
+	s.appendAlertaService()
+	s.appendHipChatService()
+	s.appendOpsGenieService()
+	s.appendPagerDutyService()
+	s.appendSMTPService()
+	s.appendSensuService()
+	s.appendSlackService()
+	s.appendTalkService()
+	s.appendTelegramService()
+	s.appendVictorOpsService()
+
+	// Append third-party integrations
 	if err := s.appendK8sService(); err != nil {
 		return nil, errors.Wrap(err, "kubernetes service")
 	}
 
-	// Append Alert integration services
-	s.appendOpsGenieService()
-	s.appendVictorOpsService()
-	s.appendPagerDutyService()
-	s.appendTelegramService()
-	s.appendHipChatService()
-	s.appendAlertaService()
-	s.appendSlackService()
-	s.appendSensuService()
-	s.appendTalkService()
-
-	// Append InfluxDB input services
+	// Append extra input services
 	s.appendCollectdService()
 	s.appendUDPServices()
 	if err := s.appendOpenTSDBService(); err != nil {
@@ -212,9 +218,9 @@ func (s *Server) appendStorageService() {
 	s.AppendService("storage", srv)
 }
 
-func (s *Server) appendConfigOverrideService(c *Config) {
+func (s *Server) appendConfigOverrideService() {
 	l := s.LogService.NewLogger("[config-override] ", log.LstdFlags)
-	srv := config.NewService(c, l, s.configUpdates)
+	srv := config.NewService(s.config.ConfigOverride, s.config, l, s.configUpdates)
 	srv.HTTPDService = s.HTTPDService
 	srv.StorageService = s.StorageService
 
@@ -224,39 +230,39 @@ func (s *Server) appendConfigOverrideService(c *Config) {
 
 func (s *Server) appendSMTPService() {
 	c := s.config.SMTP
-	if c.Enabled {
-		l := s.LogService.NewLogger("[smtp] ", log.LstdFlags)
-		srv := smtp.NewService(c, l)
+	l := s.LogService.NewLogger("[smtp] ", log.LstdFlags)
+	srv := smtp.NewService(c, l)
 
-		s.TaskMaster.SMTPService = srv
-		s.AppendService("smtp", srv)
-	}
+	s.TaskMaster.SMTPService = srv
+	s.AppendService("smtp", srv)
+	s.DynamicServices["smtp"] = srv
 }
 
 func (s *Server) appendInfluxDBService() error {
 	c := s.config.InfluxDB
-	if len(c) > 0 {
-		l := s.LogService.NewLogger("[influxdb] ", log.LstdFlags)
-		httpPort, err := s.config.HTTP.Port()
-		if err != nil {
-			return errors.Wrap(err, "failed to get http port")
-		}
-		srv := influxdb.NewService(c, httpPort, s.config.Hostname, s.config.HTTP.AuthEnabled, l)
-		srv.HTTPDService = s.HTTPDService
-		srv.PointsWriter = s.TaskMaster
-		srv.LogService = s.LogService
-		srv.AuthService = s.AuthService
-		srv.ClientCreator = iclient.ClientCreator{}
-
-		s.InfluxDBService = srv
-		s.TaskMaster.InfluxDBService = srv
-		s.AppendService("influxdb", srv)
-		//s.DynamicServices["influxdb"] = srv
+	l := s.LogService.NewLogger("[influxdb] ", log.LstdFlags)
+	httpPort, err := s.config.HTTP.Port()
+	if err != nil {
+		return errors.Wrap(err, "failed to get http port")
 	}
+	srv, err := influxdb.NewService(c, httpPort, s.config.Hostname, s.config.HTTP.AuthEnabled, l)
+	if err != nil {
+		return err
+	}
+	srv.HTTPDService = s.HTTPDService
+	srv.PointsWriter = s.TaskMaster
+	srv.LogService = s.LogService
+	srv.AuthService = s.AuthService
+	srv.ClientCreator = iclient.ClientCreator{}
+
+	s.InfluxDBService = srv
+	s.TaskMaster.InfluxDBService = srv
+	s.AppendService("influxdb", srv)
+	s.DynamicServices["influxdb"] = srv
 	return nil
 }
 
-func (s *Server) InitHTTPDService() {
+func (s *Server) initHTTPDService() {
 	l := s.LogService.NewLogger("[httpd] ", log.LstdFlags)
 	srv := httpd.NewService(s.config.HTTP, s.hostname, l, s.LogService)
 
@@ -299,16 +305,15 @@ func (s *Server) appendReplayService() {
 
 func (s *Server) appendK8sService() error {
 	c := s.config.Kubernetes
-	if c.Enabled {
-		l := s.LogService.NewLogger("[kubernetes] ", log.LstdFlags)
-		srv, err := k8s.NewService(c, l)
-		if err != nil {
-			return err
-		}
-
-		s.TaskMaster.K8sService = srv
-		s.AppendService("kubernetes", srv)
+	l := s.LogService.NewLogger("[kubernetes] ", log.LstdFlags)
+	srv, err := k8s.NewService(c, l)
+	if err != nil {
+		return err
 	}
+
+	s.TaskMaster.K8sService = srv
+	s.DynamicServices["kubernetes"] = srv
+	s.AppendService("kubernetes", srv)
 	return nil
 }
 
@@ -339,111 +344,93 @@ func (s *Server) appendAuthService() {
 
 func (s *Server) appendOpsGenieService() {
 	c := s.config.OpsGenie
-	if c.Enabled {
-		l := s.LogService.NewLogger("[opsgenie] ", log.LstdFlags)
-		srv := opsgenie.NewService(c, l)
-		s.TaskMaster.OpsGenieService = srv
+	l := s.LogService.NewLogger("[opsgenie] ", log.LstdFlags)
+	srv := opsgenie.NewService(c, l)
+	s.TaskMaster.OpsGenieService = srv
 
-		s.AppendService("opsgenie", srv)
-		//s.DynamicServices["opsgenie"] = srv
-	}
+	s.AppendService("opsgenie", srv)
+	s.DynamicServices["opsgenie"] = srv
 }
 
 func (s *Server) appendVictorOpsService() {
 	c := s.config.VictorOps
-	if c.Enabled {
-		l := s.LogService.NewLogger("[victorops] ", log.LstdFlags)
-		srv := victorops.NewService(c, l)
-		s.TaskMaster.VictorOpsService = srv
+	l := s.LogService.NewLogger("[victorops] ", log.LstdFlags)
+	srv := victorops.NewService(c, l)
+	s.TaskMaster.VictorOpsService = srv
 
-		s.AppendService("victorops", srv)
-		s.DynamicServices["victorops"] = srv
-	}
+	s.AppendService("victorops", srv)
+	s.DynamicServices["victorops"] = srv
 }
 
 func (s *Server) appendPagerDutyService() {
 	c := s.config.PagerDuty
-	if c.Enabled {
-		l := s.LogService.NewLogger("[pagerduty] ", log.LstdFlags)
-		srv := pagerduty.NewService(c, l)
-		srv.HTTPDService = s.HTTPDService
-		s.TaskMaster.PagerDutyService = srv
+	l := s.LogService.NewLogger("[pagerduty] ", log.LstdFlags)
+	srv := pagerduty.NewService(c, l)
+	srv.HTTPDService = s.HTTPDService
+	s.TaskMaster.PagerDutyService = srv
 
-		s.AppendService("pagerduty", srv)
-		//s.DynamicServices["pagerduty"] = srv
-	}
+	s.AppendService("pagerduty", srv)
+	s.DynamicServices["pagerduty"] = srv
 }
 
 func (s *Server) appendSensuService() {
 	c := s.config.Sensu
-	if c.Enabled {
-		l := s.LogService.NewLogger("[sensu] ", log.LstdFlags)
-		srv := sensu.NewService(c, l)
-		s.TaskMaster.SensuService = srv
+	l := s.LogService.NewLogger("[sensu] ", log.LstdFlags)
+	srv := sensu.NewService(c, l)
+	s.TaskMaster.SensuService = srv
 
-		s.AppendService("sensu", srv)
-		//s.DynamicServices["sensu"] = srv
-	}
+	s.AppendService("sensu", srv)
+	s.DynamicServices["sensu"] = srv
 }
 
 func (s *Server) appendSlackService() {
 	c := s.config.Slack
-	if c.Enabled {
-		l := s.LogService.NewLogger("[slack] ", log.LstdFlags)
-		srv := slack.NewService(c, l)
-		s.TaskMaster.SlackService = srv
+	l := s.LogService.NewLogger("[slack] ", log.LstdFlags)
+	srv := slack.NewService(c, l)
+	s.TaskMaster.SlackService = srv
 
-		s.AppendService("slack", srv)
-		//s.DynamicServices["slack"] = srv
-	}
+	s.AppendService("slack", srv)
+	s.DynamicServices["slack"] = srv
 }
 
 func (s *Server) appendTelegramService() {
 	c := s.config.Telegram
-	if c.Enabled {
-		l := s.LogService.NewLogger("[telegram] ", log.LstdFlags)
-		srv := telegram.NewService(c, l)
-		s.TaskMaster.TelegramService = srv
+	l := s.LogService.NewLogger("[telegram] ", log.LstdFlags)
+	srv := telegram.NewService(c, l)
+	s.TaskMaster.TelegramService = srv
 
-		s.AppendService("telegram", srv)
-		//s.DynamicServices["telegram"] = srv
-	}
+	s.AppendService("telegram", srv)
+	s.DynamicServices["telegram"] = srv
 }
 
 func (s *Server) appendHipChatService() {
 	c := s.config.HipChat
-	if c.Enabled {
-		l := s.LogService.NewLogger("[hipchat] ", log.LstdFlags)
-		srv := hipchat.NewService(c, l)
-		s.TaskMaster.HipChatService = srv
+	l := s.LogService.NewLogger("[hipchat] ", log.LstdFlags)
+	srv := hipchat.NewService(c, l)
+	s.TaskMaster.HipChatService = srv
 
-		s.AppendService("hipchat", srv)
-		//s.DynamicServices["hipchat"] = srv
-	}
+	s.AppendService("hipchat", srv)
+	s.DynamicServices["hipchat"] = srv
 }
 
 func (s *Server) appendAlertaService() {
 	c := s.config.Alerta
-	if c.Enabled {
-		l := s.LogService.NewLogger("[alerta] ", log.LstdFlags)
-		srv := alerta.NewService(c, l)
-		s.TaskMaster.AlertaService = srv
+	l := s.LogService.NewLogger("[alerta] ", log.LstdFlags)
+	srv := alerta.NewService(c, l)
+	s.TaskMaster.AlertaService = srv
 
-		s.AppendService("alerta", srv)
-		//s.DynamicServices["alerta"] = srv
-	}
+	s.AppendService("alerta", srv)
+	s.DynamicServices["alerta"] = srv
 }
 
 func (s *Server) appendTalkService() {
 	c := s.config.Talk
-	if c.Enabled {
-		l := s.LogService.NewLogger("[talk] ", log.LstdFlags)
-		srv := talk.NewService(c, l)
-		s.TaskMaster.TalkService = srv
+	l := s.LogService.NewLogger("[talk] ", log.LstdFlags)
+	srv := talk.NewService(c, l)
+	s.TaskMaster.TalkService = srv
 
-		s.AppendService("talk", srv)
-		//s.DynamicServices["talk"] = srv
-	}
+	s.AppendService("talk", srv)
+	s.DynamicServices["talk"] = srv
 }
 
 func (s *Server) appendCollectdService() {
@@ -536,6 +523,10 @@ func (s *Server) Err() <-chan error { return s.err }
 
 // Open opens all the services.
 func (s *Server) Open() error {
+
+	// Start profiling, if set.
+	s.startProfile(s.CPUProfile, s.MemProfile)
+
 	if err := s.startServices(); err != nil {
 		s.Close()
 		return err
@@ -548,14 +539,33 @@ func (s *Server) Open() error {
 }
 
 func (s *Server) startServices() error {
-	// Start profiling, if set.
-	s.startProfile(s.CPUProfile, s.MemProfile)
 	for _, service := range s.Services {
 		s.Logger.Printf("D! opening service: %T", service)
 		if err := service.Open(); err != nil {
 			return fmt.Errorf("open service %T: %s", service, err)
 		}
 		s.Logger.Printf("D! opened service: %T", service)
+
+		// Apply config overrides after the config override service has been opened and before any dynamic services.
+		if service == s.ConfigOverrideService && !s.config.SkipConfigOverrides {
+			// Apply initial config updates
+			s.Logger.Println("D! applying configuration overrides")
+			configs, err := s.ConfigOverrideService.Config()
+			if err != nil {
+				return errors.Wrap(err, "failed to apply config overrides")
+			}
+			for service, config := range configs {
+				if srv, ok := s.DynamicServices[service]; !ok {
+					return fmt.Errorf("found configuration override for unknown service %q", service)
+				} else {
+					s.Logger.Println("D! applying configuration overrides for", service)
+					if err := srv.Update(config); err != nil {
+						return errors.Wrapf(err, "failed to update configuration for service %s", service)
+					}
+				}
+			}
+		}
+
 	}
 	return nil
 }
@@ -572,11 +582,9 @@ func (s *Server) watchServices() {
 func (s *Server) watchConfigUpdates() {
 	for cu := range s.configUpdates {
 		if srv, ok := s.DynamicServices[cu.Name]; !ok {
-			s.Logger.Printf("E! got configuration update for unkown service %s", cu.Name)
+			cu.ErrC <- fmt.Errorf("received configuration update for unknown dynamic service %s", cu.Name)
 		} else {
-			if err := srv.Update(cu.NewConfig); err != nil {
-				s.Logger.Printf("E! got error when attempting to update configuration for service %s: %v", cu.Name, err)
-			}
+			cu.ErrC <- srv.Update(cu.NewConfig)
 		}
 	}
 }

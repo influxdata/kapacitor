@@ -3,32 +3,31 @@ package victorops
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"sync"
+	"net/url"
+	"path"
+	"sync/atomic"
 	"time"
 
 	"github.com/influxdata/kapacitor"
+	"github.com/pkg/errors"
 )
 
 type Service struct {
-	mu         sync.RWMutex
-	routingKey string
-	url        string
-	global     bool
-	logger     *log.Logger
+	configValue atomic.Value
+	logger      *log.Logger
 }
 
 func NewService(c Config, l *log.Logger) *Service {
-	return &Service{
-		routingKey: c.RoutingKey,
-		url:        c.URL + "/" + c.APIKey + "/",
-		global:     c.Global,
-		logger:     l,
+	s := &Service{
+		logger: l,
 	}
+	s.configValue.Store(c)
+	return s
 }
 
 func (s *Service) Open() error {
@@ -39,6 +38,10 @@ func (s *Service) Close() error {
 	return nil
 }
 
+func (s *Service) config() Config {
+	return s.configValue.Load().(Config)
+}
+
 func (s *Service) Update(newConfig []interface{}) error {
 	if l := len(newConfig); l != 1 {
 		return fmt.Errorf("expected only one new config object, got %d", l)
@@ -46,51 +49,23 @@ func (s *Service) Update(newConfig []interface{}) error {
 	if c, ok := newConfig[0].(Config); !ok {
 		return fmt.Errorf("expected config object to be of type %T, got %T", c, newConfig[0])
 	} else {
-		s.mu.Lock()
-		s.routingKey = c.RoutingKey
-		s.url = c.URL + "/" + c.APIKey + "/"
-		s.global = c.Global
-		s.mu.Unlock()
+		s.configValue.Store(c)
 	}
 	return nil
 }
 
 func (s *Service) Global() bool {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.global
+	c := s.config()
+	return c.Global
 }
 
 func (s *Service) Alert(routingKey, messageType, message, entityID string, t time.Time, details interface{}) error {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	voData := make(map[string]interface{})
-	voData["message_type"] = messageType
-	voData["entity_id"] = entityID
-	voData["state_message"] = message
-	voData["timestamp"] = t.Unix()
-	voData["monitoring_tool"] = kapacitor.Product
-	if details != nil {
-		b, err := json.Marshal(details)
-		if err != nil {
-			return err
-		}
-		voData["data"] = string(b)
-	}
-
-	if routingKey == "" {
-		routingKey = s.routingKey
-	}
-
-	// Post data to VO
-	var post bytes.Buffer
-	enc := json.NewEncoder(&post)
-	err := enc.Encode(voData)
+	url, post, err := s.preparePost(routingKey, messageType, message, entityID, t, details)
 	if err != nil {
 		return err
 	}
 
-	resp, err := http.Post(s.url+routingKey, "application/json", &post)
+	resp, err := http.Post(url, "application/json", post)
 	if err != nil {
 		return err
 	}
@@ -113,4 +88,43 @@ func (s *Service) Alert(routingKey, messageType, message, entityID string, t tim
 		return errors.New(r.Message)
 	}
 	return nil
+}
+
+func (s *Service) preparePost(routingKey, messageType, message, entityID string, t time.Time, details interface{}) (string, io.Reader, error) {
+	c := s.config()
+	if !c.Enabled {
+		return "", nil, errors.New("service is not enabled")
+	}
+
+	voData := make(map[string]interface{})
+	voData["message_type"] = messageType
+	voData["entity_id"] = entityID
+	voData["state_message"] = message
+	voData["timestamp"] = t.Unix()
+	voData["monitoring_tool"] = kapacitor.Product
+	if details != nil {
+		b, err := json.Marshal(details)
+		if err != nil {
+			return "", nil, err
+		}
+		voData["data"] = string(b)
+	}
+
+	if routingKey == "" {
+		routingKey = c.RoutingKey
+	}
+
+	// Post data to VO
+	var post bytes.Buffer
+	enc := json.NewEncoder(&post)
+	err := enc.Encode(voData)
+	if err != nil {
+		return "", nil, err
+	}
+	u, err := url.Parse(c.URL)
+	if err != nil {
+		return "", nil, errors.Wrap(err, "invalid URL")
+	}
+	u.Path = path.Join(u.Path, c.APIKey, routingKey)
+	return u.String(), &post, nil
 }

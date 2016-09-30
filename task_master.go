@@ -58,7 +58,6 @@ type TaskMaster struct {
 	UDFService UDFService
 
 	InfluxDBService interface {
-		NewDefaultClient() (influxdb.Client, error)
 		NewNamedClient(name string) (influxdb.Client, error)
 	}
 	SMTPService interface {
@@ -116,7 +115,7 @@ type TaskMaster struct {
 		NewTimer(timer.Setter) timer.Timer
 	}
 	K8sService interface {
-		Client() k8s.Client
+		Client() (k8s.Client, error)
 	}
 	LogService LogService
 

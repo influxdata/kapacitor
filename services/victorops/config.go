@@ -10,15 +10,15 @@ const DefaultVictorOpsAPIURL = "https://alert.victorops.com/integrations/generic
 
 type Config struct {
 	// Whether to enable Victor Ops integration.
-	Enabled bool `toml:"enabled"`
+	Enabled bool `toml:"enabled" override:"enabled"`
 	// The Victor Ops API key.
-	APIKey string `toml:"api-key" override:",redact"`
+	APIKey string `toml:"api-key" override:"api-key,redact"`
 	// The default Routing Key, can be overridden per alert.
-	RoutingKey string `toml:"routing-key"`
+	RoutingKey string `toml:"routing-key" override:"routing-key"`
 	// The Victor Ops API URL, should not need to be changed.
-	URL string `toml:"url"`
+	URL string `toml:"url" override:"url"`
 	// Whether every alert should automatically go to VictorOps.
-	Global bool `toml:"global"`
+	Global bool `toml:"global" override:"global"`
 }
 
 func NewConfig() Config {

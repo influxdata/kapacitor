@@ -11,25 +11,25 @@ import (
 )
 
 type SectionA struct {
-	Option1 string `toml:"toml-option1" json:"json-option1"`
-	Option2 string `toml:"toml-option2" json:"json-option2"`
+	Option1 string `override:"option1"`
+	Option2 string `override:"option2"`
 }
 type SectionB struct {
-	Option3 string `toml:"toml-option3" json:"json-option3"`
+	Option3 string `override:"option3"`
 }
 type SectionC struct {
-	Option4  int64  `toml:"toml-option4" json:"json-option4"`
-	Password string `toml:"toml-password" json:"json-password" override:",redact"`
+	Option4  int64  `override:"option4"`
+	Password string `override:"password,redact"`
 }
 
 type SectionD struct {
-	ID      string                    `toml:"toml-id" json:"json-id"`
-	Option5 string                    `toml:"toml-option5" json:"json-option5"`
-	Option6 map[string]map[string]int `toml:"toml-option6" json:"json-option6"`
-	Option7 [][]int                   `toml:"toml-option7" json:"json-option7"`
+	ID      string                    `override:"id"`
+	Option5 string                    `override:"option5"`
+	Option6 map[string]map[string]int `override:"option6"`
+	Option7 [][]int                   `override:"option7"`
 }
 
-func (d *SectionD) SetDefaults() {
+func (d *SectionD) Init() {
 	d.Option5 = "o5"
 }
 
@@ -66,13 +66,13 @@ type TestConfig struct {
 	SectionB       SectionB    `override:"section-b"`
 	SectionC       *SectionC   `override:"section-c"`
 	SectionNums    SectionNums `override:"section-nums"`
-	SectionDs      []SectionD  `override:"section-d,element-key=ID"`
+	SectionDs      []SectionD  `override:"section-d,element-key=id"`
 	SectionIgnored SectionIgnored
 	IgnoredInt     int
 	IgnoredString  string
 }
 
-func ExampleOverrider() {
+func ExampleOverrideConfig() {
 	config := &TestConfig{
 		SectionA: SectionA{
 			Option1: "o1",
@@ -99,86 +99,73 @@ func ExampleOverrider() {
 		},
 	}
 
-	// Create new ConfigOverrider
-	cu := override.New(config)
-	// Use toml tags to map field names
-	cu.OptionNameFunc = override.TomlFieldName
-
 	// Override options in section-a
-	if newSectionA, err := cu.Override(override.Override{
-		Section: "section-a",
-		Options: map[string]interface{}{
-			"toml-option1": "new option1 value",
-			"toml-option2": "initial option2 value",
-		}}); err != nil {
+	if newConfig, err := override.OverrideConfig(config, []override.Override{
+		{
+			Section: "section-a",
+			Options: map[string]interface{}{
+				"option1": "new option1 value",
+				"option2": "initial option2 value",
+			},
+		},
+		{
+			Section: "section-b",
+			Options: map[string]interface{}{
+				"option3": "initial option3 value",
+			},
+		},
+		{
+			Section: "section-c",
+			Options: map[string]interface{}{
+				"option4": 586,
+			},
+		},
+		{
+			Section: "section-d",
+			Element: "x",
+			Options: map[string]interface{}{
+				"option5": "x-new-5",
+			},
+		},
+		{
+			Section: "section-d",
+			Element: "y",
+			Options: map[string]interface{}{
+				"option5": "y-new-5",
+			},
+		},
+		{
+			Section: "section-d",
+			Create:  true,
+			Options: map[string]interface{}{
+				"id":      "w",
+				"option5": "w-new-5",
+			},
+		},
+	}); err != nil {
 		fmt.Println("ERROR:", err)
 	} else {
-		a := newSectionA.Value().(SectionA)
+		a := newConfig["section-a"][0].Value().(SectionA)
 		fmt.Println("New SectionA.Option1:", a.Option1)
 		fmt.Println("New SectionA.Option2:", a.Option2)
-	}
 
-	// Override options in section-b
-	if newSectionB, err := cu.Override(override.Override{
-		Section: "section-b",
-		Options: map[string]interface{}{
-			"toml-option3": "initial option3 value",
-		}}); err != nil {
-		fmt.Println("ERROR:", err)
-	} else {
-		b := newSectionB.Value().(SectionB)
+		b := newConfig["section-b"][0].Value().(SectionB)
 		fmt.Println("New SectionB.Option3:", b.Option3)
 
-	}
-	// Override options in section-c
-	if newSectionC, err := cu.Override(override.Override{
-		Section: "section-c",
-		Options: map[string]interface{}{
-			"toml-option4": 586,
-		}}); err != nil {
-		fmt.Println("ERROR:", err)
-	} else {
-		c := newSectionC.Value().(*SectionC)
+		c := newConfig["section-c"][0].Value().(*SectionC)
 		fmt.Println("New SectionC.Option4:", c.Option4)
 
-	}
-	// Override options in section-d
-	if newSectionD, err := cu.Override(override.Override{
-		Section: "section-d",
-		Element: "x",
-		Options: map[string]interface{}{
-			"toml-option5": "x-new-5",
-		}}); err != nil {
-		fmt.Println("ERROR:", err)
-	} else {
-		d := newSectionD.Value().(SectionD)
-		fmt.Println("New SectionD[0].Option5:", d.Option5)
-	}
+		// NOTE: Section elements are sorted by element key
+		d := newConfig["section-d"]
+		d0 := d[0].Value().(SectionD)
+		d1 := d[1].Value().(SectionD)
+		d2 := d[2].Value().(SectionD)
+		d3 := d[3].Value().(SectionD)
 
-	if newSectionD, err := cu.Override(override.Override{
-		Section: "section-d",
-		Element: "y",
-		Options: map[string]interface{}{
-			"toml-option5": "y-new-5",
-		}}); err != nil {
-		fmt.Println("ERROR:", err)
-	} else {
-		d := newSectionD.Value().(SectionD)
-		fmt.Println("New SectionD[1].Option5:", d.Option5)
-	}
-
-	// Create new element in section-d
-	if newSectionD, err := cu.Override(override.Override{
-		Section: "section-d",
-		Create:  true,
-		Options: map[string]interface{}{
-			"ID":           "w",
-			"toml-option5": "w-new-5",
-		}}); err != nil {
-		fmt.Println("ERROR:", err)
-	} else {
-		d := newSectionD.Value().(SectionD)
-		fmt.Println("New SectionD[3].Option5:", d.Option5)
+		fmt.Println("New SectionD[0].Option5:", d0.Option5)
+		fmt.Println("New SectionD[1].Option5:", d1.Option5)
+		fmt.Println("New SectionD[2].Option5:", d2.Option5)
+		fmt.Println("Old SectionD[3].Option5:", d3.Option5)
 	}
 
 	//Output:
@@ -186,12 +173,13 @@ func ExampleOverrider() {
 	// New SectionA.Option2: initial option2 value
 	// New SectionB.Option3: initial option3 value
 	// New SectionC.Option4: 586
-	// New SectionD[0].Option5: x-new-5
-	// New SectionD[1].Option5: y-new-5
-	// New SectionD[3].Option5: w-new-5
+	// New SectionD[0].Option5: w-new-5
+	// New SectionD[1].Option5: x-new-5
+	// New SectionD[2].Option5: y-new-5
+	// Old SectionD[3].Option5: z-5
 }
 
-func TestOverrider_Override(t *testing.T) {
+func TestOverrideConfig_Single(t *testing.T) {
 	testConfig := &TestConfig{
 		SectionA: SectionA{
 			Option1: "o1",
@@ -220,72 +208,53 @@ func TestOverrider_Override(t *testing.T) {
 	}
 
 	testCases := []struct {
-		o              override.Override
-		exp            interface{}
-		redacted       map[string]interface{}
-		optionNameFunc override.OptionNameFunc
+		o        override.Override
+		exp      interface{}
+		redacted map[string]interface{}
 	}{
 		{
 			o: override.Override{
 				Section: "section-a",
 				Options: map[string]interface{}{
-					"Option1": "new-o1",
+					"option1": "new-o1",
 				},
 			},
 			exp: SectionA{
 				Option1: "new-o1",
 			},
 			redacted: map[string]interface{}{
-				"Option1": "new-o1",
-				"Option2": "",
+				"option1": "new-o1",
+				"option2": "",
 			},
 		},
 		{
 			o: override.Override{
 				Section: "section-a",
 				Options: map[string]interface{}{
-					"toml-option1": "new-o1",
+					"option1": "new-o1",
 				},
 			},
-			optionNameFunc: override.TomlFieldName,
 			exp: SectionA{
 				Option1: "new-o1",
 			},
 			redacted: map[string]interface{}{
-				"toml-option1": "new-o1",
-				"toml-option2": "",
-			},
-		},
-		{
-			o: override.Override{
-				Section: "section-a",
-				Options: map[string]interface{}{
-					"json-option1": "new-o1",
-				},
-			},
-			optionNameFunc: override.JSONFieldName,
-			exp: SectionA{
-				Option1: "new-o1",
-			},
-			redacted: map[string]interface{}{
-				"json-option1": "new-o1",
-				"json-option2": "",
+				"option1": "new-o1",
+				"option2": "",
 			},
 		},
 		{
 			o: override.Override{
 				Section: "section-c",
 				Options: map[string]interface{}{
-					"toml-option4": 42,
+					"option4": 42,
 				},
 			},
-			optionNameFunc: override.TomlFieldName,
 			exp: &SectionC{
 				Option4: 42,
 			},
 			redacted: map[string]interface{}{
-				"toml-option4":  int64(42),
-				"toml-password": false,
+				"option4":  int64(42),
+				"password": false,
 			},
 		},
 		{
@@ -997,8 +966,8 @@ func TestOverrider_Override(t *testing.T) {
 			o: override.Override{
 				Section: "section-c",
 				Options: map[string]interface{}{
-					"Option4":  42,
-					"Password": "supersecret",
+					"option4":  42,
+					"password": "supersecret",
 				},
 			},
 			exp: &SectionC{
@@ -1006,8 +975,8 @@ func TestOverrider_Override(t *testing.T) {
 				Password: "supersecret",
 			},
 			redacted: map[string]interface{}{
-				"Option4":  int64(42),
-				"Password": true,
+				"option4":  int64(42),
+				"password": true,
 			},
 		},
 		{
@@ -1015,7 +984,7 @@ func TestOverrider_Override(t *testing.T) {
 				Section: "section-d",
 				Element: "x",
 				Options: map[string]interface{}{
-					"Option5": "x-new-5",
+					"option5": "x-new-5",
 				},
 			},
 			exp: SectionD{
@@ -1023,10 +992,10 @@ func TestOverrider_Override(t *testing.T) {
 				Option5: "x-new-5",
 			},
 			redacted: map[string]interface{}{
-				"ID":      "x",
-				"Option5": "x-new-5",
-				"Option6": map[string]map[string]int(nil),
-				"Option7": [][]int(nil),
+				"id":      "x",
+				"option5": "x-new-5",
+				"option6": map[string]map[string]int(nil),
+				"option7": [][]int(nil),
 			},
 		},
 		{
@@ -1034,7 +1003,7 @@ func TestOverrider_Override(t *testing.T) {
 				Section: "section-d",
 				Element: "x",
 				Options: map[string]interface{}{
-					"Option6": map[string]interface{}{"a": map[string]interface{}{"b": 42}},
+					"option6": map[string]interface{}{"a": map[string]interface{}{"b": 42}},
 				},
 			},
 			exp: SectionD{
@@ -1043,10 +1012,10 @@ func TestOverrider_Override(t *testing.T) {
 				Option6: map[string]map[string]int{"a": {"b": 42}},
 			},
 			redacted: map[string]interface{}{
-				"ID":      "x",
-				"Option5": "x-5",
-				"Option6": map[string]map[string]int{"a": {"b": 42}},
-				"Option7": [][]int(nil),
+				"id":      "x",
+				"option5": "x-5",
+				"option6": map[string]map[string]int{"a": {"b": 42}},
+				"option7": [][]int(nil),
 			},
 		},
 		{
@@ -1054,7 +1023,7 @@ func TestOverrider_Override(t *testing.T) {
 				Section: "section-d",
 				Element: "x",
 				Options: map[string]interface{}{
-					"Option7": []interface{}{[]interface{}{6, 7, 42}, []interface{}{6, 9, 42}},
+					"option7": []interface{}{[]interface{}{6, 7, 42}, []interface{}{6, 9, 42}},
 				},
 			},
 			exp: SectionD{
@@ -1063,10 +1032,10 @@ func TestOverrider_Override(t *testing.T) {
 				Option7: [][]int{{6, 7, 42}, {6, 9, 42}},
 			},
 			redacted: map[string]interface{}{
-				"ID":      "x",
-				"Option5": "x-5",
-				"Option6": map[string]map[string]int(nil),
-				"Option7": [][]int{{6, 7, 42}, {6, 9, 42}},
+				"id":      "x",
+				"option5": "x-5",
+				"option6": map[string]map[string]int(nil),
+				"option7": [][]int{{6, 7, 42}, {6, 9, 42}},
 			},
 		},
 		{
@@ -1075,7 +1044,7 @@ func TestOverrider_Override(t *testing.T) {
 				Section: "section-d",
 				Element: "x",
 				Options: map[string]interface{}{
-					"Option7": []interface{}{
+					"option7": []interface{}{
 						[]interface{}{
 							json.Number("6"),
 							json.Number("7"),
@@ -1094,27 +1063,24 @@ func TestOverrider_Override(t *testing.T) {
 				Option7: [][]int{{6, 7, 42}, {6, 9, 42}},
 			},
 			redacted: map[string]interface{}{
-				"ID":      "x",
-				"Option5": "x-5",
-				"Option6": map[string]map[string]int(nil),
-				"Option7": [][]int{{6, 7, 42}, {6, 9, 42}},
+				"id":      "x",
+				"option5": "x-5",
+				"option6": map[string]map[string]int(nil),
+				"option7": [][]int{{6, 7, 42}, {6, 9, 42}},
 			},
 		},
 	}
 	for _, tc := range testCases {
-		cu := override.New(testConfig)
-		if tc.optionNameFunc != nil {
-			cu.OptionNameFunc = tc.optionNameFunc
-		}
-		if newConfig, err := cu.Override(tc.o); err != nil {
+		if newConfig, err := override.OverrideConfig(testConfig, []override.Override{tc.o}); err != nil {
 			t.Fatal(err)
 		} else {
+			element := newConfig[tc.o.Section][0]
 			// Validate value
-			if got := newConfig.Value(); !reflect.DeepEqual(got, tc.exp) {
+			if got := element.Value(); !reflect.DeepEqual(got, tc.exp) {
 				t.Errorf("unexpected newConfig.Value result:\ngot\n%#v\nexp\n%#v\n", got, tc.exp)
 			}
 			// Validate redacted
-			if got, err := newConfig.Redacted(); err != nil {
+			if got, err := element.Redacted(); err != nil {
 				t.Fatal(err)
 			} else if !reflect.DeepEqual(got, tc.redacted) {
 				t.Errorf("unexpected newConfig.Redacted result:\ngot\n%#v\nexp\n%#v\n", got, tc.redacted)
@@ -1127,7 +1093,7 @@ func TestOverrider_Override(t *testing.T) {
 	}
 }
 
-func TestOverrider_OverrideAll(t *testing.T) {
+func TestOverrideConfig_Multiple(t *testing.T) {
 	testConfig := &TestConfig{
 		SectionA: SectionA{
 			Option1: "o1",
@@ -1156,10 +1122,9 @@ func TestOverrider_OverrideAll(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name           string
-		os             []override.Override
-		optionNameFunc override.OptionNameFunc
-		exp            map[string][]map[string]interface{}
+		name string
+		os   []override.Override
+		exp  map[string][]map[string]interface{}
 	}{
 		{
 			name: "leave section-c default",
@@ -1167,41 +1132,41 @@ func TestOverrider_OverrideAll(t *testing.T) {
 				{
 					Section: "section-a",
 					Options: map[string]interface{}{
-						"Option1": "new-1",
+						"option1": "new-1",
 					},
 				},
 				{
 					Section: "section-b",
 					Options: map[string]interface{}{
-						"Option3": "new-3",
+						"option3": "new-3",
 					},
 				},
 				{
 					Section: "section-d",
 					Element: "y",
 					Options: map[string]interface{}{
-						"Option5": "y-new-5",
+						"option5": "y-new-5",
 					},
 				},
 				{
 					Section: "section-d",
 					Element: "x",
 					Options: map[string]interface{}{
-						"Option5": "x-new-5",
+						"option5": "x-new-5",
 					},
 				},
 			},
 			exp: map[string][]map[string]interface{}{
 				"section-a": {{
-					"Option1": "new-1",
-					"Option2": "",
+					"option1": "new-1",
+					"option2": "",
 				}},
 				"section-b": {{
-					"Option3": "new-3",
+					"option3": "new-3",
 				}},
 				"section-c": {{
-					"Option4":  int64(-1),
-					"Password": false,
+					"option4":  int64(-1),
+					"password": false,
 				}},
 				"section-nums": {{
 					"Int":     int(0),
@@ -1219,22 +1184,22 @@ func TestOverrider_OverrideAll(t *testing.T) {
 				}},
 				"section-d": {
 					{
-						"ID":      "x",
-						"Option5": "x-new-5",
-						"Option6": map[string]map[string]int(nil),
-						"Option7": [][]int(nil),
+						"id":      "x",
+						"option5": "x-new-5",
+						"option6": map[string]map[string]int(nil),
+						"option7": [][]int(nil),
 					},
 					{
-						"ID":      "y",
-						"Option5": "y-new-5",
-						"Option6": map[string]map[string]int(nil),
-						"Option7": [][]int(nil),
+						"id":      "y",
+						"option5": "y-new-5",
+						"option6": map[string]map[string]int(nil),
+						"option7": [][]int(nil),
 					},
 					{
-						"ID":      "z",
-						"Option5": "z-5",
-						"Option6": map[string]map[string]int(nil),
-						"Option7": [][]int(nil),
+						"id":      "z",
+						"option5": "z-5",
+						"option6": map[string]map[string]int(nil),
+						"option7": [][]int(nil),
 					},
 				},
 			},
@@ -1245,29 +1210,29 @@ func TestOverrider_OverrideAll(t *testing.T) {
 				{
 					Section: "section-c",
 					Options: map[string]interface{}{
-						"Password": "secret",
+						"password": "secret",
 					},
 				},
 				{
 					Section: "section-d",
 					Create:  true,
 					Options: map[string]interface{}{
-						"ID":      "w",
-						"Option5": "w-new-5",
+						"id":      "w",
+						"option5": "w-new-5",
 					},
 				},
 			},
 			exp: map[string][]map[string]interface{}{
 				"section-a": {{
-					"Option1": "o1",
-					"Option2": "",
+					"option1": "o1",
+					"option2": "",
 				}},
 				"section-b": {{
-					"Option3": "",
+					"option3": "",
 				}},
 				"section-c": {{
-					"Option4":  int64(-1),
-					"Password": true,
+					"option4":  int64(-1),
+					"password": true,
 				}},
 				"section-nums": {{
 					"Int":     int(0),
@@ -1285,28 +1250,28 @@ func TestOverrider_OverrideAll(t *testing.T) {
 				}},
 				"section-d": {
 					{
-						"ID":      "w",
-						"Option5": "w-new-5",
-						"Option6": map[string]map[string]int(nil),
-						"Option7": [][]int(nil),
+						"id":      "w",
+						"option5": "w-new-5",
+						"option6": map[string]map[string]int(nil),
+						"option7": [][]int(nil),
 					},
 					{
-						"ID":      "x",
-						"Option5": "x-5",
-						"Option6": map[string]map[string]int(nil),
-						"Option7": [][]int(nil),
+						"id":      "x",
+						"option5": "x-5",
+						"option6": map[string]map[string]int(nil),
+						"option7": [][]int(nil),
 					},
 					{
-						"ID":      "y",
-						"Option5": "y-5",
-						"Option6": map[string]map[string]int(nil),
-						"Option7": [][]int(nil),
+						"id":      "y",
+						"option5": "y-5",
+						"option6": map[string]map[string]int(nil),
+						"option7": [][]int(nil),
 					},
 					{
-						"ID":      "z",
-						"Option5": "z-5",
-						"Option6": map[string]map[string]int(nil),
-						"Option7": [][]int(nil),
+						"id":      "z",
+						"option5": "z-5",
+						"option6": map[string]map[string]int(nil),
+						"option7": [][]int(nil),
 					},
 				},
 			},
@@ -1322,15 +1287,15 @@ func TestOverrider_OverrideAll(t *testing.T) {
 			},
 			exp: map[string][]map[string]interface{}{
 				"section-a": {{
-					"Option1": "o1",
-					"Option2": "",
+					"option1": "o1",
+					"option2": "",
 				}},
 				"section-b": {{
-					"Option3": "",
+					"option3": "",
 				}},
 				"section-c": {{
-					"Option4":  int64(-1),
-					"Password": false,
+					"option4":  int64(-1),
+					"password": false,
 				}},
 				"section-nums": {{
 					"Int":     int(0),
@@ -1348,16 +1313,16 @@ func TestOverrider_OverrideAll(t *testing.T) {
 				}},
 				"section-d": {
 					{
-						"ID":      "x",
-						"Option5": "x-5",
-						"Option6": map[string]map[string]int(nil),
-						"Option7": [][]int(nil),
+						"id":      "x",
+						"option5": "x-5",
+						"option6": map[string]map[string]int(nil),
+						"option7": [][]int(nil),
 					},
 					{
-						"ID":      "z",
-						"Option5": "z-5",
-						"Option6": map[string]map[string]int(nil),
-						"Option7": [][]int(nil),
+						"id":      "z",
+						"option5": "z-5",
+						"option6": map[string]map[string]int(nil),
+						"option7": [][]int(nil),
 					},
 				},
 			},
@@ -1369,8 +1334,8 @@ func TestOverrider_OverrideAll(t *testing.T) {
 					Section: "section-d",
 					Create:  true,
 					Options: map[string]interface{}{
-						"ID":      "w",
-						"Option5": "w-new-5",
+						"id":      "w",
+						"option5": "w-new-5",
 					},
 				},
 				{
@@ -1381,15 +1346,15 @@ func TestOverrider_OverrideAll(t *testing.T) {
 			},
 			exp: map[string][]map[string]interface{}{
 				"section-a": {{
-					"Option1": "o1",
-					"Option2": "",
+					"option1": "o1",
+					"option2": "",
 				}},
 				"section-b": {{
-					"Option3": "",
+					"option3": "",
 				}},
 				"section-c": {{
-					"Option4":  int64(-1),
-					"Password": false,
+					"option4":  int64(-1),
+					"password": false,
 				}},
 				"section-nums": {{
 					"Int":     int(0),
@@ -1407,22 +1372,22 @@ func TestOverrider_OverrideAll(t *testing.T) {
 				}},
 				"section-d": {
 					{
-						"ID":      "w",
-						"Option5": "w-new-5",
-						"Option6": map[string]map[string]int(nil),
-						"Option7": [][]int(nil),
+						"id":      "w",
+						"option5": "w-new-5",
+						"option6": map[string]map[string]int(nil),
+						"option7": [][]int(nil),
 					},
 					{
-						"ID":      "x",
-						"Option5": "x-5",
-						"Option6": map[string]map[string]int(nil),
-						"Option7": [][]int(nil),
+						"id":      "x",
+						"option5": "x-5",
+						"option6": map[string]map[string]int(nil),
+						"option7": [][]int(nil),
 					},
 					{
-						"ID":      "z",
-						"Option5": "z-5",
-						"Option6": map[string]map[string]int(nil),
-						"Option7": [][]int(nil),
+						"id":      "z",
+						"option5": "z-5",
+						"option6": map[string]map[string]int(nil),
+						"option7": [][]int(nil),
 					},
 				},
 			},
@@ -1434,21 +1399,21 @@ func TestOverrider_OverrideAll(t *testing.T) {
 					Section: "section-d",
 					Create:  true,
 					Options: map[string]interface{}{
-						"ID": "w",
+						"id": "w",
 					},
 				},
 			},
 			exp: map[string][]map[string]interface{}{
 				"section-a": {{
-					"Option1": "o1",
-					"Option2": "",
+					"option1": "o1",
+					"option2": "",
 				}},
 				"section-b": {{
-					"Option3": "",
+					"option3": "",
 				}},
 				"section-c": {{
-					"Option4":  int64(-1),
-					"Password": false,
+					"option4":  int64(-1),
+					"password": false,
 				}},
 				"section-nums": {{
 					"Int":     int(0),
@@ -1466,28 +1431,28 @@ func TestOverrider_OverrideAll(t *testing.T) {
 				}},
 				"section-d": {
 					{
-						"ID":      "w",
-						"Option5": "o5",
-						"Option6": map[string]map[string]int(nil),
-						"Option7": [][]int(nil),
+						"id":      "w",
+						"option5": "o5",
+						"option6": map[string]map[string]int(nil),
+						"option7": [][]int(nil),
 					},
 					{
-						"ID":      "x",
-						"Option5": "x-5",
-						"Option6": map[string]map[string]int(nil),
-						"Option7": [][]int(nil),
+						"id":      "x",
+						"option5": "x-5",
+						"option6": map[string]map[string]int(nil),
+						"option7": [][]int(nil),
 					},
 					{
-						"ID":      "y",
-						"Option5": "y-5",
-						"Option6": map[string]map[string]int(nil),
-						"Option7": [][]int(nil),
+						"id":      "y",
+						"option5": "y-5",
+						"option6": map[string]map[string]int(nil),
+						"option7": [][]int(nil),
 					},
 					{
-						"ID":      "z",
-						"Option5": "z-5",
-						"Option6": map[string]map[string]int(nil),
-						"Option7": [][]int(nil),
+						"id":      "z",
+						"option5": "z-5",
+						"option6": map[string]map[string]int(nil),
+						"option7": [][]int(nil),
 					},
 				},
 			},
@@ -1499,8 +1464,8 @@ func TestOverrider_OverrideAll(t *testing.T) {
 					Section: "section-d",
 					Create:  true,
 					Options: map[string]interface{}{
-						"ID":      "w",
-						"Option5": "w-new-5",
+						"id":      "w",
+						"option5": "w-new-5",
 					},
 				},
 				{
@@ -1516,15 +1481,15 @@ func TestOverrider_OverrideAll(t *testing.T) {
 			},
 			exp: map[string][]map[string]interface{}{
 				"section-a": {{
-					"Option1": "o1",
-					"Option2": "",
+					"option1": "o1",
+					"option2": "",
 				}},
 				"section-b": {{
-					"Option3": "",
+					"option3": "",
 				}},
 				"section-c": {{
-					"Option4":  int64(-1),
-					"Password": false,
+					"option4":  int64(-1),
+					"password": false,
 				}},
 				"section-nums": {{
 					"Int":     int(0),
@@ -1542,16 +1507,16 @@ func TestOverrider_OverrideAll(t *testing.T) {
 				}},
 				"section-d": {
 					{
-						"ID":      "x",
-						"Option5": "x-5",
-						"Option6": map[string]map[string]int(nil),
-						"Option7": [][]int(nil),
+						"id":      "x",
+						"option5": "x-5",
+						"option6": map[string]map[string]int(nil),
+						"option7": [][]int(nil),
 					},
 					{
-						"ID":      "z",
-						"Option5": "z-5",
-						"Option6": map[string]map[string]int(nil),
-						"Option7": [][]int(nil),
+						"id":      "z",
+						"option5": "z-5",
+						"option6": map[string]map[string]int(nil),
+						"option7": [][]int(nil),
 					},
 				},
 			},
@@ -1577,15 +1542,15 @@ func TestOverrider_OverrideAll(t *testing.T) {
 			},
 			exp: map[string][]map[string]interface{}{
 				"section-a": {{
-					"Option1": "o1",
-					"Option2": "",
+					"option1": "o1",
+					"option2": "",
 				}},
 				"section-b": {{
-					"Option3": "",
+					"option3": "",
 				}},
 				"section-c": {{
-					"Option4":  int64(-1),
-					"Password": false,
+					"option4":  int64(-1),
+					"password": false,
 				}},
 				"section-nums": {{
 					"Int":     int(0),
@@ -1607,11 +1572,7 @@ func TestOverrider_OverrideAll(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Log(tc.name)
-		cu := override.New(testConfig)
-		if tc.optionNameFunc != nil {
-			cu.OptionNameFunc = tc.optionNameFunc
-		}
-		if sections, err := cu.OverrideAll(tc.os); err != nil {
+		if sections, err := override.OverrideConfig(testConfig, tc.os); err != nil {
 			t.Fatal(err)
 		} else {
 			// Validate sections

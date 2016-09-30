@@ -8,16 +8,16 @@ import (
 
 type Config struct {
 	// Whether Slack integration is enabled.
-	Enabled bool `toml:"enabled"`
+	Enabled bool `toml:"enabled" override:"enabled"`
 	// The Slack webhook URL, can be obtained by adding Incoming Webhook integration.
-	URL string `toml:"url" override:",redact"`
+	URL string `toml:"url" override:"url,redact"`
 	// The default channel, can be overridden per alert.
-	Channel string `toml:"channel"`
+	Channel string `toml:"channel" override:"channel"`
 	// Whether all alerts should automatically post to slack
-	Global bool `toml:"global"`
+	Global bool `toml:"global" override:"global"`
 	// Whether all alerts should automatically use stateChangesOnly mode.
 	// Only applies if global is also set.
-	StateChangesOnly bool `toml:"state-changes-only"`
+	StateChangesOnly bool `toml:"state-changes-only" override:"state-changes-only"`
 }
 
 func NewConfig() Config {

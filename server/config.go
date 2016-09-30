@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor/services/alerta"
+	"github.com/influxdata/kapacitor/services/config"
 	"github.com/influxdata/kapacitor/services/deadman"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
@@ -41,14 +42,13 @@ import (
 
 // Config represents the configuration format for the kapacitord binary.
 type Config struct {
-	HTTP       httpd.Config      `toml:"http"`
-	Replay     replay.Config     `toml:"replay"`
-	Storage    storage.Config    `toml:"storage"`
-	Task       task_store.Config `toml:"task"`
-	InfluxDB   []influxdb.Config `toml:"influxdb"`
-	InfluxDB   []influxdb.Config `toml:"influxdb" override:"influxdb,element-key=name"`
-	Logging    logging.Config    `toml:"logging"`
-	Kubernetes k8s.Config        `toml:"kubernetes"`
+	HTTP           httpd.Config      `toml:"http"`
+	Replay         replay.Config     `toml:"replay"`
+	Storage        storage.Config    `toml:"storage"`
+	Task           task_store.Config `toml:"task"`
+	InfluxDB       []influxdb.Config `toml:"influxdb" override:"influxdb,element-key=name"`
+	Logging        logging.Config    `toml:"logging"`
+	ConfigOverride config.Config     `toml:"config-override"`
 
 	// Input services
 	Graphites []graphite.Config `toml:"graphite"`
@@ -68,13 +68,17 @@ type Config struct {
 	Telegram  telegram.Config  `toml:"telegram" override:"telegram"`
 	VictorOps victorops.Config `toml:"victorops" override:"victorops"`
 
+	// Third-party integrations
+	Kubernetes k8s.Config `toml:"kubernetes" override:"kubernetes"`
+
 	Reporting reporting.Config `toml:"reporting"`
 	Stats     stats.Config     `toml:"stats"`
 	UDF       udf.Config       `toml:"udf"`
 	Deadman   deadman.Config   `toml:"deadman"`
 
-	Hostname string `toml:"hostname"`
-	DataDir  string `toml:"data_dir"`
+	Hostname            string `toml:"hostname"`
+	DataDir             string `toml:"data_dir"`
+	SkipConfigOverrides bool   `toml:"skip-config-overrides"`
 }
 
 // NewConfig returns an instance of Config with reasonable defaults.
@@ -90,6 +94,7 @@ func NewConfig() *Config {
 	c.InfluxDB = []influxdb.Config{influxdb.NewConfig()}
 	c.Logging = logging.NewConfig()
 	c.Kubernetes = k8s.NewConfig()
+	c.ConfigOverride = config.NewConfig()
 
 	c.Collectd = collectd.NewConfig()
 	c.OpenTSDB = opentsdb.NewConfig()
@@ -163,6 +168,7 @@ func (c *Config) Validate() error {
 	defaultInfluxDB := -1
 	numEnabled := 0
 	for i, config := range c.InfluxDB {
+		config.ApplyConditionalDefaults()
 		if names[config.Name] {
 			return fmt.Errorf("duplicate name %q for influxdb configs", config.Name)
 		}
@@ -180,17 +186,7 @@ func (c *Config) Validate() error {
 			numEnabled++
 		}
 	}
-	// Set default if it is the only one
-	if numEnabled == 1 {
-		for i, config := range c.InfluxDB {
-			if config.Enabled {
-				defaultInfluxDB = 0
-				c.InfluxDB[i].Default = true
-				break
-			}
-		}
-	}
-	if numEnabled > 0 && defaultInfluxDB == -1 {
+	if numEnabled > 1 && defaultInfluxDB == -1 {
 		return errors.New("at least one of the enabled InfluxDB clusters must be marked as default.")
 	}
 

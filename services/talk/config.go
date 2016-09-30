@@ -8,11 +8,11 @@ import (
 
 type Config struct {
 	// Whether Talk integration is enabled.
-	Enabled bool `toml:"enabled"`
+	Enabled bool `toml:"enabled" override:"enabled"`
 	// The Talk webhook URL, can be obtained by adding Incoming Webhook integration.
-	URL string `toml:"url" override:",redact"`
+	URL string `toml:"url" override:"url,redact"`
 	// The default authorName, can be overridden per alert.
-	AuthorName string `toml:"author_name"`
+	AuthorName string `toml:"author_name" override:"author_name"`
 }
 
 func NewConfig() Config {
