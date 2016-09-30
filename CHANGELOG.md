@@ -10,6 +10,7 @@
 ### Bugfixes
 
 - [#951](https://github.com/influxdata/kapacitor/pull/951): Fix bug where errors to save cluster/server ID files were ignored.
+- [#954](https://github.com/influxdata/kapacitor/pull/954): Create data_dir on startup if it does not exist.
 
 ## v1.0.1 [2016-09-26]
 
