@@ -540,6 +540,14 @@ func (s *Server) Close() error {
 }
 
 func (s *Server) setupIDs() error {
+	// Create the data dir if not exists
+	if f, err := os.Stat(s.dataDir); err != nil && os.IsNotExist(err) {
+		if err := os.Mkdir(s.dataDir, 0755); err != nil {
+			return errors.Wrapf(err, "data_dir %s does not exist, failed to create it", s.dataDir)
+		}
+	} else if !f.IsDir() {
+		return fmt.Errorf("path data_dir %s exists and is not a directory", s.dataDir)
+	}
 	clusterIDPath := filepath.Join(s.dataDir, clusterIDFilename)
 	clusterID, err := s.readID(clusterIDPath)
 	if err != nil && !os.IsNotExist(err) {
