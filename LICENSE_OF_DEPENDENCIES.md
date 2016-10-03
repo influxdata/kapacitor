@@ -19,4 +19,5 @@ Dependencies
 * github.com/stretchr/testify [MIT](https://github.com/stretchr/testify/blob/master/LICENSE)
 * github.com/twinj/uuid [MIT](https://github.com/twinj/uuid/blob/master/LICENSE)
 * gopkg.in/gomail.v2 [MIT](https://github.com/go-gomail/gomail/blob/v2/LICENSE)
+* github.com/Shopfiy/sarama [MIT](https://github.com/Shopify/sarama/blob/master/MIT-LICENSE)
 

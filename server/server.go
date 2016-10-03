@@ -24,6 +24,7 @@ import (
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/influxdb"
+	"github.com/influxdata/kapacitor/services/kafka"
 	"github.com/influxdata/kapacitor/services/logging"
 	"github.com/influxdata/kapacitor/services/noauth"
 	"github.com/influxdata/kapacitor/services/opsgenie"
@@ -161,6 +162,7 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	s.appendSlackService()
 	s.appendSensuService()
 	s.appendTalkService()
+	s.appendKafkaService()
 
 	// Append InfluxDB input services
 	s.appendCollectdService()
@@ -385,6 +387,17 @@ func (s *Server) appendAlertaService() {
 	}
 }
 
+func (s *Server) appendKafkaService() {
+	c := s.config.Kafka
+	if c.Enabled {
+		l := s.LogService.NewLogger("[kafka] ", log.LstdFlags)
+		srv := kafka.NewService(c, l)
+		s.TaskMaster.KafkaService = srv
+
+		s.AppendService("kafka", srv)
+	}
+}
+
 func (s *Server) appendTalkService() {
 	c := s.config.Talk
 	if c.Enabled {
@@ -555,9 +568,7 @@ func (s *Server) setupIDs() error {
 	}
 	if clusterID == "" {
 		clusterID = uuid.NewV4().String()
-		if err := s.writeID(clusterIDPath, clusterID); err != nil {
-			return errors.Wrap(err, "failed to save cluster ID")
-		}
+		s.writeID(clusterIDPath, clusterID)
 	}
 	s.ClusterID = clusterID
 
@@ -568,9 +579,7 @@ func (s *Server) setupIDs() error {
 	}
 	if serverID == "" {
 		serverID = uuid.NewV4().String()
-		if err := s.writeID(serverIDPath, serverID); err != nil {
-			return errors.Wrap(err, "failed to save server ID")
-		}
+		s.writeID(serverIDPath, serverID)
 	}
 	s.ServerID = serverID
 

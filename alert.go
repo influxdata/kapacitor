@@ -269,6 +269,20 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		n.IsStateChangesOnly = true
 	}
 
+	for _, kafka := range n.KafkaHandlers {
+		kafka := kafka
+		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleKafka(kafka, ad) })
+	}
+	if len(n.KafkaHandlers) == 0 && (et.tm.KafkaService != nil && et.tm.KafkaService.Global()) {
+		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleKafka(&pipeline.KafkaHandler{}, ad) })
+	}
+	// If Kafka has been configured with state changes only set it.
+	if et.tm.KafkaService != nil &&
+		et.tm.KafkaService.Global() &&
+		et.tm.KafkaService.StateChangesOnly() {
+		n.IsStateChangesOnly = true
+	}
+
 	for _, alerta := range n.AlertaHandlers {
 		// Validate alerta templates
 		rtmpl, err := text.New("resource").Parse(alerta.Resource)
@@ -1254,6 +1268,22 @@ func (a *AlertNode) handleTalk(talk *pipeline.TalkHandler, ad *AlertData) {
 	)
 	if err != nil {
 		a.logger.Println("E! failed to send alert data to Talk:", err)
+		return
+	}
+}
+
+func (a *AlertNode) handleKafka(kafka *pipeline.KafkaHandler, ad *AlertData) {
+	if a.et.tm.KafkaService == nil {
+		a.logger.Println("E! failed to send Kafka message. Kafka is not enabled")
+		return
+	}
+	err := a.et.tm.KafkaService.Alert(
+		kafka.Topics,
+		ad.Message,
+		ad.Level,
+	)
+	if err != nil {
+		a.logger.Println("E! failed to send alert data to Kafka:", err)
 		return
 	}
 }
