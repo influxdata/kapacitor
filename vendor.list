@@ -18,6 +18,7 @@ github.com/shurcooL/markdownfmt
 github.com/shurcooL/sanitized_anchor_name
 github.com/twinj/uuid
 golang.org/x/crypto master
+github.com/Shopify/sarama
 gopkg.in/gomail.v2
 # Generate deps
 github.com/benbjohnson/tmpl

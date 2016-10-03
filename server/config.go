@@ -11,11 +11,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/influxdata/influxdb/services/collectd"
+	"github.com/influxdata/influxdb/services/graphite"
+	"github.com/influxdata/influxdb/services/opentsdb"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/deadman"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/influxdb"
+	"github.com/influxdata/kapacitor/services/kafka"
 	"github.com/influxdata/kapacitor/services/logging"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
@@ -32,10 +36,6 @@ import (
 	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
-
-	"github.com/influxdata/influxdb/services/collectd"
-	"github.com/influxdata/influxdb/services/graphite"
-	"github.com/influxdata/influxdb/services/opentsdb"
 )
 
 // Config represents the configuration format for the kapacitord binary.
@@ -65,6 +65,7 @@ type Config struct {
 	UDF       udf.Config        `toml:"udf"`
 	Deadman   deadman.Config    `toml:"deadman"`
 	Talk      talk.Config       `toml:"talk"`
+	Kafka     kafka.Config      `toml:"kafka"`
 
 	Hostname string `toml:"hostname"`
 	DataDir  string `toml:"data_dir"`
@@ -101,6 +102,7 @@ func NewConfig() *Config {
 	c.UDF = udf.NewConfig()
 	c.Deadman = deadman.NewConfig()
 	c.Talk = talk.NewConfig()
+	c.Kafka = kafka.NewConfig()
 
 	return c
 }
