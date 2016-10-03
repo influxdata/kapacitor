@@ -49,6 +49,7 @@ const defaultLogFileMode = 0600
 //    * PagerDuty -- Send alert to PagerDuty.
 //    * Talk -- Post alert message to Talk client.
 //    * Telegram -- Post alert message to Telegram client.
+//    *	Kafka -- Send alert message to a Kafka instance
 //
 // See below for more details on configuring each handler.
 //
@@ -339,6 +340,10 @@ type AlertNode struct {
 	// Send alert to Talk.
 	// tick:ignore
 	TalkHandlers []*TalkHandler `tick:"Talk"`
+
+	// Send alert to Kafka
+	// tick:ignore
+	KafkaHandlers []*KafkaHandler `tick:"Kafka"`
 }
 
 func newAlertNode(wants EdgeType) *AlertNode {
@@ -1253,4 +1258,38 @@ func (a *AlertNode) Talk() *TalkHandler {
 // tick:embedded:AlertNode.Talk
 type TalkHandler struct {
 	*AlertNode
+}
+
+// Send the alert to Kafka.
+// To use Kafka alerting you must have a kafka instance running.
+// Add the url, port and the brokers that alerts should go to.
+// You can also optionally enable SASL or TLS authentication.
+//
+// Example:
+//    [kafka]
+//      enabled = true
+//      brokers = ["kafka.example.com:9092", "kafka2.example.com:8080"]
+//
+// Example:
+//    stream
+//         |alert()
+//             .kafka("topic1", "topic2", ..., "topicN")
+//
+// Send alerts to Kafka.
+//
+// tick:property
+func (a *AlertNode) Kafka(topics ...string) *KafkaHandler {
+	kafka := &KafkaHandler{
+		AlertNode: a,
+		Topics:    topics,
+	}
+	a.KafkaHandlers = append(a.KafkaHandlers, kafka)
+	return kafka
+}
+
+// tick:embedded:AlertNode.Kafka
+type KafkaHandler struct {
+	*AlertNode
+
+	Topics []string
 }

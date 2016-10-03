@@ -18,6 +18,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/Shopify/sarama"
+	"github.com/Shopify/sarama/mocks"
 	"github.com/influxdata/influxdb/client"
 	"github.com/influxdata/influxdb/influxql"
 	imodels "github.com/influxdata/influxdb/models"
@@ -27,6 +29,7 @@ import (
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
+	"github.com/influxdata/kapacitor/services/kafka"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/sensu"
@@ -5847,6 +5850,46 @@ stream
 	if rc := atomic.LoadInt32(&requestCount); rc != 2 {
 		t.Errorf("unexpected requestCount got %d exp 2", rc)
 	}
+}
+
+func TestStream_AlertKafka(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.kafka()
+		.kafka('topic1', 'topic2')
+`
+
+	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
+	defer tm.Close()
+	mock_producer := mocks.NewSyncProducer(t, sarama.NewConfig())
+
+	c := kafka.NewConfig()
+	tm.KafkaService = kafka.NewMockService(c, logService.NewLogger("[test_kafka] ", log.LstdFlags), mock_producer)
+
+	// Expect 3 messages due to 2 calls one with 1 topic (default), and one with 2 topics
+	mock_producer.ExpectSendMessageAndSucceed()
+	mock_producer.ExpectSendMessageAndSucceed()
+	mock_producer.ExpectSendMessageAndSucceed()
+
+	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
+	if err != nil {
+		t.Error(err)
+	}
+
+	mock_producer.Close()
 }
 
 func TestStream_AlertTelegram(t *testing.T) {
