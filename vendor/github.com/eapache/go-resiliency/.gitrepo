@@ -1,0 +1,11 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/eapache/go-resiliency.git
+	branch = master
+	commit = b86b1ec0dd4209a588dc1285cdd471e73525c0b3
+	parent = 443e3c1604d50f7840ec6201d5f802c0d5efe010
+	cmdver = 0.3.0
