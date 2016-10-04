@@ -1,0 +1,11 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/klauspost/crc32.git
+	branch = master
+	commit = 19b0b332c9e4516a6370a0456e6182c3b5036720
+	parent = 716a17db0af8ae853e92625a9b696adb22a17bf2
+	cmdver = 0.3.0
