@@ -1,0 +1,11 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/golang/snappy.git
+	branch = master
+	commit = d9eb7a3d35ec988b8585d4a0068e462c27d28380
+	parent = dd8728b9ed46a65a79549e9babee4f9a750ce786
+	cmdver = 0.3.0
