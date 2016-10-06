@@ -444,3 +444,10 @@ func (n *chainnode) Delete() *DeleteNode {
 	n.linkChild(s)
 	return s
 }
+
+// Create a node that can trigger autoscale events for a kubernetes cluster.
+func (n *chainnode) K8sAutoscale() *K8sAutoscaleNode {
+	k := newK8sAutoscaleNode(n.Provides())
+	n.linkChild(k)
+	return k
+}

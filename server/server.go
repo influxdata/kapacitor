@@ -24,6 +24,7 @@ import (
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/influxdb"
+	"github.com/influxdata/kapacitor/services/k8s"
 	"github.com/influxdata/kapacitor/services/logging"
 	"github.com/influxdata/kapacitor/services/noauth"
 	"github.com/influxdata/kapacitor/services/opsgenie"
@@ -151,6 +152,10 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	s.appendTaskStoreService()
 	s.appendReplayService()
 
+	if err := s.appendK8sService(); err != nil {
+		return nil, errors.Wrap(err, "kubernetes service")
+	}
+
 	// Append Alert integration services
 	s.appendOpsGenieService()
 	s.appendVictorOpsService()
@@ -269,6 +274,21 @@ func (s *Server) appendReplayService() {
 
 	s.ReplayService = srv
 	s.AppendService("replay", srv)
+}
+
+func (s *Server) appendK8sService() error {
+	c := s.config.Kubernetes
+	if c.Enabled {
+		l := s.LogService.NewLogger("[kubernetes] ", log.LstdFlags)
+		srv, err := k8s.NewService(c, l)
+		if err != nil {
+			return err
+		}
+
+		s.TaskMaster.K8sService = srv
+		s.AppendService("kubernetes", srv)
+	}
+	return nil
 }
 
 func (s *Server) appendDeadmanService() {

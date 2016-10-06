@@ -13,6 +13,7 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/services/httpd"
+	k8s "github.com/influxdata/kapacitor/services/k8s/client"
 	"github.com/influxdata/kapacitor/tick"
 	"github.com/influxdata/kapacitor/tick/stateful"
 	"github.com/influxdata/kapacitor/timer"
@@ -113,6 +114,9 @@ type TaskMaster struct {
 	}
 	TimingService interface {
 		NewTimer(timer.Setter) timer.Timer
+	}
+	K8sService interface {
+		Client() k8s.Client
 	}
 	LogService LogService
 

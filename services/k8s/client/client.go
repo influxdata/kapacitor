@@ -1,12 +1,13 @@
-package k8s
+package client
 
 import (
 	"bytes"
 	"encoding/json"
-	"log"
+	"fmt"
 	"net/http"
 	"net/url"
 	"path"
+	"sync"
 
 	"github.com/pkg/errors"
 )
@@ -23,14 +24,25 @@ type Config struct {
 	URLs []string
 }
 
-// Client is a lighweight HTTP client for k8s resources.
-type Client struct {
+type Client interface {
+	Scales(namespace string) ScalesInterface
+}
+
+// httpClient is a lightweight HTTP client for k8s resources.
+// It emulates the same structure as the package k8s.io/client-go/
+// so as to make replacing this client with an official client simpler
+// once https://github.com/kubernetes/kubernetes/issues/5660 is fixed
+type httpClient struct {
+	mu      sync.Mutex
 	urls    []*url.URL
 	client  *http.Client
 	current int
 }
 
-func NewClient(c Config) (*Client, error) {
+func New(c Config) (Client, error) {
+	if len(c.URLs) == 0 {
+		return nil, fmt.Errorf("must provide at least one URL")
+	}
 	urls := make([]*url.URL, len(c.URLs))
 	for i := range c.URLs {
 		u, err := url.Parse(c.URLs[i])
@@ -39,24 +51,29 @@ func NewClient(c Config) (*Client, error) {
 		}
 		urls[i] = u
 	}
-	return &Client{
+	return &httpClient{
 		urls:   urls,
 		client: http.DefaultClient,
 	}, nil
 }
 
-func (c *Client) Do(r http.Request) (*http.Response, error) {
+func (c *httpClient) nextURL() *url.URL {
+	c.mu.Lock()
 	u := c.urls[c.current]
+	c.current = (c.current + 1) % len(c.urls)
+	c.mu.Unlock()
+	return u
+}
+
+func (c *httpClient) Do(r http.Request) (*http.Response, error) {
+	u := c.nextURL()
 	r.URL.Host = u.Host
 	r.URL.Scheme = u.Scheme
-	log.Println("D! request:", r)
-	c.current = (c.current + 1) % len(c.urls)
 	resp, err := c.client.Do(&r)
 	return resp, errors.Wrap(err, "k8s client request failed")
 }
 
-func (c *Client) Get(p string, response interface{}, successfulCodes ...int) error {
-	log.Println("D! GET", p)
+func (c *httpClient) Get(p string, response interface{}, successfulCodes ...int) error {
 	r, err := http.NewRequest("GET", p, nil)
 	if err != nil {
 		return errors.Wrapf(err, "failed create GET request for %q", p)
@@ -69,7 +86,7 @@ func (c *Client) Get(p string, response interface{}, successfulCodes ...int) err
 	return c.decodeResponse(resp, response, successfulCodes)
 }
 
-func (c *Client) Patch(p string, patch JSONPatch, successfulCodes ...int) error {
+func (c *httpClient) Patch(p string, patch JSONPatch, successfulCodes ...int) error {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	err := enc.Encode([]JSONPatch{patch})
@@ -89,7 +106,7 @@ func (c *Client) Patch(p string, patch JSONPatch, successfulCodes ...int) error 
 	return c.decodeResponse(resp, nil, successfulCodes)
 }
 
-func (c *Client) decodeResponse(resp *http.Response, response interface{}, successfulCodes []int) error {
+func (c *httpClient) decodeResponse(resp *http.Response, response interface{}, successfulCodes []int) error {
 	dec := json.NewDecoder(resp.Body)
 	successful := false
 	for _, code := range successfulCodes {
@@ -117,20 +134,20 @@ func (c *Client) decodeResponse(resp *http.Response, response interface{}, succe
 }
 
 type ScalesInterface interface {
-	Get(kind Kind, name string) (*Scale, error)
-	Update(kind Kind, scale *Scale) error
+	Get(kind, name string) (*Scale, error)
+	Update(kind string, scale *Scale) error
 }
 
 type Scales struct {
-	c         *Client
+	c         *httpClient
 	namespace string
 }
 
-func (c *Client) Scales(namespace string) ScalesInterface {
+func (c *httpClient) Scales(namespace string) ScalesInterface {
 	return Scales{c: c, namespace: namespace}
 }
 
-func (s Scales) Get(kind Kind, name string) (*Scale, error) {
+func (s Scales) Get(kind, name string) (*Scale, error) {
 	p := path.Join(extensionsNamespacePath, s.namespace, string(kind), name, scaleEndpoint)
 	scale := &Scale{}
 	err := s.c.Get(p, scale, http.StatusOK)
@@ -140,7 +157,7 @@ func (s Scales) Get(kind Kind, name string) (*Scale, error) {
 	return scale, nil
 }
 
-func (s Scales) Update(kind Kind, scale *Scale) error {
+func (s Scales) Update(kind string, scale *Scale) error {
 	patch := JSONPatch{
 		Operation: "replace",
 		Path:      "/spec/replicas",

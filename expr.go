@@ -24,6 +24,22 @@ func EvalPredicate(se stateful.Expression, scopePool stateful.ScopePool, now tim
 	return b, nil
 }
 
+// EvalInt - Evaluate a given expression as an int64 against a set of fields and tags
+func EvalInt(se stateful.Expression, scopePool stateful.ScopePool, now time.Time, fields models.Fields, tags models.Tags) (int64, error) {
+	vars := scopePool.Get()
+	defer scopePool.Put(vars)
+	err := fillScope(vars, scopePool.ReferenceVariables(), now, fields, tags)
+	if err != nil {
+		return 0, err
+	}
+
+	i, err := se.EvalInt(vars)
+	if err != nil {
+		return 0, err
+	}
+	return i, nil
+}
+
 // fillScope - given a scope and reference variables, we fill the exact variables from the now, fields and tags.
 func fillScope(vars *stateful.Scope, referenceVariables []string, now time.Time, fields models.Fields, tags models.Tags) error {
 	for _, refVariableName := range referenceVariables {
