@@ -1,11 +1,10 @@
 # Changelog
 
-## v1.0.2 [unreleased]
+## v1.0.2 [2016-10-06]
 
 ### Release Notes
 
 ### Features
-
 
 ### Bugfixes
 
