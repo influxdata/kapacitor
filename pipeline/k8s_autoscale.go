@@ -62,6 +62,10 @@ type K8sAutoscaleNode struct {
 	// Namespace is the namespace of the resource, if empty the default namespace will be used.
 	Namespace string
 
+	// CurrentField is the name of a field into which the current scale factor will be set as an int.
+	// If empty no field will be set.
+	CurrentField string
+
 	// The maximum scale factor to set.
 	// If 0 then there is no upper limit.
 	// Default: 0, a.k.a no limit.
@@ -111,6 +115,9 @@ func (n *K8sAutoscaleNode) validate() error {
 	}
 	if n.Kind != client.DeploymentsKind && n.Kind != client.ReplicationControllerKind {
 		return fmt.Errorf("invalid Kind, must be 'deployments' or 'replicationcontrollers', got %s", n.Kind)
+	}
+	if n.Min < 1 {
+		return fmt.Errorf("min must be >= 1, got %d", n.Min)
 	}
 	return nil
 }

@@ -54,6 +54,9 @@ func newK8sAutoscaleNode(et *ExecutingTask, n *pipeline.K8sAutoscaleNode, l *log
 		min:            int(n.Min),
 		max:            int(n.Max),
 	}
+	if kn.min < 1 {
+		return nil, fmt.Errorf("minimum count must be >= 1, got %d", kn.min)
+	}
 	kn.node.runF = kn.runAutoscale
 	// Initialize the lambda expressions
 	if n.Increase != nil {
@@ -160,19 +163,21 @@ func (k *K8sAutoscaleNode) handlePoint(name string, group models.GroupID, dims m
 	// Eval all expressions
 	var increase, decrease, set int
 	if k.k.Increase != nil {
-		increase, err = k.evalExpr(group, k.k.Increase, k.increaseExprs, k.increaseScopePool, t, fields, tags)
+		increase, err = k.evalExpr(state.current, group, k.k.Increase, k.increaseExprs, k.increaseScopePool, t, fields, tags)
 		if err != nil {
 			return models.Point{}, errors.Wrap(err, "failed to evaluate increase expression")
 		}
 	}
 	if k.k.Decrease != nil {
-		decrease, err = k.evalExpr(group, k.k.Decrease, k.decreaseExprs, k.decreaseScopePool, t, fields, tags)
+		decrease, err = k.evalExpr(state.current, group, k.k.Decrease, k.decreaseExprs, k.decreaseScopePool, t, fields, tags)
 		if err != nil {
 			return models.Point{}, errors.Wrap(err, "failed to evaluate decrease expression")
 		}
 	}
+	useSet := false
 	if k.k.Set != nil {
-		set, err = k.evalExpr(group, k.k.Set, k.setExprs, k.setScopePool, t, fields, tags)
+		useSet = true
+		set, err = k.evalExpr(state.current, group, k.k.Set, k.setExprs, k.setScopePool, t, fields, tags)
 		if err != nil {
 			return models.Point{}, errors.Wrap(err, "failed to evaluate set expression")
 		}
@@ -181,12 +186,12 @@ func (k *K8sAutoscaleNode) handlePoint(name string, group models.GroupID, dims m
 	if increase != 0 && decrease != 0 {
 		return models.Point{}, fmt.Errorf("cannot increase and decrease in the same event, got increase %d and decrease %d", increase, decrease)
 	}
-	if set != 0 && (increase != 0 || decrease != 0) {
+	if useSet && (increase != 0 || decrease != 0) {
 		return models.Point{}, fmt.Errorf("cannot set and increase/decrease in the same event, got set %d, increase %d and decrease %d", set, increase, decrease)
 	}
 
 	// transform set into an increase/decrease operation
-	if set != 0 {
+	if useSet {
 		if set > state.current {
 			increase = set - state.current
 		} else if set < state.current {
@@ -196,6 +201,7 @@ func (k *K8sAutoscaleNode) handlePoint(name string, group models.GroupID, dims m
 	change := increase
 	change -= decrease
 
+	// Create the event
 	e := event{
 		Namespace: namespace,
 		Kind:      kind,
@@ -203,17 +209,22 @@ func (k *K8sAutoscaleNode) handlePoint(name string, group models.GroupID, dims m
 		Old:       state.current,
 		New:       state.current + change,
 	}
+	// Check bounds
 	if e.New > k.max {
 		e.New = k.max
 	}
 	if e.New < k.min {
 		e.New = k.min
 	}
+
+	// Check something changed
 	if e.New == e.Old {
 		// Nothing to do
 		return models.Point{}, nil
 	}
+
 	// Update local copy of state
+	state.current = e.New
 	var counter *expvar.Int
 	switch {
 	case increase != 0:
@@ -259,6 +270,7 @@ func (k *K8sAutoscaleNode) handlePoint(name string, group models.GroupID, dims m
 }
 
 func (k *K8sAutoscaleNode) evalExpr(
+	current int,
 	group models.GroupID,
 	lambda *ast.LambdaNode,
 	expressionsMap map[models.GroupID]stateful.Expression,
@@ -276,7 +288,7 @@ func (k *K8sAutoscaleNode) evalExpr(
 		}
 		expressionsMap[group] = expr
 	}
-	i, err := EvalInt(expr, pool, t, fields, tags)
+	i, err := k.evalInt(int64(current), expr, pool, t, fields, tags)
 	return int(i), err
 }
 
@@ -333,4 +345,24 @@ func (k *K8sAutoscaleNode) applyEvent(e event) error {
 		return errors.Wrapf(err, "failed to update the scale for resource %s/%s/%s", e.Namespace, e.Kind, e.Name)
 	}
 	return nil
+}
+
+// evalInt - Evaluate a given expression as an int64 against a set of fields and tags.
+// The CurrentField is also set on the scope if not empty.
+func (k *K8sAutoscaleNode) evalInt(current int64, se stateful.Expression, scopePool stateful.ScopePool, now time.Time, fields models.Fields, tags models.Tags) (int64, error) {
+	vars := scopePool.Get()
+	if k.k.CurrentField != "" {
+		vars.Set(k.k.CurrentField, current)
+	}
+	defer scopePool.Put(vars)
+	err := fillScope(vars, scopePool.ReferenceVariables(), now, fields, tags)
+	if err != nil {
+		return 0, err
+	}
+
+	i, err := se.EvalInt(vars)
+	if err != nil {
+		return 0, err
+	}
+	return i, nil
 }
