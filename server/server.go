@@ -40,6 +40,7 @@ import (
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/udp"
+	"github.com/influxdata/kapacitor/services/vars"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/pkg/errors"
 	"github.com/twinj/uuid"
@@ -161,6 +162,9 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	s.appendSlackService()
 	s.appendSensuService()
 	s.appendTalkService()
+	if err := s.appendVarsService(); err != nil {
+		return nil, errors.Wrap(err, "vars service")
+	}
 
 	// Append InfluxDB input services
 	s.appendCollectdService()
@@ -479,6 +483,17 @@ func (s *Server) appendReportingService() {
 
 		s.AppendService("reporting", srv)
 	}
+}
+
+func (s *Server) appendVarsService() error {
+	l := s.LogService.NewLogger("[vars] ", log.LstdFlags)
+	srv, err := vars.NewService(s.config.Vars, l)
+	if err != nil {
+		return err
+	}
+	s.TaskMaster.VarsService = srv
+	s.AppendService("vars", srv)
+	return nil
 }
 
 // Err returns an error channel that multiplexes all out of band errors received from all services.
