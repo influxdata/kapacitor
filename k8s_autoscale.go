@@ -180,14 +180,14 @@ func (k *K8sAutoscaleNode) handlePoint(name string, group models.GroupID, dims m
 	var counter *expvar.Int
 	switch {
 	case change > 0:
-		if !t.After(state.lastIncrease.Add(k.k.IncreaseCooldown)) {
+		if t.Before(state.lastIncrease.Add(k.k.IncreaseCooldown)) {
 			// Still hot, nothing to do
 			return models.Point{}, nil
 		}
 		state.lastIncrease = t
 		counter = k.increaseCount
 	case change < 0:
-		if !t.After(state.lastDecrease.Add(k.k.DecreaseCooldown)) {
+		if t.Before(state.lastDecrease.Add(k.k.DecreaseCooldown)) {
 			// Still hot, nothing to do
 			return models.Point{}, nil
 		}
