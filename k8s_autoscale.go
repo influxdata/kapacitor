@@ -15,9 +15,9 @@ import (
 )
 
 const (
-	statsK8sIncreaseCount = "increase_count"
-	statsK8sDecreaseCount = "decrease_count"
-	statsK8sErrorsCount   = "errors_count"
+	statsK8sIncreaseEventsCount = "increase_events"
+	statsK8sDecreaseEventsCount = "decrease_events"
+	statsK8sErrorsCount         = "errors"
 )
 
 type K8sAutoscaleNode struct {
@@ -26,14 +26,8 @@ type K8sAutoscaleNode struct {
 
 	client client.Client
 
-	increaseExprs     map[models.GroupID]stateful.Expression
-	increaseScopePool stateful.ScopePool
-
-	decreaseExprs     map[models.GroupID]stateful.Expression
-	decreaseScopePool stateful.ScopePool
-
-	setExprs     map[models.GroupID]stateful.Expression
-	setScopePool stateful.ScopePool
+	replicasExprs     map[models.GroupID]stateful.Expression
+	replicasScopePool stateful.ScopePool
 
 	resourceStates map[string]resourceState
 
@@ -59,19 +53,9 @@ func newK8sAutoscaleNode(et *ExecutingTask, n *pipeline.K8sAutoscaleNode, l *log
 	}
 	kn.node.runF = kn.runAutoscale
 	// Initialize the lambda expressions
-	if n.Increase != nil {
-		kn.increaseExprs = make(map[models.GroupID]stateful.Expression)
-		kn.increaseScopePool = stateful.NewScopePool(stateful.FindReferenceVariables(n.Increase.Expression))
-	}
-
-	if n.Decrease != nil {
-		kn.decreaseExprs = make(map[models.GroupID]stateful.Expression)
-		kn.decreaseScopePool = stateful.NewScopePool(stateful.FindReferenceVariables(n.Decrease.Expression))
-	}
-
-	if n.Set != nil {
-		kn.setExprs = make(map[models.GroupID]stateful.Expression)
-		kn.setScopePool = stateful.NewScopePool(stateful.FindReferenceVariables(n.Set.Expression))
+	if n.Replicas != nil {
+		kn.replicasExprs = make(map[models.GroupID]stateful.Expression)
+		kn.replicasScopePool = stateful.NewScopePool(stateful.FindReferenceVariables(n.Replicas.Expression))
 	}
 	if et.tm.K8sService == nil {
 		return nil, errors.New("cannot use the k8sAutoscale node, the kubernetes service is not enabled")
@@ -85,8 +69,8 @@ func (k *K8sAutoscaleNode) runAutoscale([]byte) error {
 	k.decreaseCount = &expvar.Int{}
 	k.errorsCount = &expvar.Int{}
 
-	k.statMap.Set(statsK8sIncreaseCount, k.increaseCount)
-	k.statMap.Set(statsK8sDecreaseCount, k.decreaseCount)
+	k.statMap.Set(statsK8sIncreaseEventsCount, k.increaseCount)
+	k.statMap.Set(statsK8sDecreaseEventsCount, k.decreaseCount)
 	k.statMap.Set(statsK8sErrorsCount, k.errorsCount)
 
 	switch k.Wants() {
@@ -160,46 +144,11 @@ func (k *K8sAutoscaleNode) handlePoint(name string, group models.GroupID, dims m
 		k.resourceStates[name] = state
 	}
 
-	// Eval all expressions
-	var increase, decrease, set int
-	if k.k.Increase != nil {
-		increase, err = k.evalExpr(state.current, group, k.k.Increase, k.increaseExprs, k.increaseScopePool, t, fields, tags)
-		if err != nil {
-			return models.Point{}, errors.Wrap(err, "failed to evaluate increase expression")
-		}
+	// Eval the replicas expression
+	newReplicas, err := k.evalExpr(state.current, group, k.k.Replicas, k.replicasExprs, k.replicasScopePool, t, fields, tags)
+	if err != nil {
+		return models.Point{}, errors.Wrap(err, "failed to evaluate the replicas expression")
 	}
-	if k.k.Decrease != nil {
-		decrease, err = k.evalExpr(state.current, group, k.k.Decrease, k.decreaseExprs, k.decreaseScopePool, t, fields, tags)
-		if err != nil {
-			return models.Point{}, errors.Wrap(err, "failed to evaluate decrease expression")
-		}
-	}
-	useSet := false
-	if k.k.Set != nil {
-		useSet = true
-		set, err = k.evalExpr(state.current, group, k.k.Set, k.setExprs, k.setScopePool, t, fields, tags)
-		if err != nil {
-			return models.Point{}, errors.Wrap(err, "failed to evaluate set expression")
-		}
-	}
-	// Check that the result is sane
-	if increase != 0 && decrease != 0 {
-		return models.Point{}, fmt.Errorf("cannot increase and decrease in the same event, got increase %d and decrease %d", increase, decrease)
-	}
-	if useSet && (increase != 0 || decrease != 0) {
-		return models.Point{}, fmt.Errorf("cannot set and increase/decrease in the same event, got set %d, increase %d and decrease %d", set, increase, decrease)
-	}
-
-	// transform set into an increase/decrease operation
-	if useSet {
-		if set > state.current {
-			increase = set - state.current
-		} else if set < state.current {
-			decrease = state.current - set
-		}
-	}
-	change := increase
-	change -= decrease
 
 	// Create the event
 	e := event{
@@ -207,60 +156,83 @@ func (k *K8sAutoscaleNode) handlePoint(name string, group models.GroupID, dims m
 		Kind:      kind,
 		Name:      name,
 		Old:       state.current,
-		New:       state.current + change,
+		New:       newReplicas,
 	}
 	// Check bounds
-	if e.New > k.max {
+	if k.max > 0 && e.New > k.max {
 		e.New = k.max
 	}
 	if e.New < k.min {
 		e.New = k.min
 	}
 
-	// Check something changed
+	// Validate something changed
 	if e.New == e.Old {
 		// Nothing to do
 		return models.Point{}, nil
 	}
 
 	// Update local copy of state
+	change := e.New - e.Old
 	state.current = e.New
+
+	// Check last change cooldown times
 	var counter *expvar.Int
 	switch {
-	case increase != 0:
+	case change > 0:
 		if !t.After(state.lastIncrease.Add(k.k.IncreaseCooldown)) {
-			// Nothing to do
+			// Still hot, nothing to do
 			return models.Point{}, nil
 		}
 		state.lastIncrease = t
 		counter = k.increaseCount
-	case decrease != 0:
+	case change < 0:
 		if !t.After(state.lastDecrease.Add(k.k.DecreaseCooldown)) {
-			// Nothing to do
+			// Still hot, nothing to do
 			return models.Point{}, nil
 		}
 		state.lastDecrease = t
 		counter = k.decreaseCount
-	default:
-		// Nothing to do
-		return models.Point{}, nil
 	}
-	// We have a real event to apply
+
+	// We have a valid event to apply
 	if err := k.applyEvent(e); err != nil {
 		k.errorsCount.Add(1)
 		return models.Point{}, errors.Wrap(err, "failed to apply scaling event")
 	}
+
 	// Only save the updated state if we were successful
 	k.resourceStates[name] = state
+
 	// Count event
 	counter.Add(1)
 
+	// Create new tags for the point.
+	// Leave room for the namespace,kind, and resource tags.
+	newTags := make(models.Tags, len(tags)+3)
+
+	// Copy group by tags
+	for _, d := range dims.TagNames {
+		newTags[d] = tags[d]
+	}
+	// Set namespace,kind,resource tags
+	if k.k.NamespaceTag != "" {
+		newTags[k.k.NamespaceTag] = namespace
+	}
+	if k.k.KindTag != "" {
+		newTags[k.k.KindTag] = kind
+	}
+	if k.k.ResourceTag != "" {
+		newTags[k.k.ResourceTag] = name
+	}
+
+	// Create point representing the event
 	p := models.Point{
 		Name:       name,
 		Time:       t,
 		Group:      group,
 		Dimensions: dims,
-		Tags:       tags,
+		Tags:       newTags,
 		Fields: models.Fields{
 			"old": int64(e.Old),
 			"new": int64(e.New),
@@ -297,13 +269,6 @@ func (k *K8sAutoscaleNode) getResourceFromPoint(fields models.Fields, tags model
 	switch {
 	case k.k.ResourceName != "":
 		name = k.k.ResourceName
-	case k.k.ResourceNameField != "":
-		f, ok := fields[k.k.ResourceNameField]
-		if ok {
-			if n, ok := f.(string); ok {
-				name = n
-			}
-		}
 	case k.k.ResourceNameTag != "":
 		t, ok := tags[k.k.ResourceNameTag]
 		if ok {
@@ -326,7 +291,7 @@ func (k *K8sAutoscaleNode) getResourceFromPoint(fields models.Fields, tags model
 func (k *K8sAutoscaleNode) getResource(namespace, kind, name string) (*client.Scale, error) {
 	scales := k.client.Scales(namespace)
 	scale, err := scales.Get(kind, name)
-	return scale, errors.Wrapf(err, "failed to get the current scale for resource %s/%s/%s", namespace, kind, name)
+	return scale, errors.Wrapf(err, "failed to get the scale for resource %s/%s/%s", namespace, kind, name)
 }
 
 func (k *K8sAutoscaleNode) applyEvent(e event) error {
@@ -334,7 +299,7 @@ func (k *K8sAutoscaleNode) applyEvent(e event) error {
 	scales := k.client.Scales(e.Namespace)
 	scale, err := k.getResource(e.Namespace, e.Kind, e.Name)
 	if err != nil {
-		return errors.Wrap(err, "failed to apply e")
+		return err
 	}
 	if scale.Spec.Replicas != int32(e.Old) {
 		k.logger.Printf("W! the kubernetes scale spec and Kapacitor's spec do not match for resource %s/%s/%s, did it change externally?", e.Namespace, e.Kind, e.Name)
