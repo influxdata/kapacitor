@@ -152,7 +152,7 @@ func newK8sAutoscaleNode(e EdgeType) *K8sAutoscaleNode {
 func (n *K8sAutoscaleNode) validate() error {
 	if (n.ResourceName != "" && n.ResourceNameTag != "") ||
 		(n.ResourceNameTag == "" && n.ResourceName == "") {
-		return fmt.Errorf("must specify exactly one of ResourceName and ResourceNameTag")
+		return fmt.Errorf("must specify exactly one of ResourceName or ResourceNameTag")
 	}
 	if n.Kind != client.DeploymentsKind && n.Kind != client.ReplicationControllerKind {
 		return fmt.Errorf("invalid Kind, must be 'deployments' or 'replicationcontrollers', got %s", n.Kind)

@@ -39,28 +39,29 @@ type K8sAutoscaleNode struct {
 	max int
 }
 
-// Create a new  K8sAutoscaleNode which caches the most recent item and exposes it over the HTTP API.
+// Create a new K8sAutoscaleNode which can trigger autoscale event for a Kubernetes cluster.
 func newK8sAutoscaleNode(et *ExecutingTask, n *pipeline.K8sAutoscaleNode, l *log.Logger) (*K8sAutoscaleNode, error) {
+	if et.tm.K8sService == nil {
+		return nil, errors.New("cannot use the k8sAutoscale node, the kubernetes service is not enabled")
+	}
+
 	kn := &K8sAutoscaleNode{
 		node:           node{Node: n, et: et, logger: l},
 		k:              n,
 		resourceStates: make(map[string]resourceState),
 		min:            int(n.Min),
 		max:            int(n.Max),
+		client:         et.tm.K8sService.Client(),
 	}
 	if kn.min < 1 {
 		return nil, fmt.Errorf("minimum count must be >= 1, got %d", kn.min)
 	}
 	kn.node.runF = kn.runAutoscale
-	// Initialize the lambda expressions
+	// Initialize the replicas lambda expression scope pool
 	if n.Replicas != nil {
 		kn.replicasExprs = make(map[models.GroupID]stateful.Expression)
 		kn.replicasScopePool = stateful.NewScopePool(stateful.FindReferenceVariables(n.Replicas.Expression))
 	}
-	if et.tm.K8sService == nil {
-		return nil, errors.New("cannot use the k8sAutoscale node, the kubernetes service is not enabled")
-	}
-	kn.client = et.tm.K8sService.Client()
 	return kn, nil
 }
 
@@ -316,10 +317,14 @@ func (k *K8sAutoscaleNode) applyEvent(e event) error {
 // The CurrentField is also set on the scope if not empty.
 func (k *K8sAutoscaleNode) evalInt(current int64, se stateful.Expression, scopePool stateful.ScopePool, now time.Time, fields models.Fields, tags models.Tags) (int64, error) {
 	vars := scopePool.Get()
+	defer scopePool.Put(vars)
+
+	// Set the current replicas value on the scope if requested.
 	if k.k.CurrentField != "" {
 		vars.Set(k.k.CurrentField, current)
 	}
-	defer scopePool.Put(vars)
+
+	// Fill the scope with the rest of the values
 	err := fillScope(vars, scopePool.ReferenceVariables(), now, fields, tags)
 	if err != nil {
 		return 0, err
