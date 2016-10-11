@@ -9,6 +9,9 @@
 ### Bugfixes
 
 - [#980](https://github.com/influxdata/kapacitor/pull/980): Upgrade to using go 1.7
+- [#931](https://github.com/influxdata/kapacitor/issues/931): A Kubernetes autoscaler node. You can now autoscale you Kubernetes deployments via Kapacitor.
+
+### Bugfixes
 
 
 ## v1.0.2 [2016-10-06]
