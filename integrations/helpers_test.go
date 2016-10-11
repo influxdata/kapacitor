@@ -14,6 +14,7 @@ import (
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/influxdb"
+	k8s "github.com/influxdata/kapacitor/services/k8s/client"
 	"github.com/influxdata/kapacitor/services/logging"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/wlog"
@@ -180,3 +181,21 @@ func (d deadman) Threshold() float64      { return d.threshold }
 func (d deadman) Id() string              { return d.id }
 func (d deadman) Message() string         { return d.message }
 func (d deadman) Global() bool            { return d.global }
+
+type k8sAutoscale struct {
+	ScalesGetFunc    func(kind, name string) (*k8s.Scale, error)
+	ScalesUpdateFunc func(kind string, scale *k8s.Scale) error
+}
+
+func (k k8sAutoscale) Client() k8s.Client {
+	return k
+}
+func (k k8sAutoscale) Scales(namespace string) k8s.ScalesInterface {
+	return k
+}
+func (k k8sAutoscale) Get(kind, name string) (*k8s.Scale, error) {
+	return k.ScalesGetFunc(kind, name)
+}
+func (k k8sAutoscale) Update(kind string, scale *k8s.Scale) error {
+	return k.ScalesUpdateFunc(kind, scale)
+}

@@ -128,7 +128,7 @@ type event struct {
 	New       int
 }
 
-func (k *K8sAutoscaleNode) handlePoint(name string, group models.GroupID, dims models.Dimensions, t time.Time, fields models.Fields, tags models.Tags) (models.Point, error) {
+func (k *K8sAutoscaleNode) handlePoint(streamName string, group models.GroupID, dims models.Dimensions, t time.Time, fields models.Fields, tags models.Tags) (models.Point, error) {
 	namespace, kind, name, err := k.getResourceFromPoint(fields, tags)
 	if err != nil {
 		return models.Point{}, err
@@ -228,7 +228,7 @@ func (k *K8sAutoscaleNode) handlePoint(name string, group models.GroupID, dims m
 
 	// Create point representing the event
 	p := models.Point{
-		Name:       name,
+		Name:       streamName,
 		Time:       t,
 		Group:      group,
 		Dimensions: dims,
