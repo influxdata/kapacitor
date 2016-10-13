@@ -196,3 +196,31 @@ func (s *Service) prepareMessge(to []string, subject, body string) (*gomail.Mess
 	m.SetBody("text/html", body)
 	return m, nil
 }
+
+type testOptions struct {
+	To      []string `json:"to"`
+	Subject string   `json:"subject"`
+	Body    string   `json:"body"`
+}
+
+func (s *Service) TestOptions() interface{} {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return &testOptions{
+		To:      s.c.To,
+		Subject: "test subject",
+		Body:    "test body",
+	}
+}
+
+func (s *Service) Test(options interface{}) error {
+	o, ok := options.(*testOptions)
+	if !ok {
+		return fmt.Errorf("unexpected options type %T", options)
+	}
+	return s.SendMail(
+		o.To,
+		o.Subject,
+		o.Body,
+	)
+}

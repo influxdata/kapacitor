@@ -252,6 +252,31 @@ func (s *Service) assignServiceToCluster(cluster *influxdbCluster) {
 	cluster.randReader = s.RandReader
 }
 
+type testOptions struct {
+	Cluster string `json:"cluster"`
+}
+
+func (s *Service) TestOptions() interface{} {
+	return &testOptions{}
+}
+
+func (s *Service) Test(options interface{}) error {
+	o, ok := options.(*testOptions)
+	if !ok {
+		return fmt.Errorf("unexpected options type %T", options)
+	}
+	cluster, ok := s.clusters[o.Cluster]
+	if !ok {
+		return fmt.Errorf("unknown cluster %q", o.Cluster)
+	}
+	cli, err := cluster.NewClient()
+	if err != nil {
+		return errors.Wrapf(err, "failed to connect to influxdb cluster %q", o.Cluster)
+	}
+	cli.Close()
+	return nil
+}
+
 // Refresh the subscriptions linking for all clusters.
 func (s *Service) handleSubscriptions(w http.ResponseWriter, r *http.Request) {
 	err := s.LinkSubscriptions()

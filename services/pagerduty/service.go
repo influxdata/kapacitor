@@ -60,6 +60,37 @@ func (s *Service) Global() bool {
 	return c.Global
 }
 
+type testOptions struct {
+	IncidentKey string               `json:"incident-key"`
+	Description string               `json:"description"`
+	Level       kapacitor.AlertLevel `json:"level"`
+}
+
+func (s *Service) TestOptions() interface{} {
+	return &testOptions{
+		IncidentKey: "testIncidentKey",
+		Description: "test pagerduty message",
+		Level:       kapacitor.CritAlert,
+	}
+}
+
+func (s *Service) Test(options interface{}) error {
+	o, ok := options.(*testOptions)
+	if !ok {
+		return fmt.Errorf("unexpected options type %T", options)
+	}
+	s.mu.RLock()
+	serviceKey := s.serviceKey
+	s.mu.RUnlock()
+	return s.Alert(
+		serviceKey,
+		o.IncidentKey,
+		o.Description,
+		o.Level,
+		nil,
+	)
+}
+
 func (s *Service) Alert(serviceKey, incidentKey, desc string, level kapacitor.AlertLevel, details interface{}) error {
 	url, post, err := s.preparePost(serviceKey, incidentKey, desc, level, details)
 	if err != nil {

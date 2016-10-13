@@ -61,6 +61,7 @@ Commands:
 	stats           Display various stats about Kapacitor.
 	version         Displays the Kapacitor version info.
 	vars            Print debug vars in JSON format.
+	service-test    Test a service.
 	help            Prints help for a command.
 
 Options:

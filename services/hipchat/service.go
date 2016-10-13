@@ -63,6 +63,33 @@ func (s *Service) StateChangesOnly() bool {
 	return c.StateChangesOnly
 }
 
+type testOptions struct {
+	Room    string               `json:"room"`
+	Message string               `json:"message"`
+	Level   kapacitor.AlertLevel `json:"level"`
+}
+
+func (s *Service) TestOptions() interface{} {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return &testOptions{
+		Room:    s.room,
+		Message: "test hipchat message",
+		Level:   kapacitor.CritAlert,
+	}
+}
+
+func (s *Service) Test(options interface{}) error {
+	o, ok := options.(*testOptions)
+	if !ok {
+		return fmt.Errorf("unexpected options type %T", options)
+	}
+	s.mu.RLock()
+	token := s.token
+	s.mu.RUnlock()
+	return s.Alert(o.Room, token, o.Message, o.Level)
+}
+
 func (s *Service) Alert(room, token, message string, level kapacitor.AlertLevel) error {
 	url, post, err := s.preparePost(room, token, message, level)
 	if err != nil {

@@ -61,6 +61,40 @@ func (s *Service) StateChangesOnly() bool {
 	return c.StateChangesOnly
 }
 
+type testOptions struct {
+	ChatId                string `json:"chat-id"`
+	ParseMode             string `json:"parse-mode"`
+	Message               string `json:"message"`
+	DisableWebPagePreview bool   `json:"disable-web-page-preview"`
+	DisableNotification   bool   `json:"disable-notification"`
+}
+
+func (s *Service) TestOptions() interface{} {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return &testOptions{
+		ChatId:                s.chatId,
+		ParseMode:             s.parseMode,
+		Message:               "test telegram message",
+		DisableWebPagePreview: s.disableWebPagePreview,
+		DisableNotification:   s.disableNotification,
+	}
+}
+
+func (s *Service) Test(options interface{}) error {
+	o, ok := options.(*testOptions)
+	if !ok {
+		return fmt.Errorf("unexpected options type %T", options)
+	}
+	return s.Alert(
+		o.ChatId,
+		o.ParseMode,
+		o.Message,
+		o.DisableWebPagePreview,
+		o.DisableNotification,
+	)
+}
+
 func (s *Service) Alert(chatId, parseMode, message string, disableWebPagePreview, disableNotification bool) error {
 	url, post, err := s.preparePost(chatId, parseMode, message, disableWebPagePreview, disableNotification)
 	if err != nil {
@@ -94,6 +128,7 @@ func (s *Service) Alert(chatId, parseMode, message string, disableWebPagePreview
 	}
 	return nil
 }
+
 func (s *Service) preparePost(chatId, parseMode, message string, disableWebPagePreview, disableNotification bool) (string, io.Reader, error) {
 	c := s.config()
 

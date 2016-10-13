@@ -49,6 +49,26 @@ func (s *Service) Update(newConfig []interface{}) error {
 	return nil
 }
 
+type testOptions struct {
+	Title string `json:"title"`
+	Text  string `json:"text"`
+}
+
+func (s *Service) TestOptions() interface{} {
+	return &testOptions{
+		Title: "testTitle",
+		Text:  "test talk text",
+	}
+}
+
+func (s *Service) Test(options interface{}) error {
+	o, ok := options.(*testOptions)
+	if !ok {
+		return fmt.Errorf("unexpected options type %T", options)
+	}
+	return s.Alert(o.Title, o.Text)
+}
+
 func (s *Service) Alert(title, text string) error {
 	url, post, err := s.preparePost(title, text)
 	if err != nil {

@@ -57,6 +57,42 @@ func (s *Service) Global() bool {
 	return c.Global
 }
 
+type testOptions struct {
+	Teams       []string `json:"teams"`
+	Recipients  []string `json:"recipients"`
+	MessageType string   `json:"message-type"`
+	Message     string   `json:"message"`
+	EntityID    string   `json:"entity-id"`
+}
+
+func (s *Service) TestOptions() interface{} {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return &testOptions{
+		Teams:       s.teams,
+		Recipients:  s.recipients,
+		MessageType: "CRITICAL",
+		Message:     "test opsgenie message",
+		EntityID:    "testEntityID",
+	}
+}
+
+func (s *Service) Test(options interface{}) error {
+	o, ok := options.(*testOptions)
+	if !ok {
+		return fmt.Errorf("unexpected options type %T", options)
+	}
+	return s.Alert(
+		o.Teams,
+		o.Recipients,
+		o.MessageType,
+		o.Message,
+		o.EntityID,
+		time.Now(),
+		nil,
+	)
+}
+
 func (s *Service) Alert(teams []string, recipients []string, messageType, message, entityID string, t time.Time, details interface{}) error {
 	url, post, err := s.preparePost(teams, recipients, messageType, message, entityID, t, details)
 	if err != nil {

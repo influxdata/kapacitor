@@ -7,6 +7,7 @@
 * [Recordings](#recordings)
 * [Replays](#replays)
 * [Configuration](#configuration)
+* [Testing Services](#testing-services)
 * [Miscellaneous](#miscellaneous)
 
 ## General Information
@@ -1699,6 +1700,94 @@ POST /kapacitor/v1/config/influxdb/remote
 | 200  | Success                                                   |
 | 403  | Config override service not enabled                       |
 | 404  | The specified configuration section/option does not exist |
+
+## Testing Serivces
+
+Kapacitor make user of various service integrations.
+The following API endpoints provide way for a user to run simple tests to ensure that a service is configured correctly.
+
+### Listing testable services
+
+A list of services that can be tested is available at the `/kapacitor/v1/tests` endpoint
+
+#### Example
+
+```
+GET /kapacitor/v1/tests
+```
+
+```
+[
+    "influxdb",
+    "slack",
+    "smtp",
+]
+```
+
+#### Response
+
+| Code | Meaning |
+| ---- | ------- |
+| 200  | Success |
+
+
+### Testing a service
+
+To test a service make a POST request to the `/kapacitor/v1/tests/<service name>` endpoint.
+The contents of the POST body depend on the service in test.
+To determine the available options use a GET request to the same endpoint.
+The returned options are also the defaults.
+
+#### Example
+
+See available/default options for the slack service:
+```
+GET /kapacitor/v1/tests/slack
+```
+
+```json
+{
+    "message": "test slack message",
+    "channel": "#alerts",
+    "level": "CRITICAL",
+}
+```
+
+Test the slack service integration using custom options:
+
+```
+POST /kapacitor/v1/tests/slack
+{
+    "message": "my custom test message",
+    "channel": "@user",
+    "level": "OK",
+}
+```
+A successful response looks like:
+
+```json
+{
+    "success": true,
+    "message": "",
+}
+```
+
+A failed response looks like:
+
+```json
+{
+    "success": false,
+    "message": "could not connect to slack",
+}
+```
+
+
+#### Response
+
+| Code | Meaning                                                                                         |
+| ---- | -------                                                                                         |
+| 200  | Success, even if the service under test fails a 200 is returned as the test complete correctly. |
+
 
 ## Miscellaneous
 

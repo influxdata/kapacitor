@@ -59,6 +59,39 @@ func (s *Service) Global() bool {
 	return c.Global
 }
 
+type testOptions struct {
+	RoutingKey  string `json:"routingKey"`
+	MessageType string `json:"messageType"`
+	Message     string `json:"message"`
+	EntityID    string `json:"entityID"`
+}
+
+func (s *Service) TestOptions() interface{} {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return &testOptions{
+		RoutingKey:  s.routingKey,
+		MessageType: "CRITICAL",
+		Message:     "test victorops message",
+		EntityID:    "testEntityID",
+	}
+}
+
+func (s *Service) Test(options interface{}) error {
+	o, ok := options.(*testOptions)
+	if !ok {
+		return fmt.Errorf("unexpected options type %T", options)
+	}
+	return s.Alert(
+		o.RoutingKey,
+		o.MessageType,
+		o.Message,
+		o.EntityID,
+		time.Now(),
+		nil,
+	)
+}
+
 func (s *Service) Alert(routingKey, messageType, message, entityID string, t time.Time, details interface{}) error {
 	url, post, err := s.preparePost(routingKey, messageType, message, entityID, t, details)
 	if err != nil {
