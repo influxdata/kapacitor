@@ -13,7 +13,10 @@ type Service struct {
 }
 
 func NewService(c Config, l *log.Logger) (*Service, error) {
-	clientConfig := c.ClientConfig()
+	clientConfig, err := c.ClientConfig()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create k8s client config")
+	}
 	cli, err := client.New(clientConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create k8s client")

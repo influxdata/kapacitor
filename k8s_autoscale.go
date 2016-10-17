@@ -136,9 +136,10 @@ func (k *K8sAutoscaleNode) handlePoint(streamName string, group models.GroupID, 
 	}
 	state, ok := k.resourceStates[name]
 	if !ok {
-		// If we haven't seen this resource before get its state
+		// If we haven't seen this resource before, get its state
 		scale, err := k.getResource(namespace, kind, name)
 		if err != nil {
+			k.errorsCount.Add(1)
 			return models.Point{}, errors.Wrapf(err, "could not determine initial scale for %s/%s/%s", namespace, kind, name)
 		}
 		state.current = int(scale.Spec.Replicas)

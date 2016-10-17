@@ -2,11 +2,15 @@ package client
 
 import (
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
+	"path/filepath"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -18,13 +22,32 @@ const (
 	extensionsPath          = apiBasePath + "/extensions/v1beta1"
 	extensionsNamespacePath = extensionsPath + "/namespaces"
 	scaleEndpoint           = "/scale"
+
+	// Secrets
+	secretsPath     = "/var/run/secrets/kubernetes.io/serviceaccount"
+	namespaceSecret = "namespace"
+	tokenSecret     = "token"
+	caCertSecret    = "ca.crt"
 )
 
 type Config struct {
-	URLs []string
+	URLs      []string
+	Namespace string
+	Token     string
+	TLSConfig *tls.Config
+}
+
+// loadPodSecret returns the string value for a given secret.
+// The secret is expected to be stored under secretsPath.
+func loadPodSecret(secret string) (value []byte, err error) {
+	p := filepath.Join(secretsPath, secret)
+	value, err = ioutil.ReadFile(p)
+	return
 }
 
 type Client interface {
+	// Scales returns an interface for interactive with Scale resources.
+	// If namespace is empty the default client namespace will be used.
 	Scales(namespace string) ScalesInterface
 }
 
@@ -33,10 +56,53 @@ type Client interface {
 // so as to make replacing this client with an official client simpler
 // once https://github.com/kubernetes/kubernetes/issues/5660 is fixed
 type httpClient struct {
-	mu      sync.Mutex
-	urls    []*url.URL
-	client  *http.Client
-	current int
+	mu         sync.Mutex
+	urls       []*url.URL
+	namespace  string
+	client     *http.Client
+	current    int
+	authHeader string
+}
+
+func NewConfigInCluster() (Config, error) {
+	// Create a config based off the expected config from within a pod.
+	namespaceBytes, err := loadPodSecret(namespaceSecret)
+	if err != nil {
+		return Config{}, errors.Wrap(err, "could not load namespace")
+	}
+	tokenBytes, err := loadPodSecret(tokenSecret)
+	if err != nil {
+		return Config{}, errors.Wrap(err, "could not load token")
+	}
+
+	caCert, err := loadPodSecret(caCertSecret)
+	if err != nil {
+		return Config{}, errors.Wrap(err, "could not load ca.crt")
+	}
+	// Construct TLSConfig from caCert
+	t := &tls.Config{}
+	caCertPool := x509.NewCertPool()
+	successful := caCertPool.AppendCertsFromPEM(caCert)
+	if !successful {
+		return Config{}, errors.New("failed to parse ca certificate as PEM encoded content")
+	}
+	t.RootCAs = caCertPool
+
+	config := Config{
+		URLs:      []string{"https://kubernetes"},
+		Namespace: string(namespaceBytes),
+		Token:     string(tokenBytes),
+		TLSConfig: t,
+	}
+	return config, nil
+}
+
+func NewInCluster() (Client, error) {
+	config, err := NewConfigInCluster()
+	if err != nil {
+		return nil, err
+	}
+	return New(config)
 }
 
 func New(c Config) (Client, error) {
@@ -51,9 +117,16 @@ func New(c Config) (Client, error) {
 		}
 		urls[i] = u
 	}
+	tr := &http.Transport{
+		TLSClientConfig: c.TLSConfig,
+	}
 	return &httpClient{
-		urls:   urls,
-		client: http.DefaultClient,
+		urls: urls,
+		client: &http.Client{
+			Transport: tr,
+		},
+		namespace:  c.Namespace,
+		authHeader: fmt.Sprintf("Bearer %s", c.Token),
 	}, nil
 }
 
@@ -69,6 +142,7 @@ func (c *httpClient) Do(r http.Request) (*http.Response, error) {
 	u := c.nextURL()
 	r.URL.Host = u.Host
 	r.URL.Scheme = u.Scheme
+	r.Header.Set("Authorization", c.authHeader)
 	resp, err := c.client.Do(&r)
 	return resp, errors.Wrap(err, "k8s client request failed")
 }
@@ -144,6 +218,13 @@ type Scales struct {
 }
 
 func (c *httpClient) Scales(namespace string) ScalesInterface {
+	if namespace == "" {
+		if c.namespace != "" {
+			namespace = c.namespace
+		} else {
+			namespace = NamespaceDefault
+		}
+	}
 	return Scales{c: c, namespace: namespace}
 }
 
