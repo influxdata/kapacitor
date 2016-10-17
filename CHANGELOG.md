@@ -54,7 +54,7 @@ Final release of v1.0.0.
 
 ### Features
 
-- [#827](https://github.com/influxdata/kapacitor/issues/827): Bring Kapacitor up to parody with available InfluxQL functions in 1.0
+- [#827](https://github.com/influxdata/kapacitor/issues/827): Bring Kapacitor up to parity with available InfluxQL functions in 1.0
 
 ### Bugfixes
 
