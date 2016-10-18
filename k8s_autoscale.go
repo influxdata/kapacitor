@@ -130,7 +130,7 @@ type event struct {
 }
 
 func (k *K8sAutoscaleNode) handlePoint(streamName string, group models.GroupID, dims models.Dimensions, t time.Time, fields models.Fields, tags models.Tags) (models.Point, error) {
-	namespace, kind, name, err := k.getResourceFromPoint(fields, tags)
+	namespace, kind, name, err := k.getResourceFromPoint(tags)
 	if err != nil {
 		return models.Point{}, err
 	}
@@ -243,30 +243,7 @@ func (k *K8sAutoscaleNode) handlePoint(streamName string, group models.GroupID, 
 	return p, nil
 }
 
-func (k *K8sAutoscaleNode) evalExpr(
-	current int,
-	group models.GroupID,
-	lambda *ast.LambdaNode,
-	expressionsMap map[models.GroupID]stateful.Expression,
-	pool stateful.ScopePool,
-	t time.Time,
-	fields models.Fields,
-	tags models.Tags,
-) (int, error) {
-	expr, ok := expressionsMap[group]
-	if !ok {
-		var err error
-		expr, err = stateful.NewExpression(lambda.Expression)
-		if err != nil {
-			return 0, err
-		}
-		expressionsMap[group] = expr
-	}
-	i, err := k.evalInt(int64(current), expr, pool, t, fields, tags)
-	return int(i), err
-}
-
-func (k *K8sAutoscaleNode) getResourceFromPoint(fields models.Fields, tags models.Tags) (namespace, kind, name string, err error) {
+func (k *K8sAutoscaleNode) getResourceFromPoint(tags models.Tags) (namespace, kind, name string, err error) {
 	// Get the name of the resource
 	switch {
 	case k.k.ResourceName != "":
@@ -312,6 +289,29 @@ func (k *K8sAutoscaleNode) applyEvent(e event) error {
 		return errors.Wrapf(err, "failed to update the scale for resource %s/%s/%s", e.Namespace, e.Kind, e.Name)
 	}
 	return nil
+}
+
+func (k *K8sAutoscaleNode) evalExpr(
+	current int,
+	group models.GroupID,
+	lambda *ast.LambdaNode,
+	expressionsMap map[models.GroupID]stateful.Expression,
+	pool stateful.ScopePool,
+	t time.Time,
+	fields models.Fields,
+	tags models.Tags,
+) (int, error) {
+	expr, ok := expressionsMap[group]
+	if !ok {
+		var err error
+		expr, err = stateful.NewExpression(lambda.Expression)
+		if err != nil {
+			return 0, err
+		}
+		expressionsMap[group] = expr
+	}
+	i, err := k.evalInt(int64(current), expr, pool, t, fields, tags)
+	return int(i), err
 }
 
 // evalInt - Evaluate a given expression as an int64 against a set of fields and tags.
