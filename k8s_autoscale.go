@@ -18,6 +18,7 @@ const (
 	statsK8sIncreaseEventsCount = "increase_events"
 	statsK8sDecreaseEventsCount = "decrease_events"
 	statsK8sErrorsCount         = "errors"
+	statsK8sCooldownDropsCount  = "cooldown_drops"
 )
 
 type K8sAutoscaleNode struct {
@@ -31,9 +32,10 @@ type K8sAutoscaleNode struct {
 
 	resourceStates map[string]resourceState
 
-	increaseCount *expvar.Int
-	decreaseCount *expvar.Int
-	errorsCount   *expvar.Int
+	increaseCount      *expvar.Int
+	decreaseCount      *expvar.Int
+	errorsCount        *expvar.Int
+	cooldownDropsCount *expvar.Int
 
 	min int
 	max int
@@ -69,10 +71,12 @@ func (k *K8sAutoscaleNode) runAutoscale([]byte) error {
 	k.increaseCount = &expvar.Int{}
 	k.decreaseCount = &expvar.Int{}
 	k.errorsCount = &expvar.Int{}
+	k.cooldownDropsCount = &expvar.Int{}
 
 	k.statMap.Set(statsK8sIncreaseEventsCount, k.increaseCount)
 	k.statMap.Set(statsK8sDecreaseEventsCount, k.decreaseCount)
 	k.statMap.Set(statsK8sErrorsCount, k.errorsCount)
+	k.statMap.Set(statsK8sCooldownDropsCount, k.cooldownDropsCount)
 
 	switch k.Wants() {
 	case pipeline.StreamEdge:
@@ -184,6 +188,7 @@ func (k *K8sAutoscaleNode) handlePoint(streamName string, group models.GroupID, 
 	case change > 0:
 		if t.Before(state.lastIncrease.Add(k.k.IncreaseCooldown)) {
 			// Still hot, nothing to do
+			k.cooldownDropsCount.Add(1)
 			return models.Point{}, nil
 		}
 		state.lastIncrease = t
@@ -191,6 +196,7 @@ func (k *K8sAutoscaleNode) handlePoint(streamName string, group models.GroupID, 
 	case change < 0:
 		if t.Before(state.lastDecrease.Add(k.k.DecreaseCooldown)) {
 			// Still hot, nothing to do
+			k.cooldownDropsCount.Add(1)
 			return models.Point{}, nil
 		}
 		state.lastDecrease = t

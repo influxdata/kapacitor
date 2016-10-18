@@ -73,6 +73,7 @@ const (
 //
 //    * increase_events -- number of times the replica count was increased.
 //    * decrease_events -- number of times the replica count was decreased.
+//    * cooldown_drops  -- number of times an event was dropped because of a cooldown timer.
 //    * errors          -- number of errors communicating with the Kubernetes API.
 //
 type K8sAutoscaleNode struct {
