@@ -1,6 +1,7 @@
 package client
 
 // Needed types from the package "k8s.io/client-go/1.4/pkg/..." can be simplified and copied here.
+// See https://github.com/kubernetes/client-go/blob/master/LICENSE for original license of some of this code.
 
 const (
 	// NamespaceDefault means the object is in the default namespace which is applied when not specified by clients
