@@ -1,0 +1,30 @@
+dbname
+rpname
+scale,deployment=serviceA replicas=1 0000000001
+dbname
+rpname
+scale,deployment=serviceB replicas=10 0000000001
+dbname
+rpname
+scale,deployment=serviceA replicas=2 0000000002
+dbname
+rpname
+scale,deployment=serviceB replicas=20 0000000002
+dbname
+rpname
+scale,deployment=serviceA replicas=-1 0000000003
+dbname
+rpname
+scale,deployment=serviceB replicas=0 0000000003
+dbname
+rpname
+scale,deployment=serviceA replicas=1000 0000000004
+dbname
+rpname
+scale,deployment=serviceB replicas=1000 0000000004
+dbname
+rpname
+scale,deployment=serviceA replicas=2 0000000005
+dbname
+rpname
+scale,deployment=serviceB replicas=20 0000000005

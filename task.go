@@ -490,6 +490,8 @@ func (et *ExecutingTask) createNode(p pipeline.Node, l *log.Logger) (n Node, err
 		n, err = newDeleteNode(et, t, l)
 	case *pipeline.CombineNode:
 		n, err = newCombineNode(et, t, l)
+	case *pipeline.K8sAutoscaleNode:
+		n, err = newK8sAutoscaleNode(et, t, l)
 	default:
 		return nil, fmt.Errorf("unknown pipeline node type %T", p)
 	}

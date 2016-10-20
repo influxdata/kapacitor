@@ -27,6 +27,7 @@ import (
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
+	k8s "github.com/influxdata/kapacitor/services/k8s/client"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/sensu"
@@ -87,7 +88,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Derivative", script, 15*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_Derivative", script, 15*time.Second, er, false, nil)
 }
 
 func TestStream_DerivativeZeroElapsed(t *testing.T) {
@@ -116,7 +117,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_DerivativeZeroElapsed", script, 15*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_DerivativeZeroElapsed", script, 15*time.Second, er, false, nil)
 }
 
 func TestStream_DerivativeUnit(t *testing.T) {
@@ -146,7 +147,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Derivative", script, 15*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_Derivative", script, 15*time.Second, er, false, nil)
 }
 
 func TestStream_DerivativeNN(t *testing.T) {
@@ -176,7 +177,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_DerivativeNN", script, 15*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_DerivativeNN", script, 15*time.Second, er, false, nil)
 }
 
 func TestStream_DerivativeN(t *testing.T) {
@@ -205,7 +206,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_DerivativeNN", script, 15*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_DerivativeNN", script, 15*time.Second, er, false, nil)
 }
 
 func TestStream_HoltWinters(t *testing.T) {
@@ -245,7 +246,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_HoltWinters", script, 15*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_HoltWinters", script, 15*time.Second, er, false, nil)
 }
 
 func TestStream_HoltWintersWithFit(t *testing.T) {
@@ -325,7 +326,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_HoltWinters", script, 15*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_HoltWinters", script, 15*time.Second, er, false, nil)
 }
 
 func TestStream_Elapsed(t *testing.T) {
@@ -355,7 +356,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Elapsed", script, 15*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_Elapsed", script, 15*time.Second, er, false, nil)
 }
 
 func TestStream_Difference(t *testing.T) {
@@ -385,7 +386,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Difference", script, 15*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_Difference", script, 15*time.Second, er, false, nil)
 }
 
 func TestStream_MovingAverage(t *testing.T) {
@@ -452,7 +453,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_MovingAverage", script, 16*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_MovingAverage", script, 16*time.Second, er, false, nil)
 }
 
 func TestStream_WindowMissing(t *testing.T) {
@@ -487,7 +488,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_WindowMissing", script, 13*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_WindowMissing", script, 13*time.Second, er, false, nil)
 }
 
 func TestStream_WindowMissingAligned(t *testing.T) {
@@ -523,7 +524,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_WindowMissing", script, 13*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_WindowMissing", script, 13*time.Second, er, false, nil)
 }
 
 func TestStream_Window(t *testing.T) {
@@ -577,7 +578,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Window", script, 13*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_Window", script, 13*time.Second, er, false, nil)
 }
 
 func TestStream_Shift(t *testing.T) {
@@ -629,7 +630,7 @@ past
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Shift", script, 15*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_Shift", script, 15*time.Second, er, false, nil)
 }
 
 func TestStream_ShiftBatch(t *testing.T) {
@@ -681,7 +682,7 @@ past
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Shift", script, 15*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_Shift", script, 15*time.Second, er, false, nil)
 }
 
 func TestStream_ShiftNegative(t *testing.T) {
@@ -733,7 +734,7 @@ past
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Shift", script, 15*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_Shift", script, 15*time.Second, er, false, nil)
 }
 
 func TestStream_ShiftBatchNegative(t *testing.T) {
@@ -785,7 +786,7 @@ past
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Shift", script, 15*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_Shift", script, 15*time.Second, er, false, nil)
 }
 
 func TestStream_SimpleMR(t *testing.T) {
@@ -815,7 +816,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_SimpleMR", script, 15*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_SimpleMR", script, 15*time.Second, er, false, nil)
 }
 
 func TestStream_Eval_AllTypes(t *testing.T) {
@@ -844,7 +845,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_EvalAllTypes", script, 2*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_EvalAllTypes", script, 2*time.Second, er, false, nil)
 }
 
 func TestStream_Eval_KeepAll(t *testing.T) {
@@ -874,7 +875,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Eval_Keep", script, 2*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_Eval_Keep", script, 2*time.Second, er, false, nil)
 }
 
 func TestStream_Eval_KeepSome(t *testing.T) {
@@ -903,7 +904,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Eval_Keep", script, 2*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_Eval_Keep", script, 2*time.Second, er, false, nil)
 }
 
 func TestStream_Eval_KeepSomeWithHidden(t *testing.T) {
@@ -931,7 +932,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Eval_Keep", script, 2*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_Eval_Keep", script, 2*time.Second, er, false, nil)
 }
 
 func TestStream_Eval_Tags(t *testing.T) {
@@ -966,7 +967,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Eval_Tags", script, 2*time.Second, er, nil, true)
+	testStreamerWithOutput(t, "TestStream_Eval_Tags", script, 2*time.Second, er, true, nil)
 }
 
 func TestStream_Eval_Tags_Keep(t *testing.T) {
@@ -1006,7 +1007,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Eval_Tags", script, 2*time.Second, er, nil, true)
+	testStreamerWithOutput(t, "TestStream_Eval_Tags", script, 2*time.Second, er, true, nil)
 }
 
 func TestStream_Eval_Tags_KeepSome(t *testing.T) {
@@ -1044,7 +1045,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Eval_Tags", script, 2*time.Second, er, nil, true)
+	testStreamerWithOutput(t, "TestStream_Eval_Tags", script, 2*time.Second, er, true, nil)
 }
 
 func TestStream_EvalGroups(t *testing.T) {
@@ -1084,7 +1085,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_EvalGroups", script, 3*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_EvalGroups", script, 3*time.Second, er, false, nil)
 }
 
 func TestStream_Eval_Time(t *testing.T) {
@@ -1125,7 +1126,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Eval_Time", script, 2*time.Hour, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_Eval_Time", script, 2*time.Hour, er, false, nil)
 }
 
 func TestStream_Default(t *testing.T) {
@@ -1157,7 +1158,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Default", script, 15*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_Default", script, 15*time.Second, er, false, nil)
 }
 
 func TestStream_Delete(t *testing.T) {
@@ -1203,7 +1204,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Delete", script, 15*time.Second, er, nil, true)
+	testStreamerWithOutput(t, "TestStream_Delete", script, 15*time.Second, er, true, nil)
 }
 
 func TestStream_Delete_GroupBy(t *testing.T) {
@@ -1254,7 +1255,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Delete_GroupBy", script, 15*time.Second, er, nil, true)
+	testStreamerWithOutput(t, "TestStream_Delete_GroupBy", script, 15*time.Second, er, true, nil)
 }
 
 func TestStream_AllMeasurements(t *testing.T) {
@@ -1282,7 +1283,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_AllMeasurements", script, 15*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_AllMeasurements", script, 15*time.Second, er, false, nil)
 }
 
 func TestStream_HttpOutPassThrough(t *testing.T) {
@@ -1313,7 +1314,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_SimpleMR", script, 15*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_SimpleMR", script, 15*time.Second, er, false, nil)
 }
 
 func TestStream_BatchGroupBy(t *testing.T) {
@@ -1361,7 +1362,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_BatchGroupBy", script, 15*time.Second, er, nil, true)
+	testStreamerWithOutput(t, "TestStream_BatchGroupBy", script, 15*time.Second, er, true, nil)
 }
 
 func TestStream_BatchGroupByAll(t *testing.T) {
@@ -1409,7 +1410,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_BatchGroupBy", script, 15*time.Second, er, nil, true)
+	testStreamerWithOutput(t, "TestStream_BatchGroupBy", script, 15*time.Second, er, true, nil)
 }
 
 func TestStream_SimpleWhere(t *testing.T) {
@@ -1442,7 +1443,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_SimpleMR", script, 15*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_SimpleMR", script, 15*time.Second, er, false, nil)
 }
 
 func TestStream_Where_NoSideEffect(t *testing.T) {
@@ -1480,7 +1481,7 @@ data
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_SimpleMR", script, 15*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_SimpleMR", script, 15*time.Second, er, false, nil)
 }
 
 func TestStream_VarWhereString(t *testing.T) {
@@ -1511,7 +1512,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_SimpleMR", script, 15*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_SimpleMR", script, 15*time.Second, er, false, nil)
 }
 
 func TestStream_VarWhereRegex(t *testing.T) {
@@ -1542,7 +1543,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_SimpleMR", script, 15*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_SimpleMR", script, 15*time.Second, er, false, nil)
 }
 
 func TestStream_GroupBy(t *testing.T) {
@@ -1591,7 +1592,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_GroupBy", script, 13*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_GroupBy", script, 13*time.Second, er, false, nil)
 }
 
 func TestStream_GroupByWhere(t *testing.T) {
@@ -1654,7 +1655,7 @@ byCpu
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_GroupByWhere", script, 13*time.Second, er, nil, true)
+	testStreamerWithOutput(t, "TestStream_GroupByWhere", script, 13*time.Second, er, true, nil)
 }
 
 func TestStream_GroupByMeasurement(t *testing.T) {
@@ -1712,7 +1713,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_GroupByMeasurement", script, 13*time.Second, er, nil, true)
+	testStreamerWithOutput(t, "TestStream_GroupByMeasurement", script, 13*time.Second, er, true, nil)
 }
 
 func TestStream_Flatten(t *testing.T) {
@@ -1760,7 +1761,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Flatten", script, 13*time.Second, er, nil, true)
+	testStreamerWithOutput(t, "TestStream_Flatten", script, 13*time.Second, er, true, nil)
 }
 
 func TestStream_Combine_All(t *testing.T) {
@@ -1838,7 +1839,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Combine", script, 13*time.Second, er, nil, true)
+	testStreamerWithOutput(t, "TestStream_Combine", script, 13*time.Second, er, true, nil)
 }
 
 func TestStream_Combine_Filtered(t *testing.T) {
@@ -1898,7 +1899,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Combine", script, 13*time.Second, er, nil, true)
+	testStreamerWithOutput(t, "TestStream_Combine", script, 13*time.Second, er, true, nil)
 }
 
 func TestStream_Combine_All_Triples(t *testing.T) {
@@ -1940,7 +1941,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Combine", script, 13*time.Second, er, nil, true)
+	testStreamerWithOutput(t, "TestStream_Combine", script, 13*time.Second, er, true, nil)
 }
 
 func TestStream_Join(t *testing.T) {
@@ -2014,7 +2015,7 @@ errorCounts
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Join", script, 13*time.Second, er, nil, true)
+	testStreamerWithOutput(t, "TestStream_Join", script, 13*time.Second, er, true, nil)
 }
 
 func TestStream_Join_Delimiter(t *testing.T) {
@@ -2089,7 +2090,7 @@ errorCounts
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Join", script, 13*time.Second, er, nil, true)
+	testStreamerWithOutput(t, "TestStream_Join", script, 13*time.Second, er, true, nil)
 }
 func TestStream_Join_DelimiterEmpty(t *testing.T) {
 
@@ -2163,7 +2164,7 @@ errorCounts
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Join", script, 13*time.Second, er, nil, true)
+	testStreamerWithOutput(t, "TestStream_Join", script, 13*time.Second, er, true, nil)
 }
 
 func TestStream_JoinTolerance(t *testing.T) {
@@ -2311,7 +2312,7 @@ errorCounts
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_JoinTolerance", script, 13*time.Second, er, nil, true)
+	testStreamerWithOutput(t, "TestStream_JoinTolerance", script, 13*time.Second, er, true, nil)
 }
 
 func TestStream_Join_Fill_Null(t *testing.T) {
@@ -2375,7 +2376,7 @@ errorCounts
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Join_Fill", script, 13*time.Second, er, nil, true)
+	testStreamerWithOutput(t, "TestStream_Join_Fill", script, 13*time.Second, er, true, nil)
 }
 
 func TestStream_Join_Fill_Num(t *testing.T) {
@@ -2436,7 +2437,7 @@ errorCounts
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Join_Fill", script, 13*time.Second, er, nil, true)
+	testStreamerWithOutput(t, "TestStream_Join_Fill", script, 13*time.Second, er, true, nil)
 }
 
 func TestStream_JoinN(t *testing.T) {
@@ -2481,7 +2482,7 @@ cpu
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_JoinN", script, 15*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_JoinN", script, 15*time.Second, er, false, nil)
 }
 
 func TestStream_JoinOn(t *testing.T) {
@@ -2599,7 +2600,7 @@ errorsByServiceGlobal
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_JoinOn", script, 13*time.Second, er, nil, true)
+	testStreamerWithOutput(t, "TestStream_JoinOn", script, 13*time.Second, er, true, nil)
 }
 
 func TestStream_JoinOnGap(t *testing.T) {
@@ -2783,7 +2784,7 @@ errorsByServiceGlobal
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_JoinOn", script, 13*time.Second, er, nil, true)
+	testStreamerWithOutput(t, "TestStream_JoinOn", script, 13*time.Second, er, true, nil)
 }
 
 func TestStream_JoinOn_AcrossMeasurement(t *testing.T) {
@@ -2858,7 +2859,7 @@ building
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_JoinOn_AcrossMeasurement", script, 13*time.Second, er, nil, true)
+	testStreamerWithOutput(t, "TestStream_JoinOn_AcrossMeasurement", script, 13*time.Second, er, true, nil)
 }
 
 func TestStream_JoinOn_Fill_Num(t *testing.T) {
@@ -2945,7 +2946,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_JoinOn_Fill", script, 13*time.Second, er, nil, true)
+	testStreamerWithOutput(t, "TestStream_JoinOn_Fill", script, 13*time.Second, er, true, nil)
 }
 
 func TestStream_JoinOn_Fill_Null(t *testing.T) {
@@ -3033,7 +3034,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_JoinOn_Fill", script, 13*time.Second, er, nil, true)
+	testStreamerWithOutput(t, "TestStream_JoinOn_Fill", script, 13*time.Second, er, true, nil)
 }
 
 func TestStream_Union(t *testing.T) {
@@ -3076,7 +3077,7 @@ cpuT
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Union", script, 15*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_Union", script, 15*time.Second, er, false, nil)
 }
 
 func TestStream_InfluxQL_Float(t *testing.T) {
@@ -3534,8 +3535,8 @@ stream
 			script.String(),
 			13*time.Second,
 			tc.ER,
-			nil,
 			false,
+			nil,
 		)
 	}
 }
@@ -3994,8 +3995,8 @@ stream
 			script.String(),
 			13*time.Second,
 			tc.ER,
-			nil,
 			false,
+			nil,
 		)
 	}
 }
@@ -4162,8 +4163,8 @@ stream
 			script.String(),
 			13*time.Second,
 			tc.ER,
-			nil,
 			false,
+			nil,
 		)
 	}
 }
@@ -4315,8 +4316,8 @@ stream
 			script.String(),
 			13*time.Second,
 			tc.ER,
-			nil,
 			false,
+			nil,
 		)
 	}
 }
@@ -4369,6 +4370,10 @@ stream
 			return nil, fmt.Errorf("unknown function %s", name)
 		}
 		return udf_test.New(uio, l), nil
+	}
+
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		tm.UDFService = udfService
 	}
 
 	done := make(chan struct{})
@@ -4475,7 +4480,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_CustomFunctions", script, 15*time.Second, er, udfService, false)
+	testStreamerWithOutput(t, "TestStream_CustomFunctions", script, 15*time.Second, er, false, tmInit)
 	<-done
 }
 
@@ -4562,7 +4567,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Alert", script, 13*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_Alert", script, 13*time.Second, er, false, nil)
 
 	if rc := atomic.LoadInt32(&requestCount); rc != 1 {
 		t.Errorf("got %v exp %v", rc, 1)
@@ -4749,7 +4754,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Alert_NoRecoveries", script, 13*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_Alert_NoRecoveries", script, 13*time.Second, er, false, nil)
 
 	if rc, exp := atomic.LoadInt32(&requestCount), int32(6); rc != exp {
 		t.Errorf("unexpected requestCount: got %v exp %v", rc, exp)
@@ -5087,7 +5092,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Alert_WithReset_0", script, 13*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_Alert_WithReset_0", script, 13*time.Second, er, false, nil)
 
 	if rc := atomic.LoadInt32(&requestCount); rc != 12 {
 		t.Errorf("got %v exp %v", rc, 1)
@@ -5491,7 +5496,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Alert_WithReset_1", script, 15*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_Alert_WithReset_1", script, 15*time.Second, er, false, nil)
 
 	if rc := atomic.LoadInt32(&requestCount); rc != 15 {
 		t.Errorf("got %v exp %v", rc, 1)
@@ -5663,7 +5668,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_AlertDuration", script, 13*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_AlertDuration", script, 13*time.Second, er, false, nil)
 
 	if exp, rc := 5, int(atomic.LoadInt32(&requestCount)); rc != exp {
 		t.Errorf("got %v exp %v", rc, exp)
@@ -6642,7 +6647,7 @@ stream
 		.post('` + ts.URL + `')
 `
 
-	testStreamerNoOutput(t, "TestStream_AlertSigma", script, 13*time.Second)
+	testStreamerNoOutput(t, "TestStream_AlertSigma", script, 13*time.Second, nil)
 
 	if rc := atomic.LoadInt32(&requestCount); rc != 2 {
 		t.Errorf("got %v exp %v", rc, 2)
@@ -6697,7 +6702,7 @@ stream
 		.post('` + ts.URL + `')
 `
 
-	testStreamerNoOutput(t, "TestStream_AlertComplexWhere", script, 13*time.Second)
+	testStreamerNoOutput(t, "TestStream_AlertComplexWhere", script, 13*time.Second, nil)
 
 	if rc := atomic.LoadInt32(&requestCount); rc != 1 {
 		t.Errorf("got %v exp %v", rc, 1)
@@ -6721,7 +6726,7 @@ stream
 		.post('` + ts.URL + `')
 `
 
-	testStreamerNoOutput(t, "TestStream_AlertStateChangesOnly", script, 13*time.Second)
+	testStreamerNoOutput(t, "TestStream_AlertStateChangesOnly", script, 13*time.Second, nil)
 
 	// Only 4 points below 93 so 8 state changes.
 	if rc := atomic.LoadInt32(&requestCount); rc != 8 {
@@ -6776,7 +6781,7 @@ stream
 		.post('` + ts.URL + `')
 `
 
-	testStreamerNoOutput(t, "TestStream_AlertStateChangesOnlyExpired", script, 13*time.Second)
+	testStreamerNoOutput(t, "TestStream_AlertStateChangesOnlyExpired", script, 13*time.Second, nil)
 
 	// 9 points below 97 once per second so 5 alerts + 1 recovery
 	if exp, rc := 6, int(atomic.LoadInt32(&requestCount)); rc != exp {
@@ -6805,11 +6810,192 @@ stream
 		.post('` + ts.URL + `')
 `
 
-	testStreamerNoOutput(t, "TestStream_AlertFlapping", script, 13*time.Second)
+	testStreamerNoOutput(t, "TestStream_AlertFlapping", script, 13*time.Second, nil)
 
 	// Flapping detection should drop the last alerts.
 	if rc := atomic.LoadInt32(&requestCount); rc != 9 {
 		t.Errorf("got %v exp %v", rc, 9)
+	}
+}
+
+func TestStream_K8sAutoscale(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('scale')
+		.groupBy('deployment')
+	|k8sAutoscale()
+		.resourceNameTag('deployment')
+		.replicas(lambda: int("replicas"))
+	|httpOut('TestStream_K8sAutoscale')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name: "scale",
+				Tags: map[string]string{
+					"deployment": "serviceA",
+					"namespace":  "default",
+					"kind":       "deployments",
+					"resource":   "serviceA",
+				},
+				Columns: []string{"time", "new", "old"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+					2.0,
+					1000.0,
+				}},
+			},
+			{
+				Name: "scale",
+				Tags: map[string]string{
+					"deployment": "serviceB",
+					"namespace":  "default",
+					"kind":       "deployments",
+					"resource":   "serviceB",
+				},
+				Columns: []string{"time", "new", "old"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+					20.0,
+					1000.0,
+				}},
+			},
+		},
+	}
+	scaleUpdates := make(chan k8s.Scale, 100)
+	k8sAutoscale := k8sAutoscale{}
+	k8sAutoscale.ScalesGetFunc = func(kind, name string) (*k8s.Scale, error) {
+		var replicas int32
+		switch name {
+		case "serviceA":
+			replicas = 1
+		case "serviceB":
+			replicas = 10
+		}
+		return &k8s.Scale{
+			ObjectMeta: k8s.ObjectMeta{
+				Name: name,
+			},
+			Spec: k8s.ScaleSpec{
+				Replicas: replicas,
+			},
+		}, nil
+	}
+	k8sAutoscale.ScalesUpdateFunc = func(kind string, scale *k8s.Scale) error {
+		scaleUpdates <- *scale
+		return nil
+	}
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		tm.K8sService = k8sAutoscale
+	}
+
+	testStreamerWithOutput(t, "TestStream_K8sAutoscale", script, 13*time.Second, er, false, tmInit)
+
+	close(scaleUpdates)
+	updatesByService := make(map[string][]int32)
+	for scale := range scaleUpdates {
+		updatesByService[scale.Name] = append(updatesByService[scale.Name], scale.Spec.Replicas)
+	}
+	expUpdates := map[string][]int32{
+		"serviceA": []int32{2, 1, 1000, 2},
+		"serviceB": []int32{20, 1, 1000, 20},
+	}
+
+	if !reflect.DeepEqual(updatesByService, expUpdates) {
+		t.Errorf("unexpected updates\ngot\n%v\nexp\n%v\n", updatesByService, expUpdates)
+	}
+}
+func TestStream_K8sAutoscale_MinMax(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('scale')
+		.groupBy('deployment')
+	|k8sAutoscale()
+		.min(3)
+		.max(500)
+		.resourceNameTag('deployment')
+		.replicas(lambda: int("replicas"))
+	|httpOut('TestStream_K8sAutoscale')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name: "scale",
+				Tags: map[string]string{
+					"deployment": "serviceA",
+					"namespace":  "default",
+					"kind":       "deployments",
+					"resource":   "serviceA",
+				},
+				Columns: []string{"time", "new", "old"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+					3.0,
+					500.0,
+				}},
+			},
+			{
+				Name: "scale",
+				Tags: map[string]string{
+					"deployment": "serviceB",
+					"namespace":  "default",
+					"kind":       "deployments",
+					"resource":   "serviceB",
+				},
+				Columns: []string{"time", "new", "old"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+					20.0,
+					500.0,
+				}},
+			},
+		},
+	}
+	scaleUpdates := make(chan k8s.Scale, 100)
+	k8sAutoscale := k8sAutoscale{}
+	k8sAutoscale.ScalesGetFunc = func(kind, name string) (*k8s.Scale, error) {
+		var replicas int32
+		switch name {
+		case "serviceA":
+			replicas = 1
+		case "serviceB":
+			replicas = 10
+		}
+		return &k8s.Scale{
+			ObjectMeta: k8s.ObjectMeta{
+				Name: name,
+			},
+			Spec: k8s.ScaleSpec{
+				Replicas: replicas,
+			},
+		}, nil
+	}
+	k8sAutoscale.ScalesUpdateFunc = func(kind string, scale *k8s.Scale) error {
+		scaleUpdates <- *scale
+		return nil
+	}
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		tm.K8sService = k8sAutoscale
+	}
+
+	testStreamerWithOutput(t, "TestStream_K8sAutoscale", script, 13*time.Second, er, false, tmInit)
+
+	close(scaleUpdates)
+	updatesByService := make(map[string][]int32)
+	for scale := range scaleUpdates {
+		updatesByService[scale.Name] = append(updatesByService[scale.Name], scale.Spec.Replicas)
+	}
+	expUpdates := map[string][]int32{
+		"serviceA": []int32{3, 500, 3},
+		"serviceB": []int32{20, 3, 500, 20},
+	}
+
+	if !reflect.DeepEqual(updatesByService, expUpdates) {
+		t.Errorf("unexpected updates\ngot\n%v\nexp\n%v\n", updatesByService, expUpdates)
 	}
 }
 
@@ -6861,58 +7047,10 @@ stream
 		done <- err
 	}))
 
-	name := "TestStream_InfluxDBOut"
-
-	// Create a new execution env
-	tm := kapacitor.NewTaskMaster("testStreamer", logService)
-	tm.HTTPDService = httpService
-	tm.TaskStore = taskStore{}
-	tm.DeadmanService = deadman{}
-	tm.InfluxDBService = influxdb
-	tm.Open()
-
-	//Create the task
-	task, err := tm.NewTask(name, script, kapacitor.StreamTask, dbrps, 0, nil)
-	if err != nil {
-		t.Fatal(err)
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		tm.InfluxDBService = influxdb
 	}
-
-	// Load test data
-	dir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	data, err := os.Open(path.Join(dir, "data", name+".srpl"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	//Start the task
-	et, err := tm.StartTask(task)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Replay test data to executor
-	stream, err := tm.Stream(name)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Use 1971 so that we don't get true negatives on Epoch 0 collisions
-	c := clock.New(time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC))
-
-	replayErr := kapacitor.ReplayStreamFromIO(c, data, stream, false, "s")
-
-	t.Log(string(et.Task.Dot()))
-	defer tm.Close()
-
-	if err := fastForwardTask(c, et, replayErr, tm, 15*time.Second); err != nil {
-		t.Error(err)
-	}
-
-	// Wait till we received a request
-	if e := <-done; e != nil {
-		t.Error(e)
-	}
+	testStreamerNoOutput(t, "TestStream_InfluxDBOut", script, 15*time.Second, tmInit)
 
 	if database != "db" {
 		t.Errorf("got %v exp %v", database, "db")
@@ -7092,11 +7230,10 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Selectors", script, 15*time.Second, er, nil, false)
+	testStreamerWithOutput(t, "TestStream_Selectors", script, 15*time.Second, er, false, nil)
 }
 
 func TestStream_TopSelector(t *testing.T) {
-
 	var script = `
 var topScores = stream
     |from()
@@ -7222,7 +7359,7 @@ func testStreamer(
 	t *testing.T,
 	name,
 	script string,
-	udfService kapacitor.UDFService,
+	tmInit func(tm *kapacitor.TaskMaster),
 ) (
 	clock.Setter,
 	*kapacitor.ExecutingTask,
@@ -7238,9 +7375,11 @@ func testStreamer(
 	// Create a new execution env
 	tm := kapacitor.NewTaskMaster("testStreamer", logService)
 	tm.HTTPDService = httpService
-	tm.UDFService = udfService
 	tm.TaskStore = taskStore{}
 	tm.DeadmanService = deadman{}
+	if tmInit != nil {
+		tmInit(tm)
+	}
 	tm.Open()
 
 	//Create the task
@@ -7305,8 +7444,9 @@ func testStreamerNoOutput(
 	name,
 	script string,
 	duration time.Duration,
+	tmInit func(tm *kapacitor.TaskMaster),
 ) {
-	clock, et, replayErr, tm := testStreamer(t, name, script, nil)
+	clock, et, replayErr, tm := testStreamer(t, name, script, tmInit)
 	err := fastForwardTask(clock, et, replayErr, tm, duration)
 	if err != nil {
 		t.Error(err)
@@ -7320,10 +7460,10 @@ func testStreamerWithOutput(
 	script string,
 	duration time.Duration,
 	er kapacitor.Result,
-	udfService kapacitor.UDFService,
 	ignoreOrder bool,
+	tmInit func(tm *kapacitor.TaskMaster),
 ) {
-	clock, et, replayErr, tm := testStreamer(t, name, script, udfService)
+	clock, et, replayErr, tm := testStreamer(t, name, script, tmInit)
 	err := fastForwardTask(clock, et, replayErr, tm, duration)
 	if err != nil {
 		t.Error(err)
