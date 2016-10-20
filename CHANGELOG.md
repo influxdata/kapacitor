@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.0.3 [unreleased]
+
+### Release Notes
+
+### Features
+
+### Bugfixes
+
+- [#980](https://github.com/influxdata/kapacitor/pull/980): Upgrade to using go 1.7
+
+
 ## v1.0.2 [2016-10-06]
 
 ### Release Notes
