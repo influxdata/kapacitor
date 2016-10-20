@@ -1,0 +1,11 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/eapache/go-xerial-snappy.git
+	branch = master
+	commit = bb955e01b9346ac19dc29eb16586c90ded99a98c
+	parent = 4808e2d4c82f64d4ec9877010e69c4d4b8874591
+	cmdver = 0.3.0

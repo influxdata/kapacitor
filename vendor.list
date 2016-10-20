@@ -18,8 +18,20 @@ github.com/shurcooL/markdownfmt
 github.com/shurcooL/sanitized_anchor_name
 github.com/twinj/uuid
 golang.org/x/crypto master
+github.com/Shopify/sarama
+# Start Shopify/saram deps
+github.com/davecgh/go-spew
+github.com/eapache/go-resiliency
+github.com/eapache/go-xerial-snappy
+# go-xerial-snappy dep
+github.com/golang/snappy
+github.com/eapache/queue
+github.com/klauspost/crc32
+github.com/rcrowley/go-metrics
+# End Shopify/saram deps
 gopkg.in/gomail.v2
 # Generate deps
 github.com/benbjohnson/tmpl
 # Testing deps
 github.com/stretchr/testify
+

@@ -1,0 +1,11 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/rcrowley/go-metrics.git
+	branch = master
+	commit = ab2277b1c5d15c3cba104e9cbddbdfc622df5ad8
+	parent = a9e859adc72b755706ce0edd87b36ec0bde8db02
+	cmdver = 0.3.0

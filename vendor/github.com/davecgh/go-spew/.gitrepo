@@ -1,0 +1,11 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/davecgh/go-spew.git
+	branch = master
+	commit = 6d212800a42e8ab5c146b8ace3490ee17e5225f9
+	parent = 5d767d798a81f9fd734c24f3439e29e06400e501
+	cmdver = 0.3.0

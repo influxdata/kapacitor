@@ -1,0 +1,11 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/Shopify/sarama.git
+	branch = master
+	commit = af0513c4d97979eb876d201391fac6475ec08268
+	parent = 946ecac5c4fd672926e2e1181b352acde9e3eb6d
+	cmdver = 0.3.0
