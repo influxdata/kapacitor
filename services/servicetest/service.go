@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -15,8 +16,8 @@ import (
 )
 
 const (
-	testPath         = "/servicetests"
-	testPathAnchored = "/servicetests/"
+	testPath         = "/service-tests"
+	testPathAnchored = "/service-tests/"
 	basePath         = httpd.BasePath + testPathAnchored
 )
 
@@ -123,13 +124,19 @@ func (s *Service) handleListTests(w http.ResponseWriter, r *http.Request) {
 	tests := ServiceTests{
 		Link: serviceTestsLink,
 	}
+	pattern := r.URL.Query().Get("pattern")
 	for name, test := range s.testers {
-		options := test.TestOptions()
-		tests.Services = append(tests.Services, ServiceTest{
-			Link:    s.serviceTestLink(name),
-			Name:    name,
-			Options: options,
-		})
+		if ok, err := filepath.Match(pattern, name); err != nil {
+			httpd.HttpError(w, fmt.Sprintf("bad pattern: %v", err), true, http.StatusBadRequest)
+			return
+		} else if ok {
+			options := test.TestOptions()
+			tests.Services = append(tests.Services, ServiceTest{
+				Link:    s.serviceTestLink(name),
+				Name:    name,
+				Options: options,
+			})
+		}
 	}
 	sort.Sort(tests.Services)
 

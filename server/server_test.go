@@ -5995,15 +5995,15 @@ func TestServer_UpdateConfig(t *testing.T) {
 func TestServer_ServiceTests(t *testing.T) {
 	s, cli := OpenDefaultServer()
 	defer s.Close()
-	serviceTests, err := cli.ServiceTests()
+	serviceTests, err := cli.ListServiceTests(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	expServiceTests := client.ServiceTests{
-		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/servicetests"},
+		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests"},
 		Services: []client.ServiceTest{
 			{
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/servicetests/alerta"},
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/alerta"},
 				Name: "alerta",
 				Options: client.ServiceTestOptions{
 					"resource":    "testResource",
@@ -6021,7 +6021,7 @@ func TestServer_ServiceTests(t *testing.T) {
 				},
 			},
 			{
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/servicetests/hipchat"},
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/hipchat"},
 				Name: "hipchat",
 				Options: client.ServiceTestOptions{
 					"room":    "",
@@ -6030,19 +6030,19 @@ func TestServer_ServiceTests(t *testing.T) {
 				},
 			},
 			{
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/servicetests/influxdb"},
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/influxdb"},
 				Name: "influxdb",
 				Options: client.ServiceTestOptions{
 					"cluster": "",
 				},
 			},
 			{
-				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1/servicetests/kubernetes"},
+				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/kubernetes"},
 				Name:    "kubernetes",
 				Options: nil,
 			},
 			{
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/servicetests/opsgenie"},
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/opsgenie"},
 				Name: "opsgenie",
 				Options: client.ServiceTestOptions{
 					"teams":        nil,
@@ -6053,7 +6053,7 @@ func TestServer_ServiceTests(t *testing.T) {
 				},
 			},
 			{
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/servicetests/pagerduty"},
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/pagerduty"},
 				Name: "pagerduty",
 				Options: client.ServiceTestOptions{
 					"incident-key": "testIncidentKey",
@@ -6062,7 +6062,7 @@ func TestServer_ServiceTests(t *testing.T) {
 				},
 			},
 			{
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/servicetests/sensu"},
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/sensu"},
 				Name: "sensu",
 				Options: client.ServiceTestOptions{
 					"name":   "testName",
@@ -6071,7 +6071,7 @@ func TestServer_ServiceTests(t *testing.T) {
 				},
 			},
 			{
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/servicetests/slack"},
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/slack"},
 				Name: "slack",
 				Options: client.ServiceTestOptions{
 					"channel": "",
@@ -6080,7 +6080,7 @@ func TestServer_ServiceTests(t *testing.T) {
 				},
 			},
 			{
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/servicetests/smtp"},
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/smtp"},
 				Name: "smtp",
 				Options: client.ServiceTestOptions{
 					"to":      nil,
@@ -6089,7 +6089,7 @@ func TestServer_ServiceTests(t *testing.T) {
 				},
 			},
 			{
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/servicetests/talk"},
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/talk"},
 				Name: "talk",
 				Options: client.ServiceTestOptions{
 					"title": "testTitle",
@@ -6097,7 +6097,7 @@ func TestServer_ServiceTests(t *testing.T) {
 				},
 			},
 			{
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/servicetests/telegram"},
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/telegram"},
 				Name: "telegram",
 				Options: client.ServiceTestOptions{
 					"chat-id":                  "",
@@ -6108,7 +6108,7 @@ func TestServer_ServiceTests(t *testing.T) {
 				},
 			},
 			{
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/servicetests/victorops"},
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/victorops"},
 				Name: "victorops",
 				Options: client.ServiceTestOptions{
 					"routingKey":  "",

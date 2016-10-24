@@ -40,7 +40,7 @@ const (
 	replayBatchPath  = basePath + "/replays/batch"
 	replayQueryPath  = basePath + "/replays/query"
 	configPath       = basePath + "/config"
-	serviceTestsPath = basePath + "/servicetests"
+	serviceTestsPath = basePath + "/service-tests"
 )
 
 // HTTP configuration for connecting to Kapacitor
@@ -1650,10 +1650,29 @@ type ServiceTestResult struct {
 	Message string `json:"message"`
 }
 
+type ListServiceTestsOptions struct {
+	Pattern string
+}
+
+func (o *ListServiceTestsOptions) Default() {
+}
+
+func (o *ListServiceTestsOptions) Values() *url.Values {
+	v := &url.Values{}
+	v.Set("pattern", o.Pattern)
+	return v
+}
+
 // ServiceTests returns the list of services available for testing.
-func (c *Client) ServiceTests() (ServiceTests, error) {
+func (c *Client) ListServiceTests(opt *ListServiceTestsOptions) (ServiceTests, error) {
+	if opt == nil {
+		opt = new(ListServiceTestsOptions)
+	}
+	opt.Default()
+
 	u := *c.url
 	u.Path = serviceTestsPath
+	u.RawQuery = opt.Values().Encode()
 
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {

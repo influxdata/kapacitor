@@ -232,7 +232,7 @@ func Test_ReportsErrors(t *testing.T) {
 		{
 			name: "ServiceTests",
 			fnc: func(c *client.Client) error {
-				_, err := c.ServiceTests()
+				_, err := c.ListServiceTests(nil)
 				return err
 			},
 		},
@@ -2227,20 +2227,20 @@ func Test_ConfigSection(t *testing.T) {
 }
 func Test_ServiceTests(t *testing.T) {
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/kapacitor/v1/servicetests" && r.Method == "GET" {
+		if r.URL.Path == "/kapacitor/v1/service-tests" && r.Method == "GET" {
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, `{
-	"link": {"rel":"self", "href": "/kapacitor/v1/servicetests"},
+	"link": {"rel":"self", "href": "/kapacitor/v1/service-tests"},
 	"services" : [
 		{
-			"link": {"rel":"self", "href": "/kapacitor/v1/servicetests/influxdb"},
+			"link": {"rel":"self", "href": "/kapacitor/v1/service-tests/influxdb"},
 			"name": "influxdb",
 			"options": {
 				"cluster": ""
 			}
 		},
 		{
-			"link": {"rel":"self", "href": "/kapacitor/v1/servicetests/slack"},
+			"link": {"rel":"self", "href": "/kapacitor/v1/service-tests/slack"},
 			"name": "slack",
 			"options": {
 				"message": "test slack message",
@@ -2249,7 +2249,7 @@ func Test_ServiceTests(t *testing.T) {
 			}
 		},
 		{
-			"link": {"rel":"self", "href": "/kapacitor/v1/servicetests/smtp"},
+			"link": {"rel":"self", "href": "/kapacitor/v1/service-tests/smtp"},
 			"name": "smtp",
 			"options": {
 				"to": ["user@example.com"],
@@ -2269,22 +2269,22 @@ func Test_ServiceTests(t *testing.T) {
 	}
 	defer s.Close()
 
-	serviceTests, err := c.ServiceTests()
+	serviceTests, err := c.ListServiceTests(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	exp := client.ServiceTests{
-		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/servicetests"},
+		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests"},
 		Services: []client.ServiceTest{
 			{
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/servicetests/influxdb"},
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/influxdb"},
 				Name: "influxdb",
 				Options: map[string]interface{}{
 					"cluster": "",
 				},
 			},
 			{
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/servicetests/slack"},
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/slack"},
 				Name: "slack",
 				Options: map[string]interface{}{
 					"message": "test slack message",
@@ -2293,7 +2293,7 @@ func Test_ServiceTests(t *testing.T) {
 				},
 			},
 			{
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/servicetests/smtp"},
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/smtp"},
 				Name: "smtp",
 				Options: map[string]interface{}{
 					"to":      []interface{}{"user@example.com"},
@@ -2309,10 +2309,10 @@ func Test_ServiceTests(t *testing.T) {
 }
 func Test_ServiceTest(t *testing.T) {
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/kapacitor/v1/servicetests/slack" && r.Method == "GET" {
+		if r.URL.Path == "/kapacitor/v1/service-tests/slack" && r.Method == "GET" {
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, `{
-	"link": {"rel":"self", "href": "/kapacitor/v1/servicetests/slack"},
+	"link": {"rel":"self", "href": "/kapacitor/v1/service-tests/slack"},
 	"name": "slack",
 	"options": {
 		"message": "test slack message",
@@ -2335,7 +2335,7 @@ func Test_ServiceTest(t *testing.T) {
 		t.Fatal(err)
 	}
 	exp := client.ServiceTest{
-		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/servicetests/slack"},
+		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/slack"},
 		Name: "slack",
 		Options: map[string]interface{}{
 			"message": "test slack message",
@@ -2356,7 +2356,7 @@ func Test_DoServiceTest(t *testing.T) {
 			"channel": "@test_user",
 		}
 
-		if r.URL.Path == "/kapacitor/v1/servicetests/slack" &&
+		if r.URL.Path == "/kapacitor/v1/service-tests/slack" &&
 			r.Method == "POST" &&
 			reflect.DeepEqual(expOptions, options) {
 			w.WriteHeader(http.StatusOK)

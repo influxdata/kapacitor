@@ -1710,25 +1710,29 @@ The following API endpoints provide way for a user to run simple tests to ensure
 
 A list of services that can be tested is available at the `/kapacitor/v1/tests` endpoint
 
+| Query Parameter | Default    | Purpose                                                                                                                                                               |
+| --------------- | -------    | -------                                                                                                                                                               |
+| pattern         |            | Filter results based on the pattern. Uses standard shell glob matching on the service name, see [this](https://golang.org/pkg/path/filepath/#Match) for more details. |
+
 #### Example
 
 ```
-GET /kapacitor/v1/servicetests
+GET /kapacitor/v1/service-tests
 ```
 
 ```
 {
-    "link": {"rel":"self", "href": "/kapacitor/v1/servicetests"},
+    "link": {"rel":"self", "href": "/kapacitor/v1/service-tests"},
     "services" : [
         {
-            "link": {"rel":"self", "href": "/kapacitor/v1/servicetests/influxdb"},
+            "link": {"rel":"self", "href": "/kapacitor/v1/service-tests/influxdb"},
             "name": "influxdb",
             "options": {
                 "cluster": ""
             }
         },
         {
-            "link": {"rel":"self", "href": "/kapacitor/v1/servicetests/slack"},
+            "link": {"rel":"self", "href": "/kapacitor/v1/service-tests/slack"},
             "name": "slack",
             "options": {
                 "message": "test slack message",
@@ -1737,7 +1741,7 @@ GET /kapacitor/v1/servicetests
             }
         },
         {
-            "link": {"rel":"self", "href": "/kapacitor/v1/servicetests/smtp"},
+            "link": {"rel":"self", "href": "/kapacitor/v1/service-tests/smtp"},
             "name": "smtp",
             "options": {
                 "to": ["user@example.com"],
@@ -1758,7 +1762,7 @@ GET /kapacitor/v1/servicetests
 
 ### Testing a service
 
-To test a service make a POST request to the `/kapacitor/v1/servicetests/<service name>` endpoint.
+To test a service make a POST request to the `/kapacitor/v1/service-tests/<service name>` endpoint.
 The contents of the POST body depend on the service in test.
 To determine the available options use a GET request to the same endpoint.
 The returned options are also the defaults.
@@ -1767,12 +1771,12 @@ The returned options are also the defaults.
 
 See available/default options for the slack service:
 ```
-GET /kapacitor/v1/servicetests/slack
+GET /kapacitor/v1/service-tests/slack
 ```
 
 ```json
 {
-    "link": {"rel":"self", "href": "/kapacitor/v1/servicetests/slack"},
+    "link": {"rel":"self", "href": "/kapacitor/v1/service-tests/slack"},
     "name": "slack"
     "options": {
         "message": "test slack message",
@@ -1785,7 +1789,7 @@ GET /kapacitor/v1/servicetests/slack
 Test the slack service integration using custom options:
 
 ```
-POST /kapacitor/v1/servicetests/slack
+POST /kapacitor/v1/service-tests/slack
 {
     "message": "my custom test message",
     "channel": "@user",

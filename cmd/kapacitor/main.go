@@ -178,6 +178,9 @@ func main() {
 	case "vars":
 		commandArgs = args
 		commandF = doVars
+	case "service-test":
+		commandArgs = args
+		commandF = doServiceTest
 	default:
 		fmt.Fprintln(os.Stderr, "Unknown command", command)
 		usage()
@@ -264,6 +267,8 @@ func doHelp(args []string) error {
 		case "version":
 			versionUsage()
 		case "vars":
+			varsUsage()
+		case "service-test":
 			varsUsage()
 		default:
 			fmt.Fprintln(os.Stderr, "Unknown command", command)
@@ -1719,5 +1724,46 @@ func doVars(args []string) error {
 	}
 	defer r.Body.Close()
 	io.Copy(os.Stdout, r.Body)
+	return nil
+}
+
+// Service-Test
+func serviceTestUsage() {
+	var u = `Usage: kapacitor service-test <service name...>
+
+	Perform the service test using defaults.
+	The service name can be a glob style pattern.
+`
+	fmt.Fprintln(os.Stderr, u)
+}
+
+func doServiceTest(args []string) error {
+	if len(args) == 0 {
+		return errors.New("must provide at least one service name or pattern.")
+	}
+	var services []client.ServiceTest
+	for _, nameOrPattern := range args {
+		s, err := cli.ListServiceTests(&client.ListServiceTestsOptions{
+			Pattern: nameOrPattern,
+		})
+		if err != nil {
+			return err
+		}
+		services = append(services, s.Services...)
+	}
+	results := make([]client.ServiceTestResult, len(services))
+	for i, s := range services {
+		tr, err := cli.DoServiceTest(s.Link, nil)
+		if err != nil {
+			return err
+		}
+		results[i] = tr
+	}
+	outFmt := "%-20s%-10v%s\n"
+	fmt.Printf(outFmt, "Service", "Success", "Message")
+	for i, s := range services {
+		tr := results[i]
+		fmt.Printf(outFmt, s.Name, tr.Success, tr.Message)
+	}
 	return nil
 }
