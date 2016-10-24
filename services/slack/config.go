@@ -3,6 +3,7 @@ package slack
 import (
 	"net/url"
 
+	"github.com/influxdata/kapacitor"
 	"github.com/pkg/errors"
 )
 
@@ -13,6 +14,9 @@ type Config struct {
 	URL string `toml:"url" override:"url,redact"`
 	// The default channel, can be overridden per alert.
 	Channel string `toml:"channel" override:"channel"`
+	// The username of the Slack bot.
+	// Default: kapacitor
+	Username string `toml:"username" override:"username"`
 	// IconEmoji uses an emoji instead of the normal icon for the message.
 	// The contents should be the name of an emoji surrounded with ':', i.e. ':chart_with_upwards_trend:'
 	IconEmoji string `toml:"icon-emoji" override:"icon-emoji"`
@@ -24,7 +28,9 @@ type Config struct {
 }
 
 func NewConfig() Config {
-	return Config{}
+	return Config{
+		Username: kapacitor.Product,
+	}
 }
 
 func (c Config) Validate() error {

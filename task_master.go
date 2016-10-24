@@ -80,7 +80,7 @@ type TaskMaster struct {
 	SlackService interface {
 		Global() bool
 		StateChangesOnly() bool
-		Alert(channel, message, iconEmoji string, level AlertLevel) error
+		Alert(channel, message, username, iconEmoji string, level AlertLevel) error
 	}
 	TelegramService interface {
 		Global() bool

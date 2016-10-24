@@ -72,6 +72,7 @@ type testOptions struct {
 	Channel   string               `json:"channel"`
 	Message   string               `json:"message"`
 	Level     kapacitor.AlertLevel `json:"level"`
+	Username  string               `json:"username"`
 	IconEmoji string               `json:"icon-emoji"`
 }
 
@@ -89,11 +90,11 @@ func (s *Service) Test(options interface{}) error {
 	if !ok {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
-	return s.Alert(o.Channel, o.Message, o.IconEmoji, o.Level)
+	return s.Alert(o.Channel, o.Message, o.Username, o.IconEmoji, o.Level)
 }
 
-func (s *Service) Alert(channel, message, iconEmoji string, level kapacitor.AlertLevel) error {
-	url, post, err := s.preparePost(channel, message, iconEmoji, level)
+func (s *Service) Alert(channel, message, username, iconEmoji string, level kapacitor.AlertLevel) error {
+	url, post, err := s.preparePost(channel, message, username, iconEmoji, level)
 	if err != nil {
 		return err
 	}
@@ -119,7 +120,7 @@ func (s *Service) Alert(channel, message, iconEmoji string, level kapacitor.Aler
 	return nil
 }
 
-func (s *Service) preparePost(channel, message, iconEmoji string, level kapacitor.AlertLevel) (string, io.Reader, error) {
+func (s *Service) preparePost(channel, message, username, iconEmoji string, level kapacitor.AlertLevel) (string, io.Reader, error) {
 	c := s.config()
 
 	if !c.Enabled {
@@ -143,16 +144,20 @@ func (s *Service) preparePost(channel, message, iconEmoji string, level kapacito
 		Color:    color,
 	}
 	postData := make(map[string]interface{})
+	postData["as_user"] = false
 	postData["channel"] = channel
-	postData["username"] = kapacitor.Product
 	postData["text"] = ""
 	postData["attachments"] = []attachment{a}
-	emoji := c.IconEmoji
-	if iconEmoji != "" {
-		emoji = iconEmoji
+
+	if username == "" {
+		username = c.Username
 	}
-	postData["as_user"] = emoji != ""
-	postData["icon_emoji"] = emoji
+	postData["username"] = username
+
+	if iconEmoji == "" {
+		iconEmoji = c.IconEmoji
+	}
+	postData["icon_emoji"] = iconEmoji
 
 	var post bytes.Buffer
 	enc := json.NewEncoder(&post)
