@@ -29,8 +29,7 @@ stream
 
 
 New API endpoints have been added to be able to configure InfluxDB clusters and alert handlers dynamically without needing to restart the Kapacitor daemon.
-Along with the ability to dynamcially configure a service, API endpoints have been added to test the services.
-Together these addition allow you to configure and validate your configurations are functional.
+Along with the ability to dynamcially configure a service, API endpoints have been added to test the configurable services.
 See the API docs for more details.
 
 ### Features
