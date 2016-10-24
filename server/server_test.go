@@ -5992,7 +5992,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 		}
 	}
 }
-func TestServer_ServiceTests(t *testing.T) {
+func TestServer_ListServiceTests(t *testing.T) {
 	s, cli := OpenDefaultServer()
 	defer s.Close()
 	serviceTests, err := cli.ListServiceTests(nil)
@@ -6115,6 +6115,62 @@ func TestServer_ServiceTests(t *testing.T) {
 					"messageType": "CRITICAL",
 					"message":     "test victorops message",
 					"entityID":    "testEntityID",
+				},
+			},
+		},
+	}
+	if got, exp := serviceTests.Link.Href, expServiceTests.Link.Href; got != exp {
+		t.Errorf("unexpected service tests link.href: got %s exp %s", got, exp)
+	}
+	if got, exp := len(serviceTests.Services), len(expServiceTests.Services); got != exp {
+		t.Fatalf("unexpected length of services: got %d exp %d", got, exp)
+	}
+	for i := range expServiceTests.Services {
+		exp := expServiceTests.Services[i]
+		got := serviceTests.Services[i]
+		if !reflect.DeepEqual(got, exp) {
+			t.Errorf("unexpected server test %s:\ngot\n%#v\nexp\n%#v\n", exp.Name, got, exp)
+		}
+	}
+}
+
+func TestServer_ListServiceTests_WithPattern(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+	serviceTests, err := cli.ListServiceTests(&client.ListServiceTestsOptions{
+		Pattern: "s*",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expServiceTests := client.ServiceTests{
+		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests"},
+		Services: []client.ServiceTest{
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/sensu"},
+				Name: "sensu",
+				Options: client.ServiceTestOptions{
+					"name":   "testName",
+					"output": "testOutput",
+					"level":  "CRITICAL",
+				},
+			},
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/slack"},
+				Name: "slack",
+				Options: client.ServiceTestOptions{
+					"channel": "",
+					"message": "test slack message",
+					"level":   "CRITICAL",
+				},
+			},
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/smtp"},
+				Name: "smtp",
+				Options: client.ServiceTestOptions{
+					"to":      nil,
+					"subject": "test subject",
+					"body":    "test body",
 				},
 			},
 		},
