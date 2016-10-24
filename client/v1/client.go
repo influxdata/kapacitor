@@ -1655,6 +1655,9 @@ type ListServiceTestsOptions struct {
 }
 
 func (o *ListServiceTestsOptions) Default() {
+	if o.Pattern == "" {
+		o.Pattern = "*"
+	}
 }
 
 func (o *ListServiceTestsOptions) Values() *url.Values {

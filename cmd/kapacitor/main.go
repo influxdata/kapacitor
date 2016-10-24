@@ -61,7 +61,7 @@ Commands:
 	stats           Display various stats about Kapacitor.
 	version         Displays the Kapacitor version info.
 	vars            Print debug vars in JSON format.
-	service-test    Test a service.
+	service-tests   Test a service.
 	help            Prints help for a command.
 
 Options:
@@ -178,7 +178,7 @@ func main() {
 	case "vars":
 		commandArgs = args
 		commandF = doVars
-	case "service-test":
+	case "service-tests":
 		commandArgs = args
 		commandF = doServiceTest
 	default:
@@ -268,7 +268,7 @@ func doHelp(args []string) error {
 			versionUsage()
 		case "vars":
 			varsUsage()
-		case "service-test":
+		case "service-tests":
 			varsUsage()
 		default:
 			fmt.Fprintln(os.Stderr, "Unknown command", command)
@@ -1484,8 +1484,23 @@ func doList(args []string) error {
 				offset += limit
 			}
 		}
+	case "service-tests":
+		outFmt := "%s\n"
+		fmt.Fprintf(os.Stdout, outFmt, "Service Name")
+		for _, pattern := range patterns {
+			serviceTests, err := cli.ListServiceTests(&client.ListServiceTestsOptions{
+				Pattern: pattern,
+			})
+			if err != nil {
+				return err
+			}
+
+			for _, s := range serviceTests.Services {
+				fmt.Fprintf(os.Stdout, outFmt, s.Name)
+			}
+		}
 	default:
-		return fmt.Errorf("cannot list '%s' did you mean 'tasks', 'recordings' or 'replays'?", kind)
+		return fmt.Errorf("cannot list '%s' did you mean 'tasks', 'recordings', 'replays' or 'service-tests'?", kind)
 	}
 	return nil
 
@@ -1729,7 +1744,7 @@ func doVars(args []string) error {
 
 // Service-Test
 func serviceTestUsage() {
-	var u = `Usage: kapacitor service-test <service name...>
+	var u = `Usage: kapacitor service-tests <service name...>
 
 	Perform the service test using defaults.
 	The service name can be a glob style pattern.
@@ -1760,10 +1775,10 @@ func doServiceTest(args []string) error {
 		results[i] = tr
 	}
 	outFmt := "%-20s%-10v%s\n"
-	fmt.Printf(outFmt, "Service", "Success", "Message")
+	fmt.Fprintf(os.Stdout, outFmt, "Service", "Success", "Message")
 	for i, s := range services {
 		tr := results[i]
-		fmt.Printf(outFmt, s.Name, tr.Success, tr.Message)
+		fmt.Fprintf(os.Stdout, outFmt, s.Name, tr.Success, tr.Message)
 	}
 	return nil
 }

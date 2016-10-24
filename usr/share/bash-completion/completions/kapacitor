@@ -48,7 +48,7 @@ _kapacitor()
                         words=$(_kapacitor_dbrps)
                         ;;
                     -tick)
-			_kapacitor_tick_files "${cur}"
+                        _kapacitor_tick_files "${cur}"
                         ;;
                     -type)
                         words='batch stream'
@@ -57,7 +57,7 @@ _kapacitor()
                         words=$(_kapacitor_list templates "$cur")
                         ;;
                     -vars)
-			_kapacitor_json_files "${cur}"
+                        _kapacitor_json_files "${cur}"
                         ;;
                     *)
                         words='-dbrp -no-reload -tick -type -template -vars'
@@ -72,7 +72,7 @@ _kapacitor()
             else
                 case "$prev" in
                     -tick)
-			_kapacitor_tick_files "${cur}"
+                        _kapacitor_tick_files "${cur}"
                         ;;
                     -type)
                         words='batch stream'
@@ -143,13 +143,16 @@ _kapacitor()
         disable)
             words=$(_kapacitor_list_filtered tasks "$cur" "\$3 == \"enabled\"")
             ;;
+        service-tests)
+            words=$(_kapacitor_list service-tests "$cur")
+            ;;
         delete|list)
             case "${COMP_WORDS[2]}" in
-                tasks|templates|recordings|replays)
+                tasks|templates|recordings|replays|service-tests)
                     words=$(_kapacitor_list "${COMP_WORDS[2]}" "$cur")
                     ;;
                 *)
-                    words='tasks templates recordings replays'
+                    words='tasks templates recordings replays service-tests'
                     ;;
             esac
             ;;
@@ -170,7 +173,7 @@ _kapacitor()
             ;;
         *)
             words='record define define-template replay replay-live enable disable \
-                reload delete list show show-template level stats version vars help'
+                reload delete list show show-template level stats version vars service-tests help'
             ;;
     esac
     if [ -z "$COMPREPLY" ]
@@ -183,34 +186,34 @@ _kapacitor()
 
 _kapacitor_files_add_postfix()
 {
-	#Add a slash (directories) or space (files except directories) after name
-	local c i=0
-	for c in "${COMPREPLY[@]}"; do
-		if [ -d "${c}" ]; then
-			COMPREPLY[i++]="${c}/";
-		else
-			COMPREPLY[i++]="${c} ";
-		fi
-	done
-        compopt -o nospace
+    #Add a slash (directories) or space (files except directories) after name
+    local c i=0
+    for c in "${COMPREPLY[@]}"; do
+        if [ -d "${c}" ]; then
+            COMPREPLY[i++]="${c}/";
+        else
+            COMPREPLY[i++]="${c} ";
+        fi
+    done
+    compopt -o nospace
 }
 
 _kapacitor_tick_files()
 {
-	local didi cur="$1"
-        COMPREPLY=($(compgen -o filenames -f -X '!*.tick' -- "$cur") )
-        didi=$(compgen -d -- "$cur")
-        COMPREPLY=(${COMPREPLY[@]:-} $didi )
-	_kapacitor_files_add_postfix
+    local didi cur="$1"
+    COMPREPLY=($(compgen -o filenames -f -X '!*.tick' -- "$cur") )
+    didi=$(compgen -d -- "$cur")
+    COMPREPLY=(${COMPREPLY[@]:-} $didi )
+    _kapacitor_files_add_postfix
 }
 
 _kapacitor_json_files()
 {
-	local didi cur="$1"
-        COMPREPLY=($(compgen -o filenames -f -X '!*.json' -- "$cur") )
-        didi=$(compgen -d -- "$cur")
-        COMPREPLY=(${COMPREPLY[@]:-} $didi )
-	_kapacitor_files_add_postfix
+    local didi cur="$1"
+    COMPREPLY=($(compgen -o filenames -f -X '!*.json' -- "$cur") )
+    didi=$(compgen -d -- "$cur")
+    COMPREPLY=(${COMPREPLY[@]:-} $didi )
+    _kapacitor_files_add_postfix
 }
 
 _kapacitor_list()
