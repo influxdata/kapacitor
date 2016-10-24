@@ -1708,11 +1708,12 @@ The following API endpoints provide way for a user to run simple tests to ensure
 
 ### Listing testable services
 
-A list of services that can be tested is available at the `/kapacitor/v1/tests` endpoint
+A list of services that can be tested is available at the `/kapacitor/v1/service-tests` endpoint
 
-| Query Parameter | Default    | Purpose                                                                                                                                                               |
-| --------------- | -------    | -------                                                                                                                                                               |
-| pattern         |            | Filter results based on the pattern. Uses standard shell glob matching on the service name, see [this](https://golang.org/pkg/path/filepath/#Match) for more details. |
+| Query Parameter | Default | Purpose                                                                                                                                                               |
+| --------------- | ------- | -------                                                                                                                                                               |
+| pattern         | *       | Filter results based on the pattern. Uses standard shell glob matching on the service name, see [this](https://golang.org/pkg/path/filepath/#Match) for more details. |
+
 
 #### Example
 
@@ -1770,6 +1771,7 @@ The returned options are also the defaults.
 #### Example
 
 See available/default options for the slack service:
+
 ```
 GET /kapacitor/v1/service-tests/slack
 ```
