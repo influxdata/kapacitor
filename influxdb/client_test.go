@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 )
 
 func TestClient_Query(t *testing.T) {
@@ -18,9 +17,8 @@ func TestClient_Query(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	config := HTTPConfig{URL: ts.URL}
+	config := Config{URLs: []string{ts.URL}}
 	c, _ := NewHTTPClient(config)
-	defer c.Close()
 
 	query := Query{}
 	_, err := c.Query(query)
@@ -48,9 +46,8 @@ func TestClient_BasicAuth(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	config := HTTPConfig{URL: ts.URL, Credentials: &Credentials{Method: UserAuthentication, Username: "username", Password: "password"}}
+	config := Config{URLs: []string{ts.URL}, Credentials: Credentials{Method: UserAuthentication, Username: "username", Password: "password"}}
 	c, _ := NewHTTPClient(config)
-	defer c.Close()
 
 	query := Query{}
 	_, err := c.Query(query)
@@ -67,11 +64,41 @@ func TestClient_Ping(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	config := HTTPConfig{URL: ts.URL}
+	config := Config{URLs: []string{ts.URL}}
 	c, _ := NewHTTPClient(config)
-	defer c.Close()
 
-	_, _, err := c.Ping(0)
+	_, _, err := c.Ping(nil)
+	if err != nil {
+		t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
+	}
+}
+
+func TestClient_Update(t *testing.T) {
+	ts0 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var data Response
+		w.WriteHeader(http.StatusNoContent)
+		_ = json.NewEncoder(w).Encode(data)
+	}))
+	defer ts0.Close()
+
+	config := Config{URLs: []string{ts0.URL}}
+	c, _ := NewHTTPClient(config)
+
+	_, _, err := c.Ping(nil)
+	if err != nil {
+		t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
+	}
+
+	ts1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var data Response
+		w.WriteHeader(http.StatusNoContent)
+		_ = json.NewEncoder(w).Encode(data)
+	}))
+	defer ts1.Close()
+	config.URLs = []string{ts1.URL}
+	c.Update(config)
+
+	_, _, err = c.Ping(nil)
 	if err != nil {
 		t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
 	}
@@ -84,9 +111,8 @@ func TestClient_Concurrent_Use(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	config := HTTPConfig{URL: ts.URL}
+	config := Config{URLs: []string{ts.URL}}
 	c, _ := NewHTTPClient(config)
-	defer c.Close()
 
 	var wg sync.WaitGroup
 	wg.Add(3)
@@ -119,7 +145,7 @@ func TestClient_Concurrent_Use(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < n; i++ {
-			c.Ping(time.Second)
+			c.Ping(nil)
 		}
 	}()
 	wg.Wait()
@@ -133,9 +159,8 @@ func TestClient_Write(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	config := HTTPConfig{URL: ts.URL}
+	config := Config{URLs: []string{ts.URL}}
 	c, _ := NewHTTPClient(config)
-	defer c.Close()
 
 	bp, err := NewBatchPoints(BatchPointsConfig{})
 	if err != nil {
@@ -179,9 +204,8 @@ func TestClient_UserAgent(t *testing.T) {
 	for _, test := range tests {
 		var err error
 
-		config := HTTPConfig{URL: ts.URL, UserAgent: test.userAgent}
+		config := Config{URLs: []string{ts.URL}, UserAgent: test.userAgent}
 		c, _ := NewHTTPClient(config)
-		defer c.Close()
 
 		receivedUserAgent = ""
 		code = http.StatusOK
@@ -207,7 +231,7 @@ func TestClient_UserAgent(t *testing.T) {
 
 		receivedUserAgent = ""
 		code = http.StatusNoContent
-		_, _, err = c.Ping(0)
+		_, _, err = c.Ping(nil)
 		if err != nil {
 			t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
 		}

@@ -4,8 +4,8 @@
 ; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
 ;
 [subrepo]
-	remote = http://github.com/BurntSushi/toml.git
+	remote = https://github.com/BurntSushi/toml.git
 	branch = datetimes
-	commit = f0aeabca5a127c4078abb8c8d64298b147264b55
-	parent = db57a2908e5de95a495f97d92e09d628d33d2071
+	commit = 99064174e013895bbd9b025c31100bd1d9b590ca
+	parent = 7ec19ba5a215ea26dbb5717e7543acf1815ffbfa
 	cmdver = 0.3.0

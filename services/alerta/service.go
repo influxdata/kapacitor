@@ -5,28 +5,26 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
+	"path"
+	"sync/atomic"
 )
 
 type Service struct {
-	url         string
-	token       string
-	environment string
-	origin      string
+	configValue atomic.Value
 	logger      *log.Logger
 }
 
 func NewService(c Config, l *log.Logger) *Service {
-	return &Service{
-		url:         c.URL,
-		token:       c.Token,
-		environment: c.Environment,
-		origin:      c.Origin,
-		logger:      l,
+	s := &Service{
+		logger: l,
 	}
+	s.configValue.Store(c)
+	return s
 }
 
 func (s *Service) Open() error {
@@ -37,51 +35,30 @@ func (s *Service) Close() error {
 	return nil
 }
 
+func (s *Service) config() Config {
+	return s.configValue.Load().(Config)
+}
+
+func (s *Service) Update(newConfig []interface{}) error {
+	if l := len(newConfig); l != 1 {
+		return fmt.Errorf("expected only one new config object, got %d", l)
+	}
+	if c, ok := newConfig[0].(Config); !ok {
+		return fmt.Errorf("expected config object to be of type %T, got %T", c, newConfig[0])
+	} else {
+		s.configValue.Store(c)
+	}
+	return nil
+}
+
 func (s *Service) Alert(token, resource, event, environment, severity, group, value, message, origin string, service []string, data interface{}) error {
 	if resource == "" || event == "" {
 		return errors.New("Resource and Event are required to send an alert")
 	}
 
-	if token == "" {
-		token = s.token
-	}
+	url, post, err := s.preparePost(token, resource, event, environment, severity, group, value, message, origin, service, data)
 
-	if environment == "" {
-		environment = s.environment
-	}
-
-	if origin == "" {
-		origin = s.origin
-	}
-
-	var Url *url.URL
-	Url, err := url.Parse(s.url + "/alert?api-key=" + token)
-	if err != nil {
-		return err
-	}
-
-	postData := make(map[string]interface{})
-	postData["resource"] = resource
-	postData["event"] = event
-	postData["environment"] = environment
-	postData["severity"] = severity
-	postData["group"] = group
-	postData["value"] = value
-	postData["text"] = message
-	postData["origin"] = origin
-	postData["rawData"] = data
-	if len(service) > 0 {
-		postData["service"] = service
-	}
-
-	var post bytes.Buffer
-	enc := json.NewEncoder(&post)
-	err = enc.Encode(postData)
-	if err != nil {
-		return err
-	}
-
-	resp, err := http.Post(Url.String(), "application/json", &post)
+	resp, err := http.Post(url, "application/json", post)
 	if err != nil {
 		return err
 	}
@@ -101,4 +78,56 @@ func (s *Service) Alert(token, resource, event, environment, severity, group, va
 		return errors.New(r.Message)
 	}
 	return nil
+}
+
+func (s *Service) preparePost(token, resource, event, environment, severity, group, value, message, origin string, service []string, data interface{}) (string, io.Reader, error) {
+	c := s.config()
+
+	if !c.Enabled {
+		return "", nil, errors.New("service is not enabled")
+	}
+
+	if token == "" {
+		token = c.Token
+	}
+
+	if environment == "" {
+		environment = c.Environment
+	}
+
+	if origin == "" {
+		origin = c.Origin
+	}
+
+	u, err := url.Parse(c.URL)
+	if err != nil {
+		return "", nil, err
+	}
+	u.Path = path.Join(u.Path, "alert")
+	v := url.Values{}
+	v.Set("api-key", token)
+	u.RawQuery = v.Encode()
+
+	postData := make(map[string]interface{})
+	postData["resource"] = resource
+	postData["event"] = event
+	postData["environment"] = environment
+	postData["severity"] = severity
+	postData["group"] = group
+	postData["value"] = value
+	postData["text"] = message
+	postData["origin"] = origin
+	postData["rawData"] = data
+	if len(service) > 0 {
+		postData["service"] = service
+	}
+
+	var post bytes.Buffer
+	enc := json.NewEncoder(&post)
+	err = enc.Encode(postData)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return u.String(), &post, nil
 }

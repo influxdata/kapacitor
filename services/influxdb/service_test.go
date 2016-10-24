@@ -1,6 +1,7 @@
 package influxdb_test
 
 import (
+	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -79,6 +80,10 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 		NoPassword    bool
 		WrongCluster  bool
 	}
+	type partialConfig struct {
+		configSubs   map[string][]string
+		configExSubs map[string][]string
+	}
 	testCases := map[string]struct {
 		useTokens bool
 
@@ -90,6 +95,9 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 		grantedTokens []tokenGrant
 		revokedTokens []string
 		subChanged    subChanged
+
+		// apply new config between rounds
+		partialConfigs map[string]partialConfig
 
 		// Second round
 		secondClusters      map[string]clusterInfo
@@ -742,16 +750,92 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 				rp:    "rpA",
 			}},
 		},
+		"ConfigChange_NewSubs": {
+			clusters: map[string]clusterInfo{
+				testClusterName: {
+					dbrps: map[string][]string{
+						"db1": []string{"rpA", "rpB"},
+						"db2": []string{"rpC", "rpD"},
+					},
+					subs: map[string][]string{
+						"db1": []string{"rpA", "rpB"},
+						"db2": []string{"rpC", "rpD"},
+					},
+				},
+			},
+			secondClusters: map[string]clusterInfo{
+				testClusterName: {
+					dbrps: map[string][]string{
+						"db1": []string{"rpA", "rpB"},
+						"db2": []string{"rpC", "rpD"},
+					},
+					subs: map[string][]string{
+						"db1": []string{"rpA", "rpB"},
+						"db2": []string{"rpC", "rpD"},
+					},
+				},
+			},
+			partialConfigs: map[string]partialConfig{
+				testClusterName: {
+					configSubs: map[string][]string{
+						"db1": {"rpA"},
+					},
+				},
+			},
+			secondDropSubs: []string{
+				`DROP SUBSCRIPTION "` + testSubName + `" ON db1.rpB`,
+				`DROP SUBSCRIPTION "` + testSubName + `" ON db2.rpC`,
+				`DROP SUBSCRIPTION "` + testSubName + `" ON db2.rpD`,
+			},
+		},
+		"ConfigChange_NewExcludes": {
+			clusters: map[string]clusterInfo{
+				testClusterName: {
+					dbrps: map[string][]string{
+						"db1": []string{"rpA", "rpB"},
+						"db2": []string{"rpC", "rpD"},
+					},
+					subs: map[string][]string{
+						"db1": []string{"rpA", "rpB"},
+						"db2": []string{"rpC", "rpD"},
+					},
+				}},
+			secondClusters: map[string]clusterInfo{
+				testClusterName: {
+					dbrps: map[string][]string{
+						"db1": []string{"rpA", "rpB"},
+						"db2": []string{"rpC", "rpD"},
+					},
+					subs: map[string][]string{
+						"db1": []string{"rpA", "rpB"},
+						"db2": []string{"rpC", "rpD"},
+					},
+				}},
+			partialConfigs: map[string]partialConfig{
+				testClusterName: {
+					configExSubs: map[string][]string{
+						"db1": {"rpA"},
+					},
+				},
+			},
+			secondDropSubs: []string{
+				`DROP SUBSCRIPTION "` + testSubName + `" ON db1.rpA`,
+			},
+		},
 	}
 	for testName, tc := range testCases {
 		t.Log("starting test:", testName)
 		log.Println("starting test:", testName)
 		clusterNames := make([]string, 0, len(tc.clusters))
+		clusterNameLookup := make(map[string]int, len(tc.clusters))
+		i := 0
 		for clusterName := range tc.clusters {
 			clusterNames = append(clusterNames, clusterName)
+			clusterNameLookup[clusterName] = i
+			i++
 		}
-		c := NewDefaultTestConfigs(clusterNames)
-		s, as, cs := NewTestService(c, "localhost", tc.useTokens)
+		defaultConfigs := NewDefaultTestConfigs(clusterNames)
+		s, as, cs := NewTestService(defaultConfigs, "localhost", tc.useTokens)
 
 		// Define the active vars
 		var activeClusters map[string]clusterInfo
@@ -900,13 +984,15 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 		dropSubs = make(map[string]bool)
 		grantedTokens = make(map[tokenGrant]bool)
 		revokedTokens = make(map[string]bool)
+
+		log.Println("D! first round")
 		if err := s.Open(); err != nil {
 			t.Fatal(err)
 		}
 		defer s.Close()
 		validate(
 			t,
-			testName,
+			testName+"-1",
 			tc.createSubs,
 			tc.dropSubs,
 			tc.grantedTokens,
@@ -926,11 +1012,24 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 		grantedTokens = make(map[tokenGrant]bool)
 		revokedTokens = make(map[string]bool)
 
+		log.Println("D! second round")
+		if len(tc.partialConfigs) > 0 {
+			configs := make([]interface{}, 0, len(tc.partialConfigs))
+			for name, pc := range tc.partialConfigs {
+				c := defaultConfigs[clusterNameLookup[name]]
+				c.Subscriptions = pc.configSubs
+				c.ExcludedSubscriptions = pc.configExSubs
+				configs = append(configs, c)
+			}
+			if err := s.Update(configs); err != nil {
+				t.Fatal(err)
+			}
+		}
 		s.LinkSubscriptions()
 
 		validate(
 			t,
-			testName,
+			testName+"-2",
 			tc.secondCreateSubs,
 			tc.secondDropSubs,
 			tc.secondGrantedTokens,
@@ -1058,7 +1157,10 @@ func NewDefaultTestConfigs(clusters []string) []influxdb.Config {
 func NewTestService(configs []influxdb.Config, hostname string, useTokens bool) (*influxdb.Service, *authService, *clientCreator) {
 	httpPort := 9092
 	l := ls.NewLogger("[test-influxdb] ", log.LstdFlags)
-	s := influxdb.NewService(configs, 0, httpPort, hostname, useTokens, l)
+	s, err := influxdb.NewService(configs, httpPort, hostname, useTokens, l)
+	if err != nil {
+		panic(err)
+	}
 	s.LogService = ls
 	s.HTTPDService = httpdService{}
 	as := &authService{}
@@ -1096,42 +1198,42 @@ func (a *authService) RevokeSubscriptionAccess(token string) error {
 
 type clientCreator struct {
 	// Index for the order the client was created, matches the order clusters are created.
-	CreateFunc func(influxcli.HTTPConfig) (influxcli.Client, error)
+	CreateFunc func(influxcli.Config) (influxcli.ClientUpdater, error)
 
 	// Cient functions passed down to any created client
-	PingFunc  func(timeout time.Duration) (time.Duration, string, error)
-	WriteFunc func(bp influxcli.BatchPoints) error
-	QueryFunc func(clusterName string, q influxcli.Query) (*influxcli.Response, error)
-	CloseFunc func() error
+	PingFunc   func(ctx context.Context) (time.Duration, string, error)
+	WriteFunc  func(bp influxcli.BatchPoints) error
+	QueryFunc  func(clusterName string, q influxcli.Query) (*influxcli.Response, error)
+	UpdateFunc func(influxcli.Config) error
 }
 
-func (c *clientCreator) Create(config influxcli.HTTPConfig) (influxcli.Client, error) {
+func (c *clientCreator) Create(config influxcli.Config) (influxcli.ClientUpdater, error) {
 	if c.CreateFunc != nil {
 		return c.CreateFunc(config)
 	}
 	// Retrieve cluster name from URL
-	u, _ := url.Parse(config.URL)
+	u, _ := url.Parse(config.URLs[0])
 	cli := influxDBClient{
 		clusterName: u.Host,
 		PingFunc:    c.PingFunc,
 		WriteFunc:   c.WriteFunc,
 		QueryFunc:   c.QueryFunc,
-		CloseFunc:   c.CloseFunc,
+		UpdateFunc:  c.UpdateFunc,
 	}
 	return cli, nil
 }
 
 type influxDBClient struct {
 	clusterName string
-	PingFunc    func(timeout time.Duration) (time.Duration, string, error)
+	PingFunc    func(ctx context.Context) (time.Duration, string, error)
 	WriteFunc   func(bp influxcli.BatchPoints) error
 	QueryFunc   func(clusterName string, q influxcli.Query) (*influxcli.Response, error)
-	CloseFunc   func() error
+	UpdateFunc  func(influxcli.Config) error
 }
 
-func (c influxDBClient) Ping(timeout time.Duration) (time.Duration, string, error) {
+func (c influxDBClient) Ping(ctx context.Context) (time.Duration, string, error) {
 	if c.PingFunc != nil {
-		return c.PingFunc(timeout)
+		return c.PingFunc(ctx)
 	}
 	return 0, "testversion", nil
 }
@@ -1147,9 +1249,9 @@ func (c influxDBClient) Query(q influxcli.Query) (*influxcli.Response, error) {
 	}
 	return &influxcli.Response{}, nil
 }
-func (c influxDBClient) Close() error {
-	if c.CloseFunc != nil {
-		return c.CloseFunc()
+func (c influxDBClient) Update(config influxcli.Config) error {
+	if c.UpdateFunc != nil {
+		return c.UpdateFunc(config)
 	}
 	return nil
 }

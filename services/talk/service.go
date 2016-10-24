@@ -5,23 +5,24 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"sync/atomic"
 )
 
 type Service struct {
-	url        string
-	authorName string
-	logger     *log.Logger
+	configValue atomic.Value
+	logger      *log.Logger
 }
 
 func NewService(c Config, l *log.Logger) *Service {
-	return &Service{
-		url:        c.URL,
-		authorName: c.AuthorName,
-		logger:     l,
+	s := &Service{
+		logger: l,
 	}
+	s.configValue.Store(c)
+	return s
 }
 
 func (s *Service) Open() error {
@@ -32,20 +33,28 @@ func (s *Service) Close() error {
 	return nil
 }
 
-func (s *Service) Alert(title, text string) error {
-	postData := make(map[string]interface{})
-	postData["title"] = title
-	postData["text"] = text
-	postData["authorName"] = s.authorName
+func (s *Service) config() Config {
+	return s.configValue.Load().(Config)
+}
 
-	var post bytes.Buffer
-	enc := json.NewEncoder(&post)
-	err := enc.Encode(postData)
+func (s *Service) Update(newConfig []interface{}) error {
+	if l := len(newConfig); l != 1 {
+		return fmt.Errorf("expected only one new config object, got %d", l)
+	}
+	if c, ok := newConfig[0].(Config); !ok {
+		return fmt.Errorf("expected config object to be of type %T, got %T", c, newConfig[0])
+	} else {
+		s.configValue.Store(c)
+	}
+	return nil
+}
+
+func (s *Service) Alert(title, text string) error {
+	url, post, err := s.preparePost(title, text)
 	if err != nil {
 		return err
 	}
-
-	resp, err := http.Post(s.url, "application/json", &post)
+	resp, err := http.Post(url, "application/json", post)
 	if err != nil {
 		return err
 	}
@@ -64,4 +73,25 @@ func (s *Service) Alert(title, text string) error {
 		return errors.New(r.Error)
 	}
 	return nil
+}
+
+func (s *Service) preparePost(title, text string) (string, io.Reader, error) {
+	c := s.config()
+
+	if !c.Enabled {
+		return "", nil, errors.New("service is not enabled")
+	}
+	postData := make(map[string]interface{})
+	postData["title"] = title
+	postData["text"] = text
+	postData["authorName"] = c.AuthorName
+
+	var post bytes.Buffer
+	enc := json.NewEncoder(&post)
+	err := enc.Encode(postData)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return c.URL, &post, nil
 }

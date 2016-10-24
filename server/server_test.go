@@ -25,7 +25,12 @@ import (
 	"github.com/influxdata/influxdb/toml"
 	"github.com/influxdata/kapacitor/client/v1"
 	"github.com/influxdata/kapacitor/server"
+	"github.com/influxdata/kapacitor/services/opsgenie"
+	"github.com/influxdata/kapacitor/services/pagerduty"
+	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/udf"
+	"github.com/influxdata/kapacitor/services/victorops"
+	"github.com/pkg/errors"
 )
 
 var udfDir string
@@ -2486,6 +2491,156 @@ func TestServer_BatchTask(t *testing.T) {
 		}
 	}
 }
+func TestServer_BatchTask_InfluxDBConfigUpdate(t *testing.T) {
+	c := NewConfig()
+	c.InfluxDB[0].Enabled = true
+	count := 0
+	stopTimeC := make(chan time.Time, 1)
+
+	badCount := 0
+
+	dbBad := NewInfluxDB(func(q string) *iclient.Response {
+		badCount++
+		// Return empty results
+		return &iclient.Response{
+			Results: []iclient.Result{},
+		}
+	})
+	defer dbBad.Close()
+	db := NewInfluxDB(func(q string) *iclient.Response {
+		stmt, err := influxql.ParseStatement(q)
+		if err != nil {
+			return &iclient.Response{Err: err.Error()}
+		}
+		slct, ok := stmt.(*influxql.SelectStatement)
+		if !ok {
+			return nil
+		}
+		cond, ok := slct.Condition.(*influxql.BinaryExpr)
+		if !ok {
+			return &iclient.Response{Err: "expected select condition to be binary expression"}
+		}
+		stopTimeExpr, ok := cond.RHS.(*influxql.BinaryExpr)
+		if !ok {
+			return &iclient.Response{Err: "expected select condition rhs to be binary expression"}
+		}
+		stopTL, ok := stopTimeExpr.RHS.(*influxql.StringLiteral)
+		if !ok {
+			return &iclient.Response{Err: "expected select condition rhs to be string literal"}
+		}
+		count++
+		switch count {
+		case 1:
+			stopTime, err := time.Parse(time.RFC3339Nano, stopTL.Val)
+			if err != nil {
+				return &iclient.Response{Err: err.Error()}
+			}
+			stopTimeC <- stopTime
+			return &iclient.Response{
+				Results: []iclient.Result{{
+					Series: []models.Row{{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{
+							{
+								stopTime.Add(-2 * time.Millisecond).Format(time.RFC3339Nano),
+								1.0,
+							},
+							{
+								stopTime.Add(-1 * time.Millisecond).Format(time.RFC3339Nano),
+								1.0,
+							},
+						},
+					}},
+				}},
+			}
+		default:
+			return &iclient.Response{
+				Results: []iclient.Result{{
+					Series: []models.Row{{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values:  [][]interface{}{},
+					}},
+				}},
+			}
+		}
+	})
+	defer db.Close()
+
+	// Set bad URL first
+	c.InfluxDB[0].URLs = []string{dbBad.URL()}
+	s := OpenServer(c)
+	defer s.Close()
+	cli := Client(s)
+
+	id := "testBatchTask"
+	ttype := client.BatchTask
+	dbrps := []client.DBRP{{
+		Database:        "mydb",
+		RetentionPolicy: "myrp",
+	}}
+	tick := `batch
+    |query('SELECT value from mydb.myrp.cpu')
+        .period(5ms)
+        .every(5ms)
+        .align()
+    |count('value')
+    |where(lambda: "count" == 2)
+    |httpOut('count')
+`
+
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+		Status: client.Enabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Update InfluxDB config, while task is running
+	influxdbDefault := cli.ConfigElementLink("influxdb", "default")
+	if err := cli.ConfigUpdate(influxdbDefault, client.ConfigUpdateAction{
+		Set: map[string]interface{}{
+			"urls": []string{db.URL()},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), id)
+	timeout := time.NewTicker(100 * time.Millisecond)
+	defer timeout.Stop()
+	select {
+	case <-timeout.C:
+		t.Fatal("timedout waiting for query")
+	case stopTime := <-stopTimeC:
+		exp := fmt.Sprintf(`{"series":[{"name":"cpu","columns":["time","count"],"values":[["%s",2]]}]}`, stopTime.Local().Format(time.RFC3339Nano))
+		err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
+		if err != nil {
+			t.Error(err)
+		}
+		_, err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+			Status: client.Disabled,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if badCount == 0 {
+		t.Error("expected bad influxdb to be queried at least once")
+	}
+}
 
 func TestServer_InvalidBatchTask(t *testing.T) {
 	c := NewConfig()
@@ -4629,6 +4784,1211 @@ func TestServer_CreateReplay_ValidIDs(t *testing.T) {
 
 		if exp, got := id, replay.ID; got != exp {
 			t.Errorf("unexpected replay ID got %s exp %s", got, exp)
+		}
+	}
+}
+
+func TestServer_UpdateConfig(t *testing.T) {
+	type updateAction struct {
+		element      string
+		updateAction client.ConfigUpdateAction
+		expSection   client.ConfigSection
+		expElement   client.ConfigElement
+	}
+	db := NewInfluxDB(func(q string) *iclient.Response {
+		return &iclient.Response{}
+	})
+	testCases := []struct {
+		section           string
+		element           string
+		setDefaults       func(*server.Config)
+		expDefaultSection client.ConfigSection
+		expDefaultElement client.ConfigElement
+		updates           []updateAction
+	}{
+		{
+			section: "influxdb",
+			element: "default",
+			setDefaults: func(c *server.Config) {
+				c.InfluxDB[0].Enabled = true
+				c.InfluxDB[0].Username = "bob"
+				c.InfluxDB[0].Password = "secret"
+				c.InfluxDB[0].URLs = []string{db.URL()}
+				// Set really long timeout since we shouldn't hit it
+				c.InfluxDB[0].StartUpTimeout = toml.Duration(time.Hour)
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
+					Options: map[string]interface{}{
+						"default":                     false,
+						"disable-subscriptions":       false,
+						"enabled":                     true,
+						"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
+						"http-port":                   float64(0),
+						"insecure-skip-verify":        false,
+						"kapacitor-hostname":          "",
+						"name":                        "default",
+						"password":                    true,
+						"ssl-ca":                      "",
+						"ssl-cert":                    "",
+						"ssl-key":                     "",
+						"startup-timeout":             "1h0m0s",
+						"subscription-protocol":       "http",
+						"subscriptions":               nil,
+						"subscriptions-sync-interval": "1m0s",
+						"timeout":                     "0s",
+						"udp-bind":                    "",
+						"udp-buffer":                  float64(1e3),
+						"udp-read-buffer":             float64(0),
+						"urls":                        []interface{}{db.URL()},
+						"username":                    "bob",
+					},
+				}},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
+				Options: map[string]interface{}{
+					"default":                     false,
+					"disable-subscriptions":       false,
+					"enabled":                     true,
+					"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
+					"http-port":                   float64(0),
+					"insecure-skip-verify":        false,
+					"kapacitor-hostname":          "",
+					"name":                        "default",
+					"password":                    true,
+					"ssl-ca":                      "",
+					"ssl-cert":                    "",
+					"ssl-key":                     "",
+					"startup-timeout":             "1h0m0s",
+					"subscription-protocol":       "http",
+					"subscriptions":               nil,
+					"subscriptions-sync-interval": "1m0s",
+					"timeout":                     "0s",
+					"udp-bind":                    "",
+					"udp-buffer":                  float64(1e3),
+					"udp-read-buffer":             float64(0),
+					"urls":                        []interface{}{db.URL()},
+					"username":                    "bob",
+				},
+			},
+			updates: []updateAction{
+				{
+					// Set Invalid URL to make sure we can fix it without waiting for connection timeouts
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"urls": []string{"http://192.0.2.0:8086"},
+						},
+					},
+					element: "default",
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
+							Options: map[string]interface{}{
+								"default":                     false,
+								"disable-subscriptions":       false,
+								"enabled":                     true,
+								"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
+								"http-port":                   float64(0),
+								"insecure-skip-verify":        false,
+								"kapacitor-hostname":          "",
+								"name":                        "default",
+								"password":                    true,
+								"ssl-ca":                      "",
+								"ssl-cert":                    "",
+								"ssl-key":                     "",
+								"startup-timeout":             "1h0m0s",
+								"subscription-protocol":       "http",
+								"subscriptions":               nil,
+								"subscriptions-sync-interval": "1m0s",
+								"timeout":                     "0s",
+								"udp-bind":                    "",
+								"udp-buffer":                  float64(1e3),
+								"udp-read-buffer":             float64(0),
+								"urls":                        []interface{}{"http://192.0.2.0:8086"},
+								"username":                    "bob",
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
+						Options: map[string]interface{}{
+							"default":                     false,
+							"disable-subscriptions":       false,
+							"enabled":                     true,
+							"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
+							"http-port":                   float64(0),
+							"insecure-skip-verify":        false,
+							"kapacitor-hostname":          "",
+							"name":                        "default",
+							"password":                    true,
+							"ssl-ca":                      "",
+							"ssl-cert":                    "",
+							"ssl-key":                     "",
+							"startup-timeout":             "1h0m0s",
+							"subscription-protocol":       "http",
+							"subscriptions":               nil,
+							"subscriptions-sync-interval": "1m0s",
+							"timeout":                     "0s",
+							"udp-bind":                    "",
+							"udp-buffer":                  float64(1e3),
+							"udp-read-buffer":             float64(0),
+							"urls":                        []interface{}{"http://192.0.2.0:8086"},
+							"username":                    "bob",
+						},
+					},
+				},
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"default":               true,
+							"subscription-protocol": "https",
+							"subscriptions":         map[string][]string{"_internal": []string{"monitor"}},
+						},
+					},
+					element: "default",
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
+							Options: map[string]interface{}{
+								"default":                     true,
+								"disable-subscriptions":       false,
+								"enabled":                     true,
+								"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
+								"http-port":                   float64(0),
+								"insecure-skip-verify":        false,
+								"kapacitor-hostname":          "",
+								"name":                        "default",
+								"password":                    true,
+								"ssl-ca":                      "",
+								"ssl-cert":                    "",
+								"ssl-key":                     "",
+								"startup-timeout":             "1h0m0s",
+								"subscription-protocol":       "https",
+								"subscriptions":               map[string]interface{}{"_internal": []interface{}{"monitor"}},
+								"subscriptions-sync-interval": "1m0s",
+								"timeout":                     "0s",
+								"udp-bind":                    "",
+								"udp-buffer":                  float64(1e3),
+								"udp-read-buffer":             float64(0),
+								"urls":                        []interface{}{"http://192.0.2.0:8086"},
+								"username":                    "bob",
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
+						Options: map[string]interface{}{
+							"default":                     true,
+							"disable-subscriptions":       false,
+							"enabled":                     true,
+							"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
+							"http-port":                   float64(0),
+							"insecure-skip-verify":        false,
+							"kapacitor-hostname":          "",
+							"name":                        "default",
+							"password":                    true,
+							"ssl-ca":                      "",
+							"ssl-cert":                    "",
+							"ssl-key":                     "",
+							"startup-timeout":             "1h0m0s",
+							"subscription-protocol":       "https",
+							"subscriptions":               map[string]interface{}{"_internal": []interface{}{"monitor"}},
+							"subscriptions-sync-interval": "1m0s",
+							"timeout":                     "0s",
+							"udp-bind":                    "",
+							"udp-buffer":                  float64(1e3),
+							"udp-read-buffer":             float64(0),
+							"urls":                        []interface{}{"http://192.0.2.0:8086"},
+							"username":                    "bob",
+						},
+					},
+				},
+				{
+					updateAction: client.ConfigUpdateAction{
+						Delete: []string{"urls"},
+					},
+					element: "default",
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
+							Options: map[string]interface{}{
+								"default":                     true,
+								"disable-subscriptions":       false,
+								"enabled":                     true,
+								"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
+								"http-port":                   float64(0),
+								"insecure-skip-verify":        false,
+								"kapacitor-hostname":          "",
+								"name":                        "default",
+								"password":                    true,
+								"ssl-ca":                      "",
+								"ssl-cert":                    "",
+								"ssl-key":                     "",
+								"startup-timeout":             "1h0m0s",
+								"subscription-protocol":       "https",
+								"subscriptions":               map[string]interface{}{"_internal": []interface{}{"monitor"}},
+								"subscriptions-sync-interval": "1m0s",
+								"timeout":                     "0s",
+								"udp-bind":                    "",
+								"udp-buffer":                  float64(1e3),
+								"udp-read-buffer":             float64(0),
+								"urls":                        []interface{}{db.URL()},
+								"username":                    "bob",
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
+						Options: map[string]interface{}{
+							"default":                     true,
+							"disable-subscriptions":       false,
+							"enabled":                     true,
+							"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
+							"http-port":                   float64(0),
+							"insecure-skip-verify":        false,
+							"kapacitor-hostname":          "",
+							"name":                        "default",
+							"password":                    true,
+							"ssl-ca":                      "",
+							"ssl-cert":                    "",
+							"ssl-key":                     "",
+							"startup-timeout":             "1h0m0s",
+							"subscription-protocol":       "https",
+							"subscriptions":               map[string]interface{}{"_internal": []interface{}{"monitor"}},
+							"subscriptions-sync-interval": "1m0s",
+							"timeout":                     "0s",
+							"udp-bind":                    "",
+							"udp-buffer":                  float64(1e3),
+							"udp-read-buffer":             float64(0),
+							"urls":                        []interface{}{db.URL()},
+							"username":                    "bob",
+						},
+					},
+				},
+				{
+					updateAction: client.ConfigUpdateAction{
+						Add: map[string]interface{}{
+							"name": "new",
+							"urls": []string{db.URL()},
+						},
+					},
+					element: "new",
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb"},
+						Elements: []client.ConfigElement{
+							{
+								Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/default"},
+								Options: map[string]interface{}{
+									"default":                     true,
+									"disable-subscriptions":       false,
+									"enabled":                     true,
+									"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
+									"http-port":                   float64(0),
+									"insecure-skip-verify":        false,
+									"kapacitor-hostname":          "",
+									"name":                        "default",
+									"password":                    true,
+									"ssl-ca":                      "",
+									"ssl-cert":                    "",
+									"ssl-key":                     "",
+									"startup-timeout":             "1h0m0s",
+									"subscription-protocol":       "https",
+									"subscriptions":               map[string]interface{}{"_internal": []interface{}{"monitor"}},
+									"subscriptions-sync-interval": "1m0s",
+									"timeout":                     "0s",
+									"udp-bind":                    "",
+									"udp-buffer":                  float64(1e3),
+									"udp-read-buffer":             float64(0),
+									"urls":                        []interface{}{db.URL()},
+									"username":                    "bob",
+								},
+							},
+							{
+								Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/new"},
+								Options: map[string]interface{}{
+									"default":                     false,
+									"disable-subscriptions":       false,
+									"enabled":                     false,
+									"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
+									"http-port":                   float64(0),
+									"insecure-skip-verify":        false,
+									"kapacitor-hostname":          "",
+									"name":                        "new",
+									"password":                    false,
+									"ssl-ca":                      "",
+									"ssl-cert":                    "",
+									"ssl-key":                     "",
+									"startup-timeout":             "5m0s",
+									"subscription-protocol":       "http",
+									"subscriptions":               nil,
+									"subscriptions-sync-interval": "1m0s",
+									"timeout":                     "0s",
+									"udp-bind":                    "",
+									"udp-buffer":                  float64(1e3),
+									"udp-read-buffer":             float64(0),
+									"urls":                        []interface{}{db.URL()},
+									"username":                    "",
+								},
+							},
+						},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/new"},
+						Options: map[string]interface{}{
+							"default":                     false,
+							"disable-subscriptions":       false,
+							"enabled":                     false,
+							"excluded-subscriptions":      map[string]interface{}{"_kapacitor": []interface{}{"autogen"}},
+							"http-port":                   float64(0),
+							"insecure-skip-verify":        false,
+							"kapacitor-hostname":          "",
+							"name":                        "new",
+							"password":                    false,
+							"ssl-ca":                      "",
+							"ssl-cert":                    "",
+							"ssl-key":                     "",
+							"startup-timeout":             "5m0s",
+							"subscription-protocol":       "http",
+							"subscriptions":               nil,
+							"subscriptions-sync-interval": "1m0s",
+							"timeout":                     "0s",
+							"udp-bind":                    "",
+							"udp-buffer":                  float64(1e3),
+							"udp-read-buffer":             float64(0),
+							"urls":                        []interface{}{db.URL()},
+							"username":                    "",
+						},
+					},
+				},
+			},
+		},
+		{
+			section: "alerta",
+			setDefaults: func(c *server.Config) {
+				c.Alerta.URL = "http://alerta.example.com"
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/alerta"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/alerta/"},
+					Options: map[string]interface{}{
+						"enabled":     false,
+						"environment": "",
+						"origin":      "",
+						"token":       false,
+						"url":         "http://alerta.example.com",
+					}},
+				},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/alerta/"},
+				Options: map[string]interface{}{
+					"enabled":     false,
+					"environment": "",
+					"origin":      "",
+					"token":       false,
+					"url":         "http://alerta.example.com",
+				},
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"token":  "token",
+							"origin": "kapacitor",
+						},
+					},
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/alerta"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/alerta/"},
+							Options: map[string]interface{}{
+								"enabled":     false,
+								"environment": "",
+								"origin":      "kapacitor",
+								"token":       true,
+								"url":         "http://alerta.example.com",
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/alerta/"},
+						Options: map[string]interface{}{
+							"enabled":     false,
+							"environment": "",
+							"origin":      "kapacitor",
+							"token":       true,
+							"url":         "http://alerta.example.com",
+						},
+					},
+				},
+			},
+		},
+		{
+			section: "kubernetes",
+			setDefaults: func(c *server.Config) {
+				c.Kubernetes.APIServers = []string{"http://localhost:80001"}
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/kubernetes"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/kubernetes/"},
+					Options: map[string]interface{}{
+						"api-servers": []interface{}{"http://localhost:80001"},
+						"ca-path":     "",
+						"enabled":     false,
+						"in-cluster":  false,
+						"namespace":   "",
+						"token":       false,
+					},
+				}},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/kubernetes/"},
+				Options: map[string]interface{}{
+					"api-servers": []interface{}{"http://localhost:80001"},
+					"ca-path":     "",
+					"enabled":     false,
+					"in-cluster":  false,
+					"namespace":   "",
+					"token":       false,
+				},
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"token": "secret",
+						},
+					},
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/kubernetes"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/kubernetes/"},
+							Options: map[string]interface{}{
+								"api-servers": []interface{}{"http://localhost:80001"},
+								"ca-path":     "",
+								"enabled":     false,
+								"in-cluster":  false,
+								"namespace":   "",
+								"token":       true,
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/kubernetes/"},
+						Options: map[string]interface{}{
+							"api-servers": []interface{}{"http://localhost:80001"},
+							"ca-path":     "",
+							"enabled":     false,
+							"in-cluster":  false,
+							"namespace":   "",
+							"token":       true,
+						},
+					},
+				},
+			},
+		},
+		{
+			section: "hipchat",
+			setDefaults: func(c *server.Config) {
+				c.HipChat.URL = "http://hipchat.example.com"
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/hipchat"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/hipchat/"},
+					Options: map[string]interface{}{
+						"enabled":            false,
+						"global":             false,
+						"room":               "",
+						"state-changes-only": false,
+						"token":              false,
+						"url":                "http://hipchat.example.com",
+					},
+				}},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/hipchat/"},
+				Options: map[string]interface{}{
+					"enabled":            false,
+					"global":             false,
+					"room":               "",
+					"state-changes-only": false,
+					"token":              false,
+					"url":                "http://hipchat.example.com",
+				},
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"token": "token",
+							"room":  "kapacitor",
+						},
+					},
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/hipchat"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/hipchat/"},
+							Options: map[string]interface{}{
+								"enabled":            false,
+								"global":             false,
+								"room":               "kapacitor",
+								"state-changes-only": false,
+								"token":              true,
+								"url":                "http://hipchat.example.com",
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/hipchat/"},
+						Options: map[string]interface{}{
+							"enabled":            false,
+							"global":             false,
+							"room":               "kapacitor",
+							"state-changes-only": false,
+							"token":              true,
+							"url":                "http://hipchat.example.com",
+						},
+					},
+				},
+			},
+		},
+		{
+			section: "opsgenie",
+			setDefaults: func(c *server.Config) {
+				c.OpsGenie.URL = "http://opsgenie.example.com"
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/opsgenie"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/opsgenie/"},
+					Options: map[string]interface{}{
+						"api-key":      false,
+						"enabled":      false,
+						"global":       false,
+						"recipients":   nil,
+						"recovery_url": opsgenie.DefaultOpsGenieRecoveryURL,
+						"teams":        nil,
+						"url":          "http://opsgenie.example.com",
+					},
+				}},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/opsgenie/"},
+				Options: map[string]interface{}{
+					"api-key":      false,
+					"enabled":      false,
+					"global":       false,
+					"recipients":   nil,
+					"recovery_url": opsgenie.DefaultOpsGenieRecoveryURL,
+					"teams":        nil,
+					"url":          "http://opsgenie.example.com",
+				},
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"api-key": "token",
+							"global":  true,
+							"teams":   []string{"teamA", "teamB"},
+						},
+					},
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/opsgenie"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/opsgenie/"},
+							Options: map[string]interface{}{
+								"api-key":      true,
+								"enabled":      false,
+								"global":       true,
+								"recipients":   nil,
+								"recovery_url": opsgenie.DefaultOpsGenieRecoveryURL,
+								"teams":        []interface{}{"teamA", "teamB"},
+								"url":          "http://opsgenie.example.com",
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/opsgenie/"},
+						Options: map[string]interface{}{
+							"api-key":      true,
+							"enabled":      false,
+							"global":       true,
+							"recipients":   nil,
+							"recovery_url": opsgenie.DefaultOpsGenieRecoveryURL,
+							"teams":        []interface{}{"teamA", "teamB"},
+							"url":          "http://opsgenie.example.com",
+						},
+					},
+				},
+			},
+		},
+		{
+			section: "pagerduty",
+			setDefaults: func(c *server.Config) {
+				c.PagerDuty.ServiceKey = "secret"
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/pagerduty"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/pagerduty/"},
+					Options: map[string]interface{}{
+						"enabled":     false,
+						"global":      false,
+						"service-key": true,
+						"url":         pagerduty.DefaultPagerDutyAPIURL,
+					},
+				}},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/pagerduty/"},
+				Options: map[string]interface{}{
+					"enabled":     false,
+					"global":      false,
+					"service-key": true,
+					"url":         pagerduty.DefaultPagerDutyAPIURL,
+				},
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"service-key": "",
+							"enabled":     true,
+						},
+					},
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/pagerduty"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/pagerduty/"},
+							Options: map[string]interface{}{
+								"enabled":     true,
+								"global":      false,
+								"service-key": false,
+								"url":         pagerduty.DefaultPagerDutyAPIURL,
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/pagerduty/"},
+						Options: map[string]interface{}{
+							"enabled":     true,
+							"global":      false,
+							"service-key": false,
+							"url":         pagerduty.DefaultPagerDutyAPIURL,
+						},
+					},
+				},
+			},
+		},
+		{
+			section: "smtp",
+			setDefaults: func(c *server.Config) {
+				c.SMTP.Host = "smtp.example.com"
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/smtp"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/smtp/"},
+					Options: map[string]interface{}{
+						"enabled":            false,
+						"from":               "",
+						"global":             false,
+						"host":               "smtp.example.com",
+						"idle-timeout":       "30s",
+						"no-verify":          false,
+						"password":           false,
+						"port":               float64(25),
+						"state-changes-only": false,
+						"to":                 nil,
+						"username":           "",
+					},
+				}},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/smtp/"},
+				Options: map[string]interface{}{
+					"enabled":            false,
+					"from":               "",
+					"global":             false,
+					"host":               "smtp.example.com",
+					"idle-timeout":       "30s",
+					"no-verify":          false,
+					"password":           false,
+					"port":               float64(25),
+					"state-changes-only": false,
+					"to":                 nil,
+					"username":           "",
+				},
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"idle-timeout": "1m0s",
+							"global":       true,
+							"password":     "secret",
+						},
+					},
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/smtp"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/smtp/"},
+							Options: map[string]interface{}{
+								"enabled":            false,
+								"from":               "",
+								"global":             true,
+								"host":               "smtp.example.com",
+								"idle-timeout":       "1m0s",
+								"no-verify":          false,
+								"password":           true,
+								"port":               float64(25),
+								"state-changes-only": false,
+								"to":                 nil,
+								"username":           "",
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/smtp/"},
+						Options: map[string]interface{}{
+							"enabled":            false,
+							"from":               "",
+							"global":             true,
+							"host":               "smtp.example.com",
+							"idle-timeout":       "1m0s",
+							"no-verify":          false,
+							"password":           true,
+							"port":               float64(25),
+							"state-changes-only": false,
+							"to":                 nil,
+							"username":           "",
+						},
+					},
+				},
+			},
+		},
+		{
+			section: "sensu",
+			setDefaults: func(c *server.Config) {
+				c.Sensu.Addr = "sensu.example.com:3000"
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/sensu"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/sensu/"},
+					Options: map[string]interface{}{
+						"addr":    "sensu.example.com:3000",
+						"enabled": false,
+						"source":  "Kapacitor",
+					},
+				}},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/sensu/"},
+				Options: map[string]interface{}{
+					"addr":    "sensu.example.com:3000",
+					"enabled": false,
+					"source":  "Kapacitor",
+				},
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"addr":    "sensu.local:3000",
+							"enabled": true,
+							"source":  "",
+						},
+					},
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/sensu"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/sensu/"},
+							Options: map[string]interface{}{
+								"addr":    "sensu.local:3000",
+								"enabled": true,
+								"source":  "",
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/sensu/"},
+						Options: map[string]interface{}{
+							"addr":    "sensu.local:3000",
+							"enabled": true,
+							"source":  "",
+						},
+					},
+				},
+			},
+		},
+		{
+			section: "slack",
+			setDefaults: func(c *server.Config) {
+				c.Slack.Global = true
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/"},
+					Options: map[string]interface{}{
+						"channel":            "",
+						"enabled":            false,
+						"global":             true,
+						"state-changes-only": false,
+						"url":                false,
+					},
+				}},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/"},
+				Options: map[string]interface{}{
+					"channel":            "",
+					"enabled":            false,
+					"global":             true,
+					"state-changes-only": false,
+					"url":                false,
+				},
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"enabled": true,
+							"global":  false,
+							"channel": "#general",
+							"url":     "http://slack.example.com/secret-token",
+						},
+					},
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/"},
+							Options: map[string]interface{}{
+								"channel":            "#general",
+								"enabled":            true,
+								"global":             false,
+								"state-changes-only": false,
+								"url":                true,
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/"},
+						Options: map[string]interface{}{
+							"channel":            "#general",
+							"enabled":            true,
+							"global":             false,
+							"state-changes-only": false,
+							"url":                true,
+						},
+					},
+				},
+			},
+		},
+		{
+			section: "talk",
+			setDefaults: func(c *server.Config) {
+				c.Talk.AuthorName = "Kapacitor"
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/talk"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/talk/"},
+					Options: map[string]interface{}{
+						"enabled":     false,
+						"url":         false,
+						"author_name": "Kapacitor",
+					},
+				}},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/talk/"},
+				Options: map[string]interface{}{
+					"enabled":     false,
+					"url":         false,
+					"author_name": "Kapacitor",
+				},
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"enabled": true,
+							"url":     "http://talk.example.com/secret-token",
+						},
+					},
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/talk"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/talk/"},
+							Options: map[string]interface{}{
+								"enabled":     true,
+								"url":         true,
+								"author_name": "Kapacitor",
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/talk/"},
+						Options: map[string]interface{}{
+							"enabled":     true,
+							"url":         true,
+							"author_name": "Kapacitor",
+						},
+					},
+				},
+			},
+		},
+		{
+			section: "telegram",
+			setDefaults: func(c *server.Config) {
+				c.Telegram.ChatId = "kapacitor"
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/telegram"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/telegram/"},
+					Options: map[string]interface{}{
+						"chat-id":                  "kapacitor",
+						"disable-notification":     false,
+						"disable-web-page-preview": false,
+						"enabled":                  false,
+						"global":                   false,
+						"parse-mode":               "",
+						"state-changes-only":       false,
+						"token":                    false,
+						"url":                      telegram.DefaultTelegramURL,
+					},
+				}},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/telegram/"},
+				Options: map[string]interface{}{
+					"chat-id":                  "kapacitor",
+					"disable-notification":     false,
+					"disable-web-page-preview": false,
+					"enabled":                  false,
+					"global":                   false,
+					"parse-mode":               "",
+					"state-changes-only":       false,
+					"token":                    false,
+					"url":                      telegram.DefaultTelegramURL,
+				},
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"enabled": true,
+							"token":   "token",
+						},
+					},
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/telegram"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/telegram/"},
+							Options: map[string]interface{}{
+								"chat-id":                  "kapacitor",
+								"disable-notification":     false,
+								"disable-web-page-preview": false,
+								"enabled":                  true,
+								"global":                   false,
+								"parse-mode":               "",
+								"state-changes-only":       false,
+								"token":                    true,
+								"url":                      telegram.DefaultTelegramURL,
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/telegram/"},
+						Options: map[string]interface{}{
+							"chat-id":                  "kapacitor",
+							"disable-notification":     false,
+							"disable-web-page-preview": false,
+							"enabled":                  true,
+							"global":                   false,
+							"parse-mode":               "",
+							"state-changes-only":       false,
+							"token":                    true,
+							"url":                      telegram.DefaultTelegramURL,
+						},
+					},
+				},
+			},
+		}, {
+			section: "victorops",
+			setDefaults: func(c *server.Config) {
+				c.VictorOps.RoutingKey = "test"
+				c.VictorOps.APIKey = "secret"
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/victorops"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/victorops/"},
+					Options: map[string]interface{}{
+						"api-key":     true,
+						"enabled":     false,
+						"global":      false,
+						"routing-key": "test",
+						"url":         victorops.DefaultVictorOpsAPIURL,
+					},
+				}},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/victorops/"},
+				Options: map[string]interface{}{
+					"api-key":     true,
+					"enabled":     false,
+					"global":      false,
+					"routing-key": "test",
+					"url":         victorops.DefaultVictorOpsAPIURL,
+				},
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"api-key": "",
+							"global":  true,
+						},
+					},
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/victorops"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/victorops/"},
+							Options: map[string]interface{}{
+								"api-key":     false,
+								"enabled":     false,
+								"global":      true,
+								"routing-key": "test",
+								"url":         victorops.DefaultVictorOpsAPIURL,
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/victorops/"},
+						Options: map[string]interface{}{
+							"api-key":     false,
+							"enabled":     false,
+							"global":      true,
+							"routing-key": "test",
+							"url":         victorops.DefaultVictorOpsAPIURL,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	compareElements := func(got, exp client.ConfigElement) error {
+		if got.Link != exp.Link {
+			return fmt.Errorf("elements have different links, got %v exp %v", got.Link, exp.Link)
+		}
+		for k, v := range exp.Options {
+			if g, ok := got.Options[k]; !ok {
+				return fmt.Errorf("missing option %q", k)
+			} else if !reflect.DeepEqual(g, v) {
+				return fmt.Errorf("unexpected config option %q got %#v exp %#v types: got %T exp %T", k, g, v, g, v)
+			}
+		}
+		for k := range got.Options {
+			if v, ok := exp.Options[k]; !ok {
+				return fmt.Errorf("extra option %q with value %#v", k, v)
+			}
+		}
+		return nil
+	}
+	compareSections := func(got, exp client.ConfigSection) error {
+		if got.Link != exp.Link {
+			return fmt.Errorf("sections have different links, got %v exp %v", got.Link, exp.Link)
+		}
+		if len(got.Elements) != len(exp.Elements) {
+			return fmt.Errorf("sections are different lengths, got %d exp %d", len(got.Elements), len(exp.Elements))
+		}
+		for i := range exp.Elements {
+			if err := compareElements(got.Elements[i], exp.Elements[i]); err != nil {
+				return errors.Wrapf(err, "section element %d are not equal", i)
+			}
+		}
+		return nil
+	}
+
+	validate := func(
+		cli *client.Client,
+		section,
+		element string,
+		expSection client.ConfigSection,
+		expElement client.ConfigElement,
+	) error {
+		// Get all sections
+		if config, err := cli.ConfigSections(); err != nil {
+			return err
+		} else {
+			if err := compareSections(config.Sections[section], expSection); err != nil {
+				return fmt.Errorf("%s: %v", section, err)
+			}
+		}
+		// Get the specific section
+		sectionLink := cli.ConfigSectionLink(section)
+		if got, err := cli.ConfigSection(sectionLink); err != nil {
+			return err
+		} else {
+			if err := compareSections(got, expSection); err != nil {
+				return fmt.Errorf("%s: %v", section, err)
+			}
+		}
+		elementLink := cli.ConfigElementLink(section, element)
+		// Get the specific element
+		if got, err := cli.ConfigElement(elementLink); err != nil {
+			return err
+		} else {
+			if err := compareElements(got, expElement); err != nil {
+				return fmt.Errorf("%s/%s: %v", section, element, err)
+			}
+		}
+		return nil
+	}
+
+	for _, tc := range testCases {
+		// Create default config
+		c := NewConfig()
+		if tc.setDefaults != nil {
+			tc.setDefaults(c)
+		}
+		s := OpenServer(c)
+		cli := Client(s)
+		defer s.Close()
+
+		if err := validate(cli, tc.section, tc.element, tc.expDefaultSection, tc.expDefaultElement); err != nil {
+			t.Errorf("unexpected defaults for %s/%s: %v", tc.section, tc.element, err)
+		}
+
+		for i, ua := range tc.updates {
+			link := cli.ConfigElementLink(tc.section, ua.element)
+
+			if len(ua.updateAction.Add) > 0 ||
+				len(ua.updateAction.Remove) > 0 {
+				link = cli.ConfigSectionLink(tc.section)
+			}
+
+			if err := cli.ConfigUpdate(link, ua.updateAction); err != nil {
+				t.Fatal(err)
+			}
+			if err := validate(cli, tc.section, ua.element, ua.expSection, ua.expElement); err != nil {
+				t.Errorf("unexpected update result %d for %s/%s: %v", i, tc.section, ua.element, err)
+			}
 		}
 	}
 }

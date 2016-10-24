@@ -1,0 +1,11 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/mitchellh/copystructure.git
+	branch = master
+	commit = ad4c8fe111e90a651ae529a0eb45a12385e2a8eb
+	parent = c03843776a074db57a4c98f20bf79328a47e5a8c
+	cmdver = 0.3.0

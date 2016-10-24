@@ -3,11 +3,9 @@ package integrations
 import (
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"reflect"
 	"time"
 
@@ -15,9 +13,7 @@ import (
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/influxdb"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
-	"github.com/influxdata/kapacitor/services/logging"
 	"github.com/influxdata/kapacitor/udf"
-	"github.com/influxdata/wlog"
 )
 
 type MockInfluxDBService struct {
@@ -31,13 +27,10 @@ func NewMockInfluxDBService(h http.Handler) *MockInfluxDBService {
 	}
 }
 
-func (m *MockInfluxDBService) NewDefaultClient() (influxdb.Client, error) {
-	return influxdb.NewHTTPClient(influxdb.HTTPConfig{
-		URL: m.ts.URL,
-	})
-}
 func (m *MockInfluxDBService) NewNamedClient(name string) (influxdb.Client, error) {
-	return m.NewDefaultClient()
+	return influxdb.NewHTTPClient(influxdb.Config{
+		URLs: []string{m.ts.URL},
+	})
 }
 
 func compareResultsMetainfo(exp, got kapacitor.Result) (bool, string) {
@@ -125,23 +118,6 @@ func compareAlertData(exp, got kapacitor.AlertData) (bool, string) {
 	return compareResults(expData, gotData)
 }
 
-type LogService struct{}
-
-func (l *LogService) NewLogger(prefix string, flag int) *log.Logger {
-	return wlog.New(os.Stderr, prefix, flag)
-}
-func (l *LogService) NewRawLogger(prefix string, flag int) *log.Logger {
-	return log.New(os.Stderr, prefix, flag)
-}
-
-func (l *LogService) NewStaticLevelLogger(prefix string, flag int, level logging.Level) *log.Logger {
-	return log.New(wlog.NewStaticLevelWriter(os.Stderr, wlog.Level(level)), prefix, flag)
-}
-
-func (l *LogService) NewStaticLevelWriter(level logging.Level) io.Writer {
-	return wlog.NewStaticLevelWriter(os.Stderr, wlog.Level(level))
-}
-
 type UDFService struct {
 	ListFunc   func() []string
 	InfoFunc   func(name string) (udf.Info, bool)
@@ -186,16 +162,27 @@ type k8sAutoscale struct {
 	ScalesGetFunc    func(kind, name string) (*k8s.Scale, error)
 	ScalesUpdateFunc func(kind string, scale *k8s.Scale) error
 }
+type k8sScales struct {
+	ScalesGetFunc    func(kind, name string) (*k8s.Scale, error)
+	ScalesUpdateFunc func(kind string, scale *k8s.Scale) error
+}
 
-func (k k8sAutoscale) Client() k8s.Client {
-	return k
+func (k k8sAutoscale) Client() (k8s.Client, error) {
+	return k, nil
 }
 func (k k8sAutoscale) Scales(namespace string) k8s.ScalesInterface {
-	return k
+	return k8sScales{
+		ScalesGetFunc:    k.ScalesGetFunc,
+		ScalesUpdateFunc: k.ScalesUpdateFunc,
+	}
 }
-func (k k8sAutoscale) Get(kind, name string) (*k8s.Scale, error) {
+func (k k8sAutoscale) Update(c k8s.Config) error {
+	return nil
+}
+
+func (k k8sScales) Get(kind, name string) (*k8s.Scale, error) {
 	return k.ScalesGetFunc(kind, name)
 }
-func (k k8sAutoscale) Update(kind string, scale *k8s.Scale) error {
+func (k k8sScales) Update(kind string, scale *k8s.Scale) error {
 	return k.ScalesUpdateFunc(kind, scale)
 }

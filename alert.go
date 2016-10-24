@@ -950,13 +950,8 @@ func (a *AlertNode) handleTcp(tcp *pipeline.TcpHandler, ad *AlertData) {
 }
 
 func (a *AlertNode) handleEmail(email *pipeline.EmailHandler, ad *AlertData) {
-	if a.et.tm.SMTPService != nil {
-		err := a.et.tm.SMTPService.SendMail(email.ToList, ad.Message, ad.Details)
-		if err != nil {
-			a.logger.Println("E!", err)
-		}
-	} else {
-		a.logger.Println("E! smtp service not enabled, cannot send email.")
+	if err := a.et.tm.SMTPService.SendMail(email.ToList, ad.Message, ad.Details); err != nil {
+		a.logger.Println("E! failed to send email:", err)
 	}
 }
 
@@ -1001,10 +996,6 @@ func (a *AlertNode) handleLog(l *pipeline.LogHandler, ad *AlertData) {
 }
 
 func (a *AlertNode) handleVictorOps(vo *pipeline.VictorOpsHandler, ad *AlertData) {
-	if a.et.tm.VictorOpsService == nil {
-		a.logger.Println("E! failed to send VictorOps alert. VictorOps is not enabled")
-		return
-	}
 	var messageType string
 	switch ad.Level {
 	case OKAlert:
@@ -1027,10 +1018,6 @@ func (a *AlertNode) handleVictorOps(vo *pipeline.VictorOpsHandler, ad *AlertData
 }
 
 func (a *AlertNode) handlePagerDuty(pd *pipeline.PagerDutyHandler, ad *AlertData) {
-	if a.et.tm.PagerDutyService == nil {
-		a.logger.Println("E! failed to send PagerDuty alert. PagerDuty is not enabled")
-		return
-	}
 	err := a.et.tm.PagerDutyService.Alert(
 		pd.ServiceKey,
 		ad.ID,
@@ -1045,11 +1032,6 @@ func (a *AlertNode) handlePagerDuty(pd *pipeline.PagerDutyHandler, ad *AlertData
 }
 
 func (a *AlertNode) handleSensu(sensu *pipeline.SensuHandler, ad *AlertData) {
-	if a.et.tm.SensuService == nil {
-		a.logger.Println("E! failed to send Sensu message. Sensu is not enabled")
-		return
-	}
-
 	err := a.et.tm.SensuService.Alert(
 		ad.ID,
 		ad.Message,
@@ -1062,10 +1044,6 @@ func (a *AlertNode) handleSensu(sensu *pipeline.SensuHandler, ad *AlertData) {
 }
 
 func (a *AlertNode) handleSlack(slack *pipeline.SlackHandler, ad *AlertData) {
-	if a.et.tm.SlackService == nil {
-		a.logger.Println("E! failed to send Slack message. Slack is not enabled")
-		return
-	}
 	err := a.et.tm.SlackService.Alert(
 		slack.Channel,
 		ad.Message,
@@ -1078,10 +1056,6 @@ func (a *AlertNode) handleSlack(slack *pipeline.SlackHandler, ad *AlertData) {
 }
 
 func (a *AlertNode) handleTelegram(telegram *pipeline.TelegramHandler, ad *AlertData) {
-	if a.et.tm.TelegramService == nil {
-		a.logger.Println("E! failed to send Telegram message. Telegram is not enabled")
-		return
-	}
 	err := a.et.tm.TelegramService.Alert(
 		telegram.ChatId,
 		telegram.ParseMode,
@@ -1096,10 +1070,6 @@ func (a *AlertNode) handleTelegram(telegram *pipeline.TelegramHandler, ad *Alert
 }
 
 func (a *AlertNode) handleHipChat(hipchat *pipeline.HipChatHandler, ad *AlertData) {
-	if a.et.tm.HipChatService == nil {
-		a.logger.Println("E! failed to send HipChat message. HipChat is not enabled")
-		return
-	}
 	err := a.et.tm.HipChatService.Alert(
 		hipchat.Room,
 		hipchat.Token,
@@ -1123,11 +1093,6 @@ type alertaHandler struct {
 }
 
 func (a *AlertNode) handleAlerta(alerta alertaHandler, ad *AlertData) {
-	if a.et.tm.AlertaService == nil {
-		a.logger.Println("E! failed to send Alerta message. Alerta is not enabled")
-		return
-	}
-
 	var severity string
 
 	switch ad.Level {
@@ -1215,10 +1180,6 @@ func (a *AlertNode) handleAlerta(alerta alertaHandler, ad *AlertData) {
 }
 
 func (a *AlertNode) handleOpsGenie(og *pipeline.OpsGenieHandler, ad *AlertData) {
-	if a.et.tm.OpsGenieService == nil {
-		a.logger.Println("E! failed to send OpsGenie alert. OpsGenie is not enabled")
-		return
-	}
 	var messageType string
 	switch ad.Level {
 	case OKAlert:
@@ -1243,11 +1204,6 @@ func (a *AlertNode) handleOpsGenie(og *pipeline.OpsGenieHandler, ad *AlertData) 
 }
 
 func (a *AlertNode) handleTalk(talk *pipeline.TalkHandler, ad *AlertData) {
-	if a.et.tm.TalkService == nil {
-		a.logger.Println("E! failed to send Talk message. Talk is not enabled")
-		return
-	}
-
 	err := a.et.tm.TalkService.Alert(
 		ad.ID,
 		ad.Message,

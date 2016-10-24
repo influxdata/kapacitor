@@ -39,6 +39,7 @@ const (
 	replaysPath      = basePath + "/replays"
 	replayBatchPath  = basePath + "/replays/batch"
 	replayQueryPath  = basePath + "/replays/query"
+	configPath       = basePath + "/config"
 )
 
 // HTTP configuration for connecting to Kapacitor
@@ -685,6 +686,18 @@ func (c *Client) TaskLink(id string) Link {
 
 func (c *Client) TemplateLink(id string) Link {
 	return Link{Relation: Self, Href: path.Join(templatesPath, id)}
+}
+
+func (c *Client) ConfigSectionLink(section string) Link {
+	return Link{Relation: Self, Href: path.Join(configPath, section)}
+}
+
+func (c *Client) ConfigElementLink(section, element string) Link {
+	href := path.Join(configPath, section, element)
+	if element == "" {
+		href += "/"
+	}
+	return Link{Relation: Self, Href: href}
 }
 
 type CreateTaskOptions struct {
@@ -1503,6 +1516,115 @@ func (c *Client) ListReplays(opt *ListReplaysOptions) ([]Replay, error) {
 		return nil, err
 	}
 	return r.Replays, nil
+}
+
+type ConfigUpdateAction struct {
+	Set    map[string]interface{} `json:"set,omitempty"`
+	Delete []string               `json:"delete,omitempty"`
+	Add    map[string]interface{} `json:"add,omitempty"`
+	Remove []string               `json:"remove,omitempty"`
+}
+
+// ConfigUpdate performs a given ConfigUpdateAction against a given section or element.
+func (c *Client) ConfigUpdate(link Link, action ConfigUpdateAction) error {
+	if link.Href == "" {
+		return fmt.Errorf("invalid link %v", link)
+	}
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	err := enc.Encode(action)
+	if err != nil {
+		return err
+	}
+
+	u := *c.url
+	u.Path = link.Href
+
+	req, err := http.NewRequest("POST", u.String(), &buf)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	_, err = c.Do(req, nil, http.StatusNoContent)
+	return err
+}
+
+type ConfigSections struct {
+	Link     Link                     `json:"link"`
+	Sections map[string]ConfigSection `json:"sections"`
+}
+
+type ConfigSection struct {
+	Link     Link            `json:"link"`
+	Elements []ConfigElement `json:"elements"`
+}
+
+type ConfigElement struct {
+	Link    Link                   `json:"link"`
+	Options map[string]interface{} `json:"options"`
+}
+
+// ConfigSections returns all the running configuration sections that can be modified.
+func (c *Client) ConfigSections() (ConfigSections, error) {
+	u := *c.url
+	u.Path = configPath
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return ConfigSections{}, err
+	}
+
+	sections := ConfigSections{}
+	_, err = c.Do(req, &sections, http.StatusOK)
+	if err != nil {
+		return ConfigSections{}, err
+	}
+	return sections, nil
+}
+
+// ConfigSection returns the running configuration for a section.
+func (c *Client) ConfigSection(link Link) (ConfigSection, error) {
+	if link.Href == "" {
+		return ConfigSection{}, fmt.Errorf("invalid link %v", link)
+	}
+
+	u := *c.url
+	u.Path = link.Href
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return ConfigSection{}, err
+	}
+
+	section := ConfigSection{}
+	_, err = c.Do(req, &section, http.StatusOK)
+	if err != nil {
+		return ConfigSection{}, err
+	}
+	return section, nil
+}
+
+// ConfigElement returns the running configuration for a given section and element.
+func (c *Client) ConfigElement(link Link) (ConfigElement, error) {
+	if link.Href == "" {
+		return ConfigElement{}, fmt.Errorf("invalid link %v", link)
+	}
+
+	u := *c.url
+	u.Path = link.Href
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return ConfigElement{}, err
+	}
+
+	element := ConfigElement{}
+	_, err = c.Do(req, &element, http.StatusOK)
+	if err != nil {
+		return ConfigElement{}, err
+	}
+	return element, nil
 }
 
 type LogLevelOptions struct {

@@ -28,6 +28,7 @@ import (
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
+	"github.com/influxdata/kapacitor/services/logging/loggingtest"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/sensu"
@@ -41,7 +42,7 @@ import (
 )
 
 var httpService *httpd.Service
-var logService = &LogService{}
+var logService = loggingtest.New()
 
 var dbrps = []kapacitor.DBRP{
 	{
@@ -5747,6 +5748,7 @@ stream
 	defer tm.Close()
 
 	c := sensu.NewConfig()
+	c.Enabled = true
 	c.Addr = listen.Addr().String()
 	c.Source = "Kapacitor"
 	sl := sensu.NewService(c, logService.NewLogger("[test_sensu] ", log.LstdFlags))
@@ -5839,6 +5841,7 @@ stream
 	defer tm.Close()
 
 	c := slack.NewConfig()
+	c.Enabled = true
 	c.URL = ts.URL + "/test/slack/url"
 	c.Channel = "#channel"
 	sl := slack.NewService(c, logService.NewLogger("[test_slack] ", log.LstdFlags))
@@ -5935,6 +5938,7 @@ stream
 	defer tm.Close()
 
 	c := telegram.NewConfig()
+	c.Enabled = true
 	c.URL = ts.URL + "/bot"
 	c.Token = "TOKEN:AUTH"
 	c.ChatId = "123456789"
@@ -6018,6 +6022,7 @@ stream
 	defer tm.Close()
 
 	c := hipchat.NewConfig()
+	c.Enabled = true
 	c.URL = ts.URL
 	c.Room = "1231234"
 	c.Token = "testtoken1231234"
@@ -6143,6 +6148,7 @@ stream
 	defer tm.Close()
 
 	c := alerta.NewConfig()
+	c.Enabled = true
 	c.URL = ts.URL
 	c.Origin = "Kapacitor"
 	sl := alerta.NewService(c, logService.NewLogger("[test_alerta] ", log.LstdFlags))
@@ -6262,6 +6268,7 @@ stream
 	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
 	defer tm.Close()
 	c := opsgenie.NewConfig()
+	c.Enabled = true
 	c.URL = ts.URL
 	c.APIKey = "api_key"
 	og := opsgenie.NewService(c, logService.NewLogger("[test_og] ", log.LstdFlags))
@@ -6343,6 +6350,7 @@ stream
 	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
 	defer tm.Close()
 	c := pagerduty.NewConfig()
+	c.Enabled = true
 	c.URL = ts.URL
 	c.ServiceKey = "service_key"
 	pd := pagerduty.NewService(c, logService.NewLogger("[test_pd] ", log.LstdFlags))
@@ -6428,6 +6436,7 @@ stream
 	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
 	defer tm.Close()
 	c := victorops.NewConfig()
+	c.Enabled = true
 	c.URL = ts.URL
 	c.APIKey = "api_key"
 	c.RoutingKey = "routing_key"
@@ -6439,8 +6448,8 @@ stream
 		t.Error(err)
 	}
 
-	if rc := atomic.LoadInt32(&requestCount); rc != 2 {
-		t.Errorf("unexpected requestCount got %d exp 1", rc)
+	if got, exp := atomic.LoadInt32(&requestCount), int32(2); got != exp {
+		t.Errorf("unexpected requestCount got %d exp %d", got, exp)
 	}
 }
 
@@ -6494,6 +6503,7 @@ stream
 	defer tm.Close()
 
 	c := talk.NewConfig()
+	c.Enabled = true
 	c.URL = ts.URL
 	c.AuthorName = "Kapacitor"
 	sl := talk.NewService(c, logService.NewLogger("[test_talk] ", log.LstdFlags))

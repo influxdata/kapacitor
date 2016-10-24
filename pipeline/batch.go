@@ -23,7 +23,6 @@ import (
 // Available Statistics:
 //
 //    * query_errors -- number of errors when querying
-//    * connect_errors -- number of errors connecting to InfluxDB
 //    * batches_queried -- number of batches returned from queries
 //    * points_queried -- total number of points in batches
 //
