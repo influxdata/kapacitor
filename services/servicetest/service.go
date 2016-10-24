@@ -125,6 +125,9 @@ func (s *Service) handleListTests(w http.ResponseWriter, r *http.Request) {
 		Link: serviceTestsLink,
 	}
 	pattern := r.URL.Query().Get("pattern")
+	if pattern == "" {
+		pattern = "*"
+	}
 	for name, test := range s.testers {
 		if ok, err := filepath.Match(pattern, name); err != nil {
 			httpd.HttpError(w, fmt.Sprintf("bad pattern: %v", err), true, http.StatusBadRequest)
