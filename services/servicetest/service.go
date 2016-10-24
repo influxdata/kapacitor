@@ -24,9 +24,8 @@ const (
 var serviceTestsLink = client.Link{Relation: client.Self, Href: path.Join(httpd.BasePath, testPath)}
 
 type Tester interface {
-	// DefaultOptions returns a object.
-	// User specified data will be JSON decoded into the object.
-	// The object will be JSON encoded to provide as an example to the user of available options.
+	// TestOptions returns an object that is in turn passed to Test.
+	// User specified data will be JSON encode/decoded to/from the object.
 	TestOptions() interface{}
 	// Test a service with the provided options.
 	Test(options interface{}) error
