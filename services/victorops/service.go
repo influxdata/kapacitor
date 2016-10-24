@@ -67,10 +67,9 @@ type testOptions struct {
 }
 
 func (s *Service) TestOptions() interface{} {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	c := s.config()
 	return &testOptions{
-		RoutingKey:  s.routingKey,
+		RoutingKey:  c.RoutingKey,
 		MessageType: "CRITICAL",
 		Message:     "test victorops message",
 		EntityID:    "testEntityID",

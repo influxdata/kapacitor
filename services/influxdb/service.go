@@ -265,15 +265,21 @@ func (s *Service) Test(options interface{}) error {
 	if !ok {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
+
+	// Get cluster
+	s.mu.Lock()
 	cluster, ok := s.clusters[o.Cluster]
+	s.mu.Unlock()
 	if !ok {
-		return fmt.Errorf("unknown cluster %q", o.Cluster)
+		return fmt.Errorf("cluster %q is not enabled or does not exist", o.Cluster)
 	}
-	cli, err := cluster.NewClient()
+
+	// Get client and ping the cluster
+	cli := cluster.NewClient()
+	_, _, err := cli.Ping(nil)
 	if err != nil {
-		return errors.Wrapf(err, "failed to connect to influxdb cluster %q", o.Cluster)
+		return errors.Wrapf(err, "failed to ping the influxdb cluster %q", o.Cluster)
 	}
-	cli.Close()
 	return nil
 }
 

@@ -1703,7 +1703,7 @@ POST /kapacitor/v1/config/influxdb/remote
 
 ## Testing Serivces
 
-Kapacitor make user of various service integrations.
+Kapacitor makes use of various service integrations.
 The following API endpoints provide way for a user to run simple tests to ensure that a service is configured correctly.
 
 ### Listing testable services
@@ -1713,15 +1713,40 @@ A list of services that can be tested is available at the `/kapacitor/v1/tests` 
 #### Example
 
 ```
-GET /kapacitor/v1/tests
+GET /kapacitor/v1/servicetests
 ```
 
 ```
-[
-    "influxdb",
-    "slack",
-    "smtp",
-]
+{
+    "link": {"rel":"self", "href": "/kapacitor/v1/servicetests"},
+    "services" : [
+        {
+            "link": {"rel":"self", "href": "/kapacitor/v1/servicetests/influxdb"},
+            "name": "influxdb",
+            "options": {
+                "cluster": ""
+            }
+        },
+        {
+            "link": {"rel":"self", "href": "/kapacitor/v1/servicetests/slack"},
+            "name": "slack",
+            "options": {
+                "message": "test slack message",
+                "channel": "#alerts",
+                "level": "CRITICAL"
+            }
+        },
+        {
+            "link": {"rel":"self", "href": "/kapacitor/v1/servicetests/smtp"},
+            "name": "smtp",
+            "options": {
+                "to": ["user@example.com"],
+                "subject": "test subject",
+                "body": "test body"
+            }
+        }
+    ]
+}
 ```
 
 #### Response
@@ -1733,7 +1758,7 @@ GET /kapacitor/v1/tests
 
 ### Testing a service
 
-To test a service make a POST request to the `/kapacitor/v1/tests/<service name>` endpoint.
+To test a service make a POST request to the `/kapacitor/v1/servicetests/<service name>` endpoint.
 The contents of the POST body depend on the service in test.
 To determine the available options use a GET request to the same endpoint.
 The returned options are also the defaults.
@@ -1742,25 +1767,29 @@ The returned options are also the defaults.
 
 See available/default options for the slack service:
 ```
-GET /kapacitor/v1/tests/slack
+GET /kapacitor/v1/servicetests/slack
 ```
 
 ```json
 {
-    "message": "test slack message",
-    "channel": "#alerts",
-    "level": "CRITICAL",
+    "link": {"rel":"self", "href": "/kapacitor/v1/servicetests/slack"},
+    "name": "slack"
+    "options": {
+        "message": "test slack message",
+        "channel": "#alerts",
+        "level": "CRITICAL"
+    }
 }
 ```
 
 Test the slack service integration using custom options:
 
 ```
-POST /kapacitor/v1/tests/slack
+POST /kapacitor/v1/servicetests/slack
 {
     "message": "my custom test message",
     "channel": "@user",
-    "level": "OK",
+    "level": "OK"
 }
 ```
 A successful response looks like:
@@ -1768,7 +1797,7 @@ A successful response looks like:
 ```json
 {
     "success": true,
-    "message": "",
+    "message": ""
 }
 ```
 
@@ -1777,7 +1806,7 @@ A failed response looks like:
 ```json
 {
     "success": false,
-    "message": "could not connect to slack",
+    "message": "could not connect to slack"
 }
 ```
 

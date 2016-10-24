@@ -232,10 +232,10 @@ type StatusDetails struct {
 type StatusCause struct {
 	// A machine-readable description of the cause of the error. If this value is
 	// empty there is no information available.
-	Type CauseType `json:"reason,omitempty" protobuf:"bytes,1,opt,name=reason,casttype=CauseType"`
+	Type CauseType `json:"reason,omitempty"`
 	// A human-readable description of the cause of the error.  This field may be
 	// presented as-is to a reader.
-	Message string `json:"message,omitempty" protobuf:"bytes,2,opt,name=message"`
+	Message string `json:"message,omitempty"`
 	// The field of the resource that has caused this error, as named by its JSON
 	// serialization. May include dot and postfix notation for nested attributes.
 	// Arrays are zero-indexed.  Fields may appear more than once in an array of
@@ -245,13 +245,40 @@ type StatusCause struct {
 	// Examples:
 	//   "name" - the field "name" on the current resource
 	//   "items[0].name" - the field "name" on the first array entry in "items"
-	Field string `json:"field,omitempty" protobuf:"bytes,3,opt,name=field"`
+	Field string `json:"field,omitempty"`
 }
 
 // CauseType is a machine readable value providing more detail about what
 // occurred in a status response. An operation may have multiple causes for a
 // status (whether Failure or Success).
 type CauseType string
+
+// APIVersions lists the versions that are available, to allow clients to
+// discover the API at /api, which is the root path of the legacy v1 API.
+//
+// +protobuf.options.(gogoproto.goproto_stringer)=false
+type APIVersions struct {
+	TypeMeta `json:",inline"`
+	// versions are the api versions that are available.
+	Versions []string `json:"versions"`
+	// a map of client CIDR to server address that is serving this group.
+	// This is to help clients reach servers in the most network-efficient way possible.
+	// Clients can use the appropriate server address as per the CIDR that they match.
+	// In case of multiple matches, clients should use the longest matching CIDR.
+	// The server returns only those CIDRs that it thinks that the client can match.
+	// For example: the master will return an internal IP CIDR only, if the client reaches the server using an internal IP.
+	// Server looks at X-Forwarded-For header or X-Real-Ip header or request.RemoteAddr (in that order) to get the client IP.
+	ServerAddressByClientCIDRs []ServerAddressByClientCIDR `json:"serverAddressByClientCIDRs"`
+}
+
+// ServerAddressByClientCIDR helps the client to determine the server address that they should use, depending on the clientCIDR that they match.
+type ServerAddressByClientCIDR struct {
+	// The CIDR with which clients can match their IP to figure out the server address that they should use.
+	ClientCIDR string `json:"clientCIDR"`
+	// Address of this server, suitable for a client that matches the above CIDR.
+	// This can be a hostname, hostname:port, IP or IP:port.
+	ServerAddress string `json:"serverAddress"`
+}
 
 // represents a scaling request for a resource.
 type Scale struct {

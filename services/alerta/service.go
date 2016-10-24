@@ -40,17 +40,16 @@ type testOptions struct {
 }
 
 func (s *Service) TestOptions() interface{} {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	c := s.config()
 	return &testOptions{
 		Resource:    "testResource",
 		Event:       "testEvent",
-		Environment: s.environment,
+		Environment: c.Environment,
 		Severity:    "critical",
 		Group:       "testGroup",
 		Value:       "testValue",
 		Message:     "test alerta message",
-		Origin:      s.origin,
+		Origin:      c.Origin,
 		Service:     []string{"testServiceA", "testServiceB"},
 	}
 }
@@ -60,11 +59,9 @@ func (s *Service) Test(options interface{}) error {
 	if !ok {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
-	s.mu.RLock()
-	token := s.token
-	s.mu.RUnlock()
+	c := s.config()
 	return s.Alert(
-		token,
+		c.Token,
 		o.Resource,
 		o.Event,
 		o.Environment,
@@ -108,6 +105,9 @@ func (s *Service) Alert(token, resource, event, environment, severity, group, va
 	}
 
 	url, post, err := s.preparePost(token, resource, event, environment, severity, group, value, message, origin, service, data)
+	if err != nil {
+		return err
+	}
 
 	resp, err := http.Post(url, "application/json", post)
 	if err != nil {

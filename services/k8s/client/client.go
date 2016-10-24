@@ -18,9 +18,10 @@ import (
 )
 
 const (
-	apiBasePath = "/apis"
+	apiPath      = "/api"
+	apisBasePath = "/apis"
 
-	extensionsPath          = apiBasePath + "/extensions/v1beta1"
+	extensionsPath          = apisBasePath + "/extensions/v1beta1"
 	extensionsNamespacePath = extensionsPath + "/namespaces"
 	scaleEndpoint           = "/scale"
 
@@ -47,6 +48,7 @@ func loadPodSecret(secret string) (value []byte, err error) {
 }
 
 type Client interface {
+	Versions() (APIVersions, error)
 	// Scales returns an interface for interactive with Scale resources.
 	// If namespace is empty the default client namespace will be used.
 	Scales(namespace string) ScalesInterface
@@ -234,6 +236,15 @@ func (c *httpClient) decodeResponse(resp *http.Response, response interface{}, s
 		}
 	}
 	return nil
+}
+
+func (c *httpClient) Versions() (APIVersions, error) {
+	apiVersions := APIVersions{}
+	err := c.Get(apiPath, &apiVersions, http.StatusOK)
+	if err != nil {
+		return apiVersions, err
+	}
+	return apiVersions, nil
 }
 
 type ScalesInterface interface {

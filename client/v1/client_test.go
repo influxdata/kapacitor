@@ -230,6 +230,27 @@ func Test_ReportsErrors(t *testing.T) {
 			},
 		},
 		{
+			name: "ServiceTests",
+			fnc: func(c *client.Client) error {
+				_, err := c.ServiceTests()
+				return err
+			},
+		},
+		{
+			name: "ServiceTest",
+			fnc: func(c *client.Client) error {
+				_, err := c.ServiceTest(c.ServiceTestLink(""))
+				return err
+			},
+		},
+		{
+			name: "DoServiceTest",
+			fnc: func(c *client.Client) error {
+				_, err := c.DoServiceTest(c.ServiceTestLink(""), nil)
+				return err
+			},
+		},
+		{
 			name: "LogLevel",
 			fnc: func(c *client.Client) error {
 				err := c.LogLevel("")
@@ -2202,6 +2223,170 @@ func Test_ConfigSection(t *testing.T) {
 	}
 	if !reflect.DeepEqual(exp, section) {
 		t.Errorf("unexpected config section:\ngot:\n%v\nexp:\n%v", section, exp)
+	}
+}
+func Test_ServiceTests(t *testing.T) {
+	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/kapacitor/v1/servicetests" && r.Method == "GET" {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, `{
+	"link": {"rel":"self", "href": "/kapacitor/v1/servicetests"},
+	"services" : [
+		{
+			"link": {"rel":"self", "href": "/kapacitor/v1/servicetests/influxdb"},
+			"name": "influxdb",
+			"options": {
+				"cluster": ""
+			}
+		},
+		{
+			"link": {"rel":"self", "href": "/kapacitor/v1/servicetests/slack"},
+			"name": "slack",
+			"options": {
+				"message": "test slack message",
+				"channel": "#alerts",
+				"level": "CRITICAL"
+			}
+		},
+		{
+			"link": {"rel":"self", "href": "/kapacitor/v1/servicetests/smtp"},
+			"name": "smtp",
+			"options": {
+				"to": ["user@example.com"],
+				"subject": "test subject",
+				"body": "test body"
+			}
+		}
+	]
+}`)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "request: %v", r)
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	serviceTests, err := c.ServiceTests()
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp := client.ServiceTests{
+		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/servicetests"},
+		Services: []client.ServiceTest{
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/servicetests/influxdb"},
+				Name: "influxdb",
+				Options: map[string]interface{}{
+					"cluster": "",
+				},
+			},
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/servicetests/slack"},
+				Name: "slack",
+				Options: map[string]interface{}{
+					"message": "test slack message",
+					"channel": "#alerts",
+					"level":   "CRITICAL",
+				},
+			},
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/servicetests/smtp"},
+				Name: "smtp",
+				Options: map[string]interface{}{
+					"to":      []interface{}{"user@example.com"},
+					"subject": "test subject",
+					"body":    "test body",
+				},
+			},
+		},
+	}
+	if !reflect.DeepEqual(exp, serviceTests) {
+		t.Errorf("unexpected service tests:\ngot:\n%v\nexp:\n%v", serviceTests, exp)
+	}
+}
+func Test_ServiceTest(t *testing.T) {
+	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/kapacitor/v1/servicetests/slack" && r.Method == "GET" {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, `{
+	"link": {"rel":"self", "href": "/kapacitor/v1/servicetests/slack"},
+	"name": "slack",
+	"options": {
+		"message": "test slack message",
+		"channel": "#alerts",
+		"level": "CRITICAL"
+	}
+}`)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "request: %v", r)
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	serviceTest, err := c.ServiceTest(c.ServiceTestLink("slack"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp := client.ServiceTest{
+		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/servicetests/slack"},
+		Name: "slack",
+		Options: map[string]interface{}{
+			"message": "test slack message",
+			"channel": "#alerts",
+			"level":   "CRITICAL",
+		},
+	}
+	if !reflect.DeepEqual(exp, serviceTest) {
+		t.Errorf("unexpected service test:\ngot:\n%v\nexp:\n%v", serviceTest, exp)
+	}
+}
+func Test_DoServiceTest(t *testing.T) {
+	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		options := make(client.ServiceTestOptions)
+		json.NewDecoder(r.Body).Decode(&options)
+		expOptions := client.ServiceTestOptions{
+			"message": "this is a slack test message",
+			"channel": "@test_user",
+		}
+
+		if r.URL.Path == "/kapacitor/v1/servicetests/slack" &&
+			r.Method == "POST" &&
+			reflect.DeepEqual(expOptions, options) {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, `{
+	"success": true,
+	"message": ""
+}`)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "request: %v", r)
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	tr, err := c.DoServiceTest(c.ServiceTestLink("slack"), client.ServiceTestOptions{
+		"message": "this is a slack test message",
+		"channel": "@test_user",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp := client.ServiceTestResult{
+		Success: true,
+		Message: "",
+	}
+	if !reflect.DeepEqual(exp, tr) {
+		t.Errorf("unexpected service test result:\ngot:\n%v\nexp:\n%v", tr, exp)
 	}
 }
 

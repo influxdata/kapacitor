@@ -5,18 +5,22 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"path"
 	"sort"
 	"strings"
 
+	client "github.com/influxdata/kapacitor/client/v1"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/pkg/errors"
 )
 
 const (
-	testPath         = "/tests"
-	testPathAnchored = "/tests/"
+	testPath         = "/servicetests"
+	testPathAnchored = "/servicetests/"
 	basePath         = httpd.BasePath + testPathAnchored
 )
+
+var serviceTestsLink = client.Link{Relation: client.Self, Href: path.Join(httpd.BasePath, testPath)}
 
 type Tester interface {
 	// DefaultOptions returns a object.
@@ -87,17 +91,48 @@ func (s *Service) nameFromPath(p string) string {
 	return strings.TrimRight(strings.TrimPrefix(p, basePath), "/")
 }
 
-type testResult struct {
+func (s *Service) serviceTestLink(service string) client.Link {
+	return client.Link{Relation: client.Self, Href: path.Join(basePath, service)}
+}
+
+type ServiceTests struct {
+	Link     client.Link     `json:"link"`
+	Services ServiceTestList `json:"services"`
+}
+
+type ServiceTestList []ServiceTest
+
+func (l ServiceTestList) Len() int           { return len(l) }
+func (l ServiceTestList) Less(i, j int) bool { return l[i].Name < l[j].Name }
+func (l ServiceTestList) Swap(i, j int)      { l[i], l[j] = l[j], l[i] }
+
+type ServiceTest struct {
+	Link    client.Link        `json:"link"`
+	Name    string             `json:"name"`
+	Options ServiceTestOptions `json:"options"`
+}
+
+type ServiceTestOptions interface{}
+
+type ServiceTestResult struct {
 	Success bool   `json:"success"`
 	Message string `json:"message"`
 }
 
 func (s *Service) handleListTests(w http.ResponseWriter, r *http.Request) {
-	tests := make([]string, 0, len(s.testers))
-	for name := range s.testers {
-		tests = append(tests, name)
+	tests := ServiceTests{
+		Link: serviceTestsLink,
 	}
-	sort.Strings(tests)
+	for name, test := range s.testers {
+		options := test.TestOptions()
+		tests.Services = append(tests.Services, ServiceTest{
+			Link:    s.serviceTestLink(name),
+			Name:    name,
+			Options: options,
+		})
+	}
+	sort.Sort(tests.Services)
+
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(tests)
 }
@@ -116,8 +151,13 @@ func (s *Service) handleTestOptions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	options := test.TestOptions()
+	serviceTest := ServiceTest{
+		Link:    s.serviceTestLink(name),
+		Name:    name,
+		Options: options,
+	}
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(options)
+	json.NewEncoder(w).Encode(serviceTest)
 }
 
 func (s *Service) handleTest(w http.ResponseWriter, r *http.Request) {
@@ -134,12 +174,14 @@ func (s *Service) handleTest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	options := test.TestOptions()
-	if err := json.NewDecoder(r.Body).Decode(options); err != nil {
-		httpd.HttpError(w, fmt.Sprint("failed to decode JSON body:", err), true, http.StatusBadRequest)
-		return
+	if options != nil {
+		if err := json.NewDecoder(r.Body).Decode(options); err != nil {
+			httpd.HttpError(w, fmt.Sprint("failed to decode JSON body:", err), true, http.StatusBadRequest)
+			return
+		}
 	}
 
-	result := testResult{}
+	result := ServiceTestResult{}
 	err := test.Test(options)
 	if err != nil {
 		result.Message = err.Error()

@@ -70,10 +70,9 @@ type testOptions struct {
 }
 
 func (s *Service) TestOptions() interface{} {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	c := s.config()
 	return &testOptions{
-		Room:    s.room,
+		Room:    c.Room,
 		Message: "test hipchat message",
 		Level:   kapacitor.CritAlert,
 	}
@@ -84,10 +83,8 @@ func (s *Service) Test(options interface{}) error {
 	if !ok {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
-	s.mu.RLock()
-	token := s.token
-	s.mu.RUnlock()
-	return s.Alert(o.Room, token, o.Message, o.Level)
+	c := s.config()
+	return s.Alert(o.Room, c.Token, o.Message, o.Level)
 }
 
 func (s *Service) Alert(room, token, message string, level kapacitor.AlertLevel) error {

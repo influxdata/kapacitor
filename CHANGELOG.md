@@ -29,6 +29,8 @@ stream
 
 
 New API endpoints have been added to be able to configure InfluxDB clusters and alert handlers dynamically without needing to restart the Kapacitor daemon.
+Along with the ability to dynamcially configure a service, the API endpoints have been added to be able to test the services.
+Together these addition allow you to configure and validate your configurations are functional
 See the API docs for more details.
 
 ### Features
@@ -36,6 +38,7 @@ See the API docs for more details.
 - [#931](https://github.com/influxdata/kapacitor/issues/931): Add a Kubernetes autoscaler node. You can now autoscale your Kubernetes deployments via Kapacitor.
 - [#928](https://github.com/influxdata/kapacitor/issues/928): Add new API endpoint for dynamically overriding sections of the configuration.
 - [#980](https://github.com/influxdata/kapacitor/pull/980): Upgrade to using go 1.7
+- [#957](https://github.com/influxdata/kapacitor/issues/957): Add API endpoints for testing service integrations.
 
 ### Bugfixes
 

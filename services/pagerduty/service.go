@@ -79,11 +79,9 @@ func (s *Service) Test(options interface{}) error {
 	if !ok {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
-	s.mu.RLock()
-	serviceKey := s.serviceKey
-	s.mu.RUnlock()
+	c := s.config()
 	return s.Alert(
-		serviceKey,
+		c.ServiceKey,
 		o.IncidentKey,
 		o.Description,
 		o.Level,

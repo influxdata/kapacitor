@@ -70,14 +70,13 @@ type testOptions struct {
 }
 
 func (s *Service) TestOptions() interface{} {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	c := s.config()
 	return &testOptions{
-		ChatId:                s.chatId,
-		ParseMode:             s.parseMode,
+		ChatId:                c.ChatId,
+		ParseMode:             c.ParseMode,
 		Message:               "test telegram message",
-		DisableWebPagePreview: s.disableWebPagePreview,
-		DisableNotification:   s.disableNotification,
+		DisableWebPagePreview: c.DisableWebPagePreview,
+		DisableNotification:   c.DisableNotification,
 	}
 }
 

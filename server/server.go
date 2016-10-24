@@ -155,7 +155,7 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	s.initHTTPDService()
 	s.appendStorageService()
 	s.appendAuthService()
-	s.appendConfigOverrideService(c)
+	s.appendConfigOverrideService()
 
 	// Append all dynamic services after the config override service.
 	s.appendTesterService()
@@ -326,6 +326,7 @@ func (s *Server) appendK8sService() error {
 	}
 
 	s.TaskMaster.K8sService = srv
+	s.TesterService.AddTester("kubernetes", srv)
 	s.DynamicServices["kubernetes"] = srv
 	s.AppendService("kubernetes", srv)
 	return nil

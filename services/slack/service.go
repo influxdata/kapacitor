@@ -75,10 +75,9 @@ type testOptions struct {
 }
 
 func (s *Service) TestOptions() interface{} {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	c := s.config()
 	return &testOptions{
-		Channel: s.channel,
+		Channel: c.Channel,
 		Message: "test slack message",
 		Level:   kapacitor.CritAlert,
 	}

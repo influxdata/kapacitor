@@ -66,11 +66,10 @@ type testOptions struct {
 }
 
 func (s *Service) TestOptions() interface{} {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	c := s.config()
 	return &testOptions{
-		Teams:       s.teams,
-		Recipients:  s.recipients,
+		Teams:       c.Teams,
+		Recipients:  c.Recipients,
 		MessageType: "CRITICAL",
 		Message:     "test opsgenie message",
 		EntityID:    "testEntityID",
@@ -124,7 +123,7 @@ func (s *Service) Alert(teams []string, recipients []string, messageType, messag
 func (s *Service) preparePost(teams []string, recipients []string, messageType, message, entityID string, t time.Time, details interface{}) (string, io.Reader, error) {
 	c := s.config()
 	if !c.Enabled {
-		return "", nil, errors.New("service not enabled")
+		return "", nil, errors.New("service is not enabled")
 	}
 
 	ogData := make(map[string]interface{})
