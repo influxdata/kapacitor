@@ -38,6 +38,7 @@ See the API docs for more details.
 - [#928](https://github.com/influxdata/kapacitor/issues/928): Add new API endpoint for dynamically overriding sections of the configuration.
 - [#980](https://github.com/influxdata/kapacitor/pull/980): Upgrade to using go 1.7
 - [#957](https://github.com/influxdata/kapacitor/issues/957): Add API endpoints for testing service integrations.
+- [#958](https://github.com/influxdata/kapacitor/issues/958): Add support for Slack icon emojis.
 
 ### Bugfixes
 

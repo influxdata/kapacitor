@@ -69,9 +69,10 @@ type attachment struct {
 }
 
 type testOptions struct {
-	Channel string               `json:"channel"`
-	Message string               `json:"message"`
-	Level   kapacitor.AlertLevel `json:"level"`
+	Channel   string               `json:"channel"`
+	Message   string               `json:"message"`
+	Level     kapacitor.AlertLevel `json:"level"`
+	IconEmoji string               `json:"icon-emoji"`
 }
 
 func (s *Service) TestOptions() interface{} {
@@ -88,11 +89,11 @@ func (s *Service) Test(options interface{}) error {
 	if !ok {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
-	return s.Alert(o.Channel, o.Message, o.Level)
+	return s.Alert(o.Channel, o.Message, o.IconEmoji, o.Level)
 }
 
-func (s *Service) Alert(channel, message string, level kapacitor.AlertLevel) error {
-	url, post, err := s.preparePost(channel, message, level)
+func (s *Service) Alert(channel, message, iconEmoji string, level kapacitor.AlertLevel) error {
+	url, post, err := s.preparePost(channel, message, iconEmoji, level)
 	if err != nil {
 		return err
 	}
@@ -118,7 +119,7 @@ func (s *Service) Alert(channel, message string, level kapacitor.AlertLevel) err
 	return nil
 }
 
-func (s *Service) preparePost(channel, message string, level kapacitor.AlertLevel) (string, io.Reader, error) {
+func (s *Service) preparePost(channel, message, iconEmoji string, level kapacitor.AlertLevel) (string, io.Reader, error) {
 	c := s.config()
 
 	if !c.Enabled {
@@ -146,6 +147,12 @@ func (s *Service) preparePost(channel, message string, level kapacitor.AlertLeve
 	postData["username"] = kapacitor.Product
 	postData["text"] = ""
 	postData["attachments"] = []attachment{a}
+	emoji := c.IconEmoji
+	if iconEmoji != "" {
+		emoji = iconEmoji
+	}
+	postData["as_user"] = emoji != ""
+	postData["icon_emoji"] = emoji
 
 	var post bytes.Buffer
 	enc := json.NewEncoder(&post)

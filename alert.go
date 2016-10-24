@@ -1047,6 +1047,7 @@ func (a *AlertNode) handleSlack(slack *pipeline.SlackHandler, ad *AlertData) {
 	err := a.et.tm.SlackService.Alert(
 		slack.Channel,
 		ad.Message,
+		slack.IconEmoji,
 		ad.Level,
 	)
 	if err != nil {

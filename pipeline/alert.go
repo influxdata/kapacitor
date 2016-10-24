@@ -1043,6 +1043,10 @@ type SlackHandler struct {
 	// Slack channel in which to post messages.
 	// If empty uses the channel from the configuration.
 	Channel string
+
+	// IconEmoji is an emoji name surrounded in ':' characters.
+	// The emoji image will replace the normal user icon for the slack bot.
+	IconEmoji string
 }
 
 // Send the alert to Telegram.

@@ -13,6 +13,9 @@ type Config struct {
 	URL string `toml:"url" override:"url,redact"`
 	// The default channel, can be overridden per alert.
 	Channel string `toml:"channel" override:"channel"`
+	// IconEmoji uses an emoji instead of the normal icon for the message.
+	// The contents should be the name of an emoji surrounded with ':', i.e. ':chart_with_upwards_trend:'
+	IconEmoji string `toml:"icon-emoji" override:"icon-emoji"`
 	// Whether all alerts should automatically post to slack
 	Global bool `toml:"global" override:"global"`
 	// Whether all alerts should automatically use stateChangesOnly mode.
