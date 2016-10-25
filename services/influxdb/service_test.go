@@ -1231,6 +1231,10 @@ type influxDBClient struct {
 	UpdateFunc  func(influxcli.Config) error
 }
 
+func (c influxDBClient) Close() error {
+	return nil
+}
+
 func (c influxDBClient) Ping(ctx context.Context) (time.Duration, string, error) {
 	if c.PingFunc != nil {
 		return c.PingFunc(ctx)
