@@ -7084,7 +7084,7 @@ stream
 		if len(p.Tags()) != 1 {
 			t.Errorf("got %v exp %v", len(p.Tags()), 1)
 		}
-		if got, exp := p.Tags()["key"], "value"; got != exp {
+		if got, exp := p.Tags().GetString("key"), "value"; got != exp {
 			t.Errorf("got %s exp %s", got, exp)
 		}
 		tm := time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC)

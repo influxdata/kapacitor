@@ -98,7 +98,7 @@ func readPointsFromIO(data io.ReadCloser, points chan<- models.Point, precision 
 			RetentionPolicy: rp,
 			Name:            mp.Name(),
 			Group:           models.NilGroup,
-			Tags:            models.Tags(mp.Tags()),
+			Tags:            models.Tags(mp.Tags().Map()),
 			Fields:          models.Fields(mp.Fields()),
 			Time:            mp.Time().UTC(),
 		}
