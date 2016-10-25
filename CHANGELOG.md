@@ -42,6 +42,8 @@ See the API docs for more details.
 
 ### Bugfixes
 
+- [#984](https://github.com/influxdata/kapacitor/issues/984): Fix bug where keeping a list of fields that where not referenced in the eval expressions would cause an error.
+
 ## v1.0.2 [2016-10-06]
 
 ### Release Notes
