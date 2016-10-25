@@ -145,10 +145,9 @@ func (c *Client) ClusterID() uint64 {
 // Database returns info for the requested database.
 func (c *Client) Database(name string) *DatabaseInfo {
 	c.mu.RLock()
-	data := c.cacheData.Clone()
-	c.mu.RUnlock()
+	defer c.mu.RUnlock()
 
-	for _, d := range data.Databases {
+	for _, d := range c.cacheData.Databases {
 		if d.Name == name {
 			return &d
 		}
@@ -160,10 +159,9 @@ func (c *Client) Database(name string) *DatabaseInfo {
 // Databases returns a list of all database infos.
 func (c *Client) Databases() []DatabaseInfo {
 	c.mu.RLock()
-	data := c.cacheData.Clone()
-	c.mu.RUnlock()
+	defer c.mu.RUnlock()
 
-	dbs := data.Databases
+	dbs := c.cacheData.Databases
 	if dbs == nil {
 		return []DatabaseInfo{}
 	}
@@ -187,12 +185,11 @@ func (c *Client) CreateDatabase(name string) (*DatabaseInfo, error) {
 
 	// create default retention policy
 	if c.retentionAutoCreate {
-		if err := data.CreateRetentionPolicy(name, &RetentionPolicyInfo{
-			ReplicaN: 1,
-		}); err != nil {
+		rpi := DefaultRetentionPolicyInfo()
+		if err := data.CreateRetentionPolicy(name, rpi); err != nil {
 			return nil, err
 		}
-		if err := data.SetDefaultRetentionPolicy(name, ""); err != nil {
+		if err := data.SetDefaultRetentionPolicy(name, rpi.Name); err != nil {
 			return nil, err
 		}
 	}
@@ -207,42 +204,48 @@ func (c *Client) CreateDatabase(name string) (*DatabaseInfo, error) {
 }
 
 // CreateDatabaseWithRetentionPolicy creates a database with the specified retention policy.
-func (c *Client) CreateDatabaseWithRetentionPolicy(name string, rpi *RetentionPolicyInfo) (*DatabaseInfo, error) {
+func (c *Client) CreateDatabaseWithRetentionPolicy(name string, spec *RetentionPolicySpec) (*DatabaseInfo, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	data := c.cacheData.Clone()
 
-	if rpi.Duration < MinRetentionPolicyDuration && rpi.Duration != 0 {
+	if spec.Duration != nil && *spec.Duration < MinRetentionPolicyDuration && *spec.Duration != 0 {
 		return nil, ErrRetentionPolicyDurationTooLow
 	}
 
-	if db := data.Database(name); db != nil {
-		// Check if the retention policy already exists. If it does and matches
-		// the desired retention policy, exit with no error.
-		if rp := db.RetentionPolicy(rpi.Name); rp != nil {
-			// Normalise ShardDuration before comparing to any existing retention policies.
-			rpi.ShardGroupDuration = normalisedShardDuration(rpi.ShardGroupDuration, rpi.Duration)
-			if rp.ReplicaN != rpi.ReplicaN || rp.Duration != rpi.Duration || rp.ShardGroupDuration != rpi.ShardGroupDuration {
-				return nil, ErrRetentionPolicyConflict
-			}
-			return db, nil
-		}
-	}
-
-	if err := data.CreateDatabase(name); err != nil {
-		return nil, err
-	}
-
-	if err := data.CreateRetentionPolicy(name, rpi); err != nil {
-		return nil, err
-	}
-
-	if err := data.SetDefaultRetentionPolicy(name, rpi.Name); err != nil {
-		return nil, err
-	}
-
 	db := data.Database(name)
+	if db == nil {
+		if err := data.CreateDatabase(name); err != nil {
+			return nil, err
+		}
+		db = data.Database(name)
+	}
+
+	rpi := spec.NewRetentionPolicyInfo()
+	if rp := db.RetentionPolicy(rpi.Name); rp == nil {
+		if err := data.CreateRetentionPolicy(name, rpi); err != nil {
+			return nil, err
+		}
+	} else if !spec.Matches(rp) {
+		// Verify that the retention policy with this name matches
+		// the one already created.
+		return nil, ErrRetentionPolicyConflict
+	}
+
+	// If no default retention policy has been set, set it to the retention
+	// policy we just created. If the default is different from what we are
+	// trying to create, record it as a conflict and abandon with an error.
+	if db.DefaultRetentionPolicy == "" {
+		if err := data.SetDefaultRetentionPolicy(name, rpi.Name); err != nil {
+			return nil, err
+		}
+	} else if rpi.Name != db.DefaultRetentionPolicy {
+		return nil, ErrRetentionPolicyConflict
+	}
+
+	// Refresh the database info.
+	db = data.Database(name)
 
 	if err := c.commit(data); err != nil {
 		return nil, err
@@ -270,22 +273,18 @@ func (c *Client) DropDatabase(name string) error {
 }
 
 // CreateRetentionPolicy creates a retention policy on the specified database.
-func (c *Client) CreateRetentionPolicy(database string, rpi *RetentionPolicyInfo) (*RetentionPolicyInfo, error) {
+func (c *Client) CreateRetentionPolicy(database string, spec *RetentionPolicySpec) (*RetentionPolicyInfo, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	data := c.cacheData.Clone()
 
-	if rpi.Duration < MinRetentionPolicyDuration && rpi.Duration != 0 {
+	if spec.Duration != nil && *spec.Duration < MinRetentionPolicyDuration && *spec.Duration != 0 {
 		return nil, ErrRetentionPolicyDurationTooLow
 	}
 
-	if err := data.CreateRetentionPolicy(database, rpi); err != nil {
-		return nil, err
-	}
-
-	rp, err := data.RetentionPolicy(database, rpi.Name)
-	if err != nil {
+	rp := spec.NewRetentionPolicyInfo()
+	if err := data.CreateRetentionPolicy(database, rp); err != nil {
 		return nil, err
 	}
 
@@ -299,10 +298,9 @@ func (c *Client) CreateRetentionPolicy(database string, rpi *RetentionPolicyInfo
 // RetentionPolicy returns the requested retention policy info.
 func (c *Client) RetentionPolicy(database, name string) (rpi *RetentionPolicyInfo, err error) {
 	c.mu.RLock()
-	data := c.cacheData.Clone()
-	c.mu.RUnlock()
+	defer c.mu.RUnlock()
 
-	db := data.Database(database)
+	db := c.cacheData.Database(database)
 	if db == nil {
 		return nil, influxdb.ErrDatabaseNotFound(database)
 	}
@@ -366,10 +364,9 @@ func (c *Client) UpdateRetentionPolicy(database, name string, rpu *RetentionPoli
 
 func (c *Client) Users() []UserInfo {
 	c.mu.RLock()
-	data := c.cacheData.Clone()
-	c.mu.RUnlock()
+	defer c.mu.RUnlock()
 
-	users := data.Users
+	users := c.cacheData.Users
 
 	if users == nil {
 		return []UserInfo{}
@@ -379,10 +376,9 @@ func (c *Client) Users() []UserInfo {
 
 func (c *Client) User(name string) (*UserInfo, error) {
 	c.mu.RLock()
-	data := c.cacheData.Clone()
-	c.mu.RUnlock()
+	defer c.mu.RUnlock()
 
-	for _, u := range data.Users {
+	for _, u := range c.cacheData.Users {
 		if u.Name == name {
 			return &u, nil
 		}
@@ -524,10 +520,9 @@ func (c *Client) SetAdminPrivilege(username string, admin bool) error {
 
 func (c *Client) UserPrivileges(username string) (map[string]influxql.Privilege, error) {
 	c.mu.RLock()
-	data := c.cacheData.Clone()
-	c.mu.RUnlock()
+	defer c.mu.RUnlock()
 
-	p, err := data.UserPrivileges(username)
+	p, err := c.cacheData.UserPrivileges(username)
 	if err != nil {
 		return nil, err
 	}
@@ -536,10 +531,9 @@ func (c *Client) UserPrivileges(username string) (map[string]influxql.Privilege,
 
 func (c *Client) UserPrivilege(username, database string) (*influxql.Privilege, error) {
 	c.mu.RLock()
-	data := c.cacheData.Clone()
-	c.mu.RUnlock()
+	defer c.mu.RUnlock()
 
-	p, err := data.UserPrivilege(username, database)
+	p, err := c.cacheData.UserPrivilege(username, database)
 	if err != nil {
 		return nil, err
 	}
@@ -548,10 +542,9 @@ func (c *Client) UserPrivilege(username, database string) (*influxql.Privilege, 
 
 func (c *Client) AdminUserExists() bool {
 	c.mu.RLock()
-	data := c.cacheData.Clone()
-	c.mu.RUnlock()
+	defer c.mu.RUnlock()
 
-	for _, u := range data.Users {
+	for _, u := range c.cacheData.Users {
 		if u.Admin {
 			return true
 		}
@@ -607,7 +600,6 @@ func (c *Client) UserCount() int {
 // ShardIDs returns a list of all shard ids.
 func (c *Client) ShardIDs() []uint64 {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
 
 	var a []uint64
 	for _, dbi := range c.cacheData.Databases {
@@ -619,6 +611,7 @@ func (c *Client) ShardIDs() []uint64 {
 			}
 		}
 	}
+	c.mu.RUnlock()
 	sort.Sort(uint64Slice(a))
 	return a
 }
@@ -647,9 +640,8 @@ func (c *Client) ShardGroupsByTimeRange(database, policy string, min, max time.T
 }
 
 // ShardsByTimeRange returns a slice of shards that may contain data in the time range.
-// Shards are returned in ascending time order.
 func (c *Client) ShardsByTimeRange(sources influxql.Sources, tmin, tmax time.Time) (a []ShardInfo, err error) {
-	m := make(map[uint64]struct{})
+	m := make(map[*ShardInfo]struct{})
 	for _, src := range sources {
 		mm, ok := src.(*influxql.Measurement)
 		if !ok {
@@ -661,15 +653,15 @@ func (c *Client) ShardsByTimeRange(sources influxql.Sources, tmin, tmax time.Tim
 			return nil, err
 		}
 		for _, g := range groups {
-			for _, sh := range g.Shards {
-				if _, ok := m[sh.ID]; ok {
-					continue
-				}
-
-				a = append(a, sh)
-				m[sh.ID] = struct{}{}
+			for i := range g.Shards {
+				m[&g.Shards[i]] = struct{}{}
 			}
 		}
+	}
+
+	a = make([]ShardInfo, 0, len(m))
+	for sh := range m {
+		a = append(a, *sh)
 	}
 
 	return a, nil
@@ -807,10 +799,9 @@ func (c *Client) PrecreateShardGroups(from, to time.Time) error {
 // ShardOwner returns the owning shard group info for a specific shard.
 func (c *Client) ShardOwner(shardID uint64) (database, policy string, sgi *ShardGroupInfo) {
 	c.mu.RLock()
-	data := c.cacheData.Clone()
-	c.mu.RUnlock()
+	defer c.mu.RUnlock()
 
-	for _, dbi := range data.Databases {
+	for _, dbi := range c.cacheData.Databases {
 		for _, rpi := range dbi.RetentionPolicies {
 			for _, g := range rpi.ShardGroups {
 				if g.Deleted() {

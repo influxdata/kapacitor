@@ -1,7 +1,6 @@
 package monitor // import "github.com/influxdata/influxdb/monitor"
 
 import (
-	"bytes"
 	"errors"
 	"expvar"
 	"fmt"
@@ -23,6 +22,7 @@ import (
 const (
 	MonitorRetentionPolicy         = "monitor"
 	MonitorRetentionPolicyDuration = 7 * 24 * time.Hour
+	MonitorRetentionPolicyReplicaN = 1
 )
 
 // Monitor represents an instance of the monitor system.
@@ -51,7 +51,7 @@ type Monitor struct {
 	storeInterval          time.Duration
 
 	MetaClient interface {
-		CreateDatabaseWithRetentionPolicy(name string, rpi *meta.RetentionPolicyInfo) (*meta.DatabaseInfo, error)
+		CreateDatabaseWithRetentionPolicy(name string, spec *meta.RetentionPolicySpec) (*meta.DatabaseInfo, error)
 		Database(name string) *meta.DatabaseInfo
 	}
 
@@ -210,10 +210,7 @@ func (m *Monitor) Statistics(tags map[string]string) ([]*Statistic, error) {
 		}
 
 		statistic := &Statistic{
-			Statistic: models.Statistic{
-				Tags:   make(map[string]string),
-				Values: make(map[string]interface{}),
-			},
+			Statistic: models.NewStatistic(""),
 		}
 
 		// Add any supplied tags.
@@ -278,11 +275,7 @@ func (m *Monitor) Statistics(tags map[string]string) ([]*Statistic, error) {
 
 	// Add Go memstats.
 	statistic := &Statistic{
-		Statistic: models.Statistic{
-			Name:   "runtime",
-			Tags:   make(map[string]string),
-			Values: make(map[string]interface{}),
-		},
+		Statistic: models.NewStatistic("runtime"),
 	}
 
 	// Add any supplied tags to Go memstats
@@ -312,8 +305,6 @@ func (m *Monitor) Statistics(tags map[string]string) ([]*Statistic, error) {
 	statistics = append(statistics, statistic)
 
 	statistics = m.gatherStatistics(statistics, tags)
-	sort.Sort(Statistics(statistics))
-
 	return statistics, nil
 }
 
@@ -352,11 +343,15 @@ func (m *Monitor) createInternalStorage() {
 	}
 
 	if di := m.MetaClient.Database(m.storeDatabase); di == nil {
-		rpi := meta.NewRetentionPolicyInfo(MonitorRetentionPolicy)
-		rpi.Duration = MonitorRetentionPolicyDuration
-		rpi.ReplicaN = 1
+		duration := MonitorRetentionPolicyDuration
+		replicaN := MonitorRetentionPolicyReplicaN
+		spec := meta.RetentionPolicySpec{
+			Name:     MonitorRetentionPolicy,
+			Duration: &duration,
+			ReplicaN: &replicaN,
+		}
 
-		if _, err := m.MetaClient.CreateDatabaseWithRetentionPolicy(m.storeDatabase, rpi); err != nil {
+		if _, err := m.MetaClient.CreateDatabaseWithRetentionPolicy(m.storeDatabase, &spec); err != nil {
 			m.Logger.Printf("failed to create database '%s', failed to create storage: %s",
 				m.storeDatabase, err.Error())
 			return
@@ -418,7 +413,7 @@ func (m *Monitor) storeStatistics() {
 
 			points := make(models.Points, 0, len(stats))
 			for _, s := range stats {
-				pt, err := models.NewPoint(s.Name, s.Tags, s.Values, now)
+				pt, err := models.NewPoint(s.Name, models.NewTags(s.Tags), s.Values, now)
 				if err != nil {
 					m.Logger.Printf("Dropping point %v: %v", s.Name, err)
 					return
@@ -460,10 +455,7 @@ type Statistics []*Statistic
 
 func (a Statistics) Len() int { return len(a) }
 func (a Statistics) Less(i, j int) bool {
-	if a[i].Name != a[j].Name {
-		return a[i].Name < a[j].Name
-	}
-	return bytes.Compare(a[i].Tags.HashKey(), a[j].Tags.HashKey()) < 0
+	return a[i].Name < a[j].Name
 }
 func (a Statistics) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 

@@ -283,11 +283,12 @@ func (c *DefaultPlanner) Plan(lastWrite time.Time) []CompactionGroup {
 	// first check if we should be doing a full compaction because nothing has been written in a long time
 	if c.CompactFullWriteColdDuration > 0 && time.Now().Sub(lastWrite) > c.CompactFullWriteColdDuration && len(generations) > 1 {
 		var tsmFiles []string
+		var genCount int
 		for i, group := range generations {
 			var skip bool
 
 			// Skip the file if it's over the max size and contains a full block and it does not have any tombstones
-			if group.size() > uint64(maxTSMFileSize) && c.FileStore.BlockCount(group.files[0].Path, 1) == tsdb.DefaultMaxPointsPerBlock && !group.hasTombstones() {
+			if len(generations) > 2 && group.size() > uint64(maxTSMFileSize) && c.FileStore.BlockCount(group.files[0].Path, 1) == tsdb.DefaultMaxPointsPerBlock && !group.hasTombstones() {
 				skip = true
 			}
 
@@ -308,10 +309,12 @@ func (c *DefaultPlanner) Plan(lastWrite time.Time) []CompactionGroup {
 			for _, f := range group.files {
 				tsmFiles = append(tsmFiles, f.Path)
 			}
+			genCount += 1
 		}
 		sort.Strings(tsmFiles)
 
-		if len(tsmFiles) <= 1 {
+		// Make sure we have more than 1 file and more than 1 generation
+		if len(tsmFiles) <= 1 || genCount <= 1 {
 			return nil
 		}
 
@@ -455,9 +458,8 @@ func (c *DefaultPlanner) Plan(lastWrite time.Time) []CompactionGroup {
 // findGenerations groups all the TSM files by they generation based
 // on their filename then returns the generations in descending order (newest first)
 func (c *DefaultPlanner) findGenerations() tsmGenerations {
-	generations := map[int]*tsmGeneration{}
-
 	tsmStats := c.FileStore.Stats()
+	generations := make(map[int]*tsmGeneration, len(tsmStats))
 	for _, f := range tsmStats {
 		gen, _, _ := ParseTSMFileName(f.Path)
 
@@ -489,53 +491,78 @@ type Compactor struct {
 		NextGeneration() int
 	}
 
-	mu      sync.RWMutex
-	opened  bool
-	closing chan struct{}
-	files   map[string]struct{}
+	mu                 sync.RWMutex
+	snapshotsEnabled   bool
+	compactionsEnabled bool
+
+	files map[string]struct{}
 }
 
 func (c *Compactor) Open() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.opened {
+	if c.snapshotsEnabled || c.compactionsEnabled {
 		return
 	}
 
-	c.closing = make(chan struct{})
-	c.opened = true
+	c.snapshotsEnabled = true
+	c.compactionsEnabled = true
 	c.files = make(map[string]struct{})
 }
 
 func (c *Compactor) Close() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if !c.opened {
+	if !(c.snapshotsEnabled || c.compactionsEnabled) {
 		return
 	}
-	c.opened = false
-	close(c.closing)
+	c.snapshotsEnabled = false
+	c.compactionsEnabled = false
+}
+
+func (c *Compactor) DisableSnapshots() {
+	c.mu.Lock()
+	c.snapshotsEnabled = false
+	c.mu.Unlock()
+}
+
+func (c *Compactor) EnableSnapshots() {
+	c.mu.Lock()
+	c.snapshotsEnabled = true
+	c.mu.Unlock()
+}
+
+func (c *Compactor) DisableCompactions() {
+	c.mu.Lock()
+	c.compactionsEnabled = false
+	c.mu.Unlock()
+}
+
+func (c *Compactor) EnableCompactions() {
+	c.mu.Lock()
+	c.compactionsEnabled = true
+	c.mu.Unlock()
 }
 
 // WriteSnapshot will write a Cache snapshot to a new TSM files.
 func (c *Compactor) WriteSnapshot(cache *Cache) ([]string, error) {
 	c.mu.RLock()
-	opened := c.opened
+	enabled := c.snapshotsEnabled
 	c.mu.RUnlock()
 
-	if !opened {
+	if !enabled {
 		return nil, errSnapshotsDisabled
 	}
 
 	iter := NewCacheKeyIterator(cache, tsdb.DefaultMaxPointsPerBlock)
 	files, err := c.writeNewFiles(c.FileStore.NextGeneration(), 0, iter)
 
-	// See if we were closed while writing a snapshot
+	// See if we were disabled while writing a snapshot
 	c.mu.RLock()
-	opened = c.opened
+	enabled = c.snapshotsEnabled
 	c.mu.RUnlock()
 
-	if !opened {
+	if !enabled {
 		return nil, errSnapshotsDisabled
 	}
 
@@ -599,10 +626,10 @@ func (c *Compactor) compact(fast bool, tsmFiles []string) ([]string, error) {
 // Compact will write multiple smaller TSM files into 1 or more larger files
 func (c *Compactor) CompactFull(tsmFiles []string) ([]string, error) {
 	c.mu.RLock()
-	opened := c.opened
+	enabled := c.compactionsEnabled
 	c.mu.RUnlock()
 
-	if !opened {
+	if !enabled {
 		return nil, errCompactionsDisabled
 	}
 
@@ -613,12 +640,12 @@ func (c *Compactor) CompactFull(tsmFiles []string) ([]string, error) {
 
 	files, err := c.compact(false, tsmFiles)
 
-	// See if we were closed while writing a snapshot
+	// See if we were disabled while writing a snapshot
 	c.mu.RLock()
-	opened = c.opened
+	enabled = c.compactionsEnabled
 	c.mu.RUnlock()
 
-	if !opened {
+	if !enabled {
 		return nil, errCompactionsDisabled
 	}
 
@@ -628,10 +655,10 @@ func (c *Compactor) CompactFull(tsmFiles []string) ([]string, error) {
 // Compact will write multiple smaller TSM files into 1 or more larger files
 func (c *Compactor) CompactFast(tsmFiles []string) ([]string, error) {
 	c.mu.RLock()
-	opened := c.opened
+	enabled := c.compactionsEnabled
 	c.mu.RUnlock()
 
-	if !opened {
+	if !enabled {
 		return nil, errCompactionsDisabled
 	}
 
@@ -642,12 +669,12 @@ func (c *Compactor) CompactFast(tsmFiles []string) ([]string, error) {
 
 	files, err := c.compact(true, tsmFiles)
 
-	// See if we were closed while writing a snapshot
+	// See if we were disabled while writing a snapshot
 	c.mu.RLock()
-	opened = c.opened
+	enabled = c.compactionsEnabled
 	c.mu.RUnlock()
 
-	if !opened {
+	if !enabled {
 		return nil, errCompactionsDisabled
 	}
 
@@ -715,14 +742,12 @@ func (c *Compactor) write(path string, iter KeyIterator) (err error) {
 
 	for iter.Next() {
 		c.mu.RLock()
-		select {
-		case <-c.closing:
-			c.mu.RUnlock()
-			return errCompactionAborted
-		default:
-		}
+		enabled := c.snapshotsEnabled || c.compactionsEnabled
 		c.mu.RUnlock()
 
+		if !enabled {
+			return errCompactionAborted
+		}
 		// Each call to read returns the next sorted key (or the prior one if there are
 		// more values to write).  The size of values will be less than or equal to our
 		// chunk size (1000)

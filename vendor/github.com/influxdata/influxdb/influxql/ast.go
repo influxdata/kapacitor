@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"regexp/syntax"
 	"sort"
 	"strconv"
 	"strings"
@@ -409,7 +410,6 @@ func IsSystemName(name string) bool {
 	case "_fieldKeys",
 		"_measurements",
 		"_series",
-		"_tagKey",
 		"_tagKeys",
 		"_tags":
 		return true
@@ -463,10 +463,10 @@ type CreateDatabaseStatement struct {
 	RetentionPolicyCreate bool
 
 	// RetentionPolicyDuration indicates retention duration for the new database
-	RetentionPolicyDuration time.Duration
+	RetentionPolicyDuration *time.Duration
 
 	// RetentionPolicyReplication indicates retention replication for the new database
-	RetentionPolicyReplication int
+	RetentionPolicyReplication *int
 
 	// RetentionPolicyName indicates retention name for the new database
 	RetentionPolicyName string
@@ -481,16 +481,23 @@ func (s *CreateDatabaseStatement) String() string {
 	_, _ = buf.WriteString("CREATE DATABASE ")
 	_, _ = buf.WriteString(QuoteIdent(s.Name))
 	if s.RetentionPolicyCreate {
-		_, _ = buf.WriteString(" WITH DURATION ")
-		_, _ = buf.WriteString(s.RetentionPolicyDuration.String())
-		_, _ = buf.WriteString(" REPLICATION ")
-		_, _ = buf.WriteString(strconv.Itoa(s.RetentionPolicyReplication))
+		_, _ = buf.WriteString(" WITH")
+		if s.RetentionPolicyDuration != nil {
+			_, _ = buf.WriteString(" DURATION ")
+			_, _ = buf.WriteString(s.RetentionPolicyDuration.String())
+		}
+		if s.RetentionPolicyReplication != nil {
+			_, _ = buf.WriteString(" REPLICATION ")
+			_, _ = buf.WriteString(strconv.Itoa(*s.RetentionPolicyReplication))
+		}
 		if s.RetentionPolicyShardGroupDuration > 0 {
 			_, _ = buf.WriteString(" SHARD DURATION ")
 			_, _ = buf.WriteString(s.RetentionPolicyShardGroupDuration.String())
 		}
-		_, _ = buf.WriteString(" NAME ")
-		_, _ = buf.WriteString(QuoteIdent(s.RetentionPolicyName))
+		if s.RetentionPolicyName != "" {
+			_, _ = buf.WriteString(" NAME ")
+			_, _ = buf.WriteString(QuoteIdent(s.RetentionPolicyName))
+		}
 	}
 
 	return buf.String()
@@ -886,6 +893,8 @@ const (
 	NumberFill
 	// PreviousFill means that empty aggregate windows will be filled with whatever the previous aggregate window had
 	PreviousFill
+	// LinearFill means that empty aggregate windows will be filled with whatever a linear value between non null windows
+	LinearFill
 )
 
 // SelectStatement represents a command for extracting data from the database.
@@ -1120,6 +1129,12 @@ func (s *SelectStatement) RewriteFields(ic IteratorCreator) (*SelectStatement, e
 					}
 					rwFields = append(rwFields, &Field{Expr: &VarRef{Val: ref.Val, Type: ref.Type}})
 				}
+			case *RegexLiteral:
+				for _, ref := range fields {
+					if expr.Val.MatchString(ref.Val) {
+						rwFields = append(rwFields, &Field{Expr: &VarRef{Val: ref.Val, Type: ref.Type}})
+					}
+				}
 			case *Call:
 				// Clone a template that we can modify and use for new fields.
 				template := CloneExpr(expr).(*Call)
@@ -1141,10 +1156,16 @@ func (s *SelectStatement) RewriteFields(ic IteratorCreator) (*SelectStatement, e
 					continue
 				}
 
-				wc, ok := call.Args[0].(*Wildcard)
-				if ok && wc.Type == TAG {
-					return s, fmt.Errorf("unable to use tag wildcard in %s()", call.Name)
-				} else if !ok {
+				// Retrieve if this is a wildcard or a regular expression.
+				var re *regexp.Regexp
+				switch expr := call.Args[0].(type) {
+				case *Wildcard:
+					if expr.Type == TAG {
+						return s, fmt.Errorf("unable to use tag wildcard in %s()", call.Name)
+					}
+				case *RegexLiteral:
+					re = expr.Val
+				default:
 					rwFields = append(rwFields, f)
 					continue
 				}
@@ -1159,9 +1180,7 @@ func (s *SelectStatement) RewriteFields(ic IteratorCreator) (*SelectStatement, e
 				switch call.Name {
 				case "count", "first", "last", "distinct", "elapsed", "mode":
 					supportedTypes[String] = struct{}{}
-					supportedTypes[Boolean] = struct{}{}
-				case "stddev":
-					supportedTypes[String] = struct{}{}
+					fallthrough
 				case "min", "max":
 					supportedTypes[Boolean] = struct{}{}
 				}
@@ -1172,6 +1191,8 @@ func (s *SelectStatement) RewriteFields(ic IteratorCreator) (*SelectStatement, e
 					if ref.Type == Tag {
 						continue
 					} else if _, ok := supportedTypes[ref.Type]; !ok {
+						continue
+					} else if re != nil && !re.MatchString(ref.Val) {
 						continue
 					}
 
@@ -1194,10 +1215,16 @@ func (s *SelectStatement) RewriteFields(ic IteratorCreator) (*SelectStatement, e
 		// Allocate a slice assuming there is exactly one wildcard for efficiency.
 		rwDimensions := make(Dimensions, 0, len(s.Dimensions)+len(dimensions)-1)
 		for _, d := range s.Dimensions {
-			switch d.Expr.(type) {
+			switch expr := d.Expr.(type) {
 			case *Wildcard:
 				for _, name := range dimensions {
 					rwDimensions = append(rwDimensions, &Dimension{Expr: &VarRef{Val: name}})
+				}
+			case *RegexLiteral:
+				for _, name := range dimensions {
+					if expr.Val.MatchString(name) {
+						rwDimensions = append(rwDimensions, &Dimension{Expr: &VarRef{Val: name}})
+					}
 				}
 			default:
 				rwDimensions = append(rwDimensions, d)
@@ -1207,6 +1234,93 @@ func (s *SelectStatement) RewriteFields(ic IteratorCreator) (*SelectStatement, e
 	}
 
 	return other, nil
+}
+
+// RewriteRegexExprs rewrites regex conditions to make better use of the
+// database index.
+//
+// Conditions that can currently be simplified are:
+//
+//     - host =~ /^foo$/ becomes host = 'foo'
+//     - host !~ /^foo$/ becomes host != 'foo'
+//
+// Note: if the regex contains groups, character classes, repetition or
+// similar, it's likely it won't be rewritten. In order to support rewriting
+// regexes with these characters would be a lot more work.
+func (s *SelectStatement) RewriteRegexConditions() {
+	s.Condition = RewriteExpr(s.Condition, func(e Expr) Expr {
+		be, ok := e.(*BinaryExpr)
+		if !ok || (be.Op != EQREGEX && be.Op != NEQREGEX) {
+			// This expression is not a binary condition or doesn't have a
+			// regex based operator.
+			return e
+		}
+
+		// Handle regex-based condition.
+		rhs := be.RHS.(*RegexLiteral) // This must be a regex.
+
+		val, ok := matchExactRegex(rhs.Val.String())
+		if !ok {
+			// Regex didn't match.
+			return e
+		}
+
+		// Remove leading and trailing ^ and $.
+		be.RHS = &StringLiteral{Val: val}
+
+		// Update the condition operator.
+		if be.Op == EQREGEX {
+			be.Op = EQ
+		} else {
+			be.Op = NEQ
+		}
+		return be
+	})
+}
+
+// matchExactRegex matches regexes that have the following form: /^foo$/. It
+// considers /^$/ to be a matching regex.
+func matchExactRegex(v string) (string, bool) {
+	re, err := syntax.Parse(v, syntax.Perl)
+	if err != nil {
+		// Nothing we can do or log.
+		return "", false
+	}
+
+	if re.Op != syntax.OpConcat {
+		return "", false
+	}
+
+	if len(re.Sub) < 2 || len(re.Sub) > 3 {
+		// Regex has too few or too many subexpressions.
+		return "", false
+	}
+
+	start := re.Sub[0]
+	if !(start.Op == syntax.OpBeginLine || start.Op == syntax.OpBeginText) {
+		// Regex does not begin with ^
+		return "", false
+	}
+
+	end := re.Sub[len(re.Sub)-1]
+	if !(end.Op == syntax.OpEndLine || end.Op == syntax.OpEndText) {
+		// Regex does not end with $
+		return "", false
+	}
+
+	if len(re.Sub) == 3 {
+		middle := re.Sub[1]
+		if middle.Op != syntax.OpLiteral {
+			// Regex does not contain a literal op.
+			return "", false
+		}
+
+		// We can rewrite this regex.
+		return string(middle.Rune), true
+	}
+
+	// The regex /^$/
+	return "", true
 }
 
 // RewriteDistinct rewrites the expression to be a call for map/reduce to work correctly
@@ -1350,6 +1464,8 @@ func (s *SelectStatement) String() string {
 		_, _ = buf.WriteString(" fill(none)")
 	case NumberFill:
 		_, _ = buf.WriteString(fmt.Sprintf(" fill(%v)", s.FillValue))
+	case LinearFill:
+		_, _ = buf.WriteString(" fill(linear)")
 	case PreviousFill:
 		_, _ = buf.WriteString(" fill(previous)")
 	}
@@ -1410,8 +1526,8 @@ func (s *SelectStatement) HasFieldWildcard() (hasWildcard bool) {
 		if hasWildcard {
 			return
 		}
-		_, ok := n.(*Wildcard)
-		if ok {
+		switch n.(type) {
+		case *Wildcard, *RegexLiteral:
 			hasWildcard = true
 		}
 	})
@@ -1422,8 +1538,8 @@ func (s *SelectStatement) HasFieldWildcard() (hasWildcard bool) {
 // at least 1 wildcard in the dimensions aka `GROUP BY`
 func (s *SelectStatement) HasDimensionWildcard() bool {
 	for _, d := range s.Dimensions {
-		_, ok := d.Expr.(*Wildcard)
-		if ok {
+		switch d.Expr.(type) {
+		case *Wildcard, *RegexLiteral:
 			return true
 		}
 	}
@@ -1505,6 +1621,7 @@ func (s *SelectStatement) validateDimensions() error {
 				return errors.New("time() is a function and expects at least one argument")
 			}
 		case *Wildcard:
+		case *RegexLiteral:
 		default:
 			return errors.New("only time and tag dimensions allowed")
 		}
@@ -1534,7 +1651,7 @@ func (s *SelectStatement) validSelectWithAggregate() error {
 	onlySelectors := true
 	for k := range calls {
 		switch k {
-		case "top", "bottom", "max", "min", "first", "last", "percentile":
+		case "top", "bottom", "max", "min", "first", "last", "percentile", "sample":
 		default:
 			onlySelectors = false
 			break
@@ -1591,7 +1708,7 @@ func (s *SelectStatement) validPercentileAggr(expr *Call) error {
 	}
 
 	switch expr.Args[0].(type) {
-	case *VarRef:
+	case *VarRef, *RegexLiteral, *Wildcard:
 		// do nothing
 	default:
 		return fmt.Errorf("expected field argument in percentile()")
@@ -1605,20 +1722,40 @@ func (s *SelectStatement) validPercentileAggr(expr *Call) error {
 	}
 }
 
+// validPercentileAggr determines if PERCENTILE have valid arguments.
+func (s *SelectStatement) validSampleAggr(expr *Call) error {
+	if err := s.validSelectWithAggregate(); err != nil {
+		return err
+	}
+	if exp, got := 2, len(expr.Args); got != exp {
+		return fmt.Errorf("invalid number of arguments for %s, expected %d, got %d", expr.Name, exp, got)
+	}
+
+	switch expr.Args[0].(type) {
+	case *VarRef, *RegexLiteral, *Wildcard:
+		// do nothing
+	default:
+		return fmt.Errorf("expected field argument in sample()")
+	}
+
+	switch expr.Args[1].(type) {
+	case *IntegerLiteral:
+		return nil
+	default:
+		return fmt.Errorf("expected integer argument in sample()")
+	}
+}
+
 func (s *SelectStatement) validateAggregates(tr targetRequirement) error {
 	for _, f := range s.Fields {
 		for _, expr := range walkFunctionCalls(f.Expr) {
 			switch expr.Name {
-			case "derivative", "non_negative_derivative", "difference", "moving_average", "elapsed":
+			case "derivative", "non_negative_derivative", "difference", "moving_average", "cumulative_sum", "elapsed":
 				if err := s.validSelectWithAggregate(); err != nil {
 					return err
 				}
 				switch expr.Name {
-				case "derivative", "non_negative_derivative":
-					if min, max, got := 1, 2, len(expr.Args); got > max || got < min {
-						return fmt.Errorf("invalid number of arguments for %s, expected at least %d but no more than %d, got %d", expr.Name, min, max, got)
-					}
-				case "elapsed":
+				case "derivative", "non_negative_derivative", "elapsed":
 					if min, max, got := 1, 2, len(expr.Args); got > max || got < min {
 						return fmt.Errorf("invalid number of arguments for %s, expected at least %d but no more than %d, got %d", expr.Name, min, max, got)
 					}
@@ -1626,12 +1763,12 @@ func (s *SelectStatement) validateAggregates(tr targetRequirement) error {
 					if len(expr.Args) == 2 {
 						// Second must be a duration .e.g (1h)
 						if _, ok := expr.Args[1].(*DurationLiteral); !ok {
-							return errors.New("elapsed requires a duration argument")
+							return fmt.Errorf("second argument to %s must be a duration, got %T", expr.Name, expr.Args[1])
 						}
 					}
-				case "difference":
+				case "difference", "cumulative_sum":
 					if got := len(expr.Args); got != 1 {
-						return fmt.Errorf("invalid number of arguments for difference, expected 1, got %d", got)
+						return fmt.Errorf("invalid number of arguments for %s, expected 1, got %d", expr.Name, got)
 					}
 				case "moving_average":
 					if got := len(expr.Args); got != 2 {
@@ -1672,7 +1809,7 @@ func (s *SelectStatement) validateAggregates(tr targetRequirement) error {
 						}
 
 						switch fc := c.Args[0].(type) {
-						case *VarRef, *Wildcard:
+						case *VarRef, *Wildcard, *RegexLiteral:
 							// do nothing
 						case *Call:
 							if fc.Name != "distinct" || expr.Name != "count" {
@@ -1697,6 +1834,10 @@ func (s *SelectStatement) validateAggregates(tr targetRequirement) error {
 				}
 			case "percentile":
 				if err := s.validPercentileAggr(expr); err != nil {
+					return err
+				}
+			case "sample":
+				if err := s.validSampleAggr(expr); err != nil {
 					return err
 				}
 			case "holt_winters", "holt_winters_with_fit":
@@ -1736,7 +1877,7 @@ func (s *SelectStatement) validateAggregates(tr targetRequirement) error {
 					return fmt.Errorf("invalid number of arguments for %s, expected %d, got %d", expr.Name, exp, got)
 				}
 				switch fc := expr.Args[0].(type) {
-				case *VarRef, *Wildcard:
+				case *VarRef, *Wildcard, *RegexLiteral:
 					// do nothing
 				case *Call:
 					if fc.Name != "distinct" || expr.Name != "count" {
@@ -1914,71 +2055,6 @@ func (s *SelectStatement) rewriteWithoutTimeDimensions() string {
 	return n.String()
 }
 
-/*
-
-BinaryExpr
-
-SELECT mean(xxx.value) + avg(yyy.value) FROM xxx JOIN yyy WHERE xxx.host = 123
-
-from xxx where host = 123
-select avg(value) from yyy where host = 123
-
-SELECT xxx.value FROM xxx WHERE xxx.host = 123
-SELECT yyy.value FROM yyy
-
----
-
-SELECT MEAN(xxx.value) + MEAN(cpu.load.value)
-FROM xxx JOIN yyy
-GROUP BY host
-WHERE (xxx.region == "uswest" OR yyy.region == "uswest") AND xxx.otherfield == "XXX"
-
-select * from (
-	select mean + mean from xxx join yyy
-	group by time(5m), host
-) (xxx.region == "uswest" OR yyy.region == "uswest") AND xxx.otherfield == "XXX"
-
-(seriesIDS for xxx.region = 'uswest' union seriesIDs for yyy.regnion = 'uswest') | seriesIDS xxx.otherfield = 'XXX'
-
-WHERE xxx.region == "uswest" AND xxx.otherfield == "XXX"
-WHERE yyy.region == "uswest"
-
-
-*/
-
-// Substatement returns a single-series statement for a given variable reference.
-func (s *SelectStatement) Substatement(ref *VarRef) (*SelectStatement, error) {
-	// Copy dimensions and properties to new statement.
-	other := &SelectStatement{
-		Fields:     Fields{{Expr: ref}},
-		Dimensions: s.Dimensions,
-		Limit:      s.Limit,
-		Offset:     s.Offset,
-		SortFields: s.SortFields,
-	}
-
-	// If there is only one series source then return it with the whole condition.
-	if len(s.Sources) == 1 {
-		other.Sources = s.Sources
-		other.Condition = s.Condition
-		return other, nil
-	}
-
-	// Find the matching source.
-	name := MatchSource(s.Sources, ref.Val)
-	if name == "" {
-		return nil, fmt.Errorf("field source not found: %s", ref.Val)
-	}
-	other.Sources = append(other.Sources, &Measurement{Name: name})
-
-	// Filter out conditions.
-	if s.Condition != nil {
-		other.Condition = filterExprBySource(name, s.Condition)
-	}
-
-	return other, nil
-}
-
 // NamesInWhere returns the field and tag names (idents) referenced in the where clause
 func (s *SelectStatement) NamesInWhere() []string {
 	var a []string
@@ -2060,7 +2136,7 @@ func walkRefs(exp Expr) []VarRef {
 	case *VarRef:
 		return []VarRef{*expr}
 	case *Call:
-		var a []VarRef
+		a := make([]VarRef, 0, len(expr.Args))
 		for _, expr := range expr.Args {
 			if ref, ok := expr.(*VarRef); ok {
 				a = append(a, *ref)
@@ -2068,9 +2144,11 @@ func walkRefs(exp Expr) []VarRef {
 		}
 		return a
 	case *BinaryExpr:
-		var ret []VarRef
-		ret = append(ret, walkRefs(expr.LHS)...)
-		ret = append(ret, walkRefs(expr.RHS)...)
+		lhs := walkRefs(expr.LHS)
+		rhs := walkRefs(expr.RHS)
+		ret := make([]VarRef, 0, len(lhs)+len(rhs))
+		ret = append(ret, lhs...)
+		ret = append(ret, rhs...)
 		return ret
 	case *ParenExpr:
 		return walkRefs(expr.Expr)
@@ -2238,6 +2316,10 @@ func (s *DeleteStatement) RequiredPrivileges() (ExecutionPrivileges, error) {
 
 // ShowSeriesStatement represents a command for listing series in the database.
 type ShowSeriesStatement struct {
+	// Database to query. If blank, use the default database.
+	// The database can also be specified per source in the Sources.
+	Database string
+
 	// Measurement(s) the series are listed for.
 	Sources Sources
 
@@ -2260,6 +2342,10 @@ func (s *ShowSeriesStatement) String() string {
 	var buf bytes.Buffer
 	_, _ = buf.WriteString("SHOW SERIES")
 
+	if s.Database != "" {
+		_, _ = buf.WriteString(" ON ")
+		_, _ = buf.WriteString(QuoteIdent(s.Database))
+	}
 	if s.Sources != nil {
 		_, _ = buf.WriteString(" FROM ")
 		_, _ = buf.WriteString(s.Sources.String())
@@ -2511,6 +2597,9 @@ func (s *DropContinuousQueryStatement) RequiredPrivileges() (ExecutionPrivileges
 
 // ShowMeasurementsStatement represents a command for listing measurements.
 type ShowMeasurementsStatement struct {
+	// Database to query. If blank, use the default database.
+	Database string
+
 	// Measurement name or regex.
 	Source Source
 
@@ -2533,6 +2622,10 @@ func (s *ShowMeasurementsStatement) String() string {
 	var buf bytes.Buffer
 	_, _ = buf.WriteString("SHOW MEASUREMENTS")
 
+	if s.Database != "" {
+		_, _ = buf.WriteString(" ON ")
+		_, _ = buf.WriteString(s.Database)
+	}
 	if s.Source != nil {
 		_, _ = buf.WriteString(" WITH MEASUREMENT ")
 		if m, ok := s.Source.(*Measurement); ok && m.Regex != nil {
@@ -2607,8 +2700,11 @@ type ShowRetentionPoliciesStatement struct {
 // String returns a string representation of a ShowRetentionPoliciesStatement.
 func (s *ShowRetentionPoliciesStatement) String() string {
 	var buf bytes.Buffer
-	_, _ = buf.WriteString("SHOW RETENTION POLICIES ON ")
-	_, _ = buf.WriteString(QuoteIdent(s.Database))
+	_, _ = buf.WriteString("SHOW RETENTION POLICIES")
+	if s.Database != "" {
+		_, _ = buf.WriteString(" ON ")
+		_, _ = buf.WriteString(QuoteIdent(s.Database))
+	}
 	return buf.String()
 }
 
@@ -2626,10 +2722,10 @@ type ShowStatsStatement struct {
 // String returns a string representation of a ShowStatsStatement.
 func (s *ShowStatsStatement) String() string {
 	var buf bytes.Buffer
-	_, _ = buf.WriteString("SHOW STATS ")
+	_, _ = buf.WriteString("SHOW STATS")
 	if s.Module != "" {
-		_, _ = buf.WriteString("FOR ")
-		_, _ = buf.WriteString(s.Module)
+		_, _ = buf.WriteString(" FOR ")
+		_, _ = buf.WriteString(QuoteString(s.Module))
 	}
 	return buf.String()
 }
@@ -2670,10 +2766,10 @@ type ShowDiagnosticsStatement struct {
 // String returns a string representation of the ShowDiagnosticsStatement.
 func (s *ShowDiagnosticsStatement) String() string {
 	var buf bytes.Buffer
-	_, _ = buf.WriteString("SHOW DIAGNOSTICS ")
+	_, _ = buf.WriteString("SHOW DIAGNOSTICS")
 	if s.Module != "" {
-		_, _ = buf.WriteString("FOR ")
-		_, _ = buf.WriteString(s.Module)
+		_, _ = buf.WriteString(" FOR ")
+		_, _ = buf.WriteString(QuoteString(s.Module))
 	}
 	return buf.String()
 }
@@ -2752,6 +2848,10 @@ func (s *ShowSubscriptionsStatement) RequiredPrivileges() (ExecutionPrivileges, 
 
 // ShowTagKeysStatement represents a command for listing tag keys.
 type ShowTagKeysStatement struct {
+	// Database to query. If blank, use the default database.
+	// The database can also be specified per source in the Sources.
+	Database string
+
 	// Data sources that fields are extracted from.
 	Sources Sources
 
@@ -2779,6 +2879,10 @@ func (s *ShowTagKeysStatement) String() string {
 	var buf bytes.Buffer
 	_, _ = buf.WriteString("SHOW TAG KEYS")
 
+	if s.Database != "" {
+		_, _ = buf.WriteString(" ON ")
+		_, _ = buf.WriteString(QuoteIdent(s.Database))
+	}
 	if s.Sources != nil {
 		_, _ = buf.WriteString(" FROM ")
 		_, _ = buf.WriteString(s.Sources.String())
@@ -2817,6 +2921,10 @@ func (s *ShowTagKeysStatement) RequiredPrivileges() (ExecutionPrivileges, error)
 
 // ShowTagValuesStatement represents a command for listing tag values.
 type ShowTagValuesStatement struct {
+	// Database to query. If blank, use the default database.
+	// The database can also be specified per source in the Sources.
+	Database string
+
 	// Data source that fields are extracted from.
 	Sources Sources
 
@@ -2845,6 +2953,10 @@ func (s *ShowTagValuesStatement) String() string {
 	var buf bytes.Buffer
 	_, _ = buf.WriteString("SHOW TAG VALUES")
 
+	if s.Database != "" {
+		_, _ = buf.WriteString(" ON ")
+		_, _ = buf.WriteString(QuoteIdent(s.Database))
+	}
 	if s.Sources != nil {
 		_, _ = buf.WriteString(" FROM ")
 		_, _ = buf.WriteString(s.Sources.String())
@@ -2852,7 +2964,11 @@ func (s *ShowTagValuesStatement) String() string {
 	_, _ = buf.WriteString(" WITH KEY ")
 	_, _ = buf.WriteString(s.Op.String())
 	_, _ = buf.WriteString(" ")
-	_, _ = buf.WriteString(s.TagKeyExpr.String())
+	if lit, ok := s.TagKeyExpr.(*StringLiteral); ok {
+		_, _ = buf.WriteString(QuoteIdent(lit.Val))
+	} else {
+		_, _ = buf.WriteString(s.TagKeyExpr.String())
+	}
 	if s.Condition != nil {
 		_, _ = buf.WriteString(" WHERE ")
 		_, _ = buf.WriteString(s.Condition.String())
@@ -2892,6 +3008,10 @@ func (s *ShowUsersStatement) RequiredPrivileges() (ExecutionPrivileges, error) {
 
 // ShowFieldKeysStatement represents a command for listing field keys.
 type ShowFieldKeysStatement struct {
+	// Database to query. If blank, use the default database.
+	// The database can also be specified per source in the Sources.
+	Database string
+
 	// Data sources that fields are extracted from.
 	Sources Sources
 
@@ -2911,6 +3031,10 @@ func (s *ShowFieldKeysStatement) String() string {
 	var buf bytes.Buffer
 	_, _ = buf.WriteString("SHOW FIELD KEYS")
 
+	if s.Database != "" {
+		_, _ = buf.WriteString(" ON ")
+		_, _ = buf.WriteString(QuoteIdent(s.Database))
+	}
 	if s.Sources != nil {
 		_, _ = buf.WriteString(" FROM ")
 		_, _ = buf.WriteString(s.Sources.String())
@@ -3327,6 +3451,33 @@ type StringLiteral struct {
 // String returns a string representation of the literal.
 func (l *StringLiteral) String() string { return QuoteString(l.Val) }
 
+// IsTimeLiteral returns if this string can be interpreted as a time literal.
+func (l *StringLiteral) IsTimeLiteral() bool {
+	return isDateTimeString(l.Val) || isDateString(l.Val)
+}
+
+// ToTimeLiteral returns a time literal if this string can be converted to a time literal.
+func (l *StringLiteral) ToTimeLiteral() (*TimeLiteral, error) {
+	if isDateTimeString(l.Val) {
+		t, err := time.Parse(DateTimeFormat, l.Val)
+		if err != nil {
+			// try to parse it as an RFCNano time
+			t, err = time.Parse(time.RFC3339Nano, l.Val)
+			if err != nil {
+				return nil, ErrInvalidTime
+			}
+		}
+		return &TimeLiteral{Val: t}, nil
+	} else if isDateString(l.Val) {
+		t, err := time.Parse(DateFormat, l.Val)
+		if err != nil {
+			return nil, ErrInvalidTime
+		}
+		return &TimeLiteral{Val: t}, nil
+	}
+	return nil, ErrInvalidTime
+}
+
 // TimeLiteral represents a point-in-time literal.
 type TimeLiteral struct {
 	Val time.Time
@@ -3630,7 +3781,7 @@ func TimeRange(expr Expr) (min, max time.Time, err error) {
 }
 
 // TimeRangeAsEpochNano returns the minimum and maximum times, as epoch nano, specified by
-// and expression. If there is no lower bound, the start of the epoch is returned
+// an expression. If there is no lower bound, the minimum time is returned
 // for minimum. If there is no higher bound, now is returned for maximum.
 func TimeRangeAsEpochNano(expr Expr) (min, max int64, err error) {
 	tmin, tmax, err := TimeRange(expr)
@@ -3639,7 +3790,7 @@ func TimeRangeAsEpochNano(expr Expr) (min, max int64, err error) {
 	}
 
 	if tmin.IsZero() {
-		min = time.Unix(0, 0).UnixNano()
+		min = time.Unix(0, MinTime).UnixNano()
 	} else {
 		min = tmin.UnixNano()
 	}
@@ -3657,22 +3808,12 @@ func timeExprValue(ref Expr, lit Expr) (t time.Time, err error) {
 	if ref, ok := ref.(*VarRef); ok && strings.ToLower(ref.Val) == "time" {
 		// If literal looks like a date time then parse it as a time literal.
 		if strlit, ok := lit.(*StringLiteral); ok {
-			if isDateTimeString(strlit.Val) {
-				t, err := time.Parse(DateTimeFormat, strlit.Val)
+			if strlit.IsTimeLiteral() {
+				t, err := strlit.ToTimeLiteral()
 				if err != nil {
-					// try to parse it as an RFCNano time
-					t, err = time.Parse(time.RFC3339Nano, strlit.Val)
-					if err != nil {
-						return time.Time{}, ErrInvalidTime
-					}
+					return time.Time{}, err
 				}
-				lit = &TimeLiteral{Val: t}
-			} else if isDateString(strlit.Val) {
-				t, err := time.Parse(DateFormat, strlit.Val)
-				if err != nil {
-					return time.Time{}, ErrInvalidTime
-				}
-				lit = &TimeLiteral{Val: t}
+				lit = t
 			}
 		}
 
@@ -3680,7 +3821,9 @@ func timeExprValue(ref Expr, lit Expr) (t time.Time, err error) {
 		case *TimeLiteral:
 			if lit.Val.After(time.Unix(0, MaxTime)) {
 				return time.Time{}, fmt.Errorf("time %s overflows time literal", lit.Val.Format(time.RFC3339))
-			} else if lit.Val.Before(time.Unix(0, MinTime)) {
+			} else if lit.Val.Before(time.Unix(0, MinTime+1)) {
+				// The minimum allowable time literal is one greater than the minimum time because the minimum time
+				// is a sentinel value only used internally.
 				return time.Time{}, fmt.Errorf("time %s underflows time literal", lit.Val.Format(time.RFC3339))
 			}
 			return lit.Val, nil
@@ -4245,6 +4388,18 @@ func reduceBinaryExprDurationLHS(op Token, lhs *DurationLiteral, rhs Expr) Expr 
 		case ADD:
 			return &TimeLiteral{Val: rhs.Val.Add(lhs.Val)}
 		}
+	case *StringLiteral:
+		t, err := rhs.ToTimeLiteral()
+		if err != nil {
+			break
+		}
+		expr := reduceBinaryExprDurationLHS(op, lhs, t)
+
+		// If the returned expression is still a binary expr, that means
+		// we couldn't reduce it so this wasn't used in a time literal context.
+		if _, ok := expr.(*BinaryExpr); !ok {
+			return expr
+		}
 	case *nilLiteral:
 		return &BooleanLiteral{Val: false}
 	}
@@ -4288,6 +4443,22 @@ func reduceBinaryExprIntegerLHS(op Token, lhs *IntegerLiteral, rhs Expr) Expr {
 			return &TimeLiteral{Val: time.Unix(0, lhs.Val).Add(rhs.Val)}
 		case SUB:
 			return &TimeLiteral{Val: time.Unix(0, lhs.Val).Add(-rhs.Val)}
+		}
+	case *TimeLiteral:
+		d := &DurationLiteral{Val: time.Duration(lhs.Val)}
+		expr := reduceBinaryExprDurationLHS(op, d, rhs)
+		if _, ok := expr.(*BinaryExpr); !ok {
+			return expr
+		}
+	case *StringLiteral:
+		t, err := rhs.ToTimeLiteral()
+		if err != nil {
+			break
+		}
+		d := &DurationLiteral{Val: time.Duration(lhs.Val)}
+		expr := reduceBinaryExprDurationLHS(op, d, t)
+		if _, ok := expr.(*BinaryExpr); !ok {
+			return expr
 		}
 	case *nilLiteral:
 		return &BooleanLiteral{Val: false}
@@ -4368,11 +4539,105 @@ func reduceBinaryExprStringLHS(op Token, lhs *StringLiteral, rhs Expr) Expr {
 	case *StringLiteral:
 		switch op {
 		case EQ:
-			return &BooleanLiteral{Val: lhs.Val == rhs.Val}
+			var expr Expr = &BooleanLiteral{Val: lhs.Val == rhs.Val}
+			// This might be a comparison between time literals.
+			// If it is, parse the time literals and then compare since it
+			// could be a different result if they use different formats
+			// for the same time.
+			if lhs.IsTimeLiteral() && rhs.IsTimeLiteral() {
+				tlhs, err := lhs.ToTimeLiteral()
+				if err != nil {
+					return expr
+				}
+
+				trhs, err := rhs.ToTimeLiteral()
+				if err != nil {
+					return expr
+				}
+
+				t := reduceBinaryExprTimeLHS(op, tlhs, trhs)
+				if _, ok := t.(*BinaryExpr); !ok {
+					expr = t
+				}
+			}
+			return expr
 		case NEQ:
-			return &BooleanLiteral{Val: lhs.Val != rhs.Val}
+			var expr Expr = &BooleanLiteral{Val: lhs.Val != rhs.Val}
+			// This might be a comparison between time literals.
+			// If it is, parse the time literals and then compare since it
+			// could be a different result if they use different formats
+			// for the same time.
+			if lhs.IsTimeLiteral() && rhs.IsTimeLiteral() {
+				tlhs, err := lhs.ToTimeLiteral()
+				if err != nil {
+					return expr
+				}
+
+				trhs, err := rhs.ToTimeLiteral()
+				if err != nil {
+					return expr
+				}
+
+				t := reduceBinaryExprTimeLHS(op, tlhs, trhs)
+				if _, ok := t.(*BinaryExpr); !ok {
+					expr = t
+				}
+			}
+			return expr
 		case ADD:
 			return &StringLiteral{Val: lhs.Val + rhs.Val}
+		default:
+			// Attempt to convert the string literal to a time literal.
+			t, err := lhs.ToTimeLiteral()
+			if err != nil {
+				break
+			}
+			expr := reduceBinaryExprTimeLHS(op, t, rhs)
+
+			// If the returned expression is still a binary expr, that means
+			// we couldn't reduce it so this wasn't used in a time literal context.
+			if _, ok := expr.(*BinaryExpr); !ok {
+				return expr
+			}
+		}
+	case *DurationLiteral:
+		// Attempt to convert the string literal to a time literal.
+		t, err := lhs.ToTimeLiteral()
+		if err != nil {
+			break
+		}
+		expr := reduceBinaryExprTimeLHS(op, t, rhs)
+
+		// If the returned expression is still a binary expr, that means
+		// we couldn't reduce it so this wasn't used in a time literal context.
+		if _, ok := expr.(*BinaryExpr); !ok {
+			return expr
+		}
+	case *TimeLiteral:
+		// Attempt to convert the string literal to a time literal.
+		t, err := lhs.ToTimeLiteral()
+		if err != nil {
+			break
+		}
+		expr := reduceBinaryExprTimeLHS(op, t, rhs)
+
+		// If the returned expression is still a binary expr, that means
+		// we couldn't reduce it so this wasn't used in a time literal context.
+		if _, ok := expr.(*BinaryExpr); !ok {
+			return expr
+		}
+	case *IntegerLiteral:
+		// Attempt to convert the string literal to a time literal.
+		t, err := lhs.ToTimeLiteral()
+		if err != nil {
+			break
+		}
+		expr := reduceBinaryExprTimeLHS(op, t, rhs)
+
+		// If the returned expression is still a binary expr, that means
+		// we couldn't reduce it so this wasn't used in a time literal context.
+		if _, ok := expr.(*BinaryExpr); !ok {
+			return expr
 		}
 	case *nilLiteral:
 		switch op {
@@ -4392,6 +4657,12 @@ func reduceBinaryExprTimeLHS(op Token, lhs *TimeLiteral, rhs Expr) Expr {
 		case SUB:
 			return &TimeLiteral{Val: lhs.Val.Add(-rhs.Val)}
 		}
+	case *IntegerLiteral:
+		d := &DurationLiteral{Val: time.Duration(rhs.Val)}
+		expr := reduceBinaryExprTimeLHS(op, lhs, d)
+		if _, ok := expr.(*BinaryExpr); !ok {
+			return expr
+		}
 	case *TimeLiteral:
 		switch op {
 		case SUB:
@@ -4408,6 +4679,18 @@ func reduceBinaryExprTimeLHS(op Token, lhs *TimeLiteral, rhs Expr) Expr {
 			return &BooleanLiteral{Val: lhs.Val.Before(rhs.Val)}
 		case LTE:
 			return &BooleanLiteral{Val: lhs.Val.Before(rhs.Val) || lhs.Val.Equal(rhs.Val)}
+		}
+	case *StringLiteral:
+		t, err := rhs.ToTimeLiteral()
+		if err != nil {
+			break
+		}
+		expr := reduceBinaryExprTimeLHS(op, lhs, t)
+
+		// If the returned expression is still a binary expr, that means
+		// we couldn't reduce it so this wasn't used in a time literal context.
+		if _, ok := expr.(*BinaryExpr); !ok {
+			return expr
 		}
 	case *nilLiteral:
 		return &BooleanLiteral{Val: false}

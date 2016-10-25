@@ -677,12 +677,6 @@ func newStddevIterator(input Iterator, opt IteratorOptions) (Iterator, error) {
 			return fn, fn
 		}
 		return &integerReduceFloatIterator{input: newBufIntegerIterator(input), opt: opt, create: createFn}, nil
-	case StringIterator:
-		createFn := func() (StringPointAggregator, StringPointEmitter) {
-			fn := NewStringSliceFuncReducer(StringStddevReduceSlice)
-			return fn, fn
-		}
-		return &stringReduceStringIterator{input: newBufStringIterator(input), opt: opt, create: createFn}, nil
 	default:
 		return nil, fmt.Errorf("unsupported stddev iterator type: %T", input)
 	}
@@ -744,11 +738,6 @@ func IntegerStddevReduceSlice(a []IntegerPoint) []FloatPoint {
 		Time:  ZeroTime,
 		Value: math.Sqrt(variance / float64(count-1)),
 	}}
-}
-
-// StringStddevReduceSlice always returns "".
-func StringStddevReduceSlice(a []StringPoint) []StringPoint {
-	return []StringPoint{{Time: ZeroTime, Value: ""}}
 }
 
 // newSpreadIterator returns an iterator for operating on a spread() call.
@@ -1227,6 +1216,26 @@ func newMovingAverageIterator(input Iterator, n int, opt IteratorOptions) (Itera
 	}
 }
 
+// newCumulativeSumIterator returns an iterator for operating on a cumulative_sum() call.
+func newCumulativeSumIterator(input Iterator, opt IteratorOptions) (Iterator, error) {
+	switch input := input.(type) {
+	case FloatIterator:
+		createFn := func() (FloatPointAggregator, FloatPointEmitter) {
+			fn := NewFloatCumulativeSumReducer()
+			return fn, fn
+		}
+		return newFloatStreamFloatIterator(input, createFn, opt), nil
+	case IntegerIterator:
+		createFn := func() (IntegerPointAggregator, IntegerPointEmitter) {
+			fn := NewIntegerCumulativeSumReducer()
+			return fn, fn
+		}
+		return newIntegerStreamIntegerIterator(input, createFn, opt), nil
+	default:
+		return nil, fmt.Errorf("unsupported cumulative sum iterator type: %T", input)
+	}
+}
+
 // newHoltWintersIterator returns an iterator for operating on a elapsed() call.
 func newHoltWintersIterator(input Iterator, opt IteratorOptions, h, m int, includeFitData bool, interval time.Duration) (Iterator, error) {
 	switch input := input.(type) {
@@ -1242,6 +1251,43 @@ func newHoltWintersIterator(input Iterator, opt IteratorOptions, h, m int, inclu
 			return fn, fn
 		}
 		return &integerReduceFloatIterator{input: newBufIntegerIterator(input), opt: opt, create: createFn}, nil
+	default:
+		return nil, fmt.Errorf("unsupported elapsed iterator type: %T", input)
+	}
+}
+
+// NewSampleIterator returns an iterator
+func NewSampleIterator(input Iterator, opt IteratorOptions, size int) (Iterator, error) {
+	return newSampleIterator(input, opt, size)
+}
+
+// newSampleIterator returns an iterator
+func newSampleIterator(input Iterator, opt IteratorOptions, size int) (Iterator, error) {
+	switch input := input.(type) {
+	case FloatIterator:
+		createFn := func() (FloatPointAggregator, FloatPointEmitter) {
+			fn := NewFloatSampleReducer(size)
+			return fn, fn
+		}
+		return &floatReduceFloatIterator{input: newBufFloatIterator(input), opt: opt, create: createFn}, nil
+	case IntegerIterator:
+		createFn := func() (IntegerPointAggregator, IntegerPointEmitter) {
+			fn := NewIntegerSampleReducer(size)
+			return fn, fn
+		}
+		return &integerReduceIntegerIterator{input: newBufIntegerIterator(input), opt: opt, create: createFn}, nil
+	case BooleanIterator:
+		createFn := func() (BooleanPointAggregator, BooleanPointEmitter) {
+			fn := NewBooleanSampleReducer(size)
+			return fn, fn
+		}
+		return &booleanReduceBooleanIterator{input: newBufBooleanIterator(input), opt: opt, create: createFn}, nil
+	case StringIterator:
+		createFn := func() (StringPointAggregator, StringPointEmitter) {
+			fn := NewStringSampleReducer(size)
+			return fn, fn
+		}
+		return &stringReduceStringIterator{input: newBufStringIterator(input), opt: opt, create: createFn}, nil
 	default:
 		return nil, fmt.Errorf("unsupported elapsed iterator type: %T", input)
 	}

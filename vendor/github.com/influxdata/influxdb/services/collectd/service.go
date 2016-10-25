@@ -49,16 +49,18 @@ type Service struct {
 	Logger       *log.Logger
 
 	wg      sync.WaitGroup
-	err     chan error
-	stop    chan struct{}
 	conn    *net.UDPConn
 	batcher *tsdb.PointBatcher
 	typesdb gollectd.Types
 	addr    net.Addr
 
+	mu    sync.RWMutex
+	ready bool          // Has the required database been created?
+	done  chan struct{} // Is the service closing or closed?
+
 	// expvar-based stats.
-	stats    *Statistics
-	statTags models.Tags
+	stats       *Statistics
+	defaultTags models.StatisticTags
 }
 
 // NewService returns a new instance of the collectd service.
@@ -67,10 +69,9 @@ func NewService(c Config) *Service {
 		// Use defaults where necessary.
 		Config: c.WithDefaults(),
 
-		Logger:   log.New(os.Stderr, "[collectd] ", log.LstdFlags),
-		err:      make(chan error),
-		stats:    &Statistics{},
-		statTags: map[string]string{"bind": c.BindAddress},
+		Logger:      log.New(os.Stderr, "[collectd] ", log.LstdFlags),
+		stats:       &Statistics{},
+		defaultTags: models.StatisticTags{"bind": c.BindAddress},
 	}
 
 	return &s
@@ -78,6 +79,14 @@ func NewService(c Config) *Service {
 
 // Open starts the service.
 func (s *Service) Open() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.closed() {
+		return nil // Already open.
+	}
+	s.done = make(chan struct{})
+
 	s.Logger.Printf("Starting collectd service")
 
 	if s.Config.BindAddress == "" {
@@ -86,11 +95,6 @@ func (s *Service) Open() error {
 		return fmt.Errorf("database name is blank")
 	} else if s.PointsWriter == nil {
 		return fmt.Errorf("PointsWriter is nil")
-	}
-
-	if _, err := s.MetaClient.CreateDatabase(s.Config.Database); err != nil {
-		s.Logger.Printf("Failed to ensure target database %s exists: %s", s.Config.Database, err.Error())
-		return err
 	}
 
 	if s.typesdb == nil {
@@ -142,7 +146,6 @@ func (s *Service) Open() error {
 			s.typesdb = typesdb
 		}
 	}
-
 	// Resolve our address.
 	addr, err := net.ResolveUDPAddr("udp", s.Config.BindAddress)
 	if err != nil {
@@ -171,23 +174,26 @@ func (s *Service) Open() error {
 	s.batcher = tsdb.NewPointBatcher(s.Config.BatchSize, s.Config.BatchPending, time.Duration(s.Config.BatchDuration))
 	s.batcher.Start()
 
-	// Create channel and wait group for signalling goroutines to stop.
-	s.stop = make(chan struct{})
+	// Create waitgroup for signalling goroutines to stop and start goroutines
+	// that process collectd packets.
 	s.wg.Add(2)
-
-	// Start goroutines that process collectd packets.
-	go s.serve()
-	go s.writePoints()
+	go func() { defer s.wg.Done(); s.serve() }()
+	go func() { defer s.wg.Done(); s.writePoints() }()
 
 	return nil
 }
 
 // Close stops the service.
 func (s *Service) Close() error {
-	// Close the connection, and wait for the goroutine to exit.
-	if s.stop != nil {
-		close(s.stop)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.closed() {
+		return nil // Already closed.
 	}
+	close(s.done)
+
+	// Close the connection, and wait for the goroutine to exit.
 	if s.conn != nil {
 		s.conn.Close()
 	}
@@ -197,10 +203,40 @@ func (s *Service) Close() error {
 	s.wg.Wait()
 
 	// Release all remaining resources.
-	s.stop = nil
 	s.conn = nil
 	s.batcher = nil
 	s.Logger.Println("collectd UDP closed")
+	s.done = nil
+	return nil
+}
+
+func (s *Service) closed() bool {
+	select {
+	case <-s.done:
+		// Service is closing.
+		return true
+	default:
+	}
+	return s.done == nil
+}
+
+// createInternalStorage ensures that the required database has been created.
+func (s *Service) createInternalStorage() error {
+	s.mu.RLock()
+	ready := s.ready
+	s.mu.RUnlock()
+	if ready {
+		return nil
+	}
+
+	if _, err := s.MetaClient.CreateDatabase(s.Config.Database); err != nil {
+		return err
+	}
+
+	// The service is now ready.
+	s.mu.Lock()
+	s.ready = true
+	s.mu.Unlock()
 	return nil
 }
 
@@ -226,7 +262,7 @@ type Statistics struct {
 func (s *Service) Statistics(tags map[string]string) []models.Statistic {
 	return []models.Statistic{{
 		Name: "collectd",
-		Tags: s.statTags.Merge(tags),
+		Tags: s.defaultTags.Merge(tags),
 		Values: map[string]interface{}{
 			statPointsReceived:       atomic.LoadInt64(&s.stats.PointsReceived),
 			statBytesReceived:        atomic.LoadInt64(&s.stats.BytesReceived),
@@ -246,17 +282,12 @@ func (s *Service) SetTypes(types string) (err error) {
 	return
 }
 
-// Err returns a channel for fatal errors that occur on go routines.
-func (s *Service) Err() chan error { return s.err }
-
 // Addr returns the listener's address. Returns nil if listener is closed.
 func (s *Service) Addr() net.Addr {
 	return s.conn.LocalAddr()
 }
 
 func (s *Service) serve() {
-	defer s.wg.Done()
-
 	// From https://collectd.org/wiki/index.php/Binary_protocol
 	//   1024 bytes (payload only, not including UDP / IP headers)
 	//   In versions 4.0 through 4.7, the receive buffer has a fixed size
@@ -269,7 +300,7 @@ func (s *Service) serve() {
 
 	for {
 		select {
-		case <-s.stop:
+		case <-s.done:
 			// We closed the connection, time to go.
 			return
 		default:
@@ -306,13 +337,17 @@ func (s *Service) handleMessage(buffer []byte) {
 }
 
 func (s *Service) writePoints() {
-	defer s.wg.Done()
-
 	for {
 		select {
-		case <-s.stop:
+		case <-s.done:
 			return
 		case batch := <-s.batcher.Out():
+			// Will attempt to create database if not yet created.
+			if err := s.createInternalStorage(); err != nil {
+				s.Logger.Printf("Required database %s not yet created: %s", s.Config.Database, err.Error())
+				continue
+			}
+
 			if err := s.PointsWriter.WritePoints(s.Config.Database, s.Config.RetentionPolicy, models.ConsistencyLevelAny, batch); err == nil {
 				atomic.AddInt64(&s.stats.BatchesTransmitted, 1)
 				atomic.AddInt64(&s.stats.PointsTransmitted, int64(len(batch)))
@@ -360,8 +395,9 @@ func (s *Service) UnmarshalCollectd(packet *gollectd.Packet) []models.Point {
 		if packet.TypeInstance != "" {
 			tags["type_instance"] = packet.TypeInstance
 		}
-		p, err := models.NewPoint(name, tags, fields, timestamp)
+
 		// Drop invalid points
+		p, err := models.NewPoint(name, models.NewTags(tags), fields, timestamp)
 		if err != nil {
 			s.Logger.Printf("Dropping point %v: %v", name, err)
 			atomic.AddInt64(&s.stats.InvalidDroppedPoints, 1)

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/url"
 	"os"
@@ -17,6 +18,8 @@ import (
 	"strings"
 	"syscall"
 	"text/tabwriter"
+
+	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/influxdata/influxdb/client"
 	"github.com/influxdata/influxdb/importer/v8"
@@ -58,6 +61,7 @@ type CommandLine struct {
 	Chunked          bool
 	Quit             chan struct{}
 	IgnoreSignals    bool // Ignore signals normally caught by this process (used primarily for testing)
+	ForceTTY         bool // Force the CLI to act as if it were connected to a TTY
 	osSignals        chan os.Signal
 	historyFilePath  string
 }
@@ -73,6 +77,22 @@ func New(version string) *CommandLine {
 
 // Run executes the CLI
 func (c *CommandLine) Run() error {
+	// If we are not running in an interactive terminal, read stdin completely
+	// and execute a query. Do not allow meta commands.
+	if !c.ForceTTY && !terminal.IsTerminal(int(os.Stdin.Fd())) {
+		if err := c.Connect(""); err != nil {
+			return fmt.Errorf(
+				"Failed to connect to %s\nPlease check your connection settings and ensure 'influxd' is running.",
+				c.Client.Addr())
+		}
+
+		cmd, err := ioutil.ReadAll(os.Stdin)
+		if err != nil {
+			return err
+		}
+		return c.ExecuteQuery(string(cmd))
+	}
+
 	if !c.IgnoreSignals {
 		// register OS signals for graceful termination
 		signal.Notify(c.osSignals, syscall.SIGINT, syscall.SIGTERM)
@@ -100,6 +120,15 @@ func (c *CommandLine) Run() error {
 		} else {
 			c.Password = p
 		}
+	}
+
+	// Read environment variables for username/password.
+	if c.Username == "" {
+		c.Username = os.Getenv("INFLUX_USERNAME")
+	}
+	// If we prompted for a password, always use the entered password.
+	if !promptForPassword && c.Password == "" {
+		c.Password = os.Getenv("INFLUX_PASSWORD")
 	}
 
 	if err := c.Connect(""); err != nil {
@@ -200,7 +229,7 @@ func (c *CommandLine) mainLoop() error {
 				c.exit()
 				return e
 			}
-			if err := c.ParseCommand(l); err != ErrBlankCommand {
+			if err := c.ParseCommand(l); err != ErrBlankCommand && !strings.HasPrefix(strings.TrimSpace(l), "auth") {
 				c.Line.AppendHistory(l)
 				c.saveHistory()
 			}
@@ -570,7 +599,8 @@ func (c *CommandLine) DatabaseToken() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if response.Error() != nil || len((*response).Results[0].Series) == 0 {
+
+	if response.Error() != nil || len(response.Results) == 0 || len(response.Results[0].Series) == 0 {
 		return "", nil
 	}
 
@@ -645,7 +675,7 @@ func (c *CommandLine) writeColumns(response *client.Response, w io.Writer) {
 // formatResults will behave differently if you are formatting for columns or csv
 func (c *CommandLine) formatResults(result client.Result, separator string) []string {
 	rows := []string{}
-	// Create a tabbed writer for each result a they won't always line up
+	// Create a tabbed writer for each result as they won't always line up
 	for i, row := range result.Series {
 		// gather tags
 		tags := []string{}
@@ -676,15 +706,11 @@ func (c *CommandLine) formatResults(result client.Result, separator string) []st
 			rows = append(rows, "")
 		}
 
-		// If we are column format, we break out the name/tag to seperate lines
+		// If we are column format, we break out the name/tag to separate lines
 		if c.Format == "column" {
 			if row.Name != "" {
 				n := fmt.Sprintf("name: %s", row.Name)
 				rows = append(rows, n)
-				if len(tags) == 0 {
-					l := strings.Repeat("-", len(n))
-					rows = append(rows, l)
-				}
 			}
 			if len(tags) > 0 {
 				t := fmt.Sprintf("tags: %s", (strings.Join(tags, ", ")))
@@ -694,8 +720,8 @@ func (c *CommandLine) formatResults(result client.Result, separator string) []st
 
 		rows = append(rows, strings.Join(columnNames, separator))
 
-		// if format is column, break tags to their own line/format
-		if c.Format == "column" && len(tags) > 0 {
+		// if format is column, write dashes under each column
+		if c.Format == "column" {
 			lines := []string{}
 			for _, columnName := range columnNames {
 				lines = append(lines, strings.Repeat("-", len(columnName)))
@@ -719,7 +745,7 @@ func (c *CommandLine) formatResults(result client.Result, separator string) []st
 			}
 			rows = append(rows, strings.Join(values, separator))
 		}
-		// Outout a line separator if in column format
+		// Output a line separator if in column format
 		if c.Format == "column" {
 			rows = append(rows, "")
 		}
@@ -745,7 +771,7 @@ func interfaceToString(v interface{}) string {
 // Settings prints current settings
 func (c *CommandLine) Settings() {
 	w := new(tabwriter.Writer)
-	w.Init(os.Stdout, 0, 8, 1, '\t', 0)
+	w.Init(os.Stdout, 0, 1, 1, '\t', 0)
 	if c.Port > 0 {
 		fmt.Fprintf(w, "Host\t%s:%d\n", c.Host, c.Port)
 	} else {

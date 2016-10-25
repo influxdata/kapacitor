@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -83,7 +84,7 @@ type WritePointsRequest struct {
 // AddPoint adds a point to the WritePointRequest with field key 'value'
 func (w *WritePointsRequest) AddPoint(name string, value interface{}, timestamp time.Time, tags map[string]string) {
 	pt, err := models.NewPoint(
-		name, tags, map[string]interface{}{"value": value}, timestamp,
+		name, models.NewTags(tags), map[string]interface{}{"value": value}, timestamp,
 	)
 	if err != nil {
 		return
@@ -117,12 +118,7 @@ func NewShardMapping() *ShardMapping {
 
 // MapPoint maps a point to shard
 func (s *ShardMapping) MapPoint(shardInfo *meta.ShardInfo, p models.Point) {
-	points, ok := s.Points[shardInfo.ID]
-	if !ok {
-		s.Points[shardInfo.ID] = []models.Point{p}
-	} else {
-		s.Points[shardInfo.ID] = append(points, p)
-	}
+	s.Points[shardInfo.ID] = append(s.Points[shardInfo.ID], p)
 	s.Shards[shardInfo.ID] = shardInfo
 }
 
@@ -195,10 +191,6 @@ func (w *PointsWriter) Statistics(tags map[string]string) []models.Statistic {
 // maps to a shard group or shard that does not currently exist, it will be
 // created before returning the mapping.
 func (w *PointsWriter) MapShards(wp *WritePointsRequest) (*ShardMapping, error) {
-
-	// holds the start time ranges for required shard groups
-	timeRanges := map[time.Time]*meta.ShardGroupInfo{}
-
 	rp, err := w.MetaClient.RetentionPolicy(wp.Database, wp.RetentionPolicy)
 	if err != nil {
 		return nil, err
@@ -206,44 +198,83 @@ func (w *PointsWriter) MapShards(wp *WritePointsRequest) (*ShardMapping, error) 
 		return nil, influxdb.ErrRetentionPolicyNotFound(wp.RetentionPolicy)
 	}
 
-	// Find the minimum time for a point if the retention policy has a shard
-	// group duration. We will automatically drop any points before this time.
-	// There is a chance of a time on the edge of the shard group duration to
-	// sneak through even after it has been removed, but the circumstances are
-	// rare enough and don't matter enough that we don't account for this
-	// edge case.
+	// Holds all the shard groups and shards that are required for writes.
+	list := make(sgList, 0, 8)
 	min := time.Unix(0, models.MinNanoTime)
 	if rp.Duration > 0 {
 		min = time.Now().Add(-rp.Duration)
 	}
 
 	for _, p := range wp.Points {
-		if p.Time().Before(min) {
+		// Either the point is outside the scope of the RP, or we already have
+		// a suitable shard group for the point.
+		if p.Time().Before(min) || list.Covers(p.Time()) {
 			continue
 		}
-		timeRanges[p.Time().Truncate(rp.ShardGroupDuration)] = nil
-	}
 
-	// holds all the shard groups and shards that are required for writes
-	for t := range timeRanges {
-		sg, err := w.MetaClient.CreateShardGroup(wp.Database, wp.RetentionPolicy, t)
+		// No shard groups overlap with the point's time, so we will create
+		// a new shard group for this point.
+		sg, err := w.MetaClient.CreateShardGroup(wp.Database, wp.RetentionPolicy, p.Time())
 		if err != nil {
 			return nil, err
 		}
-		timeRanges[t] = sg
+
+		if sg == nil {
+			return nil, errors.New("nil shard group")
+		}
+		list = list.Append(*sg)
 	}
 
 	mapping := NewShardMapping()
 	for _, p := range wp.Points {
-		sg, ok := timeRanges[p.Time().Truncate(rp.ShardGroupDuration)]
-		if !ok {
+		sg := list.ShardGroupAt(p.Time())
+		if sg == nil {
+			// We didn't create a shard group because the point was outside the
+			// scope of the RP.
 			atomic.AddInt64(&w.stats.WriteDropped, 1)
 			continue
 		}
+
 		sh := sg.ShardFor(p.HashID())
 		mapping.MapPoint(&sh, p)
 	}
 	return mapping, nil
+}
+
+// sgList is a wrapper around a meta.ShardGroupInfos where we can also check
+// if a given time is covered by any of the shard groups in the list.
+type sgList meta.ShardGroupInfos
+
+func (l sgList) Covers(t time.Time) bool {
+	if len(l) == 0 {
+		return false
+	}
+	return l.ShardGroupAt(t) != nil
+}
+
+func (l sgList) ShardGroupAt(t time.Time) *meta.ShardGroupInfo {
+	// Attempt to find a shard group that could contain this point.
+	// Shard groups are sorted first according to end time, and then according
+	// to start time. Therefore, if there are multiple shard groups that match
+	// this point's time they will be preferred in this order:
+	//
+	//  - a shard group with the earliest end time;
+	//  - (assuming identical end times) the shard group with the earliest start
+	//    time.
+	idx := sort.Search(len(l), func(i int) bool { return l[i].EndTime.After(t) })
+
+	// We couldn't find a shard group the point falls into.
+	if idx == len(l) || t.Before(l[idx].StartTime) {
+		return nil
+	}
+	return &l[idx]
+}
+
+// Append appends a shard group to the list, and returns a sorted list.
+func (l sgList) Append(sgi meta.ShardGroupInfo) sgList {
+	next := append(l, sgi)
+	sort.Sort(meta.ShardGroupInfos(next))
+	return next
 }
 
 // WritePointsInto is a copy of WritePoints that uses a tsdb structure instead of
@@ -270,8 +301,7 @@ func (w *PointsWriter) WritePoints(database, retentionPolicy string, consistency
 		return err
 	}
 
-	// Write each shard in it's own goroutine and return as soon
-	// as one fails.
+	// Write each shard in it's own goroutine and return as soon as one fails.
 	ch := make(chan error, len(shardMappings.Points))
 	for shardID, points := range shardMappings.Points {
 		go func(shard *meta.ShardInfo, database, retentionPolicy string, points []models.Point) {

@@ -68,7 +68,7 @@ type TSMIndex interface {
 	Key(index int) (string, []IndexEntry)
 
 	// KeyAt returns the key in the index at the given postion.
-	KeyAt(index int) (string, byte)
+	KeyAt(index int) ([]byte, byte)
 
 	// KeyCount returns the count of unique keys in the index.
 	KeyCount() int
@@ -116,7 +116,7 @@ func (b *BlockIterator) PeekNext() string {
 		return b.key
 	} else if b.n-b.i > 1 {
 		key, _ := b.r.KeyAt(b.i + 1)
-		return key
+		return string(key)
 	}
 	return ""
 }
@@ -163,10 +163,10 @@ type blockAccessor interface {
 	read(key string, timestamp int64) ([]Value, error)
 	readAll(key string) ([]Value, error)
 	readBlock(entry *IndexEntry, values []Value) ([]Value, error)
-	readFloatBlock(entry *IndexEntry, tdec *TimeDecoder, fdec *FloatDecoder, values *[]FloatValue) ([]FloatValue, error)
-	readIntegerBlock(entry *IndexEntry, tdec *TimeDecoder, vdec *IntegerDecoder, values *[]IntegerValue) ([]IntegerValue, error)
-	readStringBlock(entry *IndexEntry, tdec *TimeDecoder, vdec *StringDecoder, values *[]StringValue) ([]StringValue, error)
-	readBooleanBlock(entry *IndexEntry, tdec *TimeDecoder, vdec *BooleanDecoder, values *[]BooleanValue) ([]BooleanValue, error)
+	readFloatBlock(entry *IndexEntry, values *[]FloatValue) ([]FloatValue, error)
+	readIntegerBlock(entry *IndexEntry, values *[]IntegerValue) ([]IntegerValue, error)
+	readStringBlock(entry *IndexEntry, values *[]StringValue) ([]StringValue, error)
+	readBooleanBlock(entry *IndexEntry, values *[]BooleanValue) ([]BooleanValue, error)
 	readBytes(entry *IndexEntry, buf []byte) (uint32, []byte, error)
 	rename(path string) error
 	path() string
@@ -243,7 +243,7 @@ func (t *TSMReader) Key(index int) (string, []IndexEntry) {
 }
 
 // KeyAt returns the key and key type at position idx in the index.
-func (t *TSMReader) KeyAt(idx int) (string, byte) {
+func (t *TSMReader) KeyAt(idx int) ([]byte, byte) {
 	return t.index.KeyAt(idx)
 }
 
@@ -254,30 +254,30 @@ func (t *TSMReader) ReadAt(entry *IndexEntry, vals []Value) ([]Value, error) {
 	return v, err
 }
 
-func (t *TSMReader) ReadFloatBlockAt(entry *IndexEntry, tdec *TimeDecoder, vdec *FloatDecoder, vals *[]FloatValue) ([]FloatValue, error) {
+func (t *TSMReader) ReadFloatBlockAt(entry *IndexEntry, vals *[]FloatValue) ([]FloatValue, error) {
 	t.mu.RLock()
-	v, err := t.accessor.readFloatBlock(entry, tdec, vdec, vals)
+	v, err := t.accessor.readFloatBlock(entry, vals)
 	t.mu.RUnlock()
 	return v, err
 }
 
-func (t *TSMReader) ReadIntegerBlockAt(entry *IndexEntry, tdec *TimeDecoder, vdec *IntegerDecoder, vals *[]IntegerValue) ([]IntegerValue, error) {
+func (t *TSMReader) ReadIntegerBlockAt(entry *IndexEntry, vals *[]IntegerValue) ([]IntegerValue, error) {
 	t.mu.RLock()
-	v, err := t.accessor.readIntegerBlock(entry, tdec, vdec, vals)
+	v, err := t.accessor.readIntegerBlock(entry, vals)
 	t.mu.RUnlock()
 	return v, err
 }
 
-func (t *TSMReader) ReadStringBlockAt(entry *IndexEntry, tdec *TimeDecoder, vdec *StringDecoder, vals *[]StringValue) ([]StringValue, error) {
+func (t *TSMReader) ReadStringBlockAt(entry *IndexEntry, vals *[]StringValue) ([]StringValue, error) {
 	t.mu.RLock()
-	v, err := t.accessor.readStringBlock(entry, tdec, vdec, vals)
+	v, err := t.accessor.readStringBlock(entry, vals)
 	t.mu.RUnlock()
 	return v, err
 }
 
-func (t *TSMReader) ReadBooleanBlockAt(entry *IndexEntry, tdec *TimeDecoder, vdec *BooleanDecoder, vals *[]BooleanValue) ([]BooleanValue, error) {
+func (t *TSMReader) ReadBooleanBlockAt(entry *IndexEntry, vals *[]BooleanValue) ([]BooleanValue, error) {
 	t.mu.RLock()
-	v, err := t.accessor.readBooleanBlock(entry, tdec, vdec, vals)
+	v, err := t.accessor.readBooleanBlock(entry, vals)
 	t.mu.RUnlock()
 	return v, err
 }
@@ -489,6 +489,13 @@ func (t *TSMReader) BlockIterator() *BlockIterator {
 	}
 }
 
+// deref removes mmap references held by another object.
+func (t *TSMReader) deref(d dereferencer) {
+	if acc, ok := t.accessor.(*mmapAccessor); ok && acc.b != nil {
+		d.Dereference(acc.b)
+	}
+}
+
 // indirectIndex is a TSMIndex that uses a raw byte slice representation of an index.  This
 // implementation can be used for indexes that may be MMAPed into memory.
 type indirectIndex struct {
@@ -612,7 +619,7 @@ func (d *indirectIndex) Entries(key string) []IndexEntry {
 		}
 
 		// The search may have returned an i == 0 which could indicated that the value
-		// searched should be inserted at postion 0.  Make sure the key in the index
+		// searched should be inserted at position 0.  Make sure the key in the index
 		// matches the search value.
 		if !bytes.Equal(kb, k) {
 			return nil
@@ -667,15 +674,15 @@ func (d *indirectIndex) Key(idx int) (string, []IndexEntry) {
 	return string(key), entries.entries
 }
 
-func (d *indirectIndex) KeyAt(idx int) (string, byte) {
+func (d *indirectIndex) KeyAt(idx int) ([]byte, byte) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
 	if idx < 0 || idx >= len(d.offsets) {
-		return "", 0
+		return nil, 0
 	}
 	n, key, _ := readKey(d.b[d.offsets[idx]:])
-	return string(key), d.b[d.offsets[idx]+int32(n)]
+	return key, d.b[d.offsets[idx]+int32(n)]
 }
 
 func (d *indirectIndex) KeyCount() int {
@@ -1034,7 +1041,7 @@ func (m *mmapAccessor) readBlock(entry *IndexEntry, values []Value) ([]Value, er
 	return values, nil
 }
 
-func (m *mmapAccessor) readFloatBlock(entry *IndexEntry, tdec *TimeDecoder, vdec *FloatDecoder, values *[]FloatValue) ([]FloatValue, error) {
+func (m *mmapAccessor) readFloatBlock(entry *IndexEntry, values *[]FloatValue) ([]FloatValue, error) {
 	m.mu.RLock()
 
 	if int64(len(m.b)) < entry.Offset+int64(entry.Size) {
@@ -1042,7 +1049,7 @@ func (m *mmapAccessor) readFloatBlock(entry *IndexEntry, tdec *TimeDecoder, vdec
 		return nil, ErrTSMClosed
 	}
 
-	a, err := DecodeFloatBlock(m.b[entry.Offset+4:entry.Offset+int64(entry.Size)], tdec, vdec, values)
+	a, err := DecodeFloatBlock(m.b[entry.Offset+4:entry.Offset+int64(entry.Size)], values)
 	m.mu.RUnlock()
 
 	if err != nil {
@@ -1052,7 +1059,7 @@ func (m *mmapAccessor) readFloatBlock(entry *IndexEntry, tdec *TimeDecoder, vdec
 	return a, nil
 }
 
-func (m *mmapAccessor) readIntegerBlock(entry *IndexEntry, tdec *TimeDecoder, vdec *IntegerDecoder, values *[]IntegerValue) ([]IntegerValue, error) {
+func (m *mmapAccessor) readIntegerBlock(entry *IndexEntry, values *[]IntegerValue) ([]IntegerValue, error) {
 	m.mu.RLock()
 
 	if int64(len(m.b)) < entry.Offset+int64(entry.Size) {
@@ -1060,7 +1067,7 @@ func (m *mmapAccessor) readIntegerBlock(entry *IndexEntry, tdec *TimeDecoder, vd
 		return nil, ErrTSMClosed
 	}
 
-	a, err := DecodeIntegerBlock(m.b[entry.Offset+4:entry.Offset+int64(entry.Size)], tdec, vdec, values)
+	a, err := DecodeIntegerBlock(m.b[entry.Offset+4:entry.Offset+int64(entry.Size)], values)
 	m.mu.RUnlock()
 
 	if err != nil {
@@ -1070,7 +1077,7 @@ func (m *mmapAccessor) readIntegerBlock(entry *IndexEntry, tdec *TimeDecoder, vd
 	return a, nil
 }
 
-func (m *mmapAccessor) readStringBlock(entry *IndexEntry, tdec *TimeDecoder, vdec *StringDecoder, values *[]StringValue) ([]StringValue, error) {
+func (m *mmapAccessor) readStringBlock(entry *IndexEntry, values *[]StringValue) ([]StringValue, error) {
 	m.mu.RLock()
 
 	if int64(len(m.b)) < entry.Offset+int64(entry.Size) {
@@ -1078,7 +1085,7 @@ func (m *mmapAccessor) readStringBlock(entry *IndexEntry, tdec *TimeDecoder, vde
 		return nil, ErrTSMClosed
 	}
 
-	a, err := DecodeStringBlock(m.b[entry.Offset+4:entry.Offset+int64(entry.Size)], tdec, vdec, values)
+	a, err := DecodeStringBlock(m.b[entry.Offset+4:entry.Offset+int64(entry.Size)], values)
 	m.mu.RUnlock()
 
 	if err != nil {
@@ -1088,7 +1095,7 @@ func (m *mmapAccessor) readStringBlock(entry *IndexEntry, tdec *TimeDecoder, vde
 	return a, nil
 }
 
-func (m *mmapAccessor) readBooleanBlock(entry *IndexEntry, tdec *TimeDecoder, vdec *BooleanDecoder, values *[]BooleanValue) ([]BooleanValue, error) {
+func (m *mmapAccessor) readBooleanBlock(entry *IndexEntry, values *[]BooleanValue) ([]BooleanValue, error) {
 	m.mu.RLock()
 
 	if int64(len(m.b)) < entry.Offset+int64(entry.Size) {
@@ -1096,7 +1103,7 @@ func (m *mmapAccessor) readBooleanBlock(entry *IndexEntry, tdec *TimeDecoder, vd
 		return nil, ErrTSMClosed
 	}
 
-	a, err := DecodeBooleanBlock(m.b[entry.Offset+4:entry.Offset+int64(entry.Size)], tdec, vdec, values)
+	a, err := DecodeBooleanBlock(m.b[entry.Offset+4:entry.Offset+int64(entry.Size)], values)
 	m.mu.RUnlock()
 
 	if err != nil {
@@ -1167,9 +1174,9 @@ func (m *mmapAccessor) readAll(key string) ([]Value, error) {
 
 func (m *mmapAccessor) path() string {
 	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	return m.f.Name()
+	path := m.f.Name()
+	m.mu.RUnlock()
+	return path
 }
 
 func (m *mmapAccessor) close() error {

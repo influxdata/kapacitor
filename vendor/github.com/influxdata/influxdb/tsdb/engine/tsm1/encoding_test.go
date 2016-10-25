@@ -1095,7 +1095,7 @@ func BenchmarkDecodeBlock_Float_TypeSpecific(b *testing.B) {
 	decodedValues := make([]tsm1.FloatValue, len(values))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err = tsm1.DecodeFloatBlock(bytes, &tsm1.TimeDecoder{}, &tsm1.FloatDecoder{}, &decodedValues)
+		_, err = tsm1.DecodeFloatBlock(bytes, &decodedValues)
 		if err != nil {
 			b.Fatalf("unexpected error decoding block: %v", err)
 		}
@@ -1164,7 +1164,7 @@ func BenchmarkDecodeBlock_Integer_TypeSpecific(b *testing.B) {
 	decodedValues := make([]tsm1.IntegerValue, len(values))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err = tsm1.DecodeIntegerBlock(bytes, &tsm1.TimeDecoder{}, &tsm1.IntegerDecoder{}, &decodedValues)
+		_, err = tsm1.DecodeIntegerBlock(bytes, &decodedValues)
 		if err != nil {
 			b.Fatalf("unexpected error decoding block: %v", err)
 		}
@@ -1233,7 +1233,7 @@ func BenchmarkDecodeBlock_Boolean_TypeSpecific(b *testing.B) {
 	decodedValues := make([]tsm1.BooleanValue, len(values))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err = tsm1.DecodeBooleanBlock(bytes, &tsm1.TimeDecoder{}, &tsm1.BooleanDecoder{}, &decodedValues)
+		_, err = tsm1.DecodeBooleanBlock(bytes, &decodedValues)
 		if err != nil {
 			b.Fatalf("unexpected error decoding block: %v", err)
 		}
@@ -1302,7 +1302,7 @@ func BenchmarkDecodeBlock_String_TypeSpecific(b *testing.B) {
 	decodedValues := make([]tsm1.StringValue, len(values))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err = tsm1.DecodeStringBlock(bytes, &tsm1.TimeDecoder{}, &tsm1.StringDecoder{}, &decodedValues)
+		_, err = tsm1.DecodeStringBlock(bytes, &decodedValues)
 		if err != nil {
 			b.Fatalf("unexpected error decoding block: %v", err)
 		}
@@ -1338,5 +1338,71 @@ func BenchmarkValues_Merge(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		tsm1.Values(a).Merge(c)
+	}
+}
+
+func BenchmarkValues_EncodeInteger(b *testing.B) {
+	valueCount := 1024
+	times := getTimes(valueCount, 60, time.Second)
+	a := make([]tsm1.Value, len(times))
+
+	for i, t := range times {
+		a[i] = tsm1.NewValue(t, int64(i))
+	}
+
+	buf := make([]byte, 1024*8)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		tsm1.Values(a).Encode(buf)
+	}
+}
+
+func BenchmarkValues_EncodeFloat(b *testing.B) {
+	valueCount := 1024
+	times := getTimes(valueCount, 60, time.Second)
+	a := make([]tsm1.Value, len(times))
+
+	for i, t := range times {
+		a[i] = tsm1.NewValue(t, float64(i))
+	}
+
+	buf := make([]byte, 1024*8)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		tsm1.Values(a).Encode(buf)
+	}
+}
+func BenchmarkValues_EncodeString(b *testing.B) {
+	valueCount := 1024
+	times := getTimes(valueCount, 60, time.Second)
+	a := make([]tsm1.Value, len(times))
+
+	for i, t := range times {
+		a[i] = tsm1.NewValue(t, fmt.Sprintf("%d", i))
+	}
+
+	buf := make([]byte, 1024*8)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		tsm1.Values(a).Encode(buf)
+	}
+}
+func BenchmarkValues_EncodeBool(b *testing.B) {
+	valueCount := 1024
+	times := getTimes(valueCount, 60, time.Second)
+	a := make([]tsm1.Value, len(times))
+
+	for i, t := range times {
+		if i%2 == 0 {
+			a[i] = tsm1.NewValue(t, true)
+		} else {
+			a[i] = tsm1.NewValue(t, false)
+		}
+	}
+
+	buf := make([]byte, 1024*8)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		tsm1.Values(a).Encode(buf)
 	}
 }

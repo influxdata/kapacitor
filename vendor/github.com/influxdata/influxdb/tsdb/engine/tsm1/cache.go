@@ -29,7 +29,9 @@ type entry struct {
 
 // newEntry returns a new instance of entry.
 func newEntry() *entry {
-	return &entry{}
+	return &entry{
+		values: make(Values, 0, 32),
+	}
 }
 
 // add adds the given values to the entry.
@@ -116,6 +118,9 @@ const (
 
 	statCachedBytes         = "cachedBytes"         // counter: Total number of bytes written into snapshots.
 	statWALCompactionTimeMs = "WALCompactionTimeMs" // counter: Total number of milliseconds spent compacting snapshots
+
+	writeOK  = "writeOk"
+	writeErr = "writeErr"
 )
 
 // Cache maintains an in-memory store of Values for a set of keys.
@@ -165,6 +170,8 @@ type CacheStatistics struct {
 	CacheAgeMs          int64
 	CachedBytes         int64
 	WALCompactionTimeMs int64
+	WriteOK             int64
+	WriteErr            int64
 }
 
 // Statistics returns statistics for periodic monitoring.
@@ -193,6 +200,7 @@ func (c *Cache) Write(key string, values []Value) error {
 	newSize := c.size + uint64(addedSize)
 	if c.maxSize > 0 && newSize+c.snapshotSize > c.maxSize {
 		c.mu.Unlock()
+		atomic.AddInt64(&c.stats.WriteErr, 1)
 		return ErrCacheMemoryExceeded
 	}
 
@@ -202,6 +210,7 @@ func (c *Cache) Write(key string, values []Value) error {
 
 	// Update the memory size stat
 	c.updateMemSize(int64(addedSize))
+	atomic.AddInt64(&c.stats.WriteOK, 1)
 
 	return nil
 }
@@ -219,6 +228,7 @@ func (c *Cache) WriteMulti(values map[string][]Value) error {
 	newSize := c.size + uint64(totalSz)
 	if c.maxSize > 0 && newSize+c.snapshotSize > c.maxSize {
 		c.mu.RUnlock()
+		atomic.AddInt64(&c.stats.WriteErr, 1)
 		return ErrCacheMemoryExceeded
 	}
 	c.mu.RUnlock()
@@ -232,6 +242,7 @@ func (c *Cache) WriteMulti(values map[string][]Value) error {
 
 	// Update the memory size stat
 	c.updateMemSize(int64(totalSz))
+	atomic.AddInt64(&c.stats.WriteOK, 1)
 
 	return nil
 }
@@ -252,7 +263,7 @@ func (c *Cache) Snapshot() (*Cache, error) {
 	// If no snapshot exists, create a new one, otherwise update the existing snapshot
 	if c.snapshot == nil {
 		c.snapshot = &Cache{
-			store: make(map[string]*entry),
+			store: make(map[string]*entry, len(c.store)),
 		}
 	}
 
@@ -273,8 +284,7 @@ func (c *Cache) Snapshot() (*Cache, error) {
 
 	snapshotSize := c.size // record the number of bytes written into a snapshot
 
-	// Reset the cache
-	c.store = make(map[string]*entry)
+	c.store = make(map[string]*entry, len(c.store))
 	c.size = 0
 	c.lastSnapshot = time.Now()
 
@@ -339,9 +349,65 @@ func (c *Cache) Keys() []string {
 
 // Values returns a copy of all values, deduped and sorted, for the given key.
 func (c *Cache) Values(key string) Values {
+	var snapshotEntries *entry
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.merged(key)
+	e := c.store[key]
+	if c.snapshot != nil {
+		snapshotEntries = c.snapshot.store[key]
+	}
+	c.mu.RUnlock()
+
+	if e == nil {
+		if snapshotEntries == nil {
+			// No values in hot cache or snapshots.
+			return nil
+		}
+	} else {
+		e.deduplicate()
+	}
+
+	// Build the sequence of entries that will be returned, in the correct order.
+	// Calculate the required size of the destination buffer.
+	var entries []*entry
+	sz := 0
+
+	if snapshotEntries != nil {
+		snapshotEntries.deduplicate() // guarantee we are deduplicated
+		entries = append(entries, snapshotEntries)
+		sz += snapshotEntries.count()
+	}
+
+	if e != nil {
+		entries = append(entries, e)
+		sz += e.count()
+	}
+
+	// Any entries? If not, return.
+	if sz == 0 {
+		return nil
+	}
+
+	// Create the buffer, and copy all hot values and snapshots. Individual
+	// entries are sorted at this point, so now the code has to check if the
+	// resultant buffer will be sorted from start to finish.
+	var needSort bool
+	values := make(Values, sz)
+	n := 0
+	for _, e := range entries {
+		e.mu.RLock()
+		if !needSort && n > 0 && len(e.values) > 0 {
+			needSort = values[n-1].UnixNano() >= e.values[0].UnixNano()
+		}
+		n += copy(values[n:], e.values)
+		e.mu.RUnlock()
+	}
+	values = values[:n]
+
+	if needSort {
+		values = values.Deduplicate()
+	}
+
+	return values
 }
 
 // Delete will remove the keys from the cache
@@ -378,74 +444,13 @@ func (c *Cache) DeleteRange(keys []string, min, max int64) {
 
 		c.size -= uint64(origSize - e.size())
 	}
+	atomic.StoreInt64(&c.stats.MemSizeBytes, int64(c.size))
 }
 
 func (c *Cache) SetMaxSize(size uint64) {
 	c.mu.Lock()
 	c.maxSize = size
 	c.mu.Unlock()
-}
-
-// merged returns a copy of hot and snapshot values. The copy will be merged, deduped, and
-// sorted. It assumes all necessary locks have been taken. If the caller knows that the
-// the hot source data for the key will not be changed, it is safe to call this function
-// with a read-lock taken. Otherwise it must be called with a write-lock taken.
-func (c *Cache) merged(key string) Values {
-	e := c.store[key]
-	if e == nil {
-		if c.snapshot == nil {
-			// No values in hot cache or snapshots.
-			return nil
-		}
-	} else {
-		e.deduplicate()
-	}
-
-	// Build the sequence of entries that will be returned, in the correct order.
-	// Calculate the required size of the destination buffer.
-	var entries []*entry
-	sz := 0
-
-	if c.snapshot != nil {
-		snapshotEntries := c.snapshot.store[key]
-		if snapshotEntries != nil {
-			snapshotEntries.deduplicate() // guarantee we are deduplicated
-			entries = append(entries, snapshotEntries)
-			sz += snapshotEntries.count()
-		}
-	}
-
-	if e != nil {
-		entries = append(entries, e)
-		sz += e.count()
-	}
-
-	// Any entries? If not, return.
-	if sz == 0 {
-		return nil
-	}
-
-	// Create the buffer, and copy all hot values and snapshots. Individual
-	// entries are sorted at this point, so now the code has to check if the
-	// resultant buffer will be sorted from start to finish.
-	var needSort bool
-	values := make(Values, sz)
-	n := 0
-	for _, e := range entries {
-		e.mu.RLock()
-		if !needSort && n > 0 && len(e.values) > 0 {
-			needSort = values[n-1].UnixNano() >= e.values[0].UnixNano()
-		}
-		n += copy(values[n:], e.values)
-		e.mu.RUnlock()
-	}
-	values = values[:n]
-
-	if needSort {
-		values = values.Deduplicate()
-	}
-
-	return values
 }
 
 // Store returns the underlying cache store. This is not goroutine safe!

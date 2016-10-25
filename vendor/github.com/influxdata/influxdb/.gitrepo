@@ -5,7 +5,7 @@
 ;
 [subrepo]
 	remote = https://github.com/influxdata/influxdb.git
-	branch = 1.0
-	commit = 5130cd703bbf5876c0cbc6273e01c2404b289dd6
-	parent = b382f601e381065c27b4bcf62fb15cc348bf5777
+	branch = master
+	commit = af72d9b0e4ebe95be30e89b160f43eabaf0529ed
+	parent = 7d5d8bc93906a5d9956ada6f6e89d62b8ca2b399
 	cmdver = 0.3.0

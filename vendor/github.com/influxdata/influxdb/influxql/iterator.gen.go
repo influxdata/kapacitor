@@ -494,103 +494,6 @@ func (itr *floatParallelIterator) monitor() {
 	}
 }
 
-type lazyFloatIterator struct {
-	itr FloatIterator
-	fn  func() (Iterator, error)
-}
-
-// init instantiates the underlying iterator.
-func (itr *lazyFloatIterator) init() error {
-	if itr.itr != nil {
-		return nil
-	}
-
-	i, err := itr.fn()
-	if err != nil {
-		return err
-	} else if i == nil {
-		return nil
-	}
-
-	if it, ok := i.(FloatIterator); ok {
-		itr.itr = it
-	} else {
-		return fmt.Errorf("invalid lazy float iterator type: %T", i)
-	}
-
-	return nil
-}
-
-func (itr *lazyFloatIterator) Close() error {
-	if itr.itr == nil {
-		return nil
-	}
-	return itr.itr.Close()
-}
-
-func (itr *lazyFloatIterator) Next() (*FloatPoint, error) {
-	if err := itr.init(); err != nil {
-		return nil, err
-	} else if itr.itr == nil {
-		return nil, nil
-	}
-	return itr.itr.Next()
-}
-
-func (itr *lazyFloatIterator) Stats() IteratorStats {
-	if itr.itr == nil {
-		return IteratorStats{}
-	}
-	return itr.itr.Stats()
-}
-
-// MultiFloatIterator represents an iterator that concatenates a list of iterators.
-type MultiFloatIterator []FloatIterator
-
-// NewMultiFloatIterator returns a pointer to a MultiFloatIterator.
-func NewMultiFloatIterator(a []FloatIterator) *MultiFloatIterator {
-	itr := MultiFloatIterator(a)
-	return &itr
-}
-
-// Close closes all iterators.
-func (a *MultiFloatIterator) Close() error {
-	for _, itr := range *a {
-		itr.Close()
-	}
-	return nil
-}
-
-// Next iterates over all points in all iterators sequentially.
-func (a *MultiFloatIterator) Next() (*FloatPoint, error) {
-	for {
-		// Return no point if
-		if len(*a) == 0 {
-			return nil, nil
-		}
-
-		// Read next point off the first iterator until EOF.
-		p, err := (*a)[0].Next()
-		if p == nil && err == nil {
-			if err := (*a)[0].Close(); err != nil {
-				return nil, err
-			}
-			*a = (*a)[1:]
-			continue
-		}
-		return p, err
-	}
-}
-
-// Stats returns the aggregation of all iterator stats.
-func (a *MultiFloatIterator) Stats() IteratorStats {
-	var stats IteratorStats
-	for _, itr := range *a {
-		stats.Add(itr.Stats())
-	}
-	return stats
-}
-
 type floatPointError struct {
 	point *FloatPoint
 	err   error
@@ -770,6 +673,23 @@ func (itr *floatFillIterator) Next() (*FloatPoint, error) {
 		}
 
 		switch itr.opt.Fill {
+		case LinearFill:
+			if !itr.prev.Nil {
+				next, err := itr.input.peek()
+				if err != nil {
+					return nil, err
+				}
+				if next != nil {
+					interval := int64(itr.opt.Interval.Duration)
+					start := itr.window.time / interval
+					p.Value = linearFloat(start, itr.prev.Time/interval, next.Time/interval, itr.prev.Value, next.Value)
+				} else {
+					p.Nil = true
+				}
+			} else {
+				p.Nil = true
+			}
+
 		case NullFill:
 			p.Nil = true
 		case NumberFill:
@@ -816,6 +736,11 @@ func (itr *floatIntervalIterator) Next() (*FloatPoint, error) {
 		return nil, err
 	}
 	p.Time, _ = itr.opt.Window(p.Time)
+	// If we see the minimum allowable time, set the time to zero so we don't
+	// break the default returned time for aggregate queries without times.
+	if p.Time == MinTime {
+		p.Time = 0
+	}
 	return p, nil
 }
 
@@ -1287,9 +1212,29 @@ func (itr *floatStreamFloatIterator) reduce() ([]FloatPoint, error) {
 // floatExprIterator executes a function to modify an existing point
 // for every output of the input iterator.
 type floatExprIterator struct {
-	left  *bufFloatIterator
-	right *bufFloatIterator
-	fn    floatExprFunc
+	left      *bufFloatIterator
+	right     *bufFloatIterator
+	fn        floatExprFunc
+	points    []FloatPoint // must be size 2
+	storePrev bool
+}
+
+func newFloatExprIterator(left, right FloatIterator, opt IteratorOptions, fn func(a, b float64) float64) *floatExprIterator {
+	var points []FloatPoint
+	switch opt.Fill {
+	case NullFill, PreviousFill:
+		points = []FloatPoint{{Nil: true}, {Nil: true}}
+	case NumberFill:
+		value := castToFloat(opt.FillValue)
+		points = []FloatPoint{{Value: value}, {Value: value}}
+	}
+	return &floatExprIterator{
+		left:      newBufFloatIterator(left),
+		right:     newBufFloatIterator(right),
+		points:    points,
+		fn:        fn,
+		storePrev: opt.Fill == PreviousFill,
+	}
 }
 
 func (itr *floatExprIterator) Stats() IteratorStats {
@@ -1305,24 +1250,70 @@ func (itr *floatExprIterator) Close() error {
 }
 
 func (itr *floatExprIterator) Next() (*FloatPoint, error) {
-	a, err := itr.left.Next()
-	if err != nil {
-		return nil, err
+	for {
+		a, err := itr.left.Next()
+		if err != nil {
+			return nil, err
+		}
+		b, err := itr.right.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		if a == nil && b == nil {
+			return nil, nil
+		} else if itr.points == nil && (a == nil || b == nil) {
+			return nil, nil
+		}
+
+		if a != nil && b != nil {
+			if a.Time > b.Time {
+				itr.left.unread(a)
+				a = nil
+			} else if a.Time < b.Time {
+				itr.right.unread(b)
+				b = nil
+			}
+		}
+
+		if a == nil || a.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *b
+			p.Value = itr.points[0].Value
+			p.Nil = itr.points[0].Nil
+			a = &p
+		} else if b == nil || b.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *a
+			p.Value = itr.points[1].Value
+			p.Nil = itr.points[1].Nil
+			b = &p
+		}
+
+		if itr.storePrev {
+			itr.points[0], itr.points[1] = *a, *b
+		}
+
+		if a.Nil {
+			return a, nil
+		} else if b.Nil {
+			return b, nil
+		}
+		a.Value = itr.fn(a.Value, b.Value)
+		return a, nil
+
 	}
-	b, err := itr.right.Next()
-	if err != nil {
-		return nil, err
-	} else if a == nil && b == nil {
-		return nil, nil
-	}
-	return itr.fn(a, b), nil
 }
 
 // floatExprFunc creates or modifies a point by combining two
 // points. The point passed in may be modified and returned rather than
 // allocating a new point if possible. One of the points may be nil, but at
 // least one of the points will be non-nil.
-type floatExprFunc func(a *FloatPoint, b *FloatPoint) *FloatPoint
+type floatExprFunc func(a, b float64) float64
 
 // floatReduceIntegerIterator executes a reducer for every interval and buffers the result.
 type floatReduceIntegerIterator struct {
@@ -1525,9 +1516,29 @@ func (itr *floatStreamIntegerIterator) reduce() ([]IntegerPoint, error) {
 // floatIntegerExprIterator executes a function to modify an existing point
 // for every output of the input iterator.
 type floatIntegerExprIterator struct {
-	left  *bufFloatIterator
-	right *bufFloatIterator
-	fn    floatIntegerExprFunc
+	left      *bufFloatIterator
+	right     *bufFloatIterator
+	fn        floatIntegerExprFunc
+	points    []FloatPoint // must be size 2
+	storePrev bool
+}
+
+func newFloatIntegerExprIterator(left, right FloatIterator, opt IteratorOptions, fn func(a, b float64) int64) *floatIntegerExprIterator {
+	var points []FloatPoint
+	switch opt.Fill {
+	case NullFill, PreviousFill:
+		points = []FloatPoint{{Nil: true}, {Nil: true}}
+	case NumberFill:
+		value := castToFloat(opt.FillValue)
+		points = []FloatPoint{{Value: value}, {Value: value}}
+	}
+	return &floatIntegerExprIterator{
+		left:      newBufFloatIterator(left),
+		right:     newBufFloatIterator(right),
+		points:    points,
+		fn:        fn,
+		storePrev: opt.Fill == PreviousFill,
+	}
 }
 
 func (itr *floatIntegerExprIterator) Stats() IteratorStats {
@@ -1543,24 +1554,74 @@ func (itr *floatIntegerExprIterator) Close() error {
 }
 
 func (itr *floatIntegerExprIterator) Next() (*IntegerPoint, error) {
-	a, err := itr.left.Next()
-	if err != nil {
-		return nil, err
+	for {
+		a, err := itr.left.Next()
+		if err != nil {
+			return nil, err
+		}
+		b, err := itr.right.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		if a == nil && b == nil {
+			return nil, nil
+		} else if itr.points == nil && (a == nil || b == nil) {
+			return nil, nil
+		}
+
+		if a != nil && b != nil {
+			if a.Time > b.Time {
+				itr.left.unread(a)
+				a = nil
+			} else if a.Time < b.Time {
+				itr.right.unread(b)
+				b = nil
+			}
+		}
+
+		if a == nil || a.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *b
+			p.Value = itr.points[0].Value
+			p.Nil = itr.points[0].Nil
+			a = &p
+		} else if b == nil || b.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *a
+			p.Value = itr.points[1].Value
+			p.Nil = itr.points[1].Nil
+			b = &p
+		}
+
+		if itr.storePrev {
+			itr.points[0], itr.points[1] = *a, *b
+		}
+
+		p := &IntegerPoint{
+			Name:       a.Name,
+			Tags:       a.Tags,
+			Time:       a.Time,
+			Nil:        a.Nil || b.Nil,
+			Aggregated: a.Aggregated,
+		}
+		if !p.Nil {
+			p.Value = itr.fn(a.Value, b.Value)
+		}
+		return p, nil
+
 	}
-	b, err := itr.right.Next()
-	if err != nil {
-		return nil, err
-	} else if a == nil && b == nil {
-		return nil, nil
-	}
-	return itr.fn(a, b), nil
 }
 
 // floatIntegerExprFunc creates or modifies a point by combining two
 // points. The point passed in may be modified and returned rather than
 // allocating a new point if possible. One of the points may be nil, but at
 // least one of the points will be non-nil.
-type floatIntegerExprFunc func(a *FloatPoint, b *FloatPoint) *IntegerPoint
+type floatIntegerExprFunc func(a, b float64) int64
 
 // floatReduceStringIterator executes a reducer for every interval and buffers the result.
 type floatReduceStringIterator struct {
@@ -1763,9 +1824,29 @@ func (itr *floatStreamStringIterator) reduce() ([]StringPoint, error) {
 // floatStringExprIterator executes a function to modify an existing point
 // for every output of the input iterator.
 type floatStringExprIterator struct {
-	left  *bufFloatIterator
-	right *bufFloatIterator
-	fn    floatStringExprFunc
+	left      *bufFloatIterator
+	right     *bufFloatIterator
+	fn        floatStringExprFunc
+	points    []FloatPoint // must be size 2
+	storePrev bool
+}
+
+func newFloatStringExprIterator(left, right FloatIterator, opt IteratorOptions, fn func(a, b float64) string) *floatStringExprIterator {
+	var points []FloatPoint
+	switch opt.Fill {
+	case NullFill, PreviousFill:
+		points = []FloatPoint{{Nil: true}, {Nil: true}}
+	case NumberFill:
+		value := castToFloat(opt.FillValue)
+		points = []FloatPoint{{Value: value}, {Value: value}}
+	}
+	return &floatStringExprIterator{
+		left:      newBufFloatIterator(left),
+		right:     newBufFloatIterator(right),
+		points:    points,
+		fn:        fn,
+		storePrev: opt.Fill == PreviousFill,
+	}
 }
 
 func (itr *floatStringExprIterator) Stats() IteratorStats {
@@ -1781,24 +1862,74 @@ func (itr *floatStringExprIterator) Close() error {
 }
 
 func (itr *floatStringExprIterator) Next() (*StringPoint, error) {
-	a, err := itr.left.Next()
-	if err != nil {
-		return nil, err
+	for {
+		a, err := itr.left.Next()
+		if err != nil {
+			return nil, err
+		}
+		b, err := itr.right.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		if a == nil && b == nil {
+			return nil, nil
+		} else if itr.points == nil && (a == nil || b == nil) {
+			return nil, nil
+		}
+
+		if a != nil && b != nil {
+			if a.Time > b.Time {
+				itr.left.unread(a)
+				a = nil
+			} else if a.Time < b.Time {
+				itr.right.unread(b)
+				b = nil
+			}
+		}
+
+		if a == nil || a.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *b
+			p.Value = itr.points[0].Value
+			p.Nil = itr.points[0].Nil
+			a = &p
+		} else if b == nil || b.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *a
+			p.Value = itr.points[1].Value
+			p.Nil = itr.points[1].Nil
+			b = &p
+		}
+
+		if itr.storePrev {
+			itr.points[0], itr.points[1] = *a, *b
+		}
+
+		p := &StringPoint{
+			Name:       a.Name,
+			Tags:       a.Tags,
+			Time:       a.Time,
+			Nil:        a.Nil || b.Nil,
+			Aggregated: a.Aggregated,
+		}
+		if !p.Nil {
+			p.Value = itr.fn(a.Value, b.Value)
+		}
+		return p, nil
+
 	}
-	b, err := itr.right.Next()
-	if err != nil {
-		return nil, err
-	} else if a == nil && b == nil {
-		return nil, nil
-	}
-	return itr.fn(a, b), nil
 }
 
 // floatStringExprFunc creates or modifies a point by combining two
 // points. The point passed in may be modified and returned rather than
 // allocating a new point if possible. One of the points may be nil, but at
 // least one of the points will be non-nil.
-type floatStringExprFunc func(a *FloatPoint, b *FloatPoint) *StringPoint
+type floatStringExprFunc func(a, b float64) string
 
 // floatReduceBooleanIterator executes a reducer for every interval and buffers the result.
 type floatReduceBooleanIterator struct {
@@ -2001,9 +2132,29 @@ func (itr *floatStreamBooleanIterator) reduce() ([]BooleanPoint, error) {
 // floatBooleanExprIterator executes a function to modify an existing point
 // for every output of the input iterator.
 type floatBooleanExprIterator struct {
-	left  *bufFloatIterator
-	right *bufFloatIterator
-	fn    floatBooleanExprFunc
+	left      *bufFloatIterator
+	right     *bufFloatIterator
+	fn        floatBooleanExprFunc
+	points    []FloatPoint // must be size 2
+	storePrev bool
+}
+
+func newFloatBooleanExprIterator(left, right FloatIterator, opt IteratorOptions, fn func(a, b float64) bool) *floatBooleanExprIterator {
+	var points []FloatPoint
+	switch opt.Fill {
+	case NullFill, PreviousFill:
+		points = []FloatPoint{{Nil: true}, {Nil: true}}
+	case NumberFill:
+		value := castToFloat(opt.FillValue)
+		points = []FloatPoint{{Value: value}, {Value: value}}
+	}
+	return &floatBooleanExprIterator{
+		left:      newBufFloatIterator(left),
+		right:     newBufFloatIterator(right),
+		points:    points,
+		fn:        fn,
+		storePrev: opt.Fill == PreviousFill,
+	}
 }
 
 func (itr *floatBooleanExprIterator) Stats() IteratorStats {
@@ -2019,24 +2170,74 @@ func (itr *floatBooleanExprIterator) Close() error {
 }
 
 func (itr *floatBooleanExprIterator) Next() (*BooleanPoint, error) {
-	a, err := itr.left.Next()
-	if err != nil {
-		return nil, err
+	for {
+		a, err := itr.left.Next()
+		if err != nil {
+			return nil, err
+		}
+		b, err := itr.right.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		if a == nil && b == nil {
+			return nil, nil
+		} else if itr.points == nil && (a == nil || b == nil) {
+			return nil, nil
+		}
+
+		if a != nil && b != nil {
+			if a.Time > b.Time {
+				itr.left.unread(a)
+				a = nil
+			} else if a.Time < b.Time {
+				itr.right.unread(b)
+				b = nil
+			}
+		}
+
+		if a == nil || a.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *b
+			p.Value = itr.points[0].Value
+			p.Nil = itr.points[0].Nil
+			a = &p
+		} else if b == nil || b.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *a
+			p.Value = itr.points[1].Value
+			p.Nil = itr.points[1].Nil
+			b = &p
+		}
+
+		if itr.storePrev {
+			itr.points[0], itr.points[1] = *a, *b
+		}
+
+		p := &BooleanPoint{
+			Name:       a.Name,
+			Tags:       a.Tags,
+			Time:       a.Time,
+			Nil:        a.Nil || b.Nil,
+			Aggregated: a.Aggregated,
+		}
+		if !p.Nil {
+			p.Value = itr.fn(a.Value, b.Value)
+		}
+		return p, nil
+
 	}
-	b, err := itr.right.Next()
-	if err != nil {
-		return nil, err
-	} else if a == nil && b == nil {
-		return nil, nil
-	}
-	return itr.fn(a, b), nil
 }
 
 // floatBooleanExprFunc creates or modifies a point by combining two
 // points. The point passed in may be modified and returned rather than
 // allocating a new point if possible. One of the points may be nil, but at
 // least one of the points will be non-nil.
-type floatBooleanExprFunc func(a *FloatPoint, b *FloatPoint) *BooleanPoint
+type floatBooleanExprFunc func(a, b float64) bool
 
 // floatTransformIterator executes a function to modify an existing point for every
 // output of the input iterator.
@@ -2655,103 +2856,6 @@ func (itr *integerParallelIterator) monitor() {
 	}
 }
 
-type lazyIntegerIterator struct {
-	itr IntegerIterator
-	fn  func() (Iterator, error)
-}
-
-// init instantiates the underlying iterator.
-func (itr *lazyIntegerIterator) init() error {
-	if itr.itr != nil {
-		return nil
-	}
-
-	i, err := itr.fn()
-	if err != nil {
-		return err
-	} else if i == nil {
-		return nil
-	}
-
-	if it, ok := i.(IntegerIterator); ok {
-		itr.itr = it
-	} else {
-		return fmt.Errorf("invalid lazy integer iterator type: %T", i)
-	}
-
-	return nil
-}
-
-func (itr *lazyIntegerIterator) Close() error {
-	if itr.itr == nil {
-		return nil
-	}
-	return itr.itr.Close()
-}
-
-func (itr *lazyIntegerIterator) Next() (*IntegerPoint, error) {
-	if err := itr.init(); err != nil {
-		return nil, err
-	} else if itr.itr == nil {
-		return nil, nil
-	}
-	return itr.itr.Next()
-}
-
-func (itr *lazyIntegerIterator) Stats() IteratorStats {
-	if itr.itr == nil {
-		return IteratorStats{}
-	}
-	return itr.itr.Stats()
-}
-
-// MultiIntegerIterator represents an iterator that concatenates a list of iterators.
-type MultiIntegerIterator []IntegerIterator
-
-// NewMultiIntegerIterator returns a pointer to a MultiIntegerIterator.
-func NewMultiIntegerIterator(a []IntegerIterator) *MultiIntegerIterator {
-	itr := MultiIntegerIterator(a)
-	return &itr
-}
-
-// Close closes all iterators.
-func (a *MultiIntegerIterator) Close() error {
-	for _, itr := range *a {
-		itr.Close()
-	}
-	return nil
-}
-
-// Next iterates over all points in all iterators sequentially.
-func (a *MultiIntegerIterator) Next() (*IntegerPoint, error) {
-	for {
-		// Return no point if
-		if len(*a) == 0 {
-			return nil, nil
-		}
-
-		// Read next point off the first iterator until EOF.
-		p, err := (*a)[0].Next()
-		if p == nil && err == nil {
-			if err := (*a)[0].Close(); err != nil {
-				return nil, err
-			}
-			*a = (*a)[1:]
-			continue
-		}
-		return p, err
-	}
-}
-
-// Stats returns the aggregation of all iterator stats.
-func (a *MultiIntegerIterator) Stats() IteratorStats {
-	var stats IteratorStats
-	for _, itr := range *a {
-		stats.Add(itr.Stats())
-	}
-	return stats
-}
-
 type integerPointError struct {
 	point *IntegerPoint
 	err   error
@@ -2931,6 +3035,23 @@ func (itr *integerFillIterator) Next() (*IntegerPoint, error) {
 		}
 
 		switch itr.opt.Fill {
+		case LinearFill:
+			if !itr.prev.Nil {
+				next, err := itr.input.peek()
+				if err != nil {
+					return nil, err
+				}
+				if next != nil {
+					interval := int64(itr.opt.Interval.Duration)
+					start := itr.window.time / interval
+					p.Value = linearInteger(start, itr.prev.Time/interval, next.Time/interval, itr.prev.Value, next.Value)
+				} else {
+					p.Nil = true
+				}
+			} else {
+				p.Nil = true
+			}
+
 		case NullFill:
 			p.Nil = true
 		case NumberFill:
@@ -2977,6 +3098,11 @@ func (itr *integerIntervalIterator) Next() (*IntegerPoint, error) {
 		return nil, err
 	}
 	p.Time, _ = itr.opt.Window(p.Time)
+	// If we see the minimum allowable time, set the time to zero so we don't
+	// break the default returned time for aggregate queries without times.
+	if p.Time == MinTime {
+		p.Time = 0
+	}
 	return p, nil
 }
 
@@ -3445,9 +3571,29 @@ func (itr *integerStreamFloatIterator) reduce() ([]FloatPoint, error) {
 // integerFloatExprIterator executes a function to modify an existing point
 // for every output of the input iterator.
 type integerFloatExprIterator struct {
-	left  *bufIntegerIterator
-	right *bufIntegerIterator
-	fn    integerFloatExprFunc
+	left      *bufIntegerIterator
+	right     *bufIntegerIterator
+	fn        integerFloatExprFunc
+	points    []IntegerPoint // must be size 2
+	storePrev bool
+}
+
+func newIntegerFloatExprIterator(left, right IntegerIterator, opt IteratorOptions, fn func(a, b int64) float64) *integerFloatExprIterator {
+	var points []IntegerPoint
+	switch opt.Fill {
+	case NullFill, PreviousFill:
+		points = []IntegerPoint{{Nil: true}, {Nil: true}}
+	case NumberFill:
+		value := castToInteger(opt.FillValue)
+		points = []IntegerPoint{{Value: value}, {Value: value}}
+	}
+	return &integerFloatExprIterator{
+		left:      newBufIntegerIterator(left),
+		right:     newBufIntegerIterator(right),
+		points:    points,
+		fn:        fn,
+		storePrev: opt.Fill == PreviousFill,
+	}
 }
 
 func (itr *integerFloatExprIterator) Stats() IteratorStats {
@@ -3463,24 +3609,74 @@ func (itr *integerFloatExprIterator) Close() error {
 }
 
 func (itr *integerFloatExprIterator) Next() (*FloatPoint, error) {
-	a, err := itr.left.Next()
-	if err != nil {
-		return nil, err
+	for {
+		a, err := itr.left.Next()
+		if err != nil {
+			return nil, err
+		}
+		b, err := itr.right.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		if a == nil && b == nil {
+			return nil, nil
+		} else if itr.points == nil && (a == nil || b == nil) {
+			return nil, nil
+		}
+
+		if a != nil && b != nil {
+			if a.Time > b.Time {
+				itr.left.unread(a)
+				a = nil
+			} else if a.Time < b.Time {
+				itr.right.unread(b)
+				b = nil
+			}
+		}
+
+		if a == nil || a.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *b
+			p.Value = itr.points[0].Value
+			p.Nil = itr.points[0].Nil
+			a = &p
+		} else if b == nil || b.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *a
+			p.Value = itr.points[1].Value
+			p.Nil = itr.points[1].Nil
+			b = &p
+		}
+
+		if itr.storePrev {
+			itr.points[0], itr.points[1] = *a, *b
+		}
+
+		p := &FloatPoint{
+			Name:       a.Name,
+			Tags:       a.Tags,
+			Time:       a.Time,
+			Nil:        a.Nil || b.Nil,
+			Aggregated: a.Aggregated,
+		}
+		if !p.Nil {
+			p.Value = itr.fn(a.Value, b.Value)
+		}
+		return p, nil
+
 	}
-	b, err := itr.right.Next()
-	if err != nil {
-		return nil, err
-	} else if a == nil && b == nil {
-		return nil, nil
-	}
-	return itr.fn(a, b), nil
 }
 
 // integerFloatExprFunc creates or modifies a point by combining two
 // points. The point passed in may be modified and returned rather than
 // allocating a new point if possible. One of the points may be nil, but at
 // least one of the points will be non-nil.
-type integerFloatExprFunc func(a *IntegerPoint, b *IntegerPoint) *FloatPoint
+type integerFloatExprFunc func(a, b int64) float64
 
 // integerReduceIntegerIterator executes a reducer for every interval and buffers the result.
 type integerReduceIntegerIterator struct {
@@ -3683,9 +3879,29 @@ func (itr *integerStreamIntegerIterator) reduce() ([]IntegerPoint, error) {
 // integerExprIterator executes a function to modify an existing point
 // for every output of the input iterator.
 type integerExprIterator struct {
-	left  *bufIntegerIterator
-	right *bufIntegerIterator
-	fn    integerExprFunc
+	left      *bufIntegerIterator
+	right     *bufIntegerIterator
+	fn        integerExprFunc
+	points    []IntegerPoint // must be size 2
+	storePrev bool
+}
+
+func newIntegerExprIterator(left, right IntegerIterator, opt IteratorOptions, fn func(a, b int64) int64) *integerExprIterator {
+	var points []IntegerPoint
+	switch opt.Fill {
+	case NullFill, PreviousFill:
+		points = []IntegerPoint{{Nil: true}, {Nil: true}}
+	case NumberFill:
+		value := castToInteger(opt.FillValue)
+		points = []IntegerPoint{{Value: value}, {Value: value}}
+	}
+	return &integerExprIterator{
+		left:      newBufIntegerIterator(left),
+		right:     newBufIntegerIterator(right),
+		points:    points,
+		fn:        fn,
+		storePrev: opt.Fill == PreviousFill,
+	}
 }
 
 func (itr *integerExprIterator) Stats() IteratorStats {
@@ -3701,24 +3917,70 @@ func (itr *integerExprIterator) Close() error {
 }
 
 func (itr *integerExprIterator) Next() (*IntegerPoint, error) {
-	a, err := itr.left.Next()
-	if err != nil {
-		return nil, err
+	for {
+		a, err := itr.left.Next()
+		if err != nil {
+			return nil, err
+		}
+		b, err := itr.right.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		if a == nil && b == nil {
+			return nil, nil
+		} else if itr.points == nil && (a == nil || b == nil) {
+			return nil, nil
+		}
+
+		if a != nil && b != nil {
+			if a.Time > b.Time {
+				itr.left.unread(a)
+				a = nil
+			} else if a.Time < b.Time {
+				itr.right.unread(b)
+				b = nil
+			}
+		}
+
+		if a == nil || a.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *b
+			p.Value = itr.points[0].Value
+			p.Nil = itr.points[0].Nil
+			a = &p
+		} else if b == nil || b.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *a
+			p.Value = itr.points[1].Value
+			p.Nil = itr.points[1].Nil
+			b = &p
+		}
+
+		if itr.storePrev {
+			itr.points[0], itr.points[1] = *a, *b
+		}
+
+		if a.Nil {
+			return a, nil
+		} else if b.Nil {
+			return b, nil
+		}
+		a.Value = itr.fn(a.Value, b.Value)
+		return a, nil
+
 	}
-	b, err := itr.right.Next()
-	if err != nil {
-		return nil, err
-	} else if a == nil && b == nil {
-		return nil, nil
-	}
-	return itr.fn(a, b), nil
 }
 
 // integerExprFunc creates or modifies a point by combining two
 // points. The point passed in may be modified and returned rather than
 // allocating a new point if possible. One of the points may be nil, but at
 // least one of the points will be non-nil.
-type integerExprFunc func(a *IntegerPoint, b *IntegerPoint) *IntegerPoint
+type integerExprFunc func(a, b int64) int64
 
 // integerReduceStringIterator executes a reducer for every interval and buffers the result.
 type integerReduceStringIterator struct {
@@ -3921,9 +4183,29 @@ func (itr *integerStreamStringIterator) reduce() ([]StringPoint, error) {
 // integerStringExprIterator executes a function to modify an existing point
 // for every output of the input iterator.
 type integerStringExprIterator struct {
-	left  *bufIntegerIterator
-	right *bufIntegerIterator
-	fn    integerStringExprFunc
+	left      *bufIntegerIterator
+	right     *bufIntegerIterator
+	fn        integerStringExprFunc
+	points    []IntegerPoint // must be size 2
+	storePrev bool
+}
+
+func newIntegerStringExprIterator(left, right IntegerIterator, opt IteratorOptions, fn func(a, b int64) string) *integerStringExprIterator {
+	var points []IntegerPoint
+	switch opt.Fill {
+	case NullFill, PreviousFill:
+		points = []IntegerPoint{{Nil: true}, {Nil: true}}
+	case NumberFill:
+		value := castToInteger(opt.FillValue)
+		points = []IntegerPoint{{Value: value}, {Value: value}}
+	}
+	return &integerStringExprIterator{
+		left:      newBufIntegerIterator(left),
+		right:     newBufIntegerIterator(right),
+		points:    points,
+		fn:        fn,
+		storePrev: opt.Fill == PreviousFill,
+	}
 }
 
 func (itr *integerStringExprIterator) Stats() IteratorStats {
@@ -3939,24 +4221,74 @@ func (itr *integerStringExprIterator) Close() error {
 }
 
 func (itr *integerStringExprIterator) Next() (*StringPoint, error) {
-	a, err := itr.left.Next()
-	if err != nil {
-		return nil, err
+	for {
+		a, err := itr.left.Next()
+		if err != nil {
+			return nil, err
+		}
+		b, err := itr.right.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		if a == nil && b == nil {
+			return nil, nil
+		} else if itr.points == nil && (a == nil || b == nil) {
+			return nil, nil
+		}
+
+		if a != nil && b != nil {
+			if a.Time > b.Time {
+				itr.left.unread(a)
+				a = nil
+			} else if a.Time < b.Time {
+				itr.right.unread(b)
+				b = nil
+			}
+		}
+
+		if a == nil || a.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *b
+			p.Value = itr.points[0].Value
+			p.Nil = itr.points[0].Nil
+			a = &p
+		} else if b == nil || b.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *a
+			p.Value = itr.points[1].Value
+			p.Nil = itr.points[1].Nil
+			b = &p
+		}
+
+		if itr.storePrev {
+			itr.points[0], itr.points[1] = *a, *b
+		}
+
+		p := &StringPoint{
+			Name:       a.Name,
+			Tags:       a.Tags,
+			Time:       a.Time,
+			Nil:        a.Nil || b.Nil,
+			Aggregated: a.Aggregated,
+		}
+		if !p.Nil {
+			p.Value = itr.fn(a.Value, b.Value)
+		}
+		return p, nil
+
 	}
-	b, err := itr.right.Next()
-	if err != nil {
-		return nil, err
-	} else if a == nil && b == nil {
-		return nil, nil
-	}
-	return itr.fn(a, b), nil
 }
 
 // integerStringExprFunc creates or modifies a point by combining two
 // points. The point passed in may be modified and returned rather than
 // allocating a new point if possible. One of the points may be nil, but at
 // least one of the points will be non-nil.
-type integerStringExprFunc func(a *IntegerPoint, b *IntegerPoint) *StringPoint
+type integerStringExprFunc func(a, b int64) string
 
 // integerReduceBooleanIterator executes a reducer for every interval and buffers the result.
 type integerReduceBooleanIterator struct {
@@ -4159,9 +4491,29 @@ func (itr *integerStreamBooleanIterator) reduce() ([]BooleanPoint, error) {
 // integerBooleanExprIterator executes a function to modify an existing point
 // for every output of the input iterator.
 type integerBooleanExprIterator struct {
-	left  *bufIntegerIterator
-	right *bufIntegerIterator
-	fn    integerBooleanExprFunc
+	left      *bufIntegerIterator
+	right     *bufIntegerIterator
+	fn        integerBooleanExprFunc
+	points    []IntegerPoint // must be size 2
+	storePrev bool
+}
+
+func newIntegerBooleanExprIterator(left, right IntegerIterator, opt IteratorOptions, fn func(a, b int64) bool) *integerBooleanExprIterator {
+	var points []IntegerPoint
+	switch opt.Fill {
+	case NullFill, PreviousFill:
+		points = []IntegerPoint{{Nil: true}, {Nil: true}}
+	case NumberFill:
+		value := castToInteger(opt.FillValue)
+		points = []IntegerPoint{{Value: value}, {Value: value}}
+	}
+	return &integerBooleanExprIterator{
+		left:      newBufIntegerIterator(left),
+		right:     newBufIntegerIterator(right),
+		points:    points,
+		fn:        fn,
+		storePrev: opt.Fill == PreviousFill,
+	}
 }
 
 func (itr *integerBooleanExprIterator) Stats() IteratorStats {
@@ -4177,24 +4529,74 @@ func (itr *integerBooleanExprIterator) Close() error {
 }
 
 func (itr *integerBooleanExprIterator) Next() (*BooleanPoint, error) {
-	a, err := itr.left.Next()
-	if err != nil {
-		return nil, err
+	for {
+		a, err := itr.left.Next()
+		if err != nil {
+			return nil, err
+		}
+		b, err := itr.right.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		if a == nil && b == nil {
+			return nil, nil
+		} else if itr.points == nil && (a == nil || b == nil) {
+			return nil, nil
+		}
+
+		if a != nil && b != nil {
+			if a.Time > b.Time {
+				itr.left.unread(a)
+				a = nil
+			} else if a.Time < b.Time {
+				itr.right.unread(b)
+				b = nil
+			}
+		}
+
+		if a == nil || a.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *b
+			p.Value = itr.points[0].Value
+			p.Nil = itr.points[0].Nil
+			a = &p
+		} else if b == nil || b.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *a
+			p.Value = itr.points[1].Value
+			p.Nil = itr.points[1].Nil
+			b = &p
+		}
+
+		if itr.storePrev {
+			itr.points[0], itr.points[1] = *a, *b
+		}
+
+		p := &BooleanPoint{
+			Name:       a.Name,
+			Tags:       a.Tags,
+			Time:       a.Time,
+			Nil:        a.Nil || b.Nil,
+			Aggregated: a.Aggregated,
+		}
+		if !p.Nil {
+			p.Value = itr.fn(a.Value, b.Value)
+		}
+		return p, nil
+
 	}
-	b, err := itr.right.Next()
-	if err != nil {
-		return nil, err
-	} else if a == nil && b == nil {
-		return nil, nil
-	}
-	return itr.fn(a, b), nil
 }
 
 // integerBooleanExprFunc creates or modifies a point by combining two
 // points. The point passed in may be modified and returned rather than
 // allocating a new point if possible. One of the points may be nil, but at
 // least one of the points will be non-nil.
-type integerBooleanExprFunc func(a *IntegerPoint, b *IntegerPoint) *BooleanPoint
+type integerBooleanExprFunc func(a, b int64) bool
 
 // integerTransformIterator executes a function to modify an existing point for every
 // output of the input iterator.
@@ -4813,103 +5215,6 @@ func (itr *stringParallelIterator) monitor() {
 	}
 }
 
-type lazyStringIterator struct {
-	itr StringIterator
-	fn  func() (Iterator, error)
-}
-
-// init instantiates the underlying iterator.
-func (itr *lazyStringIterator) init() error {
-	if itr.itr != nil {
-		return nil
-	}
-
-	i, err := itr.fn()
-	if err != nil {
-		return err
-	} else if i == nil {
-		return nil
-	}
-
-	if it, ok := i.(StringIterator); ok {
-		itr.itr = it
-	} else {
-		return fmt.Errorf("invalid lazy string iterator type: %T", i)
-	}
-
-	return nil
-}
-
-func (itr *lazyStringIterator) Close() error {
-	if itr.itr == nil {
-		return nil
-	}
-	return itr.itr.Close()
-}
-
-func (itr *lazyStringIterator) Next() (*StringPoint, error) {
-	if err := itr.init(); err != nil {
-		return nil, err
-	} else if itr.itr == nil {
-		return nil, nil
-	}
-	return itr.itr.Next()
-}
-
-func (itr *lazyStringIterator) Stats() IteratorStats {
-	if itr.itr == nil {
-		return IteratorStats{}
-	}
-	return itr.itr.Stats()
-}
-
-// MultiStringIterator represents an iterator that concatenates a list of iterators.
-type MultiStringIterator []StringIterator
-
-// NewMultiStringIterator returns a pointer to a MultiStringIterator.
-func NewMultiStringIterator(a []StringIterator) *MultiStringIterator {
-	itr := MultiStringIterator(a)
-	return &itr
-}
-
-// Close closes all iterators.
-func (a *MultiStringIterator) Close() error {
-	for _, itr := range *a {
-		itr.Close()
-	}
-	return nil
-}
-
-// Next iterates over all points in all iterators sequentially.
-func (a *MultiStringIterator) Next() (*StringPoint, error) {
-	for {
-		// Return no point if
-		if len(*a) == 0 {
-			return nil, nil
-		}
-
-		// Read next point off the first iterator until EOF.
-		p, err := (*a)[0].Next()
-		if p == nil && err == nil {
-			if err := (*a)[0].Close(); err != nil {
-				return nil, err
-			}
-			*a = (*a)[1:]
-			continue
-		}
-		return p, err
-	}
-}
-
-// Stats returns the aggregation of all iterator stats.
-func (a *MultiStringIterator) Stats() IteratorStats {
-	var stats IteratorStats
-	for _, itr := range *a {
-		stats.Add(itr.Stats())
-	}
-	return stats
-}
-
 type stringPointError struct {
 	point *StringPoint
 	err   error
@@ -5089,6 +5394,8 @@ func (itr *stringFillIterator) Next() (*StringPoint, error) {
 		}
 
 		switch itr.opt.Fill {
+		case LinearFill:
+			fallthrough
 		case NullFill:
 			p.Nil = true
 		case NumberFill:
@@ -5135,6 +5442,11 @@ func (itr *stringIntervalIterator) Next() (*StringPoint, error) {
 		return nil, err
 	}
 	p.Time, _ = itr.opt.Window(p.Time)
+	// If we see the minimum allowable time, set the time to zero so we don't
+	// break the default returned time for aggregate queries without times.
+	if p.Time == MinTime {
+		p.Time = 0
+	}
 	return p, nil
 }
 
@@ -5603,9 +5915,29 @@ func (itr *stringStreamFloatIterator) reduce() ([]FloatPoint, error) {
 // stringFloatExprIterator executes a function to modify an existing point
 // for every output of the input iterator.
 type stringFloatExprIterator struct {
-	left  *bufStringIterator
-	right *bufStringIterator
-	fn    stringFloatExprFunc
+	left      *bufStringIterator
+	right     *bufStringIterator
+	fn        stringFloatExprFunc
+	points    []StringPoint // must be size 2
+	storePrev bool
+}
+
+func newStringFloatExprIterator(left, right StringIterator, opt IteratorOptions, fn func(a, b string) float64) *stringFloatExprIterator {
+	var points []StringPoint
+	switch opt.Fill {
+	case NullFill, PreviousFill:
+		points = []StringPoint{{Nil: true}, {Nil: true}}
+	case NumberFill:
+		value := castToString(opt.FillValue)
+		points = []StringPoint{{Value: value}, {Value: value}}
+	}
+	return &stringFloatExprIterator{
+		left:      newBufStringIterator(left),
+		right:     newBufStringIterator(right),
+		points:    points,
+		fn:        fn,
+		storePrev: opt.Fill == PreviousFill,
+	}
 }
 
 func (itr *stringFloatExprIterator) Stats() IteratorStats {
@@ -5621,24 +5953,74 @@ func (itr *stringFloatExprIterator) Close() error {
 }
 
 func (itr *stringFloatExprIterator) Next() (*FloatPoint, error) {
-	a, err := itr.left.Next()
-	if err != nil {
-		return nil, err
+	for {
+		a, err := itr.left.Next()
+		if err != nil {
+			return nil, err
+		}
+		b, err := itr.right.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		if a == nil && b == nil {
+			return nil, nil
+		} else if itr.points == nil && (a == nil || b == nil) {
+			return nil, nil
+		}
+
+		if a != nil && b != nil {
+			if a.Time > b.Time {
+				itr.left.unread(a)
+				a = nil
+			} else if a.Time < b.Time {
+				itr.right.unread(b)
+				b = nil
+			}
+		}
+
+		if a == nil || a.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *b
+			p.Value = itr.points[0].Value
+			p.Nil = itr.points[0].Nil
+			a = &p
+		} else if b == nil || b.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *a
+			p.Value = itr.points[1].Value
+			p.Nil = itr.points[1].Nil
+			b = &p
+		}
+
+		if itr.storePrev {
+			itr.points[0], itr.points[1] = *a, *b
+		}
+
+		p := &FloatPoint{
+			Name:       a.Name,
+			Tags:       a.Tags,
+			Time:       a.Time,
+			Nil:        a.Nil || b.Nil,
+			Aggregated: a.Aggregated,
+		}
+		if !p.Nil {
+			p.Value = itr.fn(a.Value, b.Value)
+		}
+		return p, nil
+
 	}
-	b, err := itr.right.Next()
-	if err != nil {
-		return nil, err
-	} else if a == nil && b == nil {
-		return nil, nil
-	}
-	return itr.fn(a, b), nil
 }
 
 // stringFloatExprFunc creates or modifies a point by combining two
 // points. The point passed in may be modified and returned rather than
 // allocating a new point if possible. One of the points may be nil, but at
 // least one of the points will be non-nil.
-type stringFloatExprFunc func(a *StringPoint, b *StringPoint) *FloatPoint
+type stringFloatExprFunc func(a, b string) float64
 
 // stringReduceIntegerIterator executes a reducer for every interval and buffers the result.
 type stringReduceIntegerIterator struct {
@@ -5841,9 +6223,29 @@ func (itr *stringStreamIntegerIterator) reduce() ([]IntegerPoint, error) {
 // stringIntegerExprIterator executes a function to modify an existing point
 // for every output of the input iterator.
 type stringIntegerExprIterator struct {
-	left  *bufStringIterator
-	right *bufStringIterator
-	fn    stringIntegerExprFunc
+	left      *bufStringIterator
+	right     *bufStringIterator
+	fn        stringIntegerExprFunc
+	points    []StringPoint // must be size 2
+	storePrev bool
+}
+
+func newStringIntegerExprIterator(left, right StringIterator, opt IteratorOptions, fn func(a, b string) int64) *stringIntegerExprIterator {
+	var points []StringPoint
+	switch opt.Fill {
+	case NullFill, PreviousFill:
+		points = []StringPoint{{Nil: true}, {Nil: true}}
+	case NumberFill:
+		value := castToString(opt.FillValue)
+		points = []StringPoint{{Value: value}, {Value: value}}
+	}
+	return &stringIntegerExprIterator{
+		left:      newBufStringIterator(left),
+		right:     newBufStringIterator(right),
+		points:    points,
+		fn:        fn,
+		storePrev: opt.Fill == PreviousFill,
+	}
 }
 
 func (itr *stringIntegerExprIterator) Stats() IteratorStats {
@@ -5859,24 +6261,74 @@ func (itr *stringIntegerExprIterator) Close() error {
 }
 
 func (itr *stringIntegerExprIterator) Next() (*IntegerPoint, error) {
-	a, err := itr.left.Next()
-	if err != nil {
-		return nil, err
+	for {
+		a, err := itr.left.Next()
+		if err != nil {
+			return nil, err
+		}
+		b, err := itr.right.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		if a == nil && b == nil {
+			return nil, nil
+		} else if itr.points == nil && (a == nil || b == nil) {
+			return nil, nil
+		}
+
+		if a != nil && b != nil {
+			if a.Time > b.Time {
+				itr.left.unread(a)
+				a = nil
+			} else if a.Time < b.Time {
+				itr.right.unread(b)
+				b = nil
+			}
+		}
+
+		if a == nil || a.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *b
+			p.Value = itr.points[0].Value
+			p.Nil = itr.points[0].Nil
+			a = &p
+		} else if b == nil || b.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *a
+			p.Value = itr.points[1].Value
+			p.Nil = itr.points[1].Nil
+			b = &p
+		}
+
+		if itr.storePrev {
+			itr.points[0], itr.points[1] = *a, *b
+		}
+
+		p := &IntegerPoint{
+			Name:       a.Name,
+			Tags:       a.Tags,
+			Time:       a.Time,
+			Nil:        a.Nil || b.Nil,
+			Aggregated: a.Aggregated,
+		}
+		if !p.Nil {
+			p.Value = itr.fn(a.Value, b.Value)
+		}
+		return p, nil
+
 	}
-	b, err := itr.right.Next()
-	if err != nil {
-		return nil, err
-	} else if a == nil && b == nil {
-		return nil, nil
-	}
-	return itr.fn(a, b), nil
 }
 
 // stringIntegerExprFunc creates or modifies a point by combining two
 // points. The point passed in may be modified and returned rather than
 // allocating a new point if possible. One of the points may be nil, but at
 // least one of the points will be non-nil.
-type stringIntegerExprFunc func(a *StringPoint, b *StringPoint) *IntegerPoint
+type stringIntegerExprFunc func(a, b string) int64
 
 // stringReduceStringIterator executes a reducer for every interval and buffers the result.
 type stringReduceStringIterator struct {
@@ -6079,9 +6531,29 @@ func (itr *stringStreamStringIterator) reduce() ([]StringPoint, error) {
 // stringExprIterator executes a function to modify an existing point
 // for every output of the input iterator.
 type stringExprIterator struct {
-	left  *bufStringIterator
-	right *bufStringIterator
-	fn    stringExprFunc
+	left      *bufStringIterator
+	right     *bufStringIterator
+	fn        stringExprFunc
+	points    []StringPoint // must be size 2
+	storePrev bool
+}
+
+func newStringExprIterator(left, right StringIterator, opt IteratorOptions, fn func(a, b string) string) *stringExprIterator {
+	var points []StringPoint
+	switch opt.Fill {
+	case NullFill, PreviousFill:
+		points = []StringPoint{{Nil: true}, {Nil: true}}
+	case NumberFill:
+		value := castToString(opt.FillValue)
+		points = []StringPoint{{Value: value}, {Value: value}}
+	}
+	return &stringExprIterator{
+		left:      newBufStringIterator(left),
+		right:     newBufStringIterator(right),
+		points:    points,
+		fn:        fn,
+		storePrev: opt.Fill == PreviousFill,
+	}
 }
 
 func (itr *stringExprIterator) Stats() IteratorStats {
@@ -6097,24 +6569,70 @@ func (itr *stringExprIterator) Close() error {
 }
 
 func (itr *stringExprIterator) Next() (*StringPoint, error) {
-	a, err := itr.left.Next()
-	if err != nil {
-		return nil, err
+	for {
+		a, err := itr.left.Next()
+		if err != nil {
+			return nil, err
+		}
+		b, err := itr.right.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		if a == nil && b == nil {
+			return nil, nil
+		} else if itr.points == nil && (a == nil || b == nil) {
+			return nil, nil
+		}
+
+		if a != nil && b != nil {
+			if a.Time > b.Time {
+				itr.left.unread(a)
+				a = nil
+			} else if a.Time < b.Time {
+				itr.right.unread(b)
+				b = nil
+			}
+		}
+
+		if a == nil || a.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *b
+			p.Value = itr.points[0].Value
+			p.Nil = itr.points[0].Nil
+			a = &p
+		} else if b == nil || b.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *a
+			p.Value = itr.points[1].Value
+			p.Nil = itr.points[1].Nil
+			b = &p
+		}
+
+		if itr.storePrev {
+			itr.points[0], itr.points[1] = *a, *b
+		}
+
+		if a.Nil {
+			return a, nil
+		} else if b.Nil {
+			return b, nil
+		}
+		a.Value = itr.fn(a.Value, b.Value)
+		return a, nil
+
 	}
-	b, err := itr.right.Next()
-	if err != nil {
-		return nil, err
-	} else if a == nil && b == nil {
-		return nil, nil
-	}
-	return itr.fn(a, b), nil
 }
 
 // stringExprFunc creates or modifies a point by combining two
 // points. The point passed in may be modified and returned rather than
 // allocating a new point if possible. One of the points may be nil, but at
 // least one of the points will be non-nil.
-type stringExprFunc func(a *StringPoint, b *StringPoint) *StringPoint
+type stringExprFunc func(a, b string) string
 
 // stringReduceBooleanIterator executes a reducer for every interval and buffers the result.
 type stringReduceBooleanIterator struct {
@@ -6317,9 +6835,29 @@ func (itr *stringStreamBooleanIterator) reduce() ([]BooleanPoint, error) {
 // stringBooleanExprIterator executes a function to modify an existing point
 // for every output of the input iterator.
 type stringBooleanExprIterator struct {
-	left  *bufStringIterator
-	right *bufStringIterator
-	fn    stringBooleanExprFunc
+	left      *bufStringIterator
+	right     *bufStringIterator
+	fn        stringBooleanExprFunc
+	points    []StringPoint // must be size 2
+	storePrev bool
+}
+
+func newStringBooleanExprIterator(left, right StringIterator, opt IteratorOptions, fn func(a, b string) bool) *stringBooleanExprIterator {
+	var points []StringPoint
+	switch opt.Fill {
+	case NullFill, PreviousFill:
+		points = []StringPoint{{Nil: true}, {Nil: true}}
+	case NumberFill:
+		value := castToString(opt.FillValue)
+		points = []StringPoint{{Value: value}, {Value: value}}
+	}
+	return &stringBooleanExprIterator{
+		left:      newBufStringIterator(left),
+		right:     newBufStringIterator(right),
+		points:    points,
+		fn:        fn,
+		storePrev: opt.Fill == PreviousFill,
+	}
 }
 
 func (itr *stringBooleanExprIterator) Stats() IteratorStats {
@@ -6335,24 +6873,74 @@ func (itr *stringBooleanExprIterator) Close() error {
 }
 
 func (itr *stringBooleanExprIterator) Next() (*BooleanPoint, error) {
-	a, err := itr.left.Next()
-	if err != nil {
-		return nil, err
+	for {
+		a, err := itr.left.Next()
+		if err != nil {
+			return nil, err
+		}
+		b, err := itr.right.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		if a == nil && b == nil {
+			return nil, nil
+		} else if itr.points == nil && (a == nil || b == nil) {
+			return nil, nil
+		}
+
+		if a != nil && b != nil {
+			if a.Time > b.Time {
+				itr.left.unread(a)
+				a = nil
+			} else if a.Time < b.Time {
+				itr.right.unread(b)
+				b = nil
+			}
+		}
+
+		if a == nil || a.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *b
+			p.Value = itr.points[0].Value
+			p.Nil = itr.points[0].Nil
+			a = &p
+		} else if b == nil || b.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *a
+			p.Value = itr.points[1].Value
+			p.Nil = itr.points[1].Nil
+			b = &p
+		}
+
+		if itr.storePrev {
+			itr.points[0], itr.points[1] = *a, *b
+		}
+
+		p := &BooleanPoint{
+			Name:       a.Name,
+			Tags:       a.Tags,
+			Time:       a.Time,
+			Nil:        a.Nil || b.Nil,
+			Aggregated: a.Aggregated,
+		}
+		if !p.Nil {
+			p.Value = itr.fn(a.Value, b.Value)
+		}
+		return p, nil
+
 	}
-	b, err := itr.right.Next()
-	if err != nil {
-		return nil, err
-	} else if a == nil && b == nil {
-		return nil, nil
-	}
-	return itr.fn(a, b), nil
 }
 
 // stringBooleanExprFunc creates or modifies a point by combining two
 // points. The point passed in may be modified and returned rather than
 // allocating a new point if possible. One of the points may be nil, but at
 // least one of the points will be non-nil.
-type stringBooleanExprFunc func(a *StringPoint, b *StringPoint) *BooleanPoint
+type stringBooleanExprFunc func(a, b string) bool
 
 // stringTransformIterator executes a function to modify an existing point for every
 // output of the input iterator.
@@ -6971,103 +7559,6 @@ func (itr *booleanParallelIterator) monitor() {
 	}
 }
 
-type lazyBooleanIterator struct {
-	itr BooleanIterator
-	fn  func() (Iterator, error)
-}
-
-// init instantiates the underlying iterator.
-func (itr *lazyBooleanIterator) init() error {
-	if itr.itr != nil {
-		return nil
-	}
-
-	i, err := itr.fn()
-	if err != nil {
-		return err
-	} else if i == nil {
-		return nil
-	}
-
-	if it, ok := i.(BooleanIterator); ok {
-		itr.itr = it
-	} else {
-		return fmt.Errorf("invalid lazy boolean iterator type: %T", i)
-	}
-
-	return nil
-}
-
-func (itr *lazyBooleanIterator) Close() error {
-	if itr.itr == nil {
-		return nil
-	}
-	return itr.itr.Close()
-}
-
-func (itr *lazyBooleanIterator) Next() (*BooleanPoint, error) {
-	if err := itr.init(); err != nil {
-		return nil, err
-	} else if itr.itr == nil {
-		return nil, nil
-	}
-	return itr.itr.Next()
-}
-
-func (itr *lazyBooleanIterator) Stats() IteratorStats {
-	if itr.itr == nil {
-		return IteratorStats{}
-	}
-	return itr.itr.Stats()
-}
-
-// MultiBooleanIterator represents an iterator that concatenates a list of iterators.
-type MultiBooleanIterator []BooleanIterator
-
-// NewMultiBooleanIterator returns a pointer to a MultiBooleanIterator.
-func NewMultiBooleanIterator(a []BooleanIterator) *MultiBooleanIterator {
-	itr := MultiBooleanIterator(a)
-	return &itr
-}
-
-// Close closes all iterators.
-func (a *MultiBooleanIterator) Close() error {
-	for _, itr := range *a {
-		itr.Close()
-	}
-	return nil
-}
-
-// Next iterates over all points in all iterators sequentially.
-func (a *MultiBooleanIterator) Next() (*BooleanPoint, error) {
-	for {
-		// Return no point if
-		if len(*a) == 0 {
-			return nil, nil
-		}
-
-		// Read next point off the first iterator until EOF.
-		p, err := (*a)[0].Next()
-		if p == nil && err == nil {
-			if err := (*a)[0].Close(); err != nil {
-				return nil, err
-			}
-			*a = (*a)[1:]
-			continue
-		}
-		return p, err
-	}
-}
-
-// Stats returns the aggregation of all iterator stats.
-func (a *MultiBooleanIterator) Stats() IteratorStats {
-	var stats IteratorStats
-	for _, itr := range *a {
-		stats.Add(itr.Stats())
-	}
-	return stats
-}
-
 type booleanPointError struct {
 	point *BooleanPoint
 	err   error
@@ -7247,6 +7738,8 @@ func (itr *booleanFillIterator) Next() (*BooleanPoint, error) {
 		}
 
 		switch itr.opt.Fill {
+		case LinearFill:
+			fallthrough
 		case NullFill:
 			p.Nil = true
 		case NumberFill:
@@ -7293,6 +7786,11 @@ func (itr *booleanIntervalIterator) Next() (*BooleanPoint, error) {
 		return nil, err
 	}
 	p.Time, _ = itr.opt.Window(p.Time)
+	// If we see the minimum allowable time, set the time to zero so we don't
+	// break the default returned time for aggregate queries without times.
+	if p.Time == MinTime {
+		p.Time = 0
+	}
 	return p, nil
 }
 
@@ -7761,9 +8259,29 @@ func (itr *booleanStreamFloatIterator) reduce() ([]FloatPoint, error) {
 // booleanFloatExprIterator executes a function to modify an existing point
 // for every output of the input iterator.
 type booleanFloatExprIterator struct {
-	left  *bufBooleanIterator
-	right *bufBooleanIterator
-	fn    booleanFloatExprFunc
+	left      *bufBooleanIterator
+	right     *bufBooleanIterator
+	fn        booleanFloatExprFunc
+	points    []BooleanPoint // must be size 2
+	storePrev bool
+}
+
+func newBooleanFloatExprIterator(left, right BooleanIterator, opt IteratorOptions, fn func(a, b bool) float64) *booleanFloatExprIterator {
+	var points []BooleanPoint
+	switch opt.Fill {
+	case NullFill, PreviousFill:
+		points = []BooleanPoint{{Nil: true}, {Nil: true}}
+	case NumberFill:
+		value := castToBoolean(opt.FillValue)
+		points = []BooleanPoint{{Value: value}, {Value: value}}
+	}
+	return &booleanFloatExprIterator{
+		left:      newBufBooleanIterator(left),
+		right:     newBufBooleanIterator(right),
+		points:    points,
+		fn:        fn,
+		storePrev: opt.Fill == PreviousFill,
+	}
 }
 
 func (itr *booleanFloatExprIterator) Stats() IteratorStats {
@@ -7779,24 +8297,74 @@ func (itr *booleanFloatExprIterator) Close() error {
 }
 
 func (itr *booleanFloatExprIterator) Next() (*FloatPoint, error) {
-	a, err := itr.left.Next()
-	if err != nil {
-		return nil, err
+	for {
+		a, err := itr.left.Next()
+		if err != nil {
+			return nil, err
+		}
+		b, err := itr.right.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		if a == nil && b == nil {
+			return nil, nil
+		} else if itr.points == nil && (a == nil || b == nil) {
+			return nil, nil
+		}
+
+		if a != nil && b != nil {
+			if a.Time > b.Time {
+				itr.left.unread(a)
+				a = nil
+			} else if a.Time < b.Time {
+				itr.right.unread(b)
+				b = nil
+			}
+		}
+
+		if a == nil || a.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *b
+			p.Value = itr.points[0].Value
+			p.Nil = itr.points[0].Nil
+			a = &p
+		} else if b == nil || b.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *a
+			p.Value = itr.points[1].Value
+			p.Nil = itr.points[1].Nil
+			b = &p
+		}
+
+		if itr.storePrev {
+			itr.points[0], itr.points[1] = *a, *b
+		}
+
+		p := &FloatPoint{
+			Name:       a.Name,
+			Tags:       a.Tags,
+			Time:       a.Time,
+			Nil:        a.Nil || b.Nil,
+			Aggregated: a.Aggregated,
+		}
+		if !p.Nil {
+			p.Value = itr.fn(a.Value, b.Value)
+		}
+		return p, nil
+
 	}
-	b, err := itr.right.Next()
-	if err != nil {
-		return nil, err
-	} else if a == nil && b == nil {
-		return nil, nil
-	}
-	return itr.fn(a, b), nil
 }
 
 // booleanFloatExprFunc creates or modifies a point by combining two
 // points. The point passed in may be modified and returned rather than
 // allocating a new point if possible. One of the points may be nil, but at
 // least one of the points will be non-nil.
-type booleanFloatExprFunc func(a *BooleanPoint, b *BooleanPoint) *FloatPoint
+type booleanFloatExprFunc func(a, b bool) float64
 
 // booleanReduceIntegerIterator executes a reducer for every interval and buffers the result.
 type booleanReduceIntegerIterator struct {
@@ -7999,9 +8567,29 @@ func (itr *booleanStreamIntegerIterator) reduce() ([]IntegerPoint, error) {
 // booleanIntegerExprIterator executes a function to modify an existing point
 // for every output of the input iterator.
 type booleanIntegerExprIterator struct {
-	left  *bufBooleanIterator
-	right *bufBooleanIterator
-	fn    booleanIntegerExprFunc
+	left      *bufBooleanIterator
+	right     *bufBooleanIterator
+	fn        booleanIntegerExprFunc
+	points    []BooleanPoint // must be size 2
+	storePrev bool
+}
+
+func newBooleanIntegerExprIterator(left, right BooleanIterator, opt IteratorOptions, fn func(a, b bool) int64) *booleanIntegerExprIterator {
+	var points []BooleanPoint
+	switch opt.Fill {
+	case NullFill, PreviousFill:
+		points = []BooleanPoint{{Nil: true}, {Nil: true}}
+	case NumberFill:
+		value := castToBoolean(opt.FillValue)
+		points = []BooleanPoint{{Value: value}, {Value: value}}
+	}
+	return &booleanIntegerExprIterator{
+		left:      newBufBooleanIterator(left),
+		right:     newBufBooleanIterator(right),
+		points:    points,
+		fn:        fn,
+		storePrev: opt.Fill == PreviousFill,
+	}
 }
 
 func (itr *booleanIntegerExprIterator) Stats() IteratorStats {
@@ -8017,24 +8605,74 @@ func (itr *booleanIntegerExprIterator) Close() error {
 }
 
 func (itr *booleanIntegerExprIterator) Next() (*IntegerPoint, error) {
-	a, err := itr.left.Next()
-	if err != nil {
-		return nil, err
+	for {
+		a, err := itr.left.Next()
+		if err != nil {
+			return nil, err
+		}
+		b, err := itr.right.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		if a == nil && b == nil {
+			return nil, nil
+		} else if itr.points == nil && (a == nil || b == nil) {
+			return nil, nil
+		}
+
+		if a != nil && b != nil {
+			if a.Time > b.Time {
+				itr.left.unread(a)
+				a = nil
+			} else if a.Time < b.Time {
+				itr.right.unread(b)
+				b = nil
+			}
+		}
+
+		if a == nil || a.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *b
+			p.Value = itr.points[0].Value
+			p.Nil = itr.points[0].Nil
+			a = &p
+		} else if b == nil || b.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *a
+			p.Value = itr.points[1].Value
+			p.Nil = itr.points[1].Nil
+			b = &p
+		}
+
+		if itr.storePrev {
+			itr.points[0], itr.points[1] = *a, *b
+		}
+
+		p := &IntegerPoint{
+			Name:       a.Name,
+			Tags:       a.Tags,
+			Time:       a.Time,
+			Nil:        a.Nil || b.Nil,
+			Aggregated: a.Aggregated,
+		}
+		if !p.Nil {
+			p.Value = itr.fn(a.Value, b.Value)
+		}
+		return p, nil
+
 	}
-	b, err := itr.right.Next()
-	if err != nil {
-		return nil, err
-	} else if a == nil && b == nil {
-		return nil, nil
-	}
-	return itr.fn(a, b), nil
 }
 
 // booleanIntegerExprFunc creates or modifies a point by combining two
 // points. The point passed in may be modified and returned rather than
 // allocating a new point if possible. One of the points may be nil, but at
 // least one of the points will be non-nil.
-type booleanIntegerExprFunc func(a *BooleanPoint, b *BooleanPoint) *IntegerPoint
+type booleanIntegerExprFunc func(a, b bool) int64
 
 // booleanReduceStringIterator executes a reducer for every interval and buffers the result.
 type booleanReduceStringIterator struct {
@@ -8237,9 +8875,29 @@ func (itr *booleanStreamStringIterator) reduce() ([]StringPoint, error) {
 // booleanStringExprIterator executes a function to modify an existing point
 // for every output of the input iterator.
 type booleanStringExprIterator struct {
-	left  *bufBooleanIterator
-	right *bufBooleanIterator
-	fn    booleanStringExprFunc
+	left      *bufBooleanIterator
+	right     *bufBooleanIterator
+	fn        booleanStringExprFunc
+	points    []BooleanPoint // must be size 2
+	storePrev bool
+}
+
+func newBooleanStringExprIterator(left, right BooleanIterator, opt IteratorOptions, fn func(a, b bool) string) *booleanStringExprIterator {
+	var points []BooleanPoint
+	switch opt.Fill {
+	case NullFill, PreviousFill:
+		points = []BooleanPoint{{Nil: true}, {Nil: true}}
+	case NumberFill:
+		value := castToBoolean(opt.FillValue)
+		points = []BooleanPoint{{Value: value}, {Value: value}}
+	}
+	return &booleanStringExprIterator{
+		left:      newBufBooleanIterator(left),
+		right:     newBufBooleanIterator(right),
+		points:    points,
+		fn:        fn,
+		storePrev: opt.Fill == PreviousFill,
+	}
 }
 
 func (itr *booleanStringExprIterator) Stats() IteratorStats {
@@ -8255,24 +8913,74 @@ func (itr *booleanStringExprIterator) Close() error {
 }
 
 func (itr *booleanStringExprIterator) Next() (*StringPoint, error) {
-	a, err := itr.left.Next()
-	if err != nil {
-		return nil, err
+	for {
+		a, err := itr.left.Next()
+		if err != nil {
+			return nil, err
+		}
+		b, err := itr.right.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		if a == nil && b == nil {
+			return nil, nil
+		} else if itr.points == nil && (a == nil || b == nil) {
+			return nil, nil
+		}
+
+		if a != nil && b != nil {
+			if a.Time > b.Time {
+				itr.left.unread(a)
+				a = nil
+			} else if a.Time < b.Time {
+				itr.right.unread(b)
+				b = nil
+			}
+		}
+
+		if a == nil || a.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *b
+			p.Value = itr.points[0].Value
+			p.Nil = itr.points[0].Nil
+			a = &p
+		} else if b == nil || b.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *a
+			p.Value = itr.points[1].Value
+			p.Nil = itr.points[1].Nil
+			b = &p
+		}
+
+		if itr.storePrev {
+			itr.points[0], itr.points[1] = *a, *b
+		}
+
+		p := &StringPoint{
+			Name:       a.Name,
+			Tags:       a.Tags,
+			Time:       a.Time,
+			Nil:        a.Nil || b.Nil,
+			Aggregated: a.Aggregated,
+		}
+		if !p.Nil {
+			p.Value = itr.fn(a.Value, b.Value)
+		}
+		return p, nil
+
 	}
-	b, err := itr.right.Next()
-	if err != nil {
-		return nil, err
-	} else if a == nil && b == nil {
-		return nil, nil
-	}
-	return itr.fn(a, b), nil
 }
 
 // booleanStringExprFunc creates or modifies a point by combining two
 // points. The point passed in may be modified and returned rather than
 // allocating a new point if possible. One of the points may be nil, but at
 // least one of the points will be non-nil.
-type booleanStringExprFunc func(a *BooleanPoint, b *BooleanPoint) *StringPoint
+type booleanStringExprFunc func(a, b bool) string
 
 // booleanReduceBooleanIterator executes a reducer for every interval and buffers the result.
 type booleanReduceBooleanIterator struct {
@@ -8475,9 +9183,29 @@ func (itr *booleanStreamBooleanIterator) reduce() ([]BooleanPoint, error) {
 // booleanExprIterator executes a function to modify an existing point
 // for every output of the input iterator.
 type booleanExprIterator struct {
-	left  *bufBooleanIterator
-	right *bufBooleanIterator
-	fn    booleanExprFunc
+	left      *bufBooleanIterator
+	right     *bufBooleanIterator
+	fn        booleanExprFunc
+	points    []BooleanPoint // must be size 2
+	storePrev bool
+}
+
+func newBooleanExprIterator(left, right BooleanIterator, opt IteratorOptions, fn func(a, b bool) bool) *booleanExprIterator {
+	var points []BooleanPoint
+	switch opt.Fill {
+	case NullFill, PreviousFill:
+		points = []BooleanPoint{{Nil: true}, {Nil: true}}
+	case NumberFill:
+		value := castToBoolean(opt.FillValue)
+		points = []BooleanPoint{{Value: value}, {Value: value}}
+	}
+	return &booleanExprIterator{
+		left:      newBufBooleanIterator(left),
+		right:     newBufBooleanIterator(right),
+		points:    points,
+		fn:        fn,
+		storePrev: opt.Fill == PreviousFill,
+	}
 }
 
 func (itr *booleanExprIterator) Stats() IteratorStats {
@@ -8493,24 +9221,70 @@ func (itr *booleanExprIterator) Close() error {
 }
 
 func (itr *booleanExprIterator) Next() (*BooleanPoint, error) {
-	a, err := itr.left.Next()
-	if err != nil {
-		return nil, err
+	for {
+		a, err := itr.left.Next()
+		if err != nil {
+			return nil, err
+		}
+		b, err := itr.right.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		if a == nil && b == nil {
+			return nil, nil
+		} else if itr.points == nil && (a == nil || b == nil) {
+			return nil, nil
+		}
+
+		if a != nil && b != nil {
+			if a.Time > b.Time {
+				itr.left.unread(a)
+				a = nil
+			} else if a.Time < b.Time {
+				itr.right.unread(b)
+				b = nil
+			}
+		}
+
+		if a == nil || a.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *b
+			p.Value = itr.points[0].Value
+			p.Nil = itr.points[0].Nil
+			a = &p
+		} else if b == nil || b.Nil {
+			if itr.points == nil {
+				continue
+			}
+			p := *a
+			p.Value = itr.points[1].Value
+			p.Nil = itr.points[1].Nil
+			b = &p
+		}
+
+		if itr.storePrev {
+			itr.points[0], itr.points[1] = *a, *b
+		}
+
+		if a.Nil {
+			return a, nil
+		} else if b.Nil {
+			return b, nil
+		}
+		a.Value = itr.fn(a.Value, b.Value)
+		return a, nil
+
 	}
-	b, err := itr.right.Next()
-	if err != nil {
-		return nil, err
-	} else if a == nil && b == nil {
-		return nil, nil
-	}
-	return itr.fn(a, b), nil
 }
 
 // booleanExprFunc creates or modifies a point by combining two
 // points. The point passed in may be modified and returned rather than
 // allocating a new point if possible. One of the points may be nil, but at
 // least one of the points will be non-nil.
-type booleanExprFunc func(a *BooleanPoint, b *BooleanPoint) *BooleanPoint
+type booleanExprFunc func(a, b bool) bool
 
 // booleanTransformIterator executes a function to modify an existing point for every
 // output of the input iterator.
