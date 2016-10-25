@@ -167,8 +167,9 @@ func (c *Config) Validate() error {
 	// Should be exactly one default if at least one configs is enabled.
 	defaultInfluxDB := -1
 	numEnabled := 0
-	for i, config := range c.InfluxDB {
-		config.ApplyConditionalDefaults()
+	for i := range c.InfluxDB {
+		c.InfluxDB[i].ApplyConditionalDefaults()
+		config := c.InfluxDB[i]
 		if names[config.Name] {
 			return fmt.Errorf("duplicate name %q for influxdb configs", config.Name)
 		}
