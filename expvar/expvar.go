@@ -46,6 +46,49 @@ func (v *Int) IntValue() int64 {
 	return atomic.LoadInt64(&v.i)
 }
 
+// IntSum is a 64-bit integer variable that consists of multiple different parts
+// and satisfies the expvar.Var interface.
+// The value of the var is the sum of all its parts.
+// The part names are opaque and are simply used to identfy each part.
+type IntSum struct {
+	mu    sync.Mutex
+	parts map[string]int64
+	sum   int64
+}
+
+func NewIntSum() *IntSum {
+	return &IntSum{
+		parts: make(map[string]int64),
+	}
+}
+
+func (v *IntSum) String() string {
+	return strconv.FormatInt(v.IntValue(), 10)
+}
+
+func (v *IntSum) Add(part string, delta int64) {
+	v.mu.Lock()
+	v.parts[part] += delta
+	v.sum += delta
+	v.mu.Unlock()
+}
+
+func (v *IntSum) Set(part string, value int64) {
+	v.mu.Lock()
+	old := v.parts[part]
+	delta := value - old
+	v.parts[part] = value
+	v.sum += delta
+	v.mu.Unlock()
+}
+
+func (v *IntSum) IntValue() int64 {
+	v.mu.Lock()
+	s := v.sum
+	v.mu.Unlock()
+	return s
+}
+
 // Float is a 64-bit float variable that satisfies the expvar.Var interface.
 type Float struct {
 	f uint64

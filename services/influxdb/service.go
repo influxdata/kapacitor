@@ -721,6 +721,7 @@ func (c *influxdbCluster) unlinkSubscriptions() error {
 			}
 		}
 	}
+	kapacitor.NumSubscriptionsVar.Set(c.clusterName, 0)
 	return nil
 }
 
@@ -760,8 +761,6 @@ func (c *influxdbCluster) linkSubscriptions(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-
-	numSubscriptions := int64(0)
 
 	// Get all databases and retention policies
 	var allSubs []subEntry
@@ -878,7 +877,6 @@ func (c *influxdbCluster) linkSubscriptions(ctx context.Context) error {
 				}
 				host, port, err := net.SplitHostPort(u.Host)
 				if host == c.hostname {
-					numSubscriptions++
 					if u.Scheme == "udp" {
 						_, err := c.startUDPListener(se, port)
 						if err != nil {
@@ -935,8 +933,6 @@ func (c *influxdbCluster) linkSubscriptions(ctx context.Context) error {
 				}
 				destination = fmt.Sprintf("udp://%s:%d", c.hostname, addr.Port)
 			}
-
-			numSubscriptions++
 
 			mode := "ANY"
 			destinations := []string{destination}
@@ -998,7 +994,7 @@ func (c *influxdbCluster) linkSubscriptions(ctx context.Context) error {
 		}
 	}
 
-	kapacitor.NumSubscriptionsVar.Set(numSubscriptions)
+	kapacitor.NumSubscriptionsVar.Set(c.clusterName, int64(len(existingSubs)))
 	return nil
 }
 

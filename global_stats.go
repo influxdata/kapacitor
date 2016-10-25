@@ -32,7 +32,7 @@ var (
 	// Global expvars
 	NumTasksVar         = &kexpvar.Int{}
 	NumEnabledTasksVar  = &kexpvar.Int{}
-	NumSubscriptionsVar = &kexpvar.Int{}
+	NumSubscriptionsVar = kexpvar.NewIntSum()
 
 	ClusterIDVar = &kexpvar.String{}
 	ServerIDVar  = &kexpvar.String{}
