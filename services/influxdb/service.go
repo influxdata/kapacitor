@@ -252,6 +252,37 @@ func (s *Service) assignServiceToCluster(cluster *influxdbCluster) {
 	cluster.randReader = s.RandReader
 }
 
+type testOptions struct {
+	Cluster string `json:"cluster"`
+}
+
+func (s *Service) TestOptions() interface{} {
+	return &testOptions{}
+}
+
+func (s *Service) Test(options interface{}) error {
+	o, ok := options.(*testOptions)
+	if !ok {
+		return fmt.Errorf("unexpected options type %T", options)
+	}
+
+	// Get cluster
+	s.mu.Lock()
+	cluster, ok := s.clusters[o.Cluster]
+	s.mu.Unlock()
+	if !ok {
+		return fmt.Errorf("cluster %q is not enabled or does not exist", o.Cluster)
+	}
+
+	// Get client and ping the cluster
+	cli := cluster.NewClient()
+	_, _, err := cli.Ping(nil)
+	if err != nil {
+		return errors.Wrapf(err, "failed to ping the influxdb cluster %q", o.Cluster)
+	}
+	return nil
+}
+
 // Refresh the subscriptions linking for all clusters.
 func (s *Service) handleSubscriptions(w http.ResponseWriter, r *http.Request) {
 	err := s.LinkSubscriptions()

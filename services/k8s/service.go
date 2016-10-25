@@ -57,10 +57,26 @@ func (s *Service) Update(newConfig []interface{}) error {
 	return s.client.Update(clientConfig)
 }
 
+func (s *Service) TestOptions() interface{} {
+	return nil
+}
+
+func (s *Service) Test(options interface{}) error {
+	cli, err := s.Client()
+	if err != nil {
+		return errors.Wrap(err, "failed to get client")
+	}
+	_, err = cli.Versions()
+	if err != nil {
+		return errors.Wrap(err, "failed to query server versions")
+	}
+	return nil
+}
+
 func (s *Service) Client() (client.Client, error) {
 	config := s.configValue.Load().(Config)
 	if !config.Enabled {
-		return nil, errors.New("service not enabled")
+		return nil, errors.New("service is not enabled")
 	}
 	return s.client, nil
 }

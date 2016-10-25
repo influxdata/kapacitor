@@ -40,6 +40,7 @@ const (
 	replayBatchPath  = basePath + "/replays/batch"
 	replayQueryPath  = basePath + "/replays/query"
 	configPath       = basePath + "/config"
+	serviceTestsPath = basePath + "/service-tests"
 )
 
 // HTTP configuration for connecting to Kapacitor
@@ -698,6 +699,10 @@ func (c *Client) ConfigElementLink(section, element string) Link {
 		href += "/"
 	}
 	return Link{Relation: Self, Href: href}
+}
+
+func (c *Client) ServiceTestLink(service string) Link {
+	return Link{Relation: Self, Href: path.Join(serviceTestsPath, service)}
 }
 
 type CreateTaskOptions struct {
@@ -1625,6 +1630,113 @@ func (c *Client) ConfigElement(link Link) (ConfigElement, error) {
 		return ConfigElement{}, err
 	}
 	return element, nil
+}
+
+type ServiceTests struct {
+	Link     Link          `json:"link"`
+	Services []ServiceTest `json:"services"`
+}
+
+type ServiceTest struct {
+	Link    Link               `json:"link"`
+	Name    string             `json:"name"`
+	Options ServiceTestOptions `json:"options"`
+}
+
+type ServiceTestOptions map[string]interface{}
+
+type ServiceTestResult struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
+type ListServiceTestsOptions struct {
+	Pattern string
+}
+
+func (o *ListServiceTestsOptions) Default() {
+	if o.Pattern == "" {
+		o.Pattern = "*"
+	}
+}
+
+func (o *ListServiceTestsOptions) Values() *url.Values {
+	v := &url.Values{}
+	v.Set("pattern", o.Pattern)
+	return v
+}
+
+// ServiceTests returns the list of services available for testing.
+func (c *Client) ListServiceTests(opt *ListServiceTestsOptions) (ServiceTests, error) {
+	if opt == nil {
+		opt = new(ListServiceTestsOptions)
+	}
+	opt.Default()
+
+	u := *c.url
+	u.Path = serviceTestsPath
+	u.RawQuery = opt.Values().Encode()
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return ServiceTests{}, err
+	}
+
+	services := ServiceTests{}
+	_, err = c.Do(req, &services, http.StatusOK)
+	if err != nil {
+		return ServiceTests{}, err
+	}
+	return services, nil
+}
+
+// ServiceTest returns the options available for a service test.
+func (c *Client) ServiceTest(link Link) (ServiceTest, error) {
+	if link.Href == "" {
+		return ServiceTest{}, fmt.Errorf("invalid link %v", link)
+	}
+	u := *c.url
+	u.Path = link.Href
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return ServiceTest{}, err
+	}
+
+	service := ServiceTest{}
+	_, err = c.Do(req, &service, http.StatusOK)
+	if err != nil {
+		return ServiceTest{}, err
+	}
+	return service, nil
+}
+
+// DoServiceTest performs a test for a service.
+func (c *Client) DoServiceTest(link Link, sto ServiceTestOptions) (ServiceTestResult, error) {
+	if link.Href == "" {
+		return ServiceTestResult{}, fmt.Errorf("invalid link %v", link)
+	}
+	u := *c.url
+	u.Path = link.Href
+
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	err := enc.Encode(sto)
+	if err != nil {
+		return ServiceTestResult{}, err
+	}
+
+	req, err := http.NewRequest("POST", u.String(), &buf)
+	if err != nil {
+		return ServiceTestResult{}, err
+	}
+
+	r := ServiceTestResult{}
+	_, err = c.Do(req, &r, http.StatusOK)
+	if err != nil {
+		return ServiceTestResult{}, err
+	}
+	return r, nil
 }
 
 type LogLevelOptions struct {

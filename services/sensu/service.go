@@ -52,6 +52,32 @@ func (s *Service) Update(newConfig []interface{}) error {
 	return nil
 }
 
+type testOptions struct {
+	Name   string               `json:"name"`
+	Output string               `json:"output"`
+	Level  kapacitor.AlertLevel `json:"level"`
+}
+
+func (s *Service) TestOptions() interface{} {
+	return &testOptions{
+		Name:   "testName",
+		Output: "testOutput",
+		Level:  kapacitor.CritAlert,
+	}
+}
+
+func (s *Service) Test(options interface{}) error {
+	o, ok := options.(*testOptions)
+	if !ok {
+		return fmt.Errorf("unexpected options type %T", options)
+	}
+	return s.Alert(
+		o.Name,
+		o.Output,
+		o.Level,
+	)
+}
+
 func (s *Service) Alert(name, output string, level kapacitor.AlertLevel) error {
 	if !validNamePattern.MatchString(name) {
 		return fmt.Errorf("invalid name %q for sensu alert. Must match %v", name, validNamePattern)

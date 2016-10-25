@@ -63,6 +63,30 @@ func (s *Service) StateChangesOnly() bool {
 	return c.StateChangesOnly
 }
 
+type testOptions struct {
+	Room    string               `json:"room"`
+	Message string               `json:"message"`
+	Level   kapacitor.AlertLevel `json:"level"`
+}
+
+func (s *Service) TestOptions() interface{} {
+	c := s.config()
+	return &testOptions{
+		Room:    c.Room,
+		Message: "test hipchat message",
+		Level:   kapacitor.CritAlert,
+	}
+}
+
+func (s *Service) Test(options interface{}) error {
+	o, ok := options.(*testOptions)
+	if !ok {
+		return fmt.Errorf("unexpected options type %T", options)
+	}
+	c := s.config()
+	return s.Alert(o.Room, c.Token, o.Message, o.Level)
+}
+
 func (s *Service) Alert(room, token, message string, level kapacitor.AlertLevel) error {
 	url, post, err := s.preparePost(room, token, message, level)
 	if err != nil {

@@ -61,6 +61,7 @@ Commands:
 	stats           Display various stats about Kapacitor.
 	version         Displays the Kapacitor version info.
 	vars            Print debug vars in JSON format.
+	service-tests   Test a service.
 	help            Prints help for a command.
 
 Options:
@@ -177,6 +178,9 @@ func main() {
 	case "vars":
 		commandArgs = args
 		commandF = doVars
+	case "service-tests":
+		commandArgs = args
+		commandF = doServiceTest
 	default:
 		fmt.Fprintln(os.Stderr, "Unknown command", command)
 		usage()
@@ -263,6 +267,8 @@ func doHelp(args []string) error {
 		case "version":
 			versionUsage()
 		case "vars":
+			varsUsage()
+		case "service-tests":
 			varsUsage()
 		default:
 			fmt.Fprintln(os.Stderr, "Unknown command", command)
@@ -1478,8 +1484,23 @@ func doList(args []string) error {
 				offset += limit
 			}
 		}
+	case "service-tests":
+		outFmt := "%s\n"
+		fmt.Fprintf(os.Stdout, outFmt, "Service Name")
+		for _, pattern := range patterns {
+			serviceTests, err := cli.ListServiceTests(&client.ListServiceTestsOptions{
+				Pattern: pattern,
+			})
+			if err != nil {
+				return err
+			}
+
+			for _, s := range serviceTests.Services {
+				fmt.Fprintf(os.Stdout, outFmt, s.Name)
+			}
+		}
 	default:
-		return fmt.Errorf("cannot list '%s' did you mean 'tasks', 'recordings' or 'replays'?", kind)
+		return fmt.Errorf("cannot list '%s' did you mean 'tasks', 'recordings', 'replays' or 'service-tests'?", kind)
 	}
 	return nil
 
@@ -1718,5 +1739,46 @@ func doVars(args []string) error {
 	}
 	defer r.Body.Close()
 	io.Copy(os.Stdout, r.Body)
+	return nil
+}
+
+// Service-Test
+func serviceTestUsage() {
+	var u = `Usage: kapacitor service-tests <service name...>
+
+	Perform the service test using defaults.
+	The service name can be a glob style pattern.
+`
+	fmt.Fprintln(os.Stderr, u)
+}
+
+func doServiceTest(args []string) error {
+	if len(args) == 0 {
+		return errors.New("must provide at least one service name or pattern.")
+	}
+	var services []client.ServiceTest
+	for _, nameOrPattern := range args {
+		s, err := cli.ListServiceTests(&client.ListServiceTestsOptions{
+			Pattern: nameOrPattern,
+		})
+		if err != nil {
+			return err
+		}
+		services = append(services, s.Services...)
+	}
+	results := make([]client.ServiceTestResult, len(services))
+	for i, s := range services {
+		tr, err := cli.DoServiceTest(s.Link, nil)
+		if err != nil {
+			return err
+		}
+		results[i] = tr
+	}
+	outFmt := "%-20s%-10v%s\n"
+	fmt.Fprintf(os.Stdout, outFmt, "Service", "Success", "Message")
+	for i, s := range services {
+		tr := results[i]
+		fmt.Fprintf(os.Stdout, outFmt, s.Name, tr.Success, tr.Message)
+	}
 	return nil
 }

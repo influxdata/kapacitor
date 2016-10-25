@@ -3,7 +3,6 @@ package slack
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -12,6 +11,7 @@ import (
 	"sync/atomic"
 
 	"github.com/influxdata/kapacitor"
+	"github.com/pkg/errors"
 )
 
 type Service struct {
@@ -66,6 +66,29 @@ type attachment struct {
 	Fallback string `json:"fallback"`
 	Color    string `json:"color"`
 	Text     string `json:"text"`
+}
+
+type testOptions struct {
+	Channel string               `json:"channel"`
+	Message string               `json:"message"`
+	Level   kapacitor.AlertLevel `json:"level"`
+}
+
+func (s *Service) TestOptions() interface{} {
+	c := s.config()
+	return &testOptions{
+		Channel: c.Channel,
+		Message: "test slack message",
+		Level:   kapacitor.CritAlert,
+	}
+}
+
+func (s *Service) Test(options interface{}) error {
+	o, ok := options.(*testOptions)
+	if !ok {
+		return fmt.Errorf("unexpected options type %T", options)
+	}
+	return s.Alert(o.Channel, o.Message, o.Level)
 }
 
 func (s *Service) Alert(channel, message string, level kapacitor.AlertLevel) error {

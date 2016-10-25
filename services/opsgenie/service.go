@@ -57,6 +57,41 @@ func (s *Service) Global() bool {
 	return c.Global
 }
 
+type testOptions struct {
+	Teams       []string `json:"teams"`
+	Recipients  []string `json:"recipients"`
+	MessageType string   `json:"message-type"`
+	Message     string   `json:"message"`
+	EntityID    string   `json:"entity-id"`
+}
+
+func (s *Service) TestOptions() interface{} {
+	c := s.config()
+	return &testOptions{
+		Teams:       c.Teams,
+		Recipients:  c.Recipients,
+		MessageType: "CRITICAL",
+		Message:     "test opsgenie message",
+		EntityID:    "testEntityID",
+	}
+}
+
+func (s *Service) Test(options interface{}) error {
+	o, ok := options.(*testOptions)
+	if !ok {
+		return fmt.Errorf("unexpected options type %T", options)
+	}
+	return s.Alert(
+		o.Teams,
+		o.Recipients,
+		o.MessageType,
+		o.Message,
+		o.EntityID,
+		time.Now(),
+		nil,
+	)
+}
+
 func (s *Service) Alert(teams []string, recipients []string, messageType, message, entityID string, t time.Time, details interface{}) error {
 	url, post, err := s.preparePost(teams, recipients, messageType, message, entityID, t, details)
 	if err != nil {
@@ -88,7 +123,7 @@ func (s *Service) Alert(teams []string, recipients []string, messageType, messag
 func (s *Service) preparePost(teams []string, recipients []string, messageType, message, entityID string, t time.Time, details interface{}) (string, io.Reader, error) {
 	c := s.config()
 	if !c.Enabled {
-		return "", nil, errors.New("service not enabled")
+		return "", nil, errors.New("service is not enabled")
 	}
 
 	ogData := make(map[string]interface{})

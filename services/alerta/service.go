@@ -27,6 +27,54 @@ func NewService(c Config, l *log.Logger) *Service {
 	return s
 }
 
+type testOptions struct {
+	Resource    string   `json:"resource"`
+	Event       string   `json:"event"`
+	Environment string   `json:"environment"`
+	Severity    string   `json:"severity"`
+	Group       string   `json:"group"`
+	Value       string   `json:"value"`
+	Message     string   `json:"message"`
+	Origin      string   `json:"origin"`
+	Service     []string `json:"service"`
+}
+
+func (s *Service) TestOptions() interface{} {
+	c := s.config()
+	return &testOptions{
+		Resource:    "testResource",
+		Event:       "testEvent",
+		Environment: c.Environment,
+		Severity:    "critical",
+		Group:       "testGroup",
+		Value:       "testValue",
+		Message:     "test alerta message",
+		Origin:      c.Origin,
+		Service:     []string{"testServiceA", "testServiceB"},
+	}
+}
+
+func (s *Service) Test(options interface{}) error {
+	o, ok := options.(*testOptions)
+	if !ok {
+		return fmt.Errorf("unexpected options type %T", options)
+	}
+	c := s.config()
+	return s.Alert(
+		c.Token,
+		o.Resource,
+		o.Event,
+		o.Environment,
+		o.Severity,
+		o.Group,
+		o.Value,
+		o.Message,
+		o.Origin,
+		o.Service,
+		nil,
+	)
+}
+
 func (s *Service) Open() error {
 	return nil
 }
@@ -57,6 +105,9 @@ func (s *Service) Alert(token, resource, event, environment, severity, group, va
 	}
 
 	url, post, err := s.preparePost(token, resource, event, environment, severity, group, value, message, origin, service, data)
+	if err != nil {
+		return err
+	}
 
 	resp, err := http.Post(url, "application/json", post)
 	if err != nil {

@@ -5992,3 +5992,347 @@ func TestServer_UpdateConfig(t *testing.T) {
 		}
 	}
 }
+func TestServer_ListServiceTests(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+	serviceTests, err := cli.ListServiceTests(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expServiceTests := client.ServiceTests{
+		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests"},
+		Services: []client.ServiceTest{
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/alerta"},
+				Name: "alerta",
+				Options: client.ServiceTestOptions{
+					"resource":    "testResource",
+					"event":       "testEvent",
+					"environment": "",
+					"severity":    "critical",
+					"group":       "testGroup",
+					"value":       "testValue",
+					"message":     "test alerta message",
+					"origin":      "",
+					"service": []interface{}{
+						"testServiceA",
+						"testServiceB",
+					},
+				},
+			},
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/hipchat"},
+				Name: "hipchat",
+				Options: client.ServiceTestOptions{
+					"room":    "",
+					"message": "test hipchat message",
+					"level":   "CRITICAL",
+				},
+			},
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/influxdb"},
+				Name: "influxdb",
+				Options: client.ServiceTestOptions{
+					"cluster": "",
+				},
+			},
+			{
+				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/kubernetes"},
+				Name:    "kubernetes",
+				Options: nil,
+			},
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/opsgenie"},
+				Name: "opsgenie",
+				Options: client.ServiceTestOptions{
+					"teams":        nil,
+					"recipients":   nil,
+					"message-type": "CRITICAL",
+					"message":      "test opsgenie message",
+					"entity-id":    "testEntityID",
+				},
+			},
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/pagerduty"},
+				Name: "pagerduty",
+				Options: client.ServiceTestOptions{
+					"incident-key": "testIncidentKey",
+					"description":  "test pagerduty message",
+					"level":        "CRITICAL",
+				},
+			},
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/sensu"},
+				Name: "sensu",
+				Options: client.ServiceTestOptions{
+					"name":   "testName",
+					"output": "testOutput",
+					"level":  "CRITICAL",
+				},
+			},
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/slack"},
+				Name: "slack",
+				Options: client.ServiceTestOptions{
+					"channel": "",
+					"message": "test slack message",
+					"level":   "CRITICAL",
+				},
+			},
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/smtp"},
+				Name: "smtp",
+				Options: client.ServiceTestOptions{
+					"to":      nil,
+					"subject": "test subject",
+					"body":    "test body",
+				},
+			},
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/talk"},
+				Name: "talk",
+				Options: client.ServiceTestOptions{
+					"title": "testTitle",
+					"text":  "test talk text",
+				},
+			},
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/telegram"},
+				Name: "telegram",
+				Options: client.ServiceTestOptions{
+					"chat-id":                  "",
+					"parse-mode":               "",
+					"message":                  "test telegram message",
+					"disable-web-page-preview": false,
+					"disable-notification":     false,
+				},
+			},
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/victorops"},
+				Name: "victorops",
+				Options: client.ServiceTestOptions{
+					"routingKey":  "",
+					"messageType": "CRITICAL",
+					"message":     "test victorops message",
+					"entityID":    "testEntityID",
+				},
+			},
+		},
+	}
+	if got, exp := serviceTests.Link.Href, expServiceTests.Link.Href; got != exp {
+		t.Errorf("unexpected service tests link.href: got %s exp %s", got, exp)
+	}
+	if got, exp := len(serviceTests.Services), len(expServiceTests.Services); got != exp {
+		t.Fatalf("unexpected length of services: got %d exp %d", got, exp)
+	}
+	for i := range expServiceTests.Services {
+		exp := expServiceTests.Services[i]
+		got := serviceTests.Services[i]
+		if !reflect.DeepEqual(got, exp) {
+			t.Errorf("unexpected server test %s:\ngot\n%#v\nexp\n%#v\n", exp.Name, got, exp)
+		}
+	}
+}
+
+func TestServer_ListServiceTests_WithPattern(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+	serviceTests, err := cli.ListServiceTests(&client.ListServiceTestsOptions{
+		Pattern: "s*",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expServiceTests := client.ServiceTests{
+		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests"},
+		Services: []client.ServiceTest{
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/sensu"},
+				Name: "sensu",
+				Options: client.ServiceTestOptions{
+					"name":   "testName",
+					"output": "testOutput",
+					"level":  "CRITICAL",
+				},
+			},
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/slack"},
+				Name: "slack",
+				Options: client.ServiceTestOptions{
+					"channel": "",
+					"message": "test slack message",
+					"level":   "CRITICAL",
+				},
+			},
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/smtp"},
+				Name: "smtp",
+				Options: client.ServiceTestOptions{
+					"to":      nil,
+					"subject": "test subject",
+					"body":    "test body",
+				},
+			},
+		},
+	}
+	if got, exp := serviceTests.Link.Href, expServiceTests.Link.Href; got != exp {
+		t.Errorf("unexpected service tests link.href: got %s exp %s", got, exp)
+	}
+	if got, exp := len(serviceTests.Services), len(expServiceTests.Services); got != exp {
+		t.Fatalf("unexpected length of services: got %d exp %d", got, exp)
+	}
+	for i := range expServiceTests.Services {
+		exp := expServiceTests.Services[i]
+		got := serviceTests.Services[i]
+		if !reflect.DeepEqual(got, exp) {
+			t.Errorf("unexpected server test %s:\ngot\n%#v\nexp\n%#v\n", exp.Name, got, exp)
+		}
+	}
+}
+
+func TestServer_DoServiceTest(t *testing.T) {
+	db := NewInfluxDB(func(q string) *iclient.Response {
+		return &iclient.Response{}
+	})
+	testCases := []struct {
+		service     string
+		setDefaults func(*server.Config)
+		options     client.ServiceTestOptions
+		exp         client.ServiceTestResult
+	}{
+		{
+			service: "alerta",
+			options: client.ServiceTestOptions{},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "service is not enabled",
+			},
+		},
+		{
+			service: "hipchat",
+			options: client.ServiceTestOptions{},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "service is not enabled",
+			},
+		},
+		{
+			service: "influxdb",
+			setDefaults: func(c *server.Config) {
+				c.InfluxDB[0].Enabled = true
+				c.InfluxDB[0].Name = "default"
+				c.InfluxDB[0].URLs = []string{db.URL()}
+			},
+			options: client.ServiceTestOptions{
+				"cluster": "default",
+			},
+			exp: client.ServiceTestResult{
+				Success: true,
+				Message: "",
+			},
+		},
+		{
+			service: "influxdb",
+			options: client.ServiceTestOptions{
+				"cluster": "default",
+			},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "cluster \"default\" is not enabled or does not exist",
+			},
+		},
+		{
+			service: "kubernetes",
+			options: client.ServiceTestOptions{},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "failed to get client: service is not enabled",
+			},
+		},
+		{
+			service: "opsgenie",
+			options: client.ServiceTestOptions{},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "service is not enabled",
+			},
+		},
+		{
+			service: "pagerduty",
+			options: client.ServiceTestOptions{},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "service is not enabled",
+			},
+		},
+		{
+			service: "sensu",
+			options: client.ServiceTestOptions{},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "service is not enabled",
+			},
+		},
+		{
+			service: "slack",
+			options: client.ServiceTestOptions{},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "service is not enabled",
+			},
+		},
+		{
+			service: "smtp",
+			options: client.ServiceTestOptions{},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "service is not enabled",
+			},
+		},
+		{
+			service: "talk",
+			options: client.ServiceTestOptions{},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "service is not enabled",
+			},
+		},
+		{
+			service: "telegram",
+			options: client.ServiceTestOptions{},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "service is not enabled",
+			},
+		},
+		{
+			service: "victorops",
+			options: client.ServiceTestOptions{},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "service is not enabled",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		// Create default config
+		c := NewConfig()
+		if tc.setDefaults != nil {
+			tc.setDefaults(c)
+		}
+		s := OpenServer(c)
+		cli := Client(s)
+		defer s.Close()
+
+		tr, err := cli.DoServiceTest(cli.ServiceTestLink(tc.service), tc.options)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !reflect.DeepEqual(tr, tc.exp) {
+			t.Log("Options", tc.options)
+			t.Errorf("unexpected service test result for %s:\ngot\n%#v\nexp\n%#v\n", tc.service, tr, tc.exp)
+		}
+	}
+}

@@ -15,13 +15,13 @@ import (
 var ErrNoRecipients = errors.New("not sending email, no recipients defined")
 
 type Service struct {
-	mu      sync.Mutex
-	config  atomic.Value
-	mail    chan *gomail.Message
-	updates chan bool
-	logger  *log.Logger
-	wg      sync.WaitGroup
-	opened  bool
+	mu          sync.Mutex
+	configValue atomic.Value
+	mail        chan *gomail.Message
+	updates     chan bool
+	logger      *log.Logger
+	wg          sync.WaitGroup
+	opened      bool
 }
 
 func NewService(c Config, l *log.Logger) *Service {
@@ -29,7 +29,7 @@ func NewService(c Config, l *log.Logger) *Service {
 		updates: make(chan bool),
 		logger:  l,
 	}
-	s.config.Store(c)
+	s.configValue.Store(c)
 	return s
 }
 
@@ -70,8 +70,8 @@ func (s *Service) Close() error {
 	return nil
 }
 
-func (s *Service) loadConfig() Config {
-	return s.config.Load().(Config)
+func (s *Service) config() Config {
+	return s.configValue.Load().(Config)
 }
 
 func (s *Service) Update(newConfig []interface{}) error {
@@ -81,7 +81,7 @@ func (s *Service) Update(newConfig []interface{}) error {
 	if c, ok := newConfig[0].(Config); !ok {
 		return fmt.Errorf("expected config object to be of type %T, got %T", c, newConfig[0])
 	} else {
-		s.config.Store(c)
+		s.configValue.Store(c)
 		s.mu.Lock()
 		opened := s.opened
 		s.mu.Unlock()
@@ -94,17 +94,17 @@ func (s *Service) Update(newConfig []interface{}) error {
 }
 
 func (s *Service) Global() bool {
-	c := s.loadConfig()
+	c := s.config()
 	return c.Global
 }
 
 func (s *Service) StateChangesOnly() bool {
-	c := s.loadConfig()
+	c := s.config()
 	return c.StateChangesOnly
 }
 
 func (s *Service) dialer() (d *gomail.Dialer, idleTimeout time.Duration) {
-	c := s.loadConfig()
+	c := s.config()
 	if c.Username == "" {
 		d = &gomail.Dialer{Host: c.Host, Port: c.Port}
 	} else {
@@ -179,9 +179,9 @@ func (s *Service) SendMail(to []string, subject, body string) error {
 }
 
 func (s *Service) prepareMessge(to []string, subject, body string) (*gomail.Message, error) {
-	c := s.loadConfig()
+	c := s.config()
 	if !c.Enabled {
-		return nil, errors.New("service not enabled")
+		return nil, errors.New("service is not enabled")
 	}
 	if len(to) == 0 {
 		to = c.To
@@ -195,4 +195,31 @@ func (s *Service) prepareMessge(to []string, subject, body string) (*gomail.Mess
 	m.SetHeader("Subject", subject)
 	m.SetBody("text/html", body)
 	return m, nil
+}
+
+type testOptions struct {
+	To      []string `json:"to"`
+	Subject string   `json:"subject"`
+	Body    string   `json:"body"`
+}
+
+func (s *Service) TestOptions() interface{} {
+	c := s.config()
+	return &testOptions{
+		To:      c.To,
+		Subject: "test subject",
+		Body:    "test body",
+	}
+}
+
+func (s *Service) Test(options interface{}) error {
+	o, ok := options.(*testOptions)
+	if !ok {
+		return fmt.Errorf("unexpected options type %T", options)
+	}
+	return s.SendMail(
+		o.To,
+		o.Subject,
+		o.Body,
+	)
 }
