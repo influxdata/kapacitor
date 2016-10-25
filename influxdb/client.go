@@ -35,6 +35,7 @@ type Client interface {
 type ClientUpdater interface {
 	Client
 	Update(new Config) error
+	Close() error
 }
 
 // BatchPointsConfig is the config data needed to create an instance of the BatchPoints struct
@@ -171,6 +172,10 @@ func (c *HTTPClient) loadHTTPClient() *http.Client {
 	client := c.client
 	c.mu.RUnlock()
 	return client
+}
+
+func (c *HTTPClient) Close() error {
+	return nil
 }
 
 // UpdateURLs updates the running list of URLs.

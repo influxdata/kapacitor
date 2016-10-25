@@ -515,7 +515,7 @@ func (c *influxdbCluster) Close() error {
 	if c.subSyncTicker != nil {
 		c.subSyncTicker.Stop()
 	}
-
+	c.client.Close()
 	return c.closeServices()
 }
 
