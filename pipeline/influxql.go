@@ -480,3 +480,21 @@ func (n *chainnode) holtWinters(field string, h, m int64, interval time.Duration
 	n.linkChild(i)
 	return i
 }
+
+// Compute a cumulative sum of each point that is received.
+// A point is emitted for every point collected.
+func (n *chainnode) CumulativeSum(field string) *InfluxQLNode {
+	i := newInfluxQLNode("cumulativeSum", field, n.Provides(), n.Provides(), ReduceCreater{
+		CreateFloatReducer: func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter) {
+			fn := influxql.NewFloatCumulativeSumReducer()
+			return fn, fn
+		},
+		CreateIntegerReducer: func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter) {
+			fn := influxql.NewIntegerCumulativeSumReducer()
+			return fn, fn
+		},
+		IsStreamTransformation: true,
+	})
+	n.linkChild(i)
+	return i
+}

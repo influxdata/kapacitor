@@ -457,6 +457,72 @@ stream
 	testStreamerWithOutput(t, "TestStream_MovingAverage", script, 16*time.Second, er, false, nil)
 }
 
+func TestStream_CumulativeSum(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('packets')
+	|cumulativeSum('value')
+	|window()
+		.period(10s)
+		.every(10s)
+	|httpOut('TestStream_CumulativeSum')
+`
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "packets",
+				Tags:    nil,
+				Columns: []string{"time", "cumulativeSum"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						1.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+						3.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						6.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+						10.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						15.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+						21.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+						28.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
+						36.0,
+					},
+				},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_CumulativeSum", script, 13*time.Second, er, false, nil)
+}
+
 func TestStream_WindowMissing(t *testing.T) {
 
 	var script = `
