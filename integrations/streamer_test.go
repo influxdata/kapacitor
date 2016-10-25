@@ -886,18 +886,19 @@ stream
 		.measurement('types')
 	|eval(lambda: "value0" + "value1", lambda: "value0" - "value1")
 		.as( 'pos', 'neg')
-		.keep('value0', 'pos', 'neg')
-	|httpOut('TestStream_Eval_Keep')
+		.keep('value0', 'pos', 'neg', 'other')
+	|httpOut('TestStream_Eval_KeepSome')
 `
 	er := kapacitor.Result{
 		Series: imodels.Rows{
 			{
 				Name:    "types",
 				Tags:    nil,
-				Columns: []string{"time", "neg", "pos", "value0"},
+				Columns: []string{"time", "neg", "other", "pos", "value0"},
 				Values: [][]interface{}{[]interface{}{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					-1.0,
+					5.0,
 					1.0,
 					0.0,
 				}},
@@ -905,7 +906,7 @@ stream
 		},
 	}
 
-	testStreamerWithOutput(t, "TestStream_Eval_Keep", script, 2*time.Second, er, false, nil)
+	testStreamerWithOutput(t, "TestStream_Eval_KeepSome", script, 2*time.Second, er, false, nil)
 }
 
 func TestStream_Eval_KeepSomeWithHidden(t *testing.T) {
@@ -1019,7 +1020,7 @@ stream
 	|eval(lambda: string("value"))
 		.as('value_tag')
 		.tags('value_tag')
-		.keep('value')
+		.keep('value', 'another')
 	|groupBy('value_tag')
 	|httpOut('TestStream_Eval_Tags')
 `
@@ -1028,18 +1029,20 @@ stream
 			{
 				Name:    "types",
 				Tags:    map[string]string{"value_tag": "0"},
-				Columns: []string{"time", "value"},
+				Columns: []string{"time", "another", "value"},
 				Values: [][]interface{}{[]interface{}{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					2.0,
 					0.0,
 				}},
 			},
 			{
 				Name:    "types",
 				Tags:    map[string]string{"value_tag": "1"},
-				Columns: []string{"time", "value"},
+				Columns: []string{"time", "another", "value"},
 				Values: [][]interface{}{[]interface{}{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					2.0,
 					1.0,
 				}},
 			},

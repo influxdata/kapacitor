@@ -167,11 +167,19 @@ func (e *EvalNode) eval(now time.Time, group models.GroupID, fields models.Field
 		if l := len(e.e.KeepList); l != 0 {
 			newFields = make(models.Fields, l)
 			for _, f := range e.e.KeepList {
-				v, err := vars.Get(f)
-				if err != nil {
-					return nil, nil, err
+				// Try the vars scope first
+				if vars.Has(f) {
+					v, err := vars.Get(f)
+					if err != nil {
+						return nil, nil, err
+					}
+					newFields[f] = v
+				} else if v, ok := fields[f]; ok {
+					// Try the raw fields next, since it may not have been a referenced var.
+					newFields[f] = v
+				} else {
+					return nil, nil, fmt.Errorf("cannot keep field %q, field does not exist", f)
 				}
-				newFields[f] = v
 			}
 		} else {
 			newFields = make(models.Fields, len(fields)+len(e.e.AsList))
