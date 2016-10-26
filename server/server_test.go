@@ -1389,6 +1389,85 @@ test value=1 0000000011
 	}
 }
 
+func TestServer_StreamTask_NoRP(t *testing.T) {
+	conf := NewConfig()
+	conf.DefaultRetentionPolicy = "myrp"
+	s := OpenServer(conf)
+	defer s.Close()
+	cli := Client(s)
+
+	id := "testStreamTask"
+	ttype := client.StreamTask
+	dbrps := []client.DBRP{{
+		Database:        "mydb",
+		RetentionPolicy: "myrp",
+	}}
+	tick := `stream
+    |from()
+        .measurement('test')
+    |window()
+        .period(10s)
+        .every(10s)
+    |count('value')
+    |httpOut('count')
+`
+
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+		Status: client.Enabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), id)
+
+	// Request data before any writes and expect null responses
+	nullResponse := `{}`
+	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
+	if err != nil {
+		t.Error(err)
+	}
+
+	points := `test value=1 0000000000
+test value=1 0000000001
+test value=1 0000000001
+test value=1 0000000002
+test value=1 0000000002
+test value=1 0000000003
+test value=1 0000000003
+test value=1 0000000004
+test value=1 0000000005
+test value=1 0000000005
+test value=1 0000000005
+test value=1 0000000006
+test value=1 0000000007
+test value=1 0000000008
+test value=1 0000000009
+test value=1 0000000010
+test value=1 0000000011
+`
+	v := url.Values{}
+	v.Add("precision", "s")
+	s.MustWrite("mydb", "", points, v)
+
+	exp := `{"series":[{"name":"test","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}]}`
+	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 func TestServer_StreamTemplateTask(t *testing.T) {
 	s, cli := OpenDefaultServer()
 	defer s.Close()

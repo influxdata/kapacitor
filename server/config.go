@@ -76,9 +76,10 @@ type Config struct {
 	UDF       udf.Config       `toml:"udf"`
 	Deadman   deadman.Config   `toml:"deadman"`
 
-	Hostname            string `toml:"hostname"`
-	DataDir             string `toml:"data_dir"`
-	SkipConfigOverrides bool   `toml:"skip-config-overrides"`
+	Hostname               string `toml:"hostname"`
+	DataDir                string `toml:"data_dir"`
+	SkipConfigOverrides    bool   `toml:"skip-config-overrides"`
+	DefaultRetentionPolicy string `toml:"default-retention-policy"`
 }
 
 // NewConfig returns an instance of Config with reasonable defaults.

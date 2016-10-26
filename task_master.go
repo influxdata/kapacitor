@@ -119,6 +119,8 @@ type TaskMaster struct {
 	}
 	LogService LogService
 
+	DefaultRetentionPolicy string
+
 	// Incoming streams
 	writePointsIn StreamCollector
 
@@ -174,22 +176,24 @@ func NewTaskMaster(id string, l LogService) *TaskMaster {
 // Returns a new TaskMaster instance with the same services as the current one.
 func (tm *TaskMaster) New(id string) *TaskMaster {
 	n := NewTaskMaster(id, tm.LogService)
+	n.DefaultRetentionPolicy = tm.DefaultRetentionPolicy
 	n.HTTPDService = tm.HTTPDService
-	n.UDFService = tm.UDFService
-	n.DeadmanService = tm.DeadmanService
 	n.TaskStore = tm.TaskStore
+	n.DeadmanService = tm.DeadmanService
+	n.UDFService = tm.UDFService
 	n.InfluxDBService = tm.InfluxDBService
 	n.SMTPService = tm.SMTPService
 	n.OpsGenieService = tm.OpsGenieService
 	n.VictorOpsService = tm.VictorOpsService
 	n.PagerDutyService = tm.PagerDutyService
 	n.SlackService = tm.SlackService
+	n.TelegramService = tm.TelegramService
 	n.HipChatService = tm.HipChatService
 	n.AlertaService = tm.AlertaService
 	n.SensuService = tm.SensuService
 	n.TalkService = tm.TalkService
 	n.TimingService = tm.TimingService
-	n.TelegramService = tm.TelegramService
+	n.K8sService = tm.K8sService
 	return n
 }
 
@@ -549,6 +553,9 @@ func (tm *TaskMaster) forkPoint(p models.Point) {
 func (tm *TaskMaster) WritePoints(database, retentionPolicy string, consistencyLevel imodels.ConsistencyLevel, points []imodels.Point) error {
 	if tm.closed {
 		return ErrTaskMasterClosed
+	}
+	if retentionPolicy == "" {
+		retentionPolicy = tm.DefaultRetentionPolicy
 	}
 	for _, mp := range points {
 		p := models.Point{

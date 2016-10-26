@@ -146,6 +146,7 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	// Start Task Master
 	s.TaskMasterLookup = kapacitor.NewTaskMasterLookup()
 	s.TaskMaster = kapacitor.NewTaskMaster(kapacitor.MainTaskMaster, logService)
+	s.TaskMaster.DefaultRetentionPolicy = c.DefaultRetentionPolicy
 	s.TaskMasterLookup.Set(s.TaskMaster)
 	if err := s.TaskMaster.Open(); err != nil {
 		return nil, err
