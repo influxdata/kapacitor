@@ -35,6 +35,10 @@ var (
 	// on a default retention policy.
 	ErrRetentionPolicyDefault = errors.New("retention policy is default")
 
+	// ErrRetentionPolicyRequired is returned when a retention policy is required
+	// by an operation, but a nil policy was passed.
+	ErrRetentionPolicyRequired = errors.New("retention policy required")
+
 	// ErrRetentionPolicyNameRequired is returned when creating a policy without a name.
 	ErrRetentionPolicyNameRequired = errors.New("retention policy name required")
 
@@ -50,6 +54,11 @@ var (
 	// ErrRetentionPolicyConflict is returned when creating a retention policy conflicts
 	// with an existing policy.
 	ErrRetentionPolicyConflict = errors.New("retention policy conflicts with an existing policy")
+
+	// ErrIncompatibleDurations is returned when creating or updating a
+	// retention policy that has a duration lower than the current shard
+	// duration.
+	ErrIncompatibleDurations = errors.New("retention policy duration must be greater than the shard duration")
 
 	// ErrReplicationFactorTooLow is returned when the replication factor is not in an
 	// acceptable range.

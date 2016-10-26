@@ -45,8 +45,6 @@ func (c *tcpConnection) Close() {
 
 // Service represents a Graphite service.
 type Service struct {
-	mu sync.Mutex
-
 	bindAddress     string
 	database        string
 	retentionPolicy string
@@ -59,9 +57,9 @@ type Service struct {
 	batcher *tsdb.PointBatcher
 	parser  *Parser
 
-	logger   *log.Logger
-	stats    *Statistics
-	statTags models.Tags
+	logger      *log.Logger
+	stats       *Statistics
+	defaultTags models.StatisticTags
 
 	tcpConnectionsMu sync.Mutex
 	tcpConnections   map[string]*tcpConnection
@@ -71,8 +69,11 @@ type Service struct {
 	addr    net.Addr
 	udpConn *net.UDPConn
 
-	wg   sync.WaitGroup
-	done chan struct{}
+	wg sync.WaitGroup
+
+	mu    sync.RWMutex
+	ready bool          // Has the required database been created?
+	done  chan struct{} // Is the service closing or closed?
 
 	Monitor interface {
 		RegisterDiagnosticsClient(name string, client diagnostics.Client)
@@ -83,8 +84,8 @@ type Service struct {
 	}
 	MetaClient interface {
 		CreateDatabase(name string) (*meta.DatabaseInfo, error)
-		CreateDatabaseWithRetentionPolicy(name string, rpi *meta.RetentionPolicyInfo) (*meta.DatabaseInfo, error)
-		CreateRetentionPolicy(database string, rpi *meta.RetentionPolicyInfo) (*meta.RetentionPolicyInfo, error)
+		CreateDatabaseWithRetentionPolicy(name string, spec *meta.RetentionPolicySpec) (*meta.DatabaseInfo, error)
+		CreateRetentionPolicy(database string, spec *meta.RetentionPolicySpec) (*meta.RetentionPolicyInfo, error)
 		Database(name string) *meta.DatabaseInfo
 		RetentionPolicy(database, name string) (*meta.RetentionPolicyInfo, error)
 	}
@@ -106,9 +107,8 @@ func NewService(c Config) (*Service, error) {
 		batchTimeout:    time.Duration(d.BatchTimeout),
 		logger:          log.New(os.Stderr, fmt.Sprintf("[graphite] %s ", d.BindAddress), log.LstdFlags),
 		stats:           &Statistics{},
-		statTags:        map[string]string{"proto": d.Protocol, "bind": d.BindAddress},
+		defaultTags:     models.StatisticTags{"proto": d.Protocol, "bind": d.BindAddress},
 		tcpConnections:  make(map[string]*tcpConnection),
-		done:            make(chan struct{}),
 		diagsKey:        strings.Join([]string{"graphite", d.Protocol, d.BindAddress}, ":"),
 	}
 
@@ -130,26 +130,16 @@ func (s *Service) Open() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if !s.closed() {
+		return nil // Already open.
+	}
+	s.done = make(chan struct{})
+
 	s.logger.Printf("Starting graphite service, batch size %d, batch timeout %s", s.batchSize, s.batchTimeout)
 
 	// Register diagnostics if a Monitor service is available.
 	if s.Monitor != nil {
 		s.Monitor.RegisterDiagnosticsClient(s.diagsKey, s)
-	}
-
-	if db := s.MetaClient.Database(s.database); db != nil {
-		if rp, _ := s.MetaClient.RetentionPolicy(s.database, s.retentionPolicy); rp == nil {
-			rpi := meta.NewRetentionPolicyInfo(s.retentionPolicy)
-			if _, err := s.MetaClient.CreateRetentionPolicy(s.database, rpi); err != nil {
-				s.logger.Printf("Failed to ensure target retention policy %s exists: %s", s.database, err.Error())
-			}
-		}
-	} else {
-		rpi := meta.NewRetentionPolicyInfo(s.retentionPolicy)
-		if _, err := s.MetaClient.CreateDatabaseWithRetentionPolicy(s.database, rpi); err != nil {
-			s.logger.Printf("Failed to ensure target database %s exists: %s", s.database, err.Error())
-			return err
-		}
 	}
 
 	s.batcher = tsdb.NewPointBatcher(s.batchSize, s.batchPending, s.batchTimeout)
@@ -187,6 +177,11 @@ func (s *Service) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if s.closed() {
+		return nil // Already closed.
+	}
+	close(s.done)
+
 	s.closeAllConnections()
 
 	if s.ln != nil {
@@ -204,10 +199,56 @@ func (s *Service) Close() error {
 		s.Monitor.DeregisterDiagnosticsClient(s.diagsKey)
 	}
 
-	close(s.done)
 	s.wg.Wait()
 	s.done = nil
 
+	return nil
+}
+
+// Closed returns true if the service is currently closed.
+func (s *Service) Closed() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.closed()
+}
+
+func (s *Service) closed() bool {
+	select {
+	case <-s.done:
+		// Service is closing.
+		return true
+	default:
+	}
+	return s.done == nil
+}
+
+// createInternalStorage ensures that the required database has been created.
+func (s *Service) createInternalStorage() error {
+	s.mu.RLock()
+	ready := s.ready
+	s.mu.RUnlock()
+	if ready {
+		return nil
+	}
+
+	if db := s.MetaClient.Database(s.database); db != nil {
+		if rp, _ := s.MetaClient.RetentionPolicy(s.database, s.retentionPolicy); rp == nil {
+			spec := meta.RetentionPolicySpec{Name: s.retentionPolicy}
+			if _, err := s.MetaClient.CreateRetentionPolicy(s.database, &spec); err != nil {
+				return err
+			}
+		}
+	} else {
+		spec := meta.RetentionPolicySpec{Name: s.retentionPolicy}
+		if _, err := s.MetaClient.CreateDatabaseWithRetentionPolicy(s.database, &spec); err != nil {
+			return err
+		}
+	}
+
+	// The service is now ready.
+	s.mu.Lock()
+	s.ready = true
+	s.mu.Unlock()
 	return nil
 }
 
@@ -234,7 +275,7 @@ type Statistics struct {
 func (s *Service) Statistics(tags map[string]string) []models.Statistic {
 	return []models.Statistic{{
 		Name: "graphite",
-		Tags: s.statTags.Merge(tags),
+		Tags: s.defaultTags.Merge(tags),
 		Values: map[string]interface{}{
 			statPointsReceived:      atomic.LoadInt64(&s.stats.PointsReceived),
 			statBytesReceived:       atomic.LoadInt64(&s.stats.BytesReceived),
@@ -397,6 +438,12 @@ func (s *Service) processBatches(batcher *tsdb.PointBatcher) {
 	for {
 		select {
 		case batch := <-batcher.Out():
+			// Will attempt to create database if not yet created.
+			if err := s.createInternalStorage(); err != nil {
+				s.logger.Printf("Required database or retention policy do not yet exist: %s", err.Error())
+				continue
+			}
+
 			if err := s.PointsWriter.WritePoints(s.database, s.retentionPolicy, models.ConsistencyLevelAny, batch); err == nil {
 				atomic.AddInt64(&s.stats.BatchesTransmitted, 1)
 				atomic.AddInt64(&s.stats.PointsTransmitted, int64(len(batch)))

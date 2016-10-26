@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -111,7 +112,7 @@ func (h *Handler) servePut(w http.ResponseWriter, r *http.Request) {
 			ts = time.Unix(p.Time/1000, (p.Time%1000)*1000)
 		}
 
-		pt, err := models.NewPoint(p.Metric, p.Tags, map[string]interface{}{"value": p.Value}, ts)
+		pt, err := models.NewPoint(p.Metric, models.NewTags(p.Tags), map[string]interface{}{"value": p.Value}, ts)
 		if err != nil {
 			h.Logger.Printf("Dropping point %v: %v", p.Metric, err)
 			if h.stats != nil {
@@ -138,8 +139,10 @@ func (h *Handler) servePut(w http.ResponseWriter, r *http.Request) {
 
 // chanListener represents a listener that receives connections through a channel.
 type chanListener struct {
-	addr net.Addr
-	ch   chan net.Conn
+	addr   net.Addr
+	ch     chan net.Conn
+	done   chan struct{}
+	closer sync.Once // closer ensures that Close is idempotent.
 }
 
 // newChanListener returns a new instance of chanListener.
@@ -147,20 +150,28 @@ func newChanListener(addr net.Addr) *chanListener {
 	return &chanListener{
 		addr: addr,
 		ch:   make(chan net.Conn),
+		done: make(chan struct{}),
 	}
 }
 
 func (ln *chanListener) Accept() (net.Conn, error) {
-	conn, ok := <-ln.ch
-	if !ok {
-		return nil, errors.New("network connection closed")
+	errClosed := errors.New("network connection closed")
+	select {
+	case <-ln.done:
+		return nil, errClosed
+	case conn, ok := <-ln.ch:
+		if !ok {
+			return nil, errClosed
+		}
+		return conn, nil
 	}
-	return conn, nil
 }
 
 // Close closes the connection channel.
 func (ln *chanListener) Close() error {
-	close(ln.ch)
+	ln.closer.Do(func() {
+		close(ln.done)
+	})
 	return nil
 }
 

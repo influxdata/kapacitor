@@ -39,16 +39,18 @@ const (
 
 	// DefaultMaxSeriesPerDatabase is the maximum number of series a node can hold per database.
 	DefaultMaxSeriesPerDatabase = 1000000
+
+	// DefaultMaxValuesPerTag is the maximum number of values a tag can have within a measurement.
+	DefaultMaxValuesPerTag = 100000
 )
 
 // Config holds the configuration for the tsbd package.
 type Config struct {
 	Dir    string `toml:"dir"`
-	Engine string `toml:"engine"`
+	Engine string `toml:"-"`
 
 	// General WAL configuration options
-	WALDir            string `toml:"wal-dir"`
-	WALLoggingEnabled bool   `toml:"wal-logging-enabled"`
+	WALDir string `toml:"wal-dir"`
 
 	// Query logging
 	QueryLogEnabled bool `toml:"query-log-enabled"`
@@ -58,7 +60,6 @@ type Config struct {
 	CacheSnapshotMemorySize        uint64        `toml:"cache-snapshot-memory-size"`
 	CacheSnapshotWriteColdDuration toml.Duration `toml:"cache-snapshot-write-cold-duration"`
 	CompactFullWriteColdDuration   toml.Duration `toml:"compact-full-write-cold-duration"`
-	MaxPointsPerBlock              int           `toml:"max-points-per-block"`
 
 	// Limits
 
@@ -66,6 +67,11 @@ type Config struct {
 	// When this limit is exceeded, writes return a 'max series per database exceeded' error.
 	// A value of 0 disables the limit.
 	MaxSeriesPerDatabase int `toml:"max-series-per-database"`
+
+	// MaxValuesPerTag is the maximum number of tag values a single tag key can have within
+	// a measurement.  When the limit is execeeded, writes return an error.
+	// A value of 0 disables the limit.
+	MaxValuesPerTag int `toml:"max-values-per-tag"`
 
 	TraceLoggingEnabled bool `toml:"trace-logging-enabled"`
 }
@@ -75,8 +81,6 @@ func NewConfig() Config {
 	return Config{
 		Engine: DefaultEngine,
 
-		WALLoggingEnabled: true,
-
 		QueryLogEnabled: true,
 
 		CacheMaxMemorySize:             DefaultCacheMaxMemorySize,
@@ -85,6 +89,7 @@ func NewConfig() Config {
 		CompactFullWriteColdDuration:   toml.Duration(DefaultCompactFullWriteColdDuration),
 
 		MaxSeriesPerDatabase: DefaultMaxSeriesPerDatabase,
+		MaxValuesPerTag:      DefaultMaxValuesPerTag,
 
 		TraceLoggingEnabled: false,
 	}

@@ -2,6 +2,7 @@ package tsm1 // import "github.com/influxdata/influxdb/tsdb/engine/tsm1"
 
 import (
 	"archive/tar"
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -39,28 +41,57 @@ const (
 
 // Statistics gathered by the engine.
 const (
-	statCacheCompactions              = "cacheCompactions"
-	statCacheCompactionError          = "cacheCompactionErr"
-	statCacheCompactionDuration       = "cacheCompactionDuration"
-	statTSMLevel1Compactions          = "tsmLevel1Compactions"
-	statTSMLevel1CompactionDuration   = "tsmLevel1CompactionDuration"
-	statTSMLevel2Compactions          = "tsmLevel2Compactions"
-	statTSMLevel2CompactionDuration   = "tsmLevel2CompactionDuration"
-	statTSMLevel3Compactions          = "tsmLevel3Compactions"
-	statTSMLevel3CompactionDuration   = "tsmLevel3CompactionDuration"
+	statCacheCompactions        = "cacheCompactions"
+	statCacheCompactionsActive  = "cacheCompactionsActive"
+	statCacheCompactionError    = "cacheCompactionErr"
+	statCacheCompactionDuration = "cacheCompactionDuration"
+
+	statTSMLevel1Compactions        = "tsmLevel1Compactions"
+	statTSMLevel1CompactionsActive  = "tsmLevel1CompactionsActive"
+	statTSMLevel1CompactionError    = "tsmLevel1CompactionErr"
+	statTSMLevel1CompactionDuration = "tsmLevel1CompactionDuration"
+
+	statTSMLevel2Compactions        = "tsmLevel2Compactions"
+	statTSMLevel2CompactionsActive  = "tsmLevel2CompactionsActive"
+	statTSMLevel2CompactionError    = "tsmLevel2CompactionErr"
+	statTSMLevel2CompactionDuration = "tsmLevel2CompactionDuration"
+
+	statTSMLevel3Compactions        = "tsmLevel3Compactions"
+	statTSMLevel3CompactionsActive  = "tsmLevel3CompactionsActive"
+	statTSMLevel3CompactionError    = "tsmLevel3CompactionErr"
+	statTSMLevel3CompactionDuration = "tsmLevel3CompactionDuration"
+
 	statTSMOptimizeCompactions        = "tsmOptimizeCompactions"
+	statTSMOptimizeCompactionsActive  = "tsmOptimizeCompactionsActive"
+	statTSMOptimizeCompactionError    = "tsmOptimizeCompactionErr"
 	statTSMOptimizeCompactionDuration = "tsmOptimizeCompactionDuration"
-	statTSMFullCompactions            = "tsmFullCompactions"
-	statTSMFullCompactionDuration     = "tsmFullCompactionDuration"
+
+	statTSMFullCompactions        = "tsmFullCompactions"
+	statTSMFullCompactionsActive  = "tsmFullCompactionsActive"
+	statTSMFullCompactionError    = "tsmFullCompactionErr"
+	statTSMFullCompactionDuration = "tsmFullCompactionDuration"
 )
 
 // Engine represents a storage engine with compressed blocks.
 type Engine struct {
-	mu                 sync.RWMutex
-	done               chan struct{}
-	wg                 sync.WaitGroup
-	compactionsEnabled bool
+	mu sync.RWMutex
 
+	// The following group of fields is used to track the state of level compactions within the
+	// Engine. The WaitGroup is used to monitor the compaction goroutines, the 'done' channel is
+	// used to signal those goroutines to shutdown. Every request to disable level compactions will
+	// call 'Wait' on 'wg', with the first goroutine to arrive (levelWorkers == 0 while holding the
+	// lock) will close the done channel and re-assign 'nil' to the variable. Re-enabling will
+	// decrease 'levelWorkers', and when it decreases to zero, level compactions will be started
+	// back up again.
+
+	wg           sync.WaitGroup // waitgroup for active level compaction goroutines
+	done         chan struct{}  // channel to signal level compactions to stop
+	levelWorkers int            // Number of "workers" that expect compactions to be in a disabled state
+
+	snapDone chan struct{}  // channel to signal snapshot compactions to stop
+	snapWG   sync.WaitGroup // waitgroup for running snapshot compactions
+
+	id           uint64
 	path         string
 	logger       *log.Logger // Logger to be used for important messages
 	traceLogger  *log.Logger // Logger to be used when trace-logging is on.
@@ -95,7 +126,7 @@ type Engine struct {
 }
 
 // NewEngine returns a new instance of Engine.
-func NewEngine(path string, walPath string, opt tsdb.EngineOptions) tsdb.Engine {
+func NewEngine(id uint64, path string, walPath string, opt tsdb.EngineOptions) tsdb.Engine {
 	w := NewWAL(walPath)
 	fs := NewFileStore(path)
 	cache := NewCache(uint64(opt.Config.CacheMaxMemorySize), path)
@@ -106,6 +137,7 @@ func NewEngine(path string, walPath string, opt tsdb.EngineOptions) tsdb.Engine 
 	}
 
 	e := &Engine{
+		id:           id,
 		path:         path,
 		logger:       log.New(os.Stderr, "[tsm1] ", log.LstdFlags),
 		traceLogger:  log.New(ioutil.Discard, "[tsm1] ", log.LstdFlags),
@@ -123,7 +155,6 @@ func NewEngine(path string, walPath string, opt tsdb.EngineOptions) tsdb.Engine 
 			FileStore:                    fs,
 			CompactFullWriteColdDuration: time.Duration(opt.Config.CompactFullWriteColdDuration),
 		},
-		MaxPointsPerBlock: opt.Config.MaxPointsPerBlock,
 
 		CacheFlushMemorySizeThreshold: opt.Config.CacheSnapshotMemorySize,
 		CacheFlushWriteColdDuration:   time.Duration(opt.Config.CacheSnapshotWriteColdDuration),
@@ -149,47 +180,100 @@ func (e *Engine) SetEnabled(enabled bool) {
 // all running compactions are aborted and new compactions stop running.
 func (e *Engine) SetCompactionsEnabled(enabled bool) {
 	if enabled {
-		e.mu.Lock()
-		if e.compactionsEnabled {
-			e.mu.Unlock()
-			return
-		}
-		e.compactionsEnabled = true
-
-		e.done = make(chan struct{})
-		e.Compactor.Open()
-
-		e.mu.Unlock()
-
-		e.wg.Add(5)
-		go e.compactCache()
-		go e.compactTSMFull()
-		go e.compactTSMLevel(true, 1)
-		go e.compactTSMLevel(true, 2)
-		go e.compactTSMLevel(false, 3)
+		e.enableSnapshotCompactions()
+		e.enableLevelCompactions(false)
 	} else {
-		e.mu.Lock()
-		if !e.compactionsEnabled {
-			e.mu.Unlock()
-			return
-		}
-		// Prevent new compactions from starting
-		e.compactionsEnabled = false
+		e.disableSnapshotCompactions()
+		e.disableLevelCompactions(false)
+	}
+}
+
+// enableLevelCompactions will request that level compactions start back up again
+//
+// 'wait' signifies that a corresponding call to disableLevelCompactions(true) was made at some
+// point, and the associated task that required disabled compactions is now complete
+func (e *Engine) enableLevelCompactions(wait bool) {
+	e.mu.Lock()
+	if wait {
+		e.levelWorkers -= 1
+	}
+	if e.levelWorkers != 0 || e.done != nil {
+		// still waiting on more workers or already enabled
 		e.mu.Unlock()
+		return
+	}
+
+	// last one to enable, start things back up
+	e.Compactor.EnableCompactions()
+	quit := make(chan struct{})
+	e.done = quit
+
+	e.wg.Add(4)
+	e.mu.Unlock()
+
+	go func() { defer e.wg.Done(); e.compactTSMFull(quit) }()
+	go func() { defer e.wg.Done(); e.compactTSMLevel(true, 1, quit) }()
+	go func() { defer e.wg.Done(); e.compactTSMLevel(true, 2, quit) }()
+	go func() { defer e.wg.Done(); e.compactTSMLevel(false, 3, quit) }()
+}
+
+// disableLevelCompactions will stop level compactions before returning
+//
+// If 'wait' is set to true, then a corresponding call to enableLevelCompactions(true) will be
+// required before level compactions will start back up again
+func (e *Engine) disableLevelCompactions(wait bool) {
+	e.mu.Lock()
+	old := e.levelWorkers
+	if wait {
+		e.levelWorkers += 1
+	}
+
+	if old == 0 && e.done != nil {
+		// Prevent new compactions from starting
+		e.Compactor.DisableCompactions()
 
 		// Stop all background compaction goroutines
 		close(e.done)
+		e.done = nil
+	}
 
-		// Abort any running goroutines (this could take a while)
-		e.Compactor.Close()
+	e.mu.Unlock()
+	e.wg.Wait()
 
-		// Wait for compaction goroutines to exit
-		e.wg.Wait()
-
+	if old == 0 { // first to disable should cleanup
 		if err := e.cleanup(); err != nil {
 			e.logger.Printf("error cleaning up temp file: %v", err)
 		}
 	}
+}
+
+func (e *Engine) enableSnapshotCompactions() {
+	e.mu.Lock()
+	if e.snapDone != nil {
+		e.mu.Unlock()
+		return
+	}
+
+	e.Compactor.EnableSnapshots()
+	quit := make(chan struct{})
+	e.snapDone = quit
+	e.snapWG.Add(1)
+	e.mu.Unlock()
+
+	go func() { defer e.snapWG.Done(); e.compactCache(quit) }()
+}
+
+func (e *Engine) disableSnapshotCompactions() {
+	e.mu.Lock()
+
+	if e.snapDone != nil {
+		e.Compactor.DisableSnapshots()
+		close(e.snapDone)
+		e.snapDone = nil
+	}
+
+	e.mu.Unlock()
+	e.snapWG.Wait()
 }
 
 // Path returns the path the engine was opened with.
@@ -229,18 +313,25 @@ func (e *Engine) Format() tsdb.EngineFormat {
 
 // EngineStatistics maintains statistics for the engine.
 type EngineStatistics struct {
-	CacheCompactions              int64
-	CacheCompactionErrors         int64
-	CacheCompactionDuration       int64
-	TSMCompactions                [3]int64
-	TSMCompactionErrors           [3]int64
-	TSMCompactionDuration         [3]int64
-	TSMOptimizeCompactions        int64
-	TSMOptimizeCompactionErrors   int64
-	TSMOptimizeCompactionDuration int64
-	TSMFullCompactions            int64
-	TSMFullCompactionErrors       int64
-	TSMFullCompactionDuration     int64
+	CacheCompactions        int64 // Counter of cache compactions that have ever run.
+	CacheCompactionsActive  int64 // Gauge of cache compactions currently running.
+	CacheCompactionErrors   int64 // Counter of cache compactions that have failed due to error.
+	CacheCompactionDuration int64 // Counter of number of wall nanoseconds spent in cache compactions.
+
+	TSMCompactions        [3]int64 // Counter of TSM compactions (by level) that have ever run.
+	TSMCompactionsActive  [3]int64 // Gauge of TSM compactions (by level) currently running.
+	TSMCompactionErrors   [3]int64 // Counter of TSM compcations (by level) that have failed due to error.
+	TSMCompactionDuration [3]int64 // Counter of number of wall nanoseconds spent in TSM compactions (by level).
+
+	TSMOptimizeCompactions        int64 // Counter of optimize compactions that have ever run.
+	TSMOptimizeCompactionsActive  int64 // Gauge of optimize compactions currently running.
+	TSMOptimizeCompactionErrors   int64 // Counter of optimize compactions that have failed due to error.
+	TSMOptimizeCompactionDuration int64 // Counter of number of wall nanoseconds spent in optimize compactions.
+
+	TSMFullCompactions        int64 // Counter of full compactions that have ever run.
+	TSMFullCompactionsActive  int64 // Gauge of full compactions currently running.
+	TSMFullCompactionErrors   int64 // Counter of full compactions that have failed due to error.
+	TSMFullCompactionDuration int64 // Counter of number of wall nanoseconds spent in full compactions.
 }
 
 // Statistics returns statistics for periodic monitoring.
@@ -250,16 +341,35 @@ func (e *Engine) Statistics(tags map[string]string) []models.Statistic {
 		Name: "tsm1_engine",
 		Tags: tags,
 		Values: map[string]interface{}{
-			statCacheCompactions:            atomic.LoadInt64(&e.stats.CacheCompactions),
-			statCacheCompactionDuration:     atomic.LoadInt64(&e.stats.CacheCompactionDuration),
+			statCacheCompactions:        atomic.LoadInt64(&e.stats.CacheCompactions),
+			statCacheCompactionsActive:  atomic.LoadInt64(&e.stats.CacheCompactionsActive),
+			statCacheCompactionError:    atomic.LoadInt64(&e.stats.CacheCompactionErrors),
+			statCacheCompactionDuration: atomic.LoadInt64(&e.stats.CacheCompactionDuration),
+
 			statTSMLevel1Compactions:        atomic.LoadInt64(&e.stats.TSMCompactions[0]),
+			statTSMLevel1CompactionsActive:  atomic.LoadInt64(&e.stats.TSMCompactionsActive[0]),
+			statTSMLevel1CompactionError:    atomic.LoadInt64(&e.stats.TSMCompactionErrors[0]),
 			statTSMLevel1CompactionDuration: atomic.LoadInt64(&e.stats.TSMCompactionDuration[0]),
+
 			statTSMLevel2Compactions:        atomic.LoadInt64(&e.stats.TSMCompactions[1]),
+			statTSMLevel2CompactionsActive:  atomic.LoadInt64(&e.stats.TSMCompactionsActive[1]),
+			statTSMLevel2CompactionError:    atomic.LoadInt64(&e.stats.TSMCompactionErrors[1]),
 			statTSMLevel2CompactionDuration: atomic.LoadInt64(&e.stats.TSMCompactionDuration[1]),
+
 			statTSMLevel3Compactions:        atomic.LoadInt64(&e.stats.TSMCompactions[2]),
+			statTSMLevel3CompactionsActive:  atomic.LoadInt64(&e.stats.TSMCompactionsActive[2]),
+			statTSMLevel3CompactionError:    atomic.LoadInt64(&e.stats.TSMCompactionErrors[2]),
 			statTSMLevel3CompactionDuration: atomic.LoadInt64(&e.stats.TSMCompactionDuration[2]),
-			statTSMFullCompactions:          atomic.LoadInt64(&e.stats.TSMFullCompactions),
-			statTSMFullCompactionDuration:   atomic.LoadInt64(&e.stats.TSMFullCompactionDuration),
+
+			statTSMOptimizeCompactions:        atomic.LoadInt64(&e.stats.TSMOptimizeCompactions),
+			statTSMOptimizeCompactionsActive:  atomic.LoadInt64(&e.stats.TSMOptimizeCompactionsActive),
+			statTSMOptimizeCompactionError:    atomic.LoadInt64(&e.stats.TSMOptimizeCompactionErrors),
+			statTSMOptimizeCompactionDuration: atomic.LoadInt64(&e.stats.TSMOptimizeCompactionDuration),
+
+			statTSMFullCompactions:        atomic.LoadInt64(&e.stats.TSMFullCompactions),
+			statTSMFullCompactionsActive:  atomic.LoadInt64(&e.stats.TSMFullCompactionsActive),
+			statTSMFullCompactionError:    atomic.LoadInt64(&e.stats.TSMFullCompactionErrors),
+			statTSMFullCompactionDuration: atomic.LoadInt64(&e.stats.TSMFullCompactionDuration),
 		},
 	})
 	statistics = append(statistics, e.Cache.Statistics(tags)...)
@@ -270,8 +380,6 @@ func (e *Engine) Statistics(tags map[string]string) []models.Statistic {
 
 // Open opens and initializes the engine.
 func (e *Engine) Open() error {
-	e.done = make(chan struct{})
-
 	if err := os.MkdirAll(e.path, 0777); err != nil {
 		return err
 	}
@@ -291,6 +399,8 @@ func (e *Engine) Open() error {
 	if err := e.reloadCache(); err != nil {
 		return err
 	}
+
+	e.Compactor.Open()
 
 	if e.enableCompactionsOnOpen {
 		e.SetCompactionsEnabled(true)
@@ -338,8 +448,9 @@ func (e *Engine) LoadMetadataIndex(shardID uint64, index *tsdb.DatabaseIndex) er
 
 	// Save reference to index for iterator creation.
 	e.index = index
+	e.FileStore.dereferencer = index
 
-	if err := e.FileStore.WalkKeys(func(key string, typ byte) error {
+	if err := e.FileStore.WalkKeys(func(key []byte, typ byte) error {
 		fieldType, err := tsmFieldTypeToInfluxQLDataType(typ)
 		if err != nil {
 			return err
@@ -365,7 +476,7 @@ func (e *Engine) LoadMetadataIndex(shardID uint64, index *tsdb.DatabaseIndex) er
 			continue
 		}
 
-		if err := e.addToIndexFromKey(shardID, key, fieldType, index); err != nil {
+		if err := e.addToIndexFromKey(shardID, []byte(key), fieldType, index); err != nil {
 			return err
 		}
 	}
@@ -522,9 +633,9 @@ func (e *Engine) readFileFromBackup(tr *tar.Reader, shardRelativePath string) er
 
 // addToIndexFromKey will pull the measurement name, series key, and field name from a composite key and add it to the
 // database index and measurement fields
-func (e *Engine) addToIndexFromKey(shardID uint64, key string, fieldType influxql.DataType, index *tsdb.DatabaseIndex) error {
+func (e *Engine) addToIndexFromKey(shardID uint64, key []byte, fieldType influxql.DataType, index *tsdb.DatabaseIndex) error {
 	seriesKey, field := SeriesAndFieldFromCompositeKey(key)
-	measurement := tsdb.MeasurementFromSeriesKey(seriesKey)
+	measurement := tsdb.MeasurementFromSeriesKey(string(seriesKey))
 
 	m := index.CreateMeasurementIndexIfNotExists(measurement)
 	m.SetFieldName(field)
@@ -540,7 +651,7 @@ func (e *Engine) addToIndexFromKey(shardID uint64, key string, fieldType influxq
 	}
 
 	// Have we already indexed this series?
-	ss := index.Series(seriesKey)
+	ss := index.SeriesBytes(seriesKey)
 	if ss != nil {
 		// Add this shard to the existing series
 		ss.AssignShard(shardID)
@@ -551,7 +662,7 @@ func (e *Engine) addToIndexFromKey(shardID uint64, key string, fieldType influxq
 	// fields (in line protocol format) in the series key
 	_, tags, _ := models.ParseKey(seriesKey)
 
-	s := tsdb.NewSeries(seriesKey, tags)
+	s := tsdb.NewSeries(string(seriesKey), tags)
 	index.CreateSeriesIndexIfNotExists(measurement, s)
 	s.AssignShard(shardID)
 
@@ -561,11 +672,31 @@ func (e *Engine) addToIndexFromKey(shardID uint64, key string, fieldType influxq
 // WritePoints writes metadata and point data into the engine.
 // Returns an error if new points are added to an existing key.
 func (e *Engine) WritePoints(points []models.Point) error {
-	values := map[string][]Value{}
+	values := make(map[string][]Value, len(points))
+	var keyBuf []byte
+	var baseLen int
 	for _, p := range points {
-		for k, v := range p.Fields() {
-			key := string(p.Key()) + keyFieldSeparator + k
-			values[key] = append(values[key], NewValue(p.Time().UnixNano(), v))
+		keyBuf = append(keyBuf[:0], p.Key()...)
+		keyBuf = append(keyBuf, keyFieldSeparator...)
+		baseLen = len(keyBuf)
+		iter := p.FieldIterator()
+		t := p.Time().UnixNano()
+		for iter.Next() {
+			keyBuf = append(keyBuf[:baseLen], iter.FieldKey()...)
+			var v Value
+			switch iter.Type() {
+			case models.Float:
+				v = NewFloatValue(t, iter.FloatValue())
+			case models.Integer:
+				v = NewIntegerValue(t, iter.IntegerValue())
+			case models.String:
+				v = NewStringValue(t, iter.StringValue())
+			case models.Boolean:
+				v = NewBooleanValue(t, iter.BooleanValue())
+			default:
+				return fmt.Errorf("unknown field type for %s: %s", string(iter.FieldKey()), p.String())
+			}
+			values[string(keyBuf)] = append(values[string(keyBuf)], v)
 		}
 	}
 
@@ -593,14 +724,14 @@ func (e *Engine) ContainsSeries(keys []string) (map[string]bool, error) {
 	}
 
 	for _, k := range e.Cache.Keys() {
-		seriesKey, _ := SeriesAndFieldFromCompositeKey(k)
-		keyMap[seriesKey] = true
+		seriesKey, _ := SeriesAndFieldFromCompositeKey([]byte(k))
+		keyMap[string(seriesKey)] = true
 	}
 
-	if err := e.FileStore.WalkKeys(func(k string, _ byte) error {
+	if err := e.FileStore.WalkKeys(func(k []byte, _ byte) error {
 		seriesKey, _ := SeriesAndFieldFromCompositeKey(k)
-		if _, ok := keyMap[seriesKey]; ok {
-			keyMap[seriesKey] = true
+		if _, ok := keyMap[string(seriesKey)]; ok {
+			keyMap[string(seriesKey)] = true
 		}
 		return nil
 	}); err != nil {
@@ -622,30 +753,36 @@ func (e *Engine) DeleteSeriesRange(seriesKeys []string, min, max int64) error {
 
 	// Disable and abort running compactions so that tombstones added existing tsm
 	// files don't get removed.  This would cause deleted measurements/series to
-	// re-appear once the compaction completed.
-	e.SetCompactionsEnabled(false)
-	defer e.SetCompactionsEnabled(true)
-
-	e.mu.RLock()
-	defer e.mu.RUnlock()
+	// re-appear once the compaction completed.  We only disable the level compactions
+	// so that snapshotting does not stop while writing out tombstones.  If it is stopped,
+	// and writing tombstones takes a long time, writes can get rejected due to the cache
+	// filling up.
+	e.disableLevelCompactions(true)
+	defer e.enableLevelCompactions(true)
 
 	// keyMap is used to see if a given key should be deleted.  seriesKey
 	// are the measurement + tagset (minus separate & field)
-	keyMap := make(map[string]int, len(seriesKeys))
+	keyMap := make(map[string]struct{}, len(seriesKeys))
 	for _, k := range seriesKeys {
-		keyMap[k] = 0
+		keyMap[k] = struct{}{}
 	}
 
 	deleteKeys := make([]string, 0, len(seriesKeys))
 	// go through the keys in the file store
-	if err := e.FileStore.WalkKeys(func(k string, _ byte) error {
+	if err := e.FileStore.WalkKeys(func(k []byte, _ byte) error {
 		seriesKey, _ := SeriesAndFieldFromCompositeKey(k)
-
 		// Keep track if we've added this key since WalkKeys can return keys
 		// we've seen before
-		if v, ok := keyMap[seriesKey]; ok && v == 0 {
-			deleteKeys = append(deleteKeys, k)
-			keyMap[seriesKey] += 1
+		key := string(k)
+		if _, ok := keyMap[string(seriesKey)]; ok {
+			i := sort.SearchStrings(deleteKeys, key)
+			if i == len(deleteKeys) {
+				deleteKeys = append(deleteKeys, key)
+			} else if key != deleteKeys[i] {
+				deleteKeys = append(deleteKeys, key)
+				copy(deleteKeys[i+1:], deleteKeys[i:])
+				deleteKeys[i] = key
+			}
 		}
 		return nil
 	}); err != nil {
@@ -656,17 +793,13 @@ func (e *Engine) DeleteSeriesRange(seriesKeys []string, min, max int64) error {
 		return err
 	}
 
-	// reset the counts
-	for k := range keyMap {
-		keyMap[k] = 0
-	}
 	// find the keys in the cache and remove them
 	walKeys := deleteKeys[:0]
 	e.Cache.RLock()
 	s := e.Cache.Store()
 	for k, _ := range s {
-		seriesKey, _ := SeriesAndFieldFromCompositeKey(k)
-		if _, ok := keyMap[seriesKey]; ok {
+		seriesKey, _ := SeriesAndFieldFromCompositeKey([]byte(k))
+		if _, ok := keyMap[string(seriesKey)]; ok {
 			walKeys = append(walKeys, k)
 		}
 	}
@@ -691,7 +824,7 @@ func (e *Engine) DeleteMeasurement(name string, seriesKeys []string) error {
 
 // SeriesCount returns the number of series buckets on the shard.
 func (e *Engine) SeriesCount() (n int, err error) {
-	return 0, nil
+	return e.index.SeriesN(), nil
 }
 
 func (e *Engine) WriteTo(w io.Writer) (n int64, err error) { panic("not implemented") }
@@ -796,11 +929,10 @@ func (e *Engine) writeSnapshotAndCommit(closedFiles []string, snapshot *Cache) (
 }
 
 // compactCache continually checks if the WAL cache should be written to disk
-func (e *Engine) compactCache() {
-	defer e.wg.Done()
+func (e *Engine) compactCache(quit <-chan struct{}) {
 	for {
 		select {
-		case <-e.done:
+		case <-quit:
 			return
 
 		default:
@@ -835,205 +967,189 @@ func (e *Engine) ShouldCompactCache(lastWriteTime time.Time) bool {
 		time.Now().Sub(lastWriteTime) > e.CacheFlushWriteColdDuration
 }
 
-func (e *Engine) compactTSMLevel(fast bool, level int) {
-	defer e.wg.Done()
-
+func (e *Engine) compactTSMLevel(fast bool, level int, quit <-chan struct{}) {
 	for {
 		select {
-		case <-e.done:
+		case <-quit:
 			return
 
 		default:
-			tsmFiles := e.CompactionPlan.PlanLevel(level)
-
-			if len(tsmFiles) == 0 {
+			s := e.levelCompactionStrategy(fast, level)
+			if s == nil {
 				time.Sleep(time.Second)
 				continue
 			}
 
-			// Keep track of the start time for statistics.
-			start := time.Now()
-
-			var wg sync.WaitGroup
-			for i, group := range tsmFiles {
-				wg.Add(1)
-				go func(groupNum int, group CompactionGroup) {
-					defer wg.Done()
-					start := time.Now()
-					e.logger.Printf("beginning level %d compaction of group %d, %d TSM files", level, groupNum, len(group))
-					for i, f := range group {
-						e.logger.Printf("compacting level %d group (%d) %s (#%d)", level, groupNum, f, i)
-					}
-
-					var files []string
-					var err error
-
-					if fast {
-						files, err = e.Compactor.CompactFast(group)
-						if err == errCompactionsDisabled || err == errCompactionInProgress {
-							e.logger.Printf("aborted level %d group (%d). %v",
-								level, groupNum, err)
-
-							if err == errCompactionInProgress {
-								time.Sleep(time.Second)
-							}
-							return
-						} else if err != nil {
-							e.logger.Printf("error compacting TSM files: %v", err)
-							atomic.AddInt64(&e.stats.TSMCompactionErrors[level-1], 1)
-							time.Sleep(time.Second)
-							return
-						}
-					} else {
-						files, err = e.Compactor.CompactFull(group)
-						if err == errCompactionsDisabled || err == errCompactionInProgress {
-							e.logger.Printf("aborted level %d compaction group (%d). %v",
-								level, groupNum, err)
-
-							if err == errCompactionInProgress {
-								time.Sleep(time.Second)
-							}
-							return
-						} else if err != nil {
-							e.logger.Printf("error compacting TSM files: %v", err)
-							atomic.AddInt64(&e.stats.TSMCompactionErrors[level-1], 1)
-							time.Sleep(time.Second)
-							return
-						}
-					}
-
-					if err := e.FileStore.Replace(group, files); err != nil {
-						e.logger.Printf("error replacing new TSM files: %v", err)
-						atomic.AddInt64(&e.stats.TSMCompactionErrors[level-1], 1)
-						time.Sleep(time.Second)
-						return
-					}
-
-					for i, f := range files {
-						e.logger.Printf("compacted level %d group (%d) into %s (#%d)", level, groupNum, f, i)
-					}
-					atomic.AddInt64(&e.stats.TSMCompactions[level-1], 1)
-					e.logger.Printf("compacted level %d group %d of %d files into %d files in %s",
-						level, groupNum, len(group), len(files), time.Since(start))
-				}(i, group)
-			}
-			wg.Wait()
-
-			// Track the amount of time spent compacting the groups.
-			atomic.AddInt64(&e.stats.TSMCompactionDuration[level-1], time.Since(start).Nanoseconds())
+			s.Apply()
 		}
 	}
 }
 
-func (e *Engine) compactTSMFull() {
-	defer e.wg.Done()
-
+func (e *Engine) compactTSMFull(quit <-chan struct{}) {
 	for {
 		select {
-		case <-e.done:
+		case <-quit:
 			return
 
 		default:
-			optimize := false
-			logDesc := "full"
-			tsmFiles := e.CompactionPlan.Plan(e.WAL.LastWriteTime())
-
-			if len(tsmFiles) == 0 {
-				optimize = true
-				logDesc = "optimize"
-				tsmFiles = e.CompactionPlan.PlanOptimize()
-			}
-
-			if len(tsmFiles) == 0 {
+			s := e.fullCompactionStrategy()
+			if s == nil {
 				time.Sleep(time.Second)
 				continue
 			}
 
-			// Keep track of the start time for statistics.
-			start := time.Now()
-
-			var wg sync.WaitGroup
-			for i, group := range tsmFiles {
-				wg.Add(1)
-				go func(groupNum int, group CompactionGroup) {
-					defer wg.Done()
-					start := time.Now()
-					e.logger.Printf("beginning %s compaction of group %d, %d TSM files", logDesc, groupNum, len(group))
-					for i, f := range group {
-						e.logger.Printf("compacting %s group (%d) %s (#%d)", logDesc, groupNum, f, i)
-					}
-
-					var (
-						files []string
-						err   error
-					)
-					if optimize {
-						files, err = e.Compactor.CompactFast(group)
-						if err == errCompactionsDisabled || err == errCompactionInProgress {
-							e.logger.Printf("aborted %s compaction group (%d). %v",
-								logDesc, groupNum, err)
-
-							if err == errCompactionInProgress {
-								time.Sleep(time.Second)
-							}
-							return
-						} else if err != nil {
-							e.logger.Printf("error compacting TSM files: %v", err)
-							atomic.AddInt64(&e.stats.TSMOptimizeCompactionErrors, 1)
-
-							time.Sleep(time.Second)
-							return
-						}
-					} else {
-						files, err = e.Compactor.CompactFull(group)
-						if err == errCompactionsDisabled || err == errCompactionInProgress {
-							e.logger.Printf("aborted %s compaction group (%d). %v",
-								logDesc, groupNum, err)
-
-							if err == errCompactionInProgress {
-								time.Sleep(time.Second)
-							}
-							return
-						} else if err != nil {
-							e.logger.Printf("error compacting TSM files: %v", err)
-							atomic.AddInt64(&e.stats.TSMFullCompactionErrors, 1)
-
-							time.Sleep(time.Second)
-							return
-						}
-					}
-
-					if err := e.FileStore.Replace(group, files); err != nil {
-						e.logger.Printf("error replacing new TSM files: %v", err)
-						atomic.AddInt64(&e.stats.TSMFullCompactionErrors, 1)
-						time.Sleep(time.Second)
-						return
-					}
-
-					for i, f := range files {
-						e.logger.Printf("compacted %s group (%d) into %s (#%d)", logDesc, groupNum, f, i)
-					}
-
-					if optimize {
-						atomic.AddInt64(&e.stats.TSMOptimizeCompactions, 1)
-					} else {
-						atomic.AddInt64(&e.stats.TSMFullCompactions, 1)
-					}
-					e.logger.Printf("compacted %s %d files into %d files in %s",
-						logDesc, len(group), len(files), time.Since(start))
-				}(i, group)
-			}
-			wg.Wait()
-
-			// Track the amount of time spent compacting the groups.
-			if optimize {
-				atomic.AddInt64(&e.stats.TSMOptimizeCompactionDuration, time.Since(start).Nanoseconds())
-			} else {
-				atomic.AddInt64(&e.stats.TSMFullCompactionDuration, time.Since(start).Nanoseconds())
-			}
-
+			s.Apply()
 		}
 	}
+}
+
+// compactionStrategy holds the details of what to do in a compaction.
+type compactionStrategy struct {
+	compactionGroups []CompactionGroup
+
+	fast        bool
+	description string
+
+	durationStat *int64
+	activeStat   *int64
+	successStat  *int64
+	errorStat    *int64
+
+	logger    *log.Logger
+	compactor *Compactor
+	fileStore *FileStore
+}
+
+// Apply concurrently compacts all the groups in a compaction strategy.
+func (s *compactionStrategy) Apply() {
+	start := time.Now()
+
+	var wg sync.WaitGroup
+	for i := range s.compactionGroups {
+		wg.Add(1)
+		go func(groupNum int) {
+			defer wg.Done()
+			s.compactGroup(groupNum)
+		}(i)
+	}
+	wg.Wait()
+
+	atomic.AddInt64(s.durationStat, time.Since(start).Nanoseconds())
+}
+
+// compactGroup executes the compaction strategy against a single CompactionGroup.
+func (s *compactionStrategy) compactGroup(groupNum int) {
+	group := s.compactionGroups[groupNum]
+	start := time.Now()
+	s.logger.Printf("beginning %s compaction of group %d, %d TSM files", s.description, groupNum, len(group))
+	for i, f := range group {
+		s.logger.Printf("compacting %s group (%d) %s (#%d)", s.description, groupNum, f, i)
+	}
+
+	files, err := func() ([]string, error) {
+		// Count the compaction as active only while the compaction is actually running.
+		atomic.AddInt64(s.activeStat, 1)
+		defer atomic.AddInt64(s.activeStat, -1)
+
+		if s.fast {
+			return s.compactor.CompactFast(group)
+		} else {
+			return s.compactor.CompactFull(group)
+		}
+	}()
+
+	if err != nil {
+		if err == errCompactionsDisabled || err == errCompactionInProgress {
+			s.logger.Printf("aborted %s compaction group (%d). %v", s.description, groupNum, err)
+
+			if err == errCompactionInProgress {
+				time.Sleep(time.Second)
+			}
+			return
+		}
+
+		s.logger.Printf("error compacting TSM files: %v", err)
+		atomic.AddInt64(s.errorStat, 1)
+		time.Sleep(time.Second)
+		return
+	}
+
+	if err := s.fileStore.Replace(group, files); err != nil {
+		s.logger.Printf("error replacing new TSM files: %v", err)
+		atomic.AddInt64(s.errorStat, 1)
+		time.Sleep(time.Second)
+		return
+	}
+
+	for i, f := range files {
+		s.logger.Printf("compacted %s group (%d) into %s (#%d)", s.description, groupNum, f, i)
+	}
+	s.logger.Printf("compacted %s %d files into %d files in %s", s.description, len(group), len(files), time.Since(start))
+	atomic.AddInt64(s.successStat, 1)
+}
+
+// levelCompactionStrategy returns a compactionStrategy for the given level.
+// It returns nil if there are no TSM files to compact.
+func (e *Engine) levelCompactionStrategy(fast bool, level int) *compactionStrategy {
+	compactionGroups := e.CompactionPlan.PlanLevel(level)
+
+	if len(compactionGroups) == 0 {
+		return nil
+	}
+
+	return &compactionStrategy{
+		compactionGroups: compactionGroups,
+		logger:           e.logger,
+		fileStore:        e.FileStore,
+		compactor:        e.Compactor,
+		fast:             fast,
+
+		description:  fmt.Sprintf("level %d", level),
+		activeStat:   &e.stats.TSMCompactionsActive[level-1],
+		successStat:  &e.stats.TSMCompactions[level-1],
+		errorStat:    &e.stats.TSMCompactionErrors[level-1],
+		durationStat: &e.stats.TSMCompactionDuration[level-1],
+	}
+}
+
+// fullCompactionStrategy returns a compactionStrategy for higher level generations of TSM files.
+// It returns nil if there are no TSM files to compact.
+func (e *Engine) fullCompactionStrategy() *compactionStrategy {
+	optimize := false
+	compactionGroups := e.CompactionPlan.Plan(e.WAL.LastWriteTime())
+
+	if len(compactionGroups) == 0 {
+		optimize = true
+		compactionGroups = e.CompactionPlan.PlanOptimize()
+	}
+
+	if len(compactionGroups) == 0 {
+		return nil
+	}
+
+	s := &compactionStrategy{
+		compactionGroups: compactionGroups,
+		logger:           e.logger,
+		fileStore:        e.FileStore,
+		compactor:        e.Compactor,
+		fast:             optimize,
+	}
+
+	if optimize {
+		s.description = "optimize"
+		s.activeStat = &e.stats.TSMOptimizeCompactionsActive
+		s.successStat = &e.stats.TSMOptimizeCompactions
+		s.errorStat = &e.stats.TSMOptimizeCompactionErrors
+		s.durationStat = &e.stats.TSMOptimizeCompactionDuration
+	} else {
+		s.description = "full"
+		s.activeStat = &e.stats.TSMFullCompactionsActive
+		s.successStat = &e.stats.TSMFullCompactions
+		s.errorStat = &e.stats.TSMFullCompactionErrors
+		s.durationStat = &e.stats.TSMFullCompactionDuration
+	}
+
+	return s
 }
 
 // reloadCache reads the WAL segment files and loads them into the cache.
@@ -1064,7 +1180,9 @@ func (e *Engine) reloadCache() error {
 
 func (e *Engine) cleanup() error {
 	allfiles, err := ioutil.ReadDir(e.path)
-	if err != nil {
+	if os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
 		return err
 	}
 
@@ -1151,7 +1269,7 @@ func (e *Engine) createVarRefIterator(opt influxql.IteratorOptions, aggregate bo
 
 		for _, mm := range mms {
 			// Determine tagsets for this measurement based on dimensions and filters.
-			tagSets, err := mm.TagSets(opt.Dimensions, opt.Condition)
+			tagSets, err := mm.TagSets(e.id, opt.Dimensions, opt.Condition)
 			if err != nil {
 				return err
 			}
@@ -1277,7 +1395,7 @@ func (e *Engine) createTagSetGroupIterators(ref *influxql.VarRef, mm *tsdb.Measu
 
 // createVarRefSeriesIterator creates an iterator for a variable reference for a series.
 func (e *Engine) createVarRefSeriesIterator(ref *influxql.VarRef, mm *tsdb.Measurement, seriesKey string, t *influxql.TagSet, filter influxql.Expr, conditionFields []influxql.VarRef, opt influxql.IteratorOptions) (influxql.Iterator, error) {
-	tags := influxql.NewTags(e.index.TagsForSeries(seriesKey))
+	tags := influxql.NewTags(e.index.TagsForSeries(seriesKey).Map())
 
 	// Create options specific for this series.
 	itrOpt := opt
@@ -1496,11 +1614,11 @@ func tsmFieldTypeToInfluxQLDataType(typ byte) (influxql.DataType, error) {
 	}
 }
 
-func SeriesAndFieldFromCompositeKey(key string) (string, string) {
-	sep := strings.Index(key, keyFieldSeparator)
+func SeriesAndFieldFromCompositeKey(key []byte) ([]byte, string) {
+	sep := bytes.Index(key, []byte(keyFieldSeparator))
 	if sep == -1 {
 		// No field???
 		return key, ""
 	}
-	return key[:sep], key[sep+len(keyFieldSeparator):]
+	return key[:sep], string(key[sep+len(keyFieldSeparator):])
 }

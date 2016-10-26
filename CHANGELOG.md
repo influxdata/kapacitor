@@ -39,6 +39,7 @@ See the API docs for more details.
 - [#980](https://github.com/influxdata/kapacitor/pull/980): Upgrade to using go 1.7
 - [#957](https://github.com/influxdata/kapacitor/issues/957): Add API endpoints for testing service integrations.
 - [#958](https://github.com/influxdata/kapacitor/issues/958): Add support for Slack icon emojis and custom usernames.
+- [#991](https://github.com/influxdata/kapacitor/pull/991): Bring Kapacitor up to parity with available InfluxQL functions in 1.1
 
 ### Bugfixes
 

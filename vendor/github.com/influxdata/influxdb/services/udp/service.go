@@ -42,7 +42,10 @@ type Service struct {
 	conn *net.UDPConn
 	addr *net.UDPAddr
 	wg   sync.WaitGroup
-	done chan struct{}
+
+	mu    sync.RWMutex
+	ready bool          // Has the required database been created?
+	done  chan struct{} // Is the service closing or closed?
 
 	parserChan chan []byte
 	batcher    *tsdb.PointBatcher
@@ -56,36 +59,39 @@ type Service struct {
 		CreateDatabase(name string) (*meta.DatabaseInfo, error)
 	}
 
-	Logger   *log.Logger
-	stats    *Statistics
-	statTags models.Tags
+	Logger      *log.Logger
+	stats       *Statistics
+	defaultTags models.StatisticTags
 }
 
 // NewService returns a new instance of Service.
 func NewService(c Config) *Service {
 	d := *c.WithDefaults()
 	return &Service{
-		config:     d,
-		done:       make(chan struct{}),
-		parserChan: make(chan []byte, parserChanLen),
-		batcher:    tsdb.NewPointBatcher(d.BatchSize, d.BatchPending, time.Duration(d.BatchTimeout)),
-		Logger:     log.New(os.Stderr, "[udp] ", log.LstdFlags),
-		stats:      &Statistics{},
-		statTags:   map[string]string{"bind": d.BindAddress},
+		config:      d,
+		parserChan:  make(chan []byte, parserChanLen),
+		batcher:     tsdb.NewPointBatcher(d.BatchSize, d.BatchPending, time.Duration(d.BatchTimeout)),
+		Logger:      log.New(os.Stderr, "[udp] ", log.LstdFlags),
+		stats:       &Statistics{},
+		defaultTags: models.StatisticTags{"bind": d.BindAddress},
 	}
 }
 
 // Open starts the service
 func (s *Service) Open() (err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.closed() {
+		return nil // Already open.
+	}
+	s.done = make(chan struct{})
+
 	if s.config.BindAddress == "" {
 		return errors.New("bind address has to be specified in config")
 	}
 	if s.config.Database == "" {
 		return errors.New("database has to be specified in config")
-	}
-
-	if _, err := s.MetaClient.CreateDatabase(s.config.Database); err != nil {
-		return errors.New("Failed to ensure target database exists")
 	}
 
 	s.addr, err = net.ResolveUDPAddr("udp", s.config.BindAddress)
@@ -134,7 +140,7 @@ type Statistics struct {
 func (s *Service) Statistics(tags map[string]string) []models.Statistic {
 	return []models.Statistic{{
 		Name: "udp",
-		Tags: s.statTags,
+		Tags: s.defaultTags.Merge(tags),
 		Values: map[string]interface{}{
 			statPointsReceived:      atomic.LoadInt64(&s.stats.PointsReceived),
 			statBytesReceived:       atomic.LoadInt64(&s.stats.BytesReceived),
@@ -153,6 +159,12 @@ func (s *Service) writer() {
 	for {
 		select {
 		case batch := <-s.batcher.Out():
+			// Will attempt to create database if not yet created.
+			if err := s.createInternalStorage(); err != nil {
+				s.Logger.Printf("Required database %s does not yet exist: %s", s.config.Database, err.Error())
+				continue
+			}
+
 			if err := s.PointsWriter.WritePoints(s.config.Database, s.config.RetentionPolicy, models.ConsistencyLevelAny, batch); err == nil {
 				atomic.AddInt64(&s.stats.BatchesTransmitted, 1)
 				atomic.AddInt64(&s.stats.PointsTransmitted, int64(len(batch)))
@@ -220,13 +232,19 @@ func (s *Service) parser() {
 
 // Close closes the underlying listener.
 func (s *Service) Close() error {
-	if s.conn == nil {
-		return errors.New("Service already closed")
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.closed() {
+		return nil // Already closed.
+	}
+	close(s.done)
+
+	if s.conn != nil {
+		s.conn.Close()
 	}
 
-	s.conn.Close()
 	s.batcher.Flush()
-	close(s.done)
 	s.wg.Wait()
 
 	// Release all remaining resources.
@@ -235,6 +253,43 @@ func (s *Service) Close() error {
 
 	s.Logger.Print("Service closed")
 
+	return nil
+}
+
+// Closed returns true if the service is currently closed.
+func (s *Service) Closed() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.closed()
+}
+
+func (s *Service) closed() bool {
+	select {
+	case <-s.done:
+		// Service is closing.
+		return true
+	default:
+	}
+	return s.done == nil
+}
+
+// createInternalStorage ensures that the required database has been created.
+func (s *Service) createInternalStorage() error {
+	s.mu.RLock()
+	ready := s.ready
+	s.mu.RUnlock()
+	if ready {
+		return nil
+	}
+
+	if _, err := s.MetaClient.CreateDatabase(s.config.Database); err != nil {
+		return err
+	}
+
+	// The service is now ready.
+	s.mu.Lock()
+	s.ready = true
+	s.mu.Unlock()
 	return nil
 }
 

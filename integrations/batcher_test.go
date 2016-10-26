@@ -374,6 +374,54 @@ batch
 
 	testBatcherWithOutput(t, "TestBatch_MovingAverage", script, 21*time.Second, er, false)
 }
+func TestBatch_CumulativeSum(t *testing.T) {
+
+	var script = `
+batch
+	|query('''
+		SELECT "value"
+		FROM "telegraf"."default".packets
+''')
+		.period(10s)
+		.every(10s)
+	|cumulativeSum('value')
+	|httpOut('TestBatch_CumulativeSum')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "packets",
+				Tags:    nil,
+				Columns: []string{"time", "cumulativeSum"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+						0.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 12, 0, time.UTC),
+						10.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 14, 0, time.UTC),
+						30.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 16, 0, time.UTC),
+						60.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 18, 0, time.UTC),
+						100.0,
+					},
+				},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_CumulativeSum", script, 31*time.Second, er, false)
+}
 
 func TestBatch_SimpleMR(t *testing.T) {
 

@@ -556,7 +556,7 @@ func (tm *TaskMaster) WritePoints(database, retentionPolicy string, consistencyL
 			RetentionPolicy: retentionPolicy,
 			Name:            mp.Name(),
 			Group:           models.NilGroup,
-			Tags:            models.Tags(mp.Tags()),
+			Tags:            models.Tags(mp.Tags().Map()),
 			Fields:          models.Fields(mp.Fields()),
 			Time:            mp.Time(),
 		}

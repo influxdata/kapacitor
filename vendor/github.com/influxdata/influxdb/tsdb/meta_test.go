@@ -3,14 +3,16 @@ package tsdb_test
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/tsdb"
 )
 
 // Test comparing SeriesIDs for equality.
-func Test_SeriesIDs_Equals(t *testing.T) {
+func TestSeriesIDs_Equals(t *testing.T) {
 	ids1 := tsdb.SeriesIDs([]uint64{1, 2, 3})
 	ids2 := tsdb.SeriesIDs([]uint64{1, 2, 3})
 	ids3 := tsdb.SeriesIDs([]uint64{4, 5, 6})
@@ -23,7 +25,7 @@ func Test_SeriesIDs_Equals(t *testing.T) {
 }
 
 // Test intersecting sets of SeriesIDs.
-func Test_SeriesIDs_Intersect(t *testing.T) {
+func TestSeriesIDs_Intersect(t *testing.T) {
 	// Test swaping l & r, all branches of if-else, and exit loop when 'j < len(r)'
 	ids1 := tsdb.SeriesIDs([]uint64{1, 3, 4, 5, 6})
 	ids2 := tsdb.SeriesIDs([]uint64{1, 2, 3, 7})
@@ -46,7 +48,7 @@ func Test_SeriesIDs_Intersect(t *testing.T) {
 }
 
 // Test union sets of SeriesIDs.
-func Test_SeriesIDs_Union(t *testing.T) {
+func TestSeriesIDs_Union(t *testing.T) {
 	// Test all branches of if-else, exit loop because of 'j < len(r)', and append remainder from left.
 	ids1 := tsdb.SeriesIDs([]uint64{1, 2, 3, 7})
 	ids2 := tsdb.SeriesIDs([]uint64{1, 3, 4, 5, 6})
@@ -69,7 +71,7 @@ func Test_SeriesIDs_Union(t *testing.T) {
 }
 
 // Test removing one set of SeriesIDs from another.
-func Test_SeriesIDs_Reject(t *testing.T) {
+func TestSeriesIDs_Reject(t *testing.T) {
 	// Test all branches of if-else, exit loop because of 'j < len(r)', and append remainder from left.
 	ids1 := tsdb.SeriesIDs([]uint64{1, 2, 3, 7})
 	ids2 := tsdb.SeriesIDs([]uint64{1, 3, 4, 5, 6})
@@ -89,6 +91,95 @@ func Test_SeriesIDs_Reject(t *testing.T) {
 	if !exp.Equals(got) {
 		t.Fatalf("exp=%v, got=%v", exp, got)
 	}
+}
+
+func TestMeasurement_AppendSeriesKeysByID_Missing(t *testing.T) {
+	m := tsdb.NewMeasurement("cpu")
+	var dst []string
+	dst = m.AppendSeriesKeysByID(dst, []uint64{1})
+	if exp, got := 0, len(dst); exp != got {
+		t.Fatalf("series len mismatch: exp %v, got %v", exp, got)
+	}
+}
+
+func TestMeasurement_AppendSeriesKeysByID_Exists(t *testing.T) {
+	m := tsdb.NewMeasurement("cpu")
+	s := tsdb.NewSeries("cpu,host=foo", models.Tags{models.Tag{Key: []byte("host"), Value: []byte("foo")}})
+	s.ID = 1
+	m.AddSeries(s)
+
+	var dst []string
+	dst = m.AppendSeriesKeysByID(dst, []uint64{1})
+	if exp, got := 1, len(dst); exp != got {
+		t.Fatalf("series len mismatch: exp %v, got %v", exp, got)
+	}
+
+	if exp, got := "cpu,host=foo", dst[0]; exp != got {
+		t.Fatalf("series mismatch: exp %v, got %v", exp, got)
+	}
+}
+
+func BenchmarkMeasurement_SeriesIDForExp_EQRegex(b *testing.B) {
+	m := tsdb.NewMeasurement("cpu")
+	for i := 0; i < 100000; i++ {
+		s := tsdb.NewSeries("cpu", models.Tags{models.Tag{
+			Key:   []byte("host"),
+			Value: []byte(fmt.Sprintf("host%d", i))}})
+		s.ID = uint64(i)
+		m.AddSeries(s)
+	}
+
+	if exp, got := 100000, len(m.SeriesKeys()); exp != got {
+		b.Fatalf("series count mismatch: exp %v got %v", exp, got)
+	}
+
+	stmt, err := influxql.NewParser(strings.NewReader(`SELECT * FROM cpu WHERE host =~ /host\d+/`)).ParseStatement()
+	if err != nil {
+		b.Fatalf("invalid statement: %s", err)
+	}
+
+	selectStmt := stmt.(*influxql.SelectStatement)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		ids := m.IDsForExpr(selectStmt.Condition.(*influxql.BinaryExpr))
+		if exp, got := 100000, len(ids); exp != got {
+			b.Fatalf("series count mismatch: exp %v got %v", exp, got)
+		}
+
+	}
+}
+
+func BenchmarkMeasurement_SeriesIDForExp_NERegex(b *testing.B) {
+	m := tsdb.NewMeasurement("cpu")
+	for i := 0; i < 100000; i++ {
+		s := tsdb.NewSeries("cpu", models.Tags{models.Tag{
+			Key:   []byte("host"),
+			Value: []byte(fmt.Sprintf("host%d", i))}})
+		s.ID = uint64(i)
+		m.AddSeries(s)
+	}
+
+	if exp, got := 100000, len(m.SeriesKeys()); exp != got {
+		b.Fatalf("series count mismatch: exp %v got %v", exp, got)
+	}
+
+	stmt, err := influxql.NewParser(strings.NewReader(`SELECT * FROM cpu WHERE host !~ /foo\d+/`)).ParseStatement()
+	if err != nil {
+		b.Fatalf("invalid statement: %s", err)
+	}
+
+	selectStmt := stmt.(*influxql.SelectStatement)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		ids := m.IDsForExpr(selectStmt.Condition.(*influxql.BinaryExpr))
+		if exp, got := 100000, len(ids); exp != got {
+			b.Fatalf("series count mismatch: exp %v got %v", exp, got)
+		}
+
+	}
+
 }
 
 // Ensure tags can be marshaled into a byte slice.
@@ -182,7 +273,7 @@ func genTestSeries(mCnt, tCnt, vCnt int) []*TestSeries {
 		for _, ts := range tagSets {
 			series = append(series, &TestSeries{
 				Measurement: m,
-				Series:      tsdb.NewSeries(fmt.Sprintf("%s:%s", m, string(tsdb.MarshalTags(ts))), ts),
+				Series:      tsdb.NewSeries(fmt.Sprintf("%s:%s", m, string(tsdb.MarshalTags(ts))), models.NewTags(ts)),
 			})
 		}
 	}
