@@ -11,34 +11,38 @@
 // ENABLE: kapacitor enable disk_alert_stream
 
 // Parameters
-var info = 75 
+var info = 75
+
 var warn = 85
+
 var crit = 92
+
 var period = 10s
+
 var every = 10s
 
 // Dataframe
 var data = stream
-  |from()
-    .database('telegraf')
-    .retentionPolicy('autogen')
-    .measurement('mem')
-    .groupBy('host')
-  |window()
-    .period(period)
-    .every(every)
-  |mean('used_percent')
-    .as('stat')
+    |from()
+        .database('telegraf')
+        .retentionPolicy('autogen')
+        .measurement('disk')
+        .groupBy('host')
+    |window()
+        .period(period)
+        .every(every)
+    |mean('used_percent')
+        .as('stat')
 
 // Thresholds
 var alert = data
-  |alert()
-    .id('{{ index .Tags "host"}}/disk_used')
-    .message('{{ .ID }}:{{ index .Fields "stat" }}')
-    .info(lambda: "stat" > info)
-    .warn(lambda: "stat" > warn)
-    .crit(lambda: "stat" > crit)
+    |alert()
+        .id('{{ index .Tags "host"}}/disk_used')
+        .message('{{ .ID }}:{{ index .Fields "stat" }}')
+        .info(lambda: "stat" > info)
+        .warn(lambda: "stat" > warn)
+        .crit(lambda: "stat" > crit)
 
 // Alert
 alert
-  .log('/tmp/mem_alert_log.txt')
+        .log('/tmp/disk_alert_log.txt')
