@@ -45,6 +45,7 @@ See the API docs for more details.
 
 - [#984](https://github.com/influxdata/kapacitor/issues/984): Fix bug where keeping a list of fields that where not referenced in the eval expressions would cause an error.
 - [#955](https://github.com/influxdata/kapacitor/issues/955): Fix the number of subscriptions statistic.
+- [#999](https://github.com/influxdata/kapacitor/issues/999): Fix inconsistency with InfluxDB by adding config option to set a default retention policy.
 
 ## v1.0.2 [2016-10-06]
 
@@ -488,7 +489,7 @@ If you have existing tasks which do not match this pattern they should continue 
 
 ### Bugfixes
 
-- [#545](https://github.com/influxdata/kapacitor/issues/545): Fixes inconsistancy with API docs for creating a task.
+- [#545](https://github.com/influxdata/kapacitor/issues/545): Fixes inconsistency with API docs for creating a task.
 - [#544](https://github.com/influxdata/kapacitor/issues/544): Fixes issues with existings tasks and invalid names.
 - [#543](https://github.com/influxdata/kapacitor/issues/543): Fixes default values not being set correctly in API calls.
 
