@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.0.3 [unreleased]
+## v1.1.0 [unreleased]
 
 ### Release Notes
 
@@ -29,7 +29,7 @@ stream
 
 
 New API endpoints have been added to be able to configure InfluxDB clusters and alert handlers dynamically without needing to restart the Kapacitor daemon.
-Along with the ability to dynamcially configure a service, API endpoints have been added to test the configurable services.
+Along with the ability to dynamically configure a service, API endpoints have been added to test the configurable services.
 See the API docs for more details.
 
 ### Features
