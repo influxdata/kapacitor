@@ -74,7 +74,7 @@ const (
 //    * increase_events -- number of times the replica count was increased.
 //    * decrease_events -- number of times the replica count was decreased.
 //    * cooldown_drops  -- number of times an event was dropped because of a cooldown timer.
-//    * errors          -- number of errors communicating with the Kubernetes API.
+//    * errors          -- number of errors encountered, typically related to communicating with the Kubernetes API.
 //
 type K8sAutoscaleNode struct {
 	chainnode
@@ -83,7 +83,7 @@ type K8sAutoscaleNode struct {
 	Namespace string
 
 	// Kind is the type of resources to autoscale.
-	// Currently only "deployments" and "replicationcontrollers" are supported.
+	// Currently only "deployments", "replicasets" and "replicationcontrollers" are supported.
 	// Default: "deployments"
 	Kind string
 
@@ -155,8 +155,8 @@ func (n *K8sAutoscaleNode) validate() error {
 		(n.ResourceNameTag == "" && n.ResourceName == "") {
 		return fmt.Errorf("must specify exactly one of ResourceName or ResourceNameTag")
 	}
-	if n.Kind != client.DeploymentsKind && n.Kind != client.ReplicationControllerKind {
-		return fmt.Errorf("invalid Kind, must be 'deployments' or 'replicationcontrollers', got %s", n.Kind)
+	if n.Kind != client.DeploymentsKind && n.Kind != client.ReplicationControllerKind && n.Kind != client.ReplicaSetsKind {
+		return fmt.Errorf("invalid Kind, must be 'deployments', 'replicasets' or 'replicationcontrollers', got %s", n.Kind)
 	}
 	if n.Min < 1 {
 		return fmt.Errorf("min must be >= 1, got %d", n.Min)
