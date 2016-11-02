@@ -34,7 +34,6 @@ type K8sAutoscaleNode struct {
 
 	increaseCount      *expvar.Int
 	decreaseCount      *expvar.Int
-	errorsCount        *expvar.Int
 	cooldownDropsCount *expvar.Int
 
 	min int
@@ -70,12 +69,12 @@ func newK8sAutoscaleNode(et *ExecutingTask, n *pipeline.K8sAutoscaleNode, l *log
 func (k *K8sAutoscaleNode) runAutoscale([]byte) error {
 	k.increaseCount = &expvar.Int{}
 	k.decreaseCount = &expvar.Int{}
-	k.errorsCount = &expvar.Int{}
+	errorsCount := &expvar.Int{}
 	k.cooldownDropsCount = &expvar.Int{}
 
 	k.statMap.Set(statsK8sIncreaseEventsCount, k.increaseCount)
 	k.statMap.Set(statsK8sDecreaseEventsCount, k.decreaseCount)
-	k.statMap.Set(statsK8sErrorsCount, k.errorsCount)
+	k.statMap.Set(statsK8sErrorsCount, errorsCount)
 	k.statMap.Set(statsK8sCooldownDropsCount, k.cooldownDropsCount)
 
 	switch k.Wants() {
@@ -83,6 +82,7 @@ func (k *K8sAutoscaleNode) runAutoscale([]byte) error {
 		for p, ok := k.ins[0].NextPoint(); ok; p, ok = k.ins[0].NextPoint() {
 			k.timer.Start()
 			if np, err := k.handlePoint(p.Name, p.Group, p.Dimensions, p.Time, p.Fields, p.Tags); err != nil {
+				errorsCount.Add(1)
 				k.logger.Println("E!", err)
 			} else if np.Name != "" {
 				k.timer.Pause()
@@ -101,6 +101,7 @@ func (k *K8sAutoscaleNode) runAutoscale([]byte) error {
 			k.timer.Start()
 			for _, p := range b.Points {
 				if np, err := k.handlePoint(b.Name, b.Group, b.PointDimensions(), p.Time, p.Fields, p.Tags); err != nil {
+					errorsCount.Add(1)
 					k.logger.Println("E!", err)
 				} else if np.Name != "" {
 					k.timer.Pause()
@@ -143,7 +144,6 @@ func (k *K8sAutoscaleNode) handlePoint(streamName string, group models.GroupID, 
 		// If we haven't seen this resource before, get its state
 		scale, err := k.getResource(namespace, kind, name)
 		if err != nil {
-			k.errorsCount.Add(1)
 			return models.Point{}, errors.Wrapf(err, "could not determine initial scale for %s/%s/%s", namespace, kind, name)
 		}
 		state.current = int(scale.Spec.Replicas)
@@ -205,7 +205,6 @@ func (k *K8sAutoscaleNode) handlePoint(streamName string, group models.GroupID, 
 
 	// We have a valid event to apply
 	if err := k.applyEvent(e); err != nil {
-		k.errorsCount.Add(1)
 		return models.Point{}, errors.Wrap(err, "failed to apply scaling event")
 	}
 

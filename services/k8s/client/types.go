@@ -10,6 +10,7 @@ const (
 
 const (
 	DeploymentsKind           = "deployments"
+	ReplicaSetsKind           = "replicasets"
 	ReplicationControllerKind = "replicationcontroller"
 )
 
