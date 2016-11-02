@@ -1701,7 +1701,7 @@ POST /kapacitor/v1/config/influxdb/remote
 | 403  | Config override service not enabled                       |
 | 404  | The specified configuration section/option does not exist |
 
-## Testing Serivces
+## Testing Services
 
 Kapacitor makes use of various service integrations.
 The following API endpoints provide way for a user to run simple tests to ensure that a service is configured correctly.
