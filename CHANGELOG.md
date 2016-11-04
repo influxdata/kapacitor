@@ -47,6 +47,7 @@ See the API docs for more details.
 - [#955](https://github.com/influxdata/kapacitor/issues/955): Fix the number of subscriptions statistic.
 - [#999](https://github.com/influxdata/kapacitor/issues/999): Fix inconsistency with InfluxDB by adding config option to set a default retention policy.
 - [#1018](https://github.com/influxdata/kapacitor/pull/1018): Sort and dynamically adjust column width in CLI output. Fixes #785
+- [#1019](https://github.com/influxdata/kapacitor/pull/1019): Adds missing strLength function.
 
 ## v1.0.2 [2016-10-06]
 

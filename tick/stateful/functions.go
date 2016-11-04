@@ -90,6 +90,7 @@ func init() {
 	statelessFuncs["strIndexAny"] = newString2Int("strIndexAny", strings.IndexAny)
 	statelessFuncs["strLastIndex"] = newString2Int("strLastIndex", strings.LastIndex)
 	statelessFuncs["strLastIndexAny"] = newString2Int("strLastIndexAny", strings.LastIndexAny)
+	statelessFuncs["strLength"] = strLength{}
 	statelessFuncs["strReplace"] = strReplace{}
 	statelessFuncs["strSubstring"] = strSubstring{}
 	statelessFuncs["strToLower"] = newString1String("strToLower", strings.ToLower)
@@ -382,6 +383,24 @@ func (m string1String) Call(args ...interface{}) (v interface{}, err error) {
 }
 
 func (m string1String) Reset() {}
+
+type strLength struct {
+}
+
+func (m strLength) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 1 {
+		return 0, errors.New("strLength expects exactly one argument")
+	}
+	str, ok := args[0].(string)
+	if !ok {
+		err = fmt.Errorf("cannot pass %T as first arg to strLength, must be string", args[0])
+		return
+	}
+	v = int64(len(str))
+	return
+}
+
+func (m strLength) Reset() {}
 
 type strReplace struct {
 }
