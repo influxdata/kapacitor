@@ -692,6 +692,26 @@ func Test_StatelessFuncs(t *testing.T) {
 			err:  errors.New("strLastIndexAny expects exactly two arguments"),
 		},
 		{
+			name: "strLength",
+			args: []interface{}{""},
+			exp:  int64(0),
+		},
+		{
+			name: "strLength",
+			args: []interface{}{"abxyzc"},
+			exp:  int64(6),
+		},
+		{
+			name: "strLength",
+			args: []interface{}{},
+			err:  errors.New("strLength expects exactly one argument"),
+		},
+		{
+			name: "strLength",
+			args: []interface{}{1},
+			err:  errors.New("cannot pass int as first arg to strLength, must be string"),
+		},
+		{
 			name: "strReplace",
 			args: []interface{}{"abxyzc", "xyz", "", int64(1)},
 			exp:  "abc",
