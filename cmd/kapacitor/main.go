@@ -1362,6 +1362,18 @@ If no ID or pattern is given then all items will be listed.
 	fmt.Fprintln(os.Stderr, u)
 }
 
+type TaskList []client.Task
+
+func (t TaskList) Len() int           { return len(t) }
+func (t TaskList) Less(i, j int) bool { return t[i].ID < t[j].ID }
+func (t TaskList) Swap(i, j int)      { t[i], t[j] = t[j], t[i] }
+
+type TemplateList []client.Template
+
+func (t TemplateList) Len() int           { return len(t) }
+func (t TemplateList) Less(i, j int) bool { return t[i].ID < t[j].ID }
+func (t TemplateList) Swap(i, j int)      { t[i], t[j] = t[j], t[i] }
+
 func doList(args []string) error {
 	if len(args) == 0 {
 		fmt.Fprintln(os.Stderr, "Must specify 'tasks', 'recordings', or 'replays'")
@@ -1380,8 +1392,8 @@ func doList(args []string) error {
 
 	switch kind := args[0]; kind {
 	case "tasks":
-		outFmt := "%-30s%-10v%-10v%-10v%s\n"
-		fmt.Fprintf(os.Stdout, outFmt, "ID", "Type", "Status", "Executing", "Databases and Retention Policies")
+		maxID := 2 // len("ID")
+		var allTasks TaskList
 		for _, pattern := range patterns {
 			offset := 0
 			for {
@@ -1394,9 +1406,11 @@ func doList(args []string) error {
 				if err != nil {
 					return err
 				}
-
+				allTasks = append(allTasks, tasks...)
 				for _, t := range tasks {
-					fmt.Fprintf(os.Stdout, outFmt, t.ID, t.Type, t.Status, t.Executing, t.DBRPs)
+					if l := len(t.ID); l > maxID {
+						maxID = l
+					}
 				}
 				if len(tasks) != limit {
 					break
@@ -1404,9 +1418,15 @@ func doList(args []string) error {
 				offset += limit
 			}
 		}
+		outFmt := fmt.Sprintf("%%-%ds%%-10v%%-10v%%-10v%%s\n", maxID+1)
+		fmt.Fprintf(os.Stdout, outFmt, "ID", "Type", "Status", "Executing", "Databases and Retention Policies")
+		sort.Sort(allTasks)
+		for _, t := range allTasks {
+			fmt.Fprintf(os.Stdout, outFmt, t.ID, t.Type, t.Status, t.Executing, t.DBRPs)
+		}
 	case "templates":
-		outFmt := "%-30s%-10v%-40v\n"
-		fmt.Fprintf(os.Stdout, outFmt, "ID", "Type", "Vars")
+		maxID := 2 // len("ID")
+		var allTemplates TemplateList
 		for _, pattern := range patterns {
 			offset := 0
 			for {
@@ -1419,14 +1439,12 @@ func doList(args []string) error {
 				if err != nil {
 					return err
 				}
+				allTemplates = append(allTemplates, templates...)
 
 				for _, t := range templates {
-					vars := make([]string, 0, len(t.Vars))
-					for name := range t.Vars {
-						vars = append(vars, name)
+					if l := len(t.ID); l > maxID {
+						maxID = l
 					}
-					sort.Strings(vars)
-					fmt.Fprintf(os.Stdout, outFmt, t.ID, t.Type, strings.Join(vars, ","))
 				}
 				if len(templates) != limit {
 					break
@@ -1434,9 +1452,21 @@ func doList(args []string) error {
 				offset += limit
 			}
 		}
+		outFmt := fmt.Sprintf("%%-%ds%%-10v%%-40v\n", maxID+1)
+		fmt.Fprintf(os.Stdout, outFmt, "ID", "Type", "Vars")
+		sort.Sort(allTemplates)
+		for _, t := range allTemplates {
+			vars := make([]string, 0, len(t.Vars))
+			for name := range t.Vars {
+				vars = append(vars, name)
+			}
+			sort.Strings(vars)
+			fmt.Fprintf(os.Stdout, outFmt, t.ID, t.Type, strings.Join(vars, ","))
+		}
 	case "recordings":
-		outFmt := "%-40s%-8v%-10s%-10s%-23s\n"
-		fmt.Fprintf(os.Stdout, outFmt, "ID", "Type", "Status", "Size", "Date")
+		maxID := 2 // len("ID")
+		// The recordings are returned in sorted order already, no need to sort them here.
+		var allRecordings []client.Recording
 		for _, pattern := range patterns {
 			offset := 0
 			for {
@@ -1449,19 +1479,30 @@ func doList(args []string) error {
 				if err != nil {
 					return err
 				}
-
+				allRecordings = append(allRecordings, recordings...)
 				for _, r := range recordings {
-					fmt.Fprintf(os.Stdout, outFmt, r.ID, r.Type, r.Status, humanize.Bytes(uint64(r.Size)), r.Date.Local().Format(time.RFC822))
+					if l := len(r.ID); l > maxID {
+						maxID = l
+					}
 				}
+
 				if len(recordings) != limit {
 					break
 				}
 				offset += limit
 			}
 		}
+		outFmt := fmt.Sprintf("%%-%ds%%-8v%%-10s%%-10s%%-23s\n", maxID+1)
+		fmt.Fprintf(os.Stdout, outFmt, "ID", "Type", "Status", "Size", "Date")
+		for _, r := range allRecordings {
+			fmt.Fprintf(os.Stdout, outFmt, r.ID, r.Type, r.Status, humanize.Bytes(uint64(r.Size)), r.Date.Local().Format(time.RFC822))
+		}
 	case "replays":
-		outFmt := "%-40v%-20v%-40v%-9v%-8v%-23v\n"
-		fmt.Fprintf(os.Stdout, outFmt, "ID", "Task", "Recording", "Status", "Clock", "Date")
+		maxID := 2        // len("ID")
+		maxTask := 4      // len("Task")
+		maxRecording := 9 // len("Recording")
+		// The replays are returned in sorted order already, no need to sort them here.
+		var allReplays []client.Replay
 		for _, pattern := range patterns {
 			offset := 0
 			for {
@@ -1474,15 +1515,29 @@ func doList(args []string) error {
 				if err != nil {
 					return err
 				}
+				allReplays = append(allReplays, replays...)
 
 				for _, r := range replays {
-					fmt.Fprintf(os.Stdout, outFmt, r.ID, r.Task, r.Recording, r.Status, r.Clock, r.Date.Local().Format(time.RFC822))
+					if l := len(r.ID); l > maxID {
+						maxID = l
+					}
+					if l := len(r.Task); l > maxTask {
+						maxTask = l
+					}
+					if l := len(r.Recording); l > maxRecording {
+						maxRecording = l
+					}
 				}
 				if len(replays) != limit {
 					break
 				}
 				offset += limit
 			}
+		}
+		outFmt := fmt.Sprintf("%%-%dv%%-%dv%%-%dv%%-9v%%-8v%%-23v\n", maxID+1, maxTask+1, maxRecording+1)
+		fmt.Fprintf(os.Stdout, outFmt, "ID", "Task", "Recording", "Status", "Clock", "Date")
+		for _, r := range allReplays {
+			fmt.Fprintf(os.Stdout, outFmt, r.ID, r.Task, r.Recording, r.Status, r.Clock, r.Date.Local().Format(time.RFC822))
 		}
 	case "service-tests":
 		outFmt := "%s\n"
@@ -1664,6 +1719,27 @@ func statsUsage() {
 	fmt.Fprintln(os.Stderr, u)
 }
 
+type IngressStat struct {
+	Database        string
+	RetentionPolicy string
+	Measurement     string
+	PointsReceived  int64
+}
+
+type IngressStatList []IngressStat
+
+func (l IngressStatList) Len() int { return len(l) }
+func (l IngressStatList) Less(i, j int) bool {
+	if di, dj := l[i].Database, l[j].Database; di != dj {
+		return di < dj
+	}
+	if ri, rj := l[i].RetentionPolicy, l[j].RetentionPolicy; ri != rj {
+		return ri < rj
+	}
+	return l[i].Measurement < l[j].Measurement
+}
+func (l IngressStatList) Swap(i, j int) { l[i], l[j] = l[j], l[i] }
+
 func doStats(args []string) error {
 	if len(args) != 1 {
 		statsUsage()
@@ -1685,23 +1761,55 @@ func doStats(args []string) error {
 		fmt.Fprintf(os.Stdout, outFmtNum, "Subscriptions:", vars.NumSubscriptions)
 		fmt.Fprintf(os.Stdout, outFmtStr, "Version:", vars.Version)
 	case "ingress":
-		outFmt := "%-30s%-30s%-30s%-20.0f\n"
-		fmt.Fprintf(os.Stdout, "%-30s%-30s%-30s%-20s\n", "Database", "Retention Policy", "Measurement", "Points Received")
+		maxDB := 8  // len("Database")
+		maxRP := 16 // len("Retention Policy")
+		maxM := 11  // len("Measurement")
+		var allIngressStats IngressStatList
 		for _, stat := range vars.Stats {
 			if stat.Name != "ingress" || stat.Tags["task_master"] != "main" {
 				continue
 			}
-			var pr float64
-			if i, ok := stat.Values["points_received"].(float64); ok {
-				pr = i
+			var pr int64
+			if f, ok := stat.Values["points_received"].(float64); ok {
+				pr = int64(f)
 			}
+			s := IngressStat{
+				Database:        stat.Tags["database"],
+				RetentionPolicy: stat.Tags["retention_policy"],
+				Measurement:     stat.Tags["measurement"],
+				PointsReceived:  pr,
+			}
+			allIngressStats = append(allIngressStats, s)
+			if l := len(s.Database); l > maxDB {
+				maxDB = l
+			}
+			if l := len(s.RetentionPolicy); l > maxRP {
+				maxRP = l
+			}
+			if l := len(s.Measurement); l > maxM {
+				maxM = l
+			}
+		}
+		// Add one space padding
+		maxRP++
+		maxDB++
+		maxM++
+
+		// Create outFmt strings
+		outFmt := fmt.Sprintf("%%-%ds%%-%ds%%-%ds%%15d\n", maxDB, maxRP, maxM)
+		outFmtHeader := fmt.Sprintf("%%-%ds%%-%ds%%-%ds%%s\n", maxDB, maxRP, maxM)
+
+		// Print output
+		fmt.Fprintf(os.Stdout, outFmtHeader, "Database", "Retention Policy", "Measurement", "Points Received")
+		sort.Sort(allIngressStats)
+		for _, s := range allIngressStats {
 			fmt.Fprintf(
 				os.Stdout,
 				outFmt,
-				stat.Tags["database"],
-				stat.Tags["retention_policy"],
-				stat.Tags["measurement"],
-				pr,
+				s.Database,
+				s.RetentionPolicy,
+				s.Measurement,
+				s.PointsReceived,
 			)
 		}
 	}
