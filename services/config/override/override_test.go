@@ -208,9 +208,10 @@ func TestOverrideConfig_Single(t *testing.T) {
 	}
 
 	testCases := []struct {
-		o        override.Override
-		exp      interface{}
-		redacted map[string]interface{}
+		o            override.Override
+		exp          interface{}
+		redacted     map[string]interface{}
+		redactedList []string
 	}{
 		{
 			o: override.Override{
@@ -256,6 +257,7 @@ func TestOverrideConfig_Single(t *testing.T) {
 				"option4":  int64(42),
 				"password": false,
 			},
+			redactedList: []string{"password"},
 		},
 		{
 			o: override.Override{
@@ -978,6 +980,7 @@ func TestOverrideConfig_Single(t *testing.T) {
 				"option4":  int64(42),
 				"password": true,
 			},
+			redactedList: []string{"password"},
 		},
 		{
 			o: override.Override{
@@ -1080,10 +1083,12 @@ func TestOverrideConfig_Single(t *testing.T) {
 				t.Errorf("unexpected newConfig.Value result:\ngot\n%#v\nexp\n%#v\n", got, tc.exp)
 			}
 			// Validate redacted
-			if got, err := element.Redacted(); err != nil {
+			if gotOptions, gotList, err := element.Redacted(); err != nil {
 				t.Fatal(err)
-			} else if !reflect.DeepEqual(got, tc.redacted) {
-				t.Errorf("unexpected newConfig.Redacted result:\ngot\n%#v\nexp\n%#v\n", got, tc.redacted)
+			} else if !reflect.DeepEqual(gotOptions, tc.redacted) {
+				t.Errorf("unexpected newConfig.Redacted Options result:\ngot\n%#v\nexp\n%#v\n", gotOptions, tc.redacted)
+			} else if !reflect.DeepEqual(gotList, tc.redactedList) {
+				t.Errorf("unexpected newConfig.Redacted List result:\ngot\n%#v\nexp\n%#v\n", gotList, tc.redactedList)
 			}
 		}
 		// Validate original not modified
@@ -1591,7 +1596,7 @@ func TestOverrideConfig_Multiple(t *testing.T) {
 					break
 				}
 				for i, s := range sectionList {
-					redacted, err := s.Redacted()
+					redacted, _, err := s.Redacted()
 					if err != nil {
 						t.Fatal(err)
 					}

@@ -469,13 +469,14 @@ func (s *Service) getConfig(section string) (client.ConfigSections, error) {
 		sec := config.Sections[name]
 		sec.Link = s.sectionLink(name)
 		for _, element := range elements {
-			redacted, err := element.Redacted()
+			redacted, list, err := element.Redacted()
 			if err != nil {
 				return client.ConfigSections{}, errors.Wrap(err, "failed to get redacted configuration data")
 			}
 			sec.Elements = append(sec.Elements, client.ConfigElement{
-				Link:    s.elementLink(name, element.ElementID()),
-				Options: redacted,
+				Link:     s.elementLink(name, element.ElementID()),
+				Options:  redacted,
+				Redacted: list,
 			})
 		}
 		config.Sections[name] = sec

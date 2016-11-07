@@ -2060,7 +2060,8 @@ func Test_ConfigSections(t *testing.T) {
 					"optionB": "o2",
 					"optionC": "o3",
 					"optionD": "o4"
-				}
+				},
+				"redacted" :["optionC"]
 			}]
 		}
 	}
@@ -2142,6 +2143,9 @@ func Test_ConfigSections(t *testing.T) {
 							"optionB": "o2",
 							"optionC": "o3",
 							"optionD": "o4",
+						},
+						Redacted: []string{
+							"optionC",
 						},
 					},
 				},

@@ -261,8 +261,9 @@ func TestService_GetConfig(t *testing.T) {
 							Options: map[string]interface{}{
 								"option-2": "o2",
 								"password": false,
-							}},
-						},
+							},
+							Redacted: []string{"password"},
+						}},
 					},
 					"section-c": client.ConfigSection{
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/section-c"},
@@ -323,8 +324,9 @@ func TestService_GetConfig(t *testing.T) {
 							Options: map[string]interface{}{
 								"option-2": "o2",
 								"password": false,
-							}},
-						},
+							},
+							Redacted: []string{"password"},
+						}},
 					},
 					"section-c": client.ConfigSection{
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/section-c"},
@@ -385,8 +387,9 @@ func TestService_GetConfig(t *testing.T) {
 							Options: map[string]interface{}{
 								"option-2": "new-o2",
 								"password": false,
-							}},
-						},
+							},
+							Redacted: []string{"password"},
+						}},
 					},
 					"section-c": client.ConfigSection{
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/section-c"},
@@ -447,8 +450,9 @@ func TestService_GetConfig(t *testing.T) {
 							Options: map[string]interface{}{
 								"option-2": "o2",
 								"password": false,
-							}},
-						},
+							},
+							Redacted: []string{"password"},
+						}},
 					},
 					"section-c": client.ConfigSection{
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/section-c"},
@@ -506,6 +510,7 @@ func TestService_GetConfig(t *testing.T) {
 								"option-2": "o2",
 								"password": true,
 							},
+							Redacted: []string{"password"},
 						}},
 					},
 					"section-c": client.ConfigSection{
@@ -564,6 +569,7 @@ func TestService_GetConfig(t *testing.T) {
 								"option-2": "o2",
 								"password": false,
 							},
+							Redacted: []string{"password"},
 						}},
 					},
 					"section-c": client.ConfigSection{
@@ -626,6 +632,7 @@ func TestService_GetConfig(t *testing.T) {
 								"option-2": "o2",
 								"password": false,
 							},
+							Redacted: []string{"password"},
 						}},
 					},
 					"section-c": client.ConfigSection{
@@ -684,6 +691,7 @@ func TestService_GetConfig(t *testing.T) {
 								"option-2": "o2",
 								"password": false,
 							},
+							Redacted: []string{"password"},
 						}},
 					},
 					"section-c": client.ConfigSection{
@@ -753,6 +761,7 @@ func TestService_GetConfig(t *testing.T) {
 								"option-2": "o2",
 								"password": false,
 							},
+							Redacted: []string{"password"},
 						}},
 					},
 					"section-c": client.ConfigSection{
@@ -829,6 +838,7 @@ func TestService_GetConfig(t *testing.T) {
 								"option-2": "o2",
 								"password": false,
 							},
+							Redacted: []string{"password"},
 						}},
 					},
 					"section-c": client.ConfigSection{
@@ -902,6 +912,7 @@ func TestService_GetConfig(t *testing.T) {
 								"option-2": "o2",
 								"password": false,
 							},
+							Redacted: []string{"password"},
 						}},
 					},
 					"section-c": client.ConfigSection{
@@ -961,6 +972,7 @@ func TestService_GetConfig(t *testing.T) {
 								"option-2": "o2",
 								"password": false,
 							},
+							Redacted: []string{"password"},
 						}},
 					},
 					"section-c": client.ConfigSection{
