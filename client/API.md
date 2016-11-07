@@ -1420,6 +1420,7 @@ The returned content will be JSON encoded version of the configuration objects.
 
 All sensitive information will not be returned in the request body.
 Instead a boolean value will be in its place indicating whether the value is empty or not.
+A list of which options are redacted is returned for each element.
 
 #### Example
 
@@ -1445,6 +1446,9 @@ GET /kapacitor/v1/config
                         "username": "",
                         "password": false
                     },
+                    "redacted" : [
+                        "password"
+                    ]
                 },
                 {
                     "link" : {"rel": "self", "href": "/kapacitor/v1/config/influxdb/remote"},
@@ -1454,7 +1458,10 @@ GET /kapacitor/v1/config
                         "default": false,
                         "username": "jim",
                         "password": true
-                    }
+                    },
+                    "redacted" : [
+                        "password"
+                    ]
                 }
             ]
         },
@@ -1473,7 +1480,10 @@ GET /kapacitor/v1/config
                     "to": [ "oncall@example.com"],
                     "from": "kapacitor@example.com",
                     "idle-timeout": "30s"
-                }
+                },
+                "redacted" : [
+                    "password"
+                ]
             }]
         }
     }
@@ -1503,7 +1513,10 @@ GET /kapacitor/v1/config/smtp
             "to": ["oncall@example.com"],
             "from": "kapacitor@example.com",
             "idle-timeout": "30s"
-        }
+        },
+        "redacted" : [
+            "password"
+        ]
     }]
 }
 ```
@@ -1528,7 +1541,10 @@ GET /kapacitor/v1/config/smtp/
         "to": ["oncall@example.com"],
         "from": "kapacitor@example.com",
         "idle-timeout": "30s"
-    }
+    },
+    "redacted" : [
+        "password"
+    ]
 }
 ```
 
@@ -1553,6 +1569,9 @@ GET /kapacitor/v1/config/influxdb
                "username": "",
                "password": false
             },
+            "redacted" : [
+                "password"
+            ]
         },
         {
             "link" : {"rel": "self", "href": "/kapacitor/v1/config/influxdb/remote"},
@@ -1562,7 +1581,10 @@ GET /kapacitor/v1/config/influxdb
                 "default": false,
                 "username": "jim",
                 "password": true
-            }
+            },
+            "redacted" : [
+                "password"
+            ]
         }
     ]
 }
@@ -1583,7 +1605,10 @@ GET /kapacitor/v1/config/influxdb/remote
         "default": false,
         "username": "jim",
         "password": true
-    }
+    },
+    "redacted" : [
+        "password"
+    ]
 }
 ```
 

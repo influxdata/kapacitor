@@ -487,13 +487,13 @@ func (e Element) Value() interface{} {
 // Redacted returns the options for the element in a map.
 // Any fields with the `override:",redact"` tag set will be replaced
 // with a boolean value indicating whether a non-zero value was set.
-func (e Element) Redacted() (map[string]interface{}, error) {
+func (e Element) Redacted() (map[string]interface{}, []string, error) {
 	walker := newRedactWalker()
 	// walk the section and collect redacted options
 	if err := reflectwalk.Walk(e.value, walker); err != nil {
-		return nil, errors.Wrap(err, "failed to redact section")
+		return nil, nil, errors.Wrap(err, "failed to redact section")
 	}
-	return walker.optionsMap(), nil
+	return walker.optionsMap(), walker.redactedList(), nil
 }
 
 // getElementKey returns the name of the field taht is used to uniquely identify elements of a list.
@@ -537,7 +537,8 @@ func findFieldByElementKey(v reflect.Value, elementKey string) (field reflect.Va
 // redactWalker reads the the sections from the walked values and redacts and sensitive fields.
 type redactWalker struct {
 	depthWalker
-	options map[string]interface{}
+	options  map[string]interface{}
+	redacted []string
 }
 
 func newRedactWalker() *redactWalker {
@@ -550,6 +551,10 @@ func (w *redactWalker) optionsMap() map[string]interface{} {
 	return w.options
 }
 
+func (w *redactWalker) redactedList() []string {
+	return w.redacted
+}
+
 func (w *redactWalker) Struct(reflect.Value) error {
 	return nil
 }
@@ -559,19 +564,19 @@ func (w *redactWalker) StructField(f reflect.StructField, v reflect.Value) error
 	// Top level
 	case 0:
 		name := fieldName(f)
-		w.options[name] = getRedactedValue(f, v)
+		var value interface{}
+		if isRedacted(f) {
+			value = !isZero(v)
+			// Add field to redacted list
+			w.redacted = append(w.redacted, name)
+		} else {
+			value = v.Interface()
+		}
+		w.options[name] = value
 	// Ignore all other levels
 	default:
 	}
 	return nil
-}
-
-func getRedactedValue(f reflect.StructField, v reflect.Value) interface{} {
-	if isRedacted(f) {
-		return !isZero(v)
-	} else {
-		return v.Interface()
-	}
 }
 
 func isRedacted(f reflect.StructField) bool {

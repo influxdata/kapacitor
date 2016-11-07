@@ -13,6 +13,7 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -4924,6 +4925,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"urls":                        []interface{}{db.URL()},
 						"username":                    "bob",
 					},
+					Redacted: []string{
+						"password",
+					},
 				}},
 			},
 			expDefaultElement: client.ConfigElement{
@@ -4951,6 +4955,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"udp-read-buffer":             float64(0),
 					"urls":                        []interface{}{db.URL()},
 					"username":                    "bob",
+				},
+				Redacted: []string{
+					"password",
 				},
 			},
 			updates: []updateAction{
@@ -4990,6 +4997,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"urls":                        []interface{}{"http://192.0.2.0:8086"},
 								"username":                    "bob",
 							},
+							Redacted: []string{
+								"password",
+							},
 						}},
 					},
 					expElement: client.ConfigElement{
@@ -5017,6 +5027,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"udp-read-buffer":             float64(0),
 							"urls":                        []interface{}{"http://192.0.2.0:8086"},
 							"username":                    "bob",
+						},
+						Redacted: []string{
+							"password",
 						},
 					},
 				},
@@ -5057,6 +5070,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"urls":                        []interface{}{"http://192.0.2.0:8086"},
 								"username":                    "bob",
 							},
+							Redacted: []string{
+								"password",
+							},
 						}},
 					},
 					expElement: client.ConfigElement{
@@ -5084,6 +5100,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"udp-read-buffer":             float64(0),
 							"urls":                        []interface{}{"http://192.0.2.0:8086"},
 							"username":                    "bob",
+						},
+						Redacted: []string{
+							"password",
 						},
 					},
 				},
@@ -5120,6 +5139,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"urls":                        []interface{}{db.URL()},
 								"username":                    "bob",
 							},
+							Redacted: []string{
+								"password",
+							},
 						}},
 					},
 					expElement: client.ConfigElement{
@@ -5147,6 +5169,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"udp-read-buffer":             float64(0),
 							"urls":                        []interface{}{db.URL()},
 							"username":                    "bob",
+						},
+						Redacted: []string{
+							"password",
 						},
 					},
 				},
@@ -5187,6 +5212,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 									"urls":                        []interface{}{db.URL()},
 									"username":                    "bob",
 								},
+								Redacted: []string{
+									"password",
+								},
 							},
 							{
 								Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/influxdb/new"},
@@ -5213,6 +5241,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 									"udp-read-buffer":             float64(0),
 									"urls":                        []interface{}{db.URL()},
 									"username":                    "",
+								},
+								Redacted: []string{
+									"password",
 								},
 							},
 						},
@@ -5243,6 +5274,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"urls":                        []interface{}{db.URL()},
 							"username":                    "",
 						},
+						Redacted: []string{
+							"password",
+						},
 					},
 				},
 			},
@@ -5262,6 +5296,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"origin":      "",
 						"token":       false,
 						"url":         "http://alerta.example.com",
+					},
+					Redacted: []string{
+						"token",
 					}},
 				},
 			},
@@ -5273,6 +5310,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"origin":      "",
 					"token":       false,
 					"url":         "http://alerta.example.com",
+				},
+				Redacted: []string{
+					"token",
 				},
 			},
 			updates: []updateAction{
@@ -5294,6 +5334,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"token":       true,
 								"url":         "http://alerta.example.com",
 							},
+							Redacted: []string{
+								"token",
+							},
 						}},
 					},
 					expElement: client.ConfigElement{
@@ -5304,6 +5347,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"origin":      "kapacitor",
 							"token":       true,
 							"url":         "http://alerta.example.com",
+						},
+						Redacted: []string{
+							"token",
 						},
 					},
 				},
@@ -5326,6 +5372,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"namespace":   "",
 						"token":       false,
 					},
+					Redacted: []string{
+						"token",
+					},
 				}},
 			},
 			expDefaultElement: client.ConfigElement{
@@ -5337,6 +5386,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"in-cluster":  false,
 					"namespace":   "",
 					"token":       false,
+				},
+				Redacted: []string{
+					"token",
 				},
 			},
 			updates: []updateAction{
@@ -5358,6 +5410,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"namespace":   "",
 								"token":       true,
 							},
+							Redacted: []string{
+								"token",
+							},
 						}},
 					},
 					expElement: client.ConfigElement{
@@ -5369,6 +5424,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"in-cluster":  false,
 							"namespace":   "",
 							"token":       true,
+						},
+						Redacted: []string{
+							"token",
 						},
 					},
 				},
@@ -5391,6 +5449,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"token":              false,
 						"url":                "http://hipchat.example.com",
 					},
+					Redacted: []string{
+						"token",
+					},
 				}},
 			},
 			expDefaultElement: client.ConfigElement{
@@ -5402,6 +5463,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"state-changes-only": false,
 					"token":              false,
 					"url":                "http://hipchat.example.com",
+				},
+				Redacted: []string{
+					"token",
 				},
 			},
 			updates: []updateAction{
@@ -5424,6 +5488,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"token":              true,
 								"url":                "http://hipchat.example.com",
 							},
+							Redacted: []string{
+								"token",
+							},
 						}},
 					},
 					expElement: client.ConfigElement{
@@ -5435,6 +5502,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"state-changes-only": false,
 							"token":              true,
 							"url":                "http://hipchat.example.com",
+						},
+						Redacted: []string{
+							"token",
 						},
 					},
 				},
@@ -5458,6 +5528,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"teams":        nil,
 						"url":          "http://opsgenie.example.com",
 					},
+					Redacted: []string{
+						"api-key",
+					},
 				}},
 			},
 			expDefaultElement: client.ConfigElement{
@@ -5470,6 +5543,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"recovery_url": opsgenie.DefaultOpsGenieRecoveryURL,
 					"teams":        nil,
 					"url":          "http://opsgenie.example.com",
+				},
+				Redacted: []string{
+					"api-key",
 				},
 			},
 			updates: []updateAction{
@@ -5494,6 +5570,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"teams":        []interface{}{"teamA", "teamB"},
 								"url":          "http://opsgenie.example.com",
 							},
+							Redacted: []string{
+								"api-key",
+							},
 						}},
 					},
 					expElement: client.ConfigElement{
@@ -5506,6 +5585,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"recovery_url": opsgenie.DefaultOpsGenieRecoveryURL,
 							"teams":        []interface{}{"teamA", "teamB"},
 							"url":          "http://opsgenie.example.com",
+						},
+						Redacted: []string{
+							"api-key",
 						},
 					},
 				},
@@ -5526,6 +5608,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"service-key": true,
 						"url":         pagerduty.DefaultPagerDutyAPIURL,
 					},
+					Redacted: []string{
+						"service-key",
+					},
 				}},
 			},
 			expDefaultElement: client.ConfigElement{
@@ -5535,6 +5620,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"global":      false,
 					"service-key": true,
 					"url":         pagerduty.DefaultPagerDutyAPIURL,
+				},
+				Redacted: []string{
+					"service-key",
 				},
 			},
 			updates: []updateAction{
@@ -5555,6 +5643,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"service-key": false,
 								"url":         pagerduty.DefaultPagerDutyAPIURL,
 							},
+							Redacted: []string{
+								"service-key",
+							},
 						}},
 					},
 					expElement: client.ConfigElement{
@@ -5564,6 +5655,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"global":      false,
 							"service-key": false,
 							"url":         pagerduty.DefaultPagerDutyAPIURL,
+						},
+						Redacted: []string{
+							"service-key",
 						},
 					},
 				},
@@ -5591,6 +5685,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"to":                 nil,
 						"username":           "",
 					},
+					Redacted: []string{
+						"password",
+					},
 				}},
 			},
 			expDefaultElement: client.ConfigElement{
@@ -5607,6 +5704,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"state-changes-only": false,
 					"to":                 nil,
 					"username":           "",
+				},
+				Redacted: []string{
+					"password",
 				},
 			},
 			updates: []updateAction{
@@ -5635,6 +5735,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"to":                 nil,
 								"username":           "",
 							},
+							Redacted: []string{
+								"password",
+							},
 						}},
 					},
 					expElement: client.ConfigElement{
@@ -5651,6 +5754,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"state-changes-only": false,
 							"to":                 nil,
 							"username":           "",
+						},
+						Redacted: []string{
+							"password",
 						},
 					},
 				},
@@ -5670,6 +5776,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"enabled": false,
 						"source":  "Kapacitor",
 					},
+					Redacted: nil,
 				}},
 			},
 			expDefaultElement: client.ConfigElement{
@@ -5679,6 +5786,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"enabled": false,
 					"source":  "Kapacitor",
 				},
+				Redacted: nil,
 			},
 			updates: []updateAction{
 				{
@@ -5698,6 +5806,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"enabled": true,
 								"source":  "",
 							},
+							Redacted: nil,
 						}},
 					},
 					expElement: client.ConfigElement{
@@ -5707,6 +5816,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"enabled": true,
 							"source":  "",
 						},
+						Redacted: nil,
 					},
 				},
 			},
@@ -5729,6 +5839,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"url":                false,
 						"username":           "kapacitor",
 					},
+					Redacted: []string{
+						"url",
+					},
 				}},
 			},
 			expDefaultElement: client.ConfigElement{
@@ -5741,6 +5854,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"state-changes-only": false,
 					"url":                false,
 					"username":           "kapacitor",
+				},
+				Redacted: []string{
+					"url",
 				},
 			},
 			updates: []updateAction{
@@ -5766,6 +5882,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"url":                true,
 								"username":           "kapacitor",
 							},
+							Redacted: []string{
+								"url",
+							},
 						}},
 					},
 					expElement: client.ConfigElement{
@@ -5778,6 +5897,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"state-changes-only": false,
 							"url":                true,
 							"username":           "kapacitor",
+						},
+						Redacted: []string{
+							"url",
 						},
 					},
 				},
@@ -5797,6 +5919,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"url":         false,
 						"author_name": "Kapacitor",
 					},
+					Redacted: []string{
+						"url",
+					},
 				}},
 			},
 			expDefaultElement: client.ConfigElement{
@@ -5805,6 +5930,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"enabled":     false,
 					"url":         false,
 					"author_name": "Kapacitor",
+				},
+				Redacted: []string{
+					"url",
 				},
 			},
 			updates: []updateAction{
@@ -5824,6 +5952,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"url":         true,
 								"author_name": "Kapacitor",
 							},
+							Redacted: []string{
+								"url",
+							},
 						}},
 					},
 					expElement: client.ConfigElement{
@@ -5832,6 +5963,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"enabled":     true,
 							"url":         true,
 							"author_name": "Kapacitor",
+						},
+						Redacted: []string{
+							"url",
 						},
 					},
 				},
@@ -5857,6 +5991,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"token":                    false,
 						"url":                      telegram.DefaultTelegramURL,
 					},
+					Redacted: []string{
+						"token",
+					},
 				}},
 			},
 			expDefaultElement: client.ConfigElement{
@@ -5871,6 +6008,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"state-changes-only":       false,
 					"token":                    false,
 					"url":                      telegram.DefaultTelegramURL,
+				},
+				Redacted: []string{
+					"token",
 				},
 			},
 			updates: []updateAction{
@@ -5896,6 +6036,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"token":                    true,
 								"url":                      telegram.DefaultTelegramURL,
 							},
+							Redacted: []string{
+								"token",
+							},
 						}},
 					},
 					expElement: client.ConfigElement{
@@ -5910,6 +6053,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"state-changes-only":       false,
 							"token":                    true,
 							"url":                      telegram.DefaultTelegramURL,
+						},
+						Redacted: []string{
+							"token",
 						},
 					},
 				},
@@ -5931,6 +6077,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"routing-key": "test",
 						"url":         victorops.DefaultVictorOpsAPIURL,
 					},
+					Redacted: []string{
+						"api-key",
+					},
 				}},
 			},
 			expDefaultElement: client.ConfigElement{
@@ -5941,6 +6090,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"global":      false,
 					"routing-key": "test",
 					"url":         victorops.DefaultVictorOpsAPIURL,
+				},
+				Redacted: []string{
+					"api-key",
 				},
 			},
 			updates: []updateAction{
@@ -5962,6 +6114,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"routing-key": "test",
 								"url":         victorops.DefaultVictorOpsAPIURL,
 							},
+							Redacted: []string{
+								"api-key",
+							},
 						}},
 					},
 					expElement: client.ConfigElement{
@@ -5972,6 +6127,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"global":      true,
 							"routing-key": "test",
 							"url":         victorops.DefaultVictorOpsAPIURL,
+						},
+						Redacted: []string{
+							"api-key",
 						},
 					},
 				},
@@ -5993,6 +6151,16 @@ func TestServer_UpdateConfig(t *testing.T) {
 		for k := range got.Options {
 			if v, ok := exp.Options[k]; !ok {
 				return fmt.Errorf("extra option %q with value %#v", k, v)
+			}
+		}
+		if len(got.Redacted) != len(exp.Redacted) {
+			return fmt.Errorf("unexpected element redacted lists: got %v exp %v", got.Redacted, exp.Redacted)
+		}
+		sort.Strings(got.Redacted)
+		sort.Strings(exp.Redacted)
+		for i := range exp.Redacted {
+			if got.Redacted[i] != exp.Redacted[i] {
+				return fmt.Errorf("unexpected element redacted lists: got %v exp %v", got.Redacted, exp.Redacted)
 			}
 		}
 		return nil

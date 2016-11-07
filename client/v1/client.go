@@ -1566,8 +1566,9 @@ type ConfigSection struct {
 }
 
 type ConfigElement struct {
-	Link    Link                   `json:"link"`
-	Options map[string]interface{} `json:"options"`
+	Link     Link                   `json:"link"`
+	Options  map[string]interface{} `json:"options"`
+	Redacted []string               `json:"redacted"`
 }
 
 // ConfigSections returns all the running configuration sections that can be modified.
