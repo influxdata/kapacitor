@@ -10,6 +10,8 @@ import (
 	"log"
 	"net/http"
 	"sync/atomic"
+
+	"github.com/influxdata/kapacitor/alert"
 )
 
 type Service struct {
@@ -74,6 +76,7 @@ func (s *Service) Alert(title, text string) error {
 	if err != nil {
 		return err
 	}
+
 	resp, err := http.Post(url, "application/json", post)
 	if err != nil {
 		return err
@@ -114,4 +117,25 @@ func (s *Service) preparePost(title, text string) (string, io.Reader, error) {
 	}
 
 	return c.URL, &post, nil
+}
+
+type handler struct {
+	s      *Service
+	logger *log.Logger
+}
+
+func (s *Service) Handler(l *log.Logger) alert.Handler {
+	return &handler{
+		s:      s,
+		logger: l,
+	}
+}
+
+func (h *handler) Handle(event alert.Event) {
+	if err := h.s.Alert(
+		event.State.ID,
+		event.State.Message,
+	); err != nil {
+		h.logger.Println("E! failed to send event to Talk", err)
+	}
 }

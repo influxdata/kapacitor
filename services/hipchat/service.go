@@ -13,7 +13,7 @@ import (
 	"path"
 	"sync/atomic"
 
-	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/alert"
 )
 
 type Service struct {
@@ -64,9 +64,9 @@ func (s *Service) StateChangesOnly() bool {
 }
 
 type testOptions struct {
-	Room    string               `json:"room"`
-	Message string               `json:"message"`
-	Level   kapacitor.AlertLevel `json:"level"`
+	Room    string      `json:"room"`
+	Message string      `json:"message"`
+	Level   alert.Level `json:"level"`
 }
 
 func (s *Service) TestOptions() interface{} {
@@ -74,7 +74,7 @@ func (s *Service) TestOptions() interface{} {
 	return &testOptions{
 		Room:    c.Room,
 		Message: "test hipchat message",
-		Level:   kapacitor.CritAlert,
+		Level:   alert.Critical,
 	}
 }
 
@@ -87,7 +87,7 @@ func (s *Service) Test(options interface{}) error {
 	return s.Alert(o.Room, c.Token, o.Message, o.Level)
 }
 
-func (s *Service) Alert(room, token, message string, level kapacitor.AlertLevel) error {
+func (s *Service) Alert(room, token, message string, level alert.Level) error {
 	url, post, err := s.preparePost(room, token, message, level)
 	if err != nil {
 		return err
@@ -115,7 +115,7 @@ func (s *Service) Alert(room, token, message string, level kapacitor.AlertLevel)
 	return nil
 }
 
-func (s *Service) preparePost(room, token, message string, level kapacitor.AlertLevel) (string, io.Reader, error) {
+func (s *Service) preparePost(room, token, message string, level alert.Level) (string, io.Reader, error) {
 	c := s.config()
 
 	if !c.Enabled {
@@ -140,16 +140,16 @@ func (s *Service) preparePost(room, token, message string, level kapacitor.Alert
 
 	var color string
 	switch level {
-	case kapacitor.WarnAlert:
+	case alert.Warning:
 		color = "yellow"
-	case kapacitor.CritAlert:
+	case alert.Critical:
 		color = "red"
 	default:
 		color = "green"
 	}
 
 	postData := make(map[string]interface{})
-	postData["from"] = kapacitor.Product
+	postData["from"] = "kapacitor"
 	postData["color"] = color
 	postData["message"] = message
 	postData["notify"] = true
@@ -161,4 +161,39 @@ func (s *Service) preparePost(room, token, message string, level kapacitor.Alert
 		return "", nil, err
 	}
 	return u.String(), &post, nil
+}
+
+type HandlerConfig struct {
+	// HipChat room in which to post messages.
+	// If empty uses the channel from the configuration.
+	Room string `mapstructure:"room"`
+
+	// HipChat authentication token.
+	// If empty uses the token from the configuration.
+	Token string `mapstructure:"token"`
+}
+
+type handler struct {
+	s      *Service
+	c      HandlerConfig
+	logger *log.Logger
+}
+
+func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+	return &handler{
+		s:      s,
+		c:      c,
+		logger: l,
+	}
+}
+
+func (h *handler) Handle(event alert.Event) {
+	if err := h.s.Alert(
+		h.c.Room,
+		h.c.Token,
+		event.State.Message,
+		event.State.Level,
+	); err != nil {
+		h.logger.Println("E! failed to send event to HipChat", err)
+	}
 }

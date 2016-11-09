@@ -23,7 +23,6 @@
 package stats
 
 import (
-	"errors"
 	"log"
 	"sync"
 	"time"
@@ -88,7 +87,7 @@ func (s *Service) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if !s.open {
-		return errors.New("error closing stats service: service not open")
+		return nil
 	}
 	s.open = false
 	close(s.closing)

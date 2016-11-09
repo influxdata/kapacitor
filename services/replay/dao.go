@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/gob"
 	"errors"
-	"path"
 	"time"
 
 	"github.com/influxdata/kapacitor/services/storage"
@@ -78,209 +77,98 @@ type Recording struct {
 	Progress float64
 }
 
-const (
-	recordingDataPrefix    = "/recordings/data/"
-	recordingIndexesPrefix = "/recordings/indexes/"
+type rawRecording Recording
 
-	// Name of ID index
-	recordingIdIndex = "id/"
-	// Name of Date index
-	recordingDateIndex = "date/"
-)
-
-// Key/Value based implementation of the RecordingDAO.
-type recordingKV struct {
-	store storage.Interface
+func (r Recording) ObjectID() string {
+	return r.ID
 }
 
-func newRecordingKV(store storage.Interface) *recordingKV {
-	return &recordingKV{
-		store: store,
-	}
-}
-
-func (d *recordingKV) encodeRecording(r Recording) ([]byte, error) {
+func (r Recording) MarshalBinary() ([]byte, error) {
 	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	err := enc.Encode(r)
+	err := gob.NewEncoder(&buf).Encode((rawRecording)(r))
 	return buf.Bytes(), err
 }
 
-func (d *recordingKV) decodeRecording(data []byte) (Recording, error) {
-	var recording Recording
-	dec := gob.NewDecoder(bytes.NewReader(data))
-	err := dec.Decode(&recording)
-	return recording, err
+func (r *Recording) UnmarshalBinary(data []byte) error {
+	return gob.NewDecoder(bytes.NewReader(data)).Decode((*rawRecording)(r))
 }
 
-// Create a key for the recording data
-func (d *recordingKV) recordingDataKey(id string) string {
-	return recordingDataPrefix + id
+// Name of Date index
+const recordingDateIndex = "date"
+
+// Key/Value based implementation of the RecordingDAO.
+type recordingKV struct {
+	store *storage.IndexedStore
 }
 
-// Create a key for a given index and value.
-//
-// Indexes are maintained via a 'directory' like system:
-//
-// /recordings/data/ID -- contains encoded recording data
-// /recordings/index/id/ID -- contains the recording ID
-// /recordings/index/date/DATE/ID -- contains the recording ID
-//
-// As such to list all recordings in Date sorted order use the /recordings/index/date/ directory.
-func (d *recordingKV) recordingIndexKey(index, value string) string {
-	return recordingIndexesPrefix + index + value
-}
-
-func (d *recordingKV) recordingIDIndexKey(r Recording) string {
-	return d.recordingIndexKey(replayIdIndex, r.ID)
-}
-func (d *recordingKV) recordingDateIndexKey(r Recording) string {
-	return d.recordingIndexKey(recordingDateIndex, r.Date.Format(time.RFC3339)+"/"+r.ID)
-}
-
-func (d *recordingKV) Get(id string) (Recording, error) {
-	key := d.recordingDataKey(id)
-	if exists, err := d.store.Exists(key); err != nil {
-		return Recording{}, err
-	} else if !exists {
-		return Recording{}, ErrNoRecordingExists
-	}
-	kv, err := d.store.Get(key)
-	if err != nil {
-		return Recording{}, err
-	}
-	return d.decodeRecording(kv.Value)
-}
-
-func (d *recordingKV) Create(r Recording) error {
-	key := d.recordingDataKey(r.ID)
-
-	exists, err := d.store.Exists(key)
-	if err != nil {
-		return err
-	}
-	if exists {
-		return ErrRecordingExists
-	}
-
-	data, err := d.encodeRecording(r)
-	if err != nil {
-		return err
-	}
-	// Put data
-	err = d.store.Put(key, data)
-	if err != nil {
-		return err
-	}
-	// Put ID index
-	indexKey := d.recordingIDIndexKey(r)
-	err = d.store.Put(indexKey, []byte(r.ID))
-	if err != nil {
-		return err
-	}
-	// Put Date index
-	indexKey = d.recordingDateIndexKey(r)
-	return d.store.Put(indexKey, []byte(r.ID))
-}
-
-func (d *recordingKV) Replace(r Recording) error {
-	key := d.recordingDataKey(r.ID)
-
-	exists, err := d.store.Exists(key)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		return ErrNoRecordingExists
-	}
-
-	prev, err := d.Get(r.ID)
-	if err != nil {
-		return err
-	}
-
-	data, err := d.encodeRecording(r)
-	if err != nil {
-		return err
-	}
-	// Put data
-	err = d.store.Put(key, data)
-	if err != nil {
-		return err
-	}
-	// Update Date index
-	prevIndexKey := d.recordingDateIndexKey(prev)
-	err = d.store.Delete(prevIndexKey)
-	if err != nil {
-		return err
-	}
-	currIndexKey := d.recordingDateIndexKey(r)
-	err = d.store.Put(currIndexKey, []byte(r.ID))
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (d *recordingKV) Delete(id string) error {
-	key := d.recordingDataKey(id)
-	r, err := d.Get(id)
-	if err != nil {
-		if err == ErrNoRecordingExists {
-			return nil
-		}
-		return err
-	}
-
-	idIndexKey := d.recordingIDIndexKey(r)
-	dateIndexKey := d.recordingDateIndexKey(r)
-
-	dataErr := d.store.Delete(key)
-	idIndexErr := d.store.Delete(idIndexKey)
-	dateIndexErr := d.store.Delete(dateIndexKey)
-	if dataErr != nil {
-		return dataErr
-	}
-	if idIndexErr != nil {
-		return dataErr
-	}
-	return dateIndexErr
-}
-
-func (d *recordingKV) List(pattern string, offset, limit int) ([]Recording, error) {
-	// Recordings are indexed by their Date.
-	// This allows us to do offset/limits and filtering without having to read in all recording data.
-
-	// List all recording ids sorted by Date
-	ids, err := d.store.List(recordingIndexesPrefix + recordingDateIndex)
+func newRecordingKV(store storage.Interface) (*recordingKV, error) {
+	c := storage.DefaultIndexedStoreConfig("recordings", func() storage.BinaryObject {
+		return new(Recording)
+	})
+	c.Indexes = append(c.Indexes, storage.Index{
+		Name: recordingDateIndex,
+		ValueFunc: func(o storage.BinaryObject) (string, error) {
+			r, ok := o.(*Recording)
+			if !ok {
+				return "", storage.ImpossibleTypeErr(r, o)
+			}
+			return r.Date.UTC().Format(time.RFC3339), nil
+		},
+	})
+	istore, err := storage.NewIndexedStore(store, c)
 	if err != nil {
 		return nil, err
 	}
-	// Reverse to sort by newest first
-	for i, j := 0, len(ids)-1; i < j; i, j = i+1, j-1 {
-		ids[i], ids[j] = ids[j], ids[i]
-	}
+	return &recordingKV{
+		store: istore,
+	}, nil
+}
 
-	var match func([]byte) bool
-	if pattern != "" {
-		match = func(value []byte) bool {
-			id := string(value)
-			matched, _ := path.Match(pattern, id)
-			return matched
-		}
-	} else {
-		match = func([]byte) bool { return true }
+func (kv *recordingKV) error(err error) error {
+	if err == storage.ErrNoObjectExists {
+		return ErrNoRecordingExists
+	} else if err == storage.ErrObjectExists {
+		return ErrRecordingExists
 	}
-	matches := storage.DoListFunc(ids, match, offset, limit)
+	return err
+}
 
-	recordings := make([]Recording, len(matches))
-	for i, id := range matches {
-		data, err := d.store.Get(d.recordingDataKey(string(id)))
-		if err != nil {
-			return nil, err
+func (kv *recordingKV) Get(id string) (Recording, error) {
+	o, err := kv.store.Get(id)
+	if err != nil {
+		return Recording{}, kv.error(err)
+	}
+	r, ok := o.(*Recording)
+	if !ok {
+		return Recording{}, storage.ImpossibleTypeErr(r, o)
+	}
+	return *r, nil
+}
+
+func (kv *recordingKV) Create(r Recording) error {
+	return kv.error(kv.store.Create(&r))
+}
+
+func (kv *recordingKV) Replace(r Recording) error {
+	return kv.error(kv.store.Replace(&r))
+}
+
+func (kv *recordingKV) Delete(id string) error {
+	return kv.store.Delete(id)
+}
+
+func (kv *recordingKV) List(pattern string, offset, limit int) ([]Recording, error) {
+	objects, err := kv.store.ReverseList(recordingDateIndex, pattern, offset, limit)
+	if err != nil {
+		return nil, err
+	}
+	recordings := make([]Recording, len(objects))
+	for i, o := range objects {
+		r, ok := o.(*Recording)
+		if !ok {
+			return nil, storage.ImpossibleTypeErr(r, o)
 		}
-		t, err := d.decodeRecording(data.Value)
-		recordings[i] = t
+		recordings[i] = *r
 	}
 	return recordings, nil
 }
@@ -328,207 +216,98 @@ type Replay struct {
 	Progress      float64
 }
 
-const (
-	replayDataPrefix    = "/replays/data/"
-	replayIndexesPrefix = "/replays/indexes/"
+type rawReplay Replay
 
-	replayIdIndex   = "id/"
-	replayDateIndex = "date/"
-)
-
-// Key/Value based implementation of the ReplayDAO.
-type replayKV struct {
-	store storage.Interface
+func (r Replay) ObjectID() string {
+	return r.ID
 }
 
-func newReplayKV(store storage.Interface) *replayKV {
-	return &replayKV{
-		store: store,
-	}
-}
-
-func (d *replayKV) encodeReplay(r Replay) ([]byte, error) {
+func (r Replay) MarshalBinary() ([]byte, error) {
 	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	err := enc.Encode(r)
+	err := gob.NewEncoder(&buf).Encode(rawReplay(r))
 	return buf.Bytes(), err
 }
 
-func (d *replayKV) decodeReplay(data []byte) (Replay, error) {
-	var replay Replay
-	dec := gob.NewDecoder(bytes.NewReader(data))
-	err := dec.Decode(&replay)
-	return replay, err
+func (r *Replay) UnmarshalBinary(data []byte) error {
+	return gob.NewDecoder(bytes.NewReader(data)).Decode((*rawReplay)(r))
 }
 
-// Create a key for the replay data
-func (d *replayKV) replayDataKey(id string) string {
-	return replayDataPrefix + id
+// Name of the replay date index
+const replayDateIndex = "date"
+
+// Key/Value based implementation of the ReplayDAO.
+type replayKV struct {
+	store *storage.IndexedStore
 }
 
-// Create a key for a given index and value.
-//
-// Indexes are maintained via a 'directory' like system:
-//
-// /replays/data/ID -- contains encoded replay data
-// /replays/index/id/ID -- contains the replay ID
-// /replays/index/date/DATE/ID -- contains the replay ID
-//
-// As such to list all replays in Date sorted order use the /replays/index/date/ directory.
-func (d *replayKV) replayIndexKey(index, value string) string {
-	return replayIndexesPrefix + index + value
-}
-
-func (d *replayKV) replayIDIndexKey(r Replay) string {
-	return d.replayIndexKey(replayIdIndex, r.ID)
-}
-func (d *replayKV) replayDateIndexKey(r Replay) string {
-	return d.replayIndexKey(replayDateIndex, r.Date.Format(time.RFC3339)+"/"+r.ID)
-}
-
-func (d *replayKV) Get(id string) (Replay, error) {
-	key := d.replayDataKey(id)
-	if exists, err := d.store.Exists(key); err != nil {
-		return Replay{}, err
-	} else if !exists {
-		return Replay{}, ErrNoReplayExists
-	}
-	kv, err := d.store.Get(key)
-	if err != nil {
-		return Replay{}, err
-	}
-	return d.decodeReplay(kv.Value)
-}
-
-func (d *replayKV) Create(r Replay) error {
-	key := d.replayDataKey(r.ID)
-
-	exists, err := d.store.Exists(key)
-	if err != nil {
-		return err
-	}
-	if exists {
-		return ErrReplayExists
-	}
-
-	data, err := d.encodeReplay(r)
-	if err != nil {
-		return err
-	}
-	// Put data
-	err = d.store.Put(key, data)
-	if err != nil {
-		return err
-	}
-	// Put ID index
-	indexKey := d.replayIDIndexKey(r)
-	err = d.store.Put(indexKey, []byte(r.ID))
-	if err != nil {
-		return err
-	}
-	// Put Date index
-	indexKey = d.replayDateIndexKey(r)
-	return d.store.Put(indexKey, []byte(r.ID))
-}
-
-func (d *replayKV) Replace(r Replay) error {
-	key := d.replayDataKey(r.ID)
-
-	exists, err := d.store.Exists(key)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		return ErrNoReplayExists
-	}
-
-	prev, err := d.Get(r.ID)
-	if err != nil {
-		return err
-	}
-
-	data, err := d.encodeReplay(r)
-	if err != nil {
-		return err
-	}
-	// Put data
-	err = d.store.Put(key, data)
-	if err != nil {
-		return err
-	}
-	// Update Date index
-	prevIndexKey := d.replayDateIndexKey(prev)
-	err = d.store.Delete(prevIndexKey)
-	if err != nil {
-		return err
-	}
-	currIndexKey := d.replayDateIndexKey(r)
-	err = d.store.Put(currIndexKey, []byte(r.ID))
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (d *replayKV) Delete(id string) error {
-	key := d.replayDataKey(id)
-	r, err := d.Get(id)
-	if err != nil {
-		if err == ErrNoReplayExists {
-			return nil
-		}
-		return err
-	}
-
-	idIndexKey := d.replayIDIndexKey(r)
-	dateIndexKey := d.replayDateIndexKey(r)
-
-	dataErr := d.store.Delete(key)
-	idIndexErr := d.store.Delete(idIndexKey)
-	dateIndexErr := d.store.Delete(dateIndexKey)
-	if dataErr != nil {
-		return dataErr
-	}
-	if idIndexErr != nil {
-		return dataErr
-	}
-	return dateIndexErr
-}
-
-func (d *replayKV) List(pattern string, offset, limit int) ([]Replay, error) {
-	// Replays are indexed by their Date.
-	// This allows us to do offset/limits and filtering without having to read in all replay data.
-
-	// List all replay ids sorted by Date
-	ids, err := d.store.List(replayIndexesPrefix + replayDateIndex)
+func newReplayKV(store storage.Interface) (*replayKV, error) {
+	c := storage.DefaultIndexedStoreConfig("replays", func() storage.BinaryObject {
+		return new(Replay)
+	})
+	c.Indexes = append(c.Indexes, storage.Index{
+		Name: replayDateIndex,
+		ValueFunc: func(o storage.BinaryObject) (string, error) {
+			r, ok := o.(*Replay)
+			if !ok {
+				return "", storage.ImpossibleTypeErr(r, o)
+			}
+			return r.Date.UTC().Format(time.RFC3339), nil
+		},
+	})
+	istore, err := storage.NewIndexedStore(store, c)
 	if err != nil {
 		return nil, err
 	}
-	// Reverse to sort by newest first
-	for i, j := 0, len(ids)-1; i < j; i, j = i+1, j-1 {
-		ids[i], ids[j] = ids[j], ids[i]
-	}
+	return &replayKV{
+		store: istore,
+	}, nil
+}
 
-	var match func([]byte) bool
-	if pattern != "" {
-		match = func(value []byte) bool {
-			id := string(value)
-			matched, _ := path.Match(pattern, id)
-			return matched
-		}
-	} else {
-		match = func([]byte) bool { return true }
+func (kv *replayKV) error(err error) error {
+	if err == storage.ErrNoObjectExists {
+		return ErrNoReplayExists
+	} else if err == storage.ErrObjectExists {
+		return ErrReplayExists
 	}
-	matches := storage.DoListFunc(ids, match, offset, limit)
+	return err
+}
 
-	replays := make([]Replay, len(matches))
-	for i, id := range matches {
-		data, err := d.store.Get(d.replayDataKey(string(id)))
-		if err != nil {
-			return nil, err
+func (kv *replayKV) Get(id string) (Replay, error) {
+	o, err := kv.store.Get(id)
+	if err != nil {
+		return Replay{}, kv.error(err)
+	}
+	r, ok := o.(*Replay)
+	if !ok {
+		return Replay{}, storage.ImpossibleTypeErr(r, o)
+	}
+	return *r, nil
+}
+
+func (kv *replayKV) Create(r Replay) error {
+	return kv.error(kv.store.Create(&r))
+}
+
+func (kv *replayKV) Replace(r Replay) error {
+	return kv.error(kv.store.Replace(&r))
+}
+
+func (kv *replayKV) Delete(id string) error {
+	return kv.store.Delete(id)
+}
+
+func (kv *replayKV) List(pattern string, offset, limit int) ([]Replay, error) {
+	objects, err := kv.store.ReverseList(replayDateIndex, pattern, offset, limit)
+	if err != nil {
+		return nil, err
+	}
+	replays := make([]Replay, len(objects))
+	for i, o := range objects {
+		r, ok := o.(*Replay)
+		if !ok {
+			return nil, storage.ImpossibleTypeErr(r, o)
 		}
-		t, err := d.decodeReplay(data.Value)
-		replays[i] = t
+		replays[i] = *r
 	}
 	return replays, nil
 }

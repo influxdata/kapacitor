@@ -43,19 +43,19 @@ func Test_encodeOverride_decodeOverride(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		got, err := encodeOverride(tc.o)
+		got, err := tc.o.MarshalBinary()
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !bytes.Equal(got, tc.exp) {
 			t.Errorf("unexpected encoding:\ngot\n%s\nexp\n%s\n", string(got), string(tc.exp))
 		}
-		o, err := decodeOverride(got)
-		if err != nil {
+		o := new(Override)
+		if err := o.UnmarshalBinary(got); err != nil {
 			t.Fatal(err)
 		}
-		if !reflect.DeepEqual(o, tc.o) {
-			t.Errorf("unexpected decoding:\ngot\n%v\nexp\n%v\n", o, tc.o)
+		if !reflect.DeepEqual(*o, tc.o) {
+			t.Errorf("unexpected decoding:\ngot\n%v\nexp\n%v\n", *o, tc.o)
 		}
 	}
 }

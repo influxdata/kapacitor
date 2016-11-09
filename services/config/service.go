@@ -63,7 +63,11 @@ const configNamespace = "config_overrides"
 
 func (s *Service) Open() error {
 	store := s.StorageService.Store(configNamespace)
-	s.overrides = newOverrideKV(store)
+	overrides, err := newOverrideKV(store)
+	if err != nil {
+		return err
+	}
+	s.overrides = overrides
 
 	// Cache element keys
 	if elementKeys, err := override.ElementKeys(s.config); err != nil {
@@ -75,26 +79,23 @@ func (s *Service) Open() error {
 	// Define API routes
 	s.routes = []httpd.Route{
 		{
-			Name:        "config",
 			Method:      "GET",
 			Pattern:     configPath,
 			HandlerFunc: s.handleGetConfig,
 		},
 		{
-			Name:        "config",
 			Method:      "GET",
 			Pattern:     configPathAnchored,
 			HandlerFunc: s.handleGetConfig,
 		},
 		{
-			Name:        "config",
 			Method:      "POST",
 			Pattern:     configPathAnchored,
 			HandlerFunc: s.handleUpdateSection,
 		},
 	}
 
-	err := s.HTTPDService.AddRoutes(s.routes)
+	err = s.HTTPDService.AddRoutes(s.routes)
 	return errors.Wrap(err, "failed to add API routes")
 }
 

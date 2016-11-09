@@ -18,7 +18,9 @@ import (
 	"github.com/influxdata/influxdb/services/opentsdb"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/auth"
+	"github.com/influxdata/kapacitor/command"
 	iclient "github.com/influxdata/kapacitor/influxdb"
+	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/config"
 	"github.com/influxdata/kapacitor/services/deadman"
@@ -69,17 +71,21 @@ type Server struct {
 
 	err chan error
 
+	Commander command.Commander
+
 	TaskMaster       *kapacitor.TaskMaster
 	TaskMasterLookup *kapacitor.TaskMasterLookup
 
 	AuthService           auth.Interface
 	HTTPDService          *httpd.Service
 	StorageService        *storage.Service
+	AlertService          *alert.Service
 	TaskStore             *task_store.Service
 	ReplayService         *replay.Service
 	InfluxDBService       *influxdb.Service
 	ConfigOverrideService *config.Service
 	TesterService         *servicetest.Service
+	StatsService          *stats.Service
 
 	MetaClient    *kapacitor.NoopMetaClient
 	QueryExecutor *Queryexecutor
@@ -126,6 +132,7 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 		Logger:          l,
 		ServicesByName:  make(map[string]int),
 		DynamicServices: make(map[string]Updater),
+		Commander:       c.Commander,
 	}
 	s.Logger.Println("I! Kapacitor hostname:", s.hostname)
 
@@ -147,6 +154,7 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	s.TaskMasterLookup = kapacitor.NewTaskMasterLookup()
 	s.TaskMaster = kapacitor.NewTaskMaster(kapacitor.MainTaskMaster, logService)
 	s.TaskMaster.DefaultRetentionPolicy = c.DefaultRetentionPolicy
+	s.TaskMaster.Commander = s.Commander
 	s.TaskMasterLookup.Set(s.TaskMaster)
 	if err := s.TaskMaster.Open(); err != nil {
 		return nil, err
@@ -158,6 +166,7 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	s.appendAuthService()
 	s.appendConfigOverrideService()
 	s.appendTesterService()
+	s.appendAlertService()
 
 	// Append all dynamic services after the config override and tester services.
 	s.appendUDFService()
@@ -202,9 +211,6 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	s.appendStatsService()
 	s.appendReportingService()
 
-	// Append HTTPD Service last so that the API is not listening till everything else succeeded.
-	s.appendHTTPDService()
-
 	return s, nil
 }
 
@@ -243,6 +249,19 @@ func (s *Server) appendConfigOverrideService() {
 	s.AppendService("config", srv)
 }
 
+func (s *Server) appendAlertService() {
+	l := s.LogService.NewLogger("[alert] ", log.LstdFlags)
+	srv := alert.NewService(s.config.Alert, l)
+
+	srv.Commander = s.Commander
+	srv.HTTPDService = s.HTTPDService
+	srv.StorageService = s.StorageService
+
+	s.AlertService = srv
+	s.TaskMaster.AlertService = srv
+	s.AppendService("alert", srv)
+}
+
 func (s *Server) appendTesterService() {
 	l := s.LogService.NewLogger("[service-tests] ", log.LstdFlags)
 	srv := servicetest.NewService(servicetest.NewConfig(), l)
@@ -258,6 +277,8 @@ func (s *Server) appendSMTPService() {
 	srv := smtp.NewService(c, l)
 
 	s.TaskMaster.SMTPService = srv
+	s.AlertService.SMTPService = srv
+
 	s.SetDynamicService("smtp", srv)
 	s.AppendService("smtp", srv)
 }
@@ -295,10 +316,6 @@ func (s *Server) initHTTPDService() {
 
 	s.HTTPDService = srv
 	s.TaskMaster.HTTPDService = srv
-}
-
-func (s *Server) appendHTTPDService() {
-	s.AppendService("httpd", s.HTTPDService)
 }
 
 func (s *Server) appendTaskStoreService() {
@@ -370,7 +387,9 @@ func (s *Server) appendOpsGenieService() {
 	c := s.config.OpsGenie
 	l := s.LogService.NewLogger("[opsgenie] ", log.LstdFlags)
 	srv := opsgenie.NewService(c, l)
+
 	s.TaskMaster.OpsGenieService = srv
+	s.AlertService.OpsGenieService = srv
 
 	s.SetDynamicService("opsgenie", srv)
 	s.AppendService("opsgenie", srv)
@@ -380,7 +399,9 @@ func (s *Server) appendVictorOpsService() {
 	c := s.config.VictorOps
 	l := s.LogService.NewLogger("[victorops] ", log.LstdFlags)
 	srv := victorops.NewService(c, l)
+
 	s.TaskMaster.VictorOpsService = srv
+	s.AlertService.VictorOpsService = srv
 
 	s.SetDynamicService("victorops", srv)
 	s.AppendService("victorops", srv)
@@ -391,7 +412,9 @@ func (s *Server) appendPagerDutyService() {
 	l := s.LogService.NewLogger("[pagerduty] ", log.LstdFlags)
 	srv := pagerduty.NewService(c, l)
 	srv.HTTPDService = s.HTTPDService
+
 	s.TaskMaster.PagerDutyService = srv
+	s.AlertService.PagerDutyService = srv
 
 	s.SetDynamicService("pagerduty", srv)
 	s.AppendService("pagerduty", srv)
@@ -401,7 +424,9 @@ func (s *Server) appendSensuService() {
 	c := s.config.Sensu
 	l := s.LogService.NewLogger("[sensu] ", log.LstdFlags)
 	srv := sensu.NewService(c, l)
+
 	s.TaskMaster.SensuService = srv
+	s.AlertService.SensuService = srv
 
 	s.SetDynamicService("sensu", srv)
 	s.AppendService("sensu", srv)
@@ -411,7 +436,9 @@ func (s *Server) appendSlackService() {
 	c := s.config.Slack
 	l := s.LogService.NewLogger("[slack] ", log.LstdFlags)
 	srv := slack.NewService(c, l)
+
 	s.TaskMaster.SlackService = srv
+	s.AlertService.SlackService = srv
 
 	s.SetDynamicService("slack", srv)
 	s.AppendService("slack", srv)
@@ -421,7 +448,9 @@ func (s *Server) appendTelegramService() {
 	c := s.config.Telegram
 	l := s.LogService.NewLogger("[telegram] ", log.LstdFlags)
 	srv := telegram.NewService(c, l)
+
 	s.TaskMaster.TelegramService = srv
+	s.AlertService.TelegramService = srv
 
 	s.SetDynamicService("telegram", srv)
 	s.AppendService("telegram", srv)
@@ -431,7 +460,9 @@ func (s *Server) appendHipChatService() {
 	c := s.config.HipChat
 	l := s.LogService.NewLogger("[hipchat] ", log.LstdFlags)
 	srv := hipchat.NewService(c, l)
+
 	s.TaskMaster.HipChatService = srv
+	s.AlertService.HipChatService = srv
 
 	s.SetDynamicService("hipchat", srv)
 	s.AppendService("hipchat", srv)
@@ -441,7 +472,9 @@ func (s *Server) appendAlertaService() {
 	c := s.config.Alerta
 	l := s.LogService.NewLogger("[alerta] ", log.LstdFlags)
 	srv := alerta.NewService(c, l)
+
 	s.TaskMaster.AlertaService = srv
+	s.AlertService.AlertaService = srv
 
 	s.SetDynamicService("alerta", srv)
 	s.AppendService("alerta", srv)
@@ -451,7 +484,9 @@ func (s *Server) appendTalkService() {
 	c := s.config.Talk
 	l := s.LogService.NewLogger("[talk] ", log.LstdFlags)
 	srv := talk.NewService(c, l)
+
 	s.TaskMaster.TalkService = srv
+	s.AlertService.TalkService = srv
 
 	s.SetDynamicService("talk", srv)
 	s.AppendService("talk", srv)
@@ -527,6 +562,7 @@ func (s *Server) appendStatsService() {
 		srv := stats.NewService(c, l)
 		srv.TaskMaster = s.TaskMaster
 
+		s.StatsService = srv
 		s.TaskMaster.TimingService = srv
 		s.AppendService("stats", srv)
 	}
@@ -553,6 +589,10 @@ func (s *Server) Open() error {
 
 	if err := s.startServices(); err != nil {
 		s.Close()
+		return err
+	}
+	// Open HTTPD Service last so that the API is not listening till everything else succeeded.
+	if err := s.HTTPDService.Open(); err != nil {
 		return err
 	}
 
@@ -617,7 +657,18 @@ func (s *Server) watchConfigUpdates() {
 func (s *Server) Close() error {
 	s.stopProfile()
 
-	// First stop all tasks.
+	// Close all services that write points first.
+	if err := s.HTTPDService.Close(); err != nil {
+		s.Logger.Printf("E! error closing httpd service: %v", err)
+	}
+	if s.StatsService != nil {
+		if err := s.StatsService.Close(); err != nil {
+			s.Logger.Printf("E! error closing stats service: %v", err)
+		}
+	}
+
+	// Drain the in-flight writes and stop all tasks.
+	s.TaskMaster.Drain()
 	s.TaskMaster.StopTasks()
 
 	// Close services now that all tasks are stopped.

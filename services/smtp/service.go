@@ -9,6 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/influxdata/kapacitor/alert"
+
 	"gopkg.in/gomail.v2"
 )
 
@@ -123,10 +125,15 @@ func (s *Service) runMailer() {
 	d, idleTimeout = s.dialer()
 
 	var conn gomail.SendCloser
+	defer func() {
+		if conn != nil {
+			conn.Close()
+		}
+	}()
+
 	var err error
 	open := false
-	done := false
-	for !done {
+	for {
 		timer := time.NewTimer(idleTimeout)
 		select {
 		case <-s.updates:
@@ -142,8 +149,7 @@ func (s *Service) runMailer() {
 			open = false
 		case m, ok := <-s.mail:
 			if !ok {
-				done = true
-				break
+				return
 			}
 			if !open {
 				if conn, err = d.Dial(); err != nil {
@@ -222,4 +228,33 @@ func (s *Service) Test(options interface{}) error {
 		o.Subject,
 		o.Body,
 	)
+}
+
+type HandlerConfig struct {
+	// List of email recipients.
+	To []string `mapstructure:"to"`
+}
+
+type handler struct {
+	s      *Service
+	c      HandlerConfig
+	logger *log.Logger
+}
+
+func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+	return &handler{
+		s:      s,
+		c:      c,
+		logger: l,
+	}
+}
+
+func (h *handler) Handle(event alert.Event) {
+	if err := h.s.SendMail(
+		h.c.To,
+		event.State.Message,
+		event.State.Details,
+	); err != nil {
+		h.logger.Println("E! failed to send email", err)
+	}
 }

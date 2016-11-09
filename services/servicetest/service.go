@@ -51,19 +51,16 @@ func (s *Service) Open() error {
 	// Define API routes
 	s.routes = []httpd.Route{
 		{
-			Name:        "tests-list",
 			Method:      "GET",
 			Pattern:     testPath,
 			HandlerFunc: s.handleListTests,
 		},
 		{
-			Name:        "tests-options",
 			Method:      "GET",
 			Pattern:     testPathAnchored,
 			HandlerFunc: s.handleTestOptions,
 		},
 		{
-			Name:        "do-test",
 			Method:      "POST",
 			Pattern:     testPathAnchored,
 			HandlerFunc: s.handleTest,

@@ -10,10 +10,13 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	yaml "gopkg.in/yaml.v2"
 
 	humanize "github.com/dustin/go-humanize"
 	"github.com/influxdata/influxdb/influxql"
@@ -47,16 +50,18 @@ Commands:
 	record          Record the result of a query or a snapshot of the current stream data.
 	define          Create/update a task.
 	define-template Create/update a template.
+	define-handler  Create/update an alert handler.
 	replay          Replay a recording to a task.
 	replay-live     Replay data against a task without recording it.
 	enable          Enable and start running a task with live data.
 	disable         Stop running a task.
 	reload          Reload a running task with an updated task definition.
 	push            Publish a task definition to another Kapacitor instance. Not implemented yet.
-	delete          Delete tasks, templates, recordings or replays.
-	list            List information about tasks, templates, recordings or replays.
+	delete          Delete tasks, templates, recordings, replays, topics or handlers.
+	list            List information about tasks, templates, recordings, replays, topics, handlers or service-tests.
 	show            Display detailed information about a task.
 	show-template   Display detailed information about a template.
+	show-handler    Display detailed information about an alert handler.
 	level           Sets the logging level on the kapacitord server.
 	stats           Display various stats about Kapacitor.
 	version         Displays the Kapacitor version info.
@@ -133,6 +138,9 @@ func main() {
 	case "define-template":
 		commandArgs = args
 		commandF = doDefineTemplate
+	case "define-handler":
+		commandArgs = args
+		commandF = doDefineHandler
 	case "replay":
 		replayFlags.Parse(args)
 		commandArgs = replayFlags.Args()
@@ -166,6 +174,9 @@ func main() {
 	case "show-template":
 		commandArgs = args
 		commandF = doShowTemplate
+	case "show-handler":
+		commandArgs = args
+		commandF = doShowHandler
 	case "level":
 		commandArgs = args
 		commandF = doLevel
@@ -242,6 +253,8 @@ func doHelp(args []string) error {
 			defineFlags.Usage()
 		case "define-template":
 			defineTemplateFlags.Usage()
+		case "define-handler":
+			defineHandlerUsage()
 		case "replay":
 			replayFlags.Usage()
 		case "enable":
@@ -258,6 +271,8 @@ func doHelp(args []string) error {
 			showUsage()
 		case "show-template":
 			showTemplateUsage()
+		case "show-handler":
+			showHandlerUsage()
 		case "level":
 			levelUsage()
 		case "help":
@@ -797,6 +812,63 @@ func doDefineTemplate(args []string) error {
 	return err
 }
 
+func defineHandlerUsage() {
+	var u = `Usage: kapacitor define-handler <path to handler file>
+
+	Create or update a handler.
+
+	A handler is defined via a JSON or YAML file.
+
+For example:
+
+	Define a handler using the slack.yaml file:
+
+		$ kapacitor define-handler slack.yaml
+
+`
+	fmt.Fprintln(os.Stderr, u)
+}
+
+func doDefineHandler(args []string) error {
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, "Must provide a path to a handler file.")
+		defineHandlerUsage()
+		os.Exit(2)
+	}
+	p := args[0]
+	f, err := os.Open(p)
+	if err != nil {
+		return errors.Wrapf(err, "failed to open handler file %q", p)
+	}
+
+	// Decode file into HandlerOptions
+	var ho client.HandlerOptions
+	ext := path.Ext(p)
+	switch ext {
+	case ".yaml":
+		data, err := ioutil.ReadAll(f)
+		if err != nil {
+			return errors.Wrapf(err, "failed to read handler file %q", p)
+		}
+		if err := yaml.Unmarshal(data, &ho); err != nil {
+			return errors.Wrapf(err, "failed to unmarshal yaml handler file %q", p)
+		}
+	case ".json":
+		if err := json.NewDecoder(f).Decode(&ho); err != nil {
+			return errors.Wrapf(err, "failed to unmarshal json handler file %q", p)
+		}
+	}
+
+	l := cli.HandlerLink(ho.ID)
+	handler, _ := cli.Handler(l)
+	if handler.ID == "" {
+		_, err = cli.CreateHandler(ho)
+	} else {
+		_, err = cli.ReplaceHandler(l, ho)
+	}
+	return err
+}
+
 // Replay
 var (
 	replayFlags = flag.NewFlagSet("replay", flag.ExitOnError)
@@ -1308,7 +1380,7 @@ func showTemplateUsage() {
 func doShowTemplate(args []string) error {
 	if len(args) != 1 {
 		fmt.Fprintln(os.Stderr, "Must specify one template ID")
-		showUsage()
+		showTemplateUsage()
 		os.Exit(2)
 	}
 
@@ -1350,14 +1422,52 @@ func doShowTemplate(args []string) error {
 	return nil
 }
 
+// Show Handler
+
+func showHandlerUsage() {
+	var u = `Usage: kapacitor show-handler [handler ID]
+
+	Show details about a specific handler.
+`
+	fmt.Fprintln(os.Stderr, u)
+}
+
+func doShowHandler(args []string) error {
+	if len(args) != 1 {
+		fmt.Fprintln(os.Stderr, "Must specify one handler ID")
+		showHandlerUsage()
+		os.Exit(2)
+	}
+
+	h, err := cli.Handler(cli.HandlerLink(args[0]))
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("ID:", h.ID)
+	fmt.Println("Topics:", fmt.Sprintf("[%s]", strings.Join(h.Topics, ", ")))
+	fmt.Println("Actions:")
+	actionOutFmt := "%-30s%s\n"
+	fmt.Printf(actionOutFmt, "Kind", "Options")
+	for _, a := range h.Actions {
+		options, err := json.Marshal(a.Options)
+		if err != nil {
+			return errors.Wrap(err, "failed to format action options")
+		}
+		fmt.Printf(actionOutFmt, a.Kind, string(options))
+	}
+	return nil
+}
+
 // List
 
 func listUsage() {
-	var u = `Usage: kapacitor list (tasks|templates|recordings|replays) [ID or pattern]...
+	var u = `Usage: kapacitor list (tasks|templates|recordings|replays|topics|handlers|service-tests) [ID or pattern]...
 
-List tasks, templates, recordings, or replays and their current state.
+	List tasks, templates, recordings, replays, topics or handlers and their current state.
 
-If no ID or pattern is given then all items will be listed.
+	If no ID or pattern is given then all items will be listed.
+
 `
 	fmt.Fprintln(os.Stderr, u)
 }
@@ -1376,7 +1486,7 @@ func (t TemplateList) Swap(i, j int)      { t[i], t[j] = t[j], t[i] }
 
 func doList(args []string) error {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "Must specify 'tasks', 'recordings', or 'replays'")
+		fmt.Fprintln(os.Stderr, "Must specify 'tasks', 'recordings', 'replays', 'topics', or 'handlers'")
 		listUsage()
 		os.Exit(2)
 	}
@@ -1554,8 +1664,80 @@ func doList(args []string) error {
 				fmt.Fprintf(os.Stdout, outFmt, s.Name)
 			}
 		}
+	case "handlers":
+		maxID := 2      // len("ID")
+		maxTopics := 6  // len("Topics")
+		maxActions := 7 // len("Actions")
+		// The handlers are returned in sorted order already, no need to sort them here.
+		type info struct {
+			ID      string
+			Topics  string
+			Actions string
+		}
+		var allHandlers []info
+		for _, pattern := range patterns {
+			handlers, err := cli.ListHandlers(&client.ListHandlersOptions{
+				Pattern: pattern,
+			})
+			if err != nil {
+				return err
+			}
+			for _, h := range handlers.Handlers {
+				kinds := make([]string, len(h.Actions))
+				for i, a := range h.Actions {
+					kinds[i] = a.Kind
+				}
+				i := info{
+					ID:      h.ID,
+					Topics:  fmt.Sprintf("[%s]", strings.Join(h.Topics, ", ")),
+					Actions: fmt.Sprintf("[%s]", strings.Join(kinds, ", ")),
+				}
+				if l := len(i.ID); l > maxID {
+					maxID = l
+				}
+				if l := len(i.Topics); l > maxTopics {
+					maxTopics = l
+				}
+				if l := len(i.Actions); l > maxActions {
+					maxActions = l
+				}
+				allHandlers = append(allHandlers, i)
+			}
+		}
+		outFmt := fmt.Sprintf("%%-%dv%%-%dv%%-%dv\n", maxID+1, maxTopics+1, maxActions+1)
+		fmt.Fprintf(os.Stdout, outFmt, "ID", "Topics", "Actions")
+		for _, h := range allHandlers {
+			fmt.Fprintf(os.Stdout, outFmt, h.ID, h.Topics, h.Actions)
+		}
+	case "topics":
+		maxID := 2    // len("ID")
+		maxLevel := 8 // len("Level")
+		// The topics are returned in sorted order already, no need to sort them here.
+		var allTopics []client.Topic
+		for _, pattern := range patterns {
+			topics, err := cli.ListTopics(&client.ListTopicsOptions{
+				Pattern: pattern,
+			})
+			if err != nil {
+				return err
+			}
+			allTopics = append(allTopics, topics.Topics...)
+			for _, t := range topics.Topics {
+				if l := len(t.ID); l > maxID {
+					maxID = l
+				}
+				if l := len(t.Level); l > maxLevel {
+					maxLevel = l
+				}
+			}
+		}
+		outFmt := fmt.Sprintf("%%-%dv%%-%dv\n", maxID+1, maxLevel+1)
+		fmt.Fprintf(os.Stdout, outFmt, "ID", "Level")
+		for _, t := range allTopics {
+			fmt.Fprintf(os.Stdout, outFmt, t.ID, t.Level)
+		}
 	default:
-		return fmt.Errorf("cannot list '%s' did you mean 'tasks', 'recordings', 'replays' or 'service-tests'?", kind)
+		return fmt.Errorf("cannot list '%s' did you mean 'tasks', 'recordings', 'replays', 'topics', 'handlers' or 'service-tests'?", kind)
 	}
 	return nil
 
@@ -1563,11 +1745,12 @@ func doList(args []string) error {
 
 // Delete
 func deleteUsage() {
-	var u = `Usage: kapacitor delete (tasks|templates|recordings|replays) [task|templates|recording|replay ID]...
+	var u = `Usage: kapacitor delete (tasks|templates|recordings|replays|topics|handlers) [ID or pattern]...
 
-	Delete a tasks, templates, recordings or replays.
+	Delete a tasks, templates, recordings, replays, topics or handlers.
 
 	If a task is enabled it will be disabled and then deleted.
+
 
 For example:
 
@@ -1680,6 +1863,36 @@ func doDelete(args []string) error {
 				}
 				if len(replays) != limit {
 					break
+				}
+			}
+		}
+	case "topics":
+		for _, pattern := range args[1:] {
+			topics, err := cli.ListTopics(&client.ListTopicsOptions{
+				Pattern: pattern,
+			})
+			if err != nil {
+				return err
+			}
+			for _, t := range topics.Topics {
+				err := cli.DeleteTopic(t.Link)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	case "handlers":
+		for _, pattern := range args[1:] {
+			handlers, err := cli.ListHandlers(&client.ListHandlersOptions{
+				Pattern: pattern,
+			})
+			if err != nil {
+				return err
+			}
+			for _, h := range handlers.Handlers {
+				err := cli.DeleteHandler(h.Link)
+				if err != nil {
+					return err
 				}
 			}
 		}

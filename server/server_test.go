@@ -1,12 +1,13 @@
 package server_test
 
 import (
-	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
+	"net/mail"
 	"net/url"
 	"os"
 	"os/exec"
@@ -24,13 +25,28 @@ import (
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/toml"
+	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/client/v1"
+	"github.com/influxdata/kapacitor/command"
+	"github.com/influxdata/kapacitor/command/commandtest"
 	"github.com/influxdata/kapacitor/server"
+	alertservice "github.com/influxdata/kapacitor/services/alert"
+	"github.com/influxdata/kapacitor/services/alert/alerttest"
+	"github.com/influxdata/kapacitor/services/alerta/alertatest"
+	"github.com/influxdata/kapacitor/services/hipchat/hipchattest"
 	"github.com/influxdata/kapacitor/services/opsgenie"
+	"github.com/influxdata/kapacitor/services/opsgenie/opsgenietest"
 	"github.com/influxdata/kapacitor/services/pagerduty"
+	"github.com/influxdata/kapacitor/services/pagerduty/pagerdutytest"
+	"github.com/influxdata/kapacitor/services/sensu/sensutest"
+	"github.com/influxdata/kapacitor/services/slack/slacktest"
+	"github.com/influxdata/kapacitor/services/smtp/smtptest"
+	"github.com/influxdata/kapacitor/services/talk/talktest"
 	"github.com/influxdata/kapacitor/services/telegram"
+	"github.com/influxdata/kapacitor/services/telegram/telegramtest"
 	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/victorops"
+	"github.com/influxdata/kapacitor/services/victorops/victoropstest"
 	"github.com/pkg/errors"
 )
 
@@ -2937,7 +2953,7 @@ test value=1 0000000012
 
 	recordings, err := cli.ListRecordings(nil)
 	if exp, got := 1, len(recordings); exp != got {
-		t.Fatalf("unexpected recordings list:\ngot %v\nexp %v", got, exp)
+		t.Fatalf("unexpected recordings list:\ngot %v\nexp %v\nrecordings %v", got, exp, recordings)
 	}
 
 	err = cli.DeleteRecording(recordings[0].Link)
@@ -2947,12 +2963,12 @@ test value=1 0000000012
 
 	recordings, err = cli.ListRecordings(nil)
 	if exp, got := 0, len(recordings); exp != got {
-		t.Errorf("unexpected recordings list:\ngot %v\nexp %v", got, exp)
+		t.Errorf("unexpected recordings list after delete:\ngot %v\nexp %v\nrecordings %v", got, exp, recordings)
 	}
 
 	replays, err := cli.ListReplays(nil)
 	if exp, got := 1, len(replays); exp != got {
-		t.Fatalf("unexpected replays list:\ngot %v\nexp %v", got, exp)
+		t.Fatalf("unexpected replays list:\ngot %v\nexp %v\nreplays %v", got, exp, replays)
 	}
 
 	err = cli.DeleteReplay(replays[0].Link)
@@ -2962,7 +2978,7 @@ test value=1 0000000012
 
 	replays, err = cli.ListReplays(nil)
 	if exp, got := 0, len(replays); exp != got {
-		t.Errorf("unexpected replays list:\ngot %v\nexp %v", got, exp)
+		t.Errorf("unexpected replays list after delete:\ngot %v\nexp %v\nreplays %v", got, exp, replays)
 	}
 }
 
@@ -3083,7 +3099,7 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 		}
 		retry++
 		if retry > 10 {
-			t.Fatal("failed to perfom replay")
+			t.Fatal("failed to perform replay")
 		}
 	}
 
@@ -3149,11 +3165,11 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 			},
 		},
 	}
-	scanner := bufio.NewScanner(f)
+	dec := json.NewDecoder(f)
 	got := make([]response, 0)
-	g := response{}
-	for scanner.Scan() {
-		json.Unmarshal(scanner.Bytes(), &g)
+	for dec.More() {
+		g := response{}
+		dec.Decode(&g)
 		got = append(got, g)
 	}
 	if !reflect.DeepEqual(exp, got) {
@@ -3350,11 +3366,11 @@ func TestServer_ReplayBatch(t *testing.T) {
 			},
 		},
 	}
-	scanner := bufio.NewScanner(f)
+	dec := json.NewDecoder(f)
 	got := make([]response, 0)
-	g := response{}
-	for scanner.Scan() {
-		json.Unmarshal(scanner.Bytes(), &g)
+	for dec.More() {
+		g := response{}
+		dec.Decode(&g)
 		got = append(got, g)
 	}
 	if !reflect.DeepEqual(exp, got) {
@@ -3594,11 +3610,11 @@ func TestServer_RecordReplayQuery(t *testing.T) {
 			},
 		},
 	}
-	scanner := bufio.NewScanner(f)
+	dec := json.NewDecoder(f)
 	got := make([]response, 0)
-	g := response{}
-	for scanner.Scan() {
-		json.Unmarshal(scanner.Bytes(), &g)
+	for dec.More() {
+		g := response{}
+		dec.Decode(&g)
 		got = append(got, g)
 	}
 	if !reflect.DeepEqual(exp, got) {
@@ -3628,7 +3644,7 @@ func TestServer_RecordReplayQuery(t *testing.T) {
 	type recResponse struct {
 		Recordings []client.Recording `json:"recordings"`
 	}
-	dec := json.NewDecoder(resp.Body)
+	dec = json.NewDecoder(resp.Body)
 	recR := recResponse{}
 	dec.Decode(&recR)
 	if exp, got := 1, len(recR.Recordings); exp != got {
@@ -3866,11 +3882,11 @@ func TestServer_ReplayQuery(t *testing.T) {
 			},
 		},
 	}
-	scanner := bufio.NewScanner(f)
+	dec := json.NewDecoder(f)
 	got := make([]response, 0)
-	g := response{}
-	for scanner.Scan() {
-		json.Unmarshal(scanner.Bytes(), &g)
+	for dec.More() {
+		g := response{}
+		dec.Decode(&g)
 		got = append(got, g)
 	}
 	if !reflect.DeepEqual(exp, got) {
@@ -6596,6 +6612,1388 @@ func TestServer_DoServiceTest(t *testing.T) {
 		if !reflect.DeepEqual(tr, tc.exp) {
 			t.Log("Options", tc.options)
 			t.Errorf("unexpected service test result for %s:\ngot\n%#v\nexp\n%#v\n", tc.service, tr, tc.exp)
+		}
+	}
+}
+
+func TestServer_AlertHandlers_CRUD(t *testing.T) {
+	testCases := []struct {
+		create    client.HandlerOptions
+		expCreate client.Handler
+		patch     client.JSONPatch
+		expPatch  client.Handler
+		put       client.HandlerOptions
+		expPut    client.Handler
+	}{
+		{
+			create: client.HandlerOptions{
+				ID:     "myhandler",
+				Topics: []string{"system", "test"},
+				Actions: []client.HandlerAction{{
+					Kind: "slack",
+					Options: map[string]interface{}{
+						"channel": "#test",
+					},
+				}},
+			},
+			expCreate: client.Handler{
+				Link:   client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/handlers/myhandler"},
+				ID:     "myhandler",
+				Topics: []string{"system", "test"},
+				Actions: []client.HandlerAction{{
+					Kind: "slack",
+					Options: map[string]interface{}{
+						"channel": "#test",
+					},
+				}},
+			},
+			patch: client.JSONPatch{
+				{
+					Path:      "/topics/0",
+					Operation: "remove",
+				},
+				{
+					Path:      "/actions/0/options/channel",
+					Operation: "replace",
+					Value:     "#kapacitor_test",
+				},
+			},
+			expPatch: client.Handler{
+				Link:   client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/handlers/myhandler"},
+				ID:     "myhandler",
+				Topics: []string{"test"},
+				Actions: []client.HandlerAction{{
+					Kind: "slack",
+					Options: map[string]interface{}{
+						"channel": "#kapacitor_test",
+					},
+				}},
+			},
+			put: client.HandlerOptions{
+				ID:     "newid",
+				Topics: []string{"test"},
+				Actions: []client.HandlerAction{{
+					Kind: "smtp",
+					Options: map[string]interface{}{
+						"to": []string{"oncall@example.com"},
+					},
+				}},
+			},
+			expPut: client.Handler{
+				Link:   client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/handlers/newid"},
+				ID:     "newid",
+				Topics: []string{"test"},
+				Actions: []client.HandlerAction{{
+					Kind: "smtp",
+					Options: map[string]interface{}{
+						"to": []interface{}{"oncall@example.com"},
+					},
+				}},
+			},
+		},
+		{
+			create: client.HandlerOptions{
+				ID:     "anotherhandler",
+				Topics: []string{"test"},
+				Actions: []client.HandlerAction{
+					{
+						Kind: "slack",
+						Options: map[string]interface{}{
+							"channel": "#test",
+						},
+					},
+					{
+						Kind: "log",
+						Options: map[string]interface{}{
+							"path": "/tmp/alert.log",
+						},
+					},
+				},
+			},
+			expCreate: client.Handler{
+				Link:   client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/handlers/anotherhandler"},
+				ID:     "anotherhandler",
+				Topics: []string{"test"},
+				Actions: []client.HandlerAction{
+					{
+						Kind: "slack",
+						Options: map[string]interface{}{
+							"channel": "#test",
+						},
+					},
+					{
+						Kind: "log",
+						Options: map[string]interface{}{
+							"path": "/tmp/alert.log",
+						},
+					},
+				},
+			},
+			patch: client.JSONPatch{
+				{
+					Path:      "/topics/-",
+					Operation: "add",
+					Value:     "system",
+				},
+				{
+					Path:      "/actions/0/options/channel",
+					Operation: "replace",
+					Value:     "#kapacitor_test",
+				},
+				{
+					Path:      "/actions/-",
+					Operation: "add",
+					Value: map[string]interface{}{
+						"kind": "smtp",
+						"options": map[string]interface{}{
+							"to": []string{"oncall@example.com"},
+						},
+					},
+				},
+			},
+			expPatch: client.Handler{
+				Link:   client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/handlers/anotherhandler"},
+				ID:     "anotherhandler",
+				Topics: []string{"test", "system"},
+				Actions: []client.HandlerAction{
+					{
+						Kind: "slack",
+						Options: map[string]interface{}{
+							"channel": "#kapacitor_test",
+						},
+					},
+					{
+						Kind: "log",
+						Options: map[string]interface{}{
+							"path": "/tmp/alert.log",
+						},
+					},
+					{
+						Kind: "smtp",
+						Options: map[string]interface{}{
+							"to": []interface{}{"oncall@example.com"},
+						},
+					},
+				},
+			},
+			put: client.HandlerOptions{
+				ID:     "anotherhandler",
+				Topics: []string{"test"},
+				Actions: []client.HandlerAction{{
+					Kind: "smtp",
+					Options: map[string]interface{}{
+						"to": []string{"oncall@example.com"},
+					},
+				}},
+			},
+			expPut: client.Handler{
+				Link:   client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/handlers/anotherhandler"},
+				ID:     "anotherhandler",
+				Topics: []string{"test"},
+				Actions: []client.HandlerAction{{
+					Kind: "smtp",
+					Options: map[string]interface{}{
+						"to": []interface{}{"oncall@example.com"},
+					},
+				}},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		// Create default config
+		c := NewConfig()
+		s := OpenServer(c)
+		cli := Client(s)
+		defer s.Close()
+
+		h, err := cli.CreateHandler(tc.create)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !reflect.DeepEqual(h, tc.expCreate) {
+			t.Errorf("unexpected handler created:\ngot\n%#v\nexp\n%#v\n", h, tc.expCreate)
+		}
+
+		h, err = cli.PatchHandler(h.Link, tc.patch)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !reflect.DeepEqual(h, tc.expPatch) {
+			t.Errorf("unexpected handler patched:\ngot\n%#v\nexp\n%#v\n", h, tc.expPatch)
+		}
+
+		h, err = cli.ReplaceHandler(h.Link, tc.put)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !reflect.DeepEqual(h, tc.expPut) {
+			t.Errorf("unexpected handler put:\ngot\n%#v\nexp\n%#v\n", h, tc.expPut)
+		}
+
+		// Restart server
+		s.Restart()
+
+		rh, err := cli.Handler(h.Link)
+		if err != nil {
+			t.Fatalf("could not find handler after restart: %v", err)
+		}
+		if got, exp := rh, h; !reflect.DeepEqual(got, exp) {
+			t.Errorf("unexpected handler after restart:\ngot\n%#v\nexp\n%#v\n", got, exp)
+		}
+
+		err = cli.DeleteHandler(h.Link)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = cli.Handler(h.Link)
+		if err == nil {
+			t.Errorf("expected handler to be deleted")
+		}
+	}
+}
+
+func TestServer_AlertHandlers(t *testing.T) {
+
+	resultJSON := `{"Series":[{"name":"alert","columns":["time","value"],"values":[["1970-01-01T00:00:00Z",1]]}],"Messages":null,"Err":null}`
+
+	alertData := alertservice.AlertData{
+		ID:      "id",
+		Message: "message",
+		Details: "details",
+		Time:    time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
+		Level:   alert.Critical,
+		Data: influxql.Result{
+			Series: models.Rows{
+				{
+					Name:    "alert",
+					Columns: []string{"time", "value"},
+					Values: [][]interface{}{[]interface{}{
+						time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339Nano),
+						1.0,
+					}},
+				},
+			},
+		},
+	}
+	adJSON, err := json.Marshal(alertData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testCases := []struct {
+		handlerAction client.HandlerAction
+		setup         func(*server.Config, *client.HandlerAction) (context.Context, error)
+		result        func(context.Context) error
+	}{
+		{
+			handlerAction: client.HandlerAction{
+				Kind: "alerta",
+				Options: map[string]interface{}{
+					"token":       "testtoken1234567",
+					"origin":      "kapacitor",
+					"group":       "test",
+					"environment": "env",
+				},
+			},
+			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+				ts := alertatest.NewServer()
+				ctxt := context.WithValue(nil, "server", ts)
+
+				c.Alerta.Enabled = true
+				c.Alerta.URL = ts.URL
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*alertatest.Server)
+				ts.Close()
+				got := ts.Requests()
+				exp := []alertatest.Request{{
+					URL:           "/alert",
+					Authorization: "Key testtoken1234567",
+					PostData: alertatest.PostData{
+						Resource:    "alert",
+						Event:       "id",
+						Group:       "test",
+						Environment: "env",
+						Text:        "message",
+						Origin:      "kapacitor",
+						Service:     []string{"alert"},
+					},
+				}}
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected alerta request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handlerAction: client.HandlerAction{
+				Kind: "exec",
+				Options: map[string]interface{}{
+					"prog": "/bin/alert-handler.sh",
+					"args": []string{"arg1", "arg2", "arg3"},
+				},
+			},
+			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+				te := alerttest.NewExec()
+				ctxt := context.WithValue(nil, "exec", te)
+				c.Commander = te.Commander
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				te := ctxt.Value("exec").(*alerttest.Exec)
+				expData := []*commandtest.Command{{
+					Spec: command.Spec{
+						Prog: "/bin/alert-handler.sh",
+						Args: []string{"arg1", "arg2", "arg3"},
+					},
+					Started:   true,
+					Waited:    true,
+					Killed:    false,
+					StdinData: append(adJSON, '\n'),
+				}}
+				cmds := te.Commands()
+				if got, exp := len(cmds), len(expData); got != exp {
+					return fmt.Errorf("unexpected commands length: got %d exp %d", got, exp)
+				}
+				for i := range expData {
+					if err := expData[i].Compare(cmds[i]); err != nil {
+						return fmt.Errorf("unexpected command %d: %v", i, err)
+					}
+				}
+				return nil
+			},
+		},
+		{
+			handlerAction: client.HandlerAction{
+				Kind: "hipchat",
+				Options: map[string]interface{}{
+					"token": "testtoken1234567",
+					"room":  "1234567",
+				},
+			},
+			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+				ts := hipchattest.NewServer()
+				ctxt := context.WithValue(nil, "server", ts)
+
+				c.HipChat.Enabled = true
+				c.HipChat.URL = ts.URL
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*hipchattest.Server)
+				ts.Close()
+				got := ts.Requests()
+				exp := []hipchattest.Request{{
+					URL: "/1234567/notification?auth_token=testtoken1234567",
+					PostData: hipchattest.PostData{
+						From:    "kapacitor",
+						Message: "message",
+						Color:   "red",
+						Notify:  true,
+					},
+				}}
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected hipchat request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handlerAction: client.HandlerAction{
+				Kind: "log",
+				Options: map[string]interface{}{
+					"mode": 0604,
+				},
+			},
+			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+				tdir := MustTempDir()
+				p := path.Join(tdir, "alert.log")
+
+				ha.Options["path"] = p
+
+				l := alerttest.NewLog(p)
+
+				ctxt := context.WithValue(nil, "tdir", tdir)
+				ctxt = context.WithValue(ctxt, "log", l)
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				tdir := ctxt.Value("tdir").(string)
+				defer os.RemoveAll(tdir)
+				l := ctxt.Value("log").(*alerttest.Log)
+				expData := []alertservice.AlertData{alertData}
+				expMode := os.FileMode(0604)
+
+				m, err := l.Mode()
+				if err != nil {
+					return err
+				}
+				if got, exp := m, expMode; exp != got {
+					return fmt.Errorf("unexpected file mode: got %v exp %v", got, exp)
+				}
+				data, err := l.Data()
+				if err != nil {
+					return err
+				}
+				if got, exp := data, expData; !reflect.DeepEqual(got, exp) {
+					return fmt.Errorf("unexpected alert data written to log:\ngot\n%+v\nexp\n%+v\n", got, exp)
+				}
+				return nil
+			},
+		},
+		{
+			handlerAction: client.HandlerAction{
+				Kind: "opsgenie",
+				Options: map[string]interface{}{
+					"teams-list":      []string{"A team", "B team"},
+					"recipients-list": []string{"test_recipient1", "test_recipient2"},
+				},
+			},
+			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+				ts := opsgenietest.NewServer()
+				ctxt := context.WithValue(nil, "server", ts)
+
+				c.OpsGenie.Enabled = true
+				c.OpsGenie.URL = ts.URL
+				c.OpsGenie.APIKey = "api_key"
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*opsgenietest.Server)
+				ts.Close()
+				got := ts.Requests()
+				exp := []opsgenietest.Request{{
+					URL: "/",
+					PostData: opsgenietest.PostData{
+						ApiKey:  "api_key",
+						Message: "message",
+						Entity:  "id",
+						Alias:   "id",
+						Note:    "",
+						Details: map[string]interface{}{
+							"Level":           "CRITICAL",
+							"Monitoring Tool": "Kapacitor",
+						},
+						Description: resultJSON,
+						Teams:       []string{"A team", "B team"},
+						Recipients:  []string{"test_recipient1", "test_recipient2"},
+					},
+				}}
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected opsgenie request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handlerAction: client.HandlerAction{
+				Kind: "pagerduty",
+				Options: map[string]interface{}{
+					"service-key": "service_key",
+				},
+			},
+			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+				ts := pagerdutytest.NewServer()
+				ctxt := context.WithValue(nil, "server", ts)
+
+				c.PagerDuty.Enabled = true
+				c.PagerDuty.URL = ts.URL
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*pagerdutytest.Server)
+				kapacitorURL := ctxt.Value("kapacitorURL").(string)
+				ts.Close()
+				got := ts.Requests()
+				exp := []pagerdutytest.Request{{
+					URL: "/",
+					PostData: pagerdutytest.PostData{
+						ServiceKey:  "service_key",
+						EventType:   "trigger",
+						Description: "message",
+						Client:      "kapacitor",
+						ClientURL:   kapacitorURL,
+						Details:     resultJSON,
+					},
+				}}
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected pagerduty request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handlerAction: client.HandlerAction{
+				Kind: "post",
+			},
+			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+				ts := alerttest.NewPostServer()
+
+				ha.Options = map[string]interface{}{"url": ts.URL}
+
+				ctxt := context.WithValue(nil, "server", ts)
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*alerttest.PostServer)
+				ts.Close()
+				exp := []alertservice.AlertData{alertData}
+				got := ts.Data()
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected post request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handlerAction: client.HandlerAction{
+				Kind: "sensu",
+			},
+			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+				ts, err := sensutest.NewServer()
+				if err != nil {
+					return nil, err
+				}
+				ctxt := context.WithValue(nil, "server", ts)
+
+				c.Sensu.Enabled = true
+				c.Sensu.Addr = ts.Addr
+				c.Sensu.Source = "Kapacitor"
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*sensutest.Server)
+				ts.Close()
+				exp := []sensutest.Request{{
+					Source: "Kapacitor",
+					Output: "message",
+					Name:   "id",
+					Status: 2,
+				}}
+				got := ts.Requests()
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected sensu request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handlerAction: client.HandlerAction{
+				Kind: "slack",
+				Options: map[string]interface{}{
+					"channel": "#test",
+				},
+			},
+			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+				ts := slacktest.NewServer()
+				ctxt := context.WithValue(nil, "server", ts)
+
+				c.Slack.Enabled = true
+				c.Slack.URL = ts.URL + "/test/slack/url"
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*slacktest.Server)
+				ts.Close()
+				got := ts.Requests()
+				exp := []slacktest.Request{{
+					URL: "/test/slack/url",
+					PostData: slacktest.PostData{
+						Channel:  "#test",
+						Username: "kapacitor",
+						Text:     "",
+						Attachments: []slacktest.Attachment{
+							{
+								Fallback:  "message",
+								Color:     "danger",
+								Text:      "message",
+								Mrkdwn_in: []string{"text"},
+							},
+						},
+					},
+				}}
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected slack request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handlerAction: client.HandlerAction{
+				Kind: "smtp",
+				Options: map[string]interface{}{
+					"to": []string{"oncall@example.com", "backup@example.com"},
+				},
+			},
+			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+				ts, err := smtptest.NewServer()
+				if err != nil {
+					return nil, err
+				}
+				ctxt := context.WithValue(nil, "server", ts)
+
+				c.SMTP.Enabled = true
+				c.SMTP.Host = ts.Host
+				c.SMTP.Port = ts.Port
+				c.SMTP.From = "test@example.com"
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*smtptest.Server)
+				ts.Close()
+
+				errors := ts.Errors()
+				if len(errors) != 0 {
+					return fmt.Errorf("multiple errors %d: %v", len(errors), errors)
+				}
+
+				expMail := []*smtptest.Message{{
+					Header: mail.Header{
+						"Mime-Version":              []string{"1.0"},
+						"Content-Type":              []string{"text/html; charset=UTF-8"},
+						"Content-Transfer-Encoding": []string{"quoted-printable"},
+						"To":      []string{"oncall@example.com, backup@example.com"},
+						"From":    []string{"test@example.com"},
+						"Subject": []string{"message"},
+					},
+					Body: "details\n",
+				}}
+				msgs := ts.SentMessages()
+				if got, exp := len(msgs), len(expMail); got != exp {
+					return fmt.Errorf("unexpected number of messages sent: got %d exp %d", got, exp)
+				}
+				for i, exp := range expMail {
+					got := msgs[i]
+					if err := exp.Compare(got); err != nil {
+						return fmt.Errorf("unexpected message %d: %v", i, err)
+					}
+				}
+				return nil
+			},
+		},
+		{
+			handlerAction: client.HandlerAction{
+				Kind: "talk",
+			},
+			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+				ts := talktest.NewServer()
+				ctxt := context.WithValue(nil, "server", ts)
+
+				c.Talk.Enabled = true
+				c.Talk.URL = ts.URL
+				c.Talk.AuthorName = "Kapacitor"
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*talktest.Server)
+				ts.Close()
+				got := ts.Requests()
+				exp := []talktest.Request{{
+					URL: "/",
+					PostData: talktest.PostData{
+						AuthorName: "Kapacitor",
+						Text:       "message",
+						Title:      "id",
+					},
+				}}
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected talk request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handlerAction: client.HandlerAction{
+				Kind: "tcp",
+			},
+			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+				ts, err := alerttest.NewTCPServer()
+				if err != nil {
+					return nil, err
+				}
+
+				ha.Options = map[string]interface{}{"address": ts.Addr}
+
+				ctxt := context.WithValue(nil, "server", ts)
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*alerttest.TCPServer)
+				ts.Close()
+				exp := []alertservice.AlertData{alertData}
+				got := ts.Data()
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected tcp request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handlerAction: client.HandlerAction{
+				Kind: "telegram",
+				Options: map[string]interface{}{
+					"chat-id":                  "chat id",
+					"disable-web-page-preview": true,
+				},
+			},
+			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+				ts := telegramtest.NewServer()
+				ctxt := context.WithValue(nil, "server", ts)
+
+				c.Telegram.Enabled = true
+				c.Telegram.URL = ts.URL + "/bot"
+				c.Telegram.Token = "TOKEN:AUTH"
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*telegramtest.Server)
+				ts.Close()
+				got := ts.Requests()
+				exp := []telegramtest.Request{{
+					URL: "/botTOKEN:AUTH/sendMessage",
+					PostData: telegramtest.PostData{
+						ChatId:                "chat id",
+						Text:                  "message",
+						ParseMode:             "",
+						DisableWebPagePreview: true,
+						DisableNotification:   false,
+					},
+				}}
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected telegram request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handlerAction: client.HandlerAction{
+				Kind: "victorops",
+				Options: map[string]interface{}{
+					"routing-key": "key",
+				},
+			},
+			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+				ts := victoropstest.NewServer()
+				ctxt := context.WithValue(nil, "server", ts)
+
+				c.VictorOps.Enabled = true
+				c.VictorOps.URL = ts.URL
+				c.VictorOps.APIKey = "api_key"
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*victoropstest.Server)
+				ts.Close()
+				got := ts.Requests()
+				exp := []victoropstest.Request{{
+					URL: "/api_key/key",
+					PostData: victoropstest.PostData{
+						MessageType:    "CRITICAL",
+						EntityID:       "id",
+						StateMessage:   "message",
+						Timestamp:      0,
+						MonitoringTool: "kapacitor",
+						Data:           resultJSON,
+					},
+				}}
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected victorops request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.handlerAction.Kind, func(t *testing.T) {
+			kind := tc.handlerAction.Kind
+			// Create default config
+			c := NewConfig()
+			var ctxt context.Context
+			if tc.setup != nil {
+				var err error
+				ctxt, err = tc.setup(c, &tc.handlerAction)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			s := OpenServer(c)
+			cli := Client(s)
+			closed := false
+			defer func() {
+				if !closed {
+					s.Close()
+				}
+			}()
+			ctxt = context.WithValue(ctxt, "kapacitorURL", s.URL())
+
+			if _, err := cli.CreateHandler(client.HandlerOptions{
+				ID:     "testAlertHandlers",
+				Topics: []string{"test"},
+				Actions: []client.HandlerAction{
+					tc.handlerAction,
+				},
+			}); err != nil {
+				t.Fatalf("%s: %v", kind, err)
+			}
+
+			tick := `
+stream
+	|from()
+		.measurement('alert')
+	|alert()
+		.topic('test')
+		.id('id')
+		.message('message')
+		.details('details')
+		.crit(lambda: TRUE)
+`
+
+			if _, err := cli.CreateTask(client.CreateTaskOptions{
+				ID:   "testAlertHandlers",
+				Type: client.StreamTask,
+				DBRPs: []client.DBRP{{
+					Database:        "mydb",
+					RetentionPolicy: "myrp",
+				}},
+				TICKscript: tick,
+				Status:     client.Enabled,
+			}); err != nil {
+				t.Fatalf("%s: %v", kind, err)
+			}
+
+			point := "alert value=1 0000000000"
+			v := url.Values{}
+			v.Add("precision", "s")
+			s.MustWrite("mydb", "myrp", point, v)
+
+			// Close the entire server to ensure all data is processed
+			s.Close()
+			closed = true
+
+			if err := tc.result(ctxt); err != nil {
+				t.Errorf("%s: %v", kind, err)
+			}
+		})
+	}
+}
+
+func TestServer_AlertTopic_PersistedState(t *testing.T) {
+	// Setup test TCP server
+	ts, err := alerttest.NewTCPServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ts.Close()
+
+	// Create default config
+	c := NewConfig()
+	s := OpenServer(c)
+	cli := Client(s)
+	defer s.Close()
+
+	if _, err := cli.CreateHandler(client.HandlerOptions{
+		ID:     "testAlertHandler",
+		Topics: []string{"test"},
+		Actions: []client.HandlerAction{{
+			Kind:    "tcp",
+			Options: map[string]interface{}{"address": ts.Addr},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	tick := `
+stream
+	|from()
+		.measurement('alert')
+	|alert()
+		.topic('test')
+		.id('id')
+		.message('message')
+		.details('details')
+		.warn(lambda: TRUE)
+`
+
+	if _, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:   "testAlertHandlers",
+		Type: client.StreamTask,
+		DBRPs: []client.DBRP{{
+			Database:        "mydb",
+			RetentionPolicy: "myrp",
+		}},
+		TICKscript: tick,
+		Status:     client.Enabled,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	point := "alert value=1 0000000000"
+	v := url.Values{}
+	v.Add("precision", "s")
+	s.MustWrite("mydb", "myrp", point, v)
+
+	// Restart the server
+	s.Restart()
+
+	l := cli.TopicEventsLink("test")
+	expTopicEvents := client.TopicEvents{
+		Link:  l,
+		Topic: "test",
+		Events: []client.TopicEvent{{
+			Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/test/events/id"},
+			ID:   "id",
+			State: client.EventState{
+				Message:  "message",
+				Details:  "details",
+				Time:     time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
+				Duration: 0,
+				Level:    "WARNING",
+			},
+		}},
+	}
+
+	te, err := cli.ListTopicEvents(l, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(te, expTopicEvents) {
+		t.Errorf("unexpected topic events:\ngot\n%+v\nexp\n%+v\n", te, expTopicEvents)
+	}
+	event, err := cli.TopicEvent(expTopicEvents.Events[0].Link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(event, expTopicEvents.Events[0]) {
+		t.Errorf("unexpected topic event:\ngot\n%+v\nexp\n%+v\n", event, expTopicEvents.Events[0])
+	}
+
+	te, err = cli.ListTopicEvents(l, &client.ListTopicEventsOptions{
+		MinLevel: "CRITICAL",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expTopicEvents.Events = expTopicEvents.Events[0:0]
+	if !reflect.DeepEqual(te, expTopicEvents) {
+		t.Errorf("unexpected topic events with minLevel:\ngot\n%+v\nexp\n%+v\n", te, expTopicEvents)
+	}
+
+	l = cli.TopicLink("test")
+	if err := cli.DeleteTopic(l); err != nil {
+		t.Fatal(err)
+	}
+	te, err = cli.ListTopicEvents(l, nil)
+	if err == nil {
+		t.Fatal("expected error for deleted topic")
+	}
+}
+
+func TestServer_AlertListHandlers(t *testing.T) {
+	// Setup test TCP server
+	ts, err := alerttest.NewTCPServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ts.Close()
+
+	// Create default config
+	c := NewConfig()
+	s := OpenServer(c)
+	cli := Client(s)
+	defer s.Close()
+
+	topics := []string{"test"}
+	actions := []client.HandlerAction{{
+		Kind:    "tcp",
+		Options: map[string]interface{}{"address": ts.Addr},
+	}}
+
+	// Number of handlers to create
+	n := 3
+	for i := 0; i < n; i++ {
+		id := fmt.Sprintf("handler%d", i)
+		if _, err := cli.CreateHandler(client.HandlerOptions{
+			ID:      id,
+			Topics:  topics,
+			Actions: actions,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	expHandlers := client.Handlers{
+		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/handlers?pattern="},
+		Handlers: []client.Handler{
+			{
+				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/handlers/handler0"},
+				ID:      "handler0",
+				Topics:  topics,
+				Actions: actions,
+			},
+			{
+				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/handlers/handler1"},
+				ID:      "handler1",
+				Topics:  topics,
+				Actions: actions,
+			},
+			{
+				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/handlers/handler2"},
+				ID:      "handler2",
+				Topics:  topics,
+				Actions: actions,
+			},
+		},
+	}
+
+	handlers, err := cli.ListHandlers(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(handlers, expHandlers) {
+		t.Errorf("unexpected handlers:\ngot\n%+v\nexp\n%+v\n", handlers, expHandlers)
+	}
+
+	// Restart the server
+	s.Restart()
+
+	// Check again
+	handlers, err = cli.ListHandlers(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(handlers, expHandlers) {
+		t.Errorf("unexpected handlers after restart:\ngot\n%+v\nexp\n%+v\n", handlers, expHandlers)
+	}
+
+	var exp client.Handlers
+
+	// Pattern = *
+	handlers, err = cli.ListHandlers(&client.ListHandlersOptions{
+		Pattern: "*",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp = expHandlers
+	exp.Link.Href = "/kapacitor/v1preview/alerts/handlers?pattern=%2A"
+	if !reflect.DeepEqual(handlers, exp) {
+		t.Errorf("unexpected handlers with pattern \"*\":\ngot\n%+v\nexp\n%+v\n", handlers, exp)
+	}
+
+	// Pattern = handler*
+	handlers, err = cli.ListHandlers(&client.ListHandlersOptions{
+		Pattern: "handler*",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp = expHandlers
+	exp.Link.Href = "/kapacitor/v1preview/alerts/handlers?pattern=handler%2A"
+	if !reflect.DeepEqual(handlers, exp) {
+		t.Errorf("unexpected handlers with pattern \"test\":\ngot\n%+v\nexp\n%+v\n", handlers, exp)
+	}
+
+	// Pattern = handler0
+	handlers, err = cli.ListHandlers(&client.ListHandlersOptions{
+		Pattern: "handler0",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp = expHandlers
+	exp.Link.Href = "/kapacitor/v1preview/alerts/handlers?pattern=handler0"
+	exp.Handlers = expHandlers.Handlers[0:1]
+	if !reflect.DeepEqual(handlers, exp) {
+		t.Errorf("unexpected handlers with pattern \"test\":\ngot\n%+v\nexp\n%+v\n", handlers, exp)
+	}
+
+	// List handlers of test topic
+	l := cli.TopicHandlersLink("test")
+	topicHandlers, err := cli.ListTopicHandlers(l)
+	expTopicHandlers := client.TopicHandlers{
+		Link:     client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/test/handlers"},
+		Topic:    "test",
+		Handlers: expHandlers.Handlers,
+	}
+	if !reflect.DeepEqual(topicHandlers, expTopicHandlers) {
+		t.Errorf("unexpected topic handlers:\ngot\n%+v\nexp\n%+v\n", topicHandlers, expTopicHandlers)
+	}
+}
+
+func TestServer_AlertListTopics(t *testing.T) {
+	// Setup test TCP server
+	ts, err := alerttest.NewTCPServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ts.Close()
+
+	// Create default config
+	c := NewConfig()
+	s := OpenServer(c)
+	cli := Client(s)
+	defer s.Close()
+
+	if _, err := cli.CreateHandler(client.HandlerOptions{
+		ID:     "testAlertHandler",
+		Topics: []string{"test", "system", "misc"},
+		Actions: []client.HandlerAction{{
+			Kind:    "tcp",
+			Options: map[string]interface{}{"address": ts.Addr},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	expTopics := client.Topics{
+		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics?min-level=OK&pattern="},
+		Topics: []client.Topic{
+			{
+				Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/misc"},
+				ID:           "misc",
+				Level:        "OK",
+				EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1preview/alerts/topics/misc/events"},
+				HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1preview/alerts/topics/misc/handlers"},
+			},
+			{
+				Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/system"},
+				ID:           "system",
+				Level:        "OK",
+				EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1preview/alerts/topics/system/events"},
+				HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1preview/alerts/topics/system/handlers"},
+			},
+			{
+				Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/test"},
+				ID:           "test",
+				Level:        "OK",
+				EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1preview/alerts/topics/test/events"},
+				HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1preview/alerts/topics/test/handlers"},
+			},
+		},
+	}
+	topics, err := cli.ListTopics(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(topics, expTopics) {
+		t.Errorf("unexpected topics:\ngot\n%+v\nexp\n%+v\n", topics, expTopics)
+	}
+
+	tick := `
+stream
+	|from()
+		.measurement('alert')
+	|alert()
+		.topic('test')
+		.id('id')
+		.message('message')
+		.details('details')
+		.crit(lambda: TRUE)
+`
+
+	if _, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:   "testAlertHandlers",
+		Type: client.StreamTask,
+		DBRPs: []client.DBRP{{
+			Database:        "mydb",
+			RetentionPolicy: "myrp",
+		}},
+		TICKscript: tick,
+		Status:     client.Enabled,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	point := "alert value=1 0000000000"
+	v := url.Values{}
+	v.Add("precision", "s")
+	s.MustWrite("mydb", "myrp", point, v)
+
+	// Restart the server
+	s.Restart()
+
+	// Update expected topics since we triggered an event.
+	expTopics.Topics[2].Level = "CRITICAL"
+
+	// Check again
+	topics, err = cli.ListTopics(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(topics, expTopics) {
+		t.Errorf("unexpected topics after restart:\ngot\n%+v\nexp\n%+v\n", topics, expTopics)
+	}
+
+	var exp client.Topics
+
+	// Pattern = *
+	topics, err = cli.ListTopics(&client.ListTopicsOptions{
+		Pattern: "*",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp = expTopics
+	exp.Link.Href = "/kapacitor/v1preview/alerts/topics?min-level=OK&pattern=%2A"
+	if !reflect.DeepEqual(topics, exp) {
+		t.Errorf("unexpected topics with pattern \"*\":\ngot\n%+v\nexp\n%+v\n", topics, exp)
+	}
+
+	// Pattern = test
+	topics, err = cli.ListTopics(&client.ListTopicsOptions{
+		Pattern: "test",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp = expTopics
+	exp.Link.Href = "/kapacitor/v1preview/alerts/topics?min-level=OK&pattern=test"
+	exp.Topics = expTopics.Topics[2:]
+	if !reflect.DeepEqual(topics, exp) {
+		t.Errorf("unexpected topics with pattern \"test\":\ngot\n%+v\nexp\n%+v\n", topics, exp)
+	}
+
+	// MinLevel = INFO
+	topics, err = cli.ListTopics(&client.ListTopicsOptions{
+		MinLevel: "INFO",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp = expTopics
+	exp.Link.Href = "/kapacitor/v1preview/alerts/topics?min-level=INFO&pattern="
+	exp.Topics = expTopics.Topics[2:]
+	if !reflect.DeepEqual(topics, exp) {
+		t.Errorf("unexpected topics min level \"info\":\ngot\n%+v\nexp\n%+v\n", topics, exp)
+	}
+}
+
+func TestServer_AlertHandler_MultipleActions(t *testing.T) {
+	resultJSON := `{"Series":[{"name":"alert","columns":["time","value"],"values":[["1970-01-01T00:00:00Z",1]]}],"Messages":null,"Err":null}`
+
+	// Create default config
+	c := NewConfig()
+
+	// Configure slack
+	slack := slacktest.NewServer()
+	c.Slack.Enabled = true
+	c.Slack.URL = slack.URL + "/test/slack/url"
+
+	// Configure victorops
+	vo := victoropstest.NewServer()
+	c.VictorOps.Enabled = true
+	c.VictorOps.URL = vo.URL
+	c.VictorOps.APIKey = "api_key"
+
+	s := OpenServer(c)
+	cli := Client(s)
+	closed := false
+	defer func() {
+		if !closed {
+			s.Close()
+		}
+	}()
+
+	if _, err := cli.CreateHandler(client.HandlerOptions{
+		ID:     "testAlertHandlers",
+		Topics: []string{"test"},
+		Actions: []client.HandlerAction{
+			{
+				Kind: "victorops",
+				Options: map[string]interface{}{
+					"routing-key": "key",
+				},
+			},
+			{
+				Kind: "slack",
+				Options: map[string]interface{}{
+					"channel": "#test",
+				},
+			},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	tick := `
+stream
+	|from()
+		.measurement('alert')
+	|alert()
+		.topic('test')
+		.id('id')
+		.message('message')
+		.details('details')
+		.crit(lambda: TRUE)
+`
+
+	if _, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:   "testAlertHandlers",
+		Type: client.StreamTask,
+		DBRPs: []client.DBRP{{
+			Database:        "mydb",
+			RetentionPolicy: "myrp",
+		}},
+		TICKscript: tick,
+		Status:     client.Enabled,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	point := "alert value=1 0000000000"
+	v := url.Values{}
+	v.Add("precision", "s")
+	s.MustWrite("mydb", "myrp", point, v)
+
+	// Close the entire server to ensure all data is processed
+	s.Close()
+	closed = true
+
+	// Validate slack
+	{
+		slack.Close()
+		got := slack.Requests()
+		exp := []slacktest.Request{{
+			URL: "/test/slack/url",
+			PostData: slacktest.PostData{
+				Channel:  "#test",
+				Username: "kapacitor",
+				Text:     "",
+				Attachments: []slacktest.Attachment{
+					{
+						Fallback:  "message",
+						Color:     "danger",
+						Text:      "message",
+						Mrkdwn_in: []string{"text"},
+					},
+				},
+			},
+		}}
+		if !reflect.DeepEqual(exp, got) {
+			t.Errorf("unexpected slack request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+		}
+	}
+	// Validate victorops
+	{
+		vo.Close()
+		got := vo.Requests()
+		exp := []victoropstest.Request{{
+			URL: "/api_key/key",
+			PostData: victoropstest.PostData{
+				MessageType:    "CRITICAL",
+				EntityID:       "id",
+				StateMessage:   "message",
+				Timestamp:      0,
+				MonitoringTool: "kapacitor",
+				Data:           resultJSON,
+			},
+		}}
+		if !reflect.DeepEqual(exp, got) {
+			t.Errorf("unexpected victorops request:\nexp\n%+v\ngot\n%+v\n", exp, got)
 		}
 	}
 }

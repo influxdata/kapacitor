@@ -12,9 +12,23 @@ import (
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/influxdb"
+	alertservice "github.com/influxdata/kapacitor/services/alert"
+	"github.com/influxdata/kapacitor/services/httpd"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
 	"github.com/influxdata/kapacitor/udf"
 )
+
+func newHTTPDService() *httpd.Service {
+	// create API server
+	config := httpd.NewConfig()
+	config.BindAddress = ":0" // Choose port dynamically
+	httpService := httpd.NewService(config, "localhost", logService.NewLogger("[http] ", log.LstdFlags), logService)
+	err := httpService.Open()
+	if err != nil {
+		panic(err)
+	}
+	return httpService
+}
 
 type MockInfluxDBService struct {
 	ts *httptest.Server
@@ -103,7 +117,7 @@ func compareResultsIgnoreSeriesOrder(exp, got kapacitor.Result) (bool, string) {
 	return true, ""
 }
 
-func compareAlertData(exp, got kapacitor.AlertData) (bool, string) {
+func compareAlertData(exp, got alertservice.AlertData) (bool, string) {
 	// Pull out Result for comparison
 	expData := kapacitor.Result(exp.Data)
 	exp.Data = influxql.Result{}

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/udf"
 )
 
@@ -80,13 +81,14 @@ func (s *Service) Create(
 		for k, v := range conf.Env {
 			env = append(env, fmt.Sprintf("%s=%s", k, v))
 		}
-		commander := kapacitor.CommandInfo{
+		cmdSpec := command.Spec{
 			Prog: conf.Prog,
 			Args: conf.Args,
 			Env:  env,
 		}
 		return kapacitor.NewUDFProcess(
-			commander,
+			command.ExecCommander,
+			cmdSpec,
 			l,
 			time.Duration(conf.Timeout),
 			abortCallback,

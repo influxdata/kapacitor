@@ -1,7 +1,6 @@
 package httpd
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/influxdata/kapacitor/auth"
@@ -75,7 +74,13 @@ func Test_RequiredPrilegeForHTTPMethod(t *testing.T) {
 		},
 		{
 			m:   "PUT",
-			err: errors.New(`unknown method "PUT"`),
+			rp:  auth.WritePrivilege,
+			err: nil,
+		},
+		{
+			m:   "put",
+			rp:  auth.WritePrivilege,
+			err: nil,
 		},
 	}
 

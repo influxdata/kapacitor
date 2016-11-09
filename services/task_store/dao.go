@@ -137,6 +137,24 @@ type Task struct {
 	LastEnabled time.Time
 }
 
+type rawTask Task
+
+func (t Task) ObjectID() string {
+	return t.ID
+}
+
+func (t Task) MarshalBinary() ([]byte, error) {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	err := enc.Encode(rawTask(t))
+	return buf.Bytes(), err
+}
+
+func (t *Task) UnmarshalBinary(data []byte) error {
+	dec := gob.NewDecoder(bytes.NewReader(data))
+	return dec.Decode((*rawTask)(t))
+}
+
 type Template struct {
 	// Unique identifier for the task
 	ID string
@@ -161,161 +179,69 @@ type Snapshot struct {
 	NodeSnapshots map[string][]byte
 }
 
-const (
-	taskDataPrefix    = "/tasks/data/"
-	taskIndexesPrefix = "/tasks/indexes/"
-
-	// Name of ID index
-	idIndex = "id/"
-)
-
 // Key/Value store based implementation of the TaskDAO
 type taskKV struct {
-	store storage.Interface
+	store *storage.IndexedStore
 }
 
-func newTaskKV(store storage.Interface) *taskKV {
-	return &taskKV{
-		store: store,
-	}
-}
-
-func (d *taskKV) encodeTask(t Task) ([]byte, error) {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	err := enc.Encode(t)
-	return buf.Bytes(), err
-}
-
-func (d *taskKV) decodeTask(data []byte) (Task, error) {
-	var task Task
-	dec := gob.NewDecoder(bytes.NewReader(data))
-	err := dec.Decode(&task)
-	return task, err
-}
-
-// Create a key for the task data
-func (d *taskKV) taskDataKey(id string) string {
-	return taskDataPrefix + id
-}
-
-// Create a key for a given index and value.
-//
-// Indexes are maintained via a 'directory' like system:
-//
-// /tasks/data/ID -- contains encoded task data
-// /tasks/index/id/ID -- contains the task ID
-//
-// As such to list all tasks in ID sorted order use the /tasks/index/id/ directory.
-func (d *taskKV) taskIndexKey(index, value string) string {
-	return taskIndexesPrefix + index + value
-}
-
-func (d *taskKV) Get(id string) (Task, error) {
-	key := d.taskDataKey(id)
-	if exists, err := d.store.Exists(key); err != nil {
-		return Task{}, err
-	} else if !exists {
-		return Task{}, ErrNoTaskExists
-	}
-	kv, err := d.store.Get(key)
-	if err != nil {
-		return Task{}, err
-	}
-	return d.decodeTask(kv.Value)
-}
-
-func (d *taskKV) Create(t Task) error {
-	key := d.taskDataKey(t.ID)
-
-	exists, err := d.store.Exists(key)
-	if err != nil {
-		return err
-	}
-	if exists {
-		return ErrTaskExists
-	}
-
-	data, err := d.encodeTask(t)
-	if err != nil {
-		return err
-	}
-	// Put data
-	err = d.store.Put(key, data)
-	if err != nil {
-		return err
-	}
-	// Put ID index
-	indexKey := d.taskIndexKey(idIndex, t.ID)
-	return d.store.Put(indexKey, []byte(t.ID))
-}
-
-func (d *taskKV) Replace(t Task) error {
-	key := d.taskDataKey(t.ID)
-
-	exists, err := d.store.Exists(key)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		return ErrNoTaskExists
-	}
-
-	data, err := d.encodeTask(t)
-	if err != nil {
-		return err
-	}
-	// Put data
-	err = d.store.Put(key, data)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (d *taskKV) Delete(id string) error {
-	key := d.taskDataKey(id)
-	indexKey := d.taskIndexKey(idIndex, id)
-
-	dataErr := d.store.Delete(key)
-	indexErr := d.store.Delete(indexKey)
-	if dataErr != nil {
-		return dataErr
-	}
-	return indexErr
-}
-
-func (d *taskKV) List(pattern string, offset, limit int) ([]Task, error) {
-	// Tasks are indexed via their ID only.
-	// While tasks are sorted in the data section by their ID anyway
-	// this allows us to do offset/limits and filtering without having to read in all task data.
-
-	// List all task ids sorted by ID
-	ids, err := d.store.List(taskIndexesPrefix + idIndex)
+func newTaskKV(store storage.Interface) (*taskKV, error) {
+	c := storage.DefaultIndexedStoreConfig("tasks", func() storage.BinaryObject {
+		return new(Task)
+	})
+	istore, err := storage.NewIndexedStore(store, c)
 	if err != nil {
 		return nil, err
 	}
+	return &taskKV{
+		store: istore,
+	}, nil
+}
 
-	var match func([]byte) bool
-	if pattern != "" {
-		match = func(value []byte) bool {
-			id := string(value)
-			matched, _ := path.Match(pattern, id)
-			return matched
-		}
-	} else {
-		match = func([]byte) bool { return true }
+func (kv *taskKV) error(err error) error {
+	if err == storage.ErrObjectExists {
+		return ErrTaskExists
+	} else if err == storage.ErrNoObjectExists {
+		return ErrNoTaskExists
 	}
-	matches := storage.DoListFunc(ids, match, offset, limit)
+	return err
+}
 
-	tasks := make([]Task, len(matches))
-	for i, id := range matches {
-		data, err := d.store.Get(d.taskDataKey(string(id)))
-		if err != nil {
-			return nil, err
+func (kv *taskKV) Get(id string) (Task, error) {
+	o, err := kv.store.Get(id)
+	if err != nil {
+		return Task{}, kv.error(err)
+	}
+	t, ok := o.(*Task)
+	if !ok {
+		return Task{}, fmt.Errorf("impossible error, object not a Task, got %T", o)
+	}
+	return *t, nil
+}
+
+func (kv *taskKV) Create(t Task) error {
+	return kv.store.Create(&t)
+}
+
+func (kv *taskKV) Replace(t Task) error {
+	return kv.store.Replace(&t)
+}
+
+func (kv *taskKV) Delete(id string) error {
+	return kv.store.Delete(id)
+}
+
+func (kv *taskKV) List(pattern string, offset, limit int) ([]Task, error) {
+	objects, err := kv.store.List(storage.DefaultIDIndex, pattern, offset, limit)
+	if err != nil {
+		return nil, err
+	}
+	tasks := make([]Task, len(objects))
+	for i, o := range objects {
+		t, ok := o.(*Task)
+		if !ok {
+			return nil, fmt.Errorf("impossible error, object not a Task, got %T", o)
 		}
-		t, err := d.decodeTask(data.Value)
-		tasks[i] = t
+		tasks[i] = *t
 	}
 	return tasks, nil
 }
@@ -325,6 +251,8 @@ const (
 	templateIndexesPrefix = "/templates/indexes/"
 	// Associate tasks with a template
 	templateTaskPrefix = "/templates/tasks/"
+
+	idIndex = "id/"
 )
 
 // Key/Value store based implementation of the TemplateDAO
@@ -374,154 +302,169 @@ func (d *templateKV) templateTaskAssociationKey(templateId, taskId string) strin
 	return templateTaskPrefix + templateId + "/" + taskId
 }
 
-func (d *templateKV) Get(id string) (Template, error) {
-	key := d.templateDataKey(id)
-	if exists, err := d.store.Exists(key); err != nil {
-		return Template{}, err
-	} else if !exists {
-		return Template{}, ErrNoTemplateExists
-	}
-	kv, err := d.store.Get(key)
-	if err != nil {
-		return Template{}, err
-	}
-	return d.decodeTemplate(kv.Value)
+func (d *templateKV) Get(id string) (t Template, err error) {
+	err = d.store.View(func(tx storage.ReadOnlyTx) error {
+		key := d.templateDataKey(id)
+		if exists, err := tx.Exists(key); err != nil {
+			return err
+		} else if !exists {
+			return ErrNoTemplateExists
+		}
+		kv, err := tx.Get(key)
+		if err != nil {
+			return err
+		}
+		t, err = d.decodeTemplate(kv.Value)
+		return err
+	})
+	return
 }
 
 func (d *templateKV) Create(t Template) error {
-	key := d.templateDataKey(t.ID)
+	return d.store.Update(func(tx storage.Tx) error {
+		key := d.templateDataKey(t.ID)
 
-	exists, err := d.store.Exists(key)
-	if err != nil {
-		return err
-	}
-	if exists {
-		return ErrTemplateExists
-	}
+		exists, err := tx.Exists(key)
+		if err != nil {
+			return err
+		}
+		if exists {
+			return ErrTemplateExists
+		}
 
-	data, err := d.encodeTemplate(t)
-	if err != nil {
-		return err
-	}
-	// Put data
-	err = d.store.Put(key, data)
-	if err != nil {
-		return err
-	}
-	// Put ID index
-	indexKey := d.templateIndexKey(idIndex, t.ID)
-	return d.store.Put(indexKey, []byte(t.ID))
+		data, err := d.encodeTemplate(t)
+		if err != nil {
+			return err
+		}
+		// Put data
+		err = tx.Put(key, data)
+		if err != nil {
+			return err
+		}
+		// Put ID index
+		indexKey := d.templateIndexKey(idIndex, t.ID)
+		return tx.Put(indexKey, []byte(t.ID))
+	})
 }
 
 func (d *templateKV) Replace(t Template) error {
-	key := d.templateDataKey(t.ID)
+	return d.store.Update(func(tx storage.Tx) error {
+		key := d.templateDataKey(t.ID)
 
-	exists, err := d.store.Exists(key)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		return ErrNoTemplateExists
-	}
+		exists, err := tx.Exists(key)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return ErrNoTemplateExists
+		}
 
-	data, err := d.encodeTemplate(t)
-	if err != nil {
-		return err
-	}
-	// Put data
-	err = d.store.Put(key, data)
-	if err != nil {
-		return err
-	}
-	return nil
+		data, err := d.encodeTemplate(t)
+		if err != nil {
+			return err
+		}
+		// Put data
+		err = tx.Put(key, data)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 func (d *templateKV) Delete(id string) error {
-	key := d.templateDataKey(id)
-	indexKey := d.templateIndexKey(idIndex, id)
+	return d.store.Update(func(tx storage.Tx) error {
+		key := d.templateDataKey(id)
+		indexKey := d.templateIndexKey(idIndex, id)
 
-	// Try and delete everything ignore errors until after.
+		if err := tx.Delete(key); err != nil {
+			return err
+		}
+		if err := tx.Delete(indexKey); err != nil {
+			return err
+		}
 
-	dataErr := d.store.Delete(key)
-	indexErr := d.store.Delete(indexKey)
+		// Delete all associations
+		ids, err := tx.List(templateTaskPrefix + id + "/")
+		if err != nil {
+			return nil
+		}
 
-	// Delete all associations
-	var lastErr error
-	ids, err := d.store.List(templateTaskPrefix + id + "/")
-	if err != nil {
-		lastErr = err
-	} else {
 		for _, id := range ids {
-			err := d.store.Delete(id.Key)
+			err := tx.Delete(id.Key)
 			if err != nil {
-				lastErr = err
+				return err
 			}
 		}
-	}
-	if dataErr != nil {
-		return dataErr
-	}
-	if indexErr != nil {
-		return indexErr
-	}
-	return lastErr
+		return nil
+	})
 }
 
 func (d *templateKV) AssociateTask(templateId, taskId string) error {
-	akey := d.templateTaskAssociationKey(templateId, taskId)
-	return d.store.Put(akey, []byte(taskId))
+	return d.store.Update(func(tx storage.Tx) error {
+		akey := d.templateTaskAssociationKey(templateId, taskId)
+		return tx.Put(akey, []byte(taskId))
+	})
 }
 
 func (d *templateKV) DisassociateTask(templateId, taskId string) error {
-	akey := d.templateTaskAssociationKey(templateId, taskId)
-	return d.store.Delete(akey)
+	return d.store.Update(func(tx storage.Tx) error {
+		akey := d.templateTaskAssociationKey(templateId, taskId)
+		return tx.Delete(akey)
+	})
 }
 
-func (d *templateKV) ListAssociatedTasks(templateId string) ([]string, error) {
-	ids, err := d.store.List(templateTaskPrefix + templateId + "/")
-	if err != nil {
-		return nil, err
-	}
-	taskIds := make([]string, len(ids))
-	for i, id := range ids {
-		taskIds[i] = string(id.Value)
-	}
-	return taskIds, nil
-}
-
-func (d *templateKV) List(pattern string, offset, limit int) ([]Template, error) {
-	// Templates are indexed via their ID only.
-	// While templates are sorted in the data section by their ID anyway
-	// this allows us to do offset/limits and filtering without having to read in all template data.
-
-	// List all template ids sorted by ID
-	ids, err := d.store.List(templateIndexesPrefix + idIndex)
-	if err != nil {
-		return nil, err
-	}
-
-	var match func([]byte) bool
-	if pattern != "" {
-		match = func(value []byte) bool {
-			id := string(value)
-			matched, _ := path.Match(pattern, id)
-			return matched
-		}
-	} else {
-		match = func([]byte) bool { return true }
-	}
-	matches := storage.DoListFunc(ids, match, offset, limit)
-
-	templates := make([]Template, len(matches))
-	for i, id := range matches {
-		data, err := d.store.Get(d.templateDataKey(string(id)))
+func (d *templateKV) ListAssociatedTasks(templateId string) (taskIds []string, err error) {
+	err = d.store.View(func(tx storage.ReadOnlyTx) error {
+		ids, err := tx.List(templateTaskPrefix + templateId + "/")
 		if err != nil {
-			return nil, err
+			return err
 		}
-		t, err := d.decodeTemplate(data.Value)
-		templates[i] = t
-	}
-	return templates, nil
+		taskIds = make([]string, len(ids))
+		for i, id := range ids {
+			taskIds[i] = string(id.Value)
+		}
+		return nil
+	})
+	return
+}
+
+func (d *templateKV) List(pattern string, offset, limit int) (templates []Template, err error) {
+	err = d.store.View(func(tx storage.ReadOnlyTx) error {
+		// Templates are indexed via their ID only.
+		// While templates are sorted in the data section by their ID anyway
+		// this allows us to do offset/limits and filtering without having to read in all template data.
+
+		// List all template ids sorted by ID
+		ids, err := tx.List(templateIndexesPrefix + idIndex)
+		if err != nil {
+			return err
+		}
+
+		var match func([]byte) bool
+		if pattern != "" {
+			match = func(value []byte) bool {
+				id := string(value)
+				matched, _ := path.Match(pattern, id)
+				return matched
+			}
+		} else {
+			match = func([]byte) bool { return true }
+		}
+		matches := storage.DoListFunc(ids, match, offset, limit)
+
+		templates = make([]Template, len(matches))
+		for i, id := range matches {
+			data, err := tx.Get(d.templateDataKey(string(id)))
+			if err != nil {
+				return err
+			}
+			t, err := d.decodeTemplate(data.Value)
+			templates[i] = t
+		}
+		return nil
+	})
+	return
 }
 
 const (
@@ -557,38 +500,50 @@ func (d *snapshotKV) snapshotDataKey(id string) string {
 }
 
 func (d *snapshotKV) Put(id string, snapshot *Snapshot) error {
-	key := d.snapshotDataKey(id)
-	data, err := d.encodeSnapshot(snapshot)
-	if err != nil {
-		return err
-	}
-	return d.store.Put(key, data)
+	return d.store.Update(func(tx storage.Tx) error {
+		key := d.snapshotDataKey(id)
+		data, err := d.encodeSnapshot(snapshot)
+		if err != nil {
+			return err
+		}
+		return tx.Put(key, data)
+	})
 }
 
 func (d *snapshotKV) Delete(id string) error {
-	key := d.snapshotDataKey(id)
-	return d.store.Delete(key)
+	return d.store.Update(func(tx storage.Tx) error {
+		key := d.snapshotDataKey(id)
+		return tx.Delete(key)
+	})
 }
 
-func (d *snapshotKV) Exists(id string) (bool, error) {
-	key := d.snapshotDataKey(id)
-	return d.store.Exists(key)
+func (d *snapshotKV) Exists(id string) (exists bool, err error) {
+	err = d.store.View(func(tx storage.ReadOnlyTx) error {
+		key := d.snapshotDataKey(id)
+		exists, err = tx.Exists(key)
+		return err
+	})
+	return
 }
 
-func (d *snapshotKV) Get(id string) (*Snapshot, error) {
-	exists, err := d.Exists(id)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, ErrNoSnapshotExists
-	}
-	key := d.snapshotDataKey(id)
-	data, err := d.store.Get(key)
-	if err != nil {
-		return nil, err
-	}
-	return d.decodeSnapshot(data.Value)
+func (d *snapshotKV) Get(id string) (snap *Snapshot, err error) {
+	err = d.store.View(func(tx storage.ReadOnlyTx) error {
+		exists, err := d.Exists(id)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return ErrNoSnapshotExists
+		}
+		key := d.snapshotDataKey(id)
+		data, err := tx.Get(key)
+		if err != nil {
+			return err
+		}
+		snap, err = d.decodeSnapshot(data.Value)
+		return err
+	})
+	return
 }
 
 type VarType int

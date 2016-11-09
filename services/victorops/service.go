@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/alert"
 	"github.com/pkg/errors"
 )
 
@@ -133,7 +133,7 @@ func (s *Service) preparePost(routingKey, messageType, message, entityID string,
 	voData["entity_id"] = entityID
 	voData["state_message"] = message
 	voData["timestamp"] = t.Unix()
-	voData["monitoring_tool"] = kapacitor.Product
+	voData["monitoring_tool"] = "kapacitor"
 	if details != nil {
 		b, err := json.Marshal(details)
 		if err != nil {
@@ -159,4 +159,44 @@ func (s *Service) preparePost(routingKey, messageType, message, entityID string,
 	}
 	u.Path = path.Join(u.Path, c.APIKey, routingKey)
 	return u.String(), &post, nil
+}
+
+type HandlerConfig struct {
+	// The routing key to use for the alert.
+	// Defaults to the value in the configuration if empty.
+	RoutingKey string `mapstructure:"routing-key"`
+}
+
+type handler struct {
+	s      *Service
+	c      HandlerConfig
+	logger *log.Logger
+}
+
+func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+	return &handler{
+		s:      s,
+		c:      c,
+		logger: l,
+	}
+}
+
+func (h *handler) Handle(event alert.Event) {
+	var messageType string
+	switch event.State.Level {
+	case alert.OK:
+		messageType = "RECOVERY"
+	default:
+		messageType = event.State.Level.String()
+	}
+	if err := h.s.Alert(
+		h.c.RoutingKey,
+		messageType,
+		event.State.Message,
+		event.State.ID,
+		event.State.Time,
+		event.Data.Result,
+	); err != nil {
+		h.logger.Println("E! failed to send event to VictorOps", err)
+	}
 }
