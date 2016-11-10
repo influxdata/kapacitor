@@ -32,9 +32,12 @@ type WindowNode struct {
 	Period time.Duration
 	// How often the current window is emitted into the pipeline.
 	Every time.Duration
-	// Wether to align the window edges with the zero time
+	// Whether to align the window edges with the zero time
 	// tick:ignore
 	AlignFlag bool `tick:"Align"`
+	// Whether to wait till the period is full before the first emit.
+	// tick:ignore
+	FillPeriodFlag bool `tick:"FillPeriod"`
 }
 
 func newWindowNode() *WindowNode {
@@ -52,5 +55,13 @@ func newWindowNode() *WindowNode {
 // tick:property
 func (w *WindowNode) Align() *WindowNode {
 	w.AlignFlag = true
+	return w
+}
+
+// FillPeriod instructs the WindowNode to wait till the period has elapsed before emitting the first batch.
+// This only applies if the period is greater than the every value.
+// tick:property
+func (w *WindowNode) FillPeriod() *WindowNode {
+	w.FillPeriodFlag = true
 	return w
 }

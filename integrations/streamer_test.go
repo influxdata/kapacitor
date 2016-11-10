@@ -648,6 +648,178 @@ stream
 	testStreamerWithOutput(t, "TestStream_Window", script, 13*time.Second, er, false, nil)
 }
 
+func TestStream_Window_Overlapping(t *testing.T) {
+
+	var script = `
+var period = 14s
+var every = 10s
+stream
+	|from()
+		.database('dbname')
+		.retentionPolicy('rpname')
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+	|window()
+		.period(period)
+		.every(every)
+	|httpOut('TestStream_Window_FillPeriod')
+`
+
+	nums := []float64{
+		93.1,
+		97.1,
+		92.6,
+		95.6,
+		93.1,
+		92.6,
+		95.8,
+		92.7,
+		96.0,
+		93.4,
+	}
+
+	values := make([][]interface{}, len(nums))
+	for i, num := range nums {
+		values[i] = []interface{}{
+			time.Date(1971, 1, 1, 0, 0, i, 0, time.UTC),
+			"serverA",
+			"idle",
+			num,
+		}
+	}
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    nil,
+				Columns: []string{"time", "host", "type", "value"},
+				Values:  values,
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Window_FillPeriod", script, 16*time.Second, er, false, nil)
+}
+
+func TestStream_Window_FillPeriod(t *testing.T) {
+
+	var script = `
+var period = 14s
+var every = 10s
+stream
+	|from()
+		.database('dbname')
+		.retentionPolicy('rpname')
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+	|window()
+		.period(period)
+		.every(every)
+		.fillPeriod()
+	|httpOut('TestStream_Window_FillPeriod')
+`
+
+	nums := []float64{
+		93.1,
+		97.1,
+		92.6,
+		95.6,
+		93.1,
+		92.6,
+		95.8,
+		92.7,
+		96.0,
+		93.4,
+		95.3,
+		96.4,
+		95.1,
+		91.1,
+	}
+
+	values := make([][]interface{}, len(nums))
+	for i, num := range nums {
+		values[i] = []interface{}{
+			time.Date(1971, 1, 1, 0, 0, i, 0, time.UTC),
+			"serverA",
+			"idle",
+			num,
+		}
+	}
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    nil,
+				Columns: []string{"time", "host", "type", "value"},
+				Values:  values,
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Window_FillPeriod", script, 16*time.Second, er, false, nil)
+}
+func TestStream_Window_FillPeriod_Aligned(t *testing.T) {
+
+	var script = `
+var period = 14s
+var every = 10s
+stream
+	|from()
+		.database('dbname')
+		.retentionPolicy('rpname')
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+	|window()
+		.period(period)
+		.every(every)
+		.fillPeriod()
+		.align()
+	|httpOut('TestStream_Window_FillPeriod_Aligned')
+`
+
+	nums := []float64{
+		95.8,
+		92.7,
+		96.0,
+		93.4,
+		95.3,
+		96.4,
+		95.1,
+		91.1,
+		95.7,
+		96.2,
+		96.6,
+		91.2,
+		98.2,
+		96.1,
+	}
+
+	values := make([][]interface{}, len(nums))
+	for i, num := range nums {
+		values[i] = []interface{}{
+			time.Date(1971, 1, 1, 0, 0, i+6, 0, time.UTC),
+			"serverA",
+			"idle",
+			num,
+		}
+	}
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    nil,
+				Columns: []string{"time", "host", "type", "value"},
+				Values:  values,
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Window_FillPeriod_Aligned", script, 21*time.Second, er, false, nil)
+}
+
 func TestStream_Shift(t *testing.T) {
 
 	var script = `

@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.1.1 [unreleased]
+
+### Release Notes
+
+### Features
+
+- [#913](https://github.com/influxdata/kapacitor/issues/913): Add fillPeriod option to Window node, so that the first emit waits till the period has elapsed before emitting.
+
+### Bugfixes
+
+
+
 ## v1.1.0 [2016-10-07]
 
 ### Release Notes
