@@ -69,6 +69,13 @@ func (w *WindowNode) runWindow([]byte) error {
 			}
 			windows[p.Group] = wnd
 		}
+		if w.w.Every == 0 {
+			// Insert the point now since we know we do not need to wait.
+			wnd.buf.insert(p)
+			// We are emitting on every point, so the nextEmit is always
+			// the time of the current point.
+			wnd.nextEmit = p.Time
+		}
 		if !p.Time.Before(wnd.nextEmit) {
 			points := wnd.emit(p.Time)
 			// Send window to all children
@@ -81,7 +88,9 @@ func (w *WindowNode) runWindow([]byte) error {
 			}
 			w.timer.Resume()
 		}
-		wnd.buf.insert(p)
+		if w.w.Every != 0 {
+			wnd.buf.insert(p)
+		}
 		w.timer.Stop()
 	}
 	return nil

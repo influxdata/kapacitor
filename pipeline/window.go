@@ -31,6 +31,7 @@ type WindowNode struct {
 	// The period, or length in time, of the window.
 	Period time.Duration
 	// How often the current window is emitted into the pipeline.
+	// If equal to zero, then every new point will emit the current window.
 	Every time.Duration
 	// Whether to align the window edges with the zero time
 	// tick:ignore
