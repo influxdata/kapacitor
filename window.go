@@ -36,9 +36,24 @@ func (w *WindowNode) runWindow([]byte) error {
 			for _, dim := range p.Dimensions.TagNames {
 				tags[dim] = p.Tags[dim]
 			}
-			nextEmit := p.Time.Add(w.w.Every)
-			if w.w.AlignFlag {
-				nextEmit = nextEmit.Truncate(w.w.Every)
+			// Determine first next emit time.
+			var nextEmit time.Time
+			if w.w.FillPeriodFlag {
+				nextEmit = p.Time.Add(w.w.Period)
+				if w.w.AlignFlag {
+					firstPeriod := nextEmit
+					// Needs to be aligned with Every and be greater than now+Period
+					nextEmit = nextEmit.Truncate(w.w.Every)
+					if !nextEmit.After(firstPeriod) {
+						// This means we will drop the first few points
+						nextEmit = nextEmit.Add(w.w.Every)
+					}
+				}
+			} else {
+				nextEmit = p.Time.Add(w.w.Every)
+				if w.w.AlignFlag {
+					nextEmit = nextEmit.Truncate(w.w.Every)
+				}
 			}
 			wnd = &window{
 				buf:      &windowBuffer{logger: w.logger},
