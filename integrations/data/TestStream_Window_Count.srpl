@@ -1,0 +1,36 @@
+dbname
+rpname
+cpu,type=idle,host=serverA value=01 0000000000
+dbname
+rpname
+cpu,type=idle,host=serverA value=02 0000000000
+dbname
+rpname
+cpu,type=idle,host=serverA value=03 0000000000
+dbname
+rpname
+cpu,type=idle,host=serverA value=04 0000000000
+dbname
+rpname
+cpu,type=idle,host=serverA value=05 0000000000
+dbname
+rpname
+cpu,type=idle,host=serverA value=06 0000000000
+dbname
+rpname
+cpu,type=idle,host=serverA value=07 0000000000
+dbname
+rpname
+cpu,type=idle,host=serverA value=08 0000000000
+dbname
+rpname
+cpu,type=idle,host=serverA value=09 0000000000
+dbname
+rpname
+cpu,type=idle,host=serverA value=10 0000000000
+dbname
+rpname
+cpu,type=idle,host=serverA value=11 0000000000
+dbname
+rpname
+cpu,type=idle,host=serverA value=12 0000000000

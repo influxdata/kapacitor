@@ -648,6 +648,242 @@ stream
 	testStreamerWithOutput(t, "TestStream_Window", script, 13*time.Second, er, false, nil)
 }
 
+func TestStream_Window_Count(t *testing.T) {
+
+	var script = `
+var period = 10
+var every = 10
+stream
+	|from()
+		.database('dbname')
+		.retentionPolicy('rpname')
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+	|window()
+		.periodCount(period)
+		.everyCount(every)
+	|httpOut('TestStream_Window_Count')
+`
+
+	count := 10
+	values := make([][]interface{}, count)
+	for i := 0; i < count; i++ {
+		values[i] = []interface{}{
+			time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+			"serverA",
+			"idle",
+			float64(i + 1),
+		}
+	}
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    nil,
+				Columns: []string{"time", "host", "type", "value"},
+				Values:  values,
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Window_Count", script, 2*time.Second, er, false, nil)
+}
+func TestStream_Window_Count_Overlapping(t *testing.T) {
+
+	var script = `
+var period = 3
+var every = 1
+stream
+	|from()
+		.database('dbname')
+		.retentionPolicy('rpname')
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+	|window()
+		.periodCount(period)
+		.everyCount(every)
+	|httpOut('TestStream_Window_Count')
+`
+
+	count := 3
+	values := make([][]interface{}, count)
+	for i := 0; i < count; i++ {
+		values[i] = []interface{}{
+			time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+			"serverA",
+			"idle",
+			float64(i + 10),
+		}
+	}
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    nil,
+				Columns: []string{"time", "host", "type", "value"},
+				Values:  values,
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Window_Count", script, 2*time.Second, er, false, nil)
+}
+
+func TestStream_Window_Count_Every_1(t *testing.T) {
+
+	var script = `
+stream
+	|from()
+		.database('dbname')
+		.retentionPolicy('rpname')
+		.measurement('cpu')
+		.groupBy('host')
+	|window()
+		.periodCount(3)
+		.everyCount(1)
+	|count('value')
+	|window()
+		.periodCount(20)
+		.everyCount(1)
+	|httpOut('TestStream_Window_Count')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverA"},
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						1.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						2.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						3.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						3.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						3.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						3.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						3.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						3.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						3.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						3.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						3.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						3.0,
+					},
+				},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Window_Count", script, 2*time.Second, er, false, nil)
+}
+
+func TestStream_Window_Count_FillPeriod(t *testing.T) {
+
+	var script = `
+stream
+	|from()
+		.database('dbname')
+		.retentionPolicy('rpname')
+		.measurement('cpu')
+		.groupBy('host')
+	|window()
+		.periodCount(4)
+		.everyCount(1)
+		.fillPeriod()
+	|count('value')
+	|window()
+		.periodCount(20)
+		.everyCount(1)
+	|httpOut('TestStream_Window_Count')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverA"},
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						4.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						4.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						4.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						4.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						4.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						4.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						4.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						4.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						4.0,
+					},
+				},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Window_Count", script, 2*time.Second, er, false, nil)
+}
+
 func TestStream_Window_Every_0(t *testing.T) {
 
 	var script = `
@@ -778,6 +1014,122 @@ stream
 					{
 						time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 						2.0,
+					},
+				},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Window", script, 13*time.Second, er, false, nil)
+}
+
+func TestStream_Window_Every_0_FillPeriod(t *testing.T) {
+
+	var script = `
+var period = 5s
+// Emit the window on every point
+var every = 0s
+stream
+	|from()
+		.database('dbname')
+		.retentionPolicy('rpname')
+		.measurement('cpu')
+		.groupBy('host')
+	|window()
+		.period(period)
+		.every(every)
+		.fillPeriod()
+	|count('value')
+	|window()
+		.period(10s)
+		.every(0s)
+	|httpOut('TestStream_Window')
+`
+
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverA"},
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+						5.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						5.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+						5.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+						5.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
+						5.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+						5.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
+						5.0,
+					},
+				},
+			},
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverB"},
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+						5.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						5.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+						5.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+						5.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
+						5.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+						5.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
+						5.0,
+					},
+				},
+			},
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverC"},
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+						1.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
+						1.0,
 					},
 				},
 			},
