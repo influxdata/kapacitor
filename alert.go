@@ -21,6 +21,7 @@ import (
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/tick/stateful"
 )
 
@@ -40,58 +41,13 @@ const maxWeight = 1.2
 
 type AlertHandler func(ad *AlertData)
 
-type AlertLevel int
-
-const (
-	OKAlert AlertLevel = iota
-	InfoAlert
-	WarnAlert
-	CritAlert
-)
-
-func (l AlertLevel) String() string {
-	switch l {
-	case OKAlert:
-		return "OK"
-	case InfoAlert:
-		return "INFO"
-	case WarnAlert:
-		return "WARNING"
-	case CritAlert:
-		return "CRITICAL"
-	default:
-		panic("unknown AlertLevel")
-	}
-}
-
-func (l AlertLevel) MarshalText() ([]byte, error) {
-	return []byte(l.String()), nil
-}
-
-func (l *AlertLevel) UnmarshalText(text []byte) error {
-	s := string(text)
-	switch s {
-	case "OK":
-		*l = OKAlert
-	case "INFO":
-		*l = InfoAlert
-	case "WARNING":
-		*l = WarnAlert
-	case "CRITICAL":
-		*l = CritAlert
-	default:
-		return fmt.Errorf("unknown AlertLevel %s", s)
-	}
-	return nil
-}
-
 type AlertData struct {
 	ID       string          `json:"id"`
 	Message  string          `json:"message"`
 	Details  string          `json:"details"`
 	Time     time.Time       `json:"time"`
 	Duration time.Duration   `json:"duration"`
-	Level    AlertLevel      `json:"level"`
+	Level    alert.Level     `json:"level"`
 	Data     influxql.Result `json:"data"`
 
 	// Info for custom templates
@@ -316,11 +272,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 	}
 
 	// Parse level expressions
-	an.levels = make([]stateful.Expression, CritAlert+1)
-	an.scopePools = make([]stateful.ScopePool, CritAlert+1)
+	an.levels = make([]stateful.Expression, alert.Critical+1)
+	an.scopePools = make([]stateful.ScopePool, alert.Critical+1)
 
-	an.levelResets = make([]stateful.Expression, CritAlert+1)
-	an.lrScopePools = make([]stateful.ScopePool, CritAlert+1)
+	an.levelResets = make([]stateful.Expression, alert.Critical+1)
+	an.lrScopePools = make([]stateful.ScopePool, alert.Critical+1)
 
 	if n.Info != nil {
 		statefulExpression, expressionCompileError := stateful.NewExpression(n.Info.Expression)
@@ -328,15 +284,15 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 			return nil, fmt.Errorf("Failed to compile stateful expression for info: %s", expressionCompileError)
 		}
 
-		an.levels[InfoAlert] = statefulExpression
-		an.scopePools[InfoAlert] = stateful.NewScopePool(stateful.FindReferenceVariables(n.Info.Expression))
+		an.levels[alert.Info] = statefulExpression
+		an.scopePools[alert.Info] = stateful.NewScopePool(stateful.FindReferenceVariables(n.Info.Expression))
 		if n.InfoReset != nil {
 			lstatefulExpression, lexpressionCompileError := stateful.NewExpression(n.InfoReset.Expression)
 			if lexpressionCompileError != nil {
 				return nil, fmt.Errorf("Failed to compile stateful expression for infoReset: %s", lexpressionCompileError)
 			}
-			an.levelResets[InfoAlert] = lstatefulExpression
-			an.lrScopePools[InfoAlert] = stateful.NewScopePool(stateful.FindReferenceVariables(n.InfoReset.Expression))
+			an.levelResets[alert.Info] = lstatefulExpression
+			an.lrScopePools[alert.Info] = stateful.NewScopePool(stateful.FindReferenceVariables(n.InfoReset.Expression))
 		}
 	}
 
@@ -345,15 +301,15 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		if expressionCompileError != nil {
 			return nil, fmt.Errorf("Failed to compile stateful expression for warn: %s", expressionCompileError)
 		}
-		an.levels[WarnAlert] = statefulExpression
-		an.scopePools[WarnAlert] = stateful.NewScopePool(stateful.FindReferenceVariables(n.Warn.Expression))
+		an.levels[alert.Warning] = statefulExpression
+		an.scopePools[alert.Warning] = stateful.NewScopePool(stateful.FindReferenceVariables(n.Warn.Expression))
 		if n.WarnReset != nil {
 			lstatefulExpression, lexpressionCompileError := stateful.NewExpression(n.WarnReset.Expression)
 			if lexpressionCompileError != nil {
 				return nil, fmt.Errorf("Failed to compile stateful expression for warnReset: %s", lexpressionCompileError)
 			}
-			an.levelResets[WarnAlert] = lstatefulExpression
-			an.lrScopePools[WarnAlert] = stateful.NewScopePool(stateful.FindReferenceVariables(n.WarnReset.Expression))
+			an.levelResets[alert.Warning] = lstatefulExpression
+			an.lrScopePools[alert.Warning] = stateful.NewScopePool(stateful.FindReferenceVariables(n.WarnReset.Expression))
 		}
 	}
 
@@ -362,15 +318,15 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		if expressionCompileError != nil {
 			return nil, fmt.Errorf("Failed to compile stateful expression for crit: %s", expressionCompileError)
 		}
-		an.levels[CritAlert] = statefulExpression
-		an.scopePools[CritAlert] = stateful.NewScopePool(stateful.FindReferenceVariables(n.Crit.Expression))
+		an.levels[alert.Critical] = statefulExpression
+		an.scopePools[alert.Critical] = stateful.NewScopePool(stateful.FindReferenceVariables(n.Crit.Expression))
 		if n.CritReset != nil {
 			lstatefulExpression, lexpressionCompileError := stateful.NewExpression(n.CritReset.Expression)
 			if lexpressionCompileError != nil {
 				return nil, fmt.Errorf("Failed to compile stateful expression for critReset: %s", lexpressionCompileError)
 			}
-			an.levelResets[CritAlert] = lstatefulExpression
-			an.lrScopePools[CritAlert] = stateful.NewScopePool(stateful.FindReferenceVariables(n.CritReset.Expression))
+			an.levelResets[alert.Critical] = lstatefulExpression
+			an.lrScopePools[alert.Critical] = stateful.NewScopePool(stateful.FindReferenceVariables(n.CritReset.Expression))
 		}
 	}
 
@@ -410,7 +366,7 @@ func (a *AlertNode) runAlert([]byte) error {
 	case pipeline.StreamEdge:
 		for p, ok := a.ins[0].NextPoint(); ok; p, ok = a.ins[0].NextPoint() {
 			a.timer.Start()
-			var currentLevel AlertLevel
+			var currentLevel alert.Level
 			if state, ok := a.states[p.Group]; ok {
 				currentLevel = state.currentLevel()
 			}
@@ -421,7 +377,7 @@ func (a *AlertNode) runAlert([]byte) error {
 				continue
 			}
 			// send alert if we are not OK or we are OK and state changed (i.e recovery)
-			if l != OKAlert || state.changed {
+			if l != alert.OK || state.changed {
 				batch := models.Batch{
 					Name:   p.Name,
 					Group:  p.Group,
@@ -431,7 +387,7 @@ func (a *AlertNode) runAlert([]byte) error {
 				}
 				state.triggered(p.Time)
 				// Suppress the recovery event.
-				if a.a.NoRecoveriesFlag && l == OKAlert {
+				if a.a.NoRecoveriesFlag && l == alert.OK {
 					a.timer.Stop()
 					continue
 				}
@@ -484,13 +440,13 @@ func (a *AlertNode) runAlert([]byte) error {
 				continue
 			}
 			// Keep track of lowest level for any point
-			lowestLevel := CritAlert
+			lowestLevel := alert.Critical
 			// Keep track of highest level and point
-			highestLevel := OKAlert
+			highestLevel := alert.OK
 			var highestPoint *models.BatchPoint
 
 			for i, p := range b.Points {
-				var currentLevel AlertLevel
+				var currentLevel alert.Level
 				if state, ok := a.states[b.Group]; ok {
 					currentLevel = state.currentLevel()
 				}
@@ -512,7 +468,7 @@ func (a *AlertNode) runAlert([]byte) error {
 			}
 			// Create alert Data
 			t := highestPoint.Time
-			if a.a.AllFlag || l == OKAlert {
+			if a.a.AllFlag || l == alert.OK {
 				t = b.TMax
 			}
 
@@ -522,13 +478,13 @@ func (a *AlertNode) runAlert([]byte) error {
 			//  l == OK and state.changed (aka recovery)
 			//    OR
 			//  l != OK and flapping/statechanges checkout
-			if state.changed && l == OKAlert ||
-				(l != OKAlert &&
+			if state.changed && l == alert.OK ||
+				(l != alert.OK &&
 					!((a.a.UseFlapping && state.flapping) ||
 						(a.a.IsStateChangesOnly && !state.changed && !state.expired))) {
 				state.triggered(t)
 				// Suppress the recovery event.
-				if a.a.NoRecoveriesFlag && l == OKAlert {
+				if a.a.NoRecoveriesFlag && l == alert.OK {
 					a.timer.Stop()
 					continue
 				}
@@ -600,13 +556,13 @@ func (a *AlertNode) runAlert([]byte) error {
 func (a *AlertNode) handleAlert(ad *AlertData) {
 	a.alertsTriggered.Add(1)
 	switch ad.Level {
-	case OKAlert:
+	case alert.OK:
 		a.oksTriggered.Add(1)
-	case InfoAlert:
+	case alert.Info:
 		a.infosTriggered.Add(1)
-	case WarnAlert:
+	case alert.Warning:
 		a.warnsTriggered.Add(1)
-	case CritAlert:
+	case alert.Critical:
 		a.critsTriggered.Add(1)
 	}
 	a.logger.Printf("D! %v alert triggered id:%s msg:%s data:%v", ad.Level, ad.ID, ad.Message, ad.Data.Series[0])
@@ -615,8 +571,8 @@ func (a *AlertNode) handleAlert(ad *AlertData) {
 	}
 }
 
-func (a *AlertNode) determineLevel(now time.Time, fields models.Fields, tags map[string]string, currentLevel AlertLevel) AlertLevel {
-	if higherLevel, found := a.findFirstMatchLevel(CritAlert, currentLevel-1, now, fields, tags); found {
+func (a *AlertNode) determineLevel(now time.Time, fields models.Fields, tags map[string]string, currentLevel alert.Level) alert.Level {
+	if higherLevel, found := a.findFirstMatchLevel(alert.Critical, currentLevel-1, now, fields, tags); found {
 		return higherLevel
 	}
 	if rse := a.levelResets[currentLevel]; rse != nil {
@@ -626,15 +582,15 @@ func (a *AlertNode) determineLevel(now time.Time, fields models.Fields, tags map
 			return currentLevel
 		}
 	}
-	if newLevel, found := a.findFirstMatchLevel(currentLevel, OKAlert, now, fields, tags); found {
+	if newLevel, found := a.findFirstMatchLevel(currentLevel, alert.OK, now, fields, tags); found {
 		return newLevel
 	}
-	return OKAlert
+	return alert.OK
 }
 
-func (a *AlertNode) findFirstMatchLevel(start AlertLevel, stop AlertLevel, now time.Time, fields models.Fields, tags map[string]string) (AlertLevel, bool) {
-	if stop < OKAlert {
-		stop = OKAlert
+func (a *AlertNode) findFirstMatchLevel(start alert.Level, stop alert.Level, now time.Time, fields models.Fields, tags map[string]string) (alert.Level, bool) {
+	if stop < alert.OK {
+		stop = alert.OK
 	}
 	for l := start; l > stop; l-- {
 		se := a.levels[l]
@@ -642,13 +598,13 @@ func (a *AlertNode) findFirstMatchLevel(start AlertLevel, stop AlertLevel, now t
 			continue
 		}
 		if pass, err := EvalPredicate(se, a.scopePools[l], now, fields, tags); err != nil {
-			a.logger.Printf("E! error evaluating expression for level %v: %s", AlertLevel(l), err)
+			a.logger.Printf("E! error evaluating expression for level %v: %s", alert.Level(l), err)
 			continue
 		} else if pass {
-			return AlertLevel(l), true
+			return alert.Level(l), true
 		}
 	}
-	return OKAlert, false
+	return alert.OK, false
 }
 
 func (a *AlertNode) batchToResult(b models.Batch) influxql.Result {
@@ -664,7 +620,7 @@ func (a *AlertNode) alertData(
 	group models.GroupID,
 	tags models.Tags,
 	fields models.Fields,
-	level AlertLevel,
+	level alert.Level,
 	t time.Time,
 	d time.Duration,
 	b models.Batch,
@@ -691,7 +647,7 @@ func (a *AlertNode) alertData(
 }
 
 type alertState struct {
-	history  []AlertLevel
+	history  []alert.Level
 	idx      int
 	flapping bool
 	changed  bool
@@ -711,26 +667,26 @@ func (a *alertState) duration() time.Duration {
 // Record that the alert was triggered at time t.
 func (a *alertState) triggered(t time.Time) {
 	a.lastTriggered = t
-	// Check if we are being triggered for first time since an OKAlert
+	// Check if we are being triggered for first time since an alert.OKAlert
 	// If so reset firstTriggered time
 	p := a.idx - 1
 	if p == -1 {
 		p = len(a.history) - 1
 	}
-	if a.history[p] == OKAlert {
+	if a.history[p] == alert.OK {
 		a.firstTriggered = t
 	}
 }
 
 // Record an event in the alert history.
-func (a *alertState) addEvent(level AlertLevel) {
+func (a *alertState) addEvent(level alert.Level) {
 	a.changed = a.history[a.idx] != level
 	a.idx = (a.idx + 1) % len(a.history)
 	a.history[a.idx] = level
 }
 
 // Return current level of this state
-func (a *alertState) currentLevel() AlertLevel {
+func (a *alertState) currentLevel() alert.Level {
 	return a.history[a.idx]
 }
 
@@ -759,11 +715,11 @@ func (a *alertState) percentChange() float64 {
 	return p
 }
 
-func (a *AlertNode) updateState(t time.Time, level AlertLevel, group models.GroupID) *alertState {
+func (a *AlertNode) updateState(t time.Time, level alert.Level, group models.GroupID) *alertState {
 	state, ok := a.states[group]
 	if !ok {
 		state = &alertState{
-			history: make([]AlertLevel, a.a.History),
+			history: make([]alert.Level, a.a.History),
 		}
 		a.states[group] = state
 	}
@@ -843,7 +799,7 @@ func (a *AlertNode) renderID(name string, group models.GroupID, tags models.Tags
 	return id.String(), nil
 }
 
-func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group models.GroupID, tags models.Tags, fields models.Fields, level AlertLevel) (string, string, detailsInfo, error) {
+func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group models.GroupID, tags models.Tags, fields models.Fields, level alert.Level) (string, string, detailsInfo, error) {
 	g := string(group)
 	if group == models.NilGroup {
 		g = "nil"
@@ -998,7 +954,7 @@ func (a *AlertNode) handleLog(l *pipeline.LogHandler, ad *AlertData) {
 func (a *AlertNode) handleVictorOps(vo *pipeline.VictorOpsHandler, ad *AlertData) {
 	var messageType string
 	switch ad.Level {
-	case OKAlert:
+	case alert.OK:
 		messageType = "RECOVERY"
 	default:
 		messageType = ad.Level.String()
@@ -1098,13 +1054,13 @@ func (a *AlertNode) handleAlerta(alerta alertaHandler, ad *AlertData) {
 	var severity string
 
 	switch ad.Level {
-	case OKAlert:
+	case alert.OK:
 		severity = "ok"
-	case InfoAlert:
+	case alert.Info:
 		severity = "informational"
-	case WarnAlert:
+	case alert.Warning:
 		severity = "warning"
-	case CritAlert:
+	case alert.Critical:
 		severity = "critical"
 	default:
 		severity = "indeterminate"
@@ -1184,7 +1140,7 @@ func (a *AlertNode) handleAlerta(alerta alertaHandler, ad *AlertData) {
 func (a *AlertNode) handleOpsGenie(og *pipeline.OpsGenieHandler, ad *AlertData) {
 	var messageType string
 	switch ad.Level {
-	case OKAlert:
+	case alert.OK:
 		messageType = "RECOVERY"
 	default:
 		messageType = ad.Level.String()

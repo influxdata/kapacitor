@@ -16,6 +16,7 @@ import (
 	imodels "github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/clock"
+	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/wlog"
 )
 
@@ -1364,7 +1365,7 @@ func TestBatch_AlertStateChangesOnly(t *testing.T) {
 				ID:      "cpu_usage_idle:cpu=cpu-total",
 				Message: "cpu_usage_idle:cpu=cpu-total is CRITICAL",
 				Time:    time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
-				Level:   kapacitor.CritAlert,
+				Level:   alert.Critical,
 			}
 			ad.Data = influxql.Result{}
 			if eq, msg := compareAlertData(expAd, ad); !eq {
@@ -1376,7 +1377,7 @@ func TestBatch_AlertStateChangesOnly(t *testing.T) {
 				Message:  "cpu_usage_idle:cpu=cpu-total is OK",
 				Time:     time.Date(1971, 1, 1, 0, 0, 38, 0, time.UTC),
 				Duration: 38 * time.Second,
-				Level:    kapacitor.OKAlert,
+				Level:    alert.OK,
 			}
 			ad.Data = influxql.Result{}
 			if eq, msg := compareAlertData(expAd, ad); !eq {
@@ -1434,7 +1435,7 @@ func TestBatch_AlertStateChangesOnlyExpired(t *testing.T) {
 				Message:  "cpu_usage_idle:cpu=cpu-total is CRITICAL",
 				Time:     time.Date(1971, 1, 1, 0, 0, int(rc-1)*20, 0, time.UTC),
 				Duration: time.Duration(rc-1) * 20 * time.Second,
-				Level:    kapacitor.CritAlert,
+				Level:    alert.Critical,
 			}
 		} else {
 			expAd = kapacitor.AlertData{
@@ -1442,7 +1443,7 @@ func TestBatch_AlertStateChangesOnlyExpired(t *testing.T) {
 				Message:  "cpu_usage_idle:cpu=cpu-total is OK",
 				Time:     time.Date(1971, 1, 1, 0, 0, 38, 0, time.UTC),
 				Duration: 38 * time.Second,
-				Level:    kapacitor.OKAlert,
+				Level:    alert.OK,
 			}
 		}
 		if eq, msg := compareAlertData(expAd, ad); !eq {
