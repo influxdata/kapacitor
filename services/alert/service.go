@@ -1,9 +1,25 @@
 package alert
 
+import (
+	"sort"
+	"sync"
+)
+
 type Service struct {
-	topics map[string]Topic
+	mu sync.RWMutex
+
+	topics map[string]*Topic
 	// Map topic name -> []Handler
 	handlers map[string][]Handler
+}
+
+func NewService() *Service {
+	s := &Service{
+		topics:   make(map[string]*Topic),
+		handlers: make(map[string][]Handler),
+	}
+
+	return s
 }
 
 func (s *Service) Collect(event Event) {
@@ -11,27 +27,159 @@ func (s *Service) Collect(event Event) {
 }
 
 func (s *Service) RegisterHandler(topics []string, h Handler) {
+	if len(topics) == 0 || h == nil {
+		return
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+TOPICS:
+	for _, topic := range topics {
+		if _, ok := s.topics[topic]; !ok {
+			s.topics[topic] = new(Topic)
+		}
+
+		handlers := s.handlers[topic]
+		for _, cur := range handlers {
+			if cur == h {
+				continue TOPICS
+			}
+			s.handlers[topic] = append(handlers, h)
+		}
+	}
 }
 
 func (s *Service) DeregisterHandler(topics []string, h Handler) {
+	if len(topics) == 0 || h == nil {
+		return
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+TOPICS:
+	for _, topic := range topics {
+		handlers := s.handlers[topic]
+		for i := 0; i < len(handlers); i++ {
+			if handlers[i] == h {
+				if i < len(handlers)-1 {
+					handlers[i] = handlers[len(handlers)-1]
+				}
+				s.handlers[topic] = handlers[:len(handlers)-1]
+				continue TOPICS
+			}
+		}
+	}
 }
 
-func (s *Service) TopicsStatus(pattern string, minLevel Level) map[string]Level {
-	panic("unimplemented")
+// TopicStatus returns the max alert level for each topic matching 'pattern', not returning
+// any topics with max alert levels less severe than 'minLevel'
+//
+// TODO: implement pattern restriction
+func (s *Service) TopicStatus(pattern string, minLevel Level) map[string]Level {
+	s.mu.RLock()
+	res := make(map[string]Level, len(s.topics))
+	for name, topic := range s.topics {
+		level := topic.MaxLevel()
+		if level >= minLevel && match(pattern, topic.name) {
+			res[name] = level
+		}
+	}
+	s.mu.RUnlock()
+	return res
 }
 
-func (s *Service) TopicsStatusDetails(pattern string, minLevel Level) map[string]map[string]EventState {
-	panic("unimplemented")
+// TopicStatusDetails is similar to TopicStatus, but will additionally return
+// the detailed EventState for every event ID with the matching topics that has
+// at least 'minLevel' severity
+//
+// TODO: implement pattern restriction
+func (s *Service) TopicStatusDetails(pattern string, minLevel Level) map[string]map[string]EventState {
+	s.mu.RLock()
+	topics := make([]*Topic, 0, len(s.topics))
+	for _, topic := range s.topics {
+		if topic.MaxLevel() >= minLevel && match(pattern, topic.name) {
+			topics = append(topics, topic)
+		}
+	}
+	s.mu.RUnlock()
+
+	res := make(map[string]map[string]EventState, len(topics))
+
+	for _, topic := range topics {
+		// TODO: move this into a method of Topic
+		topic.mu.RLock()
+		idx := sort.Search(len(topic.sorted), func(i int) bool {
+			return topic.sorted[i].Level < minLevel
+		})
+		if idx > 0 {
+			ids := make(map[string]EventState, idx)
+			for i := 0; i < idx; i++ {
+				ids[topic.sorted[i].ID] = *topic.sorted[i]
+			}
+			res[topic.name] = ids
+		}
+		topic.mu.RUnlock()
+	}
+
+	return res
+}
+
+func match(pattern, name string) bool {
+	return true
 }
 
 type Topic struct {
-	Name   string
-	Events map[string]EventState
+	name string
+
+	mu     sync.RWMutex
+	events map[string]*EventState
+	sorted []*EventState
 }
 
 func (t *Topic) MaxLevel() Level {
-	panic("unimplemented")
+	level := OK
+	t.mu.RLock()
+	if len(t.sorted) > 0 {
+		level = t.sorted[0].Level
+	}
+	t.mu.RUnlock()
+	return level
 }
 
-func (t *Topic) UpdateEvent(id string, state EventState) {
+// UpdateEvent will store the latest state for the given ID and return true if
+// the update caused a level change for the ID
+func (t *Topic) UpdateEvent(id string, state EventState) bool {
+	var needSort bool
+	t.mu.Lock()
+	cur := t.events[id]
+	if cur == nil {
+		needSort = true
+		cur = new(EventState)
+		t.events[id] = cur
+		t.sorted = append(t.sorted, cur)
+	}
+	needSort = needSort || cur.Level != state.Level
+
+	*cur = state
+
+	if needSort {
+		sort.Sort(sortedStates(t.sorted))
+	}
+
+	t.mu.Unlock()
+
+	return needSort
+}
+
+type sortedStates []*EventState
+
+func (e sortedStates) Len() int          { return len(e) }
+func (e sortedStates) Swap(i int, j int) { e[i], e[j] = e[j], e[i] }
+func (e sortedStates) Less(i int, j int) bool {
+	if e[i].Level > e[j].Level {
+		return true
+	}
+	return e[i].ID < e[j].ID
 }

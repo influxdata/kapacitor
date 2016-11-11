@@ -1,6 +1,7 @@
 package alert
 
 import (
+	"bytes"
 	"fmt"
 	"time"
 
@@ -8,16 +9,14 @@ import (
 )
 
 type Event struct {
-	ID    string
 	Topic string
 	State EventState
 }
 
-type Handler interface {
-	Handle(event Event)
-}
+type Handler chan Event
 
 type EventState struct {
+	ID       string
 	Message  string
 	Details  string
 	Time     time.Time
@@ -33,21 +32,20 @@ const (
 	Info
 	Warning
 	Critical
+	maxLevel
 )
 
+const levelStrings = "OKINFOWARNINGCRITICAL"
+
+var levelBytes = []byte(levelStrings)
+
+var levelOffsets = []int{0, 2, 6, 13, 21}
+
 func (l Level) String() string {
-	switch l {
-	case OK:
-		return "OK"
-	case Info:
-		return "INFO"
-	case Warning:
-		return "WARNING"
-	case Critical:
-		return "CRITICAL"
-	default:
-		panic("unknown AlertLevel")
+	if l < maxLevel {
+		return levelStrings[levelOffsets[l]:levelOffsets[l+1]]
 	}
+	return "unknown"
 }
 
 func (l Level) MarshalText() ([]byte, error) {
@@ -55,18 +53,15 @@ func (l Level) MarshalText() ([]byte, error) {
 }
 
 func (l *Level) UnmarshalText(text []byte) error {
-	s := string(text)
-	switch s {
-	case "OK":
-		*l = OK
-	case "INFO":
-		*l = Info
-	case "WARNING":
-		*l = Warning
-	case "CRITICAL":
-		*l = Critical
-	default:
-		return fmt.Errorf("unknown AlertLevel %s", s)
+	idx := bytes.Index(levelBytes, text)
+	if idx >= 0 {
+		for i := 0; i < int(maxLevel); i++ {
+			if idx == levelOffsets[i] {
+				*l = Level(i)
+				return nil
+			}
+		}
 	}
-	return nil
+
+	return fmt.Errorf("unknown alert level '%s'", text)
 }
