@@ -6,6 +6,9 @@ rpname
 cpu,type=idle,host=serverB value=97.1 0000000001
 dbname
 rpname
+cpu,type=idle,host=serverC value=96.4 0000000001
+dbname
+rpname
 disk,type=sda,host=serverB value=39   0000000001
 dbname
 rpname
@@ -79,3 +82,6 @@ cpu,type=idle,host=serverA value=95.1 0000000012
 dbname
 rpname
 cpu,type=idle,host=serverB value=95.1 0000000012
+dbname
+rpname
+cpu,type=idle,host=serverC value=95.8 0000000012
