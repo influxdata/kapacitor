@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 
 	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/services/alert"
 )
 
 type Service struct {
@@ -64,9 +65,9 @@ func (s *Service) StateChangesOnly() bool {
 }
 
 type testOptions struct {
-	Room    string               `json:"room"`
-	Message string               `json:"message"`
-	Level   kapacitor.AlertLevel `json:"level"`
+	Room    string      `json:"room"`
+	Message string      `json:"message"`
+	Level   alert.Level `json:"level"`
 }
 
 func (s *Service) TestOptions() interface{} {
@@ -74,7 +75,7 @@ func (s *Service) TestOptions() interface{} {
 	return &testOptions{
 		Room:    c.Room,
 		Message: "test hipchat message",
-		Level:   kapacitor.CritAlert,
+		Level:   alert.Critical,
 	}
 }
 
@@ -87,7 +88,7 @@ func (s *Service) Test(options interface{}) error {
 	return s.Alert(o.Room, c.Token, o.Message, o.Level)
 }
 
-func (s *Service) Alert(room, token, message string, level kapacitor.AlertLevel) error {
+func (s *Service) Alert(room, token, message string, level alert.Level) error {
 	url, post, err := s.preparePost(room, token, message, level)
 	if err != nil {
 		return err
@@ -115,7 +116,7 @@ func (s *Service) Alert(room, token, message string, level kapacitor.AlertLevel)
 	return nil
 }
 
-func (s *Service) preparePost(room, token, message string, level kapacitor.AlertLevel) (string, io.Reader, error) {
+func (s *Service) preparePost(room, token, message string, level alert.Level) (string, io.Reader, error) {
 	c := s.config()
 
 	if !c.Enabled {
@@ -140,9 +141,9 @@ func (s *Service) preparePost(room, token, message string, level kapacitor.Alert
 
 	var color string
 	switch level {
-	case kapacitor.WarnAlert:
+	case alert.Warning:
 		color = "yellow"
-	case kapacitor.CritAlert:
+	case alert.Critical:
 		color = "red"
 	default:
 		color = "green"

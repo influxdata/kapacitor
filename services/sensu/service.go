@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"sync/atomic"
 
-	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/services/alert"
 )
 
 type Service struct {
@@ -53,16 +53,16 @@ func (s *Service) Update(newConfig []interface{}) error {
 }
 
 type testOptions struct {
-	Name   string               `json:"name"`
-	Output string               `json:"output"`
-	Level  kapacitor.AlertLevel `json:"level"`
+	Name   string      `json:"name"`
+	Output string      `json:"output"`
+	Level  alert.Level `json:"level"`
 }
 
 func (s *Service) TestOptions() interface{} {
 	return &testOptions{
 		Name:   "testName",
 		Output: "testOutput",
-		Level:  kapacitor.CritAlert,
+		Level:  alert.Critical,
 	}
 }
 
@@ -78,7 +78,7 @@ func (s *Service) Test(options interface{}) error {
 	)
 }
 
-func (s *Service) Alert(name, output string, level kapacitor.AlertLevel) error {
+func (s *Service) Alert(name, output string, level alert.Level) error {
 	if !validNamePattern.MatchString(name) {
 		return fmt.Errorf("invalid name %q for sensu alert. Must match %v", name, validNamePattern)
 	}
@@ -106,7 +106,7 @@ func (s *Service) Alert(name, output string, level kapacitor.AlertLevel) error {
 	return nil
 }
 
-func (s *Service) prepareData(name, output string, level kapacitor.AlertLevel) (*net.TCPAddr, map[string]interface{}, error) {
+func (s *Service) prepareData(name, output string, level alert.Level) (*net.TCPAddr, map[string]interface{}, error) {
 
 	c := s.config()
 
@@ -116,13 +116,13 @@ func (s *Service) prepareData(name, output string, level kapacitor.AlertLevel) (
 
 	var status int
 	switch level {
-	case kapacitor.OKAlert:
+	case alert.OK:
 		status = 0
-	case kapacitor.InfoAlert:
+	case alert.Info:
 		status = 0
-	case kapacitor.WarnAlert:
+	case alert.Warning:
 		status = 1
-	case kapacitor.CritAlert:
+	case alert.Critical:
 		status = 2
 	default:
 		status = 3

@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 
 	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/services/alert"
 )
 
 type Service struct {
@@ -61,16 +62,16 @@ func (s *Service) Global() bool {
 }
 
 type testOptions struct {
-	IncidentKey string               `json:"incident-key"`
-	Description string               `json:"description"`
-	Level       kapacitor.AlertLevel `json:"level"`
+	IncidentKey string      `json:"incident-key"`
+	Description string      `json:"description"`
+	Level       alert.Level `json:"level"`
 }
 
 func (s *Service) TestOptions() interface{} {
 	return &testOptions{
 		IncidentKey: "testIncidentKey",
 		Description: "test pagerduty message",
-		Level:       kapacitor.CritAlert,
+		Level:       alert.Critical,
 	}
 }
 
@@ -89,7 +90,7 @@ func (s *Service) Test(options interface{}) error {
 	)
 }
 
-func (s *Service) Alert(serviceKey, incidentKey, desc string, level kapacitor.AlertLevel, details interface{}) error {
+func (s *Service) Alert(serviceKey, incidentKey, desc string, level alert.Level, details interface{}) error {
 	url, post, err := s.preparePost(serviceKey, incidentKey, desc, level, details)
 	if err != nil {
 		return err
@@ -116,7 +117,7 @@ func (s *Service) Alert(serviceKey, incidentKey, desc string, level kapacitor.Al
 	return nil
 }
 
-func (s *Service) preparePost(serviceKey, incidentKey, desc string, level kapacitor.AlertLevel, details interface{}) (string, io.Reader, error) {
+func (s *Service) preparePost(serviceKey, incidentKey, desc string, level alert.Level, details interface{}) (string, io.Reader, error) {
 
 	c := s.config()
 	if !c.Enabled {
@@ -125,9 +126,9 @@ func (s *Service) preparePost(serviceKey, incidentKey, desc string, level kapaci
 
 	var eventType string
 	switch level {
-	case kapacitor.WarnAlert, kapacitor.CritAlert:
+	case alert.Warning, alert.Critical:
 		eventType = "trigger"
-	case kapacitor.InfoAlert:
+	case alert.Info:
 		return "", nil, fmt.Errorf("AlertLevel 'info' is currently ignored by the PagerDuty service")
 	default:
 		eventType = "resolve"

@@ -24,6 +24,7 @@ import (
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/clock"
 	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
@@ -4570,7 +4571,7 @@ func TestStream_Alert(t *testing.T) {
 			Message: "kapacitor/cpu/serverA is CRITICAL",
 			Details: "details",
 			Time:    time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
-			Level:   kapacitor.CritAlert,
+			Level:   alert.Critical,
 			Data: influxql.Result{
 				Series: imodels.Rows{
 					{
@@ -4663,7 +4664,7 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 				Message:  "kapacitor/cpu/serverA is WARNING",
 				Time:     time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 				Duration: 0,
-				Level:    kapacitor.WarnAlert,
+				Level:    alert.Warning,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -4684,7 +4685,7 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 				Message:  "kapacitor/cpu/serverA is INFO",
 				Time:     time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 				Duration: 0,
-				Level:    kapacitor.InfoAlert,
+				Level:    alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -4705,7 +4706,7 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 				Message:  "kapacitor/cpu/serverA is WARNING",
 				Time:     time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 				Duration: time.Second,
-				Level:    kapacitor.WarnAlert,
+				Level:    alert.Warning,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -4726,7 +4727,7 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 				Message:  "kapacitor/cpu/serverA is WARNING",
 				Time:     time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 				Duration: 2 * time.Second,
-				Level:    kapacitor.WarnAlert,
+				Level:    alert.Warning,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -4747,7 +4748,7 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 				Message:  "kapacitor/cpu/serverA is CRITICAL",
 				Time:     time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 				Duration: 3 * time.Second,
-				Level:    kapacitor.CritAlert,
+				Level:    alert.Critical,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -4768,7 +4769,7 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 				Message:  "kapacitor/cpu/serverA is INFO",
 				Time:     time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
 				Duration: 0,
-				Level:    kapacitor.InfoAlert,
+				Level:    alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -4850,7 +4851,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Message: "kapacitor/cpu/serverA is INFO",
 				Details: "details",
 				Time:    time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
-				Level:   kapacitor.InfoAlert,
+				Level:   alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -4872,7 +4873,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
 				Duration: time.Second,
-				Level:    kapacitor.InfoAlert,
+				Level:    alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -4894,7 +4895,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 				Duration: 2 * time.Second,
-				Level:    kapacitor.InfoAlert,
+				Level:    alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -4916,7 +4917,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 				Duration: 3 * time.Second,
-				Level:    kapacitor.OKAlert,
+				Level:    alert.OK,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -4938,7 +4939,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 				Duration: 0 * time.Second,
-				Level:    kapacitor.InfoAlert,
+				Level:    alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -4960,7 +4961,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 				Duration: 1 * time.Second,
-				Level:    kapacitor.WarnAlert,
+				Level:    alert.Warning,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -4982,7 +4983,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
 				Duration: 2 * time.Second,
-				Level:    kapacitor.WarnAlert,
+				Level:    alert.Warning,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5004,7 +5005,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
 				Duration: 3 * time.Second,
-				Level:    kapacitor.OKAlert,
+				Level:    alert.OK,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5026,7 +5027,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 				Duration: 0 * time.Second,
-				Level:    kapacitor.InfoAlert,
+				Level:    alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5048,7 +5049,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
 				Duration: 1 * time.Second,
-				Level:    kapacitor.WarnAlert,
+				Level:    alert.Warning,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5070,7 +5071,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 				Duration: 2 * time.Second,
-				Level:    kapacitor.CritAlert,
+				Level:    alert.Critical,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5092,7 +5093,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 				Duration: 3 * time.Second,
-				Level:    kapacitor.OKAlert,
+				Level:    alert.OK,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5188,7 +5189,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Message: "kapacitor/cpu/serverA is INFO",
 				Details: "details",
 				Time:    time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
-				Level:   kapacitor.InfoAlert,
+				Level:   alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5210,7 +5211,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
 				Duration: time.Second,
-				Level:    kapacitor.InfoAlert,
+				Level:    alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5232,7 +5233,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 				Duration: 2 * time.Second,
-				Level:    kapacitor.InfoAlert,
+				Level:    alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5254,7 +5255,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 				Duration: 3 * time.Second,
-				Level:    kapacitor.OKAlert,
+				Level:    alert.OK,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5276,7 +5277,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 				Duration: 0 * time.Second,
-				Level:    kapacitor.InfoAlert,
+				Level:    alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5298,7 +5299,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 				Duration: 1 * time.Second,
-				Level:    kapacitor.WarnAlert,
+				Level:    alert.Warning,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5320,7 +5321,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
 				Duration: 2 * time.Second,
-				Level:    kapacitor.InfoAlert,
+				Level:    alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5342,7 +5343,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
 				Duration: 3 * time.Second,
-				Level:    kapacitor.OKAlert,
+				Level:    alert.OK,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5364,7 +5365,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 				Duration: 0 * time.Second,
-				Level:    kapacitor.InfoAlert,
+				Level:    alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5386,7 +5387,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
 				Duration: 1 * time.Second,
-				Level:    kapacitor.WarnAlert,
+				Level:    alert.Warning,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5408,7 +5409,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 				Duration: 2 * time.Second,
-				Level:    kapacitor.CritAlert,
+				Level:    alert.Critical,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5430,7 +5431,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 				Duration: 3 * time.Second,
-				Level:    kapacitor.WarnAlert,
+				Level:    alert.Warning,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5452,7 +5453,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 12, 0, time.UTC),
 				Duration: 4 * time.Second,
-				Level:    kapacitor.WarnAlert,
+				Level:    alert.Warning,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5474,7 +5475,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 13, 0, time.UTC),
 				Duration: 5 * time.Second,
-				Level:    kapacitor.InfoAlert,
+				Level:    alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5496,7 +5497,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 14, 0, time.UTC),
 				Duration: 6 * time.Second,
-				Level:    kapacitor.OKAlert,
+				Level:    alert.OK,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5593,7 +5594,7 @@ func TestStream_AlertDuration(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 				Duration: 0,
-				Level:    kapacitor.CritAlert,
+				Level:    alert.Critical,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5615,7 +5616,7 @@ func TestStream_AlertDuration(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 				Duration: 2 * time.Second,
-				Level:    kapacitor.WarnAlert,
+				Level:    alert.Warning,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5637,7 +5638,7 @@ func TestStream_AlertDuration(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 				Duration: 4 * time.Second,
-				Level:    kapacitor.OKAlert,
+				Level:    alert.OK,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5659,7 +5660,7 @@ func TestStream_AlertDuration(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 				Duration: 0,
-				Level:    kapacitor.WarnAlert,
+				Level:    alert.Warning,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5681,7 +5682,7 @@ func TestStream_AlertDuration(t *testing.T) {
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 				Duration: 3 * time.Second,
-				Level:    kapacitor.OKAlert,
+				Level:    alert.OK,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -6664,7 +6665,7 @@ func TestStream_AlertSigma(t *testing.T) {
 				Message: "cpu:nil is INFO",
 				Details: "cpu:nil is INFO",
 				Time:    time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
-				Level:   kapacitor.InfoAlert,
+				Level:   alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -6687,7 +6688,7 @@ func TestStream_AlertSigma(t *testing.T) {
 				Details:  "cpu:nil is OK",
 				Time:     time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 				Duration: time.Second,
-				Level:    kapacitor.OKAlert,
+				Level:    alert.OK,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -6749,7 +6750,7 @@ func TestStream_AlertComplexWhere(t *testing.T) {
 			Message: "cpu:nil is CRITICAL",
 			Details: "",
 			Time:    time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
-			Level:   kapacitor.CritAlert,
+			Level:   alert.Critical,
 			Data: influxql.Result{
 				Series: imodels.Rows{
 					{
@@ -6833,7 +6834,7 @@ func TestStream_AlertStateChangesOnlyExpired(t *testing.T) {
 				Message:  "cpu:nil is CRITICAL",
 				Time:     time.Date(1971, 1, 1, 0, 0, int(rc)*2-1, 0, time.UTC),
 				Duration: time.Duration(rc-1) * 2 * time.Second,
-				Level:    kapacitor.CritAlert,
+				Level:    alert.Critical,
 			}
 		} else {
 			expAd = kapacitor.AlertData{
@@ -6841,7 +6842,7 @@ func TestStream_AlertStateChangesOnlyExpired(t *testing.T) {
 				Message:  "cpu:nil is OK",
 				Time:     time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 				Duration: 9 * time.Second,
-				Level:    kapacitor.OKAlert,
+				Level:    alert.OK,
 			}
 		}
 		if eq, msg := compareAlertData(expAd, ad); !eq {

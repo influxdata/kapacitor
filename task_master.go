@@ -12,6 +12,7 @@ import (
 	"github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/httpd"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
 	"github.com/influxdata/kapacitor/tick"
@@ -75,12 +76,12 @@ type TaskMaster struct {
 	}
 	PagerDutyService interface {
 		Global() bool
-		Alert(serviceKey, incidentKey, desc string, level AlertLevel, details interface{}) error
+		Alert(serviceKey, incidentKey, desc string, level alert.Level, details interface{}) error
 	}
 	SlackService interface {
 		Global() bool
 		StateChangesOnly() bool
-		Alert(channel, message, username, iconEmoji string, level AlertLevel) error
+		Alert(channel, message, username, iconEmoji string, level alert.Level) error
 	}
 	TelegramService interface {
 		Global() bool
@@ -90,7 +91,7 @@ type TaskMaster struct {
 	HipChatService interface {
 		Global() bool
 		StateChangesOnly() bool
-		Alert(room, token, message string, level AlertLevel) error
+		Alert(room, token, message string, level alert.Level) error
 	}
 	AlertaService interface {
 		Alert(token,
@@ -106,7 +107,7 @@ type TaskMaster struct {
 			data interface{}) error
 	}
 	SensuService interface {
-		Alert(name, output string, level AlertLevel) error
+		Alert(name, output string, level alert.Level) error
 	}
 	TalkService interface {
 		Alert(title, text string) error
