@@ -3820,6 +3820,170 @@ cpuT
 	testStreamerWithOutput(t, "TestStream_Union", script, 15*time.Second, er, false, nil)
 }
 
+func TestStream_Union_Stepped(t *testing.T) {
+	var script = `
+var cpuT = stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "cpu" == 'total')
+var cpu0 = stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "cpu" == '0')
+var cpu1 = stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "cpu" == '1')
+
+cpuT
+	|union(cpu0, cpu1)
+		.rename('cpu_all')
+	|groupBy('cpu')
+	|httpOut('TestStream_Union_Stepped')
+`
+
+	steps := []step{
+		{
+			t: time.Second,
+		},
+		{
+			t: 3 * time.Second,
+			er: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu_all",
+						Tags:    map[string]string{"cpu": "0"},
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+							98.0,
+						}},
+					},
+					{
+						Name:    "cpu_all",
+						Tags:    map[string]string{"cpu": "1"},
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+							92.0,
+						}},
+					},
+					{
+						Name:    "cpu_all",
+						Tags:    map[string]string{"cpu": "total"},
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+							92.0,
+						}},
+					},
+				},
+			},
+		},
+		{
+			t: 6 * time.Second,
+			er: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu_all",
+						Tags:    map[string]string{"cpu": "0"},
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+							92.0,
+						}},
+					},
+					{
+						Name:    "cpu_all",
+						Tags:    map[string]string{"cpu": "1"},
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+							92.0,
+						}},
+					},
+					{
+						Name:    "cpu_all",
+						Tags:    map[string]string{"cpu": "total"},
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+							93.0,
+						}},
+					},
+				},
+			},
+		},
+		{
+			t: 15 * time.Second,
+			er: kapacitor.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu_all",
+						Tags:    map[string]string{"cpu": "0"},
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
+							96.0,
+						}},
+					},
+					{
+						Name:    "cpu_all",
+						Tags:    map[string]string{"cpu": "1"},
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
+							93.0,
+						}},
+					},
+					{
+						Name:    "cpu_all",
+						Tags:    map[string]string{"cpu": "total"},
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
+							96.0,
+						}},
+					},
+				},
+			},
+		},
+	}
+	er := kapacitor.Result{
+		Series: imodels.Rows{
+			{
+				Name:    "cpu_all",
+				Tags:    map[string]string{"cpu": "0"},
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 12, 0, time.UTC),
+					95.0,
+				}},
+			},
+			{
+				Name:    "cpu_all",
+				Tags:    map[string]string{"cpu": "1"},
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 12, 0, time.UTC),
+					95.0,
+				}},
+			},
+			{
+				Name:    "cpu_all",
+				Tags:    map[string]string{"cpu": "total"},
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
+					96.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithSteppedOutput(t, "TestStream_Union_Stepped", script, steps, er, true, nil)
+}
+
 func TestStream_InfluxQL_Float(t *testing.T) {
 
 	type testCase struct {
@@ -8469,4 +8633,89 @@ func compareListIgnoreOrder(got, exp []interface{}, cmpF func(got, exp interface
 		}
 	}
 	return nil
+
+}
+
+type step struct {
+	t  time.Duration
+	er kapacitor.Result
+}
+
+func testStreamerWithSteppedOutput(
+	t *testing.T,
+	name,
+	script string,
+	steps []step,
+	er kapacitor.Result,
+	ignoreOrder bool,
+	tmInit func(tm *kapacitor.TaskMaster),
+) {
+	clock, et, replayErr, tm := testStreamer(t, name, script, tmInit)
+	defer tm.Close()
+	for s, step := range steps {
+		// Move time forward
+		clock.Set(clock.Zero().Add(step.t))
+		// TODO: make this deterministic via a barrier or some such.
+		time.Sleep(100 * time.Millisecond)
+
+		// Get the result
+		output, err := et.GetOutput(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		resp, err := http.Get(output.Endpoint())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Assert we got the expected result
+		result := kapacitor.ResultFromJSON(resp.Body)
+		if ignoreOrder {
+			if eq, msg := compareResultsIgnoreSeriesOrder(step.er, result); !eq {
+				t.Errorf("step %d: %s", s, msg)
+			}
+		} else {
+			if eq, msg := compareResults(step.er, result); !eq {
+				t.Errorf("step %d: %s", s, msg)
+			}
+		}
+	}
+	// Wait till the replay has finished
+	if err := <-replayErr; err != nil {
+		if err != nil {
+			t.Error(err)
+		}
+	}
+	tm.Drain()
+	et.StopStats()
+	// Wait till the task is finished
+	if err := et.Wait(); err != nil {
+		if err != nil {
+			t.Error(err)
+		}
+	}
+
+	// Get the last result
+	output, err := et.GetOutput(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := http.Get(output.Endpoint())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert we got the expected result
+	result := kapacitor.ResultFromJSON(resp.Body)
+	if ignoreOrder {
+		if eq, msg := compareResultsIgnoreSeriesOrder(er, result); !eq {
+			t.Errorf("final %s", msg)
+		}
+	} else {
+		if eq, msg := compareResults(er, result); !eq {
+			t.Errorf("final %s", msg)
+		}
+	}
 }
