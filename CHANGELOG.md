@@ -4,8 +4,27 @@
 
 ### Release Notes
 
+This release introduces a new feature where you can window based off the number of points instead of their time.
+For example:
+
+```
+stream
+    |from()
+        .measurement('my-measurement')
+    // Emit window for every 10 points with 100 points per window.
+    |window()
+        .periodCount(100)
+        .everyCount(10)
+    |mean('value')
+    |alert()
+         .crit(lambda: "mean" > 100)
+         .slack()
+         .channel('#alerts')
+```
+
 ### Features
 
+- [#327](https://github.com/influxdata/kapacitor/issues/327): You can now window based on count in addition to time.
 - [#913](https://github.com/influxdata/kapacitor/issues/913): Add fillPeriod option to Window node, so that the first emit waits till the period has elapsed before emitting.
 - [#898](https://github.com/influxdata/kapacitor/issues/898): Now when the Window node every value is zero, the window will be emitted immediately for each new point.
 

@@ -1,9 +1,9 @@
 package kapacitor
 
 import (
+	"errors"
 	"fmt"
 	"log"
-	"sync"
 	"time"
 
 	"github.com/influxdata/kapacitor/models"
@@ -25,8 +25,12 @@ func newWindowNode(et *ExecutingTask, n *pipeline.WindowNode, l *log.Logger) (*W
 	return wn, nil
 }
 
+type window interface {
+	Insert(p models.Point) (models.Batch, bool)
+}
+
 func (w *WindowNode) runWindow([]byte) error {
-	windows := make(map[models.GroupID]*window)
+	windows := make(map[models.GroupID]window)
 	// Loops through points windowing by group
 	for p, ok := w.ins[0].NextPoint(); ok; p, ok = w.ins[0].NextPoint() {
 		w.timer.Start()
@@ -36,68 +40,57 @@ func (w *WindowNode) runWindow([]byte) error {
 			for _, dim := range p.Dimensions.TagNames {
 				tags[dim] = p.Tags[dim]
 			}
-			// Determine first next emit time.
-			var nextEmit time.Time
-			if w.w.FillPeriodFlag {
-				nextEmit = p.Time.Add(w.w.Period)
-				if w.w.AlignFlag {
-					firstPeriod := nextEmit
-					// Needs to be aligned with Every and be greater than now+Period
-					nextEmit = nextEmit.Truncate(w.w.Every)
-					if !nextEmit.After(firstPeriod) {
-						// This means we will drop the first few points
-						nextEmit = nextEmit.Add(w.w.Every)
-					}
-				}
-			} else {
-				nextEmit = p.Time.Add(w.w.Every)
-				if w.w.AlignFlag {
-					nextEmit = nextEmit.Truncate(w.w.Every)
-				}
-			}
-			wnd = &window{
-				buf:      &windowBuffer{logger: w.logger},
-				align:    w.w.AlignFlag,
-				nextEmit: nextEmit,
-				period:   w.w.Period,
-				every:    w.w.Every,
-				name:     p.Name,
-				group:    p.Group,
-				byName:   p.Dimensions.ByName,
-				tags:     tags,
-				logger:   w.logger,
+			switch {
+			case w.w.Period != 0:
+				// Window by time
+				wnd = newWindowByTime(
+					p.Time,
+					w.w.Period,
+					w.w.Every,
+					p.Name,
+					p.Group,
+					w.w.AlignFlag,
+					p.Dimensions.ByName,
+					w.w.FillPeriodFlag,
+					tags,
+					w.logger,
+				)
+			case w.w.PeriodCount != 0:
+				wnd = newWindowByCount(
+					p.Name,
+					p.Group,
+					tags,
+					p.Dimensions.ByName,
+					int(w.w.PeriodCount),
+					int(w.w.EveryCount),
+					w.w.FillPeriodFlag,
+					w.logger,
+				)
+			default:
+				// This should not be possible, but just in case.
+				return errors.New("invalid window, no period specified for either time or count")
 			}
 			windows[p.Group] = wnd
 		}
-		if w.w.Every == 0 {
-			// Insert the point now since we know we do not need to wait.
-			wnd.buf.insert(p)
-			// We are emitting on every point, so the nextEmit is always
-			// the time of the current point.
-			wnd.nextEmit = p.Time
-		}
-		if !p.Time.Before(wnd.nextEmit) {
-			points := wnd.emit(p.Time)
+		batch, ok := wnd.Insert(p)
+		if ok {
 			// Send window to all children
 			w.timer.Pause()
 			for _, child := range w.outs {
-				err := child.CollectBatch(points)
+				err := child.CollectBatch(batch)
 				if err != nil {
 					return err
 				}
 			}
 			w.timer.Resume()
 		}
-		if w.w.Every != 0 {
-			wnd.buf.insert(p)
-		}
 		w.timer.Stop()
 	}
 	return nil
 }
 
-type window struct {
-	buf      *windowBuffer
+type windowByTime struct {
+	buf      *windowTimeBuffer
 	align    bool
 	nextEmit time.Time
 	period   time.Duration
@@ -109,29 +102,106 @@ type window struct {
 	logger   *log.Logger
 }
 
-func (w *window) emit(now time.Time) models.Batch {
-	oldest := w.nextEmit.Add(-1 * w.period)
-	w.buf.purge(oldest)
+func newWindowByTime(
+	now time.Time,
+	period,
+	every time.Duration,
+	name string,
+	group models.GroupID,
+	align,
+	byName,
+	fillPeriod bool,
+	tags models.Tags,
+	logger *log.Logger,
 
-	batch := w.buf.batch()
-	batch.Name = w.name
-	batch.Group = w.group
-	batch.Tags = w.tags
-	batch.TMax = w.nextEmit
-	batch.ByName = w.byName
-
-	// Determine next emit time.
-	// This is dependent on the current time not the last time we emitted.
-	w.nextEmit = now.Add(w.every)
-	if w.align {
-		w.nextEmit = w.nextEmit.Truncate(w.every)
+) *windowByTime {
+	// Determine first nextEmit time.
+	var nextEmit time.Time
+	if fillPeriod {
+		nextEmit = now.Add(period)
+		if align {
+			firstPeriod := nextEmit
+			// Needs to be aligned with Every and be greater than now+Period
+			nextEmit = nextEmit.Truncate(every)
+			if !nextEmit.After(firstPeriod) {
+				// This means we will drop the first few points
+				nextEmit = nextEmit.Add(every)
+			}
+		}
+	} else {
+		nextEmit = now.Add(every)
+		if align {
+			nextEmit = nextEmit.Truncate(every)
+		}
 	}
-	return batch
+	return &windowByTime{
+		buf:      &windowTimeBuffer{logger: logger},
+		nextEmit: nextEmit,
+		align:    align,
+		period:   period,
+		every:    every,
+		name:     name,
+		group:    group,
+		byName:   byName,
+		tags:     tags,
+		logger:   logger,
+	}
+}
+
+func (w *windowByTime) Insert(p models.Point) (b models.Batch, ok bool) {
+	if w.every == 0 {
+		// Insert point before.
+		w.buf.insert(p)
+		// Since we are emitting every point we can use a right aligned window (oldest, now]
+		if !p.Time.Before(w.nextEmit) {
+			// purge old points
+			oldest := p.Time.Add(-1 * w.period)
+			w.buf.purge(oldest, false)
+
+			// get current batch
+			b = w.batch(p.Time)
+			ok = true
+
+			// Next emit time is now
+			w.nextEmit = p.Time
+		}
+	} else {
+		// Since more points can arrive with the same time we need to use a left aligned window [oldest, now).
+		if !p.Time.Before(w.nextEmit) {
+			// purge old points
+			oldest := w.nextEmit.Add(-1 * w.period)
+			w.buf.purge(oldest, true)
+
+			// get current batch
+			b = w.batch(w.nextEmit)
+			ok = true
+
+			// Determine next emit time.
+			// This is dependent on the current time not the last time we emitted.
+			w.nextEmit = p.Time.Add(w.every)
+			if w.align {
+				w.nextEmit = w.nextEmit.Truncate(w.every)
+			}
+		}
+		// Insert point after.
+		w.buf.insert(p)
+	}
+	return
+}
+
+func (w *windowByTime) batch(tmax time.Time) models.Batch {
+	return models.Batch{
+		Name:   w.name,
+		Group:  w.group,
+		Tags:   w.tags,
+		TMax:   tmax,
+		ByName: w.byName,
+		Points: w.buf.points(),
+	}
 }
 
 // implements a purpose built ring buffer for the window of points
-type windowBuffer struct {
-	sync.Mutex
+type windowTimeBuffer struct {
 	window []models.Point
 	start  int
 	stop   int
@@ -140,9 +210,7 @@ type windowBuffer struct {
 }
 
 // Insert a single point into the buffer.
-func (b *windowBuffer) insert(p models.Point) {
-	b.Lock()
-	defer b.Unlock()
+func (b *windowTimeBuffer) insert(p models.Point) {
 	if b.size == cap(b.window) {
 		//Increase our buffer
 		c := 2 * (b.size + 1)
@@ -183,31 +251,35 @@ func (b *windowBuffer) insert(p models.Point) {
 }
 
 // Purge expired data from the window.
-func (b *windowBuffer) purge(oldest time.Time) {
-	b.Lock()
-	defer b.Unlock()
+func (b *windowTimeBuffer) purge(oldest time.Time, inclusive bool) {
+	include := func(t time.Time) bool {
+		if inclusive {
+			return !t.Before(oldest)
+		}
+		return t.After(oldest)
+	}
 	l := len(b.window)
 	if l == 0 {
 		return
 	}
 	if b.start < b.stop {
 		for ; b.start < b.stop; b.start++ {
-			if !b.window[b.start].Time.Before(oldest) {
+			if include(b.window[b.start].Time) {
 				break
 			}
 		}
 		b.size = b.stop - b.start
 	} else {
-		if !b.window[l-1].Time.Before(oldest) {
+		if include(b.window[l-1].Time) {
 			for ; b.start < l; b.start++ {
-				if !b.window[b.start].Time.Before(oldest) {
+				if include(b.window[b.start].Time) {
 					break
 				}
 			}
 			b.size = l - b.start + b.stop
 		} else {
 			for b.start = 0; b.start < b.stop; b.start++ {
-				if !b.window[b.start].Time.Before(oldest) {
+				if include(b.window[b.start].Time) {
 					break
 				}
 			}
@@ -217,31 +289,130 @@ func (b *windowBuffer) purge(oldest time.Time) {
 }
 
 // Returns a copy of the current buffer.
-func (b *windowBuffer) batch() models.Batch {
-	b.Lock()
-	defer b.Unlock()
-	batch := models.Batch{}
+func (b *windowTimeBuffer) points() []models.BatchPoint {
 	if b.size == 0 {
-		return batch
+		return nil
 	}
-	batch.Points = make([]models.BatchPoint, b.size)
+	points := make([]models.BatchPoint, b.size)
 	if b.stop > b.start {
 		for i, p := range b.window[b.start:b.stop] {
-			batch.Points[i] = models.BatchPointFromPoint(p)
+			points[i] = models.BatchPointFromPoint(p)
 		}
 	} else {
 		j := 0
 		l := len(b.window)
 		for i := b.start; i < l; i++ {
 			p := b.window[i]
-			batch.Points[j] = models.BatchPointFromPoint(p)
+			points[j] = models.BatchPointFromPoint(p)
 			j++
 		}
 		for i := 0; i < b.stop; i++ {
 			p := b.window[i]
-			batch.Points[j] = models.BatchPointFromPoint(p)
+			points[j] = models.BatchPointFromPoint(p)
 			j++
 		}
 	}
-	return batch
+	return points
+}
+
+type windowByCount struct {
+	name   string
+	group  models.GroupID
+	tags   models.Tags
+	byName bool
+
+	buf      []models.BatchPoint
+	start    int
+	stop     int
+	period   int
+	every    int
+	nextEmit int
+	size     int
+	count    int
+
+	logger *log.Logger
+}
+
+func newWindowByCount(
+	name string,
+	group models.GroupID,
+	tags models.Tags,
+	byName bool,
+	period,
+	every int,
+	fillPeriod bool,
+	logger *log.Logger) *windowByCount {
+	// Determine the first nextEmit index
+	nextEmit := every
+	if fillPeriod {
+		nextEmit = period
+	}
+	return &windowByCount{
+		name:     name,
+		group:    group,
+		tags:     tags,
+		byName:   byName,
+		buf:      make([]models.BatchPoint, period),
+		period:   period,
+		every:    every,
+		nextEmit: nextEmit,
+		logger:   logger,
+	}
+}
+
+func (w *windowByCount) Insert(p models.Point) (b models.Batch, ok bool) {
+	w.buf[w.stop] = models.BatchPoint{
+		Time:   p.Time,
+		Fields: p.Fields,
+		Tags:   p.Tags,
+	}
+	w.stop = (w.stop + 1) % w.period
+	if w.size == w.period {
+		w.start = (w.start + 1) % w.period
+	} else {
+		w.size++
+	}
+	w.count++
+	//Check if its time to emit
+	if w.count == w.nextEmit {
+		b = w.batch()
+		ok = true
+	}
+	return
+}
+
+func (w *windowByCount) batch() models.Batch {
+	w.nextEmit += w.every
+	points := w.points()
+	return models.Batch{
+		Name:   w.name,
+		Group:  w.group,
+		Tags:   w.tags,
+		TMax:   points[len(points)-1].Time,
+		ByName: w.byName,
+		Points: points,
+	}
+}
+
+// Returns a copy of the current buffer.
+func (w *windowByCount) points() []models.BatchPoint {
+	if w.size == 0 {
+		return nil
+	}
+	points := make([]models.BatchPoint, w.size)
+	if w.stop > w.start {
+		copy(points, w.buf[w.start:w.stop])
+	} else {
+		j := 0
+		l := len(w.buf)
+		for i := w.start; i < l; i++ {
+			points[j] = w.buf[i]
+			j++
+		}
+		for i := 0; i < w.stop; i++ {
+			points[j] = w.buf[i]
+			j++
+		}
+	}
+	return points
 }
