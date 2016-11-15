@@ -58,6 +58,11 @@ type TaskMaster struct {
 
 	UDFService UDFService
 
+	AlertService interface {
+		Collect(event alert.Event)
+		RegisterHandler(topics []string, h alert.Handler)
+		DeregisterHandler(topics []string, h alert.Handler)
+	}
 	InfluxDBService interface {
 		NewNamedClient(name string) (influxdb.Client, error)
 	}
@@ -182,6 +187,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.TaskStore = tm.TaskStore
 	n.DeadmanService = tm.DeadmanService
 	n.UDFService = tm.UDFService
+	n.AlertService = tm.AlertService
 	n.InfluxDBService = tm.InfluxDBService
 	n.SMTPService = tm.SMTPService
 	n.OpsGenieService = tm.OpsGenieService

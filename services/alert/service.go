@@ -1,6 +1,7 @@
 package alert
 
 import (
+	"log"
 	"sort"
 	"sync"
 )
@@ -11,15 +12,26 @@ type Service struct {
 	topics map[string]*Topic
 	// Map topic name -> []Handler
 	handlers map[string][]Handler
+
+	logger *log.Logger
 }
 
-func NewService() *Service {
+func NewService(c Config, l *log.Logger) *Service {
 	s := &Service{
 		topics:   make(map[string]*Topic),
 		handlers: make(map[string][]Handler),
+		logger:   l,
 	}
 
 	return s
+}
+
+func (s *Service) Open() error {
+	return nil
+}
+
+func (s *Service) Close() error {
+	return nil
 }
 
 func (s *Service) Collect(event Event) {

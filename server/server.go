@@ -19,6 +19,7 @@ import (
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/auth"
 	iclient "github.com/influxdata/kapacitor/influxdb"
+	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/config"
 	"github.com/influxdata/kapacitor/services/deadman"
@@ -75,6 +76,7 @@ type Server struct {
 	AuthService           auth.Interface
 	HTTPDService          *httpd.Service
 	StorageService        *storage.Service
+	AlertService          *alert.Service
 	TaskStore             *task_store.Service
 	ReplayService         *replay.Service
 	InfluxDBService       *influxdb.Service
@@ -158,6 +160,7 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	s.appendAuthService()
 	s.appendConfigOverrideService()
 	s.appendTesterService()
+	s.appendAlertService()
 
 	// Append all dynamic services after the config override and tester services.
 	s.appendUDFService()
@@ -241,6 +244,15 @@ func (s *Server) appendConfigOverrideService() {
 
 	s.ConfigOverrideService = srv
 	s.AppendService("config", srv)
+}
+
+func (s *Server) appendAlertService() {
+	l := s.LogService.NewLogger("[alert] ", log.LstdFlags)
+	srv := alert.NewService(s.config.Alert, l)
+
+	s.AlertService = srv
+	s.TaskMaster.AlertService = srv
+	s.AppendService("alert", srv)
 }
 
 func (s *Server) appendTesterService() {
