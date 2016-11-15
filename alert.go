@@ -39,7 +39,7 @@ const weightDiff = 1.5
 // Maximum weight applied to newest state change.
 const maxWeight = 1.2
 
-type AlertHandler func(ad *AlertData)
+type AlertHandler func(e *alert.Event)
 
 type AlertData struct {
 	ID       string          `json:"id"`
@@ -57,7 +57,7 @@ type AlertData struct {
 type AlertNode struct {
 	node
 	a           *pipeline.AlertNode
-	endpoint    string
+	topic       string
 	handlers    []AlertHandler
 	levels      []stateful.Expression
 	scopePools  []stateful.ScopePool
@@ -85,6 +85,13 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		a:    n,
 	}
 	an.node.runF = an.runAlert
+
+	// Create topic name
+	an.topic = n.Topic
+	if an.topic == "" {
+		an.topic = fmt.Sprintf("%s:%s", et.ID, an.Name())
+	}
+	l.Println("D! topic", an.topic)
 
 	// Create buffer pool for the templates
 	an.bufPool = sync.Pool{
