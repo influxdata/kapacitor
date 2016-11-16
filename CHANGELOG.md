@@ -30,6 +30,8 @@ stream
 
 ### Bugfixes
 
+- [#1045](https://github.com/influxdata/kapacitor/issues/1045): Fix panic during replays.
+
 
 
 ## v1.1.0 [2016-10-07]
