@@ -2,6 +2,7 @@ package slack
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -90,15 +91,20 @@ func (s *Service) Test(options interface{}) error {
 	if !ok {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
-	return s.Alert(o.Channel, o.Message, o.Username, o.IconEmoji, o.Level)
+	return s.Alert(nil, o.Channel, o.Message, o.Username, o.IconEmoji, o.Level)
 }
 
-func (s *Service) Alert(channel, message, username, iconEmoji string, level alert.Level) error {
+func (s *Service) Alert(ctxt context.Context, channel, message, username, iconEmoji string, level alert.Level) error {
 	url, post, err := s.preparePost(channel, message, username, iconEmoji, level)
 	if err != nil {
 		return err
 	}
-	resp, err := http.Post(url, "application/json", post)
+	req, err := http.NewRequest("POST", url, post)
+	req.Header.Set("Content-Type", "application/json")
+	if ctxt != nil {
+		req = req.WithContext(ctxt)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -167,4 +173,41 @@ func (s *Service) preparePost(channel, message, username, iconEmoji string, leve
 	}
 
 	return c.URL, &post, nil
+}
+
+type HandlerConfig struct {
+	// Slack channel in which to post messages.
+	// If empty uses the channel from the configuration.
+	Channel string
+
+	// Username of the Slack bot.
+	// If empty uses the username from the configuration.
+	Username string
+
+	// IconEmoji is an emoji name surrounded in ':' characters.
+	// The emoji image will replace the normal user icon for the slack bot.
+	IconEmoji string
+}
+
+type handler struct {
+	s *Service
+	c HandlerConfig
+}
+
+func (s *Service) Handler(c HandlerConfig) alert.Handler {
+	return handler{
+		s: s,
+		c: c,
+	}
+}
+
+func (h handler) Handle(ctxt context.Context, event alert.Event) error {
+	return h.s.Alert(
+		ctxt,
+		h.c.Channel,
+		event.State.Message,
+		h.c.Username,
+		h.c.IconEmoji,
+		event.State.Level,
+	)
 }

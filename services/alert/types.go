@@ -2,6 +2,7 @@ package alert
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"time"
 
@@ -11,9 +12,27 @@ import (
 type Event struct {
 	Topic string
 	State EventState
+	Data  EventData
 }
 
-type Handler chan Event
+func (e Event) TemplateData() TemplateData {
+	return TemplateData{
+		ID:       e.State.ID,
+		Message:  e.State.Message,
+		Level:    e.State.Level.String(),
+		Time:     e.State.Time,
+		Duration: e.State.Duration,
+		Name:     e.Data.Name,
+		TaskName: e.Data.TaskName,
+		Group:    e.Data.Group,
+		Tags:     e.Data.Tags,
+		Fields:   e.Data.Fields,
+	}
+}
+
+type Handler interface {
+	Handle(ctxt context.Context, event Event) error
+}
 
 type EventState struct {
 	ID       string
@@ -22,7 +41,60 @@ type EventState struct {
 	Time     time.Time
 	Duration time.Duration
 	Level    Level
-	Data     influxql.Result
+}
+
+type EventData struct {
+	// Measurement name
+	Name string
+
+	// TaskName is the name of the task that generated this event.
+	TaskName string
+
+	// Concatenation of all group-by tags of the form [key=value,]+.
+	// If not groupBy is performed equal to literal 'nil'
+	Group string
+
+	// Map of tags
+	Tags map[string]string
+
+	// Fields of alerting data point.
+	Fields map[string]interface{}
+
+	Result influxql.Result
+}
+
+// TemplateData is a structure containing all information available to use in templates for an Event.
+type TemplateData struct {
+	// The ID of the alert.
+	ID string
+
+	// The Message of the Alert
+	Message string
+
+	// Alert Level, one of: INFO, WARNING, CRITICAL.
+	Level string
+
+	// Time the event occurred.
+	Time time.Time
+
+	// Duration of the event
+	Duration time.Duration
+
+	// Measurement name
+	Name string
+
+	// Task name
+	TaskName string
+
+	// Concatenation of all group-by tags of the form [key=value,]+.
+	// If not groupBy is performed equal to literal 'nil'
+	Group string
+
+	// Map of tags
+	Tags map[string]string
+
+	// Fields of alerting data point.
+	Fields map[string]interface{}
 }
 
 type Level int

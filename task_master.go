@@ -13,8 +13,10 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/services/alert"
+	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/httpd"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
+	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/tick"
 	"github.com/influxdata/kapacitor/tick/stateful"
 	"github.com/influxdata/kapacitor/timer"
@@ -86,7 +88,7 @@ type TaskMaster struct {
 	SlackService interface {
 		Global() bool
 		StateChangesOnly() bool
-		Alert(channel, message, username, iconEmoji string, level alert.Level) error
+		Handler(slack.HandlerConfig) alert.Handler
 	}
 	TelegramService interface {
 		Global() bool
@@ -99,17 +101,7 @@ type TaskMaster struct {
 		Alert(room, token, message string, level alert.Level) error
 	}
 	AlertaService interface {
-		Alert(token,
-			resource,
-			event,
-			environment,
-			severity,
-			group,
-			value,
-			message,
-			origin string,
-			service []string,
-			data interface{}) error
+		Handler(c alerta.HandlerConfig) (alert.Handler, error)
 	}
 	SensuService interface {
 		Alert(name, output string, level alert.Level) error

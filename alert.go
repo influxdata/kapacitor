@@ -2,8 +2,8 @@ package kapacitor
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	html "html/template"
 	"log"
@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"sync"
 	text "text/template"
 	"time"
@@ -22,7 +21,10 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/services/alert"
+	"github.com/influxdata/kapacitor/services/alerta"
+	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/tick/stateful"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -39,26 +41,11 @@ const weightDiff = 1.5
 // Maximum weight applied to newest state change.
 const maxWeight = 1.2
 
-type AlertHandler func(e *alert.Event)
-
-type AlertData struct {
-	ID       string          `json:"id"`
-	Message  string          `json:"message"`
-	Details  string          `json:"details"`
-	Time     time.Time       `json:"time"`
-	Duration time.Duration   `json:"duration"`
-	Level    alert.Level     `json:"level"`
-	Data     influxql.Result `json:"data"`
-
-	// Info for custom templates
-	info detailsInfo
-}
-
 type AlertNode struct {
 	node
 	a           *pipeline.AlertNode
 	topic       string
-	handlers    []AlertHandler
+	handlers    []alert.Handler
 	levels      []stateful.Expression
 	scopePools  []stateful.ScopePool
 	states      map[models.GroupID]*alertState
@@ -85,12 +72,13 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		a:    n,
 	}
 	an.node.runF = an.runAlert
+	an.node.stopF = an.stopAlert
 
 	// Create topic name
-	an.topic = n.Topic
-	if an.topic == "" {
-		an.topic = fmt.Sprintf("%s:%s", et.ID, an.Name())
-	}
+	//an.topic = n.Topic
+	//if an.topic == "" {
+	an.topic = fmt.Sprintf("%s:%s", et.Task.ID, an.Name())
+	//}
 	l.Println("D! topic", an.topic)
 
 	// Create buffer pool for the templates
@@ -130,72 +118,76 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 	}
 
 	// Construct alert handlers
-	an.handlers = make([]AlertHandler, 0)
-
 	for _, post := range n.PostHandlers {
-		post := post
-		an.handlers = append(an.handlers, func(ad *AlertData) { an.handlePost(post, ad) })
+		h := an.postHandler(post)
+		an.handlers = append(an.handlers, h)
 	}
 
 	for _, tcp := range n.TcpHandlers {
-		tcp := tcp
-		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleTcp(tcp, ad) })
+		h := an.tcpHandler(tcp)
+		an.handlers = append(an.handlers, h)
 	}
 
-	for _, email := range n.EmailHandlers {
-		email := email
-		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleEmail(email, ad) })
-	}
-	if len(n.EmailHandlers) == 0 && (et.tm.SMTPService != nil && et.tm.SMTPService.Global()) {
-		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleEmail(&pipeline.EmailHandler{}, ad) })
-	}
-	// If email has been configured with state changes only set it.
-	if et.tm.SMTPService != nil &&
-		et.tm.SMTPService.Global() &&
-		et.tm.SMTPService.StateChangesOnly() {
-		n.IsStateChangesOnly = true
-	}
+	//for _, email := range n.EmailHandlers {
+	//	email := email
+	//	an.handlers = append(an.handlers, func(ad *alertData) { an.handleEmail(email, ad) })
+	//}
+	//if len(n.EmailHandlers) == 0 && (et.tm.SMTPService != nil && et.tm.SMTPService.Global()) {
+	//	an.handlers = append(an.handlers, func(ad *alertData) { an.handleEmail(&pipeline.EmailHandler{}, ad) })
+	//}
+	//// If email has been configured with state changes only set it.
+	//if et.tm.SMTPService != nil &&
+	//	et.tm.SMTPService.Global() &&
+	//	et.tm.SMTPService.StateChangesOnly() {
+	//	n.IsStateChangesOnly = true
+	//}
 
-	for _, exec := range n.ExecHandlers {
-		exec := exec
-		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleExec(exec, ad) })
-	}
+	//for _, exec := range n.ExecHandlers {
+	//	exec := exec
+	//	an.handlers = append(an.handlers, func(ad *alertData) { an.handleExec(exec, ad) })
+	//}
 
-	for _, log := range n.LogHandlers {
-		log := log
-		if !filepath.IsAbs(log.FilePath) {
-			return nil, fmt.Errorf("alert log path must be absolute: %s is not absolute", log.FilePath)
+	//for _, log := range n.LogHandlers {
+	//	log := log
+	//	if !filepath.IsAbs(log.FilePath) {
+	//		return nil, fmt.Errorf("alert log path must be absolute: %s is not absolute", log.FilePath)
+	//	}
+	//	an.handlers = append(an.handlers, func(ad *alertData) { an.handleLog(log, ad) })
+	//}
+
+	//for _, vo := range n.VictorOpsHandlers {
+	//	vo := vo
+	//	an.handlers = append(an.handlers, func(ad *alertData) { an.handleVictorOps(vo, ad) })
+	//}
+	//if len(n.VictorOpsHandlers) == 0 && (et.tm.VictorOpsService != nil && et.tm.VictorOpsService.Global()) {
+	//	an.handlers = append(an.handlers, func(ad *alertData) { an.handleVictorOps(&pipeline.VictorOpsHandler{}, ad) })
+	//}
+
+	//for _, pd := range n.PagerDutyHandlers {
+	//	pd := pd
+	//	an.handlers = append(an.handlers, func(ad *alertData) { an.handlePagerDuty(pd, ad) })
+	//}
+	//if len(n.PagerDutyHandlers) == 0 && (et.tm.PagerDutyService != nil && et.tm.PagerDutyService.Global()) {
+	//	an.handlers = append(an.handlers, func(ad *alertData) { an.handlePagerDuty(&pipeline.PagerDutyHandler{}, ad) })
+	//}
+
+	//for _, sensu := range n.SensuHandlers {
+	//	sensu := sensu
+	//	an.handlers = append(an.handlers, func(ad *alertData) { an.handleSensu(sensu, ad) })
+	//}
+
+	for _, s := range n.SlackHandlers {
+		c := slack.HandlerConfig{
+			Channel:   s.Channel,
+			Username:  s.Username,
+			IconEmoji: s.IconEmoji,
 		}
-		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleLog(log, ad) })
-	}
-
-	for _, vo := range n.VictorOpsHandlers {
-		vo := vo
-		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleVictorOps(vo, ad) })
-	}
-	if len(n.VictorOpsHandlers) == 0 && (et.tm.VictorOpsService != nil && et.tm.VictorOpsService.Global()) {
-		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleVictorOps(&pipeline.VictorOpsHandler{}, ad) })
-	}
-
-	for _, pd := range n.PagerDutyHandlers {
-		pd := pd
-		an.handlers = append(an.handlers, func(ad *AlertData) { an.handlePagerDuty(pd, ad) })
-	}
-	if len(n.PagerDutyHandlers) == 0 && (et.tm.PagerDutyService != nil && et.tm.PagerDutyService.Global()) {
-		an.handlers = append(an.handlers, func(ad *AlertData) { an.handlePagerDuty(&pipeline.PagerDutyHandler{}, ad) })
-	}
-
-	for _, sensu := range n.SensuHandlers {
-		sensu := sensu
-		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleSensu(sensu, ad) })
-	}
-
-	for _, slack := range n.SlackHandlers {
-		slack := slack
-		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleSlack(slack, ad) })
+		h := et.tm.SlackService.Handler(c)
+		an.handlers = append(an.handlers, h)
 	}
 	if len(n.SlackHandlers) == 0 && (et.tm.SlackService != nil && et.tm.SlackService.Global()) {
-		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleSlack(&pipeline.SlackHandler{}, ad) })
+		h := et.tm.SlackService.Handler(slack.HandlerConfig{})
+		an.handlers = append(an.handlers, h)
 	}
 	// If slack has been configured with state changes only set it.
 	if et.tm.SlackService != nil &&
@@ -204,78 +196,68 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		n.IsStateChangesOnly = true
 	}
 
-	for _, telegram := range n.TelegramHandlers {
-		telegram := telegram
-		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleTelegram(telegram, ad) })
-	}
-	if len(n.TelegramHandlers) == 0 && (et.tm.TelegramService != nil && et.tm.TelegramService.Global()) {
-		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleTelegram(&pipeline.TelegramHandler{}, ad) })
-	}
-	// If telegram has been configured with state changes only set it.
-	if et.tm.TelegramService != nil &&
-		et.tm.TelegramService.Global() &&
-		et.tm.TelegramService.StateChangesOnly() {
-		n.IsStateChangesOnly = true
+	//for _, telegram := range n.TelegramHandlers {
+	//	telegram := telegram
+	//	an.handlers = append(an.handlers, func(ad *alertData) { an.handleTelegram(telegram, ad) })
+	//}
+	//if len(n.TelegramHandlers) == 0 && (et.tm.TelegramService != nil && et.tm.TelegramService.Global()) {
+	//	an.handlers = append(an.handlers, func(ad *alertData) { an.handleTelegram(&pipeline.TelegramHandler{}, ad) })
+	//}
+	//// If telegram has been configured with state changes only set it.
+	//if et.tm.TelegramService != nil &&
+	//	et.tm.TelegramService.Global() &&
+	//	et.tm.TelegramService.StateChangesOnly() {
+	//	n.IsStateChangesOnly = true
+	//}
+
+	//for _, hipchat := range n.HipChatHandlers {
+	//	hipchat := hipchat
+	//	an.handlers = append(an.handlers, func(ad *alertData) { an.handleHipChat(hipchat, ad) })
+	//}
+	//if len(n.HipChatHandlers) == 0 && (et.tm.HipChatService != nil && et.tm.HipChatService.Global()) {
+	//	an.handlers = append(an.handlers, func(ad *alertData) { an.handleHipChat(&pipeline.HipChatHandler{}, ad) })
+	//}
+	//// If HipChat has been configured with state changes only set it.
+	//if et.tm.HipChatService != nil &&
+	//	et.tm.HipChatService.Global() &&
+	//	et.tm.HipChatService.StateChangesOnly() {
+	//	n.IsStateChangesOnly = true
+	//}
+
+	for _, a := range n.AlertaHandlers {
+		c := alerta.HandlerConfig{
+			Token:       a.Token,
+			Resource:    a.Resource,
+			Event:       a.Event,
+			Environment: a.Environment,
+			Group:       a.Group,
+			Value:       a.Value,
+			Origin:      a.Origin,
+			Service:     a.Service,
+		}
+		h, err := et.tm.AlertaService.Handler(c)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create Alerta handler")
+		}
+		an.handlers = append(an.handlers, h)
 	}
 
-	for _, hipchat := range n.HipChatHandlers {
-		hipchat := hipchat
-		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleHipChat(hipchat, ad) })
-	}
-	if len(n.HipChatHandlers) == 0 && (et.tm.HipChatService != nil && et.tm.HipChatService.Global()) {
-		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleHipChat(&pipeline.HipChatHandler{}, ad) })
-	}
-	// If HipChat has been configured with state changes only set it.
-	if et.tm.HipChatService != nil &&
-		et.tm.HipChatService.Global() &&
-		et.tm.HipChatService.StateChangesOnly() {
-		n.IsStateChangesOnly = true
-	}
+	//for _, og := range n.OpsGenieHandlers {
+	//	og := og
+	//	an.handlers = append(an.handlers, func(ad *alertData) { an.handleOpsGenie(og, ad) })
+	//}
+	//if len(n.OpsGenieHandlers) == 0 && (et.tm.OpsGenieService != nil && et.tm.OpsGenieService.Global()) {
+	//	an.handlers = append(an.handlers, func(ad *alertData) { an.handleOpsGenie(&pipeline.OpsGenieHandler{}, ad) })
+	//}
 
-	for _, alerta := range n.AlertaHandlers {
-		// Validate alerta templates
-		rtmpl, err := text.New("resource").Parse(alerta.Resource)
-		if err != nil {
-			return nil, err
-		}
-		evtmpl, err := text.New("event").Parse(alerta.Event)
-		if err != nil {
-			return nil, err
-		}
-		etmpl, err := text.New("environment").Parse(alerta.Environment)
-		if err != nil {
-			return nil, err
-		}
-		gtmpl, err := text.New("group").Parse(alerta.Group)
-		if err != nil {
-			return nil, err
-		}
-		vtmpl, err := text.New("value").Parse(alerta.Value)
-		if err != nil {
-			return nil, err
-		}
-		ai := alertaHandler{
-			AlertaHandler:   alerta,
-			resourceTmpl:    rtmpl,
-			eventTmpl:       evtmpl,
-			environmentTmpl: etmpl,
-			groupTmpl:       gtmpl,
-			valueTmpl:       vtmpl,
-		}
-		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleAlerta(ai, ad) })
-	}
+	//for _, talk := range n.TalkHandlers {
+	//	talk := talk
+	//	an.handlers = append(an.handlers, func(ad *alertData) { an.handleTalk(talk, ad) })
+	//}
 
-	for _, og := range n.OpsGenieHandlers {
-		og := og
-		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleOpsGenie(og, ad) })
-	}
-	if len(n.OpsGenieHandlers) == 0 && (et.tm.OpsGenieService != nil && et.tm.OpsGenieService.Global()) {
-		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleOpsGenie(&pipeline.OpsGenieHandler{}, ad) })
-	}
-
-	for _, talk := range n.TalkHandlers {
-		talk := talk
-		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleTalk(talk, ad) })
+	// Register Handlers on topic
+	for _, h := range an.handlers {
+		et.tm.AlertService.RegisterHandler([]string{an.topic}, h)
 	}
 
 	// Parse level expressions
@@ -353,6 +335,13 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 	return
 }
 
+func (a *AlertNode) stopAlert() {
+	// Deregister Handlers on topic
+	for _, h := range a.handlers {
+		a.et.tm.AlertService.DeregisterHandler([]string{a.topic}, h)
+	}
+}
+
 func (a *AlertNode) runAlert([]byte) error {
 	a.alertsTriggered = &expvar.Int{}
 	a.statMap.Set(statsAlertsTriggered, a.alertsTriggered)
@@ -399,18 +388,18 @@ func (a *AlertNode) runAlert([]byte) error {
 					continue
 				}
 				duration := state.duration()
-				ad, err := a.alertData(p.Name, p.Group, p.Tags, p.Fields, l, p.Time, duration, batch)
+				event, err := a.event(p.Name, p.Group, p.Tags, p.Fields, l, p.Time, duration, batch)
 				if err != nil {
 					return err
 				}
-				a.handleAlert(ad)
+				a.handleEvent(event)
 				if a.a.LevelTag != "" || a.a.IdTag != "" {
 					p.Tags = p.Tags.Copy()
 					if a.a.LevelTag != "" {
 						p.Tags[a.a.LevelTag] = l.String()
 					}
 					if a.a.IdTag != "" {
-						p.Tags[a.a.IdTag] = ad.ID
+						p.Tags[a.a.IdTag] = event.State.ID
 					}
 				}
 				if a.a.LevelField != "" || a.a.IdField != "" || a.a.DurationField != "" || a.a.MessageField != "" {
@@ -419,10 +408,10 @@ func (a *AlertNode) runAlert([]byte) error {
 						p.Fields[a.a.LevelField] = l.String()
 					}
 					if a.a.MessageField != "" {
-						p.Fields[a.a.MessageField] = ad.Message
+						p.Fields[a.a.MessageField] = event.State.Message
 					}
 					if a.a.IdField != "" {
-						p.Fields[a.a.IdField] = ad.ID
+						p.Fields[a.a.IdField] = event.State.ID
 					}
 					if a.a.DurationField != "" {
 						p.Fields[a.a.DurationField] = int64(duration)
@@ -497,11 +486,11 @@ func (a *AlertNode) runAlert([]byte) error {
 				}
 
 				duration := state.duration()
-				ad, err := a.alertData(b.Name, b.Group, b.Tags, highestPoint.Fields, l, t, duration, b)
+				event, err := a.event(b.Name, b.Group, b.Tags, highestPoint.Fields, l, t, duration, b)
 				if err != nil {
 					return err
 				}
-				a.handleAlert(ad)
+				a.handleEvent(event)
 				// Update tags or fields for Level property
 				if a.a.LevelTag != "" ||
 					a.a.LevelField != "" ||
@@ -516,7 +505,7 @@ func (a *AlertNode) runAlert([]byte) error {
 								b.Points[i].Tags[a.a.LevelTag] = l.String()
 							}
 							if a.a.IdTag != "" {
-								b.Points[i].Tags[a.a.IdTag] = ad.ID
+								b.Points[i].Tags[a.a.IdTag] = event.State.ID
 							}
 						}
 						if a.a.LevelField != "" || a.a.IdField != "" || a.a.DurationField != "" || a.a.MessageField != "" {
@@ -525,10 +514,10 @@ func (a *AlertNode) runAlert([]byte) error {
 								b.Points[i].Fields[a.a.LevelField] = l.String()
 							}
 							if a.a.MessageField != "" {
-								b.Points[i].Fields[a.a.MessageField] = ad.Message
+								b.Points[i].Fields[a.a.MessageField] = event.State.Message
 							}
 							if a.a.IdField != "" {
-								b.Points[i].Fields[a.a.IdField] = ad.ID
+								b.Points[i].Fields[a.a.IdField] = event.State.ID
 							}
 							if a.a.DurationField != "" {
 								b.Points[i].Fields[a.a.DurationField] = int64(duration)
@@ -541,7 +530,7 @@ func (a *AlertNode) runAlert([]byte) error {
 							b.Tags[a.a.LevelTag] = l.String()
 						}
 						if a.a.IdTag != "" {
-							b.Tags[a.a.IdTag] = ad.ID
+							b.Tags[a.a.IdTag] = event.State.ID
 						}
 					}
 				}
@@ -560,9 +549,9 @@ func (a *AlertNode) runAlert([]byte) error {
 	return nil
 }
 
-func (a *AlertNode) handleAlert(ad *AlertData) {
+func (a *AlertNode) handleEvent(event alert.Event) {
 	a.alertsTriggered.Add(1)
-	switch ad.Level {
+	switch event.State.Level {
 	case alert.OK:
 		a.oksTriggered.Add(1)
 	case alert.Info:
@@ -572,10 +561,8 @@ func (a *AlertNode) handleAlert(ad *AlertData) {
 	case alert.Critical:
 		a.critsTriggered.Add(1)
 	}
-	a.logger.Printf("D! %v alert triggered id:%s msg:%s data:%v", ad.Level, ad.ID, ad.Message, ad.Data.Series[0])
-	for _, h := range a.handlers {
-		h(ad)
-	}
+	a.logger.Printf("D! %v alert triggered id:%s msg:%s data:%v", event.State.Level, event.State.ID, event.State.Message, event.Data.Result.Series[0])
+	a.et.tm.AlertService.Collect(event)
 }
 
 func (a *AlertNode) determineLevel(now time.Time, fields models.Fields, tags map[string]string, currentLevel alert.Level) alert.Level {
@@ -622,7 +609,7 @@ func (a *AlertNode) batchToResult(b models.Batch) influxql.Result {
 	return r
 }
 
-func (a *AlertNode) alertData(
+func (a *AlertNode) event(
 	name string,
 	group models.GroupID,
 	tags models.Tags,
@@ -631,26 +618,35 @@ func (a *AlertNode) alertData(
 	t time.Time,
 	d time.Duration,
 	b models.Batch,
-) (*AlertData, error) {
+) (alert.Event, error) {
 	id, err := a.renderID(name, group, tags)
 	if err != nil {
-		return nil, err
+		return alert.Event{}, err
 	}
-	msg, details, info, err := a.renderMessageAndDetails(id, name, t, group, tags, fields, level)
+	msg, details, err := a.renderMessageAndDetails(id, name, t, group, tags, fields, level)
 	if err != nil {
-		return nil, err
+		return alert.Event{}, err
 	}
-	ad := &AlertData{
-		ID:       id,
-		Message:  msg,
-		Details:  details,
-		Time:     t,
-		Duration: d,
-		Level:    level,
-		Data:     a.batchToResult(b),
-		info:     info,
+	event := alert.Event{
+		Topic: a.topic,
+		State: alert.EventState{
+			ID:       id,
+			Message:  msg,
+			Details:  details,
+			Time:     t,
+			Duration: d,
+			Level:    level,
+		},
+		Data: alert.EventData{
+			Name:     name,
+			TaskName: a.et.Task.ID,
+			Group:    string(group),
+			Tags:     tags,
+			Fields:   fields,
+			Result:   a.batchToResult(b),
+		},
 	}
-	return ad, nil
+	return event, nil
 }
 
 type alertState struct {
@@ -806,7 +802,7 @@ func (a *AlertNode) renderID(name string, group models.GroupID, tags models.Tags
 	return id.String(), nil
 }
 
-func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group models.GroupID, tags models.Tags, fields models.Fields, level alert.Level) (string, string, detailsInfo, error) {
+func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group models.GroupID, tags models.Tags, fields models.Fields, level alert.Level) (string, string, error) {
 	g := string(group)
 	if group == models.NilGroup {
 		g = "nil"
@@ -834,7 +830,7 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group 
 
 	err := a.messageTmpl.Execute(tmpBuffer, minfo)
 	if err != nil {
-		return "", "", detailsInfo{}, err
+		return "", "", err
 	}
 
 	msg := tmpBuffer.String()
@@ -847,78 +843,120 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group 
 	tmpBuffer.Reset()
 	err = a.detailsTmpl.Execute(tmpBuffer, dinfo)
 	if err != nil {
-		return "", "", dinfo, err
+		return "", "", err
 	}
 
 	details := tmpBuffer.String()
-	return msg, details, dinfo, nil
+	return msg, details, nil
 }
 
 //--------------------------------
 // Alert handlers
 
-func (a *AlertNode) handlePost(post *pipeline.PostHandler, ad *AlertData) {
-	bodyBuffer := a.bufPool.Get().(*bytes.Buffer)
-	defer func() {
-		bodyBuffer.Reset()
-		a.bufPool.Put(bodyBuffer)
-	}()
-
-	err := json.NewEncoder(bodyBuffer).Encode(ad)
-	if err != nil {
-		a.logger.Println("E! failed to marshal alert data json", err)
-		return
-	}
-
-	resp, err := http.Post(post.URL, "application/json", bodyBuffer)
-	if err != nil {
-		a.logger.Println("E! failed to POST batch", err)
-		return
-	}
-
-	if resp == nil {
-		a.logger.Println("E! failed to POST batch response is nil")
-		return
-	}
-
-	// close http response otherwise tcp socket will be 'ESTABLISHED' in a long time
-	defer resp.Body.Close()
-	return
+type postHandler struct {
+	bufPool *sync.Pool
+	url     string
 }
 
-func (a *AlertNode) handleTcp(tcp *pipeline.TcpHandler, ad *AlertData) {
-	buf := a.bufPool.Get().(*bytes.Buffer)
+type alertData struct {
+	ID       string          `json:"id"`
+	Message  string          `json:"message"`
+	Details  string          `json:"details"`
+	Time     time.Time       `json:"time"`
+	Duration time.Duration   `json:"duration"`
+	Level    alert.Level     `json:"level"`
+	Data     influxql.Result `json:"data"`
+}
+
+func alertDataFromEvent(event alert.Event) alertData {
+	return alertData{
+		ID:       event.State.ID,
+		Message:  event.State.Message,
+		Details:  event.State.Details,
+		Time:     event.State.Time,
+		Duration: event.State.Duration,
+		Level:    event.State.Level,
+		Data:     event.Data.Result,
+	}
+}
+
+func (a *AlertNode) postHandler(post *pipeline.PostHandler) alert.Handler {
+	return postHandler{
+		bufPool: &a.bufPool,
+		url:     post.URL,
+	}
+}
+
+func (h postHandler) Handle(ctxt context.Context, event alert.Event) error {
+	body := h.bufPool.Get().(*bytes.Buffer)
+	defer func() {
+		body.Reset()
+		h.bufPool.Put(body)
+	}()
+	ad := alertDataFromEvent(event)
+
+	err := json.NewEncoder(body).Encode(ad)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal alert data json")
+	}
+
+	req, err := http.NewRequest("POST", h.url, body)
+	req.Header.Set("Content-Type", "application/json")
+	if ctxt != nil {
+		req = req.WithContext(ctxt)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return errors.Wrap(err, "failed to POST alert data")
+	}
+	resp.Body.Close()
+	return nil
+}
+
+type tcpHandler struct {
+	bufPool *sync.Pool
+	addr    string
+}
+
+func (a *AlertNode) tcpHandler(tcp *pipeline.TcpHandler) alert.Handler {
+	return tcpHandler{
+		bufPool: &a.bufPool,
+		addr:    tcp.Address,
+	}
+}
+
+func (h tcpHandler) Handle(ctxt context.Context, event alert.Event) error {
+	buf := h.bufPool.Get().(*bytes.Buffer)
 	defer func() {
 		buf.Reset()
-		a.bufPool.Put(buf)
+		h.bufPool.Put(buf)
 	}()
+	ad := alertDataFromEvent(event)
 
 	err := json.NewEncoder(buf).Encode(ad)
 	if err != nil {
-		a.logger.Println("E! failed to marshal alert data json", err)
-		return
+		return errors.Wrap(err, "failed to marshal alert data json")
 	}
 
-	conn, err := net.Dial("tcp", tcp.Address)
+	conn, err := net.Dial("tcp", h.addr)
 	if err != nil {
-		a.logger.Println("E! failed to connect", err)
-		return
+		return errors.Wrapf(err, "failed to connect to %s", h.addr)
 	}
 	defer conn.Close()
 
 	buf.WriteByte('\n')
 	conn.Write(buf.Bytes())
 
-	return
+	return nil
 }
 
-func (a *AlertNode) handleEmail(email *pipeline.EmailHandler, ad *AlertData) {
+func (a *AlertNode) handleEmail(email *pipeline.EmailHandler, ad *alertData) {
 	if err := a.et.tm.SMTPService.SendMail(email.ToList, ad.Message, ad.Details); err != nil {
 		a.logger.Println("E! failed to send email:", err)
 	}
 }
 
-func (a *AlertNode) handleExec(ex *pipeline.ExecHandler, ad *AlertData) {
+func (a *AlertNode) handleExec(ex *pipeline.ExecHandler, ad *alertData) {
 	b, err := json.Marshal(ad)
 	if err != nil {
 		a.logger.Println("E! failed to marshal alert data json", err)
@@ -936,7 +974,7 @@ func (a *AlertNode) handleExec(ex *pipeline.ExecHandler, ad *AlertData) {
 	}
 }
 
-func (a *AlertNode) handleLog(l *pipeline.LogHandler, ad *AlertData) {
+func (a *AlertNode) handleLog(l *pipeline.LogHandler, ad *alertData) {
 	b, err := json.Marshal(ad)
 	if err != nil {
 		a.logger.Println("E! failed to marshal alert data json", err)
@@ -958,7 +996,7 @@ func (a *AlertNode) handleLog(l *pipeline.LogHandler, ad *AlertData) {
 	}
 }
 
-func (a *AlertNode) handleVictorOps(vo *pipeline.VictorOpsHandler, ad *AlertData) {
+func (a *AlertNode) handleVictorOps(vo *pipeline.VictorOpsHandler, ad *alertData) {
 	var messageType string
 	switch ad.Level {
 	case alert.OK:
@@ -980,7 +1018,7 @@ func (a *AlertNode) handleVictorOps(vo *pipeline.VictorOpsHandler, ad *AlertData
 	}
 }
 
-func (a *AlertNode) handlePagerDuty(pd *pipeline.PagerDutyHandler, ad *AlertData) {
+func (a *AlertNode) handlePagerDuty(pd *pipeline.PagerDutyHandler, ad *alertData) {
 	err := a.et.tm.PagerDutyService.Alert(
 		pd.ServiceKey,
 		ad.ID,
@@ -994,7 +1032,7 @@ func (a *AlertNode) handlePagerDuty(pd *pipeline.PagerDutyHandler, ad *AlertData
 	}
 }
 
-func (a *AlertNode) handleSensu(sensu *pipeline.SensuHandler, ad *AlertData) {
+func (a *AlertNode) handleSensu(sensu *pipeline.SensuHandler, ad *alertData) {
 	err := a.et.tm.SensuService.Alert(
 		ad.ID,
 		ad.Message,
@@ -1006,21 +1044,7 @@ func (a *AlertNode) handleSensu(sensu *pipeline.SensuHandler, ad *AlertData) {
 	}
 }
 
-func (a *AlertNode) handleSlack(slack *pipeline.SlackHandler, ad *AlertData) {
-	err := a.et.tm.SlackService.Alert(
-		slack.Channel,
-		ad.Message,
-		slack.Username,
-		slack.IconEmoji,
-		ad.Level,
-	)
-	if err != nil {
-		a.logger.Println("E! failed to send alert data to Slack:", err)
-		return
-	}
-}
-
-func (a *AlertNode) handleTelegram(telegram *pipeline.TelegramHandler, ad *AlertData) {
+func (a *AlertNode) handleTelegram(telegram *pipeline.TelegramHandler, ad *alertData) {
 	err := a.et.tm.TelegramService.Alert(
 		telegram.ChatId,
 		telegram.ParseMode,
@@ -1034,7 +1058,7 @@ func (a *AlertNode) handleTelegram(telegram *pipeline.TelegramHandler, ad *Alert
 	}
 }
 
-func (a *AlertNode) handleHipChat(hipchat *pipeline.HipChatHandler, ad *AlertData) {
+func (a *AlertNode) handleHipChat(hipchat *pipeline.HipChatHandler, ad *alertData) {
 	err := a.et.tm.HipChatService.Alert(
 		hipchat.Room,
 		hipchat.Token,
@@ -1047,104 +1071,7 @@ func (a *AlertNode) handleHipChat(hipchat *pipeline.HipChatHandler, ad *AlertDat
 	}
 }
 
-type alertaHandler struct {
-	*pipeline.AlertaHandler
-
-	resourceTmpl    *text.Template
-	eventTmpl       *text.Template
-	environmentTmpl *text.Template
-	valueTmpl       *text.Template
-	groupTmpl       *text.Template
-}
-
-func (a *AlertNode) handleAlerta(alerta alertaHandler, ad *AlertData) {
-	var severity string
-
-	switch ad.Level {
-	case alert.OK:
-		severity = "ok"
-	case alert.Info:
-		severity = "informational"
-	case alert.Warning:
-		severity = "warning"
-	case alert.Critical:
-		severity = "critical"
-	default:
-		severity = "indeterminate"
-	}
-	var buf bytes.Buffer
-	err := alerta.resourceTmpl.Execute(&buf, ad.info)
-	if err != nil {
-		a.logger.Printf("E! failed to evaluate Alerta Resource template %s", alerta.Resource)
-		return
-	}
-	resource := buf.String()
-	buf.Reset()
-
-	type eventData struct {
-		idInfo
-		ID string
-	}
-	data := eventData{
-		idInfo: ad.info.messageInfo.idInfo,
-		ID:     ad.ID,
-	}
-	err = alerta.eventTmpl.Execute(&buf, data)
-	if err != nil {
-		a.logger.Printf("E! failed to evaluate Alerta Event template %s", alerta.Event)
-		return
-	}
-	event := buf.String()
-	buf.Reset()
-
-	err = alerta.environmentTmpl.Execute(&buf, ad.info)
-	if err != nil {
-		a.logger.Printf("E! failed to evaluate Alerta Environment template %s", alerta.Environment)
-		return
-	}
-	environment := buf.String()
-	buf.Reset()
-
-	err = alerta.groupTmpl.Execute(&buf, ad.info)
-	if err != nil {
-		a.logger.Printf("E! failed to evaluate Alerta Group template %s", alerta.Group)
-		return
-	}
-	group := buf.String()
-	buf.Reset()
-
-	err = alerta.valueTmpl.Execute(&buf, ad.info)
-	if err != nil {
-		a.logger.Printf("E! failed to evaluate Alerta Value template %s", alerta.Value)
-		return
-	}
-	value := buf.String()
-
-	service := alerta.Service
-	if len(alerta.Service) == 0 {
-		service = []string{ad.info.Name}
-	}
-
-	err = a.et.tm.AlertaService.Alert(
-		alerta.Token,
-		resource,
-		event,
-		environment,
-		severity,
-		group,
-		value,
-		ad.Message,
-		alerta.Origin,
-		service,
-		ad.Data,
-	)
-	if err != nil {
-		a.logger.Println("E! failed to send alert data to Alerta:", err)
-		return
-	}
-}
-
-func (a *AlertNode) handleOpsGenie(og *pipeline.OpsGenieHandler, ad *AlertData) {
+func (a *AlertNode) handleOpsGenie(og *pipeline.OpsGenieHandler, ad *alertData) {
 	var messageType string
 	switch ad.Level {
 	case alert.OK:
@@ -1168,7 +1095,7 @@ func (a *AlertNode) handleOpsGenie(og *pipeline.OpsGenieHandler, ad *AlertData) 
 	}
 }
 
-func (a *AlertNode) handleTalk(talk *pipeline.TalkHandler, ad *AlertData) {
+func (a *AlertNode) handleTalk(talk *pipeline.TalkHandler, ad *alertData) {
 	err := a.et.tm.TalkService.Alert(
 		ad.ID,
 		ad.Message,
