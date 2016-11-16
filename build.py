@@ -146,6 +146,7 @@ def package_scripts(build_root, config_only=False):
         shutil.copy(LOGROTATE_CONFIG, os.path.join(build_root, LOGROTATE_CONFIG))
         shutil.copy(BASH_COMPLETION_SH, os.path.join(build_root, BASH_COMPLETION_SH))
         shutil.copy(DEFAULT_CONFIG, os.path.join(build_root, DEFAULT_CONFIG))
+        os.chmod(os.path.join(build_root, LOGROTATE_CONFIG), 0o644)
 
 def run_generate():
     """Run 'go generate' to rebuild any static assets.
