@@ -103,7 +103,7 @@ func (s *Service) TopicStatus(pattern string, minLevel Level) map[string]Level {
 }
 
 // TopicStatusDetails is similar to TopicStatus, but will additionally return
-// the detailed EventState for every event ID with the matching topics that has
+
 // at least 'minLevel' severity
 //
 // TODO: implement pattern restriction

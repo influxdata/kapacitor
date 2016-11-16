@@ -3,9 +3,10 @@ package slack
 import (
 	"net/url"
 
-	"github.com/influxdata/kapacitor"
 	"github.com/pkg/errors"
 )
+
+const DefaultUsername = "kapacitor"
 
 type Config struct {
 	// Whether Slack integration is enabled.
@@ -29,7 +30,7 @@ type Config struct {
 
 func NewConfig() Config {
 	return Config{
-		Username: kapacitor.Product,
+		Username: DefaultUsername,
 	}
 }
 
