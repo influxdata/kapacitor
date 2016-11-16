@@ -31,6 +31,9 @@ type BatchCollector interface {
 }
 
 type Edge struct {
+	mu     sync.Mutex
+	closed bool
+
 	stream chan models.Point
 	batch  chan models.Batch
 
@@ -108,7 +111,14 @@ func (e *Edge) readGroupStats(f func(group models.GroupID, collected, emitted in
 
 // Close the edge, this can only be called after all
 // collect calls to the edge have finished.
+// Can be called multiple times.
 func (e *Edge) Close() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.closed {
+		return
+	}
+	e.closed = true
 	e.logger.Printf(
 		"D! closing c: %d e: %d\n",
 		e.collected.IntValue(),
