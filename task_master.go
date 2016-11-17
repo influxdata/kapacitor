@@ -61,9 +61,10 @@ type TaskMaster struct {
 	UDFService UDFService
 
 	AlertService interface {
-		Collect(event alert.Event)
+		Collect(event alert.Event) error
 		RegisterHandler(topics []string, h alert.Handler)
 		DeregisterHandler(topics []string, h alert.Handler)
+		DeleteTopic(topic string)
 	}
 	InfluxDBService interface {
 		NewNamedClient(name string) (influxdb.Client, error)

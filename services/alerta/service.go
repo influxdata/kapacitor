@@ -307,6 +307,10 @@ type eventData struct {
 	Tags map[string]string
 }
 
+func (h handler) Name() string {
+	return "Alerta"
+}
+
 func (h handler) Handle(ctxt context.Context, event alert.Event) error {
 	td := event.TemplateData()
 	var buf bytes.Buffer
