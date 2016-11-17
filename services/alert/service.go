@@ -38,6 +38,13 @@ func (s *Service) Collect(event Event) {
 
 }
 
+func (s *Service) DeleteTopic(topic string) {
+	s.mu.Lock()
+	delete(s.topics, topic)
+	delete(s.handlers, topic)
+	s.mu.Unlock()
+}
+
 func (s *Service) RegisterHandler(topics []string, h Handler) {
 	if len(topics) == 0 || h == nil {
 		return
