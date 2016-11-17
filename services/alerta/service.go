@@ -2,10 +2,10 @@ package alerta
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -16,6 +16,7 @@ import (
 
 type Service struct {
 	configValue atomic.Value
+	clientValue atomic.Value
 	logger      *log.Logger
 }
 
@@ -24,6 +25,11 @@ func NewService(c Config, l *log.Logger) *Service {
 		logger: l,
 	}
 	s.configValue.Store(c)
+	s.clientValue.Store(&http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: c.InsecureSkipVerify},
+		},
+	})
 	return s
 }
 
@@ -95,7 +101,13 @@ func (s *Service) Update(newConfig []interface{}) error {
 		return fmt.Errorf("expected config object to be of type %T, got %T", c, newConfig[0])
 	} else {
 		s.configValue.Store(c)
+		s.clientValue.Store(&http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: c.InsecureSkipVerify},
+			},
+		})
 	}
+
 	return nil
 }
 
@@ -104,12 +116,13 @@ func (s *Service) Alert(token, resource, event, environment, severity, group, va
 		return errors.New("Resource and Event are required to send an alert")
 	}
 
-	url, post, err := s.preparePost(token, resource, event, environment, severity, group, value, message, origin, service, data)
+	req, err := s.preparePost(token, resource, event, environment, severity, group, value, message, origin, service, data)
 	if err != nil {
 		return err
 	}
 
-	resp, err := http.Post(url, "application/json", post)
+	client := s.clientValue.Load().(*http.Client)
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -131,11 +144,11 @@ func (s *Service) Alert(token, resource, event, environment, severity, group, va
 	return nil
 }
 
-func (s *Service) preparePost(token, resource, event, environment, severity, group, value, message, origin string, service []string, data interface{}) (string, io.Reader, error) {
+func (s *Service) preparePost(token, resource, event, environment, severity, group, value, message, origin string, service []string, data interface{}) (*http.Request, error) {
 	c := s.config()
 
 	if !c.Enabled {
-		return "", nil, errors.New("service is not enabled")
+		return nil, errors.New("service is not enabled")
 	}
 
 	if token == "" {
@@ -152,12 +165,9 @@ func (s *Service) preparePost(token, resource, event, environment, severity, gro
 
 	u, err := url.Parse(c.URL)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 	u.Path = path.Join(u.Path, "alert")
-	v := url.Values{}
-	v.Set("api-key", token)
-	u.RawQuery = v.Encode()
 
 	postData := make(map[string]interface{})
 	postData["resource"] = resource
@@ -177,8 +187,15 @@ func (s *Service) preparePost(token, resource, event, environment, severity, gro
 	enc := json.NewEncoder(&post)
 	err = enc.Encode(postData)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 
-	return u.String(), &post, nil
+	req, err := http.NewRequest("POST", u.String(), &post)
+	req.Header.Add("Authorization", "Bearer "+token)
+	req.Header.Add("Content-Type", "application/json")
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
 }

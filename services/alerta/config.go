@@ -11,6 +11,8 @@ type Config struct {
 	Enabled bool `toml:"enabled" override:"enabled"`
 	// The Alerta URL.
 	URL string `toml:"url" override:"url"`
+	// Whether to skip the tls verification of the alerta host
+	InsecureSkipVerify bool `toml:"insecure-skip-verify" override:"insecure-skip-verify"`
 	// The authentication token for this notification, can be overridden per alert.
 	Token string `toml:"token" override:"token,redact"`
 	// The environment in which to raise the alert.

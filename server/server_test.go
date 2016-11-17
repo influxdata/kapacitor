@@ -5296,6 +5296,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"origin":      "",
 						"token":       false,
 						"url":         "http://alerta.example.com",
+						"insecure-skip-verify": false,
 					},
 					Redacted: []string{
 						"token",
@@ -5310,6 +5311,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"origin":      "",
 					"token":       false,
 					"url":         "http://alerta.example.com",
+					"insecure-skip-verify": false,
 				},
 				Redacted: []string{
 					"token",
@@ -5333,6 +5335,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"origin":      "kapacitor",
 								"token":       true,
 								"url":         "http://alerta.example.com",
+								"insecure-skip-verify": false,
 							},
 							Redacted: []string{
 								"token",
@@ -5347,6 +5350,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"origin":      "kapacitor",
 							"token":       true,
 							"url":         "http://alerta.example.com",
+							"insecure-skip-verify": false,
 						},
 						Redacted: []string{
 							"token",
