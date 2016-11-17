@@ -202,6 +202,10 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	return n
 }
 
+func (tm *TaskMaster) ID() string {
+	return tm.id
+}
+
 func (tm *TaskMaster) Open() (err error) {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()

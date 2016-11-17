@@ -83,7 +83,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 
 	an.topic = n.Topic
 	// Create anonymous topic name
-	an.anonTopic = fmt.Sprintf("%s:%s", et.Task.ID, an.Name())
+	an.anonTopic = fmt.Sprintf("%s:%s:%s", et.tm.ID(), et.Task.ID, an.Name())
 	l.Println("D! topic", an.anonTopic)
 
 	// Create buffer pool for the templates
@@ -1052,18 +1052,7 @@ func (h *logHandler) Name() string {
 }
 
 func (h *logHandler) Handle(ctxt context.Context, event alert.Event) error {
-	buf := h.bufPool.Get().(*bytes.Buffer)
-	defer func() {
-		buf.Reset()
-		h.bufPool.Put(buf)
-	}()
 	ad := alertDataFromEvent(event)
-
-	err := json.NewEncoder(buf).Encode(ad)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal alert data json")
-	}
-	buf.WriteByte('\n')
 
 	f, err := os.OpenFile(h.logpath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, os.FileMode(h.mode))
 	if err != nil {
@@ -1071,9 +1060,9 @@ func (h *logHandler) Handle(ctxt context.Context, event alert.Event) error {
 	}
 	defer f.Close()
 
-	_, err = f.Write(buf.Bytes())
+	err = json.NewEncoder(f).Encode(ad)
 	if err != nil {
-		return errors.Wrapf(err, "failed to write to file %s", h.logpath)
+		return errors.Wrap(err, "failed to marshal alert data json")
 	}
 	return nil
 }

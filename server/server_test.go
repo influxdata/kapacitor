@@ -1,7 +1,6 @@
 package server_test
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -3011,6 +3010,7 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Log(tmpDir)
 	defer os.RemoveAll(tmpDir)
 	tick := `batch
     |query('SELECT value from mydb.myrp.cpu')
@@ -3083,7 +3083,7 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 		}
 		retry++
 		if retry > 10 {
-			t.Fatal("failed to perfom replay")
+			t.Fatal("failed to perform replay")
 		}
 	}
 
@@ -3149,11 +3149,11 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 			},
 		},
 	}
-	scanner := bufio.NewScanner(f)
+	dec := json.NewDecoder(f)
 	got := make([]response, 0)
-	g := response{}
-	for scanner.Scan() {
-		json.Unmarshal(scanner.Bytes(), &g)
+	for dec.More() {
+		g := response{}
+		dec.Decode(&g)
 		got = append(got, g)
 	}
 	if !reflect.DeepEqual(exp, got) {
@@ -3350,11 +3350,11 @@ func TestServer_ReplayBatch(t *testing.T) {
 			},
 		},
 	}
-	scanner := bufio.NewScanner(f)
+	dec := json.NewDecoder(f)
 	got := make([]response, 0)
-	g := response{}
-	for scanner.Scan() {
-		json.Unmarshal(scanner.Bytes(), &g)
+	for dec.More() {
+		g := response{}
+		dec.Decode(&g)
 		got = append(got, g)
 	}
 	if !reflect.DeepEqual(exp, got) {
@@ -3594,11 +3594,11 @@ func TestServer_RecordReplayQuery(t *testing.T) {
 			},
 		},
 	}
-	scanner := bufio.NewScanner(f)
+	dec := json.NewDecoder(f)
 	got := make([]response, 0)
-	g := response{}
-	for scanner.Scan() {
-		json.Unmarshal(scanner.Bytes(), &g)
+	for dec.More() {
+		g := response{}
+		dec.Decode(&g)
 		got = append(got, g)
 	}
 	if !reflect.DeepEqual(exp, got) {
@@ -3628,7 +3628,7 @@ func TestServer_RecordReplayQuery(t *testing.T) {
 	type recResponse struct {
 		Recordings []client.Recording `json:"recordings"`
 	}
-	dec := json.NewDecoder(resp.Body)
+	dec = json.NewDecoder(resp.Body)
 	recR := recResponse{}
 	dec.Decode(&recR)
 	if exp, got := 1, len(recR.Recordings); exp != got {
@@ -3866,11 +3866,11 @@ func TestServer_ReplayQuery(t *testing.T) {
 			},
 		},
 	}
-	scanner := bufio.NewScanner(f)
+	dec := json.NewDecoder(f)
 	got := make([]response, 0)
-	g := response{}
-	for scanner.Scan() {
-		json.Unmarshal(scanner.Bytes(), &g)
+	for dec.More() {
+		g := response{}
+		dec.Decode(&g)
 		got = append(got, g)
 	}
 	if !reflect.DeepEqual(exp, got) {
