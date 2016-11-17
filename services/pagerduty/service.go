@@ -2,6 +2,7 @@ package pagerduty
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,7 +12,6 @@ import (
 	"net/http"
 	"sync/atomic"
 
-	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/services/alert"
 )
 
@@ -82,6 +82,7 @@ func (s *Service) Test(options interface{}) error {
 	}
 	c := s.config()
 	return s.Alert(
+		nil,
 		c.ServiceKey,
 		o.IncidentKey,
 		o.Description,
@@ -90,12 +91,17 @@ func (s *Service) Test(options interface{}) error {
 	)
 }
 
-func (s *Service) Alert(serviceKey, incidentKey, desc string, level alert.Level, details interface{}) error {
+func (s *Service) Alert(ctxt context.Context, serviceKey, incidentKey, desc string, level alert.Level, details interface{}) error {
 	url, post, err := s.preparePost(serviceKey, incidentKey, desc, level, details)
 	if err != nil {
 		return err
 	}
-	resp, err := http.Post(url, "application/json", post)
+	req, err := http.NewRequest("POST", url, post)
+	req.Header.Set("Content-Type", "application/json")
+	if ctxt != nil {
+		req = req.WithContext(ctxt)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -143,7 +149,7 @@ func (s *Service) preparePost(serviceKey, incidentKey, desc string, level alert.
 	pData["event_type"] = eventType
 	pData["description"] = desc
 	pData["incident_key"] = incidentKey
-	pData["client"] = kapacitor.Product
+	pData["client"] = "kapacitor"
 	pData["client_url"] = s.HTTPDService.URL()
 	if details != nil {
 		b, err := json.Marshal(details)
@@ -162,4 +168,37 @@ func (s *Service) preparePost(serviceKey, incidentKey, desc string, level alert.
 	}
 
 	return c.URL, &post, nil
+}
+
+type HandlerConfig struct {
+	// The service key to use for the alert.
+	// Defaults to the value in the configuration if empty.
+	ServiceKey string
+}
+
+type handler struct {
+	s *Service
+	c HandlerConfig
+}
+
+func (s *Service) Handler(c HandlerConfig) alert.Handler {
+	return &handler{
+		s: s,
+		c: c,
+	}
+}
+
+func (h *handler) Name() string {
+	return "PagerDuty"
+}
+
+func (h *handler) Handle(ctxt context.Context, event alert.Event) error {
+	return h.s.Alert(
+		ctxt,
+		h.c.ServiceKey,
+		event.State.ID,
+		event.State.Message,
+		event.State.Level,
+		event.Data.Result,
+	)
 }

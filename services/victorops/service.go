@@ -2,6 +2,7 @@ package victorops
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,7 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/pkg/errors"
 )
 
@@ -82,6 +83,7 @@ func (s *Service) Test(options interface{}) error {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
 	return s.Alert(
+		nil,
 		o.RoutingKey,
 		o.MessageType,
 		o.Message,
@@ -91,13 +93,18 @@ func (s *Service) Test(options interface{}) error {
 	)
 }
 
-func (s *Service) Alert(routingKey, messageType, message, entityID string, t time.Time, details interface{}) error {
+func (s *Service) Alert(ctxt context.Context, routingKey, messageType, message, entityID string, t time.Time, details interface{}) error {
 	url, post, err := s.preparePost(routingKey, messageType, message, entityID, t, details)
 	if err != nil {
 		return err
 	}
 
-	resp, err := http.Post(url, "application/json", post)
+	req, err := http.NewRequest("POST", url, post)
+	req.Header.Set("Content-Type", "application/json")
+	if ctxt != nil {
+		req = req.WithContext(ctxt)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -133,7 +140,7 @@ func (s *Service) preparePost(routingKey, messageType, message, entityID string,
 	voData["entity_id"] = entityID
 	voData["state_message"] = message
 	voData["timestamp"] = t.Unix()
-	voData["monitoring_tool"] = kapacitor.Product
+	voData["monitoring_tool"] = "kapacitor"
 	if details != nil {
 		b, err := json.Marshal(details)
 		if err != nil {
@@ -159,4 +166,45 @@ func (s *Service) preparePost(routingKey, messageType, message, entityID string,
 	}
 	u.Path = path.Join(u.Path, c.APIKey, routingKey)
 	return u.String(), &post, nil
+}
+
+type HandlerConfig struct {
+	// The routing key to use for the alert.
+	// Defaults to the value in the configuration if empty.
+	RoutingKey string
+}
+
+type handler struct {
+	s *Service
+	c HandlerConfig
+}
+
+func (s *Service) Handler(c HandlerConfig) alert.Handler {
+	return &handler{
+		s: s,
+		c: c,
+	}
+}
+
+func (h *handler) Name() string {
+	return "VictorOps"
+}
+
+func (h *handler) Handle(ctxt context.Context, event alert.Event) error {
+	var messageType string
+	switch event.State.Level {
+	case alert.OK:
+		messageType = "RECOVERY"
+	default:
+		messageType = event.State.Level.String()
+	}
+	return h.s.Alert(
+		ctxt,
+		h.c.RoutingKey,
+		messageType,
+		event.State.Message,
+		event.State.ID,
+		event.State.Time,
+		event.Data.Result,
+	)
 }

@@ -280,7 +280,7 @@ func (s *Service) Handler(c HandlerConfig) (alert.Handler, error) {
 	if err != nil {
 		return nil, err
 	}
-	return handler{
+	return &handler{
 		s:               s,
 		c:               c,
 		resourceTmpl:    rtmpl,
@@ -307,11 +307,11 @@ type eventData struct {
 	Tags map[string]string
 }
 
-func (h handler) Name() string {
+func (h *handler) Name() string {
 	return "Alerta"
 }
 
-func (h handler) Handle(ctxt context.Context, event alert.Event) error {
+func (h *handler) Handle(ctxt context.Context, event alert.Event) error {
 	td := event.TemplateData()
 	var buf bytes.Buffer
 	err := h.resourceTmpl.Execute(&buf, td)

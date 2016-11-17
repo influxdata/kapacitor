@@ -2,6 +2,7 @@ package hipchat
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,7 +14,6 @@ import (
 	"path"
 	"sync/atomic"
 
-	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/services/alert"
 )
 
@@ -85,16 +85,21 @@ func (s *Service) Test(options interface{}) error {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
 	c := s.config()
-	return s.Alert(o.Room, c.Token, o.Message, o.Level)
+	return s.Alert(nil, o.Room, c.Token, o.Message, o.Level)
 }
 
-func (s *Service) Alert(room, token, message string, level alert.Level) error {
+func (s *Service) Alert(ctxt context.Context, room, token, message string, level alert.Level) error {
 	url, post, err := s.preparePost(room, token, message, level)
 	if err != nil {
 		return err
 	}
 
-	resp, err := http.Post(url, "application/json", post)
+	req, err := http.NewRequest("POST", url, post)
+	req.Header.Set("Content-Type", "application/json")
+	if ctxt != nil {
+		req = req.WithContext(ctxt)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -150,7 +155,7 @@ func (s *Service) preparePost(room, token, message string, level alert.Level) (s
 	}
 
 	postData := make(map[string]interface{})
-	postData["from"] = kapacitor.Product
+	postData["from"] = "kapacitor"
 	postData["color"] = color
 	postData["message"] = message
 	postData["notify"] = true
@@ -162,4 +167,40 @@ func (s *Service) preparePost(room, token, message string, level alert.Level) (s
 		return "", nil, err
 	}
 	return u.String(), &post, nil
+}
+
+type HandlerConfig struct {
+	// HipChat room in which to post messages.
+	// If empty uses the channel from the configuration.
+	Room string
+
+	// HipChat authentication token.
+	// If empty uses the token from the configuration.
+	Token string
+}
+
+type handler struct {
+	s *Service
+	c HandlerConfig
+}
+
+func (s *Service) Handler(c HandlerConfig) alert.Handler {
+	return &handler{
+		s: s,
+		c: c,
+	}
+}
+
+func (h *handler) Name() string {
+	return "HipChat"
+}
+
+func (h *handler) Handle(ctxt context.Context, event alert.Event) error {
+	return h.s.Alert(
+		ctxt,
+		h.c.Room,
+		h.c.Token,
+		event.State.Message,
+		event.State.Level,
+	)
 }
