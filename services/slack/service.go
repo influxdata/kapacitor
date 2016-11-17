@@ -195,17 +195,17 @@ type handler struct {
 }
 
 func (s *Service) Handler(c HandlerConfig) alert.Handler {
-	return handler{
+	return &handler{
 		s: s,
 		c: c,
 	}
 }
 
-func (h handler) Name() string {
+func (h *handler) Name() string {
 	return "Slack"
 }
 
-func (h handler) Handle(ctxt context.Context, event alert.Event) error {
+func (h *handler) Handle(ctxt context.Context, event alert.Event) error {
 	return h.s.Alert(
 		ctxt,
 		h.c.Channel,

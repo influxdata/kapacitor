@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"path"
 	"sync/atomic"
 
+	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/pkg/errors"
 )
 
@@ -86,6 +88,7 @@ func (s *Service) Test(options interface{}) error {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
 	return s.Alert(
+		nil,
 		o.ChatId,
 		o.ParseMode,
 		o.Message,
@@ -94,13 +97,18 @@ func (s *Service) Test(options interface{}) error {
 	)
 }
 
-func (s *Service) Alert(chatId, parseMode, message string, disableWebPagePreview, disableNotification bool) error {
+func (s *Service) Alert(ctxt context.Context, chatId, parseMode, message string, disableWebPagePreview, disableNotification bool) error {
 	url, post, err := s.preparePost(chatId, parseMode, message, disableWebPagePreview, disableNotification)
 	if err != nil {
 		return err
 	}
 
-	resp, err := http.Post(url, "application/json", post)
+	req, err := http.NewRequest("POST", url, post)
+	req.Header.Set("Content-Type", "application/json")
+	if ctxt != nil {
+		req = req.WithContext(ctxt)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -175,4 +183,50 @@ func (s *Service) preparePost(chatId, parseMode, message string, disableWebPageP
 	}
 	u.Path = path.Join(u.Path+c.Token, "sendMessage")
 	return u.String(), &post, nil
+}
+
+type HandlerConfig struct {
+
+	// Telegram user/group ID to post messages to.
+	// If empty uses the chati-d from the configuration.
+	ChatId string
+
+	// Parse node, defaults to Mardown
+	// If empty uses the parse-mode from the configuration.
+	ParseMode string
+
+	// Web Page preview
+	// If empty uses the disable-web-page-preview from the configuration.
+	DisableWebPagePreview bool
+
+	// Disables Notification
+	// If empty uses the disable-notification from the configuration.
+	DisableNotification bool
+}
+
+type handler struct {
+	s *Service
+	c HandlerConfig
+}
+
+func (s *Service) Handler(c HandlerConfig) alert.Handler {
+	return &handler{
+		s: s,
+		c: c,
+	}
+}
+
+func (h *handler) Name() string {
+	return "Telegram"
+}
+
+func (h *handler) Handle(ctxt context.Context, event alert.Event) error {
+	return h.s.Alert(
+		ctxt,
+		h.c.ChatId,
+		h.c.ParseMode,
+		event.State.Message,
+		h.c.DisableWebPagePreview,
+		h.c.DisableNotification,
+	)
 }

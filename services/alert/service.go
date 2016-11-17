@@ -46,7 +46,7 @@ func (s *Service) Collect(event Event) error {
 	if topic == nil {
 		return nil
 	}
-	s.logger.Println("D! handling event", event.Topic, event.State.ID)
+	s.logger.Println("D! handling event", event.Topic, event.State.ID, len(handlers))
 	topic.UpdateEvent(event.State)
 	ctxt := context.TODO()
 	for _, h := range handlers {
@@ -82,6 +82,7 @@ TOPICS:
 
 		handlers := s.handlers[topic]
 		for _, cur := range handlers {
+			// TODO, do we want to force the handler implementations to all be comparable?
 			if cur == h {
 				continue TOPICS
 			}

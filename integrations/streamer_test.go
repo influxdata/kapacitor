@@ -5813,21 +5813,15 @@ stream
 		.crit(lambda: "count" > 8.0)
 		.sensu()
 `
-
-	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
-	defer tm.Close()
-
-	c := sensu.NewConfig()
-	c.Enabled = true
-	c.Addr = listen.Addr().String()
-	c.Source = "Kapacitor"
-	sl := sensu.NewService(c, logService.NewLogger("[test_sensu] ", log.LstdFlags))
-	tm.SensuService = sl
-
-	err = fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
-	if err != nil {
-		t.Error(err)
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := sensu.NewConfig()
+		c.Enabled = true
+		c.Addr = listen.Addr().String()
+		c.Source = "Kapacitor"
+		sl := sensu.NewService(c, logService.NewLogger("[test_sensu] ", log.LstdFlags))
+		tm.SensuService = sl
 	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
 
 	if rc := atomic.LoadInt32(&requestCount); rc != 1 {
 		t.Errorf("unexpected requestCount got %d exp 1", rc)
@@ -5907,20 +5901,15 @@ stream
 		.channel('@jim')
 `
 
-	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
-	defer tm.Close()
-
-	c := slack.NewConfig()
-	c.Enabled = true
-	c.URL = ts.URL + "/test/slack/url"
-	c.Channel = "#channel"
-	sl := slack.NewService(c, logService.NewLogger("[test_slack] ", log.LstdFlags))
-	tm.SlackService = sl
-
-	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
-	if err != nil {
-		t.Error(err)
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := slack.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL + "/test/slack/url"
+		c.Channel = "#channel"
+		sl := slack.NewService(c, logService.NewLogger("[test_slack] ", log.LstdFlags))
+		tm.SlackService = sl
 	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
 
 	if rc := atomic.LoadInt32(&requestCount); rc != 2 {
 		t.Errorf("unexpected requestCount got %d exp 2", rc)
@@ -6003,24 +5992,18 @@ stream
                 .telegram()
                 	.chatId('87654321')
 `
-
-	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
-	defer tm.Close()
-
-	c := telegram.NewConfig()
-	c.Enabled = true
-	c.URL = ts.URL + "/bot"
-	c.Token = "TOKEN:AUTH"
-	c.ChatId = "123456789"
-	c.DisableWebPagePreview = true
-	c.DisableNotification = false
-	tl := telegram.NewService(c, logService.NewLogger("[test_telegram] ", log.LstdFlags))
-	tm.TelegramService = tl
-
-	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
-	if err != nil {
-		t.Error(err)
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := telegram.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL + "/bot"
+		c.Token = "TOKEN:AUTH"
+		c.ChatId = "123456789"
+		c.DisableWebPagePreview = true
+		c.DisableNotification = false
+		tl := telegram.NewService(c, logService.NewLogger("[test_telegram] ", log.LstdFlags))
+		tm.TelegramService = tl
 	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
 
 	if rc := atomic.LoadInt32(&requestCount); rc != 2 {
 		t.Errorf("unexpected requestCount got %d exp 2", rc)
@@ -6087,22 +6070,17 @@ stream
 			.room('Test Room')
 			.token('testtokenTestRoom')
 `
+	tmInit := func(tm *kapacitor.TaskMaster) {
 
-	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
-	defer tm.Close()
-
-	c := hipchat.NewConfig()
-	c.Enabled = true
-	c.URL = ts.URL
-	c.Room = "1231234"
-	c.Token = "testtoken1231234"
-	sl := hipchat.NewService(c, logService.NewLogger("[test_hipchat] ", log.LstdFlags))
-	tm.HipChatService = sl
-
-	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
-	if err != nil {
-		t.Error(err)
+		c := hipchat.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL
+		c.Room = "1231234"
+		c.Token = "testtoken1231234"
+		sl := hipchat.NewService(c, logService.NewLogger("[test_hipchat] ", log.LstdFlags))
+		tm.HipChatService = sl
 	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
 
 	if rc := atomic.LoadInt32(&requestCount); rc != 2 {
 		t.Errorf("unexpected requestCount got %d exp 2", rc)
@@ -6181,6 +6159,7 @@ func TestStream_AlertAlerta(t *testing.T) {
 		if exp := "kapacitor/cpu/serverA is CRITICAL @1971-01-01 00:00:10 +0000 UTC"; pd.Text != exp {
 			t.Errorf("unexpected text got %s exp %s", pd.Text, exp)
 		}
+		w.WriteHeader(http.StatusCreated)
 	}))
 	defer ts.Close()
 
@@ -6213,21 +6192,15 @@ stream
 			.value('{{ index .Fields "count" }}')
 			.services('serviceA', 'serviceB')
 `
-
-	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
-	defer tm.Close()
-
-	c := alerta.NewConfig()
-	c.Enabled = true
-	c.URL = ts.URL
-	c.Origin = "Kapacitor"
-	sl := alerta.NewService(c, logService.NewLogger("[test_alerta] ", log.LstdFlags))
-	tm.AlertaService = sl
-
-	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
-	if err != nil {
-		t.Error(err)
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := alerta.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL
+		c.Origin = "Kapacitor"
+		sl := alerta.NewService(c, logService.NewLogger("[test_alerta] ", log.LstdFlags))
+		tm.AlertaService = sl
 	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
 
 	if rc := atomic.LoadInt32(&requestCount); rc != 2 {
 		t.Errorf("unexpected requestCount got %d exp 2", rc)
@@ -6334,20 +6307,15 @@ stream
 			.teams('test_team2' )
 			.recipients('test_recipient2', 'another_recipient')
 `
-
-	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
-	defer tm.Close()
-	c := opsgenie.NewConfig()
-	c.Enabled = true
-	c.URL = ts.URL
-	c.APIKey = "api_key"
-	og := opsgenie.NewService(c, logService.NewLogger("[test_og] ", log.LstdFlags))
-	tm.OpsGenieService = og
-
-	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
-	if err != nil {
-		t.Error(err)
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := opsgenie.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL
+		c.APIKey = "api_key"
+		og := opsgenie.NewService(c, logService.NewLogger("[test_og] ", log.LstdFlags))
+		tm.OpsGenieService = og
 	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
 
 	if rc := atomic.LoadInt32(&requestCount); rc != 2 {
 		t.Errorf("unexpected requestCount got %d exp 1", rc)
@@ -6417,20 +6385,16 @@ stream
 			.serviceKey('test_override_key')
 `
 
-	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
-	defer tm.Close()
-	c := pagerduty.NewConfig()
-	c.Enabled = true
-	c.URL = ts.URL
-	c.ServiceKey = "service_key"
-	pd := pagerduty.NewService(c, logService.NewLogger("[test_pd] ", log.LstdFlags))
-	pd.HTTPDService = tm.HTTPDService
-	tm.PagerDutyService = pd
-
-	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
-	if err != nil {
-		t.Error(err)
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := pagerduty.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL
+		c.ServiceKey = "service_key"
+		pd := pagerduty.NewService(c, logService.NewLogger("[test_pd] ", log.LstdFlags))
+		pd.HTTPDService = tm.HTTPDService
+		tm.PagerDutyService = pd
 	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
 
 	if rc := atomic.LoadInt32(&requestCount); rc != 2 {
 		t.Errorf("unexpected requestCount got %d exp 1", rc)
@@ -6503,20 +6467,16 @@ stream
 			.routingKey('test_key2')
 `
 
-	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
-	defer tm.Close()
-	c := victorops.NewConfig()
-	c.Enabled = true
-	c.URL = ts.URL
-	c.APIKey = "api_key"
-	c.RoutingKey = "routing_key"
-	vo := victorops.NewService(c, logService.NewLogger("[test_vo] ", log.LstdFlags))
-	tm.VictorOpsService = vo
-
-	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
-	if err != nil {
-		t.Error(err)
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := victorops.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL
+		c.APIKey = "api_key"
+		c.RoutingKey = "routing_key"
+		vo := victorops.NewService(c, logService.NewLogger("[test_vo] ", log.LstdFlags))
+		tm.VictorOpsService = vo
 	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
 
 	if got, exp := atomic.LoadInt32(&requestCount), int32(2); got != exp {
 		t.Errorf("unexpected requestCount got %d exp %d", got, exp)
@@ -6569,25 +6529,21 @@ stream
 		.talk()
 `
 
-	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
-	defer tm.Close()
-
-	c := talk.NewConfig()
-	c.Enabled = true
-	c.URL = ts.URL
-	c.AuthorName = "Kapacitor"
-	sl := talk.NewService(c, logService.NewLogger("[test_talk] ", log.LstdFlags))
-	tm.TalkService = sl
-
-	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
-	if err != nil {
-		t.Error(err)
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := talk.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL
+		c.AuthorName = "Kapacitor"
+		sl := talk.NewService(c, logService.NewLogger("[test_talk] ", log.LstdFlags))
+		tm.TalkService = sl
 	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
 
 	if rc := atomic.LoadInt32(&requestCount); rc != 1 {
 		t.Errorf("unexpected requestCount got %d exp 1", rc)
 	}
 }
+
 func TestStream_AlertLog(t *testing.T) {
 	tmpDir, err := ioutil.TempDir("", "TestStream_AlertLog")
 	if err != nil {
@@ -7457,6 +7413,7 @@ func testStreamer(
 	tm.HTTPDService = httpService
 	tm.TaskStore = taskStore{}
 	tm.DeadmanService = deadman{}
+	tm.AlertService = alert.NewService(alert.NewConfig(), logService.NewLogger("[alert] ", log.LstdFlags))
 	if tmInit != nil {
 		tmInit(tm)
 	}

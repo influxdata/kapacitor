@@ -14,9 +14,14 @@ import (
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
+	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
+	"github.com/influxdata/kapacitor/services/opsgenie"
+	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/slack"
+	"github.com/influxdata/kapacitor/services/telegram"
+	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/tick"
 	"github.com/influxdata/kapacitor/tick/stateful"
 	"github.com/influxdata/kapacitor/timer"
@@ -76,15 +81,15 @@ type TaskMaster struct {
 	}
 	OpsGenieService interface {
 		Global() bool
-		Alert(teams []string, recipients []string, messageType, message, entityID string, t time.Time, details interface{}) error
+		Handler(opsgenie.HandlerConfig) alert.Handler
 	}
 	VictorOpsService interface {
 		Global() bool
-		Alert(routingKey, messageType, message, entityID string, t time.Time, extra interface{}) error
+		Handler(victorops.HandlerConfig) alert.Handler
 	}
 	PagerDutyService interface {
 		Global() bool
-		Alert(serviceKey, incidentKey, desc string, level alert.Level, details interface{}) error
+		Handler(pagerduty.HandlerConfig) alert.Handler
 	}
 	SlackService interface {
 		Global() bool
@@ -94,21 +99,21 @@ type TaskMaster struct {
 	TelegramService interface {
 		Global() bool
 		StateChangesOnly() bool
-		Alert(chatId, parseMode, message string, disableWebPagePreview, disableNotification bool) error
+		Handler(telegram.HandlerConfig) alert.Handler
 	}
 	HipChatService interface {
 		Global() bool
 		StateChangesOnly() bool
-		Alert(room, token, message string, level alert.Level) error
+		Handler(hipchat.HandlerConfig) alert.Handler
 	}
 	AlertaService interface {
 		Handler(c alerta.HandlerConfig) (alert.Handler, error)
 	}
 	SensuService interface {
-		Alert(name, output string, level alert.Level) error
+		Handler() alert.Handler
 	}
 	TalkService interface {
-		Alert(title, text string) error
+		Handler() alert.Handler
 	}
 	TimingService interface {
 		NewTimer(timer.Setter) timer.Timer
