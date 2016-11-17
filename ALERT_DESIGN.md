@@ -3,36 +3,54 @@
 Kapacitor enables a user to define and trigger alerts.
 Alerts can be sent to various backend handlers.
 
+## Alerts vs Events
+
+An alert is defined via an [AlertNode](https://docs.influxdata.com/kapacitor/latest/nodes/alert_node/) in a TICKscript.
+Each alert generates multiple events.
+
+## Topics
+
+Each alert belongs to a `topic`, if no topic is specified an unique topic is generated for the alert.
+A topic may contain multiple alerts, enabling you to group your alerts into various topics.
+
+
 ## Alert State
 
-Kapacitor exposes the state of all the alerts via its HTTP API.
+Kapacitor exposes the state of the alerts via topics in the HTTP API.
+The maximum level of all events withing a topic as well as the state of each event within the topic can be queried.
 See the API docs for more details.
 
 
-## Two ways to work with alerts
+## Two ways to setup alert handlers
 
-### Direct Alerts
+There are two ways to setup handlers for your alerts in Kapacitor.
+The first method is designed to be quick and easy to configure.
+The second method take a bit more setup but provides more control over the handlers.
 
-If you already have a system that manages your alerts then you can define your alerts directly in your TICKscripts.
-This allows you to send alerts as they are triggered to any of the various alert handlers.
+### Direct Handlers
+
+You can directly define handlers in TICKscript.
+Doing so dynamically creates a topic and configures the defined handlers on the topic.
+
+This method is useful if you already have a system that manages your alert events for you.
 
 
 ### Alert Events Subsystem
 
-If you want to have more fine grained control over your alerts then an alert subsystem is available.
-The alert subsystem allows you to various different actions with your alerts:
+The alert event subsystem follows a publish/subscribe model giving you fine grained control over how alert events are handled.
+This is where alert topics show their strength.
+Alert publish events to their topics and handlers subscribe to the various topics.
+
+The alert subsystem allows you to do various different actions with your alerts:
 
 * Aggregate Alerts into a single alert containing summary information.
 * Rate limit alerts
 * Easily manage which handlers handle which alerts without modifying your Kapacitor tasks.
 
-This subsystem is based on an event model.
-When Kapacitor triggers an alert instead of directly sending it to the handlers, it is first sent to this subsystem as an event.
-Then different handlers can listen for different events and take appropriate actions.
 
 #### Using the Alert Event Subsystem
 
-Add an alert handler called `alertEvent`, either globally in the config or on a task by task basis.
+By specifying a `topic` for an alert, all events from the alert will be sent to that topic.
 
 Example TICKscript:
 
@@ -45,10 +63,10 @@ stream
         .every(1m)
     |mean('usage')
     |alert()
+        // Send this alert to the alert event subsystem (not currently implemented)
+        .topic('cpu')
         .warn(lambda: "mean" > 70)
         .crit(lambda: "mean" > 80)
-        // Send this alert to the alert event subsystem (not currently implemented)
-        .alertEvent()
         // Send this alert directly to slack. (works today)
         .slack()
 ```

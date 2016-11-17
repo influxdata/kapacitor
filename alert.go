@@ -45,6 +45,7 @@ type AlertNode struct {
 	node
 	a           *pipeline.AlertNode
 	topic       string
+	anonTopic   string
 	handlers    []alert.Handler
 	levels      []stateful.Expression
 	scopePools  []stateful.ScopePool
@@ -74,12 +75,10 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 	an.node.runF = an.runAlert
 	an.node.stopF = an.stopAlert
 
-	// Create topic name
-	//an.topic = n.Topic
-	//if an.topic == "" {
-	an.topic = fmt.Sprintf("%s:%s", et.Task.ID, an.Name())
-	//}
-	l.Println("D! topic", an.topic)
+	an.topic = n.Topic
+	// Create anonymous topic name
+	an.anonTopic = fmt.Sprintf("%s:%s", et.Task.ID, an.Name())
+	l.Println("D! topic", an.anonTopic)
 
 	// Create buffer pool for the templates
 	an.bufPool = sync.Pool{
@@ -257,7 +256,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 
 	// Register Handlers on topic
 	for _, h := range an.handlers {
-		et.tm.AlertService.RegisterHandler([]string{an.topic}, h)
+		et.tm.AlertService.RegisterHandler([]string{an.anonTopic}, h)
 	}
 
 	// Parse level expressions
@@ -336,10 +335,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 }
 
 func (a *AlertNode) stopAlert() {
-	// Deregister Handlers on topic
-	for _, h := range a.handlers {
-		a.et.tm.AlertService.DeregisterHandler([]string{a.topic}, h)
-	}
+	a.et.tm.AlertService.DeleteTopic(a.anonTopic)
 }
 
 func (a *AlertNode) runAlert([]byte) error {
@@ -562,7 +558,18 @@ func (a *AlertNode) handleEvent(event alert.Event) {
 		a.critsTriggered.Add(1)
 	}
 	a.logger.Printf("D! %v alert triggered id:%s msg:%s data:%v", event.State.Level, event.State.ID, event.State.Message, event.Data.Result.Series[0])
-	a.et.tm.AlertService.Collect(event)
+
+	// If we have anon handlers, emit event to the anonTopic
+	if len(a.handlers) > 0 {
+		event.Topic = a.anonTopic
+		a.et.tm.AlertService.Collect(event)
+	}
+
+	// If we have a user define topic, emit event to the topic.
+	if a.topic != "" {
+		event.Topic = a.topic
+		a.et.tm.AlertService.Collect(event)
+	}
 }
 
 func (a *AlertNode) determineLevel(now time.Time, fields models.Fields, tags map[string]string, currentLevel alert.Level) alert.Level {
@@ -628,7 +635,7 @@ func (a *AlertNode) event(
 		return alert.Event{}, err
 	}
 	event := alert.Event{
-		Topic: a.topic,
+		Topic: a.anonTopic,
 		State: alert.EventState{
 			ID:       id,
 			Message:  msg,
