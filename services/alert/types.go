@@ -31,6 +31,9 @@ func (e Event) TemplateData() TemplateData {
 }
 
 type Handler interface {
+	// Name returns a name for the handler, it doe snot need to be unique.
+	Name() string
+	// Handle is responsible for taking action on the event and honoring the context.
 	Handle(ctxt context.Context, event Event) error
 }
 

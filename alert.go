@@ -255,6 +255,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 	//}
 
 	// Register Handlers on topic
+	an.logger.Printf("D! registering handlers for topic %s: %v", an.anonTopic, an.handlers)
 	for _, h := range an.handlers {
 		et.tm.AlertService.RegisterHandler([]string{an.anonTopic}, h)
 	}
@@ -335,6 +336,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 }
 
 func (a *AlertNode) stopAlert() {
+	// Delete the anonymous topic, which will also deregister its handlers
 	a.et.tm.AlertService.DeleteTopic(a.anonTopic)
 }
 
@@ -562,13 +564,19 @@ func (a *AlertNode) handleEvent(event alert.Event) {
 	// If we have anon handlers, emit event to the anonTopic
 	if len(a.handlers) > 0 {
 		event.Topic = a.anonTopic
-		a.et.tm.AlertService.Collect(event)
+		err := a.et.tm.AlertService.Collect(event)
+		if err != nil {
+			a.logger.Println("E!", err)
+		}
 	}
 
 	// If we have a user define topic, emit event to the topic.
 	if a.topic != "" {
 		event.Topic = a.topic
-		a.et.tm.AlertService.Collect(event)
+		err := a.et.tm.AlertService.Collect(event)
+		if err != nil {
+			a.logger.Println("E!", err)
+		}
 	}
 }
 
@@ -894,6 +902,10 @@ func (a *AlertNode) postHandler(post *pipeline.PostHandler) alert.Handler {
 	}
 }
 
+func (h postHandler) Name() string {
+	return "HTTP POST"
+}
+
 func (h postHandler) Handle(ctxt context.Context, event alert.Event) error {
 	body := h.bufPool.Get().(*bytes.Buffer)
 	defer func() {
@@ -930,6 +942,10 @@ func (a *AlertNode) tcpHandler(tcp *pipeline.TcpHandler) alert.Handler {
 		bufPool: &a.bufPool,
 		addr:    tcp.Address,
 	}
+}
+
+func (h tcpHandler) Name() string {
+	return "TCP"
 }
 
 func (h tcpHandler) Handle(ctxt context.Context, event alert.Event) error {
