@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/mail"
 	"os"
 	"path"
 	"path/filepath"
@@ -37,6 +38,8 @@ import (
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/slack"
+	"github.com/influxdata/kapacitor/services/smtp"
+	"github.com/influxdata/kapacitor/services/smtp/smtptest"
 	"github.com/influxdata/kapacitor/services/talk"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
@@ -7401,6 +7404,131 @@ stream
 			}
 		default:
 			t.Error("expected command to be created")
+		}
+	}
+}
+
+func TestStream_AlertEmail(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor.{{ .Name }}.{{ index .Tags "host" }}')
+		.details('''
+<b>{{.Message}}</b>
+
+Value: {{ index .Fields "count" }}
+<a href="http://graphs.example.com/host/{{index .Tags "host"}}">Details</a>
+''')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.email('user1@example.com', 'user2@example.com')
+		.email()
+			.to('user1@example.com', 'user2@example.com')
+`
+
+	expMail := []*smtptest.Message{
+		{
+			Header: mail.Header{
+				"Mime-Version":              []string{"1.0"},
+				"Content-Type":              []string{"text/html; charset=UTF-8"},
+				"Content-Transfer-Encoding": []string{"quoted-printable"},
+				"To":      []string{"user1@example.com, user2@example.com"},
+				"From":    []string{"test@example.com"},
+				"Subject": []string{"kapacitor.cpu.serverA is CRITICAL"},
+			},
+			Body: `
+<b>kapacitor.cpu.serverA is CRITICAL</b>
+
+Value: 10
+<a href=3D"http://graphs.example.com/host/serverA">Details</a>
+`,
+		},
+		{
+			Header: mail.Header{
+				"Mime-Version":              []string{"1.0"},
+				"Content-Type":              []string{"text/html; charset=UTF-8"},
+				"Content-Transfer-Encoding": []string{"quoted-printable"},
+				"To":      []string{"user1@example.com, user2@example.com"},
+				"From":    []string{"test@example.com"},
+				"Subject": []string{"kapacitor.cpu.serverA is CRITICAL"},
+			},
+			Body: `
+<b>kapacitor.cpu.serverA is CRITICAL</b>
+
+Value: 10
+<a href=3D"http://graphs.example.com/host/serverA">Details</a>
+`,
+		},
+	}
+	compareMessages := func(exp, got *smtptest.Message) error {
+		if exp.Body != got.Body {
+			return fmt.Errorf("unequal bodies:\ngot\n%q\nexp\n%q\n", got.Body, exp.Body)
+		}
+		// Compare only the header keys specified in the exp message.
+		for k, ev := range exp.Header {
+			gv, ok := got.Header[k]
+			if !ok {
+				return fmt.Errorf("missing header %s", k)
+			}
+			if len(gv) != len(ev) {
+				return fmt.Errorf("unexpected header %s: got %v exp %v", k, gv, ev)
+			}
+			for i := range ev {
+				if gv[i] != ev[i] {
+					return fmt.Errorf("unexpected header %s: got %v exp %v", k, gv, ev)
+				}
+			}
+		}
+		return nil
+	}
+
+	smtpServer, err := smtptest.NewServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer smtpServer.Close()
+	sc := smtp.Config{
+		Enabled: true,
+		Host:    smtpServer.Host,
+		Port:    smtpServer.Port,
+		From:    "test@example.com",
+	}
+	smtpService := smtp.NewService(sc, logService.NewLogger("[test-smtp] ", log.LstdFlags))
+	if err := smtpService.Open(); err != nil {
+		t.Fatal(err)
+	}
+	defer smtpService.Close()
+
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		tm.SMTPService = smtpService
+	}
+
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	smtpServer.Close()
+
+	errors := smtpServer.Errors()
+	if got, exp := len(errors), 0; got != exp {
+		t.Errorf("unexpected smtp server errors: %v", errors)
+	}
+
+	msgs := smtpServer.SentMessages()
+	if got, exp := len(msgs), len(expMail); got != exp {
+		t.Errorf("unexpected number of messages sent: got %d exp %d", got, exp)
+	}
+	for i, exp := range expMail {
+		got := msgs[i]
+		if err := compareMessages(exp, got); err != nil {
+			t.Errorf("%d %s", i, err)
 		}
 	}
 }
