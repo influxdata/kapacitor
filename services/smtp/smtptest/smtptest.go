@@ -2,12 +2,10 @@ package smtptest
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net"
 	"net/mail"
 	"net/textproto"
-	"os"
 	"strconv"
 	"sync"
 )
@@ -95,28 +93,12 @@ var replyOK = `250 Ok`
 var replyData = `354 Go ahead`
 var replyGoodbye = `221 Goodbye`
 
-type teeReadWriteCloser struct {
-	io.Reader
-	io.Writer
-	io.Closer
-}
-
-func newTeeReadWriteCloser(orig io.ReadWriteCloser, tee io.Writer) io.ReadWriteCloser {
-	r := io.TeeReader(orig, tee)
-	return teeReadWriteCloser{
-		r,
-		orig,
-		orig,
-	}
-}
-
 func (s *Server) handleConn(conn net.Conn) {
-	trwc := newTeeReadWriteCloser(conn, os.Stdout)
 	errC := make(chan error, 2)
 	go func() {
 		var err error
 		var line string
-		tc := textproto.NewConn(trwc)
+		tc := textproto.NewConn(conn)
 		tc.PrintfLine(replyGreeting)
 		for {
 			line, err = tc.ReadLine()
