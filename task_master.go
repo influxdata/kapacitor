@@ -8,6 +8,7 @@ import (
 	"time"
 
 	imodels "github.com/influxdata/influxdb/models"
+	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/models"
@@ -123,6 +124,8 @@ type TaskMaster struct {
 	}
 	LogService LogService
 
+	Commander command.Commander
+
 	DefaultRetentionPolicy string
 
 	// Incoming streams
@@ -174,6 +177,7 @@ func NewTaskMaster(id string, l LogService) *TaskMaster {
 		logger:         l.NewLogger(fmt.Sprintf("[task_master:%s] ", id), log.LstdFlags),
 		closed:         true,
 		TimingService:  noOpTimingService{},
+		Commander:      command.ExecCommander,
 	}
 }
 
@@ -199,6 +203,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.TalkService = tm.TalkService
 	n.TimingService = tm.TimingService
 	n.K8sService = tm.K8sService
+	n.Commander = tm.Commander
 	return n
 }
 

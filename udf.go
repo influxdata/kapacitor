@@ -6,11 +6,11 @@ import (
 	"io"
 	"log"
 	"net"
-	"os/exec"
 	"sync"
 	"time"
 
 	"github.com/cenkalti/backoff"
+	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/udf"
@@ -175,8 +175,9 @@ func (u *UDFNode) snapshot() ([]byte, error) {
 // via normal Kapacitor logging.
 type UDFProcess struct {
 	server    *udf.Server
-	commander Commander
-	cmd       Command
+	commander command.Commander
+	cmdInfo   command.CommandInfo
+	cmd       command.Command
 
 	stderr io.Reader
 
@@ -192,13 +193,15 @@ type UDFProcess struct {
 }
 
 func NewUDFProcess(
-	commander Commander,
+	commander command.Commander,
+	cmdInfo command.CommandInfo,
 	l *log.Logger,
 	timeout time.Duration,
 	abortCallback func(),
 ) *UDFProcess {
 	return &UDFProcess{
 		commander:     commander,
+		cmdInfo:       cmdInfo,
 		logger:        l,
 		timeout:       timeout,
 		abortCallback: abortCallback,
@@ -210,7 +213,7 @@ func (p *UDFProcess) Open() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	cmd := p.commander.NewCommand()
+	cmd := p.commander.NewCommand(p.cmdInfo)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return err
@@ -295,48 +298,6 @@ func (p *UDFProcess) BatchIn() chan<- models.Batch     { return p.server.BatchIn
 func (p *UDFProcess) PointOut() <-chan models.Point    { return p.server.PointOut() }
 func (p *UDFProcess) BatchOut() <-chan models.Batch    { return p.server.BatchOut() }
 func (p *UDFProcess) Info() (udf.Info, error)          { return p.server.Info() }
-
-type Command interface {
-	Start() error
-	Wait() error
-
-	StdinPipe() (io.WriteCloser, error)
-	StdoutPipe() (io.Reader, error)
-	StderrPipe() (io.Reader, error)
-
-	Kill()
-}
-
-type Commander interface {
-	NewCommand() Command
-}
-
-// Necessary information to create a new command
-type CommandInfo struct {
-	Prog string
-	Args []string
-	Env  []string
-}
-
-// Create a new Command using golang exec package and the information.
-func (ci CommandInfo) NewCommand() Command {
-	c := exec.Command(ci.Prog, ci.Args...)
-	c.Env = ci.Env
-	return cmd{c}
-}
-
-type cmd struct {
-	*exec.Cmd
-}
-
-func (c cmd) StdoutPipe() (io.Reader, error) { return c.Cmd.StdoutPipe() }
-func (c cmd) StderrPipe() (io.Reader, error) { return c.Cmd.StderrPipe() }
-
-func (c cmd) Kill() {
-	if c.Cmd.Process != nil {
-		c.Cmd.Process.Kill()
-	}
-}
 
 type UDFSocket struct {
 	server *udf.Server
