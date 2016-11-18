@@ -297,7 +297,6 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 	}
 
 	// Register Handlers on topic
-	an.logger.Printf("D! registering handlers for topic %s: %v", an.anonTopic, an.handlers)
 	for _, h := range an.handlers {
 		et.tm.AlertService.RegisterHandler([]string{an.anonTopic}, h)
 	}
@@ -910,11 +909,8 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group 
 //--------------------------------
 // Alert handlers
 
-type postHandler struct {
-	bufPool *sync.Pool
-	url     string
-}
-
+// AlertData is a structure that contains relevant data about an alert event.
+// The structure is intended to be JSON encoded, providing a consistent data format.
 type AlertData struct {
 	ID       string          `json:"id"`
 	Message  string          `json:"message"`
@@ -923,6 +919,11 @@ type AlertData struct {
 	Duration time.Duration   `json:"duration"`
 	Level    alert.Level     `json:"level"`
 	Data     influxql.Result `json:"data"`
+}
+
+type postHandler struct {
+	bufPool *sync.Pool
+	url     string
 }
 
 func alertDataFromEvent(event alert.Event) AlertData {
@@ -1055,15 +1056,33 @@ func (h *execHandler) Handle(ctxt context.Context, event alert.Event) error {
 	var out bytes.Buffer
 	cmd.Stdout(&out)
 	cmd.Stderr(&out)
-	err = cmd.Start()
-	if err != nil {
-		return errors.Wrapf(err, "exec command failed: Output: %s", out.String())
+	run := func() error {
+		err = cmd.Start()
+		if err != nil {
+			return errors.Wrapf(err, "exec command failed: Output: %s", out.String())
+		}
+		err = cmd.Wait()
+		if err != nil {
+			return errors.Wrapf(err, "exec command failed: Output: %s", out.String())
+		}
+		return nil
 	}
-	err = cmd.Wait()
-	if err != nil {
-		return errors.Wrapf(err, "exec command failed: Output: %s", out.String())
+
+	errC := make(chan error, 1)
+	go func() {
+		errC <- run()
+	}()
+
+	var done <-chan struct{}
+	if ctxt != nil {
+		done = ctxt.Done()
 	}
-	return nil
+	select {
+	case err := <-errC:
+		return err
+	case <-done:
+		return errors.New("exec command canceled or deadline reached")
+	}
 }
 
 type logHandler struct {
