@@ -122,6 +122,8 @@ const defaultLogFileMode = 0600
 type AlertNode struct {
 	chainnode
 
+	Topic string
+
 	// Template for constructing a unique ID for a given alert.
 	//
 	// Available template data:

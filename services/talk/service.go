@@ -2,6 +2,7 @@ package talk
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +11,8 @@ import (
 	"log"
 	"net/http"
 	"sync/atomic"
+
+	"github.com/influxdata/kapacitor/services/alert"
 )
 
 type Service struct {
@@ -66,15 +69,20 @@ func (s *Service) Test(options interface{}) error {
 	if !ok {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
-	return s.Alert(o.Title, o.Text)
+	return s.Alert(nil, o.Title, o.Text)
 }
 
-func (s *Service) Alert(title, text string) error {
+func (s *Service) Alert(ctxt context.Context, title, text string) error {
 	url, post, err := s.preparePost(title, text)
 	if err != nil {
 		return err
 	}
-	resp, err := http.Post(url, "application/json", post)
+	req, err := http.NewRequest("POST", url, post)
+	req.Header.Set("Content-Type", "application/json")
+	if ctxt != nil {
+		req = req.WithContext(ctxt)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -114,4 +122,20 @@ func (s *Service) preparePost(title, text string) (string, io.Reader, error) {
 	}
 
 	return c.URL, &post, nil
+}
+
+func (s *Service) Handler() alert.Handler {
+	return s
+}
+
+func (s *Service) Name() string {
+	return "Talk"
+}
+
+func (s *Service) Handle(ctxt context.Context, event alert.Event) error {
+	return s.Alert(
+		ctxt,
+		event.State.ID,
+		event.State.Message,
+	)
 }

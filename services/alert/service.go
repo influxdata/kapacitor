@@ -1,8 +1,12 @@
 package alert
 
 import (
+	"context"
+	"log"
 	"sort"
 	"sync"
+
+	"github.com/pkg/errors"
 )
 
 type Service struct {
@@ -11,19 +15,55 @@ type Service struct {
 	topics map[string]*Topic
 	// Map topic name -> []Handler
 	handlers map[string][]Handler
+
+	logger *log.Logger
 }
 
-func NewService() *Service {
+func NewService(c Config, l *log.Logger) *Service {
 	s := &Service{
 		topics:   make(map[string]*Topic),
 		handlers: make(map[string][]Handler),
+		logger:   l,
 	}
 
 	return s
 }
 
-func (s *Service) Collect(event Event) {
+func (s *Service) Open() error {
+	return nil
+}
 
+func (s *Service) Close() error {
+	return nil
+}
+
+func (s *Service) Collect(event Event) error {
+	s.mu.RLock()
+	topic := s.topics[event.Topic]
+	handlers := s.handlers[event.Topic]
+	s.mu.RUnlock()
+
+	if topic == nil {
+		return nil
+	}
+	s.logger.Println("D! handling event", event.Topic, event.State.ID, len(handlers))
+	topic.UpdateEvent(event.State)
+	ctxt := context.TODO()
+	for _, h := range handlers {
+		// TODO do not return early, collect all errors
+		err := h.Handle(ctxt, event)
+		if err != nil {
+			return errors.Wrapf(err, "handler %s failed", h.Name())
+		}
+	}
+	return nil
+}
+
+func (s *Service) DeleteTopic(topic string) {
+	s.mu.Lock()
+	delete(s.topics, topic)
+	delete(s.handlers, topic)
+	s.mu.Unlock()
 }
 
 func (s *Service) RegisterHandler(topics []string, h Handler) {
@@ -37,16 +77,17 @@ func (s *Service) RegisterHandler(topics []string, h Handler) {
 TOPICS:
 	for _, topic := range topics {
 		if _, ok := s.topics[topic]; !ok {
-			s.topics[topic] = new(Topic)
+			s.topics[topic] = newTopic(topic)
 		}
 
 		handlers := s.handlers[topic]
 		for _, cur := range handlers {
+			// TODO, do we want to force the handler implementations to all be comparable?
 			if cur == h {
 				continue TOPICS
 			}
-			s.handlers[topic] = append(handlers, h)
 		}
+		s.handlers[topic] = append(handlers, h)
 	}
 }
 
@@ -91,7 +132,7 @@ func (s *Service) TopicStatus(pattern string, minLevel Level) map[string]Level {
 }
 
 // TopicStatusDetails is similar to TopicStatus, but will additionally return
-// the detailed EventState for every event ID with the matching topics that has
+
 // at least 'minLevel' severity
 //
 // TODO: implement pattern restriction
@@ -138,6 +179,13 @@ type Topic struct {
 	sorted []*EventState
 }
 
+func newTopic(name string) *Topic {
+	return &Topic{
+		name:   name,
+		events: make(map[string]*EventState),
+	}
+}
+
 func (t *Topic) MaxLevel() Level {
 	level := OK
 	t.mu.RLock()
@@ -150,14 +198,14 @@ func (t *Topic) MaxLevel() Level {
 
 // UpdateEvent will store the latest state for the given ID and return true if
 // the update caused a level change for the ID
-func (t *Topic) UpdateEvent(id string, state EventState) bool {
+func (t *Topic) UpdateEvent(state EventState) bool {
 	var needSort bool
 	t.mu.Lock()
-	cur := t.events[id]
+	cur := t.events[state.ID]
 	if cur == nil {
 		needSort = true
 		cur = new(EventState)
-		t.events[id] = cur
+		t.events[state.ID] = cur
 		t.sorted = append(t.sorted, cur)
 	}
 	needSort = needSort || cur.Level != state.Level

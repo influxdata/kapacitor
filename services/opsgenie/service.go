@@ -2,6 +2,7 @@ package opsgenie
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,7 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/services/alert"
 )
 
 type Service struct {
@@ -82,6 +83,7 @@ func (s *Service) Test(options interface{}) error {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
 	return s.Alert(
+		nil,
 		o.Teams,
 		o.Recipients,
 		o.MessageType,
@@ -92,13 +94,18 @@ func (s *Service) Test(options interface{}) error {
 	)
 }
 
-func (s *Service) Alert(teams []string, recipients []string, messageType, message, entityID string, t time.Time, details interface{}) error {
+func (s *Service) Alert(ctxt context.Context, teams []string, recipients []string, messageType, message, entityID string, t time.Time, details interface{}) error {
 	url, post, err := s.preparePost(teams, recipients, messageType, message, entityID, t, details)
 	if err != nil {
 		return err
 	}
 
-	resp, err := http.Post(url, "application/json", post)
+	req, err := http.NewRequest("POST", url, post)
+	req.Header.Set("Content-Type", "application/json")
+	if ctxt != nil {
+		req = req.WithContext(ctxt)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -134,7 +141,7 @@ func (s *Service) preparePost(teams []string, recipients []string, messageType, 
 	ogData["alias"] = entityID
 	ogData["message"] = message
 	ogData["note"] = ""
-	ogData["monitoring_tool"] = kapacitor.Product
+	ogData["monitoring_tool"] = "kapacitor"
 
 	//Extra Fields (can be used for filtering)
 	ogDetails := make(map[string]interface{})
@@ -182,4 +189,50 @@ func (s *Service) preparePost(teams []string, recipients []string, messageType, 
 	}
 
 	return url, &post, nil
+}
+
+type HandlerConfig struct {
+	// OpsGenie Teams.
+	// tick:ignore
+	TeamsList []string
+
+	// OpsGenie Recipients.
+	// tick:ignore
+	RecipientsList []string
+}
+
+type handler struct {
+	s *Service
+	c HandlerConfig
+}
+
+func (s *Service) Handler(c HandlerConfig) alert.Handler {
+	return &handler{
+		s: s,
+		c: c,
+	}
+}
+
+func (h *handler) Name() string {
+	return "OpsGenie"
+}
+
+func (h *handler) Handle(ctxt context.Context, event alert.Event) error {
+	var messageType string
+	switch event.State.Level {
+	case alert.OK:
+		messageType = "RECOVERY"
+	default:
+		messageType = event.State.Level.String()
+	}
+	return h.s.Alert(
+		ctxt,
+		h.c.TeamsList,
+		h.c.RecipientsList,
+		messageType,
+		event.State.Message,
+		event.State.ID,
+		event.State.Time,
+		event.Data.Result,
+	)
 }

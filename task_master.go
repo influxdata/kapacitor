@@ -8,13 +8,22 @@ import (
 	"time"
 
 	imodels "github.com/influxdata/influxdb/models"
+	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/services/alert"
+	"github.com/influxdata/kapacitor/services/alerta"
+	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
+	"github.com/influxdata/kapacitor/services/opsgenie"
+	"github.com/influxdata/kapacitor/services/pagerduty"
+	"github.com/influxdata/kapacitor/services/slack"
+	"github.com/influxdata/kapacitor/services/smtp"
+	"github.com/influxdata/kapacitor/services/telegram"
+	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/tick"
 	"github.com/influxdata/kapacitor/tick/stateful"
 	"github.com/influxdata/kapacitor/timer"
@@ -58,59 +67,55 @@ type TaskMaster struct {
 
 	UDFService UDFService
 
+	AlertService interface {
+		Collect(event alert.Event) error
+		RegisterHandler(topics []string, h alert.Handler)
+		DeregisterHandler(topics []string, h alert.Handler)
+		DeleteTopic(topic string)
+	}
 	InfluxDBService interface {
 		NewNamedClient(name string) (influxdb.Client, error)
 	}
 	SMTPService interface {
 		Global() bool
 		StateChangesOnly() bool
-		SendMail(to []string, subject string, msg string) error
+		Handler(smtp.HandlerConfig) alert.Handler
 	}
 	OpsGenieService interface {
 		Global() bool
-		Alert(teams []string, recipients []string, messageType, message, entityID string, t time.Time, details interface{}) error
+		Handler(opsgenie.HandlerConfig) alert.Handler
 	}
 	VictorOpsService interface {
 		Global() bool
-		Alert(routingKey, messageType, message, entityID string, t time.Time, extra interface{}) error
+		Handler(victorops.HandlerConfig) alert.Handler
 	}
 	PagerDutyService interface {
 		Global() bool
-		Alert(serviceKey, incidentKey, desc string, level alert.Level, details interface{}) error
+		Handler(pagerduty.HandlerConfig) alert.Handler
 	}
 	SlackService interface {
 		Global() bool
 		StateChangesOnly() bool
-		Alert(channel, message, username, iconEmoji string, level alert.Level) error
+		Handler(slack.HandlerConfig) alert.Handler
 	}
 	TelegramService interface {
 		Global() bool
 		StateChangesOnly() bool
-		Alert(chatId, parseMode, message string, disableWebPagePreview, disableNotification bool) error
+		Handler(telegram.HandlerConfig) alert.Handler
 	}
 	HipChatService interface {
 		Global() bool
 		StateChangesOnly() bool
-		Alert(room, token, message string, level alert.Level) error
+		Handler(hipchat.HandlerConfig) alert.Handler
 	}
 	AlertaService interface {
-		Alert(token,
-			resource,
-			event,
-			environment,
-			severity,
-			group,
-			value,
-			message,
-			origin string,
-			service []string,
-			data interface{}) error
+		Handler(c alerta.HandlerConfig) (alert.Handler, error)
 	}
 	SensuService interface {
-		Alert(name, output string, level alert.Level) error
+		Handler() alert.Handler
 	}
 	TalkService interface {
-		Alert(title, text string) error
+		Handler() alert.Handler
 	}
 	TimingService interface {
 		NewTimer(timer.Setter) timer.Timer
@@ -119,6 +124,8 @@ type TaskMaster struct {
 		Client() (k8s.Client, error)
 	}
 	LogService LogService
+
+	Commander command.Commander
 
 	DefaultRetentionPolicy string
 
@@ -171,6 +178,7 @@ func NewTaskMaster(id string, l LogService) *TaskMaster {
 		logger:         l.NewLogger(fmt.Sprintf("[task_master:%s] ", id), log.LstdFlags),
 		closed:         true,
 		TimingService:  noOpTimingService{},
+		Commander:      command.ExecCommander,
 	}
 }
 
@@ -182,6 +190,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.TaskStore = tm.TaskStore
 	n.DeadmanService = tm.DeadmanService
 	n.UDFService = tm.UDFService
+	n.AlertService = tm.AlertService
 	n.InfluxDBService = tm.InfluxDBService
 	n.SMTPService = tm.SMTPService
 	n.OpsGenieService = tm.OpsGenieService
@@ -195,7 +204,12 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.TalkService = tm.TalkService
 	n.TimingService = tm.TimingService
 	n.K8sService = tm.K8sService
+	n.Commander = tm.Commander
 	return n
+}
+
+func (tm *TaskMaster) ID() string {
+	return tm.id
 }
 
 func (tm *TaskMaster) Open() (err error) {
