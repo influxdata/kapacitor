@@ -88,65 +88,70 @@ func (s *Server) run() {
 	}
 }
 
-var replyGreeting = `220 hello`
-var replyOK = `250 Ok`
-var replyData = `354 Go ahead`
-var replyGoodbye = `221 Goodbye`
+const replyGreeting = "220 hello"
+const replyOK = "250 Ok"
+const replyData = "354 Go ahead"
+const replyGoodbye = "221 Goodbye"
 
+// handleConn takes a connection and implements a simplified SMTP protocol,
+// while capturing the message contents.
 func (s *Server) handleConn(conn net.Conn) {
-	errC := make(chan error, 2)
-	go func() {
-		var err error
-		var line string
-		tc := textproto.NewConn(conn)
-		tc.PrintfLine(replyGreeting)
-		for {
-			line, err = tc.ReadLine()
+	var err error
+	var line string
+	tc := textproto.NewConn(conn)
+	err = tc.PrintfLine(replyGreeting)
+	if err != nil {
+		goto FAIL
+	}
+	for {
+		line, err = tc.ReadLine()
+		if err != nil {
+			goto FAIL
+		}
+		if len(line) < 4 {
+			err = fmt.Errorf("unexpected data %q", line)
+			goto FAIL
+		}
+		switch line[:4] {
+		case "EHLO", "MAIL", "RCPT":
+			tc.PrintfLine(replyOK)
+		case "DATA":
+			var message *mail.Message
+			var body []byte
+			err = tc.PrintfLine(replyData)
 			if err != nil {
 				goto FAIL
 			}
-			if len(line) < 4 {
-				err = fmt.Errorf("unexpected data %q", line)
+			dotReader := tc.DotReader()
+			message, err = mail.ReadMessage(dotReader)
+			if err != nil {
 				goto FAIL
 			}
-			switch line[:4] {
-			case "EHLO", "MAIL", "RCPT":
-				tc.PrintfLine(replyOK)
-			case "DATA":
-				var message *mail.Message
-				tc.PrintfLine(replyData)
-				dotReader := tc.DotReader()
-				message, err = mail.ReadMessage(dotReader)
-				if err != nil {
-					goto FAIL
-				}
-				body, err := ioutil.ReadAll(message.Body)
-				if err != nil {
-					goto FAIL
-				}
-				msg := &Message{
-					Header: message.Header,
-					Body:   string(body),
-				}
-				s.mu.Lock()
-				s.sentMessages = append(s.sentMessages, msg)
-				s.mu.Unlock()
-				tc.PrintfLine(replyOK)
-			case "QUIT":
-				tc.PrintfLine(replyGoodbye)
-				errC <- nil
-				return
+			body, err = ioutil.ReadAll(message.Body)
+			if err != nil {
+				goto FAIL
 			}
+			s.mu.Lock()
+			s.sentMessages = append(s.sentMessages, &Message{
+				Header: message.Header,
+				Body:   string(body),
+			})
+			s.mu.Unlock()
+			err = tc.PrintfLine(replyOK)
+			if err != nil {
+				goto FAIL
+			}
+		case "QUIT":
+			err = tc.PrintfLine(replyGoodbye)
+			if err != nil {
+				goto FAIL
+			}
+			return
 		}
-	FAIL:
-		errC <- err
-		tc.PrintfLine(replyGoodbye)
-		return
-	}()
-	err := <-errC
-	if err != nil {
-		s.mu.Lock()
-		s.errors = append(s.errors, err)
-		s.mu.Unlock()
 	}
+FAIL:
+	tc.PrintfLine(replyGoodbye)
+	s.mu.Lock()
+	s.errors = append(s.errors, err)
+	s.mu.Unlock()
 }
