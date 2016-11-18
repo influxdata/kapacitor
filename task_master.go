@@ -21,6 +21,7 @@ import (
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/slack"
+	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/tick"
@@ -78,7 +79,7 @@ type TaskMaster struct {
 	SMTPService interface {
 		Global() bool
 		StateChangesOnly() bool
-		SendMail(to []string, subject string, msg string) error
+		Handler(smtp.HandlerConfig) alert.Handler
 	}
 	OpsGenieService interface {
 		Global() bool

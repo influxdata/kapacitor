@@ -27,6 +27,7 @@ import (
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/slack"
+	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/tick/stateful"
@@ -133,19 +134,24 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		an.handlers = append(an.handlers, h)
 	}
 
-	//for _, email := range n.EmailHandlers {
-	//	email := email
-	//	an.handlers = append(an.handlers, func(ad *alertData) { an.handleEmail(email, ad) })
-	//}
-	//if len(n.EmailHandlers) == 0 && (et.tm.SMTPService != nil && et.tm.SMTPService.Global()) {
-	//	an.handlers = append(an.handlers, func(ad *alertData) { an.handleEmail(&pipeline.EmailHandler{}, ad) })
-	//}
-	//// If email has been configured with state changes only set it.
-	//if et.tm.SMTPService != nil &&
-	//	et.tm.SMTPService.Global() &&
-	//	et.tm.SMTPService.StateChangesOnly() {
-	//	n.IsStateChangesOnly = true
-	//}
+	for _, email := range n.EmailHandlers {
+		c := smtp.HandlerConfig{
+			To: email.ToList,
+		}
+		h := et.tm.SMTPService.Handler(c)
+		an.handlers = append(an.handlers, h)
+	}
+	if len(n.EmailHandlers) == 0 && (et.tm.SMTPService != nil && et.tm.SMTPService.Global()) {
+		c := smtp.HandlerConfig{}
+		h := et.tm.SMTPService.Handler(c)
+		an.handlers = append(an.handlers, h)
+	}
+	// If email has been configured with state changes only set it.
+	if et.tm.SMTPService != nil &&
+		et.tm.SMTPService.Global() &&
+		et.tm.SMTPService.StateChangesOnly() {
+		n.IsStateChangesOnly = true
+	}
 
 	for _, e := range n.ExecHandlers {
 		h := an.execHandler(e)
@@ -1007,12 +1013,6 @@ func (h *tcpHandler) Handle(ctxt context.Context, event alert.Event) error {
 	conn.Write(buf.Bytes())
 
 	return nil
-}
-
-func (a *AlertNode) handleEmail(email *pipeline.EmailHandler, ad *AlertData) {
-	if err := a.et.tm.SMTPService.SendMail(email.ToList, ad.Message, ad.Details); err != nil {
-		a.logger.Println("E! failed to send email:", err)
-	}
 }
 
 type execHandler struct {
