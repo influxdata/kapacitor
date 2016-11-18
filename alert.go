@@ -10,7 +10,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sync"
 	text "text/template"
@@ -18,6 +17,7 @@ import (
 
 	"github.com/influxdata/influxdb/influxql"
 	imodels "github.com/influxdata/influxdb/models"
+	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
@@ -147,10 +147,10 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 	//	n.IsStateChangesOnly = true
 	//}
 
-	//for _, exec := range n.ExecHandlers {
-	//	exec := exec
-	//	an.handlers = append(an.handlers, func(ad *alertData) { an.handleExec(exec, ad) })
-	//}
+	for _, e := range n.ExecHandlers {
+		h := an.execHandler(e)
+		an.handlers = append(an.handlers, h)
+	}
 
 	for _, log := range n.LogHandlers {
 		if !filepath.IsAbs(log.FilePath) {
@@ -1015,33 +1015,64 @@ func (a *AlertNode) handleEmail(email *pipeline.EmailHandler, ad *AlertData) {
 	}
 }
 
-func (a *AlertNode) handleExec(ex *pipeline.ExecHandler, ad *AlertData) {
-	b, err := json.Marshal(ad)
-	if err != nil {
-		a.logger.Println("E! failed to marshal alert data json", err)
-		return
+type execHandler struct {
+	bufPool   *sync.Pool
+	ci        command.CommandInfo
+	commander command.Commander
+}
+
+func (a *AlertNode) execHandler(e *pipeline.ExecHandler) alert.Handler {
+	ci := command.CommandInfo{
+		Prog: e.Command[0],
+		Args: e.Command[1:],
 	}
-	cmd := exec.Command(ex.Command[0], ex.Command[1:]...)
-	cmd.Stdin = bytes.NewBuffer(b)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-	err = cmd.Run()
-	if err != nil {
-		a.logger.Println("E! error running alert command:", err, out.String())
-		return
+	return &execHandler{
+		bufPool:   &a.bufPool,
+		ci:        ci,
+		commander: a.et.tm.Commander,
 	}
 }
 
+func (h *execHandler) Name() string {
+	return "Exec"
+}
+
+func (h *execHandler) Handle(ctxt context.Context, event alert.Event) error {
+	buf := h.bufPool.Get().(*bytes.Buffer)
+	defer func() {
+		buf.Reset()
+		h.bufPool.Put(buf)
+	}()
+	ad := alertDataFromEvent(event)
+
+	err := json.NewEncoder(buf).Encode(ad)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal alert data json")
+	}
+
+	cmd := h.commander.NewCommand(h.ci)
+	cmd.Stdin(buf)
+	var out bytes.Buffer
+	cmd.Stdout(&out)
+	cmd.Stderr(&out)
+	err = cmd.Start()
+	if err != nil {
+		return errors.Wrapf(err, "exec command failed: Output: %s", out.String())
+	}
+	err = cmd.Wait()
+	if err != nil {
+		return errors.Wrapf(err, "exec command failed: Output: %s", out.String())
+	}
+	return nil
+}
+
 type logHandler struct {
-	bufPool *sync.Pool
 	logpath string
 	mode    os.FileMode
 }
 
 func (a *AlertNode) logHandler(l *pipeline.LogHandler) alert.Handler {
 	return &logHandler{
-		bufPool: &a.bufPool,
 		logpath: l.FilePath,
 		mode:    os.FileMode(l.Mode),
 	}

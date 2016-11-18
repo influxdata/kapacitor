@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/udf"
 	udf_test "github.com/influxdata/kapacitor/udf/test"
@@ -27,7 +28,7 @@ func newUDFProcess(name string) (*kapacitor.UDFProcess, *udf_test.IO) {
 	uio := udf_test.NewIO()
 	cmd := newTestCommander(uio)
 	l := log.New(os.Stderr, fmt.Sprintf("[%s] ", name), log.LstdFlags)
-	u := kapacitor.NewUDFProcess(cmd, l, 0, nil)
+	u := kapacitor.NewUDFProcess(cmd, command.CommandInfo{}, l, 0, nil)
 	return u, uio
 }
 
@@ -230,19 +231,23 @@ type testCommander struct {
 	uio *udf_test.IO
 }
 
-func newTestCommander(uio *udf_test.IO) kapacitor.Commander {
+func newTestCommander(uio *udf_test.IO) command.Commander {
 	return &testCommander{
 		uio: uio,
 	}
 }
 
-func (c *testCommander) NewCommand() kapacitor.Command {
+func (c *testCommander) NewCommand(ci command.CommandInfo) command.Command {
 	return c
 }
 
 func (c *testCommander) Start() error { return nil }
 
 func (c *testCommander) Wait() error { return nil }
+
+func (c *testCommander) Stdin(io.Reader)  {}
+func (c *testCommander) Stdout(io.Writer) {}
+func (c *testCommander) Stderr(io.Writer) {}
 
 func (c *testCommander) StdinPipe() (io.WriteCloser, error) {
 	return c.uio.In(), nil

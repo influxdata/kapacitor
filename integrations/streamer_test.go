@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -23,6 +24,8 @@ import (
 	imodels "github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/clock"
+	"github.com/influxdata/kapacitor/command"
+	"github.com/influxdata/kapacitor/command/commandtest"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
@@ -7233,6 +7236,7 @@ stream
 	|count('value')
 	|alert()
 		.id('kapacitor.{{ .Name }}.{{ index .Tags "host" }}')
+		.details('')
 		.info(lambda: "count" > 6.0)
 		.warn(lambda: "count" > 7.0)
 		.crit(lambda: "count" > 8.0)
@@ -7240,6 +7244,36 @@ stream
 		.log('%s')
 			.mode(0644)
 `, normalPath, modePath)
+
+	expAD := kapacitor.AlertData{
+		ID:      "kapacitor.cpu.serverA",
+		Message: "kapacitor.cpu.serverA is CRITICAL",
+		Time:    time.Date(1971, 01, 01, 0, 0, 10, 0, time.UTC),
+		Level:   alert.Critical,
+		Data: influxql.Result{
+			Series: imodels.Rows{
+				{
+					Name:    "cpu",
+					Tags:    map[string]string{"host": "serverA"},
+					Columns: []string{"time", "count"},
+					Values: [][]interface{}{[]interface{}{
+						time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC).Format(time.RFC3339Nano),
+						10.0,
+					}},
+				},
+			},
+		},
+	}
+
+	testAD := func(name string, f io.Reader) {
+		ad := kapacitor.AlertData{}
+		if err := json.NewDecoder(f).Decode(&ad); err != nil {
+			t.Fatal(err)
+		}
+		if got, exp := ad, expAD; !reflect.DeepEqual(got, exp) {
+			t.Errorf("%s unexpected alert data written to log:\ngot\n%+v\nexp\n%+v\n", name, got, exp)
+		}
+	}
 
 	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
 	defer tm.Close()
@@ -7259,6 +7293,7 @@ stream
 	} else if exp, got := os.FileMode(0600), stat.Mode(); exp != got {
 		t.Errorf("unexpected normal file mode: got %v exp %v", got, exp)
 	}
+	testAD("normal", normal)
 
 	mode, err := os.Open(modePath)
 	if err != nil {
@@ -7269,6 +7304,104 @@ stream
 		t.Fatal(err)
 	} else if exp, got := os.FileMode(0644), stat.Mode(); exp != got {
 		t.Errorf("unexpected normal file mode: got %v exp %v", got, exp)
+	}
+
+	testAD("mode", mode)
+}
+
+func TestStream_AlertExec(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor.{{ .Name }}.{{ index .Tags "host" }}')
+		.details('')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.exec('/bin/my-script', 'arg1', 'arg2')
+		.exec('/bin/my-other-script')
+`
+
+	expInfo := []command.CommandInfo{
+		{
+			Prog: "/bin/my-script",
+			Args: []string{"arg1", "arg2"},
+		},
+		{
+			Prog: "/bin/my-other-script",
+			Args: []string{},
+		},
+	}
+	expAD := kapacitor.AlertData{
+		ID:      "kapacitor.cpu.serverA",
+		Message: "kapacitor.cpu.serverA is CRITICAL",
+		Time:    time.Date(1971, 01, 01, 0, 0, 10, 0, time.UTC),
+		Level:   alert.Critical,
+		Data: influxql.Result{
+			Series: imodels.Rows{
+				{
+					Name:    "cpu",
+					Tags:    map[string]string{"host": "serverA"},
+					Columns: []string{"time", "count"},
+					Values: [][]interface{}{[]interface{}{
+						time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC).Format(time.RFC3339Nano),
+						10.0,
+					}},
+				},
+			},
+		},
+	}
+
+	cmdC := make(chan *commandtest.CommandTest, 2)
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		tm.Commander = commandtest.CommanderTest{
+			NewCommandHook: func(c *commandtest.CommandTest) {
+				log.Println("D! command!")
+				cmdC <- c
+			},
+		}
+	}
+
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+	for i := 0; i < 2; i++ {
+		select {
+		case cmd := <-cmdC:
+			cmd.Lock()
+			defer cmd.Unlock()
+
+			if got, exp := cmd.Info, expInfo[i]; !reflect.DeepEqual(got, exp) {
+				t.Errorf("%d unexpected command info:\ngot\n%+v\nexp\n%+v\n", i, got, exp)
+			}
+
+			if !cmd.Started {
+				t.Errorf("%d expected command to have been started", i)
+			}
+			if !cmd.Waited {
+				t.Errorf("%d expected command to have waited", i)
+			}
+			if cmd.Killed {
+				t.Errorf("%d expected command not to have been killed", i)
+			}
+
+			ad := kapacitor.AlertData{}
+			err := json.Unmarshal(cmd.StdinData, &ad)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got, exp := ad, expAD; !reflect.DeepEqual(got, exp) {
+				t.Errorf("%d unexpected alert data sent to command:\ngot\n%+v\nexp\n%+v\n%s", i, got, exp, string(cmd.StdinData))
+			}
+		default:
+			t.Error("expected command to be created")
+		}
 	}
 }
 
