@@ -6790,8 +6790,11 @@ func TestStream_AlertAlerta(t *testing.T) {
 		dec.Decode(&pd)
 
 		if rc := atomic.LoadInt32(&requestCount); rc == 1 {
-			if exp := "/alert?api-key=testtoken1234567"; r.URL.String() != exp {
+			if exp := "/alert"; r.URL.String() != exp {
 				t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
+			}
+			if exp := "Bearer testtoken1234567"; r.Header.Get("Authorization") != exp {
+				t.Errorf("unexpected token in header got %s exp %s", r.Header.Get("Authorization"), exp)
 			}
 			if exp := "cpu"; pd.Resource != exp {
 				t.Errorf("unexpected resource got %s exp %s", pd.Resource, exp)
@@ -6815,8 +6818,11 @@ func TestStream_AlertAlerta(t *testing.T) {
 				t.Errorf("unexpected origin got %s exp %s", pd.Origin, exp)
 			}
 		} else {
-			if exp := "/alert?api-key=anothertesttoken"; r.URL.String() != exp {
+			if exp := "/alert"; r.URL.String() != exp {
 				t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
+			}
+			if exp := "Bearer anothertesttoken"; r.Header.Get("Authorization") != exp {
+				t.Errorf("unexpected token in header got %s exp %s", r.Header.Get("Authorization"), exp)
 			}
 			if exp := "resource: serverA"; pd.Resource != exp {
 				t.Errorf("unexpected resource got %s exp %s", pd.Resource, exp)
