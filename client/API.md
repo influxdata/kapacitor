@@ -6,6 +6,7 @@
 * [Templates](#templates)
 * [Recordings](#recordings)
 * [Replays](#replays)
+* [Alerts](#alerts)
 * [Configuration](#configuration)
 * [Testing Services](#testing-services)
 * [Miscellaneous](#miscellaneous)
@@ -1340,6 +1341,302 @@ GET /kapacitor/v1/replays
     ]
 }
 ```
+
+## Alerts
+
+Kapacitor can generate and handle alerts.
+The API allows you to see the current state of any alert and to configure various handlers for the alerts.
+
+### Topics
+
+Alerts are grouped into topics.
+An alert handler "listens" on a topic for any new events.
+You can either specify the alert topic in the TICKscript or one will be generated for you.
+
+To query the list of available topics make a GET requests to `/kapacitor/v1/alerts/topics/`.
+
+#### Example
+
+```
+GET /kapacitor/v1/alerts/topics
+```
+
+```
+{
+    "link": {"rel":"self","href":"/kapacitor/v1/alerts/topics"},
+    "topics: [
+        {
+            "links": [
+                {"rel":"self","href":"/kapacitor/v1/alerts/topics/system"},
+                {"rel":"events","href":"/kapacitor/v1/alerts/topics/system/events"},
+                {"rel":"handlers","href":"/kapacitor/v1/alerts/topics/system/handlers"},
+            ],
+            "id": "system"
+            "level":"CRITICAL"
+        },
+        {
+            "links": [
+                {"rel":"self","href":"/kapacitor/v1/alerts/topics/app"},
+                {"rel":"events","href":"/kapacitor/v1/alerts/topics/app/events"},
+                {"rel":"handlers","href":"/kapacitor/v1/alerts/topics/app/handlers"},
+            ],
+            "id": "app"
+            "level":"OK"
+        }
+    ]
+}
+```
+
+### Topic Status
+
+To query the status of a topic make a GET request to `/kapacitor/v1/alerts/topics/<topic id>`.
+
+#### Example
+
+```
+GET /kapacitor/v1/alerts/topics/system
+```
+
+```
+{
+    "links": [
+        {"rel":"self","href":"/kapacitor/v1/alerts/topics/system"},
+        {"rel":"events","href":"/kapacitor/v1/alerts/topics/system/events"},
+        {"rel":"handlers","href":"/kapacitor/v1/alerts/topics/system/handlers"},
+    ],
+    "id": "system",
+    "level":"CRITICAL"
+}
+```
+
+### Topic Events
+
+To query all the events within a topic make a GET request to `/kapacitor/v1/alerts/topics/<topic id>/events`.
+
+#### Example
+
+```
+GET /kapacitor/v1/alerts/topics/system/events
+```
+
+```
+{
+    "link": {"rel":"self","href":"/kapacitor/v1/alerts/topics/system/events"},
+    "id": "system",
+    "events": [
+        {
+            "link":{"rel":"self","href":"/kapacitor/v1/topics/system/events/cpu"},
+            "id": "cpu",
+            "state": {
+                "level": "WARN",
+                "message": "cpu is WARNING",
+                "events: "",
+                "time": "2016-12-01T00:00:00Z",
+                "duration": "5m"
+            }
+        },
+        {
+            "link":{"rel":"self","href":"/kapacitor/v1/topics/system/events/mem"},
+            "id": "mem",
+            "state": {
+                "level": "CRITICAL",
+                "message": "mem is WARNING",
+                "events: "",
+                "time": "2016-12-01T00:10:00Z",
+                "duration": "1m"
+            }
+        }
+    ]
+}
+```
+
+### Topic Events
+
+You can query a specific event within a topic by making a GET request to `/kapacitor/v1/alerts/topics/<topic id>/events/<event id>`.
+
+#### Example
+
+```
+GET /kapacitor/v1/alerts/topics/system/events/cpu
+```
+
+```
+{
+    "link":{"rel":"self","href":"/kapacitor/v1/topics/system/events/cpu"},
+    "id": "cpu",
+    "state": {
+        "level": "WARN",
+        "message": "cpu is WARNING",
+        "events: "",
+        "time": "2016-12-01T00:00:00Z",
+        "duration": "5m"
+    }
+}
+```
+
+### Topic Handlers
+
+Handlers are created independent of a topic but are associated with a topic.
+You can get a list of handlers configured for a topic by making a GET request to `/kapacitor/v1/alerts/topics/<topic id>/handlers`.
+
+#### Example
+
+```
+GET /kapacitor/v1/alerts/topics/system/handlers
+```
+
+```
+{
+    "link":{"rel":"self","href":"/kapacitor/v1/topics/system/handlers"},
+    "id": "system",
+    "handlers": [
+        {
+            "link":{"rel":"self","href":"/kapacitor/v1/alerts/handlers/slack"},
+            "id":"slack",
+        },
+        {
+            "link":{"rel":"self","href":"/kapacitor/v1/alerts/handlers/smtp"},
+            "id":"smtp",
+        }
+    ]
+}
+```
+
+### List Handlers
+
+To query information about all handlers make a GET request to `/kapacitor/v1/alerts/handlers`.
+
+#### Example
+
+```
+GET /kapacitor/v1/alerts/handlers
+```
+
+```
+{
+    "link":{"rel":"self","href":"/kapacitor/v1/handlers"},
+    "handlers": [
+        {
+            "link":{"rel":"self","href":"/kapacitor/v1/alerts/handlers/slack"},
+            "id":"slack",
+        },
+        {
+            "link":{"rel":"self","href":"/kapacitor/v1/alerts/handlers/smtp"},
+            "id":"smtp",
+        }
+    ]
+}
+```
+### Get a Handler
+
+To query information about a specific handler make a GET request to `/kapacitor/v1/alerts/handlers/<handler id>`.
+
+#### Example
+
+```
+GET /kapacitor/v1/alerts/handlers/<handler id>
+```
+
+```
+{
+    "link":{"rel":"self","href":"/kapacitor/v1/handlers/slack"},
+    "id":"slack"
+}
+```
+
+### Create a Handler
+
+To create a new handler make a POST request to `/kapacitor/v1/alerts/handlers`.
+
+```
+POST /kapacitor/v1/alerts/handlers
+{
+    "id":"slack",
+    "topics": ["system", "app"],
+    "actions": [
+        { "slack": {"channel":"#alerts"}} }
+    ]
+
+}
+```
+
+```
+{
+    "link":{"rel":"self","href":"/kapacitor/v1/handlers/slack"},
+    "id": "slack",
+    "topics": ["system", "app"],
+    "actions": [
+        {"slack": {"channel":"#alerts"}}
+    ]
+}
+```
+
+### Update a Handler
+
+To update an existing handler you can either make a PUT or PATCH request to `/kapacitor/v1/alerts/handlers/<handler id>`.
+
+Using PUT will replace the entire handler, while using PATCH you can modify specific parts of the handler.
+
+PATCH will apply JSON patch object to the existing handler, see [rfc6902](https://tools.ietf.org/html/rfc6902) for more details.
+
+#### Example
+
+Update the topics and actions for a handler.
+
+```
+PATCH /kapacitor/v1/alerts/handlers/slack
+[
+    {"op":"replace", "path":"/topics", "value":["system", "test"]},
+    {"op":"add", "path":"/actions", "value":{"log":{"path":"/tmp/test.log"}}}
+]
+```
+
+```
+{
+    "link":{"rel":"self","href":"/kapacitor/v1/handlers/slack"},
+    "id": "slack",
+    "topics": ["system", "test"],
+    "actions": [
+        {"slack": {"channel":"#alerts"}},
+        {"log": {"path":"/tmp/test.log"}}
+    ]
+}
+```
+
+Replace an entire handler.
+
+```
+PUT /kapacitor/v1/alerts/handlers/slack
+{
+    "id": "slack",
+    "topics": ["system", "test"],
+    "actions": [
+        {"slack": {"channel":"#alerts"}},
+        {"log": {"path":"/tmp/test.log"}}
+    ]
+}
+```
+
+```
+{
+    "link":{"rel":"self","href":"/kapacitor/v1/handlers/slack"},
+    "id": "slack",
+    "topics": ["system", "test"],
+    "actions": [
+        {"slack": {"channel":"#alerts"}},
+        {"log": {"path":"/tmp/test.log"}}
+    ]
+}
+```
+
+### Remove a Handler
+
+To remove an existing handler make a DELETE request to `/kapacitor/v1/alerts/handlers/<handler id>`.
+
+```
+DELETE /kapacitor/v1/alerts/handlers/<handler id>
+```
+
 
 ## Configuration
 

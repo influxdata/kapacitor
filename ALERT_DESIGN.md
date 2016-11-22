@@ -76,28 +76,30 @@ These alert handlers will be configured via the API.
 Use yaml/json to define the alert handlers.
 
 ```yaml
-alert:
-    - events:
-        - cpu
-        - mem
+topics:
+    - cpu
+    - mem
+
+actions:
     - aggregate:
         groupBy: id
         interval: 1m
     - throttle:
         count: 10
         every: 5m
-    - publish: throttled_agged
+    - publish:
+        topics: [ throttled_aggreated ]
     - pagerDuty:
          serviceKey: XXX
 ```
 
 ```json
 {
-    "alert" : [
-        {"events": ["cpu", "mem"]},
+    "topics": ["cpu", "mem"],
+    "actions" : [
         {"aggregate": {"groupBy":"id","internal":"1m"}},
         {"throttle": {"count":10,"every":"5m"}},
-        {"publish": ["throttled_aggreated"]},
+        {"publish": {"topics":["throttled_aggreated"]},
         {"pagerDuty": {"serviceKey":"XXX"}}
     ]
 }
