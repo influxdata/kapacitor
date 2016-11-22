@@ -2,7 +2,6 @@ package victorops
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -83,7 +82,6 @@ func (s *Service) Test(options interface{}) error {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
 	return s.Alert(
-		nil,
 		o.RoutingKey,
 		o.MessageType,
 		o.Message,
@@ -93,18 +91,13 @@ func (s *Service) Test(options interface{}) error {
 	)
 }
 
-func (s *Service) Alert(ctxt context.Context, routingKey, messageType, message, entityID string, t time.Time, details interface{}) error {
+func (s *Service) Alert(routingKey, messageType, message, entityID string, t time.Time, details interface{}) error {
 	url, post, err := s.preparePost(routingKey, messageType, message, entityID, t, details)
 	if err != nil {
 		return err
 	}
 
-	req, err := http.NewRequest("POST", url, post)
-	req.Header.Set("Content-Type", "application/json")
-	if ctxt != nil {
-		req = req.WithContext(ctxt)
-	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.Post(url, "application/json", post)
 	if err != nil {
 		return err
 	}
@@ -175,22 +168,20 @@ type HandlerConfig struct {
 }
 
 type handler struct {
-	s *Service
-	c HandlerConfig
+	s      *Service
+	c      HandlerConfig
+	logger *log.Logger
 }
 
-func (s *Service) Handler(c HandlerConfig) alert.Handler {
+func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
 	return &handler{
-		s: s,
-		c: c,
+		s:      s,
+		c:      c,
+		logger: l,
 	}
 }
 
-func (h *handler) Name() string {
-	return "VictorOps"
-}
-
-func (h *handler) Handle(ctxt context.Context, event alert.Event) error {
+func (h *handler) Handle(event alert.Event) {
 	var messageType string
 	switch event.State.Level {
 	case alert.OK:
@@ -198,13 +189,14 @@ func (h *handler) Handle(ctxt context.Context, event alert.Event) error {
 	default:
 		messageType = event.State.Level.String()
 	}
-	return h.s.Alert(
-		ctxt,
+	if err := h.s.Alert(
 		h.c.RoutingKey,
 		messageType,
 		event.State.Message,
 		event.State.ID,
 		event.State.Time,
 		event.Data.Result,
-	)
+	); err != nil {
+		h.logger.Println("E! failed to send event to VictorOps", err)
+	}
 }

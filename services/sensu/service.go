@@ -1,7 +1,6 @@
 package sensu
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -73,14 +72,13 @@ func (s *Service) Test(options interface{}) error {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
 	return s.Alert(
-		nil,
 		o.Name,
 		o.Output,
 		o.Level,
 	)
 }
 
-func (s *Service) Alert(ctxt context.Context, name, output string, level alert.Level) error {
+func (s *Service) Alert(name, output string, level alert.Level) error {
 	if !validNamePattern.MatchString(name) {
 		return fmt.Errorf("invalid name %q for sensu alert. Must match %v", name, validNamePattern)
 	}
@@ -90,38 +88,22 @@ func (s *Service) Alert(ctxt context.Context, name, output string, level alert.L
 		return err
 	}
 
-	errC := make(chan error, 1)
-	go func() {
-		conn, err := net.DialTCP("tcp", nil, addr)
-		if err != nil {
-			errC <- err
-			return
-		}
-		defer conn.Close()
-
-		enc := json.NewEncoder(conn)
-		err = enc.Encode(postData)
-		if err != nil {
-			errC <- err
-			return
-		}
-		resp, err := ioutil.ReadAll(conn)
-		if string(resp) != "ok" {
-			errC <- errors.New("sensu socket error: " + string(resp))
-			return
-		}
-		errC <- nil
-	}()
-	var done <-chan struct{}
-	if ctxt != nil {
-		done = ctxt.Done()
-	}
-	select {
-	case err := <-errC:
+	conn, err := net.DialTCP("tcp", nil, addr)
+	if err != nil {
 		return err
-	case <-done:
-		return errors.New("sensu request canceled or deadline reached")
 	}
+	defer conn.Close()
+
+	enc := json.NewEncoder(conn)
+	err = enc.Encode(postData)
+	if err != nil {
+		return err
+	}
+	resp, err := ioutil.ReadAll(conn)
+	if string(resp) != "ok" {
+		return errors.New("sensu socket error: " + string(resp))
+	}
+	return nil
 }
 
 func (s *Service) prepareData(name, output string, level alert.Level) (*net.TCPAddr, map[string]interface{}, error) {
@@ -160,19 +142,24 @@ func (s *Service) prepareData(name, output string, level alert.Level) (*net.TCPA
 	return addr, postData, nil
 }
 
-func (s *Service) Handler() alert.Handler {
-	return s
+type handler struct {
+	s      *Service
+	logger *log.Logger
 }
 
-func (s *Service) Name() string {
-	return "Sensu"
+func (s *Service) Handler(l *log.Logger) alert.Handler {
+	return &handler{
+		s:      s,
+		logger: l,
+	}
 }
 
-func (s *Service) Handle(ctxt context.Context, event alert.Event) error {
-	return s.Alert(
-		ctxt,
+func (h *handler) Handle(event alert.Event) {
+	if err := h.s.Alert(
 		event.State.ID,
 		event.State.Message,
 		event.State.Level,
-	)
+	); err != nil {
+		h.logger.Println("E! failed to send event to Sensu", err)
+	}
 }

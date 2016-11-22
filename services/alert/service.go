@@ -1,29 +1,26 @@
 package alert
 
 import (
-	"context"
+	"fmt"
 	"log"
 	"sort"
 	"sync"
-
-	"github.com/pkg/errors"
 )
+
+// eventBufferSize is the number of events to buffer to each handler per topic.
+const eventBufferSize = 100
 
 type Service struct {
 	mu sync.RWMutex
 
 	topics map[string]*Topic
-	// Map topic name -> []Handler
-	handlers map[string][]Handler
-
 	logger *log.Logger
 }
 
 func NewService(c Config, l *log.Logger) *Service {
 	s := &Service{
-		topics:   make(map[string]*Topic),
-		handlers: make(map[string][]Handler),
-		logger:   l,
+		topics: make(map[string]*Topic),
+		logger: l,
 	}
 
 	return s
@@ -34,36 +31,35 @@ func (s *Service) Open() error {
 }
 
 func (s *Service) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for topic, t := range s.topics {
+		t.Close()
+		delete(s.topics, topic)
+	}
 	return nil
 }
 
 func (s *Service) Collect(event Event) error {
 	s.mu.RLock()
 	topic := s.topics[event.Topic]
-	handlers := s.handlers[event.Topic]
 	s.mu.RUnlock()
 
 	if topic == nil {
 		return nil
 	}
-	s.logger.Println("D! handling event", event.Topic, event.State.ID, len(handlers))
-	topic.UpdateEvent(event.State)
-	ctxt := context.TODO()
-	for _, h := range handlers {
-		// TODO do not return early, collect all errors
-		err := h.Handle(ctxt, event)
-		if err != nil {
-			return errors.Wrapf(err, "handler %s failed", h.Name())
-		}
-	}
-	return nil
+
+	return topic.Handle(event)
 }
 
 func (s *Service) DeleteTopic(topic string) {
 	s.mu.Lock()
+	t := s.topics[topic]
 	delete(s.topics, topic)
-	delete(s.handlers, topic)
 	s.mu.Unlock()
+	if t != nil {
+		t.Close()
+	}
 }
 
 func (s *Service) RegisterHandler(topics []string, h Handler) {
@@ -74,20 +70,11 @@ func (s *Service) RegisterHandler(topics []string, h Handler) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-TOPICS:
 	for _, topic := range topics {
 		if _, ok := s.topics[topic]; !ok {
 			s.topics[topic] = newTopic(topic)
 		}
-
-		handlers := s.handlers[topic]
-		for _, cur := range handlers {
-			// TODO, do we want to force the handler implementations to all be comparable?
-			if cur == h {
-				continue TOPICS
-			}
-		}
-		s.handlers[topic] = append(handlers, h)
+		s.topics[topic].AddHandler(h)
 	}
 }
 
@@ -99,18 +86,8 @@ func (s *Service) DeregisterHandler(topics []string, h Handler) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-TOPICS:
 	for _, topic := range topics {
-		handlers := s.handlers[topic]
-		for i := 0; i < len(handlers); i++ {
-			if handlers[i] == h {
-				if i < len(handlers)-1 {
-					handlers[i] = handlers[len(handlers)-1]
-				}
-				s.handlers[topic] = handlers[:len(handlers)-1]
-				continue TOPICS
-			}
-		}
+		s.topics[topic].RemoveHandler(h)
 	}
 }
 
@@ -132,7 +109,6 @@ func (s *Service) TopicStatus(pattern string, minLevel Level) map[string]Level {
 }
 
 // TopicStatusDetails is similar to TopicStatus, but will additionally return
-
 // at least 'minLevel' severity
 //
 // TODO: implement pattern restriction
@@ -174,9 +150,12 @@ func match(pattern, name string) bool {
 type Topic struct {
 	name string
 
-	mu     sync.RWMutex
+	mu sync.RWMutex
+
 	events map[string]*EventState
 	sorted []*EventState
+
+	handlers []*handler
 }
 
 func newTopic(name string) *Topic {
@@ -196,11 +175,68 @@ func (t *Topic) MaxLevel() Level {
 	return level
 }
 
-// UpdateEvent will store the latest state for the given ID and return true if
-// the update caused a level change for the ID
-func (t *Topic) UpdateEvent(state EventState) bool {
+func (t *Topic) AddHandler(h Handler) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	for _, cur := range t.handlers {
+		if cur.Equal(h) {
+			return
+		}
+	}
+	hdlr := newHandler(h)
+	t.handlers = append(t.handlers, hdlr)
+}
+
+func (t *Topic) RemoveHandler(h Handler) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	for i := 0; i < len(t.handlers); i++ {
+		if t.handlers[i].Equal(h) {
+			// Close handler
+			t.handlers[i].Close()
+			if i < len(t.handlers)-1 {
+				t.handlers[i] = t.handlers[len(t.handlers)-1]
+			}
+			t.handlers = t.handlers[:len(t.handlers)-1]
+			break
+		}
+	}
+}
+
+func (t *Topic) Close() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	// Close all handlers
+	for _, h := range t.handlers {
+		h.Close()
+	}
+	t.handlers = nil
+}
+
+func (t *Topic) Handle(event Event) error {
+	t.updateEvent(event.State)
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	// Handle event
+	var errs multiError
+	for _, h := range t.handlers {
+		err := h.Handle(event)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) != 0 {
+		return errs
+	}
+	return nil
+}
+
+// updateEvent will store the latest state for the given ID.
+func (t *Topic) updateEvent(state EventState) {
 	var needSort bool
 	t.mu.Lock()
+	defer t.mu.Unlock()
 	cur := t.events[state.ID]
 	if cur == nil {
 		needSort = true
@@ -215,10 +251,6 @@ func (t *Topic) UpdateEvent(state EventState) bool {
 	if needSort {
 		sort.Sort(sortedStates(t.sorted))
 	}
-
-	t.mu.Unlock()
-
-	return needSort
 }
 
 type sortedStates []*EventState
@@ -230,4 +262,85 @@ func (e sortedStates) Less(i int, j int) bool {
 		return true
 	}
 	return e[i].ID < e[j].ID
+}
+
+// handler wraps a Handler implementation in order to provide buffering and non-blocking event handling.
+type handler struct {
+	h        Handler
+	events   chan Event
+	aborting chan struct{}
+	wg       sync.WaitGroup
+}
+
+func newHandler(h Handler) *handler {
+	hdlr := &handler{
+		h:        h,
+		events:   make(chan Event, eventBufferSize),
+		aborting: make(chan struct{}),
+	}
+	hdlr.wg.Add(1)
+	go func() {
+		defer hdlr.wg.Done()
+		hdlr.run()
+	}()
+	return hdlr
+}
+
+func (h *handler) Equal(o Handler) (b bool) {
+	defer func() {
+		// Recover in case the interface concrete type is not a comparable type.
+		r := recover()
+		if r != nil {
+			b = false
+		}
+	}()
+	b = h.h == o
+	return
+}
+
+func (h *handler) Close() {
+	close(h.events)
+	h.wg.Wait()
+}
+
+func (h *handler) Abort() {
+	close(h.aborting)
+	h.wg.Wait()
+}
+
+func (h *handler) Handle(event Event) error {
+	select {
+	case h.events <- event:
+		return nil
+	default:
+		return fmt.Errorf("failed to deliver event %q to handler", event.State.ID)
+	}
+}
+
+func (h *handler) run() {
+	for {
+		select {
+		case event, ok := <-h.events:
+			if !ok {
+				return
+			}
+			h.h.Handle(event)
+		case <-h.aborting:
+			return
+		}
+	}
+}
+
+// multiError is a list of errors.
+type multiError []error
+
+func (e multiError) Error() string {
+	if len(e) == 1 {
+		return e[0].Error()
+	}
+	msg := "multiple errors:"
+	for _, err := range e {
+		msg += "\n" + err.Error()
+	}
+	return msg
 }

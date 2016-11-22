@@ -79,43 +79,43 @@ type TaskMaster struct {
 	SMTPService interface {
 		Global() bool
 		StateChangesOnly() bool
-		Handler(smtp.HandlerConfig) alert.Handler
+		Handler(smtp.HandlerConfig, *log.Logger) alert.Handler
 	}
 	OpsGenieService interface {
 		Global() bool
-		Handler(opsgenie.HandlerConfig) alert.Handler
+		Handler(opsgenie.HandlerConfig, *log.Logger) alert.Handler
 	}
 	VictorOpsService interface {
 		Global() bool
-		Handler(victorops.HandlerConfig) alert.Handler
+		Handler(victorops.HandlerConfig, *log.Logger) alert.Handler
 	}
 	PagerDutyService interface {
 		Global() bool
-		Handler(pagerduty.HandlerConfig) alert.Handler
+		Handler(pagerduty.HandlerConfig, *log.Logger) alert.Handler
 	}
 	SlackService interface {
 		Global() bool
 		StateChangesOnly() bool
-		Handler(slack.HandlerConfig) alert.Handler
+		Handler(slack.HandlerConfig, *log.Logger) alert.Handler
 	}
 	TelegramService interface {
 		Global() bool
 		StateChangesOnly() bool
-		Handler(telegram.HandlerConfig) alert.Handler
+		Handler(telegram.HandlerConfig, *log.Logger) alert.Handler
 	}
 	HipChatService interface {
 		Global() bool
 		StateChangesOnly() bool
-		Handler(hipchat.HandlerConfig) alert.Handler
+		Handler(hipchat.HandlerConfig, *log.Logger) alert.Handler
 	}
 	AlertaService interface {
-		Handler(c alerta.HandlerConfig) (alert.Handler, error)
+		Handler(alerta.HandlerConfig, *log.Logger) (alert.Handler, error)
 	}
 	SensuService interface {
-		Handler() alert.Handler
+		Handler(*log.Logger) alert.Handler
 	}
 	TalkService interface {
-		Handler() alert.Handler
+		Handler(*log.Logger) alert.Handler
 	}
 	TimingService interface {
 		NewTimer(timer.Setter) timer.Timer

@@ -2,7 +2,6 @@ package slack
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -91,20 +90,15 @@ func (s *Service) Test(options interface{}) error {
 	if !ok {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
-	return s.Alert(nil, o.Channel, o.Message, o.Username, o.IconEmoji, o.Level)
+	return s.Alert(o.Channel, o.Message, o.Username, o.IconEmoji, o.Level)
 }
 
-func (s *Service) Alert(ctxt context.Context, channel, message, username, iconEmoji string, level alert.Level) error {
+func (s *Service) Alert(channel, message, username, iconEmoji string, level alert.Level) error {
 	url, post, err := s.preparePost(channel, message, username, iconEmoji, level)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequest("POST", url, post)
-	req.Header.Set("Content-Type", "application/json")
-	if ctxt != nil {
-		req = req.WithContext(ctxt)
-	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.Post(url, "application/json", post)
 	if err != nil {
 		return err
 	}
@@ -190,28 +184,28 @@ type HandlerConfig struct {
 }
 
 type handler struct {
-	s *Service
-	c HandlerConfig
+	s      *Service
+	c      HandlerConfig
+	logger *log.Logger
 }
 
-func (s *Service) Handler(c HandlerConfig) alert.Handler {
+func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
 	return &handler{
-		s: s,
-		c: c,
+		s:      s,
+		c:      c,
+		logger: l,
 	}
 }
 
-func (h *handler) Name() string {
-	return "Slack"
-}
-
-func (h *handler) Handle(ctxt context.Context, event alert.Event) error {
-	return h.s.Alert(
-		ctxt,
+func (h *handler) Handle(event alert.Event) {
+	h.logger.Printf("D!  Slack event %v channel %s", event.State.ID, h.c.Channel)
+	if err := h.s.Alert(
 		h.c.Channel,
 		event.State.Message,
 		h.c.Username,
 		h.c.IconEmoji,
 		event.State.Level,
-	)
+	); err != nil {
+		h.logger.Println("E! failed to send event to Slack", err)
+	}
 }

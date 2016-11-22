@@ -1,7 +1,6 @@
 package smtp
 
 import (
-	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -172,21 +171,13 @@ func (s *Service) runMailer() {
 	}
 }
 
-func (s *Service) SendMail(ctxt context.Context, to []string, subject, body string) error {
+func (s *Service) SendMail(to []string, subject, body string) error {
 	s.logger.Println("D! SendMail", to, subject)
 	m, err := s.prepareMessge(to, subject, body)
 	if err != nil {
 		return err
 	}
-	var done <-chan struct{}
-	if ctxt != nil {
-		done = ctxt.Done()
-	}
-	select {
-	case s.mail <- m:
-	case <-done:
-		return errors.New("sending mail canceled or deadline reached")
-	}
+	s.mail <- m
 	return nil
 }
 
@@ -230,7 +221,6 @@ func (s *Service) Test(options interface{}) error {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
 	return s.SendMail(
-		nil,
 		o.To,
 		o.Subject,
 		o.Body,
@@ -243,26 +233,25 @@ type HandlerConfig struct {
 }
 
 type handler struct {
-	s *Service
-	c HandlerConfig
+	s      *Service
+	c      HandlerConfig
+	logger *log.Logger
 }
 
-func (s *Service) Handler(c HandlerConfig) alert.Handler {
+func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
 	return &handler{
-		s: s,
-		c: c,
+		s:      s,
+		c:      c,
+		logger: l,
 	}
 }
 
-func (h *handler) Name() string {
-	return "SMTP"
-}
-
-func (h *handler) Handle(ctxt context.Context, event alert.Event) error {
-	return h.s.SendMail(
-		ctxt,
+func (h *handler) Handle(event alert.Event) {
+	if err := h.s.SendMail(
 		h.c.To,
 		event.State.Message,
 		event.State.Details,
-	)
+	); err != nil {
+		h.logger.Println("E! failed to send email", err)
+	}
 }

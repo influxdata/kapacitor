@@ -2,7 +2,6 @@ package alerta
 
 import (
 	"bytes"
-	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -71,7 +70,6 @@ func (s *Service) Test(options interface{}) error {
 	}
 	c := s.config()
 	return s.Alert(
-		nil,
 		c.Token,
 		o.Resource,
 		o.Event,
@@ -116,7 +114,7 @@ func (s *Service) Update(newConfig []interface{}) error {
 	return nil
 }
 
-func (s *Service) Alert(ctxt context.Context, token, resource, event, environment, severity, group, value, message, origin string, service []string, data interface{}) error {
+func (s *Service) Alert(token, resource, event, environment, severity, group, value, message, origin string, service []string, data interface{}) error {
 	if resource == "" || event == "" {
 		return errors.New("Resource and Event are required to send an alert")
 	}
@@ -126,9 +124,6 @@ func (s *Service) Alert(ctxt context.Context, token, resource, event, environmen
 		return err
 	}
 
-	if ctxt != nil {
-		req = req.WithContext(ctxt)
-	}
 	client := s.clientValue.Load().(*http.Client)
 	resp, err := client.Do(req)
 	if err != nil {
@@ -248,8 +243,9 @@ type HandlerConfig struct {
 }
 
 type handler struct {
-	s *Service
-	c HandlerConfig
+	s      *Service
+	c      HandlerConfig
+	logger *log.Logger
 
 	resourceTmpl    *text.Template
 	eventTmpl       *text.Template
@@ -258,7 +254,7 @@ type handler struct {
 	groupTmpl       *text.Template
 }
 
-func (s *Service) Handler(c HandlerConfig) (alert.Handler, error) {
+func (s *Service) Handler(c HandlerConfig, l *log.Logger) (alert.Handler, error) {
 	// Parse and validate alerta templates
 	rtmpl, err := text.New("resource").Parse(c.Resource)
 	if err != nil {
@@ -283,6 +279,7 @@ func (s *Service) Handler(c HandlerConfig) (alert.Handler, error) {
 	return &handler{
 		s:               s,
 		c:               c,
+		logger:          l,
 		resourceTmpl:    rtmpl,
 		eventTmpl:       evtmpl,
 		environmentTmpl: etmpl,
@@ -307,16 +304,13 @@ type eventData struct {
 	Tags map[string]string
 }
 
-func (h *handler) Name() string {
-	return "Alerta"
-}
-
-func (h *handler) Handle(ctxt context.Context, event alert.Event) error {
+func (h *handler) Handle(event alert.Event) {
 	td := event.TemplateData()
 	var buf bytes.Buffer
 	err := h.resourceTmpl.Execute(&buf, td)
 	if err != nil {
-		return errors.Wrapf(err, "failed to evaluate Alerta Resource template %s", h.c.Resource)
+		h.logger.Printf("E! failed to evaluate Alerta Resource template %s: %v", h.c.Resource, err)
+		return
 	}
 	resource := buf.String()
 	buf.Reset()
@@ -330,28 +324,32 @@ func (h *handler) Handle(ctxt context.Context, event alert.Event) error {
 	}
 	err = h.eventTmpl.Execute(&buf, data)
 	if err != nil {
-		return errors.Wrapf(err, "failed to evaluate Alerta Event template %s", h.c.Event)
+		h.logger.Printf("E! failed to evaluate Alerta Event template %s: %v", h.c.Event, err)
+		return
 	}
 	eventStr := buf.String()
 	buf.Reset()
 
 	err = h.environmentTmpl.Execute(&buf, td)
 	if err != nil {
-		return errors.Wrapf(err, "failed to evaluate Alerta Environment template %s", h.c.Environment)
+		h.logger.Printf("E! failed to evaluate Alerta Environment template %s: %v", h.c.Environment, err)
+		return
 	}
 	environment := buf.String()
 	buf.Reset()
 
 	err = h.groupTmpl.Execute(&buf, td)
 	if err != nil {
-		return errors.Wrapf(err, "failed to evaluate Alerta Group template %s", h.c.Group)
+		h.logger.Printf("E! failed to evaluate Alerta Group template %s: %v", h.c.Group, err)
+		return
 	}
 	group := buf.String()
 	buf.Reset()
 
 	err = h.valueTmpl.Execute(&buf, td)
 	if err != nil {
-		return errors.Wrapf(err, "failed to evaluate Alerta Value template %s", h.c.Value)
+		h.logger.Printf("E! failed to evaluate Alerta Value template %s: %v", h.c.Value, err)
+		return
 	}
 	value := buf.String()
 
@@ -375,8 +373,7 @@ func (h *handler) Handle(ctxt context.Context, event alert.Event) error {
 		severity = "indeterminate"
 	}
 
-	return h.s.Alert(
-		ctxt,
+	if err := h.s.Alert(
 		h.c.Token,
 		resource,
 		eventStr,
@@ -388,5 +385,7 @@ func (h *handler) Handle(ctxt context.Context, event alert.Event) error {
 		h.c.Origin,
 		service,
 		event.Data.Result,
-	)
+	); err != nil {
+		h.logger.Printf("E! failed to send event to Alerta: %v", err)
+	}
 }

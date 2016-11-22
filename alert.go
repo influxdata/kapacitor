@@ -2,7 +2,6 @@ package kapacitor
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	html "html/template"
@@ -40,6 +39,7 @@ const (
 	statsInfosTriggered  = "infos_triggered"
 	statsWarnsTriggered  = "warns_triggered"
 	statsCritsTriggered  = "crits_triggered"
+	statsEventsDropped   = "events_dropped"
 )
 
 // The newest state change is weighted 'weightDiff' times more than oldest state change.
@@ -66,6 +66,7 @@ type AlertNode struct {
 	infosTriggered  *expvar.Int
 	warnsTriggered  *expvar.Int
 	critsTriggered  *expvar.Int
+	eventsDropped   *expvar.Int
 
 	bufPool sync.Pool
 
@@ -138,12 +139,12 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		c := smtp.HandlerConfig{
 			To: email.ToList,
 		}
-		h := et.tm.SMTPService.Handler(c)
+		h := et.tm.SMTPService.Handler(c, l)
 		an.handlers = append(an.handlers, h)
 	}
 	if len(n.EmailHandlers) == 0 && (et.tm.SMTPService != nil && et.tm.SMTPService.Global()) {
 		c := smtp.HandlerConfig{}
-		h := et.tm.SMTPService.Handler(c)
+		h := et.tm.SMTPService.Handler(c, l)
 		an.handlers = append(an.handlers, h)
 	}
 	// If email has been configured with state changes only set it.
@@ -170,12 +171,12 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		c := victorops.HandlerConfig{
 			RoutingKey: vo.RoutingKey,
 		}
-		h := et.tm.VictorOpsService.Handler(c)
+		h := et.tm.VictorOpsService.Handler(c, l)
 		an.handlers = append(an.handlers, h)
 	}
 	if len(n.VictorOpsHandlers) == 0 && (et.tm.VictorOpsService != nil && et.tm.VictorOpsService.Global()) {
 		c := victorops.HandlerConfig{}
-		h := et.tm.VictorOpsService.Handler(c)
+		h := et.tm.VictorOpsService.Handler(c, l)
 		an.handlers = append(an.handlers, h)
 	}
 
@@ -183,17 +184,17 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		c := pagerduty.HandlerConfig{
 			ServiceKey: pd.ServiceKey,
 		}
-		h := et.tm.PagerDutyService.Handler(c)
+		h := et.tm.PagerDutyService.Handler(c, l)
 		an.handlers = append(an.handlers, h)
 	}
 	if len(n.PagerDutyHandlers) == 0 && (et.tm.PagerDutyService != nil && et.tm.PagerDutyService.Global()) {
 		c := pagerduty.HandlerConfig{}
-		h := et.tm.PagerDutyService.Handler(c)
+		h := et.tm.PagerDutyService.Handler(c, l)
 		an.handlers = append(an.handlers, h)
 	}
 
 	for range n.SensuHandlers {
-		h := et.tm.SensuService.Handler()
+		h := et.tm.SensuService.Handler(l)
 		an.handlers = append(an.handlers, h)
 	}
 
@@ -203,11 +204,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 			Username:  s.Username,
 			IconEmoji: s.IconEmoji,
 		}
-		h := et.tm.SlackService.Handler(c)
+		h := et.tm.SlackService.Handler(c, l)
 		an.handlers = append(an.handlers, h)
 	}
 	if len(n.SlackHandlers) == 0 && (et.tm.SlackService != nil && et.tm.SlackService.Global()) {
-		h := et.tm.SlackService.Handler(slack.HandlerConfig{})
+		h := et.tm.SlackService.Handler(slack.HandlerConfig{}, l)
 		an.handlers = append(an.handlers, h)
 	}
 	// If slack has been configured with state changes only set it.
@@ -224,12 +225,12 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 			DisableWebPagePreview: t.IsDisableWebPagePreview,
 			DisableNotification:   t.IsDisableNotification,
 		}
-		h := et.tm.TelegramService.Handler(c)
+		h := et.tm.TelegramService.Handler(c, l)
 		an.handlers = append(an.handlers, h)
 	}
 	if len(n.TelegramHandlers) == 0 && (et.tm.TelegramService != nil && et.tm.TelegramService.Global()) {
 		c := telegram.HandlerConfig{}
-		h := et.tm.TelegramService.Handler(c)
+		h := et.tm.TelegramService.Handler(c, l)
 		an.handlers = append(an.handlers, h)
 	}
 	// If telegram has been configured with state changes only set it.
@@ -244,12 +245,12 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 			Room:  hc.Room,
 			Token: hc.Token,
 		}
-		h := et.tm.HipChatService.Handler(c)
+		h := et.tm.HipChatService.Handler(c, l)
 		an.handlers = append(an.handlers, h)
 	}
 	if len(n.HipChatHandlers) == 0 && (et.tm.HipChatService != nil && et.tm.HipChatService.Global()) {
 		c := hipchat.HandlerConfig{}
-		h := et.tm.HipChatService.Handler(c)
+		h := et.tm.HipChatService.Handler(c, l)
 		an.handlers = append(an.handlers, h)
 	}
 	// If HipChat has been configured with state changes only set it.
@@ -270,7 +271,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 			Origin:      a.Origin,
 			Service:     a.Service,
 		}
-		h, err := et.tm.AlertaService.Handler(c)
+		h, err := et.tm.AlertaService.Handler(c, l)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create Alerta handler")
 		}
@@ -282,17 +283,17 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 			TeamsList:      og.TeamsList,
 			RecipientsList: og.RecipientsList,
 		}
-		h := et.tm.OpsGenieService.Handler(c)
+		h := et.tm.OpsGenieService.Handler(c, l)
 		an.handlers = append(an.handlers, h)
 	}
 	if len(n.OpsGenieHandlers) == 0 && (et.tm.OpsGenieService != nil && et.tm.OpsGenieService.Global()) {
 		c := opsgenie.HandlerConfig{}
-		h := et.tm.OpsGenieService.Handler(c)
+		h := et.tm.OpsGenieService.Handler(c, l)
 		an.handlers = append(an.handlers, h)
 	}
 
 	for range n.TalkHandlers {
-		h := et.tm.TalkService.Handler()
+		h := et.tm.TalkService.Handler(l)
 		an.handlers = append(an.handlers, h)
 	}
 
@@ -395,6 +396,9 @@ func (a *AlertNode) runAlert([]byte) error {
 	a.statMap.Set(statsWarnsTriggered, a.warnsTriggered)
 
 	a.critsTriggered = &expvar.Int{}
+	a.statMap.Set(statsCritsTriggered, a.critsTriggered)
+
+	a.eventsDropped = &expvar.Int{}
 	a.statMap.Set(statsCritsTriggered, a.critsTriggered)
 
 	switch a.Wants() {
@@ -585,6 +589,8 @@ func (a *AlertNode) runAlert([]byte) error {
 			a.timer.Stop()
 		}
 	}
+	// Delete the anonymous topic, which will also deregister its handlers
+	a.et.tm.AlertService.DeleteTopic(a.anonTopic)
 	return nil
 }
 
@@ -607,6 +613,7 @@ func (a *AlertNode) handleEvent(event alert.Event) {
 		event.Topic = a.anonTopic
 		err := a.et.tm.AlertService.Collect(event)
 		if err != nil {
+			a.eventsDropped.Add(1)
 			a.logger.Println("E!", err)
 		}
 	}
@@ -616,6 +623,7 @@ func (a *AlertNode) handleEvent(event alert.Event) {
 		event.Topic = a.topic
 		err := a.et.tm.AlertService.Collect(event)
 		if err != nil {
+			a.eventsDropped.Add(1)
 			a.logger.Println("E!", err)
 		}
 	}
@@ -921,11 +929,6 @@ type AlertData struct {
 	Data     influxql.Result `json:"data"`
 }
 
-type postHandler struct {
-	bufPool *sync.Pool
-	url     string
-}
-
 func alertDataFromEvent(event alert.Event) AlertData {
 	return AlertData{
 		ID:       event.State.ID,
@@ -938,18 +941,21 @@ func alertDataFromEvent(event alert.Event) AlertData {
 	}
 }
 
+type postHandler struct {
+	bufPool *sync.Pool
+	url     string
+	logger  *log.Logger
+}
+
 func (a *AlertNode) postHandler(post *pipeline.PostHandler) alert.Handler {
 	return &postHandler{
 		bufPool: &a.bufPool,
 		url:     post.URL,
+		logger:  a.logger,
 	}
 }
 
-func (h *postHandler) Name() string {
-	return "HTTP POST"
-}
-
-func (h *postHandler) Handle(ctxt context.Context, event alert.Event) error {
+func (h *postHandler) Handle(event alert.Event) {
 	body := h.bufPool.Get().(*bytes.Buffer)
 	defer func() {
 		body.Reset()
@@ -959,39 +965,33 @@ func (h *postHandler) Handle(ctxt context.Context, event alert.Event) error {
 
 	err := json.NewEncoder(body).Encode(ad)
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal alert data json")
+		h.logger.Printf("E! failed to marshal alert data json: %v", err)
+		return
 	}
 
-	req, err := http.NewRequest("POST", h.url, body)
-	req.Header.Set("Content-Type", "application/json")
-	if ctxt != nil {
-		req = req.WithContext(ctxt)
-	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.Post(h.url, "application/json", body)
 	if err != nil {
-		return errors.Wrap(err, "failed to POST alert data")
+		h.logger.Printf("E! failed to POST alert data: %v", err)
+		return
 	}
 	resp.Body.Close()
-	return nil
 }
 
 type tcpHandler struct {
 	bufPool *sync.Pool
 	addr    string
+	logger  *log.Logger
 }
 
 func (a *AlertNode) tcpHandler(tcp *pipeline.TcpHandler) alert.Handler {
 	return &tcpHandler{
 		bufPool: &a.bufPool,
 		addr:    tcp.Address,
+		logger:  a.logger,
 	}
 }
 
-func (h *tcpHandler) Name() string {
-	return "TCP"
-}
-
-func (h *tcpHandler) Handle(ctxt context.Context, event alert.Event) error {
+func (h *tcpHandler) Handle(event alert.Event) {
 	buf := h.bufPool.Get().(*bytes.Buffer)
 	defer func() {
 		buf.Reset()
@@ -1001,25 +1001,26 @@ func (h *tcpHandler) Handle(ctxt context.Context, event alert.Event) error {
 
 	err := json.NewEncoder(buf).Encode(ad)
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal alert data json")
+		h.logger.Printf("E! failed to marshal alert data json: %v", err)
+		return
 	}
 
 	conn, err := net.Dial("tcp", h.addr)
 	if err != nil {
-		return errors.Wrapf(err, "failed to connect to %s", h.addr)
+		h.logger.Printf("E! failed to connect to %s: %v", h.addr, err)
+		return
 	}
 	defer conn.Close()
 
 	buf.WriteByte('\n')
 	conn.Write(buf.Bytes())
-
-	return nil
 }
 
 type execHandler struct {
 	bufPool   *sync.Pool
 	ci        command.CommandInfo
 	commander command.Commander
+	logger    *log.Logger
 }
 
 func (a *AlertNode) execHandler(e *pipeline.ExecHandler) alert.Handler {
@@ -1031,14 +1032,11 @@ func (a *AlertNode) execHandler(e *pipeline.ExecHandler) alert.Handler {
 		bufPool:   &a.bufPool,
 		ci:        ci,
 		commander: a.et.tm.Commander,
+		logger:    a.logger,
 	}
 }
 
-func (h *execHandler) Name() string {
-	return "Exec"
-}
-
-func (h *execHandler) Handle(ctxt context.Context, event alert.Event) error {
+func (h *execHandler) Handle(event alert.Event) {
 	buf := h.bufPool.Get().(*bytes.Buffer)
 	defer func() {
 		buf.Reset()
@@ -1048,7 +1046,8 @@ func (h *execHandler) Handle(ctxt context.Context, event alert.Event) error {
 
 	err := json.NewEncoder(buf).Encode(ad)
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal alert data json")
+		h.logger.Printf("E! failed to marshal alert data json: %v", err)
+		return
 	}
 
 	cmd := h.commander.NewCommand(h.ci)
@@ -1056,63 +1055,44 @@ func (h *execHandler) Handle(ctxt context.Context, event alert.Event) error {
 	var out bytes.Buffer
 	cmd.Stdout(&out)
 	cmd.Stderr(&out)
-	run := func() error {
-		err = cmd.Start()
-		if err != nil {
-			return errors.Wrapf(err, "exec command failed: Output: %s", out.String())
-		}
-		err = cmd.Wait()
-		if err != nil {
-			return errors.Wrapf(err, "exec command failed: Output: %s", out.String())
-		}
-		return nil
+	err = cmd.Start()
+	if err != nil {
+		h.logger.Printf("E! exec command failed: Output: %s: %v", out.String(), err)
+		return
 	}
-
-	errC := make(chan error, 1)
-	go func() {
-		errC <- run()
-	}()
-
-	var done <-chan struct{}
-	if ctxt != nil {
-		done = ctxt.Done()
-	}
-	select {
-	case err := <-errC:
-		return err
-	case <-done:
-		return errors.New("exec command canceled or deadline reached")
+	err = cmd.Wait()
+	if err != nil {
+		h.logger.Printf("E! exec command failed: Output: %s: %v", out.String(), err)
+		return
 	}
 }
 
 type logHandler struct {
 	logpath string
 	mode    os.FileMode
+	logger  *log.Logger
 }
 
 func (a *AlertNode) logHandler(l *pipeline.LogHandler) alert.Handler {
 	return &logHandler{
 		logpath: l.FilePath,
 		mode:    os.FileMode(l.Mode),
+		logger:  a.logger,
 	}
 }
 
-func (h *logHandler) Name() string {
-	return "Log"
-}
-
-func (h *logHandler) Handle(ctxt context.Context, event alert.Event) error {
+func (h *logHandler) Handle(event alert.Event) {
 	ad := alertDataFromEvent(event)
 
 	f, err := os.OpenFile(h.logpath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, os.FileMode(h.mode))
 	if err != nil {
-		return errors.Wrapf(err, "failed to open file %s for alert logging", h.logpath)
+		h.logger.Printf("E! failed to open file %s for alert logging: %v", h.logpath, err)
+		return
 	}
 	defer f.Close()
 
 	err = json.NewEncoder(f).Encode(ad)
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal alert data json")
+		h.logger.Printf("E! failed to marshal alert data json: %v", err)
 	}
-	return nil
 }

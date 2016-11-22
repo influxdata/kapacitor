@@ -2,7 +2,6 @@ package hipchat
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -85,21 +84,16 @@ func (s *Service) Test(options interface{}) error {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
 	c := s.config()
-	return s.Alert(nil, o.Room, c.Token, o.Message, o.Level)
+	return s.Alert(o.Room, c.Token, o.Message, o.Level)
 }
 
-func (s *Service) Alert(ctxt context.Context, room, token, message string, level alert.Level) error {
+func (s *Service) Alert(room, token, message string, level alert.Level) error {
 	url, post, err := s.preparePost(room, token, message, level)
 	if err != nil {
 		return err
 	}
 
-	req, err := http.NewRequest("POST", url, post)
-	req.Header.Set("Content-Type", "application/json")
-	if ctxt != nil {
-		req = req.WithContext(ctxt)
-	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.Post(url, "application/json", post)
 	if err != nil {
 		return err
 	}
@@ -180,27 +174,26 @@ type HandlerConfig struct {
 }
 
 type handler struct {
-	s *Service
-	c HandlerConfig
+	s      *Service
+	c      HandlerConfig
+	logger *log.Logger
 }
 
-func (s *Service) Handler(c HandlerConfig) alert.Handler {
+func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
 	return &handler{
-		s: s,
-		c: c,
+		s:      s,
+		c:      c,
+		logger: l,
 	}
 }
 
-func (h *handler) Name() string {
-	return "HipChat"
-}
-
-func (h *handler) Handle(ctxt context.Context, event alert.Event) error {
-	return h.s.Alert(
-		ctxt,
+func (h *handler) Handle(event alert.Event) {
+	if err := h.s.Alert(
 		h.c.Room,
 		h.c.Token,
 		event.State.Message,
 		event.State.Level,
-	)
+	); err != nil {
+		h.logger.Println("E! failed to send event to HipChat", err)
+	}
 }

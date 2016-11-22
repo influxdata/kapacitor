@@ -2,7 +2,6 @@ package talk
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -69,20 +68,16 @@ func (s *Service) Test(options interface{}) error {
 	if !ok {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
-	return s.Alert(nil, o.Title, o.Text)
+	return s.Alert(o.Title, o.Text)
 }
 
-func (s *Service) Alert(ctxt context.Context, title, text string) error {
+func (s *Service) Alert(title, text string) error {
 	url, post, err := s.preparePost(title, text)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequest("POST", url, post)
-	req.Header.Set("Content-Type", "application/json")
-	if ctxt != nil {
-		req = req.WithContext(ctxt)
-	}
-	resp, err := http.DefaultClient.Do(req)
+
+	resp, err := http.Post(url, "application/json", post)
 	if err != nil {
 		return err
 	}
@@ -124,18 +119,23 @@ func (s *Service) preparePost(title, text string) (string, io.Reader, error) {
 	return c.URL, &post, nil
 }
 
-func (s *Service) Handler() alert.Handler {
-	return s
+type handler struct {
+	s      *Service
+	logger *log.Logger
 }
 
-func (s *Service) Name() string {
-	return "Talk"
+func (s *Service) Handler(l *log.Logger) alert.Handler {
+	return &handler{
+		s:      s,
+		logger: l,
+	}
 }
 
-func (s *Service) Handle(ctxt context.Context, event alert.Event) error {
-	return s.Alert(
-		ctxt,
+func (h *handler) Handle(event alert.Event) {
+	if err := h.s.Alert(
 		event.State.ID,
 		event.State.Message,
-	)
+	); err != nil {
+		h.logger.Println("E! failed to send event to Talk", err)
+	}
 }
