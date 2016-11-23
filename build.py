@@ -59,6 +59,7 @@ fpm_common_args = "-f -s dir --log error \
  --maintainer {} \
  --config-files {} \
  --config-files {} \
+ --config-files {} \
  --directories {} \
  --description \"{}\"".format(
         VENDOR,
