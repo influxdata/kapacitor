@@ -59,7 +59,6 @@ fpm_common_args = "-f -s dir --log error \
  --maintainer {} \
  --config-files {} \
  --config-files {} \
- --config-files {} \
  --directories {} \
  --description \"{}\"".format(
         VENDOR,
@@ -70,7 +69,6 @@ fpm_common_args = "-f -s dir --log error \
         MAINTAINER,
         DEFAULT_CONFIG,
         LOGROTATE_CONFIG,
-        BASH_COMPLETION_SH,
         ' --directories '.join([
                          LOG_DIR[1:],
                          DATA_DIR[1:],
