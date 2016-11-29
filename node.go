@@ -209,25 +209,36 @@ func (n *node) closeChildEdges() {
 func (n *node) edot(buf *bytes.Buffer, labels bool) {
 	if labels {
 		// Print all stats on node.
-		buf.Write([]byte(
-			fmt.Sprintf("\n%s [label=\"%s ",
-				n.Name(),
+		buf.WriteString(
+			fmt.Sprintf("\n%s [xlabel=\"",
 				n.Name(),
 			),
-		))
+		)
+		i := 0
 		n.statMap.DoSorted(func(kv expvar.KeyValue) {
-			buf.Write([]byte(
-				fmt.Sprintf("%s=%s ",
+			if i != 0 {
+				// NOTE: A literal \r, indicates a newline right justified in graphviz syntax.
+				buf.WriteString(`\r`)
+			}
+			i++
+			var s string
+			if sv, ok := kv.Value.(kexpvar.StringVar); ok {
+				s = sv.StringValue()
+			} else {
+				s = kv.Value.String()
+			}
+			buf.WriteString(
+				fmt.Sprintf("%s=%s",
 					kv.Key,
-					kv.Value.String(),
+					s,
 				),
-			))
+			)
 		})
 		buf.Write([]byte("\"];\n"))
 
 		for i, c := range n.children {
 			buf.Write([]byte(
-				fmt.Sprintf("%s -> %s [label=\"%d\"];\n",
+				fmt.Sprintf("%s -> %s [label=\"processed=%d\"];\n",
 					n.Name(),
 					c.Name(),
 					n.outs[i].collectedCount(),
