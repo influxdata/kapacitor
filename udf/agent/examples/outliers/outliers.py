@@ -88,8 +88,6 @@ class OutliersHandler(Handler):
                 self._field = opt.values[0].stringValue
             elif opt.name == 'scale':
                 self._scale = opt.values[0].doubleValue
-            elif opt.name == 'as':
-                self._as = opt.values[0].stringValue
 
         if self._field is None:
             success = False
