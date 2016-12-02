@@ -35,6 +35,11 @@ stream
 
 - [#1043](https://github.com/influxdata/kapacitor/issues/1043): logrotate.d ignores kapacitor configuration due to bad file mode
 
+## v1.1.1 [2016-12-02]
+
+### Release Notes
+
+No changes to Kapacitor, only upgrading to go 1.7.4 for security patches.
 
 ## v1.1.0 [2016-10-07]
 
