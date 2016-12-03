@@ -6505,9 +6505,10 @@ func TestStream_AlertSlack(t *testing.T) {
 			Username    string `json:"username"`
 			Text        string `json:"text"`
 			Attachments []struct {
-				Fallback string `json:"fallback"`
-				Color    string `json:"color"`
-				Text     string `json:"text"`
+				Fallback  string   `json:"fallback"`
+				Color     string   `json:"color"`
+				Text      string   `json:"text"`
+				Mrkdwn_in []string `json:"mrkdwn_in"`
 			} `json:"attachments"`
 		}
 		pd := postData{}
@@ -6543,6 +6544,9 @@ func TestStream_AlertSlack(t *testing.T) {
 			}
 			if exp := "danger"; pd.Attachments[0].Color != exp {
 				t.Errorf("unexpected color got %s exp %s", pd.Attachments[0].Color, exp)
+			}
+			if exp := []string{"text"}; !reflect.DeepEqual(pd.Attachments[0].Mrkdwn_in, exp) {
+				t.Errorf("unexpected mrkdwn_in got %v exp %v", pd.Attachments[0].Mrkdwn_in, exp)
 			}
 		}
 	}))
