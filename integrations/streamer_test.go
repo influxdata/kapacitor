@@ -6793,7 +6793,7 @@ func TestStream_AlertAlerta(t *testing.T) {
 			if exp := "/alert"; r.URL.String() != exp {
 				t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
 			}
-			if exp := "Bearer testtoken1234567"; r.Header.Get("Authorization") != exp {
+			if exp := "Key testtoken1234567"; r.Header.Get("Authorization") != exp {
 				t.Errorf("unexpected token in header got %s exp %s", r.Header.Get("Authorization"), exp)
 			}
 			if exp := "cpu"; pd.Resource != exp {
@@ -6821,7 +6821,7 @@ func TestStream_AlertAlerta(t *testing.T) {
 			if exp := "/alert"; r.URL.String() != exp {
 				t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
 			}
-			if exp := "Bearer anothertesttoken"; r.Header.Get("Authorization") != exp {
+			if exp := "Key anothertesttoken"; r.Header.Get("Authorization") != exp {
 				t.Errorf("unexpected token in header got %s exp %s", r.Header.Get("Authorization"), exp)
 			}
 			if exp := "resource: serverA"; pd.Resource != exp {
