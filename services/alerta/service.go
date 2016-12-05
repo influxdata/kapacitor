@@ -191,7 +191,7 @@ func (s *Service) preparePost(token, resource, event, environment, severity, gro
 	}
 
 	req, err := http.NewRequest("POST", u.String(), &post)
-	req.Header.Add("Authorization", "Bearer "+token)
+	req.Header.Add("Authorization", "Key "+token)
 	req.Header.Add("Content-Type", "application/json")
 	if err != nil {
 		return nil, err
