@@ -63,9 +63,10 @@ func (s *Service) StateChangesOnly() bool {
 
 // slack attachment info
 type attachment struct {
-	Fallback string `json:"fallback"`
-	Color    string `json:"color"`
-	Text     string `json:"text"`
+	Fallback  string   `json:"fallback"`
+	Color     string   `json:"color"`
+	Text      string   `json:"text"`
+	Mrkdwn_in []string `json:"mrkdwn_in"`
 }
 
 type testOptions struct {
@@ -139,9 +140,10 @@ func (s *Service) preparePost(channel, message, username, iconEmoji string, leve
 		color = "good"
 	}
 	a := attachment{
-		Fallback: message,
-		Text:     message,
-		Color:    color,
+		Fallback:  message,
+		Text:      message,
+		Color:     color,
+		Mrkdwn_in: []string{"text"},
 	}
 	postData := make(map[string]interface{})
 	postData["as_user"] = false
