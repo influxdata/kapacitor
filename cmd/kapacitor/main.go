@@ -566,7 +566,7 @@ func (d *dbrps) Set(value string) error {
 	}
 	value = value[n+1:]
 	if value[0] == '"' {
-		dbrp.RetentionPolicy, n = parseQuotedStr(value)
+		dbrp.RetentionPolicy, _ = parseQuotedStr(value)
 	} else {
 		dbrp.RetentionPolicy = value
 	}

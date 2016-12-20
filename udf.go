@@ -246,7 +246,9 @@ func (p *UDFProcess) Open() error {
 		p.abortCallback,
 		cmd.Kill,
 	)
-	p.server.Start()
+	if err := p.server.Start(); err != nil {
+		return err
+	}
 
 	p.logStdErrGroup.Add(1)
 	go p.logStdErr()

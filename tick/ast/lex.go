@@ -551,7 +551,6 @@ func lexReference(l *lexer) stateFn {
 
 func lexSingleOrTripleString(l *lexer) stateFn {
 	count := 0
-	total := 0
 	for {
 		switch r := l.next(); r {
 		case '\'':
@@ -569,7 +568,7 @@ func lexSingleOrTripleString(l *lexer) stateFn {
 				}
 			}
 			if (count == 1 && l.peek() != '\'') || count == 3 {
-				total = count
+				total := count
 				for {
 					switch r := l.next(); {
 					//escape single quotes if single quoted

@@ -313,7 +313,9 @@ func (c *Config) applyEnvOverrides(prefix string, fieldDesc string, spec reflect
 		}
 		s.SetFloat(floatValue)
 	case reflect.Struct:
-		c.applyEnvOverridesToStruct(prefix, s)
+		if err := c.applyEnvOverridesToStruct(prefix, s); err != nil {
+			return err
+		}
 	}
 	return nil
 }

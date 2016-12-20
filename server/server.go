@@ -234,7 +234,7 @@ type dynamicService interface {
 
 func (s *Server) SetDynamicService(name string, srv dynamicService) {
 	s.DynamicServices[name] = srv
-	s.TesterService.AddTester(name, srv)
+	_ = s.TesterService.AddTester(name, srv)
 }
 
 func (s *Server) appendStorageService() {
@@ -793,7 +793,9 @@ func (s *Server) startProfile(cpuprofile, memprofile string) {
 		}
 		s.Logger.Printf("I! writing CPU profile to: %s\n", cpuprofile)
 		prof.cpu = f
-		pprof.StartCPUProfile(prof.cpu)
+		if err := pprof.StartCPUProfile(prof.cpu); err != nil {
+			s.Logger.Fatalf("#! start cpu profile: %v", err)
+		}
 	}
 
 	if memprofile != "" {
@@ -816,7 +818,9 @@ func (s *Server) stopProfile() {
 		s.Logger.Println("I! CPU profile stopped")
 	}
 	if prof.mem != nil {
-		pprof.Lookup("heap").WriteTo(prof.mem, 0)
+		if err := pprof.Lookup("heap").WriteTo(prof.mem, 0); err != nil {
+			s.Logger.Printf("I! failed to write mem profile: %v\n", err)
+		}
 		prof.mem.Close()
 		s.Logger.Println("I! mem profile stopped")
 	}

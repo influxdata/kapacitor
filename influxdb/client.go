@@ -258,7 +258,9 @@ func (c *HTTPClient) do(req *http.Request, result interface{}, codes ...int) (*h
 		rp := struct {
 			Error string `json:"error"`
 		}{}
-		d.Decode(&rp)
+		if err := d.Decode(&rp); err != nil {
+			return nil, err
+		}
 		if rp.Error != "" {
 			return nil, errors.New(rp.Error)
 		}

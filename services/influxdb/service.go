@@ -842,6 +842,9 @@ func (c *influxdbCluster) linkSubscriptions(ctx context.Context) error {
 					// This is an just the cluster ID
 					// drop it and recreate with new name.
 					err := c.dropSub(se.name, se.db, se.rp)
+					if err != nil {
+						return err
+					}
 					se.name = c.subName
 					err = c.createSub(se.name, se.db, se.rp, si.Mode, si.Destinations)
 					if err != nil {
@@ -875,6 +878,10 @@ func (c *influxdbCluster) linkSubscriptions(ctx context.Context) error {
 					continue
 				}
 				host, port, err := net.SplitHostPort(u.Host)
+				if err != nil {
+					c.logger.Println("E! invalid host in subscription:", err)
+					continue
+				}
 				if host == c.hostname {
 					if u.Scheme == "udp" {
 						_, err := c.startUDPListener(se, port)

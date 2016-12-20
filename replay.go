@@ -187,7 +187,9 @@ func replayBatchFromChan(clck clock.Clock, batches <-chan models.Batch, collecto
 				b.TMax = b.TMax.UTC()
 				tmax = b.TMax
 			}
-			collector.CollectBatch(b)
+			if err := collector.CollectBatch(b); err != nil {
+				return err
+			}
 			continue
 		}
 		if start.IsZero() {
@@ -209,7 +211,9 @@ func replayBatchFromChan(clck clock.Clock, batches <-chan models.Batch, collecto
 		}
 		b.TMax = b.TMax.UTC()
 		tmax = b.TMax
-		collector.CollectBatch(b)
+		if err := collector.CollectBatch(b); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -253,9 +257,15 @@ func readBatchFromIO(data io.ReadCloser, batches chan<- models.Batch) error {
 }
 
 func WritePointForRecording(w io.Writer, p models.Point, precision string) error {
-	fmt.Fprintf(w, "%s\n%s\n", p.Database, p.RetentionPolicy)
-	w.Write(p.Bytes(precision))
-	w.Write([]byte("\n"))
+	if _, err := fmt.Fprintf(w, "%s\n%s\n", p.Database, p.RetentionPolicy); err != nil {
+		return err
+	}
+	if _, err := w.Write(p.Bytes(precision)); err != nil {
+		return err
+	}
+	if _, err := w.Write([]byte("\n")); err != nil {
+		return err
+	}
 	return nil
 }
 

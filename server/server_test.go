@@ -2954,6 +2954,9 @@ test value=1 0000000012
 	}
 
 	recordings, err := cli.ListRecordings(nil)
+	if err != nil {
+		t.Error(err)
+	}
 	if exp, got := 1, len(recordings); exp != got {
 		t.Fatalf("unexpected recordings list:\ngot %v\nexp %v\nrecordings %v", got, exp, recordings)
 	}
@@ -2964,11 +2967,17 @@ test value=1 0000000012
 	}
 
 	recordings, err = cli.ListRecordings(nil)
+	if err != nil {
+		t.Error(err)
+	}
 	if exp, got := 0, len(recordings); exp != got {
 		t.Errorf("unexpected recordings list after delete:\ngot %v\nexp %v\nrecordings %v", got, exp, recordings)
 	}
 
 	replays, err := cli.ListReplays(nil)
+	if err != nil {
+		t.Error(err)
+	}
 	if exp, got := 1, len(replays); exp != got {
 		t.Fatalf("unexpected replays list:\ngot %v\nexp %v\nreplays %v", got, exp, replays)
 	}
@@ -2979,6 +2988,9 @@ test value=1 0000000012
 	}
 
 	replays, err = cli.ListReplays(nil)
+	if err != nil {
+		t.Error(err)
+	}
 	if exp, got := 0, len(replays); exp != got {
 		t.Errorf("unexpected replays list after delete:\ngot %v\nexp %v\nreplays %v", got, exp, replays)
 	}
@@ -3181,6 +3193,9 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 	}
 
 	recordings, err := cli.ListRecordings(nil)
+	if err != nil {
+		t.Error(err)
+	}
 	if exp, got := 1, len(recordings); exp != got {
 		t.Fatalf("unexpected recordings list:\ngot %v\nexp %v", got, exp)
 	}
@@ -3191,11 +3206,17 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 	}
 
 	recordings, err = cli.ListRecordings(nil)
+	if err != nil {
+		t.Error(err)
+	}
 	if exp, got := 0, len(recordings); exp != got {
 		t.Errorf("unexpected recordings list:\ngot %v\nexp %v", got, exp)
 	}
 
 	replays, err := cli.ListReplays(nil)
+	if err != nil {
+		t.Error(err)
+	}
 	if exp, got := 1, len(replays); exp != got {
 		t.Fatalf("unexpected replays list:\ngot %v\nexp %v", got, exp)
 	}
@@ -3206,6 +3227,9 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 	}
 
 	replays, err = cli.ListReplays(nil)
+	if err != nil {
+		t.Error(err)
+	}
 	if exp, got := 0, len(replays); exp != got {
 		t.Errorf("unexpected replays list:\ngot %v\nexp %v", got, exp)
 	}
@@ -3382,11 +3406,17 @@ func TestServer_ReplayBatch(t *testing.T) {
 	}
 
 	recordings, err := cli.ListRecordings(nil)
+	if err != nil {
+		t.Error(err)
+	}
 	if exp, got := 0, len(recordings); exp != got {
 		t.Fatalf("unexpected recordings list:\ngot %v\nexp %v", got, exp)
 	}
 
 	replays, err := cli.ListReplays(nil)
+	if err != nil {
+		t.Error(err)
+	}
 	if exp, got := 1, len(replays); exp != got {
 		t.Fatalf("unexpected replays list:\ngot %v\nexp %v", got, exp)
 	}
@@ -3397,6 +3427,9 @@ func TestServer_ReplayBatch(t *testing.T) {
 	}
 
 	replays, err = cli.ListReplays(nil)
+	if err != nil {
+		t.Error(err)
+	}
 	if exp, got := 0, len(replays); exp != got {
 		t.Errorf("unexpected replays list:\ngot %v\nexp %v", got, exp)
 	}
@@ -3629,6 +3662,9 @@ func TestServer_RecordReplayQuery(t *testing.T) {
 	// Test List/Delete Recordings/Replays
 
 	recordings, err := cli.ListRecordings(nil)
+	if err != nil {
+		t.Error(err)
+	}
 	if exp, got := 1, len(recordings); exp != got {
 		t.Fatalf("unexpected recordings list:\ngot %v\nexp %v", got, exp)
 	}
@@ -3659,11 +3695,17 @@ func TestServer_RecordReplayQuery(t *testing.T) {
 	}
 
 	recordings, err = cli.ListRecordings(nil)
+	if err != nil {
+		t.Error(err)
+	}
 	if exp, got := 0, len(recordings); exp != got {
 		t.Errorf("unexpected recordings list:\ngot %v\nexp %v", got, exp)
 	}
 
 	replays, err := cli.ListReplays(nil)
+	if err != nil {
+		t.Error(err)
+	}
 	if exp, got := 1, len(replays); exp != got {
 		t.Fatalf("unexpected replays list:\ngot %v\nexp %v", got, exp)
 	}
@@ -3694,6 +3736,9 @@ func TestServer_RecordReplayQuery(t *testing.T) {
 	}
 
 	replays, err = cli.ListReplays(nil)
+	if err != nil {
+		t.Error(err)
+	}
 	if exp, got := 0, len(replays); exp != got {
 		t.Errorf("unexpected replays list:\ngot %v\nexp %v", got, exp)
 	}
@@ -3898,11 +3943,17 @@ func TestServer_ReplayQuery(t *testing.T) {
 	}
 
 	recordings, err := cli.ListRecordings(nil)
+	if err != nil {
+		t.Error(err)
+	}
 	if exp, got := 0, len(recordings); exp != got {
 		t.Fatalf("unexpected recordings list:\ngot %v\nexp %v", got, exp)
 	}
 
 	replays, err := cli.ListReplays(nil)
+	if err != nil {
+		t.Error(err)
+	}
 	if exp, got := 1, len(replays); exp != got {
 		t.Fatalf("unexpected replays list:\ngot %v\nexp %v", got, exp)
 	}
@@ -3913,6 +3964,9 @@ func TestServer_ReplayQuery(t *testing.T) {
 	}
 
 	replays, err = cli.ListReplays(nil)
+	if err != nil {
+		t.Error(err)
+	}
 	if exp, got := 0, len(replays); exp != got {
 		t.Errorf("unexpected replays list:\ngot %v\nexp %v", got, exp)
 	}

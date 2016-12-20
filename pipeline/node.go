@@ -134,7 +134,7 @@ func (n *node) addParent(c Node) {
 
 func (n *node) linkChild(c Node) {
 	c.setPipeline(n.p)
-	n.p.assignID(c)
+	_ = n.p.assignID(c)
 	n.children = append(n.children, c)
 	c.addParent(n)
 }

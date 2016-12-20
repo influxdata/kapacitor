@@ -438,6 +438,7 @@ func (s *Service) handleListRecordings(w http.ResponseWriter, r *http.Request) {
 		offset, err = strconv.ParseInt(offsetStr, 10, 64)
 		if err != nil {
 			httpd.HttpError(w, fmt.Sprintf("invalid offset parameter %q must be an integer: %s", offsetStr, err), true, http.StatusBadRequest)
+			return
 		}
 	}
 
@@ -447,10 +448,15 @@ func (s *Service) handleListRecordings(w http.ResponseWriter, r *http.Request) {
 		limit, err = strconv.ParseInt(limitStr, 10, 64)
 		if err != nil {
 			httpd.HttpError(w, fmt.Sprintf("invalid limit parameter %q must be an integer: %s", limitStr, err), true, http.StatusBadRequest)
+			return
 		}
 	}
 
 	recordings, err := s.recordings.List(pattern, int(offset), int(limit))
+	if err != nil {
+		httpd.HttpError(w, fmt.Sprintf("failed to list recordings with pattern %q: %s", pattern, err), true, http.StatusBadRequest)
+		return
+	}
 
 	rs := make([]map[string]interface{}, len(recordings))
 	for i, recording := range recordings {
@@ -807,6 +813,7 @@ func (s *Service) handleListReplays(w http.ResponseWriter, r *http.Request) {
 		offset, err = strconv.ParseInt(offsetStr, 10, 64)
 		if err != nil {
 			httpd.HttpError(w, fmt.Sprintf("invalid offset parameter %q must be an integer: %s", offsetStr, err), true, http.StatusBadRequest)
+			return
 		}
 	}
 
@@ -816,10 +823,15 @@ func (s *Service) handleListReplays(w http.ResponseWriter, r *http.Request) {
 		limit, err = strconv.ParseInt(limitStr, 10, 64)
 		if err != nil {
 			httpd.HttpError(w, fmt.Sprintf("invalid limit parameter %q must be an integer: %s", limitStr, err), true, http.StatusBadRequest)
+			return
 		}
 	}
 
 	replays, err := s.replays.List(pattern, int(offset), int(limit))
+	if err != nil {
+		httpd.HttpError(w, fmt.Sprintf("failed to list replays with pattern %q: %s", pattern, err), true, http.StatusBadRequest)
+		return
+	}
 
 	rs := make([]map[string]interface{}, len(replays))
 	for i, replay := range replays {

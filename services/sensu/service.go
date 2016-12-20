@@ -100,6 +100,9 @@ func (s *Service) Alert(name, output string, level alert.Level) error {
 		return err
 	}
 	resp, err := ioutil.ReadAll(conn)
+	if err != nil {
+		return err
+	}
 	if string(resp) != "ok" {
 		return errors.New("sensu socket error: " + string(resp))
 	}
