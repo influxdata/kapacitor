@@ -15,6 +15,7 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/services/alerta"
+	"github.com/influxdata/kapacitor/services/foo"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
@@ -89,6 +90,10 @@ type TaskMaster struct {
 	VictorOpsService interface {
 		Global() bool
 		Handler(victorops.HandlerConfig, *log.Logger) alert.Handler
+	}
+	FooService interface {
+		DefaultHandlerConfig() foo.HandlerConfig
+		Handler(foo.HandlerConfig, *log.Logger) alert.Handler
 	}
 	PagerDutyService interface {
 		Global() bool
@@ -196,6 +201,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.SMTPService = tm.SMTPService
 	n.OpsGenieService = tm.OpsGenieService
 	n.VictorOpsService = tm.VictorOpsService
+	n.FooService = tm.FooService
 	n.PagerDutyService = tm.PagerDutyService
 	n.SlackService = tm.SlackService
 	n.TelegramService = tm.TelegramService

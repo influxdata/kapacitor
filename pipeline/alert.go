@@ -44,6 +44,7 @@ const defaultDetailsTmpl = "{{ json . }}"
 //    * PagerDuty -- Send alert to PagerDuty.
 //    * Talk -- Post alert message to Talk client.
 //    * Telegram -- Post alert message to Telegram client.
+//    * Foo -- Send alert to a Foo server.
 //
 // See below for more details on configuring each handler.
 //
@@ -304,6 +305,10 @@ type AlertNode struct {
 	// Send alert to VictorOps.
 	// tick:ignore
 	VictorOpsHandlers []*VictorOpsHandler `tick:"VictorOps"`
+
+	// Send alert to Foo.
+	// tick:ignore
+	FooHandlers []*FooHandler `tick:"Foo"`
 
 	// Send alert to PagerDuty.
 	// tick:ignore
@@ -690,6 +695,25 @@ type VictorOpsHandler struct {
 	// The routing key to use for the alert.
 	// Defaults to the value in the configuration if empty.
 	RoutingKey string
+}
+
+// Send alert to a Foo server.
+// tick:property
+func (a *AlertNode) Foo() *FooHandler {
+	f := &FooHandler{
+		AlertNode: a,
+	}
+	a.FooHandlers = append(a.FooHandlers, f)
+	return f
+}
+
+// tick:embedded:AlertNode.Foo
+type FooHandler struct {
+	*AlertNode
+
+	// The room for the messages.
+	// Defaults to the room in the configuration if empty.
+	Room string
 }
 
 // Send the alert to PagerDuty.

@@ -33,6 +33,7 @@ import (
 	alertservice "github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alert/alerttest"
 	"github.com/influxdata/kapacitor/services/alerta/alertatest"
+	"github.com/influxdata/kapacitor/services/foo/footest"
 	"github.com/influxdata/kapacitor/services/hipchat/hipchattest"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/opsgenie/opsgenietest"
@@ -5453,6 +5454,59 @@ func TestServer_UpdateConfig(t *testing.T) {
 			},
 		},
 		{
+			section: "foo",
+			setDefaults: func(c *server.Config) {
+				c.Foo.URL = "http://foo.example.com"
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/foo"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/foo/"},
+					Options: map[string]interface{}{
+						"enabled": false,
+						"room":    "",
+						"url":     "http://foo.example.com",
+					},
+				}},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/foo/"},
+				Options: map[string]interface{}{
+					"enabled": false,
+					"room":    "",
+					"url":     "http://foo.example.com",
+				},
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"room": "kapacitor",
+						},
+					},
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/foo"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/foo/"},
+							Options: map[string]interface{}{
+								"enabled": false,
+								"room":    "kapacitor",
+								"url":     "http://foo.example.com",
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/foo/"},
+						Options: map[string]interface{}{
+							"enabled": false,
+							"room":    "kapacitor",
+							"url":     "http://foo.example.com",
+						},
+					},
+				},
+			},
+		},
+		{
 			section: "hipchat",
 			setDefaults: func(c *server.Config) {
 				c.HipChat.URL = "http://hipchat.example.com"
@@ -6296,6 +6350,14 @@ func TestServer_ListServiceTests(t *testing.T) {
 				},
 			},
 			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/foo"},
+				Name: "foo",
+				Options: client.ServiceTestOptions{
+					"room":    "",
+					"message": "test foo message",
+				},
+			},
+			{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/hipchat"},
 				Name: "hipchat",
 				Options: client.ServiceTestOptions{
@@ -6481,6 +6543,14 @@ func TestServer_DoServiceTest(t *testing.T) {
 	}{
 		{
 			service: "alerta",
+			options: client.ServiceTestOptions{},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "service is not enabled",
+			},
+		},
+		{
+			service: "foo",
 			options: client.ServiceTestOptions{},
 			exp: client.ServiceTestResult{
 				Success: false,
@@ -6963,6 +7033,38 @@ func TestServer_AlertHandlers(t *testing.T) {
 					if err := expData[i].Compare(cmds[i]); err != nil {
 						return fmt.Errorf("unexpected command %d: %v", i, err)
 					}
+				}
+				return nil
+			},
+		},
+		{
+			handlerAction: client.HandlerAction{
+				Kind: "foo",
+				Options: map[string]interface{}{
+					"room": "alerts",
+				},
+			},
+			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+				ts := footest.NewServer()
+				ctxt := context.WithValue(nil, "server", ts)
+
+				c.Foo.Enabled = true
+				c.Foo.URL = ts.URL
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*footest.Server)
+				ts.Close()
+				got := ts.Requests()
+				exp := []footest.Request{{
+					URL: "/",
+					PostData: footest.PostData{
+						Room:    "alerts",
+						Message: "message",
+					},
+				}}
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected foo request:\nexp\n%+v\ngot\n%+v\n", exp, got)
 				}
 				return nil
 			},

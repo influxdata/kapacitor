@@ -16,6 +16,7 @@ import (
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/config"
 	"github.com/influxdata/kapacitor/services/deadman"
+	"github.com/influxdata/kapacitor/services/foo"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/influxdb"
@@ -70,6 +71,7 @@ type Config struct {
 	Talk      talk.Config      `toml:"talk" override:"talk"`
 	Telegram  telegram.Config  `toml:"telegram" override:"telegram"`
 	VictorOps victorops.Config `toml:"victorops" override:"victorops"`
+	Foo       foo.Config       `toml:"foo" override:"foo"`
 
 	// Third-party integrations
 	Kubernetes k8s.Config `toml:"kubernetes" override:"kubernetes"`
@@ -117,6 +119,7 @@ func NewConfig() *Config {
 	c.Talk = talk.NewConfig()
 	c.Telegram = telegram.NewConfig()
 	c.VictorOps = victorops.NewConfig()
+	c.Foo = foo.NewConfig()
 
 	c.Reporting = reporting.NewConfig()
 	c.Stats = stats.NewConfig()
@@ -235,6 +238,9 @@ func (c *Config) Validate() error {
 		return err
 	}
 	if err := c.VictorOps.Validate(); err != nil {
+		return err
+	}
+	if err := c.Foo.Validate(); err != nil {
 		return err
 	}
 
