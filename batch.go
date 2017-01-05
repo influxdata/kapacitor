@@ -165,6 +165,10 @@ func newQueryNode(et *ExecutingTask, n *pipeline.QueryNode, l *log.Logger) (*Que
 	if err != nil {
 		return nil, err
 	}
+	// Set offset alignment
+	if n.AlignGroupFlag {
+		bn.query.AlignGroup()
+	}
 	// Set fill
 	switch fill := n.Fill.(type) {
 	case string:
