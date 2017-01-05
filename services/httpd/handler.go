@@ -39,6 +39,8 @@ const (
 const (
 	// Root path for the API
 	BasePath = "/kapacitor/v1"
+	// Root path for the preview API
+	BasePreviewPath = "/kapacitor/v1preview"
 	// Name of the special user for subscriptions
 	SubscriptionUser = "~subscriber"
 )
@@ -56,7 +58,6 @@ const (
 type AuthorizationHandler func(http.ResponseWriter, *http.Request, auth.User)
 
 type Route struct {
-	Name        string
 	Method      string
 	Pattern     string
 	HandlerFunc interface{}
@@ -123,6 +124,7 @@ func NewHandler(
 		"GET",
 		"POST",
 		"PATCH",
+		"PUT",
 		"DELETE",
 		"HEAD",
 		"OPTIONS",
@@ -132,108 +134,100 @@ func NewHandler(
 		h.methodMux[method] = NewServeMux()
 		route := Route{
 			// Catch all 404
-			Name:        "404",
 			Method:      method,
 			Pattern:     "/",
 			HandlerFunc: h.serve404,
 		}
 		h.addRawRoute(route)
+		previewRoute := Route{
+			// Catch all Rewrite+404
+			Method:      method,
+			Pattern:     BasePreviewPath + "/",
+			HandlerFunc: h.rewritePreview,
+		}
+		h.addRawRoute(previewRoute)
 	}
 
 	h.addRawRoutes([]Route{
 		{
 			// Ping
-			Name:        "ping",
 			Method:      "GET",
 			Pattern:     BasePath + "/ping",
 			HandlerFunc: h.servePing,
 		},
 		{
 			// Ping
-			Name:        "ping-head",
 			Method:      "HEAD",
 			Pattern:     BasePath + "/ping",
 			HandlerFunc: h.servePing,
 		},
 		{
 			// Data-ingest route.
-			Name:        "write",
 			Method:      "POST",
 			Pattern:     BasePath + "/write",
 			HandlerFunc: h.serveWrite,
 		},
 		{
 			// Satisfy CORS checks.
-			Name:        "write",
 			Method:      "OPTIONS",
 			Pattern:     BasePath + "/write",
 			HandlerFunc: ServeOptions,
 		},
 		{
 			// Data-ingest route for /write endpoint without base path
-			Name:        "write-raw",
 			Method:      "POST",
 			Pattern:     "/write",
 			HandlerFunc: h.serveWrite,
 		},
 		{
 			// Satisfy CORS checks.
-			Name:        "write-raw",
 			Method:      "OPTIONS",
 			Pattern:     "/write",
 			HandlerFunc: ServeOptions,
 		},
 		{
 			// Display current API routes
-			Name:        "routes",
 			Method:      "GET",
 			Pattern:     BasePath + "/:routes",
 			HandlerFunc: h.serveRoutes,
 		},
 		{
 			// Change current log level
-			Name:        "log-level",
 			Method:      "POST",
 			Pattern:     BasePath + "/loglevel",
 			HandlerFunc: h.serveLogLevel,
 		},
 		{
-			Name:        "pprof",
 			Method:      "GET",
 			Pattern:     BasePath + "/debug/pprof/",
 			HandlerFunc: pprof.Index,
 			noJSON:      true,
 		},
 		{
-			Name:        "pprof/cmdline",
 			Method:      "GET",
 			Pattern:     BasePath + "/debug/pprof/cmdline",
 			HandlerFunc: pprof.Cmdline,
 			noJSON:      true,
 		},
 		{
-			Name:        "pprof/profile",
 			Method:      "GET",
 			Pattern:     BasePath + "/debug/pprof/profile",
 			HandlerFunc: pprof.Profile,
 			noJSON:      true,
 		},
 		{
-			Name:        "pprof/symbol",
 			Method:      "GET",
 			Pattern:     BasePath + "/debug/pprof/symbol",
 			HandlerFunc: pprof.Symbol,
 			noJSON:      true,
 		},
 		{
-			Name:        "pprof/trace",
 			Method:      "GET",
 			Pattern:     BasePath + "/debug/pprof/trace",
 			HandlerFunc: pprof.Trace,
 			noJSON:      true,
 		},
 		{
-			Name:        "debug/vars",
 			Method:      "GET",
 			Pattern:     BasePath + "/debug/vars",
 			HandlerFunc: serveExpvar,
@@ -258,6 +252,24 @@ func (h *Handler) AddRoute(r Route) error {
 		return fmt.Errorf("route patterns must begin with a '/' %s", r.Pattern)
 	}
 	r.Pattern = BasePath + r.Pattern
+	return h.addRawRoute(r)
+}
+
+func (h *Handler) AddPreviewRoutes(routes []Route) error {
+	for _, r := range routes {
+		err := h.AddPreviewRoute(r)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (h *Handler) AddPreviewRoute(r Route) error {
+	if len(r.Pattern) > 0 && r.Pattern[0] != '/' {
+		return fmt.Errorf("route patterns must begin with a '/' %s", r.Pattern)
+	}
+	r.Pattern = BasePreviewPath + r.Pattern
 	return h.addRawRoute(r)
 }
 
@@ -299,9 +311,9 @@ func (h *Handler) addRawRoute(r Route) error {
 	handler = requestID(handler)
 
 	if h.loggingEnabled {
-		handler = logHandler(handler, r.Name, h.clfLogger)
+		handler = logHandler(handler, h.clfLogger)
 	}
-	handler = recovery(handler, r.Name, h.logger) // make sure recovery is always last
+	handler = recovery(handler, h.logger) // make sure recovery is always last
 
 	mux, ok := h.methodMux[r.Method]
 	if !ok {
@@ -327,6 +339,17 @@ func (h *Handler) delRawRoute(r Route) {
 	mux, ok := h.methodMux[r.Method]
 	if ok {
 		mux.Deregister(r.Pattern)
+	}
+}
+
+// RewritePreview rewrites the URL path from BasePreviewPath to BasePath,
+// thus allowing any URI that exist on BasePath to be auto promotted to the BasePreviewPath.
+func (h *Handler) rewritePreview(w http.ResponseWriter, r *http.Request) {
+	if strings.HasPrefix(r.URL.Path, BasePreviewPath) {
+		r.URL.Path = strings.Replace(r.URL.Path, BasePreviewPath, BasePath, 1)
+		h.ServeHTTP(w, r)
+	} else {
+		h.serve404(w, r)
 	}
 }
 
@@ -637,7 +660,7 @@ func requiredPrivilegeForHTTPMethod(method string) (auth.Privilege, error) {
 		return auth.NoPrivileges, nil
 	case "GET":
 		return auth.ReadPrivilege, nil
-	case "POST", "PATCH":
+	case "POST", "PATCH", "PUT":
 		return auth.WritePrivilege, nil
 	case "DELETE":
 		return auth.DeletePrivilege, nil
@@ -840,7 +863,7 @@ func requestID(inner http.Handler) http.Handler {
 	})
 }
 
-func logHandler(inner http.Handler, name string, weblog *log.Logger) http.Handler {
+func logHandler(inner http.Handler, weblog *log.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		l := &responseLogger{w: w}
@@ -849,7 +872,7 @@ func logHandler(inner http.Handler, name string, weblog *log.Logger) http.Handle
 	})
 }
 
-func recovery(inner http.Handler, name string, weblog *log.Logger) http.Handler {
+func recovery(inner http.Handler, weblog *log.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		l := &responseLogger{w: w}

@@ -18,6 +18,7 @@ import (
 	iclient "github.com/influxdata/influxdb/client/v2"
 	"github.com/influxdata/kapacitor/client/v1"
 	"github.com/influxdata/kapacitor/server"
+	"github.com/influxdata/kapacitor/services/logging"
 	"github.com/influxdata/kapacitor/services/logging/loggingtest"
 	"github.com/influxdata/wlog"
 )
@@ -25,7 +26,9 @@ import (
 // Server represents a test wrapper for server.Server.
 type Server struct {
 	*server.Server
-	Config *server.Config
+	Config    *server.Config
+	buildInfo server.BuildInfo
+	ls        logging.Interface
 }
 
 // NewServer returns a new instance of Server.
@@ -43,10 +46,24 @@ func NewServer(c *server.Config) *Server {
 		panic(err)
 	}
 	s := Server{
-		Server: srv,
-		Config: c,
+		Server:    srv,
+		Config:    c,
+		buildInfo: buildInfo,
+		ls:        ls,
 	}
 	return &s
+}
+
+func (s *Server) Restart() {
+	s.Server.Close()
+	srv, err := server.New(s.Config, s.buildInfo, s.ls)
+	if err != nil {
+		panic(err.Error())
+	}
+	if err := srv.Open(); err != nil {
+		panic(err.Error())
+	}
+	s.Server = srv
 }
 
 // OpenServer opens a test server.
@@ -75,6 +92,16 @@ func Client(s *Server) *client.Client {
 		panic(err)
 	}
 	return client
+}
+
+func (s *Server) Open() error {
+	err := s.Server.Open()
+	if err != nil {
+		return err
+	}
+	u, _ := url.Parse(s.URL())
+	s.Config.HTTP.BindAddress = u.Host
+	return nil
 }
 
 // Close shuts down the server and removes all temporary paths.

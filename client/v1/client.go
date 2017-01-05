@@ -26,21 +26,27 @@ const DefaultUserAgent = "KapacitorClient"
 // then use the appropriate *Link methods.
 
 const (
-	basePath         = "/kapacitor/v1"
-	pingPath         = basePath + "/ping"
-	logLevelPath     = basePath + "/loglevel"
-	debugVarsPath    = basePath + "/debug/vars"
-	tasksPath        = basePath + "/tasks"
-	templatesPath    = basePath + "/templates"
-	recordingsPath   = basePath + "/recordings"
-	recordStreamPath = basePath + "/recordings/stream"
-	recordBatchPath  = basePath + "/recordings/batch"
-	recordQueryPath  = basePath + "/recordings/query"
-	replaysPath      = basePath + "/replays"
-	replayBatchPath  = basePath + "/replays/batch"
-	replayQueryPath  = basePath + "/replays/query"
-	configPath       = basePath + "/config"
-	serviceTestsPath = basePath + "/service-tests"
+	basePath          = "/kapacitor/v1"
+	basePreviewPath   = "/kapacitor/v1preview"
+	pingPath          = basePath + "/ping"
+	logLevelPath      = basePath + "/loglevel"
+	debugVarsPath     = basePath + "/debug/vars"
+	tasksPath         = basePath + "/tasks"
+	templatesPath     = basePath + "/templates"
+	recordingsPath    = basePath + "/recordings"
+	recordStreamPath  = basePath + "/recordings/stream"
+	recordBatchPath   = basePath + "/recordings/batch"
+	recordQueryPath   = basePath + "/recordings/query"
+	replaysPath       = basePath + "/replays"
+	replayBatchPath   = basePath + "/replays/batch"
+	replayQueryPath   = basePath + "/replays/query"
+	configPath        = basePath + "/config"
+	serviceTestsPath  = basePath + "/service-tests"
+	alertsPath        = basePreviewPath + "/alerts"
+	handlersPath      = alertsPath + "/handlers"
+	topicsPath        = alertsPath + "/topics"
+	topicEventsPath   = "events"
+	topicHandlersPath = "handlers"
 )
 
 // HTTP configuration for connecting to Kapacitor
@@ -158,47 +164,14 @@ func New(conf Config) (*Client, error) {
 	}, nil
 }
 
-type Relation int
+type Relation string
 
 const (
-	Self Relation = iota
-	Next
-	Previous
+	Self Relation = "self"
 )
 
-func (r Relation) MarshalText() ([]byte, error) {
-	switch r {
-	case Self:
-		return []byte("self"), nil
-	case Next:
-		return []byte("next"), nil
-	case Previous:
-		return []byte("prev"), nil
-	default:
-		return nil, fmt.Errorf("unknown Relation %d", r)
-	}
-}
-
-func (r *Relation) UnmarshalText(text []byte) error {
-	switch s := string(text); s {
-	case "self":
-		*r = Self
-	case "next":
-		*r = Next
-	case "prev":
-		*r = Previous
-	default:
-		return fmt.Errorf("unknown Relation %s", s)
-	}
-	return nil
-}
-
 func (r Relation) String() string {
-	s, err := r.MarshalText()
-	if err != nil {
-		return err.Error()
-	}
-	return string(s)
+	return string(r)
 }
 
 type Link struct {
@@ -599,6 +572,15 @@ type Replay struct {
 	Progress      float64   `json:"progress"`
 }
 
+type JSONOperation struct {
+	Path      string      `json:"path"`
+	Operation string      `json:"op"`
+	Value     interface{} `json:"value"`
+	From      string      `json:"from,omitempty"`
+}
+
+type JSONPatch []JSONOperation
+
 func (c *Client) URL() string {
 	return c.url.String()
 }
@@ -703,6 +685,24 @@ func (c *Client) ConfigElementLink(section, element string) Link {
 
 func (c *Client) ServiceTestLink(service string) Link {
 	return Link{Relation: Self, Href: path.Join(serviceTestsPath, service)}
+}
+
+func (c *Client) TopicEventsLink(topic string) Link {
+	return Link{Relation: Self, Href: path.Join(topicsPath, topic, topicEventsPath)}
+}
+func (c *Client) TopicEventLink(topic, event string) Link {
+	return Link{Relation: Self, Href: path.Join(topicsPath, topic, topicEventsPath, event)}
+}
+
+func (c *Client) TopicHandlersLink(topic string) Link {
+	return Link{Relation: Self, Href: path.Join(topicsPath, topic, topicHandlersPath)}
+}
+
+func (c *Client) HandlerLink(id string) Link {
+	return Link{Relation: Self, Href: path.Join(handlersPath, id)}
+}
+func (c *Client) TopicLink(id string) Link {
+	return Link{Relation: Self, Href: path.Join(topicsPath, id)}
 }
 
 type CreateTaskOptions struct {
@@ -1740,6 +1740,353 @@ func (c *Client) DoServiceTest(link Link, sto ServiceTestOptions) (ServiceTestRe
 	return r, nil
 }
 
+type ListTopicsOptions struct {
+	Pattern  string
+	MinLevel string
+}
+
+func (o *ListTopicsOptions) Default() {
+	if o.MinLevel == "" {
+		o.MinLevel = "OK"
+	}
+}
+
+func (o *ListTopicsOptions) Values() *url.Values {
+	v := &url.Values{}
+	v.Set("pattern", o.Pattern)
+	v.Set("min-level", o.MinLevel)
+	return v
+}
+
+type Topics struct {
+	Link   Link    `json:"link"`
+	Topics []Topic `json:"topics"`
+}
+
+type Topic struct {
+	Link         Link   `json:"link"`
+	ID           string `json:"id"`
+	Level        string `json:"level"`
+	EventsLink   Link   `json:"events-link"`
+	HandlersLink Link   `json:"handlers-link"`
+}
+
+func (c *Client) ListTopics(opt *ListTopicsOptions) (Topics, error) {
+	topics := Topics{}
+	if opt == nil {
+		opt = new(ListTopicsOptions)
+	}
+	opt.Default()
+
+	u := *c.url
+	u.Path = topicsPath
+	u.RawQuery = opt.Values().Encode()
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return topics, err
+	}
+
+	_, err = c.Do(req, &topics, http.StatusOK)
+	if err != nil {
+		return topics, err
+	}
+	return topics, nil
+}
+
+func (c *Client) DeleteTopic(link Link) error {
+	if link.Href == "" {
+		return fmt.Errorf("invalid link %v", link)
+	}
+	u := *c.url
+	u.Path = link.Href
+
+	req, err := http.NewRequest("DELETE", u.String(), nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.Do(req, nil, http.StatusNoContent)
+	return err
+}
+
+type TopicEvents struct {
+	Link   Link         `json:"link"`
+	Topic  string       `json:"topic"`
+	Events []TopicEvent `json:"events"`
+}
+
+type TopicEvent struct {
+	Link  Link       `json:"link"`
+	ID    string     `json:"id"`
+	State EventState `json:"state"`
+}
+
+type EventState struct {
+	Message  string    `json:"message"`
+	Details  string    `json:"details"`
+	Time     time.Time `json:"time"`
+	Duration Duration  `json:"duration"`
+	Level    string    `json:"level"`
+}
+
+// TopicEvent retrieves details for a single event of a topic
+// Errors if no event exists.
+func (c *Client) TopicEvent(link Link) (TopicEvent, error) {
+	e := TopicEvent{}
+	if link.Href == "" {
+		return e, fmt.Errorf("invalid link %v", link)
+	}
+
+	u := *c.url
+	u.Path = link.Href
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return e, err
+	}
+
+	_, err = c.Do(req, &e, http.StatusOK)
+	return e, err
+}
+
+type ListTopicEventsOptions struct {
+	MinLevel string
+}
+
+func (o *ListTopicEventsOptions) Default() {
+	if o.MinLevel == "" {
+		o.MinLevel = "OK"
+	}
+}
+
+func (o *ListTopicEventsOptions) Values() *url.Values {
+	v := &url.Values{}
+	v.Set("min-level", o.MinLevel)
+	return v
+}
+
+// ListTopicEvents returns the current state for events within a topic.
+func (c *Client) ListTopicEvents(link Link, opt *ListTopicEventsOptions) (TopicEvents, error) {
+	t := TopicEvents{}
+	if link.Href == "" {
+		return t, fmt.Errorf("invalid link %v", link)
+	}
+
+	if opt == nil {
+		opt = new(ListTopicEventsOptions)
+	}
+	opt.Default()
+
+	u := *c.url
+	u.Path = link.Href
+	u.RawQuery = opt.Values().Encode()
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return t, err
+	}
+
+	_, err = c.Do(req, &t, http.StatusOK)
+	return t, err
+}
+
+type TopicHandlers struct {
+	Link     Link      `json:"link"`
+	Topic    string    `json:"topic"`
+	Handlers []Handler `json:"handlers"`
+}
+
+// TopicHandlers returns the current state for events within a topic.
+func (c *Client) ListTopicHandlers(link Link) (TopicHandlers, error) {
+	t := TopicHandlers{}
+	if link.Href == "" {
+		return t, fmt.Errorf("invalid link %v", link)
+	}
+
+	u := *c.url
+	u.Path = link.Href
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return t, err
+	}
+
+	_, err = c.Do(req, &t, http.StatusOK)
+	return t, err
+}
+
+type Handlers struct {
+	Link     Link      `json:"link"`
+	Handlers []Handler `json:"handlers"`
+}
+
+type Handler struct {
+	Link    Link            `json:"link"`
+	ID      string          `json:"id"`
+	Topics  []string        `json:"topics"`
+	Actions []HandlerAction `json:"actions"`
+}
+
+type HandlerAction struct {
+	Kind    string                 `json:"kind" yaml:"kind"`
+	Options map[string]interface{} `json:"options" yaml:"options"`
+}
+
+// Handler retrieves an alert handler.
+// Errors if no handler exists.
+func (c *Client) Handler(link Link) (Handler, error) {
+	h := Handler{}
+	if link.Href == "" {
+		return h, fmt.Errorf("invalid link %v", link)
+	}
+
+	u := *c.url
+	u.Path = link.Href
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return h, err
+	}
+
+	_, err = c.Do(req, &h, http.StatusOK)
+	return h, err
+}
+
+type HandlerOptions struct {
+	ID      string          `json:"id" yaml:"id"`
+	Topics  []string        `json:"topics" yaml:"topics"`
+	Actions []HandlerAction `json:"actions" yaml:"actions"`
+}
+
+// CreateHandler creates a new alert handler.
+// Errors if the handler already exists.
+func (c *Client) CreateHandler(opt HandlerOptions) (Handler, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	err := enc.Encode(opt)
+	if err != nil {
+		return Handler{}, err
+	}
+
+	u := *c.url
+	u.Path = handlersPath
+
+	req, err := http.NewRequest("POST", u.String(), &buf)
+	if err != nil {
+		return Handler{}, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	h := Handler{}
+	_, err = c.Do(req, &h, http.StatusOK)
+	return h, err
+}
+
+// PatchHandler applies a patch operation to an existing handler.
+func (c *Client) PatchHandler(link Link, patch JSONPatch) (Handler, error) {
+	h := Handler{}
+	if link.Href == "" {
+		return h, fmt.Errorf("invalid link %v", link)
+	}
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	err := enc.Encode(patch)
+	if err != nil {
+		return h, err
+	}
+
+	u := *c.url
+	u.Path = link.Href
+
+	req, err := http.NewRequest("PATCH", u.String(), &buf)
+	if err != nil {
+		return h, err
+	}
+	req.Header.Set("Content-Type", "application/json+patch")
+
+	_, err = c.Do(req, &h, http.StatusOK)
+	return h, err
+}
+
+// ReplaceHandler replaces an existing handler, with the new definition.
+func (c *Client) ReplaceHandler(link Link, opt HandlerOptions) (Handler, error) {
+	h := Handler{}
+	if link.Href == "" {
+		return h, fmt.Errorf("invalid link %v", link)
+	}
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	err := enc.Encode(opt)
+	if err != nil {
+		return h, err
+	}
+
+	u := *c.url
+	u.Path = link.Href
+
+	req, err := http.NewRequest("PUT", u.String(), &buf)
+	if err != nil {
+		return h, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	_, err = c.Do(req, &h, http.StatusOK)
+	return h, err
+}
+
+// DeleteHandler deletes a handler.
+func (c *Client) DeleteHandler(link Link) error {
+	if link.Href == "" {
+		return fmt.Errorf("invalid link %v", link)
+	}
+	u := *c.url
+	u.Path = link.Href
+
+	req, err := http.NewRequest("DELETE", u.String(), nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = c.Do(req, nil, http.StatusNoContent)
+	return err
+}
+
+type ListHandlersOptions struct {
+	Pattern string
+}
+
+func (o *ListHandlersOptions) Default() {}
+
+func (o *ListHandlersOptions) Values() *url.Values {
+	v := &url.Values{}
+	v.Set("pattern", o.Pattern)
+	return v
+}
+
+func (c *Client) ListHandlers(opt *ListHandlersOptions) (Handlers, error) {
+	handlers := Handlers{}
+	if opt == nil {
+		opt = new(ListHandlersOptions)
+	}
+	opt.Default()
+
+	u := *c.url
+	u.Path = handlersPath
+	u.RawQuery = opt.Values().Encode()
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return handlers, err
+	}
+
+	_, err = c.Do(req, &handlers, http.StatusOK)
+	if err != nil {
+		return handlers, err
+	}
+	return handlers, nil
+}
+
 type LogLevelOptions struct {
 	Level string `json:"level"`
 }
@@ -1800,4 +2147,18 @@ func (c *Client) DebugVars() (DebugVars, error) {
 	vars := DebugVars{}
 	_, err = c.Do(req, &vars, http.StatusOK)
 	return vars, err
+}
+
+type Duration time.Duration
+
+func (d Duration) MarshalText() ([]byte, error) {
+	return []byte(time.Duration(d).String()), nil
+}
+func (d *Duration) UnmarshalText(data []byte) error {
+	dur, err := time.ParseDuration(string(data))
+	if err != nil {
+		return err
+	}
+	*d = Duration(dur)
+	return nil
 }

@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"sync/atomic"
 
-	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/alert"
 )
 
 type Service struct {
@@ -61,16 +61,16 @@ func (s *Service) Global() bool {
 }
 
 type testOptions struct {
-	IncidentKey string               `json:"incident-key"`
-	Description string               `json:"description"`
-	Level       kapacitor.AlertLevel `json:"level"`
+	IncidentKey string      `json:"incident-key"`
+	Description string      `json:"description"`
+	Level       alert.Level `json:"level"`
 }
 
 func (s *Service) TestOptions() interface{} {
 	return &testOptions{
 		IncidentKey: "testIncidentKey",
 		Description: "test pagerduty message",
-		Level:       kapacitor.CritAlert,
+		Level:       alert.Critical,
 	}
 }
 
@@ -89,11 +89,12 @@ func (s *Service) Test(options interface{}) error {
 	)
 }
 
-func (s *Service) Alert(serviceKey, incidentKey, desc string, level kapacitor.AlertLevel, details interface{}) error {
+func (s *Service) Alert(serviceKey, incidentKey, desc string, level alert.Level, details interface{}) error {
 	url, post, err := s.preparePost(serviceKey, incidentKey, desc, level, details)
 	if err != nil {
 		return err
 	}
+
 	resp, err := http.Post(url, "application/json", post)
 	if err != nil {
 		return err
@@ -116,7 +117,7 @@ func (s *Service) Alert(serviceKey, incidentKey, desc string, level kapacitor.Al
 	return nil
 }
 
-func (s *Service) preparePost(serviceKey, incidentKey, desc string, level kapacitor.AlertLevel, details interface{}) (string, io.Reader, error) {
+func (s *Service) preparePost(serviceKey, incidentKey, desc string, level alert.Level, details interface{}) (string, io.Reader, error) {
 
 	c := s.config()
 	if !c.Enabled {
@@ -125,9 +126,9 @@ func (s *Service) preparePost(serviceKey, incidentKey, desc string, level kapaci
 
 	var eventType string
 	switch level {
-	case kapacitor.WarnAlert, kapacitor.CritAlert:
+	case alert.Warning, alert.Critical:
 		eventType = "trigger"
-	case kapacitor.InfoAlert:
+	case alert.Info:
 		return "", nil, fmt.Errorf("AlertLevel 'info' is currently ignored by the PagerDuty service")
 	default:
 		eventType = "resolve"
@@ -142,7 +143,7 @@ func (s *Service) preparePost(serviceKey, incidentKey, desc string, level kapaci
 	pData["event_type"] = eventType
 	pData["description"] = desc
 	pData["incident_key"] = incidentKey
-	pData["client"] = kapacitor.Product
+	pData["client"] = "kapacitor"
 	pData["client_url"] = s.HTTPDService.URL()
 	if details != nil {
 		b, err := json.Marshal(details)
@@ -161,4 +162,36 @@ func (s *Service) preparePost(serviceKey, incidentKey, desc string, level kapaci
 	}
 
 	return c.URL, &post, nil
+}
+
+type HandlerConfig struct {
+	// The service key to use for the alert.
+	// Defaults to the value in the configuration if empty.
+	ServiceKey string `mapstructure:"service-key"`
+}
+
+type handler struct {
+	s      *Service
+	c      HandlerConfig
+	logger *log.Logger
+}
+
+func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+	return &handler{
+		s:      s,
+		c:      c,
+		logger: l,
+	}
+}
+
+func (h *handler) Handle(event alert.Event) {
+	if err := h.s.Alert(
+		h.c.ServiceKey,
+		event.State.ID,
+		event.State.Message,
+		event.State.Level,
+		event.Data.Result,
+	); err != nil {
+		h.logger.Println("E! failed to send event to PagerDuty", err)
+	}
 }

@@ -83,6 +83,9 @@ _kapacitor()
                 esac
             fi
             ;;
+        define-handler)
+            _kapacitor_json_yaml_files "${cur}"
+            ;;
         replay)
             case "$prev" in
                 -recording)
@@ -148,16 +151,19 @@ _kapacitor()
             ;;
         delete|list)
             case "${COMP_WORDS[2]}" in
-                tasks|templates|recordings|replays|service-tests)
+                tasks|templates|recordings|replays|handlers|topics|service-tests)
                     words=$(_kapacitor_list "${COMP_WORDS[2]}" "$cur")
                     ;;
                 *)
-                    words='tasks templates recordings replays service-tests'
+                    words='tasks templates recordings replays handlers topics service-tests'
                     ;;
             esac
             ;;
         show-template)
             words=$(_kapacitor_list templates "$cur")
+            ;;
+        show-handler)
+            words=$(_kapacitor_list handlers "$cur")
             ;;
         level)
             words='debug info warn error'
@@ -172,8 +178,8 @@ _kapacitor()
             esac
             ;;
         *)
-            words='record define define-template replay replay-live enable disable \
-                reload delete list show show-template level stats version vars service-tests help'
+            words='record define define-template define-handler replay replay-live enable disable \
+                reload delete list show show-template show-handler level stats version vars service-tests help'
             ;;
     esac
     if [ -z "$COMPREPLY" ]
@@ -211,6 +217,16 @@ _kapacitor_json_files()
 {
     local didi cur="$1"
     COMPREPLY=($(compgen -o filenames -f -X '!*.json' -- "$cur") )
+    didi=$(compgen -d -- "$cur")
+    COMPREPLY=(${COMPREPLY[@]:-} $didi )
+    _kapacitor_files_add_postfix
+}
+
+_kapacitor_json_yaml_files()
+{
+    local didi cur="$1"
+    COMPREPLY=($(compgen -o filenames -f -X '!*.json' -- "$cur") )
+    COMPREPLY+=($(compgen -o filenames -f -X '!*.yaml' -- "$cur") )
     didi=$(compgen -d -- "$cur")
     COMPREPLY=(${COMPREPLY[@]:-} $didi )
     _kapacitor_files_add_postfix

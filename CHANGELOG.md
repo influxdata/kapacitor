@@ -4,6 +4,33 @@
 
 ### Release Notes
 
+A new system for working with alerts has been introduced.
+This alerting system allows you to configure topics for alert events and then configure handlers for various topics.
+This way alert generation is decoupled from alert handling.
+
+Existing TICKscripts will continue to work without modification.
+
+To use this new alerting system remove any explicit alert handlers from your TICKscript and specify a topic.
+Then configure the handlers for the topic.
+
+```
+stream
+    |from()
+      .measurement('cpu')
+      .groupBy('host')
+    |alert()
+      // Specify the topic for the alert
+      .topic('cpu')
+      .info(lambda: "value" > 60)
+      .warn(lambda: "value" > 70)
+      .crit(lambda: "value" > 80)
+      // No handlers are configured in the script, they are instead defined on the topic via the API.
+```
+
+The API exposes endpoints to query the state of each alert and endpoints for configuring alert handlers.
+See the API docs for more details.
+The kapacitor CLI has been updated with commands for defining alert handlers.
+
 This release introduces a new feature where you can window based off the number of points instead of their time.
 For example:
 
@@ -29,6 +56,8 @@ stream
 - [#898](https://github.com/influxdata/kapacitor/issues/898): Now when the Window node every value is zero, the window will be emitted immediately for each new point.
 - [#1052](https://github.com/influxdata/kapacitor/issues/1052): Move alerta api token to header and add option to skip TLS verification.
 - [#251](https://github.com/influxdata/kapacitor/issues/251): Enable markdown in slack attachments.
+- [#1095](https://github.com/influxdata/kapacitor/pull/1095): Add new alert API, with support for configuring handlers and topics.
+
 
 ### Bugfixes
 

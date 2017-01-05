@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/mail"
 	"os"
 	"path"
 	"path/filepath"
@@ -22,26 +22,41 @@ import (
 	"github.com/influxdata/influxdb/influxql"
 	imodels "github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/clock"
+	"github.com/influxdata/kapacitor/command"
+	"github.com/influxdata/kapacitor/command/commandtest"
 	"github.com/influxdata/kapacitor/models"
+	alertservice "github.com/influxdata/kapacitor/services/alert"
+	"github.com/influxdata/kapacitor/services/alert/alerttest"
 	"github.com/influxdata/kapacitor/services/alerta"
+	"github.com/influxdata/kapacitor/services/alerta/alertatest"
 	"github.com/influxdata/kapacitor/services/hipchat"
-	"github.com/influxdata/kapacitor/services/httpd"
+	"github.com/influxdata/kapacitor/services/hipchat/hipchattest"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
 	"github.com/influxdata/kapacitor/services/logging/loggingtest"
 	"github.com/influxdata/kapacitor/services/opsgenie"
+	"github.com/influxdata/kapacitor/services/opsgenie/opsgenietest"
 	"github.com/influxdata/kapacitor/services/pagerduty"
+	"github.com/influxdata/kapacitor/services/pagerduty/pagerdutytest"
 	"github.com/influxdata/kapacitor/services/sensu"
+	"github.com/influxdata/kapacitor/services/sensu/sensutest"
 	"github.com/influxdata/kapacitor/services/slack"
+	"github.com/influxdata/kapacitor/services/slack/slacktest"
+	"github.com/influxdata/kapacitor/services/smtp"
+	"github.com/influxdata/kapacitor/services/smtp/smtptest"
+	"github.com/influxdata/kapacitor/services/storage/storagetest"
 	"github.com/influxdata/kapacitor/services/talk"
+	"github.com/influxdata/kapacitor/services/talk/talktest"
 	"github.com/influxdata/kapacitor/services/telegram"
+	"github.com/influxdata/kapacitor/services/telegram/telegramtest"
 	"github.com/influxdata/kapacitor/services/victorops"
+	"github.com/influxdata/kapacitor/services/victorops/victoropstest"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/udf/test"
 	"github.com/influxdata/wlog"
 )
 
-var httpService *httpd.Service
 var logService = loggingtest.New()
 
 var dbrps = []kapacitor.DBRP{
@@ -53,14 +68,6 @@ var dbrps = []kapacitor.DBRP{
 
 func init() {
 	wlog.SetLevel(wlog.OFF)
-	// create API server
-	config := httpd.NewConfig()
-	config.BindAddress = ":0" // Choose port dynamically
-	httpService = httpd.NewService(config, "localhost", logService.NewLogger("[http] ", log.LstdFlags), logService)
-	err := httpService.Open()
-	if err != nil {
-		panic(err)
-	}
 }
 
 func TestStream_Derivative(t *testing.T) {
@@ -5220,7 +5227,7 @@ stream
 func TestStream_Alert(t *testing.T) {
 	requestCount := int32(0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ad := kapacitor.AlertData{}
+		ad := alertservice.AlertData{}
 		dec := json.NewDecoder(r.Body)
 		err := dec.Decode(&ad)
 		if err != nil {
@@ -5228,12 +5235,12 @@ func TestStream_Alert(t *testing.T) {
 		}
 		atomic.AddInt32(&requestCount, 1)
 		rc := atomic.LoadInt32(&requestCount)
-		expAd := kapacitor.AlertData{
+		expAd := alertservice.AlertData{
 			ID:      "kapacitor/cpu/serverA",
 			Message: "kapacitor/cpu/serverA is CRITICAL",
 			Details: "details",
 			Time:    time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
-			Level:   kapacitor.CritAlert,
+			Level:   alert.Critical,
 			Data: influxql.Result{
 				Series: imodels.Rows{
 					{
@@ -5310,7 +5317,7 @@ stream
 func TestStream_Alert_NoRecoveries(t *testing.T) {
 	requestCount := int32(0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ad := kapacitor.AlertData{}
+		ad := alertservice.AlertData{}
 		dec := json.NewDecoder(r.Body)
 		err := dec.Decode(&ad)
 		if err != nil {
@@ -5318,15 +5325,15 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 		}
 		atomic.AddInt32(&requestCount, 1)
 		rc := atomic.LoadInt32(&requestCount)
-		var expAd kapacitor.AlertData
+		var expAd alertservice.AlertData
 		switch rc {
 		case 1:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is WARNING",
 				Time:     time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 				Duration: 0,
-				Level:    kapacitor.WarnAlert,
+				Level:    alert.Warning,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5342,12 +5349,12 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 				},
 			}
 		case 2:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is INFO",
 				Time:     time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 				Duration: 0,
-				Level:    kapacitor.InfoAlert,
+				Level:    alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5363,12 +5370,12 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 				},
 			}
 		case 3:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is WARNING",
 				Time:     time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 				Duration: time.Second,
-				Level:    kapacitor.WarnAlert,
+				Level:    alert.Warning,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5384,12 +5391,12 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 				},
 			}
 		case 4:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is WARNING",
 				Time:     time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 				Duration: 2 * time.Second,
-				Level:    kapacitor.WarnAlert,
+				Level:    alert.Warning,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5405,12 +5412,12 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 				},
 			}
 		case 5:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is CRITICAL",
 				Time:     time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 				Duration: 3 * time.Second,
-				Level:    kapacitor.CritAlert,
+				Level:    alert.Critical,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5426,12 +5433,12 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 				},
 			}
 		case 6:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is INFO",
 				Time:     time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
 				Duration: 0,
-				Level:    kapacitor.InfoAlert,
+				Level:    alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5497,7 +5504,7 @@ stream
 func TestStream_Alert_WithReset_0(t *testing.T) {
 	requestCount := int32(0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ad := kapacitor.AlertData{}
+		ad := alertservice.AlertData{}
 		dec := json.NewDecoder(r.Body)
 		err := dec.Decode(&ad)
 		if err != nil {
@@ -5505,15 +5512,15 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 		}
 		atomic.AddInt32(&requestCount, 1)
 		rc := atomic.LoadInt32(&requestCount)
-		var expAd kapacitor.AlertData
+		var expAd alertservice.AlertData
 		switch rc {
 		case 1:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:      "kapacitor/cpu/serverA",
 				Message: "kapacitor/cpu/serverA is INFO",
 				Details: "details",
 				Time:    time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
-				Level:   kapacitor.InfoAlert,
+				Level:   alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5529,13 +5536,13 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				},
 			}
 		case 2:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is INFO",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
 				Duration: time.Second,
-				Level:    kapacitor.InfoAlert,
+				Level:    alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5551,13 +5558,13 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				},
 			}
 		case 3:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is INFO",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 				Duration: 2 * time.Second,
-				Level:    kapacitor.InfoAlert,
+				Level:    alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5573,13 +5580,13 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				},
 			}
 		case 4:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is OK",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 				Duration: 3 * time.Second,
-				Level:    kapacitor.OKAlert,
+				Level:    alert.OK,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5595,13 +5602,13 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				},
 			}
 		case 5:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is INFO",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 				Duration: 0 * time.Second,
-				Level:    kapacitor.InfoAlert,
+				Level:    alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5617,13 +5624,13 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				},
 			}
 		case 6:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is WARNING",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 				Duration: 1 * time.Second,
-				Level:    kapacitor.WarnAlert,
+				Level:    alert.Warning,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5639,13 +5646,13 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				},
 			}
 		case 7:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is WARNING",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
 				Duration: 2 * time.Second,
-				Level:    kapacitor.WarnAlert,
+				Level:    alert.Warning,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5661,13 +5668,13 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				},
 			}
 		case 8:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is OK",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
 				Duration: 3 * time.Second,
-				Level:    kapacitor.OKAlert,
+				Level:    alert.OK,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5683,13 +5690,13 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				},
 			}
 		case 9:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is INFO",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 				Duration: 0 * time.Second,
-				Level:    kapacitor.InfoAlert,
+				Level:    alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5705,13 +5712,13 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				},
 			}
 		case 10:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is WARNING",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
 				Duration: 1 * time.Second,
-				Level:    kapacitor.WarnAlert,
+				Level:    alert.Warning,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5727,13 +5734,13 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				},
 			}
 		case 11:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is CRITICAL",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 				Duration: 2 * time.Second,
-				Level:    kapacitor.CritAlert,
+				Level:    alert.Critical,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5749,13 +5756,13 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				},
 			}
 		case 12:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is OK",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 				Duration: 3 * time.Second,
-				Level:    kapacitor.OKAlert,
+				Level:    alert.OK,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5835,7 +5842,7 @@ stream
 func TestStream_Alert_WithReset_1(t *testing.T) {
 	requestCount := int32(0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ad := kapacitor.AlertData{}
+		ad := alertservice.AlertData{}
 		dec := json.NewDecoder(r.Body)
 		err := dec.Decode(&ad)
 		if err != nil {
@@ -5843,15 +5850,15 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 		}
 		atomic.AddInt32(&requestCount, 1)
 		rc := atomic.LoadInt32(&requestCount)
-		var expAd kapacitor.AlertData
+		var expAd alertservice.AlertData
 		switch rc {
 		case 1:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:      "kapacitor/cpu/serverA",
 				Message: "kapacitor/cpu/serverA is INFO",
 				Details: "details",
 				Time:    time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
-				Level:   kapacitor.InfoAlert,
+				Level:   alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5867,13 +5874,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				},
 			}
 		case 2:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is INFO",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
 				Duration: time.Second,
-				Level:    kapacitor.InfoAlert,
+				Level:    alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5889,13 +5896,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				},
 			}
 		case 3:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is INFO",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 				Duration: 2 * time.Second,
-				Level:    kapacitor.InfoAlert,
+				Level:    alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5911,13 +5918,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				},
 			}
 		case 4:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is OK",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 				Duration: 3 * time.Second,
-				Level:    kapacitor.OKAlert,
+				Level:    alert.OK,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5933,13 +5940,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				},
 			}
 		case 5:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is INFO",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 				Duration: 0 * time.Second,
-				Level:    kapacitor.InfoAlert,
+				Level:    alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5955,13 +5962,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				},
 			}
 		case 6:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is WARNING",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 				Duration: 1 * time.Second,
-				Level:    kapacitor.WarnAlert,
+				Level:    alert.Warning,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5977,13 +5984,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				},
 			}
 		case 7:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is INFO",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
 				Duration: 2 * time.Second,
-				Level:    kapacitor.InfoAlert,
+				Level:    alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -5999,13 +6006,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				},
 			}
 		case 8:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is OK",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
 				Duration: 3 * time.Second,
-				Level:    kapacitor.OKAlert,
+				Level:    alert.OK,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -6021,13 +6028,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				},
 			}
 		case 9:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is INFO",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 				Duration: 0 * time.Second,
-				Level:    kapacitor.InfoAlert,
+				Level:    alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -6043,13 +6050,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				},
 			}
 		case 10:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is WARNING",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
 				Duration: 1 * time.Second,
-				Level:    kapacitor.WarnAlert,
+				Level:    alert.Warning,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -6065,13 +6072,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				},
 			}
 		case 11:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is CRITICAL",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 				Duration: 2 * time.Second,
-				Level:    kapacitor.CritAlert,
+				Level:    alert.Critical,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -6087,13 +6094,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				},
 			}
 		case 12:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is WARNING",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 				Duration: 3 * time.Second,
-				Level:    kapacitor.WarnAlert,
+				Level:    alert.Warning,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -6109,13 +6116,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				},
 			}
 		case 13:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is WARNING",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 12, 0, time.UTC),
 				Duration: 4 * time.Second,
-				Level:    kapacitor.WarnAlert,
+				Level:    alert.Warning,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -6131,13 +6138,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				},
 			}
 		case 14:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is INFO",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 13, 0, time.UTC),
 				Duration: 5 * time.Second,
-				Level:    kapacitor.InfoAlert,
+				Level:    alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -6153,13 +6160,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				},
 			}
 		case 15:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is OK",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 14, 0, time.UTC),
 				Duration: 6 * time.Second,
-				Level:    kapacitor.OKAlert,
+				Level:    alert.OK,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -6239,24 +6246,24 @@ stream
 func TestStream_AlertDuration(t *testing.T) {
 	requestCount := int32(0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ad := kapacitor.AlertData{}
+		ad := alertservice.AlertData{}
 		dec := json.NewDecoder(r.Body)
 		err := dec.Decode(&ad)
 		if err != nil {
 			t.Fatal(err)
 		}
 		atomic.AddInt32(&requestCount, 1)
-		var expAd kapacitor.AlertData
+		var expAd alertservice.AlertData
 		rc := atomic.LoadInt32(&requestCount)
 		switch rc {
 		case 1:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is CRITICAL",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 				Duration: 0,
-				Level:    kapacitor.CritAlert,
+				Level:    alert.Critical,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -6272,13 +6279,13 @@ func TestStream_AlertDuration(t *testing.T) {
 				},
 			}
 		case 2:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is WARNING",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 				Duration: 2 * time.Second,
-				Level:    kapacitor.WarnAlert,
+				Level:    alert.Warning,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -6294,13 +6301,13 @@ func TestStream_AlertDuration(t *testing.T) {
 				},
 			}
 		case 3:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is OK",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 				Duration: 4 * time.Second,
-				Level:    kapacitor.OKAlert,
+				Level:    alert.OK,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -6316,13 +6323,13 @@ func TestStream_AlertDuration(t *testing.T) {
 				},
 			}
 		case 4:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is WARNING",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 				Duration: 0,
-				Level:    kapacitor.WarnAlert,
+				Level:    alert.Warning,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -6338,13 +6345,13 @@ func TestStream_AlertDuration(t *testing.T) {
 				},
 			}
 		case 5:
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "kapacitor/cpu/serverA",
 				Message:  "kapacitor/cpu/serverA is OK",
 				Details:  "details",
 				Time:     time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 				Duration: 3 * time.Second,
-				Level:    kapacitor.OKAlert,
+				Level:    alert.OK,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -6409,54 +6416,11 @@ stream
 }
 
 func TestStream_AlertSensu(t *testing.T) {
-	requestCount := int32(0)
-	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+	ts, err := sensutest.NewServer()
 	if err != nil {
 		t.Fatal(err)
 	}
-	listen, err := net.ListenTCP("tcp", addr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer listen.Close()
-	go func() {
-		for {
-			conn, err := listen.Accept()
-			if err != nil {
-				return
-			}
-			func() {
-				defer conn.Close()
-
-				atomic.AddInt32(&requestCount, 1)
-				type postData struct {
-					Name   string `json:"name"`
-					Source string `json:"source"`
-					Output string `json:"output"`
-					Status int    `json:"status"`
-				}
-				pd := postData{}
-				dec := json.NewDecoder(conn)
-				dec.Decode(&pd)
-
-				if exp := "Kapacitor"; pd.Source != exp {
-					t.Errorf("unexpected source got %s exp %s", pd.Source, exp)
-				}
-
-				if exp := "kapacitor.cpu.serverA is CRITICAL"; pd.Output != exp {
-					t.Errorf("unexpected text got %s exp %s", pd.Output, exp)
-				}
-
-				if exp := "kapacitor.cpu.serverA"; pd.Name != exp {
-					t.Errorf("unexpected text got %s exp %s", pd.Name, exp)
-				}
-
-				if exp := 2; pd.Status != exp {
-					t.Errorf("unexpected status got %v exp %v", pd.Status, exp)
-				}
-			}()
-		}
-	}()
+	defer ts.Close()
 
 	var script = `
 stream
@@ -6475,81 +6439,39 @@ stream
 		.crit(lambda: "count" > 8.0)
 		.sensu()
 `
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := sensu.NewConfig()
+		c.Enabled = true
+		c.Addr = ts.Addr
+		c.Source = "Kapacitor"
+		sl := sensu.NewService(c, logService.NewLogger("[test_sensu] ", log.LstdFlags))
+		tm.SensuService = sl
+	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
 
-	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
-	defer tm.Close()
+	exp := []interface{}{
+		sensutest.Request{
+			Source: "Kapacitor",
+			Output: "kapacitor.cpu.serverA is CRITICAL",
+			Name:   "kapacitor.cpu.serverA",
+			Status: 2,
+		},
+	}
 
-	c := sensu.NewConfig()
-	c.Enabled = true
-	c.Addr = listen.Addr().String()
-	c.Source = "Kapacitor"
-	sl := sensu.NewService(c, logService.NewLogger("[test_sensu] ", log.LstdFlags))
-	tm.SensuService = sl
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Requests() {
+		got = append(got, g)
+	}
 
-	err = fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
-	if err != nil {
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
 		t.Error(err)
 	}
 
-	if rc := atomic.LoadInt32(&requestCount); rc != 1 {
-		t.Errorf("unexpected requestCount got %d exp 1", rc)
-	}
 }
 
 func TestStream_AlertSlack(t *testing.T) {
-	requestCount := int32(0)
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&requestCount, 1)
-		type postData struct {
-			Channel     string `json:"channel"`
-			Username    string `json:"username"`
-			Text        string `json:"text"`
-			Attachments []struct {
-				Fallback  string   `json:"fallback"`
-				Color     string   `json:"color"`
-				Text      string   `json:"text"`
-				Mrkdwn_in []string `json:"mrkdwn_in"`
-			} `json:"attachments"`
-		}
-		pd := postData{}
-		dec := json.NewDecoder(r.Body)
-		dec.Decode(&pd)
-		if exp := "/test/slack/url"; r.URL.String() != exp {
-			t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
-		}
-		if rc := atomic.LoadInt32(&requestCount); rc == 1 {
-			if exp := "#alerts"; pd.Channel != exp {
-				t.Errorf("unexpected channel got %s exp %s", pd.Channel, exp)
-			}
-		} else if rc := atomic.LoadInt32(&requestCount); rc == 2 {
-			if exp := "@jim"; pd.Channel != exp {
-				t.Errorf("unexpected channel got %s exp %s", pd.Channel, exp)
-			}
-		}
-		if exp := "kapacitor"; pd.Username != exp {
-			t.Errorf("unexpected username got %s exp %s", pd.Username, exp)
-		}
-		if exp := ""; pd.Text != exp {
-			t.Errorf("unexpected text got %s exp %s", pd.Text, exp)
-		}
-		if len(pd.Attachments) != 1 {
-			t.Errorf("unexpected attachments got %v", pd.Attachments)
-		} else {
-			exp := "kapacitor/cpu/serverA is CRITICAL"
-			if pd.Attachments[0].Fallback != exp {
-				t.Errorf("unexpected fallback got %s exp %s", pd.Attachments[0].Fallback, exp)
-			}
-			if pd.Attachments[0].Text != exp {
-				t.Errorf("unexpected text got %s exp %s", pd.Attachments[0].Text, exp)
-			}
-			if exp := "danger"; pd.Attachments[0].Color != exp {
-				t.Errorf("unexpected color got %s exp %s", pd.Attachments[0].Color, exp)
-			}
-			if exp := []string{"text"}; !reflect.DeepEqual(pd.Attachments[0].Mrkdwn_in, exp) {
-				t.Errorf("unexpected mrkdwn_in got %v exp %v", pd.Attachments[0].Mrkdwn_in, exp)
-			}
-		}
-	}))
+	ts := slacktest.NewServer()
 	defer ts.Close()
 
 	var script = `
@@ -6573,78 +6495,64 @@ stream
 		.channel('@jim')
 `
 
-	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
-	defer tm.Close()
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := slack.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL + "/test/slack/url"
+		c.Channel = "#channel"
+		sl := slack.NewService(c, logService.NewLogger("[test_slack] ", log.LstdFlags))
+		tm.SlackService = sl
+	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
 
-	c := slack.NewConfig()
-	c.Enabled = true
-	c.URL = ts.URL + "/test/slack/url"
-	c.Channel = "#channel"
-	sl := slack.NewService(c, logService.NewLogger("[test_slack] ", log.LstdFlags))
-	tm.SlackService = sl
-
-	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
-	if err != nil {
-		t.Error(err)
+	exp := []interface{}{
+		slacktest.Request{
+			URL: "/test/slack/url",
+			PostData: slacktest.PostData{
+				Channel:  "@jim",
+				Username: "kapacitor",
+				Text:     "",
+				Attachments: []slacktest.Attachment{
+					{
+						Fallback:  "kapacitor/cpu/serverA is CRITICAL",
+						Color:     "danger",
+						Text:      "kapacitor/cpu/serverA is CRITICAL",
+						Mrkdwn_in: []string{"text"},
+					},
+				},
+			},
+		},
+		slacktest.Request{
+			URL: "/test/slack/url",
+			PostData: slacktest.PostData{
+				Channel:  "#alerts",
+				Username: "kapacitor",
+				Text:     "",
+				Attachments: []slacktest.Attachment{
+					{
+						Fallback:  "kapacitor/cpu/serverA is CRITICAL",
+						Color:     "danger",
+						Text:      "kapacitor/cpu/serverA is CRITICAL",
+						Mrkdwn_in: []string{"text"},
+					},
+				},
+			},
+		},
 	}
 
-	if rc := atomic.LoadInt32(&requestCount); rc != 2 {
-		t.Errorf("unexpected requestCount got %d exp 2", rc)
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Requests() {
+		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+		t.Error(err)
 	}
 }
 
 func TestStream_AlertTelegram(t *testing.T) {
-	requestCount := int32(0)
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&requestCount, 1)
-		type postData struct {
-			ChatId                string `json:"chat_id"`
-			Text                  string `json:"text"`
-			ParseMode             string `json:"parse_mode"`
-			DisableWebPagePreview bool   `json:"disable_web_page_preview"`
-			DisableNotification   bool   `json:"disable_notification"`
-		}
-		pd := postData{}
-		dec := json.NewDecoder(r.Body)
-		dec.Decode(&pd)
-
-		if exp := "/botTOKEN:AUTH/sendMessage"; r.URL.String() != exp {
-			t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
-		}
-
-		if rc := atomic.LoadInt32(&requestCount); rc == 1 {
-			if exp := "12345678"; pd.ChatId != exp {
-				t.Errorf("unexpected recipient got %s exp %s", pd.ChatId, exp)
-			}
-			if exp := "HTML"; pd.ParseMode != exp {
-				t.Errorf("unexpected recipient got %s exp %s", pd.ParseMode, exp)
-			}
-			if exp := true; pd.DisableWebPagePreview != exp {
-				t.Errorf("unexpected DisableWebPagePreview got %t exp %t", pd.DisableWebPagePreview, exp)
-			}
-			if exp := true; pd.DisableNotification != exp {
-				t.Errorf("unexpected DisableNotification got %t exp %t", pd.DisableNotification, exp)
-			}
-
-		} else if rc := atomic.LoadInt32(&requestCount); rc == 2 {
-			if exp := "87654321"; pd.ChatId != exp {
-				t.Errorf("unexpected recipient got %s exp %s", pd.ChatId, exp)
-			}
-			if exp := ""; pd.ParseMode != exp {
-				t.Errorf("unexpected recipient got '%s' exp '%s'", pd.ParseMode, exp)
-			}
-			if exp := true; pd.DisableWebPagePreview != exp {
-				t.Errorf("unexpected DisableWebPagePreview got %t exp %t", pd.DisableWebPagePreview, exp)
-			}
-			if exp := false; pd.DisableNotification != exp {
-				t.Errorf("unexpected DisableNotification got %t exp %t", pd.DisableNotification, exp)
-			}
-		}
-
-		if exp := "kapacitor/cpu/serverA is CRITICAL"; pd.Text != exp {
-			t.Errorf("unexpected text got %s exp %s", pd.Text, exp)
-		}
-	}))
+	ts := telegramtest.NewServer()
 	defer ts.Close()
 
 	var script = `
@@ -6664,71 +6572,120 @@ stream
 		.crit(lambda: "count" > 8.0)
 		.telegram()
 			.chatId('12345678')
-                	.disableNotification()
-                	.parseMode('HTML')
-                .telegram()
-                	.chatId('87654321')
+				.disableNotification()
+				.parseMode('HTML')
+		.telegram()
+			.chatId('87654321')
 `
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := telegram.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL + "/bot"
+		c.Token = "TOKEN:AUTH"
+		c.ChatId = "123456789"
+		c.DisableWebPagePreview = true
+		c.DisableNotification = false
+		tl := telegram.NewService(c, logService.NewLogger("[test_telegram] ", log.LstdFlags))
+		tm.TelegramService = tl
+	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
 
-	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
-	defer tm.Close()
-
-	c := telegram.NewConfig()
-	c.Enabled = true
-	c.URL = ts.URL + "/bot"
-	c.Token = "TOKEN:AUTH"
-	c.ChatId = "123456789"
-	c.DisableWebPagePreview = true
-	c.DisableNotification = false
-	tl := telegram.NewService(c, logService.NewLogger("[test_telegram] ", log.LstdFlags))
-	tm.TelegramService = tl
-
-	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
-	if err != nil {
-		t.Error(err)
+	exp := []interface{}{
+		telegramtest.Request{
+			URL: "/botTOKEN:AUTH/sendMessage",
+			PostData: telegramtest.PostData{
+				ChatId:                "12345678",
+				Text:                  "kapacitor/cpu/serverA is CRITICAL",
+				ParseMode:             "HTML",
+				DisableWebPagePreview: true,
+				DisableNotification:   true,
+			},
+		},
+		telegramtest.Request{
+			URL: "/botTOKEN:AUTH/sendMessage",
+			PostData: telegramtest.PostData{
+				ChatId:                "87654321",
+				Text:                  "kapacitor/cpu/serverA is CRITICAL",
+				ParseMode:             "",
+				DisableWebPagePreview: true,
+				DisableNotification:   false,
+			},
+		},
 	}
 
-	if rc := atomic.LoadInt32(&requestCount); rc != 2 {
-		t.Errorf("unexpected requestCount got %d exp 2", rc)
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Requests() {
+		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestStream_AlertTCP(t *testing.T) {
+	ts, err := alerttest.NewTCPServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ts.Close()
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor.{{ .Name }}.{{ index .Tags "host" }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.details('')
+		.tcp('` + ts.Addr + `')
+`
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, nil)
+
+	exp := []interface{}{
+		alertservice.AlertData{
+			ID:      "kapacitor.cpu.serverA",
+			Message: "kapacitor.cpu.serverA is CRITICAL",
+			Time:    time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+			Level:   alert.Critical,
+			Data: influxql.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA"},
+						Columns: []string{"time", "count"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC).Format(time.RFC3339Nano),
+							10.0,
+						}},
+					},
+				},
+			},
+		},
+	}
+
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Data() {
+		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+		t.Error(err)
 	}
 }
 
 func TestStream_AlertHipChat(t *testing.T) {
-	requestCount := int32(0)
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&requestCount, 1)
-		type postData struct {
-			From    string `json:"from"`
-			Message string `json:"message"`
-			Color   string `json:"color"`
-			Notify  bool   `json:"notify"`
-		}
-		pd := postData{}
-		dec := json.NewDecoder(r.Body)
-		dec.Decode(&pd)
-
-		if rc := atomic.LoadInt32(&requestCount); rc == 1 {
-			if exp := "/1234567/notification?auth_token=testtoken1234567"; r.URL.String() != exp {
-				t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
-			}
-		} else if rc := atomic.LoadInt32(&requestCount); rc == 2 {
-			if exp := "/Test%20Room/notification?auth_token=testtokenTestRoom"; r.URL.String() != exp {
-				t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
-			}
-		}
-		if exp := "kapacitor"; pd.From != exp {
-			t.Errorf("unexpected username got %s exp %s", pd.From, exp)
-		}
-		if exp := "kapacitor/cpu/serverA is CRITICAL"; pd.Message != exp {
-			t.Errorf("unexpected text got %s exp %s", pd.Message, exp)
-		}
-		if exp := "red"; pd.Color != exp {
-			t.Errorf("unexpected color got %s exp %s", pd.Color, exp)
-		}
-		if exp := true; pd.Notify != exp {
-			t.Errorf("unexpected notify got %t exp %t", pd.Notify, exp)
-		}
-	}))
+	ts := hipchattest.NewServer()
 	defer ts.Close()
 
 	var script = `
@@ -6753,107 +6710,52 @@ stream
 			.room('Test Room')
 			.token('testtokenTestRoom')
 `
+	tmInit := func(tm *kapacitor.TaskMaster) {
 
-	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
-	defer tm.Close()
+		c := hipchat.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL
+		c.Room = "1231234"
+		c.Token = "testtoken1231234"
+		sl := hipchat.NewService(c, logService.NewLogger("[test_hipchat] ", log.LstdFlags))
+		tm.HipChatService = sl
+	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
 
-	c := hipchat.NewConfig()
-	c.Enabled = true
-	c.URL = ts.URL
-	c.Room = "1231234"
-	c.Token = "testtoken1231234"
-	sl := hipchat.NewService(c, logService.NewLogger("[test_hipchat] ", log.LstdFlags))
-	tm.HipChatService = sl
-
-	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
-	if err != nil {
-		t.Error(err)
+	exp := []interface{}{
+		hipchattest.Request{
+			URL: "/1234567/notification?auth_token=testtoken1234567",
+			PostData: hipchattest.PostData{
+				From:    "kapacitor",
+				Message: "kapacitor/cpu/serverA is CRITICAL",
+				Color:   "red",
+				Notify:  true,
+			},
+		},
+		hipchattest.Request{
+			URL: "/Test%20Room/notification?auth_token=testtokenTestRoom",
+			PostData: hipchattest.PostData{
+				From:    "kapacitor",
+				Message: "kapacitor/cpu/serverA is CRITICAL",
+				Color:   "red",
+				Notify:  true,
+			},
+		},
 	}
 
-	if rc := atomic.LoadInt32(&requestCount); rc != 2 {
-		t.Errorf("unexpected requestCount got %d exp 2", rc)
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Requests() {
+		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+		t.Error(err)
 	}
 }
 
 func TestStream_AlertAlerta(t *testing.T) {
-	requestCount := int32(0)
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&requestCount, 1)
-		type postData struct {
-			Resource    string   `json:"resource"`
-			Event       string   `json:"event"`
-			Group       string   `json:"group"`
-			Environment string   `json:"environment"`
-			Text        string   `json:"text"`
-			Origin      string   `json:"origin"`
-			Service     []string `json:"service"`
-			Value       string   `json:"value"`
-		}
-		pd := postData{}
-		dec := json.NewDecoder(r.Body)
-		dec.Decode(&pd)
-
-		if rc := atomic.LoadInt32(&requestCount); rc == 1 {
-			if exp := "/alert"; r.URL.String() != exp {
-				t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
-			}
-			if exp := "Key testtoken1234567"; r.Header.Get("Authorization") != exp {
-				t.Errorf("unexpected token in header got %s exp %s", r.Header.Get("Authorization"), exp)
-			}
-			if exp := "cpu"; pd.Resource != exp {
-				t.Errorf("unexpected resource got %s exp %s", pd.Resource, exp)
-			}
-			if exp := "serverA"; pd.Event != exp {
-				t.Errorf("unexpected event got %s exp %s", pd.Event, exp)
-			}
-			if exp := "production"; pd.Environment != exp {
-				t.Errorf("unexpected environment got %s exp %s", pd.Environment, exp)
-			}
-			if exp := "host=serverA"; pd.Group != exp {
-				t.Errorf("unexpected group got %s exp %s", pd.Group, exp)
-			}
-			if exp := ""; pd.Value != exp {
-				t.Errorf("unexpected value got %s exp %s", pd.Value, exp)
-			}
-			if exp := []string{"cpu"}; !reflect.DeepEqual(pd.Service, exp) {
-				t.Errorf("unexpected service got %s exp %s", pd.Service, exp)
-			}
-			if exp := "Kapacitor"; pd.Origin != exp {
-				t.Errorf("unexpected origin got %s exp %s", pd.Origin, exp)
-			}
-		} else {
-			if exp := "/alert"; r.URL.String() != exp {
-				t.Errorf("unexpected url got %s exp %s", r.URL.String(), exp)
-			}
-			if exp := "Key anothertesttoken"; r.Header.Get("Authorization") != exp {
-				t.Errorf("unexpected token in header got %s exp %s", r.Header.Get("Authorization"), exp)
-			}
-			if exp := "resource: serverA"; pd.Resource != exp {
-				t.Errorf("unexpected resource got %s exp %s", pd.Resource, exp)
-			}
-			if exp := "event: TestStream_Alert"; pd.Event != exp {
-				t.Errorf("unexpected event got %s exp %s", pd.Event, exp)
-			}
-			if exp := "serverA"; pd.Environment != exp {
-				t.Errorf("unexpected environment got %s exp %s", pd.Environment, exp)
-			}
-			if exp := "serverA"; pd.Group != exp {
-				t.Errorf("unexpected group got %s exp %s", pd.Group, exp)
-			}
-			if exp := "10"; pd.Value != exp {
-				t.Errorf("unexpected value got %s exp %s", pd.Value, exp)
-			}
-			if exp := []string{"serviceA", "serviceB"}; !reflect.DeepEqual(pd.Service, exp) {
-				t.Errorf("unexpected service got %s exp %s", pd.Service, exp)
-			}
-			if exp := "override"; pd.Origin != exp {
-				t.Errorf("unexpected origin got %s exp %s", pd.Origin, exp)
-			}
-		}
-		if exp := "kapacitor/cpu/serverA is CRITICAL @1971-01-01 00:00:10 +0000 UTC"; pd.Text != exp {
-			t.Errorf("unexpected text got %s exp %s", pd.Text, exp)
-		}
-	}))
+	ts := alertatest.NewServer()
 	defer ts.Close()
 
 	var script = `
@@ -6885,103 +6787,59 @@ stream
 			.value('{{ index .Fields "count" }}')
 			.services('serviceA', 'serviceB')
 `
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := alerta.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL
+		c.Origin = "Kapacitor"
+		sl := alerta.NewService(c, logService.NewLogger("[test_alerta] ", log.LstdFlags))
+		tm.AlertaService = sl
+	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
 
-	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
-	defer tm.Close()
-
-	c := alerta.NewConfig()
-	c.Enabled = true
-	c.URL = ts.URL
-	c.Origin = "Kapacitor"
-	sl := alerta.NewService(c, logService.NewLogger("[test_alerta] ", log.LstdFlags))
-	tm.AlertaService = sl
-
-	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
-	if err != nil {
-		t.Error(err)
+	exp := []interface{}{
+		alertatest.Request{
+			URL:           "/alert",
+			Authorization: "Key testtoken1234567",
+			PostData: alertatest.PostData{
+				Resource:    "cpu",
+				Event:       "serverA",
+				Group:       "host=serverA",
+				Environment: "production",
+				Text:        "kapacitor/cpu/serverA is CRITICAL @1971-01-01 00:00:10 +0000 UTC",
+				Origin:      "Kapacitor",
+				Service:     []string{"cpu"},
+			},
+		},
+		alertatest.Request{
+			URL:           "/alert",
+			Authorization: "Key anothertesttoken",
+			PostData: alertatest.PostData{
+				Resource:    "resource: serverA",
+				Event:       "event: TestStream_Alert",
+				Group:       "serverA",
+				Environment: "serverA",
+				Text:        "kapacitor/cpu/serverA is CRITICAL @1971-01-01 00:00:10 +0000 UTC",
+				Origin:      "override",
+				Service:     []string{"serviceA", "serviceB"},
+				Value:       "10",
+			},
+		},
 	}
 
-	if rc := atomic.LoadInt32(&requestCount); rc != 2 {
-		t.Errorf("unexpected requestCount got %d exp 2", rc)
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Requests() {
+		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+		t.Error(err)
 	}
 }
 
 func TestStream_AlertOpsGenie(t *testing.T) {
-	requestCount := int32(0)
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&requestCount, 1)
-
-		type postData struct {
-			ApiKey      string                 `json:"apiKey"`
-			Message     string                 `json:"message"`
-			Entity      string                 `json:"entity"`
-			Alias       string                 `json:"alias"`
-			Note        int                    `json:"note"`
-			Details     map[string]interface{} `json:"details"`
-			Description interface{}            `json:"description"`
-			Teams       []string               `json:"teams"`
-			Recipients  []string               `json:"recipients"`
-		}
-
-		pd := postData{}
-		dec := json.NewDecoder(r.Body)
-		dec.Decode(&pd)
-
-		if exp := "CRITICAL"; pd.Details["Level"] != exp {
-			t.Errorf("unexpected level got %s exp %s", pd.Details["level"], exp)
-		}
-		if exp := "kapacitor/cpu/serverA"; pd.Entity != exp {
-			t.Errorf("unexpected entity got %s exp %s", pd.Entity, exp)
-		}
-		if exp := "kapacitor/cpu/serverA"; pd.Alias != exp {
-			t.Errorf("unexpected alias got %s exp %s", pd.Alias, exp)
-		}
-		if exp := "kapacitor/cpu/serverA is CRITICAL"; pd.Message != exp {
-			t.Errorf("unexpected entity id got %s exp %s", pd.Message, exp)
-		}
-		if exp := "Kapacitor"; pd.Details["Monitoring Tool"] != exp {
-			t.Errorf("unexpected monitoring tool got %s exp %s", pd.Details["Monitoring Tool"], exp)
-		}
-		if pd.Description == nil {
-			t.Error("unexpected description got nil")
-		}
-		if rc := atomic.LoadInt32(&requestCount); rc == 1 {
-			if exp, l := 2, len(pd.Teams); l != exp {
-				t.Errorf("unexpected teams count got %d exp %d", l, exp)
-			}
-			if exp := "test_team"; pd.Teams[0] != exp {
-				t.Errorf("unexpected teams[0] got %s exp %s", pd.Teams[0], exp)
-			}
-			if exp := "another_team"; pd.Teams[1] != exp {
-				t.Errorf("unexpected teams[1] got %s exp %s", pd.Teams[1], exp)
-			}
-			if exp, l := 2, len(pd.Recipients); l != exp {
-				t.Errorf("unexpected recipients count got %d exp %d", l, exp)
-			}
-			if exp := "test_recipient"; pd.Recipients[0] != exp {
-				t.Errorf("unexpected recipients[0] got %s exp %s", pd.Recipients[0], exp)
-			}
-			if exp := "another_recipient"; pd.Recipients[1] != exp {
-				t.Errorf("unexpected recipients[1] got %s exp %s", pd.Recipients[1], exp)
-			}
-		} else if rc := atomic.LoadInt32(&requestCount); rc == 2 {
-			if exp, l := 1, len(pd.Teams); l != exp {
-				t.Errorf("unexpected teams count got %d exp %d", l, exp)
-			}
-			if exp := "test_team2"; pd.Teams[0] != exp {
-				t.Errorf("unexpected teams[0] got %s exp %s", pd.Teams[0], exp)
-			}
-			if exp, l := 2, len(pd.Recipients); l != exp {
-				t.Errorf("unexpected recipients count got %d exp %d", l, exp)
-			}
-			if exp := "test_recipient2"; pd.Recipients[0] != exp {
-				t.Errorf("unexpected recipients[0] got %s exp %s", pd.Recipients[0], exp)
-			}
-			if exp := "another_recipient"; pd.Recipients[1] != exp {
-				t.Errorf("unexpected recipients[1] got %s exp %s", pd.Recipients[1], exp)
-			}
-		}
-	}))
+	ts := opsgenietest.NewServer()
 	defer ts.Close()
 
 	var script = `
@@ -7006,66 +6864,67 @@ stream
 			.teams('test_team2' )
 			.recipients('test_recipient2', 'another_recipient')
 `
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := opsgenie.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL
+		c.APIKey = "api_key"
+		og := opsgenie.NewService(c, logService.NewLogger("[test_og] ", log.LstdFlags))
+		tm.OpsGenieService = og
+	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
 
-	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
-	defer tm.Close()
-	c := opsgenie.NewConfig()
-	c.Enabled = true
-	c.URL = ts.URL
-	c.APIKey = "api_key"
-	og := opsgenie.NewService(c, logService.NewLogger("[test_og] ", log.LstdFlags))
-	tm.OpsGenieService = og
+	exp := []interface{}{
+		opsgenietest.Request{
+			URL: "/",
+			PostData: opsgenietest.PostData{
+				ApiKey:  "api_key",
+				Message: "kapacitor/cpu/serverA is CRITICAL",
+				Entity:  "kapacitor/cpu/serverA",
+				Alias:   "kapacitor/cpu/serverA",
+				Note:    "",
+				Details: map[string]interface{}{
+					"Level":           "CRITICAL",
+					"Monitoring Tool": "Kapacitor",
+				},
+				Description: `{"Series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}],"Messages":null,"Err":null}`,
+				Teams:       []string{"test_team", "another_team"},
+				Recipients:  []string{"test_recipient", "another_recipient"},
+			},
+		},
+		opsgenietest.Request{
+			URL: "/",
+			PostData: opsgenietest.PostData{
+				ApiKey:  "api_key",
+				Message: "kapacitor/cpu/serverA is CRITICAL",
+				Entity:  "kapacitor/cpu/serverA",
+				Alias:   "kapacitor/cpu/serverA",
+				Note:    "",
+				Details: map[string]interface{}{
+					"Level":           "CRITICAL",
+					"Monitoring Tool": "Kapacitor",
+				},
+				Description: `{"Series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}],"Messages":null,"Err":null}`,
+				Teams:       []string{"test_team2"},
+				Recipients:  []string{"test_recipient2", "another_recipient"},
+			},
+		},
+	}
 
-	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
-	if err != nil {
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Requests() {
+		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
 		t.Error(err)
 	}
 
-	if rc := atomic.LoadInt32(&requestCount); rc != 2 {
-		t.Errorf("unexpected requestCount got %d exp 1", rc)
-	}
 }
 
 func TestStream_AlertPagerDuty(t *testing.T) {
-	requestCount := int32(0)
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&requestCount, 1)
-		type postData struct {
-			ServiceKey  string      `json:"service_key"`
-			EventType   string      `json:"event_type"`
-			Description string      `json:"description"`
-			Client      string      `json:"client"`
-			ClientURL   string      `json:"client_url"`
-			Details     interface{} `json:"details"`
-		}
-		pd := postData{}
-		dec := json.NewDecoder(r.Body)
-		dec.Decode(&pd)
-		if rc := atomic.LoadInt32(&requestCount); rc == 1 {
-			if exp := "service_key"; pd.ServiceKey != exp {
-				t.Errorf("unexpected service key got %s exp %s", pd.ServiceKey, exp)
-			}
-		} else if rc := atomic.LoadInt32(&requestCount); rc == 2 {
-			if exp := "test_override_key"; pd.ServiceKey != exp {
-				t.Errorf("unexpected service key got %s exp %s", pd.ServiceKey, exp)
-			}
-		}
-		if exp := "trigger"; pd.EventType != exp {
-			t.Errorf("unexpected event type got %s exp %s", pd.EventType, exp)
-		}
-		if exp := "CRITICAL alert for kapacitor/cpu/serverA"; pd.Description != exp {
-			t.Errorf("unexpected description got %s exp %s", pd.Description, exp)
-		}
-		if exp := "kapacitor"; pd.Client != exp {
-			t.Errorf("unexpected client got %s exp %s", pd.Client, exp)
-		}
-		if len(pd.ClientURL) == 0 {
-			t.Errorf("unexpected client url got empty string")
-		}
-		if pd.Details == nil {
-			t.Error("unexpected data got nil")
-		}
-	}))
+	ts := pagerdutytest.NewServer()
 	defer ts.Close()
 
 	var script = `
@@ -7089,69 +6948,116 @@ stream
 			.serviceKey('test_override_key')
 `
 
-	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
-	defer tm.Close()
-	c := pagerduty.NewConfig()
-	c.Enabled = true
-	c.URL = ts.URL
-	c.ServiceKey = "service_key"
-	pd := pagerduty.NewService(c, logService.NewLogger("[test_pd] ", log.LstdFlags))
-	pd.HTTPDService = tm.HTTPDService
-	tm.PagerDutyService = pd
+	var kapacitorURL string
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := pagerduty.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL
+		c.ServiceKey = "service_key"
+		pd := pagerduty.NewService(c, logService.NewLogger("[test_pd] ", log.LstdFlags))
+		pd.HTTPDService = tm.HTTPDService
+		tm.PagerDutyService = pd
 
-	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
-	if err != nil {
-		t.Error(err)
+		kapacitorURL = tm.HTTPDService.URL()
+	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	exp := []interface{}{
+		pagerdutytest.Request{
+			URL: "/",
+			PostData: pagerdutytest.PostData{
+				ServiceKey:  "service_key",
+				EventType:   "trigger",
+				Description: "CRITICAL alert for kapacitor/cpu/serverA",
+				Client:      "kapacitor",
+				ClientURL:   kapacitorURL,
+				Details:     `{"Series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}],"Messages":null,"Err":null}`,
+			},
+		},
+		pagerdutytest.Request{
+			URL: "/",
+			PostData: pagerdutytest.PostData{
+				ServiceKey:  "test_override_key",
+				EventType:   "trigger",
+				Description: "CRITICAL alert for kapacitor/cpu/serverA",
+				Client:      "kapacitor",
+				ClientURL:   kapacitorURL,
+				Details:     `{"Series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}],"Messages":null,"Err":null}`,
+			},
+		},
 	}
 
-	if rc := atomic.LoadInt32(&requestCount); rc != 2 {
-		t.Errorf("unexpected requestCount got %d exp 1", rc)
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Requests() {
+		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestStream_AlertPost(t *testing.T) {
+	ts := alerttest.NewPostServer()
+	defer ts.Close()
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor.{{ .Name }}.{{ index .Tags "host" }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.details('')
+		.post('` + ts.URL + `')
+`
+
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, nil)
+
+	exp := []interface{}{
+		alertservice.AlertData{
+			ID:      "kapacitor.cpu.serverA",
+			Message: "kapacitor.cpu.serverA is CRITICAL",
+			Time:    time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+			Level:   alert.Critical,
+			Data: influxql.Result{
+				Series: imodels.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA"},
+						Columns: []string{"time", "count"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC).Format(time.RFC3339Nano),
+							10.0,
+						}},
+					},
+				},
+			},
+		},
+	}
+
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Data() {
+		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+		t.Error(err)
 	}
 }
 
 func TestStream_AlertVictorOps(t *testing.T) {
-	requestCount := int32(0)
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&requestCount, 1)
-		if rc := atomic.LoadInt32(&requestCount); rc == 1 {
-			if exp, got := "/api_key/test_key", r.URL.String(); got != exp {
-				t.Errorf("unexpected VO url got %s exp %s", got, exp)
-			}
-		} else if rc := atomic.LoadInt32(&requestCount); rc == 2 {
-			if exp, got := "/api_key/test_key2", r.URL.String(); got != exp {
-				t.Errorf("unexpected VO url got %s exp %s", got, exp)
-			}
-		}
-		type postData struct {
-			MessageType    string      `json:"message_type"`
-			EntityID       string      `json:"entity_id"`
-			StateMessage   string      `json:"state_message"`
-			Timestamp      int         `json:"timestamp"`
-			MonitoringTool string      `json:"monitoring_tool"`
-			Data           interface{} `json:"data"`
-		}
-		pd := postData{}
-		dec := json.NewDecoder(r.Body)
-		dec.Decode(&pd)
-		if exp := "CRITICAL"; pd.MessageType != exp {
-			t.Errorf("unexpected message type got %s exp %s", pd.MessageType, exp)
-		}
-		if exp := "kapacitor/cpu/serverA"; pd.EntityID != exp {
-			t.Errorf("unexpected entity id got %s exp %s", pd.EntityID, exp)
-		}
-		if exp := "kapacitor/cpu/serverA is CRITICAL"; pd.StateMessage != exp {
-			t.Errorf("unexpected state message got %s exp %s", pd.StateMessage, exp)
-		}
-		if exp := "kapacitor"; pd.MonitoringTool != exp {
-			t.Errorf("unexpected monitoring tool got %s exp %s", pd.MonitoringTool, exp)
-		}
-		if exp := 31536010; pd.Timestamp != exp {
-			t.Errorf("unexpected timestamp got %d exp %d", pd.Timestamp, exp)
-		}
-		if pd.Data == nil {
-			t.Error("unexpected data got nil")
-		}
-	}))
+	ts := victoropstest.NewServer()
 	defer ts.Close()
 
 	var script = `
@@ -7175,52 +7081,55 @@ stream
 			.routingKey('test_key2')
 `
 
-	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
-	defer tm.Close()
-	c := victorops.NewConfig()
-	c.Enabled = true
-	c.URL = ts.URL
-	c.APIKey = "api_key"
-	c.RoutingKey = "routing_key"
-	vo := victorops.NewService(c, logService.NewLogger("[test_vo] ", log.LstdFlags))
-	tm.VictorOpsService = vo
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := victorops.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL
+		c.APIKey = "api_key"
+		c.RoutingKey = "routing_key"
+		vo := victorops.NewService(c, logService.NewLogger("[test_vo] ", log.LstdFlags))
+		tm.VictorOpsService = vo
+	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
 
-	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
-	if err != nil {
-		t.Error(err)
+	exp := []interface{}{
+		victoropstest.Request{
+			URL: "/api_key/test_key",
+			PostData: victoropstest.PostData{
+				MessageType:    "CRITICAL",
+				EntityID:       "kapacitor/cpu/serverA",
+				StateMessage:   "kapacitor/cpu/serverA is CRITICAL",
+				Timestamp:      31536010,
+				MonitoringTool: "kapacitor",
+				Data:           `{"Series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}],"Messages":null,"Err":null}`,
+			},
+		},
+		victoropstest.Request{
+			URL: "/api_key/test_key2",
+			PostData: victoropstest.PostData{
+				MessageType:    "CRITICAL",
+				EntityID:       "kapacitor/cpu/serverA",
+				StateMessage:   "kapacitor/cpu/serverA is CRITICAL",
+				Timestamp:      31536010,
+				MonitoringTool: "kapacitor",
+				Data:           `{"Series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}],"Messages":null,"Err":null}`,
+			},
+		},
 	}
 
-	if got, exp := atomic.LoadInt32(&requestCount), int32(2); got != exp {
-		t.Errorf("unexpected requestCount got %d exp %d", got, exp)
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Requests() {
+		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+		t.Error(err)
 	}
 }
 
 func TestStream_AlertTalk(t *testing.T) {
-	requestCount := int32(0)
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&requestCount, 1)
-		type postData struct {
-			Title      string `json:"title"`
-			Text       string `json:"text"`
-			AuthorName string `json:"authorName"`
-		}
-		pd := postData{}
-		dec := json.NewDecoder(r.Body)
-		dec.Decode(&pd)
-
-		if exp := "Kapacitor"; pd.AuthorName != exp {
-			t.Errorf("unexpected source got %s exp %s", pd.AuthorName, exp)
-		}
-
-		if exp := "kapacitor/cpu/serverA is CRITICAL"; pd.Text != exp {
-			t.Errorf("unexpected text got %s exp %s", pd.Text, exp)
-		}
-
-		if exp := "kapacitor/cpu/serverA"; pd.Title != exp {
-			t.Errorf("unexpected text got %s exp %s", pd.Title, exp)
-		}
-
-	}))
+	ts := talktest.NewServer()
 	defer ts.Close()
 
 	var script = `
@@ -7241,25 +7150,38 @@ stream
 		.talk()
 `
 
-	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
-	defer tm.Close()
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := talk.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL
+		c.AuthorName = "Kapacitor"
+		sl := talk.NewService(c, logService.NewLogger("[test_talk] ", log.LstdFlags))
+		tm.TalkService = sl
+	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
 
-	c := talk.NewConfig()
-	c.Enabled = true
-	c.URL = ts.URL
-	c.AuthorName = "Kapacitor"
-	sl := talk.NewService(c, logService.NewLogger("[test_talk] ", log.LstdFlags))
-	tm.TalkService = sl
+	exp := []interface{}{
+		talktest.Request{
+			URL: "/",
+			PostData: talktest.PostData{
+				AuthorName: "Kapacitor",
+				Text:       "kapacitor/cpu/serverA is CRITICAL",
+				Title:      "kapacitor/cpu/serverA",
+			},
+		},
+	}
 
-	err := fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
-	if err != nil {
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Requests() {
+		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
 		t.Error(err)
 	}
-
-	if rc := atomic.LoadInt32(&requestCount); rc != 1 {
-		t.Errorf("unexpected requestCount got %d exp 1", rc)
-	}
 }
+
 func TestStream_AlertLog(t *testing.T) {
 	tmpDir, err := ioutil.TempDir("", "TestStream_AlertLog")
 	if err != nil {
@@ -7268,6 +7190,10 @@ func TestStream_AlertLog(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	normalPath := filepath.Join(tmpDir, "normal.log")
 	modePath := filepath.Join(tmpDir, "mode.log")
+
+	normal := alerttest.NewLog(normalPath)
+	mode := alerttest.NewLog(modePath)
+
 	var script = fmt.Sprintf(`
 stream
 	|from()
@@ -7280,6 +7206,7 @@ stream
 	|count('value')
 	|alert()
 		.id('kapacitor.{{ .Name }}.{{ index .Tags "host" }}')
+		.details('')
 		.info(lambda: "count" > 6.0)
 		.warn(lambda: "count" > 7.0)
 		.crit(lambda: "count" > 8.0)
@@ -7288,56 +7215,316 @@ stream
 			.mode(0644)
 `, normalPath, modePath)
 
-	clock, et, replayErr, tm := testStreamer(t, "TestStream_Alert", script, nil)
-	defer tm.Close()
+	expAD := []alertservice.AlertData{{
+		ID:      "kapacitor.cpu.serverA",
+		Message: "kapacitor.cpu.serverA is CRITICAL",
+		Time:    time.Date(1971, 01, 01, 0, 0, 10, 0, time.UTC),
+		Level:   alert.Critical,
+		Data: influxql.Result{
+			Series: imodels.Rows{
+				{
+					Name:    "cpu",
+					Tags:    map[string]string{"host": "serverA"},
+					Columns: []string{"time", "count"},
+					Values: [][]interface{}{[]interface{}{
+						time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC).Format(time.RFC3339Nano),
+						10.0,
+					}},
+				},
+			},
+		},
+	}}
 
-	err = fastForwardTask(clock, et, replayErr, tm, 13*time.Second)
-	if err != nil {
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, nil)
+
+	testLog := func(name string, expData []alertservice.AlertData, expMode os.FileMode, l *alerttest.Log) error {
+		m, err := l.Mode()
+		if err != nil {
+			return err
+		}
+		if got, exp := m, expMode; exp != got {
+			return fmt.Errorf("%s unexpected file mode: got %v exp %v", name, got, exp)
+		}
+		data, err := l.Data()
+		if err != nil {
+			return err
+		}
+		if got, exp := data, expData; !reflect.DeepEqual(got, exp) {
+			return fmt.Errorf("%s unexpected alert data written to log:\ngot\n%+v\nexp\n%+v\n", name, got, exp)
+		}
+		return nil
+	}
+
+	if err := testLog("normal", expAD, 0600, normal); err != nil {
+		t.Error(err)
+	}
+	if err := testLog("mode", expAD, 0644, mode); err != nil {
 		t.Error(err)
 	}
 
-	normal, err := os.Open(normalPath)
-	if err != nil {
-		t.Fatalf("missing log file for alert %v", err)
+}
+
+func TestStream_AlertExec(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor.{{ .Name }}.{{ index .Tags "host" }}')
+		.details('')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.exec('/bin/my-script', 'arg1', 'arg2')
+		.exec('/bin/my-other-script')
+`
+
+	expAD := alertservice.AlertData{
+		ID:      "kapacitor.cpu.serverA",
+		Message: "kapacitor.cpu.serverA is CRITICAL",
+		Time:    time.Date(1971, 01, 01, 0, 0, 10, 0, time.UTC),
+		Level:   alert.Critical,
+		Data: influxql.Result{
+			Series: imodels.Rows{
+				{
+					Name:    "cpu",
+					Tags:    map[string]string{"host": "serverA"},
+					Columns: []string{"time", "count"},
+					Values: [][]interface{}{[]interface{}{
+						time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC).Format(time.RFC3339Nano),
+						10.0,
+					}},
+				},
+			},
+		},
 	}
-	defer normal.Close()
-	if stat, err := normal.Stat(); err != nil {
+	expStdin, err := json.Marshal(expAD)
+	if err != nil {
 		t.Fatal(err)
-	} else if exp, got := os.FileMode(0600), stat.Mode(); exp != got {
-		t.Errorf("unexpected normal file mode: got %v exp %v", got, exp)
+	}
+	// Append trailing new line
+	expStdin = append(expStdin, '\n')
+
+	te := alerttest.NewExec()
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		tm.Commander = te.Commander
 	}
 
-	mode, err := os.Open(modePath)
-	if err != nil {
-		t.Fatalf("missing log file for alert %v", err)
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	expCmds := []interface{}{
+		&commandtest.Command{
+			Spec: command.Spec{
+				Prog: "/bin/my-script",
+				Args: []string{"arg1", "arg2"},
+			},
+			Started:   true,
+			Waited:    true,
+			Killed:    false,
+			StdinData: expStdin,
+		},
+		&commandtest.Command{
+			Spec: command.Spec{
+				Prog: "/bin/my-other-script",
+				Args: []string{},
+			},
+			Started:   true,
+			Waited:    true,
+			Killed:    false,
+			StdinData: expStdin,
+		},
 	}
-	defer mode.Close()
-	if stat, err := mode.Stat(); err != nil {
+
+	cmds := te.Commands()
+	cmdsI := make([]interface{}, len(cmds))
+	for i := range cmds {
+		cmdsI[i] = cmds[i]
+	}
+	if err := compareListIgnoreOrder(cmdsI, expCmds, func(got, exp interface{}) error {
+		g := got.(*commandtest.Command)
+		e := exp.(*commandtest.Command)
+		return e.Compare(g)
+	}); err != nil {
+		t.Error(err)
+	}
+
+	//for i := 0; i < 2; i++ {
+	//	select {
+	//	case cmd := <-cmdC:
+	//		cmd.Lock()
+	//		defer cmd.Unlock()
+
+	//		var err error
+	//		for j, info := range expInfo {
+	//			if got, exp := cmd.Info, info; reflect.DeepEqual(got, exp) {
+	//				// Found match remove it
+	//				if j == 0 {
+	//					expInfo = expInfo[1:]
+	//				} else {
+	//					expInfo = expInfo[:1]
+	//				}
+	//				err = nil
+	//				break
+	//			} else {
+	//				err = fmt.Errorf("%d unexpected command info:\ngot\n%+v\nexp\n%+v\n", i, got, exp)
+	//			}
+	//		}
+	//		if err != nil {
+	//			t.Error(err)
+	//		}
+
+	//		if !cmd.Started {
+	//			t.Errorf("%d expected command to have been started", i)
+	//		}
+	//		if !cmd.Waited {
+	//			t.Errorf("%d expected command to have waited", i)
+	//		}
+	//		if cmd.Killed {
+	//			t.Errorf("%d expected command not to have been killed", i)
+	//		}
+
+	//		ad := alertservice.AlertData{}
+	//		if err := json.Unmarshal(cmd.StdinData, &ad); err != nil {
+	//			t.Fatal(err)
+	//		}
+	//		if got, exp := ad, expAD; !reflect.DeepEqual(got, exp) {
+	//			t.Errorf("%d unexpected alert data sent to command:\ngot\n%+v\nexp\n%+v\n%s", i, got, exp, string(cmd.StdinData))
+	//		}
+	//	default:
+	//		t.Error("expected command to be created")
+	//	}
+	//}
+}
+
+func TestStream_AlertEmail(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor.{{ .Name }}.{{ index .Tags "host" }}')
+		.details('''
+<b>{{.Message}}</b>
+
+Value: {{ index .Fields "count" }}
+<a href="http://graphs.example.com/host/{{index .Tags "host"}}">Details</a>
+''')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.email('user1@example.com', 'user2@example.com')
+		.email()
+			.to('user1@example.com', 'user2@example.com')
+`
+
+	expMail := []*smtptest.Message{
+		{
+			Header: mail.Header{
+				"Mime-Version":              []string{"1.0"},
+				"Content-Type":              []string{"text/html; charset=UTF-8"},
+				"Content-Transfer-Encoding": []string{"quoted-printable"},
+				"To":      []string{"user1@example.com, user2@example.com"},
+				"From":    []string{"test@example.com"},
+				"Subject": []string{"kapacitor.cpu.serverA is CRITICAL"},
+			},
+			Body: `
+<b>kapacitor.cpu.serverA is CRITICAL</b>
+
+Value: 10
+<a href=3D"http://graphs.example.com/host/serverA">Details</a>
+`,
+		},
+		{
+			Header: mail.Header{
+				"Mime-Version":              []string{"1.0"},
+				"Content-Type":              []string{"text/html; charset=UTF-8"},
+				"Content-Transfer-Encoding": []string{"quoted-printable"},
+				"To":      []string{"user1@example.com, user2@example.com"},
+				"From":    []string{"test@example.com"},
+				"Subject": []string{"kapacitor.cpu.serverA is CRITICAL"},
+			},
+			Body: `
+<b>kapacitor.cpu.serverA is CRITICAL</b>
+
+Value: 10
+<a href=3D"http://graphs.example.com/host/serverA">Details</a>
+`,
+		},
+	}
+
+	smtpServer, err := smtptest.NewServer()
+	if err != nil {
 		t.Fatal(err)
-	} else if exp, got := os.FileMode(0644), stat.Mode(); exp != got {
-		t.Errorf("unexpected normal file mode: got %v exp %v", got, exp)
+	}
+	defer smtpServer.Close()
+	sc := smtp.Config{
+		Enabled: true,
+		Host:    smtpServer.Host,
+		Port:    smtpServer.Port,
+		From:    "test@example.com",
+	}
+	smtpService := smtp.NewService(sc, logService.NewLogger("[test-smtp] ", log.LstdFlags))
+	if err := smtpService.Open(); err != nil {
+		t.Fatal(err)
+	}
+	defer smtpService.Close()
+
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		tm.SMTPService = smtpService
+	}
+
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	smtpServer.Close()
+
+	errors := smtpServer.Errors()
+	if got, exp := len(errors), 0; got != exp {
+		t.Errorf("unexpected smtp server errors: %v", errors)
+	}
+
+	msgs := smtpServer.SentMessages()
+	if got, exp := len(msgs), len(expMail); got != exp {
+		t.Errorf("unexpected number of messages sent: got %d exp %d", got, exp)
+	}
+	for i, exp := range expMail {
+		got := msgs[i]
+		if err := exp.Compare(got); err != nil {
+			t.Errorf("%d %s", i, err)
+		}
 	}
 }
 
 func TestStream_AlertSigma(t *testing.T) {
 	requestCount := int32(0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ad := kapacitor.AlertData{}
+		ad := alertservice.AlertData{}
 		dec := json.NewDecoder(r.Body)
 		err := dec.Decode(&ad)
 		if err != nil {
 			t.Fatal(err)
 		}
-		var expAd kapacitor.AlertData
+		var expAd alertservice.AlertData
 		atomic.AddInt32(&requestCount, 1)
 		rc := atomic.LoadInt32(&requestCount)
 		if rc := atomic.LoadInt32(&requestCount); rc == 1 {
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:      "cpu:nil",
 				Message: "cpu:nil is INFO",
 				Details: "cpu:nil is INFO",
 				Time:    time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
-				Level:   kapacitor.InfoAlert,
+				Level:   alert.Info,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -7354,13 +7541,13 @@ func TestStream_AlertSigma(t *testing.T) {
 				},
 			}
 		} else {
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "cpu:nil",
 				Message:  "cpu:nil is OK",
 				Details:  "cpu:nil is OK",
 				Time:     time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 				Duration: time.Second,
-				Level:    kapacitor.OKAlert,
+				Level:    alert.OK,
 				Data: influxql.Result{
 					Series: imodels.Rows{
 						{
@@ -7410,19 +7597,19 @@ func TestStream_AlertComplexWhere(t *testing.T) {
 
 	requestCount := int32(0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ad := kapacitor.AlertData{}
+		ad := alertservice.AlertData{}
 		dec := json.NewDecoder(r.Body)
 		err := dec.Decode(&ad)
 		if err != nil {
 			t.Fatal(err)
 		}
 		atomic.AddInt32(&requestCount, 1)
-		expAd := kapacitor.AlertData{
+		expAd := alertservice.AlertData{
 			ID:      "cpu:nil",
 			Message: "cpu:nil is CRITICAL",
 			Details: "",
 			Time:    time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
-			Level:   kapacitor.CritAlert,
+			Level:   alert.Critical,
 			Data: influxql.Result{
 				Series: imodels.Rows{
 					{
@@ -7489,7 +7676,7 @@ func TestStream_AlertStateChangesOnlyExpired(t *testing.T) {
 
 	requestCount := int32(0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ad := kapacitor.AlertData{}
+		ad := alertservice.AlertData{}
 		dec := json.NewDecoder(r.Body)
 		err := dec.Decode(&ad)
 		if err != nil {
@@ -7497,24 +7684,24 @@ func TestStream_AlertStateChangesOnlyExpired(t *testing.T) {
 		}
 		//We don't care about the data for this test
 		ad.Data = influxql.Result{}
-		var expAd kapacitor.AlertData
+		var expAd alertservice.AlertData
 		atomic.AddInt32(&requestCount, 1)
 		rc := atomic.LoadInt32(&requestCount)
 		if rc < 6 {
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "cpu:nil",
 				Message:  "cpu:nil is CRITICAL",
 				Time:     time.Date(1971, 1, 1, 0, 0, int(rc)*2-1, 0, time.UTC),
 				Duration: time.Duration(rc-1) * 2 * time.Second,
-				Level:    kapacitor.CritAlert,
+				Level:    alert.Critical,
 			}
 		} else {
-			expAd = kapacitor.AlertData{
+			expAd = alertservice.AlertData{
 				ID:       "cpu:nil",
 				Message:  "cpu:nil is OK",
 				Time:     time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 				Duration: 9 * time.Second,
-				Level:    kapacitor.OKAlert,
+				Level:    alert.OK,
 			}
 		}
 		if eq, msg := compareAlertData(expAd, ad); !eq {
@@ -7863,7 +8050,7 @@ stream
 
 	// Create a new execution env
 	tm := kapacitor.NewTaskMaster("testStreamer", logService)
-	tm.HTTPDService = httpService
+	tm.HTTPDService = newHTTPDService()
 	tm.TaskStore = taskStore{}
 	tm.DeadmanService = deadman{}
 	tm.InfluxDBService = influxdb
@@ -7923,7 +8110,7 @@ stream
 
 	// Create a new execution env
 	tm := kapacitor.NewTaskMaster("testStreamer", logService)
-	tm.HTTPDService = httpService
+	tm.HTTPDService = newHTTPDService()
 	tm.TaskStore = taskStore{}
 	tm.DeadmanService = deadman{}
 	tm.InfluxDBService = influxdb
@@ -8126,9 +8313,17 @@ func testStreamer(
 
 	// Create a new execution env
 	tm := kapacitor.NewTaskMaster("testStreamer", logService)
-	tm.HTTPDService = httpService
+	httpdService := newHTTPDService()
+	tm.HTTPDService = httpdService
 	tm.TaskStore = taskStore{}
 	tm.DeadmanService = deadman{}
+	as := alertservice.NewService(alertservice.NewConfig(), logService.NewLogger("[alert] ", log.LstdFlags))
+	as.StorageService = storagetest.New()
+	as.HTTPDService = httpdService
+	if err := as.Open(); err != nil {
+		t.Fatal(err)
+	}
+	tm.AlertService = as
 	if tmInit != nil {
 		tmInit(tm)
 	}
@@ -8244,4 +8439,34 @@ func testStreamerWithOutput(
 			t.Error(msg)
 		}
 	}
+}
+
+func compareListIgnoreOrder(got, exp []interface{}, cmpF func(got, exp interface{}) error) error {
+	if len(got) != len(exp) {
+		return fmt.Errorf("unexpected count got %d exp %d", len(got), len(exp))
+	}
+
+	if cmpF == nil {
+		cmpF = func(got, exp interface{}) error {
+			if !reflect.DeepEqual(got, exp) {
+				return fmt.Errorf("\ngot\n%+v\nexp\n%+v\n", got, exp)
+			}
+			return nil
+		}
+	}
+
+	for _, e := range exp {
+		found := false
+		var err error
+		for _, g := range got {
+			if err = cmpF(g, e); err == nil {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return err
+		}
+	}
+	return nil
 }

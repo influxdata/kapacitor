@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -12,6 +11,16 @@ import (
 	"net/url"
 	"path"
 	"sync/atomic"
+	text "text/template"
+
+	"github.com/influxdata/kapacitor/alert"
+	"github.com/pkg/errors"
+)
+
+const (
+	defaultResource = "{{ .Name }}"
+	defaultEvent    = "{{ .ID }}"
+	defaultGroup    = "{{ .Group }}"
 )
 
 type Service struct {
@@ -198,4 +207,198 @@ func (s *Service) preparePost(token, resource, event, environment, severity, gro
 	}
 
 	return req, nil
+}
+
+type HandlerConfig struct {
+	// Alerta authentication token.
+	// If empty uses the token from the configuration.
+	Token string `mapstructure:"token"`
+
+	// Alerta resource.
+	// Can be a template and has access to the same data as the AlertNode.Details property.
+	// Default: {{ .Name }}
+	Resource string `mapstructure:"resource"`
+
+	// Alerta event.
+	// Can be a template and has access to the same data as the idInfo property.
+	// Default: {{ .ID }}
+	Event string `mapstructure:"event"`
+
+	// Alerta environment.
+	// Can be a template and has access to the same data as the AlertNode.Details property.
+	// Defaut is set from the configuration.
+	Environment string `mapstructure:"environment"`
+
+	// Alerta group.
+	// Can be a template and has access to the same data as the AlertNode.Details property.
+	// Default: {{ .Group }}
+	Group string `mapstructure:"group"`
+
+	// Alerta value.
+	// Can be a template and has access to the same data as the AlertNode.Details property.
+	// Default is an empty string.
+	Value string `mapstructure:"value"`
+
+	// Alerta origin.
+	// If empty uses the origin from the configuration.
+	Origin string `mapstructure:"origin"`
+
+	// List of effected Services
+	Service []string `mapstructure:"service"`
+}
+
+type handler struct {
+	s      *Service
+	c      HandlerConfig
+	logger *log.Logger
+
+	resourceTmpl    *text.Template
+	eventTmpl       *text.Template
+	environmentTmpl *text.Template
+	valueTmpl       *text.Template
+	groupTmpl       *text.Template
+}
+
+func (s *Service) DefaultHandlerConfig() HandlerConfig {
+	return HandlerConfig{
+		Resource: defaultResource,
+		Event:    defaultEvent,
+		Group:    defaultGroup,
+	}
+}
+
+func (s *Service) Handler(c HandlerConfig, l *log.Logger) (alert.Handler, error) {
+	// Parse and validate alerta templates
+	rtmpl, err := text.New("resource").Parse(c.Resource)
+	if err != nil {
+		return nil, err
+	}
+	evtmpl, err := text.New("event").Parse(c.Event)
+	if err != nil {
+		return nil, err
+	}
+	etmpl, err := text.New("environment").Parse(c.Environment)
+	if err != nil {
+		return nil, err
+	}
+	gtmpl, err := text.New("group").Parse(c.Group)
+	if err != nil {
+		return nil, err
+	}
+	vtmpl, err := text.New("value").Parse(c.Value)
+	if err != nil {
+		return nil, err
+	}
+	return &handler{
+		s:               s,
+		c:               c,
+		logger:          l,
+		resourceTmpl:    rtmpl,
+		eventTmpl:       evtmpl,
+		environmentTmpl: etmpl,
+		groupTmpl:       gtmpl,
+		valueTmpl:       vtmpl,
+	}, nil
+}
+
+type eventData struct {
+	ID string
+	// Measurement name
+	Name string
+
+	// Task name
+	TaskName string
+
+	// Concatenation of all group-by tags of the form [key=value,]+.
+	// If not groupBy is performed equal to literal 'nil'
+	Group string
+
+	// Map of tags
+	Tags map[string]string
+}
+
+func (h *handler) Handle(event alert.Event) {
+	td := event.TemplateData()
+	var buf bytes.Buffer
+	err := h.resourceTmpl.Execute(&buf, td)
+	if err != nil {
+		h.logger.Printf("E! failed to evaluate Alerta Resource template %s: %v", h.c.Resource, err)
+		return
+	}
+	resource := buf.String()
+	buf.Reset()
+
+	data := eventData{
+		ID:       td.ID,
+		Name:     td.Name,
+		TaskName: td.TaskName,
+		Group:    td.Group,
+		Tags:     td.Tags,
+	}
+	err = h.eventTmpl.Execute(&buf, data)
+	if err != nil {
+		h.logger.Printf("E! failed to evaluate Alerta Event template %s: %v", h.c.Event, err)
+		return
+	}
+	eventStr := buf.String()
+	buf.Reset()
+
+	err = h.environmentTmpl.Execute(&buf, td)
+	if err != nil {
+		h.logger.Printf("E! failed to evaluate Alerta Environment template %s: %v", h.c.Environment, err)
+		return
+	}
+	environment := buf.String()
+	buf.Reset()
+
+	err = h.groupTmpl.Execute(&buf, td)
+	if err != nil {
+		h.logger.Printf("E! failed to evaluate Alerta Group template %s: %v", h.c.Group, err)
+		return
+	}
+	group := buf.String()
+	buf.Reset()
+
+	err = h.valueTmpl.Execute(&buf, td)
+	if err != nil {
+		h.logger.Printf("E! failed to evaluate Alerta Value template %s: %v", h.c.Value, err)
+		return
+	}
+	value := buf.String()
+
+	service := h.c.Service
+	if len(service) == 0 {
+		service = []string{td.Name}
+	}
+
+	var severity string
+
+	switch event.State.Level {
+	case alert.OK:
+		severity = "ok"
+	case alert.Info:
+		severity = "informational"
+	case alert.Warning:
+		severity = "warning"
+	case alert.Critical:
+		severity = "critical"
+	default:
+		severity = "indeterminate"
+	}
+
+	if err := h.s.Alert(
+		h.c.Token,
+		resource,
+		eventStr,
+		environment,
+		severity,
+		group,
+		value,
+		event.State.Message,
+		h.c.Origin,
+		service,
+		event.Data.Result,
+	); err != nil {
+		h.logger.Printf("E! failed to send event to Alerta: %v", err)
+	}
 }

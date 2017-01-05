@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/alert"
 )
 
 type Service struct {
@@ -134,7 +134,7 @@ func (s *Service) preparePost(teams []string, recipients []string, messageType, 
 	ogData["alias"] = entityID
 	ogData["message"] = message
 	ogData["note"] = ""
-	ogData["monitoring_tool"] = kapacitor.Product
+	ogData["monitoring_tool"] = "kapacitor"
 
 	//Extra Fields (can be used for filtering)
 	ogDetails := make(map[string]interface{})
@@ -182,4 +182,47 @@ func (s *Service) preparePost(teams []string, recipients []string, messageType, 
 	}
 
 	return url, &post, nil
+}
+
+type HandlerConfig struct {
+	// OpsGenie Teams.
+	TeamsList []string `mapstructure:"teams-list"`
+
+	// OpsGenie Recipients.
+	RecipientsList []string `mapstructure:"recipients-list"`
+}
+
+type handler struct {
+	s      *Service
+	c      HandlerConfig
+	logger *log.Logger
+}
+
+func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+	return &handler{
+		s:      s,
+		c:      c,
+		logger: l,
+	}
+}
+
+func (h *handler) Handle(event alert.Event) {
+	var messageType string
+	switch event.State.Level {
+	case alert.OK:
+		messageType = "RECOVERY"
+	default:
+		messageType = event.State.Level.String()
+	}
+	if err := h.s.Alert(
+		h.c.TeamsList,
+		h.c.RecipientsList,
+		messageType,
+		event.State.Message,
+		event.State.ID,
+		event.State.Time,
+		event.Data.Result,
+	); err != nil {
+		h.logger.Println("E! failed to send event to OpsGenie", err)
+	}
 }

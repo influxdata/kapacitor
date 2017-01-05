@@ -115,7 +115,6 @@ func (s *Service) Open() error {
 	// Define API routes
 	s.routes = []httpd.Route{
 		{
-			Name:        "subscriptions",
 			Method:      "POST",
 			Pattern:     subscriptionsPath,
 			HandlerFunc: s.handleSubscriptions,

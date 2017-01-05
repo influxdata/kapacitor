@@ -6,6 +6,7 @@
 * [Templates](#templates)
 * [Recordings](#recordings)
 * [Replays](#replays)
+* [Alerts](#alerts)
 * [Configuration](#configuration)
 * [Testing Services](#testing-services)
 * [Miscellaneous](#miscellaneous)
@@ -61,6 +62,26 @@ This way you can control the meaning of the IDs.
 If you do not specify an ID a random UUID will be generated for the resource.
 
 All IDs must match this regex `^[-\._\p{L}0-9]+$`, which is essentially numbers, unicode letters, '-', '.' and '_'.
+
+
+### Backwards Compatibility
+
+Currently Kapacitor is in 1.x release with a guarantee that all new releases will be backwards compatible with previous releases.
+This applies directly to the API. New additions may be made to the API but existing endpoints will not be changed in backwards incompatible ways during the 1.x releases.
+
+### Technical Preview
+
+On occasion when a new feature is added to Kapacitor it may be added in a technical preview for a few minor releases and then later promoted to fully fledged v1 feature.
+Preview means that the newly added features may be changed in backwards incompatible ways until they are promoted to v1 features.
+Using technical preview allows for new features to fully mature while maintaining regularly scheduled releases.
+
+To make it clear which features of the API are in technical preview the base path `/kapacitor/v1preview` is used.
+If you wish to preview some of these new features, simply use the path `/kapacitor/v1preview` instead of `/kapacitor/v1` for your requests.
+All v1 endpoints are available under the v1preview path so that your client need not be configured with multiple paths.
+The technical preview endpoints are only available under the v1preview path.
+
+
+>NOTE: Using a technical preview means that you may have to update your client for breaking changes to the previewed endpoints.
 
 ## Writing Data
 
@@ -404,7 +425,7 @@ GET /kapacitor/v1/tasks
 Optionally specify a glob `pattern` to list only matching tasks.
 
 ```
-GET /kapacitor/v1/task?pattern=TASK*
+GET /kapacitor/v1/tasks?pattern=TASK*
 ```
 
 ```json
@@ -1339,6 +1360,419 @@ GET /kapacitor/v1/replays
         }
     ]
 }
+```
+
+## Alerts
+
+Kapacitor can generate and handle alerts.
+The API allows you to see the current state of any alert and to configure various handlers for the alerts.
+
+>NOTE: All API endpoints related to alerts are in a technical preview.
+Meaning that they are subject to change in the future until the technical preview is completed.
+As such the URL for the endpoints uses the base path `/kapacitor/v1preview`.
+Once the technical preview is deemed complete the endpoint paths will be promoted to use the v1 `/kapacitor/v1` base path.
+
+### Topics
+
+Alerts are grouped into topics.
+An alert handler "listens" on a topic for any new events.
+You can either specify the alert topic in the TICKscript or one will be generated for you.
+
+To query the list of available topics make a GET requests to `/kapacitor/v1preview/alerts/topics`.
+
+| Query Parameter | Default | Purpose                                                                                                                                                            |
+| --------------- | ------- | -------                                                                                                                                                            |
+| min-level       | OK      | Only return topics that are greater or equal to the min-level. Valid values include OK, INFO, WARNING, CRITICAL.                                                   |
+| pattern         | *       | Filter results based on the pattern. Uses standard shell glob matching on the topic ID, see [this](https://golang.org/pkg/path/filepath/#Match) for more details. |
+
+
+#### Example
+
+Get all topics.
+
+```
+GET /kapacitor/v1preview/alerts/topics
+```
+
+```
+{
+    "link": {"rel":"self","href":"/kapacitor/v1preview/alerts/topics"},
+    "topics": [
+        {
+            "link": {"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system"},
+            "events-link" : {"rel":"events","href":"/kapacitor/v1preview/alerts/topics/system/events"},
+            "handlers-link": {"rel":"handlers","href":"/kapacitor/v1preview/alerts/topics/system/handlers"},
+            "id": "system",
+            "level":"CRITICAL"
+        },
+        {
+            "link": {"rel":"self","href":"/kapacitor/v1preview/alerts/topics/app"},
+            "events-link" : {"rel":"events","href":"/kapacitor/v1preview/alerts/topics/app/events"},
+            "handlers-link": {"rel":"handlers","href":"/kapacitor/v1preview/alerts/topics/app/handlers"},
+            "id": "app",
+            "level":"OK"
+        }
+    ]
+}
+```
+
+Get all topics in a WARNING or CRITICAL state.
+
+
+```
+GET /kapacitor/v1preview/alerts/topics?min-level=WARNING
+```
+
+```
+{
+    "link": {"rel":"self","href":"/kapacitor/v1preview/alerts/topics"},
+    "topics": [
+        {
+            "link": {"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system"},
+            "events-link" : {"rel":"events","href":"/kapacitor/v1preview/alerts/topics/system/events"},
+            "handlers-link": {"rel":"handlers","href":"/kapacitor/v1preview/alerts/topics/system/handlers"},
+            "id": "system",
+            "level":"CRITICAL"
+        }
+    ]
+}
+```
+
+### Topic Status
+
+To query the status of a topic make a GET request to `/kapacitor/v1preview/alerts/topics/<topic id>`.
+
+#### Example
+
+```
+GET /kapacitor/v1preview/alerts/topics/system
+```
+
+```
+{
+    "link": {"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system"},
+    "id": "system",
+    "level":"CRITICAL"
+    "events-link" : {"rel":"events","href":"/kapacitor/v1preview/alerts/topics/system/events"},
+    "handlers-link": {"rel":"handlers","href":"/kapacitor/v1preview/alerts/topics/system/handlers"},
+}
+```
+
+### All Topic Events
+
+To query all the events within a topic make a GET request to `/kapacitor/v1preview/alerts/topics/<topic id>/events`.
+
+| Query Parameter | Default | Purpose                                                                                                          |
+| --------------- | ------- | -------                                                                                                          |
+| min-level       | OK      | Only return events that are greater or equal to the min-level. Valid values include OK, INFO, WARNING, CRITICAL. |
+
+#### Example
+
+```
+GET /kapacitor/v1preview/alerts/topics/system/events
+```
+
+```
+{
+    "link": {"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/events"},
+    "topic": "system",
+    "events": [
+        {
+            "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/events/cpu"},
+            "id": "cpu",
+            "state": {
+                "level": "WARNING",
+                "message": "cpu is WARNING",
+                "time": "2016-12-01T00:00:00Z",
+                "duration": "5m"
+            }
+        },
+        {
+            "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/events/mem"},
+            "id": "mem",
+            "state": {
+                "level": "CRITICAL",
+                "message": "mem is CRITICAL",
+                "time": "2016-12-01T00:10:00Z",
+                "duration": "1m"
+            }
+        }
+    ]
+}
+```
+
+### Specific Topic Event
+
+You can query a specific event within a topic by making a GET request to `/kapacitor/v1preview/alerts/topics/<topic id>/events/<event id>`.
+
+#### Example
+
+```
+GET /kapacitor/v1preview/alerts/topics/system/events/cpu
+```
+
+```
+{
+    "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/events/cpu"},
+    "id": "cpu",
+    "state": {
+        "level": "WARNING",
+        "message": "cpu is WARNING",
+        "time": "2016-12-01T00:00:00Z",
+        "duration": "5m"
+    }
+}
+```
+
+### Topic Handlers
+
+Handlers are created independent of a topic but are associated with a topic.
+You can get a list of handlers configured for a topic by making a GET request to `/kapacitor/v1preview/alerts/topics/<topic id>/handlers`.
+
+>NOTE: Anonymous handlers (created automatically from TICKscripts) will not be listed under their associated anonymous topic as they are not configured via the API.
+
+#### Example
+
+
+Get the handlers for the `system` topic.
+
+```
+GET /kapacitor/v1preview/alerts/topics/system/handlers
+```
+
+```
+{
+    "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/handlers"},
+    "topic": "system",
+    "handlers": [
+        {
+            "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/handlers/slack"},
+            "id":"slack",
+            "topics": ["system", "app"],
+            "actions": [{
+                "kind":"slack",
+                "options":{
+                    "channel":"#alerts"
+                }
+            }]
+        },
+        {
+            "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/handlers/smtp"},
+            "id":"smtp",
+            "topics": ["system", "app"],
+            "actions": [{
+                "kind":"smtp"
+            }]
+        }
+    ]
+}
+```
+
+This `main:alert_cpu:alert5` topic represents an auto-generated topic from a task that has defined handlers explicitly in the TICKscript.
+Anonymous handlers cannot be listed or modified via the API.
+
+```
+GET /kapacitor/v1preview/alerts/topics/main:alert_cpu:alert5/handlers
+```
+
+```
+{
+    "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/handlers"},
+    "topic": "main:alert_cpu:alert5",
+    "handlers": null
+}
+```
+
+### Creating and Removing Topics
+
+Topics are created dynamically for you when they referenced in TICKscripts or in handlers.
+To delete a topic make a `DELETE` request to `/kapacitor/v1preview/alerts/topics/<topic id>`.
+This will delete all known events and state for the topic.
+
+>NOTE: Since topics are dynamically created, a topic may return after having deleted it, if a new event is created for the topic.
+
+
+#### Example
+
+```
+DELETE /kapacitor/v1preview/alerts/topics/system
+```
+
+
+### List Handlers
+
+To query information about all handlers independent of a given topic make a GET request to `/kapacitor/v1preview/alerts/handlers`.
+
+| Query Parameter | Default | Purpose                                                                                                                                                               |
+| --------------- | ------- | -------                                                                                                                                                               |
+| pattern         | *       | Filter results based on the pattern. Uses standard shell glob matching on the service name, see [this](https://golang.org/pkg/path/filepath/#Match) for more details. |
+
+#### Example
+
+```
+GET /kapacitor/v1preview/alerts/handlers
+```
+
+```
+{
+    "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/handlers"},
+    "handlers": [
+        {
+            "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/handlers/slack"},
+            "id":"slack",
+            "topics": ["system", "app"],
+            "actions": [{
+                "kind":"slack",
+                "options": {
+                    "channel":"#alerts"
+                }
+            }]
+        },
+        {
+            "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/handlers/smtp"},
+            "id":"smtp",
+            "topics": ["system", "app"],
+            "actions": [{
+                "kind":"smtp"
+            }]
+        }
+    ]
+}
+```
+
+### Get a Handler
+
+To query information about a specific handler make a GET request to `/kapacitor/v1preview/alerts/handlers/<handler id>`.
+
+#### Example
+
+```
+GET /kapacitor/v1preview/alerts/handlers/slack
+```
+
+```
+{
+    "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/handlers/slack"},
+    "id":"slack",
+    "topics": ["system", "app"],
+    "actions": [{
+        "kind":"slack",
+        "options": {
+            "channel":"#alerts"
+        }
+    }]
+}
+```
+
+### Create a Handler
+
+To create a new handler make a POST request to `/kapacitor/v1preview/alerts/handlers`.
+
+```
+POST /kapacitor/v1preview/alerts/handlers
+{
+    "id":"slack",
+    "topics": ["system", "app"],
+    "actions": [{
+        "kind":"slack",
+        "options": {
+            "channel":"#alerts"
+        }
+    }]
+
+}
+```
+
+```
+{
+    "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/handlers/slack"},
+    "id": "slack",
+    "topics": ["system", "app"],
+    "actions": [{
+        "kind":"slack",
+        "options": {
+            "channel":"#alerts"
+        }
+    }]
+}
+```
+
+### Update a Handler
+
+To update an existing handler you can either make a PUT or PATCH request to `/kapacitor/v1preview/alerts/handlers/<handler id>`.
+
+Using PUT will replace the entire handler, by using PATCH specific parts of the handler can be modified.
+
+PATCH will apply JSON patch object to the existing handler, see [rfc6902](https://tools.ietf.org/html/rfc6902) for more details.
+
+#### Example
+
+Update the topics and actions for a handler using the PATCH method.
+
+```
+PATCH /kapacitor/v1preview/alerts/handlers/slack
+[
+    {"op":"replace", "path":"/topics", "value":["system", "test"]},
+    {"op":"replace", "path":"/actions/0/options/channel", "value":"#testing_alerts"}
+]
+```
+
+```
+{
+    "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/handlers/slack"},
+    "id": "slack",
+    "topics": ["system", "test"],
+    "actions": [
+        {
+            "kind":"slack",
+            "options": {
+                "channel":"#testing_alerts"
+            }
+        }
+    ]
+}
+```
+
+Replace an entire handler using the PUT method.
+
+```
+PUT /kapacitor/v1preview/alerts/handlers/slack
+{
+    "id": "slack",
+    "topics": ["system", "test"],
+    "actions": [
+        {
+            "kind":"slack",
+            "options": {
+                "channel":"#testing_alerts"
+            }
+        }
+    ]
+}
+```
+
+```
+{
+    "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/handlers/slack"},
+    "id": "slack",
+    "topics": ["system", "test"],
+    "actions": [
+        {
+            "kind":"slack",
+            "options": {
+                "channel":"#testing_alerts"
+            }
+        }
+    ]
+}
+```
+
+### Remove a Handler
+
+To remove an existing handler make a DELETE request to `/kapacitor/v1preview/alerts/handlers/<handler id>`.
+
+```
+DELETE /kapacitor/v1preview/alerts/handlers/<handler id>
 ```
 
 ## Configuration

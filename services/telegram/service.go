@@ -12,6 +12,7 @@ import (
 	"path"
 	"sync/atomic"
 
+	"github.com/influxdata/kapacitor/alert"
 	"github.com/pkg/errors"
 )
 
@@ -175,4 +176,48 @@ func (s *Service) preparePost(chatId, parseMode, message string, disableWebPageP
 	}
 	u.Path = path.Join(u.Path+c.Token, "sendMessage")
 	return u.String(), &post, nil
+}
+
+type HandlerConfig struct {
+	// Telegram user/group ID to post messages to.
+	// If empty uses the chati-d from the configuration.
+	ChatId string `mapstructure:"chat-id"`
+
+	// Parse node, defaults to Mardown
+	// If empty uses the parse-mode from the configuration.
+	ParseMode string `mapstructure:"parse-mode"`
+
+	// Web Page preview
+	// If empty uses the disable-web-page-preview from the configuration.
+	DisableWebPagePreview bool `mapstructure:"disable-web-page-preview"`
+
+	// Disables Notification
+	// If empty uses the disable-notification from the configuration.
+	DisableNotification bool `mapstructure:"disable-notification"`
+}
+
+type handler struct {
+	s      *Service
+	c      HandlerConfig
+	logger *log.Logger
+}
+
+func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+	return &handler{
+		s:      s,
+		c:      c,
+		logger: l,
+	}
+}
+
+func (h *handler) Handle(event alert.Event) {
+	if err := h.s.Alert(
+		h.c.ChatId,
+		h.c.ParseMode,
+		event.State.Message,
+		h.c.DisableWebPagePreview,
+		h.c.DisableNotification,
+	); err != nil {
+		h.logger.Println("E! failed to send event to Telegram", err)
+	}
 }

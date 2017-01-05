@@ -1,0 +1,11 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/evanphx/json-patch.git
+	branch = master
+	commit = 30afec6a1650c11c861dc1fb58e100cd5219e490
+	parent = 793eec80022a4099c569b56a2a62a5f39f0d9e3a
+	cmdver = 0.3.0

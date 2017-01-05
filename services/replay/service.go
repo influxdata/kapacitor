@@ -101,16 +101,22 @@ const replayNamespace = "replay_store"
 
 func (s *Service) Open() error {
 	// Create DAO
-	s.recordings = newRecordingKV(s.StorageService.Store(recordingNamespace))
-	s.replays = newReplayKV(s.StorageService.Store(replayNamespace))
-
-	err := os.MkdirAll(s.saveDir, 0755)
+	recordings, err := newRecordingKV(s.StorageService.Store(recordingNamespace))
 	if err != nil {
 		return err
 	}
-
-	err = s.syncRecordingMetadata()
+	s.recordings = recordings
+	replays, err := newReplayKV(s.StorageService.Store(replayNamespace))
 	if err != nil {
+		return err
+	}
+	s.replays = replays
+
+	if err := os.MkdirAll(s.saveDir, 0755); err != nil {
+		return err
+	}
+
+	if err := s.syncRecordingMetadata(); err != nil {
 		return err
 	}
 
@@ -122,85 +128,71 @@ func (s *Service) Open() error {
 	// Setup routes
 	s.routes = []httpd.Route{
 		{
-			Name:        "recording",
 			Method:      "GET",
 			Pattern:     recordingsPathAnchored,
 			HandlerFunc: s.handleRecording,
 		},
 		{
-			Name:        "deleteRecording",
 			Method:      "DELETE",
 			Pattern:     recordingsPathAnchored,
 			HandlerFunc: s.handleDeleteRecording,
 		},
 		{
-			Name:        "/recordings/-cors",
 			Method:      "OPTIONS",
 			Pattern:     recordingsPathAnchored,
 			HandlerFunc: httpd.ServeOptions,
 		},
 		{
-			Name:        "listRecordings",
 			Method:      "GET",
 			Pattern:     recordingsPath,
 			HandlerFunc: s.handleListRecordings,
 		},
 		{
-			Name:        "createRecording",
 			Method:      "POST",
 			Pattern:     recordStreamPath,
 			HandlerFunc: s.handleRecordStream,
 		},
 		{
-			Name:        "createRecording",
 			Method:      "POST",
 			Pattern:     recordBatchPath,
 			HandlerFunc: s.handleRecordBatch,
 		},
 		{
-			Name:        "createRecording",
 			Method:      "POST",
 			Pattern:     recordQueryPath,
 			HandlerFunc: s.handleRecordQuery,
 		},
 		{
-			Name:        "replay",
 			Method:      "GET",
 			Pattern:     replaysPathAnchored,
 			HandlerFunc: s.handleReplay,
 		},
 		{
-			Name:        "deleteReplay",
 			Method:      "DELETE",
 			Pattern:     replaysPathAnchored,
 			HandlerFunc: s.handleDeleteReplay,
 		},
 		{
-			Name:        "/replays/-cors",
 			Method:      "OPTIONS",
 			Pattern:     replaysPathAnchored,
 			HandlerFunc: httpd.ServeOptions,
 		},
 		{
-			Name:        "listReplays",
 			Method:      "GET",
 			Pattern:     replaysPath,
 			HandlerFunc: s.handleListReplays,
 		},
 		{
-			Name:        "createReplay",
 			Method:      "POST",
 			Pattern:     replaysPath,
 			HandlerFunc: s.handleCreateReplay,
 		},
 		{
-			Name:        "replayBatch",
 			Method:      "POST",
 			Pattern:     replayBatchPath,
 			HandlerFunc: s.handleReplayBatch,
 		},
 		{
-			Name:        "replayQuery",
 			Method:      "POST",
 			Pattern:     replayQueryPath,
 			HandlerFunc: s.handleReplayQuery,

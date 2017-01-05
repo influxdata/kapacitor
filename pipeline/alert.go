@@ -1,8 +1,6 @@
 package pipeline
 
 import (
-	"fmt"
-	"os"
 	"reflect"
 	"time"
 
@@ -20,9 +18,6 @@ const defaultMessageTmpl = "{{ .ID }} is {{ .Level }}"
 
 // Default template for constructing a details message.
 const defaultDetailsTmpl = "{{ json . }}"
-
-// Default log mode for file
-const defaultLogFileMode = 0600
 
 // An AlertNode can trigger an event of varying severity levels,
 // and pass the event to alert handlers. The criteria for triggering
@@ -121,6 +116,8 @@ const defaultLogFileMode = 0600
 //
 type AlertNode struct {
 	chainnode
+
+	Topic string
 
 	// Template for constructing a unique ID for a given alert.
 	//
@@ -350,15 +347,6 @@ func newAlertNode(wants EdgeType) *AlertNode {
 		Details:   defaultDetailsTmpl,
 	}
 	return a
-}
-
-func (n *AlertNode) validate() error {
-	for _, lh := range n.LogHandlers {
-		if err := lh.validate(); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 //tick:ignore
@@ -623,7 +611,6 @@ func (a *AlertNode) Log(filepath string) *LogHandler {
 	log := &LogHandler{
 		AlertNode: a,
 		FilePath:  filepath,
-		Mode:      defaultLogFileMode,
 	}
 	a.LogHandlers = append(a.LogHandlers, log)
 	return log
@@ -641,13 +628,6 @@ type LogHandler struct {
 	// File's mode and permissions, default is 0600
 	// NOTE: The leading 0 is required to interpret the value as an octal integer.
 	Mode int64
-}
-
-func (h *LogHandler) validate() error {
-	if os.FileMode(h.Mode).Perm()&0200 == 0 {
-		return fmt.Errorf("invalid file mode %o, must be user writable", h.Mode)
-	}
-	return nil
 }
 
 // Send alert to VictorOps.
@@ -880,17 +860,10 @@ type HipChatHandler struct {
 func (a *AlertNode) Alerta() *AlertaHandler {
 	alerta := &AlertaHandler{
 		AlertNode: a,
-		Resource:  defaultAlertaResource,
-		Event:     defaultAlertaEvent,
-		Group:     defaultAlertaGroup,
 	}
 	a.AlertaHandlers = append(a.AlertaHandlers, alerta)
 	return alerta
 }
-
-const defaultAlertaResource = "{{ .Name }}"
-const defaultAlertaEvent = "{{ .ID }}"
-const defaultAlertaGroup = "{{ .Group }}"
 
 // tick:embedded:AlertNode.Alerta
 type AlertaHandler struct {

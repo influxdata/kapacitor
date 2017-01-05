@@ -274,6 +274,10 @@ func (s *Service) AddRoutes(routes []Route) error {
 	return s.Handler.AddRoutes(routes)
 }
 
+func (s *Service) AddPreviewRoutes(routes []Route) error {
+	return s.Handler.AddPreviewRoutes(routes)
+}
+
 func (s *Service) DelRoutes(routes []Route) {
 	s.Handler.DelRoutes(routes)
 }

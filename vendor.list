@@ -1,8 +1,10 @@
 github.com/BurntSushi/toml
 github.com/boltdb/bolt
 github.com/cenkalti/backoff
+github.com/davecgh/go-spew
 github.com/dgrijalva/jwt-go v3.0.0
 github.com/dustin/go-humanize
+github.com/evanphx/json-patch
 github.com/gogo/protobuf
 github.com/golang/protobuf
 github.com/gorhill/cronexpr
@@ -11,6 +13,7 @@ github.com/influxdata/usage-client
 github.com/kimor79/gollectd
 github.com/mattn/go-runewidth
 github.com/mitchellh/copystructure
+github.com/mitchellh/mapstructure
 github.com/mitchellh/reflectwalk
 github.com/pkg/errors
 github.com/russross/blackfriday
@@ -21,6 +24,7 @@ github.com/shurcooL/sanitized_anchor_name
 github.com/twinj/uuid
 golang.org/x/crypto master
 gopkg.in/gomail.v2
+gopkg.in/yaml.v2
 # Generate deps
 github.com/benbjohnson/tmpl
 # Testing deps
