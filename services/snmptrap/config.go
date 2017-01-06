@@ -1,41 +1,29 @@
 package snmptrap
 
-import (
-	"github.com/influxdata/kapacitor"
-	"github.com/pkg/errors"
-)
+import "errors"
 
 type Config struct {
 	// Whether Snmptrap is enabled.
 	Enabled bool `toml:"enabled" override:"enabled"`
-	// NMS IP (Network Management Station).
-	TargetIp string `toml:"target-ip" override:"target-ip"`
-	// NMS port
-	TargetPort int `toml:"target-port" override:"target-port"`
+	// The host:port address of the SNMP trap server
+	Addr string `toml:"addr" override:"addr"`
 	// SNMP Community
-	Community string `toml:"community" override:"community"`
-	// SNMP Version
-	Version string `toml:"version" override:"version"`
-	// Whether all alerts should automatically post to snmptrap
-	Global bool `toml:"global" override:"global"`
-	// Whether all alerts should automatically use stateChangesOnly mode.
-	// Only applies if global is also set.
-	StateChangesOnly bool `toml:"state-changes-only" override:"state-changes-only"`
+	Community string `toml:"community" override:"community,redact"`
+	// Retries count for traps
+	Retries int `toml:"retries" override:"retries"`
 }
 
 func NewConfig() Config {
 	return Config{
-		Community: kapacitor.Product,
-		Version:   "2c",
+		Addr:      "localhost:162",
+		Community: "kapacitor",
+		Retries:   1,
 	}
 }
 
 func (c Config) Validate() error {
-	if c.Enabled && c.TargetIp == "" {
-		return errors.New("must specify target-ip")
-	}
-	if c.Enabled && c.TargetPort <= 0 {
-		return errors.New("must specify target-port")
+	if c.Enabled && c.Addr == "" {
+		return errors.New("must specify addr")
 	}
 	return nil
 }

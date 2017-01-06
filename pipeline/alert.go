@@ -1,10 +1,12 @@
 package pipeline
 
 import (
+	"fmt"
 	"reflect"
 	"time"
 
 	"github.com/influxdata/kapacitor/tick/ast"
+	"github.com/pkg/errors"
 )
 
 // Number of previous states to remember when computing flapping percentage.
@@ -39,6 +41,7 @@ const defaultDetailsTmpl = "{{ json . }}"
 //    * Alerta -- Post alert message to Alerta.
 //    * Sensu -- Post alert message to Sensu client.
 //    * Slack -- Post alert message to Slack channel.
+//    * SNMPTraps -- Trigger SNMP traps.
 //    * OpsGenie -- Send alert to OpsGenie.
 //    * VictorOps -- Send alert to VictorOps.
 //    * PagerDuty -- Send alert to PagerDuty.
@@ -339,7 +342,7 @@ type AlertNode struct {
 
 	// Send alert using SNMPtraps.
 	// tick:ignore
-	SnmpTrapHandlers []*SnmpTrapHandler `tick:"SnmpTrap"`
+	SNMPTrapHandlers []*SNMPTrapHandler `tick:"SnmpTrap"`
 }
 
 func newAlertNode(wants EdgeType) *AlertNode {
@@ -358,6 +361,15 @@ func (n *AlertNode) ChainMethods() map[string]reflect.Value {
 	return map[string]reflect.Value{
 		"Log": reflect.ValueOf(n.chainnode.Log),
 	}
+}
+
+func (n *AlertNode) validate() error {
+	for _, snmp := range n.SNMPTrapHandlers {
+		if err := snmp.validate(); err != nil {
+			return errors.Wrapf(err, "invalid SNMP trap %q", snmp.TrapOid)
+		}
+	}
+	return nil
 }
 
 // Indicates an alert should trigger only if all points in a batch match the criteria.
@@ -1246,69 +1258,92 @@ type TalkHandler struct {
 // Example:
 //    [snmptrap]
 //      enabled = true
-//      target-ip = "127.0.0.1"
-//      target-port = 9162
+//      addr = "127.0.0.1:9162"
 //      community = "public"
-//      version = "2c"
-//      state-changes-only = false
-//
-// In order to not post a message every alert interval
-// use AlertNode.StateChangesOnly so that only events
-// where the alert changed state are posted to the channel.
 //
 // Example:
 //    stream
 //         |alert()
-//             .snmpTrap()
-//             .data('1.3.6.1.2.1.1.7', 'i', '{{ index .Field "value" }}')
+//             .snmpTrap('1.1.1.')
+//                 .data('1.3.6.1.2.1.1.7', 'i', '{{ index .Field "value" }}')
 //
 // Send alerts to `target-ip:target-port` on OID '1.3.6.1.2.1.1.7'
 //
 // tick:property
-func (a *AlertNode) SnmpTrap(trapOid string, dataList ...[3]string) *SnmpTrapHandler {
-	snmpTrap := &SnmpTrapHandler{
+func (a *AlertNode) SnmpTrap(trapOid string) *SNMPTrapHandler {
+	snmpTrap := &SNMPTrapHandler{
 		AlertNode: a,
 		TrapOid:   trapOid,
-		DataList:  dataList,
 	}
-	a.SnmpTrapHandlers = append(a.SnmpTrapHandlers, snmpTrap)
+	a.SNMPTrapHandlers = append(a.SNMPTrapHandlers, snmpTrap)
 	return snmpTrap
 }
 
 // SNMPTrap AlertHandler
 // tick:embedded:AlertNode.SnmpTrap
-type SnmpTrapHandler struct {
+type SNMPTrapHandler struct {
 	*AlertNode
 
+	// TrapOid
+	// tick:ignore
 	TrapOid string
+
 	// List of trap data.
 	// tick:ignore
-	DataList [][3]string `tick:"Data"`
+	DataList []SNMPData `tick:"Data"`
+}
+
+// tick:ignore
+type SNMPData struct {
+	Oid   string
+	Type  string
+	Value string
 }
 
 // Define Data for SNMP Trap alert.
 // Multiple calls append to the existing list of data.
 //
+// Available types:
+//
+// | Abbreviation | Datatype   |
+// | ------------ | --------   |
+// | c            | Counter    |
+// | i            | Integer    |
+// | n            | Null       |
+// | s            | String     |
+// | t            | Time ticks |
+//
 // Example:
 //    |alert()
-//       .id('{{ .Name }}')
-//       // Email subject
 //       .meassage('{{ .ID }}:{{ .Level }}')
-//       //Email body as HTML
-//       .details('''
-//<h1>{{ .ID }}</h1>
-//<b>{{ .Message }}</b>
-//Value: {{ index .Fields "value" }}
-//''')
 //       .snmpTrap('1.3.6.1.4.1.1')
 //          .data('1.3.6.1.4.1.1.5', 's', '{{ .Level }}' )
-//          .data('1.3.6.1.4.1.1.6', 's', '50' )
-//          .data('1.3.6.1.4.1..1.7', 's', '{{ index .Fields "used_percent" }}' )
+//          .data('1.3.6.1.4.1.1.6', 'i', '50' )
+//          .data('1.3.6.1.4.1.1.7', 'c', '{{ index .Fields "num_requests" }}' )
+//          .data('1.3.6.1.4.1.1.8', 's', '{{ .Message }}' )
 //
 // tick:property
-func (h *SnmpTrapHandler) Data(oid, rawType, value string) *SnmpTrapHandler {
-	// TODO check element validity
-	data := [3]string{oid, rawType, value}
+func (h *SNMPTrapHandler) Data(oid, typ, value string) *SNMPTrapHandler {
+	data := SNMPData{
+		Oid:   oid,
+		Type:  typ,
+		Value: value,
+	}
 	h.DataList = append(h.DataList, data)
 	return h
+}
+
+func (h *SNMPTrapHandler) validate() error {
+	if h.TrapOid == "" {
+		return fmt.Errorf("you must supply a trap Oid")
+	}
+	for _, d := range h.DataList {
+		switch d.Type {
+		case "c", "i", "n", "s", "t":
+			// OK
+		default:
+			return fmt.Errorf("unsupported data type %q for data entry %q", d.Type, d.Oid)
+		}
+	}
+	return nil
 }

@@ -1,18 +1,23 @@
 package snmptrap
 
 import (
-	"errors"
+	"bytes"
 	"fmt"
 	"log"
 	"strconv"
+	"sync"
 	"sync/atomic"
+	text "text/template"
 
-	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/alert"
 	"github.com/k-sone/snmpgo"
+	"github.com/pkg/errors"
 )
 
 type Service struct {
 	configValue atomic.Value
+	clientMu    sync.Mutex
+	client      *snmpgo.SNMP
 	logger      *log.Logger
 }
 
@@ -25,15 +30,48 @@ func NewService(c Config, l *log.Logger) *Service {
 }
 
 func (s *Service) Open() error {
+	c := s.config()
+	if c.Enabled {
+		err := s.loadNewSNMPClient(c)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
 func (s *Service) Close() error {
+	s.closeClient()
 	return nil
+}
+
+func (s *Service) closeClient() {
+	s.clientMu.Lock()
+	defer s.clientMu.Unlock()
+	if s.client != nil {
+		s.client.Close()
+	}
+	s.client = nil
 }
 
 func (s *Service) config() Config {
 	return s.configValue.Load().(Config)
+}
+
+func (s *Service) loadNewSNMPClient(c Config) error {
+	snmp, err := snmpgo.NewSNMP(snmpgo.SNMPArguments{
+		Version:   snmpgo.V2c,
+		Address:   c.Addr,
+		Retries:   uint(c.Retries),
+		Community: c.Community,
+	})
+	if err != nil {
+		return errors.Wrap(err, "invalid SNMP configuration")
+	}
+	s.clientMu.Lock()
+	s.client = snmp
+	s.clientMu.Unlock()
+	return nil
 }
 
 func (s *Service) Update(newConfig []interface{}) error {
@@ -43,34 +81,35 @@ func (s *Service) Update(newConfig []interface{}) error {
 	if c, ok := newConfig[0].(Config); !ok {
 		return fmt.Errorf("expected config object to be of type %T, got %T", c, newConfig[0])
 	} else {
-		s.configValue.Store(c)
+		old := s.config()
+		if old != c {
+			if c.Enabled {
+				err := s.loadNewSNMPClient(c)
+				if err != nil {
+					return err
+				}
+			} else {
+				s.closeClient()
+			}
+			s.configValue.Store(c)
+		}
 	}
 	return nil
 }
 
-func (s *Service) Global() bool {
-	c := s.config()
-	return c.Global
-}
-
-func (s *Service) StateChangesOnly() bool {
-	c := s.config()
-	return c.StateChangesOnly
-}
-
 type testOptions struct {
-	TargetIp   string               `json:"target-ip"`
-	TargetPort int                  `json:"target-port"`
-	Community  string               `json:"community"`
-	Version    string               `json:"version"`
-	Message    string               `json:"message"`
-	Level      kapacitor.AlertLevel `json:"level"`
+	TrapOid  string `json:"trap-oid"`
+	DataList []Data `json:"data-list"`
 }
 
 func (s *Service) TestOptions() interface{} {
 	return &testOptions{
-		Message: "test snmptrap message",
-		Level:   kapacitor.CritAlert,
+		TrapOid: "1.1.1.1",
+		DataList: []Data{{
+			Oid:   "1.1.1.1.2",
+			Type:  "s",
+			Value: "test snmptrap message",
+		}},
 	}
 }
 
@@ -79,56 +118,36 @@ func (s *Service) Test(options interface{}) error {
 	if !ok {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
-	trapOid := "1.1.1.1"
-	var dataList [][3]string
-	var data [3]string
-	data[0] = "1.1.1.1.2"
-	data[1] = "s"
-	data[2] = "test msg"
-	dataList = append(dataList, data)
-	return s.Alert(trapOid, dataList, o.Level)
+	return s.Trap(o.TrapOid, o.DataList)
 }
 
-func (s *Service) Alert(trapOid string, dataList [][3]string, level kapacitor.AlertLevel) error {
+func (s *Service) Trap(trapOid string, dataList []Data) error {
 	c := s.config()
-	// SNMP target address
-	address := c.TargetIp + ":" + strconv.Itoa(c.TargetPort)
-	// SNMP version
-	var version snmpgo.SNMPVersion
-	switch c.Version {
-	case "1":
-		return errors.New("Version 1 not supported yet")
-	case "2c":
-		version = snmpgo.V2c
-	case "3":
-		return errors.New("Version 3 not supported yet")
-	default:
-		return errors.New("Bad snmp version should be: '1', '2c' or '3'")
+	if !c.Enabled {
+		return errors.New("service is not enabled")
 	}
-	// Create SNMP client
-	snmp, err := snmpgo.NewSNMP(snmpgo.SNMPArguments{
-		Version:   version,
-		Address:   address,
-		Retries:   1,
-		Community: c.Community,
-	})
 
-	var varBinds snmpgo.VarBinds
 	// Add trap oid
-	varBinds = append(varBinds, snmpgo.NewVarBind(snmpgo.OidSysUpTime, snmpgo.NewTimeTicks(1000)))
-	oid, _ := snmpgo.NewOid(trapOid)
-	varBinds = append(varBinds, snmpgo.NewVarBind(snmpgo.OidSnmpTrap, oid))
+	oid, err := snmpgo.NewOid(trapOid)
+	if err != nil {
+		return errors.Wrapf(err, "invalid trap Oid %q", trapOid)
+	}
+	varBinds := snmpgo.VarBinds{
+		snmpgo.NewVarBind(snmpgo.OidSnmpTrap, oid),
+	}
+
 	// Add Data
 	for _, data := range dataList {
-		oidStr := data[0]
-		oidTypeRaw := data[1]
-		oid, _ := snmpgo.NewOid(oidStr)
+		oid, err := snmpgo.NewOid(data.Oid)
+		if err != nil {
+			return errors.Wrapf(err, "invalid data Oid %q", data.Oid)
+		}
 		// http://docstore.mik.ua/orelly/networking_2ndEd/snmp/ch10_03.htm
-		switch oidTypeRaw {
+		switch data.Type {
 		case "a":
 			return errors.New("Snmptrap Datatype 'IP address' not supported")
 		case "c":
-			oidValue, err := strconv.ParseInt(data[2], 10, 64)
+			oidValue, err := strconv.ParseInt(data.Value, 10, 64)
 			if err != nil {
 				return err
 			}
@@ -136,7 +155,7 @@ func (s *Service) Alert(trapOid string, dataList [][3]string, level kapacitor.Al
 		case "d":
 			return errors.New("Snmptrap Datatype 'Decimal string' not supported")
 		case "i":
-			oidValue, err := strconv.ParseInt(data[2], 10, 64)
+			oidValue, err := strconv.ParseInt(data.Value, 10, 64)
 			if err != nil {
 				return err
 			}
@@ -146,10 +165,10 @@ func (s *Service) Alert(trapOid string, dataList [][3]string, level kapacitor.Al
 		case "o":
 			return errors.New("Snmptrap Datatype 'Object ID' not supported")
 		case "s":
-			oidValue := []byte(data[2])
+			oidValue := []byte(data.Value)
 			varBinds = append(varBinds, snmpgo.NewVarBind(oid, snmpgo.NewOctetString(oidValue)))
 		case "t":
-			oidValue, err := strconv.ParseInt(data[2], 10, 64)
+			oidValue, err := strconv.ParseInt(data.Value, 10, 64)
 			if err != nil {
 				return err
 			}
@@ -159,22 +178,69 @@ func (s *Service) Alert(trapOid string, dataList [][3]string, level kapacitor.Al
 		case "x":
 			return errors.New("Snmptrap Datatype 'Hexadecimal string' not supported")
 		default:
-			return errors.New("Snmptrap Datatype not supported: " + oidTypeRaw)
+			return fmt.Errorf("Snmptrap Datatype not known: %v", data.Type)
 		}
 	}
 
-	if err = snmp.Open(); err != nil {
-		// Failed to open connection
-		fmt.Println(err)
-		return err
+	s.clientMu.Lock()
+	defer s.clientMu.Unlock()
+	if err = s.client.V2Trap(varBinds); err != nil {
+		return errors.Wrap(err, "failed to send SNMP trap")
 	}
-	defer snmp.Close()
-
-	if err = snmp.V2Trap(varBinds); err != nil {
-		// Failed to request
-		fmt.Println(err)
-		return err
-	}
-
 	return nil
+}
+
+type HandlerConfig struct {
+	TrapOid  string `mapstructure:"trap-oid"`
+	DataList []Data `mapstructure:"data-list"`
+}
+
+type Data struct {
+	Oid   string `mapstructure:"oid" json:"oid"`
+	Type  string `mapstructure:"type" json:"type"`
+	Value string `mapstructure:"value" json:"value"`
+	tmpl  *text.Template
+}
+
+// handler provides the implementation of the alert.Handler interface for the Foo service.
+type handler struct {
+	s      *Service
+	c      HandlerConfig
+	logger *log.Logger
+}
+
+// Handler creates a handler from the config.
+func (s *Service) Handler(c HandlerConfig, l *log.Logger) (alert.Handler, error) {
+	// Compile data value templates
+	for i, d := range c.DataList {
+		tmpl, err := text.New("data").Parse(d.Value)
+		if err != nil {
+			return nil, err
+		}
+		c.DataList[i].tmpl = tmpl
+	}
+	return &handler{
+		s:      s,
+		c:      c,
+		logger: l,
+	}, nil
+}
+
+// Handle takes an event triggers an SNMP trap.
+func (h *handler) Handle(event alert.Event) {
+	// Execute templates
+	td := event.TemplateData()
+	var buf bytes.Buffer
+	for i, d := range h.c.DataList {
+		err := d.tmpl.Execute(&buf, td)
+		if err != nil {
+			h.logger.Println("E! failed to handle event", err)
+			return
+		}
+		h.c.DataList[i].Value = buf.String()
+		buf.Reset()
+	}
+	if err := h.s.Trap(h.c.TrapOid, h.c.DataList); err != nil {
+		h.logger.Println("E! failed to handle event", err)
+	}
 }

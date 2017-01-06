@@ -66,12 +66,12 @@ type Config struct {
 	OpsGenie  opsgenie.Config  `toml:"opsgenie" override:"opsgenie"`
 	PagerDuty pagerduty.Config `toml:"pagerduty" override:"pagerduty"`
 	SMTP      smtp.Config      `toml:"smtp" override:"smtp"`
+	SNMPTrap  snmptrap.Config  `toml:"snmptrap" override:"snmptrap"`
 	Sensu     sensu.Config     `toml:"sensu" override:"sensu"`
 	Slack     slack.Config     `toml:"slack" override:"slack"`
 	Talk      talk.Config      `toml:"talk" override:"talk"`
 	Telegram  telegram.Config  `toml:"telegram" override:"telegram"`
 	VictorOps victorops.Config `toml:"victorops" override:"victorops"`
-	SnmpTrap  snmptrap.Config  `toml:"snmptrap" override:"snmptrap"`
 
 	// Third-party integrations
 	Kubernetes k8s.Config `toml:"kubernetes" override:"kubernetes"`
@@ -117,7 +117,7 @@ func NewConfig() *Config {
 	c.Sensu = sensu.NewConfig()
 	c.Slack = slack.NewConfig()
 	c.Talk = talk.NewConfig()
-	c.SnmpTrap = snmptrap.NewConfig()
+	c.SNMPTrap = snmptrap.NewConfig()
 	c.Telegram = telegram.NewConfig()
 	c.VictorOps = victorops.NewConfig()
 
@@ -225,13 +225,13 @@ func (c *Config) Validate() error {
 	if err := c.SMTP.Validate(); err != nil {
 		return err
 	}
+	if err := c.SNMPTrap.Validate(); err != nil {
+		return err
+	}
 	if err := c.Sensu.Validate(); err != nil {
 		return err
 	}
 	if err := c.Slack.Validate(); err != nil {
-		return err
-	}
-	if err := c.SnmpTrap.Validate(); err != nil {
 		return err
 	}
 	if err := c.Talk.Validate(); err != nil {

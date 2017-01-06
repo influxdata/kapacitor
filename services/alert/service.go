@@ -22,6 +22,7 @@ import (
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
+	"github.com/influxdata/kapacitor/services/snmptrap"
 	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
@@ -109,6 +110,9 @@ type Service struct {
 	}
 	SMTPService interface {
 		Handler(smtp.HandlerConfig, *log.Logger) alert.Handler
+	}
+	SNMPTrapService interface {
+		Handler(snmptrap.HandlerConfig, *log.Logger) (alert.Handler, error)
 	}
 	TalkService interface {
 		Handler(*log.Logger) alert.Handler
@@ -977,6 +981,17 @@ func (s *Service) createHandlerActionFromSpec(spec HandlerActionSpec) (ha handle
 			return
 		}
 		h := s.SMTPService.Handler(c, s.logger)
+		ha = newPassThroughHandler(h)
+	case "snmptrap":
+		c := snmptrap.HandlerConfig{}
+		err = decodeOptions(spec.Options, &c)
+		if err != nil {
+			return
+		}
+		h, err := s.SNMPTrapService.Handler(c, s.logger)
+		if err != nil {
+			return nil, err
+		}
 		ha = newPassThroughHandler(h)
 	case "talk":
 		h := s.TalkService.Handler(s.logger)

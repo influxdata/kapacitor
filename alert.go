@@ -6,10 +6,7 @@ import (
 	"fmt"
 	html "html/template"
 	"log"
-	"net"
-	"net/http"
 	"os"
-	"os/exec"
 	"sync"
 	text "text/template"
 	"time"
@@ -26,6 +23,7 @@ import (
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
+	"github.com/influxdata/kapacitor/services/snmptrap"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/tick/stateful"
@@ -242,9 +240,24 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		an.handlers = append(an.handlers, h)
 	}
 
-	for _, snmpTrap := range n.SnmpTrapHandlers {
-		snmpTrap := snmpTrap
-		an.handlers = append(an.handlers, func(ad *AlertData) { an.handleSnmpTrap(snmpTrap, ad) })
+	for _, s := range n.SNMPTrapHandlers {
+		dataList := make([]snmptrap.Data, len(s.DataList))
+		for i, d := range s.DataList {
+			dataList[i] = snmptrap.Data{
+				Oid:   d.Oid,
+				Type:  d.Type,
+				Value: d.Value,
+			}
+		}
+		c := snmptrap.HandlerConfig{
+			TrapOid:  s.TrapOid,
+			DataList: dataList,
+		}
+		h, err := et.tm.SNMPTrapService.Handler(c, l)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to create SNMP handler")
+		}
+		an.handlers = append(an.handlers, h)
 	}
 
 	if len(n.TelegramHandlers) == 0 && (et.tm.TelegramService != nil && et.tm.TelegramService.Global()) {
@@ -973,365 +986,5 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group 
 	}
 
 	details := tmpBuffer.String()
-	return msg, details, dinfo, nil
-}
-
-//--------------------------------
-// Alert handlers
-
-func (a *AlertNode) handlePost(post *pipeline.PostHandler, ad *AlertData) {
-	bodyBuffer := a.bufPool.Get().(*bytes.Buffer)
-	defer func() {
-		bodyBuffer.Reset()
-		a.bufPool.Put(bodyBuffer)
-	}()
-
-	err := json.NewEncoder(bodyBuffer).Encode(ad)
-	if err != nil {
-		a.logger.Println("E! failed to marshal alert data json", err)
-		return
-	}
-
-	resp, err := http.Post(post.URL, "application/json", bodyBuffer)
-	if err != nil {
-		a.logger.Println("E! failed to POST batch", err)
-		return
-	}
-
-	if resp == nil {
-		a.logger.Println("E! failed to POST batch response is nil")
-		return
-	}
-
-	// close http response otherwise tcp socket will be 'ESTABLISHED' in a long time
-	defer resp.Body.Close()
-	return
-}
-
-func (a *AlertNode) handleTcp(tcp *pipeline.TcpHandler, ad *AlertData) {
-	buf := a.bufPool.Get().(*bytes.Buffer)
-	defer func() {
-		buf.Reset()
-		a.bufPool.Put(buf)
-	}()
-
-	err := json.NewEncoder(buf).Encode(ad)
-	if err != nil {
-		a.logger.Println("E! failed to marshal alert data json", err)
-		return
-	}
-
-	conn, err := net.Dial("tcp", tcp.Address)
-	if err != nil {
-		a.logger.Println("E! failed to connect", err)
-		return
-	}
-	defer conn.Close()
-
-	buf.WriteByte('\n')
-	conn.Write(buf.Bytes())
-
-	return
-}
-
-func (a *AlertNode) handleEmail(email *pipeline.EmailHandler, ad *AlertData) {
-	if err := a.et.tm.SMTPService.SendMail(email.ToList, ad.Message, ad.Details); err != nil {
-		a.logger.Println("E! failed to send email:", err)
-	}
-}
-
-func (a *AlertNode) handleExec(ex *pipeline.ExecHandler, ad *AlertData) {
-	b, err := json.Marshal(ad)
-	if err != nil {
-		a.logger.Println("E! failed to marshal alert data json", err)
-		return
-	}
-	cmd := exec.Command(ex.Command[0], ex.Command[1:]...)
-	cmd.Stdin = bytes.NewBuffer(b)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-	err = cmd.Run()
-	if err != nil {
-		a.logger.Println("E! error running alert command:", err, out.String())
-		return
-	}
-}
-
-func (a *AlertNode) handleLog(l *pipeline.LogHandler, ad *AlertData) {
-	b, err := json.Marshal(ad)
-	if err != nil {
-		a.logger.Println("E! failed to marshal alert data json", err)
-		return
-	}
-	f, err := os.OpenFile(l.FilePath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, os.FileMode(l.Mode))
-	if err != nil {
-		a.logger.Println("E! failed to open file for alert logging", err)
-		return
-	}
-	defer f.Close()
-	n, err := f.Write(b)
-	if n != len(b) || err != nil {
-		a.logger.Println("E! failed to write to file", err)
-	}
-	n, err = f.Write([]byte("\n"))
-	if n != 1 || err != nil {
-		a.logger.Println("E! failed to write to file", err)
-	}
-}
-
-func (a *AlertNode) handleVictorOps(vo *pipeline.VictorOpsHandler, ad *AlertData) {
-	var messageType string
-	switch ad.Level {
-	case OKAlert:
-		messageType = "RECOVERY"
-	default:
-		messageType = ad.Level.String()
-	}
-	err := a.et.tm.VictorOpsService.Alert(
-		vo.RoutingKey,
-		messageType,
-		ad.Message,
-		ad.ID,
-		ad.Time,
-		ad.Data,
-	)
-	if err != nil {
-		a.logger.Println("E! failed to send alert data to VictorOps:", err)
-		return
-	}
-}
-
-func (a *AlertNode) handlePagerDuty(pd *pipeline.PagerDutyHandler, ad *AlertData) {
-	err := a.et.tm.PagerDutyService.Alert(
-		pd.ServiceKey,
-		ad.ID,
-		ad.Message,
-		ad.Level,
-		ad.Data,
-	)
-	if err != nil {
-		a.logger.Println("E! failed to send alert data to PagerDuty:", err)
-		return
-	}
-}
-
-func (a *AlertNode) handleSensu(sensu *pipeline.SensuHandler, ad *AlertData) {
-	err := a.et.tm.SensuService.Alert(
-		ad.ID,
-		ad.Message,
-		ad.Level,
-	)
-	if err != nil {
-		a.logger.Println("E! failed to send alert data to Sensu:", err)
-		return
-	}
-}
-
-func (a *AlertNode) handleSlack(slack *pipeline.SlackHandler, ad *AlertData) {
-	err := a.et.tm.SlackService.Alert(
-		slack.Channel,
-		ad.Message,
-		slack.Username,
-		slack.IconEmoji,
-		ad.Level,
-	)
-	if err != nil {
-		a.logger.Println("E! failed to send alert data to Slack:", err)
-		return
-	}
-}
-
-func (a *AlertNode) handleSnmpTrap(snmpTrap *pipeline.SnmpTrapHandler, ad *AlertData) {
-	if a.et.tm.SnmpTrapService == nil {
-		a.logger.Println("E! failed to send SNMP traps. SNMP is not enabled")
-		return
-	}
-
-	// Template
-	/*
-		var buf bytes.Buffer
-		var tmpDataList [][]interface{}
-		for _, data := range snmpTrap.DataList {
-			var rowData []interface{}
-			for _, attr := range data {
-				err := attr.(*text.Template).Execute(&buf, ad.info)
-				if err != nil {
-					a.logger.Printf("E! failed to evaluate SNMP Trap attribute template %s", attr)
-					return
-				}
-				rowData = append(rowData, buf.String())
-				buf.Reset()
-			}
-			tmpDataList = append(tmpDataList, rowData)
-		}*/
-
-	err := a.et.tm.SnmpTrapService.Alert(
-		snmpTrap.TrapOid,
-		snmpTrap.DataList,
-		ad.Level,
-	)
-	if err != nil {
-		a.logger.Println("E! failed to send alert data by SNMP traps:", err)
-		return
-	}
-}
-
-func (a *AlertNode) handleTelegram(telegram *pipeline.TelegramHandler, ad *AlertData) {
-	err := a.et.tm.TelegramService.Alert(
-		telegram.ChatId,
-		telegram.ParseMode,
-		ad.Message,
-		telegram.IsDisableWebPagePreview,
-		telegram.IsDisableNotification,
-	)
-	if err != nil {
-		a.logger.Println("E! failed to send alert data to Telegram:", err)
-		return
-	}
-}
-
-func (a *AlertNode) handleHipChat(hipchat *pipeline.HipChatHandler, ad *AlertData) {
-	err := a.et.tm.HipChatService.Alert(
-		hipchat.Room,
-		hipchat.Token,
-		ad.Message,
-		ad.Level,
-	)
-	if err != nil {
-		a.logger.Println("E! failed to send alert data to HipChat:", err)
-		return
-	}
-}
-
-type alertaHandler struct {
-	*pipeline.AlertaHandler
-
-	resourceTmpl    *text.Template
-	eventTmpl       *text.Template
-	environmentTmpl *text.Template
-	valueTmpl       *text.Template
-	groupTmpl       *text.Template
-}
-
-func (a *AlertNode) handleAlerta(alerta alertaHandler, ad *AlertData) {
-	var severity string
-
-	switch ad.Level {
-	case OKAlert:
-		severity = "ok"
-	case InfoAlert:
-		severity = "informational"
-	case WarnAlert:
-		severity = "warning"
-	case CritAlert:
-		severity = "critical"
-	default:
-		severity = "indeterminate"
-	}
-	var buf bytes.Buffer
-	err := alerta.resourceTmpl.Execute(&buf, ad.info)
-	if err != nil {
-		a.logger.Printf("E! failed to evaluate Alerta Resource template %s", alerta.Resource)
-		return
-	}
-	resource := buf.String()
-	buf.Reset()
-
-	type eventData struct {
-		idInfo
-		ID string
-	}
-	data := eventData{
-		idInfo: ad.info.messageInfo.idInfo,
-		ID:     ad.ID,
-	}
-	err = alerta.eventTmpl.Execute(&buf, data)
-	if err != nil {
-		a.logger.Printf("E! failed to evaluate Alerta Event template %s", alerta.Event)
-		return
-	}
-	event := buf.String()
-	buf.Reset()
-
-	err = alerta.environmentTmpl.Execute(&buf, ad.info)
-	if err != nil {
-		a.logger.Printf("E! failed to evaluate Alerta Environment template %s", alerta.Environment)
-		return
-	}
-	environment := buf.String()
-	buf.Reset()
-
-	err = alerta.groupTmpl.Execute(&buf, ad.info)
-	if err != nil {
-		a.logger.Printf("E! failed to evaluate Alerta Group template %s", alerta.Group)
-		return
-	}
-	group := buf.String()
-	buf.Reset()
-
-	err = alerta.valueTmpl.Execute(&buf, ad.info)
-	if err != nil {
-		a.logger.Printf("E! failed to evaluate Alerta Value template %s", alerta.Value)
-		return
-	}
-	value := buf.String()
-
-	service := alerta.Service
-	if len(alerta.Service) == 0 {
-		service = []string{ad.info.Name}
-	}
-
-	err = a.et.tm.AlertaService.Alert(
-		alerta.Token,
-		resource,
-		event,
-		environment,
-		severity,
-		group,
-		value,
-		ad.Message,
-		alerta.Origin,
-		service,
-		ad.Data,
-	)
-	if err != nil {
-		a.logger.Println("E! failed to send alert data to Alerta:", err)
-		return
-	}
-}
-
-func (a *AlertNode) handleOpsGenie(og *pipeline.OpsGenieHandler, ad *AlertData) {
-	var messageType string
-	switch ad.Level {
-	case OKAlert:
-		messageType = "RECOVERY"
-	default:
-		messageType = ad.Level.String()
-	}
-
-	err := a.et.tm.OpsGenieService.Alert(
-		og.TeamsList,
-		og.RecipientsList,
-		messageType,
-		ad.Message,
-		ad.ID,
-		ad.Time,
-		ad.Data,
-	)
-	if err != nil {
-		a.logger.Println("E! failed to send alert data to OpsGenie:", err)
-		return
-	}
-}
-
-func (a *AlertNode) handleTalk(talk *pipeline.TalkHandler, ad *AlertData) {
-	err := a.et.tm.TalkService.Alert(
-		ad.ID,
-		ad.Message,
-	)
-	if err != nil {
-		a.logger.Println("E! failed to send alert data to Talk:", err)
-		return
-	}
+	return msg, details, nil
 }

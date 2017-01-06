@@ -190,7 +190,7 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	s.appendHipChatService()
 	s.appendAlertaService()
 	s.appendSlackService()
-	s.appendSnmpTrapService()
+	s.appendSNMPTrapService()
 	s.appendSensuService()
 	s.appendSlackService()
 	s.appendTalkService()
@@ -450,11 +450,13 @@ func (s *Server) appendSlackService() {
 	s.AppendService("slack", srv)
 }
 
-func (s *Server) appendSnmpTrapService() {
-	c := s.config.SnmpTrap
+func (s *Server) appendSNMPTrapService() {
+	c := s.config.SNMPTrap
 	l := s.LogService.NewLogger("[snmptrap] ", log.LstdFlags)
 	srv := snmptrap.NewService(c, l)
-	s.TaskMaster.SnmpTrapService = srv
+
+	s.TaskMaster.SNMPTrapService = srv
+	s.AlertService.SNMPTrapService = srv
 
 	s.SetDynamicService("snmptrap", srv)
 	s.AppendService("snmptrap", srv)
