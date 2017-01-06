@@ -5,6 +5,7 @@ github.com/davecgh/go-spew
 github.com/dgrijalva/jwt-go v3.0.0
 github.com/dustin/go-humanize
 github.com/evanphx/json-patch
+github.com/ghodss/yaml
 github.com/gogo/protobuf
 github.com/golang/protobuf
 github.com/gorhill/cronexpr
