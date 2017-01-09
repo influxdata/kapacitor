@@ -6,7 +6,6 @@ import (
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
-	"github.com/influxdata/kapacitor/timer"
 )
 
 type UnionNode struct {
@@ -15,6 +14,8 @@ type UnionNode struct {
 
 	// Buffer of points/batches from each parent
 	sources [][]models.PointInterface
+	// the low water marks for each source.
+	lowMarks []time.Time
 
 	rename string
 }
@@ -36,8 +37,7 @@ func (u *UnionNode) runUnion([]byte) error {
 	// Spawn goroutine for each parent
 	errors := make(chan error, len(u.ins))
 	for i, in := range u.ins {
-		t := u.et.tm.TimingService.NewTimer(u.statMap.Get(statAverageExecTime).(timer.Setter))
-		go func(index int, e *Edge, t timer.Timer) {
+		go func(index int, e *Edge) {
 			for p, ok := e.Next(); ok; p, ok = e.Next() {
 				union <- srcPoint{
 					src: index,
@@ -45,7 +45,7 @@ func (u *UnionNode) runUnion([]byte) error {
 				}
 			}
 			errors <- nil
-		}(i, in, t)
+		}(i, in)
 	}
 
 	// Channel for returning the first if any errors, from parent goroutines.
@@ -69,6 +69,7 @@ func (u *UnionNode) runUnion([]byte) error {
 
 	// Keep buffer of values from parents so they can be ordered.
 	u.sources = make([][]models.PointInterface, len(u.ins))
+	u.lowMarks = make([]time.Time, len(u.ins))
 
 	for {
 		select {
@@ -78,22 +79,14 @@ func (u *UnionNode) runUnion([]byte) error {
 		case source, ok := <-union:
 			u.timer.Start()
 			if !ok {
-				// We are done, emit all buffered points
-				for {
-					more, err := u.emitNext(true)
-					if err != nil {
-						return err
-					}
-					if !more {
-						return nil
-					}
-				}
+				// We are done, emit all buffered
+				return u.emitReady(true)
 			}
 			// Add newest point to buffer
 			u.sources[source.src] = append(u.sources[source.src], source.p)
 
 			// Emit the next values
-			_, err := u.emitNext(false)
+			err := u.emitReady(false)
 			if err != nil {
 				return err
 			}
@@ -102,47 +95,60 @@ func (u *UnionNode) runUnion([]byte) error {
 	}
 }
 
-func (u *UnionNode) emitNext(drain bool) (more bool, err error) {
-	more = true
-
-	// Find low water mark
-	var mark time.Time
-	markSet := false
-	for _, values := range u.sources {
-		if len(values) > 0 {
-			if !markSet || values[0].PointTime().Before(mark) {
-				mark = values[0].PointTime()
-				markSet = true
-			}
-		} else if !drain {
-			// We can't continue processing until we have
-			// at least one value buffered from each parent.
-			// Unless we are draining the buffer than we can continue.
-			return
-		}
-	}
-
-	// Emit all values that are at or below the mark.
-	remaining := 0
-	for i, values := range u.sources {
-		var j int
-		l := len(values)
-		for j = 0; j < l; j++ {
-			if !values[j].PointTime().After(mark) {
-				err = u.emit(values[j])
-				if err != nil {
-					return
+func (u *UnionNode) emitReady(drain bool) error {
+	emitted := true
+	// Emit all points until nothing changes
+	for emitted {
+		emitted = false
+		// Find low water mark
+		var mark time.Time
+		validSources := 0
+		for i, values := range u.sources {
+			sourceMark := u.lowMarks[i]
+			if len(values) > 0 {
+				t := values[0].PointTime()
+				if mark.IsZero() || t.Before(mark) {
+					mark = t
 				}
-			} else {
-				break
+				sourceMark = t
+			}
+			u.lowMarks[i] = sourceMark
+			if !sourceMark.IsZero() {
+				validSources++
+				// Only consider the sourceMark if we are not draining
+				if !drain && (mark.IsZero() || sourceMark.Before(mark)) {
+					mark = sourceMark
+				}
 			}
 		}
-		// Drop values that were emitted
-		u.sources[i] = values[j:]
-		remaining += len(u.sources[i])
+		if !drain && validSources != len(u.sources) {
+			// We can't continue processing until we have
+			// at least one value from each parent.
+			// Unless we are draining the buffer than we can continue.
+			return nil
+		}
+
+		// Emit all values that are at or below the mark.
+		for i, values := range u.sources {
+			var j int
+			l := len(values)
+			for j = 0; j < l; j++ {
+				if !values[j].PointTime().After(mark) {
+					err := u.emit(values[j])
+					if err != nil {
+						return err
+					}
+					// Note that we emitted something
+					emitted = true
+				} else {
+					break
+				}
+			}
+			// Drop values that were emitted
+			u.sources[i] = values[j:]
+		}
 	}
-	more = remaining > 0
-	return
+	return nil
 }
 
 func (u *UnionNode) emit(v models.PointInterface) error {

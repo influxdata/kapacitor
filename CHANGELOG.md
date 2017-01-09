@@ -62,8 +62,8 @@ stream
 ### Bugfixes
 
 - [#1045](https://github.com/influxdata/kapacitor/issues/1045): Fix panic during replays.
-
 - [#1043](https://github.com/influxdata/kapacitor/issues/1043): logrotate.d ignores kapacitor configuration due to bad file mode
+- [#1100](https://github.com/influxdata/kapacitor/issues/1100): Fix issue with the Union node buffering more points than necessary.
 
 ## v1.1.1 [2016-12-02]
 
