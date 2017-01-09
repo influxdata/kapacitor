@@ -8,6 +8,7 @@ Dependencies
 * github.com/dustin/go-humanize [MIT](https://github.com/dustin/go-humanize/blob/master/LICENSE)
 * github.com/golang/protobuf [BSD](https://github.com/golang/protobuf/blob/master/LICENSE)
 * github.com/gorhill/cronexpr [APLv2](https://github.com/gorhill/cronexpr/blob/master/APLv2)
+* github.com/k-sone/snmpgo [MIT](https://github.com/k-sone/snmpgo/blob/master/LICENSE)
 * github.com/kimor79/gollectd [BSD](https://github.com/kimor79/gollectd/blob/master/LICENSE)
 * github.com/mattn/go-runewidth [MIT](https://github.com/mattn/go-runewidth/blob/master/README.mkd)
 * github.com/mitchellh/copystructure[MIT](https://github.com/mitchellh/copystructure/blob/master/LICENSE)
@@ -21,4 +22,3 @@ Dependencies
 * github.com/stretchr/testify [MIT](https://github.com/stretchr/testify/blob/master/LICENSE)
 * github.com/twinj/uuid [MIT](https://github.com/twinj/uuid/blob/master/LICENSE)
 * gopkg.in/gomail.v2 [MIT](https://github.com/go-gomail/gomail/blob/v2/LICENSE)
-

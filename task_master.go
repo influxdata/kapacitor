@@ -22,6 +22,7 @@ import (
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
+	"github.com/influxdata/kapacitor/services/snmptrap"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/tick"
@@ -98,6 +99,9 @@ type TaskMaster struct {
 		Global() bool
 		StateChangesOnly() bool
 		Handler(slack.HandlerConfig, *log.Logger) alert.Handler
+	}
+	SNMPTrapService interface {
+		Handler(snmptrap.HandlerConfig, *log.Logger) (alert.Handler, error)
 	}
 	TelegramService interface {
 		Global() bool
@@ -199,6 +203,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.PagerDutyService = tm.PagerDutyService
 	n.SlackService = tm.SlackService
 	n.TelegramService = tm.TelegramService
+	n.SNMPTrapService = tm.SNMPTrapService
 	n.HipChatService = tm.HipChatService
 	n.AlertaService = tm.AlertaService
 	n.SensuService = tm.SensuService

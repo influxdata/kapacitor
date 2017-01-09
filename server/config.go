@@ -28,6 +28,7 @@ import (
 	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
+	"github.com/influxdata/kapacitor/services/snmptrap"
 	"github.com/influxdata/kapacitor/services/stats"
 	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/influxdata/kapacitor/services/talk"
@@ -65,6 +66,7 @@ type Config struct {
 	OpsGenie  opsgenie.Config  `toml:"opsgenie" override:"opsgenie"`
 	PagerDuty pagerduty.Config `toml:"pagerduty" override:"pagerduty"`
 	SMTP      smtp.Config      `toml:"smtp" override:"smtp"`
+	SNMPTrap  snmptrap.Config  `toml:"snmptrap" override:"snmptrap"`
 	Sensu     sensu.Config     `toml:"sensu" override:"sensu"`
 	Slack     slack.Config     `toml:"slack" override:"slack"`
 	Talk      talk.Config      `toml:"talk" override:"talk"`
@@ -115,6 +117,7 @@ func NewConfig() *Config {
 	c.Sensu = sensu.NewConfig()
 	c.Slack = slack.NewConfig()
 	c.Talk = talk.NewConfig()
+	c.SNMPTrap = snmptrap.NewConfig()
 	c.Telegram = telegram.NewConfig()
 	c.VictorOps = victorops.NewConfig()
 
@@ -220,6 +223,9 @@ func (c *Config) Validate() error {
 		return err
 	}
 	if err := c.SMTP.Validate(); err != nil {
+		return err
+	}
+	if err := c.SNMPTrap.Validate(); err != nil {
 		return err
 	}
 	if err := c.Sensu.Validate(); err != nil {

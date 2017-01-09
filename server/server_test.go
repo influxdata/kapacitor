@@ -41,12 +41,14 @@ import (
 	"github.com/influxdata/kapacitor/services/sensu/sensutest"
 	"github.com/influxdata/kapacitor/services/slack/slacktest"
 	"github.com/influxdata/kapacitor/services/smtp/smtptest"
+	"github.com/influxdata/kapacitor/services/snmptrap/snmptraptest"
 	"github.com/influxdata/kapacitor/services/talk/talktest"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/telegram/telegramtest"
 	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/services/victorops/victoropstest"
+	"github.com/k-sone/snmpgo"
 	"github.com/pkg/errors"
 )
 
@@ -5926,6 +5928,79 @@ func TestServer_UpdateConfig(t *testing.T) {
 			},
 		},
 		{
+			section: "snmptrap",
+			setDefaults: func(c *server.Config) {
+				c.SNMPTrap.Community = "test"
+				c.SNMPTrap.Retries = 2.0
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/snmptrap"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/snmptrap/"},
+					Options: map[string]interface{}{
+						"addr":      "localhost:162",
+						"enabled":   false,
+						"community": true,
+						"retries":   2.0,
+					},
+					Redacted: []string{
+						"community",
+					},
+				}},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/snmptrap/"},
+				Options: map[string]interface{}{
+					"addr":      "localhost:162",
+					"enabled":   false,
+					"community": true,
+					"retries":   2.0,
+				},
+				Redacted: []string{
+					"community",
+				},
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"enabled":   true,
+							"addr":      "snmptrap.example.com:162",
+							"community": "public",
+							"retries":   1.0,
+						},
+					},
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/snmptrap"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/snmptrap/"},
+							Options: map[string]interface{}{
+								"addr":      "snmptrap.example.com:162",
+								"enabled":   true,
+								"community": true,
+								"retries":   1.0,
+							},
+							Redacted: []string{
+								"community",
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/snmptrap/"},
+						Options: map[string]interface{}{
+							"addr":      "snmptrap.example.com:162",
+							"enabled":   true,
+							"community": true,
+							"retries":   1.0,
+						},
+						Redacted: []string{
+							"community",
+						},
+					},
+				},
+			},
+		},
+		{
 			section: "talk",
 			setDefaults: func(c *server.Config) {
 				c.Talk.AuthorName = "Kapacitor"
@@ -6080,7 +6155,8 @@ func TestServer_UpdateConfig(t *testing.T) {
 					},
 				},
 			},
-		}, {
+		},
+		{
 			section: "victorops",
 			setDefaults: func(c *server.Config) {
 				c.VictorOps.RoutingKey = "test"
@@ -6366,6 +6442,20 @@ func TestServer_ListServiceTests(t *testing.T) {
 				},
 			},
 			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/snmptrap"},
+				Name: "snmptrap",
+				Options: client.ServiceTestOptions{
+					"trap-oid": "1.1.1.1",
+					"data-list": []interface{}{
+						map[string]interface{}{
+							"oid":   "1.1.1.1.2",
+							"type":  "s",
+							"value": "test snmptrap message",
+						},
+					},
+				},
+			},
+			{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/talk"},
 				Name: "talk",
 				Options: client.ServiceTestOptions{
@@ -6450,6 +6540,20 @@ func TestServer_ListServiceTests_WithPattern(t *testing.T) {
 					"to":      nil,
 					"subject": "test subject",
 					"body":    "test body",
+				},
+			},
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/snmptrap"},
+				Name: "snmptrap",
+				Options: client.ServiceTestOptions{
+					"trap-oid": "1.1.1.1",
+					"data-list": []interface{}{
+						map[string]interface{}{
+							"oid":   "1.1.1.1.2",
+							"type":  "s",
+							"value": "test snmptrap message",
+						},
+					},
 				},
 			},
 		},
@@ -6562,6 +6666,14 @@ func TestServer_DoServiceTest(t *testing.T) {
 		},
 		{
 			service: "smtp",
+			options: client.ServiceTestOptions{},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "service is not enabled",
+			},
+		},
+		{
+			service: "snmptrap",
 			options: client.ServiceTestOptions{},
 			exp: client.ServiceTestResult{
 				Success: false,
@@ -7271,6 +7383,70 @@ func TestServer_AlertHandlers(t *testing.T) {
 					if err := exp.Compare(got); err != nil {
 						return fmt.Errorf("unexpected message %d: %v", i, err)
 					}
+				}
+				return nil
+			},
+		},
+		{
+			handlerAction: client.HandlerAction{
+				Kind: "snmptrap",
+				Options: map[string]interface{}{
+					"trap-oid": "1.1.2",
+					"data-list": []map[string]string{
+						{
+							"oid":   "1.1.2.1",
+							"type":  "s",
+							"value": "{{.Message}}",
+						},
+						{
+							"oid":   "1.1.2.2",
+							"type":  "s",
+							"value": "{{.Level}}",
+						},
+					},
+				},
+			},
+			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+				ts, err := snmptraptest.NewServer()
+				if err != nil {
+					return nil, err
+				}
+				ctxt := context.WithValue(nil, "server", ts)
+
+				c.SNMPTrap.Enabled = true
+				c.SNMPTrap.Addr = ts.Addr
+				c.SNMPTrap.Community = ts.Community
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*snmptraptest.Server)
+				ts.Close()
+				got := ts.Traps()
+				exp := []snmptraptest.Trap{{
+					Pdu: snmptraptest.Pdu{
+						Type:        snmpgo.SNMPTrapV2,
+						ErrorStatus: snmpgo.NoError,
+						VarBinds: snmptraptest.VarBinds{
+							{
+								Oid:   "1.3.6.1.6.3.1.1.4.1.0",
+								Value: "1.1.2",
+								Type:  "Oid",
+							},
+							{
+								Oid:   "1.1.2.1",
+								Value: "message",
+								Type:  "OctetString",
+							},
+							{
+								Oid:   "1.1.2.2",
+								Value: "CRITICAL",
+								Type:  "OctetString",
+							},
+						},
+					},
+				}}
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected snmptrap request:\nexp\n%+v\ngot\n%+v\n", exp, got)
 				}
 				return nil
 			},

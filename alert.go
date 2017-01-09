@@ -23,6 +23,7 @@ import (
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
+	"github.com/influxdata/kapacitor/services/snmptrap"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/tick/stateful"
@@ -238,6 +239,27 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		h := et.tm.TelegramService.Handler(c, l)
 		an.handlers = append(an.handlers, h)
 	}
+
+	for _, s := range n.SNMPTrapHandlers {
+		dataList := make([]snmptrap.Data, len(s.DataList))
+		for i, d := range s.DataList {
+			dataList[i] = snmptrap.Data{
+				Oid:   d.Oid,
+				Type:  d.Type,
+				Value: d.Value,
+			}
+		}
+		c := snmptrap.HandlerConfig{
+			TrapOid:  s.TrapOid,
+			DataList: dataList,
+		}
+		h, err := et.tm.SNMPTrapService.Handler(c, l)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to create SNMP handler")
+		}
+		an.handlers = append(an.handlers, h)
+	}
+
 	if len(n.TelegramHandlers) == 0 && (et.tm.TelegramService != nil && et.tm.TelegramService.Global()) {
 		c := telegram.HandlerConfig{}
 		h := et.tm.TelegramService.Handler(c, l)

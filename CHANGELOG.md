@@ -57,6 +57,7 @@ stream
 - [#1052](https://github.com/influxdata/kapacitor/issues/1052): Move alerta api token to header and add option to skip TLS verification.
 - [#251](https://github.com/influxdata/kapacitor/issues/251): Enable markdown in slack attachments.
 - [#1095](https://github.com/influxdata/kapacitor/pull/1095): Add new alert API, with support for configuring handlers and topics.
+- [#929](https://github.com/influxdata/kapacitor/pull/929): Add SNMP trap service for alerting
 
 
 ### Bugfixes
