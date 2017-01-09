@@ -8605,37 +8605,6 @@ func testStreamerWithOutput(
 	}
 }
 
-func compareListIgnoreOrder(got, exp []interface{}, cmpF func(got, exp interface{}) error) error {
-	if len(got) != len(exp) {
-		return fmt.Errorf("unexpected count got %d exp %d", len(got), len(exp))
-	}
-
-	if cmpF == nil {
-		cmpF = func(got, exp interface{}) error {
-			if !reflect.DeepEqual(got, exp) {
-				return fmt.Errorf("\ngot\n%+v\nexp\n%+v\n", got, exp)
-			}
-			return nil
-		}
-	}
-
-	for _, e := range exp {
-		found := false
-		var err error
-		for _, g := range got {
-			if err = cmpF(g, e); err == nil {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return err
-		}
-	}
-	return nil
-
-}
-
 type step struct {
 	t  time.Duration
 	er kapacitor.Result
@@ -8650,6 +8619,7 @@ func testStreamerWithSteppedOutput(
 	ignoreOrder bool,
 	tmInit func(tm *kapacitor.TaskMaster),
 ) {
+	t.Skip("Test is not deterministic, need a mechanisim to safely step task execution.")
 	clock, et, replayErr, tm := testStreamer(t, name, script, tmInit)
 	defer tm.Close()
 	for s, step := range steps {
@@ -8664,6 +8634,9 @@ func testStreamerWithSteppedOutput(
 			t.Fatal(err)
 		}
 
+		// TODO: this creates a race condition with the executing task
+		//Read at github.com/influxdata/kapacitor.(*HTTPOutNode).Endpoint()
+		//Previous write at github.com/influxdata/kapacitor.(*HTTPOutNode).runOut()
 		resp, err := http.Get(output.Endpoint())
 		if err != nil {
 			t.Fatal(err)
@@ -8718,4 +8691,35 @@ func testStreamerWithSteppedOutput(
 			t.Errorf("final %s", msg)
 		}
 	}
+}
+
+func compareListIgnoreOrder(got, exp []interface{}, cmpF func(got, exp interface{}) error) error {
+	if len(got) != len(exp) {
+		return fmt.Errorf("unexpected count got %d exp %d", len(got), len(exp))
+	}
+
+	if cmpF == nil {
+		cmpF = func(got, exp interface{}) error {
+			if !reflect.DeepEqual(got, exp) {
+				return fmt.Errorf("\ngot\n%+v\nexp\n%+v\n", got, exp)
+			}
+			return nil
+		}
+	}
+
+	for _, e := range exp {
+		found := false
+		var err error
+		for _, g := range got {
+			if err = cmpF(g, e); err == nil {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return err
+		}
+	}
+	return nil
+
 }

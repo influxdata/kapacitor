@@ -83,8 +83,8 @@ function run_test_docker {
          -e "INFLUXDB_DATA_ENGINE=$INFLUXDB_DATA_ENGINE" \
          -e "GORACE=$GORACE" \
          -e "GO_CHECKOUT=$GO_CHECKOUT" \
-	 -e "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID" \
-	 -e "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY" \
+         -e "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID" \
+         -e "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY" \
          "$imagename" \
          "--parallel=$PARALLELISM" \
          "--timeout=$TIMEOUT" \
