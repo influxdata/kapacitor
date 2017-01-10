@@ -7657,6 +7657,140 @@ stream
 	}
 }
 
+func TestServer_AlertAnonTopic(t *testing.T) {
+	// Setup test TCP server
+	ts, err := alerttest.NewTCPServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ts.Close()
+
+	// Create default config
+	c := NewConfig()
+	s := OpenServer(c)
+	cli := Client(s)
+	defer s.Close()
+
+	tick := `
+stream
+	|from()
+		.measurement('alert')
+	|alert()
+		.id('id')
+		.message('message')
+		.details('details')
+		.warn(lambda: "value" <= 1.0)
+		.crit(lambda: "value" > 1.0)
+		.tcp('` + ts.Addr + `')
+`
+
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:   "testAlertHandlers",
+		Type: client.StreamTask,
+		DBRPs: []client.DBRP{{
+			Database:        "mydb",
+			RetentionPolicy: "myrp",
+		}},
+		TICKscript: tick,
+		Status:     client.Enabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Write warning point
+	point := "alert value=1 0000000000"
+	v := url.Values{}
+	v.Add("precision", "s")
+	s.MustWrite("mydb", "myrp", point, v)
+
+	// Restart the server
+	s.Restart()
+
+	topic := "main:testAlertHandlers:alert2"
+	l := cli.TopicEventsLink(topic)
+	expTopicEvents := client.TopicEvents{
+		Link:  l,
+		Topic: topic,
+		Events: []client.TopicEvent{{
+			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1preview/alerts/topics/%s/events/id", topic)},
+			ID:   "id",
+			State: client.EventState{
+				Message:  "message",
+				Details:  "details",
+				Time:     time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
+				Duration: 0,
+				Level:    "WARNING",
+			},
+		}},
+	}
+
+	te, err := cli.ListTopicEvents(l, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(te, expTopicEvents) {
+		t.Errorf("unexpected topic events for anonymous topic:\ngot\n%+v\nexp\n%+v\n", te, expTopicEvents)
+	}
+	event, err := cli.TopicEvent(expTopicEvents.Events[0].Link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(event, expTopicEvents.Events[0]) {
+		t.Errorf("unexpected topic event for anonymous topic:\ngot\n%+v\nexp\n%+v\n", event, expTopicEvents.Events[0])
+	}
+
+	// Disable task
+	task, err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+		Status: client.Disabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := cli.ListTopicEvents(l, nil); err == nil {
+		t.Fatal("expected error listing anonymous topic for disabled task")
+	} else if got, exp := err.Error(), fmt.Sprintf("topic %q does not exist", topic); got != exp {
+		t.Errorf("unexpected error message for nonexistent anonymous topic: got %q exp %q", got, exp)
+	}
+
+	// Enable task
+	task, err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+		Status: client.Enabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	te, err = cli.ListTopicEvents(l, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(te, expTopicEvents) {
+		t.Errorf("unexpected topic events for anonymous topic after re-enable:\ngot\n%+v\nexp\n%+v\n", te, expTopicEvents)
+	}
+
+	// Restart the server, again and ensure that the anonymous topic state is restored
+	s.Restart()
+	te, err = cli.ListTopicEvents(l, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(te, expTopicEvents) {
+		t.Errorf("unexpected topic events for anonymous topic after re-enable and restart:\ngot\n%+v\nexp\n%+v\n", te, expTopicEvents)
+	}
+
+	// Delete task
+	if err := cli.DeleteTask(task.Link); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := cli.ListTopicEvents(l, nil); err == nil {
+		t.Fatal("expected error listing anonymous topic for deleted task")
+	} else if got, exp := err.Error(), fmt.Sprintf("topic %q does not exist", topic); got != exp {
+		t.Errorf("unexpected error message for nonexistent anonymous topic: got %q exp %q", got, exp)
+	}
+}
+
 func TestServer_AlertTopic_PersistedState(t *testing.T) {
 	// Setup test TCP server
 	ts, err := alerttest.NewTCPServer()
@@ -7664,6 +7798,10 @@ func TestServer_AlertTopic_PersistedState(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ts.Close()
+
+	tmpDir := MustTempDir()
+	defer os.RemoveAll(tmpDir)
+	tmpPath := path.Join(tmpDir, "alert.log")
 
 	// Create default config
 	c := NewConfig()
@@ -7692,6 +7830,7 @@ stream
 		.message('message')
 		.details('details')
 		.warn(lambda: TRUE)
+		.log('` + tmpPath + `')
 `
 
 	if _, err := cli.CreateTask(client.CreateTaskOptions{
@@ -7715,56 +7854,62 @@ stream
 	// Restart the server
 	s.Restart()
 
-	l := cli.TopicEventsLink("test")
-	expTopicEvents := client.TopicEvents{
-		Link:  l,
-		Topic: "test",
-		Events: []client.TopicEvent{{
-			Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/test/events/id"},
-			ID:   "id",
-			State: client.EventState{
-				Message:  "message",
-				Details:  "details",
-				Time:     time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
-				Duration: 0,
-				Level:    "WARNING",
-			},
-		}},
+	topics := []string{
+		"test",
+		"main:testAlertHandlers:alert2",
 	}
+	for _, topic := range topics {
+		l := cli.TopicEventsLink(topic)
+		expTopicEvents := client.TopicEvents{
+			Link:  l,
+			Topic: topic,
+			Events: []client.TopicEvent{{
+				Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1preview/alerts/topics/%s/events/id", topic)},
+				ID:   "id",
+				State: client.EventState{
+					Message:  "message",
+					Details:  "details",
+					Time:     time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
+					Duration: 0,
+					Level:    "WARNING",
+				},
+			}},
+		}
 
-	te, err := cli.ListTopicEvents(l, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(te, expTopicEvents) {
-		t.Errorf("unexpected topic events:\ngot\n%+v\nexp\n%+v\n", te, expTopicEvents)
-	}
-	event, err := cli.TopicEvent(expTopicEvents.Events[0].Link)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(event, expTopicEvents.Events[0]) {
-		t.Errorf("unexpected topic event:\ngot\n%+v\nexp\n%+v\n", event, expTopicEvents.Events[0])
-	}
+		te, err := cli.ListTopicEvents(l, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(te, expTopicEvents) {
+			t.Errorf("unexpected topic events for topic %q:\ngot\n%+v\nexp\n%+v\n", topic, te, expTopicEvents)
+		}
+		event, err := cli.TopicEvent(expTopicEvents.Events[0].Link)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(event, expTopicEvents.Events[0]) {
+			t.Errorf("unexpected topic event for topic %q:\ngot\n%+v\nexp\n%+v\n", topic, event, expTopicEvents.Events[0])
+		}
 
-	te, err = cli.ListTopicEvents(l, &client.ListTopicEventsOptions{
-		MinLevel: "CRITICAL",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	expTopicEvents.Events = expTopicEvents.Events[0:0]
-	if !reflect.DeepEqual(te, expTopicEvents) {
-		t.Errorf("unexpected topic events with minLevel:\ngot\n%+v\nexp\n%+v\n", te, expTopicEvents)
-	}
+		te, err = cli.ListTopicEvents(l, &client.ListTopicEventsOptions{
+			MinLevel: "CRITICAL",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		expTopicEvents.Events = expTopicEvents.Events[0:0]
+		if !reflect.DeepEqual(te, expTopicEvents) {
+			t.Errorf("unexpected topic events with minLevel for topic %q:\ngot\n%+v\nexp\n%+v\n", topic, te, expTopicEvents)
+		}
 
-	l = cli.TopicLink("test")
-	if err := cli.DeleteTopic(l); err != nil {
-		t.Fatal(err)
-	}
-	te, err = cli.ListTopicEvents(l, nil)
-	if err == nil {
-		t.Fatal("expected error for deleted topic")
+		l = cli.TopicLink(topic)
+		if err := cli.DeleteTopic(l); err != nil {
+			t.Fatal(err)
+		}
+		te, err = cli.ListTopicEvents(l, nil)
+		if err == nil {
+			t.Fatalf("expected error for deleted topic %q", topic)
+		}
 	}
 }
 

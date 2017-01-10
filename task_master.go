@@ -49,6 +49,8 @@ type UDFService interface {
 var ErrTaskMasterClosed = errors.New("TaskMaster is closed")
 var ErrTaskMasterOpen = errors.New("TaskMaster is open")
 
+type deleteHook func(*TaskMaster)
+
 // An execution framework for  a set of tasks.
 type TaskMaster struct {
 	// Unique id for this task master instance
@@ -70,9 +72,12 @@ type TaskMaster struct {
 
 	AlertService interface {
 		EventState(topic, event string) (alert.EventState, bool)
+		UpdateEvent(topic string, event alert.EventState) error
 		Collect(event alert.Event) error
 		RegisterHandler(topics []string, h alert.Handler)
 		DeregisterHandler(topics []string, h alert.Handler)
+		RestoreTopic(topic string) error
+		CloseTopic(topic string) error
 		DeleteTopic(topic string) error
 	}
 	InfluxDBService interface {
@@ -157,6 +162,9 @@ type TaskMaster struct {
 	// Executing tasks
 	tasks map[string]*ExecutingTask
 
+	// DeleteHooks for tasks
+	deleteHooks map[string][]deleteHook
+
 	logger *log.Logger
 
 	closed  bool
@@ -180,6 +188,7 @@ func NewTaskMaster(id string, l LogService) *TaskMaster {
 		taskToForkKeys: make(map[string][]forkKey),
 		batches:        make(map[string][]BatchCollector),
 		tasks:          make(map[string]*ExecutingTask),
+		deleteHooks:    make(map[string][]deleteHook),
 		LogService:     l,
 		logger:         l.NewLogger(fmt.Sprintf("[task_master:%s] ", id), log.LstdFlags),
 		closed:         true,
@@ -446,17 +455,30 @@ func (tm *TaskMaster) StopTask(id string) error {
 	return tm.stopTask(id)
 }
 
+func (tm *TaskMaster) DeleteTask(id string) error {
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
+	if err := tm.stopTask(id); err != nil {
+		return err
+	}
+	tm.deleteTask(id)
+	return nil
+}
+
 // internal stopTask function. The caller must have acquired
 // the lock in order to call this function
 func (tm *TaskMaster) stopTask(id string) (err error) {
 	if et, ok := tm.tasks[id]; ok {
+
 		delete(tm.tasks, id)
+
 		switch et.Task.Type {
 		case StreamTask:
 			tm.delFork(id)
 		case BatchTask:
 			delete(tm.batches, id)
 		}
+
 		err = et.stop()
 		if err != nil {
 			tm.logger.Println("E! Stopped task:", id, err)
@@ -465,6 +487,21 @@ func (tm *TaskMaster) stopTask(id string) (err error) {
 		}
 	}
 	return
+}
+
+// internal deleteTask function. The caller must have acquired
+// the lock in order to call this function
+func (tm *TaskMaster) deleteTask(id string) {
+	hooks := tm.deleteHooks[id]
+	for _, deleteHook := range hooks {
+		deleteHook(tm)
+	}
+}
+
+func (tm *TaskMaster) registerDeleteHookForTask(id string, hook deleteHook) {
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
+	tm.deleteHooks[id] = append(tm.deleteHooks[id], hook)
 }
 
 func (tm *TaskMaster) IsExecuting(id string) bool {

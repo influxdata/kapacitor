@@ -61,6 +61,17 @@ func (s *Topics) RestoreTopic(id string, eventStates map[string]EventState) {
 	t.restoreEventStates(eventStates)
 }
 
+func (s *Topics) UpdateEvent(id string, event EventState) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t, ok := s.topics[id]
+	if !ok {
+		t = newTopic(id)
+		s.topics[id] = t
+	}
+	t.updateEvent(event)
+}
+
 func (s *Topics) EventState(topic, event string) (EventState, bool) {
 	s.mu.RLock()
 	t, ok := s.topics[topic]
@@ -126,7 +137,9 @@ func (s *Topics) DeregisterHandler(topics []string, h Handler) {
 	defer s.mu.Unlock()
 
 	for _, topic := range topics {
-		s.topics[topic].removeHandler(h)
+		if t := s.topics[topic]; t != nil {
+			t.removeHandler(h)
+		}
 	}
 }
 
@@ -135,7 +148,9 @@ func (s *Topics) ReplaceHandler(oldTopics, newTopics []string, oldH, newH Handle
 	defer s.mu.Unlock()
 
 	for _, topic := range oldTopics {
-		s.topics[topic].removeHandler(oldH)
+		if t := s.topics[topic]; t != nil {
+			t.removeHandler(oldH)
+		}
 	}
 
 	for _, topic := range newTopics {

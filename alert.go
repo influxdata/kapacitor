@@ -344,11 +344,6 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		an.handlers = append(an.handlers, h)
 	}
 
-	// Register Handlers on topic
-	for _, h := range an.handlers {
-		et.tm.AlertService.RegisterHandler([]string{an.anonTopic}, h)
-	}
-
 	// Parse level expressions
 	an.levels = make([]stateful.Expression, alert.Critical+1)
 	an.scopePools = make([]stateful.ScopePool, alert.Critical+1)
@@ -425,6 +420,19 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 }
 
 func (a *AlertNode) runAlert([]byte) error {
+	// Register delete hook
+	if a.hasAnonTopic() {
+		a.et.tm.registerDeleteHookForTask(a.et.Task.ID, deleteAlertHook(a.anonTopic))
+
+		// Register Handlers on topic
+		for _, h := range a.handlers {
+			a.et.tm.AlertService.RegisterHandler([]string{a.anonTopic}, h)
+		}
+		// Restore anonTopic
+		a.et.tm.AlertService.RestoreTopic(a.anonTopic)
+	}
+
+	// Setup stats
 	a.alertsTriggered = &expvar.Int{}
 	a.statMap.Set(statsAlertsTriggered, a.alertsTriggered)
 
@@ -455,14 +463,8 @@ func (a *AlertNode) runAlert([]byte) error {
 			if state, ok := a.states[p.Group]; ok {
 				currentLevel = state.currentLevel()
 			} else {
-				// Check for pre-existing level on topic.
-				// Anon Topics do not preserve state as they are deleted when a task stops,
-				// so we only check the explict topic.
-				if a.topic != "" {
-					if state, ok := a.et.tm.AlertService.EventState(a.topic, id); ok {
-						currentLevel = state.Level
-					}
-				}
+				// Check for previous state
+				currentLevel = a.restoreEventState(id)
 				if currentLevel != alert.OK {
 					// Update the state with the restored state
 					a.updateState(p.Time, currentLevel, p.Group)
@@ -551,17 +553,8 @@ func (a *AlertNode) runAlert([]byte) error {
 			if state, ok := a.states[b.Group]; ok {
 				currentLevel = state.currentLevel()
 			} else {
-				// Check for pre-existing level on topics
-				if len(a.handlers) > 0 {
-					if state, ok := a.et.tm.AlertService.EventState(a.anonTopic, id); ok {
-						currentLevel = state.Level
-					}
-				}
-				if a.topic != "" {
-					if state, ok := a.et.tm.AlertService.EventState(a.topic, id); ok {
-						currentLevel = state.Level
-					}
-				}
+				// Check for previous state
+				currentLevel = a.restoreEventState(id)
 				if currentLevel != alert.OK {
 					// Update the state with the restored state
 					a.updateState(b.TMax, currentLevel, b.Group)
@@ -668,9 +661,62 @@ func (a *AlertNode) runAlert([]byte) error {
 			a.timer.Stop()
 		}
 	}
-	// Delete the anonymous topic, which will also deregister its handlers
-	a.et.tm.AlertService.DeleteTopic(a.anonTopic)
+	// Close the anonymous topic.
+	a.et.tm.AlertService.CloseTopic(a.anonTopic)
+	// Deregister Handlers on topic
+	for _, h := range a.handlers {
+		a.et.tm.AlertService.DeregisterHandler([]string{a.anonTopic}, h)
+	}
 	return nil
+}
+
+func deleteAlertHook(anonTopic string) deleteHook {
+	return func(tm *TaskMaster) {
+		tm.AlertService.DeleteTopic(anonTopic)
+	}
+}
+
+func (a *AlertNode) hasAnonTopic() bool {
+	return len(a.handlers) > 0
+}
+func (a *AlertNode) hasTopic() bool {
+	return a.topic != ""
+}
+
+func (a *AlertNode) restoreEventState(id string) alert.Level {
+	var topicState, anonTopicState alert.EventState
+	var anonFound, topicFound bool
+	// Check for previous state on anonTopic
+	if a.hasAnonTopic() {
+		if state, ok := a.et.tm.AlertService.EventState(a.anonTopic, id); ok {
+			anonTopicState = state
+			anonFound = true
+		}
+	}
+	// Check for previous state on topic.
+	if a.hasTopic() {
+		if state, ok := a.et.tm.AlertService.EventState(a.topic, id); ok {
+			topicState = state
+			topicFound = true
+		}
+	}
+	if topicState.Level != anonTopicState.Level {
+		if anonFound && topicFound {
+			// Anon topic takes precedence
+			if err := a.et.tm.AlertService.UpdateEvent(a.topic, anonTopicState); err != nil {
+				a.logger.Printf("E! failed to update topic %q event state for event %q", a.topic, id)
+			}
+		} else if topicFound && a.hasAnonTopic() {
+			// Update event state for topic
+			if err := a.et.tm.AlertService.UpdateEvent(a.anonTopic, topicState); err != nil {
+				a.logger.Printf("E! failed to update topic %q event state for event %q", a.topic, id)
+			}
+		} // else nothing was found, nothing to do
+	}
+	if anonFound {
+		return anonTopicState.Level
+	}
+	return topicState.Level
 }
 
 func (a *AlertNode) handleEvent(event alert.Event) {
@@ -688,7 +734,7 @@ func (a *AlertNode) handleEvent(event alert.Event) {
 	a.logger.Printf("D! %v alert triggered id:%s msg:%s data:%v", event.State.Level, event.State.ID, event.State.Message, event.Data.Result.Series[0])
 
 	// If we have anon handlers, emit event to the anonTopic
-	if len(a.handlers) > 0 {
+	if a.hasAnonTopic() {
 		event.Topic = a.anonTopic
 		err := a.et.tm.AlertService.Collect(event)
 		if err != nil {
@@ -698,7 +744,7 @@ func (a *AlertNode) handleEvent(event alert.Event) {
 	}
 
 	// If we have a user define topic, emit event to the topic.
-	if a.topic != "" {
+	if a.hasTopic() {
 		event.Topic = a.topic
 		err := a.et.tm.AlertService.Collect(event)
 		if err != nil {

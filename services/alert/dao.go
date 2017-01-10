@@ -77,6 +77,15 @@ func (h HandlerSpec) Validate() error {
 	return nil
 }
 
+func (h HandlerSpec) HasTopic(topic string) bool {
+	for _, t := range h.Topics {
+		if t == topic {
+			return true
+		}
+	}
+	return false
+}
+
 // HandlerActionSpec defines an action an handler can take.
 type HandlerActionSpec struct {
 	Kind    string                 `json:"kind"`
