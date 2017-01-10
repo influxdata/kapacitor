@@ -1022,7 +1022,6 @@ func (s *Service) createHandlerActionFromSpec(spec HandlerActionSpec) (ha handle
 		ha = newPassThroughHandler(h)
 	default:
 		err = fmt.Errorf("unsupported action kind %q", spec.Kind)
-		log.Println("error", err)
 	}
 	return
 }
