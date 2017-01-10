@@ -41,7 +41,8 @@ func (s *LogNode) runLog([]byte) error {
 		for p, ok := s.ins[0].NextPoint(); ok; p, ok = s.ins[0].NextPoint() {
 			buf.Reset()
 			if err := env.Encode(p); err != nil {
-				return err
+				s.logger.Println("E!", err)
+				continue
 			}
 			s.logger.Println(key, buf.String())
 			for _, child := range s.outs {
@@ -55,7 +56,8 @@ func (s *LogNode) runLog([]byte) error {
 		for b, ok := s.ins[0].NextBatch(); ok; b, ok = s.ins[0].NextBatch() {
 			buf.Reset()
 			if err := env.Encode(b); err != nil {
-				return err
+				s.logger.Println("E!", err)
+				continue
 			}
 			s.logger.Println(key, buf.String())
 			for _, child := range s.outs {
