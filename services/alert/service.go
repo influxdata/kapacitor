@@ -1035,6 +1035,16 @@ func (s *Service) createHandlerActionFromSpec(spec HandlerActionSpec) (ha handle
 		}
 		h := NewPostHandler(c, s.logger)
 		ha = newPassThroughHandler(h)
+	case "publish":
+		c := PublishHandlerConfig{
+			topics: s.topics,
+		}
+		err = decodeOptions(spec.Options, &c)
+		if err != nil {
+			return
+		}
+		h := NewPublishHandler(c, s.logger)
+		ha = newPassThroughHandler(h)
 	case "sensu":
 		h := s.SensuService.Handler(s.logger)
 		ha = newPassThroughHandler(h)
@@ -1065,6 +1075,11 @@ func (s *Service) createHandlerActionFromSpec(spec HandlerActionSpec) (ha handle
 			return nil, err
 		}
 		ha = newPassThroughHandler(h)
+	case "stateChangesOnly":
+		c := StateChangesOnlyHandlerConfig{
+			topics: s.topics,
+		}
+		ha = NewStateChangesOnlyHandler(c, s.logger)
 	case "talk":
 		h := s.TalkService.Handler(s.logger)
 		ha = newPassThroughHandler(h)

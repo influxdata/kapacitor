@@ -1483,7 +1483,7 @@ func (t topicEvents) Swap(i int, j int)      { t[i], t[j] = t[j], t[i] }
 func doShowTopic(args []string) error {
 	if len(args) != 1 {
 		fmt.Fprintln(os.Stderr, "Must specify one topic ID")
-		showHandlerUsage()
+		showTopicUsage()
 		os.Exit(2)
 	}
 
