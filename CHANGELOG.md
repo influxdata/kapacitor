@@ -49,6 +49,11 @@ stream
          .channel('#alerts')
 ```
 
+
+With this change alert nodes will have an anonymous topic created for them.
+This topic is managed like all other topics preserving state etc. across restarts.
+As a result existing alert nodes will now remember the state of alerts after restarts and disiabling/enabling a task.
+
 ### Features
 
 - [#327](https://github.com/influxdata/kapacitor/issues/327): You can now window based on count in addition to time.
@@ -59,6 +64,7 @@ stream
 - [#1095](https://github.com/influxdata/kapacitor/pull/1095): Add new alert API, with support for configuring handlers and topics.
 - [#929](https://github.com/influxdata/kapacitor/pull/929): Add SNMP trap service for alerting
 - [#1110](https://github.com/influxdata/kapacitor/pull/1110): Add new query property for aligning group by intervals to start times.
+- [#744](https://github.com/influxdata/kapacitor/issues/744): Preserve alert state across restarts and disable/enable actions.
 
 
 ### Bugfixes
