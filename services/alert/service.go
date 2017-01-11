@@ -74,6 +74,8 @@ type Service struct {
 
 	handlers map[string]handler
 
+	closedTopics map[string]bool
+
 	topics *alert.Topics
 
 	routes       []httpd.Route
@@ -127,9 +129,10 @@ type Service struct {
 
 func NewService(c Config, l *log.Logger) *Service {
 	s := &Service{
-		handlers: make(map[string]handler),
-		topics:   alert.NewTopics(l),
-		logger:   l,
+		handlers:     make(map[string]handler),
+		closedTopics: make(map[string]bool),
+		topics:       alert.NewTopics(l),
+		logger:       l,
 	}
 	return s
 }
@@ -488,14 +491,7 @@ func (s *Service) handleTopicEvent(t *alert.Topic, w http.ResponseWriter, r *htt
 func (s *Service) handleListTopicHandlers(t *alert.Topic, w http.ResponseWriter, r *http.Request) {
 	var handlers []client.Handler
 	for _, h := range s.handlers {
-		match := false
-		for _, topic := range h.Spec.Topics {
-			if topic == t.ID() {
-				match = true
-				break
-			}
-		}
-		if match {
+		if h.Spec.HasTopic(t.ID()) {
 			handlers = append(handlers, s.convertHandlerSpec(h.Spec))
 		}
 	}
@@ -664,26 +660,102 @@ func (s *Service) EventState(topic, event string) (alert.EventState, bool) {
 }
 
 func (s *Service) Collect(event alert.Event) error {
+	s.mu.RLock()
+	closed := s.closedTopics[event.Topic]
+	s.mu.RUnlock()
+	if closed {
+		// Restore topic
+		if err := s.restoreClosedTopic(event.Topic); err != nil {
+			return err
+		}
+	}
+
 	err := s.topics.Collect(event)
 	if err != nil {
 		return err
 	}
-	t, ok := s.topics.Topic(event.Topic)
+	return s.persistTopicState(event.Topic)
+}
+
+func (s *Service) persistTopicState(topic string) error {
+	t, ok := s.topics.Topic(topic)
 	if !ok {
-		// Topic was deleted, nothing to do
+		// Topic was deleted since event was collected, nothing to do.
 		return nil
 	}
 
 	ts := TopicState{
-		Topic:       event.Topic,
+		Topic:       topic,
 		EventStates: s.convertEventStatesFromAlert(t.EventStates(alert.OK)),
 	}
 	return s.topicsDAO.Put(ts)
 }
 
+func (s *Service) restoreClosedTopic(topic string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.closedTopics[topic] {
+		// Topic already restored
+		return nil
+	}
+	if err := s.restoreTopic(topic); err != nil {
+		return err
+	}
+	// Topic no longer closed
+	delete(s.closedTopics, topic)
+	return nil
+}
+
+// restoreTopic restores a topic's state from the storage and registers any handlers.
+// Caller must have lock to call.
+func (s *Service) restoreTopic(topic string) error {
+	// Restore events state from storage
+	ts, err := s.topicsDAO.Get(topic)
+	if err != nil && err != ErrNoTopicStateExists {
+		return err
+	} else if err != ErrNoTopicStateExists {
+		s.topics.RestoreTopic(topic, s.convertEventStatesToAlert(ts.EventStates))
+	} // else nothing to restore
+
+	// Re-Register all handlers
+	topics := []string{topic}
+	for _, h := range s.handlers {
+		if h.Spec.HasTopic(topic) {
+			s.topics.RegisterHandler(topics, h.Handler)
+		}
+	}
+	return nil
+}
+
+func (s *Service) RestoreTopic(topic string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.restoreTopic(topic)
+}
+
+func (s *Service) CloseTopic(topic string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Delete running topic
+	s.topics.DeleteTopic(topic)
+	s.closedTopics[topic] = true
+
+	// Save the final topic state
+	return s.persistTopicState(topic)
+}
+
 func (s *Service) DeleteTopic(topic string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.closedTopics, topic)
 	s.topics.DeleteTopic(topic)
 	return s.topicsDAO.Delete(topic)
+}
+
+func (s *Service) UpdateEvent(topic string, event alert.EventState) error {
+	s.topics.UpdateEvent(topic, event)
+	return s.persistTopicState(topic)
 }
 
 func (s *Service) RegisterHandler(topics []string, h alert.Handler) {

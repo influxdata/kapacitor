@@ -61,6 +61,7 @@ Commands:
 	show            Display detailed information about a task.
 	show-template   Display detailed information about a template.
 	show-handler    Display detailed information about an alert handler.
+	show-topic      Display detailed information about an alert topic.
 	level           Sets the logging level on the kapacitord server.
 	stats           Display various stats about Kapacitor.
 	version         Displays the Kapacitor version info.
@@ -176,6 +177,9 @@ func main() {
 	case "show-handler":
 		commandArgs = args
 		commandF = doShowHandler
+	case "show-topic":
+		commandArgs = args
+		commandF = doShowTopic
 	case "level":
 		commandArgs = args
 		commandF = doLevel
@@ -272,6 +276,8 @@ func doHelp(args []string) error {
 			showTemplateUsage()
 		case "show-handler":
 			showHandlerUsage()
+		case "show-topic":
+			showTopicUsage()
 		case "level":
 			levelUsage()
 		case "help":
@@ -1454,6 +1460,53 @@ func doShowHandler(args []string) error {
 			return errors.Wrap(err, "failed to format action options")
 		}
 		fmt.Printf(actionOutFmt, a.Kind, string(options))
+	}
+	return nil
+}
+
+// Show Topic
+
+func showTopicUsage() {
+	var u = `Usage: kapacitor show-topic [topic ID]
+
+	Show details about a specific topic.
+`
+	fmt.Fprintln(os.Stderr, u)
+}
+
+type topicEvents []client.TopicEvent
+
+func (t topicEvents) Len() int               { return len(t) }
+func (t topicEvents) Less(i int, j int) bool { return t[i].State.Time.Before(t[j].State.Time) }
+func (t topicEvents) Swap(i int, j int)      { t[i], t[j] = t[j], t[i] }
+
+func doShowTopic(args []string) error {
+	if len(args) != 1 {
+		fmt.Fprintln(os.Stderr, "Must specify one topic ID")
+		showHandlerUsage()
+		os.Exit(2)
+	}
+
+	te, err := cli.ListTopicEvents(cli.TopicEventsLink(args[0]), nil)
+	if err != nil {
+		return err
+	}
+	maxEvent := 5   // len("Event")
+	maxMessage := 7 // len("Message")
+	for _, e := range te.Events {
+		if l := len(e.ID); l > maxEvent {
+			maxEvent = l
+		}
+		if l := len(e.State.Message); l > maxMessage {
+			maxMessage = l
+		}
+	}
+
+	sort.Sort(topicEvents(te.Events))
+	outFmt := fmt.Sprintf("%%-%ds%%-9s%%-%ds%%-23s\n", maxEvent+1, maxMessage+1)
+	fmt.Printf(outFmt, "Event", "Level", "Message", "Date")
+	for _, e := range te.Events {
+		fmt.Printf(outFmt, e.ID, e.State.Level, e.State.Message, e.State.Time.Local().Format(time.RFC822))
 	}
 	return nil
 }

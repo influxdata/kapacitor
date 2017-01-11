@@ -1317,7 +1317,7 @@ func (ts *Service) deleteTask(id string) error {
 	kapacitor.NumTasksVar.Add(-1)
 	if task.Status == Enabled {
 		kapacitor.NumEnabledTasksVar.Add(-1)
-		ts.stopTask(id)
+		ts.TaskMasterLookup.Main().DeleteTask(id)
 	}
 	return ts.tasks.Delete(id)
 }
