@@ -359,8 +359,7 @@ func NewStateChangesOnlyHandler(c StateChangesOnlyHandlerConfig, l *log.Logger) 
 }
 
 func (h *stateChangesOnlyHandler) Handle(event alert.Event) {
-	state, ok := h.topics.EventState(event.Topic, event.State.ID)
-	if !ok || (ok && state.Level != event.State.Level) {
+	if event.State.Level != event.PreviousState().Level {
 		h.next.Handle(event)
 	}
 }

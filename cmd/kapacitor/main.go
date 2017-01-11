@@ -1487,6 +1487,10 @@ func doShowTopic(args []string) error {
 		os.Exit(2)
 	}
 
+	topic, err := cli.Topic(cli.TopicLink(args[0]))
+	if err != nil {
+		return err
+	}
 	te, err := cli.ListTopicEvents(cli.TopicEventsLink(args[0]), nil)
 	if err != nil {
 		return err
@@ -1503,7 +1507,12 @@ func doShowTopic(args []string) error {
 	}
 
 	sort.Sort(topicEvents(te.Events))
+
 	outFmt := fmt.Sprintf("%%-%ds%%-9s%%-%ds%%-23s\n", maxEvent+1, maxMessage+1)
+	fmt.Println("ID:", topic.ID)
+	fmt.Println("Level:", topic.Level)
+	fmt.Println("Collected:", topic.Collected)
+	fmt.Println("Events:")
 	fmt.Printf(outFmt, "Event", "Level", "Message", "Date")
 	for _, e := range te.Events {
 		fmt.Printf(outFmt, e.ID, e.State.Level, e.State.Message, e.State.Time.Local().Format(time.RFC822))
@@ -1783,10 +1792,10 @@ func doList(args []string) error {
 				}
 			}
 		}
-		outFmt := fmt.Sprintf("%%-%dv%%-%dv\n", maxID+1, maxLevel+1)
-		fmt.Fprintf(os.Stdout, outFmt, "ID", "Level")
+		outFmt := fmt.Sprintf("%%-%dv%%-%dv%%10v\n", maxID+1, maxLevel+1)
+		fmt.Fprintf(os.Stdout, outFmt, "ID", "Level", "Collected")
 		for _, t := range allTopics {
-			fmt.Fprintf(os.Stdout, outFmt, t.ID, t.Level)
+			fmt.Fprintf(os.Stdout, outFmt, t.ID, t.Level, t.Collected)
 		}
 	default:
 		return fmt.Errorf("cannot list '%s' did you mean 'tasks', 'recordings', 'replays', 'topics', 'handlers' or 'service-tests'?", kind)
