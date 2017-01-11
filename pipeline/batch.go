@@ -113,6 +113,10 @@ type QueryNode struct {
 	// 1 AM and the Offset is 1 hour. Then at 1 AM on Sunday the data from 12 AM will be queried.
 	Offset time.Duration
 
+	// Align the group by time intervals with the start time of the query
+	// tick:ignore
+	AlignGroupFlag bool `tick:"AlignGroup"`
+
 	// The list of dimensions for the group-by clause.
 	//tick:ignore
 	Dimensions []interface{} `tick:"GroupBy"`
@@ -178,6 +182,26 @@ func (n *QueryNode) ChainMethods() map[string]reflect.Value {
 //
 // It is recommended to use QueryNode.Align and QueryNode.Offset in conjunction with
 // group by time dimensions so that the time bounds match up with the group by intervals.
+// To automatically align the group by intervals to the start of the query time,
+// use QueryNode.AlignGroup. This is useful in more complex situations, such as when
+// the groupBy time period is longer than the query frequency.
+//
+// Example:
+//    batch
+//        |query(...)
+//            .period(5m)
+//            .every(30s)
+//            .groupBy(time(1m), 'tag1', 'tag2')
+//            .align()
+//            .alignGroup()
+//
+// For the above example, without QueryNode.AlignGroup, every other query issued by Kapacitor
+// (at :30 past the minute) will align to :00 seconds instead of the desired :30 seconds,
+// which would create 6 group by intervals instead of 5, the first and last of which
+// would only have 30 seconds of data instead of a full minute.
+// If the group by time offset (i.e. time(t, offset)) is used in conjunction with
+// QueryNode.AlignGroup, the alignment will occur first, and will be offset
+// the specified amount after.
 //
 // NOTE: Since QueryNode.Offset is inherently a negative property the second "offset" argument to the "time" function is negative to match.
 //
@@ -210,5 +234,12 @@ func (n *QueryNode) GroupByMeasurement() *QueryNode {
 // tick:property
 func (b *QueryNode) Align() *QueryNode {
 	b.AlignFlag = true
+	return b
+}
+
+// Align the group by time intervals with the start time of the query
+// tick:property
+func (b *QueryNode) AlignGroup() *QueryNode {
+	b.AlignGroupFlag = true
 	return b
 }

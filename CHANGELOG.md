@@ -58,6 +58,7 @@ stream
 - [#251](https://github.com/influxdata/kapacitor/issues/251): Enable markdown in slack attachments.
 - [#1095](https://github.com/influxdata/kapacitor/pull/1095): Add new alert API, with support for configuring handlers and topics.
 - [#929](https://github.com/influxdata/kapacitor/pull/929): Add SNMP trap service for alerting
+- [#1110](https://github.com/influxdata/kapacitor/pull/1110): Add new query property for aligning group by intervals to start times.
 
 
 ### Bugfixes

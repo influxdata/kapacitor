@@ -12,8 +12,10 @@ import (
 type Query struct {
 	startTL         *influxql.TimeLiteral
 	stopTL          *influxql.TimeLiteral
+	groupByTimeDL   *influxql.DurationLiteral
+	groupByOffsetDL *influxql.DurationLiteral
 	stmt            *influxql.SelectStatement
-	isGroupedByTime bool
+	alignGroup      bool
 }
 
 func NewQuery(queryString string) (*Query, error) {
@@ -96,6 +98,9 @@ func (q *Query) StopTime() time.Time {
 // Set the start time of the query
 func (q *Query) SetStartTime(s time.Time) {
 	q.startTL.Val = s
+	if q.alignGroup && q.groupByTimeDL != nil && q.groupByOffsetDL != nil {
+		q.groupByOffsetDL.Val = s.Sub(time.Unix(0, 0)) % q.groupByTimeDL.Val
+	}
 }
 
 // Set the stop time of the query
@@ -106,8 +111,8 @@ func (q *Query) SetStopTime(s time.Time) {
 // Deep clone this query
 func (q *Query) Clone() (*Query, error) {
 	n := &Query{
-		stmt:            q.stmt.Clone(),
-		isGroupedByTime: q.isGroupedByTime,
+		stmt:       q.stmt.Clone(),
+		alignGroup: q.alignGroup,
 	}
 	// Find the start/stop time literals
 	var err error
@@ -141,6 +146,22 @@ func (q *Query) Clone() (*Query, error) {
 			}
 		}
 	})
+	influxql.WalkFunc(n.stmt.Dimensions, func(qlNode influxql.Node) {
+		if cn, ok := qlNode.(*influxql.Call); ok {
+			if cn.Name == "time" {
+				if dln, ok := cn.Args[0].(*influxql.DurationLiteral); ok {
+					n.groupByTimeDL = &influxql.DurationLiteral{
+						Val: dln.Val,
+					}
+				}
+				if don, ok := cn.Args[1].(*influxql.DurationLiteral); ok {
+					n.groupByOffsetDL = &influxql.DurationLiteral{
+						Val: don.Val,
+					}
+				}
+			}
+		}
+	})
 	if n.startTL == nil {
 		err = errors.New("invalid query, missing start time condition")
 	}
@@ -153,6 +174,10 @@ func (q *Query) Clone() (*Query, error) {
 // Set the dimensions on the query
 func (q *Query) Dimensions(dims []interface{}) error {
 	q.stmt.Dimensions = q.stmt.Dimensions[:0]
+	q.groupByTimeDL = nil
+	q.groupByOffsetDL = &influxql.DurationLiteral{
+		Val: 0,
+	}
 	// Add in dimensions
 	hasTime := false
 	for _, d := range dims {
@@ -163,14 +188,19 @@ func (q *Query) Dimensions(dims []interface{}) error {
 			}
 			// Add time dimension
 			hasTime = true
+			q.groupByTimeDL = &influxql.DurationLiteral{
+				Val: dim,
+			}
+			if q.alignGroup {
+				q.SetStartTime(q.StartTime())
+			}
 			q.stmt.Dimensions = append(q.stmt.Dimensions,
 				&influxql.Dimension{
 					Expr: &influxql.Call{
 						Name: "time",
 						Args: []influxql.Expr{
-							&influxql.DurationLiteral{
-								Val: dim,
-							},
+							q.groupByTimeDL,
+							q.groupByOffsetDL,
 						},
 					},
 				})
@@ -192,17 +222,20 @@ func (q *Query) Dimensions(dims []interface{}) error {
 			}
 			// Add time dimension
 			hasTime = true
+			q.groupByTimeDL = &influxql.DurationLiteral{
+				Val: dim.Length,
+			}
+			q.groupByOffsetDL.Val = dim.Offset
+			if q.alignGroup {
+				q.SetStartTime(q.StartTime())
+			}
 			q.stmt.Dimensions = append(q.stmt.Dimensions,
 				&influxql.Dimension{
 					Expr: &influxql.Call{
 						Name: "time",
 						Args: []influxql.Expr{
-							&influxql.DurationLiteral{
-								Val: dim.Length,
-							},
-							&influxql.DurationLiteral{
-								Val: dim.Offset,
-							},
+							q.groupByTimeDL,
+							q.groupByOffsetDL,
 						},
 					},
 				})
@@ -212,12 +245,15 @@ func (q *Query) Dimensions(dims []interface{}) error {
 		}
 	}
 
-	q.isGroupedByTime = hasTime
 	return nil
 }
 
 func (q *Query) IsGroupedByTime() bool {
-	return q.isGroupedByTime
+	return q.groupByTimeDL != nil
+}
+
+func (q *Query) AlignGroup() {
+	q.alignGroup = true
 }
 
 func (q *Query) Fill(option influxql.FillOption, value interface{}) {

@@ -109,6 +109,34 @@ func TestQuery_Clone(t *testing.T) {
 		if err := equal(clone, q); err != nil {
 			t.Error(err)
 		}
+
+		// Set group align and dimensions
+		q.AlignGroup()
+		q.Dimensions([]interface{}{kapacitor.TimeDimension{
+			Length: time.Minute,
+			Offset: time.Second,
+		}})
+		if err := equal(clone, q); err == nil {
+			t.Errorf("equal after modification: got %v", clone)
+			return
+		}
+		// Set group align and dimesions on the clone in the same way
+		clone.AlignGroup()
+		clone.Dimensions([]interface{}{kapacitor.TimeDimension{
+			Length: time.Minute,
+			Offset: time.Second,
+		}})
+		if err := equal(clone, q); err != nil {
+			t.Error(err)
+		}
+		// Re-clone
+		clone, err = q.Clone()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := equal(clone, q); err != nil {
+			t.Error(err)
+		}
 	}
 }
 func TestQuery_IsGroupedByTime(t *testing.T) {
