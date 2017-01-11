@@ -190,7 +190,7 @@ func (s *Server) abort() {
 	if s.abortCallback != nil {
 		s.abortOnce.Do(s.abortCallback)
 	}
-	s.stop()
+	_ = s.stop()
 }
 
 // Wait for all IO to stop on the in/out objects.

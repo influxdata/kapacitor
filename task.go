@@ -81,7 +81,7 @@ func (t *Task) Dot() []byte {
 func (t *Task) Measurements() []string {
 	measurements := make([]string, 0)
 
-	t.Pipeline.Walk(func(node pipeline.Node) error {
+	_ = t.Pipeline.Walk(func(node pipeline.Node) error {
 		switch streamNode := node.(type) {
 		case *pipeline.FromNode:
 			measurements = append(measurements, streamNode.Measurement)
@@ -229,7 +229,7 @@ func (et *ExecutingTask) start(ins []*Edge, snapshot *TaskSnapshot) error {
 
 func (et *ExecutingTask) stop() (err error) {
 	close(et.stopping)
-	et.walk(func(n Node) error {
+	_ = et.walk(func(n Node) error {
 		n.stop()
 		e := n.Wait()
 		if e != nil {
@@ -302,7 +302,7 @@ func (et *ExecutingTask) checkDBRPs(batcher *BatchNode) error {
 
 // Stop all stats nodes
 func (et *ExecutingTask) StopStats() {
-	et.walk(func(n Node) error {
+	_ = et.walk(func(n Node) error {
 		if s, ok := n.(*StatsNode); ok {
 			s.stopStats()
 		}
@@ -395,7 +395,7 @@ func (et *ExecutingTask) EDot(labels bool) []byte {
 		))
 	}
 
-	et.walk(func(n Node) error {
+	_ = et.walk(func(n Node) error {
 		n.edot(&buf, labels)
 		return nil
 	})

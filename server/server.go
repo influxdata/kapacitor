@@ -234,7 +234,7 @@ type dynamicService interface {
 
 func (s *Server) SetDynamicService(name string, srv dynamicService) {
 	s.DynamicServices[name] = srv
-	s.TesterService.AddTester(name, srv)
+	_ = s.TesterService.AddTester(name, srv)
 }
 
 func (s *Server) appendStorageService() {
@@ -603,7 +603,9 @@ func (s *Server) Err() <-chan error { return s.err }
 func (s *Server) Open() error {
 
 	// Start profiling, if set.
-	s.startProfile(s.CPUProfile, s.MemProfile)
+	if err := s.startProfile(s.CPUProfile, s.MemProfile); err != nil {
+		return err
+	}
 
 	if err := s.startServices(); err != nil {
 		s.Close()
@@ -785,27 +787,29 @@ var prof struct {
 }
 
 // StartProfile initializes the cpu and memory profile, if specified.
-func (s *Server) startProfile(cpuprofile, memprofile string) {
+func (s *Server) startProfile(cpuprofile, memprofile string) error {
 	if cpuprofile != "" {
 		f, err := os.Create(cpuprofile)
 		if err != nil {
-			s.Logger.Fatalf("E! cpuprofile: %v", err)
+			return fmt.Errorf("E! cpuprofile: %v", err)
 		}
 		s.Logger.Printf("I! writing CPU profile to: %s\n", cpuprofile)
 		prof.cpu = f
-		pprof.StartCPUProfile(prof.cpu)
+		if err := pprof.StartCPUProfile(prof.cpu); err != nil {
+			return fmt.Errorf("#! start cpu profile: %v", err)
+		}
 	}
 
 	if memprofile != "" {
 		f, err := os.Create(memprofile)
 		if err != nil {
-			s.Logger.Fatalf("E! memprofile: %v", err)
+			return fmt.Errorf("E! memprofile: %v", err)
 		}
 		s.Logger.Printf("I! writing mem profile to: %s\n", memprofile)
 		prof.mem = f
 		runtime.MemProfileRate = 4096
 	}
-
+	return nil
 }
 
 // StopProfile closes the cpu and memory profiles if they are running.
@@ -816,7 +820,9 @@ func (s *Server) stopProfile() {
 		s.Logger.Println("I! CPU profile stopped")
 	}
 	if prof.mem != nil {
-		pprof.Lookup("heap").WriteTo(prof.mem, 0)
+		if err := pprof.Lookup("heap").WriteTo(prof.mem, 0); err != nil {
+			s.Logger.Printf("I! failed to write mem profile: %v\n", err)
+		}
 		prof.mem.Close()
 		s.Logger.Println("I! mem profile stopped")
 	}

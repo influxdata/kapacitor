@@ -110,7 +110,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 				an.bufPool.Put(tmpBuffer)
 			}()
 
-			json.NewEncoder(tmpBuffer).Encode(v)
+			_ = json.NewEncoder(tmpBuffer).Encode(v)
 
 			return html.JS(tmpBuffer.String())
 		},

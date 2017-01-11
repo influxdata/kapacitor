@@ -112,7 +112,7 @@ type Pipeline struct {
 
 func (p *Pipeline) addSource(src Node) {
 	src.setPipeline(p)
-	p.assignID(src)
+	_ = p.assignID(src)
 	p.sources = append(p.sources, src)
 }
 
@@ -185,7 +185,7 @@ func (p *Pipeline) Dot(name string) []byte {
 	buf.Write([]byte("digraph "))
 	buf.Write([]byte(name))
 	buf.Write([]byte(" {\n"))
-	p.Walk(func(n Node) error {
+	_ = p.Walk(func(n Node) error {
 		n.dot(&buf)
 		return nil
 	})

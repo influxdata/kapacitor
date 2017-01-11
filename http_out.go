@@ -56,7 +56,7 @@ func (h *HTTPOutNode) runOut([]byte) error {
 				http.StatusInternalServerError,
 			)
 		} else {
-			w.Write(b)
+			_, _ = w.Write(b)
 		}
 	}
 

@@ -68,7 +68,7 @@ func init() {
 }
 
 func Uptime() time.Duration {
-	return time.Now().Sub(startTime)
+	return time.Since(startTime)
 }
 
 // NewStatistics creates an expvar-based map. Within there "name" is the Measurement name, "tags" are the tags,

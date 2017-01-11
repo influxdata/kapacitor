@@ -20,7 +20,7 @@ func ResultFromJSON(in io.Reader) (r Result) {
 		return
 	}
 
-	json.Unmarshal(b, &r)
+	_ = json.Unmarshal(b, &r)
 	// Convert all times to time.Time
 	ConvertResultTimes(&r)
 	return

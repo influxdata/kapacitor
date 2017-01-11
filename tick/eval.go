@@ -902,6 +902,9 @@ func resolveIdents(n ast.Node, scope *stateful.Scope) (_ ast.Node, err error) {
 			return nil, err
 		}
 		node.Right, err = resolveIdents(node.Right, scope)
+		if err != nil {
+			return nil, err
+		}
 	case *ast.FunctionNode:
 		for i, arg := range node.Args {
 			node.Args[i], err = resolveIdents(arg, scope)

@@ -40,7 +40,10 @@ func (s *LogNode) runLog([]byte) error {
 	case pipeline.StreamEdge:
 		for p, ok := s.ins[0].NextPoint(); ok; p, ok = s.ins[0].NextPoint() {
 			buf.Reset()
-			env.Encode(p)
+			if err := env.Encode(p); err != nil {
+				s.logger.Println("E!", err)
+				continue
+			}
 			s.logger.Println(key, buf.String())
 			for _, child := range s.outs {
 				err := child.CollectPoint(p)
@@ -52,7 +55,10 @@ func (s *LogNode) runLog([]byte) error {
 	case pipeline.BatchEdge:
 		for b, ok := s.ins[0].NextBatch(); ok; b, ok = s.ins[0].NextBatch() {
 			buf.Reset()
-			env.Encode(b)
+			if err := env.Encode(b); err != nil {
+				s.logger.Println("E!", err)
+				continue
+			}
 			s.logger.Println(key, buf.String())
 			for _, child := range s.outs {
 				err := child.CollectBatch(b)
