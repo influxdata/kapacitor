@@ -511,7 +511,7 @@ type TcpHandler struct {
 //    |alert()
 //       .id('{{ .Name }}')
 //       // Email subject
-//       .meassage('{{ .ID }}:{{ .Level }}')
+//       .message('{{ .ID }}:{{ .Level }}')
 //       //Email body as HTML
 //       .details('''
 //<h1>{{ .ID }}</h1>
@@ -569,7 +569,7 @@ type EmailHandler struct {
 //    |alert()
 //       .id('{{ .Name }}')
 //       // Email subject
-//       .meassage('{{ .ID }}:{{ .Level }}')
+//       .message('{{ .ID }}:{{ .Level }}')
 //       //Email body as HTML
 //       .details('''
 //<h1>{{ .ID }}</h1>
@@ -1315,7 +1315,7 @@ type SNMPData struct {
 //
 // Example:
 //    |alert()
-//       .meassage('{{ .ID }}:{{ .Level }}')
+//       .message('{{ .ID }}:{{ .Level }}')
 //       .snmpTrap('1.3.6.1.4.1.1')
 //          .data('1.3.6.1.4.1.1.5', 's', '{{ .Level }}' )
 //          .data('1.3.6.1.4.1.1.6', 'i', '50' )
