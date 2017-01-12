@@ -8,8 +8,8 @@ import (
 	"sync"
 
 	"github.com/influxdata/influxdb/models"
-	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/expvar"
+	"github.com/influxdata/kapacitor/vars"
 )
 
 const (
@@ -85,7 +85,7 @@ func (s *Service) Open() (err error) {
 	// Configure expvar monitoring. It's OK to do this even if the service fails to open and
 	// should be done before any data could arrive for the service.
 	tags := map[string]string{"bind": s.addr.String()}
-	s.statKey, s.statMap = kapacitor.NewStatistics("udp", tags)
+	s.statKey, s.statMap = vars.NewStatistic("udp", tags)
 
 	if s.config.ReadBuffer != 0 {
 		err = s.conn.SetReadBuffer(s.config.ReadBuffer)
@@ -168,7 +168,7 @@ func (s *Service) Close() error {
 	if s.conn == nil {
 		return errors.New("Service already closed")
 	}
-	kapacitor.DeleteStatistics(s.statKey)
+	vars.DeleteStatistic(s.statKey)
 
 	close(s.done)
 	s.conn.Close()

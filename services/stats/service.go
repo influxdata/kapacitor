@@ -30,6 +30,7 @@ import (
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/timer"
+	"github.com/influxdata/kapacitor/vars"
 )
 
 // Sends internal stats back into the Kapacitor stream.
@@ -113,7 +114,7 @@ func (s *Service) sendStats() {
 
 func (s *Service) reportStats() {
 	now := time.Now().UTC()
-	data, err := kapacitor.GetStatsData()
+	data, err := vars.GetStatsData()
 	if err != nil {
 		s.logger.Println("E! error getting stats data:", err)
 		return

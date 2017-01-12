@@ -47,6 +47,7 @@ import (
 	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
+	"github.com/influxdata/kapacitor/vars"
 	"github.com/pkg/errors"
 	"github.com/twinj/uuid"
 )
@@ -144,11 +145,11 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	}
 
 	// Set published vars
-	kapacitor.ClusterIDVar.Set(s.ClusterID)
-	kapacitor.ServerIDVar.Set(s.ServerID)
-	kapacitor.HostVar.Set(s.hostname)
-	kapacitor.ProductVar.Set(kapacitor.Product)
-	kapacitor.VersionVar.Set(s.BuildInfo.Version)
+	vars.ClusterIDVar.Set(s.ClusterID)
+	vars.ServerIDVar.Set(s.ServerID)
+	vars.HostVar.Set(s.hostname)
+	vars.ProductVar.Set(vars.Product)
+	vars.VersionVar.Set(s.BuildInfo.Version)
 	s.Logger.Printf("I! ClusterID: %s ServerID: %s", s.ClusterID, s.ServerID)
 
 	// Start Task Master

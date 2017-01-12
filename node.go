@@ -14,6 +14,7 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/timer"
+	"github.com/influxdata/kapacitor/vars"
 	"github.com/pkg/errors"
 )
 
@@ -98,7 +99,7 @@ func (n *node) init() {
 		"type": n.et.Task.Type.String(),
 		"kind": n.Desc(),
 	}
-	n.statsKey, n.statMap = NewStatistics("nodes", tags)
+	n.statsKey, n.statMap = vars.NewStatistic("nodes", tags)
 	avgExecVar := &MaxDuration{}
 	n.statMap.Set(statAverageExecTime, avgExecVar)
 	n.timer = n.et.tm.TimingService.NewTimer(avgExecVar)
@@ -135,7 +136,7 @@ func (n *node) stop() {
 	if n.stopF != nil {
 		n.stopF()
 	}
-	DeleteStatistics(n.statsKey)
+	vars.DeleteStatistic(n.statsKey)
 }
 
 // no-op snapshot

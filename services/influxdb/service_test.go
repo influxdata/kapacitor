@@ -14,10 +14,10 @@ import (
 
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/models"
-	"github.com/influxdata/kapacitor"
 	influxcli "github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/influxdb"
+	"github.com/influxdata/kapacitor/vars"
 )
 
 var ls = logSerivce{}
@@ -37,7 +37,7 @@ const (
 )
 
 func init() {
-	kapacitor.ClusterIDVar.Set(testKapacitorClusterID)
+	vars.ClusterIDVar.Set(testKapacitorClusterID)
 	if len(randomTokenData) != tokenSize {
 		panic(fmt.Sprintf("invalid randomTokenData: got %d exp %d", len(randomTokenData), tokenSize))
 	}

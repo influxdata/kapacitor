@@ -6,7 +6,9 @@ import (
 	"path"
 	"sort"
 	"sync"
-	"sync/atomic"
+
+	"github.com/influxdata/kapacitor/expvar"
+	"github.com/influxdata/kapacitor/vars"
 )
 
 const (
@@ -220,17 +222,26 @@ type Topic struct {
 	events map[string]*EventState
 	sorted []*EventState
 
-	collected int64
+	collected *expvar.Int
+	statsKey  string
 
 	handlers []*bufHandler
 }
 
 func newTopic(id string) *Topic {
-	return &Topic{
-		id:     id,
-		events: make(map[string]*EventState),
+	t := &Topic{
+		id:        id,
+		events:    make(map[string]*EventState),
+		collected: new(expvar.Int),
 	}
+	statsKey, statsMap := vars.NewStatistic("topics", map[string]string{
+		"id": id,
+	})
+	statsMap.Set("collected", t.collected)
+	t.statsKey = statsKey
+	return t
 }
+
 func (t *Topic) ID() string {
 	return t.id
 }
@@ -324,6 +335,7 @@ func (t *Topic) close() {
 		h.Close()
 	}
 	t.handlers = nil
+	vars.DeleteStatistic(t.statsKey)
 }
 
 func (t *Topic) handleEvent(event Event) error {
@@ -332,14 +344,7 @@ func (t *Topic) handleEvent(event Event) error {
 		event.previousState = prev
 	}
 
-	// Count collected event
-	for {
-		old := atomic.LoadInt64(&t.collected)
-		new := old + 1
-		if atomic.CompareAndSwapInt64(&t.collected, old, new) {
-			break
-		}
-	}
+	t.collected.Add(1)
 
 	t.mu.RLock()
 	defer t.mu.RUnlock()
@@ -360,7 +365,7 @@ func (t *Topic) handleEvent(event Event) error {
 }
 
 func (t *Topic) Collected() int64 {
-	return atomic.LoadInt64(&t.collected)
+	return t.collected.IntValue()
 }
 
 // updateEvent will store the latest state for the given ID.

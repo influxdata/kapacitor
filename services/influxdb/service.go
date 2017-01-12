@@ -22,10 +22,10 @@ import (
 	"github.com/cenkalti/backoff"
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/models"
-	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/udp"
+	"github.com/influxdata/kapacitor/vars"
 	"github.com/pkg/errors"
 )
 
@@ -80,7 +80,7 @@ type Service struct {
 }
 
 func NewService(configs []Config, httpPort int, hostname string, useTokens bool, l *log.Logger) (*Service, error) {
-	clusterID := kapacitor.ClusterIDVar.StringValue()
+	clusterID := vars.ClusterIDVar.StringValue()
 	subName := subNamePrefix + clusterID
 	s := &Service{
 		clusters:   make(map[string]*influxdbCluster),
@@ -720,7 +720,7 @@ func (c *influxdbCluster) unlinkSubscriptions() error {
 			}
 		}
 	}
-	kapacitor.NumSubscriptionsVar.Set(c.clusterName, 0)
+	vars.NumSubscriptionsVar.Set(c.clusterName, 0)
 	return nil
 }
 
@@ -1000,7 +1000,7 @@ func (c *influxdbCluster) linkSubscriptions(ctx context.Context) error {
 		}
 	}
 
-	kapacitor.NumSubscriptionsVar.Set(c.clusterName, int64(len(existingSubs)))
+	vars.NumSubscriptionsVar.Set(c.clusterName, int64(len(existingSubs)))
 	return nil
 }
 
