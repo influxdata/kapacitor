@@ -8098,6 +8098,40 @@ func TestServer_AlertListHandlers(t *testing.T) {
 		t.Errorf("unexpected topic handlers:\ngot\n%+v\nexp\n%+v\n", topicHandlers, expTopicHandlers)
 	}
 }
+func TestServer_AlertTopic(t *testing.T) {
+	// Create default config
+	c := NewConfig()
+	s := OpenServer(c)
+	cli := Client(s)
+	defer s.Close()
+
+	if _, err := cli.CreateHandler(client.HandlerOptions{
+		ID:     "testAlertHandler",
+		Topics: []string{"misc"},
+		Actions: []client.HandlerAction{{
+			Kind:    "tcp",
+			Options: map[string]interface{}{"address": "localhost:4657"},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	expTopic := client.Topic{
+		Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/misc"},
+		ID:           "misc",
+		Level:        "OK",
+		Collected:    0,
+		EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1preview/alerts/topics/misc/events"},
+		HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1preview/alerts/topics/misc/handlers"},
+	}
+	topic, err := cli.Topic(cli.TopicLink("misc"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(topic, expTopic) {
+		t.Errorf("unexpected topic:\ngot\n%+v\nexp\n%+v\n", topic, expTopic)
+	}
+}
 
 func TestServer_AlertListTopics(t *testing.T) {
 	// Setup test TCP server

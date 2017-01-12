@@ -1,80 +1,28 @@
-package kapacitor
+package vars
 
 import (
 	"expvar"
 	"fmt"
 	"runtime"
-	"time"
 
 	kexpvar "github.com/influxdata/kapacitor/expvar"
 	"github.com/twinj/uuid"
 )
 
-const (
-	// List of names for top-level exported vars
-	ClusterIDVarName = "cluster_id"
-	ServerIDVarName  = "server_id"
-	HostVarName      = "host"
-	ProductVarName   = "product"
-	VersionVarName   = "version"
-
-	NumTasksVarName         = "num_tasks"
-	NumEnabledTasksVarName  = "num_enabled_tasks"
-	NumSubscriptionsVarName = "num_subscriptions"
-
-	UptimeVarName = "uptime"
-
-	// The name of the product
-	Product = "kapacitor"
-)
-
 var (
-	// Global expvars
-	NumTasksVar         = &kexpvar.Int{}
-	NumEnabledTasksVar  = &kexpvar.Int{}
-	NumSubscriptionsVar = kexpvar.NewIntSum()
-
-	ClusterIDVar = &kexpvar.String{}
-	ServerIDVar  = &kexpvar.String{}
-	HostVar      = &kexpvar.String{}
-	ProductVar   = &kexpvar.String{}
-	VersionVar   = &kexpvar.String{}
-
 	// All internal stats are added as sub-maps to this top level map.
 	stats *kexpvar.Map
 )
 
-var (
-	startTime time.Time
-)
-
 func init() {
-	startTime = time.Now().UTC()
-
-	expvar.Publish(NumTasksVarName, NumTasksVar)
-	expvar.Publish(NumEnabledTasksVarName, NumEnabledTasksVar)
-	expvar.Publish(NumSubscriptionsVarName, NumSubscriptionsVar)
-
-	expvar.Publish(ClusterIDVarName, ClusterIDVar)
-	expvar.Publish(ServerIDVarName, ServerIDVar)
-	expvar.Publish(HostVarName, HostVar)
-	expvar.Publish(ProductVarName, ProductVar)
-	expvar.Publish(VersionVarName, VersionVar)
-
 	// Initialze the global stats map
 	stats = &kexpvar.Map{}
 	stats.Init()
 	expvar.Publish(Product, stats)
 }
 
-func Uptime() time.Duration {
-	return time.Since(startTime)
-}
-
-// NewStatistics creates an expvar-based map. Within there "name" is the Measurement name, "tags" are the tags,
-// and values are placed at the key "values".
-// The "values" map is returned so that statistics can be set.
-func NewStatistics(name string, tags map[string]string) (string, *kexpvar.Map) {
+// NewStatistic creates a new statistic in the published expvar map.
+func NewStatistic(name string, tags map[string]string) (string, *kexpvar.Map) {
 	key := uuid.NewV4().String()
 
 	m := &kexpvar.Map{}
@@ -111,8 +59,8 @@ func NewStatistics(name string, tags map[string]string) (string, *kexpvar.Map) {
 	return key, statMap
 }
 
-// Remove a statistics map.
-func DeleteStatistics(key string) {
+// DeleteStatistic removes the specified  statistic from the published map.
+func DeleteStatistic(key string) {
 	stats.Delete(key)
 }
 
@@ -122,7 +70,7 @@ type StatsData struct {
 	Values map[string]interface{} `json:"values"`
 }
 
-// Return all stats data from the expvars.
+// GetStatsData return all stats data from the published expvars.
 func GetStatsData() ([]StatsData, error) {
 	allData := make([]StatsData, 0)
 	// Add Global expvars

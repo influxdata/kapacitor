@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/vars"
 	client "github.com/influxdata/usage-client/v1"
 )
 
@@ -47,11 +47,11 @@ func (s *Service) Open() error {
 	}
 
 	// Populate published vars
-	s.clusterID = kapacitor.ClusterIDVar.StringValue()
-	s.serverID = kapacitor.ServerIDVar.StringValue()
-	s.hostname = kapacitor.HostVar.StringValue()
-	s.version = kapacitor.VersionVar.StringValue()
-	s.product = kapacitor.Product
+	s.clusterID = vars.ClusterIDVar.StringValue()
+	s.serverID = vars.ServerIDVar.StringValue()
+	s.hostname = vars.HostVar.StringValue()
+	s.version = vars.VersionVar.StringValue()
+	s.product = vars.Product
 
 	// Populate anonymous tags
 	s.tags = make(client.Tags)
@@ -114,15 +114,15 @@ func (s *Service) sendUsageReport() error {
 		Values: make(client.Values),
 	}
 	// Add values
-	data.Values[kapacitor.ClusterIDVarName] = s.clusterID
-	data.Values[kapacitor.ServerIDVarName] = s.serverID
-	data.Values[kapacitor.NumTasksVarName] = kapacitor.NumTasksVar.IntValue()
-	data.Values[kapacitor.NumEnabledTasksVarName] = kapacitor.NumEnabledTasksVar.IntValue()
-	data.Values[kapacitor.NumSubscriptionsVarName] = kapacitor.NumSubscriptionsVar.IntValue()
-	data.Values[kapacitor.UptimeVarName] = kapacitor.Uptime().Seconds()
+	data.Values[vars.ClusterIDVarName] = s.clusterID
+	data.Values[vars.ServerIDVarName] = s.serverID
+	data.Values[vars.NumTasksVarName] = vars.NumTasksVar.IntValue()
+	data.Values[vars.NumEnabledTasksVarName] = vars.NumEnabledTasksVar.IntValue()
+	data.Values[vars.NumSubscriptionsVarName] = vars.NumSubscriptionsVar.IntValue()
+	data.Values[vars.UptimeVarName] = vars.Uptime().Seconds()
 
 	usage := client.Usage{
-		Product: kapacitor.Product,
+		Product: vars.Product,
 		Data:    []client.UsageData{data},
 	}
 

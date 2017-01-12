@@ -10,9 +10,14 @@ import (
 )
 
 type Event struct {
-	Topic string
-	State EventState
-	Data  EventData
+	Topic         string
+	State         EventState
+	Data          EventData
+	previousState EventState
+}
+
+func (e Event) PreviousState() EventState {
+	return e.previousState
 }
 
 func (e Event) TemplateData() TemplateData {
@@ -142,4 +147,9 @@ func (l *Level) UnmarshalText(text []byte) error {
 func ParseLevel(s string) (l Level, err error) {
 	err = l.UnmarshalText([]byte(strings.ToUpper(s)))
 	return
+}
+
+type TopicStatus struct {
+	Level     Level
+	Collected int64
 }

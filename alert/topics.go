@@ -6,6 +6,9 @@ import (
 	"path"
 	"sort"
 	"sync"
+
+	"github.com/influxdata/kapacitor/expvar"
+	"github.com/influxdata/kapacitor/vars"
 )
 
 const (
@@ -163,16 +166,19 @@ func (s *Topics) ReplaceHandler(oldTopics, newTopics []string, oldH, newH Handle
 
 // TopicStatus returns the max alert level for each topic matching 'pattern', not returning
 // any topics with max alert levels less severe than 'minLevel'
-func (s *Topics) TopicStatus(pattern string, minLevel Level) map[string]Level {
+func (s *Topics) TopicStatus(pattern string, minLevel Level) map[string]TopicStatus {
 	s.mu.RLock()
-	res := make(map[string]Level, len(s.topics))
+	res := make(map[string]TopicStatus, len(s.topics))
 	for _, topic := range s.topics {
 		if !match(pattern, topic.ID()) {
 			continue
 		}
 		level := topic.MaxLevel()
 		if level >= minLevel {
-			res[topic.ID()] = level
+			res[topic.ID()] = TopicStatus{
+				Level:     level,
+				Collected: topic.Collected(),
+			}
 		}
 	}
 	s.mu.RUnlock()
@@ -216,19 +222,36 @@ type Topic struct {
 	events map[string]*EventState
 	sorted []*EventState
 
+	collected *expvar.Int
+	statsKey  string
+
 	handlers []*bufHandler
 }
 
 func newTopic(id string) *Topic {
-	return &Topic{
-		id:     id,
-		events: make(map[string]*EventState),
+	t := &Topic{
+		id:        id,
+		events:    make(map[string]*EventState),
+		collected: new(expvar.Int),
 	}
+	statsKey, statsMap := vars.NewStatistic("topics", map[string]string{
+		"id": id,
+	})
+	statsMap.Set("collected", t.collected)
+	t.statsKey = statsKey
+	return t
 }
+
 func (t *Topic) ID() string {
 	return t.id
 }
 
+func (t *Topic) Status() TopicStatus {
+	return TopicStatus{
+		Level:     t.MaxLevel(),
+		Collected: t.Collected(),
+	}
+}
 func (t *Topic) MaxLevel() Level {
 	level := OK
 	t.mu.RLock()
@@ -312,10 +335,17 @@ func (t *Topic) close() {
 		h.Close()
 	}
 	t.handlers = nil
+	vars.DeleteStatistic(t.statsKey)
 }
 
 func (t *Topic) handleEvent(event Event) error {
-	t.updateEvent(event.State)
+	prev, ok := t.updateEvent(event.State)
+	if ok {
+		event.previousState = prev
+	}
+
+	t.collected.Add(1)
+
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
@@ -330,12 +360,17 @@ func (t *Topic) handleEvent(event Event) error {
 	if len(errs) != 0 {
 		return errs
 	}
+
 	return nil
 }
 
+func (t *Topic) Collected() int64 {
+	return t.collected.IntValue()
+}
+
 // updateEvent will store the latest state for the given ID.
-func (t *Topic) updateEvent(state EventState) {
-	var needSort bool
+func (t *Topic) updateEvent(state EventState) (EventState, bool) {
+	var hasPrev, needSort bool
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	cur := t.events[state.ID]
@@ -344,14 +379,18 @@ func (t *Topic) updateEvent(state EventState) {
 		cur = new(EventState)
 		t.events[state.ID] = cur
 		t.sorted = append(t.sorted, cur)
+	} else {
+		hasPrev = true
 	}
 	needSort = needSort || cur.Level != state.Level
 
+	prev := *cur
 	*cur = state
 
 	if needSort {
 		sort.Sort(sortedStates(t.sorted))
 	}
+	return prev, hasPrev
 }
 
 type sortedStates []*EventState

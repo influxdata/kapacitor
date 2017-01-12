@@ -317,3 +317,54 @@ func (h *aggregateHandler) Close() {
 	close(h.closing)
 	h.wg.Wait()
 }
+
+type PublishHandlerConfig struct {
+	Topics []string `mapstructure:"topics"`
+	topics *alert.Topics
+}
+type publishHandler struct {
+	c      PublishHandlerConfig
+	logger *log.Logger
+}
+
+func NewPublishHandler(c PublishHandlerConfig, l *log.Logger) alert.Handler {
+	return &publishHandler{
+		c:      c,
+		logger: l,
+	}
+}
+
+func (h *publishHandler) Handle(event alert.Event) {
+	for _, t := range h.c.Topics {
+		event.Topic = t
+		h.c.topics.Collect(event)
+	}
+}
+
+type StateChangesOnlyHandlerConfig struct {
+	topics *alert.Topics
+}
+
+type stateChangesOnlyHandler struct {
+	topics *alert.Topics
+	logger *log.Logger
+	next   alert.Handler
+}
+
+func NewStateChangesOnlyHandler(c StateChangesOnlyHandlerConfig, l *log.Logger) handlerAction {
+	return &stateChangesOnlyHandler{
+		topics: c.topics,
+		logger: l,
+	}
+}
+
+func (h *stateChangesOnlyHandler) Handle(event alert.Event) {
+	if event.State.Level != event.PreviousState().Level {
+		h.next.Handle(event)
+	}
+}
+
+func (h *stateChangesOnlyHandler) SetNext(n alert.Handler) {
+	h.next = n
+}
+func (h *stateChangesOnlyHandler) Close() {}

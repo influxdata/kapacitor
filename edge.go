@@ -9,6 +9,7 @@ import (
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/vars"
 )
 
 const (
@@ -54,7 +55,7 @@ func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, size i
 		"child":  childName,
 		"type":   t.String(),
 	}
-	key, sm := NewStatistics("edges", tags)
+	key, sm := vars.NewStatistic("edges", tags)
 	collected := &expvar.Int{}
 	emitted := &expvar.Int{}
 	sm.Set(statCollected, collected)
@@ -130,7 +131,7 @@ func (e *Edge) Close() {
 	if e.batch != nil {
 		close(e.batch)
 	}
-	DeleteStatistics(e.statsKey)
+	vars.DeleteStatistic(e.statsKey)
 }
 
 // Abort all next and collect calls.

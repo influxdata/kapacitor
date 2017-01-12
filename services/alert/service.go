@@ -367,18 +367,19 @@ func (s *Service) topicHandlerLink(topic, handler string) client.Link {
 	return client.Link{Relation: client.Self, Href: path.Join(topicsBasePath, topic, topicHandlersPath, handler)}
 }
 
-func (s *Service) createClientTopic(topic string, level alert.Level) client.Topic {
+func (s *Service) createClientTopic(topic string, status alert.TopicStatus) client.Topic {
 	return client.Topic{
 		ID:           topic,
 		Link:         s.topicLink(topic),
-		Level:        level.String(),
+		Level:        status.Level.String(),
+		Collected:    status.Collected,
 		EventsLink:   s.topicEventsLink(topic, eventsRelation),
 		HandlersLink: s.topicHandlersLink(topic, handlersRelation),
 	}
 }
 
 func (s *Service) handleTopic(t *alert.Topic, w http.ResponseWriter, r *http.Request) {
-	topic := s.createClientTopic(t.ID(), t.MaxLevel())
+	topic := s.createClientTopic(t.ID(), t.Status())
 
 	w.WriteHeader(http.StatusOK)
 	w.Write(httpd.MarshalJSON(topic, true))
@@ -878,8 +879,8 @@ func (s sortedTopics) Swap(i int, j int)      { s[i], s[j] = s[j], s[i] }
 func (s *Service) TopicStatus(pattern string, minLevel alert.Level) []client.Topic {
 	statuses := s.topics.TopicStatus(pattern, minLevel)
 	topics := make([]client.Topic, 0, len(statuses))
-	for topic, level := range statuses {
-		topics = append(topics, s.createClientTopic(topic, level))
+	for topic, status := range statuses {
+		topics = append(topics, s.createClientTopic(topic, status))
 	}
 	sort.Sort(sortedTopics(topics))
 	return topics
@@ -1035,6 +1036,16 @@ func (s *Service) createHandlerActionFromSpec(spec HandlerActionSpec) (ha handle
 		}
 		h := NewPostHandler(c, s.logger)
 		ha = newPassThroughHandler(h)
+	case "publish":
+		c := PublishHandlerConfig{
+			topics: s.topics,
+		}
+		err = decodeOptions(spec.Options, &c)
+		if err != nil {
+			return
+		}
+		h := NewPublishHandler(c, s.logger)
+		ha = newPassThroughHandler(h)
 	case "sensu":
 		h := s.SensuService.Handler(s.logger)
 		ha = newPassThroughHandler(h)
@@ -1065,6 +1076,11 @@ func (s *Service) createHandlerActionFromSpec(spec HandlerActionSpec) (ha handle
 			return nil, err
 		}
 		ha = newPassThroughHandler(h)
+	case "stateChangesOnly":
+		c := StateChangesOnlyHandlerConfig{
+			topics: s.topics,
+		}
+		ha = NewStateChangesOnlyHandler(c, s.logger)
 	case "talk":
 		h := s.TalkService.Handler(s.logger)
 		ha = newPassThroughHandler(h)

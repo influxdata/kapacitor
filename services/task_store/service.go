@@ -20,6 +20,7 @@ import (
 	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/influxdata/kapacitor/tick"
 	"github.com/influxdata/kapacitor/tick/ast"
+	"github.com/influxdata/kapacitor/vars"
 	"github.com/pkg/errors"
 	"github.com/twinj/uuid"
 )
@@ -166,7 +167,7 @@ func (ts *Service) Open() error {
 	// Count all tasks
 	offset := 0
 	limit := 100
-	kapacitor.NumEnabledTasksVar.Set(0)
+	vars.NumEnabledTasksVar.Set(0)
 	for {
 		tasks, err := ts.tasks.List("*", offset, limit)
 		if err != nil {
@@ -192,8 +193,8 @@ func (ts *Service) Open() error {
 	}
 
 	// Set expvars
-	kapacitor.NumTasksVar.Set(numTasks)
-	kapacitor.NumEnabledTasksVar.Set(numEnabledTasks)
+	vars.NumTasksVar.Set(numTasks)
+	vars.NumEnabledTasksVar.Set(numEnabledTasks)
 
 	return nil
 }
@@ -766,10 +767,10 @@ func (ts *Service) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Count new task
-	kapacitor.NumTasksVar.Add(1)
+	vars.NumTasksVar.Add(1)
 	if newTask.Status == Enabled {
 		//Count new enabled task
-		kapacitor.NumEnabledTasksVar.Add(1)
+		vars.NumEnabledTasksVar.Add(1)
 		// Start task
 		err = ts.startTask(newTask)
 		if err != nil {
@@ -926,14 +927,14 @@ func (ts *Service) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 		// Enable/Disable task
 		switch updated.Status {
 		case Enabled:
-			kapacitor.NumEnabledTasksVar.Add(1)
+			vars.NumEnabledTasksVar.Add(1)
 			err = ts.startTask(updated)
 			if err != nil {
 				httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
 				return
 			}
 		case Disabled:
-			kapacitor.NumEnabledTasksVar.Add(-1)
+			vars.NumEnabledTasksVar.Add(-1)
 			ts.stopTask(original.ID)
 		}
 	}
@@ -1314,9 +1315,9 @@ func (ts *Service) deleteTask(id string) error {
 			ts.logger.Printf("E! failed to disassociate task %s from template %s", task.TemplateID, task.ID)
 		}
 	}
-	kapacitor.NumTasksVar.Add(-1)
+	vars.NumTasksVar.Add(-1)
 	if task.Status == Enabled {
-		kapacitor.NumEnabledTasksVar.Add(-1)
+		vars.NumEnabledTasksVar.Add(-1)
 		ts.TaskMasterLookup.Main().DeleteTask(id)
 	}
 	return ts.tasks.Delete(id)

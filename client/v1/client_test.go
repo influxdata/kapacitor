@@ -251,6 +251,13 @@ func Test_ReportsErrors(t *testing.T) {
 			},
 		},
 		{
+			name: "Topic",
+			fnc: func(c *client.Client) error {
+				_, err := c.Topic(c.TopicLink(""))
+				return err
+			},
+		},
+		{
 			name: "ListTopics",
 			fnc: func(c *client.Client) error {
 				_, err := c.ListTopics(nil)
@@ -2468,6 +2475,46 @@ func Test_DoServiceTest(t *testing.T) {
 	}
 	if !reflect.DeepEqual(exp, tr) {
 		t.Errorf("unexpected service test result:\ngot:\n%v\nexp:\n%v", tr, exp)
+	}
+}
+
+func Test_Topic(t *testing.T) {
+	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.String() == "/kapacitor/v1preview/alerts/topics/system" &&
+			r.Method == "GET" {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, `{
+    "link": {"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system"},
+    "events-link" : {"rel":"events","href":"/kapacitor/v1preview/alerts/topics/system/events"},
+    "handlers-link": {"rel":"handlers","href":"/kapacitor/v1preview/alerts/topics/system/handlers"},
+    "id": "system",
+    "level":"CRITICAL",
+	"collected": 5
+}`)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "request: %v", r)
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	topic, err := c.Topic(c.TopicLink("system"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp := client.Topic{
+		ID:           "system",
+		Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/system"},
+		EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1preview/alerts/topics/system/events"},
+		HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1preview/alerts/topics/system/handlers"},
+		Level:        "CRITICAL",
+		Collected:    5,
+	}
+	if !reflect.DeepEqual(exp, topic) {
+		t.Errorf("unexpected topic result:\ngot:\n%v\nexp:\n%v", topic, exp)
 	}
 }
 

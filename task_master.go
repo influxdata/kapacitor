@@ -29,6 +29,7 @@ import (
 	"github.com/influxdata/kapacitor/tick/stateful"
 	"github.com/influxdata/kapacitor/timer"
 	"github.com/influxdata/kapacitor/udf"
+	"github.com/influxdata/kapacitor/vars"
 )
 
 const (
@@ -613,7 +614,7 @@ func (tm *TaskMaster) forkPoint(p models.Point) {
 			"retention_policy": key.RetentionPolicy,
 			"measurement":      key.Measurement,
 		}
-		_, statMap := NewStatistics("ingress", tags)
+		_, statMap := vars.NewStatistic("ingress", tags)
 		statMap.Set(statPointsReceived, c)
 	}
 	c.Add(1)

@@ -1767,6 +1767,7 @@ type Topic struct {
 	Link         Link   `json:"link"`
 	ID           string `json:"id"`
 	Level        string `json:"level"`
+	Collected    int64  `json:"collected"`
 	EventsLink   Link   `json:"events-link"`
 	HandlersLink Link   `json:"handlers-link"`
 }
@@ -1792,6 +1793,23 @@ func (c *Client) ListTopics(opt *ListTopicsOptions) (Topics, error) {
 		return topics, err
 	}
 	return topics, nil
+}
+
+func (c *Client) Topic(link Link) (Topic, error) {
+	var t Topic
+	if link.Href == "" {
+		return t, fmt.Errorf("invalid link %v", link)
+	}
+	u := *c.url
+	u.Path = link.Href
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return t, err
+	}
+
+	_, err = c.Do(req, &t, http.StatusOK)
+	return t, err
 }
 
 func (c *Client) DeleteTopic(link Link) error {

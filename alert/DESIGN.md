@@ -104,7 +104,7 @@ actions:
     "actions": [
         {"kind":"aggregate", "options": {"groupBy":"id","internal":"1m"}},
         {"kind":"throttle", "options": {"count":10,"every":"5m"}},
-        {"kind":"publish", "options": {"topics":["throttled_aggreated"]},
+        {"kind":"publish", "options": {"topics":["throttled_aggreated"]}},
         {"kind":"pagerDuty", "options": {"serviceKey":"XXX"}}
     ]
 }
