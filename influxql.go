@@ -201,11 +201,13 @@ func (n *InfluxQLNode) runBatchInfluxQL() error {
 			}
 			n.timer.Resume()
 		} else {
-			if err := context.AggregateBatch(&b); err != nil {
+			err := context.AggregateBatch(&b)
+			if err == nil {
+				if err := n.emit(context); err != nil {
+					n.logger.Println("E! failed to emit batch:", err)
+				}
+			} else {
 				n.logger.Println("E! failed to aggregate batch:", err)
-			}
-			if err := n.emit(context); err != nil {
-				n.logger.Println("E! failed to emit batch:", err)
 			}
 		}
 		n.timer.Stop()
