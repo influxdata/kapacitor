@@ -76,6 +76,7 @@ See the [API docs on technical preview](https://docs.influxdata.com/kapacitor/v1
 - [#1045](https://github.com/influxdata/kapacitor/issues/1045): Fix panic during replays.
 - [#1043](https://github.com/influxdata/kapacitor/issues/1043): logrotate.d ignores kapacitor configuration due to bad file mode
 - [#1100](https://github.com/influxdata/kapacitor/issues/1100): Fix issue with the Union node buffering more points than necessary.
+- [#872](https://github.com/influxdata/kapacitor/issues/872): Fix panic during failed aggregate results.
 
 ## v1.1.1 [2016-12-02]
 
