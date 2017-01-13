@@ -116,6 +116,8 @@ New API endpoints have been added to be able to configure InfluxDB clusters and 
 Along with the ability to dynamically configure a service, API endpoints have been added to test the configurable services.
 See the [API docs](https://docs.influxdata.com/kapacitor/latest/api/api/) for more details.
 
+>NOTE: The `connect_errors` stat from the query node was removed since the client changed, all errors are now counted in the `query_errors` stat.
+
 ### Features
 
 - [#931](https://github.com/influxdata/kapacitor/issues/931): Add a Kubernetes autoscaler node. You can now autoscale your Kubernetes deployments via Kapacitor.
