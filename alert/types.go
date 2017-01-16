@@ -44,6 +44,7 @@ type EventState struct {
 	ID       string
 	Message  string
 	Details  string
+	Hostname string
 	Time     time.Time
 	Duration time.Duration
 	Level    Level
