@@ -13,7 +13,7 @@ import (
 
 const (
 	// eventBufferSize is the number of events to buffer to each handler per topic.
-	eventBufferSize = 100
+	eventBufferSize = 5000
 )
 
 type Topics struct {
