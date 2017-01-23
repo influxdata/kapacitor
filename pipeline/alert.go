@@ -1267,7 +1267,7 @@ type TalkHandler struct {
 // Example:
 //    stream
 //         |alert()
-//             .snmpTrap('1.1.1.')
+//             .snmpTrap('1.1.1.1')
 //                 .data('1.3.6.1.2.1.1.7', 'i', '{{ index .Field "value" }}')
 //
 // Send alerts to `target-ip:target-port` on OID '1.3.6.1.2.1.1.7'
