@@ -70,6 +70,56 @@ func TestServer_Ping(t *testing.T) {
 		t.Fatal("unexpected version", version)
 	}
 }
+
+func TestServer_Pprof_Index(t *testing.T) {
+	s, _ := OpenDefaultServer()
+	defer s.Close()
+	testCases := []struct {
+		path        string
+		code        int
+		contentType string
+	}{
+		{
+			path:        "/debug/pprof/",
+			code:        http.StatusOK,
+			contentType: "text/html; charset=utf-8",
+		},
+		{
+			path:        "/debug/pprof/block",
+			code:        http.StatusOK,
+			contentType: "text/plain; charset=utf-8",
+		},
+		{
+			path:        "/debug/pprof/goroutine",
+			code:        http.StatusOK,
+			contentType: "text/plain; charset=utf-8",
+		},
+		{
+			path:        "/debug/pprof/heap",
+			code:        http.StatusOK,
+			contentType: "text/plain; charset=utf-8",
+		},
+		{
+			path:        "/debug/pprof/threadcreate",
+			code:        http.StatusOK,
+			contentType: "text/plain; charset=utf-8",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.path, func(t *testing.T) {
+			r, err := http.Get(s.URL() + tc.path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got, exp := r.StatusCode, tc.code; got != exp {
+				t.Errorf("unexpected status code got %d exp %d", got, exp)
+			}
+			if got, exp := r.Header.Get("Content-Type"), tc.contentType; got != exp {
+				t.Errorf("unexpected content type got %s exp %s", got, exp)
+			}
+		})
+	}
+}
 func TestServer_Authenticate_Fail(t *testing.T) {
 	conf := NewConfig()
 	conf.HTTP.AuthEnabled = true
