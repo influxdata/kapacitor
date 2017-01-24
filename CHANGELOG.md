@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.2.1 [unreleased]
+
+### Release Notes
+
+### Features
+
+### Bugfixes
+
+- [#1147](https://github.com/influxdata/kapacitor/issues/1147): Fix pprof debug endpoint
+
+
 ## v1.2.0 [2017-01-23]
 
 ### Release Notes

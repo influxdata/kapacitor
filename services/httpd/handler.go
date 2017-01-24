@@ -200,7 +200,7 @@ func NewHandler(
 		{
 			Method:      "GET",
 			Pattern:     BasePath + "/debug/pprof/",
-			HandlerFunc: pprof.Index,
+			HandlerFunc: servePprof,
 			noJSON:      true,
 		},
 		{
@@ -521,6 +521,13 @@ func MarshalJSON(v interface{}, pretty bool) []byte {
 		b, _ = json.Marshal(er)
 	}
 	return b
+}
+
+func servePprof(w http.ResponseWriter, r *http.Request) {
+	p := strings.TrimPrefix(r.URL.Path, BasePath)
+	r.URL.Path = p
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	pprof.Index(w, r)
 }
 
 // serveExpvar serves registered expvar information over HTTP.
