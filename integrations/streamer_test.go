@@ -7608,6 +7608,8 @@ Value: 10
 
 	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
 
+	// Close both client and server to ensure all message are processed
+	smtpService.Close()
 	smtpServer.Close()
 
 	errors := smtpServer.Errors()
@@ -8638,11 +8640,11 @@ func testStreamerNoOutput(
 	tmInit func(tm *kapacitor.TaskMaster),
 ) {
 	clock, et, replayErr, tm := testStreamer(t, name, script, tmInit)
+	defer tm.Close()
 	err := fastForwardTask(clock, et, replayErr, tm, duration)
 	if err != nil {
 		t.Error(err)
 	}
-	defer tm.Close()
 }
 
 func testStreamerWithOutput(
@@ -8655,11 +8657,12 @@ func testStreamerWithOutput(
 	tmInit func(tm *kapacitor.TaskMaster),
 ) {
 	clock, et, replayErr, tm := testStreamer(t, name, script, tmInit)
+	defer tm.Close()
+
 	err := fastForwardTask(clock, et, replayErr, tm, duration)
 	if err != nil {
 		t.Error(err)
 	}
-	defer tm.Close()
 
 	// Get the result
 	output, err := et.GetOutput(name)
@@ -8702,6 +8705,7 @@ func testStreamerWithSteppedOutput(
 	t.Skip("Test is not deterministic, need a mechanisim to safely step task execution.")
 	clock, et, replayErr, tm := testStreamer(t, name, script, tmInit)
 	defer tm.Close()
+
 	for s, step := range steps {
 		// Move time forward
 		clock.Set(clock.Zero().Add(step.t))
