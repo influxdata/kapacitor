@@ -71,15 +71,15 @@ See the [API docs on technical preview](https://docs.influxdata.com/kapacitor/v1
 
 ### Features
 
+- [#1110](https://github.com/influxdata/kapacitor/pull/1110): Add new query property for aligning group by intervals to start times.
+- [#1095](https://github.com/influxdata/kapacitor/pull/1095): Add new alert API, with support for configuring handlers and topics.
+- [#1052](https://github.com/influxdata/kapacitor/issues/1052): Move alerta api token to header and add option to skip TLS verification.
 - [#929](https://github.com/influxdata/kapacitor/pull/929): Add SNMP trap service for alerting.
 - [#913](https://github.com/influxdata/kapacitor/issues/913): Add fillPeriod option to Window node, so that the first emit waits till the period has elapsed before emitting.
 - [#898](https://github.com/influxdata/kapacitor/issues/898): Now when the Window node every value is zero, the window will be emitted immediately for each new point.
 - [#744](https://github.com/influxdata/kapacitor/issues/744): Preserve alert state across restarts and disable/enable actions.
 - [#327](https://github.com/influxdata/kapacitor/issues/327): You can now window based on count in addition to time.
 - [#251](https://github.com/influxdata/kapacitor/issues/251): Enable markdown in slack attachments.
-- [#1110](https://github.com/influxdata/kapacitor/pull/1110): Add new query property for aligning group by intervals to start times.
-- [#1095](https://github.com/influxdata/kapacitor/pull/1095): Add new alert API, with support for configuring handlers and topics.
-- [#1052](https://github.com/influxdata/kapacitor/issues/1052): Move alerta api token to header and add option to skip TLS verification.
 
 
 ### Bugfixes
