@@ -21,6 +21,9 @@ const defaultMessageTmpl = "{{ .ID }} is {{ .Level }}"
 // Default template for constructing a details message.
 const defaultDetailsTmpl = "{{ json . }}"
 
+// Default template for constructing a host
+const defaultHostnameTmpl = "Unknown"
+
 // An AlertNode can trigger an event of varying severity levels,
 // and pass the event to alert handlers. The criteria for triggering
 // an alert is specified via a [lambda expression](/kapacitor/latest/tick/expr/).
@@ -220,6 +223,9 @@ type AlertNode struct {
 	// Default: {{ json . }}
 	Details string
 
+	// Template for constructing a hostname
+	Hostname string
+
 	// Filter expression for the INFO alert level.
 	// An empty value indicates the level is invalid and is skipped.
 	Info *ast.LambdaNode
@@ -352,6 +358,7 @@ func newAlertNode(wants EdgeType) *AlertNode {
 		Id:        defaultIDTmpl,
 		Message:   defaultMessageTmpl,
 		Details:   defaultDetailsTmpl,
+		Hostname:  defaultHostnameTmpl,
 	}
 	return a
 }
