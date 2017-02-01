@@ -2,7 +2,6 @@ package kapacitor
 
 import (
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/influxdata/kapacitor/expvar"
@@ -12,6 +11,7 @@ import (
 	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/tick/stateful"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 )
 
 const (
@@ -41,7 +41,7 @@ type K8sAutoscaleNode struct {
 }
 
 // Create a new K8sAutoscaleNode which can trigger autoscale event for a Kubernetes cluster.
-func newK8sAutoscaleNode(et *ExecutingTask, n *pipeline.K8sAutoscaleNode, l *log.Logger) (*K8sAutoscaleNode, error) {
+func newK8sAutoscaleNode(et *ExecutingTask, n *pipeline.K8sAutoscaleNode, l zap.Logger) (*K8sAutoscaleNode, error) {
 	client, err := et.tm.K8sService.Client()
 	if err != nil {
 		return nil, fmt.Errorf("cannot use the k8sAutoscale node, could not create kubernetes client: %v", err)
@@ -83,7 +83,7 @@ func (k *K8sAutoscaleNode) runAutoscale([]byte) error {
 			k.timer.Start()
 			if np, err := k.handlePoint(p.Name, p.Group, p.Dimensions, p.Time, p.Fields, p.Tags); err != nil {
 				errorsCount.Add(1)
-				k.logger.Println("E!", err)
+				k.logger.Error(err.Error())
 			} else if np.Name != "" {
 				k.timer.Pause()
 				for _, child := range k.outs {
@@ -102,7 +102,7 @@ func (k *K8sAutoscaleNode) runAutoscale([]byte) error {
 			for _, p := range b.Points {
 				if np, err := k.handlePoint(b.Name, b.Group, b.PointDimensions(), p.Time, p.Fields, p.Tags); err != nil {
 					errorsCount.Add(1)
-					k.logger.Println("E!", err)
+					k.logger.Error(err.Error())
 				} else if np.Name != "" {
 					k.timer.Pause()
 					for _, child := range k.outs {
@@ -279,14 +279,14 @@ func (k *K8sAutoscaleNode) getResource(namespace, kind, name string) (*client.Sc
 }
 
 func (k *K8sAutoscaleNode) applyEvent(e event) error {
-	k.logger.Printf("D! setting scale replicas to %d was %d for %s/%s/%s", e.New, e.Old, e.Namespace, e.Kind, e.Name)
+	k.logger.Debug("setting scale replicas", zap.Int("new", e.New), zap.Int("old", e.Old), zap.String("namespace", e.Namespace), zap.String("kind", e.Kind), zap.String("name", e.Name))
 	scales := k.client.Scales(e.Namespace)
 	scale, err := k.getResource(e.Namespace, e.Kind, e.Name)
 	if err != nil {
 		return err
 	}
 	if scale.Spec.Replicas != int32(e.Old) {
-		k.logger.Printf("W! the kubernetes scale spec and Kapacitor's spec do not match for resource %s/%s/%s, did it change externally?", e.Namespace, e.Kind, e.Name)
+		k.logger.Warn("kubernetes scale spec and Kapacitor's spec do not match, did it change externally?", zap.String("namespace", e.Namespace), zap.String("kind", e.Kind), zap.String("name", e.Name))
 	}
 
 	scale.Spec.Replicas = int32(e.New)

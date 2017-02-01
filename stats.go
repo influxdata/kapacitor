@@ -2,12 +2,12 @@ package kapacitor
 
 import (
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"go.uber.org/zap"
 )
 
 type StatsNode struct {
@@ -20,7 +20,7 @@ type StatsNode struct {
 }
 
 // Create a new  FromNode which filters data from a source.
-func newStatsNode(et *ExecutingTask, n *pipeline.StatsNode, l *log.Logger) (*StatsNode, error) {
+func newStatsNode(et *ExecutingTask, n *pipeline.StatsNode, l zap.Logger) (*StatsNode, error) {
 	// Lookup the executing node for stats.
 	en := et.lookup[n.SourceNode.ID()]
 	if en == nil {

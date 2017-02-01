@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/mail"
@@ -17,6 +16,8 @@ import (
 	"testing"
 	"text/template"
 	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/influxdata/influxdb/client"
@@ -62,6 +63,7 @@ import (
 )
 
 var logService = loggingtest.New()
+var logger = logService.Root()
 
 var dbrps = []kapacitor.DBRP{
 	{
@@ -5273,7 +5275,7 @@ stream
 		return
 	}
 	uio := udf_test.NewIO()
-	udfService.CreateFunc = func(name string, l *log.Logger, abortCallback func()) (udf.Interface, error) {
+	udfService.CreateFunc = func(name string, l zap.Logger, abortCallback func()) (udf.Interface, error) {
 		if name != "customFunc" {
 			return nil, fmt.Errorf("unknown function %s", name)
 		}
@@ -6612,7 +6614,7 @@ stream
 		c.Enabled = true
 		c.Addr = ts.Addr
 		c.Source = "Kapacitor"
-		sl := sensu.NewService(c, logService.NewLogger("[test_sensu] ", log.LstdFlags))
+		sl := sensu.NewService(c, logger.With(zap.String("service", "test_sensu")))
 		tm.SensuService = sl
 	}
 	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
@@ -6668,7 +6670,7 @@ stream
 		c.Enabled = true
 		c.URL = ts.URL + "/test/slack/url"
 		c.Channel = "#channel"
-		sl := slack.NewService(c, logService.NewLogger("[test_slack] ", log.LstdFlags))
+		sl := slack.NewService(c, logger.With(zap.String("service", "test_slack")))
 		tm.SlackService = sl
 	}
 	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
@@ -6753,7 +6755,7 @@ stream
 		c.ChatId = "123456789"
 		c.DisableWebPagePreview = true
 		c.DisableNotification = false
-		tl := telegram.NewService(c, logService.NewLogger("[test_telegram] ", log.LstdFlags))
+		tl := telegram.NewService(c, logger.With(zap.String("service", "test_telegram")))
 		tm.TelegramService = tl
 	}
 	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
@@ -6885,7 +6887,7 @@ stream
 		c.URL = ts.URL
 		c.Room = "1231234"
 		c.Token = "testtoken1231234"
-		sl := hipchat.NewService(c, logService.NewLogger("[test_hipchat] ", log.LstdFlags))
+		sl := hipchat.NewService(c, logger.With(zap.String("service", "test_hipchat")))
 		tm.HipChatService = sl
 	}
 	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
@@ -6960,7 +6962,7 @@ stream
 		c.Enabled = true
 		c.URL = ts.URL
 		c.Origin = "Kapacitor"
-		sl := alerta.NewService(c, logService.NewLogger("[test_alerta] ", log.LstdFlags))
+		sl := alerta.NewService(c, logger.With(zap.String("service", "test_alerta")))
 		tm.AlertaService = sl
 	}
 	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
@@ -7037,7 +7039,7 @@ stream
 		c.Enabled = true
 		c.URL = ts.URL
 		c.APIKey = "api_key"
-		og := opsgenie.NewService(c, logService.NewLogger("[test_og] ", log.LstdFlags))
+		og := opsgenie.NewService(c, logger.With(zap.String("service", "test_og")))
 		tm.OpsGenieService = og
 	}
 	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
@@ -7055,7 +7057,7 @@ stream
 					"Level":           "CRITICAL",
 					"Monitoring Tool": "Kapacitor",
 				},
-				Description: `{"Series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}],"Messages":null,"Err":null}`,
+				Description: `{"StatementID":0,"Series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}],"Messages":null,"Partial":false,"Err":null}`,
 				Teams:       []string{"test_team", "another_team"},
 				Recipients:  []string{"test_recipient", "another_recipient"},
 			},
@@ -7072,7 +7074,7 @@ stream
 					"Level":           "CRITICAL",
 					"Monitoring Tool": "Kapacitor",
 				},
-				Description: `{"Series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}],"Messages":null,"Err":null}`,
+				Description: `{"StatementID":0,"Series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}],"Messages":null,"Partial":false,"Err":null}`,
 				Teams:       []string{"test_team2"},
 				Recipients:  []string{"test_recipient2", "another_recipient"},
 			},
@@ -7122,7 +7124,7 @@ stream
 		c.Enabled = true
 		c.URL = ts.URL
 		c.ServiceKey = "service_key"
-		pd := pagerduty.NewService(c, logService.NewLogger("[test_pd] ", log.LstdFlags))
+		pd := pagerduty.NewService(c, logger.With(zap.String("service", "test_pd")))
 		pd.HTTPDService = tm.HTTPDService
 		tm.PagerDutyService = pd
 
@@ -7139,7 +7141,7 @@ stream
 				Description: "CRITICAL alert for kapacitor/cpu/serverA",
 				Client:      "kapacitor",
 				ClientURL:   kapacitorURL,
-				Details:     `{"Series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}],"Messages":null,"Err":null}`,
+				Details:     `{"StatementID":0,"Series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}],"Messages":null,"Partial":false,"Err":null}`,
 			},
 		},
 		pagerdutytest.Request{
@@ -7150,7 +7152,7 @@ stream
 				Description: "CRITICAL alert for kapacitor/cpu/serverA",
 				Client:      "kapacitor",
 				ClientURL:   kapacitorURL,
-				Details:     `{"Series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}],"Messages":null,"Err":null}`,
+				Details:     `{"StatementID":0,"Series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}],"Messages":null,"Partial":false,"Err":null}`,
 			},
 		},
 	}
@@ -7255,7 +7257,7 @@ stream
 		c.URL = ts.URL
 		c.APIKey = "api_key"
 		c.RoutingKey = "routing_key"
-		vo := victorops.NewService(c, logService.NewLogger("[test_vo] ", log.LstdFlags))
+		vo := victorops.NewService(c, logger.With(zap.String("service", "test_vo")))
 		tm.VictorOpsService = vo
 	}
 	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
@@ -7269,7 +7271,7 @@ stream
 				StateMessage:   "kapacitor/cpu/serverA is CRITICAL",
 				Timestamp:      31536010,
 				MonitoringTool: "kapacitor",
-				Data:           `{"Series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}],"Messages":null,"Err":null}`,
+				Data:           `{"StatementID":0,"Series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}],"Messages":null,"Partial":false,"Err":null}`,
 			},
 		},
 		victoropstest.Request{
@@ -7280,7 +7282,7 @@ stream
 				StateMessage:   "kapacitor/cpu/serverA is CRITICAL",
 				Timestamp:      31536010,
 				MonitoringTool: "kapacitor",
-				Data:           `{"Series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}],"Messages":null,"Err":null}`,
+				Data:           `{"StatementID":0,"Series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}],"Messages":null,"Partial":false,"Err":null}`,
 			},
 		},
 	}
@@ -7323,7 +7325,7 @@ stream
 		c.Enabled = true
 		c.URL = ts.URL
 		c.AuthorName = "Kapacitor"
-		sl := talk.NewService(c, logService.NewLogger("[test_talk] ", log.LstdFlags))
+		sl := talk.NewService(c, logger.With(zap.String("service", "test_talk")))
 		tm.TalkService = sl
 	}
 	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
@@ -7596,7 +7598,7 @@ Value: 10
 		Port:    smtpServer.Port,
 		From:    "test@example.com",
 	}
-	smtpService := smtp.NewService(sc, logService.NewLogger("[test-smtp] ", log.LstdFlags))
+	smtpService := smtp.NewService(sc, logger.With(zap.String("service", "test-smtp")))
 	if err := smtpService.Open(); err != nil {
 		t.Fatal(err)
 	}
@@ -7726,7 +7728,7 @@ stream
 	c.Addr = snmpServer.Addr
 	c.Community = snmpServer.Community
 	c.Retries = 2
-	st := snmptrap.NewService(c, logService.NewLogger("[test_snmptrap] ", log.LstdFlags))
+	st := snmptrap.NewService(c, logger.With(zap.String("service", "test_snmptrap")))
 	if err := st.Open(); err != nil {
 		t.Fatal(err)
 	}
@@ -8253,8 +8255,8 @@ stream
 		if p.Name() != "m" {
 			t.Errorf("got %v exp %v", p.Name(), "m")
 		}
-		if p.Fields()["count"] != int64(10) {
-			t.Errorf("got %v exp %v", p.Fields()["count"], 10.0)
+		if fields, _ := p.Fields(); fields["count"] != int64(10) {
+			t.Errorf("got %v exp %v", fields["count"], 10.0)
 		}
 		if len(p.Tags()) != 1 {
 			t.Errorf("got %v exp %v", len(p.Tags()), 1)
@@ -8563,7 +8565,7 @@ func testStreamer(
 	tm.HTTPDService = httpdService
 	tm.TaskStore = taskStore{}
 	tm.DeadmanService = deadman{}
-	as := alertservice.NewService(alertservice.NewConfig(), logService.NewLogger("[alert] ", log.LstdFlags))
+	as := alertservice.NewService(alertservice.NewConfig(), logger.With(zap.String("service", "alert")))
 	as.StorageService = storagetest.New()
 	as.HTTPDService = httpdService
 	if err := as.Open(); err != nil {

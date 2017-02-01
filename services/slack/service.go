@@ -6,20 +6,20 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"sync/atomic"
 
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 )
 
 type Service struct {
 	configValue atomic.Value
-	logger      *log.Logger
+	logger      zap.Logger
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, l zap.Logger) *Service {
 	s := &Service{
 		logger: l,
 	}
@@ -188,10 +188,10 @@ type HandlerConfig struct {
 type handler struct {
 	s      *Service
 	c      HandlerConfig
-	logger *log.Logger
+	logger zap.Logger
 }
 
-func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+func (s *Service) Handler(c HandlerConfig, l zap.Logger) alert.Handler {
 	return &handler{
 		s:      s,
 		c:      c,
@@ -207,6 +207,6 @@ func (h *handler) Handle(event alert.Event) {
 		h.c.IconEmoji,
 		event.State.Level,
 	); err != nil {
-		h.logger.Println("E! failed to send event to Slack", err)
+		h.logger.Error("failed to send event to Slack", zap.Error(err))
 	}
 }

@@ -1,11 +1,12 @@
 package kapacitor
 
 import (
-	"log"
+	"fmt"
 	"time"
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"go.uber.org/zap"
 )
 
 type DerivativeNode struct {
@@ -14,7 +15,7 @@ type DerivativeNode struct {
 }
 
 // Create a new derivative node.
-func newDerivativeNode(et *ExecutingTask, n *pipeline.DerivativeNode, l *log.Logger) (*DerivativeNode, error) {
+func newDerivativeNode(et *ExecutingTask, n *pipeline.DerivativeNode, l zap.Logger) (*DerivativeNode, error) {
 	dn := &DerivativeNode{
 		node: node{Node: n, et: et, logger: l},
 		d:    n,
@@ -90,19 +91,19 @@ func (d *DerivativeNode) runDerivative([]byte) error {
 func (d *DerivativeNode) derivative(prev, curr models.Fields, prevTime, currTime time.Time) (float64, bool) {
 	f0, ok := numToFloat(prev[d.d.Field])
 	if !ok {
-		d.logger.Printf("E! cannot apply derivative to type %T", prev[d.d.Field])
+		d.logger.Error(fmt.Sprintf("cannot apply derivative to type %T", prev[d.d.Field]))
 		return 0, false
 	}
 
 	f1, ok := numToFloat(curr[d.d.Field])
 	if !ok {
-		d.logger.Printf("E! cannot apply derivative to type %T", curr[d.d.Field])
+		d.logger.Error(fmt.Sprintf("cannot apply derivative to type %T", curr[d.d.Field]))
 		return 0, false
 	}
 
 	elapsed := float64(currTime.Sub(prevTime))
 	if elapsed == 0 {
-		d.logger.Printf("E! cannot perform derivative elapsed time was 0")
+		d.logger.Error("cannot perform derivative elapsed time was 0")
 		return 0, false
 	}
 	diff := f1 - f0

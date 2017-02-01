@@ -2,13 +2,13 @@ package alert
 
 import (
 	"fmt"
-	"log"
 	"path"
 	"sort"
 	"sync"
 
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/vars"
+	"go.uber.org/zap"
 )
 
 const (
@@ -21,10 +21,10 @@ type Topics struct {
 
 	topics map[string]*Topic
 
-	logger *log.Logger
+	logger zap.Logger
 }
 
-func NewTopics(l *log.Logger) *Topics {
+func NewTopics(l zap.Logger) *Topics {
 	s := &Topics{
 		topics: make(map[string]*Topic),
 		logger: l,

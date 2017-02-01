@@ -3,7 +3,6 @@ package kapacitor
 import (
 	"errors"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -18,6 +17,7 @@ import (
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
+	"github.com/influxdata/kapacitor/services/logging"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/slack"
@@ -30,6 +30,7 @@ import (
 	"github.com/influxdata/kapacitor/timer"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/vars"
+	"go.uber.org/zap"
 )
 
 const (
@@ -37,14 +38,10 @@ const (
 	MainTaskMaster     = "main"
 )
 
-type LogService interface {
-	NewLogger(prefix string, flag int) *log.Logger
-}
-
 type UDFService interface {
 	List() []string
 	Info(name string) (udf.Info, bool)
-	Create(name string, l *log.Logger, abortCallback func()) (udf.Interface, error)
+	Create(name string, l zap.Logger, abortCallback func()) (udf.Interface, error)
 }
 
 var ErrTaskMasterClosed = errors.New("TaskMaster is closed")
@@ -87,47 +84,47 @@ type TaskMaster struct {
 	SMTPService interface {
 		Global() bool
 		StateChangesOnly() bool
-		Handler(smtp.HandlerConfig, *log.Logger) alert.Handler
+		Handler(smtp.HandlerConfig, zap.Logger) alert.Handler
 	}
 	OpsGenieService interface {
 		Global() bool
-		Handler(opsgenie.HandlerConfig, *log.Logger) alert.Handler
+		Handler(opsgenie.HandlerConfig, zap.Logger) alert.Handler
 	}
 	VictorOpsService interface {
 		Global() bool
-		Handler(victorops.HandlerConfig, *log.Logger) alert.Handler
+		Handler(victorops.HandlerConfig, zap.Logger) alert.Handler
 	}
 	PagerDutyService interface {
 		Global() bool
-		Handler(pagerduty.HandlerConfig, *log.Logger) alert.Handler
+		Handler(pagerduty.HandlerConfig, zap.Logger) alert.Handler
 	}
 	SlackService interface {
 		Global() bool
 		StateChangesOnly() bool
-		Handler(slack.HandlerConfig, *log.Logger) alert.Handler
+		Handler(slack.HandlerConfig, zap.Logger) alert.Handler
 	}
 	SNMPTrapService interface {
-		Handler(snmptrap.HandlerConfig, *log.Logger) (alert.Handler, error)
+		Handler(snmptrap.HandlerConfig, zap.Logger) (alert.Handler, error)
 	}
 	TelegramService interface {
 		Global() bool
 		StateChangesOnly() bool
-		Handler(telegram.HandlerConfig, *log.Logger) alert.Handler
+		Handler(telegram.HandlerConfig, zap.Logger) alert.Handler
 	}
 	HipChatService interface {
 		Global() bool
 		StateChangesOnly() bool
-		Handler(hipchat.HandlerConfig, *log.Logger) alert.Handler
+		Handler(hipchat.HandlerConfig, zap.Logger) alert.Handler
 	}
 	AlertaService interface {
 		DefaultHandlerConfig() alerta.HandlerConfig
-		Handler(alerta.HandlerConfig, *log.Logger) (alert.Handler, error)
+		Handler(alerta.HandlerConfig, zap.Logger) (alert.Handler, error)
 	}
 	SensuService interface {
-		Handler(*log.Logger) alert.Handler
+		Handler(zap.Logger) alert.Handler
 	}
 	TalkService interface {
-		Handler(*log.Logger) alert.Handler
+		Handler(zap.Logger) alert.Handler
 	}
 	TimingService interface {
 		NewTimer(timer.Setter) timer.Timer
@@ -135,7 +132,7 @@ type TaskMaster struct {
 	K8sService interface {
 		Client() (k8s.Client, error)
 	}
-	LogService LogService
+	LogService logging.Interface
 
 	Commander command.Commander
 
@@ -166,7 +163,7 @@ type TaskMaster struct {
 	// DeleteHooks for tasks
 	deleteHooks map[string][]deleteHook
 
-	logger *log.Logger
+	logger zap.Logger
 
 	closed  bool
 	drained bool
@@ -181,7 +178,7 @@ type forkKey struct {
 }
 
 // Create a new Executor with a given clock.
-func NewTaskMaster(id string, l LogService) *TaskMaster {
+func NewTaskMaster(id string, l logging.Interface) *TaskMaster {
 	return &TaskMaster{
 		id:             id,
 		forks:          make(map[forkKey]map[string]*Edge),
@@ -191,7 +188,7 @@ func NewTaskMaster(id string, l LogService) *TaskMaster {
 		tasks:          make(map[string]*ExecutingTask),
 		deleteHooks:    make(map[string][]deleteHook),
 		LogService:     l,
-		logger:         l.NewLogger(fmt.Sprintf("[task_master:%s] ", id), log.LstdFlags),
+		logger:         l.Root().With(zap.String("task_master", id)),
 		closed:         true,
 		TimingService:  noOpTimingService{},
 	}
@@ -241,7 +238,7 @@ func (tm *TaskMaster) Open() (err error) {
 		tm.closed = true
 		return
 	}
-	tm.logger.Println("I! opened")
+	tm.logger.Info("opened")
 	return
 }
 
@@ -264,7 +261,6 @@ func (tm *TaskMaster) Close() error {
 	for _, et := range tm.tasks {
 		_ = tm.stopTask(et.Task.ID)
 	}
-	tm.logger.Println("I! closed")
 	return nil
 }
 
@@ -399,7 +395,7 @@ func (tm *TaskMaster) StartTask(t *Task) (*ExecutingTask, error) {
 	if tm.closed {
 		return nil, errors.New("task master is closed cannot start a task")
 	}
-	tm.logger.Println("D! Starting task:", t.ID)
+	tm.logger.Debug("starting task", zap.String("task", t.ID))
 	et, err := NewExecutingTask(tm, t)
 	if err != nil {
 		return nil, err
@@ -420,7 +416,7 @@ func (tm *TaskMaster) StartTask(t *Task) (*ExecutingTask, error) {
 		}
 		ins = make([]*Edge, count)
 		for i := 0; i < count; i++ {
-			in := newEdge(t.ID, "batch", fmt.Sprintf("batch%d", i), pipeline.BatchEdge, defaultEdgeBufferSize, tm.LogService)
+			in := newEdge(t.ID, "batch", fmt.Sprintf("batch%d", i), pipeline.BatchEdge, defaultEdgeBufferSize, et.logger)
 			ins[i] = in
 			tm.batches[t.ID] = append(tm.batches[t.ID], in)
 		}
@@ -440,8 +436,8 @@ func (tm *TaskMaster) StartTask(t *Task) (*ExecutingTask, error) {
 	}
 
 	tm.tasks[et.Task.ID] = et
-	tm.logger.Println("I! Started task:", t.ID)
-	tm.logger.Println("D!", string(t.Dot()))
+	tm.logger.Info("started task:", zap.String("task", t.ID))
+	tm.logger.Debug(fmt.Sprintf("task DAG: %s", string(t.Dot())), zap.String("task", t.ID))
 
 	return et, nil
 }
@@ -482,9 +478,9 @@ func (tm *TaskMaster) stopTask(id string) (err error) {
 
 		err = et.stop()
 		if err != nil {
-			tm.logger.Println("E! Stopped task:", id, err)
+			tm.logger.Error(fmt.Sprintf("error stopping task: %v", err), zap.String("task", id))
 		} else {
-			tm.logger.Println("I! Stopped task:", id)
+			tm.logger.Info("stopped task", zap.String("task", id))
 		}
 	}
 	return
@@ -543,7 +539,7 @@ func (tm *TaskMaster) stream(name string) (StreamCollector, error) {
 	if tm.closed {
 		return nil, ErrTaskMasterClosed
 	}
-	in := newEdge(fmt.Sprintf("task_master:%s", tm.id), name, "stream", pipeline.StreamEdge, defaultEdgeBufferSize, tm.LogService)
+	in := newEdge(fmt.Sprintf("task_master:%s", tm.id), name, "stream", pipeline.StreamEdge, defaultEdgeBufferSize, tm.logger)
 	tm.wg.Add(1)
 	go func() {
 		defer tm.wg.Done()
@@ -628,16 +624,20 @@ func (tm *TaskMaster) WritePoints(database, retentionPolicy string, consistencyL
 		retentionPolicy = tm.DefaultRetentionPolicy
 	}
 	for _, mp := range points {
+		fields, err := mp.Fields()
+		if err != nil {
+			return err
+		}
 		p := models.Point{
 			Database:        database,
 			RetentionPolicy: retentionPolicy,
 			Name:            mp.Name(),
 			Group:           models.NilGroup,
 			Tags:            models.Tags(mp.Tags().Map()),
-			Fields:          models.Fields(mp.Fields()),
+			Fields:          models.Fields(fields),
 			Time:            mp.Time(),
 		}
-		err := tm.writePointsIn.CollectPoint(p)
+		err = tm.writePointsIn.CollectPoint(p)
 		if err != nil {
 			return err
 		}
@@ -675,7 +675,7 @@ func (tm *TaskMaster) newFork(taskName string, dbrps []DBRP, measurements []stri
 		return nil, ErrTaskMasterClosed
 	}
 
-	e := newEdge(taskName, "stream", "stream0", pipeline.StreamEdge, defaultEdgeBufferSize, tm.LogService)
+	e := newEdge(taskName, "stream", "stream0", pipeline.StreamEdge, defaultEdgeBufferSize, tm.logger.With(zap.String("task", taskName)))
 
 	for _, key := range forkKeys(dbrps, measurements) {
 		tm.taskToForkKeys[taskName] = append(tm.taskToForkKeys[taskName], key)

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -28,6 +27,7 @@ import (
 	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/pkg/errors"
 	"github.com/twinj/uuid"
+	"go.uber.org/zap"
 )
 
 const streamEXT = ".srpl"
@@ -84,11 +84,11 @@ type Service struct {
 		Stream(name string) (kapacitor.StreamCollector, error)
 	}
 
-	logger *log.Logger
+	logger zap.Logger
 }
 
 // Create a new replay master.
-func NewService(conf Config, l *log.Logger) *Service {
+func NewService(conf Config, l zap.Logger) *Service {
 	return &Service{
 		saveDir: conf.Dir,
 		logger:  l,
@@ -228,7 +228,7 @@ func (s *Service) syncRecordingMetadata() error {
 		case batchEXT:
 			typ = BatchRecording
 		default:
-			s.logger.Println("E! unknown file in replay dir", name)
+			s.logger.Error("unknown file in replay dir", zap.String("dir", name))
 			continue
 		}
 		dataUrl := url.URL{
@@ -250,7 +250,7 @@ func (s *Service) syncRecordingMetadata() error {
 			if err != nil {
 				return errors.Wrap(err, "creating recording metadata")
 			}
-			s.logger.Printf("D! recording %s metadata synced", id)
+			s.logger.Debug("recording metadata synced", zap.String("recording", id))
 		} else if err != nil {
 			return errors.Wrap(err, "checking for existing recording metadata")
 		} else if err == nil {
@@ -260,9 +260,9 @@ func (s *Service) syncRecordingMetadata() error {
 				if err != nil {
 					return errors.Wrap(err, "updating recording metadata")
 				}
-				s.logger.Printf("D! recording %s data url fixed", id)
+				s.logger.Debug("recording data url fixed", zap.String("recording", id))
 			} else {
-				s.logger.Printf("D! skipping recording %s, metadata already correct", id)
+				s.logger.Debug("skipping recording, metadata already correct", zap.String("recording", id))
 			}
 		}
 	}
@@ -275,7 +275,7 @@ func (s *Service) markFailedRecordings() {
 	for {
 		recordings, err := s.recordings.List("", offset, limit)
 		if err != nil {
-			s.logger.Println("E! failed to retrieve recordings:", err)
+			s.logger.Error("failed to retrieve recordings", zap.Error(err))
 		}
 		for _, recording := range recordings {
 			if recording.Status == Running {
@@ -283,7 +283,7 @@ func (s *Service) markFailedRecordings() {
 				recording.Error = "unexpected Kapacitor shutdown"
 				err := s.recordings.Replace(recording)
 				if err != nil {
-					s.logger.Println("E! failed to set recording status to failed:", err)
+					s.logger.Error("failed to set recording status to failed", zap.Error(err))
 				}
 			}
 		}
@@ -300,7 +300,7 @@ func (s *Service) markFailedReplays() {
 	for {
 		replays, err := s.replays.List("", offset, limit)
 		if err != nil {
-			s.logger.Println("E! failed to retrieve replays:", err)
+			s.logger.Error("failed to retrieve replays", zap.Error(err))
 		}
 		for _, replay := range replays {
 			if replay.Status == Running {
@@ -308,7 +308,7 @@ func (s *Service) markFailedReplays() {
 				replay.Error = "unexpected Kapacitor shutdown"
 				err := s.replays.Replace(replay)
 				if err != nil {
-					s.logger.Println("E! failed to set replay status to failed:", err)
+					s.logger.Error("failed to set replay status to failed", zap.Error(err))
 				}
 			}
 		}
@@ -731,12 +731,12 @@ func (s *Service) updateRecordingResult(recording Recording, ds DataSource, err 
 	recording.Progress = 1.0
 	recording.Size, err = ds.Size()
 	if err != nil {
-		s.logger.Println("E! failed to determine size of recording", recording.ID, err)
+		s.logger.Error(fmt.Sprintf("failed to determine size of recording: %v", err), zap.String("recording", recording.ID))
 	}
 
 	err = s.recordings.Replace(recording)
 	if err != nil {
-		s.logger.Println("E! failed to save recording info", recording.ID, err)
+		s.logger.Error(fmt.Sprintf("failed to save recording info: %v", err), zap.String("recording", recording.ID))
 	}
 }
 func (r *Service) updateReplayResult(replay Replay, err error) {
@@ -749,7 +749,7 @@ func (r *Service) updateReplayResult(replay Replay, err error) {
 	replay.Date = time.Now()
 	err = r.replays.Replace(replay)
 	if err != nil {
-		r.logger.Println("E! failed to save replay results:", err)
+		r.logger.Error("failed to save replay results", zap.Error(err))
 	}
 }
 

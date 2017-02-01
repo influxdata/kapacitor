@@ -2,10 +2,10 @@ package kapacitor
 
 import (
 	"errors"
-	"log"
 	"time"
 
 	"github.com/influxdata/kapacitor/pipeline"
+	"go.uber.org/zap"
 )
 
 type ShiftNode struct {
@@ -16,7 +16,7 @@ type ShiftNode struct {
 }
 
 // Create a new  ShiftNode which shifts points and batches in time.
-func newShiftNode(et *ExecutingTask, n *pipeline.ShiftNode, l *log.Logger) (*ShiftNode, error) {
+func newShiftNode(et *ExecutingTask, n *pipeline.ShiftNode, l zap.Logger) (*ShiftNode, error) {
 	sn := &ShiftNode{
 		node:  node{Node: n, et: et, logger: l},
 		s:     n,

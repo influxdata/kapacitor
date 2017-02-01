@@ -5,9 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
-	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -17,8 +15,11 @@ import (
 	"github.com/influxdata/kapacitor/services/config"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/httpd/httpdtest"
+	"github.com/influxdata/kapacitor/services/logging/loggingtest"
 	"github.com/influxdata/kapacitor/services/storage/storagetest"
 )
+
+var logger = loggingtest.New().Root()
 
 type SectionA struct {
 	Option1 string `override:"option-1"`
@@ -49,7 +50,7 @@ type TestConfig struct {
 
 func OpenNewSerivce(testConfig interface{}, updates chan<- config.ConfigUpdate) (*config.Service, *httpdtest.Server) {
 	c := config.NewConfig()
-	service := config.NewService(c, testConfig, log.New(os.Stderr, "[config] ", log.LstdFlags), updates)
+	service := config.NewService(c, testConfig, logger, updates)
 	service.StorageService = storagetest.New()
 	server := httpdtest.NewServer(testing.Verbose())
 	service.HTTPDService = server

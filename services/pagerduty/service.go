@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"sync/atomic"
 
 	"github.com/influxdata/kapacitor/alert"
+	"go.uber.org/zap"
 )
 
 type Service struct {
@@ -20,10 +20,10 @@ type Service struct {
 	HTTPDService interface {
 		URL() string
 	}
-	logger *log.Logger
+	logger zap.Logger
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, l zap.Logger) *Service {
 	s := &Service{
 		logger: l,
 	}
@@ -173,10 +173,10 @@ type HandlerConfig struct {
 type handler struct {
 	s      *Service
 	c      HandlerConfig
-	logger *log.Logger
+	logger zap.Logger
 }
 
-func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+func (s *Service) Handler(c HandlerConfig, l zap.Logger) alert.Handler {
 	return &handler{
 		s:      s,
 		c:      c,
@@ -192,6 +192,6 @@ func (h *handler) Handle(event alert.Event) {
 		event.State.Level,
 		event.Data.Result,
 	); err != nil {
-		h.logger.Println("E! failed to send event to PagerDuty", err)
+		h.logger.Error("failed to send event to PagerDuty", zap.Error(err))
 	}
 }

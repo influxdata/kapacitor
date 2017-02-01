@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,6 +11,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/influxdata/influxdb/influxql"
 	imodels "github.com/influxdata/influxdb/models"
@@ -2341,7 +2342,7 @@ func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.Ex
 	tm.HTTPDService = httpdService
 	tm.TaskStore = taskStore{}
 	tm.DeadmanService = deadman{}
-	as := alertservice.NewService(alertservice.NewConfig(), logService.NewLogger("[alert] ", log.LstdFlags))
+	as := alertservice.NewService(alertservice.NewConfig(), logger.With(zap.String("service", "alert")))
 	as.StorageService = storagetest.New()
 	as.HTTPDService = httpdService
 	if err := as.Open(); err != nil {

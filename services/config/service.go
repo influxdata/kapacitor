@@ -3,7 +3,6 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"path"
 	"regexp"
@@ -15,6 +14,7 @@ import (
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 )
 
 const (
@@ -35,7 +35,7 @@ type ConfigUpdate struct {
 type Service struct {
 	enabled bool
 	config  interface{}
-	logger  *log.Logger
+	logger  zap.Logger
 	updates chan<- ConfigUpdate
 	routes  []httpd.Route
 
@@ -53,7 +53,7 @@ type Service struct {
 	}
 }
 
-func NewService(c Config, config interface{}, l *log.Logger, updates chan<- ConfigUpdate) *Service {
+func NewService(c Config, config interface{}, l zap.Logger, updates chan<- ConfigUpdate) *Service {
 	return &Service{
 		enabled: c.Enabled,
 		config:  config,

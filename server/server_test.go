@@ -1423,7 +1423,7 @@ func TestServer_StreamTask(t *testing.T) {
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), id)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"statement_id":0}`
 	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -1451,7 +1451,7 @@ test value=1 0000000011
 	v.Add("precision", "s")
 	s.MustWrite("mydb", "myrp", points, v)
 
-	exp := `{"series":[{"name":"test","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}]}`
+	exp := `{"statement_id":0,"series":[{"name":"test","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}]}`
 	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -1502,7 +1502,7 @@ func TestServer_StreamTask_NoRP(t *testing.T) {
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), id)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"statement_id":0}`
 	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -1530,7 +1530,7 @@ test value=1 0000000011
 	v.Add("precision", "s")
 	s.MustWrite("mydb", "", points, v)
 
-	exp := `{"series":[{"name":"test","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}]}`
+	exp := `{"statement_id":0,"series":[{"name":"test","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}]}`
 	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -1585,7 +1585,7 @@ stream
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), taskId)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"statement_id":0}`
 	if err := s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5); err != nil {
 		t.Error(err)
 	}
@@ -1612,7 +1612,7 @@ test value=1 0000000011
 	v.Add("precision", "s")
 	s.MustWrite("mydb", "myrp", points, v)
 
-	exp := `{"series":[{"name":"test","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}]}`
+	exp := `{"statement_id":0,"series":[{"name":"test","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}]}`
 	if err := s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5); err != nil {
 		t.Error(err)
 	}
@@ -1764,7 +1764,7 @@ stream
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), taskId)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"statement_id":0}`
 	if err := s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5); err != nil {
 		t.Error(err)
 	}
@@ -1796,7 +1796,7 @@ test,tag=abc,other=a value=1 0000000021
 	v.Add("precision", "s")
 	s.MustWrite("mydb", "myrp", points, v)
 
-	exp := `{"series":[{"name":"test","tags":{"tag":"abc"},"columns":["time","count"],"values":[["1970-01-01T00:00:10Z",24]]}]}`
+	exp := `{"statement_id":0,"series":[{"name":"test","tags":{"tag":"abc"},"columns":["time","count"],"values":[["1970-01-01T00:00:10Z",24]]}]}`
 	if err := s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5); err != nil {
 		t.Error(err)
 	}
@@ -1857,7 +1857,7 @@ stream
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), taskId)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"statement_id":0}`
 	if err := s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5); err != nil {
 		t.Error(err)
 	}
@@ -1884,7 +1884,7 @@ test value=1 0000000011
 	v.Add("precision", "s")
 	s.MustWrite("mydb", "myrp", points, v)
 
-	exp := `{"series":[{"name":"test","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}]}`
+	exp := `{"statement_id":0,"series":[{"name":"test","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}]}`
 	if err := s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5); err != nil {
 		t.Error(err)
 	}
@@ -1954,7 +1954,7 @@ stream
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), taskId)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"statement_id":0}`
 	if err := s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5); err != nil {
 		t.Error(err)
 	}
@@ -1981,7 +1981,7 @@ test value=1 0000000011
 	v.Add("precision", "s")
 	s.MustWrite("mydb", "myrp", points, v)
 
-	exp := `{"series":[{"name":"test","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}]}`
+	exp := `{"statement_id":0,"series":[{"name":"test","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}]}`
 	if err := s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5); err != nil {
 		t.Error(err)
 	}
@@ -2098,7 +2098,7 @@ stream
 		endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), taskId)
 
 		// Request data before any writes and expect null responses
-		nullResponse := `{}`
+		nullResponse := `{"statement_id":0}`
 		if err := s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5); err != nil {
 			t.Error(err)
 		}
@@ -2130,7 +2130,7 @@ test value=1 0000000011
 		taskId := task.ID
 		endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), taskId)
 
-		exp := `{"series":[{"name":"test","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}]}`
+		exp := `{"statement_id":0,"series":[{"name":"test","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}]}`
 		if err := s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5); err != nil {
 			t.Error(err)
 		}
@@ -2479,7 +2479,7 @@ func TestServer_StreamTask_AllMeasurements(t *testing.T) {
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), id)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"statement_id":0}`
 	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -2507,7 +2507,7 @@ test0 value=1 0000000011
 	v.Add("precision", "s")
 	s.MustWrite("mydb", "myrp", points, v)
 
-	exp := `{"series":[{"name":"test0","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}]}`
+	exp := `{"statement_id":0,"series":[{"name":"test0","columns":["time","count"],"values":[["1970-01-01T00:00:10Z",15]]}]}`
 	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -2626,7 +2626,7 @@ func TestServer_BatchTask(t *testing.T) {
 	case <-timeout.C:
 		t.Fatal("timedout waiting for query")
 	case stopTime := <-stopTimeC:
-		exp := fmt.Sprintf(`{"series":[{"name":"cpu","columns":["time","count"],"values":[["%s",2]]}]}`, stopTime.Local().Format(time.RFC3339Nano))
+		exp := fmt.Sprintf(`{"statement_id":0,"series":[{"name":"cpu","columns":["time","count"],"values":[["%s",2]]}]}`, stopTime.Local().Format(time.RFC3339Nano))
 		err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
 		if err != nil {
 			t.Error(err)
@@ -2773,7 +2773,7 @@ func TestServer_BatchTask_InfluxDBConfigUpdate(t *testing.T) {
 	case <-timeout.C:
 		t.Fatal("timedout waiting for query")
 	case stopTime := <-stopTimeC:
-		exp := fmt.Sprintf(`{"series":[{"name":"cpu","columns":["time","count"],"values":[["%s",2]]}]}`, stopTime.Local().Format(time.RFC3339Nano))
+		exp := fmt.Sprintf(`{"statement_id":0,"series":[{"name":"cpu","columns":["time","count"],"values":[["%s",2]]}]}`, stopTime.Local().Format(time.RFC3339Nano))
 		err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
 		if err != nil {
 			t.Error(err)
@@ -4141,7 +4141,7 @@ func testStreamAgent(t *testing.T, c *server.Config) {
 	endpoint := fmt.Sprintf("%s/tasks/%s/moving_avg", s.URL(), id)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"statement_id":0}`
 	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -4176,7 +4176,7 @@ test,group=b value=0 0000000011
 	v.Add("precision", "s")
 	s.MustWrite("mydb", "myrp", points, v)
 
-	exp := `{"series":[{"name":"test","tags":{"group":"a"},"columns":["time","mean"],"values":[["1970-01-01T00:00:11Z",0.9]]},{"name":"test","tags":{"group":"b"},"columns":["time","mean"],"values":[["1970-01-01T00:00:11Z",1.9]]}]}`
+	exp := `{"statement_id":0,"series":[{"name":"test","tags":{"group":"a"},"columns":["time","mean"],"values":[["1970-01-01T00:00:11Z",0.9]]},{"name":"test","tags":{"group":"b"},"columns":["time","mean"],"values":[["1970-01-01T00:00:11Z",1.9]]}]}`
 	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -4314,7 +4314,7 @@ func testStreamAgentSocket(t *testing.T, c *server.Config) {
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), id)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"statement_id":0}`
 	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -4337,7 +4337,7 @@ test,group=a value=0 0000000011
 	v.Add("precision", "s")
 	s.MustWrite("mydb", "myrp", points, v)
 
-	exp := `{"series":[{"name":"test","tags":{"group":"a"},"columns":["time","count"],"values":[["1970-01-01T00:00:10Z",10]]}]}`
+	exp := `{"statement_id":0,"series":[{"name":"test","tags":{"group":"a"},"columns":["time","count"],"values":[["1970-01-01T00:00:10Z",10]]}]}`
 	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -4558,7 +4558,7 @@ func testBatchAgent(t *testing.T, c *server.Config) {
 	}
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), id)
 	exp := fmt.Sprintf(
-		`{"series":[{"name":"cpu","tags":{"count":"1"},"columns":["time","count"],"values":[["%s",5]]},{"name":"cpu","tags":{"count":"0"},"columns":["time","count"],"values":[["%s",5]]}]}`,
+		`{"statement_id":0,"series":[{"name":"cpu","tags":{"count":"1"},"columns":["time","count"],"values":[["%s",5]]},{"name":"cpu","tags":{"count":"0"},"columns":["time","count"],"values":[["%s",5]]}]}`,
 		stopTimes[0].Format(time.RFC3339Nano),
 		stopTimes[1].Format(time.RFC3339Nano),
 	)
@@ -7074,7 +7074,7 @@ func TestServer_AlertHandlers_CRUD(t *testing.T) {
 
 func TestServer_AlertHandlers(t *testing.T) {
 
-	resultJSON := `{"Series":[{"name":"alert","columns":["time","value"],"values":[["1970-01-01T00:00:00Z",1]]}],"Messages":null,"Err":null}`
+	resultJSON := `{"StatementID":0,"Series":[{"name":"alert","columns":["time","value"],"values":[["1970-01-01T00:00:00Z",1]]}],"Messages":null,"Partial":false,"Err":null}`
 
 	alertData := alertservice.AlertData{
 		ID:      "id",
@@ -8332,7 +8332,7 @@ stream
 }
 
 func TestServer_AlertHandler_MultipleActions(t *testing.T) {
-	resultJSON := `{"Series":[{"name":"alert","columns":["time","value"],"values":[["1970-01-01T00:00:00Z",1]]}],"Messages":null,"Err":null}`
+	resultJSON := `{"StatementID":0,"Series":[{"name":"alert","columns":["time","value"],"values":[["1970-01-01T00:00:00Z",1]]}],"Messages":null,"Partial":false,"Err":null}`
 
 	// Create default config
 	c := NewConfig()

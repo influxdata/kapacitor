@@ -2,20 +2,23 @@ package udf_test
 
 import (
 	"errors"
-	"log"
-	"os"
 	"reflect"
 	"testing"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/services/logging/loggingtest"
 	"github.com/influxdata/kapacitor/udf"
 	udf_test "github.com/influxdata/kapacitor/udf/test"
 )
 
+var logger = loggingtest.New().Root()
+
 func TestUDF_StartStop(t *testing.T) {
 	u := udf_test.NewIO()
-	l := log.New(os.Stderr, "[TestUDF_StartStop] ", log.LstdFlags)
+	l := logger.With(zap.String("test", "StartStop"))
 	s := udf.NewServer(u.Out(), u.In(), l, 0, nil, nil)
 
 	s.Start()
@@ -32,7 +35,7 @@ func TestUDF_StartStop(t *testing.T) {
 
 func TestUDF_StartInitStop(t *testing.T) {
 	u := udf_test.NewIO()
-	l := log.New(os.Stderr, "[TestUDF_StartStop] ", log.LstdFlags)
+	l := logger.With(zap.String("test", "StartStop"))
 	s := udf.NewServer(u.Out(), u.In(), l, 0, nil, nil)
 	go func() {
 		req := <-u.Requests
@@ -68,7 +71,7 @@ func TestUDF_StartInitStop(t *testing.T) {
 
 func TestUDF_StartInitAbort(t *testing.T) {
 	u := udf_test.NewIO()
-	l := log.New(os.Stderr, "[TestUDF_StartInfoAbort] ", log.LstdFlags)
+	l := logger.With(zap.String("test", "StartInfoAbort"))
 	s := udf.NewServer(u.Out(), u.In(), l, 0, nil, nil)
 	s.Start()
 	expErr := errors.New("explicit abort")
@@ -89,7 +92,7 @@ func TestUDF_StartInitAbort(t *testing.T) {
 
 func TestUDF_StartInfoStop(t *testing.T) {
 	u := udf_test.NewIO()
-	l := log.New(os.Stderr, "[TestUDF_StartInfoStop] ", log.LstdFlags)
+	l := logger.With(zap.String("test", "StartInfoStop"))
 	s := udf.NewServer(u.Out(), u.In(), l, 0, nil, nil)
 	go func() {
 		req := <-u.Requests
@@ -131,7 +134,7 @@ func TestUDF_StartInfoStop(t *testing.T) {
 
 func TestUDF_StartInfoAbort(t *testing.T) {
 	u := udf_test.NewIO()
-	l := log.New(os.Stderr, "[TestUDF_StartInfoAbort] ", log.LstdFlags)
+	l := logger.With(zap.String("test", "StartInfoAbort"))
 	s := udf.NewServer(u.Out(), u.In(), l, 0, nil, nil)
 	s.Start()
 	expErr := errors.New("explicit abort")
@@ -153,7 +156,7 @@ func TestUDF_StartInfoAbort(t *testing.T) {
 func TestUDF_Keepalive(t *testing.T) {
 	t.Parallel()
 	u := udf_test.NewIO()
-	l := log.New(os.Stderr, "[TestUDF_Keepalive] ", log.LstdFlags)
+	l := logger.With(zap.String("test", "Keepalive"))
 	s := udf.NewServer(u.Out(), u.In(), l, time.Millisecond*100, nil, nil)
 	s.Start()
 	s.Init(nil)
@@ -193,7 +196,7 @@ func TestUDF_MissedKeepalive(t *testing.T) {
 	}
 
 	u := udf_test.NewIO()
-	l := log.New(os.Stderr, "[TestUDF_MissedKeepalive] ", log.LstdFlags)
+	l := logger.With(zap.String("test", "MissedKeepalive"))
 	s := udf.NewServer(u.Out(), u.In(), l, time.Millisecond*100, aborted, nil)
 	s.Start()
 
@@ -227,7 +230,7 @@ func TestUDF_KillCallBack(t *testing.T) {
 	}
 
 	u := udf_test.NewIO()
-	l := log.New(os.Stderr, "[TestUDF_MissedKeepalive] ", log.LstdFlags)
+	l := logger.With(zap.String("test", "MissedKeepalive"))
 	s := udf.NewServer(u.Out(), u.In(), l, timeout, aborted, kill)
 	s.Start()
 
@@ -256,7 +259,7 @@ func TestUDF_MissedKeepaliveInit(t *testing.T) {
 	}
 
 	u := udf_test.NewIO()
-	l := log.New(os.Stderr, "[TestUDF_MissedKeepaliveInit] ", log.LstdFlags)
+	l := logger.With(zap.String("test", "MissedKeepaliveInit"))
 	s := udf.NewServer(u.Out(), u.In(), l, time.Millisecond*100, aborted, nil)
 	s.Start()
 	s.Init(nil)
@@ -284,7 +287,7 @@ func TestUDF_MissedKeepaliveInfo(t *testing.T) {
 	}
 
 	u := udf_test.NewIO()
-	l := log.New(os.Stderr, "[TestUDF_MissedKeepaliveInfo] ", log.LstdFlags)
+	l := logger.With(zap.String("test", "MissedKeepaliveInfo"))
 	s := udf.NewServer(u.Out(), u.In(), l, time.Millisecond*100, aborted, nil)
 	s.Start()
 	s.Info()
@@ -306,7 +309,7 @@ func TestUDF_MissedKeepaliveInfo(t *testing.T) {
 
 func TestUDF_SnapshotRestore(t *testing.T) {
 	u := udf_test.NewIO()
-	l := log.New(os.Stderr, "[TestUDF_SnapshotRestore] ", log.LstdFlags)
+	l := logger.With(zap.String("test", "SnapshotRestore"))
 	s := udf.NewServer(u.Out(), u.In(), l, 0, nil, nil)
 	go func() {
 		// Init
@@ -375,7 +378,7 @@ func TestUDF_SnapshotRestore(t *testing.T) {
 }
 func TestUDF_StartInitPointStop(t *testing.T) {
 	u := udf_test.NewIO()
-	l := log.New(os.Stderr, "[TestUDF_StartPointStop] ", log.LstdFlags)
+	l := logger.With(zap.String("test", "StartPointStop"))
 	s := udf.NewServer(u.Out(), u.In(), l, 0, nil, nil)
 	go func() {
 		req := <-u.Requests
@@ -436,7 +439,7 @@ func TestUDF_StartInitPointStop(t *testing.T) {
 }
 func TestUDF_StartInitBatchStop(t *testing.T) {
 	u := udf_test.NewIO()
-	l := log.New(os.Stderr, "[TestUDF_StartPointStop] ", log.LstdFlags)
+	l := logger.With(zap.String("test", "StartPointStop"))
 	s := udf.NewServer(u.Out(), u.In(), l, 0, nil, nil)
 	go func() {
 		req := <-u.Requests

@@ -2,10 +2,7 @@ package kapacitor_test
 
 import (
 	"bytes"
-	"fmt"
 	"io"
-	"log"
-	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -13,22 +10,24 @@ import (
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/services/logging/loggingtest"
 	"github.com/influxdata/kapacitor/udf"
 	udf_test "github.com/influxdata/kapacitor/udf/test"
+	"go.uber.org/zap"
 )
+
+var logger = loggingtest.New().Root()
 
 func newUDFSocket(name string) (*kapacitor.UDFSocket, *udf_test.IO) {
 	uio := udf_test.NewIO()
-	l := log.New(os.Stderr, fmt.Sprintf("[%s] ", name), log.LstdFlags)
-	u := kapacitor.NewUDFSocket(newTestSocket(uio), l, 0, nil)
+	u := kapacitor.NewUDFSocket(newTestSocket(uio), logger.With(zap.String("socket", name)), 0, nil)
 	return u, uio
 }
 
 func newUDFProcess(name string) (*kapacitor.UDFProcess, *udf_test.IO) {
 	uio := udf_test.NewIO()
 	cmd := newTestCommander(uio)
-	l := log.New(os.Stderr, fmt.Sprintf("[%s] ", name), log.LstdFlags)
-	u := kapacitor.NewUDFProcess(cmd, command.Spec{}, l, 0, nil)
+	u := kapacitor.NewUDFProcess(cmd, command.Spec{}, logger.With(zap.String("process", name)), 0, nil)
 	return u, uio
 }
 

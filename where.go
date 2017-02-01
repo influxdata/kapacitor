@@ -3,11 +3,11 @@ package kapacitor
 import (
 	"errors"
 	"fmt"
-	"log"
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick/stateful"
+	"go.uber.org/zap"
 )
 
 type WhereNode struct {
@@ -20,7 +20,7 @@ type WhereNode struct {
 }
 
 // Create a new WhereNode which filters down the batch or stream by a condition
-func newWhereNode(et *ExecutingTask, n *pipeline.WhereNode, l *log.Logger) (wn *WhereNode, err error) {
+func newWhereNode(et *ExecutingTask, n *pipeline.WhereNode, l zap.Logger) (wn *WhereNode, err error) {
 	wn = &WhereNode{
 		node:        node{Node: n, et: et, logger: l},
 		w:           n,
@@ -64,7 +64,7 @@ func (w *WhereNode) runWhere(snapshot []byte) error {
 				}
 				w.timer.Resume()
 			} else if err != nil {
-				w.logger.Println("E! error while evaluating expression:", err)
+				w.logger.Error("error while evaluating expression", zap.Error(err))
 			}
 			w.timer.Stop()
 		}
@@ -91,7 +91,7 @@ func (w *WhereNode) runWhere(snapshot []byte) error {
 			for _, p := range points {
 				if pass, err := EvalPredicate(expr, scopePool, p.Time, p.Fields, p.Tags); pass {
 					if err != nil {
-						w.logger.Println("E! error while evaluating WHERE expression:", err)
+						w.logger.Error("error while evaluating WHERE expression", zap.Error(err))
 					}
 					b.Points = append(b.Points, p)
 				}

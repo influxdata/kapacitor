@@ -4,7 +4,6 @@ package server
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -50,6 +49,7 @@ import (
 	"github.com/influxdata/kapacitor/vars"
 	"github.com/pkg/errors"
 	"github.com/twinj/uuid"
+	"go.uber.org/zap"
 )
 
 const clusterIDFilename = "cluster.id"
@@ -93,7 +93,7 @@ type Server struct {
 	QueryExecutor *Queryexecutor
 
 	// List of services in startup order
-	Services []Service
+	Services []service
 	// Map of service name to index in Services list
 	ServicesByName map[string]int
 
@@ -111,7 +111,7 @@ type Server struct {
 	MemProfile string
 
 	LogService logging.Interface
-	Logger     *log.Logger
+	Logger     zap.Logger
 }
 
 // New returns a new instance of Server built from a config.
@@ -120,7 +120,7 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	if err != nil {
 		return nil, fmt.Errorf("%s. To generate a valid configuration file run `kapacitord config > kapacitor.generated.conf`.", err)
 	}
-	l := logService.NewLogger("[srv] ", log.LstdFlags)
+	l := logService.Root().With(zap.Bool("server", true))
 	s := &Server{
 		config:          c,
 		BuildInfo:       buildInfo,
@@ -136,7 +136,7 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 		DynamicServices: make(map[string]Updater),
 		Commander:       c.Commander,
 	}
-	s.Logger.Println("I! Kapacitor hostname:", s.hostname)
+	s.Logger.Info("Kapacitor hostname", zap.String("hostname", s.hostname))
 
 	// Setup IDs
 	err = s.setupIDs()
@@ -150,7 +150,7 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	vars.HostVar.Set(s.hostname)
 	vars.ProductVar.Set(vars.Product)
 	vars.VersionVar.Set(s.BuildInfo.Version)
-	s.Logger.Printf("I! ClusterID: %s ServerID: %s", s.ClusterID, s.ServerID)
+	s.Logger.Info("Kapacitor ids", zap.String("cluster-id", s.ClusterID), zap.String("server-id", s.ServerID))
 
 	// Start Task Master
 	s.TaskMasterLookup = kapacitor.NewTaskMasterLookup()
@@ -223,7 +223,7 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 
 func (s *Server) AppendService(name string, srv Service) {
 	i := len(s.Services)
-	s.Services = append(s.Services, srv)
+	s.Services = append(s.Services, service{Name: name, Service: srv})
 	s.ServicesByName[name] = i
 }
 
@@ -239,7 +239,7 @@ func (s *Server) SetDynamicService(name string, srv dynamicService) {
 }
 
 func (s *Server) appendStorageService() {
-	l := s.LogService.NewLogger("[storage] ", log.LstdFlags)
+	l := s.LogService.Root().With(zap.String("service", "storage"))
 	srv := storage.NewService(s.config.Storage, l)
 
 	s.StorageService = srv
@@ -247,7 +247,7 @@ func (s *Server) appendStorageService() {
 }
 
 func (s *Server) appendConfigOverrideService() {
-	l := s.LogService.NewLogger("[config-override] ", log.LstdFlags)
+	l := s.LogService.Root().With(zap.String("service", "config-override"))
 	srv := config.NewService(s.config.ConfigOverride, s.config, l, s.configUpdates)
 	srv.HTTPDService = s.HTTPDService
 	srv.StorageService = s.StorageService
@@ -257,7 +257,7 @@ func (s *Server) appendConfigOverrideService() {
 }
 
 func (s *Server) appendAlertService() {
-	l := s.LogService.NewLogger("[alert] ", log.LstdFlags)
+	l := s.LogService.Root().With(zap.String("service", "alert"))
 	srv := alert.NewService(s.config.Alert, l)
 
 	srv.Commander = s.Commander
@@ -270,7 +270,7 @@ func (s *Server) appendAlertService() {
 }
 
 func (s *Server) appendTesterService() {
-	l := s.LogService.NewLogger("[service-tests] ", log.LstdFlags)
+	l := s.LogService.Root().With(zap.String("service", "service-tests"))
 	srv := servicetest.NewService(servicetest.NewConfig(), l)
 	srv.HTTPDService = s.HTTPDService
 
@@ -280,7 +280,7 @@ func (s *Server) appendTesterService() {
 
 func (s *Server) appendSMTPService() {
 	c := s.config.SMTP
-	l := s.LogService.NewLogger("[smtp] ", log.LstdFlags)
+	l := s.LogService.Root().With(zap.String("service", "smtp"))
 	srv := smtp.NewService(c, l)
 
 	s.TaskMaster.SMTPService = srv
@@ -292,7 +292,7 @@ func (s *Server) appendSMTPService() {
 
 func (s *Server) appendInfluxDBService() error {
 	c := s.config.InfluxDB
-	l := s.LogService.NewLogger("[influxdb] ", log.LstdFlags)
+	l := s.LogService.Root().With(zap.String("service", "influxdb"))
 	httpPort, err := s.config.HTTP.Port()
 	if err != nil {
 		return errors.Wrap(err, "failed to get http port")
@@ -303,7 +303,6 @@ func (s *Server) appendInfluxDBService() error {
 	}
 	srv.HTTPDService = s.HTTPDService
 	srv.PointsWriter = s.TaskMaster
-	srv.LogService = s.LogService
 	srv.AuthService = s.AuthService
 	srv.ClientCreator = iclient.ClientCreator{}
 
@@ -315,7 +314,7 @@ func (s *Server) appendInfluxDBService() error {
 }
 
 func (s *Server) initHTTPDService() {
-	l := s.LogService.NewLogger("[httpd] ", log.LstdFlags)
+	l := s.LogService.Root().With(zap.String("service", "httpd"))
 	srv := httpd.NewService(s.config.HTTP, s.hostname, l, s.LogService)
 
 	srv.Handler.PointsWriter = s.TaskMaster
@@ -326,7 +325,7 @@ func (s *Server) initHTTPDService() {
 }
 
 func (s *Server) appendTaskStoreService() {
-	l := s.LogService.NewLogger("[task_store] ", log.LstdFlags)
+	l := s.LogService.Root().With(zap.String("service", "task_store"))
 	srv := task_store.NewService(s.config.Task, l)
 	srv.StorageService = s.StorageService
 	srv.HTTPDService = s.HTTPDService
@@ -338,7 +337,7 @@ func (s *Server) appendTaskStoreService() {
 }
 
 func (s *Server) appendReplayService() {
-	l := s.LogService.NewLogger("[replay] ", log.LstdFlags)
+	l := s.LogService.Root().With(zap.String("service", "replay"))
 	srv := replay.NewService(s.config.Replay, l)
 	srv.StorageService = s.StorageService
 	srv.TaskStore = s.TaskStore
@@ -353,7 +352,7 @@ func (s *Server) appendReplayService() {
 
 func (s *Server) appendK8sService() error {
 	c := s.config.Kubernetes
-	l := s.LogService.NewLogger("[kubernetes] ", log.LstdFlags)
+	l := s.LogService.Root().With(zap.String("service", "kubernetes"))
 	srv, err := k8s.NewService(c, l)
 	if err != nil {
 		return err
@@ -366,7 +365,7 @@ func (s *Server) appendK8sService() error {
 }
 
 func (s *Server) appendDeadmanService() {
-	l := s.LogService.NewLogger("[deadman] ", log.LstdFlags)
+	l := s.LogService.Root().With(zap.String("service", "deadman"))
 	srv := deadman.NewService(s.config.Deadman, l)
 
 	s.TaskMaster.DeadmanService = srv
@@ -374,7 +373,7 @@ func (s *Server) appendDeadmanService() {
 }
 
 func (s *Server) appendUDFService() {
-	l := s.LogService.NewLogger("[udf] ", log.LstdFlags)
+	l := s.LogService.Root().With(zap.String("service", "udf"))
 	srv := udf.NewService(s.config.UDF, l)
 
 	s.TaskMaster.UDFService = srv
@@ -382,7 +381,7 @@ func (s *Server) appendUDFService() {
 }
 
 func (s *Server) appendAuthService() {
-	l := s.LogService.NewLogger("[noauth] ", log.LstdFlags)
+	l := s.LogService.Root().With(zap.String("service", "noauth"))
 	srv := noauth.NewService(l)
 
 	s.AuthService = srv
@@ -392,7 +391,7 @@ func (s *Server) appendAuthService() {
 
 func (s *Server) appendOpsGenieService() {
 	c := s.config.OpsGenie
-	l := s.LogService.NewLogger("[opsgenie] ", log.LstdFlags)
+	l := s.LogService.Root().With(zap.String("service", "opsgenie"))
 	srv := opsgenie.NewService(c, l)
 
 	s.TaskMaster.OpsGenieService = srv
@@ -404,7 +403,7 @@ func (s *Server) appendOpsGenieService() {
 
 func (s *Server) appendVictorOpsService() {
 	c := s.config.VictorOps
-	l := s.LogService.NewLogger("[victorops] ", log.LstdFlags)
+	l := s.LogService.Root().With(zap.String("service", "victorops"))
 	srv := victorops.NewService(c, l)
 
 	s.TaskMaster.VictorOpsService = srv
@@ -416,7 +415,7 @@ func (s *Server) appendVictorOpsService() {
 
 func (s *Server) appendPagerDutyService() {
 	c := s.config.PagerDuty
-	l := s.LogService.NewLogger("[pagerduty] ", log.LstdFlags)
+	l := s.LogService.Root().With(zap.String("service", "pagerduty"))
 	srv := pagerduty.NewService(c, l)
 	srv.HTTPDService = s.HTTPDService
 
@@ -429,7 +428,7 @@ func (s *Server) appendPagerDutyService() {
 
 func (s *Server) appendSensuService() {
 	c := s.config.Sensu
-	l := s.LogService.NewLogger("[sensu] ", log.LstdFlags)
+	l := s.LogService.Root().With(zap.String("service", "sensu"))
 	srv := sensu.NewService(c, l)
 
 	s.TaskMaster.SensuService = srv
@@ -441,7 +440,7 @@ func (s *Server) appendSensuService() {
 
 func (s *Server) appendSlackService() {
 	c := s.config.Slack
-	l := s.LogService.NewLogger("[slack] ", log.LstdFlags)
+	l := s.LogService.Root().With(zap.String("service", "slack"))
 	srv := slack.NewService(c, l)
 
 	s.TaskMaster.SlackService = srv
@@ -453,7 +452,7 @@ func (s *Server) appendSlackService() {
 
 func (s *Server) appendSNMPTrapService() {
 	c := s.config.SNMPTrap
-	l := s.LogService.NewLogger("[snmptrap] ", log.LstdFlags)
+	l := s.LogService.Root().With(zap.String("service", "snmptrap"))
 	srv := snmptrap.NewService(c, l)
 
 	s.TaskMaster.SNMPTrapService = srv
@@ -465,7 +464,7 @@ func (s *Server) appendSNMPTrapService() {
 
 func (s *Server) appendTelegramService() {
 	c := s.config.Telegram
-	l := s.LogService.NewLogger("[telegram] ", log.LstdFlags)
+	l := s.LogService.Root().With(zap.String("service", "telegram"))
 	srv := telegram.NewService(c, l)
 
 	s.TaskMaster.TelegramService = srv
@@ -477,7 +476,7 @@ func (s *Server) appendTelegramService() {
 
 func (s *Server) appendHipChatService() {
 	c := s.config.HipChat
-	l := s.LogService.NewLogger("[hipchat] ", log.LstdFlags)
+	l := s.LogService.Root().With(zap.String("service", "hipchat"))
 	srv := hipchat.NewService(c, l)
 
 	s.TaskMaster.HipChatService = srv
@@ -489,7 +488,7 @@ func (s *Server) appendHipChatService() {
 
 func (s *Server) appendAlertaService() {
 	c := s.config.Alerta
-	l := s.LogService.NewLogger("[alerta] ", log.LstdFlags)
+	l := s.LogService.Root().With(zap.String("service", "alerta"))
 	srv := alerta.NewService(c, l)
 
 	s.TaskMaster.AlertaService = srv
@@ -501,7 +500,7 @@ func (s *Server) appendAlertaService() {
 
 func (s *Server) appendTalkService() {
 	c := s.config.Talk
-	l := s.LogService.NewLogger("[talk] ", log.LstdFlags)
+	l := s.LogService.Root().With(zap.String("service", "talk"))
 	srv := talk.NewService(c, l)
 
 	s.TaskMaster.TalkService = srv
@@ -517,8 +516,7 @@ func (s *Server) appendCollectdService() {
 		return
 	}
 	srv := collectd.NewService(c)
-	w := s.LogService.NewStaticLevelWriter(logging.INFO)
-	srv.SetLogOutput(w)
+	srv.WithLogger(s.LogService.Root())
 
 	srv.MetaClient = s.MetaClient
 	srv.PointsWriter = s.TaskMaster
@@ -534,8 +532,7 @@ func (s *Server) appendOpenTSDBService() error {
 	if err != nil {
 		return err
 	}
-	w := s.LogService.NewStaticLevelWriter(logging.INFO)
-	srv.SetLogOutput(w)
+	srv.WithLogger(s.LogService.Root())
 
 	srv.PointsWriter = s.TaskMaster
 	srv.MetaClient = s.MetaClient
@@ -552,8 +549,7 @@ func (s *Server) appendGraphiteServices() error {
 		if err != nil {
 			return errors.Wrap(err, "creating new graphite service")
 		}
-		w := s.LogService.NewStaticLevelWriter(logging.INFO)
-		srv.SetLogOutput(w)
+		srv.WithLogger(s.LogService.Root())
 
 		srv.PointsWriter = s.TaskMaster
 		srv.MetaClient = s.MetaClient
@@ -567,7 +563,7 @@ func (s *Server) appendUDPServices() {
 		if !c.Enabled {
 			continue
 		}
-		l := s.LogService.NewLogger("[udp] ", log.LstdFlags)
+		l := s.LogService.Root().With(zap.String("service", "udp"), zap.String("addr", c.BindAddress))
 		srv := udp.NewService(c, l)
 		srv.PointsWriter = s.TaskMaster
 		s.AppendService(fmt.Sprintf("udp%d", i), srv)
@@ -577,7 +573,7 @@ func (s *Server) appendUDPServices() {
 func (s *Server) appendStatsService() {
 	c := s.config.Stats
 	if c.Enabled {
-		l := s.LogService.NewLogger("[stats] ", log.LstdFlags)
+		l := s.LogService.Root().With(zap.String("service", "stats"))
 		srv := stats.NewService(c, l)
 		srv.TaskMaster = s.TaskMaster
 
@@ -590,7 +586,7 @@ func (s *Server) appendStatsService() {
 func (s *Server) appendReportingService() {
 	c := s.config.Reporting
 	if c.Enabled {
-		l := s.LogService.NewLogger("[reporting] ", log.LstdFlags)
+		l := s.LogService.Root().With(zap.String("service", "reporting"))
 		srv := reporting.NewService(c, l)
 
 		s.AppendService("reporting", srv)
@@ -625,16 +621,16 @@ func (s *Server) Open() error {
 
 func (s *Server) startServices() error {
 	for _, service := range s.Services {
-		s.Logger.Printf("D! opening service: %T", service)
+		s.Logger.Debug("opening service", zap.String("service", service.Name))
 		if err := service.Open(); err != nil {
-			return fmt.Errorf("open service %T: %s", service, err)
+			return fmt.Errorf("open service %s: %s", service.Name, err)
 		}
-		s.Logger.Printf("D! opened service: %T", service)
+		s.Logger.Debug("opened service", zap.String("service", service.Name))
 
 		// Apply config overrides after the config override service has been opened and before any dynamic services.
-		if service == s.ConfigOverrideService && !s.config.SkipConfigOverrides {
+		if service.Service == s.ConfigOverrideService && !s.config.SkipConfigOverrides {
 			// Apply initial config updates
-			s.Logger.Println("D! applying configuration overrides")
+			s.Logger.Debug("applying configuration overrides")
 			configs, err := s.ConfigOverrideService.Config()
 			if err != nil {
 				return errors.Wrap(err, "failed to apply config overrides")
@@ -643,14 +639,13 @@ func (s *Server) startServices() error {
 				if srv, ok := s.DynamicServices[service]; !ok {
 					return fmt.Errorf("found configuration override for unknown service %q", service)
 				} else {
-					s.Logger.Println("D! applying configuration overrides for", service)
+					s.Logger.Debug("applying configuration overrides for service", zap.String("service", service))
 					if err := srv.Update(config); err != nil {
 						return errors.Wrapf(err, "failed to update configuration for service %s", service)
 					}
 				}
 			}
 		}
-
 	}
 	return nil
 }
@@ -680,11 +675,11 @@ func (s *Server) Close() error {
 
 	// Close all services that write points first.
 	if err := s.HTTPDService.Close(); err != nil {
-		s.Logger.Printf("E! error closing httpd service: %v", err)
+		s.Logger.Error("error closing httpd service", zap.Error(err))
 	}
 	if s.StatsService != nil {
 		if err := s.StatsService.Close(); err != nil {
-			s.Logger.Printf("E! error closing stats service: %v", err)
+			s.Logger.Error("error closing stats service", zap.Error(err))
 		}
 	}
 
@@ -694,16 +689,21 @@ func (s *Server) Close() error {
 
 	// Close services now that all tasks are stopped.
 	for _, service := range s.Services {
-		s.Logger.Printf("D! closing service: %T", service)
+		s.Logger.Debug("closing service", zap.String("service", service.Name))
 		err := service.Close()
 		if err != nil {
-			s.Logger.Printf("E! error closing service %T: %v", service, err)
+			s.Logger.Error(fmt.Sprintf("error closing service: %v", err), zap.String("service", service.Name))
 		}
-		s.Logger.Printf("D! closed service: %T", service)
+		s.Logger.Debug("closed service", zap.String("service", service.Name))
 	}
 
+	s.Logger.Debug("closing task master")
 	// Finally close the task master
-	return s.TaskMaster.Close()
+	if err := s.TaskMaster.Close(); err != nil {
+		return err
+	}
+	s.Logger.Debug("closed task master")
+	return nil
 }
 
 func (s *Server) setupIDs() error {
@@ -776,6 +776,11 @@ type Service interface {
 	Close() error
 }
 
+type service struct {
+	Service
+	Name string
+}
+
 // Updater represents a service that can have its configuration updated while running.
 type Updater interface {
 	Update(c []interface{}) error
@@ -794,7 +799,7 @@ func (s *Server) startProfile(cpuprofile, memprofile string) error {
 		if err != nil {
 			return fmt.Errorf("E! cpuprofile: %v", err)
 		}
-		s.Logger.Printf("I! writing CPU profile to: %s\n", cpuprofile)
+		s.Logger.Info("writing CPU profile", zap.String("file", cpuprofile))
 		prof.cpu = f
 		if err := pprof.StartCPUProfile(prof.cpu); err != nil {
 			return fmt.Errorf("#! start cpu profile: %v", err)
@@ -806,7 +811,7 @@ func (s *Server) startProfile(cpuprofile, memprofile string) error {
 		if err != nil {
 			return fmt.Errorf("E! memprofile: %v", err)
 		}
-		s.Logger.Printf("I! writing mem profile to: %s\n", memprofile)
+		s.Logger.Info("writing mem profile", zap.String("file", memprofile))
 		prof.mem = f
 		runtime.MemProfileRate = 4096
 	}
@@ -818,14 +823,14 @@ func (s *Server) stopProfile() {
 	if prof.cpu != nil {
 		pprof.StopCPUProfile()
 		prof.cpu.Close()
-		s.Logger.Println("I! CPU profile stopped")
+		s.Logger.Info("CPU profile stopped")
 	}
 	if prof.mem != nil {
 		if err := pprof.Lookup("heap").WriteTo(prof.mem, 0); err != nil {
-			s.Logger.Printf("I! failed to write mem profile: %v\n", err)
+			s.Logger.Error("failed to write mem profile", zap.Error(err))
 		}
 		prof.mem.Close()
-		s.Logger.Println("I! mem profile stopped")
+		s.Logger.Info("mem profile stopped")
 	}
 }
 

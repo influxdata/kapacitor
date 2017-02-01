@@ -1,54 +1,56 @@
 package logging
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"os"
 	"path"
+	"strings"
 
-	"github.com/influxdata/wlog"
-)
+	"go.uber.org/zap"
 
-type Level wlog.Level
-
-const (
-	_ Level = iota
-	DEBUG
-	INFO
-	WARN
-	ERROR
-	OFF
+	zaplogfmt "github.com/jsternberg/zap-logfmt"
 )
 
 // Interface for creating new loggers
 type Interface interface {
-	NewLogger(prefix string, flag int) *log.Logger
-	NewRawLogger(prefix string, flag int) *log.Logger
-	NewStaticLevelLogger(prefix string, flag int, l Level) *log.Logger
-	NewStaticLevelWriter(l Level) io.Writer
+	Root() zap.Logger
+	Writer() io.Writer
+	SetLevel(level string) error
 }
 
 type Service struct {
-	f      io.WriteCloser
+	root   zap.Logger
 	c      Config
-	stdout io.Writer
-	stderr io.Writer
+	stdout WriteSyncer
+	stderr WriteSyncer
+	writer io.Writer
+	closer io.Closer
+	level  zap.AtomicLevel
 }
 
-func NewService(c Config, stdout, stderr io.Writer) *Service {
+type WriteSyncer interface {
+	io.Writer
+	Sync() error
+}
+
+func NewService(c Config, stdout, stderr WriteSyncer) *Service {
 	return &Service{
 		c:      c,
 		stdout: stdout,
 		stderr: stderr,
+		level:  zap.DynamicLevel(),
 	}
 }
 
 func (s *Service) Open() error {
+	var output WriteSyncer
 	switch s.c.File {
 	case "STDERR":
-		s.f = &nopCloser{f: s.stderr}
+		output = s.stderr
 	case "STDOUT":
-		s.f = &nopCloser{f: s.stdout}
+		output = s.stdout
 	default:
 		dir := path.Dir(s.c.File)
 		if _, err := os.Stat(dir); os.IsNotExist(err) {
@@ -62,44 +64,65 @@ func (s *Service) Open() error {
 		if err != nil {
 			return err
 		}
-		s.f = f
+		output = f
+		s.closer = f
+	}
+	s.writer = output
+
+	// Set level from configuration
+	if err := s.SetLevel(s.c.Level); err != nil {
+		return err
 	}
 
-	// Configure default logger
+	var encoder zap.Encoder
+	switch s.c.Encoding {
+	case "logfmt":
+		encoder = zaplogfmt.NewEncoder()
+	case "text":
+		encoder = zap.NewTextEncoder()
+	default:
+		return fmt.Errorf("unknown log encoding %s", s.c.Encoding)
+	}
+
+	// Create root logger
+	s.root = zap.New(encoder, zap.Output(output), s.level)
+
+	// Configure default logger, should not be used.
 	log.SetPrefix("[log] ")
 	log.SetFlags(log.LstdFlags)
-	log.SetOutput(wlog.NewWriter(s.f))
+	log.SetOutput(output)
 
-	wlog.SetLevelFromName(s.c.Level)
 	return nil
 }
 
 func (s *Service) Close() error {
-	if s.f != nil {
-		return s.f.Close()
+	if s.closer != nil {
+		return s.closer.Close()
 	}
 	return nil
 }
 
-func (s *Service) NewLogger(prefix string, flag int) *log.Logger {
-	return wlog.New(s.f, prefix, flag)
+func (s *Service) Root() zap.Logger {
+	return s.root
 }
 
-func (s *Service) NewRawLogger(prefix string, flag int) *log.Logger {
-	return log.New(s.f, prefix, flag)
+func (s *Service) Writer() io.Writer {
+	return s.writer
 }
 
-func (s *Service) NewStaticLevelLogger(prefix string, flag int, l Level) *log.Logger {
-	return log.New(wlog.NewStaticLevelWriter(s.f, wlog.Level(l)), prefix, flag)
+func (s *Service) SetLevel(level string) error {
+	log.Println("setting log level", level)
+	switch strings.ToUpper(level) {
+	case "DEBUG":
+		s.level.SetLevel(zap.DebugLevel)
+	case "INFO":
+		s.level.SetLevel(zap.InfoLevel)
+	case "WARN":
+		s.level.SetLevel(zap.WarnLevel)
+	case "ERROR":
+		s.level.SetLevel(zap.ErrorLevel)
+	default:
+		return fmt.Errorf("unknown logging level %s", level)
+	}
+	return nil
 }
-
-func (s *Service) NewStaticLevelWriter(l Level) io.Writer {
-	return wlog.NewStaticLevelWriter(s.f, wlog.Level(l))
-}
-
-type nopCloser struct {
-	f io.Writer
-}
-
-func (c *nopCloser) Write(b []byte) (int, error) { return c.f.Write(b) }
-func (c *nopCloser) Close() error                { return nil }

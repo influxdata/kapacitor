@@ -3,7 +3,6 @@ package kapacitor
 import (
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/influxdata/kapacitor/expvar"
@@ -11,6 +10,7 @@ import (
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/tick/stateful"
+	"go.uber.org/zap"
 )
 
 const (
@@ -30,7 +30,7 @@ type EvalNode struct {
 }
 
 // Create a new  EvalNode which applies a transformation func to each point in a stream and returns a single point.
-func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalNode, error) {
+func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l zap.Logger) (*EvalNode, error) {
 	if len(n.AsList) != len(n.Lambdas) {
 		return nil, errors.New("must provide one name per expression via the 'As' property")
 	}
@@ -80,7 +80,7 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 			if err != nil {
 				e.evalErrors.Add(1)
 				if !e.e.QuiteFlag {
-					e.logger.Println("E!", err)
+					e.logger.Error("eval error", zap.Error(err))
 				}
 				e.timer.Stop()
 				// Skip bad point
@@ -104,7 +104,7 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 				if err != nil {
 					e.evalErrors.Add(1)
 					if !e.e.QuiteFlag {
-						e.logger.Println("E!", err)
+						e.logger.Error("eval error", zap.Error(err))
 					}
 					// Remove bad point
 					b.Points = append(b.Points[:i], b.Points[i+1:]...)

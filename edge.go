@@ -3,13 +3,13 @@ package kapacitor
 import (
 	"errors"
 	"fmt"
-	"log"
 	"sync"
 
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/vars"
+	"go.uber.org/zap"
 )
 
 const (
@@ -38,7 +38,7 @@ type Edge struct {
 	stream chan models.Point
 	batch  chan models.Batch
 
-	logger     *log.Logger
+	logger     zap.Logger
 	aborted    chan struct{}
 	statsKey   string
 	collected  *expvar.Int
@@ -48,7 +48,7 @@ type Edge struct {
 	groupStats map[models.GroupID]*edgeStat
 }
 
-func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, size int, logService LogService) *Edge {
+func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, size int, parentLogger zap.Logger) *Edge {
 	tags := map[string]string{
 		"task":   taskName,
 		"parent": parentName,
@@ -68,8 +68,8 @@ func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, size i
 		aborted:    make(chan struct{}),
 		groupStats: make(map[models.GroupID]*edgeStat),
 	}
-	name := fmt.Sprintf("%s|%s->%s", taskName, parentName, childName)
-	e.logger = logService.NewLogger(fmt.Sprintf("[edge:%s] ", name), log.LstdFlags)
+	name := fmt.Sprintf("%s->%s", parentName, childName)
+	e.logger = parentLogger.With(zap.String("edge", name), zap.String("type", t.String()))
 	switch t {
 	case pipeline.StreamEdge:
 		e.stream = make(chan models.Point, size)
@@ -120,10 +120,10 @@ func (e *Edge) Close() {
 		return
 	}
 	e.closed = true
-	e.logger.Printf(
-		"D! closing c: %d e: %d\n",
-		e.collected.IntValue(),
-		e.emitted.IntValue(),
+	e.logger.Debug(
+		"closing edge",
+		zap.Int64("collected", e.collected.IntValue()),
+		zap.Int64("emitted", e.emitted.IntValue()),
 	)
 	if e.stream != nil {
 		close(e.stream)
@@ -138,10 +138,10 @@ func (e *Edge) Close() {
 // Items in flight may or may not be processed.
 func (e *Edge) Abort() {
 	close(e.aborted)
-	e.logger.Printf(
-		"I! aborting c: %d e: %d\n",
-		e.collected.IntValue(),
-		e.emitted.IntValue(),
+	e.logger.Error(
+		"aborting edge",
+		zap.Int64("collected", e.collected.IntValue()),
+		zap.Int64("emitted", e.emitted.IntValue()),
 	)
 }
 

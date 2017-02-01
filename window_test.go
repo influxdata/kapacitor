@@ -1,16 +1,15 @@
 package kapacitor
 
 import (
-	"log"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/services/logging/loggingtest"
 	"github.com/stretchr/testify/assert"
 )
 
-var logger = log.New(os.Stderr, "[window] ", log.LstdFlags|log.Lshortfile)
+var logger = loggingtest.New().Root()
 
 func TestWindowBufferByTime(t *testing.T) {
 	assert := assert.New(t)

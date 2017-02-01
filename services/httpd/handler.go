@@ -22,7 +22,7 @@ import (
 	"github.com/influxdata/kapacitor/auth"
 	"github.com/influxdata/kapacitor/client/v1"
 	"github.com/influxdata/kapacitor/services/logging"
-	"github.com/influxdata/wlog"
+	"go.uber.org/zap"
 )
 
 // statistics gathered by the httpd package.
@@ -81,14 +81,16 @@ type Handler struct {
 		WritePoints(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
 	}
 
-	// Normal wlog logger
-	logger *log.Logger
+	logService logging.Interface
+
+	// Normal logger
+	logger zap.Logger
 	// Detailed logging of write path
 	// Uses normal logger
 	writeTrace bool
 
 	// Common log format logger.
-	// This logger does not use log levels with wlog.
+	// This logger does not use log levels.
 	// Its simply a binary on off from the config.
 	clfLogger *log.Logger
 	// Log every HTTP access.
@@ -104,8 +106,8 @@ func NewHandler(
 	writeTrace,
 	allowGzip bool,
 	statMap *expvar.Map,
-	l *log.Logger,
-	li logging.Interface,
+	l zap.Logger,
+	ls logging.Interface,
 	sharedSecret string,
 ) *Handler {
 	h := &Handler{
@@ -115,7 +117,8 @@ func NewHandler(
 		allowGzip:             allowGzip,
 		logger:                l,
 		writeTrace:            writeTrace,
-		clfLogger:             li.NewRawLogger("[httpd] ", 0),
+		logService:            ls,
+		clfLogger:             log.New(ls.Writer(), "[httpd] ", 0),
 		loggingEnabled:        loggingEnabled,
 		statMap:               statMap,
 	}
@@ -376,7 +379,8 @@ func (h *Handler) serveLogLevel(w http.ResponseWriter, r *http.Request) {
 		HttpError(w, "invalid json: "+err.Error(), true, http.StatusBadRequest)
 		return
 	}
-	err = wlog.SetLevelFromName(opt.Level)
+
+	err = h.logService.SetLevel(opt.Level)
 	if err != nil {
 		HttpError(w, err.Error(), true, http.StatusBadRequest)
 		return
@@ -438,14 +442,14 @@ func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user auth.U
 	b, err := ioutil.ReadAll(body)
 	if err != nil {
 		if h.writeTrace {
-			h.logger.Print("E! write handler unable to read bytes from request body")
+			h.logger.Error("write handler unable to read bytes from request body")
 		}
 		h.writeError(w, influxql.Result{Err: err}, http.StatusBadRequest)
 		return
 	}
 	h.statMap.Add(statWriteRequestBytesReceived, int64(len(b)))
 	if h.writeTrace {
-		h.logger.Printf("D! write body received by handler: %s", string(b))
+		h.logger.Debug(fmt.Sprintf("write body received by handler: %s", string(b)))
 	}
 
 	h.serveWriteLine(w, r, b, user)
@@ -879,15 +883,14 @@ func logHandler(inner http.Handler, weblog *log.Logger) http.Handler {
 	})
 }
 
-func recovery(inner http.Handler, weblog *log.Logger) http.Handler {
+func recovery(inner http.Handler, weblog zap.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		l := &responseLogger{w: w}
 		inner.ServeHTTP(l, r)
 		if err := recover(); err != nil {
 			logLine := buildLogLine(l, r, start)
-			logLine = fmt.Sprintf("E! %s [err:%s]", logLine, err)
-			weblog.Println(logLine)
+			weblog.Error(logLine, zap.String("error", fmt.Sprintf("%v", err)))
 		}
 	})
 }

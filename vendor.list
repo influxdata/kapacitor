@@ -1,3 +1,4 @@
+collectd.org
 github.com/BurntSushi/toml
 github.com/boltdb/bolt
 github.com/cenkalti/backoff
@@ -11,6 +12,7 @@ github.com/golang/protobuf
 github.com/gorhill/cronexpr
 github.com/influxdata/influxdb master
 github.com/influxdata/usage-client
+github.com/jsternberg/zap-logfmt
 github.com/k-sone/snmpgo
 github.com/kimor79/gollectd
 github.com/mattn/go-runewidth
@@ -24,6 +26,8 @@ github.com/shurcooL/go
 github.com/shurcooL/markdownfmt
 github.com/shurcooL/sanitized_anchor_name
 github.com/twinj/uuid
+github.com/uber-go/atomic
+go.uber.org/zap
 golang.org/x/crypto master
 gopkg.in/gomail.v2
 gopkg.in/yaml.v2

@@ -3,48 +3,57 @@ package kapacitor
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
-	"log"
 	"strings"
 
 	"github.com/influxdata/kapacitor/pipeline"
-	"github.com/influxdata/wlog"
+	"go.uber.org/zap"
 )
 
 type LogNode struct {
 	node
-	level  wlog.Level
+	level  zap.Level
+	l      zap.Logger
 	prefix string
 }
 
 // Create a new  LogNode which logs all data it receives
-func newLogNode(et *ExecutingTask, n *pipeline.LogNode, l *log.Logger) (*LogNode, error) {
-	level, ok := wlog.StringToLevel[strings.ToUpper(n.Level)]
-	if !ok {
-		return nil, fmt.Errorf("invalid log level %s", n.Level)
+func newLogNode(et *ExecutingTask, n *pipeline.LogNode, l zap.Logger) (*LogNode, error) {
+	var level zap.Level
+	switch strings.ToUpper(n.Level) {
+	case "DEBUG":
+		level = zap.DebugLevel
+	case "INFO":
+		level = zap.InfoLevel
+	case "WARN":
+		level = zap.WarnLevel
+	case "ERROR":
+		level = zap.ErrorLevel
 	}
 	nn := &LogNode{
 		node:   node{Node: n, et: et, logger: l},
 		level:  level,
-		prefix: n.Prefix,
+		l:      l.With(zap.String("prefix", n.Prefix)),
+		prefix: n.Prefix + " ",
 	}
 	nn.node.runF = nn.runLog
 	return nn, nil
 }
 
 func (s *LogNode) runLog([]byte) error {
-	key := fmt.Sprintf("%c! %s", wlog.ReverseLevels[s.level], s.prefix)
 	var buf bytes.Buffer
-	env := json.NewEncoder(&buf)
+	enc := json.NewEncoder(&buf)
 	switch s.Wants() {
 	case pipeline.StreamEdge:
 		for p, ok := s.ins[0].NextPoint(); ok; p, ok = s.ins[0].NextPoint() {
 			buf.Reset()
-			if err := env.Encode(p); err != nil {
-				s.logger.Println("E!", err)
+			buf.WriteString(s.prefix)
+			if err := enc.Encode(p); err != nil {
+				s.logger.Error(err.Error())
 				continue
 			}
-			s.logger.Println(key, buf.String())
+			// Drop newline
+			buf.Truncate(buf.Len() - 1)
+			s.l.Log(s.level, buf.String())
 			for _, child := range s.outs {
 				err := child.CollectPoint(p)
 				if err != nil {
@@ -55,11 +64,14 @@ func (s *LogNode) runLog([]byte) error {
 	case pipeline.BatchEdge:
 		for b, ok := s.ins[0].NextBatch(); ok; b, ok = s.ins[0].NextBatch() {
 			buf.Reset()
-			if err := env.Encode(b); err != nil {
-				s.logger.Println("E!", err)
+			buf.WriteString(s.prefix)
+			if err := enc.Encode(b); err != nil {
+				s.logger.Error(err.Error())
 				continue
 			}
-			s.logger.Println(key, buf.String())
+			// Drop newline
+			buf.Truncate(buf.Len() - 1)
+			s.l.Log(s.level, buf.String())
 			for _, child := range s.outs {
 				err := child.CollectBatch(b)
 				if err != nil {

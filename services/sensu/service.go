@@ -5,22 +5,22 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net"
 	"regexp"
 	"sync/atomic"
 
 	"github.com/influxdata/kapacitor/alert"
+	"go.uber.org/zap"
 )
 
 type Service struct {
 	configValue atomic.Value
-	logger      *log.Logger
+	logger      zap.Logger
 }
 
 var validNamePattern = regexp.MustCompile(`^[\w\.-]+$`)
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, l zap.Logger) *Service {
 	s := &Service{
 		logger: l,
 	}
@@ -147,10 +147,10 @@ func (s *Service) prepareData(name, output string, level alert.Level) (*net.TCPA
 
 type handler struct {
 	s      *Service
-	logger *log.Logger
+	logger zap.Logger
 }
 
-func (s *Service) Handler(l *log.Logger) alert.Handler {
+func (s *Service) Handler(l zap.Logger) alert.Handler {
 	return &handler{
 		s:      s,
 		logger: l,
@@ -163,6 +163,6 @@ func (h *handler) Handle(event alert.Event) {
 		event.State.Message,
 		event.State.Level,
 	); err != nil {
-		h.logger.Println("E! failed to send event to Sensu", err)
+		h.logger.Error("failed to send event to Sensu", zap.Error(err))
 	}
 }

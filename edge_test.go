@@ -1,20 +1,18 @@
 package kapacitor
 
 import (
-	"log"
-	"os"
 	"testing"
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
-	"github.com/influxdata/wlog"
+	"github.com/influxdata/kapacitor/services/logging/loggingtest"
 )
 
 func BenchmarkCollectPoint(b *testing.B) {
 	name := "point"
 	b.ReportAllocs()
-	ls := &logService{}
-	e := newEdge("BCollectPoint", "parent", "child", pipeline.StreamEdge, defaultEdgeBufferSize, ls)
+	ls := loggingtest.New()
+	e := newEdge("BCollectPoint", "parent", "child", pipeline.StreamEdge, defaultEdgeBufferSize, ls.Root())
 	p := models.Point{
 		Name: name,
 		Tags: models.Tags{
@@ -39,10 +37,4 @@ func BenchmarkCollectPoint(b *testing.B) {
 			e.NextPoint()
 		}
 	})
-}
-
-type logService struct{}
-
-func (l *logService) NewLogger(prefix string, flag int) *log.Logger {
-	return wlog.New(os.Stderr, prefix, flag)
 }

@@ -2,7 +2,7 @@ package kapacitor
 
 import (
 	"bytes"
-	"log"
+	"fmt"
 	"sync"
 	"time"
 
@@ -12,6 +12,7 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 )
 
 const (
@@ -28,7 +29,7 @@ type InfluxDBOutNode struct {
 	writeErrors   *expvar.Int
 }
 
-func newInfluxDBOutNode(et *ExecutingTask, n *pipeline.InfluxDBOutNode, l *log.Logger) (*InfluxDBOutNode, error) {
+func newInfluxDBOutNode(et *ExecutingTask, n *pipeline.InfluxDBOutNode, l zap.Logger) (*InfluxDBOutNode, error) {
 	if et.tm.InfluxDBService == nil {
 		return nil, errors.New("no InfluxDB cluster configured cannot use the InfluxDBOutNode")
 	}
@@ -78,7 +79,7 @@ func (i *InfluxDBOutNode) runOut([]byte) error {
 			return nil
 		}()
 		if err != nil {
-			i.logger.Printf("E! failed to create database %q on cluster %q: %v", i.i.Database, i.i.Cluster, err)
+			i.logger.Error(fmt.Sprintf("failed to create database on cluster: %v", err), zap.String("database", i.i.Database), zap.String("cluster", i.i.Cluster))
 		}
 	}
 
@@ -234,7 +235,7 @@ func (w *writeBuffer) run() {
 			if !ok {
 				bp, err = influxdb.NewBatchPoints(qe.bpc)
 				if err != nil {
-					w.i.logger.Println("E! failed to write points to InfluxDB:", err)
+					w.i.logger.Error("failed to write points to InfluxDB", zap.Error(err))
 					break
 				}
 				w.buffer[qe.bpc] = bp
@@ -244,7 +245,7 @@ func (w *writeBuffer) run() {
 			if len(bp.Points()) >= w.size {
 				err = w.write(bp)
 				if err != nil {
-					w.i.logger.Println("E! failed to write points to InfluxDB:", err)
+					w.i.logger.Error("failed to write points to InfluxDB", zap.Error(err))
 				}
 				delete(w.buffer, qe.bpc)
 			}
@@ -265,7 +266,7 @@ func (w *writeBuffer) writeAll() {
 	for bpc, bp := range w.buffer {
 		err := w.write(bp)
 		if err != nil {
-			w.i.logger.Println("E! failed to write points to InfluxDB:", err)
+			w.i.logger.Error("failed to write points to InfluxDB", zap.Error(err))
 		}
 		delete(w.buffer, bpc)
 	}

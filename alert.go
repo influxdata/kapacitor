@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	html "html/template"
-	"log"
 	"os"
 	"sync"
 	text "text/template"
@@ -28,6 +27,7 @@ import (
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/tick/stateful"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 )
 
 const (
@@ -72,7 +72,7 @@ type AlertNode struct {
 }
 
 // Create a new  AlertNode which caches the most recent item and exposes it over the HTTP API.
-func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *AlertNode, err error) {
+func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l zap.Logger) (an *AlertNode, err error) {
 	an = &AlertNode{
 		node: node{Node: n, et: et, logger: l},
 		a:    n,
@@ -704,12 +704,12 @@ func (a *AlertNode) restoreEventState(id string) alert.Level {
 		if anonFound && topicFound {
 			// Anon topic takes precedence
 			if err := a.et.tm.AlertService.UpdateEvent(a.topic, anonTopicState); err != nil {
-				a.logger.Printf("E! failed to update topic %q event state for event %q", a.topic, id)
+				a.logger.Error("failed to update topic event state for event", zap.String("topic", a.topic), zap.String("event", id))
 			}
 		} else if topicFound && a.hasAnonTopic() {
 			// Update event state for topic
 			if err := a.et.tm.AlertService.UpdateEvent(a.anonTopic, topicState); err != nil {
-				a.logger.Printf("E! failed to update topic %q event state for event %q", a.topic, id)
+				a.logger.Error("failed to update topic event state for event", zap.String("topic", a.anonTopic), zap.String("event", id))
 			}
 		} // else nothing was found, nothing to do
 	}
@@ -731,7 +731,13 @@ func (a *AlertNode) handleEvent(event alert.Event) {
 	case alert.Critical:
 		a.critsTriggered.Add(1)
 	}
-	a.logger.Printf("D! %v alert triggered id:%s msg:%s data:%v", event.State.Level, event.State.ID, event.State.Message, event.Data.Result.Series[0])
+	a.logger.Debug(
+		"alert event triggered",
+		zap.String("level", event.State.Level.String()),
+		zap.String("id", event.State.ID),
+		zap.String("message", event.State.Message),
+		zap.String("data", fmt.Sprintf("%v", event.Data.Result.Series[0])),
+	)
 
 	// If we have anon handlers, emit event to the anonTopic
 	if a.hasAnonTopic() {
@@ -739,7 +745,7 @@ func (a *AlertNode) handleEvent(event alert.Event) {
 		err := a.et.tm.AlertService.Collect(event)
 		if err != nil {
 			a.eventsDropped.Add(1)
-			a.logger.Println("E!", err)
+			a.logger.Error("dropped alert event", zap.Error(err))
 		}
 	}
 
@@ -749,7 +755,7 @@ func (a *AlertNode) handleEvent(event alert.Event) {
 		err := a.et.tm.AlertService.Collect(event)
 		if err != nil {
 			a.eventsDropped.Add(1)
-			a.logger.Println("E!", err)
+			a.logger.Error("dropped alert event", zap.Error(err))
 		}
 	}
 }
@@ -760,7 +766,7 @@ func (a *AlertNode) determineLevel(now time.Time, fields models.Fields, tags map
 	}
 	if rse := a.levelResets[currentLevel]; rse != nil {
 		if pass, err := EvalPredicate(rse, a.lrScopePools[currentLevel], now, fields, tags); err != nil {
-			a.logger.Printf("E! error evaluating reset expression for current level %v: %s", currentLevel, err)
+			a.logger.Error(fmt.Sprintf("error evaluating reset expression for current level: %s", err), zap.String("level", currentLevel.String()))
 		} else if !pass {
 			return currentLevel
 		}
@@ -781,7 +787,7 @@ func (a *AlertNode) findFirstMatchLevel(start alert.Level, stop alert.Level, now
 			continue
 		}
 		if pass, err := EvalPredicate(se, a.scopePools[l], now, fields, tags); err != nil {
-			a.logger.Printf("E! error evaluating expression for level %v: %s", alert.Level(l), err)
+			a.logger.Error(fmt.Sprintf("error evaluating expression for level: %s", err), zap.String("level", alert.Level(l).String()))
 			continue
 		} else if pass {
 			return alert.Level(l), true

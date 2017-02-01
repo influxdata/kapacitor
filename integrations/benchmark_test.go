@@ -17,12 +17,13 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"sync"
 	"testing"
+
+	"go.uber.org/zap"
 
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/services/httpd"
@@ -172,9 +173,9 @@ func Bench(b *testing.B, tasksCount, pointCount, expectedProcessedCount int, tic
 	config := httpd.NewConfig()
 	config.BindAddress = ":0" // Choose port dynamically
 	config.LogEnabled = false
-	httpdService := httpd.NewService(config, "localhost", logService.NewLogger("[http] ", log.LstdFlags), logService)
+	httpdService := httpd.NewService(config, "localhost", logger.With(zap.String("service", "httpd")), logService)
 
-	httpdService.Handler.AuthService = noauth.NewService(logService.NewLogger("[noauth] ", log.LstdFlags))
+	httpdService.Handler.AuthService = noauth.NewService(logger.With(zap.String("service", "noath")))
 	err := httpdService.Open()
 	if err != nil {
 		b.Fatal(err)
