@@ -6,6 +6,8 @@
 
 ### Features
 
+- [#1159](https://github.com/influxdata/kapacitor/pulls/1159): Go version 1.7.4 -> 1.7.5
+
 ### Bugfixes
 
 - [#1147](https://github.com/influxdata/kapacitor/issues/1147): Fix pprof debug endpoint
