@@ -9,7 +9,7 @@
 ### Bugfixes
 
 - [#1147](https://github.com/influxdata/kapacitor/issues/1147): Fix pprof debug endpoint
-
+- [#1161](https://github.com/influxdata/kapacitor/pull/1161): Fixed install/remove of kapacitor on non-systemd Debian/Ubuntu systems
 
 ## v1.2.0 [2017-01-23]
 
