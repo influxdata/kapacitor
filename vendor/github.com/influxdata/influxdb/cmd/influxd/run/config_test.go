@@ -1,6 +1,7 @@
 package run_test
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -118,6 +119,9 @@ bind-address = ":8087"
 
 [[graphite]]
 protocol = "udp"
+templates = [
+  "default.* .template.in.config"
+]
 
 [[graphite]]
 protocol = "tcp"
@@ -156,6 +160,14 @@ enabled = true
 		t.Fatalf("failed to set env var: %v", err)
 	}
 
+	if err := os.Setenv("INFLUXDB_GRAPHITE_0_TEMPLATES_0", "overide.* .template.0"); err != nil {
+		t.Fatalf("failed to set env var: %v", err)
+	}
+
+	if err := os.Setenv("INFLUXDB_GRAPHITE_1_TEMPLATES", "overide.* .template.1.1,overide.* .template.1.2"); err != nil {
+		t.Fatalf("failed to set env var: %v", err)
+	}
+
 	if err := os.Setenv("INFLUXDB_GRAPHITE_1_PROTOCOL", "udp"); err != nil {
 		t.Fatalf("failed to set env var: %v", err)
 	}
@@ -183,6 +195,14 @@ enabled = true
 
 	if c.UDPInputs[1].BindAddress != ":1234" {
 		t.Fatalf("unexpected udp bind address: %s", c.UDPInputs[1].BindAddress)
+	}
+
+	if len(c.GraphiteInputs[0].Templates) != 1 || c.GraphiteInputs[0].Templates[0] != "overide.* .template.0" {
+		t.Fatalf("unexpected graphite 0 templates: %+v", c.GraphiteInputs[0].Templates)
+	}
+
+	if len(c.GraphiteInputs[1].Templates) != 2 || c.GraphiteInputs[1].Templates[1] != "overide.* .template.1.2" {
+		t.Fatalf("unexpected graphite 1 templates: %+v", c.GraphiteInputs[1].Templates)
 	}
 
 	if c.GraphiteInputs[1].Protocol != "udp" {
@@ -253,5 +273,45 @@ max-select-point = 100
 	if c.Coordinator.MaxSelectPointN != 100 {
 		t.Fatalf("unexpected coordinator max select points: %d", c.Coordinator.MaxSelectPointN)
 
+	}
+}
+
+// Ensure that Config.Validate correctly validates the individual subsections.
+func TestConfig_InvalidSubsections(t *testing.T) {
+	// Precondition: NewDemoConfig must validate correctly.
+	c, err := run.NewDemoConfig()
+	if err != nil {
+		t.Fatalf("error creating demo config: %s", err)
+	}
+	if err := c.Validate(); err != nil {
+		t.Fatalf("new demo config failed validation: %s", err)
+	}
+
+	// For each subsection, load a config with a single invalid setting.
+	for _, tc := range []struct {
+		section string
+		kv      string
+	}{
+		{"meta", `dir = ""`},
+		{"data", `dir = ""`},
+		{"monitor", `store-database = ""`},
+		{"continuous_queries", `run-interval = "0s"`},
+		{"subscriber", `http-timeout = "0s"`},
+		{"retention", `check-interval = "0s"`},
+		{"shard-precreation", `advance-period = "0s"`},
+	} {
+		c, err := run.NewDemoConfig()
+		if err != nil {
+			t.Fatalf("error creating demo config: %s", err)
+		}
+
+		s := fmt.Sprintf("\n[%s]\n%s\n", tc.section, tc.kv)
+		if err := c.FromToml(s); err != nil {
+			t.Fatalf("error loading toml %q: %s", s, err)
+		}
+
+		if err := c.Validate(); err == nil {
+			t.Fatalf("expected error but got nil for config: %s", s)
+		}
 	}
 }

@@ -1,7 +1,10 @@
+// Package client implements a now-deprecated client for InfluxDB;
+// use github.com/influxdata/influxdb/client/v2 instead.
 package client // import "github.com/influxdata/influxdb/client"
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -87,13 +90,15 @@ func ParseConnectionString(path string, ssl bool) (url.URL, error) {
 // UserAgent: If not provided, will default "InfluxDBClient",
 // Timeout: If not provided, will default to 0 (no timeout)
 type Config struct {
-	URL       url.URL
-	Username  string
-	Password  string
-	UserAgent string
-	Timeout   time.Duration
-	Precision string
-	UnsafeSsl bool
+	URL              url.URL
+	UnixSocket       string
+	Username         string
+	Password         string
+	UserAgent        string
+	Timeout          time.Duration
+	Precision        string
+	WriteConsistency string
+	UnsafeSsl        bool
 }
 
 // NewConfig will create a config to be used in connecting to the client
@@ -106,6 +111,7 @@ func NewConfig() Config {
 // Client is used to make calls to the server.
 type Client struct {
 	url        url.URL
+	unixSocket string
 	username   string
 	password   string
 	httpClient *http.Client
@@ -137,8 +143,18 @@ func NewClient(c Config) (*Client, error) {
 		TLSClientConfig: tlsConfig,
 	}
 
+	if c.UnixSocket != "" {
+		// No need for compression in local communications.
+		tr.DisableCompression = true
+
+		tr.DialContext = func(_ context.Context, _, _ string) (net.Conn, error) {
+			return net.Dial("unix", c.UnixSocket)
+		}
+	}
+
 	client := Client{
 		url:        c.URL,
+		unixSocket: c.UnixSocket,
 		username:   c.Username,
 		password:   c.Password,
 		httpClient: &http.Client{Timeout: c.Timeout, Transport: tr},
@@ -751,6 +767,9 @@ func (bp *BatchPoints) UnmarshalJSON(b []byte) error {
 
 // Addr provides the current url as a string of the server the client is connected to.
 func (c *Client) Addr() string {
+	if c.unixSocket != "" {
+		return c.unixSocket
+	}
 	return c.url.String()
 }
 

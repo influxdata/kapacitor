@@ -53,18 +53,34 @@ func (a {{.Name}}Values) assertOrdered() {
 // Deduplicate returns a new slice with any values that have the same timestamp removed.
 // The Value that appears last in the slice is the one that is kept.
 func (a {{.Name}}Values) Deduplicate() {{.Name}}Values {
-	m := make(map[int64]{{.Name}}Value)
-	for _, val := range a {
-		m[val.UnixNano()] = val
+	if len(a) == 0 {
+		return a
 	}
 
-	other := make({{.Name}}Values, 0, len(m))
-	for _, val := range m {
-		other = append(other, val)
+	// See if we're already sorted and deduped
+	var needSort bool
+	for i := 1; i < len(a); i++ {
+		if a[i-1].UnixNano() >= a[i].UnixNano() {
+			needSort = true
+			break
+		}
 	}
 
-	sort.Sort(other)
-	return other
+	if !needSort {
+		return a
+	}
+
+	sort.Stable(a)
+	var i int
+	for j := 1; j < len(a); j++ {
+		v := a[j]
+		if v.UnixNano() != a[i].UnixNano() {
+			i++
+		}
+		a[i] = v
+
+	}
+	return a[:i+1]
 }
 
 //  Exclude returns the subset of values not in [min, max]
@@ -110,13 +126,8 @@ func (a {{.Name}}Values) Merge(b {{.Name}}Values) {{.Name}}Values {
 	// Normally, both a and b should not contain duplicates.  Due to a bug in older versions, it's
 	// possible stored blocks might contain duplicate values.  Remove them if they exists before
 	// merging.
-	if !a.ordered() {
-		a = a.Deduplicate()
-	}
-
-	if !b.ordered() {
-		b = b.Deduplicate()
-	}
+	a = a.Deduplicate()
+	b = b.Deduplicate()
 
 	if a[len(a)-1].UnixNano() < b[0].UnixNano() {
 		return append(a, b...)

@@ -10,6 +10,7 @@ type Row struct {
 	Tags    map[string]string `json:"tags,omitempty"`
 	Columns []string          `json:"columns,omitempty"`
 	Values  [][]interface{}   `json:"values,omitempty"`
+	Partial bool              `json:"partial,omitempty"`
 }
 
 // SameSeries returns true if r contains values for the same series as o.
@@ -41,8 +42,10 @@ func (r *Row) tagsKeys() []string {
 // Rows represents a collection of rows. Rows implements sort.Interface.
 type Rows []*Row
 
+// Len implements sort.Interface.
 func (p Rows) Len() int { return len(p) }
 
+// Less implements sort.Interface.
 func (p Rows) Less(i, j int) bool {
 	// Sort by name first.
 	if p[i].Name != p[j].Name {
@@ -55,4 +58,5 @@ func (p Rows) Less(i, j int) bool {
 	return p[i].tagsHash() < p[j].tagsHash()
 }
 
+// Swap implements sort.Interface.
 func (p Rows) Swap(i, j int) { p[i], p[j] = p[j], p[i] }

@@ -67,7 +67,7 @@ func TestRunCLI_ExecuteInsert(t *testing.T) {
 	c := cli.New(CLIENT_VERSION)
 	c.Host = h
 	c.Port, _ = strconv.Atoi(p)
-	c.Precision = "ms"
+	c.ClientConfig.Precision = "ms"
 	c.Execute = "INSERT sensor,floor=1 value=2"
 	c.IgnoreSignals = true
 	c.ForceTTY = true
@@ -87,11 +87,11 @@ func TestSetAuth(t *testing.T) {
 	c.SetAuth("auth " + u + " " + p)
 
 	// validate CLI configuration
-	if c.Username != u {
-		t.Fatalf("Username is %s but should be %s", c.Username, u)
+	if c.ClientConfig.Username != u {
+		t.Fatalf("Username is %s but should be %s", c.ClientConfig.Username, u)
 	}
-	if c.Password != p {
-		t.Fatalf("Password is %s but should be %s", c.Password, p)
+	if c.ClientConfig.Password != p {
+		t.Fatalf("Password is %s but should be %s", c.ClientConfig.Password, p)
 	}
 }
 
@@ -105,15 +105,15 @@ func TestSetPrecision(t *testing.T) {
 	// validate set non-default precision
 	p := "ns"
 	c.SetPrecision("precision " + p)
-	if c.Precision != p {
-		t.Fatalf("Precision is %s but should be %s", c.Precision, p)
+	if c.ClientConfig.Precision != p {
+		t.Fatalf("Precision is %s but should be %s", c.ClientConfig.Precision, p)
 	}
 
 	// validate set default precision which equals empty string
 	p = "rfc3339"
 	c.SetPrecision("precision " + p)
-	if c.Precision != "" {
-		t.Fatalf("Precision is %s but should be empty", c.Precision)
+	if c.ClientConfig.Precision != "" {
+		t.Fatalf("Precision is %s but should be empty", c.ClientConfig.Precision)
 	}
 }
 
@@ -142,22 +142,22 @@ func TestSetWriteConsistency(t *testing.T) {
 	// set valid write consistency
 	consistency := "all"
 	c.SetWriteConsistency("consistency " + consistency)
-	if c.WriteConsistency != consistency {
-		t.Fatalf("WriteConsistency is %s but should be %s", c.WriteConsistency, consistency)
+	if c.ClientConfig.WriteConsistency != consistency {
+		t.Fatalf("WriteConsistency is %s but should be %s", c.ClientConfig.WriteConsistency, consistency)
 	}
 
 	// set different valid write consistency and validate change
 	consistency = "quorum"
 	c.SetWriteConsistency("consistency " + consistency)
-	if c.WriteConsistency != consistency {
-		t.Fatalf("WriteConsistency is %s but should be %s", c.WriteConsistency, consistency)
+	if c.ClientConfig.WriteConsistency != consistency {
+		t.Fatalf("WriteConsistency is %s but should be %s", c.ClientConfig.WriteConsistency, consistency)
 	}
 
 	// set invalid write consistency and verify there was no change
 	invalidConsistency := "invalid_consistency"
 	c.SetWriteConsistency("consistency " + invalidConsistency)
-	if c.WriteConsistency == invalidConsistency {
-		t.Fatalf("WriteConsistency is %s but should be %s", c.WriteConsistency, consistency)
+	if c.ClientConfig.WriteConsistency == invalidConsistency {
+		t.Fatalf("WriteConsistency is %s but should be %s", c.ClientConfig.WriteConsistency, consistency)
 	}
 }
 
@@ -340,7 +340,8 @@ func TestParseCommand_UseAuth(t *testing.T) {
 			t.Errorf("%d. unexpected error.  expected %v, actual %v", i, nil, err)
 			continue
 		}
-		m := cli.CommandLine{Client: c, Username: tt.user}
+		m := cli.CommandLine{Client: c}
+		m.ClientConfig.Username = tt.user
 
 		if err := m.ParseCommand(tt.cmd); err != nil {
 			t.Fatalf(`%d. Got error %v for command %q, expected nil.`, i, err, tt.cmd)
@@ -371,8 +372,8 @@ func TestParseCommand_Consistency(t *testing.T) {
 			t.Fatalf(`Got error %v for command %q, expected nil.`, err, test.cmd)
 		}
 
-		if c.WriteConsistency != "one" {
-			t.Fatalf(`Command "consistency" changed consistency to %q. Expected one`, c.WriteConsistency)
+		if c.ClientConfig.WriteConsistency != "one" {
+			t.Fatalf(`Command "consistency" changed consistency to %q. Expected one`, c.ClientConfig.WriteConsistency)
 		}
 	}
 }
@@ -406,67 +407,6 @@ func TestParseCommand_Insert(t *testing.T) {
 	for _, test := range tests {
 		if err := m.ParseCommand(test.cmd); err != nil {
 			t.Fatalf(`Got error %v for command %q, expected nil.`, err, test.cmd)
-		}
-	}
-}
-
-func TestParseCommand_InsertInto(t *testing.T) {
-	t.Parallel()
-	ts := emptyTestServer()
-	defer ts.Close()
-
-	u, _ := url.Parse(ts.URL)
-	config := client.Config{URL: *u}
-	c, err := client.NewClient(config)
-	if err != nil {
-		t.Fatalf("unexpected error.  expected %v, actual %v", nil, err)
-	}
-	m := cli.CommandLine{Client: c}
-
-	tests := []struct {
-		cmd, db, rp string
-	}{
-		{
-			cmd: `INSERT INTO test cpu,host=serverA,region=us-west value=1.0`,
-			db:  "",
-			rp:  "test",
-		},
-		{
-			cmd: ` INSERT INTO .test cpu,host=serverA,region=us-west value=1.0`,
-			db:  "",
-			rp:  "test",
-		},
-		{
-			cmd: `INSERT INTO   "test test" cpu,host=serverA,region=us-west value=1.0`,
-			db:  "",
-			rp:  "test test",
-		},
-		{
-			cmd: `Insert iNTO test.test cpu,host=serverA,region=us-west value=1.0`,
-			db:  "test",
-			rp:  "test",
-		},
-		{
-			cmd: `insert into "test test" cpu,host=serverA,region=us-west value=1.0`,
-			db:  "test",
-			rp:  "test test",
-		},
-		{
-			cmd: `insert into "d b"."test test" cpu,host=serverA,region=us-west value=1.0`,
-			db:  "d b",
-			rp:  "test test",
-		},
-	}
-
-	for _, test := range tests {
-		if err := m.ParseCommand(test.cmd); err != nil {
-			t.Fatalf(`Got error %v for command %q, expected nil.`, err, test.cmd)
-		}
-		if m.Database != test.db {
-			t.Fatalf(`Command "insert into" db parsing failed, expected: %q, actual: %q`, test.db, m.Database)
-		}
-		if m.RetentionPolicy != test.rp {
-			t.Fatalf(`Command "insert into" rp parsing failed, expected: %q, actual: %q`, test.rp, m.RetentionPolicy)
 		}
 	}
 }

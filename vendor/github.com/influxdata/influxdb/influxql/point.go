@@ -78,7 +78,7 @@ func NewTags(m map[string]string) Tags {
 	}
 }
 
-// newTagsID returns a new instance of Tags parses from a tag id.
+// newTagsID returns a new instance of Tags by parsing the given tag ID.
 func newTagsID(id string) Tags {
 	m := decodeTags([]byte(id))
 	if len(m) == 0 {
@@ -281,6 +281,15 @@ func decodeAux(pb []*internal.Aux) []interface{} {
 		}
 	}
 	return aux
+}
+
+func cloneAux(src []interface{}) []interface{} {
+	if src == nil {
+		return src
+	}
+	dest := make([]interface{}, len(src))
+	copy(dest, src)
+	return dest
 }
 
 // PointDecoder decodes generic points from a reader.

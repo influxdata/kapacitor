@@ -1,3 +1,5 @@
+// Package meta provides control over meta data for InfluxDB,
+// such as controlling databases, retention policies, users, etc.
 package meta
 
 import (
@@ -8,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"math/rand"
 	"net/http"
 	"os"
@@ -19,15 +20,20 @@ import (
 
 	"github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/influxql"
+	"go.uber.org/zap"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
 const (
-	// SaltBytes is the number of bytes used for salts
+	// SaltBytes is the number of bytes used for salts.
 	SaltBytes = 32
 
 	metaFile = "meta.db"
+
+	// ShardGroupDeletedExpiration is the amount of time before a shard group info will be removed from cached
+	// data after it has been marked deleted (2 weeks).
+	ShardGroupDeletedExpiration = -2 * 7 * 24 * time.Hour
 )
 
 var (
@@ -41,7 +47,7 @@ var (
 // Client is used to execute commands on and read data from
 // a meta service cluster.
 type Client struct {
-	logger *log.Logger
+	logger zap.Logger
 
 	mu        sync.RWMutex
 	closing   chan struct{}
@@ -71,7 +77,7 @@ func NewClient(config *Config) *Client {
 		},
 		closing:             make(chan struct{}),
 		changed:             make(chan struct{}),
-		logger:              log.New(ioutil.Discard, "[metaclient] ", log.LstdFlags),
+		logger:              zap.New(zap.NullEncoder()),
 		authCache:           make(map[string]authUser, 0),
 		path:                config.Dir,
 		retentionAutoCreate: config.RetentionAutoCreate,
@@ -127,13 +133,6 @@ func (c *Client) AcquireLease(name string) (*Lease, error) {
 	return &l, nil
 }
 
-func (c *Client) data() *Data {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	data := c.cacheData.Clone()
-	return data
-}
-
 // ClusterID returns the ID of the cluster it's connected to.
 func (c *Client) ClusterID() uint64 {
 	c.mu.RLock()
@@ -168,7 +167,7 @@ func (c *Client) Databases() []DatabaseInfo {
 	return dbs
 }
 
-// CreateDatabase creates a database or returns it if it already exists
+// CreateDatabase creates a database or returns it if it already exists.
 func (c *Client) CreateDatabase(name string) (*DatabaseInfo, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -186,10 +185,7 @@ func (c *Client) CreateDatabase(name string) (*DatabaseInfo, error) {
 	// create default retention policy
 	if c.retentionAutoCreate {
 		rpi := DefaultRetentionPolicyInfo()
-		if err := data.CreateRetentionPolicy(name, rpi); err != nil {
-			return nil, err
-		}
-		if err := data.SetDefaultRetentionPolicy(name, rpi.Name); err != nil {
+		if err := data.CreateRetentionPolicy(name, rpi, true); err != nil {
 			return nil, err
 		}
 	}
@@ -203,8 +199,23 @@ func (c *Client) CreateDatabase(name string) (*DatabaseInfo, error) {
 	return db, nil
 }
 
-// CreateDatabaseWithRetentionPolicy creates a database with the specified retention policy.
+// CreateDatabaseWithRetentionPolicy creates a database with the specified
+// retention policy.
+//
+// When creating a database with a retention policy, the retention policy will
+// always be set to default. Therefore if the caller provides a retention policy
+// that already exists on the database, but that retention policy is not the
+// default one, an error will be returned.
+//
+// This call is only idempotent when the caller provides the exact same
+// retention policy, and that retention policy is already the default for the
+// database.
+//
 func (c *Client) CreateDatabaseWithRetentionPolicy(name string, spec *RetentionPolicySpec) (*DatabaseInfo, error) {
+	if spec == nil {
+		return nil, errors.New("CreateDatabaseWithRetentionPolicy called with nil spec")
+	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -222,34 +233,35 @@ func (c *Client) CreateDatabaseWithRetentionPolicy(name string, spec *RetentionP
 		db = data.Database(name)
 	}
 
+	// No existing retention policies, so we can create the provided policy as
+	// the new default policy.
 	rpi := spec.NewRetentionPolicyInfo()
-	if rp := db.RetentionPolicy(rpi.Name); rp == nil {
-		if err := data.CreateRetentionPolicy(name, rpi); err != nil {
+	if len(db.RetentionPolicies) == 0 {
+		if err := data.CreateRetentionPolicy(name, rpi, true); err != nil {
 			return nil, err
 		}
-	} else if !spec.Matches(rp) {
-		// Verify that the retention policy with this name matches
-		// the one already created.
+	} else if !spec.Matches(db.RetentionPolicy(rpi.Name)) {
+		// In this case we already have a retention policy on the database and
+		// the provided retention policy does not match it. Therefore, this call
+		// is not idempotent and we need to return an error.
 		return nil, ErrRetentionPolicyConflict
 	}
 
-	// If no default retention policy has been set, set it to the retention
-	// policy we just created. If the default is different from what we are
-	// trying to create, record it as a conflict and abandon with an error.
-	if db.DefaultRetentionPolicy == "" {
-		if err := data.SetDefaultRetentionPolicy(name, rpi.Name); err != nil {
-			return nil, err
-		}
-	} else if rpi.Name != db.DefaultRetentionPolicy {
+	// If a non-default retention policy was passed in that already exists then
+	// it's an error regardless of if the exact same retention policy is
+	// provided. CREATE DATABASE WITH RETENTION POLICY should only be used to
+	// create DEFAULT retention policies.
+	if db.DefaultRetentionPolicy != rpi.Name {
 		return nil, ErrRetentionPolicyConflict
+	}
+
+	// Commit the changes.
+	if err := c.commit(data); err != nil {
+		return nil, err
 	}
 
 	// Refresh the database info.
 	db = data.Database(name)
-
-	if err := c.commit(data); err != nil {
-		return nil, err
-	}
 
 	return db, nil
 }
@@ -273,7 +285,7 @@ func (c *Client) DropDatabase(name string) error {
 }
 
 // CreateRetentionPolicy creates a retention policy on the specified database.
-func (c *Client) CreateRetentionPolicy(database string, spec *RetentionPolicySpec) (*RetentionPolicyInfo, error) {
+func (c *Client) CreateRetentionPolicy(database string, spec *RetentionPolicySpec, makeDefault bool) (*RetentionPolicyInfo, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -284,7 +296,7 @@ func (c *Client) CreateRetentionPolicy(database string, spec *RetentionPolicySpe
 	}
 
 	rp := spec.NewRetentionPolicyInfo()
-	if err := data.CreateRetentionPolicy(database, rp); err != nil {
+	if err := data.CreateRetentionPolicy(database, rp, makeDefault); err != nil {
 		return nil, err
 	}
 
@@ -326,32 +338,14 @@ func (c *Client) DropRetentionPolicy(database, name string) error {
 	return nil
 }
 
-// SetDefaultRetentionPolicy sets a database's default retention policy.
-func (c *Client) SetDefaultRetentionPolicy(database, name string) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	data := c.cacheData.Clone()
-
-	if err := data.SetDefaultRetentionPolicy(database, name); err != nil {
-		return err
-	}
-
-	if err := c.commit(data); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // UpdateRetentionPolicy updates a retention policy.
-func (c *Client) UpdateRetentionPolicy(database, name string, rpu *RetentionPolicyUpdate) error {
+func (c *Client) UpdateRetentionPolicy(database, name string, rpu *RetentionPolicyUpdate, makeDefault bool) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	data := c.cacheData.Clone()
 
-	if err := data.UpdateRetentionPolicy(database, name, rpu); err != nil {
+	if err := data.UpdateRetentionPolicy(database, name, rpu, makeDefault); err != nil {
 		return err
 	}
 
@@ -362,6 +356,7 @@ func (c *Client) UpdateRetentionPolicy(database, name string, rpu *RetentionPoli
 	return nil
 }
 
+// Users returns a slice of UserInfo representing the currently known users.
 func (c *Client) Users() []UserInfo {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -374,6 +369,7 @@ func (c *Client) Users() []UserInfo {
 	return users
 }
 
+// User returns the user with the given name, or ErrUserNotFound.
 func (c *Client) User(name string) (*UserInfo, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -391,7 +387,7 @@ func (c *Client) User(name string) (*UserInfo, error) {
 // This setting is lowered during testing to improve test suite performance.
 var bcryptCost = bcrypt.DefaultCost
 
-// hashWithSalt returns a salted hash of password using salt
+// hashWithSalt returns a salted hash of password using salt.
 func (c *Client) hashWithSalt(salt []byte, password string) []byte {
 	hasher := sha256.New()
 	hasher.Write(salt)
@@ -399,7 +395,7 @@ func (c *Client) hashWithSalt(salt []byte, password string) []byte {
 	return hasher.Sum(nil)
 }
 
-// saltedHash returns a salt and salted hash of password
+// saltedHash returns a salt and salted hash of password.
 func (c *Client) saltedHash(password string) (salt, hash []byte, err error) {
 	salt = make([]byte, SaltBytes)
 	if _, err := io.ReadFull(crand.Reader, salt); err != nil {
@@ -409,6 +405,7 @@ func (c *Client) saltedHash(password string) (salt, hash []byte, err error) {
 	return salt, c.hashWithSalt(salt, password), nil
 }
 
+// CreateUser adds a user with the given name and password and admin status.
 func (c *Client) CreateUser(name, password string, admin bool) (*UserInfo, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -442,6 +439,7 @@ func (c *Client) CreateUser(name, password string, admin bool) (*UserInfo, error
 	return u, nil
 }
 
+// UpdateUser updates the password of an existing user.
 func (c *Client) UpdateUser(name, password string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -455,7 +453,7 @@ func (c *Client) UpdateUser(name, password string) error {
 	}
 
 	if err := data.UpdateUser(name, string(hash)); err != nil {
-		return nil
+		return err
 	}
 
 	delete(c.authCache, name)
@@ -467,6 +465,7 @@ func (c *Client) UpdateUser(name, password string) error {
 	return nil
 }
 
+// DropUser removes the user with the given name.
 func (c *Client) DropUser(name string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -484,6 +483,7 @@ func (c *Client) DropUser(name string) error {
 	return nil
 }
 
+// SetPrivilege sets a privilege for the given user on the given database.
 func (c *Client) SetPrivilege(username, database string, p influxql.Privilege) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -501,6 +501,7 @@ func (c *Client) SetPrivilege(username, database string, p influxql.Privilege) e
 	return nil
 }
 
+// SetAdminPrivilege sets or unsets admin privilege to the given username.
 func (c *Client) SetAdminPrivilege(username string, admin bool) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -518,6 +519,7 @@ func (c *Client) SetAdminPrivilege(username string, admin bool) error {
 	return nil
 }
 
+// UserPrivileges returns the privileges for a user mapped by database name.
 func (c *Client) UserPrivileges(username string) (map[string]influxql.Privilege, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -529,6 +531,7 @@ func (c *Client) UserPrivileges(username string) (map[string]influxql.Privilege,
 	return p, nil
 }
 
+// UserPrivilege returns the privilege for the given user on the given database.
 func (c *Client) UserPrivilege(username, database string) (*influxql.Privilege, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -540,6 +543,7 @@ func (c *Client) UserPrivilege(username, database string) (*influxql.Privilege, 
 	return p, nil
 }
 
+// AdminUserExists returns true if any user has admin privilege.
 func (c *Client) AdminUserExists() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -552,6 +556,7 @@ func (c *Client) AdminUserExists() bool {
 	return false
 }
 
+// Authenticate returns a UserInfo if the username and password match an existing entry.
 func (c *Client) Authenticate(username, password string) (*UserInfo, error) {
 	// Find user.
 	c.mu.RLock()
@@ -590,6 +595,7 @@ func (c *Client) Authenticate(username, password string) (*UserInfo, error) {
 	return userInfo, nil
 }
 
+// UserCount returns the number of users stored.
 func (c *Client) UserCount() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -642,12 +648,7 @@ func (c *Client) ShardGroupsByTimeRange(database, policy string, min, max time.T
 // ShardsByTimeRange returns a slice of shards that may contain data in the time range.
 func (c *Client) ShardsByTimeRange(sources influxql.Sources, tmin, tmax time.Time) (a []ShardInfo, err error) {
 	m := make(map[*ShardInfo]struct{})
-	for _, src := range sources {
-		mm, ok := src.(*influxql.Measurement)
-		if !ok {
-			return nil, fmt.Errorf("invalid source type: %#v", src)
-		}
-
+	for _, mm := range sources.Measurements() {
 		groups, err := c.ShardGroupsByTimeRange(mm.Database, mm.RetentionPolicy, tmin, tmax)
 		if err != nil {
 			return nil, err
@@ -675,6 +676,32 @@ func (c *Client) DropShard(id uint64) error {
 	data := c.cacheData.Clone()
 	data.DropShard(id)
 	return c.commit(data)
+}
+
+// PruneShardGroups remove deleted shard groups from the data store.
+func (c *Client) PruneShardGroups() error {
+	var changed bool
+	expiration := time.Now().Add(ShardGroupDeletedExpiration)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	data := c.cacheData.Clone()
+	for i, d := range data.Databases {
+		for j, rp := range d.RetentionPolicies {
+			var remainingShardGroups []ShardGroupInfo
+			for _, sgi := range rp.ShardGroups {
+				if sgi.DeletedAt.IsZero() || !expiration.After(sgi.DeletedAt) {
+					remainingShardGroups = append(remainingShardGroups, sgi)
+					continue
+				}
+				changed = true
+			}
+			data.Databases[i].RetentionPolicies[j].ShardGroups = remainingShardGroups
+		}
+	}
+	if changed {
+		return c.commit(data)
+	}
+	return nil
 }
 
 // CreateShardGroup creates a shard group on a database and policy for a given timestamp.
@@ -773,16 +800,16 @@ func (c *Client) PrecreateShardGroups(from, to time.Time) error {
 				nextShardGroupTime := g.EndTime.Add(1 * time.Nanosecond)
 				// if it already exists, continue
 				if sg, _ := data.ShardGroupByTimestamp(di.Name, rp.Name, nextShardGroupTime); sg != nil {
-					c.logger.Printf("shard group %d exists for database %s, retention policy %s", sg.ID, di.Name, rp.Name)
+					c.logger.Info(fmt.Sprintf("shard group %d exists for database %s, retention policy %s", sg.ID, di.Name, rp.Name))
 					continue
 				}
 				newGroup, err := createShardGroup(data, di.Name, rp.Name, nextShardGroupTime)
 				if err != nil {
-					c.logger.Printf("failed to precreate successive shard group for group %d: %s", g.ID, err.Error())
+					c.logger.Info(fmt.Sprintf("failed to precreate successive shard group for group %d: %s", g.ID, err.Error()))
 					continue
 				}
 				changed = true
-				c.logger.Printf("new shard group %d successfully precreated for database %s, retention policy %s", newGroup.ID, di.Name, rp.Name)
+				c.logger.Info(fmt.Sprintf("new shard group %d successfully precreated for database %s, retention policy %s", newGroup.ID, di.Name, rp.Name))
 			}
 		}
 	}
@@ -822,6 +849,7 @@ func (c *Client) ShardOwner(shardID uint64) (database, policy string, sgi *Shard
 	return
 }
 
+// CreateContinuousQuery saves a continuous query with the given name for the given database.
 func (c *Client) CreateContinuousQuery(database, name, query string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -839,6 +867,7 @@ func (c *Client) CreateContinuousQuery(database, name, query string) error {
 	return nil
 }
 
+// DropContinuousQuery removes the continuous query with the given name on the given database.
 func (c *Client) DropContinuousQuery(database, name string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -846,7 +875,7 @@ func (c *Client) DropContinuousQuery(database, name string) error {
 	data := c.cacheData.Clone()
 
 	if err := data.DropContinuousQuery(database, name); err != nil {
-		return nil
+		return err
 	}
 
 	if err := c.commit(data); err != nil {
@@ -856,6 +885,7 @@ func (c *Client) DropContinuousQuery(database, name string) error {
 	return nil
 }
 
+// CreateSubscription creates a subscription against the given database and retention policy.
 func (c *Client) CreateSubscription(database, rp, name, mode string, destinations []string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -873,6 +903,7 @@ func (c *Client) CreateSubscription(database, rp, name, mode string, destination
 	return nil
 }
 
+// DropSubscription removes the named subscription from the given database and retention policy.
 func (c *Client) DropSubscription(database, rp, name string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -890,6 +921,7 @@ func (c *Client) DropSubscription(database, rp, name string) error {
 	return nil
 }
 
+// SetData overwrites the underlying data in the meta store.
 func (c *Client) SetData(data *Data) error {
 	c.mu.Lock()
 
@@ -909,6 +941,7 @@ func (c *Client) SetData(data *Data) error {
 	return nil
 }
 
+// Data returns a clone of the underlying data in the meta store.
 func (c *Client) Data() Data {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -916,15 +949,16 @@ func (c *Client) Data() Data {
 	return *d
 }
 
-// WaitForDataChanged will return a channel that will get closed when
-// the metastore data has changed
+// WaitForDataChanged returns a channel that will get closed when
+// the metastore data has changed.
 func (c *Client) WaitForDataChanged() chan struct{} {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.changed
 }
 
-// commit assumes it is under a full lock
+// commit writes data to the underlying store.
+// This method assumes c's mutex is already locked.
 func (c *Client) commit(data *Data) error {
 	data.Index++
 
@@ -943,36 +977,21 @@ func (c *Client) commit(data *Data) error {
 	return nil
 }
 
+// MarshalBinary returns a binary representation of the underlying data.
 func (c *Client) MarshalBinary() ([]byte, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.cacheData.MarshalBinary()
 }
 
-// SetLogOutput sets the writer to which all logs are written. It must not be
-// called after Open is called.
-func (c *Client) SetLogOutput(w io.Writer) {
+// WithLogger sets the logger for the client.
+func (c *Client) WithLogger(log zap.Logger) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.logger = log.New(w, "[metaclient] ", log.LstdFlags)
+	c.logger = log.With(zap.String("service", "metaclient"))
 }
 
-func (c *Client) updateAuthCache() {
-	// copy cached user info for still-present users
-	newCache := make(map[string]authUser, len(c.authCache))
-
-	for _, userInfo := range c.cacheData.Users {
-		if cached, ok := c.authCache[userInfo.Name]; ok {
-			if cached.bhash == userInfo.Hash {
-				newCache[userInfo.Name] = cached
-			}
-		}
-	}
-
-	c.authCache = newCache
-}
-
-// snapshot will save the current meta data to disk
+// snapshot saves the current meta data to disk.
 func snapshot(path string, data *Data) error {
 	file := filepath.Join(path, metaFile)
 	tmpFile := file + "tmp"
@@ -1006,7 +1025,7 @@ func snapshot(path string, data *Data) error {
 	return renameFile(tmpFile, file)
 }
 
-// Load will save the current meta data from disk
+// Load loads the current meta data from disk.
 func (c *Client) Load() error {
 	file := filepath.Join(c.path, metaFile)
 

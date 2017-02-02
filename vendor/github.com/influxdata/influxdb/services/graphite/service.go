@@ -1,13 +1,11 @@
+// Package graphite provides a service for InfluxDB to ingest data via the graphite protocol.
 package graphite // import "github.com/influxdata/influxdb/services/graphite"
 
 import (
 	"bufio"
 	"fmt"
-	"io"
-	"log"
 	"math"
 	"net"
-	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -17,6 +15,7 @@ import (
 	"github.com/influxdata/influxdb/monitor/diagnostics"
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/influxdb/tsdb"
+	"go.uber.org/zap"
 )
 
 const udpBufferSize = 65536
@@ -57,7 +56,7 @@ type Service struct {
 	batcher *tsdb.PointBatcher
 	parser  *Parser
 
-	logger      *log.Logger
+	logger      zap.Logger
 	stats       *Statistics
 	defaultTags models.StatisticTags
 
@@ -83,9 +82,8 @@ type Service struct {
 		WritePoints(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
 	}
 	MetaClient interface {
-		CreateDatabase(name string) (*meta.DatabaseInfo, error)
 		CreateDatabaseWithRetentionPolicy(name string, spec *meta.RetentionPolicySpec) (*meta.DatabaseInfo, error)
-		CreateRetentionPolicy(database string, spec *meta.RetentionPolicySpec) (*meta.RetentionPolicyInfo, error)
+		CreateRetentionPolicy(database string, spec *meta.RetentionPolicySpec, makeDefault bool) (*meta.RetentionPolicyInfo, error)
 		Database(name string) *meta.DatabaseInfo
 		RetentionPolicy(database, name string) (*meta.RetentionPolicyInfo, error)
 	}
@@ -105,7 +103,7 @@ func NewService(c Config) (*Service, error) {
 		batchPending:    d.BatchPending,
 		udpReadBuffer:   d.UDPReadBuffer,
 		batchTimeout:    time.Duration(d.BatchTimeout),
-		logger:          log.New(os.Stderr, fmt.Sprintf("[graphite] %s ", d.BindAddress), log.LstdFlags),
+		logger:          zap.New(zap.NullEncoder()),
 		stats:           &Statistics{},
 		defaultTags:     models.StatisticTags{"proto": d.Protocol, "bind": d.BindAddress},
 		tcpConnections:  make(map[string]*tcpConnection),
@@ -135,7 +133,7 @@ func (s *Service) Open() error {
 	}
 	s.done = make(chan struct{})
 
-	s.logger.Printf("Starting graphite service, batch size %d, batch timeout %s", s.batchSize, s.batchTimeout)
+	s.logger.Info(fmt.Sprintf("Starting graphite service, batch size %d, batch timeout %s", s.batchSize, s.batchTimeout))
 
 	// Register diagnostics if a Monitor service is available.
 	if s.Monitor != nil {
@@ -161,7 +159,7 @@ func (s *Service) Open() error {
 		return err
 	}
 
-	s.logger.Printf("Listening on %s: %s", strings.ToUpper(s.protocol), s.addr.String())
+	s.logger.Info(fmt.Sprintf("Listening on %s: %s", strings.ToUpper(s.protocol), s.addr.String()))
 	return nil
 }
 func (s *Service) closeAllConnections() {
@@ -234,7 +232,7 @@ func (s *Service) createInternalStorage() error {
 	if db := s.MetaClient.Database(s.database); db != nil {
 		if rp, _ := s.MetaClient.RetentionPolicy(s.database, s.retentionPolicy); rp == nil {
 			spec := meta.RetentionPolicySpec{Name: s.retentionPolicy}
-			if _, err := s.MetaClient.CreateRetentionPolicy(s.database, &spec); err != nil {
+			if _, err := s.MetaClient.CreateRetentionPolicy(s.database, &spec, true); err != nil {
 				return err
 			}
 		}
@@ -252,10 +250,12 @@ func (s *Service) createInternalStorage() error {
 	return nil
 }
 
-// SetLogOutput sets the writer to which all logs are written. It must not be
-// called after Open is called.
-func (s *Service) SetLogOutput(w io.Writer) {
-	s.logger = log.New(w, "[graphite] ", log.LstdFlags)
+// WithLogger sets the logger on the service.
+func (s *Service) WithLogger(log zap.Logger) {
+	s.logger = log.With(
+		zap.String("service", "graphite"),
+		zap.String("addr", s.bindAddress),
+	)
 }
 
 // Statistics maintains statistics for the graphite service.
@@ -309,11 +309,11 @@ func (s *Service) openTCPServer() (net.Addr, error) {
 		for {
 			conn, err := s.ln.Accept()
 			if opErr, ok := err.(*net.OpError); ok && !opErr.Temporary() {
-				s.logger.Println("graphite TCP listener closed")
+				s.logger.Info("graphite TCP listener closed")
 				return
 			}
 			if err != nil {
-				s.logger.Println("error accepting TCP connection", err.Error())
+				s.logger.Info("error accepting TCP connection", zap.Error(err))
 				continue
 			}
 
@@ -424,7 +424,7 @@ func (s *Service) handleLine(line string) {
 				return
 			}
 		}
-		s.logger.Printf("unable to parse line: %s: %s", line, err)
+		s.logger.Info(fmt.Sprintf("unable to parse line: %s: %s", line, err))
 		atomic.AddInt64(&s.stats.PointsParseFail, 1)
 		return
 	}
@@ -440,7 +440,7 @@ func (s *Service) processBatches(batcher *tsdb.PointBatcher) {
 		case batch := <-batcher.Out():
 			// Will attempt to create database if not yet created.
 			if err := s.createInternalStorage(); err != nil {
-				s.logger.Printf("Required database or retention policy do not yet exist: %s", err.Error())
+				s.logger.Info(fmt.Sprintf("Required database or retention policy do not yet exist: %s", err.Error()))
 				continue
 			}
 
@@ -448,7 +448,7 @@ func (s *Service) processBatches(batcher *tsdb.PointBatcher) {
 				atomic.AddInt64(&s.stats.BatchesTransmitted, 1)
 				atomic.AddInt64(&s.stats.PointsTransmitted, int64(len(batch)))
 			} else {
-				s.logger.Printf("failed to write point batch to database %q: %s", s.database, err)
+				s.logger.Info(fmt.Sprintf("failed to write point batch to database %q: %s", s.database, err))
 				atomic.AddInt64(&s.stats.BatchesTransmitFail, 1)
 			}
 

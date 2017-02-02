@@ -24,9 +24,11 @@ import (
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/monitor"
+	"github.com/influxdata/influxdb/monitor/diagnostics"
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/influxdb/tsdb"
 	"github.com/influxdata/influxdb/uuid"
+	"go.uber.org/zap"
 )
 
 const (
@@ -42,7 +44,10 @@ type AuthenticationMethod int
 
 // Supported authentication methods.
 const (
+	// Authenticate using basic authentication.
 	UserAuthentication AuthenticationMethod = iota
+
+	// Authenticate with jwt.
 	BearerAuthentication
 )
 
@@ -82,6 +87,7 @@ type Handler struct {
 
 	Monitor interface {
 		Statistics(tags map[string]string) ([]*monitor.Statistic, error)
+		Diagnostics() (map[string]*diagnostics.Diagnostics, error)
 	}
 
 	PointsWriter interface {
@@ -89,7 +95,7 @@ type Handler struct {
 	}
 
 	Config    *Config
-	Logger    *log.Logger
+	Logger    zap.Logger
 	CLFLogger *log.Logger
 	stats     *Statistics
 }
@@ -99,7 +105,7 @@ func NewHandler(c Config) *Handler {
 	h := &Handler{
 		mux:       pat.New(),
 		Config:    &c,
-		Logger:    log.New(os.Stderr, "[httpd] ", log.LstdFlags),
+		Logger:    zap.New(zap.NullEncoder()),
 		CLFLogger: log.New(os.Stderr, "[httpd] ", 0),
 		stats:     &Statistics{},
 	}
@@ -224,7 +230,6 @@ func (h *Handler) AddRoutes(routes ...Route) {
 		handler = h.recovery(handler, r.Name) // make sure recovery is always last
 
 		h.mux.Add(r.Method, r.Pattern, handler)
-
 	}
 }
 
@@ -358,7 +363,7 @@ func (h *Handler) serveQuery(w http.ResponseWriter, r *http.Request, user *meta.
 	if h.Config.AuthEnabled {
 		if err := h.QueryAuthorizer.AuthorizeQuery(user, query, db); err != nil {
 			if err, ok := err.(meta.ErrAuthorize); ok {
-				h.Logger.Printf("Unauthorized request | user: %q | query: %q | database %q\n", err.User, err.Query.String(), err.Database)
+				h.Logger.Info(fmt.Sprintf("Unauthorized request | user: %q | query: %q | database %q", err.User, err.Query.String(), err.Database))
 			}
 			h.httpError(rw, "error authorizing query: "+err.Error(), http.StatusForbidden)
 			return
@@ -376,6 +381,13 @@ func (h *Handler) serveQuery(w http.ResponseWriter, r *http.Request, user *meta.
 
 	// Parse whether this is an async command.
 	async := r.FormValue("async") == "true"
+
+	opts := influxql.ExecutionOptions{
+		Database:  db,
+		ChunkSize: chunkSize,
+		ReadOnly:  r.Method == "GET",
+		NodeID:    nodeID,
+	}
 
 	// Make sure if the client disconnects we signal the query to abort
 	var closing chan struct{}
@@ -398,6 +410,7 @@ func (h *Handler) serveQuery(w http.ResponseWriter, r *http.Request, user *meta.
 					close(closing)
 				}
 			}()
+			opts.AbortCh = done
 		} else {
 			defer close(closing)
 		}
@@ -405,12 +418,7 @@ func (h *Handler) serveQuery(w http.ResponseWriter, r *http.Request, user *meta.
 
 	// Execute query.
 	rw.Header().Add("Connection", "close")
-	results := h.QueryExecutor.ExecuteQuery(query, influxql.ExecutionOptions{
-		Database:  db,
-		ChunkSize: chunkSize,
-		ReadOnly:  r.Method == "GET",
-		NodeID:    nodeID,
-	}, closing)
+	results := h.QueryExecutor.ExecuteQuery(query, opts, closing)
 
 	// If we are running in async mode, open a goroutine to drain the results
 	// and return with a StatusNoContent.
@@ -454,13 +462,33 @@ func (h *Handler) serveQuery(w http.ResponseWriter, r *http.Request, user *meta.
 			continue
 		}
 
-		// Limit the number of rows that can be returned in a non-chunked response.
-		// This is to prevent the server from going OOM when returning a large response.
-		// If you want to return more than the default chunk size, then use chunking
-		// to process multiple blobs.
-		rows += len(r.Series)
-		if h.Config.MaxRowLimit > 0 && rows > h.Config.MaxRowLimit {
-			break
+		// Limit the number of rows that can be returned in a non-chunked
+		// response.  This is to prevent the server from going OOM when
+		// returning a large response.  If you want to return more than the
+		// default chunk size, then use chunking to process multiple blobs.
+		// Iterate through the series in this result to count the rows and
+		// truncate any rows we shouldn't return.
+		if h.Config.MaxRowLimit > 0 {
+			for i, series := range r.Series {
+				n := h.Config.MaxRowLimit - rows
+				if n < len(series.Values) {
+					// We have reached the maximum number of values. Truncate
+					// the values within this row.
+					series.Values = series.Values[:n]
+					// Since this was truncated, it will always be a partial return.
+					// Add this so the client knows we truncated the response.
+					series.Partial = true
+				}
+				rows += len(series.Values)
+
+				if rows >= h.Config.MaxRowLimit {
+					// Drop any remaining series since we have already reached the row limit.
+					if i < len(r.Series) {
+						r.Series = r.Series[:i+1]
+					}
+					break
+				}
+			}
 		}
 
 		// It's not chunked so buffer results in memory.
@@ -496,8 +524,23 @@ func (h *Handler) serveQuery(w http.ResponseWriter, r *http.Request, user *meta.
 			r.Series = r.Series[rowsMerged:]
 			cr.Series = append(cr.Series, r.Series...)
 			cr.Messages = append(cr.Messages, r.Messages...)
+			cr.Partial = r.Partial
 		} else {
 			resp.Results = append(resp.Results, r)
+		}
+
+		// Drop out of this loop and do not process further results when we hit the row limit.
+		if h.Config.MaxRowLimit > 0 && rows >= h.Config.MaxRowLimit {
+			// If the result is marked as partial, remove that partial marking
+			// here. While the series is partial and we would normally have
+			// tried to return the rest in the next chunk, we are not using
+			// chunking and are truncating the series so we don't want to
+			// signal to the client that we plan on sending another JSON blob
+			// with another result.  The series, on the other hand, still
+			// returns partial true if it was truncated or had more data to
+			// send in a future chunk.
+			r.Partial = false
+			break
 		}
 	}
 
@@ -519,7 +562,7 @@ func (h *Handler) async(query *influxql.Query, results <-chan *influxql.Result) 
 			if r.Err == influxql.ErrNotExecuted {
 				continue
 			}
-			h.Logger.Printf("error while running async query: %s: %s", query, r.Err)
+			h.Logger.Info(fmt.Sprintf("error while running async query: %s: %s", query, r.Err))
 		}
 	}
 }
@@ -581,7 +624,7 @@ func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user *meta.
 	_, err := buf.ReadFrom(body)
 	if err != nil {
 		if h.Config.WriteTracing {
-			h.Logger.Print("Write handler unable to read bytes from request body")
+			h.Logger.Info("Write handler unable to read bytes from request body")
 		}
 		h.httpError(w, err.Error(), http.StatusBadRequest)
 		return
@@ -589,7 +632,7 @@ func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user *meta.
 	atomic.AddInt64(&h.stats.WriteRequestBytesReceived, int64(buf.Len()))
 
 	if h.Config.WriteTracing {
-		h.Logger.Printf("Write body received by handler: %s", buf.Bytes())
+		h.Logger.Info(fmt.Sprintf("Write body received by handler: %s", buf.Bytes()))
 	}
 
 	points, parseError := models.ParsePointsWithPrecision(buf.Bytes(), time.Now().UTC(), r.URL.Query().Get("precision"))
@@ -653,9 +696,9 @@ func (h *Handler) servePing(w http.ResponseWriter, r *http.Request) {
 	h.writeHeader(w, http.StatusNoContent)
 }
 
-// serveStatus has been deprecated
+// serveStatus has been deprecated.
 func (h *Handler) serveStatus(w http.ResponseWriter, r *http.Request) {
-	h.Logger.Printf("WARNING: /status has been deprecated.  Use /ping instead.")
+	h.Logger.Info("WARNING: /status has been deprecated.  Use /ping instead.")
 	atomic.AddInt64(&h.stats.StatusRequests, 1)
 	h.writeHeader(w, http.StatusNoContent)
 }
@@ -695,10 +738,36 @@ func (h *Handler) serveExpvar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Retrieve diagnostics from the monitor.
+	diags, err := h.Monitor.Diagnostics()
+	if err != nil {
+		h.httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
-	fmt.Fprintln(w, "{")
 	first := true
+	if val, ok := diags["system"]; ok {
+		jv, err := parseSystemDiagnostics(val)
+		if err != nil {
+			h.httpError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		data, err := json.Marshal(jv)
+		if err != nil {
+			h.httpError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		first = false
+		fmt.Fprintln(w, "{")
+		fmt.Fprintf(w, "\"system\": %s", data)
+	} else {
+		fmt.Fprintln(w, "{")
+	}
+
 	if val := expvar.Get("cmdline"); val != nil {
 		if !first {
 			fmt.Fprintln(w, ",")
@@ -756,7 +825,49 @@ func (h *Handler) serveExpvar(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "\n}")
 }
 
-// h.httpError writes an error to the client in a standard format.
+// parseSystemDiagnostics converts the system diagnostics into an appropriate
+// format for marshaling to JSON in the /debug/vars format.
+func parseSystemDiagnostics(d *diagnostics.Diagnostics) (map[string]interface{}, error) {
+	// We don't need PID in this case.
+	m := map[string]interface{}{"currentTime": nil, "started": nil, "uptime": nil}
+	for key := range m {
+		// Find the associated column.
+		ci := -1
+		for i, col := range d.Columns {
+			if col == key {
+				ci = i
+				break
+			}
+		}
+
+		if ci == -1 {
+			return nil, fmt.Errorf("unable to find column %q", key)
+		}
+
+		if len(d.Rows) < 1 || len(d.Rows[0]) <= ci {
+			return nil, fmt.Errorf("no data for column %q", key)
+		}
+
+		var res interface{}
+		switch v := d.Rows[0][ci].(type) {
+		case time.Time:
+			res = v
+		case string:
+			// Should be a string representation of a time.Duration
+			d, err := time.ParseDuration(v)
+			if err != nil {
+				return nil, err
+			}
+			res = int64(d.Seconds())
+		default:
+			return nil, fmt.Errorf("value for column %q is not parsable (got %T)", key, v)
+		}
+		m[key] = res
+	}
+	return m, nil
+}
+
+// httpError writes an error to the client in a standard format.
 func (h *Handler) httpError(w http.ResponseWriter, error string, code int) {
 	if code == http.StatusUnauthorized {
 		// If an unauthorized header will be sent back, add a WWW-Authenticate header
@@ -901,7 +1012,7 @@ func authenticate(inner func(http.ResponseWriter, *http.Request, *meta.UserInfo)
 				claims, ok := token.Claims.(jwt.MapClaims)
 				if !ok {
 					h.httpError(w, "problem authenticating token", http.StatusInternalServerError)
-					h.Logger.Print("Could not assert JWT token claims as jwt.MapClaims")
+					h.Logger.Info("Could not assert JWT token claims as jwt.MapClaims")
 					return
 				}
 
@@ -969,7 +1080,7 @@ func (w gzipResponseWriter) CloseNotify() <-chan bool {
 	return w.ResponseWriter.(http.CloseNotifier).CloseNotify()
 }
 
-// determines if the client can accept compressed responses, and encodes accordingly
+// gzipFilter determines if the client can accept compressed responses, and encodes accordingly.
 func gzipFilter(inner http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
@@ -1056,7 +1167,7 @@ func (h *Handler) recovery(inner http.Handler, name string) http.Handler {
 			if err := recover(); err != nil {
 				logLine := buildLogLine(l, r, start)
 				logLine = fmt.Sprintf("%s [panic:%s] %s", logLine, err, debug.Stack())
-				h.Logger.Println(logLine)
+				h.CLFLogger.Println(logLine)
 			}
 		}()
 
@@ -1087,7 +1198,7 @@ func (r Response) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&o)
 }
 
-// UnmarshalJSON decodes the data into the Response struct
+// UnmarshalJSON decodes the data into the Response struct.
 func (r *Response) UnmarshalJSON(b []byte) error {
 	var o struct {
 		Results []*influxql.Result `json:"results,omitempty"`

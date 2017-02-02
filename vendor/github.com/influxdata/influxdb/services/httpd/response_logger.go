@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/influxdata/influxdb/influxql"
@@ -75,7 +76,7 @@ func redactPassword(r *http.Request) {
 // buildLogLine creates a common log format
 // in addition to the common fields, we also append referrer, user agent,
 // request ID and response time (microseconds)
-//  ie, in apache mod_log_config terms:
+// ie, in apache mod_log_config terms:
 //     %h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-agent}i\"" %L %D
 func buildLogLine(l *responseLogger, r *http.Request, start time.Time) string {
 
@@ -84,9 +85,13 @@ func buildLogLine(l *responseLogger, r *http.Request, start time.Time) string {
 	username := parseUsername(r)
 
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
-
 	if err != nil {
 		host = r.RemoteAddr
+	}
+
+	if xff := r.Header["X-Forwarded-For"]; xff != nil {
+		addrs := append(xff, host)
+		host = strings.Join(addrs, ",")
 	}
 
 	uri := r.URL.RequestURI()
@@ -151,7 +156,7 @@ func parseUsername(r *http.Request) string {
 	return username
 }
 
-// Sanitize passwords from query string for logging.
+// sanitize redacts passwords from query string for logging.
 func sanitize(r *http.Request) {
 	values := r.URL.Query()
 	for i, q := range values["q"] {

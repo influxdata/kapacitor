@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -18,12 +17,13 @@ import (
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/pkg/limiter"
+	"go.uber.org/zap"
 )
 
 var (
-	// ErrShardNotFound gets returned when trying to get a non existing shard.
+	// ErrShardNotFound is returned when trying to get a non existing shard.
 	ErrShardNotFound = fmt.Errorf("shard not found")
-	// ErrStoreClosed gets returned when trying to use a closed Store.
+	// ErrStoreClosed is returned when trying to use a closed Store.
 	ErrStoreClosed = fmt.Errorf("store is closed")
 )
 
@@ -38,10 +38,8 @@ type Store struct {
 	shards map[uint64]*Shard
 
 	EngineOptions EngineOptions
-	Logger        *log.Logger
-
-	// logOutput is where output from the underlying databases will go.
-	logOutput io.Writer
+	baseLogger    zap.Logger
+	Logger        zap.Logger
 
 	closing chan struct{}
 	wg      sync.WaitGroup
@@ -53,27 +51,25 @@ type Store struct {
 func NewStore(path string) *Store {
 	opts := NewEngineOptions()
 
+	logger := zap.New(zap.NullEncoder())
 	return &Store{
 		path:          path,
 		EngineOptions: opts,
-		Logger:        log.New(os.Stderr, "[store] ", log.LstdFlags),
-		logOutput:     os.Stderr,
+		Logger:        logger,
+		baseLogger:    logger,
 	}
 }
 
-// SetLogOutput sets the writer to which all logs are written. It is safe for
-// concurrent use.
-func (s *Store) SetLogOutput(w io.Writer) {
-	s.Logger.SetOutput(w)
-	for _, s := range s.shards {
-		s.SetLogOutput(w)
+// WithLogger sets the logger for the store.
+func (s *Store) WithLogger(log zap.Logger) {
+	s.baseLogger = log
+	s.Logger = log.With(zap.String("service", "store"))
+	for _, sh := range s.shards {
+		sh.WithLogger(s.baseLogger)
 	}
-
-	s.mu.Lock()
-	s.logOutput = w
-	s.mu.Unlock()
 }
 
+// Statistics returns statistics for period monitoring.
 func (s *Store) Statistics(tags map[string]string) []models.Statistic {
 	var statistics []models.Statistic
 
@@ -107,7 +103,7 @@ func (s *Store) Open() error {
 	s.shards = map[uint64]*Shard{}
 	s.databaseIndexes = map[string]*DatabaseIndex{}
 
-	s.Logger.Printf("Using data dir: %v", s.Path())
+	s.Logger.Info(fmt.Sprintf("Using data dir: %v", s.Path()))
 
 	// Create directory.
 	if err := os.MkdirAll(s.path, 0777); err != nil {
@@ -135,7 +131,7 @@ func (s *Store) loadIndexes() error {
 	}
 	for _, db := range dbs {
 		if !db.IsDir() {
-			s.Logger.Printf("Skipping database dir: %s. Not a directory", db.Name())
+			s.Logger.Info(fmt.Sprintf("Skipping database dir: %s. Not a directory", db.Name()))
 			continue
 		}
 		s.databaseIndexes[db.Name()] = NewDatabaseIndex(db.Name())
@@ -165,7 +161,7 @@ func (s *Store) loadShards() error {
 		for _, rp := range rps {
 			// retention policies should be directories.  Skip anything that is not a dir.
 			if !rp.IsDir() {
-				s.Logger.Printf("Skipping retention policy dir: %s. Not a directory", rp.Name())
+				s.Logger.Info(fmt.Sprintf("Skipping retention policy dir: %s. Not a directory", rp.Name()))
 				continue
 			}
 
@@ -191,7 +187,7 @@ func (s *Store) loadShards() error {
 					}
 
 					shard := NewShard(shardID, s.databaseIndexes[db], path, walPath, s.EngineOptions)
-					shard.SetLogOutput(s.logOutput)
+					shard.WithLogger(s.baseLogger)
 
 					err = shard.Open()
 					if err != nil {
@@ -200,7 +196,7 @@ func (s *Store) loadShards() error {
 					}
 
 					resC <- &res{s: shard}
-					s.Logger.Printf("%s opened in %s", path, time.Now().Sub(start))
+					s.Logger.Info(fmt.Sprintf("%s opened in %s", path, time.Since(start)))
 				}(s.databaseIndexes[db], db, rp.Name(), sh.Name())
 			}
 		}
@@ -209,7 +205,7 @@ func (s *Store) loadShards() error {
 	for i := 0; i < n; i++ {
 		res := <-resC
 		if res.err != nil {
-			s.Logger.Println(res.err)
+			s.Logger.Info(res.err.Error())
 			continue
 		}
 		s.shards[res.s.id] = res.s
@@ -243,7 +239,7 @@ func (s *Store) Close() error {
 	return nil
 }
 
-// DatabaseIndexN returns the number of databases indicies in the store.
+// DatabaseIndexN returns the number of databases indices in the store.
 func (s *Store) DatabaseIndexN() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -274,6 +270,11 @@ func (s *Store) Shards(ids []uint64) []*Shard {
 		a = append(a, sh)
 	}
 	return a
+}
+
+// ShardGroup returns a ShardGroup with a list of shards by id.
+func (s *Store) ShardGroup(ids []uint64) ShardGroup {
+	return Shards(s.Shards(ids))
 }
 
 // ShardN returns the number of shards in the store.
@@ -319,7 +320,7 @@ func (s *Store) CreateShard(database, retentionPolicy string, shardID uint64, en
 
 	path := filepath.Join(s.path, database, retentionPolicy, strconv.FormatUint(shardID, 10))
 	shard := NewShard(shardID, db, path, walPath, s.EngineOptions)
-	shard.SetLogOutput(s.logOutput)
+	shard.WithLogger(s.baseLogger)
 	shard.EnableOnOpen = enabled
 
 	if err := shard.Open(); err != nil {
@@ -331,8 +332,8 @@ func (s *Store) CreateShard(database, retentionPolicy string, shardID uint64, en
 	return nil
 }
 
-// CreateShardSnapShot will create a hard link to the underlying shard and return a path
-// The caller is responsible for cleaning up (removing) the file path returned
+// CreateShardSnapShot will create a hard link to the underlying shard and return a path.
+// The caller is responsible for cleaning up (removing) the file path returned.
 func (s *Store) CreateShardSnapshot(id uint64) (string, error) {
 	sh := s.Shard(id)
 	if sh == nil {
@@ -342,7 +343,7 @@ func (s *Store) CreateShardSnapshot(id uint64) (string, error) {
 	return sh.CreateSnapshot()
 }
 
-// SetShardEnabled enables or disables a shard for read and writes
+// SetShardEnabled enables or disables a shard for read and writes.
 func (s *Store) SetShardEnabled(shardID uint64, enabled bool) error {
 	sh := s.Shard(shardID)
 	if sh == nil {
@@ -383,21 +384,14 @@ func (s *Store) DeleteShard(shardID uint64) error {
 	return nil
 }
 
-// ShardIteratorCreator returns an iterator creator for a shard.
-func (s *Store) ShardIteratorCreator(id uint64, opt *influxql.SelectOptions) influxql.IteratorCreator {
-	sh := s.Shard(id)
-	if sh == nil {
-		return nil
-	}
-	return &shardIteratorCreator{
-		sh:         sh,
-		maxSeriesN: opt.MaxSeriesN,
-	}
-}
-
 // DeleteDatabase will close all shards associated with a database and remove the directory and files from disk.
 func (s *Store) DeleteDatabase(name string) error {
 	s.mu.RLock()
+	if s.databaseIndexes[name] == nil {
+		s.mu.RUnlock()
+		// no files locally, so nothing to do
+		return nil
+	}
 	shards := s.filterShards(func(sh *Shard) bool {
 		return sh.database == name
 	})
@@ -413,7 +407,15 @@ func (s *Store) DeleteDatabase(name string) error {
 		return err
 	}
 
-	if err := os.RemoveAll(filepath.Join(s.path, name)); err != nil {
+	dbPath := filepath.Clean(filepath.Join(s.path, name))
+
+	// extra sanity check to make sure that even if someone named their database "../.."
+	// that we don't delete everything because of it, they'll just have extra files forever
+	if filepath.Clean(s.path) != filepath.Dir(dbPath) {
+		return fmt.Errorf("invalid database directory location for database '%s': %s", name, dbPath)
+	}
+
+	if err := os.RemoveAll(dbPath); err != nil {
 		return err
 	}
 	if err := os.RemoveAll(filepath.Join(s.EngineOptions.Config.WALDir, name)); err != nil {
@@ -435,6 +437,11 @@ func (s *Store) DeleteDatabase(name string) error {
 // both the DB and WAL, and remove all shard files from disk.
 func (s *Store) DeleteRetentionPolicy(database, name string) error {
 	s.mu.RLock()
+	if s.databaseIndexes[database] == nil {
+		s.mu.RUnlock()
+		// unknown database, nothing to do
+		return nil
+	}
 	shards := s.filterShards(func(sh *Shard) bool {
 		return sh.database == database && sh.retentionPolicy == name
 	})
@@ -450,6 +457,13 @@ func (s *Store) DeleteRetentionPolicy(database, name string) error {
 		return sh.Close()
 	}); err != nil {
 		return err
+	}
+
+	rpPath := filepath.Clean(filepath.Join(s.path, database, name))
+
+	// ensure Store's path is the grandparent of the retention policy
+	if filepath.Clean(s.path) != filepath.Dir(filepath.Dir(rpPath)) {
+		return fmt.Errorf("invalid path for database '%s', retention policy '%s': %s", database, name, rpPath)
 	}
 
 	// Remove the rentention policy folder.
@@ -556,7 +570,7 @@ func (s *Store) walkShards(shards []*Shard, fn func(sh *Shard) error) error {
 	return err
 }
 
-// ShardIDs returns a slice of all ShardIDs under management.
+// ShardIDs returns a slice of all ShardIDs under management, in arbitrary order.
 func (s *Store) ShardIDs() []uint64 {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -588,7 +602,7 @@ func (s *Store) DatabaseIndex(name string) *DatabaseIndex {
 	return s.databaseIndexes[name]
 }
 
-// Databases returns all the databases in the indexes
+// Databases returns all the databases in the indexes.
 func (s *Store) Databases() []string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -626,7 +640,7 @@ func (s *Store) DiskSize() (int64, error) {
 	return size, nil
 }
 
-// BackupShard will get the shard and have the engine backup since the passed in time to the writer
+// BackupShard will get the shard and have the engine backup since the passed in time to the writer.
 func (s *Store) BackupShard(id uint64, since time.Time, w io.Writer) error {
 	shard := s.Shard(id)
 	if shard == nil {
@@ -657,7 +671,7 @@ func (s *Store) RestoreShard(id uint64, r io.Reader) error {
 	return shard.Restore(r, path)
 }
 
-// ShardRelativePath will return the relative path to the shard. i.e. <database>/<retention>/<id>
+// ShardRelativePath will return the relative path to the shard. i.e. <database>/<retention>/<id>.
 func (s *Store) ShardRelativePath(id uint64) (string, error) {
 	shard := s.Shard(id)
 	if shard == nil {
@@ -666,7 +680,7 @@ func (s *Store) ShardRelativePath(id uint64) (string, error) {
 	return relativePath(s.path, shard.path)
 }
 
-// DeleteSeries loops through the local shards and deletes the series data and metadata for the passed in series keys
+// DeleteSeries loops through the local shards and deletes the series data and metadata for the passed in series keys.
 func (s *Store) DeleteSeries(database string, sources []influxql.Source, condition influxql.Expr) error {
 	// Expand regex expressions in the FROM clause.
 	a, err := s.ExpandSources(sources)
@@ -773,40 +787,12 @@ func (s *Store) deleteSeries(database string, seriesKeys []string, min, max int6
 
 // ExpandSources expands sources against all local shards.
 func (s *Store) ExpandSources(sources influxql.Sources) (influxql.Sources, error) {
-	return s.IteratorCreators().ExpandSources(sources)
-}
-
-// IteratorCreators returns a set of all local shards as iterator creators.
-func (s *Store) IteratorCreators() influxql.IteratorCreators {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	a := make(influxql.IteratorCreators, 0, len(s.shards))
-	for _, sh := range s.shards {
-		a = append(a, sh)
-	}
-	return a
-}
-
-func (s *Store) IteratorCreator(shards []uint64, opt *influxql.SelectOptions) (influxql.IteratorCreator, error) {
-	// Generate iterators for each node.
-	ics := make([]influxql.IteratorCreator, 0)
-	if err := func() error {
-		for _, id := range shards {
-			ic := s.ShardIteratorCreator(id, opt)
-			if ic == nil {
-				continue
-			}
-			ics = append(ics, ic)
-		}
-
-		return nil
-	}(); err != nil {
-		influxql.IteratorCreators(ics).Close()
-		return nil, err
-	}
-
-	return influxql.IteratorCreators(ics), nil
+	shards := func() Shards {
+		s.mu.RLock()
+		defer s.mu.RUnlock()
+		return Shards(s.shardsSlice())
+	}()
+	return shards.ExpandSources(sources)
 }
 
 // WriteToShard writes a list of points to a shard identified by its ID.
@@ -830,6 +816,8 @@ func (s *Store) WriteToShard(shardID uint64, points []models.Point) error {
 	return sh.WritePoints(points)
 }
 
+// Measurements returns a slice of sorted measurement names in the given database,
+// matching the given condition.
 func (s *Store) Measurements(database string, cond influxql.Expr) ([]string, error) {
 	dbi := s.DatabaseIndex(database)
 	if dbi == nil {
@@ -859,11 +847,13 @@ func (s *Store) Measurements(database string, cond influxql.Expr) ([]string, err
 	return measurements, nil
 }
 
+// TagValues represents the tag keys and values in a measurement.
 type TagValues struct {
 	Measurement string
 	Values      []KeyValue
 }
 
+// TagValues returns the tag keys and values in the given database, matching the condition.
 func (s *Store) TagValues(database string, cond influxql.Expr) ([]TagValues, error) {
 	if cond == nil {
 		return nil, errors.New("a condition is required")
@@ -963,49 +953,27 @@ func (s *Store) TagValues(database string, cond influxql.Expr) ([]TagValues, err
 	return tagValues, nil
 }
 
+// KeyValue holds a string key and a string value.
 type KeyValue struct {
 	Key, Value string
 }
 
+// KeyValues is a sortable slice of KeyValue.
 type KeyValues []KeyValue
 
-func (a KeyValues) Len() int      { return len(a) }
+// Len implements sort.Interface.
+func (a KeyValues) Len() int { return len(a) }
+
+// Swap implements sort.Interface.
 func (a KeyValues) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+
+// Less implements sort.Interface. Keys are compared before values.
 func (a KeyValues) Less(i, j int) bool {
 	ki, kj := a[i].Key, a[j].Key
 	if ki == kj {
 		return a[i].Value < a[j].Value
 	}
 	return ki < kj
-}
-
-// filterShowSeriesResult will limit the number of series returned based on the limit and the offset.
-// Unlike limit and offset on SELECT statements, the limit and offset don't apply to the number of Rows, but
-// to the number of total Values returned, since each Value represents a unique series.
-func (e *Store) filterShowSeriesResult(limit, offset int, rows models.Rows) models.Rows {
-	var filteredSeries models.Rows
-	seriesCount := 0
-	for _, r := range rows {
-		var currentSeries [][]interface{}
-
-		// filter the values
-		for _, v := range r.Values {
-			if seriesCount >= offset && seriesCount-offset < limit {
-				currentSeries = append(currentSeries, v)
-			}
-			seriesCount++
-		}
-
-		// only add the row back in if there are some values in it
-		if len(currentSeries) > 0 {
-			r.Values = currentSeries
-			filteredSeries = append(filteredSeries, r)
-			if seriesCount > limit+offset {
-				return filteredSeries
-			}
-		}
-	}
-	return filteredSeries
 }
 
 // DecodeStorePath extracts the database and retention policy names

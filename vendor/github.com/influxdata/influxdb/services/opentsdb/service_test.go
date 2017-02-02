@@ -3,10 +3,9 @@ package opentsdb
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
+	"os"
 	"reflect"
 	"strings"
 	"sync/atomic"
@@ -17,10 +16,13 @@ import (
 	"github.com/influxdata/influxdb/internal"
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/services/meta"
+	"go.uber.org/zap"
 )
 
 func Test_Service_OpenClose(t *testing.T) {
-	service := NewTestService("db0", "127.0.0.1:45362")
+	// Let the OS assign a random port since we are only opening and closing the service,
+	// not actually connecting to it.
+	service := NewTestService("db0", "127.0.0.1:0")
 
 	// Closing a closed service is fine.
 	if err := service.Service.Close(); err != nil {
@@ -276,8 +278,11 @@ func NewTestService(database string, bind string) *TestService {
 		return nil, nil
 	}
 
-	if !testing.Verbose() {
-		service.Service.Logger = log.New(ioutil.Discard, "", log.LstdFlags)
+	if testing.Verbose() {
+		service.Service.WithLogger(zap.New(
+			zap.NewTextEncoder(),
+			zap.Output(os.Stderr),
+		))
 	}
 
 	service.Service.MetaClient = service.MetaClient

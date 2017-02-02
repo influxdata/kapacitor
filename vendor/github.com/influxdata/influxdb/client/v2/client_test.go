@@ -2,6 +2,7 @@ package client
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -153,6 +154,47 @@ func TestClient_Query(t *testing.T) {
 	}
 }
 
+func TestClient_BoundParameters(t *testing.T) {
+	var parameterString string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var data Response
+		r.ParseForm()
+		parameterString = r.FormValue("params")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(data)
+	}))
+	defer ts.Close()
+
+	config := HTTPConfig{Addr: ts.URL}
+	c, _ := NewHTTPClient(config)
+	defer c.Close()
+
+	expectedParameters := map[string]interface{}{
+		"testStringParameter": "testStringValue",
+		"testNumberParameter": 12.3,
+	}
+
+	query := Query{
+		Parameters: expectedParameters,
+	}
+
+	_, err := c.Query(query)
+	if err != nil {
+		t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
+	}
+
+	var actualParameters map[string]interface{}
+
+	err = json.Unmarshal([]byte(parameterString), &actualParameters)
+	if err != nil {
+		t.Errorf("unexpected error. expected %v, actual %v", nil, err)
+	}
+
+	if !reflect.DeepEqual(expectedParameters, actualParameters) {
+		t.Errorf("unexpected parameters. expected %v, actual %v", expectedParameters, actualParameters)
+	}
+}
+
 func TestClient_BasicAuth(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		u, p, ok := r.BasicAuth()
@@ -216,16 +258,19 @@ func TestClient_Concurrent_Use(t *testing.T) {
 	wg.Add(3)
 	n := 1000
 
+	errC := make(chan error)
 	go func() {
 		defer wg.Done()
 		bp, err := NewBatchPoints(BatchPointsConfig{})
 		if err != nil {
-			t.Errorf("got error %v", err)
+			errC <- fmt.Errorf("got error %v", err)
+			return
 		}
 
 		for i := 0; i < n; i++ {
 			if err = c.Write(bp); err != nil {
-				t.Fatalf("got error %v", err)
+				errC <- fmt.Errorf("got error %v", err)
+				return
 			}
 		}
 	}()
@@ -235,7 +280,8 @@ func TestClient_Concurrent_Use(t *testing.T) {
 		var q Query
 		for i := 0; i < n; i++ {
 			if _, err := c.Query(q); err != nil {
-				t.Fatalf("got error %v", err)
+				errC <- fmt.Errorf("got error %v", err)
+				return
 			}
 		}
 	}()
@@ -246,7 +292,17 @@ func TestClient_Concurrent_Use(t *testing.T) {
 			c.Ping(time.Second)
 		}
 	}()
-	wg.Wait()
+
+	go func() {
+		wg.Wait()
+		close(errC)
+	}()
+
+	for err := range errC {
+		if err != nil {
+			t.Error(err)
+		}
+	}
 }
 
 func TestClient_Write(t *testing.T) {
@@ -418,9 +474,13 @@ func TestClient_PointFields(t *testing.T) {
 	fields := map[string]interface{}{"idle": 10.1, "system": 50.9, "user": 39.0}
 	p, _ := NewPoint("cpu_usage", tags, fields)
 
-	if !reflect.DeepEqual(fields, p.Fields()) {
+	pfields, err := p.Fields()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(fields, pfields) {
 		t.Errorf("Error, got %v, expected %v",
-			p.Fields(), fields)
+			pfields, fields)
 	}
 }
 

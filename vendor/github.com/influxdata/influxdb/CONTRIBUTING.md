@@ -69,7 +69,7 @@ second to sign our CLA, which can be found
 
 Installing Go
 -------------
-InfluxDB requires Go 1.6.2.
+InfluxDB requires Go 1.7.4.
 
 At InfluxDB we find gvm, a Go version manager, useful for installing Go. For instructions
 on how to install it see [the gvm page on github](https://github.com/moovweb/gvm).
@@ -77,8 +77,8 @@ on how to install it see [the gvm page on github](https://github.com/moovweb/gvm
 After installing gvm you can install and set the default go version by
 running the following:
 
-    gvm install go1.6.2
-    gvm use go1.6.2 --default
+    gvm install go1.7.4
+    gvm use go1.7.4 --default
 
 Installing GDM
 -------------
@@ -201,7 +201,7 @@ If generating the protobuf code is failing for you, check each of the following:
 Generated Go Templates
 ----------------------
 
-The query engine requires optimizes data structures for each data type so
+The query engine requires optimized data structures for each data type so
 instead of writing each implementation several times we use templates. _Do not
 change code that ends in a `.gen.go` extension!_ Instead you must edit the
 `.gen.go.tmpl` file that was used to generate it.
