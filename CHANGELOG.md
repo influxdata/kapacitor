@@ -272,6 +272,7 @@ For more details on the alerting system see the full documentation [here](https:
 ### Bugfixes
 
 - [#1323](https://github.com/influxdata/kapacitor/pull/1323): Fix issue where credentials to InfluxDB could not be updated dynamically.
+- [#1161](https://github.com/influxdata/kapacitor/pull/1161): Fixed install/remove of kapacitor on non-systemd Debian/Ubuntu systems
 
 ## v1.2.0 [2017-01-23]
 
