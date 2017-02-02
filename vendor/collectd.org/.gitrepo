@@ -1,0 +1,11 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/collectd/go-collectd.git
+	branch = master
+	commit = be37d69b13d7d58dedea5dabac9278bfcd038868
+	parent = eabe54c1c69e2967870423c5f770595bf53f3bc9
+	cmdver = 0.3.0
