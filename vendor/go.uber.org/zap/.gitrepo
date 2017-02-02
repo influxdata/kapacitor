@@ -1,0 +1,11 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/uber-go/zap.git
+	branch = master
+	commit = a5783ee4b216a927da8f839c45cfbf9d694e1467
+	parent = fd420865fff018caee3d755b1ad8c114ae1caf8e
+	cmdver = 0.3.0
