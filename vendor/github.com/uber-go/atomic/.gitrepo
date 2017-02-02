@@ -1,0 +1,11 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/uber-go/atomic.git
+	branch = master
+	commit = 3b8db5e93c4c02efbc313e17b2e796b0914a01fb
+	parent = 98438a02c637cabed5108df60f595c052317b915
+	cmdver = 0.3.0
