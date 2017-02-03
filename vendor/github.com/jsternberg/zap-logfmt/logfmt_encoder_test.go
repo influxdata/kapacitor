@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap"
-	"go.uber.org/zap/spywrite"
+	"github.com/uber-go/zap"
+	"github.com/uber-go/zap/spywrite"
 )
 
 var epoch = time.Date(1970, time.January, 1, 0, 0, 0, 0, time.UTC)

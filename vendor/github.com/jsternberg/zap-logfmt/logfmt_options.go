@@ -3,7 +3,7 @@ package zaplogfmt
 import (
 	"time"
 
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 type LogfmtOption interface {

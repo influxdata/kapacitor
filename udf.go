@@ -14,7 +14,7 @@ import (
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 // User defined function

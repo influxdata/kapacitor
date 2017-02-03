@@ -30,7 +30,7 @@ import (
 	"github.com/influxdata/kapacitor/timer"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/vars"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 const (

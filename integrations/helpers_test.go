@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"time"
 
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor"

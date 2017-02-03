@@ -9,7 +9,7 @@ import (
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/udf"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 type Service struct {

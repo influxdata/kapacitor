@@ -49,7 +49,7 @@ import (
 	"github.com/influxdata/kapacitor/vars"
 	"github.com/pkg/errors"
 	"github.com/twinj/uuid"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 const clusterIDFilename = "cluster.id"
@@ -516,7 +516,7 @@ func (s *Server) appendCollectdService() {
 		return
 	}
 	srv := collectd.NewService(c)
-	srv.WithLogger(s.LogService.Root())
+	//srv.WithLogger(s.LogService.Root())
 
 	srv.MetaClient = s.MetaClient
 	srv.PointsWriter = s.TaskMaster
@@ -532,7 +532,7 @@ func (s *Server) appendOpenTSDBService() error {
 	if err != nil {
 		return err
 	}
-	srv.WithLogger(s.LogService.Root())
+	//srv.WithLogger(s.LogService.Root())
 
 	srv.PointsWriter = s.TaskMaster
 	srv.MetaClient = s.MetaClient
@@ -549,7 +549,7 @@ func (s *Server) appendGraphiteServices() error {
 		if err != nil {
 			return errors.Wrap(err, "creating new graphite service")
 		}
-		srv.WithLogger(s.LogService.Root())
+		//srv.WithLogger(s.LogService.Root())
 
 		srv.PointsWriter = s.TaskMaster
 		srv.MetaClient = s.MetaClient

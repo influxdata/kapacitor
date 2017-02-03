@@ -8,7 +8,7 @@ import (
 
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/vars"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 const (

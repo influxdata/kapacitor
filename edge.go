@@ -9,7 +9,7 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/vars"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 const (

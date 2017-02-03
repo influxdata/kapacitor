@@ -16,7 +16,7 @@ import (
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/bufpool"
 	"github.com/influxdata/kapacitor/command"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 // AlertData is a structure that contains relevant data about an alert event.

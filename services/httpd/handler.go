@@ -22,7 +22,7 @@ import (
 	"github.com/influxdata/kapacitor/auth"
 	"github.com/influxdata/kapacitor/client/v1"
 	"github.com/influxdata/kapacitor/services/logging"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 // statistics gathered by the httpd package.

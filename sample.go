@@ -6,7 +6,7 @@ import (
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 type SampleNode struct {

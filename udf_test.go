@@ -13,7 +13,7 @@ import (
 	"github.com/influxdata/kapacitor/services/logging/loggingtest"
 	"github.com/influxdata/kapacitor/udf"
 	udf_test "github.com/influxdata/kapacitor/udf/test"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 var logger = loggingtest.New().Root()

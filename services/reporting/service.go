@@ -8,7 +8,7 @@ import (
 
 	"github.com/influxdata/kapacitor/vars"
 	client "github.com/influxdata/usage-client/v1"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 const reportingInterval = time.Hour * 12

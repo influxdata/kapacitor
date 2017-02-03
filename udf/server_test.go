@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/services/logging/loggingtest"

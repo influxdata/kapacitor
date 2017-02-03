@@ -22,7 +22,7 @@ import (
 	"github.com/influxdata/kapacitor/vars"
 	"github.com/pkg/errors"
 	"github.com/twinj/uuid"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 const (

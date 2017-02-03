@@ -8,7 +8,7 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick/stateful"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 type CombineNode struct {

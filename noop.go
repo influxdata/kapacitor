@@ -2,7 +2,7 @@ package kapacitor
 
 import (
 	"github.com/influxdata/kapacitor/pipeline"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 type NoOpNode struct {

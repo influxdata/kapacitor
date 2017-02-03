@@ -17,7 +17,7 @@ import (
 	"text/template"
 	"time"
 
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/influxdata/influxdb/client"

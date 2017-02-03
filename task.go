@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor/pipeline"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 // The type of a task

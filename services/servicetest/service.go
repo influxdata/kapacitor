@@ -12,7 +12,7 @@ import (
 	client "github.com/influxdata/kapacitor/client/v1"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 const (

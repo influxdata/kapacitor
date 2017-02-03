@@ -6,7 +6,7 @@ import (
 
 	"github.com/influxdata/kapacitor/services/k8s/client"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 type Service struct {

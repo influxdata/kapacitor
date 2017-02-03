@@ -7,7 +7,7 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 // tmpl -- go get github.com/benbjohnson/tmpl

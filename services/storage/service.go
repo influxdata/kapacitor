@@ -7,7 +7,7 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 type Service struct {

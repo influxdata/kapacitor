@@ -4,7 +4,7 @@ import (
 	"io"
 	"os"
 
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 type TestLogService struct {

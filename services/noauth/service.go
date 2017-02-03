@@ -2,7 +2,7 @@ package noauth
 
 import (
 	"github.com/influxdata/kapacitor/auth"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 // Provide an implentation of an Authentication service.

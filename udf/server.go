@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor/models"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 var ErrServerStopped = errors.New("server already stopped")

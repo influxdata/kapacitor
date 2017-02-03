@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 
 	"github.com/influxdata/kapacitor/alert"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 type Service struct {

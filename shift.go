@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor/pipeline"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 type ShiftNode struct {

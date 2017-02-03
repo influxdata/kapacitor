@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor/alert"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 
 	"gopkg.in/gomail.v2"
 )

@@ -13,7 +13,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/influxdata/kapacitor/server"
 	"github.com/influxdata/kapacitor/services/logging"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 const logo = `

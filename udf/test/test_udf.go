@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"github.com/influxdata/kapacitor/udf"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 // IO implements a UDF process communication.

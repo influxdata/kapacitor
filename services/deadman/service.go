@@ -3,7 +3,7 @@ package deadman
 import (
 	"time"
 
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 type Service struct {

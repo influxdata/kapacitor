@@ -23,7 +23,7 @@ import (
 	"sync"
 	"testing"
 
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/services/httpd"

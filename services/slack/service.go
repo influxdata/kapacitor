@@ -11,7 +11,7 @@ import (
 
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 type Service struct {

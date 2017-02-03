@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"go.uber.org/zap"
-	"go.uber.org/zap/zwrap"
+	"github.com/uber-go/zap"
+	"github.com/uber-go/zap/zwrap"
 )
 
 // teeEncoder implements the zap.Encoder interface duplicating all actions to exactly two child encoders.
@@ -112,7 +112,7 @@ func (e entry) reset() {
 
 var chanEncoderPool = &sync.Pool{
 	New: func() interface{} {
-		return chanEncoder{
+		return &chanEncoder{
 			e: entry{
 				Fields: make(zwrap.KeyValueMap),
 			},
@@ -127,7 +127,7 @@ type chanEncoder struct {
 }
 
 func newChanEncoder(entries chan<- entry) zap.Encoder {
-	return chanEncoder{
+	return &chanEncoder{
 		entries: entries,
 		e: entry{
 			Fields: make(zwrap.KeyValueMap),
@@ -135,58 +135,58 @@ func newChanEncoder(entries chan<- entry) zap.Encoder {
 	}
 }
 
-func (c chanEncoder) AddBool(key string, value bool) {
+func (c *chanEncoder) AddBool(key string, value bool) {
 	c.e.Fields.AddBool(key, value)
 }
 
-func (c chanEncoder) AddFloat64(key string, value float64) {
+func (c *chanEncoder) AddFloat64(key string, value float64) {
 	c.e.Fields.AddFloat64(key, value)
 }
 
-func (c chanEncoder) AddInt(key string, value int) {
+func (c *chanEncoder) AddInt(key string, value int) {
 	c.e.Fields.AddInt(key, value)
 }
 
-func (c chanEncoder) AddInt64(key string, value int64) {
+func (c *chanEncoder) AddInt64(key string, value int64) {
 	c.e.Fields.AddInt64(key, value)
 }
 
-func (c chanEncoder) AddUint(key string, value uint) {
+func (c *chanEncoder) AddUint(key string, value uint) {
 	c.e.Fields.AddUint(key, value)
 }
 
-func (c chanEncoder) AddUint64(key string, value uint64) {
+func (c *chanEncoder) AddUint64(key string, value uint64) {
 	c.e.Fields.AddUint64(key, value)
 }
 
-func (c chanEncoder) AddUintptr(key string, value uintptr) {
+func (c *chanEncoder) AddUintptr(key string, value uintptr) {
 	c.e.Fields.AddUintptr(key, value)
 }
 
-func (c chanEncoder) AddMarshaler(key string, marshaler zap.LogMarshaler) error {
+func (c *chanEncoder) AddMarshaler(key string, marshaler zap.LogMarshaler) error {
 	return c.e.Fields.AddMarshaler(key, marshaler)
 }
 
-func (c chanEncoder) AddObject(key string, value interface{}) error {
+func (c *chanEncoder) AddObject(key string, value interface{}) error {
 	return c.e.Fields.AddObject(key, value)
 }
 
-func (c chanEncoder) AddString(key string, value string) {
+func (c *chanEncoder) AddString(key string, value string) {
 	c.e.Fields.AddString(key, value)
 }
 
-func (c chanEncoder) Clone() zap.Encoder {
-	n := chanEncoderPool.Get().(chanEncoder)
+func (c *chanEncoder) Clone() zap.Encoder {
+	n := chanEncoderPool.Get().(*chanEncoder)
 	n.entries = c.entries
 	n.e.reset()
 	return n
 }
 
-func (c chanEncoder) Free() {
+func (c *chanEncoder) Free() {
 	chanEncoderPool.Put(c)
 }
 
-func (c chanEncoder) WriteEntry(w io.Writer, msg string, l zap.Level, t time.Time) error {
+func (c *chanEncoder) WriteEntry(w io.Writer, msg string, l zap.Level, t time.Time) error {
 	c.e.Time = t
 	c.e.Message = msg
 	c.e.Level = l

@@ -13,7 +13,7 @@ import (
 
 	"github.com/influxdata/kapacitor/cmd/kapacitord/help"
 	"github.com/influxdata/kapacitor/cmd/kapacitord/run"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 // These variables are populated via the Go linker.

@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/influxdata/kapacitor/pipeline"
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 type LogNode struct {

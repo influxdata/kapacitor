@@ -10,7 +10,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"go.uber.org/zap"
+	"github.com/uber-go/zap"
 )
 
 const (
