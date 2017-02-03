@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 
 	"go.uber.org/zap"
 
@@ -28,6 +29,10 @@ type Service struct {
 	writer io.Writer
 	closer io.Closer
 	level  zap.AtomicLevel
+
+	wg sync.WaitGroup
+
+	entries chan entry
 }
 
 type WriteSyncer interface {
@@ -37,10 +42,11 @@ type WriteSyncer interface {
 
 func NewService(c Config, stdout, stderr WriteSyncer) *Service {
 	return &Service{
-		c:      c,
-		stdout: stdout,
-		stderr: stderr,
-		level:  zap.DynamicLevel(),
+		c:       c,
+		stdout:  stdout,
+		stderr:  stderr,
+		level:   zap.DynamicLevel(),
+		entries: make(chan entry, 5000),
 	}
 }
 
@@ -84,8 +90,19 @@ func (s *Service) Open() error {
 		return fmt.Errorf("unknown log encoding %s", s.c.Encoding)
 	}
 
+	// Start  readEntries goroutine
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		s.readEntries()
+	}()
+
 	// Create root logger
-	s.root = zap.New(encoder, zap.Output(output), s.level)
+	s.root = zap.New(
+		newTeeEncoder([2]zap.Encoder{newChanEncoder(s.entries), encoder}),
+		zap.Output(output),
+		s.level,
+	)
 
 	// Configure default logger, should not be used.
 	log.SetPrefix("[log] ")
@@ -99,6 +116,7 @@ func (s *Service) Close() error {
 	if s.closer != nil {
 		return s.closer.Close()
 	}
+	s.wg.Wait()
 	return nil
 }
 
@@ -125,4 +143,14 @@ func (s *Service) SetLevel(level string) error {
 		return fmt.Errorf("unknown logging level %s", level)
 	}
 	return nil
+}
+
+func (s *Service) Subscribe(level zap.Level, match map[string]interface{}) *Subscription {
+	return nil
+}
+
+func (s *Service) readEntries() {
+	for e := range s.entries {
+		log.Println(e)
+	}
 }
