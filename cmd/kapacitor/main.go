@@ -561,7 +561,7 @@ func (d *dbrps) Set(value string) error {
 	if value[0] == '"' {
 		dbrp.Database, n = parseQuotedStr(value)
 	} else {
-		n = strings.IndexRune(value, '.')
+		n = strings.LastIndexByte(value, '.')
 		if n == -1 {
 			return errors.New("does not contain a '.', it must be in the form \"dbname\".\"rpname\" where the quotes are optional.")
 		}
