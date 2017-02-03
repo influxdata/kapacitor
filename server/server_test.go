@@ -5413,11 +5413,12 @@ func TestServer_UpdateConfig(t *testing.T) {
 				Elements: []client.ConfigElement{{
 					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/alerta/"},
 					Options: map[string]interface{}{
-						"enabled":     false,
-						"environment": "",
-						"origin":      "",
-						"token":       false,
-						"url":         "http://alerta.example.com",
+						"enabled":      false,
+						"environment":  "",
+						"origin":       "",
+						"token":        false,
+						"token-prefix": "",
+						"url":          "http://alerta.example.com",
 						"insecure-skip-verify": false,
 					},
 					Redacted: []string{
@@ -5428,11 +5429,12 @@ func TestServer_UpdateConfig(t *testing.T) {
 			expDefaultElement: client.ConfigElement{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/alerta/"},
 				Options: map[string]interface{}{
-					"enabled":     false,
-					"environment": "",
-					"origin":      "",
-					"token":       false,
-					"url":         "http://alerta.example.com",
+					"enabled":      false,
+					"environment":  "",
+					"origin":       "",
+					"token":        false,
+					"token-prefix": "",
+					"url":          "http://alerta.example.com",
 					"insecure-skip-verify": false,
 				},
 				Redacted: []string{
@@ -5452,11 +5454,12 @@ func TestServer_UpdateConfig(t *testing.T) {
 						Elements: []client.ConfigElement{{
 							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/alerta/"},
 							Options: map[string]interface{}{
-								"enabled":     false,
-								"environment": "",
-								"origin":      "kapacitor",
-								"token":       true,
-								"url":         "http://alerta.example.com",
+								"enabled":      false,
+								"environment":  "",
+								"origin":       "kapacitor",
+								"token":        true,
+								"token-prefix": "",
+								"url":          "http://alerta.example.com",
 								"insecure-skip-verify": false,
 							},
 							Redacted: []string{
@@ -5467,11 +5470,12 @@ func TestServer_UpdateConfig(t *testing.T) {
 					expElement: client.ConfigElement{
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/alerta/"},
 						Options: map[string]interface{}{
-							"enabled":     false,
-							"environment": "",
-							"origin":      "kapacitor",
-							"token":       true,
-							"url":         "http://alerta.example.com",
+							"enabled":      false,
+							"environment":  "",
+							"origin":       "kapacitor",
+							"token":        true,
+							"token-prefix": "",
+							"url":          "http://alerta.example.com",
 							"insecure-skip-verify": false,
 						},
 						Redacted: []string{
@@ -7108,10 +7112,11 @@ func TestServer_AlertHandlers(t *testing.T) {
 			handlerAction: client.HandlerAction{
 				Kind: "alerta",
 				Options: map[string]interface{}{
-					"token":       "testtoken1234567",
-					"origin":      "kapacitor",
-					"group":       "test",
-					"environment": "env",
+					"token":        "testtoken1234567",
+					"token-prefix": "Bearer",
+					"origin":       "kapacitor",
+					"group":        "test",
+					"environment":  "env",
 				},
 			},
 			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
@@ -7128,7 +7133,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				got := ts.Requests()
 				exp := []alertatest.Request{{
 					URL:           "/alert",
-					Authorization: "Key testtoken1234567",
+					Authorization: "Bearer testtoken1234567",
 					PostData: alertatest.PostData{
 						Resource:    "alert",
 						Event:       "id",

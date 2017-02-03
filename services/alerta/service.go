@@ -18,9 +18,10 @@ import (
 )
 
 const (
-	defaultResource = "{{ .Name }}"
-	defaultEvent    = "{{ .ID }}"
-	defaultGroup    = "{{ .Group }}"
+	defaultResource    = "{{ .Name }}"
+	defaultEvent       = "{{ .ID }}"
+	defaultGroup       = "{{ .Group }}"
+	defaultTokenPrefix = "Bearer"
 )
 
 type Service struct {
@@ -77,6 +78,7 @@ func (s *Service) Test(options interface{}) error {
 	c := s.config()
 	return s.Alert(
 		c.Token,
+		c.TokenPrefix,
 		o.Resource,
 		o.Event,
 		o.Environment,
@@ -120,12 +122,12 @@ func (s *Service) Update(newConfig []interface{}) error {
 	return nil
 }
 
-func (s *Service) Alert(token, resource, event, environment, severity, group, value, message, origin string, service []string, data interface{}) error {
+func (s *Service) Alert(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin string, service []string, data interface{}) error {
 	if resource == "" || event == "" {
 		return errors.New("Resource and Event are required to send an alert")
 	}
 
-	req, err := s.preparePost(token, resource, event, environment, severity, group, value, message, origin, service, data)
+	req, err := s.preparePost(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin, service, data)
 	if err != nil {
 		return err
 	}
@@ -153,7 +155,7 @@ func (s *Service) Alert(token, resource, event, environment, severity, group, va
 	return nil
 }
 
-func (s *Service) preparePost(token, resource, event, environment, severity, group, value, message, origin string, service []string, data interface{}) (*http.Request, error) {
+func (s *Service) preparePost(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin string, service []string, data interface{}) (*http.Request, error) {
 	c := s.config()
 
 	if !c.Enabled {
@@ -162,6 +164,14 @@ func (s *Service) preparePost(token, resource, event, environment, severity, gro
 
 	if token == "" {
 		token = c.Token
+	}
+
+	if tokenPrefix == "" {
+		if c.TokenPrefix == "" {
+			tokenPrefix = defaultTokenPrefix
+		} else {
+			tokenPrefix = c.TokenPrefix
+		}
 	}
 
 	if environment == "" {
@@ -200,7 +210,7 @@ func (s *Service) preparePost(token, resource, event, environment, severity, gro
 	}
 
 	req, err := http.NewRequest("POST", u.String(), &post)
-	req.Header.Add("Authorization", "Key "+token)
+	req.Header.Add("Authorization", tokenPrefix+" "+token)
 	req.Header.Add("Content-Type", "application/json")
 	if err != nil {
 		return nil, err
@@ -213,6 +223,10 @@ type HandlerConfig struct {
 	// Alerta authentication token.
 	// If empty uses the token from the configuration.
 	Token string `mapstructure:"token"`
+
+	// Alerta authentication token prefix.
+	// If empty uses Bearer.
+	TokenPrefix string `mapstructure:"token-prefix"`
 
 	// Alerta resource.
 	// Can be a template and has access to the same data as the AlertNode.Details property.
@@ -388,6 +402,7 @@ func (h *handler) Handle(event alert.Event) {
 
 	if err := h.s.Alert(
 		h.c.Token,
+		h.c.TokenPrefix,
 		resource,
 		eventStr,
 		environment,
