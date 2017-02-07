@@ -580,28 +580,26 @@ func (d *dbrps) Set(value string) error {
 	return nil
 }
 
-// read from txt starting with beginning quote until next unescaped quote.
+// parseQuotedStr reads from txt starting with beginning quote until next unescaped quote returning the unescaped string and the number of bytes read.
 func parseQuotedStr(txt string) (string, int) {
-	literal := txt[1 : len(txt)-1]
 	quote := txt[0]
 	// Unescape quotes
 	var buf bytes.Buffer
-	buf.Grow(len(literal))
-	last := 0
-	i := 0
-	for ; i < len(literal)-1; i++ {
-		if literal[i] == '\\' && literal[i+1] == quote {
-			buf.Write([]byte(literal[last:i]))
+	buf.Grow(len(txt))
+	last := 1
+	i := 1
+	for ; i < len(txt)-1; i++ {
+		if txt[i] == '\\' && txt[i+1] == quote {
+			buf.Write([]byte(txt[last:i]))
 			buf.Write([]byte{quote})
 			i += 2
 			last = i
-		} else if literal[i] == quote {
+		} else if txt[i] == quote {
 			break
 		}
 	}
-	buf.Write([]byte(literal[last:i]))
-	literal = buf.String()
-	return literal, i + 1
+	buf.Write([]byte(txt[last:i]))
+	return buf.String(), i + 1
 }
 
 func defineUsage() {
