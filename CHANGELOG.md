@@ -14,6 +14,7 @@
 - [#1164](https://github.com/influxdata/kapacitor/pull/1164): Fix hang in config API to update a config section.
     Now if the service update process takes too long the request will timeout and return an error.
     Previously the request would block forever.
+- [#1165](https://github.com/influxdata/kapacitor/issues/1165): Make the alerta auth token prefix configurable and default it to Bearer.
 
 
 

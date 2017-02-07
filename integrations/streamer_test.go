@@ -6968,7 +6968,7 @@ stream
 	exp := []interface{}{
 		alertatest.Request{
 			URL:           "/alert",
-			Authorization: "Key testtoken1234567",
+			Authorization: "Bearer testtoken1234567",
 			PostData: alertatest.PostData{
 				Resource:    "cpu",
 				Event:       "serverA",
@@ -6981,7 +6981,7 @@ stream
 		},
 		alertatest.Request{
 			URL:           "/alert",
-			Authorization: "Key anothertesttoken",
+			Authorization: "Bearer anothertesttoken",
 			PostData: alertatest.PostData{
 				Resource:    "resource: serverA",
 				Event:       "event: TestStream_Alert",
