@@ -1,13 +1,13 @@
 package storage
 
 import (
-	"log"
 	"os"
 	"path"
 	"sync"
 
 	"github.com/boltdb/bolt"
 	"github.com/pkg/errors"
+	"github.com/uber-go/zap"
 )
 
 type Service struct {
@@ -17,10 +17,10 @@ type Service struct {
 	stores map[string]Interface
 	mu     sync.Mutex
 
-	logger *log.Logger
+	logger zap.Logger
 }
 
-func NewService(conf Config, l *log.Logger) *Service {
+func NewService(conf Config, l zap.Logger) *Service {
 	return &Service{
 		dbpath: conf.BoltDBPath,
 		logger: l,

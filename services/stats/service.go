@@ -23,7 +23,6 @@
 package stats
 
 import (
-	"log"
 	"sync"
 	"time"
 
@@ -31,6 +30,7 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/timer"
 	"github.com/influxdata/kapacitor/vars"
+	"github.com/uber-go/zap"
 )
 
 // Sends internal stats back into the Kapacitor stream.
@@ -55,10 +55,10 @@ type Service struct {
 	mu      sync.Mutex
 	wg      sync.WaitGroup
 
-	logger *log.Logger
+	logger zap.Logger
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, l zap.Logger) *Service {
 	return &Service{
 		interval:            time.Duration(c.StatsInterval),
 		db:                  c.Database,
@@ -80,7 +80,7 @@ func (s *Service) Open() (err error) {
 	s.closing = make(chan struct{})
 	s.wg.Add(1)
 	go s.sendStats()
-	s.logger.Println("I! opened service")
+	s.logger.Info("opened service")
 	return
 }
 
@@ -94,7 +94,7 @@ func (s *Service) Close() error {
 	close(s.closing)
 	s.wg.Wait()
 	s.stream.Close()
-	s.logger.Println("I! closed service")
+	s.logger.Info("closed service")
 	return nil
 }
 
@@ -116,7 +116,7 @@ func (s *Service) reportStats() {
 	now := time.Now().UTC()
 	data, err := vars.GetStatsData()
 	if err != nil {
-		s.logger.Println("E! error getting stats data:", err)
+		s.logger.Error("error getting stats data", zap.Error(err))
 		return
 	}
 	for _, stat := range data {

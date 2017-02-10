@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"expvar"
 	"fmt"
-	"log"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -16,6 +15,7 @@ import (
 	"github.com/influxdata/kapacitor/timer"
 	"github.com/influxdata/kapacitor/vars"
 	"github.com/pkg/errors"
+	"github.com/uber-go/zap"
 )
 
 const (
@@ -76,7 +76,7 @@ type node struct {
 	finished   bool
 	ins        []*Edge
 	outs       []*Edge
-	logger     *log.Logger
+	logger     zap.Logger
 	timer      timer.Timer
 	statsKey   string
 	statMap    *kexpvar.Map
@@ -122,7 +122,7 @@ func (n *node) start(snapshot []byte) {
 					err = fmt.Errorf("%s: Trace:%s", r, string(trace[:n]))
 				}
 				n.abortParentEdges()
-				n.logger.Println("E!", err)
+				n.logger.Error(err.Error())
 				err = errors.Wrap(err, n.Name())
 			}
 			n.errCh <- err
@@ -164,7 +164,7 @@ func (n *node) addChild(c Node) (*Edge, error) {
 	}
 	n.children = append(n.children, c)
 
-	edge := newEdge(n.et.Task.ID, n.Name(), c.Name(), n.Provides(), defaultEdgeBufferSize, n.et.tm.LogService)
+	edge := newEdge(n.et.Task.ID, n.Name(), c.Name(), n.Provides(), defaultEdgeBufferSize, n.et.logger)
 	if edge == nil {
 		return nil, fmt.Errorf("unknown edge type %s", n.Provides())
 	}

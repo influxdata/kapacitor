@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"path"
 	"sort"
@@ -28,6 +27,7 @@ import (
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
+	"github.com/uber-go/zap"
 )
 
 const (
@@ -89,45 +89,45 @@ type Service struct {
 
 	Commander command.Commander
 
-	logger *log.Logger
+	logger zap.Logger
 
 	AlertaService interface {
 		DefaultHandlerConfig() alerta.HandlerConfig
-		Handler(alerta.HandlerConfig, *log.Logger) (alert.Handler, error)
+		Handler(alerta.HandlerConfig, zap.Logger) (alert.Handler, error)
 	}
 	HipChatService interface {
-		Handler(hipchat.HandlerConfig, *log.Logger) alert.Handler
+		Handler(hipchat.HandlerConfig, zap.Logger) alert.Handler
 	}
 	OpsGenieService interface {
-		Handler(opsgenie.HandlerConfig, *log.Logger) alert.Handler
+		Handler(opsgenie.HandlerConfig, zap.Logger) alert.Handler
 	}
 	PagerDutyService interface {
-		Handler(pagerduty.HandlerConfig, *log.Logger) alert.Handler
+		Handler(pagerduty.HandlerConfig, zap.Logger) alert.Handler
 	}
 	SensuService interface {
-		Handler(*log.Logger) alert.Handler
+		Handler(zap.Logger) alert.Handler
 	}
 	SlackService interface {
-		Handler(slack.HandlerConfig, *log.Logger) alert.Handler
+		Handler(slack.HandlerConfig, zap.Logger) alert.Handler
 	}
 	SMTPService interface {
-		Handler(smtp.HandlerConfig, *log.Logger) alert.Handler
+		Handler(smtp.HandlerConfig, zap.Logger) alert.Handler
 	}
 	SNMPTrapService interface {
-		Handler(snmptrap.HandlerConfig, *log.Logger) (alert.Handler, error)
+		Handler(snmptrap.HandlerConfig, zap.Logger) (alert.Handler, error)
 	}
 	TalkService interface {
-		Handler(*log.Logger) alert.Handler
+		Handler(zap.Logger) alert.Handler
 	}
 	TelegramService interface {
-		Handler(telegram.HandlerConfig, *log.Logger) alert.Handler
+		Handler(telegram.HandlerConfig, zap.Logger) alert.Handler
 	}
 	VictorOpsService interface {
-		Handler(victorops.HandlerConfig, *log.Logger) alert.Handler
+		Handler(victorops.HandlerConfig, zap.Logger) alert.Handler
 	}
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, l zap.Logger) *Service {
 	s := &Service{
 		handlers:     make(map[string]handler),
 		closedTopics: make(map[string]bool),
@@ -236,7 +236,7 @@ func (s *Service) loadSavedHandlerSpecs() error {
 
 		for _, spec := range specs {
 			if err := s.loadHandlerSpec(spec); err != nil {
-				s.logger.Println("E! failed to load handler on startup", err)
+				s.logger.Error("failed to load handler on startup", zap.Error(err))
 			}
 		}
 

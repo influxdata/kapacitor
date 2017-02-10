@@ -1,3 +1,4 @@
+// Package snapshotter provides the meta snapshot service.
 package snapshotter // import "github.com/influxdata/influxdb/services/snapshotter"
 
 import (
@@ -6,10 +7,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"io"
-	"log"
 	"net"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -17,6 +15,7 @@ import (
 	"github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/influxdb/tsdb"
+	"go.uber.org/zap"
 )
 
 const (
@@ -43,20 +42,20 @@ type Service struct {
 	TSDBStore *tsdb.Store
 
 	Listener net.Listener
-	Logger   *log.Logger
+	Logger   zap.Logger
 }
 
 // NewService returns a new instance of Service.
 func NewService() *Service {
 	return &Service{
 		err:    make(chan error),
-		Logger: log.New(os.Stderr, "[snapshot] ", log.LstdFlags),
+		Logger: zap.New(zap.NullEncoder()),
 	}
 }
 
 // Open starts the service.
 func (s *Service) Open() error {
-	s.Logger.Println("Starting snapshot service")
+	s.Logger.Info("Starting snapshot service")
 
 	s.wg.Add(1)
 	go s.serve()
@@ -72,10 +71,9 @@ func (s *Service) Close() error {
 	return nil
 }
 
-// SetLogOutput sets the writer to which all logs are written. It must not be
-// called after Open is called.
-func (s *Service) SetLogOutput(w io.Writer) {
-	s.Logger = log.New(w, "[snapshot] ", log.LstdFlags)
+// WithLogger sets the logger on the service.
+func (s *Service) WithLogger(log zap.Logger) {
+	s.Logger = log.With(zap.String("service", "snapshot"))
 }
 
 // Err returns a channel for fatal out-of-band errors.
@@ -89,10 +87,10 @@ func (s *Service) serve() {
 		// Wait for next connection.
 		conn, err := s.Listener.Accept()
 		if err != nil && strings.Contains(err.Error(), "connection closed") {
-			s.Logger.Println("snapshot listener closed")
+			s.Logger.Info("snapshot listener closed")
 			return
 		} else if err != nil {
-			s.Logger.Println("error accepting snapshot request: ", err.Error())
+			s.Logger.Info(fmt.Sprint("error accepting snapshot request: ", err.Error()))
 			continue
 		}
 
@@ -102,7 +100,7 @@ func (s *Service) serve() {
 			defer s.wg.Done()
 			defer conn.Close()
 			if err := s.handleConn(conn); err != nil {
-				s.Logger.Println(err)
+				s.Logger.Info(err.Error())
 			}
 		}(conn)
 	}
@@ -173,7 +171,7 @@ func (s *Service) writeMetaStore(conn net.Conn) error {
 }
 
 // writeDatabaseInfo will write the relative paths of all shards in the database on
-// this server into the connection
+// this server into the connection.
 func (s *Service) writeDatabaseInfo(conn net.Conn, database string) error {
 	res := Response{}
 	db := s.MetaClient.Database(database)
@@ -251,7 +249,7 @@ func (s *Service) writeRetentionPolicyInfo(conn net.Conn, database, retentionPol
 	return nil
 }
 
-// readRequest Unmarshals a request object from the conn
+// readRequest unmarshals a request object from the conn.
 func (s *Service) readRequest(conn net.Conn) (Request, error) {
 	var r Request
 	if err := json.NewDecoder(conn).Decode(&r); err != nil {
@@ -260,17 +258,25 @@ func (s *Service) readRequest(conn net.Conn) (Request, error) {
 	return r, nil
 }
 
+// RequestType indicates the typeof snapshot request.
 type RequestType uint8
 
 const (
+	// RequestShardBackup represents a request for a shard backup.
 	RequestShardBackup RequestType = iota
+
+	// RequestMetastoreBackup represents a request to back up the metastore.
 	RequestMetastoreBackup
+
+	// RequestDatabaseInfo represents a request for database info.
 	RequestDatabaseInfo
+
+	// RequestRetentionPolicyInfo represents a request for retention policy info.
 	RequestRetentionPolicyInfo
 )
 
 // Request represents a request for a specific backup or for information
-// about the shards on this server for a database or retention policy
+// about the shards on this server for a database or retention policy.
 type Request struct {
 	Type            RequestType
 	Database        string
@@ -280,7 +286,7 @@ type Request struct {
 }
 
 // Response contains the relative paths for all the shards on this server
-// that are in the requested database or retention policy
+// that are in the requested database or retention policy.
 type Response struct {
 	Paths []string
 }

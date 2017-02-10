@@ -1,0 +1,11 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/jsternberg/zap-logfmt.git
+	branch = master
+	commit = 593cb68c7620469eb58b478c821b01b784ac368c
+	parent = 4a533bbf47ef27f72adaea35b59a126f4e1461ea
+	cmdver = 0.3.0

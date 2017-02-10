@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"sync"
 	"time"
@@ -15,6 +14,7 @@ import (
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/pkg/errors"
+	"github.com/uber-go/zap"
 )
 
 // User defined function
@@ -30,7 +30,7 @@ type UDFNode struct {
 }
 
 // Create a new UDFNode that sends incoming data to child udf
-func newUDFNode(et *ExecutingTask, n *pipeline.UDFNode, l *log.Logger) (*UDFNode, error) {
+func newUDFNode(et *ExecutingTask, n *pipeline.UDFNode, l zap.Logger) (*UDFNode, error) {
 	un := &UDFNode{
 		node:    node{Node: n, et: et, logger: l},
 		u:       n,
@@ -187,7 +187,7 @@ type UDFProcess struct {
 
 	mu sync.Mutex
 
-	logger        *log.Logger
+	logger        zap.Logger
 	timeout       time.Duration
 	abortCallback func()
 }
@@ -195,7 +195,7 @@ type UDFProcess struct {
 func NewUDFProcess(
 	commander command.Commander,
 	cmdSpec command.Spec,
-	l *log.Logger,
+	l zap.Logger,
 	timeout time.Duration,
 	abortCallback func(),
 ) *UDFProcess {
@@ -285,9 +285,11 @@ func (p *UDFProcess) Close() error {
 // Replay any lines from STDERR of the process to the Kapacitor log.
 func (p *UDFProcess) logStdErr() {
 	defer p.logStdErrGroup.Done()
+
+	l := p.logger.With(zap.String("process", p.cmdSpec.Prog))
 	scanner := bufio.NewScanner(p.stderr)
 	for scanner.Scan() {
-		p.logger.Println("I!P", scanner.Text())
+		l.Info(scanner.Text())
 	}
 }
 
@@ -305,7 +307,7 @@ type UDFSocket struct {
 	server *udf.Server
 	socket Socket
 
-	logger        *log.Logger
+	logger        zap.Logger
 	timeout       time.Duration
 	abortCallback func()
 }
@@ -319,7 +321,7 @@ type Socket interface {
 
 func NewUDFSocket(
 	socket Socket,
-	l *log.Logger,
+	l zap.Logger,
 	timeout time.Duration,
 	abortCallback func(),
 ) *UDFSocket {

@@ -17,6 +17,8 @@ import (
 	"github.com/influxdata/influxdb/tsdb"
 )
 
+// ErrDatabaseNameRequired is returned when executing statements that require a database,
+// when a database has not been provided.
 var ErrDatabaseNameRequired = errors.New("database name required")
 
 type pointsWriter interface {
@@ -33,6 +35,9 @@ type StatementExecutor struct {
 	// TSDB storage for local node.
 	TSDBStore TSDBStore
 
+	// ShardMapper for mapping shards when executing a SELECT statement.
+	ShardMapper ShardMapper
+
 	// Holds monitoring data for SHOW STATS and SHOW DIAGNOSTICS.
 	Monitor *monitor.Monitor
 
@@ -45,6 +50,7 @@ type StatementExecutor struct {
 	MaxSelectBucketsN int
 }
 
+// ExecuteStatement executes the given statement with the given execution context.
 func (e *StatementExecutor) ExecuteStatement(stmt influxql.Statement, ctx influxql.ExecutionContext) error {
 	// Select statements are handled separately so that they can be streamed.
 	if stmt, ok := stmt.(*influxql.SelectStatement); ok {
@@ -187,12 +193,11 @@ func (e *StatementExecutor) ExecuteStatement(stmt influxql.Statement, ctx influx
 		return err
 	}
 
-	ctx.Results <- &influxql.Result{
+	return ctx.Send(&influxql.Result{
 		StatementID: ctx.StatementID,
 		Series:      rows,
 		Messages:    messages,
-	}
-	return nil
+	})
 }
 
 func (e *StatementExecutor) executeAlterRetentionPolicyStatement(stmt *influxql.AlterRetentionPolicyStatement) error {
@@ -203,17 +208,9 @@ func (e *StatementExecutor) executeAlterRetentionPolicyStatement(stmt *influxql.
 	}
 
 	// Update the retention policy.
-	if err := e.MetaClient.UpdateRetentionPolicy(stmt.Database, stmt.Name, rpu); err != nil {
+	if err := e.MetaClient.UpdateRetentionPolicy(stmt.Database, stmt.Name, rpu, stmt.Default); err != nil {
 		return err
 	}
-
-	// If requested, set as default retention policy.
-	if stmt.Default {
-		if err := e.MetaClient.SetDefaultRetentionPolicy(stmt.Database, stmt.Name); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -247,9 +244,23 @@ func (e *StatementExecutor) executeCreateContinuousQueryStatement(q *influxql.Cr
 }
 
 func (e *StatementExecutor) executeCreateDatabaseStatement(stmt *influxql.CreateDatabaseStatement) error {
+	if !meta.ValidName(stmt.Name) {
+		// TODO This should probably be in `(*meta.Data).CreateDatabase`
+		// but can't go there until 1.1 is used everywhere
+		return meta.ErrInvalidName
+	}
+
 	if !stmt.RetentionPolicyCreate {
 		_, err := e.MetaClient.CreateDatabase(stmt.Name)
 		return err
+	}
+
+	// If we're doing, for example, CREATE DATABASE "db" WITH DURATION 1d then
+	// the name will not yet be set. We only need to validate non-empty
+	// retention policy names, such as in the statement:
+	// 	CREATE DATABASE "db" WITH DURATION 1d NAME "xyz"
+	if stmt.RetentionPolicyName != "" && !meta.ValidName(stmt.RetentionPolicyName) {
+		return meta.ErrInvalidName
 	}
 
 	spec := meta.RetentionPolicySpec{
@@ -263,6 +274,12 @@ func (e *StatementExecutor) executeCreateDatabaseStatement(stmt *influxql.Create
 }
 
 func (e *StatementExecutor) executeCreateRetentionPolicyStatement(stmt *influxql.CreateRetentionPolicyStatement) error {
+	if !meta.ValidName(stmt.Name) {
+		// TODO This should probably be in `(*meta.Data).CreateRetentionPolicy`
+		// but can't go there until 1.1 is used everywhere
+		return meta.ErrInvalidName
+	}
+
 	spec := meta.RetentionPolicySpec{
 		Name:               stmt.Name,
 		Duration:           &stmt.Duration,
@@ -271,17 +288,11 @@ func (e *StatementExecutor) executeCreateRetentionPolicyStatement(stmt *influxql
 	}
 
 	// Create new retention policy.
-	rp, err := e.MetaClient.CreateRetentionPolicy(stmt.Database, &spec)
+	_, err := e.MetaClient.CreateRetentionPolicy(stmt.Database, &spec, stmt.Default)
 	if err != nil {
 		return err
 	}
 
-	// If requested, set new policy as the default.
-	if stmt.Default {
-		if err := e.MetaClient.SetDefaultRetentionPolicy(stmt.Database, rp.Name); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -314,6 +325,10 @@ func (e *StatementExecutor) executeDropContinuousQueryStatement(q *influxql.Drop
 // It does not return an error if the database was not found on any of
 // the nodes, or in the Meta store.
 func (e *StatementExecutor) executeDropDatabaseStatement(stmt *influxql.DropDatabaseStatement) error {
+	if e.MetaClient.Database(stmt.Name) == nil {
+		return nil
+	}
+
 	// Locally delete the datababse.
 	if err := e.TSDBStore.DeleteDatabase(stmt.Name); err != nil {
 		return err
@@ -357,6 +372,15 @@ func (e *StatementExecutor) executeDropShardStatement(stmt *influxql.DropShardSt
 }
 
 func (e *StatementExecutor) executeDropRetentionPolicyStatement(stmt *influxql.DropRetentionPolicyStatement) error {
+	dbi := e.MetaClient.Database(stmt.Database)
+	if dbi == nil {
+		return nil
+	}
+
+	if dbi.RetentionPolicy(stmt.Name) == nil {
+		return nil
+	}
+
 	// Locally drop the retention policy.
 	if err := e.TSDBStore.DeleteRetentionPolicy(stmt.Database, stmt.Name); err != nil {
 		return err
@@ -427,7 +451,7 @@ func (e *StatementExecutor) executeSelectStatement(stmt *influxql.SelectStatemen
 	}
 
 	for {
-		row, err := em.Emit()
+		row, partial, err := em.Emit()
 		if err != nil {
 			return err
 		} else if row == nil {
@@ -452,13 +476,12 @@ func (e *StatementExecutor) executeSelectStatement(stmt *influxql.SelectStatemen
 		result := &influxql.Result{
 			StatementID: ctx.StatementID,
 			Series:      []*models.Row{row},
+			Partial:     partial,
 		}
 
 		// Send results or exit if closing.
-		select {
-		case <-ctx.InterruptCh:
-			return influxql.ErrQueryInterrupted
-		case ctx.Results <- result:
+		if err := ctx.Send(result); err != nil {
+			return err
 		}
 
 		emitted = true
@@ -475,7 +498,7 @@ func (e *StatementExecutor) executeSelectStatement(stmt *influxql.SelectStatemen
 			messages = append(messages, influxql.ReadOnlyWarning(stmt.String()))
 		}
 
-		ctx.Results <- &influxql.Result{
+		return ctx.Send(&influxql.Result{
 			StatementID: ctx.StatementID,
 			Messages:    messages,
 			Series: []*models.Row{{
@@ -483,16 +506,15 @@ func (e *StatementExecutor) executeSelectStatement(stmt *influxql.SelectStatemen
 				Columns: []string{"time", "written"},
 				Values:  [][]interface{}{{time.Unix(0, 0).UTC(), writeN}},
 			}},
-		}
-		return nil
+		})
 	}
 
 	// Always emit at least one result.
 	if !emitted {
-		ctx.Results <- &influxql.Result{
+		return ctx.Send(&influxql.Result{
 			StatementID: ctx.StatementID,
 			Series:      make([]*models.Row, 0),
-		}
+		})
 	}
 
 	return nil
@@ -509,11 +531,7 @@ func (e *StatementExecutor) createIterators(stmt *influxql.SelectStatement, ctx 
 
 	// Replace instances of "now()" with the current time, and check the resultant times.
 	nowValuer := influxql.NowValuer{Now: now}
-	stmt.Condition = influxql.Reduce(stmt.Condition, &nowValuer)
-	// Replace instances of "now()" with the current time in the dimensions.
-	for _, d := range stmt.Dimensions {
-		d.Expr = influxql.Reduce(d.Expr, &nowValuer)
-	}
+	stmt = stmt.Reduce(&nowValuer)
 
 	var err error
 	opt.MinTime, opt.MaxTime, err = influxql.TimeRange(stmt.Condition)
@@ -522,15 +540,7 @@ func (e *StatementExecutor) createIterators(stmt *influxql.SelectStatement, ctx 
 	}
 
 	if opt.MaxTime.IsZero() {
-		// In the case that we're executing a meta query where the user cannot
-		// specify a time condition, then we expand the default max time
-		// to the maximum possible value, to ensure that data where all points
-		// are in the future are returned.
-		if influxql.Sources(stmt.Sources).HasSystemSource() {
-			opt.MaxTime = time.Unix(0, influxql.MaxTime).UTC()
-		} else {
-			opt.MaxTime = now
-		}
+		opt.MaxTime = time.Unix(0, influxql.MaxTime)
 	}
 	if opt.MinTime.IsZero() {
 		opt.MinTime = time.Unix(0, influxql.MinTime).UTC()
@@ -542,23 +552,20 @@ func (e *StatementExecutor) createIterators(stmt *influxql.SelectStatement, ctx 
 	// Remove "time" from fields list.
 	stmt.RewriteTimeFields()
 
+	// Rewrite time condition.
+	if err := stmt.RewriteTimeCondition(now); err != nil {
+		return nil, stmt, err
+	}
+
 	// Rewrite any regex conditions that could make use of the index.
 	stmt.RewriteRegexConditions()
 
 	// Create an iterator creator based on the shards in the cluster.
-	ic, err := e.iteratorCreator(stmt, &opt)
+	ic, err := e.ShardMapper.MapShards(stmt.Sources, &opt)
 	if err != nil {
 		return nil, stmt, err
 	}
-
-	// Expand regex sources to their actual source names.
-	if stmt.Sources.HasRegex() {
-		sources, err := ic.ExpandSources(stmt.Sources)
-		if err != nil {
-			return nil, stmt, err
-		}
-		stmt.Sources = sources
-	}
+	defer ic.Close()
 
 	// Rewrite wildcards, if any exist.
 	tmp, err := stmt.RewriteFields(ic)
@@ -581,7 +588,7 @@ func (e *StatementExecutor) createIterators(stmt *influxql.SelectStatement, ctx 
 			// Determine the number of buckets by finding the time span and dividing by the interval.
 			buckets := int64(max.Sub(min)) / int64(interval)
 			if int(buckets) > e.MaxSelectBucketsN {
-				return nil, stmt, fmt.Errorf("max select bucket count exceeded: %d buckets", buckets)
+				return nil, stmt, fmt.Errorf("max-select-buckets limit exceeded: (%d/%d)", buckets, e.MaxSelectBucketsN)
 			}
 		}
 	}
@@ -597,16 +604,6 @@ func (e *StatementExecutor) createIterators(stmt *influxql.SelectStatement, ctx 
 		ctx.Query.Monitor(monitor)
 	}
 	return itrs, stmt, nil
-}
-
-// iteratorCreator returns a new instance of IteratorCreator based on stmt.
-func (e *StatementExecutor) iteratorCreator(stmt *influxql.SelectStatement, opt *influxql.SelectOptions) (influxql.IteratorCreator, error) {
-	// Retrieve a list of shard IDs.
-	shards, err := e.MetaClient.ShardsByTimeRange(stmt.Sources, opt.MinTime, opt.MaxTime)
-	if err != nil {
-		return nil, err
-	}
-	return e.TSDBStore.IteratorCreator(shards, opt)
 }
 
 func (e *StatementExecutor) executeShowContinuousQueriesStatement(stmt *influxql.ShowContinuousQueriesStatement) (models.Rows, error) {
@@ -681,11 +678,10 @@ func (e *StatementExecutor) executeShowMeasurementsStatement(q *influxql.ShowMea
 
 	measurements, err := e.TSDBStore.Measurements(q.Database, q.Condition)
 	if err != nil || len(measurements) == 0 {
-		ctx.Results <- &influxql.Result{
+		return ctx.Send(&influxql.Result{
 			StatementID: ctx.StatementID,
 			Err:         err,
-		}
-		return nil
+		})
 	}
 
 	if q.Offset > 0 {
@@ -708,21 +704,19 @@ func (e *StatementExecutor) executeShowMeasurementsStatement(q *influxql.ShowMea
 	}
 
 	if len(values) == 0 {
-		ctx.Results <- &influxql.Result{
+		return ctx.Send(&influxql.Result{
 			StatementID: ctx.StatementID,
-		}
-		return nil
+		})
 	}
 
-	ctx.Results <- &influxql.Result{
+	return ctx.Send(&influxql.Result{
 		StatementID: ctx.StatementID,
 		Series: []*models.Row{{
 			Name:    "measurements",
 			Columns: []string{"name"},
 			Values:  values,
 		}},
-	}
-	return nil
+	})
 }
 
 func (e *StatementExecutor) executeShowRetentionPoliciesStatement(q *influxql.ShowRetentionPoliciesStatement) (models.Rows, error) {
@@ -851,17 +845,16 @@ func (e *StatementExecutor) executeShowSubscriptionsStatement(stmt *influxql.Sho
 }
 
 func (e *StatementExecutor) executeShowTagValues(q *influxql.ShowTagValuesStatement, ctx *influxql.ExecutionContext) error {
-	if ctx.Database == "" {
+	if q.Database == "" {
 		return ErrDatabaseNameRequired
 	}
 
-	tagValues, err := e.TSDBStore.TagValues(ctx.Database, q.Condition)
+	tagValues, err := e.TSDBStore.TagValues(q.Database, q.Condition)
 	if err != nil {
-		ctx.Results <- &influxql.Result{
+		return ctx.Send(&influxql.Result{
 			StatementID: ctx.StatementID,
 			Err:         err,
-		}
-		return nil
+		})
 	}
 
 	emitted := false
@@ -895,18 +888,20 @@ func (e *StatementExecutor) executeShowTagValues(q *influxql.ShowTagValuesStatem
 			row.Values[i] = []interface{}{v.Key, v.Value}
 		}
 
-		ctx.Results <- &influxql.Result{
+		if err := ctx.Send(&influxql.Result{
 			StatementID: ctx.StatementID,
 			Series:      []*models.Row{row},
+		}); err != nil {
+			return err
 		}
 		emitted = true
 	}
 
 	// Ensure at least one result is emitted.
 	if !emitted {
-		ctx.Results <- &influxql.Result{
+		return ctx.Send(&influxql.Result{
 			StatementID: ctx.StatementID,
-		}
+		})
 	}
 	return nil
 }
@@ -919,6 +914,8 @@ func (e *StatementExecutor) executeShowUsersStatement(q *influxql.ShowUsersState
 	return []*models.Row{row}, nil
 }
 
+// BufferedPointsWriter adds buffering to a pointsWriter so that SELECT INTO queries
+// write their points to the destination in batches.
 type BufferedPointsWriter struct {
 	w               pointsWriter
 	buf             []models.Point
@@ -926,6 +923,7 @@ type BufferedPointsWriter struct {
 	retentionPolicy string
 }
 
+// NewBufferedPointsWriter returns a new BufferedPointsWriter.
 func NewBufferedPointsWriter(w pointsWriter, database, retentionPolicy string, capacity int) *BufferedPointsWriter {
 	return &BufferedPointsWriter{
 		w:               w,
@@ -935,6 +933,7 @@ func NewBufferedPointsWriter(w pointsWriter, database, retentionPolicy string, c
 	}
 }
 
+// WritePointsInto implements pointsWriter for BufferedPointsWriter.
 func (w *BufferedPointsWriter) WritePointsInto(req *IntoWriteRequest) error {
 	// Make sure we're buffering points only for the expected destination.
 	if req.Database != w.database || req.RetentionPolicy != w.retentionPolicy {
@@ -1083,8 +1082,18 @@ func (e *StatementExecutor) NormalizeStatement(stmt influxql.Statement, defaultD
 			if node.Database == "" {
 				node.Database = defaultDatabase
 			}
+		case *influxql.ShowTagValuesStatement:
+			if node.Database == "" {
+				node.Database = defaultDatabase
+			}
 		case *influxql.Measurement:
-			err = e.normalizeMeasurement(node, defaultDatabase)
+			switch stmt.(type) {
+			case *influxql.DropSeriesStatement, *influxql.DeleteSeriesStatement:
+			// DB and RP not supported by these statements so don't rewrite into invalid
+			// statements
+			default:
+				err = e.normalizeMeasurement(node, defaultDatabase)
+			}
 		}
 	})
 	return
@@ -1144,22 +1153,17 @@ type TSDBStore interface {
 	DeleteRetentionPolicy(database, name string) error
 	DeleteSeries(database string, sources []influxql.Source, condition influxql.Expr) error
 	DeleteShard(id uint64) error
-	IteratorCreator(shards []meta.ShardInfo, opt *influxql.SelectOptions) (influxql.IteratorCreator, error)
 
 	Measurements(database string, cond influxql.Expr) ([]string, error)
 	TagValues(database string, cond influxql.Expr) ([]tsdb.TagValues, error)
 }
 
+var _ TSDBStore = LocalTSDBStore{}
+
+// LocalTSDBStore embeds a tsdb.Store and implements IteratorCreator
+// to satisfy the TSDBStore interface.
 type LocalTSDBStore struct {
 	*tsdb.Store
-}
-
-func (s LocalTSDBStore) IteratorCreator(shards []meta.ShardInfo, opt *influxql.SelectOptions) (influxql.IteratorCreator, error) {
-	shardIDs := make([]uint64, len(shards))
-	for i, sh := range shards {
-		shardIDs[i] = sh.ID
-	}
-	return s.Store.IteratorCreator(shardIDs, opt)
 }
 
 // ShardIteratorCreator is an interface for creating an IteratorCreator to access a specific shard.
@@ -1177,63 +1181,4 @@ func joinUint64(a []uint64) string {
 		}
 	}
 	return buf.String()
-}
-
-// stringSet represents a set of strings.
-type stringSet map[string]struct{}
-
-// newStringSet returns an empty stringSet.
-func newStringSet() stringSet {
-	return make(map[string]struct{})
-}
-
-// add adds strings to the set.
-func (s stringSet) add(ss ...string) {
-	for _, n := range ss {
-		s[n] = struct{}{}
-	}
-}
-
-// contains returns whether the set contains the given string.
-func (s stringSet) contains(ss string) bool {
-	_, ok := s[ss]
-	return ok
-}
-
-// list returns the current elements in the set, in sorted order.
-func (s stringSet) list() []string {
-	l := make([]string, 0, len(s))
-	for k := range s {
-		l = append(l, k)
-	}
-	sort.Strings(l)
-	return l
-}
-
-// union returns the union of this set and another.
-func (s stringSet) union(o stringSet) stringSet {
-	ns := newStringSet()
-	for k := range s {
-		ns[k] = struct{}{}
-	}
-	for k := range o {
-		ns[k] = struct{}{}
-	}
-	return ns
-}
-
-// intersect returns the intersection of this set and another.
-func (s stringSet) intersect(o stringSet) stringSet {
-	shorter, longer := s, o
-	if len(longer) < len(shorter) {
-		shorter, longer = longer, shorter
-	}
-
-	ns := newStringSet()
-	for k := range shorter {
-		if _, ok := longer[k]; ok {
-			ns[k] = struct{}{}
-		}
-	}
-	return ns
 }

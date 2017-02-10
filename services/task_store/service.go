@@ -5,7 +5,6 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"path"
 	"path/filepath"
@@ -23,6 +22,7 @@ import (
 	"github.com/influxdata/kapacitor/vars"
 	"github.com/pkg/errors"
 	"github.com/twinj/uuid"
+	"github.com/uber-go/zap"
 )
 
 const (
@@ -54,7 +54,7 @@ type Service struct {
 		Delete(*kapacitor.TaskMaster)
 	}
 
-	logger *log.Logger
+	logger zap.Logger
 }
 
 type taskStore struct {
@@ -63,7 +63,7 @@ type taskStore struct {
 	TICKScript string
 }
 
-func NewService(conf Config, l *log.Logger) *Service {
+func NewService(conf Config, l zap.Logger) *Service {
 	return &Service{
 		snapshotInterval: time.Duration(conf.SnapshotInterval),
 		logger:           l,
@@ -177,12 +177,12 @@ func (ts *Service) Open() error {
 			numTasks++
 			if task.Status == Enabled {
 				numEnabledTasks++
-				ts.logger.Println("D! starting enabled task on startup", task.ID)
+				ts.logger.Debug("starting enabled task on startup", zap.String("task", task.ID))
 				err = ts.startTask(task)
 				if err != nil {
-					ts.logger.Printf("E! error starting enabled task %s, err: %s\n", task.ID, err)
+					ts.logger.Error(fmt.Sprintf("error starting enabled task: %s", err), zap.String("task", task.ID))
 				} else {
-					ts.logger.Println("D! started task during startup", task.ID)
+					ts.logger.Debug("started task during startup", zap.String("task", task.ID))
 				}
 			}
 		}
@@ -218,7 +218,7 @@ func (ts *Service) migrate() error {
 	// Connect to old boltdb
 	db, err := bolt.Open(filepath.Join(ts.oldDBDir, "task.db"), 0600, &bolt.Options{ReadOnly: true})
 	if err != nil {
-		ts.logger.Println("D! could not open old boltd for task_store. Not performing migration. Remove the `task_store.dir` configuration to disable migration.")
+		ts.logger.Debug("could not open old boltd for task_store. Not performing migration. Remove the `task_store.dir` configuration to disable migration.")
 		return nil
 	}
 
@@ -250,7 +250,7 @@ func (ts *Service) migrate() error {
 			task := &rawTask{}
 			err = dec.Decode(task)
 			if err != nil {
-				ts.logger.Println("E! corrupt data in old task_store boltdb tasks:", err)
+				ts.logger.Error("corrupt data in old task_store boltdb tasks", zap.Error(err))
 				return nil
 			}
 
@@ -299,10 +299,10 @@ func (ts *Service) migrate() error {
 					// Failed to migrate task stop process
 					return err
 				} else {
-					ts.logger.Printf("D! task %s has already been migrated skipping", task.Name)
+					ts.logger.Debug("task has already been migrated skipping", zap.String("task", task.Name))
 				}
 			} else {
-				ts.logger.Printf("D! task %s was migrated to new storage service", task.Name)
+				ts.logger.Debug("task was migrated to new storage service", zap.String("task", task.Name))
 			}
 			return nil
 		})
@@ -323,7 +323,7 @@ func (ts *Service) migrate() error {
 			snapshot := &kapacitor.TaskSnapshot{}
 			err = dec.Decode(snapshot)
 			if err != nil {
-				ts.logger.Println("E! corrupt data in old task_store boltdb snapshots:", err)
+				ts.logger.Error("corrupt data in old task_store boltdb snapshots", zap.Error(err))
 				return nil
 			}
 
@@ -338,9 +338,9 @@ func (ts *Service) migrate() error {
 						// Failed to migrate snapshot stop process.
 						return err
 					}
-					ts.logger.Printf("D! snapshot %s was migrated to new storage service", id)
+					ts.logger.Debug("snapshot was migrated to new storage service", zap.String("snapshot", id))
 				} else {
-					ts.logger.Printf("D! snapshot %s skipped, already migrated to new storage service", id)
+					ts.logger.Debug("snapshot skipped, already migrated to new storage service", zap.String("snapshot", id))
 				}
 			} else if err != nil {
 				return err
@@ -377,7 +377,7 @@ func (ts *Service) SaveSnapshot(id string, snapshot *kapacitor.TaskSnapshot) err
 func (ts *Service) HasSnapshot(id string) bool {
 	exists, err := ts.snapshots.Exists(id)
 	if err != nil {
-		ts.logger.Println("E! error checking for snapshot", err)
+		ts.logger.Error("error checking for snapshot", zap.Error(err))
 		return false
 	}
 	return exists
@@ -607,7 +607,7 @@ func (ts *Service) handleListTasks(w http.ResponseWriter, r *http.Request) {
 				if executing {
 					s, err := tm.ExecutionStats(task.ID)
 					if err != nil {
-						ts.logger.Printf("E! failed to retrieve stats for task %s: %v", task.ID, err)
+						ts.logger.Error(fmt.Sprintf("failed to retrieve stats for task: %v", err), zap.String("task", task.ID))
 					} else {
 						value = client.ExecutionStats{
 							TaskStats: s.TaskStats,
@@ -906,7 +906,7 @@ func (ts *Service) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := ts.tasks.Delete(original.ID); err != nil {
-			ts.logger.Printf("E! failed to delete old task definition during ID change: old ID: %s new ID: %s, %s", original.ID, updated.ID, err.Error())
+			ts.logger.Error(fmt.Sprintf("failed to delete old task definition during ID change %s", err.Error()), zap.String("old", original.ID), zap.String("new", updated.ID))
 		}
 		if original.Status == Enabled && updated.Status == Enabled {
 			// Stop task and start it under new name
@@ -970,7 +970,7 @@ func (ts *Service) convertTask(t Task, scriptFormat, dotView string, tm *kapacit
 			dot = tm.ExecutingDot(t.ID, dotView == "labels")
 			s, err := tm.ExecutionStats(t.ID)
 			if err != nil {
-				ts.logger.Printf("E! failed to retrieve stats for task %s: %v", t.ID, err)
+				ts.logger.Error(fmt.Sprintf("failed to retrieve stats for task: %v", err), zap.String("tasks", t.ID))
 			} else {
 				stats.TaskStats = s.TaskStats
 				stats.NodeStats = s.NodeStats
@@ -1312,7 +1312,7 @@ func (ts *Service) deleteTask(id string) error {
 	}
 	if task.TemplateID != "" {
 		if err := ts.templates.DisassociateTask(task.TemplateID, task.ID); err != nil {
-			ts.logger.Printf("E! failed to disassociate task %s from template %s", task.TemplateID, task.ID)
+			ts.logger.Error("failed to disassociate task from template", zap.String("template", task.TemplateID), zap.String("task", task.ID))
 		}
 	}
 	vars.NumTasksVar.Add(-1)
@@ -1511,7 +1511,7 @@ func (ts *Service) handleListTemplates(w http.ResponseWriter, r *http.Request) {
 			case "vars":
 				vars, err := ts.convertToClientVarsFromTick(task.Vars())
 				if err != nil {
-					ts.logger.Printf("E! failed to get vars for template %s: %s", template.ID, err)
+					ts.logger.Error(fmt.Sprintf("failed to get vars for template: %s", err), zap.String("template", template.ID))
 					break
 				}
 				value = vars
@@ -1675,7 +1675,7 @@ func (ts *Service) handleUpdateTemplate(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		if err := ts.templates.Delete(original.ID); err != nil {
-			ts.logger.Printf("E! failed to delete old template during ID change, old ID: %s new ID: %s, %s", original.ID, updated.ID, err.Error())
+			ts.logger.Error(fmt.Sprintf("failed to delete old template during ID change: %s", err.Error()), zap.String("old", original.ID), zap.String("new", updated.ID))
 		}
 	} else {
 		if err := ts.templates.Replace(updated); err != nil {
@@ -1718,7 +1718,7 @@ func (ts *Service) updateAllAssociatedTasks(old, new Template, taskIds []string)
 			task, err := ts.tasks.Get(taskId)
 			if err != nil {
 				if err != ErrNoTaskExists {
-					ts.logger.Printf("E! error rolling back associated task %s: %s", taskId, err)
+					ts.logger.Error(fmt.Sprintf("error rolling back associated task: %s", err), zap.String("task", taskId))
 				}
 				continue
 			}
@@ -1726,13 +1726,13 @@ func (ts *Service) updateAllAssociatedTasks(old, new Template, taskIds []string)
 			task.TICKscript = old.TICKscript
 			task.Type = old.Type
 			if err := ts.tasks.Replace(task); err != nil {
-				ts.logger.Printf("E! error rolling back associated task %s: %s", taskId, err)
+				ts.logger.Error(fmt.Sprintf("error rolling back associated task: %s", err), zap.String("task", taskId))
 			}
 			if task.Status == Enabled {
 				ts.stopTask(taskId)
 				err := ts.startTask(task)
 				if err != nil {
-					ts.logger.Printf("E! error rolling back associated task %s: %s", taskId, err)
+					ts.logger.Error(fmt.Sprintf("error rolling back associated task: %s", err), zap.String("task", taskId))
 				}
 			}
 		}
@@ -1859,17 +1859,17 @@ func (ts *Service) startTask(task Task) error {
 	go func() {
 		// Wait for task to finish
 		err := et.Wait()
-		ts.logger.Printf("D! task %s finished", et.Task.ID)
+		ts.logger.Debug("task finished", zap.String("task", et.Task.ID))
 
 		if err != nil {
 			// Stop task
 			tm.StopTask(t.ID)
 
-			ts.logger.Printf("E! task %s finished with error: %s", et.Task.ID, err)
+			ts.logger.Error(fmt.Sprintf("task finished with error: %s", err), zap.String("task", et.Task.ID))
 			// Save last error from task.
 			err = ts.saveLastError(t.ID, err.Error())
 			if err != nil {
-				ts.logger.Println("E! failed to save last error for task", et.Task.ID)
+				ts.logger.Error("failed to save last error for task", zap.String("task", et.Task.ID))
 			}
 		}
 	}()

@@ -2,7 +2,6 @@ package udf
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"sync"
 	"time"
@@ -10,16 +9,17 @@ import (
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/udf"
+	"github.com/uber-go/zap"
 )
 
 type Service struct {
 	configs map[string]FunctionConfig
 	infos   map[string]udf.Info
-	logger  *log.Logger
+	logger  zap.Logger
 	mu      sync.RWMutex
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, l zap.Logger) *Service {
 	return &Service{
 		configs: c.Functions,
 		infos:   make(map[string]udf.Info),
@@ -60,13 +60,14 @@ func (s *Service) Info(name string) (udf.Info, bool) {
 
 func (s *Service) Create(
 	name string,
-	l *log.Logger,
+	l zap.Logger,
 	abortCallback func(),
 ) (udf.Interface, error) {
 	conf, ok := s.configs[name]
 	if !ok {
 		return nil, fmt.Errorf("no such UDF %s", name)
 	}
+	l = l.With(zap.String("udf", name))
 	if conf.Socket != "" {
 		// Create socket UDF
 		return kapacitor.NewUDFSocket(
@@ -104,7 +105,7 @@ func (s *Service) Refresh(name string) error {
 		return fmt.Errorf("failed to load process info for %q: %v", name, err)
 	}
 	s.infos[name] = info
-	s.logger.Printf("D! loaded UDF info %q", name)
+	s.logger.Debug("loaded UDF info", zap.String("udf", name))
 	return nil
 }
 

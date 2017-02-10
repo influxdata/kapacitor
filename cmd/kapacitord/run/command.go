@@ -3,7 +3,6 @@ package run
 import (
 	"flag"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -14,7 +13,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/influxdata/kapacitor/server"
 	"github.com/influxdata/kapacitor/services/logging"
-	"github.com/influxdata/kapacitor/tick"
+	"github.com/uber-go/zap"
 )
 
 const logo = `
@@ -38,12 +37,12 @@ type Command struct {
 	closing chan struct{}
 	Closed  chan struct{}
 
-	Stdin  io.Reader
-	Stdout io.Writer
-	Stderr io.Writer
+	Stdin  *os.File
+	Stdout *os.File
+	Stderr *os.File
 
 	Server     *server.Server
-	Logger     *log.Logger
+	Logger     zap.Logger
 	logService *logging.Service
 }
 
@@ -102,14 +101,14 @@ func (cmd *Command) Run(args ...string) error {
 		return fmt.Errorf("init logging: %s", err)
 	}
 	// Initialize packages loggers
-	tick.SetLogger(cmd.logService.NewLogger("[tick] ", log.LstdFlags))
+	// TODO integrate logging into tick package
+	//tick.SetLogger(cmd.logService.NewLogger("tick"))
 
 	// Initialize cmd logger
-	cmd.Logger = cmd.logService.NewLogger("[run] ", log.LstdFlags)
+	cmd.Logger = cmd.logService.Root()
 
 	// Mark start-up in log.,
-	cmd.Logger.Printf("I! Kapacitor starting, version %s, branch %s, commit %s", cmd.Version, cmd.Branch, cmd.Commit)
-	cmd.Logger.Printf("I! Go version %s", runtime.Version())
+	cmd.Logger.Info("Kapacitor starting", zap.String("version", cmd.Version), zap.String("branch", cmd.Branch), zap.String("commit", cmd.Commit), zap.String("go-version", runtime.Version()))
 
 	// Write the PID file.
 	if err := cmd.writePIDFile(options.PIDFile); err != nil {
@@ -153,7 +152,7 @@ func (cmd *Command) monitorServerErrors() {
 		select {
 		case err := <-cmd.Server.Err():
 			if err != nil {
-				cmd.Logger.Println("E! " + err.Error())
+				cmd.Logger.Error(err.Error())
 			}
 		case <-cmd.closing:
 			return

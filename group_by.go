@@ -1,13 +1,13 @@
 package kapacitor
 
 import (
-	"log"
 	"sort"
 	"time"
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick/ast"
+	"github.com/uber-go/zap"
 )
 
 type GroupByNode struct {
@@ -19,7 +19,7 @@ type GroupByNode struct {
 }
 
 // Create a new GroupByNode which splits the stream dynamically based on the specified dimensions.
-func newGroupByNode(et *ExecutingTask, n *pipeline.GroupByNode, l *log.Logger) (*GroupByNode, error) {
+func newGroupByNode(et *ExecutingTask, n *pipeline.GroupByNode, l zap.Logger) (*GroupByNode, error) {
 	gn := &GroupByNode{
 		node:   node{Node: n, et: et, logger: l},
 		g:      n,

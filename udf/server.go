@@ -4,11 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"sync"
 	"time"
 
 	"github.com/influxdata/kapacitor/models"
+	"github.com/uber-go/zap"
 )
 
 var ErrServerStopped = errors.New("server already stopped")
@@ -73,7 +73,7 @@ type Server struct {
 	ioGroup sync.WaitGroup
 
 	mu     sync.Mutex
-	logger *log.Logger
+	logger zap.Logger
 
 	responseBuf []byte
 
@@ -88,7 +88,7 @@ type Server struct {
 func NewServer(
 	in ByteReadReader,
 	out io.WriteCloser,
-	l *log.Logger,
+	l zap.Logger,
 	timeout time.Duration,
 	abortCallback func(),
 	killCallback func(),
@@ -346,7 +346,7 @@ func (s *Server) doResponse(response *Response, respC chan *Response) {
 	select {
 	case respC <- response:
 	default:
-		s.logger.Printf("E! received %T without requesting it", response.Message)
+		s.logger.Error(fmt.Sprintf("received %T without requesting it", response.Message))
 	}
 }
 
@@ -397,7 +397,7 @@ func (s *Server) watchKeepalive() {
 				default:
 					// We failed to abort just kill it.
 					if s.killCallback != nil {
-						s.logger.Println("E! process not responding! killing")
+						s.logger.Error("process not responding! killing")
 						s.killCallback()
 					}
 				}
@@ -424,7 +424,7 @@ func (s *Server) watchKeepalive() {
 				break
 			}
 			err = fmt.Errorf("keepalive timedout, last keepalive received was: %s", time.Unix(0, last))
-			s.logger.Println("E!", err)
+			s.logger.Error(err.Error())
 			return
 		case <-s.stopping:
 			return
@@ -648,7 +648,7 @@ func (s *Server) handleResponse(response *Response) error {
 	case *Response_Restore:
 		s.doResponse(response, s.restoreResponse)
 	case *Response_Error:
-		s.logger.Println("E!", msg.Error.Error)
+		s.logger.Error(msg.Error.Error)
 		return errors.New(msg.Error.Error)
 	case *Response_Begin:
 		s.batch = &models.Batch{

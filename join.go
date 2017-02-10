@@ -2,7 +2,6 @@ package kapacitor
 
 import (
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/timer"
+	"github.com/uber-go/zap"
 )
 
 type JoinNode struct {
@@ -34,7 +34,7 @@ type JoinNode struct {
 }
 
 // Create a new JoinNode, which takes pairs from parent streams combines them into a single point.
-func newJoinNode(et *ExecutingTask, n *pipeline.JoinNode, l *log.Logger) (*JoinNode, error) {
+func newJoinNode(et *ExecutingTask, n *pipeline.JoinNode, l zap.Logger) (*JoinNode, error) {
 	jn := &JoinNode{
 		j:                    n,
 		node:                 node{Node: n, et: et, logger: l},
@@ -277,7 +277,7 @@ func (j *JoinNode) getGroup(p models.PointInterface, groupErrs chan<- error) *gr
 		go func() {
 			err := group.run()
 			if err != nil {
-				j.logger.Println("E! join group error:", err)
+				j.logger.Error("join group error", zap.Error(err))
 				select {
 				case groupErrs <- err:
 				default:
@@ -482,7 +482,7 @@ type joinset struct {
 
 	first int
 
-	logger *log.Logger
+	logger zap.Logger
 }
 
 func newJoinset(
@@ -493,7 +493,7 @@ func newJoinset(
 	delimiter string,
 	tolerance time.Duration,
 	time time.Time,
-	l *log.Logger,
+	l zap.Logger,
 ) *joinset {
 	expected := len(prefixes)
 	return &joinset{
@@ -599,7 +599,7 @@ BATCH_POINT:
 			}
 			b, ok := batch.(models.Batch)
 			if !ok {
-				js.logger.Printf("E! invalid join data got %T expected models.Batch", batch)
+				js.logger.Error(fmt.Sprintf("invalid join data got %T expected models.Batch", batch))
 				return models.Batch{}, false
 			}
 			if indexes[i] == len(b.Points) {

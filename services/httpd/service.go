@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"expvar"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor/services/logging"
+	"github.com/uber-go/zap"
 )
 
 type Service struct {
@@ -37,10 +37,10 @@ type Service struct {
 
 	Handler *Handler
 
-	logger *log.Logger
+	logger zap.Logger
 }
 
-func NewService(c Config, hostname string, l *log.Logger, li logging.Interface) *Service {
+func NewService(c Config, hostname string, l zap.Logger, li logging.Interface) *Service {
 	statMap := &expvar.Map{}
 	statMap.Init()
 	port, _ := c.Port()
@@ -77,8 +77,7 @@ func NewService(c Config, hostname string, l *log.Logger, li logging.Interface) 
 func (s *Service) Open() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.logger.Println("I! Starting HTTP service")
-	s.logger.Println("I! Authentication enabled:", s.Handler.requireAuthentication)
+	s.logger.Info(fmt.Sprintf("authentication enabled: %t", s.Handler.requireAuthentication))
 
 	// Open listener.
 	if s.https {
@@ -94,7 +93,7 @@ func (s *Service) Open() error {
 			return err
 		}
 
-		s.logger.Println("I! Listening on HTTPS:", listener.Addr().String())
+		s.logger.Info(fmt.Sprintf("listening on HTTPS: %v", listener.Addr()))
 		s.ln = listener
 	} else {
 		listener, err := net.Listen("tcp", s.addr)
@@ -102,7 +101,7 @@ func (s *Service) Open() error {
 			return err
 		}
 
-		s.logger.Println("I! Listening on HTTP:", listener.Addr().String())
+		s.logger.Info(fmt.Sprintf("listening on HTTP: %v", listener.Addr()))
 		s.ln = listener
 	}
 
@@ -128,7 +127,7 @@ func (s *Service) Open() error {
 
 // Close closes the underlying listener.
 func (s *Service) Close() error {
-	defer s.logger.Println("I! Closed HTTP service")
+	defer s.logger.Info("Closed HTTP service")
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	// If server is not set we were never started
@@ -223,7 +222,7 @@ func (s *Service) manage() {
 			// continue the loop and wait for all the ConnState updates which will
 			// eventually close(stopDone) and return from this goroutine.
 		case <-timeout:
-			s.logger.Println("E! shutdown timedout, forcefully closing all remaining connections")
+			s.logger.Error("shutdown timedout, forcefully closing all remaining connections")
 			// Connections didn't close in time.
 			// Forcefully close all connections.
 			for c := range conns {

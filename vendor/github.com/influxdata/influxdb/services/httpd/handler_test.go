@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -39,7 +39,7 @@ func TestHandler_Query(t *testing.T) {
 	h.ServeHTTP(w, MustNewJSONRequest("GET", "/query?db=foo&q=SELECT+*+FROM+bar", nil))
 	if w.Code != http.StatusOK {
 		t.Fatalf("unexpected status: %d", w.Code)
-	} else if body := strings.TrimSpace(w.Body.String()); body != `{"results":[{"series":[{"name":"series0"}]},{"series":[{"name":"series1"}]}]}` {
+	} else if body := strings.TrimSpace(w.Body.String()); body != `{"results":[{"statement_id":1,"series":[{"name":"series0"}]},{"statement_id":2,"series":[{"name":"series1"}]}]}` {
 		t.Fatalf("unexpected body: %s", body)
 	}
 }
@@ -77,7 +77,7 @@ func TestHandler_Query_File(t *testing.T) {
 	h.ServeHTTP(w, r)
 	if w.Code != http.StatusOK {
 		t.Fatalf("unexpected status: %d", w.Code)
-	} else if body := strings.TrimSpace(w.Body.String()); body != `{"results":[{"series":[{"name":"series0"}]},{"series":[{"name":"series1"}]}]}` {
+	} else if body := strings.TrimSpace(w.Body.String()); body != `{"results":[{"statement_id":1,"series":[{"name":"series0"}]},{"statement_id":2,"series":[{"name":"series1"}]}]}` {
 		t.Fatalf("unexpected body: %s", body)
 	}
 }
@@ -141,7 +141,7 @@ func TestHandler_Query_Auth(t *testing.T) {
 	h.ServeHTTP(w, MustNewJSONRequest("GET", "/query?u=user1&p=abcd&db=foo&q=SELECT+*+FROM+bar", nil))
 	if w.Code != http.StatusOK {
 		t.Fatalf("unexpected status: %d: %s", w.Code, w.Body.String())
-	} else if body := strings.TrimSpace(w.Body.String()); body != `{"results":[{"series":[{"name":"series0"}]},{"series":[{"name":"series1"}]}]}` {
+	} else if body := strings.TrimSpace(w.Body.String()); body != `{"results":[{"statement_id":1,"series":[{"name":"series0"}]},{"statement_id":2,"series":[{"name":"series1"}]}]}` {
 		t.Fatalf("unexpected body: %s", body)
 	}
 
@@ -155,7 +155,7 @@ func TestHandler_Query_Auth(t *testing.T) {
 	h.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("unexpected status: %d: %s", w.Code, w.Body.String())
-	} else if body := strings.TrimSpace(w.Body.String()); body != `{"results":[{"series":[{"name":"series0"}]},{"series":[{"name":"series1"}]}]}` {
+	} else if body := strings.TrimSpace(w.Body.String()); body != `{"results":[{"statement_id":1,"series":[{"name":"series0"}]},{"statement_id":2,"series":[{"name":"series1"}]}]}` {
 		t.Fatalf("unexpected body: %s", body)
 	}
 
@@ -244,7 +244,7 @@ func TestHandler_Query_MergeResults(t *testing.T) {
 	h.ServeHTTP(w, MustNewJSONRequest("GET", "/query?db=foo&q=SELECT+*+FROM+bar", nil))
 	if w.Code != http.StatusOK {
 		t.Fatalf("unexpected status: %d", w.Code)
-	} else if body := strings.TrimSpace(w.Body.String()); body != `{"results":[{"series":[{"name":"series0"},{"name":"series1"}]}]}` {
+	} else if body := strings.TrimSpace(w.Body.String()); body != `{"results":[{"statement_id":1,"series":[{"name":"series0"},{"name":"series1"}]}]}` {
 		t.Fatalf("unexpected body: %s", body)
 	}
 }
@@ -262,7 +262,7 @@ func TestHandler_Query_MergeEmptyResults(t *testing.T) {
 	h.ServeHTTP(w, MustNewJSONRequest("GET", "/query?db=foo&q=SELECT+*+FROM+bar", nil))
 	if w.Code != http.StatusOK {
 		t.Fatalf("unexpected status: %d", w.Code)
-	} else if body := strings.TrimSpace(w.Body.String()); body != `{"results":[{"series":[{"name":"series1"}]}]}` {
+	} else if body := strings.TrimSpace(w.Body.String()); body != `{"results":[{"statement_id":1,"series":[{"name":"series1"}]}]}` {
 		t.Fatalf("unexpected body: %s", body)
 	}
 }
@@ -283,8 +283,8 @@ func TestHandler_Query_Chunked(t *testing.T) {
 	h.ServeHTTP(w, MustNewJSONRequest("GET", "/query?db=foo&q=SELECT+*+FROM+bar&chunked=true&chunk_size=2", nil))
 	if w.Code != http.StatusOK {
 		t.Fatalf("unexpected status: %d", w.Code)
-	} else if w.Body.String() != `{"results":[{"series":[{"name":"series0"}]}]}
-{"results":[{"series":[{"name":"series1"}]}]}
+	} else if w.Body.String() != `{"results":[{"statement_id":1,"series":[{"name":"series0"}]}]}
+{"results":[{"statement_id":1,"series":[{"name":"series1"}]}]}
 ` {
 		t.Fatalf("unexpected body: %s", w.Body.String())
 	}
@@ -435,7 +435,7 @@ func TestHandler_Query_ErrResult(t *testing.T) {
 	h.ServeHTTP(w, MustNewJSONRequest("GET", "/query?db=foo&q=SHOW+SERIES+from+bin", nil))
 	if w.Code != http.StatusOK {
 		t.Fatalf("unexpected status: %d", w.Code)
-	} else if body := strings.TrimSpace(w.Body.String()); body != `{"results":[{"error":"measurement not found"}]}` {
+	} else if body := strings.TrimSpace(w.Body.String()); body != `{"results":[{"statement_id":0,"error":"measurement not found"}]}` {
 		t.Fatalf("unexpected body: %s", body)
 	}
 }
@@ -593,9 +593,22 @@ func TestHandler_HandleBadRequestBody(t *testing.T) {
 	}
 }
 
-type invalidJSON struct{}
+// Ensure X-Forwarded-For header writes the correct log message.
+func TestHandler_XForwardedFor(t *testing.T) {
+	var buf bytes.Buffer
+	h := NewHandler(false)
+	h.CLFLogger = log.New(&buf, "", 0)
 
-func (*invalidJSON) MarshalJSON() ([]byte, error) { return nil, errors.New("marker") }
+	req := MustNewRequest("GET", "/query", nil)
+	req.Header.Set("X-Forwarded-For", "192.168.0.1")
+	req.RemoteAddr = "127.0.0.1"
+	h.ServeHTTP(httptest.NewRecorder(), req)
+
+	parts := strings.Split(buf.String(), " ")
+	if parts[0] != "192.168.0.1,127.0.0.1" {
+		t.Errorf("unexpected host ip address: %s", parts[0])
+	}
+}
 
 // NewHandler represents a test wrapper for httpd.Handler.
 type Handler struct {
@@ -687,21 +700,6 @@ func MustNewJSONRequest(method, urlStr string, body io.Reader) *http.Request {
 	r := MustNewRequest(method, urlStr, body)
 	r.Header.Set("Accept", "application/json")
 	return r
-}
-
-// matchRegex returns true if a s matches pattern.
-func matchRegex(pattern, s string) bool {
-	return regexp.MustCompile(pattern).MatchString(s)
-}
-
-// NewResultChan returns a channel that sends all results and then closes.
-func NewResultChan(results ...*influxql.Result) <-chan *influxql.Result {
-	ch := make(chan *influxql.Result, len(results))
-	for _, r := range results {
-		ch <- r
-	}
-	close(ch)
-	return ch
 }
 
 // MustJWTToken returns a new JWT token and signed string or panics trying.

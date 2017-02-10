@@ -3,7 +3,6 @@ package kapacitor
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/pkg/errors"
+	"github.com/uber-go/zap"
 )
 
 const (
@@ -28,7 +28,7 @@ type BatchNode struct {
 	idx int
 }
 
-func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode, l *log.Logger) (*BatchNode, error) {
+func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode, l zap.Logger) (*BatchNode, error) {
 	sn := &BatchNode{
 		node: node{Node: n, et: et, logger: l},
 		s:    n,
@@ -143,7 +143,7 @@ type QueryNode struct {
 	byName         bool
 }
 
-func newQueryNode(et *ExecutingTask, n *pipeline.QueryNode, l *log.Logger) (*QueryNode, error) {
+func newQueryNode(et *ExecutingTask, n *pipeline.QueryNode, l zap.Logger) (*QueryNode, error) {
 	bn := &QueryNode{
 		node:     node{Node: n, et: et, logger: l},
 		b:        n,
@@ -297,7 +297,7 @@ func (b *QueryNode) doQuery() error {
 			b.query.SetStopTime(stop)
 
 			qStr := b.query.String()
-			b.logger.Println("D! starting next batch query:", qStr)
+			b.logger.Debug("starting next batch query", zap.String("query", qStr))
 
 			// Execute query
 			q := influxdb.Query{
@@ -306,7 +306,7 @@ func (b *QueryNode) doQuery() error {
 			resp, err := con.Query(q)
 			if err != nil {
 				b.queryErrors.Add(1)
-				b.logger.Println("E!", err)
+				b.logger.Error("error performing query", zap.Error(err))
 				b.timer.Stop()
 				break
 			}
@@ -315,7 +315,7 @@ func (b *QueryNode) doQuery() error {
 			for _, res := range resp.Results {
 				batches, err := models.ResultToBatches(res, b.byName)
 				if err != nil {
-					b.logger.Println("E! failed to understand query result:", err)
+					b.logger.Error("failed to understand query result", zap.Error(err))
 					b.queryErrors.Add(1)
 					continue
 				}

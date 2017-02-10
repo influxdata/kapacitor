@@ -1,16 +1,17 @@
 package deadman
 
 import (
-	"log"
 	"time"
+
+	"github.com/uber-go/zap"
 )
 
 type Service struct {
 	c      Config
-	logger *log.Logger
+	logger zap.Logger
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, l zap.Logger) *Service {
 	return &Service{
 		c:      c,
 		logger: l,
@@ -39,7 +40,7 @@ func (s *Service) Global() bool {
 
 func (s *Service) Open() error {
 	if s.Global() {
-		s.logger.Println("I! Deadman's switch is configured globally")
+		s.logger.Info("Deadman's switch is configured globally")
 	}
 	return nil
 }

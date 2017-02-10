@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"log"
 	"math/rand"
 	"sync"
 	"time"
 
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/uber-go/zap"
 )
 
 // The type of a task
@@ -106,7 +106,7 @@ type ExecutingTask struct {
 	nodes    []Node
 	stopping chan struct{}
 	wg       sync.WaitGroup
-	logger   *log.Logger
+	logger   zap.Logger
 
 	// Mutex for throughput var
 	tmu        sync.RWMutex
@@ -115,7 +115,7 @@ type ExecutingTask struct {
 
 // Create a new  task from a defined kapacitor.
 func NewExecutingTask(tm *TaskMaster, t *Task) (*ExecutingTask, error) {
-	l := tm.LogService.NewLogger(fmt.Sprintf("[task:%s] ", t.ID), log.LstdFlags)
+	l := tm.logger.With(zap.String("task", t.ID))
 	et := &ExecutingTask{
 		tm:      tm,
 		Task:    t,
@@ -157,10 +157,7 @@ func (et *ExecutingTask) link() error {
 
 	// Walk Pipeline and create equivalent executing nodes
 	err := et.Task.Pipeline.Walk(func(n pipeline.Node) error {
-		l := et.tm.LogService.NewLogger(
-			fmt.Sprintf("[%s:%s] ", et.Task.ID, n.Name()),
-			log.LstdFlags,
-		)
+		l := et.logger.With(zap.String("node", n.Name()))
 		en, err := et.createNode(n, l)
 		if err != nil {
 			return err
@@ -438,7 +435,7 @@ func (et *ExecutingTask) calcThroughput() {
 }
 
 // Create a  node from a given pipeline node.
-func (et *ExecutingTask) createNode(p pipeline.Node, l *log.Logger) (n Node, err error) {
+func (et *ExecutingTask) createNode(p pipeline.Node, l zap.Logger) (n Node, err error) {
 	switch t := p.(type) {
 	case *pipeline.FromNode:
 		n, err = newFromNode(et, t, l)
@@ -538,7 +535,7 @@ func (et *ExecutingTask) runSnapshotter() {
 		case <-ticker.C:
 			snapshot, err := et.Snapshot()
 			if err != nil {
-				et.logger.Println("E! failed to snapshot task", et.Task.ID, err)
+				et.logger.Error(fmt.Sprintf("failed to snapshot task: %v", err), zap.String("task", et.Task.ID))
 				break
 			}
 			size := 0
@@ -549,7 +546,7 @@ func (et *ExecutingTask) runSnapshotter() {
 			if size > 0 {
 				err = et.tm.TaskStore.SaveSnapshot(et.Task.ID, snapshot)
 				if err != nil {
-					et.logger.Println("E! failed to save task snapshot", et.Task.ID, err)
+					et.logger.Error(fmt.Sprintf("failed to save task snapshot: %v", err), zap.String("task", et.Task.ID))
 				}
 			}
 		case <-et.stopping:

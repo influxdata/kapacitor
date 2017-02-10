@@ -4,12 +4,12 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"log"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/influxdata/kapacitor/alert"
+	"github.com/uber-go/zap"
 
 	"gopkg.in/gomail.v2"
 )
@@ -21,12 +21,12 @@ type Service struct {
 	configValue atomic.Value
 	mail        chan *gomail.Message
 	updates     chan bool
-	logger      *log.Logger
+	logger      zap.Logger
 	wg          sync.WaitGroup
 	opened      bool
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, l zap.Logger) *Service {
 	s := &Service{
 		updates: make(chan bool),
 		logger:  l,
@@ -42,8 +42,6 @@ func (s *Service) Open() error {
 		return nil
 	}
 	s.opened = true
-
-	s.logger.Println("I! Starting SMTP service")
 
 	s.mail = make(chan *gomail.Message)
 
@@ -63,8 +61,6 @@ func (s *Service) Close() error {
 		return nil
 	}
 	s.opened = false
-
-	s.logger.Println("I! Closing SMTP service")
 
 	close(s.mail)
 	s.wg.Wait()
@@ -140,7 +136,7 @@ func (s *Service) runMailer() {
 			// Close old connection
 			if conn != nil {
 				if err := conn.Close(); err != nil {
-					s.logger.Println("E! error closing connection to old SMTP server:", err)
+					s.logger.Error("error closing connection to old SMTP server", zap.Error(err))
 				}
 				conn = nil
 			}
@@ -153,20 +149,20 @@ func (s *Service) runMailer() {
 			}
 			if !open {
 				if conn, err = d.Dial(); err != nil {
-					s.logger.Println("E! error connecting to SMTP server", err)
+					s.logger.Error("error connecting to SMTP server", zap.Error(err))
 					break
 				}
 				open = true
 			}
 			if err := gomail.Send(conn, m); err != nil {
-				s.logger.Println("E!", err)
+				s.logger.Error("error sending mail", zap.Error(err))
 			}
 		// Close the connection to the SMTP server if no email was sent in
 		// the last IdleTimeout duration.
 		case <-timer.C:
 			if open {
 				if err := conn.Close(); err != nil {
-					s.logger.Println("E! error closing connection to SMTP server:", err)
+					s.logger.Error("error closing connection to SMTP server", zap.Error(err))
 				}
 				open = false
 			}
@@ -238,10 +234,10 @@ type HandlerConfig struct {
 type handler struct {
 	s      *Service
 	c      HandlerConfig
-	logger *log.Logger
+	logger zap.Logger
 }
 
-func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+func (s *Service) Handler(c HandlerConfig, l zap.Logger) alert.Handler {
 	return &handler{
 		s:      s,
 		c:      c,
@@ -255,6 +251,6 @@ func (h *handler) Handle(event alert.Event) {
 		event.State.Message,
 		event.State.Details,
 	); err != nil {
-		h.logger.Println("E! failed to send email", err)
+		h.logger.Error("failed to send email", zap.Error(err))
 	}
 }

@@ -2,13 +2,13 @@
 package reporting
 
 import (
-	"log"
 	"runtime"
 	"sync"
 	"time"
 
 	"github.com/influxdata/kapacitor/vars"
 	client "github.com/influxdata/usage-client/v1"
+	"github.com/uber-go/zap"
 )
 
 const reportingInterval = time.Hour * 12
@@ -28,11 +28,11 @@ type Service struct {
 	statsTicker *time.Ticker
 	usageTicker *time.Ticker
 	closing     chan struct{}
-	logger      *log.Logger
+	logger      zap.Logger
 	wg          sync.WaitGroup
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, l zap.Logger) *Service {
 	client := client.New("")
 	client.URL = c.URL
 	return &Service{
@@ -65,7 +65,7 @@ func (s *Service) Open() error {
 		defer s.wg.Done()
 		err := s.sendUsageReport()
 		if err != nil {
-			s.logger.Println("E! error while sending usage report on startup:", err)
+			s.logger.Error("error while sending usage report on startup", zap.Error(err))
 		}
 	}()
 
@@ -101,7 +101,7 @@ func (s *Service) usage() {
 		case <-s.usageTicker.C:
 			err := s.sendUsageReport()
 			if err != nil {
-				s.logger.Println("E! error while sending usage report:", err)
+				s.logger.Error("error while sending usage report", zap.Error(err))
 			}
 		}
 	}

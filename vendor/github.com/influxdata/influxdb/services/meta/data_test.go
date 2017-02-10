@@ -1,56 +1,111 @@
-package meta
+package meta_test
 
 import (
 	"reflect"
-	"sort"
+	"testing"
 	"time"
 
-	"testing"
+	"github.com/influxdata/influxdb/influxql"
+
+	"github.com/influxdata/influxdb/services/meta"
 )
 
-func Test_newShardOwner(t *testing.T) {
-	// An error is returned if there are no data nodes available.
-	_, err := NewShardOwner(ShardInfo{}, map[int]int{})
-	if err == nil {
-		t.Error("got no error, but expected one")
+func Test_Data_DropDatabase(t *testing.T) {
+	data := &meta.Data{
+		Databases: []meta.DatabaseInfo{
+			{Name: "db0"},
+			{Name: "db1"},
+			{Name: "db2"},
+			{Name: "db4"},
+			{Name: "db5"},
+		},
+		Users: []meta.UserInfo{
+			{Name: "user1", Privileges: map[string]influxql.Privilege{"db1": influxql.ReadPrivilege, "db2": influxql.ReadPrivilege}},
+			{Name: "user2", Privileges: map[string]influxql.Privilege{"db2": influxql.ReadPrivilege}},
+		},
 	}
 
-	ownerFreqs := map[int]int{1: 15, 2: 11, 3: 12}
-	id, err := NewShardOwner(ShardInfo{ID: 4}, ownerFreqs)
+	// Dropping the first database removes it from the Data object.
+	expDbs := make([]meta.DatabaseInfo, 4)
+	copy(expDbs, data.Databases[1:])
+	if err := data.DropDatabase("db0"); err != nil {
+		t.Fatal(err)
+	} else if got, exp := data.Databases, expDbs; !reflect.DeepEqual(got, exp) {
+		t.Fatalf("got %v, expected %v", got, exp)
+	}
+
+	// Dropping a middle database removes it from the data object.
+	expDbs = []meta.DatabaseInfo{{Name: "db1"}, {Name: "db2"}, {Name: "db5"}}
+	if err := data.DropDatabase("db4"); err != nil {
+		t.Fatal(err)
+	} else if got, exp := data.Databases, expDbs; !reflect.DeepEqual(got, exp) {
+		t.Fatalf("got %v, expected %v", got, exp)
+	}
+
+	// Dropping the last database removes it from the data object.
+	expDbs = []meta.DatabaseInfo{{Name: "db1"}, {Name: "db2"}}
+	if err := data.DropDatabase("db5"); err != nil {
+		t.Fatal(err)
+	} else if got, exp := data.Databases, expDbs; !reflect.DeepEqual(got, exp) {
+		t.Fatalf("got %v, expected %v", got, exp)
+	}
+
+	// Dropping a database also drops all the user privileges associated with
+	// it.
+	expUsers := []meta.UserInfo{
+		{Name: "user1", Privileges: map[string]influxql.Privilege{"db1": influxql.ReadPrivilege}},
+		{Name: "user2", Privileges: map[string]influxql.Privilege{}},
+	}
+	if err := data.DropDatabase("db2"); err != nil {
+		t.Fatal(err)
+	} else if got, exp := data.Users, expUsers; !reflect.DeepEqual(got, exp) {
+		t.Fatalf("got %v, expected %v", got, exp)
+	}
+}
+
+func Test_Data_CreateRetentionPolicy(t *testing.T) {
+	data := meta.Data{}
+
+	err := data.CreateDatabase("foo")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// The ID that owns the fewest shards is returned.
-	if got, exp := id, uint64(2); got != exp {
-		t.Errorf("got id %d, expected id %d", got, exp)
+	err = data.CreateRetentionPolicy("foo", &meta.RetentionPolicyInfo{
+		Name:     "bar",
+		ReplicaN: 1,
+		Duration: 24 * time.Hour,
+	}, false)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	// The ownership frequencies are updated.
-	if got, exp := ownerFreqs, map[int]int{1: 15, 2: 12, 3: 12}; !reflect.DeepEqual(got, exp) {
-		t.Errorf("got owner frequencies %v, expected %v", got, exp)
-	}
-}
-
-func TestShardGroupSort(t *testing.T) {
-	sg1 := ShardGroupInfo{
-		ID:          1,
-		StartTime:   time.Unix(1000, 0),
-		EndTime:     time.Unix(1100, 0),
-		TruncatedAt: time.Unix(1050, 0),
+	rp, err := data.RetentionPolicy("foo", "bar")
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	sg2 := ShardGroupInfo{
-		ID:        2,
-		StartTime: time.Unix(1000, 0),
-		EndTime:   time.Unix(1100, 0),
+	if rp == nil {
+		t.Fatal("creation of retention policy failed")
 	}
 
-	sgs := ShardGroupInfos{sg2, sg1}
+	// Try to recreate the same RP with default set to true, should fail
+	err = data.CreateRetentionPolicy("foo", &meta.RetentionPolicyInfo{
+		Name:     "bar",
+		ReplicaN: 1,
+		Duration: 24 * time.Hour,
+	}, true)
+	if err == nil || err != meta.ErrRetentionPolicyConflict {
+		t.Fatalf("unexpected error.  got: %v, exp: %s", err, meta.ErrRetentionPolicyConflict)
+	}
 
-	sort.Sort(sgs)
-
-	if sgs[len(sgs)-1].ID != 2 {
-		t.Fatal("unstable sort for ShardGroupInfos")
+	// Creating the same RP with the same specifications should succeed
+	err = data.CreateRetentionPolicy("foo", &meta.RetentionPolicyInfo{
+		Name:     "bar",
+		ReplicaN: 1,
+		Duration: 24 * time.Hour,
+	}, false)
+	if err != nil {
+		t.Fatal(err)
 	}
 }

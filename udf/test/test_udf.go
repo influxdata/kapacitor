@@ -3,9 +3,9 @@ package udf_test
 import (
 	"bufio"
 	"io"
-	"log"
 
 	"github.com/influxdata/kapacitor/udf"
+	"github.com/uber-go/zap"
 )
 
 // IO implements a UDF process communication.
@@ -121,10 +121,10 @@ func (o *IO) Out() udf.ByteReadReader {
 type UDF struct {
 	*udf.Server
 	uio    *IO
-	logger *log.Logger
+	logger zap.Logger
 }
 
-func New(uio *IO, l *log.Logger) *UDF {
+func New(uio *IO, l zap.Logger) *UDF {
 	return &UDF{
 		uio:    uio,
 		logger: l,

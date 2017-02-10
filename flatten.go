@@ -2,13 +2,13 @@ package kapacitor
 
 import (
 	"bytes"
-	"log"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/uber-go/zap"
 )
 
 type FlattenNode struct {
@@ -19,7 +19,7 @@ type FlattenNode struct {
 }
 
 // Create a new FlattenNode, which takes pairs from parent streams combines them into a single point.
-func newFlattenNode(et *ExecutingTask, n *pipeline.FlattenNode, l *log.Logger) (*FlattenNode, error) {
+func newFlattenNode(et *ExecutingTask, n *pipeline.FlattenNode, l zap.Logger) (*FlattenNode, error) {
 	fn := &FlattenNode{
 		f:    n,
 		node: node{Node: n, et: et, logger: l},
@@ -184,7 +184,7 @@ POINTS:
 				fieldPrefix.WriteString(v)
 				fieldPrefix.WriteString(n.f.Delimiter)
 			} else {
-				n.logger.Printf("E! point missing tag %q for flatten operation", tag)
+				n.logger.Error("point missing tag for flatten operation", zap.String("tag", tag))
 				continue POINTS
 			}
 		}

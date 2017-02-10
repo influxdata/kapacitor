@@ -7,19 +7,19 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"sync/atomic"
 
 	"github.com/influxdata/kapacitor/alert"
+	"github.com/uber-go/zap"
 )
 
 type Service struct {
 	configValue atomic.Value
-	logger      *log.Logger
+	logger      zap.Logger
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, l zap.Logger) *Service {
 	s := &Service{
 		logger: l,
 	}
@@ -121,10 +121,10 @@ func (s *Service) preparePost(title, text string) (string, io.Reader, error) {
 
 type handler struct {
 	s      *Service
-	logger *log.Logger
+	logger zap.Logger
 }
 
-func (s *Service) Handler(l *log.Logger) alert.Handler {
+func (s *Service) Handler(l zap.Logger) alert.Handler {
 	return &handler{
 		s:      s,
 		logger: l,
@@ -136,6 +136,6 @@ func (h *handler) Handle(event alert.Event) {
 		event.State.ID,
 		event.State.Message,
 	); err != nil {
-		h.logger.Println("E! failed to send event to Talk", err)
+		h.logger.Error("failed to send event to Talk", zap.Error(err))
 	}
 }

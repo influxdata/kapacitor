@@ -2,11 +2,11 @@ package kapacitor
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick/stateful"
+	"github.com/uber-go/zap"
 )
 
 type StreamNode struct {
@@ -15,7 +15,7 @@ type StreamNode struct {
 }
 
 // Create a new  StreamNode which copies all data to children
-func newStreamNode(et *ExecutingTask, n *pipeline.StreamNode, l *log.Logger) (*StreamNode, error) {
+func newStreamNode(et *ExecutingTask, n *pipeline.StreamNode, l zap.Logger) (*StreamNode, error) {
 	sn := &StreamNode{
 		node: node{Node: n, et: et, logger: l},
 		s:    n,
@@ -49,7 +49,7 @@ type FromNode struct {
 }
 
 // Create a new  FromNode which filters data from a source.
-func newFromNode(et *ExecutingTask, n *pipeline.FromNode, l *log.Logger) (*FromNode, error) {
+func newFromNode(et *ExecutingTask, n *pipeline.FromNode, l zap.Logger) (*FromNode, error) {
 	sn := &FromNode{
 		node: node{Node: n, et: et, logger: l},
 		s:    n,
@@ -114,7 +114,7 @@ func (s *FromNode) matches(p models.Point) bool {
 	}
 	if s.expression != nil {
 		if pass, err := EvalPredicate(s.expression, s.scopePool, p.Time, p.Fields, p.Tags); err != nil {
-			s.logger.Println("E! error while evaluating WHERE expression:", err)
+			s.logger.Error("error while evaluating WHERE expression", zap.Error(err))
 			return false
 		} else {
 			return pass

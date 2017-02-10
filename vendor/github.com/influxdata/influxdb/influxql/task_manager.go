@@ -2,12 +2,11 @@ package influxql
 
 import (
 	"fmt"
-	"io/ioutil"
-	"log"
 	"sync"
 	"time"
 
 	"github.com/influxdata/influxdb/models"
+	"go.uber.org/zap"
 )
 
 const (
@@ -30,7 +29,7 @@ type TaskManager struct {
 
 	// Logger to use for all logging.
 	// Defaults to discarding all log output.
-	Logger *log.Logger
+	Logger zap.Logger
 
 	// Used for managing and tracking running queries.
 	queries  map[uint64]*QueryTask
@@ -43,7 +42,7 @@ type TaskManager struct {
 func NewTaskManager() *TaskManager {
 	return &TaskManager{
 		QueryTimeout: DefaultQueryTimeout,
-		Logger:       log.New(ioutil.Discard, "[query] ", log.LstdFlags),
+		Logger:       zap.New(zap.NullEncoder()),
 		queries:      make(map[uint64]*QueryTask),
 		nextID:       1,
 	}
@@ -95,15 +94,16 @@ func (t *TaskManager) executeShowQueriesStatement(q *ShowQueriesStatement) (mode
 	for id, qi := range t.queries {
 		d := now.Sub(qi.startTime)
 
-		var ds string
-		if d == 0 {
-			ds = "0s"
-		} else if d < time.Second {
-			ds = fmt.Sprintf("%du", d)
-		} else {
-			ds = (d - (d % time.Second)).String()
+		switch {
+		case d >= time.Second:
+			d = d - (d % time.Second)
+		case d >= time.Millisecond:
+			d = d - (d % time.Millisecond)
+		case d >= time.Microsecond:
+			d = d - (d % time.Microsecond)
 		}
-		values = append(values, []interface{}{id, qi.query, qi.database, ds})
+
+		values = append(values, []interface{}{id, qi.query, qi.database, d.String()})
 	}
 
 	return []*models.Row{{
@@ -135,7 +135,7 @@ func (t *TaskManager) AttachQuery(q *Query, database string, interrupt <-chan st
 	}
 
 	if t.MaxConcurrentQueries > 0 && len(t.queries) >= t.MaxConcurrentQueries {
-		return 0, nil, ErrMaxConcurrentQueriesReached
+		return 0, nil, ErrMaxConcurrentQueriesLimitExceeded(len(t.queries), t.MaxConcurrentQueries)
 	}
 
 	qid := t.nextID
@@ -156,8 +156,8 @@ func (t *TaskManager) AttachQuery(q *Query, database string, interrupt <-chan st
 
 			select {
 			case <-timer.C:
-				t.Logger.Printf("Detected slow query: %s (qid: %d, database: %s, threshold: %s)",
-					query.query, qid, query.database, t.LogQueriesAfter)
+				t.Logger.Warn(fmt.Sprintf("Detected slow query: %s (qid: %d, database: %s, threshold: %s)",
+					query.query, qid, query.database, t.LogQueriesAfter))
 			case <-closing:
 			}
 			return nil
@@ -239,7 +239,7 @@ func (t *TaskManager) waitForQuery(qid uint64, interrupt <-chan struct{}, closin
 		if !ok {
 			break
 		}
-		query.setError(ErrQueryTimeoutReached)
+		query.setError(ErrQueryTimeoutLimitExceeded)
 	case <-interrupt:
 		// Query was manually closed so exit the select.
 		return

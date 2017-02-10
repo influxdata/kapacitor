@@ -2,7 +2,6 @@ package httpdtest
 
 import (
 	"expvar"
-	"log"
 	"net/http/httptest"
 
 	"github.com/influxdata/kapacitor/services/httpd"
@@ -25,7 +24,7 @@ func NewServer(verbose bool) *Server {
 			verbose,
 			false,
 			statMap,
-			ls.NewLogger("[httpdtest] ", log.LstdFlags),
+			ls.Root(),
 			ls,
 			"",
 		),

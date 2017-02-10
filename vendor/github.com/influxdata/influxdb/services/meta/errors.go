@@ -22,6 +22,9 @@ var (
 
 	// ErrDatabaseNameRequired is returned when creating a database without a name.
 	ErrDatabaseNameRequired = errors.New("database name required")
+
+	// ErrInvalidName is returned when attempting to create a database or retention policy with an invalid name
+	ErrInvalidName = errors.New("invalid name")
 )
 
 var (
@@ -48,8 +51,7 @@ var (
 
 	// ErrRetentionPolicyDurationTooLow is returned when updating a retention
 	// policy that has a duration lower than the allowed minimum.
-	ErrRetentionPolicyDurationTooLow = errors.New(fmt.Sprintf("retention policy duration must be at least %s",
-		MinRetentionPolicyDuration))
+	ErrRetentionPolicyDurationTooLow = fmt.Errorf("retention policy duration must be at least %s", MinRetentionPolicyDuration)
 
 	// ErrRetentionPolicyConflict is returned when creating a retention policy conflicts
 	// with an existing policy.
@@ -92,6 +94,11 @@ var (
 	// ErrSubscriptionNotFound is returned when removing a subscription that doesn't exist.
 	ErrSubscriptionNotFound = errors.New("subscription not found")
 )
+
+// ErrInvalidSubscriptionURL is returned when the subscription's destination URL is invalid.
+func ErrInvalidSubscriptionURL(url string) error {
+	return fmt.Errorf("invalid subscription URL: %s", url)
+}
 
 var (
 	// ErrUserExists is returned when creating an already existing user.

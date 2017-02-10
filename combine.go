@@ -2,13 +2,13 @@ package kapacitor
 
 import (
 	"fmt"
-	"log"
 	"sort"
 	"time"
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick/stateful"
+	"github.com/uber-go/zap"
 )
 
 type CombineNode struct {
@@ -23,7 +23,7 @@ type CombineNode struct {
 }
 
 // Create a new CombineNode, which combines a stream with itself dynamically.
-func newCombineNode(et *ExecutingTask, n *pipeline.CombineNode, l *log.Logger) (*CombineNode, error) {
+func newCombineNode(et *ExecutingTask, n *pipeline.CombineNode, l zap.Logger) (*CombineNode, error) {
 	cn := &CombineNode{
 		c:                  n,
 		node:               node{Node: n, et: et, logger: l},
@@ -180,7 +180,7 @@ func (n *CombineNode) combineBuffer(buf *buffer) error {
 		for i := range expressions {
 			matched, err := EvalPredicate(expressions[i], n.scopePools[i], p.Time, p.Fields, p.Tags)
 			if err != nil {
-				n.logger.Println("E! evaluating lambda expression:", err)
+				n.logger.Error("evaluating lambda expression", zap.Error(err))
 			}
 			matches[i][idx] = matched
 		}

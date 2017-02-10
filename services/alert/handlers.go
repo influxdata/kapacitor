@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -17,6 +16,7 @@ import (
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/bufpool"
 	"github.com/influxdata/kapacitor/command"
+	"github.com/uber-go/zap"
 )
 
 // AlertData is a structure that contains relevant data about an alert event.
@@ -64,7 +64,7 @@ func (c LogHandlerConfig) Validate() error {
 type logHandler struct {
 	logpath string
 	mode    os.FileMode
-	logger  *log.Logger
+	logger  zap.Logger
 }
 
 func DefaultLogHandlerConfig() LogHandlerConfig {
@@ -73,7 +73,7 @@ func DefaultLogHandlerConfig() LogHandlerConfig {
 	}
 }
 
-func NewLogHandler(c LogHandlerConfig, l *log.Logger) (alert.Handler, error) {
+func NewLogHandler(c LogHandlerConfig, l zap.Logger) (alert.Handler, error) {
 	if err := c.Validate(); err != nil {
 		return nil, err
 	}
@@ -89,14 +89,14 @@ func (h *logHandler) Handle(event alert.Event) {
 
 	f, err := os.OpenFile(h.logpath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, h.mode)
 	if err != nil {
-		h.logger.Printf("E! failed to open file %s for alert logging: %v", h.logpath, err)
+		h.logger.Error(fmt.Sprintf("failed to open file for alert logging: %v", err), zap.String("file", h.logpath))
 		return
 	}
 	defer f.Close()
 
 	err = json.NewEncoder(f).Encode(ad)
 	if err != nil {
-		h.logger.Printf("E! failed to marshal alert data json: %v", err)
+		h.logger.Error("failed to marshal alert data json", zap.Error(err))
 	}
 }
 
@@ -110,10 +110,10 @@ type execHandler struct {
 	bp        *bufpool.Pool
 	s         command.Spec
 	commander command.Commander
-	logger    *log.Logger
+	logger    zap.Logger
 }
 
-func NewExecHandler(c ExecHandlerConfig, l *log.Logger) alert.Handler {
+func NewExecHandler(c ExecHandlerConfig, l zap.Logger) alert.Handler {
 	s := command.Spec{
 		Prog: c.Prog,
 		Args: c.Args,
@@ -133,7 +133,7 @@ func (h *execHandler) Handle(event alert.Event) {
 
 	err := json.NewEncoder(buf).Encode(ad)
 	if err != nil {
-		h.logger.Printf("E! failed to marshal alert data json: %v", err)
+		h.logger.Error("failed to marshal alert data json", zap.Error(err))
 		return
 	}
 
@@ -144,12 +144,12 @@ func (h *execHandler) Handle(event alert.Event) {
 	cmd.Stderr(&out)
 	err = cmd.Start()
 	if err != nil {
-		h.logger.Printf("E! exec command failed: Output: %s: %v", out.String(), err)
+		h.logger.Error(fmt.Sprintf("exec command failed: Output: %s: %v", out.String(), err))
 		return
 	}
 	err = cmd.Wait()
 	if err != nil {
-		h.logger.Printf("E! exec command failed: Output: %s: %v", out.String(), err)
+		h.logger.Error(fmt.Sprintf("exec command failed: Output: %s: %v", out.String(), err))
 		return
 	}
 }
@@ -161,10 +161,10 @@ type TCPHandlerConfig struct {
 type tcpHandler struct {
 	bp     *bufpool.Pool
 	addr   string
-	logger *log.Logger
+	logger zap.Logger
 }
 
-func NewTCPHandler(c TCPHandlerConfig, l *log.Logger) alert.Handler {
+func NewTCPHandler(c TCPHandlerConfig, l zap.Logger) alert.Handler {
 	return &tcpHandler{
 		bp:     bufpool.New(),
 		addr:   c.Address,
@@ -179,13 +179,13 @@ func (h *tcpHandler) Handle(event alert.Event) {
 
 	err := json.NewEncoder(buf).Encode(ad)
 	if err != nil {
-		h.logger.Printf("E! failed to marshal alert data json: %v", err)
+		h.logger.Error("failed to marshal alert data json", zap.Error(err))
 		return
 	}
 
 	conn, err := net.Dial("tcp", h.addr)
 	if err != nil {
-		h.logger.Printf("E! failed to connect to %s: %v", h.addr, err)
+		h.logger.Error(fmt.Sprintf("failed to connect to tcp endpoint: %v", err), zap.String("address", h.addr))
 		return
 	}
 	defer conn.Close()
@@ -201,10 +201,10 @@ type PostHandlerConfig struct {
 type postHandler struct {
 	bp     *bufpool.Pool
 	url    string
-	logger *log.Logger
+	logger zap.Logger
 }
 
-func NewPostHandler(c PostHandlerConfig, l *log.Logger) alert.Handler {
+func NewPostHandler(c PostHandlerConfig, l zap.Logger) alert.Handler {
 	return &postHandler{
 		bp:     bufpool.New(),
 		url:    c.URL,
@@ -219,13 +219,13 @@ func (h *postHandler) Handle(event alert.Event) {
 
 	err := json.NewEncoder(body).Encode(ad)
 	if err != nil {
-		h.logger.Printf("E! failed to marshal alert data json: %v", err)
+		h.logger.Error("failed to marshal alert data json", zap.Error(err))
 		return
 	}
 
 	resp, err := http.Post(h.url, "application/json", body)
 	if err != nil {
-		h.logger.Printf("E! failed to POST alert data: %v", err)
+		h.logger.Error("failed to POST alert data", zap.Error(err))
 		return
 	}
 	resp.Body.Close()
@@ -239,14 +239,14 @@ type aggregateHandler struct {
 	interval time.Duration
 	next     alert.Handler
 
-	logger  *log.Logger
+	logger  zap.Logger
 	events  chan alert.Event
 	closing chan struct{}
 
 	wg sync.WaitGroup
 }
 
-func NewAggregateHandler(c AggregateHandlerConfig, l *log.Logger) handlerAction {
+func NewAggregateHandler(c AggregateHandlerConfig, l zap.Logger) handlerAction {
 	h := &aggregateHandler{
 		interval: time.Duration(c.Interval),
 		logger:   l,
@@ -324,10 +324,10 @@ type PublishHandlerConfig struct {
 }
 type publishHandler struct {
 	c      PublishHandlerConfig
-	logger *log.Logger
+	logger zap.Logger
 }
 
-func NewPublishHandler(c PublishHandlerConfig, l *log.Logger) alert.Handler {
+func NewPublishHandler(c PublishHandlerConfig, l zap.Logger) alert.Handler {
 	return &publishHandler{
 		c:      c,
 		logger: l,
@@ -347,11 +347,11 @@ type StateChangesOnlyHandlerConfig struct {
 
 type stateChangesOnlyHandler struct {
 	topics *alert.Topics
-	logger *log.Logger
+	logger zap.Logger
 	next   alert.Handler
 }
 
-func NewStateChangesOnlyHandler(c StateChangesOnlyHandlerConfig, l *log.Logger) handlerAction {
+func NewStateChangesOnlyHandler(c StateChangesOnlyHandlerConfig, l zap.Logger) handlerAction {
 	return &stateChangesOnlyHandler{
 		topics: c.topics,
 		logger: l,

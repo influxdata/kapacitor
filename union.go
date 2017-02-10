@@ -1,11 +1,11 @@
 package kapacitor
 
 import (
-	"log"
 	"time"
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/uber-go/zap"
 )
 
 type UnionNode struct {
@@ -22,7 +22,7 @@ type UnionNode struct {
 
 // Create a new  UnionNode which combines all parent data streams into a single stream.
 // No transformation of any kind is performed.
-func newUnionNode(et *ExecutingTask, n *pipeline.UnionNode, l *log.Logger) (*UnionNode, error) {
+func newUnionNode(et *ExecutingTask, n *pipeline.UnionNode, l zap.Logger) (*UnionNode, error) {
 	un := &UnionNode{
 		u:    n,
 		node: node{Node: n, et: et, logger: l},

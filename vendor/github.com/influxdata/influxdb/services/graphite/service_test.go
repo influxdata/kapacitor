@@ -3,8 +3,8 @@ package graphite
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -13,10 +13,13 @@ import (
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/influxdb/toml"
+	"go.uber.org/zap"
 )
 
 func Test_Service_OpenClose(t *testing.T) {
-	c := Config{BindAddress: ":35422"}
+	// Let the OS assign a random port since we are only opening and closing the service,
+	// not actually connecting to it.
+	c := Config{BindAddress: "127.0.0.1:0"}
 	service := NewTestService(&c)
 
 	// Closing a closed service is fine.
@@ -271,7 +274,7 @@ func NewTestService(c *Config) *TestService {
 		MetaClient: &internal.MetaClientMock{},
 	}
 
-	service.MetaClient.CreateRetentionPolicyFn = func(string, *meta.RetentionPolicySpec) (*meta.RetentionPolicyInfo, error) {
+	service.MetaClient.CreateRetentionPolicyFn = func(string, *meta.RetentionPolicySpec, bool) (*meta.RetentionPolicyInfo, error) {
 		return nil, nil
 	}
 
@@ -287,8 +290,11 @@ func NewTestService(c *Config) *TestService {
 		return nil, nil
 	}
 
-	if !testing.Verbose() {
-		service.Service.SetLogOutput(ioutil.Discard)
+	if testing.Verbose() {
+		service.Service.WithLogger(zap.New(
+			zap.NewTextEncoder(),
+			zap.Output(os.Stderr),
+		))
 	}
 
 	// Set the Meta Client and PointsWriter.

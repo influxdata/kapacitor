@@ -3,11 +3,11 @@ package kapacitor
 import (
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/uber-go/zap"
 )
 
 type WindowNode struct {
@@ -16,7 +16,7 @@ type WindowNode struct {
 }
 
 // Create a new  WindowNode, which windows data for a period of time and emits the window.
-func newWindowNode(et *ExecutingTask, n *pipeline.WindowNode, l *log.Logger) (*WindowNode, error) {
+func newWindowNode(et *ExecutingTask, n *pipeline.WindowNode, l zap.Logger) (*WindowNode, error) {
 	wn := &WindowNode{
 		w:    n,
 		node: node{Node: n, et: et, logger: l},
@@ -99,7 +99,7 @@ type windowByTime struct {
 	group    models.GroupID
 	byName   bool
 	tags     map[string]string
-	logger   *log.Logger
+	logger   zap.Logger
 }
 
 func newWindowByTime(
@@ -112,7 +112,7 @@ func newWindowByTime(
 	byName,
 	fillPeriod bool,
 	tags models.Tags,
-	logger *log.Logger,
+	logger zap.Logger,
 
 ) *windowByTime {
 	// Determine first nextEmit time.
@@ -206,7 +206,7 @@ type windowTimeBuffer struct {
 	start  int
 	stop   int
 	size   int
-	logger *log.Logger
+	logger zap.Logger
 }
 
 // Insert a single point into the buffer.
@@ -330,7 +330,7 @@ type windowByCount struct {
 	size     int
 	count    int
 
-	logger *log.Logger
+	logger zap.Logger
 }
 
 func newWindowByCount(
@@ -341,7 +341,7 @@ func newWindowByCount(
 	period,
 	every int,
 	fillPeriod bool,
-	logger *log.Logger) *windowByCount {
+	logger zap.Logger) *windowByCount {
 	// Determine the first nextEmit index
 	nextEmit := every
 	if fillPeriod {

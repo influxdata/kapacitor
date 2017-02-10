@@ -1,54 +1,66 @@
 package logging
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"os"
 	"path"
+	"strings"
+	"sync"
 
-	"github.com/influxdata/wlog"
-)
+	"github.com/uber-go/zap"
 
-type Level wlog.Level
-
-const (
-	_ Level = iota
-	DEBUG
-	INFO
-	WARN
-	ERROR
-	OFF
+	zaplogfmt "github.com/jsternberg/zap-logfmt"
 )
 
 // Interface for creating new loggers
 type Interface interface {
-	NewLogger(prefix string, flag int) *log.Logger
-	NewRawLogger(prefix string, flag int) *log.Logger
-	NewStaticLevelLogger(prefix string, flag int, l Level) *log.Logger
-	NewStaticLevelWriter(l Level) io.Writer
+	Root() zap.Logger
+	Writer() io.Writer
+	SetLevel(level string) error
 }
 
 type Service struct {
-	f      io.WriteCloser
+	root   zap.Logger
 	c      Config
-	stdout io.Writer
-	stderr io.Writer
+	stdout WriteSyncer
+	stderr WriteSyncer
+	writer io.Writer
+	closer io.Closer
+	level  zap.AtomicLevel
+
+	wg sync.WaitGroup
+
+	closing chan struct{}
+	subs    chan subAction
+	entries chan entry
 }
 
-func NewService(c Config, stdout, stderr io.Writer) *Service {
+type WriteSyncer interface {
+	io.Writer
+	Sync() error
+}
+
+func NewService(c Config, stdout, stderr WriteSyncer) *Service {
 	return &Service{
-		c:      c,
-		stdout: stdout,
-		stderr: stderr,
+		c:       c,
+		stdout:  stdout,
+		stderr:  stderr,
+		level:   zap.DynamicLevel(),
+		entries: make(chan entry, 5000),
+		closing: make(chan struct{}),
+		subs:    make(chan subAction),
 	}
 }
 
 func (s *Service) Open() error {
+	var output WriteSyncer
 	switch s.c.File {
 	case "STDERR":
-		s.f = &nopCloser{f: s.stderr}
+		output = s.stderr
 	case "STDOUT":
-		s.f = &nopCloser{f: s.stdout}
+		output = s.stdout
 	default:
 		dir := path.Dir(s.c.File)
 		if _, err := os.Stat(dir); os.IsNotExist(err) {
@@ -62,44 +74,114 @@ func (s *Service) Open() error {
 		if err != nil {
 			return err
 		}
-		s.f = f
+		output = f
+		s.closer = f
+	}
+	s.writer = output
+
+	// Set level from configuration
+	if err := s.SetLevel(s.c.Level); err != nil {
+		return err
 	}
 
-	// Configure default logger
+	var encoder zap.Encoder
+	switch s.c.Encoding {
+	case "logfmt":
+		encoder = zaplogfmt.NewEncoder()
+	case "text":
+		encoder = zap.NewTextEncoder()
+	default:
+		return fmt.Errorf("unknown log encoding %s", s.c.Encoding)
+	}
+
+	// Start  doSubscriptions goroutine
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		s.doSubscriptions()
+	}()
+
+	// Create root logger
+	s.root = zap.New(
+		newTeeEncoder([2]zap.Encoder{newChanEncoder(s.entries), encoder}),
+		zap.Output(output),
+		s.level,
+	)
+
+	// Configure default logger, should not be used.
 	log.SetPrefix("[log] ")
 	log.SetFlags(log.LstdFlags)
-	log.SetOutput(wlog.NewWriter(s.f))
+	log.SetOutput(output)
 
-	wlog.SetLevelFromName(s.c.Level)
 	return nil
 }
 
 func (s *Service) Close() error {
-	if s.f != nil {
-		return s.f.Close()
+	if s.closer != nil {
+		return s.closer.Close()
+	}
+	close(s.closing)
+	s.wg.Wait()
+	return nil
+}
+
+func (s *Service) Root() zap.Logger {
+	return s.root
+}
+
+func (s *Service) Writer() io.Writer {
+	return s.writer
+}
+
+func (s *Service) SetLevel(level string) error {
+	log.Println("setting log level", level)
+	switch strings.ToUpper(level) {
+	case "DEBUG":
+		s.level.SetLevel(zap.DebugLevel)
+	case "INFO":
+		s.level.SetLevel(zap.InfoLevel)
+	case "WARN":
+		s.level.SetLevel(zap.WarnLevel)
+	case "ERROR":
+		s.level.SetLevel(zap.ErrorLevel)
+	default:
+		return fmt.Errorf("unknown logging level %s", level)
 	}
 	return nil
 }
 
-func (s *Service) NewLogger(prefix string, flag int) *log.Logger {
-	return wlog.New(s.f, prefix, flag)
+func (s *Service) Subscribe(level zap.Level, match map[string]interface{}) *Subscription {
+	return nil
 }
 
-func (s *Service) NewRawLogger(prefix string, flag int) *log.Logger {
-	return log.New(s.f, prefix, flag)
+type subAction struct {
+	Add          bool
+	Subscription *Subscription
 }
 
-func (s *Service) NewStaticLevelLogger(prefix string, flag int, l Level) *log.Logger {
-	return log.New(wlog.NewStaticLevelWriter(s.f, wlog.Level(l)), prefix, flag)
+func (s *Service) doSubscriptions() {
+	subs := make([]*Subscription)
+	for {
+		select {
+		case <-s.closing:
+			return
+		case e := <-s.entries:
+			for _, sub := range subs {
+				sub.Collect(e)
+			}
+		case sub := <-s.subs:
+			if sub.Add {
+				subs = append(subs, sub.Subscription)
+			} else {
+				// Remove sub
+				newSubs := subs[0:0]
+				for _, s := range subs {
+					if s != sub.Subscription {
+						newSubs = append(newSubs, s)
+					}
+				}
+				subs = newSubs
+			}
+		}
+	}
 }
-
-func (s *Service) NewStaticLevelWriter(l Level) io.Writer {
-	return wlog.NewStaticLevelWriter(s.f, wlog.Level(l))
-}
-
-type nopCloser struct {
-	f io.Writer
-}
-
-func (c *nopCloser) Write(b []byte) (int, error) { return c.f.Write(b) }
-func (c *nopCloser) Close() error                { return nil }

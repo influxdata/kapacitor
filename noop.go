@@ -1,9 +1,8 @@
 package kapacitor
 
 import (
-	"log"
-
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/uber-go/zap"
 )
 
 type NoOpNode struct {
@@ -11,7 +10,7 @@ type NoOpNode struct {
 }
 
 // Create a new  NoOpNode which does nothing with the data and just passes it through.
-func newNoOpNode(et *ExecutingTask, n *pipeline.NoOpNode, l *log.Logger) (*NoOpNode, error) {
+func newNoOpNode(et *ExecutingTask, n *pipeline.NoOpNode, l zap.Logger) (*NoOpNode, error) {
 	nn := &NoOpNode{
 		node: node{Node: n, et: et, logger: l},
 	}

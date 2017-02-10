@@ -2,20 +2,20 @@ package k8s
 
 import (
 	"fmt"
-	"log"
 	"sync/atomic"
 
 	"github.com/influxdata/kapacitor/services/k8s/client"
 	"github.com/pkg/errors"
+	"github.com/uber-go/zap"
 )
 
 type Service struct {
 	configValue atomic.Value // Config
 	client      client.Client
-	logger      *log.Logger
+	logger      zap.Logger
 }
 
-func NewService(c Config, l *log.Logger) (*Service, error) {
+func NewService(c Config, l zap.Logger) (*Service, error) {
 	clientConfig, err := c.ClientConfig()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create k8s client config")

@@ -320,7 +320,7 @@ func (p *Parser) parseKillQueryStatement() (*KillQueryStatement, error) {
 	return &KillQueryStatement{QueryID: qid, Host: host}, nil
 }
 
-// parseCreateSubscriptionStatement parses a string and returns a CreatesubScriptionStatement.
+// parseCreateSubscriptionStatement parses a string and returns a CreateSubscriptionStatement.
 // This function assumes the "CREATE SUBSCRIPTION" tokens have already been consumed.
 func (p *Parser) parseCreateSubscriptionStatement() (*CreateSubscriptionStatement, error) {
 	stmt := &CreateSubscriptionStatement{}
@@ -428,6 +428,17 @@ func (p *Parser) parseCreateRetentionPolicyStatement() (*CreateRetentionPolicySt
 		if tok, pos, lit := p.scanIgnoreWhitespace(); tok != DURATION {
 			return nil, newParseError(tokstr(tok, lit), []string{"DURATION"}, pos)
 		}
+
+		// Check to see if they used the INF keyword
+		tok, pos, _ := p.scanIgnoreWhitespace()
+		if tok == INF {
+			return nil, &ParseError{
+				Message: "invalid duration INF for shard duration",
+				Pos:     pos,
+			}
+		}
+		p.unscan()
+
 		d, err := p.parseDuration()
 		if err != nil {
 			return nil, err
@@ -502,6 +513,16 @@ Loop:
 		case SHARD:
 			tok, pos, lit := p.scanIgnoreWhitespace()
 			if tok == DURATION {
+				// Check to see if they used the INF keyword
+				tok, pos, _ := p.scanIgnoreWhitespace()
+				if tok == INF {
+					return nil, &ParseError{
+						Message: "invalid duration INF for shard duration",
+						Pos:     pos,
+					}
+				}
+				p.unscan()
+
 				d, err := p.parseDuration()
 				if err != nil {
 					return nil, err
@@ -525,7 +546,8 @@ Loop:
 	return stmt, nil
 }
 
-// parseInt parses a string and returns an integer literal.
+// parseInt parses a string representing a base 10 integer and returns the number.
+// It returns an error if the parsed number is outside the range [min, max].
 func (p *Parser) parseInt(min, max int) (int, error) {
 	tok, pos, lit := p.scanIgnoreWhitespace()
 	if tok != INTEGER {
@@ -544,22 +566,6 @@ func (p *Parser) parseInt(min, max int) (int, error) {
 	}
 
 	return n, nil
-}
-
-// parseUInt32 parses a string and returns a 32-bit unsigned integer literal.
-func (p *Parser) parseUInt32() (uint32, error) {
-	tok, pos, lit := p.scanIgnoreWhitespace()
-	if tok != INTEGER {
-		return 0, newParseError(tokstr(tok, lit), []string{"integer"}, pos)
-	}
-
-	// Convert string to unsigned 32-bit integer
-	n, err := strconv.ParseUint(lit, 10, 32)
-	if err != nil {
-		return 0, &ParseError{Message: err.Error(), Pos: pos}
-	}
-
-	return uint32(n), nil
 }
 
 // parseUInt64 parses a string and returns a 64-bit unsigned integer literal.
@@ -676,7 +682,7 @@ func (p *Parser) parseSegmentedIdents() ([]string, error) {
 	return idents, nil
 }
 
-// parserString parses a string.
+// parseString parses a string.
 func (p *Parser) parseString() (string, error) {
 	tok, pos, lit := p.scanIgnoreWhitespace()
 	if tok != STRING {
@@ -685,7 +691,7 @@ func (p *Parser) parseString() (string, error) {
 	return lit, nil
 }
 
-// parserString parses a string.
+// parseStringList parses a list of strings separated by commas.
 func (p *Parser) parseStringList() ([]string, error) {
 	// Parse first (required) string.
 	str, err := p.parseString()
@@ -867,7 +873,7 @@ func (p *Parser) parseGrantAdminStatement() (*GrantAdminStatement, error) {
 	return stmt, nil
 }
 
-// parsePrivilege parses a string and returns a Privilege
+// parsePrivilege parses a string and returns a Privilege.
 func (p *Parser) parsePrivilege() (Privilege, error) {
 	tok, pos, lit := p.scanIgnoreWhitespace()
 	switch tok {
@@ -906,7 +912,7 @@ func (p *Parser) parseSelectStatement(tr targetRequirement) (*SelectStatement, e
 	if tok, pos, lit := p.scanIgnoreWhitespace(); tok != FROM {
 		return nil, newParseError(tokstr(tok, lit), []string{"FROM"}, pos)
 	}
-	if stmt.Sources, err = p.parseSources(); err != nil {
+	if stmt.Sources, err = p.parseSources(true); err != nil {
 		return nil, err
 	}
 
@@ -971,6 +977,7 @@ type targetRequirement int
 const (
 	targetRequired targetRequirement = iota
 	targetNotRequired
+	targetSubquery
 )
 
 // parseTarget parses a string and returns a Target.
@@ -1027,7 +1034,7 @@ func (p *Parser) parseDeleteStatement() (Statement, error) {
 
 	if tok == FROM {
 		// Parse source.
-		if stmt.Sources, err = p.parseSources(); err != nil {
+		if stmt.Sources, err = p.parseSources(false); err != nil {
 			return nil, err
 		}
 
@@ -1085,7 +1092,7 @@ func (p *Parser) parseShowSeriesStatement() (*ShowSeriesStatement, error) {
 
 	// Parse optional FROM.
 	if tok, _, _ := p.scanIgnoreWhitespace(); tok == FROM {
-		if stmt.Sources, err = p.parseSources(); err != nil {
+		if stmt.Sources, err = p.parseSources(false); err != nil {
 			return nil, err
 		}
 	} else {
@@ -1144,7 +1151,7 @@ func (p *Parser) parseShowMeasurementsStatement() (*ShowMeasurementsStatement, e
 		switch tok {
 		case EQ, EQREGEX:
 			// Parse required source (measurement name or regex).
-			if stmt.Source, err = p.parseSource(); err != nil {
+			if stmt.Source, err = p.parseSource(false); err != nil {
 				return nil, err
 			}
 		default:
@@ -1223,7 +1230,7 @@ func (p *Parser) parseShowTagKeysStatement() (*ShowTagKeysStatement, error) {
 
 	// Parse optional source.
 	if tok, _, _ := p.scanIgnoreWhitespace(); tok == FROM {
-		if stmt.Sources, err = p.parseSources(); err != nil {
+		if stmt.Sources, err = p.parseSources(false); err != nil {
 			return nil, err
 		}
 	} else {
@@ -1282,7 +1289,7 @@ func (p *Parser) parseShowTagValuesStatement() (*ShowTagValuesStatement, error) 
 
 	// Parse optional source.
 	if tok, _, _ := p.scanIgnoreWhitespace(); tok == FROM {
-		if stmt.Sources, err = p.parseSources(); err != nil {
+		if stmt.Sources, err = p.parseSources(false); err != nil {
 			return nil, err
 		}
 	} else {
@@ -1398,7 +1405,7 @@ func (p *Parser) parseShowFieldKeysStatement() (*ShowFieldKeysStatement, error) 
 
 	// Parse optional source.
 	if tok, _, _ := p.scanIgnoreWhitespace(); tok == FROM {
-		if stmt.Sources, err = p.parseSources(); err != nil {
+		if stmt.Sources, err = p.parseSources(false); err != nil {
 			return nil, err
 		}
 	} else {
@@ -1448,7 +1455,7 @@ func (p *Parser) parseDropSeriesStatement() (*DropSeriesStatement, error) {
 
 	if tok == FROM {
 		// Parse source.
-		if stmt.Sources, err = p.parseSources(); err != nil {
+		if stmt.Sources, err = p.parseSources(false); err != nil {
 			return nil, err
 		}
 
@@ -1822,37 +1829,6 @@ func (p *Parser) parseDropUserStatement() (*DropUserStatement, error) {
 	return stmt, nil
 }
 
-// parseRetentionPolicy parses a string and returns a retention policy name.
-// This function assumes the "WITH" token has already been consumed.
-func (p *Parser) parseRetentionPolicy() (name string, dfault bool, err error) {
-	// Check for optional DEFAULT token.
-	tok, pos, lit := p.scanIgnoreWhitespace()
-	if tok == DEFAULT {
-		dfault = true
-		tok, pos, lit = p.scanIgnoreWhitespace()
-	}
-
-	// Check for required RETENTION token.
-	if tok != RETENTION {
-		err = newParseError(tokstr(tok, lit), []string{"RETENTION"}, pos)
-		return
-	}
-
-	// Check of required POLICY token.
-	if tok, pos, lit = p.scanIgnoreWhitespace(); tok != POLICY {
-		err = newParseError(tokstr(tok, lit), []string{"POLICY"}, pos)
-		return
-	}
-
-	// Parse retention policy name.
-	name, err = p.parseIdent()
-	if err != nil {
-		return
-	}
-
-	return
-}
-
 // parseShowShardGroupsStatement parses a string for "SHOW SHARD GROUPS" statement.
 // This function assumes the "SHOW SHARD GROUPS" tokens have already been consumed.
 func (p *Parser) parseShowShardGroupsStatement() (*ShowShardGroupsStatement, error) {
@@ -1988,7 +1964,7 @@ func (p *Parser) parseField() (*Field, error) {
 }
 
 // validateField checks if the Expr is a valid field. We disallow all binary expression
-// that return a boolean
+// that return a boolean.
 type validateField struct {
 	foundInvalid bool
 	badToken     Token
@@ -2028,11 +2004,11 @@ func (p *Parser) parseAlias() (string, error) {
 }
 
 // parseSources parses a comma delimited list of sources.
-func (p *Parser) parseSources() (Sources, error) {
+func (p *Parser) parseSources(subqueries bool) (Sources, error) {
 	var sources Sources
 
 	for {
-		s, err := p.parseSource()
+		s, err := p.parseSource(subqueries)
 		if err != nil {
 			return nil, err
 		}
@@ -2057,7 +2033,7 @@ func (p *Parser) peekRune() rune {
 	return r
 }
 
-func (p *Parser) parseSource() (Source, error) {
+func (p *Parser) parseSource(subqueries bool) (Source, error) {
 	m := &Measurement{}
 
 	// Attempt to parse a regex.
@@ -2068,6 +2044,28 @@ func (p *Parser) parseSource() (Source, error) {
 		m.Regex = re
 		// Regex is always last so we're done.
 		return m, nil
+	}
+
+	// If there is no regular expression, this might be a subquery.
+	// Parse the subquery if we are in a query that allows them as a source.
+	if m.Regex == nil && subqueries {
+		if tok, _, _ := p.scanIgnoreWhitespace(); tok == LPAREN {
+			if err := p.parseTokens([]Token{SELECT}); err != nil {
+				return nil, err
+			}
+
+			stmt, err := p.parseSelectStatement(targetSubquery)
+			if err != nil {
+				return nil, err
+			}
+
+			if err := p.parseTokens([]Token{RPAREN}); err != nil {
+				return nil, err
+			}
+			return &SubQuery{Statement: stmt}, nil
+		} else {
+			p.unscan()
+		}
 	}
 
 	// Didn't find a regex so parse segmented identifiers.
@@ -2718,7 +2716,7 @@ func ParseDuration(s string) (time.Duration, error) {
 	}
 
 	// Split string into individual runes.
-	a := split(s)
+	a := []rune(s)
 
 	// Start with a zero duration.
 	var d time.Duration
@@ -2839,7 +2837,10 @@ func (p *Parser) parseTokenMaybe(expected Token) bool {
 }
 
 var (
+	// Quote String replacer.
 	qsReplacer = strings.NewReplacer("\n", `\n`, `\`, `\\`, `'`, `\'`)
+
+	// Quote Ident replacer.
 	qiReplacer = strings.NewReplacer("\n", `\n`, `\`, `\\`, `"`, `\"`)
 )
 
@@ -2853,7 +2854,8 @@ func QuoteIdent(segments ...string) string {
 	var buf bytes.Buffer
 	for i, segment := range segments {
 		needQuote := IdentNeedsQuotes(segment) ||
-			((i < len(segments)-1) && segment != "") // not last segment && not ""
+			((i < len(segments)-1) && segment != "") || // not last segment && not ""
+			((i == 0 || i == len(segments)-1) && segment == "") // the first or last segment and an empty string
 
 		if needQuote {
 			_ = buf.WriteByte('"')
@@ -2889,14 +2891,6 @@ func IdentNeedsQuotes(ident string) bool {
 	return false
 }
 
-// split splits a string into a slice of runes.
-func split(s string) (a []rune) {
-	for _, ch := range s {
-		a = append(a, ch)
-	}
-	return
-}
-
 // isDateString returns true if the string looks like a date-only time literal.
 func isDateString(s string) bool { return dateStringRegexp.MatchString(s) }
 
@@ -2906,7 +2900,7 @@ func isDateTimeString(s string) bool { return dateTimeStringRegexp.MatchString(s
 var dateStringRegexp = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 var dateTimeStringRegexp = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}.+`)
 
-// ErrInvalidDuration is returned when parsing a malformatted duration.
+// ErrInvalidDuration is returned when parsing a malformed duration.
 var ErrInvalidDuration = errors.New("invalid duration")
 
 // ParseError represents an error that occurred during parsing.

@@ -1,19 +1,18 @@
+// Package restore is the restore subcommand for the influxd command,
+// for restoring from a backup.
 package restore
 
 import (
 	"archive/tar"
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
 	"os"
 	"path/filepath"
 	"strconv"
-	"sync"
 
 	"github.com/influxdata/influxdb/cmd/influxd/backup"
 	"github.com/influxdata/influxdb/services/meta"
@@ -159,7 +158,7 @@ func (cmd *Command) unpackMeta() error {
 	// Size of the node.json bytes
 	length = int(binary.BigEndian.Uint64(b[i : i+8]))
 	i += 8
-	nodeBytes := b[i:]
+	nodeBytes := b[i : i+length]
 
 	// Unpack into metadata.
 	var data meta.Data
@@ -182,7 +181,6 @@ func (cmd *Command) unpackMeta() error {
 	}
 
 	client := meta.NewClient(c)
-	client.SetLogOutput(ioutil.Discard)
 	if err := client.Open(); err != nil {
 		return err
 	}
@@ -309,7 +307,8 @@ func (cmd *Command) unpackTar(tarFile string) error {
 
 // unpackFile will copy the current file from the tar archive to the data dir
 func (cmd *Command) unpackFile(tr *tar.Reader, fileName string) error {
-	fn := filepath.Join(cmd.datadir, fileName)
+	nativeFileName := filepath.FromSlash(fileName)
+	fn := filepath.Join(cmd.datadir, nativeFileName)
 	fmt.Printf("unpacking %s\n", fn)
 
 	if err := os.MkdirAll(filepath.Dir(fn), 0777); err != nil {
@@ -354,33 +353,3 @@ Usage: influxd restore [flags] PATH
 
 `)
 }
-
-type nopListener struct {
-	mu      sync.Mutex
-	closing chan struct{}
-}
-
-func newNopListener() *nopListener {
-	return &nopListener{closing: make(chan struct{})}
-}
-
-func (ln *nopListener) Accept() (net.Conn, error) {
-	ln.mu.Lock()
-	defer ln.mu.Unlock()
-
-	<-ln.closing
-	return nil, errors.New("listener closing")
-}
-
-func (ln *nopListener) Close() error {
-	if ln.closing != nil {
-		close(ln.closing)
-		ln.mu.Lock()
-		defer ln.mu.Unlock()
-
-		ln.closing = nil
-	}
-	return nil
-}
-
-func (ln *nopListener) Addr() net.Addr { return &net.TCPAddr{} }

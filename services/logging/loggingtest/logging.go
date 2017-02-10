@@ -2,30 +2,27 @@ package loggingtest
 
 import (
 	"io"
-	"log"
 	"os"
 
-	"github.com/influxdata/kapacitor/services/logging"
-	"github.com/influxdata/wlog"
+	"github.com/uber-go/zap"
 )
 
-type TestLogService struct{}
+type TestLogService struct {
+	root zap.Logger
+}
 
 func New() TestLogService {
-	return TestLogService{}
+	return TestLogService{
+		root: zap.New(zap.NewTextEncoder(), zap.Output(os.Stderr), zap.DebugLevel),
+	}
 }
 
-func (l TestLogService) NewLogger(prefix string, flag int) *log.Logger {
-	return wlog.New(os.Stderr, prefix, flag)
+func (l TestLogService) Root() zap.Logger {
+	return l.root
 }
-func (l TestLogService) NewRawLogger(prefix string, flag int) *log.Logger {
-	return log.New(os.Stderr, prefix, flag)
+func (l TestLogService) Writer() io.Writer {
+	return os.Stderr
 }
-
-func (l TestLogService) NewStaticLevelLogger(prefix string, flag int, level logging.Level) *log.Logger {
-	return log.New(wlog.NewStaticLevelWriter(os.Stderr, wlog.Level(level)), prefix, flag)
-}
-
-func (l TestLogService) NewStaticLevelWriter(level logging.Level) io.Writer {
-	return wlog.NewStaticLevelWriter(os.Stderr, wlog.Level(level))
+func (l TestLogService) SetLevel(string) error {
+	return nil
 }

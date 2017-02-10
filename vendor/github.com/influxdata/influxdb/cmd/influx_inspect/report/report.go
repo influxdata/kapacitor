@@ -1,3 +1,4 @@
+// Package report reports statistics about TSM files.
 package report
 
 import (
@@ -76,11 +77,6 @@ func (cmd *Command) Run(args ...string) error {
 	tagCardialities := map[string]*hllpp.HLLPP{}
 	measCardinalities := map[string]*hllpp.HLLPP{}
 	fieldCardinalities := map[string]*hllpp.HLLPP{}
-
-	ordering := make([]chan struct{}, 0, len(files))
-	for range files {
-		ordering = append(ordering, make(chan struct{}))
-	}
 
 	for _, f := range files {
 		file, err := os.OpenFile(f, os.O_RDONLY, 0600)

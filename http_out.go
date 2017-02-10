@@ -2,7 +2,6 @@ package kapacitor
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"path"
 	"sync"
@@ -12,6 +11,7 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/services/httpd"
+	"github.com/uber-go/zap"
 )
 
 type HTTPOutNode struct {
@@ -25,7 +25,7 @@ type HTTPOutNode struct {
 }
 
 // Create a new  HTTPOutNode which caches the most recent item and exposes it over the HTTP API.
-func newHTTPOutNode(et *ExecutingTask, n *pipeline.HTTPOutNode, l *log.Logger) (*HTTPOutNode, error) {
+func newHTTPOutNode(et *ExecutingTask, n *pipeline.HTTPOutNode, l zap.Logger) (*HTTPOutNode, error) {
 	hn := &HTTPOutNode{
 		node:           node{Node: n, et: et, logger: l},
 		c:              n,

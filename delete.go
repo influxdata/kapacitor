@@ -1,11 +1,10 @@
 package kapacitor
 
 import (
-	"log"
-
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/uber-go/zap"
 )
 
 const (
@@ -24,7 +23,7 @@ type DeleteNode struct {
 }
 
 // Create a new  DeleteNode which applies a transformation func to each point in a stream and returns a single point.
-func newDeleteNode(et *ExecutingTask, n *pipeline.DeleteNode, l *log.Logger) (*DeleteNode, error) {
+func newDeleteNode(et *ExecutingTask, n *pipeline.DeleteNode, l zap.Logger) (*DeleteNode, error) {
 	dn := &DeleteNode{
 		node: node{Node: n, et: et, logger: l},
 		d:    n,

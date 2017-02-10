@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -17,10 +16,11 @@ import (
 	influxcli "github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/influxdb"
+	"github.com/influxdata/kapacitor/services/logging/loggingtest"
 	"github.com/influxdata/kapacitor/vars"
 )
 
-var ls = logSerivce{}
+var ls = loggingtest.New()
 
 const (
 	testKapacitorClusterID = "test-kclusterid"
@@ -985,7 +985,6 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 		grantedTokens = make(map[tokenGrant]bool)
 		revokedTokens = make(map[string]bool)
 
-		log.Println("D! first round")
 		if err := s.Open(); err != nil {
 			t.Fatal(err)
 		}
@@ -1012,7 +1011,6 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 		grantedTokens = make(map[tokenGrant]bool)
 		revokedTokens = make(map[string]bool)
 
-		log.Println("D! second round")
 		if len(tc.partialConfigs) > 0 {
 			configs := make([]interface{}, 0, len(tc.partialConfigs))
 			for name, pc := range tc.partialConfigs {
@@ -1156,12 +1154,11 @@ func NewDefaultTestConfigs(clusters []string) []influxdb.Config {
 
 func NewTestService(configs []influxdb.Config, hostname string, useTokens bool) (*influxdb.Service, *authService, *clientCreator) {
 	httpPort := 9092
-	l := ls.NewLogger("[test-influxdb] ", log.LstdFlags)
+	l := ls.Root()
 	s, err := influxdb.NewService(configs, httpPort, hostname, useTokens, l)
 	if err != nil {
 		panic(err)
 	}
-	s.LogService = ls
 	s.HTTPDService = httpdService{}
 	as := &authService{}
 	s.AuthService = as
@@ -1258,13 +1255,6 @@ func (c influxDBClient) Update(config influxcli.Config) error {
 		return c.UpdateFunc(config)
 	}
 	return nil
-}
-
-type logSerivce struct {
-}
-
-func (logSerivce) NewLogger(p string, flags int) *log.Logger {
-	return log.New(os.Stderr, p, flags)
 }
 
 type httpdService struct {

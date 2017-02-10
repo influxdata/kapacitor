@@ -93,13 +93,17 @@ func readPointsFromIO(data io.ReadCloser, points chan<- models.Point, precision 
 			return err
 		}
 		mp := mps[0]
+		fields, err := mp.Fields()
+		if err != nil {
+			return err
+		}
 		p := models.Point{
 			Database:        db,
 			RetentionPolicy: rp,
 			Name:            mp.Name(),
 			Group:           models.NilGroup,
 			Tags:            models.Tags(mp.Tags().Map()),
-			Fields:          models.Fields(mp.Fields()),
+			Fields:          models.Fields(fields),
 			Time:            mp.Time().UTC(),
 		}
 		points <- p

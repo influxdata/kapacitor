@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 	goast "go/ast"
-	"log"
-	"os"
 	"reflect"
 	"runtime"
 	"strings"
@@ -19,18 +17,6 @@ import (
 )
 
 var mu sync.Mutex
-var logger = log.New(os.Stderr, "[tick] ", log.LstdFlags)
-
-func getLogger() *log.Logger {
-	mu.Lock()
-	defer mu.Unlock()
-	return logger
-}
-func SetLogger(l *log.Logger) {
-	mu.Lock()
-	defer mu.Unlock()
-	logger = l
-}
 
 type unboundFunc func(obj interface{}) (interface{}, error)
 

@@ -3,7 +3,6 @@ package snmptrap
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -12,16 +11,17 @@ import (
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/k-sone/snmpgo"
 	"github.com/pkg/errors"
+	"github.com/uber-go/zap"
 )
 
 type Service struct {
 	configValue atomic.Value
 	clientMu    sync.Mutex
 	client      *snmpgo.SNMP
-	logger      *log.Logger
+	logger      zap.Logger
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, l zap.Logger) *Service {
 	s := &Service{
 		logger: l,
 	}
@@ -206,11 +206,11 @@ type Data struct {
 type handler struct {
 	s      *Service
 	c      HandlerConfig
-	logger *log.Logger
+	logger zap.Logger
 }
 
 // Handler creates a handler from the config.
-func (s *Service) Handler(c HandlerConfig, l *log.Logger) (alert.Handler, error) {
+func (s *Service) Handler(c HandlerConfig, l zap.Logger) (alert.Handler, error) {
 	// Compile data value templates
 	for i, d := range c.DataList {
 		tmpl, err := text.New("data").Parse(d.Value)
@@ -234,13 +234,13 @@ func (h *handler) Handle(event alert.Event) {
 	for i, d := range h.c.DataList {
 		err := d.tmpl.Execute(&buf, td)
 		if err != nil {
-			h.logger.Println("E! failed to handle event", err)
+			h.logger.Error("failed to handle event", zap.Error(err))
 			return
 		}
 		h.c.DataList[i].Value = buf.String()
 		buf.Reset()
 	}
 	if err := h.s.Trap(h.c.TrapOid, h.c.DataList); err != nil {
-		h.logger.Println("E! failed to handle event", err)
+		h.logger.Error("failed to handle event", zap.Error(err))
 	}
 }

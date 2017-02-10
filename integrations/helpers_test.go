@@ -3,11 +3,12 @@ package integrations
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"time"
+
+	"github.com/uber-go/zap"
 
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor"
@@ -22,7 +23,7 @@ func newHTTPDService() *httpd.Service {
 	// create API server
 	config := httpd.NewConfig()
 	config.BindAddress = ":0" // Choose port dynamically
-	httpService := httpd.NewService(config, "localhost", logService.NewLogger("[http] ", log.LstdFlags), logService)
+	httpService := httpd.NewService(config, "localhost", logger.With(zap.String("service", "httpd ")), logService)
 	err := httpService.Open()
 	if err != nil {
 		panic(err)
@@ -135,7 +136,7 @@ func compareAlertData(exp, got alertservice.AlertData) (bool, string) {
 type UDFService struct {
 	ListFunc   func() []string
 	InfoFunc   func(name string) (udf.Info, bool)
-	CreateFunc func(name string, l *log.Logger, abortCallback func()) (udf.Interface, error)
+	CreateFunc func(name string, l zap.Logger, abortCallback func()) (udf.Interface, error)
 }
 
 func (u UDFService) List() []string {
@@ -146,7 +147,7 @@ func (u UDFService) Info(name string) (udf.Info, bool) {
 	return u.InfoFunc(name)
 }
 
-func (u UDFService) Create(name string, l *log.Logger, abortCallback func()) (udf.Interface, error) {
+func (u UDFService) Create(name string, l zap.Logger, abortCallback func()) (udf.Interface, error) {
 	return u.CreateFunc(name, l, abortCallback)
 }
 

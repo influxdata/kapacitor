@@ -1,12 +1,11 @@
+// Package subscriber implements the subscriber service
+// to forward incoming data to remote services.
 package subscriber // import "github.com/influxdata/influxdb/services/subscriber"
 
 import (
 	"errors"
 	"fmt"
-	"io"
-	"log"
 	"net/url"
-	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -15,12 +14,14 @@ import (
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/monitor"
 	"github.com/influxdata/influxdb/services/meta"
+	"go.uber.org/zap"
 )
 
 // Statistics for the Subscriber service.
 const (
-	statPointsWritten = "pointsWritten"
-	statWriteFailures = "writeFailures"
+	statCreateFailures = "createFailures"
+	statPointsWritten  = "pointsWritten"
+	statWriteFailures  = "writeFailures"
 )
 
 // PointsWriter is an interface for writing points to a subscription destination.
@@ -30,7 +31,7 @@ type PointsWriter interface {
 	WritePoints(p *coordinator.WritePointsRequest) error
 }
 
-// unique set that identifies a given subscription
+// subEntry is a unique set that identifies a given subscription.
 type subEntry struct {
 	db   string
 	rp   string
@@ -46,7 +47,7 @@ type Service struct {
 		WaitForDataChanged() chan struct{}
 	}
 	NewPointsWriter func(u url.URL) (PointsWriter, error)
-	Logger          *log.Logger
+	Logger          zap.Logger
 	update          chan struct{}
 	stats           *Statistics
 	points          chan *coordinator.WritePointsRequest
@@ -63,7 +64,7 @@ type Service struct {
 // NewService returns a subscriber service with given settings
 func NewService(c Config) *Service {
 	s := &Service{
-		Logger: log.New(os.Stderr, "[subscriber] ", log.LstdFlags),
+		Logger: zap.New(zap.NullEncoder()),
 		closed: true,
 		stats:  &Statistics{},
 		conf:   c,
@@ -74,6 +75,10 @@ func NewService(c Config) *Service {
 
 // Open starts the subscription service.
 func (s *Service) Open() error {
+	if !s.conf.Enabled {
+		return nil // Service disabled.
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.MetaClient == nil {
@@ -96,35 +101,40 @@ func (s *Service) Open() error {
 		s.waitForMetaUpdates()
 	}()
 
-	s.Logger.Println("opened service")
+	s.Logger.Info("opened service")
 	return nil
 }
 
-// Close terminates the subscription service
-// Will panic if called multiple times or without first opening the service.
+// Close terminates the subscription service.
+// It will panic if called multiple times or without first opening the service.
 func (s *Service) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if s.closed {
+		return nil // Already closed.
+	}
+
 	s.closed = true
 
 	close(s.points)
 	close(s.closing)
 
 	s.wg.Wait()
-	s.Logger.Println("closed service")
+	s.Logger.Info("closed service")
 	return nil
 }
 
-// SetLogOutput sets the writer to which all logs are written. It must not be
-// called after Open is called.
-func (s *Service) SetLogOutput(w io.Writer) {
-	s.Logger = log.New(w, "[subscriber] ", log.LstdFlags)
+// WithLogger sets the logger on the service.
+func (s *Service) WithLogger(log zap.Logger) {
+	s.Logger = log.With(zap.String("service", "subscriber"))
 }
 
 // Statistics maintains the statistics for the subscriber service.
 type Statistics struct {
-	WriteFailures int64
-	PointsWritten int64
+	CreateFailures int64
+	PointsWritten  int64
+	WriteFailures  int64
 }
 
 // Statistics returns statistics for periodic monitoring.
@@ -133,8 +143,9 @@ func (s *Service) Statistics(tags map[string]string) []models.Statistic {
 		Name: "subscriber",
 		Tags: tags,
 		Values: map[string]interface{}{
-			statPointsWritten: atomic.LoadInt64(&s.stats.PointsWritten),
-			statWriteFailures: atomic.LoadInt64(&s.stats.WriteFailures),
+			statCreateFailures: atomic.LoadInt64(&s.stats.CreateFailures),
+			statPointsWritten:  atomic.LoadInt64(&s.stats.PointsWritten),
+			statWriteFailures:  atomic.LoadInt64(&s.stats.WriteFailures),
 		},
 	}}
 
@@ -154,7 +165,7 @@ func (s *Service) waitForMetaUpdates() {
 		case <-ch:
 			err := s.Update()
 			if err != nil {
-				s.Logger.Println("error updating subscriptions:", err)
+				s.Logger.Info(fmt.Sprint("error updating subscriptions: ", err))
 			}
 		case <-s.closing:
 			return
@@ -183,20 +194,22 @@ func (s *Service) createSubscription(se subEntry, mode string, destinations []st
 	default:
 		return nil, fmt.Errorf("unknown balance mode %q", mode)
 	}
-	writers := make([]PointsWriter, len(destinations))
-	stats := make([]writerStats, len(writers))
-	for i, dest := range destinations {
+	writers := make([]PointsWriter, 0, len(destinations))
+	stats := make([]writerStats, 0, len(destinations))
+	// add only valid destinations
+	for _, dest := range destinations {
 		u, err := url.Parse(dest)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to parse destination: %s", dest)
 		}
 		w, err := s.NewPointsWriter(*u)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create writer for destination: %s", dest)
 		}
-		writers[i] = w
-		stats[i].dest = dest
+		writers = append(writers, w)
+		stats = append(stats, writerStats{dest: dest})
 	}
+
 	return &balancewriter{
 		bm:      bm,
 		writers: writers,
@@ -215,7 +228,7 @@ func (s *Service) Points() chan<- *coordinator.WritePointsRequest {
 	return s.points
 }
 
-// read points off chan and write them
+// run read points from the points channel and writes them to the subscriptions.
 func (s *Service) run() {
 	var wg sync.WaitGroup
 	s.subs = make(map[subEntry]chanWriter)
@@ -224,10 +237,7 @@ func (s *Service) run() {
 	for {
 		select {
 		case <-s.update:
-			err := s.updateSubs(&wg)
-			if err != nil {
-				s.Logger.Println("failed to update subscriptions:", err)
-			}
+			s.updateSubs(&wg)
 		case p, ok := <-s.points:
 			if !ok {
 				// Close out all chanWriters
@@ -247,7 +257,7 @@ func (s *Service) run() {
 	}
 }
 
-// close closes the existing channel writers
+// close closes the existing channel writers.
 func (s *Service) close(wg *sync.WaitGroup) {
 	s.subMu.Lock()
 	defer s.subMu.Unlock()
@@ -260,7 +270,7 @@ func (s *Service) close(wg *sync.WaitGroup) {
 	s.subs = nil
 }
 
-func (s *Service) updateSubs(wg *sync.WaitGroup) error {
+func (s *Service) updateSubs(wg *sync.WaitGroup) {
 	s.subMu.Lock()
 	defer s.subMu.Unlock()
 
@@ -285,7 +295,9 @@ func (s *Service) updateSubs(wg *sync.WaitGroup) error {
 				}
 				sub, err := s.createSubscription(se, si.Mode, si.Destinations)
 				if err != nil {
-					return err
+					atomic.AddInt64(&s.stats.CreateFailures, 1)
+					s.Logger.Info(fmt.Sprintf("Subscription creation failed for '%s' with error: %s", si.Name, err))
+					continue
 				}
 				cw := chanWriter{
 					writeRequests: make(chan *coordinator.WritePointsRequest, s.conf.WriteBufferSize),
@@ -302,7 +314,7 @@ func (s *Service) updateSubs(wg *sync.WaitGroup) error {
 					}()
 				}
 				s.subs[se] = cw
-				s.Logger.Println("added new subscription for", se.db, se.rp)
+				s.Logger.Info(fmt.Sprintf("added new subscription for %s %s", se.db, se.rp))
 			}
 		}
 	}
@@ -315,14 +327,12 @@ func (s *Service) updateSubs(wg *sync.WaitGroup) error {
 
 			// Remove it from the set
 			delete(s.subs, se)
-			s.Logger.Println("deleted old subscription for", se.db, se.rp)
+			s.Logger.Info(fmt.Sprintf("deleted old subscription for %s %s", se.db, se.rp))
 		}
 	}
-
-	return nil
 }
 
-// Creates a PointsWriter from the given URL
+// newPointsWriter returns a new PointsWriter from the given URL.
 func (s *Service) newPointsWriter(u url.URL) (PointsWriter, error) {
 	switch u.Scheme {
 	case "udp":
@@ -331,7 +341,7 @@ func (s *Service) newPointsWriter(u url.URL) (PointsWriter, error) {
 		return NewHTTP(u.String(), time.Duration(s.conf.HTTPTimeout))
 	case "https":
 		if s.conf.InsecureSkipVerify {
-			s.Logger.Println("WARNING: 'insecure-skip-verify' is true. This will skip all certificate verifications.")
+			s.Logger.Info("WARNING: 'insecure-skip-verify' is true. This will skip all certificate verifications.")
 		}
 		return NewHTTPS(u.String(), time.Duration(s.conf.HTTPTimeout), s.conf.InsecureSkipVerify, s.conf.CaCerts)
 	default:
@@ -339,16 +349,16 @@ func (s *Service) newPointsWriter(u url.URL) (PointsWriter, error) {
 	}
 }
 
-// Sends WritePointsRequest to a PointsWriter received over a channel.
+// chanWriter sends WritePointsRequest to a PointsWriter received over a channel.
 type chanWriter struct {
 	writeRequests chan *coordinator.WritePointsRequest
 	pw            PointsWriter
 	pointsWritten *int64
 	failures      *int64
-	logger        *log.Logger
+	logger        zap.Logger
 }
 
-// Close the chanWriter
+// Close closes the chanWriter.
 func (c chanWriter) Close() {
 	close(c.writeRequests)
 }
@@ -357,7 +367,7 @@ func (c chanWriter) Run() {
 	for wr := range c.writeRequests {
 		err := c.pw.WritePoints(wr)
 		if err != nil {
-			c.logger.Println(err)
+			c.logger.Info(err.Error())
 			atomic.AddInt64(c.failures, 1)
 		} else {
 			atomic.AddInt64(c.pointsWritten, int64(len(wr.Points)))
@@ -373,13 +383,14 @@ func (c chanWriter) Statistics(tags map[string]string) []models.Statistic {
 	return []models.Statistic{}
 }
 
-// BalanceMode sets what balance mode to use on a subscription.
-// valid options are currently ALL or ANY
+// BalanceMode specifies what balance mode to use on a subscription.
 type BalanceMode int
 
-//ALL is a Balance mode option
 const (
+	// ALL indicates to send writes to all subscriber destinations.
 	ALL BalanceMode = iota
+
+	// ANY indicates to send writes to a single subscriber destination, round robin.
 	ANY
 )
 

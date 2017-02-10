@@ -2,12 +2,12 @@ package kapacitor
 
 import (
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/pkg/errors"
+	"github.com/uber-go/zap"
 )
 
 // tmpl -- go get github.com/benbjohnson/tmpl
@@ -24,7 +24,7 @@ type InfluxQLNode struct {
 	isStreamTransformation bool
 }
 
-func newInfluxQLNode(et *ExecutingTask, n *pipeline.InfluxQLNode, l *log.Logger) (*InfluxQLNode, error) {
+func newInfluxQLNode(et *ExecutingTask, n *pipeline.InfluxQLNode, l zap.Logger) (*InfluxQLNode, error) {
 	m := &InfluxQLNode{
 		node: node{Node: n, et: et, logger: l},
 		n:    n,
@@ -100,26 +100,26 @@ func (n *InfluxQLNode) runStreamInfluxQL() error {
 		if n.isStreamTransformation {
 			err := context.AggregatePoint(&p)
 			if err != nil {
-				n.logger.Println("E! failed to aggregate point:", err)
+				n.logger.Error("failed to aggregate point", zap.Error(err))
 			}
 			p, ok = n.ins[0].NextPoint()
 
 			err = n.emit(context)
 			if err != nil && err != ErrEmptyEmit {
-				n.logger.Println("E! failed to emit stream:", err)
+				n.logger.Error("failed to emit stream", zap.Error(err))
 			}
 		} else {
 			if p.Time.Equal(context.Time()) {
 				err := context.AggregatePoint(&p)
 				if err != nil {
-					n.logger.Println("E! failed to aggregate point:", err)
+					n.logger.Error("failed to aggregate point", zap.Error(err))
 				}
 				// advance to next point
 				p, ok = n.ins[0].NextPoint()
 			} else {
 				err := n.emit(context)
 				if err != nil {
-					n.logger.Println("E! failed to emit stream:", err)
+					n.logger.Error("failed to emit stream", zap.Error(err))
 				}
 
 				// Nil out reduced point
@@ -180,10 +180,10 @@ func (n *InfluxQLNode) runBatchInfluxQL() error {
 					Tags:   bp.Tags,
 				}
 				if err := context.AggregatePoint(&p); err != nil {
-					n.logger.Println("E! failed to aggregate batch point:", err)
+					n.logger.Error("failed to aggregate batch point", zap.Error(err))
 				}
 				if ep, err := context.EmitPoint(); err != nil && err != ErrEmptyEmit {
-					n.logger.Println("E! failed to emit batch point:", err)
+					n.logger.Error("failed to emit batch point", zap.Error(err))
 				} else if err != ErrEmptyEmit {
 					eb.Points = append(eb.Points, models.BatchPoint{
 						Time:   ep.Time,
@@ -196,7 +196,7 @@ func (n *InfluxQLNode) runBatchInfluxQL() error {
 			n.timer.Pause()
 			for _, out := range n.outs {
 				if err := out.CollectBatch(eb); err != nil {
-					n.logger.Println("E! failed to emit batch points:", err)
+					n.logger.Error("failed to emit batch points", zap.Error(err))
 				}
 			}
 			n.timer.Resume()
@@ -204,10 +204,10 @@ func (n *InfluxQLNode) runBatchInfluxQL() error {
 			err := context.AggregateBatch(&b)
 			if err == nil {
 				if err := n.emit(context); err != nil {
-					n.logger.Println("E! failed to emit batch:", err)
+					n.logger.Error("failed to emit batch", zap.Error(err))
 				}
 			} else {
-				n.logger.Println("E! failed to aggregate batch:", err)
+				n.logger.Error("failed to aggregate batch", zap.Error(err))
 			}
 		}
 		n.timer.Stop()
