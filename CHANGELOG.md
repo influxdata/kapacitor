@@ -10,6 +10,7 @@
 
 ### Bugfixes
 
+- [#1133](https://github.com/influxdata/kapacitor/issues/1133): Fix case-sensitivity for Telegram `parseMode` value. 
 - [#1147](https://github.com/influxdata/kapacitor/issues/1147): Fix pprof debug endpoint
 - [#1164](https://github.com/influxdata/kapacitor/pull/1164): Fix hang in config API to update a config section.
     Now if the service update process takes too long the request will timeout and return an error.
