@@ -7766,6 +7766,121 @@ stream
 	}
 }
 
+func TestServer_Alert_Duration(t *testing.T) {
+	// Setup test TCP server
+	ts, err := alerttest.NewTCPServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ts.Close()
+
+	// Create default config
+	c := NewConfig()
+	s := OpenServer(c)
+	cli := Client(s)
+	defer s.Close()
+
+	tick := `
+stream
+	|from()
+		.measurement('alert')
+	|alert()
+		.id('id')
+		.message('message')
+		.details('details')
+		.crit(lambda: "value" > 1.0)
+		.tcp('` + ts.Addr + `')
+`
+
+	if _, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:   "testAlertHandlers",
+		Type: client.StreamTask,
+		DBRPs: []client.DBRP{{
+			Database:        "mydb",
+			RetentionPolicy: "myrp",
+		}},
+		TICKscript: tick,
+		Status:     client.Enabled,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Write point
+	point := "alert value=2 0000000000"
+	v := url.Values{}
+	v.Add("precision", "s")
+	s.MustWrite("mydb", "myrp", point, v)
+
+	// Restart the server
+	s.Restart()
+
+	topic := "main:testAlertHandlers:alert2"
+	l := cli.TopicEventsLink(topic)
+	expTopicEvents := client.TopicEvents{
+		Link:  l,
+		Topic: topic,
+		Events: []client.TopicEvent{{
+			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1preview/alerts/topics/%s/events/id", topic)},
+			ID:   "id",
+			State: client.EventState{
+				Message:  "message",
+				Details:  "details",
+				Time:     time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
+				Duration: 0,
+				Level:    "CRITICAL",
+			},
+		}},
+	}
+
+	te, err := cli.ListTopicEvents(l, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(te, expTopicEvents) {
+		t.Errorf("unexpected topic events for anonymous topic:\ngot\n%+v\nexp\n%+v\n", te, expTopicEvents)
+	}
+	event, err := cli.TopicEvent(expTopicEvents.Events[0].Link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(event, expTopicEvents.Events[0]) {
+		t.Errorf("unexpected topic event for anonymous topic:\ngot\n%+v\nexp\n%+v\n", event, expTopicEvents.Events[0])
+	}
+
+	// Write point
+	point = "alert value=3 0000000001"
+	v = url.Values{}
+	v.Add("precision", "s")
+	s.MustWrite("mydb", "myrp", point, v)
+
+	// Restart the server
+	s.Restart()
+
+	expTopicEvents = client.TopicEvents{
+		Link:  l,
+		Topic: topic,
+		Events: []client.TopicEvent{{
+			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1preview/alerts/topics/%s/events/id", topic)},
+			ID:   "id",
+			State: client.EventState{
+				Message:  "message",
+				Details:  "details",
+				Time:     time.Date(1970, 1, 1, 0, 0, 1, 0, time.UTC),
+				Duration: client.Duration(time.Second),
+				Level:    "CRITICAL",
+			},
+		}},
+	}
+
+	te, err = cli.ListTopicEvents(l, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(te, expTopicEvents) {
+		t.Errorf("unexpected topic events for anonymous topic after second point:\ngot\n%+v\nexp\n%+v\n", te, expTopicEvents)
+	}
+}
+
 func TestServer_AlertAnonTopic(t *testing.T) {
 	// Setup test TCP server
 	ts, err := alerttest.NewTCPServer()
