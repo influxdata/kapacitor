@@ -16,7 +16,8 @@
     Now if the service update process takes too long the request will timeout and return an error.
     Previously the request would block forever.
 - [#1165](https://github.com/influxdata/kapacitor/issues/1165): Make the alerta auth token prefix configurable and default it to Bearer.
-- [#1184](https://github.com/influxdata/kapacitor/pull/1184#issuecomment-278697177): Fix logrotate file to correctly rotate error log.
+- [#1184](https://github.com/influxdata/kapacitor/pull/1184): Fix logrotate file to correctly rotate error log.
+- [#1200](https://github.com/influxdata/kapacitor/pull/1200): Fix bug with alert duration being incorrect after restoring alert state.
 
 
 
