@@ -9,9 +9,9 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/influxdb"
+	"github.com/influxdata/kapacitor/models"
 	alertservice "github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/httpd"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
@@ -47,7 +47,7 @@ func (m *MockInfluxDBService) NewNamedClient(name string) (influxdb.Client, erro
 	})
 }
 
-func compareResultsMetainfo(exp, got kapacitor.Result) (bool, string) {
+func compareResultsMetainfo(exp, got models.Result) (bool, string) {
 	if (exp.Err == nil && got.Err != nil) || (exp.Err != nil && got.Err == nil) {
 		return false, fmt.Sprintf("unexpected error: exp %v got %v", exp.Err, got.Err)
 	}
@@ -60,7 +60,7 @@ func compareResultsMetainfo(exp, got kapacitor.Result) (bool, string) {
 	return true, ""
 }
 
-func compareResults(exp, got kapacitor.Result) (bool, string) {
+func compareResults(exp, got models.Result) (bool, string) {
 	ok, msg := compareResultsMetainfo(exp, got)
 	if !ok {
 		return ok, msg
@@ -82,7 +82,7 @@ func compareResults(exp, got kapacitor.Result) (bool, string) {
 	return true, ""
 }
 
-func compareResultsIgnoreSeriesOrder(exp, got kapacitor.Result) (bool, string) {
+func compareResultsIgnoreSeriesOrder(exp, got models.Result) (bool, string) {
 	ok, msg := compareResultsMetainfo(exp, got)
 	if !ok {
 		return ok, msg
@@ -119,11 +119,10 @@ func compareResultsIgnoreSeriesOrder(exp, got kapacitor.Result) (bool, string) {
 
 func compareAlertData(exp, got alertservice.AlertData) (bool, string) {
 	// Pull out Result for comparison
-	expData := kapacitor.Result(exp.Data)
-	exp.Data = influxql.Result{}
-	gotData := kapacitor.Result(got.Data)
-	kapacitor.ConvertResultTimes(&gotData)
-	got.Data = influxql.Result{}
+	expData := exp.Data
+	exp.Data = models.Result{}
+	gotData := got.Data
+	got.Data = models.Result{}
 
 	if !reflect.DeepEqual(got, exp) {
 		return false, fmt.Sprintf("\ngot %v\nexp %v", got, exp)

@@ -14,6 +14,7 @@ import (
 	text "text/template"
 
 	"github.com/influxdata/kapacitor/alert"
+	"github.com/influxdata/kapacitor/models"
 	"github.com/pkg/errors"
 )
 
@@ -88,7 +89,7 @@ func (s *Service) Test(options interface{}) error {
 		o.Message,
 		o.Origin,
 		o.Service,
-		nil,
+		models.Result{},
 	)
 }
 
@@ -122,7 +123,7 @@ func (s *Service) Update(newConfig []interface{}) error {
 	return nil
 }
 
-func (s *Service) Alert(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin string, service []string, data interface{}) error {
+func (s *Service) Alert(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin string, service []string, data models.Result) error {
 	if resource == "" || event == "" {
 		return errors.New("Resource and Event are required to send an alert")
 	}
@@ -155,7 +156,7 @@ func (s *Service) Alert(token, tokenPrefix, resource, event, environment, severi
 	return nil
 }
 
-func (s *Service) preparePost(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin string, service []string, data interface{}) (*http.Request, error) {
+func (s *Service) preparePost(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin string, service []string, data models.Result) (*http.Request, error) {
 	c := s.config()
 
 	if !c.Enabled {

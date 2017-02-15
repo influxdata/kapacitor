@@ -11,8 +11,6 @@ import (
 	text "text/template"
 	"time"
 
-	"github.com/influxdata/influxdb/influxql"
-	imodels "github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
@@ -794,14 +792,6 @@ func (a *AlertNode) findFirstMatchLevel(start alert.Level, stop alert.Level, now
 	return alert.OK, false
 }
 
-func (a *AlertNode) batchToResult(b models.Batch) influxql.Result {
-	row := models.BatchToRow(b)
-	r := influxql.Result{
-		Series: imodels.Rows{row},
-	}
-	return r
-}
-
 func (a *AlertNode) event(
 	id, name string,
 	group models.GroupID,
@@ -832,7 +822,7 @@ func (a *AlertNode) event(
 			Group:    string(group),
 			Tags:     tags,
 			Fields:   fields,
-			Result:   a.batchToResult(b),
+			Result:   models.BatchToResult(b),
 		},
 	}
 	return event, nil
