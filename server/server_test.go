@@ -23,12 +23,13 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	iclient "github.com/influxdata/influxdb/client/v2"
 	"github.com/influxdata/influxdb/influxql"
-	"github.com/influxdata/influxdb/models"
+	imodels "github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/toml"
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/client/v1"
 	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/command/commandtest"
+	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/server"
 	alertservice "github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alert/alerttest"
@@ -1423,7 +1424,7 @@ func TestServer_StreamTask(t *testing.T) {
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), id)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"series":null}`
 	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -1502,7 +1503,7 @@ func TestServer_StreamTask_NoRP(t *testing.T) {
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), id)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"series":null}`
 	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -1585,7 +1586,7 @@ stream
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), taskId)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"series":null}`
 	if err := s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5); err != nil {
 		t.Error(err)
 	}
@@ -1764,7 +1765,7 @@ stream
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), taskId)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"series":null}`
 	if err := s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5); err != nil {
 		t.Error(err)
 	}
@@ -1857,7 +1858,7 @@ stream
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), taskId)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"series":null}`
 	if err := s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5); err != nil {
 		t.Error(err)
 	}
@@ -1954,7 +1955,7 @@ stream
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), taskId)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"series":null}`
 	if err := s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5); err != nil {
 		t.Error(err)
 	}
@@ -2098,7 +2099,7 @@ stream
 		endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), taskId)
 
 		// Request data before any writes and expect null responses
-		nullResponse := `{}`
+		nullResponse := `{"series":null}`
 		if err := s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5); err != nil {
 			t.Error(err)
 		}
@@ -2479,7 +2480,7 @@ func TestServer_StreamTask_AllMeasurements(t *testing.T) {
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), id)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"series":null}`
 	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -2551,7 +2552,7 @@ func TestServer_BatchTask(t *testing.T) {
 			stopTimeC <- stopTime
 			return &iclient.Response{
 				Results: []iclient.Result{{
-					Series: []models.Row{{
+					Series: []imodels.Row{{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
 						Values: [][]interface{}{
@@ -2570,7 +2571,7 @@ func TestServer_BatchTask(t *testing.T) {
 		default:
 			return &iclient.Response{
 				Results: []iclient.Result{{
-					Series: []models.Row{{
+					Series: []imodels.Row{{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
 						Values:  [][]interface{}{},
@@ -2686,7 +2687,7 @@ func TestServer_BatchTask_InfluxDBConfigUpdate(t *testing.T) {
 			stopTimeC <- stopTime
 			return &iclient.Response{
 				Results: []iclient.Result{{
-					Series: []models.Row{{
+					Series: []imodels.Row{{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
 						Values: [][]interface{}{
@@ -2705,7 +2706,7 @@ func TestServer_BatchTask_InfluxDBConfigUpdate(t *testing.T) {
 		default:
 			return &iclient.Response{
 				Results: []iclient.Result{{
-					Series: []models.Row{{
+					Series: []imodels.Row{{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
 						Values:  [][]interface{}{},
@@ -2982,7 +2983,7 @@ test value=1 0000000012
 		Time:    time.Date(1970, 1, 1, 0, 0, 10, 0, time.UTC),
 		Level:   "CRITICAL",
 		Data: influxql.Result{
-			Series: models.Rows{
+			Series: imodels.Rows{
 				{
 					Name:    "test",
 					Columns: []string{"time", "count"},
@@ -3054,7 +3055,7 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 		if len(q) > 6 && q[:6] == "SELECT" {
 			r := &iclient.Response{
 				Results: []iclient.Result{{
-					Series: []models.Row{{
+					Series: []imodels.Row{{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
 						Values: [][]interface{}{
@@ -3186,7 +3187,7 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 			Time:    time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 			Level:   "CRITICAL",
 			Data: influxql.Result{
-				Series: models.Rows{
+				Series: imodels.Rows{
 					{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
@@ -3210,7 +3211,7 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 			Time:    time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 			Level:   "CRITICAL",
 			Data: influxql.Result{
-				Series: models.Rows{
+				Series: imodels.Rows{
 					{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
@@ -3292,7 +3293,7 @@ func TestServer_ReplayBatch(t *testing.T) {
 		if len(q) > 6 && q[:6] == "SELECT" {
 			r := &iclient.Response{
 				Results: []iclient.Result{{
-					Series: []models.Row{{
+					Series: []imodels.Row{{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
 						Values: [][]interface{}{
@@ -3399,7 +3400,7 @@ func TestServer_ReplayBatch(t *testing.T) {
 			Time:    time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 			Level:   "CRITICAL",
 			Data: influxql.Result{
-				Series: models.Rows{
+				Series: imodels.Rows{
 					{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
@@ -3423,7 +3424,7 @@ func TestServer_ReplayBatch(t *testing.T) {
 			Time:    time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 			Level:   "CRITICAL",
 			Data: influxql.Result{
-				Series: models.Rows{
+				Series: imodels.Rows{
 					{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
@@ -3492,7 +3493,7 @@ func TestServer_RecordReplayQuery(t *testing.T) {
 		if len(q) > 6 && q[:6] == "SELECT" {
 			r := &iclient.Response{
 				Results: []iclient.Result{{
-					Series: []models.Row{
+					Series: []imodels.Row{
 						{
 							Name:    "cpu",
 							Columns: []string{"time", "value"},
@@ -3652,7 +3653,7 @@ func TestServer_RecordReplayQuery(t *testing.T) {
 			Time:    time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 			Level:   "CRITICAL",
 			Data: influxql.Result{
-				Series: models.Rows{
+				Series: imodels.Rows{
 					{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
@@ -3676,7 +3677,7 @@ func TestServer_RecordReplayQuery(t *testing.T) {
 			Time:    time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 			Level:   "CRITICAL",
 			Data: influxql.Result{
-				Series: models.Rows{
+				Series: imodels.Rows{
 					{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
@@ -3801,7 +3802,7 @@ func TestServer_ReplayQuery(t *testing.T) {
 		if len(q) > 6 && q[:6] == "SELECT" {
 			r := &iclient.Response{
 				Results: []iclient.Result{{
-					Series: []models.Row{
+					Series: []imodels.Row{
 						{
 							Name:    "cpu",
 							Columns: []string{"time", "value"},
@@ -3936,7 +3937,7 @@ func TestServer_ReplayQuery(t *testing.T) {
 			Time:    time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 			Level:   "CRITICAL",
 			Data: influxql.Result{
-				Series: models.Rows{
+				Series: imodels.Rows{
 					{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
@@ -3960,7 +3961,7 @@ func TestServer_ReplayQuery(t *testing.T) {
 			Time:    time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 			Level:   "CRITICAL",
 			Data: influxql.Result{
-				Series: models.Rows{
+				Series: imodels.Rows{
 					{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
@@ -4141,7 +4142,7 @@ func testStreamAgent(t *testing.T, c *server.Config) {
 	endpoint := fmt.Sprintf("%s/tasks/%s/moving_avg", s.URL(), id)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"series":null}`
 	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -4314,7 +4315,7 @@ func testStreamAgentSocket(t *testing.T, c *server.Config) {
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), id)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"series":null}`
 	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -4485,7 +4486,7 @@ func testBatchAgent(t *testing.T, c *server.Config) {
 
 			return &iclient.Response{
 				Results: []iclient.Result{{
-					Series: []models.Row{{
+					Series: []imodels.Row{{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
 						Tags: map[string]string{
@@ -7078,7 +7079,7 @@ func TestServer_AlertHandlers_CRUD(t *testing.T) {
 
 func TestServer_AlertHandlers(t *testing.T) {
 
-	resultJSON := `{"Series":[{"name":"alert","columns":["time","value"],"values":[["1970-01-01T00:00:00Z",1]]}],"Messages":null,"Err":null}`
+	resultJSON := `{"series":[{"name":"alert","columns":["time","value"],"values":[["1970-01-01T00:00:00Z",1]]}]}`
 
 	alertData := alertservice.AlertData{
 		ID:      "id",
@@ -7086,13 +7087,13 @@ func TestServer_AlertHandlers(t *testing.T) {
 		Details: "details",
 		Time:    time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
 		Level:   alert.Critical,
-		Data: influxql.Result{
+		Data: models.Result{
 			Series: models.Rows{
 				{
 					Name:    "alert",
 					Columns: []string{"time", "value"},
 					Values: [][]interface{}{[]interface{}{
-						time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339Nano),
+						time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
 						1.0,
 					}},
 				},
@@ -8452,7 +8453,7 @@ stream
 }
 
 func TestServer_AlertHandler_MultipleActions(t *testing.T) {
-	resultJSON := `{"Series":[{"name":"alert","columns":["time","value"],"values":[["1970-01-01T00:00:00Z",1]]}],"Messages":null,"Err":null}`
+	resultJSON := `{"series":[{"name":"alert","columns":["time","value"],"values":[["1970-01-01T00:00:00Z",1]]}]}`
 
 	// Create default config
 	c := NewConfig()

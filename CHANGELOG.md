@@ -19,6 +19,12 @@
 - [#1184](https://github.com/influxdata/kapacitor/pull/1184): Fix logrotate file to correctly rotate error log.
 - [#1200](https://github.com/influxdata/kapacitor/pull/1200): Fix bug with alert duration being incorrect after restoring alert state.
 
+- [#1199](https://github.com/influxdata/kapacitor/pull/1199): BREAKING: Fix inconsistency with JSON data from alerts.
+    The alert handlers Alerta, Log, OpsGenie, PagerDuty, Post and VictorOps allow extra opaque data to be attached to alert notifications.
+    That opaque data was inconsistent and this change fixes that.
+    Depending on how that data was consumed this could result in a breaking change, since the original behavior was inconsistent
+    we decided it would be best to fix the issue now and make it consistent for all future builds.
+    Specifically in the JSON result data the old key `Series` is always `series`, and the old key `Err` is now always `error` instead of for only some of the outputs.
 
 
 ## v1.2.0 [2017-01-23]

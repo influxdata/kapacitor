@@ -13,11 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/influxdata/influxdb/influxql"
-	imodels "github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/clock"
+	"github.com/influxdata/kapacitor/models"
 	alertservice "github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/storage/storagetest"
 	"github.com/influxdata/wlog"
@@ -76,8 +75,8 @@ batch
 	|httpOut('TestBatch_Derivative')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "packets",
 				Tags:    nil,
@@ -123,8 +122,8 @@ batch
 	|httpOut('TestBatch_Derivative')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "packets",
 				Tags:    nil,
@@ -169,8 +168,8 @@ batch
 	|httpOut('TestBatch_DerivativeNN')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "packets",
 				Tags:    nil,
@@ -216,8 +215,8 @@ batch
 	|httpOut('TestBatch_DerivativeNN')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "packets",
 				Tags:    nil,
@@ -257,8 +256,8 @@ batch
 	|httpOut('TestBatch_Elapsed')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "packets",
 				Tags:    nil,
@@ -303,8 +302,8 @@ batch
 	|httpOut('TestBatch_Difference')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "packets",
 				Tags:    nil,
@@ -348,8 +347,8 @@ batch
 	|httpOut('TestBatch_MovingAverage')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "packets",
 				Tags:    nil,
@@ -392,8 +391,8 @@ batch
 	|httpOut('TestBatch_CumulativeSum')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "packets",
 				Tags:    nil,
@@ -447,8 +446,8 @@ batch
 	|httpOut('TestBatch_SimpleMR')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu-total"},
@@ -504,8 +503,8 @@ data
 	|httpOut('TestBatch_SimpleMR')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu-total"},
@@ -593,8 +592,8 @@ batch
 	|httpOut('TestBatch_CountEmptyBatch')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu-total"},
@@ -645,8 +644,8 @@ batch
 	|httpOut('TestBatch_CountEmptyBatch')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu-total"},
@@ -700,8 +699,8 @@ batch
 	|httpOut('TestBatch_SimpleMR')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu-total"},
@@ -755,8 +754,8 @@ batch
 	|httpOut('TestBatch_Default')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"dc": "sfc"},
@@ -795,8 +794,8 @@ batch
 	|httpOut('TestBatch_Delete')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"dc": "sfc"},
@@ -832,8 +831,8 @@ batch
 	|httpOut('TestBatch_Delete_GroupBy')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu_usage_idle",
 				Tags:    nil,
@@ -866,8 +865,8 @@ batch
 	|httpOut('TestBatch_SimpleMR')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu1"},
@@ -900,8 +899,8 @@ batch
 	|httpOut('TestBatch_GroupByMeasurement')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu_usage_user",
 				Tags:    map[string]string{"cpu": "cpu-total"},
@@ -979,8 +978,8 @@ batch
 	|httpOut('TestBatch_GroupByMeasurement')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu_usage_user",
 				Tags:    map[string]string{"cpu": "cpu-total"},
@@ -1059,7 +1058,7 @@ batch
 `
 
 	// Expect no result since the condition is not met.
-	er := kapacitor.Result{Series: imodels.Rows{}}
+	er := models.Result{Series: models.Rows{}}
 
 	testBatcherWithOutput(t, "TestBatch_SimpleMR", script, 30*time.Second, er, false)
 
@@ -1080,8 +1079,8 @@ batch
 	|httpOut('TestBatch_SimpleMR')
 `
 
-	er = kapacitor.Result{
-		Series: imodels.Rows{
+	er = models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu1"},
@@ -1138,8 +1137,8 @@ batch
 	|httpOut('TestBatch_SimpleMR')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu1"},
@@ -1202,8 +1201,8 @@ batch
 	|httpOut('TestBatch_SimpleMR')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu1", "level": "CRITICAL", "id": "cpu_usage_idle:cpu=cpu1"},
@@ -1255,8 +1254,8 @@ batch
 	|httpOut('TestBatch_SimpleMR')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu1"},
@@ -1313,8 +1312,8 @@ batch
 	|httpOut('TestBatch_SimpleMR')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu_usage_idle",
 				Tags:    map[string]string{"cpu": "cpu1"},
@@ -1370,7 +1369,7 @@ func TestBatch_AlertStateChangesOnly(t *testing.T) {
 				Time:    time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 				Level:   alert.Critical,
 			}
-			ad.Data = influxql.Result{}
+			ad.Data = models.Result{}
 			if eq, msg := compareAlertData(expAd, ad); !eq {
 				t.Error(msg)
 			}
@@ -1382,7 +1381,7 @@ func TestBatch_AlertStateChangesOnly(t *testing.T) {
 				Duration: 38 * time.Second,
 				Level:    alert.OK,
 			}
-			ad.Data = influxql.Result{}
+			ad.Data = models.Result{}
 			if eq, msg := compareAlertData(expAd, ad); !eq {
 				t.Errorf("unexpected alert data for request: %d %s", rc, msg)
 			}
@@ -1428,7 +1427,7 @@ func TestBatch_AlertStateChangesOnlyExpired(t *testing.T) {
 			t.Fatal(err)
 		}
 		// We don't care about the data for this test
-		ad.Data = influxql.Result{}
+		ad.Data = models.Result{}
 		var expAd alertservice.AlertData
 		atomic.AddInt32(&requestCount, 1)
 		rc := atomic.LoadInt32(&requestCount)
@@ -1497,8 +1496,8 @@ batch
     |httpOut('TestBatch_Flatten')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "A"},
@@ -1561,8 +1560,8 @@ batch
     |httpOut('TestBatch_Combine')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "A", "first.service": "cart", "second.service": "auth"},
@@ -1641,8 +1640,8 @@ batch
     |httpOut('TestBatch_Combine')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "A", "other.service": "log", "auth.service": "auth"},
@@ -1703,8 +1702,8 @@ batch
     |httpOut('TestBatch_Combine')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "A", "first.service": "cart", "second.service": "auth", "third.service": "log"},
@@ -1763,8 +1762,8 @@ cpu0
 	|httpOut('TestBatch_Join')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu_usage_idle",
 				Columns: []string{"time", "sum"},
@@ -1813,8 +1812,8 @@ cpu0
 	|httpOut('TestBatch_Join')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu_usage_idle",
 				Columns: []string{"time", "sum"},
@@ -1863,8 +1862,8 @@ cpu0
 	|httpOut('TestBatch_Join')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu_usage_idle",
 				Columns: []string{"time", "sum"},
@@ -1914,8 +1913,8 @@ cpu0
 	|httpOut('TestBatch_JoinTolerance')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu_usage_idle",
 				Columns: []string{"time", "sum"},
@@ -1966,8 +1965,8 @@ cpu0
 	|httpOut('TestBatch_Join_Fill')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu_usage_idle",
 				Columns: []string{"time", "sum"},
@@ -2019,8 +2018,8 @@ cpu0
 	|httpOut('TestBatch_Join_Fill')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu_usage_idle",
 				Columns: []string{"time", "sum"},
@@ -2067,8 +2066,8 @@ errorsByServiceGlobal
 	|httpOut('TestBatch_JoinOn')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "dc_error_percent",
 				Tags:    map[string]string{"dc": "slc", "service": "cart"},
@@ -2177,8 +2176,8 @@ batch
     |httpOut('TestBatch_JoinOn_Fill')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "disk",
 				Tags:    map[string]string{"host": "A", "path": "/"},
@@ -2265,8 +2264,8 @@ batch
     |httpOut('TestBatch_JoinOn_Fill')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "disk",
 				Tags:    map[string]string{"host": "A", "path": "/"},
@@ -2392,7 +2391,7 @@ func testBatcherWithOutput(
 	name,
 	script string,
 	duration time.Duration,
-	er kapacitor.Result,
+	er models.Result,
 	ignoreOrder bool,
 ) {
 	clock, et, replayErr, tm := testBatcher(t, name, script)
@@ -2415,7 +2414,11 @@ func testBatcherWithOutput(
 	}
 
 	// Assert we got the expected result
-	result := kapacitor.ResultFromJSON(resp.Body)
+	result := models.Result{}
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if ignoreOrder {
 		if eq, msg := compareResultsIgnoreSeriesOrder(er, result); !eq {
 			t.Error(msg)

@@ -7,7 +7,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor/influxdb"
 )
 
@@ -98,8 +97,16 @@ func (b *Batch) UpdateGroup() {
 	b.Group = ToGroupID(b.Name, b.Tags, b.PointDimensions())
 }
 
-func BatchToRow(b Batch) (row *models.Row) {
-	row = &models.Row{
+func BatchToResult(b Batch) Result {
+	row := BatchToRow(b)
+	r := Result{
+		Series: Rows{row},
+	}
+	return r
+}
+
+func BatchToRow(b Batch) (row *Row) {
+	row = &Row{
 		Name: b.Name,
 		Tags: b.Tags,
 	}
