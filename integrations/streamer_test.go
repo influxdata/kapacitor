@@ -20,7 +20,6 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/influxdata/influxdb/client"
-	"github.com/influxdata/influxdb/influxql"
 	imodels "github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/alert"
@@ -86,8 +85,8 @@ stream
 	|mean('value')
 	|httpOut('TestStream_Derivative')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "packets",
 				Tags:    nil,
@@ -115,8 +114,8 @@ stream
 	|count('value')
 	|httpOut('TestStream_DerivativeZeroElapsed')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "packets",
 				Tags:    nil,
@@ -145,8 +144,8 @@ stream
 	|mean('value')
 	|httpOut('TestStream_Derivative')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "packets",
 				Tags:    nil,
@@ -175,8 +174,8 @@ stream
 	|mean('value')
 	|httpOut('TestStream_DerivativeNN')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "packets",
 				Tags:    nil,
@@ -204,8 +203,8 @@ stream
 	|mean('value')
 	|httpOut('TestStream_DerivativeNN')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "packets",
 				Tags:    nil,
@@ -234,8 +233,8 @@ stream
 	|where(lambda: "host" == 'serverA')
 	|httpOut('TestStream_HoltWinters')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "packets",
 				Tags:    models.Tags{"host": "serverA"},
@@ -274,8 +273,8 @@ stream
 	|where(lambda: "host" == 'serverA')
 	|httpOut('TestStream_HoltWinters')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "packets",
 				Tags:    models.Tags{"host": "serverA"},
@@ -354,8 +353,8 @@ stream
 	|max('elapsed')
 	|httpOut('TestStream_Elapsed')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "packets",
 				Tags:    nil,
@@ -384,8 +383,8 @@ stream
 	|max('difference')
 	|httpOut('TestStream_Difference')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "packets",
 				Tags:    nil,
@@ -413,8 +412,8 @@ stream
 		.every(10s)
 	|httpOut('TestStream_MovingAverage')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "packets",
 				Tags:    nil,
@@ -479,8 +478,8 @@ stream
 		.every(10s)
 	|httpOut('TestStream_CumulativeSum')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "packets",
 				Tags:    nil,
@@ -552,8 +551,8 @@ stream
 	|httpOut('TestStream_WindowMissing')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    nil,
@@ -588,8 +587,8 @@ stream
 	|httpOut('TestStream_WindowMissing')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    nil,
@@ -645,8 +644,8 @@ stream
 		}
 	}
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    nil,
@@ -687,8 +686,8 @@ stream
 		}
 	}
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    nil,
@@ -728,8 +727,8 @@ stream
 		}
 	}
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    nil,
@@ -761,8 +760,8 @@ stream
 	|httpOut('TestStream_Window_Count')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA"},
@@ -844,8 +843,8 @@ stream
 	|httpOut('TestStream_Window_Count')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA"},
@@ -917,8 +916,8 @@ stream
 	|httpOut('TestStream_Window')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA"},
@@ -1057,8 +1056,8 @@ stream
 	|httpOut('TestStream_Window')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA"},
@@ -1190,8 +1189,8 @@ stream
 		}
 	}
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    nil,
@@ -1249,8 +1248,8 @@ stream
 		}
 	}
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    nil,
@@ -1308,8 +1307,8 @@ stream
 		}
 	}
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    nil,
@@ -1355,8 +1354,8 @@ past
 		.as('diff')
 	|httpOut('TestStream_Shift')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    nil,
@@ -1407,8 +1406,8 @@ past
 		.as('diff')
 	|httpOut('TestStream_Shift')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    nil,
@@ -1459,8 +1458,8 @@ past
 		.as('diff')
 	|httpOut('TestStream_Shift')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    nil,
@@ -1511,8 +1510,8 @@ past
 		.as('diff')
 	|httpOut('TestStream_Shift')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    nil,
@@ -1543,8 +1542,8 @@ stream
 	|count('value')
 	|httpOut('TestStream_SimpleMR')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    nil,
@@ -1569,8 +1568,8 @@ stream
 		.as( 'str', 'bool', 'int', 'float')
 	|httpOut('TestStream_EvalAllTypes')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "types",
 				Tags:    nil,
@@ -1599,8 +1598,8 @@ stream
 		.keep()
 	|httpOut('TestStream_Eval_Keep')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "types",
 				Tags:    nil,
@@ -1629,8 +1628,8 @@ stream
 		.keep('value0', 'pos', 'neg', 'other')
 	|httpOut('TestStream_Eval_KeepSome')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "types",
 				Tags:    nil,
@@ -1659,8 +1658,8 @@ stream
 		.keep('value0', 'zero')
 	|httpOut('TestStream_Eval_Keep')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "types",
 				Tags:    nil,
@@ -1688,8 +1687,8 @@ stream
 	|groupBy('value')
 	|httpOut('TestStream_Eval_Tags')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "types",
 				Tags:    map[string]string{"value": "0"},
@@ -1724,8 +1723,8 @@ stream
 	|groupBy('value')
 	|httpOut('TestStream_Eval_Tags')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "types",
 				Tags:    map[string]string{"value": "0"},
@@ -1764,8 +1763,8 @@ stream
 	|groupBy('value_tag')
 	|httpOut('TestStream_Eval_Tags')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "types",
 				Tags:    map[string]string{"value_tag": "0"},
@@ -1802,8 +1801,8 @@ stream
 		.as('count')
 	|httpOut('TestStream_EvalGroups')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "types",
 				Tags:    map[string]string{"group": "A"},
@@ -1843,8 +1842,8 @@ stream
 	|httpOut('TestStream_Eval_Time')
 `
 	hour := float64(time.Date(1971, 1, 1, 1, 0, 0, 0, time.UTC).Local().Hour())
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "types",
 				Tags:    map[string]string{"group": "A"},
@@ -1888,8 +1887,8 @@ stream
 	|sum('value')
 	|httpOut('TestStream_Default')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    nil,
@@ -1916,8 +1915,8 @@ stream
 	|groupBy(*)
 	|httpOut('TestStream_Delete')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA"},
@@ -1967,8 +1966,8 @@ stream
 		.as('value')
 	|httpOut('TestStream_Delete_GroupBy')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA"},
@@ -2013,8 +2012,8 @@ stream
 	|count('value')
 	|httpOut('TestStream_AllMeasurements')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    nil,
@@ -2044,8 +2043,8 @@ stream
 	|httpOut('unused')
 	|httpOut('TestStream_SimpleMR')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    nil,
@@ -2074,8 +2073,8 @@ stream
 	|count('value')
 	|httpOut('TestStream_BatchGroupBy')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA"},
@@ -2122,8 +2121,8 @@ stream
 	|count('value')
 	|httpOut('TestStream_BatchGroupBy')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -2173,8 +2172,8 @@ stream
 	|where(lambda: "count" < 12)
 	|httpOut('TestStream_SimpleMR')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    nil,
@@ -2211,8 +2210,8 @@ data
 data
 	|httpOut('TestStream_SimpleMR')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    nil,
@@ -2242,8 +2241,8 @@ stream
 	|count('value')
 	|httpOut('TestStream_SimpleMR')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    nil,
@@ -2273,8 +2272,8 @@ stream
 	|count('value')
 	|httpOut('TestStream_SimpleMR')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    nil,
@@ -2304,8 +2303,8 @@ stream
 	|httpOut('TestStream_GroupBy')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "errors",
 				Tags:    map[string]string{"service": "cartA"},
@@ -2367,8 +2366,8 @@ byCpu
 	|httpOut('TestStream_GroupByWhere')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    map[string]string{"cpu": "cpu0", "host": "serverA"},
@@ -2416,8 +2415,8 @@ stream
 	|httpOut('TestStream_GroupByMeasurement')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "errors",
 				Tags:    map[string]string{"service": "cartA"},
@@ -2472,8 +2471,8 @@ stream
     |httpOut('TestStream_Flatten')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "A"},
@@ -2524,8 +2523,8 @@ stream
     |httpOut('TestStream_Combine')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "A", "second.service": "log", "first.service": "auth"},
@@ -2602,8 +2601,8 @@ stream
     |httpOut('TestStream_Combine')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "A", "other.service": "log", "auth.service": "auth"},
@@ -2662,8 +2661,8 @@ stream
     |httpOut('TestStream_Combine')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "A", "first.service": "auth", "second.service": "log", "third.service": "cart"},
@@ -2721,8 +2720,8 @@ errorCounts
 	|httpOut('TestStream_Join')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "error_view",
 				Tags:    map[string]string{"service": "cartA"},
@@ -2796,8 +2795,8 @@ errorCounts
 	|httpOut('TestStream_Join')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "error_view",
 				Tags:    map[string]string{"service": "cartA"},
@@ -2870,8 +2869,8 @@ errorCounts
 	|httpOut('TestStream_Join')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "error_view",
 				Tags:    map[string]string{"service": "cartA"},
@@ -2935,8 +2934,8 @@ errorCounts
 	|httpOut('TestStream_JoinTolerance')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "error_view",
 				Tags:    map[string]string{"service": "cartA"},
@@ -3088,8 +3087,8 @@ errorCounts
 	|httpOut('TestStream_Join_Fill')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "error_view",
 				Tags:    map[string]string{"service": "cartA"},
@@ -3149,8 +3148,8 @@ errorCounts
 	|httpOut('TestStream_Join_Fill')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "error_view",
 				Tags:    map[string]string{"service": "cartA"},
@@ -3212,8 +3211,8 @@ cpu
 	|httpOut('TestStream_JoinN')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "magic",
 				Tags:    nil,
@@ -3262,8 +3261,8 @@ errorsByServiceGlobal
 	|httpOut('TestStream_JoinOn')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "dc_error_percent",
 				Tags:    map[string]string{"dc": "A", "service": "cartA"},
@@ -3380,8 +3379,8 @@ errorsByServiceGlobal
 	|httpOut('TestStream_JoinOn')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "loc_error_percent",
 				Tags:    map[string]string{"dc": "A", "service": "cartA", "rack": "0"},
@@ -3553,8 +3552,8 @@ building
     |httpOut('TestStream_JoinOn_AcrossMeasurement')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "power_floor_percentage",
 				Tags:    map[string]string{"building": "shack", "floor": "1"},
@@ -3631,8 +3630,8 @@ stream
     |httpOut('TestStream_JoinOn_Fill')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "disk",
 				Tags:    map[string]string{"host": "A", "path": "/"},
@@ -3719,8 +3718,8 @@ stream
     |httpOut('TestStream_JoinOn_Fill')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "disk",
 				Tags:    map[string]string{"host": "A", "path": "/"},
@@ -3807,8 +3806,8 @@ cpuT
 	|httpOut('TestStream_Union')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu_all",
 				Tags:    nil,
@@ -3852,8 +3851,8 @@ cpuT
 		},
 		{
 			t: 3 * time.Second,
-			er: kapacitor.Result{
-				Series: imodels.Rows{
+			er: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu_all",
 						Tags:    map[string]string{"cpu": "0"},
@@ -3886,8 +3885,8 @@ cpuT
 		},
 		{
 			t: 6 * time.Second,
-			er: kapacitor.Result{
-				Series: imodels.Rows{
+			er: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu_all",
 						Tags:    map[string]string{"cpu": "0"},
@@ -3920,8 +3919,8 @@ cpuT
 		},
 		{
 			t: 15 * time.Second,
-			er: kapacitor.Result{
-				Series: imodels.Rows{
+			er: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu_all",
 						Tags:    map[string]string{"cpu": "0"},
@@ -3953,8 +3952,8 @@ cpuT
 			},
 		},
 	}
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu_all",
 				Tags:    map[string]string{"cpu": "0"},
@@ -3993,7 +3992,7 @@ func TestStream_InfluxQL_Float(t *testing.T) {
 	type testCase struct {
 		Method        string
 		Args          string
-		ER            kapacitor.Result
+		ER            models.Result
 		UsePointTimes bool
 	}
 
@@ -4014,8 +4013,8 @@ stream
 	testCases := []testCase{
 		testCase{
 			Method: "sum",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -4030,8 +4029,8 @@ stream
 		},
 		testCase{
 			Method: "count",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -4046,8 +4045,8 @@ stream
 		},
 		testCase{
 			Method: "distinct",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -4084,8 +4083,8 @@ stream
 		},
 		testCase{
 			Method: "mean",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -4100,8 +4099,8 @@ stream
 		},
 		testCase{
 			Method: "median",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -4116,8 +4115,8 @@ stream
 		},
 		testCase{
 			Method: "mode",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -4133,8 +4132,8 @@ stream
 		testCase{
 			Method:        "min",
 			UsePointTimes: true,
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -4149,8 +4148,8 @@ stream
 		},
 		testCase{
 			Method: "min",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -4166,8 +4165,8 @@ stream
 		testCase{
 			Method:        "max",
 			UsePointTimes: true,
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -4182,8 +4181,8 @@ stream
 		},
 		testCase{
 			Method: "max",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -4198,8 +4197,8 @@ stream
 		},
 		testCase{
 			Method: "spread",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -4214,8 +4213,8 @@ stream
 		},
 		testCase{
 			Method: "stddev",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -4231,8 +4230,8 @@ stream
 		testCase{
 			Method:        "first",
 			UsePointTimes: true,
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -4247,8 +4246,8 @@ stream
 		},
 		testCase{
 			Method: "first",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -4264,8 +4263,8 @@ stream
 		testCase{
 			Method:        "last",
 			UsePointTimes: true,
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -4280,8 +4279,8 @@ stream
 		},
 		testCase{
 			Method: "last",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -4297,8 +4296,8 @@ stream
 		testCase{
 			Method: "percentile",
 			Args:   "'value', 50.0",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -4315,8 +4314,8 @@ stream
 			Method:        "top",
 			UsePointTimes: true,
 			Args:          "2, 'value'",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -4340,8 +4339,8 @@ stream
 		testCase{
 			Method: "top",
 			Args:   "2, 'value'",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -4366,8 +4365,8 @@ stream
 			Method:        "bottom",
 			UsePointTimes: true,
 			Args:          "3, 'value'",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -4396,8 +4395,8 @@ stream
 		testCase{
 			Method: "bottom",
 			Args:   "3, 'value'",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -4453,7 +4452,7 @@ func TestStream_InfluxQL_Integer(t *testing.T) {
 	type testCase struct {
 		Method        string
 		Args          string
-		ER            kapacitor.Result
+		ER            models.Result
 		UsePointTimes bool
 	}
 
@@ -4474,8 +4473,8 @@ stream
 	testCases := []testCase{
 		testCase{
 			Method: "sum",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -4490,8 +4489,8 @@ stream
 		},
 		testCase{
 			Method: "count",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -4506,8 +4505,8 @@ stream
 		},
 		testCase{
 			Method: "distinct",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -4544,8 +4543,8 @@ stream
 		},
 		testCase{
 			Method: "mean",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -4560,8 +4559,8 @@ stream
 		},
 		testCase{
 			Method: "median",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -4576,8 +4575,8 @@ stream
 		},
 		testCase{
 			Method: "mode",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -4593,8 +4592,8 @@ stream
 		testCase{
 			Method:        "min",
 			UsePointTimes: true,
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -4609,8 +4608,8 @@ stream
 		},
 		testCase{
 			Method: "min",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -4626,8 +4625,8 @@ stream
 		testCase{
 			Method:        "max",
 			UsePointTimes: true,
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -4642,8 +4641,8 @@ stream
 		},
 		testCase{
 			Method: "max",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -4658,8 +4657,8 @@ stream
 		},
 		testCase{
 			Method: "spread",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -4674,8 +4673,8 @@ stream
 		},
 		testCase{
 			Method: "stddev",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -4691,8 +4690,8 @@ stream
 		testCase{
 			Method:        "first",
 			UsePointTimes: true,
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -4707,8 +4706,8 @@ stream
 		},
 		testCase{
 			Method: "first",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -4724,8 +4723,8 @@ stream
 		testCase{
 			Method:        "last",
 			UsePointTimes: true,
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -4740,8 +4739,8 @@ stream
 		},
 		testCase{
 			Method: "last",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -4757,8 +4756,8 @@ stream
 		testCase{
 			Method: "percentile",
 			Args:   "'value', 50.0",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -4775,8 +4774,8 @@ stream
 			Method:        "top",
 			UsePointTimes: true,
 			Args:          "2, 'value'",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -4800,8 +4799,8 @@ stream
 		testCase{
 			Method: "top",
 			Args:   "2, 'value'",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -4826,8 +4825,8 @@ stream
 			Method:        "bottom",
 			UsePointTimes: true,
 			Args:          "3, 'value'",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -4856,8 +4855,8 @@ stream
 		testCase{
 			Method: "bottom",
 			Args:   "3, 'value'",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -4912,7 +4911,7 @@ func TestStream_InfluxQL_String(t *testing.T) {
 	type testCase struct {
 		Method        string
 		Args          string
-		ER            kapacitor.Result
+		ER            models.Result
 		UsePointTimes bool
 	}
 
@@ -4933,8 +4932,8 @@ stream
 	testCases := []testCase{
 		testCase{
 			Method: "count",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -4949,8 +4948,8 @@ stream
 		},
 		testCase{
 			Method: "distinct",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -4988,8 +4987,8 @@ stream
 		testCase{
 			Method:        "first",
 			UsePointTimes: true,
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -5004,8 +5003,8 @@ stream
 		},
 		testCase{
 			Method: "first",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -5021,8 +5020,8 @@ stream
 		testCase{
 			Method:        "last",
 			UsePointTimes: true,
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -5037,8 +5036,8 @@ stream
 		},
 		testCase{
 			Method: "last",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -5081,7 +5080,7 @@ func TestStream_InfluxQL_Boolean(t *testing.T) {
 	type testCase struct {
 		Method        string
 		Args          string
-		ER            kapacitor.Result
+		ER            models.Result
 		UsePointTimes bool
 	}
 
@@ -5102,8 +5101,8 @@ stream
 	testCases := []testCase{
 		testCase{
 			Method: "count",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -5118,8 +5117,8 @@ stream
 		},
 		testCase{
 			Method: "distinct",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    models.Tags{"host": "serverA"},
@@ -5141,8 +5140,8 @@ stream
 		testCase{
 			Method:        "first",
 			UsePointTimes: true,
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -5157,8 +5156,8 @@ stream
 		},
 		testCase{
 			Method: "first",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -5174,8 +5173,8 @@ stream
 		testCase{
 			Method:        "last",
 			UsePointTimes: true,
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -5190,8 +5189,8 @@ stream
 		},
 		testCase{
 			Method: "last",
-			ER: kapacitor.Result{
-				Series: imodels.Rows{
+			ER: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -5374,8 +5373,8 @@ stream
 		}
 	}()
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    nil,
@@ -5409,8 +5408,8 @@ func TestStream_Alert(t *testing.T) {
 			Details: "details",
 			Time:    time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 			Level:   alert.Critical,
-			Data: influxql.Result{
-				Series: imodels.Rows{
+			Data: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA"},
@@ -5458,8 +5457,8 @@ stream
 	|httpOut('TestStream_Alert')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA", "level": "CRITICAL", "id": "kapacitor/cpu/serverA"},
@@ -5502,8 +5501,8 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 				Duration: 0,
 				Level:    alert.Warning,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA"},
@@ -5523,8 +5522,8 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 				Duration: 0,
 				Level:    alert.Info,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA"},
@@ -5544,8 +5543,8 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 				Duration: time.Second,
 				Level:    alert.Warning,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA"},
@@ -5565,8 +5564,8 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 				Duration: 2 * time.Second,
 				Level:    alert.Warning,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA"},
@@ -5586,8 +5585,8 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 				Duration: 3 * time.Second,
 				Level:    alert.Critical,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA"},
@@ -5607,8 +5606,8 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
 				Duration: 0,
 				Level:    alert.Info,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA"},
@@ -5648,8 +5647,8 @@ stream
 	|httpOut('TestStream_Alert_NoRecoveries')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA"},
@@ -5689,8 +5688,8 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Details: "details",
 				Time:    time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 				Level:   alert.Info,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -5711,8 +5710,8 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
 				Duration: time.Second,
 				Level:    alert.Info,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -5733,8 +5732,8 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 				Duration: 2 * time.Second,
 				Level:    alert.Info,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -5755,8 +5754,8 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 				Duration: 3 * time.Second,
 				Level:    alert.OK,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -5777,8 +5776,8 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 				Duration: 0 * time.Second,
 				Level:    alert.Info,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -5799,8 +5798,8 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 				Duration: 1 * time.Second,
 				Level:    alert.Warning,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -5821,8 +5820,8 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
 				Duration: 2 * time.Second,
 				Level:    alert.Warning,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -5843,8 +5842,8 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
 				Duration: 3 * time.Second,
 				Level:    alert.OK,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -5865,8 +5864,8 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 				Duration: 0 * time.Second,
 				Level:    alert.Info,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -5887,8 +5886,8 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
 				Duration: 1 * time.Second,
 				Level:    alert.Warning,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -5909,8 +5908,8 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 				Duration: 2 * time.Second,
 				Level:    alert.Critical,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -5931,8 +5930,8 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 				Duration: 3 * time.Second,
 				Level:    alert.OK,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -5984,8 +5983,8 @@ stream
 	|httpOut('TestStream_Alert_WithReset_0')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA", "level": "OK", "id": "kapacitor/cpu/serverA", "type": "usage"},
@@ -6027,8 +6026,8 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Details: "details",
 				Time:    time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 				Level:   alert.Info,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -6049,8 +6048,8 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
 				Duration: time.Second,
 				Level:    alert.Info,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -6071,8 +6070,8 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 				Duration: 2 * time.Second,
 				Level:    alert.Info,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -6093,8 +6092,8 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 				Duration: 3 * time.Second,
 				Level:    alert.OK,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -6115,8 +6114,8 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 				Duration: 0 * time.Second,
 				Level:    alert.Info,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -6137,8 +6136,8 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 				Duration: 1 * time.Second,
 				Level:    alert.Warning,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -6159,8 +6158,8 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
 				Duration: 2 * time.Second,
 				Level:    alert.Info,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -6181,8 +6180,8 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
 				Duration: 3 * time.Second,
 				Level:    alert.OK,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -6203,8 +6202,8 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 				Duration: 0 * time.Second,
 				Level:    alert.Info,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -6225,8 +6224,8 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
 				Duration: 1 * time.Second,
 				Level:    alert.Warning,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -6247,8 +6246,8 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 				Duration: 2 * time.Second,
 				Level:    alert.Critical,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -6269,8 +6268,8 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 				Duration: 3 * time.Second,
 				Level:    alert.Warning,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -6291,8 +6290,8 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 12, 0, time.UTC),
 				Duration: 4 * time.Second,
 				Level:    alert.Warning,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -6313,8 +6312,8 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 13, 0, time.UTC),
 				Duration: 5 * time.Second,
 				Level:    alert.Info,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -6335,8 +6334,8 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 14, 0, time.UTC),
 				Duration: 6 * time.Second,
 				Level:    alert.OK,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "usage"},
@@ -6388,8 +6387,8 @@ stream
 	|httpOut('TestStream_Alert_WithReset_1')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA", "level": "OK", "id": "kapacitor/cpu/serverA", "type": "usage"},
@@ -6432,8 +6431,8 @@ func TestStream_AlertDuration(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 				Duration: 0,
 				Level:    alert.Critical,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -6454,8 +6453,8 @@ func TestStream_AlertDuration(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 				Duration: 2 * time.Second,
 				Level:    alert.Warning,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -6476,8 +6475,8 @@ func TestStream_AlertDuration(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 				Duration: 4 * time.Second,
 				Level:    alert.OK,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -6498,8 +6497,8 @@ func TestStream_AlertDuration(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 				Duration: 0,
 				Level:    alert.Warning,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -6520,8 +6519,8 @@ func TestStream_AlertDuration(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 				Duration: 3 * time.Second,
 				Level:    alert.OK,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -6561,8 +6560,8 @@ stream
 	|httpOut('TestStream_AlertDuration')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -6825,14 +6824,14 @@ stream
 			Message: "kapacitor.cpu.serverA is CRITICAL",
 			Time:    time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 			Level:   alert.Critical,
-			Data: influxql.Result{
-				Series: imodels.Rows{
+			Data: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA"},
 						Columns: []string{"time", "count"},
 						Values: [][]interface{}{[]interface{}{
-							time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC).Format(time.RFC3339Nano),
+							time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 							10.0,
 						}},
 					},
@@ -6968,7 +6967,7 @@ stream
 	exp := []interface{}{
 		alertatest.Request{
 			URL:           "/alert",
-			Authorization: "Key testtoken1234567",
+			Authorization: "Bearer testtoken1234567",
 			PostData: alertatest.PostData{
 				Resource:    "cpu",
 				Event:       "serverA",
@@ -6981,7 +6980,7 @@ stream
 		},
 		alertatest.Request{
 			URL:           "/alert",
-			Authorization: "Key anothertesttoken",
+			Authorization: "Bearer anothertesttoken",
 			PostData: alertatest.PostData{
 				Resource:    "resource: serverA",
 				Event:       "event: TestStream_Alert",
@@ -7055,7 +7054,7 @@ stream
 					"Level":           "CRITICAL",
 					"Monitoring Tool": "Kapacitor",
 				},
-				Description: `{"Series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}],"Messages":null,"Err":null}`,
+				Description: `{"series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}]}`,
 				Teams:       []string{"test_team", "another_team"},
 				Recipients:  []string{"test_recipient", "another_recipient"},
 			},
@@ -7072,7 +7071,7 @@ stream
 					"Level":           "CRITICAL",
 					"Monitoring Tool": "Kapacitor",
 				},
-				Description: `{"Series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}],"Messages":null,"Err":null}`,
+				Description: `{"series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}]}`,
 				Teams:       []string{"test_team2"},
 				Recipients:  []string{"test_recipient2", "another_recipient"},
 			},
@@ -7139,7 +7138,7 @@ stream
 				Description: "CRITICAL alert for kapacitor/cpu/serverA",
 				Client:      "kapacitor",
 				ClientURL:   kapacitorURL,
-				Details:     `{"Series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}],"Messages":null,"Err":null}`,
+				Details:     `{"series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}]}`,
 			},
 		},
 		pagerdutytest.Request{
@@ -7150,7 +7149,7 @@ stream
 				Description: "CRITICAL alert for kapacitor/cpu/serverA",
 				Client:      "kapacitor",
 				ClientURL:   kapacitorURL,
-				Details:     `{"Series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}],"Messages":null,"Err":null}`,
+				Details:     `{"series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}]}`,
 			},
 		},
 	}
@@ -7197,14 +7196,14 @@ stream
 			Message: "kapacitor.cpu.serverA is CRITICAL",
 			Time:    time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 			Level:   alert.Critical,
-			Data: influxql.Result{
-				Series: imodels.Rows{
+			Data: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA"},
 						Columns: []string{"time", "count"},
 						Values: [][]interface{}{[]interface{}{
-							time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC).Format(time.RFC3339Nano),
+							time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 							10.0,
 						}},
 					},
@@ -7269,7 +7268,7 @@ stream
 				StateMessage:   "kapacitor/cpu/serverA is CRITICAL",
 				Timestamp:      31536010,
 				MonitoringTool: "kapacitor",
-				Data:           `{"Series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}],"Messages":null,"Err":null}`,
+				Data:           `{"series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}]}`,
 			},
 		},
 		victoropstest.Request{
@@ -7280,7 +7279,7 @@ stream
 				StateMessage:   "kapacitor/cpu/serverA is CRITICAL",
 				Timestamp:      31536010,
 				MonitoringTool: "kapacitor",
-				Data:           `{"Series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}],"Messages":null,"Err":null}`,
+				Data:           `{"series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}]}`,
 			},
 		},
 	}
@@ -7388,14 +7387,14 @@ stream
 		Message: "kapacitor.cpu.serverA is CRITICAL",
 		Time:    time.Date(1971, 01, 01, 0, 0, 10, 0, time.UTC),
 		Level:   alert.Critical,
-		Data: influxql.Result{
-			Series: imodels.Rows{
+		Data: models.Result{
+			Series: models.Rows{
 				{
 					Name:    "cpu",
 					Tags:    map[string]string{"host": "serverA"},
 					Columns: []string{"time", "count"},
 					Values: [][]interface{}{[]interface{}{
-						time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC).Format(time.RFC3339Nano),
+						time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 						10.0,
 					}},
 				},
@@ -7458,14 +7457,14 @@ stream
 		Message: "kapacitor.cpu.serverA is CRITICAL",
 		Time:    time.Date(1971, 01, 01, 0, 0, 10, 0, time.UTC),
 		Level:   alert.Critical,
-		Data: influxql.Result{
-			Series: imodels.Rows{
+		Data: models.Result{
+			Series: models.Rows{
 				{
 					Name:    "cpu",
 					Tags:    map[string]string{"host": "serverA"},
 					Columns: []string{"time", "count"},
 					Values: [][]interface{}{[]interface{}{
-						time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC).Format(time.RFC3339Nano),
+						time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
 						10.0,
 					}},
 				},
@@ -7771,8 +7770,8 @@ func TestStream_AlertSigma(t *testing.T) {
 				Details: "cpu:nil is INFO",
 				Time:    time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
 				Level:   alert.Info,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -7794,8 +7793,8 @@ func TestStream_AlertSigma(t *testing.T) {
 				Time:     time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 				Duration: time.Second,
 				Level:    alert.OK,
-				Data: influxql.Result{
-					Series: imodels.Rows{
+				Data: models.Result{
+					Series: models.Rows{
 						{
 							Name:    "cpu",
 							Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -7856,8 +7855,8 @@ func TestStream_AlertComplexWhere(t *testing.T) {
 			Details: "",
 			Time:    time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
 			Level:   alert.Critical,
-			Data: influxql.Result{
-				Series: imodels.Rows{
+			Data: models.Result{
+				Series: models.Rows{
 					{
 						Name:    "cpu",
 						Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -7929,7 +7928,7 @@ func TestStream_AlertStateChangesOnlyExpired(t *testing.T) {
 			t.Fatal(err)
 		}
 		//We don't care about the data for this test
-		ad.Data = influxql.Result{}
+		ad.Data = models.Result{}
 		var expAd alertservice.AlertData
 		atomic.AddInt32(&requestCount, 1)
 		rc := atomic.LoadInt32(&requestCount)
@@ -8015,8 +8014,8 @@ stream
 	|httpOut('TestStream_K8sAutoscale')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name: "scale",
 				Tags: map[string]string{
@@ -8106,8 +8105,8 @@ stream
 	|httpOut('TestStream_K8sAutoscale')
 `
 
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name: "scale",
 				Tags: map[string]string{
@@ -8400,8 +8399,8 @@ stream
 	|last('value')
 	|httpOut('TestStream_Selectors')
 `
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "cpu",
 				Tags:    map[string]string{"host": "serverA", "type": "idle"},
@@ -8444,8 +8443,8 @@ topScores
 `
 
 	tw := time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC)
-	er := kapacitor.Result{
-		Series: imodels.Rows{
+	er := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "scores",
 				Tags:    map[string]string{"game": "g0"},
@@ -8473,8 +8472,8 @@ topScores
 		},
 	}
 
-	sampleER := kapacitor.Result{
-		Series: imodels.Rows{
+	sampleER := models.Result{
+		Series: models.Rows{
 			{
 				Name:    "scores",
 				Tags:    map[string]string{"game": "g0"},
@@ -8516,7 +8515,11 @@ topScores
 	}
 
 	// Assert we got the expected result
-	result := kapacitor.ResultFromJSON(resp.Body)
+	result := models.Result{}
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if eq, msg := compareResults(er, result); !eq {
 		t.Error(msg)
 	}
@@ -8533,7 +8536,11 @@ topScores
 	}
 
 	// Assert we got the expected result
-	result = kapacitor.ResultFromJSON(resp.Body)
+	result = models.Result{}
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if eq, msg := compareResults(sampleER, result); !eq {
 		t.Error(msg)
 	}
@@ -8652,7 +8659,7 @@ func testStreamerWithOutput(
 	name,
 	script string,
 	duration time.Duration,
-	er kapacitor.Result,
+	er models.Result,
 	ignoreOrder bool,
 	tmInit func(tm *kapacitor.TaskMaster),
 ) {
@@ -8676,7 +8683,11 @@ func testStreamerWithOutput(
 	}
 
 	// Assert we got the expected result
-	result := kapacitor.ResultFromJSON(resp.Body)
+	result := models.Result{}
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if ignoreOrder {
 		if eq, msg := compareResultsIgnoreSeriesOrder(er, result); !eq {
 			t.Error(msg)
@@ -8690,7 +8701,7 @@ func testStreamerWithOutput(
 
 type step struct {
 	t  time.Duration
-	er kapacitor.Result
+	er models.Result
 }
 
 func testStreamerWithSteppedOutput(
@@ -8698,7 +8709,7 @@ func testStreamerWithSteppedOutput(
 	name,
 	script string,
 	steps []step,
-	er kapacitor.Result,
+	er models.Result,
 	ignoreOrder bool,
 	tmInit func(tm *kapacitor.TaskMaster),
 ) {
@@ -8727,7 +8738,11 @@ func testStreamerWithSteppedOutput(
 		}
 
 		// Assert we got the expected result
-		result := kapacitor.ResultFromJSON(resp.Body)
+		result := models.Result{}
+		err = json.NewDecoder(resp.Body).Decode(&result)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if ignoreOrder {
 			if eq, msg := compareResultsIgnoreSeriesOrder(step.er, result); !eq {
 				t.Errorf("step %d: %s", s, msg)
@@ -8765,7 +8780,11 @@ func testStreamerWithSteppedOutput(
 	}
 
 	// Assert we got the expected result
-	result := kapacitor.ResultFromJSON(resp.Body)
+	result := models.Result{}
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if ignoreOrder {
 		if eq, msg := compareResultsIgnoreSeriesOrder(er, result); !eq {
 			t.Errorf("final %s", msg)

@@ -6,10 +6,25 @@
 
 ### Features
 
+- [#1159](https://github.com/influxdata/kapacitor/pulls/1159): Go version 1.7.4 -> 1.7.5
+
 ### Bugfixes
 
+- [#1133](https://github.com/influxdata/kapacitor/issues/1133): Fix case-sensitivity for Telegram `parseMode` value. 
 - [#1147](https://github.com/influxdata/kapacitor/issues/1147): Fix pprof debug endpoint
 - [#1161](https://github.com/influxdata/kapacitor/pull/1161): Fixed install/remove of kapacitor on non-systemd Debian/Ubuntu systems
+- [#1164](https://github.com/influxdata/kapacitor/pull/1164): Fix hang in config API to update a config section.
+    Now if the service update process takes too long the request will timeout and return an error.
+    Previously the request would block forever.
+- [#1165](https://github.com/influxdata/kapacitor/issues/1165): Make the alerta auth token prefix configurable and default it to Bearer.
+- [#1184](https://github.com/influxdata/kapacitor/pull/1184): Fix logrotate file to correctly rotate error log.
+- [#1200](https://github.com/influxdata/kapacitor/pull/1200): Fix bug with alert duration being incorrect after restoring alert state.
+- [#1199](https://github.com/influxdata/kapacitor/pull/1199): BREAKING: Fix inconsistency with JSON data from alerts.
+    The alert handlers Alerta, Log, OpsGenie, PagerDuty, Post and VictorOps allow extra opaque data to be attached to alert notifications.
+    That opaque data was inconsistent and this change fixes that.
+    Depending on how that data was consumed this could result in a breaking change, since the original behavior was inconsistent
+    we decided it would be best to fix the issue now and make it consistent for all future builds.
+    Specifically in the JSON result data the old key `Series` is always `series`, and the old key `Err` is now always `error` instead of for only some of the outputs.
 
 ## v1.2.0 [2017-01-23]
 

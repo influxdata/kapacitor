@@ -14,6 +14,7 @@ import (
 
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/pkg/errors"
+	"strings"
 )
 
 type Service struct {
@@ -143,7 +144,7 @@ func (s *Service) preparePost(chatId, parseMode, message string, disableWebPageP
 		parseMode = c.ParseMode
 	}
 
-	if parseMode != "" && parseMode != "Markdown" && parseMode != "HTML" {
+	if parseMode != "" && strings.ToLower(parseMode) != "markdown" && strings.ToLower(parseMode) != "html" {
 		return "", nil, fmt.Errorf("parseMode %s is not valid, please use 'Markdown' or 'HTML'", parseMode)
 	}
 
