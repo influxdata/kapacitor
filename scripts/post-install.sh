@@ -44,7 +44,7 @@ if [[ -f /etc/redhat-release ]]; then
         # Assuming SysVinit
         install_init
         # Run update-rc.d or fallback to chkconfig if not available
-        if which update-rc.d >/dev/null; then
+        if which update-rc.d &>/dev/null; then
             install_update_rcd
         else
             install_chkconfig
@@ -58,7 +58,7 @@ elif [[ -f /etc/debian_version ]]; then
         # Assuming SysVinit
         install_init
         # Run update-rc.d or fallback to chkconfig if not available
-        if which update-rc.d >/dev/null; then
+        if which update-rc.d &>/dev/null; then
             install_update_rcd
         else
             install_chkconfig
@@ -70,7 +70,7 @@ elif [[ -f /etc/os-release ]]; then
         # Amazon Linux logic
         install_init
         # Run update-rc.d or fallback to chkconfig if not available
-        if which update-rc.d >/dev/null; then
+        if which update-rc.d &>/dev/null; then
             install_update_rcd
         else
             install_chkconfig
