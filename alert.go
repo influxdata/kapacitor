@@ -25,6 +25,7 @@ import (
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/tick/stateful"
+	"github.com/influxdata/kapacitor/vars"
 	"github.com/pkg/errors"
 )
 
@@ -67,6 +68,8 @@ type AlertNode struct {
 
 	levelResets  []stateful.Expression
 	lrScopePools []stateful.ScopePool
+
+	serverInfo serverInfo
 }
 
 // Create a new  AlertNode which caches the most recent item and exposes it over the HTTP API.
@@ -74,6 +77,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 	an = &AlertNode{
 		node: node{Node: n, et: et, logger: l},
 		a:    n,
+		serverInfo: serverInfo{
+			Hostname:  vars.HostVar.StringValue(),
+			ClusterID: vars.ClusterIDVar.StringValue(),
+			ServerID:  vars.ServerIDVar.StringValue(),
+		},
 	}
 	an.node.runF = an.runAlert
 
@@ -919,6 +927,12 @@ func (a *AlertNode) updateState(t time.Time, level alert.Level, group models.Gro
 	return state
 }
 
+type serverInfo struct {
+	Hostname  string
+	ClusterID string
+	ServerID  string
+}
+
 // Type containing information available to ID template.
 type idInfo struct {
 	// Measurement name
@@ -933,6 +947,8 @@ type idInfo struct {
 
 	// Map of tags
 	Tags map[string]string
+
+	ServerInfo serverInfo
 }
 
 type messageInfo struct {
@@ -963,10 +979,11 @@ func (a *AlertNode) renderID(name string, group models.GroupID, tags models.Tags
 		g = "nil"
 	}
 	info := idInfo{
-		Name:     name,
-		TaskName: a.et.Task.ID,
-		Group:    g,
-		Tags:     tags,
+		Name:       name,
+		TaskName:   a.et.Task.ID,
+		Group:      g,
+		Tags:       tags,
+		ServerInfo: a.serverInfo,
 	}
 	id := a.bufPool.Get().(*bytes.Buffer)
 	defer func() {
@@ -988,10 +1005,11 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group 
 	}
 	minfo := messageInfo{
 		idInfo: idInfo{
-			Name:     name,
-			TaskName: a.et.Task.ID,
-			Group:    g,
-			Tags:     tags,
+			Name:       name,
+			TaskName:   a.et.Task.ID,
+			Group:      g,
+			Tags:       tags,
+			ServerInfo: a.serverInfo,
 		},
 		ID:     id,
 		Fields: fields,
