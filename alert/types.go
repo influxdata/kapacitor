@@ -13,6 +13,7 @@ type Event struct {
 	Topic         string
 	State         EventState
 	Data          EventData
+	NoExternal    bool
 	previousState EventState
 }
 
