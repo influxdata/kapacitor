@@ -265,12 +265,15 @@ func (h *aggregateHandler) run() {
 	ticker := time.NewTicker(h.interval)
 	defer ticker.Stop()
 	var events []alert.Event
+	// Keep track if this batch of events should be external.
+	external := false
 	for {
 		select {
 		case <-h.closing:
 			return
 		case e := <-h.events:
 			events = append(events, e)
+			external = external || !e.NoExternal
 		case <-ticker.C:
 			if len(events) == 0 {
 				continue
@@ -281,6 +284,7 @@ func (h *aggregateHandler) run() {
 					ID:      "aggregate",
 					Message: fmt.Sprintf("Received %d events in the last %v.", len(events), h.interval),
 				},
+				NoExternal: !external,
 			}
 			for i, e := range events {
 				agg.Topic = e.Topic
@@ -298,6 +302,7 @@ func (h *aggregateHandler) run() {
 			agg.State.Details = strings.Join(details, "\n")
 			h.next.Handle(agg)
 			events = events[0:0]
+			external = false
 		}
 	}
 }
