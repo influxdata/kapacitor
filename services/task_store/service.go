@@ -16,6 +16,7 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/client/v1"
+	"github.com/influxdata/kapacitor/services/events"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/influxdata/kapacitor/tick"
@@ -53,6 +54,7 @@ type Service struct {
 		Set(*kapacitor.TaskMaster)
 		Delete(*kapacitor.TaskMaster)
 	}
+	Events events.PubSub
 
 	logger *log.Logger
 }
@@ -184,6 +186,11 @@ func (ts *Service) Open() error {
 				} else {
 					ts.logger.Println("D! started task during startup", task.ID)
 				}
+				event := TaskEvent{
+					Task:  task.ID,
+					Event: TaskEnabled,
+				}
+				ts.Events.Publish(event)
 			}
 		}
 		if len(tasks) != limit {
@@ -778,6 +785,16 @@ func (ts *Service) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// Publish task event
+	event := TaskEvent{
+		Task:  newTask.ID,
+		Event: TaskCreated,
+	}
+	ts.Events.Publish(event)
+	if newTask.Status == Enabled {
+		event.Event = TaskEnabled
+		ts.Events.Publish(event)
+	}
 
 	// Return task info
 	t, err := ts.convertTask(newTask, "formatted", "attributes", ts.TaskMasterLookup.Main())
@@ -933,9 +950,23 @@ func (ts *Service) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 				httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
 				return
 			}
+
+			// Publish task event
+			event := TaskEvent{
+				Task:  updated.ID,
+				Event: TaskEnabled,
+			}
+			ts.Events.Publish(event)
 		case Disabled:
 			vars.NumEnabledTasksVar.Add(-1)
 			ts.stopTask(original.ID)
+
+			// Publish task event
+			event := TaskEvent{
+				Task:  updated.ID,
+				Event: TaskDisabled,
+			}
+			ts.Events.Publish(event)
 		}
 	}
 
@@ -1295,6 +1326,14 @@ func (ts *Service) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
 		httpd.HttpError(w, err.Error(), true, http.StatusInternalServerError)
 		return
 	}
+
+	// Publish task event
+	event := TaskEvent{
+		Task:  id,
+		Event: TaskDeleted,
+	}
+	ts.Events.Publish(event)
+
 	w.WriteHeader(http.StatusNoContent)
 }
 

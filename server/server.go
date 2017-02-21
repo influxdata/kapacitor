@@ -24,6 +24,7 @@ import (
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/config"
 	"github.com/influxdata/kapacitor/services/deadman"
+	"github.com/influxdata/kapacitor/services/events"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/influxdb"
@@ -80,6 +81,7 @@ type Server struct {
 
 	AuthService           auth.Interface
 	HTTPDService          *httpd.Service
+	EventsService         *events.Service
 	StorageService        *storage.Service
 	AlertService          *alert.Service
 	TaskStore             *task_store.Service
@@ -164,6 +166,7 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 
 	// Append Kapacitor services.
 	s.initHTTPDService()
+	s.appendEventsService()
 	s.appendStorageService()
 	s.appendAuthService()
 	s.appendConfigOverrideService()
@@ -236,6 +239,14 @@ type dynamicService interface {
 func (s *Server) SetDynamicService(name string, srv dynamicService) {
 	s.DynamicServices[name] = srv
 	_ = s.TesterService.AddTester(name, srv)
+}
+
+func (s *Server) appendEventsService() {
+	l := s.LogService.NewLogger("[events] ", log.LstdFlags)
+	srv := events.NewService(l)
+
+	s.EventsService = srv
+	s.AppendService("events", srv)
 }
 
 func (s *Server) appendStorageService() {
@@ -331,6 +342,7 @@ func (s *Server) appendTaskStoreService() {
 	srv.StorageService = s.StorageService
 	srv.HTTPDService = s.HTTPDService
 	srv.TaskMasterLookup = s.TaskMasterLookup
+	srv.Events = s.EventsService
 
 	s.TaskStore = srv
 	s.TaskMaster.TaskStore = srv
