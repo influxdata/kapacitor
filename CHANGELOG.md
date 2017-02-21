@@ -1,6 +1,33 @@
 # Changelog
 
-## v1.2.0 [unreleased]
+## v1.2.1 [unreleased]
+
+### Release Notes
+
+### Features
+
+- [#1159](https://github.com/influxdata/kapacitor/pulls/1159): Go version 1.7.4 -> 1.7.5
+
+### Bugfixes
+
+- [#1133](https://github.com/influxdata/kapacitor/issues/1133): Fix case-sensitivity for Telegram `parseMode` value. 
+- [#1147](https://github.com/influxdata/kapacitor/issues/1147): Fix pprof debug endpoint
+- [#1164](https://github.com/influxdata/kapacitor/pull/1164): Fix hang in config API to update a config section.
+    Now if the service update process takes too long the request will timeout and return an error.
+    Previously the request would block forever.
+- [#1165](https://github.com/influxdata/kapacitor/issues/1165): Make the alerta auth token prefix configurable and default it to Bearer.
+- [#1184](https://github.com/influxdata/kapacitor/pull/1184): Fix logrotate file to correctly rotate error log.
+- [#1200](https://github.com/influxdata/kapacitor/pull/1200): Fix bug with alert duration being incorrect after restoring alert state.
+
+- [#1199](https://github.com/influxdata/kapacitor/pull/1199): BREAKING: Fix inconsistency with JSON data from alerts.
+    The alert handlers Alerta, Log, OpsGenie, PagerDuty, Post and VictorOps allow extra opaque data to be attached to alert notifications.
+    That opaque data was inconsistent and this change fixes that.
+    Depending on how that data was consumed this could result in a breaking change, since the original behavior was inconsistent
+    we decided it would be best to fix the issue now and make it consistent for all future builds.
+    Specifically in the JSON result data the old key `Series` is always `series`, and the old key `Err` is now always `error` instead of for only some of the outputs.
+
+
+## v1.2.0 [2017-01-23]
 
 ### Release Notes
 
@@ -60,22 +87,23 @@ See the [API docs on technical preview](https://docs.influxdata.com/kapacitor/v1
 
 ### Features
 
-- [#327](https://github.com/influxdata/kapacitor/issues/327): You can now window based on count in addition to time.
+- [#1110](https://github.com/influxdata/kapacitor/pull/1110): Add new query property for aligning group by intervals to start times.
+- [#1095](https://github.com/influxdata/kapacitor/pull/1095): Add new alert API, with support for configuring handlers and topics.
+- [#1052](https://github.com/influxdata/kapacitor/issues/1052): Move alerta api token to header and add option to skip TLS verification.
+- [#929](https://github.com/influxdata/kapacitor/pull/929): Add SNMP trap service for alerting.
 - [#913](https://github.com/influxdata/kapacitor/issues/913): Add fillPeriod option to Window node, so that the first emit waits till the period has elapsed before emitting.
 - [#898](https://github.com/influxdata/kapacitor/issues/898): Now when the Window node every value is zero, the window will be emitted immediately for each new point.
-- [#1052](https://github.com/influxdata/kapacitor/issues/1052): Move alerta api token to header and add option to skip TLS verification.
-- [#251](https://github.com/influxdata/kapacitor/issues/251): Enable markdown in slack attachments.
-- [#1095](https://github.com/influxdata/kapacitor/pull/1095): Add new alert API, with support for configuring handlers and topics.
-- [#929](https://github.com/influxdata/kapacitor/pull/929): Add SNMP trap service for alerting
-- [#1110](https://github.com/influxdata/kapacitor/pull/1110): Add new query property for aligning group by intervals to start times.
 - [#744](https://github.com/influxdata/kapacitor/issues/744): Preserve alert state across restarts and disable/enable actions.
+- [#327](https://github.com/influxdata/kapacitor/issues/327): You can now window based on count in addition to time.
+- [#251](https://github.com/influxdata/kapacitor/issues/251): Enable markdown in slack attachments.
 
 
 ### Bugfixes
 
-- [#1045](https://github.com/influxdata/kapacitor/issues/1045): Fix panic during replays.
-- [#1043](https://github.com/influxdata/kapacitor/issues/1043): logrotate.d ignores kapacitor configuration due to bad file mode
 - [#1100](https://github.com/influxdata/kapacitor/issues/1100): Fix issue with the Union node buffering more points than necessary.
+- [#1087](https://github.com/influxdata/kapacitor/issues/1087): Fix panic during close of failed startup when connecting to InfluxDB.
+- [#1045](https://github.com/influxdata/kapacitor/issues/1045): Fix panic during replays.
+- [#1043](https://github.com/influxdata/kapacitor/issues/1043): logrotate.d ignores kapacitor configuration due to bad file mode.
 - [#872](https://github.com/influxdata/kapacitor/issues/872): Fix panic during failed aggregate results.
 
 ## v1.1.1 [2016-12-02]

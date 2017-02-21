@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/kapacitor/models"
 )
 
 type Event struct {
@@ -67,7 +67,7 @@ type EventData struct {
 	// Fields of alerting data point.
 	Fields map[string]interface{}
 
-	Result influxql.Result
+	Result models.Result
 }
 
 // TemplateData is a structure containing all information available to use in templates for an Event.

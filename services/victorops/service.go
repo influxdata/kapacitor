@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor/alert"
+	"github.com/influxdata/kapacitor/models"
 	"github.com/pkg/errors"
 )
 
@@ -87,11 +88,11 @@ func (s *Service) Test(options interface{}) error {
 		o.Message,
 		o.EntityID,
 		time.Now(),
-		nil,
+		models.Result{},
 	)
 }
 
-func (s *Service) Alert(routingKey, messageType, message, entityID string, t time.Time, details interface{}) error {
+func (s *Service) Alert(routingKey, messageType, message, entityID string, t time.Time, details models.Result) error {
 	url, post, err := s.preparePost(routingKey, messageType, message, entityID, t, details)
 	if err != nil {
 		return err
@@ -122,7 +123,7 @@ func (s *Service) Alert(routingKey, messageType, message, entityID string, t tim
 	return nil
 }
 
-func (s *Service) preparePost(routingKey, messageType, message, entityID string, t time.Time, details interface{}) (string, io.Reader, error) {
+func (s *Service) preparePost(routingKey, messageType, message, entityID string, t time.Time, details models.Result) (string, io.Reader, error) {
 	c := s.config()
 	if !c.Enabled {
 		return "", nil, errors.New("service is not enabled")
@@ -134,13 +135,12 @@ func (s *Service) preparePost(routingKey, messageType, message, entityID string,
 	voData["state_message"] = message
 	voData["timestamp"] = t.Unix()
 	voData["monitoring_tool"] = "kapacitor"
-	if details != nil {
-		b, err := json.Marshal(details)
-		if err != nil {
-			return "", nil, err
-		}
-		voData["data"] = string(b)
+
+	b, err := json.Marshal(details)
+	if err != nil {
+		return "", nil, err
 	}
+	voData["data"] = string(b)
 
 	if routingKey == "" {
 		routingKey = c.RoutingKey
@@ -149,7 +149,7 @@ func (s *Service) preparePost(routingKey, messageType, message, entityID string,
 	// Post data to VO
 	var post bytes.Buffer
 	enc := json.NewEncoder(&post)
-	err := enc.Encode(voData)
+	err = enc.Encode(voData)
 	if err != nil {
 		return "", nil, err
 	}

@@ -1491,7 +1491,7 @@ func doShowTopic(args []string) error {
 	if err != nil {
 		return err
 	}
-	te, err := cli.ListTopicEvents(cli.TopicEventsLink(args[0]), nil)
+	te, err := cli.ListTopicEvents(topic.EventsLink, nil)
 	if err != nil {
 		return err
 	}
@@ -1508,10 +1508,20 @@ func doShowTopic(args []string) error {
 
 	sort.Sort(topicEvents(te.Events))
 
+	th, err := cli.ListTopicHandlers(topic.HandlersLink)
+	if err != nil {
+		return err
+	}
+	handlerIDs := make([]string, len(th.Handlers))
+	for i, h := range th.Handlers {
+		handlerIDs[i] = h.ID
+	}
+
 	outFmt := fmt.Sprintf("%%-%ds%%-9s%%-%ds%%-23s\n", maxEvent+1, maxMessage+1)
 	fmt.Println("ID:", topic.ID)
 	fmt.Println("Level:", topic.Level)
 	fmt.Println("Collected:", topic.Collected)
+	fmt.Printf("Handlers: [%s]\n", strings.Join(handlerIDs, ", "))
 	fmt.Println("Events:")
 	fmt.Printf(outFmt, "Event", "Level", "Message", "Date")
 	for _, e := range te.Events {

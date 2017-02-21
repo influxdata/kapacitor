@@ -23,12 +23,13 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	iclient "github.com/influxdata/influxdb/client/v2"
 	"github.com/influxdata/influxdb/influxql"
-	"github.com/influxdata/influxdb/models"
+	imodels "github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/toml"
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/client/v1"
 	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/command/commandtest"
+	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/server"
 	alertservice "github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alert/alerttest"
@@ -68,6 +69,56 @@ func TestServer_Ping(t *testing.T) {
 	}
 	if version != "testServer" {
 		t.Fatal("unexpected version", version)
+	}
+}
+
+func TestServer_Pprof_Index(t *testing.T) {
+	s, _ := OpenDefaultServer()
+	defer s.Close()
+	testCases := []struct {
+		path        string
+		code        int
+		contentType string
+	}{
+		{
+			path:        "/debug/pprof/",
+			code:        http.StatusOK,
+			contentType: "text/html; charset=utf-8",
+		},
+		{
+			path:        "/debug/pprof/block",
+			code:        http.StatusOK,
+			contentType: "text/plain; charset=utf-8",
+		},
+		{
+			path:        "/debug/pprof/goroutine",
+			code:        http.StatusOK,
+			contentType: "text/plain; charset=utf-8",
+		},
+		{
+			path:        "/debug/pprof/heap",
+			code:        http.StatusOK,
+			contentType: "text/plain; charset=utf-8",
+		},
+		{
+			path:        "/debug/pprof/threadcreate",
+			code:        http.StatusOK,
+			contentType: "text/plain; charset=utf-8",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.path, func(t *testing.T) {
+			r, err := http.Get(s.URL() + tc.path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got, exp := r.StatusCode, tc.code; got != exp {
+				t.Errorf("unexpected status code got %d exp %d", got, exp)
+			}
+			if got, exp := r.Header.Get("Content-Type"), tc.contentType; got != exp {
+				t.Errorf("unexpected content type got %s exp %s", got, exp)
+			}
+		})
 	}
 }
 func TestServer_Authenticate_Fail(t *testing.T) {
@@ -1373,7 +1424,7 @@ func TestServer_StreamTask(t *testing.T) {
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), id)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"series":null}`
 	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -1452,7 +1503,7 @@ func TestServer_StreamTask_NoRP(t *testing.T) {
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), id)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"series":null}`
 	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -1535,7 +1586,7 @@ stream
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), taskId)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"series":null}`
 	if err := s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5); err != nil {
 		t.Error(err)
 	}
@@ -1714,7 +1765,7 @@ stream
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), taskId)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"series":null}`
 	if err := s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5); err != nil {
 		t.Error(err)
 	}
@@ -1807,7 +1858,7 @@ stream
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), taskId)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"series":null}`
 	if err := s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5); err != nil {
 		t.Error(err)
 	}
@@ -1904,7 +1955,7 @@ stream
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), taskId)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"series":null}`
 	if err := s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5); err != nil {
 		t.Error(err)
 	}
@@ -2048,7 +2099,7 @@ stream
 		endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), taskId)
 
 		// Request data before any writes and expect null responses
-		nullResponse := `{}`
+		nullResponse := `{"series":null}`
 		if err := s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5); err != nil {
 			t.Error(err)
 		}
@@ -2429,7 +2480,7 @@ func TestServer_StreamTask_AllMeasurements(t *testing.T) {
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), id)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"series":null}`
 	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -2501,7 +2552,7 @@ func TestServer_BatchTask(t *testing.T) {
 			stopTimeC <- stopTime
 			return &iclient.Response{
 				Results: []iclient.Result{{
-					Series: []models.Row{{
+					Series: []imodels.Row{{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
 						Values: [][]interface{}{
@@ -2520,7 +2571,7 @@ func TestServer_BatchTask(t *testing.T) {
 		default:
 			return &iclient.Response{
 				Results: []iclient.Result{{
-					Series: []models.Row{{
+					Series: []imodels.Row{{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
 						Values:  [][]interface{}{},
@@ -2636,7 +2687,7 @@ func TestServer_BatchTask_InfluxDBConfigUpdate(t *testing.T) {
 			stopTimeC <- stopTime
 			return &iclient.Response{
 				Results: []iclient.Result{{
-					Series: []models.Row{{
+					Series: []imodels.Row{{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
 						Values: [][]interface{}{
@@ -2655,7 +2706,7 @@ func TestServer_BatchTask_InfluxDBConfigUpdate(t *testing.T) {
 		default:
 			return &iclient.Response{
 				Results: []iclient.Result{{
-					Series: []models.Row{{
+					Series: []imodels.Row{{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
 						Values:  [][]interface{}{},
@@ -2932,7 +2983,7 @@ test value=1 0000000012
 		Time:    time.Date(1970, 1, 1, 0, 0, 10, 0, time.UTC),
 		Level:   "CRITICAL",
 		Data: influxql.Result{
-			Series: models.Rows{
+			Series: imodels.Rows{
 				{
 					Name:    "test",
 					Columns: []string{"time", "count"},
@@ -3004,7 +3055,7 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 		if len(q) > 6 && q[:6] == "SELECT" {
 			r := &iclient.Response{
 				Results: []iclient.Result{{
-					Series: []models.Row{{
+					Series: []imodels.Row{{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
 						Values: [][]interface{}{
@@ -3136,7 +3187,7 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 			Time:    time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 			Level:   "CRITICAL",
 			Data: influxql.Result{
-				Series: models.Rows{
+				Series: imodels.Rows{
 					{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
@@ -3160,7 +3211,7 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 			Time:    time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 			Level:   "CRITICAL",
 			Data: influxql.Result{
-				Series: models.Rows{
+				Series: imodels.Rows{
 					{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
@@ -3242,7 +3293,7 @@ func TestServer_ReplayBatch(t *testing.T) {
 		if len(q) > 6 && q[:6] == "SELECT" {
 			r := &iclient.Response{
 				Results: []iclient.Result{{
-					Series: []models.Row{{
+					Series: []imodels.Row{{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
 						Values: [][]interface{}{
@@ -3349,7 +3400,7 @@ func TestServer_ReplayBatch(t *testing.T) {
 			Time:    time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 			Level:   "CRITICAL",
 			Data: influxql.Result{
-				Series: models.Rows{
+				Series: imodels.Rows{
 					{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
@@ -3373,7 +3424,7 @@ func TestServer_ReplayBatch(t *testing.T) {
 			Time:    time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 			Level:   "CRITICAL",
 			Data: influxql.Result{
-				Series: models.Rows{
+				Series: imodels.Rows{
 					{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
@@ -3442,7 +3493,7 @@ func TestServer_RecordReplayQuery(t *testing.T) {
 		if len(q) > 6 && q[:6] == "SELECT" {
 			r := &iclient.Response{
 				Results: []iclient.Result{{
-					Series: []models.Row{
+					Series: []imodels.Row{
 						{
 							Name:    "cpu",
 							Columns: []string{"time", "value"},
@@ -3602,7 +3653,7 @@ func TestServer_RecordReplayQuery(t *testing.T) {
 			Time:    time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 			Level:   "CRITICAL",
 			Data: influxql.Result{
-				Series: models.Rows{
+				Series: imodels.Rows{
 					{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
@@ -3626,7 +3677,7 @@ func TestServer_RecordReplayQuery(t *testing.T) {
 			Time:    time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 			Level:   "CRITICAL",
 			Data: influxql.Result{
-				Series: models.Rows{
+				Series: imodels.Rows{
 					{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
@@ -3751,7 +3802,7 @@ func TestServer_ReplayQuery(t *testing.T) {
 		if len(q) > 6 && q[:6] == "SELECT" {
 			r := &iclient.Response{
 				Results: []iclient.Result{{
-					Series: []models.Row{
+					Series: []imodels.Row{
 						{
 							Name:    "cpu",
 							Columns: []string{"time", "value"},
@@ -3886,7 +3937,7 @@ func TestServer_ReplayQuery(t *testing.T) {
 			Time:    time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 			Level:   "CRITICAL",
 			Data: influxql.Result{
-				Series: models.Rows{
+				Series: imodels.Rows{
 					{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
@@ -3910,7 +3961,7 @@ func TestServer_ReplayQuery(t *testing.T) {
 			Time:    time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
 			Level:   "CRITICAL",
 			Data: influxql.Result{
-				Series: models.Rows{
+				Series: imodels.Rows{
 					{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
@@ -4091,7 +4142,7 @@ func testStreamAgent(t *testing.T, c *server.Config) {
 	endpoint := fmt.Sprintf("%s/tasks/%s/moving_avg", s.URL(), id)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"series":null}`
 	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -4264,7 +4315,7 @@ func testStreamAgentSocket(t *testing.T, c *server.Config) {
 	endpoint := fmt.Sprintf("%s/tasks/%s/count", s.URL(), id)
 
 	// Request data before any writes and expect null responses
-	nullResponse := `{}`
+	nullResponse := `{"series":null}`
 	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
 	if err != nil {
 		t.Error(err)
@@ -4435,7 +4486,7 @@ func testBatchAgent(t *testing.T, c *server.Config) {
 
 			return &iclient.Response{
 				Results: []iclient.Result{{
-					Series: []models.Row{{
+					Series: []imodels.Row{{
 						Name:    "cpu",
 						Columns: []string{"time", "value"},
 						Tags: map[string]string{
@@ -5363,11 +5414,12 @@ func TestServer_UpdateConfig(t *testing.T) {
 				Elements: []client.ConfigElement{{
 					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/alerta/"},
 					Options: map[string]interface{}{
-						"enabled":     false,
-						"environment": "",
-						"origin":      "",
-						"token":       false,
-						"url":         "http://alerta.example.com",
+						"enabled":      false,
+						"environment":  "",
+						"origin":       "",
+						"token":        false,
+						"token-prefix": "",
+						"url":          "http://alerta.example.com",
 						"insecure-skip-verify": false,
 					},
 					Redacted: []string{
@@ -5378,11 +5430,12 @@ func TestServer_UpdateConfig(t *testing.T) {
 			expDefaultElement: client.ConfigElement{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/alerta/"},
 				Options: map[string]interface{}{
-					"enabled":     false,
-					"environment": "",
-					"origin":      "",
-					"token":       false,
-					"url":         "http://alerta.example.com",
+					"enabled":      false,
+					"environment":  "",
+					"origin":       "",
+					"token":        false,
+					"token-prefix": "",
+					"url":          "http://alerta.example.com",
 					"insecure-skip-verify": false,
 				},
 				Redacted: []string{
@@ -5402,11 +5455,12 @@ func TestServer_UpdateConfig(t *testing.T) {
 						Elements: []client.ConfigElement{{
 							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/alerta/"},
 							Options: map[string]interface{}{
-								"enabled":     false,
-								"environment": "",
-								"origin":      "kapacitor",
-								"token":       true,
-								"url":         "http://alerta.example.com",
+								"enabled":      false,
+								"environment":  "",
+								"origin":       "kapacitor",
+								"token":        true,
+								"token-prefix": "",
+								"url":          "http://alerta.example.com",
 								"insecure-skip-verify": false,
 							},
 							Redacted: []string{
@@ -5417,11 +5471,12 @@ func TestServer_UpdateConfig(t *testing.T) {
 					expElement: client.ConfigElement{
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/alerta/"},
 						Options: map[string]interface{}{
-							"enabled":     false,
-							"environment": "",
-							"origin":      "kapacitor",
-							"token":       true,
-							"url":         "http://alerta.example.com",
+							"enabled":      false,
+							"environment":  "",
+							"origin":       "kapacitor",
+							"token":        true,
+							"token-prefix": "",
+							"url":          "http://alerta.example.com",
 							"insecure-skip-verify": false,
 						},
 						Redacted: []string{
@@ -7024,7 +7079,7 @@ func TestServer_AlertHandlers_CRUD(t *testing.T) {
 
 func TestServer_AlertHandlers(t *testing.T) {
 
-	resultJSON := `{"Series":[{"name":"alert","columns":["time","value"],"values":[["1970-01-01T00:00:00Z",1]]}],"Messages":null,"Err":null}`
+	resultJSON := `{"series":[{"name":"alert","columns":["time","value"],"values":[["1970-01-01T00:00:00Z",1]]}]}`
 
 	alertData := alertservice.AlertData{
 		ID:      "id",
@@ -7032,13 +7087,13 @@ func TestServer_AlertHandlers(t *testing.T) {
 		Details: "details",
 		Time:    time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
 		Level:   alert.Critical,
-		Data: influxql.Result{
+		Data: models.Result{
 			Series: models.Rows{
 				{
 					Name:    "alert",
 					Columns: []string{"time", "value"},
 					Values: [][]interface{}{[]interface{}{
-						time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339Nano),
+						time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
 						1.0,
 					}},
 				},
@@ -7058,10 +7113,11 @@ func TestServer_AlertHandlers(t *testing.T) {
 			handlerAction: client.HandlerAction{
 				Kind: "alerta",
 				Options: map[string]interface{}{
-					"token":       "testtoken1234567",
-					"origin":      "kapacitor",
-					"group":       "test",
-					"environment": "env",
+					"token":        "testtoken1234567",
+					"token-prefix": "Bearer",
+					"origin":       "kapacitor",
+					"group":        "test",
+					"environment":  "env",
 				},
 			},
 			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
@@ -7078,7 +7134,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				got := ts.Requests()
 				exp := []alertatest.Request{{
 					URL:           "/alert",
-					Authorization: "Key testtoken1234567",
+					Authorization: "Bearer testtoken1234567",
 					PostData: alertatest.PostData{
 						Resource:    "alert",
 						Event:       "id",
@@ -7711,6 +7767,121 @@ stream
 	}
 }
 
+func TestServer_Alert_Duration(t *testing.T) {
+	// Setup test TCP server
+	ts, err := alerttest.NewTCPServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ts.Close()
+
+	// Create default config
+	c := NewConfig()
+	s := OpenServer(c)
+	cli := Client(s)
+	defer s.Close()
+
+	tick := `
+stream
+	|from()
+		.measurement('alert')
+	|alert()
+		.id('id')
+		.message('message')
+		.details('details')
+		.crit(lambda: "value" > 1.0)
+		.tcp('` + ts.Addr + `')
+`
+
+	if _, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:   "testAlertHandlers",
+		Type: client.StreamTask,
+		DBRPs: []client.DBRP{{
+			Database:        "mydb",
+			RetentionPolicy: "myrp",
+		}},
+		TICKscript: tick,
+		Status:     client.Enabled,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Write point
+	point := "alert value=2 0000000000"
+	v := url.Values{}
+	v.Add("precision", "s")
+	s.MustWrite("mydb", "myrp", point, v)
+
+	// Restart the server
+	s.Restart()
+
+	topic := "main:testAlertHandlers:alert2"
+	l := cli.TopicEventsLink(topic)
+	expTopicEvents := client.TopicEvents{
+		Link:  l,
+		Topic: topic,
+		Events: []client.TopicEvent{{
+			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1preview/alerts/topics/%s/events/id", topic)},
+			ID:   "id",
+			State: client.EventState{
+				Message:  "message",
+				Details:  "details",
+				Time:     time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
+				Duration: 0,
+				Level:    "CRITICAL",
+			},
+		}},
+	}
+
+	te, err := cli.ListTopicEvents(l, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(te, expTopicEvents) {
+		t.Errorf("unexpected topic events for anonymous topic:\ngot\n%+v\nexp\n%+v\n", te, expTopicEvents)
+	}
+	event, err := cli.TopicEvent(expTopicEvents.Events[0].Link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(event, expTopicEvents.Events[0]) {
+		t.Errorf("unexpected topic event for anonymous topic:\ngot\n%+v\nexp\n%+v\n", event, expTopicEvents.Events[0])
+	}
+
+	// Write point
+	point = "alert value=3 0000000001"
+	v = url.Values{}
+	v.Add("precision", "s")
+	s.MustWrite("mydb", "myrp", point, v)
+
+	// Restart the server
+	s.Restart()
+
+	expTopicEvents = client.TopicEvents{
+		Link:  l,
+		Topic: topic,
+		Events: []client.TopicEvent{{
+			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1preview/alerts/topics/%s/events/id", topic)},
+			ID:   "id",
+			State: client.EventState{
+				Message:  "message",
+				Details:  "details",
+				Time:     time.Date(1970, 1, 1, 0, 0, 1, 0, time.UTC),
+				Duration: client.Duration(time.Second),
+				Level:    "CRITICAL",
+			},
+		}},
+	}
+
+	te, err = cli.ListTopicEvents(l, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(te, expTopicEvents) {
+		t.Errorf("unexpected topic events for anonymous topic after second point:\ngot\n%+v\nexp\n%+v\n", te, expTopicEvents)
+	}
+}
+
 func TestServer_AlertAnonTopic(t *testing.T) {
 	// Setup test TCP server
 	ts, err := alerttest.NewTCPServer()
@@ -8282,7 +8453,7 @@ stream
 }
 
 func TestServer_AlertHandler_MultipleActions(t *testing.T) {
-	resultJSON := `{"Series":[{"name":"alert","columns":["time","value"],"values":[["1970-01-01T00:00:00Z",1]]}],"Messages":null,"Err":null}`
+	resultJSON := `{"series":[{"name":"alert","columns":["time","value"],"values":[["1970-01-01T00:00:00Z",1]]}]}`
 
 	// Create default config
 	c := NewConfig()

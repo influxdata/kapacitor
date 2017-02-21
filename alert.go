@@ -11,8 +11,6 @@ import (
 	text "text/template"
 	"time"
 
-	"github.com/influxdata/influxdb/influxql"
-	imodels "github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
@@ -470,10 +468,12 @@ func (a *AlertNode) runAlert([]byte) error {
 				currentLevel = state.currentLevel()
 			} else {
 				// Check for previous state
-				currentLevel = a.restoreEventState(id)
+				var triggered time.Time
+				currentLevel, triggered = a.restoreEventState(id)
 				if currentLevel != alert.OK {
 					// Update the state with the restored state
-					a.updateState(p.Time, currentLevel, p.Group)
+					state = a.updateState(p.Time, currentLevel, p.Group)
+					state.triggered(triggered)
 				}
 			}
 			l := a.determineLevel(p.Time, p.Fields, p.Tags, currentLevel)
@@ -560,10 +560,12 @@ func (a *AlertNode) runAlert([]byte) error {
 				currentLevel = state.currentLevel()
 			} else {
 				// Check for previous state
-				currentLevel = a.restoreEventState(id)
+				var triggered time.Time
+				currentLevel, triggered = a.restoreEventState(id)
 				if currentLevel != alert.OK {
 					// Update the state with the restored state
-					a.updateState(b.TMax, currentLevel, b.Group)
+					state = a.updateState(b.TMax, currentLevel, b.Group)
+					state.triggered(triggered)
 				}
 			}
 			for i, p := range b.Points {
@@ -689,7 +691,7 @@ func (a *AlertNode) hasTopic() bool {
 	return a.topic != ""
 }
 
-func (a *AlertNode) restoreEventState(id string) alert.Level {
+func (a *AlertNode) restoreEventState(id string) (alert.Level, time.Time) {
 	var topicState, anonTopicState alert.EventState
 	var anonFound, topicFound bool
 	// Check for previous state on anonTopic
@@ -720,9 +722,9 @@ func (a *AlertNode) restoreEventState(id string) alert.Level {
 		} // else nothing was found, nothing to do
 	}
 	if anonFound {
-		return anonTopicState.Level
+		return anonTopicState.Level, anonTopicState.Time
 	}
-	return topicState.Level
+	return topicState.Level, topicState.Time
 }
 
 func (a *AlertNode) handleEvent(event alert.Event) {
@@ -796,14 +798,6 @@ func (a *AlertNode) findFirstMatchLevel(start alert.Level, stop alert.Level, now
 	return alert.OK, false
 }
 
-func (a *AlertNode) batchToResult(b models.Batch) influxql.Result {
-	row := models.BatchToRow(b)
-	r := influxql.Result{
-		Series: imodels.Rows{row},
-	}
-	return r
-}
-
 func (a *AlertNode) event(
 	id, name string,
 	group models.GroupID,
@@ -835,7 +829,7 @@ func (a *AlertNode) event(
 			Group:    string(group),
 			Tags:     tags,
 			Fields:   fields,
-			Result:   a.batchToResult(b),
+			Result:   models.BatchToResult(b),
 		},
 	}
 	return event, nil

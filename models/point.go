@@ -191,8 +191,8 @@ func (p Point) Bytes(precision string) []byte {
 	return bytes
 }
 
-func PointToRow(p Point) (row *models.Row) {
-	row = &models.Row{
+func PointToRow(p Point) (row *Row) {
+	row = &Row{
 		Name:    p.Name,
 		Tags:    p.Tags,
 		Columns: []string{"time"},

@@ -123,6 +123,9 @@ const defaultHostnameTmpl = "Unknown"
 type AlertNode struct {
 	chainnode
 
+	// Topic specifies the name of an alert topic to which,
+	// alerts will be published.
+	// Alert handlers can be configured per topic, see the API documentation.
 	Topic string
 
 	// Template for constructing a unique ID for a given alert.
@@ -1271,7 +1274,7 @@ type TalkHandler struct {
 // Example:
 //    stream
 //         |alert()
-//             .snmpTrap('1.1.1.')
+//             .snmpTrap('1.1.1.1')
 //                 .data('1.3.6.1.2.1.1.7', 'i', '{{ index .Field "value" }}')
 //
 // Send alerts to `target-ip:target-port` on OID '1.3.6.1.2.1.1.7'

@@ -8,6 +8,7 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"time"
 
 	client "github.com/influxdata/kapacitor/client/v1"
 	"github.com/influxdata/kapacitor/services/config/override"
@@ -20,6 +21,9 @@ const (
 	configPath         = "/config"
 	configPathAnchored = "/config/"
 	configBasePath     = httpd.BasePath + configPathAnchored
+
+	// The amount of time an update is allowed take, when sending and receiving.
+	updateTimeout = 5 * time.Second
 )
 
 type ConfigUpdate struct {
@@ -245,11 +249,27 @@ func (s *Service) handleUpdateSection(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send update
-	s.updates <- cu
-	// Wait for error
-	if err := <-errC; err != nil {
-		httpd.HttpError(w, fmt.Sprintf("failed to update configuration %s/%s: %v", section, element, err), true, http.StatusInternalServerError)
+	sendTimer := time.NewTimer(updateTimeout)
+	defer sendTimer.Stop()
+	select {
+	case <-sendTimer.C:
+		httpd.HttpError(w, fmt.Sprintf("failed to send configuration update %s/%s: timeout", section, element), true, http.StatusInternalServerError)
 		return
+	case s.updates <- cu:
+	}
+
+	// Wait for error
+	recvTimer := time.NewTimer(updateTimeout)
+	defer recvTimer.Stop()
+	select {
+	case <-recvTimer.C:
+		httpd.HttpError(w, fmt.Sprintf("failed to update configuration %s/%s: timeout", section, element), true, http.StatusInternalServerError)
+		return
+	case err := <-errC:
+		if err != nil {
+			httpd.HttpError(w, fmt.Sprintf("failed to update configuration %s/%s: %v", section, element, err), true, http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Save the result of the update

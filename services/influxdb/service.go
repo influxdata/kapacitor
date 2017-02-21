@@ -500,7 +500,11 @@ func (c *influxdbCluster) Open() error {
 	}
 
 	c.watchSubs()
-	return c.linkSubscriptions(ctx)
+
+	if err := c.linkSubscriptions(ctx); err != nil {
+		return errors.Wrap(err, "failed to link subscription on startup")
+	}
+	return nil
 }
 
 func (c *influxdbCluster) Close() error {
@@ -514,7 +518,9 @@ func (c *influxdbCluster) Close() error {
 	if c.subSyncTicker != nil {
 		c.subSyncTicker.Stop()
 	}
-	c.client.Close()
+	if c.client != nil {
+		c.client.Close()
+	}
 	return c.closeServices()
 }
 

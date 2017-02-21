@@ -1038,7 +1038,7 @@ func TestService_GetConfig(t *testing.T) {
 			go func() {
 				// Validate we got the update over the chan.
 				// This keeps the chan unblocked.
-				timer := time.NewTimer(10 * time.Millisecond)
+				timer := time.NewTimer(100 * time.Millisecond)
 				defer timer.Stop()
 				select {
 				case cu := <-updates:
