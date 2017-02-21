@@ -9334,6 +9334,141 @@ func testStreamerCardinality(
 	}
 }
 
+func TestStream_StateDuration(t *testing.T) {
+	var script = `
+stream
+	|from().measurement('cpu')
+	|groupBy('host')
+	|stateDuration(lambda: "value" > 95)
+		.unit(1ms)
+		.as('my_duration')
+	|window().period(4s).every(4s)
+	|httpOut('TestStream_StateTracking')
+`
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverA"},
+				Columns: []string{"time", "my_duration", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						0.0,
+						97.1,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+						1000.0,
+						96.6,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						-1.0,
+						83.6,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+						0.0,
+						99.1,
+					},
+				},
+			},
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverB"},
+				Columns: []string{"time", "my_duration", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						-1.0,
+						47.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+						0.0,
+						95.1,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+						2000.0,
+						96.1,
+					},
+				},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_StateTracking", script, 4*time.Second, er, false, nil)
+}
+
+func TestStream_StateCount(t *testing.T) {
+	var script = `
+stream
+	|from().measurement('cpu')
+	|groupBy('host')
+	|stateCount(lambda: "value" > 95)
+		.as('my_count')
+	|window().period(4s).every(4s)
+	|httpOut('TestStream_StateTracking')
+`
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverA"},
+				Columns: []string{"time", "my_count", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						1.0,
+						97.1,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+						2.0,
+						96.6,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						-1.0,
+						83.6,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+						1.0,
+						99.1,
+					},
+				},
+			},
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverB"},
+				Columns: []string{"time", "my_count", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						-1.0,
+						47.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+						1.0,
+						95.1,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+						2.0,
+						96.1,
+					},
+				},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_StateTracking", script, 4*time.Second, er, false, nil)
+}
+
 // Helper test function for streamer
 func testStreamer(
 	t *testing.T,

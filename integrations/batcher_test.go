@@ -2326,6 +2326,143 @@ batch
 	testBatcherWithOutput(t, "TestBatch_JoinOn_Fill", script, 30*time.Second, er, true)
 }
 
+func TestBatch_StateDuration(t *testing.T) {
+	var script = `
+batch
+	|query('SELECT value FROM "telegraf"."default"."cpu"')
+		.period(4s)
+		.every(4s)
+		.groupBy('host')
+	|stateDuration(lambda: "value" > 95)
+		.unit(1ms)
+		.as('my_duration')
+	|httpOut('TestBatch_StateTracking')
+`
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverA"},
+				Columns: []string{"time", "my_duration", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						0.0,
+						97.1,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+						1000.0,
+						96.6,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						-1.0,
+						83.6,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+						0.0,
+						99.1,
+					},
+				},
+			},
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverB"},
+				Columns: []string{"time", "my_duration", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						-1.0,
+						47.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+						0.0,
+						95.1,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+						2000.0,
+						96.1,
+					},
+				},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_StateTracking", script, 8*time.Second, er, false)
+}
+
+func TestBatch_StateCount(t *testing.T) {
+	var script = `
+batch
+	|query('SELECT value FROM "telegraf"."default"."cpu"')
+		.period(4s)
+		.every(4s)
+		.groupBy('host')
+	|stateCount(lambda: "value" > 95)
+		.as('my_count')
+	|httpOut('TestBatch_StateTracking')
+`
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverA"},
+				Columns: []string{"time", "my_count", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						1.0,
+						97.1,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+						2.0,
+						96.6,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						-1.0,
+						83.6,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+						1.0,
+						99.1,
+					},
+				},
+			},
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverB"},
+				Columns: []string{"time", "my_count", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						-1.0,
+						47.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+						1.0,
+						95.1,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+						2.0,
+						96.1,
+					},
+				},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_StateTracking", script, 8*time.Second, er, false)
+}
+
 // Helper test function for batcher
 func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.ExecutingTask, <-chan error, *kapacitor.TaskMaster) {
 	if testing.Verbose() {
