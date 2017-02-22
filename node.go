@@ -19,7 +19,9 @@ import (
 )
 
 const (
-	statAverageExecTime = "avg_exec_time_ns"
+	// TODO: Define stat somewhere else?
+	statsCardinalityGauge = "cardinality"
+	statAverageExecTime   = "avg_exec_time_ns"
 )
 
 // A node that can be  in an executor.
