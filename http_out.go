@@ -7,6 +7,7 @@ import (
 	"path"
 	"sync"
 
+	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/services/httpd"
@@ -20,6 +21,8 @@ type HTTPOutNode struct {
 	endpoint       string
 	routes         []httpd.Route
 	mu             sync.RWMutex
+
+	nodeCardinality *expvar.IntFuncGauge
 }
 
 // Create a new  HTTPOutNode which caches the most recent item and exposes it over the HTTP API.
@@ -30,6 +33,12 @@ func newHTTPOutNode(et *ExecutingTask, n *pipeline.HTTPOutNode, l *log.Logger) (
 		groupSeriesIdx: make(map[models.GroupID]int),
 		result:         new(models.Result),
 	}
+	hn.nodeCardinality = expvar.NewIntFuncGauge(func() int {
+		hn.mu.RLock()
+		l := len(hn.groupSeriesIdx)
+		hn.mu.RUnlock()
+		return l
+	})
 	et.registerOutput(hn.c.Endpoint, hn)
 	hn.node.runF = hn.runOut
 	hn.node.stopF = hn.stopOut
@@ -41,6 +50,8 @@ func (h *HTTPOutNode) Endpoint() string {
 }
 
 func (h *HTTPOutNode) runOut([]byte) error {
+	// h.nodeCardinality is assigned in newHTTPOutNode
+	h.statMap.Set(statsCardinalityGauge, h.nodeCardinality)
 
 	hndl := func(w http.ResponseWriter, req *http.Request) {
 		h.mu.RLock()
