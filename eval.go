@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
+	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick/ast"
@@ -20,6 +22,11 @@ type EvalNode struct {
 	refVarList         [][]string
 	scopePool          stateful.ScopePool
 	tags               map[string]bool
+
+	cardinalityMu   sync.RWMutex
+	nodeCardinality *expvar.IntFuncGauge
+
+	evalErrors *expvar.Int
 }
 
 // Create a new  EvalNode which applies a transformation func to each point in a stream and returns a single point.
@@ -32,6 +39,13 @@ func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalN
 		e:                  n,
 		expressionsByGroup: make(map[models.GroupID][]stateful.Expression),
 	}
+	en.nodeCardinality = expvar.NewIntFuncGauge(func() int {
+		en.cardinalityMu.RLock()
+		l := len(en.expressionsByGroup)
+		en.cardinalityMu.RUnlock()
+		return l
+	})
+
 	// Create stateful expressions
 	en.expressions = make([]stateful.Expression, len(n.Lambdas))
 	en.refVarList = make([][]string, len(n.Lambdas))
@@ -62,6 +76,9 @@ func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalN
 }
 
 func (e *EvalNode) runEval(snapshot []byte) error {
+	// e.nodeCardinality is assigned in newEvalNode
+	e.statMap.Set(statsCardinalityGauge, e.nodeCardinality)
+
 	switch e.Provides() {
 	case pipeline.StreamEdge:
 		var err error
@@ -118,13 +135,17 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 func (e *EvalNode) eval(now time.Time, group models.GroupID, fields models.Fields, tags models.Tags) (models.Fields, models.Tags, error) {
 	vars := e.scopePool.Get()
 	defer e.scopePool.Put(vars)
+	e.cardinalityMu.RLock()
 	expressions, ok := e.expressionsByGroup[group]
+	e.cardinalityMu.RUnlock()
 	if !ok {
 		expressions = make([]stateful.Expression, len(e.expressions))
 		for i, exp := range e.expressions {
 			expressions[i] = exp.CopyReset()
 		}
+		e.cardinalityMu.Lock()
 		e.expressionsByGroup[group] = expressions
+		e.cardinalityMu.Unlock()
 	}
 	for i, expr := range expressions {
 		err := fillScope(vars, e.refVarList[i], now, fields, tags)
