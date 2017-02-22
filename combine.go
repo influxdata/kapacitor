@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"sync"
 	"time"
 
+	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick/stateful"
@@ -19,6 +21,10 @@ type CombineNode struct {
 	expressionsByGroup map[models.GroupID][]stateful.Expression
 	scopePools         []stateful.ScopePool
 
+	cardinalityMu sync.RWMutex
+
+	nodeCardinality *expvar.IntFuncGauge
+
 	combination combination
 }
 
@@ -30,6 +36,14 @@ func newCombineNode(et *ExecutingTask, n *pipeline.CombineNode, l *log.Logger) (
 		expressionsByGroup: make(map[models.GroupID][]stateful.Expression),
 		combination:        combination{max: n.Max},
 	}
+
+	cn.nodeCardinality = expvar.NewIntFuncGauge(func() int {
+		cn.cardinalityMu.RLock()
+		l := len(cn.expressionsByGroup)
+		cn.cardinalityMu.RUnlock()
+		return l
+	})
+
 	// Create stateful expressions
 	cn.expressions = make([]stateful.Expression, len(n.Lambdas))
 	cn.scopePools = make([]stateful.ScopePool, len(n.Lambdas))
@@ -60,6 +74,9 @@ func (t timeList) Less(i, j int) bool { return t[i].Before(t[j]) }
 func (t timeList) Swap(i, j int)      { t[i], t[j] = t[j], t[i] }
 
 func (n *CombineNode) runCombine([]byte) error {
+	// n.nodeCardinality is assigned in newCombineNode
+	n.statMap.Set(statsCardinalityGauge, n.nodeCardinality)
+
 	switch n.Wants() {
 	case pipeline.StreamEdge:
 		buffers := make(map[models.GroupID]*buffer)
@@ -162,13 +179,17 @@ func (n *CombineNode) combineBuffer(buf *buffer) error {
 		return nil
 	}
 	l := len(n.expressions)
+	n.cardinalityMu.RLock()
 	expressions, ok := n.expressionsByGroup[buf.Group]
+	n.cardinalityMu.RUnlock()
 	if !ok {
 		expressions = make([]stateful.Expression, l)
 		for i, expr := range n.expressions {
 			expressions[i] = expr.CopyReset()
 		}
+		n.cardinalityMu.Lock()
 		n.expressionsByGroup[buf.Group] = expressions
+		n.cardinalityMu.Unlock()
 	}
 
 	// Compute matching result for all points
