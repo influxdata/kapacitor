@@ -9,21 +9,28 @@ import (
 	"github.com/influxdata/wlog"
 )
 
-type TestLogService struct{}
+type TestLogService struct {
+	prefix string
+}
 
 func New() TestLogService {
-	return TestLogService{}
+	return NewWithPrefix("")
+}
+func NewWithPrefix(prefix string) TestLogService {
+	return TestLogService{
+		prefix: prefix,
+	}
 }
 
 func (l TestLogService) NewLogger(prefix string, flag int) *log.Logger {
-	return wlog.New(os.Stderr, prefix, flag)
+	return wlog.New(os.Stderr, l.prefix+prefix, flag)
 }
 func (l TestLogService) NewRawLogger(prefix string, flag int) *log.Logger {
-	return log.New(os.Stderr, prefix, flag)
+	return log.New(os.Stderr, l.prefix+prefix, flag)
 }
 
 func (l TestLogService) NewStaticLevelLogger(prefix string, flag int, level logging.Level) *log.Logger {
-	return log.New(wlog.NewStaticLevelWriter(os.Stderr, wlog.Level(level)), prefix, flag)
+	return log.New(wlog.NewStaticLevelWriter(os.Stderr, wlog.Level(level)), l.prefix+prefix, flag)
 }
 
 func (l TestLogService) NewStaticLevelWriter(level logging.Level) io.Writer {
