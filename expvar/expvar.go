@@ -46,6 +46,26 @@ func (v *Int) IntValue() int64 {
 	return atomic.LoadInt64(&v.i)
 }
 
+// IntGauge is a 64-bit integer variable that satisfies the expvar.Var interface.
+type IntFuncGauge struct {
+	ValueF func() int
+}
+
+func (v *IntFuncGauge) String() string {
+	return strconv.FormatInt(v.IntValue(), 10)
+}
+
+func (v *IntFuncGauge) Add(delta int64) {}
+func (v *IntFuncGauge) Set(value int64) {}
+
+func (v *IntFuncGauge) IntValue() int64 {
+	return int64(v.ValueF())
+}
+
+func NewIntFuncGauge(fn func() int) *IntFuncGauge {
+	return &IntFuncGauge{fn}
+}
+
 // IntSum is a 64-bit integer variable that consists of multiple different parts
 // and satisfies the expvar.Var interface.
 // The value of the var is the sum of all its parts.
