@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
+	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 )
@@ -30,11 +32,22 @@ type window interface {
 }
 
 func (w *WindowNode) runWindow([]byte) error {
+	var mu sync.RWMutex
 	windows := make(map[models.GroupID]window)
+	valueF := func() int64 {
+		mu.RLock()
+		l := len(windows)
+		mu.RUnlock()
+		return int64(l)
+	}
+	w.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
+
 	// Loops through points windowing by group
 	for p, ok := w.ins[0].NextPoint(); ok; p, ok = w.ins[0].NextPoint() {
 		w.timer.Start()
+		mu.RLock()
 		wnd := windows[p.Group]
+		mu.RUnlock()
 		if wnd == nil {
 			tags := make(map[string]string, len(p.Dimensions.TagNames))
 			for _, dim := range p.Dimensions.TagNames {
@@ -70,7 +83,9 @@ func (w *WindowNode) runWindow([]byte) error {
 				// This should not be possible, but just in case.
 				return errors.New("invalid window, no period specified for either time or count")
 			}
+			mu.Lock()
 			windows[p.Group] = wnd
+			mu.Unlock()
 		}
 		batch, ok := wnd.Insert(p)
 		if ok {

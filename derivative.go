@@ -2,8 +2,10 @@ package kapacitor
 
 import (
 	"log"
+	"sync"
 	"time"
 
+	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 )
@@ -27,12 +29,25 @@ func newDerivativeNode(et *ExecutingTask, n *pipeline.DerivativeNode, l *log.Log
 func (d *DerivativeNode) runDerivative([]byte) error {
 	switch d.Provides() {
 	case pipeline.StreamEdge:
+		var mu sync.RWMutex
 		previous := make(map[models.GroupID]models.Point)
+		valueF := func() int64 {
+			mu.RLock()
+			l := len(previous)
+			mu.RUnlock()
+			return int64(l)
+		}
+		d.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
+
 		for p, ok := d.ins[0].NextPoint(); ok; p, ok = d.ins[0].NextPoint() {
 			d.timer.Start()
+			mu.RLock()
 			pr, ok := previous[p.Group]
+			mu.RUnlock()
 			if !ok {
+				mu.Lock()
 				previous[p.Group] = p
+				mu.Unlock()
 				d.timer.Stop()
 				continue
 			}
@@ -51,7 +66,9 @@ func (d *DerivativeNode) runDerivative([]byte) error {
 				}
 				d.timer.Resume()
 			}
+			mu.Lock()
 			previous[p.Group] = p
+			mu.Unlock()
 			d.timer.Stop()
 		}
 	case pipeline.BatchEdge:

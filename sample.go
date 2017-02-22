@@ -3,8 +3,10 @@ package kapacitor
 import (
 	"errors"
 	"log"
+	"sync"
 	"time"
 
+	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 )
@@ -12,6 +14,8 @@ import (
 type SampleNode struct {
 	node
 	s *pipeline.SampleNode
+
+	countsMu sync.RWMutex
 
 	counts   map[models.GroupID]int64
 	duration time.Duration
@@ -33,6 +37,14 @@ func newSampleNode(et *ExecutingTask, n *pipeline.SampleNode, l *log.Logger) (*S
 }
 
 func (s *SampleNode) runSample([]byte) error {
+	valueF := func() int64 {
+		s.countsMu.RLock()
+		l := len(s.counts)
+		s.countsMu.RUnlock()
+		return int64(l)
+	}
+	s.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
+
 	switch s.Wants() {
 	case pipeline.StreamEdge:
 		for p, ok := s.ins[0].NextPoint(); ok; p, ok = s.ins[0].NextPoint() {
@@ -73,10 +85,12 @@ func (s *SampleNode) shouldKeep(group models.GroupID, t time.Time) bool {
 		keepTime := t.Truncate(s.duration)
 		return t.Equal(keepTime)
 	} else {
+		s.countsMu.Lock()
 		count := s.counts[group]
 		keep := count%s.s.N == 0
 		count++
 		s.counts[group] = count
+		s.countsMu.Unlock()
 		return keep
 	}
 }
