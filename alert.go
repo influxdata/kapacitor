@@ -58,12 +58,15 @@ type AlertNode struct {
 	messageTmpl *text.Template
 	detailsTmpl *html.Template
 
+	cardinalityMu sync.RWMutex
+
 	alertsTriggered *expvar.Int
 	oksTriggered    *expvar.Int
 	infosTriggered  *expvar.Int
 	warnsTriggered  *expvar.Int
 	critsTriggered  *expvar.Int
 	eventsDropped   *expvar.Int
+	nodeCardinality *expvar.IntFuncGauge
 
 	bufPool sync.Pool
 
@@ -436,6 +439,12 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		n.History = 2
 	}
 	an.states = make(map[models.GroupID]*alertState)
+	an.nodeCardinality = expvar.NewIntFuncGauge(func() int {
+		an.cardinalityMu.RLock()
+		l := len(an.states)
+		an.cardinalityMu.RUnlock()
+		return l
+	})
 
 	// Configure flapping
 	if n.UseFlapping {
@@ -479,6 +488,9 @@ func (a *AlertNode) runAlert([]byte) error {
 	a.eventsDropped = &expvar.Int{}
 	a.statMap.Set(statsCritsTriggered, a.critsTriggered)
 
+	// a.nodeCardinality is assigned in newAlertNode
+	a.statMap.Set(statsCardinalityGauge, a.nodeCardinality)
+
 	switch a.Wants() {
 	case pipeline.StreamEdge:
 		for p, ok := a.ins[0].NextPoint(); ok; p, ok = a.ins[0].NextPoint() {
@@ -488,7 +500,10 @@ func (a *AlertNode) runAlert([]byte) error {
 				return err
 			}
 			var currentLevel alert.Level
-			if state, ok := a.states[p.Group]; ok {
+			a.cardinalityMu.RLock()
+			state, ok := a.states[p.Group]
+			a.cardinalityMu.RUnlock()
+			if ok {
 				currentLevel = state.currentLevel()
 			} else {
 				// Check for previous state
@@ -501,7 +516,7 @@ func (a *AlertNode) runAlert([]byte) error {
 				}
 			}
 			l := a.determineLevel(p.Time, p.Fields, p.Tags, currentLevel)
-			state := a.updateState(p.Time, l, p.Group)
+			state = a.updateState(p.Time, l, p.Group)
 			if (a.a.UseFlapping && state.flapping) || (a.a.IsStateChangesOnly && !state.changed && !state.expired) {
 				a.timer.Stop()
 				continue
@@ -580,7 +595,10 @@ func (a *AlertNode) runAlert([]byte) error {
 			var highestPoint *models.BatchPoint
 
 			var currentLevel alert.Level
-			if state, ok := a.states[b.Group]; ok {
+			a.cardinalityMu.RLock()
+			state, ok := a.states[b.Group]
+			a.cardinalityMu.RUnlock()
+			if ok {
 				currentLevel = state.currentLevel()
 			} else {
 				// Check for previous state
@@ -616,7 +634,7 @@ func (a *AlertNode) runAlert([]byte) error {
 			}
 
 			// Update state
-			state := a.updateState(t, l, b.Group)
+			state = a.updateState(t, l, b.Group)
 			// Trigger alert if:
 			//  l == OK and state.changed (aka recovery)
 			//    OR
@@ -934,12 +952,16 @@ func (a *alertState) percentChange() float64 {
 }
 
 func (a *AlertNode) updateState(t time.Time, level alert.Level, group models.GroupID) *alertState {
+	a.cardinalityMu.RLock()
 	state, ok := a.states[group]
+	a.cardinalityMu.RUnlock()
 	if !ok {
 		state = &alertState{
 			history: make([]alert.Level, a.a.History),
 		}
+		a.cardinalityMu.Lock()
 		a.states[group] = state
+		a.cardinalityMu.Unlock()
 	}
 	state.addEvent(level)
 

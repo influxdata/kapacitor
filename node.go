@@ -19,8 +19,9 @@ import (
 )
 
 const (
-	statAverageExecTime = "avg_exec_time_ns"
-	statErrorCount      = "errors"
+	statErrorCount        = "errors"
+	statsCardinalityGauge = "cardinality"
+	statAverageExecTime   = "avg_exec_time_ns"
 )
 
 // A node that can be  in an executor.
