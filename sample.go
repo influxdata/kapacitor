@@ -3,8 +3,10 @@ package kapacitor
 import (
 	"errors"
 	"log"
+	"sync"
 	"time"
 
+	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 )
@@ -12,6 +14,9 @@ import (
 type SampleNode struct {
 	node
 	s *pipeline.SampleNode
+
+	cardinalityMu   sync.RWMutex
+	nodeCardinality *expvar.IntFuncGauge
 
 	counts   map[models.GroupID]int64
 	duration time.Duration
@@ -25,6 +30,12 @@ func newSampleNode(et *ExecutingTask, n *pipeline.SampleNode, l *log.Logger) (*S
 		counts:   make(map[models.GroupID]int64),
 		duration: n.Duration,
 	}
+	sn.nodeCardinality = expvar.NewIntFuncGauge(func() int {
+		sn.cardinalityMu.RLock()
+		l := len(sn.counts)
+		sn.cardinalityMu.RUnlock()
+		return l
+	})
 	sn.node.runF = sn.runSample
 	if n.Duration == 0 && n.N == 0 {
 		return nil, errors.New("invalid sample rate: must be positive integer or duration")
@@ -33,6 +44,8 @@ func newSampleNode(et *ExecutingTask, n *pipeline.SampleNode, l *log.Logger) (*S
 }
 
 func (s *SampleNode) runSample([]byte) error {
+	// s.nodeCardinality is assigned in newSampleNode
+	s.statMap.Set(statsCardinalityGauge, s.nodeCardinality)
 	switch s.Wants() {
 	case pipeline.StreamEdge:
 		for p, ok := s.ins[0].NextPoint(); ok; p, ok = s.ins[0].NextPoint() {
@@ -73,10 +86,14 @@ func (s *SampleNode) shouldKeep(group models.GroupID, t time.Time) bool {
 		keepTime := t.Truncate(s.duration)
 		return t.Equal(keepTime)
 	} else {
+		s.cardinalityMu.RLock()
 		count := s.counts[group]
+		s.cardinalityMu.RUnlock()
 		keep := count%s.s.N == 0
 		count++
+		s.cardinalityMu.Lock()
 		s.counts[group] = count
+		s.cardinalityMu.Unlock()
 		return keep
 	}
 }
