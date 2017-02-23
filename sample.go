@@ -30,11 +30,11 @@ func newSampleNode(et *ExecutingTask, n *pipeline.SampleNode, l *log.Logger) (*S
 		counts:   make(map[models.GroupID]int64),
 		duration: n.Duration,
 	}
-	sn.nodeCardinality = expvar.NewIntFuncGauge(func() int {
+	sn.nodeCardinality = expvar.NewIntFuncGauge(func() int64 {
 		sn.cardinalityMu.RLock()
 		l := len(sn.counts)
 		sn.cardinalityMu.RUnlock()
-		return l
+		return int64(l)
 	})
 	sn.node.runF = sn.runSample
 	if n.Duration == 0 && n.N == 0 {

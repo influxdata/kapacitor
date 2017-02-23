@@ -439,11 +439,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		n.History = 2
 	}
 	an.states = make(map[models.GroupID]*alertState)
-	an.nodeCardinality = expvar.NewIntFuncGauge(func() int {
+	an.nodeCardinality = expvar.NewIntFuncGauge(func() int64 {
 		an.cardinalityMu.RLock()
 		l := len(an.states)
 		an.cardinalityMu.RUnlock()
-		return l
+		return int64(l)
 	})
 
 	// Configure flapping

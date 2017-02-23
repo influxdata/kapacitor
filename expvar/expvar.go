@@ -46,9 +46,9 @@ func (v *Int) IntValue() int64 {
 	return atomic.LoadInt64(&v.i)
 }
 
-// IntGauge is a 64-bit integer variable that satisfies the expvar.Var interface.
+// IntFuncGauge is a 64-bit integer variable that satisfies the expvar.Var interface.
 type IntFuncGauge struct {
-	ValueF func() int
+	ValueF func() int64
 }
 
 func (v *IntFuncGauge) String() string {
@@ -59,10 +59,10 @@ func (v *IntFuncGauge) Add(delta int64) {}
 func (v *IntFuncGauge) Set(value int64) {}
 
 func (v *IntFuncGauge) IntValue() int64 {
-	return int64(v.ValueF())
+	return v.ValueF()
 }
 
-func NewIntFuncGauge(fn func() int) *IntFuncGauge {
+func NewIntFuncGauge(fn func() int64) *IntFuncGauge {
 	return &IntFuncGauge{fn}
 }
 

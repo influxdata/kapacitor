@@ -74,11 +74,11 @@ func (c *baseReduceContext) Time() time.Time {
 func (n *InfluxQLNode) runStreamInfluxQL() error {
 	var mu sync.RWMutex
 	contexts := make(map[models.GroupID]reduceContext)
-	cardinalityGauge := expvar.NewIntFuncGauge(func() int {
+	cardinalityGauge := expvar.NewIntFuncGauge(func() int64 {
 		mu.RLock()
 		l := len(contexts)
 		mu.RUnlock()
-		return l
+		return int64(l)
 	})
 	n.statMap.Set(statsCardinalityGauge, cardinalityGauge)
 

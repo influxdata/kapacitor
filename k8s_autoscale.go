@@ -65,11 +65,11 @@ func newK8sAutoscaleNode(et *ExecutingTask, n *pipeline.K8sAutoscaleNode, l *log
 	// Initialize the replicas lambda expression scope pool
 	if n.Replicas != nil {
 		kn.replicasExprs = make(map[models.GroupID]stateful.Expression)
-		kn.nodeCardinality = expvar.NewIntFuncGauge(func() int {
+		kn.nodeCardinality = expvar.NewIntFuncGauge(func() int64 {
 			kn.cardinalityMu.RLock()
 			l := len(kn.replicasExprs)
 			kn.cardinalityMu.RUnlock()
-			return l
+			return int64(l)
 		})
 		kn.replicasScopePool = stateful.NewScopePool(stateful.FindReferenceVariables(n.Replicas.Expression))
 	}

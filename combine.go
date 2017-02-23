@@ -37,11 +37,11 @@ func newCombineNode(et *ExecutingTask, n *pipeline.CombineNode, l *log.Logger) (
 		combination:        combination{max: n.Max},
 	}
 
-	cn.nodeCardinality = expvar.NewIntFuncGauge(func() int {
+	cn.nodeCardinality = expvar.NewIntFuncGauge(func() int64 {
 		cn.cardinalityMu.RLock()
 		l := len(cn.expressionsByGroup)
 		cn.cardinalityMu.RUnlock()
-		return l
+		return int64(l)
 	})
 
 	// Create stateful expressions

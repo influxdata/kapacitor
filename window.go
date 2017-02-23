@@ -34,11 +34,11 @@ type window interface {
 func (w *WindowNode) runWindow([]byte) error {
 	var mu sync.RWMutex
 	windows := make(map[models.GroupID]window)
-	cardinalityGauge := kexpvar.NewIntFuncGauge(func() int {
+	cardinalityGauge := kexpvar.NewIntFuncGauge(func() int64 {
 		mu.RLock()
 		l := len(windows)
 		mu.RUnlock()
-		return l
+		return int64(l)
 	})
 	w.statMap.Set(statsCardinalityGauge, cardinalityGauge)
 	// Loops through points windowing by group

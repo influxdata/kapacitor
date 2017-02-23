@@ -39,11 +39,11 @@ func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalN
 		e:                  n,
 		expressionsByGroup: make(map[models.GroupID][]stateful.Expression),
 	}
-	en.nodeCardinality = expvar.NewIntFuncGauge(func() int {
+	en.nodeCardinality = expvar.NewIntFuncGauge(func() int64 {
 		en.cardinalityMu.RLock()
 		l := len(en.expressionsByGroup)
 		en.cardinalityMu.RUnlock()
-		return l
+		return int64(l)
 	})
 
 	// Create stateful expressions

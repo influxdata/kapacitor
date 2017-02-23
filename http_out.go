@@ -33,11 +33,11 @@ func newHTTPOutNode(et *ExecutingTask, n *pipeline.HTTPOutNode, l *log.Logger) (
 		groupSeriesIdx: make(map[models.GroupID]int),
 		result:         new(models.Result),
 	}
-	hn.nodeCardinality = expvar.NewIntFuncGauge(func() int {
+	hn.nodeCardinality = expvar.NewIntFuncGauge(func() int64 {
 		hn.mu.RLock()
 		l := len(hn.groupSeriesIdx)
 		hn.mu.RUnlock()
-		return l
+		return int64(l)
 	})
 	et.registerOutput(hn.c.Endpoint, hn)
 	hn.node.runF = hn.runOut

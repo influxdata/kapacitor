@@ -38,11 +38,11 @@ func newWhereNode(et *ExecutingTask, n *pipeline.WhereNode, l *log.Logger) (wn *
 
 func (w *WhereNode) runWhere(snapshot []byte) error {
 	var mu sync.RWMutex
-	cardinalityGauge := expvar.NewIntFuncGauge(func() int {
+	cardinalityGauge := expvar.NewIntFuncGauge(func() int64 {
 		mu.RLock()
 		l := len(w.expressions)
 		mu.RUnlock()
-		return l
+		return int64(l)
 	})
 	w.statMap.Set(statsCardinalityGauge, cardinalityGauge)
 

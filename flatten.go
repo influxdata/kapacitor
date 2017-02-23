@@ -54,11 +54,11 @@ func (n *FlattenNode) runFlatten([]byte) error {
 	switch n.Wants() {
 	case pipeline.StreamEdge:
 		flattenBuffers := make(map[models.GroupID]*flattenStreamBuffer)
-		cardinalityGauge := expvar.NewIntFuncGauge(func() int {
+		cardinalityGauge := expvar.NewIntFuncGauge(func() int64 {
 			mu.RLock()
 			l := len(flattenBuffers)
 			mu.RUnlock()
-			return l
+			return int64(l)
 		})
 		n.statMap.Set(statsCardinalityGauge, cardinalityGauge)
 
@@ -118,11 +118,11 @@ func (n *FlattenNode) runFlatten([]byte) error {
 		}
 	case pipeline.BatchEdge:
 		allBuffers := make(map[models.GroupID]*flattenBatchBuffer)
-		cardinalityGauge := expvar.NewIntFuncGauge(func() int {
+		cardinalityGauge := expvar.NewIntFuncGauge(func() int64 {
 			mu.RLock()
 			l := len(allBuffers)
 			mu.RUnlock()
-			return l
+			return int64(l)
 		})
 		n.statMap.Set(statsCardinalityGauge, cardinalityGauge)
 		for b, ok := n.ins[0].NextBatch(); ok; b, ok = n.ins[0].NextBatch() {

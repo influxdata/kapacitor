@@ -31,11 +31,11 @@ func (d *DerivativeNode) runDerivative([]byte) error {
 	case pipeline.StreamEdge:
 		var mu sync.RWMutex
 		previous := make(map[models.GroupID]models.Point)
-		cardinalityGauge := expvar.NewIntFuncGauge(func() int {
+		cardinalityGauge := expvar.NewIntFuncGauge(func() int64 {
 			mu.RLock()
 			l := len(previous)
 			mu.RUnlock()
-			return l
+			return int64(l)
 		})
 		d.statMap.Set(statsCardinalityGauge, cardinalityGauge)
 		for p, ok := d.ins[0].NextPoint(); ok; p, ok = d.ins[0].NextPoint() {
