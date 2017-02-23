@@ -277,6 +277,7 @@ func (j *JoinNode) getGroup(p models.PointInterface, groupErrs chan<- error) *gr
 		go func() {
 			err := group.run()
 			if err != nil {
+				j.incrementErrorCount()
 				j.logger.Println("E! join group error:", err)
 				select {
 				case groupErrs <- err:
@@ -342,6 +343,7 @@ func (g *group) collect(i int, p models.PointInterface) error {
 	sets := g.sets[t]
 	if len(sets) == 0 {
 		set = newJoinset(
+			g.j,
 			g.j.j.StreamName,
 			g.j.fill,
 			g.j.fillValue,
@@ -362,6 +364,7 @@ func (g *group) collect(i int, p models.PointInterface) error {
 	}
 	if set == nil {
 		set = newJoinset(
+			g.j,
 			g.j.j.StreamName,
 			g.j.fill,
 			g.j.fillValue,
@@ -466,6 +469,7 @@ func (g *group) emitJoinedSet(set *joinset) error {
 
 // represents a set of points or batches from the same joined time
 type joinset struct {
+	j         *JoinNode
 	name      string
 	fill      influxql.FillOption
 	fillValue interface{}
@@ -486,6 +490,7 @@ type joinset struct {
 }
 
 func newJoinset(
+	n *JoinNode,
 	name string,
 	fill influxql.FillOption,
 	fillValue interface{},
@@ -497,6 +502,7 @@ func newJoinset(
 ) *joinset {
 	expected := len(prefixes)
 	return &joinset{
+		j:         n,
 		name:      name,
 		fill:      fill,
 		fillValue: fillValue,
@@ -599,6 +605,7 @@ BATCH_POINT:
 			}
 			b, ok := batch.(models.Batch)
 			if !ok {
+				js.j.incrementErrorCount()
 				js.logger.Printf("E! invalid join data got %T expected models.Batch", batch)
 				return models.Batch{}, false
 			}

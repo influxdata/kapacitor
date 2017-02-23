@@ -6,15 +6,10 @@ import (
 	"log"
 	"time"
 
-	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/tick/stateful"
-)
-
-const (
-	statsEvalErrors = "eval_errors"
 )
 
 type EvalNode struct {
@@ -25,8 +20,6 @@ type EvalNode struct {
 	refVarList         [][]string
 	scopePool          stateful.ScopePool
 	tags               map[string]bool
-
-	evalErrors *expvar.Int
 }
 
 // Create a new  EvalNode which applies a transformation func to each point in a stream and returns a single point.
@@ -69,8 +62,6 @@ func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalN
 }
 
 func (e *EvalNode) runEval(snapshot []byte) error {
-	e.evalErrors = &expvar.Int{}
-	e.statMap.Set(statsEvalErrors, e.evalErrors)
 	switch e.Provides() {
 	case pipeline.StreamEdge:
 		var err error
@@ -78,7 +69,7 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 			e.timer.Start()
 			p.Fields, p.Tags, err = e.eval(p.Time, p.Group, p.Fields, p.Tags)
 			if err != nil {
-				e.evalErrors.Add(1)
+				e.incrementErrorCount()
 				if !e.e.QuiteFlag {
 					e.logger.Println("E!", err)
 				}
@@ -102,7 +93,7 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 				p := b.Points[i]
 				b.Points[i].Fields, b.Points[i].Tags, err = e.eval(p.Time, b.Group, p.Fields, p.Tags)
 				if err != nil {
-					e.evalErrors.Add(1)
+					e.incrementErrorCount()
 					if !e.e.QuiteFlag {
 						e.logger.Println("E!", err)
 					}

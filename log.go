@@ -41,6 +41,7 @@ func (s *LogNode) runLog([]byte) error {
 		for p, ok := s.ins[0].NextPoint(); ok; p, ok = s.ins[0].NextPoint() {
 			buf.Reset()
 			if err := env.Encode(p); err != nil {
+				s.incrementErrorCount()
 				s.logger.Println("E!", err)
 				continue
 			}
@@ -56,6 +57,7 @@ func (s *LogNode) runLog([]byte) error {
 		for b, ok := s.ins[0].NextBatch(); ok; b, ok = s.ins[0].NextBatch() {
 			buf.Reset()
 			if err := env.Encode(b); err != nil {
+				s.incrementErrorCount()
 				s.logger.Println("E!", err)
 				continue
 			}

@@ -64,6 +64,7 @@ func (w *WhereNode) runWhere(snapshot []byte) error {
 				}
 				w.timer.Resume()
 			} else if err != nil {
+				w.incrementErrorCount()
 				w.logger.Println("E! error while evaluating expression:", err)
 			}
 			w.timer.Stop()
@@ -91,6 +92,7 @@ func (w *WhereNode) runWhere(snapshot []byte) error {
 			for _, p := range points {
 				if pass, err := EvalPredicate(expr, scopePool, p.Time, p.Fields, p.Tags); pass {
 					if err != nil {
+						w.incrementErrorCount()
 						w.logger.Println("E! error while evaluating WHERE expression:", err)
 					}
 					b.Points = append(b.Points, p)

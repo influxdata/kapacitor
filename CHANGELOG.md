@@ -7,6 +7,9 @@
 ### Features
 
 - [#1159](https://github.com/influxdata/kapacitor/pulls/1159): Go version 1.7.4 -> 1.7.5
+- [#1175](https://github.com/influxdata/kapacitor/pull/1175): BREAKING: Add generic error counters to every node type.
+    Renamed `query_errors` to `errors` in batch node.
+    Renamed `eval_errors` to `errors` in eval node.
 
 ### Bugfixes
 

@@ -408,10 +408,10 @@ func TestServer_EnableTask(t *testing.T) {
 	dot := `digraph testTaskID {
 graph [throughput="0.00 points/s"];
 
-stream0 [avg_exec_time_ns="0s" ];
+stream0 [avg_exec_time_ns="0s" errors="0" ];
 stream0 -> from1 [processed="0"];
 
-from1 [avg_exec_time_ns="0s" ];
+from1 [avg_exec_time_ns="0s" errors="0" ];
 }`
 	if ti.Dot != dot {
 		t.Fatalf("unexpected dot\ngot\n%s\nexp\n%s\n", ti.Dot, dot)
@@ -478,10 +478,10 @@ func TestServer_EnableTaskOnCreate(t *testing.T) {
 	dot := `digraph testTaskID {
 graph [throughput="0.00 points/s"];
 
-stream0 [avg_exec_time_ns="0s" ];
+stream0 [avg_exec_time_ns="0s" errors="0" ];
 stream0 -> from1 [processed="0"];
 
-from1 [avg_exec_time_ns="0s" ];
+from1 [avg_exec_time_ns="0s" errors="0" ];
 }`
 	if ti.Dot != dot {
 		t.Fatalf("unexpected dot\ngot\n%s\nexp\n%s\n", ti.Dot, dot)

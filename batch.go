@@ -17,7 +17,6 @@ import (
 )
 
 const (
-	statsQueryErrors    = "query_errors"
 	statsBatchesQueried = "batches_queried"
 	statsPointsQueried  = "points_queried"
 )
@@ -137,7 +136,6 @@ type QueryNode struct {
 	closing  chan struct{}
 	aborting chan struct{}
 
-	queryErrors    *expvar.Int
 	batchesQueried *expvar.Int
 	pointsQueried  *expvar.Int
 	byName         bool
@@ -266,11 +264,9 @@ func (b *QueryNode) Queries(start, stop time.Time) ([]*Query, error) {
 // Query InfluxDB and collect batches on batch collector.
 func (b *QueryNode) doQuery() error {
 	defer b.ins[0].Close()
-	b.queryErrors = &expvar.Int{}
 	b.batchesQueried = &expvar.Int{}
 	b.pointsQueried = &expvar.Int{}
 
-	b.statMap.Set(statsQueryErrors, b.queryErrors)
 	b.statMap.Set(statsBatchesQueried, b.batchesQueried)
 	b.statMap.Set(statsPointsQueried, b.pointsQueried)
 
@@ -305,7 +301,7 @@ func (b *QueryNode) doQuery() error {
 			}
 			resp, err := con.Query(q)
 			if err != nil {
-				b.queryErrors.Add(1)
+				b.incrementErrorCount()
 				b.logger.Println("E!", err)
 				b.timer.Stop()
 				break
@@ -315,8 +311,8 @@ func (b *QueryNode) doQuery() error {
 			for _, res := range resp.Results {
 				batches, err := models.ResultToBatches(res, b.byName)
 				if err != nil {
+					b.incrementErrorCount()
 					b.logger.Println("E! failed to understand query result:", err)
-					b.queryErrors.Add(1)
 					continue
 				}
 				for _, bch := range batches {

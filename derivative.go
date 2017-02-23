@@ -90,18 +90,21 @@ func (d *DerivativeNode) runDerivative([]byte) error {
 func (d *DerivativeNode) derivative(prev, curr models.Fields, prevTime, currTime time.Time) (float64, bool) {
 	f0, ok := numToFloat(prev[d.d.Field])
 	if !ok {
+		d.incrementErrorCount()
 		d.logger.Printf("E! cannot apply derivative to type %T", prev[d.d.Field])
 		return 0, false
 	}
 
 	f1, ok := numToFloat(curr[d.d.Field])
 	if !ok {
+		d.incrementErrorCount()
 		d.logger.Printf("E! cannot apply derivative to type %T", curr[d.d.Field])
 		return 0, false
 	}
 
 	elapsed := float64(currTime.Sub(prevTime))
 	if elapsed == 0 {
+		d.incrementErrorCount()
 		d.logger.Printf("E! cannot perform derivative elapsed time was 0")
 		return 0, false
 	}

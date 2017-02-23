@@ -114,6 +114,7 @@ func (s *FromNode) matches(p models.Point) bool {
 	}
 	if s.expression != nil {
 		if pass, err := EvalPredicate(s.expression, s.scopePool, p.Time, p.Fields, p.Tags); err != nil {
+			s.incrementErrorCount()
 			s.logger.Println("E! error while evaluating WHERE expression:", err)
 			return false
 		} else {
