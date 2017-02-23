@@ -184,6 +184,7 @@ POINTS:
 				fieldPrefix.WriteString(v)
 				fieldPrefix.WriteString(n.f.Delimiter)
 			} else {
+				n.incrementErrorCount()
 				n.logger.Printf("E! point missing tag %q for flatten operation", tag)
 				continue POINTS
 			}

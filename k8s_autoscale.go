@@ -17,7 +17,6 @@ import (
 const (
 	statsK8sIncreaseEventsCount = "increase_events"
 	statsK8sDecreaseEventsCount = "decrease_events"
-	statsK8sErrorsCount         = "errors"
 	statsK8sCooldownDropsCount  = "cooldown_drops"
 )
 
@@ -69,12 +68,10 @@ func newK8sAutoscaleNode(et *ExecutingTask, n *pipeline.K8sAutoscaleNode, l *log
 func (k *K8sAutoscaleNode) runAutoscale([]byte) error {
 	k.increaseCount = &expvar.Int{}
 	k.decreaseCount = &expvar.Int{}
-	errorsCount := &expvar.Int{}
 	k.cooldownDropsCount = &expvar.Int{}
 
 	k.statMap.Set(statsK8sIncreaseEventsCount, k.increaseCount)
 	k.statMap.Set(statsK8sDecreaseEventsCount, k.decreaseCount)
-	k.statMap.Set(statsK8sErrorsCount, errorsCount)
 	k.statMap.Set(statsK8sCooldownDropsCount, k.cooldownDropsCount)
 
 	switch k.Wants() {
@@ -82,7 +79,7 @@ func (k *K8sAutoscaleNode) runAutoscale([]byte) error {
 		for p, ok := k.ins[0].NextPoint(); ok; p, ok = k.ins[0].NextPoint() {
 			k.timer.Start()
 			if np, err := k.handlePoint(p.Name, p.Group, p.Dimensions, p.Time, p.Fields, p.Tags); err != nil {
-				errorsCount.Add(1)
+				k.incrementErrorCount()
 				k.logger.Println("E!", err)
 			} else if np.Name != "" {
 				k.timer.Pause()
@@ -101,7 +98,7 @@ func (k *K8sAutoscaleNode) runAutoscale([]byte) error {
 			k.timer.Start()
 			for _, p := range b.Points {
 				if np, err := k.handlePoint(b.Name, b.Group, b.PointDimensions(), p.Time, p.Fields, p.Tags); err != nil {
-					errorsCount.Add(1)
+					k.incrementErrorCount()
 					k.logger.Println("E!", err)
 				} else if np.Name != "" {
 					k.timer.Pause()

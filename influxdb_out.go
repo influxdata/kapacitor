@@ -78,6 +78,7 @@ func (i *InfluxDBOutNode) runOut([]byte) error {
 			return nil
 		}()
 		if err != nil {
+			i.incrementErrorCount()
 			i.logger.Printf("E! failed to create database %q on cluster %q: %v", i.i.Database, i.i.Cluster, err)
 		}
 	}
@@ -234,6 +235,7 @@ func (w *writeBuffer) run() {
 			if !ok {
 				bp, err = influxdb.NewBatchPoints(qe.bpc)
 				if err != nil {
+					w.i.incrementErrorCount()
 					w.i.logger.Println("E! failed to write points to InfluxDB:", err)
 					break
 				}
@@ -244,6 +246,7 @@ func (w *writeBuffer) run() {
 			if len(bp.Points()) >= w.size {
 				err = w.write(bp)
 				if err != nil {
+					w.i.incrementErrorCount()
 					w.i.logger.Println("E! failed to write points to InfluxDB:", err)
 				}
 				delete(w.buffer, qe.bpc)
@@ -265,6 +268,7 @@ func (w *writeBuffer) writeAll() {
 	for bpc, bp := range w.buffer {
 		err := w.write(bp)
 		if err != nil {
+			w.i.incrementErrorCount()
 			w.i.logger.Println("E! failed to write points to InfluxDB:", err)
 		}
 		delete(w.buffer, bpc)

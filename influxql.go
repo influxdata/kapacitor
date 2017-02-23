@@ -100,18 +100,21 @@ func (n *InfluxQLNode) runStreamInfluxQL() error {
 		if n.isStreamTransformation {
 			err := context.AggregatePoint(&p)
 			if err != nil {
+				n.incrementErrorCount()
 				n.logger.Println("E! failed to aggregate point:", err)
 			}
 			p, ok = n.ins[0].NextPoint()
 
 			err = n.emit(context)
 			if err != nil && err != ErrEmptyEmit {
+				n.incrementErrorCount()
 				n.logger.Println("E! failed to emit stream:", err)
 			}
 		} else {
 			if p.Time.Equal(context.Time()) {
 				err := context.AggregatePoint(&p)
 				if err != nil {
+					n.incrementErrorCount()
 					n.logger.Println("E! failed to aggregate point:", err)
 				}
 				// advance to next point
@@ -119,6 +122,7 @@ func (n *InfluxQLNode) runStreamInfluxQL() error {
 			} else {
 				err := n.emit(context)
 				if err != nil {
+					n.incrementErrorCount()
 					n.logger.Println("E! failed to emit stream:", err)
 				}
 
@@ -180,9 +184,11 @@ func (n *InfluxQLNode) runBatchInfluxQL() error {
 					Tags:   bp.Tags,
 				}
 				if err := context.AggregatePoint(&p); err != nil {
+					n.incrementErrorCount()
 					n.logger.Println("E! failed to aggregate batch point:", err)
 				}
 				if ep, err := context.EmitPoint(); err != nil && err != ErrEmptyEmit {
+					n.incrementErrorCount()
 					n.logger.Println("E! failed to emit batch point:", err)
 				} else if err != ErrEmptyEmit {
 					eb.Points = append(eb.Points, models.BatchPoint{
@@ -196,6 +202,7 @@ func (n *InfluxQLNode) runBatchInfluxQL() error {
 			n.timer.Pause()
 			for _, out := range n.outs {
 				if err := out.CollectBatch(eb); err != nil {
+					n.incrementErrorCount()
 					n.logger.Println("E! failed to emit batch points:", err)
 				}
 			}
@@ -204,9 +211,11 @@ func (n *InfluxQLNode) runBatchInfluxQL() error {
 			err := context.AggregateBatch(&b)
 			if err == nil {
 				if err := n.emit(context); err != nil {
+					n.incrementErrorCount()
 					n.logger.Println("E! failed to emit batch:", err)
 				}
 			} else {
+				n.incrementErrorCount()
 				n.logger.Println("E! failed to aggregate batch:", err)
 			}
 		}

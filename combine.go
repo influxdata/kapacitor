@@ -180,6 +180,7 @@ func (n *CombineNode) combineBuffer(buf *buffer) error {
 		for i := range expressions {
 			matched, err := EvalPredicate(expressions[i], n.scopePools[i], p.Time, p.Fields, p.Tags)
 			if err != nil {
+				n.incrementErrorCount()
 				n.logger.Println("E! evaluating lambda expression:", err)
 			}
 			matches[i][idx] = matched
