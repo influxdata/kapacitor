@@ -10,6 +10,7 @@
 - [#1175](https://github.com/influxdata/kapacitor/pull/1175): BREAKING: Add generic error counters to every node type.
     Renamed `query_errors` to `errors` in batch node.
     Renamed `eval_errors` to `errors` in eval node.
+- [#922](https://github.com/influxdata/kapacitor/issues/922): Expose server specific information in alert templates.
 
 ### Bugfixes
 

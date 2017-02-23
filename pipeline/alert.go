@@ -134,6 +134,8 @@ type AlertNode struct {
 	//    * Group -- Concatenation of all group-by tags of the form [key=value,]+.
 	//        If no groupBy is performed equal to literal 'nil'.
 	//    * Tags -- Map of tags. Use '{{ index .Tags "key" }}' to get a specific tag value.
+	//    * ServerInfo -- Information about the running server. Available nested fields are:
+	//        Hostname, ClusterID and ServerID.
 	//
 	// Example:
 	//   stream
