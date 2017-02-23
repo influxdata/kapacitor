@@ -21,8 +21,6 @@ type HTTPOutNode struct {
 	endpoint       string
 	routes         []httpd.Route
 	mu             sync.RWMutex
-
-	nodeCardinality *expvar.IntFuncGauge
 }
 
 // Create a new  HTTPOutNode which caches the most recent item and exposes it over the HTTP API.
@@ -50,9 +48,6 @@ func (h *HTTPOutNode) Endpoint() string {
 }
 
 func (h *HTTPOutNode) runOut([]byte) error {
-	// h.nodeCardinality is assigned in newHTTPOutNode
-	h.statMap.Set(statsCardinalityGauge, h.nodeCardinality)
-
 	hndl := func(w http.ResponseWriter, req *http.Request) {
 		h.mu.RLock()
 		defer h.mu.RUnlock()

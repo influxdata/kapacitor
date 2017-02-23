@@ -66,7 +66,6 @@ type AlertNode struct {
 	warnsTriggered  *expvar.Int
 	critsTriggered  *expvar.Int
 	eventsDropped   *expvar.Int
-	nodeCardinality *expvar.IntFuncGauge
 
 	bufPool sync.Pool
 
@@ -487,9 +486,6 @@ func (a *AlertNode) runAlert([]byte) error {
 
 	a.eventsDropped = &expvar.Int{}
 	a.statMap.Set(statsCritsTriggered, a.critsTriggered)
-
-	// a.nodeCardinality is assigned in newAlertNode
-	a.statMap.Set(statsCardinalityGauge, a.nodeCardinality)
 
 	switch a.Wants() {
 	case pipeline.StreamEdge:

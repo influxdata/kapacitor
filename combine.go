@@ -23,8 +23,6 @@ type CombineNode struct {
 
 	cardinalityMu sync.RWMutex
 
-	nodeCardinality *expvar.IntFuncGauge
-
 	combination combination
 }
 
@@ -74,9 +72,6 @@ func (t timeList) Less(i, j int) bool { return t[i].Before(t[j]) }
 func (t timeList) Swap(i, j int)      { t[i], t[j] = t[j], t[i] }
 
 func (n *CombineNode) runCombine([]byte) error {
-	// n.nodeCardinality is assigned in newCombineNode
-	n.statMap.Set(statsCardinalityGauge, n.nodeCardinality)
-
 	switch n.Wants() {
 	case pipeline.StreamEdge:
 		buffers := make(map[models.GroupID]*buffer)

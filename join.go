@@ -29,8 +29,7 @@ type JoinNode struct {
 	// Represents the lower bound of times per group per parent
 	lowMarks map[srcGroup]time.Time
 
-	cardinalityMu   sync.RWMutex
-	nodeCardinality *expvar.IntFuncGauge
+	cardinalityMu sync.RWMutex
 
 	reported    map[int]bool
 	allReported bool
@@ -75,8 +74,6 @@ func (j *JoinNode) runJoin([]byte) error {
 		j.cardinalityMu.RUnlock()
 		return int64(l)
 	})
-
-	j.statMap.Set(statsCardinalityGauge, j.nodeCardinality)
 
 	groupErrs := make(chan error, 1)
 	done := make(chan struct{}, len(j.ins))

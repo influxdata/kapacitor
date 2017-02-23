@@ -23,8 +23,7 @@ type EvalNode struct {
 	scopePool          stateful.ScopePool
 	tags               map[string]bool
 
-	cardinalityMu   sync.RWMutex
-	nodeCardinality *expvar.IntFuncGauge
+	cardinalityMu sync.RWMutex
 
 	evalErrors *expvar.Int
 }
@@ -76,9 +75,6 @@ func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalN
 }
 
 func (e *EvalNode) runEval(snapshot []byte) error {
-	// e.nodeCardinality is assigned in newEvalNode
-	e.statMap.Set(statsCardinalityGauge, e.nodeCardinality)
-
 	switch e.Provides() {
 	case pipeline.StreamEdge:
 		var err error

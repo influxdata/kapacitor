@@ -36,8 +36,6 @@ type K8sAutoscaleNode struct {
 	decreaseCount      *expvar.Int
 	cooldownDropsCount *expvar.Int
 
-	nodeCardinality *expvar.IntFuncGauge
-
 	cardinalityMu sync.RWMutex
 
 	min int
@@ -84,8 +82,6 @@ func (k *K8sAutoscaleNode) runAutoscale([]byte) error {
 	k.statMap.Set(statsK8sIncreaseEventsCount, k.increaseCount)
 	k.statMap.Set(statsK8sDecreaseEventsCount, k.decreaseCount)
 	k.statMap.Set(statsK8sCooldownDropsCount, k.cooldownDropsCount)
-	// k.nodeCardinality is assigned in newK8sAutoscaleNode
-	k.statMap.Set(statsCardinalityGauge, k.nodeCardinality)
 
 	switch k.Wants() {
 	case pipeline.StreamEdge:

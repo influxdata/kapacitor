@@ -85,7 +85,8 @@ type node struct {
 	statsKey   string
 	statMap    *kexpvar.Map
 
-	nodeErrors *kexpvar.Int
+	nodeErrors      *kexpvar.Int
+	nodeCardinality *kexpvar.IntFuncGauge
 }
 
 func (n *node) addParentEdge(e *Edge) {
@@ -110,6 +111,8 @@ func (n *node) init() {
 	n.statMap.Set(statAverageExecTime, avgExecVar)
 	n.nodeErrors = &kexpvar.Int{}
 	n.statMap.Set(statErrorCount, n.nodeErrors)
+	n.nodeCardinality = kexpvar.NewIntFuncGauge(func() int64 { return 0 })
+	n.statMap.Set(statsCardinalityGauge, n.nodeCardinality)
 	n.timer = n.et.tm.TimingService.NewTimer(avgExecVar)
 	n.errCh = make(chan error, 1)
 }

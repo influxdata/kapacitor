@@ -15,8 +15,7 @@ type SampleNode struct {
 	node
 	s *pipeline.SampleNode
 
-	cardinalityMu   sync.RWMutex
-	nodeCardinality *expvar.IntFuncGauge
+	cardinalityMu sync.RWMutex
 
 	counts   map[models.GroupID]int64
 	duration time.Duration
@@ -44,8 +43,6 @@ func newSampleNode(et *ExecutingTask, n *pipeline.SampleNode, l *log.Logger) (*S
 }
 
 func (s *SampleNode) runSample([]byte) error {
-	// s.nodeCardinality is assigned in newSampleNode
-	s.statMap.Set(statsCardinalityGauge, s.nodeCardinality)
 	switch s.Wants() {
 	case pipeline.StreamEdge:
 		for p, ok := s.ins[0].NextPoint(); ok; p, ok = s.ins[0].NextPoint() {
