@@ -3,6 +3,7 @@ package kapacitor
 import (
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/influxdata/kapacitor/expvar"
@@ -35,6 +36,10 @@ type K8sAutoscaleNode struct {
 	decreaseCount      *expvar.Int
 	cooldownDropsCount *expvar.Int
 
+	nodeCardinality *expvar.IntFuncGauge
+
+	cardinalityMu sync.RWMutex
+
 	min int
 	max int
 }
@@ -60,6 +65,12 @@ func newK8sAutoscaleNode(et *ExecutingTask, n *pipeline.K8sAutoscaleNode, l *log
 	// Initialize the replicas lambda expression scope pool
 	if n.Replicas != nil {
 		kn.replicasExprs = make(map[models.GroupID]stateful.Expression)
+		kn.nodeCardinality = expvar.NewIntFuncGauge(func() int {
+			kn.cardinalityMu.RLock()
+			l := len(kn.replicasExprs)
+			kn.cardinalityMu.RUnlock()
+			return l
+		})
 		kn.replicasScopePool = stateful.NewScopePool(stateful.FindReferenceVariables(n.Replicas.Expression))
 	}
 	return kn, nil
@@ -73,6 +84,8 @@ func (k *K8sAutoscaleNode) runAutoscale([]byte) error {
 	k.statMap.Set(statsK8sIncreaseEventsCount, k.increaseCount)
 	k.statMap.Set(statsK8sDecreaseEventsCount, k.decreaseCount)
 	k.statMap.Set(statsK8sCooldownDropsCount, k.cooldownDropsCount)
+	// k.nodeCardinality is assigned in newK8sAutoscaleNode
+	k.statMap.Set(statsCardinalityGauge, k.nodeCardinality)
 
 	switch k.Wants() {
 	case pipeline.StreamEdge:
@@ -148,7 +161,9 @@ func (k *K8sAutoscaleNode) handlePoint(streamName string, group models.GroupID, 
 	}
 
 	// Eval the replicas expression
+	k.cardinalityMu.Lock()
 	newReplicas, err := k.evalExpr(state.current, group, k.k.Replicas, k.replicasExprs, k.replicasScopePool, t, fields, tags)
+	k.cardinalityMu.Unlock()
 	if err != nil {
 		return models.Point{}, errors.Wrap(err, "failed to evaluate the replicas expression")
 	}
