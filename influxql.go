@@ -3,8 +3,10 @@ package kapacitor
 import (
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
+	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/pkg/errors"
@@ -70,10 +72,21 @@ func (c *baseReduceContext) Time() time.Time {
 }
 
 func (n *InfluxQLNode) runStreamInfluxQL() error {
+	var mu sync.RWMutex
 	contexts := make(map[models.GroupID]reduceContext)
+	cardinalityGauge := expvar.NewIntFuncGauge(func() int {
+		mu.RLock()
+		l := len(contexts)
+		mu.RUnlock()
+		return l
+	})
+	n.statMap.Set(statsCardinalityGauge, cardinalityGauge)
+
 	for p, ok := n.ins[0].NextPoint(); ok; {
 		n.timer.Start()
+		mu.RLock()
 		context := contexts[p.Group]
+		mu.RUnlock()
 		// Fisrt point in window
 		if context == nil {
 			// Create new context
@@ -94,7 +107,9 @@ func (n *InfluxQLNode) runStreamInfluxQL() error {
 			}
 
 			context = createFn(c)
+			mu.Lock()
 			contexts[p.Group] = context
+			mu.Unlock()
 
 		}
 		if n.isStreamTransformation {
@@ -127,7 +142,9 @@ func (n *InfluxQLNode) runStreamInfluxQL() error {
 				}
 
 				// Nil out reduced point
+				mu.Lock()
 				contexts[p.Group] = nil
+				mu.Unlock()
 				// do not advance,
 				// go through loop again to initialize new iterator.
 			}
