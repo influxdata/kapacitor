@@ -16,6 +16,7 @@
 
 - [#1133](https://github.com/influxdata/kapacitor/issues/1133): Fix case-sensitivity for Telegram `parseMode` value. 
 - [#1147](https://github.com/influxdata/kapacitor/issues/1147): Fix pprof debug endpoint
+- [#1161](https://github.com/influxdata/kapacitor/pull/1161): Fixed install/remove of kapacitor on non-systemd Debian/Ubuntu systems
 - [#1164](https://github.com/influxdata/kapacitor/pull/1164): Fix hang in config API to update a config section.
     Now if the service update process takes too long the request will timeout and return an error.
     Previously the request would block forever.
@@ -29,7 +30,6 @@
     we decided it would be best to fix the issue now and make it consistent for all future builds.
     Specifically in the JSON result data the old key `Series` is always `series`, and the old key `Err` is now always `error` instead of for only some of the outputs.
 - [#1181](https://github.com/influxdata/kapacitor/pull/1181): Fix bug parsing dbrp values with quotes.
-
 
 ## v1.2.0 [2017-01-23]
 

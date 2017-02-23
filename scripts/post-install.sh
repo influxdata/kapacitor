@@ -1,11 +1,30 @@
-#!/bin/sh
+#!/bin/bash
+
 BIN_DIR=/usr/bin
 DATA_DIR=/var/lib/kapacitor
 LOG_DIR=/var/log/kapacitor
 SCRIPT_DIR=/usr/lib/kapacitor/scripts
 
+function install_init {
+    cp -f $SCRIPT_DIR/init.sh /etc/init.d/kapacitor
+    chmod +x /etc/init.d/kapacitor
+}
+
+function install_systemd {
+    cp -f $SCRIPT_DIR/kapacitor.service /lib/systemd/system/kapacitor.service
+    systemctl enable kapacitor
+}
+
+function install_update_rcd {
+    update-rc.d kapacitor defaults
+}
+
+function install_chkconfig {
+    chkconfig --add kapacitor
+}
+
 if ! id kapacitor >/dev/null 2>&1; then
-        useradd --system -U -M kapacitor -s /bin/false -d $DATA_DIR
+    useradd --system -U -M kapacitor -s /bin/false -d $DATA_DIR
 fi
 chmod a+rX $BIN_DIR/kapacitor*
 
@@ -16,19 +35,45 @@ chown -R -L kapacitor:kapacitor $DATA_DIR
 
 test -f /etc/default/kapacitor || touch /etc/default/kapacitor
 
-# Systemd
-if which systemctl > /dev/null 2>&1 ; then
-    cp -f $SCRIPT_DIR/kapacitor.service /lib/systemd/system/kapacitor.service
-    systemctl enable kapacitor
-
-# Sysv
-else
-    cp -f $SCRIPT_DIR/init.sh /etc/init.d/kapacitor
-    chmod +x /etc/init.d/kapacitor
-    if which update-rc.d > /dev/null 2>&1 ; then
-        update-rc.d -f kapacitor remove
-        update-rc.d kapacitor defaults
+# Distribution-specific logic
+if [[ -f /etc/redhat-release ]]; then
+    # RHEL-variant logic
+    if [[ "$(readlink /proc/1/exe)" == */systemd ]]; then
+        install_systemd
     else
-        chkconfig --add kapacitor
+        # Assuming SysVinit
+        install_init
+        # Run update-rc.d or fallback to chkconfig if not available
+        if which update-rc.d &>/dev/null; then
+            install_update_rcd
+        else
+            install_chkconfig
+        fi
+    fi
+elif [[ -f /etc/debian_version ]]; then
+    # Debian/Ubuntu logic
+    if [[ "$(readlink /proc/1/exe)" == */systemd ]]; then
+        install_systemd
+    else
+        # Assuming SysVinit
+        install_init
+        # Run update-rc.d or fallback to chkconfig if not available
+        if which update-rc.d &>/dev/null; then
+            install_update_rcd
+        else
+            install_chkconfig
+        fi
+    fi
+elif [[ -f /etc/os-release ]]; then
+    source /etc/os-release
+    if [[ $ID = "amzn" ]]; then
+        # Amazon Linux logic
+        install_init
+        # Run update-rc.d or fallback to chkconfig if not available
+        if which update-rc.d &>/dev/null; then
+            install_update_rcd
+        else
+            install_chkconfig
+        fi
     fi
 fi
