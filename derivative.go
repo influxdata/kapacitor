@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 )
@@ -31,12 +30,12 @@ func (d *DerivativeNode) runDerivative([]byte) error {
 	case pipeline.StreamEdge:
 		var mu sync.RWMutex
 		previous := make(map[models.GroupID]models.Point)
-		d.nodeCardinality = expvar.NewIntFuncGauge(func() int64 {
+		d.nodeCardinality.ValueF = func() int64 {
 			mu.RLock()
 			l := len(previous)
 			mu.RUnlock()
 			return int64(l)
-		})
+		}
 		for p, ok := d.ins[0].NextPoint(); ok; p, ok = d.ins[0].NextPoint() {
 			d.timer.Start()
 			mu.RLock()

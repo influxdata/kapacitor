@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	kexpvar "github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 )
@@ -34,12 +33,13 @@ type window interface {
 func (w *WindowNode) runWindow([]byte) error {
 	var mu sync.RWMutex
 	windows := make(map[models.GroupID]window)
-	w.nodeCardinality = kexpvar.NewIntFuncGauge(func() int64 {
+	w.nodeCardinality.ValueF = func() int64 {
 		mu.RLock()
 		l := len(windows)
 		mu.RUnlock()
 		return int64(l)
-	})
+	}
+
 	// Loops through points windowing by group
 	for p, ok := w.ins[0].NextPoint(); ok; p, ok = w.ins[0].NextPoint() {
 		w.timer.Start()

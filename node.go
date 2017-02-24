@@ -19,7 +19,8 @@ import (
 )
 
 const (
-	statErrorCount        = "errors"
+	statErrorCount = "errors"
+	// TODO: Change to working_cardinality
 	statsCardinalityGauge = "cardinality"
 	statAverageExecTime   = "avg_exec_time_ns"
 )
@@ -111,7 +112,7 @@ func (n *node) init() {
 	n.statMap.Set(statAverageExecTime, avgExecVar)
 	n.nodeErrors = &kexpvar.Int{}
 	n.statMap.Set(statErrorCount, n.nodeErrors)
-	n.nodeCardinality = kexpvar.NewIntFuncGauge(func() int64 { return 0 })
+	n.nodeCardinality = kexpvar.NewIntFuncGauge(nil)
 	n.statMap.Set(statsCardinalityGauge, n.nodeCardinality)
 	n.timer = n.et.tm.TimingService.NewTimer(avgExecVar)
 	n.errCh = make(chan error, 1)

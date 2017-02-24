@@ -38,12 +38,6 @@ func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalN
 		e:                  n,
 		expressionsByGroup: make(map[models.GroupID][]stateful.Expression),
 	}
-	en.nodeCardinality = expvar.NewIntFuncGauge(func() int64 {
-		en.cardinalityMu.RLock()
-		l := len(en.expressionsByGroup)
-		en.cardinalityMu.RUnlock()
-		return int64(l)
-	})
 
 	// Create stateful expressions
 	en.expressions = make([]stateful.Expression, len(n.Lambdas))
@@ -75,6 +69,12 @@ func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalN
 }
 
 func (e *EvalNode) runEval(snapshot []byte) error {
+	e.nodeCardinality.ValueF = func() int64 {
+		e.cardinalityMu.RLock()
+		l := len(e.expressionsByGroup)
+		e.cardinalityMu.RUnlock()
+		return int64(l)
+	}
 	switch e.Provides() {
 	case pipeline.StreamEdge:
 		var err error

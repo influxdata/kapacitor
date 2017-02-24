@@ -7,7 +7,6 @@ import (
 	"path"
 	"sync"
 
-	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/services/httpd"
@@ -31,12 +30,6 @@ func newHTTPOutNode(et *ExecutingTask, n *pipeline.HTTPOutNode, l *log.Logger) (
 		groupSeriesIdx: make(map[models.GroupID]int),
 		result:         new(models.Result),
 	}
-	hn.nodeCardinality = expvar.NewIntFuncGauge(func() int64 {
-		hn.mu.RLock()
-		l := len(hn.groupSeriesIdx)
-		hn.mu.RUnlock()
-		return int64(l)
-	})
 	et.registerOutput(hn.c.Endpoint, hn)
 	hn.node.runF = hn.runOut
 	hn.node.stopF = hn.stopOut
@@ -48,6 +41,13 @@ func (h *HTTPOutNode) Endpoint() string {
 }
 
 func (h *HTTPOutNode) runOut([]byte) error {
+	h.nodeCardinality.ValueF = func() int64 {
+		h.mu.RLock()
+		l := len(h.groupSeriesIdx)
+		h.mu.RUnlock()
+		return int64(l)
+	}
+
 	hndl := func(w http.ResponseWriter, req *http.Request) {
 		h.mu.RLock()
 		defer h.mu.RUnlock()

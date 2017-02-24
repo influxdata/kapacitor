@@ -59,6 +59,9 @@ func (v *IntFuncGauge) Add(delta int64) {}
 func (v *IntFuncGauge) Set(value int64) {}
 
 func (v *IntFuncGauge) IntValue() int64 {
+	if v == nil || v.ValueF == nil {
+		return 0
+	}
 	return v.ValueF()
 }
 

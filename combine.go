@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick/stateful"
@@ -34,13 +33,6 @@ func newCombineNode(et *ExecutingTask, n *pipeline.CombineNode, l *log.Logger) (
 		expressionsByGroup: make(map[models.GroupID][]stateful.Expression),
 		combination:        combination{max: n.Max},
 	}
-
-	cn.nodeCardinality = expvar.NewIntFuncGauge(func() int64 {
-		cn.cardinalityMu.RLock()
-		l := len(cn.expressionsByGroup)
-		cn.cardinalityMu.RUnlock()
-		return int64(l)
-	})
 
 	// Create stateful expressions
 	cn.expressions = make([]stateful.Expression, len(n.Lambdas))
@@ -72,6 +64,13 @@ func (t timeList) Less(i, j int) bool { return t[i].Before(t[j]) }
 func (t timeList) Swap(i, j int)      { t[i], t[j] = t[j], t[i] }
 
 func (n *CombineNode) runCombine([]byte) error {
+	n.nodeCardinality.ValueF = func() int64 {
+		n.cardinalityMu.RLock()
+		l := len(n.expressionsByGroup)
+		n.cardinalityMu.RUnlock()
+		return int64(l)
+	}
+
 	switch n.Wants() {
 	case pipeline.StreamEdge:
 		buffers := make(map[models.GroupID]*buffer)

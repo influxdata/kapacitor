@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 )
@@ -29,12 +28,6 @@ func newSampleNode(et *ExecutingTask, n *pipeline.SampleNode, l *log.Logger) (*S
 		counts:   make(map[models.GroupID]int64),
 		duration: n.Duration,
 	}
-	sn.nodeCardinality = expvar.NewIntFuncGauge(func() int64 {
-		sn.cardinalityMu.RLock()
-		l := len(sn.counts)
-		sn.cardinalityMu.RUnlock()
-		return int64(l)
-	})
 	sn.node.runF = sn.runSample
 	if n.Duration == 0 && n.N == 0 {
 		return nil, errors.New("invalid sample rate: must be positive integer or duration")
@@ -43,6 +36,13 @@ func newSampleNode(et *ExecutingTask, n *pipeline.SampleNode, l *log.Logger) (*S
 }
 
 func (s *SampleNode) runSample([]byte) error {
+	s.nodeCardinality.ValueF = func() int64 {
+		s.cardinalityMu.RLock()
+		l := len(s.counts)
+		s.cardinalityMu.RUnlock()
+		return int64(l)
+	}
+
 	switch s.Wants() {
 	case pipeline.StreamEdge:
 		for p, ok := s.ins[0].NextPoint(); ok; p, ok = s.ins[0].NextPoint() {

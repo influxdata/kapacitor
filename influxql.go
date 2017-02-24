@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/pkg/errors"
@@ -74,12 +73,12 @@ func (c *baseReduceContext) Time() time.Time {
 func (n *InfluxQLNode) runStreamInfluxQL() error {
 	var mu sync.RWMutex
 	contexts := make(map[models.GroupID]reduceContext)
-	n.nodeCardinality = expvar.NewIntFuncGauge(func() int64 {
+	n.nodeCardinality.ValueF = func() int64 {
 		mu.RLock()
 		l := len(contexts)
 		mu.RUnlock()
 		return int64(l)
-	})
+	}
 
 	for p, ok := n.ins[0].NextPoint(); ok; {
 		n.timer.Start()
