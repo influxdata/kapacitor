@@ -222,6 +222,44 @@ stream
 	testStreamerWithOutput(t, "TestStream_DerivativeNN", script, 15*time.Second, er, false, nil)
 }
 
+func TestStream_DerivativeCardinality(t *testing.T) {
+
+	var script = `
+stream
+    |from()
+        .measurement('cpu')
+        .groupBy('host','cpu')
+    |derivative('usage_user')
+`
+
+	// Expected Stats
+	es := map[string]map[string]interface{}{
+		"stream0": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(9),
+		},
+		"from1": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(9),
+		},
+		"derivative2": map[string]interface{}{
+			"emitted":             int64(0),
+			"working_cardinality": int64(9),
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"collected":           int64(9),
+		},
+	}
+
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+}
+
 func TestStream_HoltWinters(t *testing.T) {
 	var script = `
 stream
