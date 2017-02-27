@@ -8780,7 +8780,7 @@ stream
 	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
 }
 
-func TestStream_InfluxQLCardinality(t *testing.T) {
+func TestStream_InfluxQLCardinalityStream(t *testing.T) {
 
 	var script = `
 stream
@@ -8813,6 +8813,55 @@ stream
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"collected":           int64(90),
+		},
+	}
+
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+}
+
+func TestStream_InfluxQLCardinalityBatch(t *testing.T) {
+
+	var script = `
+stream
+    |from()
+        .measurement('cpu')
+        .groupBy('host','cpu')
+    |window()
+      .period(1s)
+      .every(1s)
+    |max('usage_user')
+      .as('max')
+`
+
+	// Expected Stats
+	es := map[string]map[string]interface{}{
+		"stream0": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(90),
+			"emitted":             int64(90),
+		},
+		"from1": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(90),
+			"emitted":             int64(90),
+		},
+		"window2": map[string]interface{}{
+			"emitted":             int64(81),
+			"working_cardinality": int64(9),
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"collected":           int64(90),
+		},
+		"max3": map[string]interface{}{
+			"emitted":             int64(0),
+			"working_cardinality": int64(0),
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"collected":           int64(81),
 		},
 	}
 
@@ -8891,6 +8940,53 @@ stream
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"collected":           int64(90),
+		},
+	}
+
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+}
+
+func TestStream_GroupByCardinality(t *testing.T) {
+
+	var script = `
+stream
+    |from()
+        .measurement('cpu')
+    |window()
+     .period(1s)
+     .every(1s)
+    |groupBy('cpu')
+`
+
+	// Expected Stats
+	es := map[string]map[string]interface{}{
+		"stream0": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(90),
+			"emitted":             int64(90),
+		},
+		"from1": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(90),
+			"emitted":             int64(90),
+		},
+		"window2": map[string]interface{}{
+			"emitted":             int64(9),
+			"working_cardinality": int64(1),
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"collected":           int64(90),
+		},
+		"groupby3": map[string]interface{}{
+			"emitted":             int64(0),
+			"working_cardinality": int64(9),
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"collected":           int64(9),
 		},
 	}
 
@@ -9076,11 +9172,6 @@ s2|join(s1)
 }
 
 func TestStream_CombineCardinality(t *testing.T) {
-	// TODO: skip for now. Needs special treatment
-	skip := true
-	if skip {
-		return
-	}
 
 	var script = `
 var s1 = stream
@@ -9119,11 +9210,87 @@ var s1 = stream
 	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
 }
 
+func TestStream_MixedCardinality(t *testing.T) {
+
+	var script = `
+stream
+    |from()
+        .measurement('cpu')
+        .groupBy('host','cpu')
+    |where(lambda: "host" == 'localhost')
+    |eval(lambda: sigma("usage_user"))
+      .as('sigma')
+    |where(lambda: "cpu" == 'cpu-total' OR "cpu" == 'cpu0' OR "cpu" == 'cpu1')
+    |derivative('sigma')
+    |alert()
+`
+
+	// Expected Stats
+	es := map[string]map[string]interface{}{
+		"stream0": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(90),
+			"emitted":             int64(90),
+		},
+		"from1": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(90),
+			"emitted":             int64(90),
+		},
+		"where2": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(90),
+		},
+		"eval3": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(90),
+		},
+		"where4": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(30),
+		},
+		"derivative5": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(3),
+			"collected":           int64(30),
+			"emitted":             int64(27),
+		},
+		"alert6": map[string]interface{}{
+			"emitted":             int64(0),
+			"working_cardinality": int64(3),
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"collected":           int64(27),
+			"warns_triggered":     int64(0),
+			"crits_triggered":     int64(0),
+			"alerts_triggered":    int64(0),
+			"oks_triggered":       int64(0),
+			"infos_triggered":     int64(0),
+		},
+	}
+
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+}
+
 func testStreamerCardinality(t *testing.T, name, script string, expectedStats map[string]map[string]interface{}) {
 	clock, et, replayErr, tm := testStreamer(t, name, script, nil)
 	defer tm.Close()
 
-	err := fastForwardTask(clock, et, replayErr, tm, 15*time.Second)
+	err := fastForwardTask(clock, et, replayErr, tm, 20*time.Second)
 	if err != nil {
 		t.Fatalf("Encountered error: %v", err)
 	}
