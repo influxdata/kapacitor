@@ -8661,7 +8661,7 @@ stream
 		},
 	}
 
-	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es, nil)
 }
 
 func TestStream_WhereCardinality(t *testing.T) {
@@ -8699,7 +8699,7 @@ stream
 		},
 	}
 
-	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es, nil)
 }
 
 func TestStream_SampleCardinality(t *testing.T) {
@@ -8737,7 +8737,7 @@ stream
 		},
 	}
 
-	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es, nil)
 }
 
 func TestStream_WindowCardinality(t *testing.T) {
@@ -8777,7 +8777,7 @@ stream
 		},
 	}
 
-	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es, nil)
 }
 
 func TestStream_InfluxQLCardinalityStream(t *testing.T) {
@@ -8816,7 +8816,7 @@ stream
 		},
 	}
 
-	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es, nil)
 }
 
 func TestStream_InfluxQLCardinalityBatch(t *testing.T) {
@@ -8865,7 +8865,7 @@ stream
 		},
 	}
 
-	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es, nil)
 }
 
 func TestStream_EvalCardinality(t *testing.T) {
@@ -8904,7 +8904,7 @@ stream
 		},
 	}
 
-	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es, nil)
 }
 
 func TestStream_FlattenCardinality(t *testing.T) {
@@ -8943,7 +8943,7 @@ stream
 		},
 	}
 
-	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es, nil)
 }
 
 func TestStream_GroupByCardinality(t *testing.T) {
@@ -8990,7 +8990,7 @@ stream
 		},
 	}
 
-	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es, nil)
 }
 
 func TestStream_AlertCardinality(t *testing.T) {
@@ -9033,7 +9033,7 @@ stream
 		},
 	}
 
-	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es, nil)
 }
 
 func TestStream_HTTPOutCardinality(t *testing.T) {
@@ -9071,15 +9071,10 @@ stream
 		},
 	}
 
-	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es, nil)
 }
 
 func TestStream_K8sAutoscaleCardinality(t *testing.T) {
-	// TODO: skip for now. Needs special treatment
-	skip := true
-	if skip {
-		return
-	}
 
 	var script = `
 stream
@@ -9087,8 +9082,8 @@ stream
         .measurement('cpu')
         .groupBy('host','cpu')
     |k8sAutoscale()
-     .resourceNameTag('deployment')
-     .replicas(lambda: 1)
+     .resourceName('a')
+     .replicas(lambda: int(0))
 `
 
 	// Expected Stats
@@ -9113,10 +9108,41 @@ stream
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"collected":           int64(90),
+			"increase_events":     int64(1),
+			"decrease_events":     int64(0),
+			"cooldown_drops":      int64(0),
 		},
 	}
 
-	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+	scaleUpdates := make(chan k8s.Scale, 100)
+	k8sAutoscale := k8sAutoscale{}
+	k8sAutoscale.ScalesGetFunc = func(kind, name string) (*k8s.Scale, error) {
+		var replicas int32
+		switch name {
+		case "serviceA":
+			replicas = 1
+		case "serviceB":
+			replicas = 10
+		}
+		return &k8s.Scale{
+			ObjectMeta: k8s.ObjectMeta{
+				Name: name,
+			},
+			Spec: k8s.ScaleSpec{
+				Replicas: replicas,
+			},
+		}, nil
+	}
+	k8sAutoscale.ScalesUpdateFunc = func(kind string, scale *k8s.Scale) error {
+		scaleUpdates <- *scale
+		return nil
+	}
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		tm.K8sService = k8sAutoscale
+	}
+
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es, tmInit)
+	close(scaleUpdates)
 }
 
 func TestStream_JoinCardinality(t *testing.T) {
@@ -9168,7 +9194,7 @@ s2|join(s1)
 		},
 	}
 
-	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es, nil)
 }
 
 func TestStream_CombineCardinality(t *testing.T) {
@@ -9207,7 +9233,7 @@ var s1 = stream
 		},
 	}
 
-	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es, nil)
 }
 
 func TestStream_MixedCardinality(t *testing.T) {
@@ -9283,11 +9309,16 @@ stream
 		},
 	}
 
-	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es, nil)
 }
 
-func testStreamerCardinality(t *testing.T, name, script string, expectedStats map[string]map[string]interface{}) {
-	clock, et, replayErr, tm := testStreamer(t, name, script, nil)
+func testStreamerCardinality(
+	t *testing.T,
+	name, script string,
+	expectedStats map[string]map[string]interface{},
+	tmInit func(tm *kapacitor.TaskMaster),
+) {
+	clock, et, replayErr, tm := testStreamer(t, name, script, tmInit)
 	defer tm.Close()
 
 	err := fastForwardTask(clock, et, replayErr, tm, 20*time.Second)
