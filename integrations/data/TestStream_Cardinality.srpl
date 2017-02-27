@@ -268,5 +268,3 @@ cpu,cpu=cpu7,host=localhost usage_user=20.1 0000000010
 dbname
 rpname
 cpu,cpu=cpu-total,host=localhost usage_user=20.1 0000000010
-dbname
-rpname

@@ -8642,22 +8642,22 @@ stream
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(90),
 		},
 		"from1": map[string]interface{}{
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(90),
 		},
 		"derivative2": map[string]interface{}{
 			"emitted":             int64(0),
 			"working_cardinality": int64(9),
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
-			"collected":           int64(9),
+			"collected":           int64(90),
 		},
 	}
 
@@ -8680,22 +8680,22 @@ stream
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(90),
 		},
 		"from1": map[string]interface{}{
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(90),
 		},
 		"where2": map[string]interface{}{
 			"emitted":             int64(0),
 			"working_cardinality": int64(9),
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
-			"collected":           int64(9),
+			"collected":           int64(90),
 		},
 	}
 
@@ -8718,22 +8718,22 @@ stream
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(90),
 		},
 		"from1": map[string]interface{}{
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(90),
 		},
 		"sample2": map[string]interface{}{
 			"emitted":             int64(0),
 			"working_cardinality": int64(9),
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
-			"collected":           int64(9),
+			"collected":           int64(90),
 		},
 	}
 
@@ -8758,22 +8758,22 @@ stream
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(90),
 		},
 		"from1": map[string]interface{}{
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(90),
 		},
 		"window2": map[string]interface{}{
 			"emitted":             int64(0),
 			"working_cardinality": int64(9),
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
-			"collected":           int64(9),
+			"collected":           int64(90),
 		},
 	}
 
@@ -8797,22 +8797,22 @@ stream
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(90),
 		},
 		"from1": map[string]interface{}{
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(90),
 		},
 		"max2": map[string]interface{}{
 			"emitted":             int64(0),
 			"working_cardinality": int64(9),
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
-			"collected":           int64(9),
+			"collected":           int64(90),
 		},
 	}
 
@@ -8836,22 +8836,22 @@ stream
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(90),
 		},
 		"from1": map[string]interface{}{
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(90),
 		},
 		"eval2": map[string]interface{}{
 			"emitted":             int64(0),
 			"working_cardinality": int64(9),
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
-			"collected":           int64(9),
+			"collected":           int64(90),
 		},
 	}
 
@@ -8875,22 +8875,22 @@ stream
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(90),
 		},
 		"from1": map[string]interface{}{
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(90),
 		},
 		"flatten2": map[string]interface{}{
 			"emitted":             int64(0),
 			"working_cardinality": int64(9),
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
-			"collected":           int64(9),
+			"collected":           int64(90),
 		},
 	}
 
@@ -8913,22 +8913,22 @@ stream
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(90),
 		},
 		"from1": map[string]interface{}{
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(90),
 		},
 		"alert2": map[string]interface{}{
 			"emitted":             int64(0),
 			"working_cardinality": int64(9),
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
-			"collected":           int64(9),
+			"collected":           int64(90),
 			"warns_triggered":     int64(0),
 			"crits_triggered":     int64(0),
 			"alerts_triggered":    int64(0),
@@ -8956,22 +8956,22 @@ stream
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(90),
 		},
 		"from1": map[string]interface{}{
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(90),
 		},
 		"http_out2": map[string]interface{}{
 			"emitted":             int64(0),
 			"working_cardinality": int64(9),
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
-			"collected":           int64(9),
+			"collected":           int64(90),
 		},
 	}
 
@@ -9001,22 +9001,22 @@ stream
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(90),
 		},
 		"from1": map[string]interface{}{
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(90),
 		},
 		"k8s_autoscale2": map[string]interface{}{
 			"emitted":             int64(0),
 			"working_cardinality": int64(9),
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
-			"collected":           int64(9),
+			"collected":           int64(90),
 		},
 	}
 
@@ -9046,29 +9046,29 @@ s2|join(s1)
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(18),
+			"collected":           int64(90),
+			"emitted":             int64(180),
 		},
 		"from1": map[string]interface{}{
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(90),
 		},
 		"from2": map[string]interface{}{
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(90),
 		},
 		"join4": map[string]interface{}{
 			"emitted":             int64(0),
 			"working_cardinality": int64(10),
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
-			"collected":           int64(18),
+			"collected":           int64(180),
 		},
 	}
 
@@ -9097,21 +9097,21 @@ var s1 = stream
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(90),
 		},
 		"from1": map[string]interface{}{
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(9),
+			"collected":           int64(90),
+			"emitted":             int64(90),
 		},
 		"combine2": map[string]interface{}{
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"working_cardinality": int64(9),
-			"collected":           int64(9),
+			"collected":           int64(90),
 			"emitted":             int64(0),
 		},
 	}
@@ -9120,9 +9120,13 @@ var s1 = stream
 }
 
 func testStreamerCardinality(t *testing.T, name, script string, expectedStats map[string]map[string]interface{}) {
-	_, et, _, _ := testStreamer(t, name, script, nil)
-	// TODO: Need something to guarantee that stats will exist
-	time.Sleep(10 * time.Millisecond)
+	clock, et, replayErr, tm := testStreamer(t, name, script, nil)
+	defer tm.Close()
+
+	err := fastForwardTask(clock, et, replayErr, tm, 15*time.Second)
+	if err != nil {
+		t.Fatalf("Encountered error: %v", err)
+	}
 	stats, err := et.ExecutionStats()
 	if err != nil {
 		t.Fatalf("Encountered error: %v", err)
