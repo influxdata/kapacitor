@@ -73,12 +73,14 @@ func (c *baseReduceContext) Time() time.Time {
 func (n *InfluxQLNode) runStreamInfluxQL() error {
 	var mu sync.RWMutex
 	contexts := make(map[models.GroupID]reduceContext)
+	n.statMu.Lock()
 	n.nodeCardinality.ValueF = func() int64 {
 		mu.RLock()
 		l := len(contexts)
 		mu.RUnlock()
 		return int64(l)
 	}
+	n.statMu.Unlock()
 
 	for p, ok := n.ins[0].NextPoint(); ok; {
 		n.timer.Start()

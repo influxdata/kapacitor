@@ -41,12 +41,14 @@ func (h *HTTPOutNode) Endpoint() string {
 }
 
 func (h *HTTPOutNode) runOut([]byte) error {
+	h.statMu.Lock()
 	h.nodeCardinality.ValueF = func() int64 {
 		h.mu.RLock()
 		l := len(h.groupSeriesIdx)
 		h.mu.RUnlock()
 		return int64(l)
 	}
+	h.statMu.Unlock()
 
 	hndl := func(w http.ResponseWriter, req *http.Request) {
 		h.mu.RLock()

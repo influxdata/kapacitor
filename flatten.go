@@ -53,12 +53,14 @@ func (n *FlattenNode) runFlatten([]byte) error {
 	switch n.Wants() {
 	case pipeline.StreamEdge:
 		flattenBuffers := make(map[models.GroupID]*flattenStreamBuffer)
+		n.statMu.Lock()
 		n.nodeCardinality.ValueF = func() int64 {
 			mu.RLock()
 			l := len(flattenBuffers)
 			mu.RUnlock()
 			return int64(l)
 		}
+		n.statMu.Unlock()
 
 		for p, ok := n.ins[0].NextPoint(); ok; p, ok = n.ins[0].NextPoint() {
 			n.timer.Start()
@@ -116,12 +118,14 @@ func (n *FlattenNode) runFlatten([]byte) error {
 		}
 	case pipeline.BatchEdge:
 		allBuffers := make(map[models.GroupID]*flattenBatchBuffer)
+		n.statMu.Lock()
 		n.nodeCardinality.ValueF = func() int64 {
 			mu.RLock()
 			l := len(allBuffers)
 			mu.RUnlock()
 			return int64(l)
 		}
+		n.statMu.Unlock()
 		for b, ok := n.ins[0].NextBatch(); ok; b, ok = n.ins[0].NextBatch() {
 			n.timer.Start()
 			t := b.TMax.Round(n.f.Tolerance)

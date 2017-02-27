@@ -54,12 +54,14 @@ func (g *GroupByNode) runGroupBy([]byte) error {
 		var mu sync.RWMutex
 		var lastTime time.Time
 		groups := make(map[models.GroupID]*models.Batch)
+		g.statMu.Lock()
 		g.nodeCardinality.ValueF = func() int64 {
 			mu.RLock()
 			l := len(groups)
 			mu.RUnlock()
 			return int64(l)
 		}
+		g.statMu.Unlock()
 		for b, ok := g.ins[0].NextBatch(); ok; b, ok = g.ins[0].NextBatch() {
 			g.timer.Start()
 			if !b.TMax.Equal(lastTime) {

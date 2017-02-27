@@ -69,12 +69,14 @@ func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalN
 }
 
 func (e *EvalNode) runEval(snapshot []byte) error {
+	e.statMu.Lock()
 	e.nodeCardinality.ValueF = func() int64 {
 		e.cardinalityMu.RLock()
 		l := len(e.expressionsByGroup)
 		e.cardinalityMu.RUnlock()
 		return int64(l)
 	}
+	e.statMu.Unlock()
 	switch e.Provides() {
 	case pipeline.StreamEdge:
 		var err error

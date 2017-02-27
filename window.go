@@ -33,12 +33,14 @@ type window interface {
 func (w *WindowNode) runWindow([]byte) error {
 	var mu sync.RWMutex
 	windows := make(map[models.GroupID]window)
+	w.statMu.Lock()
 	w.nodeCardinality.ValueF = func() int64 {
 		mu.RLock()
 		l := len(windows)
 		mu.RUnlock()
 		return int64(l)
 	}
+	w.statMu.Unlock()
 
 	// Loops through points windowing by group
 	for p, ok := w.ins[0].NextPoint(); ok; p, ok = w.ins[0].NextPoint() {

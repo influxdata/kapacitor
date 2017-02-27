@@ -49,6 +49,7 @@ func (v *Int) IntValue() int64 {
 // IntFuncGauge is a 64-bit integer variable that satisfies the expvar.Var interface.
 type IntFuncGauge struct {
 	ValueF func() int64
+	mu     *sync.Mutex
 }
 
 func (v *IntFuncGauge) String() string {
@@ -59,14 +60,19 @@ func (v *IntFuncGauge) Add(delta int64) {}
 func (v *IntFuncGauge) Set(value int64) {}
 
 func (v *IntFuncGauge) IntValue() int64 {
+	v.mu.Lock()
+	defer v.mu.Unlock()
 	if v == nil || v.ValueF == nil {
 		return 0
 	}
 	return v.ValueF()
 }
 
-func NewIntFuncGauge(fn func() int64) *IntFuncGauge {
-	return &IntFuncGauge{fn}
+func NewIntFuncGauge(fn func() int64, mu *sync.Mutex) *IntFuncGauge {
+	return &IntFuncGauge{
+		ValueF: fn,
+		mu:     mu,
+	}
 }
 
 // IntSum is a 64-bit integer variable that consists of multiple different parts

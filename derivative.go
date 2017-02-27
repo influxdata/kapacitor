@@ -30,12 +30,14 @@ func (d *DerivativeNode) runDerivative([]byte) error {
 	case pipeline.StreamEdge:
 		var mu sync.RWMutex
 		previous := make(map[models.GroupID]models.Point)
+		d.statMu.Lock()
 		d.nodeCardinality.ValueF = func() int64 {
 			mu.RLock()
 			l := len(previous)
 			mu.RUnlock()
 			return int64(l)
 		}
+		d.statMu.Unlock()
 		for p, ok := d.ins[0].NextPoint(); ok; p, ok = d.ins[0].NextPoint() {
 			d.timer.Start()
 			mu.RLock()

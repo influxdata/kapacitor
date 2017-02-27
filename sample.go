@@ -36,12 +36,14 @@ func newSampleNode(et *ExecutingTask, n *pipeline.SampleNode, l *log.Logger) (*S
 }
 
 func (s *SampleNode) runSample([]byte) error {
+	s.statMu.Lock()
 	s.nodeCardinality.ValueF = func() int64 {
 		s.cardinalityMu.RLock()
 		l := len(s.counts)
 		s.cardinalityMu.RUnlock()
 		return int64(l)
 	}
+	s.statMu.Unlock()
 
 	switch s.Wants() {
 	case pipeline.StreamEdge:

@@ -84,6 +84,7 @@ type node struct {
 	timer      timer.Timer
 	statsKey   string
 	statMap    *kexpvar.Map
+	statMu     sync.Mutex
 
 	nodeErrors      *kexpvar.Int
 	nodeCardinality *kexpvar.IntFuncGauge
@@ -111,7 +112,7 @@ func (n *node) init() {
 	n.statMap.Set(statAverageExecTime, avgExecVar)
 	n.nodeErrors = &kexpvar.Int{}
 	n.statMap.Set(statErrorCount, n.nodeErrors)
-	n.nodeCardinality = kexpvar.NewIntFuncGauge(nil)
+	n.nodeCardinality = kexpvar.NewIntFuncGauge(nil, &n.statMu)
 	n.statMap.Set(statsCardinalityGauge, n.nodeCardinality)
 	n.timer = n.et.tm.TimingService.NewTimer(avgExecVar)
 	n.errCh = make(chan error, 1)

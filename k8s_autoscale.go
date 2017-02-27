@@ -69,12 +69,14 @@ func newK8sAutoscaleNode(et *ExecutingTask, n *pipeline.K8sAutoscaleNode, l *log
 }
 
 func (k *K8sAutoscaleNode) runAutoscale([]byte) error {
+	k.statMu.Lock()
 	k.nodeCardinality.ValueF = func() int64 {
 		k.cardinalityMu.RLock()
 		l := len(k.replicasExprs)
 		k.cardinalityMu.RUnlock()
 		return int64(l)
 	}
+	k.statMu.Unlock()
 
 	k.increaseCount = &expvar.Int{}
 	k.decreaseCount = &expvar.Int{}
