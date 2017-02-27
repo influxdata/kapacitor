@@ -218,6 +218,10 @@ func (s *Service) syncRecordingMetadata() error {
 		}
 		name := info.Name()
 		i := strings.LastIndex(name, ".")
+		if i == -1 {
+			s.logger.Println("E! file without extension in replay dir", name)
+			continue
+		}
 		ext := name[i:]
 		id := name[:i]
 
