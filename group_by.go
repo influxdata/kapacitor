@@ -3,6 +3,7 @@ package kapacitor
 import (
 	"log"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/influxdata/kapacitor/models"
@@ -50,13 +51,21 @@ func (g *GroupByNode) runGroupBy([]byte) error {
 			}
 		}
 	default:
+		var mu sync.RWMutex
 		var lastTime time.Time
 		groups := make(map[models.GroupID]*models.Batch)
+		g.nodeCardinality.ValueF = func() int64 {
+			mu.RLock()
+			l := len(groups)
+			mu.RUnlock()
+			return int64(l)
+		}
 		for b, ok := g.ins[0].NextBatch(); ok; b, ok = g.ins[0].NextBatch() {
 			g.timer.Start()
 			if !b.TMax.Equal(lastTime) {
 				lastTime = b.TMax
 				// Emit all groups
+				mu.RLock()
 				for id, group := range groups {
 					for _, child := range g.outs {
 						err := child.CollectBatch(*group)
@@ -64,9 +73,14 @@ func (g *GroupByNode) runGroupBy([]byte) error {
 							return err
 						}
 					}
+					mu.RUnlock()
+					mu.Lock()
 					// Remove from groups
 					delete(groups, id)
+					mu.Unlock()
+					mu.RLock()
 				}
+				mu.RUnlock()
 			}
 			for _, p := range b.Points {
 				if g.allDimensions {
@@ -75,7 +89,9 @@ func (g *GroupByNode) runGroupBy([]byte) error {
 					dims.TagNames = g.dimensions
 				}
 				groupID := models.ToGroupID(b.Name, p.Tags, dims)
+				mu.RLock()
 				group, ok := groups[groupID]
+				mu.RUnlock()
 				if !ok {
 					tags := make(map[string]string, len(dims.TagNames))
 					for _, dim := range dims.TagNames {
@@ -88,7 +104,9 @@ func (g *GroupByNode) runGroupBy([]byte) error {
 						ByName: b.ByName,
 						Tags:   tags,
 					}
+					mu.Lock()
 					groups[groupID] = group
+					mu.Unlock()
 				}
 				group.Points = append(group.Points, p)
 			}
