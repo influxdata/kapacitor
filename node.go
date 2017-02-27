@@ -19,9 +19,8 @@ import (
 )
 
 const (
-	statErrorCount = "errors"
-	// TODO: Change to working_cardinality
-	statsCardinalityGauge = "cardinality"
+	statErrorCount        = "errors"
+	statsCardinalityGauge = "working_cardinality"
 	statAverageExecTime   = "avg_exec_time_ns"
 )
 
