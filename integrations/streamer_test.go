@@ -8626,6 +8626,19 @@ topScores
 	}
 }
 
+func testStreamerCardinality(t *testing.T, name, script string, expectedStats map[string]map[string]interface{}) {
+	_, et, _, _ := testStreamer(t, name, script, nil)
+	// TODO: Need something to guarantee that stats will exist
+	time.Sleep(1 * time.Millisecond)
+	stats, err := et.ExecutionStats()
+	if err != nil {
+		t.Fatalf("Encountered error: %v", err)
+	}
+	if !reflect.DeepEqual(expectedStats, stats.NodeStats) {
+		t.Errorf("got:\n%+v\n\nexp:\n%+v\n", stats.NodeStats, expectedStats)
+	}
+}
+
 // Helper test function for streamer
 func testStreamer(
 	t *testing.T,
