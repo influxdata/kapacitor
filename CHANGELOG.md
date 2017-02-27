@@ -29,7 +29,7 @@
     we decided it would be best to fix the issue now and make it consistent for all future builds.
     Specifically in the JSON result data the old key `Series` is always `series`, and the old key `Err` is now always `error` instead of for only some of the outputs.
 - [#1181](https://github.com/influxdata/kapacitor/pull/1181): Fix bug parsing dbrp values with quotes.
-
+- [#1228](https://github.com/influxdata/kapacitor/pull/1228): Fix panic on loading replay files without a file extension.
 
 ## v1.2.0 [2017-01-23]
 
