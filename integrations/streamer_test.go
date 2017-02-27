@@ -222,44 +222,6 @@ stream
 	testStreamerWithOutput(t, "TestStream_DerivativeNN", script, 15*time.Second, er, false, nil)
 }
 
-func TestStream_DerivativeCardinality(t *testing.T) {
-
-	var script = `
-stream
-    |from()
-        .measurement('cpu')
-        .groupBy('host','cpu')
-    |derivative('usage_user')
-`
-
-	// Expected Stats
-	es := map[string]map[string]interface{}{
-		"stream0": map[string]interface{}{
-			"avg_exec_time_ns":    int64(0),
-			"errors":              int64(0),
-			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(9),
-		},
-		"from1": map[string]interface{}{
-			"avg_exec_time_ns":    int64(0),
-			"errors":              int64(0),
-			"working_cardinality": int64(0),
-			"collected":           int64(9),
-			"emitted":             int64(9),
-		},
-		"derivative2": map[string]interface{}{
-			"emitted":             int64(0),
-			"working_cardinality": int64(9),
-			"avg_exec_time_ns":    int64(0),
-			"errors":              int64(0),
-			"collected":           int64(9),
-		},
-	}
-
-	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
-}
-
 func TestStream_HoltWinters(t *testing.T) {
 	var script = `
 stream
@@ -8664,10 +8626,503 @@ topScores
 	}
 }
 
+func TestStream_DerivativeCardinality(t *testing.T) {
+
+	var script = `
+stream
+    |from()
+        .measurement('cpu')
+        .groupBy('host','cpu')
+    |derivative('usage_user')
+`
+
+	// Expected Stats
+	es := map[string]map[string]interface{}{
+		"stream0": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(9),
+		},
+		"from1": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(9),
+		},
+		"derivative2": map[string]interface{}{
+			"emitted":             int64(0),
+			"working_cardinality": int64(9),
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"collected":           int64(9),
+		},
+	}
+
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+}
+
+func TestStream_WhereCardinality(t *testing.T) {
+
+	var script = `
+stream
+    |from()
+        .measurement('cpu')
+        .groupBy('host','cpu')
+    |where(lambda: "host" == 'localhost') // replace with localhost
+`
+
+	// Expected Stats
+	es := map[string]map[string]interface{}{
+		"stream0": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(9),
+		},
+		"from1": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(9),
+		},
+		"where2": map[string]interface{}{
+			"emitted":             int64(0),
+			"working_cardinality": int64(9),
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"collected":           int64(9),
+		},
+	}
+
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+}
+
+func TestStream_SampleCardinality(t *testing.T) {
+
+	var script = `
+stream
+    |from()
+        .measurement('cpu')
+        .groupBy('host','cpu')
+    |sample(2)
+`
+
+	// Expected Stats
+	es := map[string]map[string]interface{}{
+		"stream0": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(9),
+		},
+		"from1": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(9),
+		},
+		"sample2": map[string]interface{}{
+			"emitted":             int64(0),
+			"working_cardinality": int64(9),
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"collected":           int64(9),
+		},
+	}
+
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+}
+
+func TestStream_WindowCardinality(t *testing.T) {
+
+	var script = `
+stream
+    |from()
+        .measurement('cpu')
+        .groupBy('host','cpu')
+    |window()
+      .period(1s)
+      .every(1s)
+`
+
+	// Expected Stats
+	es := map[string]map[string]interface{}{
+		"stream0": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(9),
+		},
+		"from1": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(9),
+		},
+		"window2": map[string]interface{}{
+			"emitted":             int64(0),
+			"working_cardinality": int64(9),
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"collected":           int64(9),
+		},
+	}
+
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+}
+
+func TestStream_InfluxQLCardinality(t *testing.T) {
+
+	var script = `
+stream
+    |from()
+        .measurement('cpu')
+        .groupBy('host','cpu')
+    |max('usage_user')
+      .as('max')
+`
+
+	// Expected Stats
+	es := map[string]map[string]interface{}{
+		"stream0": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(9),
+		},
+		"from1": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(9),
+		},
+		"max2": map[string]interface{}{
+			"emitted":             int64(0),
+			"working_cardinality": int64(9),
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"collected":           int64(9),
+		},
+	}
+
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+}
+
+func TestStream_EvalCardinality(t *testing.T) {
+
+	var script = `
+stream
+    |from()
+        .measurement('cpu')
+        .groupBy('host','cpu')
+    |eval(lambda: sigma("usage_user"))
+      .as('sigma')
+`
+
+	// Expected Stats
+	es := map[string]map[string]interface{}{
+		"stream0": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(9),
+		},
+		"from1": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(9),
+		},
+		"eval2": map[string]interface{}{
+			"emitted":             int64(0),
+			"working_cardinality": int64(9),
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"collected":           int64(9),
+		},
+	}
+
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+}
+
+func TestStream_FlattenCardinality(t *testing.T) {
+
+	var script = `
+stream
+    |from()
+        .measurement('cpu')
+        .groupBy('host','cpu')
+    |flatten()
+     .on('host','cpu')
+`
+
+	// Expected Stats
+	es := map[string]map[string]interface{}{
+		"stream0": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(9),
+		},
+		"from1": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(9),
+		},
+		"flatten2": map[string]interface{}{
+			"emitted":             int64(0),
+			"working_cardinality": int64(9),
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"collected":           int64(9),
+		},
+	}
+
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+}
+
+func TestStream_AlertCardinality(t *testing.T) {
+
+	var script = `
+stream
+    |from()
+        .measurement('cpu')
+        .groupBy('host','cpu')
+    |alert()
+`
+
+	// Expected Stats
+	es := map[string]map[string]interface{}{
+		"stream0": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(9),
+		},
+		"from1": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(9),
+		},
+		"alert2": map[string]interface{}{
+			"emitted":             int64(0),
+			"working_cardinality": int64(9),
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"collected":           int64(9),
+			"warns_triggered":     int64(0),
+			"crits_triggered":     int64(0),
+			"alerts_triggered":    int64(0),
+			"oks_triggered":       int64(0),
+			"infos_triggered":     int64(0),
+		},
+	}
+
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+}
+
+func TestStream_HTTPOutCardinality(t *testing.T) {
+
+	var script = `
+stream
+    |from()
+        .measurement('cpu')
+        .groupBy('host','cpu')
+    |httpOut('usage_user')
+`
+
+	// Expected Stats
+	es := map[string]map[string]interface{}{
+		"stream0": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(9),
+		},
+		"from1": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(9),
+		},
+		"http_out2": map[string]interface{}{
+			"emitted":             int64(0),
+			"working_cardinality": int64(9),
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"collected":           int64(9),
+		},
+	}
+
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+}
+
+func TestStream_K8sAutoscaleCardinality(t *testing.T) {
+	// TODO: skip for now. Needs special treatment
+	skip := true
+	if skip {
+		return
+	}
+
+	var script = `
+stream
+    |from()
+        .measurement('cpu')
+        .groupBy('host','cpu')
+    |k8sAutoscale()
+     .resourceNameTag('deployment')
+     .replicas(lambda: 1)
+`
+
+	// Expected Stats
+	es := map[string]map[string]interface{}{
+		"stream0": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(9),
+		},
+		"from1": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(9),
+		},
+		"k8s_autoscale2": map[string]interface{}{
+			"emitted":             int64(0),
+			"working_cardinality": int64(9),
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"collected":           int64(9),
+		},
+	}
+
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+}
+
+func TestStream_JoinCardinality(t *testing.T) {
+
+	var script = `
+var s1 = stream
+    |from()
+        .measurement('cpu')
+        .groupBy('host')
+
+var s2 = stream
+    |from()
+        .measurement('cpu')
+        .groupBy('cpu')
+
+s2|join(s1)
+   .as('s1','s2')
+`
+
+	// Expected Stats
+	es := map[string]map[string]interface{}{
+		"stream0": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(18),
+		},
+		"from1": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(9),
+		},
+		"from2": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(9),
+		},
+		"join4": map[string]interface{}{
+			"emitted":             int64(0),
+			"working_cardinality": int64(10),
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"collected":           int64(18),
+		},
+	}
+
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+}
+
+func TestStream_CombineCardinality(t *testing.T) {
+	// TODO: skip for now. Needs special treatment
+	skip := true
+	if skip {
+		return
+	}
+
+	var script = `
+var s1 = stream
+    |from()
+        .measurement('cpu')
+        .groupBy('cpu','host')
+    |combine(lambda: TRUE, lambda: TRUE)
+        .as('total','true')
+`
+
+	// Expected Stats
+	es := map[string]map[string]interface{}{
+		"stream0": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(9),
+		},
+		"from1": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(0),
+			"collected":           int64(9),
+			"emitted":             int64(9),
+		},
+		"combine2": map[string]interface{}{
+			"avg_exec_time_ns":    int64(0),
+			"errors":              int64(0),
+			"working_cardinality": int64(9),
+			"collected":           int64(9),
+			"emitted":             int64(0),
+		},
+	}
+
+	testStreamerCardinality(t, "TestStream_Cardinality", script, es)
+}
+
 func testStreamerCardinality(t *testing.T, name, script string, expectedStats map[string]map[string]interface{}) {
 	_, et, _, _ := testStreamer(t, name, script, nil)
 	// TODO: Need something to guarantee that stats will exist
-	time.Sleep(1 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
 	stats, err := et.ExecutionStats()
 	if err != nil {
 		t.Fatalf("Encountered error: %v", err)
