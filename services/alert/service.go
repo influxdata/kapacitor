@@ -286,6 +286,12 @@ func validatePattern(pattern string) error {
 	return err
 }
 
+type sortedTopics []client.Topic
+
+func (s sortedTopics) Len() int               { return len(s) }
+func (s sortedTopics) Less(i int, j int) bool { return s[i].ID < s[j].ID }
+func (s sortedTopics) Swap(i int, j int)      { s[i], s[j] = s[j], s[i] }
+
 func (s *Service) handleListTopics(w http.ResponseWriter, r *http.Request) {
 	pattern := r.URL.Query().Get("pattern")
 	if err := validatePattern(pattern); err != nil {
@@ -298,9 +304,20 @@ func (s *Service) handleListTopics(w http.ResponseWriter, r *http.Request) {
 		httpd.HttpError(w, err.Error(), true, http.StatusBadRequest)
 		return
 	}
+	statuses, err := s.TopicStatus(pattern, minLevel)
+	if err != nil {
+		httpd.HttpError(w, fmt.Sprint("failed to get topic statuses: ", err.Error()), true, http.StatusInternalServerError)
+		return
+	}
+	list := make([]client.Topic, 0, len(statuses))
+	for topic, status := range statuses {
+		list = append(list, s.createClientTopic(topic, status))
+	}
+	sort.Sort(sortedTopics(list))
+
 	topics := client.Topics{
 		Link:   client.Link{Relation: client.Self, Href: r.URL.String()},
-		Topics: s.TopicStatus(pattern, minLevel),
+		Topics: list,
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -510,15 +527,33 @@ func (s *Service) handleListTopicHandlers(t *alert.Topic, w http.ResponseWriter,
 	w.Write(httpd.MarshalJSON(th, true))
 }
 
+type sortedHandlers []client.Handler
+
+func (s sortedHandlers) Len() int               { return len(s) }
+func (s sortedHandlers) Less(i int, j int) bool { return s[i].ID < s[j].ID }
+func (s sortedHandlers) Swap(i int, j int)      { s[i], s[j] = s[j], s[i] }
+
 func (s *Service) handleListHandlers(w http.ResponseWriter, r *http.Request) {
 	pattern := r.URL.Query().Get("pattern")
 	if err := validatePattern(pattern); err != nil {
 		httpd.HttpError(w, fmt.Sprint("invalid pattern: ", err.Error()), true, http.StatusBadRequest)
 		return
 	}
+
+	specs, err := s.HandlerSpecs(pattern)
+	if err != nil {
+		httpd.HttpError(w, fmt.Sprint("failed to get handler specs: ", err.Error()), true, http.StatusInternalServerError)
+		return
+	}
+	list := make([]client.Handler, len(specs))
+	for i := range specs {
+		list[i] = s.convertHandlerSpec(specs[i])
+	}
+	sort.Sort(sortedHandlers(list))
+
 	handlers := client.Handlers{
 		Link:     client.Link{Relation: client.Self, Href: r.URL.String()},
-		Handlers: s.Handlers(pattern),
+		Handlers: list,
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -588,7 +623,7 @@ func (s *Service) handlePatchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.ReplaceHandlerSpec(h.Spec, newSpec); err != nil {
+	if err := s.UpdateHandlerSpec(h.Spec, newSpec); err != nil {
 		httpd.HttpError(w, fmt.Sprint("failed to update handler: ", err.Error()), true, http.StatusInternalServerError)
 		return
 	}
@@ -620,7 +655,7 @@ func (s *Service) handlePutHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.ReplaceHandlerSpec(h.Spec, newSpec); err != nil {
+	if err := s.UpdateHandlerSpec(h.Spec, newSpec); err != nil {
 		httpd.HttpError(w, fmt.Sprint("failed to update handler: ", err.Error()), true, http.StatusInternalServerError)
 		return
 	}
@@ -766,6 +801,7 @@ func (s *Service) UpdateEvent(topic string, event alert.EventState) error {
 func (s *Service) RegisterHandler(topics []string, h alert.Handler) {
 	s.topics.RegisterHandler(topics, h)
 }
+
 func (s *Service) DeregisterHandler(topics []string, h alert.Handler) {
 	s.topics.DeregisterHandler(topics, h)
 }
@@ -836,7 +872,7 @@ func (s *Service) DeregisterHandlerSpec(id string) error {
 	return nil
 }
 
-func (s *Service) ReplaceHandlerSpec(oldSpec, newSpec HandlerSpec) error {
+func (s *Service) UpdateHandlerSpec(oldSpec, newSpec HandlerSpec) error {
 	if err := newSpec.Validate(); err != nil {
 		return err
 	}
@@ -872,48 +908,40 @@ func (s *Service) ReplaceHandlerSpec(oldSpec, newSpec HandlerSpec) error {
 	return nil
 }
 
-type sortedTopics []client.Topic
-
-func (s sortedTopics) Len() int               { return len(s) }
-func (s sortedTopics) Less(i int, j int) bool { return s[i].ID < s[j].ID }
-func (s sortedTopics) Swap(i int, j int)      { s[i], s[j] = s[j], s[i] }
-
 // TopicStatus returns the max alert level for each topic matching 'pattern', not returning
 // any topics with max alert levels less severe than 'minLevel'
-func (s *Service) TopicStatus(pattern string, minLevel alert.Level) []client.Topic {
-	statuses := s.topics.TopicStatus(pattern, minLevel)
-	topics := make([]client.Topic, 0, len(statuses))
-	for topic, status := range statuses {
-		topics = append(topics, s.createClientTopic(topic, status))
-	}
-	sort.Sort(sortedTopics(topics))
-	return topics
+func (s *Service) TopicStatus(pattern string, minLevel alert.Level) (map[string]alert.TopicStatus, error) {
+	return s.topics.TopicStatus(pattern, minLevel), nil
 }
 
 // TopicStatusDetails is similar to TopicStatus, but will additionally return
 // at least 'minLevel' severity
-func (s *Service) TopicStatusEvents(pattern string, minLevel alert.Level) map[string]map[string]alert.EventState {
-	return s.topics.TopicStatusEvents(pattern, minLevel)
+func (s *Service) TopicStatusEvents(pattern string, minLevel alert.Level) (map[string]map[string]alert.EventState, error) {
+	return s.topics.TopicStatusEvents(pattern, minLevel), nil
 }
 
-type sortedHandlers []client.Handler
-
-func (s sortedHandlers) Len() int               { return len(s) }
-func (s sortedHandlers) Less(i int, j int) bool { return s[i].ID < s[j].ID }
-func (s sortedHandlers) Swap(i int, j int)      { s[i], s[j] = s[j], s[i] }
-
-func (s *Service) Handlers(pattern string) []client.Handler {
+func (s *Service) HandlerSpec(id string) (HandlerSpec, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	handlers := make([]client.Handler, 0, len(s.handlers))
+	h, ok := s.handlers[id]
+	if !ok {
+		return HandlerSpec{}, fmt.Errorf("handler %s does not exist", id)
+	}
+	return h.Spec, nil
+}
+
+func (s *Service) HandlerSpecs(pattern string) ([]HandlerSpec, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	handlers := make([]HandlerSpec, 0, len(s.handlers))
 	for id, h := range s.handlers {
 		if match(pattern, id) {
-			handlers = append(handlers, s.convertHandlerSpec(h.Spec))
+			handlers = append(handlers, h.Spec)
 		}
 	}
-	sort.Sort(sortedHandlers(handlers))
-	return handlers
+	return handlers, nil
 }
 func match(pattern, id string) bool {
 	if pattern == "" {
