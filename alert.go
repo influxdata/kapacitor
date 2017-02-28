@@ -450,14 +450,14 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 }
 
 func (a *AlertNode) runAlert([]byte) error {
-	a.statMu.Lock()
-	a.nodeCardinality.ValueF = func() int64 {
+	valueF := func() int64 {
 		a.cardinalityMu.RLock()
 		l := len(a.states)
 		a.cardinalityMu.RUnlock()
 		return int64(l)
 	}
-	a.statMu.Unlock()
+	a.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
+
 	// Register delete hook
 	if a.hasAnonTopic() {
 		a.et.tm.registerDeleteHookForTask(a.et.Task.ID, deleteAlertHook(a.anonTopic))

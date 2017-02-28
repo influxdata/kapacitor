@@ -6,6 +6,7 @@ import (
 	"log"
 	"sync"
 
+	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick/stateful"
@@ -37,14 +38,13 @@ func newWhereNode(et *ExecutingTask, n *pipeline.WhereNode, l *log.Logger) (wn *
 
 func (w *WhereNode) runWhere(snapshot []byte) error {
 	var mu sync.RWMutex
-	w.statMu.Lock()
-	w.nodeCardinality.ValueF = func() int64 {
+	valueF := func() int64 {
 		mu.RLock()
 		l := len(w.expressions)
 		mu.RUnlock()
 		return int64(l)
 	}
-	w.statMu.Unlock()
+	w.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
 
 	switch w.Wants() {
 	case pipeline.StreamEdge:

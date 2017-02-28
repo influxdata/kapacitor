@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick/stateful"
@@ -64,14 +65,13 @@ func (t timeList) Less(i, j int) bool { return t[i].Before(t[j]) }
 func (t timeList) Swap(i, j int)      { t[i], t[j] = t[j], t[i] }
 
 func (n *CombineNode) runCombine([]byte) error {
-	n.statMu.Lock()
-	n.nodeCardinality.ValueF = func() int64 {
+	valueF := func() int64 {
 		n.cardinalityMu.RLock()
 		l := len(n.expressionsByGroup)
 		n.cardinalityMu.RUnlock()
 		return int64(l)
 	}
-	n.statMu.Unlock()
+	n.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
 
 	switch n.Wants() {
 	case pipeline.StreamEdge:

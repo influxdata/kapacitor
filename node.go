@@ -19,9 +19,9 @@ import (
 )
 
 const (
-	statErrorCount        = "errors"
-	statsCardinalityGauge = "working_cardinality"
-	statAverageExecTime   = "avg_exec_time_ns"
+	statErrorCount       = "errors"
+	statCardinalityGauge = "working_cardinality"
+	statAverageExecTime  = "avg_exec_time_ns"
 )
 
 // A node that can be  in an executor.
@@ -84,7 +84,6 @@ type node struct {
 	timer      timer.Timer
 	statsKey   string
 	statMap    *kexpvar.Map
-	statMu     sync.Mutex
 
 	nodeErrors      *kexpvar.Int
 	nodeCardinality *kexpvar.IntFuncGauge
@@ -112,8 +111,7 @@ func (n *node) init() {
 	n.statMap.Set(statAverageExecTime, avgExecVar)
 	n.nodeErrors = &kexpvar.Int{}
 	n.statMap.Set(statErrorCount, n.nodeErrors)
-	n.nodeCardinality = kexpvar.NewIntFuncGauge(nil, &n.statMu)
-	n.statMap.Set(statsCardinalityGauge, n.nodeCardinality)
+	n.statMap.Set(statCardinalityGauge, kexpvar.NewIntFuncGauge(nil))
 	n.timer = n.et.tm.TimingService.NewTimer(avgExecVar)
 	n.errCh = make(chan error, 1)
 }

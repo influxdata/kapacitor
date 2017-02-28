@@ -68,14 +68,13 @@ func newJoinNode(et *ExecutingTask, n *pipeline.JoinNode, l *log.Logger) (*JoinN
 
 func (j *JoinNode) runJoin([]byte) error {
 	j.groups = make(map[models.GroupID]*group)
-	j.statMu.Lock()
-	j.nodeCardinality.ValueF = func() int64 {
+	valueF := func() int64 {
 		j.cardinalityMu.RLock()
 		l := len(j.groups)
 		j.cardinalityMu.RUnlock()
 		return int64(l)
 	}
-	j.statMu.Unlock()
+	j.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
 
 	groupErrs := make(chan error, 1)
 	done := make(chan struct{}, len(j.ins))
