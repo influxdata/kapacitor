@@ -52,4 +52,6 @@ type TopicPersister interface {
 	DeleteTopic(topic string) error
 	// RestoreTopic signals that a topic should be restored from persisted state.
 	RestoreTopic(topic string) error
+	// Topic returns an topic if it exists.
+	topic(id string) (*alert.Topic, bool)
 }

@@ -171,7 +171,7 @@ func (s *Topics) TopicStatus(pattern string, minLevel Level) map[string]TopicSta
 	s.mu.RLock()
 	res := make(map[string]TopicStatus, len(s.topics))
 	for _, topic := range s.topics {
-		if !match(pattern, topic.ID()) {
+		if !PatternMatch(pattern, topic.ID()) {
 			continue
 		}
 		level := topic.MaxLevel()
@@ -192,7 +192,7 @@ func (s *Topics) TopicStatusEvents(pattern string, minLevel Level) map[string]ma
 	s.mu.RLock()
 	topics := make([]*Topic, 0, len(s.topics))
 	for _, topic := range s.topics {
-		if topic.MaxLevel() >= minLevel && match(pattern, topic.id) {
+		if topic.MaxLevel() >= minLevel && PatternMatch(pattern, topic.id) {
 			topics = append(topics, topic)
 		}
 	}
@@ -207,7 +207,7 @@ func (s *Topics) TopicStatusEvents(pattern string, minLevel Level) map[string]ma
 	return res
 }
 
-func match(pattern, id string) bool {
+func PatternMatch(pattern, id string) bool {
 	if pattern == "" {
 		return true
 	}
