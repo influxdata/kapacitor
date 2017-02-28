@@ -32,6 +32,7 @@ import (
 	"github.com/influxdata/kapacitor/services/noauth"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
+	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/replay"
 	"github.com/influxdata/kapacitor/services/reporting"
 	"github.com/influxdata/kapacitor/services/sensu"
@@ -186,6 +187,7 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	s.appendHipChatService()
 	s.appendOpsGenieService()
 	s.appendPagerDutyService()
+	s.appendPushoverService()
 	s.appendSMTPService()
 	s.appendTelegramService()
 	s.appendHipChatService()
@@ -425,6 +427,18 @@ func (s *Server) appendPagerDutyService() {
 
 	s.SetDynamicService("pagerduty", srv)
 	s.AppendService("pagerduty", srv)
+}
+
+func (s *Server) appendPushoverService() {
+	c := s.config.Pushover
+	l := s.LogService.NewLogger("[pushover] ", log.LstdFlags)
+	srv := pushover.NewService(c, l)
+
+	s.TaskMaster.PushoverService = srv
+	s.AlertService.PushoverService = srv
+
+	s.SetDynamicService("pushover", srv)
+	s.AppendService("pushover", srv)
 }
 
 func (s *Server) appendSensuService() {

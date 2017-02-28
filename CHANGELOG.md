@@ -11,6 +11,7 @@
     Renamed `query_errors` to `errors` in batch node.
     Renamed `eval_errors` to `errors` in eval node.
 - [#922](https://github.com/influxdata/kapacitor/issues/922): Expose server specific information in alert templates.
+- [#1162](https://github.com/influxdata/kapacitor/pulls/1162): Add Pushover integration.
 
 ### Bugfixes
 

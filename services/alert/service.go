@@ -20,6 +20,7 @@ import (
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
+	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/snmptrap"
@@ -103,6 +104,9 @@ type Service struct {
 	}
 	PagerDutyService interface {
 		Handler(pagerduty.HandlerConfig, *log.Logger) alert.Handler
+	}
+	PushoverService interface {
+		Handler(pushover.HandlerConfig, *log.Logger) alert.Handler
 	}
 	SensuService interface {
 		Handler(*log.Logger) alert.Handler
@@ -1027,6 +1031,14 @@ func (s *Service) createHandlerActionFromSpec(spec HandlerActionSpec) (ha handle
 			return
 		}
 		h := s.PagerDutyService.Handler(c, s.logger)
+		ha = newPassThroughHandler(h)
+	case "pushover":
+		c := pushover.HandlerConfig{}
+		err = decodeOptions(spec.Options, &c)
+		if err != nil {
+			return
+		}
+		h := s.PushoverService.Handler(c, s.logger)
 		ha = newPassThroughHandler(h)
 	case "post":
 		c := PostHandlerConfig{}

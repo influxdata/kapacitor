@@ -39,6 +39,8 @@ import (
 	"github.com/influxdata/kapacitor/services/opsgenie/opsgenietest"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pagerduty/pagerdutytest"
+	"github.com/influxdata/kapacitor/services/pushover"
+	"github.com/influxdata/kapacitor/services/pushover/pushovertest"
 	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/sensu/sensutest"
 	"github.com/influxdata/kapacitor/services/slack"
@@ -6990,6 +6992,84 @@ stream
 				Origin:      "override",
 				Service:     []string{"serviceA", "serviceB"},
 				Value:       "10",
+			},
+		},
+	}
+
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Requests() {
+		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestStream_AlertPushover(t *testing.T) {
+	ts := pushovertest.NewServer()
+	defer ts.Close()
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('{{ index .Tags "host" }}')
+		.message('kapacitor/{{ .Name }}/{{ index .Tags "host" }} is {{ .Level }} @{{.Time}}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.pushover()
+			.sound('siren')
+			.device('mydev')
+			.title('mytitle')
+			.URL('http://example.com')
+			.URLTitle('myurltitle')
+		.pushover()
+			.title('othertitle')
+			.device('otherdev')
+`
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := pushover.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL
+		c.UserKey = "user"
+		c.Token = "KzGDORePKggMaC0QOYAMyEEuzJnyUi"
+		sl := pushover.NewService(c, logService.NewLogger("[test_pushover] ", log.LstdFlags))
+		tm.PushoverService = sl
+	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	exp := []interface{}{
+		pushovertest.Request{
+			PostData: pushovertest.PostData{
+				Token:    "KzGDORePKggMaC0QOYAMyEEuzJnyUi",
+				UserKey:  "user",
+				Message:  "kapacitor/cpu/serverA is CRITICAL @1971-01-01 00:00:10 +0000 UTC",
+				Device:   "mydev",
+				Sound:    "siren",
+				Title:    "mytitle",
+				URL:      "http://example.com",
+				URLTitle: "myurltitle",
+				Priority: 1,
+			},
+		},
+		pushovertest.Request{
+			PostData: pushovertest.PostData{
+				Token:    "KzGDORePKggMaC0QOYAMyEEuzJnyUi",
+				UserKey:  "user",
+				Message:  "kapacitor/cpu/serverA is CRITICAL @1971-01-01 00:00:10 +0000 UTC",
+				Device:   "otherdev",
+				Title:    "othertitle",
+				Priority: 1,
 			},
 		},
 	}
