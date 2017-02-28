@@ -14,6 +14,7 @@ import (
 	"github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	alertservice "github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
@@ -73,14 +74,9 @@ type TaskMaster struct {
 	UDFService UDFService
 
 	AlertService interface {
-		EventState(topic, event string) (alert.EventState, bool)
-		UpdateEvent(topic string, event alert.EventState) error
-		Collect(event alert.Event) error
-		RegisterHandler(topics []string, h alert.Handler)
-		DeregisterHandler(topics []string, h alert.Handler)
-		RestoreTopic(topic string) error
-		CloseTopic(topic string) error
-		DeleteTopic(topic string) error
+		alertservice.HandlerRegistrar
+		alertservice.Eventer
+		alertservice.TopicPersister
 	}
 	InfluxDBService interface {
 		NewNamedClient(name string) (influxdb.Client, error)
