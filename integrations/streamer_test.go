@@ -1906,6 +1906,36 @@ stream
 	testStreamerWithOutput(t, "TestStream_Default", script, 15*time.Second, er, false, nil)
 }
 
+func TestStream_DefaultEmptyTags(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+	|default()
+		.tag('host', '')
+	|default()
+		.tag('host', 'serverA')
+	|default()
+		.tag('host', 'serverB')
+	|httpOut('TestStream_DefaultEmptyTags')
+`
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"cpu": "cpu-total", "host": "serverA"},
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					9.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_DefaultEmptyTags", script, 15*time.Second, er, false, nil)
+}
+
 func TestStream_Delete(t *testing.T) {
 	var script = `
 stream
