@@ -771,6 +771,7 @@ type PagerDutyHandler struct {
 }
 
 // Send the alert to HipChat.
+// For step-by-step instructions on setting up Kapacitor with HipChat, see the Event Handler Setup Guide (https://docs.influxdata.com//kapacitor/latest/guides/event-handler-setup/#hipchat-setup).
 // To allow Kapacitor to post to HipChat,
 // go to the URL https://www.hipchat.com/docs/apiv2 for
 // information on how to get your room id and tokens.
@@ -1048,6 +1049,7 @@ type SlackHandler struct {
 }
 
 // Send the alert to Telegram.
+// For step-by-step instructions on setting up Kapacitor with Telegram, see the Event Handler Setup Guide (https://docs.influxdata.com//kapacitor/latest/guides/event-handler-setup/#telegram-setup).
 // To allow Kapacitor to post to Telegram,
 //
 // Example:
