@@ -45,6 +45,7 @@ const defaultDetailsTmpl = "{{ json . }}"
 //    * OpsGenie -- Send alert to OpsGenie.
 //    * VictorOps -- Send alert to VictorOps.
 //    * PagerDuty -- Send alert to PagerDuty.
+//    * Pushover -- Send alert to Pushover.
 //    * Talk -- Post alert message to Talk client.
 //    * Telegram -- Post alert message to Telegram client.
 //
@@ -316,6 +317,10 @@ type AlertNode struct {
 	// Send alert to PagerDuty.
 	// tick:ignore
 	PagerDutyHandlers []*PagerDutyHandler `tick:"PagerDuty"`
+
+	// Send alert to Pushover.
+	// tick:ignore
+	PushoverHandlers []*PushoverHandler `tick:"Pushover"`
 
 	// Send alert to Sensu.
 	// tick:ignore
@@ -964,6 +969,74 @@ func (a *AlertNode) Sensu() *SensuHandler {
 // tick:embedded:AlertNode.Sensu
 type SensuHandler struct {
 	*AlertNode
+}
+
+// Send the alert to Pushover.
+// Register your application with Pushover at
+// https://pushover.net/apps/build to get a
+// Pushover token.
+//
+// Alert Level Mapping:
+// OK - Sends a -2 priority level.
+// Info - Sends a -1 priority level.
+// Warning - Sends a 0 priority level.
+// Critical - Sends a 1 priority level.
+//
+// Example:
+//    [pushover]
+//      enabled = true
+//      token = "9hiWoDOZ9IbmHsOTeST123ABciWTIqXQVFDo63h9"
+//      user_key = "Pushover"
+//
+// Example:
+//    stream
+//         |alert()
+//             .pushover()
+//              .sound('siren')
+//              .user_key('other user')
+//              .device('mydev')
+//              .title('mytitle')
+//              .URL('myurl')
+//              .URLTitle('mytitle')
+//
+// Send alerts to Pushover.
+//
+// tick:property
+func (a *AlertNode) Pushover() *PushoverHandler {
+	pushover := &PushoverHandler{
+		AlertNode: a,
+	}
+	a.PushoverHandlers = append(a.PushoverHandlers, pushover)
+	return pushover
+}
+
+// tick:embedded:AlertNode.Pushover
+type PushoverHandler struct {
+	*AlertNode
+
+	// User/Group key of your user (or you), viewable when logged
+	// into the Pushover dashboard. Often referred to as USER_KEY
+	// in the Pushover documentation.
+	// If empty uses the user from the configuration.
+	UserKey string
+
+	// Users device name to send message directly to that device,
+	// rather than all of a user's devices (multiple device names may
+	// be separated by a comma)
+	Device string
+
+	// Your message's title, otherwise your apps name is used
+	Title string
+
+	// A supplementary URL to show with your message
+	URL string
+
+	// A title for your supplementary URL, otherwise just URL is shown
+	URLTitle string
+
+	// The name of one of the sounds supported by the device clients to override
+	// the user's default sound choice
+	Sound string
 }
 
 // Send the alert to Slack.

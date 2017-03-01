@@ -23,6 +23,7 @@ import (
 	"github.com/influxdata/kapacitor/services/logging"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
+	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/replay"
 	"github.com/influxdata/kapacitor/services/reporting"
 	"github.com/influxdata/kapacitor/services/sensu"
@@ -65,6 +66,7 @@ type Config struct {
 	HipChat   hipchat.Config   `toml:"hipchat" override:"hipchat"`
 	OpsGenie  opsgenie.Config  `toml:"opsgenie" override:"opsgenie"`
 	PagerDuty pagerduty.Config `toml:"pagerduty" override:"pagerduty"`
+	Pushover  pushover.Config  `toml:"pushover" override:"pushover"`
 	SMTP      smtp.Config      `toml:"smtp" override:"smtp"`
 	SNMPTrap  snmptrap.Config  `toml:"snmptrap" override:"snmptrap"`
 	Sensu     sensu.Config     `toml:"sensu" override:"sensu"`
@@ -113,6 +115,7 @@ func NewConfig() *Config {
 	c.HipChat = hipchat.NewConfig()
 	c.OpsGenie = opsgenie.NewConfig()
 	c.PagerDuty = pagerduty.NewConfig()
+	c.Pushover = pushover.NewConfig()
 	c.SMTP = smtp.NewConfig()
 	c.Sensu = sensu.NewConfig()
 	c.Slack = slack.NewConfig()
@@ -220,6 +223,9 @@ func (c *Config) Validate() error {
 		return err
 	}
 	if err := c.PagerDuty.Validate(); err != nil {
+		return err
+	}
+	if err := c.Pushover.Validate(); err != nil {
 		return err
 	}
 	if err := c.SMTP.Validate(); err != nil {

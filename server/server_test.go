@@ -39,6 +39,7 @@ import (
 	"github.com/influxdata/kapacitor/services/opsgenie/opsgenietest"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pagerduty/pagerdutytest"
+	"github.com/influxdata/kapacitor/services/pushover/pushovertest"
 	"github.com/influxdata/kapacitor/services/sensu/sensutest"
 	"github.com/influxdata/kapacitor/services/slack/slacktest"
 	"github.com/influxdata/kapacitor/services/smtp/smtptest"
@@ -5487,6 +5488,80 @@ func TestServer_UpdateConfig(t *testing.T) {
 			},
 		},
 		{
+			section: "pushover",
+			setDefaults: func(c *server.Config) {
+				c.Pushover.URL = "http://pushover.example.com"
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/pushover"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/pushover/"},
+					Options: map[string]interface{}{
+						"enabled":  false,
+						"token":    false,
+						"user-key": false,
+						"url":      "http://pushover.example.com",
+					},
+					Redacted: []string{
+						"token",
+						"user-key",
+					}},
+				},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/pushover/"},
+				Options: map[string]interface{}{
+					"enabled":  false,
+					"token":    false,
+					"user-key": false,
+					"url":      "http://pushover.example.com",
+				},
+				Redacted: []string{
+					"token",
+					"user-key",
+				},
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"token":    "token",
+							"user-key": "kapacitor",
+						},
+					},
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/pushover"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/pushover/"},
+							Options: map[string]interface{}{
+								"enabled":  false,
+								"user-key": true,
+								"token":    true,
+								"url":      "http://pushover.example.com",
+							},
+							Redacted: []string{
+								"token",
+								"user-key",
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/pushover/"},
+						Options: map[string]interface{}{
+							"enabled":  false,
+							"user-key": true,
+							"token":    true,
+							"url":      "http://pushover.example.com",
+						},
+						Redacted: []string{
+							"token",
+							"user-key",
+						},
+					},
+				},
+			},
+		},
+		{
 			section: "kubernetes",
 			setDefaults: func(c *server.Config) {
 				c.Kubernetes.APIServers = []string{"http://localhost:80001"}
@@ -6522,6 +6597,20 @@ func TestServer_ListServiceTests(t *testing.T) {
 				},
 			},
 			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/pushover"},
+				Name: "pushover",
+				Options: client.ServiceTestOptions{
+					"user-key":  "", //gohere
+					"message":   "test pushover message",
+					"device":    "",
+					"title":     "",
+					"url":       "",
+					"url-title": "",
+					"sound":     "",
+					"level":     "CRITICAL",
+				},
+			},
+			{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/sensu"},
 				Name: "sensu",
 				Options: client.ServiceTestOptions{
@@ -6751,6 +6840,14 @@ func TestServer_DoServiceTest(t *testing.T) {
 		},
 		{
 			service: "pagerduty",
+			options: client.ServiceTestOptions{},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "service is not enabled",
+			},
+		},
+		{
+			service: "pushover",
 			options: client.ServiceTestOptions{},
 			exp: client.ServiceTestResult{
 				Success: false,
@@ -7311,6 +7408,41 @@ func TestServer_AlertHandlers(t *testing.T) {
 				return nil
 			},
 		},
+
+		{
+			handlerAction: client.HandlerAction{
+				Kind:    "pushover",
+				Options: map[string]interface{}{},
+			},
+			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+				ts := pushovertest.NewServer()
+				ctxt := context.WithValue(nil, "server", ts)
+
+				c.Pushover.Enabled = true
+				c.Pushover.URL = ts.URL
+				c.Pushover.Token = "api_key"
+				c.Pushover.UserKey = "user"
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*pushovertest.Server)
+				ts.Close()
+				got := ts.Requests()
+				exp := []pushovertest.Request{{
+					PostData: pushovertest.PostData{
+						Token:    "api_key",
+						UserKey:  "user",
+						Message:  "message",
+						Priority: 1,
+					},
+				}}
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected opsgenie request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+
 		{
 			handlerAction: client.HandlerAction{
 				Kind: "pagerduty",

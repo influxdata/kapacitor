@@ -20,6 +20,7 @@ import (
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
+	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/snmptrap"
@@ -100,6 +101,9 @@ type TaskMaster struct {
 	PagerDutyService interface {
 		Global() bool
 		Handler(pagerduty.HandlerConfig, *log.Logger) alert.Handler
+	}
+	PushoverService interface {
+		Handler(pushover.HandlerConfig, *log.Logger) alert.Handler
 	}
 	SlackService interface {
 		Global() bool
@@ -211,6 +215,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.OpsGenieService = tm.OpsGenieService
 	n.VictorOpsService = tm.VictorOpsService
 	n.PagerDutyService = tm.PagerDutyService
+	n.PushoverService = tm.PushoverService
 	n.SlackService = tm.SlackService
 	n.TelegramService = tm.TelegramService
 	n.SNMPTrapService = tm.SNMPTrapService
