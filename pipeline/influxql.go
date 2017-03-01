@@ -453,12 +453,12 @@ func (n *chainnode) MovingAverage(field string, window int64) *InfluxQLNode {
 	return i
 }
 
-// Compute the holt-winters forecast of a data set.
+// Compute the holt-winters (https://docs.influxdata.com/influxdb/latest/query_language/functions/#holt-winters) forecast of a data set.
 func (n *chainnode) HoltWinters(field string, h, m int64, interval time.Duration) *InfluxQLNode {
 	return n.holtWinters(field, h, m, interval, false)
 }
 
-// Compute the holt-winters forecast of a data set.
+// Compute the holt-winters (https://docs.influxdata.com/influxdb/latest/query_language/functions/#holt-winters) forecast of a data set.
 // This method also outputs all the points used to fit the data in addition to the forecasted data.
 func (n *chainnode) HoltWintersWithFit(field string, h, m int64, interval time.Duration) *InfluxQLNode {
 	return n.holtWinters(field, h, m, interval, true)
