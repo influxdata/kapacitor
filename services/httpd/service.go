@@ -149,6 +149,7 @@ func (s *Service) Close() error {
 
 	<-stopping
 	s.wg.Wait()
+	s.server = nil
 	return nil
 }
 

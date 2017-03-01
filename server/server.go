@@ -188,14 +188,10 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	s.appendPagerDutyService()
 	s.appendSMTPService()
 	s.appendTelegramService()
-	s.appendHipChatService()
-	s.appendAlertaService()
 	s.appendSlackService()
 	s.appendSNMPTrapService()
 	s.appendSensuService()
-	s.appendSlackService()
 	s.appendTalkService()
-	s.appendTelegramService()
 	s.appendVictorOpsService()
 
 	// Append third-party integrations
@@ -218,10 +214,17 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	s.appendStatsService()
 	s.appendReportingService()
 
+	// Append HTTPD Service last so that the API is not listening till everything else succeeded.
+	s.appendHTTPDService()
+
 	return s, nil
 }
 
 func (s *Server) AppendService(name string, srv Service) {
+	if _, ok := s.ServicesByName[name]; ok {
+		// Should be unreachable code
+		panic("cannot append service twice")
+	}
 	i := len(s.Services)
 	s.Services = append(s.Services, srv)
 	s.ServicesByName[name] = i
@@ -323,6 +326,10 @@ func (s *Server) initHTTPDService() {
 
 	s.HTTPDService = srv
 	s.TaskMaster.HTTPDService = srv
+}
+
+func (s *Server) appendHTTPDService() {
+	s.AppendService("httpd", s.HTTPDService)
 }
 
 func (s *Server) appendTaskStoreService() {
@@ -610,10 +617,6 @@ func (s *Server) Open() error {
 
 	if err := s.startServices(); err != nil {
 		s.Close()
-		return err
-	}
-	// Open HTTPD Service last so that the API is not listening till everything else succeeded.
-	if err := s.HTTPDService.Open(); err != nil {
 		return err
 	}
 
