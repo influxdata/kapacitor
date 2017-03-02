@@ -23,7 +23,7 @@ type EvalNode struct {
 	scopePool          stateful.ScopePool
 	tags               map[string]bool
 
-	cardinalityMu sync.RWMutex
+	expressionsByGroupMu sync.RWMutex
 
 	evalErrors *expvar.Int
 }
@@ -70,9 +70,9 @@ func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalN
 
 func (e *EvalNode) runEval(snapshot []byte) error {
 	valueF := func() int64 {
-		e.cardinalityMu.RLock()
+		e.expressionsByGroupMu.RLock()
 		l := len(e.expressionsByGroup)
-		e.cardinalityMu.RUnlock()
+		e.expressionsByGroupMu.RUnlock()
 		return int64(l)
 	}
 	e.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
@@ -133,17 +133,17 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 func (e *EvalNode) eval(now time.Time, group models.GroupID, fields models.Fields, tags models.Tags) (models.Fields, models.Tags, error) {
 	vars := e.scopePool.Get()
 	defer e.scopePool.Put(vars)
-	e.cardinalityMu.RLock()
+	e.expressionsByGroupMu.RLock()
 	expressions, ok := e.expressionsByGroup[group]
-	e.cardinalityMu.RUnlock()
+	e.expressionsByGroupMu.RUnlock()
 	if !ok {
 		expressions = make([]stateful.Expression, len(e.expressions))
 		for i, exp := range e.expressions {
 			expressions[i] = exp.CopyReset()
 		}
-		e.cardinalityMu.Lock()
+		e.expressionsByGroupMu.Lock()
 		e.expressionsByGroup[group] = expressions
-		e.cardinalityMu.Unlock()
+		e.expressionsByGroupMu.Unlock()
 	}
 	for i, expr := range expressions {
 		err := fillScope(vars, e.refVarList[i], now, fields, tags)
