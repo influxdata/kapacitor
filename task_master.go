@@ -74,8 +74,8 @@ type TaskMaster struct {
 	UDFService UDFService
 
 	AlertService interface {
-		alertservice.HandlerRegistrar
-		alertservice.Eventer
+		alertservice.AnonHandlerRegistrar
+		alertservice.Events
 		alertservice.TopicPersister
 	}
 	InfluxDBService interface {

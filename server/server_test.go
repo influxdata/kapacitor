@@ -8107,7 +8107,7 @@ stream
 
 	if _, err := cli.ListTopicEvents(l, nil); err == nil {
 		t.Fatal("expected error listing anonymous topic for disabled task")
-	} else if got, exp := err.Error(), fmt.Sprintf("topic %q does not exist", topic); got != exp {
+	} else if got, exp := err.Error(), fmt.Sprintf("failed to get topic events: unknown topic %q", topic); got != exp {
 		t.Errorf("unexpected error message for nonexistent anonymous topic: got %q exp %q", got, exp)
 	}
 
@@ -8143,7 +8143,7 @@ stream
 
 	if _, err := cli.ListTopicEvents(l, nil); err == nil {
 		t.Fatal("expected error listing anonymous topic for deleted task")
-	} else if got, exp := err.Error(), fmt.Sprintf("topic %q does not exist", topic); got != exp {
+	} else if got, exp := err.Error(), fmt.Sprintf("failed to get topic events: unknown topic %q", topic); got != exp {
 		t.Errorf("unexpected error message for nonexistent anonymous topic: got %q exp %q", got, exp)
 	}
 }

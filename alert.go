@@ -464,7 +464,7 @@ func (a *AlertNode) runAlert([]byte) error {
 
 		// Register Handlers on topic
 		for _, h := range a.handlers {
-			a.et.tm.AlertService.RegisterHandler([]string{a.anonTopic}, h)
+			a.et.tm.AlertService.RegisterAnonHandler([]string{a.anonTopic}, h)
 		}
 		// Restore anonTopic
 		a.et.tm.AlertService.RestoreTopic(a.anonTopic)
@@ -707,7 +707,7 @@ func (a *AlertNode) runAlert([]byte) error {
 	a.et.tm.AlertService.CloseTopic(a.anonTopic)
 	// Deregister Handlers on topic
 	for _, h := range a.handlers {
-		a.et.tm.AlertService.DeregisterHandler([]string{a.anonTopic}, h)
+		a.et.tm.AlertService.DeregisterAnonHandler([]string{a.anonTopic}, h)
 	}
 	return nil
 }
@@ -730,14 +730,20 @@ func (a *AlertNode) restoreEventState(id string) (alert.Level, time.Time) {
 	var anonFound, topicFound bool
 	// Check for previous state on anonTopic
 	if a.hasAnonTopic() {
-		if state, ok := a.et.tm.AlertService.EventState(a.anonTopic, id); ok {
+		if state, ok, err := a.et.tm.AlertService.EventState(a.anonTopic, id); err != nil {
+			a.incrementErrorCount()
+			a.logger.Printf("E! failed to get event state for anonymous topic %s, event %s: %v", a.anonTopic, id, err)
+		} else if ok {
 			anonTopicState = state
 			anonFound = true
 		}
 	}
 	// Check for previous state on topic.
 	if a.hasTopic() {
-		if state, ok := a.et.tm.AlertService.EventState(a.topic, id); ok {
+		if state, ok, err := a.et.tm.AlertService.EventState(a.topic, id); err != nil {
+			a.incrementErrorCount()
+			a.logger.Printf("E! failed to get event state for topic %s, event %s: %v", a.topic, id, err)
+		} else if ok {
 			topicState = state
 			topicFound = true
 		}
