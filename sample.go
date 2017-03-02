@@ -15,7 +15,7 @@ type SampleNode struct {
 	node
 	s *pipeline.SampleNode
 
-	cardinalityMu sync.RWMutex
+	countsMu sync.RWMutex
 
 	counts   map[models.GroupID]int64
 	duration time.Duration
@@ -38,9 +38,9 @@ func newSampleNode(et *ExecutingTask, n *pipeline.SampleNode, l *log.Logger) (*S
 
 func (s *SampleNode) runSample([]byte) error {
 	valueF := func() int64 {
-		s.cardinalityMu.RLock()
+		s.countsMu.RLock()
 		l := len(s.counts)
-		s.cardinalityMu.RUnlock()
+		s.countsMu.RUnlock()
 		return int64(l)
 	}
 	s.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
@@ -85,14 +85,14 @@ func (s *SampleNode) shouldKeep(group models.GroupID, t time.Time) bool {
 		keepTime := t.Truncate(s.duration)
 		return t.Equal(keepTime)
 	} else {
-		s.cardinalityMu.RLock()
+		s.countsMu.RLock()
 		count := s.counts[group]
-		s.cardinalityMu.RUnlock()
+		s.countsMu.RUnlock()
 		keep := count%s.s.N == 0
 		count++
-		s.cardinalityMu.Lock()
+		s.countsMu.Lock()
 		s.counts[group] = count
-		s.cardinalityMu.Unlock()
+		s.countsMu.Unlock()
 		return keep
 	}
 }
