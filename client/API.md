@@ -1438,9 +1438,9 @@ GET /kapacitor/v1preview/alerts/topics?min-level=WARNING
 }
 ```
 
-### Topic Status
+### Topic State
 
-To query the status of a topic make a GET request to `/kapacitor/v1preview/alerts/topics/<topic id>`.
+To query the state of a topic make a GET request to `/kapacitor/v1preview/alerts/topics/<topic id>`.
 
 #### Example
 

@@ -165,45 +165,24 @@ func (s *Topics) ReplaceHandler(oldTopics, newTopics []string, oldH, newH Handle
 	}
 }
 
-// TopicStatus returns the max alert level for each topic matching 'pattern', not returning
+// TopicState returns the max alert level for each topic matching 'pattern', not returning
 // any topics with max alert levels less severe than 'minLevel'
-func (s *Topics) TopicStatus(pattern string, minLevel Level) map[string]TopicStatus {
+func (s *Topics) TopicState(pattern string, minLevel Level) map[string]TopicState {
 	s.mu.RLock()
-	res := make(map[string]TopicStatus, len(s.topics))
+	res := make(map[string]TopicState, len(s.topics))
 	for _, topic := range s.topics {
 		if !PatternMatch(pattern, topic.ID()) {
 			continue
 		}
 		level := topic.MaxLevel()
 		if level >= minLevel {
-			res[topic.ID()] = TopicStatus{
+			res[topic.ID()] = TopicState{
 				Level:     level,
 				Collected: topic.Collected(),
 			}
 		}
 	}
 	s.mu.RUnlock()
-	return res
-}
-
-// TopicStatusDetails is similar to TopicStatus, but will additionally return
-// at least 'minLevel' severity
-func (s *Topics) TopicStatusEvents(pattern string, minLevel Level) map[string]map[string]EventState {
-	s.mu.RLock()
-	topics := make([]*Topic, 0, len(s.topics))
-	for _, topic := range s.topics {
-		if topic.MaxLevel() >= minLevel && PatternMatch(pattern, topic.id) {
-			topics = append(topics, topic)
-		}
-	}
-	s.mu.RUnlock()
-
-	res := make(map[string]map[string]EventState, len(topics))
-
-	for _, topic := range topics {
-		res[topic.ID()] = topic.EventStates(minLevel)
-	}
-
 	return res
 }
 
@@ -247,8 +226,8 @@ func (t *Topic) ID() string {
 	return t.id
 }
 
-func (t *Topic) Status() TopicStatus {
-	return TopicStatus{
+func (t *Topic) State() TopicState {
+	return TopicState{
 		Level:     t.MaxLevel(),
 		Collected: t.Collected(),
 	}

@@ -110,8 +110,9 @@ func NewService(c Config, l *log.Logger) *Service {
 	}
 	s.APIServer = &apiServer{
 		Registrar: s,
-		Statuser:  s,
-		persister: s,
+		Topics:    s,
+		Persister: s,
+		logger:    l,
 	}
 	return s
 }
@@ -152,6 +153,13 @@ func (s *Service) Open() error {
 	}
 
 	return nil
+}
+
+func (s *Service) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.topics.Close()
+	return s.APIServer.Close()
 }
 
 func (s *Service) loadSavedHandlerSpecs() error {
@@ -234,24 +242,9 @@ func (s *Service) loadSavedTopicStates() error {
 	return nil
 }
 
-func (s *Service) Close() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.topics.Close()
-	return s.APIServer.Close()
-}
-
 func validatePattern(pattern string) error {
 	_, err := path.Match(pattern, "")
 	return err
-}
-
-func (s *Service) EventState(topic, event string) (alert.EventState, bool) {
-	t, ok := s.topics.Topic(topic)
-	if !ok {
-		return alert.EventState{}, false
-	}
-	return t.EventState(event)
 }
 
 func (s *Service) Collect(event alert.Event) error {
@@ -322,13 +315,6 @@ func (s *Service) restoreTopic(topic string) error {
 	return nil
 }
 
-func (s *Service) topic(id string) (*alert.Topic, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	t, ok := s.topics.Topic(id)
-	return t, ok
-}
-
 func (s *Service) RestoreTopic(topic string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -360,11 +346,11 @@ func (s *Service) UpdateEvent(topic string, event alert.EventState) error {
 	return s.persistTopicState(topic)
 }
 
-func (s *Service) RegisterHandler(topics []string, h alert.Handler) {
+func (s *Service) RegisterAnonHandler(topics []string, h alert.Handler) {
 	s.topics.RegisterHandler(topics, h)
 }
 
-func (s *Service) DeregisterHandler(topics []string, h alert.Handler) {
+func (s *Service) DeregisterAnonHandler(topics []string, h alert.Handler) {
 	s.topics.DeregisterHandler(topics, h)
 }
 
@@ -470,16 +456,39 @@ func (s *Service) UpdateHandlerSpec(oldSpec, newSpec HandlerSpec) error {
 	return nil
 }
 
-// TopicStatus returns the max alert level for each topic matching 'pattern', not returning
-// any topics with max alert levels less severe than 'minLevel'
-func (s *Service) TopicStatus(pattern string, minLevel alert.Level) (map[string]alert.TopicStatus, error) {
-	return s.topics.TopicStatus(pattern, minLevel), nil
+// TopicState returns the state for the specified topic.
+func (s *Service) TopicState(topic string) (alert.TopicState, bool, error) {
+	t, ok := s.topics.Topic(topic)
+	if !ok {
+		return alert.TopicState{}, false, nil
+	}
+	return t.State(), true, nil
 }
 
-// TopicStatusDetails is similar to TopicStatus, but will additionally return
-// at least 'minLevel' severity
-func (s *Service) TopicStatusEvents(pattern string, minLevel alert.Level) (map[string]map[string]alert.EventState, error) {
-	return s.topics.TopicStatusEvents(pattern, minLevel), nil
+// TopicStates returns the max alert level for each topic matching 'pattern', not returning
+// any topics with max alert levels less severe than 'minLevel'
+func (s *Service) TopicStates(pattern string, minLevel alert.Level) (map[string]alert.TopicState, error) {
+	return s.topics.TopicState(pattern, minLevel), nil
+}
+
+// EventState returns the current state of the event.
+func (s *Service) EventState(topic, event string) (alert.EventState, bool, error) {
+	t, ok := s.topics.Topic(topic)
+	if !ok {
+		return alert.EventState{}, false, nil
+	}
+	state, ok := t.EventState(event)
+	return state, ok, nil
+}
+
+// EventStates returns the current state of events for the specified topic.
+// Only events greater or equal to minLevel will be returned
+func (s *Service) EventStates(topic string, minLevel alert.Level) (map[string]alert.EventState, error) {
+	t, ok := s.topics.Topic(topic)
+	if !ok {
+		return nil, fmt.Errorf("unknown topic %q", topic)
+	}
+	return t.EventStates(minLevel), nil
 }
 
 func (s *Service) HandlerSpec(id string) (HandlerSpec, error) {
