@@ -85,12 +85,10 @@ func (s *SampleNode) shouldKeep(group models.GroupID, t time.Time) bool {
 		keepTime := t.Truncate(s.duration)
 		return t.Equal(keepTime)
 	} else {
-		s.countsMu.RLock()
+		s.countsMu.Lock()
 		count := s.counts[group]
-		s.countsMu.RUnlock()
 		keep := count%s.s.N == 0
 		count++
-		s.countsMu.Lock()
 		s.counts[group] = count
 		s.countsMu.Unlock()
 		return keep
