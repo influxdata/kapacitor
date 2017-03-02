@@ -58,7 +58,7 @@ type AlertNode struct {
 	messageTmpl *text.Template
 	detailsTmpl *html.Template
 
-	cardinalityMu sync.RWMutex
+	statesMu sync.RWMutex
 
 	alertsTriggered *expvar.Int
 	oksTriggered    *expvar.Int
@@ -451,9 +451,9 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 
 func (a *AlertNode) runAlert([]byte) error {
 	valueF := func() int64 {
-		a.cardinalityMu.RLock()
+		a.statesMu.RLock()
 		l := len(a.states)
-		a.cardinalityMu.RUnlock()
+		a.statesMu.RUnlock()
 		return int64(l)
 	}
 	a.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
@@ -951,9 +951,9 @@ func (a *AlertNode) updateState(t time.Time, level alert.Level, group models.Gro
 		state = &alertState{
 			history: make([]alert.Level, a.a.History),
 		}
-		a.cardinalityMu.Lock()
+		a.statesMu.Lock()
 		a.states[group] = state
-		a.cardinalityMu.Unlock()
+		a.statesMu.Unlock()
 	}
 	state.addEvent(level)
 
@@ -1090,8 +1090,8 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group 
 }
 
 func (a *AlertNode) getAlertState(id models.GroupID) (state *alertState, ok bool) {
-	a.cardinalityMu.RLock()
+	a.statesMu.RLock()
 	state, ok = a.states[id]
-	a.cardinalityMu.RUnlock()
+	a.statesMu.RUnlock()
 	return state, ok
 }
