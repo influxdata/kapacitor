@@ -498,9 +498,7 @@ func (a *AlertNode) runAlert([]byte) error {
 				return err
 			}
 			var currentLevel alert.Level
-			a.cardinalityMu.RLock()
-			state, ok := a.states[p.Group]
-			a.cardinalityMu.RUnlock()
+			state, ok := a.getAlertState(p.Group)
 			if ok {
 				currentLevel = state.currentLevel()
 			} else {
@@ -593,9 +591,7 @@ func (a *AlertNode) runAlert([]byte) error {
 			var highestPoint *models.BatchPoint
 
 			var currentLevel alert.Level
-			a.cardinalityMu.RLock()
-			state, ok := a.states[b.Group]
-			a.cardinalityMu.RUnlock()
+			state, ok := a.getAlertState(b.Group)
 			if ok {
 				currentLevel = state.currentLevel()
 			} else {
@@ -950,9 +946,7 @@ func (a *alertState) percentChange() float64 {
 }
 
 func (a *AlertNode) updateState(t time.Time, level alert.Level, group models.GroupID) *alertState {
-	a.cardinalityMu.RLock()
-	state, ok := a.states[group]
-	a.cardinalityMu.RUnlock()
+	state, ok := a.getAlertState(group)
 	if !ok {
 		state = &alertState{
 			history: make([]alert.Level, a.a.History),
@@ -1093,4 +1087,11 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group 
 
 	details := tmpBuffer.String()
 	return msg, details, nil
+}
+
+func (a *AlertNode) getAlertState(id models.GroupID) (state *alertState, ok bool) {
+	a.cardinalityMu.RLock()
+	state, ok = a.states[id]
+	a.cardinalityMu.RUnlock()
+	return state, ok
 }
