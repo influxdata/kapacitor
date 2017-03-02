@@ -29,7 +29,7 @@ type JoinNode struct {
 	// Represents the lower bound of times per group per parent
 	lowMarks map[srcGroup]time.Time
 
-	cardinalityMu sync.RWMutex
+	groupsMu sync.RWMutex
 
 	reported    map[int]bool
 	allReported bool
@@ -69,9 +69,9 @@ func newJoinNode(et *ExecutingTask, n *pipeline.JoinNode, l *log.Logger) (*JoinN
 func (j *JoinNode) runJoin([]byte) error {
 	j.groups = make(map[models.GroupID]*group)
 	valueF := func() int64 {
-		j.cardinalityMu.RLock()
+		j.groupsMu.RLock()
 		l := len(j.groups)
-		j.cardinalityMu.RUnlock()
+		j.groupsMu.RUnlock()
 		return int64(l)
 	}
 	j.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
@@ -117,21 +117,21 @@ func (j *JoinNode) runJoin([]byte) error {
 		}
 	}
 	// No more points are coming signal all groups to finish up.
-	j.cardinalityMu.RLock()
+	j.groupsMu.RLock()
 	for _, group := range j.groups {
 		close(group.points)
 	}
-	j.cardinalityMu.RUnlock()
+	j.groupsMu.RUnlock()
 
 	j.runningGroups.Wait()
-	j.cardinalityMu.RLock()
+	j.groupsMu.RLock()
 	for _, group := range j.groups {
 		err := group.emitAll()
 		if err != nil {
 			return err
 		}
 	}
-	j.cardinalityMu.RUnlock()
+	j.groupsMu.RUnlock()
 	return nil
 }
 
@@ -282,15 +282,15 @@ func (j *JoinNode) sendSpecificPoint(specific srcPoint, groupErrs chan<- error) 
 
 // safely get the group for the point or create one if it doesn't exist.
 func (j *JoinNode) getGroup(p models.PointInterface, groupErrs chan<- error) *group {
-	j.cardinalityMu.RLock()
+	j.groupsMu.RLock()
 	group := j.groups[p.PointGroup()]
-	j.cardinalityMu.RUnlock()
+	j.groupsMu.RUnlock()
 	if group == nil {
 		group = newGroup(len(j.ins), j)
-		j.cardinalityMu.Lock()
+		j.groupsMu.Lock()
 		j.groups[p.PointGroup()] = group
 		j.runningGroups.Add(1)
-		j.cardinalityMu.Unlock()
+		j.groupsMu.Unlock()
 		go func() {
 			err := group.run()
 			if err != nil {
