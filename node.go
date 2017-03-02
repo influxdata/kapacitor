@@ -85,8 +85,7 @@ type node struct {
 	statsKey   string
 	statMap    *kexpvar.Map
 
-	nodeErrors      *kexpvar.Int
-	nodeCardinality *kexpvar.IntFuncGauge
+	nodeErrors *kexpvar.Int
 }
 
 func (n *node) addParentEdge(e *Edge) {
