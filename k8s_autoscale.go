@@ -36,7 +36,7 @@ type K8sAutoscaleNode struct {
 	decreaseCount      *expvar.Int
 	cooldownDropsCount *expvar.Int
 
-	cardinalityMu sync.RWMutex
+	replicasExprsMu sync.RWMutex
 
 	min int
 	max int
@@ -70,9 +70,9 @@ func newK8sAutoscaleNode(et *ExecutingTask, n *pipeline.K8sAutoscaleNode, l *log
 
 func (k *K8sAutoscaleNode) runAutoscale([]byte) error {
 	valueF := func() int64 {
-		k.cardinalityMu.RLock()
+		k.replicasExprsMu.RLock()
 		l := len(k.replicasExprs)
-		k.cardinalityMu.RUnlock()
+		k.replicasExprsMu.RUnlock()
 		return int64(l)
 	}
 	k.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
@@ -159,9 +159,9 @@ func (k *K8sAutoscaleNode) handlePoint(streamName string, group models.GroupID, 
 	}
 
 	// Eval the replicas expression
-	k.cardinalityMu.Lock()
+	k.replicasExprsMu.Lock()
 	newReplicas, err := k.evalExpr(state.current, group, k.k.Replicas, k.replicasExprs, k.replicasScopePool, t, fields, tags)
-	k.cardinalityMu.Unlock()
+	k.replicasExprsMu.Unlock()
 	if err != nil {
 		return models.Point{}, errors.Wrap(err, "failed to evaluate the replicas expression")
 	}
