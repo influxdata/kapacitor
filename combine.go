@@ -21,7 +21,7 @@ type CombineNode struct {
 	expressionsByGroup map[models.GroupID][]stateful.Expression
 	scopePools         []stateful.ScopePool
 
-	cardinalityMu sync.RWMutex
+	expressionsByGroupMu sync.RWMutex
 
 	combination combination
 }
@@ -66,9 +66,9 @@ func (t timeList) Swap(i, j int)      { t[i], t[j] = t[j], t[i] }
 
 func (n *CombineNode) runCombine([]byte) error {
 	valueF := func() int64 {
-		n.cardinalityMu.RLock()
+		n.expressionsByGroupMu.RLock()
 		l := len(n.expressionsByGroup)
-		n.cardinalityMu.RUnlock()
+		n.expressionsByGroupMu.RUnlock()
 		return int64(l)
 	}
 	n.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
@@ -175,17 +175,17 @@ func (n *CombineNode) combineBuffer(buf *buffer) error {
 		return nil
 	}
 	l := len(n.expressions)
-	n.cardinalityMu.RLock()
+	n.expressionsByGroupMu.RLock()
 	expressions, ok := n.expressionsByGroup[buf.Group]
-	n.cardinalityMu.RUnlock()
+	n.expressionsByGroupMu.RUnlock()
 	if !ok {
 		expressions = make([]stateful.Expression, l)
 		for i, expr := range n.expressions {
 			expressions[i] = expr.CopyReset()
 		}
-		n.cardinalityMu.Lock()
+		n.expressionsByGroupMu.Lock()
 		n.expressionsByGroup[buf.Group] = expressions
-		n.cardinalityMu.Unlock()
+		n.expressionsByGroupMu.Unlock()
 	}
 
 	// Compute matching result for all points
