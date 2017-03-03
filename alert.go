@@ -498,8 +498,7 @@ func (a *AlertNode) runAlert([]byte) error {
 				return err
 			}
 			var currentLevel alert.Level
-			state, ok := a.getAlertState(p.Group)
-			if ok {
+			if state, ok := a.getAlertState(p.Group); ok {
 				currentLevel = state.currentLevel()
 			} else {
 				// Check for previous state
@@ -512,7 +511,7 @@ func (a *AlertNode) runAlert([]byte) error {
 				}
 			}
 			l := a.determineLevel(p.Time, p.Fields, p.Tags, currentLevel)
-			state = a.updateState(p.Time, l, p.Group)
+			state := a.updateState(p.Time, l, p.Group)
 			if (a.a.UseFlapping && state.flapping) || (a.a.IsStateChangesOnly && !state.changed && !state.expired) {
 				a.timer.Stop()
 				continue
@@ -591,8 +590,7 @@ func (a *AlertNode) runAlert([]byte) error {
 			var highestPoint *models.BatchPoint
 
 			var currentLevel alert.Level
-			state, ok := a.getAlertState(b.Group)
-			if ok {
+			if state, ok := a.getAlertState(b.Group); ok {
 				currentLevel = state.currentLevel()
 			} else {
 				// Check for previous state
@@ -628,7 +626,7 @@ func (a *AlertNode) runAlert([]byte) error {
 			}
 
 			// Update state
-			state = a.updateState(t, l, b.Group)
+			state := a.updateState(t, l, b.Group)
 			// Trigger alert if:
 			//  l == OK and state.changed (aka recovery)
 			//    OR
