@@ -4,9 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"sync"
 
-	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick/stateful"
@@ -37,22 +35,11 @@ func newWhereNode(et *ExecutingTask, n *pipeline.WhereNode, l *log.Logger) (wn *
 }
 
 func (w *WhereNode) runWhere(snapshot []byte) error {
-	var mu sync.RWMutex
-	valueF := func() int64 {
-		mu.RLock()
-		l := len(w.expressions)
-		mu.RUnlock()
-		return int64(l)
-	}
-	w.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
-
 	switch w.Wants() {
 	case pipeline.StreamEdge:
 		for p, ok := w.ins[0].NextPoint(); ok; p, ok = w.ins[0].NextPoint() {
 			w.timer.Start()
-			mu.RLock()
 			expr := w.expressions[p.Group]
-			mu.RUnlock()
 			scopePool := w.scopePools[p.Group]
 
 			if expr == nil {
@@ -62,9 +49,7 @@ func (w *WhereNode) runWhere(snapshot []byte) error {
 				}
 
 				expr = compiledExpr
-				mu.Lock()
 				w.expressions[p.Group] = expr
-				mu.Unlock()
 
 				scopePool = stateful.NewScopePool(stateful.FindReferenceVariables(w.w.Lambda.Expression))
 				w.scopePools[p.Group] = scopePool
@@ -87,9 +72,7 @@ func (w *WhereNode) runWhere(snapshot []byte) error {
 	case pipeline.BatchEdge:
 		for b, ok := w.ins[0].NextBatch(); ok; b, ok = w.ins[0].NextBatch() {
 			w.timer.Start()
-			mu.RLock()
 			expr := w.expressions[b.Group]
-			mu.RUnlock()
 			scopePool := w.scopePools[b.Group]
 
 			if expr == nil {
@@ -99,9 +82,7 @@ func (w *WhereNode) runWhere(snapshot []byte) error {
 				}
 
 				expr = compiledExpr
-				mu.Lock()
 				w.expressions[b.Group] = expr
-				mu.Unlock()
 
 				scopePool = stateful.NewScopePool(stateful.FindReferenceVariables(w.w.Lambda.Expression))
 				w.scopePools[b.Group] = scopePool

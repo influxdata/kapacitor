@@ -3,7 +3,6 @@ package kapacitor
 import (
 	"fmt"
 	"log"
-	"sync"
 	"time"
 
 	"github.com/influxdata/kapacitor/expvar"
@@ -36,8 +35,6 @@ type K8sAutoscaleNode struct {
 	decreaseCount      *expvar.Int
 	cooldownDropsCount *expvar.Int
 
-	replicasExprsMu sync.RWMutex
-
 	min int
 	max int
 }
@@ -69,14 +66,6 @@ func newK8sAutoscaleNode(et *ExecutingTask, n *pipeline.K8sAutoscaleNode, l *log
 }
 
 func (k *K8sAutoscaleNode) runAutoscale([]byte) error {
-	valueF := func() int64 {
-		k.replicasExprsMu.RLock()
-		l := len(k.replicasExprs)
-		k.replicasExprsMu.RUnlock()
-		return int64(l)
-	}
-	k.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
-
 	k.increaseCount = &expvar.Int{}
 	k.decreaseCount = &expvar.Int{}
 	k.cooldownDropsCount = &expvar.Int{}
@@ -159,9 +148,7 @@ func (k *K8sAutoscaleNode) handlePoint(streamName string, group models.GroupID, 
 	}
 
 	// Eval the replicas expression
-	k.replicasExprsMu.Lock()
 	newReplicas, err := k.evalExpr(state.current, group, k.k.Replicas, k.replicasExprs, k.replicasScopePool, t, fields, tags)
-	k.replicasExprsMu.Unlock()
 	if err != nil {
 		return models.Point{}, errors.Wrap(err, "failed to evaluate the replicas expression")
 	}
