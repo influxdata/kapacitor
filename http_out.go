@@ -7,7 +7,6 @@ import (
 	"path"
 	"sync"
 
-	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/services/httpd"
@@ -42,13 +41,6 @@ func (h *HTTPOutNode) Endpoint() string {
 }
 
 func (h *HTTPOutNode) runOut([]byte) error {
-	valueF := func() int64 {
-		h.mu.RLock()
-		l := len(h.groupSeriesIdx)
-		h.mu.RUnlock()
-		return int64(l)
-	}
-	h.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
 
 	hndl := func(w http.ResponseWriter, req *http.Request) {
 		h.mu.RLock()

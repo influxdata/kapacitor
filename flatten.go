@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 )
@@ -50,24 +49,13 @@ type flattenBatchBuffer struct {
 }
 
 func (n *FlattenNode) runFlatten([]byte) error {
-	var mu sync.RWMutex
 	switch n.Wants() {
 	case pipeline.StreamEdge:
 		flattenBuffers := make(map[models.GroupID]*flattenStreamBuffer)
-		valueF := func() int64 {
-			mu.RLock()
-			l := len(flattenBuffers)
-			mu.RUnlock()
-			return int64(l)
-		}
-		n.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
-
 		for p, ok := n.ins[0].NextPoint(); ok; p, ok = n.ins[0].NextPoint() {
 			n.timer.Start()
 			t := p.Time.Round(n.f.Tolerance)
-			mu.RLock()
 			currentBuf, ok := flattenBuffers[p.Group]
-			mu.RUnlock()
 			if !ok {
 				currentBuf = &flattenStreamBuffer{
 					Time:       t,
@@ -76,9 +64,7 @@ func (n *FlattenNode) runFlatten([]byte) error {
 					Dimensions: p.Dimensions,
 					Tags:       p.PointTags(),
 				}
-				mu.Lock()
 				flattenBuffers[p.Group] = currentBuf
-				mu.Unlock()
 			}
 			rp := models.RawPoint{
 				Time:   t,
@@ -118,20 +104,10 @@ func (n *FlattenNode) runFlatten([]byte) error {
 		}
 	case pipeline.BatchEdge:
 		allBuffers := make(map[models.GroupID]*flattenBatchBuffer)
-		valueF := func() int64 {
-			mu.RLock()
-			l := len(allBuffers)
-			mu.RUnlock()
-			return int64(l)
-		}
-		n.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
-
 		for b, ok := n.ins[0].NextBatch(); ok; b, ok = n.ins[0].NextBatch() {
 			n.timer.Start()
 			t := b.TMax.Round(n.f.Tolerance)
-			mu.RLock()
 			currentBuf, ok := allBuffers[b.Group]
-			mu.RUnlock()
 			if !ok {
 				currentBuf = &flattenBatchBuffer{
 					Time:   t,
@@ -140,9 +116,7 @@ func (n *FlattenNode) runFlatten([]byte) error {
 					Tags:   b.Tags,
 					Points: make(map[time.Time][]models.RawPoint),
 				}
-				mu.Lock()
 				allBuffers[b.Group] = currentBuf
-				mu.Unlock()
 			}
 			if !t.Equal(currentBuf.Time) {
 				// Flatten/Emit old buffer

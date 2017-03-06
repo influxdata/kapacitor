@@ -4,10 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"sync"
 	"time"
 
-	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick/ast"
@@ -22,10 +20,6 @@ type EvalNode struct {
 	refVarList         [][]string
 	scopePool          stateful.ScopePool
 	tags               map[string]bool
-
-	expressionsByGroupMu sync.RWMutex
-
-	evalErrors *expvar.Int
 }
 
 // Create a new  EvalNode which applies a transformation func to each point in a stream and returns a single point.
@@ -38,7 +32,6 @@ func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalN
 		e:                  n,
 		expressionsByGroup: make(map[models.GroupID][]stateful.Expression),
 	}
-
 	// Create stateful expressions
 	en.expressions = make([]stateful.Expression, len(n.Lambdas))
 	en.refVarList = make([][]string, len(n.Lambdas))
@@ -69,14 +62,6 @@ func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalN
 }
 
 func (e *EvalNode) runEval(snapshot []byte) error {
-	valueF := func() int64 {
-		e.expressionsByGroupMu.RLock()
-		l := len(e.expressionsByGroup)
-		e.expressionsByGroupMu.RUnlock()
-		return int64(l)
-	}
-	e.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
-
 	switch e.Provides() {
 	case pipeline.StreamEdge:
 		var err error
@@ -133,17 +118,13 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 func (e *EvalNode) eval(now time.Time, group models.GroupID, fields models.Fields, tags models.Tags) (models.Fields, models.Tags, error) {
 	vars := e.scopePool.Get()
 	defer e.scopePool.Put(vars)
-	e.expressionsByGroupMu.RLock()
 	expressions, ok := e.expressionsByGroup[group]
-	e.expressionsByGroupMu.RUnlock()
 	if !ok {
 		expressions = make([]stateful.Expression, len(e.expressions))
 		for i, exp := range e.expressions {
 			expressions[i] = exp.CopyReset()
 		}
-		e.expressionsByGroupMu.Lock()
 		e.expressionsByGroup[group] = expressions
-		e.expressionsByGroupMu.Unlock()
 	}
 	for i, expr := range expressions {
 		err := fillScope(vars, e.refVarList[i], now, fields, tags)
