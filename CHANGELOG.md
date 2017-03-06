@@ -12,6 +12,7 @@
     Renamed `eval_errors` to `errors` in eval node.
 - [#922](https://github.com/influxdata/kapacitor/issues/922): Expose server specific information in alert templates.
 - [#1162](https://github.com/influxdata/kapacitor/pulls/1162): Add Pushover integration.
+- [#1221](https://github.com/influxdata/kapacitor/pull/1221): Add `working_cardinality` stat to each node type that tracks the number of groups per node.
 
 ### Bugfixes
 
