@@ -29,6 +29,8 @@ type JoinNode struct {
 	// Represents the lower bound of times per group per parent
 	lowMarks map[srcGroup]time.Time
 
+	groupsMu sync.RWMutex
+
 	reported    map[int]bool
 	allReported bool
 }
@@ -65,8 +67,14 @@ func newJoinNode(et *ExecutingTask, n *pipeline.JoinNode, l *log.Logger) (*JoinN
 }
 
 func (j *JoinNode) runJoin([]byte) error {
-
 	j.groups = make(map[models.GroupID]*group)
+	valueF := func() int64 {
+		j.groupsMu.RLock()
+		l := len(j.groups)
+		j.groupsMu.RUnlock()
+		return int64(l)
+	}
+	j.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
 
 	groupErrs := make(chan error, 1)
 	done := make(chan struct{}, len(j.ins))
@@ -109,16 +117,21 @@ func (j *JoinNode) runJoin([]byte) error {
 		}
 	}
 	// No more points are coming signal all groups to finish up.
+	j.groupsMu.RLock()
 	for _, group := range j.groups {
 		close(group.points)
 	}
+	j.groupsMu.RUnlock()
+
 	j.runningGroups.Wait()
+	j.groupsMu.RLock()
 	for _, group := range j.groups {
 		err := group.emitAll()
 		if err != nil {
 			return err
 		}
 	}
+	j.groupsMu.RUnlock()
 	return nil
 }
 
@@ -269,11 +282,15 @@ func (j *JoinNode) sendSpecificPoint(specific srcPoint, groupErrs chan<- error) 
 
 // safely get the group for the point or create one if it doesn't exist.
 func (j *JoinNode) getGroup(p models.PointInterface, groupErrs chan<- error) *group {
+	j.groupsMu.RLock()
 	group := j.groups[p.PointGroup()]
+	j.groupsMu.RUnlock()
 	if group == nil {
 		group = newGroup(len(j.ins), j)
+		j.groupsMu.Lock()
 		j.groups[p.PointGroup()] = group
 		j.runningGroups.Add(1)
+		j.groupsMu.Unlock()
 		go func() {
 			err := group.run()
 			if err != nil {

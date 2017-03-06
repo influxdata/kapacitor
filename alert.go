@@ -58,6 +58,8 @@ type AlertNode struct {
 	messageTmpl *text.Template
 	detailsTmpl *html.Template
 
+	statesMu sync.RWMutex
+
 	alertsTriggered *expvar.Int
 	oksTriggered    *expvar.Int
 	infosTriggered  *expvar.Int
@@ -448,6 +450,14 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 }
 
 func (a *AlertNode) runAlert([]byte) error {
+	valueF := func() int64 {
+		a.statesMu.RLock()
+		l := len(a.states)
+		a.statesMu.RUnlock()
+		return int64(l)
+	}
+	a.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
+
 	// Register delete hook
 	if a.hasAnonTopic() {
 		a.et.tm.registerDeleteHookForTask(a.et.Task.ID, deleteAlertHook(a.anonTopic))
@@ -488,7 +498,7 @@ func (a *AlertNode) runAlert([]byte) error {
 				return err
 			}
 			var currentLevel alert.Level
-			if state, ok := a.states[p.Group]; ok {
+			if state, ok := a.getAlertState(p.Group); ok {
 				currentLevel = state.currentLevel()
 			} else {
 				// Check for previous state
@@ -580,7 +590,7 @@ func (a *AlertNode) runAlert([]byte) error {
 			var highestPoint *models.BatchPoint
 
 			var currentLevel alert.Level
-			if state, ok := a.states[b.Group]; ok {
+			if state, ok := a.getAlertState(b.Group); ok {
 				currentLevel = state.currentLevel()
 			} else {
 				// Check for previous state
@@ -934,12 +944,14 @@ func (a *alertState) percentChange() float64 {
 }
 
 func (a *AlertNode) updateState(t time.Time, level alert.Level, group models.GroupID) *alertState {
-	state, ok := a.states[group]
+	state, ok := a.getAlertState(group)
 	if !ok {
 		state = &alertState{
 			history: make([]alert.Level, a.a.History),
 		}
+		a.statesMu.Lock()
 		a.states[group] = state
+		a.statesMu.Unlock()
 	}
 	state.addEvent(level)
 
@@ -1073,4 +1085,11 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group 
 
 	details := tmpBuffer.String()
 	return msg, details, nil
+}
+
+func (a *AlertNode) getAlertState(id models.GroupID) (state *alertState, ok bool) {
+	a.statesMu.RLock()
+	state, ok = a.states[id]
+	a.statesMu.RUnlock()
+	return state, ok
 }
