@@ -1,0 +1,30 @@
+dbname
+rpname
+cpu,host=serverA value=97.1 0000000001
+dbname
+rpname
+cpu,host=serverB value=47.0 0000000001
+dbname
+rpname
+cpu,host=serverA value=96.6 0000000002
+dbname
+rpname
+cpu,host=serverB value=95.1 0000000002
+dbname
+rpname
+cpu,host=serverA value=83.6 0000000003
+dbname
+rpname
+cpu,host=serverB x=95.6 0000000003
+dbname
+rpname
+cpu,host=serverA value=99.1 0000000004
+dbname
+rpname
+cpu,host=serverB value=96.1 0000000004
+dbname
+rpname
+cpu,host=serverA value=0 0000000005
+dbname
+rpname
+cpu,host=serverB value=0 0000000005

@@ -451,3 +451,17 @@ func (n *chainnode) K8sAutoscale() *K8sAutoscaleNode {
 	n.linkChild(k)
 	return k
 }
+
+// Create a node that tracks duration in a given state.
+func (n *chainnode) StateDuration(expression *ast.LambdaNode) *StateDurationNode {
+	sd := newStateDurationNode(n.provides, expression)
+	n.linkChild(sd)
+	return sd
+}
+
+// Create a node that tracks number of consecutive points in a given state.
+func (n *chainnode) StateCount(expression *ast.LambdaNode) *StateCountNode {
+	sc := newStateCountNode(n.provides, expression)
+	n.linkChild(sc)
+	return sc
+}

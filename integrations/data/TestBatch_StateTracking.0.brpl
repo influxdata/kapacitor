@@ -1,0 +1,4 @@
+{"name":"cpu","tags":{"host":"serverA"},"points":[{"time":"1971-01-01T00:00:00Z","fields":{"value":100}}]}
+{"name":"cpu","tags":{"host":"serverB"},"points":[{"time":"1971-01-01T00:00:00Z","fields":{"value":100}}]}
+{"name":"cpu","tags":{"host":"serverA"},"points":[{"time":"1971-01-01T00:00:04Z","fields":{"value":97.1}},{"time":"1971-01-01T00:00:05Z","fields":{"value":96.6}},{"time":"1971-01-01T00:00:06Z","fields":{"value":83.6}},{"time":"1971-01-01T00:00:07Z","fields":{"value":99.1}}]}
+{"name":"cpu","tags":{"host":"serverB"},"points":[{"time":"1971-01-01T00:00:04Z","fields":{"value":47}},{"time":"1971-01-01T00:00:05Z","fields":{"value":95.1}},{"time":"1971-01-01T00:00:06Z","fields":{"value":null}},{"time":"1971-01-01T00:00:07Z","fields":{"value":96.1}}]}
