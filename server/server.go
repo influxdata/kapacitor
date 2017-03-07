@@ -169,7 +169,9 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	s.appendAuthService()
 	s.appendConfigOverrideService()
 	s.appendTesterService()
-	s.appendAlertService()
+
+	// Init alert service
+	s.initAlertService()
 
 	// Append all dynamic services after the config override and tester services.
 	s.appendUDFService()
@@ -178,9 +180,6 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	if err := s.appendInfluxDBService(); err != nil {
 		return nil, errors.Wrap(err, "influxdb service")
 	}
-	// Append these after InfluxDB because they depend on it
-	s.appendTaskStoreService()
-	s.appendReplayService()
 
 	// Append Alert integration services
 	s.appendAlertaService()
@@ -195,6 +194,13 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	s.appendSensuService()
 	s.appendTalkService()
 	s.appendVictorOpsService()
+
+	// Append alert service
+	s.appendAlertService()
+
+	// Append these after InfluxDB because they depend on it
+	s.appendTaskStoreService()
+	s.appendReplayService()
 
 	// Append third-party integrations
 	if err := s.appendK8sService(); err != nil {
@@ -261,7 +267,7 @@ func (s *Server) appendConfigOverrideService() {
 	s.AppendService("config", srv)
 }
 
-func (s *Server) appendAlertService() {
+func (s *Server) initAlertService() {
 	l := s.LogService.NewLogger("[alert] ", log.LstdFlags)
 	srv := alert.NewService(s.config.Alert, l)
 
@@ -271,7 +277,10 @@ func (s *Server) appendAlertService() {
 
 	s.AlertService = srv
 	s.TaskMaster.AlertService = srv
-	s.AppendService("alert", srv)
+}
+
+func (s *Server) appendAlertService() {
+	s.AppendService("alert", s.AlertService)
 }
 
 func (s *Server) appendTesterService() {
@@ -710,7 +719,8 @@ func (s *Server) Close() error {
 	s.TaskMaster.StopTasks()
 
 	// Close services now that all tasks are stopped.
-	for _, service := range s.Services {
+	for i := len(s.Services) - 1; i >= 0; i-- {
+		service := s.Services[i]
 		s.Logger.Printf("D! closing service: %T", service)
 		err := service.Close()
 		if err != nil {
