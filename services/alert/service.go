@@ -29,12 +29,6 @@ type handler struct {
 	Handler alert.Handler
 }
 
-type handlerAction interface {
-	alert.Handler
-	SetNext(h alert.Handler)
-	Close()
-}
-
 type Service struct {
 	mu sync.RWMutex
 
@@ -43,7 +37,7 @@ type Service struct {
 
 	APIServer *apiServer
 
-	handlers map[string]handler
+	handlers map[string]map[string]handler
 
 	closedTopics map[string]bool
 
@@ -103,7 +97,7 @@ type Service struct {
 
 func NewService(c Config, l *log.Logger) *Service {
 	s := &Service{
-		handlers:     make(map[string]handler),
+		handlers:     make(map[string]map[string]handler),
 		closedTopics: make(map[string]bool),
 		topics:       alert.NewTopics(l),
 		logger:       l,
@@ -166,7 +160,7 @@ func (s *Service) loadSavedHandlerSpecs() error {
 	offset := 0
 	limit := 100
 	for {
-		specs, err := s.specsDAO.List("", offset, limit)
+		specs, err := s.specsDAO.List("*", "", offset, limit)
 		if err != nil {
 			return err
 		}
@@ -247,6 +241,14 @@ func validatePattern(pattern string) error {
 	return err
 }
 
+// set a topic handler in the internal map, caller must have lock.
+func (s *Service) setTopicHandler(topic, id string, h handler) {
+	if s.handlers[topic] == nil {
+		s.handlers[topic] = make(map[string]handler)
+	}
+	s.handlers[topic][id] = h
+}
+
 func (s *Service) Collect(event alert.Event) error {
 	s.mu.RLock()
 	closed := s.closedTopics[event.Topic]
@@ -306,11 +308,8 @@ func (s *Service) restoreTopic(topic string) error {
 	} // else nothing to restore
 
 	// Re-Register all handlers
-	topics := []string{topic}
-	for _, h := range s.handlers {
-		if h.Spec.HasTopic(topic) {
-			s.topics.RegisterHandler(topics, h.Handler)
-		}
+	for _, h := range s.handlers[topic] {
+		s.topics.RegisterHandler(topic, h.Handler)
 	}
 	return nil
 }
@@ -346,12 +345,12 @@ func (s *Service) UpdateEvent(topic string, event alert.EventState) error {
 	return s.persistTopicState(topic)
 }
 
-func (s *Service) RegisterAnonHandler(topics []string, h alert.Handler) {
-	s.topics.RegisterHandler(topics, h)
+func (s *Service) RegisterAnonHandler(topic string, h alert.Handler) {
+	s.topics.RegisterHandler(topic, h)
 }
 
-func (s *Service) DeregisterAnonHandler(topics []string, h alert.Handler) {
-	s.topics.DeregisterHandler(topics, h)
+func (s *Service) DeregisterAnonHandler(topic string, h alert.Handler) {
+	s.topics.DeregisterHandler(topic, h)
 }
 
 // loadHandlerSpec initializes a spec that already exists.
@@ -362,9 +361,8 @@ func (s *Service) loadHandlerSpec(spec HandlerSpec) error {
 		return err
 	}
 
-	s.handlers[spec.ID] = h
-
-	s.topics.RegisterHandler(spec.Topics, h.Handler)
+	s.setTopicHandler(spec.Topic, spec.ID, h)
+	s.topics.RegisterHandler(spec.Topic, h.Handler)
 	return nil
 }
 
@@ -372,16 +370,18 @@ func (s *Service) RegisterHandlerSpec(spec HandlerSpec) error {
 	if err := spec.Validate(); err != nil {
 		return err
 	}
-	s.mu.RLock()
-	_, ok := s.handlers[spec.ID]
-	s.mu.RUnlock()
-	if ok {
-		return fmt.Errorf("cannot register handler, handler with ID %q already exists", spec.ID)
-	}
 
 	h, err := s.createHandlerFromSpec(spec)
 	if err != nil {
 		return err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_, ok := s.handlers[spec.Topic][spec.ID]
+	if ok {
+		return fmt.Errorf("cannot register handler, handler with ID %q already exists", spec.ID)
 	}
 
 	// Persist handler spec
@@ -389,33 +389,34 @@ func (s *Service) RegisterHandlerSpec(spec HandlerSpec) error {
 		return err
 	}
 
-	s.mu.Lock()
-	s.handlers[spec.ID] = h
-	s.mu.Unlock()
+	s.setTopicHandler(spec.Topic, spec.ID, h)
 
-	s.topics.RegisterHandler(spec.Topics, h.Handler)
+	s.topics.RegisterHandler(spec.Topic, h.Handler)
 	return nil
 }
 
-func (s *Service) DeregisterHandlerSpec(id string) error {
-	s.mu.RLock()
-	h, ok := s.handlers[id]
-	s.mu.RUnlock()
+type closer interface {
+	Close()
+}
+
+func (s *Service) DeregisterHandlerSpec(topic, handler string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	h, ok := s.handlers[topic][handler]
 
 	if ok {
 		// Delete handler spec
-		if err := s.specsDAO.Delete(id); err != nil {
+		if err := s.specsDAO.Delete(topic, handler); err != nil {
 			return err
 		}
-		s.topics.DeregisterHandler(h.Spec.Topics, h.Handler)
+		s.topics.DeregisterHandler(topic, h.Handler)
 
-		if ha, ok := h.Handler.(handlerAction); ok {
+		if ha, ok := h.Handler.(closer); ok {
 			ha.Close()
 		}
 
-		s.mu.Lock()
-		delete(s.handlers, id)
-		s.mu.Unlock()
+		delete(s.handlers[h.Spec.Topic], handler)
 	}
 	return nil
 }
@@ -424,14 +425,19 @@ func (s *Service) UpdateHandlerSpec(oldSpec, newSpec HandlerSpec) error {
 	if err := newSpec.Validate(); err != nil {
 		return err
 	}
+	if newSpec.Topic != oldSpec.Topic {
+		return errors.New("cannot change topic in update")
+	}
+	topic := newSpec.Topic
 	newH, err := s.createHandlerFromSpec(newSpec)
 	if err != nil {
 		return err
 	}
 
-	s.mu.RLock()
-	oldH := s.handlers[oldSpec.ID]
-	s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	oldH := s.handlers[topic][oldSpec.ID]
 
 	// Persist new handler specs
 	if newSpec.ID == oldSpec.ID {
@@ -442,17 +448,15 @@ func (s *Service) UpdateHandlerSpec(oldSpec, newSpec HandlerSpec) error {
 		if err := s.specsDAO.Create(newSpec); err != nil {
 			return err
 		}
-		if err := s.specsDAO.Delete(oldSpec.ID); err != nil {
+		if err := s.specsDAO.Delete(oldSpec.Topic, oldSpec.ID); err != nil {
 			return err
 		}
 	}
 
-	s.mu.Lock()
-	delete(s.handlers, oldSpec.ID)
-	s.handlers[newSpec.ID] = newH
-	s.mu.Unlock()
+	delete(s.handlers[topic], oldSpec.ID)
+	s.setTopicHandler(newSpec.Topic, newSpec.ID, newH)
 
-	s.topics.ReplaceHandler(oldSpec.Topics, newSpec.Topics, oldH.Handler, newH.Handler)
+	s.topics.ReplaceHandler(topic, oldH.Handler, newH.Handler)
 	return nil
 }
 
@@ -491,57 +495,28 @@ func (s *Service) EventStates(topic string, minLevel alert.Level) (map[string]al
 	return t.EventStates(minLevel), nil
 }
 
-func (s *Service) HandlerSpec(id string) (HandlerSpec, error) {
+func (s *Service) HandlerSpec(topic, handler string) (HandlerSpec, bool, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	h, ok := s.handlers[id]
+	h, ok := s.handlers[topic][handler]
 	if !ok {
-		return HandlerSpec{}, fmt.Errorf("handler %s does not exist", id)
+		return HandlerSpec{}, false, nil
 	}
-	return h.Spec, nil
+	return h.Spec, true, nil
 }
 
-func (s *Service) HandlerSpecs(pattern string) ([]HandlerSpec, error) {
+func (s *Service) HandlerSpecs(topic, pattern string) ([]HandlerSpec, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	handlers := make([]HandlerSpec, 0, len(s.handlers))
-	for id, h := range s.handlers {
+	for id, h := range s.handlers[topic] {
 		if alert.PatternMatch(pattern, id) {
 			handlers = append(handlers, h.Spec)
 		}
 	}
 	return handlers, nil
-}
-
-func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
-	if 0 == len(spec.Actions) {
-		return handler{}, errors.New("invalid handler spec, must have at least one action")
-	}
-
-	// Create actions chained together in a singly linked list
-	var prev, first handlerAction
-	for _, actionSpec := range spec.Actions {
-		curr, err := s.createHandlerActionFromSpec(actionSpec)
-		if err != nil {
-			return handler{}, err
-		}
-		if first == nil {
-			// Keep first action
-			first = curr
-		}
-		if prev != nil {
-			// Link previous action to current action
-			prev.SetNext(curr)
-		}
-		prev = curr
-	}
-
-	// set a noopHandler for the last action
-	prev.SetNext(noopHandler{})
-
-	return handler{Spec: spec, Handler: first}, nil
 }
 
 func decodeOptions(options map[string]interface{}, c interface{}) error {
@@ -559,195 +534,170 @@ func decodeOptions(options map[string]interface{}, c interface{}) error {
 	return nil
 }
 
-func (s *Service) createHandlerActionFromSpec(spec HandlerActionSpec) (ha handlerAction, err error) {
+func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
+	var h alert.Handler
+	var err error
 	switch spec.Kind {
 	case "aggregate":
-		c := AggregateHandlerConfig{}
+		c := AggregateHandlerConfig{
+			topics: s.topics,
+		}
 		err = decodeOptions(spec.Options, &c)
 		if err != nil {
-			return
+			return handler{}, err
 		}
-		ha = NewAggregateHandler(c, s.logger)
+		h = NewAggregateHandler(c, s.logger)
 	case "alerta":
 		c := s.AlertaService.DefaultHandlerConfig()
 		err = decodeOptions(spec.Options, &c)
 		if err != nil {
-			return
+			return handler{}, err
 		}
-		h, err := s.AlertaService.Handler(c, s.logger)
+		h, err = s.AlertaService.Handler(c, s.logger)
 		if err != nil {
-			return nil, err
+			return handler{}, err
 		}
-		ha = newPassThroughHandler(newExternalHandler(h))
+		h = newExternalHandler(h)
 	case "exec":
 		c := ExecHandlerConfig{
 			Commander: s.Commander,
 		}
 		err = decodeOptions(spec.Options, &c)
 		if err != nil {
-			return
+			return handler{}, err
 		}
-		h := NewExecHandler(c, s.logger)
-		ha = newPassThroughHandler(newExternalHandler(h))
+		h = NewExecHandler(c, s.logger)
+		h = newExternalHandler(h)
 	case "hipchat":
 		c := hipchat.HandlerConfig{}
 		err = decodeOptions(spec.Options, &c)
 		if err != nil {
-			return
+			return handler{}, err
 		}
-		h := s.HipChatService.Handler(c, s.logger)
-		ha = newPassThroughHandler(newExternalHandler(h))
+		h = s.HipChatService.Handler(c, s.logger)
+		h = newExternalHandler(h)
 	case "log":
 		c := DefaultLogHandlerConfig()
 		err = decodeOptions(spec.Options, &c)
 		if err != nil {
-			return
+			return handler{}, err
 		}
-		h, err := NewLogHandler(c, s.logger)
+		h, err = NewLogHandler(c, s.logger)
 		if err != nil {
-			return nil, err
+			return handler{}, err
 		}
-		ha = newPassThroughHandler(newExternalHandler(h))
+		h = newExternalHandler(h)
 	case "opsgenie":
 		c := opsgenie.HandlerConfig{}
 		err = decodeOptions(spec.Options, &c)
 		if err != nil {
-			return
+			return handler{}, err
 		}
-		h := s.OpsGenieService.Handler(c, s.logger)
-		ha = newPassThroughHandler(newExternalHandler(h))
+		h = s.OpsGenieService.Handler(c, s.logger)
+		h = newExternalHandler(h)
 	case "pagerduty":
 		c := pagerduty.HandlerConfig{}
 		err = decodeOptions(spec.Options, &c)
 		if err != nil {
-			return
+			return handler{}, err
 		}
-		h := s.PagerDutyService.Handler(c, s.logger)
-		ha = newPassThroughHandler(newExternalHandler(h))
+		h = s.PagerDutyService.Handler(c, s.logger)
+		h = newExternalHandler(h)
 	case "pushover":
 		c := pushover.HandlerConfig{}
 		err = decodeOptions(spec.Options, &c)
 		if err != nil {
-			return
+			return handler{}, err
 		}
-		h := s.PushoverService.Handler(c, s.logger)
-		ha = newPassThroughHandler(newExternalHandler(h))
+		h = s.PushoverService.Handler(c, s.logger)
+		h = newExternalHandler(h)
 	case "post":
 		c := PostHandlerConfig{}
 		err = decodeOptions(spec.Options, &c)
 		if err != nil {
-			return
+			return handler{}, err
 		}
-		h := NewPostHandler(c, s.logger)
-		ha = newPassThroughHandler(newExternalHandler(h))
+		h = NewPostHandler(c, s.logger)
+		h = newExternalHandler(h)
 	case "publish":
 		c := PublishHandlerConfig{
 			topics: s.topics,
 		}
 		err = decodeOptions(spec.Options, &c)
 		if err != nil {
-			return
+			return handler{}, err
 		}
-		h := NewPublishHandler(c, s.logger)
-		ha = newPassThroughHandler(h)
+		h = NewPublishHandler(c, s.logger)
 	case "sensu":
-		h := s.SensuService.Handler(s.logger)
-		ha = newPassThroughHandler(newExternalHandler(h))
+		h = s.SensuService.Handler(s.logger)
+		h = newExternalHandler(h)
 	case "slack":
 		c := slack.HandlerConfig{}
 		err = decodeOptions(spec.Options, &c)
 		if err != nil {
-			return
+			return handler{}, err
 		}
-		h := s.SlackService.Handler(c, s.logger)
-		ha = newPassThroughHandler(newExternalHandler(h))
+		h = s.SlackService.Handler(c, s.logger)
+		h = newExternalHandler(h)
 	case "smtp":
 		c := smtp.HandlerConfig{}
 		err = decodeOptions(spec.Options, &c)
 		if err != nil {
-			return
+			return handler{}, err
 		}
-		h := s.SMTPService.Handler(c, s.logger)
-		ha = newPassThroughHandler(newExternalHandler(h))
+		h = s.SMTPService.Handler(c, s.logger)
+		h = newExternalHandler(h)
 	case "snmptrap":
 		c := snmptrap.HandlerConfig{}
 		err = decodeOptions(spec.Options, &c)
 		if err != nil {
-			return
+			return handler{}, err
 		}
-		h, err := s.SNMPTrapService.Handler(c, s.logger)
+		h, err = s.SNMPTrapService.Handler(c, s.logger)
 		if err != nil {
-			return nil, err
+			return handler{}, err
 		}
-		ha = newPassThroughHandler(newExternalHandler(h))
-	case "stateChangesOnly":
-		c := StateChangesOnlyHandlerConfig{
-			topics: s.topics,
-		}
-		ha = NewStateChangesOnlyHandler(c, s.logger)
+		h = newExternalHandler(h)
+	//case "stateChangesOnly":
+	//	c := StateChangesOnlyHandlerConfig{
+	//		topics: s.topics,
+	//	}
+	//	h = NewStateChangesOnlyHandler(c, s.logger)
 	case "talk":
-		h := s.TalkService.Handler(s.logger)
-		ha = newPassThroughHandler(newExternalHandler(h))
+		h = s.TalkService.Handler(s.logger)
+		h = newExternalHandler(h)
 	case "tcp":
 		c := TCPHandlerConfig{}
 		err = decodeOptions(spec.Options, &c)
 		if err != nil {
-			return
+			return handler{}, err
 		}
-		h := NewTCPHandler(c, s.logger)
-		ha = newPassThroughHandler(newExternalHandler(h))
+		h = NewTCPHandler(c, s.logger)
+		h = newExternalHandler(h)
 	case "telegram":
 		c := telegram.HandlerConfig{}
 		err = decodeOptions(spec.Options, &c)
 		if err != nil {
-			return
+			return handler{}, err
 		}
-		h := s.TelegramService.Handler(c, s.logger)
-		ha = newPassThroughHandler(newExternalHandler(h))
+		h = s.TelegramService.Handler(c, s.logger)
+		h = newExternalHandler(h)
 	case "victorops":
 		c := victorops.HandlerConfig{}
 		err = decodeOptions(spec.Options, &c)
 		if err != nil {
-			return
+			return handler{}, err
 		}
-		h := s.VictorOpsService.Handler(c, s.logger)
-		ha = newPassThroughHandler(newExternalHandler(h))
+		h = s.VictorOpsService.Handler(c, s.logger)
+		h = newExternalHandler(h)
 	default:
 		err = fmt.Errorf("unsupported action kind %q", spec.Kind)
 	}
-	return
+	return handler{Spec: spec, Handler: h}, err
 }
-
-// PassThroughHandler implements HandlerAction and passes through all events to the next handler.
-type passThroughHandler struct {
-	h    alert.Handler
-	next alert.Handler
-}
-
-func newPassThroughHandler(h alert.Handler) *passThroughHandler {
-	return &passThroughHandler{
-		h: h,
-	}
-}
-
-func (h *passThroughHandler) Handle(event alert.Event) {
-	h.h.Handle(event)
-	h.next.Handle(event)
-}
-
-func (h *passThroughHandler) SetNext(next alert.Handler) {
-	h.next = next
-}
-func (h *passThroughHandler) Close() {
-}
-
-// NoopHandler implements Handler and does nothing with the event
-type noopHandler struct{}
-
-func (h noopHandler) Handle(event alert.Event) {}
 
 // ExternalHandler wraps an existing handler that calls out to external services.
-// The events are checked for the NoExternal flag before being passed onto the external handler.
+// The events are checked for the NoExternal flag before being passed to the external handler.
 type externalHandler struct {
 	h alert.Handler
 }

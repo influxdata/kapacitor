@@ -9,6 +9,10 @@ import (
 	"github.com/influxdata/wlog"
 )
 
+func init() {
+	wlog.SetLevel(wlog.DEBUG)
+}
+
 type TestLogService struct {
 	prefix string
 }

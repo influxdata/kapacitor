@@ -816,7 +816,7 @@ func doDefineTemplate(args []string) error {
 }
 
 func defineHandlerUsage() {
-	var u = `Usage: kapacitor define-handler <path to handler file>
+	var u = `Usage: kapacitor define-handler <topic> <path to handler file>
 
 	Create or update a handler.
 
@@ -826,26 +826,27 @@ For example:
 
 	Define a handler using the slack.yaml file:
 
-		$ kapacitor define-handler slack.yaml
+		$ kapacitor define-handler system slack.yaml
 
 `
 	fmt.Fprintln(os.Stderr, u)
 }
 
 func doDefineHandler(args []string) error {
-	if len(args) < 1 {
-		fmt.Fprintln(os.Stderr, "Must provide a path to a handler file.")
+	if len(args) < 2 {
+		fmt.Fprintln(os.Stderr, "Must provide both a topic ID and a path to a handler file.")
 		defineHandlerUsage()
 		os.Exit(2)
 	}
-	p := args[0]
+	topic := args[0]
+	p := args[1]
 	f, err := os.Open(p)
 	if err != nil {
 		return errors.Wrapf(err, "failed to open handler file %q", p)
 	}
 
 	// Decode file into HandlerOptions
-	var ho client.HandlerOptions
+	var ho client.TopicHandlerOptions
 	ext := path.Ext(p)
 	switch ext {
 	case ".yaml":
@@ -862,12 +863,12 @@ func doDefineHandler(args []string) error {
 		}
 	}
 
-	l := cli.HandlerLink(ho.ID)
-	handler, _ := cli.Handler(l)
+	l := cli.TopicHandlerLink(topic, ho.ID)
+	handler, _ := cli.TopicHandler(l)
 	if handler.ID == "" {
-		_, err = cli.CreateHandler(ho)
+		_, err = cli.CreateTopicHandler(cli.TopicHandlersLink(topic), ho)
 	} else {
-		_, err = cli.ReplaceHandler(l, ho)
+		_, err = cli.ReplaceTopicHandler(l, ho)
 	}
 	return err
 }
@@ -1428,7 +1429,7 @@ func doShowTemplate(args []string) error {
 // Show Handler
 
 func showHandlerUsage() {
-	var u = `Usage: kapacitor show-handler [handler ID]
+	var u = `Usage: kapacitor show-handler [topic ID] [handler ID]
 
 	Show details about a specific handler.
 `
@@ -1436,29 +1437,27 @@ func showHandlerUsage() {
 }
 
 func doShowHandler(args []string) error {
-	if len(args) != 1 {
-		fmt.Fprintln(os.Stderr, "Must specify one handler ID")
+	if len(args) != 2 {
+		fmt.Fprintln(os.Stderr, "Must specify both topic and handler IDs")
 		showHandlerUsage()
 		os.Exit(2)
 	}
 
-	h, err := cli.Handler(cli.HandlerLink(args[0]))
+	topic := args[0]
+	handler := args[1]
+	h, err := cli.TopicHandler(cli.TopicHandlerLink(topic, handler))
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("ID:", h.ID)
-	fmt.Println("Topics:", fmt.Sprintf("[%s]", strings.Join(h.Topics, ", ")))
-	fmt.Println("Actions:")
-	actionOutFmt := "%-30s%s\n"
-	fmt.Printf(actionOutFmt, "Kind", "Options")
-	for _, a := range h.Actions {
-		options, err := json.Marshal(a.Options)
-		if err != nil {
-			return errors.Wrap(err, "failed to format action options")
-		}
-		fmt.Printf(actionOutFmt, a.Kind, string(options))
+	options, err := json.Marshal(h.Options)
+	if err != nil {
+		return errors.Wrap(err, "failed to format options")
 	}
+	fmt.Println("ID:", h.ID)
+	fmt.Println("Topic:", topic)
+	fmt.Println("Kind:", h.Kind)
+	fmt.Println("Options:", string(options))
 	return nil
 }
 
@@ -1506,7 +1505,7 @@ func doShowTopic(args []string) error {
 
 	sort.Sort(topicEvents(te.Events))
 
-	th, err := cli.ListTopicHandlers(topic.HandlersLink)
+	th, err := cli.ListTopicHandlers(topic.HandlersLink, nil)
 	if err != nil {
 		return err
 	}
@@ -1734,49 +1733,52 @@ func doList(args []string) error {
 			}
 		}
 	case "handlers":
-		maxID := 2      // len("ID")
-		maxTopics := 6  // len("Topics")
-		maxActions := 7 // len("Actions")
+		// Get all topics first
+		topics, err := cli.ListTopics(nil)
+		if err != nil {
+			return err
+		}
+		maxID := 2    // len("ID")
+		maxTopic := 5 // len("Topic")
+		maxKind := 4  // len("Kind")
 		// The handlers are returned in sorted order already, no need to sort them here.
 		type info struct {
-			ID      string
-			Topics  string
-			Actions string
+			ID    string
+			Topic string
+			Kind  string
 		}
 		var allHandlers []info
-		for _, pattern := range patterns {
-			handlers, err := cli.ListHandlers(&client.ListHandlersOptions{
-				Pattern: pattern,
-			})
-			if err != nil {
-				return err
-			}
-			for _, h := range handlers.Handlers {
-				kinds := make([]string, len(h.Actions))
-				for i, a := range h.Actions {
-					kinds[i] = a.Kind
+		for _, topic := range topics.Topics {
+			for _, pattern := range patterns {
+				handlers, err := cli.ListTopicHandlers(topic.HandlersLink, &client.ListTopicHandlersOptions{
+					Pattern: pattern,
+				})
+				if err != nil {
+					return err
 				}
-				i := info{
-					ID:      h.ID,
-					Topics:  fmt.Sprintf("[%s]", strings.Join(h.Topics, ", ")),
-					Actions: fmt.Sprintf("[%s]", strings.Join(kinds, ", ")),
+				for _, h := range handlers.Handlers {
+					i := info{
+						ID:    h.ID,
+						Topic: topic.ID,
+						Kind:  h.Kind,
+					}
+					if l := len(i.ID); l > maxID {
+						maxID = l
+					}
+					if l := len(i.Topic); l > maxTopic {
+						maxTopic = l
+					}
+					if l := len(i.Kind); l > maxKind {
+						maxKind = l
+					}
+					allHandlers = append(allHandlers, i)
 				}
-				if l := len(i.ID); l > maxID {
-					maxID = l
-				}
-				if l := len(i.Topics); l > maxTopics {
-					maxTopics = l
-				}
-				if l := len(i.Actions); l > maxActions {
-					maxActions = l
-				}
-				allHandlers = append(allHandlers, i)
 			}
 		}
-		outFmt := fmt.Sprintf("%%-%dv%%-%dv%%-%dv\n", maxID+1, maxTopics+1, maxActions+1)
-		fmt.Fprintf(os.Stdout, outFmt, "ID", "Topics", "Actions")
+		outFmt := fmt.Sprintf("%%-%dv%%-%dv%%-%dv\n", maxID+1, maxTopic+1, maxKind+1)
+		fmt.Fprintf(os.Stdout, outFmt, "ID", "Topic", "Kind")
 		for _, h := range allHandlers {
-			fmt.Fprintf(os.Stdout, outFmt, h.ID, h.Topics, h.Actions)
+			fmt.Fprintf(os.Stdout, outFmt, h.ID, h.Topic, h.Kind)
 		}
 	case "topics":
 		maxID := 2    // len("ID")
@@ -1820,6 +1822,10 @@ func deleteUsage() {
 
 	If a task is enabled it will be disabled and then deleted.
 
+	Deleting a handler requires that the topic be specified before the pattern.
+
+		$ kapacitor delete handlers [topic] [ID or pattern]
+
 
 For example:
 
@@ -1834,6 +1840,10 @@ For example:
 	You can delete recordings:
 
 		$ kapacitor delete recordings b0a2ba8a-aeeb-45ec-bef9-1a2939963586
+
+	You can delete a handler in the topic 'system':
+
+		$ kapacitor delete handlers system slack
 `
 	fmt.Fprintln(os.Stderr, u)
 }
@@ -1951,22 +1961,23 @@ func doDelete(args []string) error {
 			}
 		}
 	case "handlers":
-		for _, pattern := range args[1:] {
-			handlers, err := cli.ListHandlers(&client.ListHandlersOptions{
+		topic := args[1]
+		for _, pattern := range args[2:] {
+			handlers, err := cli.ListTopicHandlers(cli.TopicHandlersLink(topic), &client.ListTopicHandlersOptions{
 				Pattern: pattern,
 			})
 			if err != nil {
 				return err
 			}
 			for _, h := range handlers.Handlers {
-				err := cli.DeleteHandler(h.Link)
+				err := cli.DeleteTopicHandler(h.Link)
 				if err != nil {
 					return err
 				}
 			}
 		}
 	default:
-		return fmt.Errorf("cannot delete '%s' did you mean 'tasks', 'recordings' or 'replays'?", kind)
+		return fmt.Errorf("cannot delete '%s' did you mean 'tasks', 'templates', 'recordings', 'replays', 'topics' or 'handlers'?", kind)
 	}
 	return nil
 }

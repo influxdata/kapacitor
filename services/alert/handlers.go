@@ -233,11 +233,14 @@ func (h *postHandler) Handle(event alert.Event) {
 
 type AggregateHandlerConfig struct {
 	Interval time.Duration `mapstructure:"interval"`
+	Topic    string
+	topics   *alert.Topics
 }
 
 type aggregateHandler struct {
 	interval time.Duration
-	next     alert.Handler
+	topic    string
+	topics   *alert.Topics
 
 	logger  *log.Logger
 	events  chan alert.Event
@@ -246,9 +249,11 @@ type aggregateHandler struct {
 	wg sync.WaitGroup
 }
 
-func NewAggregateHandler(c AggregateHandlerConfig, l *log.Logger) handlerAction {
+func NewAggregateHandler(c AggregateHandlerConfig, l *log.Logger) alert.Handler {
 	h := &aggregateHandler{
 		interval: time.Duration(c.Interval),
+		topic:    c.Topic,
+		topics:   c.topics,
 		logger:   l,
 		events:   make(chan alert.Event),
 		closing:  make(chan struct{}),
@@ -280,6 +285,7 @@ func (h *aggregateHandler) run() {
 			}
 			details := make([]string, len(events))
 			agg := alert.Event{
+				Topic: h.topic,
 				State: alert.EventState{
 					ID:      "aggregate",
 					Message: fmt.Sprintf("Received %d events in the last %v.", len(events), h.interval),
@@ -287,7 +293,6 @@ func (h *aggregateHandler) run() {
 				NoExternal: !external,
 			}
 			for i, e := range events {
-				agg.Topic = e.Topic
 				if e.State.Level > agg.State.Level {
 					agg.State.Level = e.State.Level
 				}
@@ -300,7 +305,7 @@ func (h *aggregateHandler) run() {
 				details[i] = e.State.Message
 			}
 			agg.State.Details = strings.Join(details, "\n")
-			h.next.Handle(agg)
+			h.topics.Collect(agg)
 			events = events[0:0]
 			external = false
 		}
@@ -312,10 +317,6 @@ func (h *aggregateHandler) Handle(event alert.Event) {
 	case h.events <- event:
 	case <-h.closing:
 	}
-}
-
-func (h *aggregateHandler) SetNext(n alert.Handler) {
-	h.next = n
 }
 
 func (h *aggregateHandler) Close() {
@@ -346,30 +347,31 @@ func (h *publishHandler) Handle(event alert.Event) {
 	}
 }
 
-type StateChangesOnlyHandlerConfig struct {
-	topics *alert.Topics
-}
-
-type stateChangesOnlyHandler struct {
-	topics *alert.Topics
-	logger *log.Logger
-	next   alert.Handler
-}
-
-func NewStateChangesOnlyHandler(c StateChangesOnlyHandlerConfig, l *log.Logger) handlerAction {
-	return &stateChangesOnlyHandler{
-		topics: c.topics,
-		logger: l,
-	}
-}
-
-func (h *stateChangesOnlyHandler) Handle(event alert.Event) {
-	if event.State.Level != event.PreviousState().Level {
-		h.next.Handle(event)
-	}
-}
-
-func (h *stateChangesOnlyHandler) SetNext(n alert.Handler) {
-	h.next = n
-}
-func (h *stateChangesOnlyHandler) Close() {}
+// TODO implement state changes only as a match condition
+//type StateChangesOnlyHandlerConfig struct {
+//	topics *alert.Topics
+//}
+//
+//type stateChangesOnlyHandler struct {
+//	topics *alert.Topics
+//	logger *log.Logger
+//	next   alert.Handler
+//}
+//
+//func NewStateChangesOnlyHandler(c StateChangesOnlyHandlerConfig, l *log.Logger) handlerAction {
+//	return &stateChangesOnlyHandler{
+//		topics: c.topics,
+//		logger: l,
+//	}
+//}
+//
+//func (h *stateChangesOnlyHandler) Handle(event alert.Event) {
+//	if event.State.Level != event.PreviousState().Level {
+//		h.next.Handle(event)
+//	}
+//}
+//
+//func (h *stateChangesOnlyHandler) SetNext(n alert.Handler) {
+//	h.next = n
+//}
+//func (h *stateChangesOnlyHandler) Close() {}
