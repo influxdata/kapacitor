@@ -3,6 +3,7 @@ package alert
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -25,17 +26,13 @@ const (
 	topicsBasePath         = httpd.BasePreviewPath + topicsPath
 	topicsBasePathAnchored = httpd.BasePreviewPath + topicsPathAnchored
 
-	handlersPath             = alertsPath + "/handlers"
-	handlersPathAnchored     = alertsPath + "/handlers/"
-	handlersBasePath         = httpd.BasePreviewPath + handlersPath
-	handlersBasePathAnchored = httpd.BasePreviewPath + handlersPathAnchored
-
 	topicEventsPath   = "events"
 	topicHandlersPath = "handlers"
 
 	eventsPattern   = "*/" + topicEventsPath
 	eventPattern    = "*/" + topicEventsPath + "/*"
 	handlersPattern = "*/" + topicHandlersPath
+	handlerPattern  = "*/" + topicHandlersPath + "/*"
 
 	eventsRelation   = "events"
 	handlersRelation = "handlers"
@@ -64,48 +61,33 @@ func (s *apiServer) Open() error {
 		{
 			Method:      "GET",
 			Pattern:     topicsPathAnchored,
-			HandlerFunc: s.handleRouteTopic,
+			HandlerFunc: s.handleRouteTopicGet,
+		},
+		{
+			Method:      "POST",
+			Pattern:     topicsPathAnchored,
+			HandlerFunc: s.handleRouteTopicPost,
+		},
+		{
+			Method:      "PATCH",
+			Pattern:     topicsPathAnchored,
+			HandlerFunc: s.handleRouteTopicPatch,
+		},
+		{
+			Method:      "PUT",
+			Pattern:     topicsPathAnchored,
+			HandlerFunc: s.handleRouteTopicPut,
 		},
 		{
 			Method:      "DELETE",
 			Pattern:     topicsPathAnchored,
-			HandlerFunc: s.handleDeleteTopic,
-		},
-		{
-			Method:      "GET",
-			Pattern:     handlersPath,
-			HandlerFunc: s.handleListHandlers,
-		},
-		{
-			Method:      "POST",
-			Pattern:     handlersPath,
-			HandlerFunc: s.handleCreateHandler,
+			HandlerFunc: s.handleRouteTopicDelete,
 		},
 		{
 			// Satisfy CORS checks.
 			Method:      "OPTIONS",
-			Pattern:     handlersPathAnchored,
+			Pattern:     topicsPathAnchored,
 			HandlerFunc: httpd.ServeOptions,
-		},
-		{
-			Method:      "PATCH",
-			Pattern:     handlersPathAnchored,
-			HandlerFunc: s.handlePatchHandler,
-		},
-		{
-			Method:      "PUT",
-			Pattern:     handlersPathAnchored,
-			HandlerFunc: s.handlePutHandler,
-		},
-		{
-			Method:      "DELETE",
-			Pattern:     handlersPathAnchored,
-			HandlerFunc: s.handleDeleteHandler,
-		},
-		{
-			Method:      "GET",
-			Pattern:     handlersPathAnchored,
-			HandlerFunc: s.handleGetHandler,
 		},
 	}
 
@@ -128,7 +110,7 @@ func (s sortedTopics) Swap(i int, j int)      { s[i], s[j] = s[j], s[i] }
 func (s *apiServer) handleListTopics(w http.ResponseWriter, r *http.Request) {
 	pattern := r.URL.Query().Get("pattern")
 	if err := validatePattern(pattern); err != nil {
-		httpd.HttpError(w, fmt.Sprint("invalide pattern: ", err.Error()), true, http.StatusBadRequest)
+		httpd.HttpError(w, fmt.Sprint("invalid pattern: ", err.Error()), true, http.StatusBadRequest)
 		return
 	}
 	minLevelStr := r.URL.Query().Get("min-level")
@@ -166,40 +148,76 @@ func (s *apiServer) topicIDFromPath(p string) (id string) {
 	return
 }
 
+func (s *apiServer) handlerIDFromPath(p string) (id string) {
+	return path.Base(p)
+}
+
+func (s *apiServer) eventIDFromPath(p string) (id string) {
+	return path.Base(p)
+}
+
 func pathMatch(pattern, p string) (match bool) {
 	match, _ = path.Match(pattern, p)
 	return
 }
 
-func (s *apiServer) handleDeleteTopic(w http.ResponseWriter, r *http.Request) {
-	p := strings.TrimPrefix(r.URL.Path, topicsBasePathAnchored)
-	id := s.topicIDFromPath(p)
-	if err := s.Persister.DeleteTopic(id); err != nil {
-		httpd.HttpError(w, fmt.Sprintf("failed to delete topic %q: %v", id, err), true, http.StatusInternalServerError)
+func (s *apiServer) handleDeleteTopic(topic string, w http.ResponseWriter, r *http.Request) {
+	if err := s.Persister.DeleteTopic(topic); err != nil {
+		httpd.HttpError(w, fmt.Sprintf("failed to delete topic %q: %v", topic, err), true, http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *apiServer) handleRouteTopic(w http.ResponseWriter, r *http.Request) {
+func (s *apiServer) handleRouteTopicGet(w http.ResponseWriter, r *http.Request) {
 	p := strings.TrimPrefix(r.URL.Path, topicsBasePathAnchored)
 	id := s.topicIDFromPath(p)
 
 	switch {
 	case pathMatch(eventsPattern, p):
-		s.handleListTopicEvents(id, w, r)
+		s.handleListEvents(id, w, r)
 	case pathMatch(eventPattern, p):
-		s.handleTopicEvent(id, w, r)
+		event := s.eventIDFromPath(p)
+		s.handleGetEvent(id, event, w, r)
 	case pathMatch(handlersPattern, p):
-		s.handleListTopicHandlers(id, w, r)
+		s.handleListHandlers(id, w, r)
+	case pathMatch(handlerPattern, p):
+		handler := s.handlerIDFromPath(p)
+		s.handleGetHandler(id, handler, w, r)
 	default:
-		s.handleTopic(id, w, r)
+		s.handleGetTopic(id, w, r)
 	}
 }
 
-func (s *apiServer) handlerLink(id string) client.Link {
-	return client.Link{Relation: client.Self, Href: path.Join(handlersBasePath, id)}
+func (s *apiServer) handleRouteTopicPost(w http.ResponseWriter, r *http.Request) {
+	p := strings.TrimPrefix(r.URL.Path, topicsBasePathAnchored)
+	topic := s.topicIDFromPath(p)
+	s.handleCreateHandler(topic, w, r)
 }
+
+func (s *apiServer) handleRouteTopicPut(w http.ResponseWriter, r *http.Request) {
+	p := strings.TrimPrefix(r.URL.Path, topicsBasePathAnchored)
+	topic := s.topicIDFromPath(p)
+	handler := s.handlerIDFromPath(p)
+	s.handlePutHandler(topic, handler, w, r)
+}
+func (s *apiServer) handleRouteTopicPatch(w http.ResponseWriter, r *http.Request) {
+	p := strings.TrimPrefix(r.URL.Path, topicsBasePathAnchored)
+	topic := s.topicIDFromPath(p)
+	handler := s.handlerIDFromPath(p)
+	s.handlePatchHandler(topic, handler, w, r)
+}
+func (s *apiServer) handleRouteTopicDelete(w http.ResponseWriter, r *http.Request) {
+	p := strings.TrimPrefix(r.URL.Path, topicsBasePathAnchored)
+	topic := s.topicIDFromPath(p)
+	handler := s.handlerIDFromPath(p)
+	if topic == handler {
+		s.handleDeleteTopic(topic, w, r)
+	} else {
+		s.handleDeleteHandler(topic, handler, w, r)
+	}
+}
+
 func (s *apiServer) topicLink(id string) client.Link {
 	return client.Link{Relation: client.Self, Href: path.Join(topicsBasePath, id)}
 }
@@ -227,7 +245,7 @@ func (s *apiServer) createClientTopic(topic string, state alert.TopicState) clie
 	}
 }
 
-func (s *apiServer) handleTopic(id string, w http.ResponseWriter, r *http.Request) {
+func (s *apiServer) handleGetTopic(id string, w http.ResponseWriter, r *http.Request) {
 	state, ok, err := s.Topics.TopicState(id)
 	if err != nil {
 		httpd.HttpError(w, fmt.Sprintf("failed to get topic state: %s", err.Error()), true, http.StatusInternalServerError)
@@ -253,24 +271,16 @@ func (s *apiServer) convertEventStateToClient(state alert.EventState) client.Eve
 	}
 }
 
-func (s *apiServer) convertHandlerSpec(spec HandlerSpec) client.Handler {
-	actions := make([]client.HandlerAction, 0, len(spec.Actions))
-	for _, actionSpec := range spec.Actions {
-		action := client.HandlerAction{
-			Kind:    actionSpec.Kind,
-			Options: actionSpec.Options,
-		}
-		actions = append(actions, action)
-	}
-	return client.Handler{
-		Link:    s.handlerLink(spec.ID),
+func (s *apiServer) convertHandlerSpec(spec HandlerSpec) client.TopicHandler {
+	return client.TopicHandler{
+		Link:    s.topicHandlerLink(spec.Topic, spec.ID),
 		ID:      spec.ID,
-		Topics:  spec.Topics,
-		Actions: actions,
+		Kind:    spec.Kind,
+		Options: spec.Options,
 	}
 }
 
-func (s *apiServer) handleListTopicEvents(topic string, w http.ResponseWriter, r *http.Request) {
+func (s *apiServer) handleListEvents(topic string, w http.ResponseWriter, r *http.Request) {
 	minLevelStr := r.URL.Query().Get("min-level")
 	minLevel, err := alert.ParseLevel(minLevelStr)
 	if err != nil {
@@ -298,8 +308,7 @@ func (s *apiServer) handleListTopicEvents(topic string, w http.ResponseWriter, r
 	w.Write(httpd.MarshalJSON(res, true))
 }
 
-func (s *apiServer) handleTopicEvent(topic string, w http.ResponseWriter, r *http.Request) {
-	eventID := path.Base(r.URL.Path)
+func (s *apiServer) handleGetEvent(topic, eventID string, w http.ResponseWriter, r *http.Request) {
 	state, ok, err := s.Topics.EventState(topic, eventID)
 	if err != nil {
 		httpd.HttpError(w, fmt.Sprintf("failed to get event state: %s", err.Error()), true, http.StatusInternalServerError)
@@ -318,22 +327,25 @@ func (s *apiServer) handleTopicEvent(topic string, w http.ResponseWriter, r *htt
 	w.Write(httpd.MarshalJSON(event, true))
 }
 
-func (s *apiServer) handleListTopicHandlers(topic string, w http.ResponseWriter, r *http.Request) {
-	var handlers []client.Handler
-	specs, err := s.Registrar.HandlerSpecs("")
+func (s *apiServer) handleListHandlers(topic string, w http.ResponseWriter, r *http.Request) {
+	pattern := r.URL.Query().Get("pattern")
+	if err := validatePattern(pattern); err != nil {
+		httpd.HttpError(w, fmt.Sprint("invalid pattern: ", err.Error()), true, http.StatusBadRequest)
+		return
+	}
+	specs, err := s.Registrar.HandlerSpecs(topic, pattern)
 	if err != nil {
 		httpd.HttpError(w, fmt.Sprint("failed to get handler specs: ", err.Error()), true, http.StatusInternalServerError)
 		return
 	}
 
-	for _, spec := range specs {
-		if spec.HasTopic(topic) {
-			handlers = append(handlers, s.convertHandlerSpec(spec))
-		}
+	handlers := make([]client.TopicHandler, len(specs))
+	for i, spec := range specs {
+		handlers[i] = s.convertHandlerSpec(spec)
 	}
 	sort.Sort(sortedHandlers(handlers))
 	th := client.TopicHandlers{
-		Link:     s.topicHandlersLink(topic, client.Self),
+		Link:     client.Link{Relation: client.Self, Href: r.URL.String()},
 		Topic:    topic,
 		Handlers: handlers,
 	}
@@ -341,42 +353,24 @@ func (s *apiServer) handleListTopicHandlers(topic string, w http.ResponseWriter,
 	w.Write(httpd.MarshalJSON(th, true))
 }
 
-type sortedHandlers []client.Handler
+type sortedHandlers []client.TopicHandler
 
 func (s sortedHandlers) Len() int               { return len(s) }
 func (s sortedHandlers) Less(i int, j int) bool { return s[i].ID < s[j].ID }
 func (s sortedHandlers) Swap(i int, j int)      { s[i], s[j] = s[j], s[i] }
 
-func (s *apiServer) handleListHandlers(w http.ResponseWriter, r *http.Request) {
-	pattern := r.URL.Query().Get("pattern")
-	if err := validatePattern(pattern); err != nil {
-		httpd.HttpError(w, fmt.Sprint("invalid pattern: ", err.Error()), true, http.StatusBadRequest)
-		return
-	}
-
-	specs, err := s.Registrar.HandlerSpecs(pattern)
+func (s *apiServer) handlerSpecFromJSON(topic string, r io.Reader) (HandlerSpec, error) {
+	handlerSpec := HandlerSpec{}
+	err := json.NewDecoder(r).Decode(&handlerSpec)
 	if err != nil {
-		httpd.HttpError(w, fmt.Sprint("failed to get handler specs: ", err.Error()), true, http.StatusInternalServerError)
-		return
+		return HandlerSpec{}, err
 	}
-	list := make([]client.Handler, len(specs))
-	for i := range specs {
-		list[i] = s.convertHandlerSpec(specs[i])
-	}
-	sort.Sort(sortedHandlers(list))
-
-	handlers := client.Handlers{
-		Link:     client.Link{Relation: client.Self, Href: r.URL.String()},
-		Handlers: list,
-	}
-
-	w.WriteHeader(http.StatusOK)
-	w.Write(httpd.MarshalJSON(handlers, true))
+	handlerSpec.Topic = topic
+	return handlerSpec, nil
 }
 
-func (s *apiServer) handleCreateHandler(w http.ResponseWriter, r *http.Request) {
-	handlerSpec := HandlerSpec{}
-	err := json.NewDecoder(r.Body).Decode(&handlerSpec)
+func (s *apiServer) handleCreateHandler(topic string, w http.ResponseWriter, r *http.Request) {
+	handlerSpec, err := s.handlerSpecFromJSON(topic, r.Body)
 	if err != nil {
 		httpd.HttpError(w, fmt.Sprint("invalid handler json: ", err.Error()), true, http.StatusBadRequest)
 		return
@@ -397,11 +391,14 @@ func (s *apiServer) handleCreateHandler(w http.ResponseWriter, r *http.Request) 
 	w.Write(httpd.MarshalJSON(h, true))
 }
 
-func (s *apiServer) handlePatchHandler(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimPrefix(r.URL.Path, handlersBasePathAnchored)
-	spec, err := s.Registrar.HandlerSpec(id)
+func (s *apiServer) handlePatchHandler(topic, handler string, w http.ResponseWriter, r *http.Request) {
+	spec, ok, err := s.Registrar.HandlerSpec(topic, handler)
 	if err != nil {
-		httpd.HttpError(w, fmt.Sprintf("unknown handler: %q", id), true, http.StatusNotFound)
+		httpd.HttpError(w, fmt.Sprintf("failed to get handler %q: %v", handler, err), true, http.StatusInternalServerError)
+		return
+	}
+	if !ok {
+		httpd.HttpError(w, fmt.Sprintf("unknown handler: %q", handler), true, http.StatusNotFound)
 		return
 	}
 
@@ -425,7 +422,9 @@ func (s *apiServer) handlePatchHandler(w http.ResponseWriter, r *http.Request) {
 		httpd.HttpError(w, fmt.Sprint("failed to apply patch: ", err.Error()), true, http.StatusBadRequest)
 		return
 	}
-	newSpec := HandlerSpec{}
+	newSpec := HandlerSpec{
+		Topic: topic,
+	}
 	if err := json.Unmarshal(newBytes, &newSpec); err != nil {
 		httpd.HttpError(w, fmt.Sprint("failed to unmarshal patched json: ", err.Error()), true, http.StatusInternalServerError)
 		return
@@ -446,17 +445,20 @@ func (s *apiServer) handlePatchHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(httpd.MarshalJSON(ch, true))
 }
 
-func (s *apiServer) handlePutHandler(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimPrefix(r.URL.Path, handlersBasePathAnchored)
-	spec, err := s.Registrar.HandlerSpec(id)
+func (s *apiServer) handlePutHandler(topic, handler string, w http.ResponseWriter, r *http.Request) {
+	spec, ok, err := s.Registrar.HandlerSpec(topic, handler)
 	if err != nil {
-		httpd.HttpError(w, fmt.Sprintf("unknown handler: %q", id), true, http.StatusNotFound)
+		httpd.HttpError(w, fmt.Sprintf("failed to get handler %q: %v", handler, err), true, http.StatusInternalServerError)
+		return
+	}
+	if !ok {
+		httpd.HttpError(w, fmt.Sprintf("unknown handler: %q", handler), true, http.StatusNotFound)
 		return
 	}
 
-	newSpec := HandlerSpec{}
-	if err := json.NewDecoder(r.Body).Decode(&newSpec); err != nil {
-		httpd.HttpError(w, fmt.Sprint("failed to unmar JSON: ", err.Error()), true, http.StatusBadRequest)
+	newSpec, err := s.handlerSpecFromJSON(topic, r.Body)
+	if err != nil {
+		httpd.HttpError(w, fmt.Sprint("failed to unmarshal JSON: ", err.Error()), true, http.StatusBadRequest)
 		return
 	}
 	if err := newSpec.Validate(); err != nil {
@@ -475,20 +477,22 @@ func (s *apiServer) handlePutHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(httpd.MarshalJSON(ch, true))
 }
 
-func (s *apiServer) handleDeleteHandler(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimPrefix(r.URL.Path, handlersBasePathAnchored)
-	if err := s.Registrar.DeregisterHandlerSpec(id); err != nil {
+func (s *apiServer) handleDeleteHandler(topic, handler string, w http.ResponseWriter, r *http.Request) {
+	if err := s.Registrar.DeregisterHandlerSpec(topic, handler); err != nil {
 		httpd.HttpError(w, fmt.Sprint("failed to delete handler: ", err.Error()), true, http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *apiServer) handleGetHandler(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimPrefix(r.URL.Path, handlersBasePathAnchored)
-	spec, err := s.Registrar.HandlerSpec(id)
+func (s *apiServer) handleGetHandler(topic, handler string, w http.ResponseWriter, r *http.Request) {
+	spec, ok, err := s.Registrar.HandlerSpec(topic, handler)
 	if err != nil {
-		httpd.HttpError(w, fmt.Sprintf("unknown handler: %q", id), true, http.StatusNotFound)
+		httpd.HttpError(w, fmt.Sprintf("failed to get handler %q: %v", handler, err), true, http.StatusInternalServerError)
+		return
+	}
+	if !ok {
+		httpd.HttpError(w, fmt.Sprintf("unknown handler: %q", handler), true, http.StatusNotFound)
 		return
 	}
 

@@ -116,53 +116,47 @@ func (s *Topics) DeleteTopic(topic string) {
 	}
 }
 
-func (s *Topics) RegisterHandler(topics []string, h Handler) {
-	if len(topics) == 0 || h == nil {
+func (s *Topics) RegisterHandler(topic string, h Handler) {
+	if h == nil {
 		return
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for _, topic := range topics {
-		if _, ok := s.topics[topic]; !ok {
-			s.topics[topic] = newTopic(topic)
-		}
-		s.topics[topic].addHandler(h)
+	t, ok := s.topics[topic]
+	if !ok {
+		t = newTopic(topic)
+		s.topics[topic] = t
 	}
+	t.addHandler(h)
 }
 
-func (s *Topics) DeregisterHandler(topics []string, h Handler) {
-	if len(topics) == 0 || h == nil {
+func (s *Topics) DeregisterHandler(topic string, h Handler) {
+	if h == nil {
 		return
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for _, topic := range topics {
-		if t := s.topics[topic]; t != nil {
-			t.removeHandler(h)
-		}
+	if t, ok := s.topics[topic]; ok {
+		t.removeHandler(h)
 	}
 }
 
-func (s *Topics) ReplaceHandler(oldTopics, newTopics []string, oldH, newH Handler) {
+func (s *Topics) ReplaceHandler(topic string, oldH, newH Handler) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for _, topic := range oldTopics {
-		if t := s.topics[topic]; t != nil {
-			t.removeHandler(oldH)
-		}
+	t, ok := s.topics[topic]
+	if !ok {
+		t = newTopic(topic)
+		s.topics[topic] = t
 	}
 
-	for _, topic := range newTopics {
-		if _, ok := s.topics[topic]; !ok {
-			s.topics[topic] = newTopic(topic)
-		}
-		s.topics[topic].addHandler(newH)
-	}
+	t.removeHandler(oldH)
+	t.addHandler(newH)
 }
 
 // TopicState returns the max alert level for each topic matching 'pattern', not returning

@@ -84,7 +84,12 @@ _kapacitor()
             fi
             ;;
         define-handler)
-            _kapacitor_json_yaml_files "${cur}"
+            if [[ -z "${COMP_WORDS[2]}" || ("$cur" = "${COMP_WORDS[2]}" && -z "${COMP_WORDS[3]}") ]]
+            then
+                words=$(_kapacitor_list topics "$cur")
+            else
+                _kapacitor_json_yaml_files "${cur}"
+            fi
             ;;
         replay)
             case "$prev" in
@@ -151,8 +156,23 @@ _kapacitor()
             ;;
         delete|list)
             case "${COMP_WORDS[2]}" in
-                tasks|templates|recordings|replays|handlers|topics|service-tests)
+                tasks|templates|recordings|replays|topics|service-tests)
                     words=$(_kapacitor_list "${COMP_WORDS[2]}" "$cur")
+                    ;;
+                handlers)
+                    case "${COMP_WORDS[1]}" in
+                        list)
+                            words=$(_kapacitor_list handlers "$cur")
+                            ;;
+                        delete)
+                            if [[ -z "${COMP_WORDS[3]}" || ("$cur" = "${COMP_WORDS[3]}" && -z "${COMP_WORDS[4]}") ]]
+                            then
+                                words=$(_kapacitor_list topics "$cur")
+                            else
+                                words=$(_kapacitor_list handlers "$cur")
+                            fi
+                            ;;
+                    esac
                     ;;
                 *)
                     words='tasks templates recordings replays handlers topics service-tests'
@@ -163,7 +183,12 @@ _kapacitor()
             words=$(_kapacitor_list templates "$cur")
             ;;
         show-handler)
-            words=$(_kapacitor_list handlers "$cur")
+            if [[ -z "${COMP_WORDS[2]}" || ("$cur" = "${COMP_WORDS[2]}" && -z "${COMP_WORDS[3]}") ]]
+            then
+                words=$(_kapacitor_list topics "$cur")
+            else
+                words=$(_kapacitor_list handlers "$cur")
+            fi
             ;;
         show-topic)
             words=$(_kapacitor_list topics "$cur")

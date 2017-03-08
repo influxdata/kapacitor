@@ -6936,184 +6936,69 @@ func TestServer_DoServiceTest(t *testing.T) {
 
 func TestServer_AlertHandlers_CRUD(t *testing.T) {
 	testCases := []struct {
-		create    client.HandlerOptions
-		expCreate client.Handler
+		topic     string
+		create    client.TopicHandlerOptions
+		expCreate client.TopicHandler
 		patch     client.JSONPatch
-		expPatch  client.Handler
-		put       client.HandlerOptions
-		expPut    client.Handler
+		expPatch  client.TopicHandler
+		put       client.TopicHandlerOptions
+		expPut    client.TopicHandler
 	}{
 		{
-			create: client.HandlerOptions{
-				ID:     "myhandler",
-				Topics: []string{"system", "test"},
-				Actions: []client.HandlerAction{{
-					Kind: "slack",
-					Options: map[string]interface{}{
-						"channel": "#test",
-					},
-				}},
+			topic: "system",
+			create: client.TopicHandlerOptions{
+				ID:   "myhandler",
+				Kind: "slack",
+				Options: map[string]interface{}{
+					"channel": "#test",
+				},
 			},
-			expCreate: client.Handler{
-				Link:   client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/handlers/myhandler"},
-				ID:     "myhandler",
-				Topics: []string{"system", "test"},
-				Actions: []client.HandlerAction{{
-					Kind: "slack",
-					Options: map[string]interface{}{
-						"channel": "#test",
-					},
-				}},
+			expCreate: client.TopicHandler{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/system/handlers/myhandler"},
+				ID:   "myhandler",
+				Kind: "slack",
+				Options: map[string]interface{}{
+					"channel": "#test",
+				},
 			},
 			patch: client.JSONPatch{
 				{
-					Path:      "/topics/0",
+					Path:      "/kind",
+					Operation: "replace",
+					Value:     "log",
+				},
+				{
+					Path:      "/options/channel",
 					Operation: "remove",
 				},
 				{
-					Path:      "/actions/0/options/channel",
-					Operation: "replace",
-					Value:     "#kapacitor_test",
-				},
-			},
-			expPatch: client.Handler{
-				Link:   client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/handlers/myhandler"},
-				ID:     "myhandler",
-				Topics: []string{"test"},
-				Actions: []client.HandlerAction{{
-					Kind: "slack",
-					Options: map[string]interface{}{
-						"channel": "#kapacitor_test",
-					},
-				}},
-			},
-			put: client.HandlerOptions{
-				ID:     "newid",
-				Topics: []string{"test"},
-				Actions: []client.HandlerAction{{
-					Kind: "smtp",
-					Options: map[string]interface{}{
-						"to": []string{"oncall@example.com"},
-					},
-				}},
-			},
-			expPut: client.Handler{
-				Link:   client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/handlers/newid"},
-				ID:     "newid",
-				Topics: []string{"test"},
-				Actions: []client.HandlerAction{{
-					Kind: "smtp",
-					Options: map[string]interface{}{
-						"to": []interface{}{"oncall@example.com"},
-					},
-				}},
-			},
-		},
-		{
-			create: client.HandlerOptions{
-				ID:     "anotherhandler",
-				Topics: []string{"test"},
-				Actions: []client.HandlerAction{
-					{
-						Kind: "slack",
-						Options: map[string]interface{}{
-							"channel": "#test",
-						},
-					},
-					{
-						Kind: "log",
-						Options: map[string]interface{}{
-							"path": "/tmp/alert.log",
-						},
-					},
-				},
-			},
-			expCreate: client.Handler{
-				Link:   client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/handlers/anotherhandler"},
-				ID:     "anotherhandler",
-				Topics: []string{"test"},
-				Actions: []client.HandlerAction{
-					{
-						Kind: "slack",
-						Options: map[string]interface{}{
-							"channel": "#test",
-						},
-					},
-					{
-						Kind: "log",
-						Options: map[string]interface{}{
-							"path": "/tmp/alert.log",
-						},
-					},
-				},
-			},
-			patch: client.JSONPatch{
-				{
-					Path:      "/topics/-",
+					Path:      "/options/path",
 					Operation: "add",
-					Value:     "system",
-				},
-				{
-					Path:      "/actions/0/options/channel",
-					Operation: "replace",
-					Value:     "#kapacitor_test",
-				},
-				{
-					Path:      "/actions/-",
-					Operation: "add",
-					Value: map[string]interface{}{
-						"kind": "smtp",
-						"options": map[string]interface{}{
-							"to": []string{"oncall@example.com"},
-						},
-					},
+					Value:     "/var/log/alert.log",
 				},
 			},
-			expPatch: client.Handler{
-				Link:   client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/handlers/anotherhandler"},
-				ID:     "anotherhandler",
-				Topics: []string{"test", "system"},
-				Actions: []client.HandlerAction{
-					{
-						Kind: "slack",
-						Options: map[string]interface{}{
-							"channel": "#kapacitor_test",
-						},
-					},
-					{
-						Kind: "log",
-						Options: map[string]interface{}{
-							"path": "/tmp/alert.log",
-						},
-					},
-					{
-						Kind: "smtp",
-						Options: map[string]interface{}{
-							"to": []interface{}{"oncall@example.com"},
-						},
-					},
+			expPatch: client.TopicHandler{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/system/handlers/myhandler"},
+				ID:   "myhandler",
+				Kind: "log",
+				Options: map[string]interface{}{
+					"path": "/var/log/alert.log",
 				},
 			},
-			put: client.HandlerOptions{
-				ID:     "anotherhandler",
-				Topics: []string{"test"},
-				Actions: []client.HandlerAction{{
-					Kind: "smtp",
-					Options: map[string]interface{}{
-						"to": []string{"oncall@example.com"},
-					},
-				}},
+			put: client.TopicHandlerOptions{
+				ID:   "newid",
+				Kind: "smtp",
+				Options: map[string]interface{}{
+					"to": []string{"oncall@example.com"},
+				},
 			},
-			expPut: client.Handler{
-				Link:   client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/handlers/anotherhandler"},
-				ID:     "anotherhandler",
-				Topics: []string{"test"},
-				Actions: []client.HandlerAction{{
-					Kind: "smtp",
-					Options: map[string]interface{}{
-						"to": []interface{}{"oncall@example.com"},
-					},
-				}},
+			expPut: client.TopicHandler{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/system/handlers/newid"},
+				ID:   "newid",
+				Kind: "smtp",
+				Options: map[string]interface{}{
+					"to": []interface{}{"oncall@example.com"},
+				},
 			},
 		},
 	}
@@ -7124,7 +7009,7 @@ func TestServer_AlertHandlers_CRUD(t *testing.T) {
 		cli := Client(s)
 		defer s.Close()
 
-		h, err := cli.CreateHandler(tc.create)
+		h, err := cli.CreateTopicHandler(cli.TopicHandlersLink(tc.topic), tc.create)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -7133,7 +7018,7 @@ func TestServer_AlertHandlers_CRUD(t *testing.T) {
 			t.Errorf("unexpected handler created:\ngot\n%#v\nexp\n%#v\n", h, tc.expCreate)
 		}
 
-		h, err = cli.PatchHandler(h.Link, tc.patch)
+		h, err = cli.PatchTopicHandler(h.Link, tc.patch)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -7142,7 +7027,7 @@ func TestServer_AlertHandlers_CRUD(t *testing.T) {
 			t.Errorf("unexpected handler patched:\ngot\n%#v\nexp\n%#v\n", h, tc.expPatch)
 		}
 
-		h, err = cli.ReplaceHandler(h.Link, tc.put)
+		h, err = cli.ReplaceTopicHandler(h.Link, tc.put)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -7154,7 +7039,7 @@ func TestServer_AlertHandlers_CRUD(t *testing.T) {
 		// Restart server
 		s.Restart()
 
-		rh, err := cli.Handler(h.Link)
+		rh, err := cli.TopicHandler(h.Link)
 		if err != nil {
 			t.Fatalf("could not find handler after restart: %v", err)
 		}
@@ -7162,12 +7047,12 @@ func TestServer_AlertHandlers_CRUD(t *testing.T) {
 			t.Errorf("unexpected handler after restart:\ngot\n%#v\nexp\n%#v\n", got, exp)
 		}
 
-		err = cli.DeleteHandler(h.Link)
+		err = cli.DeleteTopicHandler(h.Link)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		_, err = cli.Handler(h.Link)
+		_, err = cli.TopicHandler(h.Link)
 		if err == nil {
 			t.Errorf("expected handler to be deleted")
 		}
@@ -7202,12 +7087,12 @@ func TestServer_AlertHandlers(t *testing.T) {
 		t.Fatal(err)
 	}
 	testCases := []struct {
-		handlerAction client.HandlerAction
-		setup         func(*server.Config, *client.HandlerAction) (context.Context, error)
-		result        func(context.Context) error
+		handler client.TopicHandler
+		setup   func(*server.Config, *client.TopicHandler) (context.Context, error)
+		result  func(context.Context) error
 	}{
 		{
-			handlerAction: client.HandlerAction{
+			handler: client.TopicHandler{
 				Kind: "alerta",
 				Options: map[string]interface{}{
 					"token":        "testtoken1234567",
@@ -7217,7 +7102,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 					"environment":  "env",
 				},
 			},
-			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := alertatest.NewServer()
 				ctxt := context.WithValue(nil, "server", ts)
 
@@ -7249,14 +7134,14 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 		},
 		{
-			handlerAction: client.HandlerAction{
+			handler: client.TopicHandler{
 				Kind: "exec",
 				Options: map[string]interface{}{
 					"prog": "/bin/alert-handler.sh",
 					"args": []string{"arg1", "arg2", "arg3"},
 				},
 			},
-			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				te := alerttest.NewExec()
 				ctxt := context.WithValue(nil, "exec", te)
 				c.Commander = te.Commander
@@ -7287,14 +7172,14 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 		},
 		{
-			handlerAction: client.HandlerAction{
+			handler: client.TopicHandler{
 				Kind: "hipchat",
 				Options: map[string]interface{}{
 					"token": "testtoken1234567",
 					"room":  "1234567",
 				},
 			},
-			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := hipchattest.NewServer()
 				ctxt := context.WithValue(nil, "server", ts)
 
@@ -7322,13 +7207,13 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 		},
 		{
-			handlerAction: client.HandlerAction{
+			handler: client.TopicHandler{
 				Kind: "log",
 				Options: map[string]interface{}{
 					"mode": 0604,
 				},
 			},
-			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				tdir := MustTempDir()
 				p := path.Join(tdir, "alert.log")
 
@@ -7365,14 +7250,14 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 		},
 		{
-			handlerAction: client.HandlerAction{
+			handler: client.TopicHandler{
 				Kind: "opsgenie",
 				Options: map[string]interface{}{
 					"teams-list":      []string{"A team", "B team"},
 					"recipients-list": []string{"test_recipient1", "test_recipient2"},
 				},
 			},
-			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := opsgenietest.NewServer()
 				ctxt := context.WithValue(nil, "server", ts)
 
@@ -7410,11 +7295,11 @@ func TestServer_AlertHandlers(t *testing.T) {
 		},
 
 		{
-			handlerAction: client.HandlerAction{
+			handler: client.TopicHandler{
 				Kind:    "pushover",
 				Options: map[string]interface{}{},
 			},
-			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := pushovertest.NewServer()
 				ctxt := context.WithValue(nil, "server", ts)
 
@@ -7444,13 +7329,13 @@ func TestServer_AlertHandlers(t *testing.T) {
 		},
 
 		{
-			handlerAction: client.HandlerAction{
+			handler: client.TopicHandler{
 				Kind: "pagerduty",
 				Options: map[string]interface{}{
 					"service-key": "service_key",
 				},
 			},
-			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := pagerdutytest.NewServer()
 				ctxt := context.WithValue(nil, "server", ts)
 
@@ -7481,10 +7366,10 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 		},
 		{
-			handlerAction: client.HandlerAction{
+			handler: client.TopicHandler{
 				Kind: "post",
 			},
-			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := alerttest.NewPostServer()
 
 				ha.Options = map[string]interface{}{"url": ts.URL}
@@ -7504,10 +7389,10 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 		},
 		{
-			handlerAction: client.HandlerAction{
+			handler: client.TopicHandler{
 				Kind: "sensu",
 			},
-			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts, err := sensutest.NewServer()
 				if err != nil {
 					return nil, err
@@ -7536,13 +7421,13 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 		},
 		{
-			handlerAction: client.HandlerAction{
+			handler: client.TopicHandler{
 				Kind: "slack",
 				Options: map[string]interface{}{
 					"channel": "#test",
 				},
 			},
-			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := slacktest.NewServer()
 				ctxt := context.WithValue(nil, "server", ts)
 
@@ -7577,13 +7462,13 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 		},
 		{
-			handlerAction: client.HandlerAction{
+			handler: client.TopicHandler{
 				Kind: "smtp",
 				Options: map[string]interface{}{
 					"to": []string{"oncall@example.com", "backup@example.com"},
 				},
 			},
-			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts, err := smtptest.NewServer()
 				if err != nil {
 					return nil, err
@@ -7630,7 +7515,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 		},
 		{
-			handlerAction: client.HandlerAction{
+			handler: client.TopicHandler{
 				Kind: "snmptrap",
 				Options: map[string]interface{}{
 					"trap-oid": "1.1.2",
@@ -7648,7 +7533,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 					},
 				},
 			},
-			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts, err := snmptraptest.NewServer()
 				if err != nil {
 					return nil, err
@@ -7694,10 +7579,10 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 		},
 		{
-			handlerAction: client.HandlerAction{
+			handler: client.TopicHandler{
 				Kind: "talk",
 			},
-			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := talktest.NewServer()
 				ctxt := context.WithValue(nil, "server", ts)
 
@@ -7725,10 +7610,10 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 		},
 		{
-			handlerAction: client.HandlerAction{
+			handler: client.TopicHandler{
 				Kind: "tcp",
 			},
-			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts, err := alerttest.NewTCPServer()
 				if err != nil {
 					return nil, err
@@ -7751,14 +7636,14 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 		},
 		{
-			handlerAction: client.HandlerAction{
+			handler: client.TopicHandler{
 				Kind: "telegram",
 				Options: map[string]interface{}{
 					"chat-id":                  "chat id",
 					"disable-web-page-preview": true,
 				},
 			},
-			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := telegramtest.NewServer()
 				ctxt := context.WithValue(nil, "server", ts)
 
@@ -7788,13 +7673,13 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 		},
 		{
-			handlerAction: client.HandlerAction{
+			handler: client.TopicHandler{
 				Kind: "victorops",
 				Options: map[string]interface{}{
 					"routing-key": "key",
 				},
 			},
-			setup: func(c *server.Config, ha *client.HandlerAction) (context.Context, error) {
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := victoropstest.NewServer()
 				ctxt := context.WithValue(nil, "server", ts)
 
@@ -7826,14 +7711,14 @@ func TestServer_AlertHandlers(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		t.Run(tc.handlerAction.Kind, func(t *testing.T) {
-			kind := tc.handlerAction.Kind
+		t.Run(tc.handler.Kind, func(t *testing.T) {
+			kind := tc.handler.Kind
 			// Create default config
 			c := NewConfig()
 			var ctxt context.Context
 			if tc.setup != nil {
 				var err error
-				ctxt, err = tc.setup(c, &tc.handlerAction)
+				ctxt, err = tc.setup(c, &tc.handler)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -7848,12 +7733,10 @@ func TestServer_AlertHandlers(t *testing.T) {
 			}()
 			ctxt = context.WithValue(ctxt, "kapacitorURL", s.URL())
 
-			if _, err := cli.CreateHandler(client.HandlerOptions{
-				ID:     "testAlertHandlers",
-				Topics: []string{"test"},
-				Actions: []client.HandlerAction{
-					tc.handlerAction,
-				},
+			if _, err := cli.CreateTopicHandler(cli.TopicHandlersLink("test"), client.TopicHandlerOptions{
+				ID:      "testAlertHandlers",
+				Kind:    tc.handler.Kind,
+				Options: tc.handler.Options,
 			}); err != nil {
 				t.Fatalf("%s: %v", kind, err)
 			}
@@ -8166,13 +8049,10 @@ func TestServer_AlertTopic_PersistedState(t *testing.T) {
 	cli := Client(s)
 	defer s.Close()
 
-	if _, err := cli.CreateHandler(client.HandlerOptions{
-		ID:     "testAlertHandler",
-		Topics: []string{"test"},
-		Actions: []client.HandlerAction{{
-			Kind:    "tcp",
-			Options: map[string]interface{}{"address": ts.Addr},
-		}},
+	if _, err := cli.CreateTopicHandler(cli.TopicHandlersLink("test"), client.TopicHandlerOptions{
+		ID:      "testAlertHandler",
+		Kind:    "tcp",
+		Options: map[string]interface{}{"address": ts.Addr},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -8284,50 +8164,47 @@ func TestServer_AlertListHandlers(t *testing.T) {
 	cli := Client(s)
 	defer s.Close()
 
-	topics := []string{"test"}
-	actions := []client.HandlerAction{{
-		Kind:    "tcp",
-		Options: map[string]interface{}{"address": ts.Addr},
-	}}
+	thl := cli.TopicHandlersLink("test")
 
 	// Number of handlers to create
 	n := 3
 	for i := 0; i < n; i++ {
 		id := fmt.Sprintf("handler%d", i)
-		if _, err := cli.CreateHandler(client.HandlerOptions{
+		if _, err := cli.CreateTopicHandler(thl, client.TopicHandlerOptions{
 			ID:      id,
-			Topics:  topics,
-			Actions: actions,
+			Kind:    "tcp",
+			Options: map[string]interface{}{"address": ts.Addr},
 		}); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	expHandlers := client.Handlers{
-		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/handlers?pattern="},
-		Handlers: []client.Handler{
+	expHandlers := client.TopicHandlers{
+		Link:  client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/test/handlers?pattern="},
+		Topic: "test",
+		Handlers: []client.TopicHandler{
 			{
-				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/handlers/handler0"},
+				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/test/handlers/handler0"},
 				ID:      "handler0",
-				Topics:  topics,
-				Actions: actions,
+				Kind:    "tcp",
+				Options: map[string]interface{}{"address": ts.Addr},
 			},
 			{
-				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/handlers/handler1"},
+				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/test/handlers/handler1"},
 				ID:      "handler1",
-				Topics:  topics,
-				Actions: actions,
+				Kind:    "tcp",
+				Options: map[string]interface{}{"address": ts.Addr},
 			},
 			{
-				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/handlers/handler2"},
+				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/test/handlers/handler2"},
 				ID:      "handler2",
-				Topics:  topics,
-				Actions: actions,
+				Kind:    "tcp",
+				Options: map[string]interface{}{"address": ts.Addr},
 			},
 		},
 	}
 
-	handlers, err := cli.ListHandlers(nil)
+	handlers, err := cli.ListTopicHandlers(thl, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -8339,7 +8216,7 @@ func TestServer_AlertListHandlers(t *testing.T) {
 	s.Restart()
 
 	// Check again
-	handlers, err = cli.ListHandlers(nil)
+	handlers, err = cli.ListTopicHandlers(thl, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -8347,60 +8224,49 @@ func TestServer_AlertListHandlers(t *testing.T) {
 		t.Errorf("unexpected handlers after restart:\ngot\n%+v\nexp\n%+v\n", handlers, expHandlers)
 	}
 
-	var exp client.Handlers
+	var exp client.TopicHandlers
 
 	// Pattern = *
-	handlers, err = cli.ListHandlers(&client.ListHandlersOptions{
+	handlers, err = cli.ListTopicHandlers(thl, &client.ListTopicHandlersOptions{
 		Pattern: "*",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	exp = expHandlers
-	exp.Link.Href = "/kapacitor/v1preview/alerts/handlers?pattern=%2A"
+	exp.Link.Href = "/kapacitor/v1preview/alerts/topics/test/handlers?pattern=%2A"
 	if !reflect.DeepEqual(handlers, exp) {
 		t.Errorf("unexpected handlers with pattern \"*\":\ngot\n%+v\nexp\n%+v\n", handlers, exp)
 	}
 
 	// Pattern = handler*
-	handlers, err = cli.ListHandlers(&client.ListHandlersOptions{
+	handlers, err = cli.ListTopicHandlers(thl, &client.ListTopicHandlersOptions{
 		Pattern: "handler*",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	exp = expHandlers
-	exp.Link.Href = "/kapacitor/v1preview/alerts/handlers?pattern=handler%2A"
+	exp.Link.Href = "/kapacitor/v1preview/alerts/topics/test/handlers?pattern=handler%2A"
 	if !reflect.DeepEqual(handlers, exp) {
-		t.Errorf("unexpected handlers with pattern \"test\":\ngot\n%+v\nexp\n%+v\n", handlers, exp)
+		t.Errorf("unexpected handlers with pattern \"handler*\":\ngot\n%+v\nexp\n%+v\n", handlers, exp)
 	}
 
 	// Pattern = handler0
-	handlers, err = cli.ListHandlers(&client.ListHandlersOptions{
+	handlers, err = cli.ListTopicHandlers(thl, &client.ListTopicHandlersOptions{
 		Pattern: "handler0",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	exp = expHandlers
-	exp.Link.Href = "/kapacitor/v1preview/alerts/handlers?pattern=handler0"
+	exp.Link.Href = "/kapacitor/v1preview/alerts/topics/test/handlers?pattern=handler0"
 	exp.Handlers = expHandlers.Handlers[0:1]
 	if !reflect.DeepEqual(handlers, exp) {
-		t.Errorf("unexpected handlers with pattern \"test\":\ngot\n%+v\nexp\n%+v\n", handlers, exp)
-	}
-
-	// List handlers of test topic
-	l := cli.TopicHandlersLink("test")
-	topicHandlers, err := cli.ListTopicHandlers(l)
-	expTopicHandlers := client.TopicHandlers{
-		Link:     client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/test/handlers"},
-		Topic:    "test",
-		Handlers: expHandlers.Handlers,
-	}
-	if !reflect.DeepEqual(topicHandlers, expTopicHandlers) {
-		t.Errorf("unexpected topic handlers:\ngot\n%+v\nexp\n%+v\n", topicHandlers, expTopicHandlers)
+		t.Errorf("unexpected handlers with pattern \"handler0\":\ngot\n%+v\nexp\n%+v\n", handlers, exp)
 	}
 }
+
 func TestServer_AlertTopic(t *testing.T) {
 	// Create default config
 	c := NewConfig()
@@ -8408,13 +8274,10 @@ func TestServer_AlertTopic(t *testing.T) {
 	cli := Client(s)
 	defer s.Close()
 
-	if _, err := cli.CreateHandler(client.HandlerOptions{
-		ID:     "testAlertHandler",
-		Topics: []string{"misc"},
-		Actions: []client.HandlerAction{{
-			Kind:    "tcp",
-			Options: map[string]interface{}{"address": "localhost:4657"},
-		}},
+	if _, err := cli.CreateTopicHandler(cli.TopicHandlersLink("misc"), client.TopicHandlerOptions{
+		ID:      "testAlertHandler",
+		Kind:    "tcp",
+		Options: map[string]interface{}{"address": "localhost:4657"},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -8450,15 +8313,14 @@ func TestServer_AlertListTopics(t *testing.T) {
 	cli := Client(s)
 	defer s.Close()
 
-	if _, err := cli.CreateHandler(client.HandlerOptions{
-		ID:     "testAlertHandler",
-		Topics: []string{"test", "system", "misc"},
-		Actions: []client.HandlerAction{{
+	for _, topic := range []string{"system", "misc", "test"} {
+		if _, err := cli.CreateTopicHandler(cli.TopicHandlersLink(topic), client.TopicHandlerOptions{
+			ID:      "testAlertHandler",
 			Kind:    "tcp",
 			Options: map[string]interface{}{"address": ts.Addr},
-		}},
-	}); err != nil {
-		t.Fatal(err)
+		}); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	expTopics := client.Topics{
@@ -8584,7 +8446,7 @@ stream
 	}
 }
 
-func TestServer_AlertHandler_MultipleActions(t *testing.T) {
+func TestServer_AlertHandler_MultipleHandlers(t *testing.T) {
 	resultJSON := `{"series":[{"name":"alert","columns":["time","value"],"values":[["1970-01-01T00:00:00Z",1]]}]}`
 
 	// Create default config
@@ -8610,22 +8472,20 @@ func TestServer_AlertHandler_MultipleActions(t *testing.T) {
 		}
 	}()
 
-	if _, err := cli.CreateHandler(client.HandlerOptions{
-		ID:     "testAlertHandlers",
-		Topics: []string{"test"},
-		Actions: []client.HandlerAction{
-			{
-				Kind: "victorops",
-				Options: map[string]interface{}{
-					"routing-key": "key",
-				},
-			},
-			{
-				Kind: "slack",
-				Options: map[string]interface{}{
-					"channel": "#test",
-				},
-			},
+	if _, err := cli.CreateTopicHandler(cli.TopicHandlersLink("test"), client.TopicHandlerOptions{
+		ID:   "testAlertHandlers-VO",
+		Kind: "victorops",
+		Options: map[string]interface{}{
+			"routing-key": "key",
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cli.CreateTopicHandler(cli.TopicHandlersLink("test"), client.TopicHandlerOptions{
+		ID:   "testAlertHandlers-Slack",
+		Kind: "slack",
+		Options: map[string]interface{}{
+			"channel": "#test",
 		},
 	}); err != nil {
 		t.Fatal(err)

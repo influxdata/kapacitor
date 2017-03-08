@@ -1372,12 +1372,29 @@ Meaning that they are subject to change in the future until the technical previe
 As such the URL for the endpoints uses the base path `/kapacitor/v1preview`.
 Once the technical preview is deemed complete the endpoint paths will be promoted to use the v1 `/kapacitor/v1` base path.
 
+
 ### Topics
 
 Alerts are grouped into topics.
 An alert handler "listens" on a topic for any new events.
 You can either specify the alert topic in the TICKscript or one will be generated for you.
 
+### Creating and Removing Topics
+
+Topics are created dynamically when they referenced in TICKscripts or in handlers.
+To delete a topic make a `DELETE` request to `/kapacitor/v1preview/alerts/topics/<topic id>`.
+This will delete all known events and state for the topic.
+
+>NOTE: Since topics are dynamically created, a topic may return after having deleted it, if a new event is created for the topic.
+
+
+#### Example
+
+```
+DELETE /kapacitor/v1preview/alerts/topics/system
+```
+
+### List Topics
 To query the list of available topics make a GET requests to `/kapacitor/v1preview/alerts/topics`.
 
 | Query Parameter | Default | Purpose                                                                                                                                                            |
@@ -1458,7 +1475,7 @@ GET /kapacitor/v1preview/alerts/topics/system
 }
 ```
 
-### All Topic Events
+### List Topic Events
 
 To query all the events within a topic make a GET request to `/kapacitor/v1preview/alerts/topics/<topic id>/events`.
 
@@ -1501,7 +1518,7 @@ GET /kapacitor/v1preview/alerts/topics/system/events
 }
 ```
 
-### Specific Topic Event
+### Topic Event
 
 You can query a specific event within a topic by making a GET request to `/kapacitor/v1preview/alerts/topics/<topic id>/events/<event id>`.
 
@@ -1524,10 +1541,14 @@ GET /kapacitor/v1preview/alerts/topics/system/events/cpu
 }
 ```
 
-### Topic Handlers
+### List Topic Handlers
 
-Handlers are created independent of a topic but are associated with a topic.
+Handlers are created within a topic.
 You can get a list of handlers configured for a topic by making a GET request to `/kapacitor/v1preview/alerts/topics/<topic id>/handlers`.
+
+| Query Parameter | Default | Purpose                                                                                                                                                               |
+| --------------- | ------- | -------                                                                                                                                                               |
+| pattern         | *       | Filter results based on the pattern. Uses standard shell glob matching on the service name, see [this](https://golang.org/pkg/path/filepath/#Match) for more details. |
 
 >NOTE: Anonymous handlers (created automatically from TICKscripts) will not be listed under their associated anonymous topic as they are not configured via the API.
 
@@ -1546,9 +1567,8 @@ GET /kapacitor/v1preview/alerts/topics/system/handlers
     "topic": "system",
     "handlers": [
         {
-            "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/handlers/slack"},
+            "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/handlers/slack"},
             "id":"slack",
-            "topics": ["system", "app"],
             "actions": [{
                 "kind":"slack",
                 "options":{
@@ -1557,9 +1577,8 @@ GET /kapacitor/v1preview/alerts/topics/system/handlers
             }]
         },
         {
-            "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/handlers/smtp"},
+            "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/handlers/smtp"},
             "id":"smtp",
-            "topics": ["system", "app"],
             "actions": [{
                 "kind":"smtp"
             }]
@@ -1583,78 +1602,20 @@ GET /kapacitor/v1preview/alerts/topics/main:alert_cpu:alert5/handlers
 }
 ```
 
-### Creating and Removing Topics
-
-Topics are created dynamically for you when they referenced in TICKscripts or in handlers.
-To delete a topic make a `DELETE` request to `/kapacitor/v1preview/alerts/topics/<topic id>`.
-This will delete all known events and state for the topic.
-
->NOTE: Since topics are dynamically created, a topic may return after having deleted it, if a new event is created for the topic.
-
-
-#### Example
-
-```
-DELETE /kapacitor/v1preview/alerts/topics/system
-```
-
-
-### List Handlers
-
-To query information about all handlers independent of a given topic make a GET request to `/kapacitor/v1preview/alerts/handlers`.
-
-| Query Parameter | Default | Purpose                                                                                                                                                               |
-| --------------- | ------- | -------                                                                                                                                                               |
-| pattern         | *       | Filter results based on the pattern. Uses standard shell glob matching on the service name, see [this](https://golang.org/pkg/path/filepath/#Match) for more details. |
-
-#### Example
-
-```
-GET /kapacitor/v1preview/alerts/handlers
-```
-
-```
-{
-    "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/handlers"},
-    "handlers": [
-        {
-            "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/handlers/slack"},
-            "id":"slack",
-            "topics": ["system", "app"],
-            "actions": [{
-                "kind":"slack",
-                "options": {
-                    "channel":"#alerts"
-                }
-            }]
-        },
-        {
-            "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/handlers/smtp"},
-            "id":"smtp",
-            "topics": ["system", "app"],
-            "actions": [{
-                "kind":"smtp"
-            }]
-        }
-    ]
-}
-```
-
 ### Get a Handler
 
-To query information about a specific handler make a GET request to `/kapacitor/v1preview/alerts/handlers/<handler id>`.
+To query information about a specific handler make a GET request to `/kapacitor/v1preview/alerts/topics/<topic id>/handlers/<handler id>`.
 
 #### Example
 
 ```
-GET /kapacitor/v1preview/alerts/handlers/slack
+GET /kapacitor/v1preview/alerts/topics/system/handlers/slack
 ```
 
 ```
 {
-    "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/handlers/slack"},
+    "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/handlers/slack"},
     "id":"slack",
-    "topics": ["system", "app"],
     "actions": [{
         "kind":"slack",
         "options": {
@@ -1666,13 +1627,12 @@ GET /kapacitor/v1preview/alerts/handlers/slack
 
 ### Create a Handler
 
-To create a new handler make a POST request to `/kapacitor/v1preview/alerts/handlers`.
+To create a new handler make a POST request to `/kapacitor/v1preview/alerts/topics/system/handlers`.
 
 ```
-POST /kapacitor/v1preview/alerts/handlers
+POST /kapacitor/v1preview/alerts/topics/system/handlers
 {
     "id":"slack",
-    "topics": ["system", "app"],
     "actions": [{
         "kind":"slack",
         "options": {
@@ -1685,9 +1645,8 @@ POST /kapacitor/v1preview/alerts/handlers
 
 ```
 {
-    "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/handlers/slack"},
+    "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/handlers/slack"},
     "id": "slack",
-    "topics": ["system", "app"],
     "actions": [{
         "kind":"slack",
         "options": {
@@ -1699,7 +1658,7 @@ POST /kapacitor/v1preview/alerts/handlers
 
 ### Update a Handler
 
-To update an existing handler you can either make a PUT or PATCH request to `/kapacitor/v1preview/alerts/handlers/<handler id>`.
+To update an existing handler you can either make a PUT or PATCH request to `/kapacitor/v1preview/alerts/topics/system/handlers/<handler id>`.
 
 Using PUT will replace the entire handler, by using PATCH specific parts of the handler can be modified.
 
@@ -1710,7 +1669,7 @@ PATCH will apply JSON patch object to the existing handler, see [rfc6902](https:
 Update the topics and actions for a handler using the PATCH method.
 
 ```
-PATCH /kapacitor/v1preview/alerts/handlers/slack
+PATCH /kapacitor/v1preview/alerts/topics/system/handlers/slack
 [
     {"op":"replace", "path":"/topics", "value":["system", "test"]},
     {"op":"replace", "path":"/actions/0/options/channel", "value":"#testing_alerts"}
@@ -1719,9 +1678,8 @@ PATCH /kapacitor/v1preview/alerts/handlers/slack
 
 ```
 {
-    "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/handlers/slack"},
+    "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/handlers/slack"},
     "id": "slack",
-    "topics": ["system", "test"],
     "actions": [
         {
             "kind":"slack",
@@ -1736,10 +1694,9 @@ PATCH /kapacitor/v1preview/alerts/handlers/slack
 Replace an entire handler using the PUT method.
 
 ```
-PUT /kapacitor/v1preview/alerts/handlers/slack
+PUT /kapacitor/v1preview/alerts/topics/system/handlers/slack
 {
     "id": "slack",
-    "topics": ["system", "test"],
     "actions": [
         {
             "kind":"slack",
@@ -1753,9 +1710,8 @@ PUT /kapacitor/v1preview/alerts/handlers/slack
 
 ```
 {
-    "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/handlers/slack"},
+    "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/handlers/slack"},
     "id": "slack",
-    "topics": ["system", "test"],
     "actions": [
         {
             "kind":"slack",
@@ -1769,11 +1725,12 @@ PUT /kapacitor/v1preview/alerts/handlers/slack
 
 ### Remove a Handler
 
-To remove an existing handler make a DELETE request to `/kapacitor/v1preview/alerts/handlers/<handler id>`.
+To remove an existing handler make a DELETE request to `/kapacitor/v1preview/alerts/topics/system/handlers/<handler id>`.
 
 ```
-DELETE /kapacitor/v1preview/alerts/handlers/<handler id>
+DELETE /kapacitor/v1preview/alerts/topics/system/handlers/<handler id>
 ```
+
 
 ## Configuration
 
@@ -1785,7 +1742,6 @@ The sections available for overriding include the InfluxDB clusters and the aler
 The intent of the API is to allow for dynamic configuration of sensitive credentials without requiring that the Kapacitor process be restarted.
 As such, it is recommended to use either the configuration file or the API to manage these configuration sections, but not both.
 This will help to eliminate any confusion that may arise as to the source of a given configuration option.
-
 
 ### Enabling/Disabling Configuration Overrides
 
