@@ -771,6 +771,40 @@ batch
 	testBatcherWithOutput(t, "TestBatch_Default", script, 30*time.Second, er, false)
 }
 
+func TestBatch_DefaultEmptyTag(t *testing.T) {
+
+	var script = `
+batch
+	|query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "host" = 'serverA' AND "cpu" = 'cpu-total'
+''')
+	.every(10s)
+	|default()
+		.field('mean', 90.0)
+		.tag('dc', 'sfc')
+	|sum('mean')
+	|httpOut('TestBatch_DefaultEmptyTag')
+`
+
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"dc": "sfc", "cpu": "cpu-total"},
+				Columns: []string{"time", "sum"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 18, 0, time.UTC),
+					441.0,
+				}},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_DefaultEmptyTag", script, 30*time.Second, er, false)
+}
+
 func TestBatch_Delete(t *testing.T) {
 
 	var script = `

@@ -33,6 +33,9 @@
     Specifically in the JSON result data the old key `Series` is always `series`, and the old key `Err` is now always `error` instead of for only some of the outputs.
 - [#1181](https://github.com/influxdata/kapacitor/pull/1181): Fix bug parsing dbrp values with quotes.
 - [#1228](https://github.com/influxdata/kapacitor/pull/1228): Fix panic on loading replay files without a file extension.
+- [#1192](https://github.com/influxdata/kapacitor/issues/1192): Fix bug in Default Node not updating batch tags and groupID.
+    Also empty string on a tag value is now a sufficient condition for the default conditions to be applied.
+    See [#1233](https://github.com/influxdata/kapacitor/pull/1233) for more information.
 
 ## v1.2.0 [2017-01-23]
 

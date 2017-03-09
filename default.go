@@ -42,6 +42,7 @@ func (e *DefaultNode) runDefault(snapshot []byte) error {
 		for p, ok := e.ins[0].NextPoint(); ok; p, ok = e.ins[0].NextPoint() {
 			e.timer.Start()
 			p.Fields, p.Tags = e.setDefaults(p.Fields, p.Tags)
+			p.UpdateGroup()
 			e.timer.Stop()
 			for _, child := range e.outs {
 				err := child.CollectPoint(p)
@@ -53,6 +54,8 @@ func (e *DefaultNode) runDefault(snapshot []byte) error {
 	case pipeline.BatchEdge:
 		for b, ok := e.ins[0].NextBatch(); ok; b, ok = e.ins[0].NextBatch() {
 			e.timer.Start()
+			_, b.Tags = e.setDefaults(nil, b.Tags)
+			b.UpdateGroup()
 			for i := range b.Points {
 				b.Points[i].Fields, b.Points[i].Tags = e.setDefaults(b.Points[i].Fields, b.Points[i].Tags)
 			}
@@ -84,7 +87,7 @@ func (d *DefaultNode) setDefaults(fields models.Fields, tags models.Tags) (model
 	newTags := tags
 	tagsCopied := false
 	for tag, value := range d.d.Tags {
-		if _, ok := tags[tag]; !ok {
+		if v := tags[tag]; v == "" {
 			if !tagsCopied {
 				newTags = newTags.Copy()
 				tagsCopied = true
