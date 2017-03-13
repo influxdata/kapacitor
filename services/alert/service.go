@@ -24,11 +24,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-type handler struct {
-	Spec    HandlerSpec
-	Handler alert.Handler
-}
-
 type Service struct {
 	mu sync.RWMutex
 
@@ -41,7 +36,8 @@ type Service struct {
 
 	closedTopics map[string]bool
 
-	topics *alert.Topics
+	topics         *alert.Topics
+	EventCollector EventCollector
 
 	HTTPDService interface {
 		AddPreviewRoutes([]httpd.Route) error
@@ -108,6 +104,7 @@ func NewService(c Config, l *log.Logger) *Service {
 		Persister: s,
 		logger:    l,
 	}
+	s.EventCollector = s
 	return s
 }
 
@@ -539,14 +536,15 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 	var err error
 	switch spec.Kind {
 	case "aggregate":
-		c := AggregateHandlerConfig{
-			topics: s.topics,
-		}
+		c := newDefaultAggregateHandlerConfig(s.EventCollector)
 		err = decodeOptions(spec.Options, &c)
 		if err != nil {
 			return handler{}, err
 		}
-		h = NewAggregateHandler(c, s.logger)
+		h, err = NewAggregateHandler(c, s.logger)
+		if err != nil {
+			return handler{}, err
+		}
 	case "alerta":
 		c := s.AlertaService.DefaultHandlerConfig()
 		err = decodeOptions(spec.Options, &c)
@@ -621,7 +619,7 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		h = newExternalHandler(h)
 	case "publish":
 		c := PublishHandlerConfig{
-			topics: s.topics,
+			ec: s.EventCollector,
 		}
 		err = decodeOptions(spec.Options, &c)
 		if err != nil {

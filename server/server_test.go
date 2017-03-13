@@ -7897,6 +7897,210 @@ stream
 	}
 }
 
+func TestServer_Alert_Aggregate(t *testing.T) {
+	// Setup test TCP server
+	ts, err := alerttest.NewTCPServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ts.Close()
+
+	// Create default config
+	c := NewConfig()
+	s := OpenServer(c)
+	cli := Client(s)
+	defer s.Close()
+
+	aggTopic := "agg"
+
+	// Create task for alert
+	tick := `
+stream
+	|from()
+		.measurement('alert')
+	|alert()
+		.id('id')
+		.message('message')
+		.details('details')
+		.crit(lambda: "value" > 1.0)
+		.topic('` + aggTopic + `')
+`
+
+	if _, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:   "agg_task",
+		Type: client.StreamTask,
+		DBRPs: []client.DBRP{{
+			Database:        "mydb",
+			RetentionPolicy: "myrp",
+		}},
+		TICKscript: tick,
+		Status:     client.Enabled,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create tpc handler on tcp topic
+	tcpTopic := "tcp"
+	if _, err := cli.CreateTopicHandler(cli.TopicHandlersLink(tcpTopic), client.TopicHandlerOptions{
+		ID:   "tcp_handler",
+		Kind: "tcp",
+		Options: map[string]interface{}{
+			"address": ts.Addr,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create aggregate handler on agg topic
+	if _, err := cli.CreateTopicHandler(cli.TopicHandlersLink(aggTopic), client.TopicHandlerOptions{
+		ID:   "aggregate_handler",
+		Kind: "aggregate",
+		Options: map[string]interface{}{
+			"id":       "id-agg",
+			"interval": 100 * time.Millisecond,
+			"topic":    "tcp",
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Write points
+	point := `alert value=3 0000000000000
+alert value=4 0000000000001
+alert value=2 0000000000002
+`
+	v := url.Values{}
+	v.Add("precision", "ms")
+	s.MustWrite("mydb", "myrp", point, v)
+
+	time.Sleep(110 * time.Millisecond)
+
+	l := cli.TopicEventsLink(tcpTopic)
+	expTopicEvents := client.TopicEvents{
+		Link:  l,
+		Topic: tcpTopic,
+		Events: []client.TopicEvent{{
+			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1preview/alerts/topics/%s/events/id-agg", tcpTopic)},
+			ID:   "id-agg",
+			State: client.EventState{
+				Message:  "Received 3 events in the last 100ms.",
+				Details:  "message\nmessage\nmessage",
+				Time:     time.Date(1970, 1, 1, 0, 0, 0, 2000000, time.UTC),
+				Duration: client.Duration(2 * time.Millisecond),
+				Level:    "CRITICAL",
+			},
+		}},
+	}
+
+	te, err := cli.ListTopicEvents(l, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(te, expTopicEvents) {
+		t.Errorf("unexpected topic events for aggregate topic:\ngot\n%+v\nexp\n%+v\n", te, expTopicEvents)
+	}
+}
+
+func TestServer_Alert_Publish(t *testing.T) {
+	// Setup test TCP server
+	ts, err := alerttest.NewTCPServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ts.Close()
+
+	// Create default config
+	c := NewConfig()
+	s := OpenServer(c)
+	cli := Client(s)
+	defer s.Close()
+
+	publishTopic := "publish"
+
+	// Create task for alert
+	tick := `
+stream
+	|from()
+		.measurement('alert')
+	|alert()
+		.id('id')
+		.message('message')
+		.details('details')
+		.crit(lambda: "value" > 1.0)
+		.topic('` + publishTopic + `')
+`
+
+	if _, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:   "publish_task",
+		Type: client.StreamTask,
+		DBRPs: []client.DBRP{{
+			Database:        "mydb",
+			RetentionPolicy: "myrp",
+		}},
+		TICKscript: tick,
+		Status:     client.Enabled,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create tpc handler on tcp topic
+	tcpTopic := "tcp"
+	if _, err := cli.CreateTopicHandler(cli.TopicHandlersLink(tcpTopic), client.TopicHandlerOptions{
+		ID:   "tcp_handler",
+		Kind: "tcp",
+		Options: map[string]interface{}{
+			"address": ts.Addr,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create publish handler on publish topic
+	if _, err := cli.CreateTopicHandler(cli.TopicHandlersLink(publishTopic), client.TopicHandlerOptions{
+		ID:   "publish_handler",
+		Kind: "publish",
+		Options: map[string]interface{}{
+			// Publish to tcpTopic
+			"topics": []string{tcpTopic},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Write points
+	point := `alert value=2 0000000000`
+	v := url.Values{}
+	v.Add("precision", "s")
+	s.MustWrite("mydb", "myrp", point, v)
+
+	s.Restart()
+
+	l := cli.TopicEventsLink(tcpTopic)
+	expTopicEvents := client.TopicEvents{
+		Link:  l,
+		Topic: tcpTopic,
+		Events: []client.TopicEvent{{
+			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1preview/alerts/topics/%s/events/id", tcpTopic)},
+			ID:   "id",
+			State: client.EventState{
+				Message:  "message",
+				Details:  "details",
+				Time:     time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
+				Duration: 0,
+				Level:    "CRITICAL",
+			},
+		}},
+	}
+
+	te, err := cli.ListTopicEvents(l, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(te, expTopicEvents) {
+		t.Errorf("unexpected topic events for publish topic:\ngot\n%+v\nexp\n%+v\n", te, expTopicEvents)
+	}
+}
+
 func TestServer_AlertAnonTopic(t *testing.T) {
 	// Setup test TCP server
 	ts, err := alerttest.NewTCPServer()
