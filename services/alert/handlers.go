@@ -11,12 +11,14 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	text "text/template"
 	"time"
 
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/bufpool"
 	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/models"
+	"github.com/pkg/errors"
 )
 
 // AlertData is a structure that contains relevant data about an alert event.
@@ -232,15 +234,32 @@ func (h *postHandler) Handle(event alert.Event) {
 }
 
 type AggregateHandlerConfig struct {
+	ID       string        `mapstructure:"id"`
 	Interval time.Duration `mapstructure:"interval"`
-	Topic    string
-	topics   *alert.Topics
+	Topic    string        `mapstructure:"topic"`
+	Message  string        `mapstructure:"message"`
+	ec       EventCollector
+}
+
+type aggregateMessageData struct {
+	Count    int
+	Interval time.Duration
+}
+
+func newDefaultAggregateHandlerConfig(ec EventCollector) AggregateHandlerConfig {
+	return AggregateHandlerConfig{
+		Message: "Received {{ .Count }} events in the last {{.Interval}}.",
+		ec:      ec,
+	}
 }
 
 type aggregateHandler struct {
 	interval time.Duration
+	id       string
 	topic    string
-	topics   *alert.Topics
+	ec       EventCollector
+
+	messageTmpl *text.Template
 
 	logger  *log.Logger
 	events  chan alert.Event
@@ -249,27 +268,42 @@ type aggregateHandler struct {
 	wg sync.WaitGroup
 }
 
-func NewAggregateHandler(c AggregateHandlerConfig, l *log.Logger) alert.Handler {
+func NewAggregateHandler(c AggregateHandlerConfig, l *log.Logger) (alert.Handler, error) {
+	// Parse and validate message template
+	tmpl, err := text.New("message").Parse(c.Message)
+	if err != nil {
+		return nil, err
+	}
+	var buf bytes.Buffer
+	md := aggregateMessageData{}
+	err = tmpl.Execute(&buf, md)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to evaluate message template with aggregate message data")
+	}
+
 	h := &aggregateHandler{
-		interval: time.Duration(c.Interval),
-		topic:    c.Topic,
-		topics:   c.topics,
-		logger:   l,
-		events:   make(chan alert.Event),
-		closing:  make(chan struct{}),
+		interval:    time.Duration(c.Interval),
+		id:          c.ID,
+		topic:       c.Topic,
+		ec:          c.ec,
+		messageTmpl: tmpl,
+		logger:      l,
+		events:      make(chan alert.Event),
+		closing:     make(chan struct{}),
 	}
 	h.wg.Add(1)
 	go func() {
 		defer h.wg.Done()
 		h.run()
 	}()
-	return h
+	return h, nil
 }
 
 func (h *aggregateHandler) run() {
 	ticker := time.NewTicker(h.interval)
 	defer ticker.Stop()
 	var events []alert.Event
+	var messageBuf bytes.Buffer
 	// Keep track if this batch of events should be external.
 	external := false
 	for {
@@ -283,12 +317,19 @@ func (h *aggregateHandler) run() {
 			if len(events) == 0 {
 				continue
 			}
+			messageBuf.Reset()
+			md := aggregateMessageData{
+				Interval: h.interval,
+				Count:    len(events),
+			}
+			// Ignore error since we have validated the template already
+			_ = h.messageTmpl.Execute(&messageBuf, md)
 			details := make([]string, len(events))
 			agg := alert.Event{
 				Topic: h.topic,
 				State: alert.EventState{
-					ID:      "aggregate",
-					Message: fmt.Sprintf("Received %d events in the last %v.", len(events), h.interval),
+					ID:      h.id,
+					Message: messageBuf.String(),
 				},
 				NoExternal: !external,
 			}
@@ -305,7 +346,7 @@ func (h *aggregateHandler) run() {
 				details[i] = e.State.Message
 			}
 			agg.State.Details = strings.Join(details, "\n")
-			h.topics.Collect(agg)
+			h.ec.Collect(agg)
 			events = events[0:0]
 			external = false
 		}
@@ -326,7 +367,7 @@ func (h *aggregateHandler) Close() {
 
 type PublishHandlerConfig struct {
 	Topics []string `mapstructure:"topics"`
-	topics *alert.Topics
+	ec     EventCollector
 }
 type publishHandler struct {
 	c      PublishHandlerConfig
@@ -343,7 +384,7 @@ func NewPublishHandler(c PublishHandlerConfig, l *log.Logger) alert.Handler {
 func (h *publishHandler) Handle(event alert.Event) {
 	for _, t := range h.c.Topics {
 		event.Topic = t
-		h.c.topics.Collect(event)
+		h.c.ec.Collect(event)
 	}
 }
 

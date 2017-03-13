@@ -39,10 +39,14 @@ type AnonHandlerRegistrar interface {
 	DeregisterAnonHandler(topic string, h alert.Handler)
 }
 
-// Events is responsible for accepting events for processing and reporting on the state of events.
-type Events interface {
+type EventCollector interface {
 	// Collect accepts a new event for processing.
 	Collect(event alert.Event) error
+}
+
+// Events is responsible for accepting events for processing and reporting on the state of events.
+type Events interface {
+	EventCollector
 	// UpdateEvent updates an existing event with a previously known state.
 	UpdateEvent(topic string, event alert.EventState) error
 	// EventState returns the current events state.
@@ -57,4 +61,9 @@ type TopicPersister interface {
 	DeleteTopic(topic string) error
 	// RestoreTopic signals that a topic should be restored from persisted state.
 	RestoreTopic(topic string) error
+}
+
+type handler struct {
+	Spec    HandlerSpec
+	Handler alert.Handler
 }
