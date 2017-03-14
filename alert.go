@@ -25,6 +25,7 @@ import (
 	"github.com/influxdata/kapacitor/services/snmptrap"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
+	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/tick/stateful"
 	"github.com/influxdata/kapacitor/vars"
 	"github.com/pkg/errors"
@@ -388,14 +389,14 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		}
 
 		an.levels[alert.Info] = statefulExpression
-		an.scopePools[alert.Info] = stateful.NewScopePool(stateful.FindReferenceVariables(n.Info.Expression))
+		an.scopePools[alert.Info] = stateful.NewScopePool(ast.FindReferenceVariables(n.Info.Expression))
 		if n.InfoReset != nil {
 			lstatefulExpression, lexpressionCompileError := stateful.NewExpression(n.InfoReset.Expression)
 			if lexpressionCompileError != nil {
 				return nil, fmt.Errorf("Failed to compile stateful expression for infoReset: %s", lexpressionCompileError)
 			}
 			an.levelResets[alert.Info] = lstatefulExpression
-			an.lrScopePools[alert.Info] = stateful.NewScopePool(stateful.FindReferenceVariables(n.InfoReset.Expression))
+			an.lrScopePools[alert.Info] = stateful.NewScopePool(ast.FindReferenceVariables(n.InfoReset.Expression))
 		}
 	}
 
@@ -405,14 +406,14 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 			return nil, fmt.Errorf("Failed to compile stateful expression for warn: %s", expressionCompileError)
 		}
 		an.levels[alert.Warning] = statefulExpression
-		an.scopePools[alert.Warning] = stateful.NewScopePool(stateful.FindReferenceVariables(n.Warn.Expression))
+		an.scopePools[alert.Warning] = stateful.NewScopePool(ast.FindReferenceVariables(n.Warn.Expression))
 		if n.WarnReset != nil {
 			lstatefulExpression, lexpressionCompileError := stateful.NewExpression(n.WarnReset.Expression)
 			if lexpressionCompileError != nil {
 				return nil, fmt.Errorf("Failed to compile stateful expression for warnReset: %s", lexpressionCompileError)
 			}
 			an.levelResets[alert.Warning] = lstatefulExpression
-			an.lrScopePools[alert.Warning] = stateful.NewScopePool(stateful.FindReferenceVariables(n.WarnReset.Expression))
+			an.lrScopePools[alert.Warning] = stateful.NewScopePool(ast.FindReferenceVariables(n.WarnReset.Expression))
 		}
 	}
 
@@ -422,14 +423,14 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 			return nil, fmt.Errorf("Failed to compile stateful expression for crit: %s", expressionCompileError)
 		}
 		an.levels[alert.Critical] = statefulExpression
-		an.scopePools[alert.Critical] = stateful.NewScopePool(stateful.FindReferenceVariables(n.Crit.Expression))
+		an.scopePools[alert.Critical] = stateful.NewScopePool(ast.FindReferenceVariables(n.Crit.Expression))
 		if n.CritReset != nil {
 			lstatefulExpression, lexpressionCompileError := stateful.NewExpression(n.CritReset.Expression)
 			if lexpressionCompileError != nil {
 				return nil, fmt.Errorf("Failed to compile stateful expression for critReset: %s", lexpressionCompileError)
 			}
 			an.levelResets[alert.Critical] = lstatefulExpression
-			an.lrScopePools[alert.Critical] = stateful.NewScopePool(stateful.FindReferenceVariables(n.CritReset.Expression))
+			an.lrScopePools[alert.Critical] = stateful.NewScopePool(ast.FindReferenceVariables(n.CritReset.Expression))
 		}
 	}
 
@@ -464,7 +465,7 @@ func (a *AlertNode) runAlert([]byte) error {
 
 		// Register Handlers on topic
 		for _, h := range a.handlers {
-			a.et.tm.AlertService.RegisterHandler([]string{a.anonTopic}, h)
+			a.et.tm.AlertService.RegisterAnonHandler(a.anonTopic, h)
 		}
 		// Restore anonTopic
 		a.et.tm.AlertService.RestoreTopic(a.anonTopic)
@@ -707,7 +708,7 @@ func (a *AlertNode) runAlert([]byte) error {
 	a.et.tm.AlertService.CloseTopic(a.anonTopic)
 	// Deregister Handlers on topic
 	for _, h := range a.handlers {
-		a.et.tm.AlertService.DeregisterHandler([]string{a.anonTopic}, h)
+		a.et.tm.AlertService.DeregisterAnonHandler(a.anonTopic, h)
 	}
 	return nil
 }
@@ -730,14 +731,20 @@ func (a *AlertNode) restoreEventState(id string) (alert.Level, time.Time) {
 	var anonFound, topicFound bool
 	// Check for previous state on anonTopic
 	if a.hasAnonTopic() {
-		if state, ok := a.et.tm.AlertService.EventState(a.anonTopic, id); ok {
+		if state, ok, err := a.et.tm.AlertService.EventState(a.anonTopic, id); err != nil {
+			a.incrementErrorCount()
+			a.logger.Printf("E! failed to get event state for anonymous topic %s, event %s: %v", a.anonTopic, id, err)
+		} else if ok {
 			anonTopicState = state
 			anonFound = true
 		}
 	}
 	// Check for previous state on topic.
 	if a.hasTopic() {
-		if state, ok := a.et.tm.AlertService.EventState(a.topic, id); ok {
+		if state, ok, err := a.et.tm.AlertService.EventState(a.topic, id); err != nil {
+			a.incrementErrorCount()
+			a.logger.Printf("E! failed to get event state for topic %s, event %s: %v", a.topic, id, err)
+		} else if ok {
 			topicState = state
 			topicFound = true
 		}

@@ -119,37 +119,3 @@ func (se *expression) Eval(scope *Scope) (interface{}, error) {
 		return nil, fmt.Errorf("expression returned unexpected type %s", typ)
 	}
 }
-
-func FindReferenceVariables(nodes ...ast.Node) []string {
-	variablesSet := make(map[string]bool, 0)
-
-	for _, node := range nodes {
-		buildReferenceVariablesSet(node, variablesSet)
-	}
-
-	variables := make([]string, 0, len(variablesSet))
-
-	for variable := range variablesSet {
-		variables = append(variables, variable)
-	}
-
-	return variables
-}
-
-// util method for findReferenceVariables, we are passing the itemsSet and not returning it
-// so we will won't to merge the maps
-func buildReferenceVariablesSet(n ast.Node, itemsSet map[string]bool) {
-	switch node := n.(type) {
-	case *ast.ReferenceNode:
-		itemsSet[node.Reference] = true
-	case *ast.UnaryNode:
-		buildReferenceVariablesSet(node.Node, itemsSet)
-	case *ast.BinaryNode:
-		buildReferenceVariablesSet(node.Left, itemsSet)
-		buildReferenceVariablesSet(node.Right, itemsSet)
-	case *ast.FunctionNode:
-		for _, arg := range node.Args {
-			buildReferenceVariablesSet(arg, itemsSet)
-		}
-	}
-}

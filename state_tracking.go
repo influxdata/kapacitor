@@ -42,7 +42,7 @@ func (stn *StateTrackingNode) group(g models.GroupID) (*stateTrackingGroup, erro
 			return nil, fmt.Errorf("Failed to compile expression: %v", err)
 		}
 
-		stg.ScopePool = stateful.NewScopePool(stateful.FindReferenceVariables(stn.lambda.Expression))
+		stg.ScopePool = stateful.NewScopePool(ast.FindReferenceVariables(stn.lambda.Expression))
 
 		stg.tracker = stn.newTracker()
 

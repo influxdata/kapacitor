@@ -85,6 +85,7 @@ func (s *Topics) EventState(topic, event string) (EventState, bool) {
 	return t.EventState(event)
 }
 
+// Collect collects an event and handles the event.
 func (s *Topics) Collect(event Event) error {
 	s.mu.RLock()
 	topic := s.topics[event.Topic]
@@ -102,7 +103,7 @@ func (s *Topics) Collect(event Event) error {
 		s.mu.Unlock()
 	}
 
-	return topic.handleEvent(event)
+	return topic.collect(event)
 }
 
 func (s *Topics) DeleteTopic(topic string) {
@@ -115,67 +116,61 @@ func (s *Topics) DeleteTopic(topic string) {
 	}
 }
 
-func (s *Topics) RegisterHandler(topics []string, h Handler) {
-	if len(topics) == 0 || h == nil {
+func (s *Topics) RegisterHandler(topic string, h Handler) {
+	if h == nil {
 		return
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for _, topic := range topics {
-		if _, ok := s.topics[topic]; !ok {
-			s.topics[topic] = newTopic(topic)
-		}
-		s.topics[topic].addHandler(h)
+	t, ok := s.topics[topic]
+	if !ok {
+		t = newTopic(topic)
+		s.topics[topic] = t
 	}
+	t.addHandler(h)
 }
 
-func (s *Topics) DeregisterHandler(topics []string, h Handler) {
-	if len(topics) == 0 || h == nil {
+func (s *Topics) DeregisterHandler(topic string, h Handler) {
+	if h == nil {
 		return
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for _, topic := range topics {
-		if t := s.topics[topic]; t != nil {
-			t.removeHandler(h)
-		}
+	if t, ok := s.topics[topic]; ok {
+		t.removeHandler(h)
 	}
 }
 
-func (s *Topics) ReplaceHandler(oldTopics, newTopics []string, oldH, newH Handler) {
+func (s *Topics) ReplaceHandler(topic string, oldH, newH Handler) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for _, topic := range oldTopics {
-		if t := s.topics[topic]; t != nil {
-			t.removeHandler(oldH)
-		}
+	t, ok := s.topics[topic]
+	if !ok {
+		t = newTopic(topic)
+		s.topics[topic] = t
 	}
 
-	for _, topic := range newTopics {
-		if _, ok := s.topics[topic]; !ok {
-			s.topics[topic] = newTopic(topic)
-		}
-		s.topics[topic].addHandler(newH)
-	}
+	t.removeHandler(oldH)
+	t.addHandler(newH)
 }
 
-// TopicStatus returns the max alert level for each topic matching 'pattern', not returning
+// TopicState returns the max alert level for each topic matching 'pattern', not returning
 // any topics with max alert levels less severe than 'minLevel'
-func (s *Topics) TopicStatus(pattern string, minLevel Level) map[string]TopicStatus {
+func (s *Topics) TopicState(pattern string, minLevel Level) map[string]TopicState {
 	s.mu.RLock()
-	res := make(map[string]TopicStatus, len(s.topics))
+	res := make(map[string]TopicState, len(s.topics))
 	for _, topic := range s.topics {
-		if !match(pattern, topic.ID()) {
+		if !PatternMatch(pattern, topic.ID()) {
 			continue
 		}
 		level := topic.MaxLevel()
 		if level >= minLevel {
-			res[topic.ID()] = TopicStatus{
+			res[topic.ID()] = TopicState{
 				Level:     level,
 				Collected: topic.Collected(),
 			}
@@ -185,28 +180,7 @@ func (s *Topics) TopicStatus(pattern string, minLevel Level) map[string]TopicSta
 	return res
 }
 
-// TopicStatusDetails is similar to TopicStatus, but will additionally return
-// at least 'minLevel' severity
-func (s *Topics) TopicStatusEvents(pattern string, minLevel Level) map[string]map[string]EventState {
-	s.mu.RLock()
-	topics := make([]*Topic, 0, len(s.topics))
-	for _, topic := range s.topics {
-		if topic.MaxLevel() >= minLevel && match(pattern, topic.id) {
-			topics = append(topics, topic)
-		}
-	}
-	s.mu.RUnlock()
-
-	res := make(map[string]map[string]EventState, len(topics))
-
-	for _, topic := range topics {
-		res[topic.ID()] = topic.EventStates(minLevel)
-	}
-
-	return res
-}
-
-func match(pattern, id string) bool {
+func PatternMatch(pattern, id string) bool {
 	if pattern == "" {
 		return true
 	}
@@ -246,8 +220,8 @@ func (t *Topic) ID() string {
 	return t.id
 }
 
-func (t *Topic) Status() TopicStatus {
-	return TopicStatus{
+func (t *Topic) State() TopicState {
+	return TopicState{
 		Level:     t.MaxLevel(),
 		Collected: t.Collected(),
 	}
@@ -338,14 +312,17 @@ func (t *Topic) close() {
 	vars.DeleteStatistic(t.statsKey)
 }
 
-func (t *Topic) handleEvent(event Event) error {
+func (t *Topic) collect(event Event) error {
 	prev, ok := t.updateEvent(event.State)
 	if ok {
 		event.previousState = prev
 	}
 
 	t.collected.Add(1)
+	return t.handleEvent(event)
+}
 
+func (t *Topic) handleEvent(event Event) error {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 

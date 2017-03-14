@@ -63,7 +63,7 @@ func newK8sAutoscaleNode(et *ExecutingTask, n *pipeline.K8sAutoscaleNode, l *log
 	// Initialize the replicas lambda expression scope pool
 	if n.Replicas != nil {
 		kn.replicasExprs = make(map[models.GroupID]stateful.Expression)
-		kn.replicasScopePool = stateful.NewScopePool(stateful.FindReferenceVariables(n.Replicas.Expression))
+		kn.replicasScopePool = stateful.NewScopePool(ast.FindReferenceVariables(n.Replicas.Expression))
 	}
 	return kn, nil
 }

@@ -13,6 +13,7 @@ type Event struct {
 	Topic         string
 	State         EventState
 	Data          EventData
+	NoExternal    bool
 	previousState EventState
 }
 
@@ -149,7 +150,7 @@ func ParseLevel(s string) (l Level, err error) {
 	return
 }
 
-type TopicStatus struct {
+type TopicState struct {
 	Level     Level
 	Collected int64
 }
