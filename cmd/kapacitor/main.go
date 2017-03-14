@@ -1460,6 +1460,7 @@ func doShowTopicHandler(args []string) error {
 	fmt.Println("ID:", h.ID)
 	fmt.Println("Topic:", topic)
 	fmt.Println("Kind:", h.Kind)
+	fmt.Println("Match:", h.Match)
 	fmt.Println("Options:", string(options))
 	return nil
 }

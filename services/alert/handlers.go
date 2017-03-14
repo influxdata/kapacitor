@@ -18,6 +18,8 @@ import (
 	"github.com/influxdata/kapacitor/bufpool"
 	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/tick/ast"
+	"github.com/influxdata/kapacitor/tick/stateful"
 	"github.com/pkg/errors"
 )
 
@@ -344,6 +346,7 @@ func (h *aggregateHandler) run() {
 					agg.State.Duration = e.State.Duration
 				}
 				details[i] = e.State.Message
+				agg.Data.Result.Series = append(agg.Data.Result.Series, e.Data.Result.Series...)
 			}
 			agg.State.Details = strings.Join(details, "\n")
 			h.ec.Collect(agg)
@@ -388,31 +391,181 @@ func (h *publishHandler) Handle(event alert.Event) {
 	}
 }
 
-// TODO implement state changes only as a match condition
-//type StateChangesOnlyHandlerConfig struct {
-//	topics *alert.Topics
-//}
-//
-//type stateChangesOnlyHandler struct {
-//	topics *alert.Topics
-//	logger *log.Logger
-//	next   alert.Handler
-//}
-//
-//func NewStateChangesOnlyHandler(c StateChangesOnlyHandlerConfig, l *log.Logger) handlerAction {
-//	return &stateChangesOnlyHandler{
-//		topics: c.topics,
-//		logger: l,
-//	}
-//}
-//
-//func (h *stateChangesOnlyHandler) Handle(event alert.Event) {
-//	if event.State.Level != event.PreviousState().Level {
-//		h.next.Handle(event)
-//	}
-//}
-//
-//func (h *stateChangesOnlyHandler) SetNext(n alert.Handler) {
-//	h.next = n
-//}
-//func (h *stateChangesOnlyHandler) Close() {}
+// ExternalHandler wraps an existing handler that calls out to external services.
+// The events are checked for the NoExternal flag before being passed to the external handler.
+type externalHandler struct {
+	h alert.Handler
+}
+
+func newExternalHandler(h alert.Handler) *externalHandler {
+	return &externalHandler{
+		h: h,
+	}
+}
+
+func (h *externalHandler) Handle(event alert.Event) {
+	if !event.NoExternal {
+		h.h.Handle(event)
+	}
+}
+
+type matchHandler struct {
+	h alert.Handler
+
+	scope *stateful.Scope
+	expr  stateful.Expression
+
+	// scope optimization
+	usesChanged,
+	usesLevel,
+	usesName,
+	usesTaskName,
+	usesDuration bool
+
+	vars []string
+
+	logger *log.Logger
+}
+
+const (
+	changedFunc  = "changed"
+	levelFunc    = "level"
+	nameFunc     = "name"
+	taskNameFunc = "taskName"
+	durationFunc = "duration"
+)
+
+var matchIdentifiers = map[string]interface{}{
+	"OK":       int64(alert.OK),
+	"INFO":     int64(alert.Info),
+	"WARNING":  int64(alert.Warning),
+	"CRITICAL": int64(alert.Critical),
+}
+
+func newMatchHandler(match string, h alert.Handler, l *log.Logger) (*matchHandler, error) {
+	lambda, err := ast.ParseLambda(match)
+	if err != nil {
+		return nil, errors.Wrap(err, "invalid match expression")
+	}
+
+	// Replace identifiers with static values
+	_, err = ast.Walk(lambda, func(n ast.Node) (ast.Node, error) {
+		if ident, ok := n.(*ast.IdentifierNode); ok {
+			v, ok := matchIdentifiers[ident.Ident]
+			if !ok {
+				return nil, fmt.Errorf("unknown identifier %q", ident.Ident)
+			}
+			return ast.ValueToLiteralNode(n, v)
+		}
+		return n, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	expr, err := stateful.NewExpression(lambda.Expression)
+	if err != nil {
+		return nil, errors.Wrap(err, "invalid match expression")
+	}
+
+	mh := &matchHandler{
+		h:      h,
+		expr:   expr,
+		scope:  stateful.NewScope(),
+		vars:   ast.FindReferenceVariables(lambda),
+		logger: l,
+	}
+
+	// Determine which functions are called
+	funcs := ast.FindFunctionCalls(lambda)
+	for _, f := range funcs {
+		switch f {
+		case changedFunc:
+			mh.usesChanged = true
+		case levelFunc:
+			mh.usesLevel = true
+		case nameFunc:
+			mh.usesName = true
+		case taskNameFunc:
+			mh.usesTaskName = true
+		case durationFunc:
+			mh.usesDuration = true
+		default:
+			// ignore the function
+		}
+	}
+
+	return mh, nil
+}
+
+func (h *matchHandler) Handle(event alert.Event) {
+	if ok, err := h.match(event); err != nil {
+		h.logger.Println("E! failed to evaluate match expression:", err)
+	} else if ok {
+		h.h.Handle(event)
+	}
+}
+
+func (h *matchHandler) match(event alert.Event) (bool, error) {
+	// Populate scope
+	h.scope.Reset()
+
+	h.logger.Printf("D! match %+v", h)
+
+	if h.usesChanged {
+		h.scope.SetDynamicMethod(changedFunc, func(self interface{}, args ...interface{}) (interface{}, error) {
+			if len(args) != 0 {
+				return nil, fmt.Errorf("%s takes no arguments", changedFunc)
+			}
+			return event.State.Level != event.PreviousState().Level, nil
+		})
+	}
+
+	if h.usesLevel {
+		h.scope.SetDynamicMethod(levelFunc, func(self interface{}, args ...interface{}) (interface{}, error) {
+			if len(args) != 0 {
+				return nil, fmt.Errorf("%s takes no arguments", levelFunc)
+			}
+			return int64(event.State.Level), nil
+		})
+	}
+
+	if h.usesName {
+		h.scope.SetDynamicMethod(nameFunc, func(self interface{}, args ...interface{}) (interface{}, error) {
+			if len(args) != 0 {
+				return nil, fmt.Errorf("%s takes no arguments", nameFunc)
+			}
+			return event.Data.Name, nil
+		})
+	}
+
+	if h.usesTaskName {
+		h.scope.SetDynamicMethod(taskNameFunc, func(self interface{}, args ...interface{}) (interface{}, error) {
+			if len(args) != 0 {
+				return nil, fmt.Errorf("%s takes no arguments", taskNameFunc)
+			}
+			return event.Data.TaskName, nil
+		})
+	}
+
+	if h.usesDuration {
+		h.scope.SetDynamicMethod(durationFunc, func(self interface{}, args ...interface{}) (interface{}, error) {
+			if len(args) != 0 {
+				return nil, fmt.Errorf("%s takes no arguments", durationFunc)
+			}
+			return event.State.Duration, nil
+		})
+	}
+
+	// Set tag values on scope
+	for _, v := range h.vars {
+		if tag, ok := event.Data.Tags[v]; ok {
+			h.scope.Set(v, tag)
+		} else {
+			return false, fmt.Errorf("no tag exists for %s", v)
+		}
+	}
+
+	// Evaluate expression with scope
+	return h.expr.EvalBool(h.scope)
+}

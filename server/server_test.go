@@ -7975,6 +7975,51 @@ alert value=2 0000000000002
 
 	time.Sleep(110 * time.Millisecond)
 
+	// Check TCP handler got event
+	alertData := alertservice.AlertData{
+		ID:       "id-agg",
+		Message:  "Received 3 events in the last 100ms.",
+		Details:  "message\nmessage\nmessage",
+		Time:     time.Date(1970, 1, 1, 0, 0, 0, 2000000, time.UTC),
+		Level:    alert.Critical,
+		Duration: 2 * time.Millisecond,
+		Data: models.Result{
+			Series: models.Rows{
+				{
+					Name:    "alert",
+					Columns: []string{"time", "value"},
+					Values: [][]interface{}{[]interface{}{
+						time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
+						3.0,
+					}},
+				},
+				{
+					Name:    "alert",
+					Columns: []string{"time", "value"},
+					Values: [][]interface{}{[]interface{}{
+						time.Date(1970, 1, 1, 0, 0, 0, 1000000, time.UTC),
+						4.0,
+					}},
+				},
+				{
+					Name:    "alert",
+					Columns: []string{"time", "value"},
+					Values: [][]interface{}{[]interface{}{
+						time.Date(1970, 1, 1, 0, 0, 0, 2000000, time.UTC),
+						2.0,
+					}},
+				},
+			},
+		},
+	}
+	ts.Close()
+	exp := []alertservice.AlertData{alertData}
+	got := ts.Data()
+	if !reflect.DeepEqual(exp, got) {
+		t.Errorf("unexpected tcp request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+	}
+
+	// Check event on topic
 	l := cli.TopicEventsLink(tcpTopic)
 	expTopicEvents := client.TopicEvents{
 		Link:  l,
@@ -8075,6 +8120,34 @@ stream
 
 	s.Restart()
 
+	// Check TCP handler got event
+	alertData := alertservice.AlertData{
+		ID:      "id",
+		Message: "message",
+		Details: "details",
+		Time:    time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
+		Level:   alert.Critical,
+		Data: models.Result{
+			Series: models.Rows{
+				{
+					Name:    "alert",
+					Columns: []string{"time", "value"},
+					Values: [][]interface{}{[]interface{}{
+						time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
+						2.0,
+					}},
+				},
+			},
+		},
+	}
+	ts.Close()
+	exp := []alertservice.AlertData{alertData}
+	got := ts.Data()
+	if !reflect.DeepEqual(exp, got) {
+		t.Errorf("unexpected tcp request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+	}
+
+	// Check event on topic
 	l := cli.TopicEventsLink(tcpTopic)
 	expTopicEvents := client.TopicEvents{
 		Link:  l,
@@ -8088,6 +8161,127 @@ stream
 				Time:     time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
 				Duration: 0,
 				Level:    "CRITICAL",
+			},
+		}},
+	}
+
+	te, err := cli.ListTopicEvents(l, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(te, expTopicEvents) {
+		t.Errorf("unexpected topic events for publish topic:\ngot\n%+v\nexp\n%+v\n", te, expTopicEvents)
+	}
+}
+
+func TestServer_Alert_Match(t *testing.T) {
+	// Setup test TCP server
+	ts, err := alerttest.NewTCPServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ts.Close()
+
+	// Create default config
+	c := NewConfig()
+	s := OpenServer(c)
+	cli := Client(s)
+	defer s.Close()
+
+	topic := "test"
+
+	// Create task for alert
+	tick := `
+stream
+	|from()
+		.measurement('alert')
+	|alert()
+		.id('id')
+		.message('message')
+		.details('details')
+		.crit(lambda: "value" > 1.0)
+		.topic('` + topic + `')
+`
+
+	if _, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:   "alert_task",
+		Type: client.StreamTask,
+		DBRPs: []client.DBRP{{
+			Database:        "mydb",
+			RetentionPolicy: "myrp",
+		}},
+		TICKscript: tick,
+		Status:     client.Enabled,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create tpc handler with match condition
+	if _, err := cli.CreateTopicHandler(cli.TopicHandlersLink(topic), client.TopicHandlerOptions{
+		ID:   "tcp_handler",
+		Kind: "tcp",
+		Options: map[string]interface{}{
+			"address": ts.Addr,
+		},
+		Match: `"host" == 'serverA' AND level() == CRITICAL`,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Write points
+	point := `alert,host=serverA value=0 0000000000
+alert,host=serverB value=2 0000000001
+alert,host=serverB value=0 0000000002
+alert,host=serverA value=2 0000000003
+alert,host=serverB value=0 0000000004
+`
+	v := url.Values{}
+	v.Add("precision", "s")
+	s.MustWrite("mydb", "myrp", point, v)
+
+	s.Restart()
+
+	alertData := alertservice.AlertData{
+		ID:      "id",
+		Message: "message",
+		Details: "details",
+		Time:    time.Date(1970, 1, 1, 0, 0, 3, 0, time.UTC),
+		Level:   alert.Critical,
+		Data: models.Result{
+			Series: models.Rows{
+				{
+					Name:    "alert",
+					Tags:    map[string]string{"host": "serverA"},
+					Columns: []string{"time", "value"},
+					Values: [][]interface{}{[]interface{}{
+						time.Date(1970, 1, 1, 0, 0, 3, 0, time.UTC),
+						2.0,
+					}},
+				},
+			},
+		},
+	}
+	ts.Close()
+	exp := []alertservice.AlertData{alertData}
+	got := ts.Data()
+	if !reflect.DeepEqual(exp, got) {
+		t.Errorf("unexpected tcp request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+	}
+
+	// Topic should have must recent event
+	l := cli.TopicEventsLink(topic)
+	expTopicEvents := client.TopicEvents{
+		Link:  l,
+		Topic: topic,
+		Events: []client.TopicEvent{{
+			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1preview/alerts/topics/%s/events/id", topic)},
+			ID:   "id",
+			State: client.EventState{
+				Message:  "message",
+				Details:  "details",
+				Time:     time.Date(1970, 1, 1, 0, 0, 4, 0, time.UTC),
+				Duration: client.Duration(time.Second),
+				Level:    "OK",
 			},
 		}},
 	}

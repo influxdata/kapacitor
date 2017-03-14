@@ -50,11 +50,11 @@ func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalN
 			return nil, fmt.Errorf("Failed to compile %v expression: %v", i, err)
 		}
 		en.expressions[i] = statefulExpr
-		refVars := stateful.FindReferenceVariables(lambda.Expression)
+		refVars := ast.FindReferenceVariables(lambda.Expression)
 		en.refVarList[i] = refVars
 	}
 	// Create a single pool for the combination of all expressions
-	en.scopePool = stateful.NewScopePool(stateful.FindReferenceVariables(expressions...))
+	en.scopePool = stateful.NewScopePool(ast.FindReferenceVariables(expressions...))
 
 	// Create map of tags
 	if l := len(n.TagsList); l > 0 {

@@ -10,6 +10,7 @@ import (
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/tick/stateful"
 )
 
@@ -44,7 +45,7 @@ func newCombineNode(et *ExecutingTask, n *pipeline.CombineNode, l *log.Logger) (
 			return nil, fmt.Errorf("Failed to compile %v expression: %v", i, err)
 		}
 		cn.expressions[i] = statefulExpr
-		cn.scopePools[i] = stateful.NewScopePool(stateful.FindReferenceVariables(lambda.Expression))
+		cn.scopePools[i] = stateful.NewScopePool(ast.FindReferenceVariables(lambda.Expression))
 	}
 	cn.node.runF = cn.runCombine
 	return cn, nil

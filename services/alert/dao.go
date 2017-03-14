@@ -61,6 +61,7 @@ type HandlerSpec struct {
 	Topic   string                 `json:"topic"`
 	Kind    string                 `json:"kind"`
 	Options map[string]interface{} `json:"options"`
+	Match   string                 `json:"match"`
 }
 
 var validHandlerID = regexp.MustCompile(`^[-\._\p{L}0-9]+$`)
