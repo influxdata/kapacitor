@@ -36,6 +36,7 @@
 - [#1192](https://github.com/influxdata/kapacitor/issues/1192): Fix bug in Default Node not updating batch tags and groupID.
     Also empty string on a tag value is now a sufficient condition for the default conditions to be applied.
     See [#1233](https://github.com/influxdata/kapacitor/pull/1233) for more information.
+- [#1068](https://github.com/influxdata/kapacitor/issues/1068): Fix dot view syntax to use xlabels and not create invalid quotes.
 
 ## v1.2.0 [2017-01-23]
 
