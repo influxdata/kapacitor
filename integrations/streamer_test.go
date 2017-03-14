@@ -31,6 +31,8 @@ import (
 	"github.com/influxdata/kapacitor/services/alert/alerttest"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/alerta/alertatest"
+	"github.com/influxdata/kapacitor/services/foo"
+	"github.com/influxdata/kapacitor/services/foo/footest"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/hipchat/hipchattest"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
@@ -6875,6 +6877,66 @@ stream
 	ts.Close()
 	var got []interface{}
 	for _, g := range ts.Data() {
+		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+		t.Error(err)
+	}
+}
+func TestStream_AlertFoo(t *testing.T) {
+	ts := footest.NewServer()
+	defer ts.Close()
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.foo()
+			.room('general')
+		.foo()
+`
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := foo.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL
+		c.Room = "alerts"
+		sl := foo.NewService(c, logService.NewLogger("[test_foo] ", log.LstdFlags))
+		tm.FooService = sl
+	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	exp := []interface{}{
+		footest.Request{
+			URL: "/",
+			PostData: footest.PostData{
+				Room:    "general",
+				Message: "kapacitor/cpu/serverA is CRITICAL",
+			},
+		},
+		footest.Request{
+			URL: "/",
+			PostData: footest.PostData{
+				Room:    "alerts",
+				Message: "kapacitor/cpu/serverA is CRITICAL",
+			},
+		},
+	}
+
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Requests() {
 		got = append(got, g)
 	}
 

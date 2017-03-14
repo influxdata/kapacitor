@@ -200,6 +200,15 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		an.handlers = append(an.handlers, h)
 	}
 
+	for _, f := range n.FooHandlers {
+		c := et.tm.FooService.DefaultHandlerConfig()
+		if f.Room != "" {
+			c.Room = f.Room
+		}
+		h := et.tm.FooService.Handler(c, l)
+		an.handlers = append(an.handlers, h)
+	}
+
 	for _, pd := range n.PagerDutyHandlers {
 		c := pagerduty.HandlerConfig{
 			ServiceKey: pd.ServiceKey,

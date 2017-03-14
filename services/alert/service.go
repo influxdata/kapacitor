@@ -16,6 +16,7 @@ import (
 	client "github.com/influxdata/kapacitor/client/v1"
 	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/services/alerta"
+	"github.com/influxdata/kapacitor/services/foo"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/opsgenie"
@@ -95,6 +96,10 @@ type Service struct {
 	AlertaService interface {
 		DefaultHandlerConfig() alerta.HandlerConfig
 		Handler(alerta.HandlerConfig, *log.Logger) (alert.Handler, error)
+	}
+	FooService interface {
+		DefaultHandlerConfig() foo.HandlerConfig
+		Handler(foo.HandlerConfig, *log.Logger) alert.Handler
 	}
 	HipChatService interface {
 		Handler(hipchat.HandlerConfig, *log.Logger) alert.Handler
@@ -996,6 +1001,14 @@ func (s *Service) createHandlerActionFromSpec(spec HandlerActionSpec) (ha handle
 			return
 		}
 		h := NewExecHandler(c, s.logger)
+		ha = newPassThroughHandler(h)
+	case "foo":
+		c := s.FooService.DefaultHandlerConfig()
+		err = decodeOptions(spec.Options, &c)
+		if err != nil {
+			return
+		}
+		h := s.FooService.Handler(c, s.logger)
 		ha = newPassThroughHandler(h)
 	case "hipchat":
 		c := hipchat.HandlerConfig{}

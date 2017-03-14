@@ -24,6 +24,7 @@ import (
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/config"
 	"github.com/influxdata/kapacitor/services/deadman"
+	"github.com/influxdata/kapacitor/services/foo"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/influxdb"
@@ -194,6 +195,7 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	s.appendSensuService()
 	s.appendTalkService()
 	s.appendVictorOpsService()
+	s.appendFooService()
 
 	// Append alert service
 	s.appendAlertService()
@@ -430,6 +432,18 @@ func (s *Server) appendVictorOpsService() {
 
 	s.SetDynamicService("victorops", srv)
 	s.AppendService("victorops", srv)
+}
+
+func (s *Server) appendFooService() {
+	c := s.config.Foo
+	l := s.LogService.NewLogger("[foo] ", log.LstdFlags)
+	srv := foo.NewService(c, l)
+
+	s.TaskMaster.FooService = srv
+	s.AlertService.FooService = srv
+
+	s.SetDynamicService("foo", srv)
+	s.AppendService("foo", srv)
 }
 
 func (s *Server) appendPagerDutyService() {
