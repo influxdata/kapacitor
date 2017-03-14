@@ -9,6 +9,7 @@ import (
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/tick/stateful"
 )
 
@@ -66,7 +67,7 @@ func (w *WhereNode) runWhere(snapshot []byte) error {
 				w.expressions[p.Group] = expr
 				mu.Unlock()
 
-				scopePool = stateful.NewScopePool(stateful.FindReferenceVariables(w.w.Lambda.Expression))
+				scopePool = stateful.NewScopePool(ast.FindReferenceVariables(w.w.Lambda.Expression))
 				w.scopePools[p.Group] = scopePool
 			}
 			if pass, err := EvalPredicate(expr, scopePool, p.Time, p.Fields, p.Tags); pass {
@@ -103,7 +104,7 @@ func (w *WhereNode) runWhere(snapshot []byte) error {
 				w.expressions[b.Group] = expr
 				mu.Unlock()
 
-				scopePool = stateful.NewScopePool(stateful.FindReferenceVariables(w.w.Lambda.Expression))
+				scopePool = stateful.NewScopePool(ast.FindReferenceVariables(w.w.Lambda.Expression))
 				w.scopePools[b.Group] = scopePool
 			}
 			points := b.Points

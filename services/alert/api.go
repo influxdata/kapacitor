@@ -277,6 +277,7 @@ func (s *apiServer) convertHandlerSpec(spec HandlerSpec) client.TopicHandler {
 		ID:      spec.ID,
 		Kind:    spec.Kind,
 		Options: spec.Options,
+		Match:   spec.Match,
 	}
 }
 

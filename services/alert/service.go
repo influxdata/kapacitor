@@ -656,11 +656,6 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 			return handler{}, err
 		}
 		h = newExternalHandler(h)
-	//case "stateChangesOnly":
-	//	c := StateChangesOnlyHandlerConfig{
-	//		topics: s.topics,
-	//	}
-	//	h = NewStateChangesOnlyHandler(c, s.logger)
 	case "talk":
 		h = s.TalkService.Handler(s.logger)
 		h = newExternalHandler(h)
@@ -691,23 +686,9 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 	default:
 		err = fmt.Errorf("unsupported action kind %q", spec.Kind)
 	}
+	if spec.Match != "" {
+		// Wrap handler in match handler
+		h, err = newMatchHandler(spec.Match, h, s.logger)
+	}
 	return handler{Spec: spec, Handler: h}, err
-}
-
-// ExternalHandler wraps an existing handler that calls out to external services.
-// The events are checked for the NoExternal flag before being passed to the external handler.
-type externalHandler struct {
-	h alert.Handler
-}
-
-func (h *externalHandler) Handle(event alert.Event) {
-	if !event.NoExternal {
-		h.h.Handle(event)
-	}
-}
-
-func newExternalHandler(h alert.Handler) *externalHandler {
-	return &externalHandler{
-		h: h,
-	}
 }

@@ -1919,6 +1919,7 @@ type TopicHandler struct {
 	ID      string                 `json:"id"`
 	Kind    string                 `json:"kind"`
 	Options map[string]interface{} `json:"options"`
+	Match   string                 `json:"match"`
 }
 
 // TopicHandler retrieves an alert handler.
@@ -1945,6 +1946,7 @@ type TopicHandlerOptions struct {
 	ID      string                 `json:"id" yaml:"id"`
 	Kind    string                 `json:"kind" yaml:"kind"`
 	Options map[string]interface{} `json:"options" yaml:"options"`
+	Match   string                 `json:"match" yaml:"match"`
 }
 
 // CreateTopicHandler creates a new alert handler.
