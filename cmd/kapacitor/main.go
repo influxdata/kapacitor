@@ -46,28 +46,28 @@ Usage: kapacitor [options] [command] [args]
 
 Commands:
 
-	record          Record the result of a query or a snapshot of the current stream data.
-	define          Create/update a task.
-	define-template Create/update a template.
-	define-handler  Create/update an alert handler.
-	replay          Replay a recording to a task.
-	replay-live     Replay data against a task without recording it.
-	enable          Enable and start running a task with live data.
-	disable         Stop running a task.
-	reload          Reload a running task with an updated task definition.
-	push            Publish a task definition to another Kapacitor instance. Not implemented yet.
-	delete          Delete tasks, templates, recordings, replays, topics or handlers.
-	list            List information about tasks, templates, recordings, replays, topics, handlers or service-tests.
-	show            Display detailed information about a task.
-	show-template   Display detailed information about a template.
-	show-handler    Display detailed information about an alert handler.
-	show-topic      Display detailed information about an alert topic.
-	level           Sets the logging level on the kapacitord server.
-	stats           Display various stats about Kapacitor.
-	version         Displays the Kapacitor version info.
-	vars            Print debug vars in JSON format.
-	service-tests   Test a service.
-	help            Prints help for a command.
+	record                Record the result of a query or a snapshot of the current stream data.
+	define                Create/update a task.
+	define-template       Create/update a template.
+	define-topic-handler  Create/update an alert handler for a topic.
+	replay                Replay a recording to a task.
+	replay-live           Replay data against a task without recording it.
+	enable                Enable and start running a task with live data.
+	disable               Stop running a task.
+	reload                Reload a running task with an updated task definition.
+	push                  Publish a task definition to another Kapacitor instance. Not implemented yet.
+	delete                Delete tasks, templates, recordings, replays, topics or topic-handlers.
+	list                  List information about tasks, templates, recordings, replays, topics, topic-handlers or service-tests.
+	show                  Display detailed information about a task.
+	show-template         Display detailed information about a template.
+	show-topic-handler    Display detailed information about an alert handler for a topic.
+	show-topic            Display detailed information about an alert topic.
+	level                 Sets the logging level on the kapacitord server.
+	stats                 Display various stats about Kapacitor.
+	version               Displays the Kapacitor version info.
+	vars                  Print debug vars in JSON format.
+	service-tests         Test a service.
+	help                  Prints help for a command.
 
 Options:
 `
@@ -138,9 +138,9 @@ func main() {
 	case "define-template":
 		commandArgs = args
 		commandF = doDefineTemplate
-	case "define-handler":
+	case "define-topic-handler":
 		commandArgs = args
-		commandF = doDefineHandler
+		commandF = doDefineTopicHandler
 	case "replay":
 		replayFlags.Parse(args)
 		commandArgs = replayFlags.Args()
@@ -174,9 +174,9 @@ func main() {
 	case "show-template":
 		commandArgs = args
 		commandF = doShowTemplate
-	case "show-handler":
+	case "show-topic-handler":
 		commandArgs = args
-		commandF = doShowHandler
+		commandF = doShowTopicHandler
 	case "show-topic":
 		commandArgs = args
 		commandF = doShowTopic
@@ -256,8 +256,8 @@ func doHelp(args []string) error {
 			defineFlags.Usage()
 		case "define-template":
 			defineTemplateFlags.Usage()
-		case "define-handler":
-			defineHandlerUsage()
+		case "define-topic-handler":
+			defineTopicHandlerUsage()
 		case "replay":
 			replayFlags.Usage()
 		case "enable":
@@ -274,8 +274,8 @@ func doHelp(args []string) error {
 			showUsage()
 		case "show-template":
 			showTemplateUsage()
-		case "show-handler":
-			showHandlerUsage()
+		case "show-topic-handler":
+			showTopicHandlerUsage()
 		case "show-topic":
 			showTopicUsage()
 		case "level":
@@ -815,8 +815,8 @@ func doDefineTemplate(args []string) error {
 	return err
 }
 
-func defineHandlerUsage() {
-	var u = `Usage: kapacitor define-handler <topic> <path to handler file>
+func defineTopicHandlerUsage() {
+	var u = `Usage: kapacitor define-topic-handler <topic id> <handler id> <path to handler spec file>
 
 	Create or update a handler.
 
@@ -826,23 +826,25 @@ For example:
 
 	Define a handler using the slack.yaml file:
 
-		$ kapacitor define-handler system slack.yaml
+		$ kapacitor define-handler system my_handler slack.yaml
 
+Options:
 `
 	fmt.Fprintln(os.Stderr, u)
 }
 
-func doDefineHandler(args []string) error {
-	if len(args) < 2 {
-		fmt.Fprintln(os.Stderr, "Must provide both a topic ID and a path to a handler file.")
-		defineHandlerUsage()
+func doDefineTopicHandler(args []string) error {
+	if len(args) != 3 {
+		fmt.Fprintln(os.Stderr, "Must provide a topic ID, a handler ID and a path to a handler file.")
+		defineTopicHandlerUsage()
 		os.Exit(2)
 	}
 	topic := args[0]
-	p := args[1]
+	handlerID := args[1]
+	p := args[2]
 	f, err := os.Open(p)
 	if err != nil {
-		return errors.Wrapf(err, "failed to open handler file %q", p)
+		return errors.Wrapf(err, "failed to open handler spec file %q", p)
 	}
 
 	// Decode file into HandlerOptions
@@ -862,6 +864,7 @@ func doDefineHandler(args []string) error {
 			return errors.Wrapf(err, "failed to unmarshal json handler file %q", p)
 		}
 	}
+	ho.ID = handlerID
 
 	l := cli.TopicHandlerLink(topic, ho.ID)
 	handler, _ := cli.TopicHandler(l)
@@ -1428,18 +1431,18 @@ func doShowTemplate(args []string) error {
 
 // Show Handler
 
-func showHandlerUsage() {
-	var u = `Usage: kapacitor show-handler [topic ID] [handler ID]
+func showTopicHandlerUsage() {
+	var u = `Usage: kapacitor show-topic-handler [topic ID] [handler ID]
 
 	Show details about a specific handler.
 `
 	fmt.Fprintln(os.Stderr, u)
 }
 
-func doShowHandler(args []string) error {
+func doShowTopicHandler(args []string) error {
 	if len(args) != 2 {
 		fmt.Fprintln(os.Stderr, "Must specify both topic and handler IDs")
-		showHandlerUsage()
+		showTopicHandlerUsage()
 		os.Exit(2)
 	}
 
@@ -1530,11 +1533,23 @@ func doShowTopic(args []string) error {
 // List
 
 func listUsage() {
-	var u = `Usage: kapacitor list (tasks|templates|recordings|replays|topics|handlers|service-tests) [ID or pattern]...
+	var u = `Usage: kapacitor list (tasks|templates|recordings|replays|topics|topic-handlers|service-tests) [ID or pattern]...
 
 	List tasks, templates, recordings, replays, topics or handlers and their current state.
 
 	If no ID or pattern is given then all items will be listed.
+
+	Listing handlers requires that the topic ID or pattern be specified before the handler patterns.
+
+		$ kapacitor list topic-handlers [topicID or pattern] [ID or pattern]
+
+	For example list all handlers in the system topic
+
+		$ kapacitor list topic-handlers system
+
+	For example list all email* handlers in the system topic
+
+		$ kapacitor list topic-handlers system email*
 
 `
 	fmt.Fprintln(os.Stderr, u)
@@ -1554,7 +1569,7 @@ func (t TemplateList) Swap(i, j int)      { t[i], t[j] = t[j], t[i] }
 
 func doList(args []string) error {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "Must specify 'tasks', 'recordings', 'replays', 'topics', or 'handlers'")
+		fmt.Fprintln(os.Stderr, "Must specify 'tasks', 'recordings', 'replays', 'topics', or 'topic-handlers'")
 		listUsage()
 		os.Exit(2)
 	}
@@ -1732,19 +1747,26 @@ func doList(args []string) error {
 				fmt.Fprintf(os.Stdout, outFmt, s.Name)
 			}
 		}
-	case "handlers":
-		// Get all topics first
-		topics, err := cli.ListTopics(nil)
+	case "topic-handlers":
+		topicPattern := patterns[0]
+		topics, err := cli.ListTopics(&client.ListTopicsOptions{
+			Pattern: topicPattern,
+		})
 		if err != nil {
 			return err
 		}
-		maxID := 2    // len("ID")
-		maxTopic := 5 // len("Topic")
-		maxKind := 4  // len("Kind")
+		patterns = patterns[1:]
+		if len(patterns) == 0 {
+			// Use empty pattern to match all handlers
+			patterns = []string{""}
+		}
+		maxTopic := 10
+		maxID := 10
+		maxKind := 10
 		// The handlers are returned in sorted order already, no need to sort them here.
 		type info struct {
-			ID    string
 			Topic string
+			ID    string
 			Kind  string
 		}
 		var allHandlers []info
@@ -1758,8 +1780,8 @@ func doList(args []string) error {
 				}
 				for _, h := range handlers.Handlers {
 					i := info{
-						ID:    h.ID,
 						Topic: topic.ID,
+						ID:    h.ID,
 						Kind:  h.Kind,
 					}
 					if l := len(i.ID); l > maxID {
@@ -1775,10 +1797,10 @@ func doList(args []string) error {
 				}
 			}
 		}
-		outFmt := fmt.Sprintf("%%-%dv%%-%dv%%-%dv\n", maxID+1, maxTopic+1, maxKind+1)
-		fmt.Fprintf(os.Stdout, outFmt, "ID", "Topic", "Kind")
+		outFmt := fmt.Sprintf("%%-%dv%%-%dv%%-%dv\n", maxTopic+1, maxID+1, maxKind+1)
+		fmt.Fprintf(os.Stdout, outFmt, "Topic", "ID", "Kind")
 		for _, h := range allHandlers {
-			fmt.Fprintf(os.Stdout, outFmt, h.ID, h.Topic, h.Kind)
+			fmt.Fprintf(os.Stdout, outFmt, h.Topic, h.ID, h.Kind)
 		}
 	case "topics":
 		maxID := 2    // len("ID")
@@ -1808,7 +1830,7 @@ func doList(args []string) error {
 			fmt.Fprintf(os.Stdout, outFmt, t.ID, t.Level, t.Collected)
 		}
 	default:
-		return fmt.Errorf("cannot list '%s' did you mean 'tasks', 'recordings', 'replays', 'topics', 'handlers' or 'service-tests'?", kind)
+		return fmt.Errorf("cannot list '%s' did you mean 'tasks', 'recordings', 'replays', 'topics', 'topic-handlers' or 'service-tests'?", kind)
 	}
 	return nil
 
@@ -1816,7 +1838,7 @@ func doList(args []string) error {
 
 // Delete
 func deleteUsage() {
-	var u = `Usage: kapacitor delete (tasks|templates|recordings|replays|topics|handlers) [ID or pattern]...
+	var u = `Usage: kapacitor delete (tasks|templates|recordings|replays|topics|topic-handlers) [ID or pattern]...
 
 	Delete a tasks, templates, recordings, replays, topics or handlers.
 
@@ -1824,7 +1846,7 @@ func deleteUsage() {
 
 	Deleting a handler requires that the topic be specified before the pattern.
 
-		$ kapacitor delete handlers [topic] [ID or pattern]
+		$ kapacitor delete topic-handlers [topic] [ID or pattern]
 
 
 For example:
@@ -1843,7 +1865,7 @@ For example:
 
 	You can delete a handler in the topic 'system':
 
-		$ kapacitor delete handlers system slack
+		$ kapacitor delete topic-handlers system slack
 `
 	fmt.Fprintln(os.Stderr, u)
 }
@@ -1960,7 +1982,7 @@ func doDelete(args []string) error {
 				}
 			}
 		}
-	case "handlers":
+	case "topic-handlers":
 		topic := args[1]
 		for _, pattern := range args[2:] {
 			handlers, err := cli.ListTopicHandlers(cli.TopicHandlersLink(topic), &client.ListTopicHandlersOptions{
@@ -1977,7 +1999,7 @@ func doDelete(args []string) error {
 			}
 		}
 	default:
-		return fmt.Errorf("cannot delete '%s' did you mean 'tasks', 'templates', 'recordings', 'replays', 'topics' or 'handlers'?", kind)
+		return fmt.Errorf("cannot delete '%s' did you mean 'tasks', 'templates', 'recordings', 'replays', 'topics' or 'topic-handlers'?", kind)
 	}
 	return nil
 }

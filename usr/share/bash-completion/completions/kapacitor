@@ -159,23 +159,16 @@ _kapacitor()
                 tasks|templates|recordings|replays|topics|service-tests)
                     words=$(_kapacitor_list "${COMP_WORDS[2]}" "$cur")
                     ;;
-                handlers)
-                    case "${COMP_WORDS[1]}" in
-                        list)
-                            words=$(_kapacitor_list handlers "$cur")
-                            ;;
-                        delete)
-                            if [[ -z "${COMP_WORDS[3]}" || ("$cur" = "${COMP_WORDS[3]}" && -z "${COMP_WORDS[4]}") ]]
-                            then
-                                words=$(_kapacitor_list topics "$cur")
-                            else
-                                words=$(_kapacitor_list handlers "$cur")
-                            fi
-                            ;;
-                    esac
+                topic-handlers)
+                    if [[ -z "${COMP_WORDS[3]}" || ("$cur" = "${COMP_WORDS[3]}" && -z "${COMP_WORDS[4]}") ]]
+                    then
+                        words=$(_kapacitor_list topics "$cur")
+                    else
+                        words=$(_kapacitor_list_topic_handlers "${COMP_WORDS[3]}" "$cur")
+                    fi
                     ;;
                 *)
-                    words='tasks templates recordings replays handlers topics service-tests'
+                    words='tasks templates recordings replays topic-handlers topics service-tests'
                     ;;
             esac
             ;;
@@ -187,7 +180,7 @@ _kapacitor()
             then
                 words=$(_kapacitor_list topics "$cur")
             else
-                words=$(_kapacitor_list handlers "$cur")
+                words=$(_kapacitor_list_topic_handlers "${COMP_WORDS[2]}" "$cur")
             fi
             ;;
         show-topic)
@@ -264,6 +257,12 @@ _kapacitor_list()
 {
     # List a certain kind of object and return a set of IDs
     kapacitor list "$1" "$2*" 2>/dev/null | awk 'NR>1 {print $1}' 2>/dev/null
+}
+
+_kapacitor_list_topic_handlers()
+{
+    # List a certain kind of object and return a set of IDs
+    kapacitor list topic-handlers "$1" "$2*" 2>/dev/null | awk 'NR>1 {print $2}' 2>/dev/null
 }
 
 _kapacitor_list_filtered()
