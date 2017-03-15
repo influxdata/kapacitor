@@ -20,9 +20,9 @@ import (
 	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/influxdata/kapacitor/tick"
 	"github.com/influxdata/kapacitor/tick/ast"
+	"github.com/influxdata/kapacitor/uuid"
 	"github.com/influxdata/kapacitor/vars"
 	"github.com/pkg/errors"
-	"github.com/twinj/uuid"
 )
 
 const (
@@ -656,7 +656,7 @@ func (ts *Service) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if task.ID == "" {
-		task.ID = uuid.NewV4().String()
+		task.ID = uuid.New().String()
 	}
 	if !validTaskID.MatchString(task.ID) {
 		httpd.HttpError(w, fmt.Sprintf("task ID must contain only letters, numbers, '-', '.' and '_'. %q", task.ID), true, http.StatusBadRequest)
@@ -1547,7 +1547,7 @@ func (ts *Service) handleCreateTemplate(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if template.ID == "" {
-		template.ID = uuid.NewV4().String()
+		template.ID = uuid.New().String()
 	}
 	if !validTemplateID.MatchString(template.ID) {
 		httpd.HttpError(w, fmt.Sprintf("template ID must contain only letters, numbers, '-', '.' and '_'. %q", template.ID), true, http.StatusBadRequest)

@@ -31,8 +31,8 @@ var (
 	NumEnabledTasksVar  = &kexpvar.Int{}
 	NumSubscriptionsVar = kexpvar.NewIntSum()
 
-	ClusterIDVar = &kexpvar.String{}
-	ServerIDVar  = &kexpvar.String{}
+	ClusterIDVar = &kexpvar.UUID{}
+	ServerIDVar  = &kexpvar.UUID{}
 	HostVar      = &kexpvar.String{}
 	ProductVar   = &kexpvar.String{}
 	VersionVar   = &kexpvar.String{}

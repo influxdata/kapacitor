@@ -7,6 +7,7 @@ Dependencies
 * github.com/dgrijalva/jwt-go [MIT](https://github.com/dgrijalva/jwt-go/blob/master/LICENSE)
 * github.com/dustin/go-humanize [MIT](https://github.com/dustin/go-humanize/blob/master/LICENSE)
 * github.com/golang/protobuf [BSD](https://github.com/golang/protobuf/blob/master/LICENSE)
+* github.com/google/uuid [BSD](https://github.com/google/uuid/blob/master/LICENSE)
 * github.com/gorhill/cronexpr [APLv2](https://github.com/gorhill/cronexpr/blob/master/APLv2)
 * github.com/k-sone/snmpgo [MIT](https://github.com/k-sone/snmpgo/blob/master/LICENSE)
 * github.com/kimor79/gollectd [BSD](https://github.com/kimor79/gollectd/blob/master/LICENSE)
@@ -20,5 +21,4 @@ Dependencies
 * github.com/shurcooL/markdownfmt [MIT](https://github.com/shurcooL/markdownfmt/blob/master/README.md)
 * github.com/shurcooL/sanitized\_anchor\_name [MIT](https://github.com/shurcooL/sanitized_anchor_name/blob/master/LICENSE)
 * github.com/stretchr/testify [MIT](https://github.com/stretchr/testify/blob/master/LICENSE)
-* github.com/twinj/uuid [MIT](https://github.com/twinj/uuid/blob/master/LICENSE)
 * gopkg.in/gomail.v2 [MIT](https://github.com/go-gomail/gomail/blob/v2/LICENSE)

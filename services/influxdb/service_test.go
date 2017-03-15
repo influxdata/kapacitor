@@ -17,15 +17,13 @@ import (
 	influxcli "github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/influxdb"
+	"github.com/influxdata/kapacitor/uuid"
 	"github.com/influxdata/kapacitor/vars"
 )
 
 var ls = logSerivce{}
 
 const (
-	testKapacitorClusterID = "test-kclusterid"
-	testSubName            = "kapacitor-" + testKapacitorClusterID
-
 	randomTokenData = "test random data that is 64 bytes long xxxxxxxxxxxxxxxxxxxxxxxxx"
 	testClusterName = "testcluster0"
 	randomToken     = testClusterName + ";" + randomTokenData
@@ -34,6 +32,11 @@ const (
 
 	subMode   = "ANY"
 	tokenSize = 64
+)
+
+var (
+	testKapacitorClusterID = uuid.New()
+	testSubName            = "kapacitor-" + testKapacitorClusterID.String()
 )
 
 func init() {

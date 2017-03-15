@@ -6,7 +6,7 @@ import (
 	"runtime"
 
 	kexpvar "github.com/influxdata/kapacitor/expvar"
-	"github.com/twinj/uuid"
+	"github.com/influxdata/kapacitor/uuid"
 )
 
 var (
@@ -23,7 +23,7 @@ func init() {
 
 // NewStatistic creates a new statistic in the published expvar map.
 func NewStatistic(name string, tags map[string]string) (string, *kexpvar.Map) {
-	key := uuid.NewV4().String()
+	key := uuid.New().String()
 
 	m := &kexpvar.Map{}
 	m.Init()
@@ -111,7 +111,7 @@ func GetStatsData() ([]StatsData, error) {
 				// string-string tags map.
 				n := subKV.Value.(*kexpvar.Map)
 				n.Do(func(t expvar.KeyValue) {
-					data.Tags[t.Key] = t.Value.(*kexpvar.String).StringValue()
+					data.Tags[t.Key] = t.Value.(kexpvar.StringVar).StringValue()
 				})
 			case "values":
 				// string-interface map.
