@@ -21,24 +21,29 @@ var (
 type HandlerSpecDAO interface {
 	// Retrieve a handler
 	Get(topic, id string) (HandlerSpec, error)
+	GetTx(tx storage.ReadOnlyTx, topic, id string) (HandlerSpec, error)
 
 	// Create a handler.
 	// ErrHandlerSpecExists is returned if a handler already exists with the same ID.
 	Create(h HandlerSpec) error
+	CreateTx(tx storage.Tx, h HandlerSpec) error
 
 	// Replace an existing handler.
 	// ErrNoHandlerSpecExists is returned if the handler does not exist.
 	Replace(h HandlerSpec) error
+	ReplaceTx(tx storage.Tx, h HandlerSpec) error
 
 	// Delete a handler.
 	// It is not an error to delete an non-existent handler.
 	Delete(topic, id string) error
+	DeleteTx(tx storage.Tx, topic, id string) error
 
 	// List handlers matching a pattern.
 	// The pattern is shell/glob matching see https://golang.org/pkg/path/#Match
 	// Offset and limit are pagination bounds. Offset is inclusive starting at index 0.
 	// More results may exist while the number of returned items is equal to limit.
 	List(topic, pattern string, offset, limit int) ([]HandlerSpec, error)
+	ListTx(tx storage.ReadOnlyTx, topic, pattern string, offset, limit int) ([]HandlerSpec, error)
 }
 
 //--------------------------------------------------------------------
@@ -113,8 +118,12 @@ type handlerSpecKV struct {
 	store *storage.IndexedStore
 }
 
+const (
+	handlerPrefix = "handlers"
+)
+
 func newHandlerSpecKV(store storage.Interface) (*handlerSpecKV, error) {
-	c := storage.DefaultIndexedStoreConfig("handlers", func() storage.BinaryObject {
+	c := storage.DefaultIndexedStoreConfig(handlerPrefix, func() storage.BinaryObject {
 		return new(HandlerSpec)
 	})
 	istore, err := storage.NewIndexedStore(store, c)
@@ -136,7 +145,13 @@ func (kv *handlerSpecKV) error(err error) error {
 }
 
 func (kv *handlerSpecKV) Get(topic, id string) (HandlerSpec, error) {
-	o, err := kv.store.Get(fullID(topic, id))
+	return kv.getHelper(kv.store.Get(fullID(topic, id)))
+}
+func (kv *handlerSpecKV) GetTx(tx storage.ReadOnlyTx, topic, id string) (HandlerSpec, error) {
+	return kv.getHelper(kv.store.GetTx(tx, fullID(topic, id)))
+}
+
+func (kv *handlerSpecKV) getHelper(o storage.BinaryObject, err error) (HandlerSpec, error) {
 	if err != nil {
 		return HandlerSpec{}, kv.error(err)
 	}
@@ -150,20 +165,37 @@ func (kv *handlerSpecKV) Get(topic, id string) (HandlerSpec, error) {
 func (kv *handlerSpecKV) Create(h HandlerSpec) error {
 	return kv.store.Create(&h)
 }
+func (kv *handlerSpecKV) CreateTx(tx storage.Tx, h HandlerSpec) error {
+	return kv.store.CreateTx(tx, &h)
+}
 
 func (kv *handlerSpecKV) Replace(h HandlerSpec) error {
 	return kv.store.Replace(&h)
 }
+func (kv *handlerSpecKV) ReplaceTx(tx storage.Tx, h HandlerSpec) error {
+	return kv.store.ReplaceTx(tx, &h)
+}
 
 func (kv *handlerSpecKV) Delete(topic, id string) error {
 	return kv.store.Delete(fullID(topic, id))
+}
+func (kv *handlerSpecKV) DeleteTx(tx storage.Tx, topic, id string) error {
+	return kv.store.DeleteTx(tx, fullID(topic, id))
 }
 
 func (kv *handlerSpecKV) List(topic, pattern string, offset, limit int) ([]HandlerSpec, error) {
 	if pattern == "" {
 		pattern = "*"
 	}
-	objects, err := kv.store.List(storage.DefaultIDIndex, fullID(topic, pattern), offset, limit)
+	return kv.listHelper(kv.store.List(storage.DefaultIDIndex, fullID(topic, pattern), offset, limit))
+}
+func (kv *handlerSpecKV) ListTx(tx storage.ReadOnlyTx, topic, pattern string, offset, limit int) ([]HandlerSpec, error) {
+	if pattern == "" {
+		pattern = "*"
+	}
+	return kv.listHelper(kv.store.ListTx(tx, storage.DefaultIDIndex, fullID(topic, pattern), offset, limit))
+}
+func (kv *handlerSpecKV) listHelper(objects []storage.BinaryObject, err error) ([]HandlerSpec, error) {
 	if err != nil {
 		return nil, err
 	}

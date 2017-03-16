@@ -1,9 +1,11 @@
 package alert
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"path"
+	"regexp"
 	"sync"
 
 	"github.com/influxdata/kapacitor/alert"
@@ -46,6 +48,7 @@ type Service struct {
 
 	StorageService interface {
 		Store(namespace string) storage.Interface
+		Versions() storage.Versions
 	}
 
 	Commander command.Commander
@@ -128,6 +131,11 @@ func (s *Service) Open() error {
 	}
 	s.topicsDAO = topicsDAO
 
+	// Migrate v1.2 handlers
+	if err := s.migrateHandlerSpecs(store); err != nil {
+		return err
+	}
+
 	// Load saved handlers
 	if err := s.loadSavedHandlerSpecs(); err != nil {
 		return err
@@ -151,6 +159,131 @@ func (s *Service) Close() error {
 	defer s.mu.Unlock()
 	s.topics.Close()
 	return s.APIServer.Close()
+}
+
+const (
+	handlerSpecsStoreVersion  = "alert_topic_handler_specs"
+	handlerSpecsStoreVersion1 = "1"
+)
+
+func (s *Service) migrateHandlerSpecs(store storage.Interface) error {
+	specVersion, err := s.StorageService.Versions().Get(handlerSpecsStoreVersion)
+	if err != nil && err != storage.ErrNoKeyExists {
+		return err
+	}
+	if specVersion == handlerSpecsStoreVersion1 {
+		// Already migrated
+		return nil
+	}
+	s.logger.Println("D! migrating old v1.2 handler specs")
+
+	// v1.2 HandlerActionSpec
+	type oldHandlerActionSpec struct {
+		Kind    string                 `json:"kind"`
+		Options map[string]interface{} `json:"options"`
+	}
+
+	// v1.2 HandlerSpec
+	type oldHandlerSpec struct {
+		ID      string                 `json:"id"`
+		Topics  []string               `json:"topics"`
+		Actions []oldHandlerActionSpec `json:"actions"`
+	}
+	oldDataPrefix := "/" + handlerPrefix + "/data"
+	oldKeyPattern := regexp.MustCompile(fmt.Sprintf(`^%s/[-\._\p{L}0-9]+$`, oldDataPrefix))
+
+	// Process to migrate to new handler specs:
+	//     1. Gather all old handlers
+	//     2. Define new handlers that are equivalent
+	//     3. Check that there are no ID conflicts
+	//     4. Save the new handlers
+	//     5. Delete the old specs
+	//
+	// All steps are performed in a single transaction,
+	// so it can be rolledback in case of an error.
+	err = store.Update(func(tx storage.Tx) error {
+		var newHandlers []HandlerSpec
+		kvs, err := tx.List(oldDataPrefix)
+		if err != nil {
+			return err
+		}
+		s.logger.Printf("D! found %d handler rows", len(kvs))
+
+		var oldKeys []string
+		for _, kv := range kvs {
+			if !oldKeyPattern.MatchString(kv.Key) {
+				s.logger.Println("D! found new handler skipping:", kv.Key)
+				continue
+			}
+			oldKeys = append(oldKeys, kv.Key)
+			var old oldHandlerSpec
+			err := storage.VersionJSONDecode(kv.Value, func(version int, dec *json.Decoder) error {
+				if version != 1 {
+					return fmt.Errorf("old handler specs should all be version 1, got version %d", version)
+				}
+				return dec.Decode(&old)
+			})
+			if err != nil {
+				return errors.Wrapf(err, "failed to read old handler spec data for %s", kv.Key)
+			}
+
+			s.logger.Println("D! migrating old handler spec", old.ID)
+
+			// Create new handlers from the old
+			hasStateChangesOnly := false
+			aggregatePrefix := ""
+			for i, action := range old.Actions {
+				new := HandlerSpec{
+					ID:      fmt.Sprintf("%s-%s-%d", old.ID, action.Kind, i),
+					Kind:    action.Kind,
+					Options: action.Options,
+				}
+				if hasStateChangesOnly {
+					new.Match = "changed() == TRUE"
+				}
+				switch action.Kind {
+				case "stateChangesOnly":
+					hasStateChangesOnly = true
+					// No need to add a handler for this one
+				case "aggregate":
+					newPrefix := aggregatePrefix + "aggregate_topic-" + old.ID + "-"
+					for _, topic := range old.Topics {
+						new.Topic = aggregatePrefix + topic
+						new.Options["topic"] = newPrefix + topic
+						newHandlers = append(newHandlers, new)
+					}
+					aggregatePrefix = newPrefix
+				default:
+					for _, topic := range old.Topics {
+						new.Topic = aggregatePrefix + topic
+						newHandlers = append(newHandlers, new)
+					}
+				}
+			}
+		}
+
+		// Check that all new handlers are unique
+		for _, handler := range newHandlers {
+			if _, err := s.specsDAO.GetTx(tx, handler.Topic, handler.ID); err != ErrNoHandlerSpecExists {
+				return fmt.Errorf("handler %q for topic %q already exists", handler.ID, handler.Topic)
+			}
+		}
+
+		s.logger.Printf("D! creating %d new handlers in place of old handlers", len(newHandlers))
+
+		// Create new handlers
+		for _, handler := range newHandlers {
+			if err := s.specsDAO.CreateTx(tx, handler); err != nil {
+				return errors.Wrap(err, "failed to create new handler during migration")
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	// Save version
+	return s.StorageService.Versions().Set(handlerSpecsStoreVersion, handlerSpecsStoreVersion1)
 }
 
 func (s *Service) loadSavedHandlerSpecs() error {

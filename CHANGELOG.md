@@ -54,6 +54,7 @@ kapacitor define-handler system aggregate_by_1m.yaml
     The change is completely breaking for the technical preview alerting service, a.k.a. the new alert topic handler features.
     The change boils down to simplifying how you define and interact with topics.
     Alert handlers now only ever have a single action and belong to a single topic.
+    An automatic migration from old to new handler definitions will be performed during startup.
     See the updated API docs.
 
 ### Bugfixes

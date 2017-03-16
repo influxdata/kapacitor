@@ -83,7 +83,7 @@ _kapacitor()
                 esac
             fi
             ;;
-        define-handler)
+        define-topic-handler)
             if [[ -z "${COMP_WORDS[2]}" || ("$cur" = "${COMP_WORDS[2]}" && -z "${COMP_WORDS[3]}") ]]
             then
                 words=$(_kapacitor_list topics "$cur")
@@ -175,7 +175,7 @@ _kapacitor()
         show-template)
             words=$(_kapacitor_list templates "$cur")
             ;;
-        show-handler)
+        show-topic-handler)
             if [[ -z "${COMP_WORDS[2]}" || ("$cur" = "${COMP_WORDS[2]}" && -z "${COMP_WORDS[3]}") ]]
             then
                 words=$(_kapacitor_list topics "$cur")
@@ -199,8 +199,8 @@ _kapacitor()
             esac
             ;;
         *)
-            words='record define define-template define-handler replay replay-live enable disable \
-                reload delete list show show-template show-handler show-topic level stats version vars service-tests help'
+            words='record define define-template define-topic-handler replay replay-live enable disable \
+                reload delete list show show-template show-topic-handler show-topic level stats version vars service-tests help'
             ;;
     esac
     if [ -z "$COMPREPLY" ]
