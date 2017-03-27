@@ -61,6 +61,13 @@ func (n *EvalFunctionNode) callFunction(scope *Scope, executionState ExecutionSt
 
 	f := executionState.Funcs[n.funcName]
 
+	// Look for function on scope
+	if f == nil {
+		if dm := scope.DynamicMethod(n.funcName); dm != nil {
+			f = dynamicMethodFunc{dm: dm}
+		}
+	}
+
 	if f == nil {
 		return nil, fmt.Errorf("undefined function: %q", n.funcName)
 	}
@@ -191,4 +198,14 @@ func eval(n NodeEvaluator, scope *Scope, executionState ExecutionState) (interfa
 		return nil, fmt.Errorf("function arg expression returned unexpected type %s", retType)
 	}
 
+}
+
+type dynamicMethodFunc struct {
+	dm DynamicMethod
+}
+
+func (dmf dynamicMethodFunc) Call(args ...interface{}) (interface{}, error) {
+	return dmf.dm(nil, args...)
+}
+func (dmf dynamicMethodFunc) Reset() {
 }

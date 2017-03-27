@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"sync"
 	"sync/atomic"
+
+	"github.com/influxdata/kapacitor/uuid"
 )
 
 type IntVar interface {
@@ -289,4 +291,36 @@ func (v *String) StringValue() string {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
 	return v.s
+}
+
+// UUID is a string variable that contain an UUID and satisfies the expvar.Var interface.
+type UUID struct {
+	mu sync.RWMutex
+	id uuid.UUID
+	s  string
+}
+
+func (v *UUID) String() string {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
+	return strconv.Quote(v.s)
+}
+
+func (v *UUID) Set(value uuid.UUID) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.id = value
+	v.s = value.String()
+}
+
+func (v *UUID) StringValue() string {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
+	return v.s
+}
+
+func (v *UUID) UUIDValue() uuid.UUID {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
+	return v.id
 }

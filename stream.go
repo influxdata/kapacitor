@@ -6,6 +6,7 @@ import (
 
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/tick/stateful"
 )
 
@@ -67,7 +68,7 @@ func newFromNode(et *ExecutingTask, n *pipeline.FromNode, l *log.Logger) (*FromN
 		}
 
 		sn.expression = expr
-		sn.scopePool = stateful.NewScopePool(stateful.FindReferenceVariables(n.Lambda.Expression))
+		sn.scopePool = stateful.NewScopePool(ast.FindReferenceVariables(n.Lambda.Expression))
 	}
 
 	return sn, nil

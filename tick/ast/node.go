@@ -29,6 +29,12 @@ type Node interface {
 	Equal(interface{}) bool
 }
 
+func Format(n Node) string {
+	var buf bytes.Buffer
+	n.Format(&buf, "", false)
+	return buf.String()
+}
+
 // Represents a node that can have a comment associated with it.
 type commentedNode interface {
 	SetComment(c *CommentNode)

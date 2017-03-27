@@ -58,7 +58,7 @@ func TestExpression_RefernceVariables(t *testing.T) {
 	}
 
 	for i, expect := range expectations {
-		refVariables := stateful.FindReferenceVariables(expect.node)
+		refVariables := ast.FindReferenceVariables(expect.node)
 		if !reflect.DeepEqual(refVariables, expect.refVariables) {
 			t.Errorf("[Iteration: %v, Node: %T] Got unexpected result:\ngot: %v\nexpected: %v", i+1, expect.node, refVariables, expect.refVariables)
 		}

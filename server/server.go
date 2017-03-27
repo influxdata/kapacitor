@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
-	"strings"
+	"sync"
 
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/services/collectd"
@@ -48,9 +48,9 @@ import (
 	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
+	"github.com/influxdata/kapacitor/uuid"
 	"github.com/influxdata/kapacitor/vars"
 	"github.com/pkg/errors"
-	"github.com/twinj/uuid"
 )
 
 const clusterIDFilename = "cluster.id"
@@ -103,9 +103,10 @@ type Server struct {
 	// Channel of incoming configuration updates.
 	configUpdates chan config.ConfigUpdate
 
-	BuildInfo BuildInfo
-	ClusterID string
-	ServerID  string
+	BuildInfo   BuildInfo
+	clusterIDMu sync.Mutex
+	ClusterID   uuid.UUID
+	ServerID    uuid.UUID
 
 	// Profiling
 	CPUProfile string
@@ -747,8 +748,8 @@ func (s *Server) setupIDs() error {
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	if clusterID == "" {
-		clusterID = uuid.NewV4().String()
+	if clusterID == uuid.Nil {
+		clusterID = uuid.New()
 		if err := s.writeID(clusterIDPath, clusterID); err != nil {
 			return errors.Wrap(err, "failed to save cluster ID")
 		}
@@ -760,8 +761,8 @@ func (s *Server) setupIDs() error {
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	if serverID == "" {
-		serverID = uuid.NewV4().String()
+	if serverID == uuid.Nil {
+		serverID = uuid.New()
 		if err := s.writeID(serverIDPath, serverID); err != nil {
 			return errors.Wrap(err, "failed to save server ID")
 		}
@@ -771,29 +772,44 @@ func (s *Server) setupIDs() error {
 	return nil
 }
 
-func (s *Server) readID(file string) (string, error) {
+func (s *Server) readID(file string) (uuid.UUID, error) {
 	f, err := os.Open(file)
 	if err != nil {
-		return "", err
+		return uuid.Nil, err
 	}
 	defer f.Close()
 	b, err := ioutil.ReadAll(f)
 	if err != nil {
-		return "", err
+		return uuid.Nil, err
 	}
-	return strings.TrimSpace(string(b)), nil
+	return uuid.ParseBytes(b)
 }
 
-func (s *Server) writeID(file, id string) error {
+func (s *Server) writeID(file string, id uuid.UUID) error {
 	f, err := os.Create(file)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	_, err = f.Write([]byte(id))
+	_, err = f.Write([]byte(id.String()))
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func (s *Server) SetClusterID(clusterID uuid.UUID) error {
+	s.clusterIDMu.Lock()
+	defer s.clusterIDMu.Unlock()
+	if s.ClusterID == clusterID {
+		return nil
+	}
+	clusterIDPath := filepath.Join(s.dataDir, clusterIDFilename)
+	if err := s.writeID(clusterIDPath, clusterID); err != nil {
+		return errors.Wrap(err, "failed to save cluster ID")
+	}
+	s.ClusterID = clusterID
+	vars.ClusterIDVar.Set(s.ClusterID)
 	return nil
 }
 

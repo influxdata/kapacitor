@@ -73,40 +73,57 @@ Then alert handlers can be configured to subscribe to the events.
 These alert handlers will be configured via the API.
 Use yaml/json to define the alert handlers.
 
+Here are a few examples:
+
 ```yaml
 id: my_handler
+kind: pagerDuty
+options:
+  serviceKey: XXX
+```
 
-topics:
-    - cpu
-    - mem
+```yaml
+id: aggregate_by_1m
+kind: aggregate
+options:
+  interval: 1m
+  topic: aggregated
+```
 
-actions:
-    - kind: aggregate
-      options:
-        groupBy: id
-        interval: 1m
-    - kind: throttle
-      options:
-        count: 10
-        every: 5m
-    - kind: publish
-      options:
-        topics: [ throttled_aggreated ]
-    - kind: pagerDuty
-      options:
-         serviceKey: XXX
+```yaml
+id: publish_to_system
+kind: publish
+options:
+  topics: [ system ]
 ```
 
 ```json
 {
     "id": "my_handler",
-    "topics": ["cpu", "mem"],
-    "actions": [
-        {"kind":"aggregate", "options": {"groupBy":"id","internal":"1m"}},
-        {"kind":"throttle", "options": {"count":10,"every":"5m"}},
-        {"kind":"publish", "options": {"topics":["throttled_aggreated"]}},
-        {"kind":"pagerDuty", "options": {"serviceKey":"XXX"}}
-    ]
+    "kind": "pagerDuty",
+    "options": {
+      "serviceKey": "XXX"
+    }
+}
+```
+
+```json
+{
+    "id": "aggregate_by_1m",
+    "kind": "aggregate",
+    "options": {
+      "interval": "1m"
+    }
+}
+```
+
+```json
+{
+    "id": "publish_to_system",
+    "kind": "publish",
+    "options": {
+      "topics": ["system"]
+    }
 }
 ```
 

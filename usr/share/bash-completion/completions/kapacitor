@@ -83,8 +83,13 @@ _kapacitor()
                 esac
             fi
             ;;
-        define-handler)
-            _kapacitor_json_yaml_files "${cur}"
+        define-topic-handler)
+            if [[ -z "${COMP_WORDS[2]}" || ("$cur" = "${COMP_WORDS[2]}" && -z "${COMP_WORDS[3]}") ]]
+            then
+                words=$(_kapacitor_list topics "$cur")
+            else
+                _kapacitor_json_yaml_files "${cur}"
+            fi
             ;;
         replay)
             case "$prev" in
@@ -151,19 +156,32 @@ _kapacitor()
             ;;
         delete|list)
             case "${COMP_WORDS[2]}" in
-                tasks|templates|recordings|replays|handlers|topics|service-tests)
+                tasks|templates|recordings|replays|topics|service-tests)
                     words=$(_kapacitor_list "${COMP_WORDS[2]}" "$cur")
                     ;;
+                topic-handlers)
+                    if [[ -z "${COMP_WORDS[3]}" || ("$cur" = "${COMP_WORDS[3]}" && -z "${COMP_WORDS[4]}") ]]
+                    then
+                        words=$(_kapacitor_list topics "$cur")
+                    else
+                        words=$(_kapacitor_list_topic_handlers "${COMP_WORDS[3]}" "$cur")
+                    fi
+                    ;;
                 *)
-                    words='tasks templates recordings replays handlers topics service-tests'
+                    words='tasks templates recordings replays topic-handlers topics service-tests'
                     ;;
             esac
             ;;
         show-template)
             words=$(_kapacitor_list templates "$cur")
             ;;
-        show-handler)
-            words=$(_kapacitor_list handlers "$cur")
+        show-topic-handler)
+            if [[ -z "${COMP_WORDS[2]}" || ("$cur" = "${COMP_WORDS[2]}" && -z "${COMP_WORDS[3]}") ]]
+            then
+                words=$(_kapacitor_list topics "$cur")
+            else
+                words=$(_kapacitor_list_topic_handlers "${COMP_WORDS[2]}" "$cur")
+            fi
             ;;
         show-topic)
             words=$(_kapacitor_list topics "$cur")
@@ -181,8 +199,8 @@ _kapacitor()
             esac
             ;;
         *)
-            words='record define define-template define-handler replay replay-live enable disable \
-                reload delete list show show-template show-handler show-topic level stats version vars service-tests help'
+            words='record define define-template define-topic-handler replay replay-live enable disable \
+                reload delete list show show-template show-topic-handler show-topic level stats version vars service-tests help'
             ;;
     esac
     if [ -z "$COMPREPLY" ]
@@ -239,6 +257,12 @@ _kapacitor_list()
 {
     # List a certain kind of object and return a set of IDs
     kapacitor list "$1" "$2*" 2>/dev/null | awk 'NR>1 {print $1}' 2>/dev/null
+}
+
+_kapacitor_list_topic_handlers()
+{
+    # List a certain kind of object and return a set of IDs
+    kapacitor list topic-handlers "$1" "$2*" 2>/dev/null | awk 'NR>1 {print $2}' 2>/dev/null
 }
 
 _kapacitor_list_filtered()

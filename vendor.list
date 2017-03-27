@@ -8,6 +8,7 @@ github.com/evanphx/json-patch
 github.com/ghodss/yaml
 github.com/gogo/protobuf
 github.com/golang/protobuf
+github.com/google/uuid
 github.com/gorhill/cronexpr
 github.com/influxdata/influxdb master
 github.com/influxdata/usage-client
@@ -23,7 +24,6 @@ github.com/serenize/snaker
 github.com/shurcooL/go
 github.com/shurcooL/markdownfmt
 github.com/shurcooL/sanitized_anchor_name
-github.com/twinj/uuid
 golang.org/x/crypto master
 gopkg.in/gomail.v2
 gopkg.in/yaml.v2

@@ -26,8 +26,8 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/storage"
+	"github.com/influxdata/kapacitor/uuid"
 	"github.com/pkg/errors"
-	"github.com/twinj/uuid"
 )
 
 const streamEXT = ".srpl"
@@ -581,7 +581,7 @@ func (s *Service) handleRecordStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if opt.ID == "" {
-		opt.ID = uuid.NewV4().String()
+		opt.ID = uuid.New().String()
 	}
 	if !validID.MatchString(opt.ID) {
 		httpd.HttpError(w, fmt.Sprintf("recording ID must contain only letters, numbers, '-', '.' and '_'. %q", opt.ID), true, http.StatusBadRequest)
@@ -627,7 +627,7 @@ func (s *Service) handleRecordBatch(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	if opt.ID == "" {
-		opt.ID = uuid.NewV4().String()
+		opt.ID = uuid.New().String()
 	}
 	if !validID.MatchString(opt.ID) {
 		httpd.HttpError(w, fmt.Sprintf("recording ID must contain only letters, numbers, '-', '.' and '_'. %q", opt.ID), true, http.StatusBadRequest)
@@ -681,7 +681,7 @@ func (s *Service) handleRecordQuery(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	if opt.ID == "" {
-		opt.ID = uuid.NewV4().String()
+		opt.ID = uuid.New().String()
 	}
 	if !validID.MatchString(opt.ID) {
 		httpd.HttpError(w, fmt.Sprintf("recording ID must contain only letters, numbers, '-', '.' and '_'. %q", opt.ID), true, http.StatusBadRequest)
@@ -899,7 +899,7 @@ func (s *Service) handleCreateReplay(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	if opt.ID == "" {
-		opt.ID = uuid.NewV4().String()
+		opt.ID = uuid.New().String()
 	}
 	if !validID.MatchString(opt.ID) {
 		httpd.HttpError(w, fmt.Sprintf("replay ID must contain only letters, numbers, '-', '.' and '_'. %q", opt.ID), true, http.StatusBadRequest)
@@ -963,7 +963,7 @@ func (s *Service) handleReplayBatch(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	if opt.ID == "" {
-		opt.ID = uuid.NewV4().String()
+		opt.ID = uuid.New().String()
 	}
 	if !validID.MatchString(opt.ID) {
 		httpd.HttpError(w, fmt.Sprintf("replay ID must match %v %q", validID, opt.ID), true, http.StatusBadRequest)
@@ -1027,7 +1027,7 @@ func (r *Service) handleReplayQuery(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	if opt.ID == "" {
-		opt.ID = uuid.NewV4().String()
+		opt.ID = uuid.New().String()
 	}
 	if !validID.MatchString(opt.ID) {
 		httpd.HttpError(w, fmt.Sprintf("recording ID must match %v %q", validID, opt.ID), true, http.StatusBadRequest)

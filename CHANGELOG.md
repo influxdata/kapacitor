@@ -4,6 +4,42 @@
 
 ### Release Notes
 
+With this release the technical preview alerting service has been refactored.
+Alert handlers now only ever have a single action and belong to a single topic.
+
+The handler defintion has been simplified as a result.
+Here are some example alert handlers using the new structure:
+
+```yaml
+id: my_handler
+kind: pagerDuty
+options:
+  serviceKey: XXX
+```
+
+```yaml
+id: aggregate_by_1m
+kind: aggregate
+options:
+  interval: 1m
+  topic: aggregated
+```
+
+```yaml
+id: publish_to_system
+kind: publish
+options:
+  topics: [ system ]
+```
+
+To define a handler now you must specify which topic the handler belongs to.
+For example to define the above aggregate handler on the system topic use this command:
+
+```sh
+kapacitor define-handler system aggregate_by_1m.yaml
+```
+
+
 ### Features
 
 - [#1159](https://github.com/influxdata/kapacitor/pulls/1159): Go version 1.7.4 -> 1.7.5
@@ -14,6 +50,12 @@
 - [#1162](https://github.com/influxdata/kapacitor/pulls/1162): Add Pushover integration.
 - [#1221](https://github.com/influxdata/kapacitor/pull/1221): Add `working_cardinality` stat to each node type that tracks the number of groups per node.
 - [#1211](https://github.com/influxdata/kapacitor/issues/1211): Add StateDuration node.
+- [#1209](https://github.com/influxdata/kapacitor/issues/1209): BREAKING: Refactor the Alerting service.
+    The change is completely breaking for the technical preview alerting service, a.k.a. the new alert topic handler features.
+    The change boils down to simplifying how you define and interact with topics.
+    Alert handlers now only ever have a single action and belong to a single topic.
+    An automatic migration from old to new handler definitions will be performed during startup.
+    See the updated API docs.
 
 ### Bugfixes
 
