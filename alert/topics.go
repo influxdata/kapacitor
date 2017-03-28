@@ -293,8 +293,8 @@ func (t *Topic) EventStates(minLevel Level) map[string]EventState {
 
 func (t *Topic) EventState(event string) (EventState, bool) {
 	t.mu.RLock()
+	defer t.mu.RUnlock()
 	state, ok := t.events[event]
-	t.mu.RUnlock()
 	if ok {
 		return *state, true
 	}
