@@ -10,7 +10,7 @@ import (
 type ValueType uint8
 
 const (
-	InvalidType ValueType = iota << 1
+	InvalidType ValueType = iota
 	TFloat
 	TInt
 	TString
