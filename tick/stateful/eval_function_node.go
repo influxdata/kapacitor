@@ -43,7 +43,7 @@ func (n *EvalFunctionNode) Type(scope ReadOnlyScope, executionState ExecutionSta
 	}
 
 	for i, argEvaluator := range n.argsEvaluators {
-		t, err := argEvaluator.Type(scope, CreateExecutionState())
+		t, err := argEvaluator.Type(scope, executionState)
 		if err != nil {
 			return ast.InvalidType, fmt.Errorf("Failed to handle %v argument: %v", i+1, err)
 		}
@@ -183,7 +183,7 @@ func (n *EvalFunctionNode) EvalBool(scope *Scope, executionState ExecutionState)
 // eval - generic evaluation until we have reflection/introspection capabillities so we can know the type of args
 // and return type, we can remove this entirely
 func eval(n NodeEvaluator, scope *Scope, executionState ExecutionState) (interface{}, error) {
-	retType, err := n.Type(scope, CreateExecutionState())
+	retType, err := n.Type(scope, executionState)
 	if err != nil {
 		return nil, err
 	}

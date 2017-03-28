@@ -79,6 +79,7 @@ func (se *expression) EvalDuration(scope *Scope) (time.Duration, error) {
 }
 
 func (se *expression) Eval(scope *Scope) (interface{}, error) {
+	// TODO: Remove CreateExecutionState eventually
 	typ, err := se.nodeEvaluator.Type(scope, CreateExecutionState())
 	if err != nil {
 		return nil, err

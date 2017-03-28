@@ -35,6 +35,7 @@ type NodeEvaluator interface {
 	EvalTime(scope *Scope, executionState ExecutionState) (time.Time, error)
 	EvalDuration(scope *Scope, executionState ExecutionState) (time.Duration, error)
 
+	// TODO: Remove executionState from Type functions type signature
 	// Type returns the type of ast.ValueType
 	Type(scope ReadOnlyScope, executionState ExecutionState) (ast.ValueType, error)
 	// Whether the type returned by the node can change.
