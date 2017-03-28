@@ -280,13 +280,12 @@ func (e *EvalBinaryNode) evaluateDynamicNode(scope *Scope, executionState Execut
 	// For example: "count() == 1"
 	//  1. we evaluate the left side and counter is 1 (upper ^ in this function)
 	//  2. we evaluate the second time in "EvalBool"
-	typeExecutionState := CreateExecutionState()
 
-	if leftType, err = left.Type(scope, typeExecutionState); err != nil {
+	if leftType, err = left.Type(scope, executionState); err != nil {
 		return emptyResultContainer, &ErrSide{error: err, IsLeft: true}
 	}
 
-	if rightType, err = right.Type(scope, typeExecutionState); err != nil {
+	if rightType, err = right.Type(scope, executionState); err != nil {
 		return emptyResultContainer, &ErrSide{error: err, IsRight: true}
 	}
 
@@ -301,8 +300,7 @@ func (e *EvalBinaryNode) evaluateDynamicNode(scope *Scope, executionState Execut
 // Return an understandable error which is most specific to the issue.
 func (e *EvalBinaryNode) determineError(scope *Scope, executionState ExecutionState) error {
 	if scope != nil {
-		typeExecutionState := CreateExecutionState()
-		leftType, err := e.leftEvaluator.Type(scope, typeExecutionState)
+		leftType, err := e.leftEvaluator.Type(scope, executionState)
 		if err != nil {
 			return fmt.Errorf("can't get the type of the left node: %s", err)
 		}
@@ -312,7 +310,7 @@ func (e *EvalBinaryNode) determineError(scope *Scope, executionState ExecutionSt
 			return errors.New("left value is invalid value type")
 		}
 
-		rightType, err := e.rightEvaluator.Type(scope, typeExecutionState)
+		rightType, err := e.rightEvaluator.Type(scope, executionState)
 		if err != nil {
 			return fmt.Errorf("can't get the type of the right node: %s", err)
 		}

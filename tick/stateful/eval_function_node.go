@@ -32,15 +32,31 @@ func NewEvalFunctionNode(funcNode *ast.FunctionNode) (*EvalFunctionNode, error) 
 }
 
 func (n *EvalFunctionNode) Type(scope ReadOnlyScope, executionState ExecutionState) (ast.ValueType, error) {
-	// PERF: today we are evaluating the function, it will be much faster if will type info the function it self
-	result, err := n.callFunction(scope.(*Scope), executionState)
-	if err != nil {
-		return ast.InvalidType, err
+	f := executionState.Funcs[n.funcName]
+	if f == nil {
+		return ast.InvalidType, fmt.Errorf("undefined function: %q", n.funcName)
+	}
+	signature := f.Signature()
+
+	domain := Domain{}
+	if len(n.argsEvaluators) > len(domain) {
 	}
 
-	// We can't cache here the result (although it's very tempting ;))
-	// because can't trust function to return always the same consistent type
-	return ast.TypeOf(result), nil
+	for i, argEvaluator := range n.argsEvaluators {
+		t, err := argEvaluator.Type(scope, executionState)
+		if err != nil {
+			return ast.InvalidType, fmt.Errorf("Failed to handle %v argument: %v", i+1, err)
+		}
+		domain[i] = t
+	}
+
+	retType, ok := signature[domain]
+	if !ok {
+		// TODO: Cleanup error returned here
+		return ast.InvalidType, fmt.Errorf("Wrong function signature")
+	}
+
+	return retType, nil
 }
 
 func (n *EvalFunctionNode) IsDynamic() bool {
@@ -174,7 +190,7 @@ func (n *EvalFunctionNode) EvalBool(scope *Scope, executionState ExecutionState)
 // eval - generic evaluation until we have reflection/introspection capabillities so we can know the type of args
 // and return type, we can remove this entirely
 func eval(n NodeEvaluator, scope *Scope, executionState ExecutionState) (interface{}, error) {
-	retType, err := n.Type(scope, CreateExecutionState())
+	retType, err := n.Type(scope, executionState)
 	if err != nil {
 		return nil, err
 	}
