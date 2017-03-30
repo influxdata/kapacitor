@@ -56,6 +56,7 @@ kapacitor define-handler system aggregate_by_1m.yaml
     Alert handlers now only ever have a single action and belong to a single topic.
     An automatic migration from old to new handler definitions will be performed during startup.
     See the updated API docs.
+- [#1286](https://github.com/influxdata/kapacitor/issues/1286): Default HipChat URL should be blank
 
 ### Bugfixes
 
