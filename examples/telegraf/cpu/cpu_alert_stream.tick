@@ -30,10 +30,12 @@ var data = stream
     .measurement('cpu')
     .groupBy('host')
     .where(lambda: "cpu" == 'cpu-total')
+  |eval(lambda: 100.0 - "usage_idle")
+    .as('used')
   |window()
     .period(period)
     .every(every)
-  |mean('usage_user')
+  |mean('used')
     .as('stat')
 
 // Thresholds
