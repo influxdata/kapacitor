@@ -1,8 +1,6 @@
 package client
 
 import (
-	//	"bytes"
-	//	"io/ioutil"
         "crypto/tls"
 	"net/http"
 	"net/url"

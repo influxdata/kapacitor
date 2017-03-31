@@ -41,9 +41,8 @@ func (c Config) Validate() error {
 
 func (c Config) ClientConfig() (client.Config, error) {
 	var t *tls.Config
-        t = &tls.Config{}
-        t.InsecureSkipVerify = c.InsecureSkipVerify
 	if !c.InsecureSkipVerify && c.CAFile != "" {
+                t = &tls.Config{}
 		caCert, err := ioutil.ReadFile(c.CAFile)
 		if err != nil {
 			return client.Config{}, errors.Wrapf(err, "failed to read ca-path %q", c.CAFile)

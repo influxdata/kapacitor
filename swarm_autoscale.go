@@ -18,7 +18,6 @@ import (
 const (
 	statsSwarmIncreaseEventsCount = "increase_events"
 	statsSwarmDecreaseEventsCount = "decrease_events"
-	//statsSwarmErrorsCount         = "errors"
 	statsSwarmCooldownDropsCount  = "cooldown_drops"
 )
 
@@ -64,7 +63,7 @@ func newSwarmAutoscaleNode(et *ExecutingTask, n *pipeline.SwarmAutoscaleNode, l 
 	// Initialize the replicas lambda expression scope pool
 	if n.Replicas != nil {
 		kn.replicasExprs = make(map[models.GroupID]stateful.Expression)
-		kn.replicasScopePool = stateful.NewScopePool(stateful.FindReferenceVariables(n.Replicas.Expression))
+		kn.replicasScopePool = stateful.NewScopePool(ast.FindReferenceVariables(n.Replicas.Expression))
 	}
 	return kn, nil
 }
@@ -80,12 +79,11 @@ func (k *SwarmAutoscaleNode) runAutoscale([]byte) error {
 
 	k.increaseCount = &expvar.Int{}
 	k.decreaseCount = &expvar.Int{}
-	errorsCount := &expvar.Int{}
+	//errorsCount := &expvar.Int{}
 	k.cooldownDropsCount = &expvar.Int{}
 
 	k.statMap.Set(statsSwarmIncreaseEventsCount, k.increaseCount)
 	k.statMap.Set(statsSwarmDecreaseEventsCount, k.decreaseCount)
-	//k.statMap.Set(statsSwarmErrorsCount, errorsCount)
 	k.statMap.Set(statsSwarmCooldownDropsCount, k.cooldownDropsCount)
 
 	switch k.Wants() {
@@ -149,7 +147,6 @@ func (k *SwarmAutoscaleNode) handlePoint(streamName string, group models.GroupID
 		return models.Point{}, err
 	}
 	state, ok := k.resourceStates[name]
-        k.logger.Println("E!ok", ok)
         if !ok {	
 	        // If we haven't seen this resource before, get its state
 		service, err := k.client.Get(name)
@@ -157,7 +154,6 @@ func (k *SwarmAutoscaleNode) handlePoint(streamName string, group models.GroupID
 			return models.Point{}, errors.Wrapf(err, "could not determine initial scale for %s", name)
 		}
 		state.current = *service.Spec.Mode.Replicated.Replicas
-                k.logger.Println("E!6", state.current)
 		k.resourceStates[name] = state
 	}
 
