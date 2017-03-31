@@ -30,6 +30,7 @@ import (
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/snmptrap"
+	"github.com/influxdata/kapacitor/services/swarm"
 	"github.com/influxdata/kapacitor/services/stats"
 	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/influxdata/kapacitor/services/talk"
@@ -77,6 +78,7 @@ type Config struct {
 
 	// Third-party integrations
 	Kubernetes k8s.Config `toml:"kubernetes" override:"kubernetes"`
+	Swarm      swarm.Config     `toml:"swarm" override:"swarm"`
 
 	Reporting reporting.Config `toml:"reporting"`
 	Stats     stats.Config     `toml:"stats"`
@@ -105,6 +107,7 @@ func NewConfig() *Config {
 	c.InfluxDB = []influxdb.Config{influxdb.NewConfig()}
 	c.Logging = logging.NewConfig()
 	c.Kubernetes = k8s.NewConfig()
+	c.Swarm = swarm.NewConfig()
 	c.ConfigOverride = config.NewConfig()
 	c.Alert = alert.NewConfig()
 

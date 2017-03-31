@@ -25,6 +25,7 @@ import (
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/snmptrap"
+	swarm "github.com/influxdata/kapacitor/services/swarm/client"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/tick"
@@ -135,6 +136,9 @@ type TaskMaster struct {
 	K8sService interface {
 		Client() (k8s.Client, error)
 	}
+	SwarmService interface {
+		Client() (swarm.Client, error)
+	}
 	LogService LogService
 
 	Commander command.Commander
@@ -221,6 +225,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.TalkService = tm.TalkService
 	n.TimingService = tm.TimingService
 	n.K8sService = tm.K8sService
+	n.SwarmService = tm.SwarmService
 	n.Commander = tm.Commander
 	return n
 }
