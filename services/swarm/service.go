@@ -54,8 +54,7 @@ func (s *Service) Update(newConfig []interface{}) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to create swarm client config")
 	}
-	return s.client.Updateconfig(clientConfig)
-	return nil
+	return s.client.Update(clientConfig)
 }
 
 func (s *Service) TestOptions() interface{} {
@@ -65,12 +64,8 @@ func (s *Service) TestOptions() interface{} {
 func (s *Service) Test(options interface{}) error {
 	_, err := s.Client()
 	if err != nil {
-            return errors.Wrap(err, "failed to get client")
+		return errors.Wrap(err, "failed to get client")
 	}
-	//_, err = cli.Versions()
-	//if err != nil {
-	  //  return errors.Wrap(err, "failed to query server versions")
-	//}
 	return nil
 }
 

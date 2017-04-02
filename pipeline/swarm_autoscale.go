@@ -8,41 +8,35 @@ import (
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
-
-// K8sAutoscaleNode triggers autoscale events for a resource on a Kubernetes cluster.
+// SwarmAutoscaleNode triggers autoscale events for a service on a Docker Swarm mode cluster.
 // The node also outputs points for the triggered events.
 //
 // Example:
-//     // Target 100 requests per second per host
-//     var target = 100.0
+//     // Target 80% cpu per container
+//     var target = 80
 //     var min = 1
-//     var max = 100
+//     var max = 10
 //     var period = 5m
 //     var every = period
 //     stream
 //         |from()
-//             .measurement('requests')
-//             .groupBy('host', 'deployment')
-//             .truncate(1s)
-//         |derivative('value')
-//             .as('requests_per_second')
-//             .unit(1s)
-//             .nonNegative()
-//         |groupBy('deployment')
-//         |sum('requests_per_second')
-//             .as('total_requests')
+//             .measurement('docker_container_cpu')
+//             .groupBy('com.docker.swarm.service.name')
+//             .where(lambda: "cpu" == 'cpu-total')
+//         |sum('usage_percent')
+//             .as('total_cpu')
 //         |window()
 //             .period(period)
 //             .every(every)
-//         |mean('total_requests')
-//             .as('total_requests')
-//         |k8sAutoscale()
+//         |mean('total_cpu')
+//             .as('cpu_stat')
+//         |SwarmAutoscale()
 //             // Get the name of the deployment from the 'deployment' tag.
-//             .resourceNameTag('deployment')
+//             .serviceName('com.docker.swarm.service.name')
 //             .min(min)
 //             .max(max)
 //             // Set the desired number of replicas based on target.
-//             .replicas(lambda: int(ceil("total_requests" / target)))
+//             .replicas(lambda: int(ceil("cpu_stat" / target)))
 //         |influxDBOut()
 //             .database('deployments')
 //             .measurement('scale_events')
@@ -57,9 +51,9 @@ import (
 // If the desired number of replicas has changed, Kapacitor makes the appropriate API call to Kubernetes
 // to update the replicas spec.
 //
-// Any time the k8sAutoscale node changes a replica count, it emits a point.
-// The point is tagged with the namespace, kind and resource name,
-// using the NamespaceTag, KindTag, and ResourceTag properties respectively.
+// Any time the SwarmAutoscale node changes a replica count, it emits a point.
+// The point is tagged with the service name,
+// using the serviceName respectively
 // In addition the group by tags will be preserved on the emitted point.
 // The point contains two fields: `old`, and `new` representing change in the replicas.
 //
@@ -80,7 +74,7 @@ type SwarmAutoscaleNode struct {
 	// Useful for computing deltas on the current state.
 	//
 	// Example:
-	//    |k8sAutoscale()
+	//    |SwarmAutoscale()
 	//        .currentField('replicas')
 	//        // Increase the replicas by 1 if the qps is over the threshold
 	//        .replicas(lambda: if("qps" > threshold, "replicas" + 1, "replicas"))

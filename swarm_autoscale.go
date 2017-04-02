@@ -147,16 +147,15 @@ func (k *SwarmAutoscaleNode) handlePoint(streamName string, group models.GroupID
 		return models.Point{}, err
 	}
 	state, ok := k.resourceStates[name]
-        if !ok {	
-	        // If we haven't seen this resource before, get its state
-		service, err := k.client.Get(name)
+	if !ok {
+		// If we haven't seen this resource before, get its state
+		service, err := k.getResource(name)
 		if err != nil {
 			return models.Point{}, errors.Wrapf(err, "could not determine initial scale for %s", name)
 		}
 		state.current = *service.Spec.Mode.Replicated.Replicas
 		k.resourceStates[name] = state
 	}
-
 	// Eval the replicas expression
 	k.replicasExprsMu.Lock()
 	newReplicas, err := k.evalExpr(state.current, group, k.k.Replicas, k.replicasExprs, k.replicasScopePool, t, fields, tags)
@@ -217,7 +216,6 @@ func (k *SwarmAutoscaleNode) handlePoint(streamName string, group models.GroupID
 
 	// Only save the updated state if we were successful
 	k.resourceStates[name] = state
-
 	// Count event
 	counter.Add(1)
 
@@ -248,11 +246,11 @@ func (k *SwarmAutoscaleNode) handlePoint(streamName string, group models.GroupID
 func (k *SwarmAutoscaleNode) getResourceFromPoint(tags models.Tags) (name string, err error) {
 	// Get the name of the resource
 	switch {
-        case k.k.ServiceName != "":
-                t, ok := tags[k.k.ServiceName]
-                if ok {
-                        name = t
-                }
+	case k.k.ServiceName != "":
+		t, ok := tags[k.k.ServiceName]
+		if ok {
+			name = t
+		}
 	default:
 		return "", errors.New("expected ServiceName to be set")
 	}
@@ -262,9 +260,20 @@ func (k *SwarmAutoscaleNode) getResourceFromPoint(tags models.Tags) (name string
 	return
 }
 
+func (k *SwarmAutoscaleNode) getResource(name string) (*client.Service, error) {
+	scales := k.client.Scales(name)
+	service, err := scales.Get(name)
+	if err != nil {
+		return service, errors.Wrapf(err, "failed to get scale %s", name)
+	}
+
+	return service, errors.Wrapf(err, "failed to get the scale for resource %s", name)
+}
+
 func (k *SwarmAutoscaleNode) applyEvent(e swarmevent) error {
 	k.logger.Printf("D! setting scale replicas to %d was %d for %s", e.New, e.Old, e.Name)
-	service, err := k.client.Get(e.Name)
+	scales := k.client.Scales(e.Name)
+	service, err := k.getResource(e.Name)
 	if err != nil {
 		return err
 	}
@@ -273,7 +282,7 @@ func (k *SwarmAutoscaleNode) applyEvent(e swarmevent) error {
 	}
 	var replicaCount uint64 = e.New
 	service.Spec.Mode.Replicated.Replicas = &replicaCount
-	if err := k.client.Update(service); err != nil {
+	if err := scales.Update(e.Name, service); err != nil {
 		return errors.Wrapf(err, "failed to update the scale for resource %s", e.Name)
 	}
 	return nil

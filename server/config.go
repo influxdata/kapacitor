@@ -30,9 +30,9 @@ import (
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/snmptrap"
-	"github.com/influxdata/kapacitor/services/swarm"
 	"github.com/influxdata/kapacitor/services/stats"
 	"github.com/influxdata/kapacitor/services/storage"
+	"github.com/influxdata/kapacitor/services/swarm"
 	"github.com/influxdata/kapacitor/services/talk"
 	"github.com/influxdata/kapacitor/services/task_store"
 	"github.com/influxdata/kapacitor/services/telegram"
@@ -77,8 +77,8 @@ type Config struct {
 	VictorOps victorops.Config `toml:"victorops" override:"victorops"`
 
 	// Third-party integrations
-	Kubernetes k8s.Config `toml:"kubernetes" override:"kubernetes"`
-	Swarm      swarm.Config     `toml:"swarm" override:"swarm"`
+	Kubernetes k8s.Config   `toml:"kubernetes" override:"kubernetes"`
+	Swarm      swarm.Config `toml:"swarm" override:"swarm"`
 
 	Reporting reporting.Config `toml:"reporting"`
 	Stats     stats.Config     `toml:"stats"`
