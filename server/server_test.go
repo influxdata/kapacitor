@@ -6187,7 +6187,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 		{
 			section: "swarm",
 			setDefaults: func(c *server.Config) {
-				c.swarm.APIServers = []string{"http://localhost:80001"}
+				c.Swarm.APIServers = []string{"http://localhost:80001"}
 			},
 			expDefaultSection: client.ConfigSection{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/swarm"},
