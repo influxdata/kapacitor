@@ -6185,6 +6185,83 @@ func TestServer_UpdateConfig(t *testing.T) {
 			},
 		},
 		{
+			section: "swarm",
+			setDefaults: func(c *server.Config) {
+				c.swarm.APIServers = []string{"http://localhost:80001"}
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/swarm"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/swarm/"},
+					Options: map[string]interface{}{
+						"api-servers": []interface{}{"http://localhost:80001"},
+						"ca-file":     "",
+						"enabled":     false,
+						"key-file":    "",
+						"cert-file":   "",
+						"api-version": "v1.24",
+					},
+					Redacted: []string{
+						"api-version",
+					},
+				}},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/swarm/"},
+				Options: map[string]interface{}{
+					"api-servers": []interface{}{"http://localhost:80001"},
+					"ca-file":     "",
+					"enabled":     false,
+					"key-file":    "",
+					"cert-file":   "",
+					"api-version": "v1.24",
+				},
+				Redacted: []string{
+					"api-version",
+				},
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"api-version": "v1.24",
+						},
+					},
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/swarm"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/swarm/"},
+							Options: map[string]interface{}{
+								"api-servers": []interface{}{"http://localhost:80001"},
+								"ca-file":     "",
+								"enabled":     false,
+								"key-file":    "",
+								"cert-file":   "",
+								"api-version": "v1.24",
+							},
+							Redacted: []string{
+								"api-version",
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/swarm/"},
+						Options: map[string]interface{}{
+							"api-servers": []interface{}{"http://localhost:80001"},
+							"ca-file":     "",
+							"enabled":     false,
+							"key-file":    "",
+							"cert-file":   "",
+							"api-version": "v1.24",
+						},
+						Redacted: []string{
+							"api-version",
+						},
+					},
+				},
+			},
+		},
+		{
 			section: "talk",
 			setDefaults: func(c *server.Config) {
 				c.Talk.AuthorName = "Kapacitor"
@@ -6654,6 +6731,11 @@ func TestServer_ListServiceTests(t *testing.T) {
 				},
 			},
 			{
+				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/swarm"},
+				Name:    "swarm",
+				Options: nil,
+			},
+			{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/talk"},
 				Name: "talk",
 				Options: client.ServiceTestOptions{
@@ -6884,6 +6966,14 @@ func TestServer_DoServiceTest(t *testing.T) {
 			exp: client.ServiceTestResult{
 				Success: false,
 				Message: "service is not enabled",
+			},
+		},
+		{
+			service: "swarm",
+			options: client.ServiceTestOptions{},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "failed to get client: service is not enabled",
 			},
 		},
 		{
