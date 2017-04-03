@@ -24,6 +24,6 @@ docker run --rm \
     -e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
     -e AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
     ${VOLUME_OPTIONS} \
-    -v $DIR:/root/go/src/github.com/influxdata/kapacitor \
+    -v $DIR:/root/go/src/github.com/influxdata/kapacitor:Z \
     influxdata/kapacitor-builder \
     "$@"
