@@ -120,6 +120,12 @@ func (s *Service) Open() error {
 		return err
 	}
 
+	//TODO: Should we expose this via the API instead of doing it during every startup?
+	// This could be expensive and should not need to be run frequently.
+	if err := s.repairRecordingIndex(); err != nil {
+		return err
+	}
+
 	// Mark all running replays or recordings as failed since
 	// we are just starting and they cannot possibly be still running
 	s.markFailedRecordings()
@@ -271,6 +277,12 @@ func (s *Service) syncRecordingMetadata() error {
 		}
 	}
 	return nil
+}
+
+func (s *Service) repairRecordingIndex() error {
+	// Based on various upgrade paths it is possible for the recording date index to have bad values.
+	// This process removes dead indexes and adds missing indexes
+	return s.recordings.Repair()
 }
 
 func (s *Service) markFailedRecordings() {
@@ -1625,7 +1637,12 @@ func (s fileSource) Size() (int64, error) {
 }
 
 func (s fileSource) Remove() error {
-	return os.Remove(string(s))
+	err := os.Remove(string(s))
+	if err == os.ErrNotExist {
+		// Ignore file not exists errors as we are trying to remove the file.
+		return nil
+	}
+	return err
 }
 
 func (s fileSource) StreamWriter() (io.WriteCloser, error) {

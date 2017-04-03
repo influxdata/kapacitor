@@ -39,6 +39,9 @@ type RecordingDAO interface {
 	// Offset and limit are pagination bounds. Offset is inclusive starting at index 0.
 	// More results may exist while the number of returned items is equal to limit.
 	List(pattern string, offset, limit int) ([]Recording, error)
+
+	// Repair fixes all indexes of the data.
+	Repair() error
 }
 
 //--------------------------------------------------------------------
@@ -122,6 +125,10 @@ func newRecordingKV(store storage.Interface) (*recordingKV, error) {
 	return &recordingKV{
 		store: istore,
 	}, nil
+}
+
+func (kv *recordingKV) Repair() error {
+	return kv.store.Repair()
 }
 
 func (kv *recordingKV) error(err error) error {

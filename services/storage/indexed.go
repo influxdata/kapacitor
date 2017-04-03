@@ -2,10 +2,11 @@ package storage
 
 import (
 	"encoding"
-	"errors"
 	"fmt"
 	"path"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 const (
@@ -369,6 +370,59 @@ func (s *IndexedStore) list(tx ReadOnlyTx, index, pattern string, offset, limit 
 		objects[i] = o
 	}
 	return objects, nil
+}
+
+func (s *IndexedStore) Repair() error {
+	return s.store.Update(func(tx Tx) error {
+		return s.RepairTx(tx)
+	})
+}
+
+func (s *IndexedStore) RepairTx(tx Tx) error {
+	// Clean all indexes
+	for _, idx := range s.indexes {
+		if err := s.cleanIndex(tx, idx.Name); err != nil {
+			return errors.Wrapf(err, "failed to clean index %s", idx.Name)
+		}
+	}
+	// Walk all data and update existing index entries
+	data, err := tx.List(s.dataPrefix)
+	if err != nil {
+		return err
+	}
+	for _, kv := range data {
+		o := s.newObject()
+		err = o.UnmarshalBinary(kv.Value)
+		if err != nil {
+			return errors.Wrapf(err, "failed to unmarshal object with key: %q", kv.Key)
+		}
+		for _, idx := range s.indexes {
+			v, err := idx.ValueOf(o)
+			if err != nil {
+				return errors.Wrapf(err, "failed to get index value for object with key: %q", kv.Key)
+			}
+			key := s.indexKey(idx.Name, v)
+			err = tx.Put(key, []byte(o.ObjectID()))
+			if err != nil {
+				return errors.Wrapf(err, "failed to update index for object with key: %q", kv.Key)
+			}
+		}
+	}
+	return nil
+}
+
+// Clean index deletes all indexes entries.
+func (s *IndexedStore) cleanIndex(tx Tx, index string) error {
+	entries, err := tx.List(s.indexKey(index, "") + "/")
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if err := tx.Delete(entry.Key); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func ImpossibleTypeErr(exp interface{}, got interface{}) error {
