@@ -27,7 +27,7 @@ var data = stream
         .database('telegraf')
         .retentionPolicy('autogen')
         .measurement('disk')
-        .groupBy('host')
+        .groupBy('host', 'path')
     |window()
         .period(period)
         .every(every)
@@ -37,7 +37,7 @@ var data = stream
 // Thresholds
 var alert = data
     |alert()
-        .id('{{ index .Tags "host"}}/disk_used')
+        .id('{{ index .Tags "host"}}/disk_used/{{ index .Tags "path" }}')
         .message('{{ .ID }}:{{ index .Fields "stat" }}')
         .info(lambda: "stat" > info)
         .warn(lambda: "stat" > warn)

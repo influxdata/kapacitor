@@ -26,12 +26,12 @@ var data = batch
     |query('''SELECT mean(used_percent) AS stat FROM "telegraf"."autogen"."disk" WHERE path = '/' ''')
         .period(period)
         .every(every)
-        .groupBy('host')
+        .groupBy('host', 'path')
 
 // Thresholds
 var alert = data
     |alert()
-        .id('{{ index .Tags "host"}}/disk_used')
+        .id('{{ index .Tags "host"}}/disk_used/{{ index .Tags "path" }}')
         .message('{{ .ID }}:{{ index .Fields "stat" }}')
         .info(lambda: "stat" > info)
         .warn(lambda: "stat" > warn)

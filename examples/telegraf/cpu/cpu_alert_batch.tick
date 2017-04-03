@@ -24,7 +24,7 @@ var every = 10s
 
 // Dataframe
 var data = batch
-  |query('''SELECT mean(usage_user) AS stat FROM "telegraf"."autogen"."cpu" WHERE cpu = 'cpu-total' ''')
+  |query('''SELECT 100 - mean(usage_idle) AS stat FROM "telegraf"."autogen"."cpu" WHERE cpu = 'cpu-total' ''')
     .period(period)
     .every(every)
     .groupBy('host')
