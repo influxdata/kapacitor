@@ -6834,6 +6834,11 @@ func TestServer_ListServiceTests_WithPattern(t *testing.T) {
 					},
 				},
 			},
+			{
+				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/swarm"},
+				Name:    "swarm",
+				Options: nil,
+			},
 		},
 	}
 	if got, exp := serviceTests.Link.Href, expServiceTests.Link.Href; got != exp {
