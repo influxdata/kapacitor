@@ -6199,12 +6199,10 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"enabled":              false,
 						"key-file":             "",
 						"cert-file":            "",
-						"api-version":          "v1.24",
+						"api-version":          "",
 						"insecure-skip-verify": false,
 					},
-					Redacted: []string{
-						"api-version",
-					},
+					Redacted: nil,
 				}},
 			},
 			expDefaultElement: client.ConfigElement{
@@ -6215,18 +6213,18 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"enabled":              false,
 					"key-file":             "",
 					"cert-file":            "",
-					"api-version":          "v1.24",
+					"api-version":          "",
 					"insecure-skip-verify": false,
 				},
-				Redacted: []string{
-					"api-version",
-				},
+				Redacted: nil,
 			},
 			updates: []updateAction{
 				{
 					updateAction: client.ConfigUpdateAction{
 						Set: map[string]interface{}{
+							"api-servers": []string{"http://localhost:80001"},
 							"api-version": "v1.24",
+							"enabled":     true,
 						},
 					},
 					expSection: client.ConfigSection{
@@ -6236,15 +6234,13 @@ func TestServer_UpdateConfig(t *testing.T) {
 							Options: map[string]interface{}{
 								"api-servers":          []interface{}{"http://localhost:80001"},
 								"ca-file":              "",
-								"enabled":              false,
+								"enabled":              true,
 								"key-file":             "",
 								"cert-file":            "",
 								"api-version":          "v1.24",
 								"insecure-skip-verify": false,
 							},
-							Redacted: []string{
-								"api-version",
-							},
+							Redacted: nil,
 						}},
 					},
 					expElement: client.ConfigElement{
@@ -6252,15 +6248,13 @@ func TestServer_UpdateConfig(t *testing.T) {
 						Options: map[string]interface{}{
 							"api-servers":          []interface{}{"http://localhost:80001"},
 							"ca-file":              "",
-							"enabled":              false,
+							"enabled":              true,
 							"key-file":             "",
 							"cert-file":            "",
 							"api-version":          "v1.24",
 							"insecure-skip-verify": false,
 						},
-						Redacted: []string{
-							"api-version",
-						},
+						Redacted: nil,
 					},
 				},
 			},
