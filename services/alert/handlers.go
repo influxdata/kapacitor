@@ -189,7 +189,7 @@ func (h *tcpHandler) Handle(event alert.Event) {
 
 	conn, err := net.Dial("tcp", h.addr)
 	if err != nil {
-		h.logger.Printf("E! failed to connect to %s: %v", h.addr, err)
+		h.logger.Printf("E! tcp handler: failed to connect to %s: %v", h.addr, err)
 		return
 	}
 	defer conn.Close()
