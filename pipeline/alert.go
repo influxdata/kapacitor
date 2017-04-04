@@ -969,6 +969,10 @@ func (a *AlertNode) Sensu() *SensuHandler {
 // tick:embedded:AlertNode.Sensu
 type SensuHandler struct {
 	*AlertNode
+
+	// Sensu source in which to post messages.
+	// If empty uses the Source from the configuration.
+	Source string
 }
 
 // Send the alert to Pushover.
