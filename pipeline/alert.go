@@ -949,6 +949,7 @@ func (a *AlertaHandler) Services(service ...string) *AlertaHandler {
 //      enabled = true
 //      url = "http://sensu:3030"
 //      source = "Kapacitor"
+//      handlers = ["sns","slack"]
 //
 // Example:
 //    stream
@@ -956,6 +957,14 @@ func (a *AlertaHandler) Services(service ...string) *AlertaHandler {
 //             .sensu()
 //
 // Send alerts to Sensu client.
+//
+// Example:
+//    stream
+//         |alert()
+//             .sensu()
+//             .handlers('sns','slack')
+//
+// Send alerts to Sensu specifying the handlers
 //
 // tick:property
 func (a *AlertNode) Sensu() *SensuHandler {
@@ -973,6 +982,19 @@ type SensuHandler struct {
 	// Sensu source in which to post messages.
 	// If empty uses the Source from the configuration.
 	Source string
+
+	// Sensu handler list
+	// If empty uses the handler list from the configuration
+	// tick:ignore
+	HandlersList []string `tick:"Handlers"`
+}
+
+// List of effected services.
+// If not specified defaults to the Name of the stream.
+// tick:property
+func (s *SensuHandler) Handlers(handlers ...string) *SensuHandler {
+	s.HandlersList = handlers
+	return s
 }
 
 // Send the alert to Pushover.

@@ -217,7 +217,8 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 
 	for _, s := range n.SensuHandlers {
 		c := sensu.HandlerConfig{
-			Source: s.Source,
+			Source:   s.Source,
+			Handlers: s.HandlersList,
 		}
 		h, err := et.tm.SensuService.Handler(c, l)
 		if err != nil {

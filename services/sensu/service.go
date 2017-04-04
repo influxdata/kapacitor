@@ -55,18 +55,20 @@ func (s *Service) Update(newConfig []interface{}) error {
 }
 
 type testOptions struct {
-	Name   string      `json:"name"`
-	Source string      `json:"source"`
-	Output string      `json:"output"`
-	Level  alert.Level `json:"level"`
+	Name     string      `json:"name"`
+	Source   string      `json:"source"`
+	Output   string      `json:"output"`
+	Handlers []string    `json:"handlers"`
+	Level    alert.Level `json:"level"`
 }
 
 func (s *Service) TestOptions() interface{} {
 	return &testOptions{
-		Name:   "testName",
-		Source: "Kapacitor",
-		Output: "testOutput",
-		Level:  alert.Critical,
+		Name:     "testName",
+		Source:   "Kapacitor",
+		Output:   "testOutput",
+		Handlers: []string{},
+		Level:    alert.Critical,
 	}
 }
 
@@ -79,16 +81,17 @@ func (s *Service) Test(options interface{}) error {
 		o.Name,
 		o.Source,
 		o.Output,
+		o.Handlers,
 		o.Level,
 	)
 }
 
-func (s *Service) Alert(name, source, output string, level alert.Level) error {
+func (s *Service) Alert(name, source, output string, handlers []string, level alert.Level) error {
 	if !validNamePattern.MatchString(name) {
 		return fmt.Errorf("invalid name %q for sensu alert. Must match %v", name, validNamePattern)
 	}
 
-	addr, postData, err := s.prepareData(name, source, output, level)
+	addr, postData, err := s.prepareData(name, source, output, handlers, level)
 	if err != nil {
 		return err
 	}
@@ -114,7 +117,7 @@ func (s *Service) Alert(name, source, output string, level alert.Level) error {
 	return nil
 }
 
-func (s *Service) prepareData(name, source, output string, level alert.Level) (*net.TCPAddr, map[string]interface{}, error) {
+func (s *Service) prepareData(name, source, output string, handlers []string, level alert.Level) (*net.TCPAddr, map[string]interface{}, error) {
 
 	c := s.config()
 
@@ -144,6 +147,10 @@ func (s *Service) prepareData(name, source, output string, level alert.Level) (*
 	postData["source"] = source
 	postData["output"] = output
 	postData["status"] = status
+	if len(handlers) == 0 {
+		handlers = c.Handlers
+	}
+	postData["handlers"] = handlers
 
 	addr, err := net.ResolveTCPAddr("tcp", c.Addr)
 	if err != nil {
@@ -157,6 +164,10 @@ type HandlerConfig struct {
 	// Sensu source for which to post messages.
 	// If empty uses the source from the configuration.
 	Source string `mapstructure:"source"`
+
+	// Sensu handler list
+	// If empty uses the handler list from the configuration
+	Handlers []string `mapstructure:"handlers"`
 }
 
 type handler struct {
@@ -194,6 +205,7 @@ func (h *handler) Handle(event alert.Event) {
 		event.State.ID,
 		sourceStr,
 		event.State.Message,
+		h.c.Handlers,
 		event.State.Level,
 	); err != nil {
 		h.logger.Println("E! failed to send event to Sensu", err)
