@@ -6194,12 +6194,13 @@ func TestServer_UpdateConfig(t *testing.T) {
 				Elements: []client.ConfigElement{{
 					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/swarm/"},
 					Options: map[string]interface{}{
-						"api-servers": []interface{}{"http://localhost:80001"},
-						"ca-file":     "",
-						"enabled":     false,
-						"key-file":    "",
-						"cert-file":   "",
-						"api-version": "v1.24",
+						"api-servers":          []interface{}{"http://localhost:80001"},
+						"ca-file":              "",
+						"enabled":              false,
+						"key-file":             "",
+						"cert-file":            "",
+						"api-version":          "v1.24",
+						"insecure-skip-verify": false,
 					},
 					Redacted: []string{
 						"api-version",
@@ -6209,12 +6210,13 @@ func TestServer_UpdateConfig(t *testing.T) {
 			expDefaultElement: client.ConfigElement{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/swarm/"},
 				Options: map[string]interface{}{
-					"api-servers": []interface{}{"http://localhost:80001"},
-					"ca-file":     "",
-					"enabled":     false,
-					"key-file":    "",
-					"cert-file":   "",
-					"api-version": "v1.24",
+					"api-servers":          []interface{}{"http://localhost:80001"},
+					"ca-file":              "",
+					"enabled":              false,
+					"key-file":             "",
+					"cert-file":            "",
+					"api-version":          "v1.24",
+					"insecure-skip-verify": false,
 				},
 				Redacted: []string{
 					"api-version",
@@ -6232,12 +6234,13 @@ func TestServer_UpdateConfig(t *testing.T) {
 						Elements: []client.ConfigElement{{
 							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/swarm/"},
 							Options: map[string]interface{}{
-								"api-servers": []interface{}{"http://localhost:80001"},
-								"ca-file":     "",
-								"enabled":     false,
-								"key-file":    "",
-								"cert-file":   "",
-								"api-version": "v1.24",
+								"api-servers":          []interface{}{"http://localhost:80001"},
+								"ca-file":              "",
+								"enabled":              false,
+								"key-file":             "",
+								"cert-file":            "",
+								"api-version":          "v1.24",
+								"insecure-skip-verify": false,
 							},
 							Redacted: []string{
 								"api-version",
@@ -6247,12 +6250,13 @@ func TestServer_UpdateConfig(t *testing.T) {
 					expElement: client.ConfigElement{
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/swarm/"},
 						Options: map[string]interface{}{
-							"api-servers": []interface{}{"http://localhost:80001"},
-							"ca-file":     "",
-							"enabled":     false,
-							"key-file":    "",
-							"cert-file":   "",
-							"api-version": "v1.24",
+							"api-servers":          []interface{}{"http://localhost:80001"},
+							"ca-file":              "",
+							"enabled":              false,
+							"key-file":             "",
+							"cert-file":            "",
+							"api-version":          "v1.24",
+							"insecure-skip-verify": false,
 						},
 						Redacted: []string{
 							"api-version",

@@ -12,7 +12,7 @@ import (
 type Config struct {
 	Enabled            bool     `toml:"enabled" override:"enabled"`
 	APIServers         []string `toml:"api-servers" override:"api-servers"`
-	CAFile             string   `toml:"ca-file" override:"ca-path"`
+	CAFile             string   `toml:"ca-file" override:"ca-file"`
 	CertFile           string   `toml:"cert-file" override:"cert-file"`
 	KeyFile            string   `toml:"key-file" override:"key-file"`
 	APIVersion         string   `toml:"api-version" override:"api-version"`
