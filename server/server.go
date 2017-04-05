@@ -209,7 +209,7 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 		return nil, errors.Wrap(err, "kubernetes service")
 	}
 	if err := s.appendSwarmService(); err != nil {
-		return nil, errors.Wrap(err, "Swarm service")
+		return nil, errors.Wrap(err, "swarm service")
 	}
 
 	// Append extra input services

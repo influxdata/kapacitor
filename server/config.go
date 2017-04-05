@@ -243,6 +243,9 @@ func (c *Config) Validate() error {
 	if err := c.Slack.Validate(); err != nil {
 		return err
 	}
+	if err := c.Swarm.Validate(); err != nil {
+		return err
+	}
 	if err := c.Talk.Validate(); err != nil {
 		return err
 	}

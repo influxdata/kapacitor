@@ -21,34 +21,34 @@ import (
 //     stream
 //         |from()
 //             .measurement('docker_container_cpu')
-//             .groupBy('com.docker.swarm.service.name')
+//             .groupBy('container_name','com.docker.swarm.service.name')
 //             .where(lambda: "cpu" == 'cpu-total')
-//         |sum('usage_percent')
-//             .as('total_cpu')
+//         |mean('usage_percent')
+//             .as('mean_cpu')
 //         |window()
 //             .period(period)
 //             .every(every)
-//         |mean('total_cpu')
-//             .as('cpu_stat')
-//         |SwarmAutoscale()
+//         |sum('mean_cpu')
+//             .as('total_cpu')
+//         |swarmAutoscale()
 //             // Get the name of the deployment from the 'deployment' tag.
 //             .serviceName('com.docker.swarm.service.name')
 //             .min(min)
 //             .max(max)
 //             // Set the desired number of replicas based on target.
-//             .replicas(lambda: int(ceil("cpu_stat" / target)))
+//             .replicas(lambda: int(ceil("total_cpu" / target)))
 //         |influxDBOut()
 //             .database('deployments')
 //             .measurement('scale_events')
 //             .precision('s')
 //
 //
-// The above example computes the requests per second by deployment and host.
-// Then the total_requests per second across all hosts is computed per deployment.
-// Using the mean of the total_requests over the last time period a desired number of replicas is computed
-// based on the target number of request per second per host.
+// The above example computes the mean of cpu usage_percent by container name and service name.
+// Then sum of mean cpu_usage is calculated as total_cpu.
+// Using the total_cpu over the last time period a desired number of replicas is computed
+// based on the target percentage usage of cpu.
 //
-// If the desired number of replicas has changed, Kapacitor makes the appropriate API call to Kubernetes
+// If the desired number of replicas has changed, Kapacitor makes the appropriate API call to Docker Swarm
 // to update the replicas spec.
 //
 // Any time the SwarmAutoscale node changes a replica count, it emits a point.
@@ -66,7 +66,7 @@ import (
 //
 type SwarmAutoscaleNode struct {
 	chainnode
-	// ResourceName is the name of the resource to autoscale.
+	// ServiceName is the name of the docker swarm service to autoscale.
 	ServiceName string
 
 	// CurrentField is the name of a field into which the current replica count will be set as an int.
@@ -74,7 +74,7 @@ type SwarmAutoscaleNode struct {
 	// Useful for computing deltas on the current state.
 	//
 	// Example:
-	//    |SwarmAutoscale()
+	//    |swarmAutoscale()
 	//        .currentField('replicas')
 	//        // Increase the replicas by 1 if the qps is over the threshold
 	//        .replicas(lambda: if("qps" > threshold, "replicas" + 1, "replicas"))
@@ -109,7 +109,7 @@ func newSwarmAutoscaleNode(e EdgeType) *SwarmAutoscaleNode {
 
 func (n *SwarmAutoscaleNode) validate() error {
 	if n.ServiceName == "" {
-		return fmt.Errorf("must specify exactly one of SwarmName")
+		return fmt.Errorf("must specify exactly one of ServiceName")
 	}
 	if n.Min < 1 {
 		return fmt.Errorf("min must be >= 1, got %d", n.Min)
