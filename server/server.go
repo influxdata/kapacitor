@@ -35,6 +35,7 @@ import (
 	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/replay"
 	"github.com/influxdata/kapacitor/services/reporting"
+	"github.com/influxdata/kapacitor/services/scraper"
 	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/servicetest"
 	"github.com/influxdata/kapacitor/services/slack"
@@ -89,6 +90,7 @@ type Server struct {
 	ConfigOverrideService *config.Service
 	TesterService         *servicetest.Service
 	StatsService          *stats.Service
+	ScraperService        *scraper.Service
 
 	MetaClient    *kapacitor.NoopMetaClient
 	QueryExecutor *Queryexecutor
@@ -224,7 +226,7 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	// to be reported
 	s.appendStatsService()
 	s.appendReportingService()
-
+	s.appendScraperService()
 	// Append HTTPD Service last so that the API is not listening till everything else succeeded.
 	s.appendHTTPDService()
 
@@ -634,6 +636,16 @@ func (s *Server) appendReportingService() {
 
 		s.AppendService("reporting", srv)
 	}
+}
+
+func (s *Server) appendScraperService() {
+	c := s.config.Scraper
+	l := s.LogService.NewLogger("[scraper] ", log.LstdFlags)
+	srv := scraper.NewService(c, l)
+	srv.PointsWriter = s.TaskMaster
+	s.ScraperService = srv
+	s.SetDynamicService("scraper", srv)
+	s.AppendService("scraper", srv)
 }
 
 // Err returns an error channel that multiplexes all out of band errors received from all services.

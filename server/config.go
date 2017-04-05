@@ -25,6 +25,7 @@ import (
 	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/replay"
 	"github.com/influxdata/kapacitor/services/reporting"
+	"github.com/influxdata/kapacitor/services/scraper"
 	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
@@ -50,6 +51,7 @@ type Config struct {
 	Storage        storage.Config    `toml:"storage"`
 	Task           task_store.Config `toml:"task"`
 	InfluxDB       []influxdb.Config `toml:"influxdb" override:"influxdb,element-key=name"`
+	Scraper        scraper.Config    `toml:"scraper" override:"scraper"`
 	Logging        logging.Config    `toml:"logging"`
 	ConfigOverride config.Config     `toml:"config-override"`
 
@@ -101,6 +103,7 @@ func NewConfig() *Config {
 	c.Replay = replay.NewConfig()
 	c.Task = task_store.NewConfig()
 	c.InfluxDB = []influxdb.Config{influxdb.NewConfig()}
+	c.Scraper = scraper.NewConfig()
 	c.Logging = logging.NewConfig()
 	c.Kubernetes = k8s.NewConfig()
 	c.ConfigOverride = config.NewConfig()
