@@ -496,7 +496,7 @@ func (e Element) Redacted() (map[string]interface{}, []string, error) {
 	return walker.optionsMap(), walker.redactedList(), nil
 }
 
-// getElementKey returns the name of the field taht is used to uniquely identify elements of a list.
+// getElementKey returns the name of the field that is used to uniquely identify elements of a list.
 func getElementKey(f reflect.StructField) string {
 	parts := strings.Split(f.Tag.Get(structTagKey), ",")
 	if len(parts) > 1 {
@@ -633,12 +633,14 @@ type sectionWalker struct {
 	sections           map[string]Section
 	currentSectionName string
 	elementKeys        map[string]string
+	uniqueElements     map[string]bool
 }
 
 func newSectionWalker() *sectionWalker {
 	return &sectionWalker{
-		sections:    make(map[string]Section),
-		elementKeys: make(map[string]string),
+		sections:       make(map[string]Section),
+		elementKeys:    make(map[string]string),
+		uniqueElements: make(map[string]bool),
 	}
 }
 
@@ -707,6 +709,11 @@ func (w *sectionWalker) SliceElem(idx int, v reflect.Value) error {
 		} else {
 			return fmt.Errorf("could not find field with the name of the element key %q on element object", elementKey)
 		}
+
+		if w.uniqueElements[element] {
+			return fmt.Errorf("section %q has duplicate elements: %q", w.currentSectionName, element)
+		}
+		w.uniqueElements[element] = true
 		w.sections[w.currentSectionName] = append(w.sections[w.currentSectionName], Element{
 			value:   v.Interface(),
 			element: element,

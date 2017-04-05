@@ -140,24 +140,24 @@ fi
 case $ENVIRONMENT_INDEX in
     0)
         # 64 bit tests
-        run_test_docker Dockerfile_build_ubuntu64 test_64bit --debug --test --generate $no_uncommitted_arg
+        run_test_docker Dockerfile_build_ubuntu64 test_64bit --test --generate $no_uncommitted_arg
         rc=$?
         ;;
     1)
         # 64 bit race tests
         GORACE="halt_on_error=1"
-        run_test_docker Dockerfile_build_ubuntu64 test_64bit_race --debug --test --generate $no_uncommitted_arg --race
+        run_test_docker Dockerfile_build_ubuntu64 test_64bit_race --test --generate $no_uncommitted_arg --race
         rc=$?
         ;;
     2)
         # 32 bit tests
-        run_test_docker Dockerfile_build_ubuntu32 test_32bit --debug --test --generate $no_uncommitted_arg --arch=i386
+        run_test_docker Dockerfile_build_ubuntu32 test_32bit --test --generate $no_uncommitted_arg --arch=i386
         rc=$?
         ;;
     #3)
     #    # 64 bit tests on golang HEAD
     #    GO_CHECKOUT=HEAD
-    #    run_test_docker Dockerfile_build_ubuntu64_git test_64bit_go_tip --debug --test --generate $no_uncommitted_arg
+    #    run_test_docker Dockerfile_build_ubuntu64_git test_64bit_go_tip --test --generate $no_uncommitted_arg
     #    rc=$?
     #    ;;
     "save")

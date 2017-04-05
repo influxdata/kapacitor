@@ -29,6 +29,11 @@ required = ["github.com/benbjohnson/tmpl","github.com/golang/protobuf/protoc-gen
   name = "github.com/mitchellh/mapstructure"
 
 [[dependencies]]
+  branch = "go-discovery-logger"
+  name = "github.com/prometheus/prometheus"
+  source = "github.com/goller/prometheus"
+
+[[dependencies]]
   branch = "master"
   name = "github.com/shurcooL/markdownfmt"
 

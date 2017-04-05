@@ -5,12 +5,14 @@ import (
 	"crypto/x509"
 	"io/ioutil"
 
+	"github.com/influxdata/kapacitor/listmap"
 	"github.com/influxdata/kapacitor/services/k8s/client"
 	"github.com/pkg/errors"
 )
 
 type Config struct {
 	Enabled    bool     `toml:"enabled" override:"enabled"`
+	ID         string   `toml:"id" override:"id"`
 	InCluster  bool     `toml:"in-cluster" override:"in-cluster"`
 	APIServers []string `toml:"api-servers" override:"api-servers"`
 	Token      string   `toml:"token" override:"token,redact"`
@@ -69,4 +71,24 @@ func (c Config) ClientConfig() (client.Config, error) {
 		Token:     c.Token,
 		TLSConfig: t,
 	}, nil
+}
+
+type Configs []Config
+
+func (cs *Configs) UnmarshalTOML(data interface{}) error {
+	return listmap.DoUnmarshalTOML(cs, data)
+}
+
+func (cs Configs) Validate() error {
+	l := len(cs)
+	for _, c := range cs {
+		if err := c.Validate(); err != nil {
+			return err
+		}
+		// ID must not be empty when we have more than one.
+		if l > 1 && c.ID == "" {
+			return errors.New("id must not be empty")
+		}
+	}
+	return nil
 }
