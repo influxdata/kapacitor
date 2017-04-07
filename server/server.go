@@ -254,6 +254,8 @@ func (s *Server) appendStorageService() {
 	l := s.LogService.NewLogger("[storage] ", log.LstdFlags)
 	srv := storage.NewService(s.config.Storage, l)
 
+	srv.HTTPDService = s.HTTPDService
+
 	s.StorageService = srv
 	s.AppendService("storage", srv)
 }

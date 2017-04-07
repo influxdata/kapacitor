@@ -57,6 +57,7 @@ kapacitor define-handler system aggregate_by_1m.yaml
     An automatic migration from old to new handler definitions will be performed during startup.
     See the updated API docs.
 - [#1286](https://github.com/influxdata/kapacitor/issues/1286): Default HipChat URL should be blank
+- [#507](https://github.com/influxdata/kapacitor/issues/507): Add API endpoint for performing Kapacitor database backups.
 
 ### Bugfixes
 

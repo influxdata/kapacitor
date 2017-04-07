@@ -27,6 +27,8 @@ type OverrideDAO interface {
 
 	// List all overrides whose ID starts with the given prefix
 	List(prefix string) ([]Override, error)
+
+	Rebuild() error
 }
 
 //--------------------------------------------------------------------
@@ -125,4 +127,8 @@ func (kv *overrideKV) List(prefix string) ([]Override, error) {
 		overrides[i] = *o
 	}
 	return overrides, nil
+}
+
+func (kv *overrideKV) Rebuild() error {
+	return kv.store.Rebuild()
 }

@@ -372,16 +372,18 @@ func (s *IndexedStore) list(tx ReadOnlyTx, index, pattern string, offset, limit 
 	return objects, nil
 }
 
-func (s *IndexedStore) Repair() error {
+// Rebuild completely rebuilds all indexes for the store.
+func (s *IndexedStore) Rebuild() error {
 	return s.store.Update(func(tx Tx) error {
-		return s.RepairTx(tx)
+		return s.RebuildTx(tx)
 	})
 }
 
-func (s *IndexedStore) RepairTx(tx Tx) error {
-	// Clean all indexes
+// Rebuild completely rebuilds all indexes for the store using the provided transaction.
+func (s *IndexedStore) RebuildTx(tx Tx) error {
+	// Delete all indexes
 	for _, idx := range s.indexes {
-		if err := s.cleanIndex(tx, idx.Name); err != nil {
+		if err := s.deleteIndex(tx, idx.Name); err != nil {
 			return errors.Wrapf(err, "failed to clean index %s", idx.Name)
 		}
 	}
@@ -411,8 +413,8 @@ func (s *IndexedStore) RepairTx(tx Tx) error {
 	return nil
 }
 
-// Clean index deletes all indexes entries.
-func (s *IndexedStore) cleanIndex(tx Tx, index string) error {
+// deleteIndex deletes all indexes entries.
+func (s *IndexedStore) deleteIndex(tx Tx, index string) error {
 	entries, err := tx.List(s.indexKey(index, "") + "/")
 	if err != nil {
 		return err

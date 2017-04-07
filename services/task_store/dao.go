@@ -41,6 +41,8 @@ type TaskDAO interface {
 	// Offset and limit are pagination bounds. Offset is inclusive starting at index 0.
 	// More results may exist while the number of returned items is equal to limit.
 	List(pattern string, offset, limit int) ([]Task, error)
+
+	Rebuild() error
 }
 
 // Data access object for Template data.
@@ -244,6 +246,10 @@ func (kv *taskKV) List(pattern string, offset, limit int) ([]Task, error) {
 		tasks[i] = *t
 	}
 	return tasks, nil
+}
+
+func (kv *taskKV) Rebuild() error {
+	return kv.store.Rebuild()
 }
 
 const (

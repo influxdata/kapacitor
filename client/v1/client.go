@@ -6,7 +6,9 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"path"
@@ -46,6 +48,9 @@ const (
 	topicsPath        = alertsPath + "/topics"
 	topicEventsPath   = "events"
 	topicHandlersPath = "handlers"
+	storagePath       = basePath + "/storage"
+	storesPath        = storagePath + "/stores"
+	backupPath        = storagePath + "/backup"
 )
 
 // HTTP configuration for connecting to Kapacitor
@@ -588,10 +593,7 @@ func (c *Client) BaseURL() url.URL {
 	return *c.url
 }
 
-// Perform the request.
-// If result is not nil the response body is JSON decoded into result.
-// Codes is a list of valid response codes.
-func (c *Client) Do(req *http.Request, result interface{}, codes ...int) (*http.Response, error) {
+func (c *Client) prepRequest(req *http.Request) error {
 	req.Header.Set("User-Agent", c.userAgent)
 	if c.credentials != nil {
 		switch c.credentials.Method {
@@ -600,8 +602,36 @@ func (c *Client) Do(req *http.Request, result interface{}, codes ...int) (*http.
 		case BearerAuthentication:
 			req.Header.Set("Authorization", "Bearer "+c.credentials.Token)
 		default:
-			return nil, errors.New("unknown authentication method set")
+			return errors.New("unknown authentication method set")
 		}
+	}
+	return nil
+}
+
+func (c *Client) decodeError(resp *http.Response) error {
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	type errResp struct {
+		Error string `json:"error"`
+	}
+	d := json.NewDecoder(bytes.NewReader(body))
+	rp := errResp{}
+	d.Decode(&rp)
+	if rp.Error != "" {
+		return errors.New(rp.Error)
+	}
+	return fmt.Errorf("invalid response: code %d: body: %s", resp.StatusCode, string(body))
+}
+
+// Perform the request.
+// If result is not nil the response body is JSON decoded into result.
+// Codes is a list of valid response codes.
+func (c *Client) Do(req *http.Request, result interface{}, codes ...int) (*http.Response, error) {
+	err := c.prepRequest(req)
+	if err != nil {
+		return nil, err
 	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -617,20 +647,7 @@ func (c *Client) Do(req *http.Request, result interface{}, codes ...int) (*http.
 		}
 	}
 	if !valid {
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return nil, err
-		}
-		type errResp struct {
-			Error string `json:"error"`
-		}
-		d := json.NewDecoder(bytes.NewReader(body))
-		rp := errResp{}
-		d.Decode(&rp)
-		if rp.Error != "" {
-			return nil, errors.New(rp.Error)
-		}
-		return nil, fmt.Errorf("invalid response: code %d: body: %s", resp.StatusCode, string(body))
+		return nil, c.decodeError(resp)
 	}
 	if result != nil {
 		d := json.NewDecoder(resp.Body)
@@ -702,6 +719,9 @@ func (c *Client) TopicHandlersLink(topic string) Link {
 }
 func (c *Client) TopicHandlerLink(topic, id string) Link {
 	return Link{Relation: Self, Href: path.Join(topicsPath, topic, topicHandlersPath, id)}
+}
+func (c *Client) StorageLink(name string) Link {
+	return Link{Relation: Self, Href: path.Join(storesPath, name)}
 }
 
 type CreateTaskOptions struct {
@@ -2075,6 +2095,117 @@ func (c *Client) ListTopicHandlers(link Link, opt *ListTopicHandlersOptions) (To
 		return handlers, err
 	}
 	return handlers, nil
+}
+
+type StorageList struct {
+	Link    Link      `json:"link"`
+	Storage []Storage `json:"storage"`
+}
+
+type Storage struct {
+	Link Link   `json:"link"`
+	Name string `json:"name"`
+}
+
+type StorageAction int
+
+const (
+	_ StorageAction = iota
+	StorageRebuild
+)
+
+func (sa StorageAction) MarshalText() ([]byte, error) {
+	switch sa {
+	case StorageRebuild:
+		return []byte("rebuild"), nil
+	default:
+		return nil, fmt.Errorf("unknown StorageAction %d", sa)
+	}
+}
+
+func (sa *StorageAction) UnmarshalText(text []byte) error {
+	switch s := string(text); s {
+	case "rebuild":
+		*sa = StorageRebuild
+	default:
+		return fmt.Errorf("unknown StorageAction %s", s)
+	}
+	return nil
+}
+
+func (sa StorageAction) String() string {
+	s, err := sa.MarshalText()
+	if err != nil {
+		return err.Error()
+	}
+	return string(s)
+}
+
+type StorageActionOptions struct {
+	Action StorageAction `json:"action"`
+}
+
+func (c *Client) ListStorage() (StorageList, error) {
+	list := StorageList{}
+	u := *c.url
+	u.Path = storesPath
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return list, err
+	}
+
+	_, err = c.Do(req, &list, http.StatusOK)
+	if err != nil {
+		return list, err
+	}
+	return list, nil
+}
+
+func (c *Client) DoStorageAction(l Link, opt StorageActionOptions) error {
+	u := *c.url
+	u.Path = l.Href
+
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	err := enc.Encode(opt)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequest("POST", u.String(), &buf)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	_, err = c.Do(req, nil, http.StatusNoContent)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// StorageBackup requests a backup of all storage from Kapacitor.
+// A short read is possible, to verify that the backup was successful
+// check that the number of bytes read matches the returned size.
+func (c *Client) StorageBackup() (int64, io.ReadCloser, error) {
+	u := *c.url
+	u.Path = backupPath
+	log.Println("D! PATH", backupPath)
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return 0, nil, err
+	}
+	err = c.prepRequest(req)
+	if err != nil {
+		return 0, nil, err
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return 0, nil, err
+	}
+	return resp.ContentLength, resp.Body, nil
 }
 
 type LogLevelOptions struct {

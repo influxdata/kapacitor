@@ -61,7 +61,8 @@ type Route struct {
 	Method      string
 	Pattern     string
 	HandlerFunc interface{}
-	noJSON      bool
+	NoGzip      bool
+	NoJSON      bool
 }
 
 // Handler represents an HTTP handler for the Kapacitor API server.
@@ -201,31 +202,31 @@ func NewHandler(
 			Method:      "GET",
 			Pattern:     BasePath + "/debug/pprof/",
 			HandlerFunc: servePprof,
-			noJSON:      true,
+			NoJSON:      true,
 		},
 		{
 			Method:      "GET",
 			Pattern:     BasePath + "/debug/pprof/cmdline",
 			HandlerFunc: pprof.Cmdline,
-			noJSON:      true,
+			NoJSON:      true,
 		},
 		{
 			Method:      "GET",
 			Pattern:     BasePath + "/debug/pprof/profile",
 			HandlerFunc: pprof.Profile,
-			noJSON:      true,
+			NoJSON:      true,
 		},
 		{
 			Method:      "GET",
 			Pattern:     BasePath + "/debug/pprof/symbol",
 			HandlerFunc: pprof.Symbol,
-			noJSON:      true,
+			NoJSON:      true,
 		},
 		{
 			Method:      "GET",
 			Pattern:     BasePath + "/debug/pprof/trace",
 			HandlerFunc: pprof.Trace,
-			noJSON:      true,
+			NoJSON:      true,
 		},
 		{
 			Method:      "GET",
@@ -300,10 +301,10 @@ func (h *Handler) addRawRoute(r Route) error {
 	}
 
 	// Set basic handlers for all requests
-	if !r.noJSON {
+	if !r.NoJSON {
 		handler = jsonContent(handler)
 	}
-	if h.allowGzip {
+	if !r.NoGzip && h.allowGzip {
 		handler = gzipFilter(handler)
 	}
 	handler = versionHeader(handler, h)

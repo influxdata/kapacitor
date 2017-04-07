@@ -61,6 +61,7 @@ type Service struct {
 
 	StorageService interface {
 		Store(namespace string) storage.Interface
+		Register(name string, store storage.StoreActioner)
 	}
 	TaskStore interface {
 		Load(id string) (*kapacitor.Task, error)
@@ -95,9 +96,15 @@ func NewService(conf Config, l *log.Logger) *Service {
 	}
 }
 
-// The storage namespace for all recording data.
-const recordingNamespace = "recording_store"
-const replayNamespace = "replay_store"
+const (
+	// Public name for the recordings store
+	recordingsAPIName = "recordings"
+	// Public name for the replays store
+	replaysAPIName = "replays"
+	// The storage namespace for all recording data.
+	recordingNamespace = "recording_store"
+	replayNamespace    = "replay_store"
+)
 
 func (s *Service) Open() error {
 	// Create DAO
@@ -106,23 +113,19 @@ func (s *Service) Open() error {
 		return err
 	}
 	s.recordings = recordings
+	s.StorageService.Register(recordingsAPIName, s.recordings)
 	replays, err := newReplayKV(s.StorageService.Store(replayNamespace))
 	if err != nil {
 		return err
 	}
 	s.replays = replays
+	s.StorageService.Register(replaysAPIName, s.replays)
 
 	if err := os.MkdirAll(s.saveDir, 0755); err != nil {
 		return err
 	}
 
 	if err := s.syncRecordingMetadata(); err != nil {
-		return err
-	}
-
-	//TODO: Should we expose this via the API instead of doing it during every startup?
-	// This could be expensive and should not need to be run frequently.
-	if err := s.repairRecordingIndex(); err != nil {
 		return err
 	}
 
@@ -277,12 +280,6 @@ func (s *Service) syncRecordingMetadata() error {
 		}
 	}
 	return nil
-}
-
-func (s *Service) repairRecordingIndex() error {
-	// Based on various upgrade paths it is possible for the recording date index to have bad values.
-	// This process removes dead indexes and adds missing indexes
-	return s.recordings.Repair()
 }
 
 func (s *Service) markFailedRecordings() {
