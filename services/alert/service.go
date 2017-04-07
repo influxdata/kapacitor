@@ -94,7 +94,7 @@ type Service struct {
 	}
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(l *log.Logger) *Service {
 	s := &Service{
 		handlers:     make(map[string]map[string]handler),
 		closedTopics: make(map[string]bool),
