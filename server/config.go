@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor/command"
-	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/config"
 	"github.com/influxdata/kapacitor/services/deadman"
@@ -53,7 +52,6 @@ type Config struct {
 	InfluxDB       []influxdb.Config `toml:"influxdb" override:"influxdb,element-key=name"`
 	Logging        logging.Config    `toml:"logging"`
 	ConfigOverride config.Config     `toml:"config-override"`
-	Alert          alert.Config      `toml:"alert"`
 
 	// Input services
 	Graphites []graphite.Config `toml:"graphite"`
@@ -106,7 +104,6 @@ func NewConfig() *Config {
 	c.Logging = logging.NewConfig()
 	c.Kubernetes = k8s.NewConfig()
 	c.ConfigOverride = config.NewConfig()
-	c.Alert = alert.NewConfig()
 
 	c.Collectd = collectd.NewConfig()
 	c.OpenTSDB = opentsdb.NewConfig()
