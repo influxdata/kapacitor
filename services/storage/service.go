@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/boltdb/bolt"
+	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/pkg/errors"
 )
 
@@ -17,7 +18,15 @@ type Service struct {
 	stores map[string]Interface
 	mu     sync.Mutex
 
+	registrar StoreActionerRegistrar
+	apiServer *APIServer
+
 	versions Versions
+
+	HTTPDService interface {
+		AddRoutes([]httpd.Route) error
+		DelRoutes([]httpd.Route)
+	}
 
 	logger *log.Logger
 }
@@ -47,6 +56,18 @@ func (s *Service) Open() error {
 	}
 	s.boltdb = db
 
+	s.registrar = NewStorageResitrar()
+	s.apiServer = &APIServer{
+		DB:           s.boltdb,
+		Registrar:    s.registrar,
+		HTTPDService: s.HTTPDService,
+		logger:       s.logger,
+	}
+
+	if err := s.apiServer.Open(); err != nil {
+		return err
+	}
+
 	s.versions = NewVersions(s.store(versionsNamespace))
 
 	return nil
@@ -55,6 +76,11 @@ func (s *Service) Open() error {
 func (s *Service) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.apiServer != nil {
+		if err := s.apiServer.Close(); err != nil {
+			return err
+		}
+	}
 	if s.boltdb != nil {
 		return s.boltdb.Close()
 	}
@@ -81,4 +107,8 @@ func (s *Service) store(name string) Interface {
 
 func (s *Service) Versions() Versions {
 	return s.versions
+}
+
+func (s *Service) Register(name string, store StoreActioner) {
+	s.registrar.Register(name, store)
 }

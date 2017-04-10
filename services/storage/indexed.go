@@ -2,10 +2,11 @@ package storage
 
 import (
 	"encoding"
-	"errors"
 	"fmt"
 	"path"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 const (
@@ -369,6 +370,61 @@ func (s *IndexedStore) list(tx ReadOnlyTx, index, pattern string, offset, limit 
 		objects[i] = o
 	}
 	return objects, nil
+}
+
+// Rebuild completely rebuilds all indexes for the store.
+func (s *IndexedStore) Rebuild() error {
+	return s.store.Update(func(tx Tx) error {
+		return s.RebuildTx(tx)
+	})
+}
+
+// Rebuild completely rebuilds all indexes for the store using the provided transaction.
+func (s *IndexedStore) RebuildTx(tx Tx) error {
+	// Delete all indexes
+	for _, idx := range s.indexes {
+		if err := s.deleteIndex(tx, idx.Name); err != nil {
+			return errors.Wrapf(err, "failed to clean index %s", idx.Name)
+		}
+	}
+	// Walk all data and update existing index entries
+	data, err := tx.List(s.dataPrefix)
+	if err != nil {
+		return err
+	}
+	for _, kv := range data {
+		o := s.newObject()
+		err = o.UnmarshalBinary(kv.Value)
+		if err != nil {
+			return errors.Wrapf(err, "failed to unmarshal object with key: %q", kv.Key)
+		}
+		for _, idx := range s.indexes {
+			v, err := idx.ValueOf(o)
+			if err != nil {
+				return errors.Wrapf(err, "failed to get index value for object with key: %q", kv.Key)
+			}
+			key := s.indexKey(idx.Name, v)
+			err = tx.Put(key, []byte(o.ObjectID()))
+			if err != nil {
+				return errors.Wrapf(err, "failed to update index for object with key: %q", kv.Key)
+			}
+		}
+	}
+	return nil
+}
+
+// deleteIndex deletes all indexes entries.
+func (s *IndexedStore) deleteIndex(tx Tx, index string) error {
+	entries, err := tx.List(s.indexKey(index, "") + "/")
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if err := tx.Delete(entry.Key); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func ImpossibleTypeErr(exp interface{}, got interface{}) error {

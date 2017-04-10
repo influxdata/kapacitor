@@ -57,6 +57,7 @@ kapacitor define-handler system aggregate_by_1m.yaml
     An automatic migration from old to new handler definitions will be performed during startup.
     See the updated API docs.
 - [#1286](https://github.com/influxdata/kapacitor/issues/1286): Default HipChat URL should be blank
+- [#507](https://github.com/influxdata/kapacitor/issues/507): Add API endpoint for performing Kapacitor database backups.
 
 ### Bugfixes
 
@@ -80,6 +81,7 @@ kapacitor define-handler system aggregate_by_1m.yaml
     Also empty string on a tag value is now a sufficient condition for the default conditions to be applied.
     See [#1233](https://github.com/influxdata/kapacitor/pull/1233) for more information.
 - [#1068](https://github.com/influxdata/kapacitor/issues/1068): Fix dot view syntax to use xlabels and not create invalid quotes.
+- [#1295](https://github.com/influxdata/kapacitor/issues/1295): Fix curruption of recordings list after deleting all recordings.
 
 ## v1.2.0 [2017-01-23]
 

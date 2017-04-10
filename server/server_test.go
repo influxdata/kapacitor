@@ -8967,3 +8967,110 @@ stream
 		}
 	}
 }
+
+func TestStorage_Rebuild(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	storages, err := cli.ListStorage()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, storage := range storages.Storage {
+		t.Log(storage.Link)
+		err := cli.DoStorageAction(storage.Link, client.StorageActionOptions{
+			Action: client.StorageRebuild,
+		})
+		if err != nil {
+			t.Errorf("error rebuilding storage %q: %v", storage.Name, err)
+		}
+	}
+}
+
+func TestStorage_Backup(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	// Create a task
+	id := "testTaskID"
+	ttype := client.StreamTask
+	dbrps := []client.DBRP{
+		{
+			Database:        "mydb",
+			RetentionPolicy: "myrp",
+		},
+		{
+			Database:        "otherdb",
+			RetentionPolicy: "default",
+		},
+	}
+	tick := `stream
+    |from()
+        .measurement('test')
+`
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Perform backup
+	size, r, err := cli.Backup()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	backup, err := ioutil.ReadAll(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, exp := int64(len(backup)), size; got != exp {
+		t.Fatalf("unexpected backup size got %d exp %d", got, exp)
+	}
+
+	// Stop the server
+	s.Stop()
+
+	// Restore from backup
+	if err := ioutil.WriteFile(s.Config.Storage.BoltDBPath, backup, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Start the server again
+	s.Start()
+
+	// Check that the task was restored
+	ti, err := cli.Task(task.Link, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ti.Error != "" {
+		t.Fatal(ti.Error)
+	}
+	if ti.ID != id {
+		t.Fatalf("unexpected id got %s exp %s", ti.ID, id)
+	}
+	if ti.Type != client.StreamTask {
+		t.Fatalf("unexpected type got %v exp %v", ti.Type, client.StreamTask)
+	}
+	if ti.Status != client.Disabled {
+		t.Fatalf("unexpected status got %v exp %v", ti.Status, client.Disabled)
+	}
+	if !reflect.DeepEqual(ti.DBRPs, dbrps) {
+		t.Fatalf("unexpected dbrps got %s exp %s", ti.DBRPs, dbrps)
+	}
+	if ti.TICKscript != tick {
+		t.Fatalf("unexpected TICKscript got %s exp %s", ti.TICKscript, tick)
+	}
+	dot := "digraph testTaskID {\nstream0 -> from1;\n}"
+	if ti.Dot != dot {
+		t.Fatalf("unexpected dot\ngot\n%s\nexp\n%s\n", ti.Dot, dot)
+	}
+}

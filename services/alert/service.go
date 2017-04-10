@@ -48,6 +48,7 @@ type Service struct {
 
 	StorageService interface {
 		Store(namespace string) storage.Interface
+		Register(name string, store storage.StoreActioner)
 		Versions() storage.Versions
 	}
 
@@ -111,8 +112,14 @@ func NewService(l *log.Logger) *Service {
 	return s
 }
 
-// The storage namespace for all task data.
-const alertNamespace = "alert_store"
+const (
+	// Public name of the handler specs store.
+	handlerSpecsAPIName = "handler-specs"
+	// Public name of the handler specs store.
+	topicStatesAPIName = "topic-states"
+	// The storage namespace for all task data.
+	alertNamespace = "alert_store"
+)
 
 func (s *Service) Open() error {
 	s.mu.Lock()
@@ -125,11 +132,13 @@ func (s *Service) Open() error {
 		return err
 	}
 	s.specsDAO = specsDAO
+	s.StorageService.Register(handlerSpecsAPIName, s.specsDAO)
 	topicsDAO, err := newTopicStateKV(store)
 	if err != nil {
 		return err
 	}
 	s.topicsDAO = topicsDAO
+	s.StorageService.Register(topicStatesAPIName, s.topicsDAO)
 
 	// Migrate v1.2 handlers
 	if err := s.migrateHandlerSpecs(store); err != nil {

@@ -42,6 +42,7 @@ type Service struct {
 	snapshotInterval time.Duration
 	StorageService   interface {
 		Store(namespace string) storage.Interface
+		Register(name string, store storage.StoreActioner)
 	}
 	HTTPDService interface {
 		AddRoutes([]httpd.Route) error
@@ -71,8 +72,12 @@ func NewService(conf Config, l *log.Logger) *Service {
 	}
 }
 
-// The storage namespace for all task data.
-const taskNamespace = "task_store"
+const (
+	// Public name for the task storage layer
+	tasksAPIName = "tasks"
+	// The storage namespace for all task data.
+	taskNamespace = "task_store"
+)
 
 func (ts *Service) Open() error {
 	// Create DAO
@@ -82,6 +87,7 @@ func (ts *Service) Open() error {
 		return err
 	}
 	ts.tasks = tasksDAO
+	ts.StorageService.Register(tasksAPIName, ts.tasks)
 	ts.templates = newTemplateKV(store)
 	ts.snapshots = newSnapshotKV(store)
 

@@ -62,6 +62,7 @@ Commands:
 	show-template         Display detailed information about a template.
 	show-topic-handler    Display detailed information about an alert handler for a topic.
 	show-topic            Display detailed information about an alert topic.
+	backup                Backup the Kapacitor database.
 	level                 Sets the logging level on the kapacitord server.
 	stats                 Display various stats about Kapacitor.
 	version               Displays the Kapacitor version info.
@@ -180,6 +181,9 @@ func main() {
 	case "show-topic":
 		commandArgs = args
 		commandF = doShowTopic
+	case "backup":
+		commandArgs = args
+		commandF = doBackup
 	case "level":
 		commandArgs = args
 		commandF = doLevel
@@ -278,6 +282,8 @@ func doHelp(args []string) error {
 			showTopicHandlerUsage()
 		case "show-topic":
 			showTopicUsage()
+		case "backup":
+			backupUsage()
 		case "level":
 			levelUsage()
 		case "help":
@@ -2203,6 +2209,40 @@ func doServiceTest(args []string) error {
 	for i, s := range services {
 		tr := results[i]
 		fmt.Fprintf(os.Stdout, outFmt, s.Name, tr.Success, tr.Message)
+	}
+	return nil
+}
+
+// Backup
+func backupUsage() {
+	var u = `Usage: kapacitor backup <output file>
+
+	Perform a backup of the Kapacitor database.
+
+	To restore a database first stop Kapacitor, then replace the existing kapacitor.db file with the backup file.
+`
+	fmt.Fprintln(os.Stderr, u)
+}
+
+func doBackup(args []string) error {
+	if len(args) != 1 {
+		return errors.New("must provide file path for backup.")
+	}
+	f, err := os.Create(args[0])
+	if err != nil {
+		return errors.Wrap(err, "failed to create backup file")
+	}
+	defer f.Close()
+	size, backup, err := cli.Backup()
+	if err != nil {
+		return errors.Wrap(err, "failed to perform backup")
+	}
+	n, err := io.Copy(f, backup)
+	if err != nil {
+		return errors.Wrap(err, "failed to save backup")
+	}
+	if n != size {
+		return fmt.Errorf("failed to download entire backup, only wrote %d bytes out of a total %d bytes.", n, size)
 	}
 	return nil
 }

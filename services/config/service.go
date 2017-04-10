@@ -46,6 +46,7 @@ type Service struct {
 
 	StorageService interface {
 		Store(namespace string) storage.Interface
+		Register(name string, store storage.StoreActioner)
 	}
 	HTTPDService interface {
 		AddRoutes([]httpd.Route) error
@@ -62,8 +63,12 @@ func NewService(c Config, config interface{}, l *log.Logger, updates chan<- Conf
 	}
 }
 
-// The storage namespace for all configuration override data.
-const configNamespace = "config_overrides"
+const (
+	// Public name of overrides store
+	overridesAPIName = "overrides"
+	// The storage namespace for all configuration override data.
+	configNamespace = "config_overrides"
+)
 
 func (s *Service) Open() error {
 	store := s.StorageService.Store(configNamespace)
@@ -72,6 +77,7 @@ func (s *Service) Open() error {
 		return err
 	}
 	s.overrides = overrides
+	s.StorageService.Register(overridesAPIName, s.overrides)
 
 	// Cache element keys
 	if elementKeys, err := override.ElementKeys(s.config); err != nil {

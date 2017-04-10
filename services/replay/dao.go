@@ -39,6 +39,9 @@ type RecordingDAO interface {
 	// Offset and limit are pagination bounds. Offset is inclusive starting at index 0.
 	// More results may exist while the number of returned items is equal to limit.
 	List(pattern string, offset, limit int) ([]Recording, error)
+
+	// Rebuild fixes all indexes of the data.
+	Rebuild() error
 }
 
 //--------------------------------------------------------------------
@@ -124,6 +127,10 @@ func newRecordingKV(store storage.Interface) (*recordingKV, error) {
 	}, nil
 }
 
+func (kv *recordingKV) Rebuild() error {
+	return kv.store.Rebuild()
+}
+
 func (kv *recordingKV) error(err error) error {
 	if err == storage.ErrNoObjectExists {
 		return ErrNoRecordingExists
@@ -195,6 +202,9 @@ type ReplayDAO interface {
 	// Offset and limit are pagination bounds. Offset is inclusive starting at index 0.
 	// More results may exist while the number of returned items is equal to limit.
 	List(pattern string, offset, limit int) ([]Replay, error)
+
+	// Rebuild rebuilds all indexes for the storage
+	Rebuild() error
 }
 
 type Clock int
@@ -310,4 +320,8 @@ func (kv *replayKV) List(pattern string, offset, limit int) ([]Replay, error) {
 		replays[i] = *r
 	}
 	return replays, nil
+}
+
+func (kv *replayKV) Rebuild() error {
+	return kv.store.Rebuild()
 }

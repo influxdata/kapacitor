@@ -61,6 +61,7 @@ type Service struct {
 
 	StorageService interface {
 		Store(namespace string) storage.Interface
+		Register(name string, store storage.StoreActioner)
 	}
 	TaskStore interface {
 		Load(id string) (*kapacitor.Task, error)
@@ -95,9 +96,15 @@ func NewService(conf Config, l *log.Logger) *Service {
 	}
 }
 
-// The storage namespace for all recording data.
-const recordingNamespace = "recording_store"
-const replayNamespace = "replay_store"
+const (
+	// Public name for the recordings store
+	recordingsAPIName = "recordings"
+	// Public name for the replays store
+	replaysAPIName = "replays"
+	// The storage namespace for all recording data.
+	recordingNamespace = "recording_store"
+	replayNamespace    = "replay_store"
+)
 
 func (s *Service) Open() error {
 	// Create DAO
@@ -106,11 +113,13 @@ func (s *Service) Open() error {
 		return err
 	}
 	s.recordings = recordings
+	s.StorageService.Register(recordingsAPIName, s.recordings)
 	replays, err := newReplayKV(s.StorageService.Store(replayNamespace))
 	if err != nil {
 		return err
 	}
 	s.replays = replays
+	s.StorageService.Register(replaysAPIName, s.replays)
 
 	if err := os.MkdirAll(s.saveDir, 0755); err != nil {
 		return err
@@ -1625,7 +1634,12 @@ func (s fileSource) Size() (int64, error) {
 }
 
 func (s fileSource) Remove() error {
-	return os.Remove(string(s))
+	err := os.Remove(string(s))
+	if err == os.ErrNotExist {
+		// Ignore file not exists errors as we are trying to remove the file.
+		return nil
+	}
+	return err
 }
 
 func (s fileSource) StreamWriter() (io.WriteCloser, error) {

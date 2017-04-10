@@ -8,6 +8,7 @@
 * [Replays](#replays)
 * [Alerts](#alerts)
 * [Configuration](#configuration)
+* [Storage](#storage)
 * [Testing Services](#testing-services)
 * [Miscellaneous](#miscellaneous)
 
@@ -2115,6 +2116,62 @@ POST /kapacitor/v1/config/influxdb/remote
 | 200  | Success                                                   |
 | 403  | Config override service not enabled                       |
 | 404  | The specified configuration section/option does not exist |
+
+## Storage
+
+Kapacitor exposes some operations that can be performed on the underlying storage.
+
+>WARNING: Everything storage operation is directly manipulating the underlying storage database.
+Always make a backup of the database before performing any of these operations.
+
+### Backing up the Storage
+
+Making a GET request to `/kapacitor/v1/storage/backup` will return a dump of the Kapacitor database.
+To restore from a backup replace the `kapacitor.db` file with the contents of the backup request.
+
+```
+# Create a backup.
+curl http://localhost:9092/kapacitor/v1/storage/backup > kapacitor.db
+```
+
+```
+# Restore a backup.
+# The destination path is dependent on your configuration.
+cp kapacitor.db ~/.kapacitor/kapacitor.db
+```
+
+### Stores
+
+Kapacitor's underlying storage system is organized into different stores.
+Various actions can be performed on each individual store.
+
+>WARNING: Everything storage operation is directly manipulating the underlying storage database.
+Always make a backup of the database before performing any of these operations.
+
+Available actions:
+
+| Action  | Description                                                           |
+| ------  | -----------                                                           |
+| rebuild | Rebuild all indexes in a store, this operation can be very expensive. |
+
+To perform an action make a POST request to the `/kapacitor/v1/storage/stores/<name of store>`
+
+#### Example
+
+```
+POST /kapacitor/v1/storage/stores/tasks
+{
+    "action" : "rebuild"
+}
+```
+
+#### Response
+
+| Code | Meaning                            |
+| ---- | -------                            |
+| 204  | Success                            |
+| 400  | Unknown action                     |
+| 404  | The specified store does not exist |
 
 ## Testing Services
 

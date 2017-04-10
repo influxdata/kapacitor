@@ -44,6 +44,8 @@ type HandlerSpecDAO interface {
 	// More results may exist while the number of returned items is equal to limit.
 	List(topic, pattern string, offset, limit int) ([]HandlerSpec, error)
 	ListTx(tx storage.ReadOnlyTx, topic, pattern string, offset, limit int) ([]HandlerSpec, error)
+
+	Rebuild() error
 }
 
 //--------------------------------------------------------------------
@@ -210,6 +212,10 @@ func (kv *handlerSpecKV) listHelper(objects []storage.BinaryObject, err error) (
 	return specs, nil
 }
 
+func (kv *handlerSpecKV) Rebuild() error {
+	return kv.store.Rebuild()
+}
+
 var (
 	ErrNoTopicStateExists = errors.New("no topic state exists")
 )
@@ -231,6 +237,8 @@ type TopicStateDAO interface {
 	// Offset and limit are pagination bounds. Offset is inclusive starting at index 0.
 	// More results may exist while the number of returned items is equal to limit.
 	List(pattern string, offset, limit int) ([]TopicState, error)
+
+	Rebuild() error
 }
 
 const topicStateVersion = 1
@@ -325,4 +333,8 @@ func (kv *topicStateKV) List(pattern string, offset, limit int) ([]TopicState, e
 		specs[i] = *t
 	}
 	return specs, nil
+}
+
+func (kv *topicStateKV) Rebuild() error {
+	return kv.store.Rebuild()
 }

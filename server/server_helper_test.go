@@ -54,8 +54,11 @@ func NewServer(c *server.Config) *Server {
 	return &s
 }
 
-func (s *Server) Restart() {
+func (s *Server) Stop() {
 	s.Server.Close()
+}
+
+func (s *Server) Start() {
 	srv, err := server.New(s.Config, s.buildInfo, s.ls)
 	if err != nil {
 		panic(err.Error())
@@ -64,6 +67,11 @@ func (s *Server) Restart() {
 		panic(err.Error())
 	}
 	s.Server = srv
+}
+
+func (s *Server) Restart() {
+	s.Stop()
+	s.Start()
 }
 
 // OpenServer opens a test server.
