@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"path"
@@ -2185,13 +2184,12 @@ func (c *Client) DoStorageAction(l Link, opt StorageActionOptions) error {
 	return nil
 }
 
-// StorageBackup requests a backup of all storage from Kapacitor.
+// Backup requests a backup of all storage from Kapacitor.
 // A short read is possible, to verify that the backup was successful
 // check that the number of bytes read matches the returned size.
-func (c *Client) StorageBackup() (int64, io.ReadCloser, error) {
+func (c *Client) Backup() (int64, io.ReadCloser, error) {
 	u := *c.url
 	u.Path = backupPath
-	log.Println("D! PATH", backupPath)
 
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {

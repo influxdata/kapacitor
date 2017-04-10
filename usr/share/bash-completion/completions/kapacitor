@@ -186,6 +186,8 @@ _kapacitor()
         show-topic)
             words=$(_kapacitor_list topics "$cur")
             ;;
+        backup)
+            ;;
         level)
             words='debug info warn error'
             ;;
@@ -200,7 +202,7 @@ _kapacitor()
             ;;
         *)
             words='record define define-template define-topic-handler replay replay-live enable disable \
-                reload delete list show show-template show-topic-handler show-topic level stats version vars service-tests help'
+                reload delete list show show-template show-topic-handler show-topic backup level stats version vars service-tests help'
             ;;
     esac
     if [ -z "$COMPREPLY" ]

@@ -9021,7 +9021,7 @@ func TestStorage_Backup(t *testing.T) {
 	}
 
 	// Perform backup
-	size, r, err := cli.StorageBackup()
+	size, r, err := cli.Backup()
 	if err != nil {
 		t.Fatal(err)
 	}
