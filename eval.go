@@ -85,7 +85,7 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 			p.Fields, p.Tags, err = e.eval(p.Time, p.Group, p.Fields, p.Tags)
 			if err != nil {
 				e.incrementErrorCount()
-				if !e.e.QuiteFlag {
+				if !e.e.QuietFlag {
 					e.logger.Println("E!", err)
 				}
 				e.timer.Stop()
@@ -109,7 +109,7 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 				b.Points[i].Fields, b.Points[i].Tags, err = e.eval(p.Time, b.Group, p.Fields, p.Tags)
 				if err != nil {
 					e.incrementErrorCount()
-					if !e.e.QuiteFlag {
+					if !e.e.QuietFlag {
 						e.logger.Println("E!", err)
 					}
 					// Remove bad point
