@@ -7543,6 +7543,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				c.SNMPTrap.Enabled = true
 				c.SNMPTrap.Addr = ts.Addr
 				c.SNMPTrap.Community = ts.Community
+				c.SNMPTrap.Retries = 3
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {

@@ -1035,6 +1035,7 @@ func TestService_GetConfig(t *testing.T) {
 		basePath := server.Server.URL + httpd.BasePath + "/config"
 		// Apply all updates
 		for _, update := range tc.updates {
+			errC := make(chan error, 1)
 			go func() {
 				// Validate we got the update over the chan.
 				// This keeps the chan unblocked.
@@ -1043,8 +1044,9 @@ func TestService_GetConfig(t *testing.T) {
 				select {
 				case cu := <-updates:
 					cu.ErrC <- nil
+					errC <- nil
 				case <-timer.C:
-					t.Fatal("expected to get config update")
+					errC <- errors.New("expected to get config update")
 				}
 			}()
 			resp, err := http.Post(basePath+update.Path, "application/json", strings.NewReader(update.Body))
@@ -1058,6 +1060,14 @@ func TestService_GetConfig(t *testing.T) {
 			}
 			if got, exp := resp.StatusCode, http.StatusNoContent; got != exp {
 				t.Fatalf("update failed: got: %d exp: %d\nBody:\n%s", got, exp, string(body))
+			}
+			select {
+			case err := <-errC:
+				if err != nil {
+					t.Fatal(err)
+				}
+			default:
+				t.Fatal("expected to get an response on errC")
 			}
 		}
 
