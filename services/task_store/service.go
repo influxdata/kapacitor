@@ -482,6 +482,7 @@ var allTaskFields = []string{
 	"created",
 	"modified",
 	"last-enabled",
+	"vars",
 }
 
 const tasksBasePathAnchored = httpd.BasePath + tasksPathAnchored
@@ -636,6 +637,13 @@ func (ts *Service) handleListTasks(w http.ResponseWriter, r *http.Request) {
 				value = task.Modified
 			case "last-enabled":
 				value = task.LastEnabled
+			case "vars":
+				vars, err := ts.convertToClientVars(task.Vars)
+				if err != nil {
+					ts.logger.Printf("E! failed to get vars for task %s: %s", task.ID, err)
+					break
+				}
+				value = vars
 			default:
 				httpd.HttpError(w, fmt.Sprintf("unsupported field %q", field), true, http.StatusBadRequest)
 				return
