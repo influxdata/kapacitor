@@ -13,7 +13,7 @@ import (
 //
 // Example:
 //     // Target 80% cpu per container
-//     var target = 80
+//     var target = 80.0
 //     var min = 1
 //     var max = 10
 //     var period = 5m
@@ -23,15 +23,16 @@ import (
 //             .measurement('docker_container_cpu')
 //             .groupBy('container_name','com.docker.swarm.service.name')
 //             .where(lambda: "cpu" == 'cpu-total')
-//         |mean('usage_percent')
-//             .as('mean_cpu')
 //         |window()
 //             .period(period)
 //             .every(every)
+//         |mean('usage_percent')
+//             .as('mean_cpu')
+//         |groupBy('com.docker.swarm.service.name')
 //         |sum('mean_cpu')
 //             .as('total_cpu')
 //         |swarmAutoscale()
-//             // Get the name of the deployment from the 'deployment' tag.
+//             // Get the name of the service from "com.docker.swarm.service.name" tag.
 //             .serviceName('com.docker.swarm.service.name')
 //             .min(min)
 //             .max(max)
@@ -62,7 +63,7 @@ import (
 //    * increase_events -- number of times the replica count was increased.
 //    * decrease_events -- number of times the replica count was decreased.
 //    * cooldown_drops  -- number of times an event was dropped because of a cooldown timer.
-//    * errors          -- number of errors encountered, typically related to communicating with the Kubernetes API.
+//    * errors          -- number of errors encountered, typically related to communicating with the Swarm manager API.
 //
 type SwarmAutoscaleNode struct {
 	chainnode
