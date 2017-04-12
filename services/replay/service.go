@@ -1358,6 +1358,8 @@ func (s *Service) startRecordBatch(t *kapacitor.Task, start, stop time.Time) ([]
 			}
 			// Run queries
 			for _, q := range queries {
+				s.logger.Println("D! Runing batch query for replay", q)
+
 				query := influxdb.Query{
 					Command: q.String(),
 				}

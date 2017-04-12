@@ -192,7 +192,7 @@ func ResultToBatches(res influxdb.Result, groupByName bool) ([]Batch, error) {
 						}
 					}
 					if value == nil {
-						break
+						continue
 					}
 					fields[c] = value
 				}

@@ -95,6 +95,7 @@ kapacitor define-handler system aggregate_by_1m.yaml
 ### Bugfixes
 
 - [#1323](https://github.com/influxdata/kapacitor/pull/1323): Fix issue where credentials to InfluxDB could not be updated dynamically.
+- [#1294](https://github.com/influxdata/kapacitor/issues/1294): Fix bug where batch queries would be missing all fields after the first nil field.
 
 ## v1.2.0 [2017-01-23]
 
