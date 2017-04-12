@@ -3,6 +3,7 @@
 		"Name":"Float",
 		"name":"float",
 		"Type":"float64",
+		"Kind":"reflect.Float64",
 		"Nil":"0",
 		"Zero":"float64(0)"
 	},
@@ -10,6 +11,7 @@
 		"Name":"Integer",
 		"name":"integer",
 		"Type":"int64",
+		"Kind":"reflect.Int64",
 		"Nil":"0",
 		"Zero":"int64(0)"
 	},
@@ -17,6 +19,7 @@
 		"Name":"String",
 		"name":"string",
 		"Type":"string",
+		"Kind":"reflect.String",
 		"Nil":"\"\"",
 		"Zero":"\"\""
 	},
@@ -24,8 +27,8 @@
 		"Name":"Boolean",
 		"name":"boolean",
 		"Type":"bool",
+		"Kind":"reflect.Bool",
 		"Nil":"false",
 		"Zero":"false"
 	}
 ]
-

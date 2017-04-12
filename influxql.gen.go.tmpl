@@ -4,6 +4,7 @@ package kapacitor
 import (
 	"fmt"
 	"time"
+	"reflect"
 
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor/models"
@@ -274,10 +275,10 @@ type {{$a.name}}Bulk{{if ne $a.Name $e.Name}}{{$e.Name}}{{end}}ReduceContext str
 
 {{/* Define switch cases for reduceContext contruction */}}
 
-func determineReduceContextCreateFn(method string, value interface{}, rc pipeline.ReduceCreater)  (fn createReduceContextFunc, err error) {
-	switch value.(type) {
+func determineReduceContextCreateFn(method string, kind reflect.Kind, rc pipeline.ReduceCreater)  (fn createReduceContextFunc, err error) {
+	switch kind {
 {{range $a := $types}}
-	case {{.Type}}:
+	case {{.Kind}}:
 		switch {
 {{range $e := $types}}
 		case rc.Create{{$a.Name}}{{if ne $a.Name $e.Name}}{{$e.Name}}{{end}}Reducer != nil:
@@ -320,7 +321,7 @@ func determineReduceContextCreateFn(method string, value interface{}, rc pipelin
 		}
 {{end}}
 	default:
-		err = fmt.Errorf("invalid field type: %T", value)
+		err = fmt.Errorf("invalid field kind: %v", kind)
 	}
 	return
 }

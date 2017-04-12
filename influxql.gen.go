@@ -8,6 +8,7 @@ package kapacitor
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/influxdata/influxdb/influxql"
@@ -1151,10 +1152,10 @@ type booleanBulkReduceContext struct {
 	booleanPointEmitter
 }
 
-func determineReduceContextCreateFn(method string, value interface{}, rc pipeline.ReduceCreater) (fn createReduceContextFunc, err error) {
-	switch value.(type) {
+func determineReduceContextCreateFn(method string, kind reflect.Kind, rc pipeline.ReduceCreater) (fn createReduceContextFunc, err error) {
+	switch kind {
 
-	case float64:
+	case reflect.Float64:
 		switch {
 
 		case rc.CreateFloatReducer != nil:
@@ -1301,7 +1302,7 @@ func determineReduceContextCreateFn(method string, value interface{}, rc pipelin
 			err = fmt.Errorf("cannot apply %s to float64 field", method)
 		}
 
-	case int64:
+	case reflect.Int64:
 		switch {
 
 		case rc.CreateIntegerFloatReducer != nil:
@@ -1448,7 +1449,7 @@ func determineReduceContextCreateFn(method string, value interface{}, rc pipelin
 			err = fmt.Errorf("cannot apply %s to int64 field", method)
 		}
 
-	case string:
+	case reflect.String:
 		switch {
 
 		case rc.CreateStringFloatReducer != nil:
@@ -1595,7 +1596,7 @@ func determineReduceContextCreateFn(method string, value interface{}, rc pipelin
 			err = fmt.Errorf("cannot apply %s to string field", method)
 		}
 
-	case bool:
+	case reflect.Bool:
 		switch {
 
 		case rc.CreateBooleanFloatReducer != nil:
@@ -1743,7 +1744,7 @@ func determineReduceContextCreateFn(method string, value interface{}, rc pipelin
 		}
 
 	default:
-		err = fmt.Errorf("invalid field type: %T", value)
+		err = fmt.Errorf("invalid field kind: %v", kind)
 	}
 	return
 }

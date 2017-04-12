@@ -3,6 +3,7 @@ package kapacitor
 import (
 	"fmt"
 	"log"
+	"reflect"
 	"sync"
 	"time"
 
@@ -13,7 +14,7 @@ import (
 )
 
 // tmpl -- go get github.com/benbjohnson/tmpl
-//go:generate tmpl -data=@tmpldata influxql.gen.go.tmpl
+//go:generate tmpl -data=@tmpldata.json influxql.gen.go.tmpl
 
 type createReduceContextFunc func(c baseReduceContext) reduceContext
 
@@ -82,6 +83,7 @@ func (n *InfluxQLNode) runStreamInfluxQL() error {
 	}
 	n.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
 
+	var kind reflect.Kind
 	for p, ok := n.ins[0].NextPoint(); ok; {
 		n.timer.Start()
 		mu.RLock()
@@ -101,7 +103,11 @@ func (n *InfluxQLNode) runStreamInfluxQL() error {
 				pointTimes: n.n.PointTimes || n.isStreamTransformation,
 			}
 
-			createFn, err := n.getCreateFn(p.Fields[c.field])
+			k := reflect.TypeOf(p.Fields[c.field]).Kind()
+			kindChanged := k != kind
+			kind = k
+
+			createFn, err := n.getCreateFn(kindChanged, kind)
 			if err != nil {
 				return err
 			}
@@ -155,7 +161,8 @@ func (n *InfluxQLNode) runStreamInfluxQL() error {
 }
 
 func (n *InfluxQLNode) runBatchInfluxQL() error {
-	var exampleValue interface{}
+	var kind reflect.Kind
+	kindChanged := true
 	for b, ok := n.ins[0].NextBatch(); ok; b, ok = n.ins[0].NextBatch() {
 		n.timer.Start()
 		// Create new base context
@@ -175,14 +182,16 @@ func (n *InfluxQLNode) runBatchInfluxQL() error {
 				n.timer.Stop()
 				continue
 			}
-			if exampleValue == nil {
+			if kind == reflect.Invalid {
 				// If we have no points and have never seen a point assume float64
-				exampleValue = float64(0)
+				kind = reflect.Float64
 			}
 		} else {
-			exampleValue = b.Points[0].Fields[c.field]
+			k := reflect.TypeOf(b.Points[0].Fields[c.field]).Kind()
+			kindChanged = k != kind
+			kind = k
 		}
-		createFn, err := n.getCreateFn(exampleValue)
+		createFn, err := n.getCreateFn(kindChanged, kind)
 		if err != nil {
 			return err
 		}
@@ -241,11 +250,11 @@ func (n *InfluxQLNode) runBatchInfluxQL() error {
 	return nil
 }
 
-func (n *InfluxQLNode) getCreateFn(value interface{}) (createReduceContextFunc, error) {
-	if n.createFn != nil {
+func (n *InfluxQLNode) getCreateFn(changed bool, kind reflect.Kind) (createReduceContextFunc, error) {
+	if !changed && n.createFn != nil {
 		return n.createFn, nil
 	}
-	createFn, err := determineReduceContextCreateFn(n.n.Method, value, n.n.ReduceCreater)
+	createFn, err := determineReduceContextCreateFn(n.n.Method, kind, n.n.ReduceCreater)
 	if err != nil {
 		return nil, errors.Wrapf(err, "invalid influxql func %s with field %s", n.n.Method, n.n.Field)
 	}
