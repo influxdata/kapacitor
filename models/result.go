@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"errors"
 	"time"
 )
 
@@ -13,6 +14,21 @@ type Result struct {
 func (r Result) String() string {
 	b, _ := json.Marshal(r)
 	return string(b)
+}
+
+func (r *Result) UnmarshalJSON(data []byte) error {
+	var o struct {
+		Series Rows   `json:"series"`
+		Err    string `json:"error"`
+	}
+	if err := json.Unmarshal(data, &o); err != nil {
+		return err
+	}
+	r.Series = o.Series
+	if o.Err != "" {
+		r.Err = errors.New(o.Err)
+	}
+	return nil
 }
 
 // Rows represents a collection of rows. Rows implements sort.Interface.

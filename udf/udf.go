@@ -1,7 +1,7 @@
 package udf
 
 import (
-	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/udf/agent"
 )
 
@@ -16,8 +16,6 @@ type Interface interface {
 	Snapshot() ([]byte, error)
 	Restore(snapshot []byte) error
 
-	PointIn() chan<- models.Point
-	BatchIn() chan<- models.Batch
-	PointOut() <-chan models.Point
-	BatchOut() <-chan models.Batch
+	In() chan<- edge.Message
+	Out() <-chan edge.Message
 }

@@ -4171,7 +4171,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	//defer os.RemoveAll(tmpDir)
 
 	tick := `stream
 	|from()

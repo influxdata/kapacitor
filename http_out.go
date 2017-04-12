@@ -7,7 +7,7 @@ import (
 	"path"
 	"sync"
 
-	"github.com/influxdata/kapacitor/expvar"
+	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/services/httpd"
@@ -15,21 +15,22 @@ import (
 
 type HTTPOutNode struct {
 	node
-	c              *pipeline.HTTPOutNode
-	result         *models.Result
-	groupSeriesIdx map[models.GroupID]int
-	endpoint       string
-	routes         []httpd.Route
-	mu             sync.RWMutex
+	c *pipeline.HTTPOutNode
+
+	endpoint string
+
+	mu      sync.RWMutex
+	routes  []httpd.Route
+	result  *models.Result
+	indexes []*httpOutGroup
 }
 
 // Create a new  HTTPOutNode which caches the most recent item and exposes it over the HTTP API.
 func newHTTPOutNode(et *ExecutingTask, n *pipeline.HTTPOutNode, l *log.Logger) (*HTTPOutNode, error) {
 	hn := &HTTPOutNode{
-		node:           node{Node: n, et: et, logger: l},
-		c:              n,
-		groupSeriesIdx: make(map[models.GroupID]int),
-		result:         new(models.Result),
+		node:   node{Node: n, et: et, logger: l},
+		c:      n,
+		result: new(models.Result),
 	}
 	et.registerOutput(hn.c.Endpoint, hn)
 	hn.node.runF = hn.runOut
@@ -37,24 +38,16 @@ func newHTTPOutNode(et *ExecutingTask, n *pipeline.HTTPOutNode, l *log.Logger) (
 	return hn, nil
 }
 
-func (h *HTTPOutNode) Endpoint() string {
-	return h.endpoint
+func (n *HTTPOutNode) Endpoint() string {
+	return n.endpoint
 }
 
-func (h *HTTPOutNode) runOut([]byte) error {
-	valueF := func() int64 {
-		h.mu.RLock()
-		l := len(h.groupSeriesIdx)
-		h.mu.RUnlock()
-		return int64(l)
-	}
-	h.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
-
+func (n *HTTPOutNode) runOut([]byte) error {
 	hndl := func(w http.ResponseWriter, req *http.Request) {
-		h.mu.RLock()
-		defer h.mu.RUnlock()
+		n.mu.RLock()
+		defer n.mu.RUnlock()
 
-		if b, err := json.Marshal(h.result); err != nil {
+		if b, err := json.Marshal(n.result); err != nil {
 			httpd.HttpError(
 				w,
 				err.Error(),
@@ -66,7 +59,7 @@ func (h *HTTPOutNode) runOut([]byte) error {
 		}
 	}
 
-	p := path.Join("/tasks/", h.et.Task.ID, h.c.Endpoint)
+	p := path.Join("/tasks/", n.et.Task.ID, n.c.Endpoint)
 
 	r := []httpd.Route{{
 		Method:      "GET",
@@ -74,65 +67,110 @@ func (h *HTTPOutNode) runOut([]byte) error {
 		HandlerFunc: hndl,
 	}}
 
-	h.endpoint = h.et.tm.HTTPDService.URL() + p
-	func() {
-		h.mu.Lock()
-		defer h.mu.Unlock()
-		h.routes = r
-	}()
+	n.endpoint = n.et.tm.HTTPDService.URL() + p
+	n.mu.Lock()
+	n.routes = r
+	n.mu.Unlock()
 
-	err := h.et.tm.HTTPDService.AddRoutes(r)
+	err := n.et.tm.HTTPDService.AddRoutes(r)
 	if err != nil {
 		return err
 	}
 
-	switch h.Wants() {
-	case pipeline.StreamEdge:
-		for p, ok := h.ins[0].NextPoint(); ok; p, ok = h.ins[0].NextPoint() {
-			h.timer.Start()
-			row := models.PointToRow(p)
-			h.updateResultWithRow(p.Group, row)
-			h.timer.Stop()
-			for _, child := range h.outs {
-				err := child.CollectPoint(p)
-				if err != nil {
-					return err
-				}
-			}
-		}
-	case pipeline.BatchEdge:
-		for b, ok := h.ins[0].NextBatch(); ok; b, ok = h.ins[0].NextBatch() {
-			h.timer.Start()
-			row := models.BatchToRow(b)
-			h.updateResultWithRow(b.Group, row)
-			h.timer.Stop()
-			for _, child := range h.outs {
-				err := child.CollectBatch(b)
-				if err != nil {
-					return err
-				}
-			}
-		}
-	}
-	return nil
+	consumer := edge.NewGroupedConsumer(
+		n.ins[0],
+		n,
+	)
+	n.statMap.Set(statCardinalityGauge, consumer.CardinalityVar())
+
+	return consumer.Consume()
 }
 
 // Update the result structure with a row.
-func (h *HTTPOutNode) updateResultWithRow(group models.GroupID, row *models.Row) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	idx, ok := h.groupSeriesIdx[group]
-	if !ok {
-		idx = len(h.result.Series)
-		h.groupSeriesIdx[group] = idx
-		h.result.Series = append(h.result.Series, row)
-	} else {
-		h.result.Series[idx] = row
+func (n *HTTPOutNode) updateResultWithRow(idx int, row *models.Row) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if idx >= len(n.result.Series) {
+		n.incrementErrorCount()
+		n.logger.Printf("E! index out of range for row update %d", idx)
+		return
 	}
+	n.result.Series[idx] = row
 }
 
-func (h *HTTPOutNode) stopOut() {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.et.tm.HTTPDService.DelRoutes(h.routes)
+func (n *HTTPOutNode) stopOut() {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.et.tm.HTTPDService.DelRoutes(n.routes)
+}
+
+func (n *HTTPOutNode) NewGroup(group edge.GroupInfo, first edge.PointMeta) (edge.Receiver, error) {
+	return edge.NewReceiverFromForwardReceiverWithStats(
+		n.outs,
+		edge.NewTimedForwardReceiver(n.timer, n.newGroup(group.ID)),
+	), nil
+}
+
+func (n *HTTPOutNode) newGroup(groupID models.GroupID) *httpOutGroup {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	idx := len(n.result.Series)
+	n.result.Series = append(n.result.Series, nil)
+	g := &httpOutGroup{
+		n:      n,
+		idx:    idx,
+		buffer: new(edge.BatchBuffer),
+	}
+	n.indexes = append(n.indexes, g)
+	return g
+}
+func (n *HTTPOutNode) deleteGroup(idx int) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	for _, g := range n.indexes[idx+1:] {
+		g.idx--
+	}
+	n.indexes = append(n.indexes[0:idx], n.indexes[idx+1:]...)
+	n.result.Series = append(n.result.Series[0:idx], n.result.Series[idx+1:]...)
+}
+
+type httpOutGroup struct {
+	n      *HTTPOutNode
+	id     models.GroupID
+	idx    int
+	buffer *edge.BatchBuffer
+}
+
+func (g *httpOutGroup) BeginBatch(begin edge.BeginBatchMessage) (edge.Message, error) {
+	return nil, g.buffer.BeginBatch(begin)
+}
+
+func (g *httpOutGroup) BatchPoint(bp edge.BatchPointMessage) (edge.Message, error) {
+	return nil, g.buffer.BatchPoint(bp)
+}
+
+func (g *httpOutGroup) EndBatch(end edge.EndBatchMessage) (edge.Message, error) {
+	return g.BufferedBatch(g.buffer.BufferedBatchMessage(end))
+}
+
+func (g *httpOutGroup) BufferedBatch(batch edge.BufferedBatchMessage) (edge.Message, error) {
+	row := batch.ToRow()
+	g.n.updateResultWithRow(g.idx, row)
+	return batch, nil
+}
+
+func (g *httpOutGroup) Point(p edge.PointMessage) (edge.Message, error) {
+	row := p.ToRow()
+	g.n.updateResultWithRow(g.idx, row)
+	return p, nil
+}
+
+func (g *httpOutGroup) Barrier(b edge.BarrierMessage) (edge.Message, error) {
+	return b, nil
+}
+func (g *httpOutGroup) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
+	g.n.deleteGroup(g.idx)
+	return d, nil
 }

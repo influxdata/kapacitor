@@ -4,9 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"sync"
-	"time"
 
+	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
@@ -16,14 +15,11 @@ import (
 
 type EvalNode struct {
 	node
-	e                  *pipeline.EvalNode
-	expressions        []stateful.Expression
-	expressionsByGroup map[models.GroupID][]stateful.Expression
-	refVarList         [][]string
-	scopePool          stateful.ScopePool
-	tags               map[string]bool
-
-	expressionsByGroupMu sync.RWMutex
+	e           *pipeline.EvalNode
+	expressions []stateful.Expression
+	refVarList  [][]string
+	scopePool   stateful.ScopePool
+	tags        map[string]bool
 
 	evalErrors *expvar.Int
 }
@@ -34,9 +30,8 @@ func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalN
 		return nil, errors.New("must provide one name per expression via the 'As' property")
 	}
 	en := &EvalNode{
-		node:               node{Node: n, et: et, logger: l},
-		e:                  n,
-		expressionsByGroup: make(map[models.GroupID][]stateful.Expression),
+		node: node{Node: n, et: et, logger: l},
+		e:    n,
 	}
 
 	// Create stateful expressions
@@ -68,155 +63,166 @@ func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalN
 	return en, nil
 }
 
-func (e *EvalNode) runEval(snapshot []byte) error {
-	valueF := func() int64 {
-		e.expressionsByGroupMu.RLock()
-		l := len(e.expressionsByGroup)
-		e.expressionsByGroupMu.RUnlock()
-		return int64(l)
-	}
-	e.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
+func (n *EvalNode) runEval(snapshot []byte) error {
+	consumer := edge.NewGroupedConsumer(
+		n.ins[0],
+		n,
+	)
+	n.statMap.Set(statCardinalityGauge, consumer.CardinalityVar())
 
-	switch e.Provides() {
-	case pipeline.StreamEdge:
-		var err error
-		for p, ok := e.ins[0].NextPoint(); ok; p, ok = e.ins[0].NextPoint() {
-			e.timer.Start()
-			p.Fields, p.Tags, err = e.eval(p.Time, p.Group, p.Fields, p.Tags)
-			if err != nil {
-				e.incrementErrorCount()
-				if !e.e.QuietFlag {
-					e.logger.Println("E!", err)
-				}
-				e.timer.Stop()
-				// Skip bad point
-				continue
-			}
-			e.timer.Stop()
-			for _, child := range e.outs {
-				err := child.CollectPoint(p)
-				if err != nil {
-					return err
-				}
-			}
-		}
-	case pipeline.BatchEdge:
-		var err error
-		for b, ok := e.ins[0].NextBatch(); ok; b, ok = e.ins[0].NextBatch() {
-			e.timer.Start()
-			b.Points = b.ShallowCopyPoints()
-			for i := 0; i < len(b.Points); {
-				p := b.Points[i]
-				b.Points[i].Fields, b.Points[i].Tags, err = e.eval(p.Time, b.Group, p.Fields, p.Tags)
-				if err != nil {
-					e.incrementErrorCount()
-					if !e.e.QuietFlag {
-						e.logger.Println("E!", err)
-					}
-					// Remove bad point
-					b.Points = append(b.Points[:i], b.Points[i+1:]...)
-				} else {
-					i++
-				}
-			}
-			e.timer.Stop()
-			for _, child := range e.outs {
-				err := child.CollectBatch(b)
-				if err != nil {
-					return err
-				}
-			}
-		}
-	}
-	return nil
+	return consumer.Consume()
+
 }
 
-func (e *EvalNode) eval(now time.Time, group models.GroupID, fields models.Fields, tags models.Tags) (models.Fields, models.Tags, error) {
-	vars := e.scopePool.Get()
-	defer e.scopePool.Put(vars)
-	e.expressionsByGroupMu.RLock()
-	expressions, ok := e.expressionsByGroup[group]
-	e.expressionsByGroupMu.RUnlock()
-	if !ok {
-		expressions = make([]stateful.Expression, len(e.expressions))
-		for i, exp := range e.expressions {
-			expressions[i] = exp.CopyReset()
-		}
-		e.expressionsByGroupMu.Lock()
-		e.expressionsByGroup[group] = expressions
-		e.expressionsByGroupMu.Unlock()
+func (n *EvalNode) NewGroup(group edge.GroupInfo, first edge.PointMeta) (edge.Receiver, error) {
+	return edge.NewReceiverFromForwardReceiverWithStats(
+		n.outs,
+		edge.NewTimedForwardReceiver(n.timer, n.newGroup()),
+	), nil
+}
+
+func (n *EvalNode) newGroup() *evalGroup {
+	expressions := make([]stateful.Expression, len(n.expressions))
+	for i, exp := range n.expressions {
+		expressions[i] = exp.CopyReset()
 	}
+	return &evalGroup{
+		n:           n,
+		expressions: expressions,
+	}
+}
+
+func (n *EvalNode) eval(expressions []stateful.Expression, p edge.FieldsTagsTimeSetter) error {
+
+	vars := n.scopePool.Get()
+	defer n.scopePool.Put(vars)
+
 	for i, expr := range expressions {
-		err := fillScope(vars, e.refVarList[i], now, fields, tags)
+		err := fillScope(vars, n.refVarList[i], p)
 		if err != nil {
-			return nil, nil, err
+			return err
 		}
 		v, err := expr.Eval(vars)
 		if err != nil {
-			return nil, nil, err
+			return err
 		}
-		name := e.e.AsList[i]
+		name := n.e.AsList[i]
 		vars.Set(name, v)
 	}
+	fields := p.Fields()
+	tags := p.Tags()
 	newTags := tags
-	if len(e.tags) > 0 {
+	if len(n.tags) > 0 {
 		newTags = newTags.Copy()
-		for tag := range e.tags {
+		for tag := range n.tags {
 			v, err := vars.Get(tag)
 			if err != nil {
-				return nil, nil, err
+				return err
 			}
 			if s, ok := v.(string); !ok {
-				return nil, nil, fmt.Errorf("result of a tag expression must be of type string, got %T", v)
+				return fmt.Errorf("result of a tag expression must be of type string, got %T", v)
 			} else {
 				newTags[tag] = s
 			}
 		}
 	}
 	var newFields models.Fields
-	if e.e.KeepFlag {
-		if l := len(e.e.KeepList); l != 0 {
+	if n.e.KeepFlag {
+		if l := len(n.e.KeepList); l != 0 {
 			newFields = make(models.Fields, l)
-			for _, f := range e.e.KeepList {
+			for _, f := range n.e.KeepList {
 				// Try the vars scope first
 				if vars.Has(f) {
 					v, err := vars.Get(f)
 					if err != nil {
-						return nil, nil, err
+						return err
 					}
 					newFields[f] = v
 				} else if v, ok := fields[f]; ok {
 					// Try the raw fields next, since it may not have been a referenced var.
 					newFields[f] = v
 				} else {
-					return nil, nil, fmt.Errorf("cannot keep field %q, field does not exist", f)
+					return fmt.Errorf("cannot keep field %q, field does not exist", f)
 				}
 			}
 		} else {
-			newFields = make(models.Fields, len(fields)+len(e.e.AsList))
+			newFields = make(models.Fields, len(fields)+len(n.e.AsList))
 			for f, v := range fields {
 				newFields[f] = v
 			}
-			for _, f := range e.e.AsList {
+			for _, f := range n.e.AsList {
 				v, err := vars.Get(f)
 				if err != nil {
-					return nil, nil, err
+					return err
 				}
 				newFields[f] = v
 			}
 		}
 	} else {
-		newFields = make(models.Fields, len(e.e.AsList)-len(e.tags))
-		for _, f := range e.e.AsList {
-			if e.tags[f] {
+		newFields = make(models.Fields, len(n.e.AsList)-len(n.tags))
+		for _, f := range n.e.AsList {
+			if n.tags[f] {
 				continue
 			}
 			v, err := vars.Get(f)
 			if err != nil {
-				return nil, nil, err
+				return err
 			}
 			newFields[f] = v
 		}
 	}
-	return newFields, newTags, nil
+	p.SetFields(newFields)
+	p.SetTags(newTags)
+	return nil
+}
+
+type evalGroup struct {
+	n           *EvalNode
+	expressions []stateful.Expression
+}
+
+func (g *evalGroup) BeginBatch(begin edge.BeginBatchMessage) (edge.Message, error) {
+	begin = begin.ShallowCopy()
+	begin.SetSizeHint(0)
+	return begin, nil
+}
+
+func (g *evalGroup) BatchPoint(bp edge.BatchPointMessage) (edge.Message, error) {
+	bp = bp.ShallowCopy()
+	if g.doEval(bp) {
+		return bp, nil
+	}
+	return nil, nil
+}
+
+func (g *evalGroup) EndBatch(end edge.EndBatchMessage) (edge.Message, error) {
+	return end, nil
+}
+
+func (g *evalGroup) Point(p edge.PointMessage) (edge.Message, error) {
+	p = p.ShallowCopy()
+	if g.doEval(p) {
+		return p, nil
+	}
+	return nil, nil
+}
+
+func (g *evalGroup) doEval(p edge.FieldsTagsTimeSetter) bool {
+	err := g.n.eval(g.expressions, p)
+	if err != nil {
+		g.n.incrementErrorCount()
+		if !g.n.e.QuietFlag {
+			g.n.logger.Println("E!", err)
+		}
+		// Skip bad point
+		return false
+	}
+	return true
+}
+
+func (g *evalGroup) Barrier(b edge.BarrierMessage) (edge.Message, error) {
+	return b, nil
+}
+func (g *evalGroup) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
+	return d, nil
 }

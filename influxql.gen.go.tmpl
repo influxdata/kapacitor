@@ -8,11 +8,45 @@ import (
 
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/pipeline"
 )
 
 {{/* Define typed Aggregate/Emit types */}}
 {{range .}}
+
+func convert{{.Name}}Point(
+	name string,
+	p edge.FieldsTagsTimeGetter,
+	field string,
+	isSimpleSelector bool,
+	topBottomInfo *pipeline.TopBottomCallInfo,
+) (*influxql.{{.Name}}Point, error) {
+	value, ok := p.Fields()[field]
+	if !ok {
+		return nil, fmt.Errorf("field %s missing from point cannot aggregate", field)
+	}
+	typed, ok := value.({{.Type}})
+	if !ok {
+		return nil, fmt.Errorf("field %s has wrong type: got %T exp {{.Type}}", field, value)
+	}
+	ap := &influxql.{{.Name}}Point{
+		Name:  name,
+		Tags:  influxql.NewTags(p.Tags()),
+		Time:  p.Time().UnixNano(),
+		Value: typed,
+	}
+	if topBottomInfo != nil {
+		// We need to populate the Aux fields
+		{{.name}}PopulateAuxFieldsAndTags(ap, topBottomInfo.FieldsAndTags, p.Fields(), p.Tags())
+	}
+
+	if isSimpleSelector {
+		ap.Aux = []interface{}{ p.Tags(), p.Fields() }
+	}
+
+	return ap, nil
+}
 
 type {{.name}}PointAggregator struct {
 	field         string
@@ -32,127 +66,11 @@ func {{.name}}PopulateAuxFieldsAndTags(ap *influxql.{{.Name}}Point, fieldsAndTag
 	}
 }
 
-func (a *{{.name}}PointAggregator) AggregateBatch(b *models.Batch) error {
-	for _, p := range b.Points {
-		value, ok := p.Fields[a.field]
-		if !ok {
-			return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
-		}
-		typed, ok := value.({{.Type}})
-		if !ok {
-			return fmt.Errorf("field %s has wrong type: got %T exp {{.Type}}", a.field, value)
-		}
-		ap := &influxql.{{.Name}}Point{
-			Name:  b.Name,
-			Tags:  influxql.NewTags(p.Tags),
-			Time:  p.Time.UnixNano(),
-			Value: typed,
-		}
-		if a.topBottomInfo != nil {
-			// We need to populate the Aux fields
-			{{.name}}PopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
-		}
-
-		if a.isSimpleSelector {
-			ap.Aux = []interface{}{ p.Tags, p.Fields }
-		}
-		
-		a.aggregator.Aggregate{{.Name}}(ap)
+func (a *{{.name}}PointAggregator) AggregatePoint(name string, p edge.FieldsTagsTimeGetter) error {
+	ap, err := convert{{.Name}}Point(name, p, a.field, a.isSimpleSelector, a.topBottomInfo)
+	if err != nil {
+		return nil
 	}
-	return nil
-}
-
-func (a *{{.name}}PointAggregator) AggregatePoint(p *models.Point) error {
-	value, ok := p.Fields[a.field]
-	if !ok {
-		return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
-	}
-	typed, ok := value.({{.Type}})
-	if !ok {
-		return fmt.Errorf("field %s has wrong type: got %T exp {{.Type}}", a.field, value)
-	}
-	ap := &influxql.{{.Name}}Point{
-		Name:  p.Name,
-		Tags:  influxql.NewTags(p.Tags),
-		Time:  p.Time.UnixNano(),
-		Value: typed,
-	}
-	if a.topBottomInfo != nil {
-		// We need to populate the Aux fields
-		{{.name}}PopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
-	}
-
-	if a.isSimpleSelector {
-		ap.Aux = []interface{}{ p.Tags, p.Fields }
-	}
-	
-	a.aggregator.Aggregate{{.Name}}(ap)
-	return nil
-}
-
-
-
-type {{.name}}PointBulkAggregator struct {
-	field      string
-	topBottomInfo *pipeline.TopBottomCallInfo
-	isSimpleSelector bool
-	aggregator    pipeline.{{.Name}}BulkPointAggregator
-}
-
-func (a *{{.name}}PointBulkAggregator) AggregateBatch(b *models.Batch) error {
-	slice := make([]influxql.{{.Name}}Point, len(b.Points))
-	for i, p := range b.Points {
-		value, ok := p.Fields[a.field]
-		if !ok {
-			return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
-		}
-		typed, ok := value.({{.Type}})
-		if !ok {
-			return fmt.Errorf("field %s has wrong type: got %T exp {{.Type}}", a.field, value)
-		}
-		slice[i] = influxql.{{.Name}}Point{
-			Name:  b.Name,
-			Tags:  influxql.NewTags(p.Tags),
-			Time:  p.Time.UnixNano(),
-			Value: typed,
-		}
-		if a.topBottomInfo != nil {
-			// We need to populate the Aux fields
-			{{.name}}PopulateAuxFieldsAndTags(&slice[i], a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
-		}
-
-		if a.isSimpleSelector {
-			slice[i].Aux = []interface{}{ p.Tags, p.Fields }
-		}
-	}
-	a.aggregator.Aggregate{{.Name}}Bulk(slice)
-	return nil
-}
-
-func (a *{{.name}}PointBulkAggregator) AggregatePoint(p *models.Point) error {
-	value, ok := p.Fields[a.field]
-	if !ok {
-		return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
-	}
-	typed, ok := value.({{.Type}})
-	if !ok {
-		return fmt.Errorf("field %s has wrong type: got %T exp {{.Type}}", a.field, value)
-	}
-	ap := &influxql.{{.Name}}Point{
-		Name:  p.Name,
-		Tags:  influxql.NewTags(p.Tags),
-		Time:  p.Time.UnixNano(),
-		Value: typed,
-	}
-	if a.topBottomInfo != nil {
-		// We need to populate the Aux fields
-		{{.name}}PopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
-	}
-
-	if a.isSimpleSelector {
-		ap.Aux = []interface{}{ p.Tags, p.Fields }
-	}
-
 	a.aggregator.Aggregate{{.Name}}(ap)
 	return nil
 }
@@ -164,10 +82,10 @@ type {{.name}}PointEmitter struct {
     byName bool
 }
 
-func (e *{{.name}}PointEmitter) EmitPoint() (models.Point, error) {
+func (e *{{.name}}PointEmitter) EmitPoint() (edge.PointMessage, error) {
 	slice := e.emitter.Emit()
 	if len(slice) != 1 {
-		return models.Point{}, ErrEmptyEmit
+		return nil, nil
 	}
 	ap := slice[0]
 	var t time.Time
@@ -192,30 +110,29 @@ func (e *{{.name}}PointEmitter) EmitPoint() (models.Point, error) {
 			delete(fields, e.field)
 		}
 	} else {
-		tags = e.tags
+		tags = e.groupInfo.Tags
 		fields = map[string]interface{}{e.as: ap.Value}
 	}
 
-	return models.Point{
-		Name:       e.name,
-		Time:       t,
-		Group:      e.group,
-		Dimensions: e.dimensions,
-		Tags:       tags,
-		Fields:     fields,
-	}, nil
+	return edge.NewPointMessage(
+		e.name, "", "",
+		e.groupInfo.Dimensions,
+		fields,
+		tags,
+		t,
+	), nil
 }
 
-func (e *{{.name}}PointEmitter) EmitBatch() models.Batch {
+func (e *{{.name}}PointEmitter) EmitBatch() edge.BufferedBatchMessage {
 	slice := e.emitter.Emit()
-	b := models.Batch{
-		Name:   e.name,
-		TMax:   e.time,
-		Group:  e.group,
-		ByName: e.dimensions.ByName,
-		Tags:   e.tags,
-		Points: make([]models.BatchPoint, len(slice)),
-	}
+	begin := edge.NewBeginBatchMessage(
+		e.name,
+		e.groupInfo.Tags,
+		e.groupInfo.Dimensions.ByName,
+		e.time,
+		len(slice),
+	)
+	points := make([]edge.BatchPointMessage, len(slice))
 	var t time.Time
 	for i, ap := range slice {
 		if e.pointTimes {
@@ -230,26 +147,30 @@ func (e *{{.name}}PointEmitter) EmitBatch() models.Batch {
 		var tags models.Tags
 		if l := len(ap.Tags.KeyValues()); l > 0 {
 			// Merge batch and point specific tags
-			tags = make(models.Tags, len(e.tags)+l)
-			for k, v := range e.tags {
+			tags = make(models.Tags, len(e.groupInfo.Tags)+l)
+			for k, v := range e.groupInfo.Tags {
 				tags[k] = v
 			}
 			for k, v := range ap.Tags.KeyValues() {
 				tags[k] = v
 			}
 		} else {
-			tags = e.tags
+			tags = e.groupInfo.Tags
 		}
-		b.Points[i] = models.BatchPoint{
-			Time:   t,
-			Tags:   tags,
-			Fields: map[string]interface{}{e.as: ap.Value},
-		}
-		if t.After(b.TMax) {
-			b.TMax = t
+		points[i] = edge.NewBatchPointMessage(
+			models.Fields{e.as: ap.Value},
+			tags,
+			t,
+		)
+		if t.After(begin.Time()) {
+			begin.SetTime(t)
 		}
 	}
-	return b
+	return edge.NewBufferedBatchMessage(
+		begin,
+		points,
+		edge.NewEndBatchMessage(),
+	)
 }
 
 {{end}}
@@ -265,11 +186,6 @@ type {{$a.name}}{{if ne $a.Name $e.Name}}{{$e.Name}}{{end}}ReduceContext struct 
     {{$e.name}}PointEmitter
 }
 
-// {{$a.name}}Bulk{{if ne $a.Name $e.Name}}{{$e.Name}}{{end}}ReduceContext uses composition to implement the reduceContext interface
-type {{$a.name}}Bulk{{if ne $a.Name $e.Name}}{{$e.Name}}{{end}}ReduceContext struct {
-    {{$a.name}}PointBulkAggregator
-    {{$e.name}}PointEmitter
-}
 {{end}}{{end}}
 
 
@@ -286,23 +202,6 @@ func determineReduceContextCreateFn(method string, kind reflect.Kind, rc pipelin
 				a, e := rc.Create{{$a.Name}}{{if ne $a.Name $e.Name}}{{$e.Name}}{{end}}Reducer()
 				return &{{$a.name}}{{if ne $a.Name $e.Name}}{{$e.Name}}{{end}}ReduceContext{
 					{{$a.name}}PointAggregator: {{$a.name}}PointAggregator{
-						field:      c.field,
-						topBottomInfo: rc.TopBottomCallInfo,
-						isSimpleSelector: rc.IsSimpleSelector,
-						aggregator: a,
-					},
-					{{$e.name}}PointEmitter: {{$e.name}}PointEmitter{
-						baseReduceContext: c,
-						emitter:           e,
-						isSimpleSelector: rc.IsSimpleSelector,
-					},
-				}
-			}
-		case rc.Create{{$a.Name}}Bulk{{if ne $a.Name $e.Name}}{{$e.Name}}{{end}}Reducer != nil:
-			 fn = func(c baseReduceContext) reduceContext {
-				a, e := rc.Create{{$a.Name}}Bulk{{if ne $a.Name $e.Name}}{{$e.Name}}{{end}}Reducer()
-				return &{{$a.name}}Bulk{{if ne $a.Name $e.Name}}{{$e.Name}}{{end}}ReduceContext{
-					{{$a.name}}PointBulkAggregator: {{$a.name}}PointBulkAggregator{
 						field:      c.field,
 						topBottomInfo: rc.TopBottomCallInfo,
 						isSimpleSelector: rc.IsSimpleSelector,

@@ -3,11 +3,9 @@ package kapacitor
 import (
 	"fmt"
 	"log"
-	"sort"
-	"sync"
 	"time"
 
-	"github.com/influxdata/kapacitor/expvar"
+	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick/ast"
@@ -18,11 +16,8 @@ type CombineNode struct {
 	node
 	c *pipeline.CombineNode
 
-	expressions        []stateful.Expression
-	expressionsByGroup map[models.GroupID][]stateful.Expression
-	scopePools         []stateful.ScopePool
-
-	expressionsByGroupMu sync.RWMutex
+	expressions []stateful.Expression
+	scopePools  []stateful.ScopePool
 
 	combination combination
 }
@@ -30,10 +25,9 @@ type CombineNode struct {
 // Create a new CombineNode, which combines a stream with itself dynamically.
 func newCombineNode(et *ExecutingTask, n *pipeline.CombineNode, l *log.Logger) (*CombineNode, error) {
 	cn := &CombineNode{
-		c:                  n,
-		node:               node{Node: n, et: et, logger: l},
-		expressionsByGroup: make(map[models.GroupID][]stateful.Expression),
-		combination:        combination{max: n.Max},
+		c:           n,
+		node:        node{Node: n, et: et, logger: l},
+		combination: combination{max: n.Max},
 	}
 
 	// Create stateful expressions
@@ -51,174 +45,142 @@ func newCombineNode(et *ExecutingTask, n *pipeline.CombineNode, l *log.Logger) (
 	return cn, nil
 }
 
-type buffer struct {
-	Time       time.Time
-	Name       string
-	Group      models.GroupID
-	Dimensions models.Dimensions
-	Points     []rawPoint
+func (n *CombineNode) runCombine([]byte) error {
+	consumer := edge.NewGroupedConsumer(
+		n.ins[0],
+		n,
+	)
+	n.statMap.Set(statCardinalityGauge, consumer.CardinalityVar())
+	return consumer.Consume()
 }
 
-type timeList []time.Time
-
-func (t timeList) Len() int           { return len(t) }
-func (t timeList) Less(i, j int) bool { return t[i].Before(t[j]) }
-func (t timeList) Swap(i, j int)      { t[i], t[j] = t[j], t[i] }
-
-func (n *CombineNode) runCombine([]byte) error {
-	valueF := func() int64 {
-		n.expressionsByGroupMu.RLock()
-		l := len(n.expressionsByGroup)
-		n.expressionsByGroupMu.RUnlock()
-		return int64(l)
+func (n *CombineNode) NewGroup(group edge.GroupInfo, first edge.PointMeta) (edge.Receiver, error) {
+	expressions := make([]stateful.Expression, len(n.expressions))
+	for i, expr := range n.expressions {
+		expressions[i] = expr.CopyReset()
 	}
-	n.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
+	return &combineBuffer{
+		n:           n,
+		time:        first.Time(),
+		name:        first.Name(),
+		groupInfo:   group,
+		expressions: expressions,
+		c:           n.combination,
+	}, nil
+}
 
-	switch n.Wants() {
-	case pipeline.StreamEdge:
-		buffers := make(map[models.GroupID]*buffer)
-		for p, ok := n.ins[0].NextPoint(); ok; p, ok = n.ins[0].NextPoint() {
-			n.timer.Start()
-			t := p.Time.Round(n.c.Tolerance)
-			currentBuf, ok := buffers[p.Group]
-			if !ok {
-				currentBuf = &buffer{
-					Time:       t,
-					Name:       p.Name,
-					Group:      p.Group,
-					Dimensions: p.Dimensions,
-				}
-				buffers[p.Group] = currentBuf
-			}
-			rp := rawPoint{
-				Time:   t,
-				Fields: p.Fields,
-				Tags:   p.Tags,
-			}
-			if t.Equal(currentBuf.Time) {
-				currentBuf.Points = append(currentBuf.Points, rp)
-			} else {
-				if err := n.combineBuffer(currentBuf); err != nil {
-					return err
-				}
-				currentBuf.Time = t
-				currentBuf.Name = p.Name
-				currentBuf.Group = p.Group
-				currentBuf.Dimensions = p.Dimensions
-				currentBuf.Points = currentBuf.Points[0:1]
-				currentBuf.Points[0] = rp
-			}
-			n.timer.Stop()
-		}
-	case pipeline.BatchEdge:
-		allBuffers := make(map[models.GroupID]map[time.Time]*buffer)
-		groupTimes := make(map[models.GroupID]time.Time)
-		for b, ok := n.ins[0].NextBatch(); ok; b, ok = n.ins[0].NextBatch() {
-			n.timer.Start()
-			t := b.TMax.Round(n.c.Tolerance)
-			buffers, ok := allBuffers[b.Group]
-			if !ok {
-				buffers = make(map[time.Time]*buffer)
-				allBuffers[b.Group] = buffers
-				groupTimes[b.Group] = t
-			}
-			groupTime := groupTimes[b.Group]
-			if !t.Equal(groupTime) {
-				// Set new groupTime
-				groupTimes[b.Group] = t
-				// Combine/Emit all old buffers
-				times := make(timeList, 0, len(buffers))
-				for t := range buffers {
-					times = append(times, t)
-				}
-				sort.Sort(times)
-				for _, t := range times {
-					if err := n.combineBuffer(buffers[t]); err != nil {
-						return err
-					}
-					delete(buffers, t)
-				}
-			}
-			for _, p := range b.Points {
-				t := p.Time.Round(n.c.Tolerance)
-				currentBuf, ok := buffers[t]
-				if !ok {
-					currentBuf = &buffer{
-						Time:       t,
-						Name:       b.Name,
-						Group:      b.Group,
-						Dimensions: b.PointDimensions(),
-					}
-					buffers[t] = currentBuf
-				}
-				currentBuf.Points = append(currentBuf.Points, rawPoint{
-					Time:   t,
-					Fields: p.Fields,
-					Tags:   p.Tags,
-				})
-			}
-			n.timer.Stop()
-		}
+type combineBuffer struct {
+	n           *CombineNode
+	time        time.Time
+	name        string
+	groupInfo   edge.GroupInfo
+	points      []edge.FieldsTagsTimeSetter
+	expressions []stateful.Expression
+	c           combination
+
+	begin edge.BeginBatchMessage
+}
+
+func (b *combineBuffer) BeginBatch(begin edge.BeginBatchMessage) error {
+	b.n.timer.Start()
+	defer b.n.timer.Stop()
+
+	b.name = begin.Name()
+	b.time = time.Time{}
+	if s := begin.SizeHint(); s > cap(b.points) {
+		b.points = make([]edge.FieldsTagsTimeSetter, 0, s)
 	}
 	return nil
 }
 
-// Simple container for point data.
-type rawPoint struct {
-	Time   time.Time
-	Fields models.Fields
-	Tags   models.Tags
+func (b *combineBuffer) BatchPoint(bp edge.BatchPointMessage) error {
+	b.n.timer.Start()
+	defer b.n.timer.Stop()
+	bp = bp.ShallowCopy()
+	return b.addPoint(bp)
+}
+
+func (b *combineBuffer) EndBatch(end edge.EndBatchMessage) error {
+	b.n.timer.Start()
+	defer b.n.timer.Stop()
+	if err := b.combine(); err != nil {
+		return err
+	}
+	b.points = b.points[0:0]
+	return nil
+}
+
+func (b *combineBuffer) Point(p edge.PointMessage) error {
+	b.n.timer.Start()
+	defer b.n.timer.Stop()
+	p = p.ShallowCopy()
+	return b.addPoint(p)
+}
+
+func (b *combineBuffer) addPoint(p edge.FieldsTagsTimeSetter) error {
+	t := p.Time().Round(b.n.c.Tolerance)
+	p.SetTime(t)
+	if t.Equal(b.time) {
+		b.points = append(b.points, p)
+	} else {
+		if err := b.combine(); err != nil {
+			return err
+		}
+		b.time = t
+		b.points = b.points[0:1]
+		b.points[0] = p
+	}
+	return nil
+}
+
+func (b *combineBuffer) Barrier(barrier edge.BarrierMessage) error {
+	return edge.Forward(b.n.outs, barrier)
+}
+func (b *combineBuffer) DeleteGroup(d edge.DeleteGroupMessage) error {
+	return edge.Forward(b.n.outs, d)
 }
 
 // Combine a set of points into all their combinations.
-func (n *CombineNode) combineBuffer(buf *buffer) error {
-	if len(buf.Points) == 0 {
+func (b *combineBuffer) combine() error {
+	if len(b.points) == 0 {
 		return nil
 	}
-	l := len(n.expressions)
-	n.expressionsByGroupMu.RLock()
-	expressions, ok := n.expressionsByGroup[buf.Group]
-	n.expressionsByGroupMu.RUnlock()
-	if !ok {
-		expressions = make([]stateful.Expression, l)
-		for i, expr := range n.expressions {
-			expressions[i] = expr.CopyReset()
-		}
-		n.expressionsByGroupMu.Lock()
-		n.expressionsByGroup[buf.Group] = expressions
-		n.expressionsByGroupMu.Unlock()
-	}
+
+	l := len(b.expressions)
 
 	// Compute matching result for all points
 	matches := make([]map[int]bool, l)
 	for i := 0; i < l; i++ {
-		matches[i] = make(map[int]bool, len(buf.Points))
+		matches[i] = make(map[int]bool, len(b.points))
 	}
-	for idx, p := range buf.Points {
-		for i := range expressions {
-			matched, err := EvalPredicate(expressions[i], n.scopePools[i], p.Time, p.Fields, p.Tags)
+	for idx, p := range b.points {
+		for i := range b.expressions {
+			matched, err := EvalPredicate(b.expressions[i], b.n.scopePools[i], p)
 			if err != nil {
-				n.incrementErrorCount()
-				n.logger.Println("E! evaluating lambda expression:", err)
+				b.n.incrementErrorCount()
+				b.n.logger.Println("E! evaluating lambda expression:", err)
 			}
 			matches[i][idx] = matched
 		}
 	}
 
-	p := models.Point{
-		Name:       buf.Name,
-		Group:      buf.Group,
-		Dimensions: buf.Dimensions,
-	}
-	dimensions := p.Dimensions.ToSet()
-	set := make([]rawPoint, l)
-	return n.combination.Do(len(buf.Points), l, func(indices []int) error {
+	p := edge.NewPointMessage(
+		b.name, "", "",
+		b.groupInfo.Dimensions,
+		nil,
+		nil,
+		time.Time{},
+	)
+
+	dimensions := p.Dimensions().ToSet()
+	set := make([]edge.FieldsTagsTimeSetter, l)
+	return b.c.Do(len(b.points), l, func(indices []int) error {
 		valid := true
 		for s := 0; s < l; s++ {
 			found := false
 			for i := range indices {
 				if matches[s][indices[i]] {
-					set[s] = buf.Points[indices[i]]
+					set[s] = b.points[indices[i]]
 					indices = append(indices[0:i], indices[i+1:]...)
 					found = true
 					break
@@ -230,48 +192,43 @@ func (n *CombineNode) combineBuffer(buf *buffer) error {
 			}
 		}
 		if valid {
-			rp := n.merge(set, dimensions)
+			fields, tags, t := b.merge(set, dimensions)
 
-			p.Time = rp.Time.Round(n.c.Tolerance)
-			p.Fields = rp.Fields
-			p.Tags = rp.Tags
+			np := p.ShallowCopy()
+			np.SetFields(fields)
+			np.SetTags(tags)
+			np.SetTime(t.Round(b.n.c.Tolerance))
 
-			n.timer.Pause()
-			for _, out := range n.outs {
-				err := out.CollectPoint(p)
-				if err != nil {
-					return err
-				}
+			b.n.timer.Pause()
+			err := edge.Forward(b.n.outs, np)
+			b.n.timer.Resume()
+			if err != nil {
+				return err
 			}
-			n.timer.Resume()
 		}
 		return nil
 	})
 }
 
 // Merge a set of points into a single point.
-func (n *CombineNode) merge(points []rawPoint, dimensions map[string]bool) rawPoint {
-	fields := make(models.Fields, len(points[0].Fields)*len(points))
-	tags := make(models.Tags, len(points[0].Tags)*len(points))
+func (b *combineBuffer) merge(points []edge.FieldsTagsTimeSetter, dimensions map[string]bool) (models.Fields, models.Tags, time.Time) {
+	fields := make(models.Fields, len(points[0].Fields())*len(points))
+	tags := make(models.Tags, len(points[0].Tags())*len(points))
 
 	for i, p := range points {
-		for field, value := range p.Fields {
-			fields[n.c.Names[i]+n.c.Delimiter+field] = value
+		for field, value := range p.Fields() {
+			fields[b.n.c.Names[i]+b.n.c.Delimiter+field] = value
 		}
-		for tag, value := range p.Tags {
+		for tag, value := range p.Tags() {
 			if !dimensions[tag] {
-				tags[n.c.Names[i]+n.c.Delimiter+tag] = value
+				tags[b.n.c.Names[i]+b.n.c.Delimiter+tag] = value
 			} else {
 				tags[tag] = value
 			}
 		}
 	}
 
-	return rawPoint{
-		Time:   points[0].Time,
-		Fields: fields,
-		Tags:   tags,
-	}
+	return fields, tags, points[0].Time()
 }
 
 // Type for performing actions on a set of combinations.

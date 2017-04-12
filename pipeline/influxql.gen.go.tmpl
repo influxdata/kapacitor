@@ -8,7 +8,6 @@ type ReduceCreater struct {
 {{range $a := $types}}
 {{range $e := $types}}
 	Create{{$a.Name}}{{if ne $a.Name $e.Name}}{{$e.Name}}{{end}}Reducer func() (influxql.{{$a.Name}}PointAggregator, influxql.{{$e.Name}}PointEmitter)
-	Create{{$a.Name}}Bulk{{if ne $a.Name $e.Name}}{{$e.Name}}{{end}}Reducer func() ({{$a.Name}}BulkPointAggregator, influxql.{{$e.Name}}PointEmitter)
 {{end}}{{end}}{{end}}
 
 	TopBottomCallInfo *TopBottomCallInfo
@@ -17,9 +16,3 @@ type ReduceCreater struct {
 	IsEmptyOK bool
 }
 
-{{range .}}
-type {{.Name}}BulkPointAggregator interface {
-	influxql.{{.Name}}PointAggregator
-	influxql.{{.Name}}BulkPointAggregator
-}
-{{end}}

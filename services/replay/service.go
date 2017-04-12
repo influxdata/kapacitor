@@ -22,6 +22,7 @@ import (
 	"github.com/influxdata/kapacitor"
 	kclient "github.com/influxdata/kapacitor/client/v1"
 	"github.com/influxdata/kapacitor/clock"
+	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/services/httpd"
@@ -79,7 +80,7 @@ type Service struct {
 		Delete(*kapacitor.TaskMaster)
 	}
 	TaskMaster interface {
-		NewFork(name string, dbrps []kapacitor.DBRP, measurements []string) (*kapacitor.Edge, error)
+		NewFork(name string, dbrps []kapacitor.DBRP, measurements []string) (edge.StatsEdge, error)
 		DelFork(name string)
 		New(name string) *kapacitor.TaskMaster
 		Stream(name string) (kapacitor.StreamCollector, error)
@@ -1151,7 +1152,7 @@ func (r *Service) doLiveQueryReplay(id string, task *kapacitor.Task, clk clock.C
 		runErrC := make(chan error, 1)
 		switch task.Type {
 		case kapacitor.StreamTask:
-			source := make(chan models.Point)
+			source := make(chan edge.PointMessage)
 			go func() {
 				runErrC <- r.runQueryStream(source, query, cluster)
 			}()
@@ -1161,12 +1162,12 @@ func (r *Service) doLiveQueryReplay(id string, task *kapacitor.Task, clk clock.C
 			}
 			replayErrC = kapacitor.ReplayStreamFromChan(clk, source, stream, recTime)
 		case kapacitor.BatchTask:
-			source := make(chan models.Batch)
+			source := make(chan edge.BufferedBatchMessage)
 			go func() {
 				runErrC <- r.runQueryBatch(source, query, cluster)
 			}()
 			collectors := tm.BatchCollectors(task.ID)
-			replayErrC = kapacitor.ReplayBatchFromChan(clk, []<-chan models.Batch{source}, collectors, recTime)
+			replayErrC = kapacitor.ReplayBatchFromChan(clk, []<-chan edge.BufferedBatchMessage{source}, collectors, recTime)
 		}
 		for i := 0; i < 2; i++ {
 			var err error
@@ -1262,11 +1263,17 @@ func (s *Service) doRecordStream(id string, dataSource DataSource, stop time.Tim
 	done := make(chan struct{})
 	go func() {
 		closed := false
-		for p, ok := e.NextPoint(); ok; p, ok = e.NextPoint() {
+		for m, ok := e.Emit(); ok; m, ok = e.Emit() {
 			if closed {
 				continue
 			}
-			if p.Time.After(stop) {
+			p, isPoint := m.(edge.PointMessage)
+			if !isPoint {
+				// Skip messages that are not points
+				continue
+			}
+
+			if p.Time().After(stop) {
 				closed = true
 				close(done)
 				//continue to read any data already on the edge, but just drop it.
@@ -1325,7 +1332,7 @@ func (s *Service) doRecordBatch(dataSource DataSource, t *kapacitor.Task, start,
 	return nil
 }
 
-func (s *Service) startRecordBatch(t *kapacitor.Task, start, stop time.Time) ([]<-chan models.Batch, <-chan error, error) {
+func (s *Service) startRecordBatch(t *kapacitor.Task, start, stop time.Time) ([]<-chan edge.BufferedBatchMessage, <-chan error, error) {
 	// We do not open the task master so it does not need to be closed
 	et, err := kapacitor.NewExecutingTask(s.TaskMaster.New(""), t)
 	if err != nil {
@@ -1341,11 +1348,11 @@ func (s *Service) startRecordBatch(t *kapacitor.Task, start, stop time.Time) ([]
 		return nil, nil, errors.New("InfluxDB not configured, cannot record batch query")
 	}
 
-	sources := make([]<-chan models.Batch, len(batches))
+	sources := make([]<-chan edge.BufferedBatchMessage, len(batches))
 	errors := make(chan error, len(batches))
 
 	for batchIndex, batchQueries := range batches {
-		source := make(chan models.Batch)
+		source := make(chan edge.BufferedBatchMessage)
 		sources[batchIndex] = source
 		go func(cluster string, queries []*kapacitor.Query, groupByName bool) {
 			defer close(source)
@@ -1369,15 +1376,15 @@ func (s *Service) startRecordBatch(t *kapacitor.Task, start, stop time.Time) ([]
 					return
 				}
 				for _, res := range resp.Results {
-					batches, err := models.ResultToBatches(res, groupByName)
+					batches, err := edge.ResultToBufferedBatches(res, groupByName)
 					if err != nil {
 						errors <- err
 						return
 					}
 					for _, b := range batches {
 						// Set stop time based off query bounds
-						if b.TMax.IsZero() || !q.IsGroupedByTime() {
-							b.TMax = q.StopTime()
+						if b.Begin().Time().IsZero() || !q.IsGroupedByTime() {
+							b.Begin().SetTime(q.StopTime())
 						}
 						source <- b
 					}
@@ -1400,7 +1407,7 @@ func (s *Service) startRecordBatch(t *kapacitor.Task, start, stop time.Time) ([]
 	return sources, errC, nil
 }
 
-func (r *Service) saveBatchRecording(dataSource DataSource, sources []<-chan models.Batch) error {
+func (r *Service) saveBatchRecording(dataSource DataSource, sources []<-chan edge.BufferedBatchMessage) error {
 	archiver, err := dataSource.BatchArchiver()
 	if err != nil {
 		return err
@@ -1422,7 +1429,7 @@ func (r *Service) doRecordQuery(dataSource DataSource, q string, typ RecordingTy
 	errC := make(chan error, 2)
 	switch typ {
 	case StreamRecording:
-		points := make(chan models.Point)
+		points := make(chan edge.PointMessage)
 		go func() {
 			errC <- r.runQueryStream(points, q, cluster)
 		}()
@@ -1430,7 +1437,7 @@ func (r *Service) doRecordQuery(dataSource DataSource, q string, typ RecordingTy
 			errC <- r.saveStreamQuery(dataSource, points, precision)
 		}()
 	case BatchRecording:
-		batches := make(chan models.Batch)
+		batches := make(chan edge.BufferedBatchMessage)
 		go func() {
 			errC <- r.runQueryBatch(batches, q, cluster)
 		}()
@@ -1447,7 +1454,7 @@ func (r *Service) doRecordQuery(dataSource DataSource, q string, typ RecordingTy
 	return nil
 }
 
-func (r *Service) runQueryStream(source chan<- models.Point, q, cluster string) error {
+func (r *Service) runQueryStream(source chan<- edge.PointMessage, q, cluster string) error {
 	defer close(source)
 	dbrp, resp, err := r.execQuery(q, cluster)
 	if err != nil {
@@ -1455,7 +1462,7 @@ func (r *Service) runQueryStream(source chan<- models.Point, q, cluster string) 
 	}
 	// Write results to sources
 	for _, res := range resp.Results {
-		batches, err := models.ResultToBatches(res, false)
+		batches, err := edge.ResultToBufferedBatches(res, false)
 		if err != nil {
 			return err
 		}
@@ -1464,10 +1471,10 @@ func (r *Service) runQueryStream(source chan<- models.Point, q, cluster string) 
 		// Find earliest time of first points
 		current := time.Time{}
 		for _, batch := range batches {
-			if len(batch.Points) > 0 &&
+			if len(batch.Points()) > 0 &&
 				(current.IsZero() ||
-					batch.Points[0].Time.Before(current)) {
-				current = batch.Points[0].Time
+					batch.Points()[0].Time().Before(current)) {
+				current = batch.Points()[0].Time()
 			}
 		}
 
@@ -1481,7 +1488,7 @@ func (r *Service) runQueryStream(source chan<- models.Point, q, cluster string) 
 
 			next := time.Time{}
 			for b := range batches {
-				l := len(batches[b].Points)
+				l := len(batches[b].Points())
 				if l == 0 {
 					if !finished[b] {
 						finishedCount++
@@ -1491,26 +1498,27 @@ func (r *Service) runQueryStream(source chan<- models.Point, q, cluster string) 
 				}
 				i := 0
 				for ; i < l; i++ {
-					bp := batches[b].Points[i]
-					if bp.Time.After(current) {
-						if next.IsZero() || bp.Time.Before(next) {
-							next = bp.Time
+					bp := batches[b].Points()[i]
+					if bp.Time().After(current) {
+						if next.IsZero() || bp.Time().Before(next) {
+							next = bp.Time()
 						}
 						break
 					}
 					// Write point
-					p := models.Point{
-						Name:            batches[b].Name,
-						Database:        dbrp.Database,
-						RetentionPolicy: dbrp.RetentionPolicy,
-						Tags:            bp.Tags,
-						Fields:          bp.Fields,
-						Time:            bp.Time,
-					}
+					p := edge.NewPointMessage(
+						batches[b].Name(),
+						dbrp.Database,
+						dbrp.RetentionPolicy,
+						models.Dimensions{},
+						bp.Fields(),
+						bp.Tags(),
+						bp.Time(),
+					)
 					source <- p
 				}
 				// Remove written points
-				batches[b].Points = batches[b].Points[i:]
+				batches[b].SetPoints(batches[b].Points()[i:])
 			}
 			current = next
 		}
@@ -1518,7 +1526,7 @@ func (r *Service) runQueryStream(source chan<- models.Point, q, cluster string) 
 	return nil
 }
 
-func (r *Service) runQueryBatch(source chan<- models.Batch, q string, cluster string) error {
+func (r *Service) runQueryBatch(source chan<- edge.BufferedBatchMessage, q string, cluster string) error {
 	defer close(source)
 	_, resp, err := r.execQuery(q, cluster)
 	if err != nil {
@@ -1526,7 +1534,7 @@ func (r *Service) runQueryBatch(source chan<- models.Batch, q string, cluster st
 	}
 	// Write results to sources
 	for _, res := range resp.Results {
-		batches, err := models.ResultToBatches(res, false)
+		batches, err := edge.ResultToBufferedBatches(res, false)
 		if err != nil {
 			return err
 		}
@@ -1537,7 +1545,7 @@ func (r *Service) runQueryBatch(source chan<- models.Batch, q string, cluster st
 	return nil
 }
 
-func (r *Service) saveBatchQuery(dataSource DataSource, batches <-chan models.Batch) error {
+func (r *Service) saveBatchQuery(dataSource DataSource, batches <-chan edge.BufferedBatchMessage) error {
 	archiver, err := dataSource.BatchArchiver()
 	if err != nil {
 		return err
@@ -1557,7 +1565,7 @@ func (r *Service) saveBatchQuery(dataSource DataSource, batches <-chan models.Ba
 	return archiver.Close()
 }
 
-func (s *Service) saveStreamQuery(dataSource DataSource, points <-chan models.Point, precision string) error {
+func (s *Service) saveStreamQuery(dataSource DataSource, points <-chan edge.PointMessage, precision string) error {
 	sw, err := dataSource.StreamWriter()
 	if err != nil {
 		return err

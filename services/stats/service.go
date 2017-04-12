@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/server/vars"
 	"github.com/influxdata/kapacitor/timer"
@@ -118,15 +119,15 @@ func (s *Service) reportStats() {
 		return
 	}
 	for _, stat := range data {
-		p := models.Point{
-			Database:        s.db,
-			RetentionPolicy: s.rp,
-			Name:            stat.Name,
-			Group:           models.NilGroup,
-			Tags:            models.Tags(stat.Tags),
-			Time:            now,
-			Fields:          models.Fields(stat.Values),
-		}
+		p := edge.NewPointMessage(
+			stat.Name,
+			s.db,
+			s.rp,
+			models.Dimensions{},
+			models.Fields(stat.Values),
+			models.Tags(stat.Tags),
+			now,
+		)
 		s.stream.CollectPoint(p)
 	}
 }

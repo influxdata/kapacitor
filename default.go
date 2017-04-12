@@ -3,6 +3,7 @@ package kapacitor
 import (
 	"log"
 
+	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
@@ -24,76 +25,85 @@ type DefaultNode struct {
 // Create a new  DefaultNode which applies a transformation func to each point in a stream and returns a single point.
 func newDefaultNode(et *ExecutingTask, n *pipeline.DefaultNode, l *log.Logger) (*DefaultNode, error) {
 	dn := &DefaultNode{
-		node: node{Node: n, et: et, logger: l},
-		d:    n,
+		node:            node{Node: n, et: et, logger: l},
+		d:               n,
+		fieldsDefaulted: new(expvar.Int),
+		tagsDefaulted:   new(expvar.Int),
 	}
 	dn.node.runF = dn.runDefault
 	return dn, nil
 }
 
-func (e *DefaultNode) runDefault(snapshot []byte) error {
-	e.fieldsDefaulted = &expvar.Int{}
-	e.tagsDefaulted = &expvar.Int{}
+func (n *DefaultNode) runDefault(snapshot []byte) error {
+	n.statMap.Set(statsFieldsDefaulted, n.fieldsDefaulted)
+	n.statMap.Set(statsTagsDefaulted, n.tagsDefaulted)
 
-	e.statMap.Set(statsFieldsDefaulted, e.fieldsDefaulted)
-	e.statMap.Set(statsTagsDefaulted, e.tagsDefaulted)
-	switch e.Provides() {
-	case pipeline.StreamEdge:
-		for p, ok := e.ins[0].NextPoint(); ok; p, ok = e.ins[0].NextPoint() {
-			e.timer.Start()
-			p.Fields, p.Tags = e.setDefaults(p.Fields, p.Tags)
-			p.UpdateGroup()
-			e.timer.Stop()
-			for _, child := range e.outs {
-				err := child.CollectPoint(p)
-				if err != nil {
-					return err
-				}
-			}
-		}
-	case pipeline.BatchEdge:
-		for b, ok := e.ins[0].NextBatch(); ok; b, ok = e.ins[0].NextBatch() {
-			e.timer.Start()
-			b.Points = b.ShallowCopyPoints()
-			_, b.Tags = e.setDefaults(nil, b.Tags)
-			b.UpdateGroup()
-			for i := range b.Points {
-				b.Points[i].Fields, b.Points[i].Tags = e.setDefaults(b.Points[i].Fields, b.Points[i].Tags)
-			}
-			e.timer.Stop()
-			for _, child := range e.outs {
-				err := child.CollectBatch(b)
-				if err != nil {
-					return err
-				}
-			}
-		}
-	}
-	return nil
+	consumer := edge.NewConsumerWithReceiver(
+		n.ins[0],
+		edge.NewReceiverFromForwardReceiverWithStats(
+			n.outs,
+			edge.NewTimedForwardReceiver(n.timer, n),
+		),
+	)
+	return consumer.Consume()
 }
 
-func (d *DefaultNode) setDefaults(fields models.Fields, tags models.Tags) (models.Fields, models.Tags) {
+func (n *DefaultNode) BeginBatch(begin edge.BeginBatchMessage) (edge.Message, error) {
+	begin = begin.ShallowCopy()
+	_, tags := n.setDefaults(nil, begin.Tags())
+	begin.SetTags(tags)
+	return begin, nil
+}
+
+func (n *DefaultNode) BatchPoint(bp edge.BatchPointMessage) (edge.Message, error) {
+	bp = bp.ShallowCopy()
+	fields, tags := n.setDefaults(bp.Fields(), bp.Tags())
+	bp.SetFields(fields)
+	bp.SetTags(tags)
+	return bp, nil
+}
+
+func (n *DefaultNode) EndBatch(end edge.EndBatchMessage) (edge.Message, error) {
+	return end, nil
+}
+
+func (n *DefaultNode) Point(p edge.PointMessage) (edge.Message, error) {
+	p = p.ShallowCopy()
+	fields, tags := n.setDefaults(p.Fields(), p.Tags())
+	p.SetFields(fields)
+	p.SetTags(tags)
+	return p, nil
+}
+
+func (n *DefaultNode) Barrier(b edge.BarrierMessage) (edge.Message, error) {
+	return b, nil
+}
+func (n *DefaultNode) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
+	return d, nil
+}
+
+func (n *DefaultNode) setDefaults(fields models.Fields, tags models.Tags) (models.Fields, models.Tags) {
 	newFields := fields
 	fieldsCopied := false
-	for field, value := range d.d.Fields {
+	for field, value := range n.d.Fields {
 		if v := fields[field]; v == nil {
 			if !fieldsCopied {
 				newFields = newFields.Copy()
 				fieldsCopied = true
 			}
-			d.fieldsDefaulted.Add(1)
+			n.fieldsDefaulted.Add(1)
 			newFields[field] = value
 		}
 	}
 	newTags := tags
 	tagsCopied := false
-	for tag, value := range d.d.Tags {
+	for tag, value := range n.d.Tags {
 		if v := tags[tag]; v == "" {
 			if !tagsCopied {
 				newTags = newTags.Copy()
 				tagsCopied = true
 			}
-			d.tagsDefaulted.Add(1)
+			n.tagsDefaulted.Add(1)
 			newTags[tag] = value
 		}
 	}

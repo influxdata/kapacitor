@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/config"
@@ -22,7 +23,7 @@ var (
 // Service represents the scraper manager
 type Service struct {
 	PointsWriter interface {
-		WriteKapacitorPoint(models.Point) error
+		WriteKapacitorPoint(edge.PointMessage) error
 	}
 	mu sync.Mutex
 	wg sync.WaitGroup
@@ -182,14 +183,15 @@ func (s *Service) Append(sample *model.Sample) error {
 		"value": value,
 	}
 
-	return s.PointsWriter.WriteKapacitorPoint(models.Point{
-		Database:        db,
-		RetentionPolicy: rp,
-		Name:            tags[model.MetricNameLabel],
-		Tags:            tags,
-		Fields:          fields,
-		Time:            sample.Timestamp.Time(),
-	})
+	return s.PointsWriter.WriteKapacitorPoint(edge.NewPointMessage(
+		tags[model.MetricNameLabel],
+		db,
+		rp,
+		models.Dimensions{},
+		fields,
+		tags,
+		sample.Timestamp.Time(),
+	))
 }
 
 // NeedsThrottling conforms to SampleAppender and never returns true currently.

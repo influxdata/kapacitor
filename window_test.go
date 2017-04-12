@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/stretchr/testify/assert"
 )
@@ -23,9 +24,13 @@ func TestWindowBufferByTime(t *testing.T) {
 	for i := 1; i <= size; i++ {
 
 		t := time.Unix(int64(i), 0)
-		p := models.Point{
-			Time: t,
-		}
+		p := edge.NewPointMessage(
+			"name", "db", "rp",
+			models.Dimensions{},
+			nil,
+			nil,
+			t,
+		)
 		buf.insert(p)
 
 		assert.Equal(i, buf.size)
@@ -46,7 +51,7 @@ func TestWindowBufferByTime(t *testing.T) {
 		points := buf.points()
 		if assert.Equal(size-i, len(points)) {
 			for _, p := range points {
-				assert.True(!p.Time.Before(oldest), "Point %s is not after oldest time %s", p.Time, oldest)
+				assert.True(!p.Time().Before(oldest), "Point %s is not after oldest time %s", p.Time(), oldest)
 			}
 		}
 	}
@@ -58,9 +63,13 @@ func TestWindowBufferByTime(t *testing.T) {
 	for i := 1; i <= size*2; i++ {
 
 		t := time.Unix(int64(i+size), 0)
-		p := models.Point{
-			Time: t,
-		}
+		p := edge.NewPointMessage(
+			"name", "db", "rp",
+			models.Dimensions{},
+			nil,
+			nil,
+			t,
+		)
 		buf.insert(p)
 
 		assert.Equal(i, buf.size)
@@ -69,7 +78,7 @@ func TestWindowBufferByTime(t *testing.T) {
 		if assert.Equal(i, len(points)) {
 			for _, p := range points {
 				if assert.NotNil(p, "i:%d", i) {
-					assert.True(!p.Time.Before(oldest), "Point %s is not after oldest time %s", p.Time, oldest)
+					assert.True(!p.Time().Before(oldest), "Point %s is not after oldest time %s", p.Time(), oldest)
 				}
 			}
 		}
@@ -118,9 +127,7 @@ func TestWindowBufferByCount(t *testing.T) {
 		t.Logf("Starting test size %d period %d every %d", tc.size, tc.period, tc.every)
 		w := newWindowByCount(
 			"test",
-			models.NilGroup,
-			nil,
-			false,
+			edge.GroupInfo{},
 			tc.period,
 			tc.every,
 			tc.fillPeriod,
@@ -129,16 +136,26 @@ func TestWindowBufferByCount(t *testing.T) {
 
 		// fill buffer
 		for i := 1; i <= tc.size; i++ {
-			p := models.Point{
-				Time: time.Unix(int64(i), 0).UTC(),
+			p := edge.NewPointMessage(
+				"name", "db", "rp",
+				models.Dimensions{},
+				nil,
+				nil,
+				time.Unix(int64(i), 0).UTC(),
+			)
+			msg, err := w.Point(p)
+			if err != nil {
+				t.Fatal(err)
 			}
-			b, emit := w.Insert(p)
 			expEmit := tc.every == 0 || i%tc.every == 0
 			if tc.fillPeriod {
 				expEmit = i > tc.period && expEmit
 			}
-			if got, exp := emit, expEmit; got != exp {
-				t.Errorf("%d unexpected emit: got %t exp %t %d %d %d", i, got, exp, w.period, w.nextEmit, w.stop)
+			if expEmit && msg == nil {
+				t.Errorf("%d unexpected nil forward message: got nil message, expected non nil message", i)
+			}
+			if !expEmit && msg != nil {
+				t.Errorf("%d unexpected forward message: got non-nil message %v, expected nil message", i, msg)
 			}
 
 			size := i
@@ -159,18 +176,22 @@ func TestWindowBufferByCount(t *testing.T) {
 				t.Errorf("%d unexpected stop: got %d exp %d", i, got, exp)
 			}
 
-			if emit {
+			if msg != nil {
+				if msg.Type() != edge.BufferedBatch {
+					t.Fatalf("unexpected message type %v", msg.Type())
+				}
+				b := msg.(edge.BufferedBatchMessage)
 				l := i
 				if l > tc.period {
 					l = tc.period
 				}
-				points := b.Points
+				points := b.Points()
 				if got, exp := len(points), l; got != exp {
 					t.Fatalf("%d unexpected number of points got %d exp %d", i, got, exp)
 				}
 
 				for j, p := range points {
-					if got, exp := p.Time, time.Unix(int64(i+j-len(points)+1), 0).UTC(); !got.Equal(exp) {
+					if got, exp := p.Time(), time.Unix(int64(i+j-len(points)+1), 0).UTC(); !got.Equal(exp) {
 						t.Errorf("%d unexpected point[%d].Time: got %v exp %v", i, j, got, exp)
 					}
 				}

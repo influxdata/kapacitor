@@ -3,6 +3,7 @@ package kapacitor
 import (
 	"log"
 
+	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/pipeline"
 )
 
@@ -19,25 +20,10 @@ func newNoOpNode(et *ExecutingTask, n *pipeline.NoOpNode, l *log.Logger) (*NoOpN
 	return nn, nil
 }
 
-func (s *NoOpNode) runNoOp([]byte) error {
-	switch s.Wants() {
-	case pipeline.StreamEdge:
-		for p, ok := s.ins[0].NextPoint(); ok; p, ok = s.ins[0].NextPoint() {
-			for _, child := range s.outs {
-				err := child.CollectPoint(p)
-				if err != nil {
-					return err
-				}
-			}
-		}
-	case pipeline.BatchEdge:
-		for b, ok := s.ins[0].NextBatch(); ok; b, ok = s.ins[0].NextBatch() {
-			for _, child := range s.outs {
-				err := child.CollectBatch(b)
-				if err != nil {
-					return err
-				}
-			}
+func (n *NoOpNode) runNoOp([]byte) error {
+	for m, ok := n.ins[0].Emit(); ok; m, ok = n.ins[0].Emit() {
+		if err := edge.Forward(n.outs, m); err != nil {
+			return err
 		}
 	}
 	return nil

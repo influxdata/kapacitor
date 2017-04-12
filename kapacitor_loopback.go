@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
@@ -18,6 +19,8 @@ type KapacitorLoopbackNode struct {
 	k *pipeline.KapacitorLoopbackNode
 
 	pointsWritten *expvar.Int
+
+	begin edge.BeginBatchMessage
 }
 
 func newKapacitorLoopbackNode(et *ExecutingTask, n *pipeline.KapacitorLoopbackNode, l *log.Logger) (*KapacitorLoopbackNode, error) {
@@ -35,73 +38,94 @@ func newKapacitorLoopbackNode(et *ExecutingTask, n *pipeline.KapacitorLoopbackNo
 	return kn, nil
 }
 
-func (k *KapacitorLoopbackNode) runOut([]byte) error {
-	k.pointsWritten = &expvar.Int{}
+func (n *KapacitorLoopbackNode) runOut([]byte) error {
+	n.pointsWritten = &expvar.Int{}
+	n.statMap.Set(statsInfluxDBPointsWritten, n.pointsWritten)
 
-	k.statMap.Set(statsInfluxDBPointsWritten, k.pointsWritten)
+	consumer := edge.NewConsumerWithReceiver(
+		n.ins[0],
+		n,
+	)
+	return consumer.Consume()
+}
 
-	switch k.Wants() {
-	case pipeline.StreamEdge:
-		for p, ok := k.ins[0].NextPoint(); ok; p, ok = k.ins[0].NextPoint() {
-			k.timer.Start()
-			if k.k.Database != "" {
-				p.Database = k.k.Database
-			}
-			if k.k.RetentionPolicy != "" {
-				p.RetentionPolicy = k.k.RetentionPolicy
-			}
-			if k.k.Measurement != "" {
-				p.Name = k.k.Measurement
-			}
-			if len(k.k.Tags) > 0 {
-				p.Tags = p.Tags.Copy()
-				for k, v := range k.k.Tags {
-					p.Tags[k] = v
-				}
-			}
-			err := k.et.tm.WriteKapacitorPoint(p)
-			if err != nil {
-				k.incrementErrorCount()
-				k.logger.Println("E! failed to write point over loopback")
-			} else {
-				k.pointsWritten.Add(1)
-			}
-			k.timer.Stop()
+func (n *KapacitorLoopbackNode) Point(p edge.PointMessage) error {
+	n.timer.Start()
+	defer n.timer.Stop()
+
+	p = p.ShallowCopy()
+
+	if n.k.Database != "" {
+		p.SetDatabase(n.k.Database)
+	}
+	if n.k.RetentionPolicy != "" {
+		p.SetRetentionPolicy(n.k.RetentionPolicy)
+	}
+	if n.k.Measurement != "" {
+		p.SetName(n.k.Measurement)
+	}
+	if len(n.k.Tags) > 0 {
+		tags := p.Tags().Copy()
+		for k, v := range n.k.Tags {
+			tags[k] = v
 		}
-	case pipeline.BatchEdge:
-		for b, ok := k.ins[0].NextBatch(); ok; b, ok = k.ins[0].NextBatch() {
-			k.timer.Start()
-			if k.k.Measurement != "" {
-				b.Name = k.k.Measurement
-			}
-			written := int64(0)
-			for _, bp := range b.Points {
-				tags := bp.Tags
-				if len(k.k.Tags) > 0 {
-					tags = bp.Tags.Copy()
-					for k, v := range k.k.Tags {
-						tags[k] = v
-					}
-				}
-				p := models.Point{
-					Database:        k.k.Database,
-					RetentionPolicy: k.k.RetentionPolicy,
-					Name:            b.Name,
-					Tags:            tags,
-					Fields:          bp.Fields,
-					Time:            bp.Time,
-				}
-				err := k.et.tm.WriteKapacitorPoint(p)
-				if err != nil {
-					k.incrementErrorCount()
-					k.logger.Println("E! failed to write point over loopback")
-				} else {
-					written++
-				}
-			}
-			k.pointsWritten.Add(written)
-			k.timer.Stop()
+		p.SetTags(tags)
+	}
+
+	n.timer.Pause()
+	err := n.et.tm.WriteKapacitorPoint(p)
+	n.timer.Resume()
+
+	if err != nil {
+		n.incrementErrorCount()
+		n.logger.Println("E! failed to write point over loopback")
+	} else {
+		n.pointsWritten.Add(1)
+	}
+	return nil
+}
+
+func (n *KapacitorLoopbackNode) BeginBatch(begin edge.BeginBatchMessage) error {
+	n.begin = begin
+	return nil
+}
+
+func (n *KapacitorLoopbackNode) BatchPoint(bp edge.BatchPointMessage) error {
+	tags := bp.Tags()
+	if len(n.k.Tags) > 0 {
+		tags = bp.Tags().Copy()
+		for k, v := range n.k.Tags {
+			tags[k] = v
 		}
 	}
+	p := edge.NewPointMessage(
+		n.begin.Name(),
+		n.k.Database,
+		n.k.RetentionPolicy,
+		models.Dimensions{},
+		bp.Fields(),
+		tags,
+		bp.Time(),
+	)
+
+	n.timer.Pause()
+	err := n.et.tm.WriteKapacitorPoint(p)
+	n.timer.Resume()
+
+	if err != nil {
+		n.incrementErrorCount()
+		n.logger.Println("E! failed to write point over loopback")
+	} else {
+		n.pointsWritten.Add(1)
+	}
+	return nil
+}
+func (n *KapacitorLoopbackNode) EndBatch(edge.EndBatchMessage) error {
+	return nil
+}
+func (n *KapacitorLoopbackNode) Barrier(edge.BarrierMessage) error {
+	return nil
+}
+func (n *KapacitorLoopbackNode) DeleteGroup(edge.DeleteGroupMessage) error {
 	return nil
 }

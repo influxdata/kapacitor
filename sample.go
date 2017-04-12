@@ -3,10 +3,9 @@ package kapacitor
 import (
 	"errors"
 	"log"
-	"sync"
 	"time"
 
-	"github.com/influxdata/kapacitor/expvar"
+	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 )
@@ -14,8 +13,6 @@ import (
 type SampleNode struct {
 	node
 	s *pipeline.SampleNode
-
-	countsMu sync.RWMutex
 
 	counts   map[models.GroupID]int64
 	duration time.Duration
@@ -36,61 +33,72 @@ func newSampleNode(et *ExecutingTask, n *pipeline.SampleNode, l *log.Logger) (*S
 	return sn, nil
 }
 
-func (s *SampleNode) runSample([]byte) error {
-	valueF := func() int64 {
-		s.countsMu.RLock()
-		l := len(s.counts)
-		s.countsMu.RUnlock()
-		return int64(l)
-	}
-	s.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
-
-	switch s.Wants() {
-	case pipeline.StreamEdge:
-		for p, ok := s.ins[0].NextPoint(); ok; p, ok = s.ins[0].NextPoint() {
-			s.timer.Start()
-			if s.shouldKeep(p.Group, p.Time) {
-				s.timer.Pause()
-				for _, child := range s.outs {
-					err := child.CollectPoint(p)
-					if err != nil {
-						return err
-					}
-				}
-				s.timer.Resume()
-			}
-			s.timer.Stop()
-		}
-	case pipeline.BatchEdge:
-		for b, ok := s.ins[0].NextBatch(); ok; b, ok = s.ins[0].NextBatch() {
-			s.timer.Start()
-			if s.shouldKeep(b.Group, b.TMax) {
-				s.timer.Pause()
-				for _, child := range s.outs {
-					err := child.CollectBatch(b)
-					if err != nil {
-						return err
-					}
-				}
-				s.timer.Resume()
-			}
-			s.timer.Stop()
-		}
-	}
-	return nil
+func (n *SampleNode) runSample([]byte) error {
+	consumer := edge.NewGroupedConsumer(
+		n.ins[0],
+		n,
+	)
+	n.statMap.Set(statCardinalityGauge, consumer.CardinalityVar())
+	return consumer.Consume()
 }
 
-func (s *SampleNode) shouldKeep(group models.GroupID, t time.Time) bool {
-	if s.duration != 0 {
-		keepTime := t.Truncate(s.duration)
+func (n *SampleNode) NewGroup(group edge.GroupInfo, first edge.PointMeta) (edge.Receiver, error) {
+	return edge.NewReceiverFromForwardReceiverWithStats(
+		n.outs,
+		edge.NewTimedForwardReceiver(n.timer, n.newGroup()),
+	), nil
+}
+func (n *SampleNode) newGroup() *sampleGroup {
+	return &sampleGroup{
+		n: n,
+	}
+}
+
+type sampleGroup struct {
+	n *SampleNode
+
+	count int64
+}
+
+func (g *sampleGroup) BeginBatch(begin edge.BeginBatchMessage) (edge.Message, error) {
+	g.count = 0
+	return begin, nil
+}
+
+func (g *sampleGroup) BatchPoint(bp edge.BatchPointMessage) (edge.Message, error) {
+	keep := g.n.shouldKeep(g.count, bp.Time())
+	g.count++
+	if keep {
+		return bp, nil
+	}
+	return nil, nil
+}
+
+func (g *sampleGroup) EndBatch(end edge.EndBatchMessage) (edge.Message, error) {
+	return end, nil
+}
+
+func (g *sampleGroup) Point(p edge.PointMessage) (edge.Message, error) {
+	keep := g.n.shouldKeep(g.count, p.Time())
+	g.count++
+	if keep {
+		return p, nil
+	}
+	return nil, nil
+}
+
+func (g *sampleGroup) Barrier(b edge.BarrierMessage) (edge.Message, error) {
+	return b, nil
+}
+func (g *sampleGroup) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
+	return d, nil
+}
+
+func (n *SampleNode) shouldKeep(count int64, t time.Time) bool {
+	if n.duration != 0 {
+		keepTime := t.Truncate(n.duration)
 		return t.Equal(keepTime)
 	} else {
-		s.countsMu.Lock()
-		count := s.counts[group]
-		keep := count%s.s.N == 0
-		count++
-		s.counts[group] = count
-		s.countsMu.Unlock()
-		return keep
+		return count%n.s.N == 0
 	}
 }

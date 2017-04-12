@@ -10,6 +10,7 @@ import (
 	imodels "github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/command"
+	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/models"
@@ -163,7 +164,7 @@ type TaskMaster struct {
 	// We are mapping from (db, rp, measurement) to map of task ids to their edges
 	// The outer map (from dbrp&measurement) is for fast access on forkPoint
 	// While the inner map is for handling fork deletions better (see taskToForkKeys)
-	forks map[forkKey]map[string]*Edge
+	forks map[forkKey]map[string]edge.Edge
 
 	// Stats for number of points each fork has received
 	forkStats map[forkKey]*expvar.Int
@@ -199,7 +200,7 @@ type forkKey struct {
 func NewTaskMaster(id string, info vars.Infoer, l LogService) *TaskMaster {
 	return &TaskMaster{
 		id:             id,
-		forks:          make(map[forkKey]map[string]*Edge),
+		forks:          make(map[forkKey]map[string]edge.Edge),
 		forkStats:      make(map[forkKey]*expvar.Int),
 		taskToForkKeys: make(map[string][]forkKey),
 		batches:        make(map[string][]BatchCollector),
@@ -433,24 +434,24 @@ func (tm *TaskMaster) StartTask(t *Task) (*ExecutingTask, error) {
 		return nil, err
 	}
 
-	var ins []*Edge
+	var ins []edge.StatsEdge
 	switch et.Task.Type {
 	case StreamTask:
 		e, err := tm.newFork(et.Task.ID, et.Task.DBRPs, et.Task.Measurements())
 		if err != nil {
 			return nil, err
 		}
-		ins = []*Edge{e}
+		ins = []edge.StatsEdge{e}
 	case BatchTask:
 		count, err := et.BatchCount()
 		if err != nil {
 			return nil, err
 		}
-		ins = make([]*Edge, count)
+		ins = make([]edge.StatsEdge, count)
 		for i := 0; i < count; i++ {
 			in := newEdge(t.ID, "batch", fmt.Sprintf("batch%d", i), pipeline.BatchEdge, defaultEdgeBufferSize, tm.LogService)
 			ins[i] = in
-			tm.batches[t.ID] = append(tm.batches[t.ID], in)
+			tm.batches[t.ID] = append(tm.batches[t.ID], &batchCollector{edge: in})
 		}
 	}
 
@@ -572,21 +573,55 @@ func (tm *TaskMaster) stream(name string) (StreamCollector, error) {
 		return nil, ErrTaskMasterClosed
 	}
 	in := newEdge(fmt.Sprintf("task_master:%s", tm.id), name, "stream", pipeline.StreamEdge, defaultEdgeBufferSize, tm.LogService)
+	se := &streamEdge{edge: in}
 	tm.wg.Add(1)
 	go func() {
 		defer tm.wg.Done()
-		tm.runForking(in)
+		tm.runForking(se)
 	}()
-	return in, nil
+	return se, nil
 }
 
-func (tm *TaskMaster) runForking(in *Edge) {
-	for p, ok := in.NextPoint(); ok; p, ok = in.NextPoint() {
+type StreamCollector interface {
+	CollectPoint(edge.PointMessage) error
+	Close() error
+}
+
+type StreamEdge interface {
+	CollectPoint(edge.PointMessage) error
+	EmitPoint() (edge.PointMessage, bool)
+	Close() error
+}
+
+type streamEdge struct {
+	edge edge.Edge
+}
+
+func (s *streamEdge) CollectPoint(p edge.PointMessage) error {
+	return s.edge.Collect(p)
+}
+func (s *streamEdge) EmitPoint() (edge.PointMessage, bool) {
+	m, ok := s.edge.Emit()
+	if !ok {
+		return nil, false
+	}
+	p, ok := m.(edge.PointMessage)
+	if !ok {
+		panic("impossible to receive non PointMessage message")
+	}
+	return p, true
+}
+func (s *streamEdge) Close() error {
+	return s.edge.Close()
+}
+
+func (tm *TaskMaster) runForking(in StreamEdge) {
+	for p, ok := in.EmitPoint(); ok; p, ok = in.EmitPoint() {
 		tm.forkPoint(p)
 	}
 }
 
-func (tm *TaskMaster) forkPoint(p models.Point) {
+func (tm *TaskMaster) forkPoint(p edge.PointMessage) {
 	tm.mu.RLock()
 	locked := true
 	defer func() {
@@ -597,26 +632,26 @@ func (tm *TaskMaster) forkPoint(p models.Point) {
 
 	// Create the fork keys - which is (db, rp, measurement)
 	key := forkKey{
-		Database:        p.Database,
-		RetentionPolicy: p.RetentionPolicy,
-		Measurement:     p.Name,
+		Database:        p.Database(),
+		RetentionPolicy: p.RetentionPolicy(),
+		Measurement:     p.Name(),
 	}
 
 	// If we have empty measurement in this db,rp we need to send it all
 	// the points
 	emptyMeasurementKey := forkKey{
-		Database:        p.Database,
-		RetentionPolicy: p.RetentionPolicy,
+		Database:        p.Database(),
+		RetentionPolicy: p.RetentionPolicy(),
 		Measurement:     "",
 	}
 
 	// Merge the results to the forks map
 	for _, edge := range tm.forks[key] {
-		_ = edge.CollectPoint(p)
+		_ = edge.Collect(p)
 	}
 
 	for _, edge := range tm.forks[emptyMeasurementKey] {
-		_ = edge.CollectPoint(p)
+		_ = edge.Collect(p)
 	}
 
 	c, ok := tm.forkStats[key]
@@ -658,15 +693,15 @@ func (tm *TaskMaster) WritePoints(database, retentionPolicy string, consistencyL
 		retentionPolicy = tm.DefaultRetentionPolicy
 	}
 	for _, mp := range points {
-		p := models.Point{
-			Database:        database,
-			RetentionPolicy: retentionPolicy,
-			Name:            mp.Name(),
-			Group:           models.NilGroup,
-			Tags:            models.Tags(mp.Tags().Map()),
-			Fields:          models.Fields(mp.Fields()),
-			Time:            mp.Time(),
-		}
+		p := edge.NewPointMessage(
+			mp.Name(),
+			database,
+			retentionPolicy,
+			models.Dimensions{},
+			models.Fields(mp.Fields()),
+			models.Tags(mp.Tags().Map()),
+			mp.Time(),
+		)
 		err := tm.writePointsIn.CollectPoint(p)
 		if err != nil {
 			return err
@@ -675,19 +710,18 @@ func (tm *TaskMaster) WritePoints(database, retentionPolicy string, consistencyL
 	return nil
 }
 
-func (tm *TaskMaster) WriteKapacitorPoint(p models.Point) error {
+func (tm *TaskMaster) WriteKapacitorPoint(p edge.PointMessage) error {
 	tm.writesMu.RLock()
 	defer tm.writesMu.RUnlock()
 	if tm.writesClosed {
 		return ErrTaskMasterClosed
 	}
-
-	p.Group = models.NilGroup
-	p.Dimensions = models.Dimensions{}
+	p = p.ShallowCopy()
+	p.SetDimensions(models.Dimensions{})
 	return tm.writePointsIn.CollectPoint(p)
 }
 
-func (tm *TaskMaster) NewFork(taskName string, dbrps []DBRP, measurements []string) (*Edge, error) {
+func (tm *TaskMaster) NewFork(taskName string, dbrps []DBRP, measurements []string) (edge.StatsEdge, error) {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
 	return tm.newFork(taskName, dbrps, measurements)
@@ -712,7 +746,7 @@ func forkKeys(dbrps []DBRP, measurements []string) []forkKey {
 }
 
 // internal newFork, must have acquired lock before calling.
-func (tm *TaskMaster) newFork(taskName string, dbrps []DBRP, measurements []string) (*Edge, error) {
+func (tm *TaskMaster) newFork(taskName string, dbrps []DBRP, measurements []string) (edge.StatsEdge, error) {
 	if tm.closed {
 		return nil, ErrTaskMasterClosed
 	}
@@ -725,7 +759,7 @@ func (tm *TaskMaster) newFork(taskName string, dbrps []DBRP, measurements []stri
 		// Add the task to the tasksMap if it doesn't exists
 		tasksMap, ok := tm.forks[key]
 		if !ok {
-			tasksMap = make(map[string]*Edge, 0)
+			tasksMap = make(map[string]edge.Edge, 0)
 		}
 
 		// Add the edge to task map
@@ -821,4 +855,20 @@ func (tml *TaskMasterLookup) Delete(tm *TaskMaster) {
 	tml.Lock()
 	defer tml.Unlock()
 	delete(tml.taskMasters, tm.id)
+}
+
+type BatchCollector interface {
+	CollectBatch(edge.BufferedBatchMessage) error
+	Close() error
+}
+
+type batchCollector struct {
+	edge edge.Edge
+}
+
+func (c *batchCollector) CollectBatch(batch edge.BufferedBatchMessage) error {
+	return c.edge.Collect(batch)
+}
+func (c *batchCollector) Close() error {
+	return c.edge.Close()
 }

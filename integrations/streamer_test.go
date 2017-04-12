@@ -4201,6 +4201,8 @@ building
         .as('building', 'floor')
         .on('building')
         .streamName('power_floor_percentage')
+	|log()
+		.prefix('JOINED')
     |eval(lambda: "floor.value" / "building.value")
         .as('value')
     |httpOut('TestStream_JoinOn_AcrossMeasurement')
@@ -5083,22 +5085,24 @@ stream
 		t.Fatal(err)
 	}
 
-	for _, tc := range testCases {
-		t.Log("Method:", tc.Method)
-		var script bytes.Buffer
-		if tc.Args == "" {
-			tc.Args = "'value'"
-		}
-		tmpl.Execute(&script, tc)
-		testStreamerWithOutput(
-			t,
-			"TestStream_InfluxQL_Float",
-			script.String(),
-			13*time.Second,
-			tc.ER,
-			false,
-			nil,
-		)
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("%s-%d", tc.Method, i), func(t *testing.T) {
+			t.Log("Method:", tc.Method)
+			var script bytes.Buffer
+			if tc.Args == "" {
+				tc.Args = "'value'"
+			}
+			tmpl.Execute(&script, tc)
+			testStreamerWithOutput(
+				t,
+				"TestStream_InfluxQL_Float",
+				script.String(),
+				13*time.Second,
+				tc.ER,
+				false,
+				nil,
+			)
+		})
 	}
 }
 
@@ -9518,7 +9522,7 @@ stream
 
 func TestStream_TopSelector(t *testing.T) {
 	var script = `
-var topScores = stream
+stream
     |from()
 		.measurement('scores')
 		// Get the most recent score for each player
@@ -9531,14 +9535,7 @@ var topScores = stream
     // Calculate the top 5 scores per game
     |groupBy('game')
     |top(5, 'last', 'player')
-
-topScores
-    |httpOut('top_scores')
-
-topScores
-    |sample(4s)
-    |count('top')
-    |httpOut('top_scores_sampled')
+    |httpOut('TestStream_TopSelector')
 `
 
 	tw := time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC)
@@ -9571,78 +9568,73 @@ topScores
 		},
 	}
 
-	sampleER := models.Result{
+	testStreamerWithOutput(t, "TestStream_TopSelector", script, 10*time.Second, er, false, nil)
+}
+
+func TestStream_Sample_Count(t *testing.T) {
+	var script = `
+stream
+    |from()
+		.measurement('packets')
+    |sample(2)
+	|window()
+		.every(4s)
+		.period(4s)
+		.align()
+	|httpOut('TestStream_Sample')
+`
+
+	er := models.Result{
 		Series: models.Rows{
 			{
-				Name:    "scores",
-				Tags:    map[string]string{"game": "g0"},
-				Columns: []string{"time", "count"},
-				Values: [][]interface{}{{
-					time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
-					5.0,
-				}},
-			},
-			{
-				Name:    "scores",
-				Tags:    map[string]string{"game": "g1"},
-				Columns: []string{"time", "count"},
-				Values: [][]interface{}{{
-					time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
-					5.0,
-				}},
+				Name:    "packets",
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						1004.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						1006.0,
+					},
+				},
 			},
 		},
 	}
 
-	clock, et, replayErr, tm := testStreamer(t, "TestStream_TopSelector", script, nil)
-	defer tm.Close()
+	testStreamerWithOutput(t, "TestStream_Sample", script, 12*time.Second, er, false, nil)
+}
 
-	err := fastForwardTask(clock, et, replayErr, tm, 10*time.Second)
-	if err != nil {
-		t.Error(err)
-	}
+func TestStream_Sample_Time(t *testing.T) {
+	var script = `
+stream
+    |from()
+		.measurement('packets')
+    |sample(3s)
+	|window()
+		.every(4s)
+		.period(4s)
+		.align()
+	|httpOut('TestStream_Sample')
+`
 
-	// Get the result
-	output, err := et.GetOutput("top_scores")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	resp, err := http.Get(output.Endpoint())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Assert we got the expected result
-	result := models.Result{}
-	err = json.NewDecoder(resp.Body).Decode(&result)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if eq, msg := compareResults(er, result); !eq {
-		t.Error(msg)
-	}
-
-	// Get the result
-	output, err = et.GetOutput("top_scores_sampled")
-	if err != nil {
-		t.Fatal(err)
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "packets",
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						1006.0,
+					},
+				},
+			},
+		},
 	}
 
-	resp, err = http.Get(output.Endpoint())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Assert we got the expected result
-	result = models.Result{}
-	err = json.NewDecoder(resp.Body).Decode(&result)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if eq, msg := compareResults(sampleER, result); !eq {
-		t.Error(msg)
-	}
+	testStreamerWithOutput(t, "TestStream_Sample", script, 12*time.Second, er, false, nil)
 }
 
 func TestStream_DerivativeCardinality(t *testing.T) {
@@ -9877,7 +9869,7 @@ stream
 		},
 		"max3": map[string]interface{}{
 			"emitted":             int64(0),
-			"working_cardinality": int64(0),
+			"working_cardinality": int64(9),
 			"avg_exec_time_ns":    int64(0),
 			"errors":              int64(0),
 			"collected":           int64(81),

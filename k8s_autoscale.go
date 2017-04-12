@@ -3,9 +3,9 @@ package kapacitor
 import (
 	"fmt"
 	"log"
-	"sync"
 	"time"
 
+	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
@@ -27,7 +27,7 @@ type K8sAutoscaleNode struct {
 
 	client client.Client
 
-	replicasExprs     map[models.GroupID]stateful.Expression
+	replicasExpr      stateful.Expression
 	replicasScopePool stateful.ScopePool
 
 	resourceStates map[string]resourceState
@@ -35,8 +35,6 @@ type K8sAutoscaleNode struct {
 	increaseCount      *expvar.Int
 	decreaseCount      *expvar.Int
 	cooldownDropsCount *expvar.Int
-
-	replicasExprsMu sync.RWMutex
 
 	min int
 	max int
@@ -62,70 +60,87 @@ func newK8sAutoscaleNode(et *ExecutingTask, n *pipeline.K8sAutoscaleNode, l *log
 	kn.node.runF = kn.runAutoscale
 	// Initialize the replicas lambda expression scope pool
 	if n.Replicas != nil {
-		kn.replicasExprs = make(map[models.GroupID]stateful.Expression)
+		expr, err := stateful.NewExpression(n.Replicas.Expression)
+		if err != nil {
+			return nil, err
+		}
+		kn.replicasExpr = expr
 		kn.replicasScopePool = stateful.NewScopePool(ast.FindReferenceVariables(n.Replicas.Expression))
 	}
 	return kn, nil
 }
 
-func (k *K8sAutoscaleNode) runAutoscale([]byte) error {
-	valueF := func() int64 {
-		k.replicasExprsMu.RLock()
-		l := len(k.replicasExprs)
-		k.replicasExprsMu.RUnlock()
-		return int64(l)
+func (n *K8sAutoscaleNode) runAutoscale([]byte) error {
+	n.increaseCount = &expvar.Int{}
+	n.decreaseCount = &expvar.Int{}
+	n.cooldownDropsCount = &expvar.Int{}
+
+	n.statMap.Set(statsK8sIncreaseEventsCount, n.increaseCount)
+	n.statMap.Set(statsK8sDecreaseEventsCount, n.decreaseCount)
+	n.statMap.Set(statsK8sCooldownDropsCount, n.cooldownDropsCount)
+
+	consumer := edge.NewGroupedConsumer(
+		n.ins[0],
+		n,
+	)
+	n.statMap.Set(statCardinalityGauge, consumer.CardinalityVar())
+	return consumer.Consume()
+}
+
+func (n *K8sAutoscaleNode) NewGroup(group edge.GroupInfo, first edge.PointMeta) (edge.Receiver, error) {
+	return edge.NewReceiverFromForwardReceiverWithStats(
+		n.outs,
+		edge.NewTimedForwardReceiver(n.timer, n.newGroup()),
+	), nil
+}
+
+func (n *K8sAutoscaleNode) newGroup() *k8sAutoscaleGroup {
+	return &k8sAutoscaleGroup{
+		n:    n,
+		expr: n.replicasExpr.CopyReset(),
 	}
-	k.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
+}
 
-	k.increaseCount = &expvar.Int{}
-	k.decreaseCount = &expvar.Int{}
-	k.cooldownDropsCount = &expvar.Int{}
+type k8sAutoscaleGroup struct {
+	n *K8sAutoscaleNode
 
-	k.statMap.Set(statsK8sIncreaseEventsCount, k.increaseCount)
-	k.statMap.Set(statsK8sDecreaseEventsCount, k.decreaseCount)
-	k.statMap.Set(statsK8sCooldownDropsCount, k.cooldownDropsCount)
+	expr stateful.Expression
 
-	switch k.Wants() {
-	case pipeline.StreamEdge:
-		for p, ok := k.ins[0].NextPoint(); ok; p, ok = k.ins[0].NextPoint() {
-			k.timer.Start()
-			if np, err := k.handlePoint(p.Name, p.Group, p.Dimensions, p.Time, p.Fields, p.Tags); err != nil {
-				k.incrementErrorCount()
-				k.logger.Println("E!", err)
-			} else if np.Name != "" {
-				k.timer.Pause()
-				for _, child := range k.outs {
-					err := child.CollectPoint(np)
-					if err != nil {
-						return err
-					}
-				}
-				k.timer.Resume()
-			}
-			k.timer.Stop()
-		}
-	case pipeline.BatchEdge:
-		for b, ok := k.ins[0].NextBatch(); ok; b, ok = k.ins[0].NextBatch() {
-			k.timer.Start()
-			for _, p := range b.Points {
-				if np, err := k.handlePoint(b.Name, b.Group, b.PointDimensions(), p.Time, p.Fields, p.Tags); err != nil {
-					k.incrementErrorCount()
-					k.logger.Println("E!", err)
-				} else if np.Name != "" {
-					k.timer.Pause()
-					for _, child := range k.outs {
-						err := child.CollectPoint(np)
-						if err != nil {
-							return err
-						}
-					}
-					k.timer.Resume()
-				}
-			}
-			k.timer.Stop()
-		}
+	begin edge.BeginBatchMessage
+}
+
+func (g *k8sAutoscaleGroup) BeginBatch(begin edge.BeginBatchMessage) (edge.Message, error) {
+	g.begin = begin
+	return nil, nil
+}
+
+func (g *k8sAutoscaleGroup) BatchPoint(bp edge.BatchPointMessage) (edge.Message, error) {
+	np, err := g.n.handlePoint(g.begin.Name(), g.begin.Dimensions(), bp, g.expr)
+	if err != nil {
+		g.n.incrementErrorCount()
+		g.n.logger.Println("E!", err)
 	}
-	return nil
+	return np, nil
+}
+
+func (g *k8sAutoscaleGroup) EndBatch(end edge.EndBatchMessage) (edge.Message, error) {
+	return nil, nil
+}
+
+func (g *k8sAutoscaleGroup) Point(p edge.PointMessage) (edge.Message, error) {
+	np, err := g.n.handlePoint(p.Name(), p.Dimensions(), p, g.expr)
+	if err != nil {
+		g.n.incrementErrorCount()
+		g.n.logger.Println("E!", err)
+	}
+	return np, nil
+}
+
+func (g *k8sAutoscaleGroup) Barrier(b edge.BarrierMessage) (edge.Message, error) {
+	return b, nil
+}
+func (g *k8sAutoscaleGroup) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
+	return d, nil
 }
 
 type resourceState struct {
@@ -142,28 +157,26 @@ type event struct {
 	New       int
 }
 
-func (k *K8sAutoscaleNode) handlePoint(streamName string, group models.GroupID, dims models.Dimensions, t time.Time, fields models.Fields, tags models.Tags) (models.Point, error) {
-	namespace, kind, name, err := k.getResourceFromPoint(tags)
+func (n *K8sAutoscaleNode) handlePoint(streamName string, dims models.Dimensions, p edge.FieldsTagsTimeGetter, expr stateful.Expression) (edge.PointMessage, error) {
+	namespace, kind, name, err := n.getResourceFromPoint(p.Tags())
 	if err != nil {
-		return models.Point{}, err
+		return nil, err
 	}
-	state, ok := k.resourceStates[name]
+	state, ok := n.resourceStates[name]
 	if !ok {
 		// If we haven't seen this resource before, get its state
-		scale, err := k.getResource(namespace, kind, name)
+		scale, err := n.getResource(namespace, kind, name)
 		if err != nil {
-			return models.Point{}, errors.Wrapf(err, "could not determine initial scale for %s/%s/%s", namespace, kind, name)
+			return nil, errors.Wrapf(err, "could not determine initial scale for %s/%s/%s", namespace, kind, name)
 		}
 		state.current = int(scale.Spec.Replicas)
-		k.resourceStates[name] = state
+		n.resourceStates[name] = state
 	}
 
 	// Eval the replicas expression
-	k.replicasExprsMu.Lock()
-	newReplicas, err := k.evalExpr(state.current, group, k.k.Replicas, k.replicasExprs, k.replicasScopePool, t, fields, tags)
-	k.replicasExprsMu.Unlock()
+	newReplicas, err := n.evalExpr(state.current, expr, p)
 	if err != nil {
-		return models.Point{}, errors.Wrap(err, "failed to evaluate the replicas expression")
+		return nil, errors.Wrap(err, "failed to evaluate the replicas expression")
 	}
 
 	// Create the event
@@ -175,17 +188,17 @@ func (k *K8sAutoscaleNode) handlePoint(streamName string, group models.GroupID, 
 		New:       newReplicas,
 	}
 	// Check bounds
-	if k.max > 0 && e.New > k.max {
-		e.New = k.max
+	if n.max > 0 && e.New > n.max {
+		e.New = n.max
 	}
-	if e.New < k.min {
-		e.New = k.min
+	if e.New < n.min {
+		e.New = n.min
 	}
 
 	// Validate something changed
 	if e.New == e.Old {
 		// Nothing to do
-		return models.Point{}, nil
+		return nil, nil
 	}
 
 	// Update local copy of state
@@ -193,78 +206,77 @@ func (k *K8sAutoscaleNode) handlePoint(streamName string, group models.GroupID, 
 	state.current = e.New
 
 	// Check last change cooldown times
+	t := p.Time()
 	var counter *expvar.Int
 	switch {
 	case change > 0:
-		if t.Before(state.lastIncrease.Add(k.k.IncreaseCooldown)) {
+		if t.Before(state.lastIncrease.Add(n.k.IncreaseCooldown)) {
 			// Still hot, nothing to do
-			k.cooldownDropsCount.Add(1)
-			return models.Point{}, nil
+			n.cooldownDropsCount.Add(1)
+			return nil, nil
 		}
 		state.lastIncrease = t
-		counter = k.increaseCount
+		counter = n.increaseCount
 	case change < 0:
-		if t.Before(state.lastDecrease.Add(k.k.DecreaseCooldown)) {
+		if t.Before(state.lastDecrease.Add(n.k.DecreaseCooldown)) {
 			// Still hot, nothing to do
-			k.cooldownDropsCount.Add(1)
-			return models.Point{}, nil
+			n.cooldownDropsCount.Add(1)
+			return nil, nil
 		}
 		state.lastDecrease = t
-		counter = k.decreaseCount
+		counter = n.decreaseCount
 	}
 
 	// We have a valid event to apply
-	if err := k.applyEvent(e); err != nil {
-		return models.Point{}, errors.Wrap(err, "failed to apply scaling event")
+	if err := n.applyEvent(e); err != nil {
+		return nil, errors.Wrap(err, "failed to apply scaling event")
 	}
 
 	// Only save the updated state if we were successful
-	k.resourceStates[name] = state
+	n.resourceStates[name] = state
 
 	// Count event
 	counter.Add(1)
 
 	// Create new tags for the point.
 	// Leave room for the namespace,kind, and resource tags.
-	newTags := make(models.Tags, len(tags)+3)
+	newTags := make(models.Tags, len(dims.TagNames)+3)
 
 	// Copy group by tags
 	for _, d := range dims.TagNames {
-		newTags[d] = tags[d]
+		newTags[d] = p.Tags()[d]
 	}
 	// Set namespace,kind,resource tags
-	if k.k.NamespaceTag != "" {
-		newTags[k.k.NamespaceTag] = namespace
+	if n.k.NamespaceTag != "" {
+		newTags[n.k.NamespaceTag] = namespace
 	}
-	if k.k.KindTag != "" {
-		newTags[k.k.KindTag] = kind
+	if n.k.KindTag != "" {
+		newTags[n.k.KindTag] = kind
 	}
-	if k.k.ResourceTag != "" {
-		newTags[k.k.ResourceTag] = name
+	if n.k.ResourceTag != "" {
+		newTags[n.k.ResourceTag] = name
 	}
 
 	// Create point representing the event
-	p := models.Point{
-		Name:       streamName,
-		Time:       t,
-		Group:      group,
-		Dimensions: dims,
-		Tags:       newTags,
-		Fields: models.Fields{
+	return edge.NewPointMessage(
+		streamName, "", "",
+		dims,
+		models.Fields{
 			"old": int64(e.Old),
 			"new": int64(e.New),
 		},
-	}
-	return p, nil
+		newTags,
+		t,
+	), nil
 }
 
-func (k *K8sAutoscaleNode) getResourceFromPoint(tags models.Tags) (namespace, kind, name string, err error) {
+func (n *K8sAutoscaleNode) getResourceFromPoint(tags models.Tags) (namespace, kind, name string, err error) {
 	// Get the name of the resource
 	switch {
-	case k.k.ResourceName != "":
-		name = k.k.ResourceName
-	case k.k.ResourceNameTag != "":
-		t, ok := tags[k.k.ResourceNameTag]
+	case n.k.ResourceName != "":
+		name = n.k.ResourceName
+	case n.k.ResourceNameTag != "":
+		t, ok := tags[n.k.ResourceNameTag]
 		if ok {
 			name = t
 		}
@@ -274,29 +286,29 @@ func (k *K8sAutoscaleNode) getResourceFromPoint(tags models.Tags) (namespace, ki
 	if name == "" {
 		return "", "", "", errors.New("could not determine the name of the resource")
 	}
-	namespace = k.k.Namespace
+	namespace = n.k.Namespace
 	if namespace == "" {
 		namespace = client.NamespaceDefault
 	}
-	kind = k.k.Kind
+	kind = n.k.Kind
 	return
 }
 
-func (k *K8sAutoscaleNode) getResource(namespace, kind, name string) (*client.Scale, error) {
-	scales := k.client.Scales(namespace)
+func (n *K8sAutoscaleNode) getResource(namespace, kind, name string) (*client.Scale, error) {
+	scales := n.client.Scales(namespace)
 	scale, err := scales.Get(kind, name)
 	return scale, errors.Wrapf(err, "failed to get the scale for resource %s/%s/%s", namespace, kind, name)
 }
 
-func (k *K8sAutoscaleNode) applyEvent(e event) error {
-	k.logger.Printf("D! setting scale replicas to %d was %d for %s/%s/%s", e.New, e.Old, e.Namespace, e.Kind, e.Name)
-	scales := k.client.Scales(e.Namespace)
-	scale, err := k.getResource(e.Namespace, e.Kind, e.Name)
+func (n *K8sAutoscaleNode) applyEvent(e event) error {
+	n.logger.Printf("D! setting scale replicas to %d was %d for %s/%s/%s", e.New, e.Old, e.Namespace, e.Kind, e.Name)
+	scales := n.client.Scales(e.Namespace)
+	scale, err := n.getResource(e.Namespace, e.Kind, e.Name)
 	if err != nil {
 		return err
 	}
 	if scale.Spec.Replicas != int32(e.Old) {
-		k.logger.Printf("W! the kubernetes scale spec and Kapacitor's spec do not match for resource %s/%s/%s, did it change externally?", e.Namespace, e.Kind, e.Name)
+		n.logger.Printf("W! the kubernetes scale spec and Kapacitor's spec do not match for resource %s/%s/%s, did it change externally?", e.Namespace, e.Kind, e.Name)
 	}
 
 	scale.Spec.Replicas = int32(e.New)
@@ -306,49 +318,28 @@ func (k *K8sAutoscaleNode) applyEvent(e event) error {
 	return nil
 }
 
-func (k *K8sAutoscaleNode) evalExpr(
+func (n *K8sAutoscaleNode) evalExpr(
 	current int,
-	group models.GroupID,
-	lambda *ast.LambdaNode,
-	expressionsMap map[models.GroupID]stateful.Expression,
-	pool stateful.ScopePool,
-	t time.Time,
-	fields models.Fields,
-	tags models.Tags,
+	expr stateful.Expression,
+	p edge.FieldsTagsTimeGetter,
 ) (int, error) {
-	expr, ok := expressionsMap[group]
-	if !ok {
-		var err error
-		expr, err = stateful.NewExpression(lambda.Expression)
-		if err != nil {
-			return 0, err
-		}
-		expressionsMap[group] = expr
-	}
-	i, err := k.evalInt(int64(current), expr, pool, t, fields, tags)
-	return int(i), err
-}
-
-// evalInt - Evaluate a given expression as an int64 against a set of fields and tags.
-// The CurrentField is also set on the scope if not empty.
-func (k *K8sAutoscaleNode) evalInt(current int64, se stateful.Expression, scopePool stateful.ScopePool, now time.Time, fields models.Fields, tags models.Tags) (int64, error) {
-	vars := scopePool.Get()
-	defer scopePool.Put(vars)
+	vars := n.replicasScopePool.Get()
+	defer n.replicasScopePool.Put(vars)
 
 	// Set the current replicas value on the scope if requested.
-	if k.k.CurrentField != "" {
-		vars.Set(k.k.CurrentField, current)
+	if n.k.CurrentField != "" {
+		vars.Set(n.k.CurrentField, current)
 	}
 
 	// Fill the scope with the rest of the values
-	err := fillScope(vars, scopePool.ReferenceVariables(), now, fields, tags)
+	err := fillScope(vars, n.replicasScopePool.ReferenceVariables(), p)
 	if err != nil {
 		return 0, err
 	}
 
-	i, err := se.EvalInt(vars)
+	i, err := expr.EvalInt(vars)
 	if err != nil {
 		return 0, err
 	}
-	return i, nil
+	return int(i), err
 }

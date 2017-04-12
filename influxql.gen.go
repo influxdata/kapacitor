@@ -12,9 +12,43 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 )
+
+func convertFloatPoint(
+	name string,
+	p edge.FieldsTagsTimeGetter,
+	field string,
+	isSimpleSelector bool,
+	topBottomInfo *pipeline.TopBottomCallInfo,
+) (*influxql.FloatPoint, error) {
+	value, ok := p.Fields()[field]
+	if !ok {
+		return nil, fmt.Errorf("field %s missing from point cannot aggregate", field)
+	}
+	typed, ok := value.(float64)
+	if !ok {
+		return nil, fmt.Errorf("field %s has wrong type: got %T exp float64", field, value)
+	}
+	ap := &influxql.FloatPoint{
+		Name:  name,
+		Tags:  influxql.NewTags(p.Tags()),
+		Time:  p.Time().UnixNano(),
+		Value: typed,
+	}
+	if topBottomInfo != nil {
+		// We need to populate the Aux fields
+		floatPopulateAuxFieldsAndTags(ap, topBottomInfo.FieldsAndTags, p.Fields(), p.Tags())
+	}
+
+	if isSimpleSelector {
+		ap.Aux = []interface{}{p.Tags(), p.Fields()}
+	}
+
+	return ap, nil
+}
 
 type floatPointAggregator struct {
 	field            string
@@ -34,125 +68,11 @@ func floatPopulateAuxFieldsAndTags(ap *influxql.FloatPoint, fieldsAndTags []stri
 	}
 }
 
-func (a *floatPointAggregator) AggregateBatch(b *models.Batch) error {
-	for _, p := range b.Points {
-		value, ok := p.Fields[a.field]
-		if !ok {
-			return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
-		}
-		typed, ok := value.(float64)
-		if !ok {
-			return fmt.Errorf("field %s has wrong type: got %T exp float64", a.field, value)
-		}
-		ap := &influxql.FloatPoint{
-			Name:  b.Name,
-			Tags:  influxql.NewTags(p.Tags),
-			Time:  p.Time.UnixNano(),
-			Value: typed,
-		}
-		if a.topBottomInfo != nil {
-			// We need to populate the Aux fields
-			floatPopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
-		}
-
-		if a.isSimpleSelector {
-			ap.Aux = []interface{}{p.Tags, p.Fields}
-		}
-
-		a.aggregator.AggregateFloat(ap)
+func (a *floatPointAggregator) AggregatePoint(name string, p edge.FieldsTagsTimeGetter) error {
+	ap, err := convertFloatPoint(name, p, a.field, a.isSimpleSelector, a.topBottomInfo)
+	if err != nil {
+		return nil
 	}
-	return nil
-}
-
-func (a *floatPointAggregator) AggregatePoint(p *models.Point) error {
-	value, ok := p.Fields[a.field]
-	if !ok {
-		return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
-	}
-	typed, ok := value.(float64)
-	if !ok {
-		return fmt.Errorf("field %s has wrong type: got %T exp float64", a.field, value)
-	}
-	ap := &influxql.FloatPoint{
-		Name:  p.Name,
-		Tags:  influxql.NewTags(p.Tags),
-		Time:  p.Time.UnixNano(),
-		Value: typed,
-	}
-	if a.topBottomInfo != nil {
-		// We need to populate the Aux fields
-		floatPopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
-	}
-
-	if a.isSimpleSelector {
-		ap.Aux = []interface{}{p.Tags, p.Fields}
-	}
-
-	a.aggregator.AggregateFloat(ap)
-	return nil
-}
-
-type floatPointBulkAggregator struct {
-	field            string
-	topBottomInfo    *pipeline.TopBottomCallInfo
-	isSimpleSelector bool
-	aggregator       pipeline.FloatBulkPointAggregator
-}
-
-func (a *floatPointBulkAggregator) AggregateBatch(b *models.Batch) error {
-	slice := make([]influxql.FloatPoint, len(b.Points))
-	for i, p := range b.Points {
-		value, ok := p.Fields[a.field]
-		if !ok {
-			return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
-		}
-		typed, ok := value.(float64)
-		if !ok {
-			return fmt.Errorf("field %s has wrong type: got %T exp float64", a.field, value)
-		}
-		slice[i] = influxql.FloatPoint{
-			Name:  b.Name,
-			Tags:  influxql.NewTags(p.Tags),
-			Time:  p.Time.UnixNano(),
-			Value: typed,
-		}
-		if a.topBottomInfo != nil {
-			// We need to populate the Aux fields
-			floatPopulateAuxFieldsAndTags(&slice[i], a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
-		}
-
-		if a.isSimpleSelector {
-			slice[i].Aux = []interface{}{p.Tags, p.Fields}
-		}
-	}
-	a.aggregator.AggregateFloatBulk(slice)
-	return nil
-}
-
-func (a *floatPointBulkAggregator) AggregatePoint(p *models.Point) error {
-	value, ok := p.Fields[a.field]
-	if !ok {
-		return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
-	}
-	typed, ok := value.(float64)
-	if !ok {
-		return fmt.Errorf("field %s has wrong type: got %T exp float64", a.field, value)
-	}
-	ap := &influxql.FloatPoint{
-		Name:  p.Name,
-		Tags:  influxql.NewTags(p.Tags),
-		Time:  p.Time.UnixNano(),
-		Value: typed,
-	}
-	if a.topBottomInfo != nil {
-		// We need to populate the Aux fields
-		floatPopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
-	}
-
-	if a.isSimpleSelector {
-		ap.Aux = []interface{}{p.Tags, p.Fields}
-	}
-
 	a.aggregator.AggregateFloat(ap)
 	return nil
 }
@@ -164,10 +84,10 @@ type floatPointEmitter struct {
 	byName           bool
 }
 
-func (e *floatPointEmitter) EmitPoint() (models.Point, error) {
+func (e *floatPointEmitter) EmitPoint() (edge.PointMessage, error) {
 	slice := e.emitter.Emit()
 	if len(slice) != 1 {
-		return models.Point{}, ErrEmptyEmit
+		return nil, nil
 	}
 	ap := slice[0]
 	var t time.Time
@@ -192,30 +112,29 @@ func (e *floatPointEmitter) EmitPoint() (models.Point, error) {
 			delete(fields, e.field)
 		}
 	} else {
-		tags = e.tags
+		tags = e.groupInfo.Tags
 		fields = map[string]interface{}{e.as: ap.Value}
 	}
 
-	return models.Point{
-		Name:       e.name,
-		Time:       t,
-		Group:      e.group,
-		Dimensions: e.dimensions,
-		Tags:       tags,
-		Fields:     fields,
-	}, nil
+	return edge.NewPointMessage(
+		e.name, "", "",
+		e.groupInfo.Dimensions,
+		fields,
+		tags,
+		t,
+	), nil
 }
 
-func (e *floatPointEmitter) EmitBatch() models.Batch {
+func (e *floatPointEmitter) EmitBatch() edge.BufferedBatchMessage {
 	slice := e.emitter.Emit()
-	b := models.Batch{
-		Name:   e.name,
-		TMax:   e.time,
-		Group:  e.group,
-		ByName: e.dimensions.ByName,
-		Tags:   e.tags,
-		Points: make([]models.BatchPoint, len(slice)),
-	}
+	begin := edge.NewBeginBatchMessage(
+		e.name,
+		e.groupInfo.Tags,
+		e.groupInfo.Dimensions.ByName,
+		e.time,
+		len(slice),
+	)
+	points := make([]edge.BatchPointMessage, len(slice))
 	var t time.Time
 	for i, ap := range slice {
 		if e.pointTimes {
@@ -230,26 +149,63 @@ func (e *floatPointEmitter) EmitBatch() models.Batch {
 		var tags models.Tags
 		if l := len(ap.Tags.KeyValues()); l > 0 {
 			// Merge batch and point specific tags
-			tags = make(models.Tags, len(e.tags)+l)
-			for k, v := range e.tags {
+			tags = make(models.Tags, len(e.groupInfo.Tags)+l)
+			for k, v := range e.groupInfo.Tags {
 				tags[k] = v
 			}
 			for k, v := range ap.Tags.KeyValues() {
 				tags[k] = v
 			}
 		} else {
-			tags = e.tags
+			tags = e.groupInfo.Tags
 		}
-		b.Points[i] = models.BatchPoint{
-			Time:   t,
-			Tags:   tags,
-			Fields: map[string]interface{}{e.as: ap.Value},
-		}
-		if t.After(b.TMax) {
-			b.TMax = t
+		points[i] = edge.NewBatchPointMessage(
+			models.Fields{e.as: ap.Value},
+			tags,
+			t,
+		)
+		if t.After(begin.Time()) {
+			begin.SetTime(t)
 		}
 	}
-	return b
+	return edge.NewBufferedBatchMessage(
+		begin,
+		points,
+		edge.NewEndBatchMessage(),
+	)
+}
+
+func convertIntegerPoint(
+	name string,
+	p edge.FieldsTagsTimeGetter,
+	field string,
+	isSimpleSelector bool,
+	topBottomInfo *pipeline.TopBottomCallInfo,
+) (*influxql.IntegerPoint, error) {
+	value, ok := p.Fields()[field]
+	if !ok {
+		return nil, fmt.Errorf("field %s missing from point cannot aggregate", field)
+	}
+	typed, ok := value.(int64)
+	if !ok {
+		return nil, fmt.Errorf("field %s has wrong type: got %T exp int64", field, value)
+	}
+	ap := &influxql.IntegerPoint{
+		Name:  name,
+		Tags:  influxql.NewTags(p.Tags()),
+		Time:  p.Time().UnixNano(),
+		Value: typed,
+	}
+	if topBottomInfo != nil {
+		// We need to populate the Aux fields
+		integerPopulateAuxFieldsAndTags(ap, topBottomInfo.FieldsAndTags, p.Fields(), p.Tags())
+	}
+
+	if isSimpleSelector {
+		ap.Aux = []interface{}{p.Tags(), p.Fields()}
+	}
+
+	return ap, nil
 }
 
 type integerPointAggregator struct {
@@ -270,125 +226,11 @@ func integerPopulateAuxFieldsAndTags(ap *influxql.IntegerPoint, fieldsAndTags []
 	}
 }
 
-func (a *integerPointAggregator) AggregateBatch(b *models.Batch) error {
-	for _, p := range b.Points {
-		value, ok := p.Fields[a.field]
-		if !ok {
-			return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
-		}
-		typed, ok := value.(int64)
-		if !ok {
-			return fmt.Errorf("field %s has wrong type: got %T exp int64", a.field, value)
-		}
-		ap := &influxql.IntegerPoint{
-			Name:  b.Name,
-			Tags:  influxql.NewTags(p.Tags),
-			Time:  p.Time.UnixNano(),
-			Value: typed,
-		}
-		if a.topBottomInfo != nil {
-			// We need to populate the Aux fields
-			integerPopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
-		}
-
-		if a.isSimpleSelector {
-			ap.Aux = []interface{}{p.Tags, p.Fields}
-		}
-
-		a.aggregator.AggregateInteger(ap)
+func (a *integerPointAggregator) AggregatePoint(name string, p edge.FieldsTagsTimeGetter) error {
+	ap, err := convertIntegerPoint(name, p, a.field, a.isSimpleSelector, a.topBottomInfo)
+	if err != nil {
+		return nil
 	}
-	return nil
-}
-
-func (a *integerPointAggregator) AggregatePoint(p *models.Point) error {
-	value, ok := p.Fields[a.field]
-	if !ok {
-		return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
-	}
-	typed, ok := value.(int64)
-	if !ok {
-		return fmt.Errorf("field %s has wrong type: got %T exp int64", a.field, value)
-	}
-	ap := &influxql.IntegerPoint{
-		Name:  p.Name,
-		Tags:  influxql.NewTags(p.Tags),
-		Time:  p.Time.UnixNano(),
-		Value: typed,
-	}
-	if a.topBottomInfo != nil {
-		// We need to populate the Aux fields
-		integerPopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
-	}
-
-	if a.isSimpleSelector {
-		ap.Aux = []interface{}{p.Tags, p.Fields}
-	}
-
-	a.aggregator.AggregateInteger(ap)
-	return nil
-}
-
-type integerPointBulkAggregator struct {
-	field            string
-	topBottomInfo    *pipeline.TopBottomCallInfo
-	isSimpleSelector bool
-	aggregator       pipeline.IntegerBulkPointAggregator
-}
-
-func (a *integerPointBulkAggregator) AggregateBatch(b *models.Batch) error {
-	slice := make([]influxql.IntegerPoint, len(b.Points))
-	for i, p := range b.Points {
-		value, ok := p.Fields[a.field]
-		if !ok {
-			return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
-		}
-		typed, ok := value.(int64)
-		if !ok {
-			return fmt.Errorf("field %s has wrong type: got %T exp int64", a.field, value)
-		}
-		slice[i] = influxql.IntegerPoint{
-			Name:  b.Name,
-			Tags:  influxql.NewTags(p.Tags),
-			Time:  p.Time.UnixNano(),
-			Value: typed,
-		}
-		if a.topBottomInfo != nil {
-			// We need to populate the Aux fields
-			integerPopulateAuxFieldsAndTags(&slice[i], a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
-		}
-
-		if a.isSimpleSelector {
-			slice[i].Aux = []interface{}{p.Tags, p.Fields}
-		}
-	}
-	a.aggregator.AggregateIntegerBulk(slice)
-	return nil
-}
-
-func (a *integerPointBulkAggregator) AggregatePoint(p *models.Point) error {
-	value, ok := p.Fields[a.field]
-	if !ok {
-		return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
-	}
-	typed, ok := value.(int64)
-	if !ok {
-		return fmt.Errorf("field %s has wrong type: got %T exp int64", a.field, value)
-	}
-	ap := &influxql.IntegerPoint{
-		Name:  p.Name,
-		Tags:  influxql.NewTags(p.Tags),
-		Time:  p.Time.UnixNano(),
-		Value: typed,
-	}
-	if a.topBottomInfo != nil {
-		// We need to populate the Aux fields
-		integerPopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
-	}
-
-	if a.isSimpleSelector {
-		ap.Aux = []interface{}{p.Tags, p.Fields}
-	}
-
 	a.aggregator.AggregateInteger(ap)
 	return nil
 }
@@ -400,10 +242,10 @@ type integerPointEmitter struct {
 	byName           bool
 }
 
-func (e *integerPointEmitter) EmitPoint() (models.Point, error) {
+func (e *integerPointEmitter) EmitPoint() (edge.PointMessage, error) {
 	slice := e.emitter.Emit()
 	if len(slice) != 1 {
-		return models.Point{}, ErrEmptyEmit
+		return nil, nil
 	}
 	ap := slice[0]
 	var t time.Time
@@ -428,30 +270,29 @@ func (e *integerPointEmitter) EmitPoint() (models.Point, error) {
 			delete(fields, e.field)
 		}
 	} else {
-		tags = e.tags
+		tags = e.groupInfo.Tags
 		fields = map[string]interface{}{e.as: ap.Value}
 	}
 
-	return models.Point{
-		Name:       e.name,
-		Time:       t,
-		Group:      e.group,
-		Dimensions: e.dimensions,
-		Tags:       tags,
-		Fields:     fields,
-	}, nil
+	return edge.NewPointMessage(
+		e.name, "", "",
+		e.groupInfo.Dimensions,
+		fields,
+		tags,
+		t,
+	), nil
 }
 
-func (e *integerPointEmitter) EmitBatch() models.Batch {
+func (e *integerPointEmitter) EmitBatch() edge.BufferedBatchMessage {
 	slice := e.emitter.Emit()
-	b := models.Batch{
-		Name:   e.name,
-		TMax:   e.time,
-		Group:  e.group,
-		ByName: e.dimensions.ByName,
-		Tags:   e.tags,
-		Points: make([]models.BatchPoint, len(slice)),
-	}
+	begin := edge.NewBeginBatchMessage(
+		e.name,
+		e.groupInfo.Tags,
+		e.groupInfo.Dimensions.ByName,
+		e.time,
+		len(slice),
+	)
+	points := make([]edge.BatchPointMessage, len(slice))
 	var t time.Time
 	for i, ap := range slice {
 		if e.pointTimes {
@@ -466,26 +307,63 @@ func (e *integerPointEmitter) EmitBatch() models.Batch {
 		var tags models.Tags
 		if l := len(ap.Tags.KeyValues()); l > 0 {
 			// Merge batch and point specific tags
-			tags = make(models.Tags, len(e.tags)+l)
-			for k, v := range e.tags {
+			tags = make(models.Tags, len(e.groupInfo.Tags)+l)
+			for k, v := range e.groupInfo.Tags {
 				tags[k] = v
 			}
 			for k, v := range ap.Tags.KeyValues() {
 				tags[k] = v
 			}
 		} else {
-			tags = e.tags
+			tags = e.groupInfo.Tags
 		}
-		b.Points[i] = models.BatchPoint{
-			Time:   t,
-			Tags:   tags,
-			Fields: map[string]interface{}{e.as: ap.Value},
-		}
-		if t.After(b.TMax) {
-			b.TMax = t
+		points[i] = edge.NewBatchPointMessage(
+			models.Fields{e.as: ap.Value},
+			tags,
+			t,
+		)
+		if t.After(begin.Time()) {
+			begin.SetTime(t)
 		}
 	}
-	return b
+	return edge.NewBufferedBatchMessage(
+		begin,
+		points,
+		edge.NewEndBatchMessage(),
+	)
+}
+
+func convertStringPoint(
+	name string,
+	p edge.FieldsTagsTimeGetter,
+	field string,
+	isSimpleSelector bool,
+	topBottomInfo *pipeline.TopBottomCallInfo,
+) (*influxql.StringPoint, error) {
+	value, ok := p.Fields()[field]
+	if !ok {
+		return nil, fmt.Errorf("field %s missing from point cannot aggregate", field)
+	}
+	typed, ok := value.(string)
+	if !ok {
+		return nil, fmt.Errorf("field %s has wrong type: got %T exp string", field, value)
+	}
+	ap := &influxql.StringPoint{
+		Name:  name,
+		Tags:  influxql.NewTags(p.Tags()),
+		Time:  p.Time().UnixNano(),
+		Value: typed,
+	}
+	if topBottomInfo != nil {
+		// We need to populate the Aux fields
+		stringPopulateAuxFieldsAndTags(ap, topBottomInfo.FieldsAndTags, p.Fields(), p.Tags())
+	}
+
+	if isSimpleSelector {
+		ap.Aux = []interface{}{p.Tags(), p.Fields()}
+	}
+
+	return ap, nil
 }
 
 type stringPointAggregator struct {
@@ -506,125 +384,11 @@ func stringPopulateAuxFieldsAndTags(ap *influxql.StringPoint, fieldsAndTags []st
 	}
 }
 
-func (a *stringPointAggregator) AggregateBatch(b *models.Batch) error {
-	for _, p := range b.Points {
-		value, ok := p.Fields[a.field]
-		if !ok {
-			return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
-		}
-		typed, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("field %s has wrong type: got %T exp string", a.field, value)
-		}
-		ap := &influxql.StringPoint{
-			Name:  b.Name,
-			Tags:  influxql.NewTags(p.Tags),
-			Time:  p.Time.UnixNano(),
-			Value: typed,
-		}
-		if a.topBottomInfo != nil {
-			// We need to populate the Aux fields
-			stringPopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
-		}
-
-		if a.isSimpleSelector {
-			ap.Aux = []interface{}{p.Tags, p.Fields}
-		}
-
-		a.aggregator.AggregateString(ap)
+func (a *stringPointAggregator) AggregatePoint(name string, p edge.FieldsTagsTimeGetter) error {
+	ap, err := convertStringPoint(name, p, a.field, a.isSimpleSelector, a.topBottomInfo)
+	if err != nil {
+		return nil
 	}
-	return nil
-}
-
-func (a *stringPointAggregator) AggregatePoint(p *models.Point) error {
-	value, ok := p.Fields[a.field]
-	if !ok {
-		return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
-	}
-	typed, ok := value.(string)
-	if !ok {
-		return fmt.Errorf("field %s has wrong type: got %T exp string", a.field, value)
-	}
-	ap := &influxql.StringPoint{
-		Name:  p.Name,
-		Tags:  influxql.NewTags(p.Tags),
-		Time:  p.Time.UnixNano(),
-		Value: typed,
-	}
-	if a.topBottomInfo != nil {
-		// We need to populate the Aux fields
-		stringPopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
-	}
-
-	if a.isSimpleSelector {
-		ap.Aux = []interface{}{p.Tags, p.Fields}
-	}
-
-	a.aggregator.AggregateString(ap)
-	return nil
-}
-
-type stringPointBulkAggregator struct {
-	field            string
-	topBottomInfo    *pipeline.TopBottomCallInfo
-	isSimpleSelector bool
-	aggregator       pipeline.StringBulkPointAggregator
-}
-
-func (a *stringPointBulkAggregator) AggregateBatch(b *models.Batch) error {
-	slice := make([]influxql.StringPoint, len(b.Points))
-	for i, p := range b.Points {
-		value, ok := p.Fields[a.field]
-		if !ok {
-			return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
-		}
-		typed, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("field %s has wrong type: got %T exp string", a.field, value)
-		}
-		slice[i] = influxql.StringPoint{
-			Name:  b.Name,
-			Tags:  influxql.NewTags(p.Tags),
-			Time:  p.Time.UnixNano(),
-			Value: typed,
-		}
-		if a.topBottomInfo != nil {
-			// We need to populate the Aux fields
-			stringPopulateAuxFieldsAndTags(&slice[i], a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
-		}
-
-		if a.isSimpleSelector {
-			slice[i].Aux = []interface{}{p.Tags, p.Fields}
-		}
-	}
-	a.aggregator.AggregateStringBulk(slice)
-	return nil
-}
-
-func (a *stringPointBulkAggregator) AggregatePoint(p *models.Point) error {
-	value, ok := p.Fields[a.field]
-	if !ok {
-		return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
-	}
-	typed, ok := value.(string)
-	if !ok {
-		return fmt.Errorf("field %s has wrong type: got %T exp string", a.field, value)
-	}
-	ap := &influxql.StringPoint{
-		Name:  p.Name,
-		Tags:  influxql.NewTags(p.Tags),
-		Time:  p.Time.UnixNano(),
-		Value: typed,
-	}
-	if a.topBottomInfo != nil {
-		// We need to populate the Aux fields
-		stringPopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
-	}
-
-	if a.isSimpleSelector {
-		ap.Aux = []interface{}{p.Tags, p.Fields}
-	}
-
 	a.aggregator.AggregateString(ap)
 	return nil
 }
@@ -636,10 +400,10 @@ type stringPointEmitter struct {
 	byName           bool
 }
 
-func (e *stringPointEmitter) EmitPoint() (models.Point, error) {
+func (e *stringPointEmitter) EmitPoint() (edge.PointMessage, error) {
 	slice := e.emitter.Emit()
 	if len(slice) != 1 {
-		return models.Point{}, ErrEmptyEmit
+		return nil, nil
 	}
 	ap := slice[0]
 	var t time.Time
@@ -664,30 +428,29 @@ func (e *stringPointEmitter) EmitPoint() (models.Point, error) {
 			delete(fields, e.field)
 		}
 	} else {
-		tags = e.tags
+		tags = e.groupInfo.Tags
 		fields = map[string]interface{}{e.as: ap.Value}
 	}
 
-	return models.Point{
-		Name:       e.name,
-		Time:       t,
-		Group:      e.group,
-		Dimensions: e.dimensions,
-		Tags:       tags,
-		Fields:     fields,
-	}, nil
+	return edge.NewPointMessage(
+		e.name, "", "",
+		e.groupInfo.Dimensions,
+		fields,
+		tags,
+		t,
+	), nil
 }
 
-func (e *stringPointEmitter) EmitBatch() models.Batch {
+func (e *stringPointEmitter) EmitBatch() edge.BufferedBatchMessage {
 	slice := e.emitter.Emit()
-	b := models.Batch{
-		Name:   e.name,
-		TMax:   e.time,
-		Group:  e.group,
-		ByName: e.dimensions.ByName,
-		Tags:   e.tags,
-		Points: make([]models.BatchPoint, len(slice)),
-	}
+	begin := edge.NewBeginBatchMessage(
+		e.name,
+		e.groupInfo.Tags,
+		e.groupInfo.Dimensions.ByName,
+		e.time,
+		len(slice),
+	)
+	points := make([]edge.BatchPointMessage, len(slice))
 	var t time.Time
 	for i, ap := range slice {
 		if e.pointTimes {
@@ -702,26 +465,63 @@ func (e *stringPointEmitter) EmitBatch() models.Batch {
 		var tags models.Tags
 		if l := len(ap.Tags.KeyValues()); l > 0 {
 			// Merge batch and point specific tags
-			tags = make(models.Tags, len(e.tags)+l)
-			for k, v := range e.tags {
+			tags = make(models.Tags, len(e.groupInfo.Tags)+l)
+			for k, v := range e.groupInfo.Tags {
 				tags[k] = v
 			}
 			for k, v := range ap.Tags.KeyValues() {
 				tags[k] = v
 			}
 		} else {
-			tags = e.tags
+			tags = e.groupInfo.Tags
 		}
-		b.Points[i] = models.BatchPoint{
-			Time:   t,
-			Tags:   tags,
-			Fields: map[string]interface{}{e.as: ap.Value},
-		}
-		if t.After(b.TMax) {
-			b.TMax = t
+		points[i] = edge.NewBatchPointMessage(
+			models.Fields{e.as: ap.Value},
+			tags,
+			t,
+		)
+		if t.After(begin.Time()) {
+			begin.SetTime(t)
 		}
 	}
-	return b
+	return edge.NewBufferedBatchMessage(
+		begin,
+		points,
+		edge.NewEndBatchMessage(),
+	)
+}
+
+func convertBooleanPoint(
+	name string,
+	p edge.FieldsTagsTimeGetter,
+	field string,
+	isSimpleSelector bool,
+	topBottomInfo *pipeline.TopBottomCallInfo,
+) (*influxql.BooleanPoint, error) {
+	value, ok := p.Fields()[field]
+	if !ok {
+		return nil, fmt.Errorf("field %s missing from point cannot aggregate", field)
+	}
+	typed, ok := value.(bool)
+	if !ok {
+		return nil, fmt.Errorf("field %s has wrong type: got %T exp bool", field, value)
+	}
+	ap := &influxql.BooleanPoint{
+		Name:  name,
+		Tags:  influxql.NewTags(p.Tags()),
+		Time:  p.Time().UnixNano(),
+		Value: typed,
+	}
+	if topBottomInfo != nil {
+		// We need to populate the Aux fields
+		booleanPopulateAuxFieldsAndTags(ap, topBottomInfo.FieldsAndTags, p.Fields(), p.Tags())
+	}
+
+	if isSimpleSelector {
+		ap.Aux = []interface{}{p.Tags(), p.Fields()}
+	}
+
+	return ap, nil
 }
 
 type booleanPointAggregator struct {
@@ -742,125 +542,11 @@ func booleanPopulateAuxFieldsAndTags(ap *influxql.BooleanPoint, fieldsAndTags []
 	}
 }
 
-func (a *booleanPointAggregator) AggregateBatch(b *models.Batch) error {
-	for _, p := range b.Points {
-		value, ok := p.Fields[a.field]
-		if !ok {
-			return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
-		}
-		typed, ok := value.(bool)
-		if !ok {
-			return fmt.Errorf("field %s has wrong type: got %T exp bool", a.field, value)
-		}
-		ap := &influxql.BooleanPoint{
-			Name:  b.Name,
-			Tags:  influxql.NewTags(p.Tags),
-			Time:  p.Time.UnixNano(),
-			Value: typed,
-		}
-		if a.topBottomInfo != nil {
-			// We need to populate the Aux fields
-			booleanPopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
-		}
-
-		if a.isSimpleSelector {
-			ap.Aux = []interface{}{p.Tags, p.Fields}
-		}
-
-		a.aggregator.AggregateBoolean(ap)
+func (a *booleanPointAggregator) AggregatePoint(name string, p edge.FieldsTagsTimeGetter) error {
+	ap, err := convertBooleanPoint(name, p, a.field, a.isSimpleSelector, a.topBottomInfo)
+	if err != nil {
+		return nil
 	}
-	return nil
-}
-
-func (a *booleanPointAggregator) AggregatePoint(p *models.Point) error {
-	value, ok := p.Fields[a.field]
-	if !ok {
-		return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
-	}
-	typed, ok := value.(bool)
-	if !ok {
-		return fmt.Errorf("field %s has wrong type: got %T exp bool", a.field, value)
-	}
-	ap := &influxql.BooleanPoint{
-		Name:  p.Name,
-		Tags:  influxql.NewTags(p.Tags),
-		Time:  p.Time.UnixNano(),
-		Value: typed,
-	}
-	if a.topBottomInfo != nil {
-		// We need to populate the Aux fields
-		booleanPopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
-	}
-
-	if a.isSimpleSelector {
-		ap.Aux = []interface{}{p.Tags, p.Fields}
-	}
-
-	a.aggregator.AggregateBoolean(ap)
-	return nil
-}
-
-type booleanPointBulkAggregator struct {
-	field            string
-	topBottomInfo    *pipeline.TopBottomCallInfo
-	isSimpleSelector bool
-	aggregator       pipeline.BooleanBulkPointAggregator
-}
-
-func (a *booleanPointBulkAggregator) AggregateBatch(b *models.Batch) error {
-	slice := make([]influxql.BooleanPoint, len(b.Points))
-	for i, p := range b.Points {
-		value, ok := p.Fields[a.field]
-		if !ok {
-			return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
-		}
-		typed, ok := value.(bool)
-		if !ok {
-			return fmt.Errorf("field %s has wrong type: got %T exp bool", a.field, value)
-		}
-		slice[i] = influxql.BooleanPoint{
-			Name:  b.Name,
-			Tags:  influxql.NewTags(p.Tags),
-			Time:  p.Time.UnixNano(),
-			Value: typed,
-		}
-		if a.topBottomInfo != nil {
-			// We need to populate the Aux fields
-			booleanPopulateAuxFieldsAndTags(&slice[i], a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
-		}
-
-		if a.isSimpleSelector {
-			slice[i].Aux = []interface{}{p.Tags, p.Fields}
-		}
-	}
-	a.aggregator.AggregateBooleanBulk(slice)
-	return nil
-}
-
-func (a *booleanPointBulkAggregator) AggregatePoint(p *models.Point) error {
-	value, ok := p.Fields[a.field]
-	if !ok {
-		return fmt.Errorf("field %s missing from point cannot aggregate", a.field)
-	}
-	typed, ok := value.(bool)
-	if !ok {
-		return fmt.Errorf("field %s has wrong type: got %T exp bool", a.field, value)
-	}
-	ap := &influxql.BooleanPoint{
-		Name:  p.Name,
-		Tags:  influxql.NewTags(p.Tags),
-		Time:  p.Time.UnixNano(),
-		Value: typed,
-	}
-	if a.topBottomInfo != nil {
-		// We need to populate the Aux fields
-		booleanPopulateAuxFieldsAndTags(ap, a.topBottomInfo.FieldsAndTags, p.Fields, p.Tags)
-	}
-
-	if a.isSimpleSelector {
-		ap.Aux = []interface{}{p.Tags, p.Fields}
-	}
-
 	a.aggregator.AggregateBoolean(ap)
 	return nil
 }
@@ -872,10 +558,10 @@ type booleanPointEmitter struct {
 	byName           bool
 }
 
-func (e *booleanPointEmitter) EmitPoint() (models.Point, error) {
+func (e *booleanPointEmitter) EmitPoint() (edge.PointMessage, error) {
 	slice := e.emitter.Emit()
 	if len(slice) != 1 {
-		return models.Point{}, ErrEmptyEmit
+		return nil, nil
 	}
 	ap := slice[0]
 	var t time.Time
@@ -900,30 +586,29 @@ func (e *booleanPointEmitter) EmitPoint() (models.Point, error) {
 			delete(fields, e.field)
 		}
 	} else {
-		tags = e.tags
+		tags = e.groupInfo.Tags
 		fields = map[string]interface{}{e.as: ap.Value}
 	}
 
-	return models.Point{
-		Name:       e.name,
-		Time:       t,
-		Group:      e.group,
-		Dimensions: e.dimensions,
-		Tags:       tags,
-		Fields:     fields,
-	}, nil
+	return edge.NewPointMessage(
+		e.name, "", "",
+		e.groupInfo.Dimensions,
+		fields,
+		tags,
+		t,
+	), nil
 }
 
-func (e *booleanPointEmitter) EmitBatch() models.Batch {
+func (e *booleanPointEmitter) EmitBatch() edge.BufferedBatchMessage {
 	slice := e.emitter.Emit()
-	b := models.Batch{
-		Name:   e.name,
-		TMax:   e.time,
-		Group:  e.group,
-		ByName: e.dimensions.ByName,
-		Tags:   e.tags,
-		Points: make([]models.BatchPoint, len(slice)),
-	}
+	begin := edge.NewBeginBatchMessage(
+		e.name,
+		e.groupInfo.Tags,
+		e.groupInfo.Dimensions.ByName,
+		e.time,
+		len(slice),
+	)
+	points := make([]edge.BatchPointMessage, len(slice))
 	var t time.Time
 	for i, ap := range slice {
 		if e.pointTimes {
@@ -938,37 +623,35 @@ func (e *booleanPointEmitter) EmitBatch() models.Batch {
 		var tags models.Tags
 		if l := len(ap.Tags.KeyValues()); l > 0 {
 			// Merge batch and point specific tags
-			tags = make(models.Tags, len(e.tags)+l)
-			for k, v := range e.tags {
+			tags = make(models.Tags, len(e.groupInfo.Tags)+l)
+			for k, v := range e.groupInfo.Tags {
 				tags[k] = v
 			}
 			for k, v := range ap.Tags.KeyValues() {
 				tags[k] = v
 			}
 		} else {
-			tags = e.tags
+			tags = e.groupInfo.Tags
 		}
-		b.Points[i] = models.BatchPoint{
-			Time:   t,
-			Tags:   tags,
-			Fields: map[string]interface{}{e.as: ap.Value},
-		}
-		if t.After(b.TMax) {
-			b.TMax = t
+		points[i] = edge.NewBatchPointMessage(
+			models.Fields{e.as: ap.Value},
+			tags,
+			t,
+		)
+		if t.After(begin.Time()) {
+			begin.SetTime(t)
 		}
 	}
-	return b
+	return edge.NewBufferedBatchMessage(
+		begin,
+		points,
+		edge.NewEndBatchMessage(),
+	)
 }
 
 // floatReduceContext uses composition to implement the reduceContext interface
 type floatReduceContext struct {
 	floatPointAggregator
-	floatPointEmitter
-}
-
-// floatBulkReduceContext uses composition to implement the reduceContext interface
-type floatBulkReduceContext struct {
-	floatPointBulkAggregator
 	floatPointEmitter
 }
 
@@ -978,21 +661,9 @@ type floatIntegerReduceContext struct {
 	integerPointEmitter
 }
 
-// floatBulkIntegerReduceContext uses composition to implement the reduceContext interface
-type floatBulkIntegerReduceContext struct {
-	floatPointBulkAggregator
-	integerPointEmitter
-}
-
 // floatStringReduceContext uses composition to implement the reduceContext interface
 type floatStringReduceContext struct {
 	floatPointAggregator
-	stringPointEmitter
-}
-
-// floatBulkStringReduceContext uses composition to implement the reduceContext interface
-type floatBulkStringReduceContext struct {
-	floatPointBulkAggregator
 	stringPointEmitter
 }
 
@@ -1002,21 +673,9 @@ type floatBooleanReduceContext struct {
 	booleanPointEmitter
 }
 
-// floatBulkBooleanReduceContext uses composition to implement the reduceContext interface
-type floatBulkBooleanReduceContext struct {
-	floatPointBulkAggregator
-	booleanPointEmitter
-}
-
 // integerFloatReduceContext uses composition to implement the reduceContext interface
 type integerFloatReduceContext struct {
 	integerPointAggregator
-	floatPointEmitter
-}
-
-// integerBulkFloatReduceContext uses composition to implement the reduceContext interface
-type integerBulkFloatReduceContext struct {
-	integerPointBulkAggregator
 	floatPointEmitter
 }
 
@@ -1026,21 +685,9 @@ type integerReduceContext struct {
 	integerPointEmitter
 }
 
-// integerBulkReduceContext uses composition to implement the reduceContext interface
-type integerBulkReduceContext struct {
-	integerPointBulkAggregator
-	integerPointEmitter
-}
-
 // integerStringReduceContext uses composition to implement the reduceContext interface
 type integerStringReduceContext struct {
 	integerPointAggregator
-	stringPointEmitter
-}
-
-// integerBulkStringReduceContext uses composition to implement the reduceContext interface
-type integerBulkStringReduceContext struct {
-	integerPointBulkAggregator
 	stringPointEmitter
 }
 
@@ -1050,21 +697,9 @@ type integerBooleanReduceContext struct {
 	booleanPointEmitter
 }
 
-// integerBulkBooleanReduceContext uses composition to implement the reduceContext interface
-type integerBulkBooleanReduceContext struct {
-	integerPointBulkAggregator
-	booleanPointEmitter
-}
-
 // stringFloatReduceContext uses composition to implement the reduceContext interface
 type stringFloatReduceContext struct {
 	stringPointAggregator
-	floatPointEmitter
-}
-
-// stringBulkFloatReduceContext uses composition to implement the reduceContext interface
-type stringBulkFloatReduceContext struct {
-	stringPointBulkAggregator
 	floatPointEmitter
 }
 
@@ -1074,21 +709,9 @@ type stringIntegerReduceContext struct {
 	integerPointEmitter
 }
 
-// stringBulkIntegerReduceContext uses composition to implement the reduceContext interface
-type stringBulkIntegerReduceContext struct {
-	stringPointBulkAggregator
-	integerPointEmitter
-}
-
 // stringReduceContext uses composition to implement the reduceContext interface
 type stringReduceContext struct {
 	stringPointAggregator
-	stringPointEmitter
-}
-
-// stringBulkReduceContext uses composition to implement the reduceContext interface
-type stringBulkReduceContext struct {
-	stringPointBulkAggregator
 	stringPointEmitter
 }
 
@@ -1098,21 +721,9 @@ type stringBooleanReduceContext struct {
 	booleanPointEmitter
 }
 
-// stringBulkBooleanReduceContext uses composition to implement the reduceContext interface
-type stringBulkBooleanReduceContext struct {
-	stringPointBulkAggregator
-	booleanPointEmitter
-}
-
 // booleanFloatReduceContext uses composition to implement the reduceContext interface
 type booleanFloatReduceContext struct {
 	booleanPointAggregator
-	floatPointEmitter
-}
-
-// booleanBulkFloatReduceContext uses composition to implement the reduceContext interface
-type booleanBulkFloatReduceContext struct {
-	booleanPointBulkAggregator
 	floatPointEmitter
 }
 
@@ -1122,33 +733,15 @@ type booleanIntegerReduceContext struct {
 	integerPointEmitter
 }
 
-// booleanBulkIntegerReduceContext uses composition to implement the reduceContext interface
-type booleanBulkIntegerReduceContext struct {
-	booleanPointBulkAggregator
-	integerPointEmitter
-}
-
 // booleanStringReduceContext uses composition to implement the reduceContext interface
 type booleanStringReduceContext struct {
 	booleanPointAggregator
 	stringPointEmitter
 }
 
-// booleanBulkStringReduceContext uses composition to implement the reduceContext interface
-type booleanBulkStringReduceContext struct {
-	booleanPointBulkAggregator
-	stringPointEmitter
-}
-
 // booleanReduceContext uses composition to implement the reduceContext interface
 type booleanReduceContext struct {
 	booleanPointAggregator
-	booleanPointEmitter
-}
-
-// booleanBulkReduceContext uses composition to implement the reduceContext interface
-type booleanBulkReduceContext struct {
-	booleanPointBulkAggregator
 	booleanPointEmitter
 }
 
@@ -1163,23 +756,6 @@ func determineReduceContextCreateFn(method string, kind reflect.Kind, rc pipelin
 				a, e := rc.CreateFloatReducer()
 				return &floatReduceContext{
 					floatPointAggregator: floatPointAggregator{
-						field:            c.field,
-						topBottomInfo:    rc.TopBottomCallInfo,
-						isSimpleSelector: rc.IsSimpleSelector,
-						aggregator:       a,
-					},
-					floatPointEmitter: floatPointEmitter{
-						baseReduceContext: c,
-						emitter:           e,
-						isSimpleSelector:  rc.IsSimpleSelector,
-					},
-				}
-			}
-		case rc.CreateFloatBulkReducer != nil:
-			fn = func(c baseReduceContext) reduceContext {
-				a, e := rc.CreateFloatBulkReducer()
-				return &floatBulkReduceContext{
-					floatPointBulkAggregator: floatPointBulkAggregator{
 						field:            c.field,
 						topBottomInfo:    rc.TopBottomCallInfo,
 						isSimpleSelector: rc.IsSimpleSelector,
@@ -1210,23 +786,6 @@ func determineReduceContextCreateFn(method string, kind reflect.Kind, rc pipelin
 					},
 				}
 			}
-		case rc.CreateFloatBulkIntegerReducer != nil:
-			fn = func(c baseReduceContext) reduceContext {
-				a, e := rc.CreateFloatBulkIntegerReducer()
-				return &floatBulkIntegerReduceContext{
-					floatPointBulkAggregator: floatPointBulkAggregator{
-						field:            c.field,
-						topBottomInfo:    rc.TopBottomCallInfo,
-						isSimpleSelector: rc.IsSimpleSelector,
-						aggregator:       a,
-					},
-					integerPointEmitter: integerPointEmitter{
-						baseReduceContext: c,
-						emitter:           e,
-						isSimpleSelector:  rc.IsSimpleSelector,
-					},
-				}
-			}
 
 		case rc.CreateFloatStringReducer != nil:
 			fn = func(c baseReduceContext) reduceContext {
@@ -1245,46 +804,12 @@ func determineReduceContextCreateFn(method string, kind reflect.Kind, rc pipelin
 					},
 				}
 			}
-		case rc.CreateFloatBulkStringReducer != nil:
-			fn = func(c baseReduceContext) reduceContext {
-				a, e := rc.CreateFloatBulkStringReducer()
-				return &floatBulkStringReduceContext{
-					floatPointBulkAggregator: floatPointBulkAggregator{
-						field:            c.field,
-						topBottomInfo:    rc.TopBottomCallInfo,
-						isSimpleSelector: rc.IsSimpleSelector,
-						aggregator:       a,
-					},
-					stringPointEmitter: stringPointEmitter{
-						baseReduceContext: c,
-						emitter:           e,
-						isSimpleSelector:  rc.IsSimpleSelector,
-					},
-				}
-			}
 
 		case rc.CreateFloatBooleanReducer != nil:
 			fn = func(c baseReduceContext) reduceContext {
 				a, e := rc.CreateFloatBooleanReducer()
 				return &floatBooleanReduceContext{
 					floatPointAggregator: floatPointAggregator{
-						field:            c.field,
-						topBottomInfo:    rc.TopBottomCallInfo,
-						isSimpleSelector: rc.IsSimpleSelector,
-						aggregator:       a,
-					},
-					booleanPointEmitter: booleanPointEmitter{
-						baseReduceContext: c,
-						emitter:           e,
-						isSimpleSelector:  rc.IsSimpleSelector,
-					},
-				}
-			}
-		case rc.CreateFloatBulkBooleanReducer != nil:
-			fn = func(c baseReduceContext) reduceContext {
-				a, e := rc.CreateFloatBulkBooleanReducer()
-				return &floatBulkBooleanReduceContext{
-					floatPointBulkAggregator: floatPointBulkAggregator{
 						field:            c.field,
 						topBottomInfo:    rc.TopBottomCallInfo,
 						isSimpleSelector: rc.IsSimpleSelector,
@@ -1322,46 +847,12 @@ func determineReduceContextCreateFn(method string, kind reflect.Kind, rc pipelin
 					},
 				}
 			}
-		case rc.CreateIntegerBulkFloatReducer != nil:
-			fn = func(c baseReduceContext) reduceContext {
-				a, e := rc.CreateIntegerBulkFloatReducer()
-				return &integerBulkFloatReduceContext{
-					integerPointBulkAggregator: integerPointBulkAggregator{
-						field:            c.field,
-						topBottomInfo:    rc.TopBottomCallInfo,
-						isSimpleSelector: rc.IsSimpleSelector,
-						aggregator:       a,
-					},
-					floatPointEmitter: floatPointEmitter{
-						baseReduceContext: c,
-						emitter:           e,
-						isSimpleSelector:  rc.IsSimpleSelector,
-					},
-				}
-			}
 
 		case rc.CreateIntegerReducer != nil:
 			fn = func(c baseReduceContext) reduceContext {
 				a, e := rc.CreateIntegerReducer()
 				return &integerReduceContext{
 					integerPointAggregator: integerPointAggregator{
-						field:            c.field,
-						topBottomInfo:    rc.TopBottomCallInfo,
-						isSimpleSelector: rc.IsSimpleSelector,
-						aggregator:       a,
-					},
-					integerPointEmitter: integerPointEmitter{
-						baseReduceContext: c,
-						emitter:           e,
-						isSimpleSelector:  rc.IsSimpleSelector,
-					},
-				}
-			}
-		case rc.CreateIntegerBulkReducer != nil:
-			fn = func(c baseReduceContext) reduceContext {
-				a, e := rc.CreateIntegerBulkReducer()
-				return &integerBulkReduceContext{
-					integerPointBulkAggregator: integerPointBulkAggregator{
 						field:            c.field,
 						topBottomInfo:    rc.TopBottomCallInfo,
 						isSimpleSelector: rc.IsSimpleSelector,
@@ -1392,46 +883,12 @@ func determineReduceContextCreateFn(method string, kind reflect.Kind, rc pipelin
 					},
 				}
 			}
-		case rc.CreateIntegerBulkStringReducer != nil:
-			fn = func(c baseReduceContext) reduceContext {
-				a, e := rc.CreateIntegerBulkStringReducer()
-				return &integerBulkStringReduceContext{
-					integerPointBulkAggregator: integerPointBulkAggregator{
-						field:            c.field,
-						topBottomInfo:    rc.TopBottomCallInfo,
-						isSimpleSelector: rc.IsSimpleSelector,
-						aggregator:       a,
-					},
-					stringPointEmitter: stringPointEmitter{
-						baseReduceContext: c,
-						emitter:           e,
-						isSimpleSelector:  rc.IsSimpleSelector,
-					},
-				}
-			}
 
 		case rc.CreateIntegerBooleanReducer != nil:
 			fn = func(c baseReduceContext) reduceContext {
 				a, e := rc.CreateIntegerBooleanReducer()
 				return &integerBooleanReduceContext{
 					integerPointAggregator: integerPointAggregator{
-						field:            c.field,
-						topBottomInfo:    rc.TopBottomCallInfo,
-						isSimpleSelector: rc.IsSimpleSelector,
-						aggregator:       a,
-					},
-					booleanPointEmitter: booleanPointEmitter{
-						baseReduceContext: c,
-						emitter:           e,
-						isSimpleSelector:  rc.IsSimpleSelector,
-					},
-				}
-			}
-		case rc.CreateIntegerBulkBooleanReducer != nil:
-			fn = func(c baseReduceContext) reduceContext {
-				a, e := rc.CreateIntegerBulkBooleanReducer()
-				return &integerBulkBooleanReduceContext{
-					integerPointBulkAggregator: integerPointBulkAggregator{
 						field:            c.field,
 						topBottomInfo:    rc.TopBottomCallInfo,
 						isSimpleSelector: rc.IsSimpleSelector,
@@ -1469,46 +926,12 @@ func determineReduceContextCreateFn(method string, kind reflect.Kind, rc pipelin
 					},
 				}
 			}
-		case rc.CreateStringBulkFloatReducer != nil:
-			fn = func(c baseReduceContext) reduceContext {
-				a, e := rc.CreateStringBulkFloatReducer()
-				return &stringBulkFloatReduceContext{
-					stringPointBulkAggregator: stringPointBulkAggregator{
-						field:            c.field,
-						topBottomInfo:    rc.TopBottomCallInfo,
-						isSimpleSelector: rc.IsSimpleSelector,
-						aggregator:       a,
-					},
-					floatPointEmitter: floatPointEmitter{
-						baseReduceContext: c,
-						emitter:           e,
-						isSimpleSelector:  rc.IsSimpleSelector,
-					},
-				}
-			}
 
 		case rc.CreateStringIntegerReducer != nil:
 			fn = func(c baseReduceContext) reduceContext {
 				a, e := rc.CreateStringIntegerReducer()
 				return &stringIntegerReduceContext{
 					stringPointAggregator: stringPointAggregator{
-						field:            c.field,
-						topBottomInfo:    rc.TopBottomCallInfo,
-						isSimpleSelector: rc.IsSimpleSelector,
-						aggregator:       a,
-					},
-					integerPointEmitter: integerPointEmitter{
-						baseReduceContext: c,
-						emitter:           e,
-						isSimpleSelector:  rc.IsSimpleSelector,
-					},
-				}
-			}
-		case rc.CreateStringBulkIntegerReducer != nil:
-			fn = func(c baseReduceContext) reduceContext {
-				a, e := rc.CreateStringBulkIntegerReducer()
-				return &stringBulkIntegerReduceContext{
-					stringPointBulkAggregator: stringPointBulkAggregator{
 						field:            c.field,
 						topBottomInfo:    rc.TopBottomCallInfo,
 						isSimpleSelector: rc.IsSimpleSelector,
@@ -1539,46 +962,12 @@ func determineReduceContextCreateFn(method string, kind reflect.Kind, rc pipelin
 					},
 				}
 			}
-		case rc.CreateStringBulkReducer != nil:
-			fn = func(c baseReduceContext) reduceContext {
-				a, e := rc.CreateStringBulkReducer()
-				return &stringBulkReduceContext{
-					stringPointBulkAggregator: stringPointBulkAggregator{
-						field:            c.field,
-						topBottomInfo:    rc.TopBottomCallInfo,
-						isSimpleSelector: rc.IsSimpleSelector,
-						aggregator:       a,
-					},
-					stringPointEmitter: stringPointEmitter{
-						baseReduceContext: c,
-						emitter:           e,
-						isSimpleSelector:  rc.IsSimpleSelector,
-					},
-				}
-			}
 
 		case rc.CreateStringBooleanReducer != nil:
 			fn = func(c baseReduceContext) reduceContext {
 				a, e := rc.CreateStringBooleanReducer()
 				return &stringBooleanReduceContext{
 					stringPointAggregator: stringPointAggregator{
-						field:            c.field,
-						topBottomInfo:    rc.TopBottomCallInfo,
-						isSimpleSelector: rc.IsSimpleSelector,
-						aggregator:       a,
-					},
-					booleanPointEmitter: booleanPointEmitter{
-						baseReduceContext: c,
-						emitter:           e,
-						isSimpleSelector:  rc.IsSimpleSelector,
-					},
-				}
-			}
-		case rc.CreateStringBulkBooleanReducer != nil:
-			fn = func(c baseReduceContext) reduceContext {
-				a, e := rc.CreateStringBulkBooleanReducer()
-				return &stringBulkBooleanReduceContext{
-					stringPointBulkAggregator: stringPointBulkAggregator{
 						field:            c.field,
 						topBottomInfo:    rc.TopBottomCallInfo,
 						isSimpleSelector: rc.IsSimpleSelector,
@@ -1616,46 +1005,12 @@ func determineReduceContextCreateFn(method string, kind reflect.Kind, rc pipelin
 					},
 				}
 			}
-		case rc.CreateBooleanBulkFloatReducer != nil:
-			fn = func(c baseReduceContext) reduceContext {
-				a, e := rc.CreateBooleanBulkFloatReducer()
-				return &booleanBulkFloatReduceContext{
-					booleanPointBulkAggregator: booleanPointBulkAggregator{
-						field:            c.field,
-						topBottomInfo:    rc.TopBottomCallInfo,
-						isSimpleSelector: rc.IsSimpleSelector,
-						aggregator:       a,
-					},
-					floatPointEmitter: floatPointEmitter{
-						baseReduceContext: c,
-						emitter:           e,
-						isSimpleSelector:  rc.IsSimpleSelector,
-					},
-				}
-			}
 
 		case rc.CreateBooleanIntegerReducer != nil:
 			fn = func(c baseReduceContext) reduceContext {
 				a, e := rc.CreateBooleanIntegerReducer()
 				return &booleanIntegerReduceContext{
 					booleanPointAggregator: booleanPointAggregator{
-						field:            c.field,
-						topBottomInfo:    rc.TopBottomCallInfo,
-						isSimpleSelector: rc.IsSimpleSelector,
-						aggregator:       a,
-					},
-					integerPointEmitter: integerPointEmitter{
-						baseReduceContext: c,
-						emitter:           e,
-						isSimpleSelector:  rc.IsSimpleSelector,
-					},
-				}
-			}
-		case rc.CreateBooleanBulkIntegerReducer != nil:
-			fn = func(c baseReduceContext) reduceContext {
-				a, e := rc.CreateBooleanBulkIntegerReducer()
-				return &booleanBulkIntegerReduceContext{
-					booleanPointBulkAggregator: booleanPointBulkAggregator{
 						field:            c.field,
 						topBottomInfo:    rc.TopBottomCallInfo,
 						isSimpleSelector: rc.IsSimpleSelector,
@@ -1686,46 +1041,12 @@ func determineReduceContextCreateFn(method string, kind reflect.Kind, rc pipelin
 					},
 				}
 			}
-		case rc.CreateBooleanBulkStringReducer != nil:
-			fn = func(c baseReduceContext) reduceContext {
-				a, e := rc.CreateBooleanBulkStringReducer()
-				return &booleanBulkStringReduceContext{
-					booleanPointBulkAggregator: booleanPointBulkAggregator{
-						field:            c.field,
-						topBottomInfo:    rc.TopBottomCallInfo,
-						isSimpleSelector: rc.IsSimpleSelector,
-						aggregator:       a,
-					},
-					stringPointEmitter: stringPointEmitter{
-						baseReduceContext: c,
-						emitter:           e,
-						isSimpleSelector:  rc.IsSimpleSelector,
-					},
-				}
-			}
 
 		case rc.CreateBooleanReducer != nil:
 			fn = func(c baseReduceContext) reduceContext {
 				a, e := rc.CreateBooleanReducer()
 				return &booleanReduceContext{
 					booleanPointAggregator: booleanPointAggregator{
-						field:            c.field,
-						topBottomInfo:    rc.TopBottomCallInfo,
-						isSimpleSelector: rc.IsSimpleSelector,
-						aggregator:       a,
-					},
-					booleanPointEmitter: booleanPointEmitter{
-						baseReduceContext: c,
-						emitter:           e,
-						isSimpleSelector:  rc.IsSimpleSelector,
-					},
-				}
-			}
-		case rc.CreateBooleanBulkReducer != nil:
-			fn = func(c baseReduceContext) reduceContext {
-				a, e := rc.CreateBooleanBulkReducer()
-				return &booleanBulkReduceContext{
-					booleanPointBulkAggregator: booleanPointBulkAggregator{
 						field:            c.field,
 						topBottomInfo:    rc.TopBottomCallInfo,
 						isSimpleSelector: rc.IsSimpleSelector,
