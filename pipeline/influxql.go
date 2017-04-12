@@ -7,7 +7,7 @@ import (
 )
 
 // tmpl -- go get github.com/benbjohnson/tmpl
-//go:generate tmpl -data=@../tmpldata influxql.gen.go.tmpl
+//go:generate tmpl -data=@../tmpldata.json influxql.gen.go.tmpl
 
 // An InfluxQLNode performs the available function from the InfluxQL language.
 // These function can be performed on a stream or batch edge.

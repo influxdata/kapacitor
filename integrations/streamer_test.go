@@ -701,6 +701,7 @@ stream
 
 	testStreamerWithOutput(t, "TestStream_Window_Count", script, 2*time.Second, er, false, nil)
 }
+
 func TestStream_Window_Count_Overlapping(t *testing.T) {
 
 	var script = `
@@ -1321,6 +1322,43 @@ stream
 	}
 
 	testStreamerWithOutput(t, "TestStream_Window_FillPeriod_Aligned", script, 21*time.Second, er, false, nil)
+}
+
+func TestStream_Aggregate_Changing_Type(t *testing.T) {
+
+	var script = `
+var period = 10s
+var every = 10s
+stream
+	|from()
+		.database('dbname')
+		.retentionPolicy('rpname')
+		.measurement('m')
+	|window()
+		.period(period)
+		.every(every)
+	|where(lambda: "c")
+	|count('value')
+	|httpOut('TestStream_Aggregate_Changing_Type')
+`
+
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "m",
+				Tags:    nil,
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 20, 0, time.UTC),
+						1.0,
+					},
+				},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Aggregate_Changing_Type", script, 25*time.Second, er, false, nil)
 }
 
 func TestStream_Shift(t *testing.T) {

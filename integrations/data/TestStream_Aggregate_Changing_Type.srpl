@@ -1,0 +1,21 @@
+dbname
+rpname
+m c=false,value=0i 0000000000
+dbname
+rpname
+m c=false,value=0i 0000000002
+dbname
+rpname
+m c=false,value=0i 0000000008
+dbname
+rpname
+m c=false,value=0i 0000000010
+dbname
+rpname
+m c=true,value=0i 0000000011
+dbname
+rpname
+m c=false,value=0i 0000000012
+dbname
+rpname
+m c=false,value=0i 0000000021
