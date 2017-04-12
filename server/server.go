@@ -190,7 +190,9 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	s.appendPushoverService()
 	s.appendSMTPService()
 	s.appendTelegramService()
-	s.appendSlackService()
+	if err := s.appendSlackService(); err != nil {
+		return nil, errors.Wrap(err, "slack service")
+	}
 	s.appendSNMPTrapService()
 	s.appendSensuService()
 	s.appendTalkService()
@@ -472,16 +474,20 @@ func (s *Server) appendSensuService() {
 	s.AppendService("sensu", srv)
 }
 
-func (s *Server) appendSlackService() {
+func (s *Server) appendSlackService() error {
 	c := s.config.Slack
 	l := s.LogService.NewLogger("[slack] ", log.LstdFlags)
-	srv := slack.NewService(c, l)
+	srv, err := slack.NewService(c, l)
+	if err != nil {
+		return err
+	}
 
 	s.TaskMaster.SlackService = srv
 	s.AlertService.SlackService = srv
 
 	s.SetDynamicService("slack", srv)
 	s.AppendService("slack", srv)
+	return nil
 }
 
 func (s *Server) appendSNMPTrapService() {

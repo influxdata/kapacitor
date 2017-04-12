@@ -26,6 +26,15 @@ type Config struct {
 	// Whether all alerts should automatically use stateChangesOnly mode.
 	// Only applies if global is also set.
 	StateChangesOnly bool `toml:"state-changes-only" override:"state-changes-only"`
+
+	// Path to CA file
+	SSLCA string `toml:"ssl-ca" override:"ssl-ca"`
+	// Path to host cert file
+	SSLCert string `toml:"ssl-cert" override:"ssl-cert"`
+	// Path to cert key file
+	SSLKey string `toml:"ssl-key" override:"ssl-key"`
+	// Use SSL but skip chain & host verification
+	InsecureSkipVerify bool `toml:"insecure-skip-verify" override:"insecure-skip-verify"`
 }
 
 func NewConfig() Config {

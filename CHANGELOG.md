@@ -42,6 +42,7 @@ kapacitor define-handler system aggregate_by_1m.yaml
 
 ### Features
 
+- [#1322](https://github.com/influxdata/kapacitor/pull/1322): TLS configuration in Slack service for Mattermost compatibility
 - [#1159](https://github.com/influxdata/kapacitor/pulls/1159): Go version 1.7.4 -> 1.7.5
 - [#1175](https://github.com/influxdata/kapacitor/pull/1175): BREAKING: Add generic error counters to every node type.
     Renamed `query_errors` to `errors` in batch node.
