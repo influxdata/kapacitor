@@ -25,7 +25,7 @@ type Handler interface {
 	// Initialize the Handler with the provided options.
 	Init(*udf.InitRequest) (*udf.InitResponse, error)
 	// Create a snapshot of the running state of the handler.
-	Snaphost() (*udf.SnapshotResponse, error)
+	Snapshot() (*udf.SnapshotResponse, error)
 	// Restore a previous snapshot.
 	Restore(*udf.RestoreRequest) (*udf.RestoreResponse, error)
 
@@ -180,7 +180,7 @@ func (a *Agent) readLoop() error {
 				},
 			}
 		case *udf.Request_Snapshot:
-			snapshot, err := a.Handler.Snaphost()
+			snapshot, err := a.Handler.Snapshot()
 			if err != nil {
 				return err
 			}
