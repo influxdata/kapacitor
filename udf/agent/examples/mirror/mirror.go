@@ -41,7 +41,7 @@ func (*mirrorHandler) Init(r *udf.InitRequest) (*udf.InitResponse, error) {
 }
 
 // Create a snapshot of the running state of the process.
-func (*mirrorHandler) Snaphost() (*udf.SnapshotResponse, error) {
+func (*mirrorHandler) Snapshot() (*udf.SnapshotResponse, error) {
 	return &udf.SnapshotResponse{}, nil
 }
 

@@ -97,7 +97,7 @@ func (a *avgHandler) Init(r *udf.InitRequest) (*udf.InitResponse, error) {
 }
 
 // Create a snapshot of the running state of the process.
-func (a *avgHandler) Snaphost() (*udf.SnapshotResponse, error) {
+func (a *avgHandler) Snapshot() (*udf.SnapshotResponse, error) {
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 	enc.Encode(a.state)

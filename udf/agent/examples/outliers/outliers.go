@@ -64,7 +64,7 @@ func (o *outlierHandler) Init(r *udf.InitRequest) (*udf.InitResponse, error) {
 }
 
 // Create a snapshot of the running state of the process.
-func (o *outlierHandler) Snaphost() (*udf.SnapshotResponse, error) {
+func (o *outlierHandler) Snapshot() (*udf.SnapshotResponse, error) {
 	return &udf.SnapshotResponse{}, nil
 }
 
