@@ -84,6 +84,7 @@ kapacitor define-handler system aggregate_by_1m.yaml
 - [#1295](https://github.com/influxdata/kapacitor/issues/1295): Fix curruption of recordings list after deleting all recordings.
 - [#1237](https://github.com/influxdata/kapacitor/issues/1237): Fix missing "vars" key when listing tasks.
 - [#1271](https://github.com/influxdata/kapacitor/issues/1271): Fix bug where aggregates would not be able to change type.
+
 ## v1.2.1 [2017-04-13]
 
 ### Bugfixes
