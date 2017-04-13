@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.2.1 [2017-04-13]
+
+### Bugfixes
+
+- [#1323](https://github.com/influxdata/kapacitor/pull/1323): Fix issue where credentials to InfluxDB could not be updated dynamically.
+
 ## v1.2.0 [2017-01-23]
 
 ### Release Notes
