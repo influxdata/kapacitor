@@ -193,7 +193,9 @@ func (c *HTTPClient) Update(new Config) error {
 		return err
 	}
 	c.urls = urls
-	if old.Timeout != new.Timeout || old.Transport != new.Transport {
+	if old.Credentials != new.Credentials ||
+		old.Timeout != new.Timeout ||
+		old.Transport != new.Transport {
 		//Replace the client
 		tr := new.Transport
 		if tr == nil {
