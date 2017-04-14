@@ -48,16 +48,17 @@ const maxWeight = 1.2
 
 type AlertNode struct {
 	node
-	a           *pipeline.AlertNode
-	topic       string
-	anonTopic   string
-	handlers    []alert.Handler
-	levels      []stateful.Expression
-	scopePools  []stateful.ScopePool
-	states      map[models.GroupID]*alertState
-	idTmpl      *text.Template
-	messageTmpl *text.Template
-	detailsTmpl *html.Template
+	a            *pipeline.AlertNode
+	topic        string
+	anonTopic    string
+	handlers     []alert.Handler
+	levels       []stateful.Expression
+	scopePools   []stateful.ScopePool
+	states       map[models.GroupID]*alertState
+	idTmpl       *text.Template
+	messageTmpl  *text.Template
+	detailsTmpl  *html.Template
+	hostnameTmpl *text.Template
 
 	statesMu sync.RWMutex
 
@@ -125,6 +126,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 			return html.JS(tmpBuffer.String())
 		},
 	}).Parse(n.Details)
+	if err != nil {
+		return nil, err
+	}
+
+	an.hostnameTmpl, err = text.New("hostname").Parse(n.Hostname)
 	if err != nil {
 		return nil, err
 	}
@@ -855,7 +861,7 @@ func (a *AlertNode) event(
 	d time.Duration,
 	b models.Batch,
 ) (alert.Event, error) {
-	msg, details, err := a.renderMessageAndDetails(id, name, t, group, tags, fields, level)
+	msg, details, hostname, err := a.renderMessageAndDetailsAndHostname(id, name, t, group, tags, fields, level)
 	if err != nil {
 		return alert.Event{}, err
 	}
@@ -864,6 +870,7 @@ func (a *AlertNode) event(
 		State: alert.EventState{
 			ID:       id,
 			Message:  msg,
+			Hostname: hostname,
 			Details:  details,
 			Time:     t,
 			Duration: d,
@@ -1045,7 +1052,7 @@ func (a *AlertNode) renderID(name string, group models.GroupID, tags models.Tags
 	return id.String(), nil
 }
 
-func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group models.GroupID, tags models.Tags, fields models.Fields, level alert.Level) (string, string, error) {
+func (a *AlertNode) renderMessageAndDetailsAndHostname(id, name string, t time.Time, group models.GroupID, tags models.Tags, fields models.Fields, level alert.Level) (string, string, string, error) {
 	g := string(group)
 	if group == models.NilGroup {
 		g = "nil"
@@ -1074,7 +1081,7 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group 
 
 	err := a.messageTmpl.Execute(tmpBuffer, minfo)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
 	msg := tmpBuffer.String()
@@ -1083,15 +1090,24 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group 
 		Message:     msg,
 	}
 
+	// Reuse the buffer, for the hostname template
+	tmpBuffer.Reset()
+	err = a.hostnameTmpl.Execute(tmpBuffer, dinfo)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	hostname := tmpBuffer.String()
+
 	// Reuse the buffer, for the details template
 	tmpBuffer.Reset()
 	err = a.detailsTmpl.Execute(tmpBuffer, dinfo)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
 	details := tmpBuffer.String()
-	return msg, details, nil
+	return msg, details, hostname, nil
 }
 
 func (a *AlertNode) getAlertState(id models.GroupID) (state *alertState, ok bool) {

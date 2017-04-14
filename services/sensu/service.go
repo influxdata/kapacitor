@@ -53,16 +53,18 @@ func (s *Service) Update(newConfig []interface{}) error {
 }
 
 type testOptions struct {
-	Name   string      `json:"name"`
-	Output string      `json:"output"`
-	Level  alert.Level `json:"level"`
+	Name     string      `json:"name"`
+	Hostname string      `json:"hostname"`
+	Output   string      `json:"output"`
+	Level    alert.Level `json:"level"`
 }
 
 func (s *Service) TestOptions() interface{} {
 	return &testOptions{
-		Name:   "testName",
-		Output: "testOutput",
-		Level:  alert.Critical,
+		Name:     "testName",
+		Hostname: "testHostname",
+		Output:   "testOutput",
+		Level:    alert.Critical,
 	}
 }
 
@@ -73,17 +75,18 @@ func (s *Service) Test(options interface{}) error {
 	}
 	return s.Alert(
 		o.Name,
+		o.Hostname,
 		o.Output,
 		o.Level,
 	)
 }
 
-func (s *Service) Alert(name, output string, level alert.Level) error {
+func (s *Service) Alert(name, hostname, output string, level alert.Level) error {
 	if !validNamePattern.MatchString(name) {
 		return fmt.Errorf("invalid name %q for sensu alert. Must match %v", name, validNamePattern)
 	}
 
-	addr, postData, err := s.prepareData(name, output, level)
+	addr, postData, err := s.prepareData(name, hostname, output, level)
 	if err != nil {
 		return err
 	}
@@ -109,7 +112,7 @@ func (s *Service) Alert(name, output string, level alert.Level) error {
 	return nil
 }
 
-func (s *Service) prepareData(name, output string, level alert.Level) (*net.TCPAddr, map[string]interface{}, error) {
+func (s *Service) prepareData(name, hostname, output string, level alert.Level) (*net.TCPAddr, map[string]interface{}, error) {
 
 	c := s.config()
 
@@ -133,9 +136,10 @@ func (s *Service) prepareData(name, output string, level alert.Level) (*net.TCPA
 
 	postData := make(map[string]interface{})
 	postData["name"] = name
-	postData["source"] = c.Source
+	postData["source"] = hostname
 	postData["output"] = output
 	postData["status"] = status
+	postData["auto_resolve"] = false
 
 	addr, err := net.ResolveTCPAddr("tcp", c.Addr)
 	if err != nil {
@@ -160,6 +164,7 @@ func (s *Service) Handler(l *log.Logger) alert.Handler {
 func (h *handler) Handle(event alert.Event) {
 	if err := h.s.Alert(
 		event.State.ID,
+		event.State.Hostname,
 		event.State.Message,
 		event.State.Level,
 	); err != nil {
