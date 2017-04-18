@@ -4,6 +4,7 @@ import (
 	"log"
 
 	pahomqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/influxdata/kapacitor/alert"
 )
 
 type QOSLevel byte
@@ -18,7 +19,8 @@ type Service struct {
 	Config Config
 	Logger *log.Logger
 
-	Client *pahomqtt.Client
+	client pahomqtt.Client
+	token  pahomqtt.Token
 }
 
 func NewService(c Config, l *log.Logger) *Service {
@@ -28,32 +30,44 @@ func NewService(c Config, l *log.Logger) *Service {
 // TODO(timraymond): improve logging here and in Close
 func (s *Service) Open() error {
 	opts := pahomqtt.NewClientOptions()
-	opts.AddBroker(s.Config.Broker)
+	opts.AddBroker(s.Config.Broker())
 	opts.SetClientID(s.Config.ClientID) // TODO(timraymond): should we provide a random one?
 	opts.SetUsername(s.Config.Username)
 	opts.SetPassword(s.Config.Password)
 	opts.SetCleanSession(false) // wtf is this? Why does it default to false?
 
-	s.Client = pahomqtt.NewClient(opts)
-	s.Token = s.Client.Connect()
+	s.client = pahomqtt.NewClient(opts)
+	s.token = s.client.Connect()
 
-	token.Wait()
+	s.token.Wait()
 
-	if err := token.Error(); err != nil {
+	if err := s.token.Error(); err != nil {
 		log.Println("E! MQTT done broke yo") //TODO(timraymond): put a legit error in
 	}
+	return nil
 }
 
 func (s *Service) Close() error {
-	s.Client.Disconnect(250) // what is this code?
+	s.client.Disconnect(250) // what is this code?
 	log.Println("I! MQTT Client Disconnected")
+	return nil
 }
 
-func (s *Service) Alert(topic, message string, qos QOSLevel) error {
-	s.Client.Publish(topic, byte(qos), false, message) // should retained be configureable?
+func (s *Service) Alert(qos QOSLevel, topic, message string) error {
+	s.client.Publish(topic, byte(qos), false, message) // should retained be configureable?
+	return nil
 }
 
 func (s *Service) Update(newConfig []interface{}) error {
+	return nil
+}
+
+func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+	return &handler{
+		s:      s,
+		c:      c,
+		logger: l,
+	}
 }
 
 type HandlerConfig struct {
@@ -68,7 +82,7 @@ type handler struct {
 }
 
 func (h *handler) Handle(event alert.Event) {
-	if err := h.s.Alert(h.c.Topic, h.c.QOS, event.State.Message); err != nil {
+	if err := h.s.Alert(h.c.QOS, h.c.Topic, event.State.Message); err != nil {
 		h.logger.Println("E! failed to post message to MQTT broker", err)
 	}
 }
@@ -78,4 +92,15 @@ func (s *Service) DefaultHandlerConfig() HandlerConfig {
 		Topic: "Barnacles",
 		QOS:   LEVEL2,
 	}
+}
+
+type testOptions struct{}
+
+func (s *Service) TestOptions() interface{} {
+	return "foo"
+}
+
+func (s *Service) Test(o interface{}) error {
+	// stubbed out for POC
+	return nil
 }
