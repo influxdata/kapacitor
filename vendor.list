@@ -4,6 +4,7 @@ github.com/cenkalti/backoff
 github.com/davecgh/go-spew
 github.com/dgrijalva/jwt-go v3.0.0
 github.com/dustin/go-humanize
+github.com/eclipse/paho.mqtt.golang
 github.com/evanphx/json-patch
 github.com/ghodss/yaml
 github.com/gogo/protobuf
