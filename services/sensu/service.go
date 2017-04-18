@@ -1,6 +1,7 @@
 package sensu
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"net"
 	"regexp"
 	"sync/atomic"
+	text "text/template"
 
 	"github.com/influxdata/kapacitor/alert"
 )
@@ -54,6 +56,7 @@ func (s *Service) Update(newConfig []interface{}) error {
 
 type testOptions struct {
 	Name   string      `json:"name"`
+	Source string      `json:"source"`
 	Output string      `json:"output"`
 	Level  alert.Level `json:"level"`
 }
@@ -61,6 +64,7 @@ type testOptions struct {
 func (s *Service) TestOptions() interface{} {
 	return &testOptions{
 		Name:   "testName",
+		Source: "Kapacitor",
 		Output: "testOutput",
 		Level:  alert.Critical,
 	}
@@ -73,17 +77,18 @@ func (s *Service) Test(options interface{}) error {
 	}
 	return s.Alert(
 		o.Name,
+		o.Source,
 		o.Output,
 		o.Level,
 	)
 }
 
-func (s *Service) Alert(name, output string, level alert.Level) error {
+func (s *Service) Alert(name, source, output string, level alert.Level) error {
 	if !validNamePattern.MatchString(name) {
 		return fmt.Errorf("invalid name %q for sensu alert. Must match %v", name, validNamePattern)
 	}
 
-	addr, postData, err := s.prepareData(name, output, level)
+	addr, postData, err := s.prepareData(name, source, output, level)
 	if err != nil {
 		return err
 	}
@@ -109,7 +114,7 @@ func (s *Service) Alert(name, output string, level alert.Level) error {
 	return nil
 }
 
-func (s *Service) prepareData(name, output string, level alert.Level) (*net.TCPAddr, map[string]interface{}, error) {
+func (s *Service) prepareData(name, source, output string, level alert.Level) (*net.TCPAddr, map[string]interface{}, error) {
 
 	c := s.config()
 
@@ -133,7 +138,10 @@ func (s *Service) prepareData(name, output string, level alert.Level) (*net.TCPA
 
 	postData := make(map[string]interface{})
 	postData["name"] = name
-	postData["source"] = c.Source
+	if source == "" {
+		source = c.Source
+	}
+	postData["source"] = source
 	postData["output"] = output
 	postData["status"] = status
 
@@ -145,21 +153,46 @@ func (s *Service) prepareData(name, output string, level alert.Level) (*net.TCPA
 	return addr, postData, nil
 }
 
-type handler struct {
-	s      *Service
-	logger *log.Logger
+type HandlerConfig struct {
+	// Sensu source for which to post messages.
+	// If empty uses the source from the configuration.
+	Source string `mapstructure:"source"`
 }
 
-func (s *Service) Handler(l *log.Logger) alert.Handler {
-	return &handler{
-		s:      s,
-		logger: l,
+type handler struct {
+	s      *Service
+	c      HandlerConfig
+	logger *log.Logger
+
+	sourceTmpl *text.Template
+}
+
+func (s *Service) Handler(c HandlerConfig, l *log.Logger) (alert.Handler, error) {
+	srcTmpl, err := text.New("source").Parse(c.Source)
+	if err != nil {
+		return nil, err
 	}
+	return &handler{
+		s:          s,
+		c:          c,
+		logger:     l,
+		sourceTmpl: srcTmpl,
+	}, nil
 }
 
 func (h *handler) Handle(event alert.Event) {
+	td := event.TemplateData()
+	var buf bytes.Buffer
+	err := h.sourceTmpl.Execute(&buf, td)
+	if err != nil {
+		h.logger.Printf("E! failed to evaluate Sensu source template %s: %v", h.c.Source, err)
+		return
+	}
+	sourceStr := buf.String()
+
 	if err := h.s.Alert(
 		event.State.ID,
+		sourceStr,
 		event.State.Message,
 		event.State.Level,
 	); err != nil {

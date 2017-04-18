@@ -6000,7 +6000,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						Set: map[string]interface{}{
 							"addr":    "sensu.local:3000",
 							"enabled": true,
-							"source":  "",
+							"source":  "Kapacitor",
 						},
 					},
 					expSection: client.ConfigSection{
@@ -6010,7 +6010,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							Options: map[string]interface{}{
 								"addr":    "sensu.local:3000",
 								"enabled": true,
-								"source":  "",
+								"source":  "Kapacitor",
 							},
 							Redacted: nil,
 						}},
@@ -6020,7 +6020,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						Options: map[string]interface{}{
 							"addr":    "sensu.local:3000",
 							"enabled": true,
-							"source":  "",
+							"source":  "Kapacitor",
 						},
 						Redacted: nil,
 					},
@@ -6616,6 +6616,7 @@ func TestServer_ListServiceTests(t *testing.T) {
 				Options: client.ServiceTestOptions{
 					"name":   "testName",
 					"output": "testOutput",
+					"source": "Kapacitor",
 					"level":  "CRITICAL",
 				},
 			},
@@ -6717,6 +6718,7 @@ func TestServer_ListServiceTests_WithPattern(t *testing.T) {
 				Options: client.ServiceTestOptions{
 					"name":   "testName",
 					"output": "testOutput",
+					"source": "Kapacitor",
 					"level":  "CRITICAL",
 				},
 			},
@@ -7391,6 +7393,9 @@ func TestServer_AlertHandlers(t *testing.T) {
 		{
 			handler: client.TopicHandler{
 				Kind: "sensu",
+				Options: map[string]interface{}{
+					"source": "Kapacitor",
+				},
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts, err := sensutest.NewServer()

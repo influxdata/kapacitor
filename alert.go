@@ -20,6 +20,7 @@ import (
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pushover"
+	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/snmptrap"
@@ -214,8 +215,14 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		an.handlers = append(an.handlers, h)
 	}
 
-	for range n.SensuHandlers {
-		h := et.tm.SensuService.Handler(l)
+	for _, s := range n.SensuHandlers {
+		c := sensu.HandlerConfig{
+			Source: s.Source,
+		}
+		h, err := et.tm.SensuService.Handler(c, l)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create sensu alert handler")
+		}
 		an.handlers = append(an.handlers, h)
 	}
 
