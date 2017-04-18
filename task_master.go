@@ -19,6 +19,7 @@ import (
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
+	"github.com/influxdata/kapacitor/services/mqtt"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pushover"
@@ -87,6 +88,11 @@ type TaskMaster struct {
 		StateChangesOnly() bool
 		Handler(smtp.HandlerConfig, *log.Logger) alert.Handler
 	}
+	MQTTService interface {
+		DefaultHandlerConfig() mqtt.HandlerConfig
+		Handler(mqtt.HandlerConfig, *log.Logger) alert.Handler
+	}
+
 	OpsGenieService interface {
 		Global() bool
 		Handler(opsgenie.HandlerConfig, *log.Logger) alert.Handler
@@ -209,6 +215,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.AlertService = tm.AlertService
 	n.InfluxDBService = tm.InfluxDBService
 	n.SMTPService = tm.SMTPService
+	n.MQTTService = tm.MQTTService
 	n.OpsGenieService = tm.OpsGenieService
 	n.VictorOpsService = tm.VictorOpsService
 	n.PagerDutyService = tm.PagerDutyService

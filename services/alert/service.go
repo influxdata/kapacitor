@@ -64,6 +64,9 @@ type Service struct {
 	HipChatService interface {
 		Handler(hipchat.HandlerConfig, *log.Logger) alert.Handler
 	}
+	MQTTService interface {
+		Handler(mqtt.HandlerConfig, *log.Logger) alert.Handler
+	}
 	OpsGenieService interface {
 		Handler(opsgenie.HandlerConfig, *log.Logger) alert.Handler
 	}
