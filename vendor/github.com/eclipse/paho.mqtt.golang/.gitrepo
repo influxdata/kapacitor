@@ -1,0 +1,11 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/eclipse/paho.mqtt.golang.git
+	branch = master
+	commit = c37a0a275c2de30bf1c7eb072dd6bef09a93c666
+	parent = 7b1c632572ceea9a0a6a303238ccbe314d4c03a0
+	cmdver = 0.3.1
