@@ -24,7 +24,10 @@ type Service struct {
 }
 
 func NewService(c Config, l *log.Logger) *Service {
-	return &Service{}
+	return &Service{
+		Config: c,
+		Logger: l,
+	}
 }
 
 // TODO(timraymond): improve logging here and in Close
@@ -42,14 +45,17 @@ func (s *Service) Open() error {
 	s.token.Wait()
 
 	if err := s.token.Error(); err != nil {
-		log.Println("E! MQTT done broke yo") //TODO(timraymond): put a legit error in
+		s.Logger.Println("E! Error connecting to MQTT broker at", s.Config.Broker(), "err:", err) //TODO(timraymond): put a legit error in
+		return err
 	}
+	s.Logger.Println("I! Connected to MQTT Broker at", s.Config.Broker())
 	return nil
+
 }
 
 func (s *Service) Close() error {
 	s.client.Disconnect(250) // what is this code?
-	log.Println("I! MQTT Client Disconnected")
+	s.Logger.Println("I! MQTT Client Disconnected")
 	return nil
 }
 
