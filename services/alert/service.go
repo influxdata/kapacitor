@@ -14,6 +14,7 @@ import (
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/httppost"
+	"github.com/influxdata/kapacitor/services/mqtt"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pushover"
@@ -64,6 +65,10 @@ type Service struct {
 	}
 	HipChatService interface {
 		Handler(hipchat.HandlerConfig, *log.Logger) alert.Handler
+	}
+	MQTTService interface {
+		DefaultHandlerConfig() mqtt.HandlerConfig
+		Handler(mqtt.HandlerConfig, *log.Logger) alert.Handler
 	}
 	OpsGenieService interface {
 		Handler(opsgenie.HandlerConfig, *log.Logger) alert.Handler
@@ -731,6 +736,14 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		if err != nil {
 			return handler{}, err
 		}
+		h = newExternalHandler(h)
+	case "mqtt":
+		c := s.MQTTService.DefaultHandlerConfig()
+		err = decodeOptions(spec.Options, &c)
+		if err != nil {
+			return handler{}, err
+		}
+		h := s.MQTTService.Handler(c, s.logger)
 		h = newExternalHandler(h)
 	case "opsgenie":
 		c := opsgenie.HandlerConfig{}

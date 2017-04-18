@@ -33,6 +33,10 @@ required = ["github.com/benbjohnson/tmpl","github.com/golang/protobuf/protoc-gen
   branch = "master"
   name = "github.com/shurcooL/markdownfmt"
 
+[[constraint]]
+  name = "github.com/eclipse/paho.mqtt.golang"
+  version = "~1.0.0"
+
 # Force the Azure projects to be a specific older version that Prometheus needs
 [[override]]
   name = "github.com/Azure/azure-sdk-for-go"

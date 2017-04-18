@@ -18,6 +18,7 @@ import (
 	alertservice "github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httppost"
+	"github.com/influxdata/kapacitor/services/mqtt"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pushover"
@@ -377,6 +378,16 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		an.handlers = append(an.handlers, h)
 	}
 
+	for _, m := range n.MQTTHandlers {
+		c := et.tm.MQTTService.DefaultHandlerConfig()
+		if m.Topic != "" {
+			c.Topic = m.Topic
+			c.QoS = mqtt.QoSLevel(m.QoS)
+			c.Retained = m.Retained
+		}
+		h := et.tm.MQTTService.Handler(c, l)
+		an.handlers = append(an.handlers, h)
+	}
 	// Parse level expressions
 	an.levels = make([]stateful.Expression, alert.Critical+1)
 	an.scopePools = make([]stateful.ScopePool, alert.Critical+1)
