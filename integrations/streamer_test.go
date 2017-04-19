@@ -6737,7 +6737,10 @@ stream
 		c.Enabled = true
 		c.URL = ts.URL + "/test/slack/url"
 		c.Channel = "#channel"
-		sl := slack.NewService(c, logService.NewLogger("[test_slack] ", log.LstdFlags))
+		sl, err := slack.NewService(c, logService.NewLogger("[test_slack] ", log.LstdFlags))
+		if err != nil {
+			t.Error(err)
+		}
 		tm.SlackService = sl
 	}
 	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
