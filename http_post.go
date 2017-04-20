@@ -19,7 +19,7 @@ type HTTPPostNode struct {
 	bp  *bufpool.Pool
 }
 
-// Create a new  HTTPPostNode which caches the most recent item and exposes it over the HTTP API.
+// Create a new  HTTPPostNode which submits received items via POST to an HTTP endpoint
 func newHTTPPostNode(et *ExecutingTask, n *pipeline.HTTPPostNode, l *log.Logger) (*HTTPPostNode, error) {
 	hn := &HTTPPostNode{
 		node: node{Node: n, et: et, logger: l},
@@ -79,6 +79,7 @@ func (h *HTTPPostNode) postRow(group models.GroupID, row *models.Row) {
 	resp, err := http.Post(h.url, "application/json", body)
 	if err != nil {
 		h.logger.Printf("E! failed to POST row data: %v", err)
+		return
 	}
 	resp.Body.Close()
 }
