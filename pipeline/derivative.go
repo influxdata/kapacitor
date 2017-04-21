@@ -23,9 +23,9 @@ import (
 // Computes the derivative via:
 //    (current - previous ) / ( time_difference / unit)
 //
-// For batch edges the derivative is computed for each
-// point in the batch and because of boundary conditions
-// the number of points is reduced by one.
+// The derivative is computed for each point, and
+// because of boundary conditions the first point is
+// dropped.
 type DerivativeNode struct {
 	chainnode
 
