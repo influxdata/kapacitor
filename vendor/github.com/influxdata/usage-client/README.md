@@ -98,7 +98,7 @@ res, err := c.Save(st)
 
 ## Posting Usage Stats:
 
-Usage stats are anonymous stats sent to Enterprise every 12 hours.
+Usage stats are sent to Enterprise every 12 hours.
 
 ```go
 c := client.New("token-goes-here")

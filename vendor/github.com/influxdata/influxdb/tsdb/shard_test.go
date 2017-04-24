@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -68,7 +69,7 @@ func TestShardWriteAndIndex(t *testing.T) {
 			t.Fatalf("series wasn't in index")
 		}
 
-		seriesTags := index.Series(string(pt.Key())).Tags
+		seriesTags := index.Series(string(pt.Key())).Tags()
 		if len(seriesTags) != len(pt.Tags()) || pt.Tags().GetString("host") != seriesTags.GetString("host") {
 			t.Fatalf("tags weren't properly saved to series index: %v, %v", pt.Tags(), seriesTags)
 		}
@@ -144,7 +145,7 @@ func TestMaxSeriesLimit(t *testing.T) {
 	err = sh.WritePoints([]models.Point{pt})
 	if err == nil {
 		t.Fatal("expected error")
-	} else if exp, got := `db db max series limit reached: (1000/1000) dropped=1`, err.Error(); exp != got {
+	} else if exp, got := `max-series-per-database limit exceeded: db=db (1000/1000) dropped=1`, err.Error(); exp != got {
 		t.Fatalf("unexpected error message:\n\texp = %s\n\tgot = %s", exp, got)
 	}
 
@@ -197,7 +198,7 @@ func TestShard_MaxTagValuesLimit(t *testing.T) {
 	err = sh.WritePoints([]models.Point{pt})
 	if err == nil {
 		t.Fatal("expected error")
-	} else if exp, got := `max tag value limit exceeded (1000/1000): measurement="cpu" tag="host" value="host" dropped=1`, err.Error(); exp != got {
+	} else if exp, got := `max-values-per-tag limit exceeded (1000/1000): measurement="cpu" tag="host" value="server9999" dropped=1`, err.Error(); exp != got {
 		t.Fatalf("unexpected error message:\n\texp = %s\n\tgot = %s", exp, got)
 	}
 
@@ -300,8 +301,8 @@ func TestWriteTimeField(t *testing.T) {
 	series := index.Series(string(key))
 	if series == nil {
 		t.Fatal("expected series")
-	} else if len(series.Tags) != 0 {
-		t.Fatalf("unexpected number of tags: got=%v exp=%v", len(series.Tags), 0)
+	} else if len(series.Tags()) != 0 {
+		t.Fatalf("unexpected number of tags: got=%v exp=%v", len(series.Tags()), 0)
 	}
 }
 
@@ -348,7 +349,7 @@ func TestShardWriteAddNewField(t *testing.T) {
 	if index.SeriesN() != 1 {
 		t.Fatalf("series wasn't in index")
 	}
-	seriesTags := index.Series(string(pt.Key())).Tags
+	seriesTags := index.Series(string(pt.Key())).Tags()
 	if len(seriesTags) != len(pt.Tags()) || pt.Tags().GetString("host") != seriesTags.GetString("host") {
 		t.Fatalf("tags weren't properly saved to series index: %v, %v", pt.Tags(), seriesTags)
 	}
@@ -359,6 +360,80 @@ func TestShardWriteAddNewField(t *testing.T) {
 	if len(index.Measurement("cpu").FieldNames()) != 2 {
 		t.Fatalf("field names wasn't saved to measurement index")
 	}
+}
+
+// Tests concurrently writing to the same shard with different field types which
+// can trigger a panic when the shard is snapshotted to TSM files.
+func TestShard_WritePoints_FieldConflictConcurrent(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	tmpDir, _ := ioutil.TempDir("", "shard_test")
+	defer os.RemoveAll(tmpDir)
+	tmpShard := path.Join(tmpDir, "shard")
+	tmpWal := path.Join(tmpDir, "wal")
+
+	index := tsdb.NewDatabaseIndex("db")
+	opts := tsdb.NewEngineOptions()
+	opts.Config.WALDir = filepath.Join(tmpDir, "wal")
+
+	sh := tsdb.NewShard(1, index, tmpShard, tmpWal, opts)
+	if err := sh.Open(); err != nil {
+		t.Fatalf("error opening shard: %s", err.Error())
+	}
+	defer sh.Close()
+
+	points := make([]models.Point, 0, 1000)
+	for i := 0; i < cap(points); i++ {
+		if i < 500 {
+			points = append(points, models.MustNewPoint(
+				"cpu",
+				models.NewTags(map[string]string{"host": "server"}),
+				map[string]interface{}{"value": 1.0},
+				time.Unix(int64(i), 0),
+			))
+		} else {
+			points = append(points, models.MustNewPoint(
+				"cpu",
+				models.NewTags(map[string]string{"host": "server"}),
+				map[string]interface{}{"value": int64(1)},
+				time.Unix(int64(i), 0),
+			))
+		}
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 50; i++ {
+			if err := sh.DeleteMeasurement("cpu", []string{"cpu,host=server"}); err != nil {
+				t.Fatalf(err.Error())
+			}
+
+			_ = sh.WritePoints(points[:500])
+			if f, err := sh.CreateSnapshot(); err == nil {
+				os.RemoveAll(f)
+			}
+
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 50; i++ {
+			if err := sh.DeleteMeasurement("cpu", []string{"cpu,host=server"}); err != nil {
+				t.Fatalf(err.Error())
+			}
+
+			_ = sh.WritePoints(points[500:])
+			if f, err := sh.CreateSnapshot(); err == nil {
+				os.RemoveAll(f)
+			}
+		}
+	}()
+
+	wg.Wait()
 }
 
 // Ensures that when a shard is closed, it removes any series meta-data
@@ -752,7 +827,7 @@ func benchmarkWritePoints(b *testing.B, mCnt, tkCnt, tvCnt, pntCnt int) {
 	points := []models.Point{}
 	for _, s := range series {
 		for val := 0.0; val < float64(pntCnt); val++ {
-			p := models.MustNewPoint(s.Measurement, s.Series.Tags, map[string]interface{}{"value": val}, time.Now())
+			p := models.MustNewPoint(s.Measurement, s.Series.Tags(), map[string]interface{}{"value": val}, time.Now())
 			points = append(points, p)
 		}
 	}
@@ -793,7 +868,7 @@ func benchmarkWritePointsExistingSeries(b *testing.B, mCnt, tkCnt, tvCnt, pntCnt
 	points := []models.Point{}
 	for _, s := range series {
 		for val := 0.0; val < float64(pntCnt); val++ {
-			p := models.MustNewPoint(s.Measurement, s.Series.Tags, map[string]interface{}{"value": val}, time.Now())
+			p := models.MustNewPoint(s.Measurement, s.Series.Tags(), map[string]interface{}{"value": val}, time.Now())
 			points = append(points, p)
 		}
 	}

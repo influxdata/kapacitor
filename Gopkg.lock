@@ -1,0 +1,217 @@
+memo = "b6d6862890dc6f8392aae533152bb96f8c4974ce1617a2826c68d2aae6e2a4a5"
+
+[[projects]]
+  name = "github.com/BurntSushi/toml"
+  packages = ["."]
+  revision = "b26d9c308763d68093482582cea63d69be07a0f0"
+  version = "v0.3.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/benbjohnson/tmpl"
+  packages = ["."]
+  revision = "8e77bc5fc07968736bb74f4b40b4c577028a61b6"
+
+[[projects]]
+  name = "github.com/boltdb/bolt"
+  packages = ["."]
+  revision = "583e8937c61f1af6513608ccc75c97b6abdf4ff9"
+  version = "v1.3.0"
+
+[[projects]]
+  name = "github.com/cenkalti/backoff"
+  packages = ["."]
+  revision = "32cd0c5b3aef12c76ed64aaf678f6c79736be7dc"
+  version = "v1.0.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/davecgh/go-spew"
+  packages = ["spew"]
+  revision = "346938d642f2ec3594ed81d874461961cd0faa76"
+
+[[projects]]
+  name = "github.com/dgrijalva/jwt-go"
+  packages = ["."]
+  revision = "d2709f9f1f31ebcda9651b03077758c1f3a0018c"
+  version = "v3.0.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/dustin/go-humanize"
+  packages = ["."]
+  revision = "259d2a102b871d17f30e3cd9881a642961a1e486"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/evanphx/json-patch"
+  packages = ["."]
+  revision = "30afec6a1650c11c861dc1fb58e100cd5219e490"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/geoffgarside/ber"
+  packages = ["."]
+  revision = "854377f11dfb81f04121879829bc53487e377739"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/ghodss/yaml"
+  packages = ["."]
+  revision = "04f313413ffd65ce25f2541bfd2b2ceec5c0908c"
+
+[[projects]]
+  name = "github.com/gogo/protobuf"
+  packages = ["proto"]
+  revision = "100ba4e885062801d56799d78530b73b178a78f3"
+  version = "v0.4"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/golang/protobuf"
+  packages = ["proto","protoc-gen-go","protoc-gen-go/descriptor","protoc-gen-go/generator","protoc-gen-go/grpc","protoc-gen-go/plugin"]
+  revision = "2bba0603135d7d7f5cb73b2125beeda19c09f4ef"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/google/uuid"
+  packages = ["."]
+  revision = "6a5e28554805e78ea6141142aba763936c4761c0"
+
+[[projects]]
+  name = "github.com/gorhill/cronexpr"
+  packages = ["."]
+  revision = "a557574d6c024ed6e36acc8b610f5f211c91568a"
+  version = "1.0.0"
+
+[[projects]]
+  name = "github.com/influxdata/influxdb"
+  packages = [".","client","client/v2","influxql","influxql/internal","influxql/neldermead","models","monitor/diagnostics","pkg/escape","pkg/limiter","services/collectd","services/graphite","services/meta","services/meta/internal","services/opentsdb","services/udp","toml","tsdb","tsdb/internal","uuid"]
+  revision = "e4628bb69266dbd624dc27d674b52705ce0dcbf2"
+  version = "v1.1.4"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/influxdata/usage-client"
+  packages = ["v1"]
+  revision = "6d3895376368aa52a3a81d2a16e90f0f52371967"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/influxdata/wlog"
+  packages = ["."]
+  revision = "7c63b0a71ef8300adc255344d275e10e5c3a71ec"
+
+[[projects]]
+  name = "github.com/k-sone/snmpgo"
+  packages = ["."]
+  revision = "de09377ff34857b08afdc16ea8c7c2929eb1fc6e"
+  version = "v3.2.0"
+
+[[projects]]
+  name = "github.com/kimor79/gollectd"
+  packages = ["."]
+  revision = "b5dddb1667dcc1e6355b9305e2c1608a2db6983c"
+  version = "v1.0.0"
+
+[[projects]]
+  name = "github.com/mattn/go-runewidth"
+  packages = ["."]
+  revision = "9e777a8366cce605130a531d2cd6363d07ad7317"
+  version = "v0.0.2"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/mitchellh/copystructure"
+  packages = ["."]
+  revision = "f81071c9d77b7931f78c90b416a074ecdc50e959"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/mitchellh/mapstructure"
+  packages = ["."]
+  revision = "5a0325d7fafaac12dda6e7fb8bd222ec1b69875e"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/mitchellh/reflectwalk"
+  packages = ["."]
+  revision = "417edcfd99a4d472c262e58f22b4bfe97580f03e"
+
+[[projects]]
+  name = "github.com/pkg/errors"
+  packages = ["."]
+  revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
+  version = "v0.8.0"
+
+[[projects]]
+  name = "github.com/pmezard/go-difflib"
+  packages = ["difflib"]
+  revision = "792786c7400a136282c1664665ae0a8db921c6c2"
+  version = "v1.0.0"
+
+[[projects]]
+  name = "github.com/russross/blackfriday"
+  packages = ["."]
+  revision = "0b647d0506a698cca42caca173e55559b12a69f2"
+  version = "v1.4"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/serenize/snaker"
+  packages = ["."]
+  revision = "543781d2b79bd95c51ffe70e70a55c946ca211ff"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/shurcooL/go"
+  packages = ["indentwriter"]
+  revision = "20b4b0a352116a106a505a8c528b6513e7e0d5c2"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/shurcooL/markdownfmt"
+  packages = ["markdown"]
+  revision = "10aae0a270abfb5d929ae6ca59c4b0ac0fa8f237"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/shurcooL/sanitized_anchor_name"
+  packages = ["."]
+  revision = "1dba4b3954bc059efc3991ec364f9f9a35f597d2"
+
+[[projects]]
+  name = "github.com/stretchr/testify"
+  packages = ["assert"]
+  revision = "69483b4bd14f5845b5a1e55bca19e954e827f1d0"
+  version = "v1.1.4"
+
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/crypto"
+  packages = ["bcrypt","blowfish"]
+  revision = "0242f07995e684be54f2a2776327141acf1cef91"
+
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/sys"
+  packages = ["unix"]
+  revision = "f3918c30c5c2cb527c0b071a27c35120a6c0719a"
+
+[[projects]]
+  branch = "v3"
+  name = "gopkg.in/alexcesaro/quotedprintable.v3"
+  packages = ["."]
+  revision = "2caba252f4dc53eaf6b553000885530023f54623"
+
+[[projects]]
+  name = "gopkg.in/gomail.v2"
+  packages = ["."]
+  revision = "41f3572897373c5538c50a2402db15db079fa4fd"
+  version = "2.0.0"
+
+[[projects]]
+  branch = "v2"
+  name = "gopkg.in/yaml.v2"
+  packages = ["."]
+  revision = "a5b47d31c556af34a302ce5d659e6fea44d90de0"

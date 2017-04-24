@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/influxdb/usage-client/v1"
+	"github.com/influxdata/usage-client/v1"
 	"github.com/stretchr/testify/require"
 )
 

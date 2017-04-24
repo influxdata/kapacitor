@@ -320,11 +320,6 @@ func (p *parser) html(out *bytes.Buffer, data []byte, doRender bool) int {
 			return size
 		}
 
-		// check for HTML CDATA
-		if size := p.htmlCDATA(out, data, doRender); size > 0 {
-			return size
-		}
-
 		// no special case recognized
 		return 0
 	}
@@ -402,10 +397,12 @@ func (p *parser) html(out *bytes.Buffer, data []byte, doRender bool) int {
 	return i
 }
 
-func (p *parser) renderHTMLBlock(out *bytes.Buffer, data []byte, start int, doRender bool) int {
-	// html block needs to end with a blank line
-	if i := p.isEmpty(data[start:]); i > 0 {
-		size := start + i
+// HTML comment, lax form
+func (p *parser) htmlComment(out *bytes.Buffer, data []byte, doRender bool) int {
+	i := p.inlineHtmlComment(out, data)
+	// needs to end with a blank line
+	if j := p.isEmpty(data[i:]); j > 0 {
+		size := i + j
 		if doRender {
 			// trim trailing newlines
 			end := size
@@ -417,35 +414,6 @@ func (p *parser) renderHTMLBlock(out *bytes.Buffer, data []byte, start int, doRe
 		return size
 	}
 	return 0
-}
-
-// HTML comment, lax form
-func (p *parser) htmlComment(out *bytes.Buffer, data []byte, doRender bool) int {
-	i := p.inlineHTMLComment(out, data)
-	return p.renderHTMLBlock(out, data, i, doRender)
-}
-
-// HTML CDATA section
-func (p *parser) htmlCDATA(out *bytes.Buffer, data []byte, doRender bool) int {
-	const cdataTag = "<![cdata["
-	const cdataTagLen = len(cdataTag)
-	if len(data) < cdataTagLen+1 {
-		return 0
-	}
-	if !bytes.Equal(bytes.ToLower(data[:cdataTagLen]), []byte(cdataTag)) {
-		return 0
-	}
-	i := cdataTagLen
-	// scan for an end-of-comment marker, across lines if necessary
-	for i < len(data) && !(data[i-2] == ']' && data[i-1] == ']' && data[i] == '>') {
-		i++
-	}
-	i++
-	// no end-of-comment marker
-	if i >= len(data) {
-		return 0
-	}
-	return p.renderHTMLBlock(out, data, i, doRender)
 }
 
 // HR, which is the only self-closing block tag considered
@@ -464,7 +432,19 @@ func (p *parser) htmlHr(out *bytes.Buffer, data []byte, doRender bool) int {
 	}
 
 	if data[i] == '>' {
-		return p.renderHTMLBlock(out, data, i+1, doRender)
+		i++
+		if j := p.isEmpty(data[i:]); j > 0 {
+			size := i + j
+			if doRender {
+				// trim newlines
+				end := size
+				for end > 0 && data[end-1] == '\n' {
+					end--
+				}
+				p.r.BlockHtml(out, data[:end])
+			}
+			return size
+		}
 	}
 
 	return 0
@@ -1153,7 +1133,6 @@ gatherlines:
 		// and move on to the next line
 		if p.isEmpty(data[line:i]) > 0 {
 			containsBlankLine = true
-			raw.Write(data[line:i])
 			line = i
 			continue
 		}
@@ -1174,14 +1153,6 @@ gatherlines:
 			p.dliPrefix(chunk) > 0:
 
 			if containsBlankLine {
-				// end the list if the type changed after a blank line
-				if indent <= itemIndent &&
-					((*flags&LIST_TYPE_ORDERED != 0 && p.uliPrefix(chunk) > 0) ||
-						(*flags&LIST_TYPE_ORDERED == 0 && p.oliPrefix(chunk) > 0)) {
-
-					*flags |= LIST_ITEM_END_OF_LIST
-					break gatherlines
-				}
 				*flags |= LIST_ITEM_CONTAINS_BLOCK
 			}
 
@@ -1229,10 +1200,17 @@ gatherlines:
 
 		// a blank line means this should be parsed as a block
 		case containsBlankLine:
+			raw.WriteByte('\n')
 			*flags |= LIST_ITEM_CONTAINS_BLOCK
 		}
 
-		containsBlankLine = false
+		// if this line was preceeded by one or more blanks,
+		// re-introduce the blank into the buffer
+		if containsBlankLine {
+			containsBlankLine = false
+			raw.WriteByte('\n')
+
+		}
 
 		// add the line into the working buffer without prefix
 		raw.Write(data[line+indent : i])

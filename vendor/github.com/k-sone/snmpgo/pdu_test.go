@@ -226,6 +226,32 @@ func TestPduV1(t *testing.T) {
 	}
 }
 
+func TestPduV1LargeObjectIdentifier(t *testing.T) {
+	buf := []byte{
+		0xa2, 0x30, 0x02, 0x04, 0x34, 0x99, 0x23, 0xc4,
+		0x02, 0x01, 0x00, 0x02, 0x01, 0x00, 0x30, 0x22,
+		0x30, 0x20, 0x06, 0x0f, 0x2b, 0x06, 0x01, 0x02,
+		0x01, 0x1f, 0x01, 0x01, 0x01, 0x01, 0x84, 0x88,
+		0x90, 0x80, 0x23, 0x04, 0x0d, 0x45, 0x74, 0x68,
+		0x65, 0x72, 0x6e, 0x65, 0x74, 0x33, 0x35, 0x2e,
+		0x36, 0x35,
+	}
+
+	expStr := `{"Type": "GetResponse", "RequestId": "882451396", ` +
+		`"ErrorStatus": "NoError", "ErrorIndex": "0", "VarBinds": [` +
+		`{"Oid": "1.3.6.1.2.1.31.1.1.1.1.1090781219", "Variable": {` +
+		`"Type": "OctetString", "Value": "Ethernet35.65"}}]}`
+
+	var w snmpgo.PduV1
+	rest, err := (&w).Unmarshal(buf)
+	if len(rest) != 0 || err != nil {
+		t.Errorf("Unmarshal() - len[%d] err[%v]", len(rest), err)
+	}
+	if expStr != w.String() {
+		t.Errorf("Unmarshal() - expected [%s], actual [%s]", expStr, w.String())
+	}
+}
+
 func TestScopedPdu(t *testing.T) {
 	pdu := snmpgo.NewPdu(snmpgo.V3, snmpgo.GetRequest)
 	pdu.SetRequestId(123)

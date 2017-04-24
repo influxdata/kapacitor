@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/geoffgarside/ber"
 )
 
 type Variable interface {
@@ -43,7 +45,7 @@ func (v *Integer) Marshal() ([]byte, error) {
 }
 
 func (v *Integer) Unmarshal(b []byte) (rest []byte, err error) {
-	return asn1.Unmarshal(b, &v.Value)
+	return ber.Unmarshal(b, &v.Value)
 }
 
 func NewInteger(i int32) *Integer {
@@ -60,7 +62,12 @@ func (v *OctetString) BigInt() (*big.Int, error) {
 
 func (v *OctetString) String() string {
 	for _, c := range v.Value {
-		if !strconv.IsPrint(rune(c)) {
+		switch {
+		case c >= 0x20 && c <= 0x7e:
+			// printable character including space
+		case c >= 0x09 && c <= 0x0d:
+			// '\t', '\n', '\v', '\f', '\r'
+		default:
 			return toHexStr(v.Value, ":")
 		}
 	}
@@ -131,7 +138,7 @@ func (v *Oid) Marshal() ([]byte, error) {
 
 func (v *Oid) Unmarshal(b []byte) (rest []byte, err error) {
 	var i asn1.ObjectIdentifier
-	rest, err = asn1.Unmarshal(b, &i)
+	rest, err = ber.Unmarshal(b, &i)
 	if err == nil {
 		v.Value = i
 	}
@@ -565,7 +572,7 @@ func NewEndOfMibView() *EndOfMibView {
 
 func unmarshalVariable(b []byte) (v Variable, rest []byte, err error) {
 	var raw asn1.RawValue
-	rest, err = asn1.Unmarshal(b, &raw)
+	rest, err = ber.Unmarshal(b, &raw)
 	if err != nil {
 		return
 	}
@@ -653,7 +660,7 @@ func unmarshalEmpty(b []byte, tag byte) (rest []byte, err error) {
 	}
 
 	var raw asn1.RawValue
-	return asn1.Unmarshal(b, &raw)
+	return ber.Unmarshal(b, &raw)
 }
 
 func unmarshalInt(b []byte, tag byte, setter func(*big.Int)) (rest []byte, err error) {
@@ -665,7 +672,7 @@ func unmarshalInt(b []byte, tag byte, setter func(*big.Int)) (rest []byte, err e
 	temp := b[0]
 	b[0] = tagInteger
 	var i *big.Int
-	rest, err = asn1.Unmarshal(b, &i)
+	rest, err = ber.Unmarshal(b, &i)
 	if err == nil {
 		setter(i)
 	}
@@ -682,7 +689,7 @@ func unmarshalString(b []byte, tag byte, setter func([]byte)) (rest []byte, err 
 	temp := b[0]
 	b[0] = tagOctetString
 	var s []byte
-	rest, err = asn1.Unmarshal(b, &s)
+	rest, err = ber.Unmarshal(b, &s)
 	if err == nil {
 		setter(s)
 	}

@@ -3,6 +3,7 @@ package influxql_test
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -110,6 +111,37 @@ func TestQueryExecutor_Interrupt(t *testing.T) {
 	}
 }
 
+func TestQueryExecutor_Abort(t *testing.T) {
+	q, err := influxql.ParseQuery(`SELECT count(value) FROM cpu`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ch1 := make(chan struct{})
+	ch2 := make(chan struct{})
+
+	e := NewQueryExecutor()
+	e.StatementExecutor = &StatementExecutor{
+		ExecuteStatementFn: func(stmt influxql.Statement, ctx influxql.ExecutionContext) error {
+			<-ch1
+			if err := ctx.Send(&influxql.Result{Err: errUnexpected}); err != influxql.ErrQueryAborted {
+				t.Errorf("unexpected error: %v", err)
+			}
+			close(ch2)
+			return nil
+		},
+	}
+
+	done := make(chan struct{})
+	close(done)
+
+	results := e.ExecuteQuery(q, influxql.ExecutionOptions{AbortCh: done}, nil)
+	close(ch1)
+
+	<-ch2
+	discardOutput(results)
+}
+
 func TestQueryExecutor_ShowQueries(t *testing.T) {
 	q, err := influxql.ParseQuery(`SELECT count(value) FROM cpu`)
 	if err != nil {
@@ -166,7 +198,7 @@ func TestQueryExecutor_Limit_Timeout(t *testing.T) {
 
 	results := e.ExecuteQuery(q, influxql.ExecutionOptions{}, nil)
 	result := <-results
-	if result.Err != influxql.ErrQueryTimeoutReached {
+	if result.Err == nil || !strings.Contains(result.Err.Error(), "query-timeout") {
 		t.Errorf("unexpected error: %s", result.Err)
 	}
 }
@@ -202,7 +234,7 @@ func TestQueryExecutor_Limit_ConcurrentQueries(t *testing.T) {
 		if len(result.Series) != 0 {
 			t.Errorf("expected %d rows, got %d", 0, len(result.Series))
 		}
-		if result.Err != influxql.ErrMaxConcurrentQueriesReached {
+		if result.Err == nil || !strings.Contains(result.Err.Error(), "max-concurrent-queries") {
 			t.Errorf("unexpected error: %s", result.Err)
 		}
 	case <-qid:
@@ -224,7 +256,6 @@ func TestQueryExecutor_Close(t *testing.T) {
 		ExecuteStatementFn: func(stmt influxql.Statement, ctx influxql.ExecutionContext) error {
 			close(ch1)
 			<-ctx.InterruptCh
-			close(ch2)
 			return influxql.ErrQueryInterrupted
 		},
 	}
@@ -235,6 +266,7 @@ func TestQueryExecutor_Close(t *testing.T) {
 		if result.Err != influxql.ErrQueryEngineShutdown {
 			t.Errorf("unexpected error: %s", result.Err)
 		}
+		close(ch2)
 	}(results)
 
 	// Wait for the statement to start executing.
@@ -247,7 +279,7 @@ func TestQueryExecutor_Close(t *testing.T) {
 	select {
 	case <-ch2:
 	case <-time.After(100 * time.Millisecond):
-		t.Error("closing the query manager did not kill the query after 100 milliseconds")
+		t.Fatal("closing the query manager did not kill the query after 100 milliseconds")
 	}
 
 	results = e.ExecuteQuery(q, influxql.ExecutionOptions{}, nil)

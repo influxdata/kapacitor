@@ -3,6 +3,8 @@ package snmpgo
 import (
 	"encoding/asn1"
 	"fmt"
+
+	"github.com/geoffgarside/ber"
 )
 
 type message interface {
@@ -75,7 +77,7 @@ func (msg *messageV1) Unmarshal(b []byte) ([]byte, error) {
 
 func (msg *messageV1) unmarshalInner(b []byte) error {
 	var community []byte
-	next, err := asn1.Unmarshal(b, &community)
+	next, err := ber.Unmarshal(b, &community)
 	if err != nil {
 		return err
 	}
@@ -103,7 +105,7 @@ func (h *globalDataV3) Marshal() (b []byte, err error) {
 }
 
 func (h *globalDataV3) Unmarshal(b []byte) (rest []byte, err error) {
-	return asn1.Unmarshal(b, h)
+	return ber.Unmarshal(b, h)
 }
 
 func (h *globalDataV3) initFlags() {
@@ -204,7 +206,7 @@ func (sec *securityParameterV3) Marshal() ([]byte, error) {
 
 func (sec *securityParameterV3) Unmarshal(b []byte) (rest []byte, err error) {
 	var raw asn1.RawValue
-	rest, err = asn1.Unmarshal(b, &raw)
+	rest, err = ber.Unmarshal(b, &raw)
 	if err != nil {
 		return
 	}
@@ -215,7 +217,7 @@ func (sec *securityParameterV3) Unmarshal(b []byte) (rest []byte, err error) {
 			raw.Class, raw.Tag, toHexStr(b, " "))}
 	}
 
-	_, err = asn1.Unmarshal(raw.Bytes, sec)
+	_, err = ber.Unmarshal(raw.Bytes, sec)
 	return
 }
 
@@ -348,8 +350,9 @@ func unmarshalMessage(b []byte) (message, []byte, error) {
 }
 
 func unmarshalMessageVersion(b []byte) (SNMPVersion, []byte, []byte, error) {
+
 	var raw asn1.RawValue
-	rest, err := asn1.Unmarshal(b, &raw)
+	rest, err := ber.Unmarshal(b, &raw)
 	if err != nil {
 		return 0, nil, nil, err
 	}
@@ -360,7 +363,7 @@ func unmarshalMessageVersion(b []byte) (SNMPVersion, []byte, []byte, error) {
 	}
 
 	var version int
-	next, err := asn1.Unmarshal(raw.Bytes, &version)
+	next, err := ber.Unmarshal(raw.Bytes, &version)
 	if err != nil {
 		return 0, nil, nil, err
 	}

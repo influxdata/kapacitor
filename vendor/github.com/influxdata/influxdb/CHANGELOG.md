@@ -1,10 +1,58 @@
-## v1.1.0 [unreleased]
+## v1.1.4 [2017-02-27]
+
+### Bugfixes
+
+- [#8063](https://github.com/influxdata/influxdb/pull/8063): Backport #7631 to reduce GC allocations.
+
+## v1.1.3 [2017-02-17]
+
+### Bugfixes
+
+- [#8027](https://github.com/influxdata/influxdb/pull/8027): Remove Tags.shouldCopy, replace with forceCopy on series creation.
+
+## v1.1.2 [2017-02-16]
+
+### Bugfixes
+
+- [#7832](https://github.com/influxdata/influxdb/pull/7832): Fix memory leak when writing new series over HTTP
+- [#7929](https://github.com/influxdata/influxdb/issues/7929): Fix series tag iteration segfault. (#7922)
+- [#8011](https://github.com/influxdata/influxdb/issues/8011): Fix tag dereferencing panic.
+
+## v1.1.1 [2016-12-06]
+
+### Features
+
+- [#7684](https://github.com/influxdata/influxdb/issues/7684): Update Go version to 1.7.4.
+
+### Bugfixes
+
+- [#7625](https://github.com/influxdata/influxdb/issues/7625): Fix incorrect tag value in error message.
+- [#7661](https://github.com/influxdata/influxdb/pull/7661): Quote the empty string as an ident.
+- [#7679](https://github.com/influxdata/influxdb/pull/7679): Fix string fields w/ trailing slashes
+
+### Security
+
+[Go 1.7.4](https://golang.org/doc/devel/release.html#go1.7.minor) was released to address two security issues.  This release includes these security fixes.
+
+## v1.1.0 [2016-11-14]
 
 ### Release Notes
 
+This release is built with go 1.7.3 and provides many performance optimizations, stability changes and a few new query capabilities.  If upgrading from a prior version, please read the configuration changes below section before upgrading.
+
+### Deprecations
+
+The admin interface is deprecated and will be removed in a subsequent release.  The configuration setting to enable the admin UI is now disabled by default, but can be enabled if necessary.  We recommend using [Chronograf](https://github.com/influxdata/chronograf) or [Grafana](https://github.com/grafana/grafana) as a replacement.
+
 ### Configuration Changes
 
-The following configuration changes in the `[data]` section may need to changed before upgrading to `1.1.0` from prior versions.
+The following configuration changes may need to changed before upgrading to `1.1.0` from prior versions.
+
+#### `[admin]` Section
+
+* `enabled` now default to false.  If you are currently using the admin interaface, you will need to change this value to `true` to re-enable it.  The admin interface is currently deprecated and will be removed in a subsequent release.
+
+#### `[data]` Section
 
 * `max-values-per-tag` was added with a default of 100,000, but can be disabled by setting it to `0`.  Existing measurements with tags that exceed this limit will continue to load, but writes that would cause the tags cardinality to increase will be dropped and a `partial write` error will be returned to the caller.  This limit can be used to prevent high cardinality tag values from being written to a measurement.
 * `cache-max-memory-size` has been increased to from `524288000` to `1048576000`.  This setting is the maximum amount of RAM, in bytes, a shard cache can use before it rejects writes with an error.  Setting this value to `0` disables the limit.
@@ -12,6 +60,15 @@ The following configuration changes in the `[data]` section may need to changed 
 * `compact-full-write-cold-duration` has been decreased from `24h` to `4h`.  The shorter duration allows cold shards to be compacted to an optimal state more quickly.
 
 ### Features
+
+The query language has been extended with a few new features:
+
+* New `cumulative_sum` function - [#7388](https://github.com/influxdata/influxdb/pull/7388)
+* New `linear` fill option - [#7408](https://github.com/influxdata/influxdb/pull/7408)
+* Support `ON` for `SHOW` commands - [#7295](https://github.com/influxdata/influxdb/pull/7295)
+* Support regex on fields keys in select clause - [#7442](https://github.com/influxdata/influxdb/pull/7442)
+
+All Changes:
 
 - [#7415](https://github.com/influxdata/influxdb/pull/7415): Add sample function to query language.
 - [#7403](https://github.com/influxdata/influxdb/pull/7403): Add `fill(linear)` to query language.
@@ -39,6 +96,8 @@ The following configuration changes in the `[data]` section may need to changed 
 - [#7480](https://github.com/influxdata/influxdb/pull/7480): Improve compaction planning performance by caching tsm file stats.
 - [#7320](https://github.com/influxdata/influxdb/issues/7320): Update defaults in config for latest best practices
 - [#7495](https://github.com/influxdata/influxdb/pull/7495): Rewrite regexes of the form host = /^server-a$/ to host = 'server-a', to take advantage of the tsdb index.
+- [#6704](https://github.com/influxdata/influxdb/issues/6704): Optimize first/last when no group by interval is present.
+- [#4461](https://github.com/influxdata/influxdb/issues/4461): Change default time boundaries for raw queries.
 
 ### Bugfixes
 
@@ -61,6 +120,11 @@ The following configuration changes in the `[data]` section may need to changed 
 - [#7482](https://github.com/influxdata/influxdb/issues/7482): Fix issue where point would be written to wrong shard.
 - [#7431](https://github.com/influxdata/influxdb/issues/7431): Remove /data/process_continuous_queries endpoint.
 - [#7053](https://github.com/influxdata/influxdb/issues/7053): Delete statement returns an error when retention policy or database is specified
+- [#7494](https://github.com/influxdata/influxdb/issues/7494): influx_inspect: export does not escape field keys.
+- [#7526](https://github.com/influxdata/influxdb/issues/7526): Truncate the version string when linking to the documentation.
+- [#7548](https://github.com/influxdata/influxdb/issues/7548): Fix output duration units for SHOW QUERIES.
+- [#7564](https://github.com/influxdata/influxdb/issues/7564): Fix incorrect grouping when multiple aggregates are used with sparse data.
+- [#7606](https://github.com/influxdata/influxdb/pull/7606): Avoid deadlock when `max-row-limit` is hit.
 
 ## v1.0.2 [2016-10-05]
 

@@ -1,5 +1,7 @@
-markdownfmt [![Build Status](https://travis-ci.org/shurcooL/markdownfmt.svg?branch=master)](https://travis-ci.org/shurcooL/markdownfmt) [![GoDoc](https://godoc.org/github.com/shurcooL/markdownfmt?status.svg)](https://godoc.org/github.com/shurcooL/markdownfmt)
-===================================================================================================================================================================================================================================================================
+markdownfmt
+===========
+
+[![Build Status](https://travis-ci.org/shurcooL/markdownfmt.svg?branch=master)](https://travis-ci.org/shurcooL/markdownfmt) [![GoDoc](https://godoc.org/github.com/shurcooL/markdownfmt?status.svg)](https://godoc.org/github.com/shurcooL/markdownfmt)
 
 Like `gofmt`, but for Markdown.
 
@@ -29,9 +31,10 @@ usage: markdownfmt [flags] [path ...]
 Editor Plugins
 --------------
 
--	[markdown-format](https://atom.io/packages/markdown-format) for Atom.
 -	[vim-markdownfmt](https://github.com/moorereason/vim-markdownfmt) for Vim.
+-	[emacs-markdownfmt](https://github.com/nlamirault/emacs-markdownfmt) for Emacs.
 -	Built-in in Conception.
+-	[markdown-format](https://atom.io/packages/markdown-format) for Atom (deprecated).
 -	Add a plugin for your favorite editor here?
 
 Alternatives
@@ -43,4 +46,4 @@ Alternatives
 License
 -------
 
--	[MIT License](http://opensource.org/licenses/mit-license.php)
+-	[MIT License](https://opensource.org/licenses/mit-license.php)

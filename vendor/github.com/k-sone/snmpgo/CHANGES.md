@@ -1,3 +1,13 @@
+## 3.2.0 (2017/03/11)
+
+- Adds ASN.1 BER Unmarshalling [#16](https://github.com/k-sone/snmpgo/pull/16)
+
+## 3.1.0 (2017/03/04)
+
+- Fix data races in closing TrapServer and packetTransport types [#13](https://github.com/k-sone/snmpgo/pull/13)
+- Fix OctetString.String() to return human-readable string [#14](https://github.com/k-sone/snmpgo/pull/14)
+- Defining a StdLogger interface to allow setting of any logger [#15](https://github.com/k-sone/snmpgo/pull/15)
+
 ## 3.0.2 (2016/12/10)
 
 - Fix for data race in generating request ids [#12](https://github.com/k-sone/snmpgo/pull/12)

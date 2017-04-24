@@ -1,7 +1,6 @@
 package errors
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -85,63 +84,24 @@ func TestCause(t *testing.T) {
 	}, {
 		err:  x, // return from errors.New
 		want: x,
+	}, {
+		WithMessage(nil, "whoops"),
+		nil,
+	}, {
+		WithMessage(io.EOF, "whoops"),
+		io.EOF,
+	}, {
+		WithStack(nil),
+		nil,
+	}, {
+		WithStack(io.EOF),
+		io.EOF,
 	}}
 
 	for i, tt := range tests {
 		got := Cause(tt.err)
 		if !reflect.DeepEqual(got, tt.want) {
 			t.Errorf("test %d: got %#v, want %#v", i+1, got, tt.want)
-		}
-	}
-}
-
-func TestFprintError(t *testing.T) {
-	x := New("error")
-	tests := []struct {
-		err  error
-		want string
-	}{{
-		// nil error is nil
-		err: nil,
-	}, {
-		// explicit nil error is nil
-		err: (error)(nil),
-	}, {
-		// uncaused error is unaffected
-		err:  io.EOF,
-		want: "EOF\n",
-	}, {
-		err: Wrap(io.EOF, "cause error"),
-		want: "EOF\n" +
-			"github.com/pkg/errors/errors_test.go:114: cause error\n",
-	}, {
-		err:  x, // return from errors.New
-		want: "github.com/pkg/errors/errors_test.go:99: error\n",
-	}, {
-		err: Wrap(x, "message"),
-		want: "github.com/pkg/errors/errors_test.go:99: error\n" +
-			"github.com/pkg/errors/errors_test.go:121: message\n",
-	}, {
-		err: Wrap(io.EOF, "message"),
-		want: "EOF\n" +
-			"github.com/pkg/errors/errors_test.go:125: message\n",
-	}, {
-		err: Wrap(Wrap(x, "message"), "another message"),
-		want: "github.com/pkg/errors/errors_test.go:99: error\n" +
-			"github.com/pkg/errors/errors_test.go:129: message\n" +
-			"github.com/pkg/errors/errors_test.go:129: another message\n",
-	}, {
-		err: Wrapf(x, "message"),
-		want: "github.com/pkg/errors/errors_test.go:99: error\n" +
-			"github.com/pkg/errors/errors_test.go:134: message\n",
-	}}
-
-	for i, tt := range tests {
-		var w bytes.Buffer
-		Fprint(&w, tt.err)
-		got := w.String()
-		if got != tt.want {
-			t.Errorf("test %d: Fprint(w, %q): got %q, want %q", i+1, tt.err, got, tt.want)
 		}
 	}
 }
@@ -189,23 +149,78 @@ func TestErrorf(t *testing.T) {
 	}
 }
 
+func TestWithStackNil(t *testing.T) {
+	got := WithStack(nil)
+	if got != nil {
+		t.Errorf("WithStack(nil): got %#v, expected nil", got)
+	}
+}
+
+func TestWithStack(t *testing.T) {
+	tests := []struct {
+		err  error
+		want string
+	}{
+		{io.EOF, "EOF"},
+		{WithStack(io.EOF), "EOF"},
+	}
+
+	for _, tt := range tests {
+		got := WithStack(tt.err).Error()
+		if got != tt.want {
+			t.Errorf("WithStack(%v): got: %v, want %v", tt.err, got, tt.want)
+		}
+	}
+}
+
+func TestWithMessageNil(t *testing.T) {
+	got := WithMessage(nil, "no error")
+	if got != nil {
+		t.Errorf("WithMessage(nil, \"no error\"): got %#v, expected nil", got)
+	}
+}
+
+func TestWithMessage(t *testing.T) {
+	tests := []struct {
+		err     error
+		message string
+		want    string
+	}{
+		{io.EOF, "read error", "read error: EOF"},
+		{WithMessage(io.EOF, "read error"), "client error", "client error: read error: EOF"},
+	}
+
+	for _, tt := range tests {
+		got := WithMessage(tt.err, tt.message).Error()
+		if got != tt.want {
+			t.Errorf("WithMessage(%v, %q): got: %q, want %q", tt.err, tt.message, got, tt.want)
+		}
+	}
+
+}
+
 // errors.New, etc values are not expected to be compared by value
 // but the change in errors#27 made them incomparable. Assert that
 // various kinds of errors have a functional equality operator, even
 // if the result of that equality is always false.
 func TestErrorEquality(t *testing.T) {
-	tests := []struct {
-		err1, err2 error
-	}{
-		{io.EOF, io.EOF},
-		{io.EOF, nil},
-		{io.EOF, errors.New("EOF")},
-		{io.EOF, New("EOF")},
-		{New("EOF"), New("EOF")},
-		{New("EOF"), Errorf("EOF")},
-		{New("EOF"), Wrap(io.EOF, "EOF")},
+	vals := []error{
+		nil,
+		io.EOF,
+		errors.New("EOF"),
+		New("EOF"),
+		Errorf("EOF"),
+		Wrap(io.EOF, "EOF"),
+		Wrapf(io.EOF, "EOF%d", 2),
+		WithMessage(nil, "whoops"),
+		WithMessage(io.EOF, "whoops"),
+		WithStack(io.EOF),
+		WithStack(nil),
 	}
-	for _, tt := range tests {
-		_ = tt.err1 == tt.err2 // mustn't panic
+
+	for i := range vals {
+		for j := range vals {
+			_ = vals[i] == vals[j] // mustn't panic
+		}
 	}
 }

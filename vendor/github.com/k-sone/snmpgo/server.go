@@ -40,7 +40,7 @@ func (a *ServerArguments) validate() error {
 	default:
 		return &ArgumentError{
 			Value:   a.Network,
-			Message: fmt.Sprintf("Unsupported Network", a.Network),
+			Message: fmt.Sprintf("Unsupported Network: %s", a.Network),
 		}
 	}
 	if m := a.MessageMaxSize; (m != 0 && m < msgSizeMinimum) || m > math.MaxInt32 {
@@ -164,7 +164,7 @@ type TrapServer struct {
 	serving   bool
 
 	// Error Logger which will be used for logging of default errors
-	ErrorLog *log.Logger
+	ErrorLog StdLogger
 }
 
 func (s *TrapServer) AddSecurity(entry *SecurityEntry) error {

@@ -122,6 +122,11 @@ Explain how to process the obtained information.
 
 [snmptrap@Net-SNMP](http://www.net-snmp.org/docs/man/snmptrap.html) like command.
 
+Dependencies
+------------
+
+- [github.com/geoffgarside/ber](https://github.com/geoffgarside/ber)
+
 License
 -------
 

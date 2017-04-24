@@ -95,15 +95,16 @@ func (t *TaskManager) executeShowQueriesStatement(q *ShowQueriesStatement) (mode
 	for id, qi := range t.queries {
 		d := now.Sub(qi.startTime)
 
-		var ds string
-		if d == 0 {
-			ds = "0s"
-		} else if d < time.Second {
-			ds = fmt.Sprintf("%du", d)
-		} else {
-			ds = (d - (d % time.Second)).String()
+		switch {
+		case d >= time.Second:
+			d = d - (d % time.Second)
+		case d >= time.Millisecond:
+			d = d - (d % time.Millisecond)
+		case d >= time.Microsecond:
+			d = d - (d % time.Microsecond)
 		}
-		values = append(values, []interface{}{id, qi.query, qi.database, ds})
+
+		values = append(values, []interface{}{id, qi.query, qi.database, d.String()})
 	}
 
 	return []*models.Row{{
@@ -135,7 +136,7 @@ func (t *TaskManager) AttachQuery(q *Query, database string, interrupt <-chan st
 	}
 
 	if t.MaxConcurrentQueries > 0 && len(t.queries) >= t.MaxConcurrentQueries {
-		return 0, nil, ErrMaxConcurrentQueriesReached
+		return 0, nil, ErrMaxConcurrentQueriesLimitExceeded(len(t.queries), t.MaxConcurrentQueries)
 	}
 
 	qid := t.nextID
@@ -239,7 +240,7 @@ func (t *TaskManager) waitForQuery(qid uint64, interrupt <-chan struct{}, closin
 		if !ok {
 			break
 		}
-		query.setError(ErrQueryTimeoutReached)
+		query.setError(ErrQueryTimeoutLimitExceeded)
 	case <-interrupt:
 		// Query was manually closed so exit the select.
 		return
