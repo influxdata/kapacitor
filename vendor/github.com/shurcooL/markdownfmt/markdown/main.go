@@ -177,7 +177,7 @@ func (mr *markdownRenderer) Table(out *bytes.Buffer, header []byte, body []byte,
 		out.WriteByte('|')
 		out.WriteByte(' ')
 		out.WriteString(cell)
-		for i := mr.stringWidth(string(cell)); i < mr.columnWidths[column]; i++ {
+		for i := mr.stringWidth(cell); i < mr.columnWidths[column]; i++ {
 			out.WriteByte(' ')
 		}
 		out.WriteByte(' ')
@@ -265,7 +265,7 @@ func (_ *markdownRenderer) FootnoteItem(out *bytes.Buffer, name, text []byte, fl
 
 // Span-level callbacks.
 func (_ *markdownRenderer) AutoLink(out *bytes.Buffer, link []byte, kind int) {
-	out.Write(link)
+	out.Write(escape(link))
 }
 func (_ *markdownRenderer) CodeSpan(out *bytes.Buffer, text []byte) {
 	out.WriteByte('`')
@@ -295,7 +295,12 @@ func (_ *markdownRenderer) Image(out *bytes.Buffer, link []byte, title []byte, a
 	out.WriteString("![")
 	out.Write(alt)
 	out.WriteString("](")
-	out.Write(link)
+	out.Write(escape(link))
+	if len(title) != 0 {
+		out.WriteString(` "`)
+		out.Write(title)
+		out.WriteString(`"`)
+	}
 	out.WriteString(")")
 }
 func (_ *markdownRenderer) LineBreak(out *bytes.Buffer) {
@@ -305,7 +310,12 @@ func (_ *markdownRenderer) Link(out *bytes.Buffer, link []byte, title []byte, co
 	out.WriteString("[")
 	out.Write(content)
 	out.WriteString("](")
-	out.Write(link)
+	out.Write(escape(link))
+	if len(title) != 0 {
+		out.WriteString(` "`)
+		out.Write(title)
+		out.WriteString(`"`)
+	}
 	out.WriteString(")")
 }
 func (_ *markdownRenderer) RawHtmlTag(out *bytes.Buffer, tag []byte) {
@@ -323,6 +333,11 @@ func (_ *markdownRenderer) StrikeThrough(out *bytes.Buffer, text []byte) {
 }
 func (_ *markdownRenderer) FootnoteRef(out *bytes.Buffer, ref []byte, id int) {
 	out.WriteString("<FootnoteRef: Not implemented.>") // TODO
+}
+
+// escape replaces instances of backslash with escaped backslash in text.
+func escape(text []byte) []byte {
+	return bytes.Replace(text, []byte(`\`), []byte(`\\`), -1)
 }
 
 func isNumber(data []byte) bool {
@@ -424,12 +439,12 @@ func doubleSpace(out *bytes.Buffer) {
 	}
 }
 
-// terminalStringWidth returns width of s, takint into account possible ANSI escape codes
+// terminalStringWidth returns width of s, taking into account possible ANSI escape codes
 // (which don't count towards string width).
 func terminalStringWidth(s string) (width int) {
 	width = runewidth.StringWidth(s)
-	width -= strings.Count(s, "\x1b[1m") * len("\x1b[1m") // HACK, TODO: Find a better way of doing this.
-	width -= strings.Count(s, "\x1b[0m") * len("\x1b[0m") // HACK, TODO: Find a better way of doing this.
+	width -= strings.Count(s, "\x1b[1m") * len("[1m") // HACK, TODO: Find a better way of doing this.
+	width -= strings.Count(s, "\x1b[0m") * len("[0m") // HACK, TODO: Find a better way of doing this.
 	return width
 }
 
@@ -468,14 +483,14 @@ func Process(filename string, src []byte, opt *Options) ([]byte, error) {
 		return nil, err
 	}
 
-	// GitHub Flavored Markdown-like extensions.
-	extensions := 0
-	extensions |= blackfriday.EXTENSION_NO_INTRA_EMPHASIS
-	extensions |= blackfriday.EXTENSION_TABLES
-	extensions |= blackfriday.EXTENSION_FENCED_CODE
-	extensions |= blackfriday.EXTENSION_AUTOLINK
-	extensions |= blackfriday.EXTENSION_STRIKETHROUGH
-	extensions |= blackfriday.EXTENSION_SPACE_HEADERS
+	// extensions for GitHub Flavored Markdown-like parsing.
+	const extensions = blackfriday.EXTENSION_NO_INTRA_EMPHASIS |
+		blackfriday.EXTENSION_TABLES |
+		blackfriday.EXTENSION_FENCED_CODE |
+		blackfriday.EXTENSION_AUTOLINK |
+		blackfriday.EXTENSION_STRIKETHROUGH |
+		blackfriday.EXTENSION_SPACE_HEADERS |
+		blackfriday.EXTENSION_NO_EMPTY_LINE_BEFORE_BLOCK
 
 	output := blackfriday.Markdown(text, NewRenderer(opt), extensions)
 	return output, nil

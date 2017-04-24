@@ -25,7 +25,7 @@ import (
 	"unicode/utf8"
 )
 
-const VERSION = "1.5"
+const VERSION = "1.4"
 
 // These are the supported markdown parsing extensions.
 // OR these values together to select multiple extensions.
@@ -105,46 +105,46 @@ const (
 // blockTags is a set of tags that are recognized as HTML block tags.
 // Any of these can be included in markdown text without special escaping.
 var blockTags = map[string]struct{}{
-	"blockquote": {},
-	"del":        {},
-	"div":        {},
-	"dl":         {},
-	"fieldset":   {},
-	"form":       {},
-	"h1":         {},
-	"h2":         {},
-	"h3":         {},
-	"h4":         {},
-	"h5":         {},
-	"h6":         {},
-	"iframe":     {},
-	"ins":        {},
-	"math":       {},
-	"noscript":   {},
-	"ol":         {},
-	"pre":        {},
-	"p":          {},
-	"script":     {},
-	"style":      {},
-	"table":      {},
-	"ul":         {},
+	"blockquote": struct{}{},
+	"del":        struct{}{},
+	"div":        struct{}{},
+	"dl":         struct{}{},
+	"fieldset":   struct{}{},
+	"form":       struct{}{},
+	"h1":         struct{}{},
+	"h2":         struct{}{},
+	"h3":         struct{}{},
+	"h4":         struct{}{},
+	"h5":         struct{}{},
+	"h6":         struct{}{},
+	"iframe":     struct{}{},
+	"ins":        struct{}{},
+	"math":       struct{}{},
+	"noscript":   struct{}{},
+	"ol":         struct{}{},
+	"pre":        struct{}{},
+	"p":          struct{}{},
+	"script":     struct{}{},
+	"style":      struct{}{},
+	"table":      struct{}{},
+	"ul":         struct{}{},
 
 	// HTML5
-	"address":    {},
-	"article":    {},
-	"aside":      {},
-	"canvas":     {},
-	"figcaption": {},
-	"figure":     {},
-	"footer":     {},
-	"header":     {},
-	"hgroup":     {},
-	"main":       {},
-	"nav":        {},
-	"output":     {},
-	"progress":   {},
-	"section":    {},
-	"video":      {},
+	"address":    struct{}{},
+	"article":    struct{}{},
+	"aside":      struct{}{},
+	"canvas":     struct{}{},
+	"figcaption": struct{}{},
+	"figure":     struct{}{},
+	"footer":     struct{}{},
+	"header":     struct{}{},
+	"hgroup":     struct{}{},
+	"main":       struct{}{},
+	"nav":        struct{}{},
+	"output":     struct{}{},
+	"progress":   struct{}{},
+	"section":    struct{}{},
+	"video":      struct{}{},
 }
 
 // Renderer is the rendering interface.
@@ -635,11 +635,11 @@ func scanLinkRef(p *parser, data []byte, i int) (linkOffset, linkEnd, titleOffse
 		i++
 	}
 	linkOffset = i
-	if i == len(data) {
-		return
-	}
 	for i < len(data) && data[i] != ' ' && data[i] != '\t' && data[i] != '\n' && data[i] != '\r' {
 		i++
+	}
+	if i == len(data) {
+		return
 	}
 	linkEnd = i
 	if data[linkOffset] == '<' && data[linkEnd-1] == '>' {

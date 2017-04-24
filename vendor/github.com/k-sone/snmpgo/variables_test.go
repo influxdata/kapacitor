@@ -97,6 +97,33 @@ func TestOctetString(t *testing.T) {
 	}
 }
 
+func TestOctetString2(t *testing.T) {
+	expStr := "\t\n\v\f\r !\"#$%&'()*+,-./0123456789:;<=>?@ABCXYZ[\\]^_`abcxyz{|}~"
+	var v snmpgo.Variable = snmpgo.NewOctetString([]byte(expStr))
+
+	if expStr != v.String() {
+		t.Errorf("String() human-readable - expected [%s], actual[%s]", expStr, v.String())
+	}
+
+	expStr = "c0:a8:01:01"
+	v = snmpgo.NewOctetString([]byte{192, 168, 1, 1})
+	if expStr != v.String() {
+		t.Errorf("String() hex-string - expected [%s], actual[%s]", expStr, v.String())
+	}
+
+	expStr = "54:65:73:74:08"
+	v = snmpgo.NewOctetString([]byte{0x54, 0x65, 0x73, 0x74, 0x08})
+	if expStr != v.String() {
+		t.Errorf("String() hex-string - expected [%s], actual[%s]", expStr, v.String())
+	}
+
+	expStr = "54:65:73:74:a0"
+	v = snmpgo.NewOctetString([]byte{0x54, 0x65, 0x73, 0x74, 0xa0})
+	if expStr != v.String() {
+		t.Errorf("String() hex-string - expected [%s], actual[%s]", expStr, v.String())
+	}
+}
+
 func TestNull(t *testing.T) {
 	expStr := ""
 	expBuf := []byte{0x05, 0x00}

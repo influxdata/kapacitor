@@ -64,17 +64,10 @@ If you are going to be contributing back to Kapacitor please take a second to si
 
 Installing Go
 -------------
-Kapacitor requires Go 1.6 or greater.
+
+Kapacitor typically requires the lastest version of Go.
 
 To install go see https://golang.org/dl/
-
-Revision Control Systems
-------------------------
-Go has the ability to import remote packages via revision control systems with the `go get` command.  To ensure that you can retrieve any remote package, be sure to install the following rcs software to your system.
-Currently the project only depends on `git` and `mercurial`.
-
-* [Install Git](http://git-scm.com/book/en/Getting-Started-Installing-Git)
-* [Install Mercurial](http://mercurial.selenic.com/wiki/Download)
 
 Getting the source
 ------
@@ -114,8 +107,6 @@ go fmt ./...
 go vet ./...
 ```
 
-NOTE: If you have not installed mercurial, the above command will fail.  See [Revision Control Systems](#revision-control-systems) above.
-
 For more information on `go vet`, [read the GoDoc](https://godoc.org/golang.org/x/tools/cmd/vet).
 
 Build and Test
@@ -140,57 +131,18 @@ Dependencies
 ------------
 
 Kapacitor vendors all dependencies.
-Kapacitor does not use a dependency manager tool, but rather uses git subrepos to place
-dependencies in the vendor directory.
-This give complete control over how dependency are managed and keeps the workflow simple.
-A few helper scripts are provided to make this process fast and easy.
+Kapacitor uses the golang [dep](https://github.com/golang/dep) tool.
 
-To manage the subrepo you must first install [git-subrepo](https://github.com/ingydotnet/git-subrepo#installation).
-
-First list all dependencies, including dependencies of dependencies.
+Install the dep tool:
 
 ```
-./list-deps
+go get -u github.com/golang/dep
 ```
 
-To add a new dependency add a new entry to the `vendor.list` file, of the form:
+See the dep help for usage and documentation.
 
-```
-<package> [branch]
-```
-
-The `branch` column is optional.
-If `branch` is left empty the default branch will be used.
-
-For example, to add the `github.com/influxdata/foo/bar` dependency add this line to the `vendor.list`.
-
-```
-github.com/influxdata/foo https://github.com/influxdata/foo.git
-```
-
-Notice that `bar` part of the path was left off since its a subdirectory of the repo.
-
-Commit this change then run:
-
-```
-./vendor.sh github.com/influxdata/foo
-```
-
-This will add the subrepo for the git repo under `vendor/github.com/influxdata/foo`.
-
-Later to update the dependency use the same command.
-
-```
-./vendor.sh github.com/influxdata/foo
-```
-
-Or to update all dependencies at once use
-
-```
-./vendor.sh
-```
-
-These scripts are really simple, we may formalize them later but currently simplicity is key.
+Kapacitor commits vendored deps into the repo, as a result always run `dep prune` after any `dep ensure` operation.
+This helps keep the amount of code committed to a minimum.
 
 
 Generating Code
@@ -206,16 +158,13 @@ Go provides a consistent command for generating all necessary code:
 go generate ./...
 ```
 
-For the generate command to succeed you will need a few dependencies installed on your system:
+For the generate command to succeed you will need a few dependencies installed on your system.
+These dependencies are already vendored in the code and and can be installed from there.
 
-* tmpl -- A utility used to generate code from templates. Install via `go get github.com/benbjohnson/tmpl`
+* tmpl -- A utility used to generate code from templates. Install via `go install ./vendor/github.com/benbjohnson/tmpl`
 * protoc + protoc-gen-go -- A protobuf compiler plus the protoc-gen-go extension.
-    You need version 3.0.0-beta-2 of protoc.
-    To install the go plugin run `go get github.com/golang/protobuf/protoc-gen-go`
-
-NOTE: Since installing dependencies can often be painful we have provided a docker container that comes with all of these dependencies installed.
-See the section below about the build script and docker.
-
+    You need version 3.0.0 of protoc.
+    To install the go plugin run `go install ./vendor/github.com/golang/protobuf/protoc-gen-go`
 
 The Build Script
 ----------------

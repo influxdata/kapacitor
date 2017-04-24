@@ -195,6 +195,28 @@ func TestEqual(t *testing.T) {
 
 }
 
+func TestFormatUnequalValues(t *testing.T) {
+	expected, actual := formatUnequalValues("foo", "bar")
+	Equal(t, `"foo"`, expected, "value should not include type")
+	Equal(t, `"bar"`, actual, "value should not include type")
+
+	expected, actual = formatUnequalValues(123, 123)
+	Equal(t, `123`, expected, "value should not include type")
+	Equal(t, `123`, actual, "value should not include type")
+
+	expected, actual = formatUnequalValues(int64(123), int32(123))
+	Equal(t, `int64(123)`, expected, "value should include type")
+	Equal(t, `int32(123)`, actual, "value should include type")
+
+	type testStructType struct {
+		Val string
+	}
+
+	expected, actual = formatUnequalValues(&testStructType{Val: "test"}, &testStructType{Val: "test"})
+	Equal(t, `&assert.testStructType{Val:"test"}`, expected, "value should not include type annotation")
+	Equal(t, `&assert.testStructType{Val:"test"}`, actual, "value should not include type annotation")
+}
+
 func TestNotNil(t *testing.T) {
 
 	mockT := new(testing.T)
@@ -523,7 +545,25 @@ func TestNoError(t *testing.T) {
 
 	False(t, NoError(mockT, err), "NoError with error should return False")
 
+	// returning an empty error interface
+	err = func() error {
+		var err *customError
+		if err != nil {
+			t.Fatal("err should be nil here")
+		}
+		return err
+	}()
+
+	if err == nil { // err is not nil here!
+		t.Errorf("Error should be nil due to empty interface", err)
+	}
+
+	False(t, NoError(mockT, err), "NoError should fail with empty error interface")
 }
+
+type customError struct{}
+
+func (*customError) Error() string { return "fail" }
 
 func TestError(t *testing.T) {
 
@@ -539,6 +579,20 @@ func TestError(t *testing.T) {
 
 	True(t, Error(mockT, err), "Error with error should return True")
 
+	// returning an empty error interface
+	err = func() error {
+		var err *customError
+		if err != nil {
+			t.Fatal("err should be nil here")
+		}
+		return err
+	}()
+
+	if err == nil { // err is not nil here!
+		t.Errorf("Error should be nil due to empty interface", err)
+	}
+
+	True(t, Error(mockT, err), "Error should pass with empty error interface")
 }
 
 func TestEqualError(t *testing.T) {
@@ -1091,6 +1145,40 @@ func TestDiffEmptyCases(t *testing.T) {
 	Equal(t, "", diff(1, 2))
 	Equal(t, "", diff(1, 2))
 	Equal(t, "", diff([]int{1}, []bool{true}))
+}
+
+// Ensure there are no data races
+func TestDiffRace(t *testing.T) {
+	t.Parallel()
+
+	expected := map[string]string{
+		"a": "A",
+		"b": "B",
+		"c": "C",
+	}
+
+	actual := map[string]string{
+		"d": "D",
+		"e": "E",
+		"f": "F",
+	}
+
+	// run diffs in parallel simulating tests with t.Parallel()
+	numRoutines := 10
+	rChans := make([]chan string, numRoutines)
+	for idx := range rChans {
+		rChans[idx] = make(chan string)
+		go func(ch chan string) {
+			defer close(ch)
+			ch <- diff(expected, actual)
+		}(rChans[idx])
+	}
+
+	for _, ch := range rChans {
+		for msg := range ch {
+			NotZero(t, msg) // dummy assert
+		}
+	}
 }
 
 type mockTestingT struct {

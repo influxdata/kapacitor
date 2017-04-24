@@ -10,7 +10,7 @@ Also see [http://godoc.org/github.com/gogo/protobuf/plugin/](http://godoc.org/gi
 
 # Fast Marshalling and Unmarshalling
 
-Generating a `Marshal`, `MarshalTo`, `Size` and `Unmarshal` method for a struct results in faster marshalling and unmarshalling than when using reflect.
+Generating a `Marshal`, `MarshalTo`, `Size` (or `ProtoSize`) and `Unmarshal` method for a struct results in faster marshalling and unmarshalling than when using reflect.
 
 See [BenchComparison](https://github.com/gogo/protobuf/blob/master/bench.md) for a comparison between reflect and generated code used for marshalling and unmarshalling.
 
@@ -19,8 +19,11 @@ See [BenchComparison](https://github.com/gogo/protobuf/blob/master/bench.md) for
 <tr><td><a href="http://godoc.org/github.com/gogo/protobuf/plugin/marshalto">marshaler</a></td><td>Message</td><td>bool</td><td>if true, a Marshal and MarshalTo method is generated for the specific message</td><td>false</td></tr>
 <tr><td><a href="http://godoc.org/github.com/gogo/protobuf/plugin/size">sizer</a></td><td>Message</td><td>bool</td><td>if true, a Size method is generated for the specific message</td><td>false</td></tr>
 <tr><td><a href="http://godoc.org/github.com/gogo/protobuf/plugin/unmarshal">unmarshaler</a></td><td> Message </td><td> bool </td><td> if true, an Unmarshal method is generated for the specific message </td><td> false</td></tr>
-<tr><td><a href="http://godoc.org/github.com/gogo/protobuf/plugin/marshalto"> unsafe_marshaler</a> </td><td> Message </td><td> bool </td><td> if true, a Marshal and MarshalTo method is generated for the specific message. The generated code uses the unsafe package. </td><td> false</td></tr>
-<tr><td><a href="http://godoc.org/github.com/gogo/protobuf/plugin/unmarshal">unsafe_unmarshaler</a></td><td> Message </td><td> bool </td><td> if true, an Unmarshal method is generated for the specific message. The generated code uses the unsafe package. </td><td> false</td></tr>
+<tr><td><a href="http://godoc.org/github.com/gogo/protobuf/plugin/size">protosizer</a></td><td>Message</td><td>bool</td><td>if true, a ProtoSize method is generated for the specific message</td><td>false</td></tr>
+<tr><td><a href="http://godoc.org/github.com/gogo/protobuf/plugin/marshalto"> unsafe_marshaler</a> </td><td> Message </td><td> bool </td><td> if true, a Marshal and MarshalTo method is generated for the specific message. The generated code uses the unsafe package and is not compatible with big endian CPUs. </td><td> false</td></tr>
+<tr><td><a href="http://godoc.org/github.com/gogo/protobuf/plugin/unmarshal">unsafe_unmarshaler</a></td><td> Message </td><td> bool </td><td> if true, an Unmarshal method is generated for the specific message. The generated code uses the unsafe package and is not compatible with big endian CPUs. </td><td> false</td></tr>
+<tr><td><a href="http://godoc.org/github.com/gogo/protobuf/plugin/marshalto">stable_marshaler</a></td><td> Message </td><td> bool </td><td> if true, a Marshal and MarshalTo method is generated for the specific message, but unlike marshaler the output is guaranteed to be deterministic, at the sacrifice of some speed</td><td> false </td></tr>
+<tr><td>typedecl (beta)</td><td> Message </td><td> bool </td><td> if false, type declaration of the message is excluded from the generated output. Requires the marshaler and unmarshaler to be generated.</td><td> true </td></tr>
 </table>
 
 # More Canonical Go Structures
@@ -35,16 +38,19 @@ You might also find that basic structs that started their life as part of an API
 <tr><td><b>Name</b></td><td><b>Option</b></td><td><b>Type</b></td><td><b>Description</b></td><td><b>Default</b></td></tr>
 <tr><td><a href="http://godoc.org/github.com/gogo/protobuf/gogoproto">nullable</a></td><td> Field </td><td> bool </td><td> if false, a field is generated without a pointer (see warning below). </td><td> true </td></tr>
 <tr><td><a href="http://godoc.org/github.com/gogo/protobuf/gogoproto">embed</a></td><td> Field </td><td> bool </td><td> if true, the field is generated as an embedded field. </td><td> false </td></tr>
-<tr><td><a href="http://godoc.org/github.com/gogo/protobuf/gogoproto">customtype</a> </td><td> Field </td><td> string </td><td> It works with the Marshal and Unmarshal methods, to allow you to have your own types in your struct, but marshal to bytes. For example, custom.Uuid or custom.Fixed128 </td><td> goprotobuf type </td></tr>
+<tr><td><a href="http://godoc.org/github.com/gogo/protobuf/gogoproto">customtype</a> </td><td> Field </td><td> string </td><td> It works with the Marshal and Unmarshal methods, to allow you to have your own types in your struct, but marshal to bytes. For example, custom.Uuid or custom.Fixed128. For more information please refer to the <a href="custom_types.md">CustomTypes</a> document </td><td> goprotobuf type </td></tr>
 <tr><td><a href="http://godoc.org/github.com/gogo/protobuf/gogoproto"> customname</a> (beta) </td><td> Field </td><td> string </td><td> Changes the generated fieldname. This is especially useful when generated methods conflict with fieldnames. </td><td> goprotobuf field name </td></tr>
 <tr><td><a href="http://godoc.org/github.com/gogo/protobuf/gogoproto"> casttype</a> (beta) </td><td> Field </td><td> string </td><td> Changes the generated field type. It assumes that this type is castable to the original goprotobuf field type.  It currently does not support maps, structs or enums. </td><td> goprotobuf field type </td></tr>
 <tr><td><a href="http://godoc.org/github.com/gogo/protobuf/gogoproto"> castkey </a> (beta) </td><td> Field </td><td> string </td><td> Changes the generated fieldtype for a map key.  All generated code assumes that this type is castable to the protocol buffer field type.  Only supported on maps. </td><td> goprotobuf field type </td></tr>
 <tr><td><a href="http://godoc.org/github.com/gogo/protobuf/gogoproto"> castvalue </a> (beta) </td><td> Field </td><td> string </td><td> Changes the generated fieldtype for a map value.  All generated code assumes that this type is castable to the protocol buffer field type.  Only supported on maps. </td><td> goprotobuf field type </td></tr>
+<tr><td>enum_customname  (beta)</td><td> Enum </td><td> string </td><td>Sets the type name of an enum. If goproto_enum_prefix is enabled, this value will be used as a prefix when generating enum values.</td><td>goprotobuf enum type name. Helps with golint issues.</td></tr>
+<tr><td>enumdecl (beta)</td><td> Enum </td><td> bool </td><td> if false, type declaration of the enum is excluded from the generated output. Requires the marshaler and unmarshaler to be generated. </td><td> true </td></tr>
+<tr><td>enumvalue_customname (beta) </td><td> Enum Value </td><td> string </td><td>Changes the generated enum name.  Helps with golint issues.</td><td>goprotobuf enum value name</td></tr>
+<tr><td><a href="https://github.com/gogo/protobuf/blob/master/test/types/types.proto">stdtime</a></td><td> Timestamp Field </td><td> bool </td><td>Changes the Well Known Timestamp Type to time.Time</td><td>Timestamp</td></tr>
+<tr><td><a href="https://github.com/gogo/protobuf/blob/master/test/types/types.proto">stdduration</a></td><td> Duration Field </td><td> bool </td><td>Changes the Well Known Duration Type to time.Duration</td><td>Duration</td></tr>
 </table>
 
 `Warning about nullable: according to the Protocol Buffer specification, you should be able to tell whether a field is set or unset. With the option nullable=false this feature is lost, since your non-nullable fields will always be set.` 
-
-`Warning about customtype: It is your responsibility to test all cases of your marshaling, unmarshaling and size methods implemented for your custom type.`
 
 # Goprotobuf Compatibility 
 
@@ -76,6 +82,7 @@ Helper methods, functions and interfaces can be generated by triggering certain 
 <tr><td><a href="http://godoc.org/github.com/gogo/protobuf/plugin/gostring">gostring</a></td><td> Message </td><td> bool </td><td> if true, a `GoString` method is generated. This returns a string representing valid go code to reproduce the current state of the struct. </td><td> false </td></tr>
 <tr><td><a href="http://godoc.org/github.com/gogo/protobuf/plugin/union"> onlyone</a> (deprecated) </td><td> Message </td><td> bool </td><td> if true, all fields must be nullable and only one of the fields may be set, like a union. Two methods are generated: `GetValue() interface{}` and `SetValue(v interface{}) (set bool)`. These provide easier interaction with a union. </td><td> false </td></tr>
 <tr><td><a href="http://godoc.org/github.com/gogo/protobuf/plugin/equal"> equal</a></td><td> Message </td><td> bool </td><td> if true, an Equal method is generated </td><td> false </td></tr>
+<tr><td><a href="http://godoc.org/github.com/gogo/protobuf/plugin/compare"> compare</a></td><td> Message </td><td> bool </td><td> if true, a Compare method is generated.  This is very useful for quickly implementing sort on a list of protobuf structs </td><td> false </td></tr>
 <tr><td><a href="http://godoc.org/github.com/gogo/protobuf/plugin/equal"> verbose_equal</a> </td><td> Message </td><td> bool </td><td> if true, a verbose equal method is generated for the message. This returns an error which describes the exact element which is not equal to the exact element in the other struct. </td><td> false </td></tr>
 <tr><td><a href="http://godoc.org/github.com/gogo/protobuf/plugin/stringer"> stringer</a> </td><td> Message </td><td> bool </td><td> if true, a String method is generated for the message. </td><td> false </td></tr>
 <tr><td><a href="http://godoc.org/github.com/gogo/protobuf/plugin/face">face</a> </td><td> Message </td><td> bool </td><td> if true, a function will be generated which can convert a structure which satisfies an interface (face) to the specified structure. This interface contains getters for each of the fields in the struct. The specified struct is also generated with the getters. This allows it to satisfy its own face. </td><td> false </td></tr>
@@ -83,6 +90,11 @@ Helper methods, functions and interfaces can be generated by triggering certain 
 <tr><td> <a href="http://godoc.org/github.com/gogo/protobuf/plugin/populate"> populate</a> </td><td> Message </td><td> bool </td><td> if true, a `NewPopulated<MessageName>` function is generated. This is necessary for  generated tests. </td><td> false </td></tr>
 <tr><td><a href="http://godoc.org/github.com/gogo/protobuf/plugin/enumstringer"> enum_stringer</a> (experimental) </td><td> Enum </td><td> bool </td><td> if true, a String method is generated for an Enum </td><td> false </td></tr>
 </table>
+
+Issues with Compare include:
+  * <a href="https://github.com/gogo/protobuf/issues/221">Oneof is not supported yet</a>
+  * <a href="https://github.com/gogo/protobuf/issues/230">Not all Well Known Types are supported yet</a>
+  * <a href="https://github.com/gogo/protobuf/issues/231">Maps are not supported</a>
 
 #Peace of Mind
 
@@ -110,17 +122,21 @@ Each of the boolean message and enum extensions also have a file extension:
 
   * `marshaler_all`
   * `sizer_all`
+  * `protosizer_all`
   * `unmarshaler_all`
   * `unsafe_marshaler_all`
   * `unsafe_unmarshaler_all`
+  * `stable_marshaler_all`
   * `goproto_enum_prefix_all`
   * `goproto_getters_all`
   * `goproto_stringer_all`
   * `goproto_enum_stringer_all`
   * `goproto_extensions_map_all`
+  * `goproto_unrecognized_all`
   * `gostring_all`
   * `onlyone_all`
   * `equal_all`
+  * `compare_all`
   * `verbose_equal_all`
   * `stringer_all`
   * `enum_stringer_all`
@@ -129,6 +145,8 @@ Each of the boolean message and enum extensions also have a file extension:
   * `populate_all`
   * `testgen_all`
   * `benchgen_all`
+  * `enumdecl_all`
+  * `typedecl_all`
 
 Each of these are the same as their Message Option counterparts, except they apply to all messages in the file.  Their Message option counterparts can also be used to overwrite their effect.
 

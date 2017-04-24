@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/influxdb/usage-client/v1"
+	"github.com/influxdata/usage-client/v1"
 	"github.com/stretchr/testify/require"
 )
 

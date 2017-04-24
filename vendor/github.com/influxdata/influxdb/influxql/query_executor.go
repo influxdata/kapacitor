@@ -25,20 +25,15 @@ var (
 	// ErrQueryInterrupted is an error returned when the query is interrupted.
 	ErrQueryInterrupted = errors.New("query interrupted")
 
-	// ErrMaxConcurrentQueriesReached is an error when a query cannot be run
-	// because the maximum number of queries has been reached.
-	ErrMaxConcurrentQueriesReached = errors.New("max concurrent queries reached")
+	// ErrQueryAborted is an error returned when the query is aborted.
+	ErrQueryAborted = errors.New("query aborted")
 
 	// ErrQueryEngineShutdown is an error sent when the query cannot be
 	// created because the query engine was shutdown.
 	ErrQueryEngineShutdown = errors.New("query engine shutdown")
 
-	// ErrMaxPointsReached is an error when a query hits the maximum number of
-	// points.
-	ErrMaxPointsReached = errors.New("max number of points reached")
-
-	// ErrQueryTimeoutReached is an error when a query hits the timeout.
-	ErrQueryTimeoutReached = errors.New("query timeout reached")
+	// ErrQueryTimeoutLimitExceeded is an error when a query hits the max time allowed to run.
+	ErrQueryTimeoutLimitExceeded = errors.New("query-timeout limit exceeded")
 )
 
 // Statistics for the QueryExecutor
@@ -54,6 +49,17 @@ func ErrDatabaseNotFound(name string) error { return fmt.Errorf("database not fo
 
 // ErrMeasurementNotFound returns a measurement not found error for the given measurement name.
 func ErrMeasurementNotFound(name string) error { return fmt.Errorf("measurement not found: %s", name) }
+
+// ErrMaxSelectPointsLimitExceeded is an error when a query hits the maximum number of points.
+func ErrMaxSelectPointsLimitExceeded(n, limit int) error {
+	return fmt.Errorf("max-select-point limit exceeed: (%d/%d)", n, limit)
+}
+
+// ErrMaxConcurrentQueriesLimitExceeded is an error when a query cannot be run
+// because the maximum number of queries has been reached.
+func ErrMaxConcurrentQueriesLimitExceeded(n, limit int) error {
+	return fmt.Errorf("max-concurrent-queries limit exceeded(%d, %d)", n, limit)
+}
 
 // ExecutionOptions contains the options for executing a query.
 type ExecutionOptions struct {
@@ -71,6 +77,9 @@ type ExecutionOptions struct {
 
 	// Quiet suppresses non-essential output from the query executor.
 	Quiet bool
+
+	// AbortCh is a channel that signals when results are no longer desired by the caller.
+	AbortCh <-chan struct{}
 }
 
 // ExecutionContext contains state that the query is currently executing with.
@@ -95,6 +104,30 @@ type ExecutionContext struct {
 
 	// Options used to start this query.
 	ExecutionOptions
+}
+
+// send sends a Result to the Results channel and will exit if the query has
+// been aborted.
+func (ctx *ExecutionContext) send(result *Result) error {
+	select {
+	case <-ctx.AbortCh:
+		return ErrQueryAborted
+	case ctx.Results <- result:
+	}
+	return nil
+}
+
+// Send sends a Result to the Results channel and will exit if the query has
+// been interrupted or aborted.
+func (ctx *ExecutionContext) Send(result *Result) error {
+	select {
+	case <-ctx.InterruptCh:
+		return ErrQueryInterrupted
+	case <-ctx.AbortCh:
+		return ErrQueryAborted
+	case ctx.Results <- result:
+	}
+	return nil
 }
 
 // StatementExecutor executes a statement within the QueryExecutor.
@@ -191,7 +224,10 @@ func (e *QueryExecutor) executeQuery(query *Query, opt ExecutionOptions, closing
 
 	qid, task, err := e.TaskManager.AttachQuery(query, opt.Database, closing)
 	if err != nil {
-		results <- &Result{Err: err}
+		select {
+		case results <- &Result{Err: err}:
+		case <-opt.AbortCh:
+		}
 		return
 	}
 	defer e.TaskManager.KillQuery(qid)
@@ -262,7 +298,9 @@ LOOP:
 		// Normalize each statement if possible.
 		if normalizer, ok := e.StatementExecutor.(StatementNormalizer); ok {
 			if err := normalizer.NormalizeStatement(stmt, defaultDB); err != nil {
-				results <- &Result{Err: err}
+				if err := ctx.send(&Result{Err: err}); err == ErrQueryAborted {
+					return
+				}
 				break
 			}
 		}
@@ -284,9 +322,11 @@ LOOP:
 
 		// Send an error for this result if it failed for some reason.
 		if err != nil {
-			results <- &Result{
+			if err := ctx.send(&Result{
 				StatementID: i,
 				Err:         err,
+			}); err == ErrQueryAborted {
+				return
 			}
 			// Stop after the first error.
 			break
@@ -310,9 +350,11 @@ LOOP:
 
 	// Send error results for any statements which were not executed.
 	for ; i < len(query.Statements)-1; i++ {
-		results <- &Result{
+		if err := ctx.send(&Result{
 			StatementID: i,
 			Err:         ErrNotExecuted,
+		}); err == ErrQueryAborted {
+			return
 		}
 	}
 }

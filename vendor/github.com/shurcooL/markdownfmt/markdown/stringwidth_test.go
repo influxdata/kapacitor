@@ -16,7 +16,7 @@ func TestNormalStringWidth(t *testing.T) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 	if got, want := r.stringWidth("**bold**"), len("**bold**"); got != want {
-		t.Errorf("got %q, want %q", got, want)
+		t.Errorf("got %v, want %v", got, want)
 	}
 	if got, want := r.stringWidth("\x1b[1m**bold**\x1b[0m"), runewidth.StringWidth("\x1b[1m**bold**\x1b[0m"); got != want {
 		t.Errorf("got %q, want %q", got, want)
@@ -32,7 +32,7 @@ func TestTerminalStringWidth(t *testing.T) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 	if got, want := r.stringWidth("\x1b[1m**bold**\x1b[0m"), len("**bold**"); got != want {
-		t.Errorf("got %q, want %q", got, want)
+		t.Errorf("got %v, want %v", got, want)
 	}
 	if got, dontWant := r.stringWidth("\x1b[1m**bold**\x1b[0m"), runewidth.StringWidth("\x1b[1m**bold**\x1b[0m"); got == dontWant {
 		t.Errorf("got %q, dontWant %q", got, dontWant)

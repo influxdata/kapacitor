@@ -15,6 +15,8 @@ import (
 	"math"
 	"sync"
 	"time"
+
+	"github.com/geoffgarside/ber"
 )
 
 type security interface {
@@ -429,7 +431,7 @@ func encrypt(msg *messageV3, proto PrivProtocol, key []byte) (err error) {
 
 func decrypt(msg *messageV3, proto PrivProtocol, key, privParam []byte) (err error) {
 	var raw asn1.RawValue
-	_, err = asn1.Unmarshal(msg.PduBytes(), &raw)
+	_, err = ber.Unmarshal(msg.PduBytes(), &raw)
 	if err != nil {
 		return
 	}

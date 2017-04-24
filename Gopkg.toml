@@ -1,0 +1,29 @@
+required = ["github.com/benbjohnson/tmpl","github.com/golang/protobuf/protoc-gen-go"]
+
+[[dependencies]]
+  branch = "master"
+  name = "github.com/davecgh/go-spew"
+
+[[dependencies]]
+  branch = "master"
+  name = "github.com/evanphx/json-patch"
+
+[[dependencies]]
+  branch = "master"
+  name = "github.com/ghodss/yaml"
+
+[[dependencies]]
+  branch = "master"
+  name = "github.com/google/uuid"
+
+[[dependencies]]
+  name = "github.com/influxdata/influxdb"
+  version = "~1.1.0"
+
+[[dependencies]]
+  branch = "master"
+  name = "github.com/mitchellh/mapstructure"
+
+[[dependencies]]
+  branch = "master"
+  name = "github.com/shurcooL/markdownfmt"

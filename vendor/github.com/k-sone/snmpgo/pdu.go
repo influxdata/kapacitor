@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/geoffgarside/ber"
 )
 
 type VarBind struct {
@@ -37,7 +39,7 @@ func (v *VarBind) Marshal() (b []byte, err error) {
 
 func (v *VarBind) Unmarshal(b []byte) (rest []byte, err error) {
 	var raw asn1.RawValue
-	rest, err = asn1.Unmarshal(b, &raw)
+	rest, err = ber.Unmarshal(b, &raw)
 	if err != nil {
 		return nil, err
 	}
@@ -280,7 +282,7 @@ func (pdu *PduV1) Marshal() (b []byte, err error) {
 
 func (pdu *PduV1) Unmarshal(b []byte) (rest []byte, err error) {
 	var raw asn1.RawValue
-	rest, err = asn1.Unmarshal(b, &raw)
+	rest, err = ber.Unmarshal(b, &raw)
 	if err != nil {
 		return
 	}
@@ -293,25 +295,25 @@ func (pdu *PduV1) Unmarshal(b []byte) (rest []byte, err error) {
 	next := raw.Bytes
 
 	var requestId int
-	next, err = asn1.Unmarshal(next, &requestId)
+	next, err = ber.Unmarshal(next, &requestId)
 	if err != nil {
 		return
 	}
 
 	var errorStatus int
-	next, err = asn1.Unmarshal(next, &errorStatus)
+	next, err = ber.Unmarshal(next, &errorStatus)
 	if err != nil {
 		return
 	}
 
 	var errorIndex int
-	next, err = asn1.Unmarshal(next, &errorIndex)
+	next, err = ber.Unmarshal(next, &errorIndex)
 	if err != nil {
 		return
 	}
 
 	var varBinds asn1.RawValue
-	_, err = asn1.Unmarshal(next, &varBinds)
+	_, err = ber.Unmarshal(next, &varBinds)
 	if err != nil {
 		return
 	}
@@ -381,7 +383,7 @@ func (pdu *ScopedPdu) Marshal() (b []byte, err error) {
 
 func (pdu *ScopedPdu) Unmarshal(b []byte) (rest []byte, err error) {
 	var raw asn1.RawValue
-	rest, err = asn1.Unmarshal(b, &raw)
+	rest, err = ber.Unmarshal(b, &raw)
 	if err != nil {
 		return nil, err
 	}
@@ -394,13 +396,13 @@ func (pdu *ScopedPdu) Unmarshal(b []byte) (rest []byte, err error) {
 	next := raw.Bytes
 
 	var contextEngineId []byte
-	next, err = asn1.Unmarshal(next, &contextEngineId)
+	next, err = ber.Unmarshal(next, &contextEngineId)
 	if err != nil {
 		return
 	}
 
 	var contextName []byte
-	next, err = asn1.Unmarshal(next, &contextName)
+	next, err = ber.Unmarshal(next, &contextName)
 	if err != nil {
 		return
 	}
