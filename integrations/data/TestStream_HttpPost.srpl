@@ -1,0 +1,18 @@
+dbname
+rpname
+cpu,type=idle,host=serverA value=97.1 0000000001
+dbname
+rpname
+cpu,type=idle,host=serverA value=92.6 0000000002
+dbname
+rpname
+cpu,type=idle,host=serverA value=95.6 0000000003
+dbname
+rpname
+cpu,type=idle,host=serverA value=93.1 0000000004
+dbname
+rpname
+cpu,type=idle,host=serverA value=92.6 0000000005
+dbname
+rpname
+cpu,type=idle,host=serverA value=95.8 0000000006

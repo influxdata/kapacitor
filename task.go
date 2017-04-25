@@ -454,6 +454,8 @@ func (et *ExecutingTask) createNode(p pipeline.Node, l *log.Logger) (n Node, err
 		n, err = newWindowNode(et, t, l)
 	case *pipeline.HTTPOutNode:
 		n, err = newHTTPOutNode(et, t, l)
+	case *pipeline.HTTPPostNode:
+		n, err = newHTTPPostNode(et, t, l)
 	case *pipeline.InfluxDBOutNode:
 		n, err = newInfluxDBOutNode(et, t, l)
 	case *pipeline.AlertNode:
