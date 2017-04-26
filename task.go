@@ -500,6 +500,8 @@ func (et *ExecutingTask) createNode(p pipeline.Node, l *log.Logger) (n Node, err
 		n, err = newStateDurationNode(et, t, l)
 	case *pipeline.StateCountNode:
 		n, err = newStateCountNode(et, t, l)
+	case *pipeline.SwarmAutoscaleNode:
+		n, err = newSwarmAutoscaleNode(et, t, l)
 	default:
 		return nil, fmt.Errorf("unknown pipeline node type %T", p)
 	}

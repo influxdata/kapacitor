@@ -31,6 +31,7 @@ import (
 	"github.com/influxdata/kapacitor/services/snmptrap"
 	"github.com/influxdata/kapacitor/services/stats"
 	"github.com/influxdata/kapacitor/services/storage"
+	"github.com/influxdata/kapacitor/services/swarm"
 	"github.com/influxdata/kapacitor/services/talk"
 	"github.com/influxdata/kapacitor/services/task_store"
 	"github.com/influxdata/kapacitor/services/telegram"
@@ -74,7 +75,8 @@ type Config struct {
 	VictorOps victorops.Config `toml:"victorops" override:"victorops"`
 
 	// Third-party integrations
-	Kubernetes k8s.Config `toml:"kubernetes" override:"kubernetes"`
+	Kubernetes k8s.Config   `toml:"kubernetes" override:"kubernetes"`
+	Swarm      swarm.Config `toml:"swarm" override:"swarm"`
 
 	Reporting reporting.Config `toml:"reporting"`
 	Stats     stats.Config     `toml:"stats"`
@@ -103,6 +105,7 @@ func NewConfig() *Config {
 	c.InfluxDB = []influxdb.Config{influxdb.NewConfig()}
 	c.Logging = logging.NewConfig()
 	c.Kubernetes = k8s.NewConfig()
+	c.Swarm = swarm.NewConfig()
 	c.ConfigOverride = config.NewConfig()
 
 	c.Collectd = collectd.NewConfig()
@@ -235,6 +238,9 @@ func (c *Config) Validate() error {
 		return err
 	}
 	if err := c.Slack.Validate(); err != nil {
+		return err
+	}
+	if err := c.Swarm.Validate(); err != nil {
 		return err
 	}
 	if err := c.Talk.Validate(); err != nil {

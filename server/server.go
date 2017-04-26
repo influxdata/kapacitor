@@ -42,6 +42,7 @@ import (
 	"github.com/influxdata/kapacitor/services/snmptrap"
 	"github.com/influxdata/kapacitor/services/stats"
 	"github.com/influxdata/kapacitor/services/storage"
+	"github.com/influxdata/kapacitor/services/swarm"
 	"github.com/influxdata/kapacitor/services/talk"
 	"github.com/influxdata/kapacitor/services/task_store"
 	"github.com/influxdata/kapacitor/services/telegram"
@@ -208,6 +209,9 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	// Append third-party integrations
 	if err := s.appendK8sService(); err != nil {
 		return nil, errors.Wrap(err, "kubernetes service")
+	}
+	if err := s.appendSwarmService(); err != nil {
+		return nil, errors.Wrap(err, "swarm service")
 	}
 
 	// Append extra input services
@@ -385,6 +389,20 @@ func (s *Server) appendK8sService() error {
 	s.TaskMaster.K8sService = srv
 	s.SetDynamicService("kubernetes", srv)
 	s.AppendService("kubernetes", srv)
+	return nil
+}
+
+func (s *Server) appendSwarmService() error {
+	c := s.config.Swarm
+	l := s.LogService.NewLogger("[swarm] ", log.LstdFlags)
+	srv, err := swarm.NewService(c, l)
+	if err != nil {
+		return err
+	}
+
+	s.TaskMaster.SwarmService = srv
+	s.SetDynamicService("swarm", srv)
+	s.AppendService("swarm", srv)
 	return nil
 }
 
