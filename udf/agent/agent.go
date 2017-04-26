@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 	"sync"
-
-	"github.com/influxdata/kapacitor/udf"
 )
 
 // The Agent calls the appropriate methods on the Handler as it receives requests over a socket.
@@ -21,20 +19,20 @@ import (
 // To write Points/Batches back to the Agent/Kapacitor use the Agent.Responses channel.
 type Handler interface {
 	// Return the InfoResponse. Describing the properties of this Handler
-	Info() (*udf.InfoResponse, error)
+	Info() (*InfoResponse, error)
 	// Initialize the Handler with the provided options.
-	Init(*udf.InitRequest) (*udf.InitResponse, error)
+	Init(*InitRequest) (*InitResponse, error)
 	// Create a snapshot of the running state of the handler.
-	Snapshot() (*udf.SnapshotResponse, error)
+	Snapshot() (*SnapshotResponse, error)
 	// Restore a previous snapshot.
-	Restore(*udf.RestoreRequest) (*udf.RestoreResponse, error)
+	Restore(*RestoreRequest) (*RestoreResponse, error)
 
 	// A batch has begun.
-	BeginBatch(*udf.BeginBatch) error
+	BeginBatch(*BeginBatch) error
 	// A point has arrived.
-	Point(*udf.Point) error
+	Point(*Point) error
 	// The batch is complete.
-	EndBatch(*udf.EndBatch) error
+	EndBatch(*EndBatch) error
 
 	// Gracefully stop the Handler.
 	// No other methods will be called.
@@ -51,11 +49,11 @@ type Agent struct {
 	out io.WriteCloser
 
 	outGroup     sync.WaitGroup
-	outResponses chan *udf.Response
+	outResponses chan *Response
 
-	responses chan *udf.Response
+	responses chan *Response
 	// A channel for writing Responses, specifically Batch and Point responses.
-	Responses chan<- *udf.Response
+	Responses chan<- *Response
 
 	writeErrC chan error
 	readErrC  chan error
@@ -70,8 +68,8 @@ func New(in io.ReadCloser, out io.WriteCloser) *Agent {
 	s := &Agent{
 		in:           in,
 		out:          out,
-		outResponses: make(chan *udf.Response),
-		responses:    make(chan *udf.Response),
+		outResponses: make(chan *Response),
+		responses:    make(chan *Response),
 	}
 	s.Responses = s.responses
 	return s
@@ -90,9 +88,9 @@ func (a *Agent) Start() error {
 		defer a.outGroup.Done()
 		err := a.readLoop()
 		if err != nil {
-			a.outResponses <- &udf.Response{
-				Message: &udf.Response_Error{
-					Error: &udf.ErrorResponse{Error: err.Error()},
+			a.outResponses <- &Response{
+				Message: &Response_Error{
+					Error: &ErrorResponse{Error: err.Error()},
 				},
 			}
 		}
@@ -140,9 +138,9 @@ func (a *Agent) readLoop() error {
 	defer a.in.Close()
 	in := bufio.NewReader(a.in)
 	var buf []byte
-	request := &udf.Request{}
+	request := &Request{}
 	for {
-		err := udf.ReadMessage(&buf, in, request)
+		err := ReadMessage(&buf, in, request)
 		if err == io.EOF {
 			break
 		}
@@ -151,63 +149,63 @@ func (a *Agent) readLoop() error {
 		}
 
 		// Hand message to handler
-		var res *udf.Response
+		var res *Response
 		switch msg := request.Message.(type) {
-		case *udf.Request_Info:
+		case *Request_Info:
 			info, err := a.Handler.Info()
 			if err != nil {
 				return err
 			}
-			res = &udf.Response{}
-			res.Message = &udf.Response_Info{
+			res = &Response{}
+			res.Message = &Response_Info{
 				Info: info,
 			}
-		case *udf.Request_Init:
+		case *Request_Init:
 			init, err := a.Handler.Init(msg.Init)
 			if err != nil {
 				return err
 			}
-			res = &udf.Response{}
-			res.Message = &udf.Response_Init{
+			res = &Response{}
+			res.Message = &Response_Init{
 				Init: init,
 			}
-		case *udf.Request_Keepalive:
-			res = &udf.Response{
-				Message: &udf.Response_Keepalive{
-					Keepalive: &udf.KeepaliveResponse{
+		case *Request_Keepalive:
+			res = &Response{
+				Message: &Response_Keepalive{
+					Keepalive: &KeepaliveResponse{
 						Time: msg.Keepalive.Time,
 					},
 				},
 			}
-		case *udf.Request_Snapshot:
+		case *Request_Snapshot:
 			snapshot, err := a.Handler.Snapshot()
 			if err != nil {
 				return err
 			}
-			res = &udf.Response{}
-			res.Message = &udf.Response_Snapshot{
+			res = &Response{}
+			res.Message = &Response_Snapshot{
 				Snapshot: snapshot,
 			}
-		case *udf.Request_Restore:
+		case *Request_Restore:
 			restore, err := a.Handler.Restore(msg.Restore)
 			if err != nil {
 				return err
 			}
-			res = &udf.Response{}
-			res.Message = &udf.Response_Restore{
+			res = &Response{}
+			res.Message = &Response_Restore{
 				Restore: restore,
 			}
-		case *udf.Request_Begin:
+		case *Request_Begin:
 			err := a.Handler.BeginBatch(msg.Begin)
 			if err != nil {
 				return err
 			}
-		case *udf.Request_Point:
+		case *Request_Point:
 			err := a.Handler.Point(msg.Point)
 			if err != nil {
 				return err
 			}
-		case *udf.Request_End:
+		case *Request_End:
 			err := a.Handler.EndBatch(msg.End)
 			if err != nil {
 				return err
@@ -223,7 +221,7 @@ func (a *Agent) readLoop() error {
 func (a *Agent) writeLoop() error {
 	defer a.out.Close()
 	for response := range a.outResponses {
-		err := udf.WriteMessage(response, a.out)
+		err := WriteMessage(response, a.out)
 		if err != nil {
 			return err
 		}

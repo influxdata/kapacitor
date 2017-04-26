@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package udf;
+package agent;
 
 //------------------------------------------------------
 // RPC Messages for Kapacitor to communicate with

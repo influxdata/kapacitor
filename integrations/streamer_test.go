@@ -57,6 +57,7 @@ import (
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/services/victorops/victoropstest"
 	"github.com/influxdata/kapacitor/udf"
+	"github.com/influxdata/kapacitor/udf/agent"
 	"github.com/influxdata/kapacitor/udf/test"
 	"github.com/influxdata/wlog"
 	"github.com/k-sone/snmpgo"
@@ -5459,19 +5460,19 @@ stream
 		if name != "customFunc" {
 			return
 		}
-		info.Wants = udf.EdgeType_STREAM
-		info.Provides = udf.EdgeType_STREAM
-		info.Options = map[string]*udf.OptionInfo{
+		info.Wants = agent.EdgeType_STREAM
+		info.Provides = agent.EdgeType_STREAM
+		info.Options = map[string]*agent.OptionInfo{
 			"opt1": {
-				ValueTypes: []udf.ValueType{udf.ValueType_STRING},
+				ValueTypes: []agent.ValueType{agent.ValueType_STRING},
 			},
 			"opt2": {
-				ValueTypes: []udf.ValueType{
-					udf.ValueType_BOOL,
-					udf.ValueType_INT,
-					udf.ValueType_DOUBLE,
-					udf.ValueType_STRING,
-					udf.ValueType_DURATION,
+				ValueTypes: []agent.ValueType{
+					agent.ValueType_BOOL,
+					agent.ValueType_INT,
+					agent.ValueType_DOUBLE,
+					agent.ValueType_STRING,
+					agent.ValueType_DURATION,
 				},
 			},
 		}
@@ -5493,7 +5494,7 @@ stream
 	go func() {
 		defer close(done)
 		req := <-uio.Requests
-		i, ok := req.Message.(*udf.Request_Init)
+		i, ok := req.Message.(*agent.Request_Init)
 		if !ok {
 			t.Error("expected init message")
 		}
@@ -5503,38 +5504,38 @@ stream
 			t.Fatalf("unexpected number of options in init request, got %d exp %d", got, exp)
 		}
 		for i, opt := range init.Options {
-			exp := &udf.Option{}
+			exp := &agent.Option{}
 			switch i {
 			case 0:
 				exp.Name = "opt1"
-				exp.Values = []*udf.OptionValue{
+				exp.Values = []*agent.OptionValue{
 					{
-						Type:  udf.ValueType_STRING,
-						Value: &udf.OptionValue_StringValue{"count"},
+						Type:  agent.ValueType_STRING,
+						Value: &agent.OptionValue_StringValue{"count"},
 					},
 				}
 			case 1:
 				exp.Name = "opt2"
-				exp.Values = []*udf.OptionValue{
+				exp.Values = []*agent.OptionValue{
 					{
-						Type:  udf.ValueType_BOOL,
-						Value: &udf.OptionValue_BoolValue{false},
+						Type:  agent.ValueType_BOOL,
+						Value: &agent.OptionValue_BoolValue{false},
 					},
 					{
-						Type:  udf.ValueType_INT,
-						Value: &udf.OptionValue_IntValue{1},
+						Type:  agent.ValueType_INT,
+						Value: &agent.OptionValue_IntValue{1},
 					},
 					{
-						Type:  udf.ValueType_DOUBLE,
-						Value: &udf.OptionValue_DoubleValue{1.0},
+						Type:  agent.ValueType_DOUBLE,
+						Value: &agent.OptionValue_DoubleValue{1.0},
 					},
 					{
-						Type:  udf.ValueType_STRING,
-						Value: &udf.OptionValue_StringValue{"1.0"},
+						Type:  agent.ValueType_STRING,
+						Value: &agent.OptionValue_StringValue{"1.0"},
 					},
 					{
-						Type:  udf.ValueType_DURATION,
-						Value: &udf.OptionValue_DurationValue{int64(time.Second)},
+						Type:  agent.ValueType_DURATION,
+						Value: &agent.OptionValue_DurationValue{int64(time.Second)},
 					},
 				}
 			}
@@ -5543,9 +5544,9 @@ stream
 			}
 		}
 
-		resp := &udf.Response{
-			Message: &udf.Response_Init{
-				Init: &udf.InitResponse{
+		resp := &agent.Response{
+			Message: &agent.Response_Init{
+				Init: &agent.InitResponse{
 					Success: true,
 				},
 			},
@@ -5554,12 +5555,12 @@ stream
 
 		// read all requests and wait till the chan is closed
 		for req := range uio.Requests {
-			p, ok := req.Message.(*udf.Request_Point)
+			p, ok := req.Message.(*agent.Request_Point)
 			if ok {
 				pt := p.Point
-				resp := &udf.Response{
-					Message: &udf.Response_Point{
-						Point: &udf.Point{
+				resp := &agent.Response{
+					Message: &agent.Response_Point{
+						Point: &agent.Point{
 							Name:         pt.Name,
 							Time:         pt.Time,
 							Group:        pt.Group,

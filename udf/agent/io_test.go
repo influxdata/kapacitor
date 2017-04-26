@@ -1,31 +1,31 @@
-package udf_test
+package agent_test
 
 import (
 	"bytes"
 	"reflect"
 	"testing"
 
-	"github.com/influxdata/kapacitor/udf"
+	"github.com/influxdata/kapacitor/udf/agent"
 )
 
 func TestMessage_ReadWrite(t *testing.T) {
-	req := &udf.Request{}
-	req.Message = &udf.Request_Keepalive{
-		Keepalive: &udf.KeepaliveRequest{
+	req := &agent.Request{}
+	req.Message = &agent.Request_Keepalive{
+		Keepalive: &agent.KeepaliveRequest{
 			Time: 42,
 		},
 	}
 
 	var buf bytes.Buffer
 
-	err := udf.WriteMessage(req, &buf)
+	err := agent.WriteMessage(req, &buf)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	nreq := &udf.Request{}
+	nreq := &agent.Request{}
 	var b []byte
-	err = udf.ReadMessage(&b, &buf, nreq)
+	err = agent.ReadMessage(&b, &buf, nreq)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,9 +36,9 @@ func TestMessage_ReadWrite(t *testing.T) {
 }
 
 func TestMessage_ReadWriteMultiple(t *testing.T) {
-	req := &udf.Request{}
-	req.Message = &udf.Request_Keepalive{
-		Keepalive: &udf.KeepaliveRequest{
+	req := &agent.Request{}
+	req.Message = &agent.Request_Keepalive{
+		Keepalive: &agent.KeepaliveRequest{
 			Time: 42,
 		},
 	}
@@ -47,17 +47,17 @@ func TestMessage_ReadWriteMultiple(t *testing.T) {
 
 	var count int = 1e4
 	for i := 0; i < count; i++ {
-		err := udf.WriteMessage(req, &buf)
+		err := agent.WriteMessage(req, &buf)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	nreq := &udf.Request{}
+	nreq := &agent.Request{}
 	var b []byte
 
 	for i := 0; i < count; i++ {
-		err := udf.ReadMessage(&b, &buf, nreq)
+		err := agent.ReadMessage(&b, &buf, nreq)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -8,7 +8,6 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/udf/agent"
 )
 
@@ -22,18 +21,18 @@ func newMirrorHandler(agent *agent.Agent) *mirrorHandler {
 }
 
 // Return the InfoResponse. Describing the properties of this UDF agent.
-func (*mirrorHandler) Info() (*udf.InfoResponse, error) {
-	info := &udf.InfoResponse{
-		Wants:    udf.EdgeType_STREAM,
-		Provides: udf.EdgeType_STREAM,
-		Options:  map[string]*udf.OptionInfo{},
+func (*mirrorHandler) Info() (*agent.InfoResponse, error) {
+	info := &agent.InfoResponse{
+		Wants:    agent.EdgeType_STREAM,
+		Provides: agent.EdgeType_STREAM,
+		Options:  map[string]*agent.OptionInfo{},
 	}
 	return info, nil
 }
 
 // Initialze the handler based of the provided options.
-func (*mirrorHandler) Init(r *udf.InitRequest) (*udf.InitResponse, error) {
-	init := &udf.InitResponse{
+func (*mirrorHandler) Init(r *agent.InitRequest) (*agent.InitResponse, error) {
+	init := &agent.InitResponse{
 		Success: true,
 		Error:   "",
 	}
@@ -41,33 +40,33 @@ func (*mirrorHandler) Init(r *udf.InitRequest) (*udf.InitResponse, error) {
 }
 
 // Create a snapshot of the running state of the process.
-func (*mirrorHandler) Snapshot() (*udf.SnapshotResponse, error) {
-	return &udf.SnapshotResponse{}, nil
+func (*mirrorHandler) Snapshot() (*agent.SnapshotResponse, error) {
+	return &agent.SnapshotResponse{}, nil
 }
 
 // Restore a previous snapshot.
-func (*mirrorHandler) Restore(req *udf.RestoreRequest) (*udf.RestoreResponse, error) {
-	return &udf.RestoreResponse{
+func (*mirrorHandler) Restore(req *agent.RestoreRequest) (*agent.RestoreResponse, error) {
+	return &agent.RestoreResponse{
 		Success: true,
 	}, nil
 }
 
 // Start working with the next batch
-func (*mirrorHandler) BeginBatch(begin *udf.BeginBatch) error {
+func (*mirrorHandler) BeginBatch(begin *agent.BeginBatch) error {
 	return errors.New("batching not supported")
 }
 
-func (h *mirrorHandler) Point(p *udf.Point) error {
+func (h *mirrorHandler) Point(p *agent.Point) error {
 	// Send back the point we just received
-	h.agent.Responses <- &udf.Response{
-		Message: &udf.Response_Point{
+	h.agent.Responses <- &agent.Response{
+		Message: &agent.Response_Point{
 			Point: p,
 		},
 	}
 	return nil
 }
 
-func (*mirrorHandler) EndBatch(end *udf.EndBatch) error {
+func (*mirrorHandler) EndBatch(end *agent.EndBatch) error {
 	return nil
 }
 

@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/udf/agent"
 )
 
@@ -50,33 +49,33 @@ func newMovingAvgHandler(a *agent.Agent) *avgHandler {
 }
 
 // Return the InfoResponse. Describing the properties of this UDF agent.
-func (a *avgHandler) Info() (*udf.InfoResponse, error) {
-	info := &udf.InfoResponse{
-		Wants:    udf.EdgeType_STREAM,
-		Provides: udf.EdgeType_STREAM,
-		Options: map[string]*udf.OptionInfo{
-			"field": {ValueTypes: []udf.ValueType{udf.ValueType_STRING}},
-			"size":  {ValueTypes: []udf.ValueType{udf.ValueType_INT}},
-			"as":    {ValueTypes: []udf.ValueType{udf.ValueType_STRING}},
+func (a *avgHandler) Info() (*agent.InfoResponse, error) {
+	info := &agent.InfoResponse{
+		Wants:    agent.EdgeType_STREAM,
+		Provides: agent.EdgeType_STREAM,
+		Options: map[string]*agent.OptionInfo{
+			"field": {ValueTypes: []agent.ValueType{agent.ValueType_STRING}},
+			"size":  {ValueTypes: []agent.ValueType{agent.ValueType_INT}},
+			"as":    {ValueTypes: []agent.ValueType{agent.ValueType_STRING}},
 		},
 	}
 	return info, nil
 }
 
 // Initialze the handler based of the provided options.
-func (a *avgHandler) Init(r *udf.InitRequest) (*udf.InitResponse, error) {
-	init := &udf.InitResponse{
+func (a *avgHandler) Init(r *agent.InitRequest) (*agent.InitResponse, error) {
+	init := &agent.InitResponse{
 		Success: true,
 		Error:   "",
 	}
 	for _, opt := range r.Options {
 		switch opt.Name {
 		case "field":
-			a.field = opt.Values[0].Value.(*udf.OptionValue_StringValue).StringValue
+			a.field = opt.Values[0].Value.(*agent.OptionValue_StringValue).StringValue
 		case "size":
-			a.size = int(opt.Values[0].Value.(*udf.OptionValue_IntValue).IntValue)
+			a.size = int(opt.Values[0].Value.(*agent.OptionValue_IntValue).IntValue)
 		case "as":
-			a.as = opt.Values[0].Value.(*udf.OptionValue_StringValue).StringValue
+			a.as = opt.Values[0].Value.(*agent.OptionValue_StringValue).StringValue
 		}
 	}
 
@@ -97,18 +96,18 @@ func (a *avgHandler) Init(r *udf.InitRequest) (*udf.InitResponse, error) {
 }
 
 // Create a snapshot of the running state of the process.
-func (a *avgHandler) Snapshot() (*udf.SnapshotResponse, error) {
+func (a *avgHandler) Snapshot() (*agent.SnapshotResponse, error) {
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 	enc.Encode(a.state)
 
-	return &udf.SnapshotResponse{
+	return &agent.SnapshotResponse{
 		Snapshot: buf.Bytes(),
 	}, nil
 }
 
 // Restore a previous snapshot.
-func (a *avgHandler) Restore(req *udf.RestoreRequest) (*udf.RestoreResponse, error) {
+func (a *avgHandler) Restore(req *agent.RestoreRequest) (*agent.RestoreResponse, error) {
 	buf := bytes.NewReader(req.Snapshot)
 	dec := gob.NewDecoder(buf)
 	err := dec.Decode(&a.state)
@@ -116,20 +115,20 @@ func (a *avgHandler) Restore(req *udf.RestoreRequest) (*udf.RestoreResponse, err
 	if err != nil {
 		msg = err.Error()
 	}
-	return &udf.RestoreResponse{
+	return &agent.RestoreResponse{
 		Success: err == nil,
 		Error:   msg,
 	}, nil
 }
 
 // This handler does not do batching
-func (a *avgHandler) BeginBatch(*udf.BeginBatch) error {
+func (a *avgHandler) BeginBatch(*agent.BeginBatch) error {
 	return errors.New("batching not supported")
 }
 
 // Receive a point and compute the average.
 // Send a response with the average value.
-func (a *avgHandler) Point(p *udf.Point) error {
+func (a *avgHandler) Point(p *agent.Point) error {
 	// Update the moving average.
 	value := p.FieldsDouble[a.field]
 	state := a.state[p.Group]
@@ -144,8 +143,8 @@ func (a *avgHandler) Point(p *udf.Point) error {
 	p.FieldsInt = nil
 	p.FieldsString = nil
 	// Send point with average value.
-	a.agent.Responses <- &udf.Response{
-		Message: &udf.Response_Point{
+	a.agent.Responses <- &agent.Response{
+		Message: &agent.Response_Point{
 			Point: p,
 		},
 	}
@@ -153,7 +152,7 @@ func (a *avgHandler) Point(p *udf.Point) error {
 }
 
 // This handler does not do batching
-func (a *avgHandler) EndBatch(*udf.EndBatch) error {
+func (a *avgHandler) EndBatch(*agent.EndBatch) error {
 	return errors.New("batching not supported")
 }
 

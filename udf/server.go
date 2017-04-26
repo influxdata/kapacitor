@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/udf/agent"
 )
 
 var ErrServerStopped = errors.New("server already stopped")
@@ -60,13 +61,13 @@ type Server struct {
 	err   error
 	errMu sync.Mutex
 
-	requests      chan *Request
+	requests      chan *agent.Request
 	requestsGroup sync.WaitGroup
 
 	keepalive        chan int64
 	keepaliveTimeout time.Duration
 
-	in  ByteReadReader
+	in  agent.ByteReadReader
 	out io.WriteCloser
 
 	// Group for waiting on read/write goroutines
@@ -77,16 +78,16 @@ type Server struct {
 
 	responseBuf []byte
 
-	infoResponse     chan *Response
-	initResponse     chan *Response
-	snapshotResponse chan *Response
-	restoreResponse  chan *Response
+	infoResponse     chan *agent.Response
+	initResponse     chan *agent.Response
+	snapshotResponse chan *agent.Response
+	restoreResponse  chan *agent.Response
 
 	batch *models.Batch
 }
 
 func NewServer(
-	in ByteReadReader,
+	in agent.ByteReadReader,
 	out io.WriteCloser,
 	l *log.Logger,
 	timeout time.Duration,
@@ -97,7 +98,7 @@ func NewServer(
 		in:               in,
 		out:              out,
 		logger:           l,
-		requests:         make(chan *Request),
+		requests:         make(chan *agent.Request),
 		keepalive:        make(chan int64, 1),
 		keepaliveTimeout: timeout,
 		abortCallback:    abortCallback,
@@ -106,10 +107,10 @@ func NewServer(
 		batchIn:          make(chan models.Batch),
 		pointOut:         make(chan models.Point),
 		batchOut:         make(chan models.Batch),
-		infoResponse:     make(chan *Response, 1),
-		initResponse:     make(chan *Response, 1),
-		snapshotResponse: make(chan *Response, 1),
-		restoreResponse:  make(chan *Response, 1),
+		infoResponse:     make(chan *agent.Response, 1),
+		initResponse:     make(chan *agent.Response, 1),
+		snapshotResponse: make(chan *agent.Response, 1),
+		restoreResponse:  make(chan *agent.Response, 1),
 	}
 
 	return s
@@ -234,24 +235,24 @@ func (s *Server) stop() error {
 }
 
 type Info struct {
-	Wants    EdgeType
-	Provides EdgeType
-	Options  map[string]*OptionInfo
+	Wants    agent.EdgeType
+	Provides agent.EdgeType
+	Options  map[string]*agent.OptionInfo
 }
 
 // Get information about the process, available options etc.
 // Info need not be called every time a process is started.
 func (s *Server) Info() (Info, error) {
 	info := Info{}
-	req := &Request{Message: &Request_Info{
-		Info: &InfoRequest{},
+	req := &agent.Request{Message: &agent.Request_Info{
+		Info: &agent.InfoRequest{},
 	}}
 
 	resp, err := s.doRequestResponse(req, s.infoResponse)
 	if err != nil {
 		return info, err
 	}
-	ri := resp.Message.(*Response_Info).Info
+	ri := resp.Message.(*agent.Response_Info).Info
 	info.Options = ri.Options
 	info.Wants = ri.Wants
 	info.Provides = ri.Provides
@@ -261,9 +262,9 @@ func (s *Server) Info() (Info, error) {
 
 // Initialize the process with a set of Options.
 // Calling Init is required even if you do not have any specific Options, just pass nil
-func (s *Server) Init(options []*Option) error {
-	req := &Request{Message: &Request_Init{
-		Init: &InitRequest{
+func (s *Server) Init(options []*agent.Option) error {
+	req := &agent.Request{Message: &agent.Request_Init{
+		Init: &agent.InitRequest{
 			Options: options,
 		},
 	}}
@@ -272,7 +273,7 @@ func (s *Server) Init(options []*Option) error {
 		return err
 	}
 
-	init := resp.Message.(*Response_Init).Init
+	init := resp.Message.(*agent.Response_Init).Init
 	if !init.Success {
 		return fmt.Errorf("failed to initialize processes %s", init.Error)
 	}
@@ -281,36 +282,36 @@ func (s *Server) Init(options []*Option) error {
 
 // Request a snapshot from the process.
 func (s *Server) Snapshot() ([]byte, error) {
-	req := &Request{Message: &Request_Snapshot{
-		Snapshot: &SnapshotRequest{},
+	req := &agent.Request{Message: &agent.Request_Snapshot{
+		Snapshot: &agent.SnapshotRequest{},
 	}}
 	resp, err := s.doRequestResponse(req, s.snapshotResponse)
 	if err != nil {
 		return nil, err
 	}
 
-	snapshot := resp.Message.(*Response_Snapshot).Snapshot.Snapshot
+	snapshot := resp.Message.(*agent.Response_Snapshot).Snapshot.Snapshot
 	return snapshot, nil
 }
 
 // Request to restore a snapshot.
 func (s *Server) Restore(snapshot []byte) error {
-	req := &Request{Message: &Request_Restore{
-		Restore: &RestoreRequest{snapshot},
+	req := &agent.Request{Message: &agent.Request_Restore{
+		Restore: &agent.RestoreRequest{snapshot},
 	}}
 	resp, err := s.doRequestResponse(req, s.restoreResponse)
 	if err != nil {
 		return err
 	}
 
-	restore := resp.Message.(*Response_Restore).Restore
+	restore := resp.Message.(*agent.Response_Restore).Restore
 	if !restore.Success {
 		return fmt.Errorf("error restoring snapshot: %s", restore.Error)
 	}
 	return nil
 }
 
-func (s *Server) doRequestResponse(req *Request, respC chan *Response) (*Response, error) {
+func (s *Server) doRequestResponse(req *agent.Request, respC chan *agent.Response) (*agent.Response, error) {
 	err := func() error {
 		s.mu.Lock()
 		defer s.mu.Unlock()
@@ -342,7 +343,7 @@ func (s *Server) doRequestResponse(req *Request, respC chan *Response) (*Respons
 	}
 }
 
-func (s *Server) doResponse(response *Response, respC chan *Response) {
+func (s *Server) doResponse(response *agent.Response, respC chan *agent.Response) {
 	select {
 	case respC <- response:
 	default:
@@ -361,8 +362,8 @@ func (s *Server) runKeepalive() {
 	for {
 		select {
 		case <-ticker.C:
-			req := &Request{Message: &Request_Keepalive{
-				Keepalive: &KeepaliveRequest{
+			req := &agent.Request{Message: &agent.Request_Keepalive{
+				Keepalive: &agent.KeepaliveRequest{
 					Time: time.Now().UnixNano(),
 				},
 			}}
@@ -476,7 +477,7 @@ func (s *Server) writeData() error {
 
 func (s *Server) writePoint(pt models.Point) error {
 	strs, floats, ints := s.fieldsToTypedMaps(pt.Fields)
-	udfPoint := &Point{
+	udfPoint := &agent.Point{
 		Time:            pt.Time.UnixNano(),
 		Name:            pt.Name,
 		Database:        pt.Database,
@@ -489,8 +490,8 @@ func (s *Server) writePoint(pt models.Point) error {
 		FieldsInt:       ints,
 		FieldsString:    strs,
 	}
-	req := &Request{
-		Message: &Request_Point{udfPoint},
+	req := &agent.Request{
+		Message: &agent.Request_Point{udfPoint},
 	}
 	return s.writeRequest(req)
 }
@@ -543,8 +544,8 @@ func (s *Server) typeMapsToFields(
 }
 
 func (s *Server) writeBatch(b models.Batch) error {
-	req := &Request{
-		Message: &Request_Begin{&BeginBatch{
+	req := &agent.Request{
+		Message: &agent.Request_Begin{&agent.BeginBatch{
 			Name:   b.Name,
 			Group:  string(b.Group),
 			Tags:   b.Tags,
@@ -556,11 +557,11 @@ func (s *Server) writeBatch(b models.Batch) error {
 	if err != nil {
 		return err
 	}
-	rp := &Request_Point{}
+	rp := &agent.Request_Point{}
 	req.Message = rp
 	for _, pt := range b.Points {
 		strs, floats, ints := s.fieldsToTypedMaps(pt.Fields)
-		udfPoint := &Point{
+		udfPoint := &agent.Point{
 			Time:         pt.Time.UnixNano(),
 			Group:        string(b.Group),
 			Tags:         pt.Tags,
@@ -575,8 +576,8 @@ func (s *Server) writeBatch(b models.Batch) error {
 		}
 	}
 
-	req.Message = &Request_End{
-		&EndBatch{
+	req.Message = &agent.Request_End{
+		&agent.EndBatch{
 			Name:  b.Name,
 			Group: string(b.Group),
 			Tmax:  b.TMax.UnixNano(),
@@ -586,8 +587,8 @@ func (s *Server) writeBatch(b models.Batch) error {
 	return s.writeRequest(req)
 }
 
-func (s *Server) writeRequest(req *Request) error {
-	err := WriteMessage(req, s.out)
+func (s *Server) writeRequest(req *agent.Request) error {
+	err := agent.WriteMessage(req, s.out)
 	if err != nil {
 		err = fmt.Errorf("write error: %s", err)
 	}
@@ -616,16 +617,16 @@ func (s *Server) readData() error {
 	}
 }
 
-func (s *Server) readResponse() (*Response, error) {
-	response := new(Response)
-	err := ReadMessage(&s.responseBuf, s.in, response)
+func (s *Server) readResponse() (*agent.Response, error) {
+	response := new(agent.Response)
+	err := agent.ReadMessage(&s.responseBuf, s.in, response)
 	if err != nil {
 		return nil, err
 	}
 	return response, nil
 }
 
-func (s *Server) handleResponse(response *Response) error {
+func (s *Server) handleResponse(response *agent.Response) error {
 	// Always reset the keepalive timer since we received a response
 	select {
 	case s.keepalive <- time.Now().UnixNano():
@@ -637,25 +638,25 @@ func (s *Server) handleResponse(response *Response) error {
 	}
 	// handle response
 	switch msg := response.Message.(type) {
-	case *Response_Keepalive:
+	case *agent.Response_Keepalive:
 		// Noop we already reset the keepalive timer
-	case *Response_Info:
+	case *agent.Response_Info:
 		s.doResponse(response, s.infoResponse)
-	case *Response_Init:
+	case *agent.Response_Init:
 		s.doResponse(response, s.initResponse)
-	case *Response_Snapshot:
+	case *agent.Response_Snapshot:
 		s.doResponse(response, s.snapshotResponse)
-	case *Response_Restore:
+	case *agent.Response_Restore:
 		s.doResponse(response, s.restoreResponse)
-	case *Response_Error:
+	case *agent.Response_Error:
 		s.logger.Println("E!", msg.Error.Error)
 		return errors.New(msg.Error.Error)
-	case *Response_Begin:
+	case *agent.Response_Begin:
 		s.batch = &models.Batch{
 			ByName: msg.Begin.ByName,
 			Points: make([]models.BatchPoint, 0, msg.Begin.Size),
 		}
-	case *Response_Point:
+	case *agent.Response_Point:
 		if s.batch != nil {
 			pt := models.BatchPoint{
 				Time: time.Unix(0, msg.Point.Time).UTC(),
@@ -688,7 +689,7 @@ func (s *Server) handleResponse(response *Response) error {
 				return s.err
 			}
 		}
-	case *Response_End:
+	case *agent.Response_End:
 		s.batch.Name = msg.End.Name
 		s.batch.TMax = time.Unix(0, msg.End.Tmax).UTC()
 		s.batch.Group = models.GroupID(msg.End.Group)
