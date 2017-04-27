@@ -12,7 +12,7 @@ import (
 // Config is a Triton service discovery configuration
 type Config struct {
 	Enabled         bool          `toml:"enabled" override:"enabled"`
-	Name            string        `toml:"name" override:"name"`
+	ID              string        `toml:"id" override:"id"`
 	Account         string        `toml:"account" override:"account"`
 	DNSSuffix       string        `toml:"dns-suffix" override:"dns-suffix"`
 	Endpoint        string        `toml:"endpoint" override:"endpoint"`
@@ -31,34 +31,17 @@ type Config struct {
 	InsecureSkipVerify bool `toml:"insecure-skip-verify" override:"insecure-skip-verify"`
 }
 
-// NewConfig creates Triton discovery configuration with default values
-func NewConfig() Config {
-	return Config{
-		Name:            "triton",
-		Enabled:         false,
-		Port:            9163,
-		RefreshInterval: toml.Duration(60 * time.Second),
-		Version:         1,
-	}
-}
-
-// ApplyConditionalDefaults adds default values to Triton configuration
-func (t *Config) ApplyConditionalDefaults() {
-	if t.Port == 0 {
-		t.Port = 9163
-	}
-	if t.RefreshInterval == 0 {
-		t.RefreshInterval = toml.Duration(60 * time.Second)
-	}
-	if t.Version == 0 {
-		t.Version = 1
-	}
+// Init adds default values to Triton configuration
+func (t *Config) Init() {
+	t.Port = 9163
+	t.RefreshInterval = toml.Duration(60 * time.Second)
+	t.Version = 1
 }
 
 // Validate validates Triton configuration values
 func (t Config) Validate() error {
-	if t.Name == "" {
-		return fmt.Errorf("triton discovery must be given a name")
+	if t.ID == "" {
+		return fmt.Errorf("triton discovery must be given an ID")
 	}
 	return nil
 }
@@ -89,7 +72,7 @@ func (t Config) Service() string {
 	return "triton"
 }
 
-// ID returns the discoverers name
-func (t Config) ID() string {
-	return t.Name
+// ServiceID returns the discoverers name
+func (t Config) ServiceID() string {
+	return t.ID
 }

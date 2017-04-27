@@ -10,7 +10,7 @@ import (
 // Config is a static list of  of labeled target groups
 type Config struct {
 	Enabled bool   `toml:"enabled" override:"enabled"`
-	Name    string `toml:"name" override:"name"`
+	ID      string `toml:"id" override:"id"`
 	// Targets is a list of targets identified by a label set. Each target is
 	// uniquely identifiable in the group by its address label.
 	Targets []map[string]string `toml:"targets" override:"targets"`
@@ -18,20 +18,16 @@ type Config struct {
 	Labels map[string]string `toml:"labels" override:"labels"`
 }
 
-// NewConfig creates a Static discovery configuration with default/empty values
-func NewConfig() Config {
-	return Config{
-		Name:    "my hosts",
-		Enabled: false,
-		Targets: []map[string]string{},
-		Labels:  map[string]string{},
-	}
+// Init the static configuration to an empty set of structures
+func (s *Config) Init() {
+	s.Targets = []map[string]string{}
+	s.Labels = map[string]string{}
 }
 
 // Validate validates Static configuration values
 func (s Config) Validate() error {
-	if s.Name == "" {
-		return fmt.Errorf("azure discovery must be given a name")
+	if s.ID == "" {
+		return fmt.Errorf("azure discovery must be given a ID")
 	}
 	return nil
 }
@@ -56,7 +52,7 @@ func (s Config) Prom(c *config.ScrapeConfig) {
 		&config.TargetGroup{
 			Targets: target(s.Targets),
 			Labels:  set(s.Labels),
-			Source:  s.Name,
+			Source:  s.ID,
 		},
 	}
 }
@@ -66,7 +62,7 @@ func (s Config) Service() string {
 	return "static"
 }
 
-// ID returns the discoverers name
-func (s Config) ID() string {
-	return s.Name
+// ServiceID returns the discoverers name
+func (s Config) ServiceID() string {
+	return s.ID
 }

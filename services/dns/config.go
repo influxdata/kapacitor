@@ -13,38 +13,23 @@ import (
 // Config is a DNS service discovery configuration
 type Config struct {
 	Enabled         bool          `toml:"enabled" override:"enabled"`
-	Name            string        `toml:"name" override:"name"`
+	ID              string        `toml:"id" override:"id"`
 	RecordNames     []string      `toml:"record-names" override:"record-names"`
 	RefreshInterval toml.Duration `toml:"refresh-interval" override:"refresh-interval"`
 	Type            string        `toml:"type" override:"type"`
 	Port            int           `toml:"port" override:"port"` // Ignored for SRV records
 }
 
-// NewDNS creates a new DNS configuration with default values
-func NewConfig() Config {
-	return Config{
-		Name:            "dns",
-		Enabled:         false,
-		RefreshInterval: toml.Duration(30 * time.Second),
-		RecordNames:     []string{},
-		Type:            "SRV",
-	}
-}
-
-// ApplyConditionalDefaults adds default values to DNS configuration
-func (d *Config) ApplyConditionalDefaults() {
-	if d.Type == "" {
-		d.Type = "SRV"
-	}
-	if d.RefreshInterval == 0 {
-		d.RefreshInterval = toml.Duration(30 * time.Second)
-	}
+// Init adds default values to DNS configuration
+func (d *Config) Init() {
+	d.Type = "SRV"
+	d.RefreshInterval = toml.Duration(30 * time.Second)
 }
 
 // Validate validates DNS configuration's values
 func (d Config) Validate() error {
-	if d.Name == "" {
-		return fmt.Errorf("dns discovery must be given a name")
+	if d.ID == "" {
+		return fmt.Errorf("dns discovery must be given a ID")
 	}
 	switch strings.ToUpper(d.Type) {
 	case "SRV":
@@ -75,7 +60,7 @@ func (d Config) Service() string {
 	return "dns"
 }
 
-// ID returns the discoverers name
-func (d Config) ID() string {
-	return d.Name
+// ServiceID returns the discoverers name
+func (d Config) ServiceID() string {
+	return d.ID
 }

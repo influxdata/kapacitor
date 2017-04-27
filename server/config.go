@@ -87,17 +87,17 @@ type Config struct {
 
 	// Discovery for scraping
 	Scrapers  []scraper.Config   `toml:"scrapers" override:"scrapers,element-key=name"`
-	Azure     []azure.Config     `toml:"azure" override:"azure,element-key=name"`
-	Consul    []consul.Config    `toml:"consul" override:"consul,element-key=name"`
-	DNS       []dns.Config       `toml:"dns" override:"dns,element-key=name"`
-	EC2       []ec2.Config       `toml:"ec2" override:"ec2,element-key=name"`
-	Files     []file.Config      `toml:"files" override:"files,element-key=name"`
-	GCE       []gce.Config       `toml:"gce" override:"gce,element-key=name"`
-	Marathon  []marathon.Config  `toml:"marathon" override:"marathon,element-key=name"`
-	Nerve     []nerve.Config     `toml:"nerve" override:"nerve,element-key=name"`
-	Serverset []serverset.Config `toml:"serverset" override:"serverset,element-key=name"`
-	Static    []static.Config    `toml:"static" override:"static,element-key=name"`
-	Triton    []triton.Config    `toml:"triton" override:"triton,element-key=name"`
+	Azure     []azure.Config     `toml:"azure" override:"azure,element-key=id"`
+	Consul    []consul.Config    `toml:"consul" override:"consul,element-key=id"`
+	DNS       []dns.Config       `toml:"dns" override:"dns,element-key=id"`
+	EC2       []ec2.Config       `toml:"ec2" override:"ec2,element-key=id"`
+	Files     []file.Config      `toml:"files" override:"files,element-key=id"`
+	GCE       []gce.Config       `toml:"gce" override:"gce,element-key=id"`
+	Marathon  []marathon.Config  `toml:"marathon" override:"marathon,element-key=id"`
+	Nerve     []nerve.Config     `toml:"nerve" override:"nerve,element-key=id"`
+	Serverset []serverset.Config `toml:"serverset" override:"serverset,element-key=id"`
+	Static    []static.Config    `toml:"static" override:"static,element-key=id"`
+	Triton    []triton.Config    `toml:"triton" override:"triton,element-key=id"`
 
 	// Third-party integrations
 	Kubernetes k8s.Config `toml:"kubernetes" override:"kubernetes"`
@@ -146,19 +146,6 @@ func NewConfig() *Config {
 	c.SNMPTrap = snmptrap.NewConfig()
 	c.Telegram = telegram.NewConfig()
 	c.VictorOps = victorops.NewConfig()
-
-	c.Scrapers = []scraper.Config{scraper.NewConfig()}
-	c.Azure = []azure.Config{azure.NewConfig()}
-	c.Consul = []consul.Config{consul.NewConfig()}
-	c.DNS = []dns.Config{dns.NewConfig()}
-	c.EC2 = []ec2.Config{ec2.NewConfig()}
-	c.Files = []file.Config{file.NewConfig()}
-	c.GCE = []gce.Config{gce.NewConfig()}
-	c.Marathon = []marathon.Config{marathon.NewConfig()}
-	c.Nerve = []nerve.Config{nerve.NewConfig()}
-	c.Serverset = []serverset.Config{serverset.NewConfig()}
-	c.Static = []static.Config{static.NewConfig()}
-	c.Triton = []triton.Config{triton.NewConfig()}
 
 	c.Reporting = reporting.NewConfig()
 	c.Stats = stats.NewConfig()

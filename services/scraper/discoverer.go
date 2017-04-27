@@ -7,7 +7,7 @@ type Discoverer interface {
 	// Service returns the service type of the Discoverer
 	Service() string
 	// ID returns the unique ID of this specific discoverer
-	ID() string
+	ServiceID() string
 	// Prom creates a prometheus scrape configuration.
 	// TODO: replace when reimplement TargetManager
 	Prom(c *config.ScrapeConfig)

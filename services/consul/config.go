@@ -10,7 +10,7 @@ import (
 // Config is a Consul service discovery configuration
 type Config struct {
 	Enabled      bool     `toml:"enabled" override:"enabled"`
-	Name         string   `toml:"name" override:"name"`
+	ID           string   `toml:"id" override:"id"`
 	Address      string   `toml:"address" override:"address"`
 	Token        string   `toml:"token" override:"token,redact"`
 	Datacenter   string   `toml:"datacenter" override:"datacenter"`
@@ -31,30 +31,17 @@ type Config struct {
 	InsecureSkipVerify bool `toml:"insecure-skip-verify" override:"insecure-skip-verify"`
 }
 
-// NewConfig creates a new Consul discovery with default values
-func NewConfig() Config {
-	return Config{
-		Address:      "127.0.0.1:8500",
-		TagSeparator: ",",
-		Scheme:       "http",
-		Services:     []string{},
-	}
-}
-
-// ApplyConditionalDefaults adds defaults to Consul
-func (c *Config) ApplyConditionalDefaults() {
-	if c.TagSeparator == "" {
-		c.TagSeparator = ","
-	}
-	if c.Scheme == "" {
-		c.Scheme = "http"
-	}
+// Init adds defaults to Consul
+func (c *Config) Init() {
+	c.Address = "127.0.0.1:8500"
+	c.TagSeparator = ","
+	c.Scheme = "http"
 }
 
 // Validate validates the consul configuration
 func (c Config) Validate() error {
-	if c.Name == "" {
-		return fmt.Errorf("consul discovery must be given a name")
+	if c.ID == "" {
+		return fmt.Errorf("consul discovery must be given a ID")
 	}
 	if strings.TrimSpace(c.Address) == "" {
 		return fmt.Errorf("consul discovery requires a server address")
@@ -90,7 +77,7 @@ func (c Config) Service() string {
 	return "consul"
 }
 
-// ID returns the discoverers name
-func (c Config) ID() string {
-	return c.Name
+// ServiceID returns the discoverers name
+func (c Config) ServiceID() string {
+	return c.ID
 }

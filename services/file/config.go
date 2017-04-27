@@ -13,34 +13,23 @@ import (
 // Config is a file service discovery configuration
 type Config struct {
 	Enabled         bool          `toml:"enabled" override:"enabled"`
-	Name            string        `toml:"name" override:"name"`
+	ID              string        `toml:"id" override:"id"`
 	Files           []string      `toml:"files" override:"files"`
 	RefreshInterval toml.Duration `toml:"refresh-interval" override:"refresh-interval"`
 }
 
-// NewConfig creates a File discovery configuration with default values
-func NewConfig() Config {
-	return Config{
-		Enabled:         false,
-		Name:            "file",
-		Files:           []string{},
-		RefreshInterval: toml.Duration(5 * time.Minute),
-	}
-}
+// Init adds defaults to an existing File configuration
+func (f *Config) Init() {
+	f.RefreshInterval = toml.Duration(5 * time.Minute)
 
-// ApplyConditionalDefaults adds defaults to an existing File configuration
-func (f *Config) ApplyConditionalDefaults() {
-	if f.RefreshInterval == 0 {
-		f.RefreshInterval = toml.Duration(5 * time.Minute)
-	}
 }
 
 var fileRegex = regexp.MustCompile(`^[^*]*(\*[^/]*)?\.(json|yml|yaml|JSON|YML|YAML)$`)
 
 // Validate validates the File configuration
 func (f Config) Validate() error {
-	if f.Name == "" {
-		return fmt.Errorf("file discovery must be given a name")
+	if f.ID == "" {
+		return fmt.Errorf("file discovery must be given a ID")
 	}
 	for _, name := range f.Files {
 		if !fileRegex.MatchString(name) {
@@ -65,7 +54,7 @@ func (f Config) Service() string {
 	return "file"
 }
 
-// ID returns the discoverers name
-func (f Config) ID() string {
-	return f.Name
+// ServiceID returns the discoverers name
+func (f Config) ServiceID() string {
+	return f.ID
 }

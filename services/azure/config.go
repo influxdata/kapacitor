@@ -12,7 +12,7 @@ import (
 // Config is a Azure service discovery configuration
 type Config struct {
 	Enabled         bool          `toml:"enabled" override:"enabled"`
-	Name            string        `toml:"name" override:"name"`
+	ID              string        `toml:"id" override:"id"`
 	Port            int           `toml:"port" override:"port"`
 	SubscriptionID  string        `toml:"subscription-id" override:"subscription-id"`
 	TenantID        string        `toml:"tenant-id" override:"tenant-id"`
@@ -21,30 +21,16 @@ type Config struct {
 	RefreshInterval toml.Duration `toml:"refresh-interval" override:"refresh-interval"`
 }
 
-// NewConfig creates a new Azure configuration with default values.
-func NewConfig() Config {
-	return Config{
-		Name:            "azure",
-		Enabled:         false,
-		Port:            80,
-		RefreshInterval: toml.Duration(5 * time.Minute),
-	}
-}
-
-// ApplyConditionalDefaults adds the default values for uninitialized configurations
-func (a *Config) ApplyConditionalDefaults() {
-	if a.Port == 0 {
-		a.Port = 80
-	}
-	if a.RefreshInterval == 0 {
-		a.RefreshInterval = toml.Duration(5 * time.Minute)
-	}
+// Init adds the default values for uninitialized configurations
+func (a *Config) Init() {
+	a.Port = 80
+	a.RefreshInterval = toml.Duration(5 * time.Minute)
 }
 
 // Validate checks the azure configuration
 func (a Config) Validate() error {
-	if a.Name == "" {
-		return fmt.Errorf("azure discovery must be given a name")
+	if a.ID == "" {
+		return fmt.Errorf("azure discovery must be given a ID")
 	}
 	return nil
 }
@@ -68,7 +54,7 @@ func (a Config) Service() string {
 	return "azure"
 }
 
-// ID returns the discoverers name
-func (a Config) ID() string {
-	return a.Name
+// ServiceID returns the discoverers name
+func (a Config) ServiceID() string {
+	return a.ID
 }

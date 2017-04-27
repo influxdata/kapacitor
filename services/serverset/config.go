@@ -13,34 +13,21 @@ import (
 // Config is a Serverset service discovery configuration
 type Config struct {
 	Enabled bool          `toml:"enabled" override:"enabled"`
-	Name    string        `toml:"name" override:"name"`
+	ID      string        `toml:"id" override:"id"`
 	Servers []string      `toml:"servers" override:"servers"`
 	Paths   []string      `toml:"paths" override:"paths"`
 	Timeout toml.Duration `toml:"timeout" override:"timeout"`
 }
 
-// NewConfig creates Serverset with default values
-func NewConfig() Config {
-	return Config{
-		Name:    "serverset",
-		Enabled: false,
-		Servers: []string{},
-		Paths:   []string{},
-		Timeout: toml.Duration(10 * time.Second),
-	}
-}
-
-// ApplyConditionalDefaults adds default values to Serverset configuration
-func (s *Config) ApplyConditionalDefaults() {
-	if s.Timeout == 0 {
-		s.Timeout = toml.Duration(10 * time.Second)
-	}
+// Init adds default values to Serverset configuration
+func (s *Config) Init() {
+	s.Timeout = toml.Duration(10 * time.Second)
 }
 
 // Validate validates Serverset configuration
 func (s Config) Validate() error {
-	if s.Name == "" {
-		return fmt.Errorf("server set discovery must be given a name")
+	if s.ID == "" {
+		return fmt.Errorf("server set discovery must be given a ID")
 	}
 	for _, path := range s.Paths {
 		if !strings.HasPrefix(path, "/") {
@@ -66,7 +53,7 @@ func (s Config) Service() string {
 	return "serverset"
 }
 
-// ID returns the discoverers name
-func (s Config) ID() string {
-	return s.Name
+// ServiceID returns the discoverers name
+func (s Config) ServiceID() string {
+	return s.ID
 }

@@ -12,7 +12,7 @@ import (
 // Config is GCE service discovery configuration
 type Config struct {
 	Enabled         bool          `toml:"enabled" override:"enabled"`
-	Name            string        `toml:"name" override:"name"`
+	ID              string        `toml:"id" override:"id"`
 	Project         string        `toml:"project" override:"project"`
 	Zone            string        `toml:"zone" override:"zone"`
 	Filter          string        `toml:"filter" override:"filter"`
@@ -21,34 +21,17 @@ type Config struct {
 	TagSeparator    string        `toml:"tag-separator" override:"tag-separator"`
 }
 
-// NewConfig creates a google compute engine discovery configuration with default values
-func NewConfig() Config {
-	return Config{
-		Enabled:         false,
-		Name:            "gce",
-		Port:            80,
-		TagSeparator:    ",",
-		RefreshInterval: toml.Duration(60 * time.Second),
-	}
-}
-
-// ApplyConditionalDefaults adds defaults to existing GCE configuration
-func (g *Config) ApplyConditionalDefaults() {
-	if g.Port == 0 {
-		g.Port = 80
-	}
-	if g.TagSeparator == "" {
-		g.TagSeparator = ","
-	}
-	if g.RefreshInterval == 0 {
-		g.RefreshInterval = toml.Duration(60 * time.Second)
-	}
+// Init adds defaults to existing GCE configuration
+func (g *Config) Init() {
+	g.Port = 80
+	g.TagSeparator = ","
+	g.RefreshInterval = toml.Duration(60 * time.Second)
 }
 
 // Validate validates the GCE configuration values
 func (g Config) Validate() error {
-	if g.Name == "" {
-		return fmt.Errorf("gce discovery must be given a name")
+	if g.ID == "" {
+		return fmt.Errorf("gce discovery must be given a ID")
 	}
 	return nil
 }
@@ -72,7 +55,7 @@ func (g Config) Service() string {
 	return "gce"
 }
 
-// ID returns the discoverers name
-func (g Config) ID() string {
-	return g.Name
+// ServiceID returns the discoverers name
+func (g Config) ServiceID() string {
+	return g.ID
 }

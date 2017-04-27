@@ -13,34 +13,21 @@ import (
 // Config is a Nerve service discovery configuration
 type Config struct {
 	Enabled bool          `toml:"enabled" override:"enabled"`
-	Name    string        `toml:"name" override:"name"`
+	ID      string        `toml:"id" override:"id"`
 	Servers []string      `toml:"servers" override:"servers"`
 	Paths   []string      `toml:"paths" override:"paths"`
 	Timeout toml.Duration `toml:"timeout" override:"timeout"`
 }
 
-// NewConfig creates Nerve discovery configuration with default values
-func NewConfig() Config {
-	return Config{
-		Name:    "nerve",
-		Enabled: false,
-		Servers: []string{},
-		Paths:   []string{},
-		Timeout: toml.Duration(10 * time.Second),
-	}
-}
-
-// ApplyConditionalDefaults adds default values to Nerve configuration
-func (n *Config) ApplyConditionalDefaults() {
-	if n.Timeout == 0 {
-		n.Timeout = toml.Duration(10 * time.Second)
-	}
+// Init adds default values to Nerve configuration
+func (n *Config) Init() {
+	n.Timeout = toml.Duration(10 * time.Second)
 }
 
 // Validate validates the Nerve configuration values
 func (n Config) Validate() error {
-	if n.Name == "" {
-		return fmt.Errorf("nerve discovery must be given a name")
+	if n.ID == "" {
+		return fmt.Errorf("nerve discovery must be given a ID")
 	}
 	for _, path := range n.Paths {
 		if !strings.HasPrefix(path, "/") {
@@ -66,7 +53,7 @@ func (n Config) Service() string {
 	return "nerve"
 }
 
-// ID returns the discoverers name
-func (n Config) ID() string {
-	return n.Name
+// ServiceID returns the discoverers name
+func (n Config) ServiceID() string {
+	return n.ID
 }

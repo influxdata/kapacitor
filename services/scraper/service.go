@@ -52,7 +52,7 @@ type Service struct {
 	mgr         TargetManager
 }
 
-// NewServicecreates a new scraper service
+// NewService creates a new scraper service
 func NewService(c []Config, l *log.Logger) *Service {
 	s := &Service{
 		configs: c,
@@ -209,7 +209,7 @@ func (s *Service) RemoveDiscoverer(rm Discoverer) {
 	defer s.mu.Unlock()
 
 	for i, d := range s.discoverers {
-		if d.ID() == rm.ID() && d.Service() == rm.Service() {
+		if d.ServiceID() == rm.ServiceID() && d.Service() == rm.Service() {
 			s.discoverers = append(s.discoverers[:i], s.discoverers[i+1:]...)
 		}
 	}
@@ -243,7 +243,7 @@ func (s *Service) Pairs() []Pair {
 			continue
 		}
 		for _, d := range s.discoverers {
-			if scr.DiscoverName == d.ID() && scr.DiscoverService == d.Service() {
+			if scr.DiscoverName == d.ServiceID() && scr.DiscoverService == d.Service() {
 				pairs = append(pairs, Pair{
 					Scraper:    scr,
 					Discoverer: d,

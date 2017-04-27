@@ -12,7 +12,7 @@ import (
 // Config is EC2 service discovery configuration
 type Config struct {
 	Enabled         bool          `toml:"enabled" override:"enabled"`
-	Name            string        `toml:"name" override:"name"`
+	ID              string        `toml:"id" override:"id"`
 	Region          string        `toml:"region" override:"region"`
 	AccessKey       string        `toml:"access-key" override:"access-key"`
 	SecretKey       string        `toml:"secret-key" override:"secret-key,redact"`
@@ -21,34 +21,19 @@ type Config struct {
 	Port            int           `toml:"port" override:"port"`
 }
 
-// NewConfig creates a new EC2 discovery configuration with default values
-func NewConfig() Config {
-	return Config{
-		Enabled:         false,
-		Region:          "us-east-1",
-		Name:            "ec2",
-		Port:            80,
-		RefreshInterval: toml.Duration(60 * time.Second),
-	}
-}
-
-// ApplyConditionalDefaults adds default values to EC2 configuration
-func (e *Config) ApplyConditionalDefaults() {
-	if e.Port == 0 {
-		e.Port = 80
-	}
-	if e.RefreshInterval == 0 {
-		e.RefreshInterval = toml.Duration(60 * time.Second)
-	}
+// Init adds default values to EC2 configuration
+func (e *Config) Init() {
+	e.Port = 80
+	e.RefreshInterval = toml.Duration(60 * time.Second)
 }
 
 // Validate validates the EC2 configuration values
 func (e Config) Validate() error {
-	if e.Name == "" {
-		return fmt.Errorf("ec2 discovery must be given a name")
+	if e.ID == "" {
+		return fmt.Errorf("ec2 discovery must be given a ID")
 	}
 	if e.Region == "" {
-		return fmt.Errorf("ec2 discovery, %s, requires a region", e.Name)
+		return fmt.Errorf("ec2 discovery, %s, requires a region", e.ID)
 	}
 	return nil
 }
@@ -72,7 +57,7 @@ func (e Config) Service() string {
 	return "ec2"
 }
 
-// ID returns the discoverers name
-func (e Config) ID() string {
-	return e.Name
+// ServiceID returns the discoverers name
+func (e Config) ServiceID() string {
+	return e.ID
 }

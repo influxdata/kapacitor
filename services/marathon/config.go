@@ -12,7 +12,7 @@ import (
 // Config is Marathon service discovery configuration
 type Config struct {
 	Enabled         bool          `toml:"enabled" override:"enabled"`
-	Name            string        `toml:"name" override:"name"`
+	ID              string        `toml:"id" override:"id"`
 	Servers         []string      `toml:"servers" override:"servers"`
 	Timeout         toml.Duration `toml:"timeout" override:"timeout"`
 	RefreshInterval toml.Duration `toml:"refresh-interval" override:"refresh-interval"`
@@ -29,31 +29,16 @@ type Config struct {
 	InsecureSkipVerify bool `toml:"insecure-skip-verify" override:"insecure-skip-verify"`
 }
 
-// NewConfig creates a Marathon discovery configuration with default values
-func NewConfig() Config {
-	return Config{
-		Enabled:         false,
-		Name:            "marathon",
-		Servers:         []string{},
-		Timeout:         toml.Duration(30 * time.Second),
-		RefreshInterval: toml.Duration(30 * time.Second),
-	}
-}
-
-// ApplyConditionalDefaults adds default values to existing Marathon configuration
-func (m *Config) ApplyConditionalDefaults() {
-	if m.Timeout == 0 {
-		m.Timeout = toml.Duration(30 * time.Second)
-	}
-	if m.RefreshInterval == 0 {
-		m.RefreshInterval = toml.Duration(30 * time.Second)
-	}
+// Init adds default values to existing Marathon configuration
+func (m *Config) Init() {
+	m.Timeout = toml.Duration(30 * time.Second)
+	m.RefreshInterval = toml.Duration(30 * time.Second)
 }
 
 // Validate validates Marathon configuration values
 func (m Config) Validate() error {
-	if m.Name == "" {
-		return fmt.Errorf("marathon discovery must be given a name")
+	if m.ID == "" {
+		return fmt.Errorf("marathon discovery must be given an ID")
 	}
 	return nil
 }
@@ -82,7 +67,7 @@ func (m Config) Service() string {
 	return "marathon"
 }
 
-// ID returns the discoverers name
-func (m Config) ID() string {
-	return m.Name
+// ServiceID returns the discoverers name
+func (m Config) ServiceID() string {
+	return m.ID
 }
