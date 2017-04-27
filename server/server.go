@@ -22,13 +22,21 @@ import (
 	iclient "github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
+	"github.com/influxdata/kapacitor/services/azure"
 	"github.com/influxdata/kapacitor/services/config"
+	"github.com/influxdata/kapacitor/services/consul"
 	"github.com/influxdata/kapacitor/services/deadman"
+	"github.com/influxdata/kapacitor/services/dns"
+	"github.com/influxdata/kapacitor/services/ec2"
+	"github.com/influxdata/kapacitor/services/file"
+	"github.com/influxdata/kapacitor/services/gce"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/influxdb"
 	"github.com/influxdata/kapacitor/services/k8s"
 	"github.com/influxdata/kapacitor/services/logging"
+	"github.com/influxdata/kapacitor/services/marathon"
+	"github.com/influxdata/kapacitor/services/nerve"
 	"github.com/influxdata/kapacitor/services/noauth"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
@@ -37,15 +45,18 @@ import (
 	"github.com/influxdata/kapacitor/services/reporting"
 	"github.com/influxdata/kapacitor/services/scraper"
 	"github.com/influxdata/kapacitor/services/sensu"
+	"github.com/influxdata/kapacitor/services/serverset"
 	"github.com/influxdata/kapacitor/services/servicetest"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/snmptrap"
+	"github.com/influxdata/kapacitor/services/static"
 	"github.com/influxdata/kapacitor/services/stats"
 	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/influxdata/kapacitor/services/talk"
 	"github.com/influxdata/kapacitor/services/task_store"
 	"github.com/influxdata/kapacitor/services/telegram"
+	"github.com/influxdata/kapacitor/services/triton"
 	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
@@ -90,7 +101,19 @@ type Server struct {
 	ConfigOverrideService *config.Service
 	TesterService         *servicetest.Service
 	StatsService          *stats.Service
-	ScraperService        *scraper.Service
+
+	ScraperService   *scraper.Service
+	AzureService     *azure.Service
+	ConsulService    *consul.Service
+	DNSService       *dns.Service
+	EC2Service       *ec2.Service
+	FileService      *file.Service
+	GCEService       *gce.Service
+	MarathonService  *marathon.Service
+	NerveService     *nerve.Service
+	ServersetService *serverset.Service
+	StaticService    *static.Service
+	TritonService    *triton.Service
 
 	MetaClient    *kapacitor.NoopMetaClient
 	QueryExecutor *Queryexecutor
@@ -226,7 +249,21 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	// to be reported
 	s.appendStatsService()
 	s.appendReportingService()
+
+	// Append Scraper and discovery services
 	s.appendScraperService()
+	s.appendAzureService(s.ScraperService)
+	s.appendConsulService(s.ScraperService)
+	s.appendDNSService(s.ScraperService)
+	s.appendEC2Service(s.ScraperService)
+	s.appendFileService(s.ScraperService)
+	s.appendGCEService(s.ScraperService)
+	s.appendMarathonService(s.ScraperService)
+	s.appendNerveService(s.ScraperService)
+	s.appendServersetService(s.ScraperService)
+	s.appendStaticService(s.ScraperService)
+	s.appendTritonService(s.ScraperService)
+
 	// Append HTTPD Service last so that the API is not listening till everything else succeeded.
 	s.appendHTTPDService()
 
@@ -639,13 +676,112 @@ func (s *Server) appendReportingService() {
 }
 
 func (s *Server) appendScraperService() {
-	c := s.config.Scraper
-	l := s.LogService.NewLogger("[scraper] ", log.LstdFlags)
+	c := s.config.Scrapers
+	l := s.LogService.NewLogger("[scrapers] ", log.LstdFlags)
 	srv := scraper.NewService(c, l)
 	srv.PointsWriter = s.TaskMaster
 	s.ScraperService = srv
-	s.SetDynamicService("scraper", srv)
-	s.AppendService("scraper", srv)
+	s.SetDynamicService("scrapers", srv)
+	s.AppendService("scrapers", srv)
+}
+
+func (s *Server) appendAzureService(r scraper.Registry) {
+	c := s.config.Azure
+	l := s.LogService.NewLogger("[azure] ", log.LstdFlags)
+	srv := azure.NewService(c, r, l)
+	s.AzureService = srv
+	s.SetDynamicService("azure", srv)
+	s.AppendService("azure", srv)
+}
+
+func (s *Server) appendConsulService(r scraper.Registry) {
+	c := s.config.Consul
+	l := s.LogService.NewLogger("[consul] ", log.LstdFlags)
+	srv := consul.NewService(c, r, l)
+	s.ConsulService = srv
+	s.SetDynamicService("consul", srv)
+	s.AppendService("consul", srv)
+}
+
+func (s *Server) appendDNSService(r scraper.Registry) {
+	c := s.config.DNS
+	l := s.LogService.NewLogger("[dns] ", log.LstdFlags)
+	srv := dns.NewService(c, r, l)
+	s.DNSService = srv
+	s.SetDynamicService("dns", srv)
+	s.AppendService("dns", srv)
+}
+
+func (s *Server) appendEC2Service(r scraper.Registry) {
+	c := s.config.EC2
+	l := s.LogService.NewLogger("[ec2] ", log.LstdFlags)
+	srv := ec2.NewService(c, r, l)
+	s.EC2Service = srv
+	s.SetDynamicService("ec2", srv)
+	s.AppendService("ec2", srv)
+}
+
+func (s *Server) appendFileService(r scraper.Registry) {
+	c := s.config.Files
+	l := s.LogService.NewLogger("[files] ", log.LstdFlags)
+	srv := file.NewService(c, r, l)
+	s.FileService = srv
+	s.SetDynamicService("files", srv)
+	s.AppendService("files", srv)
+}
+
+func (s *Server) appendGCEService(r scraper.Registry) {
+	c := s.config.GCE
+	l := s.LogService.NewLogger("[gce] ", log.LstdFlags)
+	srv := gce.NewService(c, r, l)
+	s.GCEService = srv
+	s.SetDynamicService("gce", srv)
+	s.AppendService("gce", srv)
+}
+
+func (s *Server) appendMarathonService(r scraper.Registry) {
+	c := s.config.Marathon
+	l := s.LogService.NewLogger("[marathon] ", log.LstdFlags)
+	srv := marathon.NewService(c, r, l)
+	s.MarathonService = srv
+	s.SetDynamicService("marathon", srv)
+	s.AppendService("marathon", srv)
+}
+
+func (s *Server) appendNerveService(r scraper.Registry) {
+	c := s.config.Nerve
+	l := s.LogService.NewLogger("[nerve] ", log.LstdFlags)
+	srv := nerve.NewService(c, r, l)
+	s.NerveService = srv
+	s.SetDynamicService("nerve", srv)
+	s.AppendService("nerve", srv)
+}
+
+func (s *Server) appendServersetService(r scraper.Registry) {
+	c := s.config.Serverset
+	l := s.LogService.NewLogger("[serverset] ", log.LstdFlags)
+	srv := serverset.NewService(c, r, l)
+	s.ServersetService = srv
+	s.SetDynamicService("serverset", srv)
+	s.AppendService("serverset", srv)
+}
+
+func (s *Server) appendStaticService(r scraper.Registry) {
+	c := s.config.Static
+	l := s.LogService.NewLogger("[static] ", log.LstdFlags)
+	srv := static.NewService(c, r, l)
+	s.StaticService = srv
+	s.SetDynamicService("static", srv)
+	s.AppendService("static", srv)
+}
+
+func (s *Server) appendTritonService(r scraper.Registry) {
+	c := s.config.Triton
+	l := s.LogService.NewLogger("[triton] ", log.LstdFlags)
+	srv := triton.NewService(c, r, l)
+	s.TritonService = srv
+	s.SetDynamicService("triton", srv)
+	s.AppendService("triton", srv)
 }
 
 // Err returns an error channel that multiplexes all out of band errors received from all services.

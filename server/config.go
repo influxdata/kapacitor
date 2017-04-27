@@ -13,13 +13,21 @@ import (
 
 	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/services/alerta"
+	"github.com/influxdata/kapacitor/services/azure"
 	"github.com/influxdata/kapacitor/services/config"
+	"github.com/influxdata/kapacitor/services/consul"
 	"github.com/influxdata/kapacitor/services/deadman"
+	"github.com/influxdata/kapacitor/services/dns"
+	"github.com/influxdata/kapacitor/services/ec2"
+	"github.com/influxdata/kapacitor/services/file"
+	"github.com/influxdata/kapacitor/services/gce"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/influxdb"
 	"github.com/influxdata/kapacitor/services/k8s"
 	"github.com/influxdata/kapacitor/services/logging"
+	"github.com/influxdata/kapacitor/services/marathon"
+	"github.com/influxdata/kapacitor/services/nerve"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pushover"
@@ -27,14 +35,17 @@ import (
 	"github.com/influxdata/kapacitor/services/reporting"
 	"github.com/influxdata/kapacitor/services/scraper"
 	"github.com/influxdata/kapacitor/services/sensu"
+	"github.com/influxdata/kapacitor/services/serverset"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/snmptrap"
+	"github.com/influxdata/kapacitor/services/static"
 	"github.com/influxdata/kapacitor/services/stats"
 	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/influxdata/kapacitor/services/talk"
 	"github.com/influxdata/kapacitor/services/task_store"
 	"github.com/influxdata/kapacitor/services/telegram"
+	"github.com/influxdata/kapacitor/services/triton"
 	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
@@ -51,7 +62,6 @@ type Config struct {
 	Storage        storage.Config    `toml:"storage"`
 	Task           task_store.Config `toml:"task"`
 	InfluxDB       []influxdb.Config `toml:"influxdb" override:"influxdb,element-key=name"`
-	Scraper        scraper.Config    `toml:"scraper" override:"scraper"`
 	Logging        logging.Config    `toml:"logging"`
 	ConfigOverride config.Config     `toml:"config-override"`
 
@@ -74,6 +84,20 @@ type Config struct {
 	Talk      talk.Config      `toml:"talk" override:"talk"`
 	Telegram  telegram.Config  `toml:"telegram" override:"telegram"`
 	VictorOps victorops.Config `toml:"victorops" override:"victorops"`
+
+	// Discovery for scraping
+	Scrapers  []scraper.Config   `toml:"scrapers" override:"scrapers,element-key=name"`
+	Azure     []azure.Config     `toml:"azure" override:"azure,element-key=name"`
+	Consul    []consul.Config    `toml:"consul" override:"consul,element-key=name"`
+	DNS       []dns.Config       `toml:"dns" override:"dns,element-key=name"`
+	EC2       []ec2.Config       `toml:"ec2" override:"ec2,element-key=name"`
+	Files     []file.Config      `toml:"files" override:"files,element-key=name"`
+	GCE       []gce.Config       `toml:"gce" override:"gce,element-key=name"`
+	Marathon  []marathon.Config  `toml:"marathon" override:"marathon,element-key=name"`
+	Nerve     []nerve.Config     `toml:"nerve" override:"nerve,element-key=name"`
+	Serverset []serverset.Config `toml:"serverset" override:"serverset,element-key=name"`
+	Static    []static.Config    `toml:"static" override:"static,element-key=name"`
+	Triton    []triton.Config    `toml:"triton" override:"triton,element-key=name"`
 
 	// Third-party integrations
 	Kubernetes k8s.Config `toml:"kubernetes" override:"kubernetes"`
@@ -103,7 +127,6 @@ func NewConfig() *Config {
 	c.Replay = replay.NewConfig()
 	c.Task = task_store.NewConfig()
 	c.InfluxDB = []influxdb.Config{influxdb.NewConfig()}
-	c.Scraper = scraper.NewConfig()
 	c.Logging = logging.NewConfig()
 	c.Kubernetes = k8s.NewConfig()
 	c.ConfigOverride = config.NewConfig()
@@ -123,6 +146,19 @@ func NewConfig() *Config {
 	c.SNMPTrap = snmptrap.NewConfig()
 	c.Telegram = telegram.NewConfig()
 	c.VictorOps = victorops.NewConfig()
+
+	c.Scrapers = []scraper.Config{scraper.NewConfig()}
+	c.Azure = []azure.Config{azure.NewConfig()}
+	c.Consul = []consul.Config{consul.NewConfig()}
+	c.DNS = []dns.Config{dns.NewConfig()}
+	c.EC2 = []ec2.Config{ec2.NewConfig()}
+	c.Files = []file.Config{file.NewConfig()}
+	c.GCE = []gce.Config{gce.NewConfig()}
+	c.Marathon = []marathon.Config{marathon.NewConfig()}
+	c.Nerve = []nerve.Config{nerve.NewConfig()}
+	c.Serverset = []serverset.Config{serverset.NewConfig()}
+	c.Static = []static.Config{static.NewConfig()}
+	c.Triton = []triton.Config{triton.NewConfig()}
 
 	c.Reporting = reporting.NewConfig()
 	c.Stats = stats.NewConfig()
@@ -253,6 +289,94 @@ func (c *Config) Validate() error {
 	if err := c.UDF.Validate(); err != nil {
 		return err
 	}
+
+	// Validate scrapers
+	for i := range c.Scrapers {
+		c.Scrapers[i].ApplyConditionalDefaults()
+		config := c.Scrapers[i]
+		if err := config.Validate(); err != nil {
+			return err
+		}
+	}
+
+	for i := range c.Azure {
+		c.Azure[i].ApplyConditionalDefaults()
+		config := c.Azure[i]
+		if err := config.Validate(); err != nil {
+			return err
+		}
+	}
+
+	for i := range c.DNS {
+		c.DNS[i].ApplyConditionalDefaults()
+		config := c.DNS[i]
+		if err := config.Validate(); err != nil {
+			return err
+		}
+	}
+
+	for i := range c.EC2 {
+		c.EC2[i].ApplyConditionalDefaults()
+		config := c.EC2[i]
+		if err := config.Validate(); err != nil {
+			return err
+		}
+	}
+
+	for i := range c.Files {
+		c.Files[i].ApplyConditionalDefaults()
+		config := c.Files[i]
+		if err := config.Validate(); err != nil {
+			return err
+		}
+	}
+
+	for i := range c.GCE {
+		c.GCE[i].ApplyConditionalDefaults()
+		config := c.GCE[i]
+		if err := config.Validate(); err != nil {
+			return err
+		}
+	}
+
+	for i := range c.Marathon {
+		c.Marathon[i].ApplyConditionalDefaults()
+		config := c.Marathon[i]
+		if err := config.Validate(); err != nil {
+			return err
+		}
+	}
+
+	for i := range c.Nerve {
+		c.Nerve[i].ApplyConditionalDefaults()
+		config := c.Nerve[i]
+		if err := config.Validate(); err != nil {
+			return err
+		}
+	}
+
+	for i := range c.Serverset {
+		c.Serverset[i].ApplyConditionalDefaults()
+		config := c.Serverset[i]
+		if err := config.Validate(); err != nil {
+			return err
+		}
+	}
+
+	for i := range c.Static {
+		if err := c.Serverset[i].Validate(); err != nil {
+			return err
+		}
+	}
+
+	for i := range c.Triton {
+		c.Triton[i].ApplyConditionalDefaults()
+		config := c.Triton[i]
+		if err := config.Validate(); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
