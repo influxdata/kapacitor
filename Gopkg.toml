@@ -1,6 +1,10 @@
 required = ["github.com/benbjohnson/tmpl","github.com/golang/protobuf/protoc-gen-go"]
 
 [[dependencies]]
+  name = "github.com/Azure/azure-sdk-for-go"
+  revision = "bd73d950fa4440dae889bd9917bff7cef539f86e"
+
+[[dependencies]]
   branch = "master"
   name = "github.com/davecgh/go-spew"
 
@@ -27,3 +31,7 @@ required = ["github.com/benbjohnson/tmpl","github.com/golang/protobuf/protoc-gen
 [[dependencies]]
   branch = "master"
   name = "github.com/shurcooL/markdownfmt"
+
+[[overrides]]
+  name = "github.com/Azure/azure-sdk-for-go"
+  revision = "bd73d950fa4440dae889bd9917bff7cef539f86e"
