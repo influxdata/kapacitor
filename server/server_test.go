@@ -4025,6 +4025,487 @@ func TestServer_ReplayQuery(t *testing.T) {
 	}
 }
 
+// Test for recording and replaying a stream query where data has missing fields and tags.
+func TestServer_RecordReplayQuery_Missing(t *testing.T) {
+	c := NewConfig()
+	c.InfluxDB[0].Enabled = true
+	db := NewInfluxDB(func(q string) *iclient.Response {
+		if len(q) > 6 && q[:6] == "SELECT" {
+			r := &iclient.Response{
+				Results: []iclient.Result{{
+					Series: []imodels.Row{
+						{
+							Name:    "m",
+							Tags:    map[string]string{"t1": "", "t2": ""},
+							Columns: []string{"time", "a", "b"},
+							Values: [][]interface{}{
+								{
+									time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC).Format(time.RFC3339Nano),
+									1.0,
+									nil,
+								},
+								{
+									time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC).Format(time.RFC3339Nano),
+									nil,
+									2.0,
+								},
+								{
+									time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC).Format(time.RFC3339Nano),
+									nil,
+									10.0,
+								},
+								{
+									time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC).Format(time.RFC3339Nano),
+									11.0,
+									nil,
+								},
+							},
+						},
+						{
+							Name:    "m",
+							Tags:    map[string]string{"t1": "", "t2": "4"},
+							Columns: []string{"time", "a", "b"},
+							Values: [][]interface{}{
+								{
+									time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC).Format(time.RFC3339Nano),
+									4.0,
+									4.0,
+								},
+							},
+						},
+						{
+							Name:    "m",
+							Tags:    map[string]string{"t1": "", "t2": "7"},
+							Columns: []string{"time", "a", "b"},
+							Values: [][]interface{}{
+								{
+									time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC).Format(time.RFC3339Nano),
+									nil,
+									7.0,
+								},
+							},
+						},
+						{
+							Name:    "m",
+							Tags:    map[string]string{"t1": "3", "t2": ""},
+							Columns: []string{"time", "a", "b"},
+							Values: [][]interface{}{
+								{
+									time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC).Format(time.RFC3339Nano),
+									3.0,
+									3.0,
+								},
+							},
+						},
+						{
+							Name:    "m",
+							Tags:    map[string]string{"t1": "5", "t2": ""},
+							Columns: []string{"time", "a", "b"},
+							Values: [][]interface{}{
+								{
+									time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC).Format(time.RFC3339Nano),
+									5.0,
+									5.0,
+								},
+							},
+						},
+						{
+							Name:    "m",
+							Tags:    map[string]string{"t1": "6", "t2": ""},
+							Columns: []string{"time", "a", "b"},
+							Values: [][]interface{}{
+								{
+									time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC).Format(time.RFC3339Nano),
+									nil,
+									6.0,
+								},
+							},
+						},
+						{
+							Name:    "m",
+							Tags:    map[string]string{"t1": "8", "t2": ""},
+							Columns: []string{"time", "a", "b"},
+							Values: [][]interface{}{
+								{
+									time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC).Format(time.RFC3339Nano),
+									nil,
+									8.0,
+								},
+							},
+						},
+						{
+							Name:    "m",
+							Tags:    map[string]string{"t1": "9", "t2": ""},
+							Columns: []string{"time", "a", "b"},
+							Values: [][]interface{}{
+								{
+									time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC).Format(time.RFC3339Nano),
+									nil,
+									9.0,
+								},
+							},
+						},
+					},
+				}},
+			}
+			return r
+		}
+		return nil
+	})
+	c.InfluxDB[0].URLs = []string{db.URL()}
+	s := OpenServer(c)
+	defer s.Close()
+	cli := Client(s)
+
+	id := "testStreamQueryRecordReplay"
+	ttype := client.StreamTask
+	dbrps := []client.DBRP{{
+		Database:        "mydb",
+		RetentionPolicy: "myrp",
+	}}
+
+	// setup temp dir for alert.log
+	tmpDir, err := ioutil.TempDir("", "testStreamTaskRecordingReplay")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	tick := `stream
+	|from()
+		.measurement('m')
+	|log()
+	|alert()
+		.id('test-stream-query')
+		.crit(lambda: TRUE)
+		.details('')
+		.log('` + tmpDir + `/alert.log')
+`
+
+	if _, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	recording, err := cli.RecordQuery(client.RecordQueryOptions{
+		ID:    "recordingid",
+		Query: "SELECT * FROM mydb.myrp.m",
+		Type:  client.StreamTask,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exp, got := "/kapacitor/v1/recordings/recordingid", recording.Link.Href; exp != got {
+		t.Errorf("unexpected recording.Link.Href got %s exp %s", got, exp)
+	}
+	// Wait for recording to finish.
+	retry := 0
+	for recording.Status == client.Running {
+		time.Sleep(100 * time.Millisecond)
+		recording, err = cli.Recording(recording.Link)
+		if err != nil {
+			t.Fatal(err)
+		}
+		retry++
+		if retry > 10 {
+			t.Fatal("failed to perfom recording")
+		}
+	}
+
+	replay, err := cli.CreateReplay(client.CreateReplayOptions{
+		Task:          id,
+		Recording:     recording.ID,
+		Clock:         client.Fast,
+		RecordingTime: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exp, got := id, replay.Task; exp != got {
+		t.Errorf("unexpected replay.Task got %s exp %s", got, exp)
+	}
+
+	// Wait for replay to finish.
+	retry = 0
+	for replay.Status == client.Running {
+		time.Sleep(100 * time.Millisecond)
+		replay, err = cli.Replay(replay.Link)
+		if err != nil {
+			t.Fatal(err)
+		}
+		retry++
+		if retry > 10 {
+			t.Fatal("failed to perfom replay")
+		}
+	}
+
+	// Validate we got the data in the alert.log
+
+	f, err := os.Open(path.Join(tmpDir, "alert.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	exp := []alertservice.AlertData{
+		{
+			ID:       "test-stream-query",
+			Message:  "test-stream-query is CRITICAL",
+			Time:     time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+			Level:    alert.Critical,
+			Duration: 0 * time.Second,
+			Data: models.Result{
+				Series: models.Rows{
+					{
+						Name:    "m",
+						Columns: []string{"time", "a"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+								1.0,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			ID:       "test-stream-query",
+			Message:  "test-stream-query is CRITICAL",
+			Time:     time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+			Level:    alert.Critical,
+			Duration: 1 * time.Second,
+			Data: models.Result{
+				Series: models.Rows{
+					{
+						Name:    "m",
+						Columns: []string{"time", "b"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+								2.0,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			ID:       "test-stream-query",
+			Message:  "test-stream-query is CRITICAL",
+			Time:     time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+			Level:    alert.Critical,
+			Duration: 2 * time.Second,
+			Data: models.Result{
+				Series: models.Rows{
+					{
+						Name:    "m",
+						Tags:    map[string]string{"t1": "3"},
+						Columns: []string{"time", "a", "b"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+								3.0,
+								3.0,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			ID:       "test-stream-query",
+			Message:  "test-stream-query is CRITICAL",
+			Time:     time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+			Level:    alert.Critical,
+			Duration: 3 * time.Second,
+			Data: models.Result{
+				Series: models.Rows{
+					{
+						Name:    "m",
+						Tags:    map[string]string{"t2": "4"},
+						Columns: []string{"time", "a", "b"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+								4.0,
+								4.0,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			ID:       "test-stream-query",
+			Message:  "test-stream-query is CRITICAL",
+			Time:     time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+			Level:    alert.Critical,
+			Duration: 4 * time.Second,
+			Data: models.Result{
+				Series: models.Rows{
+					{
+						Name:    "m",
+						Tags:    map[string]string{"t1": "5"},
+						Columns: []string{"time", "a", "b"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+								5.0,
+								5.0,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			ID:       "test-stream-query",
+			Message:  "test-stream-query is CRITICAL",
+			Time:     time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+			Level:    alert.Critical,
+			Duration: 5 * time.Second,
+			Data: models.Result{
+				Series: models.Rows{
+					{
+						Name:    "m",
+						Tags:    map[string]string{"t1": "6"},
+						Columns: []string{"time", "b"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+								6.0,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			ID:       "test-stream-query",
+			Message:  "test-stream-query is CRITICAL",
+			Time:     time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+			Level:    alert.Critical,
+			Duration: 6 * time.Second,
+			Data: models.Result{
+				Series: models.Rows{
+					{
+						Name:    "m",
+						Tags:    map[string]string{"t2": "7"},
+						Columns: []string{"time", "b"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+								7.0,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			ID:       "test-stream-query",
+			Message:  "test-stream-query is CRITICAL",
+			Time:     time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+			Level:    alert.Critical,
+			Duration: 7 * time.Second,
+			Data: models.Result{
+				Series: models.Rows{
+					{
+						Name:    "m",
+						Tags:    map[string]string{"t1": "8"},
+						Columns: []string{"time", "b"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+								8.0,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			ID:       "test-stream-query",
+			Message:  "test-stream-query is CRITICAL",
+			Time:     time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
+			Level:    alert.Critical,
+			Duration: 8 * time.Second,
+			Data: models.Result{
+				Series: models.Rows{
+					{
+						Name:    "m",
+						Tags:    map[string]string{"t1": "9"},
+						Columns: []string{"time", "b"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
+								9.0,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			ID:       "test-stream-query",
+			Message:  "test-stream-query is CRITICAL",
+			Time:     time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+			Level:    alert.Critical,
+			Duration: 9 * time.Second,
+			Data: models.Result{
+				Series: models.Rows{
+					{
+						Name:    "m",
+						Columns: []string{"time", "b"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+								10.0,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			ID:       "test-stream-query",
+			Message:  "test-stream-query is CRITICAL",
+			Time:     time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
+			Level:    alert.Critical,
+			Duration: 10 * time.Second,
+			Data: models.Result{
+				Series: models.Rows{
+					{
+						Name:    "m",
+						Columns: []string{"time", "a"},
+						Values: [][]interface{}{
+							{
+								time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
+								11.0,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	dec := json.NewDecoder(f)
+	var got []alertservice.AlertData
+	for dec.More() {
+		g := alertservice.AlertData{}
+		dec.Decode(&g)
+		got = append(got, g)
+	}
+	if !reflect.DeepEqual(exp, got) {
+		t.Errorf("unexpected alert log:\ngot %+v\nexp %+v", got, exp)
+	}
+}
+
 // If this test fails due to missing python dependencies, run 'INSTALL_PREFIX=/usr/local ./install-deps.sh' from the root directory of the
 // kapacitor project.
 func TestServer_UDFStreamAgents(t *testing.T) {
