@@ -10,6 +10,8 @@ TODO:
 - test discover 2 hours+
 - blacklisting? 2 hour+
 redact 30 mins
+- add scraper object
+- add scraper type
 */
 import (
 	"fmt"
@@ -28,28 +30,30 @@ var (
 	_ storage.SampleAppender = &Service{}
 )
 
-// TargetManager represents a scraping/discovery manager
-type TargetManager interface {
-	ApplyConfig(cfg *config.Config) error
-	Stop()
-	Run()
-}
-
 // Service represents the scraper manager
 type Service struct {
 	PointsWriter interface {
 		WritePoints(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
 	}
-	mu      sync.Mutex
-	wg      sync.WaitGroup
-	open    bool
-	closing chan struct{}
+	mu sync.Mutex
+	wg sync.WaitGroup
+
+	open     bool
+	closing  chan struct{}
+	updating chan *config.Config
+
 	configs []Config
 
 	logger *log.Logger
 
 	discoverers []Discoverer
-	mgr         TargetManager
+
+	// TargetManager represents a scraping/discovery manager
+	mgr interface {
+		ApplyConfig(cfg *config.Config) error
+		Stop()
+		Run()
+	}
 }
 
 // NewService creates a new scraper service
@@ -71,6 +75,7 @@ func (s *Service) Open() error {
 	defer s.mu.Unlock()
 
 	s.open = true
+	s.updating = make(chan *config.Config)
 	s.closing = make(chan struct{})
 
 	go s.scrape()
@@ -90,7 +95,9 @@ func (s *Service) Close() error {
 	}
 
 	s.open = false
+	close(s.updating)
 	close(s.closing)
+
 	s.wg.Wait()
 
 	s.logger.Println("I! closed service")
@@ -104,20 +111,26 @@ func (s *Service) scrape() {
 		pairs := s.Pairs()
 
 		s.mu.Lock()
-		err := s.apply(pairs)
+		conf := s.prom(pairs)
 		s.mu.Unlock()
 
-		if err != nil {
-			panic(err)
-		}
+		s.mgr.ApplyConfig(conf)
 
 		s.mgr.Run()
 	}()
-	select {
-	case <-s.closing:
-		s.mgr.Stop()
+
+	for {
+		select {
+		case <-s.closing:
+			s.mgr.Stop()
+			return
+		case conf := <-s.updating:
+			if s.open {
+				s.logger.Println("I! updating scraper service")
+				s.mgr.ApplyConfig(conf)
+			}
+		}
 	}
-	return
 }
 
 // Append tranforms prometheus samples and inserts data into the tasks pipeline
@@ -161,6 +174,7 @@ func (s *Service) Test(options interface{}) error {
 func (s *Service) Update(newConfigs []interface{}) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	configs := make([]Config, len(newConfigs))
 	for i, c := range newConfigs {
 		if config, ok := c.(Config); ok {
@@ -169,34 +183,49 @@ func (s *Service) Update(newConfigs []interface{}) error {
 			return fmt.Errorf("unexpected config object type, got %T exp %T", c, config)
 		}
 	}
+
 	s.configs = configs
 	pairs := s.Pairs()
-	return s.apply(pairs)
+	conf := s.prom(pairs)
+	s.updating <- conf
+	return nil
 }
 
-// apply assumes service is locked
-func (s *Service) apply(pairs []Pair) error {
+// prom assumes service is locked
+func (s *Service) prom(pairs []Pair) *config.Config {
 	conf := &config.Config{
 		ScrapeConfigs: make([]*config.ScrapeConfig, len(pairs)),
 	}
+
 	for i, pair := range pairs {
 		sc := pair.Scraper.Prom()
 		pair.Discoverer.Prom(sc)
 		conf.ScrapeConfigs[i] = sc
 	}
-	return s.mgr.ApplyConfig(conf)
+	return conf
 }
 
 // Commit applies the configuration to the scraper
 func (s *Service) Commit() error {
+	if !s.open {
+		return nil
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	pairs := s.Pairs()
-	return s.apply(pairs)
+	conf := s.prom(pairs)
+	s.updating <- conf
+	return nil
 }
 
 // AddDiscoverer adds discoverer to the registry
 func (s *Service) AddDiscoverer(discoverer Discoverer) {
+	if !s.open {
+		return
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -205,6 +234,10 @@ func (s *Service) AddDiscoverer(discoverer Discoverer) {
 
 // RemoveDiscoverer removes discoverer from the registry
 func (s *Service) RemoveDiscoverer(rm Discoverer) {
+	if !s.open {
+		return
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -217,6 +250,10 @@ func (s *Service) RemoveDiscoverer(rm Discoverer) {
 
 // AddScrapers adds scrapers to the registry
 func (s *Service) AddScrapers(scrapers []Config) {
+	if !s.open {
+		return
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.configs = append(s.configs, scrapers...)
@@ -224,6 +261,10 @@ func (s *Service) AddScrapers(scrapers []Config) {
 
 // RemoveScrapers removes scrapers from the registry
 func (s *Service) RemoveScrapers(scrapers []Config) {
+	if !s.open {
+		return
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, rm := range scrapers {
@@ -243,7 +284,7 @@ func (s *Service) Pairs() []Pair {
 			continue
 		}
 		for _, d := range s.discoverers {
-			if scr.DiscoverName == d.ServiceID() && scr.DiscoverService == d.Service() {
+			if scr.DiscoverID == d.ServiceID() && scr.DiscoverService == d.Service() {
 				pairs = append(pairs, Pair{
 					Scraper:    scr,
 					Discoverer: d,
