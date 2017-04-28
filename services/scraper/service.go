@@ -195,9 +195,11 @@ func (s *Service) Update(newConfigs []interface{}) error {
 	}
 
 	s.configs = configs
-	pairs := s.Pairs()
-	conf := s.prom(pairs)
-	s.updating <- conf
+	if s.open {
+		pairs := s.Pairs()
+		conf := s.prom(pairs)
+		s.updating <- conf
+	}
 	return nil
 }
 
