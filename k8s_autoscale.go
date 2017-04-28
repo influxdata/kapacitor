@@ -44,7 +44,7 @@ type K8sAutoscaleNode struct {
 
 // Create a new K8sAutoscaleNode which can trigger autoscale event for a Kubernetes cluster.
 func newK8sAutoscaleNode(et *ExecutingTask, n *pipeline.K8sAutoscaleNode, l *log.Logger) (*K8sAutoscaleNode, error) {
-	client, err := et.tm.K8sService.Client()
+	client, err := et.tm.K8sService.Client(n.Cluster)
 	if err != nil {
 		return nil, fmt.Errorf("cannot use the k8sAutoscale node, could not create kubernetes client: %v", err)
 	}

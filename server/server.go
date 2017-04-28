@@ -815,7 +815,7 @@ func (s *Server) startServices() error {
 		s.Logger.Printf("D! opened service: %T", service)
 
 		// Apply config overrides after the config override service has been opened and before any dynamic services.
-		if service == s.ConfigOverrideService && !s.config.SkipConfigOverrides {
+		if service == s.ConfigOverrideService && !s.config.SkipConfigOverrides && s.config.ConfigOverride.Enabled {
 			// Apply initial config updates
 			s.Logger.Println("D! applying configuration overrides")
 			configs, err := s.ConfigOverrideService.Config()
@@ -833,7 +833,6 @@ func (s *Server) startServices() error {
 				}
 			}
 		}
-
 	}
 	return nil
 }

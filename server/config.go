@@ -100,7 +100,7 @@ type Config struct {
 	Triton    []triton.Config    `toml:"triton" override:"triton,element-key=id"`
 
 	// Third-party integrations
-	Kubernetes k8s.Config `toml:"kubernetes" override:"kubernetes"`
+	Kubernetes k8s.Configs `toml:"kubernetes" override:"kubernetes,element-key=id"`
 
 	Reporting reporting.Config `toml:"reporting"`
 	Stats     stats.Config     `toml:"stats"`
@@ -128,7 +128,6 @@ func NewConfig() *Config {
 	c.Task = task_store.NewConfig()
 	c.InfluxDB = []influxdb.Config{influxdb.NewConfig()}
 	c.Logging = logging.NewConfig()
-	c.Kubernetes = k8s.NewConfig()
 	c.ConfigOverride = config.NewConfig()
 
 	c.Collectd = collectd.NewConfig()
@@ -318,6 +317,10 @@ func (c *Config) Validate() error {
 		if err := c.GCE[i].Validate(); err != nil {
 			return err
 		}
+	}
+
+	if err := c.Kubernetes.Validate(); err != nil {
+		return err
 	}
 
 	for i := range c.Marathon {
