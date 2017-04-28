@@ -128,7 +128,7 @@ func (s *Service) Test(options interface{}) error {
 	}
 
 	sd := s.Configs[found].PromConfig()
-	discoverer, err := pmarathon.NewDiscovery(sd)
+	discoverer, err := pmarathon.NewDiscovery(sd, scraper.NewLogger(s.logger))
 	if err != nil {
 		return err
 	}

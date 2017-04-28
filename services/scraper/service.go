@@ -49,7 +49,7 @@ func NewService(c []Config, l *log.Logger) *Service {
 		configs: c,
 		logger:  l,
 	}
-	s.mgr = retrieval.NewTargetManager(s)
+	s.mgr = retrieval.NewTargetManager(s, NewLogger(l))
 	return s
 }
 

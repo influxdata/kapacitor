@@ -128,7 +128,7 @@ func (s *Service) Test(options interface{}) error {
 	}
 
 	sd := s.Configs[found].PromConfig()
-	discoverer := pdns.NewDiscovery(sd)
+	discoverer := pdns.NewDiscovery(sd, scraper.NewLogger(s.logger))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	updates := make(chan []*config.TargetGroup)

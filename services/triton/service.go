@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor/services/scraper"
-	plog "github.com/prometheus/common/log"
 	"github.com/prometheus/prometheus/config"
 	ptriton "github.com/prometheus/prometheus/discovery/triton"
 )
@@ -129,7 +128,7 @@ func (s *Service) Test(options interface{}) error {
 	}
 
 	sd := s.Configs[found].PromConfig()
-	discoverer, err := ptriton.New(&Logger{s.logger}, sd)
+	discoverer, err := ptriton.New(scraper.NewLogger(s.logger), sd)
 	if err != nil {
 		return err
 	}
@@ -153,72 +152,4 @@ func (s *Service) Test(options interface{}) error {
 	cancel()
 
 	return err
-}
-
-type Logger struct {
-	*log.Logger
-}
-
-func (l *Logger) Debug(v ...interface{}) {
-	l.Logger.Print("D! ", v)
-}
-
-func (l *Logger) Debugln(v ...interface{}) {
-	l.Logger.Println("D! ", v)
-}
-
-func (l *Logger) Debugf(s string, v ...interface{}) {
-	l.Logger.Printf("D! "+s, v)
-}
-
-func (l *Logger) Info(v ...interface{}) {
-	l.Logger.Print("I! ", v)
-}
-
-func (l *Logger) Infoln(v ...interface{}) {
-	l.Logger.Println("I! ", v)
-}
-
-func (l *Logger) Infof(s string, v ...interface{}) {
-	l.Logger.Printf("I! "+s, v)
-}
-
-func (l *Logger) Warn(v ...interface{}) {
-	l.Logger.Print("W! ", v)
-}
-
-func (l *Logger) Warnln(v ...interface{}) {
-	l.Logger.Println("W! ", v)
-}
-
-func (l *Logger) Warnf(s string, v ...interface{}) {
-	l.Logger.Printf("W! "+s, v)
-}
-
-func (l *Logger) Error(v ...interface{}) {
-	l.Logger.Print("E! ", v)
-}
-
-func (l *Logger) Errorln(v ...interface{}) {
-	l.Logger.Println("E! ", v)
-}
-
-func (l *Logger) Errorf(s string, v ...interface{}) {
-	l.Logger.Printf("E! "+s, v)
-}
-
-func (l *Logger) Fatal(v ...interface{}) {
-	l.Logger.Fatal(v)
-}
-
-func (l *Logger) Fatalln(v ...interface{}) {
-	l.Logger.Fatalln(v)
-}
-
-func (l *Logger) Fatalf(s string, v ...interface{}) {
-	l.Logger.Fatalf(s, v)
-}
-
-func (l *Logger) With(key string, value interface{}) plog.Logger {
-	return l
 }

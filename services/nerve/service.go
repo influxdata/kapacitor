@@ -128,7 +128,7 @@ func (s *Service) Test(options interface{}) error {
 	}
 
 	sd := s.Configs[found].PromConfig()
-	discoverer := pnerve.NewNerveDiscovery(sd)
+	discoverer := pnerve.NewNerveDiscovery(sd, scraper.NewLogger(s.logger))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	updates := make(chan []*config.TargetGroup)
