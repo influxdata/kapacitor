@@ -3,6 +3,7 @@ package scraper
 import (
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/influxdata/influxdb/toml"
@@ -14,8 +15,12 @@ import (
 type Config struct {
 	Enabled bool `toml:"enabled" override:"enabled"`
 	// The job name to which the job label is set by default.
-	Name            string `toml:"name" override:"name"`
-	Database        string `toml:"db" override:"db"`
+	Name string `toml:"name" override:"name"`
+	// Type of the scraper
+	Type string `toml:"type" override:"type"`
+	// Database this data will be associated with
+	Database string `toml:"db" override:"db"`
+	// RetentionPolicyt this data will be associated with
 	RetentionPolicy string `toml:"rp" override:"rp"`
 	// The URL scheme with which to fetch metrics from targets.
 	Scheme string `toml:"scheme" override:"scheme"`
@@ -52,20 +57,9 @@ type Config struct {
 	DiscoverService string `toml:"discoverer-service" override:"discoverer-service"`
 }
 
-// NewConfig creates a new configuration with default values
-func NewConfig() Config {
-	return Config{
-		Enabled:        false,
-		ScrapeInterval: toml.Duration(time.Minute),
-		ScrapeTimeout:  toml.Duration(10 * time.Second),
-		MetricsPath:    "/metrics",
-		Scheme:         "http",
-		Name:           "name",
-	}
-}
-
 // Init adds default values to Config scraper
 func (c *Config) Init() {
+	c.Type = "prometheus"
 	c.ScrapeInterval = toml.Duration(time.Minute)
 	c.ScrapeTimeout = toml.Duration(10 * time.Second)
 	c.MetricsPath = "/metrics"
@@ -83,6 +77,9 @@ func (c *Config) Validate() error {
 	if c.RetentionPolicy == "" {
 		return fmt.Errorf("scraper config must be given an rp")
 	}
+	if c.Type != "prometheus" {
+		return fmt.Errorf("Unknown scraper type")
+	}
 
 	return nil
 }
@@ -90,7 +87,7 @@ func (c *Config) Validate() error {
 // Prom generates the prometheus configuration for the scraper
 func (c *Config) Prom() *config.ScrapeConfig {
 	sc := &config.ScrapeConfig{
-		JobName:        c.Name,
+		JobName:        encodeJobName(c.Database, c.RetentionPolicy, c.Name),
 		Scheme:         c.Scheme,
 		MetricsPath:    c.MetricsPath,
 		Params:         c.Params,
@@ -114,6 +111,21 @@ func (c *Config) Prom() *config.ScrapeConfig {
 		},
 	}
 	return sc
+}
+
+func encodeJobName(db, rp, name string) string {
+	// Because I cannot add label information to my scraped targets
+	// I'm abusing the JobName by encoding database, retention policy,
+	// and name.
+	return fmt.Sprintf("%s|%s|%s", db, rp, name)
+}
+
+func decodeJobName(job string) (string, string, string, error) {
+	split := strings.Split(job, "|")
+	if len(split) != 3 {
+		return "", "", "", fmt.Errorf("unable to decode job name")
+	}
+	return split[0], split[1], split[2], nil
 }
 
 type KubernetesRole string

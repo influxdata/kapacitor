@@ -1,14 +1,5 @@
 package scraper
 
-/*
-TODO:
-- Add db/rp (specify in coniguration) 1 hour
-- Fixup logging (vendoring?) 2 hour delay)
-- test scraping 2 hours+
-- blacklisting? 2 hour+
-- add scraper object 1 hour
-- add scraper type
-*/
 import (
 	"fmt"
 	"log"
@@ -131,19 +122,28 @@ func (s *Service) scrape() {
 
 // Append tranforms prometheus samples and inserts data into the tasks pipeline
 func (s *Service) Append(sample *model.Sample) error {
+	var err error
+	db := ""
+	rp := ""
+	job := ""
+
 	p := float64(sample.Value)
 	tags := map[string]string{}
 	for name, value := range sample.Metric {
+		if name == "job" {
+			db, rp, job, err = decodeJobName(string(value))
+			continue
+		}
 		tags[string(name)] = string(value)
 	}
 	fields := models.Fields{}
 	fields["value"] = p
-	pt, err := models.NewPoint("meas", models.NewTags(tags), fields, sample.Timestamp.Time())
+	pt, err := models.NewPoint(job, models.NewTags(tags), fields, sample.Timestamp.Time())
 	if err != nil {
 		return err
 	}
 	// TODO: figure out how to get db/rp
-	s.PointsWriter.WritePoints("cpg", "myrp", models.ConsistencyLevelAny, []models.Point{pt})
+	s.PointsWriter.WritePoints(db, rp, models.ConsistencyLevelAny, []models.Point{pt})
 	return nil
 }
 
