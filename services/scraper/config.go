@@ -30,21 +30,21 @@ type Config struct {
 	Username string `toml:"username" override:"username"`
 	Password string `toml:"password" override:"password"`
 	// The CA cert to use for the targets.
-	CAFile string `toml:"ca_file" override:"ca_file"`
+	CAFile string `toml:"ca-file" override:"ca-file"`
 	// The client cert file for the targets.
-	CertFile string `toml:"cert_file" override:"cert_file"`
+	CertFile string `toml:"cert-file" override:"cert-file"`
 	// The client key file for the targets.
-	KeyFile string `toml:"key_file" override:"key_file"`
+	KeyFile string `toml:"key-file" override:"key-file"`
 	// Used to verify the hostname for the targets.
-	ServerName string `toml:"server_name" override:"server_name"`
+	ServerName string `toml:"server-name" override:"server-name"`
 	// Disable target certificate validation.
-	InsecureSkipVerify bool `toml:"insecure_skip_verify" override:"insecure_skip_verify"`
+	InsecureSkipVerify bool `toml:"insecure-skip-verify" override:"insecure-skip-verify"`
 	// The bearer token for the targets.
 	BearerToken string `toml:"bearer-token" override:"bearer-token"`
 	// HTTP proxy server to use to connect to the targets.
 	ProxyURL *url.URL `toml:"proxy-url" override:"proxy-url"`
-	// DiscoverName is the name of the discoverer that generates hosts for the scraper
-	DiscoverName string `toml:"discoverer-name" override:"discoverer-name"`
+	// DiscoverID is the id of the discoverer that generates hosts for the scraper
+	DiscoverID string `toml:"discoverer-id" override:"discoverer-id"`
 	// DiscoverService is the type of the discoverer that generates hosts for the scraper
 	DiscoverService string `toml:"discoverer-service" override:"discoverer-service"`
 }
@@ -61,8 +61,13 @@ func NewConfig() Config {
 	}
 }
 
-// ApplyConditionalDefaults adds default values to Config scraper
-func (c *Config) ApplyConditionalDefaults() {}
+// Init adds default values to Config scraper
+func (c *Config) Init() {
+	c.ScrapeInterval = toml.Duration(time.Minute)
+	c.ScrapeTimeout = toml.Duration(10 * time.Second)
+	c.MetricsPath = "/metrics"
+	c.Scheme = "http"
+}
 
 // Validate validates the configuration of the Scraper
 func (c *Config) Validate() error {
