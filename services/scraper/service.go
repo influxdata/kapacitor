@@ -127,7 +127,6 @@ func (s *Service) Append(sample *model.Sample) error {
 	rp := ""
 	job := ""
 
-	p := float64(sample.Value)
 	tags := map[string]string{}
 	for name, value := range sample.Metric {
 		if name == "job" {
@@ -136,15 +135,30 @@ func (s *Service) Append(sample *model.Sample) error {
 		}
 		tags[string(name)] = string(value)
 	}
-	fields := models.Fields{}
-	fields["value"] = p
+
+	// If instance is blacklisted then do not send to PointsWriter
+	if instance, ok := tags["instance"]; ok {
+		for i := range s.configs {
+			if s.configs[i].Name == job {
+				for _, listed := range s.configs[i].Blacklist {
+					if instance == listed {
+						return nil
+					}
+				}
+			}
+		}
+	}
+
+	fields := models.Fields{
+		"value": float64(sample.Value),
+	}
+
 	pt, err := models.NewPoint(job, models.NewTags(tags), fields, sample.Timestamp.Time())
 	if err != nil {
 		return err
 	}
-	// TODO: figure out how to get db/rp
-	s.PointsWriter.WritePoints(db, rp, models.ConsistencyLevelAny, []models.Point{pt})
-	return nil
+
+	return s.PointsWriter.WritePoints(db, rp, models.ConsistencyLevelAny, []models.Point{pt})
 }
 
 // NeedsThrottling conforms to SampleAppender and never returns true currently.
