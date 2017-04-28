@@ -2,7 +2,6 @@ package scraper
 
 /*
 TODO:
-- validate (at least one discovery)
 - Add db/rp (specify in coniguration) 1 hour
 - Fixup logging (vendoring?) 2 hour delay)
 - test scraping 2 hours+

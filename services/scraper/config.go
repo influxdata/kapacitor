@@ -1,6 +1,7 @@
 package scraper
 
 import (
+	"fmt"
 	"net/url"
 	"time"
 
@@ -29,18 +30,20 @@ type Config struct {
 	// The HTTP basic authentication credentials for the targets.
 	Username string `toml:"username" override:"username"`
 	Password string `toml:"password" override:"password,redact"`
-	// The CA cert to use for the targets.
-	CAFile string `toml:"ca-file" override:"ca-file"`
-	// The client cert file for the targets.
-	CertFile string `toml:"cert-file" override:"cert-file"`
-	// The client key file for the targets.
-	KeyFile string `toml:"key-file" override:"key-file"`
-	// Used to verify the hostname for the targets.
-	ServerName string `toml:"server-name" override:"server-name"`
-	// Disable target certificate validation.
+
+	// Path to CA file
+	SSLCA string `toml:"ssl-ca" override:"ssl-ca"`
+	// Path to host cert file
+	SSLCert string `toml:"ssl-cert" override:"ssl-cert"`
+	// Path to cert key file
+	SSLKey string `toml:"ssl-key" override:"ssl-key"`
+	// SSLServerName is used to verify the hostname for the targets.
+	SSLServerName string `toml:"ssl-server-name" override:"ssl-server-name"`
+	// Use SSL but skip chain & host verification
 	InsecureSkipVerify bool `toml:"insecure-skip-verify" override:"insecure-skip-verify"`
+
 	// The bearer token for the targets.
-	BearerToken string `toml:"bearer-token" override:"bearer-token"`
+	BearerToken string `toml:"bearer-token" override:"bearer-token,redact"`
 	// HTTP proxy server to use to connect to the targets.
 	ProxyURL *url.URL `toml:"proxy-url" override:"proxy-url"`
 	// DiscoverID is the id of the discoverer that generates hosts for the scraper
@@ -71,6 +74,16 @@ func (c *Config) Init() {
 
 // Validate validates the configuration of the Scraper
 func (c *Config) Validate() error {
+	if c.Name == "" {
+		return fmt.Errorf("scraper config must be given a name")
+	}
+	if c.Database == "" {
+		return fmt.Errorf("scraper config must be given a db")
+	}
+	if c.RetentionPolicy == "" {
+		return fmt.Errorf("scraper config must be given an rp")
+	}
+
 	return nil
 }
 
@@ -92,10 +105,10 @@ func (c *Config) Prom() *config.ScrapeConfig {
 				URL: c.ProxyURL,
 			},
 			TLSConfig: config.TLSConfig{
-				CAFile:             c.CAFile,
-				CertFile:           c.CertFile,
-				KeyFile:            c.KeyFile,
-				ServerName:         c.ServerName,
+				CAFile:             c.SSLCA,
+				CertFile:           c.SSLCert,
+				KeyFile:            c.SSLKey,
+				ServerName:         c.SSLServerName,
 				InsecureSkipVerify: c.InsecureSkipVerify,
 			},
 		},
