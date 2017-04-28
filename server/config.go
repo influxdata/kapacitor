@@ -279,87 +279,73 @@ func (c *Config) Validate() error {
 
 	// Validate scrapers
 	for i := range c.Scrapers {
-		c.Scrapers[i].ApplyConditionalDefaults()
-		config := c.Scrapers[i]
-		if err := config.Validate(); err != nil {
+		if err := c.Scrapers[i].Validate(); err != nil {
 			return err
 		}
 	}
 
 	for i := range c.Azure {
-		c.Azure[i].ApplyConditionalDefaults()
-		config := c.Azure[i]
-		if err := config.Validate(); err != nil {
+		if err := c.Azure[i].Validate(); err != nil {
+			return err
+		}
+	}
+
+	for i := range c.Consul {
+		if err := c.Consul[i].Validate(); err != nil {
 			return err
 		}
 	}
 
 	for i := range c.DNS {
-		c.DNS[i].ApplyConditionalDefaults()
-		config := c.DNS[i]
-		if err := config.Validate(); err != nil {
+		if err := c.DNS[i].Validate(); err != nil {
 			return err
 		}
 	}
 
 	for i := range c.EC2 {
-		c.EC2[i].ApplyConditionalDefaults()
-		config := c.EC2[i]
-		if err := config.Validate(); err != nil {
+		if err := c.EC2[i].Validate(); err != nil {
 			return err
 		}
 	}
 
 	for i := range c.Files {
-		c.Files[i].ApplyConditionalDefaults()
-		config := c.Files[i]
-		if err := config.Validate(); err != nil {
+		if err := c.Files[i].Validate(); err != nil {
 			return err
 		}
 	}
 
 	for i := range c.GCE {
-		c.GCE[i].ApplyConditionalDefaults()
-		config := c.GCE[i]
-		if err := config.Validate(); err != nil {
+		if err := c.GCE[i].Validate(); err != nil {
 			return err
 		}
 	}
 
 	for i := range c.Marathon {
-		c.Marathon[i].ApplyConditionalDefaults()
-		config := c.Marathon[i]
-		if err := config.Validate(); err != nil {
+		if err := c.Marathon[i].Validate(); err != nil {
 			return err
 		}
 	}
 
 	for i := range c.Nerve {
-		c.Nerve[i].ApplyConditionalDefaults()
-		config := c.Nerve[i]
-		if err := config.Validate(); err != nil {
+		if err := c.Nerve[i].Validate(); err != nil {
 			return err
 		}
 	}
 
 	for i := range c.Serverset {
-		c.Serverset[i].ApplyConditionalDefaults()
-		config := c.Serverset[i]
-		if err := config.Validate(); err != nil {
-			return err
-		}
-	}
-
-	for i := range c.Static {
 		if err := c.Serverset[i].Validate(); err != nil {
 			return err
 		}
 	}
 
+	for i := range c.Static {
+		if err := c.Static[i].Validate(); err != nil {
+			return err
+		}
+	}
+
 	for i := range c.Triton {
-		c.Triton[i].ApplyConditionalDefaults()
-		config := c.Triton[i]
-		if err := config.Validate(); err != nil {
+		if err := c.Triton[i].Validate(); err != nil {
 			return err
 		}
 	}
