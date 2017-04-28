@@ -3,14 +3,11 @@ package scraper
 /*
 TODO:
 - validate (at least one discovery)
-- update running configuration (change from interface) 1 hour
 - Add db/rp (specify in coniguration) 1 hour
 - Fixup logging (vendoring?) 2 hour delay)
 - test scraping 2 hours+
-- test discover 2 hours+
 - blacklisting? 2 hour+
-redact 30 mins
-- add scraper object
+- add scraper object 1 hour
 - add scraper type
 */
 import (

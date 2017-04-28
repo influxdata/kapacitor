@@ -28,7 +28,7 @@ type Config struct {
 	ScrapeTimeout toml.Duration `toml:"scrape-timeout" override:"scrape-timeout"`
 	// The HTTP basic authentication credentials for the targets.
 	Username string `toml:"username" override:"username"`
-	Password string `toml:"password" override:"password"`
+	Password string `toml:"password" override:"password,redact"`
 	// The CA cert to use for the targets.
 	CAFile string `toml:"ca-file" override:"ca-file"`
 	// The client cert file for the targets.

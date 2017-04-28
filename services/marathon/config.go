@@ -16,7 +16,7 @@ type Config struct {
 	Servers         []string      `toml:"servers" override:"servers"`
 	Timeout         toml.Duration `toml:"timeout" override:"timeout"`
 	RefreshInterval toml.Duration `toml:"refresh-interval" override:"refresh-interval"`
-	BearerToken     string        `toml:"bearer-token" override:"bearer-token"`
+	BearerToken     string        `toml:"bearer-token" override:"bearer-token,redact"`
 	// Path to CA file
 	SSLCA string `toml:"ssl-ca" override:"ssl-ca"`
 	// Path to host cert file
