@@ -1,11 +1,15 @@
 package ec2
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/influxdata/kapacitor/services/scraper"
+	"github.com/prometheus/prometheus/config"
+	pec2 "github.com/prometheus/prometheus/discovery/ec2"
 )
 
 // Service is the ec2 discovery service
@@ -97,12 +101,53 @@ func (s *Service) Update(newConfigs []interface{}) error {
 	return s.registry.Commit()
 }
 
+type testOptions struct {
+	ID string `json:"id"`
+}
+
 // TestOptions returns an object that is in turn passed to Test.
 func (s *Service) TestOptions() interface{} {
-	return nil
+	return &testOptions{}
 }
 
 // Test a service with the provided options.
 func (s *Service) Test(options interface{}) error {
-	return nil
+	o, ok := options.(*testOptions)
+	if !ok {
+		return fmt.Errorf("unexpected options type %T", options)
+	}
+
+	found := -1
+	for i := range s.Configs {
+		if s.Configs[i].ID == o.ID && s.Configs[i].Enabled {
+			found = i
+		}
+	}
+	if found < 0 {
+		return fmt.Errorf("discoverer %q is not enabled or does not exist", o.ID)
+	}
+
+	sd := s.Configs[found].PromConfig()
+	discoverer := pec2.NewDiscovery(sd)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	updates := make(chan []*config.TargetGroup)
+	go discoverer.Run(ctx, updates)
+
+	var err error
+	select {
+	case _, ok := <-updates:
+		// Handle the case that a target provider exits and closes the channel
+		// before the context is done.
+		if !ok {
+			err = fmt.Errorf("discoverer %q exited ", o.ID)
+		}
+		break
+	case <-time.After(30 * time.Second):
+		err = fmt.Errorf("timeout waiting for discoverer %q to return", o.ID)
+		break
+	}
+	cancel()
+
+	return err
 }

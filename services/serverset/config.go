@@ -37,14 +37,19 @@ func (s Config) Validate() error {
 	return nil
 }
 
-// Prom creates prometheus configuration from Serverset
+// Prom writes the prometheus configuration for discoverer into ScrapeConfig
 func (s Config) Prom(c *config.ScrapeConfig) {
 	c.ServiceDiscoveryConfig.ServersetSDConfigs = []*config.ServersetSDConfig{
-		&config.ServersetSDConfig{
-			Servers: s.Servers,
-			Paths:   s.Paths,
-			Timeout: model.Duration(s.Timeout),
-		},
+		s.PromConfig(),
+	}
+}
+
+// PromConfig returns the prometheus configuration for this discoverer
+func (s Config) PromConfig() *config.ServersetSDConfig {
+	return &config.ServersetSDConfig{
+		Servers: s.Servers,
+		Paths:   s.Paths,
+		Timeout: model.Duration(s.Timeout),
 	}
 }
 

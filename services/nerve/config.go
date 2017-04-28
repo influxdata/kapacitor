@@ -37,14 +37,19 @@ func (n Config) Validate() error {
 	return nil
 }
 
-// Prom creates a prometheus configuration for Nerve
+// Prom writes the prometheus configuration for discoverer into ScrapeConfig
 func (n Config) Prom(c *config.ScrapeConfig) {
 	c.ServiceDiscoveryConfig.NerveSDConfigs = []*config.NerveSDConfig{
-		&config.NerveSDConfig{
-			Servers: n.Servers,
-			Paths:   n.Paths,
-			Timeout: model.Duration(n.Timeout),
-		},
+		n.PromConfig(),
+	}
+}
+
+// PromConfig returns the prometheus configuration for this discoverer
+func (n Config) PromConfig() *config.NerveSDConfig {
+	return &config.NerveSDConfig{
+		Servers: n.Servers,
+		Paths:   n.Paths,
+		Timeout: model.Duration(n.Timeout),
 	}
 }
 

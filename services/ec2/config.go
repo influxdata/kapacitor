@@ -38,17 +38,22 @@ func (e Config) Validate() error {
 	return nil
 }
 
-// Prom creates a prometheus configuration for EC2
+// Prom writes the prometheus configuration for discoverer into ScrapeConfig
 func (e Config) Prom(c *config.ScrapeConfig) {
 	c.ServiceDiscoveryConfig.EC2SDConfigs = []*config.EC2SDConfig{
-		&config.EC2SDConfig{
-			Region:          e.Region,
-			AccessKey:       e.AccessKey,
-			SecretKey:       e.SecretKey,
-			Profile:         e.Profile,
-			RefreshInterval: model.Duration(e.RefreshInterval),
-			Port:            e.Port,
-		},
+		e.PromConfig(),
+	}
+}
+
+// PromConfig returns the prometheus configuration for this discoverer
+func (e Config) PromConfig() *config.EC2SDConfig {
+	return &config.EC2SDConfig{
+		Region:          e.Region,
+		AccessKey:       e.AccessKey,
+		SecretKey:       e.SecretKey,
+		Profile:         e.Profile,
+		RefreshInterval: model.Duration(e.RefreshInterval),
+		Port:            e.Port,
 	}
 }
 

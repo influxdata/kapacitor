@@ -35,17 +35,22 @@ func (a Config) Validate() error {
 	return nil
 }
 
-// Prom returns the prometheus configuration for this discoverer
+// Prom writes the prometheus configuration for discoverer into ScrapeConfig
 func (a Config) Prom(c *config.ScrapeConfig) {
 	c.ServiceDiscoveryConfig.AzureSDConfigs = []*config.AzureSDConfig{
-		&config.AzureSDConfig{
-			Port:            a.Port,
-			SubscriptionID:  a.SubscriptionID,
-			TenantID:        a.TenantID,
-			ClientID:        a.ClientID,
-			ClientSecret:    a.ClientSecret,
-			RefreshInterval: model.Duration(a.RefreshInterval),
-		},
+		a.PromConfig(),
+	}
+}
+
+// PromConfig returns the prometheus configuration for this discoverer
+func (a Config) PromConfig() *config.AzureSDConfig {
+	return &config.AzureSDConfig{
+		Port:            a.Port,
+		SubscriptionID:  a.SubscriptionID,
+		TenantID:        a.TenantID,
+		ClientID:        a.ClientID,
+		ClientSecret:    a.ClientSecret,
+		RefreshInterval: model.Duration(a.RefreshInterval),
 	}
 }
 

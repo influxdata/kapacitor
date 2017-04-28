@@ -49,20 +49,25 @@ func (t Config) Validate() error {
 // Prom creates a prometheus configuration for Triton
 func (t Config) Prom(c *config.ScrapeConfig) {
 	c.ServiceDiscoveryConfig.TritonSDConfigs = []*config.TritonSDConfig{
-		&config.TritonSDConfig{
-			Account:         t.Account,
-			DNSSuffix:       t.DNSSuffix,
-			Endpoint:        t.Endpoint,
-			Port:            t.Port,
-			RefreshInterval: model.Duration(t.RefreshInterval),
-			Version:         t.Version,
-			TLSConfig: config.TLSConfig{
-				CAFile:             t.SSLCA,
-				CertFile:           t.SSLCert,
-				KeyFile:            t.SSLKey,
-				ServerName:         t.SSLServerName,
-				InsecureSkipVerify: t.InsecureSkipVerify,
-			},
+		t.PromConfig(),
+	}
+}
+
+// PromConfig returns the prometheus configuration for this discoverer
+func (t Config) PromConfig() *config.TritonSDConfig {
+	return &config.TritonSDConfig{
+		Account:         t.Account,
+		DNSSuffix:       t.DNSSuffix,
+		Endpoint:        t.Endpoint,
+		Port:            t.Port,
+		RefreshInterval: model.Duration(t.RefreshInterval),
+		Version:         t.Version,
+		TLSConfig: config.TLSConfig{
+			CAFile:             t.SSLCA,
+			CertFile:           t.SSLCert,
+			KeyFile:            t.SSLKey,
+			ServerName:         t.SSLServerName,
+			InsecureSkipVerify: t.InsecureSkipVerify,
 		},
 	}
 }

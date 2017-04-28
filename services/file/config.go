@@ -39,13 +39,18 @@ func (f Config) Validate() error {
 	return nil
 }
 
-// Prom creates a prometheus configuration for the File discovery
+// Prom writes the prometheus configuration for discoverer into ScrapeConfig
 func (f Config) Prom(c *config.ScrapeConfig) {
 	c.ServiceDiscoveryConfig.FileSDConfigs = []*config.FileSDConfig{
-		&config.FileSDConfig{
-			Files:           f.Files,
-			RefreshInterval: model.Duration(f.RefreshInterval),
-		},
+		f.PromConfig(),
+	}
+}
+
+// PromConfig returns the prometheus configuration for this discoverer
+func (f Config) PromConfig() *config.FileSDConfig {
+	return &config.FileSDConfig{
+		Files:           f.Files,
+		RefreshInterval: model.Duration(f.RefreshInterval),
 	}
 }
 

@@ -32,8 +32,13 @@ func (s Config) Validate() error {
 	return nil
 }
 
-// Prom creates a prometheus configuration from Static
+// Prom writes the prometheus configuration for discoverer into ScrapeConfig
 func (s Config) Prom(c *config.ScrapeConfig) {
+	c.ServiceDiscoveryConfig.StaticConfigs = s.PromConfig()
+}
+
+// PromConfig returns the prometheus configuration for this discoverer
+func (s Config) PromConfig() []*config.TargetGroup {
 	set := func(l map[string]string) model.LabelSet {
 		res := make(model.LabelSet)
 		for k, v := range l {
@@ -48,7 +53,7 @@ func (s Config) Prom(c *config.ScrapeConfig) {
 		}
 		return res
 	}
-	c.ServiceDiscoveryConfig.StaticConfigs = []*config.TargetGroup{
+	return []*config.TargetGroup{
 		&config.TargetGroup{
 			Targets: target(s.Targets),
 			Labels:  set(s.Labels),

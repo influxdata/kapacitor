@@ -49,25 +49,30 @@ func (c Config) Validate() error {
 	return nil
 }
 
-// Prom creates a prometheus configuration from Consul configuration
+// Prom writes the prometheus configuration for discoverer into ScrapeConfig
 func (c Config) Prom(conf *config.ScrapeConfig) {
 	conf.ServiceDiscoveryConfig.ConsulSDConfigs = []*config.ConsulSDConfig{
-		&config.ConsulSDConfig{
-			Server:       c.Address,
-			Token:        c.Token,
-			Datacenter:   c.Datacenter,
-			TagSeparator: c.TagSeparator,
-			Scheme:       c.Scheme,
-			Username:     c.Username,
-			Password:     c.Password,
-			Services:     c.Services,
-			TLSConfig: config.TLSConfig{
-				CAFile:             c.SSLCA,
-				CertFile:           c.SSLCert,
-				KeyFile:            c.SSLKey,
-				ServerName:         c.SSLServerName,
-				InsecureSkipVerify: c.InsecureSkipVerify,
-			},
+		c.PromConfig(),
+	}
+}
+
+// PromConfig returns the prometheus configuration for this discoverer
+func (c Config) PromConfig() *config.ConsulSDConfig {
+	return &config.ConsulSDConfig{
+		Server:       c.Address,
+		Token:        c.Token,
+		Datacenter:   c.Datacenter,
+		TagSeparator: c.TagSeparator,
+		Scheme:       c.Scheme,
+		Username:     c.Username,
+		Password:     c.Password,
+		Services:     c.Services,
+		TLSConfig: config.TLSConfig{
+			CAFile:             c.SSLCA,
+			CertFile:           c.SSLCert,
+			KeyFile:            c.SSLKey,
+			ServerName:         c.SSLServerName,
+			InsecureSkipVerify: c.InsecureSkipVerify,
 		},
 	}
 }

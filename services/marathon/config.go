@@ -43,21 +43,26 @@ func (m Config) Validate() error {
 	return nil
 }
 
-// Prom creates prometheus configuration for Marathon
+// Prom writes the prometheus configuration for discoverer into ScrapeConfig
 func (m Config) Prom(c *config.ScrapeConfig) {
 	c.ServiceDiscoveryConfig.MarathonSDConfigs = []*config.MarathonSDConfig{
-		&config.MarathonSDConfig{
-			Servers:         m.Servers,
-			Timeout:         model.Duration(m.Timeout),
-			RefreshInterval: model.Duration(m.RefreshInterval),
-			BearerToken:     m.BearerToken,
-			TLSConfig: config.TLSConfig{
-				CAFile:             m.SSLCA,
-				CertFile:           m.SSLCert,
-				KeyFile:            m.SSLKey,
-				ServerName:         m.SSLServerName,
-				InsecureSkipVerify: m.InsecureSkipVerify,
-			},
+		m.PromConfig(),
+	}
+}
+
+// PromConfig returns the prometheus configuration for this discoverer
+func (m Config) PromConfig() *config.MarathonSDConfig {
+	return &config.MarathonSDConfig{
+		Servers:         m.Servers,
+		Timeout:         model.Duration(m.Timeout),
+		RefreshInterval: model.Duration(m.RefreshInterval),
+		BearerToken:     m.BearerToken,
+		TLSConfig: config.TLSConfig{
+			CAFile:             m.SSLCA,
+			CertFile:           m.SSLCert,
+			KeyFile:            m.SSLKey,
+			ServerName:         m.SSLServerName,
+			InsecureSkipVerify: m.InsecureSkipVerify,
 		},
 	}
 }

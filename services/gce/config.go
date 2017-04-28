@@ -36,17 +36,22 @@ func (g Config) Validate() error {
 	return nil
 }
 
-// Prom creates a prometheus configuration for GCE
+// Prom writes the prometheus configuration for discoverer into ScrapeConfig
 func (g Config) Prom(c *config.ScrapeConfig) {
 	c.ServiceDiscoveryConfig.GCESDConfigs = []*config.GCESDConfig{
-		&config.GCESDConfig{
-			Project:         g.Project,
-			Zone:            g.Zone,
-			Filter:          g.Filter,
-			RefreshInterval: model.Duration(g.RefreshInterval),
-			Port:            g.Port,
-			TagSeparator:    g.TagSeparator,
-		},
+		g.PromConfig(),
+	}
+}
+
+// PromConfig returns the prometheus configuration for this discoverer
+func (g Config) PromConfig() *config.GCESDConfig {
+	return &config.GCESDConfig{
+		Project:         g.Project,
+		Zone:            g.Zone,
+		Filter:          g.Filter,
+		RefreshInterval: model.Duration(g.RefreshInterval),
+		Port:            g.Port,
+		TagSeparator:    g.TagSeparator,
 	}
 }
 

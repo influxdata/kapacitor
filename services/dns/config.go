@@ -43,15 +43,20 @@ func (d Config) Validate() error {
 	return nil
 }
 
-// Prom creates the prometheus configuration using the DNS configuration
+// Prom writes the prometheus configuration for discoverer into ScrapeConfig
 func (d Config) Prom(c *config.ScrapeConfig) {
 	c.ServiceDiscoveryConfig.DNSSDConfigs = []*config.DNSSDConfig{
-		&config.DNSSDConfig{
-			Names:           d.RecordNames,
-			RefreshInterval: model.Duration(d.RefreshInterval),
-			Type:            d.Type,
-			Port:            d.Port,
-		},
+		d.PromConfig(),
+	}
+}
+
+// PromConfig returns the prometheus configuration for this discoverer
+func (d Config) PromConfig() *config.DNSSDConfig {
+	return &config.DNSSDConfig{
+		Names:           d.RecordNames,
+		RefreshInterval: model.Duration(d.RefreshInterval),
+		Type:            d.Type,
+		Port:            d.Port,
 	}
 }
 
