@@ -56,7 +56,7 @@ func (f Config) PromConfig() *config.FileSDConfig {
 
 // Service return discoverer type
 func (f Config) Service() string {
-	return "file"
+	return "files"
 }
 
 // ServiceID returns the discoverers name
