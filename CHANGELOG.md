@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased [unreleased]
+## v1.3.0-beta1 [2017-04-29]
 
 ### Release Notes
 
