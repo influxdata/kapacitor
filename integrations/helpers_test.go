@@ -183,7 +183,7 @@ type k8sScales struct {
 func (k k8sAutoscale) Versions() (k8s.APIVersions, error) {
 	return k8s.APIVersions{}, nil
 }
-func (k k8sAutoscale) Client() (k8s.Client, error) {
+func (k k8sAutoscale) Client(string) (k8s.Client, error) {
 	return k, nil
 }
 func (k k8sAutoscale) Scales(namespace string) k8s.ScalesInterface {

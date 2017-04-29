@@ -35,6 +35,7 @@ import (
 	"github.com/influxdata/kapacitor/services/alert/alerttest"
 	"github.com/influxdata/kapacitor/services/alerta/alertatest"
 	"github.com/influxdata/kapacitor/services/hipchat/hipchattest"
+	"github.com/influxdata/kapacitor/services/k8s"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/opsgenie/opsgenietest"
 	"github.com/influxdata/kapacitor/services/pagerduty"
@@ -5564,13 +5565,15 @@ func TestServer_UpdateConfig(t *testing.T) {
 		{
 			section: "kubernetes",
 			setDefaults: func(c *server.Config) {
-				c.Kubernetes.APIServers = []string{"http://localhost:80001"}
+				c.Kubernetes = k8s.Configs{k8s.NewConfig()}
+				c.Kubernetes[0].APIServers = []string{"http://localhost:80001"}
 			},
 			expDefaultSection: client.ConfigSection{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/kubernetes"},
 				Elements: []client.ConfigElement{{
 					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/kubernetes/"},
 					Options: map[string]interface{}{
+						"id":          "",
 						"api-servers": []interface{}{"http://localhost:80001"},
 						"ca-path":     "",
 						"enabled":     false,
@@ -5586,6 +5589,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 			expDefaultElement: client.ConfigElement{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/kubernetes/"},
 				Options: map[string]interface{}{
+					"id":          "",
 					"api-servers": []interface{}{"http://localhost:80001"},
 					"ca-path":     "",
 					"enabled":     false,
@@ -5609,6 +5613,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						Elements: []client.ConfigElement{{
 							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/kubernetes/"},
 							Options: map[string]interface{}{
+								"id":          "",
 								"api-servers": []interface{}{"http://localhost:80001"},
 								"ca-path":     "",
 								"enabled":     false,
@@ -5624,6 +5629,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 					expElement: client.ConfigElement{
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/kubernetes/"},
 						Options: map[string]interface{}{
+							"id":          "",
 							"api-servers": []interface{}{"http://localhost:80001"},
 							"ca-path":     "",
 							"enabled":     false,
@@ -6572,6 +6578,47 @@ func TestServer_ListServiceTests(t *testing.T) {
 				},
 			},
 			{
+				Link: client.Link{Relation: "self", Href: "/kapacitor/v1/service-tests/azure"},
+				Name: "azure",
+				Options: client.ServiceTestOptions{
+					"id": "",
+				},
+			},
+			{
+				Link: client.Link{Relation: "self", Href: "/kapacitor/v1/service-tests/consul"},
+				Name: "consul",
+				Options: client.ServiceTestOptions{
+					"id": "",
+				},
+			},
+			{
+				Link: client.Link{Relation: "self", Href: "/kapacitor/v1/service-tests/dns"},
+				Name: "dns",
+				Options: client.ServiceTestOptions{
+					"id": ""},
+			},
+			{
+				Link: client.Link{Relation: "self", Href: "/kapacitor/v1/service-tests/ec2"},
+				Name: "ec2",
+				Options: client.ServiceTestOptions{
+					"id": "",
+				},
+			},
+			{
+				Link: client.Link{Relation: "self", Href: "/kapacitor/v1/service-tests/files"},
+				Name: "files",
+				Options: client.ServiceTestOptions{
+					"id": "",
+				},
+			},
+			{
+				Link: client.Link{Relation: "self", Href: "/kapacitor/v1/service-tests/gce"},
+				Name: "gce",
+				Options: client.ServiceTestOptions{
+					"id": "",
+				},
+			},
+			{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/hipchat"},
 				Name: "hipchat",
 				Options: client.ServiceTestOptions{
@@ -6588,9 +6635,25 @@ func TestServer_ListServiceTests(t *testing.T) {
 				},
 			},
 			{
-				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/kubernetes"},
-				Name:    "kubernetes",
-				Options: nil,
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/kubernetes"},
+				Name: "kubernetes",
+				Options: client.ServiceTestOptions{
+					"id": "",
+				},
+			},
+			{
+				Link: client.Link{Relation: "self", Href: "/kapacitor/v1/service-tests/marathon"},
+				Name: "marathon",
+				Options: client.ServiceTestOptions{
+					"id": "",
+				},
+			},
+			{
+				Link: client.Link{Relation: "self", Href: "/kapacitor/v1/service-tests/nerve"},
+				Name: "nerve",
+				Options: client.ServiceTestOptions{
+					"id": "",
+				},
 			},
 			{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/opsgenie"},
@@ -6627,6 +6690,13 @@ func TestServer_ListServiceTests(t *testing.T) {
 				},
 			},
 			{
+				Link: client.Link{Relation: "self", Href: "/kapacitor/v1/service-tests/scrapers"},
+				Name: "scrapers",
+				Options: client.ServiceTestOptions{
+					"name": "",
+				},
+			},
+			{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/sensu"},
 				Name: "sensu",
 				Options: client.ServiceTestOptions{
@@ -6634,6 +6704,13 @@ func TestServer_ListServiceTests(t *testing.T) {
 					"output": "testOutput",
 					"source": "Kapacitor",
 					"level":  "CRITICAL",
+				},
+			},
+			{
+				Link: client.Link{Relation: "self", Href: "/kapacitor/v1/service-tests/serverset"},
+				Name: "serverset",
+				Options: client.ServiceTestOptions{
+					"id": "",
 				},
 			},
 			{
@@ -6671,6 +6748,13 @@ func TestServer_ListServiceTests(t *testing.T) {
 				},
 			},
 			{
+				Link: client.Link{Relation: "self", Href: "/kapacitor/v1/service-tests/static"},
+				Name: "static",
+				Options: client.ServiceTestOptions{
+					"id": "",
+				},
+			},
+			{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/talk"},
 				Name: "talk",
 				Options: client.ServiceTestOptions{
@@ -6687,6 +6771,13 @@ func TestServer_ListServiceTests(t *testing.T) {
 					"message":                  "test telegram message",
 					"disable-web-page-preview": false,
 					"disable-notification":     false,
+				},
+			},
+			{
+				Link: client.Link{Relation: "self", Href: "/kapacitor/v1/service-tests/triton"},
+				Name: "triton",
+				Options: client.ServiceTestOptions{
+					"id": "",
 				},
 			},
 			{
@@ -6729,6 +6820,13 @@ func TestServer_ListServiceTests_WithPattern(t *testing.T) {
 		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests"},
 		Services: []client.ServiceTest{
 			{
+				Link: client.Link{Relation: "self", Href: "/kapacitor/v1/service-tests/scrapers"},
+				Name: "scrapers",
+				Options: client.ServiceTestOptions{
+					"name": "",
+				},
+			},
+			{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/sensu"},
 				Name: "sensu",
 				Options: client.ServiceTestOptions{
@@ -6736,6 +6834,13 @@ func TestServer_ListServiceTests_WithPattern(t *testing.T) {
 					"output": "testOutput",
 					"source": "Kapacitor",
 					"level":  "CRITICAL",
+				},
+			},
+			{
+				Link: client.Link{Relation: "self", Href: "/kapacitor/v1/service-tests/serverset"},
+				Name: "serverset",
+				Options: client.ServiceTestOptions{
+					"id": "",
 				},
 			},
 			{
@@ -6772,6 +6877,13 @@ func TestServer_ListServiceTests_WithPattern(t *testing.T) {
 					},
 				},
 			},
+			{
+				Link: client.Link{Relation: "self", Href: "/kapacitor/v1/service-tests/static"},
+				Name: "static",
+				Options: client.ServiceTestOptions{
+					"id": "",
+				},
+			},
 		},
 	}
 	if got, exp := serviceTests.Link.Href, expServiceTests.Link.Href; got != exp {
@@ -6779,6 +6891,7 @@ func TestServer_ListServiceTests_WithPattern(t *testing.T) {
 	}
 	if got, exp := len(serviceTests.Services), len(expServiceTests.Services); got != exp {
 		t.Fatalf("unexpected length of services: got %d exp %d", got, exp)
+
 	}
 	for i := range expServiceTests.Services {
 		exp := expServiceTests.Services[i]
@@ -6842,10 +6955,12 @@ func TestServer_DoServiceTest(t *testing.T) {
 		},
 		{
 			service: "kubernetes",
-			options: client.ServiceTestOptions{},
+			options: client.ServiceTestOptions{
+				"id": "default",
+			},
 			exp: client.ServiceTestResult{
 				Success: false,
-				Message: "failed to get client: service is not enabled",
+				Message: "unknown kubernetes cluster \"default\"",
 			},
 		},
 		{

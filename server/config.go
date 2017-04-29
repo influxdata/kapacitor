@@ -13,27 +13,39 @@ import (
 
 	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/services/alerta"
+	"github.com/influxdata/kapacitor/services/azure"
 	"github.com/influxdata/kapacitor/services/config"
+	"github.com/influxdata/kapacitor/services/consul"
 	"github.com/influxdata/kapacitor/services/deadman"
+	"github.com/influxdata/kapacitor/services/dns"
+	"github.com/influxdata/kapacitor/services/ec2"
+	"github.com/influxdata/kapacitor/services/file"
+	"github.com/influxdata/kapacitor/services/gce"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/influxdb"
 	"github.com/influxdata/kapacitor/services/k8s"
 	"github.com/influxdata/kapacitor/services/logging"
+	"github.com/influxdata/kapacitor/services/marathon"
+	"github.com/influxdata/kapacitor/services/nerve"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/replay"
 	"github.com/influxdata/kapacitor/services/reporting"
+	"github.com/influxdata/kapacitor/services/scraper"
 	"github.com/influxdata/kapacitor/services/sensu"
+	"github.com/influxdata/kapacitor/services/serverset"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/snmptrap"
+	"github.com/influxdata/kapacitor/services/static"
 	"github.com/influxdata/kapacitor/services/stats"
 	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/influxdata/kapacitor/services/talk"
 	"github.com/influxdata/kapacitor/services/task_store"
 	"github.com/influxdata/kapacitor/services/telegram"
+	"github.com/influxdata/kapacitor/services/triton"
 	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
@@ -73,8 +85,22 @@ type Config struct {
 	Telegram  telegram.Config  `toml:"telegram" override:"telegram"`
 	VictorOps victorops.Config `toml:"victorops" override:"victorops"`
 
+	// Discovery for scraping
+	Scrapers  []scraper.Config   `toml:"scrapers" override:"scrapers,element-key=name"`
+	Azure     []azure.Config     `toml:"azure" override:"azure,element-key=id"`
+	Consul    []consul.Config    `toml:"consul" override:"consul,element-key=id"`
+	DNS       []dns.Config       `toml:"dns" override:"dns,element-key=id"`
+	EC2       []ec2.Config       `toml:"ec2" override:"ec2,element-key=id"`
+	Files     []file.Config      `toml:"files" override:"files,element-key=id"`
+	GCE       []gce.Config       `toml:"gce" override:"gce,element-key=id"`
+	Marathon  []marathon.Config  `toml:"marathon" override:"marathon,element-key=id"`
+	Nerve     []nerve.Config     `toml:"nerve" override:"nerve,element-key=id"`
+	Serverset []serverset.Config `toml:"serverset" override:"serverset,element-key=id"`
+	Static    []static.Config    `toml:"static" override:"static,element-key=id"`
+	Triton    []triton.Config    `toml:"triton" override:"triton,element-key=id"`
+
 	// Third-party integrations
-	Kubernetes k8s.Config `toml:"kubernetes" override:"kubernetes"`
+	Kubernetes k8s.Configs `toml:"kubernetes" override:"kubernetes,element-key=id"`
 
 	Reporting reporting.Config `toml:"reporting"`
 	Stats     stats.Config     `toml:"stats"`
@@ -102,7 +128,6 @@ func NewConfig() *Config {
 	c.Task = task_store.NewConfig()
 	c.InfluxDB = []influxdb.Config{influxdb.NewConfig()}
 	c.Logging = logging.NewConfig()
-	c.Kubernetes = k8s.NewConfig()
 	c.ConfigOverride = config.NewConfig()
 
 	c.Collectd = collectd.NewConfig()
@@ -250,6 +275,84 @@ func (c *Config) Validate() error {
 	if err := c.UDF.Validate(); err != nil {
 		return err
 	}
+
+	// Validate scrapers
+	for i := range c.Scrapers {
+		if err := c.Scrapers[i].Validate(); err != nil {
+			return err
+		}
+	}
+
+	for i := range c.Azure {
+		if err := c.Azure[i].Validate(); err != nil {
+			return err
+		}
+	}
+
+	for i := range c.Consul {
+		if err := c.Consul[i].Validate(); err != nil {
+			return err
+		}
+	}
+
+	for i := range c.DNS {
+		if err := c.DNS[i].Validate(); err != nil {
+			return err
+		}
+	}
+
+	for i := range c.EC2 {
+		if err := c.EC2[i].Validate(); err != nil {
+			return err
+		}
+	}
+
+	for i := range c.Files {
+		if err := c.Files[i].Validate(); err != nil {
+			return err
+		}
+	}
+
+	for i := range c.GCE {
+		if err := c.GCE[i].Validate(); err != nil {
+			return err
+		}
+	}
+
+	if err := c.Kubernetes.Validate(); err != nil {
+		return err
+	}
+
+	for i := range c.Marathon {
+		if err := c.Marathon[i].Validate(); err != nil {
+			return err
+		}
+	}
+
+	for i := range c.Nerve {
+		if err := c.Nerve[i].Validate(); err != nil {
+			return err
+		}
+	}
+
+	for i := range c.Serverset {
+		if err := c.Serverset[i].Validate(); err != nil {
+			return err
+		}
+	}
+
+	for i := range c.Static {
+		if err := c.Static[i].Validate(); err != nil {
+			return err
+		}
+	}
+
+	for i := range c.Triton {
+		if err := c.Triton[i].Validate(); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
