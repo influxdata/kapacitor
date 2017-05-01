@@ -4,6 +4,13 @@
 
 ### Features
 
+
+### Bugfixes
+
+## v1.3.0-beta2 [2017-05-01]
+
+### Features
+
 - [#117](https://github.com/influxdata/kapacitor/issues/117): Add headers to alert POST requests.
 
 ### Bugfixes
