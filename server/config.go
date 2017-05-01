@@ -91,12 +91,12 @@ type Config struct {
 	Consul    []consul.Config    `toml:"consul" override:"consul,element-key=id"`
 	DNS       []dns.Config       `toml:"dns" override:"dns,element-key=id"`
 	EC2       []ec2.Config       `toml:"ec2" override:"ec2,element-key=id"`
-	Files     []file.Config      `toml:"files" override:"files,element-key=id"`
+	Files     []file.Config      `toml:"files-discovery" override:"files-discovery,element-key=id"`
 	GCE       []gce.Config       `toml:"gce" override:"gce,element-key=id"`
 	Marathon  []marathon.Config  `toml:"marathon" override:"marathon,element-key=id"`
 	Nerve     []nerve.Config     `toml:"nerve" override:"nerve,element-key=id"`
 	Serverset []serverset.Config `toml:"serverset" override:"serverset,element-key=id"`
-	Static    []static.Config    `toml:"static" override:"static,element-key=id"`
+	Static    []static.Config    `toml:"static-discovery" override:"static-discovery,element-key=id"`
 	Triton    []triton.Config    `toml:"triton" override:"triton,element-key=id"`
 
 	// Third-party integrations

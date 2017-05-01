@@ -27,7 +27,7 @@ func (s *Config) Init() {
 // Validate validates Static configuration values
 func (s Config) Validate() error {
 	if s.ID == "" {
-		return fmt.Errorf("azure discovery must be given a ID")
+		return fmt.Errorf("static discovery must be given a ID")
 	}
 	return nil
 }
@@ -64,7 +64,7 @@ func (s Config) PromConfig() []*config.TargetGroup {
 
 // Service return discoverer type
 func (s Config) Service() string {
-	return "static"
+	return "static-discovery"
 }
 
 // ServiceID returns the discoverers name

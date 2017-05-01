@@ -723,11 +723,11 @@ func (s *Server) appendEC2Service(r scraper.Registry) {
 
 func (s *Server) appendFileService(r scraper.Registry) {
 	c := s.config.Files
-	l := s.LogService.NewLogger("[files] ", log.LstdFlags)
+	l := s.LogService.NewLogger("[files-discovery] ", log.LstdFlags)
 	srv := file.NewService(c, r, l)
 	s.FileService = srv
-	s.SetDynamicService("files", srv)
-	s.AppendService("files", srv)
+	s.SetDynamicService("files-discovery", srv)
+	s.AppendService("files-discovery", srv)
 }
 
 func (s *Server) appendGCEService(r scraper.Registry) {
@@ -768,11 +768,11 @@ func (s *Server) appendServersetService(r scraper.Registry) {
 
 func (s *Server) appendStaticService(r scraper.Registry) {
 	c := s.config.Static
-	l := s.LogService.NewLogger("[static] ", log.LstdFlags)
+	l := s.LogService.NewLogger("[static-discovery] ", log.LstdFlags)
 	srv := static.NewService(c, r, l)
 	s.StaticService = srv
-	s.SetDynamicService("static", srv)
-	s.AppendService("static", srv)
+	s.SetDynamicService("static-discovery", srv)
+	s.AppendService("static-discovery", srv)
 }
 
 func (s *Server) appendTritonService(r scraper.Registry) {
