@@ -3,6 +3,7 @@ package scraper
 import (
 	"fmt"
 	"log"
+	"math"
 	"sync"
 
 	"github.com/influxdata/influxdb/models"
@@ -118,6 +119,13 @@ func (s *Service) scrape() {
 
 // Append tranforms prometheus samples and inserts data into the tasks pipeline
 func (s *Service) Append(sample *model.Sample) error {
+	value := float64(sample.Value)
+	// Remove all NaN values
+	// TODO: Add counter stat for this variable
+	if math.IsNaN(value) {
+		return nil
+	}
+
 	var err error
 	db := ""
 	rp := ""
@@ -154,7 +162,7 @@ func (s *Service) Append(sample *model.Sample) error {
 	}
 
 	fields := models.Fields{
-		"value": float64(sample.Value),
+		"value": value,
 	}
 
 	pt, err := models.NewPoint(job, models.NewTags(tags), fields, sample.Timestamp.Time())

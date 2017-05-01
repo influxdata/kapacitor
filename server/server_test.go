@@ -7179,8 +7179,8 @@ func TestServer_ListServiceTests(t *testing.T) {
 				},
 			},
 			{
-				Link: client.Link{Relation: "self", Href: "/kapacitor/v1/service-tests/files"},
-				Name: "files",
+				Link: client.Link{Relation: "self", Href: "/kapacitor/v1/service-tests/files-discovery"},
+				Name: "files-discovery",
 				Options: client.ServiceTestOptions{
 					"id": "",
 				},
@@ -7331,8 +7331,8 @@ func TestServer_ListServiceTests(t *testing.T) {
 				},
 			},
 			{
-				Link: client.Link{Relation: "self", Href: "/kapacitor/v1/service-tests/static"},
-				Name: "static",
+				Link: client.Link{Relation: "self", Href: "/kapacitor/v1/service-tests/static-discovery"},
+				Name: "static-discovery",
 				Options: client.ServiceTestOptions{
 					"id": "",
 				},
@@ -7461,8 +7461,8 @@ func TestServer_ListServiceTests_WithPattern(t *testing.T) {
 				},
 			},
 			{
-				Link: client.Link{Relation: "self", Href: "/kapacitor/v1/service-tests/static"},
-				Name: "static",
+				Link: client.Link{Relation: "self", Href: "/kapacitor/v1/service-tests/static-discovery"},
+				Name: "static-discovery",
 				Options: client.ServiceTestOptions{
 					"id": "",
 				},
