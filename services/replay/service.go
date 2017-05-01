@@ -1358,6 +1358,8 @@ func (s *Service) startRecordBatch(t *kapacitor.Task, start, stop time.Time) ([]
 			}
 			// Run queries
 			for _, q := range queries {
+				s.logger.Println("D! Runing batch query for replay", q)
+
 				query := influxdb.Query{
 					Command: q.String(),
 				}
@@ -1470,13 +1472,21 @@ func (r *Service) runQueryStream(source chan<- models.Point, q, cluster string) 
 		}
 
 		finishedCount := 0
+		finished := make(map[int]bool, len(batches))
 		batchCount := len(batches)
 		for finishedCount != batchCount {
+			if finishedCount > batchCount {
+				return errors.New("unexpected state, recording failed to order points by time")
+			}
+
 			next := time.Time{}
 			for b := range batches {
 				l := len(batches[b].Points)
 				if l == 0 {
-					finishedCount++
+					if !finished[b] {
+						finishedCount++
+					}
+					finished[b] = true
 					continue
 				}
 				i := 0
