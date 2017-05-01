@@ -14,6 +14,7 @@ import (
 	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/udf"
+	"github.com/influxdata/kapacitor/udf/agent"
 	udf_test "github.com/influxdata/kapacitor/udf/test"
 )
 
@@ -67,25 +68,25 @@ func TestUDFProcess_WritePoint(t *testing.T) {
 func testUDF_WritePoint(u udf.Interface, uio *udf_test.IO, t *testing.T) {
 	go func() {
 		req := <-uio.Requests
-		_, ok := req.Message.(*udf.Request_Init)
+		_, ok := req.Message.(*agent.Request_Init)
 		if !ok {
 			t.Errorf("expected init message got %T", req.Message)
 		}
-		res := &udf.Response{
-			Message: &udf.Response_Init{
-				Init: &udf.InitResponse{
+		res := &agent.Response{
+			Message: &agent.Response_Init{
+				Init: &agent.InitResponse{
 					Success: true,
 				},
 			},
 		}
 		uio.Responses <- res
 		req = <-uio.Requests
-		pt, ok := req.Message.(*udf.Request_Point)
+		pt, ok := req.Message.(*agent.Request_Point)
 		if !ok {
 			t.Errorf("expected point message got %T", req.Message)
 		}
-		res = &udf.Response{
-			Message: &udf.Response_Point{
+		res = &agent.Response{
+			Message: &agent.Response_Point{
 				Point: pt.Point,
 			},
 		}
@@ -139,13 +140,13 @@ func TestUDFProcess_WriteBatch(t *testing.T) {
 func testUDF_WriteBatch(u udf.Interface, uio *udf_test.IO, t *testing.T) {
 	go func() {
 		req := <-uio.Requests
-		_, ok := req.Message.(*udf.Request_Init)
+		_, ok := req.Message.(*agent.Request_Init)
 		if !ok {
 			t.Errorf("expected init message got %T", req.Message)
 		}
-		res := &udf.Response{
-			Message: &udf.Response_Init{
-				Init: &udf.InitResponse{
+		res := &agent.Response{
+			Message: &agent.Response_Init{
+				Init: &agent.InitResponse{
 					Success: true,
 				},
 			},
@@ -153,12 +154,12 @@ func testUDF_WriteBatch(u udf.Interface, uio *udf_test.IO, t *testing.T) {
 		uio.Responses <- res
 		// Begin batch
 		req = <-uio.Requests
-		bb, ok := req.Message.(*udf.Request_Begin)
+		bb, ok := req.Message.(*agent.Request_Begin)
 		if !ok {
 			t.Errorf("expected begin message got %T", req.Message)
 		}
-		res = &udf.Response{
-			Message: &udf.Response_Begin{
+		res = &agent.Response{
+			Message: &agent.Response_Begin{
 				Begin: bb.Begin,
 			},
 		}
@@ -166,12 +167,12 @@ func testUDF_WriteBatch(u udf.Interface, uio *udf_test.IO, t *testing.T) {
 
 		// Point
 		req = <-uio.Requests
-		pt, ok := req.Message.(*udf.Request_Point)
+		pt, ok := req.Message.(*agent.Request_Point)
 		if !ok {
 			t.Errorf("expected point message got %T", req.Message)
 		}
-		res = &udf.Response{
-			Message: &udf.Response_Point{
+		res = &agent.Response{
+			Message: &agent.Response_Point{
 				Point: pt.Point,
 			},
 		}
@@ -179,12 +180,12 @@ func testUDF_WriteBatch(u udf.Interface, uio *udf_test.IO, t *testing.T) {
 
 		// End batch
 		req = <-uio.Requests
-		eb, ok := req.Message.(*udf.Request_End)
+		eb, ok := req.Message.(*agent.Request_End)
 		if !ok {
 			t.Errorf("expected end message got %T", req.Message)
 		}
-		res = &udf.Response{
-			Message: &udf.Response_End{
+		res = &agent.Response{
+			Message: &agent.Response_End{
 				End: eb.End,
 			},
 		}

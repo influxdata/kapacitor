@@ -1,4 +1,4 @@
-package udf
+package agent
 
 import (
 	"encoding/binary"
@@ -8,7 +8,7 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-//go:generate protoc --go_out=./ --python_out=./agent/py/kapacitor/udf/ udf.proto
+//go:generate protoc --go_out=./ --python_out=./py/kapacitor/udf/ udf.proto
 
 // Interface for reading messages
 // If you have an io.Reader

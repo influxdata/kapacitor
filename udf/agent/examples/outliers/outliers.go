@@ -5,7 +5,6 @@ import (
 	"os"
 	"sort"
 
-	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/udf/agent"
 )
 
@@ -14,7 +13,7 @@ type outlierHandler struct {
 	field string
 	scale float64
 	state *outlierState
-	begin *udf.BeginBatch
+	begin *agent.BeginBatch
 
 	agent *agent.Agent
 }
@@ -24,30 +23,30 @@ func newOutlierHandler(agent *agent.Agent) *outlierHandler {
 }
 
 // Return the InfoResponse. Describing the properties of this UDF agent.
-func (*outlierHandler) Info() (*udf.InfoResponse, error) {
-	info := &udf.InfoResponse{
-		Wants:    udf.EdgeType_BATCH,
-		Provides: udf.EdgeType_BATCH,
-		Options: map[string]*udf.OptionInfo{
-			"field": {ValueTypes: []udf.ValueType{udf.ValueType_STRING}},
-			"scale": {ValueTypes: []udf.ValueType{udf.ValueType_DOUBLE}},
+func (*outlierHandler) Info() (*agent.InfoResponse, error) {
+	info := &agent.InfoResponse{
+		Wants:    agent.EdgeType_BATCH,
+		Provides: agent.EdgeType_BATCH,
+		Options: map[string]*agent.OptionInfo{
+			"field": {ValueTypes: []agent.ValueType{agent.ValueType_STRING}},
+			"scale": {ValueTypes: []agent.ValueType{agent.ValueType_DOUBLE}},
 		},
 	}
 	return info, nil
 }
 
 // Initialze the handler based of the provided options.
-func (o *outlierHandler) Init(r *udf.InitRequest) (*udf.InitResponse, error) {
-	init := &udf.InitResponse{
+func (o *outlierHandler) Init(r *agent.InitRequest) (*agent.InitResponse, error) {
+	init := &agent.InitResponse{
 		Success: true,
 		Error:   "",
 	}
 	for _, opt := range r.Options {
 		switch opt.Name {
 		case "field":
-			o.field = opt.Values[0].Value.(*udf.OptionValue_StringValue).StringValue
+			o.field = opt.Values[0].Value.(*agent.OptionValue_StringValue).StringValue
 		case "scale":
-			o.scale = opt.Values[0].Value.(*udf.OptionValue_DoubleValue).DoubleValue
+			o.scale = opt.Values[0].Value.(*agent.OptionValue_DoubleValue).DoubleValue
 		}
 	}
 
@@ -64,19 +63,19 @@ func (o *outlierHandler) Init(r *udf.InitRequest) (*udf.InitResponse, error) {
 }
 
 // Create a snapshot of the running state of the process.
-func (o *outlierHandler) Snapshot() (*udf.SnapshotResponse, error) {
-	return &udf.SnapshotResponse{}, nil
+func (o *outlierHandler) Snapshot() (*agent.SnapshotResponse, error) {
+	return &agent.SnapshotResponse{}, nil
 }
 
 // Restore a previous snapshot.
-func (o *outlierHandler) Restore(req *udf.RestoreRequest) (*udf.RestoreResponse, error) {
-	return &udf.RestoreResponse{
+func (o *outlierHandler) Restore(req *agent.RestoreRequest) (*agent.RestoreResponse, error) {
+	return &agent.RestoreResponse{
 		Success: true,
 	}, nil
 }
 
 // Start working with the next batch
-func (o *outlierHandler) BeginBatch(begin *udf.BeginBatch) error {
+func (o *outlierHandler) BeginBatch(begin *agent.BeginBatch) error {
 	o.state.reset()
 
 	// Keep begin batch for later
@@ -85,37 +84,37 @@ func (o *outlierHandler) BeginBatch(begin *udf.BeginBatch) error {
 	return nil
 }
 
-func (o *outlierHandler) Point(p *udf.Point) error {
+func (o *outlierHandler) Point(p *agent.Point) error {
 	value := p.FieldsDouble[o.field]
 	o.state.update(value, p)
 	return nil
 }
 
-func (o *outlierHandler) EndBatch(end *udf.EndBatch) error {
+func (o *outlierHandler) EndBatch(end *agent.EndBatch) error {
 	// Get outliers
 	outliers := o.state.outliers(o.scale)
 
 	// Send BeginBatch response to Kapacitor
 	// with count of outliers
 	o.begin.Size = int64(len(outliers))
-	o.agent.Responses <- &udf.Response{
-		Message: &udf.Response_Begin{
+	o.agent.Responses <- &agent.Response{
+		Message: &agent.Response_Begin{
 			Begin: o.begin,
 		},
 	}
 
 	// Send outliers as part of batch
 	for _, outlier := range outliers {
-		o.agent.Responses <- &udf.Response{
-			Message: &udf.Response_Point{
+		o.agent.Responses <- &agent.Response{
+			Message: &agent.Response_Point{
 				Point: outlier,
 			},
 		}
 	}
 
 	// End batch
-	o.agent.Responses <- &udf.Response{
-		Message: &udf.Response_End{
+	o.agent.Responses <- &agent.Response{
+		Message: &agent.Response_End{
 			End: end,
 		},
 	}
@@ -133,7 +132,7 @@ type outlierState struct {
 
 type entry struct {
 	value float64
-	point *udf.Point
+	point *agent.Point
 }
 
 type entries []entry
@@ -146,15 +145,15 @@ func (s *outlierState) reset() {
 	s.entries = nil
 }
 
-func (s *outlierState) update(value float64, point *udf.Point) {
+func (s *outlierState) update(value float64, point *agent.Point) {
 	s.entries = append(s.entries, entry{value: value, point: point})
 }
 
-func (s *outlierState) outliers(scale float64) []*udf.Point {
+func (s *outlierState) outliers(scale float64) []*agent.Point {
 	first, third, lower, upper := s.bounds(scale)
 
 	max := first + len(s.entries) - third
-	outliers := make([]*udf.Point, 0, max)
+	outliers := make([]*agent.Point, 0, max)
 
 	// Append lower outliers
 	for i := 0; i < first; i++ {

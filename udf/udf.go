@@ -1,12 +1,15 @@
 package udf
 
-import "github.com/influxdata/kapacitor/models"
+import (
+	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/udf/agent"
+)
 
 // Interface for communicating with a UDF
 type Interface interface {
 	Open() error
 	Info() (Info, error)
-	Init(options []*Option) error
+	Init(options []*agent.Option) error
 	Abort(err error)
 	Close() error
 

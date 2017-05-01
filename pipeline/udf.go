@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor/tick"
-	"github.com/influxdata/kapacitor/udf"
+	"github.com/influxdata/kapacitor/udf/agent"
 )
 
 // A UDFNode is a node that can run a User Defined Function (UDF) in a separate process.
@@ -48,11 +48,11 @@ type UDFNode struct {
 	chainnode
 
 	UDFName string
-	options map[string]*udf.OptionInfo
+	options map[string]*agent.OptionInfo
 
 	// Options that were set on the node
 	// tick:ignore
-	Options []*udf.Option
+	Options []*agent.Option
 
 	describer *tick.ReflectionDescriber
 }
@@ -61,20 +61,20 @@ func NewUDF(
 	parent Node,
 	name string,
 	wants,
-	provides udf.EdgeType,
-	options map[string]*udf.OptionInfo,
+	provides agent.EdgeType,
+	options map[string]*agent.OptionInfo,
 ) *UDFNode {
 	var pwants, pprovides EdgeType
 	switch wants {
-	case udf.EdgeType_STREAM:
+	case agent.EdgeType_STREAM:
 		pwants = StreamEdge
-	case udf.EdgeType_BATCH:
+	case agent.EdgeType_BATCH:
 		pwants = BatchEdge
 	}
 	switch provides {
-	case udf.EdgeType_STREAM:
+	case agent.EdgeType_STREAM:
 		pprovides = StreamEdge
-	case udf.EdgeType_BATCH:
+	case agent.EdgeType_BATCH:
 		pprovides = BatchEdge
 	}
 	udf := &UDFNode{
@@ -123,31 +123,31 @@ func (u *UDFNode) SetProperty(name string, args ...interface{}) (interface{}, er
 		if got, exp := len(args), len(opt.ValueTypes); got != exp {
 			return nil, fmt.Errorf("unexpected number of args to %s, got %d expected %d", name, got, exp)
 		}
-		values := make([]*udf.OptionValue, len(args))
+		values := make([]*agent.OptionValue, len(args))
 		for i, arg := range args {
-			values[i] = &udf.OptionValue{}
+			values[i] = &agent.OptionValue{}
 			switch v := arg.(type) {
 			case bool:
-				values[i].Type = udf.ValueType_BOOL
-				values[i].Value = &udf.OptionValue_BoolValue{v}
+				values[i].Type = agent.ValueType_BOOL
+				values[i].Value = &agent.OptionValue_BoolValue{v}
 			case int64:
-				values[i].Type = udf.ValueType_INT
-				values[i].Value = &udf.OptionValue_IntValue{v}
+				values[i].Type = agent.ValueType_INT
+				values[i].Value = &agent.OptionValue_IntValue{v}
 			case float64:
-				values[i].Type = udf.ValueType_DOUBLE
-				values[i].Value = &udf.OptionValue_DoubleValue{v}
+				values[i].Type = agent.ValueType_DOUBLE
+				values[i].Value = &agent.OptionValue_DoubleValue{v}
 			case string:
-				values[i].Type = udf.ValueType_STRING
-				values[i].Value = &udf.OptionValue_StringValue{v}
+				values[i].Type = agent.ValueType_STRING
+				values[i].Value = &agent.OptionValue_StringValue{v}
 			case time.Duration:
-				values[i].Type = udf.ValueType_DURATION
-				values[i].Value = &udf.OptionValue_DurationValue{int64(v)}
+				values[i].Type = agent.ValueType_DURATION
+				values[i].Value = &agent.OptionValue_DurationValue{int64(v)}
 			}
 			if values[i].Type != opt.ValueTypes[i] {
 				return nil, fmt.Errorf("unexpected arg to %s, got %v expected %v", name, values[i].Type, opt.ValueTypes[i])
 			}
 		}
-		u.Options = append(u.Options, &udf.Option{
+		u.Options = append(u.Options, &agent.Option{
 			Name:   name,
 			Values: values,
 		})

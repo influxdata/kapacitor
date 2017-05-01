@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/influxdata/kapacitor/udf"
+	"github.com/influxdata/kapacitor/udf/agent"
 )
 
 // IO implements a UDF process communication.
@@ -17,13 +18,13 @@ type IO struct {
 	inw *io.PipeWriter
 
 	outr *io.PipeReader
-	brr  udf.ByteReadReader
+	brr  agent.ByteReadReader
 	outw *io.PipeWriter
 
 	// Requests sent to the UDF
-	Requests chan *udf.Request
+	Requests chan *agent.Request
 	// Responses from the UDF
-	Responses chan *udf.Response
+	Responses chan *agent.Response
 	// Any error that may have occurred
 	ErrC chan error
 }
@@ -33,8 +34,8 @@ func NewIO() *IO {
 	outr, outw := io.Pipe()
 	brr := bufio.NewReader(outr)
 	u := &IO{
-		Requests:  make(chan *udf.Request),
-		Responses: make(chan *udf.Response),
+		Requests:  make(chan *agent.Request),
+		Responses: make(chan *agent.Response),
 		ErrC:      make(chan error, 1),
 		inr:       inr,
 		inw:       inw,
@@ -64,8 +65,8 @@ func (o *IO) readRequests() error {
 	buf := bufio.NewReader(o.inr)
 	var b []byte
 	for {
-		req := &udf.Request{}
-		err := udf.ReadMessage(&b, buf, req)
+		req := &agent.Request{}
+		err := agent.ReadMessage(&b, buf, req)
 		if err == io.EOF {
 			return nil
 		}
@@ -79,7 +80,7 @@ func (o *IO) readRequests() error {
 func (o *IO) writeResponses() error {
 	defer o.outw.Close()
 	for response := range o.Responses {
-		udf.WriteMessage(response, o.outw)
+		agent.WriteMessage(response, o.outw)
 	}
 	return nil
 }
@@ -114,7 +115,7 @@ func (o *IO) In() io.WriteCloser {
 	return o.inw
 }
 
-func (o *IO) Out() udf.ByteReadReader {
+func (o *IO) Out() agent.ByteReadReader {
 	return o.brr
 }
 

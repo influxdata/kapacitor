@@ -5,6 +5,7 @@
 ### Bugfixes
 
 - [#1294](https://github.com/influxdata/kapacitor/issues/1294): Fix bug where batch queries would be missing all fields after the first nil field.
+- [#1343](https://github.com/influxdata/kapacitor/issues/1343): BREAKING: The UDF agent Go API has changed, the changes now make it so that the agent package is self contained.
 
 ## v1.3.0-beta1 [2017-04-29]
 

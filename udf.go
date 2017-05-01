@@ -14,6 +14,7 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/udf"
+	"github.com/influxdata/kapacitor/udf/agent"
 	"github.com/pkg/errors"
 )
 
@@ -291,15 +292,15 @@ func (p *UDFProcess) logStdErr() {
 	}
 }
 
-func (p *UDFProcess) Abort(err error)                  { p.server.Abort(err) }
-func (p *UDFProcess) Init(options []*udf.Option) error { return p.server.Init(options) }
-func (p *UDFProcess) Snapshot() ([]byte, error)        { return p.server.Snapshot() }
-func (p *UDFProcess) Restore(snapshot []byte) error    { return p.server.Restore(snapshot) }
-func (p *UDFProcess) PointIn() chan<- models.Point     { return p.server.PointIn() }
-func (p *UDFProcess) BatchIn() chan<- models.Batch     { return p.server.BatchIn() }
-func (p *UDFProcess) PointOut() <-chan models.Point    { return p.server.PointOut() }
-func (p *UDFProcess) BatchOut() <-chan models.Batch    { return p.server.BatchOut() }
-func (p *UDFProcess) Info() (udf.Info, error)          { return p.server.Info() }
+func (p *UDFProcess) Abort(err error)                    { p.server.Abort(err) }
+func (p *UDFProcess) Init(options []*agent.Option) error { return p.server.Init(options) }
+func (p *UDFProcess) Snapshot() ([]byte, error)          { return p.server.Snapshot() }
+func (p *UDFProcess) Restore(snapshot []byte) error      { return p.server.Restore(snapshot) }
+func (p *UDFProcess) PointIn() chan<- models.Point       { return p.server.PointIn() }
+func (p *UDFProcess) BatchIn() chan<- models.Batch       { return p.server.BatchIn() }
+func (p *UDFProcess) PointOut() <-chan models.Point      { return p.server.PointOut() }
+func (p *UDFProcess) BatchOut() <-chan models.Batch      { return p.server.BatchOut() }
+func (p *UDFProcess) Info() (udf.Info, error)            { return p.server.Info() }
 
 type UDFSocket struct {
 	server *udf.Server
@@ -363,15 +364,15 @@ func (s *UDFSocket) Close() error {
 	return nil
 }
 
-func (s *UDFSocket) Abort(err error)                  { s.server.Abort(err) }
-func (s *UDFSocket) Init(options []*udf.Option) error { return s.server.Init(options) }
-func (s *UDFSocket) Snapshot() ([]byte, error)        { return s.server.Snapshot() }
-func (s *UDFSocket) Restore(snapshot []byte) error    { return s.server.Restore(snapshot) }
-func (s *UDFSocket) PointIn() chan<- models.Point     { return s.server.PointIn() }
-func (s *UDFSocket) BatchIn() chan<- models.Batch     { return s.server.BatchIn() }
-func (s *UDFSocket) PointOut() <-chan models.Point    { return s.server.PointOut() }
-func (s *UDFSocket) BatchOut() <-chan models.Batch    { return s.server.BatchOut() }
-func (s *UDFSocket) Info() (udf.Info, error)          { return s.server.Info() }
+func (s *UDFSocket) Abort(err error)                    { s.server.Abort(err) }
+func (s *UDFSocket) Init(options []*agent.Option) error { return s.server.Init(options) }
+func (s *UDFSocket) Snapshot() ([]byte, error)          { return s.server.Snapshot() }
+func (s *UDFSocket) Restore(snapshot []byte) error      { return s.server.Restore(snapshot) }
+func (s *UDFSocket) PointIn() chan<- models.Point       { return s.server.PointIn() }
+func (s *UDFSocket) BatchIn() chan<- models.Batch       { return s.server.BatchIn() }
+func (s *UDFSocket) PointOut() <-chan models.Point      { return s.server.PointOut() }
+func (s *UDFSocket) BatchOut() <-chan models.Batch      { return s.server.BatchOut() }
+func (s *UDFSocket) Info() (udf.Info, error)            { return s.server.Info() }
 
 type socket struct {
 	path string
