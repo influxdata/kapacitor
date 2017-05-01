@@ -121,6 +121,7 @@ func (s *Service) scrape() {
 func (s *Service) Append(sample *model.Sample) error {
 	value := float64(sample.Value)
 	// Remove all NaN values
+	// TODO: Add counter stat for this variable
 	if math.IsNaN(value) {
 		return nil
 	}
