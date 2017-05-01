@@ -4,6 +4,7 @@
 
 ### Features
 
+- [#1299](https://github.com/influxdata/kapacitor/pull/1299): Allowing sensu handler to be specified 
 
 ### Bugfixes
 
@@ -80,7 +81,6 @@ kapacitor define-handler system aggregate_by_1m.yaml
 - [#507](https://github.com/influxdata/kapacitor/issues/507): Add API endpoint for performing Kapacitor database backups.
 - [#1132](https://github.com/influxdata/kapacitor/issues/1132): Adding source for sensu alert as parameter
 - [#1346](https://github.com/influxdata/kapacitor/pull/1346): Add discovery and scraping services.
-- [#1299](https://github.com/influxdata/kapacitor/pull/1299): Allowing sensu handler to be specified 
 
 ### Bugfixes
 
