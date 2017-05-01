@@ -23,6 +23,7 @@ import (
 	"github.com/influxdata/kapacitor/services/gce"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
+	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/influxdb"
 	"github.com/influxdata/kapacitor/services/k8s"
 	"github.com/influxdata/kapacitor/services/logging"
@@ -77,6 +78,7 @@ type Config struct {
 	OpsGenie  opsgenie.Config  `toml:"opsgenie" override:"opsgenie"`
 	PagerDuty pagerduty.Config `toml:"pagerduty" override:"pagerduty"`
 	Pushover  pushover.Config  `toml:"pushover" override:"pushover"`
+	HTTPPost  httppost.Configs `toml:"httppost" override:"httppost,element-key=endpoint"`
 	SMTP      smtp.Config      `toml:"smtp" override:"smtp"`
 	SNMPTrap  snmptrap.Config  `toml:"snmptrap" override:"snmptrap"`
 	Sensu     sensu.Config     `toml:"sensu" override:"sensu"`
@@ -138,6 +140,7 @@ func NewConfig() *Config {
 	c.OpsGenie = opsgenie.NewConfig()
 	c.PagerDuty = pagerduty.NewConfig()
 	c.Pushover = pushover.NewConfig()
+	c.HTTPPost = httppost.Configs{}
 	c.SMTP = smtp.NewConfig()
 	c.Sensu = sensu.NewConfig()
 	c.Slack = slack.NewConfig()
@@ -250,6 +253,9 @@ func (c *Config) Validate() error {
 	if err := c.Pushover.Validate(); err != nil {
 		return err
 	}
+	if err := c.HTTPPost.Validate(); err != nil {
+		return err
+	}
 	if err := c.SMTP.Validate(); err != nil {
 		return err
 	}
@@ -360,6 +366,72 @@ func (c *Config) ApplyEnvOverrides() error {
 	return c.applyEnvOverrides("KAPACITOR", "", reflect.ValueOf(c))
 }
 
+func (c *Config) applyEnvOverridesToMap(prefix string, fieldDesc string, mapValue, key, spec reflect.Value) error {
+	// If we have a pointer, dereference it
+	s := spec
+	if spec.Kind() == reflect.Ptr {
+		s = spec.Elem()
+	}
+
+	var value string
+
+	if s.Kind() != reflect.Struct {
+		value = os.Getenv(prefix)
+		// Skip any fields we don't have a value to set
+		if value == "" {
+			return nil
+		}
+
+		if fieldDesc != "" {
+			fieldDesc = " to " + fieldDesc
+		}
+	}
+
+	switch s.Kind() {
+	case reflect.String:
+		mapValue.SetMapIndex(key, reflect.ValueOf(value))
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+
+		var intValue int64
+
+		// Handle toml.Duration
+		if s.Type().Name() == "Duration" {
+			dur, err := time.ParseDuration(value)
+			if err != nil {
+				return fmt.Errorf("failed to apply %v%v using type %v and value '%v'", prefix, fieldDesc, s.Type().String(), value)
+			}
+			intValue = dur.Nanoseconds()
+		} else {
+			var err error
+			intValue, err = strconv.ParseInt(value, 0, s.Type().Bits())
+			if err != nil {
+				return fmt.Errorf("failed to apply %v%v using type %v and value '%v'", prefix, fieldDesc, s.Type().String(), value)
+			}
+		}
+
+		mapValue.SetMapIndex(key, reflect.ValueOf(intValue))
+	case reflect.Bool:
+		boolValue, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("failed to apply %v%v using type %v and value '%v'", prefix, fieldDesc, s.Type().String(), value)
+
+		}
+		mapValue.SetMapIndex(key, reflect.ValueOf(boolValue))
+	case reflect.Float32, reflect.Float64:
+		floatValue, err := strconv.ParseFloat(value, s.Type().Bits())
+		if err != nil {
+			return fmt.Errorf("failed to apply %v%v using type %v and value '%v'", prefix, fieldDesc, s.Type().String(), value)
+
+		}
+		mapValue.SetMapIndex(key, reflect.ValueOf(floatValue))
+	case reflect.Struct:
+		if err := c.applyEnvOverridesToStruct(prefix, s); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (c *Config) applyEnvOverrides(prefix string, fieldDesc string, spec reflect.Value) error {
 	// If we have a pointer, dereference it
 	s := spec
@@ -450,6 +522,12 @@ func (c *Config) applyEnvOverridesToStruct(prefix string, s reflect.Value) error
 			if f.Kind() == reflect.Slice || f.Kind() == reflect.Array {
 				for i := 0; i < f.Len(); i++ {
 					if err := c.applyEnvOverrides(fmt.Sprintf("%s_%d", key, i), fieldName, f.Index(i)); err != nil {
+						return err
+					}
+				}
+			} else if f.Kind() == reflect.Map {
+				for _, k := range f.MapKeys() {
+					if err := c.applyEnvOverridesToMap(fmt.Sprintf("%s_%v", key, k), fieldName, f, k, f.MapIndex(k)); err != nil {
 						return err
 					}
 				}

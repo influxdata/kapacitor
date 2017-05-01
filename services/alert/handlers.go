@@ -17,35 +17,10 @@ import (
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/bufpool"
 	"github.com/influxdata/kapacitor/command"
-	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/tick/stateful"
 	"github.com/pkg/errors"
 )
-
-// AlertData is a structure that contains relevant data about an alert event.
-// The structure is intended to be JSON encoded, providing a consistent data format.
-type AlertData struct {
-	ID       string        `json:"id"`
-	Message  string        `json:"message"`
-	Details  string        `json:"details"`
-	Time     time.Time     `json:"time"`
-	Duration time.Duration `json:"duration"`
-	Level    alert.Level   `json:"level"`
-	Data     models.Result `json:"data"`
-}
-
-func alertDataFromEvent(event alert.Event) AlertData {
-	return AlertData{
-		ID:       event.State.ID,
-		Message:  event.State.Message,
-		Details:  event.State.Details,
-		Time:     event.State.Time,
-		Duration: event.State.Duration,
-		Level:    event.State.Level,
-		Data:     event.Data.Result,
-	}
-}
 
 // Default log mode for file
 const defaultLogFileMode = 0600
@@ -89,7 +64,7 @@ func NewLogHandler(c LogHandlerConfig, l *log.Logger) (alert.Handler, error) {
 }
 
 func (h *logHandler) Handle(event alert.Event) {
-	ad := alertDataFromEvent(event)
+	ad := event.AlertData()
 
 	f, err := os.OpenFile(h.logpath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, h.mode)
 	if err != nil {
@@ -133,7 +108,7 @@ func NewExecHandler(c ExecHandlerConfig, l *log.Logger) alert.Handler {
 func (h *execHandler) Handle(event alert.Event) {
 	buf := h.bp.Get()
 	defer h.bp.Put(buf)
-	ad := alertDataFromEvent(event)
+	ad := event.AlertData()
 
 	err := json.NewEncoder(buf).Encode(ad)
 	if err != nil {
@@ -179,7 +154,7 @@ func NewTCPHandler(c TCPHandlerConfig, l *log.Logger) alert.Handler {
 func (h *tcpHandler) Handle(event alert.Event) {
 	buf := h.bp.Get()
 	defer h.bp.Put(buf)
-	ad := alertDataFromEvent(event)
+	ad := event.AlertData()
 
 	err := json.NewEncoder(buf).Encode(ad)
 	if err != nil {
@@ -219,7 +194,7 @@ func NewPostHandler(c PostHandlerConfig, l *log.Logger) alert.Handler {
 func (h *postHandler) Handle(event alert.Event) {
 	body := h.bp.Get()
 	defer h.bp.Put(body)
-	ad := alertDataFromEvent(event)
+	ad := event.AlertData()
 
 	err := json.NewEncoder(body).Encode(ad)
 	if err != nil {

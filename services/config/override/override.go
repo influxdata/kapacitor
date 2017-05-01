@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/mitchellh/copystructure"
+	"github.com/mitchellh/mapstructure"
 	"github.com/mitchellh/reflectwalk"
 	"github.com/pkg/errors"
 )
@@ -438,6 +439,19 @@ func weakCopyValue(dst, src reflect.Value) (err error) {
 			}
 			return fmt.Errorf("cannot convert string %q into %s", str, dstK)
 		}
+	} else if dstK == reflect.Struct && srcK == reflect.Map {
+		dec, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+			ErrorUnused: true,
+			Result:      addrDst.Interface(),
+			DecodeHook:  mapstructure.StringToTimeDurationHookFunc(),
+		})
+		if err != nil {
+			return errors.Wrap(err, "failed to initialize mapstructure decoder")
+		}
+		if err := dec.Decode(src.Interface()); err != nil {
+			return errors.Wrapf(err, "failed to decode options into %s", addrDst.Type())
+		}
+		return nil
 	} else {
 		return fmt.Errorf("wrong kind %s, expected value of kind %s: %t", srcK, dstK, srcK == dstK)
 	}
@@ -607,9 +621,8 @@ func isZero(v reflect.Value) bool {
 		// Check structs recusively since not all of its field may be comparable
 		z := true
 		for i := 0; i < v.NumField() && z; i++ {
-			if f := v.Field(i); f.CanSet() {
-				z = z && isZero(f)
-			}
+			f := v.Field(i)
+			z = z && isZero(f)
 		}
 		return z
 	default:

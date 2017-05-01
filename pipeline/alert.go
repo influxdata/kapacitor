@@ -3,6 +3,7 @@ package pipeline
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/influxdata/kapacitor/tick/ast"
@@ -292,7 +293,7 @@ type AlertNode struct {
 
 	// Post the JSON alert data to the specified URL.
 	// tick:ignore
-	PostHandlers []*PostHandler `tick:"Post"`
+	HTTPPostHandlers []*AlertHTTPPostHandler `tick:"Post"`
 
 	// Send the JSON alert data to the specified endpoint via TCP.
 	// tick:ignore
@@ -377,6 +378,12 @@ func (n *AlertNode) validate() error {
 	for _, snmp := range n.SNMPTrapHandlers {
 		if err := snmp.validate(); err != nil {
 			return errors.Wrapf(err, "invalid SNMP trap %q", snmp.TrapOid)
+		}
+	}
+
+	for _, post := range n.HTTPPostHandlers {
+		if err := post.validate(); err != nil {
+			return errors.Wrap(err, "invalid post")
 		}
 	}
 	return nil
@@ -468,23 +475,69 @@ func (a *AlertNode) Flapping(low, high float64) *AlertNode {
 }
 
 // HTTP POST JSON alert data to a specified URL.
+// Example with endpoint:
+//    stream
+//         |alert()
+//             .post()
+//              .endpoint('example')
+//
+// Example with url:
+//    stream
+//         |alert()
+//             .post('http://example.com')
+//
 // tick:property
-func (a *AlertNode) Post(url string) *PostHandler {
-	post := &PostHandler{
+func (a *AlertNode) Post(urls ...string) *AlertHTTPPostHandler {
+	post := &AlertHTTPPostHandler{
 		AlertNode: a,
-		URL:       url,
 	}
-	a.PostHandlers = append(a.PostHandlers, post)
+	a.HTTPPostHandlers = append(a.HTTPPostHandlers, post)
+
+	if len(urls) == 0 {
+		return post
+	}
+
+	post.URL = urls[0]
 	return post
 }
 
+// Example:
+//    stream
+//         |alert()
+//             .post()
+//              .endpoint('example')
+//              .header('a','b')
+// tick:property
+func (a *AlertHTTPPostHandler) Header(k, v string) *AlertHTTPPostHandler {
+	if a.Headers == nil {
+		a.Headers = map[string]string{}
+	}
+
+	a.Headers[k] = v
+	return a
+}
+
 // tick:embedded:AlertNode.Post
-type PostHandler struct {
+type AlertHTTPPostHandler struct {
 	*AlertNode
 
 	// The POST URL.
 	// tick:ignore
 	URL string
+
+	// Name of the endpoint to be used, as is defined in the configuration file
+	Endpoint string
+
+	Headers map[string]string `tick:"Header"`
+}
+
+func (a *AlertHTTPPostHandler) validate() error {
+	for k := range a.Headers {
+		if strings.ToUpper(k) == "AUTHENTICATE" {
+			return errors.New("cannot set 'authenticate' header")
+		}
+	}
+	return nil
 }
 
 // Send JSON alert data to a specified address over TCP.

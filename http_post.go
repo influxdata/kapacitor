@@ -2,6 +2,7 @@ package kapacitor
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -9,24 +10,42 @@ import (
 	"github.com/influxdata/kapacitor/bufpool"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/httppost"
 )
 
 type HTTPPostNode struct {
 	node
-	c   *pipeline.HTTPPostNode
-	url string
-	mu  sync.RWMutex
-	bp  *bufpool.Pool
+	c        *pipeline.HTTPPostNode
+	endpoint *httppost.Endpoint
+	mu       sync.RWMutex
+	bp       *bufpool.Pool
 }
 
 // Create a new  HTTPPostNode which submits received items via POST to an HTTP endpoint
 func newHTTPPostNode(et *ExecutingTask, n *pipeline.HTTPPostNode, l *log.Logger) (*HTTPPostNode, error) {
+
 	hn := &HTTPPostNode{
 		node: node{Node: n, et: et, logger: l},
 		c:    n,
 		bp:   bufpool.New(),
-		url:  n.Url,
 	}
+
+	// Should only ever be 0 or 1 from validation of n
+	if len(n.URLs) == 1 {
+		e := httppost.NewEndpoint(n.URLs[0], nil, httppost.BasicAuth{})
+		hn.endpoint = e
+	}
+
+	// Should only ever be 0 or 1 from validation of n
+	if len(n.HTTPPostEndpoints) == 1 {
+		endpointName := n.HTTPPostEndpoints[0].Endpoint
+		e, ok := et.tm.HTTPPostService.Endpoint(endpointName)
+		if !ok {
+			return nil, fmt.Errorf("endpoint '%s' does not exist", endpointName)
+		}
+		hn.endpoint = e
+	}
+
 	hn.node.runF = hn.runPost
 	return hn, nil
 }
@@ -72,14 +91,27 @@ func (h *HTTPPostNode) postRow(group models.GroupID, row *models.Row) {
 	defer h.bp.Put(body)
 	err := json.NewEncoder(body).Encode(result)
 	if err != nil {
+		h.incrementErrorCount()
+		h.logger.Printf("E! failed to marshal row data json: %v", err)
+		return
+	}
+	req, err := h.endpoint.NewHTTPRequest(body)
+	if err != nil {
+		h.incrementErrorCount()
 		h.logger.Printf("E! failed to marshal row data json: %v", err)
 		return
 	}
 
-	resp, err := http.Post(h.url, "application/json", body)
+	req.Header.Set("Content-Type", "application/json")
+	for k, v := range h.c.Headers {
+		req.Header.Set(k, v)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
+		h.incrementErrorCount()
 		h.logger.Printf("E! failed to POST row data: %v", err)
 		return
 	}
 	resp.Body.Close()
+
 }

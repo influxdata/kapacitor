@@ -5,10 +5,13 @@ These fields may either be a struct or a slice of structs.
 As such a section consists of a list of elements.
 In the case where the field is a struct and not a slice, the section list always contains one element.
 Further nested levels may exist but Overrider will not interact with them directly.
+If a nested field is a struct, then github.com/mitchellh/mapstructure will be used to decode the map into the struct.
 
 In order for a section to be overridden an `override` struct tag must be present.
 The `override` tag defines a name for the section and option.
 Struct tags can be used to mark options as redacted by adding a `<name>,redact` to the end of the `override` tag value.
+
+
 
 Example:
    type SectionAConfig struct {

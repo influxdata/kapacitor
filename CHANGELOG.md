@@ -2,6 +2,10 @@
 
 ## Unreleased [unreleased]
 
+### Features
+
+- [#117](https://github.com/influxdata/kapacitor/issues/117): Add headers to alert POST requests.
+
 ### Bugfixes
 
 - [#1294](https://github.com/influxdata/kapacitor/issues/1294): Fix bug where batch queries would be missing all fields after the first nil field.

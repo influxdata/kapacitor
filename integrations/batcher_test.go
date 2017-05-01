@@ -18,6 +18,7 @@ import (
 	"github.com/influxdata/kapacitor/clock"
 	"github.com/influxdata/kapacitor/models"
 	alertservice "github.com/influxdata/kapacitor/services/alert"
+	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/storage/storagetest"
 	"github.com/influxdata/wlog"
 )
@@ -1389,7 +1390,7 @@ batch
 func TestBatch_AlertStateChangesOnly(t *testing.T) {
 	requestCount := int32(0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ad := alertservice.AlertData{}
+		ad := alert.Data{}
 		dec := json.NewDecoder(r.Body)
 		err := dec.Decode(&ad)
 		if err != nil {
@@ -1397,7 +1398,7 @@ func TestBatch_AlertStateChangesOnly(t *testing.T) {
 		}
 		atomic.AddInt32(&requestCount, 1)
 		if rc := atomic.LoadInt32(&requestCount); rc == 1 {
-			expAd := alertservice.AlertData{
+			expAd := alert.Data{
 				ID:      "cpu_usage_idle:cpu=cpu-total",
 				Message: "cpu_usage_idle:cpu=cpu-total is CRITICAL",
 				Time:    time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
@@ -1408,7 +1409,7 @@ func TestBatch_AlertStateChangesOnly(t *testing.T) {
 				t.Error(msg)
 			}
 		} else {
-			expAd := alertservice.AlertData{
+			expAd := alert.Data{
 				ID:       "cpu_usage_idle:cpu=cpu-total",
 				Message:  "cpu_usage_idle:cpu=cpu-total is OK",
 				Time:     time.Date(1971, 1, 1, 0, 0, 38, 0, time.UTC),
@@ -1454,7 +1455,7 @@ batch
 func TestBatch_AlertStateChangesOnlyExpired(t *testing.T) {
 	requestCount := int32(0)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ad := alertservice.AlertData{}
+		ad := alert.Data{}
 		dec := json.NewDecoder(r.Body)
 		err := dec.Decode(&ad)
 		if err != nil {
@@ -1462,11 +1463,11 @@ func TestBatch_AlertStateChangesOnlyExpired(t *testing.T) {
 		}
 		// We don't care about the data for this test
 		ad.Data = models.Result{}
-		var expAd alertservice.AlertData
+		var expAd alert.Data
 		atomic.AddInt32(&requestCount, 1)
 		rc := atomic.LoadInt32(&requestCount)
 		if rc < 3 {
-			expAd = alertservice.AlertData{
+			expAd = alert.Data{
 				ID:       "cpu_usage_idle:cpu=cpu-total",
 				Message:  "cpu_usage_idle:cpu=cpu-total is CRITICAL",
 				Time:     time.Date(1971, 1, 1, 0, 0, int(rc-1)*20, 0, time.UTC),
@@ -1474,7 +1475,7 @@ func TestBatch_AlertStateChangesOnlyExpired(t *testing.T) {
 				Level:    alert.Critical,
 			}
 		} else {
-			expAd = alertservice.AlertData{
+			expAd = alert.Data{
 				ID:       "cpu_usage_idle:cpu=cpu-total",
 				Message:  "cpu_usage_idle:cpu=cpu-total is OK",
 				Time:     time.Date(1971, 1, 1, 0, 0, 38, 0, time.UTC),
@@ -2923,6 +2924,7 @@ func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.Ex
 	tm.HTTPDService = httpdService
 	tm.TaskStore = taskStore{}
 	tm.DeadmanService = deadman{}
+	tm.HTTPPostService = httppost.NewService(nil, logService.NewLogger("[httppost] ", log.LstdFlags))
 	as := alertservice.NewService(logService.NewLogger("[alert] ", log.LstdFlags))
 	as.StorageService = storagetest.New()
 	as.HTTPDService = httpdService

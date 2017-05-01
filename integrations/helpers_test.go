@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/models"
-	alertservice "github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/httpd"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
 	"github.com/influxdata/kapacitor/udf"
@@ -117,7 +117,7 @@ func compareResultsIgnoreSeriesOrder(exp, got models.Result) (bool, string) {
 	return true, ""
 }
 
-func compareAlertData(exp, got alertservice.AlertData) (bool, string) {
+func compareAlertData(exp, got alert.Data) (bool, string) {
 	// Pull out Result for comparison
 	expData := exp.Data
 	exp.Data = models.Result{}

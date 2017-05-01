@@ -31,10 +31,10 @@ import (
 	"github.com/influxdata/kapacitor/command/commandtest"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/server"
-	alertservice "github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alert/alerttest"
 	"github.com/influxdata/kapacitor/services/alerta/alertatest"
 	"github.com/influxdata/kapacitor/services/hipchat/hipchattest"
+	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/k8s"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/opsgenie/opsgenietest"
@@ -4251,7 +4251,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer f.Close()
-	exp := []alertservice.AlertData{
+	exp := []alert.Data{
 		{
 			ID:       "test-stream-query",
 			Message:  "test-stream-query is CRITICAL",
@@ -4495,9 +4495,9 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 		},
 	}
 	dec := json.NewDecoder(f)
-	var got []alertservice.AlertData
+	var got []alert.Data
 	for dec.More() {
-		g := alertservice.AlertData{}
+		g := alert.Data{}
 		dec.Decode(&g)
 		got = append(got, g)
 	}
@@ -5970,6 +5970,99 @@ func TestServer_UpdateConfig(t *testing.T) {
 			},
 		},
 		{
+			section: "httppost",
+			element: "test",
+			setDefaults: func(c *server.Config) {
+				apc := httppost.Config{
+					Endpoint: "test",
+					URL:      "http://httppost.example.com",
+					Headers: map[string]string{
+						"testing": "works",
+					},
+				}
+				c.HTTPPost = httppost.Configs{apc}
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/httppost"},
+				Elements: []client.ConfigElement{
+					{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/httppost/test"},
+						Options: map[string]interface{}{
+							"endpoint": "test",
+							"url":      "http://httppost.example.com",
+							"headers": map[string]interface{}{
+								"testing": "works",
+							},
+							"basic-auth": false,
+						},
+						Redacted: []string{
+							"basic-auth",
+						}},
+				},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/httppost/test"},
+				Options: map[string]interface{}{
+					"endpoint": "test",
+					"url":      "http://httppost.example.com",
+					"headers": map[string]interface{}{
+						"testing": "works",
+					},
+					"basic-auth": false,
+				},
+				Redacted: []string{
+					"basic-auth",
+				},
+			},
+			updates: []updateAction{
+				{
+					element: "test",
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"headers": map[string]string{
+								"testing": "more",
+							},
+							"basic-auth": httppost.BasicAuth{
+								Username: "usr",
+								Password: "pass",
+							},
+						},
+					},
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/httppost"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/httppost/test"},
+							Options: map[string]interface{}{
+								"endpoint": "test",
+								"url":      "http://httppost.example.com",
+								"headers": map[string]interface{}{
+									"testing": "more",
+								},
+								"basic-auth": true,
+							},
+							Redacted: []string{
+								"basic-auth",
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/httppost/test"},
+						Options: map[string]interface{}{
+							"endpoint": "test",
+							"url":      "http://httppost.example.com",
+							"headers": map[string]interface{}{
+								"testing": "more",
+							},
+							"basic-auth": true,
+						},
+						Redacted: []string{
+							"basic-auth",
+						},
+					},
+				},
+			},
+		},
+		{
 			section: "pushover",
 			setDefaults: func(c *server.Config) {
 				c.Pushover.URL = "http://pushover.example.com"
@@ -7109,6 +7202,15 @@ func TestServer_ListServiceTests(t *testing.T) {
 				},
 			},
 			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/httppost"},
+				Name: "httppost",
+				Options: client.ServiceTestOptions{
+					"endpoint": "example",
+					"url":      "http://localhost:3000/",
+					"headers":  map[string]interface{}{"Auth": "secret"},
+				},
+			},
+			{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/influxdb"},
 				Name: "influxdb",
 				Options: client.ServiceTestOptions{
@@ -7677,7 +7779,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 
 	resultJSON := `{"series":[{"name":"alert","columns":["time","value"],"values":[["1970-01-01T00:00:00Z",1]]}]}`
 
-	alertData := alertservice.AlertData{
+	alertData := alert.Data{
 		ID:      "id",
 		Message: "message",
 		Details: "details",
@@ -7843,7 +7945,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				tdir := ctxt.Value("tdir").(string)
 				defer os.RemoveAll(tdir)
 				l := ctxt.Value("log").(*alerttest.Log)
-				expData := []alertservice.AlertData{alertData}
+				expData := []alert.Data{alertData}
 				expMode := os.FileMode(0604)
 
 				m, err := l.Mode()
@@ -7994,7 +8096,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			result: func(ctxt context.Context) error {
 				ts := ctxt.Value("server").(*alerttest.PostServer)
 				ts.Close()
-				exp := []alertservice.AlertData{alertData}
+				exp := []alert.Data{alertData}
 				got := ts.Data()
 				if !reflect.DeepEqual(exp, got) {
 					return fmt.Errorf("unexpected post request:\nexp\n%+v\ngot\n%+v\n", exp, got)
@@ -8245,7 +8347,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			result: func(ctxt context.Context) error {
 				ts := ctxt.Value("server").(*alerttest.TCPServer)
 				ts.Close()
-				exp := []alertservice.AlertData{alertData}
+				exp := []alert.Data{alertData}
 				got := ts.Data()
 				if !reflect.DeepEqual(exp, got) {
 					return fmt.Errorf("unexpected tcp request:\nexp\n%+v\ngot\n%+v\n", exp, got)
@@ -8594,7 +8696,7 @@ alert value=2 0000000000002
 	time.Sleep(110 * time.Millisecond)
 
 	// Check TCP handler got event
-	alertData := alertservice.AlertData{
+	alertData := alert.Data{
 		ID:       "id-agg",
 		Message:  "Received 3 events in the last 100ms.",
 		Details:  "message\nmessage\nmessage",
@@ -8631,7 +8733,7 @@ alert value=2 0000000000002
 		},
 	}
 	ts.Close()
-	exp := []alertservice.AlertData{alertData}
+	exp := []alert.Data{alertData}
 	got := ts.Data()
 	if !reflect.DeepEqual(exp, got) {
 		t.Errorf("unexpected tcp request:\nexp\n%+v\ngot\n%+v\n", exp, got)
@@ -8739,7 +8841,7 @@ stream
 	s.Restart()
 
 	// Check TCP handler got event
-	alertData := alertservice.AlertData{
+	alertData := alert.Data{
 		ID:      "id",
 		Message: "message",
 		Details: "details",
@@ -8759,7 +8861,7 @@ stream
 		},
 	}
 	ts.Close()
-	exp := []alertservice.AlertData{alertData}
+	exp := []alert.Data{alertData}
 	got := ts.Data()
 	if !reflect.DeepEqual(exp, got) {
 		t.Errorf("unexpected tcp request:\nexp\n%+v\ngot\n%+v\n", exp, got)
@@ -8859,7 +8961,7 @@ alert,host=serverB value=0 0000000004
 
 	s.Restart()
 
-	alertData := alertservice.AlertData{
+	alertData := alert.Data{
 		ID:      "id",
 		Message: "message",
 		Details: "details",
@@ -8880,7 +8982,7 @@ alert,host=serverB value=0 0000000004
 		},
 	}
 	ts.Close()
-	exp := []alertservice.AlertData{alertData}
+	exp := []alert.Data{alertData}
 	got := ts.Data()
 	if !reflect.DeepEqual(exp, got) {
 		t.Errorf("unexpected tcp request:\nexp\n%+v\ngot\n%+v\n", exp, got)

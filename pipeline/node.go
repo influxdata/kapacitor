@@ -327,8 +327,10 @@ func (n *chainnode) HttpOut(endpoint string) *HTTPOutNode {
 }
 
 // Creates an HTTP Post node that POSTS received data to the provided HTTP endpoint.
-func (n *chainnode) HttpPost(url string) *HTTPPostNode {
-	h := newHTTPPostNode(n.provides, url)
+// HttpPost expects 0 or 1 arguments. If 0 arguments are provided, you must specify an
+// endpoint property method.
+func (n *chainnode) HttpPost(url ...string) *HTTPPostNode {
+	h := newHTTPPostNode(n.provides, url...)
 	n.linkChild(h)
 	return h
 }
