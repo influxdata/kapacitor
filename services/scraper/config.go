@@ -95,6 +95,7 @@ func (c *Config) Prom() *config.ScrapeConfig {
 		MetricsPath:    c.MetricsPath,
 		Params:         c.Params,
 		ScrapeInterval: model.Duration(c.ScrapeInterval),
+		ScrapeTimeout:  model.Duration(c.ScrapeTimeout),
 		HTTPClientConfig: config.HTTPClientConfig{
 			BasicAuth: &config.BasicAuth{
 				Username: c.Username,
