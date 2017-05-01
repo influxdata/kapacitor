@@ -6558,9 +6558,10 @@ func TestServer_UpdateConfig(t *testing.T) {
 				Elements: []client.ConfigElement{{
 					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/sensu/"},
 					Options: map[string]interface{}{
-						"addr":    "sensu.example.com:3000",
-						"enabled": false,
-						"source":  "Kapacitor",
+						"addr":     "sensu.example.com:3000",
+						"enabled":  false,
+						"source":   "Kapacitor",
+						"handlers": nil,
 					},
 					Redacted: nil,
 				}},
@@ -6568,9 +6569,10 @@ func TestServer_UpdateConfig(t *testing.T) {
 			expDefaultElement: client.ConfigElement{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/sensu/"},
 				Options: map[string]interface{}{
-					"addr":    "sensu.example.com:3000",
-					"enabled": false,
-					"source":  "Kapacitor",
+					"addr":     "sensu.example.com:3000",
+					"enabled":  false,
+					"source":   "Kapacitor",
+					"handlers": nil,
 				},
 				Redacted: nil,
 			},
@@ -6588,9 +6590,10 @@ func TestServer_UpdateConfig(t *testing.T) {
 						Elements: []client.ConfigElement{{
 							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/sensu/"},
 							Options: map[string]interface{}{
-								"addr":    "sensu.local:3000",
-								"enabled": true,
-								"source":  "Kapacitor",
+								"addr":     "sensu.local:3000",
+								"enabled":  true,
+								"source":   "Kapacitor",
+								"handlers": nil,
 							},
 							Redacted: nil,
 						}},
@@ -6598,9 +6601,10 @@ func TestServer_UpdateConfig(t *testing.T) {
 					expElement: client.ConfigElement{
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/sensu/"},
 						Options: map[string]interface{}{
-							"addr":    "sensu.local:3000",
-							"enabled": true,
-							"source":  "Kapacitor",
+							"addr":     "sensu.local:3000",
+							"enabled":  true,
+							"source":   "Kapacitor",
+							"handlers": nil,
 						},
 						Redacted: nil,
 					},
@@ -7283,10 +7287,11 @@ func TestServer_ListServiceTests(t *testing.T) {
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/sensu"},
 				Name: "sensu",
 				Options: client.ServiceTestOptions{
-					"name":   "testName",
-					"output": "testOutput",
-					"source": "Kapacitor",
-					"level":  "CRITICAL",
+					"name":     "testName",
+					"output":   "testOutput",
+					"source":   "Kapacitor",
+					"handlers": []interface{}{},
+					"level":    "CRITICAL",
 				},
 			},
 			{
@@ -7413,10 +7418,11 @@ func TestServer_ListServiceTests_WithPattern(t *testing.T) {
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/sensu"},
 				Name: "sensu",
 				Options: client.ServiceTestOptions{
-					"name":   "testName",
-					"output": "testOutput",
-					"source": "Kapacitor",
-					"level":  "CRITICAL",
+					"name":     "testName",
+					"output":   "testOutput",
+					"source":   "Kapacitor",
+					"handlers": []interface{}{},
+					"level":    "CRITICAL",
 				},
 			},
 			{
