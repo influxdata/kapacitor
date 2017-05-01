@@ -18,6 +18,7 @@ import (
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
+	"github.com/influxdata/kapacitor/services/httppost"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
@@ -101,6 +102,10 @@ type TaskMaster struct {
 	}
 	PushoverService interface {
 		Handler(pushover.HandlerConfig, *log.Logger) alert.Handler
+	}
+	HTTPPostService interface {
+		Handler(httppost.HandlerConfig, *log.Logger) alert.Handler
+		Endpoint(string) (*httppost.Endpoint, bool)
 	}
 	SlackService interface {
 		Global() bool

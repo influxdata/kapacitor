@@ -32,6 +32,7 @@ import (
 	"github.com/influxdata/kapacitor/services/gce"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
+	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/influxdb"
 	"github.com/influxdata/kapacitor/services/k8s"
 	"github.com/influxdata/kapacitor/services/logging"
@@ -213,6 +214,7 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	s.appendOpsGenieService()
 	s.appendPagerDutyService()
 	s.appendPushoverService()
+	s.appendHTTPPostService()
 	s.appendSMTPService()
 	s.appendTelegramService()
 	if err := s.appendSlackService(); err != nil {
@@ -499,6 +501,18 @@ func (s *Server) appendPushoverService() {
 
 	s.SetDynamicService("pushover", srv)
 	s.AppendService("pushover", srv)
+}
+
+func (s *Server) appendHTTPPostService() {
+	c := s.config.HTTPPost
+	l := s.LogService.NewLogger("[httppost] ", log.LstdFlags)
+	srv := httppost.NewService(c, l)
+
+	s.TaskMaster.HTTPPostService = srv
+	s.AlertService.HTTPPostService = srv
+
+	s.SetDynamicService("httppost", srv)
+	s.AppendService("httppost", srv)
 }
 
 func (s *Server) appendSensuService() {

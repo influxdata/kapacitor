@@ -47,3 +47,49 @@ func TestGetSectionName(t *testing.T) {
 		}
 	}
 }
+
+func Test_isZero(t *testing.T) {
+	tt := []struct {
+		exp   bool
+		value struct {
+			X string
+			Y int
+		}
+	}{
+		{
+			exp: true,
+			value: struct {
+				X string
+				Y int
+			}{},
+		},
+		{
+			exp: false,
+			value: struct {
+				X string
+				Y int
+			}{X: "hello"},
+		},
+		{
+			exp: false,
+			value: struct {
+				X string
+				Y int
+			}{Y: 10},
+		},
+		{
+			exp: false,
+			value: struct {
+				X string
+				Y int
+			}{X: "hello", Y: 10},
+		},
+	}
+
+	for _, tst := range tt {
+		if got, exp := isZero(reflect.ValueOf(tst.value)), tst.exp; got != exp {
+			t.Errorf("unexpected result for isZero of %v got %t exp %t", tst.value, got, exp)
+		}
+	}
+
+}

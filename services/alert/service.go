@@ -13,6 +13,7 @@ import (
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
+	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pushover"
@@ -72,6 +73,9 @@ type Service struct {
 	}
 	PushoverService interface {
 		Handler(pushover.HandlerConfig, *log.Logger) alert.Handler
+	}
+	HTTPPostService interface {
+		Handler(httppost.HandlerConfig, *log.Logger) alert.Handler
 	}
 	SensuService interface {
 		Handler(sensu.HandlerConfig, *log.Logger) (alert.Handler, error)

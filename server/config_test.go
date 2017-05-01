@@ -43,6 +43,9 @@ dir = "/tmp/replay"
 
 [storage]
 boltdb = "/tmp/kapacitor.db"
+
+[[httppost]]
+headers = { Authorization = "your-key" }
 `, &c); err != nil {
 		t.Fatal(err)
 	}
@@ -59,6 +62,10 @@ boltdb = "/tmp/kapacitor.db"
 		t.Fatalf("failed to set env var: %v", err)
 	}
 
+	if err := os.Setenv("KAPACITOR_HTTPPOST_0_HEADERS_Authorization", "my-key"); err != nil {
+		t.Fatalf("failed to set env var: %v", err)
+	}
+
 	if err := c.ApplyEnvOverrides(); err != nil {
 		t.Fatalf("failed to apply env overrides: %v", err)
 	}
@@ -70,5 +77,7 @@ boltdb = "/tmp/kapacitor.db"
 		t.Fatalf("unexpected storage boltdb-path: %s", c.Storage.BoltDBPath)
 	} else if c.InfluxDB[0].URLs[0] != "http://localhost:18086" {
 		t.Fatalf("unexpected url 0: %s", c.InfluxDB[0].URLs[0])
+	} else if c.HTTPPost[0].Headers["Authorization"] != "my-key" {
+		t.Fatalf("unexpected header Authorization: %s", c.InfluxDB[0].URLs[0])
 	}
 }
