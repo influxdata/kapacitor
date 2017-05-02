@@ -10,6 +10,10 @@
 
 ### Bugfixes
 
+- [#1329](https://github.com/influxdata/kapacitor/issues/1329): BREAKING: A bug was fixed around missing fields in the derivative node.
+    The behavior of the node changes slightly in order to provide a consistent fix to the bug.
+    The breaking change is that now, the time of the points returned are from the right hand or current point time, instead of the left hand or previous point time.
+
 ## v1.3.0-beta2 [2017-05-01]
 
 ### Features
