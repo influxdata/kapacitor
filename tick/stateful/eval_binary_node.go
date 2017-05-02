@@ -117,15 +117,15 @@ func NewEvalBinaryNode(node *ast.BinaryNode) (*EvalBinaryNode, error) {
 	return b, nil
 }
 
-func (n *EvalBinaryNode) Type(scope ReadOnlyScope, executionState ExecutionState) (ast.ValueType, error) {
+func (n *EvalBinaryNode) Type(scope ReadOnlyScope) (ast.ValueType, error) {
 	if n.constReturnType == ast.InvalidType {
 		var err error
 		// We are dynamic and we need to figure out our type
-		n.leftType, err = n.leftEvaluator.Type(scope, executionState)
+		n.leftType, err = n.leftEvaluator.Type(scope)
 		if err != nil {
 			return ast.InvalidType, err
 		}
-		n.rightType, err = n.rightEvaluator.Type(scope, executionState)
+		n.rightType, err = n.rightEvaluator.Type(scope)
 		if err != nil {
 			return ast.InvalidType, err
 		}
@@ -152,6 +152,10 @@ func (n *EvalBinaryNode) EvalRegex(scope *Scope, executionState ExecutionState) 
 
 func (n *EvalBinaryNode) EvalTime(scope *Scope, executionState ExecutionState) (time.Time, error) {
 	return time.Time{}, ErrTypeGuardFailed{RequestedType: ast.TTime, ActualType: n.constReturnType}
+}
+
+func (n *EvalBinaryNode) EvalMissing(scope *Scope, executionState ExecutionState) (*ast.Missing, error) {
+	return nil, ErrTypeGuardFailed{RequestedType: ast.TMissing, ActualType: n.constReturnType}
 }
 
 func (e *EvalBinaryNode) EvalDuration(scope *Scope, executionState ExecutionState) (time.Duration, error) {
@@ -182,7 +186,13 @@ func (e *EvalBinaryNode) EvalString(scope *Scope, executionState ExecutionState)
 
 // EvalBool executes the expression based on eval bool
 func (e *EvalBinaryNode) EvalBool(scope *Scope, executionState ExecutionState) (bool, error) {
-	result, err := e.eval(scope, executionState)
+	var result resultContainer
+	var err *ErrSide
+	if e.leftEvaluator.IsDynamic() || e.rightEvaluator.IsDynamic() {
+		result, err = e.evaluateDynamicNode(scope, executionState, e.leftEvaluator, e.rightEvaluator)
+	} else {
+		result, err = e.eval(scope, executionState)
+	}
 	if err != nil {
 		return false, err.error
 	}
@@ -280,13 +290,12 @@ func (e *EvalBinaryNode) evaluateDynamicNode(scope *Scope, executionState Execut
 	// For example: "count() == 1"
 	//  1. we evaluate the left side and counter is 1 (upper ^ in this function)
 	//  2. we evaluate the second time in "EvalBool"
-	typeExecutionState := CreateExecutionState()
 
-	if leftType, err = left.Type(scope, typeExecutionState); err != nil {
+	if leftType, err = left.Type(scope); err != nil {
 		return emptyResultContainer, &ErrSide{error: err, IsLeft: true}
 	}
 
-	if rightType, err = right.Type(scope, typeExecutionState); err != nil {
+	if rightType, err = right.Type(scope); err != nil {
 		return emptyResultContainer, &ErrSide{error: err, IsRight: true}
 	}
 
@@ -301,8 +310,7 @@ func (e *EvalBinaryNode) evaluateDynamicNode(scope *Scope, executionState Execut
 // Return an understandable error which is most specific to the issue.
 func (e *EvalBinaryNode) determineError(scope *Scope, executionState ExecutionState) error {
 	if scope != nil {
-		typeExecutionState := CreateExecutionState()
-		leftType, err := e.leftEvaluator.Type(scope, typeExecutionState)
+		leftType, err := e.leftEvaluator.Type(scope)
 		if err != nil {
 			return fmt.Errorf("can't get the type of the left node: %s", err)
 		}
@@ -312,7 +320,15 @@ func (e *EvalBinaryNode) determineError(scope *Scope, executionState ExecutionSt
 			return errors.New("left value is invalid value type")
 		}
 
-		rightType, err := e.rightEvaluator.Type(scope, typeExecutionState)
+		if leftType == ast.TMissing {
+			ref, ok := e.leftEvaluator.(*EvalReferenceNode)
+			if !ok {
+				return fmt.Errorf("expected leftEvaluator to be *EvalReferenceNode got %T", e.leftEvaluator)
+			}
+			return fmt.Errorf("left reference value \"%s\" is missing value", ref.Node.Reference)
+		}
+
+		rightType, err := e.rightEvaluator.Type(scope)
 		if err != nil {
 			return fmt.Errorf("can't get the type of the right node: %s", err)
 		}
@@ -320,6 +336,14 @@ func (e *EvalBinaryNode) determineError(scope *Scope, executionState ExecutionSt
 
 		if rightType == ast.InvalidType {
 			return errors.New("right value is invalid value type")
+		}
+
+		if rightType == ast.TMissing {
+			ref, ok := e.rightEvaluator.(*EvalReferenceNode)
+			if !ok {
+				return fmt.Errorf("expected rightEvaluator to be *EvalReferenceNode got %T", e.rightEvaluator)
+			}
+			return fmt.Errorf("right reference value \"%s\" is missing value", ref.Node.Reference)
 		}
 	}
 

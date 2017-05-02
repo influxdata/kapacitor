@@ -11,7 +11,7 @@ type EvalIntNode struct {
 	Int64 int64
 }
 
-func (n *EvalIntNode) Type(scope ReadOnlyScope, executionState ExecutionState) (ast.ValueType, error) {
+func (n *EvalIntNode) Type(scope ReadOnlyScope) (ast.ValueType, error) {
 	return ast.TInt, nil
 }
 
@@ -30,15 +30,23 @@ func (n *EvalIntNode) EvalString(scope *Scope, executionState ExecutionState) (s
 func (n *EvalIntNode) EvalBool(scope *Scope, executionState ExecutionState) (bool, error) {
 	return false, ErrTypeGuardFailed{RequestedType: ast.TBool, ActualType: ast.TInt}
 }
+
 func (n *EvalIntNode) EvalRegex(scope *Scope, executionState ExecutionState) (*regexp.Regexp, error) {
 	return nil, ErrTypeGuardFailed{RequestedType: ast.TRegex, ActualType: ast.TInt}
 }
+
 func (n *EvalIntNode) EvalTime(scope *Scope, executionState ExecutionState) (time.Time, error) {
 	return time.Time{}, ErrTypeGuardFailed{RequestedType: ast.TTime, ActualType: ast.TInt}
 }
+
 func (n *EvalIntNode) EvalDuration(scope *Scope, executionState ExecutionState) (time.Duration, error) {
 	return 0, ErrTypeGuardFailed{RequestedType: ast.TDuration, ActualType: ast.TInt}
 }
+
+func (n *EvalIntNode) EvalMissing(scope *Scope, executionState ExecutionState) (*ast.Missing, error) {
+	return nil, ErrTypeGuardFailed{RequestedType: ast.TMissing, ActualType: ast.TInt}
+}
+
 func (n *EvalIntNode) IsDynamic() bool {
 	return false
 }

@@ -12,20 +12,79 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/kapacitor/tick/ast"
 )
 
+// maxArgs is used to specify the largest number of arguments that a
+// builtin function can accept.
+// Increment this value if you create a builtin function with more than
+// the current value of maxArgs.
+const (
+	maxArgs = 4
+)
+
+type ErrWrongFuncSignature struct {
+	Name           string
+	DomainProvided Domain
+	Func           Func
+}
+
+func (e ErrWrongFuncSignature) Error() string {
+	return fmt.Sprintf("Cannot call function \"%s\" with args signature %s, available signatures are %s.",
+		e.Name, e.DomainProvided, FuncDomains(e.Func))
+}
+
 var ErrNotFloat = errors.New("value is not a float")
+
+type Domain [maxArgs]ast.ValueType
+
+func (d Domain) String() string {
+	input := []string{}
+	for _, el := range d {
+		if el == ast.InvalidType {
+			// Because inputs should be consecutive
+			break
+		}
+		input = append(input, el.String())
+	}
+
+	return "(" + strings.Join(input, ",") + ")"
+}
+
+type Domains []Domain
+
+func (ds Domains) String() string {
+	input := []string{}
+	for _, d := range ds {
+		input = append(input, d.String())
+	}
+
+	return "[" + strings.Join(input, ", ") + "]"
+}
 
 // A callable function from within the expression
 type Func interface {
 	Reset()
 	Call(...interface{}) (interface{}, error)
+	Signature() map[Domain]ast.ValueType
+}
+
+func FuncDomains(f Func) Domains {
+	ds := []Domain{}
+
+	for d := range f.Signature() {
+		ds = append(ds, d)
+	}
+
+	return ds
 }
 
 // Lookup for functions
 type Funcs map[string]Func
 
 var statelessFuncs Funcs
+
+var builtinFuncs Funcs
 
 func init() {
 	statelessFuncs = make(Funcs)
@@ -105,6 +164,9 @@ func init() {
 	// Regex functions
 	statelessFuncs["regexReplace"] = regexReplace{}
 
+	// Missing functions
+	statelessFuncs["isPresent"] = isPresent{}
+
 	// Time functions
 	statelessFuncs["minute"] = minute{}
 	statelessFuncs["hour"] = hour{}
@@ -118,6 +180,9 @@ func init() {
 
 	// Conditionals
 	statelessFuncs["if"] = ifFunc{}
+
+	// Create map of builtin functions after all functions have been added to statelessFuncs
+	builtinFuncs = NewFunctions()
 }
 
 // Return set of built-in Funcs
@@ -161,6 +226,19 @@ func (m math1) Call(args ...interface{}) (v interface{}, err error) {
 	return
 }
 
+var math1FuncSignature = map[Domain]ast.ValueType{}
+
+// Initialize Math 1 Func Signature
+func init() {
+	d := Domain{}
+	d[0] = ast.TFloat
+	math1FuncSignature[d] = ast.TFloat
+}
+
+func (m math1) Signature() map[Domain]ast.ValueType {
+	return math1FuncSignature
+}
+
 func (m math1) Reset() {}
 
 type math2Func func(float64, float64) float64
@@ -194,6 +272,20 @@ func (m math2) Call(args ...interface{}) (v interface{}, err error) {
 	return
 }
 
+var math2FuncSignature = map[Domain]ast.ValueType{}
+
+// Initialize Math 2 Function Signature
+func init() {
+	d := Domain{}
+	d[0] = ast.TFloat
+	d[1] = ast.TFloat
+	math2FuncSignature[d] = ast.TFloat
+}
+
+func (m math2) Signature() map[Domain]ast.ValueType {
+	return math2FuncSignature
+}
+
 func (m math2) Reset() {}
 
 type mathIFunc func(int) float64
@@ -220,6 +312,19 @@ func (m mathI) Call(args ...interface{}) (v interface{}, err error) {
 	}
 	v = m.f(int(a0))
 	return
+}
+
+var mathIFuncSignature = map[Domain]ast.ValueType{}
+
+// Initialize Math I Function Signature
+func init() {
+	d := Domain{}
+	d[0] = ast.TInt
+	mathIFuncSignature[d] = ast.TFloat
+}
+
+func (m mathI) Signature() map[Domain]ast.ValueType {
+	return mathIFuncSignature
 }
 
 func (m mathI) Reset() {}
@@ -255,6 +360,20 @@ func (m mathIF) Call(args ...interface{}) (v interface{}, err error) {
 	return
 }
 
+var mathIFFuncSignature = map[Domain]ast.ValueType{}
+
+// Initialize Math IF Function Signature
+func init() {
+	d := Domain{}
+	d[0] = ast.TInt
+	d[1] = ast.TFloat
+	mathIFFuncSignature[d] = ast.TFloat
+}
+
+func (m mathIF) Signature() map[Domain]ast.ValueType {
+	return mathIFFuncSignature
+}
+
 func (m mathIF) Reset() {}
 
 type string2BoolFunc func(string, string) bool
@@ -286,6 +405,20 @@ func (m string2Bool) Call(args ...interface{}) (v interface{}, err error) {
 	}
 	v = m.f(a0, a1)
 	return
+}
+
+var string2BoolFuncSignature = map[Domain]ast.ValueType{}
+
+// Initialize String 2 Bool Function Signature
+func init() {
+	d := Domain{}
+	d[0] = ast.TString
+	d[1] = ast.TString
+	string2BoolFuncSignature[d] = ast.TBool
+}
+
+func (m string2Bool) Signature() map[Domain]ast.ValueType {
+	return string2BoolFuncSignature
 }
 
 func (m string2Bool) Reset() {}
@@ -321,6 +454,20 @@ func (m string2Int) Call(args ...interface{}) (v interface{}, err error) {
 	return
 }
 
+var string2IntFuncSignature = map[Domain]ast.ValueType{}
+
+// Initialize String 2 Int Function Signature
+func init() {
+	d := Domain{}
+	d[0] = ast.TString
+	d[1] = ast.TString
+	string2IntFuncSignature[d] = ast.TInt
+}
+
+func (m string2Int) Signature() map[Domain]ast.ValueType {
+	return string2IntFuncSignature
+}
+
 func (m string2Int) Reset() {}
 
 type string2StringFunc func(string, string) string
@@ -354,6 +501,20 @@ func (m string2String) Call(args ...interface{}) (v interface{}, err error) {
 	return
 }
 
+var string2StringFuncSignature = map[Domain]ast.ValueType{}
+
+// Initialize String 2 String Function Signature
+func init() {
+	d := Domain{}
+	d[0] = ast.TString
+	d[1] = ast.TString
+	string2StringFuncSignature[d] = ast.TString
+}
+
+func (m string2String) Signature() map[Domain]ast.ValueType {
+	return string2StringFuncSignature
+}
+
 func (m string2String) Reset() {}
 
 type string1StringFunc func(string) string
@@ -382,6 +543,19 @@ func (m string1String) Call(args ...interface{}) (v interface{}, err error) {
 	return
 }
 
+var string1StringFuncSignature = map[Domain]ast.ValueType{}
+
+// Initialize String 1 String Function Signature
+func init() {
+	d := Domain{}
+	d[0] = ast.TString
+	string1StringFuncSignature[d] = ast.TString
+}
+
+func (m string1String) Signature() map[Domain]ast.ValueType {
+	return string1StringFuncSignature
+}
+
 func (m string1String) Reset() {}
 
 type strLength struct {
@@ -398,6 +572,19 @@ func (m strLength) Call(args ...interface{}) (v interface{}, err error) {
 	}
 	v = int64(len(str))
 	return
+}
+
+var strLengthFuncSignature = map[Domain]ast.ValueType{}
+
+// Initialize String Length Function Signature
+func init() {
+	d := Domain{}
+	d[0] = ast.TString
+	strLengthFuncSignature[d] = ast.TInt
+}
+
+func (strLength) Signature() map[Domain]ast.ValueType {
+	return strLengthFuncSignature
 }
 
 func (m strLength) Reset() {}
@@ -431,6 +618,22 @@ func (m strReplace) Call(args ...interface{}) (v interface{}, err error) {
 	}
 	v = strings.Replace(str, old, new, int(n))
 	return
+}
+
+var strReplaceFuncSignature = map[Domain]ast.ValueType{}
+
+// Initialize String Replace Function Signature
+func init() {
+	d := Domain{}
+	d[0] = ast.TString
+	d[1] = ast.TString
+	d[2] = ast.TString
+	d[3] = ast.TInt
+	strReplaceFuncSignature[d] = ast.TString
+}
+
+func (strReplace) Signature() map[Domain]ast.ValueType {
+	return strReplaceFuncSignature
 }
 
 func (m strReplace) Reset() {}
@@ -471,6 +674,21 @@ func (m strSubstring) Call(args ...interface{}) (v interface{}, err error) {
 	return
 }
 
+var strSubstringFuncSignature = map[Domain]ast.ValueType{}
+
+// Initialize String Substring Function Signature
+func init() {
+	d := Domain{}
+	d[0] = ast.TString
+	d[1] = ast.TInt
+	d[2] = ast.TInt
+	strSubstringFuncSignature[d] = ast.TString
+}
+
+func (strSubstring) Signature() map[Domain]ast.ValueType {
+	return strSubstringFuncSignature
+}
+
 func (m strSubstring) Reset() {}
 
 type regexReplace struct {
@@ -497,6 +715,21 @@ func (m regexReplace) Call(args ...interface{}) (v interface{}, err error) {
 	}
 	v = pattern.ReplaceAllString(src, repl)
 	return
+}
+
+var regexReplaceFuncSignature = map[Domain]ast.ValueType{}
+
+// Initialize Regex Replace Function Signature
+func init() {
+	d := Domain{}
+	d[0] = ast.TRegex
+	d[1] = ast.TString
+	d[2] = ast.TString
+	regexReplaceFuncSignature[d] = ast.TString
+}
+
+func (regexReplace) Signature() map[Domain]ast.ValueType {
+	return regexReplaceFuncSignature
 }
 
 func (m regexReplace) Reset() {}
@@ -541,6 +774,25 @@ func (boolean) Call(args ...interface{}) (v interface{}, err error) {
 	return
 }
 
+var booleanFuncSignature = map[Domain]ast.ValueType{}
+
+// Initialize Boolean Function Signature
+func init() {
+	d := Domain{}
+	d[0] = ast.TBool
+	booleanFuncSignature[d] = ast.TBool
+	d[0] = ast.TString
+	booleanFuncSignature[d] = ast.TBool
+	d[0] = ast.TInt
+	booleanFuncSignature[d] = ast.TBool
+	d[0] = ast.TFloat
+	booleanFuncSignature[d] = ast.TBool
+}
+
+func (boolean) Signature() map[Domain]ast.ValueType {
+	return booleanFuncSignature
+}
+
 type integer struct {
 }
 
@@ -573,6 +825,25 @@ func (integer) Call(args ...interface{}) (v interface{}, err error) {
 	return
 }
 
+var integerFuncSignature = map[Domain]ast.ValueType{}
+
+// Initialize Integer Function Signature
+func init() {
+	d := Domain{}
+	d[0] = ast.TBool
+	integerFuncSignature[d] = ast.TInt
+	d[0] = ast.TString
+	integerFuncSignature[d] = ast.TInt
+	d[0] = ast.TInt
+	integerFuncSignature[d] = ast.TInt
+	d[0] = ast.TFloat
+	integerFuncSignature[d] = ast.TInt
+}
+
+func (integer) Signature() map[Domain]ast.ValueType {
+	return integerFuncSignature
+}
+
 type float struct {
 }
 
@@ -603,6 +874,25 @@ func (float) Call(args ...interface{}) (v interface{}, err error) {
 	return
 }
 
+var floatFuncSignature = map[Domain]ast.ValueType{}
+
+// Initialize Float Function Signature
+func init() {
+	d := Domain{}
+	d[0] = ast.TBool
+	floatFuncSignature[d] = ast.TFloat
+	d[0] = ast.TString
+	floatFuncSignature[d] = ast.TFloat
+	d[0] = ast.TInt
+	floatFuncSignature[d] = ast.TFloat
+	d[0] = ast.TFloat
+	floatFuncSignature[d] = ast.TFloat
+}
+
+func (float) Signature() map[Domain]ast.ValueType {
+	return floatFuncSignature
+}
+
 type str struct {
 }
 
@@ -629,6 +919,27 @@ func (str) Call(args ...interface{}) (v interface{}, err error) {
 		err = fmt.Errorf("cannot convert %T to string", a)
 	}
 	return
+}
+
+var stringFuncSignature = map[Domain]ast.ValueType{}
+
+// Initialize String Function Signature
+func init() {
+	d := Domain{}
+	d[0] = ast.TBool
+	stringFuncSignature[d] = ast.TString
+	d[0] = ast.TString
+	stringFuncSignature[d] = ast.TString
+	d[0] = ast.TInt
+	stringFuncSignature[d] = ast.TString
+	d[0] = ast.TFloat
+	stringFuncSignature[d] = ast.TString
+	d[0] = ast.TDuration
+	stringFuncSignature[d] = ast.TString
+}
+
+func (str) Signature() map[Domain]ast.ValueType {
+	return stringFuncSignature
 }
 
 type duration struct {
@@ -674,6 +985,28 @@ func (duration) Call(args ...interface{}) (v interface{}, err error) {
 	return
 }
 
+var durationFuncSignature = map[Domain]ast.ValueType{}
+
+// Initialize Duration Function Signature
+func init() {
+	d := Domain{}
+	d[0] = ast.TDuration
+	durationFuncSignature[d] = ast.TDuration
+	d[0] = ast.TInt
+	d[1] = ast.TDuration
+	durationFuncSignature[d] = ast.TDuration
+	d[0] = ast.TFloat
+	d[1] = ast.TDuration
+	durationFuncSignature[d] = ast.TDuration
+	d[0] = ast.TString
+	d[1] = ast.TDuration
+	durationFuncSignature[d] = ast.TDuration
+}
+
+func (duration) Signature() map[Domain]ast.ValueType {
+	return durationFuncSignature
+}
+
 type count struct {
 	n int64
 }
@@ -686,6 +1019,18 @@ func (c *count) Reset() {
 func (c *count) Call(args ...interface{}) (v interface{}, err error) {
 	c.n++
 	return c.n, nil
+}
+
+var countFuncSignature = map[Domain]ast.ValueType{}
+
+// Initialize Count Function Signature
+func init() {
+	d := Domain{}
+	countFuncSignature[d] = ast.TInt
+}
+
+func (c *count) Signature() map[Domain]ast.ValueType {
+	return countFuncSignature
 }
 
 type sigma struct {
@@ -723,6 +1068,19 @@ func (s *sigma) Call(args ...interface{}) (interface{}, error) {
 	return math.Abs(x-s.mean) / math.Sqrt(s.variance), nil
 }
 
+var sigmaFuncSignature = map[Domain]ast.ValueType{}
+
+// Initialize Sigma Function Signature
+func init() {
+	d := Domain{}
+	d[0] = ast.TFloat
+	sigmaFuncSignature[d] = ast.TFloat
+}
+
+func (s *sigma) Signature() map[Domain]ast.ValueType {
+	return sigmaFuncSignature
+}
+
 type spread struct {
 	min float64
 	max float64
@@ -754,6 +1112,29 @@ func (s *spread) Call(args ...interface{}) (interface{}, error) {
 	return s.max - s.min, nil
 }
 
+var spreadFuncSignature = map[Domain]ast.ValueType{}
+
+// Initialize Spread Function Signature
+func init() {
+	d := Domain{}
+	d[0] = ast.TFloat
+	spreadFuncSignature[d] = ast.TFloat
+}
+
+func (s *spread) Signature() map[Domain]ast.ValueType {
+	return spreadFuncSignature
+}
+
+// Time function signatures
+var timeFuncSignature = map[Domain]ast.ValueType{}
+
+// Initialize Time Function Signature
+func init() {
+	d := Domain{}
+	d[0] = ast.TTime
+	timeFuncSignature[d] = ast.TInt
+}
+
 type minute struct {
 }
 
@@ -772,6 +1153,10 @@ func (minute) Call(args ...interface{}) (v interface{}, err error) {
 		err = fmt.Errorf("cannot convert %T to time.Time", a)
 	}
 	return
+}
+
+func (minute) Signature() map[Domain]ast.ValueType {
+	return timeFuncSignature
 }
 
 type hour struct {
@@ -794,6 +1179,10 @@ func (hour) Call(args ...interface{}) (v interface{}, err error) {
 	return
 }
 
+func (hour) Signature() map[Domain]ast.ValueType {
+	return timeFuncSignature
+}
+
 type weekday struct {
 }
 
@@ -812,6 +1201,10 @@ func (weekday) Call(args ...interface{}) (v interface{}, err error) {
 		err = fmt.Errorf("cannot convert %T to time.Time", a)
 	}
 	return
+}
+
+func (weekday) Signature() map[Domain]ast.ValueType {
+	return timeFuncSignature
 }
 
 type day struct {
@@ -834,6 +1227,10 @@ func (day) Call(args ...interface{}) (v interface{}, err error) {
 	return
 }
 
+func (day) Signature() map[Domain]ast.ValueType {
+	return timeFuncSignature
+}
+
 type month struct {
 }
 
@@ -852,6 +1249,10 @@ func (month) Call(args ...interface{}) (v interface{}, err error) {
 		err = fmt.Errorf("cannot convert %T to time.Time", a)
 	}
 	return
+}
+
+func (month) Signature() map[Domain]ast.ValueType {
+	return timeFuncSignature
 }
 
 type year struct {
@@ -874,6 +1275,10 @@ func (year) Call(args ...interface{}) (v interface{}, err error) {
 	return
 }
 
+func (year) Signature() map[Domain]ast.ValueType {
+	return timeFuncSignature
+}
+
 type humanBytes struct {
 }
 
@@ -894,6 +1299,21 @@ func (humanBytes) Call(args ...interface{}) (v interface{}, err error) {
 		err = fmt.Errorf("cannot convert %T to humanBytes", a)
 	}
 	return
+}
+
+var humanBytesFuncSignature = map[Domain]ast.ValueType{}
+
+// Initialize HumanBytes Function Signature
+func init() {
+	d := Domain{}
+	d[0] = ast.TFloat
+	humanBytesFuncSignature[d] = ast.TString
+	d[0] = ast.TInt
+	humanBytesFuncSignature[d] = ast.TString
+}
+
+func (humanBytes) Signature() map[Domain]ast.ValueType {
+	return humanBytesFuncSignature
 }
 
 type ifFunc struct {
@@ -924,4 +1344,68 @@ func (ifFunc) Call(args ...interface{}) (interface{}, error) {
 	}
 
 	return args[2], nil
+}
+
+var ifFuncSignature = map[Domain]ast.ValueType{}
+
+// Initialize If Function Signature
+func init() {
+	d := Domain{}
+	d[0] = ast.TBool
+	types := []ast.ValueType{
+		ast.TFloat,
+		ast.TInt,
+		ast.TString,
+		ast.TBool,
+		ast.TRegex,
+		ast.TTime,
+		ast.TDuration,
+	}
+
+	for _, t := range types {
+		d[1] = t
+		d[2] = t
+		ifFuncSignature[d] = t
+	}
+}
+
+func (ifFunc) Signature() map[Domain]ast.ValueType {
+	return ifFuncSignature
+}
+
+type isPresent struct {
+}
+
+func (isPresent) Reset() {
+
+}
+
+func (isPresent) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 1 {
+		return false, errors.New("isMissing expects exactly one argument")
+	}
+	_, isMissing := args[0].(*ast.Missing)
+
+	return !isMissing, nil
+}
+
+var isPresentFuncSignature = map[Domain]ast.ValueType{}
+
+// Initialize isPresent Function Signature
+func init() {
+	d := Domain{}
+	d[0] = ast.TMissing
+	isPresentFuncSignature[d] = ast.TBool
+	d[0] = ast.TBool
+	isPresentFuncSignature[d] = ast.TBool
+	d[0] = ast.TString
+	isPresentFuncSignature[d] = ast.TBool
+	d[0] = ast.TInt
+	isPresentFuncSignature[d] = ast.TBool
+	d[0] = ast.TFloat
+	isPresentFuncSignature[d] = ast.TBool
+}
+
+func (isPresent) Signature() map[Domain]ast.ValueType {
+	return isPresentFuncSignature
 }

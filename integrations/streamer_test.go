@@ -1915,6 +1915,63 @@ stream
 	testStreamerWithOutput(t, "TestStream_Eval_Time", script, 2*time.Hour, er, false, nil)
 }
 
+func TestStream_Eval_Missing(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('missing')
+	|eval(lambda: "or_not_to_be")
+		.as('that_is_the_question')
+	|httpOut('TestStream_Eval_Missing')
+`
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "missing",
+				Tags:    map[string]string{"t": "t1"},
+				Columns: []string{"time", "that_is_the_question"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						float64(42),
+					},
+				},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Eval_Missing", script, 2*time.Hour, er, false, nil)
+}
+
+func TestStream_Eval_Missing_isPresent(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('missing')
+	|where(lambda: isPresent("or_not_to_be"))
+	|eval(lambda: !isPresent("or_not_to_be"))
+		.as('that_is_the_question')
+	|httpOut('TestStream_Eval_Missing')
+`
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "missing",
+				Tags:    map[string]string{"t": "t1"},
+				Columns: []string{"time", "that_is_the_question"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						false,
+					},
+				},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Eval_Missing", script, 2*time.Hour, er, false, nil)
+}
+
 func TestStream_Default(t *testing.T) {
 	var script = `
 stream

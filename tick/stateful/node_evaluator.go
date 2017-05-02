@@ -22,6 +22,7 @@ func (e ErrTypeGuardFailed) Error() string {
 
 type ReadOnlyScope interface {
 	Get(name string) (interface{}, error)
+	DynamicFunc(name string) *DynamicFunc
 }
 
 // NodeEvaluator provides a generic way for trying to fetch
@@ -34,9 +35,10 @@ type NodeEvaluator interface {
 	EvalRegex(scope *Scope, executionState ExecutionState) (*regexp.Regexp, error)
 	EvalTime(scope *Scope, executionState ExecutionState) (time.Time, error)
 	EvalDuration(scope *Scope, executionState ExecutionState) (time.Duration, error)
+	EvalMissing(scope *Scope, executionState ExecutionState) (*ast.Missing, error)
 
 	// Type returns the type of ast.ValueType
-	Type(scope ReadOnlyScope, executionState ExecutionState) (ast.ValueType, error)
+	Type(scope ReadOnlyScope) (ast.ValueType, error)
 	// Whether the type returned by the node can change.
 	IsDynamic() bool
 }

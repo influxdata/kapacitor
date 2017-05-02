@@ -22,6 +22,7 @@ func Test_TypeOf(t *testing.T) {
 		{value: regexp.MustCompile("\\d"), valueType: ast.TRegex},
 		{value: time.Duration(5), valueType: ast.TDuration},
 		{value: time.Time{}, valueType: ast.TTime},
+		{value: ast.MissingValue, valueType: ast.TMissing},
 		{value: t, valueType: ast.InvalidType},
 	}
 

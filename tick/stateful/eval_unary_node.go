@@ -33,11 +33,11 @@ func isValidUnaryOperator(operator ast.TokenType) bool {
 	return operator == ast.TokenNot || operator == ast.TokenMinus
 }
 
-func (n *EvalUnaryNode) Type(scope ReadOnlyScope, executionState ExecutionState) (ast.ValueType, error) {
+func (n *EvalUnaryNode) Type(scope ReadOnlyScope) (ast.ValueType, error) {
 	if n.constReturnType == ast.InvalidType {
 		// We are dynamic and we need to figure out our type
 		// Do NOT cache this result in n.returnType since it can change.
-		return n.nodeEvaluator.Type(scope, executionState)
+		return n.nodeEvaluator.Type(scope)
 	}
 	return n.constReturnType, nil
 }
@@ -57,8 +57,16 @@ func (n *EvalUnaryNode) EvalTime(scope *Scope, executionState ExecutionState) (t
 	return time.Time{}, ErrTypeGuardFailed{RequestedType: ast.TTime, ActualType: n.constReturnType}
 }
 
+func (n *EvalUnaryNode) EvalMissing(scope *Scope, executionState ExecutionState) (*ast.Missing, error) {
+	ref, ok := n.nodeEvaluator.(*EvalReferenceNode)
+	if !ok {
+		return nil, fmt.Errorf("expected nodeEvaluator to be *EvalReferenceNode got %T", n.nodeEvaluator)
+	}
+	return nil, fmt.Errorf("reference \"%s\" is missing value", ref.Node.Reference)
+}
+
 func (n *EvalUnaryNode) EvalDuration(scope *Scope, executionState ExecutionState) (time.Duration, error) {
-	typ, err := n.Type(scope, executionState)
+	typ, err := n.Type(scope)
 	if err != nil {
 		return 0, err
 	}
@@ -79,7 +87,7 @@ func (n *EvalUnaryNode) EvalString(scope *Scope, executionState ExecutionState) 
 }
 
 func (n *EvalUnaryNode) EvalFloat(scope *Scope, executionState ExecutionState) (float64, error) {
-	typ, err := n.Type(scope, executionState)
+	typ, err := n.Type(scope)
 	if err != nil {
 		return 0, err
 	}
@@ -96,7 +104,7 @@ func (n *EvalUnaryNode) EvalFloat(scope *Scope, executionState ExecutionState) (
 }
 
 func (n *EvalUnaryNode) EvalInt(scope *Scope, executionState ExecutionState) (int64, error) {
-	typ, err := n.Type(scope, executionState)
+	typ, err := n.Type(scope)
 	if err != nil {
 		return 0, err
 	}
@@ -113,7 +121,7 @@ func (n *EvalUnaryNode) EvalInt(scope *Scope, executionState ExecutionState) (in
 }
 
 func (n *EvalUnaryNode) EvalBool(scope *Scope, executionState ExecutionState) (bool, error) {
-	typ, err := n.Type(scope, executionState)
+	typ, err := n.Type(scope)
 	if err != nil {
 		return false, err
 	}

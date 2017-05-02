@@ -10,7 +10,7 @@ import (
 type ValueType uint8
 
 const (
-	InvalidType ValueType = iota << 1
+	InvalidType ValueType = iota
 	TFloat
 	TInt
 	TString
@@ -21,7 +21,12 @@ const (
 	TLambda
 	TList
 	TStar
+	TMissing
 )
+
+type Missing struct{}
+
+var MissingValue = &Missing{}
 
 func (v ValueType) String() string {
 	switch v {
@@ -45,6 +50,8 @@ func (v ValueType) String() string {
 		return "list"
 	case TStar:
 		return "star"
+	case TMissing:
+		return "missing"
 	}
 
 	return "invalid type"
@@ -72,6 +79,8 @@ func TypeOf(v interface{}) ValueType {
 		return TList
 	case *StarNode:
 		return TStar
+	case *Missing:
+		return TMissing
 	default:
 		return InvalidType
 	}
@@ -99,6 +108,8 @@ func ZeroValue(t ValueType) interface{} {
 		return []interface{}(nil)
 	case TStar:
 		return (*StarNode)(nil)
+	case TMissing:
+		return (*Missing)(nil)
 	default:
 		return errors.New("invalid type")
 	}

@@ -1,0 +1,12 @@
+dbname
+rpname
+missing,t=t1 to_be=42 0000000000
+dbname
+rpname
+missing,t=t1 or_not_to_be=42 0000000000
+dbname
+rpname
+missing,t=t1 to_be=24 0000003600
+dbname
+rpname
+missing,t=t1 to_be=24 0000003600
