@@ -42,55 +42,48 @@ func (d *DerivativeNode) runDerivative([]byte) error {
 		for p, ok := d.ins[0].NextPoint(); ok; p, ok = d.ins[0].NextPoint() {
 			d.timer.Start()
 			mu.RLock()
-			pr, ok := previous[p.Group]
+			pr := previous[p.Group]
 			mu.RUnlock()
-			if !ok {
+
+			value, store, emit := d.derivative(pr.Fields, p.Fields, pr.Time, p.Time)
+			if store {
 				mu.Lock()
 				previous[p.Group] = p
 				mu.Unlock()
-				d.timer.Stop()
-				continue
 			}
-
-			value, ok := d.derivative(pr.Fields, p.Fields, pr.Time, p.Time)
-			if ok {
+			if emit {
 				fields := pr.Fields.Copy()
 				fields[d.d.As] = value
-				pr.Fields = fields
+				p.Fields = fields
 				d.timer.Pause()
 				for _, child := range d.outs {
-					err := child.CollectPoint(pr)
+					err := child.CollectPoint(p)
 					if err != nil {
 						return err
 					}
 				}
 				d.timer.Resume()
 			}
-			mu.Lock()
-			previous[p.Group] = p
-			mu.Unlock()
 			d.timer.Stop()
 		}
 	case pipeline.BatchEdge:
 		for b, ok := d.ins[0].NextBatch(); ok; b, ok = d.ins[0].NextBatch() {
 			d.timer.Start()
-			if len(b.Points) > 0 {
-				pr := b.Points[0]
-				var p models.BatchPoint
-				for i := 1; i < len(b.Points); i++ {
-					p = b.Points[i]
-					value, ok := d.derivative(pr.Fields, p.Fields, pr.Time, p.Time)
-					if ok {
-						fields := pr.Fields.Copy()
-						fields[d.d.As] = value
-						b.Points[i-1].Fields = fields
-					} else {
-						b.Points = append(b.Points[:i-1], b.Points[i:]...)
-						i--
-					}
+			var pr, p models.BatchPoint
+			for i := 0; i < len(b.Points); i++ {
+				p = b.Points[i]
+				value, store, emit := d.derivative(pr.Fields, p.Fields, pr.Time, p.Time)
+				if store {
 					pr = p
 				}
-				b.Points = b.Points[:len(b.Points)-1]
+				if emit {
+					fields := pr.Fields.Copy()
+					fields[d.d.As] = value
+					b.Points[i].Fields = fields
+				} else {
+					b.Points = append(b.Points[:i], b.Points[i+1:]...)
+					i--
+				}
 			}
 			d.timer.Stop()
 			for _, child := range d.outs {
@@ -104,35 +97,39 @@ func (d *DerivativeNode) runDerivative([]byte) error {
 	return nil
 }
 
-func (d *DerivativeNode) derivative(prev, curr models.Fields, prevTime, currTime time.Time) (float64, bool) {
-	f0, ok := numToFloat(prev[d.d.Field])
-	if !ok {
-		d.incrementErrorCount()
-		d.logger.Printf("E! cannot apply derivative to type %T", prev[d.d.Field])
-		return 0, false
-	}
-
+// derivative calculates the derivative between prev and cur.
+// Return is the resulting derivative, whether the current point should be
+// stored as previous, and whether the point result should be emitted.
+func (d *DerivativeNode) derivative(prev, curr models.Fields, prevTime, currTime time.Time) (float64, bool, bool) {
 	f1, ok := numToFloat(curr[d.d.Field])
 	if !ok {
 		d.incrementErrorCount()
 		d.logger.Printf("E! cannot apply derivative to type %T", curr[d.d.Field])
-		return 0, false
+		return 0, false, false
+	}
+
+	f0, ok := numToFloat(prev[d.d.Field])
+	if !ok {
+		// The only time this will fail to parse is if there is no previous.
+		// Because we only return `store=true` if current parses successfully, we will
+		// never get a previous which doesn't parse.
+		return 0, true, false
 	}
 
 	elapsed := float64(currTime.Sub(prevTime))
 	if elapsed == 0 {
 		d.incrementErrorCount()
 		d.logger.Printf("E! cannot perform derivative elapsed time was 0")
-		return 0, false
+		return 0, true, false
 	}
 	diff := f1 - f0
 	// Drop negative values for non-negative derivatives
 	if d.d.NonNegativeFlag && diff < 0 {
-		return 0, false
+		return 0, true, false
 	}
 
 	value := float64(diff) / (elapsed / float64(d.d.Unit))
-	return value, true
+	return value, true, true
 }
 
 func numToFloat(num interface{}) (float64, bool) {

@@ -84,10 +84,6 @@ batch
 				Columns: []string{"time", "value"},
 				Values: [][]interface{}{
 					{
-						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
-						0.5,
-					},
-					{
 						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 						0.5,
 					},
@@ -97,6 +93,10 @@ batch
 					},
 					{
 						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						0.5,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 						0.5,
 					},
 				},
@@ -131,10 +131,6 @@ batch
 				Columns: []string{"time", "value"},
 				Values: [][]interface{}{
 					{
-						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
-						1.0,
-					},
-					{
 						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 						1.0,
 					},
@@ -144,6 +140,10 @@ batch
 					},
 					{
 						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						1.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 						1.0,
 					},
 				},
@@ -177,19 +177,19 @@ batch
 				Columns: []string{"time", "value"},
 				Values: [][]interface{}{
 					{
-						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
-						0.5,
-					},
-					{
 						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 						0.5,
 					},
 					{
 						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
-						-501.0,
+						0.5,
 					},
 					{
 						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						-501.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 						0.5,
 					},
 				},
@@ -224,15 +224,15 @@ batch
 				Columns: []string{"time", "value"},
 				Values: [][]interface{}{
 					{
-						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
-						0.5,
-					},
-					{
 						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 						0.5,
 					},
 					{
-						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						0.5,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
 						0.5,
 					},
 				},

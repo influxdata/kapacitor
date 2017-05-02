@@ -6,7 +6,7 @@ rpname
 packets value=1001 0000000002
 dbname
 rpname
-packets value=1002 0000000003
+packets value2=0 0000000003
 dbname
 rpname
 packets value=1003 0000000004

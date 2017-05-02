@@ -97,7 +97,7 @@ stream
 				Tags:    nil,
 				Columns: []string{"time", "mean"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 					1.0,
 				}},
 			},
@@ -126,7 +126,7 @@ stream
 				Tags:    nil,
 				Columns: []string{"time", "count"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 					9.0,
 				}},
 			},
@@ -156,7 +156,7 @@ stream
 				Tags:    nil,
 				Columns: []string{"time", "mean"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 					10.0,
 				}},
 			},
@@ -186,7 +186,7 @@ stream
 				Tags:    nil,
 				Columns: []string{"time", "mean"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 					1.0,
 				}},
 			},
@@ -215,7 +215,7 @@ stream
 				Tags:    nil,
 				Columns: []string{"time", "mean"},
 				Values: [][]interface{}{[]interface{}{
-					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
 					-99.7,
 				}},
 			},
