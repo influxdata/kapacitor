@@ -5,6 +5,8 @@
 ### Features
 
 - [#1299](https://github.com/influxdata/kapacitor/pull/1299): Allowing sensu handler to be specified 
+- [#1284](https://github.com/influxdata/kapacitor/pull/1284): Add type signatures to Kapacitor functions.
+- [#1203](https://github.com/influxdata/kapacitor/issues/1203): Add `isPresent` operator for verifying whether a value is present (part of [#1284](https://github.com/influxdata/kapacitor/pull/1284)).
 
 ### Bugfixes
 

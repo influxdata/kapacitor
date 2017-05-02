@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/tick/stateful"
 )
 
@@ -17,11 +18,12 @@ func EvalPredicate(se stateful.Expression, scopePool stateful.ScopePool, now tim
 		return false, err
 	}
 
-	b, err := se.EvalBool(vars)
-	if err != nil {
+	// for function signature check
+	if _, err := se.Type(vars); err != nil {
 		return false, err
 	}
-	return b, nil
+
+	return se.EvalBool(vars)
 }
 
 // fillScope - given a scope and reference variables, we fill the exact variables from the now, fields and tags.
@@ -50,8 +52,9 @@ func fillScope(vars *stateful.Scope, referenceVariables []string, now time.Time,
 		}
 		if !isFieldExists && !isTagExists {
 			if !vars.Has(refVariableName) {
-				return fmt.Errorf("no field or tag exists for %s", refVariableName)
+				vars.Set(refVariableName, ast.MissingValue)
 			}
+
 		}
 	}
 

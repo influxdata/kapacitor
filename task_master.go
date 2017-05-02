@@ -380,7 +380,7 @@ func (tm *TaskMaster) CreateTICKScope() *stateful.Scope {
 			info, _ := tm.UDFService.Info(f)
 			scope.SetDynamicMethod(
 				f,
-				stateful.DynamicMethod(func(self interface{}, args ...interface{}) (interface{}, error) {
+				func(self interface{}, args ...interface{}) (interface{}, error) {
 					parent, ok := self.(pipeline.Node)
 					if !ok {
 						return nil, fmt.Errorf("cannot call %s on %T", f, self)
@@ -393,7 +393,7 @@ func (tm *TaskMaster) CreateTICKScope() *stateful.Scope {
 						info.Options,
 					)
 					return udf, nil
-				}),
+				},
 			)
 		}
 	}

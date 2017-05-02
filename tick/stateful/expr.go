@@ -12,6 +12,8 @@ import (
 type Expression interface {
 	Reset()
 
+	Type(scope ReadOnlyScope) (ast.ValueType, error)
+
 	EvalFloat(scope *Scope) (float64, error)
 	EvalInt(scope *Scope) (int64, error)
 	EvalString(scope *Scope) (string, error)
@@ -58,6 +60,10 @@ func (se *expression) Reset() {
 	se.executionState.ResetAll()
 }
 
+func (se *expression) Type(scope ReadOnlyScope) (ast.ValueType, error) {
+	return se.nodeEvaluator.Type(scope)
+}
+
 func (se *expression) EvalBool(scope *Scope) (bool, error) {
 	return se.nodeEvaluator.EvalBool(scope, se.executionState)
 }
@@ -78,9 +84,12 @@ func (se *expression) EvalDuration(scope *Scope) (time.Duration, error) {
 	return se.nodeEvaluator.EvalDuration(scope, se.executionState)
 }
 
+func (se *expression) EvalMissing(scope *Scope) (*ast.Missing, error) {
+	return se.nodeEvaluator.EvalMissing(scope, se.executionState)
+}
+
 func (se *expression) Eval(scope *Scope) (interface{}, error) {
-	// TODO: Remove CreateExecutionState eventually
-	typ, err := se.nodeEvaluator.Type(scope, CreateExecutionState())
+	typ, err := se.nodeEvaluator.Type(scope)
 	if err != nil {
 		return nil, err
 	}
@@ -112,6 +121,12 @@ func (se *expression) Eval(scope *Scope) (interface{}, error) {
 		return result, err
 	case ast.TDuration:
 		result, err := se.EvalDuration(scope)
+		if err != nil {
+			return nil, err
+		}
+		return result, err
+	case ast.TMissing:
+		result, err := se.EvalMissing(scope)
 		if err != nil {
 			return nil, err
 		}
