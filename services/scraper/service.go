@@ -27,6 +27,7 @@ type Service struct {
 	wg sync.WaitGroup
 
 	open     bool
+	running  bool
 	closing  chan struct{}
 	updating chan *config.Config
 
@@ -40,7 +41,8 @@ type Service struct {
 	mgr interface {
 		ApplyConfig(cfg *config.Config) error
 		Stop()
-		Run()
+		Start()
+		Wait()
 	}
 }
 
@@ -102,13 +104,27 @@ func (s *Service) scrape() {
 
 		s.mgr.ApplyConfig(conf)
 
-		s.mgr.Run()
+		s.mu.Lock()
+		// Need to check open if service was stopped just before this lock
+		if s.open {
+			s.mgr.Start()
+			s.running = true
+		}
+		s.mu.Unlock()
+		// Wait will block until mgr.Stop has been called.
+		s.mgr.Wait()
 	}()
 
 	for {
 		select {
 		case <-s.closing:
-			s.mgr.Stop()
+			s.mu.Lock()
+			// Need to check if the targetmanager is even running before Stopping
+			if s.running {
+				s.mgr.Stop()
+				s.running = false
+			}
+			s.mu.Unlock()
 			return
 		case conf := <-s.updating:
 			s.logger.Println("I! updating scraper service")
