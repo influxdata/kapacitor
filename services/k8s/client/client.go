@@ -113,6 +113,7 @@ func New(c Config) (Client, error) {
 		urls:   urls,
 		client: &http.Client{
 			Transport: &http.Transport{
+				Proxy:           http.ProxyFromEnvironment,
 				TLSClientConfig: c.TLSConfig,
 			},
 		},
@@ -157,6 +158,7 @@ func (c *httpClient) Update(new Config) error {
 	if old.TLSConfig != new.TLSConfig {
 		c.client = &http.Client{
 			Transport: &http.Transport{
+				Proxy:           http.ProxyFromEnvironment,
 				TLSClientConfig: new.TLSConfig,
 			},
 		}

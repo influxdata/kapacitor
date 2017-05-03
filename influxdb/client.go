@@ -123,7 +123,9 @@ func NewHTTPClient(conf Config) (*HTTPClient, error) {
 		return nil, errors.Wrap(err, "invalid URLs")
 	}
 	if conf.Transport == nil {
-		conf.Transport = &http.Transport{}
+		conf.Transport = &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+		}
 	}
 	c := &HTTPClient{
 		config: conf,
