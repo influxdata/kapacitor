@@ -1,12 +1,17 @@
 # Kapacitor UDF Agent implementation in Python
 #
 # Requires protobuf v3
-#   pip install protobuf==3.0.0b2
+#   pip install protobuf==3.0.0
 
 import sys
-import udf_pb2
+from . import udf_pb2
 from threading import Lock, Thread
-from Queue import Queue
+
+try:
+    from queue import Queue
+except ImportError:
+    from Queue import Queue
+
 import io
 import traceback
 import socket
