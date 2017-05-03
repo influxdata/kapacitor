@@ -233,10 +233,6 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	s.appendReplayService()
 
 	// Append third-party integrations
-	if err := s.appendK8sService(); err != nil {
-		return nil, errors.Wrap(err, "kubernetes service")
-	}
-
 	// Append extra input services
 	s.appendCollectdService()
 	s.appendUDPServices()
@@ -254,6 +250,11 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 
 	// Append Scraper and discovery services
 	s.appendScraperService()
+
+	if err := s.appendK8sService(s.ScraperService); err != nil {
+		return nil, errors.Wrap(err, "kubernetes service")
+	}
+
 	s.appendAzureService(s.ScraperService)
 	s.appendConsulService(s.ScraperService)
 	s.appendDNSService(s.ScraperService)
@@ -415,10 +416,10 @@ func (s *Server) appendReplayService() {
 	s.AppendService("replay", srv)
 }
 
-func (s *Server) appendK8sService() error {
+func (s *Server) appendK8sService(r scraper.Registry) error {
 	c := s.config.Kubernetes
 	l := s.LogService.NewLogger("[kubernetes] ", log.LstdFlags)
-	srv, err := k8s.NewService(c, l)
+	srv, err := k8s.NewService(c, r, l)
 	if err != nil {
 		return err
 	}

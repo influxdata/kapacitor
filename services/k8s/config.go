@@ -4,10 +4,12 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"io/ioutil"
+	"net/url"
 
 	"github.com/influxdata/kapacitor/listmap"
 	"github.com/influxdata/kapacitor/services/k8s/client"
 	"github.com/pkg/errors"
+	"github.com/prometheus/prometheus/config"
 )
 
 type Config struct {
@@ -18,6 +20,7 @@ type Config struct {
 	Token      string   `toml:"token" override:"token,redact"`
 	CAPath     string   `toml:"ca-path" override:"ca-path"`
 	Namespace  string   `toml:"namespace" override:"namespace"`
+	Resource   string   `toml:"resource" override:"resource"`
 }
 
 func NewConfig() Config {
@@ -43,6 +46,21 @@ func (c Config) Validate() error {
 		}
 	} else if len(c.APIServers) == 0 {
 		return errors.New("no api-servers specified, must provide at least one server URL")
+	} else {
+		for _, s := range c.APIServers {
+			_, err := url.Parse(s)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	if c.Resource != "" {
+		switch c.Resource {
+		case "node", "pod", "service", "endpoint":
+		default:
+			return errors.New("Resource must be one of node, pod, service, or endpoints")
+		}
+
 	}
 	return nil
 }
@@ -91,4 +109,46 @@ func (cs Configs) Validate() error {
 		}
 	}
 	return nil
+}
+
+// Prom writes the prometheus configuration for discoverer into ScrapeConfig
+func (c Config) Prom(conf *config.ScrapeConfig) {
+	if len(c.APIServers) == 0 {
+		conf.ServiceDiscoveryConfig.KubernetesSDConfigs = []*config.KubernetesSDConfig{
+			&config.KubernetesSDConfig{
+				Role:        config.KubernetesRole(c.Resource),
+				BearerToken: c.Token,
+				TLSConfig: config.TLSConfig{
+					CAFile: c.CAPath,
+				},
+			},
+		}
+		return
+	}
+
+	sds := make([]*config.KubernetesSDConfig, len(c.APIServers))
+	for i, srv := range c.APIServers {
+		url, _ := url.Parse(srv)
+		sds[i] = &config.KubernetesSDConfig{
+			APIServer: config.URL{
+				URL: url,
+			},
+			Role:        config.KubernetesRole(c.Resource),
+			BearerToken: c.Token,
+			TLSConfig: config.TLSConfig{
+				CAFile: c.CAPath,
+			},
+		}
+	}
+	conf.ServiceDiscoveryConfig.KubernetesSDConfigs = sds
+}
+
+// Service return discoverer type
+func (c Config) Service() string {
+	return "kubernetes"
+}
+
+// ServiceID returns the discoverers name
+func (c Config) ServiceID() string {
+	return c.ID
 }

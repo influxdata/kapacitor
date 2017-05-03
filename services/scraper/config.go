@@ -131,34 +131,3 @@ func decodeJobName(job string) (string, string, string, error) {
 	}
 	return split[0], split[1], split[2], nil
 }
-
-type KubernetesRole string
-
-const (
-	KubernetesRoleNode     = "node"
-	KubernetesRolePod      = "pod"
-	KubernetesRoleService  = "service"
-	KubernetesRoleEndpoint = "endpoints"
-)
-
-// Kubernetes is Kubernetes service discovery configuration
-type Kubernetes struct {
-	APIServer url.URL        `toml:"api_server" override:"api_server"`
-	Role      KubernetesRole `toml:"role" override:"role"`
-}
-
-func (k Kubernetes) Prom(c *config.ScrapeConfig) {
-	// TODO: auth token tls
-	c.ServiceDiscoveryConfig.KubernetesSDConfigs = []*config.KubernetesSDConfig{
-		&config.KubernetesSDConfig{
-			APIServer: config.URL{
-				URL: &k.APIServer,
-			},
-			Role: config.KubernetesRole(k.Role),
-		},
-	}
-}
-
-func NewKubernetes() Kubernetes {
-	return Kubernetes{}
-}

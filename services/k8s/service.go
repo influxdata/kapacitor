@@ -6,15 +6,20 @@ import (
 	"sync"
 
 	"github.com/influxdata/kapacitor/services/k8s/client"
+	"github.com/influxdata/kapacitor/services/scraper"
 )
 
+// Service is the kubernetes discovery and autoscale service
 type Service struct {
 	mu       sync.Mutex
+	configs  []Config
 	clusters map[string]*Cluster
+	registry scraper.Registry
 	logger   *log.Logger
 }
 
-func NewService(c []Config, l *log.Logger) (*Service, error) {
+// NewService creates a new unopened k8s service
+func NewService(c []Config, r scraper.Registry, l *log.Logger) (*Service, error) {
 	l.Println("D! k8s configs", c)
 
 	clusters := make(map[string]*Cluster, len(c))
@@ -28,10 +33,13 @@ func NewService(c []Config, l *log.Logger) (*Service, error) {
 
 	return &Service{
 		clusters: clusters,
+		configs:  c,
 		logger:   l,
+		registry: r,
 	}, nil
 }
 
+// Open starts the kubernetes service
 func (s *Service) Open() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -40,26 +48,47 @@ func (s *Service) Open() error {
 			return err
 		}
 	}
-	return nil
+	s.register()
+	return s.registry.Commit()
 }
+
 func (s *Service) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, c := range s.clusters {
 		c.Close()
 	}
-	return nil
+	s.deregister()
+	return s.registry.Commit()
+}
+
+func (s *Service) deregister() {
+	// Remove all the configurations in the registry
+	for _, d := range s.configs {
+		s.registry.RemoveDiscoverer(&d)
+	}
+}
+
+func (s *Service) register() {
+	// Add all configurations to registry
+	for _, d := range s.configs {
+		if d.Enabled {
+			s.registry.AddDiscoverer(&d)
+		}
+	}
 }
 
 func (s *Service) Update(newConfigs []interface{}) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	configs := make([]Config, len(newConfigs))
 	existingClusters := make(map[string]bool, len(newConfigs))
 	for i := range newConfigs {
 		c, ok := newConfigs[i].(Config)
 		if !ok {
 			return fmt.Errorf("expected config object to be of type %T, got %T", c, newConfigs[i])
 		}
+		configs[i] = c
 		cluster, ok := s.clusters[c.ID]
 		if !ok {
 			var err error
@@ -86,6 +115,9 @@ func (s *Service) Update(newConfigs []interface{}) error {
 			delete(s.clusters, id)
 		}
 	}
+	s.deregister()
+	s.configs = configs
+	s.register()
 	return nil
 }
 

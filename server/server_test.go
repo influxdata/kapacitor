@@ -6154,6 +6154,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"in-cluster":  false,
 						"namespace":   "",
 						"token":       false,
+						"resource":    "",
 					},
 					Redacted: []string{
 						"token",
@@ -6170,6 +6171,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"in-cluster":  false,
 					"namespace":   "",
 					"token":       false,
+					"resource":    "",
 				},
 				Redacted: []string{
 					"token",
@@ -6194,6 +6196,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"in-cluster":  false,
 								"namespace":   "",
 								"token":       true,
+								"resource":    "",
 							},
 							Redacted: []string{
 								"token",
@@ -6210,6 +6213,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"in-cluster":  false,
 							"namespace":   "",
 							"token":       true,
+							"resource":    "",
 						},
 						Redacted: []string{
 							"token",
