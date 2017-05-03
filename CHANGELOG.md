@@ -15,6 +15,7 @@
     The behavior of the node changes slightly in order to provide a consistent fix to the bug.
     The breaking change is that now, the time of the points returned are from the right hand or current point time, instead of the left hand or previous point time.
 - [#1353](https://github.com/influxdata/kapacitor/issues/1353): Fix panic in scraping TargetManager.
+- [#1238](https://github.com/influxdata/kapacitor/pull/1238): Use ProxyFromEnvironment for all outgoing HTTP traffic.
 
 ## v1.3.0-beta2 [2017-05-01]
 

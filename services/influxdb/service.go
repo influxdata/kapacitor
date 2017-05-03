@@ -452,6 +452,7 @@ func httpConfig(c Config) (influxdb.Config, error) {
 		return influxdb.Config{}, errors.Wrap(err, "invalid TLS options")
 	}
 	tr := &http.Transport{
+		Proxy:           http.ProxyFromEnvironment,
 		TLSClientConfig: tlsConfig,
 	}
 	var credentials influxdb.Credentials
