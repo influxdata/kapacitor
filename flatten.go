@@ -205,10 +205,12 @@ func (n *FlattenNode) flatten(points []models.RawPoint) (models.Fields, error) {
 	defer n.bufPool.Put(fieldPrefix)
 POINTS:
 	for _, p := range points {
-		for _, tag := range n.f.Dimensions {
+		for i, tag := range n.f.Dimensions {
 			if v, ok := p.Tags[tag]; ok {
+				if i > 0 {
+					fieldPrefix.WriteString(n.f.Delimiter)
+				}
 				fieldPrefix.WriteString(v)
-				fieldPrefix.WriteString(n.f.Delimiter)
 			} else {
 				n.incrementErrorCount()
 				n.logger.Printf("E! point missing tag %q for flatten operation", tag)
@@ -217,7 +219,12 @@ POINTS:
 		}
 		l := fieldPrefix.Len()
 		for fname, value := range p.Fields {
-			fieldPrefix.WriteString(fname)
+			if !n.f.DropOriginalFieldNameFlag {
+				if l > 0 {
+					fieldPrefix.WriteString(n.f.Delimiter)
+				}
+				fieldPrefix.WriteString(fname)
+			}
 			fields[fieldPrefix.String()] = value
 			fieldPrefix.Truncate(l)
 		}

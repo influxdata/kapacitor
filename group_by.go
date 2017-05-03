@@ -42,7 +42,7 @@ func (g *GroupByNode) runGroupBy([]byte) error {
 		dims.TagNames = g.dimensions
 		for pt, ok := g.ins[0].NextPoint(); ok; pt, ok = g.ins[0].NextPoint() {
 			g.timer.Start()
-			pt = setGroupOnPoint(pt, g.allDimensions, dims)
+			pt = setGroupOnPoint(pt, g.allDimensions, dims, g.g.ExcludedDimensions)
 			g.timer.Stop()
 			for _, child := range g.outs {
 				err := child.CollectPoint(pt)
@@ -132,9 +132,23 @@ func determineDimensions(dimensions []interface{}) (allDimensions bool, realDime
 	return
 }
 
-func setGroupOnPoint(p models.Point, allDimensions bool, dimensions models.Dimensions) models.Point {
+func setGroupOnPoint(p models.Point, allDimensions bool, dimensions models.Dimensions, excluded []string) models.Point {
 	if allDimensions {
 		dimensions.TagNames = models.SortedKeys(p.Tags)
+		filtered := dimensions.TagNames[0:0]
+		for _, t := range dimensions.TagNames {
+			found := false
+			for _, x := range excluded {
+				if x == t {
+					found = true
+					break
+				}
+			}
+			if !found {
+				filtered = append(filtered, t)
+			}
+		}
+		dimensions.TagNames = filtered
 	}
 	p.Group = models.ToGroupID(p.Name, p.Tags, dimensions)
 	p.Dimensions = dimensions

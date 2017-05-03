@@ -26,6 +26,11 @@ type GroupByNode struct {
 	// tick:ignore
 	Dimensions []interface{}
 
+	// The dimensions to exclude.
+	// Useful for substractive tags from using *.
+	// tick:ignore
+	ExcludedDimensions []string `tick:"Exclude"`
+
 	// Whether to include the measurement in the group ID.
 	// tick:ignore
 	ByMeasurementFlag bool `tick:"ByMeasurement"`
@@ -82,5 +87,11 @@ func validateDimensions(dimensions []interface{}) error {
 // tick:property
 func (n *GroupByNode) ByMeasurement() *GroupByNode {
 	n.ByMeasurementFlag = true
+	return n
+}
+
+// Exclude removes any tags from the group.
+func (n *GroupByNode) Exclude(dims ...string) *GroupByNode {
+	n.ExcludedDimensions = append(n.ExcludedDimensions, dims...)
 	return n
 }

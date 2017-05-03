@@ -52,6 +52,11 @@ type FlattenNode struct {
 	// The joined data point's time will be rounded to the nearest
 	// multiple of the tolerance duration.
 	Tolerance time.Duration
+
+	// DropOriginalFieldNameFlag indicates whether the original field name should
+	// be included in the final field name.
+	//tick:ignore
+	DropOriginalFieldNameFlag bool `tick:"DropOriginalFieldName"`
 }
 
 func newFlattenNode(e EdgeType) *FlattenNode {
@@ -66,5 +71,17 @@ func newFlattenNode(e EdgeType) *FlattenNode {
 // tick:property
 func (f *FlattenNode) On(dims ...string) *FlattenNode {
 	f.Dimensions = dims
+	return f
+}
+
+// DropOriginalFieldName indicates whether the original field name should
+// be dropped when constructing the final field name.
+// tick:property
+func (f *FlattenNode) DropOriginalFieldName(drop ...bool) *FlattenNode {
+	if len(drop) == 1 {
+		f.DropOriginalFieldNameFlag = drop[0]
+	} else {
+		f.DropOriginalFieldNameFlag = true
+	}
 	return f
 }
