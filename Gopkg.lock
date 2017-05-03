@@ -1,4 +1,4 @@
-memo = "0323eb5f9e25a377fbe1e582475afb7ca5945b434cb770f2dad8ea1fd51854e1"
+memo = "92770b8e4eb3071b7b03e0fdb5be20a0fecb16d6b3b3ca0f68a74789f43b3e07"
 
 [[projects]]
   name = "cloud.google.com/go"
@@ -378,10 +378,10 @@ memo = "0323eb5f9e25a377fbe1e582475afb7ca5945b434cb770f2dad8ea1fd51854e1"
   revision = "6ac8c5d890d415025dd5aae7595bcb2a6e7e2fad"
 
 [[projects]]
-  branch = "go-discovery-logger"
+  branch = "master"
   name = "github.com/prometheus/prometheus"
   packages = ["config","discovery","discovery/azure","discovery/consul","discovery/dns","discovery/ec2","discovery/file","discovery/gce","discovery/kubernetes","discovery/marathon","discovery/triton","discovery/zookeeper","relabel","retrieval","storage","storage/local","storage/local/chunk","storage/local/codable","storage/local/index","storage/metric","util/flock","util/httputil","util/strutil","util/testutil","util/treecache"]
-  revision = "1d19e25cd38579f5b007906a119ddf76e3cd160b"
+  revision = "58298e738211f46cdab48c404e5514a544774579"
   source = "github.com/goller/prometheus"
 
 [[projects]]
