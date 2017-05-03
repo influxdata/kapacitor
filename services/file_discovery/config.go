@@ -1,4 +1,4 @@
-package file
+package file_discovery
 
 import (
 	"fmt"
@@ -56,7 +56,7 @@ func (f Config) PromConfig() *config.FileSDConfig {
 
 // Service return discoverer type
 func (f Config) Service() string {
-	return "files-discovery"
+	return "file-discovery"
 }
 
 // ServiceID returns the discoverers name
