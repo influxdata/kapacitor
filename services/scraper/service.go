@@ -288,11 +288,13 @@ func (s *Service) RemoveDiscoverer(rm Discoverer) {
 		return
 	}
 
-	for i, d := range s.discoverers {
-		if d.ServiceID() == rm.ServiceID() && d.Service() == rm.Service() {
-			s.discoverers = append(s.discoverers[:i], s.discoverers[i+1:]...)
+	filtered := s.discoverers[0:0]
+	for _, d := range s.discoverers {
+		if d.ServiceID() != rm.ServiceID() || d.Service() != rm.Service() {
+			filtered = append(filtered, d)
 		}
 	}
+	s.discoverers = filtered
 }
 
 // AddScrapers adds scrapers to the registry
