@@ -7,12 +7,14 @@
 - [#1299](https://github.com/influxdata/kapacitor/pull/1299): Allowing sensu handler to be specified 
 - [#1284](https://github.com/influxdata/kapacitor/pull/1284): Add type signatures to Kapacitor functions.
 - [#1203](https://github.com/influxdata/kapacitor/issues/1203): Add `isPresent` operator for verifying whether a value is present (part of [#1284](https://github.com/influxdata/kapacitor/pull/1284)).
+- [#1354](https://github.com/influxdata/kapacitor/pull/1354): Add Kubernetes scraping support.
 
 ### Bugfixes
 
 - [#1329](https://github.com/influxdata/kapacitor/issues/1329): BREAKING: A bug was fixed around missing fields in the derivative node.
     The behavior of the node changes slightly in order to provide a consistent fix to the bug.
     The breaking change is that now, the time of the points returned are from the right hand or current point time, instead of the left hand or previous point time.
+- [#1353](https://github.com/influxdata/kapacitor/issues/1353): Fix panic in scraping TargetManager.
 
 ## v1.3.0-beta2 [2017-05-01]
 
