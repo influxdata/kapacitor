@@ -1,0 +1,21 @@
+dbname
+rpname
+cpu value=45 0000000001
+dbname
+rpname
+cpu value=25 0000000002
+dbname
+rpname
+cpu value=23 0000000003
+dbname
+rpname
+cpu value=78 0000000010
+dbname
+rpname
+cpu value=97 0000000011
+dbname
+rpname
+cpu value=62 0000000012
+dbname
+rpname
+cpu value=32 0000000016
