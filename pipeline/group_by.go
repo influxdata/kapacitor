@@ -44,10 +44,10 @@ func newGroupByNode(wants EdgeType, dims []interface{}) *GroupByNode {
 }
 
 func (n *GroupByNode) validate() error {
-	return validateDimensions(n.Dimensions)
+	return validateDimensions(n.Dimensions, n.ExcludedDimensions)
 }
 
-func validateDimensions(dimensions []interface{}) error {
+func validateDimensions(dimensions []interface{}, excludedDimensions []string) error {
 	hasStar := false
 	for _, d := range dimensions {
 		switch dim := d.(type) {
@@ -63,6 +63,9 @@ func validateDimensions(dimensions []interface{}) error {
 	}
 	if hasStar && len(dimensions) > 1 {
 		return errors.New("cannot group by both '*' and named dimensions.")
+	}
+	if !hasStar && len(excludedDimensions) > 0 {
+		return errors.New("exclude requires '*'")
 	}
 	return nil
 }

@@ -87,7 +87,7 @@ func (g *GroupByNode) runGroupBy([]byte) error {
 			}
 			for _, p := range b.Points {
 				if g.allDimensions {
-					dims.TagNames = models.SortedKeys(p.Tags)
+					dims.TagNames = filterExcludedDimensions(p.Tags, dims, g.g.ExcludedDimensions)
 				} else {
 					dims.TagNames = g.dimensions
 				}
@@ -132,23 +132,27 @@ func determineDimensions(dimensions []interface{}) (allDimensions bool, realDime
 	return
 }
 
-func setGroupOnPoint(p models.Point, allDimensions bool, dimensions models.Dimensions, excluded []string) models.Point {
-	if allDimensions {
-		dimensions.TagNames = models.SortedKeys(p.Tags)
-		filtered := dimensions.TagNames[0:0]
-		for _, t := range dimensions.TagNames {
-			found := false
-			for _, x := range excluded {
-				if x == t {
-					found = true
-					break
-				}
-			}
-			if !found {
-				filtered = append(filtered, t)
+func filterExcludedDimensions(tags models.Tags, dimensions models.Dimensions, excluded []string) []string {
+	dimensions.TagNames = models.SortedKeys(tags)
+	filtered := dimensions.TagNames[0:0]
+	for _, t := range dimensions.TagNames {
+		found := false
+		for _, x := range excluded {
+			if x == t {
+				found = true
+				break
 			}
 		}
-		dimensions.TagNames = filtered
+		if !found {
+			filtered = append(filtered, t)
+		}
+	}
+	return filtered
+}
+
+func setGroupOnPoint(p models.Point, allDimensions bool, dimensions models.Dimensions, excluded []string) models.Point {
+	if allDimensions {
+		dimensions.TagNames = filterExcludedDimensions(p.Tags, dimensions, excluded)
 	}
 	p.Group = models.ToGroupID(p.Name, p.Tags, dimensions)
 	p.Dimensions = dimensions
