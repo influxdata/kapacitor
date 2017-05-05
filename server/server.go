@@ -685,8 +685,8 @@ func (s *Server) appendScraperService() {
 	srv := scraper.NewService(c, l)
 	srv.PointsWriter = s.TaskMaster
 	s.ScraperService = srv
-	s.SetDynamicService("scrapers", srv)
-	s.AppendService("scrapers", srv)
+	s.SetDynamicService("scraper", srv)
+	s.AppendService("scraper", srv)
 }
 
 func (s *Server) appendAzureService() {
@@ -723,10 +723,10 @@ func (s *Server) appendEC2Service() {
 
 func (s *Server) appendFileService() {
 	c := s.config.FileDiscovery
-	l := s.LogService.NewLogger("[files-discovery] ", log.LstdFlags)
+	l := s.LogService.NewLogger("[file-discovery] ", log.LstdFlags)
 	srv := file_discovery.NewService(c, s.ScraperService, l)
-	s.SetDynamicService("files-discovery", srv)
-	s.AppendService("files-discovery", srv)
+	s.SetDynamicService("file-discovery", srv)
+	s.AppendService("file-discovery", srv)
 }
 
 func (s *Server) appendGCEService() {
