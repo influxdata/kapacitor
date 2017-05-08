@@ -37,8 +37,8 @@ func newHTTPPostNode(et *ExecutingTask, n *pipeline.HTTPPostNode, l *log.Logger)
 	}
 
 	// Should only ever be 0 or 1 from validation of n
-	if len(n.HTTPPostEndpoints) == 1 {
-		endpointName := n.HTTPPostEndpoints[0].Endpoint
+	if len(n.Endpoints) == 1 {
+		endpointName := n.Endpoints[0]
 		e, ok := et.tm.HTTPPostService.Endpoint(endpointName)
 		if !ok {
 			return nil, fmt.Errorf("endpoint '%s' does not exist", endpointName)

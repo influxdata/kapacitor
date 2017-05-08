@@ -33,7 +33,7 @@ type HTTPPostNode struct {
 	chainnode
 
 	// tick:ignore
-	HTTPPostEndpoints []*HTTPPostEndpoint `tick:"Endpoint"`
+	Endpoints []string `tick:"Endpoint"`
 
 	// Headers
 	Headers map[string]string `tick:"Header"`
@@ -55,15 +55,15 @@ func (p *HTTPPostNode) validate() error {
 		return fmt.Errorf("httpPost expects 0 or 1 arguments, got %v", len(p.URLs))
 	}
 
-	if len(p.HTTPPostEndpoints) > 1 {
-		return fmt.Errorf("httpPost expects 0 or 1 endpoints, got %v", len(p.HTTPPostEndpoints))
+	if len(p.Endpoints) > 1 {
+		return fmt.Errorf("httpPost expects 0 or 1 endpoints, got %v", len(p.Endpoints))
 	}
 
-	if len(p.URLs) == 0 && len(p.HTTPPostEndpoints) == 0 {
+	if len(p.URLs) == 0 && len(p.Endpoints) == 0 {
 		return errors.New("must provide url or endpoint")
 	}
 
-	if len(p.URLs) > 0 && len(p.HTTPPostEndpoints) > 0 {
+	if len(p.URLs) > 0 && len(p.Endpoints) > 0 {
 		return errors.New("only one endpoint and url may be specified")
 	}
 
@@ -76,20 +76,17 @@ func (p *HTTPPostNode) validate() error {
 	return nil
 }
 
+// Name of the endpoint to be used, as is defined in the configuration file.
+//
 // Example:
 //    stream
 //         |httpPost()
 //            .endpoint('example')
 //
 // tick:property
-func (p *HTTPPostNode) Endpoint(endpoint string) *HTTPPostEndpoint {
-	post := &HTTPPostEndpoint{
-		HTTPPostNode: p,
-		Endpoint:     endpoint,
-	}
-	p.HTTPPostEndpoints = append(p.HTTPPostEndpoints, post)
-
-	return post
+func (p *HTTPPostNode) Endpoint(endpoint string) *HTTPPostNode {
+	p.Endpoints = append(p.Endpoints, endpoint)
+	return p
 }
 
 // Example:
@@ -106,12 +103,4 @@ func (p *HTTPPostNode) Header(k, v string) *HTTPPostNode {
 	p.Headers[k] = v
 
 	return p
-}
-
-// tick:embedded:HTTPPostNode.Endpoint
-type HTTPPostEndpoint struct {
-	*HTTPPostNode
-
-	// Name of the endpoint to be used, as is defined in the configuration file
-	Endpoint string
 }
