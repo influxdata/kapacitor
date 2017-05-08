@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -171,43 +170,6 @@ func (h *tcpHandler) Handle(event alert.Event) {
 
 	buf.WriteByte('\n')
 	conn.Write(buf.Bytes())
-}
-
-type PostHandlerConfig struct {
-	URL string `mapstructure:"url"`
-}
-
-type postHandler struct {
-	bp     *bufpool.Pool
-	url    string
-	logger *log.Logger
-}
-
-func NewPostHandler(c PostHandlerConfig, l *log.Logger) alert.Handler {
-	return &postHandler{
-		bp:     bufpool.New(),
-		url:    c.URL,
-		logger: l,
-	}
-}
-
-func (h *postHandler) Handle(event alert.Event) {
-	body := h.bp.Get()
-	defer h.bp.Put(body)
-	ad := event.AlertData()
-
-	err := json.NewEncoder(body).Encode(ad)
-	if err != nil {
-		h.logger.Printf("E! failed to marshal alert data json: %v", err)
-		return
-	}
-
-	resp, err := http.Post(h.url, "application/json", body)
-	if err != nil {
-		h.logger.Printf("E! failed to POST alert data: %v", err)
-		return
-	}
-	resp.Body.Close()
 }
 
 type AggregateHandlerConfig struct {
