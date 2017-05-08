@@ -19,7 +19,7 @@ import (
 	"github.com/influxdata/kapacitor/services/deadman"
 	"github.com/influxdata/kapacitor/services/dns"
 	"github.com/influxdata/kapacitor/services/ec2"
-	"github.com/influxdata/kapacitor/services/file"
+	"github.com/influxdata/kapacitor/services/file_discovery"
 	"github.com/influxdata/kapacitor/services/gce"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
@@ -40,7 +40,7 @@ import (
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/snmptrap"
-	"github.com/influxdata/kapacitor/services/static"
+	"github.com/influxdata/kapacitor/services/static_discovery"
 	"github.com/influxdata/kapacitor/services/stats"
 	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/influxdata/kapacitor/services/talk"
@@ -67,10 +67,10 @@ type Config struct {
 	ConfigOverride config.Config     `toml:"config-override"`
 
 	// Input services
-	Graphites []graphite.Config `toml:"graphite"`
-	Collectd  collectd.Config   `toml:"collectd"`
-	OpenTSDB  opentsdb.Config   `toml:"opentsdb"`
-	UDPs      []udp.Config      `toml:"udp"`
+	Graphite []graphite.Config `toml:"graphite"`
+	Collectd collectd.Config   `toml:"collectd"`
+	OpenTSDB opentsdb.Config   `toml:"opentsdb"`
+	UDP      []udp.Config      `toml:"udp"`
 
 	// Alert handlers
 	Alerta    alerta.Config    `toml:"alerta" override:"alerta"`
@@ -88,18 +88,18 @@ type Config struct {
 	VictorOps victorops.Config `toml:"victorops" override:"victorops"`
 
 	// Discovery for scraping
-	Scrapers  []scraper.Config   `toml:"scrapers" override:"scrapers,element-key=name"`
-	Azure     []azure.Config     `toml:"azure" override:"azure,element-key=id"`
-	Consul    []consul.Config    `toml:"consul" override:"consul,element-key=id"`
-	DNS       []dns.Config       `toml:"dns" override:"dns,element-key=id"`
-	EC2       []ec2.Config       `toml:"ec2" override:"ec2,element-key=id"`
-	Files     []file.Config      `toml:"files-discovery" override:"files-discovery,element-key=id"`
-	GCE       []gce.Config       `toml:"gce" override:"gce,element-key=id"`
-	Marathon  []marathon.Config  `toml:"marathon" override:"marathon,element-key=id"`
-	Nerve     []nerve.Config     `toml:"nerve" override:"nerve,element-key=id"`
-	Serverset []serverset.Config `toml:"serverset" override:"serverset,element-key=id"`
-	Static    []static.Config    `toml:"static-discovery" override:"static-discovery,element-key=id"`
-	Triton    []triton.Config    `toml:"triton" override:"triton,element-key=id"`
+	Scraper         []scraper.Config          `toml:"scraper" override:"scraper,element-key=name"`
+	Azure           []azure.Config            `toml:"azure" override:"azure,element-key=id"`
+	Consul          []consul.Config           `toml:"consul" override:"consul,element-key=id"`
+	DNS             []dns.Config              `toml:"dns" override:"dns,element-key=id"`
+	EC2             []ec2.Config              `toml:"ec2" override:"ec2,element-key=id"`
+	FileDiscovery   []file_discovery.Config   `toml:"file-discovery" override:"file-discovery,element-key=id"`
+	GCE             []gce.Config              `toml:"gce" override:"gce,element-key=id"`
+	Marathon        []marathon.Config         `toml:"marathon" override:"marathon,element-key=id"`
+	Nerve           []nerve.Config            `toml:"nerve" override:"nerve,element-key=id"`
+	Serverset       []serverset.Config        `toml:"serverset" override:"serverset,element-key=id"`
+	StaticDiscovery []static_discovery.Config `toml:"static-discovery" override:"static-discovery,element-key=id"`
+	Triton          []triton.Config           `toml:"triton" override:"triton,element-key=id"`
 
 	// Third-party integrations
 	Kubernetes k8s.Configs `toml:"kubernetes" override:"kubernetes,element-key=id"`
@@ -231,7 +231,7 @@ func (c *Config) Validate() error {
 	}
 
 	// Validate inputs
-	for _, g := range c.Graphites {
+	for _, g := range c.Graphite {
 		if err := g.Validate(); err != nil {
 			return fmt.Errorf("invalid graphite config: %v", err)
 		}
@@ -283,8 +283,8 @@ func (c *Config) Validate() error {
 	}
 
 	// Validate scrapers
-	for i := range c.Scrapers {
-		if err := c.Scrapers[i].Validate(); err != nil {
+	for i := range c.Scraper {
+		if err := c.Scraper[i].Validate(); err != nil {
 			return err
 		}
 	}
@@ -313,8 +313,8 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	for i := range c.Files {
-		if err := c.Files[i].Validate(); err != nil {
+	for i := range c.FileDiscovery {
+		if err := c.FileDiscovery[i].Validate(); err != nil {
 			return err
 		}
 	}
@@ -347,8 +347,8 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	for i := range c.Static {
-		if err := c.Static[i].Validate(); err != nil {
+	for i := range c.StaticDiscovery {
+		if err := c.StaticDiscovery[i].Validate(); err != nil {
 			return err
 		}
 	}
