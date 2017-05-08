@@ -8875,6 +8875,298 @@ stream
 	}
 }
 
+func TestStream_KapacitorLoopback_PreventLoop(t *testing.T) {
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+	|kapacitorLoopback()
+		.database('dbname')
+		.retentionPolicy('rpname')
+`
+
+	// Create a new execution env
+	tm, err := createTaskMaster()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tm.Open()
+
+	// Create the task
+	task, err := tm.NewTask("KapacitorLoopbackWithLoop", script, kapacitor.StreamTask, dbrps, 0, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Start the task
+	_, err = tm.StartTask(task)
+	if err == nil {
+		t.Error("expected error about starting a task with a loop")
+	}
+}
+
+func TestStream_KapacitorLoopback(t *testing.T) {
+	var scriptLoop = `
+stream
+	|from()
+		.measurement('cpu')
+	|kapacitorLoopback()
+		.database('new-dbname')
+		.retentionPolicy('new-rpname')
+`
+	var scriptCount = `
+stream
+	|from()
+		.measurement('cpu')
+	|window()
+		.every(10s)
+		.period(10s)
+	|count('value')
+	|httpOut('TestStream_KapacitorLoopback')
+`
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "cpu",
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					4.0,
+				}},
+			},
+		},
+	}
+	var newDBRPs = []kapacitor.DBRP{
+		{
+			Database:        "new-dbname",
+			RetentionPolicy: "new-rpname",
+		},
+	}
+	// Create a new execution env
+	tm, err := createTaskMaster()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tm.Open()
+	defer tm.Close()
+
+	// Create the loopback task
+	taskLoop, err := tm.NewTask("KapacitorLoopback-Loop", scriptLoop, kapacitor.StreamTask, dbrps, 0, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Create the count task
+	taskCount, err := tm.NewTask("KapacitorLoopback-Count", scriptCount, kapacitor.StreamTask, newDBRPs, 0, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Load test data
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := "TestStream_KapacitorLoopback"
+	data, err := os.Open(path.Join(dir, "data", name+".srpl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Start the tasks
+	etLoop, err := tm.StartTask(taskLoop)
+	if err != nil {
+		t.Fatal(err)
+	}
+	etCount, err := tm.StartTask(taskCount)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Replay test data to executor
+	stream, err := tm.Stream(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Use 1971 so that we don't get true negatives on Epoch 0 collisions
+	clock := clock.New(time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC))
+
+	replayErr := kapacitor.ReplayStreamFromIO(clock, data, stream, false, "s")
+
+	// Advance time
+	// Move time forward
+	clock.Set(clock.Zero().Add(20 * time.Second))
+	// Wait till the replay has finished
+	if err := <-replayErr; err != nil {
+		t.Fatal(err)
+	}
+	// Give the loopback data a chance to process, since we can't track it with the clock
+	time.Sleep(10 * time.Millisecond)
+	// Drain the task master and wait for the tasks to finish
+	tm.Drain()
+	etLoop.StopStats()
+	etCount.StopStats()
+	if err := etLoop.Wait(); err != nil {
+		t.Fatal(err)
+	}
+	if err := etCount.Wait(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Get the result
+	output, err := etCount.GetOutput(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := http.Get(output.Endpoint())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert we got the expected result
+	result := models.Result{}
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if eq, msg := compareResults(er, result); !eq {
+		t.Error(msg)
+	}
+}
+
+func TestBatch_KapacitorLoopback(t *testing.T) {
+	var scriptLoop = `
+stream
+	|from()
+		.measurement('cpu')
+	|window()
+		.every(5s)
+		.period(5s)
+	|kapacitorLoopback()
+		.database('new-dbname')
+		.retentionPolicy('new-rpname')
+`
+	var scriptCount = `
+stream
+	|from()
+		.measurement('cpu')
+	|window()
+		.every(10s)
+		.period(10s)
+	|count('value')
+	|httpOut('TestStream_KapacitorLoopback')
+`
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "cpu",
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					4.0,
+				}},
+			},
+		},
+	}
+	var newDBRPs = []kapacitor.DBRP{
+		{
+			Database:        "new-dbname",
+			RetentionPolicy: "new-rpname",
+		},
+	}
+	// Create a new execution env
+	tm, err := createTaskMaster()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tm.Open()
+	defer tm.Close()
+
+	// Create the loopback task
+	taskLoop, err := tm.NewTask("KapacitorLoopback-Loop", scriptLoop, kapacitor.StreamTask, dbrps, 0, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Create the count task
+	taskCount, err := tm.NewTask("KapacitorLoopback-Count", scriptCount, kapacitor.StreamTask, newDBRPs, 0, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Load test data
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := "TestStream_KapacitorLoopback"
+	data, err := os.Open(path.Join(dir, "data", name+".srpl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Start the tasks
+	etLoop, err := tm.StartTask(taskLoop)
+	if err != nil {
+		t.Fatal(err)
+	}
+	etCount, err := tm.StartTask(taskCount)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Replay test data to executor
+	stream, err := tm.Stream(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Use 1971 so that we don't get true negatives on Epoch 0 collisions
+	clock := clock.New(time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC))
+
+	replayErr := kapacitor.ReplayStreamFromIO(clock, data, stream, false, "s")
+
+	// Advance time
+	// Move time forward
+	clock.Set(clock.Zero().Add(20 * time.Second))
+	// Wait till the replay has finished
+	if err := <-replayErr; err != nil {
+		t.Fatal(err)
+	}
+	// Give the loopback data a chance to process, since we can't track it with the clock
+	time.Sleep(10 * time.Millisecond)
+	// Drain the task master and wait for the tasks to finish
+	tm.Drain()
+	etLoop.StopStats()
+	etCount.StopStats()
+	if err := etLoop.Wait(); err != nil {
+		t.Fatal(err)
+	}
+	if err := etCount.Wait(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Get the result
+	output, err := etCount.GetOutput(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := http.Get(output.Endpoint())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert we got the expected result
+	result := models.Result{}
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if eq, msg := compareResults(er, result); !eq {
+		t.Error(msg)
+	}
+}
+
 func TestStream_InfluxDBOut(t *testing.T) {
 
 	var script = `
@@ -8986,10 +9278,10 @@ stream
 	name := "TestStream_InfluxDBOut"
 
 	// Create a new execution env
-	tm := kapacitor.NewTaskMaster("testStreamer", logService)
-	tm.HTTPDService = newHTTPDService()
-	tm.TaskStore = taskStore{}
-	tm.DeadmanService = deadman{}
+	tm, err := createTaskMaster()
+	if err != nil {
+		t.Fatal(err)
+	}
 	tm.InfluxDBService = influxdb
 	tm.Open()
 
@@ -9046,10 +9338,10 @@ stream
 	name := "TestStream_InfluxDBOut"
 
 	// Create a new execution env
-	tm := kapacitor.NewTaskMaster("testStreamer", logService)
-	tm.HTTPDService = newHTTPDService()
-	tm.TaskStore = taskStore{}
-	tm.DeadmanService = deadman{}
+	tm, err := createTaskMaster()
+	if err != nil {
+		t.Fatal(err)
+	}
 	tm.InfluxDBService = influxdb
 	tm.Open()
 
@@ -10100,19 +10392,10 @@ func testStreamer(
 	}
 
 	// Create a new execution env
-	tm := kapacitor.NewTaskMaster("testStreamer", logService)
-	httpdService := newHTTPDService()
-	tm.HTTPDService = httpdService
-	tm.TaskStore = taskStore{}
-	tm.DeadmanService = deadman{}
-	tm.HTTPPostService = httppost.NewService(nil, logService.NewLogger("[httppost] ", log.LstdFlags))
-	as := alertservice.NewService(logService.NewLogger("[alert] ", log.LstdFlags))
-	as.StorageService = storagetest.New()
-	as.HTTPDService = httpdService
-	if err := as.Open(); err != nil {
+	tm, err := createTaskMaster()
+	if err != nil {
 		t.Fatal(err)
 	}
-	tm.AlertService = as
 	if tmInit != nil {
 		tmInit(tm)
 	}
@@ -10359,4 +10642,21 @@ func compareListIgnoreOrder(got, exp []interface{}, cmpF func(got, exp interface
 		}
 	}
 	return nil
+}
+
+func createTaskMaster() (*kapacitor.TaskMaster, error) {
+	tm := kapacitor.NewTaskMaster("testStreamer", logService)
+	httpdService := newHTTPDService()
+	tm.HTTPDService = httpdService
+	tm.TaskStore = taskStore{}
+	tm.DeadmanService = deadman{}
+	tm.HTTPPostService = httppost.NewService(nil, logService.NewLogger("[httppost] ", log.LstdFlags))
+	as := alertservice.NewService(logService.NewLogger("[alert] ", log.LstdFlags))
+	as.StorageService = storagetest.New()
+	as.HTTPDService = httpdService
+	if err := as.Open(); err != nil {
+		return nil, err
+	}
+	tm.AlertService = as
+	return tm, nil
 }

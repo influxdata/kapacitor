@@ -342,6 +342,13 @@ func (n *chainnode) InfluxDBOut() *InfluxDBOutNode {
 	return i
 }
 
+// Create an kapacitor loopback node that will send data back into Kapacitor as a stream.
+func (n *chainnode) KapacitorLoopback() *KapacitorLoopbackNode {
+	k := newKapacitorLoopbackNode(n.provides)
+	n.linkChild(k)
+	return k
+}
+
 // Create an alert node, which can trigger alerts.
 func (n *chainnode) Alert() *AlertNode {
 	a := newAlertNode(n.provides)

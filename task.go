@@ -458,6 +458,8 @@ func (et *ExecutingTask) createNode(p pipeline.Node, l *log.Logger) (n Node, err
 		n, err = newHTTPPostNode(et, t, l)
 	case *pipeline.InfluxDBOutNode:
 		n, err = newInfluxDBOutNode(et, t, l)
+	case *pipeline.KapacitorLoopbackNode:
+		n, err = newKapacitorLoopbackNode(et, t, l)
 	case *pipeline.AlertNode:
 		n, err = newAlertNode(et, t, l)
 	case *pipeline.GroupByNode:

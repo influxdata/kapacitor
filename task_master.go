@@ -149,6 +149,8 @@ type TaskMaster struct {
 
 	// Incoming streams
 	writePointsIn StreamCollector
+	writesClosed  bool
+	writesMu      sync.RWMutex
 
 	// Forks of incoming streams
 	// We are mapping from (db, rp, measurement) to map of task ids to their edges
@@ -261,12 +263,18 @@ func (tm *TaskMaster) StopTasks() {
 }
 
 func (tm *TaskMaster) Close() error {
-	tm.Drain()
 	tm.mu.Lock()
-	defer tm.mu.Unlock()
-	if tm.closed {
+	closed := tm.closed
+	tm.mu.Unlock()
+
+	if closed {
 		return ErrTaskMasterClosed
 	}
+
+	tm.Drain()
+
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
 	tm.closed = true
 	for _, et := range tm.tasks {
 		_ = tm.stopTask(et.Task.ID)
@@ -362,6 +370,10 @@ func (tm *TaskMaster) waitForForks() {
 	tm.mu.Lock()
 	tm.drained = true
 	tm.mu.Unlock()
+
+	tm.writesMu.Lock()
+	tm.writesClosed = true
+	tm.writesMu.Unlock()
 
 	// Close the write points in stream
 	tm.writePointsIn.Close()
@@ -628,7 +640,9 @@ func (tm *TaskMaster) forkPoint(p models.Point) {
 }
 
 func (tm *TaskMaster) WritePoints(database, retentionPolicy string, consistencyLevel imodels.ConsistencyLevel, points []imodels.Point) error {
-	if tm.closed {
+	tm.writesMu.RLock()
+	defer tm.writesMu.RUnlock()
+	if tm.writesClosed {
 		return ErrTaskMasterClosed
 	}
 	if retentionPolicy == "" {
@@ -650,6 +664,18 @@ func (tm *TaskMaster) WritePoints(database, retentionPolicy string, consistencyL
 		}
 	}
 	return nil
+}
+
+func (tm *TaskMaster) WriteKapacitorPoint(p models.Point) error {
+	tm.writesMu.RLock()
+	defer tm.writesMu.RUnlock()
+	if tm.writesClosed {
+		return ErrTaskMasterClosed
+	}
+
+	p.Group = models.NilGroup
+	p.Dimensions = models.Dimensions{}
+	return tm.writePointsIn.CollectPoint(p)
 }
 
 func (tm *TaskMaster) NewFork(taskName string, dbrps []DBRP, measurements []string) (*Edge, error) {
