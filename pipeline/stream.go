@@ -271,5 +271,5 @@ func (n *FromNode) GroupByMeasurement() *FromNode {
 }
 
 func (s *FromNode) validate() error {
-	return validateDimensions(s.Dimensions)
+	return validateDimensions(s.Dimensions, nil)
 }

@@ -1,0 +1,48 @@
+dbname
+rpname
+mock,t=A,s=1 value=97.1 0000000001
+dbname
+rpname
+mock,t=A,s=2 value=97.1 0000000001
+dbname
+rpname
+mock,t=B,s=1 value=97.1 0000000001
+dbname
+rpname
+mock,t=B,s=2 value=97.1 0000000001
+dbname
+rpname
+mock,t=A,s=1 value=97.1 0000000002
+dbname
+rpname
+mock,t=A,s=2 value=97.1 0000000002
+dbname
+rpname
+mock,t=B,s=1 value=97.1 0000000002
+dbname
+rpname
+mock,t=B,s=2 value=97.1 0000000002
+dbname
+rpname
+mock,t=A,s=1 value=97.1 0000000003
+dbname
+rpname
+mock,t=A,s=2 value=97.1 0000000003
+dbname
+rpname
+mock,t=B,s=1 value=97.1 0000000003
+dbname
+rpname
+mock,t=B,s=2 value=97.1 0000000003
+dbname
+rpname
+mock,t=A,s=1 value=97.1 0000000004
+dbname
+rpname
+mock,t=A,s=2 value=97.1 0000000004
+dbname
+rpname
+mock,t=B,s=1 value=97.1 0000000004
+dbname
+rpname
+mock,t=B,s=2 value=97.1 0000000004

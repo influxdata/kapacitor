@@ -88,7 +88,7 @@ func (s *FromNode) runStream([]byte) error {
 				pt.Time = pt.Time.Round(s.s.Round)
 			}
 			dims.TagNames = s.dimensions
-			pt = setGroupOnPoint(pt, s.allDimensions, dims)
+			pt = setGroupOnPoint(pt, s.allDimensions, dims, nil)
 			s.timer.Pause()
 			for _, child := range s.outs {
 				err := child.CollectPoint(pt)

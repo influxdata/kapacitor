@@ -2575,6 +2575,77 @@ stream
 	testStreamerWithOutput(t, "TestStream_BatchGroupBy", script, 15*time.Second, er, true, nil)
 }
 
+func TestStream_BatchGroupByAllExclude(t *testing.T) {
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+	|window()
+		.period(5s)
+		.every(5s)
+	|groupBy(*)
+		.exclude('host')
+	|count('value')
+	|httpOut('TestStream_BatchGroupBy')
+`
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"type": "idle"},
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+					11.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_BatchGroupBy", script, 15*time.Second, er, true, nil)
+}
+
+func TestStream_GroupByAllExclude(t *testing.T) {
+
+	var script = `
+stream
+	|from()
+		.measurement('mock')
+	|groupBy(*)
+		.exclude('s')
+	|window()
+		.period(2s)
+		.every(2s)
+	|count('value')
+	|httpOut('TestStream_GroupByExclude')
+`
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "mock",
+				Tags:    map[string]string{"t": "A"},
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+					4.0,
+				}},
+			},
+			{
+				Name:    "mock",
+				Tags:    map[string]string{"t": "B"},
+				Columns: []string{"time", "count"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+					4.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_GroupByExclude", script, 5*time.Second, er, true, nil)
+}
+
 func TestStream_SimpleWhere(t *testing.T) {
 
 	var script = `
@@ -2910,6 +2981,55 @@ stream
 				Name:    "request_latency",
 				Tags:    map[string]string{"dc": "B"},
 				Columns: []string{"time", "auth.server01.value", "auth.server02.value", "cart.server01.value", "cart.server02.value", "log.server01.value", "log.server02.value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					750.0,
+					752.0,
+					850.0,
+					852.0,
+					650.0,
+					652.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_Flatten", script, 13*time.Second, er, true, nil)
+}
+
+func TestStream_FlattenDropOriginalFieldName(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('request_latency')
+		.groupBy('dc')
+	|flatten()
+		.on('service', 'host')
+		.tolerance(1s)
+		.dropOriginalFieldName()
+		|httpOut('TestStream_Flatten')
+`
+
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "A"},
+				Columns: []string{"time", "auth.server01", "auth.server02", "cart.server01", "cart.server02", "log.server01", "log.server02"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+					700.0,
+					702.0,
+					800.0,
+					802.0,
+					600.0,
+					602.0,
+				}},
+			},
+			{
+				Name:    "request_latency",
+				Tags:    map[string]string{"dc": "B"},
+				Columns: []string{"time", "auth.server01", "auth.server02", "cart.server01", "cart.server02", "log.server01", "log.server02"},
 				Values: [][]interface{}{[]interface{}{
 					time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 					750.0,

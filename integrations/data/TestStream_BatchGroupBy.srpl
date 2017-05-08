@@ -70,3 +70,21 @@ cpu,type=idle,host=serverA value=95.1 0000000012
 dbname
 rpname
 cpu,type=idle,host=serverB value=95.1 0000000012
+dbname
+rpname
+cpu,type=idle,host=serverA value=95.1 0000000013
+dbname
+rpname
+cpu,type=idle,host=serverB value=95.1 0000000013
+dbname
+rpname
+cpu,type=idle,host=serverA value=95.1 0000000014
+dbname
+rpname
+cpu,type=idle,host=serverB value=95.1 0000000014
+dbname
+rpname
+cpu,type=idle,host=serverA value=95.1 0000000015
+dbname
+rpname
+cpu,type=idle,host=serverB value=95.1 0000000015
