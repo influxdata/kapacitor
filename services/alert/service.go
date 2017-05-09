@@ -757,12 +757,12 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		h = s.PushoverService.Handler(c, s.logger)
 		h = newExternalHandler(h)
 	case "post":
-		c := PostHandlerConfig{}
+		c := httppost.HandlerConfig{}
 		err = decodeOptions(spec.Options, &c)
 		if err != nil {
 			return handler{}, err
 		}
-		h = NewPostHandler(c, s.logger)
+		h = s.HTTPPostService.Handler(c, s.logger)
 		h = newExternalHandler(h)
 	case "publish":
 		c := PublishHandlerConfig{
