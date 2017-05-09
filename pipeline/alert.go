@@ -475,13 +475,14 @@ func (a *AlertNode) Flapping(low, high float64) *AlertNode {
 }
 
 // HTTP POST JSON alert data to a specified URL.
-// Example with endpoint:
+//
+// Example:
 //    stream
 //         |alert()
 //             .post()
-//              .endpoint('example')
+//                 .endpoint('example')
 //
-// Example with url:
+// Example:
 //    stream
 //         |alert()
 //             .post('http://example.com')
@@ -501,12 +502,16 @@ func (a *AlertNode) Post(urls ...string) *AlertHTTPPostHandler {
 	return post
 }
 
+// Set a header key and value on the post request.
+// Setting the Authenticate header is not allowed from within TICKscript,
+// please use the configuration file to specify sensitive headers.
+//
 // Example:
 //    stream
 //         |alert()
 //             .post()
-//              .endpoint('example')
-//              .header('a','b')
+//                 .endpoint('example')
+//                 .header('a','b')
 // tick:property
 func (a *AlertHTTPPostHandler) Header(k, v string) *AlertHTTPPostHandler {
 	if a.Headers == nil {
@@ -528,6 +533,7 @@ type AlertHTTPPostHandler struct {
 	// Name of the endpoint to be used, as is defined in the configuration file
 	Endpoint string
 
+	// tick:ignore
 	Headers map[string]string `tick:"Header"`
 }
 
