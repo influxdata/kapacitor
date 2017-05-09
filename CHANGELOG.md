@@ -8,39 +8,59 @@
 
 ## v1.3.0-rc1 [2017-05-08]
 
-### Features
-
-- [#1299](https://github.com/influxdata/kapacitor/pull/1299): Allowing sensu handler to be specified 
-- [#1284](https://github.com/influxdata/kapacitor/pull/1284): Add type signatures to Kapacitor functions.
-- [#1203](https://github.com/influxdata/kapacitor/issues/1203): Add `isPresent` operator for verifying whether a value is present (part of [#1284](https://github.com/influxdata/kapacitor/pull/1284)).
-- [#1354](https://github.com/influxdata/kapacitor/pull/1354): Add Kubernetes scraping support.
-- [#1359](https://github.com/influxdata/kapacitor/pull/1359): Add groupBy exclude and Add dropOriginalFieldName to flatten.
-- [#1360](https://github.com/influxdata/kapacitor/pull/1360): Add KapacitorLoopback node to be able to send data from a task back into Kapacitor.
-
-### Bugfixes
-
-- [#1329](https://github.com/influxdata/kapacitor/issues/1329): BREAKING: A bug was fixed around missing fields in the derivative node.
-    The behavior of the node changes slightly in order to provide a consistent fix to the bug.
-    The breaking change is that now, the time of the points returned are from the right hand or current point time, instead of the left hand or previous point time.
-- [#1353](https://github.com/influxdata/kapacitor/issues/1353): Fix panic in scraping TargetManager.
-- [#1238](https://github.com/influxdata/kapacitor/pull/1238): Use ProxyFromEnvironment for all outgoing HTTP traffic.
-
-## v1.3.0-beta2 [2017-05-01]
-
-### Features
-
-- [#117](https://github.com/influxdata/kapacitor/issues/117): Add headers to alert POST requests.
-
-### Bugfixes
-
-- [#1294](https://github.com/influxdata/kapacitor/issues/1294): Fix bug where batch queries would be missing all fields after the first nil field.
-- [#1343](https://github.com/influxdata/kapacitor/issues/1343): BREAKING: The UDF agent Go API has changed, the changes now make it so that the agent package is self contained.
-
-## v1.3.0-beta1 [2017-04-29]
-
 ### Release Notes
 
-With this release the technical preview alerting service has been refactored.
+The v1.3.0 release has two major features.
+
+1. Addition of scraping and discovering for Prometheues style data collection.
+2. Updates to the Alert Topic system
+
+Here is a quick example of how to configure Kapacitor to scrape discovered targets.
+First configure a discoverer, here we use the file-discovery discoverer.
+Next configure a scraper to use that discoverer.
+
+```
+# Configure file discoverer
+[[file-discovery]]
+ enabled = true
+ id = "discover_files"
+ refresh-interval = "10s"
+ ##### This will look for prometheus json files
+ ##### File format is here https://prometheus.io/docs/operating/configuration/#%3Cfile_sd_config%3E
+ files = ["/tmp/prom/*.json"]
+
+# Configure scraper 
+[[scraper]]
+ enabled = true
+ name = "node_exporter"
+ discoverer-id = "discover_files"
+ discoverer-service = "file-discovery"
+ db = "prometheus"
+ rp = "autogen"
+ type = "prometheus"
+ scheme = "http"
+ metrics-path = "/metrics"
+ scrape-interval = "2s"
+ scrape-timeout = "10s"
+```
+
+Add the above snippet to your kapacitor.conf file.
+
+Create the below snippet as the file `/tmp/prom/localhost.json`:
+
+```
+[{
+ "targets": ["localhost:9100"]
+}]
+```
+
+Start the Prometheues node_exporter locally.
+
+Now startup Kapacitor and it will discover the localhost:9100 node_exporter target and begin scrapping it for metrics.
+For more details on the scraping and discovery systems see the full documentation [here](https://docs.influxdata.com/kapacitor/v1.3/scraping).
+
+The second major feature with this release, are changes to the alert topic system.
+The previous release introduce this new system as a technical preview, with this release the alerting service has been simplified.
 Alert handlers now only ever have a single action and belong to a single topic.
 
 The handler defintion has been simplified as a result.
@@ -75,6 +95,37 @@ For example to define the above aggregate handler on the system topic use this c
 kapacitor define-handler system aggregate_by_1m.yaml
 ```
 
+For more details on the alerting system see the full documentation [here](https://docs.influxdata.com/kapacitor/v1.3/alerts).
+
+### Features
+
+- [#1299](https://github.com/influxdata/kapacitor/pull/1299): Allowing sensu handler to be specified 
+- [#1284](https://github.com/influxdata/kapacitor/pull/1284): Add type signatures to Kapacitor functions.
+- [#1203](https://github.com/influxdata/kapacitor/issues/1203): Add `isPresent` operator for verifying whether a value is present (part of [#1284](https://github.com/influxdata/kapacitor/pull/1284)).
+- [#1354](https://github.com/influxdata/kapacitor/pull/1354): Add Kubernetes scraping support.
+- [#1359](https://github.com/influxdata/kapacitor/pull/1359): Add groupBy exclude and Add dropOriginalFieldName to flatten.
+- [#1360](https://github.com/influxdata/kapacitor/pull/1360): Add KapacitorLoopback node to be able to send data from a task back into Kapacitor.
+
+### Bugfixes
+
+- [#1329](https://github.com/influxdata/kapacitor/issues/1329): BREAKING: A bug was fixed around missing fields in the derivative node.
+    The behavior of the node changes slightly in order to provide a consistent fix to the bug.
+    The breaking change is that now, the time of the points returned are from the right hand or current point time, instead of the left hand or previous point time.
+- [#1353](https://github.com/influxdata/kapacitor/issues/1353): Fix panic in scraping TargetManager.
+- [#1238](https://github.com/influxdata/kapacitor/pull/1238): Use ProxyFromEnvironment for all outgoing HTTP traffic.
+
+## v1.3.0-beta2 [2017-05-01]
+
+### Features
+
+- [#117](https://github.com/influxdata/kapacitor/issues/117): Add headers to alert POST requests.
+
+### Bugfixes
+
+- [#1294](https://github.com/influxdata/kapacitor/issues/1294): Fix bug where batch queries would be missing all fields after the first nil field.
+- [#1343](https://github.com/influxdata/kapacitor/issues/1343): BREAKING: The UDF agent Go API has changed, the changes now make it so that the agent package is self contained.
+
+## v1.3.0-beta1 [2017-04-29]
 
 ### Features
 
