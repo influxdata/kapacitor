@@ -3,8 +3,10 @@ package kapacitor
 import (
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
+	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick/ast"
@@ -28,30 +30,53 @@ type StateTrackingNode struct {
 	as     string
 
 	newTracker func() stateTracker
-	groups     map[models.GroupID]*stateTrackingGroup
+
+	groupsMu sync.RWMutex
+	groups   map[models.GroupID]*stateTrackingGroup
 }
 
 func (stn *StateTrackingNode) group(g models.GroupID) (*stateTrackingGroup, error) {
+	stn.groupsMu.RLock()
 	stg := stn.groups[g]
+	stn.groupsMu.RUnlock()
+
 	if stg == nil {
-		stg = &stateTrackingGroup{}
+		// Grab the write lock
+		stn.groupsMu.Lock()
+		defer stn.groupsMu.Unlock()
 
-		var err error
-		stg.Expression, err = stateful.NewExpression(stn.lambda.Expression)
-		if err != nil {
-			return nil, fmt.Errorf("Failed to compile expression: %v", err)
+		// Check again now that we have the write lock
+		stg = stn.groups[g]
+		if stg == nil {
+			// Create a new tracking group
+			stg = &stateTrackingGroup{}
+
+			var err error
+			stg.Expression, err = stateful.NewExpression(stn.lambda.Expression)
+			if err != nil {
+				return nil, fmt.Errorf("Failed to compile expression: %v", err)
+			}
+
+			stg.ScopePool = stateful.NewScopePool(ast.FindReferenceVariables(stn.lambda.Expression))
+
+			stg.tracker = stn.newTracker()
+
+			stn.groups[g] = stg
 		}
-
-		stg.ScopePool = stateful.NewScopePool(ast.FindReferenceVariables(stn.lambda.Expression))
-
-		stg.tracker = stn.newTracker()
-
-		stn.groups[g] = stg
 	}
 	return stg, nil
 }
 
 func (stn *StateTrackingNode) runStateTracking(_ []byte) error {
+	// Setup working_cardinality gauage.
+	valueF := func() int64 {
+		stn.groupsMu.RLock()
+		l := len(stn.groups)
+		stn.groupsMu.RUnlock()
+		return int64(l)
+	}
+	stn.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
+
 	switch stn.Provides() {
 	case pipeline.StreamEdge:
 		for p, ok := stn.ins[0].NextPoint(); ok; p, ok = stn.ins[0].NextPoint() {
