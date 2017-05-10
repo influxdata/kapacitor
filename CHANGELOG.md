@@ -6,6 +6,8 @@
 
 ### Bugfixes
 
+- [#1370](https://github.com/influxdata/kapacitor/issues/1370): Fix missing working_cardinality stats on stateDuration and stateCount nodes.
+
 ## v1.3.0-rc1 [2017-05-08]
 
 ### Release Notes
