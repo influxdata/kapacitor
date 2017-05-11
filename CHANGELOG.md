@@ -6,9 +6,7 @@
 
 ### Bugfixes
 
-- [#1370](https://github.com/influxdata/kapacitor/issues/1370): Fix missing working_cardinality stats on stateDuration and stateCount nodes.
-
-## v1.3.0-rc1 [2017-05-08]
+## v1.3.0-rc2 [2017-05-11]
 
 ### Release Notes
 
@@ -98,6 +96,13 @@ kapacitor define-handler system aggregate_by_1m.yaml
 ```
 
 For more details on the alerting system see the full documentation [here](https://docs.influxdata.com/kapacitor/v1.3/alerts).
+
+### Bugfixes
+
+- [#1370](https://github.com/influxdata/kapacitor/issues/1370): Fix missing working_cardinality stats on stateDuration and stateCount nodes.
+
+## v1.3.0-rc1 [2017-05-08]
+
 
 ### Features
 
