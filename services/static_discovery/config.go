@@ -13,14 +13,14 @@ type Config struct {
 	ID      string `toml:"id" override:"id"`
 	// Targets is a list of targets identified by a label set. Each target is
 	// uniquely identifiable in the group by its address label.
-	Targets []map[string]string `toml:"targets" override:"targets"`
+	Targets []string `toml:"targets" override:"targets"`
 	// Labels is a set of labels that is common across all targets in the group.
 	Labels map[string]string `toml:"labels" override:"labels"`
 }
 
 // Init the static configuration to an empty set of structures
 func (s *Config) Init() {
-	s.Targets = []map[string]string{}
+	s.Targets = []string{}
 	s.Labels = map[string]string{}
 }
 
@@ -46,10 +46,12 @@ func (s Config) PromConfig() []*config.TargetGroup {
 		}
 		return res
 	}
-	target := func(t []map[string]string) []model.LabelSet {
+	target := func(t []string) []model.LabelSet {
 		res := make([]model.LabelSet, len(t))
 		for i, l := range t {
-			res[i] = set(l)
+			res[i] = model.LabelSet{
+				model.LabelName(model.AddressLabel): model.LabelValue(l),
+			}
 		}
 		return res
 	}
