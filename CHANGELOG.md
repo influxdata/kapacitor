@@ -94,6 +94,7 @@ For more details on the alerting system see the full documentation [here](https:
 ### Bugfixes
 
 - [#1369](https://github.com/influxdata/kapacitor/issues/1369): Fix panic with concurrent writes to same points in state tracking nodes.
+- [#1387](https://github.com/influxdata/kapacitor/pull/1387): static-discovery configuration simplified
 
 ## v1.3.0-rc2 [2017-05-11]
 
