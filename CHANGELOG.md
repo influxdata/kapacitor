@@ -2,14 +2,6 @@
 
 ## Unreleased [unreleased]
 
-### Features
-
-### Bugfixes
-
-- [#1378](https://github.com/influxdata/kapacitor/issues/1378): Fix panic in InfluxQL node with missing field.
-
-## v1.3.0-rc2 [2017-05-11]
-
 ### Release Notes
 
 The v1.3.0 release has two major features.
@@ -103,6 +95,7 @@ For more details on the alerting system see the full documentation [here](https:
 
 - [#1369](https://github.com/influxdata/kapacitor/issues/1369): Fix panic with concurrent writes to same points in state tracking nodes.
 - [#1387](https://github.com/influxdata/kapacitor/pull/1387): static-discovery configuration simplified
+- [#1378](https://github.com/influxdata/kapacitor/issues/1378): Fix panic in InfluxQL node with missing field.
 
 ## v1.3.0-rc2 [2017-05-11]
 
