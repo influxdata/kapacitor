@@ -78,6 +78,49 @@ func init() {
 	wlog.SetLevel(wlog.OFF)
 }
 
+func TestStream_InfluxQLNodeMissingValue_Batch(t *testing.T) {
+
+	var script = `
+stream
+	|from().measurement('packets')
+	|derivative('value')
+	|window()
+		.period(10s)
+		.every(10s)
+	|mean('is_missing_value')
+	|httpOut('TestStream_InfluxQLNodeMissingValue')
+`
+	er := models.Result{}
+
+	testStreamerWithOutput(t, "TestStream_InfluxQLNodeMissingValue", script, 15*time.Second, er, false, nil)
+}
+
+func TestStream_InfluxQLNodeMissingValue_Stream(t *testing.T) {
+
+	var script = `
+stream
+	|from().measurement('packets')
+	|mean('is_missing_value')
+	|httpOut('TestStream_InfluxQLNodeMissingValue')
+`
+
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "packets",
+				Tags:    nil,
+				Columns: []string{"time", "mean"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+					1011.0,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_InfluxQLNodeMissingValue", script, 15*time.Second, er, false, nil)
+}
+
 func TestStream_Derivative(t *testing.T) {
 
 	var script = `

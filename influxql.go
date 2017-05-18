@@ -89,7 +89,7 @@ func (n *InfluxQLNode) runStreamInfluxQL() error {
 		mu.RLock()
 		context := contexts[p.Group]
 		mu.RUnlock()
-		// Fisrt point in window
+		// First point in window
 		if context == nil {
 			// Create new context
 			c := baseReduceContext{
@@ -103,7 +103,16 @@ func (n *InfluxQLNode) runStreamInfluxQL() error {
 				pointTimes: n.n.PointTimes || n.isStreamTransformation,
 			}
 
-			k := reflect.TypeOf(p.Fields[c.field]).Kind()
+			f, exists := p.Fields[c.field]
+			if !exists {
+				n.incrementErrorCount()
+				n.logger.Printf("E! field %s missing from point, skipping point", c.field)
+				p, ok = n.ins[0].NextPoint()
+				n.timer.Stop()
+				continue
+			}
+
+			k := reflect.TypeOf(f).Kind()
 			kindChanged := k != kind
 			kind = k
 
@@ -187,7 +196,14 @@ func (n *InfluxQLNode) runBatchInfluxQL() error {
 				kind = reflect.Float64
 			}
 		} else {
-			k := reflect.TypeOf(b.Points[0].Fields[c.field]).Kind()
+			f, ok := b.Points[0].Fields[c.field]
+			if !ok {
+				n.incrementErrorCount()
+				n.logger.Printf("E! field %s missing from point, skipping batch", c.field)
+				n.timer.Stop()
+				continue
+			}
+			k := reflect.TypeOf(f).Kind()
 			kindChanged = k != kind
 			kind = k
 		}

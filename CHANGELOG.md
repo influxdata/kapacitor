@@ -2,6 +2,14 @@
 
 ## Unreleased [unreleased]
 
+### Features
+
+### Bugfixes
+
+- [#1378](https://github.com/influxdata/kapacitor/issues/1378): Fix panic in InfluxQL node with missing field.
+
+## v1.3.0-rc2 [2017-05-11]
+
 ### Release Notes
 
 The v1.3.0 release has two major features.
