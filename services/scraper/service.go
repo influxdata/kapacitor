@@ -69,7 +69,6 @@ func (s *Service) Open() error {
 	s.closing = make(chan struct{})
 
 	go s.scrape()
-	s.logger.Println("I! opened service")
 
 	s.open = true
 	return nil
@@ -89,7 +88,6 @@ func (s *Service) Close() error {
 
 	s.wg.Wait()
 
-	s.logger.Println("I! closed service")
 	return nil
 }
 
@@ -127,7 +125,6 @@ func (s *Service) scrape() {
 			s.mu.Unlock()
 			return
 		case conf := <-s.updating:
-			s.logger.Println("I! updating scraper service")
 			s.mgr.ApplyConfig(conf)
 		}
 	}
