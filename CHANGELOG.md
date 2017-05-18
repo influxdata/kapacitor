@@ -2,6 +2,8 @@
 
 ## Unreleased [unreleased]
 
+## v1.3.0-rc3 [2017-05-18]
+
 ### Release Notes
 
 The v1.3.0 release has two major features.
@@ -12,6 +14,9 @@ The v1.3.0 release has two major features.
 Here is a quick example of how to configure Kapacitor to scrape discovered targets.
 First configure a discoverer, here we use the file-discovery discoverer.
 Next configure a scraper to use that discoverer.
+
+>NOTE: The scraping and discovering features are released under technical preview,
+meaning that the configuration or API around the feature may change in a future release.
 
 ```
 # Configure file discoverer
