@@ -2,12 +2,6 @@
 
 ## Unreleased [unreleased]
 
-### Features
-
-### Bugfixes
-
-## v1.3.0-rc2 [2017-05-11]
-
 ### Release Notes
 
 The v1.3.0 release has two major features.
@@ -96,6 +90,12 @@ kapacitor define-handler system aggregate_by_1m.yaml
 ```
 
 For more details on the alerting system see the full documentation [here](https://docs.influxdata.com/kapacitor/v1.3/alerts).
+
+### Bugfixes
+
+- [#1369](https://github.com/influxdata/kapacitor/issues/1369): Fix panic with concurrent writes to same points in state tracking nodes.
+
+## v1.3.0-rc2 [2017-05-11]
 
 ### Bugfixes
 
