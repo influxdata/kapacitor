@@ -43,8 +43,6 @@ func (s *Service) Open() error {
 	}
 	s.opened = true
 
-	s.logger.Println("I! Starting SMTP service")
-
 	s.mail = make(chan *gomail.Message)
 
 	s.wg.Add(1)
@@ -63,8 +61,6 @@ func (s *Service) Close() error {
 		return nil
 	}
 	s.opened = false
-
-	s.logger.Println("I! Closing SMTP service")
 
 	close(s.mail)
 	s.wg.Wait()

@@ -462,8 +462,6 @@ func (h *matchHandler) match(event alert.Event) (bool, error) {
 	// Populate scope
 	h.scope.Reset()
 
-	h.logger.Printf("D! match %+v", h)
-
 	if h.usesChanged {
 		h.scope.SetDynamicFunc(changedFunc, &stateful.DynamicFunc{
 			F: func(args ...interface{}) (interface{}, error) {

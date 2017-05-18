@@ -20,8 +20,6 @@ type Service struct {
 
 // NewService creates a new unopened k8s service
 func NewService(c []Config, r scraper.Registry, l *log.Logger) (*Service, error) {
-	l.Println("D! k8s configs", c)
-
 	clusters := make(map[string]*Cluster, len(c))
 	for i := range c {
 		cluster, err := NewCluster(c[i], l)
