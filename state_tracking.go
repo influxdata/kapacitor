@@ -115,6 +115,7 @@ func (stn *StateTrackingNode) runStateTracking(_ []byte) error {
 			}
 			stg.tracker.reset()
 
+			b = b.Copy().(models.Batch)
 			for i := 0; i < len(b.Points); {
 				p := &b.Points[i]
 				pass, err := EvalPredicate(stg.Expression, stg.ScopePool, p.Time, p.Fields, p.Tags)

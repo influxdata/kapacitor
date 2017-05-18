@@ -10240,14 +10240,17 @@ func testStreamerCardinality(
 
 func TestStream_StateDuration(t *testing.T) {
 	var script = `
-stream
+var data = stream
 	|from().measurement('cpu')
 	|groupBy('host')
+data
 	|stateDuration(lambda: "value" > 95)
 		.unit(1ms)
 		.as('my_duration')
 	|window().period(4s).every(4s)
 	|httpOut('TestStream_StateTracking')
+data
+	|stateDuration(lambda: "value" > 95) // discard
 `
 	er := models.Result{
 		Series: models.Rows{
@@ -10308,13 +10311,16 @@ stream
 
 func TestStream_StateCount(t *testing.T) {
 	var script = `
-stream
+var data = stream
 	|from().measurement('cpu')
 	|groupBy('host')
+data
 	|stateCount(lambda: "value" > 95)
 		.as('my_count')
 	|window().period(4s).every(4s)
 	|httpOut('TestStream_StateTracking')
+data
+	|stateCount(lambda: "value" > 95) // discard
 `
 	er := models.Result{
 		Series: models.Rows{

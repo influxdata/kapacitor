@@ -2363,15 +2363,18 @@ batch
 
 func TestBatch_StateDuration(t *testing.T) {
 	var script = `
-batch
+var data = batch
 	|query('SELECT value FROM "telegraf"."default"."cpu"')
 		.period(4s)
 		.every(4s)
 		.groupBy('host')
+data
 	|stateDuration(lambda: "value" > 95)
 		.unit(1ms)
 		.as('my_duration')
 	|httpOut('TestBatch_StateTracking')
+data
+	|stateDuration(lambda: "value" > 95) // discard
 `
 	er := models.Result{
 		Series: models.Rows{
@@ -2432,14 +2435,17 @@ batch
 
 func TestBatch_StateCount(t *testing.T) {
 	var script = `
-batch
+var data = batch
 	|query('SELECT value FROM "telegraf"."default"."cpu"')
 		.period(4s)
 		.every(4s)
 		.groupBy('host')
+data
 	|stateCount(lambda: "value" > 95)
 		.as('my_count')
 	|httpOut('TestBatch_StateTracking')
+data
+	|stateCount(lambda: "value" > 95) // discard
 `
 	er := models.Result{
 		Series: models.Rows{
