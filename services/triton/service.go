@@ -44,7 +44,6 @@ func (s *Service) Open() error {
 	s.open = true
 	s.register()
 
-	s.logger.Println("I! opened service")
 	return s.registry.Commit()
 }
 
@@ -60,7 +59,6 @@ func (s *Service) Close() error {
 	s.open = false
 	s.deregister()
 
-	s.logger.Println("I! closed service")
 	return s.registry.Commit()
 }
 
