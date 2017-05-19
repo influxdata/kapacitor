@@ -666,6 +666,7 @@ func (a *AlertNode) runAlert([]byte) error {
 					a.a.IdField != "" ||
 					a.a.DurationField != "" ||
 					a.a.MessageField != "" {
+					b.Points = b.ShallowCopyPoints()
 					for i := range b.Points {
 						if a.a.LevelTag != "" || a.a.IdTag != "" {
 							b.Points[i].Tags = b.Points[i].Tags.Copy()
