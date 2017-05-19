@@ -4,6 +4,8 @@
 
 # Bugfixes
 
+## v1.3.0-rc4 [2017-05-19]
+
 - [#1379](https://github.com/influxdata/kapacitor/issues/1379): Copy batch points slice before modification, fixes potential panics and data corruption.
 - [#1394](https://github.com/influxdata/kapacitor/pull/1394): Use the Prometheus metric name as the measurement name by default for scrape data.
 - [#1392](https://github.com/influxdata/kapacitor/pull/1392): Fix possible deadlock for scraper configuration updating.
