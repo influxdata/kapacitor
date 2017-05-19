@@ -316,11 +316,11 @@ func (s *Service) RemoveScrapers(scrapers []Config) {
 		return
 	}
 
-	configs := s.loadConfigs()
+	configs := s.loadConfigs()[0:0]
 	for _, rm := range scrapers {
-		for i, c := range configs {
-			if c.Name == rm.Name {
-				configs = append(configs, configs[i+1:]...)
+		for _, c := range configs {
+			if c.Name != rm.Name {
+				configs = append(configs, c)
 			}
 		}
 	}
