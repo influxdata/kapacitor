@@ -80,7 +80,6 @@ func (s *Service) Open() (err error) {
 	s.closing = make(chan struct{})
 	s.wg.Add(1)
 	go s.sendStats()
-	s.logger.Println("I! opened service")
 	return
 }
 
@@ -94,7 +93,6 @@ func (s *Service) Close() error {
 	close(s.closing)
 	s.wg.Wait()
 	s.stream.Close()
-	s.logger.Println("I! closed service")
 	return nil
 }
 
