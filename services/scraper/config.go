@@ -127,7 +127,7 @@ func encodeJobName(db, rp, name string) string {
 func decodeJobName(job string) (string, string, string, error) {
 	split := strings.Split(job, "|")
 	if len(split) != 3 {
-		return "", "", "", fmt.Errorf("unable to decode job name")
+		return "", "", "", fmt.Errorf("unable to decode job name %q", job)
 	}
 	return split[0], split[1], split[2], nil
 }
