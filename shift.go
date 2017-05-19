@@ -47,6 +47,7 @@ func (s *ShiftNode) runShift([]byte) error {
 		for b, ok := s.ins[0].NextBatch(); ok; b, ok = s.ins[0].NextBatch() {
 			s.timer.Start()
 			b.TMax = b.TMax.Add(s.shift)
+			b.Points = b.ShallowCopyPoints()
 			for i, p := range b.Points {
 				b.Points[i].Time = p.Time.Add(s.shift)
 			}

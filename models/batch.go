@@ -78,6 +78,14 @@ func (b Batch) Copy() PointInterface {
 	return cb
 }
 
+// ShallowCopyPoints creates a new slice for the points but only shallow copies the points themselves.
+// Then if a single point needs to be modified it must first be copied.
+func (b Batch) ShallowCopyPoints() []BatchPoint {
+	points := make([]BatchPoint, len(b.Points))
+	copy(points, b.Points)
+	return points
+}
+
 func (b Batch) Setter() PointSetter {
 	return &b
 }

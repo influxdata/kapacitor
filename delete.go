@@ -77,6 +77,7 @@ func (e *DeleteNode) runDelete(snapshot []byte) error {
 	case pipeline.BatchEdge:
 		for b, ok := e.ins[0].NextBatch(); ok; b, ok = e.ins[0].NextBatch() {
 			e.timer.Start()
+			b.Points = b.ShallowCopyPoints()
 			for i := range b.Points {
 				b.Points[i].Fields, b.Points[i].Tags = e.doDeletes(b.Points[i].Fields, b.Points[i].Tags)
 			}
