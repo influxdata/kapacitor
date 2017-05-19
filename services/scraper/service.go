@@ -7,7 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/influxdata/influxdb/models"
+	"github.com/influxdata/kapacitor/models"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/retrieval"
@@ -22,7 +22,7 @@ var (
 // Service represents the scraper manager
 type Service struct {
 	PointsWriter interface {
-		WritePoints(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
+		WriteKapacitorPoint(models.Point) error
 	}
 	mu sync.Mutex
 	wg sync.WaitGroup
@@ -153,10 +153,13 @@ func (s *Service) Append(sample *model.Sample) error {
 	rp := ""
 	job := ""
 
-	tags := map[string]string{}
+	tags := make(models.Tags)
 	for name, value := range sample.Metric {
 		if name == "job" {
 			db, rp, job, err = decodeJobName(string(value))
+			if err != nil {
+				return err
+			}
 			continue
 		}
 		tags[string(name)] = string(value)
@@ -179,12 +182,14 @@ func (s *Service) Append(sample *model.Sample) error {
 		"value": value,
 	}
 
-	pt, err := models.NewPoint(job, models.NewTags(tags), fields, sample.Timestamp.Time())
-	if err != nil {
-		return err
-	}
-
-	return s.PointsWriter.WritePoints(db, rp, models.ConsistencyLevelAny, []models.Point{pt})
+	return s.PointsWriter.WriteKapacitorPoint(models.Point{
+		Database:        db,
+		RetentionPolicy: rp,
+		Name:            tags[model.MetricNameLabel],
+		Tags:            tags,
+		Fields:          fields,
+		Time:            sample.Timestamp.Time(),
+	})
 }
 
 // NeedsThrottling conforms to SampleAppender and never returns true currently.
