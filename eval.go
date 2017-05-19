@@ -104,6 +104,7 @@ func (e *EvalNode) runEval(snapshot []byte) error {
 		var err error
 		for b, ok := e.ins[0].NextBatch(); ok; b, ok = e.ins[0].NextBatch() {
 			e.timer.Start()
+			b.Points = b.ShallowCopyPoints()
 			for i := 0; i < len(b.Points); {
 				p := b.Points[i]
 				b.Points[i].Fields, b.Points[i].Tags, err = e.eval(p.Time, b.Group, p.Fields, p.Tags)

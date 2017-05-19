@@ -69,6 +69,7 @@ func (d *DerivativeNode) runDerivative([]byte) error {
 	case pipeline.BatchEdge:
 		for b, ok := d.ins[0].NextBatch(); ok; b, ok = d.ins[0].NextBatch() {
 			d.timer.Start()
+			b.Points = b.ShallowCopyPoints()
 			var pr, p models.BatchPoint
 			for i := 0; i < len(b.Points); i++ {
 				p = b.Points[i]

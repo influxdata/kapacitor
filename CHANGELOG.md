@@ -2,6 +2,10 @@
 
 ## Unreleased [unreleased]
 
+# Bugfixes
+
+- [#1379](https://github.com/influxdata/kapacitor/issues/1379): Copy batch points slice before modification, fixes potential panics and data corruption.
+
 ## v1.3.0-rc3 [2017-05-18]
 
 ### Release Notes

@@ -54,6 +54,7 @@ func (e *DefaultNode) runDefault(snapshot []byte) error {
 	case pipeline.BatchEdge:
 		for b, ok := e.ins[0].NextBatch(); ok; b, ok = e.ins[0].NextBatch() {
 			e.timer.Start()
+			b.Points = b.ShallowCopyPoints()
 			_, b.Tags = e.setDefaults(nil, b.Tags)
 			b.UpdateGroup()
 			for i := range b.Points {
