@@ -5,6 +5,7 @@
 # Bugfixes
 
 - [#1396](https://github.com/influxdata/kapacitor/pull/1396): Fix broken ENV var config overrides for the kubernetes section.
+- [#1397](https://github.com/influxdata/kapacitor/pull/1397): Update default configuration file to include sections for each discoverer service.
 
 ## v1.3.0-rc4 [2017-05-19]
 
