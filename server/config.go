@@ -102,7 +102,7 @@ type Config struct {
 	Triton          []triton.Config           `toml:"triton" override:"triton,element-key=id"`
 
 	// Third-party integrations
-	Kubernetes k8s.Configs `toml:"kubernetes" override:"kubernetes,element-key=id"`
+	Kubernetes k8s.Configs `toml:"kubernetes" override:"kubernetes,element-key=id" env-config:"implicit-index"`
 
 	Reporting reporting.Config `toml:"reporting"`
 	Stats     stats.Config     `toml:"stats"`
@@ -498,6 +498,13 @@ func (c *Config) applyEnvOverrides(prefix string, fieldDesc string, spec reflect
 	return nil
 }
 
+const (
+	// envConfigTag is a struct tag key for specifying information to the apply env overrides configuration process.
+	envConfigTag = "env-config"
+	// implicitIndexTag is the name of the value of an env-config tag that instructs the process to allow implicit 0 indexes.
+	implicitIndexTag = "implicit-index"
+)
+
 func (c *Config) applyEnvOverridesToStruct(prefix string, s reflect.Value) error {
 	typeOfSpec := s.Type()
 	for i := 0; i < s.NumField(); i++ {
@@ -506,7 +513,8 @@ func (c *Config) applyEnvOverridesToStruct(prefix string, s reflect.Value) error
 		configName := typeOfSpec.Field(i).Tag.Get("toml")
 		// Replace hyphens with underscores to avoid issues with shells
 		configName = strings.Replace(configName, "-", "_", -1)
-		fieldName := typeOfSpec.Field(i).Name
+		fieldType := typeOfSpec.Field(i)
+		fieldName := fieldType.Name
 
 		// Skip any fields that we cannot set
 		if f.CanSet() || f.Kind() == reflect.Slice {
@@ -520,7 +528,25 @@ func (c *Config) applyEnvOverridesToStruct(prefix string, s reflect.Value) error
 			// If the type is s slice, apply to each using the index as a suffix
 			// e.g. GRAPHITE_0
 			if f.Kind() == reflect.Slice || f.Kind() == reflect.Array {
-				for i := 0; i < f.Len(); i++ {
+				// Determine if the field supports implicit indexes.
+				implicitIndex := false
+				fieldEnvConfigTags := strings.Split(fieldType.Tag.Get(envConfigTag), ",")
+				for _, s := range fieldEnvConfigTags {
+					if s == implicitIndexTag {
+						implicitIndex = true
+						break
+					}
+				}
+
+				l := f.Len()
+				for i := 0; i < l; i++ {
+					// Also support an implicit 0 index, if there is only one entry and the slice supports it.
+					// e.g. KAPACITOR_KUBERNETES_ENABLED=true
+					if implicitIndex && l == 1 {
+						if err := c.applyEnvOverrides(key, fieldName, f.Index(i)); err != nil {
+							return err
+						}
+					}
 					if err := c.applyEnvOverrides(fmt.Sprintf("%s_%d", key, i), fieldName, f.Index(i)); err != nil {
 						return err
 					}
