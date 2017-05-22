@@ -4,6 +4,8 @@
 
 # Bugfixes
 
+- [#1396](https://github.com/influxdata/kapacitor/pull/1396): Fix broken ENV var config overrides for the kubernetes section.
+
 ## v1.3.0-rc4 [2017-05-19]
 
 - [#1379](https://github.com/influxdata/kapacitor/issues/1379): Copy batch points slice before modification, fixes potential panics and data corruption.
