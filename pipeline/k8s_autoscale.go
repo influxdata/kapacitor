@@ -144,7 +144,6 @@ type K8sAutoscaleNode struct {
 func newK8sAutoscaleNode(e EdgeType) *K8sAutoscaleNode {
 	k := &K8sAutoscaleNode{
 		chainnode:    newBasicChainNode("k8s_autoscale", e, StreamEdge),
-		Cluster:      "default",
 		Min:          1,
 		Kind:         client.DeploymentsKind,
 		NamespaceTag: DefaultNamespaceTag,
