@@ -2,24 +2,17 @@
 
 ## Unreleased [unreleased]
 
-# Bugfixes
+### Features
 
-- [#1396](https://github.com/influxdata/kapacitor/pull/1396): Fix broken ENV var config overrides for the kubernetes section.
-- [#1397](https://github.com/influxdata/kapacitor/pull/1397): Update default configuration file to include sections for each discoverer service.
+### Bugfixes
 
-## v1.3.0-rc4 [2017-05-19]
-
-- [#1379](https://github.com/influxdata/kapacitor/issues/1379): Copy batch points slice before modification, fixes potential panics and data corruption.
-- [#1394](https://github.com/influxdata/kapacitor/pull/1394): Use the Prometheus metric name as the measurement name by default for scrape data.
-- [#1392](https://github.com/influxdata/kapacitor/pull/1392): Fix possible deadlock for scraper configuration updating.
-
-## v1.3.0-rc3 [2017-05-18]
+## v1.3.0 [2017-05-22]
 
 ### Release Notes
 
 The v1.3.0 release has two major features.
 
-1. Addition of scraping and discovering for Prometheues style data collection.
+1. Addition of scraping and discovering for Prometheus style data collection.
 2. Updates to the Alert Topic system
 
 Here is a quick example of how to configure Kapacitor to scrape discovered targets.
@@ -64,16 +57,16 @@ Create the below snippet as the file `/tmp/prom/localhost.json`:
 }]
 ```
 
-Start the Prometheues node_exporter locally.
+Start the Prometheus node_exporter locally.
 
-Now startup Kapacitor and it will discover the localhost:9100 node_exporter target and begin scrapping it for metrics.
+Now startup Kapacitor and it will discover the `localhost:9100` node_exporter target and begin scrapping it for metrics.
 For more details on the scraping and discovery systems see the full documentation [here](https://docs.influxdata.com/kapacitor/v1.3/scraping).
 
 The second major feature with this release, are changes to the alert topic system.
 The previous release introduce this new system as a technical preview, with this release the alerting service has been simplified.
 Alert handlers now only ever have a single action and belong to a single topic.
 
-The handler defintion has been simplified as a result.
+The handler definition has been simplified as a result.
 Here are some example alert handlers using the new structure:
 
 ```yaml
@@ -107,6 +100,21 @@ kapacitor define-handler system aggregate_by_1m.yaml
 
 For more details on the alerting system see the full documentation [here](https://docs.influxdata.com/kapacitor/v1.3/alerts).
 
+# Bugfixes
+
+- [#1396](https://github.com/influxdata/kapacitor/pull/1396): Fix broken ENV var config overrides for the kubernetes section.
+- [#1397](https://github.com/influxdata/kapacitor/pull/1397): Update default configuration file to include sections for each discoverer service.
+
+## v1.3.0-rc4 [2017-05-19]
+
+# Bugfixes
+
+- [#1379](https://github.com/influxdata/kapacitor/issues/1379): Copy batch points slice before modification, fixes potential panics and data corruption.
+- [#1394](https://github.com/influxdata/kapacitor/pull/1394): Use the Prometheus metric name as the measurement name by default for scrape data.
+- [#1392](https://github.com/influxdata/kapacitor/pull/1392): Fix possible deadlock for scraper configuration updating.
+
+## v1.3.0-rc3 [2017-05-18]
+
 ### Bugfixes
 
 - [#1369](https://github.com/influxdata/kapacitor/issues/1369): Fix panic with concurrent writes to same points in state tracking nodes.
@@ -120,7 +128,6 @@ For more details on the alerting system see the full documentation [here](https:
 - [#1370](https://github.com/influxdata/kapacitor/issues/1370): Fix missing working_cardinality stats on stateDuration and stateCount nodes.
 
 ## v1.3.0-rc1 [2017-05-08]
-
 
 ### Features
 
