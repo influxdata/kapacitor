@@ -857,7 +857,7 @@ func doDefineTopicHandler(args []string) error {
 	var ho client.TopicHandlerOptions
 	ext := path.Ext(p)
 	switch ext {
-	case ".yaml":
+	case ".yaml", ".yml":
 		data, err := ioutil.ReadAll(f)
 		if err != nil {
 			return errors.Wrapf(err, "failed to read handler file %q", p)
