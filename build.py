@@ -164,21 +164,24 @@ def run_generate():
         logging.error("Generate failed.")
         return False
 
-def go_get(branch, update=False, no_uncommitted=False):
+def go_get():
     """
     Retrieve build dependencies or restore pinned dependencies.
     """
-    # All Kapacitor deps should be vendored so do not go get them
-    logging.info("Pretending to retrieve Go dependencies...")
-
-    # Check for uncommitted changes if no_uncommitted was given.
-    if no_uncommitted:
-        changes = run("git status --porcelain").strip()
-        if len(changes) > 0:
-            logging.error("There are un-committed changes in your local branch, --no-uncommited was given, cannot continue")
-            return False
-
+    # Nothing to do, all dependencies are vendored.
     return True
+
+def check_nochanges():
+    """
+    Check that there are no changes
+    """
+    changes = run("git status --porcelain").strip()
+    if len(changes) > 0:
+        logging.error("There are un-committed changes in your local branch, --no-uncommited was given, cannot continue")
+        logging.debug("Changes:\n{}".format(changes))
+        return False
+    return True
+
 
 def run_tests(race, parallel, timeout, no_vet):
     """Run the Go test suite on binary output.
@@ -819,12 +822,16 @@ def main(args):
         logging.info("Moving to git commit: {}".format(args.commit))
         run("git checkout {}".format(args.commit))
 
+    if not args.no_get:
+        if not go_get():
+            return 1
+
     if args.generate:
         if not run_generate():
             return 1
 
-    if not args.no_get:
-        if not go_get(args.branch, update=args.update, no_uncommitted=args.no_uncommitted):
+    if args.no_uncommitted:
+        if not check_nochanges():
             return 1
 
     if args.test:
