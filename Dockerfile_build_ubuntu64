@@ -5,7 +5,7 @@ FROM ubuntu:latest
 
 MAINTAINER support@influxdb.com
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get -qq update && apt-get -qq install -y \
     python-software-properties \
     software-properties-common \
     wget \
@@ -30,12 +30,12 @@ RUN gem install fpm
 
 # Install protobuf3 protoc binary
 ENV PROTO_VERSION 3.0.0
-RUN wget https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protoc-${PROTO_VERSION}-linux-x86_64.zip \
+RUN wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protoc-${PROTO_VERSION}-linux-x86_64.zip \
     && unzip -j protoc-${PROTO_VERSION}-linux-x86_64.zip bin/protoc -d /bin \
     rm protoc-${PROTO_VERSION}-linux-x86_64.zip
 
 # Install protobuf3 python library
-RUN wget https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protobuf-python-${PROTO_VERSION}.tar.gz \
+RUN wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protobuf-python-${PROTO_VERSION}.tar.gz \
     && tar -xf protobuf-python-${PROTO_VERSION}.tar.gz \
     && cd /protobuf-${PROTO_VERSION}/python \
     && python setup.py install \
@@ -45,7 +45,7 @@ RUN wget https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/
 ENV GOPATH /root/go
 ENV GO_VERSION 1.7.5
 ENV GO_ARCH amd64
-RUN wget https://storage.googleapis.com/golang/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz; \
+RUN wget -q https://storage.googleapis.com/golang/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz; \
    tar -C /usr/local/ -xf /go${GO_VERSION}.linux-${GO_ARCH}.tar.gz ; \
    rm /go${GO_VERSION}.linux-${GO_ARCH}.tar.gz
 ENV PATH /usr/local/go/bin:$PATH
