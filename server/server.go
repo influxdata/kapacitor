@@ -347,7 +347,7 @@ func (s *Server) appendInfluxDBService() error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get http port")
 	}
-	srv, err := influxdb.NewService(c, httpPort, s.config.Hostname, s.config.HTTP.AuthEnabled, l)
+	srv, err := influxdb.NewService(c, httpPort, s.config.Hostname, varsIDer{}, s.config.HTTP.AuthEnabled, l)
 	if err != nil {
 		return err
 	}
@@ -1036,4 +1036,14 @@ func (qe *Queryexecutor) Authorize(u *meta.UserInfo, q *influxql.Query, db strin
 }
 func (qe *Queryexecutor) ExecuteQuery(q *influxql.Query, db string, chunkSize int) (<-chan *influxql.Result, error) {
 	return nil, errors.New("cannot execute queries against Kapacitor")
+}
+
+type varsIDer struct {
+}
+
+func (v varsIDer) ClusterID() uuid.UUID {
+	return vars.ClusterIDVar.UUIDValue()
+}
+func (v varsIDer) ServerID() uuid.UUID {
+	return vars.ServerIDVar.UUIDValue()
 }
