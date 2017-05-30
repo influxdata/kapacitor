@@ -5,6 +5,7 @@
 ### Features
 
 ### Bugfixes
+- [#1400](https://github.com/influxdata/kapacitor/issues/1400): Allow for `.yml` file extensions in `define-topic-handler`
 
 - [#1402](https://github.com/influxdata/kapacitor/pull/1402): Fix http server error logging.
 
