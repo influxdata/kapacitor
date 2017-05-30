@@ -6,6 +6,8 @@
 
 ### Bugfixes
 
+- [#1402](https://github.com/influxdata/kapacitor/pull/1402): Fix http server error logging.
+
 ## v1.3.0 [2017-05-22]
 
 ### Release Notes
