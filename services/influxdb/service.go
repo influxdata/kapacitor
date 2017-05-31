@@ -23,10 +23,10 @@ import (
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor/influxdb"
+	"github.com/influxdata/kapacitor/server/vars"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/uuid"
-	"github.com/influxdata/kapacitor/vars"
 	"github.com/pkg/errors"
 )
 

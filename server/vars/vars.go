@@ -5,6 +5,7 @@ import (
 	"time"
 
 	kexpvar "github.com/influxdata/kapacitor/expvar"
+	"github.com/influxdata/kapacitor/uuid"
 )
 
 const (
@@ -56,6 +57,51 @@ func init() {
 	expvar.Publish(VersionVarName, VersionVar)
 }
 
-func Uptime() time.Duration {
+func uptime() time.Duration {
 	return time.Since(startTime)
+}
+
+type Infoer interface {
+	ClusterID() uuid.UUID
+	ServerID() uuid.UUID
+	Hostname() string
+	Version() string
+	Product() string
+	NumTasks() int64
+	NumEnabledTasks() int64
+	NumSubscriptions() int64
+	Uptime() time.Duration
+}
+
+var Info = info{}
+
+type info struct{}
+
+func (info) ClusterID() uuid.UUID {
+	return ClusterIDVar.UUIDValue()
+}
+func (info) ServerID() uuid.UUID {
+	return ServerIDVar.UUIDValue()
+}
+func (info) Hostname() string {
+	return HostVar.StringValue()
+}
+func (info) Version() string {
+	return VersionVar.StringValue()
+}
+func (info) Product() string {
+	return ProductVar.StringValue()
+}
+
+func (info) NumTasks() int64 {
+	return NumTasksVar.IntValue()
+}
+func (info) NumEnabledTasks() int64 {
+	return NumEnabledTasksVar.IntValue()
+}
+func (info) NumSubscriptions() int64 {
+	return NumSubscriptionsVar.IntValue()
+}
+func (info) Uptime() time.Duration {
+	return uptime()
 }

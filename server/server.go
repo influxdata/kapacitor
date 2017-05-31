@@ -20,6 +20,7 @@ import (
 	"github.com/influxdata/kapacitor/auth"
 	"github.com/influxdata/kapacitor/command"
 	iclient "github.com/influxdata/kapacitor/influxdb"
+	"github.com/influxdata/kapacitor/server/vars"
 	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/azure"
@@ -62,7 +63,6 @@ import (
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/uuid"
-	"github.com/influxdata/kapacitor/vars"
 	"github.com/pkg/errors"
 )
 
@@ -171,7 +171,7 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 
 	// Start Task Master
 	s.TaskMasterLookup = kapacitor.NewTaskMasterLookup()
-	s.TaskMaster = kapacitor.NewTaskMaster(kapacitor.MainTaskMaster, logService)
+	s.TaskMaster = kapacitor.NewTaskMaster(kapacitor.MainTaskMaster, vars.Info, logService)
 	s.TaskMaster.DefaultRetentionPolicy = c.DefaultRetentionPolicy
 	s.TaskMaster.Commander = s.Commander
 	s.TaskMasterLookup.Set(s.TaskMaster)
@@ -347,7 +347,7 @@ func (s *Server) appendInfluxDBService() error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get http port")
 	}
-	srv, err := influxdb.NewService(c, httpPort, s.config.Hostname, varsIDer{}, s.config.HTTP.AuthEnabled, l)
+	srv, err := influxdb.NewService(c, httpPort, s.config.Hostname, vars.Info, s.config.HTTP.AuthEnabled, l)
 	if err != nil {
 		return err
 	}
@@ -673,7 +673,7 @@ func (s *Server) appendReportingService() {
 	c := s.config.Reporting
 	if c.Enabled {
 		l := s.LogService.NewLogger("[reporting] ", log.LstdFlags)
-		srv := reporting.NewService(c, l)
+		srv := reporting.NewService(c, vars.Info, l)
 
 		s.AppendService("reporting", srv)
 	}
@@ -1036,14 +1036,4 @@ func (qe *Queryexecutor) Authorize(u *meta.UserInfo, q *influxql.Query, db strin
 }
 func (qe *Queryexecutor) ExecuteQuery(q *influxql.Query, db string, chunkSize int) (<-chan *influxql.Result, error) {
 	return nil, errors.New("cannot execute queries against Kapacitor")
-}
-
-type varsIDer struct {
-}
-
-func (v varsIDer) ClusterID() uuid.UUID {
-	return vars.ClusterIDVar.UUIDValue()
-}
-func (v varsIDer) ServerID() uuid.UUID {
-	return vars.ServerIDVar.UUIDValue()
 }

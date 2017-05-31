@@ -14,6 +14,7 @@ import (
 	"github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/server/vars"
 	alertservice "github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/hipchat"
@@ -33,7 +34,6 @@ import (
 	"github.com/influxdata/kapacitor/tick/stateful"
 	"github.com/influxdata/kapacitor/timer"
 	"github.com/influxdata/kapacitor/udf"
-	"github.com/influxdata/kapacitor/vars"
 )
 
 const (
@@ -60,6 +60,8 @@ type deleteHook func(*TaskMaster)
 type TaskMaster struct {
 	// Unique id for this task master instance
 	id string
+
+	ServerInfo vars.Infoer
 
 	HTTPDService interface {
 		AddRoutes([]httpd.Route) error
@@ -189,7 +191,7 @@ type forkKey struct {
 }
 
 // Create a new Executor with a given clock.
-func NewTaskMaster(id string, l LogService) *TaskMaster {
+func NewTaskMaster(id string, info vars.Infoer, l LogService) *TaskMaster {
 	return &TaskMaster{
 		id:             id,
 		forks:          make(map[forkKey]map[string]*Edge),
@@ -199,6 +201,7 @@ func NewTaskMaster(id string, l LogService) *TaskMaster {
 		tasks:          make(map[string]*ExecutingTask),
 		deleteHooks:    make(map[string][]deleteHook),
 		LogService:     l,
+		ServerInfo:     info,
 		logger:         l.NewLogger(fmt.Sprintf("[task_master:%s] ", id), log.LstdFlags),
 		closed:         true,
 		TimingService:  noOpTimingService{},
@@ -207,7 +210,7 @@ func NewTaskMaster(id string, l LogService) *TaskMaster {
 
 // Returns a new TaskMaster instance with the same services as the current one.
 func (tm *TaskMaster) New(id string) *TaskMaster {
-	n := NewTaskMaster(id, tm.LogService)
+	n := NewTaskMaster(id, tm.ServerInfo, tm.LogService)
 	n.DefaultRetentionPolicy = tm.DefaultRetentionPolicy
 	n.HTTPDService = tm.HTTPDService
 	n.TaskStore = tm.TaskStore

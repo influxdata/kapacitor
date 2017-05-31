@@ -138,7 +138,7 @@ func GetStatsData() ([]StatsData, error) {
 	})
 
 	// Add uptime to globalData
-	globalData.Values[UptimeVarName] = Uptime().Seconds()
+	globalData.Values[UptimeVarName] = uptime().Seconds()
 
 	// Add Go runtime stats.
 	data := StatsData{

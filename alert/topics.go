@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/influxdata/kapacitor/expvar"
-	"github.com/influxdata/kapacitor/vars"
+	"github.com/influxdata/kapacitor/server/vars"
 )
 
 const (
