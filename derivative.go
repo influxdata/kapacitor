@@ -52,7 +52,7 @@ func (d *DerivativeNode) runDerivative([]byte) error {
 				mu.Unlock()
 			}
 			if emit {
-				fields := pr.Fields.Copy()
+				fields := p.Fields.Copy()
 				fields[d.d.As] = value
 				p.Fields = fields
 				d.timer.Pause()
@@ -78,7 +78,7 @@ func (d *DerivativeNode) runDerivative([]byte) error {
 					pr = p
 				}
 				if emit {
-					fields := pr.Fields.Copy()
+					fields := p.Fields.Copy()
 					fields[d.d.As] = value
 					b.Points[i].Fields = fields
 				} else {

@@ -10,6 +10,8 @@
 
 ### Bugfixes
 
+- [#1414](https://github.com/influxdata/kapacitor/pull/1414): Fix derivative node preserving fields from previous point in stream tasks.
+
 ## v1.3.0 [2017-05-22]
 
 ### Release Notes
