@@ -97,7 +97,58 @@ batch
 					},
 					{
 						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+						1.0,
+					},
+				},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_Derivative", script, 21*time.Second, er, false)
+}
+
+func TestBatch_DerivativeAs(t *testing.T) {
+
+	var script = `
+batch
+	|query('''
+		SELECT sum("value") as "value"
+		FROM "telegraf"."default".packets
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s))
+	|derivative('value')
+		.as('derivative')
+	|httpOut('TestBatch_Derivative')
+`
+
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "packets",
+				Tags:    nil,
+				Columns: []string{"time", "derivative", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
 						0.5,
+						1001.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						0.5,
+						1002.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						0.5,
+						1003.0,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+						1.0,
+						1005.0,
 					},
 				},
 			},
@@ -144,7 +195,7 @@ batch
 					},
 					{
 						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
-						1.0,
+						2.0,
 					},
 				},
 			},
