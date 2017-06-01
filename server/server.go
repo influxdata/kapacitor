@@ -63,6 +63,7 @@ import (
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/uuid"
+	"github.com/influxdata/kapacitor/waiter"
 	"github.com/pkg/errors"
 )
 
@@ -86,6 +87,9 @@ type Server struct {
 	config *Config
 
 	err chan error
+
+	// clusterIDChanged signals when the cluster ID has changed.
+	clusterIDChanged *waiter.WaiterGroup
 
 	Commander command.Commander
 
@@ -139,19 +143,20 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	}
 	l := logService.NewLogger("[srv] ", log.LstdFlags)
 	s := &Server{
-		config:          c,
-		BuildInfo:       buildInfo,
-		dataDir:         c.DataDir,
-		hostname:        c.Hostname,
-		err:             make(chan error),
-		configUpdates:   make(chan config.ConfigUpdate, 100),
-		LogService:      logService,
-		MetaClient:      &kapacitor.NoopMetaClient{},
-		QueryExecutor:   &Queryexecutor{},
-		Logger:          l,
-		ServicesByName:  make(map[string]int),
-		DynamicServices: make(map[string]Updater),
-		Commander:       c.Commander,
+		config:           c,
+		BuildInfo:        buildInfo,
+		dataDir:          c.DataDir,
+		hostname:         c.Hostname,
+		err:              make(chan error),
+		configUpdates:    make(chan config.ConfigUpdate, 100),
+		LogService:       logService,
+		MetaClient:       &kapacitor.NoopMetaClient{},
+		QueryExecutor:    &Queryexecutor{},
+		Logger:           l,
+		ServicesByName:   make(map[string]int),
+		DynamicServices:  make(map[string]Updater),
+		Commander:        c.Commander,
+		clusterIDChanged: waiter.NewGroup(),
 	}
 	s.Logger.Println("I! Kapacitor hostname:", s.hostname)
 
@@ -351,6 +356,12 @@ func (s *Server) appendInfluxDBService() error {
 	if err != nil {
 		return err
 	}
+	w, err := s.newClusterIDChangedWaiter()
+	if err != nil {
+		return err
+	}
+	srv.ClusterIDWaiter = w
+
 	srv.HTTPDService = s.HTTPDService
 	srv.PointsWriter = s.TaskMaster
 	srv.LogService = s.LogService
@@ -852,6 +863,7 @@ func (s *Server) watchConfigUpdates() {
 // Close shuts down the meta and data stores and all services.
 func (s *Server) Close() error {
 	s.stopProfile()
+	s.clusterIDChanged.Stop()
 
 	// Close all services that write points first.
 	if err := s.HTTPDService.Close(); err != nil {
@@ -962,7 +974,12 @@ func (s *Server) SetClusterID(clusterID uuid.UUID) error {
 	}
 	s.ClusterID = clusterID
 	vars.ClusterIDVar.Set(s.ClusterID)
+	s.clusterIDChanged.Broadcast()
 	return nil
+}
+
+func (s *Server) newClusterIDChangedWaiter() (waiter.Waiter, error) {
+	return s.clusterIDChanged.NewWaiter()
 }
 
 // Service represents a service attached to the server.

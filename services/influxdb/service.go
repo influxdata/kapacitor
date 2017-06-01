@@ -53,6 +53,7 @@ type IDer interface {
 
 // Handles requests to write or read from an InfluxDB cluster
 type Service struct {
+	wg     sync.WaitGroup
 	mu     sync.RWMutex
 	opened bool
 
@@ -64,6 +65,12 @@ type Service struct {
 	ider      IDer
 	httpPort  int
 	useTokens bool
+
+	// Wait for the cluster ID to change
+	ClusterIDWaiter interface {
+		Wait() bool
+		Stop()
+	}
 
 	PointsWriter interface {
 		WritePoints(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
@@ -130,8 +137,18 @@ func (s *Service) Open() error {
 		return errors.Wrap(err, "adding API routes")
 	}
 	// Revoke any tokens for removed clusters.
-	err := s.revokeClusterTokens()
-	return errors.Wrap(err, "revoking old cluster tokens")
+	if err := s.revokeClusterTokens(); err != nil {
+		return errors.Wrap(err, "revoking old cluster tokens")
+	}
+
+	if s.ClusterIDWaiter != nil {
+		s.wg.Add(1)
+		go func() {
+			defer s.wg.Done()
+			s.waitForClusterIDChanges()
+		}()
+	}
+	return nil
 }
 
 func (s *Service) Close() error {
@@ -141,7 +158,13 @@ func (s *Service) Close() error {
 		return nil
 	}
 	s.opened = false
+
 	s.HTTPDService.DelRoutes(s.routes)
+
+	if s.ClusterIDWaiter != nil {
+		s.ClusterIDWaiter.Stop()
+	}
+
 	var lastErr error
 	for _, cluster := range s.clusters {
 		err := cluster.Close()
@@ -149,6 +172,8 @@ func (s *Service) Close() error {
 			lastErr = err
 		}
 	}
+
+	s.wg.Wait()
 	return lastErr
 }
 
@@ -169,6 +194,12 @@ func (s *Service) Update(newConfigs []interface{}) error {
 	// Revoke any tokens for removed clusters.
 	err := s.revokeClusterTokens()
 	return errors.Wrap(err, "revoking old cluster tokens")
+}
+
+func (s *Service) waitForClusterIDChanges() {
+	for s.ClusterIDWaiter.Wait() {
+		s.LinkSubscriptions()
+	}
 }
 
 // updateConfigs updates the running configuration for the various clusters.
@@ -360,6 +391,7 @@ type influxdbCluster struct {
 	udpReadBuffer            int
 	startupTimeout           time.Duration
 	subscriptionSyncInterval time.Duration
+	subscriptionMode         SubscriptionMode
 	disableSubs              bool
 	runningSubs              map[subEntry]bool
 	useTokens                bool
@@ -420,7 +452,7 @@ func newInfluxDBCluster(c Config, hostname string, ider IDer, httpPort int, useT
 	if err != nil {
 		return nil, err
 	}
-	subName, err := getSubName(c, ider)
+	subName, err := getSubName(c.SubscriptionMode, ider)
 	if err != nil {
 		return nil, err
 	}
@@ -447,12 +479,13 @@ func newInfluxDBCluster(c Config, hostname string, ider IDer, httpPort int, useT
 		udpReadBuffer:            c.UDPReadBuffer,
 		startupTimeout:           time.Duration(c.StartUpTimeout),
 		subscriptionSyncInterval: time.Duration(c.SubscriptionSyncInterval),
-		ider:        ider,
-		subName:     subName,
-		disableSubs: c.DisableSubscriptions,
-		protocol:    c.SubscriptionProtocol,
-		runningSubs: make(map[subEntry]bool, len(c.Subscriptions)),
-		services:    make(map[subEntry]openCloser, len(c.Subscriptions)),
+		subscriptionMode:         c.SubscriptionMode,
+		ider:                     ider,
+		subName:                  subName,
+		disableSubs:              c.DisableSubscriptions,
+		protocol:                 c.SubscriptionProtocol,
+		runningSubs:              make(map[subEntry]bool, len(c.Subscriptions)),
+		services:                 make(map[subEntry]openCloser, len(c.Subscriptions)),
 		// Do not use tokens for non http protocols
 		useTokens: useTokens && (c.SubscriptionProtocol == "http" || c.SubscriptionProtocol == "https"),
 	}, nil
@@ -552,8 +585,8 @@ func (c *influxdbCluster) closeServices() error {
 	return lastErr
 }
 
-func getSubName(conf Config, ider IDer) (string, error) {
-	switch conf.SubscriptionMode {
+func getSubName(mode SubscriptionMode, ider IDer) (string, error) {
+	switch mode {
 	case ClusterMode:
 		return subNamePrefix + ider.ClusterID().String(), nil
 	case ServerMode:
@@ -571,10 +604,11 @@ func (c *influxdbCluster) Update(conf Config) error {
 	defer c.mu.Unlock()
 
 	// Get new subscription name
-	newSubName, err := getSubName(conf, c.ider)
+	newSubName, err := getSubName(conf.SubscriptionMode, c.ider)
 	if err != nil {
 		return err
 	}
+	c.subscriptionMode = conf.SubscriptionMode
 
 	if conf.InsecureSkipVerify {
 		c.logger.Printf("W! Using InsecureSkipVerify when connecting to InfluxDB @ %v this is insecure!", conf.URLs)
@@ -782,7 +816,16 @@ func (c *influxdbCluster) LinkSubscriptions() error {
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.linkSubscriptions(ctx, c.subName)
+	newSubName, err := getSubName(c.subscriptionMode, c.ider)
+	if err != nil {
+		return err
+	}
+	oldSubName := c.subName
+	c.subName = newSubName
+	if newSubName != oldSubName {
+		c.unlinkSubscriptions(oldSubName)
+	}
+	return c.linkSubscriptions(ctx, newSubName)
 }
 
 // linkSubscriptions you must have the lock to call this method.
