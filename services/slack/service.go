@@ -37,6 +37,7 @@ func NewService(c Config, l *log.Logger) (*Service, error) {
 	s.configValue.Store(c)
 	s.clientValue.Store(&http.Client{
 		Transport: &http.Transport{
+			Proxy:           http.ProxyFromEnvironment,
 			TLSClientConfig: tlsConfig,
 		},
 	})
@@ -72,6 +73,7 @@ func (s *Service) Update(newConfig []interface{}) error {
 		s.configValue.Store(c)
 		s.clientValue.Store(&http.Client{
 			Transport: &http.Transport{
+				Proxy:           http.ProxyFromEnvironment,
 				TLSClientConfig: tlsConfig,
 			},
 		})
