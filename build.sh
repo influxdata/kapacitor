@@ -30,9 +30,14 @@ docker cp "$DIR/" "$dataname:$HOME_DIR/go/src/github.com/influxdata/"
 
 echo "Running build.py"
 # Run docker
-docker run --rm \
+docker run \
+    --rm \
     --volumes-from $dataname \
     -e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
     -e AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
     $imagename \
     "$@"
+
+docker cp "$dataname:$HOME_DIR/go/src/github.com/influxdata/kapacitor/build" \
+    ./
+docker rm -v $dataname
