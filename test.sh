@@ -65,7 +65,6 @@ function run_test_docker {
 
     imagename="$imagename-$BUILD_NUM"
     dataname="kapacitor-data-$BUILD_NUM"
-    buildername="kapacitor-builder-$BUILD_NUM"
 
     echo "Building docker image $imagename"
     docker build -f "$dockerfile" -t "$imagename" .
@@ -81,7 +80,7 @@ function run_test_docker {
 
     # Run tests in docker
     docker run \
-         --name $buildername \
+         --rm \
          --volumes-from $dataname \
          -e "GORACE=$GORACE" \
          -e "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID" \
@@ -94,11 +93,11 @@ function run_test_docker {
 
     # Copy results back out
     docker cp \
-        "$buildername:$HOME_DIR/go/src/github.com/influxdata/kapacitor/build" \
-        ./build/
+        "$dataname:$HOME_DIR/go/src/github.com/influxdata/kapacitor/build" \
+        ./
 
     # Remove the data and builder containers
-    docker rm -v $dataname $buildername
+    docker rm -v $dataname
 }
 
 if [ ! -d "$OUTPUT_DIR" ]
