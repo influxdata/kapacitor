@@ -6,6 +6,10 @@
 
 ### Bugfixes
 
+## v1.3.1 [unreleased]
+
+### Bugfixes
+
 ## v1.3.0 [2017-05-22]
 
 ### Release Notes
