@@ -1,10 +1,6 @@
 required = ["github.com/benbjohnson/tmpl","github.com/golang/protobuf/protoc-gen-go"]
 
 [[constraint]]
-  name = "github.com/Azure/azure-sdk-for-go"
-  revision = "bd73d950fa4440dae889bd9917bff7cef539f86e"
-
-[[constraint]]
   branch = "master"
   name = "github.com/davecgh/go-spew"
 
@@ -37,6 +33,12 @@ required = ["github.com/benbjohnson/tmpl","github.com/golang/protobuf/protoc-gen
   branch = "master"
   name = "github.com/shurcooL/markdownfmt"
 
+# Force the Azure projects to be a specific older version that Prometheus needs
 [[override]]
   name = "github.com/Azure/azure-sdk-for-go"
   revision = "bd73d950fa4440dae889bd9917bff7cef539f86e"
+
+[[override]]
+  name = "github.com/Azure/go-autorest"
+  revision = "a2fdd780c9a50455cecd249b00bdc3eb73a78e31"
+

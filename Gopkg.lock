@@ -16,7 +16,6 @@
   name = "github.com/Azure/go-autorest"
   packages = ["autorest","autorest/azure","autorest/date","autorest/to","autorest/validation"]
   revision = "a2fdd780c9a50455cecd249b00bdc3eb73a78e31"
-  version = "v7.3.1"
 
 [[projects]]
   name = "github.com/BurntSushi/toml"
@@ -532,6 +531,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "92770b8e4eb3071b7b03e0fdb5be20a0fecb16d6b3b3ca0f68a74789f43b3e07"
+  inputs-digest = "84824f8feb60a52ecdc9ba2d8c071f5e546c4b21211e962011f24f08163ede70"
   solver-name = "gps-cdcl"
   solver-version = 1
