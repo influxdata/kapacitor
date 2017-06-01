@@ -36,3 +36,6 @@ docker run --rm \
     -e AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
     $imagename \
     "$@"
+
+# Copy artifacts to current working directory
+docker cp $dataname:/root/go/src/github.com/influxdata/kapacitor/build .
