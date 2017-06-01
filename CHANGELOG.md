@@ -8,6 +8,8 @@
 
 ## v1.3.1 [unreleased]
 
+- [#1415](https://github.com/influxdata/kapacitor/pull/1415): Proxy from environment for HTTP request to slack
+
 ### Bugfixes
 
 ## v1.3.0 [2017-05-22]
