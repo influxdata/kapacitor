@@ -9,6 +9,13 @@
 
 - [#1402](https://github.com/influxdata/kapacitor/pull/1402): Fix http server error logging.
 
+## v1.3.1 [2017-06-02]
+
+### Bugfixes
+
+- [#1415](https://github.com/influxdata/kapacitor/pull/1415): Proxy from environment for HTTP request to slack
+- [#1414](https://github.com/influxdata/kapacitor/pull/1414): Fix derivative node preserving fields from previous point in stream tasks.
+
 ## v1.3.0 [2017-05-22]
 
 ### Release Notes
