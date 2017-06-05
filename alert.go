@@ -29,7 +29,6 @@ import (
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/tick/stateful"
-	"github.com/influxdata/kapacitor/vars"
 	"github.com/pkg/errors"
 )
 
@@ -74,8 +73,6 @@ type AlertNode struct {
 
 	levelResets  []stateful.Expression
 	lrScopePools []stateful.ScopePool
-
-	serverInfo serverInfo
 }
 
 // Create a new  AlertNode which caches the most recent item and exposes it over the HTTP API.
@@ -83,11 +80,6 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 	an = &AlertNode{
 		node: node{Node: n, et: et, logger: l},
 		a:    n,
-		serverInfo: serverInfo{
-			Hostname:  vars.HostVar.StringValue(),
-			ClusterID: vars.ClusterIDVar.StringValue(),
-			ServerID:  vars.ServerIDVar.StringValue(),
-		},
 	}
 	an.node.runF = an.runAlert
 
@@ -1031,6 +1023,14 @@ type detailsInfo struct {
 	Message string
 }
 
+func (a *AlertNode) serverInfo() serverInfo {
+	return serverInfo{
+		Hostname:  a.et.tm.ServerInfo.Hostname(),
+		ClusterID: a.et.tm.ServerInfo.ClusterID().String(),
+		ServerID:  a.et.tm.ServerInfo.ServerID().String(),
+	}
+
+}
 func (a *AlertNode) renderID(name string, group models.GroupID, tags models.Tags) (string, error) {
 	g := string(group)
 	if group == models.NilGroup {
@@ -1041,7 +1041,7 @@ func (a *AlertNode) renderID(name string, group models.GroupID, tags models.Tags
 		TaskName:   a.et.Task.ID,
 		Group:      g,
 		Tags:       tags,
-		ServerInfo: a.serverInfo,
+		ServerInfo: a.serverInfo(),
 	}
 	id := a.bufPool.Get().(*bytes.Buffer)
 	defer func() {
@@ -1067,7 +1067,7 @@ func (a *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group 
 			TaskName:   a.et.Task.ID,
 			Group:      g,
 			Tags:       tags,
-			ServerInfo: a.serverInfo,
+			ServerInfo: a.serverInfo(),
 		},
 		ID:     id,
 		Fields: fields,

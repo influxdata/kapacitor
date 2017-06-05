@@ -13,8 +13,8 @@ import (
 	kexpvar "github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/server/vars"
 	"github.com/influxdata/kapacitor/timer"
-	"github.com/influxdata/kapacitor/vars"
 	"github.com/pkg/errors"
 )
 

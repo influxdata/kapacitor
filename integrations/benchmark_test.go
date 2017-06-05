@@ -197,7 +197,7 @@ func Bench(b *testing.B, tasksCount, pointCount, expectedProcessedCount int, tic
 	for i := 0; i < b.N; i++ {
 		// Do not time setup
 		b.StopTimer()
-		tm := kapacitor.NewTaskMaster("bench", loggingtest.New())
+		tm := kapacitor.NewTaskMaster("bench", newServerInfo(), loggingtest.New())
 		tm.HTTPDService = httpdService
 		tm.UDFService = nil
 		tm.TaskStore = taskStore{}

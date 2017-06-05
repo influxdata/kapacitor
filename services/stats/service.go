@@ -29,8 +29,8 @@ import (
 
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/server/vars"
 	"github.com/influxdata/kapacitor/timer"
-	"github.com/influxdata/kapacitor/vars"
 )
 
 // Sends internal stats back into the Kapacitor stream.

@@ -16,6 +16,7 @@ import (
 	"github.com/influxdata/kapacitor/services/httpd"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
 	"github.com/influxdata/kapacitor/udf"
+	"github.com/influxdata/kapacitor/uuid"
 )
 
 func newHTTPDService() *httpd.Service {
@@ -201,4 +202,68 @@ func (k k8sScales) Get(kind, name string) (*k8s.Scale, error) {
 }
 func (k k8sScales) Update(kind string, scale *k8s.Scale) error {
 	return k.ScalesUpdateFunc(kind, scale)
+}
+
+type serverInfo struct {
+	clusterID,
+	serverID uuid.UUID
+
+	hostname,
+	version,
+	product string
+
+	numTasks,
+	numEnabledTasks,
+	numSubscriptions int64
+
+	uptime func() time.Duration
+}
+
+func newServerInfo() serverInfo {
+	return serverInfo{
+		clusterID: uuid.New(),
+		serverID:  uuid.New(),
+		hostname:  "localhost",
+		version:   "test",
+		product:   "kapacitor",
+	}
+}
+
+func (i serverInfo) ClusterID() uuid.UUID {
+	return i.clusterID
+}
+
+func (i serverInfo) ServerID() uuid.UUID {
+	return i.serverID
+}
+
+func (i serverInfo) Hostname() string {
+	return i.hostname
+}
+
+func (i serverInfo) Version() string {
+	return i.version
+}
+
+func (i serverInfo) Product() string {
+	return i.product
+}
+
+func (i serverInfo) NumTasks() int64 {
+	return i.numTasks
+}
+
+func (i serverInfo) NumEnabledTasks() int64 {
+	return i.numEnabledTasks
+}
+
+func (i serverInfo) NumSubscriptions() int64 {
+	return i.numSubscriptions
+}
+
+func (i serverInfo) Uptime() time.Duration {
+	if i.uptime != nil {
+		return i.uptime()
+	}
+	return 0
 }
