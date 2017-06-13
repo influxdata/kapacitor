@@ -393,6 +393,18 @@ func (n *chainnode) Eval(expressions ...*ast.LambdaNode) *EvalNode {
 	return e
 }
 
+// Create a reduce node that will evaluate the given reduce function over each data point in
+// a batch.  A list of expressions may be provided and will be evaluated in the order they are
+// given.  The result is available to later expressions.
+func (n *chainnode) Reduce(expressions ...*ast.LambdaNode) *ReduceNode {
+	if n.Provides() != BatchEdge {
+		panic("cannot Reduce stream edge")
+	}
+	r := newReduceNode(expressions)
+	n.linkChild(r)
+	return r
+}
+
 // Group the data by a set of tags.
 //
 // Can pass literal * to group by all dimensions.
