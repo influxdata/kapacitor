@@ -177,6 +177,8 @@ func newQueryNode(et *ExecutingTask, n *pipeline.QueryNode, l *log.Logger) (*Que
 			bn.query.Fill(influxql.NoFill, nil)
 		case "previous":
 			bn.query.Fill(influxql.PreviousFill, nil)
+		case "linear":
+			bn.query.Fill(influxql.LinearFill, nil)
 		default:
 			return nil, fmt.Errorf("unexpected fill option %s", fill)
 		}

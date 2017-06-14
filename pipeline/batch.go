@@ -132,6 +132,7 @@ type QueryNode struct {
 	//   - null - exhibits the same behavior as the default
 	//   - previous - reports the value of the previous window
 	//   - none - suppresses timestamps and values where the value is null
+	//   - linear - reports the results of linear interpolation
 	Fill interface{}
 
 	// The name of a configured InfluxDB cluster.
