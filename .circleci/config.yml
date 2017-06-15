@@ -2,6 +2,7 @@
 version: 2
 jobs:
   build:
+    parallelism: 3
     docker:
       - image: nathanielc/docker-client
     working_directory: ~/kapacitor
