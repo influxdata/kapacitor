@@ -1,7 +1,7 @@
 package server
 
 import (
-	"errors"
+	"encoding"
 	"fmt"
 	"os"
 	"os/user"
@@ -50,6 +50,7 @@ import (
 	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
+	"github.com/pkg/errors"
 
 	"github.com/influxdata/influxdb/services/collectd"
 	"github.com/influxdata/influxdb/services/graphite"
@@ -432,11 +433,17 @@ func (c *Config) applyEnvOverridesToMap(prefix string, fieldDesc string, mapValu
 	return nil
 }
 
+var textUnmarshalerType = reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()
+
 func (c *Config) applyEnvOverrides(prefix string, fieldDesc string, spec reflect.Value) error {
 	// If we have a pointer, dereference it
 	s := spec
 	if spec.Kind() == reflect.Ptr {
 		s = spec.Elem()
+	}
+	var addrSpec reflect.Value
+	if i := reflect.Indirect(s); i.CanAddr() {
+		addrSpec = i.Addr()
 	}
 
 	var value string
@@ -453,26 +460,20 @@ func (c *Config) applyEnvOverrides(prefix string, fieldDesc string, spec reflect
 		}
 	}
 
+	// Check if the type is a test.Unmarshaler
+	if addrSpec.Type().Implements(textUnmarshalerType) {
+		um := addrSpec.Interface().(encoding.TextUnmarshaler)
+		err := um.UnmarshalText([]byte(value))
+		return errors.Wrap(err, "failed to unmarshal env var")
+	}
+
 	switch s.Kind() {
 	case reflect.String:
 		s.SetString(value)
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-
-		var intValue int64
-
-		// Handle toml.Duration
-		if s.Type().Name() == "Duration" {
-			dur, err := time.ParseDuration(value)
-			if err != nil {
-				return fmt.Errorf("failed to apply %v%v using type %v and value '%v'", prefix, fieldDesc, s.Type().String(), value)
-			}
-			intValue = dur.Nanoseconds()
-		} else {
-			var err error
-			intValue, err = strconv.ParseInt(value, 0, s.Type().Bits())
-			if err != nil {
-				return fmt.Errorf("failed to apply %v%v using type %v and value '%v'", prefix, fieldDesc, s.Type().String(), value)
-			}
+		intValue, err := strconv.ParseInt(value, 0, s.Type().Bits())
+		if err != nil {
+			return fmt.Errorf("failed to apply %v%v using type %v and value '%v'", prefix, fieldDesc, s.Type().String(), value)
 		}
 
 		s.SetInt(intValue)
