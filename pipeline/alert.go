@@ -523,6 +523,9 @@ type AlertHTTPPostHandler struct {
 
 	// tick:ignore
 	CaptureResponseFlag bool `tick:"CaptureResponse"`
+
+	// Timeout for HTTP Post
+	Timeout time.Duration
 }
 
 // Set a header key and value on the post request.

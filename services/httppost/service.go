@@ -2,6 +2,7 @@ package httppost
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +11,8 @@ import (
 	"strconv"
 	"sync"
 	"text/template"
+
+	"time"
 
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/bufpool"
@@ -185,6 +188,7 @@ type testOptions struct {
 	Endpoint string            `json:"endpoint"`
 	URL      string            `json:"url"`
 	Headers  map[string]string `json:"headers"`
+	Timeout  time.Duration     `json:"timeout"`
 }
 
 func (s *Service) TestOptions() interface{} {
@@ -234,6 +238,7 @@ type HandlerConfig struct {
 	Endpoint        string            `mapstructure:"endpoint"`
 	Headers         map[string]string `mapstructure:"headers"`
 	CaptureResponse bool              `mapstructure:"capture-response"`
+	Timeout         time.Duration     `mapstructure:"timeout"`
 }
 
 type handler struct {
@@ -246,6 +251,8 @@ type handler struct {
 	captureResponse bool
 
 	diag Diagnostic
+
+	timeout time.Duration
 }
 
 func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
@@ -260,6 +267,7 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
 		diag:            s.diag.WithContext(ctx...),
 		headers:         c.Headers,
 		captureResponse: c.CaptureResponse,
+		timeout:         c.Timeout,
 	}
 }
 
@@ -308,6 +316,13 @@ func (h *handler) Handle(event alert.Event) {
 
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
+	}
+
+	// Set timeout
+	if h.timeout > 0 {
+		ctx, cancel := context.WithTimeout(req.Context(), h.timeout)
+		defer cancel()
+		req = req.WithContext(ctx)
 	}
 
 	// Execute the request
