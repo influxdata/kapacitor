@@ -22,6 +22,7 @@ type Config struct {
 	PprofEnabled     bool          `toml:"pprof-enabled"`
 	HttpsEnabled     bool          `toml:"https-enabled"`
 	HttpsCertificate string        `toml:"https-certificate"`
+	HttpsPrivateKey  string        `toml:"https-private-key"`
 	ShutdownTimeout  toml.Duration `toml:"shutdown-timeout"`
 	SharedSecret     string        `toml:"shared-secret"`
 
@@ -35,6 +36,7 @@ func NewConfig() Config {
 		BindAddress:      ":9092",
 		LogEnabled:       true,
 		HttpsCertificate: "/etc/ssl/kapacitor.pem",
+		HttpsPrivateKey:  "/etc/ssl/kapacitor.key",
 		ShutdownTimeout:  DefaultShutdownTimeout,
 		GZIP:             true,
 	}
