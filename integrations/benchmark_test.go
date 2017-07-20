@@ -17,7 +17,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -26,8 +25,6 @@ import (
 
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/services/httpd"
-	"github.com/influxdata/kapacitor/services/logging/loggingtest"
-	"github.com/influxdata/kapacitor/services/noauth"
 )
 
 const (
@@ -172,13 +169,6 @@ func Bench(b *testing.B, tasksCount, pointCount, expectedProcessedCount int, tic
 	config := httpd.NewConfig()
 	config.BindAddress = ":0" // Choose port dynamically
 	config.LogEnabled = false
-	httpdService := httpd.NewService(config, "localhost", logService.NewLogger("[http] ", log.LstdFlags), logService)
-
-	httpdService.Handler.AuthService = noauth.NewService(logService.NewLogger("[noauth] ", log.LstdFlags))
-	err := httpdService.Open()
-	if err != nil {
-		b.Fatal(err)
-	}
 
 	writes := make([]struct {
 		request *http.Request
@@ -197,12 +187,12 @@ func Bench(b *testing.B, tasksCount, pointCount, expectedProcessedCount int, tic
 	for i := 0; i < b.N; i++ {
 		// Do not time setup
 		b.StopTimer()
-		tm := kapacitor.NewTaskMaster("bench", newServerInfo(), loggingtest.New())
-		tm.HTTPDService = httpdService
-		tm.UDFService = nil
-		tm.TaskStore = taskStore{}
-		tm.DeadmanService = deadman{}
+		tm, err := createTaskMaster()
+		if err != nil {
+			b.Fatal(err)
+		}
 		tm.Open()
+		httpdService := tm.HTTPDService.(*httpd.Service)
 
 		httpdService.Handler.PointsWriter = tm
 		tasks := createTasks(b, tm, tasksCount, tickScript, dbrps)
@@ -241,6 +231,7 @@ func Bench(b *testing.B, tasksCount, pointCount, expectedProcessedCount int, tic
 		validateTasks(b, tm, tasks, expectedProcessedCount)
 
 		tm.Close()
+		httpdService.Close()
 	}
 }
 
