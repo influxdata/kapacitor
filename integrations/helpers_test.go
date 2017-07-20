@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"testing"
 	"time"
 
 	"github.com/influxdata/kapacitor"
@@ -23,6 +24,7 @@ func newHTTPDService() *httpd.Service {
 	// create API server
 	config := httpd.NewConfig()
 	config.BindAddress = ":0" // Choose port dynamically
+	config.LogEnabled = testing.Verbose()
 	httpService := httpd.NewService(config, "localhost", logService.NewLogger("[http] ", log.LstdFlags), logService)
 	err := httpService.Open()
 	if err != nil {
