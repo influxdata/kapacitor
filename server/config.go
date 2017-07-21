@@ -77,7 +77,7 @@ type Config struct {
 	// Alert handlers
 	Alerta    alerta.Config    `toml:"alerta" override:"alerta"`
 	HipChat   hipchat.Config   `toml:"hipchat" override:"hipchat"`
-	MQTT      mqtt.Config      `toml:"mqtt" override:"mqtt"`
+	MQTT      mqtt.Configs     `toml:"mqtt" override:"mqtt,element-key=name"`
 	OpsGenie  opsgenie.Config  `toml:"opsgenie" override:"opsgenie"`
 	PagerDuty pagerduty.Config `toml:"pagerduty" override:"pagerduty"`
 	Pushover  pushover.Config  `toml:"pushover" override:"pushover"`
@@ -140,7 +140,7 @@ func NewConfig() *Config {
 
 	c.Alerta = alerta.NewConfig()
 	c.HipChat = hipchat.NewConfig()
-	c.MQTT = mqtt.NewConfig()
+	c.MQTT = mqtt.Configs{}
 	c.OpsGenie = opsgenie.NewConfig()
 	c.PagerDuty = pagerduty.NewConfig()
 	c.Pushover = pushover.NewConfig()

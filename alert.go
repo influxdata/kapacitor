@@ -379,11 +379,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 	}
 
 	for _, m := range n.MQTTHandlers {
-		c := et.tm.MQTTService.DefaultHandlerConfig()
-		if m.Topic != "" {
-			c.Topic = m.Topic
-			c.QoS = mqtt.QoSLevel(m.QoS)
-			c.Retained = m.Retained
+		c := mqtt.HandlerConfig{
+			BrokerName: m.BrokerName,
+			Topic:      m.Topic,
+			QoS:        mqtt.QoSLevel(m.Qos),
+			Retained:   m.Retained,
 		}
 		h := et.tm.MQTTService.Handler(c, l)
 		an.handlers = append(an.handlers, h)

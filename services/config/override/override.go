@@ -18,6 +18,7 @@ const (
 	structTagKey   = "override"
 	redactKeyword  = "redact"
 	elementKeyword = "element-key="
+	omitField      = "-"
 )
 
 // Validator is a type that can validate itself.
@@ -216,6 +217,9 @@ func (w *overrideWalker) StructField(f reflect.StructField, v reflect.Value) err
 		}
 
 		name := fieldName(f)
+		if name == omitField {
+			break
+		}
 		setValue, ok := w.o.Options[name]
 		if !ok {
 			name = strings.ToLower(name)
@@ -523,29 +527,29 @@ func getElementKey(f reflect.StructField) string {
 	return ""
 }
 
-func findFieldByElementKey(v reflect.Value, elementKey string) (field reflect.Value) {
+func findFieldByElementKey(v reflect.Value, elementKey string) reflect.Value {
 	v = reflect.Indirect(v)
 	if v.Kind() != reflect.Struct {
-		return
+		return reflect.Value{}
 	}
-	field = v.FieldByName(elementKey)
+	field := v.FieldByName(elementKey)
 	if field.IsValid() {
-		return
+		return field
 	}
 
 	t := v.Type()
 	for i := 0; i < t.NumField(); i++ {
-		field = v.Field(i)
+		field := v.Field(i)
 		// Skip any unexported fields
 		if !field.CanSet() {
 			continue
 		}
 		name := fieldName(t.Field(i))
 		if name == elementKey {
-			return
+			return field
 		}
 	}
-	return
+	return reflect.Value{}
 }
 
 // redactWalker reads the the sections from the walked values and redacts and sensitive fields.
@@ -578,6 +582,9 @@ func (w *redactWalker) StructField(f reflect.StructField, v reflect.Value) error
 	// Top level
 	case 0:
 		name := fieldName(f)
+		if name == omitField {
+			break
+		}
 		var value interface{}
 		if isRedacted(f) {
 			value = !isZero(v)
@@ -679,6 +686,7 @@ func (w *sectionWalker) StructField(f reflect.StructField, v reflect.Value) erro
 		name, ok := getSectionName(f)
 		if ok {
 			w.currentSectionName = name
+			w.uniqueElements = make(map[string]bool)
 			elementKey := getElementKey(f)
 			w.elementKeys[name] = elementKey
 			if k := reflect.Indirect(v).Kind(); k == reflect.Struct {

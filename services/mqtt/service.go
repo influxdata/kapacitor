@@ -1,13 +1,12 @@
 package mqtt
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"sync"
-	"sync/atomic"
 
 	"github.com/influxdata/kapacitor/alert"
+	"github.com/pkg/errors"
 )
 
 // QoSLevel indicates the quality of service for messages delivered to a
@@ -15,16 +14,16 @@ import (
 type QoSLevel byte
 
 var (
-	ErrInvalidQoS = errors.New("invalid QoS specified. Valid options are \"AtMostOnce\", \"AtLeastOnce\", \"ExactlyOnce\"")
+	ErrInvalidQoS = errors.New("invalid QoS")
 )
 
 func (q *QoSLevel) UnmarshalText(text []byte) error {
 	switch string(text) {
-	case "AtMostOnce":
+	case "at-most-once":
 		*q = AtMostOnce
-	case "AtLeastOnce":
+	case "at-least-once":
 		*q = AtLeastOnce
-	case "ExactlyOnce":
+	case "exactly-one":
 		*q = ExactlyOnce
 	default:
 		return ErrInvalidQoS
@@ -32,14 +31,14 @@ func (q *QoSLevel) UnmarshalText(text []byte) error {
 	return nil
 }
 
-func (q *QoSLevel) MarshalText() (text []byte, err error) {
-	switch *q {
+func (q QoSLevel) MarshalText() (text []byte, err error) {
+	switch q {
 	case AtMostOnce:
-		return []byte("AtMostOnce"), nil
+		return []byte("at-most-once"), nil
 	case AtLeastOnce:
-		return []byte("AtLeastOnce"), nil
+		return []byte("at-least-once"), nil
 	case ExactlyOnce:
-		return []byte("ExactlyOnce"), nil
+		return []byte("exactly-once"), nil
 	default:
 		return []byte{}, ErrInvalidQoS
 	}
@@ -57,77 +56,152 @@ const (
 type Service struct {
 	logger *log.Logger
 
-	configValue atomic.Value
+	mu      sync.RWMutex
+	clients map[string]Client
+	configs map[string]Config
 
-	mu     sync.RWMutex
-	client Client
+	defaultBrokerName string
 }
 
-func NewService(c Config, l *log.Logger) *Service {
-	s := &Service{
-		logger: l,
+func NewService(cs Configs, l *log.Logger) (*Service, error) {
+	configs := cs.index()
+	clients := make(map[string]Client, len(cs))
+
+	var defaultBrokerName string
+	for name, c := range configs {
+		if c.Enabled {
+			cli, err := c.NewClient()
+			if err != nil {
+				return nil, err
+			}
+			clients[name] = cli
+		}
+		if c.Default {
+			defaultBrokerName = c.Name
+		}
+	}
+	if len(cs) == 1 {
+		defaultBrokerName = cs[0].Name
 	}
 
-	cl := NewClient(c)
-
-	s.configValue.Store(c)
-	s.client = cl
-	return s
-}
-
-func (s *Service) config() Config {
-	return s.configValue.Load().(Config)
+	return &Service{
+		logger:            l,
+		configs:           configs,
+		clients:           clients,
+		defaultBrokerName: defaultBrokerName,
+	}, nil
 }
 
 func (s *Service) Open() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.logger.Println("I! Starting MQTT service")
-	return s.client.Connect()
+	for name, client := range s.clients {
+		if client == nil {
+			return fmt.Errorf("no client found for MQTT broker %q", name)
+		}
+		if err := client.Connect(); err != nil {
+			return errors.Wrapf(err, "failed to connect to MQTT broker %q", name)
+		}
+	}
+	return nil
 }
 
 func (s *Service) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.logger.Println("I! Stopping MQTT service")
-	s.client.Disconnect()
+	for _, client := range s.clients {
+		if client != nil {
+			client.Disconnect()
+		}
+	}
 	return nil
 }
 
-func (s *Service) Alert(qos QoSLevel, retained bool, topic, message string) error {
+func (s *Service) Alert(brokerName, topic string, qos QoSLevel, retained bool, message string) error {
+	log.Println("D! ALERT", topic, message)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.client.Publish(topic, byte(qos), retained, message)
+	if topic == "" {
+		return fmt.Errorf("missing MQTT topic")
+	}
+	if brokerName == "" {
+		brokerName = s.defaultBrokerName
+	}
+	client := s.clients[brokerName]
+	if client == nil {
+		return fmt.Errorf("unknown MQTT broker %q", brokerName)
+	}
+	return client.Publish(topic, qos, retained, []byte(message))
 }
 
-func (s *Service) Update(newConfig []interface{}) error {
-	if l := len(newConfig); l != 1 {
-		return fmt.Errorf("expected only one new config object, got %d", l)
+func (s *Service) Update(newConfigs []interface{}) error {
+	cs := make(Configs, len(newConfigs))
+	for i, c := range newConfigs {
+		config, ok := c.(Config)
+		if !ok {
+			return fmt.Errorf("expected config object to be of type %T, got %T", config, c)
+		}
+		cs[i] = config
 	}
-	if c, ok := newConfig[0].(Config); !ok {
-		return fmt.Errorf("expected config object to be of type %T, got %T", c, newConfig[0])
-	} else {
-		s.configValue.Store(c)
+	return s.update(cs)
+}
 
-		go func() {
-			// lock out concurrent publishers
-			s.mu.Lock()
-			defer s.mu.Unlock()
+func (s *Service) update(cs Configs) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-			c := s.config()
-			s.client.Disconnect()
-			cl := NewClient(c)
-			if err := cl.Connect(); err != nil {
-				s.logger.Println("E! Error updating MQTT config. Using previous configuration: err:", err)
-				return
+	if err := cs.Validate(); err != nil {
+		return err
+	}
+
+	configs := cs.index()
+	for name, c := range configs {
+		if c.Default {
+			s.defaultBrokerName = name
+		}
+		old, ok := s.configs[name]
+		if ok && old.Equal(c) {
+			continue
+		}
+		client := s.clients[name]
+
+		if client != nil {
+			client.Disconnect()
+		}
+		s.clients[name] = nil
+
+		if c.Enabled {
+			client, err := c.NewClient()
+			if err != nil {
+				return err
 			}
-			s.client = cl
-		}()
+
+			if err := client.Connect(); err != nil {
+				return err
+			}
+			s.clients[name] = client
+		}
 	}
+	if len(cs) == 1 {
+		s.defaultBrokerName = cs[0].Name
+	}
+
+	// Disconnect and remove old clients
+	for name := range s.configs {
+		if _, ok := configs[name]; !ok {
+			client := s.clients[name]
+			if client != nil {
+				client.Disconnect()
+			}
+			delete(s.clients, name)
+		}
+	}
+	s.configs = configs
 	return nil
 }
 
 func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+	s.logger.Println("D! create Handler", c)
 	return &handler{
 		s:      s,
 		c:      c,
@@ -136,9 +210,10 @@ func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
 }
 
 type HandlerConfig struct {
-	Topic    string
-	QoS      QoSLevel
-	Retained bool
+	BrokerName string   `mapstructure:"broker-name"`
+	Topic      string   `mapstructure:"topic"`
+	QoS        QoSLevel `mapstructure:"qos"`
+	Retained   bool     `mapstructure:"retained"`
 }
 
 type handler struct {
@@ -148,33 +223,26 @@ type handler struct {
 }
 
 func (h *handler) Handle(event alert.Event) {
-	if err := h.s.Alert(h.c.QoS, h.c.Retained, h.c.Topic, event.State.Message); err != nil {
+	h.logger.Println("D! HANDLE")
+	if err := h.s.Alert(h.c.BrokerName, h.c.Topic, h.c.QoS, h.c.Retained, event.State.Message); err != nil {
 		h.logger.Println("E! failed to post message to MQTT broker", err)
 	}
 }
 
-func (s *Service) DefaultHandlerConfig() HandlerConfig {
-	c := s.config()
-	return HandlerConfig{
-		Topic:    c.DefaultTopic,
-		QoS:      c.DefaultQoS,
-		Retained: c.DefaultRetained,
-	}
-}
-
 type testOptions struct {
-	Topic    string   `json:"topic"`
-	Message  string   `json:"message"`
-	QoS      QoSLevel `json:"qos"`
-	Retained bool     `json:"retained"`
+	BrokerName string   `json:"broker-name"`
+	Topic      string   `json:"topic"`
+	Message    string   `json:"message"`
+	QoS        QoSLevel `json:"qos"`
+	Retained   bool     `json:"retained"`
 }
 
 func (s *Service) TestOptions() interface{} {
-	c := s.config()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	return &testOptions{
-		Topic:   c.DefaultTopic,
-		QoS:     c.DefaultQoS,
-		Message: "test MQTT message",
+		BrokerName: s.defaultBrokerName,
+		Message:    "test MQTT message",
 	}
 }
 
@@ -183,5 +251,5 @@ func (s *Service) Test(o interface{}) error {
 	if !ok {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
-	return s.Alert(options.QoS, options.Retained, options.Topic, options.Message)
+	return s.Alert(options.BrokerName, options.Topic, options.QoS, options.Retained, options.Message)
 }

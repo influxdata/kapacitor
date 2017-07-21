@@ -1,11 +1,10 @@
 package mqtt
 
 import (
-	"errors"
-	"log"
 	"time"
 
 	pahomqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/influxdata/kapacitor/tlsconfig"
 )
 
 // Client describes an immutable MQTT client, designed to accommodate the
@@ -13,59 +12,52 @@ import (
 type Client interface {
 	Connect() error
 	Disconnect()
-	Publish(string, byte, bool, string) error
+	Publish(topic string, qos QoSLevel, retained bool, message []byte) error
 }
 
-// NewClient produces a disconnected MQTT client
-var NewClient = func(c Config) Client {
-	return &PahoClient{
-		host:     c.Broker(),
-		port:     c.Port,
-		username: c.Username,
-		password: c.Password,
-		clientID: c.ClientID,
+// newClient produces a disconnected MQTT client
+var newClient = func(c Config) (Client, error) {
+	opts := pahomqtt.NewClientOptions()
+	opts.AddBroker(c.URL)
+	if c.ClientID != "" {
+		opts.SetClientID(c.ClientID)
+	} else {
+		opts.SetClientID(c.Name)
 	}
+	opts.SetUsername(c.Username)
+	opts.SetPassword(c.Password)
+
+	tlsConfig, err := tlsconfig.Create(c.SSLCA, c.SSLCert, c.SSLKey, c.InsecureSkipVerify)
+	if err != nil {
+		return nil, err
+	}
+	opts.SetTLSConfig(tlsConfig)
+
+	return &PahoClient{
+		opts: opts,
+	}, nil
 }
 
 type PahoClient struct {
-	host string
-	port uint16
-
-	username string
-	password string
-
-	clientID string
-
+	opts   *pahomqtt.ClientOptions
 	client pahomqtt.Client
 }
-
-var _ Client = &PahoClient{}
 
 // DefaultQuiesceTimeout is the duration the client will wait for outstanding
 // messages to be published before forcing a disconnection
 const DefaultQuiesceTimeout time.Duration = 250 * time.Millisecond
 
 func (p *PahoClient) Connect() error {
-	log.Printf("Current config: %#v\n", p)
-	opts := pahomqtt.NewClientOptions()
-	opts.AddBroker(p.host)
-	opts.SetClientID(p.clientID)
-	opts.SetUsername(p.username)
-	opts.SetPassword(p.password)
-
 	// Using a clean session forces the broker to dispose of client session
 	// information after disconnecting. Retention of this is useful for
 	// constrained clients.  Since Kapacitor is only publishing, it has no
 	// storage requirements and can reduce load on the broker by using a clean
 	// session.
-	opts.SetCleanSession(true)
+	p.opts.SetCleanSession(true)
 
-	p.client = pahomqtt.NewClient(opts)
+	p.client = pahomqtt.NewClient(p.opts)
 	token := p.client.Connect()
-	log.Printf("Current config: %#v\n", p)
-
-	token.Wait() // Tokens are futures
-
+	token.Wait()
 	return token.Error()
 }
 
@@ -75,31 +67,8 @@ func (p *PahoClient) Disconnect() {
 	}
 }
 
-var foo int = 1
-
-func (p *PahoClient) Publish(topic string, qos byte, retained bool, message string) error {
-	p.client.Publish(topic, qos, retained, message)
-	return nil
-}
-
-var _ Client = &MockClient{}
-
-type MockClient struct {
-	connected bool
-}
-
-func (m *MockClient) Connect() error {
-	m.connected = true
-	return nil
-}
-
-func (m *MockClient) Disconnect() {
-	m.connected = false
-}
-
-func (m *MockClient) Publish(topic string, qos byte, retained bool, message string) error {
-	if !m.connected {
-		return errors.New("Publish() called before Connect()")
-	}
-	return nil
+func (p *PahoClient) Publish(topic string, qos QoSLevel, retained bool, message []byte) error {
+	token := p.client.Publish(topic, byte(qos), retained, message)
+	token.Wait()
+	return token.Error()
 }

@@ -1017,17 +1017,29 @@ func (a *AlertNode) Mqtt(topic string) *MQTTHandler {
 	return m
 }
 
+// tick:embedded:AlertNode.Mqtt
 type MQTTHandler struct {
 	*AlertNode
+
+	// BrokerName is the name of the configured MQTT broker to use when publishing the alert.
+	// If empty defaults to the configured default broker.
+	BrokerName string
 
 	// The topic where alerts will be dispatched to
 	Topic string
 
-	// The QoS that will be used to deliver the alerts
-	QoS int64
+	// The Qos that will be used to deliver the alerts
+	//
+	// Valid values are:
+	//
+	//    * 0 - At most once delivery
+	//    * 1 - At least once delivery
+	//    * 2 - Exactly once delivery
+	//
+	Qos int64
 
 	// Retained indicates whether this alert should be delivered to
-	// clients that were not connected to the broker at the time of the alert
+	// clients that were not connected to the broker at the time of the alert.
 	Retained bool
 }
 

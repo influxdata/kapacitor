@@ -92,7 +92,6 @@ type TaskMaster struct {
 		Handler(smtp.HandlerConfig, *log.Logger) alert.Handler
 	}
 	MQTTService interface {
-		DefaultHandlerConfig() mqtt.HandlerConfig
 		Handler(mqtt.HandlerConfig, *log.Logger) alert.Handler
 	}
 

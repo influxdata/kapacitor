@@ -206,7 +206,9 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	// Append Alert integration services
 	s.appendAlertaService()
 	s.appendHipChatService()
-	s.appendMQTTService()
+	if err := s.appendMQTTService(); err != nil {
+		return nil, errors.Wrap(err, "mqtt service")
+	}
 	s.appendOpsGenieService()
 	s.appendPagerDutyService()
 	s.appendPushoverService()
@@ -457,16 +459,20 @@ func (s *Server) appendAuthService() {
 	s.AppendService("auth", srv)
 }
 
-func (s *Server) appendMQTTService() {
-	c := s.config.MQTT
+func (s *Server) appendMQTTService() error {
+	cs := s.config.MQTT
 	l := s.LogService.NewLogger("[mqtt] ", log.LstdFlags)
-	srv := mqtt.NewService(c, l)
+	srv, err := mqtt.NewService(cs, l)
+	if err != nil {
+		return err
+	}
 
 	s.TaskMaster.MQTTService = srv
 	s.AlertService.MQTTService = srv
 
 	s.SetDynamicService("mqtt", srv)
 	s.AppendService("mqtt", srv)
+	return nil
 }
 
 func (s *Server) appendOpsGenieService() {
