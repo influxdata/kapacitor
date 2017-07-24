@@ -36,6 +36,8 @@ import (
 	"github.com/influxdata/kapacitor/services/hipchat/hipchattest"
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/k8s"
+	"github.com/influxdata/kapacitor/services/mqtt"
+	"github.com/influxdata/kapacitor/services/mqtt/mqtttest"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/opsgenie/opsgenietest"
 	"github.com/influxdata/kapacitor/services/pagerduty"
@@ -6312,6 +6314,110 @@ func TestServer_UpdateConfig(t *testing.T) {
 			},
 		},
 		{
+			section: "mqtt",
+			setDefaults: func(c *server.Config) {
+				c.MQTT = mqtt.Configs{mqtt.Config{
+					Name:       "default",
+					URL:        "tcp://mqtt.example.com:1883",
+					NewClientF: mqtttest.NewClient,
+				}}
+			},
+			element: "default",
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/mqtt"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/mqtt/default"},
+					Options: map[string]interface{}{
+						"enabled":              false,
+						"name":                 "default",
+						"default":              false,
+						"url":                  "tcp://mqtt.example.com:1883",
+						"ssl-ca":               "",
+						"ssl-cert":             "",
+						"ssl-key":              "",
+						"insecure-skip-verify": false,
+						"client-id":            "",
+						"username":             "",
+						"password":             false,
+					},
+					Redacted: []string{
+						"password",
+					},
+				}},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/mqtt/default"},
+				Options: map[string]interface{}{
+					"enabled":              false,
+					"name":                 "default",
+					"default":              false,
+					"url":                  "tcp://mqtt.example.com:1883",
+					"ssl-ca":               "",
+					"ssl-cert":             "",
+					"ssl-key":              "",
+					"insecure-skip-verify": false,
+					"client-id":            "",
+					"username":             "",
+					"password":             false,
+				},
+				Redacted: []string{
+					"password",
+				},
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"client-id": "kapacitor-default",
+							"password":  "super secret",
+						},
+					},
+					element: "default",
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/mqtt"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/mqtt/default"},
+							Options: map[string]interface{}{
+								"enabled":              false,
+								"name":                 "default",
+								"default":              false,
+								"url":                  "tcp://mqtt.example.com:1883",
+								"ssl-ca":               "",
+								"ssl-cert":             "",
+								"ssl-key":              "",
+								"insecure-skip-verify": false,
+								"client-id":            "kapacitor-default",
+								"username":             "",
+								"password":             true,
+							},
+							Redacted: []string{
+								"password",
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/mqtt/default"},
+						Options: map[string]interface{}{
+							"enabled":              false,
+							"name":                 "default",
+							"default":              false,
+							"url":                  "tcp://mqtt.example.com:1883",
+							"ssl-ca":               "",
+							"ssl-cert":             "",
+							"ssl-key":              "",
+							"insecure-skip-verify": false,
+							"client-id":            "kapacitor-default",
+							"username":             "",
+							"password":             true,
+						},
+						Redacted: []string{
+							"password",
+						},
+					},
+				},
+			},
+		},
+		{
 			section: "opsgenie",
 			setDefaults: func(c *server.Config) {
 				c.OpsGenie.URL = "http://opsgenie.example.com"
@@ -7084,7 +7190,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 	) error {
 		// Get all sections
 		if config, err := cli.ConfigSections(); err != nil {
-			return err
+			return errors.Wrap(err, "failed to get sections")
 		} else {
 			if err := compareSections(config.Sections[section], expSection); err != nil {
 				return fmt.Errorf("%s: %v", section, err)
@@ -7111,35 +7217,37 @@ func TestServer_UpdateConfig(t *testing.T) {
 		return nil
 	}
 
-	for _, tc := range testCases {
-		// Create default config
-		c := NewConfig()
-		if tc.setDefaults != nil {
-			tc.setDefaults(c)
-		}
-		s := OpenServer(c)
-		cli := Client(s)
-		defer s.Close()
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("%s/%s-%d", tc.section, tc.element, i), func(t *testing.T) {
+			// Create default config
+			c := NewConfig()
+			if tc.setDefaults != nil {
+				tc.setDefaults(c)
+			}
+			s := OpenServer(c)
+			cli := Client(s)
+			defer s.Close()
 
-		if err := validate(cli, tc.section, tc.element, tc.expDefaultSection, tc.expDefaultElement); err != nil {
-			t.Errorf("unexpected defaults for %s/%s: %v", tc.section, tc.element, err)
-		}
-
-		for i, ua := range tc.updates {
-			link := cli.ConfigElementLink(tc.section, ua.element)
-
-			if len(ua.updateAction.Add) > 0 ||
-				len(ua.updateAction.Remove) > 0 {
-				link = cli.ConfigSectionLink(tc.section)
+			if err := validate(cli, tc.section, tc.element, tc.expDefaultSection, tc.expDefaultElement); err != nil {
+				t.Errorf("unexpected defaults for %s/%s: %v", tc.section, tc.element, err)
 			}
 
-			if err := cli.ConfigUpdate(link, ua.updateAction); err != nil {
-				t.Fatal(err)
+			for i, ua := range tc.updates {
+				link := cli.ConfigElementLink(tc.section, ua.element)
+
+				if len(ua.updateAction.Add) > 0 ||
+					len(ua.updateAction.Remove) > 0 {
+					link = cli.ConfigSectionLink(tc.section)
+				}
+
+				if err := cli.ConfigUpdate(link, ua.updateAction); err != nil {
+					t.Fatal(err)
+				}
+				if err := validate(cli, tc.section, ua.element, ua.expSection, ua.expElement); err != nil {
+					t.Errorf("unexpected update result %d for %s/%s: %v", i, tc.section, ua.element, err)
+				}
 			}
-			if err := validate(cli, tc.section, ua.element, ua.expSection, ua.expElement); err != nil {
-				t.Errorf("unexpected update result %d for %s/%s: %v", i, tc.section, ua.element, err)
-			}
-		}
+		})
 	}
 }
 func TestServer_ListServiceTests(t *testing.T) {
@@ -7248,6 +7356,17 @@ func TestServer_ListServiceTests(t *testing.T) {
 				Name: "marathon",
 				Options: client.ServiceTestOptions{
 					"id": "",
+				},
+			},
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/mqtt"},
+				Name: "mqtt",
+				Options: client.ServiceTestOptions{
+					"broker-name": "",
+					"topic":       "",
+					"message":     "test MQTT message",
+					"qos":         "at-most-once",
+					"retained":    false,
 				},
 			},
 			{
@@ -7565,6 +7684,17 @@ func TestServer_DoServiceTest(t *testing.T) {
 			exp: client.ServiceTestResult{
 				Success: false,
 				Message: "unknown kubernetes cluster \"default\"",
+			},
+		},
+		{
+			service: "mqtt",
+			options: client.ServiceTestOptions{
+				"broker-name": "default",
+				"topic":       "test",
+			},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "unknown MQTT broker \"default\"",
 			},
 		},
 		{
@@ -7988,6 +8118,53 @@ func TestServer_AlertHandlers(t *testing.T) {
 		},
 		{
 			handler: client.TopicHandler{
+				Kind: "mqtt",
+				Options: map[string]interface{}{
+					"topic":    "test",
+					"qos":      "at-least-once",
+					"retained": true,
+				},
+			},
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
+				cc := new(mqtttest.ClientCreator)
+				ctxt := context.WithValue(nil, "clientCreator", cc)
+
+				c.MQTT = mqtt.Configs{
+					mqtt.Config{
+						Enabled:    true,
+						Name:       "test",
+						URL:        "tcp://mqtt.example.com:1883",
+						NewClientF: cc.NewClient,
+					},
+				}
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				s := ctxt.Value("clientCreator").(*mqtttest.ClientCreator)
+				if got, exp := len(s.Clients), 1; got != exp {
+					return fmt.Errorf("unexpected number of clients created : exp %d got: %d", exp, got)
+				}
+				if got, exp := len(s.Configs), 1; got != exp {
+					return fmt.Errorf("unexpected number of configs received: exp %d got: %d", exp, got)
+				}
+				if got, exp := s.Configs[0].URL, "tcp://mqtt.example.com:1883"; exp != got {
+					return fmt.Errorf("unexpected config URL: exp %q got %q", exp, got)
+				}
+				got := s.Clients[0].PublishData
+				exp := []mqtttest.PublishData{{
+					Topic:    "test",
+					QoS:      mqtt.AtLeastOnce,
+					Retained: true,
+					Message:  []byte("message"),
+				}}
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected mqtt publish data:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handler: client.TopicHandler{
 				Kind: "opsgenie",
 				Options: map[string]interface{}{
 					"teams-list":      []string{"A team", "B team"},
@@ -8059,7 +8236,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 					},
 				}}
 				if !reflect.DeepEqual(exp, got) {
-					return fmt.Errorf("unexpected opsgenie request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+					return fmt.Errorf("unexpected pushover request:\nexp\n%+v\ngot\n%+v\n", exp, got)
 				}
 				return nil
 			},
@@ -8451,8 +8628,8 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 		},
 	}
-	for _, tc := range testCases {
-		t.Run(tc.handler.Kind, func(t *testing.T) {
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("%s-%d", tc.handler.Kind, i), func(t *testing.T) {
 			kind := tc.handler.Kind
 			// Create default config
 			c := NewConfig()

@@ -1,10 +1,12 @@
 package alert
 
 import (
+	"encoding"
 	"encoding/json"
 	"fmt"
 	"log"
 	"path"
+	"reflect"
 	"regexp"
 	"sync"
 
@@ -14,6 +16,7 @@ import (
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/httppost"
+	"github.com/influxdata/kapacitor/services/mqtt"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pushover"
@@ -64,6 +67,9 @@ type Service struct {
 	}
 	HipChatService interface {
 		Handler(hipchat.HandlerConfig, *log.Logger) alert.Handler
+	}
+	MQTTService interface {
+		Handler(mqtt.HandlerConfig, *log.Logger) alert.Handler
 	}
 	OpsGenieService interface {
 		Handler(opsgenie.HandlerConfig, *log.Logger) alert.Handler
@@ -667,7 +673,7 @@ func decodeOptions(options map[string]interface{}, c interface{}) error {
 	dec, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: true,
 		Result:      c,
-		DecodeHook:  mapstructure.StringToTimeDurationHookFunc(),
+		DecodeHook:  decodeStringToTextUnmarshaler,
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize mapstructure decoder")
@@ -676,6 +682,36 @@ func decodeOptions(options map[string]interface{}, c interface{}) error {
 		return errors.Wrapf(err, "failed to decode options into %T", c)
 	}
 	return nil
+}
+
+var textUnmarshalerType = reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()
+
+// decodeStringToTextUnmarshaler will decode a string value into any type
+// that implements the encoding.TextUnmarshaler interface.
+func decodeStringToTextUnmarshaler(f, t reflect.Type, data interface{}) (interface{}, error) {
+	if f.Kind() != reflect.String {
+		return data, nil
+	}
+	isPtr := true
+	if t.Kind() != reflect.Ptr {
+		isPtr = false
+		t = reflect.PtrTo(t)
+	}
+	if t.Implements(textUnmarshalerType) {
+		value := reflect.New(t.Elem())
+		tum := value.Interface().(encoding.TextUnmarshaler)
+		str := data.(string)
+		err := tum.UnmarshalText([]byte(str))
+		if err != nil {
+			return nil, err
+		}
+
+		if isPtr {
+			return value.Interface(), nil
+		}
+		return reflect.Indirect(value).Interface(), nil
+	}
+	return data, nil
 }
 
 func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
@@ -731,6 +767,14 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		if err != nil {
 			return handler{}, err
 		}
+		h = newExternalHandler(h)
+	case "mqtt":
+		c := mqtt.HandlerConfig{}
+		err = decodeOptions(spec.Options, &c)
+		if err != nil {
+			return handler{}, err
+		}
+		h = s.MQTTService.Handler(c, s.logger)
 		h = newExternalHandler(h)
 	case "opsgenie":
 		c := opsgenie.HandlerConfig{}

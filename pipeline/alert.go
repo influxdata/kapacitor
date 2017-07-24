@@ -49,6 +49,7 @@ const defaultDetailsTmpl = "{{ json . }}"
 //    * Pushover -- Send alert to Pushover.
 //    * Talk -- Post alert message to Talk client.
 //    * Telegram -- Post alert message to Telegram client.
+//    * MQTT -- Post alert message to MQTT.
 //
 // See below for more details on configuring each handler.
 //
@@ -350,6 +351,10 @@ type AlertNode struct {
 	// Send alert to Talk.
 	// tick:ignore
 	TalkHandlers []*TalkHandler `tick:"Talk"`
+
+	// Send alert to MQTT
+	// tick:ignore
+	MQTTHandlers []*MQTTHandler `tick:"Mqtt"`
 
 	// Send alert using SNMPtraps.
 	// tick:ignore
@@ -999,6 +1004,43 @@ type AlertaHandler struct {
 func (a *AlertaHandler) Services(service ...string) *AlertaHandler {
 	a.Service = service
 	return a
+}
+
+// Send alert to an MQTT broker
+// tick:property
+func (a *AlertNode) Mqtt(topic string) *MQTTHandler {
+	m := &MQTTHandler{
+		AlertNode: a,
+		Topic:     topic,
+	}
+	a.MQTTHandlers = append(a.MQTTHandlers, m)
+	return m
+}
+
+// tick:embedded:AlertNode.Mqtt
+type MQTTHandler struct {
+	*AlertNode
+
+	// BrokerName is the name of the configured MQTT broker to use when publishing the alert.
+	// If empty defaults to the configured default broker.
+	BrokerName string
+
+	// The topic where alerts will be dispatched to
+	Topic string
+
+	// The Qos that will be used to deliver the alerts
+	//
+	// Valid values are:
+	//
+	//    * 0 - At most once delivery
+	//    * 1 - At least once delivery
+	//    * 2 - Exactly once delivery
+	//
+	Qos int64
+
+	// Retained indicates whether this alert should be delivered to
+	// clients that were not connected to the broker at the time of the alert.
+	Retained bool
 }
 
 // Send the alert to Sensu.

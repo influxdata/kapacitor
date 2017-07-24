@@ -26,6 +26,7 @@ import (
 	"github.com/influxdata/kapacitor/server/vars"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/udp"
+	"github.com/influxdata/kapacitor/tlsconfig"
 	"github.com/influxdata/kapacitor/uuid"
 	"github.com/pkg/errors"
 )
@@ -492,7 +493,7 @@ func newInfluxDBCluster(c Config, hostname string, ider IDer, httpPort int, useT
 }
 
 func httpConfig(c Config) (influxdb.Config, error) {
-	tlsConfig, err := getTLSConfig(c.SSLCA, c.SSLCert, c.SSLKey, c.InsecureSkipVerify)
+	tlsConfig, err := tlsconfig.Create(c.SSLCA, c.SSLCert, c.SSLKey, c.InsecureSkipVerify)
 	if err != nil {
 		return influxdb.Config{}, errors.Wrap(err, "invalid TLS options")
 	}

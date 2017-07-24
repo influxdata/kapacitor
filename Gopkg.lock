@@ -114,6 +114,12 @@
   revision = "259d2a102b871d17f30e3cd9881a642961a1e486"
 
 [[projects]]
+  name = "github.com/eclipse/paho.mqtt.golang"
+  packages = [".","packets"]
+  revision = "45f9b18f4864c81d49c3ed01e5faec9eeb05de31"
+  version = "v1.0.0"
+
+[[projects]]
   name = "github.com/emicklei/go-restful"
   packages = [".","log","swagger"]
   revision = "777bb3f19bcafe2575ffb2a3e46af92509ae9594"
@@ -453,7 +459,7 @@
 [[projects]]
   branch = "master"
   name = "golang.org/x/net"
-  packages = ["context","context/ctxhttp","http2","http2/hpack","idna","internal/timeseries","lex/httplex","trace"]
+  packages = ["context","context/ctxhttp","http2","http2/hpack","idna","internal/timeseries","lex/httplex","trace","websocket"]
   revision = "d212a1ef2de2f5d441c327b8f26cf3ea3ea9f265"
 
 [[projects]]
@@ -531,6 +537,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "84824f8feb60a52ecdc9ba2d8c071f5e546c4b21211e962011f24f08163ede70"
+  inputs-digest = "16e362d86a0439a145205c733892c9849a09aa7af6b9d6bc225f41520e26577c"
   solver-name = "gps-cdcl"
   solver-version = 1

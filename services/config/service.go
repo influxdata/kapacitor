@@ -305,7 +305,9 @@ func (s *Service) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if !hasSection {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(config)
+		if err := json.NewEncoder(w).Encode(config); err != nil {
+			s.logger.Println("E! failed to JSON encode configuration", err)
+		}
 	} else if section != "" {
 		sec, ok := config.Sections[section]
 		if !ok {
@@ -326,14 +328,18 @@ func (s *Service) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 			}
 			if found {
 				w.WriteHeader(http.StatusOK)
-				json.NewEncoder(w).Encode(elementEntry)
+				if err := json.NewEncoder(w).Encode(elementEntry); err != nil {
+					s.logger.Println("E! failed to JSON encode element", err)
+				}
 			} else {
 				httpd.HttpError(w, fmt.Sprintf("unknown section/element: %s/%s", section, element), true, http.StatusNotFound)
 				return
 			}
 		} else {
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(sec)
+			if err := json.NewEncoder(w).Encode(sec); err != nil {
+				s.logger.Println("E! failed to JSON encode sec", err)
+			}
 		}
 	}
 }

@@ -2,8 +2,6 @@ package slack
 
 import (
 	"bytes"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,6 +11,7 @@ import (
 	"sync/atomic"
 
 	"github.com/influxdata/kapacitor/alert"
+	"github.com/influxdata/kapacitor/tlsconfig"
 	"github.com/pkg/errors"
 )
 
@@ -24,7 +23,7 @@ type Service struct {
 }
 
 func NewService(c Config, l *log.Logger) (*Service, error) {
-	tlsConfig, err := getTLSConfig(c.SSLCA, c.SSLCert, c.SSLKey, c.InsecureSkipVerify)
+	tlsConfig, err := tlsconfig.Create(c.SSLCA, c.SSLCert, c.SSLKey, c.InsecureSkipVerify)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +62,7 @@ func (s *Service) Update(newConfig []interface{}) error {
 	if c, ok := newConfig[0].(Config); !ok {
 		return fmt.Errorf("expected config object to be of type %T, got %T", c, newConfig[0])
 	} else {
-		tlsConfig, err := getTLSConfig(c.SSLCA, c.SSLCert, c.SSLKey, c.InsecureSkipVerify)
+		tlsConfig, err := tlsconfig.Create(c.SSLCA, c.SSLCert, c.SSLKey, c.InsecureSkipVerify)
 		if err != nil {
 			return err
 		}
@@ -240,40 +239,4 @@ func (h *handler) Handle(event alert.Event) {
 	); err != nil {
 		h.logger.Println("E! failed to send event to Slack", err)
 	}
-}
-
-// getTLSConfig creates a tls.Config object from the given certs, key, and CA files.
-// you must give the full path to the files.
-func getTLSConfig(
-	SSLCA, SSLCert, SSLKey string,
-	InsecureSkipVerify bool,
-) (*tls.Config, error) {
-	t := &tls.Config{
-		InsecureSkipVerify: InsecureSkipVerify,
-	}
-	if SSLCert != "" && SSLKey != "" {
-		cert, err := tls.LoadX509KeyPair(SSLCert, SSLKey)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"Could not load TLS client key/certificate: %s",
-				err)
-		}
-		t.Certificates = []tls.Certificate{cert}
-	} else if SSLCert != "" {
-		return nil, errors.New("Must provide both key and cert files: only cert file provided.")
-	} else if SSLKey != "" {
-		return nil, errors.New("Must provide both key and cert files: only key file provided.")
-	}
-
-	if SSLCA != "" {
-		caCert, err := ioutil.ReadFile(SSLCA)
-		if err != nil {
-			return nil, fmt.Errorf("Could not load TLS CA: %s",
-				err)
-		}
-		caCertPool := x509.NewCertPool()
-		caCertPool.AppendCertsFromPEM(caCert)
-		t.RootCAs = caCertPool
-	}
-	return t, nil
 }

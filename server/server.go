@@ -38,6 +38,7 @@ import (
 	"github.com/influxdata/kapacitor/services/k8s"
 	"github.com/influxdata/kapacitor/services/logging"
 	"github.com/influxdata/kapacitor/services/marathon"
+	"github.com/influxdata/kapacitor/services/mqtt"
 	"github.com/influxdata/kapacitor/services/nerve"
 	"github.com/influxdata/kapacitor/services/noauth"
 	"github.com/influxdata/kapacitor/services/opsgenie"
@@ -205,6 +206,9 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	// Append Alert integration services
 	s.appendAlertaService()
 	s.appendHipChatService()
+	if err := s.appendMQTTService(); err != nil {
+		return nil, errors.Wrap(err, "mqtt service")
+	}
 	s.appendOpsGenieService()
 	s.appendPagerDutyService()
 	s.appendPushoverService()
@@ -453,6 +457,22 @@ func (s *Server) appendAuthService() {
 	s.AuthService = srv
 	s.HTTPDService.Handler.AuthService = srv
 	s.AppendService("auth", srv)
+}
+
+func (s *Server) appendMQTTService() error {
+	cs := s.config.MQTT
+	l := s.LogService.NewLogger("[mqtt] ", log.LstdFlags)
+	srv, err := mqtt.NewService(cs, l)
+	if err != nil {
+		return err
+	}
+
+	s.TaskMaster.MQTTService = srv
+	s.AlertService.MQTTService = srv
+
+	s.SetDynamicService("mqtt", srv)
+	s.AppendService("mqtt", srv)
+	return nil
 }
 
 func (s *Server) appendOpsGenieService() {
