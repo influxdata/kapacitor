@@ -168,6 +168,7 @@ func init() {
 	statelessFuncs["isPresent"] = isPresent{}
 
 	// Time functions
+	statelessFuncs["unixNano"] = unixNano{}
 	statelessFuncs["minute"] = minute{}
 	statelessFuncs["hour"] = hour{}
 	statelessFuncs["weekday"] = weekday{}
@@ -1133,6 +1134,30 @@ func init() {
 	d := Domain{}
 	d[0] = ast.TTime
 	timeFuncSignature[d] = ast.TInt
+}
+
+type unixNano struct {
+}
+
+func (unixNano) Reset() {
+}
+
+// Return the nanosecond unix timestamp for the given time.
+func (unixNano) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 1 {
+		return 0, errors.New("unixNano expects exactly one argument")
+	}
+	switch a := args[0].(type) {
+	case time.Time:
+		v = int64(a.UnixNano())
+	default:
+		err = fmt.Errorf("cannot convert %T to time.Time", a)
+	}
+	return
+}
+
+func (unixNano) Signature() map[Domain]ast.ValueType {
+	return timeFuncSignature
 }
 
 type minute struct {
