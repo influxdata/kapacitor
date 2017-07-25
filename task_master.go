@@ -30,6 +30,7 @@ import (
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/snmptrap"
+	swarm "github.com/influxdata/kapacitor/services/swarm/client"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/tick"
@@ -148,6 +149,9 @@ type TaskMaster struct {
 	}
 	K8sService interface {
 		Client(string) (k8s.Client, error)
+	}
+	SwarmService interface {
+		Client(string) (swarm.Client, error)
 	}
 	LogService LogService
 

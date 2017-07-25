@@ -15,7 +15,6 @@ import (
 	"github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/services/httpd"
-	k8s "github.com/influxdata/kapacitor/services/k8s/client"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/uuid"
 )
@@ -173,38 +172,6 @@ func (d deadman) Threshold() float64      { return d.threshold }
 func (d deadman) Id() string              { return d.id }
 func (d deadman) Message() string         { return d.message }
 func (d deadman) Global() bool            { return d.global }
-
-type k8sAutoscale struct {
-	ScalesGetFunc    func(kind, name string) (*k8s.Scale, error)
-	ScalesUpdateFunc func(kind string, scale *k8s.Scale) error
-}
-type k8sScales struct {
-	ScalesGetFunc    func(kind, name string) (*k8s.Scale, error)
-	ScalesUpdateFunc func(kind string, scale *k8s.Scale) error
-}
-
-func (k k8sAutoscale) Versions() (k8s.APIVersions, error) {
-	return k8s.APIVersions{}, nil
-}
-func (k k8sAutoscale) Client(string) (k8s.Client, error) {
-	return k, nil
-}
-func (k k8sAutoscale) Scales(namespace string) k8s.ScalesInterface {
-	return k8sScales{
-		ScalesGetFunc:    k.ScalesGetFunc,
-		ScalesUpdateFunc: k.ScalesUpdateFunc,
-	}
-}
-func (k k8sAutoscale) Update(c k8s.Config) error {
-	return nil
-}
-
-func (k k8sScales) Get(kind, name string) (*k8s.Scale, error) {
-	return k.ScalesGetFunc(kind, name)
-}
-func (k k8sScales) Update(kind string, scale *k8s.Scale) error {
-	return k.ScalesUpdateFunc(kind, scale)
-}
 
 type serverInfo struct {
 	clusterID,

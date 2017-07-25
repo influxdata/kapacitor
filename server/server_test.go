@@ -47,6 +47,7 @@ import (
 	"github.com/influxdata/kapacitor/services/slack/slacktest"
 	"github.com/influxdata/kapacitor/services/smtp/smtptest"
 	"github.com/influxdata/kapacitor/services/snmptrap/snmptraptest"
+	"github.com/influxdata/kapacitor/services/swarm"
 	"github.com/influxdata/kapacitor/services/talk/talktest"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/telegram/telegramtest"
@@ -6906,6 +6907,81 @@ func TestServer_UpdateConfig(t *testing.T) {
 			},
 		},
 		{
+			section: "swarm",
+			setDefaults: func(c *server.Config) {
+				c.Swarm = swarm.Configs{swarm.Config{
+					Servers: []string{"http://localhost:80001"},
+				}}
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/swarm"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/swarm/"},
+					Options: map[string]interface{}{
+						"id":                   "",
+						"enabled":              false,
+						"servers":              []interface{}{"http://localhost:80001"},
+						"ssl-ca":               "",
+						"ssl-cert":             "",
+						"ssl-key":              "",
+						"insecure-skip-verify": false,
+					},
+					Redacted: nil,
+				}},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/swarm/"},
+				Options: map[string]interface{}{
+					"id":                   "",
+					"enabled":              false,
+					"servers":              []interface{}{"http://localhost:80001"},
+					"ssl-ca":               "",
+					"ssl-cert":             "",
+					"ssl-key":              "",
+					"insecure-skip-verify": false,
+				},
+				Redacted: nil,
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"enabled": true,
+						},
+					},
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/swarm"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/swarm/"},
+							Options: map[string]interface{}{
+								"id":                   "",
+								"enabled":              true,
+								"servers":              []interface{}{"http://localhost:80001"},
+								"ssl-ca":               "",
+								"ssl-cert":             "",
+								"ssl-key":              "",
+								"insecure-skip-verify": false,
+							},
+							Redacted: nil,
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/swarm/"},
+						Options: map[string]interface{}{
+							"id":                   "",
+							"enabled":              true,
+							"servers":              []interface{}{"http://localhost:80001"},
+							"ssl-ca":               "",
+							"ssl-cert":             "",
+							"ssl-key":              "",
+							"insecure-skip-verify": false,
+						},
+						Redacted: nil,
+					},
+				},
+			},
+		},
+		{
 			section: "talk",
 			setDefaults: func(c *server.Config) {
 				c.Talk.AuthorName = "Kapacitor"
@@ -7477,6 +7553,13 @@ func TestServer_ListServiceTests(t *testing.T) {
 				},
 			},
 			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/swarm"},
+				Name: "swarm",
+				Options: client.ServiceTestOptions{
+					"id": "",
+				},
+			},
+			{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/talk"},
 				Name: "talk",
 				Options: client.ServiceTestOptions{
@@ -7603,6 +7686,13 @@ func TestServer_ListServiceTests_WithPattern(t *testing.T) {
 			{
 				Link: client.Link{Relation: "self", Href: "/kapacitor/v1/service-tests/static-discovery"},
 				Name: "static-discovery",
+				Options: client.ServiceTestOptions{
+					"id": "",
+				},
+			},
+			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/swarm"},
+				Name: "swarm",
 				Options: client.ServiceTestOptions{
 					"id": "",
 				},
@@ -7751,6 +7841,14 @@ func TestServer_DoServiceTest(t *testing.T) {
 			exp: client.ServiceTestResult{
 				Success: false,
 				Message: "service is not enabled",
+			},
+		},
+		{
+			service: "swarm",
+			options: client.ServiceTestOptions{},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "unknown swarm cluster \"\"",
 			},
 		},
 		{

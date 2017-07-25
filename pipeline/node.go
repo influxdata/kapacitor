@@ -468,6 +468,13 @@ func (n *chainnode) K8sAutoscale() *K8sAutoscaleNode {
 	return k
 }
 
+// Create a node that can trigger autoscale events for a docker swarm cluster.
+func (n *chainnode) SwarmAutoscale() *SwarmAutoscaleNode {
+	k := newSwarmAutoscaleNode(n.Provides())
+	n.linkChild(k)
+	return k
+}
+
 // Create a node that tracks duration in a given state.
 func (n *chainnode) StateDuration(expression *ast.LambdaNode) *StateDurationNode {
 	sd := newStateDurationNode(n.provides, expression)

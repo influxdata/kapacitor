@@ -44,6 +44,7 @@ import (
 	"github.com/influxdata/kapacitor/services/static_discovery"
 	"github.com/influxdata/kapacitor/services/stats"
 	"github.com/influxdata/kapacitor/services/storage"
+	"github.com/influxdata/kapacitor/services/swarm"
 	"github.com/influxdata/kapacitor/services/talk"
 	"github.com/influxdata/kapacitor/services/task_store"
 	"github.com/influxdata/kapacitor/services/telegram"
@@ -105,7 +106,8 @@ type Config struct {
 	Triton          []triton.Config           `toml:"triton" override:"triton,element-key=id"`
 
 	// Third-party integrations
-	Kubernetes k8s.Configs `toml:"kubernetes" override:"kubernetes,element-key=id" env-config:"implicit-index"`
+	Kubernetes k8s.Configs   `toml:"kubernetes" override:"kubernetes,element-key=id" env-config:"implicit-index"`
+	Swarm      swarm.Configs `toml:"swarm" override:"swarm,element-key=id"`
 
 	Reporting reporting.Config `toml:"reporting"`
 	Stats     stats.Config     `toml:"stats"`
@@ -358,6 +360,10 @@ func (c *Config) Validate() error {
 		if err := c.StaticDiscovery[i].Validate(); err != nil {
 			return err
 		}
+	}
+
+	if err := c.Swarm.Validate(); err != nil {
+		return err
 	}
 
 	for i := range c.Triton {
