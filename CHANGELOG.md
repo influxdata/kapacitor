@@ -7,6 +7,7 @@
 - [#1413](https://github.com/influxdata/kapacitor/issues/1413): Add subscriptions modes to InfluxDB subscriptions.
 - [#1436](https://github.com/influxdata/kapacitor/issues/1436): Add linear fill support for QueryNode.
 - [#1345](https://github.com/influxdata/kapacitor/issues/1345): Add MQTT Alert Handler
+- [#1390](https://github.com/influxdata/kapacitor/issues/1390): Add built in functions to convert timestamps to integers
 
 ### Bugfixes
 
@@ -46,7 +47,7 @@ meaning that the configuration or API around the feature may change in a future 
  ##### File format is here https://prometheus.io/docs/operating/configuration/#%3Cfile_sd_config%3E
  files = ["/tmp/prom/*.json"]
 
-# Configure scraper 
+# Configure scraper
 [[scraper]]
  enabled = true
  name = "node_exporter"
@@ -145,7 +146,7 @@ For more details on the alerting system see the full documentation [here](https:
 
 ### Features
 
-- [#1299](https://github.com/influxdata/kapacitor/pull/1299): Allowing sensu handler to be specified 
+- [#1299](https://github.com/influxdata/kapacitor/pull/1299): Allowing sensu handler to be specified
 - [#1284](https://github.com/influxdata/kapacitor/pull/1284): Add type signatures to Kapacitor functions.
 - [#1203](https://github.com/influxdata/kapacitor/issues/1203): Add `isPresent` operator for verifying whether a value is present (part of [#1284](https://github.com/influxdata/kapacitor/pull/1284)).
 - [#1354](https://github.com/influxdata/kapacitor/pull/1354): Add Kubernetes scraping support.
@@ -198,7 +199,7 @@ For more details on the alerting system see the full documentation [here](https:
 
 ### Bugfixes
 
-- [#1133](https://github.com/influxdata/kapacitor/issues/1133): Fix case-sensitivity for Telegram `parseMode` value. 
+- [#1133](https://github.com/influxdata/kapacitor/issues/1133): Fix case-sensitivity for Telegram `parseMode` value.
 - [#1147](https://github.com/influxdata/kapacitor/issues/1147): Fix pprof debug endpoint
 - [#1164](https://github.com/influxdata/kapacitor/pull/1164): Fix hang in config API to update a config section.
     Now if the service update process takes too long the request will timeout and return an error.
