@@ -120,20 +120,25 @@ func (o *IO) Out() agent.ByteReadReader {
 }
 
 type UDF struct {
+	taskID string
+	nodeID string
+
 	*udf.Server
 	uio    *IO
 	logger *log.Logger
 }
 
-func New(uio *IO, l *log.Logger) *UDF {
+func New(taskID, nodeID string, uio *IO, l *log.Logger) *UDF {
 	return &UDF{
+		taskID: taskID,
+		nodeID: nodeID,
 		uio:    uio,
 		logger: l,
 	}
 }
 
 func (u *UDF) Open() error {
-	u.Server = udf.NewServer(u.uio.Out(), u.uio.In(), u.logger, 0, nil, nil)
+	u.Server = udf.NewServer(u.taskID, u.nodeID, u.uio.Out(), u.uio.In(), u.logger, 0, nil, nil)
 	return u.Server.Start()
 }
 

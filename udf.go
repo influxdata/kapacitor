@@ -40,6 +40,8 @@ func newUDFNode(et *ExecutingTask, n *pipeline.UDFNode, l *log.Logger) (*UDFNode
 	// Create the UDF
 	f, err := et.tm.UDFService.Create(
 		n.UDFName,
+		et.Task.ID,
+		n.Name(),
 		l,
 		un.abortedCallback,
 	)
@@ -143,6 +145,9 @@ func (n *UDFNode) snapshot() ([]byte, error) {
 // over STDIN and STDOUT. Lines received over STDERR are logged
 // via normal Kapacitor logging.
 type UDFProcess struct {
+	taskName string
+	nodeName string
+
 	server    *udf.Server
 	commander command.Commander
 	cmdSpec   command.Spec
@@ -162,6 +167,7 @@ type UDFProcess struct {
 }
 
 func NewUDFProcess(
+	taskName, nodeName string,
 	commander command.Commander,
 	cmdSpec command.Spec,
 	l *log.Logger,
@@ -169,6 +175,8 @@ func NewUDFProcess(
 	abortCallback func(),
 ) *UDFProcess {
 	return &UDFProcess{
+		taskName:      taskName,
+		nodeName:      nodeName,
 		commander:     commander,
 		cmdSpec:       cmdSpec,
 		logger:        l,
@@ -208,6 +216,8 @@ func (p *UDFProcess) Open() error {
 	outBuf := bufio.NewReader(stdout)
 
 	p.server = udf.NewServer(
+		p.taskName,
+		p.nodeName,
 		outBuf,
 		stdin,
 		p.logger,
@@ -269,6 +279,9 @@ func (p *UDFProcess) Out() <-chan edge.Message           { return p.server.Out()
 func (p *UDFProcess) Info() (udf.Info, error)            { return p.server.Info() }
 
 type UDFSocket struct {
+	taskName string
+	nodeName string
+
 	server *udf.Server
 	socket Socket
 
@@ -285,12 +298,15 @@ type Socket interface {
 }
 
 func NewUDFSocket(
+	taskName, nodeName string,
 	socket Socket,
 	l *log.Logger,
 	timeout time.Duration,
 	abortCallback func(),
 ) *UDFSocket {
 	return &UDFSocket{
+		taskName:      taskName,
+		nodeName:      nodeName,
 		socket:        socket,
 		logger:        l,
 		timeout:       timeout,
@@ -308,6 +324,8 @@ func (s *UDFSocket) Open() error {
 	outBuf := bufio.NewReader(out)
 
 	s.server = udf.NewServer(
+		s.taskName,
+		s.nodeName,
 		outBuf,
 		in,
 		s.logger,

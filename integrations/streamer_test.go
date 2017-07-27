@@ -5930,11 +5930,11 @@ stream
 		return
 	}
 	uio := udf_test.NewIO()
-	udfService.CreateFunc = func(name string, l *log.Logger, abortCallback func()) (udf.Interface, error) {
+	udfService.CreateFunc = func(name, taskID, nodeID string, l *log.Logger, abortCallback func()) (udf.Interface, error) {
 		if name != "customFunc" {
 			return nil, fmt.Errorf("unknown function %s", name)
 		}
-		return udf_test.New(uio, l), nil
+		return udf_test.New(taskID, nodeID, uio, l), nil
 	}
 
 	tmInit := func(tm *kapacitor.TaskMaster) {
@@ -5950,6 +5950,12 @@ stream
 			t.Error("expected init message")
 		}
 		init := i.Init
+		if got, exp := init.TaskID, "TestStream_CustomFunctions"; got != exp {
+			t.Errorf("unexpected task ID got %q exp %q", got, exp)
+		}
+		if got, exp := init.NodeID, "customFunc4"; got != exp {
+			t.Errorf("unexpected task ID got %q exp %q", got, exp)
+		}
 
 		if got, exp := len(init.Options), 2; got != exp {
 			t.Fatalf("unexpected number of options in init request, got %d exp %d", got, exp)

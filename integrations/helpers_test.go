@@ -137,7 +137,7 @@ func compareAlertData(exp, got alert.Data) (bool, string) {
 type UDFService struct {
 	ListFunc   func() []string
 	InfoFunc   func(name string) (udf.Info, bool)
-	CreateFunc func(name string, l *log.Logger, abortCallback func()) (udf.Interface, error)
+	CreateFunc func(name, taskID, nodeID string, l *log.Logger, abortCallback func()) (udf.Interface, error)
 }
 
 func (u UDFService) List() []string {
@@ -148,8 +148,8 @@ func (u UDFService) Info(name string) (udf.Info, bool) {
 	return u.InfoFunc(name)
 }
 
-func (u UDFService) Create(name string, l *log.Logger, abortCallback func()) (udf.Interface, error) {
-	return u.CreateFunc(name, l, abortCallback)
+func (u UDFService) Create(name, taskID, nodeID string, l *log.Logger, abortCallback func()) (udf.Interface, error) {
+	return u.CreateFunc(name, taskID, nodeID, l, abortCallback)
 }
 
 type taskStore struct{}

@@ -91,7 +91,7 @@ func (s *Server) run() error {
 	errC := make(chan error, 1)
 	s.wg.Add(1)
 	go func() {
-		s.wg.Done()
+		defer s.wg.Done()
 		for {
 			conn, err := s.listener.Accept()
 			if err != nil {
