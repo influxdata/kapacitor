@@ -4,7 +4,6 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"strings"
 	"sync"
 )
 
@@ -14,11 +13,11 @@ type Server struct {
 	listener net.Listener
 	accepter Accepter
 
-	conns chan net.Conn
-
 	mu       sync.Mutex
 	stopped  bool
 	stopping chan struct{}
+
+	wg sync.WaitGroup
 }
 
 type Accepter interface {
@@ -32,59 +31,88 @@ func NewServer(l net.Listener, a Accepter) *Server {
 	return &Server{
 		listener: l,
 		accepter: a,
-		conns:    make(chan net.Conn),
 		stopping: make(chan struct{}),
 	}
 }
 
+// Server starts the server and blocks.
 func (s *Server) Serve() error {
+	s.mu.Lock()
+	if s.stopped {
+		s.mu.Unlock()
+		return nil
+	}
+	s.wg.Add(1)
+	s.mu.Unlock()
+
+	defer s.wg.Done()
 	return s.run()
 }
 
+// Stop closes the listener and stops all server activity.
 func (s *Server) Stop() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.stopped {
+		s.mu.Unlock()
 		return
 	}
 	s.stopped = true
+	s.listener.Close()
+	s.mu.Unlock()
+
 	close(s.stopping)
+	s.wg.Wait()
 }
 
-// Register a signal handler to stop the Server for the given signals.
+// StopOnSignals registers a signal handler to stop the Server for the given signals.
 func (s *Server) StopOnSignals(signals ...os.Signal) {
+	s.mu.Lock()
+	if s.stopped {
+		s.mu.Unlock()
+		return
+	}
+	s.wg.Add(1)
+	s.mu.Unlock()
+
 	c := make(chan os.Signal)
 	signal.Notify(c, signals...)
 	go func() {
-		for range c {
+		defer s.wg.Done()
+		select {
+		case <-s.stopping:
+		case <-c:
 			s.Stop()
 		}
 	}()
 }
 
 func (s *Server) run() error {
+	conns := make(chan net.Conn)
 	errC := make(chan error, 1)
+	s.wg.Add(1)
 	go func() {
+		s.wg.Done()
 		for {
 			conn, err := s.listener.Accept()
 			if err != nil {
 				errC <- err
 			}
-			s.conns <- conn
+			conns <- conn
 		}
 	}()
 	for {
 		select {
 		case <-s.stopping:
-			s.listener.Close()
 			return nil
 		case err := <-errC:
-			// If err is listener closed err ignore and return nil
-			if strings.Contains(err.Error(), "closed") {
+			s.mu.Lock()
+			stopped := s.stopped
+			s.mu.Unlock()
+			if stopped {
 				return nil
 			}
 			return err
-		case conn := <-s.conns:
+		case conn := <-conns:
 			s.accepter.Accept(conn)
 		}
 	}
