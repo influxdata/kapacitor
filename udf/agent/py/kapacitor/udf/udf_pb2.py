@@ -20,9 +20,8 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='udf.proto',
   package='agent',
   syntax='proto3',
-  serialized_pb=_b('\n\tudf.proto\x12\x05\x61gent\"\r\n\x0bInfoRequest\"\xc7\x01\n\x0cInfoResponse\x12\x1e\n\x05wants\x18\x01 \x01(\x0e\x32\x0f.agent.EdgeType\x12!\n\x08provides\x18\x02 \x01(\x0e\x32\x0f.agent.EdgeType\x12\x31\n\x07options\x18\x03 \x03(\x0b\x32 .agent.InfoResponse.OptionsEntry\x1a\x41\n\x0cOptionsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12 \n\x05value\x18\x02 \x01(\x0b\x32\x11.agent.OptionInfo:\x02\x38\x01\"2\n\nOptionInfo\x12$\n\nvalueTypes\x18\x01 \x03(\x0e\x32\x10.agent.ValueType\"M\n\x0bInitRequest\x12\x1e\n\x07options\x18\x01 \x03(\x0b\x32\r.agent.Option\x12\x0e\n\x06taskID\x18\x02 \x01(\t\x12\x0e\n\x06nodeID\x18\x03 \x01(\t\":\n\x06Option\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\"\n\x06values\x18\x02 \x03(\x0b\x32\x12.agent.OptionValue\"\xa6\x01\n\x0bOptionValue\x12\x1e\n\x04type\x18\x01 \x01(\x0e\x32\x10.agent.ValueType\x12\x13\n\tboolValue\x18\x02 \x01(\x08H\x00\x12\x12\n\x08intValue\x18\x03 \x01(\x03H\x00\x12\x15\n\x0b\x64oubleValue\x18\x04 \x01(\x01H\x00\x12\x15\n\x0bstringValue\x18\x05 \x01(\tH\x00\x12\x17\n\rdurationValue\x18\x06 \x01(\x03H\x00\x42\x07\n\x05value\".\n\x0cInitResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\r\n\x05\x65rror\x18\x02 \x01(\t\"\x11\n\x0fSnapshotRequest\"$\n\x10SnapshotResponse\x12\x10\n\x08snapshot\x18\x01 \x01(\x0c\"\"\n\x0eRestoreRequest\x12\x10\n\x08snapshot\x18\x01 \x01(\x0c\"1\n\x0fRestoreResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\r\n\x05\x65rror\x18\x02 \x01(\t\" \n\x10KeepaliveRequest\x12\x0c\n\x04time\x18\x01 \x01(\x03\"!\n\x11KeepaliveResponse\x12\x0c\n\x04time\x18\x01 \x01(\x03\"\x1e\n\rErrorResponse\x12\r\n\x05\x65rror\x18\x01 \x01(\t\"\x9f\x01\n\nBeginBatch\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05group\x18\x02 \x01(\t\x12)\n\x04tags\x18\x03 \x03(\x0b\x32\x1b.agent.BeginBatch.TagsEntry\x12\x0c\n\x04size\x18\x04 \x01(\x03\x12\x0e\n\x06\x62yName\x18\x05 \x01(\x08\x1a+\n\tTagsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x8c\x04\n\x05Point\x12\x0c\n\x04time\x18\x01 \x01(\x03\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x10\n\x08\x64\x61tabase\x18\x03 \x01(\t\x12\x17\n\x0fretentionPolicy\x18\x04 \x01(\t\x12\r\n\x05group\x18\x05 \x01(\t\x12\x12\n\ndimensions\x18\x06 \x03(\t\x12$\n\x04tags\x18\x07 \x03(\x0b\x32\x16.agent.Point.TagsEntry\x12\x34\n\x0c\x66ieldsDouble\x18\x08 \x03(\x0b\x32\x1e.agent.Point.FieldsDoubleEntry\x12.\n\tfieldsInt\x18\t \x03(\x0b\x32\x1b.agent.Point.FieldsIntEntry\x12\x34\n\x0c\x66ieldsString\x18\n \x03(\x0b\x32\x1e.agent.Point.FieldsStringEntry\x12\x0e\n\x06\x62yName\x18\x0b \x01(\x08\x1a+\n\tTagsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x33\n\x11\x46ieldsDoubleEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x01:\x02\x38\x01\x1a\x30\n\x0e\x46ieldsIntEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x03:\x02\x38\x01\x1a\x33\n\x11\x46ieldsStringEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x9b\x01\n\x08\x45ndBatch\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05group\x18\x02 \x01(\t\x12\x0c\n\x04tmax\x18\x03 \x01(\x03\x12\'\n\x04tags\x18\x04 \x03(\x0b\x32\x19.agent.EndBatch.TagsEntry\x12\x0e\n\x06\x62yName\x18\x05 \x01(\x08\x1a+\n\tTagsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\xc3\x02\n\x07Request\x12\"\n\x04info\x18\x01 \x01(\x0b\x32\x12.agent.InfoRequestH\x00\x12\"\n\x04init\x18\x02 \x01(\x0b\x32\x12.agent.InitRequestH\x00\x12,\n\tkeepalive\x18\x03 \x01(\x0b\x32\x17.agent.KeepaliveRequestH\x00\x12*\n\x08snapshot\x18\x04 \x01(\x0b\x32\x16.agent.SnapshotRequestH\x00\x12(\n\x07restore\x18\x05 \x01(\x0b\x32\x15.agent.RestoreRequestH\x00\x12\"\n\x05\x62\x65gin\x18\x10 \x01(\x0b\x32\x11.agent.BeginBatchH\x00\x12\x1d\n\x05point\x18\x11 \x01(\x0b\x32\x0c.agent.PointH\x00\x12\x1e\n\x03\x65nd\x18\x12 \x01(\x0b\x32\x0f.agent.EndBatchH\x00\x42\t\n\x07message\"\xf0\x02\n\x08Response\x12#\n\x04info\x18\x01 \x01(\x0b\x32\x13.agent.InfoResponseH\x00\x12#\n\x04init\x18\x02 \x01(\x0b\x32\x13.agent.InitResponseH\x00\x12-\n\tkeepalive\x18\x03 \x01(\x0b\x32\x18.agent.KeepaliveResponseH\x00\x12+\n\x08snapshot\x18\x04 \x01(\x0b\x32\x17.agent.SnapshotResponseH\x00\x12)\n\x07restore\x18\x05 \x01(\x0b\x32\x16.agent.RestoreResponseH\x00\x12%\n\x05\x65rror\x18\x06 \x01(\x0b\x32\x14.agent.ErrorResponseH\x00\x12\"\n\x05\x62\x65gin\x18\x10 \x01(\x0b\x32\x11.agent.BeginBatchH\x00\x12\x1d\n\x05point\x18\x11 \x01(\x0b\x32\x0c.agent.PointH\x00\x12\x1e\n\x03\x65nd\x18\x12 \x01(\x0b\x32\x0f.agent.EndBatchH\x00\x42\t\n\x07message*!\n\x08\x45\x64geType\x12\n\n\x06STREAM\x10\x00\x12\t\n\x05\x42\x41TCH\x10\x01*D\n\tValueType\x12\x08\n\x04\x42OOL\x10\x00\x12\x07\n\x03INT\x10\x01\x12\n\n\x06\x44OUBLE\x10\x02\x12\n\n\x06STRING\x10\x03\x12\x0c\n\x08\x44URATION\x10\x04\x62\x06proto3')
+  serialized_pb=_b('\n\tudf.proto\x12\x05\x61gent\"\r\n\x0bInfoRequest\"\xc7\x01\n\x0cInfoResponse\x12\x1e\n\x05wants\x18\x01 \x01(\x0e\x32\x0f.agent.EdgeType\x12!\n\x08provides\x18\x02 \x01(\x0e\x32\x0f.agent.EdgeType\x12\x31\n\x07options\x18\x03 \x03(\x0b\x32 .agent.InfoResponse.OptionsEntry\x1a\x41\n\x0cOptionsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12 \n\x05value\x18\x02 \x01(\x0b\x32\x11.agent.OptionInfo:\x02\x38\x01\"2\n\nOptionInfo\x12$\n\nvalueTypes\x18\x01 \x03(\x0e\x32\x10.agent.ValueType\"M\n\x0bInitRequest\x12\x1e\n\x07options\x18\x01 \x03(\x0b\x32\r.agent.Option\x12\x0e\n\x06taskID\x18\x02 \x01(\t\x12\x0e\n\x06nodeID\x18\x03 \x01(\t\":\n\x06Option\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\"\n\x06values\x18\x02 \x03(\x0b\x32\x12.agent.OptionValue\"\xa6\x01\n\x0bOptionValue\x12\x1e\n\x04type\x18\x01 \x01(\x0e\x32\x10.agent.ValueType\x12\x13\n\tboolValue\x18\x02 \x01(\x08H\x00\x12\x12\n\x08intValue\x18\x03 \x01(\x03H\x00\x12\x15\n\x0b\x64oubleValue\x18\x04 \x01(\x01H\x00\x12\x15\n\x0bstringValue\x18\x05 \x01(\tH\x00\x12\x17\n\rdurationValue\x18\x06 \x01(\x03H\x00\x42\x07\n\x05value\".\n\x0cInitResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\r\n\x05\x65rror\x18\x02 \x01(\t\"\x11\n\x0fSnapshotRequest\"$\n\x10SnapshotResponse\x12\x10\n\x08snapshot\x18\x01 \x01(\x0c\"\"\n\x0eRestoreRequest\x12\x10\n\x08snapshot\x18\x01 \x01(\x0c\"1\n\x0fRestoreResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\r\n\x05\x65rror\x18\x02 \x01(\t\" \n\x10KeepaliveRequest\x12\x0c\n\x04time\x18\x01 \x01(\x03\"!\n\x11KeepaliveResponse\x12\x0c\n\x04time\x18\x01 \x01(\x03\"\x1e\n\rErrorResponse\x12\r\n\x05\x65rror\x18\x01 \x01(\t\"\x9f\x01\n\nBeginBatch\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05group\x18\x02 \x01(\t\x12)\n\x04tags\x18\x03 \x03(\x0b\x32\x1b.agent.BeginBatch.TagsEntry\x12\x0c\n\x04size\x18\x04 \x01(\x03\x12\x0e\n\x06\x62yName\x18\x05 \x01(\x08\x1a+\n\tTagsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\xf1\x04\n\x05Point\x12\x0c\n\x04time\x18\x01 \x01(\x03\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x10\n\x08\x64\x61tabase\x18\x03 \x01(\t\x12\x17\n\x0fretentionPolicy\x18\x04 \x01(\t\x12\r\n\x05group\x18\x05 \x01(\t\x12\x12\n\ndimensions\x18\x06 \x03(\t\x12$\n\x04tags\x18\x07 \x03(\x0b\x32\x16.agent.Point.TagsEntry\x12\x34\n\x0c\x66ieldsDouble\x18\x08 \x03(\x0b\x32\x1e.agent.Point.FieldsDoubleEntry\x12.\n\tfieldsInt\x18\t \x03(\x0b\x32\x1b.agent.Point.FieldsIntEntry\x12\x34\n\x0c\x66ieldsString\x18\n \x03(\x0b\x32\x1e.agent.Point.FieldsStringEntry\x12\x30\n\nfieldsBool\x18\x0c \x03(\x0b\x32\x1c.agent.Point.FieldsBoolEntry\x12\x0e\n\x06\x62yName\x18\x0b \x01(\x08\x1a+\n\tTagsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x33\n\x11\x46ieldsDoubleEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x01:\x02\x38\x01\x1a\x30\n\x0e\x46ieldsIntEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x03:\x02\x38\x01\x1a\x33\n\x11\x46ieldsStringEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x31\n\x0f\x46ieldsBoolEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x08:\x02\x38\x01\"\x9b\x01\n\x08\x45ndBatch\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05group\x18\x02 \x01(\t\x12\x0c\n\x04tmax\x18\x03 \x01(\x03\x12\'\n\x04tags\x18\x04 \x03(\x0b\x32\x19.agent.EndBatch.TagsEntry\x12\x0e\n\x06\x62yName\x18\x05 \x01(\x08\x1a+\n\tTagsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\xc3\x02\n\x07Request\x12\"\n\x04info\x18\x01 \x01(\x0b\x32\x12.agent.InfoRequestH\x00\x12\"\n\x04init\x18\x02 \x01(\x0b\x32\x12.agent.InitRequestH\x00\x12,\n\tkeepalive\x18\x03 \x01(\x0b\x32\x17.agent.KeepaliveRequestH\x00\x12*\n\x08snapshot\x18\x04 \x01(\x0b\x32\x16.agent.SnapshotRequestH\x00\x12(\n\x07restore\x18\x05 \x01(\x0b\x32\x15.agent.RestoreRequestH\x00\x12\"\n\x05\x62\x65gin\x18\x10 \x01(\x0b\x32\x11.agent.BeginBatchH\x00\x12\x1d\n\x05point\x18\x11 \x01(\x0b\x32\x0c.agent.PointH\x00\x12\x1e\n\x03\x65nd\x18\x12 \x01(\x0b\x32\x0f.agent.EndBatchH\x00\x42\t\n\x07message\"\xf0\x02\n\x08Response\x12#\n\x04info\x18\x01 \x01(\x0b\x32\x13.agent.InfoResponseH\x00\x12#\n\x04init\x18\x02 \x01(\x0b\x32\x13.agent.InitResponseH\x00\x12-\n\tkeepalive\x18\x03 \x01(\x0b\x32\x18.agent.KeepaliveResponseH\x00\x12+\n\x08snapshot\x18\x04 \x01(\x0b\x32\x17.agent.SnapshotResponseH\x00\x12)\n\x07restore\x18\x05 \x01(\x0b\x32\x16.agent.RestoreResponseH\x00\x12%\n\x05\x65rror\x18\x06 \x01(\x0b\x32\x14.agent.ErrorResponseH\x00\x12\"\n\x05\x62\x65gin\x18\x10 \x01(\x0b\x32\x11.agent.BeginBatchH\x00\x12\x1d\n\x05point\x18\x11 \x01(\x0b\x32\x0c.agent.PointH\x00\x12\x1e\n\x03\x65nd\x18\x12 \x01(\x0b\x32\x0f.agent.EndBatchH\x00\x42\t\n\x07message*!\n\x08\x45\x64geType\x12\n\n\x06STREAM\x10\x00\x12\t\n\x05\x42\x41TCH\x10\x01*D\n\tValueType\x12\x08\n\x04\x42OOL\x10\x00\x12\x07\n\x03INT\x10\x01\x12\n\n\x06\x44OUBLE\x10\x02\x12\n\n\x06STRING\x10\x03\x12\x0c\n\x08\x44URATION\x10\x04\x62\x06proto3')
 )
-_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 _EDGETYPE = _descriptor.EnumDescriptor(
   name='EdgeType',
@@ -41,8 +40,8 @@ _EDGETYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=2434,
-  serialized_end=2467,
+  serialized_start=2535,
+  serialized_end=2568,
 )
 _sym_db.RegisterEnumDescriptor(_EDGETYPE)
 
@@ -76,8 +75,8 @@ _VALUETYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=2469,
-  serialized_end=2537,
+  serialized_start=2570,
+  serialized_end=2638,
 )
 _sym_db.RegisterEnumDescriptor(_VALUETYPE)
 
@@ -802,8 +801,8 @@ _POINT_FIELDSDOUBLEENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1423,
-  serialized_end=1474,
+  serialized_start=1473,
+  serialized_end=1524,
 )
 
 _POINT_FIELDSINTENTRY = _descriptor.Descriptor(
@@ -839,8 +838,8 @@ _POINT_FIELDSINTENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1476,
-  serialized_end=1524,
+  serialized_start=1526,
+  serialized_end=1574,
 )
 
 _POINT_FIELDSSTRINGENTRY = _descriptor.Descriptor(
@@ -876,8 +875,45 @@ _POINT_FIELDSSTRINGENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1526,
-  serialized_end=1577,
+  serialized_start=1576,
+  serialized_end=1627,
+)
+
+_POINT_FIELDSBOOLENTRY = _descriptor.Descriptor(
+  name='FieldsBoolEntry',
+  full_name='agent.Point.FieldsBoolEntry',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='key', full_name='agent.Point.FieldsBoolEntry.key', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='value', full_name='agent.Point.FieldsBoolEntry.value', index=1,
+      number=2, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=_descriptor._ParseOptions(descriptor_pb2.MessageOptions(), _b('8\001')),
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1629,
+  serialized_end=1678,
 )
 
 _POINT = _descriptor.Descriptor(
@@ -958,7 +994,14 @@ _POINT = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='byName', full_name='agent.Point.byName', index=10,
+      name='fieldsBool', full_name='agent.Point.fieldsBool', index=10,
+      number=12, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='byName', full_name='agent.Point.byName', index=11,
       number=11, type=8, cpp_type=7, label=1,
       has_default_value=False, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
@@ -967,7 +1010,7 @@ _POINT = _descriptor.Descriptor(
   ],
   extensions=[
   ],
-  nested_types=[_POINT_TAGSENTRY, _POINT_FIELDSDOUBLEENTRY, _POINT_FIELDSINTENTRY, _POINT_FIELDSSTRINGENTRY, ],
+  nested_types=[_POINT_TAGSENTRY, _POINT_FIELDSDOUBLEENTRY, _POINT_FIELDSINTENTRY, _POINT_FIELDSSTRINGENTRY, _POINT_FIELDSBOOLENTRY, ],
   enum_types=[
   ],
   options=None,
@@ -977,7 +1020,7 @@ _POINT = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=1053,
-  serialized_end=1577,
+  serialized_end=1678,
 )
 
 
@@ -1072,8 +1115,8 @@ _ENDBATCH = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1580,
-  serialized_end=1735,
+  serialized_start=1681,
+  serialized_end=1836,
 )
 
 
@@ -1155,8 +1198,8 @@ _REQUEST = _descriptor.Descriptor(
       name='message', full_name='agent.Request.message',
       index=0, containing_type=None, fields=[]),
   ],
-  serialized_start=1738,
-  serialized_end=2061,
+  serialized_start=1839,
+  serialized_end=2162,
 )
 
 
@@ -1245,8 +1288,8 @@ _RESPONSE = _descriptor.Descriptor(
       name='message', full_name='agent.Response.message',
       index=0, containing_type=None, fields=[]),
   ],
-  serialized_start=2064,
-  serialized_end=2432,
+  serialized_start=2165,
+  serialized_end=2533,
 )
 
 _INFORESPONSE_OPTIONSENTRY.fields_by_name['value'].message_type = _OPTIONINFO
@@ -1279,10 +1322,12 @@ _POINT_TAGSENTRY.containing_type = _POINT
 _POINT_FIELDSDOUBLEENTRY.containing_type = _POINT
 _POINT_FIELDSINTENTRY.containing_type = _POINT
 _POINT_FIELDSSTRINGENTRY.containing_type = _POINT
+_POINT_FIELDSBOOLENTRY.containing_type = _POINT
 _POINT.fields_by_name['tags'].message_type = _POINT_TAGSENTRY
 _POINT.fields_by_name['fieldsDouble'].message_type = _POINT_FIELDSDOUBLEENTRY
 _POINT.fields_by_name['fieldsInt'].message_type = _POINT_FIELDSINTENTRY
 _POINT.fields_by_name['fieldsString'].message_type = _POINT_FIELDSSTRINGENTRY
+_POINT.fields_by_name['fieldsBool'].message_type = _POINT_FIELDSBOOLENTRY
 _ENDBATCH_TAGSENTRY.containing_type = _ENDBATCH
 _ENDBATCH.fields_by_name['tags'].message_type = _ENDBATCH_TAGSENTRY
 _REQUEST.fields_by_name['info'].message_type = _INFOREQUEST
@@ -1374,6 +1419,7 @@ DESCRIPTOR.message_types_by_name['Request'] = _REQUEST
 DESCRIPTOR.message_types_by_name['Response'] = _RESPONSE
 DESCRIPTOR.enum_types_by_name['EdgeType'] = _EDGETYPE
 DESCRIPTOR.enum_types_by_name['ValueType'] = _VALUETYPE
+_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 InfoRequest = _reflection.GeneratedProtocolMessageType('InfoRequest', (_message.Message,), dict(
   DESCRIPTOR = _INFOREQUEST,
@@ -1525,6 +1571,13 @@ Point = _reflection.GeneratedProtocolMessageType('Point', (_message.Message,), d
     # @@protoc_insertion_point(class_scope:agent.Point.FieldsStringEntry)
     ))
   ,
+
+  FieldsBoolEntry = _reflection.GeneratedProtocolMessageType('FieldsBoolEntry', (_message.Message,), dict(
+    DESCRIPTOR = _POINT_FIELDSBOOLENTRY,
+    __module__ = 'udf_pb2'
+    # @@protoc_insertion_point(class_scope:agent.Point.FieldsBoolEntry)
+    ))
+  ,
   DESCRIPTOR = _POINT,
   __module__ = 'udf_pb2'
   # @@protoc_insertion_point(class_scope:agent.Point)
@@ -1534,6 +1587,7 @@ _sym_db.RegisterMessage(Point.TagsEntry)
 _sym_db.RegisterMessage(Point.FieldsDoubleEntry)
 _sym_db.RegisterMessage(Point.FieldsIntEntry)
 _sym_db.RegisterMessage(Point.FieldsStringEntry)
+_sym_db.RegisterMessage(Point.FieldsBoolEntry)
 
 EndBatch = _reflection.GeneratedProtocolMessageType('EndBatch', (_message.Message,), dict(
 
@@ -1577,6 +1631,8 @@ _POINT_FIELDSINTENTRY.has_options = True
 _POINT_FIELDSINTENTRY._options = _descriptor._ParseOptions(descriptor_pb2.MessageOptions(), _b('8\001'))
 _POINT_FIELDSSTRINGENTRY.has_options = True
 _POINT_FIELDSSTRINGENTRY._options = _descriptor._ParseOptions(descriptor_pb2.MessageOptions(), _b('8\001'))
+_POINT_FIELDSBOOLENTRY.has_options = True
+_POINT_FIELDSBOOLENTRY._options = _descriptor._ParseOptions(descriptor_pb2.MessageOptions(), _b('8\001'))
 _ENDBATCH_TAGSENTRY.has_options = True
 _ENDBATCH_TAGSENTRY._options = _descriptor._ParseOptions(descriptor_pb2.MessageOptions(), _b('8\001'))
 # @@protoc_insertion_point(module_scope)

@@ -10,6 +10,7 @@
 - [#1425](https://github.com/influxdata/kapacitor/pull/1425): BREAKING: Change over internal API to use message passing semantics.
     The breaking change is that the Combine and Flatten nodes previously, but erroneously, operated across batch boundaries; this has been fixed.
 - [#1497](https://github.com/influxdata/kapacitor/pull/1497): Add support for Docker Swarm autoscaling services.
+- [#1485](https://github.com/influxdata/kapacitor/issues/1485): Add bools field types to UDFs.
 
 ### Bugfixes
 

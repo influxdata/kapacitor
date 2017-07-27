@@ -491,7 +491,7 @@ func (s *Server) writeData() error {
 }
 
 func (s *Server) writePoint(p edge.PointMessage) error {
-	strs, floats, ints := s.fieldsToTypedMaps(p.Fields())
+	strs, floats, ints, bools := s.fieldsToTypedMaps(p.Fields())
 	udfPoint := &agent.Point{
 		Time:            p.Time().UnixNano(),
 		Name:            p.Name(),
@@ -504,6 +504,7 @@ func (s *Server) writePoint(p edge.PointMessage) error {
 		FieldsDouble:    floats,
 		FieldsInt:       ints,
 		FieldsString:    strs,
+		FieldsBool:      bools,
 	}
 	req := &agent.Request{
 		Message: &agent.Request_Point{Point: udfPoint},
@@ -515,6 +516,7 @@ func (s *Server) fieldsToTypedMaps(fields models.Fields) (
 	strs map[string]string,
 	floats map[string]float64,
 	ints map[string]int64,
+	bools map[string]bool,
 ) {
 	for k, v := range fields {
 		switch value := v.(type) {
@@ -533,6 +535,11 @@ func (s *Server) fieldsToTypedMaps(fields models.Fields) (
 				ints = make(map[string]int64)
 			}
 			ints[k] = value
+		case bool:
+			if bools == nil {
+				bools = make(map[string]bool)
+			}
+			bools[k] = value
 		default:
 			panic("unsupported field value type")
 		}
@@ -544,6 +551,7 @@ func (s *Server) typeMapsToFields(
 	strs map[string]string,
 	floats map[string]float64,
 	ints map[string]int64,
+	bools map[string]bool,
 ) models.Fields {
 	fields := make(models.Fields)
 	for k, v := range strs {
@@ -553,6 +561,9 @@ func (s *Server) typeMapsToFields(
 		fields[k] = v
 	}
 	for k, v := range floats {
+		fields[k] = v
+	}
+	for k, v := range bools {
 		fields[k] = v
 	}
 	return fields
@@ -573,7 +584,7 @@ func (s *Server) writeBeginBatch(begin edge.BeginBatchMessage) error {
 }
 
 func (s *Server) writeBatchPoint(group models.GroupID, bp edge.BatchPointMessage) error {
-	strs, floats, ints := s.fieldsToTypedMaps(bp.Fields())
+	strs, floats, ints, bools := s.fieldsToTypedMaps(bp.Fields())
 	req := &agent.Request{
 		Message: &agent.Request_Point{
 			Point: &agent.Point{
@@ -583,6 +594,7 @@ func (s *Server) writeBatchPoint(group models.GroupID, bp edge.BatchPointMessage
 				FieldsDouble: floats,
 				FieldsInt:    ints,
 				FieldsString: strs,
+				FieldsBool:   bools,
 			},
 		},
 	}
@@ -688,6 +700,7 @@ func (s *Server) handleResponse(response *agent.Response) error {
 					msg.Point.FieldsString,
 					msg.Point.FieldsDouble,
 					msg.Point.FieldsInt,
+					msg.Point.FieldsBool,
 				),
 				msg.Point.Tags,
 				time.Unix(0, msg.Point.Time).UTC(),
@@ -703,6 +716,7 @@ func (s *Server) handleResponse(response *agent.Response) error {
 					msg.Point.FieldsString,
 					msg.Point.FieldsDouble,
 					msg.Point.FieldsInt,
+					msg.Point.FieldsBool,
 				),
 				msg.Point.Tags,
 				time.Unix(0, msg.Point.Time).UTC(),
