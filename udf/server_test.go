@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/udf/agent"
@@ -413,18 +414,19 @@ func TestUDF_StartInitPointStop(t *testing.T) {
 	}
 
 	// Write point to server
-	pt := models.Point{
-		Name:            "test",
-		Database:        "db",
-		RetentionPolicy: "rp",
-		Tags:            models.Tags{"t1": "v1", "t2": "v2"},
-		Fields:          models.Fields{"f1": 1.0, "f2": 2.0},
-		Time:            time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
-	}
-	s.PointIn() <- pt
-	rpt := <-s.PointOut()
-	if !reflect.DeepEqual(rpt, pt) {
-		t.Errorf("unexpected returned point got: %v exp %v", rpt, pt)
+	p := edge.NewPointMessage(
+		"test",
+		"db",
+		"rp",
+		models.Dimensions{},
+		models.Fields{"f1": 1.0, "f2": 2.0},
+		models.Tags{"t1": "v1", "t2": "v2"},
+		time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+	)
+	s.In() <- p
+	rp := <-s.Out()
+	if !reflect.DeepEqual(rp, p) {
+		t.Errorf("unexpected returned point got: %v exp %v", rp, p)
 	}
 
 	s.Stop()
@@ -501,18 +503,25 @@ func TestUDF_StartInitBatchStop(t *testing.T) {
 	}
 
 	// Write point to server
-	b := models.Batch{
-		Name: "test",
-		Tags: models.Tags{"t1": "v1"},
-		TMax: time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
-		Points: []models.BatchPoint{{
-			Fields: models.Fields{"f1": 1.0, "f2": 2.0, "f3": int64(1), "f4": "str"},
-			Time:   time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
-			Tags:   models.Tags{"t1": "v1", "t2": "v2"},
-		}},
-	}
-	s.BatchIn() <- b
-	rb := <-s.BatchOut()
+	b := edge.NewBufferedBatchMessage(
+		edge.NewBeginBatchMessage(
+			"test",
+			models.Tags{"t1": "v1"},
+			false,
+			time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+			1,
+		),
+		[]edge.BatchPointMessage{
+			edge.NewBatchPointMessage(
+				models.Fields{"f1": 1.0, "f2": 2.0, "f3": int64(1), "f4": "str"},
+				models.Tags{"t1": "v1", "t2": "v2"},
+				time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+			),
+		},
+		edge.NewEndBatchMessage(),
+	)
+	s.In() <- b
+	rb := <-s.Out()
 	if !reflect.DeepEqual(b, rb) {
 		t.Errorf("unexpected returned batch got: %v exp %v", rb, b)
 	}

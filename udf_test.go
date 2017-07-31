@@ -12,6 +12,7 @@ import (
 
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/command"
+	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/udf/agent"
@@ -104,18 +105,19 @@ func testUDF_WritePoint(u udf.Interface, uio *udf_test.IO, t *testing.T) {
 	}
 
 	// Write point to server
-	pt := models.Point{
-		Name:            "test",
-		Database:        "db",
-		RetentionPolicy: "rp",
-		Tags:            models.Tags{"t1": "v1", "t2": "v2"},
-		Fields:          models.Fields{"f1": 1.0, "f2": 2.0},
-		Time:            time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
-	}
-	u.PointIn() <- pt
-	rpt := <-u.PointOut()
-	if !reflect.DeepEqual(rpt, pt) {
-		t.Errorf("unexpected returned point got: %v exp %v", rpt, pt)
+	p := edge.NewPointMessage(
+		"test",
+		"db",
+		"rp",
+		models.Dimensions{},
+		models.Fields{"f1": 1.0, "f2": 2.0},
+		models.Tags{"t1": "v1", "t2": "v2"},
+		time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+	)
+	u.In() <- p
+	rp := <-u.Out()
+	if !reflect.DeepEqual(rp, p) {
+		t.Errorf("unexpected returned point got: %v exp %v", rp, p)
 	}
 
 	u.Close()
@@ -203,18 +205,25 @@ func testUDF_WriteBatch(u udf.Interface, uio *udf_test.IO, t *testing.T) {
 	}
 
 	// Write point to server
-	b := models.Batch{
-		Name: "test",
-		Tags: models.Tags{"t1": "v1"},
-		TMax: time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
-		Points: []models.BatchPoint{{
-			Fields: models.Fields{"f1": 1.0, "f2": 2.0, "f3": int64(1), "f4": "str"},
-			Time:   time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
-			Tags:   models.Tags{"t1": "v1", "t2": "v2"},
-		}},
-	}
-	u.BatchIn() <- b
-	rb := <-u.BatchOut()
+	b := edge.NewBufferedBatchMessage(
+		edge.NewBeginBatchMessage(
+			"test",
+			models.Tags{"t1": "v1"},
+			false,
+			time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+			1,
+		),
+		[]edge.BatchPointMessage{
+			edge.NewBatchPointMessage(
+				models.Fields{"f1": 1.0, "f2": 2.0, "f3": int64(1), "f4": "str"},
+				models.Tags{"t1": "v1", "t2": "v2"},
+				time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+			),
+		},
+		edge.NewEndBatchMessage(),
+	)
+	u.In() <- b
+	rb := <-u.Out()
 	if !reflect.DeepEqual(b, rb) {
 		t.Errorf("unexpected returned batch got: %v exp %v", rb, b)
 	}

@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/pipeline"
 )
 
@@ -29,36 +30,46 @@ func newShiftNode(et *ExecutingTask, n *pipeline.ShiftNode, l *log.Logger) (*Shi
 	return sn, nil
 }
 
-func (s *ShiftNode) runShift([]byte) error {
-	switch s.Wants() {
-	case pipeline.StreamEdge:
-		for p, ok := s.ins[0].NextPoint(); ok; p, ok = s.ins[0].NextPoint() {
-			s.timer.Start()
-			p.Time = p.Time.Add(s.shift)
-			s.timer.Stop()
-			for _, child := range s.outs {
-				err := child.CollectPoint(p)
-				if err != nil {
-					return err
-				}
-			}
-		}
-	case pipeline.BatchEdge:
-		for b, ok := s.ins[0].NextBatch(); ok; b, ok = s.ins[0].NextBatch() {
-			s.timer.Start()
-			b.TMax = b.TMax.Add(s.shift)
-			b.Points = b.ShallowCopyPoints()
-			for i, p := range b.Points {
-				b.Points[i].Time = p.Time.Add(s.shift)
-			}
-			s.timer.Stop()
-			for _, child := range s.outs {
-				err := child.CollectBatch(b)
-				if err != nil {
-					return err
-				}
-			}
-		}
-	}
-	return nil
+func (n *ShiftNode) runShift([]byte) error {
+	consumer := edge.NewConsumerWithReceiver(
+		n.ins[0],
+		edge.NewReceiverFromForwardReceiverWithStats(
+			n.outs,
+			edge.NewTimedForwardReceiver(n.timer, n),
+		),
+	)
+	return consumer.Consume()
+}
+
+func (n *ShiftNode) doShift(t edge.TimeSetter) {
+	t.SetTime(t.Time().Add(n.shift))
+}
+
+func (n *ShiftNode) BeginBatch(begin edge.BeginBatchMessage) (edge.Message, error) {
+	begin = begin.ShallowCopy()
+	n.doShift(begin)
+	return begin, nil
+}
+
+func (n *ShiftNode) BatchPoint(bp edge.BatchPointMessage) (edge.Message, error) {
+	bp = bp.ShallowCopy()
+	n.doShift(bp)
+	return bp, nil
+}
+
+func (n *ShiftNode) EndBatch(end edge.EndBatchMessage) (edge.Message, error) {
+	return end, nil
+}
+
+func (n *ShiftNode) Point(p edge.PointMessage) (edge.Message, error) {
+	p = p.ShallowCopy()
+	n.doShift(p)
+	return p, nil
+}
+
+func (n *ShiftNode) Barrier(b edge.BarrierMessage) (edge.Message, error) {
+	return b, nil
+}
+func (n *ShiftNode) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
+	return d, nil
 }

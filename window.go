@@ -4,10 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"sync"
 	"time"
 
-	"github.com/influxdata/kapacitor/expvar"
+	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 )
@@ -19,6 +18,9 @@ type WindowNode struct {
 
 // Create a new  WindowNode, which windows data for a period of time and emits the window.
 func newWindowNode(et *ExecutingTask, n *pipeline.WindowNode, l *log.Logger) (*WindowNode, error) {
+	if n.Period == 0 && n.PeriodCount == 0 {
+		return nil, errors.New("window node must have either a non zero period or non zero period count")
+	}
 	wn := &WindowNode{
 		w:    n,
 		node: node{Node: n, et: et, logger: l},
@@ -27,113 +29,86 @@ func newWindowNode(et *ExecutingTask, n *pipeline.WindowNode, l *log.Logger) (*W
 	return wn, nil
 }
 
-type window interface {
-	Insert(p models.Point) (models.Batch, bool)
+func (n *WindowNode) runWindow([]byte) error {
+	consumer := edge.NewGroupedConsumer(n.ins[0], n)
+	n.statMap.Set(statCardinalityGauge, consumer.CardinalityVar())
+	return consumer.Consume()
 }
 
-func (w *WindowNode) runWindow([]byte) error {
-	var mu sync.RWMutex
-	windows := make(map[models.GroupID]window)
-	valueF := func() int64 {
-		mu.RLock()
-		l := len(windows)
-		mu.RUnlock()
-		return int64(l)
+func (n *WindowNode) NewGroup(group edge.GroupInfo, first edge.PointMeta) (edge.Receiver, error) {
+	r, err := n.newWindow(group, first)
+	if err != nil {
+		return nil, err
 	}
-	w.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
+	return edge.NewReceiverFromForwardReceiverWithStats(
+		n.outs,
+		edge.NewTimedForwardReceiver(n.timer, r),
+	), nil
+}
 
-	// Loops through points windowing by group
-	for p, ok := w.ins[0].NextPoint(); ok; p, ok = w.ins[0].NextPoint() {
-		w.timer.Start()
-		mu.RLock()
-		wnd := windows[p.Group]
-		mu.RUnlock()
-		if wnd == nil {
-			tags := make(map[string]string, len(p.Dimensions.TagNames))
-			for _, dim := range p.Dimensions.TagNames {
-				tags[dim] = p.Tags[dim]
-			}
-			switch {
-			case w.w.Period != 0:
-				// Window by time
-				wnd = newWindowByTime(
-					p.Time,
-					w.w.Period,
-					w.w.Every,
-					p.Name,
-					p.Group,
-					w.w.AlignFlag,
-					p.Dimensions.ByName,
-					w.w.FillPeriodFlag,
-					tags,
-					w.logger,
-				)
-			case w.w.PeriodCount != 0:
-				wnd = newWindowByCount(
-					p.Name,
-					p.Group,
-					tags,
-					p.Dimensions.ByName,
-					int(w.w.PeriodCount),
-					int(w.w.EveryCount),
-					w.w.FillPeriodFlag,
-					w.logger,
-				)
-			default:
-				// This should not be possible, but just in case.
-				return errors.New("invalid window, no period specified for either time or count")
-			}
-			mu.Lock()
-			windows[p.Group] = wnd
-			mu.Unlock()
-		}
-		batch, ok := wnd.Insert(p)
-		if ok {
-			// Send window to all children
-			w.timer.Pause()
-			for _, child := range w.outs {
-				err := child.CollectBatch(batch)
-				if err != nil {
-					return err
-				}
-			}
-			w.timer.Resume()
-		}
-		w.timer.Stop()
+func (n *WindowNode) DeleteGroup(group models.GroupID) {
+	// Nothing to do
+}
+
+func (n *WindowNode) newWindow(group edge.GroupInfo, first edge.PointMeta) (edge.ForwardReceiver, error) {
+	switch {
+	case n.w.Period != 0:
+		return newWindowByTime(
+			first.Name(),
+			first.Time(),
+			group,
+			n.w.Period,
+			n.w.Every,
+			n.w.AlignFlag,
+			n.w.FillPeriodFlag,
+			n.logger,
+		), nil
+	case n.w.PeriodCount != 0:
+		return newWindowByCount(
+			first.Name(),
+			group,
+			int(n.w.PeriodCount),
+			int(n.w.EveryCount),
+			n.w.FillPeriodFlag,
+			n.logger,
+		), nil
+	default:
+		return nil, errors.New("unreachable code, window node should have a non-zero period or period count")
 	}
-	return nil
 }
 
 type windowByTime struct {
-	buf      *windowTimeBuffer
-	align    bool
+	name  string
+	group edge.GroupInfo
+
 	nextEmit time.Time
-	period   time.Duration
-	every    time.Duration
-	name     string
-	group    models.GroupID
-	byName   bool
-	tags     map[string]string
-	logger   *log.Logger
+
+	buf *windowTimeBuffer
+
+	align,
+	fillPeriod bool
+
+	period time.Duration
+	every  time.Duration
+
+	logger *log.Logger
 }
 
 func newWindowByTime(
-	now time.Time,
+	name string,
+	t time.Time,
+	group edge.GroupInfo,
 	period,
 	every time.Duration,
-	name string,
-	group models.GroupID,
 	align,
-	byName,
 	fillPeriod bool,
-	tags models.Tags,
 	logger *log.Logger,
 
 ) *windowByTime {
-	// Determine first nextEmit time.
+	// Determine nextEmit time.
 	var nextEmit time.Time
 	if fillPeriod {
-		nextEmit = now.Add(period)
+		nextEmit = t.Add(period)
 		if align {
 			firstPeriod := nextEmit
 			// Needs to be aligned with Every and be greater than now+Period
@@ -144,56 +119,70 @@ func newWindowByTime(
 			}
 		}
 	} else {
-		nextEmit = now.Add(every)
+		nextEmit = t.Add(every)
 		if align {
 			nextEmit = nextEmit.Truncate(every)
 		}
 	}
 	return &windowByTime{
-		buf:      &windowTimeBuffer{logger: logger},
-		nextEmit: nextEmit,
-		align:    align,
-		period:   period,
-		every:    every,
-		name:     name,
-		group:    group,
-		byName:   byName,
-		tags:     tags,
-		logger:   logger,
+		name:       name,
+		group:      group,
+		nextEmit:   nextEmit,
+		buf:        &windowTimeBuffer{logger: logger},
+		align:      align,
+		fillPeriod: fillPeriod,
+		period:     period,
+		every:      every,
+		logger:     logger,
 	}
 }
 
-func (w *windowByTime) Insert(p models.Point) (b models.Batch, ok bool) {
+func (w *windowByTime) BeginBatch(edge.BeginBatchMessage) (edge.Message, error) {
+	return nil, errors.New("window does not support batch data")
+}
+func (w *windowByTime) BatchPoint(edge.BatchPointMessage) (edge.Message, error) {
+	return nil, errors.New("window does not support batch data")
+}
+func (w *windowByTime) EndBatch(edge.EndBatchMessage) (edge.Message, error) {
+	return nil, errors.New("window does not support batch data")
+}
+func (w *windowByTime) Barrier(b edge.BarrierMessage) (edge.Message, error) {
+	//TODO(nathanielc): Implement barrier messages to flush window
+	return b, nil
+}
+func (w *windowByTime) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
+	return d, nil
+}
+
+func (w *windowByTime) Point(p edge.PointMessage) (msg edge.Message, err error) {
 	if w.every == 0 {
 		// Insert point before.
 		w.buf.insert(p)
 		// Since we are emitting every point we can use a right aligned window (oldest, now]
-		if !p.Time.Before(w.nextEmit) {
+		if !p.Time().Before(w.nextEmit) {
 			// purge old points
-			oldest := p.Time.Add(-1 * w.period)
+			oldest := p.Time().Add(-1 * w.period)
 			w.buf.purge(oldest, false)
 
 			// get current batch
-			b = w.batch(p.Time)
-			ok = true
+			msg = w.batch(p.Time())
 
 			// Next emit time is now
-			w.nextEmit = p.Time
+			w.nextEmit = p.Time()
 		}
 	} else {
 		// Since more points can arrive with the same time we need to use a left aligned window [oldest, now).
-		if !p.Time.Before(w.nextEmit) {
+		if !p.Time().Before(w.nextEmit) {
 			// purge old points
 			oldest := w.nextEmit.Add(-1 * w.period)
 			w.buf.purge(oldest, true)
 
 			// get current batch
-			b = w.batch(w.nextEmit)
-			ok = true
+			msg = w.batch(w.nextEmit)
 
 			// Determine next emit time.
 			// This is dependent on the current time not the last time we emitted.
-			w.nextEmit = p.Time.Add(w.every)
+			w.nextEmit = p.Time().Add(w.every)
 			if w.align {
 				w.nextEmit = w.nextEmit.Truncate(w.every)
 			}
@@ -204,20 +193,26 @@ func (w *windowByTime) Insert(p models.Point) (b models.Batch, ok bool) {
 	return
 }
 
-func (w *windowByTime) batch(tmax time.Time) models.Batch {
-	return models.Batch{
-		Name:   w.name,
-		Group:  w.group,
-		Tags:   w.tags,
-		TMax:   tmax,
-		ByName: w.byName,
-		Points: w.buf.points(),
-	}
+// batch returns the current window buffer as a batch message.
+// TODO(nathanielc): A possible optimization could be to not buffer the data at all if we know that we do not have overlapping windows.
+func (w *windowByTime) batch(tmax time.Time) edge.BufferedBatchMessage {
+	points := w.buf.points()
+	return edge.NewBufferedBatchMessage(
+		edge.NewBeginBatchMessage(
+			w.name,
+			w.group.Tags,
+			w.group.Dimensions.ByName,
+			tmax,
+			len(points),
+		),
+		points,
+		edge.NewEndBatchMessage(),
+	)
 }
 
 // implements a purpose built ring buffer for the window of points
 type windowTimeBuffer struct {
-	window []models.Point
+	window []edge.PointMessage
 	start  int
 	stop   int
 	size   int
@@ -225,11 +220,11 @@ type windowTimeBuffer struct {
 }
 
 // Insert a single point into the buffer.
-func (b *windowTimeBuffer) insert(p models.Point) {
+func (b *windowTimeBuffer) insert(p edge.PointMessage) {
 	if b.size == cap(b.window) {
 		//Increase our buffer
 		c := 2 * (b.size + 1)
-		w := make([]models.Point, b.size+1, c)
+		w := make([]edge.PointMessage, b.size+1, c)
 		if b.size == 0 {
 			//do nothing
 		} else if b.stop > b.start {
@@ -279,22 +274,22 @@ func (b *windowTimeBuffer) purge(oldest time.Time, inclusive bool) {
 	}
 	if b.start < b.stop {
 		for ; b.start < b.stop; b.start++ {
-			if include(b.window[b.start].Time) {
+			if include(b.window[b.start].Time()) {
 				break
 			}
 		}
 		b.size = b.stop - b.start
 	} else {
-		if include(b.window[l-1].Time) {
+		if include(b.window[l-1].Time()) {
 			for ; b.start < l; b.start++ {
-				if include(b.window[b.start].Time) {
+				if include(b.window[b.start].Time()) {
 					break
 				}
 			}
 			b.size = l - b.start + b.stop
 		} else {
 			for b.start = 0; b.start < b.stop; b.start++ {
-				if include(b.window[b.start].Time) {
+				if include(b.window[b.start].Time()) {
 					break
 				}
 			}
@@ -304,26 +299,27 @@ func (b *windowTimeBuffer) purge(oldest time.Time, inclusive bool) {
 }
 
 // Returns a copy of the current buffer.
-func (b *windowTimeBuffer) points() []models.BatchPoint {
+// TODO(nathanielc): Optimize this function use buffered vs unbuffered batch messages.
+func (b *windowTimeBuffer) points() []edge.BatchPointMessage {
 	if b.size == 0 {
 		return nil
 	}
-	points := make([]models.BatchPoint, b.size)
+	points := make([]edge.BatchPointMessage, b.size)
 	if b.stop > b.start {
 		for i, p := range b.window[b.start:b.stop] {
-			points[i] = models.BatchPointFromPoint(p)
+			points[i] = edge.BatchPointFromPoint(p)
 		}
 	} else {
 		j := 0
 		l := len(b.window)
 		for i := b.start; i < l; i++ {
 			p := b.window[i]
-			points[j] = models.BatchPointFromPoint(p)
+			points[j] = edge.BatchPointFromPoint(p)
 			j++
 		}
 		for i := 0; i < b.stop; i++ {
 			p := b.window[i]
-			points[j] = models.BatchPointFromPoint(p)
+			points[j] = edge.BatchPointFromPoint(p)
 			j++
 		}
 	}
@@ -331,12 +327,10 @@ func (b *windowTimeBuffer) points() []models.BatchPoint {
 }
 
 type windowByCount struct {
-	name   string
-	group  models.GroupID
-	tags   models.Tags
-	byName bool
+	name  string
+	group edge.GroupInfo
 
-	buf      []models.BatchPoint
+	buf      []edge.BatchPointMessage
 	start    int
 	stop     int
 	period   int
@@ -350,9 +344,7 @@ type windowByCount struct {
 
 func newWindowByCount(
 	name string,
-	group models.GroupID,
-	tags models.Tags,
-	byName bool,
+	group edge.GroupInfo,
 	period,
 	every int,
 	fillPeriod bool,
@@ -365,22 +357,32 @@ func newWindowByCount(
 	return &windowByCount{
 		name:     name,
 		group:    group,
-		tags:     tags,
-		byName:   byName,
-		buf:      make([]models.BatchPoint, period),
+		buf:      make([]edge.BatchPointMessage, period),
 		period:   period,
 		every:    every,
 		nextEmit: nextEmit,
 		logger:   logger,
 	}
 }
+func (w *windowByCount) BeginBatch(edge.BeginBatchMessage) (edge.Message, error) {
+	return nil, errors.New("window does not support batch data")
+}
+func (w *windowByCount) BatchPoint(edge.BatchPointMessage) (edge.Message, error) {
+	return nil, errors.New("window does not support batch data")
+}
+func (w *windowByCount) EndBatch(edge.EndBatchMessage) (edge.Message, error) {
+	return nil, errors.New("window does not support batch data")
+}
+func (w *windowByCount) Barrier(b edge.BarrierMessage) (edge.Message, error) {
+	//TODO(nathanielc): Implement barrier messages to flush window
+	return b, nil
+}
+func (w *windowByCount) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
+	return d, nil
+}
 
-func (w *windowByCount) Insert(p models.Point) (b models.Batch, ok bool) {
-	w.buf[w.stop] = models.BatchPoint{
-		Time:   p.Time,
-		Fields: p.Fields,
-		Tags:   p.Tags,
-	}
+func (w *windowByCount) Point(p edge.PointMessage) (msg edge.Message, err error) {
+	w.buf[w.stop] = edge.BatchPointFromPoint(p)
 	w.stop = (w.stop + 1) % w.period
 	if w.size == w.period {
 		w.start = (w.start + 1) % w.period
@@ -390,31 +392,33 @@ func (w *windowByCount) Insert(p models.Point) (b models.Batch, ok bool) {
 	w.count++
 	//Check if its time to emit
 	if w.count == w.nextEmit {
-		b = w.batch()
-		ok = true
+		w.nextEmit += w.every
+		msg = w.batch()
 	}
 	return
 }
 
-func (w *windowByCount) batch() models.Batch {
-	w.nextEmit += w.every
+func (w *windowByCount) batch() edge.BufferedBatchMessage {
 	points := w.points()
-	return models.Batch{
-		Name:   w.name,
-		Group:  w.group,
-		Tags:   w.tags,
-		TMax:   points[len(points)-1].Time,
-		ByName: w.byName,
-		Points: points,
-	}
+	return edge.NewBufferedBatchMessage(
+		edge.NewBeginBatchMessage(
+			w.name,
+			w.group.Tags,
+			w.group.Dimensions.ByName,
+			points[len(points)-1].Time(),
+			len(points),
+		),
+		points,
+		edge.NewEndBatchMessage(),
+	)
 }
 
 // Returns a copy of the current buffer.
-func (w *windowByCount) points() []models.BatchPoint {
+func (w *windowByCount) points() []edge.BatchPointMessage {
 	if w.size == 0 {
 		return nil
 	}
-	points := make([]models.BatchPoint, w.size)
+	points := make([]edge.BatchPointMessage, w.size)
 	if w.stop > w.start {
 		copy(points, w.buf[w.start:w.stop])
 	} else {

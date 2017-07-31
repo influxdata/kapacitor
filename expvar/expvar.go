@@ -16,14 +16,17 @@ import (
 )
 
 type IntVar interface {
+	expvar.Var
 	IntValue() int64
 }
 
 type FloatVar interface {
+	expvar.Var
 	FloatValue() float64
 }
 
 type StringVar interface {
+	expvar.Var
 	StringValue() string
 }
 

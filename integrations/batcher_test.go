@@ -350,7 +350,6 @@ batch
 		.period(10s)
 		.every(10s)
 	|difference('value')
-	|log()
 	|httpOut('TestBatch_Difference')
 `
 

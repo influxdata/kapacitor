@@ -10,76 +10,40 @@ import "github.com/influxdata/influxdb/influxql"
 
 //tick:ignore
 type ReduceCreater struct {
-	CreateFloatReducer     func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter)
-	CreateFloatBulkReducer func() (FloatBulkPointAggregator, influxql.FloatPointEmitter)
+	CreateFloatReducer func() (influxql.FloatPointAggregator, influxql.FloatPointEmitter)
 
-	CreateFloatIntegerReducer     func() (influxql.FloatPointAggregator, influxql.IntegerPointEmitter)
-	CreateFloatBulkIntegerReducer func() (FloatBulkPointAggregator, influxql.IntegerPointEmitter)
+	CreateFloatIntegerReducer func() (influxql.FloatPointAggregator, influxql.IntegerPointEmitter)
 
-	CreateFloatStringReducer     func() (influxql.FloatPointAggregator, influxql.StringPointEmitter)
-	CreateFloatBulkStringReducer func() (FloatBulkPointAggregator, influxql.StringPointEmitter)
+	CreateFloatStringReducer func() (influxql.FloatPointAggregator, influxql.StringPointEmitter)
 
-	CreateFloatBooleanReducer     func() (influxql.FloatPointAggregator, influxql.BooleanPointEmitter)
-	CreateFloatBulkBooleanReducer func() (FloatBulkPointAggregator, influxql.BooleanPointEmitter)
+	CreateFloatBooleanReducer func() (influxql.FloatPointAggregator, influxql.BooleanPointEmitter)
 
-	CreateIntegerFloatReducer     func() (influxql.IntegerPointAggregator, influxql.FloatPointEmitter)
-	CreateIntegerBulkFloatReducer func() (IntegerBulkPointAggregator, influxql.FloatPointEmitter)
+	CreateIntegerFloatReducer func() (influxql.IntegerPointAggregator, influxql.FloatPointEmitter)
 
-	CreateIntegerReducer     func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter)
-	CreateIntegerBulkReducer func() (IntegerBulkPointAggregator, influxql.IntegerPointEmitter)
+	CreateIntegerReducer func() (influxql.IntegerPointAggregator, influxql.IntegerPointEmitter)
 
-	CreateIntegerStringReducer     func() (influxql.IntegerPointAggregator, influxql.StringPointEmitter)
-	CreateIntegerBulkStringReducer func() (IntegerBulkPointAggregator, influxql.StringPointEmitter)
+	CreateIntegerStringReducer func() (influxql.IntegerPointAggregator, influxql.StringPointEmitter)
 
-	CreateIntegerBooleanReducer     func() (influxql.IntegerPointAggregator, influxql.BooleanPointEmitter)
-	CreateIntegerBulkBooleanReducer func() (IntegerBulkPointAggregator, influxql.BooleanPointEmitter)
+	CreateIntegerBooleanReducer func() (influxql.IntegerPointAggregator, influxql.BooleanPointEmitter)
 
-	CreateStringFloatReducer     func() (influxql.StringPointAggregator, influxql.FloatPointEmitter)
-	CreateStringBulkFloatReducer func() (StringBulkPointAggregator, influxql.FloatPointEmitter)
+	CreateStringFloatReducer func() (influxql.StringPointAggregator, influxql.FloatPointEmitter)
 
-	CreateStringIntegerReducer     func() (influxql.StringPointAggregator, influxql.IntegerPointEmitter)
-	CreateStringBulkIntegerReducer func() (StringBulkPointAggregator, influxql.IntegerPointEmitter)
+	CreateStringIntegerReducer func() (influxql.StringPointAggregator, influxql.IntegerPointEmitter)
 
-	CreateStringReducer     func() (influxql.StringPointAggregator, influxql.StringPointEmitter)
-	CreateStringBulkReducer func() (StringBulkPointAggregator, influxql.StringPointEmitter)
+	CreateStringReducer func() (influxql.StringPointAggregator, influxql.StringPointEmitter)
 
-	CreateStringBooleanReducer     func() (influxql.StringPointAggregator, influxql.BooleanPointEmitter)
-	CreateStringBulkBooleanReducer func() (StringBulkPointAggregator, influxql.BooleanPointEmitter)
+	CreateStringBooleanReducer func() (influxql.StringPointAggregator, influxql.BooleanPointEmitter)
 
-	CreateBooleanFloatReducer     func() (influxql.BooleanPointAggregator, influxql.FloatPointEmitter)
-	CreateBooleanBulkFloatReducer func() (BooleanBulkPointAggregator, influxql.FloatPointEmitter)
+	CreateBooleanFloatReducer func() (influxql.BooleanPointAggregator, influxql.FloatPointEmitter)
 
-	CreateBooleanIntegerReducer     func() (influxql.BooleanPointAggregator, influxql.IntegerPointEmitter)
-	CreateBooleanBulkIntegerReducer func() (BooleanBulkPointAggregator, influxql.IntegerPointEmitter)
+	CreateBooleanIntegerReducer func() (influxql.BooleanPointAggregator, influxql.IntegerPointEmitter)
 
-	CreateBooleanStringReducer     func() (influxql.BooleanPointAggregator, influxql.StringPointEmitter)
-	CreateBooleanBulkStringReducer func() (BooleanBulkPointAggregator, influxql.StringPointEmitter)
+	CreateBooleanStringReducer func() (influxql.BooleanPointAggregator, influxql.StringPointEmitter)
 
-	CreateBooleanReducer     func() (influxql.BooleanPointAggregator, influxql.BooleanPointEmitter)
-	CreateBooleanBulkReducer func() (BooleanBulkPointAggregator, influxql.BooleanPointEmitter)
+	CreateBooleanReducer func() (influxql.BooleanPointAggregator, influxql.BooleanPointEmitter)
 
 	TopBottomCallInfo      *TopBottomCallInfo
 	IsSimpleSelector       bool
 	IsStreamTransformation bool
 	IsEmptyOK              bool
-}
-
-type FloatBulkPointAggregator interface {
-	influxql.FloatPointAggregator
-	influxql.FloatBulkPointAggregator
-}
-
-type IntegerBulkPointAggregator interface {
-	influxql.IntegerPointAggregator
-	influxql.IntegerBulkPointAggregator
-}
-
-type StringBulkPointAggregator interface {
-	influxql.StringPointAggregator
-	influxql.StringBulkPointAggregator
-}
-
-type BooleanBulkPointAggregator interface {
-	influxql.BooleanPointAggregator
-	influxql.BooleanBulkPointAggregator
 }

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/pipeline"
 )
 
@@ -37,31 +37,31 @@ func newStatsNode(et *ExecutingTask, n *pipeline.StatsNode, l *log.Logger) (*Sta
 	return sn, nil
 }
 
-func (s *StatsNode) runStats([]byte) error {
-	if s.s.AlignFlag {
+func (n *StatsNode) runStats([]byte) error {
+	if n.s.AlignFlag {
 		// Wait till we are roughly aligned with the interval.
 		now := time.Now()
-		next := now.Truncate(s.s.Interval).Add(s.s.Interval)
+		next := now.Truncate(n.s.Interval).Add(n.s.Interval)
 		after := time.NewTicker(next.Sub(now))
 		select {
 		case <-after.C:
 			after.Stop()
-		case <-s.closing:
+		case <-n.closing:
 			after.Stop()
 			return nil
 		}
-		if err := s.emit(now); err != nil {
+		if err := n.emit(now); err != nil {
 			return err
 		}
 	}
-	ticker := time.NewTicker(s.s.Interval)
+	ticker := time.NewTicker(n.s.Interval)
 	defer ticker.Stop()
 	for {
 		select {
-		case <-s.closing:
+		case <-n.closing:
 			return nil
 		case now := <-ticker.C:
-			if err := s.emit(now); err != nil {
+			if err := n.emit(now); err != nil {
 				return err
 			}
 		}
@@ -69,40 +69,41 @@ func (s *StatsNode) runStats([]byte) error {
 }
 
 // Emit a set of stats data points.
-func (s *StatsNode) emit(now time.Time) error {
-	s.timer.Start()
-	point := models.Point{
-		Name: "stats",
-		Tags: map[string]string{"node": s.en.Name()},
-		Time: now.UTC(),
+func (n *StatsNode) emit(now time.Time) error {
+	n.timer.Start()
+	defer n.timer.Stop()
+
+	name := "stats"
+	t := now.UTC()
+	if n.s.AlignFlag {
+		t = t.Round(n.s.Interval)
 	}
-	if s.s.AlignFlag {
-		point.Time = point.Time.Round(s.s.Interval)
-	}
-	stats := s.en.nodeStatsByGroup()
-	for group, stat := range stats {
-		point.Fields = stat.Fields
-		point.Group = group
-		point.Dimensions = stat.Dimensions
-		point.Tags = stat.Tags
-		s.timer.Pause()
-		for _, out := range s.outs {
-			err := out.CollectPoint(point)
+	stats := n.en.nodeStatsByGroup()
+	for _, stat := range stats {
+		point := edge.NewPointMessage(
+			name, "", "",
+			stat.Dimensions,
+			stat.Fields,
+			stat.Tags,
+			t,
+		)
+		n.timer.Pause()
+		for _, out := range n.outs {
+			err := out.Collect(point)
 			if err != nil {
 				return err
 			}
 		}
-		s.timer.Resume()
+		n.timer.Resume()
 	}
-	s.timer.Stop()
 	return nil
 }
 
-func (s *StatsNode) stopStats() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if !s.closed {
-		s.closed = true
-		close(s.closing)
+func (n *StatsNode) stopStats() {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if !n.closed {
+		n.closed = true
+		close(n.closing)
 	}
 }

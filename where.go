@@ -4,10 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"sync"
 
-	"github.com/influxdata/kapacitor/expvar"
-	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/tick/stateful"
@@ -18,18 +16,24 @@ type WhereNode struct {
 	w        *pipeline.WhereNode
 	endpoint string
 
-	expressions map[models.GroupID]stateful.Expression
-	scopePools  map[models.GroupID]stateful.ScopePool
+	expression stateful.Expression
+	scopePool  stateful.ScopePool
 }
 
 // Create a new WhereNode which filters down the batch or stream by a condition
 func newWhereNode(et *ExecutingTask, n *pipeline.WhereNode, l *log.Logger) (wn *WhereNode, err error) {
 	wn = &WhereNode{
-		node:        node{Node: n, et: et, logger: l},
-		w:           n,
-		expressions: make(map[models.GroupID]stateful.Expression),
-		scopePools:  make(map[models.GroupID]stateful.ScopePool),
+		node: node{Node: n, et: et, logger: l},
+		w:    n,
 	}
+
+	expr, err := stateful.NewExpression(n.Lambda.Expression)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to compile expression in where clause: %v", err)
+	}
+	wn.expression = expr
+	wn.scopePool = stateful.NewScopePool(ast.FindReferenceVariables(n.Lambda.Expression))
+
 	wn.runF = wn.runWhere
 	if n.Lambda == nil {
 		return nil, errors.New("nil expression passed to WhereNode")
@@ -37,95 +41,69 @@ func newWhereNode(et *ExecutingTask, n *pipeline.WhereNode, l *log.Logger) (wn *
 	return
 }
 
-func (w *WhereNode) runWhere(snapshot []byte) error {
-	var mu sync.RWMutex
-	valueF := func() int64 {
-		mu.RLock()
-		l := len(w.expressions)
-		mu.RUnlock()
-		return int64(l)
+func (n *WhereNode) runWhere(snapshot []byte) error {
+	consumer := edge.NewGroupedConsumer(
+		n.ins[0],
+		n,
+	)
+	n.statMap.Set(statCardinalityGauge, consumer.CardinalityVar())
+
+	return consumer.Consume()
+}
+
+func (n *WhereNode) NewGroup(group edge.GroupInfo, first edge.PointMeta) (edge.Receiver, error) {
+	return edge.NewReceiverFromForwardReceiverWithStats(
+		n.outs,
+		edge.NewTimedForwardReceiver(n.timer, n.newGroup()),
+	), nil
+}
+
+func (n *WhereNode) newGroup() *whereGroup {
+	return &whereGroup{
+		n:    n,
+		expr: n.expression.CopyReset(),
 	}
-	w.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
+}
 
-	switch w.Wants() {
-	case pipeline.StreamEdge:
-		for p, ok := w.ins[0].NextPoint(); ok; p, ok = w.ins[0].NextPoint() {
-			w.timer.Start()
-			mu.RLock()
-			expr := w.expressions[p.Group]
-			mu.RUnlock()
-			scopePool := w.scopePools[p.Group]
+type whereGroup struct {
+	n    *WhereNode
+	expr stateful.Expression
+}
 
-			if expr == nil {
-				compiledExpr, err := stateful.NewExpression(w.w.Lambda.Expression)
-				if err != nil {
-					return fmt.Errorf("Failed to compile expression in where clause: %v", err)
-				}
+func (g *whereGroup) BeginBatch(begin edge.BeginBatchMessage) (edge.Message, error) {
+	begin = begin.ShallowCopy()
+	begin.SetSizeHint(0)
+	return begin, nil
+}
 
-				expr = compiledExpr
-				mu.Lock()
-				w.expressions[p.Group] = expr
-				mu.Unlock()
+func (g *whereGroup) BatchPoint(bp edge.BatchPointMessage) (edge.Message, error) {
+	return g.doWhere(bp)
+}
 
-				scopePool = stateful.NewScopePool(ast.FindReferenceVariables(w.w.Lambda.Expression))
-				w.scopePools[p.Group] = scopePool
-			}
-			if pass, err := EvalPredicate(expr, scopePool, p.Time, p.Fields, p.Tags); pass {
-				w.timer.Pause()
-				for _, child := range w.outs {
-					err := child.CollectPoint(p)
-					if err != nil {
-						return err
-					}
-				}
-				w.timer.Resume()
-			} else if err != nil {
-				w.incrementErrorCount()
-				w.logger.Println("E! error while evaluating expression:", err)
-			}
-			w.timer.Stop()
-		}
-	case pipeline.BatchEdge:
-		for b, ok := w.ins[0].NextBatch(); ok; b, ok = w.ins[0].NextBatch() {
-			w.timer.Start()
-			mu.RLock()
-			expr := w.expressions[b.Group]
-			mu.RUnlock()
-			scopePool := w.scopePools[b.Group]
+func (g *whereGroup) EndBatch(end edge.EndBatchMessage) (edge.Message, error) {
+	return end, nil
+}
 
-			if expr == nil {
-				compiledExpr, err := stateful.NewExpression(w.w.Lambda.Expression)
-				if err != nil {
-					return fmt.Errorf("Failed to compile expression in where clause: %v", err)
-				}
+func (g *whereGroup) Point(p edge.PointMessage) (edge.Message, error) {
+	return g.doWhere(p)
+}
 
-				expr = compiledExpr
-				mu.Lock()
-				w.expressions[b.Group] = expr
-				mu.Unlock()
-
-				scopePool = stateful.NewScopePool(ast.FindReferenceVariables(w.w.Lambda.Expression))
-				w.scopePools[b.Group] = scopePool
-			}
-			points := b.Points
-			b.Points = make([]models.BatchPoint, 0, len(b.Points))
-			for _, p := range points {
-				if pass, err := EvalPredicate(expr, scopePool, p.Time, p.Fields, p.Tags); pass {
-					if err != nil {
-						w.incrementErrorCount()
-						w.logger.Println("E! error while evaluating WHERE expression:", err)
-					}
-					b.Points = append(b.Points, p)
-				}
-			}
-			w.timer.Stop()
-			for _, child := range w.outs {
-				err := child.CollectBatch(b)
-				if err != nil {
-					return err
-				}
-			}
-		}
+func (g *whereGroup) doWhere(p edge.FieldsTagsTimeGetterMessage) (edge.Message, error) {
+	pass, err := EvalPredicate(g.expr, g.n.scopePool, p)
+	if err != nil {
+		g.n.incrementErrorCount()
+		g.n.logger.Println("E! error while evaluating expression:", err)
+		return nil, nil
 	}
-	return nil
+	if pass {
+		return p, nil
+	}
+	return nil, nil
+}
+
+func (g *whereGroup) Barrier(b edge.BarrierMessage) (edge.Message, error) {
+	return b, nil
+}
+func (g *whereGroup) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
+	return d, nil
 }

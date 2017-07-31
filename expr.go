@@ -2,18 +2,17 @@ package kapacitor
 
 import (
 	"fmt"
-	"time"
 
-	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/tick/stateful"
 )
 
 // EvalPredicate - Evaluate a given expression as a boolean predicate against a set of fields and tags
-func EvalPredicate(se stateful.Expression, scopePool stateful.ScopePool, now time.Time, fields models.Fields, tags models.Tags) (bool, error) {
+func EvalPredicate(se stateful.Expression, scopePool stateful.ScopePool, p edge.FieldsTagsTimeGetter) (bool, error) {
 	vars := scopePool.Get()
 	defer scopePool.Put(vars)
-	err := fillScope(vars, scopePool.ReferenceVariables(), now, fields, tags)
+	err := fillScope(vars, scopePool.ReferenceVariables(), p)
 	if err != nil {
 		return false, err
 	}
@@ -27,7 +26,10 @@ func EvalPredicate(se stateful.Expression, scopePool stateful.ScopePool, now tim
 }
 
 // fillScope - given a scope and reference variables, we fill the exact variables from the now, fields and tags.
-func fillScope(vars *stateful.Scope, referenceVariables []string, now time.Time, fields models.Fields, tags models.Tags) error {
+func fillScope(vars *stateful.Scope, referenceVariables []string, p edge.FieldsTagsTimeGetter) error {
+	now := p.Time()
+	fields := p.Fields()
+	tags := p.Tags()
 	for _, refVariableName := range referenceVariables {
 		if refVariableName == "time" {
 			vars.Set("time", now.Local())

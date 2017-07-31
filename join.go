@@ -7,29 +7,29 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
-	"github.com/influxdata/kapacitor/timer"
+	"github.com/pkg/errors"
 )
 
 type JoinNode struct {
 	node
-	j             *pipeline.JoinNode
-	fill          influxql.FillOption
-	fillValue     interface{}
-	groups        map[models.GroupID]*group
-	mu            sync.RWMutex
-	runningGroups sync.WaitGroup
+	j         *pipeline.JoinNode
+	fill      influxql.FillOption
+	fillValue interface{}
+
+	groupsMu sync.RWMutex
+	groups   map[models.GroupID]*joinGroup
+
+	// Represents the lower bound of times per group per source
+	lowMarks map[srcGroup]time.Time
 
 	// Buffer for caching points that need to be matched with specific points.
 	matchGroupsBuffer map[models.GroupID][]srcPoint
 	// Buffer for caching specific points until their match arrivces.
 	specificGroupsBuffer map[models.GroupID][]srcPoint
-	// Represents the lower bound of times per group per parent
-	lowMarks map[srcGroup]time.Time
-
-	groupsMu sync.RWMutex
 
 	reported    map[int]bool
 	allReported bool
@@ -40,6 +40,7 @@ func newJoinNode(et *ExecutingTask, n *pipeline.JoinNode, l *log.Logger) (*JoinN
 	jn := &JoinNode{
 		j:                    n,
 		node:                 node{Node: n, et: et, logger: l},
+		groups:               make(map[models.GroupID]*joinGroup),
 		matchGroupsBuffer:    make(map[models.GroupID][]srcPoint),
 		specificGroupsBuffer: make(map[models.GroupID][]srcPoint),
 		lowMarks:             make(map[srcGroup]time.Time),
@@ -66,72 +67,61 @@ func newJoinNode(et *ExecutingTask, n *pipeline.JoinNode, l *log.Logger) (*JoinN
 	return jn, nil
 }
 
-func (j *JoinNode) runJoin([]byte) error {
-	j.groups = make(map[models.GroupID]*group)
+func (n *JoinNode) runJoin([]byte) error {
+	consumer := edge.NewMultiConsumerWithStats(n.ins, n)
 	valueF := func() int64 {
-		j.groupsMu.RLock()
-		l := len(j.groups)
-		j.groupsMu.RUnlock()
+		n.groupsMu.RLock()
+		l := len(n.groups)
+		n.groupsMu.RUnlock()
 		return int64(l)
 	}
-	j.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
+	n.statMap.Set(statCardinalityGauge, expvar.NewIntFuncGauge(valueF))
 
-	groupErrs := make(chan error, 1)
-	done := make(chan struct{}, len(j.ins))
+	return consumer.Consume()
+}
 
-	for i := range j.ins {
-		// Start gorouting per parent so we do not deadlock.
-		// This way independent of the order that parents receive data
-		// we can handle it.
-		t := j.et.tm.TimingService.NewTimer(j.statMap.Get(statAverageExecTime).(timer.Setter))
-		go func(i int, t timer.Timer) {
-			defer func() {
-				done <- struct{}{}
-			}()
-			in := j.ins[i]
-			for p, ok := in.Next(); ok; p, ok = in.Next() {
-				t.Start()
-				srcP := srcPoint{src: i, p: p}
-				if len(j.j.Dimensions) > 0 {
-					// Match points with their group based on join dimensions.
-					j.matchPoints(srcP, groupErrs)
-				} else {
-					// Just send point on to group, we are not joining on specific dimensions.
-					func() {
-						j.mu.Lock()
-						defer j.mu.Unlock()
-						group := j.getGroup(p, groupErrs)
-						// Send current point
-						group.points <- srcP
-					}()
-				}
-				t.Stop()
-			}
-		}(i, t)
-	}
-	for range j.ins {
-		select {
-		case <-done:
-		case err := <-groupErrs:
-			return err
-		}
-	}
+func (n *JoinNode) BufferedBatch(src int, batch edge.BufferedBatchMessage) error {
+	return n.doMessage(src, batch)
+}
+
+func (n *JoinNode) Point(src int, p edge.PointMessage) error {
+	return n.doMessage(src, p)
+}
+
+func (n *JoinNode) Barrier(src int, b edge.BarrierMessage) error {
+	return edge.Forward(n.outs, b)
+}
+
+func (n *JoinNode) Finish() error {
 	// No more points are coming signal all groups to finish up.
-	j.groupsMu.RLock()
-	for _, group := range j.groups {
-		close(group.points)
-	}
-	j.groupsMu.RUnlock()
-
-	j.runningGroups.Wait()
-	j.groupsMu.RLock()
-	for _, group := range j.groups {
-		err := group.emitAll()
-		if err != nil {
+	for _, group := range n.groups {
+		if err := group.Finish(); err != nil {
 			return err
 		}
 	}
-	j.groupsMu.RUnlock()
+	return nil
+}
+
+type messageMeta interface {
+	edge.Message
+	edge.PointMeta
+}
+type srcPoint struct {
+	Src int
+	Msg messageMeta
+}
+
+func (n *JoinNode) doMessage(src int, m messageMeta) error {
+	n.timer.Start()
+	defer n.timer.Stop()
+	if len(n.j.Dimensions) > 0 {
+		// Match points with their group based on join dimensions.
+		n.matchPoints(srcPoint{Src: src, Msg: m})
+	} else {
+		// Just send point on to group, we are not joining on specific dimensions.
+		group := n.getOrCreateGroup(m.GroupID())
+		group.Collect(src, m)
+	}
 	return nil
 }
 
@@ -139,62 +129,60 @@ func (j *JoinNode) runJoin([]byte) error {
 // with the less specific points as they arrive.
 //
 // Where 'more specific' means, that a point has more dimensions than the join.on dimensions.
-func (j *JoinNode) matchPoints(p srcPoint, groupErrs chan<- error) {
+func (n *JoinNode) matchPoints(p srcPoint) {
 	// Specific points may be sent to the joinset without a matching point, but not the other way around.
 	// This is because the specific points have the needed specific tag data.
 	// The joinset will later handle the fill inner/outer join operations.
-	j.mu.Lock()
-	defer j.mu.Unlock()
 
-	if !j.allReported {
-		j.reported[p.src] = true
-		j.allReported = len(j.reported) == len(j.ins)
+	if !n.allReported {
+		n.reported[p.Src] = true
+		n.allReported = len(n.reported) == len(n.ins)
 	}
-	t := p.p.PointTime().Round(j.j.Tolerance)
+	t := p.Msg.Time().Round(n.j.Tolerance)
 
 	groupId := models.ToGroupID(
-		p.p.PointName(),
-		p.p.PointTags(),
+		p.Msg.Name(),
+		p.Msg.GroupInfo().Tags,
 		models.Dimensions{
-			ByName:   p.p.PointDimensions().ByName,
-			TagNames: j.j.Dimensions,
+			ByName:   p.Msg.Dimensions().ByName,
+			TagNames: n.j.Dimensions,
 		},
 	)
 	// Update current srcGroup lowMark
-	srcG := srcGroup{src: p.src, groupId: groupId}
-	j.lowMarks[srcG] = t
+	srcG := srcGroup{src: p.Src, groupId: groupId}
+	n.lowMarks[srcG] = t
 
 	// Determine lowMark, the oldest time per parent per group.
 	var lowMark time.Time
-	if j.allReported {
-		for s := 0; s < len(j.ins); s++ {
+	if n.allReported {
+		for s := 0; s < len(n.ins); s++ {
 			sg := srcGroup{src: s, groupId: groupId}
-			if lm := j.lowMarks[sg]; lowMark.IsZero() || lm.Before(lowMark) {
+			if lm := n.lowMarks[sg]; lowMark.IsZero() || lm.Before(lowMark) {
 				lowMark = lm
 			}
 		}
 	}
 
 	// Check for cached specific points that can now be sent alone.
-	if j.allReported {
+	if n.allReported {
 		// Send all cached specific point that won't match anymore.
 		var i int
-		buf := j.specificGroupsBuffer[groupId]
+		buf := n.specificGroupsBuffer[groupId]
 		l := len(buf)
 		for i = 0; i < l; i++ {
-			st := buf[i].p.PointTime().Round(j.j.Tolerance)
+			st := buf[i].Msg.Time().Round(n.j.Tolerance)
 			if st.Before(lowMark) {
 				// Send point by itself since it won't get a match.
-				j.sendSpecificPoint(buf[i], groupErrs)
+				n.sendSpecificPoint(buf[i])
 			} else {
 				break
 			}
 		}
 		// Remove all sent points.
-		j.specificGroupsBuffer[groupId] = buf[i:]
+		n.specificGroupsBuffer[groupId] = buf[i:]
 	}
 
-	if len(p.p.PointDimensions().TagNames) > len(j.j.Dimensions) {
+	if len(p.Msg.Dimensions().TagNames) > len(n.j.Dimensions) {
 		// We have a specific point and three options:
 		// 1. Find the cached match point and send both to group.
 		// 2. Cache the specific point for later.
@@ -202,156 +190,127 @@ func (j *JoinNode) matchPoints(p srcPoint, groupErrs chan<- error) {
 
 		// Search for a match.
 		// Also purge any old match points.
-		matches := j.matchGroupsBuffer[groupId]
+		matches := n.matchGroupsBuffer[groupId]
 		matched := false
 		var i int
 		l := len(matches)
 		for i = 0; i < l; i++ {
 			match := matches[i]
-			pt := match.p.PointTime().Round(j.j.Tolerance)
+			pt := match.Msg.Time().Round(n.j.Tolerance)
 			if pt.Equal(t) {
 				// Option 1, send both points
-				j.sendMatchPoint(p, match, groupErrs)
+				n.sendMatchPoint(p, match)
 				matched = true
 			}
 			if !pt.Before(lowMark) {
 				break
 			}
 		}
-		if j.allReported {
+		if n.allReported {
 			// Can't trust lowMark until all parents have reported.
 			// Remove any unneeded match points.
-			j.matchGroupsBuffer[groupId] = matches[i:]
+			n.matchGroupsBuffer[groupId] = matches[i:]
 		}
 
 		// If the point didn't match that leaves us with options 2 and 3.
 		if !matched {
-			if j.allReported && t.Before(lowMark) {
+			if n.allReported && t.Before(lowMark) {
 				// Option 3
 				// Send this specific point by itself since it won't get a match.
-				j.sendSpecificPoint(p, groupErrs)
+				n.sendSpecificPoint(p)
 			} else {
 				// Option 2
 				// Cache this point for when its match arrives.
-				j.specificGroupsBuffer[groupId] = append(j.specificGroupsBuffer[groupId], p)
+				n.specificGroupsBuffer[groupId] = append(n.specificGroupsBuffer[groupId], p)
 			}
 		}
 	} else {
 		// Cache match point.
-		j.matchGroupsBuffer[groupId] = append(j.matchGroupsBuffer[groupId], p)
+		n.matchGroupsBuffer[groupId] = append(n.matchGroupsBuffer[groupId], p)
 
 		// Send all specific points that match, to the group.
 		var i int
-		buf := j.specificGroupsBuffer[groupId]
+		buf := n.specificGroupsBuffer[groupId]
 		l := len(buf)
 		for i = 0; i < l; i++ {
-			st := buf[i].p.PointTime().Round(j.j.Tolerance)
+			st := buf[i].Msg.Time().Round(n.j.Tolerance)
 			if st.Equal(t) {
-				j.sendMatchPoint(buf[i], p, groupErrs)
+				n.sendMatchPoint(buf[i], p)
 			} else {
 				break
 			}
 		}
 		// Remove all sent points
-		j.specificGroupsBuffer[groupId] = buf[i:]
+		n.specificGroupsBuffer[groupId] = buf[i:]
 	}
 }
 
 // Add the specific tags from the specific point to the matched point
 // and then send both on to the group.
-func (j *JoinNode) sendMatchPoint(specific, matched srcPoint, groupErrs chan<- error) {
-	np := matched.p.Copy().Setter()
-	for key, value := range specific.p.PointTags() {
-		np.SetNewDimTag(key, value)
+func (n *JoinNode) sendMatchPoint(specific, matched srcPoint) {
+	var newMatched messageMeta
+	switch msg := matched.Msg.(type) {
+	case edge.BufferedBatchMessage:
+		b := msg.ShallowCopy()
+		b.SetBegin(b.Begin().ShallowCopy())
+		b.Begin().SetTags(specific.Msg.GroupInfo().Tags)
+		newMatched = b
+	case edge.PointMessage:
+		p := msg.ShallowCopy()
+		info := specific.Msg.GroupInfo()
+		p.SetTagsAndDimensions(info.Tags, info.Dimensions)
+		newMatched = p
 	}
-	np.UpdateGroup()
-	group := j.getGroup(specific.p, groupErrs)
-	// Send current point
-	group.points <- specific
-	// Send new matched point
-	matched.p = np.Interface()
-	group.points <- matched
+	group := n.getOrCreateGroup(specific.Msg.GroupID())
+	// Collect specific point
+	group.Collect(specific.Src, specific.Msg)
+	// Collect new matched point
+	group.Collect(matched.Src, newMatched)
 }
 
 // Send only the specific point to the group
-func (j *JoinNode) sendSpecificPoint(specific srcPoint, groupErrs chan<- error) {
-	group := j.getGroup(specific.p, groupErrs)
-	// Send current point
-	group.points <- specific
+func (n *JoinNode) sendSpecificPoint(specific srcPoint) {
+	group := n.getOrCreateGroup(specific.Msg.GroupID())
+	group.Collect(specific.Src, specific.Msg)
 }
 
 // safely get the group for the point or create one if it doesn't exist.
-func (j *JoinNode) getGroup(p models.PointInterface, groupErrs chan<- error) *group {
-	j.groupsMu.RLock()
-	group := j.groups[p.PointGroup()]
-	j.groupsMu.RUnlock()
+func (n *JoinNode) getOrCreateGroup(groupID models.GroupID) *joinGroup {
+	group := n.groups[groupID]
 	if group == nil {
-		group = newGroup(len(j.ins), j)
-		j.groupsMu.Lock()
-		j.groups[p.PointGroup()] = group
-		j.runningGroups.Add(1)
-		j.groupsMu.Unlock()
-		go func() {
-			err := group.run()
-			if err != nil {
-				j.incrementErrorCount()
-				j.logger.Println("E! join group error:", err)
-				select {
-				case groupErrs <- err:
-				default:
-				}
-			}
-		}()
+		group = n.newGroup(len(n.ins))
+		n.groupsMu.Lock()
+		n.groups[groupID] = group
+		n.groupsMu.Unlock()
 	}
 	return group
 }
 
-// A groupId and its parent
-type srcGroup struct {
-	src     int
-	groupId models.GroupID
-}
-
-// represents an incoming data point and which parent it came from
-type srcPoint struct {
-	src int
-	p   models.PointInterface
+func (n *JoinNode) newGroup(count int) *joinGroup {
+	return &joinGroup{
+		n:    n,
+		sets: make(map[time.Time][]*joinset),
+		head: make([]time.Time, count),
+	}
 }
 
 // handles emitting joined sets once enough data has arrived from parents.
-type group struct {
+type joinGroup struct {
+	n *JoinNode
+
 	sets       map[time.Time][]*joinset
 	head       []time.Time
 	oldestTime time.Time
-	j          *JoinNode
-	points     chan srcPoint
 }
 
-func newGroup(i int, j *JoinNode) *group {
-	return &group{
-		sets:   make(map[time.Time][]*joinset),
-		head:   make([]time.Time, i),
-		j:      j,
-		points: make(chan srcPoint),
-	}
+func (g *joinGroup) Finish() error {
+	return g.emitAll()
 }
 
-// start consuming incoming points
-func (g *group) run() error {
-	defer g.j.runningGroups.Done()
-	for sp := range g.points {
-		err := g.collect(sp.src, sp.p)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// collect a point from a given parent.
+// Collect a point from a given parent.
 // emit the oldest set if we have collected enough data.
-func (g *group) collect(i int, p models.PointInterface) error {
-	t := p.PointTime().Round(g.j.j.Tolerance)
+func (g *joinGroup) Collect(src int, p timeMessage) error {
+	t := p.Time().Round(g.n.j.Tolerance)
 	if t.Before(g.oldestTime) || g.oldestTime.IsZero() {
 		g.oldestTime = t
 	}
@@ -359,45 +318,25 @@ func (g *group) collect(i int, p models.PointInterface) error {
 	var set *joinset
 	sets := g.sets[t]
 	if len(sets) == 0 {
-		set = newJoinset(
-			g.j,
-			g.j.j.StreamName,
-			g.j.fill,
-			g.j.fillValue,
-			g.j.j.Names,
-			g.j.j.Delimiter,
-			g.j.j.Tolerance,
-			t,
-			g.j.logger,
-		)
+		set = g.newJoinset(t)
 		sets = append(sets, set)
 		g.sets[t] = sets
 	}
-	for j := 0; j < len(sets); j++ {
-		if !sets[j].Has(i) {
-			set = sets[j]
+	for i := 0; i < len(sets); i++ {
+		if !sets[i].Has(src) {
+			set = sets[i]
 			break
 		}
 	}
 	if set == nil {
-		set = newJoinset(
-			g.j,
-			g.j.j.StreamName,
-			g.j.fill,
-			g.j.fillValue,
-			g.j.j.Names,
-			g.j.j.Delimiter,
-			g.j.j.Tolerance,
-			t,
-			g.j.logger,
-		)
+		set = g.newJoinset(t)
 		sets = append(sets, set)
 		g.sets[t] = sets
 	}
-	set.Set(i, p)
+	set.Set(src, p)
 
 	// Update head
-	g.head[i] = t
+	g.head[src] = t
 
 	onlyReadySets := false
 	for _, t := range g.head {
@@ -413,8 +352,22 @@ func (g *group) collect(i int, p models.PointInterface) error {
 	return nil
 }
 
+func (g *joinGroup) newJoinset(t time.Time) *joinset {
+	return newJoinset(
+		g.n,
+		g.n.j.StreamName,
+		g.n.fill,
+		g.n.fillValue,
+		g.n.j.Names,
+		g.n.j.Delimiter,
+		g.n.j.Tolerance,
+		t,
+		g.n.logger,
+	)
+}
+
 // emit a set and update the oldestTime.
-func (g *group) emit(onlyReadySets bool) error {
+func (g *joinGroup) emit(onlyReadySets bool) error {
 	sets := g.sets[g.oldestTime]
 	i := 0
 	for ; i < len(sets); i++ {
@@ -443,7 +396,7 @@ func (g *group) emit(onlyReadySets bool) error {
 }
 
 // emit sets until we have none left.
-func (g *group) emitAll() error {
+func (g *joinGroup) emitAll() error {
 	var lastErr error
 	for len(g.sets) > 0 {
 		err := g.emit(false)
@@ -455,33 +408,39 @@ func (g *group) emitAll() error {
 }
 
 // emit a single joined set
-func (g *group) emitJoinedSet(set *joinset) error {
+func (g *joinGroup) emitJoinedSet(set *joinset) error {
 	if set.name == "" {
-		set.name = set.First().PointName()
+		set.name = set.First().(edge.NameGetter).Name()
 	}
-	switch g.j.Wants() {
+	switch g.n.Wants() {
 	case pipeline.StreamEdge:
-		p, ok := set.JoinIntoPoint()
-		if ok {
-			for _, out := range g.j.outs {
-				err := out.CollectPoint(p)
-				if err != nil {
-					return err
-				}
+		p, err := set.JoinIntoPoint()
+		if err != nil {
+			return errors.Wrap(err, "failed to join into point")
+		}
+		if p != nil {
+			if err := edge.Forward(g.n.outs, p); err != nil {
+				return err
 			}
 		}
 	case pipeline.BatchEdge:
-		b, ok := set.JoinIntoBatch()
-		if ok {
-			for _, out := range g.j.outs {
-				err := out.CollectBatch(b)
-				if err != nil {
-					return err
-				}
+		b, err := set.JoinIntoBatch()
+		if err != nil {
+			return errors.Wrap(err, "failed to join into batch")
+		}
+		if b != nil {
+			if err := edge.Forward(g.n.outs, b); err != nil {
+				return err
 			}
 		}
 	}
 	return nil
+}
+
+// A groupId and its parent
+type srcGroup struct {
+	src     int
+	groupId models.GroupID
 }
 
 // represents a set of points or batches from the same joined time
@@ -495,7 +454,7 @@ type joinset struct {
 
 	time      time.Time
 	tolerance time.Duration
-	values    []models.PointInterface
+	values    []edge.Message
 
 	expected int
 	size     int
@@ -526,7 +485,7 @@ func newJoinset(
 		prefixes:  prefixes,
 		delimiter: delimiter,
 		expected:  expected,
-		values:    make([]models.PointInterface, expected),
+		values:    make([]edge.Message, expected),
 		first:     expected,
 		time:      time,
 		tolerance: tolerance,
@@ -543,7 +502,7 @@ func (js *joinset) Has(i int) bool {
 }
 
 // add a point to the set from a given parent index.
-func (js *joinset) Set(i int, v models.PointInterface) {
+func (js *joinset) Set(i int, v edge.Message) {
 	if i < js.first {
 		js.first = i
 	}
@@ -552,55 +511,67 @@ func (js *joinset) Set(i int, v models.PointInterface) {
 }
 
 // a valid point in the set
-func (js *joinset) First() models.PointInterface {
+func (js *joinset) First() edge.Message {
 	return js.values[js.first]
 }
 
 // join all points into a single point
-func (js *joinset) JoinIntoPoint() (models.Point, bool) {
-	fields := make(models.Fields, js.size*len(js.First().PointFields()))
-	for i, p := range js.values {
-		if p == nil {
+func (js *joinset) JoinIntoPoint() (edge.PointMessage, error) {
+	first, ok := js.First().(edge.PointMessage)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type of first value %T", js.First())
+	}
+	firstFields := first.Fields()
+	fields := make(models.Fields, js.size*len(firstFields))
+	for i, v := range js.values {
+		if v == nil {
 			switch js.fill {
 			case influxql.NullFill:
-				for k := range js.First().PointFields() {
+				for k := range firstFields {
 					fields[js.prefixes[i]+js.delimiter+k] = nil
 				}
 			case influxql.NumberFill:
-				for k := range js.First().PointFields() {
+				for k := range firstFields {
 					fields[js.prefixes[i]+js.delimiter+k] = js.fillValue
 				}
 			default:
 				// inner join no valid point possible
-				return models.Point{}, false
+				return nil, nil
 			}
 		} else {
-			for k, v := range p.PointFields() {
+			p, ok := v.(edge.FieldGetter)
+			if !ok {
+				return nil, fmt.Errorf("unexpected type %T", v)
+			}
+			for k, v := range p.Fields() {
 				fields[js.prefixes[i]+js.delimiter+k] = v
 			}
 		}
 	}
-	p := models.Point{
-		Name:       js.name,
-		Group:      js.First().PointGroup(),
-		Tags:       js.First().PointTags(),
-		Dimensions: js.First().PointDimensions(),
-		Time:       js.time,
-		Fields:     fields,
-	}
-
-	return p, true
+	np := edge.NewPointMessage(
+		js.name, "", "",
+		first.Dimensions(),
+		fields,
+		first.GroupInfo().Tags,
+		js.time,
+	)
+	return np, nil
 }
 
 // join all batches the set into a single batch
-func (js *joinset) JoinIntoBatch() (models.Batch, bool) {
-	newBatch := models.Batch{
-		Name:   js.name,
-		Group:  js.First().PointGroup(),
-		Tags:   js.First().PointTags(),
-		ByName: js.First().PointDimensions().ByName,
-		TMax:   js.time,
+func (js *joinset) JoinIntoBatch() (edge.BufferedBatchMessage, error) {
+	first, ok := js.First().(edge.BufferedBatchMessage)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type of first value %T", js.First())
 	}
+	newBegin := edge.NewBeginBatchMessage(
+		js.name,
+		first.Tags(),
+		first.Dimensions().ByName,
+		js.time,
+		0,
+	)
+	newPoints := make([]edge.BatchPointMessage, 0, len(first.Points()))
 	empty := make([]bool, js.expected)
 	emptyCount := 0
 	indexes := make([]int, js.expected)
@@ -608,7 +579,7 @@ func (js *joinset) JoinIntoBatch() (models.Batch, bool) {
 
 BATCH_POINT:
 	for emptyCount < js.expected {
-		set := make([]*models.BatchPoint, js.expected)
+		set := make([]edge.BatchPointMessage, js.expected)
 		setTime := time.Time{}
 		count := 0
 		for i, batch := range js.values {
@@ -620,19 +591,17 @@ BATCH_POINT:
 				empty[i] = true
 				continue
 			}
-			b, ok := batch.(models.Batch)
+			b, ok := batch.(edge.BufferedBatchMessage)
 			if !ok {
-				js.j.incrementErrorCount()
-				js.logger.Printf("E! invalid join data got %T expected models.Batch", batch)
-				return models.Batch{}, false
+				return nil, fmt.Errorf("unexpected type of batch value %T", batch)
 			}
-			if indexes[i] == len(b.Points) {
+			if indexes[i] == len(b.Points()) {
 				emptyCount++
 				empty[i] = true
 				continue
 			}
-			bp := b.Points[indexes[i]]
-			t := bp.Time.Round(js.tolerance)
+			bp := b.Points()[indexes[i]]
+			t := bp.Time().Round(js.tolerance)
 			if setTime.IsZero() {
 				setTime = t
 			}
@@ -645,16 +614,16 @@ BATCH_POINT:
 					}
 					set[j] = nil
 				}
-				set[i] = &bp
+				set[i] = bp
 				indexes[i]++
 				count = 1
 			} else if t.Equal(setTime) {
 				if fieldNames == nil {
-					for k := range bp.Fields {
+					for k := range bp.Fields() {
 						fieldNames = append(fieldNames, k)
 					}
 				}
-				set[i] = &bp
+				set[i] = bp
 				indexes[i]++
 				count++
 			}
@@ -682,19 +651,24 @@ BATCH_POINT:
 					continue BATCH_POINT
 				}
 			} else {
-				for k, v := range bp.Fields {
+				for k, v := range bp.Fields() {
 					fields[js.prefixes[i]+js.delimiter+k] = v
 				}
 			}
 		}
-		bp := models.BatchPoint{
-			Tags:   newBatch.Tags,
-			Time:   setTime,
-			Fields: fields,
-		}
-		newBatch.Points = append(newBatch.Points, bp)
+		bp := edge.NewBatchPointMessage(
+			fields,
+			newBegin.Tags(),
+			setTime,
+		)
+		newPoints = append(newPoints, bp)
 	}
-	return newBatch, true
+	newBegin.SetSizeHint(len(newPoints))
+	return edge.NewBufferedBatchMessage(
+		newBegin,
+		newPoints,
+		edge.NewEndBatchMessage(),
+	), nil
 }
 
 type durationVar struct {

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/pipeline"
 )
 
@@ -188,7 +189,7 @@ func (et *ExecutingTask) link() error {
 }
 
 // Start the task.
-func (et *ExecutingTask) start(ins []*Edge, snapshot *TaskSnapshot) error {
+func (et *ExecutingTask) start(ins []edge.StatsEdge, snapshot *TaskSnapshot) error {
 
 	for _, in := range ins {
 		et.source.addParentEdge(in)
