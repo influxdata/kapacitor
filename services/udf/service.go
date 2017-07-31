@@ -59,7 +59,7 @@ func (s *Service) Info(name string) (udf.Info, bool) {
 }
 
 func (s *Service) Create(
-	name string,
+	name, taskID, nodeID string,
 	l *log.Logger,
 	abortCallback func(),
 ) (udf.Interface, error) {
@@ -70,6 +70,7 @@ func (s *Service) Create(
 	if conf.Socket != "" {
 		// Create socket UDF
 		return kapacitor.NewUDFSocket(
+			taskID, nodeID,
 			kapacitor.NewSocketConn(conf.Socket),
 			l,
 			time.Duration(conf.Timeout),
@@ -87,6 +88,7 @@ func (s *Service) Create(
 			Env:  env,
 		}
 		return kapacitor.NewUDFProcess(
+			taskID, nodeID,
 			command.ExecCommander,
 			cmdSpec,
 			l,
@@ -109,7 +111,10 @@ func (s *Service) Refresh(name string) error {
 }
 
 func (s *Service) loadUDFInfo(name string) (udf.Info, error) {
-	u, err := s.Create(name, s.logger, nil)
+	// loadUDFInfo creates a UDF connection outside the context of a task or node
+	// because it only makes the Info request and never makes an Init request.
+	// As such it does not need to provide actual task and node IDs.
+	u, err := s.Create(name, "", "", s.logger, nil)
 	if err != nil {
 		return udf.Info{}, err
 	}

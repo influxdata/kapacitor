@@ -68,6 +68,8 @@ message OptionInfo {
 // Request that the process initialize itself with the provided options.
 message InitRequest {
     repeated Option options = 1;
+    string taskID           = 2;
+    string nodeID           = 3;
 }
 
 message Option {

@@ -22,7 +22,7 @@ import (
 func newUDFSocket(name string) (*kapacitor.UDFSocket, *udf_test.IO) {
 	uio := udf_test.NewIO()
 	l := log.New(os.Stderr, fmt.Sprintf("[%s] ", name), log.LstdFlags)
-	u := kapacitor.NewUDFSocket(newTestSocket(uio), l, 0, nil)
+	u := kapacitor.NewUDFSocket(name, "testNode", newTestSocket(uio), l, 0, nil)
 	return u, uio
 }
 
@@ -30,7 +30,7 @@ func newUDFProcess(name string) (*kapacitor.UDFProcess, *udf_test.IO) {
 	uio := udf_test.NewIO()
 	cmd := newTestCommander(uio)
 	l := log.New(os.Stderr, fmt.Sprintf("[%s] ", name), log.LstdFlags)
-	u := kapacitor.NewUDFProcess(cmd, command.Spec{}, l, 0, nil)
+	u := kapacitor.NewUDFProcess(name, "testNode", cmd, command.Spec{}, l, 0, nil)
 	return u, uio
 }
 
