@@ -156,11 +156,12 @@ func numToFloat(num interface{}) (float64, bool) {
 		return 0, false
 	}
 }
+
 func diffFunc(f0,f1 interface{})(float64, bool){
-	n0 , ok := numToFloat(f0);
-	n1 , ok1 := numToFloat(f1);
+	n0 , ok := numToFloat(f0)
+	n1 , ok1 := numToFloat(f1)
 	if ok&&ok1{
-		return n1-n0,true;
+		return n1-n0,true
 	}
 	s0 , ok := f0.(string)
 	s1 , ok1 := f1.(string)
