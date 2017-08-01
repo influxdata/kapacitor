@@ -128,8 +128,8 @@ func (n *DerivativeNode) derivative(prev, curr models.Fields, prevTime, currTime
 		n.logger.Printf("E! cannot perform derivative elapsed time was 0")
 		return 0, true, false
 	}
-	f0 := curr[n.d.Field]
-	f1 := prev[n.d.Field]
+	f1 := curr[n.d.Field]
+	f0 := prev[n.d.Field]
 	diff, ok := diffFunc(f0,f1)
 	if !ok {
 		// The only time this will fail to parse is if there is no previous.
