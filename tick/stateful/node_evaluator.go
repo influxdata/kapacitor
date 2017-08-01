@@ -22,6 +22,7 @@ func (e ErrTypeGuardFailed) Error() string {
 
 type ReadOnlyScope interface {
 	Get(name string) (interface{}, error)
+	References() []string
 	DynamicFunc(name string) *DynamicFunc
 }
 

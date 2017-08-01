@@ -11,6 +11,10 @@ type EvalRegexNode struct {
 	Node *ast.RegexNode
 }
 
+func (n *EvalRegexNode) String() string {
+	return n.Node.Literal
+}
+
 func (n *EvalRegexNode) Type(scope ReadOnlyScope) (ast.ValueType, error) {
 	return ast.TRegex, nil
 }

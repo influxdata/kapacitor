@@ -11,6 +11,10 @@ type EvalStringNode struct {
 	Node *ast.StringNode
 }
 
+func (n *EvalStringNode) String() string {
+	return n.Node.Literal
+}
+
 func (n *EvalStringNode) Type(scope ReadOnlyScope) (ast.ValueType, error) {
 	return ast.TString, nil
 }

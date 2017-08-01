@@ -25,6 +25,10 @@ func (n *EvalReferenceNode) getReferenceValue(scope *Scope) (interface{}, error)
 	return value, nil
 }
 
+func (n *EvalReferenceNode) String() string {
+	return "\"" + n.Node.Reference + "\""
+}
+
 func (n *EvalReferenceNode) Type(scope ReadOnlyScope) (ast.ValueType, error) {
 	value, err := n.getReferenceValue(scope.(*Scope))
 	if err != nil {

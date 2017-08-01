@@ -28,6 +28,10 @@ func NewEvalLambdaNode(lambda *ast.LambdaNode) (*EvalLambdaNode, error) {
 	}, nil
 }
 
+func (n *EvalLambdaNode) String() string {
+	return fmt.Sprintf("%s", n.nodeEvaluator)
+}
+
 func (n *EvalLambdaNode) Type(scope ReadOnlyScope) (ast.ValueType, error) {
 	if n.constReturnType == ast.InvalidType {
 		// We are dynamic and we need to figure out our type

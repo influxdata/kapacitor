@@ -23,15 +23,65 @@ const (
 	maxArgs = 4
 )
 
+type ErrMissingType struct {
+	Name  string
+	Args  []string
+	Scope []string
+}
+
+func (e ErrMissingType) Error() string {
+	s := "Cannot call function \"%s\" argument %s is missing, values in scope are [%s]"
+	if len(e.Args) > 1 {
+		s = "Cannot call function \"%s\" arguments %s are missing, values in scope are [%s]"
+	}
+
+	// remove missing values from scope
+	for _, a := range e.Args {
+		e.Scope = removeElement(e.Scope, a)
+	}
+
+	return fmt.Sprintf(s, e.Name, strings.Join(e.Args, ", "), strings.Join(e.Scope, ", "))
+}
+
+func removeElement(xs []string, el string) []string {
+	for i, x := range xs {
+		if x == el {
+			xs = append(xs[:i], xs[i+1:]...)
+			break
+		}
+	}
+	return xs
+}
+
 type ErrWrongFuncSignature struct {
 	Name           string
 	DomainProvided Domain
+	ArgLiterals    []string
 	Func           Func
 }
 
 func (e ErrWrongFuncSignature) Error() string {
-	return fmt.Sprintf("Cannot call function \"%s\" with args signature %s, available signatures are %s.",
-		e.Name, e.DomainProvided, FuncDomains(e.Func))
+	var argStringer fmt.Stringer = &argDomain{args: e.ArgLiterals, domain: e.DomainProvided}
+	if e.ArgLiterals == nil {
+		argStringer = e.DomainProvided
+	}
+	return fmt.Sprintf("Cannot call function \"%s\" with args %s, available signatures are %s.",
+		e.Name, argStringer, FuncDomains(e.Func))
+}
+
+type argDomain struct {
+	args   []string
+	domain Domain
+}
+
+func (a *argDomain) String() string {
+	input := []string{}
+	for j, el := range a.args {
+		t := a.domain[j]
+		input = append(input, fmt.Sprintf("%s: %s", el, t))
+	}
+
+	return "(" + strings.Join(input, ",") + ")"
 }
 
 var ErrNotFloat = errors.New("value is not a float")

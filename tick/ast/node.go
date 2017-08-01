@@ -236,6 +236,7 @@ func newBool(p position, text string, c *CommentNode) (*BoolNode, error) {
 func (n *BoolNode) String() string {
 	return fmt.Sprintf("BoolNode@%v{%v}%v", n.position, n.Bool, n.Comment)
 }
+
 func (n *BoolNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
 	if n.Comment != nil {
 		n.Comment.Format(buf, indent, onNewLine)
