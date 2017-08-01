@@ -156,7 +156,6 @@ func numToFloat(num interface{}) (float64, bool) {
 		return 0, false
 	}
 }
-
 func diffFunc(f0,f1 interface{})(float64, bool){
 	n0 , ok := numToFloat(f0);
 	n1 , ok1 := numToFloat(f1);
