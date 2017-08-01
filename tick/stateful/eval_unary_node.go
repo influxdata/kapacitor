@@ -9,6 +9,7 @@ import (
 )
 
 type EvalUnaryNode struct {
+	operator        ast.TokenType
 	nodeEvaluator   NodeEvaluator
 	constReturnType ast.ValueType
 }
@@ -24,6 +25,7 @@ func NewEvalUnaryNode(unaryNode *ast.UnaryNode) (*EvalUnaryNode, error) {
 	}
 
 	return &EvalUnaryNode{
+		operator:        unaryNode.Operator,
 		nodeEvaluator:   nodeEvaluator,
 		constReturnType: getConstantNodeType(unaryNode),
 	}, nil
@@ -31,6 +33,10 @@ func NewEvalUnaryNode(unaryNode *ast.UnaryNode) (*EvalUnaryNode, error) {
 
 func isValidUnaryOperator(operator ast.TokenType) bool {
 	return operator == ast.TokenNot || operator == ast.TokenMinus
+}
+
+func (n *EvalUnaryNode) String() string {
+	return fmt.Sprintf("%s%s", n.operator, n.nodeEvaluator)
 }
 
 func (n *EvalUnaryNode) Type(scope ReadOnlyScope) (ast.ValueType, error) {

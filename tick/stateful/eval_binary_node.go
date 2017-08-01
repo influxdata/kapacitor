@@ -117,6 +117,11 @@ func NewEvalBinaryNode(node *ast.BinaryNode) (*EvalBinaryNode, error) {
 	return b, nil
 }
 
+func (n *EvalBinaryNode) String() string {
+
+	return fmt.Sprintf("%s %s %s", n.leftEvaluator, n.operator, n.rightEvaluator)
+}
+
 func (n *EvalBinaryNode) Type(scope ReadOnlyScope) (ast.ValueType, error) {
 	if n.constReturnType == ast.InvalidType {
 		var err error

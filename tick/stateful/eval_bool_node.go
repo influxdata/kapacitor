@@ -1,6 +1,7 @@
 package stateful
 
 import (
+	"fmt"
 	"regexp"
 	"time"
 
@@ -9,6 +10,10 @@ import (
 
 type EvalBoolNode struct {
 	Node *ast.BoolNode
+}
+
+func (n *EvalBoolNode) String() string {
+	return fmt.Sprintf("%v", n.Node.Bool)
 }
 
 func (n *EvalBoolNode) Type(scope ReadOnlyScope) (ast.ValueType, error) {

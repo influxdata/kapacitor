@@ -44,6 +44,14 @@ func NewScope() *Scope {
 	}
 }
 
+func (s *Scope) References() []string {
+	ks := []string{}
+	for k := range s.variables {
+		ks = append(ks, "\""+k+"\"")
+	}
+	return ks
+}
+
 // Set defines a name -> value pairing in the scope.
 func (s *Scope) Set(name string, value interface{}) {
 	s.variables[name] = value
