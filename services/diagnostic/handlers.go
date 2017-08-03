@@ -17,6 +17,7 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	alertservice "github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
+	"github.com/influxdata/kapacitor/services/ec2"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/influxdb"
@@ -898,6 +899,159 @@ func (h *SwarmHandler) WithClusterContext(cluster string) swarm.Diagnostic {
 	return &SwarmHandler{
 		l: h.l.With(String("cluster_id", cluster)),
 	}
+}
+
+// EC2 handler
+
+type EC2Handler struct {
+	mu  sync.Mutex
+	buf *bytes.Buffer
+	l   Logger
+}
+
+func (h *EC2Handler) WithClusterContext(cluster string) ec2.Diagnostic {
+	return &EC2Handler{
+		l: h.l.With(String("cluster_id", cluster)),
+	}
+}
+
+func (h *EC2Handler) Debug(ctx ...interface{}) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	defer h.buf.Reset()
+	fmt.Fprint(h.buf, ctx...)
+
+	h.l.Debug(h.buf.String())
+}
+
+func (h *EC2Handler) Debugln(ctx ...interface{}) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	defer h.buf.Reset()
+	fmt.Fprintln(h.buf, ctx...)
+
+	h.l.Debug(strconv.Quote(h.buf.String()))
+}
+
+func (h *EC2Handler) Debugf(s string, ctx ...interface{}) {
+	h.l.Debug(fmt.Sprintf(s, ctx...))
+}
+
+func (h *EC2Handler) Info(ctx ...interface{}) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	defer h.buf.Reset()
+	fmt.Fprint(h.buf, ctx...)
+
+	h.l.Info(h.buf.String())
+}
+
+func (h *EC2Handler) Infoln(ctx ...interface{}) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	defer h.buf.Reset()
+	fmt.Fprintln(h.buf, ctx...)
+
+	h.l.Info(strconv.Quote(h.buf.String()))
+}
+
+func (h *EC2Handler) Infof(s string, ctx ...interface{}) {
+	h.l.Debug(fmt.Sprintf(s, ctx...))
+}
+
+func (h *EC2Handler) Warn(ctx ...interface{}) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	defer h.buf.Reset()
+	fmt.Fprint(h.buf, ctx...)
+
+	h.l.Info(h.buf.String())
+}
+
+func (h *EC2Handler) Warnln(ctx ...interface{}) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	defer h.buf.Reset()
+	fmt.Fprintln(h.buf, ctx...)
+
+	h.l.Info(strconv.Quote(h.buf.String()))
+}
+
+func (h *EC2Handler) Warnf(s string, ctx ...interface{}) {
+	h.l.Info(fmt.Sprintf(s, ctx...))
+}
+
+func (h *EC2Handler) Error(ctx ...interface{}) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	defer h.buf.Reset()
+	fmt.Fprint(h.buf, ctx...)
+
+	h.l.Error(h.buf.String())
+}
+
+func (h *EC2Handler) Errorln(ctx ...interface{}) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	defer h.buf.Reset()
+	fmt.Fprintln(h.buf, ctx...)
+
+	h.l.Error(strconv.Quote(h.buf.String()))
+}
+
+func (h *EC2Handler) Errorf(s string, ctx ...interface{}) {
+	h.l.Error(fmt.Sprintf(s, ctx...))
+}
+
+func (h *EC2Handler) Fatal(ctx ...interface{}) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	defer h.buf.Reset()
+	fmt.Fprint(h.buf, ctx...)
+
+	h.l.Error(h.buf.String())
+}
+
+func (h *EC2Handler) Fatalln(ctx ...interface{}) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	defer h.buf.Reset()
+	fmt.Fprintln(h.buf, ctx...)
+
+	h.l.Error(h.buf.String())
+}
+
+func (h *EC2Handler) Fatalf(s string, ctx ...interface{}) {
+	h.l.Error(fmt.Sprintf(s, ctx...))
+}
+
+func (h *EC2Handler) With(key string, value interface{}) plog.Logger {
+	var field Field
+
+	switch value.(type) {
+	case int:
+		field = Int(key, value.(int))
+	case float64:
+		field = Float64(key, value.(float64))
+	case string:
+		field = String(key, value.(string))
+	case time.Duration:
+		field = Duration(key, value.(time.Duration))
+	default:
+		field = String(key, fmt.Sprintf("%v", value))
+	}
+
+	return &EC2Handler{
+		l: h.l.With(field),
+	}
+}
+
+func (h *EC2Handler) SetFormat(string) error {
+	return nil
+}
+
+func (h *EC2Handler) SetLevel(string) error {
+	return nil
 }
 
 // Deadman handler

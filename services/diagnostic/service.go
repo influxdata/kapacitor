@@ -292,6 +292,12 @@ func (s *Service) NewSwarmHandler() *SwarmHandler {
 	}
 }
 
+func (s *Service) NewEC2Handler() *EC2Handler {
+	return &EC2Handler{
+		l: s.logger.With(String("service", "ec2")),
+	}
+}
+
 func (s *Service) NewDeadmanHandler() *DeadmanHandler {
 	return &DeadmanHandler{
 		l: s.logger.With(String("service", "deadman")),
@@ -346,13 +352,6 @@ func (s *Service) NewConsulHandler() *ScraperHandler {
 func (s *Service) NewDNSHandler() *ScraperHandler {
 	return &ScraperHandler{
 		l:   s.logger.With(String("service", "dns")),
-		buf: bytes.NewBuffer(nil),
-	}
-}
-
-func (s *Service) NewEC2Handler() *ScraperHandler {
-	return &ScraperHandler{
-		l:   s.logger.With(String("service", "ec2")),
 		buf: bytes.NewBuffer(nil),
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	ec2 "github.com/influxdata/kapacitor/services/ec2/client"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
 	swarm "github.com/influxdata/kapacitor/services/swarm/client"
 	"github.com/influxdata/kapacitor/tick/ast"
@@ -534,5 +535,98 @@ func (a *swarmAutoscaler) SetReplicas(id resourceID, replicas int) error {
 func (a *swarmAutoscaler) SetResourceIDOnTags(id resourceID, tags models.Tags) {
 	if a.outputServiceNameTag != "" {
 		tags[a.outputServiceNameTag] = id.ID()
+	}
+}
+
+/////////////////////////////////////////////
+// EC2 implementation of Autoscaler
+
+type ec2Autoscaler struct {
+	client ec2.Client
+
+	groupName          string
+	groupNameTag       string
+	outputGroupNameTag string
+}
+
+func newEc2AutoscaleNode(et *ExecutingTask, n *pipeline.Ec2AutoscaleNode, d NodeDiagnostic) (*AutoscaleNode, error) {
+	client, err := et.tm.EC2Service.Client(n.Cluster)
+	if err != nil {
+		return nil, fmt.Errorf("cannot use the EC2Autoscale node, could not create ec2 client: %v", err)
+	}
+	outputGroupNameTag := n.OutputGroupNameTag
+	if outputGroupNameTag == "" {
+		outputGroupNameTag = n.GroupNameTag
+	}
+	a := &ec2Autoscaler{
+		client: client,
+
+		groupName:          n.GroupName,
+		groupNameTag:       n.GroupNameTag,
+		outputGroupNameTag: outputGroupNameTag,
+	}
+	return newAutoscaleNode(
+		et,
+		d,
+		n,
+		a,
+		int(n.Min),
+		int(n.Max),
+		n.IncreaseCooldown,
+		n.DecreaseCooldown,
+		n.CurrentField,
+		n.Replicas,
+	)
+}
+
+type ec2ResourceID string
+
+func (id ec2ResourceID) ID() string {
+	return string(id)
+}
+
+func (a *ec2Autoscaler) ResourceIDFromTags(tags models.Tags) (resourceID, error) {
+	// Get the name of the resource
+	var name string
+	switch {
+	case a.groupName != "":
+		name = a.groupName
+	case a.groupNameTag != "":
+		t, ok := tags[a.groupNameTag]
+		if ok {
+			name = t
+		}
+	default:
+		return nil, errors.New("expected one of GroupName or GroupNameTag to be set")
+	}
+	if name == "" {
+		return nil, errors.New("could not determine the name of the resource")
+	}
+	return swarmResourceID(name), nil
+}
+
+func (a *ec2Autoscaler) Replicas(id resourceID) (int, error) {
+	sid := id.ID()
+	group, err := a.client.Group(sid)
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to get ec2 autoscaleGroup for %q", id)
+	}
+	var desiredcapacity int64
+	for _, resp := range group.AutoScalingGroups {
+		desiredcapacity = *resp.DesiredCapacity
+	}
+	return int(desiredcapacity), nil
+
+}
+
+func (a *ec2Autoscaler) SetReplicas(id resourceID, replicas int) error {
+	sid := id.ID()
+
+	return a.client.UpdateGroup(sid, int64(replicas))
+}
+
+func (a *ec2Autoscaler) SetResourceIDOnTags(id resourceID, tags models.Tags) {
+	if a.outputGroupNameTag != "" {
+		tags[a.outputGroupNameTag] = id.ID()
 	}
 }

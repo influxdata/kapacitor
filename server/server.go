@@ -274,11 +274,13 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 	if err := s.appendSwarmService(); err != nil {
 		return nil, errors.Wrap(err, "docker swarm service")
 	}
+	if err := s.appendEC2Service(); err != nil {
+		return nil, errors.Wrap(err, "Aws service")
+	}
 
 	s.appendAzureService()
 	s.appendConsulService()
 	s.appendDNSService()
-	s.appendEC2Service()
 	s.appendFileService()
 	s.appendGCEService()
 	s.appendMarathonService()
@@ -511,7 +513,19 @@ func (s *Server) appendSwarmService() error {
 	s.AppendService("swarm", srv)
 	return nil
 }
+func (s *Server) appendEC2Service() error {
+	c := s.config.EC2
+	d := s.DiagService.NewEC2Handler()
+	srv, err := ec2.NewService(c, s.ScraperService, d)
+	if err != nil {
+		return err
+	}
 
+	s.TaskMaster.EC2Service = srv
+	s.SetDynamicService("ec2", srv)
+	s.AppendService("ec2", srv)
+	return nil
+}
 func (s *Server) appendDeadmanService() {
 	d := s.DiagService.NewDeadmanHandler()
 	srv := deadman.NewService(s.config.Deadman, d)
@@ -835,14 +849,6 @@ func (s *Server) appendDNSService() {
 	srv := dns.NewService(c, s.ScraperService, d)
 	s.SetDynamicService("dns", srv)
 	s.AppendService("dns", srv)
-}
-
-func (s *Server) appendEC2Service() {
-	c := s.config.EC2
-	d := s.DiagService.NewEC2Handler()
-	srv := ec2.NewService(c, s.ScraperService, d)
-	s.SetDynamicService("ec2", srv)
-	s.AppendService("ec2", srv)
 }
 
 func (s *Server) appendFileService() {

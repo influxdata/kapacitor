@@ -505,6 +505,8 @@ func (et *ExecutingTask) createNode(p pipeline.Node, d NodeDiagnostic) (n Node, 
 		n, err = newK8sAutoscaleNode(et, t, d)
 	case *pipeline.SwarmAutoscaleNode:
 		n, err = newSwarmAutoscaleNode(et, t, d)
+	case *pipeline.Ec2AutoscaleNode:
+		n, err = newEc2AutoscaleNode(et, t, d)
 	case *pipeline.StateDurationNode:
 		n, err = newStateDurationNode(et, t, d)
 	case *pipeline.StateCountNode:

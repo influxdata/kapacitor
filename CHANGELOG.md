@@ -2,6 +2,10 @@
 
 ## unreleased
 
+### Features
+
+- [#1622](https://github.com/influxdata/kapacitor/pull/1622): Add support for AWS EC2 autoscaling services.
+
 ### Bugfixes
 
 - [#1250](https://github.com/influxdata/kapacitor/issues/1250): Fix VictorOps "data" field being a string instead of actual JSON.
