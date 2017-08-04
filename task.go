@@ -499,6 +499,8 @@ func (et *ExecutingTask) createNode(p pipeline.Node, l *log.Logger) (n Node, err
 		n, err = newCombineNode(et, t, l)
 	case *pipeline.K8sAutoscaleNode:
 		n, err = newK8sAutoscaleNode(et, t, l)
+	case *pipeline.SwarmAutoscaleNode:
+		n, err = newSwarmAutoscaleNode(et, t, l)
 	case *pipeline.StateDurationNode:
 		n, err = newStateDurationNode(et, t, l)
 	case *pipeline.StateCountNode:

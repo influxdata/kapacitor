@@ -2,6 +2,7 @@ package integrations
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -19,6 +20,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/docker/docker/api/types/swarm"
 	"github.com/influxdata/influxdb/client"
 	imodels "github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor"
@@ -36,6 +38,7 @@ import (
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/httppost/httpposttest"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
+	"github.com/influxdata/kapacitor/services/k8s/k8stest"
 	"github.com/influxdata/kapacitor/services/logging/loggingtest"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/opsgenie/opsgenietest"
@@ -52,6 +55,7 @@ import (
 	"github.com/influxdata/kapacitor/services/snmptrap"
 	"github.com/influxdata/kapacitor/services/snmptrap/snmptraptest"
 	"github.com/influxdata/kapacitor/services/storage/storagetest"
+	"github.com/influxdata/kapacitor/services/swarm/swarmtest"
 	"github.com/influxdata/kapacitor/services/talk"
 	"github.com/influxdata/kapacitor/services/talk/talktest"
 	"github.com/influxdata/kapacitor/services/telegram"
@@ -8819,184 +8823,282 @@ stream
 	}
 }
 
-func TestStream_K8sAutoscale(t *testing.T) {
-	var script = `
-stream
-	|from()
-		.measurement('scale')
-		.groupBy('deployment')
-	|k8sAutoscale()
-		.resourceNameTag('deployment')
-		.replicas(lambda: int("replicas"))
-	|httpOut('TestStream_K8sAutoscale')
-`
-
-	er := models.Result{
-		Series: models.Rows{
-			{
-				Name: "scale",
-				Tags: map[string]string{
-					"deployment": "serviceA",
-					"namespace":  "default",
-					"kind":       "deployments",
-					"resource":   "serviceA",
+func TestStream_Autoscale(t *testing.T) {
+	testCases := map[string]struct {
+		script           string
+		result           models.Result
+		minMaxResult     models.Result
+		setup            func(*kapacitor.TaskMaster) context.Context
+		updatesByService func(context.Context) map[string][]int
+	}{
+		"k8sAutoscale": {
+			script: `|k8sAutoscale().resourceNameTag('deployment')`,
+			result: models.Result{
+				Series: models.Rows{
+					{
+						Name: "scale",
+						Tags: map[string]string{
+							"deployment": "serviceA",
+							"namespace":  "default",
+							"kind":       "deployments",
+							"resource":   "serviceA",
+						},
+						Columns: []string{"time", "new", "old"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+							2.0,
+							1000.0,
+						}},
+					},
+					{
+						Name: "scale",
+						Tags: map[string]string{
+							"deployment": "serviceB",
+							"namespace":  "default",
+							"kind":       "deployments",
+							"resource":   "serviceB",
+						},
+						Columns: []string{"time", "new", "old"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+							20.0,
+							1000.0,
+						}},
+					},
 				},
-				Columns: []string{"time", "new", "old"},
-				Values: [][]interface{}{[]interface{}{
-					time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
-					2.0,
-					1000.0,
-				}},
 			},
-			{
-				Name: "scale",
-				Tags: map[string]string{
-					"deployment": "serviceB",
-					"namespace":  "default",
-					"kind":       "deployments",
-					"resource":   "serviceB",
+			minMaxResult: models.Result{
+				Series: models.Rows{
+					{
+						Name: "scale",
+						Tags: map[string]string{
+							"deployment": "serviceA",
+							"namespace":  "default",
+							"kind":       "deployments",
+							"resource":   "serviceA",
+						},
+						Columns: []string{"time", "new", "old"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+							3.0,
+							500.0,
+						}},
+					},
+					{
+						Name: "scale",
+						Tags: map[string]string{
+							"deployment": "serviceB",
+							"namespace":  "default",
+							"kind":       "deployments",
+							"resource":   "serviceB",
+						},
+						Columns: []string{"time", "new", "old"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+							20.0,
+							500.0,
+						}},
+					},
 				},
-				Columns: []string{"time", "new", "old"},
-				Values: [][]interface{}{[]interface{}{
-					time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
-					20.0,
-					1000.0,
-				}},
+			},
+			setup: func(tm *kapacitor.TaskMaster) context.Context {
+				scaleUpdates := make(chan k8s.Scale, 100)
+				ctx := context.WithValue(nil, "updates", scaleUpdates)
+				k8sAutoscale := k8stest.Client{}
+				k8sAutoscale.ScalesGetFunc = func(kind, name string) (*k8s.Scale, error) {
+					var replicas int32
+					switch name {
+					case "serviceA":
+						replicas = 1
+					case "serviceB":
+						replicas = 10
+					}
+					return &k8s.Scale{
+						ObjectMeta: k8s.ObjectMeta{
+							Name: name,
+						},
+						Spec: k8s.ScaleSpec{
+							Replicas: replicas,
+						},
+					}, nil
+				}
+				k8sAutoscale.ScalesUpdateFunc = func(kind string, scale *k8s.Scale) error {
+					scaleUpdates <- *scale
+					return nil
+				}
+				tm.K8sService = k8sAutoscale
+				return ctx
+			},
+			updatesByService: func(ctx context.Context) map[string][]int {
+				scaleUpdates := ctx.Value("updates").(chan k8s.Scale)
+				close(scaleUpdates)
+				updatesByService := make(map[string][]int)
+				for scale := range scaleUpdates {
+					updatesByService[scale.Name] = append(updatesByService[scale.Name], int(scale.Spec.Replicas))
+				}
+				return updatesByService
+			},
+		},
+		"swarmAutoscale": {
+			script: `|swarmAutoscale().serviceNameTag('deployment')`,
+			result: models.Result{
+				Series: models.Rows{
+					{
+						Name: "scale",
+						Tags: map[string]string{
+							"deployment": "serviceA",
+						},
+						Columns: []string{"time", "new", "old"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+							2.0,
+							1000.0,
+						}},
+					},
+					{
+						Name: "scale",
+						Tags: map[string]string{
+							"deployment": "serviceB",
+						},
+						Columns: []string{"time", "new", "old"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+							20.0,
+							1000.0,
+						}},
+					},
+				},
+			},
+			minMaxResult: models.Result{
+				Series: models.Rows{
+					{
+						Name: "scale",
+						Tags: map[string]string{
+							"deployment": "serviceA",
+						},
+						Columns: []string{"time", "new", "old"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+							3.0,
+							500.0,
+						}},
+					},
+					{
+						Name: "scale",
+						Tags: map[string]string{
+							"deployment": "serviceB",
+						},
+						Columns: []string{"time", "new", "old"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+							20.0,
+							500.0,
+						}},
+					},
+				},
+			},
+			setup: func(tm *kapacitor.TaskMaster) context.Context {
+				serviceUpdates := make(chan swarm.Service, 100)
+				ctx := context.WithValue(nil, "updates", serviceUpdates)
+				swarmAutoscale := swarmtest.Client{}
+				swarmAutoscale.ServiceFunc = func(name string) (*swarm.Service, error) {
+					var replicas uint64
+					switch name {
+					case "serviceA":
+						replicas = 1
+					case "serviceB":
+						replicas = 10
+					}
+					return &swarm.Service{
+						ID: name,
+						Spec: swarm.ServiceSpec{
+							Mode: swarm.ServiceMode{
+								Replicated: &swarm.ReplicatedService{
+									Replicas: &replicas,
+								},
+							},
+						},
+					}, nil
+				}
+				swarmAutoscale.UpdateServiceFunc = func(service *swarm.Service) error {
+					serviceUpdates <- *service
+					return nil
+				}
+				tm.SwarmService = swarmAutoscale
+				return ctx
+			},
+			updatesByService: func(ctx context.Context) map[string][]int {
+				updates := ctx.Value("updates").(chan swarm.Service)
+				close(updates)
+				updatesByService := make(map[string][]int)
+				for service := range updates {
+					updatesByService[service.ID] = append(updatesByService[service.ID], int(*service.Spec.Mode.Replicated.Replicas))
+				}
+				return updatesByService
 			},
 		},
 	}
-	scaleUpdates := make(chan k8s.Scale, 100)
-	k8sAutoscale := k8sAutoscale{}
-	k8sAutoscale.ScalesGetFunc = func(kind, name string) (*k8s.Scale, error) {
-		var replicas int32
-		switch name {
-		case "serviceA":
-			replicas = 1
-		case "serviceB":
-			replicas = 10
-		}
-		return &k8s.Scale{
-			ObjectMeta: k8s.ObjectMeta{
-				Name: name,
-			},
-			Spec: k8s.ScaleSpec{
-				Replicas: replicas,
-			},
-		}, nil
+	expUpdatesByService := map[string][]int{
+		"serviceA": []int{2, 1, 1000, 2},
+		"serviceB": []int{20, 1, 1000, 20},
 	}
-	k8sAutoscale.ScalesUpdateFunc = func(kind string, scale *k8s.Scale) error {
-		scaleUpdates <- *scale
-		return nil
-	}
-	tmInit := func(tm *kapacitor.TaskMaster) {
-		tm.K8sService = k8sAutoscale
+	expMinMaxUpdatesByService := map[string][]int{
+		"serviceA": []int{3, 500, 3},
+		"serviceB": []int{20, 3, 500, 20},
 	}
 
-	testStreamerWithOutput(t, "TestStream_K8sAutoscale", script, 13*time.Second, er, false, tmInit)
-
-	close(scaleUpdates)
-	updatesByService := make(map[string][]int32)
-	for scale := range scaleUpdates {
-		updatesByService[scale.Name] = append(updatesByService[scale.Name], scale.Spec.Replicas)
-	}
-	expUpdates := map[string][]int32{
-		"serviceA": []int32{2, 1, 1000, 2},
-		"serviceB": []int32{20, 1, 1000, 20},
-	}
-
-	if !reflect.DeepEqual(updatesByService, expUpdates) {
-		t.Errorf("unexpected updates\ngot\n%v\nexp\n%v\n", updatesByService, expUpdates)
-	}
-}
-func TestStream_K8sAutoscale_MinMax(t *testing.T) {
-	var script = `
+	var scriptTmpl = `
 stream
 	|from()
 		.measurement('scale')
 		.groupBy('deployment')
-	|k8sAutoscale()
+	%s
+		.replicas(lambda: int("replicas"))
+	|httpOut('TestStream_Autoscale')
+`
+
+	var scriptMinMaxTmpl = `
+stream
+	|from()
+		.measurement('scale')
+		.groupBy('deployment')
+	%s
+		.replicas(lambda: int("replicas"))
 		.min(3)
 		.max(500)
-		.resourceNameTag('deployment')
-		.replicas(lambda: int("replicas"))
-	|httpOut('TestStream_K8sAutoscale')
+	|httpOut('TestStream_Autoscale')
 `
 
-	er := models.Result{
-		Series: models.Rows{
-			{
-				Name: "scale",
-				Tags: map[string]string{
-					"deployment": "serviceA",
-					"namespace":  "default",
-					"kind":       "deployments",
-					"resource":   "serviceA",
-				},
-				Columns: []string{"time", "new", "old"},
-				Values: [][]interface{}{[]interface{}{
-					time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
-					3.0,
-					500.0,
-				}},
-			},
-			{
-				Name: "scale",
-				Tags: map[string]string{
-					"deployment": "serviceB",
-					"namespace":  "default",
-					"kind":       "deployments",
-					"resource":   "serviceB",
-				},
-				Columns: []string{"time", "new", "old"},
-				Values: [][]interface{}{[]interface{}{
-					time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
-					20.0,
-					500.0,
-				}},
-			},
-		},
-	}
-	scaleUpdates := make(chan k8s.Scale, 100)
-	k8sAutoscale := k8sAutoscale{}
-	k8sAutoscale.ScalesGetFunc = func(kind, name string) (*k8s.Scale, error) {
-		var replicas int32
-		switch name {
-		case "serviceA":
-			replicas = 1
-		case "serviceB":
-			replicas = 10
-		}
-		return &k8s.Scale{
-			ObjectMeta: k8s.ObjectMeta{
-				Name: name,
-			},
-			Spec: k8s.ScaleSpec{
-				Replicas: replicas,
-			},
-		}, nil
-	}
-	k8sAutoscale.ScalesUpdateFunc = func(kind string, scale *k8s.Scale) error {
-		scaleUpdates <- *scale
-		return nil
-	}
-	tmInit := func(tm *kapacitor.TaskMaster) {
-		tm.K8sService = k8sAutoscale
-	}
+	for name, tc := range testCases {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			var ctx context.Context
+			tmInit := func(tm *kapacitor.TaskMaster) {
+				ctx = tc.setup(tm)
+			}
 
-	testStreamerWithOutput(t, "TestStream_K8sAutoscale", script, 13*time.Second, er, false, tmInit)
+			testStreamerWithOutput(t, "TestStream_Autoscale", fmt.Sprintf(scriptTmpl, tc.script), 13*time.Second, tc.result, false, tmInit)
 
-	close(scaleUpdates)
-	updatesByService := make(map[string][]int32)
-	for scale := range scaleUpdates {
-		updatesByService[scale.Name] = append(updatesByService[scale.Name], scale.Spec.Replicas)
-	}
-	expUpdates := map[string][]int32{
-		"serviceA": []int32{3, 500, 3},
-		"serviceB": []int32{20, 3, 500, 20},
-	}
+			updatesByService := tc.updatesByService(ctx)
 
-	if !reflect.DeepEqual(updatesByService, expUpdates) {
-		t.Errorf("unexpected updates\ngot\n%v\nexp\n%v\n", updatesByService, expUpdates)
+			if !reflect.DeepEqual(updatesByService, expUpdatesByService) {
+				t.Errorf("unexpected updates\ngot\n%v\nexp\n%v\n", updatesByService, expUpdatesByService)
+			}
+		})
+		t.Run("min-max-"+name, func(t *testing.T) {
+			var ctx context.Context
+			tmInit := func(tm *kapacitor.TaskMaster) {
+				ctx = tc.setup(tm)
+			}
+
+			testStreamerWithOutput(t, "TestStream_Autoscale", fmt.Sprintf(scriptMinMaxTmpl, tc.script), 13*time.Second, tc.minMaxResult, false, tmInit)
+
+			updatesByService := tc.updatesByService(ctx)
+
+			if !reflect.DeepEqual(updatesByService, expMinMaxUpdatesByService) {
+				t.Errorf("unexpected updates\ngot\n%v\nexp\n%v\n", updatesByService, expMinMaxUpdatesByService)
+			}
+		})
 	}
 }
 
@@ -10132,7 +10234,7 @@ stream
 	}
 
 	scaleUpdates := make(chan k8s.Scale, 100)
-	k8sAutoscale := k8sAutoscale{}
+	k8sAutoscale := k8stest.Client{}
 	k8sAutoscale.ScalesGetFunc = func(kind, name string) (*k8s.Scale, error) {
 		var replicas int32
 		switch name {
