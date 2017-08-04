@@ -12,7 +12,6 @@ import (
 	"sync/atomic"
 
 	"github.com/influxdata/kapacitor/alert"
-	"github.com/influxdata/kapacitor/models"
 )
 
 type Service struct {
@@ -64,6 +63,7 @@ func (s *Service) Global() bool {
 type testOptions struct {
 	IncidentKey string      `json:"incident-key"`
 	Description string      `json:"description"`
+	Details     string      `json:"details"`
 	Level       alert.Level `json:"level"`
 }
 
@@ -86,11 +86,11 @@ func (s *Service) Test(options interface{}) error {
 		o.IncidentKey,
 		o.Description,
 		o.Level,
-		models.Result{},
+		o.Details,
 	)
 }
 
-func (s *Service) Alert(serviceKey, incidentKey, desc string, level alert.Level, details models.Result) error {
+func (s *Service) Alert(serviceKey, incidentKey, desc string, level alert.Level, details string) error {
 	url, post, err := s.preparePost(serviceKey, incidentKey, desc, level, details)
 	if err != nil {
 		return err
@@ -118,7 +118,7 @@ func (s *Service) Alert(serviceKey, incidentKey, desc string, level alert.Level,
 	return nil
 }
 
-func (s *Service) preparePost(serviceKey, incidentKey, desc string, level alert.Level, details models.Result) (string, io.Reader, error) {
+func (s *Service) preparePost(serviceKey, incidentKey, desc string, level alert.Level, details string) (string, io.Reader, error) {
 
 	c := s.config()
 	if !c.Enabled {
@@ -147,16 +147,12 @@ func (s *Service) preparePost(serviceKey, incidentKey, desc string, level alert.
 	pData["client"] = "kapacitor"
 	pData["client_url"] = s.HTTPDService.URL()
 
-	b, err := json.Marshal(details)
-	if err != nil {
-		return "", nil, err
-	}
-	pData["details"] = string(b)
+	pData["details"] = details
 
 	// Post data to PagerDuty
 	var post bytes.Buffer
 	enc := json.NewEncoder(&post)
-	err = enc.Encode(pData)
+	err := enc.Encode(pData)
 	if err != nil {
 		return "", nil, err
 	}
@@ -190,7 +186,7 @@ func (h *handler) Handle(event alert.Event) {
 		event.State.ID,
 		event.State.Message,
 		event.State.Level,
-		event.Data.Result,
+		event.State.Details,
 	); err != nil {
 		h.logger.Println("E! failed to send event to PagerDuty", err)
 	}
