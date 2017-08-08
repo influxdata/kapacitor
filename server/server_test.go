@@ -7470,6 +7470,7 @@ func TestServer_ListServiceTests(t *testing.T) {
 					"incident-key": "testIncidentKey",
 					"description":  "test pagerduty message",
 					"level":        "CRITICAL",
+					"details":      "",
 				},
 			},
 			{
@@ -8368,7 +8369,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 						Description: "message",
 						Client:      "kapacitor",
 						ClientURL:   kapacitorURL,
-						Details:     resultJSON,
+						Details:     "details",
 					},
 				}}
 				if !reflect.DeepEqual(exp, got) {

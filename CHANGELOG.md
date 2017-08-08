@@ -19,6 +19,11 @@
 - [#1500](https://github.com/influxdata/kapacitor/pull/1500): Fix bugs with stopping running UDF agent.
 - [#1470](https://github.com/influxdata/kapacitor/pull/1470): Fix error messages for missing fields which are arguments to functions are not clear
 
+## v1.3.2 [2017-08-08]
+
+### Bugfixes
+- [#1512](https://github.com/influxdata/kapacitor/pull/1512): Use details field from alert node in PagerDuty.
+
 ## v1.3.1 [2017-06-02]
 
 ### Bugfixes
