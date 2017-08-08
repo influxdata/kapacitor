@@ -18,6 +18,7 @@
 - [#1402](https://github.com/influxdata/kapacitor/pull/1402): Fix http server error logging.
 - [#1500](https://github.com/influxdata/kapacitor/pull/1500): Fix bugs with stopping running UDF agent.
 - [#1470](https://github.com/influxdata/kapacitor/pull/1470): Fix error messages for missing fields which are arguments to functions are not clear
+- [#1516](https://github.com/influxdata/kapacitor/pull/1516): Fix bad PagerDuty test the required server info.
 
 ## v1.3.2 [2017-08-08]
 
