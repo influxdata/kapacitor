@@ -6,6 +6,11 @@
 
 ### Bugfixes
 
+## v1.3.2 [2017-08-08]
+
+### Bugfixes
+- [#1512](https://github.com/influxdata/kapacitor/pull/1512): Use details field from alert node in PagerDuty.
+
 ## v1.3.1 [2017-06-02]
 
 ### Bugfixes
