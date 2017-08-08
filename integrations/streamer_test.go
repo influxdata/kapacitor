@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -7842,7 +7843,9 @@ func TestStream_AlertPagerDuty(t *testing.T) {
 	ts := pagerdutytest.NewServer()
 	defer ts.Close()
 
-	defaultDetails := "{&#34;Name&#34;:&#34;cpu&#34;,&#34;TaskName&#34;:&#34;TestStream_Alert&#34;,&#34;Group&#34;:&#34;host=serverA&#34;,&#34;Tags&#34;:{&#34;host&#34;:&#34;serverA&#34;},&#34;ServerInfo&#34;:{&#34;Hostname&#34;:&#34;&#34;,&#34;ClusterID&#34;:&#34;&#34;,&#34;ServerID&#34;:&#34;&#34;},&#34;ID&#34;:&#34;kapacitor/cpu/serverA&#34;,&#34;Fields&#34;:{&#34;count&#34;:10},&#34;Level&#34;:&#34;CRITICAL&#34;,&#34;Time&#34;:&#34;1971-01-01T00:00:10Z&#34;,&#34;Message&#34;:&#34;CRITICAL alert for kapacitor/cpu/serverA&#34;}\n"
+	defaultDetailsTmpl := `{"Name":"cpu","TaskName":"TestStream_Alert","Group":"host=serverA","Tags":{"host":"serverA"},"ServerInfo":{"Hostname":"%v","ClusterID":"%v","ServerID":"%v"},"ID":"kapacitor/cpu/serverA","Fields":{"count":10},"Level":"CRITICAL","Time":"1971-01-01T00:00:10Z","Message":"CRITICAL alert for kapacitor/cpu/serverA"}
+`
+	var defaultDetails string
 
 	var script = `
 stream
@@ -7867,6 +7870,12 @@ stream
 
 	var kapacitorURL string
 	tmInit := func(tm *kapacitor.TaskMaster) {
+		si := tm.ServerInfo
+		defaultDetails = fmt.Sprintf(defaultDetailsTmpl,
+			si.Hostname(),
+			si.ClusterID(),
+			si.ServerID(),
+		)
 		c := pagerduty.NewConfig()
 		c.Enabled = true
 		c.URL = ts.URL
@@ -7888,7 +7897,7 @@ stream
 				Description: "CRITICAL alert for kapacitor/cpu/serverA",
 				Client:      "kapacitor",
 				ClientURL:   kapacitorURL,
-				Details:     defaultDetails,
+				Details:     html.EscapeString(defaultDetails),
 			},
 		},
 		pagerdutytest.Request{
@@ -7899,7 +7908,7 @@ stream
 				Description: "CRITICAL alert for kapacitor/cpu/serverA",
 				Client:      "kapacitor",
 				ClientURL:   kapacitorURL,
-				Details:     defaultDetails,
+				Details:     html.EscapeString(defaultDetails),
 			},
 		},
 	}
