@@ -18,7 +18,6 @@ import (
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/influxdb"
 	"github.com/influxdata/kapacitor/uuid"
-	"github.com/influxdata/kapacitor/vars"
 )
 
 var ls = logSerivce{}
@@ -40,7 +39,6 @@ var (
 )
 
 func init() {
-	vars.ClusterIDVar.Set(testKapacitorClusterID)
 	if len(randomTokenData) != tokenSize {
 		panic(fmt.Sprintf("invalid randomTokenData: got %d exp %d", len(randomTokenData), tokenSize))
 	}
@@ -1160,7 +1158,12 @@ func NewDefaultTestConfigs(clusters []string) []influxdb.Config {
 func NewTestService(configs []influxdb.Config, hostname string, useTokens bool) (*influxdb.Service, *authService, *clientCreator) {
 	httpPort := 9092
 	l := ls.NewLogger("[test-influxdb] ", log.LstdFlags)
-	s, err := influxdb.NewService(configs, httpPort, hostname, useTokens, l)
+	s, err := influxdb.NewService(
+		configs,
+		httpPort,
+		hostname,
+		ider{clusterID: testKapacitorClusterID, serverID: uuid.New()},
+		useTokens, l)
 	if err != nil {
 		panic(err)
 	}
@@ -1283,4 +1286,16 @@ type randReader struct {
 
 func (randReader) Read(p []byte) (int, error) {
 	return copy(p, []byte(randomTokenData)), nil
+}
+
+type ider struct {
+	clusterID,
+	serverID uuid.UUID
+}
+
+func (i ider) ClusterID() uuid.UUID {
+	return i.clusterID
+}
+func (i ider) ServerID() uuid.UUID {
+	return i.serverID
 }

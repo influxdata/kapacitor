@@ -16,12 +16,12 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/client/v1"
+	"github.com/influxdata/kapacitor/server/vars"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/influxdata/kapacitor/tick"
 	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/uuid"
-	"github.com/influxdata/kapacitor/vars"
 	"github.com/pkg/errors"
 )
 

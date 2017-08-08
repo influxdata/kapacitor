@@ -7,18 +7,21 @@
 #      0: normal 64bit tests
 #      1: race enabled 64bit tests
 #      2: normal 32bit tests
-#      3: normal 64bit tests against Go HEAD
-#      save: build the docker images and save them to DOCKER_SAVE_DIR. Do not run tests.
 #      count: print the number of test environments
 #      *: to run all tests in parallel containers
 #
 # Logs from the test runs will be saved in OUTPUT_DIR, which defaults to ./test-logs
 #
 
+set -eo pipefail
+
 # Get dir of script and make it is our working directory.
 DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
 cd $DIR
 
+# Unique number for this build
+BUILD_NUM=${BUILD_NUM-$RANDOM}
+# Index for which test environment to use
 ENVIRONMENT_INDEX=$1
 # Set the default OUTPUT_DIR
 OUTPUT_DIR=${OUTPUT_DIR-./test-logs}
@@ -30,6 +33,8 @@ PARALLELISM=${PARALLELISM-1}
 TIMEOUT=${TIMEOUT-480s}
 # No uncommitted changes
 NO_UNCOMMITTED=${NO_UNCOMMITTED-false}
+# Home dir of the docker user
+HOME_DIR=/root
 
 no_uncomitted_arg="$no_uncommitted_arg"
 if [ ! $NO_UNCOMMITTED ]
@@ -37,27 +42,11 @@ then
     no_uncomitted_arg=""
 fi
 
-
-# Default to deleteing the container
-DOCKER_RM=${DOCKER_RM-true}
-
 # Update this value if you add a new test environment.
 ENV_COUNT=3
 
 # Default return code 0
 rc=0
-
-# Executes the given statement, and exits if the command returns a non-zero code.
-function exit_if_fail {
-    command=$@
-    echo "Executing '$command'"
-    $command
-    rc=$?
-    if [ $rc -ne 0 ]; then
-        echo "'$command' returned $rc."
-        exit $rc
-    fi
-}
 
 # Convert dockerfile name to valid docker image tag name.
 function filename2imagename {
@@ -74,15 +63,26 @@ function run_test_docker {
     shift
     local logfile="$OUTPUT_DIR/${name}.log"
 
-    build_docker_image "$dockerfile" "$imagename"
+    imagename="$imagename-$BUILD_NUM"
+    dataname="kapacitor-data-$BUILD_NUM"
+
+    echo "Building docker image $imagename"
+    docker build -f "$dockerfile" -t "$imagename" .
+
     echo "Running test in docker $name with args $@"
 
+    # Create data volume with code
+    docker create \
+        --name $dataname \
+        -v "$HOME_DIR/go/src/github.com/influxdata/kapacitor" \
+        $imagename /bin/true
+    docker cp "$DIR/" "$dataname:$HOME_DIR/go/src/github.com/influxdata/"
+
+    # Run tests in docker
     docker run \
-         --rm=$DOCKER_RM \
-         -v "$DIR:/root/go/src/github.com/influxdata/kapacitor" \
-         -e "INFLUXDB_DATA_ENGINE=$INFLUXDB_DATA_ENGINE" \
+         --rm \
+         --volumes-from $dataname \
          -e "GORACE=$GORACE" \
-         -e "GO_CHECKOUT=$GO_CHECKOUT" \
          -e "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID" \
          -e "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY" \
          "$imagename" \
@@ -90,45 +90,14 @@ function run_test_docker {
          "--timeout=$TIMEOUT" \
          "$@" \
          2>&1 | tee "$logfile"
-    return "${PIPESTATUS[0]}"
 
-}
+    # Copy results back out
+    docker cp \
+        "$dataname:$HOME_DIR/go/src/github.com/influxdata/kapacitor/build" \
+        ./
 
-# Build the docker image defined by given dockerfile.
-function build_docker_image {
-    local dockerfile=$1
-    local imagename=$2
-
-    echo "Building docker image $imagename"
-    exit_if_fail docker build -f "$dockerfile" -t "$imagename" .
-}
-
-
-# Saves a docker image to $DOCKER_SAVE_DIR
-function save_docker_image {
-    local dockerfile=$1
-    local imagename=$(filename2imagename "$dockerfile")
-    local imagefile="$DOCKER_SAVE_DIR/${imagename}.tar.gz"
-
-    if [ ! -d  "$DOCKER_SAVE_DIR" ]
-    then
-        mkdir -p "$DOCKER_SAVE_DIR"
-    fi
-
-    if [[ -e "$imagefile" ]]
-    then
-        zcat $imagefile | docker load
-    fi
-    imageid=$(docker images -q --no-trunc "$imagename")
-    build_docker_image "$dockerfile" "$imagename"
-    newimageid=$(docker images -q --no-trunc "$imagename")
-    rc=0
-    if [ "$imageid" != "$newimageid" ]
-    then
-        docker save "$imagename" | gzip > "$imagefile"
-        rc="${PIPESTATUS[0]}"
-    fi
-    return "$rc"
+    # Remove the data and builder containers
+    docker rm -v $dataname
 }
 
 if [ ! -d "$OUTPUT_DIR" ]
@@ -153,45 +122,6 @@ case $ENVIRONMENT_INDEX in
         # 32 bit tests
         run_test_docker Dockerfile_build_ubuntu32 test_32bit --test --generate $no_uncommitted_arg --arch=i386
         rc=$?
-        ;;
-    #3)
-    #    # 64 bit tests on golang HEAD
-    #    GO_CHECKOUT=HEAD
-    #    run_test_docker Dockerfile_build_ubuntu64_git test_64bit_go_tip --test --generate $no_uncommitted_arg
-    #    rc=$?
-    #    ;;
-    "save")
-        # Save docker images for every Dockerfile_build* file.
-        # Useful for creating an external cache.
-        pids=()
-        tail_cmds=()
-        for d in Dockerfile_build*
-        do
-            echo "Building and saving $d ..."
-            out="$OUTPUT_DIR/${d}.log"
-            save_docker_image "$d" > "$out" 2>&1 &
-            pid=$!
-            pids+=($pid)
-            tail_cmds+=("tail -n +0 --pid $pid -F $out")
-        done
-        echo "Waiting..."
-        # Wait for all saves to finish
-        i=0
-        for pid in "${pids[@]}"
-        do
-            tail_cmd="${tail_cmds[$i]}"
-            $tail_cmd
-            wait $pid
-            rc=$(($? + $rc))
-            i=$((i+1))
-        done
-        # Check if all saves passed
-        if [ $rc -eq 0 ]
-        then
-            echo "All saves succeeded"
-        else
-            echo "Some saves failed, check logs in $OUTPUT_DIR"
-        fi
         ;;
     "count")
         echo $ENV_COUNT

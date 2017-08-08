@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/influxdata/kapacitor/vars"
+	"github.com/influxdata/kapacitor/server/vars"
 	client "github.com/influxdata/usage-client/v1"
 )
 
@@ -19,11 +19,7 @@ type Service struct {
 
 	client *client.Client
 
-	clusterID string
-	serverID  string
-	hostname  string
-	version   string
-	product   string
+	info vars.Infoer
 
 	statsTicker *time.Ticker
 	usageTicker *time.Ticker
@@ -32,11 +28,12 @@ type Service struct {
 	wg          sync.WaitGroup
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, info vars.Infoer, l *log.Logger) *Service {
 	client := client.New("")
 	client.URL = c.URL
 	return &Service{
 		client: client,
+		info:   info,
 		logger: l,
 	}
 }
@@ -46,16 +43,9 @@ func (s *Service) Open() error {
 		s.closing = make(chan struct{})
 	}
 
-	// Populate published vars
-	s.clusterID = vars.ClusterIDVar.StringValue()
-	s.serverID = vars.ServerIDVar.StringValue()
-	s.hostname = vars.HostVar.StringValue()
-	s.version = vars.VersionVar.StringValue()
-	s.product = vars.Product
-
 	// Populate anonymous tags
 	s.tags = make(client.Tags)
-	s.tags["version"] = s.version
+	s.tags["version"] = s.info.Version()
 	s.tags["arch"] = runtime.GOARCH
 	s.tags["os"] = runtime.GOOS
 
@@ -114,15 +104,15 @@ func (s *Service) sendUsageReport() error {
 		Values: make(client.Values),
 	}
 	// Add values
-	data.Values[vars.ClusterIDVarName] = s.clusterID
-	data.Values[vars.ServerIDVarName] = s.serverID
-	data.Values[vars.NumTasksVarName] = vars.NumTasksVar.IntValue()
-	data.Values[vars.NumEnabledTasksVarName] = vars.NumEnabledTasksVar.IntValue()
-	data.Values[vars.NumSubscriptionsVarName] = vars.NumSubscriptionsVar.IntValue()
-	data.Values[vars.UptimeVarName] = vars.Uptime().Seconds()
+	data.Values[vars.ClusterIDVarName] = s.info.ClusterID().String()
+	data.Values[vars.ServerIDVarName] = s.info.ServerID().String()
+	data.Values[vars.NumTasksVarName] = s.info.NumTasks()
+	data.Values[vars.NumEnabledTasksVarName] = s.info.NumEnabledTasks()
+	data.Values[vars.NumSubscriptionsVarName] = s.info.NumSubscriptions()
+	data.Values[vars.UptimeVarName] = s.info.Uptime().Seconds()
 
 	usage := client.Usage{
-		Product: vars.Product,
+		Product: s.info.Product(),
 		Data:    []client.UsageData{data},
 	}
 

@@ -37,7 +37,8 @@ type Service struct {
 
 	Handler *Handler
 
-	logger *log.Logger
+	logger           *log.Logger
+	httpServerLogger *log.Logger
 }
 
 func NewService(c Config, hostname string, l *log.Logger, li logging.Interface) *Service {
@@ -68,7 +69,8 @@ func NewService(c Config, hostname string, l *log.Logger, li logging.Interface) 
 			li,
 			c.SharedSecret,
 		),
-		logger: l,
+		logger:           l,
+		httpServerLogger: li.NewStaticLevelLogger("[httpd]", log.LstdFlags, logging.ERROR),
 	}
 	return s
 }
@@ -110,6 +112,7 @@ func (s *Service) Open() error {
 	s.server = &http.Server{
 		Handler:   s.Handler,
 		ConnState: s.connStateHandler,
+		ErrorLog:  s.httpServerLogger,
 	}
 
 	s.new = make(chan net.Conn)

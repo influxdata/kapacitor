@@ -10768,7 +10768,7 @@ func compareListIgnoreOrder(got, exp []interface{}, cmpF func(got, exp interface
 }
 
 func createTaskMaster() (*kapacitor.TaskMaster, error) {
-	tm := kapacitor.NewTaskMaster("testStreamer", logService)
+	tm := kapacitor.NewTaskMaster("testStreamer", newServerInfo(), logService)
 	httpdService := newHTTPDService()
 	tm.HTTPDService = httpdService
 	tm.TaskStore = taskStore{}

@@ -26,7 +26,7 @@ import (
 func TestBatch_InvalidQuery(t *testing.T) {
 
 	// Create a new execution env
-	tm := kapacitor.NewTaskMaster("invalidQuery", logService)
+	tm := kapacitor.NewTaskMaster("invalidQuery", newServerInfo(), logService)
 	tm.HTTPDService = newHTTPDService()
 	tm.TaskStore = taskStore{}
 	tm.DeadmanService = deadman{}
@@ -2976,7 +2976,7 @@ func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.Ex
 	}
 
 	// Create a new execution env
-	tm := kapacitor.NewTaskMaster("testBatcher", logService)
+	tm := kapacitor.NewTaskMaster("testBatcher", newServerInfo(), logService)
 	httpdService := newHTTPDService()
 	tm.HTTPDService = httpdService
 	tm.TaskStore = taskStore{}

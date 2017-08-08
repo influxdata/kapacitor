@@ -7,23 +7,37 @@ set -e
 DIR=$(cd $(dirname ${BASH_SOURCE[0]}) && pwd)
 cd $DIR
 
+# Unique number for this build
+BUILD_NUM=${BUILD_NUM-$RANDOM}
+# Home dir of the docker user
+HOME_DIR=/root
+
+imagename=kapacitor-builder-img-$BUILD_NUM
+dataname=kapacitor-data-$BUILD_NUM
+
+# Build new docker image
+docker build -f Dockerfile_build_ubuntu64 -t $imagename $DIR
+
 # Build new docker image
 docker build -f Dockerfile_build_ubuntu64 -t influxdata/kapacitor-builder $DIR
-if test "${KAPACITOR_USE_BUILD_CACHE}" = "true"; then
-	# create a container that owns the /root/go/src volume used as a cache of go dependency downloads
-	# ignore failures, since this usually means the container already exists.
-	docker run --entrypoint=/bin/true --name kapacitor-builder-cache influxdata/kapacitor-builder 2>/dev/null || true
-	VOLUME_OPTIONS="--volumes-from kapacitor-builder-cache"
-else
-	VOLUME_OPTIONS=
-fi
+
+# Create data volume with code
+docker create \
+    --name $dataname \
+    -v "$HOME_DIR/go/src/github.com/influxdata/kapacitor" \
+    $imagename /bin/true
+docker cp "$DIR/" "$dataname:$HOME_DIR/go/src/github.com/influxdata/"
 
 echo "Running build.py"
 # Run docker
-docker run --rm \
+docker run \
+    --rm \
+    --volumes-from $dataname \
     -e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
     -e AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
-    ${VOLUME_OPTIONS} \
-    -v $DIR:/root/go/src/github.com/influxdata/kapacitor:Z \
-    influxdata/kapacitor-builder \
+    $imagename \
     "$@"
+
+docker cp "$dataname:$HOME_DIR/go/src/github.com/influxdata/kapacitor/build" \
+    ./
+docker rm -v $dataname
