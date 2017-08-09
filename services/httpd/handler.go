@@ -63,6 +63,7 @@ type Route struct {
 	HandlerFunc interface{}
 	NoGzip      bool
 	NoJSON      bool
+	BypassAuth  bool
 }
 
 // Handler represents an HTTP handler for the Kapacitor API server.
@@ -70,6 +71,7 @@ type Handler struct {
 	methodMux map[string]*ServeMux
 
 	requireAuthentication bool
+	exposePprof           bool
 	sharedSecret          string
 
 	allowGzip bool
@@ -101,6 +103,7 @@ type Handler struct {
 // NewHandler returns a new instance of handler with routes.
 func NewHandler(
 	requireAuthentication,
+	pprofEnabled,
 	loggingEnabled,
 	writeTrace,
 	allowGzip bool,
@@ -112,6 +115,7 @@ func NewHandler(
 	h := &Handler{
 		methodMux:             make(map[string]*ServeMux),
 		requireAuthentication: requireAuthentication,
+		exposePprof:           pprofEnabled,
 		sharedSecret:          sharedSecret,
 		allowGzip:             allowGzip,
 		logger:                l,
@@ -203,35 +207,41 @@ func NewHandler(
 			Pattern:     BasePath + "/debug/pprof/",
 			HandlerFunc: servePprof,
 			NoJSON:      true,
+			BypassAuth:  true,
 		},
 		{
 			Method:      "GET",
 			Pattern:     BasePath + "/debug/pprof/cmdline",
 			HandlerFunc: pprof.Cmdline,
 			NoJSON:      true,
+			BypassAuth:  true,
 		},
 		{
 			Method:      "GET",
 			Pattern:     BasePath + "/debug/pprof/profile",
 			HandlerFunc: pprof.Profile,
 			NoJSON:      true,
+			BypassAuth:  true,
 		},
 		{
 			Method:      "GET",
 			Pattern:     BasePath + "/debug/pprof/symbol",
 			HandlerFunc: pprof.Symbol,
 			NoJSON:      true,
+			BypassAuth:  true,
 		},
 		{
 			Method:      "GET",
 			Pattern:     BasePath + "/debug/pprof/trace",
 			HandlerFunc: pprof.Trace,
 			NoJSON:      true,
+			BypassAuth:  true,
 		},
 		{
 			Method:      "GET",
 			Pattern:     BasePath + "/debug/vars",
 			HandlerFunc: serveExpvar,
+			BypassAuth:  true,
 		},
 	})
 
@@ -294,7 +304,11 @@ func (h *Handler) addRawRoute(r Route) error {
 
 	// This is a normal handler signature so perform standard authentication/authorization.
 	if hf, ok := r.HandlerFunc.(func(http.ResponseWriter, *http.Request)); ok {
-		handler = authenticate(authorize(hf), h, h.requireAuthentication)
+		requireAuth := h.requireAuthentication
+		if r.BypassAuth && h.exposePprof {
+			requireAuth = false
+		}
+		handler = authenticate(authorize(hf), h, requireAuth)
 	}
 	if handler == nil {
 		return errors.New("route does not have valid handler function")
