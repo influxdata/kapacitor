@@ -14,6 +14,7 @@
 - [#1485](https://github.com/influxdata/kapacitor/issues/1485): Add bools field types to UDFs.
 - [#1545](https://github.com/influxdata/kapacitor/pull/1545): Add support for timeout, tags and service template in the Alerta AlertNode
 - [#1568](https://github.com/influxdata/kapacitor/issues/1568): Add support for custom HTTP Post bodies via a template system.
+- [#1518](https://github.com/influxdata/kapacitor/pull/1518): Add Database and RetentionPolicy properties to QueryNode
 
 ### Bugfixes
 

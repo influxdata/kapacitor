@@ -157,6 +157,13 @@ func newQueryNode(et *ExecutingTask, n *pipeline.QueryNode, d NodeDiagnostic) (*
 		return nil, err
 	}
 	bn.query = q
+	// Set database (if applicable)
+	if n.Database != "" {
+		bn.query.DBRP(DBRP{
+			Database:        n.Database,
+			RetentionPolicy: n.RetentionPolicy,
+		})
+	}
 	// Add in dimensions
 	err = bn.query.Dimensions(n.Dimensions)
 	if err != nil {
@@ -298,7 +305,8 @@ func (n *QueryNode) doQuery(in edge.Edge) error {
 
 			// Execute query
 			q := influxdb.Query{
-				Command: qStr,
+				Command:  qStr,
+				Database: n.b.Database,
 			}
 			resp, err := con.Query(q)
 			if err != nil {

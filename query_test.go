@@ -2,6 +2,7 @@ package kapacitor_test
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -163,5 +164,32 @@ func TestQuery_IsGroupedByTime(t *testing.T) {
 	q.Dimensions([]interface{}{"host"})
 	if q.IsGroupedByTime() {
 		t.Error("expected query to not be grouped by time")
+	}
+}
+func TestQuery_DoesUseDBRP(t *testing.T) {
+	q, err := kapacitor.NewQuery("SELECT usage FROM telegraf.autogen.cpu")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	q.DBRP(kapacitor.DBRP{
+		Database:        "db",
+		RetentionPolicy: "rp",
+	})
+	if !strings.HasPrefix(q.String(), "SELECT usage FROM db.rp.cpu WHERE") {
+		t.Error("expected dbrp to be \"db\".\"rp\"")
+	}
+
+	q, err = kapacitor.NewQuery("SELECT usage FROM telegraf.autogen.cpu")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	q.DBRP(kapacitor.DBRP{
+		Database:        "db",
+		RetentionPolicy: "",
+	})
+	if !strings.HasPrefix(q.String(), "SELECT usage FROM db..cpu WHERE") {
+		t.Error("expected dbrp to be \"db\".\"\"")
 	}
 }

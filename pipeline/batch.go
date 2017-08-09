@@ -83,6 +83,20 @@ type QueryNode struct {
 	//tick:ignore
 	QueryStr string
 
+	// The database to query
+	//
+	// This is optional, but using this property obviates the need
+	// to specify the database in the query string.
+	Database string
+
+	// The retention policy to query
+	//
+	// This is optional, but is used in conjunction with the Database
+	// property to obviate the need to specity the retention policy in the
+	// query string. If the Database property is specified and this
+	// property is not, the default retention policy will be used.
+	RetentionPolicy string
+
 	// The period or length of time that will be queried from InfluxDB
 	Period time.Duration
 
