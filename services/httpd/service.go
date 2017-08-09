@@ -60,6 +60,7 @@ func NewService(c Config, hostname string, l *log.Logger, li logging.Interface) 
 		shutdownTimeout: time.Duration(c.ShutdownTimeout),
 		Handler: NewHandler(
 			c.AuthEnabled,
+			c.PprofEnabled,
 			c.LogEnabled,
 			c.WriteTracing,
 			c.GZIP,
