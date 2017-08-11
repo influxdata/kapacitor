@@ -21,6 +21,7 @@ func NewServer(verbose bool) *Server {
 	s := &Server{
 		Handler: httpd.NewHandler(
 			false,
+			false,
 			verbose,
 			verbose,
 			false,
