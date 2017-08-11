@@ -1,10 +1,9 @@
 # Changelog
 
-## Unreleased [unreleased]
-
-### Features
+## v1.3.2 [2017-08-11]
 
 ### Bugfixes
+- [#1520](https://github.com/influxdata/kapacitor/pull/1520): Expose pprof without authentication if enabled
 
 ## v1.3.2 [2017-08-08]
 
