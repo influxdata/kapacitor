@@ -1,7 +1,8 @@
 # Changelog
 
-## v1.3.3 [2017-08-11]
+## Unreleased
 
+### Features
 - [#1413](https://github.com/influxdata/kapacitor/issues/1413): Add subscriptions modes to InfluxDB subscriptions.
 - [#1436](https://github.com/influxdata/kapacitor/issues/1436): Add linear fill support for QueryNode.
 - [#1345](https://github.com/influxdata/kapacitor/issues/1345): Add MQTT Alert Handler
@@ -11,13 +12,17 @@
 - [#1497](https://github.com/influxdata/kapacitor/pull/1497): Add support for Docker Swarm autoscaling services.
 
 ### Bugfixes
-- [#1520](https://github.com/influxdata/kapacitor/pull/1520): Expose pprof without authentication if enabled
 
 - [#1400](https://github.com/influxdata/kapacitor/issues/1400): Allow for `.yml` file extensions in `define-topic-handler`
 - [#1402](https://github.com/influxdata/kapacitor/pull/1402): Fix http server error logging.
 - [#1500](https://github.com/influxdata/kapacitor/pull/1500): Fix bugs with stopping running UDF agent.
 - [#1470](https://github.com/influxdata/kapacitor/pull/1470): Fix error messages for missing fields which are arguments to functions are not clear
 - [#1516](https://github.com/influxdata/kapacitor/pull/1516): Fix bad PagerDuty test the required server info.
+
+## v1.3.3 [2017-08-11]
+
+### Bugfixes
+- [#1520](https://github.com/influxdata/kapacitor/pull/1520): Expose pprof without authentication if enabled
 
 ## v1.3.2 [2017-08-08]
 
