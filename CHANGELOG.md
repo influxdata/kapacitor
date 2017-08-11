@@ -1,8 +1,6 @@
 # Changelog
 
-## Unreleased [unreleased]
-
-### Features
+## v1.3.3 [2017-08-11]
 
 - [#1413](https://github.com/influxdata/kapacitor/issues/1413): Add subscriptions modes to InfluxDB subscriptions.
 - [#1436](https://github.com/influxdata/kapacitor/issues/1436): Add linear fill support for QueryNode.
@@ -13,6 +11,7 @@
 - [#1497](https://github.com/influxdata/kapacitor/pull/1497): Add support for Docker Swarm autoscaling services.
 
 ### Bugfixes
+- [#1520](https://github.com/influxdata/kapacitor/pull/1520): Expose pprof without authentication if enabled
 
 - [#1400](https://github.com/influxdata/kapacitor/issues/1400): Allow for `.yml` file extensions in `define-topic-handler`
 - [#1402](https://github.com/influxdata/kapacitor/pull/1402): Fix http server error logging.
