@@ -8,6 +8,7 @@ import (
 
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/notary"
 )
 
 type StatsNode struct {
@@ -20,14 +21,14 @@ type StatsNode struct {
 }
 
 // Create a new  FromNode which filters data from a source.
-func newStatsNode(et *ExecutingTask, n *pipeline.StatsNode, l *log.Logger) (*StatsNode, error) {
+func newStatsNode(et *ExecutingTask, n *pipeline.StatsNode, l *log.Logger, nt Notary) (*StatsNode, error) {
 	// Lookup the executing node for stats.
 	en := et.lookup[n.SourceNode.ID()]
 	if en == nil {
 		return nil, fmt.Errorf("no node found for %s", n.SourceNode.Name())
 	}
 	sn := &StatsNode{
-		node:    node{Node: n, et: et, logger: l},
+		node:    node{Node: n, et: et, logger: l, notary: notary.WithPrefix(nt, "node", "stats")},
 		s:       n,
 		en:      en,
 		closing: make(chan struct{}),

@@ -1,0 +1,426 @@
+alert.go:func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *AlertNode, err error) {
+
+
+alert/topics.go:	logger *log.Logger
+alert/topics.go:func NewTopics(l *log.Logger) *Topics {
+autoscale.go:	l *log.Logger,
+autoscale.go:func newK8sAutoscaleNode(et *ExecutingTask, n *pipeline.K8sAutoscaleNode, l *log.Logger) (*AutoscaleNode, error) {
+autoscale.go:func newSwarmAutoscaleNode(et *ExecutingTask, n *pipeline.SwarmAutoscaleNode, l *log.Logger) (*AutoscaleNode, error) {
+batch.go:func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode, l *log.Logger) (*BatchNode, error) {
+batch.go:func newQueryNode(et *ExecutingTask, n *pipeline.QueryNode, l *log.Logger) (*QueryNode, error) {
+build.py:    output = run(test_command, printOutput=logging.getLogger().getEffectiveLevel() == logging.DEBUG)
+build.py:        logging.getLogger("boto").setLevel(logging.WARNING)
+cmd/kapacitord/main.go:	Logger *log.Logger
+cmd/kapacitord/main.go:		Logger: wlog.New(os.Stderr, "[run] ", log.LstdFlags),
+cmd/kapacitord/main.go:		if cmd.Logger != nil {
+cmd/kapacitord/main.go:			m.Logger = cmd.Logger
+cmd/kapacitord/main.go:			m.Logger.Println("E!", err)
+cmd/kapacitord/main.go:		m.Logger.Println("I! Listening for signals")
+cmd/kapacitord/main.go:			m.Logger.Println("I! Signal received, initializing clean shutdown...")
+cmd/kapacitord/main.go:		m.Logger.Println("I! Waiting for clean shutdown...")
+cmd/kapacitord/main.go:			m.Logger.Println("I! second signal received, initializing hard shutdown")
+cmd/kapacitord/main.go:			m.Logger.Println("I! time limit reached, initializing hard shutdown")
+cmd/kapacitord/main.go:			m.Logger.Println("I! server shutdown completed")
+cmd/kapacitord/run/command.go:	Logger     *log.Logger
+cmd/kapacitord/run/command.go:	tick.SetLogger(cmd.logService.NewLogger("[tick] ", log.LstdFlags))
+cmd/kapacitord/run/command.go:	cmd.Logger = cmd.logService.NewLogger("[run] ", log.LstdFlags)
+cmd/kapacitord/run/command.go:	cmd.Logger.Printf("I! Kapacitor starting, version %s, branch %s, commit %s", cmd.Version, cmd.Branch, cmd.Commit)
+cmd/kapacitord/run/command.go:	cmd.Logger.Printf("I! Go version %s", runtime.Version())
+cmd/kapacitord/run/command.go:				cmd.Logger.Println("E! " + err.Error())
+combine.go:func newCombineNode(et *ExecutingTask, n *pipeline.CombineNode, l *log.Logger) (*CombineNode, error) {
+default.go:func newDefaultNode(et *ExecutingTask, n *pipeline.DefaultNode, l *log.Logger) (*DefaultNode, error) {
+delete.go:func newDeleteNode(et *ExecutingTask, n *pipeline.DeleteNode, l *log.Logger) (*DeleteNode, error) {
+derivative.go:func newDerivativeNode(et *ExecutingTask, n *pipeline.DerivativeNode, l *log.Logger) (*DerivativeNode, error) {
+edge.go:	logger   *log.Logger
+edge.go:		logger:    logService.NewLogger(fmt.Sprintf("[edge:%s] ", name), log.LstdFlags),
+edge/log.go:	logger *log.Logger
+edge/log.go:func NewLogEdge(l *log.Logger, e Edge) Edge {
+eval.go:func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalNode, error) {
+flatten.go:func newFlattenNode(et *ExecutingTask, n *pipeline.FlattenNode, l *log.Logger) (*FlattenNode, error) {
+group_by.go:func newGroupByNode(et *ExecutingTask, n *pipeline.GroupByNode, l *log.Logger) (*GroupByNode, error) {
+http_out.go:func newHTTPOutNode(et *ExecutingTask, n *pipeline.HTTPOutNode, l *log.Logger) (*HTTPOutNode, error) {
+http_post.go:func newHTTPPostNode(et *ExecutingTask, n *pipeline.HTTPPostNode, l *log.Logger) (*HTTPPostNode, error) {
+influxdb_out.go:func newInfluxDBOutNode(et *ExecutingTask, n *pipeline.InfluxDBOutNode, l *log.Logger) (*InfluxDBOutNode, error) {
+influxql.go:func newInfluxQLNode(et *ExecutingTask, n *pipeline.InfluxQLNode, l *log.Logger) (*InfluxQLNode, error) {
+integrations/batcher_test.go:	tm.HTTPPostService = httppost.NewService(nil, logService.NewLogger("[httppost] ", log.LstdFlags))
+integrations/batcher_test.go:	as := alertservice.NewService(logService.NewLogger("[alert] ", log.LstdFlags))
+integrations/helpers_test.go:	httpService := httpd.NewService(config, "localhost", logService.NewLogger("[http] ", log.LstdFlags), logService)
+integrations/helpers_test.go:	CreateFunc func(name, taskID, nodeID string, l *log.Logger, abortCallback func()) (udf.Interface, error)
+integrations/helpers_test.go:func (u UDFService) Create(name, taskID, nodeID string, l *log.Logger, abortCallback func()) (udf.Interface, error) {
+integrations/streamer_test.go:		sl := httppost.NewService(httppost.Configs{c}, logService.NewLogger("[test_httppost_endpoint] ", log.LstdFlags))
+integrations/streamer_test.go:	udfService.CreateFunc = func(name, taskID, nodeID string, l *log.Logger, abortCallback func()) (udf.Interface, error) {
+integrations/streamer_test.go:		sl := sensu.NewService(c, logService.NewLogger("[test_sensu] ", log.LstdFlags))
+integrations/streamer_test.go:		sl, err := slack.NewService(c, logService.NewLogger("[test_slack] ", log.LstdFlags))
+integrations/streamer_test.go:		tl := telegram.NewService(c, logService.NewLogger("[test_telegram] ", log.LstdFlags))
+integrations/streamer_test.go:		sl := hipchat.NewService(c, logService.NewLogger("[test_hipchat] ", log.LstdFlags))
+integrations/streamer_test.go:		sl := alerta.NewService(c, logService.NewLogger("[test_alerta] ", log.LstdFlags))
+integrations/streamer_test.go:		sl := pushover.NewService(c, logService.NewLogger("[test_pushover] ", log.LstdFlags))
+integrations/streamer_test.go:		og := opsgenie.NewService(c, logService.NewLogger("[test_og] ", log.LstdFlags))
+integrations/streamer_test.go:		pd := pagerduty.NewService(c, logService.NewLogger("[test_pd] ", log.LstdFlags))
+integrations/streamer_test.go:		sl := httppost.NewService(httppost.Configs{c}, logService.NewLogger("[test_pushover] ", log.LstdFlags))
+integrations/streamer_test.go:		vo := victorops.NewService(c, logService.NewLogger("[test_vo] ", log.LstdFlags))
+integrations/streamer_test.go:		sl := talk.NewService(c, logService.NewLogger("[test_talk] ", log.LstdFlags))
+integrations/streamer_test.go:	smtpService := smtp.NewService(sc, logService.NewLogger("[test-smtp] ", log.LstdFlags))
+integrations/streamer_test.go:	st := snmptrap.NewService(c, logService.NewLogger("[test_snmptrap] ", log.LstdFlags))
+integrations/streamer_test.go:	tm.HTTPPostService = httppost.NewService(nil, logService.NewLogger("[httppost] ", log.LstdFlags))
+integrations/streamer_test.go:	as := alertservice.NewService(logService.NewLogger("[alert] ", log.LstdFlags))
+join.go:func newJoinNode(et *ExecutingTask, n *pipeline.JoinNode, l *log.Logger) (*JoinNode, error) {
+join.go:	logger *log.Logger
+join.go:	l *log.Logger,
+kapacitor_loopback.go:func newKapacitorLoopbackNode(et *ExecutingTask, n *pipeline.KapacitorLoopbackNode, l *log.Logger) (*KapacitorLoopbackNode, error) {
+log.go:func newLogNode(et *ExecutingTask, n *pipeline.LogNode, l *log.Logger) (*LogNode, error) {
+node.go:	logger     *log.Logger
+noop.go:func newNoOpNode(et *ExecutingTask, n *pipeline.NoOpNode, l *log.Logger) (*NoOpNode, error) {
+sample.go:func newSampleNode(et *ExecutingTask, n *pipeline.SampleNode, l *log.Logger) (*SampleNode, error) {
+server/server.go:	Logger     *log.Logger
+server/server.go:	l := logService.NewLogger("[srv] ", log.LstdFlags)
+server/server.go:		Logger:           l,
+server/server.go:	s.Logger.Println("I! Kapacitor hostname:", s.hostname)
+server/server.go:	s.Logger.Printf("I! ClusterID: %s ServerID: %s", s.ClusterID, s.ServerID)
+server/server.go:	l := s.LogService.NewLogger("[storage] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[config-override] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[alert] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[service-tests] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[smtp] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[influxdb] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[httpd] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[task_store] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[replay] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[kubernetes] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[swarm] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[deadman] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[udf] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[noauth] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[mqtt] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[opsgenie] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[victorops] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[pagerduty] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[pushover] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[httppost] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[sensu] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[slack] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[snmptrap] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[telegram] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[hipchat] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[alerta] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[talk] ", log.LstdFlags)
+server/server.go:		l := s.LogService.NewLogger("[udp] ", log.LstdFlags)
+server/server.go:		l := s.LogService.NewLogger("[stats] ", log.LstdFlags)
+server/server.go:		l := s.LogService.NewLogger("[reporting] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[scrapers] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[azure] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[consul] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[dns] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[ec2] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[file-discovery] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[gce] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[marathon] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[nerve] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[serverset] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[static-discovery] ", log.LstdFlags)
+server/server.go:	l := s.LogService.NewLogger("[triton] ", log.LstdFlags)
+server/server.go:		s.Logger.Printf("D! opening service: %T", service)
+server/server.go:		s.Logger.Printf("D! opened service: %T", service)
+server/server.go:			s.Logger.Println("D! applying configuration overrides")
+server/server.go:					s.Logger.Println("D! applying configuration overrides for", service)
+server/server.go:		s.Logger.Printf("E! error closing httpd service: %v", err)
+server/server.go:			s.Logger.Printf("E! error closing stats service: %v", err)
+server/server.go:		s.Logger.Printf("D! closing service: %T", service)
+server/server.go:			s.Logger.Printf("E! error closing service %T: %v", service, err)
+server/server.go:		s.Logger.Printf("D! closed service: %T", service)
+server/server.go:		s.Logger.Printf("I! writing CPU profile to: %s\n", cpuprofile)
+server/server.go:		s.Logger.Printf("I! writing mem profile to: %s\n", memprofile)
+server/server.go:		s.Logger.Println("I! CPU profile stopped")
+server/server.go:			s.Logger.Printf("I! failed to write mem profile: %v\n", err)
+server/server.go:		s.Logger.Println("I! mem profile stopped")
+services/alert/api.go:	logger *log.Logger
+services/alert/handlers.go:	logger  *log.Logger
+services/alert/handlers.go:func NewLogHandler(c LogHandlerConfig, l *log.Logger) (alert.Handler, error) {
+services/alert/handlers.go:	logger    *log.Logger
+services/alert/handlers.go:func NewExecHandler(c ExecHandlerConfig, l *log.Logger) alert.Handler {
+services/alert/handlers.go:	logger *log.Logger
+services/alert/handlers.go:func NewTCPHandler(c TCPHandlerConfig, l *log.Logger) alert.Handler {
+services/alert/handlers.go:	logger  *log.Logger
+services/alert/handlers.go:func NewAggregateHandler(c AggregateHandlerConfig, l *log.Logger) (alert.Handler, error) {
+services/alert/handlers.go:	logger *log.Logger
+services/alert/handlers.go:func NewPublishHandler(c PublishHandlerConfig, l *log.Logger) alert.Handler {
+services/alert/handlers.go:	logger *log.Logger
+services/alert/handlers.go:func newMatchHandler(match string, h alert.Handler, l *log.Logger) (*matchHandler, error) {
+services/alert/service.go:	logger *log.Logger
+services/alert/service.go:		Handler(alerta.HandlerConfig, *log.Logger) (alert.Handler, error)
+services/alert/service.go:		Handler(hipchat.HandlerConfig, *log.Logger) alert.Handler
+services/alert/service.go:		Handler(mqtt.HandlerConfig, *log.Logger) alert.Handler
+services/alert/service.go:		Handler(opsgenie.HandlerConfig, *log.Logger) alert.Handler
+services/alert/service.go:		Handler(pagerduty.HandlerConfig, *log.Logger) alert.Handler
+services/alert/service.go:		Handler(pushover.HandlerConfig, *log.Logger) alert.Handler
+services/alert/service.go:		Handler(httppost.HandlerConfig, *log.Logger) alert.Handler
+services/alert/service.go:		Handler(sensu.HandlerConfig, *log.Logger) (alert.Handler, error)
+services/alert/service.go:		Handler(slack.HandlerConfig, *log.Logger) alert.Handler
+services/alert/service.go:		Handler(smtp.HandlerConfig, *log.Logger) alert.Handler
+services/alert/service.go:		Handler(snmptrap.HandlerConfig, *log.Logger) (alert.Handler, error)
+services/alert/service.go:		Handler(*log.Logger) alert.Handler
+services/alert/service.go:		Handler(telegram.HandlerConfig, *log.Logger) alert.Handler
+services/alert/service.go:		Handler(victorops.HandlerConfig, *log.Logger) alert.Handler
+services/alert/service.go:func NewService(l *log.Logger) *Service {
+services/alerta/service.go:	logger      *log.Logger
+services/alerta/service.go:func NewService(c Config, l *log.Logger) *Service {
+services/alerta/service.go:	logger *log.Logger
+services/alerta/service.go:func (s *Service) Handler(c HandlerConfig, l *log.Logger) (alert.Handler, error) {
+services/azure/service.go:	logger *log.Logger
+services/azure/service.go:func NewService(c []Config, r scraper.Registry, l *log.Logger) *Service {
+services/azure/service.go:	discoverer := pazure.NewDiscovery(sd, scraper.NewLogger(s.logger))
+services/config/service.go:	logger  *log.Logger
+services/config/service.go:func NewService(c Config, config interface{}, l *log.Logger, updates chan<- ConfigUpdate) *Service {
+services/consul/service.go:	logger *log.Logger
+services/consul/service.go:func NewService(c []Config, r scraper.Registry, l *log.Logger) *Service {
+services/consul/service.go:	discoverer, err := pconsul.NewDiscovery(sd, scraper.NewLogger(s.logger))
+services/deadman/service.go:	logger *log.Logger
+services/deadman/service.go:func NewService(c Config, l *log.Logger) *Service {
+services/dns/service.go:	logger *log.Logger
+services/dns/service.go:func NewService(c []Config, r scraper.Registry, l *log.Logger) *Service {
+services/dns/service.go:	discoverer := pdns.NewDiscovery(sd, scraper.NewLogger(s.logger))
+services/ec2/service.go:	logger *log.Logger
+services/ec2/service.go:func NewService(c []Config, r scraper.Registry, l *log.Logger) *Service {
+services/ec2/service.go:	discoverer := pec2.NewDiscovery(sd, scraper.NewLogger(s.logger))
+services/file_discovery/service.go:	logger *log.Logger
+services/file_discovery/service.go:func NewService(c []Config, r scraper.Registry, l *log.Logger) *Service {
+services/file_discovery/service.go:	discoverer := pfile.NewDiscovery(sd, scraper.NewLogger(s.logger))
+services/gce/service.go:	logger *log.Logger
+services/gce/service.go:func NewService(c []Config, r scraper.Registry, l *log.Logger) *Service {
+services/gce/service.go:	discoverer, err := pgce.NewDiscovery(sd, scraper.NewLogger(s.logger))
+services/hipchat/service.go:	logger      *log.Logger
+services/hipchat/service.go:func NewService(c Config, l *log.Logger) *Service {
+services/hipchat/service.go:	logger *log.Logger
+services/hipchat/service.go:func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+services/httpd/handler.go:	logger *log.Logger
+services/httpd/handler.go:	clfLogger *log.Logger
+services/httpd/handler.go:	l *log.Logger,
+services/httpd/handler.go:		clfLogger:             li.NewRawLogger("[httpd] ", 0),
+services/httpd/handler.go:		handler = logHandler(handler, h.clfLogger)
+services/httpd/handler.go:func logHandler(inner http.Handler, weblog *log.Logger) http.Handler {
+services/httpd/handler.go:		l := &responseLogger{w: w}
+services/httpd/handler.go:func recovery(inner http.Handler, weblog *log.Logger) http.Handler {
+services/httpd/handler.go:		l := &responseLogger{w: w}
+services/httpd/httpdtest/server.go:			ls.NewLogger("[httpdtest] ", log.LstdFlags),
+services/httpd/logger.go:// responseLogger is wrapper of http.ResponseWriter that keeps track of its HTTP status
+services/httpd/logger.go:type responseLogger struct {
+services/httpd/logger.go:func (l *responseLogger) Header() http.Header {
+services/httpd/logger.go:func (l *responseLogger) Flush() {
+services/httpd/logger.go:func (l *responseLogger) Write(b []byte) (int, error) {
+services/httpd/logger.go:func (l *responseLogger) WriteHeader(s int) {
+services/httpd/logger.go:func (l *responseLogger) Status() int {
+services/httpd/logger.go:func (l *responseLogger) Size() int {
+services/httpd/logger.go:func buildLogLine(l *responseLogger, r *http.Request, start time.Time) string {
+services/httpd/service.go:	logger           *log.Logger
+services/httpd/service.go:	httpServerLogger *log.Logger
+services/httpd/service.go:func NewService(c Config, hostname string, l *log.Logger, li logging.Interface) *Service {
+services/httpd/service.go:		httpServerLogger: li.NewStaticLevelLogger("[httpd]", log.LstdFlags, logging.ERROR),
+services/httpd/service.go:		ErrorLog:  s.httpServerLogger,
+services/httppost/service.go:	logger    *log.Logger
+services/httppost/service.go:func NewService(c Configs, l *log.Logger) *Service {
+services/httppost/service.go:	logger   *log.Logger
+services/httppost/service.go:func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+services/influxdb/service.go:		NewLogger(string, int) *log.Logger
+services/influxdb/service.go:	logger     *log.Logger
+services/influxdb/service.go:func NewService(configs []Config, httpPort int, hostname string, ider IDer, useTokens bool, l *log.Logger) (*Service, error) {
+services/influxdb/service.go:	logger                   *log.Logger
+services/influxdb/service.go:		NewLogger(string, int) *log.Logger
+services/influxdb/service.go:func newInfluxDBCluster(c Config, hostname string, ider IDer, httpPort int, useTokens bool, l *log.Logger) (*influxdbCluster, error) {
+services/influxdb/service.go:	l := c.LogService.NewLogger(fmt.Sprintf("[udp:%s.%s] ", se.db, se.rp), log.LstdFlags)
+services/influxdb/service_test.go:	l := ls.NewLogger("[test-influxdb] ", log.LstdFlags)
+services/influxdb/service_test.go:func (logSerivce) NewLogger(p string, flags int) *log.Logger {
+services/k8s/k8s.go:	logger      *log.Logger
+services/k8s/k8s.go:func NewCluster(c Config, l *log.Logger) (*Cluster, error) {
+services/k8s/service.go:	logger   *log.Logger
+services/k8s/service.go:func NewService(c []Config, r scraper.Registry, l *log.Logger) (*Service, error) {
+services/logging/loggingtest/logging.go:func (l TestLogService) NewLogger(prefix string, flag int) *log.Logger {
+services/logging/loggingtest/logging.go:func (l TestLogService) NewRawLogger(prefix string, flag int) *log.Logger {
+services/logging/loggingtest/logging.go:func (l TestLogService) NewStaticLevelLogger(prefix string, flag int, level logging.Level) *log.Logger {
+services/logging/service.go:	NewLogger(prefix string, flag int) *log.Logger
+services/logging/service.go:	NewRawLogger(prefix string, flag int) *log.Logger
+services/logging/service.go:	NewStaticLevelLogger(prefix string, flag int, l Level) *log.Logger
+services/logging/service.go:func (s *Service) NewLogger(prefix string, flag int) *log.Logger {
+services/logging/service.go:func (s *Service) NewRawLogger(prefix string, flag int) *log.Logger {
+services/logging/service.go:func (s *Service) NewStaticLevelLogger(prefix string, flag int, l Level) *log.Logger {
+services/marathon/service.go:	logger *log.Logger
+services/marathon/service.go:func NewService(c []Config, r scraper.Registry, l *log.Logger) *Service {
+services/marathon/service.go:	discoverer, err := pmarathon.NewDiscovery(sd, scraper.NewLogger(s.logger))
+services/mqtt/service.go:	logger *log.Logger
+services/mqtt/service.go:func NewService(cs Configs, l *log.Logger) (*Service, error) {
+services/mqtt/service.go:func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+services/mqtt/service.go:	logger *log.Logger
+services/nerve/service.go:	logger *log.Logger
+services/nerve/service.go:func NewService(c []Config, r scraper.Registry, l *log.Logger) *Service {
+services/nerve/service.go:	discoverer := pnerve.NewNerveDiscovery(sd, scraper.NewLogger(s.logger))
+services/noauth/service.go:	logger *log.Logger
+services/noauth/service.go:func NewService(l *log.Logger) *Service {
+services/opsgenie/service.go:	logger      *log.Logger
+services/opsgenie/service.go:func NewService(c Config, l *log.Logger) *Service {
+services/opsgenie/service.go:	logger *log.Logger
+services/opsgenie/service.go:func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+services/pagerduty/service.go:	logger *log.Logger
+services/pagerduty/service.go:func NewService(c Config, l *log.Logger) *Service {
+services/pagerduty/service.go:	logger *log.Logger
+services/pagerduty/service.go:func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+services/pushover/service.go:	logger      *log.Logger
+services/pushover/service.go:func NewService(c Config, l *log.Logger) *Service {
+services/pushover/service.go:	logger *log.Logger
+services/pushover/service.go:func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+services/replay/service.go:	logger *log.Logger
+services/replay/service.go:func NewService(conf Config, l *log.Logger) *Service {
+services/reporting/service.go:	logger      *log.Logger
+services/reporting/service.go:func NewService(c Config, info vars.Infoer, l *log.Logger) *Service {
+services/scraper/log.go:// Logger wraps kapacitor logging for prometheus
+services/scraper/log.go:type Logger struct {
+services/scraper/log.go:	*log.Logger
+services/scraper/log.go:// NewLogger wraps a logger to be used for prometheus
+services/scraper/log.go:func NewLogger(l *log.Logger) *Logger {
+services/scraper/log.go:	return &Logger{
+services/scraper/log.go:		Logger: l,
+services/scraper/log.go:func (l *Logger) Debug(v ...interface{}) {
+services/scraper/log.go:	l.Logger.Print("D! ", v)
+services/scraper/log.go:func (l *Logger) Debugln(v ...interface{}) {
+services/scraper/log.go:	l.Logger.Println("D! ", v)
+services/scraper/log.go:func (l *Logger) Debugf(s string, v ...interface{}) {
+services/scraper/log.go:	l.Logger.Printf("D! "+s, v)
+services/scraper/log.go:func (l *Logger) Info(v ...interface{}) {
+services/scraper/log.go:	l.Logger.Print("I! ", v)
+services/scraper/log.go:func (l *Logger) Infoln(v ...interface{}) {
+services/scraper/log.go:	l.Logger.Println("I! ", v)
+services/scraper/log.go:func (l *Logger) Infof(s string, v ...interface{}) {
+services/scraper/log.go:	l.Logger.Printf("I! "+s, v)
+services/scraper/log.go:func (l *Logger) Warn(v ...interface{}) {
+services/scraper/log.go:	l.Logger.Print("W! ", v)
+services/scraper/log.go:func (l *Logger) Warnln(v ...interface{}) {
+services/scraper/log.go:	l.Logger.Println("W! ", v)
+services/scraper/log.go:func (l *Logger) Warnf(s string, v ...interface{}) {
+services/scraper/log.go:	l.Logger.Printf("W! "+s, v)
+services/scraper/log.go:func (l *Logger) Error(v ...interface{}) {
+services/scraper/log.go:	l.Logger.Print("E! ", v)
+services/scraper/log.go:func (l *Logger) Errorln(v ...interface{}) {
+services/scraper/log.go:	l.Logger.Println("E! ", v)
+services/scraper/log.go:func (l *Logger) Errorf(s string, v ...interface{}) {
+services/scraper/log.go:	l.Logger.Printf("E! "+s, v)
+services/scraper/log.go:func (l *Logger) Fatal(v ...interface{}) {
+services/scraper/log.go:	l.Logger.Fatal(v)
+services/scraper/log.go:func (l *Logger) Fatalln(v ...interface{}) {
+services/scraper/log.go:	l.Logger.Fatalln(v)
+services/scraper/log.go:func (l *Logger) Fatalf(s string, v ...interface{}) {
+services/scraper/log.go:	l.Logger.Fatalf(s, v)
+services/scraper/log.go:func (l *Logger) With(key string, value interface{}) plog.Logger {
+services/scraper/service.go:	logger *log.Logger
+services/scraper/service.go:func NewService(c []Config, l *log.Logger) *Service {
+services/scraper/service.go:	s.mgr = retrieval.NewTargetManager(s, NewLogger(l))
+services/sensu/service.go:	logger      *log.Logger
+services/sensu/service.go:func NewService(c Config, l *log.Logger) *Service {
+services/sensu/service.go:	logger *log.Logger
+services/sensu/service.go:func (s *Service) Handler(c HandlerConfig, l *log.Logger) (alert.Handler, error) {
+services/serverset/service.go:	logger *log.Logger
+services/serverset/service.go:func NewService(c []Config, r scraper.Registry, l *log.Logger) *Service {
+services/serverset/service.go:	discoverer := pzookeeper.NewServersetDiscovery(sd, scraper.NewLogger(s.logger))
+services/servicetest/service.go:func NewService(c Config, l *log.Logger) *Service {
+services/slack/service.go:	logger      *log.Logger
+services/slack/service.go:func NewService(c Config, l *log.Logger) (*Service, error) {
+services/slack/service.go:	logger *log.Logger
+services/slack/service.go:func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+services/smtp/service.go:	logger      *log.Logger
+services/smtp/service.go:func NewService(c Config, l *log.Logger) *Service {
+services/smtp/service.go:	logger *log.Logger
+services/smtp/service.go:func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+services/snmptrap/service.go:	logger      *log.Logger
+services/snmptrap/service.go:func NewService(c Config, l *log.Logger) *Service {
+services/snmptrap/service.go:	logger *log.Logger
+services/snmptrap/service.go:func (s *Service) Handler(c HandlerConfig, l *log.Logger) (alert.Handler, error) {
+services/static_discovery/service.go:	logger *log.Logger
+services/static_discovery/service.go:func NewService(c []Config, r scraper.Registry, l *log.Logger) *Service {
+services/stats/service.go:	logger *log.Logger
+services/stats/service.go:func NewService(c Config, l *log.Logger) *Service {
+services/storage/api.go:	logger    *log.Logger
+services/storage/service.go:	logger *log.Logger
+services/storage/service.go:func NewService(conf Config, l *log.Logger) *Service {
+services/swarm/cluster.go:	logger      *log.Logger
+services/swarm/cluster.go:func NewCluster(c Config, l *log.Logger) (*Cluster, error) {
+services/swarm/service.go:	logger   *log.Logger
+services/swarm/service.go:func NewService(cs Configs, l *log.Logger) (*Service, error) {
+services/talk/service.go:	logger      *log.Logger
+services/talk/service.go:func NewService(c Config, l *log.Logger) *Service {
+services/talk/service.go:	logger *log.Logger
+services/talk/service.go:func (s *Service) Handler(l *log.Logger) alert.Handler {
+services/task_store/service.go:	logger *log.Logger
+services/task_store/service.go:func NewService(conf Config, l *log.Logger) *Service {
+services/telegram/service.go:	logger      *log.Logger
+services/telegram/service.go:func NewService(c Config, l *log.Logger) *Service {
+services/telegram/service.go:	logger *log.Logger
+services/telegram/service.go:func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+services/triton/service.go:	logger *log.Logger
+services/triton/service.go:func NewService(c []Config, r scraper.Registry, l *log.Logger) *Service {
+services/triton/service.go:	discoverer, err := ptriton.New(scraper.NewLogger(s.logger), sd)
+services/udf/service.go:	logger  *log.Logger
+services/udf/service.go:func NewService(c Config, l *log.Logger) *Service {
+services/udf/service.go:	l *log.Logger,
+services/udp/service.go:	Logger  *log.Logger
+services/udp/service.go:func NewService(c Config, l *log.Logger) *Service {
+services/udp/service.go:		Logger: l,
+services/udp/service.go:		s.Logger.Printf("E! Failed to resolve UDP address %s: %s", s.config.BindAddress, err)
+services/udp/service.go:		s.Logger.Printf("E! Failed to set up UDP listener at address %s: %s", s.addr, err)
+services/udp/service.go:			s.Logger.Printf("E! Failed to set UDP read buffer to %d: %s", s.config.ReadBuffer, err)
+services/udp/service.go:	s.Logger.Printf("I! Started listening on UDP: %s", s.addr.String())
+services/udp/service.go:				s.Logger.Printf("E! Failed to read UDP message: %s", err)
+services/udp/service.go:			s.Logger.Printf("E! Failed to parse points: %s", err)
+services/udp/service.go:			s.Logger.Printf("E! failed to write points to database %q: %s", s.config.Database, err)
+services/udp/service.go:	s.Logger.Print("I! Service closed")
+services/victorops/service.go:	logger      *log.Logger
+services/victorops/service.go:func NewService(c Config, l *log.Logger) *Service {
+services/victorops/service.go:	logger *log.Logger
+services/victorops/service.go:func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+shift.go:func newShiftNode(et *ExecutingTask, n *pipeline.ShiftNode, l *log.Logger) (*ShiftNode, error) {
+state_tracking.go:func newStateDurationNode(et *ExecutingTask, sd *pipeline.StateDurationNode, l *log.Logger) (*StateTrackingNode, error) {
+state_tracking.go:func newStateCountNode(et *ExecutingTask, sc *pipeline.StateCountNode, l *log.Logger) (*StateTrackingNode, error) {
+stats.go:func newStatsNode(et *ExecutingTask, n *pipeline.StatsNode, l *log.Logger) (*StatsNode, error) {
+stream.go:func newStreamNode(et *ExecutingTask, n *pipeline.StreamNode, l *log.Logger) (*StreamNode, error) {
+stream.go:func newFromNode(et *ExecutingTask, n *pipeline.FromNode, l *log.Logger) (*FromNode, error) {
+task.go:	logger   *log.Logger
+task.go:	l := tm.LogService.NewLogger(fmt.Sprintf("[task:%s] ", t.ID), log.LstdFlags)
+task.go:		l := et.tm.LogService.NewLogger(
+task.go:func (et *ExecutingTask) createNode(p pipeline.Node, l *log.Logger) (n Node, err error) {
+task_master.go:	NewLogger(prefix string, flag int) *log.Logger
+task_master.go:	Create(name, taskID, nodeID string, l *log.Logger, abortCallback func()) (udf.Interface, error)
+task_master.go:		Handler(smtp.HandlerConfig, *log.Logger) alert.Handler
+task_master.go:		Handler(mqtt.HandlerConfig, *log.Logger) alert.Handler
+task_master.go:		Handler(opsgenie.HandlerConfig, *log.Logger) alert.Handler
+task_master.go:		Handler(victorops.HandlerConfig, *log.Logger) alert.Handler
+task_master.go:		Handler(pagerduty.HandlerConfig, *log.Logger) alert.Handler
+task_master.go:		Handler(pushover.HandlerConfig, *log.Logger) alert.Handler
+task_master.go:		Handler(httppost.HandlerConfig, *log.Logger) alert.Handler
+task_master.go:		Handler(slack.HandlerConfig, *log.Logger) alert.Handler
+task_master.go:		Handler(snmptrap.HandlerConfig, *log.Logger) (alert.Handler, error)
+task_master.go:		Handler(telegram.HandlerConfig, *log.Logger) alert.Handler
+task_master.go:		Handler(hipchat.HandlerConfig, *log.Logger) alert.Handler
+task_master.go:		Handler(alerta.HandlerConfig, *log.Logger) (alert.Handler, error)
+task_master.go:		Handler(sensu.HandlerConfig, *log.Logger) (alert.Handler, error)
+task_master.go:		Handler(*log.Logger) alert.Handler
+task_master.go:	logger *log.Logger
+task_master.go:		logger:         l.NewLogger(fmt.Sprintf("[task_master:%s] ", id), log.LstdFlags),
+tick/eval.go:func getLogger() *log.Logger {
+tick/eval.go:func SetLogger(l *log.Logger) {
+udf.go:func newUDFNode(et *ExecutingTask, n *pipeline.UDFNode, l *log.Logger) (*UDFNode, error) {
+udf.go:	logger        *log.Logger
+udf.go:	l *log.Logger,
+udf.go:	logger        *log.Logger
+udf.go:	l *log.Logger,
+udf/agent/examples/mirror/mirror.py:logger = logging.getLogger()
+udf/agent/examples/moving_avg/moving_avg.py:logger = logging.getLogger()
+udf/agent/examples/outliers/outliers.py:logger = logging.getLogger()
+udf/agent/py/kapacitor/udf/agent.py:logger = logging.getLogger()
+udf/server.go:	logger *log.Logger
+udf/server.go:	l *log.Logger,
+udf/test/test_udf.go:	logger *log.Logger
+udf/test/test_udf.go:func New(taskID, nodeID string, uio *IO, l *log.Logger) *UDF {
+union.go:func newUnionNode(et *ExecutingTask, n *pipeline.UnionNode, l *log.Logger) (*UnionNode, error) {
+where.go:func newWhereNode(et *ExecutingTask, n *pipeline.WhereNode, l *log.Logger) (wn *WhereNode, err error) {
+window.go:func newWindowNode(et *ExecutingTask, n *pipeline.WindowNode, l *log.Logger) (*WindowNode, error) {
+window.go:	logger *log.Logger
+window.go:	logger *log.Logger,
+window.go:	logger *log.Logger
+window.go:	logger *log.Logger
+window.go:	logger *log.Logger) *windowByCount {

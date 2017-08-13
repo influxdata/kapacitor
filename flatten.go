@@ -9,6 +9,7 @@ import (
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/notary"
 )
 
 type FlattenNode struct {
@@ -19,10 +20,10 @@ type FlattenNode struct {
 }
 
 // Create a new FlattenNode, which takes pairs from parent streams combines them into a single point.
-func newFlattenNode(et *ExecutingTask, n *pipeline.FlattenNode, l *log.Logger) (*FlattenNode, error) {
+func newFlattenNode(et *ExecutingTask, n *pipeline.FlattenNode, l *log.Logger, nt Notary) (*FlattenNode, error) {
 	fn := &FlattenNode{
 		f:    n,
-		node: node{Node: n, et: et, logger: l},
+		node: node{Node: n, et: et, logger: l, notary: notary.WithPrefix(nt, "node", "flattten")},
 		bufPool: sync.Pool{
 			New: func() interface{} { return &bytes.Buffer{} },
 		},
@@ -203,6 +204,10 @@ POINTS:
 			} else {
 				n.incrementErrorCount()
 				n.logger.Printf("E! point missing tag %q for flatten operation", tag)
+				n.notary.Error(
+					"msg", "point missing tag for flatten operation",
+					"tag", tag,
+				)
 				continue POINTS
 			}
 		}

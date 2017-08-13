@@ -11,6 +11,7 @@ import (
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/notary"
 	"github.com/pkg/errors"
 )
 
@@ -36,10 +37,10 @@ type JoinNode struct {
 }
 
 // Create a new JoinNode, which takes pairs from parent streams combines them into a single point.
-func newJoinNode(et *ExecutingTask, n *pipeline.JoinNode, l *log.Logger) (*JoinNode, error) {
+func newJoinNode(et *ExecutingTask, n *pipeline.JoinNode, l *log.Logger, nt Notary) (*JoinNode, error) {
 	jn := &JoinNode{
 		j:                    n,
-		node:                 node{Node: n, et: et, logger: l},
+		node:                 node{Node: n, et: et, logger: l, notary: notary.WithPrefix(nt, "node", "join")},
 		groups:               make(map[models.GroupID]*joinGroup),
 		matchGroupsBuffer:    make(map[models.GroupID][]srcPoint),
 		specificGroupsBuffer: make(map[models.GroupID][]srcPoint),
@@ -363,6 +364,7 @@ func (g *joinGroup) newJoinset(t time.Time) *joinset {
 		g.n.j.Tolerance,
 		t,
 		g.n.logger,
+		g.n.notary,
 	)
 }
 
@@ -463,6 +465,7 @@ type joinset struct {
 	first int
 
 	logger *log.Logger
+	notary Notary
 }
 
 func newJoinset(
@@ -475,6 +478,7 @@ func newJoinset(
 	tolerance time.Duration,
 	time time.Time,
 	l *log.Logger,
+	notary Notary,
 ) *joinset {
 	expected := len(prefixes)
 	return &joinset{
@@ -490,6 +494,7 @@ func newJoinset(
 		time:      time,
 		tolerance: tolerance,
 		logger:    l,
+		notary:    notary,
 	}
 }
 

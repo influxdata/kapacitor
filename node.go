@@ -82,6 +82,7 @@ type node struct {
 	ins        []edge.StatsEdge
 	outs       []edge.StatsEdge
 	logger     *log.Logger
+	notary     Notary
 	timer      timer.Timer
 	statsKey   string
 	statMap    *kexpvar.Map
@@ -133,6 +134,7 @@ func (n *node) start(snapshot []byte) {
 				}
 				n.abortParentEdges()
 				n.logger.Println("E!", err)
+				n.notary.Error("error", err)
 				err = errors.Wrap(err, n.Name())
 			}
 			n.errCh <- err

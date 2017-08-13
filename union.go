@@ -6,6 +6,7 @@ import (
 
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/notary"
 )
 
 type UnionNode struct {
@@ -25,12 +26,13 @@ type timeMessage interface {
 	edge.TimeGetter
 }
 
+// TODO: revist for logging
 // Create a new  UnionNode which combines all parent data streams into a single stream.
 // No transformation of any kind is performed.
-func newUnionNode(et *ExecutingTask, n *pipeline.UnionNode, l *log.Logger) (*UnionNode, error) {
+func newUnionNode(et *ExecutingTask, n *pipeline.UnionNode, l *log.Logger, nt Notary) (*UnionNode, error) {
 	un := &UnionNode{
 		u:      n,
-		node:   node{Node: n, et: et, logger: l},
+		node:   node{Node: n, et: et, logger: l, notary: notary.WithPrefix(nt, "node", "union")},
 		rename: n.Rename,
 	}
 	un.node.runF = un.runUnion

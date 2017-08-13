@@ -7,6 +7,7 @@ import (
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/notary"
 )
 
 type DerivativeNode struct {
@@ -15,9 +16,9 @@ type DerivativeNode struct {
 }
 
 // Create a new derivative node.
-func newDerivativeNode(et *ExecutingTask, n *pipeline.DerivativeNode, l *log.Logger) (*DerivativeNode, error) {
+func newDerivativeNode(et *ExecutingTask, n *pipeline.DerivativeNode, l *log.Logger, nt Notary) (*DerivativeNode, error) {
 	dn := &DerivativeNode{
-		node: node{Node: n, et: et, logger: l},
+		node: node{Node: n, et: et, logger: l, notary: notary.WithPrefix(nt, "node", "derivative")},
 		d:    n,
 	}
 	// Create stateful expressions
@@ -126,6 +127,10 @@ func (n *DerivativeNode) derivative(prev, curr models.Fields, prevTime, currTime
 	if !ok {
 		n.incrementErrorCount()
 		n.logger.Printf("E! cannot apply derivative to type %T", curr[n.d.Field])
+		n.notary.Error(
+			"msg", "cannot apply derivative to type",
+			"type", curr[n.d.Field],
+		)
 		return 0, false, false
 	}
 
@@ -141,6 +146,7 @@ func (n *DerivativeNode) derivative(prev, curr models.Fields, prevTime, currTime
 	if elapsed == 0 {
 		n.incrementErrorCount()
 		n.logger.Printf("E! cannot perform derivative elapsed time was 0")
+		n.notary.Error("msg", "cannot perform derivative elapsed time was 0")
 		return 0, true, false
 	}
 	diff := f1 - f0

@@ -5,6 +5,7 @@ import (
 
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/notary"
 )
 
 type NoOpNode struct {
@@ -12,9 +13,9 @@ type NoOpNode struct {
 }
 
 // Create a new  NoOpNode which does nothing with the data and just passes it through.
-func newNoOpNode(et *ExecutingTask, n *pipeline.NoOpNode, l *log.Logger) (*NoOpNode, error) {
+func newNoOpNode(et *ExecutingTask, n *pipeline.NoOpNode, l *log.Logger, nt Notary) (*NoOpNode, error) {
 	nn := &NoOpNode{
-		node: node{Node: n, et: et, logger: l},
+		node: node{Node: n, et: et, logger: l, notary: notary.WithPrefix(nt, "node", "noop")},
 	}
 	nn.node.runF = nn.runNoOp
 	return nn, nil

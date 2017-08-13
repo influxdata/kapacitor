@@ -7,10 +7,12 @@ import (
 
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/notary"
 	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/tick/stateful"
 )
 
+// TODO: Implement Notary
 type WhereNode struct {
 	node
 	w        *pipeline.WhereNode
@@ -21,9 +23,9 @@ type WhereNode struct {
 }
 
 // Create a new WhereNode which filters down the batch or stream by a condition
-func newWhereNode(et *ExecutingTask, n *pipeline.WhereNode, l *log.Logger) (wn *WhereNode, err error) {
+func newWhereNode(et *ExecutingTask, n *pipeline.WhereNode, l *log.Logger, nt Notary) (wn *WhereNode, err error) {
 	wn = &WhereNode{
-		node: node{Node: n, et: et, logger: l},
+		node: node{Node: n, et: et, logger: l, notary: notary.WithPrefix(nt, "node", "where")},
 		w:    n,
 	}
 

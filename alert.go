@@ -20,6 +20,7 @@ import (
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/mqtt"
+	"github.com/influxdata/kapacitor/services/notary"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pushover"
@@ -75,9 +76,9 @@ type AlertNode struct {
 }
 
 // Create a new  AlertNode which caches the most recent item and exposes it over the HTTP API.
-func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *AlertNode, err error) {
+func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger, nt Notary) (an *AlertNode, err error) {
 	an = &AlertNode{
-		node: node{Node: n, et: et, logger: l},
+		node: node{Node: n, et: et, logger: l, notary: notary.WithPrefix(nt, "node", "alert")}, // TODO idk about this
 		a:    n,
 	}
 	an.node.runF = an.runAlert
@@ -559,6 +560,13 @@ func (n *AlertNode) restoreEvent(id string) (alert.Level, time.Time) {
 		if state, ok, err := n.et.tm.AlertService.EventState(n.anonTopic, id); err != nil {
 			n.incrementErrorCount()
 			n.logger.Printf("E! failed to get event state for anonymous topic %s, event %s: %v", n.anonTopic, id, err)
+			n.notary.Error(
+				"msg", "failed to get event state",
+				"topic-type", "anonymous",
+				"topic", n.anonTopic,
+				"event", id,
+				"error", err,
+			)
 		} else if ok {
 			anonTopicState = state
 			anonFound = true
@@ -569,6 +577,13 @@ func (n *AlertNode) restoreEvent(id string) (alert.Level, time.Time) {
 		if state, ok, err := n.et.tm.AlertService.EventState(n.topic, id); err != nil {
 			n.incrementErrorCount()
 			n.logger.Printf("E! failed to get event state for topic %s, event %s: %v", n.topic, id, err)
+			n.notary.Error(
+				"msg", "failed to get event state",
+				"topic-type", "known",
+				"topic", n.topic,
+				"event", id,
+				"error", err,
+			)
 		} else if ok {
 			topicState = state
 			topicFound = true
@@ -580,12 +595,24 @@ func (n *AlertNode) restoreEvent(id string) (alert.Level, time.Time) {
 			if err := n.et.tm.AlertService.UpdateEvent(n.topic, anonTopicState); err != nil {
 				n.incrementErrorCount()
 				n.logger.Printf("E! failed to update topic %q event state for event %q", n.topic, id)
+				n.notary.Error(
+					"msg", "failed to update topic event state",
+					"topic", n.topic,
+					"event", id,
+					"error", err,
+				)
 			}
 		} else if topicFound && n.hasAnonTopic() {
 			// Update event state for topic
 			if err := n.et.tm.AlertService.UpdateEvent(n.anonTopic, topicState); err != nil {
 				n.incrementErrorCount()
 				n.logger.Printf("E! failed to update topic %q event state for event %q", n.topic, id)
+				n.notary.Error(
+					"msg", "failed to update topic event state",
+					"topic", n.topic,
+					"event", id,
+					"error", err,
+				)
 			}
 		} // else nothing was found, nothing to do
 	}
@@ -621,6 +648,13 @@ func (n *AlertNode) handleEvent(event alert.Event) {
 		n.critsTriggered.Add(1)
 	}
 	n.logger.Printf("D! %v alert triggered id:%s msg:%s data:%v", event.State.Level, event.State.ID, event.State.Message, event.Data.Result.Series[0])
+	n.notary.Debug(
+		"msg", "alert triggered",
+		"level", event.State.Level,
+		"id", event.State.ID, // event-id maybe?
+		"event-message", event.State.Message, //idk
+		"result", event.Data.Result, // idk again
+	)
 
 	// If we have anon handlers, emit event to the anonTopic
 	if n.hasAnonTopic() {
@@ -630,6 +664,7 @@ func (n *AlertNode) handleEvent(event alert.Event) {
 			n.eventsDropped.Add(1)
 			n.incrementErrorCount()
 			n.logger.Println("E!", err)
+			n.notary.Error("error", err)
 		}
 	}
 
@@ -641,6 +676,7 @@ func (n *AlertNode) handleEvent(event alert.Event) {
 			n.eventsDropped.Add(1)
 			n.incrementErrorCount()
 			n.logger.Println("E!", err)
+			n.notary.Error("error", err)
 		}
 	}
 }
@@ -653,6 +689,12 @@ func (n *AlertNode) determineLevel(p edge.FieldsTagsTimeGetter, currentLevel ale
 		if pass, err := EvalPredicate(rse, n.lrScopePools[currentLevel], p); err != nil {
 			n.incrementErrorCount()
 			n.logger.Printf("E! error evaluating reset expression for current level %v: %s", currentLevel, err)
+			n.notary.Error(
+				"msg", "error evaluating expression",
+				"expression", "reset",
+				"current-level", currentLevel, // idk about current-level
+				"error", err,
+			)
 		} else if !pass {
 			return currentLevel
 		}
@@ -675,6 +717,11 @@ func (n *AlertNode) findFirstMatchLevel(start alert.Level, stop alert.Level, p e
 		if pass, err := EvalPredicate(se, n.scopePools[l], p); err != nil {
 			n.incrementErrorCount()
 			n.logger.Printf("E! error evaluating expression for level %v: %s", alert.Level(l), err)
+			n.notary.Error(
+				"msg", "error evaluating expression",
+				"level", alert.Level(l),
+				"error", err,
+			)
 			continue
 		} else if pass {
 			return alert.Level(l), true

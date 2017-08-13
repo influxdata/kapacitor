@@ -12,6 +12,7 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/services/httppost"
+	"github.com/influxdata/kapacitor/services/notary"
 )
 
 type HTTPPostNode struct {
@@ -23,10 +24,10 @@ type HTTPPostNode struct {
 }
 
 // Create a new  HTTPPostNode which submits received items via POST to an HTTP endpoint
-func newHTTPPostNode(et *ExecutingTask, n *pipeline.HTTPPostNode, l *log.Logger) (*HTTPPostNode, error) {
+func newHTTPPostNode(et *ExecutingTask, n *pipeline.HTTPPostNode, l *log.Logger, nt Notary) (*HTTPPostNode, error) {
 
 	hn := &HTTPPostNode{
-		node: node{Node: n, et: et, logger: l},
+		node: node{Node: n, et: et, logger: l, notary: notary.WithPrefix(nt, "node", "httpPost")},
 		c:    n,
 		bp:   bufpool.New(),
 	}
@@ -119,12 +120,20 @@ func (n *HTTPPostNode) postRow(row *models.Row) {
 	if err != nil {
 		n.incrementErrorCount()
 		n.logger.Printf("E! failed to marshal row data json: %v", err)
+		n.notary.Error(
+			"msg", "failed to marshal row data json",
+			"error", err,
+		)
 		return
 	}
 	req, err := n.endpoint.NewHTTPRequest(body)
 	if err != nil {
 		n.incrementErrorCount()
 		n.logger.Printf("E! failed to marshal row data json: %v", err)
+		n.notary.Error(
+			"msg", "failed to create new http request", // TODO: this error message right?
+			"error", err,
+		)
 		return
 	}
 
@@ -136,6 +145,10 @@ func (n *HTTPPostNode) postRow(row *models.Row) {
 	if err != nil {
 		n.incrementErrorCount()
 		n.logger.Printf("E! failed to POST row data: %v", err)
+		n.notary.Error(
+			"msg", "failed to POST row data",
+			"error", err,
+		)
 		return
 	}
 	resp.Body.Close()

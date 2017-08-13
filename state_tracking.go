@@ -7,6 +7,7 @@ import (
 
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/notary"
 	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/tick/stateful"
 )
@@ -71,6 +72,10 @@ func (g *stateTrackingGroup) BatchPoint(bp edge.BatchPointMessage) (edge.Message
 	if err != nil {
 		g.n.incrementErrorCount()
 		g.n.logger.Println("E! error while evaluating expression:", err)
+		g.n.notary.Error(
+			"msg", "error evaluating expression",
+			"error", err,
+		)
 		return nil, nil
 	}
 	return bp, nil
@@ -86,6 +91,10 @@ func (g *stateTrackingGroup) Point(p edge.PointMessage) (edge.Message, error) {
 	if err != nil {
 		g.n.incrementErrorCount()
 		g.n.logger.Println("E! error while evaluating expression:", err)
+		g.n.notary.Error(
+			"msg", "error evaluating expression",
+			"error", err,
+		)
 		return nil, nil
 	}
 	return p, nil
@@ -132,7 +141,7 @@ func (sdt *stateDurationTracker) track(t time.Time, inState bool) interface{} {
 	return float64(t.Sub(sdt.startTime)) / float64(sdt.sd.Unit)
 }
 
-func newStateDurationNode(et *ExecutingTask, sd *pipeline.StateDurationNode, l *log.Logger) (*StateTrackingNode, error) {
+func newStateDurationNode(et *ExecutingTask, sd *pipeline.StateDurationNode, l *log.Logger, nt Notary) (*StateTrackingNode, error) {
 	if sd.Lambda == nil {
 		return nil, fmt.Errorf("nil expression passed to StateDurationNode")
 	}
@@ -142,7 +151,7 @@ func newStateDurationNode(et *ExecutingTask, sd *pipeline.StateDurationNode, l *
 		return nil, err
 	}
 	n := &StateTrackingNode{
-		node:       node{Node: sd, et: et, logger: l},
+		node:       node{Node: sd, et: et, logger: l, notary: notary.WithPrefix(nt, "node", "stateDuration")},
 		as:         sd.As,
 		newTracker: func() stateTracker { return &stateDurationTracker{sd: sd} },
 		expr:       expr,
@@ -170,7 +179,7 @@ func (sct *stateCountTracker) track(t time.Time, inState bool) interface{} {
 	return sct.count
 }
 
-func newStateCountNode(et *ExecutingTask, sc *pipeline.StateCountNode, l *log.Logger) (*StateTrackingNode, error) {
+func newStateCountNode(et *ExecutingTask, sc *pipeline.StateCountNode, l *log.Logger, nt Notary) (*StateTrackingNode, error) {
 	if sc.Lambda == nil {
 		return nil, fmt.Errorf("nil expression passed to StateCountNode")
 	}
@@ -180,7 +189,7 @@ func newStateCountNode(et *ExecutingTask, sc *pipeline.StateCountNode, l *log.Lo
 		return nil, err
 	}
 	n := &StateTrackingNode{
-		node:       node{Node: sc, et: et, logger: l},
+		node:       node{Node: sc, et: et, logger: l, notary: notary.WithPrefix(nt, "node", "stateCount")},
 		as:         sc.As,
 		newTracker: func() stateTracker { return &stateCountTracker{} },
 		expr:       expr,

@@ -13,7 +13,10 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor/services/logging"
+	"github.com/influxdata/kapacitor/services/notary"
 )
+
+type Notary notary.Notary
 
 type Service struct {
 	ln    net.Listener
@@ -39,6 +42,8 @@ type Service struct {
 
 	logger           *log.Logger
 	httpServerLogger *log.Logger
+
+	notary Notary
 }
 
 func NewService(c Config, hostname string, l *log.Logger, li logging.Interface) *Service {

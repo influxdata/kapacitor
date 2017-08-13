@@ -10,6 +10,7 @@ import (
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/notary"
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
@@ -31,9 +32,9 @@ type GroupByNode struct {
 }
 
 // Create a new GroupByNode which splits the stream dynamically based on the specified dimensions.
-func newGroupByNode(et *ExecutingTask, n *pipeline.GroupByNode, l *log.Logger) (*GroupByNode, error) {
+func newGroupByNode(et *ExecutingTask, n *pipeline.GroupByNode, l *log.Logger, nt Notary) (*GroupByNode, error) {
 	gn := &GroupByNode{
-		node:   node{Node: n, et: et, logger: l},
+		node:   node{Node: n, et: et, logger: l, notary: notary.WithPrefix(nt, "node", "groupBy")},
 		g:      n,
 		groups: make(map[models.GroupID]edge.BufferedBatchMessage),
 	}

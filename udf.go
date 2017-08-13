@@ -13,6 +13,7 @@ import (
 	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/notary"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/udf/agent"
 	"github.com/pkg/errors"
@@ -31,9 +32,9 @@ type UDFNode struct {
 }
 
 // Create a new UDFNode that sends incoming data to child udf
-func newUDFNode(et *ExecutingTask, n *pipeline.UDFNode, l *log.Logger) (*UDFNode, error) {
+func newUDFNode(et *ExecutingTask, n *pipeline.UDFNode, l *log.Logger, nt Notary) (*UDFNode, error) {
 	un := &UDFNode{
-		node:    node{Node: n, et: et, logger: l},
+		node:    node{Node: n, et: et, logger: l, notary: notary.WithPrefix(nt, "node", "udf")},
 		u:       n,
 		aborted: make(chan struct{}),
 	}

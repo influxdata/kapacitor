@@ -11,6 +11,7 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/services/httpd"
+	"github.com/influxdata/kapacitor/services/notary"
 )
 
 type HTTPOutNode struct {
@@ -26,9 +27,9 @@ type HTTPOutNode struct {
 }
 
 // Create a new  HTTPOutNode which caches the most recent item and exposes it over the HTTP API.
-func newHTTPOutNode(et *ExecutingTask, n *pipeline.HTTPOutNode, l *log.Logger) (*HTTPOutNode, error) {
+func newHTTPOutNode(et *ExecutingTask, n *pipeline.HTTPOutNode, l *log.Logger, nt Notary) (*HTTPOutNode, error) {
 	hn := &HTTPOutNode{
-		node:   node{Node: n, et: et, logger: l},
+		node:   node{Node: n, et: et, logger: l, notary: notary.WithPrefix(nt, "node", "httpOut")},
 		c:      n,
 		result: new(models.Result),
 	}
@@ -93,6 +94,10 @@ func (n *HTTPOutNode) updateResultWithRow(idx int, row *models.Row) {
 	if idx >= len(n.result.Series) {
 		n.incrementErrorCount()
 		n.logger.Printf("E! index out of range for row update %d", idx)
+		n.notary.Error(
+			"msg", "index out  of range for row update",
+			"index", idx,
+		)
 		return
 	}
 	n.result.Series[idx] = row

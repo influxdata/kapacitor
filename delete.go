@@ -7,6 +7,7 @@ import (
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/notary"
 )
 
 const (
@@ -25,14 +26,14 @@ type DeleteNode struct {
 }
 
 // Create a new  DeleteNode which applies a transformation func to each point in a stream and returns a single point.
-func newDeleteNode(et *ExecutingTask, n *pipeline.DeleteNode, l *log.Logger) (*DeleteNode, error) {
+func newDeleteNode(et *ExecutingTask, n *pipeline.DeleteNode, l *log.Logger, nt Notary) (*DeleteNode, error) {
 	tags := make(map[string]bool)
 	for _, tag := range n.Tags {
 		tags[tag] = true
 	}
 
 	dn := &DeleteNode{
-		node:          node{Node: n, et: et, logger: l},
+		node:          node{Node: n, et: et, logger: l, notary: notary.WithPrefix(nt, "node", "delete")},
 		d:             n,
 		fieldsDeleted: new(expvar.Int),
 		tagsDeleted:   new(expvar.Int),

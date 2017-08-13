@@ -41,6 +41,7 @@ import (
 	"github.com/influxdata/kapacitor/services/mqtt"
 	"github.com/influxdata/kapacitor/services/nerve"
 	"github.com/influxdata/kapacitor/services/noauth"
+	"github.com/influxdata/kapacitor/services/notary"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pushover"
@@ -135,6 +136,14 @@ type Server struct {
 
 	LogService logging.Interface
 	Logger     *log.Logger
+	Notary     Notary
+}
+
+type Notary interface {
+	Info(kv ...interface{}) error
+	Error(kv ...interface{}) error
+	Debug(kv ...interface{}) error
+	//WithContext(kv ...interface{}) error
 }
 
 // New returns a new instance of Server built from a config.
@@ -155,12 +164,14 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 		MetaClient:       &kapacitor.NoopMetaClient{},
 		QueryExecutor:    &Queryexecutor{},
 		Logger:           l,
+		Notary:           notary.New("prefix", "srv"),
 		ServicesByName:   make(map[string]int),
 		DynamicServices:  make(map[string]Updater),
 		Commander:        c.Commander,
 		clusterIDChanged: waiter.NewGroup(),
 	}
 	s.Logger.Println("I! Kapacitor hostname:", s.hostname)
+	s.Notary.Info("msg", "listing hostname", "hostname", s.hostname)
 
 	// Setup IDs
 	err = s.setupIDs()
@@ -175,6 +186,7 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	vars.ProductVar.Set(vars.Product)
 	vars.VersionVar.Set(s.BuildInfo.Version)
 	s.Logger.Printf("I! ClusterID: %s ServerID: %s", s.ClusterID, s.ServerID)
+	s.Notary.Info("ClusterID", s.ClusterID, "ServerID", s.ServerID)
 
 	// Start Task Master
 	s.TaskMasterLookup = kapacitor.NewTaskMasterLookup()
@@ -905,10 +917,20 @@ func (s *Server) Close() error {
 	// Close all services that write points first.
 	if err := s.HTTPDService.Close(); err != nil {
 		s.Logger.Printf("E! error closing httpd service: %v", err)
+		s.Notary.Error(
+			"msg", "error closing service",
+			"service", "http",
+			"error", err,
+		)
 	}
 	if s.StatsService != nil {
 		if err := s.StatsService.Close(); err != nil {
 			s.Logger.Printf("E! error closing stats service: %v", err)
+			s.Notary.Error(
+				"msg", "error closing service",
+				"service", "stats",
+				"error", err,
+			)
 		}
 	}
 
@@ -923,6 +945,11 @@ func (s *Server) Close() error {
 		err := service.Close()
 		if err != nil {
 			s.Logger.Printf("E! error closing service %T: %v", service, err)
+			s.Notary.Error(
+				"msg", "error closing service",
+				"service", service, // Maybe make service implement some type of Name method
+				"error", err,
+			)
 		}
 		s.Logger.Printf("D! closed service: %T", service)
 	}
@@ -1041,11 +1068,21 @@ func (s *Server) startProfile(cpuprofile, memprofile string) error {
 	if cpuprofile != "" {
 		f, err := os.Create(cpuprofile)
 		if err != nil {
-			return fmt.Errorf("E! cpuprofile: %v", err)
+			s.Notary.Error(
+				"msg", "error creating file",
+				"error", err,
+				"file", cpuprofile,
+			)
+			return fmt.Errorf("E! cpuprofile: %v", err) // Do something about this?
 		}
 		s.Logger.Printf("I! writing CPU profile to: %s\n", cpuprofile)
+		s.Notary.Info("msg", "writing CPU profile", "file", cpuprofile)
 		prof.cpu = f
 		if err := pprof.StartCPUProfile(prof.cpu); err != nil {
+			s.Notary.Error(
+				"msg", "error starting cpu profile",
+				"error", err,
+			)
 			return fmt.Errorf("#! start cpu profile: %v", err)
 		}
 	}
@@ -1053,9 +1090,15 @@ func (s *Server) startProfile(cpuprofile, memprofile string) error {
 	if memprofile != "" {
 		f, err := os.Create(memprofile)
 		if err != nil {
+			s.Notary.Error(
+				"msg", "error creating file",
+				"error", err,
+				"file", memprofile,
+			)
 			return fmt.Errorf("E! memprofile: %v", err)
 		}
 		s.Logger.Printf("I! writing mem profile to: %s\n", memprofile)
+		s.Notary.Info("msg", "writing mem profile", "file", memprofile)
 		prof.mem = f
 		runtime.MemProfileRate = 4096
 	}
@@ -1068,13 +1111,16 @@ func (s *Server) stopProfile() {
 		pprof.StopCPUProfile()
 		prof.cpu.Close()
 		s.Logger.Println("I! CPU profile stopped")
+		s.Notary.Info("msg", "CPU profile stopped")
 	}
 	if prof.mem != nil {
 		if err := pprof.Lookup("heap").WriteTo(prof.mem, 0); err != nil {
 			s.Logger.Printf("I! failed to write mem profile: %v\n", err)
+			s.Notary.Info("msg", "failed to write mem profile", "error", err)
 		}
 		prof.mem.Close()
 		s.Logger.Println("I! mem profile stopped")
+		s.Notary.Info("msg", "mem profile stopped")
 	}
 }
 

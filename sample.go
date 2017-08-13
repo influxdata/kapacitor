@@ -8,6 +8,7 @@ import (
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/notary"
 )
 
 type SampleNode struct {
@@ -19,9 +20,9 @@ type SampleNode struct {
 }
 
 // Create a new  SampleNode which filters data from a source.
-func newSampleNode(et *ExecutingTask, n *pipeline.SampleNode, l *log.Logger) (*SampleNode, error) {
+func newSampleNode(et *ExecutingTask, n *pipeline.SampleNode, l *log.Logger, nt Notary) (*SampleNode, error) {
 	sn := &SampleNode{
-		node:     node{Node: n, et: et, logger: l},
+		node:     node{Node: n, et: et, logger: l, notary: notary.WithPrefix(nt, "node", "sample")},
 		s:        n,
 		counts:   make(map[models.GroupID]int64),
 		duration: n.Duration,

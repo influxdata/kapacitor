@@ -9,6 +9,7 @@ import (
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/notary"
 )
 
 type WindowNode struct {
@@ -16,14 +17,15 @@ type WindowNode struct {
 	w *pipeline.WindowNode
 }
 
+// TODO: add more notary things around here
 // Create a new  WindowNode, which windows data for a period of time and emits the window.
-func newWindowNode(et *ExecutingTask, n *pipeline.WindowNode, l *log.Logger) (*WindowNode, error) {
+func newWindowNode(et *ExecutingTask, n *pipeline.WindowNode, l *log.Logger, nt Notary) (*WindowNode, error) {
 	if n.Period == 0 && n.PeriodCount == 0 {
 		return nil, errors.New("window node must have either a non zero period or non zero period count")
 	}
 	wn := &WindowNode{
 		w:    n,
-		node: node{Node: n, et: et, logger: l},
+		node: node{Node: n, et: et, logger: l, notary: notary.WithPrefix(nt, "node", "window")},
 	}
 	wn.node.runF = wn.runWindow
 	return wn, nil

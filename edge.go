@@ -10,6 +10,7 @@ import (
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/server/vars"
+	"github.com/influxdata/kapacitor/services/notary"
 )
 
 const (
@@ -30,6 +31,8 @@ type Edge struct {
 	statsKey string
 	statMap  *expvar.Map
 	logger   *log.Logger
+
+	notary Notary
 }
 
 func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, size int, logService LogService) edge.StatsEdge {
@@ -49,6 +52,7 @@ func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, size i
 		statsKey:  key,
 		statMap:   sm,
 		logger:    logService.NewLogger(fmt.Sprintf("[edge:%s] ", name), log.LstdFlags),
+		notary:    notary.New("edge", name),
 	}
 }
 
@@ -63,6 +67,11 @@ func (e *Edge) Close() error {
 	e.logger.Printf("D! closing c: %d e: %d",
 		e.Collected(),
 		e.Emitted(),
+	)
+	e.notary.Debug(
+		"msg", "closing edge",
+		"collected", e.Collected(),
+		"emitted", e.Emitted(),
 	)
 	return e.StatsEdge.Close()
 }

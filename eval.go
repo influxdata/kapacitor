@@ -9,6 +9,7 @@ import (
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/notary"
 	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/tick/stateful"
 )
@@ -25,12 +26,12 @@ type EvalNode struct {
 }
 
 // Create a new  EvalNode which applies a transformation func to each point in a stream and returns a single point.
-func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalNode, error) {
+func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger, nt Notary) (*EvalNode, error) {
 	if len(n.AsList) != len(n.Lambdas) {
 		return nil, errors.New("must provide one name per expression via the 'As' property")
 	}
 	en := &EvalNode{
-		node: node{Node: n, et: et, logger: l},
+		node: node{Node: n, et: et, logger: l, notary: notary.WithPrefix(nt, "node", "eval")},
 		e:    n,
 	}
 
@@ -213,6 +214,7 @@ func (g *evalGroup) doEval(p edge.FieldsTagsTimeSetter) bool {
 		g.n.incrementErrorCount()
 		if !g.n.e.QuietFlag {
 			g.n.logger.Println("E!", err)
+			g.n.notary.Error("error", err)
 		}
 		// Skip bad point
 		return false
