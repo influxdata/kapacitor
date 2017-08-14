@@ -1,6 +1,8 @@
 package notary
 
-import "os"
+import (
+	"os"
+)
 
 func WithPrefix(logger Notary, kv ...interface{}) *context {
 

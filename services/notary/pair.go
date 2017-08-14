@@ -11,10 +11,14 @@ import (
 type pairLogger struct {
 	mu      sync.Mutex
 	bufPool *sync.Pool
+	//context *context
 	io.Writer
+
+	keys []interface{}
 }
 
 func NewPairLogger(w io.Writer) *pairLogger {
+	//func NewPairLogger(w io.Writer, c *context) *pairLogger {
 	p := &pairLogger{
 		bufPool: &sync.Pool{
 			New: func() interface{} {
@@ -41,6 +45,7 @@ func (t *pairLogger) Info(kv ...interface{}) error {
 	}
 	buf := t.NewBuffer()
 	buf.WriteString("level=info ")
+
 	for i, el := range kv {
 		if i%2 == 0 {
 			buf.WriteString(el.(string))
