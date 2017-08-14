@@ -117,6 +117,12 @@ func (n *node) init() {
 	n.errCh = make(chan error, 1)
 }
 
+func (n *node) Error(kv ...interface{}) {
+	n.notary.Diag(
+		kv...,
+	)
+}
+
 func (n *node) start(snapshot []byte) {
 	go func() {
 		var err error
@@ -134,7 +140,14 @@ func (n *node) start(snapshot []byte) {
 				}
 				n.abortParentEdges()
 				n.logger.Println("E!", err)
-				n.notary.Error("error", err)
+				n.notary.Error(
+					"msg", "encountered error running node",
+					"error", err,
+				)
+				//n.notary.Diag(
+				//	"type", "error",
+				//	"error", err,
+				//)
 				err = errors.Wrap(err, n.Name())
 			}
 			n.errCh <- err

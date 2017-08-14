@@ -1,7 +1,7 @@
 package kapacitor
 
-import (
-	nt "github.com/influxdata/kapacitor/services/notary/types" // TODO: idk about this
-)
+// TODO: idk about this
 
-type Notary nt.Notary
+type Notary interface {
+	Diag(msg string, kv ...interface{})
+}
