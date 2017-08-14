@@ -3,5 +3,7 @@ package kapacitor
 // TODO: idk about this
 
 type Notary interface {
-	Diag(msg string, kv ...interface{})
+	Error(kv ...interface{}) error
+	Debug(kv ...interface{}) error
+	Info(kv ...interface{}) error
 }

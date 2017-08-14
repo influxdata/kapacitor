@@ -1,4 +1,4 @@
-package benchmarks
+package notary_test
 
 import (
 	"io/ioutil"

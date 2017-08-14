@@ -117,12 +117,6 @@ func (n *node) init() {
 	n.errCh = make(chan error, 1)
 }
 
-func (n *node) Error(kv ...interface{}) {
-	n.notary.Diag(
-		kv...,
-	)
-}
-
 func (n *node) start(snapshot []byte) {
 	go func() {
 		var err error
