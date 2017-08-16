@@ -1,11 +1,11 @@
 package diagnostic
 
-type Diagnosticer interface {
+type Diagnostic interface {
 	Diag(...interface{}) error
 }
 
 type Service interface {
-	NewDiagnosticer(Diagnosticer, ...interface{}) Diagnosticer
+	NewDiagnostic(Diagnostic, ...interface{}) Diagnostic
 	//Subscribe(key string, subscr Subscriber) error
 	SubscribeAll(subscr Subscriber) error
 }

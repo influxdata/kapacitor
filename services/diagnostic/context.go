@@ -2,7 +2,7 @@ package diagnostic
 
 type context struct {
 	keyvals []interface{}
-	s       *service
+	s       Subscriber // was previously *service
 }
 
 func (c *context) Diag(keyvals ...interface{}) error {

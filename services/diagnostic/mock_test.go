@@ -10,7 +10,7 @@ import (
 func TestService(t *testing.T) {
 	s := diagnostic.NewService()
 
-	d := s.NewDiagnosticer(nil, "set", "before", "this", 1)
+	d := s.NewDiagnostic(nil, "set", "before", "this", 1)
 
 	l := diagnostic.NewLogger(diagnostic.NewPairEncoder(os.Stdout))
 

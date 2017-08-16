@@ -13,6 +13,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/influxdata/kapacitor/server"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/logging"
 	"github.com/influxdata/kapacitor/tick"
 )
@@ -107,6 +108,14 @@ func (cmd *Command) Run(args ...string) error {
 	// Initialize cmd logger
 	cmd.Logger = cmd.logService.NewLogger("[run] ", log.LstdFlags)
 
+	// Initialize DiagnosticService
+	// TODO: Add details
+	//       add to cmd
+	diagnosticService := diagnostic.NewService()
+	// TODO: use different types of encoders
+	l := diagnostic.NewLogger(diagnostic.NewPairEncoder(os.Stdout))
+	diagnosticService.SubscribeAll(l)
+
 	// Mark start-up in log.,
 	cmd.Logger.Printf("I! Kapacitor starting, version %s, branch %s, commit %s", cmd.Version, cmd.Branch, cmd.Commit)
 	cmd.Logger.Printf("I! Go version %s", runtime.Version())
@@ -118,7 +127,8 @@ func (cmd *Command) Run(args ...string) error {
 
 	// Create server from config and start it.
 	buildInfo := server.BuildInfo{Version: cmd.Version, Commit: cmd.Commit, Branch: cmd.Branch}
-	s, err := server.New(config, buildInfo, cmd.logService)
+	// TODO: remove log service
+	s, err := server.New(config, buildInfo, cmd.logService, diagnosticService)
 	if err != nil {
 		return fmt.Errorf("create server: %s", err)
 	}

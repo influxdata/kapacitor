@@ -27,6 +27,7 @@ import (
 	"github.com/influxdata/kapacitor/services/config"
 	"github.com/influxdata/kapacitor/services/consul"
 	"github.com/influxdata/kapacitor/services/deadman"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/dns"
 	"github.com/influxdata/kapacitor/services/ec2"
 	"github.com/influxdata/kapacitor/services/file_discovery"
@@ -41,7 +42,6 @@ import (
 	"github.com/influxdata/kapacitor/services/mqtt"
 	"github.com/influxdata/kapacitor/services/nerve"
 	"github.com/influxdata/kapacitor/services/noauth"
-	"github.com/influxdata/kapacitor/services/notary"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pushover"
@@ -136,42 +136,50 @@ type Server struct {
 
 	LogService logging.Interface
 	Logger     *log.Logger
-	Notary     Notary
+
+	DiagnosticService diagnostic.Service
+
+	// TODO: not a fan of the stutter
+	// also not a fan of calling it a diagnosticer
+	// or diagnostic generator
+	Diagnostic diagnostic.Diagnostic
 }
 
-type Notary interface {
-	Info(kv ...interface{}) error
-	Error(kv ...interface{}) error
-	Debug(kv ...interface{}) error
-	//WithContext(kv ...interface{}) error
-}
+// TODO: not a fan of the stutter
+type Diagnostic diagnostic.Diagnostic
 
 // New returns a new instance of Server built from a config.
-func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server, error) {
+func New(c *Config, buildInfo BuildInfo, logService logging.Interface, diagnosticService diagnostic.Service) (*Server, error) {
 	err := c.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("%s. To generate a valid configuration file run `kapacitord config > kapacitor.generated.conf`.", err)
 	}
 	l := logService.NewLogger("[srv] ", log.LstdFlags)
+	d := diagnosticService.NewDiagnostic(nil, "service", "srv")
 	s := &Server{
-		config:           c,
-		BuildInfo:        buildInfo,
-		dataDir:          c.DataDir,
-		hostname:         c.Hostname,
-		err:              make(chan error),
-		configUpdates:    make(chan config.ConfigUpdate, 100),
-		LogService:       logService,
-		MetaClient:       &kapacitor.NoopMetaClient{},
-		QueryExecutor:    &Queryexecutor{},
-		Logger:           l,
-		Notary:           notary.New("prefix", "srv"),
-		ServicesByName:   make(map[string]int),
-		DynamicServices:  make(map[string]Updater),
-		Commander:        c.Commander,
-		clusterIDChanged: waiter.NewGroup(),
+		config:            c,
+		BuildInfo:         buildInfo,
+		dataDir:           c.DataDir,
+		hostname:          c.Hostname,
+		err:               make(chan error),
+		configUpdates:     make(chan config.ConfigUpdate, 100),
+		LogService:        logService,
+		DiagnosticService: diagnosticService,
+		MetaClient:        &kapacitor.NoopMetaClient{},
+		QueryExecutor:     &Queryexecutor{},
+		Logger:            l,
+		Diagnostic:        d,
+		ServicesByName:    make(map[string]int),
+		DynamicServices:   make(map[string]Updater),
+		Commander:         c.Commander,
+		clusterIDChanged:  waiter.NewGroup(),
 	}
-	s.Logger.Println("I! Kapacitor hostname:", s.hostname)
-	s.Notary.Info("msg", "listing hostname", "hostname", s.hostname)
+	//s.Logger.Println("I! Kapacitor hostname:", s.hostname)
+	s.Diagnostic.Diag(
+		"level", "info",
+		"msg", "listing hostname", // TODO: do we need this message?
+		"hostname", s.hostname,
+	)
 
 	// Setup IDs
 	err = s.setupIDs()
@@ -185,8 +193,12 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	vars.HostVar.Set(s.hostname)
 	vars.ProductVar.Set(vars.Product)
 	vars.VersionVar.Set(s.BuildInfo.Version)
-	s.Logger.Printf("I! ClusterID: %s ServerID: %s", s.ClusterID, s.ServerID)
-	s.Notary.Info("ClusterID", s.ClusterID, "ServerID", s.ServerID)
+	//s.Logger.Printf("I! ClusterID: %s ServerID: %s", s.ClusterID, s.ServerID)
+	s.Diagnostic.Diag(
+		"level", "info",
+		"ClusterID", s.ClusterID,
+		"ServerID", s.ServerID,
+	)
 
 	// Start Task Master
 	s.TaskMasterLookup = kapacitor.NewTaskMasterLookup()
@@ -861,16 +873,30 @@ func (s *Server) Open() error {
 
 func (s *Server) startServices() error {
 	for _, service := range s.Services {
-		s.Logger.Printf("D! opening service: %T", service)
+		//s.Logger.Printf("D! opening service: %T", service)
+		s.Diagnostic.Diag(
+			"level", "debug",
+			"msg", "opening service",
+			"service", fmt.Sprintf("%T", service), // TODO: fix this
+		)
 		if err := service.Open(); err != nil {
 			return fmt.Errorf("open service %T: %s", service, err)
 		}
-		s.Logger.Printf("D! opened service: %T", service)
+		//s.Logger.Printf("D! opened service: %T", service)
+		s.Diagnostic.Diag(
+			"level", "debug",
+			"msg", "opened service",
+			"service", fmt.Sprintf("%T", service), // TODO: fix this
+		)
 
 		// Apply config overrides after the config override service has been opened and before any dynamic services.
 		if service == s.ConfigOverrideService && !s.config.SkipConfigOverrides && s.config.ConfigOverride.Enabled {
 			// Apply initial config updates
-			s.Logger.Println("D! applying configuration overrides")
+			//s.Logger.Println("D! applying configuration overrides")
+			s.Diagnostic.Diag(
+				"level", "debug",
+				"msg", "applying configuration overrides",
+			)
 			configs, err := s.ConfigOverrideService.Config()
 			if err != nil {
 				return errors.Wrap(err, "failed to apply config overrides")
@@ -879,7 +905,12 @@ func (s *Server) startServices() error {
 				if srv, ok := s.DynamicServices[service]; !ok {
 					return fmt.Errorf("found configuration override for unknown service %q", service)
 				} else {
-					s.Logger.Println("D! applying configuration overrides for", service)
+					//s.Logger.Println("D! applying configuration overrides for", service)
+					s.Diagnostic.Diag(
+						"level", "debug",
+						"msg", "applying configuration overrides for service",
+						"service", service,
+					)
 					if err := srv.Update(config); err != nil {
 						return errors.Wrapf(err, "failed to update configuration for service %s", service)
 					}
@@ -916,8 +947,9 @@ func (s *Server) Close() error {
 
 	// Close all services that write points first.
 	if err := s.HTTPDService.Close(); err != nil {
-		s.Logger.Printf("E! error closing httpd service: %v", err)
-		s.Notary.Error(
+		//s.Logger.Printf("E! error closing httpd service: %v", err)
+		s.Diagnostic.Diag(
+			"level", "error",
 			"msg", "error closing service",
 			"service", "http",
 			"error", err,
@@ -925,8 +957,9 @@ func (s *Server) Close() error {
 	}
 	if s.StatsService != nil {
 		if err := s.StatsService.Close(); err != nil {
-			s.Logger.Printf("E! error closing stats service: %v", err)
-			s.Notary.Error(
+			//s.Logger.Printf("E! error closing stats service: %v", err)
+			s.Diagnostic.Diag(
+				"level", "error",
 				"msg", "error closing service",
 				"service", "stats",
 				"error", err,
@@ -941,17 +974,28 @@ func (s *Server) Close() error {
 	// Close services now that all tasks are stopped.
 	for i := len(s.Services) - 1; i >= 0; i-- {
 		service := s.Services[i]
-		s.Logger.Printf("D! closing service: %T", service)
+		//s.Logger.Printf("D! closing service: %T", service)
+		s.Diagnostic.Diag(
+			"level", "debug",
+			"msg", "closing service",
+			"service", fmt.Sprintf("%T", service), // TODO: fmt bad
+		)
 		err := service.Close()
 		if err != nil {
-			s.Logger.Printf("E! error closing service %T: %v", service, err)
-			s.Notary.Error(
+			//s.Logger.Printf("E! error closing service %T: %v", service, err)
+			s.Diagnostic.Diag(
+				"level", "error",
 				"msg", "error closing service",
 				"service", service, // Maybe make service implement some type of Name method
 				"error", err,
 			)
 		}
-		s.Logger.Printf("D! closed service: %T", service)
+		//s.Logger.Printf("D! closed service: %T", service)
+		s.Diagnostic.Diag(
+			"level", "debug",
+			"msg", "closed service",
+			"service", fmt.Sprintf("%T", service), // TODO: fmt bad
+		)
 	}
 
 	// Finally close the task master
@@ -1068,18 +1112,24 @@ func (s *Server) startProfile(cpuprofile, memprofile string) error {
 	if cpuprofile != "" {
 		f, err := os.Create(cpuprofile)
 		if err != nil {
-			s.Notary.Error(
+			s.Diagnostic.Diag(
+				"level", "error",
 				"msg", "error creating file",
 				"error", err,
 				"file", cpuprofile,
 			)
 			return fmt.Errorf("E! cpuprofile: %v", err) // Do something about this?
 		}
-		s.Logger.Printf("I! writing CPU profile to: %s\n", cpuprofile)
-		s.Notary.Info("msg", "writing CPU profile", "file", cpuprofile)
+		//s.Logger.Printf("I! writing CPU profile to: %s\n", cpuprofile)
+		s.Diagnostic.Diag(
+			"level", "info",
+			"msg", "writing CPU profile",
+			"file", cpuprofile,
+		)
 		prof.cpu = f
 		if err := pprof.StartCPUProfile(prof.cpu); err != nil {
-			s.Notary.Error(
+			s.Diagnostic.Diag(
+				"level", "error",
 				"msg", "error starting cpu profile",
 				"error", err,
 			)
@@ -1090,15 +1140,20 @@ func (s *Server) startProfile(cpuprofile, memprofile string) error {
 	if memprofile != "" {
 		f, err := os.Create(memprofile)
 		if err != nil {
-			s.Notary.Error(
+			s.Diagnostic.Diag(
+				"level", "error",
 				"msg", "error creating file",
 				"error", err,
 				"file", memprofile,
 			)
 			return fmt.Errorf("E! memprofile: %v", err)
 		}
-		s.Logger.Printf("I! writing mem profile to: %s\n", memprofile)
-		s.Notary.Info("msg", "writing mem profile", "file", memprofile)
+		//s.Logger.Printf("I! writing mem profile to: %s\n", memprofile)
+		s.Diagnostic.Diag(
+			"level", "info",
+			"msg", "writing mem profile",
+			"file", memprofile,
+		)
 		prof.mem = f
 		runtime.MemProfileRate = 4096
 	}
@@ -1110,17 +1165,27 @@ func (s *Server) stopProfile() {
 	if prof.cpu != nil {
 		pprof.StopCPUProfile()
 		prof.cpu.Close()
-		s.Logger.Println("I! CPU profile stopped")
-		s.Notary.Info("msg", "CPU profile stopped")
+		//s.Logger.Println("I! CPU profile stopped")
+		s.Diagnostic.Diag(
+			"level", "info",
+			"msg", "CPU profile stopped",
+		)
 	}
 	if prof.mem != nil {
 		if err := pprof.Lookup("heap").WriteTo(prof.mem, 0); err != nil {
-			s.Logger.Printf("I! failed to write mem profile: %v\n", err)
-			s.Notary.Info("msg", "failed to write mem profile", "error", err)
+			//s.Logger.Printf("I! failed to write mem profile: %v\n", err)
+			s.Diagnostic.Diag(
+				"level", "info",
+				"msg", "failed to write mem profile",
+				"error", err,
+			)
 		}
 		prof.mem.Close()
-		s.Logger.Println("I! mem profile stopped")
-		s.Notary.Info("msg", "mem profile stopped")
+		//s.Logger.Println("I! mem profile stopped")
+		s.Diagnostic.Diag(
+			"level", "info",
+			"msg", "mem profile stopped",
+		)
 	}
 }
 

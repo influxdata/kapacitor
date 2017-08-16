@@ -3,6 +3,7 @@ package diagnostic
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"strconv"
 	"sync"
@@ -34,10 +35,14 @@ func (p *pairEncoder) Encode(keyvalsList ...[]interface{}) error {
 	defer p.mu.Unlock()
 	buf := p.NewBuffer()
 	// TODO: fomatting will be a bit off
-	for _, keyvals := range keyvalsList {
+	for i, keyvals := range keyvalsList {
 
 		if len(keyvals)%2 != 0 {
 			return errors.New("nope")
+		}
+
+		if i != 0 {
+			buf.WriteByte(' ')
 		}
 
 		for i, el := range keyvals {
@@ -49,9 +54,18 @@ func (p *pairEncoder) Encode(keyvalsList ...[]interface{}) error {
 			buf.WriteByte('=')
 			switch el.(type) {
 			case string:
+				buf.WriteByte('"')
 				buf.WriteString(el.(string))
+				buf.WriteByte('"')
 			case int:
 				buf.WriteString(strconv.Itoa(el.(int)))
+			case error:
+				buf.WriteByte('"')
+				buf.WriteString(el.(error).Error())
+				buf.WriteByte('"')
+			default:
+				// TODO: need better default than this
+				buf.WriteString(fmt.Sprintf("%v", el))
 			}
 
 			if i+1 == len(keyvals) {

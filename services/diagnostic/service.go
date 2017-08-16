@@ -13,6 +13,14 @@ func NewService() Service {
 	return s
 }
 
+func (s *service) Open() error {
+	return nil
+}
+
+func (s *service) Close() error {
+	return nil
+}
+
 func (s *service) SubscribeAll(sub Subscriber) error {
 	s.subMu.Lock()
 	defer s.subMu.Unlock()
@@ -34,7 +42,7 @@ func (s *service) Handle(keyvalList ...[]interface{}) error {
 	return nil
 }
 
-func (s *service) NewDiagnosticer(d Diagnosticer, keyvals ...interface{}) Diagnosticer {
+func (s *service) NewDiagnostic(d Diagnostic, keyvals ...interface{}) Diagnostic {
 	ctx := &context{
 		s: s,
 	}
