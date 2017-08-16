@@ -59,6 +59,8 @@ func (p *pairEncoder) Encode(keyvalsList ...[]interface{}) error {
 				buf.WriteByte('"')
 			case int:
 				buf.WriteString(strconv.Itoa(el.(int)))
+			case bool:
+				buf.WriteString(strconv.FormatBool(el.(bool)))
 			case error:
 				buf.WriteByte('"')
 				buf.WriteString(el.(error).Error())

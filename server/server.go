@@ -139,13 +139,12 @@ type Server struct {
 
 	DiagnosticService diagnostic.Service
 
-	// TODO: not a fan of the stutter
-	// also not a fan of calling it a diagnosticer
-	// or diagnostic generator
-	Diagnostic diagnostic.Diagnostic
+	Diagnostic Diagnostic
 }
 
 // TODO: not a fan of the stutter
+// also not a fan of calling it a diagnosticer
+// or diagnostic generator
 type Diagnostic diagnostic.Diagnostic
 
 // New returns a new instance of Server built from a config.
@@ -409,7 +408,8 @@ func (s *Server) appendInfluxDBService() error {
 
 func (s *Server) initHTTPDService() {
 	l := s.LogService.NewLogger("[httpd] ", log.LstdFlags)
-	srv := httpd.NewService(s.config.HTTP, s.hostname, l, s.LogService)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "httpd")
+	srv := httpd.NewService(s.config.HTTP, s.hostname, l, s.LogService, d, s.DiagnosticService)
 
 	srv.Handler.PointsWriter = s.TaskMaster
 	srv.Handler.Version = s.BuildInfo.Version

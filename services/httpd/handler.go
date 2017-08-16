@@ -21,6 +21,7 @@ import (
 	"github.com/influxdata/influxdb/uuid"
 	"github.com/influxdata/kapacitor/auth"
 	"github.com/influxdata/kapacitor/client/v1"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/logging"
 	"github.com/influxdata/wlog"
 )
@@ -84,6 +85,9 @@ type Handler struct {
 
 	// Normal wlog logger
 	logger *log.Logger
+
+	diagnostic Diagnostic
+
 	// Detailed logging of write path
 	// Uses normal logger
 	writeTrace bool
@@ -91,6 +95,7 @@ type Handler struct {
 	// Common log format logger.
 	// This logger does not use log levels with wlog.
 	// Its simply a binary on off from the config.
+	// TODO: do I need to do something about this?
 	clfLogger *log.Logger
 	// Log every HTTP access.
 	loggingEnabled bool
@@ -107,6 +112,8 @@ func NewHandler(
 	statMap *expvar.Map,
 	l *log.Logger,
 	li logging.Interface,
+	d Diagnostic,
+	ds diagnostic.Service,
 	sharedSecret string,
 ) *Handler {
 	h := &Handler{
@@ -114,6 +121,7 @@ func NewHandler(
 		requireAuthentication: requireAuthentication,
 		sharedSecret:          sharedSecret,
 		allowGzip:             allowGzip,
+		diagnostic:            d,
 		logger:                l,
 		writeTrace:            writeTrace,
 		clfLogger:             li.NewRawLogger("[httpd] ", 0),
@@ -312,6 +320,7 @@ func (h *Handler) addRawRoute(r Route) error {
 	handler = requestID(handler)
 
 	if h.loggingEnabled {
+		// TODO: not sure what to do here
 		handler = logHandler(handler, h.clfLogger)
 	}
 	handler = recovery(handler, h.logger) // make sure recovery is always last

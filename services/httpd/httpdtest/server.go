@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http/httptest"
 
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/logging/loggingtest"
 )
@@ -18,6 +19,9 @@ func NewServer(verbose bool) *Server {
 	statMap := &expvar.Map{}
 	statMap.Init()
 	ls := loggingtest.New()
+	// TODO: revisit
+	ds := diagnostic.NewService()
+	d := ds.NewDiagnostic(nil)
 	s := &Server{
 		Handler: httpd.NewHandler(
 			false,
@@ -27,6 +31,8 @@ func NewServer(verbose bool) *Server {
 			statMap,
 			ls.NewLogger("[httpdtest] ", log.LstdFlags),
 			ls,
+			d,
+			ds,
 			"",
 		),
 	}
