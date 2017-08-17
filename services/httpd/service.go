@@ -41,7 +41,6 @@ type Service struct {
 
 	Handler *Handler
 
-	logger           *log.Logger
 	httpServerLogger *log.Logger
 
 	diagnostic Diagnostic
@@ -54,9 +53,7 @@ type Service struct {
 // or diagnostic generator
 type Diagnostic diagnostic.Diagnostic
 
-func NewService(c Config, hostname string, l *log.Logger, li logging.Interface,
-	d Diagnostic, ds diagnostic.Service,
-) *Service {
+func NewService(c Config, hostname string, li logging.Interface, d Diagnostic, ds diagnostic.Service) *Service {
 	statMap := &expvar.Map{}
 	statMap.Init()
 	port, _ := c.Port()
@@ -80,13 +77,11 @@ func NewService(c Config, hostname string, l *log.Logger, li logging.Interface,
 			c.WriteTracing,
 			c.GZIP,
 			statMap,
-			l,
 			li,
 			d,
 			ds,
 			c.SharedSecret,
 		),
-		logger: l,
 		// TODO: not totally sure what to do about this
 		httpServerLogger: li.NewStaticLevelLogger("[httpd]", log.LstdFlags, logging.ERROR),
 
@@ -99,12 +94,10 @@ func NewService(c Config, hostname string, l *log.Logger, li logging.Interface,
 func (s *Service) Open() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	//s.logger.Println("I! Starting HTTP service")
 	s.diagnostic.Diag(
 		"level", "info",
 		"msg", "starting HTTP service",
 	)
-	//s.logger.Println("I! Authentication enabled:", s.Handler.requireAuthentication)
 	s.diagnostic.Diag(
 		"level", "info",
 		"auth_enabled", s.Handler.requireAuthentication, // TODO: idk if I like this
@@ -124,7 +117,6 @@ func (s *Service) Open() error {
 			return err
 		}
 
-		//s.logger.Println("I! Listening on HTTPS:", listener.Addr().String())
 		s.diagnostic.Diag(
 			"level", "info",
 			"msg", "listening on HTTPS",
@@ -137,7 +129,6 @@ func (s *Service) Open() error {
 			return err
 		}
 
-		//s.logger.Println("I! Listening on HTTP:", listener.Addr().String())
 		s.diagnostic.Diag(
 			"level", "info",
 			"msg", "listening on HTTP",
@@ -169,7 +160,6 @@ func (s *Service) Open() error {
 
 // Close closes the underlying listener.
 func (s *Service) Close() error {
-	//defer s.logger.Println("I! Closed HTTP service")
 	defer s.diagnostic.Diag("level", "info", "msg", "closed HTTP service")
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -266,7 +256,6 @@ func (s *Service) manage() {
 			// continue the loop and wait for all the ConnState updates which will
 			// eventually close(stopDone) and return from this goroutine.
 		case <-timeout:
-			//s.logger.Println("E! shutdown timedout, forcefully closing all remaining connections")
 			s.diagnostic.Diag(
 				"level", "error",
 				"msg", "shutdown timedout, forcefully closing all remaining connections",

@@ -110,7 +110,6 @@ func NewHandler(
 	writeTrace,
 	allowGzip bool,
 	statMap *expvar.Map,
-	l *log.Logger,
 	li logging.Interface,
 	d Diagnostic,
 	ds diagnostic.Service,
@@ -122,7 +121,6 @@ func NewHandler(
 		sharedSecret:          sharedSecret,
 		allowGzip:             allowGzip,
 		diagnostic:            d,
-		logger:                l,
 		writeTrace:            writeTrace,
 		clfLogger:             li.NewRawLogger("[httpd] ", 0),
 		loggingEnabled:        loggingEnabled,
@@ -323,7 +321,7 @@ func (h *Handler) addRawRoute(r Route) error {
 		// TODO: not sure what to do here
 		handler = logHandler(handler, h.clfLogger)
 	}
-	handler = recovery(handler, h.logger) // make sure recovery is always last
+	handler = recovery(handler, h.diagnostic) // make sure recovery is always last
 
 	mux, ok := h.methodMux[r.Method]
 	if !ok {
@@ -889,7 +887,7 @@ func logHandler(inner http.Handler, weblog *log.Logger) http.Handler {
 	})
 }
 
-func recovery(inner http.Handler, weblog *log.Logger) http.Handler {
+func recovery(inner http.Handler, weblog diagnostic.Diagnostic) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		l := &responseLogger{w: w}
@@ -897,7 +895,13 @@ func recovery(inner http.Handler, weblog *log.Logger) http.Handler {
 		if err := recover(); err != nil {
 			logLine := buildLogLine(l, r, start)
 			logLine = fmt.Sprintf("E! %s [err:%s]", logLine, err)
-			weblog.Println(logLine)
+			// TODO: this okay?
+			weblog.Diag(
+				"level", "error",
+				"msg", logLine,
+				"error", err,
+			)
+			//weblog.Println(logLine)
 		}
 	})
 }
