@@ -390,7 +390,7 @@ func (s *Server) appendInfluxDBService() error {
 
 	srv.HTTPDService = s.HTTPDService
 	srv.PointsWriter = s.TaskMaster
-	srv.LogService = s.LogService
+	srv.DiagnosticService = s.DiagnosticService
 	srv.AuthService = s.AuthService
 	srv.ClientCreator = iclient.ClientCreator{}
 
@@ -486,8 +486,8 @@ func (s *Server) appendUDFService() {
 }
 
 func (s *Server) appendAuthService() {
-	l := s.LogService.NewLogger("[noauth] ", log.LstdFlags)
-	srv := noauth.NewService(l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "noauth")
+	srv := noauth.NewService(d)
 
 	s.AuthService = srv
 	s.HTTPDService.Handler.AuthService = srv
@@ -715,8 +715,8 @@ func (s *Server) appendUDPServices() {
 		if !c.Enabled {
 			continue
 		}
-		l := s.LogService.NewLogger("[udp] ", log.LstdFlags)
-		srv := udp.NewService(c, l)
+		d := s.DiagnosticService.NewDiagnostic(nil, "service", "udp")
+		srv := udp.NewService(c, d)
 		srv.PointsWriter = s.TaskMaster
 		s.AppendService(fmt.Sprintf("udp%d", i), srv)
 	}

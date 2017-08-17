@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -77,9 +76,8 @@ type Service struct {
 	PointsWriter interface {
 		WritePoints(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
 	}
-	// TODO: Use diagnostic server here
-	LogService interface {
-		NewLogger(string, int) *log.Logger
+	DiagnosticService interface {
+		NewDiagnostic(diagnostic.Diagnostic, ...interface{}) diagnostic.Diagnostic
 	}
 	HTTPDService interface {
 		AddRoutes([]httpd.Route) error
@@ -294,7 +292,7 @@ func (s *Service) updateConfigs(configs []Config) error {
 
 func (s *Service) assignServiceToCluster(cluster *influxdbCluster) {
 	cluster.PointsWriter = s.PointsWriter
-	cluster.LogService = s.LogService
+	cluster.DiagnosticService = s.DiagnosticService
 	cluster.AuthService = s.AuthService
 	cluster.ClientCreator = s.ClientCreator
 	cluster.randReader = s.RandReader
@@ -422,9 +420,8 @@ type influxdbCluster struct {
 	PointsWriter interface {
 		WritePoints(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
 	}
-	// TODO: Use diagnostic server here
-	LogService interface {
-		NewLogger(string, int) *log.Logger
+	DiagnosticService interface {
+		NewDiagnostic(diagnostic.Diagnostic, ...interface{}) diagnostic.Diagnostic
 	}
 	ClientCreator interface {
 		Create(influxdb.Config) (influxdb.ClientUpdater, error)
@@ -1284,9 +1281,8 @@ func (c *influxdbCluster) startUDPListener(se subEntry, port string) (*net.UDPAd
 	conf.Buffer = c.udpBuffer
 	conf.ReadBuffer = c.udpReadBuffer
 
-	// TODO: Use diagnostic server here
-	l := c.LogService.NewLogger(fmt.Sprintf("[udp:%s.%s] ", se.db, se.rp), log.LstdFlags)
-	service := udp.NewService(conf, l)
+	d := c.DiagnosticService.NewDiagnostic(nil, "dbrp", fmt.Sprintf("%s.%s", se.db, se.rp), "type", "udp") // TODO: idk what udp refers to
+	service := udp.NewService(conf, d)
 	service.PointsWriter = c.PointsWriter
 	err := service.Open()
 	if err != nil {

@@ -2,7 +2,6 @@ package udp
 
 import (
 	"errors"
-	"log"
 	"net"
 	"strings"
 	"sync"
@@ -10,6 +9,7 @@ import (
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/server/vars"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 )
 
 const (
@@ -44,17 +44,17 @@ type Service struct {
 		WritePoints(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
 	}
 
-	Logger  *log.Logger
-	statMap *expvar.Map
-	statKey string
+	Diagnostic diagnostic.Diagnostic
+	statMap    *expvar.Map
+	statKey    string
 }
 
-func NewService(c Config, l *log.Logger) *Service {
-	d := *c.WithDefaults()
+func NewService(c Config, d diagnostic.Diagnostic) *Service {
+	cfg := *c.WithDefaults()
 	return &Service{
-		config: d,
-		done:   make(chan struct{}),
-		Logger: l,
+		config:     cfg,
+		done:       make(chan struct{}),
+		Diagnostic: d,
 	}
 }
 
@@ -69,13 +69,23 @@ func (s *Service) Open() (err error) {
 
 	s.addr, err = net.ResolveUDPAddr("udp", s.config.BindAddress)
 	if err != nil {
-		s.Logger.Printf("E! Failed to resolve UDP address %s: %s", s.config.BindAddress, err)
+		s.Diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to resolve UDP address",
+			"address", s.config.BindAddress,
+			"error", err,
+		)
 		return err
 	}
 
 	s.conn, err = net.ListenUDP("udp", s.addr)
 	if err != nil {
-		s.Logger.Printf("E! Failed to set up UDP listener at address %s: %s", s.addr, err)
+		s.Diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to st up UDP listener",
+			"address", s.addr,
+			"error", err,
+		)
 		return err
 	}
 
@@ -90,12 +100,21 @@ func (s *Service) Open() (err error) {
 	if s.config.ReadBuffer != 0 {
 		err = s.conn.SetReadBuffer(s.config.ReadBuffer)
 		if err != nil {
-			s.Logger.Printf("E! Failed to set UDP read buffer to %d: %s", s.config.ReadBuffer, err)
+			s.Diagnostic.Diag(
+				"level", "error",
+				"msg", "failed to set up UDP read buffer",
+				"buffer", s.config.ReadBuffer,
+				"error", err,
+			)
 			return err
 		}
 	}
 
-	s.Logger.Printf("I! Started listening on UDP: %s", s.addr.String())
+	s.Diagnostic.Diag(
+		"level", "info",
+		"msg", "started listening on UDP",
+		"address", s.addr.String(),
+	)
 
 	// Start reading and processing packets
 	s.packets = make(chan []byte, s.config.Buffer)
@@ -126,7 +145,11 @@ func (s *Service) serve() {
 		if err != nil {
 			if !strings.Contains(err.Error(), "use of closed network connection") {
 				s.statMap.Add(statReadFail, 1)
-				s.Logger.Printf("E! Failed to read UDP message: %s", err)
+				s.Diagnostic.Diag(
+					"level", "error",
+					"msg", "failed to read UDP message",
+					"error", err,
+				)
 			}
 			continue
 		}
@@ -144,7 +167,11 @@ func (s *Service) processPackets() {
 		points, err := models.ParsePoints(p)
 		if err != nil {
 			s.statMap.Add(statPointsParseFail, 1)
-			s.Logger.Printf("E! Failed to parse points: %s", err)
+			s.Diagnostic.Diag(
+				"level", "error",
+				"msg", "failed to parse points",
+				"error", err,
+			)
 			continue
 		}
 
@@ -156,7 +183,12 @@ func (s *Service) processPackets() {
 		); err == nil {
 			s.statMap.Add(statPointsTransmitted, int64(len(points)))
 		} else {
-			s.Logger.Printf("E! failed to write points to database %q: %s", s.config.Database, err)
+			s.Diagnostic.Diag(
+				"level", "error",
+				"msg", "failed to write points to database",
+				"database", s.config.Database,
+				"error", err,
+			)
 			s.statMap.Add(statTransmitFail, 1)
 		}
 
@@ -179,7 +211,10 @@ func (s *Service) Close() error {
 	s.conn = nil
 	s.packets = nil
 
-	s.Logger.Print("I! Service closed")
+	s.Diagnostic.Diag(
+		"level", "info",
+		"msg", "service closed",
+	)
 
 	return nil
 }
