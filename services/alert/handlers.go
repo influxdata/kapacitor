@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -16,6 +15,7 @@ import (
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/bufpool"
 	"github.com/influxdata/kapacitor/command"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/tick/stateful"
 	"github.com/pkg/errors"
@@ -40,9 +40,9 @@ func (c LogHandlerConfig) Validate() error {
 }
 
 type logHandler struct {
-	logpath string
-	mode    os.FileMode
-	logger  *log.Logger
+	logpath    string
+	mode       os.FileMode
+	diagnostic diagnostic.Diagnostic
 }
 
 func DefaultLogHandlerConfig() LogHandlerConfig {
@@ -51,14 +51,14 @@ func DefaultLogHandlerConfig() LogHandlerConfig {
 	}
 }
 
-func NewLogHandler(c LogHandlerConfig, l *log.Logger) (alert.Handler, error) {
+func NewLogHandler(c LogHandlerConfig, d diagnostic.Diagnostic) (alert.Handler, error) {
 	if err := c.Validate(); err != nil {
 		return nil, err
 	}
 	return &logHandler{
-		logpath: c.Path,
-		mode:    c.Mode,
-		logger:  l,
+		logpath:    c.Path,
+		mode:       c.Mode,
+		diagnostic: d,
 	}, nil
 }
 
@@ -67,14 +67,25 @@ func (h *logHandler) Handle(event alert.Event) {
 
 	f, err := os.OpenFile(h.logpath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, h.mode)
 	if err != nil {
-		h.logger.Printf("E! failed to open file %s for alert logging: %v", h.logpath, err)
+		//h.logger.Printf("E! failed to open file %s for alert logging: %v", h.logpath, err)
+		h.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to ope file for alert logging",
+			"file", h.logpath,
+			"error", err,
+		)
 		return
 	}
 	defer f.Close()
 
 	err = json.NewEncoder(f).Encode(ad)
 	if err != nil {
-		h.logger.Printf("E! failed to marshal alert data json: %v", err)
+		//h.logger.Printf("E! failed to marshal alert data json: %v", err)
+		h.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to marshal alert data json",
+			"error", err,
+		)
 	}
 }
 
@@ -85,22 +96,22 @@ type ExecHandlerConfig struct {
 }
 
 type execHandler struct {
-	bp        *bufpool.Pool
-	s         command.Spec
-	commander command.Commander
-	logger    *log.Logger
+	bp         *bufpool.Pool
+	s          command.Spec
+	commander  command.Commander
+	diagnostic diagnostic.Diagnostic
 }
 
-func NewExecHandler(c ExecHandlerConfig, l *log.Logger) alert.Handler {
+func NewExecHandler(c ExecHandlerConfig, d diagnostic.Diagnostic) alert.Handler {
 	s := command.Spec{
 		Prog: c.Prog,
 		Args: c.Args,
 	}
 	return &execHandler{
-		bp:        bufpool.New(),
-		s:         s,
-		commander: c.Commander,
-		logger:    l,
+		bp:         bufpool.New(),
+		s:          s,
+		commander:  c.Commander,
+		diagnostic: d,
 	}
 }
 
@@ -111,7 +122,12 @@ func (h *execHandler) Handle(event alert.Event) {
 
 	err := json.NewEncoder(buf).Encode(ad)
 	if err != nil {
-		h.logger.Printf("E! failed to marshal alert data json: %v", err)
+		//h.logger.Printf("E! failed to marshal alert data json: %v", err)
+		h.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to marshal alert data json",
+			"error", err,
+		)
 		return
 	}
 
@@ -122,12 +138,24 @@ func (h *execHandler) Handle(event alert.Event) {
 	cmd.Stderr(&out)
 	err = cmd.Start()
 	if err != nil {
-		h.logger.Printf("E! exec command failed: Output: %s: %v", out.String(), err)
+		//h.logger.Printf("E! exec command failed: Output: %s: %v", out.String(), err)
+		h.diagnostic.Diag(
+			"level", "error",
+			"msg", "exec command failed",
+			"output", out.String(),
+			"error", err,
+		)
 		return
 	}
 	err = cmd.Wait()
 	if err != nil {
-		h.logger.Printf("E! exec command failed: Output: %s: %v", out.String(), err)
+		//h.logger.Printf("E! exec command failed: Output: %s: %v", out.String(), err)
+		h.diagnostic.Diag(
+			"level", "error",
+			"msg", "exec command failed",
+			"output", out.String(),
+			"error", err,
+		)
 		return
 	}
 }
@@ -137,16 +165,16 @@ type TCPHandlerConfig struct {
 }
 
 type tcpHandler struct {
-	bp     *bufpool.Pool
-	addr   string
-	logger *log.Logger
+	bp         *bufpool.Pool
+	addr       string
+	diagnostic diagnostic.Diagnostic
 }
 
-func NewTCPHandler(c TCPHandlerConfig, l *log.Logger) alert.Handler {
+func NewTCPHandler(c TCPHandlerConfig, d diagnostic.Diagnostic) alert.Handler {
 	return &tcpHandler{
-		bp:     bufpool.New(),
-		addr:   c.Address,
-		logger: l,
+		bp:         bufpool.New(),
+		addr:       c.Address,
+		diagnostic: d,
 	}
 }
 
@@ -157,13 +185,24 @@ func (h *tcpHandler) Handle(event alert.Event) {
 
 	err := json.NewEncoder(buf).Encode(ad)
 	if err != nil {
-		h.logger.Printf("E! failed to marshal alert data json: %v", err)
+		//h.logger.Printf("E! failed to marshal alert data json: %v", err)
+		h.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to marshal alert data to json",
+			"error", err,
+		)
 		return
 	}
 
 	conn, err := net.Dial("tcp", h.addr)
 	if err != nil {
-		h.logger.Printf("E! tcp handler: failed to connect to %s: %v", h.addr, err)
+		//h.logger.Printf("E! tcp handler: failed to connect to %s: %v", h.addr, err)
+		h.diagnostic.Diag(
+			"level", "error",
+			"msg", "tcp handler failed to connect",
+			"address", h.addr,
+			"error", err,
+		)
 		return
 	}
 	defer conn.Close()
@@ -200,14 +239,14 @@ type aggregateHandler struct {
 
 	messageTmpl *text.Template
 
-	logger  *log.Logger
-	events  chan alert.Event
-	closing chan struct{}
+	diagnostic diagnostic.Diagnostic
+	events     chan alert.Event
+	closing    chan struct{}
 
 	wg sync.WaitGroup
 }
 
-func NewAggregateHandler(c AggregateHandlerConfig, l *log.Logger) (alert.Handler, error) {
+func NewAggregateHandler(c AggregateHandlerConfig, d diagnostic.Diagnostic) (alert.Handler, error) {
 	// Parse and validate message template
 	tmpl, err := text.New("message").Parse(c.Message)
 	if err != nil {
@@ -226,7 +265,7 @@ func NewAggregateHandler(c AggregateHandlerConfig, l *log.Logger) (alert.Handler
 		topic:       c.Topic,
 		ec:          c.ec,
 		messageTmpl: tmpl,
-		logger:      l,
+		diagnostic:  d,
 		events:      make(chan alert.Event),
 		closing:     make(chan struct{}),
 	}
@@ -310,14 +349,14 @@ type PublishHandlerConfig struct {
 	ec     EventCollector
 }
 type publishHandler struct {
-	c      PublishHandlerConfig
-	logger *log.Logger
+	c          PublishHandlerConfig
+	diagnostic diagnostic.Diagnostic
 }
 
-func NewPublishHandler(c PublishHandlerConfig, l *log.Logger) alert.Handler {
+func NewPublishHandler(c PublishHandlerConfig, d diagnostic.Diagnostic) alert.Handler {
 	return &publishHandler{
-		c:      c,
-		logger: l,
+		c:          c,
+		diagnostic: d,
 	}
 }
 
@@ -361,7 +400,7 @@ type matchHandler struct {
 
 	vars []string
 
-	logger *log.Logger
+	diagnostic diagnostic.Diagnostic
 }
 
 const (
@@ -379,7 +418,7 @@ var matchIdentifiers = map[string]interface{}{
 	"CRITICAL": int64(alert.Critical),
 }
 
-func newMatchHandler(match string, h alert.Handler, l *log.Logger) (*matchHandler, error) {
+func newMatchHandler(match string, h alert.Handler, d diagnostic.Diagnostic) (*matchHandler, error) {
 	lambda, err := ast.ParseLambda(match)
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid match expression")
@@ -406,11 +445,11 @@ func newMatchHandler(match string, h alert.Handler, l *log.Logger) (*matchHandle
 	}
 
 	mh := &matchHandler{
-		h:      h,
-		expr:   expr,
-		scope:  stateful.NewScope(),
-		vars:   ast.FindReferenceVariables(lambda),
-		logger: l,
+		h:          h,
+		expr:       expr,
+		scope:      stateful.NewScope(),
+		vars:       ast.FindReferenceVariables(lambda),
+		diagnostic: d,
 	}
 
 	// Determine which functions are called
@@ -437,7 +476,12 @@ func newMatchHandler(match string, h alert.Handler, l *log.Logger) (*matchHandle
 
 func (h *matchHandler) Handle(event alert.Event) {
 	if ok, err := h.match(event); err != nil {
-		h.logger.Println("E! failed to evaluate match expression:", err)
+		//h.logger.Println("E! failed to evaluate match expression:", err)
+		h.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to evaluate match expression",
+			"error", err,
+		)
 	} else if ok {
 		h.h.Handle(event)
 	}

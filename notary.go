@@ -5,5 +5,6 @@ package kapacitor
 type Notary interface {
 	Error(kv ...interface{}) error
 	Debug(kv ...interface{}) error
+	Diag(kv ...interface{}) error
 	Info(kv ...interface{}) error
 }

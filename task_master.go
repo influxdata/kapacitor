@@ -18,6 +18,7 @@ import (
 	"github.com/influxdata/kapacitor/server/vars"
 	alertservice "github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/httppost"
@@ -43,6 +44,8 @@ const (
 	statPointsReceived = "points_received"
 	MainTaskMaster     = "main"
 )
+
+type Diagnostic diagnostic.Diagnostic
 
 type LogService interface {
 	NewLogger(prefix string, flag int) *log.Logger
@@ -91,58 +94,58 @@ type TaskMaster struct {
 	SMTPService interface {
 		Global() bool
 		StateChangesOnly() bool
-		Handler(smtp.HandlerConfig, *log.Logger) alert.Handler
+		Handler(smtp.HandlerConfig, diagnostic.Diagnostic) alert.Handler
 	}
 	MQTTService interface {
-		Handler(mqtt.HandlerConfig, *log.Logger) alert.Handler
+		Handler(mqtt.HandlerConfig, diagnostic.Diagnostic) alert.Handler
 	}
 
 	OpsGenieService interface {
 		Global() bool
-		Handler(opsgenie.HandlerConfig, *log.Logger) alert.Handler
+		Handler(opsgenie.HandlerConfig, diagnostic.Diagnostic) alert.Handler
 	}
 	VictorOpsService interface {
 		Global() bool
-		Handler(victorops.HandlerConfig, *log.Logger) alert.Handler
+		Handler(victorops.HandlerConfig, diagnostic.Diagnostic) alert.Handler
 	}
 	PagerDutyService interface {
 		Global() bool
-		Handler(pagerduty.HandlerConfig, *log.Logger) alert.Handler
+		Handler(pagerduty.HandlerConfig, diagnostic.Diagnostic) alert.Handler
 	}
 	PushoverService interface {
-		Handler(pushover.HandlerConfig, *log.Logger) alert.Handler
+		Handler(pushover.HandlerConfig, diagnostic.Diagnostic) alert.Handler
 	}
 	HTTPPostService interface {
-		Handler(httppost.HandlerConfig, *log.Logger) alert.Handler
+		Handler(httppost.HandlerConfig, diagnostic.Diagnostic) alert.Handler
 		Endpoint(string) (*httppost.Endpoint, bool)
 	}
 	SlackService interface {
 		Global() bool
 		StateChangesOnly() bool
-		Handler(slack.HandlerConfig, *log.Logger) alert.Handler
+		Handler(slack.HandlerConfig, diagnostic.Diagnostic) alert.Handler
 	}
 	SNMPTrapService interface {
-		Handler(snmptrap.HandlerConfig, *log.Logger) (alert.Handler, error)
+		Handler(snmptrap.HandlerConfig, diagnostic.Diagnostic) (alert.Handler, error)
 	}
 	TelegramService interface {
 		Global() bool
 		StateChangesOnly() bool
-		Handler(telegram.HandlerConfig, *log.Logger) alert.Handler
+		Handler(telegram.HandlerConfig, diagnostic.Diagnostic) alert.Handler
 	}
 	HipChatService interface {
 		Global() bool
 		StateChangesOnly() bool
-		Handler(hipchat.HandlerConfig, *log.Logger) alert.Handler
+		Handler(hipchat.HandlerConfig, diagnostic.Diagnostic) alert.Handler
 	}
 	AlertaService interface {
 		DefaultHandlerConfig() alerta.HandlerConfig
-		Handler(alerta.HandlerConfig, *log.Logger) (alert.Handler, error)
+		Handler(alerta.HandlerConfig, diagnostic.Diagnostic) (alert.Handler, error)
 	}
 	SensuService interface {
-		Handler(sensu.HandlerConfig, *log.Logger) (alert.Handler, error)
+		Handler(sensu.HandlerConfig, diagnostic.Diagnostic) (alert.Handler, error)
 	}
 	TalkService interface {
-		Handler(*log.Logger) alert.Handler
+		Handler(diagnostic.Diagnostic) alert.Handler
 	}
 	TimingService interface {
 		NewTimer(timer.Setter) timer.Timer

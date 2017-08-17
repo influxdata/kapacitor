@@ -6,12 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"sync"
 
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/bufpool"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 )
 
 // Only one of name and url should be non-empty
@@ -69,15 +69,15 @@ func (e *Endpoint) NewHTTPRequest(body io.Reader) (req *http.Request, err error)
 }
 
 type Service struct {
-	mu        sync.RWMutex
-	endpoints map[string]*Endpoint
-	logger    *log.Logger
+	mu         sync.RWMutex
+	endpoints  map[string]*Endpoint
+	diagnostic diagnostic.Diagnostic
 }
 
-func NewService(c Configs, l *log.Logger) *Service {
+func NewService(c Configs, d diagnostic.Diagnostic) *Service {
 	s := &Service{
-		logger:    l,
-		endpoints: c.index(),
+		diagnostic: d,
+		endpoints:  c.index(),
 	}
 	return s
 }
@@ -188,25 +188,25 @@ type HandlerConfig struct {
 }
 
 type handler struct {
-	s        *Service
-	bp       *bufpool.Pool
-	endpoint *Endpoint
-	logger   *log.Logger
-	headers  map[string]string
+	s          *Service
+	bp         *bufpool.Pool
+	endpoint   *Endpoint
+	diagnostic diagnostic.Diagnostic
+	headers    map[string]string
 }
 
-func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+func (s *Service) Handler(c HandlerConfig, d diagnostic.Diagnostic) alert.Handler {
 	e, ok := s.Endpoint(c.Endpoint)
 	if !ok {
 		e = NewEndpoint(c.URL, nil, BasicAuth{})
 	}
 
 	return &handler{
-		s:        s,
-		bp:       bufpool.New(),
-		endpoint: e,
-		logger:   l,
-		headers:  c.Headers,
+		s:          s,
+		bp:         bufpool.New(),
+		endpoint:   e,
+		diagnostic: d,
+		headers:    c.Headers,
 	}
 }
 
@@ -233,13 +233,21 @@ func (h *handler) Handle(event alert.Event) {
 
 	err = json.NewEncoder(body).Encode(ad)
 	if err != nil {
-		h.logger.Printf("E! failed to marshal alert data json: %v", err)
+		h.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to marshal alert data json",
+			"error", err,
+		)
 		return
 	}
 
 	req, err := h.NewHTTPRequest(body)
 	if err != nil {
-		h.logger.Printf("E! fail to create HTTP request: %v", err)
+		h.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to create HTTP request",
+			"error", err,
+		)
 		return
 	}
 
@@ -247,7 +255,11 @@ func (h *handler) Handle(event alert.Event) {
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		h.logger.Printf("E! failed to POST alert data: %v", err)
+		h.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to POST alert data",
+			"error", err,
+		)
 		return
 	}
 	resp.Body.Close()

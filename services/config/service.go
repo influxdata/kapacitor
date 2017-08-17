@@ -3,7 +3,6 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"path"
 	"regexp"
@@ -12,6 +11,7 @@ import (
 
 	client "github.com/influxdata/kapacitor/client/v1"
 	"github.com/influxdata/kapacitor/services/config/override"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/pkg/errors"
@@ -33,11 +33,11 @@ type ConfigUpdate struct {
 }
 
 type Service struct {
-	enabled bool
-	config  interface{}
-	logger  *log.Logger
-	updates chan<- ConfigUpdate
-	routes  []httpd.Route
+	enabled    bool
+	config     interface{}
+	diagnostic Diagnostic
+	updates    chan<- ConfigUpdate
+	routes     []httpd.Route
 
 	// Cached map of section name to element key name
 	elementKeys map[string]string
@@ -54,12 +54,14 @@ type Service struct {
 	}
 }
 
-func NewService(c Config, config interface{}, l *log.Logger, updates chan<- ConfigUpdate) *Service {
+type Diagnostic diagnostic.Diagnostic
+
+func NewService(c Config, config interface{}, d Diagnostic, updates chan<- ConfigUpdate) *Service {
 	return &Service{
-		enabled: c.Enabled,
-		config:  config,
-		logger:  l,
-		updates: updates,
+		enabled:    c.Enabled,
+		config:     config,
+		diagnostic: d,
+		updates:    updates,
 	}
 }
 
@@ -306,7 +308,12 @@ func (s *Service) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	if !hasSection {
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(config); err != nil {
-			s.logger.Println("E! failed to JSON encode configuration", err)
+			//s.logger.Println("E! failed to JSON encode configuration", err)
+			s.diagnostic.Diag(
+				"level", "error",
+				"msg", "failed to JSON encode configuation",
+				"error", err,
+			)
 		}
 	} else if section != "" {
 		sec, ok := config.Sections[section]
@@ -329,7 +336,12 @@ func (s *Service) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 			if found {
 				w.WriteHeader(http.StatusOK)
 				if err := json.NewEncoder(w).Encode(elementEntry); err != nil {
-					s.logger.Println("E! failed to JSON encode element", err)
+					//s.logger.Println("E! failed to JSON encode element", err)
+					s.diagnostic.Diag(
+						"level", "error",
+						"msg", "failed to JSON encode element",
+						"error", err,
+					)
 				}
 			} else {
 				httpd.HttpError(w, fmt.Sprintf("unknown section/element: %s/%s", section, element), true, http.StatusNotFound)
@@ -338,7 +350,12 @@ func (s *Service) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 		} else {
 			w.WriteHeader(http.StatusOK)
 			if err := json.NewEncoder(w).Encode(sec); err != nil {
-				s.logger.Println("E! failed to JSON encode sec", err)
+				//s.logger.Println("E! failed to JSON encode sec", err)
+				s.diagnostic.Diag(
+					"level", "error",
+					"msg", "failed to JSON encode sec",
+					"error", err,
+				)
 			}
 		}
 	}

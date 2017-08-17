@@ -4,6 +4,8 @@ type Diagnostic interface {
 	Diag(...interface{}) error
 }
 
+type T Diagnostic
+
 type Service interface {
 	NewDiagnostic(Diagnostic, ...interface{}) Diagnostic
 	//Subscribe(key string, subscr Subscriber) error

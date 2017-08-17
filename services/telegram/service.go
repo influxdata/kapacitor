@@ -6,25 +6,26 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"path"
 	"sync/atomic"
 
-	"github.com/influxdata/kapacitor/alert"
-	"github.com/pkg/errors"
 	"strings"
+
+	"github.com/influxdata/kapacitor/alert"
+	"github.com/influxdata/kapacitor/services/diagnostic"
+	"github.com/pkg/errors"
 )
 
 type Service struct {
 	configValue atomic.Value
-	logger      *log.Logger
+	diagnostic  diagnostic.Diagnostic
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, d diagnostic.Diagnostic) *Service {
 	s := &Service{
-		logger: l,
+		diagnostic: d,
 	}
 	s.configValue.Store(c)
 	return s
@@ -198,16 +199,16 @@ type HandlerConfig struct {
 }
 
 type handler struct {
-	s      *Service
-	c      HandlerConfig
-	logger *log.Logger
+	s          *Service
+	c          HandlerConfig
+	diagnostic diagnostic.Diagnostic
 }
 
-func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+func (s *Service) Handler(c HandlerConfig, d diagnostic.Diagnostic) alert.Handler {
 	return &handler{
-		s:      s,
-		c:      c,
-		logger: l,
+		s:          s,
+		c:          c,
+		diagnostic: d,
 	}
 }
 
@@ -219,6 +220,10 @@ func (h *handler) Handle(event alert.Event) {
 		h.c.DisableWebPagePreview,
 		h.c.DisableNotification,
 	); err != nil {
-		h.logger.Println("E! failed to send event to Telegram", err)
+		h.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to send event to Telegram",
+			"error", err,
+		)
 	}
 }

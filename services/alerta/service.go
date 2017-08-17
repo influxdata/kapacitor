@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"path"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/pkg/errors"
 )
 
@@ -28,12 +28,12 @@ const (
 type Service struct {
 	configValue atomic.Value
 	clientValue atomic.Value
-	logger      *log.Logger
+	diagnostic  diagnostic.Diagnostic
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, d diagnostic.Diagnostic) *Service {
 	s := &Service{
-		logger: l,
+		diagnostic: d,
 	}
 	s.configValue.Store(c)
 	s.clientValue.Store(&http.Client{
@@ -265,9 +265,9 @@ type HandlerConfig struct {
 }
 
 type handler struct {
-	s      *Service
-	c      HandlerConfig
-	logger *log.Logger
+	s          *Service
+	c          HandlerConfig
+	diagnostic diagnostic.Diagnostic
 
 	resourceTmpl    *text.Template
 	eventTmpl       *text.Template
@@ -284,7 +284,7 @@ func (s *Service) DefaultHandlerConfig() HandlerConfig {
 	}
 }
 
-func (s *Service) Handler(c HandlerConfig, l *log.Logger) (alert.Handler, error) {
+func (s *Service) Handler(c HandlerConfig, d diagnostic.Diagnostic) (alert.Handler, error) {
 	// Parse and validate alerta templates
 	rtmpl, err := text.New("resource").Parse(c.Resource)
 	if err != nil {
@@ -309,7 +309,7 @@ func (s *Service) Handler(c HandlerConfig, l *log.Logger) (alert.Handler, error)
 	return &handler{
 		s:               s,
 		c:               c,
-		logger:          l,
+		diagnostic:      d,
 		resourceTmpl:    rtmpl,
 		eventTmpl:       evtmpl,
 		environmentTmpl: etmpl,
@@ -339,7 +339,12 @@ func (h *handler) Handle(event alert.Event) {
 	var buf bytes.Buffer
 	err := h.resourceTmpl.Execute(&buf, td)
 	if err != nil {
-		h.logger.Printf("E! failed to evaluate Alerta Resource template %s: %v", h.c.Resource, err)
+		h.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to evaluate Alerta Resource template",
+			"resource", h.c.Resource,
+			"error", err,
+		)
 		return
 	}
 	resource := buf.String()
@@ -354,7 +359,12 @@ func (h *handler) Handle(event alert.Event) {
 	}
 	err = h.eventTmpl.Execute(&buf, data)
 	if err != nil {
-		h.logger.Printf("E! failed to evaluate Alerta Event template %s: %v", h.c.Event, err)
+		h.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to evaluate Alerta Event template",
+			"event", h.c.Event,
+			"error", err,
+		)
 		return
 	}
 	eventStr := buf.String()
@@ -362,7 +372,12 @@ func (h *handler) Handle(event alert.Event) {
 
 	err = h.environmentTmpl.Execute(&buf, td)
 	if err != nil {
-		h.logger.Printf("E! failed to evaluate Alerta Environment template %s: %v", h.c.Environment, err)
+		h.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to evaluate Alerta Environment template",
+			"environment", h.c.Environment,
+			"error", err,
+		)
 		return
 	}
 	environment := buf.String()
@@ -370,7 +385,12 @@ func (h *handler) Handle(event alert.Event) {
 
 	err = h.groupTmpl.Execute(&buf, td)
 	if err != nil {
-		h.logger.Printf("E! failed to evaluate Alerta Group template %s: %v", h.c.Group, err)
+		h.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to evaluate Alerta Group template",
+			"group", h.c.Group,
+			"error", err,
+		)
 		return
 	}
 	group := buf.String()
@@ -378,7 +398,12 @@ func (h *handler) Handle(event alert.Event) {
 
 	err = h.valueTmpl.Execute(&buf, td)
 	if err != nil {
-		h.logger.Printf("E! failed to evaluate Alerta Value template %s: %v", h.c.Value, err)
+		h.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to evaluate Alerta Value template",
+			"alerta-value", h.c.Value,
+			"error", err,
+		)
 		return
 	}
 	value := buf.String()
@@ -417,6 +442,10 @@ func (h *handler) Handle(event alert.Event) {
 		service,
 		event.Data.Result,
 	); err != nil {
-		h.logger.Printf("E! failed to send event to Alerta: %v", err)
+		h.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to send event to Alerta",
+			"error", err,
+		)
 	}
 }

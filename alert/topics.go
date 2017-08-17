@@ -2,13 +2,13 @@ package alert
 
 import (
 	"fmt"
-	"log"
 	"path"
 	"sort"
 	"sync"
 
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/server/vars"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 )
 
 const (
@@ -21,13 +21,15 @@ type Topics struct {
 
 	topics map[string]*Topic
 
-	logger *log.Logger
+	diagnostic Diagnostic
 }
 
-func NewTopics(l *log.Logger) *Topics {
+type Diagnostic diagnostic.Diagnostic
+
+func NewTopics(d Diagnostic) *Topics {
 	s := &Topics{
-		topics: make(map[string]*Topic),
-		logger: l,
+		topics:     make(map[string]*Topic),
+		diagnostic: d,
 	}
 	return s
 }

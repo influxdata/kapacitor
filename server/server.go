@@ -320,8 +320,9 @@ func (s *Server) SetDynamicService(name string, srv dynamicService) {
 }
 
 func (s *Server) appendStorageService() {
-	l := s.LogService.NewLogger("[storage] ", log.LstdFlags)
-	srv := storage.NewService(s.config.Storage, l)
+	//l := s.LogService.NewLogger("[storage] ", log.LstdFlags)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "storage")
+	srv := storage.NewService(s.config.Storage, d)
 
 	srv.HTTPDService = s.HTTPDService
 
@@ -330,8 +331,8 @@ func (s *Server) appendStorageService() {
 }
 
 func (s *Server) appendConfigOverrideService() {
-	l := s.LogService.NewLogger("[config-override] ", log.LstdFlags)
-	srv := config.NewService(s.config.ConfigOverride, s.config, l, s.configUpdates)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "config-override")
+	srv := config.NewService(s.config.ConfigOverride, s.config, d, s.configUpdates)
 	srv.HTTPDService = s.HTTPDService
 	srv.StorageService = s.StorageService
 
@@ -340,8 +341,8 @@ func (s *Server) appendConfigOverrideService() {
 }
 
 func (s *Server) initAlertService() {
-	l := s.LogService.NewLogger("[alert] ", log.LstdFlags)
-	srv := alert.NewService(l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "alert")
+	srv := alert.NewService(d)
 
 	srv.Commander = s.Commander
 	srv.HTTPDService = s.HTTPDService
@@ -366,8 +367,9 @@ func (s *Server) appendTesterService() {
 
 func (s *Server) appendSMTPService() {
 	c := s.config.SMTP
-	l := s.LogService.NewLogger("[smtp] ", log.LstdFlags)
-	srv := smtp.NewService(c, l)
+	//l := s.LogService.NewLogger("[smtp] ", log.LstdFlags)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "smtp")
+	srv := smtp.NewService(c, d)
 
 	s.TaskMaster.SMTPService = srv
 	s.AlertService.SMTPService = srv
@@ -502,8 +504,8 @@ func (s *Server) appendAuthService() {
 
 func (s *Server) appendMQTTService() error {
 	cs := s.config.MQTT
-	l := s.LogService.NewLogger("[mqtt] ", log.LstdFlags)
-	srv, err := mqtt.NewService(cs, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "mqtt")
+	srv, err := mqtt.NewService(cs, d)
 	if err != nil {
 		return err
 	}
@@ -518,8 +520,8 @@ func (s *Server) appendMQTTService() error {
 
 func (s *Server) appendOpsGenieService() {
 	c := s.config.OpsGenie
-	l := s.LogService.NewLogger("[opsgenie] ", log.LstdFlags)
-	srv := opsgenie.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "opsgenie")
+	srv := opsgenie.NewService(c, d)
 
 	s.TaskMaster.OpsGenieService = srv
 	s.AlertService.OpsGenieService = srv
@@ -530,8 +532,8 @@ func (s *Server) appendOpsGenieService() {
 
 func (s *Server) appendVictorOpsService() {
 	c := s.config.VictorOps
-	l := s.LogService.NewLogger("[victorops] ", log.LstdFlags)
-	srv := victorops.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "victorops")
+	srv := victorops.NewService(c, d)
 
 	s.TaskMaster.VictorOpsService = srv
 	s.AlertService.VictorOpsService = srv
@@ -542,8 +544,8 @@ func (s *Server) appendVictorOpsService() {
 
 func (s *Server) appendPagerDutyService() {
 	c := s.config.PagerDuty
-	l := s.LogService.NewLogger("[pagerduty] ", log.LstdFlags)
-	srv := pagerduty.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "pagerduty")
+	srv := pagerduty.NewService(c, d)
 	srv.HTTPDService = s.HTTPDService
 
 	s.TaskMaster.PagerDutyService = srv
@@ -555,8 +557,8 @@ func (s *Server) appendPagerDutyService() {
 
 func (s *Server) appendPushoverService() {
 	c := s.config.Pushover
-	l := s.LogService.NewLogger("[pushover] ", log.LstdFlags)
-	srv := pushover.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "pushover")
+	srv := pushover.NewService(c, d)
 
 	s.TaskMaster.PushoverService = srv
 	s.AlertService.PushoverService = srv
@@ -567,8 +569,8 @@ func (s *Server) appendPushoverService() {
 
 func (s *Server) appendHTTPPostService() {
 	c := s.config.HTTPPost
-	l := s.LogService.NewLogger("[httppost] ", log.LstdFlags)
-	srv := httppost.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "httppost")
+	srv := httppost.NewService(c, d)
 
 	s.TaskMaster.HTTPPostService = srv
 	s.AlertService.HTTPPostService = srv
@@ -579,8 +581,8 @@ func (s *Server) appendHTTPPostService() {
 
 func (s *Server) appendSensuService() {
 	c := s.config.Sensu
-	l := s.LogService.NewLogger("[sensu] ", log.LstdFlags)
-	srv := sensu.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "sensu")
+	srv := sensu.NewService(c, d)
 
 	s.TaskMaster.SensuService = srv
 	s.AlertService.SensuService = srv
@@ -591,8 +593,8 @@ func (s *Server) appendSensuService() {
 
 func (s *Server) appendSlackService() error {
 	c := s.config.Slack
-	l := s.LogService.NewLogger("[slack] ", log.LstdFlags)
-	srv, err := slack.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "slack")
+	srv, err := slack.NewService(c, d)
 	if err != nil {
 		return err
 	}
@@ -607,8 +609,8 @@ func (s *Server) appendSlackService() error {
 
 func (s *Server) appendSNMPTrapService() {
 	c := s.config.SNMPTrap
-	l := s.LogService.NewLogger("[snmptrap] ", log.LstdFlags)
-	srv := snmptrap.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "snmptrap")
+	srv := snmptrap.NewService(c, d)
 
 	s.TaskMaster.SNMPTrapService = srv
 	s.AlertService.SNMPTrapService = srv
@@ -619,8 +621,8 @@ func (s *Server) appendSNMPTrapService() {
 
 func (s *Server) appendTelegramService() {
 	c := s.config.Telegram
-	l := s.LogService.NewLogger("[telegram] ", log.LstdFlags)
-	srv := telegram.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "telegram")
+	srv := telegram.NewService(c, d)
 
 	s.TaskMaster.TelegramService = srv
 	s.AlertService.TelegramService = srv
@@ -631,8 +633,8 @@ func (s *Server) appendTelegramService() {
 
 func (s *Server) appendHipChatService() {
 	c := s.config.HipChat
-	l := s.LogService.NewLogger("[hipchat] ", log.LstdFlags)
-	srv := hipchat.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "hipchat")
+	srv := hipchat.NewService(c, d)
 
 	s.TaskMaster.HipChatService = srv
 	s.AlertService.HipChatService = srv
@@ -643,8 +645,8 @@ func (s *Server) appendHipChatService() {
 
 func (s *Server) appendAlertaService() {
 	c := s.config.Alerta
-	l := s.LogService.NewLogger("[alerta] ", log.LstdFlags)
-	srv := alerta.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "alerta")
+	srv := alerta.NewService(c, d)
 
 	s.TaskMaster.AlertaService = srv
 	s.AlertService.AlertaService = srv
@@ -655,8 +657,8 @@ func (s *Server) appendAlertaService() {
 
 func (s *Server) appendTalkService() {
 	c := s.config.Talk
-	l := s.LogService.NewLogger("[talk] ", log.LstdFlags)
-	srv := talk.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "talk")
+	srv := talk.NewService(c, d)
 
 	s.TaskMaster.TalkService = srv
 	s.AlertService.TalkService = srv

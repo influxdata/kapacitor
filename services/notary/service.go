@@ -21,6 +21,9 @@ func (t *context) Info(kv ...interface{}) error {
 	}
 	return t.n.Info(kv...)
 }
+func (t *context) Diag(kv ...interface{}) error {
+	return nil
+}
 func (t *context) Debug(kv ...interface{}) error {
 	return nil
 }

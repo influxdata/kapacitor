@@ -127,7 +127,8 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger, nt No
 		c := alertservice.TCPHandlerConfig{
 			Address: tcp.Address,
 		}
-		h := alertservice.NewTCPHandler(c, l)
+		//TODO: replace with real diagnostic instead of nt
+		h := alertservice.NewTCPHandler(c, nt)
 		an.handlers = append(an.handlers, h)
 	}
 
@@ -135,12 +136,14 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger, nt No
 		c := smtp.HandlerConfig{
 			To: email.ToList,
 		}
-		h := et.tm.SMTPService.Handler(c, l)
+		// TODO: replace this with real diagnostic later
+		h := et.tm.SMTPService.Handler(c, nt)
 		an.handlers = append(an.handlers, h)
 	}
 	if len(n.EmailHandlers) == 0 && (et.tm.SMTPService != nil && et.tm.SMTPService.Global()) {
 		c := smtp.HandlerConfig{}
-		h := et.tm.SMTPService.Handler(c, l)
+		// TODO: replace this with real diagnostic later
+		h := et.tm.SMTPService.Handler(c, nt)
 		an.handlers = append(an.handlers, h)
 	}
 	// If email has been configured with state changes only set it.
@@ -156,7 +159,8 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger, nt No
 			Args:      e.Command[1:],
 			Commander: et.tm.Commander,
 		}
-		h := alertservice.NewExecHandler(c, l)
+		//TODO: replace with real diagnostic instead of nt
+		h := alertservice.NewExecHandler(c, nt)
 		an.handlers = append(an.handlers, h)
 	}
 
@@ -166,7 +170,8 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger, nt No
 		if log.Mode != 0 {
 			c.Mode = os.FileMode(log.Mode)
 		}
-		h, err := alertservice.NewLogHandler(c, l)
+		//TODO: replace with real diagnostic instead of nt
+		h, err := alertservice.NewLogHandler(c, nt)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create log alert handler")
 		}
@@ -177,12 +182,12 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger, nt No
 		c := victorops.HandlerConfig{
 			RoutingKey: vo.RoutingKey,
 		}
-		h := et.tm.VictorOpsService.Handler(c, l)
+		h := et.tm.VictorOpsService.Handler(c, nt)
 		an.handlers = append(an.handlers, h)
 	}
 	if len(n.VictorOpsHandlers) == 0 && (et.tm.VictorOpsService != nil && et.tm.VictorOpsService.Global()) {
 		c := victorops.HandlerConfig{}
-		h := et.tm.VictorOpsService.Handler(c, l)
+		h := et.tm.VictorOpsService.Handler(c, nt)
 		an.handlers = append(an.handlers, h)
 	}
 
@@ -190,12 +195,12 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger, nt No
 		c := pagerduty.HandlerConfig{
 			ServiceKey: pd.ServiceKey,
 		}
-		h := et.tm.PagerDutyService.Handler(c, l)
+		h := et.tm.PagerDutyService.Handler(c, nt)
 		an.handlers = append(an.handlers, h)
 	}
 	if len(n.PagerDutyHandlers) == 0 && (et.tm.PagerDutyService != nil && et.tm.PagerDutyService.Global()) {
 		c := pagerduty.HandlerConfig{}
-		h := et.tm.PagerDutyService.Handler(c, l)
+		h := et.tm.PagerDutyService.Handler(c, nt)
 		an.handlers = append(an.handlers, h)
 	}
 
@@ -204,7 +209,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger, nt No
 			Source:   s.Source,
 			Handlers: s.HandlersList,
 		}
-		h, err := et.tm.SensuService.Handler(c, l)
+		h, err := et.tm.SensuService.Handler(c, nt)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create sensu alert handler")
 		}
@@ -217,11 +222,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger, nt No
 			Username:  s.Username,
 			IconEmoji: s.IconEmoji,
 		}
-		h := et.tm.SlackService.Handler(c, l)
+		h := et.tm.SlackService.Handler(c, nt)
 		an.handlers = append(an.handlers, h)
 	}
 	if len(n.SlackHandlers) == 0 && (et.tm.SlackService != nil && et.tm.SlackService.Global()) {
-		h := et.tm.SlackService.Handler(slack.HandlerConfig{}, l)
+		h := et.tm.SlackService.Handler(slack.HandlerConfig{}, nt)
 		an.handlers = append(an.handlers, h)
 	}
 	// If slack has been configured with state changes only set it.
@@ -238,7 +243,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger, nt No
 			DisableWebPagePreview: t.IsDisableWebPagePreview,
 			DisableNotification:   t.IsDisableNotification,
 		}
-		h := et.tm.TelegramService.Handler(c, l)
+		h := et.tm.TelegramService.Handler(c, nt)
 		an.handlers = append(an.handlers, h)
 	}
 
@@ -255,7 +260,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger, nt No
 			TrapOid:  s.TrapOid,
 			DataList: dataList,
 		}
-		h, err := et.tm.SNMPTrapService.Handler(c, l)
+		h, err := et.tm.SNMPTrapService.Handler(c, nt)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create SNMP handler")
 		}
@@ -264,7 +269,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger, nt No
 
 	if len(n.TelegramHandlers) == 0 && (et.tm.TelegramService != nil && et.tm.TelegramService.Global()) {
 		c := telegram.HandlerConfig{}
-		h := et.tm.TelegramService.Handler(c, l)
+		h := et.tm.TelegramService.Handler(c, nt)
 		an.handlers = append(an.handlers, h)
 	}
 	// If telegram has been configured with state changes only set it.
@@ -279,12 +284,12 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger, nt No
 			Room:  hc.Room,
 			Token: hc.Token,
 		}
-		h := et.tm.HipChatService.Handler(c, l)
+		h := et.tm.HipChatService.Handler(c, nt)
 		an.handlers = append(an.handlers, h)
 	}
 	if len(n.HipChatHandlers) == 0 && (et.tm.HipChatService != nil && et.tm.HipChatService.Global()) {
 		c := hipchat.HandlerConfig{}
-		h := et.tm.HipChatService.Handler(c, l)
+		h := et.tm.HipChatService.Handler(c, nt)
 		an.handlers = append(an.handlers, h)
 	}
 	// If HipChat has been configured with state changes only set it.
@@ -320,7 +325,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger, nt No
 		if len(a.Service) != 0 {
 			c.Service = a.Service
 		}
-		h, err := et.tm.AlertaService.Handler(c, l)
+		h, err := et.tm.AlertaService.Handler(c, nt)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create Alerta handler")
 		}
@@ -344,7 +349,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger, nt No
 		if p.Sound != "" {
 			c.Sound = p.Sound
 		}
-		h := et.tm.PushoverService.Handler(c, l)
+		h := et.tm.PushoverService.Handler(c, nt)
 		an.handlers = append(an.handlers, h)
 	}
 
@@ -354,7 +359,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger, nt No
 			Endpoint: p.Endpoint,
 			Headers:  p.Headers,
 		}
-		h := et.tm.HTTPPostService.Handler(c, l)
+		h := et.tm.HTTPPostService.Handler(c, nt)
 		an.handlers = append(an.handlers, h)
 	}
 
@@ -363,17 +368,17 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger, nt No
 			TeamsList:      og.TeamsList,
 			RecipientsList: og.RecipientsList,
 		}
-		h := et.tm.OpsGenieService.Handler(c, l)
+		h := et.tm.OpsGenieService.Handler(c, nt)
 		an.handlers = append(an.handlers, h)
 	}
 	if len(n.OpsGenieHandlers) == 0 && (et.tm.OpsGenieService != nil && et.tm.OpsGenieService.Global()) {
 		c := opsgenie.HandlerConfig{}
-		h := et.tm.OpsGenieService.Handler(c, l)
+		h := et.tm.OpsGenieService.Handler(c, nt)
 		an.handlers = append(an.handlers, h)
 	}
 
 	for range n.TalkHandlers {
-		h := et.tm.TalkService.Handler(l)
+		h := et.tm.TalkService.Handler(nt)
 		an.handlers = append(an.handlers, h)
 	}
 
@@ -384,7 +389,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger, nt No
 			QoS:        mqtt.QoSLevel(m.Qos),
 			Retained:   m.Retained,
 		}
-		h := et.tm.MQTTService.Handler(c, l)
+		h := et.tm.MQTTService.Handler(c, nt)
 		an.handlers = append(an.handlers, h)
 	}
 	// Parse level expressions

@@ -3,7 +3,6 @@ package storage
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"path"
 	"strconv"
@@ -25,10 +24,10 @@ const (
 )
 
 type APIServer struct {
-	Registrar StoreActionerRegistrar
-	DB        *bolt.DB
-	routes    []httpd.Route
-	logger    *log.Logger
+	Registrar  StoreActionerRegistrar
+	DB         *bolt.DB
+	routes     []httpd.Route
+	diagnostic Diagnostic
 
 	HTTPDService interface {
 		AddRoutes([]httpd.Route) error
@@ -83,7 +82,13 @@ func (s *APIServer) handleBackup(w http.ResponseWriter, r *http.Request) {
 		// since the headers have already been sent.
 		// The client can simply check that the Content-Length matches
 		// the amount of data to ensure a successful backup was performed.
-		s.logger.Println("E! failed to send backup data:", err)
+
+		//s.logger.Println("E! failed to send backup data:", err)
+		s.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to send backup data",
+			"error", err,
+		)
 	}
 }
 

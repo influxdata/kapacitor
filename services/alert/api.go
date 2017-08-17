@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"path"
 	"sort"
@@ -14,6 +13,7 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/influxdata/kapacitor/alert"
 	client "github.com/influxdata/kapacitor/client/v1"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/httpd"
 )
 
@@ -47,7 +47,7 @@ type apiServer struct {
 		AddPreviewRoutes([]httpd.Route) error
 		DelRoutes([]httpd.Route)
 	}
-	logger *log.Logger
+	diagnostic diagnostic.Diagnostic
 }
 
 func (s *apiServer) Open() error {

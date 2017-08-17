@@ -1,12 +1,12 @@
 package storage
 
 import (
-	"log"
 	"os"
 	"path"
 	"sync"
 
 	"github.com/boltdb/bolt"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/pkg/errors"
 )
@@ -28,14 +28,17 @@ type Service struct {
 		DelRoutes([]httpd.Route)
 	}
 
-	logger *log.Logger
+	//logger     *log.Logger
+	diagnostic Diagnostic
 }
 
-func NewService(conf Config, l *log.Logger) *Service {
+type Diagnostic diagnostic.Diagnostic
+
+func NewService(conf Config, d Diagnostic) *Service {
 	return &Service{
-		dbpath: conf.BoltDBPath,
-		logger: l,
-		stores: make(map[string]Interface),
+		dbpath:     conf.BoltDBPath,
+		diagnostic: d,
+		stores:     make(map[string]Interface),
 	}
 }
 
@@ -61,7 +64,8 @@ func (s *Service) Open() error {
 		DB:           s.boltdb,
 		Registrar:    s.registrar,
 		HTTPDService: s.HTTPDService,
-		logger:       s.logger,
+		//logger:       s.logger,
+		diagnostic: s.diagnostic,
 	}
 
 	if err := s.apiServer.Open(); err != nil {
