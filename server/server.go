@@ -4,7 +4,6 @@ package server
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -725,8 +724,8 @@ func (s *Server) appendUDPServices() {
 func (s *Server) appendStatsService() {
 	c := s.config.Stats
 	if c.Enabled {
-		l := s.LogService.NewLogger("[stats] ", log.LstdFlags)
-		srv := stats.NewService(c, l)
+		d := s.DiagnosticService.NewDiagnostic(nil, "service", "stats")
+		srv := stats.NewService(c, d)
 		srv.TaskMaster = s.TaskMaster
 
 		s.StatsService = srv
@@ -738,8 +737,8 @@ func (s *Server) appendStatsService() {
 func (s *Server) appendReportingService() {
 	c := s.config.Reporting
 	if c.Enabled {
-		l := s.LogService.NewLogger("[reporting] ", log.LstdFlags)
-		srv := reporting.NewService(c, vars.Info, l)
+		d := s.DiagnosticService.NewDiagnostic(nil, "service", "reporting")
+		srv := reporting.NewService(c, vars.Info, d)
 
 		s.AppendService("reporting", srv)
 	}
@@ -747,8 +746,8 @@ func (s *Server) appendReportingService() {
 
 func (s *Server) appendScraperService() {
 	c := s.config.Scraper
-	l := s.LogService.NewLogger("[scrapers] ", log.LstdFlags)
-	srv := scraper.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "scrapers")
+	srv := scraper.NewService(c, d)
 	srv.PointsWriter = s.TaskMaster
 	s.ScraperService = srv
 	s.SetDynamicService("scraper", srv)
@@ -757,88 +756,88 @@ func (s *Server) appendScraperService() {
 
 func (s *Server) appendAzureService() {
 	c := s.config.Azure
-	l := s.LogService.NewLogger("[azure] ", log.LstdFlags)
-	srv := azure.NewService(c, s.ScraperService, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "azure")
+	srv := azure.NewService(c, s.ScraperService, d)
 	s.SetDynamicService("azure", srv)
 	s.AppendService("azure", srv)
 }
 
 func (s *Server) appendConsulService() {
 	c := s.config.Consul
-	l := s.LogService.NewLogger("[consul] ", log.LstdFlags)
-	srv := consul.NewService(c, s.ScraperService, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "consul")
+	srv := consul.NewService(c, s.ScraperService, d)
 	s.SetDynamicService("consul", srv)
 	s.AppendService("consul", srv)
 }
 
 func (s *Server) appendDNSService() {
 	c := s.config.DNS
-	l := s.LogService.NewLogger("[dns] ", log.LstdFlags)
-	srv := dns.NewService(c, s.ScraperService, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "dns")
+	srv := dns.NewService(c, s.ScraperService, d)
 	s.SetDynamicService("dns", srv)
 	s.AppendService("dns", srv)
 }
 
 func (s *Server) appendEC2Service() {
 	c := s.config.EC2
-	l := s.LogService.NewLogger("[ec2] ", log.LstdFlags)
-	srv := ec2.NewService(c, s.ScraperService, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "ec2")
+	srv := ec2.NewService(c, s.ScraperService, d)
 	s.SetDynamicService("ec2", srv)
 	s.AppendService("ec2", srv)
 }
 
 func (s *Server) appendFileService() {
 	c := s.config.FileDiscovery
-	l := s.LogService.NewLogger("[file-discovery] ", log.LstdFlags)
-	srv := file_discovery.NewService(c, s.ScraperService, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "file-discovery")
+	srv := file_discovery.NewService(c, s.ScraperService, d)
 	s.SetDynamicService("file-discovery", srv)
 	s.AppendService("file-discovery", srv)
 }
 
 func (s *Server) appendGCEService() {
 	c := s.config.GCE
-	l := s.LogService.NewLogger("[gce] ", log.LstdFlags)
-	srv := gce.NewService(c, s.ScraperService, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "gce")
+	srv := gce.NewService(c, s.ScraperService, d)
 	s.SetDynamicService("gce", srv)
 	s.AppendService("gce", srv)
 }
 
 func (s *Server) appendMarathonService() {
 	c := s.config.Marathon
-	l := s.LogService.NewLogger("[marathon] ", log.LstdFlags)
-	srv := marathon.NewService(c, s.ScraperService, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "marathon")
+	srv := marathon.NewService(c, s.ScraperService, d)
 	s.SetDynamicService("marathon", srv)
 	s.AppendService("marathon", srv)
 }
 
 func (s *Server) appendNerveService() {
 	c := s.config.Nerve
-	l := s.LogService.NewLogger("[nerve] ", log.LstdFlags)
-	srv := nerve.NewService(c, s.ScraperService, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "nerve")
+	srv := nerve.NewService(c, s.ScraperService, d)
 	s.SetDynamicService("nerve", srv)
 	s.AppendService("nerve", srv)
 }
 
 func (s *Server) appendServersetService() {
 	c := s.config.Serverset
-	l := s.LogService.NewLogger("[serverset] ", log.LstdFlags)
-	srv := serverset.NewService(c, s.ScraperService, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "serverset")
+	srv := serverset.NewService(c, s.ScraperService, d)
 	s.SetDynamicService("serverset", srv)
 	s.AppendService("serverset", srv)
 }
 
 func (s *Server) appendStaticService() {
 	c := s.config.StaticDiscovery
-	l := s.LogService.NewLogger("[static-discovery] ", log.LstdFlags)
-	srv := static_discovery.NewService(c, s.ScraperService, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "static-discovery")
+	srv := static_discovery.NewService(c, s.ScraperService, d)
 	s.SetDynamicService("static-discovery", srv)
 	s.AppendService("static-discovery", srv)
 }
 
 func (s *Server) appendTritonService() {
 	c := s.config.Triton
-	l := s.LogService.NewLogger("[triton] ", log.LstdFlags)
-	srv := triton.NewService(c, s.ScraperService, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "triton")
+	srv := triton.NewService(c, s.ScraperService, d)
 	s.SetDynamicService("triton", srv)
 	s.AppendService("triton", srv)
 }

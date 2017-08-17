@@ -2,12 +2,12 @@
 package reporting
 
 import (
-	"log"
 	"runtime"
 	"sync"
 	"time"
 
 	"github.com/influxdata/kapacitor/server/vars"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	client "github.com/influxdata/usage-client/v1"
 )
 
@@ -24,17 +24,17 @@ type Service struct {
 	statsTicker *time.Ticker
 	usageTicker *time.Ticker
 	closing     chan struct{}
-	logger      *log.Logger
+	diagnostic  diagnostic.Diagnostic
 	wg          sync.WaitGroup
 }
 
-func NewService(c Config, info vars.Infoer, l *log.Logger) *Service {
+func NewService(c Config, info vars.Infoer, d diagnostic.Diagnostic) *Service {
 	client := client.New("")
 	client.URL = c.URL
 	return &Service{
-		client: client,
-		info:   info,
-		logger: l,
+		client:     client,
+		info:       info,
+		diagnostic: d,
 	}
 }
 
@@ -55,7 +55,11 @@ func (s *Service) Open() error {
 		defer s.wg.Done()
 		err := s.sendUsageReport()
 		if err != nil {
-			s.logger.Println("E! error while sending usage report on startup:", err)
+			s.diagnostic.Diag(
+				"level", "error",
+				"msg", "error while sending usage report on startup",
+				"error", err,
+			)
 		}
 	}()
 
@@ -91,7 +95,11 @@ func (s *Service) usage() {
 		case <-s.usageTicker.C:
 			err := s.sendUsageReport()
 			if err != nil {
-				s.logger.Println("E! error while sending usage report:", err)
+				s.diagnostic.Diag(
+					"level", "error",
+					"msg", "error while sending usage report",
+					"error", err,
+				)
 			}
 		}
 	}
