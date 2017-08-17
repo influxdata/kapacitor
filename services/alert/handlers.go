@@ -67,7 +67,6 @@ func (h *logHandler) Handle(event alert.Event) {
 
 	f, err := os.OpenFile(h.logpath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, h.mode)
 	if err != nil {
-		//h.logger.Printf("E! failed to open file %s for alert logging: %v", h.logpath, err)
 		h.diagnostic.Diag(
 			"level", "error",
 			"msg", "failed to ope file for alert logging",
@@ -80,7 +79,6 @@ func (h *logHandler) Handle(event alert.Event) {
 
 	err = json.NewEncoder(f).Encode(ad)
 	if err != nil {
-		//h.logger.Printf("E! failed to marshal alert data json: %v", err)
 		h.diagnostic.Diag(
 			"level", "error",
 			"msg", "failed to marshal alert data json",
@@ -122,7 +120,6 @@ func (h *execHandler) Handle(event alert.Event) {
 
 	err := json.NewEncoder(buf).Encode(ad)
 	if err != nil {
-		//h.logger.Printf("E! failed to marshal alert data json: %v", err)
 		h.diagnostic.Diag(
 			"level", "error",
 			"msg", "failed to marshal alert data json",
@@ -138,7 +135,6 @@ func (h *execHandler) Handle(event alert.Event) {
 	cmd.Stderr(&out)
 	err = cmd.Start()
 	if err != nil {
-		//h.logger.Printf("E! exec command failed: Output: %s: %v", out.String(), err)
 		h.diagnostic.Diag(
 			"level", "error",
 			"msg", "exec command failed",
@@ -149,7 +145,6 @@ func (h *execHandler) Handle(event alert.Event) {
 	}
 	err = cmd.Wait()
 	if err != nil {
-		//h.logger.Printf("E! exec command failed: Output: %s: %v", out.String(), err)
 		h.diagnostic.Diag(
 			"level", "error",
 			"msg", "exec command failed",
@@ -185,7 +180,6 @@ func (h *tcpHandler) Handle(event alert.Event) {
 
 	err := json.NewEncoder(buf).Encode(ad)
 	if err != nil {
-		//h.logger.Printf("E! failed to marshal alert data json: %v", err)
 		h.diagnostic.Diag(
 			"level", "error",
 			"msg", "failed to marshal alert data to json",
@@ -196,7 +190,6 @@ func (h *tcpHandler) Handle(event alert.Event) {
 
 	conn, err := net.Dial("tcp", h.addr)
 	if err != nil {
-		//h.logger.Printf("E! tcp handler: failed to connect to %s: %v", h.addr, err)
 		h.diagnostic.Diag(
 			"level", "error",
 			"msg", "tcp handler failed to connect",
@@ -476,7 +469,6 @@ func newMatchHandler(match string, h alert.Handler, d diagnostic.Diagnostic) (*m
 
 func (h *matchHandler) Handle(event alert.Event) {
 	if ok, err := h.match(event); err != nil {
-		//h.logger.Println("E! failed to evaluate match expression:", err)
 		h.diagnostic.Diag(
 			"level", "error",
 			"msg", "failed to evaluate match expression",

@@ -136,7 +136,6 @@ func (s *Service) runMailer() {
 			// Close old connection
 			if conn != nil {
 				if err := conn.Close(); err != nil {
-					//s.logger.Println("E! error closing connection to old SMTP server:", err)
 					s.diagnostic.Diag(
 						"level", "error",
 						"msg", "error closing old connection to SMTP server",
@@ -154,7 +153,6 @@ func (s *Service) runMailer() {
 			}
 			if !open {
 				if conn, err = d.Dial(); err != nil {
-					//s.logger.Println("E! error connecting to SMTP server", err)
 					s.diagnostic.Diag(
 						"level", "error",
 						"msg", "error connecting to SMTP server",
@@ -165,7 +163,6 @@ func (s *Service) runMailer() {
 				open = true
 			}
 			if err := gomail.Send(conn, m); err != nil {
-				//s.logger.Println("E!", err)
 				s.diagnostic.Diag(
 					"level", "error",
 					"error", err,
@@ -176,7 +173,6 @@ func (s *Service) runMailer() {
 		case <-timer.C:
 			if open {
 				if err := conn.Close(); err != nil {
-					//s.logger.Println("E! error closing connection to SMTP server:", err)
 					s.diagnostic.Diag(
 						"level", "error",
 						"msg", "error closing connection to SMTP server",
@@ -270,7 +266,6 @@ func (h *handler) Handle(event alert.Event) {
 		event.State.Message,
 		event.State.Details,
 	); err != nil {
-		//h.logger.Println("E! failed to send email", err)
 		h.diagnostic.Diag(
 			"level", "error",
 			"msg", "failed to send email",
