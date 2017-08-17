@@ -429,8 +429,8 @@ func (s *Server) appendTaskStoreService() {
 }
 
 func (s *Server) appendReplayService() {
-	l := s.LogService.NewLogger("[replay] ", log.LstdFlags)
-	srv := replay.NewService(s.config.Replay, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "replay")
+	srv := replay.NewService(s.config.Replay, d)
 	srv.StorageService = s.StorageService
 	srv.TaskStore = s.TaskStore
 	srv.HTTPDService = s.HTTPDService
@@ -444,8 +444,8 @@ func (s *Server) appendReplayService() {
 
 func (s *Server) appendK8sService() error {
 	c := s.config.Kubernetes
-	l := s.LogService.NewLogger("[kubernetes] ", log.LstdFlags)
-	srv, err := k8s.NewService(c, s.ScraperService, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "kubernetes")
+	srv, err := k8s.NewService(c, s.ScraperService, d)
 	if err != nil {
 		return err
 	}
@@ -457,8 +457,8 @@ func (s *Server) appendK8sService() error {
 }
 func (s *Server) appendSwarmService() error {
 	c := s.config.Swarm
-	l := s.LogService.NewLogger("[swarm] ", log.LstdFlags)
-	srv, err := swarm.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "swarm")
+	srv, err := swarm.NewService(c, d)
 	if err != nil {
 		return err
 	}

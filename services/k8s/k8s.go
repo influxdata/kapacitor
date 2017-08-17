@@ -1,9 +1,9 @@
 package k8s
 
 import (
-	"log"
 	"sync/atomic"
 
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/k8s/client"
 	"github.com/pkg/errors"
 )
@@ -11,10 +11,10 @@ import (
 type Cluster struct {
 	configValue atomic.Value // Config
 	client      client.Client
-	logger      *log.Logger
+	diagnostic  diagnostic.Diagnostic
 }
 
-func NewCluster(c Config, l *log.Logger) (*Cluster, error) {
+func NewCluster(c Config, d diagnostic.Diagnostic) (*Cluster, error) {
 	clientConfig, err := c.ClientConfig()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create k8s client config")
@@ -25,8 +25,8 @@ func NewCluster(c Config, l *log.Logger) (*Cluster, error) {
 	}
 
 	s := &Cluster{
-		client: cli,
-		logger: l,
+		client:     cli,
+		diagnostic: d,
 	}
 	s.configValue.Store(c)
 	return s, nil

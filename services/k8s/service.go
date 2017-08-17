@@ -2,27 +2,27 @@ package k8s
 
 import (
 	"fmt"
-	"log"
 	"sync"
 
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/k8s/client"
 	"github.com/influxdata/kapacitor/services/scraper"
 )
 
 // Service is the kubernetes discovery and autoscale service
 type Service struct {
-	mu       sync.Mutex
-	configs  []Config
-	clusters map[string]*Cluster
-	registry scraper.Registry
-	logger   *log.Logger
+	mu         sync.Mutex
+	configs    []Config
+	clusters   map[string]*Cluster
+	registry   scraper.Registry
+	diagnostic diagnostic.Diagnostic
 }
 
 // NewService creates a new unopened k8s service
-func NewService(c []Config, r scraper.Registry, l *log.Logger) (*Service, error) {
+func NewService(c []Config, r scraper.Registry, d diagnostic.Diagnostic) (*Service, error) {
 	clusters := make(map[string]*Cluster, len(c))
 	for i := range c {
-		cluster, err := NewCluster(c[i], l)
+		cluster, err := NewCluster(c[i], d)
 		if err != nil {
 			return nil, err
 		}
@@ -30,10 +30,10 @@ func NewService(c []Config, r scraper.Registry, l *log.Logger) (*Service, error)
 	}
 
 	return &Service{
-		clusters: clusters,
-		configs:  c,
-		logger:   l,
-		registry: r,
+		clusters:   clusters,
+		configs:    c,
+		diagnostic: d,
+		registry:   r,
 	}, nil
 }
 
@@ -90,7 +90,7 @@ func (s *Service) Update(newConfigs []interface{}) error {
 		cluster, ok := s.clusters[c.ID]
 		if !ok {
 			var err error
-			cluster, err = NewCluster(c, s.logger)
+			cluster, err = NewCluster(c, s.diagnostic)
 			if err != nil {
 				return err
 			}
