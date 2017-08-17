@@ -4,12 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"sync"
 	"time"
 
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/udf/agent"
 )
 
@@ -75,8 +75,8 @@ type Server struct {
 	// Group for waiting on read/write goroutines
 	ioGroup sync.WaitGroup
 
-	mu     sync.Mutex
-	logger *log.Logger
+	mu         sync.Mutex
+	diagnostic diagnostic.Diagnostic
 
 	responseBuf []byte
 
@@ -94,7 +94,7 @@ func NewServer(
 	taskID, nodeID string,
 	in agent.ByteReadReader,
 	out io.WriteCloser,
-	l *log.Logger,
+	d diagnostic.Diagnostic,
 	timeout time.Duration,
 	abortCallback func(),
 	killCallback func(),
@@ -104,7 +104,7 @@ func NewServer(
 		nodeID:           nodeID,
 		in:               in,
 		out:              out,
-		logger:           l,
+		diagnostic:       d,
 		requests:         make(chan *agent.Request),
 		keepalive:        make(chan int64, 1),
 		keepaliveTimeout: timeout,
@@ -347,7 +347,11 @@ func (s *Server) doResponse(response *agent.Response, respC chan *agent.Response
 	select {
 	case respC <- response:
 	default:
-		s.logger.Printf("E! received %T without requesting it", response.Message)
+		s.diagnostic.Diag(
+			"level", "error",
+			"msg", "received message without requesting it",
+			"type", fmt.Sprintf("%T", response.Message),
+		)
 	}
 }
 
@@ -398,7 +402,10 @@ func (s *Server) watchKeepalive() {
 				default:
 					// We failed to abort just kill it.
 					if s.killCallback != nil {
-						s.logger.Println("E! process not responding! killing")
+						s.diagnostic.Diag(
+							"level", "error",
+							"msg", "process not responding! killing",
+						)
 						s.killCallback()
 					}
 				}
@@ -425,7 +432,10 @@ func (s *Server) watchKeepalive() {
 				break
 			}
 			err = fmt.Errorf("keepalive timedout, last keepalive received was: %s", time.Unix(0, last))
-			s.logger.Println("E!", err)
+			s.diagnostic.Diag(
+				"level", "error",
+				"error", err,
+			)
 			return
 		case <-s.stopping:
 			return
@@ -676,7 +686,10 @@ func (s *Server) handleResponse(response *agent.Response) error {
 	case *agent.Response_Restore:
 		s.doResponse(response, s.restoreResponse)
 	case *agent.Response_Error:
-		s.logger.Println("E!", msg.Error.Error)
+		s.diagnostic.Diag(
+			"level", "error",
+			"error", msg.Error.Error,
+		)
 		return errors.New(msg.Error.Error)
 	case *agent.Response_Begin:
 		s.begin = msg.Begin

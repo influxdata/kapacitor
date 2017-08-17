@@ -13,6 +13,7 @@ import (
 	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/notary"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/udf/agent"
@@ -43,7 +44,7 @@ func newUDFNode(et *ExecutingTask, n *pipeline.UDFNode, l *log.Logger, nt Notary
 		n.UDFName,
 		et.Task.ID,
 		n.Name(),
-		l,
+		nt, // TODO: fix. use real diagnostic
 		un.abortedCallback,
 	)
 	if err != nil {
@@ -162,7 +163,7 @@ type UDFProcess struct {
 
 	mu sync.Mutex
 
-	logger        *log.Logger
+	diagnostic    diagnostic.Diagnostic
 	timeout       time.Duration
 	abortCallback func()
 }
@@ -171,7 +172,7 @@ func NewUDFProcess(
 	taskName, nodeName string,
 	commander command.Commander,
 	cmdSpec command.Spec,
-	l *log.Logger,
+	d diagnostic.Diagnostic,
 	timeout time.Duration,
 	abortCallback func(),
 ) *UDFProcess {
@@ -180,7 +181,7 @@ func NewUDFProcess(
 		nodeName:      nodeName,
 		commander:     commander,
 		cmdSpec:       cmdSpec,
-		logger:        l,
+		diagnostic:    d,
 		timeout:       timeout,
 		abortCallback: abortCallback,
 	}
@@ -221,7 +222,7 @@ func (p *UDFProcess) Open() error {
 		p.nodeName,
 		outBuf,
 		stdin,
-		p.logger,
+		p.diagnostic,
 		p.timeout,
 		p.abortCallback,
 		cmd.Kill,
@@ -267,7 +268,10 @@ func (p *UDFProcess) logStdErr() {
 	defer p.logStdErrGroup.Done()
 	scanner := bufio.NewScanner(p.stderr)
 	for scanner.Scan() {
-		p.logger.Println("I!P", scanner.Text())
+		p.diagnostic.Diag(
+			"level", "info",
+			"P", scanner.Text(), // TODO: ???
+		)
 	}
 }
 
@@ -286,7 +290,7 @@ type UDFSocket struct {
 	server *udf.Server
 	socket Socket
 
-	logger        *log.Logger
+	diagnostic    diagnostic.Diagnostic
 	timeout       time.Duration
 	abortCallback func()
 }
@@ -301,7 +305,7 @@ type Socket interface {
 func NewUDFSocket(
 	taskName, nodeName string,
 	socket Socket,
-	l *log.Logger,
+	d diagnostic.Diagnostic,
 	timeout time.Duration,
 	abortCallback func(),
 ) *UDFSocket {
@@ -309,7 +313,7 @@ func NewUDFSocket(
 		taskName:      taskName,
 		nodeName:      nodeName,
 		socket:        socket,
-		logger:        l,
+		diagnostic:    d,
 		timeout:       timeout,
 		abortCallback: abortCallback,
 	}
@@ -329,7 +333,7 @@ func (s *UDFSocket) Open() error {
 		s.nodeName,
 		outBuf,
 		in,
-		s.logger,
+		s.diagnostic,
 		s.timeout,
 		s.abortCallback,
 		func() { s.socket.Close() },

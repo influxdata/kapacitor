@@ -470,16 +470,16 @@ func (s *Server) appendSwarmService() error {
 }
 
 func (s *Server) appendDeadmanService() {
-	l := s.LogService.NewLogger("[deadman] ", log.LstdFlags)
-	srv := deadman.NewService(s.config.Deadman, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "deadman")
+	srv := deadman.NewService(s.config.Deadman, d)
 
 	s.TaskMaster.DeadmanService = srv
 	s.AppendService("deadman", srv)
 }
 
 func (s *Server) appendUDFService() {
-	l := s.LogService.NewLogger("[udf] ", log.LstdFlags)
-	srv := udf.NewService(s.config.UDF, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "udf")
+	srv := udf.NewService(s.config.UDF, d)
 
 	s.TaskMaster.UDFService = srv
 	s.AppendService("udf", srv)
