@@ -135,7 +135,6 @@ type Server struct {
 	MemProfile string
 
 	LogService logging.Interface
-	Logger     *log.Logger
 
 	DiagnosticService diagnostic.Service
 
@@ -153,7 +152,6 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface, diagnosti
 	if err != nil {
 		return nil, fmt.Errorf("%s. To generate a valid configuration file run `kapacitord config > kapacitor.generated.conf`.", err)
 	}
-	l := logService.NewLogger("[srv] ", log.LstdFlags)
 	d := diagnosticService.NewDiagnostic(nil, "service", "srv")
 	s := &Server{
 		config:            c,
@@ -166,14 +164,12 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface, diagnosti
 		DiagnosticService: diagnosticService,
 		MetaClient:        &kapacitor.NoopMetaClient{},
 		QueryExecutor:     &Queryexecutor{},
-		Logger:            l,
 		Diagnostic:        d,
 		ServicesByName:    make(map[string]int),
 		DynamicServices:   make(map[string]Updater),
 		Commander:         c.Commander,
 		clusterIDChanged:  waiter.NewGroup(),
 	}
-	//s.Logger.Println("I! Kapacitor hostname:", s.hostname)
 	s.Diagnostic.Diag(
 		"level", "info",
 		"msg", "listing hostname", // TODO: do we need this message?
@@ -192,7 +188,6 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface, diagnosti
 	vars.HostVar.Set(s.hostname)
 	vars.ProductVar.Set(vars.Product)
 	vars.VersionVar.Set(s.BuildInfo.Version)
-	//s.Logger.Printf("I! ClusterID: %s ServerID: %s", s.ClusterID, s.ServerID)
 	s.Diagnostic.Diag(
 		"level", "info",
 		"ClusterID", s.ClusterID,
@@ -320,7 +315,6 @@ func (s *Server) SetDynamicService(name string, srv dynamicService) {
 }
 
 func (s *Server) appendStorageService() {
-	//l := s.LogService.NewLogger("[storage] ", log.LstdFlags)
 	d := s.DiagnosticService.NewDiagnostic(nil, "service", "storage")
 	srv := storage.NewService(s.config.Storage, d)
 
@@ -357,8 +351,8 @@ func (s *Server) appendAlertService() {
 }
 
 func (s *Server) appendTesterService() {
-	l := s.LogService.NewLogger("[service-tests] ", log.LstdFlags)
-	srv := servicetest.NewService(servicetest.NewConfig(), l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "service-tests")
+	srv := servicetest.NewService(servicetest.NewConfig(), d)
 	srv.HTTPDService = s.HTTPDService
 
 	s.TesterService = srv
@@ -367,7 +361,6 @@ func (s *Server) appendTesterService() {
 
 func (s *Server) appendSMTPService() {
 	c := s.config.SMTP
-	//l := s.LogService.NewLogger("[smtp] ", log.LstdFlags)
 	d := s.DiagnosticService.NewDiagnostic(nil, "service", "smtp")
 	srv := smtp.NewService(c, d)
 
@@ -380,12 +373,12 @@ func (s *Server) appendSMTPService() {
 
 func (s *Server) appendInfluxDBService() error {
 	c := s.config.InfluxDB
-	l := s.LogService.NewLogger("[influxdb] ", log.LstdFlags)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "influxdb")
 	httpPort, err := s.config.HTTP.Port()
 	if err != nil {
 		return errors.Wrap(err, "failed to get http port")
 	}
-	srv, err := influxdb.NewService(c, httpPort, s.config.Hostname, vars.Info, s.config.HTTP.AuthEnabled, l)
+	srv, err := influxdb.NewService(c, httpPort, s.config.Hostname, vars.Info, s.config.HTTP.AuthEnabled, d)
 	if err != nil {
 		return err
 	}
@@ -875,7 +868,6 @@ func (s *Server) Open() error {
 
 func (s *Server) startServices() error {
 	for _, service := range s.Services {
-		//s.Logger.Printf("D! opening service: %T", service)
 		s.Diagnostic.Diag(
 			"level", "debug",
 			"msg", "opening service",
@@ -884,7 +876,6 @@ func (s *Server) startServices() error {
 		if err := service.Open(); err != nil {
 			return fmt.Errorf("open service %T: %s", service, err)
 		}
-		//s.Logger.Printf("D! opened service: %T", service)
 		s.Diagnostic.Diag(
 			"level", "debug",
 			"msg", "opened service",
@@ -894,7 +885,6 @@ func (s *Server) startServices() error {
 		// Apply config overrides after the config override service has been opened and before any dynamic services.
 		if service == s.ConfigOverrideService && !s.config.SkipConfigOverrides && s.config.ConfigOverride.Enabled {
 			// Apply initial config updates
-			//s.Logger.Println("D! applying configuration overrides")
 			s.Diagnostic.Diag(
 				"level", "debug",
 				"msg", "applying configuration overrides",
@@ -907,7 +897,6 @@ func (s *Server) startServices() error {
 				if srv, ok := s.DynamicServices[service]; !ok {
 					return fmt.Errorf("found configuration override for unknown service %q", service)
 				} else {
-					//s.Logger.Println("D! applying configuration overrides for", service)
 					s.Diagnostic.Diag(
 						"level", "debug",
 						"msg", "applying configuration overrides for service",
@@ -949,7 +938,6 @@ func (s *Server) Close() error {
 
 	// Close all services that write points first.
 	if err := s.HTTPDService.Close(); err != nil {
-		//s.Logger.Printf("E! error closing httpd service: %v", err)
 		s.Diagnostic.Diag(
 			"level", "error",
 			"msg", "error closing service",
@@ -959,7 +947,6 @@ func (s *Server) Close() error {
 	}
 	if s.StatsService != nil {
 		if err := s.StatsService.Close(); err != nil {
-			//s.Logger.Printf("E! error closing stats service: %v", err)
 			s.Diagnostic.Diag(
 				"level", "error",
 				"msg", "error closing service",
@@ -976,7 +963,6 @@ func (s *Server) Close() error {
 	// Close services now that all tasks are stopped.
 	for i := len(s.Services) - 1; i >= 0; i-- {
 		service := s.Services[i]
-		//s.Logger.Printf("D! closing service: %T", service)
 		s.Diagnostic.Diag(
 			"level", "debug",
 			"msg", "closing service",
@@ -984,7 +970,6 @@ func (s *Server) Close() error {
 		)
 		err := service.Close()
 		if err != nil {
-			//s.Logger.Printf("E! error closing service %T: %v", service, err)
 			s.Diagnostic.Diag(
 				"level", "error",
 				"msg", "error closing service",
@@ -992,7 +977,6 @@ func (s *Server) Close() error {
 				"error", err,
 			)
 		}
-		//s.Logger.Printf("D! closed service: %T", service)
 		s.Diagnostic.Diag(
 			"level", "debug",
 			"msg", "closed service",
@@ -1122,7 +1106,6 @@ func (s *Server) startProfile(cpuprofile, memprofile string) error {
 			)
 			return fmt.Errorf("E! cpuprofile: %v", err) // Do something about this?
 		}
-		//s.Logger.Printf("I! writing CPU profile to: %s\n", cpuprofile)
 		s.Diagnostic.Diag(
 			"level", "info",
 			"msg", "writing CPU profile",
@@ -1150,7 +1133,6 @@ func (s *Server) startProfile(cpuprofile, memprofile string) error {
 			)
 			return fmt.Errorf("E! memprofile: %v", err)
 		}
-		//s.Logger.Printf("I! writing mem profile to: %s\n", memprofile)
 		s.Diagnostic.Diag(
 			"level", "info",
 			"msg", "writing mem profile",
@@ -1167,7 +1149,6 @@ func (s *Server) stopProfile() {
 	if prof.cpu != nil {
 		pprof.StopCPUProfile()
 		prof.cpu.Close()
-		//s.Logger.Println("I! CPU profile stopped")
 		s.Diagnostic.Diag(
 			"level", "info",
 			"msg", "CPU profile stopped",
@@ -1175,7 +1156,6 @@ func (s *Server) stopProfile() {
 	}
 	if prof.mem != nil {
 		if err := pprof.Lookup("heap").WriteTo(prof.mem, 0); err != nil {
-			//s.Logger.Printf("I! failed to write mem profile: %v\n", err)
 			s.Diagnostic.Diag(
 				"level", "info",
 				"msg", "failed to write mem profile",
@@ -1183,7 +1163,6 @@ func (s *Server) stopProfile() {
 			)
 		}
 		prof.mem.Close()
-		//s.Logger.Println("I! mem profile stopped")
 		s.Diagnostic.Diag(
 			"level", "info",
 			"msg", "mem profile stopped",
