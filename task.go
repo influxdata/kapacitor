@@ -11,6 +11,7 @@ import (
 
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/notary"
 )
 
@@ -162,15 +163,11 @@ func (et *ExecutingTask) link() error {
 
 	// Walk Pipeline and create equivalent executing nodes
 	err := et.Task.Pipeline.Walk(func(n pipeline.Node) error {
-		l := et.tm.LogService.NewLogger(
-			fmt.Sprintf("[%s:%s] ", et.Task.ID, n.Name()),
-			log.LstdFlags,
-		)
-		nt := notary.New(
+		d := et.tm.DiagnosticService.NewDiagnostic(nil,
 			"task-id", et.Task.ID,
 			"node-name", n.Name(),
 		)
-		en, err := et.createNode(n, l, nt)
+		en, err := et.createNode(n, d)
 		if err != nil {
 			return err
 		}
@@ -449,70 +446,70 @@ func (et *ExecutingTask) calcThroughput() {
 }
 
 // Create a  node from a given pipeline node.
-func (et *ExecutingTask) createNode(p pipeline.Node, l *log.Logger, nt Notary) (n Node, err error) {
+func (et *ExecutingTask) createNode(p pipeline.Node, d diagnostic.Diagnostic) (n Node, err error) {
 	switch t := p.(type) {
 	case *pipeline.FromNode:
-		n, err = newFromNode(et, t, l, nt)
+		n, err = newFromNode(et, t, d)
 	case *pipeline.StreamNode:
-		n, err = newStreamNode(et, t, l, nt)
+		n, err = newStreamNode(et, t, d)
 	case *pipeline.BatchNode:
-		n, err = newBatchNode(et, t, l, nt)
+		n, err = newBatchNode(et, t, d)
 	case *pipeline.QueryNode:
-		n, err = newQueryNode(et, t, l, nt)
+		n, err = newQueryNode(et, t, d)
 	case *pipeline.WindowNode:
-		n, err = newWindowNode(et, t, l, nt)
+		n, err = newWindowNode(et, t, d)
 	case *pipeline.HTTPOutNode:
-		n, err = newHTTPOutNode(et, t, l, nt)
+		n, err = newHTTPOutNode(et, t, d)
 	case *pipeline.HTTPPostNode:
-		n, err = newHTTPPostNode(et, t, l, nt)
+		n, err = newHTTPPostNode(et, t, d)
 	case *pipeline.InfluxDBOutNode:
-		n, err = newInfluxDBOutNode(et, t, l, nt)
+		n, err = newInfluxDBOutNode(et, t, d)
 	case *pipeline.KapacitorLoopbackNode:
-		n, err = newKapacitorLoopbackNode(et, t, l, nt)
+		n, err = newKapacitorLoopbackNode(et, t, d)
 	case *pipeline.AlertNode:
-		n, err = newAlertNode(et, t, l, nt)
+		n, err = newAlertNode(et, t, d)
 	case *pipeline.GroupByNode:
-		n, err = newGroupByNode(et, t, l, nt)
+		n, err = newGroupByNode(et, t, d)
 	case *pipeline.UnionNode:
-		n, err = newUnionNode(et, t, l, nt)
+		n, err = newUnionNode(et, t, d)
 	case *pipeline.JoinNode:
-		n, err = newJoinNode(et, t, l, nt)
+		n, err = newJoinNode(et, t, d)
 	case *pipeline.FlattenNode:
-		n, err = newFlattenNode(et, t, l, nt)
+		n, err = newFlattenNode(et, t, d)
 	case *pipeline.EvalNode:
-		n, err = newEvalNode(et, t, l, nt)
+		n, err = newEvalNode(et, t, d)
 	case *pipeline.WhereNode:
-		n, err = newWhereNode(et, t, l, nt)
+		n, err = newWhereNode(et, t, d)
 	case *pipeline.SampleNode:
-		n, err = newSampleNode(et, t, l, nt)
+		n, err = newSampleNode(et, t, d)
 	case *pipeline.DerivativeNode:
-		n, err = newDerivativeNode(et, t, l, nt)
+		n, err = newDerivativeNode(et, t, d)
 	case *pipeline.UDFNode:
-		n, err = newUDFNode(et, t, l, nt)
+		n, err = newUDFNode(et, t, d)
 	case *pipeline.StatsNode:
-		n, err = newStatsNode(et, t, l, nt)
+		n, err = newStatsNode(et, t, d)
 	case *pipeline.ShiftNode:
-		n, err = newShiftNode(et, t, l, nt)
+		n, err = newShiftNode(et, t, d)
 	case *pipeline.NoOpNode:
-		n, err = newNoOpNode(et, t, l, nt)
+		n, err = newNoOpNode(et, t, d)
 	case *pipeline.InfluxQLNode:
-		n, err = newInfluxQLNode(et, t, l, nt)
+		n, err = newInfluxQLNode(et, t, d)
 	case *pipeline.LogNode:
-		n, err = newLogNode(et, t, l, nt)
+		n, err = newLogNode(et, t, d)
 	case *pipeline.DefaultNode:
-		n, err = newDefaultNode(et, t, l, nt)
+		n, err = newDefaultNode(et, t, d)
 	case *pipeline.DeleteNode:
-		n, err = newDeleteNode(et, t, l, nt)
+		n, err = newDeleteNode(et, t, d)
 	case *pipeline.CombineNode:
-		n, err = newCombineNode(et, t, l, nt)
+		n, err = newCombineNode(et, t, d)
 	case *pipeline.K8sAutoscaleNode:
-		n, err = newK8sAutoscaleNode(et, t, l, nt)
+		n, err = newK8sAutoscaleNode(et, t, d)
 	case *pipeline.SwarmAutoscaleNode:
-		n, err = newSwarmAutoscaleNode(et, t, l, nt)
+		n, err = newSwarmAutoscaleNode(et, t, d)
 	case *pipeline.StateDurationNode:
-		n, err = newStateDurationNode(et, t, l, nt)
+		n, err = newStateDurationNode(et, t, d)
 	case *pipeline.StateCountNode:
-		n, err = newStateCountNode(et, t, l, nt)
+		n, err = newStateCountNode(et, t, d)
 	default:
 		return nil, fmt.Errorf("unknown pipeline node type %T", p)
 	}

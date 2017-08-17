@@ -45,7 +45,8 @@ const (
 	MainTaskMaster     = "main"
 )
 
-type Diagnostic diagnostic.Diagnostic
+//type Diagnostic diagnostic.Diagnostic
+type DiagnosticService diagnostic.Service
 
 type LogService interface {
 	NewLogger(prefix string, flag int) *log.Logger
@@ -157,6 +158,7 @@ type TaskMaster struct {
 		Client(string) (swarm.Client, error)
 	}
 	LogService LogService
+	DiagnosticService
 
 	Commander command.Commander
 

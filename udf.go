@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"sync"
 	"time"
@@ -14,7 +13,6 @@ import (
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/services/diagnostic"
-	"github.com/influxdata/kapacitor/services/notary"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/udf/agent"
 	"github.com/pkg/errors"
@@ -33,9 +31,9 @@ type UDFNode struct {
 }
 
 // Create a new UDFNode that sends incoming data to child udf
-func newUDFNode(et *ExecutingTask, n *pipeline.UDFNode, l *log.Logger, nt Notary) (*UDFNode, error) {
+func newUDFNode(et *ExecutingTask, n *pipeline.UDFNode, d diagnostic.Diagnostic) (*UDFNode, error) {
 	un := &UDFNode{
-		node:    node{Node: n, et: et, logger: l, notary: notary.WithPrefix(nt, "node", "udf")},
+		node:    node{Node: n, et: et, diagnostic: d},
 		u:       n,
 		aborted: make(chan struct{}),
 	}
@@ -44,7 +42,7 @@ func newUDFNode(et *ExecutingTask, n *pipeline.UDFNode, l *log.Logger, nt Notary
 		n.UDFName,
 		et.Task.ID,
 		n.Name(),
-		nt, // TODO: fix. use real diagnostic
+		d,
 		un.abortedCallback,
 	)
 	if err != nil {

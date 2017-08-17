@@ -2,13 +2,12 @@ package kapacitor
 
 import (
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
-	"github.com/influxdata/kapacitor/services/notary"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/tick/stateful"
 )
@@ -24,10 +23,10 @@ type CombineNode struct {
 }
 
 // Create a new CombineNode, which combines a stream with itself dynamically.
-func newCombineNode(et *ExecutingTask, n *pipeline.CombineNode, l *log.Logger, nt Notary) (*CombineNode, error) {
+func newCombineNode(et *ExecutingTask, n *pipeline.CombineNode, d diagnostic.Diagnostic) (*CombineNode, error) {
 	cn := &CombineNode{
 		c:           n,
-		node:        node{Node: n, et: et, logger: l, notary: notary.WithPrefix(nt, "node", "combine")},
+		node:        node{Node: n, et: et, diagnostic: d},
 		combination: combination{max: n.Max},
 	}
 
@@ -159,8 +158,8 @@ func (b *combineBuffer) combine() error {
 			matched, err := EvalPredicate(b.expressions[i], b.n.scopePools[i], p)
 			if err != nil {
 				b.n.incrementErrorCount()
-				b.n.logger.Println("E! evaluating lambda expression:", err)
-				b.n.notary.Error(
+				b.n.diagnostic.Diag(
+					"level", "error",
 					"msg", "error evaluating lambda expression",
 					"error", err,
 				)

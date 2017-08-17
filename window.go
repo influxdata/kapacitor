@@ -3,13 +3,12 @@ package kapacitor
 import (
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
-	"github.com/influxdata/kapacitor/services/notary"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 )
 
 type WindowNode struct {
@@ -17,15 +16,14 @@ type WindowNode struct {
 	w *pipeline.WindowNode
 }
 
-// TODO: add more notary things around here
 // Create a new  WindowNode, which windows data for a period of time and emits the window.
-func newWindowNode(et *ExecutingTask, n *pipeline.WindowNode, l *log.Logger, nt Notary) (*WindowNode, error) {
+func newWindowNode(et *ExecutingTask, n *pipeline.WindowNode, d diagnostic.Diagnostic) (*WindowNode, error) {
 	if n.Period == 0 && n.PeriodCount == 0 {
 		return nil, errors.New("window node must have either a non zero period or non zero period count")
 	}
 	wn := &WindowNode{
 		w:    n,
-		node: node{Node: n, et: et, logger: l, notary: notary.WithPrefix(nt, "node", "window")},
+		node: node{Node: n, et: et, diagnostic: d},
 	}
 	wn.node.runF = wn.runWindow
 	return wn, nil
@@ -63,7 +61,7 @@ func (n *WindowNode) newWindow(group edge.GroupInfo, first edge.PointMeta) (edge
 			n.w.Every,
 			n.w.AlignFlag,
 			n.w.FillPeriodFlag,
-			n.logger,
+			n.diagnostic,
 		), nil
 	case n.w.PeriodCount != 0:
 		return newWindowByCount(
@@ -72,7 +70,7 @@ func (n *WindowNode) newWindow(group edge.GroupInfo, first edge.PointMeta) (edge
 			int(n.w.PeriodCount),
 			int(n.w.EveryCount),
 			n.w.FillPeriodFlag,
-			n.logger,
+			n.diagnostic,
 		), nil
 	default:
 		return nil, errors.New("unreachable code, window node should have a non-zero period or period count")
@@ -93,7 +91,7 @@ type windowByTime struct {
 	period time.Duration
 	every  time.Duration
 
-	logger *log.Logger
+	diagnostic diagnostic.Diagnostic
 }
 
 func newWindowByTime(
@@ -104,7 +102,7 @@ func newWindowByTime(
 	every time.Duration,
 	align,
 	fillPeriod bool,
-	logger *log.Logger,
+	d diagnostic.Diagnostic,
 
 ) *windowByTime {
 	// Determine nextEmit time.
@@ -130,12 +128,12 @@ func newWindowByTime(
 		name:       name,
 		group:      group,
 		nextEmit:   nextEmit,
-		buf:        &windowTimeBuffer{logger: logger},
+		buf:        &windowTimeBuffer{diagnostic: d},
 		align:      align,
 		fillPeriod: fillPeriod,
 		period:     period,
 		every:      every,
-		logger:     logger,
+		diagnostic: d,
 	}
 }
 
@@ -214,11 +212,11 @@ func (w *windowByTime) batch(tmax time.Time) edge.BufferedBatchMessage {
 
 // implements a purpose built ring buffer for the window of points
 type windowTimeBuffer struct {
-	window []edge.PointMessage
-	start  int
-	stop   int
-	size   int
-	logger *log.Logger
+	window     []edge.PointMessage
+	start      int
+	stop       int
+	size       int
+	diagnostic diagnostic.Diagnostic
 }
 
 // Insert a single point into the buffer.
@@ -341,7 +339,7 @@ type windowByCount struct {
 	size     int
 	count    int
 
-	logger *log.Logger
+	diagnostic diagnostic.Diagnostic
 }
 
 func newWindowByCount(
@@ -350,20 +348,20 @@ func newWindowByCount(
 	period,
 	every int,
 	fillPeriod bool,
-	logger *log.Logger) *windowByCount {
+	d diagnostic.Diagnostic) *windowByCount {
 	// Determine the first nextEmit index
 	nextEmit := every
 	if fillPeriod {
 		nextEmit = period
 	}
 	return &windowByCount{
-		name:     name,
-		group:    group,
-		buf:      make([]edge.BatchPointMessage, period),
-		period:   period,
-		every:    every,
-		nextEmit: nextEmit,
-		logger:   logger,
+		name:       name,
+		group:      group,
+		buf:        make([]edge.BatchPointMessage, period),
+		period:     period,
+		every:      every,
+		nextEmit:   nextEmit,
+		diagnostic: d,
 	}
 }
 func (w *windowByCount) BeginBatch(edge.BeginBatchMessage) (edge.Message, error) {

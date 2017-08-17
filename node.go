@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"expvar"
 	"fmt"
-	"log"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -15,6 +14,7 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/server/vars"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/timer"
 	"github.com/pkg/errors"
 )
@@ -67,6 +67,10 @@ type Node interface {
 	stats() map[string]interface{}
 }
 
+//type Diagnostic interface {
+//	Diag(...interface{}) error
+//}
+
 //implementation of Node
 type node struct {
 	pipeline.Node
@@ -81,7 +85,7 @@ type node struct {
 	finished   bool
 	ins        []edge.StatsEdge
 	outs       []edge.StatsEdge
-	logger     *log.Logger
+	diagnostic diagnostic.Diagnostic
 	notary     Notary
 	timer      timer.Timer
 	statsKey   string
@@ -133,15 +137,11 @@ func (n *node) start(snapshot []byte) {
 					err = fmt.Errorf("%s: Trace:%s", r, string(trace[:n]))
 				}
 				n.abortParentEdges()
-				n.logger.Println("E!", err)
-				n.notary.Error(
+				n.diagnostic.Diag(
+					"level", "error",
 					"msg", "encountered error running node",
 					"error", err,
 				)
-				//n.notary.Diag(
-				//	"type", "error",
-				//	"error", err,
-				//)
 				err = errors.Wrap(err, n.Name())
 			}
 			n.errCh <- err

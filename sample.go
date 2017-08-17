@@ -2,13 +2,12 @@ package kapacitor
 
 import (
 	"errors"
-	"log"
 	"time"
 
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
-	"github.com/influxdata/kapacitor/services/notary"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 )
 
 type SampleNode struct {
@@ -20,9 +19,9 @@ type SampleNode struct {
 }
 
 // Create a new  SampleNode which filters data from a source.
-func newSampleNode(et *ExecutingTask, n *pipeline.SampleNode, l *log.Logger, nt Notary) (*SampleNode, error) {
+func newSampleNode(et *ExecutingTask, n *pipeline.SampleNode, d diagnostic.Diagnostic) (*SampleNode, error) {
 	sn := &SampleNode{
-		node:     node{Node: n, et: et, logger: l, notary: notary.WithPrefix(nt, "node", "sample")},
+		node:     node{Node: n, et: et, diagnostic: d},
 		s:        n,
 		counts:   make(map[models.GroupID]int64),
 		duration: n.Duration,
