@@ -3,14 +3,13 @@ package kapacitor
 import (
 	"errors"
 	"fmt"
-	"log"
 	"sync"
 
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/server/vars"
-	"github.com/influxdata/kapacitor/services/notary"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 )
 
 const (
@@ -30,12 +29,11 @@ type Edge struct {
 
 	statsKey string
 	statMap  *expvar.Map
-	logger   *log.Logger
 
-	notary Notary
+	diagnostic diagnostic.Diagnostic
 }
 
-func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, size int, logService LogService) edge.StatsEdge {
+func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, size int, diagService DiagnosticService) edge.StatsEdge {
 	e := edge.NewStatsEdge(edge.NewChannelEdge(t, defaultEdgeBufferSize))
 	tags := map[string]string{
 		"task":   taskName,
@@ -48,11 +46,10 @@ func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, size i
 	sm.Set(statEmitted, e.EmittedVar())
 	name := fmt.Sprintf("%s|%s->%s", taskName, parentName, childName)
 	return &Edge{
-		StatsEdge: e,
-		statsKey:  key,
-		statMap:   sm,
-		logger:    logService.NewLogger(fmt.Sprintf("[edge:%s] ", name), log.LstdFlags),
-		notary:    notary.New("edge", name),
+		StatsEdge:  e,
+		statsKey:   key,
+		statMap:    sm,
+		diagnostic: diagService.NewDiagnostic(nil, "edge", name),
 	}
 }
 
@@ -64,11 +61,8 @@ func (e *Edge) Close() error {
 	}
 	e.closed = true
 	vars.DeleteStatistic(e.statsKey)
-	e.logger.Printf("D! closing c: %d e: %d",
-		e.Collected(),
-		e.Emitted(),
-	)
-	e.notary.Debug(
+	e.diagnostic.Diag(
+		"level", "debug",
 		"msg", "closing edge",
 		"collected", e.Collected(),
 		"emitted", e.Emitted(),

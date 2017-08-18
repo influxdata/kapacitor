@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"log"
 	"math/rand"
 	"sync"
 	"time"
@@ -12,7 +11,6 @@ import (
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/services/diagnostic"
-	"github.com/influxdata/kapacitor/services/notary"
 )
 
 // The type of a task
@@ -105,12 +103,11 @@ type ExecutingTask struct {
 	source  Node
 	outputs map[string]Output
 	// node lookup from pipeline.ID -> Node
-	lookup   map[pipeline.ID]Node
-	nodes    []Node
-	stopping chan struct{}
-	wg       sync.WaitGroup
-	logger   *log.Logger
-	notary   Notary
+	lookup     map[pipeline.ID]Node
+	nodes      []Node
+	stopping   chan struct{}
+	wg         sync.WaitGroup
+	diagnostic diagnostic.Diagnostic
 
 	// Mutex for throughput var
 	tmu        sync.RWMutex
@@ -119,15 +116,13 @@ type ExecutingTask struct {
 
 // Create a new  task from a defined kapacitor.
 func NewExecutingTask(tm *TaskMaster, t *Task) (*ExecutingTask, error) {
-	l := tm.LogService.NewLogger(fmt.Sprintf("[task:%s] ", t.ID), log.LstdFlags)
-	nt := notary.WithPrefix(nil, "task-id", t.ID) // idk
+	d := tm.DiagnosticService.NewDiagnostic(nil, "task", t.ID)
 	et := &ExecutingTask{
-		tm:      tm,
-		Task:    t,
-		outputs: make(map[string]Output),
-		lookup:  make(map[pipeline.ID]Node),
-		logger:  l,
-		notary:  nt, // TODO: think about this
+		tm:         tm,
+		Task:       t,
+		outputs:    make(map[string]Output),
+		lookup:     make(map[pipeline.ID]Node),
+		diagnostic: d,
 	}
 	err := et.link()
 	if err != nil {
@@ -556,7 +551,12 @@ func (et *ExecutingTask) runSnapshotter() {
 		case <-ticker.C:
 			snapshot, err := et.Snapshot()
 			if err != nil {
-				et.logger.Println("E! failed to snapshot task", et.Task.ID, err)
+				et.diagnostic.Diag(
+					"level", "error",
+					"msg", "failed to snapshop task",
+					"task", et.Task.ID,
+					"error", err,
+				)
 				break
 			}
 			size := 0
@@ -567,7 +567,12 @@ func (et *ExecutingTask) runSnapshotter() {
 			if size > 0 {
 				err = et.tm.TaskStore.SaveSnapshot(et.Task.ID, snapshot)
 				if err != nil {
-					et.logger.Println("E! failed to save task snapshot", et.Task.ID, err)
+					et.diagnostic.Diag(
+						"level", "error",
+						"msg", "failed to save task snapshop",
+						"task", et.Task.ID,
+						"error", err,
+					)
 				}
 			}
 		case <-et.stopping:

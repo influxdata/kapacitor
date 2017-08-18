@@ -127,8 +127,7 @@ func (cmd *Command) Run(args ...string) error {
 
 	// Create server from config and start it.
 	buildInfo := server.BuildInfo{Version: cmd.Version, Commit: cmd.Commit, Branch: cmd.Branch}
-	// TODO: remove log service
-	s, err := server.New(config, buildInfo, cmd.logService, diagnosticService)
+	s, err := server.New(config, buildInfo, diagnosticService)
 	if err != nil {
 		return fmt.Errorf("create server: %s", err)
 	}

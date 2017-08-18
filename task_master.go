@@ -3,7 +3,6 @@ package kapacitor
 import (
 	"errors"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -47,10 +46,6 @@ const (
 
 //type Diagnostic diagnostic.Diagnostic
 type DiagnosticService diagnostic.Service
-
-type LogService interface {
-	NewLogger(prefix string, flag int) *log.Logger
-}
 
 type UDFService interface {
 	List() []string
@@ -157,7 +152,6 @@ type TaskMaster struct {
 	SwarmService interface {
 		Client(string) (swarm.Client, error)
 	}
-	LogService LogService
 	DiagnosticService
 
 	Commander command.Commander
@@ -191,7 +185,7 @@ type TaskMaster struct {
 	// DeleteHooks for tasks
 	deleteHooks map[string][]deleteHook
 
-	logger *log.Logger
+	diagnostic diagnostic.Diagnostic
 
 	closed  bool
 	drained bool
@@ -206,26 +200,27 @@ type forkKey struct {
 }
 
 // Create a new Executor with a given clock.
-func NewTaskMaster(id string, info vars.Infoer, l LogService) *TaskMaster {
+func NewTaskMaster(id string, info vars.Infoer, d DiagnosticService) *TaskMaster {
 	return &TaskMaster{
-		id:             id,
-		forks:          make(map[forkKey]map[string]edge.Edge),
-		forkStats:      make(map[forkKey]*expvar.Int),
-		taskToForkKeys: make(map[string][]forkKey),
-		batches:        make(map[string][]BatchCollector),
-		tasks:          make(map[string]*ExecutingTask),
-		deleteHooks:    make(map[string][]deleteHook),
-		LogService:     l,
-		ServerInfo:     info,
-		logger:         l.NewLogger(fmt.Sprintf("[task_master:%s] ", id), log.LstdFlags),
-		closed:         true,
-		TimingService:  noOpTimingService{},
+		id:                id,
+		forks:             make(map[forkKey]map[string]edge.Edge),
+		forkStats:         make(map[forkKey]*expvar.Int),
+		taskToForkKeys:    make(map[string][]forkKey),
+		batches:           make(map[string][]BatchCollector),
+		tasks:             make(map[string]*ExecutingTask),
+		deleteHooks:       make(map[string][]deleteHook),
+		DiagnosticService: d,
+		ServerInfo:        info,
+		diagnostic:        d.NewDiagnostic(nil, "task_master", id),
+
+		closed:        true,
+		TimingService: noOpTimingService{},
 	}
 }
 
 // Returns a new TaskMaster instance with the same services as the current one.
 func (tm *TaskMaster) New(id string) *TaskMaster {
-	n := NewTaskMaster(id, tm.ServerInfo, tm.LogService)
+	n := NewTaskMaster(id, tm.ServerInfo, tm.DiagnosticService)
 	n.DefaultRetentionPolicy = tm.DefaultRetentionPolicy
 	n.HTTPDService = tm.HTTPDService
 	n.TaskStore = tm.TaskStore
@@ -269,7 +264,10 @@ func (tm *TaskMaster) Open() (err error) {
 		tm.closed = true
 		return
 	}
-	tm.logger.Println("I! opened")
+	tm.diagnostic.Diag(
+		"level", "info",
+		"msg", "opened task master",
+	)
 	return
 }
 
@@ -298,7 +296,10 @@ func (tm *TaskMaster) Close() error {
 	for _, et := range tm.tasks {
 		_ = tm.stopTask(et.Task.ID)
 	}
-	tm.logger.Println("I! closed")
+	tm.diagnostic.Diag(
+		"level", "info",
+		"msg", "closed task master",
+	)
 	return nil
 }
 
@@ -437,7 +438,11 @@ func (tm *TaskMaster) StartTask(t *Task) (*ExecutingTask, error) {
 	if tm.closed {
 		return nil, errors.New("task master is closed cannot start a task")
 	}
-	tm.logger.Println("D! Starting task:", t.ID)
+	tm.diagnostic.Diag(
+		"level", "debug",
+		"msg", "starting task",
+		"task", t.ID,
+	)
 	et, err := NewExecutingTask(tm, t)
 	if err != nil {
 		return nil, err
@@ -458,7 +463,7 @@ func (tm *TaskMaster) StartTask(t *Task) (*ExecutingTask, error) {
 		}
 		ins = make([]edge.StatsEdge, count)
 		for i := 0; i < count; i++ {
-			in := newEdge(t.ID, "batch", fmt.Sprintf("batch%d", i), pipeline.BatchEdge, defaultEdgeBufferSize, tm.LogService)
+			in := newEdge(t.ID, "batch", fmt.Sprintf("batch%d", i), pipeline.BatchEdge, defaultEdgeBufferSize, tm.DiagnosticService)
 			ins[i] = in
 			tm.batches[t.ID] = append(tm.batches[t.ID], &batchCollector{edge: in})
 		}
@@ -478,8 +483,15 @@ func (tm *TaskMaster) StartTask(t *Task) (*ExecutingTask, error) {
 	}
 
 	tm.tasks[et.Task.ID] = et
-	tm.logger.Println("I! Started task:", t.ID)
-	tm.logger.Println("D!", string(t.Dot()))
+	tm.diagnostic.Diag(
+		"level", "info",
+		"msg", "started task",
+		"task", t.ID,
+	)
+	tm.diagnostic.Diag(
+		"level", "debug",
+		"dot", string(t.Dot()),
+	)
 
 	return et, nil
 }
@@ -520,9 +532,18 @@ func (tm *TaskMaster) stopTask(id string) (err error) {
 
 		err = et.stop()
 		if err != nil {
-			tm.logger.Println("E! Stopped task:", id, err)
+			tm.diagnostic.Diag(
+				"level", "error",
+				"msg", "stopped task",
+				"task", id,
+				"error", err,
+			)
 		} else {
-			tm.logger.Println("I! Stopped task:", id)
+			tm.diagnostic.Diag(
+				"level", "info",
+				"msg", "stopped task",
+				"task", id,
+			)
 		}
 	}
 	return
@@ -581,7 +602,7 @@ func (tm *TaskMaster) stream(name string) (StreamCollector, error) {
 	if tm.closed {
 		return nil, ErrTaskMasterClosed
 	}
-	in := newEdge(fmt.Sprintf("task_master:%s", tm.id), name, "stream", pipeline.StreamEdge, defaultEdgeBufferSize, tm.LogService)
+	in := newEdge(fmt.Sprintf("task_master:%s", tm.id), name, "stream", pipeline.StreamEdge, defaultEdgeBufferSize, tm.DiagnosticService)
 	se := &streamEdge{edge: in}
 	tm.wg.Add(1)
 	go func() {
@@ -760,7 +781,7 @@ func (tm *TaskMaster) newFork(taskName string, dbrps []DBRP, measurements []stri
 		return nil, ErrTaskMasterClosed
 	}
 
-	e := newEdge(taskName, "stream", "stream0", pipeline.StreamEdge, defaultEdgeBufferSize, tm.LogService)
+	e := newEdge(taskName, "stream", "stream0", pipeline.StreamEdge, defaultEdgeBufferSize, tm.DiagnosticService)
 
 	for _, key := range forkKeys(dbrps, measurements) {
 		tm.taskToForkKeys[taskName] = append(tm.taskToForkKeys[taskName], key)

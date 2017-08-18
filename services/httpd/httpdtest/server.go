@@ -6,7 +6,6 @@ import (
 
 	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/httpd"
-	"github.com/influxdata/kapacitor/services/logging/loggingtest"
 )
 
 type Server struct {
@@ -17,7 +16,6 @@ type Server struct {
 func NewServer(verbose bool) *Server {
 	statMap := &expvar.Map{}
 	statMap.Init()
-	ls := loggingtest.New()
 	// TODO: revisit
 	ds := diagnostic.NewService()
 	d := ds.NewDiagnostic(nil)
@@ -28,7 +26,6 @@ func NewServer(verbose bool) *Server {
 			verbose,
 			false,
 			statMap,
-			ls,
 			d,
 			ds,
 			"",

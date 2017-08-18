@@ -11,6 +11,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/pprof"
+	"os"
 	"strings"
 	"time"
 
@@ -22,7 +23,6 @@ import (
 	"github.com/influxdata/kapacitor/auth"
 	"github.com/influxdata/kapacitor/client/v1"
 	"github.com/influxdata/kapacitor/services/diagnostic"
-	"github.com/influxdata/kapacitor/services/logging"
 	"github.com/influxdata/wlog"
 )
 
@@ -110,7 +110,6 @@ func NewHandler(
 	writeTrace,
 	allowGzip bool,
 	statMap *expvar.Map,
-	li logging.Interface,
 	d Diagnostic,
 	ds diagnostic.Service,
 	sharedSecret string,
@@ -122,9 +121,11 @@ func NewHandler(
 		allowGzip:             allowGzip,
 		diagnostic:            d,
 		writeTrace:            writeTrace,
-		clfLogger:             li.NewRawLogger("[httpd] ", 0),
-		loggingEnabled:        loggingEnabled,
-		statMap:               statMap,
+		// TODO: Need to fix this
+		//clfLogger:             li.NewRawLogger("[httpd] ", 0),
+		clfLogger:      log.New(os.Stdout, "idk", log.LstdFlags),
+		loggingEnabled: loggingEnabled,
+		statMap:        statMap,
 	}
 
 	allowedMethods := []string{

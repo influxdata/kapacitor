@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor/services/diagnostic"
-	"github.com/influxdata/kapacitor/services/logging"
 	"github.com/influxdata/kapacitor/services/notary"
 )
 
@@ -53,7 +52,7 @@ type Service struct {
 // or diagnostic generator
 type Diagnostic diagnostic.Diagnostic
 
-func NewService(c Config, hostname string, li logging.Interface, d Diagnostic, ds diagnostic.Service) *Service {
+func NewService(c Config, hostname string, d Diagnostic, ds diagnostic.Service) *Service {
 	statMap := &expvar.Map{}
 	statMap.Init()
 	port, _ := c.Port()
@@ -77,13 +76,13 @@ func NewService(c Config, hostname string, li logging.Interface, d Diagnostic, d
 			c.WriteTracing,
 			c.GZIP,
 			statMap,
-			li,
 			d,
 			ds,
 			c.SharedSecret,
 		),
 		// TODO: not totally sure what to do about this
-		httpServerLogger: li.NewStaticLevelLogger("[httpd]", log.LstdFlags, logging.ERROR),
+		//httpServerLogger: li.NewStaticLevelLogger("[httpd]", log.LstdFlags, logging.ERROR),
+		httpServerLogger: nil,
 
 		diagnostic: d,
 	}

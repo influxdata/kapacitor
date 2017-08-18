@@ -146,7 +146,7 @@ type Server struct {
 type Diagnostic diagnostic.Diagnostic
 
 // New returns a new instance of Server built from a config.
-func New(c *Config, buildInfo BuildInfo, logService logging.Interface, diagnosticService diagnostic.Service) (*Server, error) {
+func New(c *Config, buildInfo BuildInfo, diagnosticService diagnostic.Service) (*Server, error) {
 	err := c.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("%s. To generate a valid configuration file run `kapacitord config > kapacitor.generated.conf`.", err)
@@ -159,7 +159,6 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface, diagnosti
 		hostname:          c.Hostname,
 		err:               make(chan error),
 		configUpdates:     make(chan config.ConfigUpdate, 100),
-		LogService:        logService,
 		DiagnosticService: diagnosticService,
 		MetaClient:        &kapacitor.NoopMetaClient{},
 		QueryExecutor:     &Queryexecutor{},
@@ -195,7 +194,7 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface, diagnosti
 
 	// Start Task Master
 	s.TaskMasterLookup = kapacitor.NewTaskMasterLookup()
-	s.TaskMaster = kapacitor.NewTaskMaster(kapacitor.MainTaskMaster, vars.Info, logService)
+	s.TaskMaster = kapacitor.NewTaskMaster(kapacitor.MainTaskMaster, vars.Info, diagnosticService)
 	s.TaskMaster.DefaultRetentionPolicy = c.DefaultRetentionPolicy
 	s.TaskMaster.Commander = s.Commander
 	s.TaskMasterLookup.Set(s.TaskMaster)
@@ -402,7 +401,7 @@ func (s *Server) appendInfluxDBService() error {
 
 func (s *Server) initHTTPDService() {
 	d := s.DiagnosticService.NewDiagnostic(nil, "service", "httpd")
-	srv := httpd.NewService(s.config.HTTP, s.hostname, s.LogService, d, s.DiagnosticService)
+	srv := httpd.NewService(s.config.HTTP, s.hostname, d, s.DiagnosticService)
 
 	srv.Handler.PointsWriter = s.TaskMaster
 	srv.Handler.Version = s.BuildInfo.Version
