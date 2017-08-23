@@ -89,16 +89,30 @@ func (m *Main) Run(args ...string) error {
 		}
 
 		signalCh := make(chan os.Signal, 1)
-		signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
+		signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 		m.Diag.Info("listening for signals")
 
-		// Block until one of the signals above is received
-		select {
-		case <-signalCh:
-			m.Diag.Info("signal received, initializing clean shutdown...")
-			go func() {
-				cmd.Close()
-			}()
+	Loop:
+		for s := range signalCh {
+			switch s.String() {
+			case syscall.SIGTERM.String():
+				m.Diag.Info("SIGTERM received, initializing clean shutdown...")
+				go func() {
+					cmd.Close()
+				}()
+				break Loop
+
+			case syscall.SIGHUP.String():
+				m.Diag.Info("SIGHUP received, reloading tasks/templates/handlers directory...")
+				cmd.Server.Reload()
+
+			default:
+				m.Diag.Info("signal received, initializing clean shutdown...")
+				go func() {
+					cmd.Close()
+				}()
+				break Loop
+			}
 		}
 
 		// Block again until another signal is received, a shutdown timeout elapses,

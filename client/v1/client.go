@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"path"
 	"strconv"
@@ -73,6 +74,10 @@ type Config struct {
 
 	// Optional credentials for authenticating with the server.
 	Credentials *Credentials
+
+	// Optional Transport https://golang.org/pkg/net/http/#RoundTripper
+	// If nil the default transport will be used
+	Transport http.RoundTripper
 }
 
 // AuthenticationMethod defines the type of authentication used.
@@ -118,6 +123,23 @@ func (c Credentials) Validate() error {
 	return nil
 }
 
+type localTransport struct {
+	h http.Handler
+}
+
+func (l *localTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	w := httptest.NewRecorder()
+	l.h.ServeHTTP(w, r)
+
+	return w.Result(), nil
+}
+
+func NewLocalTransport(h http.Handler) http.RoundTripper {
+	return &localTransport{
+		h: h,
+	}
+}
+
 // Basic HTTP client
 type Client struct {
 	url         *url.URL
@@ -148,21 +170,28 @@ func New(conf Config) (*Client, error) {
 		}
 	}
 
-	tr := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: conf.InsecureSkipVerify,
-		},
-	}
-	if conf.TLSConfig != nil {
-		tr.TLSClientConfig = conf.TLSConfig
+	rt := conf.Transport
+	var tr *http.Transport
+
+	if rt == nil {
+		tr = &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: conf.InsecureSkipVerify,
+			},
+		}
+		if conf.TLSConfig != nil {
+			tr.TLSClientConfig = conf.TLSConfig
+		}
+
+		rt = tr
 	}
 	return &Client{
 		url:       u,
 		userAgent: conf.UserAgent,
 		httpClient: &http.Client{
 			Timeout:   conf.Timeout,
-			Transport: tr,
+			Transport: rt,
 		},
 		credentials: conf.Credentials,
 	}, nil
@@ -203,8 +232,9 @@ type ExecutionStats struct {
 type TaskType int
 
 const (
-	StreamTask TaskType = 1
-	BatchTask  TaskType = 2
+	InvalidTask TaskType = 0
+	StreamTask  TaskType = 1
+	BatchTask   TaskType = 2
 )
 
 func (tt TaskType) MarshalText() ([]byte, error) {
@@ -213,6 +243,8 @@ func (tt TaskType) MarshalText() ([]byte, error) {
 		return []byte("stream"), nil
 	case BatchTask:
 		return []byte("batch"), nil
+	case InvalidTask:
+		return []byte("invalid"), nil
 	default:
 		return nil, fmt.Errorf("unknown TaskType %d", tt)
 	}
@@ -224,6 +256,8 @@ func (tt *TaskType) UnmarshalText(text []byte) error {
 		*tt = StreamTask
 	case "batch":
 		*tt = BatchTask
+	case "invalid":
+		*tt = InvalidTask
 	default:
 		return fmt.Errorf("unknown TaskType %s", s)
 	}
@@ -513,9 +547,9 @@ func (vs *Vars) UnmarshalJSON(b []byte) error {
 }
 
 type Var struct {
-	Type        VarType     `json:"type"`
-	Value       interface{} `json:"value"`
-	Description string      `json:"description"`
+	Type        VarType     `json:"type" yaml:"type"`
+	Value       interface{} `json:"value" yaml:"value"`
+	Description string      `json:"description" yaml:"description"`
 }
 
 // A Task plus its read-only attributes.
@@ -725,13 +759,13 @@ func (c *Client) StorageLink(name string) Link {
 }
 
 type CreateTaskOptions struct {
-	ID         string     `json:"id,omitempty"`
-	TemplateID string     `json:"template-id,omitempty"`
+	ID         string     `json:"id,omitempty" yaml:"id"`
+	TemplateID string     `json:"template-id,omitempty" yaml:"template-id"`
 	Type       TaskType   `json:"type,omitempty"`
-	DBRPs      []DBRP     `json:"dbrps,omitempty"`
+	DBRPs      []DBRP     `json:"dbrps,omitempty" yaml:"dbrps"`
 	TICKscript string     `json:"script,omitempty"`
 	Status     TaskStatus `json:"status,omitempty"`
-	Vars       Vars       `json:"vars,omitempty"`
+	Vars       Vars       `json:"vars,omitempty" yaml:"vars"`
 }
 
 // Create a new task.
@@ -759,13 +793,13 @@ func (c *Client) CreateTask(opt CreateTaskOptions) (Task, error) {
 }
 
 type UpdateTaskOptions struct {
-	ID         string     `json:"id,omitempty"`
-	TemplateID string     `json:"template-id,omitempty"`
+	ID         string     `json:"id,omitempty" yaml:"id"`
+	TemplateID string     `json:"template-id,omitempty" yaml:"template-id"`
 	Type       TaskType   `json:"type,omitempty"`
-	DBRPs      []DBRP     `json:"dbrps,omitempty"`
+	DBRPs      []DBRP     `json:"dbrps,omitempty" yaml:"dbrps"`
 	TICKscript string     `json:"script,omitempty"`
 	Status     TaskStatus `json:"status,omitempty"`
-	Vars       Vars       `json:"vars,omitempty"`
+	Vars       Vars       `json:"vars,omitempty" yaml:"vars"`
 }
 
 // Update an existing task.
@@ -1963,6 +1997,7 @@ func (c *Client) TopicHandler(link Link) (TopicHandler, error) {
 }
 
 type TopicHandlerOptions struct {
+	Topic   string                 `json:"topic" yaml:"topic"`
 	ID      string                 `json:"id" yaml:"id"`
 	Kind    string                 `json:"kind" yaml:"kind"`
 	Options map[string]interface{} `json:"options" yaml:"options"`
@@ -2281,4 +2316,38 @@ func (d *Duration) UnmarshalText(data []byte) error {
 	}
 	*d = Duration(dur)
 	return nil
+}
+
+type DBRPs []DBRP
+
+func (d *DBRPs) String() string {
+	return fmt.Sprint(*d)
+}
+
+type TaskVars struct {
+	ID         string `json:"id,omitempty" yaml:"id"`
+	TemplateID string `json:"template-id,omitempty" yaml:"template-id"`
+	DBRPs      []DBRP `json:"dbrps,omitempty" yaml:"dbrps"`
+	Vars       Vars   `json:"vars,omitempty" yaml:"vars"`
+}
+
+func (t TaskVars) CreateTaskOptions() (CreateTaskOptions, error) {
+	o := CreateTaskOptions{
+		ID:         t.ID,
+		TemplateID: t.TemplateID,
+		Vars:       t.Vars,
+		DBRPs:      t.DBRPs,
+	}
+
+	return o, nil
+}
+
+func (t TaskVars) UpdateTaskOptions() (UpdateTaskOptions, error) {
+	o := UpdateTaskOptions{
+		ID:         t.ID,
+		TemplateID: t.TemplateID,
+		Vars:       t.Vars,
+		DBRPs:      t.DBRPs,
+	}
+	return o, nil
 }

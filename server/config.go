@@ -27,6 +27,7 @@ import (
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/influxdb"
 	"github.com/influxdata/kapacitor/services/k8s"
+	"github.com/influxdata/kapacitor/services/load"
 	"github.com/influxdata/kapacitor/services/marathon"
 	"github.com/influxdata/kapacitor/services/mqtt"
 	"github.com/influxdata/kapacitor/services/nerve"
@@ -65,6 +66,7 @@ type Config struct {
 	Replay         replay.Config     `toml:"replay"`
 	Storage        storage.Config    `toml:"storage"`
 	Task           task_store.Config `toml:"task"`
+	Load           load.Config       `toml:"load"`
 	InfluxDB       []influxdb.Config `toml:"influxdb" override:"influxdb,element-key=name"`
 	Logging        diagnostic.Config `toml:"logging"`
 	ConfigOverride config.Config     `toml:"config-override"`
@@ -159,6 +161,7 @@ func NewConfig() *Config {
 	c.Stats = stats.NewConfig()
 	c.UDF = udf.NewConfig()
 	c.Deadman = deadman.NewConfig()
+	c.Load = load.NewConfig()
 
 	return c
 }
@@ -182,6 +185,7 @@ func NewDemoConfig() (*Config, error) {
 	c.Task.Dir = filepath.Join(homeDir, ".kapacitor", c.Task.Dir)
 	c.Storage.BoltDBPath = filepath.Join(homeDir, ".kapacitor", c.Storage.BoltDBPath)
 	c.DataDir = filepath.Join(homeDir, ".kapacitor", c.DataDir)
+	c.Load.Dir = filepath.Join(homeDir, ".kapacitor", c.Load.Dir)
 
 	return c, nil
 }
@@ -205,6 +209,9 @@ func (c *Config) Validate() error {
 	}
 	if err := c.Task.Validate(); err != nil {
 		return errors.Wrap(err, "task")
+	}
+	if err := c.Load.Validate(); err != nil {
+		return err
 	}
 	// Validate the set of InfluxDB configs.
 	// All names should be unique.

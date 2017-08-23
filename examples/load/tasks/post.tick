@@ -1,0 +1,9 @@
+dbrp "telegraf"."autogen"
+
+stream
+    |from()
+        .measurement('cpu')
+    |alert()
+        .crit(lambda: "usage_idle" < 50.0)
+        //.post('http://localhost:2345')
+        .post('http://localhost:5555')

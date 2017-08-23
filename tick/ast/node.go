@@ -362,6 +362,48 @@ func (n *BinaryNode) Equal(o interface{}) bool {
 	return false
 }
 
+type DBRPNode struct {
+	position
+	Comment *CommentNode
+	DB      *ReferenceNode
+	RP      *ReferenceNode
+}
+
+func newDBRP(p position, db, rp *ReferenceNode, c *CommentNode) *DBRPNode {
+	return &DBRPNode{
+		position: p,
+		DB:       db,
+		RP:       rp,
+		Comment:  c,
+	}
+}
+
+func (d *DBRPNode) DBRP() string {
+	return "\"" + d.DB.Reference + "\"" + "." + "\"" + d.RP.Reference + "\""
+}
+
+func (d *DBRPNode) Equal(o interface{}) bool {
+	if on, ok := o.(*DBRPNode); ok {
+		return d.DB.Equal(on.DB) && d.RP.Equal(on.RP)
+	}
+
+	return false
+}
+
+func (s *DBRPNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
+	if s.Comment != nil {
+		s.Comment.Format(buf, indent, onNewLine)
+	}
+	buf.WriteString(indent)
+	buf.WriteString(TokenDBRP.String())
+	buf.WriteByte(' ')
+	buf.WriteString(s.DBRP())
+}
+
+func (n *DBRPNode) String() string {
+	return fmt.Sprintf("DBRPNode@%v{%v %v}%v", n.position, n.DB, n.RP, n.Comment)
+}
+
 type DeclarationNode struct {
 	position
 	Left    *IdentifierNode

@@ -25,6 +25,7 @@ type TaskType int
 const (
 	StreamTask TaskType = iota
 	BatchTask
+	InvalidTask
 )
 
 func (t TaskType) String() string {

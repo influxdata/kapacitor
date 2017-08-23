@@ -1,0 +1,14 @@
+{
+  "dbrps": [{"db": "telegraf", "rp": "autogen"}],
+  "template-id": "base_template",
+  "vars": {
+    "measurement": {"type" : "string", "value" : "cpu" },
+    "where_filter": {"type": "lambda", "value": "\"cpu\" == 'cpu-total'"},
+    "groups": {"type": "list", "value": [{"type":"string", "value":"host"},{"type":"string", "value":"dc"}]},
+    "field": {"type" : "string", "value" : "usage_idle" },
+    "warn": {"type" : "lambda", "value" : "\"mean\" < 30.0" },
+    "crit": {"type" : "lambda", "value" : "\"mean\" < 10.0" },
+    "window": {"type" : "duration", "value" : "1m" },
+    "slack_channel": {"type" : "string", "value" : "#alerts_testing" }
+  }
+}

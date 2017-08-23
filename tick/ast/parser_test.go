@@ -128,6 +128,41 @@ func TestParseStatements(t *testing.T) {
 		err    error
 	}{
 		{
+			script: `dbrp "telegraf"."autogen"`,
+			Root: &ProgramNode{
+				position: position{
+					pos:  0,
+					line: 1,
+					char: 1,
+				},
+				Nodes: []Node{
+					&DBRPNode{
+						position: position{
+							pos:  0,
+							line: 1,
+							char: 1,
+						},
+						DB: &ReferenceNode{
+							position: position{
+								pos:  5,
+								line: 1,
+								char: 6,
+							},
+							Reference: "telegraf",
+						},
+						RP: &ReferenceNode{
+							position: position{
+								pos:  16,
+								line: 1,
+								char: 17,
+							},
+							Reference: "autogen",
+						},
+					},
+				},
+			},
+		},
+		{
 			script: `var x int`,
 			Root: &ProgramNode{
 				position: position{

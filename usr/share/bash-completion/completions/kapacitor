@@ -84,12 +84,7 @@ _kapacitor()
             fi
             ;;
         define-topic-handler)
-            if [[ -z "${COMP_WORDS[2]}" || ("$cur" = "${COMP_WORDS[2]}" && -z "${COMP_WORDS[3]}") ]]
-            then
-                words=$(_kapacitor_list topics "$cur")
-            else
-                _kapacitor_json_yaml_files "${cur}"
-            fi
+          _kapacitor_json_yaml_files "${cur}"
             ;;
         replay)
             case "$prev" in

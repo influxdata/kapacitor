@@ -423,3 +423,9 @@ func (s *Service) NewCmdHandler() *CmdHandler {
 		l: s.logger.With(klog.String("service", "run")),
 	}
 }
+
+func (s *Service) NewLoadHandler() *LoadHandler {
+	return &LoadHandler{
+		l: s.logger.With(klog.String("service", "load")),
+	}
+}

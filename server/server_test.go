@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -342,6 +343,259 @@ func TestServer_CreateTask(t *testing.T) {
 		t.Fatalf("unexpected TICKscript got %s exp %s", ti.TICKscript, tick)
 	}
 	dot := "digraph testTaskID {\nstream0 -> from1;\n}"
+	if ti.Dot != dot {
+		t.Fatalf("unexpected dot\ngot\n%s\nexp\n%s\n", ti.Dot, dot)
+	}
+}
+
+func TestServer_CreateTaskImplicitStream(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	id := "testTaskID"
+	dbrps := []client.DBRP{
+		{
+			Database:        "mydb",
+			RetentionPolicy: "myrp",
+		},
+		{
+			Database:        "otherdb",
+			RetentionPolicy: "default",
+		},
+	}
+	tick := `dbrp "mydb"."myrp"
+
+dbrp "otherdb"."default"
+
+stream
+    |from()
+        .measurement('test')
+`
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ti, err := cli.Task(task.Link, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ti.Error != "" {
+		t.Fatal(ti.Error)
+	}
+	if ti.ID != id {
+		t.Fatalf("unexpected id got %s exp %s", ti.ID, id)
+	}
+	if ti.Type != client.StreamTask {
+		t.Fatalf("unexpected type got %v exp %v", ti.Type, client.StreamTask)
+	}
+	if ti.Status != client.Disabled {
+		t.Fatalf("unexpected status got %v exp %v", ti.Status, client.Disabled)
+	}
+	if !reflect.DeepEqual(ti.DBRPs, dbrps) {
+		t.Fatalf("unexpected dbrps got %s exp %s", ti.DBRPs, dbrps)
+	}
+	if ti.TICKscript != tick {
+		t.Fatalf("unexpected TICKscript got %s exp %s", ti.TICKscript, tick)
+	}
+	dot := "digraph testTaskID {\nstream0 -> from1;\n}"
+	if ti.Dot != dot {
+		t.Fatalf("unexpected dot\ngot\n%s\nexp\n%s\n", ti.Dot, dot)
+	}
+}
+
+func TestServer_CreateTaskBatch(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	id := "testTaskID"
+	dbrps := []client.DBRP{
+		{
+			Database:        "mydb",
+			RetentionPolicy: "myrp",
+		},
+	}
+	tick := `dbrp "mydb"."myrp"
+
+batch
+    |query('SELECT * from mydb.myrp.mymeas')
+    |log()
+`
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ti, err := cli.Task(task.Link, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ti.Error != "" {
+		t.Fatal(ti.Error)
+	}
+	if ti.ID != id {
+		t.Fatalf("unexpected id got %s exp %s", ti.ID, id)
+	}
+	if ti.Type != client.BatchTask {
+		t.Fatalf("unexpected type got %v exp %v", ti.Type, client.BatchTask)
+	}
+	if ti.Status != client.Disabled {
+		t.Fatalf("unexpected status got %v exp %v", ti.Status, client.Disabled)
+	}
+	if !reflect.DeepEqual(ti.DBRPs, dbrps) {
+		t.Fatalf("unexpected dbrps got %s exp %s", ti.DBRPs, dbrps)
+	}
+	if ti.TICKscript != tick {
+		t.Fatalf("unexpected TICKscript got %s exp %s", ti.TICKscript, tick)
+	}
+	dot := "digraph testTaskID {\nquery1 -> log2;\n}"
+	if ti.Dot != dot {
+		t.Fatalf("unexpected dot\ngot\n%s\nexp\n%s\n", ti.Dot, dot)
+	}
+}
+
+func TestServer_CreateTaskImplicitAndExplicit(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	id := "testTaskID"
+	dbrps := []client.DBRP{
+		{
+			Database:        "mydb",
+			RetentionPolicy: "myrp",
+		},
+	}
+	tick := `dbrp "mydb"."myrp"
+
+dbrp "otherdb"."default"
+
+stream
+    |from()
+        .measurement('test')
+`
+	_, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
+
+	// It is expected that error should be non nil
+	if err == nil {
+		t.Fatal("expected task to fail to be created")
+	}
+}
+
+func TestServer_CreateTaskExplicitUpdateImplicit(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	id := "testTaskID"
+	createDBRPs := []client.DBRP{
+		{
+			Database:        "mydb",
+			RetentionPolicy: "myrp",
+		},
+		{
+			Database:        "otherdb",
+			RetentionPolicy: "default",
+		},
+	}
+	createTick := `stream
+    |from()
+        .measurement('test')
+`
+	updateDBRPs := []client.DBRP{
+		{
+			Database:        "mydb",
+			RetentionPolicy: "myrp",
+		},
+	}
+	updateTick := `dbrp "mydb"."myrp"
+
+stream
+    |from()
+        .measurement('test')
+`
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		DBRPs:      createDBRPs,
+		TICKscript: createTick,
+		Status:     client.Disabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ti, err := cli.Task(task.Link, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ti.Error != "" {
+		t.Fatal(ti.Error)
+	}
+	if ti.ID != id {
+		t.Fatalf("unexpected id got %s exp %s", ti.ID, id)
+	}
+	if ti.Type != client.StreamTask {
+		t.Fatalf("unexpected type got %v exp %v", ti.Type, client.StreamTask)
+	}
+	if ti.Status != client.Disabled {
+		t.Fatalf("unexpected status got %v exp %v", ti.Status, client.Disabled)
+	}
+	if !reflect.DeepEqual(ti.DBRPs, createDBRPs) {
+		t.Fatalf("unexpected dbrps got %s exp %s", ti.DBRPs, createDBRPs)
+	}
+	if ti.TICKscript != createTick {
+		t.Fatalf("unexpected TICKscript got %s exp %s", ti.TICKscript, createTick)
+	}
+	dot := "digraph testTaskID {\nstream0 -> from1;\n}"
+	if ti.Dot != dot {
+		t.Fatalf("unexpected dot\ngot\n%s\nexp\n%s\n", ti.Dot, dot)
+	}
+
+	_, err = cli.UpdateTask(task.Link, client.UpdateTaskOptions{
+		TICKscript: updateTick,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ti, err = cli.Task(task.Link, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ti.Error != "" {
+		t.Fatal(ti.Error)
+	}
+	if ti.ID != id {
+		t.Fatalf("unexpected id got %s exp %s", ti.ID, id)
+	}
+	if ti.Type != client.StreamTask {
+		t.Fatalf("unexpected type got %v exp %v", ti.Type, client.StreamTask)
+	}
+	if ti.Status != client.Disabled {
+		t.Fatalf("unexpected status got %v exp %v", ti.Status, client.Disabled)
+	}
+	if !reflect.DeepEqual(ti.DBRPs, updateDBRPs) {
+		t.Fatalf("unexpected dbrps got %s exp %s", ti.DBRPs, updateDBRPs)
+	}
+	if ti.TICKscript != updateTick {
+		t.Fatalf("unexpected TICKscript got %s exp %s", ti.TICKscript, updateTick)
+	}
+	dot = "digraph testTaskID {\nstream0 -> from1;\n}"
 	if ti.Dot != dot {
 		t.Fatalf("unexpected dot\ngot\n%s\nexp\n%s\n", ti.Dot, dot)
 	}
@@ -1014,6 +1268,139 @@ stream
 	}
 	if !reflect.DeepEqual(vars, ti.Vars) {
 		t.Fatalf("unexpected vars\ngot\n%s\nexp\n%s\n", ti.Vars, vars)
+	}
+}
+
+func TestServer_CreateTemplateImplicitAndUpdateExplicitWithTasks(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	id := "testTemplateID"
+	implicitTick := `dbrp "telegraf"."autogen"
+
+var x = 5
+
+stream
+    |from()
+        .measurement('test')
+`
+	template, err := cli.CreateTemplate(client.CreateTemplateOptions{
+		ID:         id,
+		TICKscript: implicitTick,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ti, err := cli.Template(template.Link, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ti.Error != "" {
+		t.Fatal(ti.Error)
+	}
+	if ti.ID != id {
+		t.Fatalf("unexpected id got %s exp %s", ti.ID, id)
+	}
+	if ti.Type != client.StreamTask {
+		t.Fatalf("unexpected type got %v exp %v", ti.Type, client.StreamTask)
+	}
+	if ti.TICKscript != implicitTick {
+		t.Fatalf("unexpected TICKscript got\n%s\nexp\n%s\n", ti.TICKscript, implicitTick)
+	}
+	dot := "digraph testTemplateID {\nstream0 -> from1;\n}"
+	if ti.Dot != dot {
+		t.Fatalf("unexpected dot\ngot\n%s\nexp\n%s\n", ti.Dot, dot)
+	}
+	vars := client.Vars{"x": {Value: int64(5), Type: client.VarInt}}
+	if !reflect.DeepEqual(vars, ti.Vars) {
+		t.Fatalf("unexpected vars\ngot\n%s\nexp\n%s\n", ti.Vars, vars)
+	}
+
+	implicitDBRPs := []client.DBRP{
+		{
+			Database:        "telegraf",
+			RetentionPolicy: "autogen",
+		},
+	}
+
+	count := 1
+	tasks := make([]client.Task, count)
+	for i := 0; i < count; i++ {
+		task, err := cli.CreateTask(client.CreateTaskOptions{
+			TemplateID: template.ID,
+			Status:     client.Enabled,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		tasks[i] = task
+
+		ti, err := cli.Task(task.Link, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !reflect.DeepEqual(ti.DBRPs, implicitDBRPs) {
+			t.Fatalf("unexpected dbrps got %s exp %s", ti.DBRPs, implicitDBRPs)
+		}
+	}
+
+	updateTick := `var x = 5
+	
+	stream
+	    |from()
+	        .measurement('test')
+	`
+
+	_, err = cli.UpdateTemplate(template.Link, client.UpdateTemplateOptions{
+		ID:         id,
+		TICKscript: updateTick,
+	})
+	// Expects error
+	if err == nil {
+		t.Fatal(err)
+	}
+
+	finalTick := `dbrp "telegraf"."autogen"
+
+	dbrp "telegraf"."not_autogen"
+
+	var x = 5
+	
+	stream
+	    |from()
+	        .measurement('test')
+	`
+
+	finalDBRPs := []client.DBRP{
+		{
+			Database:        "telegraf",
+			RetentionPolicy: "autogen",
+		},
+		{
+			Database:        "telegraf",
+			RetentionPolicy: "not_autogen",
+		},
+	}
+	template, err = cli.UpdateTemplate(template.Link, client.UpdateTemplateOptions{
+		ID:         id,
+		TICKscript: finalTick,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, task := range tasks {
+		ti, err := cli.Task(task.Link, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !reflect.DeepEqual(ti.DBRPs, finalDBRPs) {
+			t.Fatalf("unexpected dbrps got %s exp %s", ti.DBRPs, finalDBRPs)
+		}
 	}
 }
 func TestServer_UpdateTemplateID_WithTasks(t *testing.T) {
@@ -10146,4 +10533,139 @@ func TestStorage_Backup(t *testing.T) {
 	if ti.Dot != dot {
 		t.Fatalf("unexpected dot\ngot\n%s\nexp\n%s\n", ti.Dot, dot)
 	}
+}
+
+func TestLoadService(t *testing.T) {
+	s, c, cli := OpenLoadServer()
+
+	// If the list of test fixtures changes update this list
+	tasks := []string{"base", "cpu_alert", "implicit", "join", "other"}
+	ts, err := cli.ListTasks(nil)
+	if err != nil {
+		t.Fatalf("enountered error listing tasks: %v", err)
+	}
+	for i, task := range ts {
+		if exp, got := tasks[i], task.ID; exp != got {
+			t.Fatalf("expected task ID to be %v, got %v\n", exp, got)
+		}
+	}
+
+	// If the list of test fixtures changes update this list
+	templates := []string{"base_template", "implicit_template"}
+	tmps, err := cli.ListTemplates(nil)
+	if err != nil {
+		t.Fatalf("enountered error listing tasks: %v", err)
+	}
+	for i, template := range tmps {
+		if exp, got := templates[i], template.ID; exp != got {
+			t.Fatalf("expected template ID to be %v, got %v\n", exp, got)
+		}
+	}
+
+	// If the list of test fixtures changes update this list
+	topicHandlers := []string{"example", "other"}
+	link := cli.TopicHandlersLink("cpu")
+	ths, err := cli.ListTopicHandlers(link, nil)
+	if err != nil {
+		t.Fatalf("enountered error listing tasks: %v", err)
+	}
+	for i, th := range ths.Handlers {
+		if exp, got := topicHandlers[i], th.ID; exp != got {
+			t.Fatalf("expected topic-handler ID to be %v, got %v\n", exp, got)
+		}
+	}
+
+	// delete task file
+	err = os.Rename(
+		path.Join(c.Load.Dir, "tasks", "join.tick"),
+		path.Join(c.Load.Dir, "tasks", "z.tick"),
+	)
+	if err != nil {
+		t.Fatalf("failed to rename tickscript: %v", err)
+	}
+
+	// reload
+	s.Reload()
+
+	// If the list of test fixtures changes update this list
+	tasks = []string{"base", "cpu_alert", "implicit", "other", "z"}
+	ts, err = cli.ListTasks(nil)
+	if err != nil {
+		t.Fatalf("enountered error listing tasks: %v", err)
+	}
+	for i, task := range ts {
+		if exp, got := tasks[i], task.ID; exp != got {
+			t.Fatalf("expected task ID to be %v, got %v\n", exp, got)
+		}
+	}
+
+	// rename template file
+	err = os.Rename(
+		path.Join(c.Load.Dir, "templates", "base_template.tick"),
+		path.Join(c.Load.Dir, "templates", "new.tick"),
+	)
+	if err != nil {
+		t.Fatalf("failed to rename tickscript: %v", err)
+	}
+
+	// reload
+	s.Reload()
+
+	// If the list of test fixtures changes update this list
+	templates = []string{"implicit_template", "new"}
+	tmps, err = cli.ListTemplates(nil)
+	if err != nil {
+		t.Fatalf("enountered error listing templates: %v", err)
+	}
+	for i, template := range tmps {
+		if exp, got := templates[i], template.ID; exp != got {
+			t.Fatalf("expected template ID to be %v, got %v\n", exp, got)
+		}
+	}
+	// move template file back
+	err = os.Rename(
+		path.Join(c.Load.Dir, "templates", "new.tick"),
+		path.Join(c.Load.Dir, "templates", "base_template.tick"),
+	)
+
+	// add a new handler
+	f, err := os.Create(path.Join(c.Load.Dir, "handlers", "new.tick"))
+	if err != nil {
+		t.Fatalf("failed to create new handler file: %v", err)
+	}
+
+	script := `topic: cpu
+id: new
+kind: slack
+match: changed() == TRUE
+options:
+  channel: '#alerts'
+`
+
+	if _, err := f.Write([]byte(script)); err != nil {
+		t.Fatalf("failed to write handler: %v", err)
+	}
+	f.Close()
+
+	// remove handler file back
+	if err := os.Remove(path.Join(c.Load.Dir, "handlers", "other.yaml")); err != nil {
+		t.Fatalf("failed to remove handler file: %v", err)
+	}
+
+	// reload
+	s.Reload()
+
+	// If the list of test fixtures changes update this list
+	topicHandlers = []string{"example", "new"}
+	link = cli.TopicHandlersLink("cpu")
+	ths, err = cli.ListTopicHandlers(link, nil)
+	if err != nil {
+		t.Fatalf("enountered error listing topic-handlers: %v", err)
+	}
+	for i, th := range ths.Handlers {
+		if exp, got := topicHandlers[i], th.ID; exp != got {
+			t.Fatalf("expected topic-handler ID to be %v, got %v\n", exp, got)
+		}
+	}
+
 }

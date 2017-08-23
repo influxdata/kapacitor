@@ -16,6 +16,12 @@
 - [#1568](https://github.com/influxdata/kapacitor/issues/1568): Add support for custom HTTP Post bodies via a template system.
 - [#1569](https://github.com/influxdata/kapacitor/issues/1569): Add support for add the HTTP status code as a field when using httpPost
 - [#1535](https://github.com/influxdata/kapacitor/pull/1535): Add logfmt support and refactor logging.
+- [#1481](https://github.com/influxdata/kapacitor/pull/1481): Add ability to load tasks/handlers from dir.
+    TICKscript was extended to be able to describe a task exclusively through a tickscript.
+      * tasks no longer need to specify their TaskType (Batch, Stream).
+      * `dbrp` expressions were added to tickscript.
+    Topic-Handler file format was modified to include the TopicID and HandlerID in the file.
+    Load service was added; the service can load tasks/handlers from a directory.
 
 ### Bugfixes
 
