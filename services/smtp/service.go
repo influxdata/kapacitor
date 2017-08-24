@@ -4,32 +4,37 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"log"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/influxdata/kapacitor/alert"
+	"github.com/influxdata/kapacitor/keyvalue"
 
 	"gopkg.in/gomail.v2"
 )
 
 var ErrNoRecipients = errors.New("not sending email, no recipients defined")
 
+type Diagnostic interface {
+	WithContext(ctx ...keyvalue.T) Diagnostic
+	Error(msg string, err error)
+}
+
 type Service struct {
 	mu          sync.Mutex
 	configValue atomic.Value
 	mail        chan *gomail.Message
 	updates     chan bool
-	logger      *log.Logger
+	diag        Diagnostic
 	wg          sync.WaitGroup
 	opened      bool
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, d Diagnostic) *Service {
 	s := &Service{
 		updates: make(chan bool),
-		logger:  l,
+		diag:    d,
 	}
 	s.configValue.Store(c)
 	return s
@@ -136,7 +141,7 @@ func (s *Service) runMailer() {
 			// Close old connection
 			if conn != nil {
 				if err := conn.Close(); err != nil {
-					s.logger.Println("E! error closing connection to old SMTP server:", err)
+					s.diag.Error("error closing connection to old SMTP server", err)
 				}
 				conn = nil
 			}
@@ -149,20 +154,20 @@ func (s *Service) runMailer() {
 			}
 			if !open {
 				if conn, err = d.Dial(); err != nil {
-					s.logger.Println("E! error connecting to SMTP server", err)
+					s.diag.Error("error closing connection to SMTP server", err)
 					break
 				}
 				open = true
 			}
 			if err := gomail.Send(conn, m); err != nil {
-				s.logger.Println("E!", err)
+				s.diag.Error("error sending", err)
 			}
 		// Close the connection to the SMTP server if no email was sent in
 		// the last IdleTimeout duration.
 		case <-timer.C:
 			if open {
 				if err := conn.Close(); err != nil {
-					s.logger.Println("E! error closing connection to SMTP server:", err)
+					s.diag.Error("error closing connection to SMTP server", err)
 				}
 				open = false
 			}
@@ -232,16 +237,16 @@ type HandlerConfig struct {
 }
 
 type handler struct {
-	s      *Service
-	c      HandlerConfig
-	logger *log.Logger
+	s    *Service
+	c    HandlerConfig
+	diag Diagnostic
 }
 
-func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
 	return &handler{
-		s:      s,
-		c:      c,
-		logger: l,
+		s:    s,
+		c:    c,
+		diag: s.diag.WithContext(ctx...),
 	}
 }
 
@@ -251,6 +256,6 @@ func (h *handler) Handle(event alert.Event) {
 		event.State.Message,
 		event.State.Details,
 	); err != nil {
-		h.logger.Println("E! failed to send email", err)
+		h.diag.Error("failed to send email", err)
 	}
 }

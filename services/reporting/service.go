@@ -2,7 +2,6 @@
 package reporting
 
 import (
-	"log"
 	"runtime"
 	"sync"
 	"time"
@@ -12,6 +11,10 @@ import (
 )
 
 const reportingInterval = time.Hour * 12
+
+type Diagnostic interface {
+	Error(msg string, err error)
+}
 
 // Sends anonymous usage information every 12 hours.
 type Service struct {
@@ -24,17 +27,17 @@ type Service struct {
 	statsTicker *time.Ticker
 	usageTicker *time.Ticker
 	closing     chan struct{}
-	logger      *log.Logger
+	diag        Diagnostic
 	wg          sync.WaitGroup
 }
 
-func NewService(c Config, info vars.Infoer, l *log.Logger) *Service {
+func NewService(c Config, info vars.Infoer, d Diagnostic) *Service {
 	client := client.New("")
 	client.URL = c.URL
 	return &Service{
 		client: client,
 		info:   info,
-		logger: l,
+		diag:   d,
 	}
 }
 
@@ -55,7 +58,7 @@ func (s *Service) Open() error {
 		defer s.wg.Done()
 		err := s.sendUsageReport()
 		if err != nil {
-			s.logger.Println("E! error while sending usage report on startup:", err)
+			s.diag.Error("error while sending usage report on startup", err)
 		}
 	}()
 
@@ -91,7 +94,7 @@ func (s *Service) usage() {
 		case <-s.usageTicker.C:
 			err := s.sendUsageReport()
 			if err != nil {
-				s.logger.Println("E! error while sending usage report:", err)
+				s.diag.Error("error while sending usage report", err)
 			}
 		}
 	}

@@ -1,7 +1,6 @@
 package swarm
 
 import (
-	"log"
 	"sync/atomic"
 
 	"github.com/influxdata/kapacitor/services/swarm/client"
@@ -11,10 +10,10 @@ import (
 type Cluster struct {
 	configValue atomic.Value // Config
 	client      client.Client
-	logger      *log.Logger
+	diag        Diagnostic
 }
 
-func NewCluster(c Config, l *log.Logger) (*Cluster, error) {
+func NewCluster(c Config, d Diagnostic) (*Cluster, error) {
 	clientConfig, err := c.ClientConfig()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create swarm client config")
@@ -26,7 +25,7 @@ func NewCluster(c Config, l *log.Logger) (*Cluster, error) {
 
 	s := &Cluster{
 		client: cli,
-		logger: l,
+		diag:   d,
 	}
 	s.configValue.Store(c)
 	return s, nil

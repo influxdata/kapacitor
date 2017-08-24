@@ -3,7 +3,6 @@ package kapacitor
 import (
 	"errors"
 	"fmt"
-	"log"
 
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
@@ -18,9 +17,9 @@ type StreamNode struct {
 }
 
 // Create a new  StreamNode which copies all data to children
-func newStreamNode(et *ExecutingTask, n *pipeline.StreamNode, l *log.Logger) (*StreamNode, error) {
+func newStreamNode(et *ExecutingTask, n *pipeline.StreamNode, d NodeDiagnostic) (*StreamNode, error) {
 	sn := &StreamNode{
-		node: node{Node: n, et: et, logger: l},
+		node: node{Node: n, et: et, diag: d},
 		s:    n,
 	}
 	sn.node.runF = sn.runSourceStream
@@ -52,9 +51,9 @@ type FromNode struct {
 }
 
 // Create a new  FromNode which filters data from a source.
-func newFromNode(et *ExecutingTask, n *pipeline.FromNode, l *log.Logger) (*FromNode, error) {
+func newFromNode(et *ExecutingTask, n *pipeline.FromNode, d NodeDiagnostic) (*FromNode, error) {
 	sn := &FromNode{
-		node: node{Node: n, et: et, logger: l},
+		node: node{Node: n, et: et, diag: d},
 		s:    n,
 		db:   n.Database,
 		rp:   n.RetentionPolicy,
@@ -133,8 +132,7 @@ func (n *FromNode) matches(p edge.PointMessage) bool {
 	}
 	if n.expression != nil {
 		if pass, err := EvalPredicate(n.expression, n.scopePool, p); err != nil {
-			n.incrementErrorCount()
-			n.logger.Println("E! error while evaluating WHERE expression:", err)
+			n.diag.Error("failed to evaluate WHERE expression", err)
 			return false
 		} else {
 			return pass

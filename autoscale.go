@@ -2,7 +2,6 @@ package kapacitor
 
 import (
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/influxdata/kapacitor/edge"
@@ -71,7 +70,7 @@ type AutoscaleNode struct {
 // Create a new AutoscaleNode which can trigger autoscale events.
 func newAutoscaleNode(
 	et *ExecutingTask,
-	l *log.Logger,
+	d NodeDiagnostic,
 	n pipeline.Node,
 	a autoscaler,
 	min,
@@ -91,7 +90,7 @@ func newAutoscaleNode(
 	}
 	replicasScopePool := stateful.NewScopePool(ast.FindReferenceVariables(replicas.Expression))
 	kn := &AutoscaleNode{
-		node:              node{Node: n, et: et, logger: l},
+		node:              node{Node: n, et: et, diag: d},
 		resourceStates:    make(map[string]resourceState),
 		min:               min,
 		max:               max,
@@ -153,8 +152,7 @@ func (g *autoscaleGroup) BeginBatch(begin edge.BeginBatchMessage) (edge.Message,
 func (g *autoscaleGroup) BatchPoint(bp edge.BatchPointMessage) (edge.Message, error) {
 	np, err := g.n.handlePoint(g.begin.Name(), g.begin.Dimensions(), bp, g.expr)
 	if err != nil {
-		g.n.incrementErrorCount()
-		g.n.logger.Println("E!", err)
+		g.n.diag.Error("error batch handling point", err)
 	}
 	return np, nil
 }
@@ -166,8 +164,7 @@ func (g *autoscaleGroup) EndBatch(end edge.EndBatchMessage) (edge.Message, error
 func (g *autoscaleGroup) Point(p edge.PointMessage) (edge.Message, error) {
 	np, err := g.n.handlePoint(p.Name(), p.Dimensions(), p, g.expr)
 	if err != nil {
-		g.n.incrementErrorCount()
-		g.n.logger.Println("E!", err)
+		g.n.diag.Error("error handling point", err)
 	}
 	return np, nil
 }
@@ -284,7 +281,7 @@ func (n *AutoscaleNode) handlePoint(streamName string, dims models.Dimensions, p
 }
 
 func (n *AutoscaleNode) applyEvent(e event) error {
-	n.logger.Printf("D! setting replicas to %d was %d for %q", e.New, e.Old, e.ID)
+	n.diag.SettingReplicas(e.New, e.Old, e.ID.ID())
 	err := n.a.SetReplicas(e.ID, e.New)
 	return errors.Wrapf(err, "failed to set new replica count for %q", e.ID)
 }
@@ -333,7 +330,7 @@ type k8sAutoscaler struct {
 	namespace string
 }
 
-func newK8sAutoscaleNode(et *ExecutingTask, n *pipeline.K8sAutoscaleNode, l *log.Logger) (*AutoscaleNode, error) {
+func newK8sAutoscaleNode(et *ExecutingTask, n *pipeline.K8sAutoscaleNode, d NodeDiagnostic) (*AutoscaleNode, error) {
 	client, err := et.tm.K8sService.Client(n.Cluster)
 	if err != nil {
 		return nil, fmt.Errorf("cannot use the k8sAutoscale node, could not create kubernetes client: %v", err)
@@ -350,7 +347,7 @@ func newK8sAutoscaleNode(et *ExecutingTask, n *pipeline.K8sAutoscaleNode, l *log
 	}
 	return newAutoscaleNode(
 		et,
-		l,
+		d,
 		n,
 		a,
 		int(n.Min),
@@ -458,7 +455,7 @@ type swarmAutoscaler struct {
 	outputServiceNameTag string
 }
 
-func newSwarmAutoscaleNode(et *ExecutingTask, n *pipeline.SwarmAutoscaleNode, l *log.Logger) (*AutoscaleNode, error) {
+func newSwarmAutoscaleNode(et *ExecutingTask, n *pipeline.SwarmAutoscaleNode, d NodeDiagnostic) (*AutoscaleNode, error) {
 	client, err := et.tm.SwarmService.Client(n.Cluster)
 	if err != nil {
 		return nil, fmt.Errorf("cannot use the swarmAutoscale node, could not create swarm client: %v", err)
@@ -475,7 +472,7 @@ func newSwarmAutoscaleNode(et *ExecutingTask, n *pipeline.SwarmAutoscaleNode, l 
 	}
 	return newAutoscaleNode(
 		et,
-		l,
+		d,
 		n,
 		a,
 		int(n.Min),

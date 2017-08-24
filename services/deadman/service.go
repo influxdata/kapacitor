@@ -1,19 +1,22 @@
 package deadman
 
 import (
-	"log"
 	"time"
 )
 
-type Service struct {
-	c      Config
-	logger *log.Logger
+type Diagnostic interface {
+	ConfiguredGlobally()
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+type Service struct {
+	c    Config
+	diag Diagnostic
+}
+
+func NewService(c Config, d Diagnostic) *Service {
 	return &Service{
-		c:      c,
-		logger: l,
+		c:    c,
+		diag: d,
 	}
 }
 
@@ -39,7 +42,7 @@ func (s *Service) Global() bool {
 
 func (s *Service) Open() error {
 	if s.Global() {
-		s.logger.Println("I! Deadman's switch is configured globally")
+		s.diag.ConfiguredGlobally()
 	}
 	return nil
 }

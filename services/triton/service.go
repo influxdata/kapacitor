@@ -3,7 +3,6 @@ package triton
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -12,6 +11,8 @@ import (
 	ptriton "github.com/prometheus/prometheus/discovery/triton"
 )
 
+type Diagnostic scraper.Diagnostic
+
 // Service is the triton discovery service
 type Service struct {
 	Configs []Config
@@ -19,16 +20,16 @@ type Service struct {
 
 	registry scraper.Registry
 
-	logger *log.Logger
-	open   bool
+	diag Diagnostic
+	open bool
 }
 
 // NewService creates a new unopened service
-func NewService(c []Config, r scraper.Registry, l *log.Logger) *Service {
+func NewService(c []Config, r scraper.Registry, d Diagnostic) *Service {
 	return &Service{
 		Configs:  c,
 		registry: r,
-		logger:   l,
+		diag:     d,
 	}
 }
 
@@ -126,7 +127,7 @@ func (s *Service) Test(options interface{}) error {
 	}
 
 	sd := s.Configs[found].PromConfig()
-	discoverer, err := ptriton.New(scraper.NewLogger(s.logger), sd)
+	discoverer, err := ptriton.New(s.diag, sd)
 	if err != nil {
 		return err
 	}

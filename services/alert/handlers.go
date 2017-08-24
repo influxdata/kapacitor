@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -16,10 +15,15 @@ import (
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/bufpool"
 	"github.com/influxdata/kapacitor/command"
+	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/tick/stateful"
 	"github.com/pkg/errors"
 )
+
+type HandlerDiagnostic interface {
+	Error(msg string, err error, ctx ...keyvalue.T)
+}
 
 // Default log mode for file
 const defaultLogFileMode = 0600
@@ -42,7 +46,7 @@ func (c LogHandlerConfig) Validate() error {
 type logHandler struct {
 	logpath string
 	mode    os.FileMode
-	logger  *log.Logger
+	diag    HandlerDiagnostic
 }
 
 func DefaultLogHandlerConfig() LogHandlerConfig {
@@ -51,14 +55,14 @@ func DefaultLogHandlerConfig() LogHandlerConfig {
 	}
 }
 
-func NewLogHandler(c LogHandlerConfig, l *log.Logger) (alert.Handler, error) {
+func NewLogHandler(c LogHandlerConfig, d HandlerDiagnostic) (alert.Handler, error) {
 	if err := c.Validate(); err != nil {
 		return nil, err
 	}
 	return &logHandler{
 		logpath: c.Path,
 		mode:    c.Mode,
-		logger:  l,
+		diag:    d,
 	}, nil
 }
 
@@ -67,14 +71,14 @@ func (h *logHandler) Handle(event alert.Event) {
 
 	f, err := os.OpenFile(h.logpath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, h.mode)
 	if err != nil {
-		h.logger.Printf("E! failed to open file %s for alert logging: %v", h.logpath, err)
+		h.diag.Error("failed to open file for alert logging", err, keyvalue.KV("file", h.logpath))
 		return
 	}
 	defer f.Close()
 
 	err = json.NewEncoder(f).Encode(ad)
 	if err != nil {
-		h.logger.Printf("E! failed to marshal alert data json: %v", err)
+		h.diag.Error("failed to marshal alert data json", err)
 	}
 }
 
@@ -88,10 +92,10 @@ type execHandler struct {
 	bp        *bufpool.Pool
 	s         command.Spec
 	commander command.Commander
-	logger    *log.Logger
+	diag      HandlerDiagnostic
 }
 
-func NewExecHandler(c ExecHandlerConfig, l *log.Logger) alert.Handler {
+func NewExecHandler(c ExecHandlerConfig, d HandlerDiagnostic) alert.Handler {
 	s := command.Spec{
 		Prog: c.Prog,
 		Args: c.Args,
@@ -100,7 +104,7 @@ func NewExecHandler(c ExecHandlerConfig, l *log.Logger) alert.Handler {
 		bp:        bufpool.New(),
 		s:         s,
 		commander: c.Commander,
-		logger:    l,
+		diag:      d,
 	}
 }
 
@@ -111,7 +115,7 @@ func (h *execHandler) Handle(event alert.Event) {
 
 	err := json.NewEncoder(buf).Encode(ad)
 	if err != nil {
-		h.logger.Printf("E! failed to marshal alert data json: %v", err)
+		h.diag.Error("failed to marshal alert data json", err)
 		return
 	}
 
@@ -122,12 +126,12 @@ func (h *execHandler) Handle(event alert.Event) {
 	cmd.Stderr(&out)
 	err = cmd.Start()
 	if err != nil {
-		h.logger.Printf("E! exec command failed: Output: %s: %v", out.String(), err)
+		h.diag.Error("exec command failed", err, keyvalue.KV("output", out.String()))
 		return
 	}
 	err = cmd.Wait()
 	if err != nil {
-		h.logger.Printf("E! exec command failed: Output: %s: %v", out.String(), err)
+		h.diag.Error("exec command failed", err, keyvalue.KV("output", out.String()))
 		return
 	}
 }
@@ -137,16 +141,16 @@ type TCPHandlerConfig struct {
 }
 
 type tcpHandler struct {
-	bp     *bufpool.Pool
-	addr   string
-	logger *log.Logger
+	bp   *bufpool.Pool
+	addr string
+	diag HandlerDiagnostic
 }
 
-func NewTCPHandler(c TCPHandlerConfig, l *log.Logger) alert.Handler {
+func NewTCPHandler(c TCPHandlerConfig, d HandlerDiagnostic) alert.Handler {
 	return &tcpHandler{
-		bp:     bufpool.New(),
-		addr:   c.Address,
-		logger: l,
+		bp:   bufpool.New(),
+		addr: c.Address,
+		diag: d,
 	}
 }
 
@@ -157,13 +161,13 @@ func (h *tcpHandler) Handle(event alert.Event) {
 
 	err := json.NewEncoder(buf).Encode(ad)
 	if err != nil {
-		h.logger.Printf("E! failed to marshal alert data json: %v", err)
+		h.diag.Error("failed to marshal alert data json", err)
 		return
 	}
 
 	conn, err := net.Dial("tcp", h.addr)
 	if err != nil {
-		h.logger.Printf("E! tcp handler: failed to connect to %s: %v", h.addr, err)
+		h.diag.Error("tcp handler failed to connect", err, keyvalue.KV("address", h.addr))
 		return
 	}
 	defer conn.Close()
@@ -200,14 +204,14 @@ type aggregateHandler struct {
 
 	messageTmpl *text.Template
 
-	logger  *log.Logger
+	diag    HandlerDiagnostic
 	events  chan alert.Event
 	closing chan struct{}
 
 	wg sync.WaitGroup
 }
 
-func NewAggregateHandler(c AggregateHandlerConfig, l *log.Logger) (alert.Handler, error) {
+func NewAggregateHandler(c AggregateHandlerConfig, d HandlerDiagnostic) (alert.Handler, error) {
 	// Parse and validate message template
 	tmpl, err := text.New("message").Parse(c.Message)
 	if err != nil {
@@ -226,7 +230,7 @@ func NewAggregateHandler(c AggregateHandlerConfig, l *log.Logger) (alert.Handler
 		topic:       c.Topic,
 		ec:          c.ec,
 		messageTmpl: tmpl,
-		logger:      l,
+		diag:        d,
 		events:      make(chan alert.Event),
 		closing:     make(chan struct{}),
 	}
@@ -310,14 +314,14 @@ type PublishHandlerConfig struct {
 	ec     EventCollector
 }
 type publishHandler struct {
-	c      PublishHandlerConfig
-	logger *log.Logger
+	c    PublishHandlerConfig
+	diag HandlerDiagnostic
 }
 
-func NewPublishHandler(c PublishHandlerConfig, l *log.Logger) alert.Handler {
+func NewPublishHandler(c PublishHandlerConfig, d HandlerDiagnostic) alert.Handler {
 	return &publishHandler{
-		c:      c,
-		logger: l,
+		c:    c,
+		diag: d,
 	}
 }
 
@@ -361,7 +365,7 @@ type matchHandler struct {
 
 	vars []string
 
-	logger *log.Logger
+	diag HandlerDiagnostic
 }
 
 const (
@@ -379,7 +383,7 @@ var matchIdentifiers = map[string]interface{}{
 	"CRITICAL": int64(alert.Critical),
 }
 
-func newMatchHandler(match string, h alert.Handler, l *log.Logger) (*matchHandler, error) {
+func newMatchHandler(match string, h alert.Handler, d HandlerDiagnostic) (*matchHandler, error) {
 	lambda, err := ast.ParseLambda(match)
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid match expression")
@@ -406,11 +410,11 @@ func newMatchHandler(match string, h alert.Handler, l *log.Logger) (*matchHandle
 	}
 
 	mh := &matchHandler{
-		h:      h,
-		expr:   expr,
-		scope:  stateful.NewScope(),
-		vars:   ast.FindReferenceVariables(lambda),
-		logger: l,
+		h:     h,
+		expr:  expr,
+		scope: stateful.NewScope(),
+		vars:  ast.FindReferenceVariables(lambda),
+		diag:  d,
 	}
 
 	// Determine which functions are called
@@ -437,7 +441,7 @@ func newMatchHandler(match string, h alert.Handler, l *log.Logger) (*matchHandle
 
 func (h *matchHandler) Handle(event alert.Event) {
 	if ok, err := h.match(event); err != nil {
-		h.logger.Println("E! failed to evaluate match expression:", err)
+		h.diag.Error("failed to evaluate match expression", err)
 	} else if ok {
 		h.h.Handle(event)
 	}

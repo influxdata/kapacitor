@@ -1,22 +1,34 @@
 package kapacitor
 
 import (
-	"log"
-	"os"
 	"testing"
 	"time"
 
+	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/edge"
+	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/stretchr/testify/assert"
 )
 
-var logger = log.New(os.Stderr, "[window] ", log.LstdFlags|log.Lshortfile)
+// Mock node diagnostic
+type windowNodeDiagnostic struct{}
+
+func newWindowNodeDiagnostic() *nodeDiagnostic { return &nodeDiagnostic{} }
+
+func (d *windowNodeDiagnostic) Error(msg string, err error, ctx ...keyvalue.T) {}
+func (d *windowNodeDiagnostic) AlertTriggered(level alert.Level, id string, message string, rows *models.Row) {
+}
+func (d *windowNodeDiagnostic) SettingReplicas(new int, old int, id string)                        {}
+func (d *windowNodeDiagnostic) StartingBatchQuery(q string)                                        {}
+func (d *windowNodeDiagnostic) LogBatchData(level, prefix string, batch edge.BufferedBatchMessage) {}
+func (d *windowNodeDiagnostic) LogPointData(level, prefix string, point edge.PointMessage)         {}
+func (d *windowNodeDiagnostic) UDFLog(s string)                                                    {}
 
 func TestWindowBufferByTime(t *testing.T) {
 	assert := assert.New(t)
 
-	buf := &windowTimeBuffer{logger: logger}
+	buf := &windowTimeBuffer{}
 
 	size := 100
 
@@ -131,7 +143,7 @@ func TestWindowBufferByCount(t *testing.T) {
 			tc.period,
 			tc.every,
 			tc.fillPeriod,
-			logger,
+			newWindowNodeDiagnostic(),
 		)
 
 		// fill buffer

@@ -2,7 +2,6 @@ package kapacitor
 
 import (
 	"errors"
-	"log"
 	"time"
 
 	"github.com/influxdata/kapacitor/edge"
@@ -19,9 +18,9 @@ type SampleNode struct {
 }
 
 // Create a new  SampleNode which filters data from a source.
-func newSampleNode(et *ExecutingTask, n *pipeline.SampleNode, l *log.Logger) (*SampleNode, error) {
+func newSampleNode(et *ExecutingTask, n *pipeline.SampleNode, d NodeDiagnostic) (*SampleNode, error) {
 	sn := &SampleNode{
-		node:     node{Node: n, et: et, logger: l},
+		node:     node{Node: n, et: et, diag: d},
 		s:        n,
 		counts:   make(map[models.GroupID]int64),
 		duration: n.Duration,

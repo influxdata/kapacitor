@@ -1,8 +1,6 @@
 package kapacitor
 
 import (
-	"log"
-
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/pipeline"
 )
@@ -12,9 +10,9 @@ type NoOpNode struct {
 }
 
 // Create a new  NoOpNode which does nothing with the data and just passes it through.
-func newNoOpNode(et *ExecutingTask, n *pipeline.NoOpNode, l *log.Logger) (*NoOpNode, error) {
+func newNoOpNode(et *ExecutingTask, n *pipeline.NoOpNode, d NodeDiagnostic) (*NoOpNode, error) {
 	nn := &NoOpNode{
-		node: node{Node: n, et: et, logger: l},
+		node: node{Node: n, et: et, diag: d},
 	}
 	nn.node.runF = nn.runNoOp
 	return nn, nil

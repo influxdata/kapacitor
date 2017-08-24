@@ -3,7 +3,6 @@ package integrations
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -24,7 +23,7 @@ func newHTTPDService() *httpd.Service {
 	config := httpd.NewConfig()
 	config.BindAddress = ":0" // Choose port dynamically
 	config.LogEnabled = testing.Verbose()
-	httpService := httpd.NewService(config, "localhost", logService.NewLogger("[http] ", log.LstdFlags), logService)
+	httpService := httpd.NewService(config, "localhost", diagService.NewHTTPDHandler())
 	err := httpService.Open()
 	if err != nil {
 		panic(err)
@@ -136,7 +135,7 @@ func compareAlertData(exp, got alert.Data) (bool, string) {
 type UDFService struct {
 	ListFunc   func() []string
 	InfoFunc   func(name string) (udf.Info, bool)
-	CreateFunc func(name, taskID, nodeID string, l *log.Logger, abortCallback func()) (udf.Interface, error)
+	CreateFunc func(name, taskID, nodeID string, d udf.Diagnostic, abortCallback func()) (udf.Interface, error)
 }
 
 func (u UDFService) List() []string {
@@ -147,8 +146,8 @@ func (u UDFService) Info(name string) (udf.Info, bool) {
 	return u.InfoFunc(name)
 }
 
-func (u UDFService) Create(name, taskID, nodeID string, l *log.Logger, abortCallback func()) (udf.Interface, error) {
-	return u.CreateFunc(name, taskID, nodeID, l, abortCallback)
+func (u UDFService) Create(name, taskID, nodeID string, d udf.Diagnostic, abortCallback func()) (udf.Interface, error) {
+	return u.CreateFunc(name, taskID, nodeID, d, abortCallback)
 }
 
 type taskStore struct{}

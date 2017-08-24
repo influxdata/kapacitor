@@ -2,7 +2,6 @@ package kapacitor
 
 import (
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -36,10 +35,10 @@ type JoinNode struct {
 }
 
 // Create a new JoinNode, which takes pairs from parent streams combines them into a single point.
-func newJoinNode(et *ExecutingTask, n *pipeline.JoinNode, l *log.Logger) (*JoinNode, error) {
+func newJoinNode(et *ExecutingTask, n *pipeline.JoinNode, d NodeDiagnostic) (*JoinNode, error) {
 	jn := &JoinNode{
 		j:                    n,
-		node:                 node{Node: n, et: et, logger: l},
+		node:                 node{Node: n, et: et, diag: d},
 		groups:               make(map[models.GroupID]*joinGroup),
 		matchGroupsBuffer:    make(map[models.GroupID][]srcPoint),
 		specificGroupsBuffer: make(map[models.GroupID][]srcPoint),
@@ -362,7 +361,7 @@ func (g *joinGroup) newJoinset(t time.Time) *joinset {
 		g.n.j.Delimiter,
 		g.n.j.Tolerance,
 		t,
-		g.n.logger,
+		g.n.diag,
 	)
 }
 
@@ -462,7 +461,7 @@ type joinset struct {
 
 	first int
 
-	logger *log.Logger
+	diag NodeDiagnostic
 }
 
 func newJoinset(
@@ -474,7 +473,7 @@ func newJoinset(
 	delimiter string,
 	tolerance time.Duration,
 	time time.Time,
-	l *log.Logger,
+	d NodeDiagnostic,
 ) *joinset {
 	expected := len(prefixes)
 	return &joinset{
@@ -489,7 +488,7 @@ func newJoinset(
 		first:     expected,
 		time:      time,
 		tolerance: tolerance,
-		logger:    l,
+		diag:      d,
 	}
 }
 

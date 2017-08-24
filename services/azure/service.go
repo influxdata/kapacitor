@@ -3,7 +3,6 @@ package azure
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -12,6 +11,8 @@ import (
 	pazure "github.com/prometheus/prometheus/discovery/azure"
 )
 
+type Diagnostic scraper.Diagnostic
+
 // Service is the azure discovery service
 type Service struct {
 	Configs []Config
@@ -19,16 +20,16 @@ type Service struct {
 
 	registry scraper.Registry
 
-	logger *log.Logger
-	open   bool
+	diag Diagnostic
+	open bool
 }
 
 // NewService creates a new unopened Azure service
-func NewService(c []Config, r scraper.Registry, l *log.Logger) *Service {
+func NewService(c []Config, r scraper.Registry, d Diagnostic) *Service {
 	return &Service{
 		Configs:  c,
 		registry: r,
-		logger:   l,
+		diag:     d,
 	}
 }
 
@@ -126,7 +127,7 @@ func (s *Service) Test(options interface{}) error {
 	}
 
 	sd := s.Configs[found].PromConfig()
-	discoverer := pazure.NewDiscovery(sd, scraper.NewLogger(s.logger))
+	discoverer := pazure.NewDiscovery(sd, s.diag)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	updates := make(chan []*config.TargetGroup)

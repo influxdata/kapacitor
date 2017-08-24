@@ -1,4 +1,4 @@
-package logging
+package diagnostic
 
 type Config struct {
 	File  string `toml:"file"`
@@ -8,6 +8,6 @@ type Config struct {
 func NewConfig() Config {
 	return Config{
 		File:  "STDERR",
-		Level: "INFO",
+		Level: "DEBUG",
 	}
 }

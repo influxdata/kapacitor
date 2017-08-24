@@ -2,8 +2,6 @@ package kapacitor
 
 import (
 	"errors"
-	"fmt"
-	"log"
 	"sync"
 
 	"github.com/influxdata/kapacitor/edge"
@@ -21,6 +19,10 @@ const (
 
 var ErrAborted = errors.New("edged aborted")
 
+type EdgeDiagnostic interface {
+	ClosingEdge(collected, emitted int64)
+}
+
 type Edge struct {
 	edge.StatsEdge
 
@@ -29,10 +31,10 @@ type Edge struct {
 
 	statsKey string
 	statMap  *expvar.Map
-	logger   *log.Logger
+	diag     EdgeDiagnostic
 }
 
-func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, size int, logService LogService) edge.StatsEdge {
+func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, size int, d EdgeDiagnostic) edge.StatsEdge {
 	e := edge.NewStatsEdge(edge.NewChannelEdge(t, defaultEdgeBufferSize))
 	tags := map[string]string{
 		"task":   taskName,
@@ -43,12 +45,11 @@ func newEdge(taskName, parentName, childName string, t pipeline.EdgeType, size i
 	key, sm := vars.NewStatistic("edges", tags)
 	sm.Set(statCollected, e.CollectedVar())
 	sm.Set(statEmitted, e.EmittedVar())
-	name := fmt.Sprintf("%s|%s->%s", taskName, parentName, childName)
 	return &Edge{
 		StatsEdge: e,
 		statsKey:  key,
 		statMap:   sm,
-		logger:    logService.NewLogger(fmt.Sprintf("[edge:%s] ", name), log.LstdFlags),
+		diag:      d,
 	}
 }
 
@@ -60,9 +61,6 @@ func (e *Edge) Close() error {
 	}
 	e.closed = true
 	vars.DeleteStatistic(e.statsKey)
-	e.logger.Printf("D! closing c: %d e: %d",
-		e.Collected(),
-		e.Emitted(),
-	)
+	e.diag.ClosingEdge(e.Collected(), e.Emitted())
 	return e.StatsEdge.Close()
 }

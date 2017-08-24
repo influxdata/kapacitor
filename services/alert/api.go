@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"path"
 	"sort"
@@ -47,7 +46,7 @@ type apiServer struct {
 		AddPreviewRoutes([]httpd.Route) error
 		DelRoutes([]httpd.Route)
 	}
-	logger *log.Logger
+	diag Diagnostic
 }
 
 func (s *apiServer) Open() error {

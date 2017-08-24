@@ -23,7 +23,6 @@
 package stats
 
 import (
-	"log"
 	"sync"
 	"time"
 
@@ -33,6 +32,10 @@ import (
 	"github.com/influxdata/kapacitor/server/vars"
 	"github.com/influxdata/kapacitor/timer"
 )
+
+type Diagnostic interface {
+	Error(msg string, err error)
+}
 
 // Sends internal stats back into the Kapacitor stream.
 // Internal stats come from running tasks and other
@@ -56,17 +59,17 @@ type Service struct {
 	mu      sync.Mutex
 	wg      sync.WaitGroup
 
-	logger *log.Logger
+	diag Diagnostic
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, d Diagnostic) *Service {
 	return &Service{
 		interval:            time.Duration(c.StatsInterval),
 		db:                  c.Database,
 		rp:                  c.RetentionPolicy,
 		timingSampleRate:    c.TimingSampleRate,
 		timingMovingAvgSize: c.TimingMovingAverageSize,
-		logger:              l,
+		diag:                d,
 	}
 }
 
@@ -115,7 +118,7 @@ func (s *Service) reportStats() {
 	now := time.Now().UTC()
 	data, err := vars.GetStatsData()
 	if err != nil {
-		s.logger.Println("E! error getting stats data:", err)
+		s.diag.Error("error getting stats data", err)
 		return
 	}
 	for _, stat := range data {

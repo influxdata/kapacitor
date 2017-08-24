@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/url"
 	"os"
@@ -15,12 +16,11 @@ import (
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/models"
 	influxcli "github.com/influxdata/kapacitor/influxdb"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/influxdb"
 	"github.com/influxdata/kapacitor/uuid"
 )
-
-var ls = logSerivce{}
 
 const (
 	randomTokenData = "test random data that is 64 bytes long xxxxxxxxxxxxxxxxxxxxxxxxx"
@@ -37,6 +37,13 @@ var (
 	testKapacitorClusterID = uuid.New()
 	testSubName            = "kapacitor-" + testKapacitorClusterID.String()
 )
+
+var diagService *diagnostic.Service
+
+func init() {
+	diagService = diagnostic.NewService(diagnostic.NewConfig(), ioutil.Discard, ioutil.Discard)
+	diagService.Open()
+}
 
 func init() {
 	if len(randomTokenData) != tokenSize {
@@ -1157,17 +1164,16 @@ func NewDefaultTestConfigs(clusters []string) []influxdb.Config {
 
 func NewTestService(configs []influxdb.Config, hostname string, useTokens bool) (*influxdb.Service, *authService, *clientCreator) {
 	httpPort := 9092
-	l := ls.NewLogger("[test-influxdb] ", log.LstdFlags)
+	d := diagService.NewInfluxDBHandler()
 	s, err := influxdb.NewService(
 		configs,
 		httpPort,
 		hostname,
 		ider{clusterID: testKapacitorClusterID, serverID: uuid.New()},
-		useTokens, l)
+		useTokens, d)
 	if err != nil {
 		panic(err)
 	}
-	s.LogService = ls
 	s.HTTPDService = httpdService{}
 	as := &authService{}
 	s.AuthService = as

@@ -6,13 +6,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"sync"
 
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/bufpool"
+	"github.com/influxdata/kapacitor/keyvalue"
 )
+
+type Diagnostic interface {
+	WithContext(ctx ...keyvalue.T) Diagnostic
+	Error(msg string, err error)
+}
 
 // Only one of name and url should be non-empty
 type Endpoint struct {
@@ -71,12 +76,12 @@ func (e *Endpoint) NewHTTPRequest(body io.Reader) (req *http.Request, err error)
 type Service struct {
 	mu        sync.RWMutex
 	endpoints map[string]*Endpoint
-	logger    *log.Logger
+	diag      Diagnostic
 }
 
-func NewService(c Configs, l *log.Logger) *Service {
+func NewService(c Configs, d Diagnostic) *Service {
 	s := &Service{
-		logger:    l,
+		diag:      d,
 		endpoints: c.index(),
 	}
 	return s
@@ -191,11 +196,11 @@ type handler struct {
 	s        *Service
 	bp       *bufpool.Pool
 	endpoint *Endpoint
-	logger   *log.Logger
+	diag     Diagnostic
 	headers  map[string]string
 }
 
-func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
 	e, ok := s.Endpoint(c.Endpoint)
 	if !ok {
 		e = NewEndpoint(c.URL, nil, BasicAuth{})
@@ -205,7 +210,7 @@ func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
 		s:        s,
 		bp:       bufpool.New(),
 		endpoint: e,
-		logger:   l,
+		diag:     s.diag.WithContext(ctx...),
 		headers:  c.Headers,
 	}
 }
@@ -233,13 +238,13 @@ func (h *handler) Handle(event alert.Event) {
 
 	err = json.NewEncoder(body).Encode(ad)
 	if err != nil {
-		h.logger.Printf("E! failed to marshal alert data json: %v", err)
+		h.diag.Error("failed to marshal alert data json", err)
 		return
 	}
 
 	req, err := h.NewHTTPRequest(body)
 	if err != nil {
-		h.logger.Printf("E! fail to create HTTP request: %v", err)
+		h.diag.Error("failed to create HTTP request", err)
 		return
 	}
 
@@ -247,7 +252,7 @@ func (h *handler) Handle(event alert.Event) {
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		h.logger.Printf("E! failed to POST alert data: %v", err)
+		h.diag.Error("failed to POST alert data", err)
 		return
 	}
 	resp.Body.Close()

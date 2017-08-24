@@ -3,7 +3,6 @@ package consul
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -12,6 +11,8 @@ import (
 	pconsul "github.com/prometheus/prometheus/discovery/consul"
 )
 
+type Diagnostic scraper.Diagnostic
+
 // Service is the consul discovery service
 type Service struct {
 	Configs []Config
@@ -19,16 +20,16 @@ type Service struct {
 
 	registry scraper.Registry
 
-	logger *log.Logger
-	open   bool
+	diag Diagnostic
+	open bool
 }
 
 // NewService creates a new unopened service
-func NewService(c []Config, r scraper.Registry, l *log.Logger) *Service {
+func NewService(c []Config, r scraper.Registry, d Diagnostic) *Service {
 	return &Service{
 		Configs:  c,
 		registry: r,
-		logger:   l,
+		diag:     d,
 	}
 }
 
@@ -126,7 +127,7 @@ func (s *Service) Test(options interface{}) error {
 	}
 
 	sd := s.Configs[found].PromConfig()
-	discoverer, err := pconsul.NewDiscovery(sd, scraper.NewLogger(s.logger))
+	discoverer, err := pconsul.NewDiscovery(sd, s.diag)
 	if err != nil {
 		return err
 	}

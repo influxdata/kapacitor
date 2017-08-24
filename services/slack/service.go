@@ -6,32 +6,40 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"sync/atomic"
 
 	"github.com/influxdata/kapacitor/alert"
+	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/tlsconfig"
 	"github.com/pkg/errors"
 )
 
+type Diagnostic interface {
+	WithContext(ctx ...keyvalue.T) Diagnostic
+
+	InsecureSkipVerify()
+
+	Error(msg string, err error)
+}
+
 type Service struct {
 	configValue atomic.Value
 	clientValue atomic.Value
-	logger      *log.Logger
+	diag        Diagnostic
 	client      *http.Client
 }
 
-func NewService(c Config, l *log.Logger) (*Service, error) {
+func NewService(c Config, d Diagnostic) (*Service, error) {
 	tlsConfig, err := tlsconfig.Create(c.SSLCA, c.SSLCert, c.SSLKey, c.InsecureSkipVerify)
 	if err != nil {
 		return nil, err
 	}
 	if tlsConfig.InsecureSkipVerify {
-		l.Println("W! Slack service is configured to skip ssl verification")
+		d.InsecureSkipVerify()
 	}
 	s := &Service{
-		logger: l,
+		diag: d,
 	}
 	s.configValue.Store(c)
 	s.clientValue.Store(&http.Client{
@@ -67,7 +75,7 @@ func (s *Service) Update(newConfig []interface{}) error {
 			return err
 		}
 		if tlsConfig.InsecureSkipVerify {
-			s.logger.Println("W! Slack service is configured to skip ssl verification")
+			s.diag.InsecureSkipVerify()
 		}
 		s.configValue.Store(c)
 		s.clientValue.Store(&http.Client{
@@ -216,16 +224,16 @@ type HandlerConfig struct {
 }
 
 type handler struct {
-	s      *Service
-	c      HandlerConfig
-	logger *log.Logger
+	s    *Service
+	c    HandlerConfig
+	diag Diagnostic
 }
 
-func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
 	return &handler{
-		s:      s,
-		c:      c,
-		logger: l,
+		s:    s,
+		c:    c,
+		diag: s.diag.WithContext(ctx...),
 	}
 }
 
@@ -237,6 +245,6 @@ func (h *handler) Handle(event alert.Event) {
 		h.c.IconEmoji,
 		event.State.Level,
 	); err != nil {
-		h.logger.Println("E! failed to send event to Slack", err)
+		h.diag.Error("failed to send event", err)
 	}
 }

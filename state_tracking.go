@@ -2,7 +2,6 @@ package kapacitor
 
 import (
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/influxdata/kapacitor/edge"
@@ -69,8 +68,7 @@ func (g *stateTrackingGroup) BatchPoint(bp edge.BatchPointMessage) (edge.Message
 	bp = bp.ShallowCopy()
 	err := g.track(bp)
 	if err != nil {
-		g.n.incrementErrorCount()
-		g.n.logger.Println("E! error while evaluating expression:", err)
+		g.n.diag.Error("error while evaluating expression", err)
 		return nil, nil
 	}
 	return bp, nil
@@ -84,8 +82,7 @@ func (g *stateTrackingGroup) Point(p edge.PointMessage) (edge.Message, error) {
 	p = p.ShallowCopy()
 	err := g.track(p)
 	if err != nil {
-		g.n.incrementErrorCount()
-		g.n.logger.Println("E! error while evaluating expression:", err)
+		g.n.diag.Error("error while evaluating expression", err)
 		return nil, nil
 	}
 	return p, nil
@@ -132,7 +129,7 @@ func (sdt *stateDurationTracker) track(t time.Time, inState bool) interface{} {
 	return float64(t.Sub(sdt.startTime)) / float64(sdt.sd.Unit)
 }
 
-func newStateDurationNode(et *ExecutingTask, sd *pipeline.StateDurationNode, l *log.Logger) (*StateTrackingNode, error) {
+func newStateDurationNode(et *ExecutingTask, sd *pipeline.StateDurationNode, d NodeDiagnostic) (*StateTrackingNode, error) {
 	if sd.Lambda == nil {
 		return nil, fmt.Errorf("nil expression passed to StateDurationNode")
 	}
@@ -142,7 +139,7 @@ func newStateDurationNode(et *ExecutingTask, sd *pipeline.StateDurationNode, l *
 		return nil, err
 	}
 	n := &StateTrackingNode{
-		node:       node{Node: sd, et: et, logger: l},
+		node:       node{Node: sd, et: et, diag: d},
 		as:         sd.As,
 		newTracker: func() stateTracker { return &stateDurationTracker{sd: sd} },
 		expr:       expr,
@@ -170,7 +167,7 @@ func (sct *stateCountTracker) track(t time.Time, inState bool) interface{} {
 	return sct.count
 }
 
-func newStateCountNode(et *ExecutingTask, sc *pipeline.StateCountNode, l *log.Logger) (*StateTrackingNode, error) {
+func newStateCountNode(et *ExecutingTask, sc *pipeline.StateCountNode, d NodeDiagnostic) (*StateTrackingNode, error) {
 	if sc.Lambda == nil {
 		return nil, fmt.Errorf("nil expression passed to StateCountNode")
 	}
@@ -180,7 +177,7 @@ func newStateCountNode(et *ExecutingTask, sc *pipeline.StateCountNode, l *log.Lo
 		return nil, err
 	}
 	n := &StateTrackingNode{
-		node:       node{Node: sc, et: et, logger: l},
+		node:       node{Node: sc, et: et, diag: d},
 		as:         sc.As,
 		newTracker: func() stateTracker { return &stateCountTracker{} },
 		expr:       expr,

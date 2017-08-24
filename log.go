@@ -3,34 +3,30 @@ package kapacitor
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
-	"log"
 	"strings"
 
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/pipeline"
-	"github.com/influxdata/wlog"
 )
 
 type LogNode struct {
 	node
 
-	key string
-	buf bytes.Buffer
-	enc *json.Encoder
+	key    string
+	level  string
+	prefix string
+	buf    bytes.Buffer
+	enc    *json.Encoder
 
 	batchBuffer *edge.BatchBuffer
 }
 
 // Create a new  LogNode which logs all data it receives
-func newLogNode(et *ExecutingTask, n *pipeline.LogNode, l *log.Logger) (*LogNode, error) {
-	level, ok := wlog.StringToLevel[strings.ToUpper(n.Level)]
-	if !ok {
-		return nil, fmt.Errorf("invalid log level %s", n.Level)
-	}
+func newLogNode(et *ExecutingTask, n *pipeline.LogNode, d NodeDiagnostic) (*LogNode, error) {
 	nn := &LogNode{
-		node:        node{Node: n, et: et, logger: l},
-		key:         fmt.Sprintf("%c! %s", wlog.ReverseLevels[level], n.Prefix),
+		node:        node{Node: n, et: et, diag: d},
+		level:       strings.ToUpper(n.Level),
+		prefix:      n.Prefix,
 		batchBuffer: new(edge.BatchBuffer),
 	}
 	nn.enc = json.NewEncoder(&nn.buf)
@@ -63,24 +59,12 @@ func (n *LogNode) EndBatch(end edge.EndBatchMessage) (edge.Message, error) {
 }
 
 func (n *LogNode) BufferedBatch(batch edge.BufferedBatchMessage) (edge.Message, error) {
-	n.buf.Reset()
-	if err := n.enc.Encode(batch); err != nil {
-		n.incrementErrorCount()
-		n.logger.Println("E!", err)
-		return batch, nil
-	}
-	n.logger.Println(n.key, n.buf.String())
+	n.diag.LogBatchData(n.level, n.prefix, batch)
 	return batch, nil
 }
 
 func (n *LogNode) Point(p edge.PointMessage) (edge.Message, error) {
-	n.buf.Reset()
-	if err := n.enc.Encode(p); err != nil {
-		n.incrementErrorCount()
-		n.logger.Println("E!", err)
-		return p, nil
-	}
-	n.logger.Println(n.key, n.buf.String())
+	n.diag.LogPointData(n.level, n.prefix, p)
 	return p, nil
 }
 

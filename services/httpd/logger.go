@@ -1,10 +1,8 @@
 package httpd
 
 import (
-	"fmt"
 	"net"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -74,7 +72,7 @@ func redactPassword(r *http.Request) {
 //     %h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-agent}i\"" %L %D
 //
 // Common Log Format: http://en.wikipedia.org/wiki/Common_Log_Format
-func buildLogLine(l *responseLogger, r *http.Request, start time.Time) string {
+func buildLogLine(d Diagnostic, l *responseLogger, r *http.Request, start time.Time) {
 
 	redactPassword(r)
 
@@ -92,25 +90,55 @@ func buildLogLine(l *responseLogger, r *http.Request, start time.Time) string {
 
 	userAgent := r.UserAgent()
 
-	fields := []string{
+	d.HTTP(
 		host,
-		"-",
 		detect(username, "-"),
-		fmt.Sprintf("[%s]", start.Format("02/Jan/2006:15:04:05 -0700")),
-		`"` + r.Method,
+		start,
+		r.Method,
 		uri,
-		r.Proto + `"`,
-		detect(strconv.Itoa(l.Status()), "-"),
-		strconv.Itoa(l.Size()),
-		`"` + detect(referer, "-") + `"`,
-		`"` + detect(userAgent, "-") + `"`,
+		r.Proto,
+		l.Status(),
+		detect(referer, "-"),
+		detect(userAgent, "-"),
 		r.Header.Get("Request-Id"),
-		// response time, report in microseconds because this is consistent
-		// with apache's %D parameter in mod_log_config
-		strconv.FormatInt(time.Since(start).Nanoseconds()/1000, 10),
+		time.Since(start),
+	)
+
+}
+
+func buildLogLineError(d Diagnostic, l *responseLogger, r *http.Request, start time.Time, e string) {
+
+	redactPassword(r)
+
+	username := parseUsername(r)
+
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+
+	if err != nil {
+		host = r.RemoteAddr
 	}
 
-	return strings.Join(fields, " ")
+	uri := r.URL.RequestURI()
+
+	referer := r.Referer()
+
+	userAgent := r.UserAgent()
+
+	d.RecoveryError(
+		"encountered error",
+		e,
+		host,
+		detect(username, "-"),
+		start,
+		r.Method,
+		uri,
+		r.Proto,
+		l.Status(),
+		detect(referer, "-"),
+		detect(userAgent, "-"),
+		r.Header.Get("Request-Id"),
+		time.Since(start),
+	)
 }
 
 // detect detects the first presence of a non blank string and returns it

@@ -2,7 +2,6 @@ package alert
 
 import (
 	"fmt"
-	"log"
 	"path"
 	"sort"
 	"sync"
@@ -20,14 +19,11 @@ type Topics struct {
 	mu sync.RWMutex
 
 	topics map[string]*Topic
-
-	logger *log.Logger
 }
 
-func NewTopics(l *log.Logger) *Topics {
+func NewTopics() *Topics {
 	s := &Topics{
 		topics: make(map[string]*Topic),
-		logger: l,
 	}
 	return s
 }

@@ -2,7 +2,6 @@ package kapacitor
 
 import (
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -20,14 +19,14 @@ type StatsNode struct {
 }
 
 // Create a new  FromNode which filters data from a source.
-func newStatsNode(et *ExecutingTask, n *pipeline.StatsNode, l *log.Logger) (*StatsNode, error) {
+func newStatsNode(et *ExecutingTask, n *pipeline.StatsNode, d NodeDiagnostic) (*StatsNode, error) {
 	// Lookup the executing node for stats.
 	en := et.lookup[n.SourceNode.ID()]
 	if en == nil {
 		return nil, fmt.Errorf("no node found for %s", n.SourceNode.Name())
 	}
 	sn := &StatsNode{
-		node:    node{Node: n, et: et, logger: l},
+		node:    node{Node: n, et: et, diag: d},
 		s:       n,
 		en:      en,
 		closing: make(chan struct{}),

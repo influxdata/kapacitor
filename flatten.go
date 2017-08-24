@@ -2,7 +2,7 @@ package kapacitor
 
 import (
 	"bytes"
-	"log"
+	"fmt"
 	"sync"
 	"time"
 
@@ -19,10 +19,10 @@ type FlattenNode struct {
 }
 
 // Create a new FlattenNode, which takes pairs from parent streams combines them into a single point.
-func newFlattenNode(et *ExecutingTask, n *pipeline.FlattenNode, l *log.Logger) (*FlattenNode, error) {
+func newFlattenNode(et *ExecutingTask, n *pipeline.FlattenNode, d NodeDiagnostic) (*FlattenNode, error) {
 	fn := &FlattenNode{
 		f:    n,
-		node: node{Node: n, et: et, logger: l},
+		node: node{Node: n, et: et, diag: d},
 		bufPool: sync.Pool{
 			New: func() interface{} { return &bytes.Buffer{} },
 		},
@@ -201,8 +201,7 @@ POINTS:
 				}
 				fieldPrefix.WriteString(v)
 			} else {
-				n.incrementErrorCount()
-				n.logger.Printf("E! point missing tag %q for flatten operation", tag)
+				n.diag.Error("poing missing tag for flatten operation", fmt.Errorf("tag %s is missing from point", tag))
 				continue POINTS
 			}
 		}
