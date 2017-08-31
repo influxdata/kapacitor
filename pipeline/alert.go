@@ -945,6 +945,7 @@ type HipChatHandler struct {
 //                 .event('Something went wrong')
 //                 .environment('Development')
 //                 .group('Dev. Servers')
+//                 .timeout(5m)
 //
 // NOTE: Alerta cannot be configured globally because of its required properties.
 // tick:property
@@ -996,6 +997,10 @@ type AlertaHandler struct {
 	// List of effected Services
 	// tick:ignore
 	Service []string `tick:"Services"`
+
+	// Alerta timeout.
+	// Default: 24h
+	Timeout time.Duration
 }
 
 // List of effected services.

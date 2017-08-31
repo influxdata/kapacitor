@@ -5918,6 +5918,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"token-prefix": "",
 						"url":          "http://alerta.example.com",
 						"insecure-skip-verify": false,
+						"timeout":              "0s",
 					},
 					Redacted: []string{
 						"token",
@@ -5934,6 +5935,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"token-prefix": "",
 					"url":          "http://alerta.example.com",
 					"insecure-skip-verify": false,
+					"timeout":              "0s",
 				},
 				Redacted: []string{
 					"token",
@@ -5943,8 +5945,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 				{
 					updateAction: client.ConfigUpdateAction{
 						Set: map[string]interface{}{
-							"token":  "token",
-							"origin": "kapacitor",
+							"token":   "token",
+							"origin":  "kapacitor",
+							"timeout": "3h",
 						},
 					},
 					expSection: client.ConfigSection{
@@ -5959,6 +5962,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"token-prefix": "",
 								"url":          "http://alerta.example.com",
 								"insecure-skip-verify": false,
+								"timeout":              "3h0m0s",
 							},
 							Redacted: []string{
 								"token",
@@ -5975,6 +5979,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"token-prefix": "",
 							"url":          "http://alerta.example.com",
 							"insecure-skip-verify": false,
+							"timeout":              "3h0m0s",
 						},
 						Redacted: []string{
 							"token",
@@ -7352,6 +7357,7 @@ func TestServer_ListServiceTests(t *testing.T) {
 						"testServiceA",
 						"testServiceB",
 					},
+					"timeout": "24h0m0s",
 				},
 			},
 			{
@@ -8066,6 +8072,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 					"origin":       "kapacitor",
 					"group":        "test",
 					"environment":  "env",
+					"timeout":      time.Duration(24 * time.Hour),
 				},
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
@@ -8091,6 +8098,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 						Text:        "message",
 						Origin:      "kapacitor",
 						Service:     []string{"alert"},
+						Timeout:     86400,
 					},
 				}}
 				if !reflect.DeepEqual(exp, got) {

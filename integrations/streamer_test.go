@@ -7616,6 +7616,7 @@ stream
 		.alerta()
 			.token('testtoken1234567')
 			.environment('production')
+			.timeout(1h)
 		.alerta()
 			.token('anothertesttoken')
 			.resource('resource: {{ index .Tags "host" }}')
@@ -7624,7 +7625,7 @@ stream
 			.origin('override')
 			.group('{{ .ID }}')
 			.value('{{ index .Fields "count" }}')
-			.services('serviceA', 'serviceB')
+			.services('serviceA', 'serviceB', '{{ .Name }}')
 `
 	tmInit := func(tm *kapacitor.TaskMaster) {
 		c := alerta.NewConfig()
@@ -7648,6 +7649,7 @@ stream
 				Text:        "kapacitor/cpu/serverA is CRITICAL @1971-01-01 00:00:10 +0000 UTC",
 				Origin:      "Kapacitor",
 				Service:     []string{"cpu"},
+				Timeout:     3600,
 			},
 		},
 		alertatest.Request{
@@ -7660,8 +7662,9 @@ stream
 				Environment: "serverA",
 				Text:        "kapacitor/cpu/serverA is CRITICAL @1971-01-01 00:00:10 +0000 UTC",
 				Origin:      "override",
-				Service:     []string{"serviceA", "serviceB"},
+				Service:     []string{"serviceA", "serviceB", "cpu"},
 				Value:       "10",
+				Timeout:     86400,
 			},
 		},
 	}
