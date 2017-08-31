@@ -13,6 +13,7 @@
 
 ### Bugfixes
 
+- [#916](https://github.com/influxdata/kapacitor/issues/916): Crash of Kapacitor on Windows x64 when starting a recording
 - [#1400](https://github.com/influxdata/kapacitor/issues/1400): Allow for `.yml` file extensions in `define-topic-handler`
 - [#1402](https://github.com/influxdata/kapacitor/pull/1402): Fix http server error logging.
 - [#1500](https://github.com/influxdata/kapacitor/pull/1500): Fix bugs with stopping running UDF agent.
