@@ -35,7 +35,7 @@ import (
 	"html"
 	"log"
 	"os"
-	"path"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -139,7 +139,7 @@ func main() {
 			weight = w
 		}
 		n.Render(&buf, r, nodes, weight)
-		filename := path.Join(out, snaker.CamelToSnake(name)+".md")
+		filename := filepath.Join(out, snaker.CamelToSnake(name)+".md")
 		log.Println("Writing file:", filename, i)
 		f, err := os.Create(filename)
 		if err != nil {

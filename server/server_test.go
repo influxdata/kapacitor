@@ -11,9 +11,9 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -2970,7 +2970,7 @@ test value=1 0000000012
 		t.Errorf("replay failed: %s", replay.Error)
 	}
 
-	f, err := os.Open(path.Join(tmpDir, "alert.log"))
+	f, err := os.Open(filepath.Join(tmpDir, "alert.log"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3173,7 +3173,7 @@ func TestServer_RecordReplayBatch(t *testing.T) {
 		}
 	}
 
-	f, err := os.Open(path.Join(tmpDir, "alert.log"))
+	f, err := os.Open(filepath.Join(tmpDir, "alert.log"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3386,7 +3386,7 @@ func TestServer_ReplayBatch(t *testing.T) {
 		}
 	}
 
-	f, err := os.Open(path.Join(tmpDir, "alert.log"))
+	f, err := os.Open(filepath.Join(tmpDir, "alert.log"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3639,7 +3639,7 @@ func TestServer_RecordReplayQuery(t *testing.T) {
 		}
 	}
 
-	f, err := os.Open(path.Join(tmpDir, "alert.log"))
+	f, err := os.Open(filepath.Join(tmpDir, "alert.log"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3923,7 +3923,7 @@ func TestServer_ReplayQuery(t *testing.T) {
 		}
 	}
 
-	f, err := os.Open(path.Join(tmpDir, "alert.log"))
+	f, err := os.Open(filepath.Join(tmpDir, "alert.log"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -4249,7 +4249,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 
 	// Validate we got the data in the alert.log
 
-	f, err := os.Open(path.Join(tmpDir, "alert.log"))
+	f, err := os.Open(filepath.Join(tmpDir, "alert.log"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -4533,7 +4533,7 @@ func TestServer_UDFStreamAgents(t *testing.T) {
 					"go",
 					"build",
 					"-o",
-					filepath.Join(tdir, "movavg"),
+					filepath.Join(tdir, "movavg"+ExecutableSuffix),
 					filepath.Join(udfDir, "agent/examples/moving_avg/moving_avg.go"),
 				)
 				out, err := cmd.CombinedOutput()
@@ -4552,7 +4552,7 @@ func TestServer_UDFStreamAgents(t *testing.T) {
 		{
 			buildFunc: func() error { return nil },
 			config: udf.FunctionConfig{
-				Prog:    "python2",
+				Prog:    PythonExecutable,
 				Args:    []string{"-u", filepath.Join(udfDir, "agent/examples/moving_avg/moving_avg.py")},
 				Timeout: toml.Duration(time.Minute),
 				Env: map[string]string{
@@ -4673,6 +4673,9 @@ test,group=b value=0 0000000011
 // If this test fails due to missing python dependencies, run 'INSTALL_PREFIX=/usr/local ./install-deps.sh' from the root directory of the
 // kapacitor project.
 func TestServer_UDFStreamAgentsSocket(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping on windows as unix sockets are not available")
+	}
 	tdir, err := ioutil.TempDir("", "kapacitor_server_test")
 	if err != nil {
 		t.Fatal(err)
@@ -4690,7 +4693,7 @@ func TestServer_UDFStreamAgentsSocket(t *testing.T) {
 					"go",
 					"build",
 					"-o",
-					filepath.Join(tdir, "mirror"),
+					filepath.Join(tdir, "mirror"+ExecutableSuffix),
 					filepath.Join(udfDir, "agent/examples/mirror/mirror.go"),
 				)
 				out, err := cmd.CombinedOutput()
@@ -4714,7 +4717,7 @@ func TestServer_UDFStreamAgentsSocket(t *testing.T) {
 		{
 			startFunc: func() *exec.Cmd {
 				cmd := exec.Command(
-					"python2",
+					PythonExecutable,
 					"-u",
 					filepath.Join(udfDir, "agent/examples/mirror/mirror.py"),
 					filepath.Join(tdir, "mirror.py.sock"),
@@ -4855,7 +4858,7 @@ func TestServer_UDFBatchAgents(t *testing.T) {
 					"go",
 					"build",
 					"-o",
-					filepath.Join(tdir, "outliers"),
+					filepath.Join(tdir, "outliers"+ExecutableSuffix),
 					filepath.Join(udfDir, "agent/examples/outliers/outliers.go"),
 				)
 				out, err := cmd.CombinedOutput()
@@ -4874,7 +4877,7 @@ func TestServer_UDFBatchAgents(t *testing.T) {
 		{
 			buildFunc: func() error { return nil },
 			config: udf.FunctionConfig{
-				Prog:    "python2",
+				Prog:    PythonExecutable,
 				Args:    []string{"-u", filepath.Join(udfDir, "agent/examples/outliers/outliers.py")},
 				Timeout: toml.Duration(time.Minute),
 				Env: map[string]string{
@@ -7940,7 +7943,7 @@ func TestServer_AlertHandlers_CRUD(t *testing.T) {
 				{
 					Path:      "/options/path",
 					Operation: "add",
-					Value:     "/var/log/alert.log",
+					Value:     AlertLogPath,
 				},
 			},
 			expPatch: client.TopicHandler{
@@ -7948,7 +7951,7 @@ func TestServer_AlertHandlers_CRUD(t *testing.T) {
 				ID:   "myhandler",
 				Kind: "log",
 				Options: map[string]interface{}{
-					"path": "/var/log/alert.log",
+					"path": AlertLogPath,
 				},
 			},
 			put: client.TopicHandlerOptions{
@@ -8181,7 +8184,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				tdir := MustTempDir()
-				p := path.Join(tdir, "alert.log")
+				p := filepath.Join(tdir, "alert.log")
 
 				ha.Options["path"] = p
 
@@ -8196,7 +8199,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				defer os.RemoveAll(tdir)
 				l := ctxt.Value("log").(*alerttest.Log)
 				expData := []alert.Data{alertData}
-				expMode := os.FileMode(0604)
+				expMode := os.FileMode(LogFileExpectedMode)
 
 				m, err := l.Mode()
 				if err != nil {
@@ -9456,7 +9459,7 @@ func TestServer_AlertTopic_PersistedState(t *testing.T) {
 
 	tmpDir := MustTempDir()
 	defer os.RemoveAll(tmpDir)
-	tmpPath := path.Join(tmpDir, "alert.log")
+	tmpPath := filepath.Join(tmpDir, "alert.log")
 
 	// Create default config
 	c := NewConfig()
