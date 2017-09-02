@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/influxdata/kapacitor/alert"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/pkg/errors"
 )
 
@@ -54,7 +55,7 @@ const (
 )
 
 type Service struct {
-	logger *log.Logger
+	diagnostic diagnostic.Diagnostic
 
 	mu      sync.RWMutex
 	clients map[string]Client
@@ -63,7 +64,7 @@ type Service struct {
 	defaultBrokerName string
 }
 
-func NewService(cs Configs, l *log.Logger) (*Service, error) {
+func NewService(cs Configs, d diagnostic.Diagnostic) (*Service, error) {
 	configs := cs.index()
 	clients := make(map[string]Client, len(cs))
 
@@ -85,7 +86,7 @@ func NewService(cs Configs, l *log.Logger) (*Service, error) {
 	}
 
 	return &Service{
-		logger:            l,
+		diagnostic:        d,
 		configs:           configs,
 		clients:           clients,
 		defaultBrokerName: defaultBrokerName,
@@ -200,12 +201,17 @@ func (s *Service) update(cs Configs) error {
 	return nil
 }
 
-func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
-	s.logger.Println("D! create Handler", c)
+func (s *Service) Handler(c HandlerConfig, d diagnostic.Diagnostic) alert.Handler {
+	//s.logger.Println("D! create Handler", c)
+	s.diagnostic.Diag(
+		"level", "debug",
+		"msg", "creating handler",
+		"handler", c,
+	)
 	return &handler{
-		s:      s,
-		c:      c,
-		logger: l,
+		s:          s,
+		c:          c,
+		diagnostic: d,
 	}
 }
 
@@ -217,15 +223,24 @@ type HandlerConfig struct {
 }
 
 type handler struct {
-	s      *Service
-	c      HandlerConfig
-	logger *log.Logger
+	s          *Service
+	c          HandlerConfig
+	diagnostic diagnostic.Diagnostic
 }
 
 func (h *handler) Handle(event alert.Event) {
-	h.logger.Println("D! HANDLE")
+	//h.logger.Println("D! HANDLE")
+	h.diagnostic.Diag(
+		"level", "debug",
+		"msg", "handling event",
+	)
 	if err := h.s.Alert(h.c.BrokerName, h.c.Topic, h.c.QoS, h.c.Retained, event.State.Message); err != nil {
-		h.logger.Println("E! failed to post message to MQTT broker", err)
+		//h.logger.Println("E! failed to post message to MQTT broker", err)
+		h.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to post message to MQTT broker",
+			"error", err,
+		)
 	}
 }
 

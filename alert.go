@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	html "html/template"
-	"log"
 	"os"
 	"sync"
 	text "text/template"
@@ -17,6 +16,7 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	alertservice "github.com/influxdata/kapacitor/services/alert"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/mqtt"
@@ -75,9 +75,9 @@ type AlertNode struct {
 }
 
 // Create a new  AlertNode which caches the most recent item and exposes it over the HTTP API.
-func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *AlertNode, err error) {
+func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d diagnostic.Diagnostic) (an *AlertNode, err error) {
 	an = &AlertNode{
-		node: node{Node: n, et: et, logger: l},
+		node: node{Node: n, et: et, diagnostic: d},
 		a:    n,
 	}
 	an.node.runF = an.runAlert
@@ -126,7 +126,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		c := alertservice.TCPHandlerConfig{
 			Address: tcp.Address,
 		}
-		h := alertservice.NewTCPHandler(c, l)
+		h := alertservice.NewTCPHandler(c, d)
 		an.handlers = append(an.handlers, h)
 	}
 
@@ -134,12 +134,12 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		c := smtp.HandlerConfig{
 			To: email.ToList,
 		}
-		h := et.tm.SMTPService.Handler(c, l)
+		h := et.tm.SMTPService.Handler(c, d)
 		an.handlers = append(an.handlers, h)
 	}
 	if len(n.EmailHandlers) == 0 && (et.tm.SMTPService != nil && et.tm.SMTPService.Global()) {
 		c := smtp.HandlerConfig{}
-		h := et.tm.SMTPService.Handler(c, l)
+		h := et.tm.SMTPService.Handler(c, d)
 		an.handlers = append(an.handlers, h)
 	}
 	// If email has been configured with state changes only set it.
@@ -155,7 +155,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 			Args:      e.Command[1:],
 			Commander: et.tm.Commander,
 		}
-		h := alertservice.NewExecHandler(c, l)
+		h := alertservice.NewExecHandler(c, d)
 		an.handlers = append(an.handlers, h)
 	}
 
@@ -165,7 +165,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		if log.Mode != 0 {
 			c.Mode = os.FileMode(log.Mode)
 		}
-		h, err := alertservice.NewLogHandler(c, l)
+		h, err := alertservice.NewLogHandler(c, d)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create log alert handler")
 		}
@@ -176,12 +176,12 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		c := victorops.HandlerConfig{
 			RoutingKey: vo.RoutingKey,
 		}
-		h := et.tm.VictorOpsService.Handler(c, l)
+		h := et.tm.VictorOpsService.Handler(c, d)
 		an.handlers = append(an.handlers, h)
 	}
 	if len(n.VictorOpsHandlers) == 0 && (et.tm.VictorOpsService != nil && et.tm.VictorOpsService.Global()) {
 		c := victorops.HandlerConfig{}
-		h := et.tm.VictorOpsService.Handler(c, l)
+		h := et.tm.VictorOpsService.Handler(c, d)
 		an.handlers = append(an.handlers, h)
 	}
 
@@ -189,12 +189,12 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		c := pagerduty.HandlerConfig{
 			ServiceKey: pd.ServiceKey,
 		}
-		h := et.tm.PagerDutyService.Handler(c, l)
+		h := et.tm.PagerDutyService.Handler(c, d)
 		an.handlers = append(an.handlers, h)
 	}
 	if len(n.PagerDutyHandlers) == 0 && (et.tm.PagerDutyService != nil && et.tm.PagerDutyService.Global()) {
 		c := pagerduty.HandlerConfig{}
-		h := et.tm.PagerDutyService.Handler(c, l)
+		h := et.tm.PagerDutyService.Handler(c, d)
 		an.handlers = append(an.handlers, h)
 	}
 
@@ -203,7 +203,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 			Source:   s.Source,
 			Handlers: s.HandlersList,
 		}
-		h, err := et.tm.SensuService.Handler(c, l)
+		h, err := et.tm.SensuService.Handler(c, d)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create sensu alert handler")
 		}
@@ -216,11 +216,11 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 			Username:  s.Username,
 			IconEmoji: s.IconEmoji,
 		}
-		h := et.tm.SlackService.Handler(c, l)
+		h := et.tm.SlackService.Handler(c, d)
 		an.handlers = append(an.handlers, h)
 	}
 	if len(n.SlackHandlers) == 0 && (et.tm.SlackService != nil && et.tm.SlackService.Global()) {
-		h := et.tm.SlackService.Handler(slack.HandlerConfig{}, l)
+		h := et.tm.SlackService.Handler(slack.HandlerConfig{}, d)
 		an.handlers = append(an.handlers, h)
 	}
 	// If slack has been configured with state changes only set it.
@@ -237,7 +237,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 			DisableWebPagePreview: t.IsDisableWebPagePreview,
 			DisableNotification:   t.IsDisableNotification,
 		}
-		h := et.tm.TelegramService.Handler(c, l)
+		h := et.tm.TelegramService.Handler(c, d)
 		an.handlers = append(an.handlers, h)
 	}
 
@@ -254,7 +254,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 			TrapOid:  s.TrapOid,
 			DataList: dataList,
 		}
-		h, err := et.tm.SNMPTrapService.Handler(c, l)
+		h, err := et.tm.SNMPTrapService.Handler(c, d)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create SNMP handler")
 		}
@@ -263,7 +263,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 
 	if len(n.TelegramHandlers) == 0 && (et.tm.TelegramService != nil && et.tm.TelegramService.Global()) {
 		c := telegram.HandlerConfig{}
-		h := et.tm.TelegramService.Handler(c, l)
+		h := et.tm.TelegramService.Handler(c, d)
 		an.handlers = append(an.handlers, h)
 	}
 	// If telegram has been configured with state changes only set it.
@@ -278,12 +278,12 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 			Room:  hc.Room,
 			Token: hc.Token,
 		}
-		h := et.tm.HipChatService.Handler(c, l)
+		h := et.tm.HipChatService.Handler(c, d)
 		an.handlers = append(an.handlers, h)
 	}
 	if len(n.HipChatHandlers) == 0 && (et.tm.HipChatService != nil && et.tm.HipChatService.Global()) {
 		c := hipchat.HandlerConfig{}
-		h := et.tm.HipChatService.Handler(c, l)
+		h := et.tm.HipChatService.Handler(c, d)
 		an.handlers = append(an.handlers, h)
 	}
 	// If HipChat has been configured with state changes only set it.
@@ -319,7 +319,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		if len(a.Service) != 0 {
 			c.Service = a.Service
 		}
-		h, err := et.tm.AlertaService.Handler(c, l)
+		h, err := et.tm.AlertaService.Handler(c, d)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create Alerta handler")
 		}
@@ -343,7 +343,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 		if p.Sound != "" {
 			c.Sound = p.Sound
 		}
-		h := et.tm.PushoverService.Handler(c, l)
+		h := et.tm.PushoverService.Handler(c, d)
 		an.handlers = append(an.handlers, h)
 	}
 
@@ -353,7 +353,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 			Endpoint: p.Endpoint,
 			Headers:  p.Headers,
 		}
-		h := et.tm.HTTPPostService.Handler(c, l)
+		h := et.tm.HTTPPostService.Handler(c, d)
 		an.handlers = append(an.handlers, h)
 	}
 
@@ -362,17 +362,17 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 			TeamsList:      og.TeamsList,
 			RecipientsList: og.RecipientsList,
 		}
-		h := et.tm.OpsGenieService.Handler(c, l)
+		h := et.tm.OpsGenieService.Handler(c, d)
 		an.handlers = append(an.handlers, h)
 	}
 	if len(n.OpsGenieHandlers) == 0 && (et.tm.OpsGenieService != nil && et.tm.OpsGenieService.Global()) {
 		c := opsgenie.HandlerConfig{}
-		h := et.tm.OpsGenieService.Handler(c, l)
+		h := et.tm.OpsGenieService.Handler(c, d)
 		an.handlers = append(an.handlers, h)
 	}
 
 	for range n.TalkHandlers {
-		h := et.tm.TalkService.Handler(l)
+		h := et.tm.TalkService.Handler(d)
 		an.handlers = append(an.handlers, h)
 	}
 
@@ -383,7 +383,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, l *log.Logger) (an *
 			QoS:        mqtt.QoSLevel(m.Qos),
 			Retained:   m.Retained,
 		}
-		h := et.tm.MQTTService.Handler(c, l)
+		h := et.tm.MQTTService.Handler(c, d)
 		an.handlers = append(an.handlers, h)
 	}
 	// Parse level expressions
@@ -558,7 +558,14 @@ func (n *AlertNode) restoreEvent(id string) (alert.Level, time.Time) {
 	if n.hasAnonTopic() {
 		if state, ok, err := n.et.tm.AlertService.EventState(n.anonTopic, id); err != nil {
 			n.incrementErrorCount()
-			n.logger.Printf("E! failed to get event state for anonymous topic %s, event %s: %v", n.anonTopic, id, err)
+			n.diagnostic.Diag(
+				"level", "error",
+				"msg", "failed to get event state",
+				"topic-type", "anonymous",
+				"topic", n.anonTopic,
+				"event", id,
+				"error", err,
+			)
 		} else if ok {
 			anonTopicState = state
 			anonFound = true
@@ -568,7 +575,14 @@ func (n *AlertNode) restoreEvent(id string) (alert.Level, time.Time) {
 	if n.hasTopic() {
 		if state, ok, err := n.et.tm.AlertService.EventState(n.topic, id); err != nil {
 			n.incrementErrorCount()
-			n.logger.Printf("E! failed to get event state for topic %s, event %s: %v", n.topic, id, err)
+			n.diagnostic.Diag(
+				"level", "error",
+				"msg", "failed to get event state",
+				"topic-type", "known",
+				"topic", n.topic,
+				"event", id,
+				"error", err,
+			)
 		} else if ok {
 			topicState = state
 			topicFound = true
@@ -579,13 +593,25 @@ func (n *AlertNode) restoreEvent(id string) (alert.Level, time.Time) {
 			// Anon topic takes precedence
 			if err := n.et.tm.AlertService.UpdateEvent(n.topic, anonTopicState); err != nil {
 				n.incrementErrorCount()
-				n.logger.Printf("E! failed to update topic %q event state for event %q", n.topic, id)
+				n.diagnostic.Diag(
+					"level", "error",
+					"msg", "failed to update topic event state",
+					"topic", n.topic,
+					"event", id,
+					"error", err,
+				)
 			}
 		} else if topicFound && n.hasAnonTopic() {
 			// Update event state for topic
 			if err := n.et.tm.AlertService.UpdateEvent(n.anonTopic, topicState); err != nil {
 				n.incrementErrorCount()
-				n.logger.Printf("E! failed to update topic %q event state for event %q", n.topic, id)
+				n.diagnostic.Diag(
+					"level", "error",
+					"msg", "failed to update topic event state",
+					"topic", n.topic,
+					"event", id,
+					"error", err,
+				)
 			}
 		} // else nothing was found, nothing to do
 	}
@@ -620,7 +646,14 @@ func (n *AlertNode) handleEvent(event alert.Event) {
 	case alert.Critical:
 		n.critsTriggered.Add(1)
 	}
-	n.logger.Printf("D! %v alert triggered id:%s msg:%s data:%v", event.State.Level, event.State.ID, event.State.Message, event.Data.Result.Series[0])
+	n.diagnostic.Diag(
+		"level", "debug",
+		"msg", "alert triggered",
+		"level", event.State.Level,
+		"id", event.State.ID, // event-id maybe?
+		"event-message", event.State.Message, //idk
+		"result", event.Data.Result, // idk again
+	)
 
 	// If we have anon handlers, emit event to the anonTopic
 	if n.hasAnonTopic() {
@@ -629,7 +662,10 @@ func (n *AlertNode) handleEvent(event alert.Event) {
 		if err != nil {
 			n.eventsDropped.Add(1)
 			n.incrementErrorCount()
-			n.logger.Println("E!", err)
+			n.diagnostic.Diag(
+				"level", "error",
+				"error", err,
+			)
 		}
 	}
 
@@ -640,7 +676,10 @@ func (n *AlertNode) handleEvent(event alert.Event) {
 		if err != nil {
 			n.eventsDropped.Add(1)
 			n.incrementErrorCount()
-			n.logger.Println("E!", err)
+			n.diagnostic.Diag(
+				"level", "error",
+				"error", err,
+			)
 		}
 	}
 }
@@ -652,7 +691,13 @@ func (n *AlertNode) determineLevel(p edge.FieldsTagsTimeGetter, currentLevel ale
 	if rse := n.levelResets[currentLevel]; rse != nil {
 		if pass, err := EvalPredicate(rse, n.lrScopePools[currentLevel], p); err != nil {
 			n.incrementErrorCount()
-			n.logger.Printf("E! error evaluating reset expression for current level %v: %s", currentLevel, err)
+			n.diagnostic.Diag(
+				"level", "error",
+				"msg", "error evaluating expression",
+				"expression", "reset",
+				"current-level", currentLevel, // idk about current-level
+				"error", err,
+			)
 		} else if !pass {
 			return currentLevel
 		}
@@ -674,7 +719,12 @@ func (n *AlertNode) findFirstMatchLevel(start alert.Level, stop alert.Level, p e
 		}
 		if pass, err := EvalPredicate(se, n.scopePools[l], p); err != nil {
 			n.incrementErrorCount()
-			n.logger.Printf("E! error evaluating expression for level %v: %s", alert.Level(l), err)
+			n.diagnostic.Diag(
+				"level", "error",
+				"msg", "error evaluating expression",
+				"level", alert.Level(l),
+				"error", err,
+			)
 			continue
 		} else if pass {
 			return alert.Level(l), true

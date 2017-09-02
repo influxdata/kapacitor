@@ -3,7 +3,6 @@ package servicetest
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"path"
 	"path/filepath"
@@ -11,6 +10,7 @@ import (
 	"strings"
 
 	client "github.com/influxdata/kapacitor/client/v1"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/pkg/errors"
 )
@@ -41,7 +41,7 @@ type Service struct {
 	}
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, d diagnostic.Diagnostic) *Service {
 	return &Service{
 		testers: make(map[string]Tester),
 	}

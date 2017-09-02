@@ -2,28 +2,28 @@ package udf
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/command"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/udf"
 )
 
 type Service struct {
-	configs map[string]FunctionConfig
-	infos   map[string]udf.Info
-	logger  *log.Logger
-	mu      sync.RWMutex
+	configs    map[string]FunctionConfig
+	infos      map[string]udf.Info
+	diagnostic diagnostic.Diagnostic
+	mu         sync.RWMutex
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, d diagnostic.Diagnostic) *Service {
 	return &Service{
-		configs: c.Functions,
-		infos:   make(map[string]udf.Info),
-		logger:  l,
+		configs:    c.Functions,
+		infos:      make(map[string]udf.Info),
+		diagnostic: d,
 	}
 }
 
@@ -60,7 +60,7 @@ func (s *Service) Info(name string) (udf.Info, bool) {
 
 func (s *Service) Create(
 	name, taskID, nodeID string,
-	l *log.Logger,
+	d diagnostic.Diagnostic,
 	abortCallback func(),
 ) (udf.Interface, error) {
 	conf, ok := s.configs[name]
@@ -72,7 +72,7 @@ func (s *Service) Create(
 		return kapacitor.NewUDFSocket(
 			taskID, nodeID,
 			kapacitor.NewSocketConn(conf.Socket),
-			l,
+			d,
 			time.Duration(conf.Timeout),
 			abortCallback,
 		), nil
@@ -91,7 +91,7 @@ func (s *Service) Create(
 			taskID, nodeID,
 			command.ExecCommander,
 			cmdSpec,
-			l,
+			d,
 			time.Duration(conf.Timeout),
 			abortCallback,
 		), nil
@@ -106,7 +106,11 @@ func (s *Service) Refresh(name string) error {
 		return fmt.Errorf("failed to load process info for %q: %v", name, err)
 	}
 	s.infos[name] = info
-	s.logger.Printf("D! loaded UDF info %q", name)
+	s.diagnostic.Diag(
+		"level", "debug",
+		"msg", "loaded UDF info",
+		"udf", name,
+	)
 	return nil
 }
 
@@ -114,7 +118,7 @@ func (s *Service) loadUDFInfo(name string) (udf.Info, error) {
 	// loadUDFInfo creates a UDF connection outside the context of a task or node
 	// because it only makes the Info request and never makes an Init request.
 	// As such it does not need to provide actual task and node IDs.
-	u, err := s.Create(name, "", "", s.logger, nil)
+	u, err := s.Create(name, "", "", s.diagnostic, nil)
 	if err != nil {
 		return udf.Info{}, err
 	}

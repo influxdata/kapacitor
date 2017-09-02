@@ -12,8 +12,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/influxdata/kapacitor/services/logging"
+	"github.com/influxdata/kapacitor/services/diagnostic"
+	"github.com/influxdata/kapacitor/services/notary"
 )
+
+type Notary notary.Notary
 
 type Service struct {
 	ln    net.Listener
@@ -37,11 +40,19 @@ type Service struct {
 
 	Handler *Handler
 
-	logger           *log.Logger
 	httpServerLogger *log.Logger
+
+	diagnostic Diagnostic
+
+	notary Notary
 }
 
-func NewService(c Config, hostname string, l *log.Logger, li logging.Interface) *Service {
+// TODO: not a fan of the stutter
+// also not a fan of calling it a diagnosticer
+// or diagnostic generator
+type Diagnostic diagnostic.Diagnostic
+
+func NewService(c Config, hostname string, d Diagnostic, ds diagnostic.Service) *Service {
 	statMap := &expvar.Map{}
 	statMap.Init()
 	port, _ := c.Port()
@@ -66,12 +77,15 @@ func NewService(c Config, hostname string, l *log.Logger, li logging.Interface) 
 			c.WriteTracing,
 			c.GZIP,
 			statMap,
-			l,
-			li,
+			d,
+			ds,
 			c.SharedSecret,
 		),
-		logger:           l,
-		httpServerLogger: li.NewStaticLevelLogger("[httpd]", log.LstdFlags, logging.ERROR),
+		// TODO: not totally sure what to do about this
+		//httpServerLogger: li.NewStaticLevelLogger("[httpd]", log.LstdFlags, logging.ERROR),
+		httpServerLogger: nil,
+
+		diagnostic: d,
 	}
 	return s
 }
@@ -80,8 +94,14 @@ func NewService(c Config, hostname string, l *log.Logger, li logging.Interface) 
 func (s *Service) Open() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.logger.Println("I! Starting HTTP service")
-	s.logger.Println("I! Authentication enabled:", s.Handler.requireAuthentication)
+	s.diagnostic.Diag(
+		"level", "info",
+		"msg", "starting HTTP service",
+	)
+	s.diagnostic.Diag(
+		"level", "info",
+		"auth_enabled", s.Handler.requireAuthentication, // TODO: idk if I like this
+	)
 
 	// Open listener.
 	if s.https {
@@ -97,7 +117,11 @@ func (s *Service) Open() error {
 			return err
 		}
 
-		s.logger.Println("I! Listening on HTTPS:", listener.Addr().String())
+		s.diagnostic.Diag(
+			"level", "info",
+			"msg", "listening on HTTPS",
+			"address", listener.Addr(),
+		)
 		s.ln = listener
 	} else {
 		listener, err := net.Listen("tcp", s.addr)
@@ -105,7 +129,11 @@ func (s *Service) Open() error {
 			return err
 		}
 
-		s.logger.Println("I! Listening on HTTP:", listener.Addr().String())
+		s.diagnostic.Diag(
+			"level", "info",
+			"msg", "listening on HTTP",
+			"address", listener.Addr(),
+		)
 		s.ln = listener
 	}
 
@@ -132,7 +160,7 @@ func (s *Service) Open() error {
 
 // Close closes the underlying listener.
 func (s *Service) Close() error {
-	defer s.logger.Println("I! Closed HTTP service")
+	defer s.diagnostic.Diag("level", "info", "msg", "closed HTTP service")
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	// If server is not set we were never started
@@ -228,7 +256,10 @@ func (s *Service) manage() {
 			// continue the loop and wait for all the ConnState updates which will
 			// eventually close(stopDone) and return from this goroutine.
 		case <-timeout:
-			s.logger.Println("E! shutdown timedout, forcefully closing all remaining connections")
+			s.diagnostic.Diag(
+				"level", "error",
+				"msg", "shutdown timedout, forcefully closing all remaining connections",
+			)
 			// Connections didn't close in time.
 			// Forcefully close all connections.
 			for c := range conns {

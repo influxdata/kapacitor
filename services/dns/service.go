@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"sync"
 	"time"
 
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/scraper"
 	"github.com/prometheus/prometheus/config"
 	pdns "github.com/prometheus/prometheus/discovery/dns"
@@ -19,16 +21,16 @@ type Service struct {
 
 	registry scraper.Registry
 
-	logger *log.Logger
-	open   bool
+	diagnostic diagnostic.Diagnostic
+	open       bool
 }
 
 // NewService creates a new unopened service
-func NewService(c []Config, r scraper.Registry, l *log.Logger) *Service {
+func NewService(c []Config, r scraper.Registry, d diagnostic.Diagnostic) *Service {
 	return &Service{
-		Configs:  c,
-		registry: r,
-		logger:   l,
+		Configs:    c,
+		registry:   r,
+		diagnostic: d,
 	}
 }
 
@@ -126,7 +128,10 @@ func (s *Service) Test(options interface{}) error {
 	}
 
 	sd := s.Configs[found].PromConfig()
-	discoverer := pdns.NewDiscovery(sd, scraper.NewLogger(s.logger))
+	// TODO: Need to think about what to do here
+	// TODO: Need to think about what to do here
+	// TODO: Need to think about what to do here
+	discoverer := pdns.NewDiscovery(sd, scraper.NewLogger(log.New(os.Stdout, "figure out", log.LstdFlags)))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	updates := make(chan []*config.TargetGroup)

@@ -1,19 +1,20 @@
 package deadman
 
 import (
-	"log"
 	"time"
+
+	"github.com/influxdata/kapacitor/services/diagnostic"
 )
 
 type Service struct {
-	c      Config
-	logger *log.Logger
+	c          Config
+	diagnostic diagnostic.Diagnostic
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, d diagnostic.Diagnostic) *Service {
 	return &Service{
-		c:      c,
-		logger: l,
+		c:          c,
+		diagnostic: d,
 	}
 }
 
@@ -39,7 +40,10 @@ func (s *Service) Global() bool {
 
 func (s *Service) Open() error {
 	if s.Global() {
-		s.logger.Println("I! Deadman's switch is configured globally")
+		s.diagnostic.Diag(
+			"level", "info",
+			"msg", "Deadman's switch is configured globally",
+		)
 	}
 	return nil
 }

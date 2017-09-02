@@ -4,12 +4,12 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"log"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/influxdata/kapacitor/alert"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 
 	"gopkg.in/gomail.v2"
 )
@@ -21,15 +21,15 @@ type Service struct {
 	configValue atomic.Value
 	mail        chan *gomail.Message
 	updates     chan bool
-	logger      *log.Logger
+	diagnostic  diagnostic.Diagnostic
 	wg          sync.WaitGroup
 	opened      bool
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, d diagnostic.Diagnostic) *Service {
 	s := &Service{
-		updates: make(chan bool),
-		logger:  l,
+		updates:    make(chan bool),
+		diagnostic: d,
 	}
 	s.configValue.Store(c)
 	return s
@@ -136,7 +136,11 @@ func (s *Service) runMailer() {
 			// Close old connection
 			if conn != nil {
 				if err := conn.Close(); err != nil {
-					s.logger.Println("E! error closing connection to old SMTP server:", err)
+					s.diagnostic.Diag(
+						"level", "error",
+						"msg", "error closing old connection to SMTP server",
+						"error", err,
+					)
 				}
 				conn = nil
 			}
@@ -149,20 +153,31 @@ func (s *Service) runMailer() {
 			}
 			if !open {
 				if conn, err = d.Dial(); err != nil {
-					s.logger.Println("E! error connecting to SMTP server", err)
+					s.diagnostic.Diag(
+						"level", "error",
+						"msg", "error connecting to SMTP server",
+						"error", err,
+					)
 					break
 				}
 				open = true
 			}
 			if err := gomail.Send(conn, m); err != nil {
-				s.logger.Println("E!", err)
+				s.diagnostic.Diag(
+					"level", "error",
+					"error", err,
+				)
 			}
 		// Close the connection to the SMTP server if no email was sent in
 		// the last IdleTimeout duration.
 		case <-timer.C:
 			if open {
 				if err := conn.Close(); err != nil {
-					s.logger.Println("E! error closing connection to SMTP server:", err)
+					s.diagnostic.Diag(
+						"level", "error",
+						"msg", "error closing connection to SMTP server",
+						"error", err,
+					)
 				}
 				open = false
 			}
@@ -232,16 +247,16 @@ type HandlerConfig struct {
 }
 
 type handler struct {
-	s      *Service
-	c      HandlerConfig
-	logger *log.Logger
+	s          *Service
+	c          HandlerConfig
+	diagnostic diagnostic.Diagnostic
 }
 
-func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
+func (s *Service) Handler(c HandlerConfig, d diagnostic.Diagnostic) alert.Handler {
 	return &handler{
-		s:      s,
-		c:      c,
-		logger: l,
+		s:          s,
+		c:          c,
+		diagnostic: d,
 	}
 }
 
@@ -251,6 +266,10 @@ func (h *handler) Handle(event alert.Event) {
 		event.State.Message,
 		event.State.Details,
 	); err != nil {
-		h.logger.Println("E! failed to send email", err)
+		h.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to send email",
+			"error", err,
+		)
 	}
 }

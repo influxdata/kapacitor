@@ -6,25 +6,25 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net"
 	"regexp"
 	"sync/atomic"
 	text "text/template"
 
 	"github.com/influxdata/kapacitor/alert"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 )
 
 type Service struct {
 	configValue atomic.Value
-	logger      *log.Logger
+	diagnostic  diagnostic.Diagnostic
 }
 
 var validNamePattern = regexp.MustCompile(`^[\w\.-]+$`)
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, d diagnostic.Diagnostic) *Service {
 	s := &Service{
-		logger: l,
+		diagnostic: d,
 	}
 	s.configValue.Store(c)
 	return s
@@ -171,14 +171,14 @@ type HandlerConfig struct {
 }
 
 type handler struct {
-	s      *Service
-	c      HandlerConfig
-	logger *log.Logger
+	s          *Service
+	c          HandlerConfig
+	diagnostic diagnostic.Diagnostic
 
 	sourceTmpl *text.Template
 }
 
-func (s *Service) Handler(c HandlerConfig, l *log.Logger) (alert.Handler, error) {
+func (s *Service) Handler(c HandlerConfig, d diagnostic.Diagnostic) (alert.Handler, error) {
 	srcTmpl, err := text.New("source").Parse(c.Source)
 	if err != nil {
 		return nil, err
@@ -186,7 +186,7 @@ func (s *Service) Handler(c HandlerConfig, l *log.Logger) (alert.Handler, error)
 	return &handler{
 		s:          s,
 		c:          c,
-		logger:     l,
+		diagnostic: d,
 		sourceTmpl: srcTmpl,
 	}, nil
 }
@@ -196,7 +196,12 @@ func (h *handler) Handle(event alert.Event) {
 	var buf bytes.Buffer
 	err := h.sourceTmpl.Execute(&buf, td)
 	if err != nil {
-		h.logger.Printf("E! failed to evaluate Sensu source template %s: %v", h.c.Source, err)
+		h.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to evaluate Sensu source template",
+			"source", h.c.Source,
+			"error", err,
+		)
 		return
 	}
 	sourceStr := buf.String()
@@ -208,6 +213,10 @@ func (h *handler) Handle(event alert.Event) {
 		h.c.Handlers,
 		event.State.Level,
 	); err != nil {
-		h.logger.Println("E! failed to send event to Sensu", err)
+		h.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to send event to Sensu",
+			"error", err,
+		)
 	}
 }

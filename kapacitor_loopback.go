@@ -2,12 +2,12 @@ package kapacitor
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 )
 
 const (
@@ -23,9 +23,9 @@ type KapacitorLoopbackNode struct {
 	begin edge.BeginBatchMessage
 }
 
-func newKapacitorLoopbackNode(et *ExecutingTask, n *pipeline.KapacitorLoopbackNode, l *log.Logger) (*KapacitorLoopbackNode, error) {
+func newKapacitorLoopbackNode(et *ExecutingTask, n *pipeline.KapacitorLoopbackNode, d diagnostic.Diagnostic) (*KapacitorLoopbackNode, error) {
 	kn := &KapacitorLoopbackNode{
-		node: node{Node: n, et: et, logger: l},
+		node: node{Node: n, et: et, diagnostic: d},
 		k:    n,
 	}
 	kn.node.runF = kn.runOut
@@ -78,7 +78,10 @@ func (n *KapacitorLoopbackNode) Point(p edge.PointMessage) error {
 
 	if err != nil {
 		n.incrementErrorCount()
-		n.logger.Println("E! failed to write point over loopback")
+		n.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to write point over loopback",
+		)
 	} else {
 		n.pointsWritten.Add(1)
 	}
@@ -114,7 +117,10 @@ func (n *KapacitorLoopbackNode) BatchPoint(bp edge.BatchPointMessage) error {
 
 	if err != nil {
 		n.incrementErrorCount()
-		n.logger.Println("E! failed to write point over loopback")
+		n.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to write point over loopback",
+		)
 	} else {
 		n.pointsWritten.Add(1)
 	}

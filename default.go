@@ -1,12 +1,11 @@
 package kapacitor
 
 import (
-	"log"
-
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 )
 
 const (
@@ -23,9 +22,9 @@ type DefaultNode struct {
 }
 
 // Create a new  DefaultNode which applies a transformation func to each point in a stream and returns a single point.
-func newDefaultNode(et *ExecutingTask, n *pipeline.DefaultNode, l *log.Logger) (*DefaultNode, error) {
+func newDefaultNode(et *ExecutingTask, n *pipeline.DefaultNode, d diagnostic.Diagnostic) (*DefaultNode, error) {
 	dn := &DefaultNode{
-		node:            node{Node: n, et: et, logger: l},
+		node:            node{Node: n, et: et, diagnostic: d},
 		d:               n,
 		fieldsDefaulted: new(expvar.Int),
 		tagsDefaulted:   new(expvar.Int),

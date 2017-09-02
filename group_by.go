@@ -1,7 +1,6 @@
 package kapacitor
 
 import (
-	"log"
 	"sort"
 	"sync"
 	"time"
@@ -10,6 +9,7 @@ import (
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
@@ -31,9 +31,9 @@ type GroupByNode struct {
 }
 
 // Create a new GroupByNode which splits the stream dynamically based on the specified dimensions.
-func newGroupByNode(et *ExecutingTask, n *pipeline.GroupByNode, l *log.Logger) (*GroupByNode, error) {
+func newGroupByNode(et *ExecutingTask, n *pipeline.GroupByNode, d diagnostic.Diagnostic) (*GroupByNode, error) {
 	gn := &GroupByNode{
-		node:   node{Node: n, et: et, logger: l},
+		node:   node{Node: n, et: et, diagnostic: d},
 		g:      n,
 		groups: make(map[models.GroupID]edge.BufferedBatchMessage),
 	}

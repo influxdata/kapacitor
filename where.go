@@ -3,10 +3,10 @@ package kapacitor
 import (
 	"errors"
 	"fmt"
-	"log"
 
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/tick/stateful"
 )
@@ -21,9 +21,9 @@ type WhereNode struct {
 }
 
 // Create a new WhereNode which filters down the batch or stream by a condition
-func newWhereNode(et *ExecutingTask, n *pipeline.WhereNode, l *log.Logger) (wn *WhereNode, err error) {
+func newWhereNode(et *ExecutingTask, n *pipeline.WhereNode, d diagnostic.Diagnostic) (wn *WhereNode, err error) {
 	wn = &WhereNode{
-		node: node{Node: n, et: et, logger: l},
+		node: node{Node: n, et: et, diagnostic: d},
 		w:    n,
 	}
 
@@ -92,7 +92,11 @@ func (g *whereGroup) doWhere(p edge.FieldsTagsTimeGetterMessage) (edge.Message, 
 	pass, err := EvalPredicate(g.expr, g.n.scopePool, p)
 	if err != nil {
 		g.n.incrementErrorCount()
-		g.n.logger.Println("E! error while evaluating expression:", err)
+		g.n.diagnostic.Diag(
+			"level", "error",
+			"msg", "error while evaluating expression",
+			"error", err,
+		)
 		return nil, nil
 	}
 	if pass {

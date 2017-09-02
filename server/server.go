@@ -4,7 +4,6 @@ package server
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -27,6 +26,7 @@ import (
 	"github.com/influxdata/kapacitor/services/config"
 	"github.com/influxdata/kapacitor/services/consul"
 	"github.com/influxdata/kapacitor/services/deadman"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/dns"
 	"github.com/influxdata/kapacitor/services/ec2"
 	"github.com/influxdata/kapacitor/services/file_discovery"
@@ -134,33 +134,45 @@ type Server struct {
 	MemProfile string
 
 	LogService logging.Interface
-	Logger     *log.Logger
+
+	DiagnosticService diagnostic.Service
+
+	Diagnostic Diagnostic
 }
 
+// TODO: not a fan of the stutter
+// also not a fan of calling it a diagnosticer
+// or diagnostic generator
+type Diagnostic diagnostic.Diagnostic
+
 // New returns a new instance of Server built from a config.
-func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server, error) {
+func New(c *Config, buildInfo BuildInfo, diagnosticService diagnostic.Service) (*Server, error) {
 	err := c.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("%s. To generate a valid configuration file run `kapacitord config > kapacitor.generated.conf`.", err)
 	}
-	l := logService.NewLogger("[srv] ", log.LstdFlags)
+	d := diagnosticService.NewDiagnostic(nil, "service", "srv")
 	s := &Server{
-		config:           c,
-		BuildInfo:        buildInfo,
-		dataDir:          c.DataDir,
-		hostname:         c.Hostname,
-		err:              make(chan error),
-		configUpdates:    make(chan config.ConfigUpdate, 100),
-		LogService:       logService,
-		MetaClient:       &kapacitor.NoopMetaClient{},
-		QueryExecutor:    &Queryexecutor{},
-		Logger:           l,
-		ServicesByName:   make(map[string]int),
-		DynamicServices:  make(map[string]Updater),
-		Commander:        c.Commander,
-		clusterIDChanged: waiter.NewGroup(),
+		config:            c,
+		BuildInfo:         buildInfo,
+		dataDir:           c.DataDir,
+		hostname:          c.Hostname,
+		err:               make(chan error),
+		configUpdates:     make(chan config.ConfigUpdate, 100),
+		DiagnosticService: diagnosticService,
+		MetaClient:        &kapacitor.NoopMetaClient{},
+		QueryExecutor:     &Queryexecutor{},
+		Diagnostic:        d,
+		ServicesByName:    make(map[string]int),
+		DynamicServices:   make(map[string]Updater),
+		Commander:         c.Commander,
+		clusterIDChanged:  waiter.NewGroup(),
 	}
-	s.Logger.Println("I! Kapacitor hostname:", s.hostname)
+	s.Diagnostic.Diag(
+		"level", "info",
+		"msg", "listing hostname", // TODO: do we need this message?
+		"hostname", s.hostname,
+	)
 
 	// Setup IDs
 	err = s.setupIDs()
@@ -174,11 +186,15 @@ func New(c *Config, buildInfo BuildInfo, logService logging.Interface) (*Server,
 	vars.HostVar.Set(s.hostname)
 	vars.ProductVar.Set(vars.Product)
 	vars.VersionVar.Set(s.BuildInfo.Version)
-	s.Logger.Printf("I! ClusterID: %s ServerID: %s", s.ClusterID, s.ServerID)
+	s.Diagnostic.Diag(
+		"level", "info",
+		"ClusterID", s.ClusterID,
+		"ServerID", s.ServerID,
+	)
 
 	// Start Task Master
 	s.TaskMasterLookup = kapacitor.NewTaskMasterLookup()
-	s.TaskMaster = kapacitor.NewTaskMaster(kapacitor.MainTaskMaster, vars.Info, logService)
+	s.TaskMaster = kapacitor.NewTaskMaster(kapacitor.MainTaskMaster, vars.Info, diagnosticService)
 	s.TaskMaster.DefaultRetentionPolicy = c.DefaultRetentionPolicy
 	s.TaskMaster.Commander = s.Commander
 	s.TaskMasterLookup.Set(s.TaskMaster)
@@ -297,8 +313,8 @@ func (s *Server) SetDynamicService(name string, srv dynamicService) {
 }
 
 func (s *Server) appendStorageService() {
-	l := s.LogService.NewLogger("[storage] ", log.LstdFlags)
-	srv := storage.NewService(s.config.Storage, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "storage")
+	srv := storage.NewService(s.config.Storage, d)
 
 	srv.HTTPDService = s.HTTPDService
 
@@ -307,8 +323,8 @@ func (s *Server) appendStorageService() {
 }
 
 func (s *Server) appendConfigOverrideService() {
-	l := s.LogService.NewLogger("[config-override] ", log.LstdFlags)
-	srv := config.NewService(s.config.ConfigOverride, s.config, l, s.configUpdates)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "config-override")
+	srv := config.NewService(s.config.ConfigOverride, s.config, d, s.configUpdates)
 	srv.HTTPDService = s.HTTPDService
 	srv.StorageService = s.StorageService
 
@@ -317,8 +333,8 @@ func (s *Server) appendConfigOverrideService() {
 }
 
 func (s *Server) initAlertService() {
-	l := s.LogService.NewLogger("[alert] ", log.LstdFlags)
-	srv := alert.NewService(l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "alert")
+	srv := alert.NewService(d)
 
 	srv.Commander = s.Commander
 	srv.HTTPDService = s.HTTPDService
@@ -333,8 +349,8 @@ func (s *Server) appendAlertService() {
 }
 
 func (s *Server) appendTesterService() {
-	l := s.LogService.NewLogger("[service-tests] ", log.LstdFlags)
-	srv := servicetest.NewService(servicetest.NewConfig(), l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "service-tests")
+	srv := servicetest.NewService(servicetest.NewConfig(), d)
 	srv.HTTPDService = s.HTTPDService
 
 	s.TesterService = srv
@@ -343,8 +359,8 @@ func (s *Server) appendTesterService() {
 
 func (s *Server) appendSMTPService() {
 	c := s.config.SMTP
-	l := s.LogService.NewLogger("[smtp] ", log.LstdFlags)
-	srv := smtp.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "smtp")
+	srv := smtp.NewService(c, d)
 
 	s.TaskMaster.SMTPService = srv
 	s.AlertService.SMTPService = srv
@@ -355,12 +371,12 @@ func (s *Server) appendSMTPService() {
 
 func (s *Server) appendInfluxDBService() error {
 	c := s.config.InfluxDB
-	l := s.LogService.NewLogger("[influxdb] ", log.LstdFlags)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "influxdb")
 	httpPort, err := s.config.HTTP.Port()
 	if err != nil {
 		return errors.Wrap(err, "failed to get http port")
 	}
-	srv, err := influxdb.NewService(c, httpPort, s.config.Hostname, vars.Info, s.config.HTTP.AuthEnabled, l)
+	srv, err := influxdb.NewService(c, httpPort, s.config.Hostname, vars.Info, s.config.HTTP.AuthEnabled, d)
 	if err != nil {
 		return err
 	}
@@ -372,7 +388,7 @@ func (s *Server) appendInfluxDBService() error {
 
 	srv.HTTPDService = s.HTTPDService
 	srv.PointsWriter = s.TaskMaster
-	srv.LogService = s.LogService
+	srv.DiagnosticService = s.DiagnosticService
 	srv.AuthService = s.AuthService
 	srv.ClientCreator = iclient.ClientCreator{}
 
@@ -384,8 +400,8 @@ func (s *Server) appendInfluxDBService() error {
 }
 
 func (s *Server) initHTTPDService() {
-	l := s.LogService.NewLogger("[httpd] ", log.LstdFlags)
-	srv := httpd.NewService(s.config.HTTP, s.hostname, l, s.LogService)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "httpd")
+	srv := httpd.NewService(s.config.HTTP, s.hostname, d, s.DiagnosticService)
 
 	srv.Handler.PointsWriter = s.TaskMaster
 	srv.Handler.Version = s.BuildInfo.Version
@@ -399,8 +415,8 @@ func (s *Server) appendHTTPDService() {
 }
 
 func (s *Server) appendTaskStoreService() {
-	l := s.LogService.NewLogger("[task_store] ", log.LstdFlags)
-	srv := task_store.NewService(s.config.Task, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "task_store")
+	srv := task_store.NewService(s.config.Task, d)
 	srv.StorageService = s.StorageService
 	srv.HTTPDService = s.HTTPDService
 	srv.TaskMasterLookup = s.TaskMasterLookup
@@ -411,8 +427,8 @@ func (s *Server) appendTaskStoreService() {
 }
 
 func (s *Server) appendReplayService() {
-	l := s.LogService.NewLogger("[replay] ", log.LstdFlags)
-	srv := replay.NewService(s.config.Replay, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "replay")
+	srv := replay.NewService(s.config.Replay, d)
 	srv.StorageService = s.StorageService
 	srv.TaskStore = s.TaskStore
 	srv.HTTPDService = s.HTTPDService
@@ -426,8 +442,8 @@ func (s *Server) appendReplayService() {
 
 func (s *Server) appendK8sService() error {
 	c := s.config.Kubernetes
-	l := s.LogService.NewLogger("[kubernetes] ", log.LstdFlags)
-	srv, err := k8s.NewService(c, s.ScraperService, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "kubernetes")
+	srv, err := k8s.NewService(c, s.ScraperService, d)
 	if err != nil {
 		return err
 	}
@@ -439,8 +455,8 @@ func (s *Server) appendK8sService() error {
 }
 func (s *Server) appendSwarmService() error {
 	c := s.config.Swarm
-	l := s.LogService.NewLogger("[swarm] ", log.LstdFlags)
-	srv, err := swarm.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "swarm")
+	srv, err := swarm.NewService(c, d)
 	if err != nil {
 		return err
 	}
@@ -452,24 +468,24 @@ func (s *Server) appendSwarmService() error {
 }
 
 func (s *Server) appendDeadmanService() {
-	l := s.LogService.NewLogger("[deadman] ", log.LstdFlags)
-	srv := deadman.NewService(s.config.Deadman, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "deadman")
+	srv := deadman.NewService(s.config.Deadman, d)
 
 	s.TaskMaster.DeadmanService = srv
 	s.AppendService("deadman", srv)
 }
 
 func (s *Server) appendUDFService() {
-	l := s.LogService.NewLogger("[udf] ", log.LstdFlags)
-	srv := udf.NewService(s.config.UDF, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "udf")
+	srv := udf.NewService(s.config.UDF, d)
 
 	s.TaskMaster.UDFService = srv
 	s.AppendService("udf", srv)
 }
 
 func (s *Server) appendAuthService() {
-	l := s.LogService.NewLogger("[noauth] ", log.LstdFlags)
-	srv := noauth.NewService(l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "noauth")
+	srv := noauth.NewService(d)
 
 	s.AuthService = srv
 	s.HTTPDService.Handler.AuthService = srv
@@ -478,8 +494,8 @@ func (s *Server) appendAuthService() {
 
 func (s *Server) appendMQTTService() error {
 	cs := s.config.MQTT
-	l := s.LogService.NewLogger("[mqtt] ", log.LstdFlags)
-	srv, err := mqtt.NewService(cs, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "mqtt")
+	srv, err := mqtt.NewService(cs, d)
 	if err != nil {
 		return err
 	}
@@ -494,8 +510,8 @@ func (s *Server) appendMQTTService() error {
 
 func (s *Server) appendOpsGenieService() {
 	c := s.config.OpsGenie
-	l := s.LogService.NewLogger("[opsgenie] ", log.LstdFlags)
-	srv := opsgenie.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "opsgenie")
+	srv := opsgenie.NewService(c, d)
 
 	s.TaskMaster.OpsGenieService = srv
 	s.AlertService.OpsGenieService = srv
@@ -506,8 +522,8 @@ func (s *Server) appendOpsGenieService() {
 
 func (s *Server) appendVictorOpsService() {
 	c := s.config.VictorOps
-	l := s.LogService.NewLogger("[victorops] ", log.LstdFlags)
-	srv := victorops.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "victorops")
+	srv := victorops.NewService(c, d)
 
 	s.TaskMaster.VictorOpsService = srv
 	s.AlertService.VictorOpsService = srv
@@ -518,8 +534,8 @@ func (s *Server) appendVictorOpsService() {
 
 func (s *Server) appendPagerDutyService() {
 	c := s.config.PagerDuty
-	l := s.LogService.NewLogger("[pagerduty] ", log.LstdFlags)
-	srv := pagerduty.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "pagerduty")
+	srv := pagerduty.NewService(c, d)
 	srv.HTTPDService = s.HTTPDService
 
 	s.TaskMaster.PagerDutyService = srv
@@ -531,8 +547,8 @@ func (s *Server) appendPagerDutyService() {
 
 func (s *Server) appendPushoverService() {
 	c := s.config.Pushover
-	l := s.LogService.NewLogger("[pushover] ", log.LstdFlags)
-	srv := pushover.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "pushover")
+	srv := pushover.NewService(c, d)
 
 	s.TaskMaster.PushoverService = srv
 	s.AlertService.PushoverService = srv
@@ -543,8 +559,8 @@ func (s *Server) appendPushoverService() {
 
 func (s *Server) appendHTTPPostService() {
 	c := s.config.HTTPPost
-	l := s.LogService.NewLogger("[httppost] ", log.LstdFlags)
-	srv := httppost.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "httppost")
+	srv := httppost.NewService(c, d)
 
 	s.TaskMaster.HTTPPostService = srv
 	s.AlertService.HTTPPostService = srv
@@ -555,8 +571,8 @@ func (s *Server) appendHTTPPostService() {
 
 func (s *Server) appendSensuService() {
 	c := s.config.Sensu
-	l := s.LogService.NewLogger("[sensu] ", log.LstdFlags)
-	srv := sensu.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "sensu")
+	srv := sensu.NewService(c, d)
 
 	s.TaskMaster.SensuService = srv
 	s.AlertService.SensuService = srv
@@ -567,8 +583,8 @@ func (s *Server) appendSensuService() {
 
 func (s *Server) appendSlackService() error {
 	c := s.config.Slack
-	l := s.LogService.NewLogger("[slack] ", log.LstdFlags)
-	srv, err := slack.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "slack")
+	srv, err := slack.NewService(c, d)
 	if err != nil {
 		return err
 	}
@@ -583,8 +599,8 @@ func (s *Server) appendSlackService() error {
 
 func (s *Server) appendSNMPTrapService() {
 	c := s.config.SNMPTrap
-	l := s.LogService.NewLogger("[snmptrap] ", log.LstdFlags)
-	srv := snmptrap.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "snmptrap")
+	srv := snmptrap.NewService(c, d)
 
 	s.TaskMaster.SNMPTrapService = srv
 	s.AlertService.SNMPTrapService = srv
@@ -595,8 +611,8 @@ func (s *Server) appendSNMPTrapService() {
 
 func (s *Server) appendTelegramService() {
 	c := s.config.Telegram
-	l := s.LogService.NewLogger("[telegram] ", log.LstdFlags)
-	srv := telegram.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "telegram")
+	srv := telegram.NewService(c, d)
 
 	s.TaskMaster.TelegramService = srv
 	s.AlertService.TelegramService = srv
@@ -607,8 +623,8 @@ func (s *Server) appendTelegramService() {
 
 func (s *Server) appendHipChatService() {
 	c := s.config.HipChat
-	l := s.LogService.NewLogger("[hipchat] ", log.LstdFlags)
-	srv := hipchat.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "hipchat")
+	srv := hipchat.NewService(c, d)
 
 	s.TaskMaster.HipChatService = srv
 	s.AlertService.HipChatService = srv
@@ -619,8 +635,8 @@ func (s *Server) appendHipChatService() {
 
 func (s *Server) appendAlertaService() {
 	c := s.config.Alerta
-	l := s.LogService.NewLogger("[alerta] ", log.LstdFlags)
-	srv := alerta.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "alerta")
+	srv := alerta.NewService(c, d)
 
 	s.TaskMaster.AlertaService = srv
 	s.AlertService.AlertaService = srv
@@ -631,8 +647,8 @@ func (s *Server) appendAlertaService() {
 
 func (s *Server) appendTalkService() {
 	c := s.config.Talk
-	l := s.LogService.NewLogger("[talk] ", log.LstdFlags)
-	srv := talk.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "talk")
+	srv := talk.NewService(c, d)
 
 	s.TaskMaster.TalkService = srv
 	s.AlertService.TalkService = srv
@@ -697,8 +713,8 @@ func (s *Server) appendUDPServices() {
 		if !c.Enabled {
 			continue
 		}
-		l := s.LogService.NewLogger("[udp] ", log.LstdFlags)
-		srv := udp.NewService(c, l)
+		d := s.DiagnosticService.NewDiagnostic(nil, "service", "udp")
+		srv := udp.NewService(c, d)
 		srv.PointsWriter = s.TaskMaster
 		s.AppendService(fmt.Sprintf("udp%d", i), srv)
 	}
@@ -707,8 +723,8 @@ func (s *Server) appendUDPServices() {
 func (s *Server) appendStatsService() {
 	c := s.config.Stats
 	if c.Enabled {
-		l := s.LogService.NewLogger("[stats] ", log.LstdFlags)
-		srv := stats.NewService(c, l)
+		d := s.DiagnosticService.NewDiagnostic(nil, "service", "stats")
+		srv := stats.NewService(c, d)
 		srv.TaskMaster = s.TaskMaster
 
 		s.StatsService = srv
@@ -720,8 +736,8 @@ func (s *Server) appendStatsService() {
 func (s *Server) appendReportingService() {
 	c := s.config.Reporting
 	if c.Enabled {
-		l := s.LogService.NewLogger("[reporting] ", log.LstdFlags)
-		srv := reporting.NewService(c, vars.Info, l)
+		d := s.DiagnosticService.NewDiagnostic(nil, "service", "reporting")
+		srv := reporting.NewService(c, vars.Info, d)
 
 		s.AppendService("reporting", srv)
 	}
@@ -729,8 +745,8 @@ func (s *Server) appendReportingService() {
 
 func (s *Server) appendScraperService() {
 	c := s.config.Scraper
-	l := s.LogService.NewLogger("[scrapers] ", log.LstdFlags)
-	srv := scraper.NewService(c, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "scrapers")
+	srv := scraper.NewService(c, d)
 	srv.PointsWriter = s.TaskMaster
 	s.ScraperService = srv
 	s.SetDynamicService("scraper", srv)
@@ -739,88 +755,88 @@ func (s *Server) appendScraperService() {
 
 func (s *Server) appendAzureService() {
 	c := s.config.Azure
-	l := s.LogService.NewLogger("[azure] ", log.LstdFlags)
-	srv := azure.NewService(c, s.ScraperService, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "azure")
+	srv := azure.NewService(c, s.ScraperService, d)
 	s.SetDynamicService("azure", srv)
 	s.AppendService("azure", srv)
 }
 
 func (s *Server) appendConsulService() {
 	c := s.config.Consul
-	l := s.LogService.NewLogger("[consul] ", log.LstdFlags)
-	srv := consul.NewService(c, s.ScraperService, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "consul")
+	srv := consul.NewService(c, s.ScraperService, d)
 	s.SetDynamicService("consul", srv)
 	s.AppendService("consul", srv)
 }
 
 func (s *Server) appendDNSService() {
 	c := s.config.DNS
-	l := s.LogService.NewLogger("[dns] ", log.LstdFlags)
-	srv := dns.NewService(c, s.ScraperService, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "dns")
+	srv := dns.NewService(c, s.ScraperService, d)
 	s.SetDynamicService("dns", srv)
 	s.AppendService("dns", srv)
 }
 
 func (s *Server) appendEC2Service() {
 	c := s.config.EC2
-	l := s.LogService.NewLogger("[ec2] ", log.LstdFlags)
-	srv := ec2.NewService(c, s.ScraperService, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "ec2")
+	srv := ec2.NewService(c, s.ScraperService, d)
 	s.SetDynamicService("ec2", srv)
 	s.AppendService("ec2", srv)
 }
 
 func (s *Server) appendFileService() {
 	c := s.config.FileDiscovery
-	l := s.LogService.NewLogger("[file-discovery] ", log.LstdFlags)
-	srv := file_discovery.NewService(c, s.ScraperService, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "file-discovery")
+	srv := file_discovery.NewService(c, s.ScraperService, d)
 	s.SetDynamicService("file-discovery", srv)
 	s.AppendService("file-discovery", srv)
 }
 
 func (s *Server) appendGCEService() {
 	c := s.config.GCE
-	l := s.LogService.NewLogger("[gce] ", log.LstdFlags)
-	srv := gce.NewService(c, s.ScraperService, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "gce")
+	srv := gce.NewService(c, s.ScraperService, d)
 	s.SetDynamicService("gce", srv)
 	s.AppendService("gce", srv)
 }
 
 func (s *Server) appendMarathonService() {
 	c := s.config.Marathon
-	l := s.LogService.NewLogger("[marathon] ", log.LstdFlags)
-	srv := marathon.NewService(c, s.ScraperService, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "marathon")
+	srv := marathon.NewService(c, s.ScraperService, d)
 	s.SetDynamicService("marathon", srv)
 	s.AppendService("marathon", srv)
 }
 
 func (s *Server) appendNerveService() {
 	c := s.config.Nerve
-	l := s.LogService.NewLogger("[nerve] ", log.LstdFlags)
-	srv := nerve.NewService(c, s.ScraperService, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "nerve")
+	srv := nerve.NewService(c, s.ScraperService, d)
 	s.SetDynamicService("nerve", srv)
 	s.AppendService("nerve", srv)
 }
 
 func (s *Server) appendServersetService() {
 	c := s.config.Serverset
-	l := s.LogService.NewLogger("[serverset] ", log.LstdFlags)
-	srv := serverset.NewService(c, s.ScraperService, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "serverset")
+	srv := serverset.NewService(c, s.ScraperService, d)
 	s.SetDynamicService("serverset", srv)
 	s.AppendService("serverset", srv)
 }
 
 func (s *Server) appendStaticService() {
 	c := s.config.StaticDiscovery
-	l := s.LogService.NewLogger("[static-discovery] ", log.LstdFlags)
-	srv := static_discovery.NewService(c, s.ScraperService, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "static-discovery")
+	srv := static_discovery.NewService(c, s.ScraperService, d)
 	s.SetDynamicService("static-discovery", srv)
 	s.AppendService("static-discovery", srv)
 }
 
 func (s *Server) appendTritonService() {
 	c := s.config.Triton
-	l := s.LogService.NewLogger("[triton] ", log.LstdFlags)
-	srv := triton.NewService(c, s.ScraperService, l)
+	d := s.DiagnosticService.NewDiagnostic(nil, "service", "triton")
+	srv := triton.NewService(c, s.ScraperService, d)
 	s.SetDynamicService("triton", srv)
 	s.AppendService("triton", srv)
 }
@@ -849,16 +865,27 @@ func (s *Server) Open() error {
 
 func (s *Server) startServices() error {
 	for _, service := range s.Services {
-		s.Logger.Printf("D! opening service: %T", service)
+		s.Diagnostic.Diag(
+			"level", "debug",
+			"msg", "opening service",
+			"service", fmt.Sprintf("%T", service), // TODO: fix this
+		)
 		if err := service.Open(); err != nil {
 			return fmt.Errorf("open service %T: %s", service, err)
 		}
-		s.Logger.Printf("D! opened service: %T", service)
+		s.Diagnostic.Diag(
+			"level", "debug",
+			"msg", "opened service",
+			"service", fmt.Sprintf("%T", service), // TODO: fix this
+		)
 
 		// Apply config overrides after the config override service has been opened and before any dynamic services.
 		if service == s.ConfigOverrideService && !s.config.SkipConfigOverrides && s.config.ConfigOverride.Enabled {
 			// Apply initial config updates
-			s.Logger.Println("D! applying configuration overrides")
+			s.Diagnostic.Diag(
+				"level", "debug",
+				"msg", "applying configuration overrides",
+			)
 			configs, err := s.ConfigOverrideService.Config()
 			if err != nil {
 				return errors.Wrap(err, "failed to apply config overrides")
@@ -867,7 +894,11 @@ func (s *Server) startServices() error {
 				if srv, ok := s.DynamicServices[service]; !ok {
 					return fmt.Errorf("found configuration override for unknown service %q", service)
 				} else {
-					s.Logger.Println("D! applying configuration overrides for", service)
+					s.Diagnostic.Diag(
+						"level", "debug",
+						"msg", "applying configuration overrides for service",
+						"service", service,
+					)
 					if err := srv.Update(config); err != nil {
 						return errors.Wrapf(err, "failed to update configuration for service %s", service)
 					}
@@ -904,11 +935,21 @@ func (s *Server) Close() error {
 
 	// Close all services that write points first.
 	if err := s.HTTPDService.Close(); err != nil {
-		s.Logger.Printf("E! error closing httpd service: %v", err)
+		s.Diagnostic.Diag(
+			"level", "error",
+			"msg", "error closing service",
+			"service", "http",
+			"error", err,
+		)
 	}
 	if s.StatsService != nil {
 		if err := s.StatsService.Close(); err != nil {
-			s.Logger.Printf("E! error closing stats service: %v", err)
+			s.Diagnostic.Diag(
+				"level", "error",
+				"msg", "error closing service",
+				"service", "stats",
+				"error", err,
+			)
 		}
 	}
 
@@ -919,12 +960,25 @@ func (s *Server) Close() error {
 	// Close services now that all tasks are stopped.
 	for i := len(s.Services) - 1; i >= 0; i-- {
 		service := s.Services[i]
-		s.Logger.Printf("D! closing service: %T", service)
+		s.Diagnostic.Diag(
+			"level", "debug",
+			"msg", "closing service",
+			"service", fmt.Sprintf("%T", service), // TODO: fmt bad
+		)
 		err := service.Close()
 		if err != nil {
-			s.Logger.Printf("E! error closing service %T: %v", service, err)
+			s.Diagnostic.Diag(
+				"level", "error",
+				"msg", "error closing service",
+				"service", service, // Maybe make service implement some type of Name method
+				"error", err,
+			)
 		}
-		s.Logger.Printf("D! closed service: %T", service)
+		s.Diagnostic.Diag(
+			"level", "debug",
+			"msg", "closed service",
+			"service", fmt.Sprintf("%T", service), // TODO: fmt bad
+		)
 	}
 
 	// Finally close the task master
@@ -1041,11 +1095,26 @@ func (s *Server) startProfile(cpuprofile, memprofile string) error {
 	if cpuprofile != "" {
 		f, err := os.Create(cpuprofile)
 		if err != nil {
-			return fmt.Errorf("E! cpuprofile: %v", err)
+			s.Diagnostic.Diag(
+				"level", "error",
+				"msg", "error creating file",
+				"error", err,
+				"file", cpuprofile,
+			)
+			return fmt.Errorf("E! cpuprofile: %v", err) // Do something about this?
 		}
-		s.Logger.Printf("I! writing CPU profile to: %s\n", cpuprofile)
+		s.Diagnostic.Diag(
+			"level", "info",
+			"msg", "writing CPU profile",
+			"file", cpuprofile,
+		)
 		prof.cpu = f
 		if err := pprof.StartCPUProfile(prof.cpu); err != nil {
+			s.Diagnostic.Diag(
+				"level", "error",
+				"msg", "error starting cpu profile",
+				"error", err,
+			)
 			return fmt.Errorf("#! start cpu profile: %v", err)
 		}
 	}
@@ -1053,9 +1122,19 @@ func (s *Server) startProfile(cpuprofile, memprofile string) error {
 	if memprofile != "" {
 		f, err := os.Create(memprofile)
 		if err != nil {
+			s.Diagnostic.Diag(
+				"level", "error",
+				"msg", "error creating file",
+				"error", err,
+				"file", memprofile,
+			)
 			return fmt.Errorf("E! memprofile: %v", err)
 		}
-		s.Logger.Printf("I! writing mem profile to: %s\n", memprofile)
+		s.Diagnostic.Diag(
+			"level", "info",
+			"msg", "writing mem profile",
+			"file", memprofile,
+		)
 		prof.mem = f
 		runtime.MemProfileRate = 4096
 	}
@@ -1067,14 +1146,24 @@ func (s *Server) stopProfile() {
 	if prof.cpu != nil {
 		pprof.StopCPUProfile()
 		prof.cpu.Close()
-		s.Logger.Println("I! CPU profile stopped")
+		s.Diagnostic.Diag(
+			"level", "info",
+			"msg", "CPU profile stopped",
+		)
 	}
 	if prof.mem != nil {
 		if err := pprof.Lookup("heap").WriteTo(prof.mem, 0); err != nil {
-			s.Logger.Printf("I! failed to write mem profile: %v\n", err)
+			s.Diagnostic.Diag(
+				"level", "info",
+				"msg", "failed to write mem profile",
+				"error", err,
+			)
 		}
 		prof.mem.Close()
-		s.Logger.Println("I! mem profile stopped")
+		s.Diagnostic.Diag(
+			"level", "info",
+			"msg", "mem profile stopped",
+		)
 	}
 }
 

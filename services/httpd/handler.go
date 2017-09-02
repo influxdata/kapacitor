@@ -11,6 +11,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/pprof"
+	"os"
 	"strings"
 	"time"
 
@@ -21,7 +22,7 @@ import (
 	"github.com/influxdata/influxdb/uuid"
 	"github.com/influxdata/kapacitor/auth"
 	"github.com/influxdata/kapacitor/client/v1"
-	"github.com/influxdata/kapacitor/services/logging"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/wlog"
 )
 
@@ -86,6 +87,9 @@ type Handler struct {
 
 	// Normal wlog logger
 	logger *log.Logger
+
+	diagnostic Diagnostic
+
 	// Detailed logging of write path
 	// Uses normal logger
 	writeTrace bool
@@ -93,6 +97,7 @@ type Handler struct {
 	// Common log format logger.
 	// This logger does not use log levels with wlog.
 	// Its simply a binary on off from the config.
+	// TODO: do I need to do something about this?
 	clfLogger *log.Logger
 	// Log every HTTP access.
 	loggingEnabled bool
@@ -108,8 +113,8 @@ func NewHandler(
 	writeTrace,
 	allowGzip bool,
 	statMap *expvar.Map,
-	l *log.Logger,
-	li logging.Interface,
+	d Diagnostic,
+	ds diagnostic.Service,
 	sharedSecret string,
 ) *Handler {
 	h := &Handler{
@@ -118,11 +123,13 @@ func NewHandler(
 		exposePprof:           pprofEnabled,
 		sharedSecret:          sharedSecret,
 		allowGzip:             allowGzip,
-		logger:                l,
+		diagnostic:            d,
 		writeTrace:            writeTrace,
-		clfLogger:             li.NewRawLogger("[httpd] ", 0),
-		loggingEnabled:        loggingEnabled,
-		statMap:               statMap,
+		// TODO: Need to fix this
+		//clfLogger:             li.NewRawLogger("[httpd] ", 0),
+		clfLogger:      log.New(os.Stdout, "idk", log.LstdFlags),
+		loggingEnabled: loggingEnabled,
+		statMap:        statMap,
 	}
 
 	allowedMethods := []string{
@@ -326,9 +333,10 @@ func (h *Handler) addRawRoute(r Route) error {
 	handler = requestID(handler)
 
 	if h.loggingEnabled {
+		// TODO: not sure what to do here
 		handler = logHandler(handler, h.clfLogger)
 	}
-	handler = recovery(handler, h.logger) // make sure recovery is always last
+	handler = recovery(handler, h.diagnostic) // make sure recovery is always last
 
 	mux, ok := h.methodMux[r.Method]
 	if !ok {
@@ -894,7 +902,7 @@ func logHandler(inner http.Handler, weblog *log.Logger) http.Handler {
 	})
 }
 
-func recovery(inner http.Handler, weblog *log.Logger) http.Handler {
+func recovery(inner http.Handler, weblog diagnostic.Diagnostic) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		l := &responseLogger{w: w}
@@ -902,7 +910,13 @@ func recovery(inner http.Handler, weblog *log.Logger) http.Handler {
 		if err := recover(); err != nil {
 			logLine := buildLogLine(l, r, start)
 			logLine = fmt.Sprintf("E! %s [err:%s]", logLine, err)
-			weblog.Println(logLine)
+			// TODO: this okay?
+			weblog.Diag(
+				"level", "error",
+				"msg", logLine,
+				"error", err,
+			)
+			//weblog.Println(logLine)
 		}
 	})
 }

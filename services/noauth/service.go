@@ -1,21 +1,20 @@
 package noauth
 
 import (
-	"log"
-
 	"github.com/influxdata/kapacitor/auth"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 )
 
 // Provide an implentation of an Authentication service.
 // NOTE: This service provides no real authentication but rather
 // returns admin users for all requests.
 type Service struct {
-	logger *log.Logger
+	diagnostic diagnostic.Diagnostic
 }
 
-func NewService(l *log.Logger) *Service {
+func NewService(d diagnostic.Diagnostic) *Service {
 	return &Service{
-		logger: l,
+		diagnostic: d,
 	}
 }
 
@@ -34,13 +33,21 @@ func (s *Service) Authenticate(username, password string) (auth.User, error) {
 
 // Return a user will all privileges and given username.
 func (s *Service) User(username string) (auth.User, error) {
-	s.logger.Println("W! using noauth auth backend. Faked authentication for user", username)
+	s.diagnostic.Diag(
+		"level", "warn",
+		"msg", "using noauth auth backend. Faked authentication for user",
+		"user", username,
+	)
+
 	return auth.NewUser(username, nil, true, nil), nil
 }
 
 // Return a user will all privileges.
 func (s *Service) SubscriptionUser(token string) (auth.User, error) {
-	s.logger.Println("W! using noauth auth backend. Faked authentication for subscription user token")
+	s.diagnostic.Diag(
+		"level", "warn",
+		"msg", "using noauth auth backend. Faked authentication for subscription user token",
+	)
 	return auth.NewUser("subscription-user", nil, true, nil), nil
 }
 

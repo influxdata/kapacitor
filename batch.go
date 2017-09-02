@@ -3,7 +3,6 @@ package kapacitor
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/pkg/errors"
 )
 
@@ -27,9 +27,9 @@ type BatchNode struct {
 	idx int
 }
 
-func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode, l *log.Logger) (*BatchNode, error) {
+func newBatchNode(et *ExecutingTask, n *pipeline.BatchNode, d diagnostic.Diagnostic) (*BatchNode, error) {
 	sn := &BatchNode{
-		node: node{Node: n, et: et, logger: l},
+		node: node{Node: n, et: et, diagnostic: d},
 		s:    n,
 	}
 	return sn, nil
@@ -141,9 +141,9 @@ type QueryNode struct {
 	byName         bool
 }
 
-func newQueryNode(et *ExecutingTask, n *pipeline.QueryNode, l *log.Logger) (*QueryNode, error) {
+func newQueryNode(et *ExecutingTask, n *pipeline.QueryNode, d diagnostic.Diagnostic) (*QueryNode, error) {
 	bn := &QueryNode{
-		node:     node{Node: n, et: et, logger: l},
+		node:     node{Node: n, et: et, diagnostic: d},
 		b:        n,
 		closing:  make(chan struct{}),
 		aborting: make(chan struct{}),
@@ -295,7 +295,11 @@ func (n *QueryNode) doQuery(in edge.Edge) error {
 			n.query.SetStopTime(stop)
 
 			qStr := n.query.String()
-			n.logger.Println("D! starting next batch query:", qStr)
+			n.diagnostic.Diag(
+				"level", "debug",
+				"msg", "starting next batch query",
+				"query", qStr,
+			)
 
 			// Execute query
 			q := influxdb.Query{
@@ -304,7 +308,10 @@ func (n *QueryNode) doQuery(in edge.Edge) error {
 			resp, err := con.Query(q)
 			if err != nil {
 				n.incrementErrorCount()
-				n.logger.Println("E!", err)
+				n.diagnostic.Diag(
+					"level", "error",
+					"error", err,
+				)
 				n.timer.Stop()
 				break
 			}
@@ -314,7 +321,11 @@ func (n *QueryNode) doQuery(in edge.Edge) error {
 				batches, err := edge.ResultToBufferedBatches(res, n.byName)
 				if err != nil {
 					n.incrementErrorCount()
-					n.logger.Println("E! failed to understand query result:", err)
+					n.diagnostic.Diag(
+						"level", "error",
+						"msg", "failed to understand query result",
+						"error", err,
+					)
 					continue
 				}
 				for _, bch := range batches {

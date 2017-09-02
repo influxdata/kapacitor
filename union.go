@@ -1,11 +1,11 @@
 package kapacitor
 
 import (
-	"log"
 	"time"
 
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 )
 
 type UnionNode struct {
@@ -27,10 +27,10 @@ type timeMessage interface {
 
 // Create a new  UnionNode which combines all parent data streams into a single stream.
 // No transformation of any kind is performed.
-func newUnionNode(et *ExecutingTask, n *pipeline.UnionNode, l *log.Logger) (*UnionNode, error) {
+func newUnionNode(et *ExecutingTask, n *pipeline.UnionNode, d diagnostic.Diagnostic) (*UnionNode, error) {
 	un := &UnionNode{
 		u:      n,
-		node:   node{Node: n, et: et, logger: l},
+		node:   node{Node: n, et: et, diagnostic: d},
 		rename: n.Rename,
 	}
 	un.node.runF = un.runUnion

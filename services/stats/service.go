@@ -23,7 +23,6 @@
 package stats
 
 import (
-	"log"
 	"sync"
 	"time"
 
@@ -31,6 +30,7 @@ import (
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/server/vars"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/timer"
 )
 
@@ -56,17 +56,17 @@ type Service struct {
 	mu      sync.Mutex
 	wg      sync.WaitGroup
 
-	logger *log.Logger
+	diagnostic diagnostic.Diagnostic
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, d diagnostic.Diagnostic) *Service {
 	return &Service{
 		interval:            time.Duration(c.StatsInterval),
 		db:                  c.Database,
 		rp:                  c.RetentionPolicy,
 		timingSampleRate:    c.TimingSampleRate,
 		timingMovingAvgSize: c.TimingMovingAverageSize,
-		logger:              l,
+		diagnostic:          d,
 	}
 }
 
@@ -115,7 +115,11 @@ func (s *Service) reportStats() {
 	now := time.Now().UTC()
 	data, err := vars.GetStatsData()
 	if err != nil {
-		s.logger.Println("E! error getting stats data:", err)
+		s.diagnostic.Diag(
+			"level", "error",
+			"msg", "error getting stats data",
+			"error", err,
+		)
 		return
 	}
 	for _, stat := range data {

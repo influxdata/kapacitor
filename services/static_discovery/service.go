@@ -3,10 +3,10 @@ package static_discovery
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/scraper"
 	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/discovery"
@@ -19,16 +19,16 @@ type Service struct {
 
 	registry scraper.Registry
 
-	logger *log.Logger
-	open   bool
+	diagnostic diagnostic.Diagnostic
+	open       bool
 }
 
 // NewService creates a new unopened service
-func NewService(c []Config, r scraper.Registry, l *log.Logger) *Service {
+func NewService(c []Config, r scraper.Registry, d diagnostic.Diagnostic) *Service {
 	return &Service{
-		Configs:  c,
-		registry: r,
-		logger:   l,
+		Configs:    c,
+		registry:   r,
+		diagnostic: d,
 	}
 }
 

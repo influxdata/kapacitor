@@ -2,13 +2,13 @@ package kapacitor
 
 import (
 	"fmt"
-	"log"
 	"reflect"
 	"time"
 
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/pkg/errors"
 )
 
@@ -26,9 +26,9 @@ type InfluxQLNode struct {
 	currentKind reflect.Kind
 }
 
-func newInfluxQLNode(et *ExecutingTask, n *pipeline.InfluxQLNode, l *log.Logger) (*InfluxQLNode, error) {
+func newInfluxQLNode(et *ExecutingTask, n *pipeline.InfluxQLNode, d diagnostic.Diagnostic) (*InfluxQLNode, error) {
 	m := &InfluxQLNode{
-		node: node{Node: n, et: et, logger: l},
+		node: node{Node: n, et: et, diagnostic: d},
 		n:    n,
 		isStreamTransformation: n.ReduceCreater.IsStreamTransformation,
 	}
@@ -112,14 +112,21 @@ func (g *influxqlGroup) BatchPoint(bp edge.BatchPointMessage) (edge.Message, err
 	if g.rc == nil {
 		if err := g.realizeReduceContextFromFields(bp.Fields()); err != nil {
 			g.n.incrementErrorCount()
-			g.n.logger.Println("E!", err)
+			g.n.diagnostic.Diag(
+				"level", "error",
+				"error", err,
+			)
 			return nil, nil
 		}
 	}
 	g.batchSize++
 	if err := g.rc.AggregatePoint(g.begin.Name(), bp); err != nil {
 		g.n.incrementErrorCount()
-		g.n.logger.Println("E! failed to aggregate point in batch:", err)
+		g.n.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to aggregate point in batch",
+			"error", err,
+		)
 	}
 	return nil, nil
 }
@@ -138,7 +145,11 @@ func (g *influxqlGroup) EndBatch(end edge.EndBatchMessage) (edge.Message, error)
 	m, err := g.n.emit(g.rc)
 	if err != nil {
 		g.n.incrementErrorCount()
-		g.n.logger.Println("E! failed to emit batch:", err)
+		g.n.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to emit batch",
+			"error", err,
+		)
 		return nil, nil
 	}
 	return m, nil
@@ -154,7 +165,11 @@ func (g *influxqlGroup) Point(p edge.PointMessage) (edge.Message, error) {
 			m, err := g.n.emit(g.rc)
 			if err != nil {
 				g.n.incrementErrorCount()
-				g.n.logger.Println("E! failed to emit stream:", err)
+				g.n.diagnostic.Diag(
+					"level", "error",
+					"msg", "failed to emit stream",
+					"error", err,
+				)
 			}
 			msg = m
 		}
@@ -176,14 +191,21 @@ func (g *influxqlGroup) aggregatePoint(p edge.PointMessage) {
 	if g.rc == nil {
 		if err := g.realizeReduceContextFromFields(p.Fields()); err != nil {
 			g.n.incrementErrorCount()
-			g.n.logger.Println("E!", err)
+			g.n.diagnostic.Diag(
+				"level", "error",
+				"error", err,
+			)
 			return
 		}
 	}
 	err := g.rc.AggregatePoint(p.Name(), p)
 	if err != nil {
 		g.n.incrementErrorCount()
-		g.n.logger.Println("E! failed to aggregate point:", err)
+		g.n.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to aggregate point",
+			"error", err,
+		)
 	}
 }
 
@@ -235,17 +257,28 @@ func (g *influxqlStreamingTransformGroup) BatchPoint(bp edge.BatchPointMessage) 
 	if g.rc == nil {
 		if err := g.realizeReduceContextFromFields(bp.Fields()); err != nil {
 			g.n.incrementErrorCount()
-			g.n.logger.Println("E!", err)
+			g.n.diagnostic.Diag(
+				"level", "error",
+				"error", err,
+			)
 			return nil, nil
 		}
 	}
 	if err := g.rc.AggregatePoint(g.begin.Name(), bp); err != nil {
 		g.n.incrementErrorCount()
-		g.n.logger.Println("E! failed to aggregate batch point:", err)
+		g.n.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to aggregate batch point",
+			"error", err,
+		)
 	}
 	if ep, err := g.rc.EmitPoint(); err != nil {
 		g.n.incrementErrorCount()
-		g.n.logger.Println("E! failed to emit batch point:", err)
+		g.n.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to emit batch point",
+			"error", err,
+		)
 	} else if ep != nil {
 		return edge.NewBatchPointMessage(
 			ep.Fields(),
@@ -264,7 +297,10 @@ func (g *influxqlStreamingTransformGroup) Point(p edge.PointMessage) (edge.Messa
 	if g.rc == nil {
 		if err := g.realizeReduceContextFromFields(p.Fields()); err != nil {
 			g.n.incrementErrorCount()
-			g.n.logger.Println("E!", err)
+			g.n.diagnostic.Diag(
+				"level", "error",
+				"error", err,
+			)
 			// Skip point
 			return nil, nil
 		}
@@ -272,13 +308,21 @@ func (g *influxqlStreamingTransformGroup) Point(p edge.PointMessage) (edge.Messa
 	err := g.rc.AggregatePoint(p.Name(), p)
 	if err != nil {
 		g.n.incrementErrorCount()
-		g.n.logger.Println("E! failed to aggregate point:", err)
+		g.n.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to aggregate point",
+			"error", err,
+		)
 	}
 
 	m, err := g.n.emit(g.rc)
 	if err != nil {
 		g.n.incrementErrorCount()
-		g.n.logger.Println("E! failed to emit stream:", err)
+		g.n.diagnostic.Diag(
+			"level", "error",
+			"msg", "failed to emit stream",
+			"error", err,
+		)
 		return nil, nil
 	}
 	return m, nil

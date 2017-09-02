@@ -2,7 +2,6 @@ package kapacitor
 
 import (
 	"bytes"
-	"log"
 	"sync"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/influxdb"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/pkg/errors"
 )
 
@@ -30,7 +30,7 @@ type InfluxDBOutNode struct {
 	batchBuffer *edge.BatchBuffer
 }
 
-func newInfluxDBOutNode(et *ExecutingTask, n *pipeline.InfluxDBOutNode, l *log.Logger) (*InfluxDBOutNode, error) {
+func newInfluxDBOutNode(et *ExecutingTask, n *pipeline.InfluxDBOutNode, d diagnostic.Diagnostic) (*InfluxDBOutNode, error) {
 	if et.tm.InfluxDBService == nil {
 		return nil, errors.New("no InfluxDB cluster configured cannot use the InfluxDBOutNode")
 	}
@@ -39,7 +39,7 @@ func newInfluxDBOutNode(et *ExecutingTask, n *pipeline.InfluxDBOutNode, l *log.L
 		return nil, errors.Wrap(err, "failed to get InfluxDB client")
 	}
 	in := &InfluxDBOutNode{
-		node:        node{Node: n, et: et, logger: l},
+		node:        node{Node: n, et: et, diagnostic: d},
 		i:           n,
 		wb:          newWriteBuffer(int(n.Buffer), n.FlushInterval, cli),
 		batchBuffer: new(edge.BatchBuffer),
@@ -82,7 +82,13 @@ func (n *InfluxDBOutNode) runOut([]byte) error {
 		}()
 		if err != nil {
 			n.incrementErrorCount()
-			n.logger.Printf("E! failed to create database %q on cluster %q: %v", n.i.Database, n.i.Cluster, err)
+			n.diagnostic.Diag(
+				"level", "error",
+				"msg", "failed to create database",
+				"database", n.i.Database,
+				"cluster", n.i.Cluster,
+				"error", err,
+			)
 		}
 	}
 
@@ -266,7 +272,11 @@ func (w *writeBuffer) run() {
 				bp, err = influxdb.NewBatchPoints(qe.bpc)
 				if err != nil {
 					w.i.incrementErrorCount()
-					w.i.logger.Println("E! failed to write points to InfluxDB:", err)
+					w.i.diagnostic.Diag(
+						"level", "error",
+						"msg", "failed to write points to InfluxDB",
+						"error", err,
+					)
 					break
 				}
 				w.buffer[qe.bpc] = bp
@@ -277,7 +287,11 @@ func (w *writeBuffer) run() {
 				err = w.write(bp)
 				if err != nil {
 					w.i.incrementErrorCount()
-					w.i.logger.Println("E! failed to write points to InfluxDB:", err)
+					w.i.diagnostic.Diag(
+						"level", "error",
+						"msg", "failed to write points to InfluxDB",
+						"error", err,
+					)
 				}
 				delete(w.buffer, qe.bpc)
 			}
@@ -299,7 +313,11 @@ func (w *writeBuffer) writeAll() {
 		err := w.write(bp)
 		if err != nil {
 			w.i.incrementErrorCount()
-			w.i.logger.Println("E! failed to write points to InfluxDB:", err)
+			w.i.diagnostic.Diag(
+				"level", "error",
+				"msg", "failed to write points to InfluxDB",
+				"error", err,
+			)
 		}
 		delete(w.buffer, bpc)
 	}

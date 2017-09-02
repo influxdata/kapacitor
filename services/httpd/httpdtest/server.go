@@ -2,11 +2,10 @@ package httpdtest
 
 import (
 	"expvar"
-	"log"
 	"net/http/httptest"
 
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/httpd"
-	"github.com/influxdata/kapacitor/services/logging/loggingtest"
 )
 
 type Server struct {
@@ -17,7 +16,9 @@ type Server struct {
 func NewServer(verbose bool) *Server {
 	statMap := &expvar.Map{}
 	statMap.Init()
-	ls := loggingtest.New()
+	// TODO: revisit
+	ds := diagnostic.NewService()
+	d := ds.NewDiagnostic(nil)
 	s := &Server{
 		Handler: httpd.NewHandler(
 			false,
@@ -26,8 +27,8 @@ func NewServer(verbose bool) *Server {
 			verbose,
 			false,
 			statMap,
-			ls.NewLogger("[httpdtest] ", log.LstdFlags),
-			ls,
+			d,
+			ds,
 			"",
 		),
 	}

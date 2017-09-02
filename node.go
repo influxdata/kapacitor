@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"expvar"
 	"fmt"
-	"log"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -15,6 +14,7 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/server/vars"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/timer"
 	"github.com/pkg/errors"
 )
@@ -67,6 +67,10 @@ type Node interface {
 	stats() map[string]interface{}
 }
 
+//type Diagnostic interface {
+//	Diag(...interface{}) error
+//}
+
 //implementation of Node
 type node struct {
 	pipeline.Node
@@ -81,7 +85,8 @@ type node struct {
 	finished   bool
 	ins        []edge.StatsEdge
 	outs       []edge.StatsEdge
-	logger     *log.Logger
+	diagnostic diagnostic.Diagnostic
+	notary     Notary
 	timer      timer.Timer
 	statsKey   string
 	statMap    *kexpvar.Map
@@ -132,7 +137,11 @@ func (n *node) start(snapshot []byte) {
 					err = fmt.Errorf("%s: Trace:%s", r, string(trace[:n]))
 				}
 				n.abortParentEdges()
-				n.logger.Println("E!", err)
+				n.diagnostic.Diag(
+					"level", "error",
+					"msg", "encountered error running node",
+					"error", err,
+				)
 				err = errors.Wrap(err, n.Name())
 			}
 			n.errCh <- err
@@ -174,7 +183,7 @@ func (n *node) addChild(c Node) (edge.StatsEdge, error) {
 	}
 	n.children = append(n.children, c)
 
-	edge := newEdge(n.et.Task.ID, n.Name(), c.Name(), n.Provides(), defaultEdgeBufferSize, n.et.tm.LogService)
+	edge := newEdge(n.et.Task.ID, n.Name(), c.Name(), n.Provides(), defaultEdgeBufferSize, n.et.tm.DiagnosticService)
 	if edge == nil {
 		return nil, fmt.Errorf("unknown edge type %s", n.Provides())
 	}

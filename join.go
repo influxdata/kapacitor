@@ -2,7 +2,6 @@ package kapacitor
 
 import (
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/influxdata/kapacitor/expvar"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/pkg/errors"
 )
 
@@ -36,10 +36,10 @@ type JoinNode struct {
 }
 
 // Create a new JoinNode, which takes pairs from parent streams combines them into a single point.
-func newJoinNode(et *ExecutingTask, n *pipeline.JoinNode, l *log.Logger) (*JoinNode, error) {
+func newJoinNode(et *ExecutingTask, n *pipeline.JoinNode, d diagnostic.Diagnostic) (*JoinNode, error) {
 	jn := &JoinNode{
 		j:                    n,
-		node:                 node{Node: n, et: et, logger: l},
+		node:                 node{Node: n, et: et, diagnostic: d},
 		groups:               make(map[models.GroupID]*joinGroup),
 		matchGroupsBuffer:    make(map[models.GroupID][]srcPoint),
 		specificGroupsBuffer: make(map[models.GroupID][]srcPoint),
@@ -362,7 +362,7 @@ func (g *joinGroup) newJoinset(t time.Time) *joinset {
 		g.n.j.Delimiter,
 		g.n.j.Tolerance,
 		t,
-		g.n.logger,
+		g.n.diagnostic,
 	)
 }
 
@@ -462,7 +462,7 @@ type joinset struct {
 
 	first int
 
-	logger *log.Logger
+	diagnostic diagnostic.Diagnostic
 }
 
 func newJoinset(
@@ -474,22 +474,22 @@ func newJoinset(
 	delimiter string,
 	tolerance time.Duration,
 	time time.Time,
-	l *log.Logger,
+	d diagnostic.Diagnostic,
 ) *joinset {
 	expected := len(prefixes)
 	return &joinset{
-		j:         n,
-		name:      name,
-		fill:      fill,
-		fillValue: fillValue,
-		prefixes:  prefixes,
-		delimiter: delimiter,
-		expected:  expected,
-		values:    make([]edge.Message, expected),
-		first:     expected,
-		time:      time,
-		tolerance: tolerance,
-		logger:    l,
+		j:          n,
+		name:       name,
+		fill:       fill,
+		fillValue:  fillValue,
+		prefixes:   prefixes,
+		delimiter:  delimiter,
+		expected:   expected,
+		values:     make([]edge.Message, expected),
+		first:      expected,
+		time:       time,
+		tolerance:  tolerance,
+		diagnostic: d,
 	}
 }
 
