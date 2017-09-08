@@ -61,4 +61,5 @@ type PostData struct {
 	Origin      string   `json:"origin"`
 	Service     []string `json:"service"`
 	Value       string   `json:"value"`
+	Timeout     int64    `json:"timeout"`
 }

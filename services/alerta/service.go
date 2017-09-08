@@ -12,6 +12,7 @@ import (
 	"path"
 	"sync/atomic"
 	text "text/template"
+	"time"
 
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/models"
@@ -22,6 +23,7 @@ const (
 	defaultResource    = "{{ .Name }}"
 	defaultEvent       = "{{ .ID }}"
 	defaultGroup       = "{{ .Group }}"
+	defaultTimeout     = time.Duration(24 * time.Hour)
 	defaultTokenPrefix = "Bearer"
 )
 
@@ -55,6 +57,7 @@ type testOptions struct {
 	Message     string   `json:"message"`
 	Origin      string   `json:"origin"`
 	Service     []string `json:"service"`
+	Timeout     string   `json:"timeout"`
 }
 
 func (s *Service) TestOptions() interface{} {
@@ -69,6 +72,7 @@ func (s *Service) TestOptions() interface{} {
 		Message:     "test alerta message",
 		Origin:      c.Origin,
 		Service:     []string{"testServiceA", "testServiceB"},
+		Timeout:     "24h0m0s",
 	}
 }
 
@@ -78,6 +82,7 @@ func (s *Service) Test(options interface{}) error {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
 	c := s.config()
+	timeout, _ := time.ParseDuration(o.Timeout)
 	return s.Alert(
 		c.Token,
 		c.TokenPrefix,
@@ -90,6 +95,8 @@ func (s *Service) Test(options interface{}) error {
 		o.Message,
 		o.Origin,
 		o.Service,
+		timeout,
+		map[string]string{},
 		models.Result{},
 	)
 }
@@ -125,12 +132,12 @@ func (s *Service) Update(newConfig []interface{}) error {
 	return nil
 }
 
-func (s *Service) Alert(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin string, service []string, data models.Result) error {
+func (s *Service) Alert(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin string, service []string, timeout time.Duration, tags map[string]string, data models.Result) error {
 	if resource == "" || event == "" {
 		return errors.New("Resource and Event are required to send an alert")
 	}
 
-	req, err := s.preparePost(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin, service, data)
+	req, err := s.preparePost(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin, service, timeout, tags, data)
 	if err != nil {
 		return err
 	}
@@ -158,7 +165,7 @@ func (s *Service) Alert(token, tokenPrefix, resource, event, environment, severi
 	return nil
 }
 
-func (s *Service) preparePost(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin string, service []string, data models.Result) (*http.Request, error) {
+func (s *Service) preparePost(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin string, service []string, timeout time.Duration, tags map[string]string, data models.Result) (*http.Request, error) {
 	c := s.config()
 
 	if !c.Enabled {
@@ -204,6 +211,13 @@ func (s *Service) preparePost(token, tokenPrefix, resource, event, environment, 
 	if len(service) > 0 {
 		postData["service"] = service
 	}
+	postData["timeout"] = int64(timeout / time.Second)
+
+	tagList := make([]string, 0)
+	for k, v := range tags {
+		tagList = append(tagList, fmt.Sprintf("%s=%s", k, v))
+	}
+	postData["tags"] = tagList
 
 	var post bytes.Buffer
 	enc := json.NewEncoder(&post)
@@ -262,6 +276,10 @@ type HandlerConfig struct {
 
 	// List of effected Services
 	Service []string `mapstructure:"service"`
+
+	// Alerta timeout.
+	// Default: 24h
+	Timeout time.Duration `mapstructure:"timeout"`
 }
 
 type handler struct {
@@ -274,6 +292,7 @@ type handler struct {
 	environmentTmpl *text.Template
 	valueTmpl       *text.Template
 	groupTmpl       *text.Template
+	serviceTmpl     []*text.Template
 }
 
 func (s *Service) DefaultHandlerConfig() HandlerConfig {
@@ -281,6 +300,7 @@ func (s *Service) DefaultHandlerConfig() HandlerConfig {
 		Resource: defaultResource,
 		Event:    defaultEvent,
 		Group:    defaultGroup,
+		Timeout:  defaultTimeout,
 	}
 }
 
@@ -306,6 +326,16 @@ func (s *Service) Handler(c HandlerConfig, l *log.Logger) (alert.Handler, error)
 	if err != nil {
 		return nil, err
 	}
+
+	var stmpl []*text.Template
+	for _, service := range c.Service {
+		tmpl, err := text.New("service").Parse(service)
+		if err != nil {
+			return nil, err
+		}
+		stmpl = append(stmpl, tmpl)
+	}
+
 	return &handler{
 		s:               s,
 		c:               c,
@@ -315,6 +345,7 @@ func (s *Service) Handler(c HandlerConfig, l *log.Logger) (alert.Handler, error)
 		environmentTmpl: etmpl,
 		groupTmpl:       gtmpl,
 		valueTmpl:       vtmpl,
+		serviceTmpl:     stmpl,
 	}, nil
 }
 
@@ -382,10 +413,21 @@ func (h *handler) Handle(event alert.Event) {
 		return
 	}
 	value := buf.String()
+	buf.Reset()
 
-	service := h.c.Service
-	if len(service) == 0 {
+	var service []string
+	if len(h.serviceTmpl) == 0 {
 		service = []string{td.Name}
+	} else {
+		for _, tmpl := range h.serviceTmpl {
+			err = tmpl.Execute(&buf, td)
+			if err != nil {
+				h.logger.Printf("E! failed to evaluate Alerta Service template: %v", err)
+				return
+			}
+			service = append(service, buf.String())
+			buf.Reset()
+		}
 	}
 
 	var severity string
@@ -415,6 +457,8 @@ func (h *handler) Handle(event alert.Event) {
 		event.State.Message,
 		h.c.Origin,
 		service,
+		h.c.Timeout,
+		event.Data.Tags,
 		event.Data.Result,
 	); err != nil {
 		h.logger.Printf("E! failed to send event to Alerta: %v", err)

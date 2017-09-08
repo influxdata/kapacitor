@@ -11,6 +11,7 @@
     The breaking change is that the Combine and Flatten nodes previously, but erroneously, operated across batch boundaries; this has been fixed.
 - [#1497](https://github.com/influxdata/kapacitor/pull/1497): Add support for Docker Swarm autoscaling services.
 - [#1485](https://github.com/influxdata/kapacitor/issues/1485): Add bools field types to UDFs.
+- [#1545](https://github.com/influxdata/kapacitor/pull/1545): Add support for timeout, tags and service template in the Alerta AlertNode
 
 ### Bugfixes
 

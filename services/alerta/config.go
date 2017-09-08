@@ -3,6 +3,7 @@ package alerta
 import (
 	"net/url"
 
+	"github.com/influxdata/influxdb/toml"
 	"github.com/pkg/errors"
 )
 
@@ -22,6 +23,8 @@ type Config struct {
 	Environment string `toml:"environment" override:"environment"`
 	// The origin of the alert.
 	Origin string `toml:"origin" override:"origin"`
+	// Optional timeout, can be overridden per alert.
+	Timeout toml.Duration `toml:"timeout" override:"timeout"`
 }
 
 func NewConfig() Config {
