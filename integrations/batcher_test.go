@@ -2966,6 +2966,140 @@ batch
 	testBatcherWithOutput(t, "TestBatch_HttpPost", script, 30*time.Second, er, false)
 }
 
+func TestBatch_Reduce(t *testing.T) {
+
+	var script = `
+batch
+	|query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "host" = 'serverA' AND "cpu" != 'cpu-total'
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s), 'cpu')
+	|reduce(lambda: ("_previous.moving_average" + "mean") / 2.0, lambda: "_previous.sum" + "mean", lambda: "_previous.count" + 1.0)
+	        .as('moving_average', 'sum', 'count')
+	        .initialValue(0.0)
+	|httpOut('TestBatch_Reduce')
+`
+
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"cpu": "cpu-total"},
+				Columns: []string{"time", "count", "moving_average", "sum"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+						5.0,
+						85.6474010546236,
+						443.0903275394929,
+					},
+				},
+			},
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"cpu": "cpu0"},
+				Columns: []string{"time", "count", "moving_average", "sum"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+						5.0,
+						78.58431240031233,
+						408.7960103333036,
+					},
+				},
+			},
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"cpu": "cpu1"},
+				Columns: []string{"time", "count", "moving_average", "sum"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+						5.0,
+						89.48335302279087,
+						468.97414741470396,
+					},
+				},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_Reduce", script, 30*time.Second, er, false)
+}
+
+func TestBatch_ReduceKeep(t *testing.T) {
+
+	var script = `
+batch
+	|query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "host" = 'serverA' AND "cpu" != 'cpu-total'
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s), 'cpu')
+	|reduce(lambda: ("_previous.moving_average" + "mean") / 2.0, lambda: "_previous.sum" + "mean", lambda: "_previous.count" + 1.0)
+	        .as('moving_average', 'sum', 'count')
+	        .initialValue(0.0)
+	        .keep()
+	|httpOut('TestBatch_Reduce')
+`
+
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"cpu": "cpu-total"},
+				Columns: []string{"time", "count", "mean", "moving_average", "sum"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+						5.0,
+						88.97243107764031,
+						85.6474010546236,
+						443.0903275394929,
+					},
+				},
+			},
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"cpu": "cpu0"},
+				Columns: []string{"time", "count", "mean", "moving_average", "sum"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+						5.0,
+						80.61224489791657,
+						78.58431240031233,
+						408.7960103333036,
+					},
+				},
+			},
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"cpu": "cpu1"},
+				Columns: []string{"time", "count", "mean", "moving_average", "sum"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+						5.0,
+						90.99999999998545,
+						89.48335302279087,
+						468.97414741470396,
+					},
+				},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_Reduce", script, 30*time.Second, er, false)
+}
+
 // Helper test function for batcher
 func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.ExecutingTask, <-chan error, *kapacitor.TaskMaster) {
 	if testing.Verbose() {
