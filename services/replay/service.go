@@ -247,7 +247,7 @@ func (s *Service) syncRecordingMetadata() error {
 		}
 		dataUrl := url.URL{
 			Scheme: "file",
-			Path:   filepath.Join(s.saveDir, info.Name()),
+			Path:   filepath.ToSlash(filepath.Join(s.saveDir, info.Name())),
 		}
 		recording := Recording{
 			ID:       id,
@@ -578,7 +578,7 @@ func (s *Service) handleDeleteRecording(w http.ResponseWriter, r *http.Request) 
 func (s *Service) dataURLFromID(id, ext string) url.URL {
 	return url.URL{
 		Scheme: "file",
-		Path:   filepath.Join(s.saveDir, id+ext),
+		Path:   filepath.ToSlash(filepath.Join(s.saveDir, id+ext)),
 	}
 }
 
@@ -1637,10 +1637,16 @@ func parseDataSourceURL(rawurl string) (DataSource, error) {
 	}
 	switch u.Scheme {
 	case "file":
-		return fileSource(u.Path), nil
+		return fileSource(getFilePathFromUrl(u)), nil
 	default:
 		return nil, fmt.Errorf("unsupported data source scheme %s", u.Scheme)
 	}
+}
+
+//getFilePathFromUrl restores filesystem path from file URL
+func getFilePathFromUrl(url *url.URL) string {
+	//Host part on windows contains drive, on non windows it is empty
+	return url.Host + filepath.FromSlash(url.Path)
 }
 
 func (s fileSource) Size() (int64, error) {
