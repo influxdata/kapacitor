@@ -104,8 +104,14 @@ func main() {
 		url = *kapacitordURL
 	}
 
+	var creds *client.Credentials
+	if basicAuth := os.Getenv("KAPACITOR_BASIC_AUTH"); basicAuth != "" {
+		result := strings.Split(basicAuth, ":")
+		creds = &client.Credentials{Method: client.UserAuthentication, Username: result[0], Password: result[1]}
+	}
+
 	var err error
-	cli, err = connect(url, skipSSL)
+	cli, err = connect(url, skipSSL, creds)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(4)
@@ -236,10 +242,11 @@ func (e responseError) Error() string {
 	return e.Err
 }
 
-func connect(url string, skipSSL bool) (*client.Client, error) {
+func connect(url string, skipSSL bool, creds *client.Credentials) (*client.Client, error) {
 	return client.New(client.Config{
 		URL:                url,
 		InsecureSkipVerify: skipSSL,
+		Credentials:        creds,
 	})
 }
 
