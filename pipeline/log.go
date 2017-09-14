@@ -1,5 +1,7 @@
 package pipeline
 
+import "encoding/json"
+
 // A node that logs all data that passes through the node.
 //
 // Example:
@@ -26,4 +28,13 @@ func newLogNode(wants EdgeType) *LogNode {
 		chainnode: newBasicChainNode("log", wants, wants),
 		Level:     "INFO",
 	}
+}
+
+func (l *LogNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":   "log",
+		"level":  l.Level,
+		"prefix": l.Prefix,
+	}
+	return json.Marshal(props)
 }

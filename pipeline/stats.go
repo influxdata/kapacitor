@@ -1,6 +1,9 @@
 package pipeline
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // A StatsNode emits internal statistics about the another node at a given interval.
 //
@@ -58,4 +61,14 @@ func newStatsNode(n Node, interval time.Duration) *StatsNode {
 func (n *StatsNode) Align() *StatsNode {
 	n.AlignFlag = true
 	return n
+}
+
+func (n *StatsNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":       "stats",
+		"sourceNode": n.SourceNode,
+		"interval":   n.Interval,
+		"align":      n.AlignFlag,
+	}
+	return json.Marshal(props)
 }

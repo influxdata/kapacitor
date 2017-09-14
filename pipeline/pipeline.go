@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -108,6 +109,17 @@ type Pipeline struct {
 	sorted  []Node
 
 	deadman DeadmanService
+}
+
+func (p *Pipeline) MarshalJSON() ([]byte, error) {
+	if p.sorted == nil {
+		p.sort()
+	}
+	props := map[string]interface{}{
+		"type":  "pipeline",
+		"nodes": p.sorted,
+	}
+	return json.Marshal(props)
 }
 
 func (p *Pipeline) addSource(src Node) {

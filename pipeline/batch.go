@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"bytes"
+	"encoding/json"
 	"reflect"
 	"time"
 )
@@ -56,6 +57,24 @@ func (b *BatchNode) Query(q string) *QueryNode {
 // since its not really an edge.
 // tick:ignore
 func (b *BatchNode) dot(buf *bytes.Buffer) {
+}
+
+// MarshalJSON converts this node to JSON
+func (b *BatchNode) MarshalJSON() ([]byte, error) {
+	children := [][]byte{}
+	for _, c := range b.children {
+		o, err := c.MarshalJSON()
+		if err != nil {
+			return nil, err
+		}
+		children = append(children, o)
+	}
+	props := map[string]interface{}{
+		"type":     "batch",
+		"children": children,
+	}
+
+	return json.Marshal(props)
 }
 
 // A QueryNode defines a source and a schedule for
@@ -243,4 +262,32 @@ func (b *QueryNode) Align() *QueryNode {
 func (b *QueryNode) AlignGroup() *QueryNode {
 	b.AlignGroupFlag = true
 	return b
+}
+
+func (b *QueryNode) MarshalJSON() ([]byte, error) {
+	children := [][]byte{}
+	for _, c := range b.children {
+		b, err := c.MarshalJSON()
+		if err != nil {
+			return nil, err
+		}
+		children = append(children, b)
+	}
+
+	props := map[string]interface{}{
+		"type":               "query",
+		"query":              b.QueryStr,
+		"period":             b.Period,
+		"every":              b.Every,
+		"align":              b.AlignFlag,
+		"cron":               b.Cron,
+		"offset":             b.Offset,
+		"alignGroup":         b.AlignGroupFlag,
+		"groupBy":            b.Dimensions,
+		"groupByMeasurement": b.GroupByMeasurementFlag,
+		"fill":               b.Fill,
+		"cluster":            b.Cluster,
+		"children":           children,
+	}
+	return json.Marshal(props)
 }

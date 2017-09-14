@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -132,6 +133,18 @@ func newJoinNode(e EdgeType, parents []Node) *JoinNode {
 		n.linkChild(j)
 	}
 	return j
+}
+
+func (j *JoinNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":       "join",
+		"as":         j.Names,
+		"on":         j.Dimensions,
+		"streamName": j.StreamName,
+		"tolerance":  j.Tolerance,
+		"fill":       j.Fill,
+	}
+	return json.Marshal(props)
 }
 
 // Prefix names for all fields from the respective nodes.

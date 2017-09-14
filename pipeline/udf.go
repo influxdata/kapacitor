@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -85,6 +86,15 @@ func NewUDF(
 	udf.describer, _ = tick.NewReflectionDescriber(udf, nil)
 	parent.linkChild(udf)
 	return udf
+}
+
+func (u *UDFNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":    "udf",
+		"name":    u.UDFName,
+		"options": u.Options,
+	}
+	return json.Marshal(props)
 }
 
 // tick:ignore

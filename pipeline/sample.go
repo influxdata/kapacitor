@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -49,4 +50,13 @@ func newSampleNode(wants EdgeType, rate interface{}) *SampleNode {
 		N:         n,
 		Duration:  d,
 	}
+}
+
+func (n *SampleNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":     "sample",
+		"n":        n.N,
+		"duration": n.Duration,
+	}
+	return json.Marshal(props)
 }

@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -41,6 +42,16 @@ func newGroupByNode(wants EdgeType, dims []interface{}) *GroupByNode {
 		chainnode:  newBasicChainNode("groupby", wants, wants),
 		Dimensions: dims,
 	}
+}
+
+func (n *GroupByNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":          "groupBy",
+		"dimensions":    n.Dimensions,
+		"exclude":       n.ExcludedDimensions,
+		"byMeasurement": n.ByMeasurementFlag,
+	}
+	return json.Marshal(props)
 }
 
 func (n *GroupByNode) validate() error {

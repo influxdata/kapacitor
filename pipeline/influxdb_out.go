@@ -1,6 +1,9 @@
 package pipeline
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 const DefaultBufferSize = 1000
 const DefaultFlushInterval = time.Second * 10
@@ -67,6 +70,23 @@ func newInfluxDBOutNode(wants EdgeType) *InfluxDBOutNode {
 		Buffer:        DefaultBufferSize,
 		FlushInterval: DefaultFlushInterval,
 	}
+}
+
+func (i *InfluxDBOutNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":             "influxdbOut",
+		"cluster":          i.Cluster,
+		"database":         i.Database,
+		"retentionPolicy":  i.RetentionPolicy,
+		"measurement":      i.Measurement,
+		"writeConsistency": i.WriteConsistency,
+		"precision":        i.Precision,
+		"buffer":           i.Buffer,
+		"flushInterval":    i.FlushInterval,
+		"tag":              i.Tags,
+		"create":           i.CreateFlag,
+	}
+	return json.Marshal(props)
 }
 
 // Add a static tag to all data points.

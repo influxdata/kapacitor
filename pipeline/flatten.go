@@ -1,6 +1,9 @@
 package pipeline
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 const (
 	defaultFlattenDelimiter = "."
@@ -65,6 +68,17 @@ func newFlattenNode(e EdgeType) *FlattenNode {
 		Delimiter: defaultFlattenDelimiter,
 	}
 	return f
+}
+
+func (f *FlattenNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":                  "flatten",
+		"on":                    f.Dimensions,
+		"delimiter":             f.Delimiter,
+		"tolerance":             f.Tolerance,
+		"dropOriginalFieldName": f.DropOriginalFieldNameFlag,
+	}
+	return json.Marshal(props)
 }
 
 // Specify the dimensions on which to flatten the points.

@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -89,6 +90,17 @@ func newCombineNode(e EdgeType, lambdas []*ast.LambdaNode) *CombineNode {
 		Max:       defaultMaxCombinations,
 	}
 	return c
+}
+
+func (n *CombineNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":      "combine",
+		"tolerance": n.Tolerance,
+		"max":       n.Max,
+		"as":        n.Names,
+		"lambdas":   n.Lambdas,
+	}
+	return json.Marshal(props)
 }
 
 // Prefix names for all fields from the respective nodes.

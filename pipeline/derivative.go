@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -54,6 +55,17 @@ func newDerivativeNode(wants EdgeType, field string) *DerivativeNode {
 		Field:     field,
 		As:        field,
 	}
+}
+
+func (d *DerivativeNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":        "derivative",
+		"field":       d.Field,
+		"as":          d.As,
+		"unit":        d.Unit,
+		"nonNegative": d.NonNegativeFlag,
+	}
+	return json.Marshal(props)
 }
 
 // If called the derivative will skip negative results.

@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -53,6 +54,19 @@ func newWindowNode() *WindowNode {
 	return &WindowNode{
 		chainnode: newBasicChainNode("window", StreamEdge, BatchEdge),
 	}
+}
+
+func (w *WindowNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":        "window",
+		"period":      w.Period,
+		"every":       w.Every,
+		"align":       w.AlignFlag,
+		"fillPeriod":  w.FillPeriodFlag,
+		"periodCount": w.PeriodCount,
+		"everyCount":  w.EveryCount,
+	}
+	return json.Marshal(props)
 }
 
 // If the `align` property is not used to modify the `window` node, then the

@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/influxdata/kapacitor/tick/ast"
@@ -56,6 +57,19 @@ func newEvalNode(e EdgeType, exprs []*ast.LambdaNode) *EvalNode {
 		Lambdas:   exprs,
 	}
 	return n
+}
+
+func (e *EvalNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":     "eval",
+		"as":       e.AsList,
+		"tags":     e.TagsList,
+		"lambdas":  e.Lambdas,
+		"keep":     e.KeepFlag,
+		"keepList": e.KeepList,
+		"quiet":    e.QuietFlag,
+	}
+	return json.Marshal(props)
 }
 
 func (e *EvalNode) validate() error {

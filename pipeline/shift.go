@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -31,4 +32,12 @@ func newShiftNode(wants EdgeType, shift time.Duration) *ShiftNode {
 		chainnode: newBasicChainNode("shift", wants, wants),
 		Shift:     shift,
 	}
+}
+
+func (n *ShiftNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":  "shift",
+		"shift": n.Shift,
+	}
+	return json.Marshal(props)
 }
