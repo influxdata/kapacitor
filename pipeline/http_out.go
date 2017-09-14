@@ -1,5 +1,7 @@
 package pipeline
 
+import "encoding/json"
+
 // An HTTPOutNode caches the most recent data for each group it has received.
 //
 // The cached data is available at the given endpoint.
@@ -29,4 +31,12 @@ func newHTTPOutNode(wants EdgeType, endpoint string) *HTTPOutNode {
 		chainnode: newBasicChainNode("http_out", wants, wants),
 		Endpoint:  endpoint,
 	}
+}
+
+func (n *HTTPOutNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":     "httpOut",
+		"endpoint": n.Endpoint,
+	}
+	return json.Marshal(props)
 }

@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/influxdata/influxdb/influxql"
@@ -54,6 +55,26 @@ func newInfluxQLNode(method, field string, wants, provides EdgeType, reducer Red
 		As:            method,
 		ReduceCreater: reducer,
 	}
+}
+
+func (n *InfluxQLNode) MarshalJSON() ([]byte, error) {
+	children := [][]byte{}
+	for _, c := range n.children {
+		b, err := c.MarshalJSON()
+		if err != nil {
+			return nil, err
+		}
+		children = append(children, b)
+	}
+
+	props := map[string]interface{}{
+		"type":     "influxql",
+		"method":   n.Method,
+		"field":    n.Field,
+		"as":       n.As,
+		"children": children,
+	}
+	return json.Marshal(props)
 }
 
 // Use the time of the selected point instead of the time of the batch.

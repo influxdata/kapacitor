@@ -1,6 +1,10 @@
 package pipeline
 
-import "github.com/influxdata/kapacitor/tick/ast"
+import (
+	"encoding/json"
+
+	"github.com/influxdata/kapacitor/tick/ast"
+)
 
 // The WhereNode filters the data stream by a given expression.
 //
@@ -28,4 +32,12 @@ func newWhereNode(wants EdgeType, predicate *ast.LambdaNode) *WhereNode {
 		chainnode: newBasicChainNode("where", wants, wants),
 		Lambda:    predicate,
 	}
+}
+
+func (n *WhereNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":   "where",
+		"lambda": n.Lambda,
+	}
+	return json.Marshal(props)
 }

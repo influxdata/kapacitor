@@ -2,6 +2,7 @@ package ast
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -27,6 +28,7 @@ type Node interface {
 	Format(buf *bytes.Buffer, indent string, onNewLine bool)
 	// Report whether to nodes are functionally equal, ignoring position and comments
 	Equal(interface{}) bool
+	MarshalJSON() ([]byte, error)
 }
 
 func Format(n Node) string {
@@ -81,6 +83,18 @@ type NumberNode struct {
 	Float64 float64 // The floating-point value.
 	Base    int     // The base of an integer value.
 	Comment *CommentNode
+}
+
+func (n *NumberNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":    "number",
+		"isInt":   n.IsInt,
+		"isFloat": n.IsFloat,
+		"int64":   n.Int64,
+		"float64": n.Float64,
+		"base":    n.Base,
+	}
+	return json.Marshal(props)
 }
 
 // create a new number from a text string
@@ -176,6 +190,15 @@ type DurationNode struct {
 	Comment *CommentNode
 }
 
+func (n *DurationNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":    "duration",
+		"dur":     n.Dur,
+		"literal": n.Literal,
+	}
+	return json.Marshal(props)
+}
+
 // create a new number from a text string
 func newDur(p position, text string, c *CommentNode) (*DurationNode, error) {
 	n := &DurationNode{
@@ -219,6 +242,14 @@ type BoolNode struct {
 	position
 	Bool    bool
 	Comment *CommentNode
+}
+
+func (n *BoolNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type": "bool",
+		"bool": n.Bool,
+	}
+	return json.Marshal(props)
 }
 
 func newBool(p position, text string, c *CommentNode) (*BoolNode, error) {
@@ -267,6 +298,15 @@ type UnaryNode struct {
 	Comment  *CommentNode
 }
 
+func (n *UnaryNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":     "unaryNode",
+		"operator": n.Operator.String(),
+		"node":     n.Node,
+	}
+	return json.Marshal(props)
+}
+
 func newUnary(p position, op TokenType, n Node, c *CommentNode) *UnaryNode {
 	return &UnaryNode{
 		position: p,
@@ -309,6 +349,18 @@ type BinaryNode struct {
 	Comment   *CommentNode
 	Parens    bool
 	MultiLine bool
+}
+
+func (n *BinaryNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":      "binaryNode",
+		"operator":  n.Operator.String(),
+		"left":      n.Left,
+		"right":     n.Right,
+		"parens":    n.Parens,
+		"multiline": n.MultiLine,
+	}
+	return json.Marshal(props)
 }
 
 func newBinary(p position, op TokenType, left, right Node, multiLine bool, c *CommentNode) *BinaryNode {
@@ -411,6 +463,15 @@ type DeclarationNode struct {
 	Comment *CommentNode
 }
 
+func (n *DeclarationNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":  "declarationNode",
+		"left":  n.Left,
+		"right": n.Right,
+	}
+	return json.Marshal(props)
+}
+
 func newDecl(p position, left *IdentifierNode, right Node, c *CommentNode) *DeclarationNode {
 	return &DeclarationNode{
 		position: p,
@@ -454,6 +515,15 @@ type TypeDeclarationNode struct {
 	Comment *CommentNode
 }
 
+func (n *TypeDeclarationNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":   "typeDeclarationNode",
+		"node":   n.Node,
+		"typeOf": n.Type,
+	}
+	return json.Marshal(props)
+}
+
 func newTypeDecl(p position, node, typeIdent *IdentifierNode, c *CommentNode) *TypeDeclarationNode {
 	return &TypeDeclarationNode{
 		position: p,
@@ -495,6 +565,16 @@ type ChainNode struct {
 	Right    Node
 	Operator TokenType
 	Comment  *CommentNode
+}
+
+func (n *ChainNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":     "chainNode",
+		"left":     n.Left,
+		"right":    n.Right,
+		"operator": n.Operator.String(),
+	}
+	return json.Marshal(props)
 }
 
 func newChain(p position, op TokenType, left, right Node, c *CommentNode) *ChainNode {
@@ -544,6 +624,14 @@ type IdentifierNode struct {
 	Comment *CommentNode
 }
 
+func (n *IdentifierNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":  "identifier",
+		"ident": n.Ident,
+	}
+	return json.Marshal(props)
+}
+
 func newIdent(p position, ident string, c *CommentNode) *IdentifierNode {
 	return &IdentifierNode{
 		position: p,
@@ -579,6 +667,14 @@ type ReferenceNode struct {
 	position
 	Reference string // The field reference
 	Comment   *CommentNode
+}
+
+func (n *ReferenceNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":      "reference",
+		"reference": n.Reference,
+	}
+	return json.Marshal(props)
 }
 
 func newReference(p position, txt string, c *CommentNode) *ReferenceNode {
@@ -640,6 +736,15 @@ type StringNode struct {
 	Literal      string // The string literal
 	TripleQuotes bool
 	Comment      *CommentNode
+}
+
+func (n *StringNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":         "string",
+		"literal":      n.Literal,
+		"tripleQuotes": n.TripleQuotes,
+	}
+	return json.Marshal(props)
 }
 
 func newString(p position, txt string, c *CommentNode) *StringNode {
@@ -725,6 +830,14 @@ type ListNode struct {
 	Comment *CommentNode
 }
 
+func (n *ListNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":  "list",
+		"nodes": n.Nodes,
+	}
+	return json.Marshal(props)
+}
+
 func newList(p position, nodes []Node, c *CommentNode) *ListNode {
 	return &ListNode{
 		position: p,
@@ -753,6 +866,7 @@ func (n *ListNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) {
 	}
 	buf.WriteByte(']')
 }
+
 func (n *ListNode) SetComment(c *CommentNode) {
 	n.Comment = c
 }
@@ -778,6 +892,15 @@ type RegexNode struct {
 	Regex   *regexp.Regexp
 	Literal string
 	Comment *CommentNode
+}
+
+func (n *RegexNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":    "regex",
+		"regex":   n.Regex.String(),
+		"literal": n.Literal,
+	}
+	return json.Marshal(props)
 }
 
 func newRegex(p position, txt string, c *CommentNode) (*RegexNode, error) {
@@ -842,6 +965,13 @@ type StarNode struct {
 	Comment *CommentNode
 }
 
+func (n *StarNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type": "star",
+	}
+	return json.Marshal(props)
+}
+
 func newStar(p position, c *CommentNode) *StarNode {
 	return &StarNode{
 		position: p,
@@ -902,6 +1032,17 @@ type FunctionNode struct {
 	Args      []Node
 	Comment   *CommentNode
 	MultiLine bool
+}
+
+func (n *FunctionNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":      "function",
+		"typeOf":    n.Type.String(),
+		"func":      n.Func,
+		"args":      n.Args,
+		"multiline": n.MultiLine,
+	}
+	return json.Marshal(props)
 }
 
 func newFunc(p position, ft FuncType, ident string, args []Node, multi bool, c *CommentNode) *FunctionNode {
@@ -972,6 +1113,14 @@ type LambdaNode struct {
 	Comment    *CommentNode
 }
 
+func (n *LambdaNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":       "lambda",
+		"expression": n.Expression,
+	}
+	return json.Marshal(props)
+}
+
 func newLambda(p position, node Node, c *CommentNode) *LambdaNode {
 	return &LambdaNode{
 		position:   p,
@@ -1018,6 +1167,14 @@ type ProgramNode struct {
 	Nodes []Node
 }
 
+func (n *ProgramNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":  "program",
+		"nodes": n.Nodes,
+	}
+	return json.Marshal(props)
+}
+
 func newProgram(p position) *ProgramNode {
 	return &ProgramNode{
 		position: p,
@@ -1061,6 +1218,14 @@ func (n *ProgramNode) Equal(o interface{}) bool {
 type CommentNode struct {
 	position
 	Comments []string
+}
+
+func (n *CommentNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":     "comment",
+		"comments": n.Comments,
+	}
+	return json.Marshal(props)
 }
 
 func newComment(p position, commentTokens []string) *CommentNode {

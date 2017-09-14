@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"errors"
 )
 
@@ -46,6 +47,17 @@ func newKapacitorLoopbackNode(wants EdgeType) *KapacitorLoopbackNode {
 		},
 		Tags: make(map[string]string),
 	}
+}
+
+func (k *KapacitorLoopbackNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":            "kapacitorLoopback",
+		"database":        k.Database,
+		"retentionPolicy": k.RetentionPolicy,
+		"measurement":     k.Measurement,
+		"tag":             k.Tags,
+	}
+	return json.Marshal(props)
 }
 
 // Add a static tag to all data points.

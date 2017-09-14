@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -372,6 +373,63 @@ func newAlertNode(wants EdgeType) *AlertNode {
 	return a
 }
 
+func (n *AlertNode) MarshalJSON() ([]byte, error) {
+	children := [][]byte{}
+	for _, c := range n.children {
+		b, err := c.MarshalJSON()
+		if err != nil {
+			return nil, err
+		}
+		children = append(children, b)
+	}
+
+	props := map[string]interface{}{
+		"type":             "alert",
+		"topic":            n.Topic,
+		"id":               n.Id,
+		"message":          n.Message,
+		"details":          n.Details,
+		"info":             n.Info,
+		"warn":             n.Warn,
+		"crit":             n.Crit,
+		"infoReset":        n.InfoReset,
+		"warnReset":        n.WarnReset,
+		"critReset":        n.CritReset,
+		"flapping":         n.Flapping,
+		"flapLow":          n.FlapLow,
+		"flapHigh":         n.FlapHigh,
+		"history":          n.History,
+		"levelTag":         n.LevelTag,
+		"levelField":       n.LevelField,
+		"messageField":     n.MessageField,
+		"durationField":    n.DurationField,
+		"idTag":            n.IdTag,
+		"idField":          n.IdField,
+		"all":              n.AllFlag,
+		"noRecoveries":     n.NoRecoveriesFlag,
+		"stateChangesOnly": n.IsStateChangesOnly,
+		"post":             n.HTTPPostHandlers,
+		"tcp":              n.TcpHandlers,
+		"email":            n.EmailHandlers,
+		"exec":             n.ExecHandlers,
+		"log":              n.LogHandlers,
+		"victorops":        n.VictorOpsHandlers,
+		"pagerduty":        n.PagerDutyHandlers,
+		"pushover":         n.PushoverHandlers,
+		"sensu":            n.SensuHandlers,
+		"slack":            n.SlackHandlers,
+		"telegraf":         n.TelegramHandlers,
+		"hipchat":          n.HipChatHandlers,
+		"alerta":           n.AlertaHandlers,
+		"opsgenie":         n.OpsGenieHandlers,
+		"talk":             n.TalkHandlers,
+		"mqtt":             n.MQTTHandlers,
+		"snmptrap":         n.SNMPTrapHandlers,
+		"children":         children,
+	}
+	return json.Marshal(props)
+}
+
 //tick:ignore
 func (n *AlertNode) ChainMethods() map[string]reflect.Value {
 	return map[string]reflect.Value{
@@ -553,6 +611,15 @@ func (a *AlertHTTPPostHandler) CaptureResponse() *AlertHTTPPostHandler {
 	return a
 }
 
+func (a *AlertHTTPPostHandler) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"url":      a.URL,
+		"endpoint": a.Endpoint,
+		"header":   a.Headers,
+	}
+	return json.Marshal(props)
+}
+
 func (a *AlertHTTPPostHandler) validate() error {
 	for k := range a.Headers {
 		if strings.ToUpper(k) == "AUTHENTICATE" {
@@ -579,6 +646,13 @@ type TcpHandler struct {
 
 	// The endpoint address.
 	Address string
+}
+
+func (a *TcpHandler) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"address": a.Address,
+	}
+	return json.Marshal(props)
 }
 
 // Email the alert data.
@@ -646,6 +720,13 @@ type EmailHandler struct {
 	ToList []string `tick:"To"`
 }
 
+func (h *EmailHandler) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"to": h.ToList,
+	}
+	return json.Marshal(props)
+}
+
 // Define the To addresses for the email alert.
 // Multiple calls append to the existing list of addresses.
 // If empty uses the addresses from the configuration.
@@ -694,6 +775,13 @@ type ExecHandler struct {
 	Command []string
 }
 
+func (h *ExecHandler) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"command": h.Command,
+	}
+	return json.Marshal(props)
+}
+
 // Log JSON alert data to file. One event per line.
 // Must specify the absolute path to the log file.
 // It will be created if it does not exist.
@@ -729,6 +817,14 @@ type LogHandler struct {
 	// File's mode and permissions, default is 0600
 	// NOTE: The leading 0 is required to interpret the value as an octal integer.
 	Mode int64
+}
+
+func (h *LogHandler) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"filePath": h.FilePath,
+		"mode":     h.Mode,
+	}
+	return json.Marshal(props)
 }
 
 // Send alert to VictorOps.
@@ -793,6 +889,13 @@ type VictorOpsHandler struct {
 	RoutingKey string
 }
 
+func (h *VictorOpsHandler) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"routingKey": h.RoutingKey,
+	}
+	return json.Marshal(props)
+}
+
 // Send the alert to PagerDuty.
 // To use PagerDuty alerting you must first follow the steps to enable a new 'Generic API' service.
 //
@@ -848,6 +951,13 @@ type PagerDutyHandler struct {
 	// The service key to use for the alert.
 	// Defaults to the value in the configuration if empty.
 	ServiceKey string
+}
+
+func (h *PagerDutyHandler) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"serviceKey": h.ServiceKey,
+	}
+	return json.Marshal(props)
 }
 
 // Send the alert to HipChat.
@@ -921,6 +1031,14 @@ type HipChatHandler struct {
 	// HipChat authentication token.
 	// If empty uses the token from the configuration.
 	Token string
+}
+
+func (h *HipChatHandler) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"room":  h.Room,
+		"token": h.Token,
+	}
+	return json.Marshal(props)
 }
 
 // Send the alert to Alerta.
@@ -1014,6 +1132,20 @@ type AlertaHandler struct {
 	Timeout time.Duration
 }
 
+func (a *AlertaHandler) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"token":       a.Token,
+		"resource":    a.Resource,
+		"event":       a.Event,
+		"environment": a.Environment,
+		"group":       a.Group,
+		"value":       a.Value,
+		"origin":      a.Origin,
+		"services":    a.Service,
+	}
+	return json.Marshal(props)
+}
+
 // List of effected services.
 // If not specified defaults to the Name of the stream.
 // tick:property
@@ -1057,6 +1189,16 @@ type MQTTHandler struct {
 	// Retained indicates whether this alert should be delivered to
 	// clients that were not connected to the broker at the time of the alert.
 	Retained bool
+}
+
+func (h *MQTTHandler) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"brokerName": h.BrokerName,
+		"topic":      h.Topic,
+		"qos":        h.Qos,
+		"retained":   h.Retained,
+	}
+	return json.Marshal(props)
 }
 
 // Send the alert to Sensu.
@@ -1104,6 +1246,14 @@ type SensuHandler struct {
 	// If empty uses the handler list from the configuration
 	// tick:ignore
 	HandlersList []string `tick:"Handlers"`
+}
+
+func (s *SensuHandler) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"source":   s.Source,
+		"handlers": s.HandlersList,
+	}
+	return json.Marshal(props)
 }
 
 // List of effected services.
@@ -1180,6 +1330,18 @@ type PushoverHandler struct {
 	// The name of one of the sounds supported by the device clients to override
 	// the user's default sound choice
 	Sound string
+}
+
+func (h *PushoverHandler) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"userKey":  h.UserKey,
+		"device":   h.Device,
+		"title":    h.Title,
+		"url":      h.URL,
+		"urlTitle": h.URLTitle,
+		"sound":    h.Sound,
+	}
+	return json.Marshal(props)
 }
 
 // Send the alert to Slack.
@@ -1264,6 +1426,15 @@ type SlackHandler struct {
 	IconEmoji string
 }
 
+func (h *SlackHandler) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"channel":   h.Channel,
+		"username":  h.Username,
+		"iconEmoji": h.IconEmoji,
+	}
+	return json.Marshal(props)
+}
+
 // Send the alert to Telegram.
 // For step-by-step instructions on setting up Kapacitor with Telegram, see the Event Handler Setup Guide (https://docs.influxdata.com//kapacitor/latest/guides/event-handler-setup/#telegram-setup).
 // To allow Kapacitor to post to Telegram,
@@ -1340,6 +1511,16 @@ type TelegramHandler struct {
 	// If empty uses the disable-notification from the configuration.
 	// tick:ignore
 	IsDisableNotification bool `tick:"DisableNotification"`
+}
+
+func (tel *TelegramHandler) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"chatId":                tel.ChatId,
+		"parseMode":             tel.ParseMode,
+		"disableWebPagePreview": tel.IsDisableWebPagePreview,
+		"disableNotification":   tel.IsDisableNotification,
+	}
+	return json.Marshal(props)
 }
 
 // Disables the Notification. If empty defaults to the configuration.
@@ -1423,6 +1604,14 @@ type OpsGenieHandler struct {
 	RecipientsList []string `tick:"Recipients"`
 }
 
+func (og *OpsGenieHandler) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"teams":      og.TeamsList,
+		"recipients": og.RecipientsList,
+	}
+	return json.Marshal(props)
+}
+
 // The list of teams to be alerted. If empty defaults to the teams from the configuration.
 // tick:property
 func (og *OpsGenieHandler) Teams(teams ...string) *OpsGenieHandler {
@@ -1475,6 +1664,11 @@ type TalkHandler struct {
 	*AlertNode
 }
 
+func (h *TalkHandler) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{}
+	return json.Marshal(props)
+}
+
 // Send the alert using SNMP traps.
 // To allow Kapacitor to post SNMP traps,
 //
@@ -1516,11 +1710,19 @@ type SNMPTrapHandler struct {
 	DataList []SNMPData `tick:"Data"`
 }
 
+func (h *SNMPTrapHandler) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"trapOid": h.TrapOid,
+		"data":    h.DataList,
+	}
+	return json.Marshal(props)
+}
+
 // tick:ignore
 type SNMPData struct {
-	Oid   string
-	Type  string
-	Value string
+	Oid   string `json:"oid"`
+	Type  string `json:"type"`
+	Value string `json:"value"`
 }
 
 // Define Data for SNMP Trap alert.

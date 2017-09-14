@@ -1,6 +1,9 @@
 package pipeline
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // Defaults fields and tags on data points.
 //
@@ -37,6 +40,15 @@ func newDefaultNode(e EdgeType) *DefaultNode {
 		Tags:      make(map[string]string),
 	}
 	return n
+}
+
+func (n *DefaultNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":  "default",
+		"field": n.Fields,
+		"tag":   n.Tags,
+	}
+	return json.Marshal(props)
 }
 
 // Define a field default.

@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -151,6 +152,27 @@ func newK8sAutoscaleNode(e EdgeType) *K8sAutoscaleNode {
 		ResourceTag:  DefaultResourceTag,
 	}
 	return k
+}
+
+func (n *K8sAutoscaleNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":             "k8sAutoscale",
+		"cluster":          n.Cluster,
+		"namespace":        n.Namespace,
+		"kind":             n.Kind,
+		"resourceName":     n.ResourceName,
+		"resourceNameTag":  n.ResourceNameTag,
+		"currentField":     n.CurrentField,
+		"max":              n.Max,
+		"min":              n.Min,
+		"replicas":         n.Replicas,
+		"increaseCooldown": n.IncreaseCooldown,
+		"decreaseCooldown": n.DecreaseCooldown,
+		"namespaceTag":     n.NamespaceTag,
+		"kindTag":          n.KindTag,
+		"resourceTag":      n.ResourceTag,
+	}
+	return json.Marshal(props)
 }
 
 func (n *K8sAutoscaleNode) validate() error {

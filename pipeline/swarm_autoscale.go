@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -118,7 +119,25 @@ func newSwarmAutoscaleNode(e EdgeType) *SwarmAutoscaleNode {
 	return k
 }
 
+func (n *SwarmAutoscaleNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":                 "swarmAutoscaleNode",
+		"cluster":              n.Cluster,
+		"serviceName":          n.ServiceName,
+		"serviceNameTag":       n.ServiceNameTag,
+		"outputServiceNameTag": n.OutputServiceNameTag,
+		"currentField":         n.CurrentField,
+		"max":                  n.Max,
+		"min":                  n.Min,
+		"replicas":             n.Replicas,
+		"increaseCooldown":     n.IncreaseCooldown,
+		"decreaseCooldown":     n.DecreaseCooldown,
+	}
+	return json.Marshal(props)
+}
+
 func (n *SwarmAutoscaleNode) validate() error {
+
 	if (n.ServiceName == "" && n.ServiceNameTag == "") ||
 		(n.ServiceName != "" && n.ServiceNameTag != "") {
 		return fmt.Errorf("must specify exactly one of ServiceName or ServiceNameTag")

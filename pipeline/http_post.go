@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -54,6 +55,16 @@ func newHTTPPostNode(wants EdgeType, urls ...string) *HTTPPostNode {
 		chainnode: newBasicChainNode("http_post", wants, wants),
 		URLs:      urls,
 	}
+}
+
+func (p *HTTPPostNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":     "httpPost",
+		"endpoint": p.Endpoints,
+		"headers":  p.Header,
+		"urls":     p.URLs,
+	}
+	return json.Marshal(props)
 }
 
 // tick:ignore

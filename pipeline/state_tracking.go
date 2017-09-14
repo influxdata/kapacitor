@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/influxdata/kapacitor/tick/ast"
@@ -58,6 +59,16 @@ func newStateDurationNode(wants EdgeType, predicate *ast.LambdaNode) *StateDurat
 	}
 }
 
+func (n *StateDurationNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":   "stateDuration",
+		"lambda": n.Lambda,
+		"as":     n.As,
+		"unit":   n.Unit,
+	}
+	return json.Marshal(props)
+}
+
 // Compute the number of consecutive points in a given state.
 // The state is defined via a lambda expression. For each consecutive point for
 // which the expression evaluates as true, the state count will be incremented
@@ -98,4 +109,13 @@ func newStateCountNode(wants EdgeType, predicate *ast.LambdaNode) *StateCountNod
 		Lambda:    predicate,
 		As:        "state_count",
 	}
+}
+
+func (n *StateCountNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"type":   "stateCount",
+		"lambda": n.Lambda,
+		"as":     n.As,
+	}
+	return json.Marshal(props)
 }

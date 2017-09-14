@@ -76,6 +76,8 @@ type Node interface {
 
 	// Return .dot string to graph DAG
 	dot(buf *bytes.Buffer)
+	// MarshalJSON converts the Node to a JSON representation
+	MarshalJSON() ([]byte, error)
 }
 
 type node struct {
@@ -89,6 +91,10 @@ type node struct {
 	provides EdgeType
 	tm       bool
 	pm       bool
+}
+
+func (n *node) MarshalJSON() ([]byte, error) {
+	return nil, nil
 }
 
 // tick:ignore

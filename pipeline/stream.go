@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"reflect"
 	"time"
 
@@ -24,6 +25,23 @@ func newStreamNode() *StreamNode {
 			provides: StreamEdge,
 		},
 	}
+}
+
+func (s *StreamNode) MarshalJSON() ([]byte, error) {
+	children := [][]byte{}
+	for _, c := range s.children {
+		b, err := c.MarshalJSON()
+		if err != nil {
+			return nil, err
+		}
+		children = append(children, b)
+	}
+	props := map[string]interface{}{
+		"type":     "stream",
+		"children": children,
+	}
+
+	return json.Marshal(props)
 }
 
 // Creates a new FromNode that can be further
@@ -125,6 +143,20 @@ func newFromNode() *FromNode {
 	return &FromNode{
 		chainnode: newBasicChainNode("from", StreamEdge, StreamEdge),
 	}
+}
+
+func (n *FromNode) MarshalJSON() ([]byte, error) {
+	props := map[string]interface{}{
+		"where":              n.Lambda,
+		"groupBy":            n.Dimensions,
+		"groupByMeasurement": n.GroupByMeasurementFlag,
+		"database":           n.Database,
+		"retentionPolicy":    n.RetentionPolicy,
+		"measurement":        n.Measurement,
+		"truncate":           n.Truncate,
+		"round":              n.Round,
+	}
+	return json.Marshal(props)
 }
 
 //tick:ignore
