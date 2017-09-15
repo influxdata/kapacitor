@@ -59,6 +59,8 @@ func newWindowNode() *WindowNode {
 func (w *WindowNode) MarshalJSON() ([]byte, error) {
 	props := map[string]interface{}{
 		"type":        "window",
+		"nodeID":      fmt.Sprintf("%d", w.ID()),
+		"children":    w.node,
 		"period":      w.Period,
 		"every":       w.Every,
 		"align":       w.AlignFlag,

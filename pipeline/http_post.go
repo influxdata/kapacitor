@@ -60,6 +60,8 @@ func newHTTPPostNode(wants EdgeType, urls ...string) *HTTPPostNode {
 func (p *HTTPPostNode) MarshalJSON() ([]byte, error) {
 	props := map[string]interface{}{
 		"type":     "httpPost",
+		"nodeID":   fmt.Sprintf("%d", p.ID()),
+		"children": p.node,
 		"endpoint": p.Endpoints,
 		"headers":  p.Header,
 		"urls":     p.URLs,

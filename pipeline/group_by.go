@@ -47,6 +47,8 @@ func newGroupByNode(wants EdgeType, dims []interface{}) *GroupByNode {
 func (n *GroupByNode) MarshalJSON() ([]byte, error) {
 	props := map[string]interface{}{
 		"type":          "groupBy",
+		"nodeID":        fmt.Sprintf("%d", n.ID()),
+		"children":      n.node,
 		"dimensions":    n.Dimensions,
 		"exclude":       n.ExcludedDimensions,
 		"byMeasurement": n.ByMeasurementFlag,

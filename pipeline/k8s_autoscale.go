@@ -157,6 +157,8 @@ func newK8sAutoscaleNode(e EdgeType) *K8sAutoscaleNode {
 func (n *K8sAutoscaleNode) MarshalJSON() ([]byte, error) {
 	props := map[string]interface{}{
 		"type":             "k8sAutoscale",
+		"nodeID":           fmt.Sprintf("%d", n.ID()),
+		"children":         n.node,
 		"cluster":          n.Cluster,
 		"namespace":        n.Namespace,
 		"kind":             n.Kind,

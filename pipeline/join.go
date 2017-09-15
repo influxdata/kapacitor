@@ -138,6 +138,8 @@ func newJoinNode(e EdgeType, parents []Node) *JoinNode {
 func (j *JoinNode) MarshalJSON() ([]byte, error) {
 	props := map[string]interface{}{
 		"type":       "join",
+		"nodeID":     fmt.Sprintf("%d", j.ID()),
+		"children":   j.node,
 		"as":         j.Names,
 		"on":         j.Dimensions,
 		"streamName": j.StreamName,

@@ -374,17 +374,10 @@ func newAlertNode(wants EdgeType) *AlertNode {
 }
 
 func (n *AlertNode) MarshalJSON() ([]byte, error) {
-	children := [][]byte{}
-	for _, c := range n.children {
-		b, err := c.MarshalJSON()
-		if err != nil {
-			return nil, err
-		}
-		children = append(children, b)
-	}
-
 	props := map[string]interface{}{
 		"type":             "alert",
+		"nodeID":           fmt.Sprintf("%d", n.ID()),
+		"children":         n.node,
 		"topic":            n.Topic,
 		"id":               n.Id,
 		"message":          n.Message,
@@ -395,7 +388,7 @@ func (n *AlertNode) MarshalJSON() ([]byte, error) {
 		"infoReset":        n.InfoReset,
 		"warnReset":        n.WarnReset,
 		"critReset":        n.CritReset,
-		"flapping":         n.Flapping,
+		"flapping":         n.UseFlapping,
 		"flapLow":          n.FlapLow,
 		"flapHigh":         n.FlapHigh,
 		"history":          n.History,
@@ -425,7 +418,6 @@ func (n *AlertNode) MarshalJSON() ([]byte, error) {
 		"talk":             n.TalkHandlers,
 		"mqtt":             n.MQTTHandlers,
 		"snmptrap":         n.SNMPTrapHandlers,
-		"children":         children,
 	}
 	return json.Marshal(props)
 }

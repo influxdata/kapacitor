@@ -3,6 +3,7 @@ package pipeline
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 )
 
 // Writes the data back into the Kapacitor stream.
@@ -52,6 +53,8 @@ func newKapacitorLoopbackNode(wants EdgeType) *KapacitorLoopbackNode {
 func (k *KapacitorLoopbackNode) MarshalJSON() ([]byte, error) {
 	props := map[string]interface{}{
 		"type":            "kapacitorLoopback",
+		"nodeID":          fmt.Sprintf("%d", k.ID()),
+		"children":        k.node,
 		"database":        k.Database,
 		"retentionPolicy": k.RetentionPolicy,
 		"measurement":     k.Measurement,

@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 )
 
@@ -75,6 +76,8 @@ func newInfluxDBOutNode(wants EdgeType) *InfluxDBOutNode {
 func (i *InfluxDBOutNode) MarshalJSON() ([]byte, error) {
 	props := map[string]interface{}{
 		"type":             "influxdbOut",
+		"nodeID":           fmt.Sprintf("%d", i.ID()),
+		"children":         i.node,
 		"cluster":          i.Cluster,
 		"database":         i.Database,
 		"retentionPolicy":  i.RetentionPolicy,

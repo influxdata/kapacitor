@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 )
 
@@ -60,6 +61,8 @@ func newDerivativeNode(wants EdgeType, field string) *DerivativeNode {
 func (d *DerivativeNode) MarshalJSON() ([]byte, error) {
 	props := map[string]interface{}{
 		"type":        "derivative",
+		"nodeID":      fmt.Sprintf("%d", d.ID()),
+		"children":    d.node,
 		"field":       d.Field,
 		"as":          d.As,
 		"unit":        d.Unit,

@@ -90,9 +90,11 @@ func NewUDF(
 
 func (u *UDFNode) MarshalJSON() ([]byte, error) {
 	props := map[string]interface{}{
-		"type":    "udf",
-		"name":    u.UDFName,
-		"options": u.Options,
+		"type":     "udf",
+		"nodeID":   fmt.Sprintf("%d", u.ID()),
+		"children": u.node,
+		"name":     u.UDFName,
+		"options":  u.Options,
 	}
 	return json.Marshal(props)
 }
