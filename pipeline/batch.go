@@ -71,6 +71,24 @@ func (b *BatchNode) MarshalJSON() ([]byte, error) {
 	return json.Marshal(props)
 }
 
+type fields map[string]*json.RawMessage
+
+func (b *BatchNode) UnmarshalJSON(data []byte) error {
+	/*
+		var node rawNode
+		err := json.Unmarshal(data, &node)
+		if err != nil {
+			return err
+		}
+		if node.Type != "batch" {
+			return fmt.Errorf(`Unknown type %s; expected batch`, node.Type)
+		}
+
+		*b = *newBatchNode()
+	*/
+	return nil
+}
+
 // A QueryNode defines a source and a schedule for
 // processing batch data. The data is queried from
 // an InfluxDB database and then passed into the data pipeline.
@@ -276,4 +294,41 @@ func (b *QueryNode) MarshalJSON() ([]byte, error) {
 		"cluster":            b.Cluster,
 	}
 	return json.Marshal(props)
+}
+
+func (b *QueryNode) UnmarshalJSON(data []byte) error {
+	var flds fields
+	err := json.Unmarshal(data, &flds)
+	if err != nil {
+		return err
+	}
+
+	*b = *newQueryNode()
+
+	var typeOf string
+	fields := map[string]interface{}{
+		"type":               &typeOf,
+		"query":              &b.QueryStr,
+		"period":             &b.Period,
+		"every":              &b.Every,
+		"align":              &b.AlignFlag,
+		"cron":               &b.Cron,
+		"offset":             &b.Offset,
+		"alignGroup":         &b.AlignGroupFlag,
+		"groupBy":            &b.Dimensions,
+		"groupByMeasurement": &b.GroupByMeasurementFlag,
+		"fill":               &b.Fill,
+		"cluster":            &b.Cluster,
+	}
+
+	for k, v := range fields {
+		if err := json.Unmarshal(*flds[k], v); err != nil {
+			return err
+		}
+	}
+
+	if typeOf != "query" {
+		return fmt.Errorf(`Unknown type %s; expected query`, typeOf)
+	}
+	return nil
 }
