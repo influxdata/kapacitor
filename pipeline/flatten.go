@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 )
 
@@ -73,6 +74,8 @@ func newFlattenNode(e EdgeType) *FlattenNode {
 func (f *FlattenNode) MarshalJSON() ([]byte, error) {
 	props := map[string]interface{}{
 		"type":                  "flatten",
+		"nodeID":                fmt.Sprintf("%d", f.ID()),
+		"children":              f.node,
 		"on":                    f.Dimensions,
 		"delimiter":             f.Delimiter,
 		"tolerance":             f.Tolerance,

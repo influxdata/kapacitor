@@ -1,6 +1,9 @@
 package pipeline
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // Takes the union of all of its parents.
 // The union is just a simple pass through.
@@ -43,8 +46,10 @@ func newUnionNode(e EdgeType, nodes []Node) *UnionNode {
 
 func (u *UnionNode) MarshalJSON() ([]byte, error) {
 	props := map[string]interface{}{
-		"type":   "union",
-		"rename": u.Rename,
+		"type":     "union",
+		"nodeID":   fmt.Sprintf("%d", u.ID()),
+		"children": u.node,
+		"rename":   u.Rename,
 	}
 	return json.Marshal(props)
 }

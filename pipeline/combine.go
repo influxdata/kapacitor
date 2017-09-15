@@ -95,6 +95,8 @@ func newCombineNode(e EdgeType, lambdas []*ast.LambdaNode) *CombineNode {
 func (n *CombineNode) MarshalJSON() ([]byte, error) {
 	props := map[string]interface{}{
 		"type":      "combine",
+		"nodeID":    fmt.Sprintf("%d", n.ID()),
+		"children":  n.node,
 		"tolerance": n.Tolerance,
 		"max":       n.Max,
 		"as":        n.Names,

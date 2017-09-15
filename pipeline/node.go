@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -93,8 +94,12 @@ type node struct {
 	pm       bool
 }
 
-func (n *node) MarshalJSON() ([]byte, error) {
-	return nil, nil
+func (n node) MarshalJSON() ([]byte, error) {
+	children := make([]string, len(n.children))
+	for i, n := range n.children {
+		children[i] = fmt.Sprintf("%d", n.ID())
+	}
+	return json.Marshal(children)
 }
 
 // tick:ignore

@@ -122,6 +122,8 @@ func newSwarmAutoscaleNode(e EdgeType) *SwarmAutoscaleNode {
 func (n *SwarmAutoscaleNode) MarshalJSON() ([]byte, error) {
 	props := map[string]interface{}{
 		"type":                 "swarmAutoscaleNode",
+		"nodeID":               fmt.Sprintf("%d", n.ID()),
+		"children":             n.node,
 		"cluster":              n.Cluster,
 		"serviceName":          n.ServiceName,
 		"serviceNameTag":       n.ServiceNameTag,

@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/influxdata/kapacitor/tick/ast"
 )
@@ -36,8 +37,10 @@ func newWhereNode(wants EdgeType, predicate *ast.LambdaNode) *WhereNode {
 
 func (n *WhereNode) MarshalJSON() ([]byte, error) {
 	props := map[string]interface{}{
-		"type":   "where",
-		"lambda": n.Lambda,
+		"type":     "where",
+		"nodeID":   fmt.Sprintf("%d", n.ID()),
+		"children": n.node,
+		"lambda":   n.Lambda,
 	}
 	return json.Marshal(props)
 }

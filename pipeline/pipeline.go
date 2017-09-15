@@ -115,9 +115,9 @@ func (p *Pipeline) MarshalJSON() ([]byte, error) {
 	if p.sorted == nil {
 		p.sort()
 	}
-	props := map[string]interface{}{
-		"type":  "pipeline",
-		"nodes": p.sorted,
+	props := map[string]interface{}{}
+	for _, n := range p.sorted {
+		props[fmt.Sprintf("%d", n.ID())] = n
 	}
 	return json.Marshal(props)
 }

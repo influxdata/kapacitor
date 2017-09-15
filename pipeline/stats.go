@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 )
 
@@ -66,6 +67,8 @@ func (n *StatsNode) Align() *StatsNode {
 func (n *StatsNode) MarshalJSON() ([]byte, error) {
 	props := map[string]interface{}{
 		"type":       "stats",
+		"nodeID":     fmt.Sprintf("%d", n.ID()),
+		"children":   n.node,
 		"sourceNode": n.SourceNode,
 		"interval":   n.Interval,
 		"align":      n.AlignFlag,

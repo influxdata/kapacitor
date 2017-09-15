@@ -62,6 +62,8 @@ func newEvalNode(e EdgeType, exprs []*ast.LambdaNode) *EvalNode {
 func (e *EvalNode) MarshalJSON() ([]byte, error) {
 	props := map[string]interface{}{
 		"type":     "eval",
+		"nodeID":   fmt.Sprintf("%d", e.ID()),
+		"children": e.node,
 		"as":       e.AsList,
 		"tags":     e.TagsList,
 		"lambdas":  e.Lambdas,

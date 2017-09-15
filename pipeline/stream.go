@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"time"
 
@@ -28,17 +29,10 @@ func newStreamNode() *StreamNode {
 }
 
 func (s *StreamNode) MarshalJSON() ([]byte, error) {
-	children := [][]byte{}
-	for _, c := range s.children {
-		b, err := c.MarshalJSON()
-		if err != nil {
-			return nil, err
-		}
-		children = append(children, b)
-	}
 	props := map[string]interface{}{
 		"type":     "stream",
-		"children": children,
+		"nodeID":   fmt.Sprintf("%d", s.ID()),
+		"children": s.node,
 	}
 
 	return json.Marshal(props)
@@ -147,6 +141,9 @@ func newFromNode() *FromNode {
 
 func (n *FromNode) MarshalJSON() ([]byte, error) {
 	props := map[string]interface{}{
+		"type":               "from",
+		"nodeID":             fmt.Sprintf("%d", n.ID()),
+		"children":           n.node,
 		"where":              n.Lambda,
 		"groupBy":            n.Dimensions,
 		"groupByMeasurement": n.GroupByMeasurementFlag,

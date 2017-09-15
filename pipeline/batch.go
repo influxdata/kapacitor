@@ -3,6 +3,7 @@ package pipeline
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"time"
 )
@@ -61,17 +62,10 @@ func (b *BatchNode) dot(buf *bytes.Buffer) {
 
 // MarshalJSON converts this node to JSON
 func (b *BatchNode) MarshalJSON() ([]byte, error) {
-	children := [][]byte{}
-	for _, c := range b.children {
-		o, err := c.MarshalJSON()
-		if err != nil {
-			return nil, err
-		}
-		children = append(children, o)
-	}
 	props := map[string]interface{}{
 		"type":     "batch",
-		"children": children,
+		"nodeID":   fmt.Sprintf("%d", b.ID()),
+		"children": b.node,
 	}
 
 	return json.Marshal(props)
@@ -265,17 +259,10 @@ func (b *QueryNode) AlignGroup() *QueryNode {
 }
 
 func (b *QueryNode) MarshalJSON() ([]byte, error) {
-	children := [][]byte{}
-	for _, c := range b.children {
-		b, err := c.MarshalJSON()
-		if err != nil {
-			return nil, err
-		}
-		children = append(children, b)
-	}
-
 	props := map[string]interface{}{
 		"type":               "query",
+		"nodeID":             fmt.Sprintf("%d", b.ID()),
+		"children":           b.node,
 		"query":              b.QueryStr,
 		"period":             b.Period,
 		"every":              b.Every,
@@ -287,7 +274,6 @@ func (b *QueryNode) MarshalJSON() ([]byte, error) {
 		"groupByMeasurement": b.GroupByMeasurementFlag,
 		"fill":               b.Fill,
 		"cluster":            b.Cluster,
-		"children":           children,
 	}
 	return json.Marshal(props)
 }

@@ -44,9 +44,11 @@ func newDefaultNode(e EdgeType) *DefaultNode {
 
 func (n *DefaultNode) MarshalJSON() ([]byte, error) {
 	props := map[string]interface{}{
-		"type":  "default",
-		"field": n.Fields,
-		"tag":   n.Tags,
+		"type":     "default",
+		"nodeID":   fmt.Sprintf("%d", n.ID()),
+		"children": n.node,
+		"field":    n.Fields,
+		"tag":      n.Tags,
 	}
 	return json.Marshal(props)
 }

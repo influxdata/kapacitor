@@ -1,6 +1,9 @@
 package pipeline
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // Deletes fields and tags from data points.
 //
@@ -38,9 +41,11 @@ func newDeleteNode(e EdgeType) *DeleteNode {
 
 func (n *DeleteNode) MarshalJSON() ([]byte, error) {
 	props := map[string]interface{}{
-		"type":  "delete",
-		"field": n.Fields,
-		"tag":   n.Tags,
+		"type":     "delete",
+		"nodeID":   fmt.Sprintf("%d", n.ID()),
+		"children": n.node,
+		"field":    n.Fields,
+		"tag":      n.Tags,
 	}
 	return json.Marshal(props)
 }

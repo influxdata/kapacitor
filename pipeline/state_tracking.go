@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/influxdata/kapacitor/tick/ast"
@@ -61,10 +62,12 @@ func newStateDurationNode(wants EdgeType, predicate *ast.LambdaNode) *StateDurat
 
 func (n *StateDurationNode) MarshalJSON() ([]byte, error) {
 	props := map[string]interface{}{
-		"type":   "stateDuration",
-		"lambda": n.Lambda,
-		"as":     n.As,
-		"unit":   n.Unit,
+		"type":     "stateDuration",
+		"nodeID":   fmt.Sprintf("%d", n.ID()),
+		"children": n.node,
+		"lambda":   n.Lambda,
+		"as":       n.As,
+		"unit":     n.Unit,
 	}
 	return json.Marshal(props)
 }
@@ -113,9 +116,11 @@ func newStateCountNode(wants EdgeType, predicate *ast.LambdaNode) *StateCountNod
 
 func (n *StateCountNode) MarshalJSON() ([]byte, error) {
 	props := map[string]interface{}{
-		"type":   "stateCount",
-		"lambda": n.Lambda,
-		"as":     n.As,
+		"type":     "stateCount",
+		"nodeID":   fmt.Sprintf("%d", n.ID()),
+		"children": n.node,
+		"lambda":   n.Lambda,
+		"as":       n.As,
 	}
 	return json.Marshal(props)
 }
