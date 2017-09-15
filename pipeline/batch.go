@@ -277,21 +277,26 @@ func (b *QueryNode) AlignGroup() *QueryNode {
 }
 
 func (b *QueryNode) MarshalJSON() ([]byte, error) {
+	var (
+		typeOf = "query"
+		nodeID = fmt.Sprintf("%d", b.ID())
+	)
+
 	props := map[string]interface{}{
-		"type":               "query",
-		"nodeID":             fmt.Sprintf("%d", b.ID()),
-		"children":           b.node,
-		"query":              b.QueryStr,
-		"period":             b.Period,
-		"every":              b.Every,
-		"align":              b.AlignFlag,
-		"cron":               b.Cron,
-		"offset":             b.Offset,
-		"alignGroup":         b.AlignGroupFlag,
-		"groupBy":            b.Dimensions,
-		"groupByMeasurement": b.GroupByMeasurementFlag,
-		"fill":               b.Fill,
-		"cluster":            b.Cluster,
+		"type":               &typeOf,
+		"nodeID":             &nodeID,
+		"children":           &b.node,
+		"query":              &b.QueryStr,
+		"period":             &b.Period,
+		"every":              &b.Every,
+		"align":              &b.AlignFlag,
+		"cron":               &b.Cron,
+		"offset":             &b.Offset,
+		"alignGroup":         &b.AlignGroupFlag,
+		"groupBy":            &b.Dimensions,
+		"groupByMeasurement": &b.GroupByMeasurementFlag,
+		"fill":               &b.Fill,
+		"cluster":            &b.Cluster,
 	}
 	return json.Marshal(props)
 }
@@ -305,9 +310,10 @@ func (b *QueryNode) UnmarshalJSON(data []byte) error {
 
 	*b = *newQueryNode()
 
-	var typeOf string
+	var typeOf, nodeID string
 	fields := map[string]interface{}{
 		"type":               &typeOf,
+		"nodeID":             &nodeID,
 		"query":              &b.QueryStr,
 		"period":             &b.Period,
 		"every":              &b.Every,
