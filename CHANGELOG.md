@@ -1,6 +1,8 @@
 # Changelog
 
 ## unreleased
+## Unreleased
+- [#1566](https://github.com/influxdata/kapacitor/pull/1566): Add BarrierNode to emit BarrierMessage periodically
 
 ### Features
 
