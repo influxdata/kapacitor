@@ -3,7 +3,6 @@ package servicetest
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"path"
 	"path/filepath"
@@ -41,7 +40,7 @@ type Service struct {
 	}
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config) *Service {
 	return &Service{
 		testers: make(map[string]Tester),
 	}

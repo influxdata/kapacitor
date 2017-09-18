@@ -3,7 +3,6 @@ package serverset
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -12,6 +11,8 @@ import (
 	pzookeeper "github.com/prometheus/prometheus/discovery/zookeeper"
 )
 
+type Diagnostic scraper.Diagnostic
+
 // Service is the serverset discovery service
 type Service struct {
 	Configs []Config
@@ -19,16 +20,16 @@ type Service struct {
 
 	registry scraper.Registry
 
-	logger *log.Logger
-	open   bool
+	diag Diagnostic
+	open bool
 }
 
 // NewService creates a new unopened service
-func NewService(c []Config, r scraper.Registry, l *log.Logger) *Service {
+func NewService(c []Config, r scraper.Registry, d Diagnostic) *Service {
 	return &Service{
 		Configs:  c,
 		registry: r,
-		logger:   l,
+		diag:     d,
 	}
 }
 
@@ -126,7 +127,7 @@ func (s *Service) Test(options interface{}) error {
 	}
 
 	sd := s.Configs[found].PromConfig()
-	discoverer := pzookeeper.NewServersetDiscovery(sd, scraper.NewLogger(s.logger))
+	discoverer := pzookeeper.NewServersetDiscovery(sd, s.diag)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	updates := make(chan []*config.TargetGroup)

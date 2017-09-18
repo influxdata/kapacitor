@@ -2,7 +2,6 @@ package kapacitor
 
 import (
 	"errors"
-	"log"
 	"time"
 
 	"github.com/influxdata/kapacitor/edge"
@@ -17,9 +16,9 @@ type ShiftNode struct {
 }
 
 // Create a new  ShiftNode which shifts points and batches in time.
-func newShiftNode(et *ExecutingTask, n *pipeline.ShiftNode, l *log.Logger) (*ShiftNode, error) {
+func newShiftNode(et *ExecutingTask, n *pipeline.ShiftNode, d NodeDiagnostic) (*ShiftNode, error) {
 	sn := &ShiftNode{
-		node:  node{Node: n, et: et, logger: l},
+		node:  node{Node: n, et: et, diag: d},
 		s:     n,
 		shift: n.Shift,
 	}

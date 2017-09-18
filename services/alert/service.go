@@ -4,7 +4,6 @@ import (
 	"encoding"
 	"encoding/json"
 	"fmt"
-	"log"
 	"path"
 	"reflect"
 	"regexp"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/command"
+	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
@@ -30,6 +30,18 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 )
+
+type Diagnostic interface {
+	WithHandlerContext(ctx ...keyvalue.T) HandlerDiagnostic
+
+	MigratingHandlerSpecs()
+	FoundHandlerRows(length int)
+	FoundNewHandler(key string)
+	CreatingNewHandlers(length int)
+	MigratingOldHandlerSpec(id string)
+
+	Error(msg string, err error, ctx ...keyvalue.T)
+}
 
 type Service struct {
 	mu sync.RWMutex
@@ -59,65 +71,65 @@ type Service struct {
 
 	Commander command.Commander
 
-	logger *log.Logger
+	diag Diagnostic
 
 	AlertaService interface {
 		DefaultHandlerConfig() alerta.HandlerConfig
-		Handler(alerta.HandlerConfig, *log.Logger) (alert.Handler, error)
+		Handler(alerta.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
 	}
 	HipChatService interface {
-		Handler(hipchat.HandlerConfig, *log.Logger) alert.Handler
+		Handler(hipchat.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 	MQTTService interface {
-		Handler(mqtt.HandlerConfig, *log.Logger) alert.Handler
+		Handler(mqtt.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 	OpsGenieService interface {
-		Handler(opsgenie.HandlerConfig, *log.Logger) alert.Handler
+		Handler(opsgenie.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 	PagerDutyService interface {
-		Handler(pagerduty.HandlerConfig, *log.Logger) alert.Handler
+		Handler(pagerduty.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 	PushoverService interface {
-		Handler(pushover.HandlerConfig, *log.Logger) alert.Handler
+		Handler(pushover.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 	HTTPPostService interface {
-		Handler(httppost.HandlerConfig, *log.Logger) alert.Handler
+		Handler(httppost.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 	SensuService interface {
-		Handler(sensu.HandlerConfig, *log.Logger) (alert.Handler, error)
+		Handler(sensu.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
 	}
 	SlackService interface {
-		Handler(slack.HandlerConfig, *log.Logger) alert.Handler
+		Handler(slack.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 	SMTPService interface {
-		Handler(smtp.HandlerConfig, *log.Logger) alert.Handler
+		Handler(smtp.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 	SNMPTrapService interface {
-		Handler(snmptrap.HandlerConfig, *log.Logger) (alert.Handler, error)
+		Handler(snmptrap.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
 	}
 	TalkService interface {
-		Handler(*log.Logger) alert.Handler
+		Handler(...keyvalue.T) alert.Handler
 	}
 	TelegramService interface {
-		Handler(telegram.HandlerConfig, *log.Logger) alert.Handler
+		Handler(telegram.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 	VictorOpsService interface {
-		Handler(victorops.HandlerConfig, *log.Logger) alert.Handler
+		Handler(victorops.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 }
 
-func NewService(l *log.Logger) *Service {
+func NewService(d Diagnostic) *Service {
 	s := &Service{
 		handlers:     make(map[string]map[string]handler),
 		closedTopics: make(map[string]bool),
-		topics:       alert.NewTopics(l),
-		logger:       l,
+		topics:       alert.NewTopics(),
+		diag:         d,
 	}
 	s.APIServer = &apiServer{
 		Registrar: s,
 		Topics:    s,
 		Persister: s,
-		logger:    l,
+		diag:      d,
 	}
 	s.EventCollector = s
 	return s
@@ -195,7 +207,7 @@ func (s *Service) migrateHandlerSpecs(store storage.Interface) error {
 		// Already migrated
 		return nil
 	}
-	s.logger.Println("D! migrating old v1.2 handler specs")
+	s.diag.MigratingHandlerSpecs()
 
 	// v1.2 HandlerActionSpec
 	type oldHandlerActionSpec struct {
@@ -227,12 +239,12 @@ func (s *Service) migrateHandlerSpecs(store storage.Interface) error {
 		if err != nil {
 			return err
 		}
-		s.logger.Printf("D! found %d handler rows", len(kvs))
+		s.diag.FoundHandlerRows(len(kvs))
 
 		var oldKeys []string
 		for _, kv := range kvs {
 			if !oldKeyPattern.MatchString(kv.Key) {
-				s.logger.Println("D! found new handler skipping:", kv.Key)
+				s.diag.FoundNewHandler(kv.Key)
 				continue
 			}
 			oldKeys = append(oldKeys, kv.Key)
@@ -247,7 +259,7 @@ func (s *Service) migrateHandlerSpecs(store storage.Interface) error {
 				return errors.Wrapf(err, "failed to read old handler spec data for %s", kv.Key)
 			}
 
-			s.logger.Println("D! migrating old handler spec", old.ID)
+			s.diag.MigratingOldHandlerSpec(old.ID)
 
 			// Create new handlers from the old
 			hasStateChangesOnly := false
@@ -289,7 +301,7 @@ func (s *Service) migrateHandlerSpecs(store storage.Interface) error {
 			}
 		}
 
-		s.logger.Printf("D! creating %d new handlers in place of old handlers", len(newHandlers))
+		s.diag.CreatingNewHandlers(len(newHandlers))
 
 		// Create new handlers
 		for _, handler := range newHandlers {
@@ -317,7 +329,7 @@ func (s *Service) loadSavedHandlerSpecs() error {
 
 		for _, spec := range specs {
 			if err := s.loadHandlerSpec(spec); err != nil {
-				s.logger.Println("E! failed to load handler on startup", err)
+				s.diag.Error("failed to load handler on startup", err)
 			}
 		}
 
@@ -717,6 +729,10 @@ func decodeStringToTextUnmarshaler(f, t reflect.Type, data interface{}) (interfa
 func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 	var h alert.Handler
 	var err error
+	ctx := []keyvalue.T{
+		keyvalue.KV("handler", spec.ID),
+		keyvalue.KV("topic", spec.Topic),
+	}
 	switch spec.Kind {
 	case "aggregate":
 		c := newDefaultAggregateHandlerConfig(s.EventCollector)
@@ -724,7 +740,8 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		if err != nil {
 			return handler{}, err
 		}
-		h, err = NewAggregateHandler(c, s.logger)
+		handlerDiag := s.diag.WithHandlerContext(ctx...)
+		h, err = NewAggregateHandler(c, handlerDiag)
 		if err != nil {
 			return handler{}, err
 		}
@@ -734,7 +751,7 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		if err != nil {
 			return handler{}, err
 		}
-		h, err = s.AlertaService.Handler(c, s.logger)
+		h, err = s.AlertaService.Handler(c, ctx...)
 		if err != nil {
 			return handler{}, err
 		}
@@ -747,7 +764,8 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		if err != nil {
 			return handler{}, err
 		}
-		h = NewExecHandler(c, s.logger)
+		handlerDiag := s.diag.WithHandlerContext(ctx...)
+		h = NewExecHandler(c, handlerDiag)
 		h = newExternalHandler(h)
 	case "hipchat":
 		c := hipchat.HandlerConfig{}
@@ -755,7 +773,7 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		if err != nil {
 			return handler{}, err
 		}
-		h = s.HipChatService.Handler(c, s.logger)
+		h = s.HipChatService.Handler(c, ctx...)
 		h = newExternalHandler(h)
 	case "log":
 		c := DefaultLogHandlerConfig()
@@ -763,7 +781,8 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		if err != nil {
 			return handler{}, err
 		}
-		h, err = NewLogHandler(c, s.logger)
+		handlerDiag := s.diag.WithHandlerContext(ctx...)
+		h, err = NewLogHandler(c, handlerDiag)
 		if err != nil {
 			return handler{}, err
 		}
@@ -774,7 +793,7 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		if err != nil {
 			return handler{}, err
 		}
-		h = s.MQTTService.Handler(c, s.logger)
+		h = s.MQTTService.Handler(c, ctx...)
 		h = newExternalHandler(h)
 	case "opsgenie":
 		c := opsgenie.HandlerConfig{}
@@ -782,7 +801,7 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		if err != nil {
 			return handler{}, err
 		}
-		h = s.OpsGenieService.Handler(c, s.logger)
+		h = s.OpsGenieService.Handler(c, ctx...)
 		h = newExternalHandler(h)
 	case "pagerduty":
 		c := pagerduty.HandlerConfig{}
@@ -790,7 +809,7 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		if err != nil {
 			return handler{}, err
 		}
-		h = s.PagerDutyService.Handler(c, s.logger)
+		h = s.PagerDutyService.Handler(c, ctx...)
 		h = newExternalHandler(h)
 	case "pushover":
 		c := pushover.HandlerConfig{}
@@ -798,7 +817,7 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		if err != nil {
 			return handler{}, err
 		}
-		h = s.PushoverService.Handler(c, s.logger)
+		h = s.PushoverService.Handler(c, ctx...)
 		h = newExternalHandler(h)
 	case "post":
 		c := httppost.HandlerConfig{}
@@ -806,7 +825,7 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		if err != nil {
 			return handler{}, err
 		}
-		h = s.HTTPPostService.Handler(c, s.logger)
+		h = s.HTTPPostService.Handler(c, ctx...)
 		h = newExternalHandler(h)
 	case "publish":
 		c := PublishHandlerConfig{
@@ -816,14 +835,15 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		if err != nil {
 			return handler{}, err
 		}
-		h = NewPublishHandler(c, s.logger)
+		handlerDiag := s.diag.WithHandlerContext(ctx...)
+		h = NewPublishHandler(c, handlerDiag)
 	case "sensu":
 		c := sensu.HandlerConfig{}
 		err = decodeOptions(spec.Options, &c)
 		if err != nil {
 			return handler{}, err
 		}
-		h, err = s.SensuService.Handler(c, s.logger)
+		h, err = s.SensuService.Handler(c, ctx...)
 		if err != nil {
 			return handler{}, err
 		}
@@ -834,7 +854,7 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		if err != nil {
 			return handler{}, err
 		}
-		h = s.SlackService.Handler(c, s.logger)
+		h = s.SlackService.Handler(c, ctx...)
 		h = newExternalHandler(h)
 	case "smtp":
 		c := smtp.HandlerConfig{}
@@ -842,7 +862,7 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		if err != nil {
 			return handler{}, err
 		}
-		h = s.SMTPService.Handler(c, s.logger)
+		h = s.SMTPService.Handler(c, ctx...)
 		h = newExternalHandler(h)
 	case "snmptrap":
 		c := snmptrap.HandlerConfig{}
@@ -850,13 +870,13 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		if err != nil {
 			return handler{}, err
 		}
-		h, err = s.SNMPTrapService.Handler(c, s.logger)
+		h, err = s.SNMPTrapService.Handler(c, ctx...)
 		if err != nil {
 			return handler{}, err
 		}
 		h = newExternalHandler(h)
 	case "talk":
-		h = s.TalkService.Handler(s.logger)
+		h = s.TalkService.Handler(ctx...)
 		h = newExternalHandler(h)
 	case "tcp":
 		c := TCPHandlerConfig{}
@@ -864,7 +884,8 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		if err != nil {
 			return handler{}, err
 		}
-		h = NewTCPHandler(c, s.logger)
+		handlerDiag := s.diag.WithHandlerContext(ctx...)
+		h = NewTCPHandler(c, handlerDiag)
 		h = newExternalHandler(h)
 	case "telegram":
 		c := telegram.HandlerConfig{}
@@ -872,7 +893,7 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		if err != nil {
 			return handler{}, err
 		}
-		h = s.TelegramService.Handler(c, s.logger)
+		h = s.TelegramService.Handler(c, ctx...)
 		h = newExternalHandler(h)
 	case "victorops":
 		c := victorops.HandlerConfig{}
@@ -880,14 +901,15 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		if err != nil {
 			return handler{}, err
 		}
-		h = s.VictorOpsService.Handler(c, s.logger)
+		h = s.VictorOpsService.Handler(c, ctx...)
 		h = newExternalHandler(h)
 	default:
 		err = fmt.Errorf("unsupported action kind %q", spec.Kind)
 	}
 	if spec.Match != "" {
 		// Wrap handler in match handler
-		h, err = newMatchHandler(spec.Match, h, s.logger)
+		handlerDiag := s.diag.WithHandlerContext(ctx...)
+		h, err = newMatchHandler(spec.Match, h, handlerDiag)
 	}
 	return handler{Spec: spec, Handler: h}, err
 }

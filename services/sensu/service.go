@@ -6,25 +6,30 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net"
 	"regexp"
 	"sync/atomic"
 	text "text/template"
 
 	"github.com/influxdata/kapacitor/alert"
+	"github.com/influxdata/kapacitor/keyvalue"
 )
+
+type Diagnostic interface {
+	WithContext(ctx ...keyvalue.T) Diagnostic
+	Error(msg string, err error, kvs ...keyvalue.T)
+}
 
 type Service struct {
 	configValue atomic.Value
-	logger      *log.Logger
+	diag        Diagnostic
 }
 
 var validNamePattern = regexp.MustCompile(`^[\w\.-]+$`)
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, d Diagnostic) *Service {
 	s := &Service{
-		logger: l,
+		diag: d,
 	}
 	s.configValue.Store(c)
 	return s
@@ -171,14 +176,14 @@ type HandlerConfig struct {
 }
 
 type handler struct {
-	s      *Service
-	c      HandlerConfig
-	logger *log.Logger
+	s    *Service
+	c    HandlerConfig
+	diag Diagnostic
 
 	sourceTmpl *text.Template
 }
 
-func (s *Service) Handler(c HandlerConfig, l *log.Logger) (alert.Handler, error) {
+func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler, error) {
 	srcTmpl, err := text.New("source").Parse(c.Source)
 	if err != nil {
 		return nil, err
@@ -186,7 +191,7 @@ func (s *Service) Handler(c HandlerConfig, l *log.Logger) (alert.Handler, error)
 	return &handler{
 		s:          s,
 		c:          c,
-		logger:     l,
+		diag:       s.diag.WithContext(ctx...),
 		sourceTmpl: srcTmpl,
 	}, nil
 }
@@ -196,7 +201,7 @@ func (h *handler) Handle(event alert.Event) {
 	var buf bytes.Buffer
 	err := h.sourceTmpl.Execute(&buf, td)
 	if err != nil {
-		h.logger.Printf("E! failed to evaluate Sensu source template %s: %v", h.c.Source, err)
+		h.diag.Error("failed to evaluate Sensu source template", err, keyvalue.KV("source", h.c.Source))
 		return
 	}
 	sourceStr := buf.String()
@@ -208,6 +213,6 @@ func (h *handler) Handle(event alert.Event) {
 		h.c.Handlers,
 		event.State.Level,
 	); err != nil {
-		h.logger.Println("E! failed to send event to Sensu", err)
+		h.diag.Error("failed to send event to Sensu", err)
 	}
 }

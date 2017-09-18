@@ -4,16 +4,22 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"sync"
 	"time"
 
 	"github.com/influxdata/kapacitor/edge"
+	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/udf/agent"
 )
 
 var ErrServerStopped = errors.New("server already stopped")
+
+type Diagnostic interface {
+	Error(msg string, err error, ctx ...keyvalue.T)
+
+	UDFLog(msg string)
+}
 
 // Server provides an implementation for the core communication with UDFs.
 // The Server provides only a partial implementation of udf.Interface as
@@ -75,8 +81,8 @@ type Server struct {
 	// Group for waiting on read/write goroutines
 	ioGroup sync.WaitGroup
 
-	mu     sync.Mutex
-	logger *log.Logger
+	mu   sync.Mutex
+	diag Diagnostic
 
 	responseBuf []byte
 
@@ -94,7 +100,7 @@ func NewServer(
 	taskID, nodeID string,
 	in agent.ByteReadReader,
 	out io.WriteCloser,
-	l *log.Logger,
+	d Diagnostic,
 	timeout time.Duration,
 	abortCallback func(),
 	killCallback func(),
@@ -104,7 +110,7 @@ func NewServer(
 		nodeID:           nodeID,
 		in:               in,
 		out:              out,
-		logger:           l,
+		diag:             d,
 		requests:         make(chan *agent.Request),
 		keepalive:        make(chan int64, 1),
 		keepaliveTimeout: timeout,
@@ -347,7 +353,7 @@ func (s *Server) doResponse(response *agent.Response, respC chan *agent.Response
 	select {
 	case respC <- response:
 	default:
-		s.logger.Printf("E! received %T without requesting it", response.Message)
+		s.diag.Error("received message without requesting it", fmt.Errorf("did not expect %T message", response.Message))
 	}
 }
 
@@ -398,7 +404,7 @@ func (s *Server) watchKeepalive() {
 				default:
 					// We failed to abort just kill it.
 					if s.killCallback != nil {
-						s.logger.Println("E! process not responding! killing")
+						s.diag.Error("killing process", errors.New("process not responding"))
 						s.killCallback()
 					}
 				}
@@ -425,7 +431,7 @@ func (s *Server) watchKeepalive() {
 				break
 			}
 			err = fmt.Errorf("keepalive timedout, last keepalive received was: %s", time.Unix(0, last))
-			s.logger.Println("E!", err)
+			s.diag.Error("encountered error", err)
 			return
 		case <-s.stopping:
 			return
@@ -688,7 +694,7 @@ func (s *Server) handleResponse(response *agent.Response) error {
 	case *agent.Response_Restore:
 		s.doResponse(response, s.restoreResponse)
 	case *agent.Response_Error:
-		s.logger.Println("E!", msg.Error.Error)
+		s.diag.Error("received error message", errors.New(msg.Error.Error))
 		return errors.New(msg.Error.Error)
 	case *agent.Response_Begin:
 		s.begin = msg.Begin

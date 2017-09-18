@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"html"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/mail"
@@ -29,18 +28,19 @@ import (
 	"github.com/influxdata/kapacitor/clock"
 	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/command/commandtest"
+	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/models"
 	alertservice "github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alert/alerttest"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/alerta/alertatest"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/hipchat/hipchattest"
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/httppost/httpposttest"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
 	"github.com/influxdata/kapacitor/services/k8s/k8stest"
-	"github.com/influxdata/kapacitor/services/logging/loggingtest"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/opsgenie/opsgenietest"
 	"github.com/influxdata/kapacitor/services/pagerduty"
@@ -70,7 +70,12 @@ import (
 	"github.com/k-sone/snmpgo"
 )
 
-var logService = loggingtest.New()
+var diagService *diagnostic.Service
+
+func init() {
+	diagService = diagnostic.NewService(diagnostic.NewConfig(), ioutil.Discard, ioutil.Discard)
+	diagService.Open()
+}
 
 var dbrps = []kapacitor.DBRP{
 	{
@@ -2557,7 +2562,7 @@ stream
 		c := httppost.Config{}
 		c.URL = ts.URL
 		c.Endpoint = "test"
-		sl := httppost.NewService(httppost.Configs{c}, logService.NewLogger("[test_httppost_endpoint] ", log.LstdFlags))
+		sl := httppost.NewService(httppost.Configs{c}, diagService.NewHTTPPostHandler())
 		tm.HTTPPostService = sl
 	}
 
@@ -5935,11 +5940,11 @@ stream
 		return
 	}
 	uio := udf_test.NewIO()
-	udfService.CreateFunc = func(name, taskID, nodeID string, l *log.Logger, abortCallback func()) (udf.Interface, error) {
+	udfService.CreateFunc = func(name, taskID, nodeID string, d udf.Diagnostic, abortCallback func()) (udf.Interface, error) {
 		if name != "customFunc" {
 			return nil, fmt.Errorf("unknown function %s", name)
 		}
-		return udf_test.New(taskID, nodeID, uio, l), nil
+		return udf_test.New(taskID, nodeID, uio, d), nil
 	}
 
 	tmInit := func(tm *kapacitor.TaskMaster) {
@@ -7280,7 +7285,7 @@ stream
 		c.Enabled = true
 		c.Addr = ts.Addr
 		c.Source = "Kapacitor"
-		sl := sensu.NewService(c, logService.NewLogger("[test_sensu] ", log.LstdFlags))
+		sl := sensu.NewService(c, diagService.NewSensuHandler())
 		tm.SensuService = sl
 	}
 	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
@@ -7336,7 +7341,8 @@ stream
 		c.Enabled = true
 		c.URL = ts.URL + "/test/slack/url"
 		c.Channel = "#channel"
-		sl, err := slack.NewService(c, logService.NewLogger("[test_slack] ", log.LstdFlags))
+		d := diagService.NewSlackHandler().WithContext(keyvalue.KV("test", "slack"))
+		sl, err := slack.NewService(c, d)
 		if err != nil {
 			t.Error(err)
 		}
@@ -7424,7 +7430,7 @@ stream
 		c.ChatId = "123456789"
 		c.DisableWebPagePreview = true
 		c.DisableNotification = false
-		tl := telegram.NewService(c, logService.NewLogger("[test_telegram] ", log.LstdFlags))
+		tl := telegram.NewService(c, diagService.NewTelegramHandler())
 		tm.TelegramService = tl
 	}
 	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
@@ -7556,7 +7562,7 @@ stream
 		c.URL = ts.URL
 		c.Room = "1231234"
 		c.Token = "testtoken1231234"
-		sl := hipchat.NewService(c, logService.NewLogger("[test_hipchat] ", log.LstdFlags))
+		sl := hipchat.NewService(c, diagService.NewHipChatHandler())
 		tm.HipChatService = sl
 	}
 	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
@@ -7632,7 +7638,7 @@ stream
 		c.Enabled = true
 		c.URL = ts.URL
 		c.Origin = "Kapacitor"
-		sl := alerta.NewService(c, logService.NewLogger("[test_alerta] ", log.LstdFlags))
+		sl := alerta.NewService(c, diagService.NewAlertaHandler())
 		tm.AlertaService = sl
 	}
 	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
@@ -7716,7 +7722,7 @@ stream
 		c.URL = ts.URL
 		c.UserKey = "user"
 		c.Token = "KzGDORePKggMaC0QOYAMyEEuzJnyUi"
-		sl := pushover.NewService(c, logService.NewLogger("[test_pushover] ", log.LstdFlags))
+		sl := pushover.NewService(c, diagService.NewPushoverHandler())
 		tm.PushoverService = sl
 	}
 	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
@@ -7788,7 +7794,7 @@ stream
 		c.Enabled = true
 		c.URL = ts.URL
 		c.APIKey = "api_key"
-		og := opsgenie.NewService(c, logService.NewLogger("[test_og] ", log.LstdFlags))
+		og := opsgenie.NewService(c, diagService.NewOpsGenieHandler())
 		tm.OpsGenieService = og
 	}
 	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
@@ -7883,7 +7889,7 @@ stream
 		c.Enabled = true
 		c.URL = ts.URL
 		c.ServiceKey = "service_key"
-		pd := pagerduty.NewService(c, logService.NewLogger("[test_pd] ", log.LstdFlags))
+		pd := pagerduty.NewService(c, diagService.NewPagerDutyHandler())
 		pd.HTTPDService = tm.HTTPDService
 		tm.PagerDutyService = pd
 
@@ -8017,7 +8023,7 @@ stream
 		c.URL = ts.URL
 		c.Endpoint = "test"
 		c.Headers = headers
-		sl := httppost.NewService(httppost.Configs{c}, logService.NewLogger("[test_pushover] ", log.LstdFlags))
+		sl := httppost.NewService(httppost.Configs{c}, diagService.NewHTTPPostHandler())
 		tm.HTTPPostService = sl
 	}
 	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
@@ -8089,7 +8095,8 @@ stream
 		c.URL = ts.URL
 		c.APIKey = "api_key"
 		c.RoutingKey = "routing_key"
-		vo := victorops.NewService(c, logService.NewLogger("[test_vo] ", log.LstdFlags))
+		d := diagService.NewVictorOpsHandler().WithContext(keyvalue.KV("test", "vo"))
+		vo := victorops.NewService(c, d)
 		tm.VictorOpsService = vo
 	}
 	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
@@ -8157,7 +8164,7 @@ stream
 		c.Enabled = true
 		c.URL = ts.URL
 		c.AuthorName = "Kapacitor"
-		sl := talk.NewService(c, logService.NewLogger("[test_talk] ", log.LstdFlags))
+		sl := talk.NewService(c, diagService.NewTalkHandler())
 		tm.TalkService = sl
 	}
 	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
@@ -8430,7 +8437,7 @@ Value: 10
 		Port:    smtpServer.Port,
 		From:    "test@example.com",
 	}
-	smtpService := smtp.NewService(sc, logService.NewLogger("[test-smtp] ", log.LstdFlags))
+	smtpService := smtp.NewService(sc, diagService.NewSMTPHandler())
 	if err := smtpService.Open(); err != nil {
 		t.Fatal(err)
 	}
@@ -8560,7 +8567,7 @@ stream
 	c.Addr = snmpServer.Addr
 	c.Community = snmpServer.Community
 	c.Retries = 2
-	st := snmptrap.NewService(c, logService.NewLogger("[test_snmptrap] ", log.LstdFlags))
+	st := snmptrap.NewService(c, diagService.NewSNMPTrapHandler())
 	if err := st.Open(); err != nil {
 		t.Fatal(err)
 	}
@@ -10880,13 +10887,14 @@ func compareListIgnoreOrder(got, exp []interface{}, cmpF func(got, exp interface
 }
 
 func createTaskMaster() (*kapacitor.TaskMaster, error) {
-	tm := kapacitor.NewTaskMaster("testStreamer", newServerInfo(), logService)
+	d := diagService.NewKapacitorHandler()
+	tm := kapacitor.NewTaskMaster("testStreamer", newServerInfo(), d)
 	httpdService := newHTTPDService()
 	tm.HTTPDService = httpdService
 	tm.TaskStore = taskStore{}
 	tm.DeadmanService = deadman{}
-	tm.HTTPPostService = httppost.NewService(nil, logService.NewLogger("[httppost] ", log.LstdFlags))
-	as := alertservice.NewService(logService.NewLogger("[alert] ", log.LstdFlags))
+	tm.HTTPPostService = httppost.NewService(nil, diagService.NewHTTPPostHandler())
+	as := alertservice.NewService(diagService.NewAlertServiceHandler())
 	as.StorageService = storagetest.New()
 	as.HTTPDService = httpdService
 	if err := as.Open(); err != nil {

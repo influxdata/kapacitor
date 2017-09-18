@@ -3,27 +3,32 @@ package snmptrap
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	text "text/template"
 
 	"github.com/influxdata/kapacitor/alert"
+	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/k-sone/snmpgo"
 	"github.com/pkg/errors"
 )
+
+type Diagnostic interface {
+	WithContext(ctx ...keyvalue.T) Diagnostic
+	Error(msg string, err error)
+}
 
 type Service struct {
 	configValue atomic.Value
 	clientMu    sync.Mutex
 	client      *snmpgo.SNMP
-	logger      *log.Logger
+	diag        Diagnostic
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, d Diagnostic) *Service {
 	s := &Service{
-		logger: l,
+		diag: d,
 	}
 	s.configValue.Store(c)
 	return s
@@ -204,13 +209,13 @@ type Data struct {
 
 // handler provides the implementation of the alert.Handler interface for the Foo service.
 type handler struct {
-	s      *Service
-	c      HandlerConfig
-	logger *log.Logger
+	s    *Service
+	c    HandlerConfig
+	diag Diagnostic
 }
 
 // Handler creates a handler from the config.
-func (s *Service) Handler(c HandlerConfig, l *log.Logger) (alert.Handler, error) {
+func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler, error) {
 	// Compile data value templates
 	for i, d := range c.DataList {
 		tmpl, err := text.New("data").Parse(d.Value)
@@ -220,9 +225,9 @@ func (s *Service) Handler(c HandlerConfig, l *log.Logger) (alert.Handler, error)
 		c.DataList[i].tmpl = tmpl
 	}
 	return &handler{
-		s:      s,
-		c:      c,
-		logger: l,
+		s:    s,
+		c:    c,
+		diag: s.diag.WithContext(ctx...),
 	}, nil
 }
 
@@ -234,13 +239,13 @@ func (h *handler) Handle(event alert.Event) {
 	for i, d := range h.c.DataList {
 		err := d.tmpl.Execute(&buf, td)
 		if err != nil {
-			h.logger.Println("E! failed to handle event", err)
+			h.diag.Error("failed to handle event", err)
 			return
 		}
 		h.c.DataList[i].Value = buf.String()
 		buf.Reset()
 	}
 	if err := h.s.Trap(h.c.TrapOid, h.c.DataList); err != nil {
-		h.logger.Println("E! failed to handle event", err)
+		h.diag.Error("failed to handle event", err)
 	}
 }

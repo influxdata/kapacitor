@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -23,6 +22,7 @@ import (
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor/influxdb"
+	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/server/vars"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/udp"
@@ -52,6 +52,17 @@ type IDer interface {
 	ServerID() uuid.UUID
 }
 
+type Diagnostic interface {
+	WithClusterContext(cluster string) Diagnostic
+	WithUDPContext(db string, rp string) udp.Diagnostic
+	Error(msg string, err error, ctx ...keyvalue.T)
+
+	InsecureSkipVerify(urls []string)
+	UnlinkingSubscriptions(cluster string)
+	LinkingSubscriptions(cluster string)
+	StartedUDPListener(db string, rp string)
+}
+
 // Handles requests to write or read from an InfluxDB cluster
 type Service struct {
 	wg     sync.WaitGroup
@@ -76,9 +87,6 @@ type Service struct {
 	PointsWriter interface {
 		WritePoints(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
 	}
-	LogService interface {
-		NewLogger(string, int) *log.Logger
-	}
 	HTTPDService interface {
 		AddRoutes([]httpd.Route) error
 		DelRoutes([]httpd.Route)
@@ -92,17 +100,17 @@ type Service struct {
 		RevokeSubscriptionAccess(token string) error
 	}
 	RandReader io.Reader
-	logger     *log.Logger
+	diag       Diagnostic
 }
 
-func NewService(configs []Config, httpPort int, hostname string, ider IDer, useTokens bool, l *log.Logger) (*Service, error) {
+func NewService(configs []Config, httpPort int, hostname string, ider IDer, useTokens bool, d Diagnostic) (*Service, error) {
 	s := &Service{
 		clusters:   make(map[string]*influxdbCluster),
 		hostname:   hostname,
 		ider:       ider,
 		httpPort:   httpPort,
 		useTokens:  useTokens,
-		logger:     l,
+		diag:       d,
 		RandReader: rand.Reader,
 	}
 	if err := s.updateConfigs(configs); err != nil {
@@ -225,7 +233,7 @@ func (s *Service) updateConfigs(configs []Config) error {
 			}
 		} else {
 			var err error
-			cluster, err = newInfluxDBCluster(c, s.hostname, s.ider, s.httpPort, s.useTokens, s.logger)
+			cluster, err = newInfluxDBCluster(c, s.hostname, s.ider, s.httpPort, s.useTokens, s.diag.WithClusterContext(c.Name))
 			if err != nil {
 				return err
 			}
@@ -270,10 +278,10 @@ func (s *Service) updateConfigs(configs []Config) error {
 	// Unlink/Close/Delete all removed clusters
 	for name, cluster := range removedClusters {
 		if err := cluster.UnlinkSubscriptions(); err != nil {
-			s.logger.Printf("E! failed to unlink subscriptions for cluster %s: %s", name, err)
+			s.diag.Error("failed to unlink subscriptions for cluster", err, keyvalue.KV("cluster", name))
 		}
 		if err := cluster.Close(); err != nil {
-			s.logger.Printf("E! failed to close cluster %s: %s", name, err)
+			s.diag.Error("failed to close cluster", err, keyvalue.KV("cluster", name))
 		}
 		delete(s.clusters, name)
 	}
@@ -282,7 +290,6 @@ func (s *Service) updateConfigs(configs []Config) error {
 
 func (s *Service) assignServiceToCluster(cluster *influxdbCluster) {
 	cluster.PointsWriter = s.PointsWriter
-	cluster.LogService = s.LogService
 	cluster.AuthService = s.AuthService
 	cluster.ClientCreator = s.ClientCreator
 	cluster.randReader = s.RandReader
@@ -385,7 +392,7 @@ type influxdbCluster struct {
 	exConfigSubs             map[subEntry]bool
 	hostname                 string
 	httpPort                 int
-	logger                   *log.Logger
+	diag                     Diagnostic
 	protocol                 string
 	udpBind                  string
 	udpBuffer                int
@@ -409,9 +416,6 @@ type influxdbCluster struct {
 
 	PointsWriter interface {
 		WritePoints(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
-	}
-	LogService interface {
-		NewLogger(string, int) *log.Logger
 	}
 	ClientCreator interface {
 		Create(influxdb.Config) (influxdb.ClientUpdater, error)
@@ -445,9 +449,9 @@ type subInfo struct {
 	Destinations []string
 }
 
-func newInfluxDBCluster(c Config, hostname string, ider IDer, httpPort int, useTokens bool, l *log.Logger) (*influxdbCluster, error) {
+func newInfluxDBCluster(c Config, hostname string, ider IDer, httpPort int, useTokens bool, d Diagnostic) (*influxdbCluster, error) {
 	if c.InsecureSkipVerify {
-		l.Printf("W! Using InsecureSkipVerify when connecting to InfluxDB @ %v this is insecure!", c.URLs)
+		d.InsecureSkipVerify(c.URLs)
 	}
 	config, err := httpConfig(c)
 	if err != nil {
@@ -474,7 +478,6 @@ func newInfluxDBCluster(c Config, hostname string, ider IDer, httpPort int, useT
 		exConfigSubs:             exSubs,
 		hostname:                 host,
 		httpPort:                 port,
-		logger:                   l,
 		udpBind:                  c.UDPBind,
 		udpBuffer:                c.UDPBuffer,
 		udpReadBuffer:            c.UDPReadBuffer,
@@ -489,6 +492,7 @@ func newInfluxDBCluster(c Config, hostname string, ider IDer, httpPort int, useT
 		services:                 make(map[subEntry]openCloser, len(c.Subscriptions)),
 		// Do not use tokens for non http protocols
 		useTokens: useTokens && (c.SubscriptionProtocol == "http" || c.SubscriptionProtocol == "https"),
+		diag:      d,
 	}, nil
 }
 
@@ -612,7 +616,7 @@ func (c *influxdbCluster) Update(conf Config) error {
 	c.subscriptionMode = conf.SubscriptionMode
 
 	if conf.InsecureSkipVerify {
-		c.logger.Printf("W! Using InsecureSkipVerify when connecting to InfluxDB @ %v this is insecure!", conf.URLs)
+		c.diag.InsecureSkipVerify(conf.URLs)
 	}
 	if conf.HTTPPort != 0 {
 		c.httpPort = conf.HTTPPort
@@ -700,7 +704,7 @@ func (c *influxdbCluster) Update(conf Config) error {
 
 			err := c.linkSubscriptions(ctx, newSubName)
 			if err != nil {
-				c.logger.Printf("E! failed to link subscriptions for cluster %s: %v", c.clusterName, err)
+				c.diag.Error("failed to link subscription for cluster", err, keyvalue.KV("cluser", c.clusterName))
 			}
 		}()
 	}
@@ -747,7 +751,7 @@ func (c *influxdbCluster) validateClientWithBackoff(ctx context.Context) error {
 			}
 			_, _, err := c.client.Ping(ctx)
 			if err != nil {
-				c.logger.Println("D! failed to connect to InfluxDB, retrying... ", err)
+				c.diag.Error("failed to connect to InfluxDB, retrying...", err)
 				continue
 			}
 			return nil
@@ -764,7 +768,7 @@ func (c *influxdbCluster) UnlinkSubscriptions() error {
 
 // unlinkSubscriptions, you must have the lock to call this function.
 func (c *influxdbCluster) unlinkSubscriptions(subName string) error {
-	c.logger.Println("D! unlinking subscriptions for cluster", c.clusterName)
+	c.diag.UnlinkingSubscriptions(c.clusterName)
 	// Get all existing subscriptions
 	resp, err := c.execQuery(&influxql.ShowSubscriptionsStatement{})
 	if err != nil {
@@ -835,7 +839,7 @@ func (c *influxdbCluster) linkSubscriptions(ctx context.Context, subName string)
 		return nil
 	}
 
-	c.logger.Println("D! linking subscriptions for cluster", c.clusterName)
+	c.diag.LinkingSubscriptions(c.clusterName)
 	err := c.validateClientWithBackoff(ctx)
 	if err != nil {
 		return err
@@ -954,19 +958,19 @@ func (c *influxdbCluster) linkSubscriptions(ctx context.Context, subName string)
 			for _, dest := range si.Destinations {
 				u, err := url.Parse(dest)
 				if err != nil {
-					c.logger.Println("E! invalid URL in subscription destinations:", err)
+					c.diag.Error("invalid URL in subscription destinations", err)
 					continue
 				}
 				host, port, err := net.SplitHostPort(u.Host)
 				if err != nil {
-					c.logger.Println("E! invalid host in subscription:", err)
+					c.diag.Error("invalid host in subscription", err)
 					continue
 				}
 				if host == c.hostname {
 					if u.Scheme == "udp" {
 						_, err := c.startUDPListener(se, port)
 						if err != nil {
-							c.logger.Println("E! failed to start UDP listener:", err)
+							c.diag.Error("failed to start UDP listener", err)
 						}
 					}
 					c.runningSubs[se] = true
@@ -1015,7 +1019,7 @@ func (c *influxdbCluster) linkSubscriptions(ctx context.Context, subName string)
 			case "udp":
 				addr, err := c.startUDPListener(se, "0")
 				if err != nil {
-					c.logger.Println("E! failed to start UDP listener:", err)
+					c.diag.Error("failed to start UDP listener", err)
 				}
 				destination = fmt.Sprintf("udp://%s:%d", c.hostname, addr.Port)
 			}
@@ -1075,7 +1079,10 @@ func (c *influxdbCluster) linkSubscriptions(ctx context.Context, subName string)
 		if _, exists := existingSubs[se]; !exists {
 			err := c.closeSub(se)
 			if err != nil {
-				c.logger.Printf("E! failed to close service for %v: %s", se, err)
+				c.diag.Error("failed to close service", err,
+					keyvalue.KV("dbrp", fmt.Sprintf("%s.%s", se.db, se.rp)),
+					keyvalue.KV("name", se.name),
+				)
 			}
 		}
 	}
@@ -1225,15 +1232,15 @@ func (c *influxdbCluster) startUDPListener(se subEntry, port string) (*net.UDPAd
 	conf.Buffer = c.udpBuffer
 	conf.ReadBuffer = c.udpReadBuffer
 
-	l := c.LogService.NewLogger(fmt.Sprintf("[udp:%s.%s] ", se.db, se.rp), log.LstdFlags)
-	service := udp.NewService(conf, l)
+	d := c.diag.WithUDPContext(se.db, se.rp)
+	service := udp.NewService(conf, d)
 	service.PointsWriter = c.PointsWriter
 	err := service.Open()
 	if err != nil {
 		return nil, err
 	}
 	c.services[se] = service
-	c.logger.Println("I! started UDP listener for", se.db, se.rp)
+	c.diag.StartedUDPListener(se.db, se.rp)
 	return service.Addr(), nil
 }
 

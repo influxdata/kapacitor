@@ -3,7 +3,6 @@ package kapacitor
 import (
 	"errors"
 	"fmt"
-	"log"
 
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/expvar"
@@ -25,12 +24,12 @@ type EvalNode struct {
 }
 
 // Create a new  EvalNode which applies a transformation func to each point in a stream and returns a single point.
-func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, l *log.Logger) (*EvalNode, error) {
+func newEvalNode(et *ExecutingTask, n *pipeline.EvalNode, d NodeDiagnostic) (*EvalNode, error) {
 	if len(n.AsList) != len(n.Lambdas) {
 		return nil, errors.New("must provide one name per expression via the 'As' property")
 	}
 	en := &EvalNode{
-		node: node{Node: n, et: et, logger: l},
+		node: node{Node: n, et: et, diag: d},
 		e:    n,
 	}
 
@@ -210,9 +209,8 @@ func (g *evalGroup) Point(p edge.PointMessage) (edge.Message, error) {
 func (g *evalGroup) doEval(p edge.FieldsTagsTimeSetter) bool {
 	err := g.n.eval(g.expressions, p)
 	if err != nil {
-		g.n.incrementErrorCount()
 		if !g.n.e.QuietFlag {
-			g.n.logger.Println("E!", err)
+			g.n.diag.Error("error evaluating expression", err)
 		}
 		// Skip bad point
 		return false

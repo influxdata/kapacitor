@@ -2,23 +2,26 @@ package swarm
 
 import (
 	"fmt"
-	"log"
 	"sync"
 
 	"github.com/influxdata/kapacitor/services/swarm/client"
 	"github.com/pkg/errors"
 )
 
+type Diagnostic interface {
+	WithClusterContext(cluster string) Diagnostic
+}
+
 type Service struct {
 	mu       sync.Mutex
 	clusters map[string]*Cluster
-	logger   *log.Logger
+	diag     Diagnostic
 }
 
-func NewService(cs Configs, l *log.Logger) (*Service, error) {
+func NewService(cs Configs, d Diagnostic) (*Service, error) {
 	clusters := make(map[string]*Cluster, len(cs))
 	for _, c := range cs {
-		cluster, err := NewCluster(c, l)
+		cluster, err := NewCluster(c, d.WithClusterContext(c.ID))
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create cluster for %q", c.ID)
 		}
@@ -26,7 +29,7 @@ func NewService(cs Configs, l *log.Logger) (*Service, error) {
 	}
 	return &Service{
 		clusters: clusters,
-		logger:   l,
+		diag:     d,
 	}, nil
 }
 
@@ -50,7 +53,7 @@ func (s *Service) Update(newConfigs []interface{}) error {
 		cluster, ok := s.clusters[c.ID]
 		if !ok {
 			var err error
-			cluster, err = NewCluster(c, s.logger)
+			cluster, err = NewCluster(c, s.diag.WithClusterContext(c.ID))
 			if err != nil {
 				return err
 			}

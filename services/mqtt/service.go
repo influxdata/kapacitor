@@ -6,8 +6,16 @@ import (
 	"sync"
 
 	"github.com/influxdata/kapacitor/alert"
+	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/pkg/errors"
 )
+
+type Diagnostic interface {
+	WithContext(ctx ...keyvalue.T) Diagnostic
+	Error(msg string, err error)
+	CreatingAlertHandler(c HandlerConfig)
+	HandlingEvent()
+}
 
 // QoSLevel indicates the quality of service for messages delivered to a
 // broker.
@@ -54,7 +62,7 @@ const (
 )
 
 type Service struct {
-	logger *log.Logger
+	diag Diagnostic
 
 	mu      sync.RWMutex
 	clients map[string]Client
@@ -63,7 +71,7 @@ type Service struct {
 	defaultBrokerName string
 }
 
-func NewService(cs Configs, l *log.Logger) (*Service, error) {
+func NewService(cs Configs, d Diagnostic) (*Service, error) {
 	configs := cs.index()
 	clients := make(map[string]Client, len(cs))
 
@@ -85,7 +93,7 @@ func NewService(cs Configs, l *log.Logger) (*Service, error) {
 	}
 
 	return &Service{
-		logger:            l,
+		diag:              d,
 		configs:           configs,
 		clients:           clients,
 		defaultBrokerName: defaultBrokerName,
@@ -200,12 +208,13 @@ func (s *Service) update(cs Configs) error {
 	return nil
 }
 
-func (s *Service) Handler(c HandlerConfig, l *log.Logger) alert.Handler {
-	s.logger.Println("D! create Handler", c)
+func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
+	d := s.diag.WithContext(ctx...)
+	d.CreatingAlertHandler(c)
 	return &handler{
-		s:      s,
-		c:      c,
-		logger: l,
+		s:    s,
+		c:    c,
+		diag: d,
 	}
 }
 
@@ -217,15 +226,15 @@ type HandlerConfig struct {
 }
 
 type handler struct {
-	s      *Service
-	c      HandlerConfig
-	logger *log.Logger
+	s    *Service
+	c    HandlerConfig
+	diag Diagnostic
 }
 
 func (h *handler) Handle(event alert.Event) {
-	h.logger.Println("D! HANDLE")
+	h.diag.HandlingEvent()
 	if err := h.s.Alert(h.c.BrokerName, h.c.Topic, h.c.QoS, h.c.Retained, event.State.Message); err != nil {
-		h.logger.Println("E! failed to post message to MQTT broker", err)
+		h.diag.Error("failed to post message to MQTT broker", err)
 	}
 }
 

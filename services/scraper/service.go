@@ -2,13 +2,13 @@ package scraper
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"sync"
 	"sync/atomic"
 
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/models"
+	plog "github.com/prometheus/common/log"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/retrieval"
@@ -19,6 +19,9 @@ var (
 	_ Registry               = &Service{}
 	_ storage.SampleAppender = &Service{}
 )
+
+// Prometheus logger
+type Diagnostic plog.Logger
 
 // Service represents the scraper manager
 type Service struct {
@@ -35,7 +38,7 @@ type Service struct {
 
 	configs atomic.Value // []Config
 
-	logger *log.Logger
+	diag Diagnostic
 
 	discoverers []Discoverer
 
@@ -49,12 +52,12 @@ type Service struct {
 }
 
 // NewService creates a new scraper service
-func NewService(c []Config, l *log.Logger) *Service {
+func NewService(c []Config, d Diagnostic) *Service {
 	s := &Service{
-		logger: l,
+		diag: d,
 	}
 	s.storeConfigs(c)
-	s.mgr = retrieval.NewTargetManager(s, NewLogger(l))
+	s.mgr = retrieval.NewTargetManager(s, d)
 	return s
 }
 

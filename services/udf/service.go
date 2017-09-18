@@ -2,7 +2,6 @@ package udf
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"sync"
 	"time"
@@ -12,18 +11,24 @@ import (
 	"github.com/influxdata/kapacitor/udf"
 )
 
+type Diagnostic interface {
+	LoadedUDFInfo(udf string)
+
+	WithUDFContext() udf.Diagnostic
+}
+
 type Service struct {
 	configs map[string]FunctionConfig
 	infos   map[string]udf.Info
-	logger  *log.Logger
+	diag    Diagnostic
 	mu      sync.RWMutex
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, d Diagnostic) *Service {
 	return &Service{
 		configs: c.Functions,
 		infos:   make(map[string]udf.Info),
-		logger:  l,
+		diag:    d,
 	}
 }
 
@@ -60,7 +65,7 @@ func (s *Service) Info(name string) (udf.Info, bool) {
 
 func (s *Service) Create(
 	name, taskID, nodeID string,
-	l *log.Logger,
+	d udf.Diagnostic,
 	abortCallback func(),
 ) (udf.Interface, error) {
 	conf, ok := s.configs[name]
@@ -72,7 +77,7 @@ func (s *Service) Create(
 		return kapacitor.NewUDFSocket(
 			taskID, nodeID,
 			kapacitor.NewSocketConn(conf.Socket),
-			l,
+			d,
 			time.Duration(conf.Timeout),
 			abortCallback,
 		), nil
@@ -91,7 +96,7 @@ func (s *Service) Create(
 			taskID, nodeID,
 			command.ExecCommander,
 			cmdSpec,
-			l,
+			d,
 			time.Duration(conf.Timeout),
 			abortCallback,
 		), nil
@@ -106,7 +111,7 @@ func (s *Service) Refresh(name string) error {
 		return fmt.Errorf("failed to load process info for %q: %v", name, err)
 	}
 	s.infos[name] = info
-	s.logger.Printf("D! loaded UDF info %q", name)
+	s.diag.LoadedUDFInfo(name)
 	return nil
 }
 
@@ -114,7 +119,7 @@ func (s *Service) loadUDFInfo(name string) (udf.Info, error) {
 	// loadUDFInfo creates a UDF connection outside the context of a task or node
 	// because it only makes the Info request and never makes an Init request.
 	// As such it does not need to provide actual task and node IDs.
-	u, err := s.Create(name, "", "", s.logger, nil)
+	u, err := s.Create(name, "", "", s.diag.WithUDFContext(), nil)
 	if err != nil {
 		return udf.Info{}, err
 	}

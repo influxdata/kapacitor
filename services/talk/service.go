@@ -7,21 +7,26 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"sync/atomic"
 
 	"github.com/influxdata/kapacitor/alert"
+	"github.com/influxdata/kapacitor/keyvalue"
 )
+
+type Diagnostic interface {
+	WithContext(ctx ...keyvalue.T) Diagnostic
+	Error(msg string, err error)
+}
 
 type Service struct {
 	configValue atomic.Value
-	logger      *log.Logger
+	diag        Diagnostic
 }
 
-func NewService(c Config, l *log.Logger) *Service {
+func NewService(c Config, d Diagnostic) *Service {
 	s := &Service{
-		logger: l,
+		diag: d,
 	}
 	s.configValue.Store(c)
 	return s
@@ -120,14 +125,14 @@ func (s *Service) preparePost(title, text string) (string, io.Reader, error) {
 }
 
 type handler struct {
-	s      *Service
-	logger *log.Logger
+	s    *Service
+	diag Diagnostic
 }
 
-func (s *Service) Handler(l *log.Logger) alert.Handler {
+func (s *Service) Handler(ctx ...keyvalue.T) alert.Handler {
 	return &handler{
-		s:      s,
-		logger: l,
+		s:    s,
+		diag: s.diag.WithContext(ctx...),
 	}
 }
 
@@ -136,6 +141,6 @@ func (h *handler) Handle(event alert.Event) {
 		event.State.ID,
 		event.State.Message,
 	); err != nil {
-		h.logger.Println("E! failed to send event to Talk", err)
+		h.diag.Error("failed to send event to Talk", err)
 	}
 }

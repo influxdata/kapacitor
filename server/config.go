@@ -17,6 +17,7 @@ import (
 	"github.com/influxdata/kapacitor/services/config"
 	"github.com/influxdata/kapacitor/services/consul"
 	"github.com/influxdata/kapacitor/services/deadman"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/dns"
 	"github.com/influxdata/kapacitor/services/ec2"
 	"github.com/influxdata/kapacitor/services/file_discovery"
@@ -26,7 +27,6 @@ import (
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/influxdb"
 	"github.com/influxdata/kapacitor/services/k8s"
-	"github.com/influxdata/kapacitor/services/logging"
 	"github.com/influxdata/kapacitor/services/marathon"
 	"github.com/influxdata/kapacitor/services/mqtt"
 	"github.com/influxdata/kapacitor/services/nerve"
@@ -66,7 +66,7 @@ type Config struct {
 	Storage        storage.Config    `toml:"storage"`
 	Task           task_store.Config `toml:"task"`
 	InfluxDB       []influxdb.Config `toml:"influxdb" override:"influxdb,element-key=name"`
-	Logging        logging.Config    `toml:"logging"`
+	Logging        diagnostic.Config `toml:"logging"`
 	ConfigOverride config.Config     `toml:"config-override"`
 
 	// Input services
@@ -134,7 +134,7 @@ func NewConfig() *Config {
 	c.Replay = replay.NewConfig()
 	c.Task = task_store.NewConfig()
 	c.InfluxDB = []influxdb.Config{influxdb.NewConfig()}
-	c.Logging = logging.NewConfig()
+	c.Logging = diagnostic.NewConfig()
 	c.ConfigOverride = config.NewConfig()
 
 	c.Collectd = collectd.NewConfig()
