@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
@@ -185,11 +186,11 @@ func (n *FromNode) Tick(buf *bytes.Buffer) {
 	}
 
 	if n.Round != 0 {
-		tick += fmt.Sprintf(`.round(%s)`, n.Round)
+		tick += fmt.Sprintf(`.round(%s)`, influxql.FormatDuration(n.Round))
 	}
 
 	if n.Truncate != 0 {
-		tick += fmt.Sprintf(`.truncate(%s)`, n.Truncate)
+		tick += fmt.Sprintf(`.truncate(%s)`, influxql.FormatDuration(n.Truncate))
 	}
 
 	if n.Lambda != nil {

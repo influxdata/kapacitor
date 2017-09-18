@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
@@ -292,11 +293,11 @@ func (b *QueryNode) Tick(buf *bytes.Buffer) {
 	tick := fmt.Sprintf("|query('''%s''')", b.QueryStr)
 
 	if b.Period != 0 {
-		tick += fmt.Sprintf(".period(%s)", b.Period)
+		tick += fmt.Sprintf(".period(%s)", influxql.FormatDuration(b.Period))
 	}
 
 	if b.Every != 0 {
-		tick += fmt.Sprintf(".every(%s)", b.Every)
+		tick += fmt.Sprintf(".every(%s)", influxql.FormatDuration(b.Every))
 	}
 
 	if b.AlignFlag {
@@ -308,7 +309,7 @@ func (b *QueryNode) Tick(buf *bytes.Buffer) {
 	}
 
 	if b.Offset != 0 {
-		tick += fmt.Sprintf(".offset(%s)", b.Offset)
+		tick += fmt.Sprintf(".offset(%s)", influxql.FormatDuration(b.Offset))
 	}
 
 	if b.AlignGroupFlag {

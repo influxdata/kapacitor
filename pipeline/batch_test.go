@@ -96,7 +96,7 @@ func TestBatchNodeTick(t *testing.T) {
 }
 
 func TestPipelineBatchTick(t *testing.T) {
-	script := `batch|query('''select * from "telegraf"."autogen"''').period(1s).every(1s).align().cron('0 0 29 2 *').offset(1s).alignGroup().groupBy(*, 'host').groupByMeasurement().fill('null').cluster('string')`
+	script := `batch|query('''select * from "telegraf"."autogen"''').period(1h).every(1s).align().cron('0 0 29 2 *').offset(1s).alignGroup().groupBy(*, 'host').groupByMeasurement().fill('null').cluster('string')`
 
 	scope := stateful.NewScope()
 	p, err := CreatePipeline(script, BatchEdge, scope, deadman{}, nil)
