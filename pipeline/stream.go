@@ -1,9 +1,11 @@
 package pipeline
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/influxdata/kapacitor/tick/ast"
@@ -25,6 +27,14 @@ func newStreamNode() *StreamNode {
 			wants:    StreamEdge,
 			provides: StreamEdge,
 		},
+	}
+}
+
+// Tick converts the pipeline node into the TICKScript
+func (s *StreamNode) Tick(buf *bytes.Buffer) {
+	buf.Write([]byte("stream"))
+	for _, child := range s.Children() {
+		child.Tick(buf)
 	}
 }
 
@@ -137,6 +147,62 @@ func newFromNode() *FromNode {
 	return &FromNode{
 		chainnode: newBasicChainNode("from", StreamEdge, StreamEdge),
 	}
+}
+
+// Tick converts the pipeline node into the TICKScript
+func (n *FromNode) Tick(buf *bytes.Buffer) {
+	tick := fmt.Sprintf("|from()")
+
+	if n.Database != "" {
+		tick += fmt.Sprintf(`.database('%s')`, n.Database)
+	}
+
+	if n.RetentionPolicy != "" {
+		tick += fmt.Sprintf(`.retentionPolicy('%s')`, n.RetentionPolicy)
+	}
+
+	if n.Measurement != "" {
+		tick += fmt.Sprintf(`.measurement('%s')`, n.Measurement)
+	}
+
+	if n.GroupByMeasurementFlag {
+		tick += ".groupByMeasurement()"
+	}
+
+	if len(n.Dimensions) != 0 {
+		dims := make([]string, len(n.Dimensions))
+		for i, d := range n.Dimensions {
+			switch dim := d.(type) {
+			case string:
+				dims[i] = fmt.Sprintf(`'%s'`, dim)
+			case *ast.StarNode:
+				dims[i] = "*"
+			default:
+				dims[i] = fmt.Sprintf(`'%s'`, dim)
+			}
+		}
+		tick += fmt.Sprintf(".groupBy(%s)", strings.Join(dims, ", "))
+	}
+
+	if n.Round != 0 {
+		tick += fmt.Sprintf(`.round(%s)`, n.Round)
+	}
+
+	if n.Truncate != 0 {
+		tick += fmt.Sprintf(`.truncate(%s)`, n.Truncate)
+	}
+
+	if n.Lambda != nil {
+		var buf bytes.Buffer
+		n.Lambda.Format(&buf, "", false)
+		tick += fmt.Sprintf(`.where(%s)`, buf.String())
+	}
+
+	buf.Write([]byte(tick))
+	for _, child := range n.Children() {
+		child.Tick(buf)
+	}
+
 }
 
 func (n *FromNode) MarshalJSON() ([]byte, error) {

@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
+
+	"github.com/influxdata/kapacitor/tick/ast"
 )
 
 // A node that handles creating several child QueryNodes.
@@ -58,6 +61,14 @@ func (b *BatchNode) Query(q string) *QueryNode {
 // since its not really an edge.
 // tick:ignore
 func (b *BatchNode) dot(buf *bytes.Buffer) {
+}
+
+// Tick converts the pipeline node into the TICKScript
+func (b *BatchNode) Tick(buf *bytes.Buffer) {
+	buf.Write([]byte("batch"))
+	for _, child := range b.Children() {
+		child.Tick(buf)
+	}
 }
 
 // MarshalJSON converts this node to JSON
@@ -274,6 +285,73 @@ func (b *QueryNode) Align() *QueryNode {
 func (b *QueryNode) AlignGroup() *QueryNode {
 	b.AlignGroupFlag = true
 	return b
+}
+
+// Tick converts the pipeline node into the TICKScript
+func (b *QueryNode) Tick(buf *bytes.Buffer) {
+	tick := fmt.Sprintf("|query('''%s''')", b.QueryStr)
+
+	if b.Period != 0 {
+		tick += fmt.Sprintf(".period(%s)", b.Period)
+	}
+
+	if b.Every != 0 {
+		tick += fmt.Sprintf(".every(%s)", b.Every)
+	}
+
+	if b.AlignFlag {
+		tick += ".align()"
+	}
+
+	if b.Cron != "" {
+		tick += fmt.Sprintf(`.cron('%s')`, b.Cron)
+	}
+
+	if b.Offset != 0 {
+		tick += fmt.Sprintf(".offset(%s)", b.Offset)
+	}
+
+	if b.AlignGroupFlag {
+		tick += ".alignGroup()"
+	}
+
+	if len(b.Dimensions) != 0 {
+		dims := make([]string, len(b.Dimensions))
+		for i, d := range b.Dimensions {
+			// TODO: convert the interfaces correctly
+			switch dim := d.(type) {
+			case string:
+				dims[i] = fmt.Sprintf(`'%s'`, dim)
+			case *ast.StarNode:
+				dims[i] = "*"
+			default:
+				dims[i] = fmt.Sprintf(`'%s'`, dim)
+			}
+		}
+		tick += fmt.Sprintf(".groupBy(%s)", strings.Join(dims, ", "))
+	}
+
+	if b.GroupByMeasurementFlag {
+		tick += ".groupByMeasurement()"
+	}
+
+	if b.Fill != nil {
+		// TODO: convert the interface correctly
+		switch f := b.Fill.(type) {
+		case float64:
+			tick += fmt.Sprintf(".fill(%f)", f)
+		case int64:
+			tick += fmt.Sprintf(".fill(%d)", f)
+		default:
+			tick += fmt.Sprintf(`.fill('%s')`, f)
+		}
+	}
+
+	if b.Cluster != "" {
+		tick += fmt.Sprintf(`.cluster('%s')`, b.Cluster)
+	}
+
+	buf.Write([]byte(tick))
 }
 
 func (b *QueryNode) MarshalJSON() ([]byte, error) {
