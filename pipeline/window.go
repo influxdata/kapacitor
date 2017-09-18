@@ -1,10 +1,13 @@
 package pipeline
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/influxdata/influxdb/influxql"
 )
 
 // A `window` node caches data within a moving time range.
@@ -53,6 +56,40 @@ type WindowNode struct {
 func newWindowNode() *WindowNode {
 	return &WindowNode{
 		chainnode: newBasicChainNode("window", StreamEdge, BatchEdge),
+	}
+}
+
+// Tick converts the pipeline node into the TICKScript
+func (w *WindowNode) Tick(buf *bytes.Buffer) {
+	tick := fmt.Sprintf("|window()")
+
+	if w.Period != 0 {
+		tick += fmt.Sprintf(`.period(%s)`, influxql.FormatDuration(w.Period))
+	}
+
+	if w.Every != 0 {
+		tick += fmt.Sprintf(`.every(%s)`, influxql.FormatDuration(w.Every))
+	}
+
+	if w.PeriodCount != 0 {
+		tick += fmt.Sprintf(".periodCount(%d)", w.PeriodCount)
+	}
+
+	if w.EveryCount != 0 {
+		tick += fmt.Sprintf(".everyCount(%d)", w.EveryCount)
+	}
+
+	if w.AlignFlag {
+		tick += ".align()"
+	}
+
+	if w.FillPeriodFlag {
+		tick += ".fillPeriod()"
+	}
+
+	buf.Write([]byte(tick))
+	for _, child := range w.Children() {
+		child.Tick(buf)
 	}
 }
 
