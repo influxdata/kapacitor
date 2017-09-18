@@ -79,6 +79,8 @@ type Node interface {
 	dot(buf *bytes.Buffer)
 	// MarshalJSON converts the Node to a JSON representation
 	MarshalJSON() ([]byte, error)
+	// Tick converts the node to the TICKscript representation
+	Tick(buf *bytes.Buffer)
 }
 
 type node struct {
@@ -100,6 +102,9 @@ func (n node) MarshalJSON() ([]byte, error) {
 		children[i] = fmt.Sprintf("%d", n.ID())
 	}
 	return json.Marshal(children)
+}
+
+func (n *node) Tick(buf *bytes.Buffer) {
 }
 
 // tick:ignore

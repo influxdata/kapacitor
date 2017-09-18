@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -147,6 +148,9 @@ func (j *JoinNode) MarshalJSON() ([]byte, error) {
 		"fill":       j.Fill,
 	}
 	return json.Marshal(props)
+}
+
+func (j *JoinNode) Tick(buf *bytes.Buffer) {
 }
 
 // Prefix names for all fields from the respective nodes.
