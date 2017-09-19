@@ -194,9 +194,7 @@ func (n *FromNode) Tick(buf *bytes.Buffer) {
 	}
 
 	if n.Lambda != nil {
-		var buf bytes.Buffer
-		n.Lambda.Format(&buf, "", false)
-		tick += fmt.Sprintf(`.where(%s)`, buf.String())
+		tick += fmt.Sprintf(`.where(%s)`, LambdaTick(n.Lambda))
 	}
 
 	buf.Write([]byte(tick))
