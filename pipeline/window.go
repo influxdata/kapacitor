@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"time"
-
-	"github.com/influxdata/influxdb/influxql"
 )
 
 // A `window` node caches data within a moving time range.
@@ -64,11 +62,11 @@ func (w *WindowNode) Tick(buf *bytes.Buffer) {
 	tick := fmt.Sprintf("|window()")
 
 	if w.Period != 0 {
-		tick += fmt.Sprintf(`.period(%s)`, influxql.FormatDuration(w.Period))
+		tick += fmt.Sprintf(`.period(%s)`, DurationTick(w.Period))
 	}
 
 	if w.Every != 0 {
-		tick += fmt.Sprintf(`.every(%s)`, influxql.FormatDuration(w.Every))
+		tick += fmt.Sprintf(`.every(%s)`, DurationTick(w.Every))
 	}
 
 	if w.PeriodCount != 0 {
