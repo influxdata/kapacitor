@@ -2981,7 +2981,7 @@ func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.Ex
 	tm.HTTPDService = httpdService
 	tm.TaskStore = taskStore{}
 	tm.DeadmanService = deadman{}
-	tm.HTTPPostService = httppost.NewService(nil, diagService.NewHTTPPostHandler())
+	tm.HTTPPostService, _ = httppost.NewService(nil, diagService.NewHTTPPostHandler())
 	as := alertservice.NewService(diagService.NewAlertServiceHandler())
 	as.StorageService = storagetest.New()
 	as.HTTPDService = httpdService

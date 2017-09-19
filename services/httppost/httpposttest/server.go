@@ -2,6 +2,7 @@ package httpposttest
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 
@@ -15,7 +16,7 @@ type AlertServer struct {
 	closed bool
 }
 
-func NewAlertServer(headers map[string]string) *AlertServer {
+func NewAlertServer(headers map[string]string, raw bool) *AlertServer {
 	s := new(AlertServer)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		req := AlertRequest{MatchingHeaders: true}
@@ -25,9 +26,12 @@ func NewAlertServer(headers map[string]string) *AlertServer {
 				req.MatchingHeaders = false
 			}
 		}
-		req.Data = alert.Data{}
-		dec := json.NewDecoder(r.Body)
-		dec.Decode(&req.Data)
+		if raw {
+			req.Raw, _ = ioutil.ReadAll(r.Body)
+			json.Unmarshal(req.Raw, &req.Data)
+		} else {
+			json.NewDecoder(r.Body).Decode(&req.Data)
+		}
 		s.data = append(s.data, req)
 	}))
 	s.ts = ts
@@ -38,6 +42,7 @@ func NewAlertServer(headers map[string]string) *AlertServer {
 type AlertRequest struct {
 	MatchingHeaders bool
 	Data            alert.Data
+	Raw             []byte
 }
 
 func (s *AlertServer) Data() []AlertRequest {

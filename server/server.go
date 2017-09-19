@@ -147,7 +147,7 @@ type Server struct {
 func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Server, error) {
 	err := c.Validate()
 	if err != nil {
-		return nil, fmt.Errorf("%s. To generate a valid configuration file run `kapacitord config > kapacitor.generated.conf`.", err)
+		return nil, fmt.Errorf("invalid configuration: %s. To generate a valid configuration file run `kapacitord config > kapacitor.generated.conf`.", err)
 	}
 	d := diagService.NewServerHandler()
 	s := &Server{
@@ -221,7 +221,9 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 	s.appendOpsGenieService()
 	s.appendPagerDutyService()
 	s.appendPushoverService()
-	s.appendHTTPPostService()
+	if err := s.appendHTTPPostService(); err != nil {
+		return nil, errors.Wrap(err, "httppost service")
+	}
 	s.appendSMTPService()
 	s.appendTelegramService()
 	if err := s.appendSlackService(); err != nil {
@@ -550,16 +552,20 @@ func (s *Server) appendPushoverService() {
 	s.AppendService("pushover", srv)
 }
 
-func (s *Server) appendHTTPPostService() {
+func (s *Server) appendHTTPPostService() error {
 	c := s.config.HTTPPost
 	d := s.DiagService.NewHTTPPostHandler()
-	srv := httppost.NewService(c, d)
+	srv, err := httppost.NewService(c, d)
+	if err != nil {
+		return err
+	}
 
 	s.TaskMaster.HTTPPostService = srv
 	s.AlertService.HTTPPostService = srv
 
 	s.SetDynamicService("httppost", srv)
 	s.AppendService("httppost", srv)
+	return nil
 }
 
 func (s *Server) appendSensuService() {

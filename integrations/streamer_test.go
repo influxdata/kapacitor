@@ -2562,7 +2562,87 @@ stream
 		c := httppost.Config{}
 		c.URL = ts.URL
 		c.Endpoint = "test"
-		sl := httppost.NewService(httppost.Configs{c}, diagService.NewHTTPPostHandler())
+		sl, _ := httppost.NewService(httppost.Configs{c}, diagService.NewHTTPPostHandler())
+		tm.HTTPPostService = sl
+	}
+
+	testStreamerWithOutput(t, "TestStream_HttpPost", script, 13*time.Second, er, false, tmInit)
+
+	if rc := atomic.LoadInt32(&requestCount); rc != 6 {
+		t.Errorf("got %v exp %v", rc, 6)
+	}
+}
+func TestStream_HttpPostEndpoint_CustomBody(t *testing.T) {
+	headers := map[string]string{"my": "header"}
+	requestCount := int32(0)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		for k, v := range headers {
+			nv := r.Header.Get(k)
+			if nv != v {
+				t.Fatalf("got '%s:%s', exp '%s:%s'", k, nv, k, v)
+			}
+		}
+		data, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := string(data)
+		atomic.AddInt32(&requestCount, 1)
+		rc := atomic.LoadInt32(&requestCount)
+
+		var exp string
+		switch rc {
+		case 1:
+			exp = "cpu host=serverA type=idle 1971-01-01 00:00:00 +0000 UTC 97.1"
+		case 2:
+			exp = "cpu host=serverA type=idle 1971-01-01 00:00:01 +0000 UTC 92.6"
+		case 3:
+			exp = "cpu host=serverA type=idle 1971-01-01 00:00:02 +0000 UTC 95.6"
+		case 4:
+			exp = "cpu host=serverA type=idle 1971-01-01 00:00:03 +0000 UTC 93.1"
+		case 5:
+			exp = "cpu host=serverA type=idle 1971-01-01 00:00:04 +0000 UTC 92.6"
+		case 6:
+			exp = "cpu host=serverA type=idle 1971-01-01 00:00:05 +0000 UTC 95.8"
+		}
+		if exp != got {
+			t.Errorf("unexpected alert data for request: %d\n%s\n%s\n", rc, exp, got)
+		}
+	}))
+	defer ts.Close()
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|httpPost()
+	  .endpoint('test')
+	  .header('my', 'header')
+	|httpOut('TestStream_HttpPost')
+`
+
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverA", "type": "idle"},
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+					95.8,
+				}},
+			},
+		},
+	}
+
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := httppost.Config{}
+		c.URL = ts.URL
+		c.Endpoint = "test"
+		c.RowTemplate = `{{.Name}} host={{index .Tags "host"}} type={{index .Tags "type"}}{{range .Values}} {{index . "time"}} {{index . "value"}}{{end}}`
+		sl, _ := httppost.NewService(httppost.Configs{c}, diagService.NewHTTPPostHandler())
 		tm.HTTPPostService = sl
 	}
 
@@ -7934,7 +8014,7 @@ stream
 }
 
 func TestStream_AlertHTTPPost(t *testing.T) {
-	ts := httpposttest.NewAlertServer(nil)
+	ts := httpposttest.NewAlertServer(nil, false)
 	defer ts.Close()
 
 	var script = `
@@ -7996,7 +8076,7 @@ stream
 
 func TestStream_AlertHTTPPostEndpoint(t *testing.T) {
 	headers := map[string]string{"Authorization": "works"}
-	ts := httpposttest.NewAlertServer(headers)
+	ts := httpposttest.NewAlertServer(headers, false)
 	defer ts.Close()
 
 	var script = `
@@ -8023,7 +8103,7 @@ stream
 		c.URL = ts.URL
 		c.Endpoint = "test"
 		c.Headers = headers
-		sl := httppost.NewService(httppost.Configs{c}, diagService.NewHTTPPostHandler())
+		sl, _ := httppost.NewService(httppost.Configs{c}, diagService.NewHTTPPostHandler())
 		tm.HTTPPostService = sl
 	}
 	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
@@ -10893,7 +10973,7 @@ func createTaskMaster() (*kapacitor.TaskMaster, error) {
 	tm.HTTPDService = httpdService
 	tm.TaskStore = taskStore{}
 	tm.DeadmanService = deadman{}
-	tm.HTTPPostService = httppost.NewService(nil, diagService.NewHTTPPostHandler())
+	tm.HTTPPostService, _ = httppost.NewService(nil, diagService.NewHTTPPostHandler())
 	as := alertservice.NewService(diagService.NewAlertServiceHandler())
 	as.StorageService = storagetest.New()
 	as.HTTPDService = httpdService

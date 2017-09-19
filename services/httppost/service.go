@@ -3,15 +3,16 @@ package httppost
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"sync"
+	"text/template"
 
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/bufpool"
 	"github.com/influxdata/kapacitor/keyvalue"
+	"github.com/pkg/errors"
 )
 
 type Diagnostic interface {
@@ -21,18 +22,22 @@ type Diagnostic interface {
 
 // Only one of name and url should be non-empty
 type Endpoint struct {
-	mu      sync.RWMutex
-	url     string
-	headers map[string]string
-	auth    BasicAuth
-	closed  bool
+	mu            sync.RWMutex
+	url           string
+	headers       map[string]string
+	auth          BasicAuth
+	alertTemplate *template.Template
+	rowTemplate   *template.Template
+	closed        bool
 }
 
-func NewEndpoint(url string, headers map[string]string, auth BasicAuth) *Endpoint {
+func NewEndpoint(url string, headers map[string]string, auth BasicAuth, at, rt *template.Template) *Endpoint {
 	return &Endpoint{
-		url:     url,
-		headers: headers,
-		auth:    auth,
+		url:           url,
+		headers:       headers,
+		auth:          auth,
+		alertTemplate: at,
+		rowTemplate:   rt,
 	}
 }
 func (e *Endpoint) Close() {
@@ -42,12 +47,35 @@ func (e *Endpoint) Close() {
 	return
 }
 
-func (e *Endpoint) Update(c Config) {
+func (e *Endpoint) Update(c Config) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.url = c.URL
 	e.headers = c.Headers
 	e.auth = c.BasicAuth
+	at, err := c.getAlertTemplate()
+	if err != nil {
+		return err
+	}
+	e.alertTemplate = at
+	rt, err := c.getRowTemplate()
+	if err != nil {
+		return err
+	}
+	e.rowTemplate = rt
+	return nil
+}
+
+func (e *Endpoint) AlertTemplate() *template.Template {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.alertTemplate
+}
+
+func (e *Endpoint) RowTemplate() *template.Template {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.rowTemplate
 }
 
 func (e *Endpoint) NewHTTPRequest(body io.Reader) (req *http.Request, err error) {
@@ -79,12 +107,15 @@ type Service struct {
 	diag      Diagnostic
 }
 
-func NewService(c Configs, d Diagnostic) *Service {
-	s := &Service{
-		diag:      d,
-		endpoints: c.index(),
+func NewService(c Configs, d Diagnostic) (*Service, error) {
+	endpoints, err := c.index()
+	if err != nil {
+		return nil, err
 	}
-	return s
+	return &Service{
+		diag:      d,
+		endpoints: endpoints,
+	}, nil
 }
 
 func (s *Service) Endpoint(name string) (*Endpoint, bool) {
@@ -108,10 +139,20 @@ func (s *Service) Update(newConfigs []interface{}) error {
 			}
 			e, ok := s.endpoints[c.Endpoint]
 			if !ok {
-				s.endpoints[c.Endpoint] = NewEndpoint(c.URL, c.Headers, c.BasicAuth)
+				at, err := c.getAlertTemplate()
+				if err != nil {
+					return errors.Wrapf(err, "failed to get alert template for endpoint %q", c.Endpoint)
+				}
+				rt, err := c.getRowTemplate()
+				if err != nil {
+					return errors.Wrapf(err, "failed to get row template for endpoint %q", c.Endpoint)
+				}
+				s.endpoints[c.Endpoint] = NewEndpoint(c.URL, c.Headers, c.BasicAuth, at, rt)
 				continue
 			}
-			e.Update(c)
+			if err := e.Update(c); err != nil {
+				return errors.Wrapf(err, "failed to update endpoint %q", c.Endpoint)
+			}
 
 			endpointSet[c.Endpoint] = true
 		} else {
@@ -193,19 +234,20 @@ type HandlerConfig struct {
 }
 
 type handler struct {
-	s        *Service
-	bp       *bufpool.Pool
+	s  *Service
+	bp *bufpool.Pool
+
 	endpoint *Endpoint
-	diag     Diagnostic
 	headers  map[string]string
+
+	diag Diagnostic
 }
 
 func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
 	e, ok := s.Endpoint(c.Endpoint)
 	if !ok {
-		e = NewEndpoint(c.URL, nil, BasicAuth{})
+		e = NewEndpoint(c.URL, nil, BasicAuth{}, nil, nil)
 	}
-
 	return &handler{
 		s:        s,
 		bp:       bufpool.New(),
@@ -236,10 +278,20 @@ func (h *handler) Handle(event alert.Event) {
 	defer h.bp.Put(body)
 	ad := event.AlertData()
 
-	err = json.NewEncoder(body).Encode(ad)
-	if err != nil {
-		h.diag.Error("failed to marshal alert data json", err)
-		return
+	var contentType string
+	if h.endpoint.AlertTemplate() != nil {
+		err := h.endpoint.AlertTemplate().Execute(body, ad)
+		if err != nil {
+			h.diag.Error("failed to execute alert template", err)
+			return
+		}
+	} else {
+		err = json.NewEncoder(body).Encode(ad)
+		if err != nil {
+			h.diag.Error("failed to marshal alert data json", err)
+			return
+		}
+		contentType = "application/json"
 	}
 
 	req, err := h.NewHTTPRequest(body)
@@ -248,8 +300,11 @@ func (h *handler) Handle(event alert.Event) {
 		return
 	}
 
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+
 	// Execute the request
-	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		h.diag.Error("failed to POST alert data", err)

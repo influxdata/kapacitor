@@ -195,16 +195,16 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("must configure valid data dir")
 	}
 	if err := c.Replay.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "replay")
 	}
 	if err := c.Storage.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "storage")
 	}
 	if err := c.HTTP.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "http")
 	}
 	if err := c.Task.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "task")
 	}
 	// Validate the set of InfluxDB configs.
 	// All names should be unique.
@@ -239,136 +239,136 @@ func (c *Config) Validate() error {
 	// Validate inputs
 	for _, g := range c.Graphite {
 		if err := g.Validate(); err != nil {
-			return fmt.Errorf("invalid graphite config: %v", err)
+			return errors.Wrap(err, "graphite")
 		}
 	}
 
 	// Validate alert handlers
 	if err := c.Alerta.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "alerta")
 	}
 	if err := c.HipChat.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "hipchat")
 	}
 	if err := c.MQTT.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "mqtt")
 	}
 	if err := c.OpsGenie.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "opsgenie")
 	}
 	if err := c.PagerDuty.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "pagerduty")
 	}
 	if err := c.Pushover.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "pushover")
 	}
 	if err := c.HTTPPost.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "httppost")
 	}
 	if err := c.SMTP.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "smtp")
 	}
 	if err := c.SNMPTrap.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "snmptrap")
 	}
 	if err := c.Sensu.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "sensu")
 	}
 	if err := c.Slack.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "slack")
 	}
 	if err := c.Talk.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "talk")
 	}
 	if err := c.Telegram.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "telegram")
 	}
 	if err := c.VictorOps.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "victorops")
 	}
 
 	if err := c.UDF.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "udf")
 	}
 
 	// Validate scrapers
 	for i := range c.Scraper {
 		if err := c.Scraper[i].Validate(); err != nil {
-			return err
+			return errors.Wrapf(err, "scraper %q", c.Scraper[i].Name)
 		}
 	}
 
 	for i := range c.Azure {
 		if err := c.Azure[i].Validate(); err != nil {
-			return err
+			return errors.Wrapf(err, "azure %q", c.Azure[i].ID)
 		}
 	}
 
 	for i := range c.Consul {
 		if err := c.Consul[i].Validate(); err != nil {
-			return err
+			return errors.Wrapf(err, "consul %q", c.Consul[i].ID)
 		}
 	}
 
 	for i := range c.DNS {
 		if err := c.DNS[i].Validate(); err != nil {
-			return err
+			return errors.Wrapf(err, "dns %q", c.DNS[i].ID)
 		}
 	}
 
 	for i := range c.EC2 {
 		if err := c.EC2[i].Validate(); err != nil {
-			return err
+			return errors.Wrapf(err, "ec2 %q", c.EC2[i].ID)
 		}
 	}
 
 	for i := range c.FileDiscovery {
 		if err := c.FileDiscovery[i].Validate(); err != nil {
-			return err
+			return errors.Wrapf(err, "file discovery %q", c.FileDiscovery[i].ID)
 		}
 	}
 
 	for i := range c.GCE {
 		if err := c.GCE[i].Validate(); err != nil {
-			return err
+			return errors.Wrapf(err, "gce %q", c.GCE[i].ID)
 		}
 	}
 
 	if err := c.Kubernetes.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "kubernetes")
 	}
 
 	for i := range c.Marathon {
 		if err := c.Marathon[i].Validate(); err != nil {
-			return err
+			return errors.Wrapf(err, "marathon %q", c.Marathon[i].ID)
 		}
 	}
 
 	for i := range c.Nerve {
 		if err := c.Nerve[i].Validate(); err != nil {
-			return err
+			return errors.Wrapf(err, "nerve %q", c.Nerve[i].ID)
 		}
 	}
 
 	for i := range c.Serverset {
 		if err := c.Serverset[i].Validate(); err != nil {
-			return err
+			return errors.Wrapf(err, "serverset %q", c.Serverset[i].ID)
 		}
 	}
 
 	for i := range c.StaticDiscovery {
 		if err := c.StaticDiscovery[i].Validate(); err != nil {
-			return err
+			return errors.Wrapf(err, "static discovery %q", c.StaticDiscovery[i].ID)
 		}
 	}
 
 	if err := c.Swarm.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "swarm")
 	}
 
 	for i := range c.Triton {
 		if err := c.Triton[i].Validate(); err != nil {
-			return err
+			return errors.Wrapf(err, "triton %q", c.Triton[i].ID)
 		}
 	}
 
