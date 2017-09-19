@@ -2653,6 +2653,109 @@ stream
 	}
 }
 
+func TestStream_HttpPostEndpoint_StatusCodes(t *testing.T) {
+	headers := map[string]string{"my": "header"}
+	requestCount := int32(0)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		for k, v := range headers {
+			nv := r.Header.Get(k)
+			if nv != v {
+				t.Fatalf("got '%s:%s', exp '%s:%s'", k, nv, k, v)
+			}
+		}
+		atomic.AddInt32(&requestCount, 1)
+		rc := atomic.LoadInt32(&requestCount)
+
+		switch rc {
+		case 1:
+			w.WriteHeader(http.StatusOK)
+		case 2:
+			w.WriteHeader(http.StatusCreated)
+		case 3:
+			w.WriteHeader(http.StatusNotFound)
+		case 4:
+			w.WriteHeader(http.StatusForbidden)
+		case 5:
+			w.WriteHeader(http.StatusInternalServerError)
+		case 6:
+			w.WriteHeader(http.StatusBadGateway)
+		}
+	}))
+	defer ts.Close()
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|httpPost()
+	  .endpoint('test')
+	  .header('my', 'header')
+	  .codeField('code')
+	|window()
+		.every(5s)
+		.period(5s)
+	|httpOut('TestStream_HttpPost')
+`
+
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverA"},
+				Columns: []string{"time", "code", "type", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						200.0,
+						"idle",
+						97.1,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+						201.0,
+						"idle",
+						92.6,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						404.0,
+						"idle",
+						95.6,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+						403.0,
+						"idle",
+						93.1,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						500.0,
+						"idle",
+						92.6,
+					},
+				},
+			},
+		},
+	}
+
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := httppost.Config{}
+		c.URL = ts.URL
+		c.Endpoint = "test"
+		sl, _ := httppost.NewService(httppost.Configs{c}, diagService.NewHTTPPostHandler())
+		tm.HTTPPostService = sl
+	}
+
+	testStreamerWithOutput(t, "TestStream_HttpPost", script, 13*time.Second, er, false, tmInit)
+
+	if rc := atomic.LoadInt32(&requestCount); rc != 6 {
+		t.Errorf("got %v exp %v", rc, 6)
+	}
+}
+
 func TestStream_HttpOutPassThrough(t *testing.T) {
 
 	var script = `
