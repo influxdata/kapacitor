@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -32,6 +33,20 @@ func newWhereNode(wants EdgeType, predicate *ast.LambdaNode) *WhereNode {
 	return &WhereNode{
 		chainnode: newBasicChainNode("where", wants, wants),
 		Lambda:    predicate,
+	}
+}
+
+// Tick converts the pipeline node into the TICKScript
+func (n *WhereNode) Tick(buf *bytes.Buffer) {
+	tick := "|where("
+	if n.Lambda != nil {
+		tick += LambdaTick(n.Lambda)
+	}
+	tick += ")"
+	buf.Write([]byte(tick))
+
+	for _, child := range n.Children() {
+		child.Tick(buf)
 	}
 }
 
