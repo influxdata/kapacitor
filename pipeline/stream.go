@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
@@ -155,15 +154,15 @@ func (n *FromNode) Tick(buf *bytes.Buffer) {
 	tick := fmt.Sprintf("|from()")
 
 	if n.Database != "" {
-		tick += fmt.Sprintf(`.database('%s')`, n.Database)
+		tick += fmt.Sprintf(`.database(%s)`, SingleQuote(n.Database))
 	}
 
 	if n.RetentionPolicy != "" {
-		tick += fmt.Sprintf(`.retentionPolicy('%s')`, n.RetentionPolicy)
+		tick += fmt.Sprintf(`.retentionPolicy(%s)`, SingleQuote(n.RetentionPolicy))
 	}
 
 	if n.Measurement != "" {
-		tick += fmt.Sprintf(`.measurement('%s')`, n.Measurement)
+		tick += fmt.Sprintf(`.measurement(%s)`, SingleQuote(n.Measurement))
 	}
 
 	if n.GroupByMeasurementFlag {
@@ -175,7 +174,7 @@ func (n *FromNode) Tick(buf *bytes.Buffer) {
 		for i, d := range n.Dimensions {
 			switch dim := d.(type) {
 			case string:
-				dims[i] = fmt.Sprintf(`'%s'`, dim)
+				dims[i] = SingleQuote(dim)
 			case *ast.StarNode:
 				dims[i] = "*"
 			default:
@@ -186,11 +185,11 @@ func (n *FromNode) Tick(buf *bytes.Buffer) {
 	}
 
 	if n.Round != 0 {
-		tick += fmt.Sprintf(`.round(%s)`, influxql.FormatDuration(n.Round))
+		tick += fmt.Sprintf(`.round(%s)`, DurationTick(n.Round))
 	}
 
 	if n.Truncate != 0 {
-		tick += fmt.Sprintf(`.truncate(%s)`, influxql.FormatDuration(n.Truncate))
+		tick += fmt.Sprintf(`.truncate(%s)`, DurationTick(n.Truncate))
 	}
 
 	if n.Lambda != nil {

@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor/tick"
 	"github.com/influxdata/kapacitor/udf/agent"
 )
@@ -98,16 +97,16 @@ func (u *UDFNode) Tick(buf *bytes.Buffer) {
 		for _, v := range o.Values {
 			switch v.Type {
 			case agent.ValueType_BOOL:
-				args = append(args, strings.ToUpper(fmt.Sprintf("%t", v.GetBoolValue())))
+				args = append(args, BoolTick(v.GetBoolValue()))
 			case agent.ValueType_INT:
 				args = append(args, fmt.Sprintf("%d", v.GetIntValue()))
 			case agent.ValueType_DOUBLE:
 				args = append(args, fmt.Sprintf("%g", v.GetDoubleValue()))
 			case agent.ValueType_STRING:
-				args = append(args, fmt.Sprintf(`'%s'`, v.GetStringValue()))
+				args = append(args, SingleQuote(v.GetStringValue()))
 			case agent.ValueType_DURATION:
 				dur := time.Duration(v.GetDurationValue())
-				args = append(args, fmt.Sprintf("%s", influxql.FormatDuration(dur)))
+				args = append(args, DurationTick(dur))
 			}
 		}
 		chain := fmt.Sprintf("%s(%s)", o.Name, strings.Join(args, ", "))

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
@@ -293,11 +292,11 @@ func (b *QueryNode) Tick(buf *bytes.Buffer) {
 	tick := fmt.Sprintf("|query('''%s''')", b.QueryStr)
 
 	if b.Period != 0 {
-		tick += fmt.Sprintf(".period(%s)", influxql.FormatDuration(b.Period))
+		tick += fmt.Sprintf(".period(%s)", DurationTick(b.Period))
 	}
 
 	if b.Every != 0 {
-		tick += fmt.Sprintf(".every(%s)", influxql.FormatDuration(b.Every))
+		tick += fmt.Sprintf(".every(%s)", DurationTick(b.Every))
 	}
 
 	if b.AlignFlag {
@@ -305,11 +304,11 @@ func (b *QueryNode) Tick(buf *bytes.Buffer) {
 	}
 
 	if b.Cron != "" {
-		tick += fmt.Sprintf(`.cron('%s')`, b.Cron)
+		tick += fmt.Sprintf(`.cron(%s)`, SingleQuote(b.Cron))
 	}
 
 	if b.Offset != 0 {
-		tick += fmt.Sprintf(".offset(%s)", influxql.FormatDuration(b.Offset))
+		tick += fmt.Sprintf(".offset(%s)", DurationTick(b.Offset))
 	}
 
 	if b.AlignGroupFlag {
@@ -322,7 +321,7 @@ func (b *QueryNode) Tick(buf *bytes.Buffer) {
 			// TODO: convert the interfaces correctly
 			switch dim := d.(type) {
 			case string:
-				dims[i] = fmt.Sprintf(`'%s'`, dim)
+				dims[i] = SingleQuote(dim)
 			case *ast.StarNode:
 				dims[i] = "*"
 			default:
@@ -349,7 +348,7 @@ func (b *QueryNode) Tick(buf *bytes.Buffer) {
 	}
 
 	if b.Cluster != "" {
-		tick += fmt.Sprintf(`.cluster('%s')`, b.Cluster)
+		tick += fmt.Sprintf(`.cluster(%s)`, SingleQuote(b.Cluster))
 	}
 
 	buf.Write([]byte(tick))
