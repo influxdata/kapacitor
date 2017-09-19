@@ -1,8 +1,10 @@
 package pipeline
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // Takes the union of all of its parents.
@@ -42,6 +44,26 @@ func newUnionNode(e EdgeType, nodes []Node) *UnionNode {
 		n.linkChild(u)
 	}
 	return u
+}
+
+// Tick converts the pipeline node into the TICKScript
+func (u *UnionNode) Tick(buf *bytes.Buffer) {
+	buf.Write([]byte("|union("))
+
+	nodes := []string{}
+	for _, child := range u.Children() {
+		var b bytes.Buffer
+		child.Tick(&b)
+		nodes = append(nodes, b.String())
+	}
+
+	buf.Write([]byte(strings.Join(nodes, ", ")))
+	buf.Write([]byte(")"))
+
+	if u.Rename != "" {
+		r := fmt.Sprintf(".rename('%s')", u.Rename)
+		buf.Write([]byte(r))
+	}
 }
 
 func (u *UnionNode) MarshalJSON() ([]byte, error) {
