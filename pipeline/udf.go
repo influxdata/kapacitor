@@ -1,10 +1,13 @@
 package pipeline
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor/tick"
 	"github.com/influxdata/kapacitor/udf/agent"
 )
@@ -86,6 +89,36 @@ func NewUDF(
 	udf.describer, _ = tick.NewReflectionDescriber(udf, nil)
 	parent.linkChild(udf)
 	return udf
+}
+
+func (u *UDFNode) Tick(buf *bytes.Buffer) {
+	chains := []string{}
+	for _, o := range u.Options {
+		args := []string{}
+		for _, v := range o.Values {
+			switch v.Type {
+			case agent.ValueType_BOOL:
+				args = append(args, strings.ToUpper(fmt.Sprintf("%t", v.GetBoolValue())))
+			case agent.ValueType_INT:
+				args = append(args, fmt.Sprintf("%d", v.GetIntValue()))
+			case agent.ValueType_DOUBLE:
+				args = append(args, fmt.Sprintf("%g", v.GetDoubleValue()))
+			case agent.ValueType_STRING:
+				args = append(args, fmt.Sprintf(`'%s'`, v.GetStringValue()))
+			case agent.ValueType_DURATION:
+				dur := time.Duration(v.GetDurationValue())
+				args = append(args, fmt.Sprintf("%s", influxql.FormatDuration(dur)))
+			}
+		}
+		chain := fmt.Sprintf("%s(%s)", o.Name, strings.Join(args, ", "))
+		chains = append(chains, chain)
+	}
+
+	tick := fmt.Sprintf("@%s().%s", u.UDFName, strings.Join(chains, "."))
+	buf.Write([]byte(tick))
+	for _, child := range u.Children() {
+		child.Tick(buf)
+	}
 }
 
 func (u *UDFNode) MarshalJSON() ([]byte, error) {
