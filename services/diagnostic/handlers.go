@@ -17,7 +17,6 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	alertservice "github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
-	klog "github.com/influxdata/kapacitor/services/diagnostic/internal/log"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/influxdb"
@@ -36,36 +35,37 @@ import (
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/udf"
+	"github.com/influxdata/kapacitor/uuid"
 	plog "github.com/prometheus/common/log"
 )
 
-func Error(l *klog.Logger, msg string, err error, ctx []keyvalue.T) {
+func Err(l Logger, msg string, err error, ctx []keyvalue.T) {
 	if len(ctx) == 0 {
-		l.Error(msg, klog.Error(err))
+		l.Error(msg, Error(err))
 		return
 	}
 
 	if len(ctx) == 1 {
 		el := ctx[0]
-		l.Error(msg, klog.Error(err), klog.String(el.Key, el.Value))
+		l.Error(msg, Error(err), String(el.Key, el.Value))
 		return
 	}
 
 	if len(ctx) == 2 {
 		x := ctx[0]
 		y := ctx[1]
-		l.Error(msg, klog.Error(err), klog.String(x.Key, x.Value), klog.String(y.Key, y.Value))
+		l.Error(msg, Error(err), String(x.Key, x.Value), String(y.Key, y.Value))
 		return
 	}
 
 	// This isn't great wrt to allocation, but should be rare. Currently
 	// no calls to Error use more than 2 ctx values. If a new call to
 	// Error uses more than 2, update this function
-	fields := make([]klog.Field, len(ctx)+1) // +1 for error
-	fields[0] = klog.Error(err)
+	fields := make([]Field, len(ctx)+1) // +1 for error
+	fields[0] = Error(err)
 	for i := 1; i < len(fields); i++ {
 		kv := ctx[i-1]
-		fields[i] = klog.String(kv.Key, kv.Value)
+		fields[i] = String(kv.Key, kv.Value)
 	}
 
 	l.Error(msg, fields...)
@@ -74,13 +74,13 @@ func Error(l *klog.Logger, msg string, err error, ctx []keyvalue.T) {
 // Alert Service Handler
 
 type AlertServiceHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
-func logFieldsFromContext(ctx []keyvalue.T) []klog.Field {
-	fields := make([]klog.Field, len(ctx))
+func logFieldsFromContext(ctx []keyvalue.T) []Field {
+	fields := make([]Field, len(ctx))
 	for i, kv := range ctx {
-		fields[i] = klog.String(kv.Key, kv.Value)
+		fields[i] = String(kv.Key, kv.Value)
 	}
 
 	return fields
@@ -99,52 +99,52 @@ func (h *AlertServiceHandler) MigratingHandlerSpecs() {
 }
 
 func (h *AlertServiceHandler) MigratingOldHandlerSpec(spec string) {
-	h.l.Debug("migrating old handler spec", klog.String("handler", spec))
+	h.l.Debug("migrating old handler spec", String("handler", spec))
 }
 
 func (h *AlertServiceHandler) FoundHandlerRows(length int) {
-	h.l.Debug("found handler rows", klog.Int("handler_row_count", length))
+	h.l.Debug("found handler rows", Int("handler_row_count", length))
 }
 
 func (h *AlertServiceHandler) CreatingNewHandlers(length int) {
-	h.l.Debug("creating new handlers in place of old handlers", klog.Int("handler_row_count", length))
+	h.l.Debug("creating new handlers in place of old handlers", Int("handler_row_count", length))
 }
 
 func (h *AlertServiceHandler) FoundNewHandler(key string) {
-	h.l.Debug("found new handler skipping", klog.String("handler", key))
+	h.l.Debug("found new handler skipping", String("handler", key))
 }
 
 func (h *AlertServiceHandler) Error(msg string, err error, ctx ...keyvalue.T) {
-	Error(h.l, msg, err, ctx)
+	Err(h.l, msg, err, ctx)
 }
 
 // Kapcitor Handler
 
 type KapacitorHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *KapacitorHandler) WithTaskContext(task string) kapacitor.TaskDiagnostic {
 	return &KapacitorHandler{
-		l: h.l.With(klog.String("task", task)),
+		l: h.l.With(String("task", task)),
 	}
 }
 
 func (h *KapacitorHandler) WithTaskMasterContext(tm string) kapacitor.Diagnostic {
 	return &KapacitorHandler{
-		l: h.l.With(klog.String("task_master", tm)),
+		l: h.l.With(String("task_master", tm)),
 	}
 }
 
 func (h *KapacitorHandler) WithNodeContext(node string) kapacitor.NodeDiagnostic {
 	return &KapacitorHandler{
-		l: h.l.With(klog.String("node", node)),
+		l: h.l.With(String("node", node)),
 	}
 }
 
 func (h *KapacitorHandler) WithEdgeContext(task, parent, child string) kapacitor.EdgeDiagnostic {
 	return &KapacitorHandler{
-		l: h.l.With(klog.String("task", task), klog.String("parent", parent), klog.String("child", child)),
+		l: h.l.With(String("task", task), String("parent", parent), String("child", child)),
 	}
 }
 
@@ -157,78 +157,78 @@ func (h *KapacitorHandler) TaskMasterClosed() {
 }
 
 func (h *KapacitorHandler) StartingTask(task string) {
-	h.l.Debug("starting task", klog.String("task", task))
+	h.l.Debug("starting task", String("task", task))
 }
 
 func (h *KapacitorHandler) StartedTask(task string) {
-	h.l.Info("started task", klog.String("task", task))
+	h.l.Info("started task", String("task", task))
 }
 
 func (h *KapacitorHandler) StoppedTask(task string) {
-	h.l.Info("stopped task", klog.String("task", task))
+	h.l.Info("stopped task", String("task", task))
 }
 
 func (h *KapacitorHandler) StoppedTaskWithError(task string, err error) {
-	h.l.Error("failed to stop task with out error", klog.String("task", task), klog.Error(err))
+	h.l.Error("failed to stop task with out error", String("task", task), Error(err))
 }
 
 func (h *KapacitorHandler) TaskMasterDot(d string) {
-	h.l.Debug("listing dot", klog.String("dot", d))
+	h.l.Debug("listing dot", String("dot", d))
 }
 
 func (h *KapacitorHandler) ClosingEdge(collected int64, emitted int64) {
-	h.l.Debug("closing edge", klog.Int64("collected", collected), klog.Int64("emitted", emitted))
+	h.l.Debug("closing edge", Int64("collected", collected), Int64("emitted", emitted))
 }
 
 func (h *KapacitorHandler) Error(msg string, err error, ctx ...keyvalue.T) {
-	Error(h.l, msg, err, ctx)
+	Err(h.l, msg, err, ctx)
 }
 
 func (h *KapacitorHandler) AlertTriggered(level alert.Level, id string, message string, rows *models.Row) {
 	h.l.Debug("alert triggered",
-		klog.Stringer("level", level),
-		klog.String("id", id),
-		klog.String("event_message", message),
-		klog.String("data", fmt.Sprintf("%v", rows)),
+		Stringer("level", level),
+		String("id", id),
+		String("event_message", message),
+		String("data", fmt.Sprintf("%v", rows)),
 	)
 }
 
 func (h *KapacitorHandler) SettingReplicas(new int, old int, id string) {
 	h.l.Debug("setting replicas",
-		klog.Int("new", new),
-		klog.Int("old", old),
-		klog.String("event_id", id),
+		Int("new", new),
+		Int("old", old),
+		String("event_id", id),
 	)
 }
 
 func (h *KapacitorHandler) StartingBatchQuery(q string) {
-	h.l.Debug("starting next batch query", klog.String("query", q))
+	h.l.Debug("starting next batch query", String("query", q))
 }
 
-func TagPairs(tags models.Tags) []klog.Field {
-	ts := []klog.Field{}
+func TagPairs(tags models.Tags) []Field {
+	ts := []Field{}
 	for k, v := range tags {
-		ts = append(ts, klog.String(k, v))
+		ts = append(ts, String(k, v))
 	}
 
 	return ts
 }
 
-func FieldPairs(tags models.Fields) []klog.Field {
-	ts := []klog.Field{}
+func FieldPairs(tags models.Fields) []Field {
+	ts := []Field{}
 	for k, v := range tags {
-		var el klog.Field
+		var el Field
 		switch t := v.(type) {
 		case int64:
-			el = klog.Int64(k, t)
+			el = Int64(k, t)
 		case string:
-			el = klog.String(k, t)
+			el = String(k, t)
 		case float64:
-			el = klog.Float64(k, t)
+			el = Float64(k, t)
 		case bool:
-			el = klog.Bool(k, t)
+			el = Bool(k, t)
 		default:
-			el = klog.String(k, fmt.Sprintf("%v", t))
+			el = String(k, fmt.Sprintf("%v", t))
 		}
 		ts = append(ts, el)
 	}
@@ -237,19 +237,19 @@ func FieldPairs(tags models.Fields) []klog.Field {
 }
 
 func (h *KapacitorHandler) LogPointData(level, prefix string, point edge.PointMessage) {
-	fields := []klog.Field{
-		klog.String("prefix", prefix),
-		klog.String("name", point.Name()),
-		klog.String("db", point.Database()),
-		klog.String("rp", point.RetentionPolicy()),
-		klog.String("group", string(point.GroupID())),
-		klog.Strings("dimension", point.Dimensions().TagNames),
-		klog.GroupedFields("tag", TagPairs(point.Tags())),
-		klog.GroupedFields("field", FieldPairs(point.Fields())),
-		klog.Time("time", point.Time()),
+	fields := []Field{
+		String("prefix", prefix),
+		String("name", point.Name()),
+		String("db", point.Database()),
+		String("rp", point.RetentionPolicy()),
+		String("group", string(point.GroupID())),
+		Strings("dimension", point.Dimensions().TagNames),
+		GroupedFields("tag", TagPairs(point.Tags())),
+		GroupedFields("field", FieldPairs(point.Fields())),
+		Time("time", point.Time()),
 	}
 
-	var log func(string, ...klog.Field)
+	var log func(string, ...Field)
 
 	switch level {
 	case "INFO":
@@ -268,7 +268,7 @@ func (h *KapacitorHandler) LogPointData(level, prefix string, point edge.PointMe
 }
 
 func (h *KapacitorHandler) LogBatchData(level, prefix string, batch edge.BufferedBatchMessage) {
-	var log func(string, ...klog.Field)
+	var log func(string, ...Field)
 
 	switch level {
 	case "INFO":
@@ -285,41 +285,41 @@ func (h *KapacitorHandler) LogBatchData(level, prefix string, batch edge.Buffere
 
 	begin := batch.Begin()
 	log("begin batch",
-		klog.String("prefix", prefix),
-		klog.String("name", begin.Name()),
-		klog.String("group", string(begin.GroupID())),
-		klog.GroupedFields("tag", TagPairs(begin.Tags())),
-		klog.Time("time", begin.Time()),
+		String("prefix", prefix),
+		String("name", begin.Name()),
+		String("group", string(begin.GroupID())),
+		GroupedFields("tag", TagPairs(begin.Tags())),
+		Time("time", begin.Time()),
 	)
 
 	for _, p := range batch.Points() {
 		log("batch point",
-			klog.String("prefix", prefix),
-			klog.String("name", begin.Name()),
-			klog.String("group", string(begin.GroupID())),
-			klog.GroupedFields("tag", TagPairs(p.Tags())),
-			klog.GroupedFields("field", FieldPairs(p.Fields())),
-			klog.Time("time", p.Time()),
+			String("prefix", prefix),
+			String("name", begin.Name()),
+			String("group", string(begin.GroupID())),
+			GroupedFields("tag", TagPairs(p.Tags())),
+			GroupedFields("field", FieldPairs(p.Fields())),
+			Time("time", p.Time()),
 		)
 	}
 
 	log("end batch",
-		klog.String("prefix", prefix),
-		klog.String("name", begin.Name()),
-		klog.String("group", string(begin.GroupID())),
-		klog.GroupedFields("tag", TagPairs(begin.Tags())),
-		klog.Time("time", begin.Time()),
+		String("prefix", prefix),
+		String("name", begin.Name()),
+		String("group", string(begin.GroupID())),
+		GroupedFields("tag", TagPairs(begin.Tags())),
+		Time("time", begin.Time()),
 	)
 }
 
 func (h *KapacitorHandler) UDFLog(s string) {
-	h.l.Info("UDF log", klog.String("text", s))
+	h.l.Info("UDF log", String("text", s))
 }
 
 // Alerta handler
 
 type AlertaHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *AlertaHandler) WithContext(ctx ...keyvalue.T) alerta.Diagnostic {
@@ -331,16 +331,16 @@ func (h *AlertaHandler) WithContext(ctx ...keyvalue.T) alerta.Diagnostic {
 }
 
 func (h *AlertaHandler) TemplateError(err error, kv keyvalue.T) {
-	h.l.Error("failed to evaluate Alerta template", klog.Error(err), klog.String(kv.Key, kv.Value))
+	h.l.Error("failed to evaluate Alerta template", Error(err), String(kv.Key, kv.Value))
 }
 
 func (h *AlertaHandler) Error(msg string, err error) {
-	h.l.Error(msg, klog.Error(err))
+	h.l.Error(msg, Error(err))
 }
 
 // HipChat handler
 type HipChatHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *HipChatHandler) WithContext(ctx ...keyvalue.T) hipchat.Diagnostic {
@@ -352,18 +352,18 @@ func (h *HipChatHandler) WithContext(ctx ...keyvalue.T) hipchat.Diagnostic {
 }
 
 func (h *HipChatHandler) Error(msg string, err error) {
-	h.l.Error(msg, klog.Error(err))
+	h.l.Error(msg, Error(err))
 }
 
 // HTTPD handler
 
 type HTTPDHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *HTTPDHandler) NewHTTPServerErrorLogger() *log.Logger {
 	s := &StaticLevelHandler{
-		l:     h.l.With(klog.String("service", "httpd_server_errors")),
+		l:     h.l.With(String("service", "httpd_server_errors")),
 		level: llError,
 	}
 
@@ -383,15 +383,15 @@ func (h *HTTPDHandler) ShutdownTimeout() {
 }
 
 func (h *HTTPDHandler) AuthenticationEnabled(enabled bool) {
-	h.l.Info("authentication", klog.Bool("enabled", enabled))
+	h.l.Info("authentication", Bool("enabled", enabled))
 }
 
 func (h *HTTPDHandler) ListeningOn(addr string, proto string) {
-	h.l.Info("listening on", klog.String("addr", addr), klog.String("protocol", proto))
+	h.l.Info("listening on", String("addr", addr), String("protocol", proto))
 }
 
 func (h *HTTPDHandler) WriteBodyReceived(body string) {
-	h.l.Debug("write body received by handler: %s", klog.String("body", body))
+	h.l.Debug("write body received by handler: %s", String("body", body))
 }
 
 func (h *HTTPDHandler) HTTP(
@@ -408,17 +408,17 @@ func (h *HTTPDHandler) HTTP(
 	duration time.Duration,
 ) {
 	h.l.Info("http request",
-		klog.String("host", host),
-		klog.String("username", username),
-		klog.Time("start", start),
-		klog.String("method", method),
-		klog.String("uri", uri),
-		klog.String("protocol", proto),
-		klog.Int("status", status),
-		klog.String("referer", referer),
-		klog.String("user-agent", userAgent),
-		klog.String("request-id", reqID),
-		klog.Duration("duration", duration),
+		String("host", host),
+		String("username", username),
+		Time("start", start),
+		String("method", method),
+		String("uri", uri),
+		String("protocol", proto),
+		Int("status", status),
+		String("referer", referer),
+		String("user-agent", userAgent),
+		String("request-id", reqID),
+		Duration("duration", duration),
 	)
 }
 
@@ -439,37 +439,37 @@ func (h *HTTPDHandler) RecoveryError(
 ) {
 	h.l.Error(
 		msg,
-		klog.String("err", err),
-		klog.String("host", host),
-		klog.String("username", username),
-		klog.Time("start", start),
-		klog.String("method", method),
-		klog.String("uri", uri),
-		klog.String("protocol", proto),
-		klog.Int("status", status),
-		klog.String("referer", referer),
-		klog.String("user-agent", userAgent),
-		klog.String("request-id", reqID),
-		klog.Duration("duration", duration),
+		String("err", err),
+		String("host", host),
+		String("username", username),
+		Time("start", start),
+		String("method", method),
+		String("uri", uri),
+		String("protocol", proto),
+		Int("status", status),
+		String("referer", referer),
+		String("user-agent", userAgent),
+		String("request-id", reqID),
+		Duration("duration", duration),
 	)
 }
 
 func (h *HTTPDHandler) Error(msg string, err error) {
-	h.l.Error(msg, klog.Error(err))
+	h.l.Error(msg, Error(err))
 }
 
 // Reporting handler
 type ReportingHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *ReportingHandler) Error(msg string, err error) {
-	h.l.Error(msg, klog.Error(err))
+	h.l.Error(msg, Error(err))
 }
 
 // PagerDuty handler
 type PagerDutyHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *PagerDutyHandler) WithContext(ctx ...keyvalue.T) pagerduty.Diagnostic {
@@ -481,13 +481,13 @@ func (h *PagerDutyHandler) WithContext(ctx ...keyvalue.T) pagerduty.Diagnostic {
 }
 
 func (h *PagerDutyHandler) Error(msg string, err error) {
-	h.l.Error(msg, klog.Error(err))
+	h.l.Error(msg, Error(err))
 }
 
 // Slack Handler
 
 type SlackHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *SlackHandler) InsecureSkipVerify() {
@@ -495,7 +495,7 @@ func (h *SlackHandler) InsecureSkipVerify() {
 }
 
 func (h *SlackHandler) Error(msg string, err error) {
-	h.l.Error(msg, klog.Error(err))
+	h.l.Error(msg, Error(err))
 }
 
 func (h *SlackHandler) WithContext(ctx ...keyvalue.T) slack.Diagnostic {
@@ -509,29 +509,29 @@ func (h *SlackHandler) WithContext(ctx ...keyvalue.T) slack.Diagnostic {
 // Storage Handler
 
 type StorageHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *StorageHandler) Error(msg string, err error) {
-	h.l.Error(msg, klog.Error(err))
+	h.l.Error(msg, Error(err))
 }
 
 // TaskStore Handler
 
 type TaskStoreHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *TaskStoreHandler) StartingTask(taskID string) {
-	h.l.Debug("starting enabled task on startup", klog.String("task", taskID))
+	h.l.Debug("starting enabled task on startup", String("task", taskID))
 }
 
 func (h *TaskStoreHandler) StartedTask(taskID string) {
-	h.l.Debug("started task during startup", klog.String("task", taskID))
+	h.l.Debug("started task during startup", String("task", taskID))
 }
 
 func (h *TaskStoreHandler) FinishedTask(taskID string) {
-	h.l.Debug("task finished", klog.String("task", taskID))
+	h.l.Debug("task finished", String("task", taskID))
 }
 
 func (h *TaskStoreHandler) Debug(msg string) {
@@ -539,25 +539,25 @@ func (h *TaskStoreHandler) Debug(msg string) {
 }
 
 func (h *TaskStoreHandler) Error(msg string, err error, ctx ...keyvalue.T) {
-	Error(h.l, msg, err, ctx)
+	Err(h.l, msg, err, ctx)
 }
 
 func (h *TaskStoreHandler) AlreadyMigrated(entity, id string) {
-	h.l.Debug("entity has already been migrated skipping", klog.String(entity, id))
+	h.l.Debug("entity has already been migrated skipping", String(entity, id))
 }
 
 func (h *TaskStoreHandler) Migrated(entity, id string) {
-	h.l.Debug("entity was migrated to new storage service", klog.String(entity, id))
+	h.l.Debug("entity was migrated to new storage service", String(entity, id))
 }
 
 // VictorOps Handler
 
 type VictorOpsHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *VictorOpsHandler) Error(msg string, err error) {
-	h.l.Error(msg, klog.Error(err))
+	h.l.Error(msg, Error(err))
 }
 
 func (h *VictorOpsHandler) WithContext(ctx ...keyvalue.T) victorops.Diagnostic {
@@ -569,11 +569,11 @@ func (h *VictorOpsHandler) WithContext(ctx ...keyvalue.T) victorops.Diagnostic {
 }
 
 type SMTPHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *SMTPHandler) Error(msg string, err error) {
-	h.l.Error(msg, klog.Error(err))
+	h.l.Error(msg, Error(err))
 }
 
 func (h *SMTPHandler) WithContext(ctx ...keyvalue.T) smtp.Diagnostic {
@@ -585,11 +585,11 @@ func (h *SMTPHandler) WithContext(ctx ...keyvalue.T) smtp.Diagnostic {
 }
 
 type OpsGenieHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *OpsGenieHandler) Error(msg string, err error) {
-	h.l.Error(msg, klog.Error(err))
+	h.l.Error(msg, Error(err))
 }
 
 func (h *OpsGenieHandler) WithContext(ctx ...keyvalue.T) opsgenie.Diagnostic {
@@ -603,11 +603,11 @@ func (h *OpsGenieHandler) WithContext(ctx ...keyvalue.T) opsgenie.Diagnostic {
 // UDF service handler
 
 type UDFServiceHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *UDFServiceHandler) LoadedUDFInfo(udf string) {
-	h.l.Debug("loaded UDF info", klog.String("udf", udf))
+	h.l.Debug("loaded UDF info", String("udf", udf))
 }
 
 func (h *UDFServiceHandler) WithUDFContext() udf.Diagnostic {
@@ -617,21 +617,21 @@ func (h *UDFServiceHandler) WithUDFContext() udf.Diagnostic {
 }
 
 func (h *UDFServiceHandler) Error(msg string, err error, ctx ...keyvalue.T) {
-	Error(h.l, msg, err, ctx)
+	Err(h.l, msg, err, ctx)
 }
 
 func (h *UDFServiceHandler) UDFLog(msg string) {
-	h.l.Info("UDF log", klog.String("text", msg))
+	h.l.Info("UDF log", String("text", msg))
 }
 
 // Pushover handler
 
 type PushoverHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *PushoverHandler) Error(msg string, err error) {
-	h.l.Error(msg, klog.Error(err))
+	h.l.Error(msg, Error(err))
 }
 
 func (h *PushoverHandler) WithContext(ctx ...keyvalue.T) pushover.Diagnostic {
@@ -645,14 +645,14 @@ func (h *PushoverHandler) WithContext(ctx ...keyvalue.T) pushover.Diagnostic {
 // Template handler
 
 type HTTPPostHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *HTTPPostHandler) Error(msg string, err error, ctx ...keyvalue.T) {
-	fields := make([]klog.Field, len(ctx)+1)
-	fields[0] = klog.Error(err)
+	fields := make([]Field, len(ctx)+1)
+	fields[0] = Error(err)
 	for i, kv := range ctx {
-		fields[i+1] = klog.String(kv.Key, kv.Value)
+		fields[i+1] = String(kv.Key, kv.Value)
 	}
 	h.l.Error(msg, fields...)
 }
@@ -668,11 +668,11 @@ func (h *HTTPPostHandler) WithContext(ctx ...keyvalue.T) httppost.Diagnostic {
 // Sensu handler
 
 type SensuHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *SensuHandler) Error(msg string, err error, ctx ...keyvalue.T) {
-	Error(h.l, msg, err, ctx)
+	Err(h.l, msg, err, ctx)
 }
 
 func (h *SensuHandler) WithContext(ctx ...keyvalue.T) sensu.Diagnostic {
@@ -686,11 +686,11 @@ func (h *SensuHandler) WithContext(ctx ...keyvalue.T) sensu.Diagnostic {
 // SNMPTrap handler
 
 type SNMPTrapHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *SNMPTrapHandler) Error(msg string, err error) {
-	h.l.Error(msg, klog.Error(err))
+	h.l.Error(msg, Error(err))
 }
 
 func (h *SNMPTrapHandler) WithContext(ctx ...keyvalue.T) snmptrap.Diagnostic {
@@ -704,11 +704,11 @@ func (h *SNMPTrapHandler) WithContext(ctx ...keyvalue.T) snmptrap.Diagnostic {
 // Telegram handler
 
 type TelegramHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *TelegramHandler) Error(msg string, err error) {
-	h.l.Error(msg, klog.Error(err))
+	h.l.Error(msg, Error(err))
 }
 
 func (h *TelegramHandler) WithContext(ctx ...keyvalue.T) telegram.Diagnostic {
@@ -722,20 +722,20 @@ func (h *TelegramHandler) WithContext(ctx ...keyvalue.T) telegram.Diagnostic {
 // MQTT handler
 
 type MQTTHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *MQTTHandler) Error(msg string, err error) {
-	h.l.Error(msg, klog.Error(err))
+	h.l.Error(msg, Error(err))
 }
 
 func (h *MQTTHandler) CreatingAlertHandler(c mqtt.HandlerConfig) {
 	qos, _ := c.QoS.MarshalText()
 	h.l.Debug("creating mqtt handler",
-		klog.String("broker_name", c.BrokerName),
-		klog.String("topic", c.Topic),
-		klog.Bool("retained", c.Retained),
-		klog.String("qos", string(qos)),
+		String("broker_name", c.BrokerName),
+		String("topic", c.Topic),
+		Bool("retained", c.Retained),
+		String("qos", string(qos)),
 	)
 }
 
@@ -754,11 +754,11 @@ func (h *MQTTHandler) WithContext(ctx ...keyvalue.T) mqtt.Diagnostic {
 // Talk handler
 
 type TalkHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *TalkHandler) Error(msg string, err error) {
-	h.l.Error(msg, klog.Error(err))
+	h.l.Error(msg, Error(err))
 }
 
 func (h *TalkHandler) WithContext(ctx ...keyvalue.T) talk.Diagnostic {
@@ -772,19 +772,19 @@ func (h *TalkHandler) WithContext(ctx ...keyvalue.T) talk.Diagnostic {
 // Config handler
 
 type ConfigOverrideHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *ConfigOverrideHandler) Error(msg string, err error) {
-	h.l.Error(msg, klog.Error(err))
+	h.l.Error(msg, Error(err))
 }
 
 type ServerHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *ServerHandler) Error(msg string, err error, ctx ...keyvalue.T) {
-	Error(h.l, msg, err, ctx)
+	Err(h.l, msg, err, ctx)
 }
 
 func (h *ServerHandler) Info(msg string, ctx ...keyvalue.T) {
@@ -795,21 +795,21 @@ func (h *ServerHandler) Info(msg string, ctx ...keyvalue.T) {
 
 	if len(ctx) == 1 {
 		el := ctx[0]
-		h.l.Info(msg, klog.String(el.Key, el.Value))
+		h.l.Info(msg, String(el.Key, el.Value))
 		return
 	}
 
 	if len(ctx) == 2 {
 		x := ctx[0]
 		y := ctx[1]
-		h.l.Info(msg, klog.String(x.Key, x.Value), klog.String(y.Key, y.Value))
+		h.l.Info(msg, String(x.Key, x.Value), String(y.Key, y.Value))
 		return
 	}
 
-	fields := make([]klog.Field, len(ctx))
+	fields := make([]Field, len(ctx))
 	for i := 0; i < len(fields); i++ {
 		kv := ctx[i]
-		fields[i] = klog.String(kv.Key, kv.Value)
+		fields[i] = String(kv.Key, kv.Value)
 	}
 
 	h.l.Info(msg, fields...)
@@ -823,32 +823,32 @@ func (h *ServerHandler) Debug(msg string, ctx ...keyvalue.T) {
 
 	if len(ctx) == 1 {
 		el := ctx[0]
-		h.l.Debug(msg, klog.String(el.Key, el.Value))
+		h.l.Debug(msg, String(el.Key, el.Value))
 		return
 	}
 
 	if len(ctx) == 2 {
 		x := ctx[0]
 		y := ctx[1]
-		h.l.Debug(msg, klog.String(x.Key, x.Value), klog.String(y.Key, y.Value))
+		h.l.Debug(msg, String(x.Key, x.Value), String(y.Key, y.Value))
 		return
 	}
 
-	fields := make([]klog.Field, len(ctx))
+	fields := make([]Field, len(ctx))
 	for i := 0; i < len(fields); i++ {
 		kv := ctx[i]
-		fields[i] = klog.String(kv.Key, kv.Value)
+		fields[i] = String(kv.Key, kv.Value)
 	}
 
 	h.l.Debug(msg, fields...)
 }
 
 type ReplayHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *ReplayHandler) Error(msg string, err error, ctx ...keyvalue.T) {
-	Error(h.l, msg, err, ctx)
+	Err(h.l, msg, err, ctx)
 }
 
 func (h *ReplayHandler) Debug(msg string, ctx ...keyvalue.T) {
@@ -859,21 +859,21 @@ func (h *ReplayHandler) Debug(msg string, ctx ...keyvalue.T) {
 
 	if len(ctx) == 1 {
 		el := ctx[0]
-		h.l.Debug(msg, klog.String(el.Key, el.Value))
+		h.l.Debug(msg, String(el.Key, el.Value))
 		return
 	}
 
 	if len(ctx) == 2 {
 		x := ctx[0]
 		y := ctx[1]
-		h.l.Debug(msg, klog.String(x.Key, x.Value), klog.String(y.Key, y.Value))
+		h.l.Debug(msg, String(x.Key, x.Value), String(y.Key, y.Value))
 		return
 	}
 
-	fields := make([]klog.Field, len(ctx))
+	fields := make([]Field, len(ctx))
 	for i := 0; i < len(fields); i++ {
 		kv := ctx[i]
-		fields[i] = klog.String(kv.Key, kv.Value)
+		fields[i] = String(kv.Key, kv.Value)
 	}
 
 	h.l.Debug(msg, fields...)
@@ -882,31 +882,31 @@ func (h *ReplayHandler) Debug(msg string, ctx ...keyvalue.T) {
 // K8s handler
 
 type K8sHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *K8sHandler) WithClusterContext(cluster string) k8s.Diagnostic {
 	return &K8sHandler{
-		l: h.l.With(klog.String("cluster_id", cluster)),
+		l: h.l.With(String("cluster_id", cluster)),
 	}
 }
 
 // Swarm handler
 
 type SwarmHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *SwarmHandler) WithClusterContext(cluster string) swarm.Diagnostic {
 	return &SwarmHandler{
-		l: h.l.With(klog.String("cluster_id", cluster)),
+		l: h.l.With(String("cluster_id", cluster)),
 	}
 }
 
 // Deadman handler
 
 type DeadmanHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *DeadmanHandler) ConfiguredGlobally() {
@@ -916,11 +916,11 @@ func (h *DeadmanHandler) ConfiguredGlobally() {
 // NoAuth handler
 
 type NoAuthHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *NoAuthHandler) FakedUserAuthentication(username string) {
-	h.l.Warn("using noauth auth backend. Faked Authentication for user", klog.String("user", username))
+	h.l.Warn("using noauth auth backend. Faked Authentication for user", String("user", username))
 }
 
 func (h *NoAuthHandler) FakedSubscriptionUserToken() {
@@ -930,25 +930,25 @@ func (h *NoAuthHandler) FakedSubscriptionUserToken() {
 // Stats handler
 
 type StatsHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *StatsHandler) Error(msg string, err error) {
-	h.l.Error(msg, klog.Error(err))
+	h.l.Error(msg, Error(err))
 }
 
 // UDP handler
 
 type UDPHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *UDPHandler) Error(msg string, err error, ctx ...keyvalue.T) {
-	Error(h.l, msg, err, ctx)
+	Err(h.l, msg, err, ctx)
 }
 
 func (h *UDPHandler) StartedListening(addr string) {
-	h.l.Info("started listening on UDP", klog.String("address", addr))
+	h.l.Info("started listening on UDP", String("address", addr))
 }
 
 func (h *UDPHandler) ClosedService() {
@@ -958,39 +958,39 @@ func (h *UDPHandler) ClosedService() {
 // InfluxDB handler
 
 type InfluxDBHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *InfluxDBHandler) Error(msg string, err error, ctx ...keyvalue.T) {
-	Error(h.l, msg, err, ctx)
+	Err(h.l, msg, err, ctx)
 }
 
 func (h *InfluxDBHandler) WithClusterContext(id string) influxdb.Diagnostic {
 	return &InfluxDBHandler{
-		l: h.l.With(klog.String("cluster", id)),
+		l: h.l.With(String("cluster", id)),
 	}
 }
 
 func (h *InfluxDBHandler) WithUDPContext(db string, rp string) udp.Diagnostic {
 	return &UDPHandler{
-		l: h.l.With(klog.String("listener_id", fmt.Sprintf("udp:%s.%s", db, rp))),
+		l: h.l.With(String("listener_id", fmt.Sprintf("udp:%s.%s", db, rp))),
 	}
 }
 
 func (h *InfluxDBHandler) InsecureSkipVerify(urls []string) {
-	h.l.Warn("using InsecureSkipVerify when connecting to InfluxDB; this is insecure", klog.Strings("urls", urls))
+	h.l.Warn("using InsecureSkipVerify when connecting to InfluxDB; this is insecure", Strings("urls", urls))
 }
 
 func (h *InfluxDBHandler) UnlinkingSubscriptions(cluster string) {
-	h.l.Debug("unlinking subscription for cluster", klog.String("cluster", cluster))
+	h.l.Debug("unlinking subscription for cluster", String("cluster", cluster))
 }
 
 func (h *InfluxDBHandler) LinkingSubscriptions(cluster string) {
-	h.l.Debug("linking subscription for cluster", klog.String("cluster", cluster))
+	h.l.Debug("linking subscription for cluster", String("cluster", cluster))
 }
 
 func (h *InfluxDBHandler) StartedUDPListener(db string, rp string) {
-	h.l.Info("started UDP listener", klog.String("dbrp", fmt.Sprintf("%s.%s", db, rp)))
+	h.l.Info("started UDP listener", String("dbrp", fmt.Sprintf("%s.%s", db, rp)))
 }
 
 // Scraper handler
@@ -998,7 +998,7 @@ func (h *InfluxDBHandler) StartedUDPListener(db string, rp string) {
 type ScraperHandler struct {
 	mu  sync.Mutex
 	buf *bytes.Buffer
-	l   *klog.Logger
+	l   Logger
 }
 
 func (h *ScraperHandler) Debug(ctx ...interface{}) {
@@ -1112,19 +1112,19 @@ func (h *ScraperHandler) Fatalf(s string, ctx ...interface{}) {
 }
 
 func (h *ScraperHandler) With(key string, value interface{}) plog.Logger {
-	var field klog.Field
+	var field Field
 
 	switch value.(type) {
 	case int:
-		field = klog.Int(key, value.(int))
+		field = Int(key, value.(int))
 	case float64:
-		field = klog.Float64(key, value.(float64))
+		field = Float64(key, value.(float64))
 	case string:
-		field = klog.String(key, value.(string))
+		field = String(key, value.(string))
 	case time.Duration:
-		field = klog.Duration(key, value.(time.Duration))
+		field = Duration(key, value.(time.Duration))
 	default:
-		field = klog.String(key, fmt.Sprintf("%v", value))
+		field = String(key, fmt.Sprintf("%v", value))
 	}
 
 	return &ScraperHandler{
@@ -1143,14 +1143,14 @@ func (h *ScraperHandler) SetLevel(string) error {
 // Edge Handler
 
 type EdgeHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *EdgeHandler) Collect(mtype edge.MessageType) {
-	h.l.Debug("collected message", klog.Stringer("message_type", mtype))
+	h.l.Debug("collected message", Stringer("message_type", mtype))
 }
 func (h *EdgeHandler) Emit(mtype edge.MessageType) {
-	h.l.Debug("emitted message", klog.Stringer("message_type", mtype))
+	h.l.Debug("emitted message", Stringer("message_type", mtype))
 }
 
 type logLevel int
@@ -1164,7 +1164,7 @@ const (
 )
 
 type StaticLevelHandler struct {
-	l     *klog.Logger
+	l     Logger
 	level logLevel
 }
 
@@ -1188,19 +1188,19 @@ func (h *StaticLevelHandler) Write(buf []byte) (int, error) {
 // Cmd handler
 
 type CmdHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *CmdHandler) Error(msg string, err error) {
-	h.l.Error(msg, klog.Error(err))
+	h.l.Error(msg, Error(err))
 }
 
 func (h *CmdHandler) KapacitorStarting(version, branch, commit string) {
-	h.l.Info("kapacitor starting", klog.String("version", version), klog.String("branch", branch), klog.String("commit", commit))
+	h.l.Info("kapacitor starting", String("version", version), String("branch", branch), String("commit", commit))
 }
 
 func (h *CmdHandler) GoVersion() {
-	h.l.Info("go version", klog.String("version", runtime.Version()))
+	h.l.Info("go version", String("version", runtime.Version()))
 }
 
 func (h *CmdHandler) Info(msg string) {
@@ -1210,11 +1210,11 @@ func (h *CmdHandler) Info(msg string) {
 // Load handler
 
 type LoadHandler struct {
-	l *klog.Logger
+	l Logger
 }
 
 func (h *LoadHandler) Error(msg string, err error) {
-	h.l.Error(msg, klog.Error(err))
+	h.l.Error(msg, Error(err))
 }
 
 func (h *LoadHandler) Debug(msg string) {
@@ -1222,5 +1222,29 @@ func (h *LoadHandler) Debug(msg string) {
 }
 
 func (h *LoadHandler) Loading(el string, file string) {
-	h.l.Debug("loading object from file", klog.String("object", el), klog.String("file", file))
+	h.l.Debug("loading object from file", String("object", el), String("file", file))
+}
+
+// Session handler
+
+type SessionHandler struct {
+	l Logger
+}
+
+func (h *SessionHandler) CreatedLogSession(id uuid.UUID, contentType string, tags []tag) {
+	ts := make([]string, len(tags))
+	for i, t := range tags {
+		ts[i] = t.key + "=" + t.value
+	}
+
+	h.l.Info("created log session", Stringer("id", id), String("content-type", contentType), Strings("tags", ts))
+}
+
+func (h *SessionHandler) DeletedLogSession(id uuid.UUID, contentType string, tags []tag) {
+	ts := make([]string, len(tags))
+	for i, t := range tags {
+		ts[i] = t.key + "=" + t.value
+	}
+
+	h.l.Info("deleted log session", Stringer("id", id), String("content-type", contentType), Strings("tags", ts))
 }
