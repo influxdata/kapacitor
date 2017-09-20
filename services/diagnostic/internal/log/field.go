@@ -394,7 +394,12 @@ func (s ErrorField) WriteTo(w *bufio.Writer) (n int64, err error) {
 		return
 	}
 
-	m, err = writeString(w, s.err.Error())
+	errStr := "nil"
+	if s.err != nil {
+		errStr = s.err.Error()
+	}
+
+	m, err = writeString(w, errStr)
 	n += int64(m)
 	if err != nil {
 		return
