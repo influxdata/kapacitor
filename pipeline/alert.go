@@ -507,6 +507,24 @@ func (a *AlertNode) Post(urls ...string) *AlertHTTPPostHandler {
 	return post
 }
 
+// tick:embedded:AlertNode.Post
+type AlertHTTPPostHandler struct {
+	*AlertNode
+
+	// The POST URL.
+	// tick:ignore
+	URL string
+
+	// Name of the endpoint to be used, as is defined in the configuration file
+	Endpoint string
+
+	// tick:ignore
+	Headers map[string]string `tick:"Header"`
+
+	// tick:ignore
+	CaptureResponseFlag bool `tick:"CaptureResponse"`
+}
+
 // Set a header key and value on the post request.
 // Setting the Authenticate header is not allowed from within TICKscript,
 // please use the configuration file to specify sensitive headers.
@@ -527,19 +545,12 @@ func (a *AlertHTTPPostHandler) Header(k, v string) *AlertHTTPPostHandler {
 	return a
 }
 
-// tick:embedded:AlertNode.Post
-type AlertHTTPPostHandler struct {
-	*AlertNode
-
-	// The POST URL.
-	// tick:ignore
-	URL string
-
-	// Name of the endpoint to be used, as is defined in the configuration file
-	Endpoint string
-
-	// tick:ignore
-	Headers map[string]string `tick:"Header"`
+// CaptureResponse indicates that the HTTP response should be read and logged if
+// the status code was not an 2xx code.
+// tick:property
+func (a *AlertHTTPPostHandler) CaptureResponse() *AlertHTTPPostHandler {
+	a.CaptureResponseFlag = true
+	return a
 }
 
 func (a *AlertHTTPPostHandler) validate() error {

@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
+	"strconv"
 	"sync"
 	"text/template"
 
@@ -17,7 +19,7 @@ import (
 
 type Diagnostic interface {
 	WithContext(ctx ...keyvalue.T) Diagnostic
-	Error(msg string, err error)
+	Error(msg string, err error, ctx ...keyvalue.T)
 }
 
 // Only one of name and url should be non-empty
@@ -228,9 +230,10 @@ func (s *Service) Test(options interface{}) error {
 }
 
 type HandlerConfig struct {
-	URL      string            `mapstructure:"url"`
-	Endpoint string            `mapstructure:"endpoint"`
-	Headers  map[string]string `mapstructure:"headers"`
+	URL             string            `mapstructure:"url"`
+	Endpoint        string            `mapstructure:"endpoint"`
+	Headers         map[string]string `mapstructure:"headers"`
+	CaptureResponse bool              `mapstructure:"capture-response"`
 }
 
 type handler struct {
@@ -239,6 +242,8 @@ type handler struct {
 
 	endpoint *Endpoint
 	headers  map[string]string
+
+	captureResponse bool
 
 	diag Diagnostic
 }
@@ -249,11 +254,12 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
 		e = NewEndpoint(c.URL, nil, BasicAuth{}, nil, nil)
 	}
 	return &handler{
-		s:        s,
-		bp:       bufpool.New(),
-		endpoint: e,
-		diag:     s.diag.WithContext(ctx...),
-		headers:  c.Headers,
+		s:               s,
+		bp:              bufpool.New(),
+		endpoint:        e,
+		diag:            s.diag.WithContext(ctx...),
+		headers:         c.Headers,
+		captureResponse: c.CaptureResponse,
 	}
 }
 
@@ -310,5 +316,21 @@ func (h *handler) Handle(event alert.Event) {
 		h.diag.Error("failed to POST alert data", err)
 		return
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
+
+	if resp.StatusCode/100 != 2 {
+		var err error
+		if h.captureResponse {
+			var body []byte
+			body, err = ioutil.ReadAll(resp.Body)
+			if err == nil {
+				// Use the body content as the error
+				err = errors.New(string(body))
+			}
+		} else {
+			err = errors.New("unknown error, use .captureResponse() to capture the HTTP response")
+		}
+		h.diag.Error("POST returned non 2xx status code", err, keyvalue.KV("code", strconv.Itoa(resp.StatusCode)))
+	}
+
 }

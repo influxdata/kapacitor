@@ -159,7 +159,6 @@ func (n *HTTPPostNode) doPost(row *models.Row) int {
 }
 
 func (n *HTTPPostNode) postRow(row *models.Row) (*http.Response, error) {
-
 	body := n.bp.Get()
 	defer n.bp.Put(body)
 
