@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Features
+
 - [#1413](https://github.com/influxdata/kapacitor/issues/1413): Add subscriptions modes to InfluxDB subscriptions.
 - [#1436](https://github.com/influxdata/kapacitor/issues/1436): Add linear fill support for QueryNode.
 - [#1345](https://github.com/influxdata/kapacitor/issues/1345): Add MQTT Alert Handler
@@ -12,6 +13,7 @@
 - [#1497](https://github.com/influxdata/kapacitor/pull/1497): Add support for Docker Swarm autoscaling services.
 - [#1485](https://github.com/influxdata/kapacitor/issues/1485): Add bools field types to UDFs.
 - [#1545](https://github.com/influxdata/kapacitor/pull/1545): Add support for timeout, tags and service template in the Alerta AlertNode
+- [#1568](https://github.com/influxdata/kapacitor/issues/1568): Add support for custom HTTP Post bodies via a template system.
 
 ### Bugfixes
 

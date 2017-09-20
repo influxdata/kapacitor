@@ -32,7 +32,7 @@ func newHTTPPostNode(et *ExecutingTask, n *pipeline.HTTPPostNode, d NodeDiagnost
 
 	// Should only ever be 0 or 1 from validation of n
 	if len(n.URLs) == 1 {
-		e := httppost.NewEndpoint(n.URLs[0], nil, httppost.BasicAuth{})
+		e := httppost.NewEndpoint(n.URLs[0], nil, httppost.BasicAuth{}, nil, nil)
 		hn.endpoint = e
 	}
 
@@ -109,23 +109,34 @@ func (g *httpPostGroup) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, er
 }
 
 func (n *HTTPPostNode) postRow(row *models.Row) {
-	result := new(models.Result)
-	result.Series = []*models.Row{row}
 
 	body := n.bp.Get()
 	defer n.bp.Put(body)
-	err := json.NewEncoder(body).Encode(result)
-	if err != nil {
-		n.diag.Error("failed to marshal row data json", err)
-		return
+
+	var contentType string
+	if n.endpoint.RowTemplate() != nil {
+		mr := newMappedRow(row)
+		n.endpoint.RowTemplate().Execute(body, mr)
+	} else {
+		result := new(models.Result)
+		result.Series = []*models.Row{row}
+		err := json.NewEncoder(body).Encode(result)
+		if err != nil {
+			n.diag.Error("failed to marshal row data json", err)
+			return
+		}
+		contentType = "application/json"
 	}
+
 	req, err := n.endpoint.NewHTTPRequest(body)
 	if err != nil {
 		n.diag.Error("failed to marshal row data json", err)
 		return
 	}
 
-	req.Header.Set("Content-Type", "application/json")
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
 	for k, v := range n.c.Headers {
 		req.Header.Set(k, v)
 	}
@@ -135,4 +146,25 @@ func (n *HTTPPostNode) postRow(row *models.Row) {
 		return
 	}
 	resp.Body.Close()
+}
+
+type mappedRow struct {
+	Name   string
+	Tags   map[string]string
+	Values []map[string]interface{}
+}
+
+func newMappedRow(row *models.Row) *mappedRow {
+	values := make([]map[string]interface{}, len(row.Values))
+	for i, v := range row.Values {
+		values[i] = make(map[string]interface{}, len(row.Columns))
+		for c, col := range row.Columns {
+			values[i][col] = v[c]
+		}
+	}
+	return &mappedRow{
+		Name:   row.Name,
+		Tags:   row.Tags,
+		Values: values,
+	}
 }

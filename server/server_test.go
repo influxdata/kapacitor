@@ -35,6 +35,7 @@ import (
 	"github.com/influxdata/kapacitor/services/alerta/alertatest"
 	"github.com/influxdata/kapacitor/services/hipchat/hipchattest"
 	"github.com/influxdata/kapacitor/services/httppost"
+	"github.com/influxdata/kapacitor/services/httppost/httpposttest"
 	"github.com/influxdata/kapacitor/services/k8s"
 	"github.com/influxdata/kapacitor/services/mqtt"
 	"github.com/influxdata/kapacitor/services/mqtt/mqtttest"
@@ -6015,7 +6016,11 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"headers": map[string]interface{}{
 								"testing": "works",
 							},
-							"basic-auth": false,
+							"basic-auth":          false,
+							"alert-template":      "",
+							"alert-template-file": "",
+							"row-template":        "",
+							"row-template-file":   "",
 						},
 						Redacted: []string{
 							"basic-auth",
@@ -6030,7 +6035,11 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"headers": map[string]interface{}{
 						"testing": "works",
 					},
-					"basic-auth": false,
+					"basic-auth":          false,
+					"alert-template":      "",
+					"alert-template-file": "",
+					"row-template":        "",
+					"row-template-file":   "",
 				},
 				Redacted: []string{
 					"basic-auth",
@@ -6060,7 +6069,11 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"headers": map[string]interface{}{
 									"testing": "more",
 								},
-								"basic-auth": true,
+								"basic-auth":          true,
+								"alert-template":      "",
+								"alert-template-file": "",
+								"row-template":        "",
+								"row-template-file":   "",
 							},
 							Redacted: []string{
 								"basic-auth",
@@ -6075,7 +6088,11 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"headers": map[string]interface{}{
 								"testing": "more",
 							},
-							"basic-auth": true,
+							"basic-auth":          true,
+							"alert-template":      "",
+							"alert-template-file": "",
+							"row-template":        "",
+							"row-template-file":   "",
 						},
 						Redacted: []string{
 							"basic-auth",
@@ -8317,41 +8334,6 @@ func TestServer_AlertHandlers(t *testing.T) {
 				return nil
 			},
 		},
-
-		{
-			handler: client.TopicHandler{
-				Kind:    "pushover",
-				Options: map[string]interface{}{},
-			},
-			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
-				ts := pushovertest.NewServer()
-				ctxt := context.WithValue(nil, "server", ts)
-
-				c.Pushover.Enabled = true
-				c.Pushover.URL = ts.URL
-				c.Pushover.Token = "api_key"
-				c.Pushover.UserKey = "user"
-				return ctxt, nil
-			},
-			result: func(ctxt context.Context) error {
-				ts := ctxt.Value("server").(*pushovertest.Server)
-				ts.Close()
-				got := ts.Requests()
-				exp := []pushovertest.Request{{
-					PostData: pushovertest.PostData{
-						Token:    "api_key",
-						UserKey:  "user",
-						Message:  "message",
-						Priority: 1,
-					},
-				}}
-				if !reflect.DeepEqual(exp, got) {
-					return fmt.Errorf("unexpected pushover request:\nexp\n%+v\ngot\n%+v\n", exp, got)
-				}
-				return nil
-			},
-		},
-
 		{
 			handler: client.TopicHandler{
 				Kind: "pagerduty",
@@ -8408,6 +8390,69 @@ func TestServer_AlertHandlers(t *testing.T) {
 				got := ts.Data()
 				if !reflect.DeepEqual(exp, got) {
 					return fmt.Errorf("unexpected post request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handler: client.TopicHandler{
+				Kind: "post",
+				Options: map[string]interface{}{
+					"endpoint": "test",
+				},
+			},
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
+				ts := httpposttest.NewAlertServer(nil, true)
+				ctxt := context.WithValue(nil, "server", ts)
+				c.HTTPPost = httppost.Configs{{
+					Endpoint:      "test",
+					URL:           ts.URL,
+					AlertTemplate: `{{.Message}}`,
+				}}
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*httpposttest.AlertServer)
+				exp := []httpposttest.AlertRequest{{
+					MatchingHeaders: true,
+					Raw:             []byte("message"),
+				}}
+				got := ts.Data()
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected httppost alert request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handler: client.TopicHandler{
+				Kind:    "pushover",
+				Options: map[string]interface{}{},
+			},
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
+				ts := pushovertest.NewServer()
+				ctxt := context.WithValue(nil, "server", ts)
+
+				c.Pushover.Enabled = true
+				c.Pushover.URL = ts.URL
+				c.Pushover.Token = "api_key"
+				c.Pushover.UserKey = "user"
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*pushovertest.Server)
+				ts.Close()
+				got := ts.Requests()
+				exp := []pushovertest.Request{{
+					PostData: pushovertest.PostData{
+						Token:    "api_key",
+						UserKey:  "user",
+						Message:  "message",
+						Priority: 1,
+					},
+				}}
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected pushover request:\nexp\n%+v\ngot\n%+v\n", exp, got)
 				}
 				return nil
 			},
