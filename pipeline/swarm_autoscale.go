@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -117,6 +118,26 @@ func newSwarmAutoscaleNode(e EdgeType) *SwarmAutoscaleNode {
 		Min:       1,
 	}
 	return k
+}
+
+// Tick converts the pipeline node into the TICKScript
+func (n *SwarmAutoscaleNode) Tick(buf *bytes.Buffer) {
+	buf.Write([]byte("|swarmAutoscale()"))
+
+	ChainString(buf, "cluster", n.Cluster)
+	ChainString(buf, "serviceName", n.ServiceName)
+	ChainString(buf, "serviceNameTag", n.ServiceNameTag)
+	ChainString(buf, "outputServiceNameTag", n.OutputServiceNameTag)
+	ChainString(buf, "currentField", n.CurrentField)
+	ChainInt(buf, "max", n.Max)
+	ChainInt(buf, "min", n.Min)
+	ChainLambda(buf, "replicas", n.Replicas)
+	ChainDuration(buf, "increaseCooldown", n.IncreaseCooldown)
+	ChainDuration(buf, "decreaseCooldown", n.DecreaseCooldown)
+
+	for _, child := range n.Children() {
+		child.Tick(buf)
+	}
 }
 
 func (n *SwarmAutoscaleNode) MarshalJSON() ([]byte, error) {
