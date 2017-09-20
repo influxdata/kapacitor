@@ -37,3 +37,43 @@ func DurationTick(dur time.Duration) string {
 func BoolTick(b bool) string {
 	return strings.ToUpper(fmt.Sprintf("%t", b))
 }
+
+// Chain converts the name/value into a chaining method
+func Chain(buf *bytes.Buffer, name string) {
+	buf.Write([]byte(fmt.Sprintf(".%s()", name)))
+}
+
+// ChainInt converts the name/value into a chaining method
+func ChainInt(buf *bytes.Buffer, name string, value int64) {
+	if value != 0 {
+		buf.Write([]byte(fmt.Sprintf(".%s(%d)", name, value)))
+	}
+}
+
+// ChainFloat converts the name/value into a chaining method
+func ChainFloat(buf *bytes.Buffer, name string, value float64) {
+	if value != 0 {
+		buf.Write([]byte(fmt.Sprintf(".%s(%f)", name, value)))
+	}
+}
+
+// ChainString converts the name/value into a chaining method
+func ChainString(buf *bytes.Buffer, name, value string) {
+	if value != "" {
+		buf.Write([]byte(fmt.Sprintf(".%s(%s)", name, SingleQuote(value))))
+	}
+}
+
+// ChainLambda converts the name/value into a chaining method
+func ChainLambda(buf *bytes.Buffer, name string, value *ast.LambdaNode) {
+	if value != nil {
+		buf.Write([]byte(fmt.Sprintf(".%s(%s)", name, LambdaTick(value))))
+	}
+}
+
+// ChainDuration converts the name/value into a chaining method
+func ChainDuration(buf *bytes.Buffer, name string, value time.Duration) {
+	if value != 0 {
+		buf.Write([]byte(fmt.Sprintf(".%s(%s)", name, DurationTick(value))))
+	}
+}
