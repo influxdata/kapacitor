@@ -40,6 +40,14 @@ func NewService(c Config, stdout, stderr io.Writer) *Service {
 	}
 }
 
+func BootstrapMainHandler() *CmdHandler {
+	s := NewService(NewConfig(), nil, os.Stderr)
+	// Should never error
+	_ = s.Open()
+
+	return s.NewCmdHandler()
+}
+
 func (s *Service) SetLogLevelFromName(lvl string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
