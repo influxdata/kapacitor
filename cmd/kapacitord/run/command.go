@@ -103,7 +103,9 @@ func (cmd *Command) Run(args ...string) error {
 
 	// Initialize Logging Services
 	cmd.diagService = diagnostic.NewService(config.Logging, cmd.Stdout, cmd.Stderr)
-	cmd.diagService.Open()
+	if err := cmd.diagService.Open(); err != nil {
+		return fmt.Errorf("failed to opend diagnostic service: %v", err)
+	}
 
 	// Initialize cmd diagnostic
 	cmd.Diag = cmd.diagService.NewCmdHandler()

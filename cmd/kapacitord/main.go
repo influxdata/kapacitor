@@ -13,6 +13,7 @@ import (
 
 	"github.com/influxdata/kapacitor/cmd/kapacitord/help"
 	"github.com/influxdata/kapacitor/cmd/kapacitord/run"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 )
 
 type Diagnostic run.Diagnostic
@@ -56,6 +57,7 @@ type Main struct {
 // NewMain return a new instance of Main.
 func NewMain() *Main {
 	return &Main{
+		Diag:   diagnostic.BootstrapMainHandler(),
 		Stdin:  os.Stdin,
 		Stdout: os.Stdout,
 		Stderr: os.Stderr,
@@ -77,7 +79,7 @@ func (m *Main) Run(args ...string) error {
 		cmd.Branch = branch
 
 		err := cmd.Run(args...)
-		// Use logger from cmd since it may have special config now.
+		// Use diagnostic from cmd since it may have special config now.
 		if cmd.Diag != nil {
 			m.Diag = cmd.Diag
 		}
