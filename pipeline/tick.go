@@ -38,6 +38,31 @@ func BoolTick(b bool) string {
 	return strings.ToUpper(fmt.Sprintf("%t", b))
 }
 
+func WithNode(buf *bytes.Buffer, name string, args ...interface{}) {
+	buf.WriteString(fmt.Sprintf("|%s(", name))
+	nodeArgs := make([]string, len(args))
+	for i, arg := range args {
+		switch a := arg.(type) {
+		case string:
+			nodeArgs[i] = SingleQuote(a)
+		case time.Duration:
+			nodeArgs[i] = DurationTick(a)
+		case bool:
+			nodeArgs[i] = BoolTick(a)
+		}
+	}
+
+	buf.WriteString(strings.Join(nodeArgs, ", "))
+	buf.WriteString(")")
+}
+
+// ChainIf adds chain method to buf if flag is true
+func ChainIf(buf *bytes.Buffer, name string, flag bool) {
+	if flag {
+		Chain(buf, name)
+	}
+}
+
 // Chain converts the name/value into a chaining method
 func Chain(buf *bytes.Buffer, name string) {
 	buf.Write([]byte(fmt.Sprintf(".%s()", name)))
