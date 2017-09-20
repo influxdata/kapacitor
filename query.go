@@ -171,6 +171,17 @@ func (q *Query) Clone() (*Query, error) {
 	return n, err
 }
 
+// Set the database on the query
+func (q *Query) DBRP(dbrp DBRP) {
+	for _, s := range q.stmt.Sources {
+		switch s := s.(type) {
+		case *influxql.Measurement:
+			s.Database = dbrp.Database
+			s.RetentionPolicy = dbrp.RetentionPolicy
+		}
+	}
+}
+
 // Set the dimensions on the query
 func (q *Query) Dimensions(dims []interface{}) error {
 	q.stmt.Dimensions = q.stmt.Dimensions[:0]
