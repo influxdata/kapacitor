@@ -173,6 +173,15 @@ func TestLoggerWithoutContext(t *testing.T) {
 			},
 		},
 		{
+			name: "nil error field",
+			exp:  fmt.Sprintf("ts=%s lvl=error msg=test err=nil\n", nowStr),
+			lvl:  "error",
+			msg:  "test",
+			fields: []log.Field{
+				log.Error(nil),
+			},
+		},
+		{
 			name: "complex error field",
 			exp:  fmt.Sprintf("ts=%s lvl=error msg=test err=\"this is \\\" a test/yeah\"\n", nowStr),
 			lvl:  "error",
