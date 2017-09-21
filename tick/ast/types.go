@@ -133,6 +133,7 @@ func ValueToLiteralNode(pos Position, v interface{}) (Node, error) {
 			position: p,
 			IsInt:    true,
 			Int64:    value,
+			Base:     10,
 		}, nil
 	case float64:
 		return &NumberNode{

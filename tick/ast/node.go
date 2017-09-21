@@ -224,6 +224,9 @@ func (n *DurationNode) Format(buf *bytes.Buffer, indent string, onNewLine bool) 
 		onNewLine = true
 	}
 	writeIndent(buf, indent, onNewLine)
+	if n.Literal == "" {
+		n.Literal = influxql.FormatDuration(n.Dur)
+	}
 	buf.WriteString(n.Literal)
 }
 func (n *DurationNode) SetComment(c *CommentNode) {
