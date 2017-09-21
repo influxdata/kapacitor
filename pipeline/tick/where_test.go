@@ -1,13 +1,14 @@
-package pipeline
+package tick_test
 
 import (
-	"bytes"
 	"testing"
 
+	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/pipeline/tick"
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
-func TestWhereNode_Tick(t *testing.T) {
+func TestWhere(t *testing.T) {
 	tests := []struct {
 		name  string
 		where *ast.LambdaNode
@@ -26,7 +27,8 @@ func TestWhereNode_Tick(t *testing.T) {
 					Operator: ast.TokenNotEqual,
 				},
 			},
-			want: `|where(lambda: "cpu" != 'cpu-total')`,
+			want: `
+    |where(lambda: "cpu" != 'cpu-total')`,
 		},
 		{
 			name: "where with regex",
@@ -41,11 +43,13 @@ func TestWhereNode_Tick(t *testing.T) {
 					Operator: ast.TokenRegexEqual,
 				},
 			},
-			want: `|where(lambda: "host" =~ /logger\d+/)`,
+			want: `
+    |where(lambda: "host" =~ /logger\d+/)`,
 		},
 		{
 			name: "where with compound logic",
-			want: `|where(lambda: "cpu" != 'cpu-total' AND "host" =~ /logger\d+/)`,
+			want: `
+    |where(lambda: lambda: "cpu" != 'cpu-total' AND lambda: "host" =~ /logger\d+/)`,
 			where: &ast.LambdaNode{
 				Expression: &ast.BinaryNode{
 					Operator: ast.TokenAnd,
@@ -78,13 +82,18 @@ func TestWhereNode_Tick(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			n := newWhereNode(StreamEdge, tt.where)
+			w := &pipeline.WhereNode{
+				Lambda: tt.where,
+			}
 
-			var buf bytes.Buffer
-			n.Tick(&buf)
-			got := buf.String()
+			ast := tick.AST{
+				Node: &NullNode{},
+			}
+
+			ast.Where(w)
+			got := ast.TICKScript()
 			if got != tt.want {
-				t.Errorf("%q. TestWhereNode_Tick() = %v, want %v", tt.name, got, tt.want)
+				t.Errorf("%q. TestWhere() = %v, want %v", tt.name, got, tt.want)
 			}
 		})
 	}
