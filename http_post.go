@@ -3,14 +3,18 @@ package kapacitor
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"strconv"
 	"sync"
 
 	"github.com/influxdata/kapacitor/bufpool"
 	"github.com/influxdata/kapacitor/edge"
+	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/services/httppost"
+	"github.com/pkg/errors"
 )
 
 type HTTPPostNode struct {
@@ -91,13 +95,35 @@ func (g *httpPostGroup) EndBatch(end edge.EndBatchMessage) (edge.Message, error)
 
 func (g *httpPostGroup) BufferedBatch(batch edge.BufferedBatchMessage) (edge.Message, error) {
 	row := batch.ToRow()
-	g.n.postRow(row)
+	code := g.n.doPost(row)
+	if g.n.c.CodeField != "" {
+		//Add code to all points
+		batch = batch.ShallowCopy()
+		points := make([]edge.BatchPointMessage, len(batch.Points()))
+		for i, bp := range batch.Points() {
+			fields := bp.Fields().Copy()
+			fields[g.n.c.CodeField] = int64(code)
+			points[i] = edge.NewBatchPointMessage(
+				fields,
+				bp.Tags(),
+				bp.Time(),
+			)
+		}
+		batch.SetPoints(points)
+	}
 	return batch, nil
 }
 
 func (g *httpPostGroup) Point(p edge.PointMessage) (edge.Message, error) {
 	row := p.ToRow()
-	g.n.postRow(row)
+	code := g.n.doPost(row)
+	if g.n.c.CodeField != "" {
+		//Add code to point
+		p = p.ShallowCopy()
+		fields := p.Fields().Copy()
+		fields[g.n.c.CodeField] = int64(code)
+		p.SetFields(fields)
+	}
 	return p, nil
 }
 
@@ -108,30 +134,54 @@ func (g *httpPostGroup) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, er
 	return d, nil
 }
 
-func (n *HTTPPostNode) postRow(row *models.Row) {
+func (n *HTTPPostNode) doPost(row *models.Row) int {
+	resp, err := n.postRow(row)
+	if err != nil {
+		n.diag.Error("failed to POST data", err)
+		return 0
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode/100 != 2 {
+		var err error
+		if n.c.CaptureResponseFlag {
+			var body []byte
+			body, err = ioutil.ReadAll(resp.Body)
+			if err == nil {
+				// Use the body content as the error
+				err = errors.New(string(body))
+			}
+		} else {
+			err = errors.New("unknown error, use .captureResponse() to capture the HTTP response")
+		}
+		n.diag.Error("POST returned non 2xx status code", err, keyvalue.KV("code", strconv.Itoa(resp.StatusCode)))
+	}
+	return resp.StatusCode
+}
 
+func (n *HTTPPostNode) postRow(row *models.Row) (*http.Response, error) {
 	body := n.bp.Get()
 	defer n.bp.Put(body)
 
 	var contentType string
 	if n.endpoint.RowTemplate() != nil {
 		mr := newMappedRow(row)
-		n.endpoint.RowTemplate().Execute(body, mr)
+		err := n.endpoint.RowTemplate().Execute(body, mr)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to execute template")
+		}
 	} else {
 		result := new(models.Result)
 		result.Series = []*models.Row{row}
 		err := json.NewEncoder(body).Encode(result)
 		if err != nil {
-			n.diag.Error("failed to marshal row data json", err)
-			return
+			return nil, errors.Wrap(err, "failed to marshal row data json")
 		}
 		contentType = "application/json"
 	}
 
 	req, err := n.endpoint.NewHTTPRequest(body)
 	if err != nil {
-		n.diag.Error("failed to marshal row data json", err)
-		return
+		return nil, errors.Wrap(err, "failed to marshal row data json")
 	}
 
 	if contentType != "" {
@@ -142,10 +192,9 @@ func (n *HTTPPostNode) postRow(row *models.Row) {
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		n.diag.Error("failed to POST row data", err)
-		return
+		return nil, err
 	}
-	resp.Body.Close()
+	return resp, nil
 }
 
 type mappedRow struct {

@@ -356,9 +356,10 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 
 	for _, p := range n.HTTPPostHandlers {
 		c := httppost.HandlerConfig{
-			URL:      p.URL,
-			Endpoint: p.Endpoint,
-			Headers:  p.Headers,
+			URL:             p.URL,
+			Endpoint:        p.Endpoint,
+			Headers:         p.Headers,
+			CaptureResponse: p.CaptureResponseFlag,
 		}
 		h := et.tm.HTTPPostService.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)

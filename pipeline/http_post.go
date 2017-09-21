@@ -35,8 +35,15 @@ type HTTPPostNode struct {
 	// tick:ignore
 	Endpoints []string `tick:"Endpoint"`
 
-	// Headers
+	// tick:ignore
 	Headers map[string]string `tick:"Header"`
+
+	// CodeField is the name of the field in which to place the HTTP status code.
+	// If the HTTP request fails at a layer below HTTP, (i.e. rejected TCP connection), then the status code is set to 0.
+	CodeField string
+
+	// tick:ignore
+	CaptureResponseFlag bool `tick:"CaptureResponse"`
 
 	// tick:ignore
 	URLs []string
@@ -102,5 +109,13 @@ func (p *HTTPPostNode) Header(k, v string) *HTTPPostNode {
 	}
 	p.Headers[k] = v
 
+	return p
+}
+
+// CaptureResponse indicates that the HTTP response should be read and logged if
+// the status code was not an 2xx code.
+// tick:property
+func (p *HTTPPostNode) CaptureResponse() *HTTPPostNode {
+	p.CaptureResponseFlag = true
 	return p
 }

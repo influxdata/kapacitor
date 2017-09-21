@@ -648,8 +648,13 @@ type HTTPPostHandler struct {
 	l *klog.Logger
 }
 
-func (h *HTTPPostHandler) Error(msg string, err error) {
-	h.l.Error(msg, klog.Error(err))
+func (h *HTTPPostHandler) Error(msg string, err error, ctx ...keyvalue.T) {
+	fields := make([]klog.Field, len(ctx)+1)
+	fields[0] = klog.Error(err)
+	for i, kv := range ctx {
+		fields[i+1] = klog.String(kv.Key, kv.Value)
+	}
+	h.l.Error(msg, fields...)
 }
 
 func (h *HTTPPostHandler) WithContext(ctx ...keyvalue.T) httppost.Diagnostic {
