@@ -1,8 +1,22 @@
 package tick
 
 import (
+	"bytes"
+
 	"github.com/influxdata/kapacitor/tick/ast"
 )
+
+// AST converts a pipeline into an AST
+type AST struct {
+	Node ast.Node
+}
+
+// TICKScript produces a TICKScript from the AST
+func (a *AST) TICKScript() string {
+	var buf bytes.Buffer
+	a.Node.Format(&buf, "", false)
+	return buf.String()
+}
 
 // PipeFunction produces an ast.FunctionNode within a Pipe Chain.  May return
 // the left node if all args evaluate to the zero value
@@ -87,9 +101,10 @@ func Function(name string, args ...interface{}) (ast.Node, error) {
 	astArgs := []ast.Node{}
 	for _, arg := range args {
 		// Skip zero values as they don't need to be rendered
-		if arg == ast.ZeroValue(ast.TypeOf(arg)) {
+		if IsZero(arg) {
 			continue
 		}
+
 		lit, err := Literal(arg)
 		if err != nil {
 			return nil, err
@@ -106,6 +121,14 @@ func Function(name string, args ...interface{}) (ast.Node, error) {
 		Func: name,
 		Args: astArgs,
 	}, nil
+}
+
+func IsZero(arg interface{}) bool {
+	typeOf := ast.TypeOf(arg)
+	if typeOf == ast.TList {
+		return len(arg.([]interface{})) == 0
+	}
+	return arg == ast.ZeroValue(typeOf)
 }
 
 // Literal produces an ast Literal (NumberNode, etc).

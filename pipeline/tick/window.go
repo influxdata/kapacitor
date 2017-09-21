@@ -1,23 +1,8 @@
 package tick
 
 import (
-	"bytes"
-
 	"github.com/influxdata/kapacitor/pipeline"
-	"github.com/influxdata/kapacitor/tick/ast"
 )
-
-// AST converts a pipeline into an AST
-type AST struct {
-	Node ast.Node
-}
-
-// TICKScript produces a TICKScript from the AST
-func (a *AST) TICKScript() string {
-	var buf bytes.Buffer
-	a.Node.Format(&buf, "", false)
-	return buf.String()
-}
 
 // Window converts the window pipeline node into the TICKScript AST
 func (a *AST) Window(w *pipeline.WindowNode) *AST {
