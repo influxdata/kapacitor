@@ -15,6 +15,7 @@
 - [#1545](https://github.com/influxdata/kapacitor/pull/1545): Add support for timeout, tags and service template in the Alerta AlertNode
 - [#1568](https://github.com/influxdata/kapacitor/issues/1568): Add support for custom HTTP Post bodies via a template system.
 - [#1569](https://github.com/influxdata/kapacitor/issues/1569): Add support for add the HTTP status code as a field when using httpPost
+- [#1535](https://github.com/influxdata/kapacitor/pull/1535): Add logfmt support and refactor logging.
 
 ### Bugfixes
 
