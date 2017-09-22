@@ -138,6 +138,7 @@ func (s *Service) Trap(trapOid string, dataList []Data) error {
 		return errors.Wrapf(err, "invalid trap Oid %q", trapOid)
 	}
 	varBinds := snmpgo.VarBinds{
+		snmpgo.NewVarBind(snmpgo.OidSysUpTime, snmpgo.NewTimeTicks(1000)),
 		snmpgo.NewVarBind(snmpgo.OidSnmpTrap, oid),
 	}
 
