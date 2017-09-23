@@ -1,7 +1,6 @@
 package kapacitor
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -10,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"context"
 	"github.com/influxdata/kapacitor/bufpool"
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/keyvalue"
@@ -26,6 +26,7 @@ type HTTPPostNode struct {
 	mu       sync.RWMutex
 	bp       *bufpool.Pool
 	timeout  time.Duration
+	hc       *http.Client
 }
 
 // Create a new  HTTPPostNode which submits received items via POST to an HTTP endpoint
@@ -164,7 +165,6 @@ func (n *HTTPPostNode) doPost(row *models.Row) int {
 
 func (n *HTTPPostNode) postRow(row *models.Row) (*http.Response, error) {
 	body := n.bp.Get()
-	defer n.bp.Put(body)
 
 	var contentType string
 	if n.endpoint.RowTemplate() != nil {

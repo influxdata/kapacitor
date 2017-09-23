@@ -2,7 +2,6 @@ package httppost
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,6 +13,7 @@ import (
 
 	"time"
 
+	"context"
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/bufpool"
 	"github.com/influxdata/kapacitor/keyvalue"
@@ -253,6 +253,8 @@ type handler struct {
 	diag Diagnostic
 
 	timeout time.Duration
+
+	hc *http.Client
 }
 
 func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
@@ -289,7 +291,6 @@ func (h *handler) Handle(event alert.Event) {
 
 	// Construct the body of the HTTP request
 	body := h.bp.Get()
-	defer h.bp.Put(body)
 	ad := event.AlertData()
 
 	var contentType string
