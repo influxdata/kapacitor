@@ -2,7 +2,6 @@ package tick_test
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 
 	"github.com/influxdata/kapacitor/pipeline"
@@ -90,7 +89,6 @@ stream
 			var buf bytes.Buffer
 			ast.Program.Format(&buf, "", false)
 			got := buf.String()
-			fmt.Println(got)
 			if got != tt.want {
 				t.Errorf("%q. TestUnion = %v, want %v", tt.name, got, tt.want)
 			}
