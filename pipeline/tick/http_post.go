@@ -10,9 +10,18 @@ type HTTPPost struct {
 	Function
 }
 
+// NewHTTPPost creates a HTTPPost function builder
+func NewHTTPPost(parents []ast.Node) *HTTPPost {
+	return &HTTPPost{
+		Function{
+			Parents: parents,
+		},
+	}
+}
+
 // Build creates a HTTPPost ast.Node
 func (n *HTTPPost) Build(h *pipeline.HTTPPostNode) (ast.Node, error) {
-	n.Pipe("httpPost", h.URLs...)
+	n.Pipe("httpPost", args(h.URLs))
 	for _, e := range h.Endpoints {
 		n.Dot("endpoint", e)
 	}

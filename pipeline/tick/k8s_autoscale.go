@@ -10,6 +10,15 @@ type K8sAutoscale struct {
 	Function
 }
 
+// NewK8sAutoscale creates a K8sAutoscale function builder
+func NewK8sAutoscale(parents []ast.Node) *K8sAutoscale {
+	return &K8sAutoscale{
+		Function{
+			Parents: parents,
+		},
+	}
+}
+
 // Build creates a K8sAutoscale ast.Node
 func (n *K8sAutoscale) Build(k *pipeline.K8sAutoscaleNode) (ast.Node, error) {
 	n.Pipe("k8sAutoscale").

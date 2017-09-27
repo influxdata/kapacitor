@@ -10,6 +10,15 @@ type Derivative struct {
 	Function
 }
 
+// NewDerivative creates a Derivative function builder
+func NewDerivative(parents []ast.Node) *Derivative {
+	return &Derivative{
+		Function{
+			Parents: parents,
+		},
+	}
+}
+
 // Build creates a Derivative ast.Node
 func (n *Derivative) Build(d *pipeline.DerivativeNode) (ast.Node, error) {
 	n.Pipe("derivative", d.Field).

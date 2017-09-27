@@ -1,8 +1,7 @@
 package tick
 
 import (
-	"bytes"
-	"log"
+	"fmt"
 
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick/ast"
@@ -73,74 +72,68 @@ func (a *AST) Link(node pipeline.Node, function ast.Node) {
 func (a *AST) Create(n pipeline.Node, parents []ast.Node) (ast.Node, error) {
 	switch node := n.(type) {
 	case *pipeline.UnionNode:
-		return Union{Parents: parents}.Build(node)
+		return NewUnion(parents).Build(node)
 	case *pipeline.JoinNode:
-		return Join{Parents: parents}.Build(node)
+		return NewJoin(parents).Build(node)
 	case *pipeline.AlertNode:
-		return Alert{Parents: parents}.Build(node)
+		return NewAlert(parents).Build(node)
 	case *pipeline.CombineNode:
-		return Combine{Parents: parents}.Build(node)
+		return NewCombine(parents).Build(node)
 	case *pipeline.DefaultNode:
-		return Default{Parents: parents}.Build(node)
+		return NewDefault(parents).Build(node)
 	case *pipeline.DeleteNode:
-		return Delete{Parents: parents}.Build(node)
+		return NewDelete(parents).Build(node)
 	case *pipeline.DerivativeNode:
-		return Derivative{Parents: parents}.Build(node)
+		return NewDerivative(parents).Build(node)
 	case *pipeline.EvalNode:
-		return Eval{Parents: parents}.Build(node)
+		return NewEval(parents).Build(node)
 	case *pipeline.FlattenNode:
-		return Flatten{Parents: parents}.Build(node)
-	case *pipeline.FlattenNode:
-		return Flatten{Parents: parents}.Build(node)
+		return NewFlatten(parents).Build(node)
 	case *pipeline.FromNode:
-		return From{Parents: parents}.Build(node)
+		return NewFrom(parents).Build(node)
 	case *pipeline.GroupByNode:
-		return GroupBy{Parents: parents}.Build(node)
+		return NewGroupBy(parents).Build(node)
 	case *pipeline.HTTPOutNode:
-		return HTTPOut{Parents: parents}.Build(node)
+		return NewHTTPOut(parents).Build(node)
 	case *pipeline.HTTPPostNode:
-		return HTTPPost{Parents: parents}.Build(node)
+		return NewHTTPPost(parents).Build(node)
 	case *pipeline.InfluxDBOutNode:
-		return InfluxDBOut{Parents: parents}.Build(node)
+		return NewInfluxDBOut(parents).Build(node)
 	case *pipeline.InfluxQLNode:
-		return InfluxQL{Parents: parents}.Build(node)
+		return NewInfluxQL(parents).Build(node)
 	case *pipeline.K8sAutoscaleNode:
-		return K8sAutoscale{Parents: parents}.Build(node)
+		return NewK8sAutoscale(parents).Build(node)
 	case *pipeline.LogNode:
-		return Log{Parents: parents}.Build(node)
+		return NewLog(parents).Build(node)
 	case *pipeline.QueryNode:
-		return Query{Parents: parents}.Build(node)
+		return NewQuery(parents).Build(node)
 	case *pipeline.SampleNode:
-		return Sample{Parents: parents}.Build(node)
+		return NewSample(parents).Build(node)
 	case *pipeline.ShiftNode:
-		return Shift{Parents: parents}.Build(node)
+		return NewShift(parents).Build(node)
 	case *pipeline.StateCountNode:
-		return StateCount{Parents: parents}.Build(node)
+		return NewStateCount(parents).Build(node)
 	case *pipeline.StateDurationNode:
-		return StateDuration{Parents: parents}.Build(node)
+		return NewStateDuration(parents).Build(node)
 	case *pipeline.SwarmAutoscaleNode:
-		return SwarmAutoscale{Parents: parents}.Build(node)
+		return NewSwarmAutoscale(parents).Build(node)
 	case *pipeline.UDFNode:
-		return UDF{Parents: parents}.Build(node)
-	case *pipeline.Where:
-		return Where{Parents: parents}.Build(node)
-	case *pipeline.Window:
-		return Window{Parents: parents}.Build(node)
+		return NewUDF(parents).Build(node)
+	case *pipeline.WhereNode:
+		return NewWhere(parents).Build(node)
+	case *pipeline.WindowNode:
+		return NewWindow(parents).Build(node)
 	case *pipeline.StreamNode:
-		return Stream{}.Build()
+		s := Stream{}
+		return s.Build()
 	case *pipeline.BatchNode:
-		return Batch{}.Build()
+		b := Batch{}
+		return b.Build()
 	case *pipeline.StatsNode:
-		return Stats{Parents: parents}.Build(node)
+		return NewStats(parents).Build(node)
+	default:
+		return nil, fmt.Errorf("Unknown pipeline node %T", node)
 	}
-}
-
-// TICKScript produces a TICKScript from the AST
-func (a *AST) TICKScript() string {
-	var buf bytes.Buffer
-	log.Printf("%#+v", a.prev)
-	a.prev.Format(&buf, "", false)
-	return buf.String()
 }
 
 func (a *AST) parentsOf(n pipeline.Node) []ast.Node {

@@ -13,6 +13,15 @@ type UDF struct {
 	Function
 }
 
+// NewUDF creates a UDF function builder
+func NewUDF(parents []ast.Node) *UDF {
+	return &UDF{
+		Function{
+			Parents: parents,
+		},
+	}
+}
+
 // Build creates a UDF ast.Node
 func (n *UDF) Build(u *pipeline.UDFNode) (ast.Node, error) {
 	n.At(u.UDFName)

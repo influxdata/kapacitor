@@ -10,6 +10,15 @@ type Window struct {
 	Function
 }
 
+// NewWindowcreates a Window function builder
+func NewWindow(parents []ast.Node) *Window {
+	return &Window{
+		Function{
+			Parents: parents,
+		},
+	}
+}
+
 // Build creates a window ast.Node
 func (n *Window) Build(w *pipeline.WindowNode) (ast.Node, error) {
 	n.Pipe("window").

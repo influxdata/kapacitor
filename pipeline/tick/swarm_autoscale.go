@@ -10,6 +10,15 @@ type SwarmAutoscale struct {
 	Function
 }
 
+// NewSwarmAutoscale creates a SwarmAutoscale function builder
+func NewSwarmAutoscale(parents []ast.Node) *SwarmAutoscale {
+	return &SwarmAutoscale{
+		Function{
+			Parents: parents,
+		},
+	}
+}
+
 // Build creates a SwarmAutoscale ast.Node
 func (n *SwarmAutoscale) Build(s *pipeline.SwarmAutoscaleNode) (ast.Node, error) {
 	n.Pipe("swarmAutoscale").
