@@ -54,6 +54,21 @@ func CreatePipeline(
 	return p, nil
 }
 
+func CreatePipelineSources(srcs ...Node) *Pipeline {
+	p := &Pipeline{}
+	for i := range srcs {
+		p.addSource(srcs[i])
+	}
+	return p
+}
+
+func Validate(p *Pipeline) error {
+	return p.Walk(
+		func(n Node) error {
+			return n.validate()
+		})
+}
+
 func createPipelineAndVars(
 	script string,
 	sourceEdge EdgeType,
@@ -62,9 +77,6 @@ func createPipelineAndVars(
 	predefinedVars map[string]tick.Var,
 	ignoreMissingVars bool,
 ) (*Pipeline, map[string]tick.Var, error) {
-	p := &Pipeline{
-		deadman: deadman,
-	}
 	var src Node
 	switch sourceEdge {
 	case StreamEdge:
@@ -76,7 +88,9 @@ func createPipelineAndVars(
 	default:
 		return nil, nil, fmt.Errorf("source edge type must be either Stream or Batch not %s", sourceEdge)
 	}
-	p.addSource(src)
+
+	p := CreatePipelineSources(src)
+	p.deadman = deadman
 
 	vars, err := tick.Evaluate(script, scope, predefinedVars, ignoreMissingVars)
 	if err != nil {
@@ -92,10 +106,7 @@ func createPipelineAndVars(
 			return nil, nil, fmt.Errorf("source edge type must be either Stream or Batch not %s", sourceEdge)
 		}
 	}
-	if err = p.Walk(
-		func(n Node) error {
-			return n.validate()
-		}); err != nil {
+	if err = Validate(p); err != nil {
 		return nil, nil, err
 	}
 	return p, vars, nil

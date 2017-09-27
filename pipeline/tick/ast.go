@@ -2,150 +2,172 @@ package tick
 
 import (
 	"bytes"
+	"log"
 
+	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
 // AST converts a pipeline into an AST
 type AST struct {
-	Node ast.Node
+	Program ast.ProgramNode
+	parents map[string]ast.Node
+	err     error
+}
+
+// Build constructs the AST Program node from the pipeline
+func (a *AST) Build(p *pipeline.Pipeline) {
+	// 1. If there is more than one child then node is a variable with name of node
+	// 2. If the child's first parent is not this node, then this should be a variable.
+	// 3. If there are no children, then, this node is added to the program
+	// 4. If there are more than one parent then you can assume the parents are variables
+	p.Walk(func(node pipeline.Node) error {
+		if a.err != nil {
+			return a.err
+		}
+
+		parents := a.parentsOf(node)
+		function, err := a.Create(node, parents)
+		if err != nil {
+			a.err = err
+			return err
+		}
+
+		// If the function has meaning, do not attach to tree
+		if function == nil {
+			return nil
+		}
+
+		a.Link(node, function)
+		return nil
+	})
+}
+
+// Link inspects the pipeline node to determine if it
+// should become a variable, or, be considered "complete."
+func (a *AST) Link(node pipeline.Node, function ast.Node) {
+	children := node.Children()
+	switch len(children) {
+	case 0:
+		// When there are no more children, this function is complete and
+		// is should be added to the program.
+		a.Program.Add(function)
+	case 1:
+		// If this node is not the left-most parent of its child, then we need
+		// it to be a variable by falling through to the default case.
+		parent := children[0].Parents()[0]
+		if parent.ID() == node.ID() {
+			a.parents[node.Name()] = function
+			return
+		}
+		fallthrough
+	default:
+		// If there is more than one child then we know
+		// this function will be used as a variable
+		// during a later node visit.
+		a.Variable(node.Name(), function)
+	}
+}
+
+// Create converts a pipeline Node to a function
+func (a *AST) Create(n pipeline.Node, parents []ast.Node) (ast.Node, error) {
+	switch node := n.(type) {
+	case *pipeline.UnionNode:
+		return Union{Parents: parents}.Build(node)
+	case *pipeline.JoinNode:
+		return Join{Parents: parents}.Build(node)
+	case *pipeline.AlertNode:
+		return Alert{Parents: parents}.Build(node)
+	case *pipeline.CombineNode:
+		return Combine{Parents: parents}.Build(node)
+	case *pipeline.DefaultNode:
+		return Default{Parents: parents}.Build(node)
+	case *pipeline.DeleteNode:
+		return Delete{Parents: parents}.Build(node)
+	case *pipeline.DerivativeNode:
+		return Derivative{Parents: parents}.Build(node)
+	case *pipeline.EvalNode:
+		return Eval{Parents: parents}.Build(node)
+	case *pipeline.FlattenNode:
+		return Flatten{Parents: parents}.Build(node)
+	case *pipeline.FlattenNode:
+		return Flatten{Parents: parents}.Build(node)
+	case *pipeline.FromNode:
+		return From{Parents: parents}.Build(node)
+	case *pipeline.GroupByNode:
+		return GroupBy{Parents: parents}.Build(node)
+	case *pipeline.HTTPOutNode:
+		return HTTPOut{Parents: parents}.Build(node)
+	case *pipeline.HTTPPostNode:
+		return HTTPPost{Parents: parents}.Build(node)
+	case *pipeline.InfluxDBOutNode:
+		return InfluxDBOut{Parents: parents}.Build(node)
+	case *pipeline.InfluxQLNode:
+		return InfluxQL{Parents: parents}.Build(node)
+	case *pipeline.K8sAutoscaleNode:
+		return K8sAutoscale{Parents: parents}.Build(node)
+	case *pipeline.LogNode:
+		return Log{Parents: parents}.Build(node)
+	case *pipeline.QueryNode:
+		return Query{Parents: parents}.Build(node)
+	case *pipeline.SampleNode:
+		return Sample{Parents: parents}.Build(node)
+	case *pipeline.ShiftNode:
+		return Shift{Parents: parents}.Build(node)
+	case *pipeline.StateCountNode:
+		return StateCount{Parents: parents}.Build(node)
+	case *pipeline.StateDurationNode:
+		return StateDuration{Parents: parents}.Build(node)
+	case *pipeline.SwarmAutoscaleNode:
+		return SwarmAutoscale{Parents: parents}.Build(node)
+	case *pipeline.UDFNode:
+		return UDF{Parents: parents}.Build(node)
+	case *pipeline.Where:
+		return Where{Parents: parents}.Build(node)
+	case *pipeline.Window:
+		return Window{Parents: parents}.Build(node)
+	case *pipeline.StreamNode:
+		return Stream{}.Build()
+	case *pipeline.BatchNode:
+		return Batch{}.Build()
+	case *pipeline.StatsNode:
+		return Stats{Parents: parents}.Build(node)
+	}
 }
 
 // TICKScript produces a TICKScript from the AST
 func (a *AST) TICKScript() string {
 	var buf bytes.Buffer
-	a.Node.Format(&buf, "", false)
+	log.Printf("%#+v", a.prev)
+	a.prev.Format(&buf, "", false)
 	return buf.String()
 }
 
-// PipeFunction produces an ast.FunctionNode within a Pipe Chain.  May return
-// the left node if all args evaluate to the zero value
-func PipeFunction(left ast.Node, name string, args ...interface{}) (ast.Node, error) {
-	fn, err := Function(name, args...)
-	if err != nil {
-		return nil, err
+func (a *AST) parentsOf(n pipeline.Node) []ast.Node {
+	p := make([]ast.Node, len(n.Parents()))
+	for i, parent := range n.Parents() {
+		p[i] = a.parents[parent.Name()]
 	}
-
-	// The function contains all zero values, so we don't need to add it to the output
-	if fn == nil {
-		return left, nil
-	}
-	return Pipe(left, fn), nil
+	return p
 }
 
-// DotFunction produces an ast.FunctionNode within a Dot Chain.  May return
-// a nil node if all args evaluate to the zero value
-func DotFunction(left ast.Node, name string, args ...interface{}) (ast.Node, error) {
-	fn, err := Function(name, args...)
-	if err != nil {
-		return nil, err
+// Variable produces an ast.DeclarationNode using ident as the
+// identifier name.
+func (a *AST) Variable(ident string, right ast.Node) *AST {
+	if a.err != nil {
+		return a
 	}
 
-	// The function contains all zero values, so we don't need to add it to the output
-	if fn == nil {
-		return left, nil
+	id := &ast.IdentifierNode{
+		Ident: ident,
 	}
-	return Dot(left, fn), nil
+
+	a.Program.Add(&ast.DeclarationNode{
+		Left:  id,
+		Right: right,
+	})
+
+	// Vars used to allow children to lookup parents.
+	a.parents[ident] = id
+	return a
 }
-
-// DotFunctionIf produces an ast.FunctionNode within a Dot Chain if use is true
-func DotFunctionIf(left ast.Node, name string, use bool) (ast.Node, error) {
-	if !use {
-		return left, nil
-	}
-
-	fn, err := Function(name)
-	if err != nil {
-		return nil, err
-	}
-
-	return Dot(left, fn), nil
-}
-
-// Pipe produces a Pipe ast.ChainNode
-func Pipe(left, right ast.Node) ast.Node {
-	return &ast.ChainNode{
-		Operator: ast.TokenPipe,
-		Left:     left,
-		Right:    right,
-	}
-}
-
-// At produces an At ast.ChainNode
-func At(left, right ast.Node) ast.Node {
-	return &ast.ChainNode{
-		Operator: ast.TokenAt,
-		Left:     left,
-		Right:    right,
-	}
-}
-
-// Dot produces a Defense of the ancients.ChainNode
-func Dot(left, right ast.Node) ast.Node {
-	return &ast.ChainNode{
-		Operator: ast.TokenDot,
-		Left:     left,
-		Right:    right,
-	}
-}
-
-// Function produces an ast.FunctionNode. Can return a nil Node
-// if all function arguments evaluate to the zero value.
-func Function(name string, args ...interface{}) (ast.Node, error) {
-	if len(args) == 0 {
-		return &ast.FunctionNode{
-			Func: name,
-		}, nil
-	}
-
-	astArgs := []ast.Node{}
-	for _, arg := range args {
-		// Skip zero values as they don't need to be rendered
-		if IsZero(arg) {
-			continue
-		}
-
-		lit, err := Literal(arg)
-		if err != nil {
-			return nil, err
-		}
-		astArgs = append(astArgs, lit)
-	}
-
-	// Because all args are zero-valued, the node isn't needed,
-	// so, return a nil to signify empty node.
-	if len(astArgs) == 0 {
-		return nil, nil
-	}
-	return &ast.FunctionNode{
-		Func: name,
-		Args: astArgs,
-	}, nil
-}
-
-func IsZero(arg interface{}) bool {
-	typeOf := ast.TypeOf(arg)
-	if typeOf == ast.TList {
-		return len(arg.([]interface{})) == 0
-	}
-	return arg == ast.ZeroValue(typeOf)
-}
-
-// Literal produces an ast Literal (NumberNode, etc).
-func Literal(lit interface{}) (ast.Node, error) {
-	return ast.ValueToLiteralNode(&NullPosition{}, lit)
-}
-
-var _ ast.Position = &NullPosition{}
-
-// NullPosition is a NOOP to satisfy the tick AST package
-type NullPosition struct{}
-
-// Position returns 0
-func (n *NullPosition) Position() int { return 0 }
-
-// Line returns 0
-func (n *NullPosition) Line() int { return 0 }
-
-// Char returns 0
-func (n *NullPosition) Char() int { return 0 }
