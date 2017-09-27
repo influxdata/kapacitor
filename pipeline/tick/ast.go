@@ -15,7 +15,8 @@ type AST struct {
 }
 
 // Build constructs the AST Program node from the pipeline
-func (a *AST) Build(p *pipeline.Pipeline) {
+func (a *AST) Build(p *pipeline.Pipeline) error {
+	a.parents = map[string]ast.Node{}
 	// 1. If there is more than one child then node is a variable with name of node
 	// 2. If the child's first parent is not this node, then this should be a variable.
 	// 3. If there are no children, then, this node is added to the program
@@ -40,6 +41,7 @@ func (a *AST) Build(p *pipeline.Pipeline) {
 		a.Link(node, function)
 		return nil
 	})
+	return a.err
 }
 
 // Link inspects the pipeline node to determine if it

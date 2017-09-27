@@ -1,15 +1,6 @@
 package tick_test
 
-import (
-	"fmt"
-	"testing"
-	"time"
-
-	"github.com/influxdata/kapacitor/pipeline"
-	"github.com/influxdata/kapacitor/pipeline/tick"
-	"github.com/influxdata/kapacitor/tick/ast"
-)
-
+/*
 func TestStreamFrom(t *testing.T) {
 	type args struct {
 		wheres             []*ast.LambdaNode
@@ -135,3 +126,4 @@ func TestStreamFrom(t *testing.T) {
 		})
 	}
 }
+*/
