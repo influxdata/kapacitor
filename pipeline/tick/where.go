@@ -1,11 +1,17 @@
 package tick
 
-import "github.com/influxdata/kapacitor/pipeline"
+import (
+	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/tick/ast"
+)
 
 // Where converts the where pipeline node into the TICKScript AST
-func (a *AST) Where(w *pipeline.WhereNode) *AST {
-	// TODO: Handle the err
-	where, _ := PipeFunction(a.Node, "where", w.Lambda)
-	a.Node = where
-	return a
+type Where struct {
+	Function
+}
+
+// Build creates a where ast.Node
+func (n *Where) Build(w *pipeline.WhereNode) (ast.Node, error) {
+	n.Pipe("where", w.Lambda)
+	return n.prev, n.err
 }

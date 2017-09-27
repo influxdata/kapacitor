@@ -122,3 +122,40 @@ func TestPipelineBatchTick(t *testing.T) {
 		t.Errorf("TestPipelineBatchTick() = got:\n%s\nwant:\n%s\n", got, want)
 	}
 }
+
+/*
+func TestCPG(t *testing.T) {
+	var script = `stream
+    		   |from()
+    		       .database('telegraf')
+    		       .retentionPolicy('autogen')
+    		       .measurement('cpu')
+    		       .groupByMeasurement()
+    		       .groupBy([*])
+    		       .where(lambda: "cpu" != 'cpu-total' AND "host" =~ /logger\d+/)`
+
+	want := "howdy"
+	scope := stateful.NewScope()
+	p, err := CreatePipeline(script, StreamEdge, scope, deadman{}, nil)
+	if err != nil {
+		t.Fatalf("Error creating pipeline %v", err)
+	}
+
+	var buf bytes.Buffer
+	visit := false
+	p.Walk(func(n Node) error {
+		if visit {
+			return nil
+		}
+		n.Tick(&buf)
+		visit = true
+		return nil
+	})
+
+	got := buf.String()
+
+	if got != want {
+		t.Errorf("TestCPG() = got:\n%s\nwant:\n%s\n", got, want)
+	}
+}
+*/
