@@ -10,6 +10,15 @@ type Alert struct {
 	Function
 }
 
+// NewAlert creates an Alert function builder
+func NewAlert(parents []ast.Node) *Alert {
+	return &Alert{
+		Function{
+			Parents: parents,
+		},
+	}
+}
+
 // Build creates a Alert ast.Node
 func (n *Alert) Build(a *pipeline.AlertNode) (ast.Node, error) {
 	n.Pipe("alert").
@@ -143,7 +152,7 @@ func (n *Alert) Build(a *pipeline.AlertNode) (ast.Node, error) {
 			Dot("recipients", args(h.RecipientsList))
 	}
 
-	for _, h := range a.TalkHandlers {
+	for _ = range a.TalkHandlers {
 		n.Dot("talk")
 	}
 
@@ -166,6 +175,14 @@ func (n *Alert) Build(a *pipeline.AlertNode) (ast.Node, error) {
 }
 
 func args(a []string) []interface{} {
+	r := make([]interface{}, len(a))
+	for i := range a {
+		r[i] = a[i]
+	}
+	return r
+}
+
+func largs(a []*ast.LambdaNode) []interface{} {
 	r := make([]interface{}, len(a))
 	for i := range a {
 		r[i] = a[i]

@@ -10,6 +10,15 @@ type InfluxDBOut struct {
 	Function
 }
 
+// NewInfluxDBOut creates a InfluxQL function builder
+func NewInfluxDBOut(parents []ast.Node) *InfluxDBOut {
+	return &InfluxDBOut{
+		Function{
+			Parents: parents,
+		},
+	}
+}
+
 // Build creates a InfluxDBOut ast.Node
 func (n *InfluxDBOut) Build(db *pipeline.InfluxDBOutNode) (ast.Node, error) {
 	n.Pipe("influxDBOut").

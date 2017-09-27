@@ -10,6 +10,15 @@ type Default struct {
 	Function
 }
 
+// NewDefault creates a Default function builder
+func NewDefault(parents []ast.Node) *Default {
+	return &Default{
+		Function{
+			Parents: parents,
+		},
+	}
+}
+
 // Build creates a Default ast.Node
 func (n *Default) Build(d *pipeline.DefaultNode) (ast.Node, error) {
 	n.Pipe("default")

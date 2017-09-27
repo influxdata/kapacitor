@@ -10,6 +10,15 @@ type Query struct {
 	Function
 }
 
+// NewQuery creates a Query function builder
+func NewQuery(parents []ast.Node) *Query {
+	return &Query{
+		Function{
+			Parents: parents,
+		},
+	}
+}
+
 // Build creates a Query ast.Node
 func (n *Query) Build(q *pipeline.QueryNode) (ast.Node, error) {
 	n.Pipe("query", q.QueryStr).
@@ -19,7 +28,7 @@ func (n *Query) Build(q *pipeline.QueryNode) (ast.Node, error) {
 		Dot("cron", q.Cron).
 		Dot("offset", q.Offset).
 		DotIf("alignGroup", q.AlignGroupFlag).
-		Dot("groupBy", q.Dimentions...).
+		Dot("groupBy", q.Dimensions).
 		DotIf("groupByMeasurement", q.GroupByMeasurementFlag).
 		Dot("fill", q.Fill).
 		Dot("cluster", q.Cluster)

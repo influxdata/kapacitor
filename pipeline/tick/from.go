@@ -10,6 +10,15 @@ type From struct {
 	Function
 }
 
+// NewFrom creates a Flatten function builder
+func NewFrom(parents []ast.Node) *From {
+	return &From{
+		Function{
+			Parents: parents,
+		},
+	}
+}
+
 // Build creates a from ast.Node
 func (n *From) Build(f *pipeline.FromNode) (ast.Node, error) {
 	n.Pipe("from").

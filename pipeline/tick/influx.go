@@ -10,6 +10,15 @@ type InfluxQL struct {
 	Function
 }
 
+// NewInfluxQL creates a InfluxQL function builder
+func NewInfluxQL(parents []ast.Node) *InfluxQL {
+	return &InfluxQL{
+		Function{
+			Parents: parents,
+		},
+	}
+}
+
 // Build creates a InfluxQL ast.Node
 func (n *InfluxQL) Build(q *pipeline.InfluxQLNode) (ast.Node, error) {
 	// TODO: ReduceCreater?

@@ -10,6 +10,15 @@ type Log struct {
 	Function
 }
 
+// NewLog creates a Log function builder
+func NewLog(parents []ast.Node) *Log {
+	return &Log{
+		Function{
+			Parents: parents,
+		},
+	}
+}
+
 // Build creates a Log ast.Node
 func (n *Log) Build(l *pipeline.LogNode) (ast.Node, error) {
 	n.Pipe("log").

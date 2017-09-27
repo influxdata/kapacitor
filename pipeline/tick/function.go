@@ -119,11 +119,11 @@ func (f *Function) DotIf(name string, use bool) *Function {
 	fn, err := Func(name)
 	if err != nil {
 		f.err = err
-		return a
+		return f
 	}
 
 	f.prev = Dot(f.prev, fn)
-	return a
+	return f
 }
 
 // Pipe produces a Pipe ast.ChainNode

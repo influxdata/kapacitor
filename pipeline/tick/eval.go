@@ -10,15 +10,24 @@ type Eval struct {
 	Function
 }
 
+// NewEval creates a Eval function builder
+func NewEval(parents []ast.Node) *Eval {
+	return &Eval{
+		Function{
+			Parents: parents,
+		},
+	}
+}
+
 // Build creates a Eval ast.Node
 func (n *Eval) Build(e *pipeline.EvalNode) (ast.Node, error) {
-	n.Pipe("eval", e.Lambdas...).
-		Dot("as", e.AsList...).
-		Dot("tags", e.TagList...).
+	n.Pipe("eval", largs(e.Lambdas)).
+		Dot("as", args(e.AsList)).
+		Dot("tags", args(e.TagsList)).
 		DotIf("quiet", e.QuietFlag)
 
 	if e.KeepFlag {
-		n.Dot("keep", e.KeepList...)
+		n.Dot("keep", args(e.KeepList))
 	}
 
 	return n.prev, n.err
