@@ -30,7 +30,7 @@ func (n *Query) Build(q *pipeline.QueryNode) (ast.Node, error) {
 		DotIf("alignGroup", q.AlignGroupFlag).
 		Dot("groupBy", q.Dimensions).
 		DotIf("groupByMeasurement", q.GroupByMeasurementFlag).
-		Dot("fill", q.Fill).
+		DotNotNil("fill", q.Fill).
 		Dot("cluster", q.Cluster)
 
 	return n.prev, n.err

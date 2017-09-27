@@ -126,6 +126,27 @@ func (f *Function) DotIf(name string, use bool) *Function {
 	return f
 }
 
+// DotNotNil produces an ast.FunctionNode within a Dot Chain if arg is not nil.
+// Assumes a previous node has been created.
+func (f *Function) DotNotNil(name string, arg interface{}) *Function {
+	if f.err != nil {
+		return f
+	}
+
+	if arg == nil {
+		return f
+	}
+
+	fn, err := Func(name, arg)
+	if err != nil {
+		f.err = err
+		return f
+	}
+
+	f.prev = Dot(f.prev, fn)
+	return f
+}
+
 // Pipe produces a Pipe ast.ChainNode
 func Pipe(left, right ast.Node) ast.Node {
 	return &ast.ChainNode{
@@ -222,6 +243,13 @@ func IsZero(arg interface{}) bool {
 
 // Literal produces an ast Literal (NumberNode, etc).
 func Literal(lit interface{}) (ast.Node, error) {
+	typeOf := ast.TypeOf(lit)
+	if typeOf == ast.InvalidType {
+		if node, ok := lit.(ast.Node); ok {
+			return node, nil
+		}
+		return nil, fmt.Errorf("unsupported literal type %T", lit)
+	}
 	return ast.ValueToLiteralNode(&NullPosition{}, lit)
 }
 

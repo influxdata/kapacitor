@@ -1,6 +1,7 @@
 package tick_test
 
 import (
+	"bytes"
 	"testing"
 	"time"
 
@@ -30,21 +31,36 @@ func TestWindow(t *testing.T) {
 				align:      true,
 				fillPeriod: true,
 			},
-			want: "\n    |window()\n        .period(1s)\n        .every(1h)\n        .align()\n        .fillPeriod()",
+			want: `stream
+    |from()
+    |window()
+        .period(1s)
+        .every(1h)
+        .align()
+        .fillPeriod()
+`,
 		},
 		{
 			name: "window with period count and every count",
 			args: args{
 				periodCount: 10,
 				everyCount:  15,
-				fillPeriod:  true,
+				fillPeriod:  false,
 			},
-			want: "\n    |window()\n        .periodCount(10)\n        .everyCount(15)\n        .fillPeriod()",
+			want: `stream
+    |from()
+    |window()
+        .periodCount(10)
+        .everyCount(15)
+`,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := &pipeline.WindowNode{}
+			stream := &pipeline.StreamNode{}
+			pipe := pipeline.CreatePipelineSources(stream)
+
+			w := stream.From().Window()
 			w.Period = tt.args.period
 			w.Every = tt.args.every
 			w.AlignFlag = tt.args.align
@@ -52,12 +68,15 @@ func TestWindow(t *testing.T) {
 			w.PeriodCount = tt.args.periodCount
 			w.EveryCount = tt.args.everyCount
 
-			ast := tick.AST{
-				Node: &NullNode{},
+			ast := tick.AST{}
+			err := ast.Build(pipe)
+			if err != nil {
+				t.Fatalf("TestWindow() ast.Build return unexpected error %v", err)
 			}
 
-			ast.Window(w)
-			got := ast.TICKScript()
+			var buf bytes.Buffer
+			ast.Program.Format(&buf, "", false)
+			got := buf.String()
 			if got != tt.want {
 				t.Errorf("%q. TestWindow() =\n%v\n want\n%v\n", tt.name, got, tt.want)
 			}

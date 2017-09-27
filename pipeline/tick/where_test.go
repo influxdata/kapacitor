@@ -1,6 +1,7 @@
 package tick_test
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/influxdata/kapacitor/pipeline"
@@ -27,8 +28,10 @@ func TestWhere(t *testing.T) {
 					Operator: ast.TokenNotEqual,
 				},
 			},
-			want: `
-    |where(lambda: "cpu" != 'cpu-total')`,
+			want: `batch
+    |query('select cpu_usage from cpu')
+    |where(lambda: "cpu" != 'cpu-total')
+`,
 		},
 		{
 			name: "where with regex",
@@ -43,13 +46,17 @@ func TestWhere(t *testing.T) {
 					Operator: ast.TokenRegexEqual,
 				},
 			},
-			want: `
-    |where(lambda: "host" =~ /logger\d+/)`,
+			want: `batch
+    |query('select cpu_usage from cpu')
+    |where(lambda: "host" =~ /logger\d+/)
+`,
 		},
 		{
 			name: "where with compound logic",
-			want: `
-    |where(lambda: lambda: "cpu" != 'cpu-total' AND lambda: "host" =~ /logger\d+/)`,
+			want: `batch
+    |query('select cpu_usage from cpu')
+    |where(lambda: lambda: "cpu" != 'cpu-total' AND lambda: "host" =~ /logger\d+/)
+`,
 			where: &ast.LambdaNode{
 				Expression: &ast.BinaryNode{
 					Operator: ast.TokenAnd,
@@ -82,16 +89,18 @@ func TestWhere(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := &pipeline.WhereNode{
-				Lambda: tt.where,
+			batch := &pipeline.BatchNode{}
+			pipe := pipeline.CreatePipelineSources(batch)
+			batch.Query("select cpu_usage from cpu").Where(tt.where)
+			ast := tick.AST{}
+			err := ast.Build(pipe)
+			if err != nil {
+				t.Fatalf("TestWhere() ast.Build return unexpected error %v", err)
 			}
 
-			ast := tick.AST{
-				Node: &NullNode{},
-			}
-
-			ast.Where(w)
-			got := ast.TICKScript()
+			var buf bytes.Buffer
+			ast.Program.Format(&buf, "", false)
+			got := buf.String()
 			if got != tt.want {
 				t.Errorf("%q. TestWhere() = %v, want %v", tt.name, got, tt.want)
 			}

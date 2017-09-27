@@ -21,7 +21,11 @@ func NewUnion(parents []ast.Node) *Union {
 
 // Build creates a union ast.Node
 func (n *Union) Build(u *pipeline.UnionNode) (ast.Node, error) {
-	n.Pipe("union", n.Parents[1:]).
+	unioned := []interface{}{}
+	for _, p := range n.Parents[1:] {
+		unioned = append(unioned, p)
+	}
+	n.Pipe("union", unioned...).
 		Dot("rename", u.Rename)
 	return n.prev, n.err
 }
