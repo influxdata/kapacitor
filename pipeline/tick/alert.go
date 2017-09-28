@@ -82,9 +82,13 @@ func (n *Alert) Build(a *pipeline.AlertNode) (ast.Node, error) {
 	}
 
 	for _, h := range a.LogHandlers {
-		// TODO: handle octal mode?
-		n.Dot("log", h.FilePath).
-			Dot("mode", h.Mode)
+		n.Dot("log", h.FilePath)
+		mode := ast.NumberNode{
+			IsInt: true,
+			Int64: h.Mode,
+			Base:  8,
+		}
+		n.Dot("mode", mode)
 	}
 
 	for _, h := range a.VictorOpsHandlers {
