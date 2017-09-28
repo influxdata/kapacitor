@@ -34,7 +34,7 @@ func (n *Default) Build(d *pipeline.DefaultNode) (ast.Node, error) {
 	}
 
 	var tagKeys []string
-	for k := range d.Fields {
+	for k := range d.Tags {
 		tagKeys = append(tagKeys, k)
 	}
 	for _, k := range tagKeys {
