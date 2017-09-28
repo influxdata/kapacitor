@@ -47,6 +47,9 @@ type InfluxQLNode struct {
 
 	// tick:ignore
 	PointTimes bool `tick:"UsePointTimes"`
+
+	// tick:ignore
+	Args []interface{}
 }
 
 func newInfluxQLNode(method, field string, wants, provides EdgeType, reducer ReduceCreater) *InfluxQLNode {
@@ -320,6 +323,7 @@ func (n *chainnode) Percentile(field string, percentile float64) *InfluxQLNode {
 		},
 		IsSimpleSelector: true,
 	})
+	i.Args = []interface{}{percentile}
 	n.linkChild(i)
 	return i
 }
@@ -356,6 +360,10 @@ func (n *chainnode) Top(num int64, field string, fieldsAndTags ...string) *Influ
 			FieldsAndTags: fieldsAndTags,
 		},
 	})
+	i.Args = []interface{}{num}
+	for _, ft := range fieldsAndTags {
+		i.Args = append(i.Args, ft)
+	}
 	n.linkChild(i)
 	return i
 }
@@ -387,6 +395,10 @@ func (n *chainnode) Bottom(num int64, field string, fieldsAndTags ...string) *In
 			FieldsAndTags: fieldsAndTags,
 		},
 	})
+	i.Args = []interface{}{num}
+	for _, ft := range fieldsAndTags {
+		i.Args = append(i.Args, ft)
+	}
 	n.linkChild(i)
 	return i
 }
@@ -432,6 +444,7 @@ func (n *chainnode) Elapsed(field string, unit time.Duration) *InfluxQLNode {
 		},
 		IsStreamTransformation: true,
 	})
+	i.Args = []interface{}{unit}
 	n.linkChild(i)
 	return i
 }
@@ -467,6 +480,7 @@ func (n *chainnode) MovingAverage(field string, window int64) *InfluxQLNode {
 		},
 		IsStreamTransformation: true,
 	})
+	i.Args = []interface{}{window}
 	n.linkChild(i)
 	return i
 }
@@ -495,6 +509,7 @@ func (n *chainnode) holtWinters(field string, h, m int64, interval time.Duration
 	})
 	// Always use point times for Holt Winters
 	i.PointTimes = true
+	i.Args = []interface{}{h, m, interval, includeFitData}
 	n.linkChild(i)
 	return i
 }
