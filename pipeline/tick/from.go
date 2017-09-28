@@ -27,8 +27,10 @@ func (n *From) Build(f *pipeline.FromNode) (ast.Node, error) {
 		Dot("measurement", f.Measurement).
 		DotIf("groupByMeasurement", f.GroupByMeasurementFlag).
 		Dot("round", f.Round).
-		Dot("groupBy", f.Dimensions).
 		Dot("truncate", f.Truncate).
 		Dot("where", f.Lambda)
+	if len(f.Dimensions) > 0 {
+		n.Dot("groupBy", f.Dimensions...)
+	}
 	return n.prev, n.err
 }
