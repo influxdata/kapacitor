@@ -22,7 +22,7 @@ func NewFlatten(parents []ast.Node) *Flatten {
 // Build creates a Flatten ast.Node
 func (n *Flatten) Build(f *pipeline.FlattenNode) (ast.Node, error) {
 	n.Pipe("flatten").
-		Dot("on", args(f.Dimensions)).
+		Dot("on", args(f.Dimensions)...).
 		Dot("delimiter", f.Delimiter).
 		Dot("tolerance", f.Tolerance).
 		DotIf("dropOriginalFieldName", f.DropOriginalFieldNameFlag)
