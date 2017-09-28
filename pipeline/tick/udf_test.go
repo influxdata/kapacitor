@@ -1,12 +1,10 @@
 package tick_test
 
 import (
-	"bytes"
 	"reflect"
 	"testing"
 
 	"github.com/influxdata/kapacitor/pipeline"
-	"github.com/influxdata/kapacitor/pipeline/tick"
 	"github.com/influxdata/kapacitor/udf/agent"
 )
 
@@ -70,12 +68,10 @@ func TestUDF(t *testing.T) {
 			},
 		},
 	}
-	ast := tick.AST{}
-	ast.Build(pipe)
-
-	var buf bytes.Buffer
-	ast.Program.Format(&buf, "", false)
-	got := buf.String()
+	got, err := PipelineTick(pipe)
+	if err != nil {
+		t.Fatalf("Unexpected error building pipeline %v", err)
+	}
 	want := `stream
     |from()
     @delorean()
