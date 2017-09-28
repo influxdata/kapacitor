@@ -42,7 +42,7 @@ func (n *UDF) Build(u *pipeline.UDFNode) (ast.Node, error) {
 				args = append(args, dur)
 			}
 		}
-		n.Dot(o.Name, args)
+		n.Dot(o.Name, args...)
 	}
 	return n.prev, n.err
 }
