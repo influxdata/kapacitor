@@ -22,7 +22,7 @@ func NewGroupBy(parents []ast.Node) *GroupBy {
 // Build creates a GroupBy ast.Node
 func (n *GroupBy) Build(g *pipeline.GroupByNode) (ast.Node, error) {
 	n.Pipe("groupBy", g.Dimensions...).
-		Dot("exclude", args(g.ExcludedDimensions)).
+		Dot("exclude", args(g.ExcludedDimensions)...).
 		DotIf("byMeasurement", g.ByMeasurementFlag)
 
 	return n.prev, n.err
