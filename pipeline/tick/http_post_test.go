@@ -16,7 +16,7 @@ func TestHTTPPost(t *testing.T) {
 
 	want := `stream
     |from()
-    |httpPost(['http://influx1.local:8086/query', 'http://influx2.local:8086/query'])
+    |httpPost('http://influx1.local:8086/query', 'http://influx2.local:8086/query')
         .endpoint('endpoint1')
         .endpoint('endpoint2')
         .header('Authorization', 'Basic GOTO 10')
