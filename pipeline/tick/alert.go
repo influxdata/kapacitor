@@ -43,7 +43,6 @@ func (n *Alert) Build(a *pipeline.AlertNode) (ast.Node, error) {
 		Dot("idField", a.IdField).
 		DotIf("all", a.AllFlag).
 		DotIf("noRecoveries", a.NoRecoveriesFlag).
-		Dot("", a.IsStateChangesOnly).
 		Dot("idField", a.IdField).
 		Dot("idField", a.IdField)
 
@@ -91,12 +90,14 @@ func (n *Alert) Build(a *pipeline.AlertNode) (ast.Node, error) {
 
 	for _, h := range a.LogHandlers {
 		n.Dot("log", h.FilePath)
-		mode := ast.NumberNode{
-			IsInt: true,
-			Int64: h.Mode,
-			Base:  8,
+		if h.Mode != 0 {
+			mode := &ast.NumberNode{
+				IsInt: true,
+				Int64: h.Mode,
+				Base:  8,
+			}
+			n.Dot("mode", mode)
 		}
-		n.Dot("mode", mode)
 	}
 
 	for _, h := range a.VictorOpsHandlers {
@@ -173,7 +174,7 @@ func (n *Alert) Build(a *pipeline.AlertNode) (ast.Node, error) {
 			Dot("brokerName", h.BrokerName).
 			Dot("topic", h.Topic).
 			Dot("qos", h.Qos).
-			Dot("retained", h.Retained)
+			DotIf("retained", h.Retained)
 	}
 
 	for _, h := range a.SNMPTrapHandlers {
