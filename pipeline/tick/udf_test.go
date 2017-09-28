@@ -1,6 +1,7 @@
 package tick_test
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -65,6 +66,12 @@ func TestUDF(t *testing.T) {
 						DurationValue: 946708560000000000, // 30 years!
 					},
 				},
+				{
+					Type: agent.ValueType_STRING,
+					Value: &agent.OptionValue_StringValue{
+						StringValue: "years",
+					},
+				},
 			},
 		},
 	}
@@ -75,13 +82,14 @@ func TestUDF(t *testing.T) {
 	want := `stream
     |from()
     @delorean()
-        .mph([88])
-        .gigawatts([1.21])
-        .nearClockTower([TRUE])
-        .martySays(['Doc!'])
-        .future([15778476m])
+        .mph(88)
+        .gigawatts(1.21)
+        .nearClockTower(TRUE)
+        .martySays('Doc!')
+        .future(15778476m, 'years')
 `
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("TestUDF = %v, want %v", got, want)
+		fmt.Println(got)
 	}
 }
