@@ -253,6 +253,22 @@ func Literal(lit interface{}) (ast.Node, error) {
 	return ast.ValueToLiteralNode(&NullPosition{}, lit)
 }
 
+func args(a []string) []interface{} {
+	r := make([]interface{}, len(a))
+	for i := range a {
+		r[i] = a[i]
+	}
+	return r
+}
+
+func largs(a []*ast.LambdaNode) []interface{} {
+	r := make([]interface{}, len(a))
+	for i := range a {
+		r[i] = a[i]
+	}
+	return r
+}
+
 var _ ast.Position = &NullPosition{}
 
 // NullPosition is a NOOP to satisfy the tick AST package

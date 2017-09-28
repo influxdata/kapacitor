@@ -86,7 +86,7 @@ func (n *Alert) Build(a *pipeline.AlertNode) (ast.Node, error) {
 	}
 
 	for _, h := range a.ExecHandlers {
-		n.Dot("exec", args(h.Command))
+		n.Dot("exec", args(h.Command)...)
 	}
 
 	for _, h := range a.LogHandlers {
@@ -122,7 +122,7 @@ func (n *Alert) Build(a *pipeline.AlertNode) (ast.Node, error) {
 	for _, h := range a.SensuHandlers {
 		n.Dot("sensu").
 			Dot("source", h.Source).
-			Dot("handlers", args(h.HandlersList))
+			Dot("handlers", args(h.HandlersList)...)
 	}
 
 	for _, h := range a.SlackHandlers {
@@ -155,13 +155,13 @@ func (n *Alert) Build(a *pipeline.AlertNode) (ast.Node, error) {
 			Dot("group", h.Group).
 			Dot("value", h.Value).
 			Dot("origin", h.Origin).
-			Dot("services", args(h.Service))
+			Dot("services", args(h.Service)...)
 	}
 
 	for _, h := range a.OpsGenieHandlers {
 		n.Dot("opsGenie").
-			Dot("teams", args(h.TeamsList)).
-			Dot("recipients", args(h.RecipientsList))
+			Dot("teams", args(h.TeamsList)...).
+			Dot("recipients", args(h.RecipientsList)...)
 	}
 
 	for _ = range a.TalkHandlers {
@@ -184,20 +184,4 @@ func (n *Alert) Build(a *pipeline.AlertNode) (ast.Node, error) {
 	}
 
 	return n.prev, n.err
-}
-
-func args(a []string) []interface{} {
-	r := make([]interface{}, len(a))
-	for i := range a {
-		r[i] = a[i]
-	}
-	return r
-}
-
-func largs(a []*ast.LambdaNode) []interface{} {
-	r := make([]interface{}, len(a))
-	for i := range a {
-		r[i] = a[i]
-	}
-	return r
 }

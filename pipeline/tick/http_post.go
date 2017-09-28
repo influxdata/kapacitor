@@ -23,7 +23,7 @@ func NewHTTPPost(parents []ast.Node) *HTTPPost {
 
 // Build creates a HTTPPost ast.Node
 func (n *HTTPPost) Build(h *pipeline.HTTPPostNode) (ast.Node, error) {
-	n.Pipe("httpPost", args(h.URLs))
+	n.Pipe("httpPost", args(h.URLs)...)
 	for _, e := range h.Endpoints {
 		n.Dot("endpoint", e)
 	}

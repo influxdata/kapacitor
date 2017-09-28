@@ -21,8 +21,8 @@ func NewCombine(parents []ast.Node) *Combine {
 
 // Build creates a Combine ast.Node
 func (n *Combine) Build(c *pipeline.CombineNode) (ast.Node, error) {
-	n.Pipe("combine", largs(c.Lambdas)).
-		Dot("as", args(c.Names)).
+	n.Pipe("combine", largs(c.Lambdas)...).
+		Dot("as", args(c.Names)...).
 		Dot("delimiter", c.Delimiter).
 		Dot("tolerance", c.Tolerance).
 		Dot("max", c.Max)
