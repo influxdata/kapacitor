@@ -21,8 +21,12 @@ func NewInfluxQL(parents []ast.Node) *InfluxQL {
 
 // Build creates a InfluxQL ast.Node
 func (n *InfluxQL) Build(q *pipeline.InfluxQLNode) (ast.Node, error) {
-	// TODO: ReduceCreater?
-	n.Pipe(q.Method, q.Field).
+	args := []interface{}{}
+	if q.Field != "" {
+		args = append(args, q.Field)
+	}
+	args = append(args, q.Args...)
+	n.Pipe(q.Method, args...).
 		Dot("as", q.As).
 		DotIf("usePointTimes", q.PointTimes)
 	return n.prev, n.err
