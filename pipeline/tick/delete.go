@@ -22,11 +22,11 @@ func NewDelete(parents []ast.Node) *Delete {
 // Build creates a Delete ast.Node
 func (n *Delete) Build(d *pipeline.DeleteNode) (ast.Node, error) {
 	n.Pipe("delete")
-	for k, v := range d.Fields {
-		n.Dot("field", k, v)
+	for _, f := range d.Fields {
+		n.Dot("field", f)
 	}
-	for k, v := range d.Tags {
-		n.Dot("tag", k, v)
+	for _, t := range d.Tags {
+		n.Dot("tag", t)
 	}
 	return n.prev, n.err
 }
