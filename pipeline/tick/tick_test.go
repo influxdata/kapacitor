@@ -27,6 +27,13 @@ func StreamFrom() (pipe *pipeline.Pipeline, stream *pipeline.StreamNode, from *p
 	return pipe, stream, from
 }
 
+func BatchQuery(q string) (pipe *pipeline.Pipeline, batch *pipeline.BatchNode, query *pipeline.QueryNode){
+	batch = &pipeline.BatchNode{}
+	pipe = pipeline.CreatePipelineSources(batch)
+	query = batch.Query(q)
+	return pipe, batch, query
+}
+
 func PipelineTick(pipe *pipeline.Pipeline) (string, error) {
 	ast := tick.AST{}
 	err := ast.Build(pipe)
