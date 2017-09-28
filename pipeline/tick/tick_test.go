@@ -26,3 +26,15 @@ func StreamFrom() (pipe *pipeline.Pipeline, stream *pipeline.StreamNode, from *p
 	from = stream.From()
 	return pipe, stream, from
 }
+
+func PipelineTick(pipe *pipeline.Pipeline) (string, error) {
+	ast := tick.AST{}
+	err := ast.Build(pipe)
+	if err != nil {
+		return "", err
+	}
+
+	var buf bytes.Buffer
+	ast.Program.Format(&buf, "", false)
+	return buf.String(), nil
+}

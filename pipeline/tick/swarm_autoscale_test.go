@@ -1,12 +1,10 @@
 package tick_test
 
 import (
-	"bytes"
 	"fmt"
 	"testing"
 	"time"
 
-	"github.com/influxdata/kapacitor/pipeline/tick"
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
@@ -104,12 +102,10 @@ func TestSwarmAutoscale(t *testing.T) {
 			n.IncreaseCooldown = tt.args.increaseCooldown
 			n.DecreaseCooldown = tt.args.decreaseCooldown
 
-			ast := tick.AST{}
-			ast.Build(pipe)
-
-			var buf bytes.Buffer
-			ast.Program.Format(&buf, "", false)
-			got := buf.String()
+			got, err := PipelineTick(pipe)
+			if err != nil {
+				t.Fatalf("Unexpected error building pipeline %v", err)
+			}
 			if got != tt.want {
 				t.Errorf("%q. TestSwarmAutoscale() =\n%v\n want\n%v\n", tt.name, got, tt.want)
 				fmt.Println(got)
