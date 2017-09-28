@@ -21,13 +21,13 @@ func NewEval(parents []ast.Node) *Eval {
 
 // Build creates a Eval ast.Node
 func (n *Eval) Build(e *pipeline.EvalNode) (ast.Node, error) {
-	n.Pipe("eval", largs(e.Lambdas)).
-		Dot("as", args(e.AsList)).
-		Dot("tags", args(e.TagsList)).
+	n.Pipe("eval", largs(e.Lambdas)...).
+		Dot("as", args(e.AsList)...).
+		Dot("tags", args(e.TagsList)...).
 		DotIf("quiet", e.QuietFlag)
 
 	if e.KeepFlag {
-		n.Dot("keep", args(e.KeepList))
+		n.Dot("keep", args(e.KeepList)...)
 	}
 
 	return n.prev, n.err
