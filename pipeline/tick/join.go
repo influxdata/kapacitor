@@ -21,12 +21,16 @@ func NewJoin(parents []ast.Node) *Join {
 
 // Build creates a join ast.Node
 func (n *Join) Build(j *pipeline.JoinNode) (ast.Node, error) {
-	n.Pipe("join", n.Parents[1:]).
+	joined := []interface{}{}
+	for _, p := range n.Parents[1:] {
+		joined = append(joined, p)
+	}
+	n.Pipe("join", joined...).
 		Dot("as", args(j.Names)).
 		Dot("on", args(j.Dimensions)).
 		Dot("delimiter", j.Delimiter).
 		Dot("streamName", j.StreamName).
 		Dot("tolerance", j.Tolerance).
-		Dot("fill", j.Fill)
+		DotNotNil("fill", j.Fill)
 	return n.prev, n.err
 }
