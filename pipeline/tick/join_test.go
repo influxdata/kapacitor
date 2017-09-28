@@ -33,15 +33,15 @@ func TestJoin(t *testing.T) {
 	want := `var from3 = stream
     |from()
         .measurement('floor_power')
-        .groupBy(['building', 'floor'])
+        .groupBy('building', 'floor')
 
 stream
     |from()
         .measurement('building_power')
-        .groupBy(['building'])
+        .groupBy('building')
     |join(from3)
-        .as(['building', 'floor'])
-        .on(['building'])
+        .as('building', 'floor')
+        .on('building')
         .delimiter('.')
         .streamName('kwh')
         .tolerance(1s)
