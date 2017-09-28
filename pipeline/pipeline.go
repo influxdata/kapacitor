@@ -122,6 +122,17 @@ type Pipeline struct {
 	deadman DeadmanService
 }
 
+// Stats returns all stats nodes within the pipeline
+func (p *Pipeline) Stats() []*StatsNode {
+	stats := []*StatsNode{}
+	for _, src := range p.sources {
+		if stat, ok := src.(*StatsNode); ok {
+			stats = append(stats, stat)
+		}
+	}
+	return stats
+}
+
 func (p *Pipeline) MarshalJSON() ([]byte, error) {
 	if p.sorted == nil {
 		p.sort()

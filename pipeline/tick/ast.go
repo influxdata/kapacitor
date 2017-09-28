@@ -9,14 +9,16 @@ import (
 
 // AST converts a pipeline into an AST
 type AST struct {
-	Program ast.ProgramNode
-	parents map[string]ast.Node
-	err     error
+	Program   ast.ProgramNode
+	parents   map[string]ast.Node
+	statsSrcs []string
+	err       error
 }
 
 // Build constructs the AST Program node from the pipeline
 func (a *AST) Build(p *pipeline.Pipeline) error {
 	a.parents = map[string]ast.Node{}
+	a.statsSrcs = statSources(p.Stats())
 	// 1. If there is more than one child then node is a variable with name of node
 	// 2. If the child's first parent is not this node, then this should be a variable.
 	// 3. If there are no children, then, this node is added to the program
@@ -47,6 +49,13 @@ func (a *AST) Build(p *pipeline.Pipeline) error {
 // Link inspects the pipeline node to determine if it
 // should become a variable, or, be considered "complete."
 func (a *AST) Link(node pipeline.Node, function ast.Node) {
+	// Special case where the stats node "parent" is this node if this node
+	// is having stats collected.
+	if a.haveStats(node) {
+		a.Variable(node.Name(), function)
+		return
+	}
+
 	children := node.Children()
 	switch len(children) {
 	case 0:
@@ -132,7 +141,9 @@ func (a *AST) Create(n pipeline.Node, parents []ast.Node) (ast.Node, error) {
 		b := Batch{}
 		return b.Build()
 	case *pipeline.StatsNode:
-		return NewStats(parents).Build(node)
+		return NewStats(a.statParent(node)).Build(node)
+	case *pipeline.NoOpNode: // NoOpNodes are swallowed
+		return nil, nil
 	default:
 		return nil, fmt.Errorf("Unknown pipeline node %T", node)
 	}
@@ -144,6 +155,20 @@ func (a *AST) parentsOf(n pipeline.Node) []ast.Node {
 		p[i] = a.parents[parent.Name()]
 	}
 	return p
+}
+
+func (a *AST) haveStats(n pipeline.Node) bool {
+	for i := range a.statsSrcs {
+		if a.statsSrcs[i] == n.Name() {
+			return true
+		}
+	}
+	return false
+}
+
+func (a *AST) statParent(stat *pipeline.StatsNode) []ast.Node {
+	name := stat.SourceNode.Name()
+	return []ast.Node{a.parents[name]}
 }
 
 // Variable produces an ast.DeclarationNode using ident as the
@@ -165,4 +190,12 @@ func (a *AST) Variable(ident string, right ast.Node) *AST {
 	// Vars used to allow children to lookup parents.
 	a.parents[ident] = id
 	return a
+}
+
+func statSources(stats []*pipeline.StatsNode) []string {
+	srcs := make([]string, len(stats))
+	for i, stat := range stats {
+		srcs[i] = stat.SourceNode.Name()
+	}
+	return srcs
 }
