@@ -1,6 +1,8 @@
 package tick
 
 import (
+	"sort"
+
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick/ast"
 )
@@ -32,8 +34,13 @@ func (n *InfluxDBOut) Build(db *pipeline.InfluxDBOutNode) (ast.Node, error) {
 		Dot("flushInterval", db.FlushInterval).
 		DotIf("create", db.CreateFlag)
 
-	for k, v := range db.Tags {
-		n.Dot("tag", k, v)
+	var tags []string
+	for k := range db.Tags {
+		tags = append(tags, k)
+	}
+	sort.Strings(tags)
+	for _, k := range tags {
+		n.Dot("tag", k, db.Tags[k])
 	}
 
 	return n.prev, n.err

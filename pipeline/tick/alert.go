@@ -1,6 +1,8 @@
 package tick
 
 import (
+	"sort"
+
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick/ast"
 )
@@ -60,8 +62,14 @@ func (n *Alert) Build(a *pipeline.AlertNode) (ast.Node, error) {
 	for _, h := range a.HTTPPostHandlers {
 		n.Dot("post", h.URL).
 			Dot("endpoint", h.Endpoint)
-		for k, v := range h.Headers {
-			n.Dot("header", k, v)
+
+		var headers []string
+		for k := range h.Headers {
+			headers = append(headers, k)
+		}
+		sort.Strings(headers)
+		for _, k := range headers {
+			n.Dot("header", k, h.Headers[k])
 		}
 	}
 

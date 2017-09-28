@@ -1,6 +1,8 @@
 package tick
 
 import (
+	"sort"
+
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick/ast"
 )
@@ -22,11 +24,21 @@ func NewDefault(parents []ast.Node) *Default {
 // Build creates a Default ast.Node
 func (n *Default) Build(d *pipeline.DefaultNode) (ast.Node, error) {
 	n.Pipe("default")
-	for k, v := range d.Fields {
-		n.Dot("field", k, v)
+	var fieldKeys []string
+	for k := range d.Fields {
+		fieldKeys = append(fieldKeys, k)
 	}
-	for k, v := range d.Tags {
-		n.Dot("tag", k, v)
+	sort.Strings(fieldKeys)
+	for _, k := range fieldKeys {
+		n.Dot("field", k, d.Fields[k])
+	}
+
+	var tagKeys []string
+	for k := range d.Fields {
+		tagKeys = append(tagKeys, k)
+	}
+	for _, k := range tagKeys {
+		n.Dot("tag", k, d.Tags[k])
 	}
 	return n.prev, n.err
 }
