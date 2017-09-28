@@ -23,7 +23,7 @@ func TestHTTPPost(t *testing.T) {
         .header('X-Forwarded-For', '10 PRINT "HELLO WORLD"')
 `
 	if got != want {
-		t.Errorf("TestSample = %v, want %v", got, want)
+		t.Errorf("TestHTTPPost = %v, want %v", got, want)
 		fmt.Println(got) // print is helpful to get the correct format.
 	}
 }

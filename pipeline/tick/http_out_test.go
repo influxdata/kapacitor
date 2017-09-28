@@ -18,7 +18,7 @@ func TestHTTPOut(t *testing.T) {
     |httpOut('There is never any ending to Paris – Hemingway')
 `
 	if got != want {
-		t.Errorf("TestSample = %v, want %v", got, want)
+		t.Errorf("TestHTTPOut = %v, want %v", got, want)
 		fmt.Println(got) // print is helpful to get the correct format.
 	}
 }
