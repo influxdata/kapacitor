@@ -20,7 +20,7 @@ func TestSample(t *testing.T) {
     |sample(1ms)
 `
 	if got != want {
-		t.Errorf("TestStream = %v, want %v", got, want)
+		t.Errorf("TestSample = %v, want %v", got, want)
 		fmt.Println(got) // print is helpful to get the correct format.
 	}
 }

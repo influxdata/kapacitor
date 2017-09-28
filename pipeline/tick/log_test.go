@@ -25,7 +25,7 @@ func TestLog(t *testing.T) {
         .level('INFO')
 `
 	if got != want {
-		t.Errorf("TestQuery = %v, want %v", got, want)
+		t.Errorf("TestLog = %v, want %v", got, want)
 		fmt.Println(got) // print is helpful to get the correct format.
 	}
 }
