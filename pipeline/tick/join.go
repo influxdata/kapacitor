@@ -26,8 +26,8 @@ func (n *Join) Build(j *pipeline.JoinNode) (ast.Node, error) {
 		joined = append(joined, p)
 	}
 	n.Pipe("join", joined...).
-		Dot("as", args(j.Names)).
-		Dot("on", args(j.Dimensions)).
+		Dot("as", args(j.Names)...).
+		Dot("on", args(j.Dimensions)...).
 		Dot("delimiter", j.Delimiter).
 		Dot("streamName", j.StreamName).
 		Dot("tolerance", j.Tolerance).
