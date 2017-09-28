@@ -1,11 +1,9 @@
 package tick_test
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/influxdata/kapacitor/pipeline"
-	"github.com/influxdata/kapacitor/pipeline/tick"
 )
 
 func TestUnion(t *testing.T) {
@@ -80,15 +78,10 @@ stream
 			logger := stream2.From().Log()
 			union.Union(logger)
 
-			ast := tick.AST{}
-			err := ast.Build(pipe)
+			got, err := PipelineTick(pipe)
 			if err != nil {
-				t.Fatalf("TestUnion() ast.Build return unexpected error %v", err)
+				t.Fatalf("Unexpected error building pipeline %v", err)
 			}
-
-			var buf bytes.Buffer
-			ast.Program.Format(&buf, "", false)
-			got := buf.String()
 			if got != tt.want {
 				t.Errorf("%q. TestUnion = %v, want %v", tt.name, got, tt.want)
 			}

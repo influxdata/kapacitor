@@ -1,12 +1,10 @@
 package tick_test
 
 import (
-	"bytes"
 	"testing"
 	"time"
 
 	"github.com/influxdata/kapacitor/pipeline"
-	"github.com/influxdata/kapacitor/pipeline/tick"
 )
 
 func TestWindow(t *testing.T) {
@@ -68,15 +66,10 @@ func TestWindow(t *testing.T) {
 			w.PeriodCount = tt.args.periodCount
 			w.EveryCount = tt.args.everyCount
 
-			ast := tick.AST{}
-			err := ast.Build(pipe)
+			got, err := PipelineTick(pipe)
 			if err != nil {
-				t.Fatalf("TestWindow() ast.Build return unexpected error %v", err)
+				t.Fatalf("Unexpected error building pipeline %v", err)
 			}
-
-			var buf bytes.Buffer
-			ast.Program.Format(&buf, "", false)
-			got := buf.String()
 			if got != tt.want {
 				t.Errorf("%q. TestWindow() =\n%v\n want\n%v\n", tt.name, got, tt.want)
 			}

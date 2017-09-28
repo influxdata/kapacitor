@@ -1,11 +1,9 @@
 package tick_test
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/influxdata/kapacitor/pipeline"
-	"github.com/influxdata/kapacitor/pipeline/tick"
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
@@ -92,15 +90,10 @@ func TestWhere(t *testing.T) {
 			batch := &pipeline.BatchNode{}
 			pipe := pipeline.CreatePipelineSources(batch)
 			batch.Query("select cpu_usage from cpu").Where(tt.where)
-			ast := tick.AST{}
-			err := ast.Build(pipe)
+			got, err := PipelineTick(pipe)
 			if err != nil {
-				t.Fatalf("TestWhere() ast.Build return unexpected error %v", err)
+				t.Fatalf("Unexpected error building pipeline %v", err)
 			}
-
-			var buf bytes.Buffer
-			ast.Program.Format(&buf, "", false)
-			got := buf.String()
 			if got != tt.want {
 				t.Errorf("%q. TestWhere() = %v, want %v", tt.name, got, tt.want)
 			}
