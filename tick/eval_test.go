@@ -887,8 +887,11 @@ func (a *A) PropertyMethodA() *A {
 	return a
 }
 
-func (a *A) ChainMethodA() *A {
-	a.chainMethodCallCount++
+func (a *A) ChainMethodA(count int, variadic ...int) *A {
+	a.chainMethodCallCount += count
+	for _, v := range variadic {
+		a.chainMethodCallCount += v
+	}
 	return new(A)
 }
 
@@ -937,9 +940,12 @@ func (b *B) AProperty() *B {
 	return new(B)
 }
 
-// Chain method hiding A.HiddenPropertyMethod property method
-func (b *B) HiddenPropertyMethod() *B {
-	b.hpmCallCount++
+// Chain method hiding B.HiddenPropertyMethod property method
+func (b *B) HiddenPropertyMethod(count int, variadic ...int) *B {
+	b.hpmCallCount += count
+	for _, v := range variadic {
+		b.hpmCallCount += v
+	}
 	return new(B)
 }
 
@@ -982,7 +988,7 @@ func (c *C) AProperty() *C {
 	return new(C)
 }
 
-// Chain method hiding A.HiddenPropertyMethod property method
+// Chain method hiding B.HiddenPropertyMethod property method
 func (c *C) HiddenPropertyMethod() *C {
 	c.hpmCallCount++
 	return new(C)
@@ -1013,6 +1019,9 @@ func TestReflectionDescriber(t *testing.T) {
 	if exp, got := true, rdA.HasProperty("aProperty"); exp != got {
 		t.Fatalf("unexpected HasProperty got: %v exp: %v", got, exp)
 	}
+	if exp, got := reflect.String, rdA.PropertyType("aProperty"); exp != got {
+		t.Fatalf("unexpected PropertyType got: %v exp: %v", got, exp)
+	}
 	if exp, got := false, rdA.HasChainMethod("aProperty"); exp != got {
 		t.Fatalf("unexpected HasChainMethod got: %v exp: %v", got, exp)
 	}
@@ -1027,6 +1036,9 @@ func TestReflectionDescriber(t *testing.T) {
 	// Test A.PropertyMethodA
 	if exp, got := true, rdA.HasProperty("propertyMethodA"); exp != got {
 		t.Fatalf("unexpected HasProperty got: %v exp: %v", got, exp)
+	}
+	if exp, got := reflect.Bool, rdA.PropertyType("propertyMethodA"); exp != got {
+		t.Fatalf("unexpected PropertyType got: %v exp: %v", got, exp)
 	}
 	if exp, got := false, rdA.HasChainMethod("propertyMethodA"); exp != got {
 		t.Fatalf("unexpected HasChainMethod got: %v exp: %v", got, exp)
@@ -1067,20 +1079,26 @@ func TestReflectionDescriber(t *testing.T) {
 	if exp, got := true, rdA.HasChainMethod("chainMethodA"); exp != got {
 		t.Fatalf("unexpected HasChainMethod got: %v exp: %v", got, exp)
 	}
+	if exp, got := []reflect.Kind{reflect.Int, reflect.Int}, rdA.ChainMethodTypes("chainMethodA"); !reflect.DeepEqual(exp, got) {
+		t.Fatalf("unexpected ChainMethodTypes got: %v exp: %v", got, exp)
+	}
 	if exp, got := false, rdA.HasProperty("chainMethodA"); exp != got {
 		t.Fatalf("unexpected HasProperty got: %v exp: %v", got, exp)
 	}
-	_, err = rdA.CallChainMethod("chainMethodA")
+	_, err = rdA.CallChainMethod("chainMethodA", 1, 1, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if exp, got := 1, a.chainMethodCallCount; exp != got {
+	if exp, got := 3, a.chainMethodCallCount; exp != got {
 		t.Fatalf("unexpected a.chainMethodCallCount got: %v exp: %v", got, exp)
 	}
 
 	// Test A.HiddenChainMethod
 	if exp, got := true, rdA.HasChainMethod("hiddenChainMethod"); exp != got {
 		t.Fatalf("unexpected HasChainMethod got: %v exp: %v", got, exp)
+	}
+	if exp, got := []reflect.Kind{}, rdA.ChainMethodTypes("hiddenChainMethod"); !reflect.DeepEqual(exp, got) {
+		t.Fatalf("unexpected ChainMethodTypes got: %v exp: %v", got, exp)
 	}
 	if exp, got := false, rdA.HasProperty("hiddenChainMethod"); exp != got {
 		t.Fatalf("unexpected HasProperty got: %v exp: %v", got, exp)
@@ -1109,6 +1127,9 @@ func TestReflectionDescriber(t *testing.T) {
 	if exp, got := true, rdB.HasProperty("aProperty"); exp != got {
 		t.Fatalf("unexpected HasProperty got: %v exp: %v", got, exp)
 	}
+	if exp, got := reflect.String, rdB.PropertyType("aProperty"); exp != got {
+		t.Fatalf("unexpected PropertyType got: %v exp: %v", got, exp)
+	}
 	_, err = rdB.SetProperty("aProperty", "test")
 	if err != nil {
 		t.Fatal(err)
@@ -1121,6 +1142,9 @@ func TestReflectionDescriber(t *testing.T) {
 	if exp, got := true, rdB.HasChainMethod("aProperty"); exp != got {
 		t.Fatalf("unexpected HasChainMethod got: %v exp: %v", got, exp)
 	}
+	if exp, got := []reflect.Kind{}, rdB.ChainMethodTypes("aProperty"); !reflect.DeepEqual(exp, got) {
+		t.Fatalf("unexpected ChainMethodTypes got: %v exp: %v", got, exp)
+	}
 	_, err = rdB.CallChainMethod("aProperty")
 	if err != nil {
 		t.Fatal(err)
@@ -1132,6 +1156,9 @@ func TestReflectionDescriber(t *testing.T) {
 	// Test B.PropertyMethodA
 	if exp, got := true, rdB.HasProperty("propertyMethodA"); exp != got {
 		t.Fatalf("unexpected HasProperty got: %v exp: %v", got, exp)
+	}
+	if exp, got := reflect.Bool, rdB.PropertyType("propertyMethodA"); exp != got {
+		t.Fatalf("unexpected PropertyType got: %v exp: %v", got, exp)
 	}
 	if exp, got := false, rdB.HasChainMethod("propertyMethodA"); exp != got {
 		t.Fatalf("unexpected HasChainMethod got: %v exp: %v", got, exp)
@@ -1154,17 +1181,23 @@ func TestReflectionDescriber(t *testing.T) {
 	if exp, got := true, rdB.HasChainMethod("hiddenPropertyMethod"); exp != got {
 		t.Fatalf("unexpected HasChainMethod got: %v exp: %v", got, exp)
 	}
-	_, err = rdB.CallChainMethod("hiddenPropertyMethod")
+	if exp, got := []reflect.Kind{reflect.Int, reflect.Int}, rdB.ChainMethodTypes("hiddenPropertyMethod"); !reflect.DeepEqual(exp, got) {
+		t.Fatalf("unexpected ChainMethodTypes got: %v exp: %v", got, exp)
+	}
+	_, err = rdB.CallChainMethod("hiddenPropertyMethod", 1, 1, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if exp, got := 1, b.hpmCallCount; exp != got {
+	if exp, got := 3, b.hpmCallCount; exp != got {
 		t.Fatalf("unexpected b.hpmCallCount got: %v exp: %v", got, exp)
 	}
 
 	// Test B.HiddenPropertyMethod as property
 	if exp, got := true, rdB.HasProperty("hiddenPropertyMethod"); exp != got {
 		t.Fatalf("unexpected HasProperty got: %v exp: %v", got, exp)
+	}
+	if exp, got := reflect.Bool, rdB.PropertyType("hiddenPropertyMethod"); exp != got {
+		t.Fatalf("unexpected PropertyType got: %v exp: %v", got, exp)
 	}
 	_, err = rdB.SetProperty("hiddenPropertyMethod")
 	if err != nil {
@@ -1178,6 +1211,9 @@ func TestReflectionDescriber(t *testing.T) {
 	if exp, got := true, rdB.HasChainMethod("hiddenChainMethod"); exp != got {
 		t.Fatalf("unexpected HasChainMethod got: %v exp: %v", got, exp)
 	}
+	if exp, got := []reflect.Kind{}, rdB.ChainMethodTypes("hiddenChainMethod"); !reflect.DeepEqual(exp, got) {
+		t.Fatalf("unexpected ChainMethodTypes got: %v exp: %v", got, exp)
+	}
 	_, err = rdB.CallChainMethod("hiddenChainMethod")
 	if err != nil {
 		t.Fatal(err)
@@ -1189,6 +1225,9 @@ func TestReflectionDescriber(t *testing.T) {
 	// Test B.HiddenPropertyMethod as property
 	if exp, got := true, rdB.HasProperty("hiddenChainMethod"); exp != got {
 		t.Fatalf("unexpected HasProperty got: %v exp: %v", got, exp)
+	}
+	if exp, got := reflect.String, rdB.PropertyType("hiddenChainMethod"); exp != got {
+		t.Fatalf("unexpected PropertyType got: %v exp: %v", got, exp)
 	}
 	_, err = rdB.SetProperty("hiddenChainMethod", "test")
 	if err != nil {
@@ -1202,17 +1241,23 @@ func TestReflectionDescriber(t *testing.T) {
 	if exp, got := true, rdB.HasChainMethod("chainMethodA"); exp != got {
 		t.Fatalf("unexpected HasChainMethod got: %v exp: %v", got, exp)
 	}
-	_, err = rdB.CallChainMethod("chainMethodA")
+	if exp, got := []reflect.Kind{reflect.Int, reflect.Int}, rdB.ChainMethodTypes("chainMethodA"); !reflect.DeepEqual(exp, got) {
+		t.Fatalf("unexpected ChainMethodTypes got: %v exp: %v", got, exp)
+	}
+	_, err = rdB.CallChainMethod("chainMethodA", 1, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if exp, got := 1, b.A.chainMethodCallCount; exp != got {
+	if exp, got := 3, b.A.chainMethodCallCount; exp != got {
 		t.Fatalf("unexpected b.A.chainMethodCallCount got: %v exp: %v", got, exp)
 	}
 
 	// Test B.ChainMethodA as property
 	if exp, got := true, rdB.HasProperty("chainMethodA"); exp != got {
 		t.Fatalf("unexpected HasProperty got: %v exp: %v", got, exp)
+	}
+	if exp, got := reflect.String, rdB.PropertyType("chainMethodA"); exp != got {
+		t.Fatalf("unexpected PropertyType got: %v exp: %v", got, exp)
 	}
 	_, err = rdB.SetProperty("chainMethodA", "test")
 	if err != nil {
@@ -1225,6 +1270,9 @@ func TestReflectionDescriber(t *testing.T) {
 	// Test B.BProperty
 	if exp, got := true, rdB.HasProperty("bProperty"); exp != got {
 		t.Fatalf("unexpected HasProperty got: %v exp: %v", got, exp)
+	}
+	if exp, got := reflect.String, rdB.PropertyType("bProperty"); exp != got {
+		t.Fatalf("unexpected PropertyType got: %v exp: %v", got, exp)
 	}
 	if exp, got := false, rdB.HasChainMethod("bProperty"); exp != got {
 		t.Fatalf("unexpected HasChainMethod got: %v exp: %v", got, exp)
@@ -1240,6 +1288,9 @@ func TestReflectionDescriber(t *testing.T) {
 	// Test B.PropertyMethodB
 	if exp, got := true, rdB.HasProperty("propertyMethodB"); exp != got {
 		t.Fatalf("unexpected HasProperty got: %v exp: %v", got, exp)
+	}
+	if exp, got := reflect.Bool, rdB.PropertyType("propertyMethodB"); exp != got {
+		t.Fatalf("unexpected PropertyType got: %v exp: %v", got, exp)
 	}
 	if exp, got := false, rdB.HasChainMethod("propertyMethodB"); exp != got {
 		t.Fatalf("unexpected HasChainMethod got: %v exp: %v", got, exp)
@@ -1258,6 +1309,9 @@ func TestReflectionDescriber(t *testing.T) {
 	// Test B.ChainMethodB
 	if exp, got := true, rdB.HasChainMethod("chainMethodB"); exp != got {
 		t.Fatalf("unexpected HasChainMethod got: %v exp: %v", got, exp)
+	}
+	if exp, got := []reflect.Kind{}, rdB.ChainMethodTypes("chainMethodB"); !reflect.DeepEqual(exp, got) {
+		t.Fatalf("unexpected ChainMethodTypes got: %v exp: %v", got, exp)
 	}
 	if exp, got := false, rdB.HasProperty("chainMethodB"); exp != got {
 		t.Fatalf("unexpected HasProperty got: %v exp: %v", got, exp)
@@ -1288,6 +1342,9 @@ func TestReflectionDescriber(t *testing.T) {
 	if exp, got := true, rdC.HasProperty("aProperty"); exp != got {
 		t.Fatalf("unexpected HasProperty got: %v exp: %v", got, exp)
 	}
+	if exp, got := reflect.String, rdC.PropertyType("aProperty"); exp != got {
+		t.Fatalf("unexpected PropertyType got: %v exp: %v", got, exp)
+	}
 	_, err = rdC.SetProperty("aProperty", "test")
 	if err != nil {
 		t.Fatal(err)
@@ -1300,6 +1357,9 @@ func TestReflectionDescriber(t *testing.T) {
 	if exp, got := true, rdC.HasChainMethod("aProperty"); exp != got {
 		t.Fatalf("unexpected HasChainMethod got: %v exp: %v", got, exp)
 	}
+	if exp, got := []reflect.Kind{}, rdC.ChainMethodTypes("aProperty"); !reflect.DeepEqual(exp, got) {
+		t.Fatalf("unexpected ChainMethodTypes got: %v exp: %v", got, exp)
+	}
 	_, err = rdC.CallChainMethod("aProperty")
 	if err != nil {
 		t.Fatal(err)
@@ -1311,6 +1371,9 @@ func TestReflectionDescriber(t *testing.T) {
 	// Test C.PropertyMethodA
 	if exp, got := true, rdC.HasProperty("propertyMethodA"); exp != got {
 		t.Fatalf("unexpected HasProperty got: %v exp: %v", got, exp)
+	}
+	if exp, got := reflect.Bool, rdC.PropertyType("propertyMethodA"); exp != got {
+		t.Fatalf("unexpected PropertyType got: %v exp: %v", got, exp)
 	}
 	if exp, got := false, rdC.HasChainMethod("propertyMethodA"); exp != got {
 		t.Fatalf("unexpected HasChainMethod got: %v exp: %v", got, exp)
@@ -1333,6 +1396,9 @@ func TestReflectionDescriber(t *testing.T) {
 	if exp, got := true, rdC.HasChainMethod("hiddenPropertyMethod"); exp != got {
 		t.Fatalf("unexpected HasChainMethod got: %v exp: %v", got, exp)
 	}
+	if exp, got := []reflect.Kind{}, rdC.ChainMethodTypes("hiddenPropertyMethod"); !reflect.DeepEqual(exp, got) {
+		t.Fatalf("unexpected ChainMethodTypes got: %v exp: %v", got, exp)
+	}
 	_, err = rdC.CallChainMethod("hiddenPropertyMethod")
 	if err != nil {
 		t.Fatal(err)
@@ -1344,6 +1410,9 @@ func TestReflectionDescriber(t *testing.T) {
 	// Test C.HiddenPropertyMethod as property
 	if exp, got := true, rdC.HasProperty("hiddenPropertyMethod"); exp != got {
 		t.Fatalf("unexpected HasProperty got: %v exp: %v", got, exp)
+	}
+	if exp, got := reflect.Bool, rdC.PropertyType("hiddenPropertyMethod"); exp != got {
+		t.Fatalf("unexpected PropertyType got: %v exp: %v", got, exp)
 	}
 	_, err = rdC.SetProperty("hiddenPropertyMethod")
 	if err != nil {
@@ -1357,6 +1426,9 @@ func TestReflectionDescriber(t *testing.T) {
 	if exp, got := true, rdC.HasChainMethod("hiddenChainMethod"); exp != got {
 		t.Fatalf("unexpected HasChainMethod got: %v exp: %v", got, exp)
 	}
+	if exp, got := []reflect.Kind{}, rdC.ChainMethodTypes("hiddenChainMethod"); !reflect.DeepEqual(exp, got) {
+		t.Fatalf("unexpected ChainMethodTypes got: %v exp: %v", got, exp)
+	}
 	_, err = rdC.CallChainMethod("hiddenChainMethod")
 	if err != nil {
 		t.Fatal(err)
@@ -1368,6 +1440,9 @@ func TestReflectionDescriber(t *testing.T) {
 	// Test C.HiddenPropertyMethod as property
 	if exp, got := true, rdC.HasProperty("hiddenChainMethod"); exp != got {
 		t.Fatalf("unexpected HasProperty got: %v exp: %v", got, exp)
+	}
+	if exp, got := reflect.String, rdC.PropertyType("hiddenChainMethod"); exp != got {
+		t.Fatalf("unexpected PropertyType got: %v exp: %v", got, exp)
 	}
 	_, err = rdC.SetProperty("hiddenChainMethod", "test")
 	if err != nil {
@@ -1381,7 +1456,10 @@ func TestReflectionDescriber(t *testing.T) {
 	if exp, got := true, rdC.HasChainMethod("chainMethodA"); exp != got {
 		t.Fatalf("unexpected HasChainMethod got: %v exp: %v", got, exp)
 	}
-	_, err = rdC.CallChainMethod("chainMethodA")
+	if exp, got := []reflect.Kind{reflect.Int, reflect.Int}, rdC.ChainMethodTypes("chainMethodA"); !reflect.DeepEqual(exp, got) {
+		t.Fatalf("unexpected ChainMethodTypes got: %v exp: %v", got, exp)
+	}
+	_, err = rdC.CallChainMethod("chainMethodA", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1392,6 +1470,9 @@ func TestReflectionDescriber(t *testing.T) {
 	// Test C.ChainMethodA as property
 	if exp, got := true, rdC.HasProperty("chainMethodA"); exp != got {
 		t.Fatalf("unexpected HasProperty got: %v exp: %v", got, exp)
+	}
+	if exp, got := reflect.String, rdC.PropertyType("chainMethodA"); exp != got {
+		t.Fatalf("unexpected PropertyType got: %v exp: %v", got, exp)
 	}
 	_, err = rdC.SetProperty("chainMethodA", "test")
 	if err != nil {
@@ -1404,6 +1485,9 @@ func TestReflectionDescriber(t *testing.T) {
 	// Test C.CProperty
 	if exp, got := true, rdC.HasProperty("cProperty"); exp != got {
 		t.Fatalf("unexpected HasProperty got: %v exp: %v", got, exp)
+	}
+	if exp, got := reflect.String, rdC.PropertyType("cProperty"); exp != got {
+		t.Fatalf("unexpected PropertyType got: %v exp: %v", got, exp)
 	}
 	if exp, got := false, rdC.HasChainMethod("cProperty"); exp != got {
 		t.Fatalf("unexpected HasChainMethod got: %v exp: %v", got, exp)
@@ -1419,6 +1503,9 @@ func TestReflectionDescriber(t *testing.T) {
 	// Test C.PropertyMethodC
 	if exp, got := true, rdC.HasProperty("propertyMethodC"); exp != got {
 		t.Fatalf("unexpected HasProperty got: %v exp: %v", got, exp)
+	}
+	if exp, got := reflect.Bool, rdC.PropertyType("propertyMethodC"); exp != got {
+		t.Fatalf("unexpected PropertyType got: %v exp: %v", got, exp)
 	}
 	if exp, got := false, rdC.HasChainMethod("propertyMethodC"); exp != got {
 		t.Fatalf("unexpected HasChainMethod got: %v exp: %v", got, exp)
@@ -1437,6 +1524,9 @@ func TestReflectionDescriber(t *testing.T) {
 	// Test C.ChainMethodC
 	if exp, got := true, rdC.HasChainMethod("chainMethodC"); exp != got {
 		t.Fatalf("unexpected HasChainMethod got: %v exp: %v", got, exp)
+	}
+	if exp, got := []reflect.Kind{}, rdC.ChainMethodTypes("chainMethodC"); !reflect.DeepEqual(exp, got) {
+		t.Fatalf("unexpected ChainMethodTypes got: %v exp: %v", got, exp)
 	}
 	if exp, got := false, rdC.HasProperty("chainMethodC"); exp != got {
 		t.Fatalf("unexpected HasProperty got: %v exp: %v", got, exp)
