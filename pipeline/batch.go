@@ -2,13 +2,8 @@ package pipeline
 
 import (
 	"bytes"
-	"encoding/json"
-	"fmt"
 	"reflect"
-	"strings"
 	"time"
-
-	"github.com/influxdata/kapacitor/tick/ast"
 )
 
 // A node that handles creating several child QueryNodes.
@@ -61,43 +56,6 @@ func (b *BatchNode) Query(q string) *QueryNode {
 // since its not really an edge.
 // tick:ignore
 func (b *BatchNode) dot(buf *bytes.Buffer) {
-}
-
-// Tick converts the pipeline node into the TICKScript
-func (b *BatchNode) Tick(buf *bytes.Buffer) {
-	buf.Write([]byte("batch"))
-	for _, child := range b.Children() {
-		child.Tick(buf)
-	}
-}
-
-// MarshalJSON converts this node to JSON
-func (b *BatchNode) MarshalJSON() ([]byte, error) {
-	props := map[string]interface{}{
-		"type":     "batch",
-		"nodeID":   fmt.Sprintf("%d", b.ID()),
-		"children": b.node,
-	}
-
-	return json.Marshal(props)
-}
-
-type fields map[string]*json.RawMessage
-
-func (b *BatchNode) UnmarshalJSON(data []byte) error {
-	/*
-		var node rawNode
-		err := json.Unmarshal(data, &node)
-		if err != nil {
-			return err
-		}
-		if node.Type != "batch" {
-			return fmt.Errorf(`Unknown type %s; expected batch`, node.Type)
-		}
-
-		*b = *newBatchNode()
-	*/
-	return nil
 }
 
 // A QueryNode defines a source and a schedule for
@@ -285,134 +243,4 @@ func (b *QueryNode) Align() *QueryNode {
 func (b *QueryNode) AlignGroup() *QueryNode {
 	b.AlignGroupFlag = true
 	return b
-}
-
-// Tick converts the pipeline node into the TICKScript
-func (b *QueryNode) Tick(buf *bytes.Buffer) {
-	tick := fmt.Sprintf("|query('''%s''')", b.QueryStr)
-
-	if b.Period != 0 {
-		tick += fmt.Sprintf(".period(%s)", DurationTick(b.Period))
-	}
-
-	if b.Every != 0 {
-		tick += fmt.Sprintf(".every(%s)", DurationTick(b.Every))
-	}
-
-	if b.AlignFlag {
-		tick += ".align()"
-	}
-
-	if b.Cron != "" {
-		tick += fmt.Sprintf(`.cron(%s)`, SingleQuote(b.Cron))
-	}
-
-	if b.Offset != 0 {
-		tick += fmt.Sprintf(".offset(%s)", DurationTick(b.Offset))
-	}
-
-	if b.AlignGroupFlag {
-		tick += ".alignGroup()"
-	}
-
-	if len(b.Dimensions) != 0 {
-		dims := make([]string, len(b.Dimensions))
-		for i, d := range b.Dimensions {
-			// TODO: convert the interfaces correctly
-			switch dim := d.(type) {
-			case string:
-				dims[i] = SingleQuote(dim)
-			case *ast.StarNode:
-				dims[i] = "*"
-			default:
-				dims[i] = fmt.Sprintf(`'%s'`, dim)
-			}
-		}
-		tick += fmt.Sprintf(".groupBy(%s)", strings.Join(dims, ", "))
-	}
-
-	if b.GroupByMeasurementFlag {
-		tick += ".groupByMeasurement()"
-	}
-
-	if b.Fill != nil {
-		// TODO: convert the interface correctly
-		switch f := b.Fill.(type) {
-		case float64:
-			tick += fmt.Sprintf(".fill(%f)", f)
-		case int64:
-			tick += fmt.Sprintf(".fill(%d)", f)
-		default:
-			tick += fmt.Sprintf(`.fill('%s')`, f)
-		}
-	}
-
-	if b.Cluster != "" {
-		tick += fmt.Sprintf(`.cluster(%s)`, SingleQuote(b.Cluster))
-	}
-
-	buf.Write([]byte(tick))
-}
-
-func (b *QueryNode) MarshalJSON() ([]byte, error) {
-	var (
-		typeOf = "query"
-		nodeID = fmt.Sprintf("%d", b.ID())
-	)
-
-	props := map[string]interface{}{
-		"type":               &typeOf,
-		"nodeID":             &nodeID,
-		"children":           &b.node,
-		"query":              &b.QueryStr,
-		"period":             &b.Period,
-		"every":              &b.Every,
-		"align":              &b.AlignFlag,
-		"cron":               &b.Cron,
-		"offset":             &b.Offset,
-		"alignGroup":         &b.AlignGroupFlag,
-		"groupBy":            &b.Dimensions,
-		"groupByMeasurement": &b.GroupByMeasurementFlag,
-		"fill":               &b.Fill,
-		"cluster":            &b.Cluster,
-	}
-	return json.Marshal(props)
-}
-
-func (b *QueryNode) UnmarshalJSON(data []byte) error {
-	var flds fields
-	err := json.Unmarshal(data, &flds)
-	if err != nil {
-		return err
-	}
-
-	*b = *newQueryNode()
-
-	var typeOf, nodeID string
-	fields := map[string]interface{}{
-		"type":               &typeOf,
-		"nodeID":             &nodeID,
-		"query":              &b.QueryStr,
-		"period":             &b.Period,
-		"every":              &b.Every,
-		"align":              &b.AlignFlag,
-		"cron":               &b.Cron,
-		"offset":             &b.Offset,
-		"alignGroup":         &b.AlignGroupFlag,
-		"groupBy":            &b.Dimensions,
-		"groupByMeasurement": &b.GroupByMeasurementFlag,
-		"fill":               &b.Fill,
-		"cluster":            &b.Cluster,
-	}
-
-	for k, v := range fields {
-		if err := json.Unmarshal(*flds[k], v); err != nil {
-			return err
-		}
-	}
-
-	if typeOf != "query" {
-		return fmt.Errorf(`Unknown type %s; expected query`, typeOf)
-	}
-	return nil
 }

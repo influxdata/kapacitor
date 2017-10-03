@@ -1,11 +1,7 @@
 package pipeline
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/influxdata/kapacitor/tick/ast"
@@ -28,24 +24,6 @@ func newStreamNode() *StreamNode {
 			provides: StreamEdge,
 		},
 	}
-}
-
-// Tick converts the pipeline node into the TICKScript
-func (s *StreamNode) Tick(buf *bytes.Buffer) {
-	buf.Write([]byte("stream"))
-	for _, child := range s.Children() {
-		child.Tick(buf)
-	}
-}
-
-func (s *StreamNode) MarshalJSON() ([]byte, error) {
-	props := map[string]interface{}{
-		"type":     "stream",
-		"nodeID":   fmt.Sprintf("%d", s.ID()),
-		"children": s.node,
-	}
-
-	return json.Marshal(props)
 }
 
 // Creates a new FromNode that can be further
@@ -147,77 +125,6 @@ func newFromNode() *FromNode {
 	return &FromNode{
 		chainnode: newBasicChainNode("from", StreamEdge, StreamEdge),
 	}
-}
-
-// Tick converts the pipeline node into the TICKScript
-func (n *FromNode) Tick(buf *bytes.Buffer) {
-	tick := fmt.Sprintf("|from()")
-
-	if n.Database != "" {
-		tick += fmt.Sprintf(`.database(%s)`, SingleQuote(n.Database))
-	}
-
-	if n.RetentionPolicy != "" {
-		tick += fmt.Sprintf(`.retentionPolicy(%s)`, SingleQuote(n.RetentionPolicy))
-	}
-
-	if n.Measurement != "" {
-		tick += fmt.Sprintf(`.measurement(%s)`, SingleQuote(n.Measurement))
-	}
-
-	if n.GroupByMeasurementFlag {
-		tick += ".groupByMeasurement()"
-	}
-
-	if len(n.Dimensions) != 0 {
-		dims := make([]string, len(n.Dimensions))
-		for i, d := range n.Dimensions {
-			switch dim := d.(type) {
-			case string:
-				dims[i] = SingleQuote(dim)
-			case *ast.StarNode:
-				dims[i] = "*"
-			default:
-				dims[i] = fmt.Sprintf(`'%s'`, dim)
-			}
-		}
-		tick += fmt.Sprintf(".groupBy(%s)", strings.Join(dims, ", "))
-	}
-
-	if n.Round != 0 {
-		tick += fmt.Sprintf(`.round(%s)`, DurationTick(n.Round))
-	}
-
-	if n.Truncate != 0 {
-		tick += fmt.Sprintf(`.truncate(%s)`, DurationTick(n.Truncate))
-	}
-
-	if n.Lambda != nil {
-		tick += fmt.Sprintf(`.where(%s)`, LambdaTick(n.Lambda))
-	}
-
-	buf.Write([]byte(tick))
-	for _, child := range n.Children() {
-		child.Tick(buf)
-	}
-
-}
-
-func (n *FromNode) MarshalJSON() ([]byte, error) {
-	props := map[string]interface{}{
-		"type":               "from",
-		"nodeID":             fmt.Sprintf("%d", n.ID()),
-		"children":           n.node,
-		"where":              n.Lambda,
-		"groupBy":            n.Dimensions,
-		"groupByMeasurement": n.GroupByMeasurementFlag,
-		"database":           n.Database,
-		"retentionPolicy":    n.RetentionPolicy,
-		"measurement":        n.Measurement,
-		"truncate":           n.Truncate,
-		"round":              n.Round,
-	}
-	return json.Marshal(props)
 }
 
 //tick:ignore

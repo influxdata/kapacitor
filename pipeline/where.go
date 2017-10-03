@@ -1,10 +1,6 @@
 package pipeline
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
@@ -34,28 +30,4 @@ func newWhereNode(wants EdgeType, predicate *ast.LambdaNode) *WhereNode {
 		chainnode: newBasicChainNode("where", wants, wants),
 		Lambda:    predicate,
 	}
-}
-
-// Tick converts the pipeline node into the TICKScript
-func (n *WhereNode) Tick(buf *bytes.Buffer) {
-	tick := "|where("
-	if n.Lambda != nil {
-		tick += LambdaTick(n.Lambda)
-	}
-	tick += ")"
-	buf.Write([]byte(tick))
-
-	for _, child := range n.Children() {
-		child.Tick(buf)
-	}
-}
-
-func (n *WhereNode) MarshalJSON() ([]byte, error) {
-	props := map[string]interface{}{
-		"type":     "where",
-		"nodeID":   fmt.Sprintf("%d", n.ID()),
-		"children": n.node,
-		"lambda":   n.Lambda,
-	}
-	return json.Marshal(props)
 }

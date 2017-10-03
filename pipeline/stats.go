@@ -1,9 +1,6 @@
 package pipeline
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
 	"time"
 )
 
@@ -63,26 +60,4 @@ func newStatsNode(n Node, interval time.Duration) *StatsNode {
 func (n *StatsNode) Align() *StatsNode {
 	n.AlignFlag = true
 	return n
-}
-
-// Tick converts the pipeline node into the TICKScript
-func (n *StatsNode) Tick(buf *bytes.Buffer) {
-	WithNode(buf, "stats", n.Interval)
-	ChainIf(buf, "align", n.AlignFlag)
-
-	for _, child := range n.Children() {
-		child.Tick(buf)
-	}
-}
-
-func (n *StatsNode) MarshalJSON() ([]byte, error) {
-	props := map[string]interface{}{
-		"type":       "stats",
-		"nodeID":     fmt.Sprintf("%d", n.ID()),
-		"children":   n.node,
-		"sourceNode": n.SourceNode,
-		"interval":   n.Interval,
-		"align":      n.AlignFlag,
-	}
-	return json.Marshal(props)
 }

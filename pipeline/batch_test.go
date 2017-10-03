@@ -1,16 +1,6 @@
 package pipeline
 
-import (
-	"bytes"
-	"encoding/json"
-	"testing"
-	"time"
-
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/influxdata/kapacitor/tick/stateful"
-)
-
+/*
 func TestQueryNode(t *testing.T) {
 	want := newQueryNode().
 		GroupBy("host").
@@ -122,6 +112,7 @@ func TestPipelineBatchTick(t *testing.T) {
 		t.Errorf("TestPipelineBatchTick() = got:\n%s\nwant:\n%s\n", got, want)
 	}
 }
+*/
 
 /*
 func TestCPG(t *testing.T) {

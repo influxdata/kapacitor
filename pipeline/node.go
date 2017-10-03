@@ -2,7 +2,6 @@ package pipeline
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -77,10 +76,6 @@ type Node interface {
 
 	// Return .dot string to graph DAG
 	dot(buf *bytes.Buffer)
-	// MarshalJSON converts the Node to a JSON representation
-	MarshalJSON() ([]byte, error)
-	// Tick converts the node to the TICKscript representation
-	Tick(buf *bytes.Buffer)
 }
 
 type node struct {
@@ -94,14 +89,6 @@ type node struct {
 	provides EdgeType
 	tm       bool
 	pm       bool
-}
-
-func (n node) MarshalJSON() ([]byte, error) {
-	children := make([]string, len(n.children))
-	for i, n := range n.children {
-		children[i] = fmt.Sprintf("%d", n.ID())
-	}
-	return json.Marshal(children)
 }
 
 func (n *node) Tick(buf *bytes.Buffer) {

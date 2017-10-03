@@ -1,8 +1,6 @@
 package pipeline
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -33,77 +31,28 @@ import (
 type WindowNode struct {
 	chainnode
 	// The period, or length in time, of the window.
-	Period time.Duration
+	Period time.Duration `json:"period"`
 	// How often the current window is emitted into the pipeline.
 	// If equal to zero, then every new point will emit the current window.
-	Every time.Duration
+	Every time.Duration `json:"every"`
 	// Whether to align the window edges with the zero time
 	// tick:ignore
-	AlignFlag bool `tick:"Align"`
+	AlignFlag bool `tick:"Align" json:"align"`
 	// Whether to wait till the period is full before the first emit.
 	// tick:ignore
-	FillPeriodFlag bool `tick:"FillPeriod"`
+	FillPeriodFlag bool `tick:"FillPeriod" json:"fill_period"`
 
 	// PeriodCount is the number of points per window.
-	PeriodCount int64
+	PeriodCount int64 `json:"period_count"`
 	// EveryCount determines how often the window is emitted based on the count of points.
 	// A value of 1 means that every new point will emit the window.
-	EveryCount int64
+	EveryCount int64 `json:"every_count"`
 }
 
 func newWindowNode() *WindowNode {
 	return &WindowNode{
 		chainnode: newBasicChainNode("window", StreamEdge, BatchEdge),
 	}
-}
-
-// Tick converts the pipeline node into the TICKScript
-func (w *WindowNode) Tick(buf *bytes.Buffer) {
-	tick := fmt.Sprintf("|window()")
-
-	if w.Period != 0 {
-		tick += fmt.Sprintf(`.period(%s)`, DurationTick(w.Period))
-	}
-
-	if w.Every != 0 {
-		tick += fmt.Sprintf(`.every(%s)`, DurationTick(w.Every))
-	}
-
-	if w.PeriodCount != 0 {
-		tick += fmt.Sprintf(".periodCount(%d)", w.PeriodCount)
-	}
-
-	if w.EveryCount != 0 {
-		tick += fmt.Sprintf(".everyCount(%d)", w.EveryCount)
-	}
-
-	if w.AlignFlag {
-		tick += ".align()"
-	}
-
-	if w.FillPeriodFlag {
-		tick += ".fillPeriod()"
-	}
-
-	buf.Write([]byte(tick))
-	for _, child := range w.Children() {
-		child.Tick(buf)
-	}
-}
-
-func (w *WindowNode) MarshalJSON() ([]byte, error) {
-	props := map[string]interface{}{
-		"type":        "window",
-		"nodeID":      fmt.Sprintf("%d", w.ID()),
-		"children":    w.node,
-		"period":      w.Period,
-		"every":       w.Every,
-		"align":       w.AlignFlag,
-		"fillPeriod":  w.FillPeriodFlag,
-		"periodCount": w.PeriodCount,
-		"everyCount":  w.EveryCount,
-	}
-	return json.Marshal(props)
 }
 
 // If the `align` property is not used to modify the `window` node, then the
@@ -137,4 +86,22 @@ func (w *WindowNode) validate() error {
 		return fmt.Errorf("everyCount must be greater than zero")
 	}
 	return nil
+}
+
+// MarshalJSON converts the Window node to JSON and adds the "typeOf" to hint deserialization
+func (w *WindowNode) MarshalJSON() ([]byte, error) {
+	return Marshal(w)
+	/*
+		type _WindowNode WindowNode
+		return json.Marshal(struct {
+			_WindowNode
+			TypeOf
+		}{
+			_WindowNode: _WindowNode(w),
+			TypeOf: TypeOf{
+				Type: "window",
+				ID:   w.ID(),
+			},
+		})
+	*/
 }
