@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -29,7 +30,7 @@ import (
 //
 // NOTE: Because no `align` property is defined, the `window` edge is defined relative to the first data point.
 type WindowNode struct {
-	chainnode
+	chainnode `json:"-"`
 	// The period, or length in time, of the window.
 	Period time.Duration `json:"period"`
 	// How often the current window is emitted into the pipeline.
@@ -37,22 +38,58 @@ type WindowNode struct {
 	Every time.Duration `json:"every"`
 	// Whether to align the window edges with the zero time
 	// tick:ignore
-	AlignFlag bool `tick:"Align" json:"align"`
+	AlignFlag bool `json:"align" tick:"Align"`
 	// Whether to wait till the period is full before the first emit.
 	// tick:ignore
-	FillPeriodFlag bool `tick:"FillPeriod" json:"fill_period"`
+	FillPeriodFlag bool `json:"fillPeriod" tick:"FillPeriod"`
 
 	// PeriodCount is the number of points per window.
-	PeriodCount int64 `json:"period_count"`
+	PeriodCount int64 `json:"periodCount"`
 	// EveryCount determines how often the window is emitted based on the count of points.
 	// A value of 1 means that every new point will emit the window.
-	EveryCount int64 `json:"every_count"`
+	EveryCount int64 `json:"everyCount"`
 }
 
 func newWindowNode() *WindowNode {
 	return &WindowNode{
 		chainnode: newBasicChainNode("window", StreamEdge, BatchEdge),
 	}
+}
+
+// MarshalJSON converts WindowNode to JSON
+func (w *WindowNode) MarshalJSON() ([]byte, error) {
+	type Alias WindowNode
+	var raw = &struct {
+		TypeOf string `json:"typeOf"`
+		ID     ID     `json:"ID,string"`
+		*Alias
+	}{
+		TypeOf: "window",
+		ID:     w.ID(),
+		Alias:  (*Alias)(w),
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to WindowNode
+func (w *WindowNode) UnmarshalJSON(data []byte) error {
+	type Alias WindowNode
+	var raw = &struct {
+		TypeOf string `json:"typeOf"`
+		ID     ID     `json:"ID,string"`
+		*Alias
+	}{
+		Alias: (*Alias)(w),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.TypeOf != "window" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as WindowNode", raw.ID, raw.TypeOf)
+	}
+	w.setID(raw.ID)
+	return nil
 }
 
 // If the `align` property is not used to modify the `window` node, then the
@@ -86,22 +123,4 @@ func (w *WindowNode) validate() error {
 		return fmt.Errorf("everyCount must be greater than zero")
 	}
 	return nil
-}
-
-// MarshalJSON converts the Window node to JSON and adds the "typeOf" to hint deserialization
-func (w *WindowNode) MarshalJSON() ([]byte, error) {
-	return Marshal(w)
-	/*
-		type _WindowNode WindowNode
-		return json.Marshal(struct {
-			_WindowNode
-			TypeOf
-		}{
-			_WindowNode: _WindowNode(w),
-			TypeOf: TypeOf{
-				Type: "window",
-				ID:   w.ID(),
-			},
-		})
-	*/
 }
