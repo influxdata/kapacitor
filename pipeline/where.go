@@ -1,6 +1,9 @@
 package pipeline
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
@@ -22,7 +25,7 @@ type WhereNode struct {
 	chainnode
 	// The expression predicate.
 	// tick:ignore
-	Lambda *ast.LambdaNode
+	Lambda *ast.LambdaNode `json:"lambda"`
 }
 
 func newWhereNode(wants EdgeType, predicate *ast.LambdaNode) *WhereNode {
@@ -30,4 +33,40 @@ func newWhereNode(wants EdgeType, predicate *ast.LambdaNode) *WhereNode {
 		chainnode: newBasicChainNode("where", wants, wants),
 		Lambda:    predicate,
 	}
+}
+
+// MarshalJSON converts WhereNode to JSON
+func (w *WhereNode) MarshalJSON() ([]byte, error) {
+	type Alias WhereNode
+	var raw = &struct {
+		TypeOf string `json:"typeOf"`
+		ID     ID     `json:"ID,string"`
+		*Alias
+	}{
+		TypeOf: "where",
+		ID:     w.ID(),
+		Alias:  (*Alias)(w),
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to WhereNode
+func (w *WhereNode) UnmarshalJSON(data []byte) error {
+	type Alias WhereNode
+	var raw = &struct {
+		TypeOf string `json:"typeOf"`
+		ID     ID     `json:"ID,string"`
+		*Alias
+	}{
+		Alias: (*Alias)(w),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.TypeOf != "where" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as WhereNode", raw.ID, raw.TypeOf)
+	}
+	w.setID(raw.ID)
+	return nil
 }
