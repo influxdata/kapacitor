@@ -58,38 +58,62 @@ func newWindowNode() *WindowNode {
 
 // MarshalJSON converts WindowNode to JSON
 func (w *WindowNode) MarshalJSON() ([]byte, error) {
-	type Alias WindowNode
-	var raw = &struct {
-		TypeOf string `json:"typeOf"`
-		ID     ID     `json:"ID,string"`
-		*Alias
-	}{
-		TypeOf: "window",
-		ID:     w.ID(),
-		Alias:  (*Alias)(w),
+	props := JSONNode{}.
+		SetType("window").
+		SetID(w.ID()).
+		SetDuration("period", w.Period).
+		SetDuration("every", w.Every).
+		Set("align", w.AlignFlag).
+		Set("fillPeriod", w.FillPeriodFlag).
+		Set("periodCount", w.PeriodCount).
+		Set("everyCount", w.EveryCount)
+
+	return json.Marshal(&props)
+}
+
+func (w *WindowNode) unmarshal(props JSONNode) error {
+	err := props.CheckTypeOf("window")
+	if err != nil {
+		return err
 	}
-	return json.Marshal(raw)
+
+	if w.id, err = props.ID(); err != nil {
+		return err
+	}
+
+	if w.Period, err = props.Duration("period"); err != nil {
+		return err
+	}
+
+	if w.Every, err = props.Duration("every"); err != nil {
+		return err
+	}
+
+	if w.AlignFlag, err = props.Bool("align"); err != nil {
+		return err
+	}
+
+	if w.FillPeriodFlag, err = props.Bool("fillPeriod"); err != nil {
+		return err
+	}
+
+	if w.PeriodCount, err = props.Int64("periodCount"); err != nil {
+		return err
+	}
+
+	if w.EveryCount, err = props.Int64("everyCount"); err != nil {
+		return err
+	}
+	return nil
 }
 
 // UnmarshalJSON converts JSON to WindowNode
 func (w *WindowNode) UnmarshalJSON(data []byte) error {
-	type Alias WindowNode
-	var raw = &struct {
-		TypeOf string `json:"typeOf"`
-		ID     ID     `json:"ID,string"`
-		*Alias
-	}{
-		Alias: (*Alias)(w),
-	}
-	err := json.Unmarshal(data, raw)
+	props, err := NewJSONNode(data)
 	if err != nil {
 		return err
 	}
-	if raw.TypeOf != "window" {
-		return fmt.Errorf("error unmarshaling node %d of type %s as WindowNode", raw.ID, raw.TypeOf)
-	}
-	w.setID(raw.ID)
-	return nil
+	return w.unmarshal(props)
 }
 
 // If the `align` property is not used to modify the `window` node, then the

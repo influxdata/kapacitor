@@ -4,8 +4,17 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"time"
 
-	"github.com/influxdata/kapacitor/tick"
+	"github.com/influxdata/influxdb/influxql"
+)
+
+const (
+	// NodeTypeOf is used by all Node to identify the node duration Marshal and Unmarshal
+	NodeTypeOf = "typeOf"
+	// NodeID is used by all Node as a unique ID duration Marshal and Unmarshal
+	NodeID = "id"
 )
 
 // TypeOf is a helper struct to add type information for each pipeline node
@@ -62,9 +71,11 @@ func (j *JSONPipeline) Unmarshal(data []byte, v interface{}) error {
 	if err := json.Unmarshal(data, _j{j}); err != nil {
 		return err
 	}
-	return j.cache()
+	return nil
+	//return j.cache()
 }
 
+/*
 func (j *JSONPipeline) cache() error {
 	for _, node := range j.Nodes {
 		typ, err := node.Type()
@@ -96,7 +107,7 @@ func (j *JSONPipeline) cache() error {
 	var err error
 	j.sorted, err = sorter.Sort()
 	return err
-}
+}*/
 
 func (j *JSONPipeline) Parents(n string) []string {
 	return j.children[n]
@@ -166,32 +177,174 @@ func (p *PipelineSorter) visit(node string) error {
 // is used to determine which type of node this is.
 type JSONNode map[string]interface{}
 
+// NewJSONNode decodes JSON bytes into a JSONNode
+func NewJSONNode(data []byte) (JSONNode, error) {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	var input JSONNode
+	err := dec.Decode(&input)
+	return input, err
+}
+
+// CheckTypeOf tests that the typeOf field is correctly set to typ.
+func (j JSONNode) CheckTypeOf(typ string) error {
+	t, ok := j[NodeTypeOf]
+	if !ok {
+		return fmt.Errorf("missing typeOf field")
+	}
+
+	if t != typ {
+		return fmt.Errorf("error unmarshaling node type %s; received %s", typ, t)
+	}
+	return nil
+}
+
+// SetType adds the Node type information
+func (j JSONNode) SetType(typ string) JSONNode {
+	j[NodeTypeOf] = typ
+	return j
+}
+
+// SetID adds the Node ID information
+func (j JSONNode) SetID(id ID) JSONNode {
+	j[NodeID] = fmt.Sprintf("%d", id)
+	return j
+}
+
+// Set adds the key/value to the JSONNode
+func (j JSONNode) Set(key string, value interface{}) JSONNode {
+	j[key] = value
+	return j
+}
+
+// SetDuration adds key to the JSONNode but formats the duration in InfluxQL style
+func (j JSONNode) SetDuration(key string, value time.Duration) JSONNode {
+	return j.Set(key, influxql.FormatDuration(value))
+}
+
+// Has returns true if field exists
+func (j JSONNode) Has(field string) bool {
+	_, ok := j[field]
+	return ok
+}
+
+// Field returns expected field or error if field doesn't exist
+func (j JSONNode) Field(field string) (interface{}, error) {
+	fld, ok := j[field]
+	if !ok {
+		return nil, fmt.Errorf("missing expected field %s", field)
+	}
+	return fld, nil
+}
+
+// String reads the field for a string value
+func (j JSONNode) String(field string) (string, error) {
+	s, err := j.Field(field)
+	if err != nil {
+		return "", err
+	}
+
+	str, ok := s.(string)
+	if !ok {
+		return "", fmt.Errorf("field %s is not a string value but is %T", field, s)
+	}
+	return str, nil
+}
+
+// Int64 reads the field for a int64 value
+func (j JSONNode) Int64(field string) (int64, error) {
+	n, err := j.Field(field)
+	if err != nil {
+		return 0, err
+	}
+
+	jnum, ok := n.(json.Number)
+	if ok {
+		return jnum.Int64()
+	}
+	num, ok := n.(int64)
+	if ok {
+		return num, nil
+	}
+	return 0, fmt.Errorf("field %s is not an integer value but is %T", field, n)
+}
+
+// Float64 reads the field for a float64 value
+func (j JSONNode) Float64(field string) (float64, error) {
+	n, err := j.Field(field)
+	if err != nil {
+		return 0, err
+	}
+
+	jnum, ok := n.(json.Number)
+	if ok {
+		return jnum.Float64()
+	}
+	num, ok := n.(float64)
+	if ok {
+		return num, nil
+	}
+	return 0, fmt.Errorf("field %s is not a floating point value but is %T", field, n)
+}
+
+// Strings reads the field an array of strings
+func (j JSONNode) Strings(field string) ([]string, error) {
+	s, err := j.Field(field)
+	if err != nil {
+		return nil, err
+	}
+
+	strs, ok := s.([]string)
+	if !ok {
+		return nil, fmt.Errorf("field %s is not an array of strings but is %T", field, s)
+	}
+	return strs, nil
+}
+
+// Duration reads the field and assumes the string is in InfluxQL Duration format.
+func (j JSONNode) Duration(field string) (time.Duration, error) {
+	d, err := j.Field(field)
+	if err != nil {
+		return 0, err
+	}
+
+	dur, ok := d.(string)
+	if !ok {
+		return 0, fmt.Errorf("field %s is not a string duration value but is %T", field, d)
+	}
+
+	return influxql.ParseDuration(dur)
+}
+
+// Bool reads the field for a boolean value
+func (j JSONNode) Bool(field string) (bool, error) {
+	b, err := j.Field(field)
+	if err != nil {
+		return false, err
+	}
+
+	boolean, ok := b.(bool)
+	if !ok {
+		return false, fmt.Errorf("field %s is not a bool value but is %T", field, b)
+	}
+	return boolean, nil
+}
+
 // Type returns the Node type.  This name can be used
 // as the chain function name for the parent node.
 func (j JSONNode) Type() (string, error) {
-	t, ok := j["typeOf"]
-	if !ok {
-		return "", fmt.Errorf("node requires typeOf")
-	}
-	typ, ok := t.(string)
-	if !ok {
-		return "", fmt.Errorf("typeOf must be string but is %T", t)
-	}
-	return typ, nil
+	return j.String(NodeTypeOf)
 }
 
 // ID returns the unique ID for this node.  This ID is used
 // as the id of the parent and children in the Edges structure.
-func (j JSONNode) ID() (string, error) {
-	i, ok := j["id"]
-	if !ok {
-		return "", fmt.Errorf("node requires id")
+func (j JSONNode) ID() (ID, error) {
+	i, err := j.String(NodeID)
+	if err != nil {
+		return 0, err
 	}
-	id, ok := i.(string)
-	if !ok {
-		return "", fmt.Errorf("id must be string but is %T", i)
-	}
-	return id, nil
+	id, err := strconv.Atoi(i)
+	return ID(id), err
 }
 
 // IsSource returns the Stream or BatchNode if this is a stream or batch.
@@ -214,6 +367,7 @@ func (j JSONNode) IsStat(typ string) bool {
 	return false
 }
 
+/*
 // Unmarshal deserializes the pipeline from JSON.
 func (p *Pipeline) Unmarshal(data []byte, v interface{}) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
@@ -222,124 +376,90 @@ func (p *Pipeline) Unmarshal(data []byte, v interface{}) error {
 	if err := dec.Decode(&input); err != nil {
 		return err
 	}
-	srcs := input.Sources()
-	for _, src := range srcs {
-		p.addSource(src)
-	}
-
 	nodes := map[string]Node{}
-	for k, v := range srcs {
-		nodes[k] = v
-	}
-
 	sorted := input.Sorted()
 	for _, n := range sorted {
-		// Because sources have been prepopulated into the pipeline
-		// we can skip them here.
-		if _, ok := srcs[n]; ok {
-			continue
-		}
 		parents := input.Parents(n)
 		if len(parents) == 0 {
 			return fmt.Errorf("Node ID %s requires at least one parent", n)
 		}
-		root := parents[0]
+		root := nodes[parents[0]]
 		node, ok := input.ids[n]
 		if !ok {
-			return fmt.Errorf("Node ID %s has edge but no node body")
+			return fmt.Errorf("Node ID %s has edge but no node body", n)
 		}
 		typ, err := node.Type()
 		if err != nil {
 			return err
 		}
-		rRoot, err := tick.NewReflectionDescriber(root, nil)
-		if err != nil {
-			return err
+		switch typ {
+		case "stream":
+			strm := newStreamNode()
+			nodes[n] = strm
+			p.addSource(strm)
+		case "batch":
+			batch := newBatchNode()
+			nodes[n] = batch
+			p.addSource(batch)
+		case "from":
+			strm, ok := root.(*StreamNode)
+			if !ok {
+				return fmt.Errorf("Node ID %s parent is not a stream but %T", n, root)
+			}
+			from := strm.From()
+			nodes[n] = from
+			rFrom, err := tick.NewReflectionDescriber(from, nil)
+			if err != nil {
+				return err
+			}
+			for k, v := range *node {
+				if k == "typeOf" || k == "id" {
+					continue
+				}
+				rFrom.PropertyType
+			}
 		}
-		rRoot.CallChainMethod
-
-	}
-
-	// All sources have
-	for _, src := range srcs {
-		rSrc, err := tick.NewReflectionDescriber(src, nil)
-		if err != nil {
-			return err
-		}
-		rSrc.CallChainMethod("howdy", 1)
 	}
 	return nil
 }
-
+*/
 /*
-func (p *Pipeline) Unmarshal(data []byte, v interface{}) error {
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.UseNumber()
-	var pipe JSONPipeline
-	if err := dec.Decode(&pipe); err != nil {
-		return err
+func ChainArgs(node *JSONNode) ([]interface{}, error) {
+	typ, err := node.Type()
+	if err != nil {
+		return nil, err
 	}
-
-	ids := map[ID]*JSONNode{}
-	types := map[ID]string{}
-	srcs := map[ID]Node{}
-	stats := []ID{}
-	for _, node := range pipe.Nodes {
-		typ, err := node.Type()
-		if err != nil {
-			return err
-		}
-		id, err := node.ID()
-		if err != nil {
-			return err
-		}
-
-		ids[id] = node
-		types[id] = typ
-
-		if src, ok := node.IsSource(typ); ok {
-			srcs[id] = src
-		}
-
-		if node.IsStat(typ) {
-			stats = append(stats, id)
-		}
+	switch typ {
+	case "where":
+		node["lambda"]
+		return nil, []string{"lambda"}
+	case "httpOut":
+		return nil, []string{"endpoint"}
+	case "httpPost":
+		return nil, []string{"urls"}
+	case "union":
+		// TODO:
+	case "join":
+		// TODO:
+	case "combine":
+		return nil, []string{"lambdas"}
+	case "eval":
+		return nil, []string{"lambdas"}
+	case "groupBy":
+		return nil, []string{"dimensions"}
+	case "sample":
+		// TODO:
+	case "derivative":
+		return nil, []string{"field"}
+	case "shift":
+		return nil, []string{"shift"}
+	case "stateDuration":
+		return nil, []string{"lambda"}
+	case "stateCount":
+		return nil, []string{"lambda"}
+	default:
+		return nil, []string{}
 	}
-
-	pipeSrcs := []Node{}
-	for _, s := range srcs {
-		pipeSrcs = append(pipeSrcs, s)
-	}
-	p = CreatePipelineSources(pipeSrcs...)
-	pGraph, cGraph := graph(pipe.Edges)
-
-	for _, s := range srcs {
-		childNodes := pGraph[s]
-	}
-
-	return nil
 }
 
-type Graph map[string][]string
-
-func graph(edges []Edge) (parents Graph, children Graph) {
-	parents = Graph{}
-	children = Graph{}
-	for _, edge := range edges {
-		parent, ok := parents[edge.Parent]
-		if !ok {
-			parent = []string{}
-		}
-		parent = append(parent, edge.Child)
-		parents[edge.Parent] = parent
-
-		child, ok := children[edge.Child]
-		if !ok {
-			child = []string{}
-		}
-		child = append(child, edge.Parent)
-		children[edge.Child] = child
-	}
-	return parents, children
-}
 */

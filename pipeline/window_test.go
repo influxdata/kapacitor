@@ -32,7 +32,7 @@ func TestWindowNode_MarshalJSON(t *testing.T) {
 				PeriodCount:    1,
 				EveryCount:     2,
 			},
-			want: `{"typeOf":"window","ID":"0","period":3600000000000,"every":60000000000,"align":true,"fillPeriod":true,"periodCount":1,"everyCount":2}`,
+			want: `{"align":true,"every":"1m","everyCount":2,"fillPeriod":true,"id":"0","period":"1h","periodCount":1,"typeOf":"window"}`,
 		},
 		{
 			name: "only period and every",
@@ -40,7 +40,7 @@ func TestWindowNode_MarshalJSON(t *testing.T) {
 				Period: time.Hour,
 				Every:  time.Minute,
 			},
-			want: `{"typeOf":"window","ID":"0","period":3600000000000,"every":60000000000,"align":false,"fillPeriod":false,"periodCount":0,"everyCount":0}`,
+			want: `{"align":false,"every":"1m","everyCount":0,"fillPeriod":false,"id":"0","period":"1h","periodCount":0,"typeOf":"window"}`,
 		},
 	}
 	for _, tt := range tests {
@@ -74,7 +74,7 @@ func TestWindowNode_UnmarshalJSON(t *testing.T) {
 	}{
 		{
 			name:  "all fields set",
-			input: `{"typeOf":"window","ID":"0","period":3600000000000,"every":60000000000,"align":true,"fillPeriod":true,"periodCount":1,"everyCount":2}`,
+			input: `{"typeOf":"window","id":"0","period":"1h","every":"1m","align":true,"fillPeriod":true,"periodCount":1,"everyCount":2}`,
 			want: &WindowNode{
 				Period:         time.Hour,
 				Every:          time.Minute,
@@ -86,7 +86,7 @@ func TestWindowNode_UnmarshalJSON(t *testing.T) {
 		},
 		{
 			name:  "only period and every",
-			input: `{"typeOf":"window","ID":"0","period":3600000000000,"every":60000000000,"align":false,"fillPeriod":false,"periodCount":0,"everyCount":0}`,
+			input: `{"typeOf":"window","id":"0","period":"1h","every":"1m","align":false,"fillPeriod":false,"periodCount":0,"everyCount":0}`,
 			want: &WindowNode{
 				Period: time.Hour,
 				Every:  time.Minute,
@@ -94,7 +94,7 @@ func TestWindowNode_UnmarshalJSON(t *testing.T) {
 		},
 		{
 			name:  "set id correctly",
-			input: `{"typeOf":"window","ID":"5","period":3600000000000,"every":60000000000,"align":false,"fillPeriod":false,"periodCount":0,"everyCount":0}`,
+			input: `{"typeOf":"window","id":"5","period":"1h","every":"1m","align":false,"fillPeriod":false,"periodCount":0,"everyCount":0}`,
 			want: &WindowNode{
 				chainnode: chainnode{
 					node: node{
@@ -107,19 +107,19 @@ func TestWindowNode_UnmarshalJSON(t *testing.T) {
 		},
 		{
 			name:    "invalid data",
-			input:   `{"typeOf":"window","ID":"0", "period": "invalid"}`,
+			input:   `{"typeOf":"window","id":"0", "period": "invalid"}`,
 			wantErr: true,
 			want:    &WindowNode{},
 		},
 		{
 			name:    "invalid node type",
-			input:   `{"typeOf":"invalid","ID":"0"}`,
+			input:   `{"typeOf":"invalid","id":"0"}`,
 			wantErr: true,
 			want:    &WindowNode{},
 		},
 		{
 			name:    "invalid id type",
-			input:   `{"typeOf":"window","ID":"invalid"}`,
+			input:   `{"typeOf":"window","id":"invalid"}`,
 			wantErr: true,
 			want:    &WindowNode{},
 		},
