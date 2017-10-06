@@ -1538,6 +1538,11 @@ func (n *LambdaNode) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&props)
 }
 
+// Unmarshal deserializes the props map into this LambdaNode
+func (n *LambdaNode) Unmarshal(props map[string]interface{}) error {
+	return n.unmarshal(JSONNode(props))
+}
+
 func (n *LambdaNode) unmarshal(props JSONNode) error {
 	err := props.CheckTypeOf("lambda")
 	if err != nil {

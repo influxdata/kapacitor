@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/kapacitor/tick/ast"
 )
 
 const (
@@ -328,6 +329,27 @@ func (j JSONNode) Bool(field string) (bool, error) {
 		return false, fmt.Errorf("field %s is not a bool value but is %T", field, b)
 	}
 	return boolean, nil
+}
+
+// Lambda reads the field as an ast.LambdaNode
+func (j JSONNode) Lambda(field string) (*ast.LambdaNode, error) {
+	n, err := j.Field(field)
+	if err != nil {
+		return nil, err
+	}
+
+	if n == nil {
+		return nil, nil
+	}
+
+	lamb, ok := n.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("field %s is not a lambda expression but is %T", field, n)
+	}
+
+	lambda := &ast.LambdaNode{}
+	err = lambda.Unmarshal(lamb)
+	return lambda, err
 }
 
 // Type returns the Node type.  This name can be used

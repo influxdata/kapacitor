@@ -47,8 +47,7 @@ func TestWhereNode_MarshalJSON(t *testing.T) {
 				},
 			},
 			want: `{
-    "typeOf": "where",
-    "ID": "0",
+    "id": "0",
     "lambda": {
         "expression": {
             "left": {
@@ -85,16 +84,17 @@ func TestWhereNode_MarshalJSON(t *testing.T) {
             "typeOf": "binary"
         },
         "typeOf": "lambda"
-    }
+    },
+    "typeOf": "where"
 }`,
 		},
 		{
 			name: "different id",
 			id:   5,
 			want: `{
-    "typeOf": "where",
-    "ID": "5",
-    "lambda": null
+    "id": "5",
+    "lambda": null,
+    "typeOf": "where"
 }`,
 		},
 	}
@@ -126,7 +126,7 @@ func TestWhereNode_UnmarshalJSON(t *testing.T) {
 			name: "all fields set",
 			input: `{
     "typeOf": "where",
-    "ID": "0",
+    "id": "0",
     "lambda": {
         "expression": {
             "left": {
@@ -197,7 +197,7 @@ func TestWhereNode_UnmarshalJSON(t *testing.T) {
 		},
 		{
 			name:  "set id correctly",
-			input: `{"typeOf":"where","ID":"5", "lambda": null}`,
+			input: `{"typeOf":"where","id":"5", "lambda": null}`,
 			want: &WhereNode{
 				chainnode: chainnode{
 					node: node{
@@ -208,17 +208,17 @@ func TestWhereNode_UnmarshalJSON(t *testing.T) {
 		},
 		{
 			name:    "invalid data",
-			input:   `{"typeOf":"where","ID":"0", "lambda": "invalid"}`,
+			input:   `{"typeOf":"where","id":"0", "lambda": "invalid"}`,
 			wantErr: true,
 		},
 		{
 			name:    "invalid node type",
-			input:   `{"typeOf":"invalid","ID":"0"}`,
+			input:   `{"typeOf":"invalid","id"0"}`,
 			wantErr: true,
 		},
 		{
 			name:    "invalid id type",
-			input:   `{"typeOf":"window","ID":"invalid"}`,
+			input:   `{"typeOf":"window","id":"invalid"}`,
 			wantErr: true,
 		},
 	}
