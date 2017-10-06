@@ -28,7 +28,9 @@ type Node interface {
 	Format(buf *bytes.Buffer, indent string, onNewLine bool)
 	// Report whether to nodes are functionally equal, ignoring position and comments
 	Equal(interface{}) bool
-	MarshalJSON() ([]byte, error)
+
+	json.Marshaler
+	json.Unmarshaler
 	unmarshal(JSONNode) error
 }
 
