@@ -1,7 +1,6 @@
 package pipeline
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -72,9 +71,6 @@ func (n *InfluxQLNode) MarshalJSON() ([]byte, error) {
 		"as":       n.As,
 	}
 	return json.Marshal(props)
-}
-
-func (n *InfluxQLNode) Tick(buf *bytes.Buffer) {
 }
 
 // Use the time of the selected point instead of the time of the batch.

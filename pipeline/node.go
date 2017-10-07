@@ -91,9 +91,6 @@ type node struct {
 	pm       bool
 }
 
-func (n *node) Tick(buf *bytes.Buffer) {
-}
-
 // tick:ignore
 func (n *node) Desc() string {
 	return n.desc
