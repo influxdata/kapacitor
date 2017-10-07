@@ -220,7 +220,7 @@ func (j JSONNode) NodeList(field string) ([]Node, error) {
 	}
 	list, ok := l.([]map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("field %s is not an operator value but is %T", field, l)
+		return nil, fmt.Errorf("field %s is not a list of values but is %T", field, l)
 	}
 	nodes := make([]Node, len(list))
 	for i, lst := range list {
