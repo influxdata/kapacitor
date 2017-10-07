@@ -1,73 +1,29 @@
 package pipeline
 
 import (
-	"bytes"
+	"encoding/json"
+	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/influxdata/kapacitor/udf/agent"
 )
 
-func TestUDFNode_Tick(t *testing.T) {
-	type args struct {
-		name    string
-		options []*agent.Option
+func TestUDFNode_MarshalJSON(t *testing.T) {
+	type fields struct {
+		Options []*agent.Option
+		UDFName string
 	}
 	tests := []struct {
-		name string
-		args args
-		want string
+		name    string
+		fields  fields
+		want    string
+		wantErr bool
 	}{
 		{
-			name: "udf with integer option",
-			args: args{
-				name: "deloran",
-				options: []*agent.Option{
-					{
-						Name: "mph",
-						Values: []*agent.OptionValue{
-							{
-								Type: agent.ValueType_INT,
-								Value: &agent.OptionValue_IntValue{
-									IntValue: 88,
-								},
-							},
-						},
-					},
-				},
-			},
-			want: `@deloran().mph(88)`,
-		},
-		{
-			name: "udf with multiple integer arguments",
-			args: args{
-				name: "deloran",
-				options: []*agent.Option{
-					{
-						Name: "year",
-						Values: []*agent.OptionValue{
-							{
-								Type: agent.ValueType_INT,
-								Value: &agent.OptionValue_IntValue{
-									IntValue: 1985,
-								},
-							},
-							{
-								Type: agent.ValueType_INT,
-								Value: &agent.OptionValue_IntValue{
-									IntValue: 1955,
-								},
-							},
-						},
-					},
-				},
-			},
-			want: `@deloran().year(1985, 1955)`,
-		},
-		{
-			name: "udf with integer, double, bool, string, duration",
-			args: args{
-				name: "deloran",
-				options: []*agent.Option{
+			name: "all udf field types",
+			fields: fields{
+				Options: []*agent.Option{
 					{
 						Name: "mph",
 						Values: []*agent.OptionValue{
@@ -121,26 +77,229 @@ func TestUDFNode_Tick(t *testing.T) {
 									DurationValue: 946708560000000000, // 30 years!
 								},
 							},
+							{
+								Type: agent.ValueType_STRING,
+								Value: &agent.OptionValue_StringValue{
+									StringValue: "years",
+								},
+							},
 						},
 					},
 				},
+				UDFName: "delorean",
 			},
-			want: `@deloran().mph(88).gigawatts(1.21).nearClockTower(TRUE).martySays('Doc!').future(15778476m)`,
+			want: `{
+    "future": [
+        "15778476m",
+        "years"
+    ],
+    "gigawatts": [
+        1.21
+    ],
+    "id": "0",
+    "martySays": [
+        "Doc!"
+    ],
+    "mph": [
+        88
+    ],
+    "nearClockTower": [
+        true
+    ],
+    "typeOf": "udf",
+    "udfName": "delorean"
+}`,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
-			n := &UDFNode{
-				UDFName: tt.args.name,
-				Options: tt.args.options,
+			u := &UDFNode{
+				Options: tt.fields.Options,
+				UDFName: tt.fields.UDFName,
 			}
-			var buf bytes.Buffer
-			n.Tick(&buf)
-			got := buf.String()
+			g, err := json.MarshalIndent(u, "", "    ")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("UDFNode.MarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			got := string(g)
 			if got != tt.want {
-				t.Errorf("%q. TestUDFNode_Tick() =\n%v\n want\n%v\n", tt.name, got, tt.want)
+				fmt.Println(got)
+				t.Errorf("UDFNode.MarshalJSON() = %s, want %s", got, tt.want)
 			}
 		})
 	}
+}
+
+func TestUDFNode_UnmarshalJSON(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    *UDFNode
+		wantErr bool
+	}{
+		{
+			name: "every type of option set",
+			input: `{
+    "future": [
+        "15778476m",
+        "years"
+    ],
+    "gigawatts": [
+        1.21
+    ],
+    "id": "0",
+    "martySays": [
+        "Doc!"
+    ],
+    "mph": [
+        88
+    ],
+    "nearClockTower": [
+        true
+    ],
+    "typeOf": "udf",
+    "udfName": "delorean"
+}`,
+			want: &UDFNode{
+				options: map[string]*agent.OptionInfo{
+					"mph": &agent.OptionInfo{
+						ValueTypes: []agent.ValueType{
+							agent.ValueType_INT,
+						},
+					},
+					"gigawatts": &agent.OptionInfo{
+						ValueTypes: []agent.ValueType{
+							agent.ValueType_DOUBLE,
+						},
+					},
+					"nearClockTower": &agent.OptionInfo{
+						ValueTypes: []agent.ValueType{
+							agent.ValueType_BOOL,
+						},
+					},
+					"martySays": &agent.OptionInfo{
+						ValueTypes: []agent.ValueType{
+							agent.ValueType_STRING,
+						},
+					},
+					"future": &agent.OptionInfo{
+						ValueTypes: []agent.ValueType{
+							agent.ValueType_DURATION,
+							agent.ValueType_STRING,
+						},
+					},
+				},
+				Options: []*agent.Option{
+					{
+						Name: "future",
+						Values: []*agent.OptionValue{
+							{
+								Type: agent.ValueType_DURATION,
+								Value: &agent.OptionValue_DurationValue{
+									DurationValue: 946708560000000000, // 30 years!
+								},
+							},
+							{
+								Type: agent.ValueType_STRING,
+								Value: &agent.OptionValue_StringValue{
+									StringValue: "years",
+								},
+							},
+						},
+					},
+					{
+						Name: "gigawatts",
+						Values: []*agent.OptionValue{
+							{
+								Type: agent.ValueType_DOUBLE,
+								Value: &agent.OptionValue_DoubleValue{
+									DoubleValue: 1.21,
+								},
+							},
+						},
+					},
+					{
+						Name: "martySays",
+						Values: []*agent.OptionValue{
+							{
+								Type: agent.ValueType_STRING,
+								Value: &agent.OptionValue_StringValue{
+									StringValue: "Doc!",
+								},
+							},
+						},
+					},
+					{
+						Name: "mph",
+						Values: []*agent.OptionValue{
+							{
+								Type: agent.ValueType_INT,
+								Value: &agent.OptionValue_IntValue{
+									IntValue: 88,
+								},
+							},
+						},
+					},
+					{
+						Name: "nearClockTower",
+						Values: []*agent.OptionValue{
+							{
+								Type: agent.ValueType_BOOL,
+								Value: &agent.OptionValue_BoolValue{
+									BoolValue: true,
+								},
+							},
+						},
+					},
+				},
+				UDFName: "delorean",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			u := &UDFNode{
+				options: map[string]*agent.OptionInfo{
+					"mph": &agent.OptionInfo{
+						ValueTypes: []agent.ValueType{
+							agent.ValueType_INT,
+						},
+					},
+					"gigawatts": &agent.OptionInfo{
+						ValueTypes: []agent.ValueType{
+							agent.ValueType_DOUBLE,
+						},
+					},
+					"nearClockTower": &agent.OptionInfo{
+						ValueTypes: []agent.ValueType{
+							agent.ValueType_BOOL,
+						},
+					},
+					"martySays": &agent.OptionInfo{
+						ValueTypes: []agent.ValueType{
+							agent.ValueType_STRING,
+						},
+					},
+					"future": &agent.OptionInfo{
+						ValueTypes: []agent.ValueType{
+							agent.ValueType_DURATION,
+							agent.ValueType_STRING,
+						},
+					},
+				},
+			}
+			err := json.Unmarshal([]byte(tt.input), u)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("UDFNode.UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			u.options = nil
+			tt.want.options = nil
+			if !reflect.DeepEqual(u, tt.want) {
+				t.Errorf("UDFNode.UnmarshalJSON() =\n%#+v\nwant\n%#+v", u, tt.want)
+			}
+		})
+	}
+
 }

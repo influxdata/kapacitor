@@ -1,9 +1,12 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"fmt"
+	"sort"
 	"time"
 
+	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor/tick"
 	"github.com/influxdata/kapacitor/udf/agent"
 )
@@ -154,4 +157,127 @@ func (u *UDFNode) SetProperty(name string, args ...interface{}) (interface{}, er
 		return u, nil
 	}
 	return u.describer.SetProperty(name, args...)
+}
+
+// MarshalJSON converts UDFNode to JSON
+func (u *UDFNode) MarshalJSON() ([]byte, error) {
+	props := JSONNode{}.
+		SetType("udf").
+		SetID(u.ID()).
+		Set("udfName", u.UDFName)
+	for _, o := range u.Options {
+		args := []interface{}{}
+		for _, v := range o.Values {
+			switch v.Type {
+			case agent.ValueType_BOOL:
+				args = append(args, v.GetBoolValue())
+			case agent.ValueType_INT:
+				args = append(args, v.GetIntValue())
+			case agent.ValueType_DOUBLE:
+				args = append(args, v.GetDoubleValue())
+			case agent.ValueType_STRING:
+				args = append(args, v.GetStringValue())
+			case agent.ValueType_DURATION:
+				dur := influxql.FormatDuration(time.Duration(v.GetDurationValue()))
+				args = append(args, dur)
+			}
+		}
+		props = props.Set(o.Name, args)
+	}
+	return json.Marshal(&props)
+}
+
+func (u *UDFNode) unmarshal(props JSONNode) error {
+	err := props.CheckTypeOf("udf")
+	if err != nil {
+		return err
+	}
+
+	if u.id, err = props.ID(); err != nil {
+		return err
+	}
+
+	if u.UDFName, err = props.String("udfName"); err != nil {
+		return err
+	}
+
+	properties := map[string][]interface{}{}
+	for name, v := range props {
+		opt, ok := u.options[name]
+		if !ok {
+			continue
+		}
+		args, ok := v.([]interface{})
+		if !ok {
+			return fmt.Errorf("property %s is not a list of values but is %T", name, v)
+		}
+
+		if got, exp := len(args), len(opt.ValueTypes); got != exp {
+			return fmt.Errorf("unexpected number of args to %s, got %d expected %d", name, got, exp)
+		}
+		values := make([]interface{}, len(args))
+		for i, arg := range args {
+			switch opt.ValueTypes[i] {
+			case agent.ValueType_BOOL:
+				values[i], ok = arg.(bool)
+				if !ok {
+					return fmt.Errorf("property %s argument %d is not a bool value but is %T", name, i, arg)
+				}
+			case agent.ValueType_INT:
+				value, ok := arg.(json.Number)
+				if !ok {
+					return fmt.Errorf("property %s argument %d is not an integer value but is %T", name, i, arg)
+				}
+				values[i], err = value.Int64()
+				if err != nil {
+					return err
+				}
+			case agent.ValueType_DOUBLE:
+				value, ok := arg.(json.Number)
+				if !ok {
+					return fmt.Errorf("property %s argument %d is not a floating point value but is %T", name, i, arg)
+				}
+				values[i], err = value.Float64()
+				if err != nil {
+					return err
+				}
+			case agent.ValueType_STRING:
+				values[i], ok = arg.(string)
+				if !ok {
+					return fmt.Errorf("property %s argument %d is not a string value but is %T", name, i, arg)
+				}
+			case agent.ValueType_DURATION:
+				value, ok := arg.(string)
+				if !ok {
+					return fmt.Errorf("property %s argument %d is not a floating point value but is %T", name, i, arg)
+				}
+				values[i], err = influxql.ParseDuration(value)
+				if err != nil {
+					return err
+				}
+			}
+		}
+		properties[name] = values
+	}
+	var names []string
+	for name := range properties {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		_, err = u.SetProperty(name, properties[name]...)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// UnmarshalJSON converts JSON to UDFNode
+func (u *UDFNode) UnmarshalJSON(data []byte) error {
+	props, err := NewJSONNode(data)
+	if err != nil {
+		return err
+	}
+	return u.unmarshal(props)
 }
