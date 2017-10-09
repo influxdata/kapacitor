@@ -1206,3 +1206,21 @@ func (h *CmdHandler) GoVersion() {
 func (h *CmdHandler) Info(msg string) {
 	h.l.Info(msg)
 }
+
+// Load handler
+
+type LoadHandler struct {
+	l *klog.Logger
+}
+
+func (h *LoadHandler) Error(msg string, err error) {
+	h.l.Error(msg, klog.Error(err))
+}
+
+func (h *LoadHandler) Debug(msg string) {
+	h.l.Debug(msg)
+}
+
+func (h *LoadHandler) Loading(el string, file string) {
+	h.l.Debug("loading object from file", klog.String("object", el), klog.String("file", file))
+}

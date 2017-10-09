@@ -1,0 +1,25 @@
+dbrp "telegaf"."not_autogen"
+
+var measurement string
+var where_filter = lambda: TRUE
+var groups = [*]
+var field string
+var warn lambda
+var crit lambda
+var window = 5m
+var slack_channel = '#alerts'
+
+stream
+    |from()
+        .measurement(measurement)
+        .where(where_filter)
+        .groupBy(groups)
+    |window()
+        .period(window)
+        .every(window)
+    |mean(field)
+    |alert()
+         .warn(warn)
+         .crit(crit)
+         .slack()
+         .channel(slack_channel)

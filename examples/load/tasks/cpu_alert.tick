@@ -1,0 +1,12 @@
+dbrp "telegraf"."autogen"
+dbrp "telegraf"."autogen_not"
+
+stream
+    |from()
+        .measurement('cpu')
+        .groupBy(*)
+    |alert()
+        .warn(lambda: "usage_idle" < 20)
+        .crit(lambda: "usage_idle" < 10)
+        // Send alerts to the `cpu` topic
+        .topic('cpu')

@@ -1,0 +1,6 @@
+topic: cpu
+id: example
+kind: slack
+match: changed() == TRUE
+options:
+  channel: '#alerts'

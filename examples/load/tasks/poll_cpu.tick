@@ -1,0 +1,8 @@
+dbrp "telegraf"."autogen"
+
+var data = batch
+  |query('select * from "telegraf".autogen.cpu')
+    .every(10s)
+    .period(10s)
+  |log()
+

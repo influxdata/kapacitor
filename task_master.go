@@ -450,6 +450,9 @@ func (tm *TaskMaster) StartTask(t *Task) (*ExecutingTask, error) {
 	if tm.closed {
 		return nil, errors.New("task master is closed cannot start a task")
 	}
+	if len(t.DBRPs) == 0 {
+		return nil, errors.New("task does contain any dbrps")
+	}
 	tm.diag.StartingTask(t.ID)
 	et, err := NewExecutingTask(tm, t)
 	if err != nil {

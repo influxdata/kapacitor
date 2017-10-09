@@ -1,0 +1,33 @@
+dbrp "telegraf"."autogen"
+
+var data = stream
+    |from()
+        .measurement('cpu')
+        .groupBy(*)
+    |eval()
+        .keep('usage_user')
+    |window()
+        .period(10s)
+        .every(5s)
+
+var mean_data = data
+  |mean('usage_user')
+    .as('usage_user')
+
+var max_data = data
+  |max('usage_user')
+    .as('usage_user')
+
+var min_data = data
+  |min('usage_user')
+    .as('usage_user')
+
+mean_data
+  |join(max_data, min_data)
+    .as('mean','max','min')
+  |eval(lambda: "mean.usage_user", lambda: "max.usage_user", lambda: "min.usage_user")
+    .as('mean_usage','max_usage','min_usage')
+  |log()
+  |influxDBOut()
+    .database('downit')
+    .measurement('idk')

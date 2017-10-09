@@ -37,6 +37,7 @@ import (
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/influxdb"
 	"github.com/influxdata/kapacitor/services/k8s"
+	"github.com/influxdata/kapacitor/services/load"
 	"github.com/influxdata/kapacitor/services/marathon"
 	"github.com/influxdata/kapacitor/services/mqtt"
 	"github.com/influxdata/kapacitor/services/nerve"
@@ -104,6 +105,7 @@ type Server struct {
 	TaskMaster       *kapacitor.TaskMaster
 	TaskMasterLookup *kapacitor.TaskMasterLookup
 
+	LoadService           *load.Service
 	AuthService           auth.Interface
 	HTTPDService          *httpd.Service
 	StorageService        *storage.Service
@@ -210,6 +212,10 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 
 	if err := s.appendInfluxDBService(); err != nil {
 		return nil, errors.Wrap(err, "influxdb service")
+	}
+
+	if err := s.appendLoadService(); err != nil {
+		return nil, errors.Wrap(err, "load service")
 	}
 
 	// Append Alert integration services
@@ -362,6 +368,28 @@ func (s *Server) appendSMTPService() {
 
 	s.SetDynamicService("smtp", srv)
 	s.AppendService("smtp", srv)
+}
+
+func (s *Server) appendLoadService() error {
+	c := s.config.Load
+	d := s.DiagService.NewLoadHandler()
+	if s.HTTPDService == nil {
+		return errors.New("httpd service must be set for load service")
+	}
+	if s.HTTPDService.Handler == nil {
+		return errors.New("httpd service handler must be set for load service")
+	}
+	srv, err := load.NewService(c, s.HTTPDService.Handler, d)
+	if err != nil {
+		return err
+	}
+
+	srv.StorageService = s.StorageService
+
+	s.LoadService = srv
+	s.AppendService("load", srv)
+
+	return nil
 }
 
 func (s *Server) appendInfluxDBService() error {
@@ -867,6 +895,10 @@ func (s *Server) Open() error {
 		return err
 	}
 
+	if err := s.LoadService.Load(); err != nil {
+		return fmt.Errorf("failed to reload tasks/templates/handlers: %v", err)
+	}
+
 	go s.watchServices()
 	go s.watchConfigUpdates()
 
@@ -1023,6 +1055,12 @@ func (s *Server) writeID(file string, id uuid.UUID) error {
 		return err
 	}
 	return nil
+}
+
+func (s *Server) Reload() {
+	if err := s.LoadService.Load(); err != nil {
+		s.Diag.Error("failed to reload tasks/templates/handlers", err)
+	}
 }
 
 func (s *Server) SetClusterID(clusterID uuid.UUID) error {

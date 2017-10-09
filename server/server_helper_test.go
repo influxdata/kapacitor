@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -80,6 +81,16 @@ func OpenDefaultServer() (*Server, *client.Client) {
 	s := OpenServer(c)
 	client := Client(s)
 	return s, client
+}
+
+func OpenLoadServer() (*Server, *server.Config, *client.Client) {
+	c := NewConfig()
+	if err := copyFiles("testdata/load", c.Load.Dir); err != nil {
+		panic(err)
+	}
+	s := OpenServer(c)
+	client := Client(s)
+	return s, c, client
 }
 
 // OpenServer opens a test server.
@@ -217,6 +228,8 @@ func NewConfig() *server.Config {
 	//c.HTTP.BindAddress = "127.0.0.1:9092"
 	//c.HTTP.GZIP = false
 	c.InfluxDB[0].Enabled = false
+	c.Load.Enabled = true
+	c.Load.Dir = MustTempDir()
 	return c
 }
 
@@ -264,4 +277,52 @@ func (i *InfluxDB) URL() string {
 
 func (i *InfluxDB) Close() {
 	i.server.Close()
+}
+
+func copyFiles(src, dst string) error {
+	fs, err := ioutil.ReadDir(src)
+	if err != nil {
+		return err
+	}
+
+	for _, f := range fs {
+		if f.IsDir() {
+			if err := os.Mkdir(path.Join(dst, f.Name()), os.ModePerm); err != nil {
+				return err
+			}
+			// copy deeper files
+			if err := copyFiles(path.Join(src, f.Name()), path.Join(dst, f.Name())); err != nil {
+				return err
+			}
+		} else {
+			copyFile(path.Join(src, f.Name()), path.Join(dst, f.Name()))
+		}
+	}
+
+	return nil
+
+}
+
+func copyFile(src, dst string) error {
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	dstFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+
+	if _, err := io.Copy(dstFile, srcFile); err != nil {
+		return err
+	}
+
+	if err := dstFile.Sync(); err != nil {
+		return err
+	}
+
+	return nil
 }

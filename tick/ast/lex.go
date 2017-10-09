@@ -17,6 +17,7 @@ const (
 	TokenError TokenType = iota
 	TokenEOF
 	TokenVar
+	TokenDBRP
 	TokenAsgn
 	TokenDot
 	TokenPipe
@@ -109,6 +110,7 @@ const (
 	KW_True   = "TRUE"
 	KW_False  = "FALSE"
 	KW_Var    = "var"
+	KW_DBRP   = "dbrp"
 	KW_Lambda = "lambda"
 )
 
@@ -118,6 +120,7 @@ var keywords = map[string]TokenType{
 	KW_True:   TokenTrue,
 	KW_False:  TokenFalse,
 	KW_Var:    TokenVar,
+	KW_DBRP:   TokenDBRP,
 	KW_Lambda: TokenLambda,
 }
 
@@ -137,6 +140,8 @@ func (t TokenType) String() string {
 		return "EOF"
 	case t == TokenVar:
 		return "var"
+	case t == TokenDBRP:
+		return "dbrp"
 	case t == TokenIdent:
 		return "identifier"
 	case t == TokenReference:
