@@ -8687,6 +8687,11 @@ stream
 				ErrorStatus: snmpgo.NoError,
 				VarBinds: snmptraptest.VarBinds{
 					{
+						Oid:   "1.3.6.1.2.1.1.3.0",
+						Value: "1000",
+						Type:  "TimeTicks",
+					},
+					{
 						Oid:   "1.3.6.1.6.3.1.1.4.1.0",
 						Value: "1.1.1",
 						Type:  "Oid",
@@ -8714,6 +8719,11 @@ stream
 				Type:        snmpgo.SNMPTrapV2,
 				ErrorStatus: snmpgo.NoError,
 				VarBinds: snmptraptest.VarBinds{
+					{
+						Oid:   "1.3.6.1.2.1.1.3.0",
+						Value: "1000",
+						Type:  "TimeTicks",
+					},
 					{
 						Oid:   "1.3.6.1.6.3.1.1.4.1.0",
 						Value: "1.1.2",
