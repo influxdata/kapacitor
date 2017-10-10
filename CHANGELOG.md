@@ -22,6 +22,7 @@
       * `dbrp` expressions were added to tickscript.
     Topic-Handler file format was modified to include the TopicID and HandlerID in the file.
     Load service was added; the service can load tasks/handlers from a directory.
+- [#1606](https://github.com/influxdata/kapacitor/pull/1606): Update Go version to 1.9.1
 
 ### Bugfixes
 
