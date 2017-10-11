@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/services/storage"
 )
 
@@ -224,6 +225,8 @@ type Replay struct {
 	Error         string
 	Status        Status
 	Progress      float64
+	// Stores snapshot of finished replayed Task status
+	ReplayStats kapacitor.ExecutionStats
 }
 
 type rawReplay Replay
