@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -53,6 +54,43 @@ func newStatsNode(n Node, interval time.Duration) *StatsNode {
 		SourceNode: n,
 		Interval:   interval,
 	}
+}
+
+// MarshalJSON converts StatsNode to JSON
+func (n *StatsNode) MarshalJSON() ([]byte, error) {
+	props := JSONNode{}.
+		SetType("stats").
+		SetID(n.ID()).
+		SetDuration("interval", n.Interval).
+		Set("align", n.AlignFlag)
+
+	return json.Marshal(&props)
+}
+
+func (n *StatsNode) unmarshal(props JSONNode) error {
+	err := props.CheckTypeOf("stats")
+	if err != nil {
+		return err
+	}
+	if n.id, err = props.ID(); err != nil {
+		return err
+	}
+	if n.Interval, err = props.Duration("interval"); err != nil {
+		return err
+	}
+	if n.AlignFlag, err = props.Bool("align"); err != nil {
+		return err
+	}
+	return nil
+}
+
+// UnmarshalJSON converts JSON to StatsNode
+func (n *StatsNode) UnmarshalJSON(data []byte) error {
+	props, err := NewJSONNode(data)
+	if err != nil {
+		return err
+	}
+	return n.unmarshal(props)
 }
 
 // Round times to the StatsNode.Interval value.
