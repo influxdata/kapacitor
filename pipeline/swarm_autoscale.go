@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -131,4 +132,73 @@ func (n *SwarmAutoscaleNode) validate() error {
 		return errors.New("must provide a replicas lambda expression")
 	}
 	return nil
+}
+
+// MarshalJSON converts SwarmAutoscaleNode to JSON
+func (n *SwarmAutoscaleNode) MarshalJSON() ([]byte, error) {
+	props := JSONNode{}.
+		SetType("swarmAutoscale").
+		SetID(n.ID()).
+		Set("cluster", n.Cluster).
+		Set("serviceName", n.ServiceName).
+		Set("serviceNameTag", n.ServiceNameTag).
+		Set("outputServiceNameTag", n.OutputServiceNameTag).
+		Set("currentField", n.CurrentField).
+		Set("max", n.Max).
+		Set("min", n.Min).
+		Set("replicas", n.Replicas).
+		Set("increaseCooldown", n.IncreaseCooldown).
+		Set("decreaseCooldown", n.DecreaseCooldown)
+
+	return json.Marshal(&props)
+}
+
+func (n *SwarmAutoscaleNode) unmarshal(props JSONNode) error {
+	err := props.CheckTypeOf("swarmAutoscale")
+	if err != nil {
+		return err
+	}
+	if n.id, err = props.ID(); err != nil {
+		return err
+	}
+	if n.Cluster, err = props.String("cluster"); err != nil {
+		return err
+	}
+	if n.ServiceName, err = props.String("serviceName"); err != nil {
+		return err
+	}
+	if n.ServiceNameTag, err = props.String("serviceNameTag"); err != nil {
+		return err
+	}
+	if n.OutputServiceNameTag, err = props.String("outputServiceNameTag"); err != nil {
+		return err
+	}
+	if n.CurrentField, err = props.String("currentField"); err != nil {
+		return err
+	}
+	if n.Max, err = props.Int64("max"); err != nil {
+		return err
+	}
+	if n.Min, err = props.Int64("min"); err != nil {
+		return err
+	}
+	if n.Replicas, err = props.Lambda("replicas"); err != nil {
+		return err
+	}
+	if n.IncreaseCooldown, err = props.Duration("increaseCooldown"); err != nil {
+		return err
+	}
+	if n.DecreaseCooldown, err = props.Duration("decreaseCooldown"); err != nil {
+		return err
+	}
+	return nil
+}
+
+// UnmarshalJSON converts JSON to SwarmAutoscaleNode
+func (n *SwarmAutoscaleNode) UnmarshalJSON(data []byte) error {
+	props, err := NewJSONNode(data)
+	if err != nil {
+		return err
+	}
+	return n.unmarshal(props)
 }
