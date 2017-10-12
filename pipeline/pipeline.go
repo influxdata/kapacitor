@@ -2,7 +2,6 @@ package pipeline
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -131,17 +130,6 @@ func (p *Pipeline) Stats() []*StatsNode {
 		}
 	}
 	return stats
-}
-
-func (p *Pipeline) MarshalJSON() ([]byte, error) {
-	if p.sorted == nil {
-		p.sort()
-	}
-	props := map[string]interface{}{}
-	for _, n := range p.sorted {
-		props[fmt.Sprintf("%d", n.ID())] = n
-	}
-	return json.Marshal(props)
 }
 
 func (p *Pipeline) addSource(src Node) {

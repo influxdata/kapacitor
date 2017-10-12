@@ -47,8 +47,8 @@ func Marshal(n Node) ([]byte, error) {
 
 // Edge is a connection between a parent ID and a ChildID
 type Edge struct {
-	Parent string `json:"parent"`
-	Child  string `json:"child"`
+	Parent ID `json:"parent,string"`
+	Child  ID `json:"child,string"`
 }
 
 // JSONPipeline is the JSON serialization format for Pipeline
@@ -60,8 +60,8 @@ type JSONPipeline struct {
 	srcs     map[string]Node
 	stats    []string
 	sorted   []string
-	parents  map[string][]string
-	children map[string][]string
+	parents  map[ID][]ID
+	children map[ID][]ID
 }
 
 // Unmarshal will decode JSON structure into a cache of maps
@@ -111,22 +111,22 @@ func (j *JSONPipeline) cache() error {
 	return err
 }*/
 
-func (j *JSONPipeline) Parents(n string) []string {
-	return j.children[n]
+func (j *JSONPipeline) Parents(id ID) []ID {
+	return j.children[id]
 }
 
 func (j *JSONPipeline) toGraph() {
 	for _, edge := range j.Edges {
 		parent, ok := j.parents[edge.Parent]
 		if !ok {
-			parent = []string{}
+			parent = []ID{}
 		}
 		parent = append(parent, edge.Child)
 		j.parents[edge.Parent] = parent
 
 		child, ok := j.children[edge.Child]
 		if !ok {
-			child = []string{}
+			child = []ID{}
 		}
 		child = append(child, edge.Parent)
 		j.children[edge.Child] = child
@@ -222,12 +222,6 @@ func (j JSONNode) Set(key string, value interface{}) JSONNode {
 // SetDuration adds key to the JSONNode but formats the duration in InfluxQL style
 func (j JSONNode) SetDuration(key string, value time.Duration) JSONNode {
 	return j.Set(key, influxql.FormatDuration(value))
-}
-
-// Has returns true if field exists
-func (j JSONNode) Has(field string) bool {
-	_, ok := j[field]
-	return ok
 }
 
 // Field returns expected field or error if field doesn't exist
@@ -370,26 +364,6 @@ func (j JSONNode) ID() (ID, error) {
 	return ID(id), err
 }
 
-// IsSource returns the Stream or BatchNode if this is a stream or batch.
-func (j JSONNode) IsSource(typ string) (Node, bool) {
-	switch typ {
-	case "stream":
-		return newStreamNode(), true
-	case "batch":
-		return newBatchNode(), true
-	default:
-		return nil, false
-	}
-}
-
-// IsStat returns true if this node is a stat node.
-func (j JSONNode) IsStat(typ string) bool {
-	if typ == "stats" {
-		return true
-	}
-	return false
-}
-
 /*
 // Unmarshal deserializes the pipeline from JSON.
 func (p *Pipeline) Unmarshal(data []byte, v interface{}) error {
@@ -446,46 +420,28 @@ func (p *Pipeline) Unmarshal(data []byte, v interface{}) error {
 	return nil
 }
 */
-/*
-func ChainArgs(node *JSONNode) ([]interface{}, error) {
-	typ, err := node.Type()
-	if err != nil {
-		return nil, err
-	}
-	switch typ {
-	case "where":
-		node["lambda"]
-		return nil, []string{"lambda"}
-	case "httpOut":
-		return nil, []string{"endpoint"}
-	case "httpPost":
-		return nil, []string{"urls"}
-	case "union":
-		// TODO:
-	case "join":
-		// TODO:
-	case "combine":
-		return nil, []string{"lambdas"}
-	case "eval":
-		return nil, []string{"lambdas"}
-	case "groupBy":
-		return nil, []string{"dimensions"}
-	case "sample":
-		// TODO:
-	case "derivative":
-		return nil, []string{"field"}
-	case "shift":
-		return nil, []string{"shift"}
-	case "stateDuration":
-		return nil, []string{"lambda"}
-	case "stateCount":
-		return nil, []string{"lambda"}
-	default:
-		return nil, []string{}
-	}
-}
 
-*/
+func (p *Pipeline) MarshalJSON() ([]byte, error) {
+	if p.sorted == nil {
+		p.sort()
+	}
+	var raw = &struct {
+		Nodes []Node `json:"nodes"`
+		Edges []Edge `json:"edges"`
+	}{}
+
+	for _, n := range p.sorted {
+		raw.Nodes = append(raw.Nodes, n)
+		for _, parent := range n.Parents() {
+			raw.Edges = append(raw.Edges,
+				Edge{
+					Parent: parent.ID(),
+					Child:  n.ID(),
+				})
+		}
+	}
+	return json.Marshal(raw)
+}
 
 var chainFunctions map[string]func(parent *chainnode) Node
 var sourceFunctions map[string]func() Node

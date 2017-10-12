@@ -5,19 +5,7 @@ import (
 
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/pipeline/tick"
-	"github.com/influxdata/kapacitor/tick/ast"
 )
-
-var _ ast.Node = &NullNode{}
-
-type NullNode struct {
-	*tick.NullPosition
-}
-
-func (n *NullNode) String() string                     { return "" }
-func (n *NullNode) Format(*bytes.Buffer, string, bool) {}
-func (n *NullNode) Equal(o interface{}) (ok bool)      { _, ok = o.(*NullNode); return }
-func (n *NullNode) MarshalJSON() ([]byte, error)       { return nil, nil }
 
 // StreamFrom builds a simple pipeline for testing
 func StreamFrom() (pipe *pipeline.Pipeline, stream *pipeline.StreamNode, from *pipeline.FromNode) {
@@ -27,7 +15,7 @@ func StreamFrom() (pipe *pipeline.Pipeline, stream *pipeline.StreamNode, from *p
 	return pipe, stream, from
 }
 
-func BatchQuery(q string) (pipe *pipeline.Pipeline, batch *pipeline.BatchNode, query *pipeline.QueryNode){
+func BatchQuery(q string) (pipe *pipeline.Pipeline, batch *pipeline.BatchNode, query *pipeline.QueryNode) {
 	batch = &pipeline.BatchNode{}
 	pipe = pipeline.CreatePipelineSources(batch)
 	query = batch.Query(q)
