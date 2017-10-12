@@ -114,13 +114,39 @@ func newStateCountNode(wants EdgeType, predicate *ast.LambdaNode) *StateCountNod
 	}
 }
 
+// MarshalJSON converts StateCountNode to JSON
 func (n *StateCountNode) MarshalJSON() ([]byte, error) {
-	props := map[string]interface{}{
-		"type":     "stateCount",
-		"nodeID":   fmt.Sprintf("%d", n.ID()),
-		"children": n.node,
-		"lambda":   n.Lambda,
-		"as":       n.As,
+	props := JSONNode{}.
+		SetType("stateCount").
+		SetID(n.ID()).
+		Set("lambda", n.Lambda).
+		Set("as", n.As)
+
+	return json.Marshal(&props)
+}
+
+func (n *StateCountNode) unmarshal(props JSONNode) error {
+	err := props.CheckTypeOf("stateCount")
+	if err != nil {
+		return err
 	}
-	return json.Marshal(props)
+	if n.id, err = props.ID(); err != nil {
+		return err
+	}
+	if n.Lambda, err = props.Lambda("lambda"); err != nil {
+		return err
+	}
+	if n.As, err = props.String("as"); err != nil {
+		return err
+	}
+	return nil
+}
+
+// UnmarshalJSON converts JSON to StateCountNode
+func (n *StateCountNode) UnmarshalJSON(data []byte) error {
+	props, err := NewJSONNode(data)
+	if err != nil {
+		return err
+	}
+	return n.unmarshal(props)
 }
