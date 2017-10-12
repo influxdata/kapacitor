@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strconv"
 	"time"
 
@@ -485,3 +486,264 @@ func ChainArgs(node *JSONNode) ([]interface{}, error) {
 }
 
 */
+
+var chainFunctions map[string]func(parent *chainnode) Node
+var sourceFunctions map[string]func() Node
+var sourceFilters map[string]func([]byte, Node) (Node, error)
+var multiParents map[string]func(*chainnode, []Node) Node
+var influxFunctions map[string]func(*chainnode, string) *InfluxQLNode
+
+func init() {
+	// Add all possible sources
+	sourceFunctions = map[string]func() Node{
+		"stream": func() Node { return newStreamNode() },
+		"batch":  func() Node { return newBatchNode() },
+	}
+
+	// Filters modify the source and produce a specific data stream
+	sourceFilters = map[string]func([]byte, Node) (Node, error){
+		"from":  UnmarshalFrom,
+		"query": UnmarshalQuery,
+	}
+
+	// Add default construction of chain nodes
+	chainFunctions = map[string]func(parent *chainnode) Node{
+		"window":            func(parent *chainnode) Node { return parent.Window() },
+		"where":             func(parent *chainnode) Node { return parent.Where(nil) },
+		"swarmAutoscale":    func(parent *chainnode) Node { return parent.SwarmAutoscale() },
+		"stateDuration":     func(parent *chainnode) Node { return parent.StateDuration(nil) },
+		"stateCount":        func(parent *chainnode) Node { return parent.StateCount(nil) },
+		"shift":             func(parent *chainnode) Node { return parent.Shift(0) },
+		"sample":            func(parent *chainnode) Node { return parent.Sample(0) },
+		"log":               func(parent *chainnode) Node { return parent.Log() },
+		"kapacitorLoopback": func(parent *chainnode) Node { return parent.KapacitorLoopback() },
+		"k8sAutoscale":      func(parent *chainnode) Node { return parent.K8sAutoscale() },
+		"influxdbOut":       func(parent *chainnode) Node { return parent.InfluxDBOut() },
+		"httpPost":          func(parent *chainnode) Node { return parent.HttpPost() },
+		"httpOut":           func(parent *chainnode) Node { return parent.HttpOut("") },
+		"groupBy":           func(parent *chainnode) Node { return parent.GroupBy() },
+		"flatten":           func(parent *chainnode) Node { return parent.Flatten() },
+		"eval":              func(parent *chainnode) Node { return parent.Eval() },
+		"derivative":        func(parent *chainnode) Node { return parent.Derivative("") },
+		"delete":            func(parent *chainnode) Node { return parent.Delete() },
+		"default":           func(parent *chainnode) Node { return parent.Default() },
+		"combine":           func(parent *chainnode) Node { return parent.Combine(nil) },
+		"alert":             func(parent *chainnode) Node { return parent.Alert() },
+	}
+
+	multiParents = map[string]func(*chainnode, []Node) Node{
+		"union": func(parent *chainnode, nodes []Node) Node { return parent.Union(nodes...) },
+		"join":  func(parent *chainnode, nodes []Node) Node { return parent.Join(nodes...) },
+	}
+
+	influxFunctions = map[string]func(*chainnode, string) *InfluxQLNode{
+		"count":          func(parent *chainnode, field string) *InfluxQLNode { return parent.Count(field) },
+		"distinct":       func(parent *chainnode, field string) *InfluxQLNode { return parent.Distinct(field) },
+		"mean":           func(parent *chainnode, field string) *InfluxQLNode { return parent.Mean(field) },
+		"median":         func(parent *chainnode, field string) *InfluxQLNode { return parent.Median(field) },
+		"mode":           func(parent *chainnode, field string) *InfluxQLNode { return parent.Mode(field) },
+		"spread":         func(parent *chainnode, field string) *InfluxQLNode { return parent.Spread(field) },
+		"sum":            func(parent *chainnode, field string) *InfluxQLNode { return parent.Sum(field) },
+		"first":          func(parent *chainnode, field string) *InfluxQLNode { return parent.First(field) },
+		"last":           func(parent *chainnode, field string) *InfluxQLNode { return parent.Last(field) },
+		"min":            func(parent *chainnode, field string) *InfluxQLNode { return parent.Min(field) },
+		"max":            func(parent *chainnode, field string) *InfluxQLNode { return parent.Max(field) },
+		"stddev":         func(parent *chainnode, field string) *InfluxQLNode { return parent.Stddev(field) },
+		"difference":     func(parent *chainnode, field string) *InfluxQLNode { return parent.Difference(field) },
+		"cumulativeSum":  func(parent *chainnode, field string) *InfluxQLNode { return parent.CumulativeSum(field) },
+		"percentile":     func(parent *chainnode, field string) *InfluxQLNode { return parent.Percentile(field, 0) },
+		"elapsed":        func(parent *chainnode, field string) *InfluxQLNode { return parent.Elapsed(field, 0) },
+		"movingAverage":  func(parent *chainnode, field string) *InfluxQLNode { return parent.MovingAverage(field, 0) },
+		"holtWinters":    func(parent *chainnode, field string) *InfluxQLNode { return parent.HoltWinters(field, 0, 0, 0) },
+		"holtWintersFit": func(parent *chainnode, field string) *InfluxQLNode { return parent.HoltWintersWithFit(field, 0, 0, 0) },
+	}
+}
+
+func (p *Pipeline) Unmarshal(data []byte) error {
+	var raw = &struct {
+		Nodes []json.RawMessage `json:"nodes"`
+	}{}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	for _, rawNode := range raw.Nodes {
+		var typ TypeOf
+		if err := json.Unmarshal(rawNode, &typ); err != nil {
+			return err
+		}
+		// TODO: get parents
+		parents := []Node{}
+		node, err := p.UnmarshalNode(rawNode, typ, parents)
+		if err != nil {
+			return err
+		}
+		// TODO: Link node to pipeline
+		log.Printf("%#+v", node)
+	}
+	return nil
+}
+
+func (p *Pipeline) UnmarshalNode(data []byte, typ TypeOf, parents []Node) (Node, error) {
+	src, ok := sourceFunctions[typ.Type]
+	if ok {
+		if len(parents) != 0 {
+			return nil, fmt.Errorf("expected no parents for source node %d but found %d", typ.ID, len(parents))
+		}
+		s := src()
+		p.addSource(s)
+		return s, nil
+	}
+
+	fn, ok := chainFunctions[typ.Type]
+	if ok {
+		if len(parents) != 1 {
+			return nil, fmt.Errorf("expected one parent for node %d but found %d", typ.ID, len(parents))
+		}
+		parent := parents[0]
+		chainParent, ok := parent.(*chainnode)
+		if !ok {
+			return nil, fmt.Errorf("parent node is not a chain node but is %T", parent)
+		}
+		child := fn(chainParent)
+		err := json.Unmarshal(data, child)
+		return child, err
+	}
+
+	filter, ok := sourceFilters[typ.Type]
+	if ok {
+		if len(parents) != 1 {
+			return nil, fmt.Errorf("expected one parent for node %d but found %d", typ.ID, len(parents))
+		}
+		parent := parents[0]
+		return filter(data, parent)
+	}
+
+	merge, ok := multiParents[typ.Type]
+	if ok {
+		if len(parents) < 2 {
+			return nil, fmt.Errorf("expected more than one parent for node %d but received %d", typ.ID, len(parents))
+		}
+		parent := parents[0]
+		chainParent, ok := parent.(*chainnode)
+		if !ok {
+			return nil, fmt.Errorf("parent node is not a chain node but is %T", parent)
+		}
+		child := merge(chainParent, parents[1:])
+		err := json.Unmarshal(data, child)
+		return child, err
+	}
+
+	infn, ok := influxFunctions[typ.Type]
+	if ok {
+		if len(parents) != 1 {
+			return nil, fmt.Errorf("expected one parent for node %d but found %d", typ.ID, len(parents))
+		}
+		parent := parents[0]
+		chainParent, ok := parent.(*chainnode)
+		if !ok {
+			return nil, fmt.Errorf("parent node is not a chain node but is %T", parent)
+		}
+
+		var raw = &struct {
+			Field string `json:"field"`
+		}{}
+		err := json.Unmarshal(data, raw)
+		if err != nil {
+			return nil, err
+		}
+		child := infn(chainParent, raw.Field)
+		child.Method = typ.Type
+		err = json.Unmarshal(data, child)
+		if err != nil {
+			return nil, err
+		}
+		return child, nil
+	}
+	switch typ.Type {
+	case "top", "bottom":
+		return UnmarshalTopBottom(data, parents, typ)
+	case "stats":
+		return UnmarshalStats(data, parents, typ)
+	case "udf":
+		return UnmarshalUDF(data, parents, typ)
+	}
+	return nil, fmt.Errorf("unknown function type %s for node %d", typ.Type, typ.ID)
+}
+
+func UnmarshalFrom(data []byte, source Node) (Node, error) {
+	stream, ok := source.(*StreamNode)
+	if !ok {
+		return nil, fmt.Errorf("parent of query node must be a StreamNode but is %T", source)
+	}
+	child := stream.From()
+	err := json.Unmarshal(data, child)
+	return child, err
+}
+
+func UnmarshalQuery(data []byte, source Node) (Node, error) {
+	batch, ok := source.(*BatchNode)
+	if !ok {
+		return nil, fmt.Errorf("parent of query node must be a BatchNode but is %T", source)
+	}
+	child := batch.Query("")
+	err := json.Unmarshal(data, child)
+	return child, err
+}
+
+func UnmarshalStats(data []byte, parents []Node, typ TypeOf) (Node, error) {
+	if len(parents) != 1 {
+		return nil, fmt.Errorf("expected one parent for node %d but found %d", typ.ID, len(parents))
+	}
+	parent := parents[0]
+	nodeParent, ok := parent.(*node)
+	if !ok {
+		return nil, fmt.Errorf("parent node is not a node but is %T", parent)
+	}
+	child := nodeParent.Stats(0)
+	err := json.Unmarshal(data, child)
+	return child, err
+}
+
+func UnmarshalTopBottom(data []byte, parents []Node, typ TypeOf) (Node, error) {
+	if len(parents) != 1 {
+		return nil, fmt.Errorf("expected one parent for node %d but found %d", typ.ID, len(parents))
+	}
+	parent := parents[0]
+	chainParent, ok := parent.(*chainnode)
+	if !ok {
+		return nil, fmt.Errorf("parent node is not a chain node but is %T", parent)
+	}
+
+	var raw = &struct {
+		Field string   `json:"field"`
+		Tags  []string `json:"tags"`
+	}{}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return nil, err
+	}
+	var child *InfluxQLNode
+	switch typ.Type {
+	case "top":
+		child = chainParent.Top(0, raw.Field, raw.Tags...)
+	case "bottom":
+		child = chainParent.Bottom(0, raw.Field, raw.Tags...)
+	default:
+		return nil, fmt.Errorf("expected top or bottom node but found %s", typ.Type)
+	}
+
+	err = json.Unmarshal(data, child)
+	return child, err
+}
+
+func UnmarshalUDF(data []byte, parents []Node, typ TypeOf) (Node, error) {
+	if len(parents) != 1 {
+		return nil, fmt.Errorf("expected one parent for node %d but found %d", typ.ID, len(parents))
+	}
+	parent := parents[0]
+	child := &UDFNode{}
+	parent.linkChild(child)
+	err := json.Unmarshal(data, child)
+	return child, err
+}
