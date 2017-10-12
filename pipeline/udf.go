@@ -201,59 +201,53 @@ func (u *UDFNode) unmarshal(props JSONNode) error {
 		return err
 	}
 
-	properties := map[string][]interface{}{}
+	properties := map[string][]*agent.OptionValue{}
 	for name, v := range props {
-		opt, ok := u.options[name]
-		if !ok {
+		if name == NodeID || name == NodeTypeOf || name == "udfName" {
 			continue
 		}
 		args, ok := v.([]interface{})
 		if !ok {
 			return fmt.Errorf("property %s is not a list of values but is %T", name, v)
 		}
-
-		if got, exp := len(args), len(opt.ValueTypes); got != exp {
-			return fmt.Errorf("unexpected number of args to %s, got %d expected %d", name, got, exp)
-		}
-		values := make([]interface{}, len(args))
+		values := make([]*agent.OptionValue, len(args))
 		for i, arg := range args {
-			switch opt.ValueTypes[i] {
-			case agent.ValueType_BOOL:
-				values[i], ok = arg.(bool)
-				if !ok {
-					return fmt.Errorf("property %s argument %d is not a bool value but is %T", name, i, arg)
+			switch v := arg.(type) {
+			case bool:
+				values[i] = &agent.OptionValue{
+					Type:  agent.ValueType_BOOL,
+					Value: &agent.OptionValue_BoolValue{v},
 				}
-			case agent.ValueType_INT:
-				value, ok := arg.(json.Number)
-				if !ok {
-					return fmt.Errorf("property %s argument %d is not an integer value but is %T", name, i, arg)
+			case json.Number:
+				integer, err := v.Int64()
+				if err == nil {
+					values[i] = &agent.OptionValue{
+						Type:  agent.ValueType_INT,
+						Value: &agent.OptionValue_IntValue{integer},
+					}
+					break
 				}
-				values[i], err = value.Int64()
+
+				flt, err := v.Float64()
 				if err != nil {
 					return err
 				}
-			case agent.ValueType_DOUBLE:
-				value, ok := arg.(json.Number)
-				if !ok {
-					return fmt.Errorf("property %s argument %d is not a floating point value but is %T", name, i, arg)
+				values[i] = &agent.OptionValue{
+					Type:  agent.ValueType_DOUBLE,
+					Value: &agent.OptionValue_DoubleValue{flt},
 				}
-				values[i], err = value.Float64()
-				if err != nil {
-					return err
+			case string:
+				dur, err := influxql.ParseDuration(v)
+				if err == nil {
+					values[i] = &agent.OptionValue{
+						Type:  agent.ValueType_DURATION,
+						Value: &agent.OptionValue_DurationValue{int64(dur)},
+					}
+					break
 				}
-			case agent.ValueType_STRING:
-				values[i], ok = arg.(string)
-				if !ok {
-					return fmt.Errorf("property %s argument %d is not a string value but is %T", name, i, arg)
-				}
-			case agent.ValueType_DURATION:
-				value, ok := arg.(string)
-				if !ok {
-					return fmt.Errorf("property %s argument %d is not a floating point value but is %T", name, i, arg)
-				}
-				values[i], err = influxql.ParseDuration(value)
-				if err != nil {
-					return err
+				values[i] = &agent.OptionValue{
+					Type:  agent.ValueType_STRING,
+					Value: &agent.OptionValue_StringValue{v},
 				}
 			}
 		}
@@ -265,10 +259,10 @@ func (u *UDFNode) unmarshal(props JSONNode) error {
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		_, err = u.SetProperty(name, properties[name]...)
-		if err != nil {
-			return err
-		}
+		u.Options = append(u.Options, &agent.Option{
+			Name:   name,
+			Values: properties[name],
+		})
 	}
 	return nil
 }
