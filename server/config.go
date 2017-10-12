@@ -157,6 +157,7 @@ func NewConfig() *Config {
 	c.Telegram = telegram.NewConfig()
 	c.VictorOps = victorops.NewConfig()
 
+	c.Kubernetes = []k8s.Config{k8s.NewConfig()}
 	c.Reporting = reporting.NewConfig()
 	c.Stats = stats.NewConfig()
 	c.UDF = udf.NewConfig()
