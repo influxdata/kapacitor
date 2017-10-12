@@ -252,6 +252,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.VictorOpsService = tm.VictorOpsService
 	n.PagerDutyService = tm.PagerDutyService
 	n.PushoverService = tm.PushoverService
+	n.HTTPPostService = tm.HTTPPostService
 	n.SlackService = tm.SlackService
 	n.TelegramService = tm.TelegramService
 	n.SNMPTrapService = tm.SNMPTrapService
