@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"reflect"
 	"time"
 
@@ -24,6 +25,35 @@ func newStreamNode() *StreamNode {
 			provides: StreamEdge,
 		},
 	}
+}
+
+// MarshalJSON converts StreamNode to JSON
+func (s *StreamNode) MarshalJSON() ([]byte, error) {
+	props := JSONNode{}.
+		SetType("stream").
+		SetID(s.ID())
+
+	return json.Marshal(&props)
+}
+
+func (s *StreamNode) unmarshal(props JSONNode) error {
+	err := props.CheckTypeOf("stream")
+	if err != nil {
+		return err
+	}
+	if s.id, err = props.ID(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// UnmarshalJSON converts JSON to StreamNode
+func (s *StreamNode) UnmarshalJSON(data []byte) error {
+	props, err := NewJSONNode(data)
+	if err != nil {
+		return err
+	}
+	return s.unmarshal(props)
 }
 
 // Creates a new FromNode that can be further
@@ -125,6 +155,64 @@ func newFromNode() *FromNode {
 	return &FromNode{
 		chainnode: newBasicChainNode("from", StreamEdge, StreamEdge),
 	}
+}
+
+// MarshalJSON converts FromNode to JSON
+func (n *FromNode) MarshalJSON() ([]byte, error) {
+	props := JSONNode{}.
+		SetType("from").
+		SetID(n.ID()).
+		Set("where", n.Lambda).
+		Set("groupBy", n.Dimensions).
+		Set("groupByMeasurement", n.GroupByMeasurementFlag).
+		Set("database", n.Database).
+		Set("retentionPolicy", n.RetentionPolicy).
+		Set("measurement", n.Measurement).
+		SetDuration("truncate", n.Truncate).
+		SetDuration("round", n.Round)
+
+	return json.Marshal(&props)
+}
+
+func (n *FromNode) unmarshal(props JSONNode) error {
+	err := props.CheckTypeOf("from")
+	if err != nil {
+		return err
+	}
+	if n.id, err = props.ID(); err != nil {
+		return err
+	}
+	if n.Lambda, err = props.Lambda("where"); err != nil {
+		return err
+	}
+	if n.GroupByMeasurementFlag, err = props.Bool("groupByMeasurement"); err != nil {
+		return err
+	}
+	if n.Database, err = props.String("database"); err != nil {
+		return err
+	}
+	if n.RetentionPolicy, err = props.String("retentionPolicy"); err != nil {
+		return err
+	}
+	if n.Measurement, err = props.String("measurement"); err != nil {
+		return err
+	}
+	if n.Truncate, err = props.Duration("truncate"); err != nil {
+		return err
+	}
+	if n.Round, err = props.Duration("round"); err != nil {
+		return err
+	}
+	return nil
+}
+
+// UnmarshalJSON converts JSON to FromNode
+func (n *FromNode) UnmarshalJSON(data []byte) error {
+	props, err := NewJSONNode(data)
+	if err != nil {
+		return err
+	}
+	return n.unmarshal(props)
 }
 
 //tick:ignore
