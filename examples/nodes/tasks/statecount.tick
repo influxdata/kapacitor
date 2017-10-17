@@ -1,0 +1,8 @@
+dbrp "telegraf"."autogen"
+
+stream
+    |from()
+        .measurement('cpu')
+    |where(lambda: "cpu" == 'cpu-total')
+    |groupBy('host')
+    |stateCount(lambda: "usage_idle" <= 10)
