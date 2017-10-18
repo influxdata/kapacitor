@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"reflect"
 	"time"
+
+	"github.com/influxdata/influxdb/influxql"
 )
 
 // A node that handles creating several child QueryNodes.
@@ -46,10 +48,10 @@ func newBatchNode() *BatchNode {
 func (n *BatchNode) MarshalJSON() ([]byte, error) {
 	type Alias BatchNode
 	var raw = &struct {
-		*TypeOf
+		TypeOf
 		*Alias
 	}{
-		TypeOf: &TypeOf{
+		TypeOf: TypeOf{
 			Type: "batch",
 			ID:   n.ID(),
 		},
@@ -62,7 +64,7 @@ func (n *BatchNode) MarshalJSON() ([]byte, error) {
 func (n *BatchNode) UnmarshalJSON(data []byte) error {
 	type Alias BatchNode
 	var raw = &struct {
-		*TypeOf
+		TypeOf
 		*Alias
 	}{
 		Alias: (*Alias)(n),
@@ -115,24 +117,24 @@ func (b *BatchNode) dot(buf *bytes.Buffer) {
 // In the above example InfluxDB is queried every 20 seconds; the window of time returned
 // spans 1 minute and is grouped into 10 second buckets.
 type QueryNode struct {
-	chainnode
+	chainnode `json:"-"`
 
 	// The query text
 	//tick:ignore
-	QueryStr string
+	QueryStr string `json:"queryStr"`
 
 	// The period or length of time that will be queried from InfluxDB
-	Period time.Duration
+	Period time.Duration `json:"period"`
 
 	// How often to query InfluxDB.
 	//
 	// The Every property is mutually exclusive with the Cron property.
-	Every time.Duration
+	Every time.Duration `json:"every"`
 
 	// Align start and end times with the Every value
 	// Does not apply if Cron is used.
 	// tick:ignore
-	AlignFlag bool `tick:"Align"`
+	AlignFlag bool `tick:"Align" json:"align"`
 
 	// Define a schedule using a cron syntax.
 	//
@@ -140,7 +142,7 @@ type QueryNode struct {
 	// https://github.com/gorhill/cronexpr#implementation
 	//
 	// The Cron property is mutually exclusive with the Every property.
-	Cron string
+	Cron string `json:"cron"`
 
 	// How far back in time to query from the current time
 	//
@@ -149,19 +151,19 @@ type QueryNode struct {
 	//
 	// This applies to Cron schedules as well. If the cron specifies to run every Sunday at
 	// 1 AM and the Offset is 1 hour. Then at 1 AM on Sunday the data from 12 AM will be queried.
-	Offset time.Duration
+	Offset time.Duration `json:"offset"`
 
 	// Align the group by time intervals with the start time of the query
 	// tick:ignore
-	AlignGroupFlag bool `tick:"AlignGroup"`
+	AlignGroupFlag bool `tick:"AlignGroup" json:"alignGroup"`
 
 	// The list of dimensions for the group-by clause.
 	//tick:ignore
-	Dimensions []interface{} `tick:"GroupBy"`
+	Dimensions []interface{} `tick:"GroupBy" json:"groupBy"`
 
 	// Whether to include the measurement in the group ID.
 	// tick:ignore
-	GroupByMeasurementFlag bool `tick:"GroupByMeasurement"`
+	GroupByMeasurementFlag bool `tick:"GroupByMeasurement" json:"groupByMeasurement"`
 
 	// Fill the data.
 	// Options are:
@@ -171,11 +173,11 @@ type QueryNode struct {
 	//   - previous - reports the value of the previous window
 	//   - none - suppresses timestamps and values where the value is null
 	//   - linear - reports the results of linear interpolation
-	Fill interface{}
+	Fill interface{} `json:"fill"`
 
 	// The name of a configured InfluxDB cluster.
 	// If empty the default cluster will be used.
-	Cluster string
+	Cluster string `json:"cluster"`
 }
 
 func newQueryNode() *QueryNode {
@@ -183,6 +185,67 @@ func newQueryNode() *QueryNode {
 		chainnode: newBasicChainNode("query", BatchEdge, BatchEdge),
 	}
 	return b
+}
+
+// MarshalJSON converts QueryNode to JSON
+func (n *QueryNode) MarshalJSON() ([]byte, error) {
+	type Alias QueryNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		Period string `json:"period"`
+		Every  string `json:"every"`
+		Offset string `json:"offset"`
+	}{
+		TypeOf: TypeOf{
+			Type: "query",
+			ID:   n.ID(),
+		},
+		Alias:  (*Alias)(n),
+		Period: influxql.FormatDuration(n.Period),
+		Every:  influxql.FormatDuration(n.Every),
+		Offset: influxql.FormatDuration(n.Offset),
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to an QueryNode
+func (n *QueryNode) UnmarshalJSON(data []byte) error {
+	type Alias QueryNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		Period string `json:"period"`
+		Every  string `json:"every"`
+		Offset string `json:"offset"`
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.Type != "query" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as QueryNode", raw.ID, raw.Type)
+	}
+
+	n.Period, err = influxql.ParseDuration(raw.Period)
+	if err != nil {
+		return err
+	}
+
+	n.Every, err = influxql.ParseDuration(raw.Every)
+	if err != nil {
+		return err
+	}
+
+	n.Offset, err = influxql.ParseDuration(raw.Offset)
+	if err != nil {
+		return err
+	}
+
+	n.setID(raw.ID)
+	return nil
 }
 
 //tick:ignore

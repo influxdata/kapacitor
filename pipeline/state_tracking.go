@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
@@ -36,19 +37,19 @@ import (
 // Note that as the first point in the given state has no previous point, its
 // state duration will be 0.
 type StateDurationNode struct {
-	chainnode
+	chainnode `json:"-"`
 
 	// Expression to determine whether state is active.
 	// tick:ignore
-	Lambda *ast.LambdaNode
+	Lambda *ast.LambdaNode `json:"lambda"`
 
 	// The new name of the resulting duration field.
 	// Default: 'state_duration'
-	As string
+	As string `json:"as"`
 
 	// The time unit of the resulting duration value.
 	// Default: 1s.
-	Unit time.Duration
+	Unit time.Duration `json:"unit"`
 }
 
 func newStateDurationNode(wants EdgeType, predicate *ast.LambdaNode) *StateDurationNode {
@@ -60,16 +61,47 @@ func newStateDurationNode(wants EdgeType, predicate *ast.LambdaNode) *StateDurat
 	}
 }
 
+// MarshalJSON converts StateDurationNode to JSON
 func (n *StateDurationNode) MarshalJSON() ([]byte, error) {
-	props := map[string]interface{}{
-		"type":     "stateDuration",
-		"nodeID":   fmt.Sprintf("%d", n.ID()),
-		"children": n.node,
-		"lambda":   n.Lambda,
-		"as":       n.As,
-		"unit":     n.Unit,
+	type Alias StateDurationNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		Unit string `json:"unit"`
+	}{
+		TypeOf: TypeOf{
+			Type: "stateDuration",
+			ID:   n.ID(),
+		},
+		Alias: (*Alias)(n),
+		Unit:  influxql.FormatDuration(n.Unit),
 	}
-	return json.Marshal(props)
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to an StateDurationNode
+func (n *StateDurationNode) UnmarshalJSON(data []byte) error {
+	type Alias StateDurationNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		Unit string `json:"unit"`
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.Type != "stateDuration" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as StateDurationNode", raw.ID, raw.Type)
+	}
+	n.Unit, err = influxql.ParseDuration(raw.Unit)
+	if err != nil {
+		return err
+	}
+	n.setID(raw.ID)
+	return nil
 }
 
 // Compute the number of consecutive points in a given state.
@@ -95,15 +127,15 @@ func (n *StateDurationNode) MarshalJSON() ([]byte, error) {
 //             // Critical after 5 points
 //             .crit(lambda: "state_count" >= 5)
 type StateCountNode struct {
-	chainnode
+	chainnode `json:"-"`
 
 	// Expression to determine whether state is active.
 	// tick:ignore
-	Lambda *ast.LambdaNode
+	Lambda *ast.LambdaNode `json:"lambda"`
 
 	// The new name of the resulting duration field.
 	// Default: 'state_count'
-	As string
+	As string `json:"as"`
 }
 
 func newStateCountNode(wants EdgeType, predicate *ast.LambdaNode) *StateCountNode {
@@ -116,37 +148,36 @@ func newStateCountNode(wants EdgeType, predicate *ast.LambdaNode) *StateCountNod
 
 // MarshalJSON converts StateCountNode to JSON
 func (n *StateCountNode) MarshalJSON() ([]byte, error) {
-	props := JSONNode{}.
-		SetType("stateCount").
-		SetID(n.ID()).
-		Set("lambda", n.Lambda).
-		Set("as", n.As)
-
-	return json.Marshal(&props)
+	type Alias StateCountNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+	}{
+		TypeOf: TypeOf{
+			Type: "stateCount",
+			ID:   n.ID(),
+		},
+		Alias: (*Alias)(n),
+	}
+	return json.Marshal(raw)
 }
 
-func (n *StateCountNode) unmarshal(props JSONNode) error {
-	err := props.CheckTypeOf("stateCount")
-	if err != nil {
-		return err
-	}
-	if n.id, err = props.ID(); err != nil {
-		return err
-	}
-	if n.Lambda, err = props.Lambda("lambda"); err != nil {
-		return err
-	}
-	if n.As, err = props.String("as"); err != nil {
-		return err
-	}
-	return nil
-}
-
-// UnmarshalJSON converts JSON to StateCountNode
+// UnmarshalJSON converts JSON to an StateCountNode
 func (n *StateCountNode) UnmarshalJSON(data []byte) error {
-	props, err := NewJSONNode(data)
+	type Alias StateCountNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
 	if err != nil {
 		return err
 	}
-	return n.unmarshal(props)
+	if raw.Type != "stateCount" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as StateCountNode", raw.ID, raw.Type)
+	}
+	n.setID(raw.ID)
+	return nil
 }

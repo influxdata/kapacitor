@@ -47,6 +47,7 @@ func TestWhereNode_MarshalJSON(t *testing.T) {
 				},
 			},
 			want: `{
+    "typeOf": "where",
     "id": "0",
     "lambda": {
         "expression": {
@@ -84,17 +85,16 @@ func TestWhereNode_MarshalJSON(t *testing.T) {
             "typeOf": "binary"
         },
         "typeOf": "lambda"
-    },
-    "typeOf": "where"
+    }
 }`,
 		},
 		{
 			name: "different id",
 			id:   5,
 			want: `{
+    "typeOf": "where",
     "id": "5",
-    "lambda": null,
-    "typeOf": "where"
+    "lambda": null
 }`,
 		},
 	}

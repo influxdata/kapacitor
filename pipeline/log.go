@@ -21,9 +21,9 @@ type LogNode struct {
 	// The level at which to log the data.
 	// One of: DEBUG, INFO, WARN, ERROR
 	// Default: INFO
-	Level string
+	Level string `json:"level"`
 	// Optional prefix to add to all log messages
-	Prefix string
+	Prefix string `json:"prefix"`
 }
 
 func newLogNode(wants EdgeType) *LogNode {
@@ -33,13 +33,38 @@ func newLogNode(wants EdgeType) *LogNode {
 	}
 }
 
-func (l *LogNode) MarshalJSON() ([]byte, error) {
-	props := map[string]interface{}{
-		"type":     "log",
-		"nodeID":   fmt.Sprintf("%d", l.ID()),
-		"children": l.node,
-		"level":    l.Level,
-		"prefix":   l.Prefix,
+// MarshalJSON converts LogNode to JSON
+func (n *LogNode) MarshalJSON() ([]byte, error) {
+	type Alias LogNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+	}{
+		TypeOf: TypeOf{
+			Type: "log",
+			ID:   n.ID(),
+		},
+		Alias: (*Alias)(n),
 	}
-	return json.Marshal(props)
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to an LogNode
+func (n *LogNode) UnmarshalJSON(data []byte) error {
+	type Alias LogNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.Type != "log" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as LogNode", raw.ID, raw.Type)
+	}
+	n.setID(raw.ID)
+	return nil
 }

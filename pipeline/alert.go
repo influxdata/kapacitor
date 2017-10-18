@@ -381,10 +381,10 @@ func newAlertNode(wants EdgeType) *AlertNode {
 func (n *AlertNode) MarshalJSON() ([]byte, error) {
 	type Alias AlertNodeData
 	var raw = &struct {
-		*TypeOf
+		TypeOf
 		*Alias
 	}{
-		TypeOf: &TypeOf{
+		TypeOf: TypeOf{
 			Type: "alert",
 			ID:   n.ID(),
 		},
@@ -398,7 +398,7 @@ func (n *AlertNode) MarshalJSON() ([]byte, error) {
 func (n *AlertNode) UnmarshalJSON(data []byte) error {
 	type Alias AlertNode
 	var raw = &struct {
-		*TypeOf
+		TypeOf
 		*Alias
 	}{
 		Alias: (*Alias)(n),

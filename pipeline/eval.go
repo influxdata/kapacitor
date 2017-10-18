@@ -63,10 +63,10 @@ func newEvalNode(e EdgeType, exprs []*ast.LambdaNode) *EvalNode {
 func (n *EvalNode) MarshalJSON() ([]byte, error) {
 	type Alias EvalNode
 	var raw = &struct {
-		*TypeOf
+		TypeOf
 		*Alias
 	}{
-		TypeOf: &TypeOf{
+		TypeOf: TypeOf{
 			Type: "eval",
 			ID:   n.ID(),
 		},
@@ -79,7 +79,7 @@ func (n *EvalNode) MarshalJSON() ([]byte, error) {
 func (n *EvalNode) UnmarshalJSON(data []byte) error {
 	type Alias EvalNode
 	var raw = &struct {
-		*TypeOf
+		TypeOf
 		*Alias
 	}{
 		Alias: (*Alias)(n),

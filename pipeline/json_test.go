@@ -33,30 +33,30 @@ func TestPipeline_MarshalJSON(t *testing.T) {
 			want: `{
     "nodes": [
         {
-            "id": "0",
-            "typeOf": "stream"
+            "typeOf": "stream",
+            "id": "0"
         },
         {
-            "database": "",
+            "typeOf": "from",
+            "id": "1",
+            "where": null,
             "groupBy": null,
             "groupByMeasurement": false,
-            "id": "1",
-            "measurement": "",
+            "database": "",
             "retentionPolicy": "",
+            "measurement": "",
             "round": "0s",
-            "truncate": "0s",
-            "typeOf": "from",
-            "where": null
+            "truncate": "0s"
         },
         {
-            "align": false,
-            "every": "1s",
-            "everyCount": 0,
-            "fillPeriod": false,
+            "typeOf": "window",
             "id": "2",
-            "period": "10s",
+            "align": false,
+            "fillPeriod": false,
             "periodCount": 0,
-            "typeOf": "window"
+            "everyCount": 0,
+            "period": "10s",
+            "every": "1s"
         }
     ],
     "edges": [
@@ -143,36 +143,36 @@ func TestPipeline_MarshalJSON(t *testing.T) {
 			want: `{
     "nodes": [
         {
-            "id": "0",
-            "typeOf": "stream"
+            "typeOf": "stream",
+            "id": "0"
         },
         {
-            "database": "telegraf",
-            "groupBy": [
-                "host"
-            ],
-            "groupByMeasurement": false,
-            "id": "1",
-            "measurement": "cpu",
-            "retentionPolicy": "autogen",
-            "round": "0s",
-            "truncate": "0s",
             "typeOf": "from",
+            "id": "1",
             "where": {
                 "expression": {
                     "bool": true,
                     "typeOf": "bool"
                 },
                 "typeOf": "lambda"
-            }
+            },
+            "groupBy": [
+                "host"
+            ],
+            "groupByMeasurement": false,
+            "database": "telegraf",
+            "retentionPolicy": "autogen",
+            "measurement": "cpu",
+            "round": "0s",
+            "truncate": "0s"
         },
         {
+            "typeOf": "eval",
+            "id": "2",
             "as": [
                 "value"
             ],
-            "children": {},
-            "keep": false,
-            "keepList": null,
+            "tags": null,
             "lambdas": [
                 {
                     "expression": {
@@ -182,10 +182,9 @@ func TestPipeline_MarshalJSON(t *testing.T) {
                     "typeOf": "lambda"
                 }
             ],
-            "nodeID": "2",
-            "quiet": false,
-            "tags": null,
-            "type": "eval"
+            "keep": false,
+            "keepList": null,
+            "quiet": false
         },
         {
             "typeOf": "alert",
@@ -257,28 +256,26 @@ func TestPipeline_MarshalJSON(t *testing.T) {
             "snmpTrap": null
         },
         {
-            "children": {},
-            "endpoint": "output",
-            "nodeID": "5",
-            "type": "httpOut"
+            "typeOf": "httpOut",
+            "id": "5",
+            "endpoint": "output"
         },
         {
-            "buffer": 1000,
-            "children": {},
+            "typeOf": "influxdbOut",
+            "id": "4",
             "cluster": "",
-            "create": true,
             "database": "chronograf",
-            "flushInterval": 10000000000,
-            "measurement": "alerts",
-            "nodeID": "4",
-            "precision": "",
             "retentionPolicy": "autogen",
-            "tag": {
+            "measurement": "alerts",
+            "writeConsistency": "",
+            "precision": "",
+            "buffer": 1000,
+            "tags": {
                 "alertName": "Ruley McRuleface",
                 "triggerType": "threshold"
             },
-            "type": "influxdbOut",
-            "writeConsistency": ""
+            "create": true,
+            "flushInterval": "10s"
         }
     ],
     "edges": [
@@ -678,8 +675,10 @@ func TestPipeline_unmarshalNode(t *testing.T) {
 					&chainnode{},
 				},
 				data: []byte(`{
+				"typeOf": "bottom",
 				"field": "usage_user",
-				"tags": null
+				"tags": null,
+				"args": [0]
 			}`),
 				typ: TypeOf{
 					Type: "bottom",
@@ -925,7 +924,10 @@ func Test_unmarshalQuery(t *testing.T) {
 				source: &BatchNode{},
 				data: []byte(`{
                     "typeOf": "query",
-                    "id": "2"
+                    "id": "2",
+                    "period": "0s",
+                    "every": "0s",
+                    "offset": "0s"
                 }`),
 			},
 			want: &QueryNode{},
@@ -1089,8 +1091,10 @@ func Test_unmarshalTopBottom(t *testing.T) {
 					&chainnode{},
 				},
 				data: []byte(`{
+                    "typeOf": "top",
                     "field": "usage_user",
-                    "tags": null
+                    "tags": null,
+                    "args": [0]
                 }`),
 				typ: TypeOf{
 					Type: "top",
@@ -1111,8 +1115,10 @@ func Test_unmarshalTopBottom(t *testing.T) {
 					&chainnode{},
 				},
 				data: []byte(`{
+                    "typeOf": "bottom",
                     "field": "usage_user",
-                    "tags": null
+                    "tags": null,
+                    "args": [0]
                 }`),
 				typ: TypeOf{
 					Type: "bottom",

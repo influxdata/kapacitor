@@ -97,11 +97,11 @@ func newCombineNode(e EdgeType, lambdas []*ast.LambdaNode) *CombineNode {
 func (n *CombineNode) MarshalJSON() ([]byte, error) {
 	type Alias CombineNode
 	var raw = &struct {
-		*TypeOf
+		TypeOf
 		*Alias
 		Tolerance string `json:"tolerance"`
 	}{
-		TypeOf: &TypeOf{
+		TypeOf: TypeOf{
 			Type: "combine",
 			ID:   n.ID(),
 		},
@@ -115,7 +115,7 @@ func (n *CombineNode) MarshalJSON() ([]byte, error) {
 func (n *CombineNode) UnmarshalJSON(data []byte) error {
 	type Alias CombineNode
 	var raw = &struct {
-		*TypeOf
+		TypeOf
 		*Alias
 		Tolerance string `json:"tolerance"`
 	}{

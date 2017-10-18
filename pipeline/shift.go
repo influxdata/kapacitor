@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/influxdata/influxdb/influxql"
 )
 
 // Shift points and batches in time, this is useful for comparing
@@ -21,11 +23,11 @@ import (
 //
 // Shift all data points 10s backward in time.
 type ShiftNode struct {
-	chainnode
+	chainnode `json:"-"`
 
 	// Keep one point or batch every Duration
 	// tick:ignore
-	Shift time.Duration
+	Shift time.Duration `json:"shift"`
 }
 
 func newShiftNode(wants EdgeType, shift time.Duration) *ShiftNode {
@@ -35,12 +37,45 @@ func newShiftNode(wants EdgeType, shift time.Duration) *ShiftNode {
 	}
 }
 
+// MarshalJSON converts ShiftNode to JSON
 func (n *ShiftNode) MarshalJSON() ([]byte, error) {
-	props := map[string]interface{}{
-		"type":     "shift",
-		"nodeID":   fmt.Sprintf("%d", n.ID()),
-		"children": n.node,
-		"shift":    n.Shift,
+	type Alias ShiftNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		Shift string `json:"shift"`
+	}{
+		TypeOf: TypeOf{
+			Type: "shift",
+			ID:   n.ID(),
+		},
+		Alias: (*Alias)(n),
+		Shift: influxql.FormatDuration(n.Shift),
 	}
-	return json.Marshal(props)
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to an ShiftNode
+func (n *ShiftNode) UnmarshalJSON(data []byte) error {
+	type Alias ShiftNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		Shift string `json:"shift"`
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.Type != "shift" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as ShiftNode", raw.ID, raw.Type)
+	}
+	n.Shift, err = influxql.ParseDuration(raw.Shift)
+	if err != nil {
+		return err
+	}
+	n.setID(raw.ID)
+	return nil
 }

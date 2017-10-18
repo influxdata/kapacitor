@@ -40,10 +40,10 @@ func newHTTPOutNode(wants EdgeType, endpoint string) *HTTPOutNode {
 func (n *HTTPOutNode) MarshalJSON() ([]byte, error) {
 	type Alias HTTPOutNode
 	var raw = &struct {
-		*TypeOf
+		TypeOf
 		*Alias
 	}{
-		TypeOf: &TypeOf{
+		TypeOf: TypeOf{
 			Type: "httpOut",
 			ID:   n.ID(),
 		},
@@ -56,7 +56,7 @@ func (n *HTTPOutNode) MarshalJSON() ([]byte, error) {
 func (n *HTTPOutNode) UnmarshalJSON(data []byte) error {
 	type Alias HTTPOutNode
 	var raw = &struct {
-		*TypeOf
+		TypeOf
 		*Alias
 	}{
 		Alias: (*Alias)(n),

@@ -19,6 +19,5 @@ func newNoOpNode(wants EdgeType) *NoOpNode {
 	}
 }
 
-func (n *NoOpNode) MarshalJSON() ([]byte, error) {
-	return nil, nil
-}
+func (n *NoOpNode) MarshalJSON() ([]byte, error)    { return nil, nil }
+func (n *NoOpNode) UnmarshalJSON(data []byte) error { return nil }

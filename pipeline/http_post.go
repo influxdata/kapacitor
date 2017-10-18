@@ -62,10 +62,10 @@ func newHTTPPostNode(wants EdgeType, urls ...string) *HTTPPostNode {
 func (n *HTTPPostNode) MarshalJSON() ([]byte, error) {
 	type Alias HTTPPostNode
 	var raw = &struct {
-		*TypeOf
+		TypeOf
 		*Alias
 	}{
-		TypeOf: &TypeOf{
+		TypeOf: TypeOf{
 			Type: "httpPost",
 			ID:   n.ID(),
 		},
@@ -78,7 +78,7 @@ func (n *HTTPPostNode) MarshalJSON() ([]byte, error) {
 func (n *HTTPPostNode) UnmarshalJSON(data []byte) error {
 	type Alias HTTPPostNode
 	var raw = &struct {
-		*TypeOf
+		TypeOf
 		*Alias
 	}{
 		Alias: (*Alias)(n),

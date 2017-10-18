@@ -32,7 +32,7 @@ func TestWindowNode_MarshalJSON(t *testing.T) {
 				PeriodCount:    1,
 				EveryCount:     2,
 			},
-			want: `{"align":true,"every":"1m","everyCount":2,"fillPeriod":true,"id":"0","period":"1h","periodCount":1,"typeOf":"window"}`,
+			want: `{"typeOf":"window","id":"0","align":true,"fillPeriod":true,"periodCount":1,"everyCount":2,"period":"1h","every":"1m"}`,
 		},
 		{
 			name: "only period and every",
@@ -40,7 +40,7 @@ func TestWindowNode_MarshalJSON(t *testing.T) {
 				Period: time.Hour,
 				Every:  time.Minute,
 			},
-			want: `{"align":false,"every":"1m","everyCount":0,"fillPeriod":false,"id":"0","period":"1h","periodCount":0,"typeOf":"window"}`,
+			want: `{"typeOf":"window","id":"0","align":false,"fillPeriod":false,"periodCount":0,"everyCount":0,"period":"1h","every":"1m"}`,
 		},
 	}
 	for _, tt := range tests {
@@ -59,7 +59,7 @@ func TestWindowNode_MarshalJSON(t *testing.T) {
 			}
 			got := string(g)
 			if got != tt.want {
-				t.Errorf("WindowNode.MarshalJSON() = %s, want %s", got, tt.want)
+				t.Errorf("WindowNode.MarshalJSON() = \n%s\n, want\n%s\n", got, tt.want)
 			}
 		})
 	}

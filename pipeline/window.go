@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/influxdata/influxdb/influxql"
 )
 
 // A `window` node caches data within a moving time range.
@@ -57,63 +59,56 @@ func newWindowNode() *WindowNode {
 }
 
 // MarshalJSON converts WindowNode to JSON
-func (w *WindowNode) MarshalJSON() ([]byte, error) {
-	props := JSONNode{}.
-		SetType("window").
-		SetID(w.ID()).
-		SetDuration("period", w.Period).
-		SetDuration("every", w.Every).
-		Set("align", w.AlignFlag).
-		Set("fillPeriod", w.FillPeriodFlag).
-		Set("periodCount", w.PeriodCount).
-		Set("everyCount", w.EveryCount)
-
-	return json.Marshal(&props)
+func (n *WindowNode) MarshalJSON() ([]byte, error) {
+	type Alias WindowNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		Period string `json:"period"`
+		Every  string `json:"every"`
+	}{
+		TypeOf: TypeOf{
+			Type: "window",
+			ID:   n.ID(),
+		},
+		Alias:  (*Alias)(n),
+		Period: influxql.FormatDuration(n.Period),
+		Every:  influxql.FormatDuration(n.Every),
+	}
+	return json.Marshal(raw)
 }
 
-func (w *WindowNode) unmarshal(props JSONNode) error {
-	err := props.CheckTypeOf("window")
+// UnmarshalJSON converts JSON to an WindowNode
+func (n *WindowNode) UnmarshalJSON(data []byte) error {
+	type Alias WindowNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		Period string `json:"period"`
+		Every  string `json:"every"`
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.Type != "window" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as WindowNode", raw.ID, raw.Type)
+	}
+
+	n.Period, err = influxql.ParseDuration(raw.Period)
 	if err != nil {
 		return err
 	}
 
-	if w.id, err = props.ID(); err != nil {
+	n.Every, err = influxql.ParseDuration(raw.Every)
+	if err != nil {
 		return err
 	}
 
-	if w.Period, err = props.Duration("period"); err != nil {
-		return err
-	}
-
-	if w.Every, err = props.Duration("every"); err != nil {
-		return err
-	}
-
-	if w.AlignFlag, err = props.Bool("align"); err != nil {
-		return err
-	}
-
-	if w.FillPeriodFlag, err = props.Bool("fillPeriod"); err != nil {
-		return err
-	}
-
-	if w.PeriodCount, err = props.Int64("periodCount"); err != nil {
-		return err
-	}
-
-	if w.EveryCount, err = props.Int64("everyCount"); err != nil {
-		return err
-	}
+	n.setID(raw.ID)
 	return nil
-}
-
-// UnmarshalJSON converts JSON to WindowNode
-func (w *WindowNode) UnmarshalJSON(data []byte) error {
-	props, err := NewJSONNode(data)
-	if err != nil {
-		return err
-	}
-	return w.unmarshal(props)
 }
 
 // If the `align` property is not used to modify the `window` node, then the

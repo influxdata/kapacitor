@@ -43,10 +43,10 @@ func newDeleteNode(e EdgeType) *DeleteNode {
 func (n *DeleteNode) MarshalJSON() ([]byte, error) {
 	type Alias DeleteNode
 	var raw = &struct {
-		*TypeOf
+		TypeOf
 		*Alias
 	}{
-		TypeOf: &TypeOf{
+		TypeOf: TypeOf{
 			Type: "delete",
 			ID:   n.ID(),
 		},
@@ -59,7 +59,7 @@ func (n *DeleteNode) MarshalJSON() ([]byte, error) {
 func (n *DeleteNode) UnmarshalJSON(data []byte) error {
 	type Alias DeleteNode
 	var raw = &struct {
-		*TypeOf
+		TypeOf
 		*Alias
 	}{
 		Alias: (*Alias)(n),

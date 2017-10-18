@@ -26,17 +26,17 @@ import (
 //    * points_written -- number of points written back to Kapacitor
 //
 type KapacitorLoopbackNode struct {
-	node
+	node `json:"-"`
 
 	// The name of the database.
-	Database string
+	Database string `json:"database"`
 	// The name of the retention policy.
-	RetentionPolicy string
+	RetentionPolicy string `json:"retention_policy"`
 	// The name of the measurement.
-	Measurement string
+	Measurement string `json:"measurement"`
 	// Static set of tags to add to all data points before writing them.
 	// tick:ignore
-	Tags map[string]string `tick:"Tag"`
+	Tags map[string]string `tick:"Tag" json:"tags"`
 }
 
 func newKapacitorLoopbackNode(wants EdgeType) *KapacitorLoopbackNode {
@@ -50,17 +50,40 @@ func newKapacitorLoopbackNode(wants EdgeType) *KapacitorLoopbackNode {
 	}
 }
 
-func (k *KapacitorLoopbackNode) MarshalJSON() ([]byte, error) {
-	props := map[string]interface{}{
-		"type":            "kapacitorLoopback",
-		"nodeID":          fmt.Sprintf("%d", k.ID()),
-		"children":        k.node,
-		"database":        k.Database,
-		"retentionPolicy": k.RetentionPolicy,
-		"measurement":     k.Measurement,
-		"tag":             k.Tags,
+// MarshalJSON converts KapacitorLoopbackNode to JSON
+func (n *KapacitorLoopbackNode) MarshalJSON() ([]byte, error) {
+	type Alias KapacitorLoopbackNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+	}{
+		TypeOf: TypeOf{
+			Type: "kapacitorLoopback",
+			ID:   n.ID(),
+		},
+		Alias: (*Alias)(n),
 	}
-	return json.Marshal(props)
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to an KapacitorLoopbackNode
+func (n *KapacitorLoopbackNode) UnmarshalJSON(data []byte) error {
+	type Alias KapacitorLoopbackNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.Type != "kapacitorLoopback" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as KapacitorLoopbackNode", raw.ID, raw.Type)
+	}
+	n.setID(raw.ID)
+	return nil
 }
 
 // Add a static tag to all data points.

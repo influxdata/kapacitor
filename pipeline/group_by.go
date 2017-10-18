@@ -48,10 +48,10 @@ func newGroupByNode(wants EdgeType, dims []interface{}) *GroupByNode {
 func (n *GroupByNode) MarshalJSON() ([]byte, error) {
 	type Alias GroupByNode
 	var raw = &struct {
-		*TypeOf
+		TypeOf
 		*Alias
 	}{
-		TypeOf: &TypeOf{
+		TypeOf: TypeOf{
 			Type: "groupBy",
 			ID:   n.ID(),
 		},
@@ -64,7 +64,7 @@ func (n *GroupByNode) MarshalJSON() ([]byte, error) {
 func (n *GroupByNode) UnmarshalJSON(data []byte) error {
 	type Alias GroupByNode
 	var raw = &struct {
-		*TypeOf
+		TypeOf
 		*Alias
 	}{
 		Alias: (*Alias)(n),

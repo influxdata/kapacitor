@@ -46,10 +46,10 @@ func newDefaultNode(e EdgeType) *DefaultNode {
 func (n *DefaultNode) MarshalJSON() ([]byte, error) {
 	type Alias DefaultNode
 	var raw = &struct {
-		*TypeOf
+		TypeOf
 		*Alias
 	}{
-		TypeOf: &TypeOf{
+		TypeOf: TypeOf{
 			Type: "default",
 			ID:   n.ID(),
 		},
@@ -62,7 +62,7 @@ func (n *DefaultNode) MarshalJSON() ([]byte, error) {
 func (n *DefaultNode) UnmarshalJSON(data []byte) error {
 	type Alias DefaultNode
 	var raw = &struct {
-		*TypeOf
+		TypeOf
 		*Alias
 	}{
 		Alias: (*Alias)(n),

@@ -397,7 +397,7 @@ func init() {
 		"elapsed":       func(parent chainnodeAlias, field string) *InfluxQLNode { return parent.Elapsed(field, 0) },
 		"movingAverage": func(parent chainnodeAlias, field string) *InfluxQLNode { return parent.MovingAverage(field, 0) },
 		"holtWinters":   func(parent chainnodeAlias, field string) *InfluxQLNode { return parent.HoltWinters(field, 0, 0, 0) },
-		"holtWintersFit": func(parent chainnodeAlias, field string) *InfluxQLNode {
+		"holtWintersWithFit": func(parent chainnodeAlias, field string) *InfluxQLNode {
 			return parent.HoltWintersWithFit(field, 0, 0, 0)
 		},
 	}

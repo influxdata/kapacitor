@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/influxdata/kapacitor/tick/ast"
 )
@@ -21,7 +22,7 @@ import (
 //        .email().to('user@example.com')
 //
 type WhereNode struct {
-	chainnode
+	chainnode `json:"-"`
 	// The expression predicate.
 	// tick:ignore
 	Lambda *ast.LambdaNode `json:"lambda"`
@@ -35,36 +36,37 @@ func newWhereNode(wants EdgeType, predicate *ast.LambdaNode) *WhereNode {
 }
 
 // MarshalJSON converts WhereNode to JSON
-func (w *WhereNode) MarshalJSON() ([]byte, error) {
-	props := JSONNode{}.
-		SetType("where").
-		SetID(w.ID()).
-		Set("lambda", w.Lambda)
-
-	return json.Marshal(&props)
+func (n *WhereNode) MarshalJSON() ([]byte, error) {
+	type Alias WhereNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+	}{
+		TypeOf: TypeOf{
+			Type: "where",
+			ID:   n.ID(),
+		},
+		Alias: (*Alias)(n),
+	}
+	return json.Marshal(raw)
 }
 
-func (w *WhereNode) unmarshal(props JSONNode) error {
-	err := props.CheckTypeOf("where")
+// UnmarshalJSON converts JSON to an WhereNode
+func (n *WhereNode) UnmarshalJSON(data []byte) error {
+	type Alias WhereNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
 	if err != nil {
 		return err
 	}
-
-	if w.id, err = props.ID(); err != nil {
-		return err
+	if raw.Type != "where" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as WhereNode", raw.ID, raw.Type)
 	}
-
-	if w.Lambda, err = props.Lambda("lambda"); err != nil {
-		return err
-	}
+	n.setID(raw.ID)
 	return nil
-}
-
-// UnmarshalJSON converts JSON to WhereNode
-func (w *WhereNode) UnmarshalJSON(data []byte) error {
-	props, err := NewJSONNode(data)
-	if err != nil {
-		return err
-	}
-	return w.unmarshal(props)
 }

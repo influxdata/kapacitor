@@ -1,6 +1,9 @@
 package pipeline
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // Takes the union of all of its parents.
 // The union is just a simple pass through.
@@ -24,11 +27,11 @@ import "encoding/json"
 //        ...
 //
 type UnionNode struct {
-	chainnode
+	chainnode `json:"-"`
 	// The new name of the stream.
 	// If empty the name of the left node
 	// (i.e. `leftNode.union(otherNode1, otherNode2)`) is used.
-	Rename string
+	Rename string `json:"rename"`
 }
 
 func newUnionNode(e EdgeType, nodes []Node) *UnionNode {
@@ -43,35 +46,36 @@ func newUnionNode(e EdgeType, nodes []Node) *UnionNode {
 
 // MarshalJSON converts UnionNode to JSON
 func (n *UnionNode) MarshalJSON() ([]byte, error) {
-	props := JSONNode{}.
-		SetType("union").
-		SetID(n.ID()).
-		Set("rename", n.Rename)
-
-	return json.Marshal(&props)
+	type Alias UnionNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+	}{
+		TypeOf: TypeOf{
+			Type: "union",
+			ID:   n.ID(),
+		},
+		Alias: (*Alias)(n),
+	}
+	return json.Marshal(raw)
 }
 
-func (n *UnionNode) unmarshal(props JSONNode) error {
-	err := props.CheckTypeOf("union")
-	if err != nil {
-		return err
-	}
-
-	if n.id, err = props.ID(); err != nil {
-		return err
-	}
-
-	if n.Rename, err = props.String("rename"); err != nil {
-		return err
-	}
-	return nil
-}
-
-// UnmarshalJSON converts JSON to UnionNode
+// UnmarshalJSON converts JSON to an UnionNode
 func (n *UnionNode) UnmarshalJSON(data []byte) error {
-	props, err := NewJSONNode(data)
+	type Alias UnionNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
 	if err != nil {
 		return err
 	}
-	return n.unmarshal(props)
+	if raw.Type != "union" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as UnionNode", raw.ID, raw.Type)
+	}
+	n.setID(raw.ID)
+	return nil
 }
