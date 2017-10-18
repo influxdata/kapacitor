@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
+	"sort"
 	"strconv"
 	"time"
 
@@ -25,26 +25,6 @@ type TypeOf struct {
 	ID   ID     `json:"id,string"`
 }
 
-// Marshal will be removed
-func Marshal(n Node) ([]byte, error) {
-	switch node := n.(type) {
-	case *WindowNode:
-		type _WindowNode WindowNode
-		return json.Marshal(struct {
-			*WindowNode
-			TypeOf
-		}{
-			WindowNode: node,
-			TypeOf: TypeOf{
-				Type: "window",
-				ID:   n.ID(),
-			},
-		})
-
-	}
-	return nil, nil
-}
-
 // Edge is a connection between a parent ID and a ChildID
 type Edge struct {
 	Parent ID `json:"parent,string"`
@@ -53,112 +33,72 @@ type Edge struct {
 
 // JSONPipeline is the JSON serialization format for Pipeline
 type JSONPipeline struct {
-	Nodes    []*JSONNode `json:"nodes"`
-	Edges    []Edge      `json:"edges"`
-	ids      map[string]*JSONNode
-	types    map[string]string
-	srcs     map[string]Node
-	stats    []string
-	sorted   []string
-	parents  map[ID][]ID
-	children map[ID][]ID
+	Nodes []json.RawMessage `json:"nodes"`
+	Edges []Edge            `json:"edges"`
 }
 
-// Unmarshal will decode JSON structure into a cache of maps
-func (j *JSONPipeline) Unmarshal(data []byte, v interface{}) error {
-	type _j struct {
-		*JSONPipeline
-	}
-	// Prevent recursion by creating a fake type
-	if err := json.Unmarshal(data, _j{j}); err != nil {
-		return err
-	}
-	return nil
-	//return j.cache()
-}
-
-/*
-func (j *JSONPipeline) cache() error {
-	for _, node := range j.Nodes {
-		typ, err := node.Type()
-		if err != nil {
-			return err
-		}
-		id, err := node.ID()
-		if err != nil {
-			return err
-		}
-
-		j.ids[id] = node
-		j.types[id] = typ
-
-		if src, ok := node.IsSource(typ); ok {
-			j.srcs[id] = src
-		}
-
-		if node.IsStat(typ) {
-			j.stats = append(j.stats, id)
-		}
-	}
-
-	j.toGraph()
-
-	sorter := PipelineSorter{
-		Graph: j.parents,
-	}
-	var err error
-	j.sorted, err = sorter.Sort()
-	return err
-}*/
-
-func (j *JSONPipeline) Parents(id ID) []ID {
-	return j.children[id]
-}
-
-func (j *JSONPipeline) toGraph() {
-	for _, edge := range j.Edges {
-		parent, ok := j.parents[edge.Parent]
-		if !ok {
-			parent = []ID{}
-		}
-		parent = append(parent, edge.Child)
-		j.parents[edge.Parent] = parent
-
-		child, ok := j.children[edge.Child]
-		if !ok {
-			child = []ID{}
-		}
-		child = append(child, edge.Parent)
-		j.children[edge.Child] = child
-	}
-}
-
-// Sources returns all source nodes in the raw JSONPipeline
-func (j *JSONPipeline) Sources() map[string]Node {
-	return j.srcs
-}
-
-func (j *JSONPipeline) Sorted() []string {
-	return j.sorted
-}
-
+type Graph map[ID][]ID
 type PipelineSorter struct {
-	Graph     map[string][]string
-	permanent map[string]bool
-	temporary map[string]bool
-	sorted    []string
+	Edges         []Edge
+	ChildrenOf    Graph
+	ParentsOf     Graph
+	SortedIndexes map[ID]int
+	sorted        []ID
+
+	permanent map[ID]bool
+	temporary map[ID]bool
 }
 
-func (p *PipelineSorter) Sort() ([]string, error) {
-	for n := range p.Graph {
-		if err := p.visit(n); err != nil {
+func NewPipelineSorter(edges []Edge) *PipelineSorter {
+	return &PipelineSorter{
+		Edges:         edges,
+		ChildrenOf:    Graph{},
+		ParentsOf:     Graph{},
+		SortedIndexes: map[ID]int{},
+		permanent:     map[ID]bool{},
+		temporary:     map[ID]bool{},
+	}
+}
+
+func (p *PipelineSorter) Graphs() (childrenOf Graph, parentsOf Graph) {
+	if len(p.ChildrenOf) == 0 || len(p.ParentsOf) == 0 {
+		childrenOf := Graph{}
+		parentsOf := Graph{}
+		for _, edge := range p.Edges {
+			children, ok := childrenOf[edge.Parent]
+			if !ok {
+				children = []ID{}
+			}
+			children = append(children, edge.Child)
+			childrenOf[edge.Parent] = children
+
+			parents, ok := parentsOf[edge.Child]
+			if !ok {
+				parents = []ID{}
+			}
+			parents = append(parents, edge.Parent)
+			parentsOf[edge.Child] = parents
+		}
+		p.ChildrenOf = childrenOf
+		p.ParentsOf = parentsOf
+	}
+	return p.ChildrenOf, p.ParentsOf
+}
+
+func (p *PipelineSorter) Sort() (map[ID]int, error) {
+	childrenOf, _ := p.Graphs()
+	for n := range childrenOf {
+		if err := p.visit(n, childrenOf); err != nil {
 			return nil, err
 		}
 	}
-	return p.sorted, nil
+	for i, id := range p.sorted {
+		p.SortedIndexes[id] = i
+	}
+	return p.SortedIndexes, nil
 }
 
-func (p *PipelineSorter) visit(node string) error {
+func (p *PipelineSorter) visit(node ID, childrenOf Graph) error {
 	if _, marked := p.permanent[node]; marked {
 		return nil
 	}
@@ -166,12 +106,12 @@ func (p *PipelineSorter) visit(node string) error {
 		return fmt.Errorf("cycle detected. kapacitor pipelines must not have cycles")
 	}
 	p.temporary[node] = true
-	children := p.Graph[node]
+	children := childrenOf[node]
 	for _, child := range children {
-		p.visit(child)
+		p.visit(child, childrenOf)
 	}
 	p.permanent[node] = true
-	p.sorted = append([]string{node}, p.sorted...)
+	p.sorted = append([]ID{node}, p.sorted...)
 	return nil
 }
 
@@ -364,63 +304,6 @@ func (j JSONNode) ID() (ID, error) {
 	return ID(id), err
 }
 
-/*
-// Unmarshal deserializes the pipeline from JSON.
-func (p *Pipeline) Unmarshal(data []byte, v interface{}) error {
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.UseNumber()
-	var input JSONPipeline
-	if err := dec.Decode(&input); err != nil {
-		return err
-	}
-	nodes := map[string]Node{}
-	sorted := input.Sorted()
-	for _, n := range sorted {
-		parents := input.Parents(n)
-		if len(parents) == 0 {
-			return fmt.Errorf("Node ID %s requires at least one parent", n)
-		}
-		root := nodes[parents[0]]
-		node, ok := input.ids[n]
-		if !ok {
-			return fmt.Errorf("Node ID %s has edge but no node body", n)
-		}
-		typ, err := node.Type()
-		if err != nil {
-			return err
-		}
-		switch typ {
-		case "stream":
-			strm := newStreamNode()
-			nodes[n] = strm
-			p.addSource(strm)
-		case "batch":
-			batch := newBatchNode()
-			nodes[n] = batch
-			p.addSource(batch)
-		case "from":
-			strm, ok := root.(*StreamNode)
-			if !ok {
-				return fmt.Errorf("Node ID %s parent is not a stream but %T", n, root)
-			}
-			from := strm.From()
-			nodes[n] = from
-			rFrom, err := tick.NewReflectionDescriber(from, nil)
-			if err != nil {
-				return err
-			}
-			for k, v := range *node {
-				if k == "typeOf" || k == "id" {
-					continue
-				}
-				rFrom.PropertyType
-			}
-		}
-	}
-	return nil
-}
-*/
-
 func (p *Pipeline) MarshalJSON() ([]byte, error) {
 	if p.sorted == nil {
 		p.sort()
@@ -443,11 +326,11 @@ func (p *Pipeline) MarshalJSON() ([]byte, error) {
 	return json.Marshal(raw)
 }
 
-var chainFunctions map[string]func(parent *chainnode) Node
+var chainFunctions map[string]func(parent chainnodeAlias) Node
 var sourceFunctions map[string]func() Node
 var sourceFilters map[string]func([]byte, Node) (Node, error)
-var multiParents map[string]func(*chainnode, []Node) Node
-var influxFunctions map[string]func(*chainnode, string) *InfluxQLNode
+var multiParents map[string]func(chainnodeAlias, []Node) Node
+var influxFunctions map[string]func(chainnodeAlias, string) *InfluxQLNode
 
 func init() {
 	// Add all possible sources
@@ -458,89 +341,128 @@ func init() {
 
 	// Filters modify the source and produce a specific data stream
 	sourceFilters = map[string]func([]byte, Node) (Node, error){
-		"from":  UnmarshalFrom,
-		"query": UnmarshalQuery,
+		"from":  unmarshalFrom,
+		"query": unmarshalQuery,
 	}
 
 	// Add default construction of chain nodes
-	chainFunctions = map[string]func(parent *chainnode) Node{
-		"window":            func(parent *chainnode) Node { return parent.Window() },
-		"where":             func(parent *chainnode) Node { return parent.Where(nil) },
-		"swarmAutoscale":    func(parent *chainnode) Node { return parent.SwarmAutoscale() },
-		"stateDuration":     func(parent *chainnode) Node { return parent.StateDuration(nil) },
-		"stateCount":        func(parent *chainnode) Node { return parent.StateCount(nil) },
-		"shift":             func(parent *chainnode) Node { return parent.Shift(0) },
-		"sample":            func(parent *chainnode) Node { return parent.Sample(0) },
-		"log":               func(parent *chainnode) Node { return parent.Log() },
-		"kapacitorLoopback": func(parent *chainnode) Node { return parent.KapacitorLoopback() },
-		"k8sAutoscale":      func(parent *chainnode) Node { return parent.K8sAutoscale() },
-		"influxdbOut":       func(parent *chainnode) Node { return parent.InfluxDBOut() },
-		"httpPost":          func(parent *chainnode) Node { return parent.HttpPost() },
-		"httpOut":           func(parent *chainnode) Node { return parent.HttpOut("") },
-		"groupBy":           func(parent *chainnode) Node { return parent.GroupBy() },
-		"flatten":           func(parent *chainnode) Node { return parent.Flatten() },
-		"eval":              func(parent *chainnode) Node { return parent.Eval() },
-		"derivative":        func(parent *chainnode) Node { return parent.Derivative("") },
-		"delete":            func(parent *chainnode) Node { return parent.Delete() },
-		"default":           func(parent *chainnode) Node { return parent.Default() },
-		"combine":           func(parent *chainnode) Node { return parent.Combine(nil) },
-		"alert":             func(parent *chainnode) Node { return parent.Alert() },
+	chainFunctions = map[string]func(parent chainnodeAlias) Node{
+		"window":            func(parent chainnodeAlias) Node { return parent.Window() },
+		"swarmAutoscale":    func(parent chainnodeAlias) Node { return parent.SwarmAutoscale() },
+		"stats":             func(parent chainnodeAlias) Node { return parent.Stats(0) },
+		"stateDuration":     func(parent chainnodeAlias) Node { return parent.StateDuration(nil) },
+		"stateCount":        func(parent chainnodeAlias) Node { return parent.StateCount(nil) },
+		"shift":             func(parent chainnodeAlias) Node { return parent.Shift(0) },
+		"sample":            func(parent chainnodeAlias) Node { return parent.Sample(0) },
+		"log":               func(parent chainnodeAlias) Node { return parent.Log() },
+		"kapacitorLoopback": func(parent chainnodeAlias) Node { return parent.KapacitorLoopback() },
+		"k8sAutoscale":      func(parent chainnodeAlias) Node { return parent.K8sAutoscale() },
+		"influxdbOut":       func(parent chainnodeAlias) Node { return parent.InfluxDBOut() },
+		"httpPost":          func(parent chainnodeAlias) Node { return parent.HttpPost() },
+		"httpOut":           func(parent chainnodeAlias) Node { return parent.HttpOut("") },
+		"flatten":           func(parent chainnodeAlias) Node { return parent.Flatten() },
+		"eval":              func(parent chainnodeAlias) Node { return parent.Eval() },
+		"derivative":        func(parent chainnodeAlias) Node { return parent.Derivative("") },
+		"delete":            func(parent chainnodeAlias) Node { return parent.Delete() },
+		"default":           func(parent chainnodeAlias) Node { return parent.Default() },
+		"combine":           func(parent chainnodeAlias) Node { return parent.Combine(nil) },
+		"alert":             func(parent chainnodeAlias) Node { return parent.Alert() },
 	}
 
-	multiParents = map[string]func(*chainnode, []Node) Node{
-		"union": func(parent *chainnode, nodes []Node) Node { return parent.Union(nodes...) },
-		"join":  func(parent *chainnode, nodes []Node) Node { return parent.Join(nodes...) },
+	multiParents = map[string]func(chainnodeAlias, []Node) Node{
+		"union": func(parent chainnodeAlias, nodes []Node) Node { return parent.Union(nodes...) },
+		"join":  func(parent chainnodeAlias, nodes []Node) Node { return parent.Join(nodes...) },
 	}
 
-	influxFunctions = map[string]func(*chainnode, string) *InfluxQLNode{
-		"count":          func(parent *chainnode, field string) *InfluxQLNode { return parent.Count(field) },
-		"distinct":       func(parent *chainnode, field string) *InfluxQLNode { return parent.Distinct(field) },
-		"mean":           func(parent *chainnode, field string) *InfluxQLNode { return parent.Mean(field) },
-		"median":         func(parent *chainnode, field string) *InfluxQLNode { return parent.Median(field) },
-		"mode":           func(parent *chainnode, field string) *InfluxQLNode { return parent.Mode(field) },
-		"spread":         func(parent *chainnode, field string) *InfluxQLNode { return parent.Spread(field) },
-		"sum":            func(parent *chainnode, field string) *InfluxQLNode { return parent.Sum(field) },
-		"first":          func(parent *chainnode, field string) *InfluxQLNode { return parent.First(field) },
-		"last":           func(parent *chainnode, field string) *InfluxQLNode { return parent.Last(field) },
-		"min":            func(parent *chainnode, field string) *InfluxQLNode { return parent.Min(field) },
-		"max":            func(parent *chainnode, field string) *InfluxQLNode { return parent.Max(field) },
-		"stddev":         func(parent *chainnode, field string) *InfluxQLNode { return parent.Stddev(field) },
-		"difference":     func(parent *chainnode, field string) *InfluxQLNode { return parent.Difference(field) },
-		"cumulativeSum":  func(parent *chainnode, field string) *InfluxQLNode { return parent.CumulativeSum(field) },
-		"percentile":     func(parent *chainnode, field string) *InfluxQLNode { return parent.Percentile(field, 0) },
-		"elapsed":        func(parent *chainnode, field string) *InfluxQLNode { return parent.Elapsed(field, 0) },
-		"movingAverage":  func(parent *chainnode, field string) *InfluxQLNode { return parent.MovingAverage(field, 0) },
-		"holtWinters":    func(parent *chainnode, field string) *InfluxQLNode { return parent.HoltWinters(field, 0, 0, 0) },
-		"holtWintersFit": func(parent *chainnode, field string) *InfluxQLNode { return parent.HoltWintersWithFit(field, 0, 0, 0) },
+	influxFunctions = map[string]func(chainnodeAlias, string) *InfluxQLNode{
+		"count":         func(parent chainnodeAlias, field string) *InfluxQLNode { return parent.Count(field) },
+		"distinct":      func(parent chainnodeAlias, field string) *InfluxQLNode { return parent.Distinct(field) },
+		"mean":          func(parent chainnodeAlias, field string) *InfluxQLNode { return parent.Mean(field) },
+		"median":        func(parent chainnodeAlias, field string) *InfluxQLNode { return parent.Median(field) },
+		"mode":          func(parent chainnodeAlias, field string) *InfluxQLNode { return parent.Mode(field) },
+		"spread":        func(parent chainnodeAlias, field string) *InfluxQLNode { return parent.Spread(field) },
+		"sum":           func(parent chainnodeAlias, field string) *InfluxQLNode { return parent.Sum(field) },
+		"first":         func(parent chainnodeAlias, field string) *InfluxQLNode { return parent.First(field) },
+		"last":          func(parent chainnodeAlias, field string) *InfluxQLNode { return parent.Last(field) },
+		"min":           func(parent chainnodeAlias, field string) *InfluxQLNode { return parent.Min(field) },
+		"max":           func(parent chainnodeAlias, field string) *InfluxQLNode { return parent.Max(field) },
+		"stddev":        func(parent chainnodeAlias, field string) *InfluxQLNode { return parent.Stddev(field) },
+		"difference":    func(parent chainnodeAlias, field string) *InfluxQLNode { return parent.Difference(field) },
+		"cumulativeSum": func(parent chainnodeAlias, field string) *InfluxQLNode { return parent.CumulativeSum(field) },
+		"percentile":    func(parent chainnodeAlias, field string) *InfluxQLNode { return parent.Percentile(field, 0) },
+		"elapsed":       func(parent chainnodeAlias, field string) *InfluxQLNode { return parent.Elapsed(field, 0) },
+		"movingAverage": func(parent chainnodeAlias, field string) *InfluxQLNode { return parent.MovingAverage(field, 0) },
+		"holtWinters":   func(parent chainnodeAlias, field string) *InfluxQLNode { return parent.HoltWinters(field, 0, 0, 0) },
+		"holtWintersFit": func(parent chainnodeAlias, field string) *InfluxQLNode {
+			return parent.HoltWintersWithFit(field, 0, 0, 0)
+		},
 	}
+}
+
+// IRNode is the intermediate representation of a node between JSON unmarshaling and a pipeline Node
+type IRNode struct {
+	Raw    json.RawMessage
+	TypeOf TypeOf
+	Pos    int
 }
 
 func (p *Pipeline) Unmarshal(data []byte) error {
-	var raw = &struct {
-		Nodes []json.RawMessage `json:"nodes"`
-	}{}
-	err := json.Unmarshal(data, raw)
+	var raw JSONPipeline
+	err := json.Unmarshal(data, &raw)
 	if err != nil {
 		return err
 	}
-	for _, rawNode := range raw.Nodes {
-		var typ TypeOf
-		if err := json.Unmarshal(rawNode, &typ); err != nil {
+	sorter := NewPipelineSorter(raw.Edges)
+	_, parentsOf := sorter.Graphs()
+	sorted, err := sorter.Sort()
+	if err != nil {
+		return err
+	}
+
+	// The intermediate representation is used to grab the type and id
+	// information common to all nodes. Additionally, the slice can be
+	// sorted using the positions of the nodes in the topo sort from above.
+	irNodes := make([]IRNode, len(raw.Nodes))
+	for i, rawNode := range raw.Nodes {
+		if err := json.Unmarshal(rawNode, &irNodes[i].TypeOf); err != nil {
 			return err
 		}
-		// TODO: get parents
-		parents := []Node{}
-		node, err := p.UnmarshalNode(rawNode, typ, parents)
+		id := irNodes[i].TypeOf.ID
+		pos, ok := sorted[id]
+		if !ok {
+			return fmt.Errorf("node %d not listed in edges", id)
+		}
+		irNodes[i].Pos = pos
+		irNodes[i].Raw = rawNode
+	}
+
+	sort.Slice(irNodes, func(i, j int) bool {
+		return irNodes[i].Pos < irNodes[j].Pos
+	})
+
+	nodes := map[ID]Node{} // used to lookup nodes that have been fully deserialized
+	// Need to go through sort order to guarantee that parents have been constructed before children
+	for _, irNode := range irNodes {
+		parentIDs := parentsOf[irNode.TypeOf.ID]
+		parents := make([]Node, len(parentIDs))
+		for i, id := range parentIDs {
+			parent, ok := nodes[id]
+			if !ok {
+				return fmt.Errorf("parent %d of node %d not yet created", id, irNode.TypeOf.ID)
+			}
+			parents[i] = parent
+		}
+		node, err := p.unmarshalNode(irNode.Raw, irNode.TypeOf, parents)
 		if err != nil {
 			return err
 		}
-		// TODO: Link node to pipeline
-		log.Printf("%#+v", node)
+		nodes[irNode.TypeOf.ID] = node
 	}
+	p.sort()
 	return nil
 }
 
-func (p *Pipeline) UnmarshalNode(data []byte, typ TypeOf, parents []Node) (Node, error) {
+func (p *Pipeline) unmarshalNode(data []byte, typ TypeOf, parents []Node) (Node, error) {
 	src, ok := sourceFunctions[typ.Type]
 	if ok {
 		if len(parents) != 0 {
@@ -557,7 +479,7 @@ func (p *Pipeline) UnmarshalNode(data []byte, typ TypeOf, parents []Node) (Node,
 			return nil, fmt.Errorf("expected one parent for node %d but found %d", typ.ID, len(parents))
 		}
 		parent := parents[0]
-		chainParent, ok := parent.(*chainnode)
+		chainParent, ok := parent.(chainnodeAlias)
 		if !ok {
 			return nil, fmt.Errorf("parent node is not a chain node but is %T", parent)
 		}
@@ -581,7 +503,7 @@ func (p *Pipeline) UnmarshalNode(data []byte, typ TypeOf, parents []Node) (Node,
 			return nil, fmt.Errorf("expected more than one parent for node %d but received %d", typ.ID, len(parents))
 		}
 		parent := parents[0]
-		chainParent, ok := parent.(*chainnode)
+		chainParent, ok := parent.(chainnodeAlias)
 		if !ok {
 			return nil, fmt.Errorf("parent node is not a chain node but is %T", parent)
 		}
@@ -596,7 +518,7 @@ func (p *Pipeline) UnmarshalNode(data []byte, typ TypeOf, parents []Node) (Node,
 			return nil, fmt.Errorf("expected one parent for node %d but found %d", typ.ID, len(parents))
 		}
 		parent := parents[0]
-		chainParent, ok := parent.(*chainnode)
+		chainParent, ok := parent.(chainnodeAlias)
 		if !ok {
 			return nil, fmt.Errorf("parent node is not a chain node but is %T", parent)
 		}
@@ -618,16 +540,18 @@ func (p *Pipeline) UnmarshalNode(data []byte, typ TypeOf, parents []Node) (Node,
 	}
 	switch typ.Type {
 	case "top", "bottom":
-		return UnmarshalTopBottom(data, parents, typ)
-	case "stats":
-		return UnmarshalStats(data, parents, typ)
+		return unmarshalTopBottom(data, parents, typ)
+	case "where":
+		return unmarshalWhere(data, parents, typ)
+	case "groupBy":
+		return unmarshalGroupby(data, parents, typ)
 	case "udf":
-		return UnmarshalUDF(data, parents, typ)
+		return unmarshalUDF(data, parents, typ)
 	}
 	return nil, fmt.Errorf("unknown function type %s for node %d", typ.Type, typ.ID)
 }
 
-func UnmarshalFrom(data []byte, source Node) (Node, error) {
+func unmarshalFrom(data []byte, source Node) (Node, error) {
 	stream, ok := source.(*StreamNode)
 	if !ok {
 		return nil, fmt.Errorf("parent of query node must be a StreamNode but is %T", source)
@@ -637,7 +561,7 @@ func UnmarshalFrom(data []byte, source Node) (Node, error) {
 	return child, err
 }
 
-func UnmarshalQuery(data []byte, source Node) (Node, error) {
+func unmarshalQuery(data []byte, source Node) (Node, error) {
 	batch, ok := source.(*BatchNode)
 	if !ok {
 		return nil, fmt.Errorf("parent of query node must be a BatchNode but is %T", source)
@@ -647,7 +571,35 @@ func UnmarshalQuery(data []byte, source Node) (Node, error) {
 	return child, err
 }
 
-func UnmarshalStats(data []byte, parents []Node, typ TypeOf) (Node, error) {
+func unmarshalWhere(data []byte, parents []Node, typ TypeOf) (Node, error) {
+	if len(parents) != 1 {
+		return nil, fmt.Errorf("expected one parent for node %d but found %d", typ.ID, len(parents))
+	}
+	parent := parents[0]
+	nodeParent, ok := parent.(chainNodeAliasWhere)
+	if !ok {
+		return nil, fmt.Errorf("parent node does not have where clause but is %T", parent)
+	}
+	child := nodeParent.Where(nil)
+	err := json.Unmarshal(data, child)
+	return child, err
+}
+
+func unmarshalGroupby(data []byte, parents []Node, typ TypeOf) (Node, error) {
+	if len(parents) != 1 {
+		return nil, fmt.Errorf("expected one parent for node %d but found %d", typ.ID, len(parents))
+	}
+	parent := parents[0]
+	nodeParent, ok := parent.(chainNodeAliasGroupBy)
+	if !ok {
+		return nil, fmt.Errorf("parent node does not have groupBy clause but is %T", parent)
+	}
+	child := nodeParent.GroupBy()
+	err := json.Unmarshal(data, child)
+	return child, err
+}
+
+func unmarshalStats(data []byte, parents []Node, typ TypeOf) (Node, error) {
 	if len(parents) != 1 {
 		return nil, fmt.Errorf("expected one parent for node %d but found %d", typ.ID, len(parents))
 	}
@@ -661,12 +613,12 @@ func UnmarshalStats(data []byte, parents []Node, typ TypeOf) (Node, error) {
 	return child, err
 }
 
-func UnmarshalTopBottom(data []byte, parents []Node, typ TypeOf) (Node, error) {
+func unmarshalTopBottom(data []byte, parents []Node, typ TypeOf) (Node, error) {
 	if len(parents) != 1 {
 		return nil, fmt.Errorf("expected one parent for node %d but found %d", typ.ID, len(parents))
 	}
 	parent := parents[0]
-	chainParent, ok := parent.(*chainnode)
+	chainParent, ok := parent.(chainnodeAlias)
 	if !ok {
 		return nil, fmt.Errorf("parent node is not a chain node but is %T", parent)
 	}
@@ -693,7 +645,7 @@ func UnmarshalTopBottom(data []byte, parents []Node, typ TypeOf) (Node, error) {
 	return child, err
 }
 
-func UnmarshalUDF(data []byte, parents []Node, typ TypeOf) (Node, error) {
+func unmarshalUDF(data []byte, parents []Node, typ TypeOf) (Node, error) {
 	if len(parents) != 1 {
 		return nil, fmt.Errorf("expected one parent for node %d but found %d", typ.ID, len(parents))
 	}
@@ -702,4 +654,82 @@ func UnmarshalUDF(data []byte, parents []Node, typ TypeOf) (Node, error) {
 	parent.linkChild(child)
 	err := json.Unmarshal(data, child)
 	return child, err
+}
+
+// chainnodeAlias is used to check for the presence of a chain node
+type chainnodeAlias interface {
+	Alert() *AlertNode
+	Bottom(int64, string, ...string) *InfluxQLNode
+	Children() []Node
+	Combine(...*ast.LambdaNode) *CombineNode
+	Count(string) *InfluxQLNode
+	CumulativeSum(string) *InfluxQLNode
+	Deadman(float64, time.Duration, ...*ast.LambdaNode) *AlertNode
+	Default() *DefaultNode
+	Delete() *DeleteNode
+	Derivative(string) *DerivativeNode
+	Desc() string
+	Difference(string) *InfluxQLNode
+	Distinct(string) *InfluxQLNode
+	Elapsed(string, time.Duration) *InfluxQLNode
+	Eval(...*ast.LambdaNode) *EvalNode
+	First(string) *InfluxQLNode
+	Flatten() *FlattenNode
+	HoltWinters(string, int64, int64, time.Duration) *InfluxQLNode
+	HoltWintersWithFit(string, int64, int64, time.Duration) *InfluxQLNode
+	HttpOut(string) *HTTPOutNode
+	HttpPost(...string) *HTTPPostNode
+	ID() ID
+	InfluxDBOut() *InfluxDBOutNode
+	Join(...Node) *JoinNode
+	K8sAutoscale() *K8sAutoscaleNode
+	KapacitorLoopback() *KapacitorLoopbackNode
+	Last(string) *InfluxQLNode
+	Log() *LogNode
+	Max(string) *InfluxQLNode
+	Mean(string) *InfluxQLNode
+	Median(string) *InfluxQLNode
+	Min(string) *InfluxQLNode
+	Mode(string) *InfluxQLNode
+	MovingAverage(string, int64) *InfluxQLNode
+	Name() string
+	Parents() []Node
+	Percentile(string, float64) *InfluxQLNode
+	Provides() EdgeType
+	Sample(interface{}) *SampleNode
+	SetName(string)
+	Shift(time.Duration) *ShiftNode
+	Spread(string) *InfluxQLNode
+	StateCount(*ast.LambdaNode) *StateCountNode
+	StateDuration(*ast.LambdaNode) *StateDurationNode
+	Stats(time.Duration) *StatsNode
+	Stddev(string) *InfluxQLNode
+	Sum(string) *InfluxQLNode
+	SwarmAutoscale() *SwarmAutoscaleNode
+	Top(int64, string, ...string) *InfluxQLNode
+	Union(...Node) *UnionNode
+	Wants() EdgeType
+	Window() *WindowNode
+	addParent(Node)
+	dot(*bytes.Buffer)
+	holtWinters(string, int64, int64, time.Duration, bool) *InfluxQLNode
+	linkChild(Node)
+	pMark() bool
+	pipeline() *Pipeline
+	setID(ID)
+	setPMark(bool)
+	setPipeline(*Pipeline)
+	setTMark(bool)
+	tMark() bool
+	validate() error
+}
+
+// chainnodeAliasWhere exists because FromNode and chainnodes have different Where()
+type chainNodeAliasWhere interface {
+	Where(*ast.LambdaNode) *WhereNode
+}
+
+// chainNodeAliasGroupBy exists because FromNode, BatchNode and chainnodes have different GroupBy()
+type chainNodeAliasGroupBy interface {
+	GroupBy(...interface{}) *GroupByNode
 }

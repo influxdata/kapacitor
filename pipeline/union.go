@@ -52,7 +52,7 @@ func (n *UnionNode) MarshalJSON() ([]byte, error) {
 }
 
 func (n *UnionNode) unmarshal(props JSONNode) error {
-	err := props.CheckTypeOf("where")
+	err := props.CheckTypeOf("union")
 	if err != nil {
 		return err
 	}

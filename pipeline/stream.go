@@ -182,6 +182,7 @@ func (n *FromNode) unmarshal(props JSONNode) error {
 	if n.id, err = props.ID(); err != nil {
 		return err
 	}
+	// TODO: groupBy
 	if n.Lambda, err = props.Lambda("where"); err != nil {
 		return err
 	}
