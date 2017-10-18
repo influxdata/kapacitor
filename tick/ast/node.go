@@ -572,6 +572,42 @@ func newDBRP(p position, db, rp *ReferenceNode, c *CommentNode) *DBRPNode {
 	}
 }
 
+// MarshalJSON converts the node to JSON with an additional
+// typeOf field.
+func (d *DBRPNode) MarshalJSON() ([]byte, error) {
+	props := JSONNode{}.
+		Type("dbrp").
+		Set("db", d.DB).
+		Set("rp", d.RP)
+	return json.Marshal(&props)
+}
+
+func (d *DBRPNode) unmarshal(props JSONNode) error {
+	err := props.CheckTypeOf("dbrp")
+	if err != nil {
+		return err
+	}
+
+	if d.DB, err = props.RefNode("db"); err != nil {
+		return err
+	}
+
+	if d.RP, err = props.RefNode("rp"); err != nil {
+		return err
+	}
+	return nil
+}
+
+// UnmarshalJSON converts JSON bytes to a DBRPNode
+func (d *DBRPNode) UnmarshalJSON(data []byte) error {
+	var props JSONNode
+	err := json.Unmarshal(data, &props)
+	if err != nil {
+		return err
+	}
+	return d.unmarshal(props)
+}
+
 func (d *DBRPNode) DBRP() string {
 	return "\"" + d.DB.Reference + "\"" + "." + "\"" + d.RP.Reference + "\""
 }

@@ -235,7 +235,8 @@ func TestPipeline_MarshalJSON(t *testing.T) {
                 {
                     "url": "http://howdy.local",
                     "endpoint": "",
-                    "headers": null
+                    "headers": null,
+                    "captureResponse": false
                 }
             ],
             "tcp": null,

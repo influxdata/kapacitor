@@ -242,6 +242,7 @@ func (j JSONNode) Node(field string) (Node, error) {
 	return j.getNode(nn)
 }
 
+// IDNode reads an IdentifierNode from the field
 func (j JSONNode) IDNode(field string) (*IdentifierNode, error) {
 	n, err := j.Node(field)
 	if err != nil {
@@ -250,6 +251,19 @@ func (j JSONNode) IDNode(field string) (*IdentifierNode, error) {
 	id, ok := n.(*IdentifierNode)
 	if !ok {
 		return nil, fmt.Errorf("field %s is not an identifier node but is %T", field, n)
+	}
+	return id, nil
+}
+
+// RefNode reads a ReferenceNode from the field
+func (j JSONNode) RefNode(field string) (*ReferenceNode, error) {
+	n, err := j.Node(field)
+	if err != nil {
+		return nil, err
+	}
+	id, ok := n.(*ReferenceNode)
+	if !ok {
+		return nil, fmt.Errorf("field %s is not a reference node but is %T", field, n)
 	}
 	return id, nil
 }
@@ -270,6 +284,8 @@ func (j JSONNode) getNode(nn interface{}) (Node, error) {
 	switch typ {
 	case "number":
 		n = &NumberNode{}
+	case "dbrp":
+		n = &DBRPNode{}
 	case "duration":
 		n = &DurationNode{}
 	case "bool":

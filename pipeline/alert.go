@@ -595,16 +595,6 @@ func (a *AlertHTTPPostHandler) CaptureResponse() *AlertHTTPPostHandler {
 	return a
 }
 
-func (a *AlertHTTPPostHandler) MarshalJSON() ([]byte, error) {
-	props := map[string]interface{}{
-		"url":             a.URL,
-		"endpoint":        a.Endpoint,
-		"header":          a.Headers,
-		"captureResponse": a.CaptureResponseFlag,
-	}
-	return json.Marshal(props)
-}
-
 func (a *AlertHTTPPostHandler) validate() error {
 	for k := range a.Headers {
 		if strings.ToUpper(k) == "AUTHENTICATE" {
@@ -1064,21 +1054,6 @@ type AlertaHandler struct {
 	// Alerta timeout.
 	// Default: 24h
 	Timeout time.Duration `json:"timeout"`
-}
-
-func (a *AlertaHandler) MarshalJSON() ([]byte, error) {
-	props := map[string]interface{}{
-		"token":       a.Token,
-		"resource":    a.Resource,
-		"event":       a.Event,
-		"environment": a.Environment,
-		"group":       a.Group,
-		"value":       a.Value,
-		"origin":      a.Origin,
-		"services":    a.Service,
-		"timeout":     a.Timeout,
-	}
-	return json.Marshal(props)
 }
 
 // List of effected services.
