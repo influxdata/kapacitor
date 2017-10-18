@@ -1,9 +1,11 @@
 package pipeline
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/influxdata/influxdb/influxql"
@@ -274,4 +276,84 @@ func (u *UDFNode) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	return u.unmarshal(props)
+}
+
+// JSONNode contains all fields associated with a node.  `typeOf`
+// is used to determine which type of node this is.
+// JSONNode is used by UDFNode specifically for marshaling and unmarshaling
+// the UDF to json
+type JSONNode map[string]interface{}
+
+// NewJSONNode decodes JSON bytes into a JSONNode
+func NewJSONNode(data []byte) (JSONNode, error) {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	var input JSONNode
+	err := dec.Decode(&input)
+	return input, err
+}
+
+// CheckTypeOf tests that the typeOf field is correctly set to typ.
+func (j JSONNode) CheckTypeOf(typ string) error {
+	t, ok := j[NodeTypeOf]
+	if !ok {
+		return fmt.Errorf("missing typeOf field")
+	}
+
+	if t != typ {
+		return fmt.Errorf("error unmarshaling node type %s; received %s", typ, t)
+	}
+	return nil
+}
+
+// SetType adds the Node type information
+func (j JSONNode) SetType(typ string) JSONNode {
+	j[NodeTypeOf] = typ
+	return j
+}
+
+// SetID adds the Node ID information
+func (j JSONNode) SetID(id ID) JSONNode {
+	j[NodeID] = fmt.Sprintf("%d", id)
+	return j
+}
+
+// Set adds the key/value to the JSONNode
+func (j JSONNode) Set(key string, value interface{}) JSONNode {
+	j[key] = value
+	return j
+}
+
+// Field returns expected field or error if field doesn't exist
+func (j JSONNode) Field(field string) (interface{}, error) {
+	fld, ok := j[field]
+	if !ok {
+		return nil, fmt.Errorf("missing expected field %s", field)
+	}
+	return fld, nil
+}
+
+// String reads the field for a string value
+func (j JSONNode) String(field string) (string, error) {
+	s, err := j.Field(field)
+	if err != nil {
+		return "", err
+	}
+
+	str, ok := s.(string)
+	if !ok {
+		return "", fmt.Errorf("field %s is not a string value but is %T", field, s)
+	}
+	return str, nil
+}
+
+// ID returns the unique ID for this node.  This ID is used
+// as the id of the parent and children in the Edges structure.
+func (j JSONNode) ID() (ID, error) {
+	i, err := j.String(NodeID)
+	if err != nil {
+		return 0, err
+	}
+	id, err := strconv.Atoi(i)
+	return ID(id), err
 }
