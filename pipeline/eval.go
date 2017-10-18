@@ -26,29 +26,29 @@ import (
 //    * eval_errors -- number of errors evaluating any expressions.
 //
 type EvalNode struct {
-	chainnode
+	chainnode `json:"-"`
 
 	// The name of the field that results from applying the expression.
 	// tick:ignore
-	AsList []string `tick:"As"`
+	AsList []string `tick:"As" json:"as"`
 
 	// The names of the expressions that should be converted to tags.
 	// tick:ignore
-	TagsList []string `tick:"Tags"`
+	TagsList []string `tick:"Tags" json:"tags"`
 
 	// tick:ignore
-	Lambdas []*ast.LambdaNode
+	Lambdas []*ast.LambdaNode `json:"lambdas"`
 
 	// tick:ignore
-	KeepFlag bool `tick:"Keep"`
+	KeepFlag bool `tick:"Keep" json:"keep"`
 	// List of fields to keep
 	// if empty and KeepFlag is true
 	// keep all fields.
 	// tick:ignore
-	KeepList []string
+	KeepList []string `json:"keepList"`
 
 	// tick:ignore
-	QuietFlag bool `tick:"Quiet"`
+	QuietFlag bool `tick:"Quiet" json:"quiet"`
 }
 
 func newEvalNode(e EdgeType, exprs []*ast.LambdaNode) *EvalNode {
@@ -59,21 +59,41 @@ func newEvalNode(e EdgeType, exprs []*ast.LambdaNode) *EvalNode {
 	return n
 }
 
-func (e *EvalNode) MarshalJSON() ([]byte, error) {
-	props := map[string]interface{}{
-		"type":     "eval",
-		"nodeID":   fmt.Sprintf("%d", e.ID()),
-		"children": e.node,
-		"as":       e.AsList,
-		"tags":     e.TagsList,
-		"lambdas":  e.Lambdas,
-		"keep":     e.KeepFlag,
-		"keepList": e.KeepList,
-		"quiet":    e.QuietFlag,
+// MarshalJSON converts EvalNode to JSON
+func (n *EvalNode) MarshalJSON() ([]byte, error) {
+	type Alias EvalNode
+	var raw = &struct {
+		*TypeOf
+		*Alias
+	}{
+		TypeOf: &TypeOf{
+			Type: "eval",
+			ID:   n.ID(),
+		},
+		Alias: (*Alias)(n),
 	}
-	return json.Marshal(props)
+	return json.Marshal(raw)
 }
 
+// UnmarshalJSON converts JSON to an EvalNode
+func (n *EvalNode) UnmarshalJSON(data []byte) error {
+	type Alias EvalNode
+	var raw = &struct {
+		*TypeOf
+		*Alias
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.Type != "eval" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as EvalNode", raw.ID, raw.Type)
+	}
+	n.setID(raw.ID)
+	return nil
+}
 func (e *EvalNode) validate() error {
 	if asLen, lambdaLen := len(e.AsList), len(e.Lambdas); asLen != lambdaLen {
 		return fmt.Errorf("must specify same number of expressions and .as() names: got %d as names, and %d expressions.", asLen, lambdaLen)

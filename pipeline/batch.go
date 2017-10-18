@@ -2,6 +2,8 @@ package pipeline
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
 	"reflect"
 	"time"
 )
@@ -38,6 +40,42 @@ func newBatchNode() *BatchNode {
 			provides: BatchEdge,
 		},
 	}
+}
+
+// MarshalJSON converts BatchNode to JSON
+func (n *BatchNode) MarshalJSON() ([]byte, error) {
+	type Alias BatchNode
+	var raw = &struct {
+		*TypeOf
+		*Alias
+	}{
+		TypeOf: &TypeOf{
+			Type: "batch",
+			ID:   n.ID(),
+		},
+		Alias: (*Alias)(n),
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to an BatchNode
+func (n *BatchNode) UnmarshalJSON(data []byte) error {
+	type Alias BatchNode
+	var raw = &struct {
+		*TypeOf
+		*Alias
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.Type != "batch" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as BatchNode", raw.ID, raw.Type)
+	}
+	n.setID(raw.ID)
+	return nil
 }
 
 // The query to execute. Must not contain a time condition

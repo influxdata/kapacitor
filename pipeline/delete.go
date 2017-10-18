@@ -21,15 +21,15 @@ import (
 //    * tags_deleted -- number of tags that were deleted. Only counts if the tag already existed.
 //
 type DeleteNode struct {
-	chainnode
+	chainnode `json:"-"`
 
 	// Set of fields to delete
 	// tick:ignore
-	Fields []string `tick:"Field"`
+	Fields []string `tick:"Field" json:"fields"`
 
 	// Set of tags to delete
 	// tick:ignore
-	Tags []string `tick:"Tag"`
+	Tags []string `tick:"Tag" json:"tags"`
 }
 
 func newDeleteNode(e EdgeType) *DeleteNode {
@@ -39,15 +39,40 @@ func newDeleteNode(e EdgeType) *DeleteNode {
 	return n
 }
 
+// MarshalJSON converts DeleteNode to JSON
 func (n *DeleteNode) MarshalJSON() ([]byte, error) {
-	props := map[string]interface{}{
-		"type":     "delete",
-		"nodeID":   fmt.Sprintf("%d", n.ID()),
-		"children": n.node,
-		"field":    n.Fields,
-		"tag":      n.Tags,
+	type Alias DeleteNode
+	var raw = &struct {
+		*TypeOf
+		*Alias
+	}{
+		TypeOf: &TypeOf{
+			Type: "delete",
+			ID:   n.ID(),
+		},
+		Alias: (*Alias)(n),
 	}
-	return json.Marshal(props)
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to an DeleteNode
+func (n *DeleteNode) UnmarshalJSON(data []byte) error {
+	type Alias DeleteNode
+	var raw = &struct {
+		*TypeOf
+		*Alias
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.Type != "delete" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as DeleteNode", raw.ID, raw.Type)
+	}
+	n.setID(raw.ID)
+	return nil
 }
 
 // Delete a field.

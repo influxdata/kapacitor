@@ -37,7 +37,10 @@ type JSONPipeline struct {
 	Edges []Edge            `json:"edges"`
 }
 
+// Graph represents a series of directional edges
 type Graph map[ID][]ID
+
+// PipelineSorter performs topological sort on the Edges of JSONPipeline.
 type PipelineSorter struct {
 	Edges         []Edge
 	ChildrenOf    Graph
@@ -331,6 +334,7 @@ var sourceFunctions map[string]func() Node
 var sourceFilters map[string]func([]byte, Node) (Node, error)
 var multiParents map[string]func(chainnodeAlias, []Node) Node
 var influxFunctions map[string]func(chainnodeAlias, string) *InfluxQLNode
+var uniqFunctions map[string]func([]byte, []Node, TypeOf) (Node, error)
 
 func init() {
 	// Add all possible sources
@@ -396,6 +400,14 @@ func init() {
 		"holtWintersFit": func(parent chainnodeAlias, field string) *InfluxQLNode {
 			return parent.HoltWintersWithFit(field, 0, 0, 0)
 		},
+	}
+
+	uniqFunctions = map[string]func([]byte, []Node, TypeOf) (Node, error){
+		"top":     unmarshalTopBottom,
+		"bottom":  unmarshalTopBottom,
+		"where":   unmarshalWhere,
+		"groupBy": unmarshalGroupby,
+		"udf":     unmarshalUDF,
 	}
 }
 
@@ -538,15 +550,10 @@ func (p *Pipeline) unmarshalNode(data []byte, typ TypeOf, parents []Node) (Node,
 		}
 		return child, nil
 	}
-	switch typ.Type {
-	case "top", "bottom":
-		return unmarshalTopBottom(data, parents, typ)
-	case "where":
-		return unmarshalWhere(data, parents, typ)
-	case "groupBy":
-		return unmarshalGroupby(data, parents, typ)
-	case "udf":
-		return unmarshalUDF(data, parents, typ)
+
+	uniq, ok := uniqFunctions[typ.Type]
+	if ok {
+		return uniq(data, parents, typ)
 	}
 	return nil, fmt.Errorf("unknown function type %s for node %d", typ.Type, typ.ID)
 }

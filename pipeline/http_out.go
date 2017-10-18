@@ -26,7 +26,7 @@ type HTTPOutNode struct {
 
 	// The relative path where the cached data is exposed
 	// tick:ignore
-	Endpoint string
+	Endpoint string `json:"endpoint"`
 }
 
 func newHTTPOutNode(wants EdgeType, endpoint string) *HTTPOutNode {
@@ -36,12 +36,38 @@ func newHTTPOutNode(wants EdgeType, endpoint string) *HTTPOutNode {
 	}
 }
 
+// MarshalJSON converts HTTPOutNode to JSON
 func (n *HTTPOutNode) MarshalJSON() ([]byte, error) {
-	props := map[string]interface{}{
-		"type":     "httpOut",
-		"nodeID":   fmt.Sprintf("%d", n.ID()),
-		"children": n.node,
-		"endpoint": n.Endpoint,
+	type Alias HTTPOutNode
+	var raw = &struct {
+		*TypeOf
+		*Alias
+	}{
+		TypeOf: &TypeOf{
+			Type: "httpOut",
+			ID:   n.ID(),
+		},
+		Alias: (*Alias)(n),
 	}
-	return json.Marshal(props)
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to an HTTPOutNode
+func (n *HTTPOutNode) UnmarshalJSON(data []byte) error {
+	type Alias HTTPOutNode
+	var raw = &struct {
+		*TypeOf
+		*Alias
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.Type != "httpOut" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as HTTPOutNode", raw.ID, raw.Type)
+	}
+	n.setID(raw.ID)
+	return nil
 }

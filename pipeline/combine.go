@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
@@ -55,31 +56,31 @@ type CombineNode struct {
 
 	// The list of expressions for matching pairs
 	// tick:ignore
-	Lambdas []*ast.LambdaNode
+	Lambdas []*ast.LambdaNode `json:"lambdas"`
 
 	// The alias names of the two parents.
 	// Note:
 	//       Names[1] corresponds to the left  parent
 	//       Names[0] corresponds to the right parent
 	// tick:ignore
-	Names []string `tick:"As"`
+	Names []string `tick:"As" json:"as"`
 
 	// The delimiter between the As names and existing field an tag keys.
 	// Can be the empty string, but you are responsible for ensuring conflicts are not possible if you use the empty string.
-	Delimiter string
+	Delimiter string `json:"delimiter"`
 
 	// The maximum duration of time that two incoming points
 	// can be apart and still be considered to be equal in time.
 	// The joined data point's time will be rounded to the nearest
 	// multiple of the tolerance duration.
-	Tolerance time.Duration
+	Tolerance time.Duration `json:"-"`
 
 	// Maximum number of possible combinations.
 	// Since the number of possible combinations can grow very rapidly
 	// you can set a maximum number of combinations allowed.
 	// If the max is crossed, an error is logged and the combinations are not calculated.
 	// Default: 10,000
-	Max int64
+	Max int64 `json:"max"`
 }
 
 func newCombineNode(e EdgeType, lambdas []*ast.LambdaNode) *CombineNode {
@@ -92,17 +93,47 @@ func newCombineNode(e EdgeType, lambdas []*ast.LambdaNode) *CombineNode {
 	return c
 }
 
+// MarshalJSON converts CombineNode to JSON
 func (n *CombineNode) MarshalJSON() ([]byte, error) {
-	props := map[string]interface{}{
-		"type":      "combine",
-		"nodeID":    fmt.Sprintf("%d", n.ID()),
-		"children":  n.node,
-		"tolerance": n.Tolerance,
-		"max":       n.Max,
-		"as":        n.Names,
-		"lambdas":   n.Lambdas,
+	type Alias CombineNode
+	var raw = &struct {
+		*TypeOf
+		*Alias
+		Tolerance string `json:"tolerance"`
+	}{
+		TypeOf: &TypeOf{
+			Type: "combine",
+			ID:   n.ID(),
+		},
+		Alias:     (*Alias)(n),
+		Tolerance: influxql.FormatDuration(n.Tolerance),
 	}
-	return json.Marshal(props)
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to an CombineNode
+func (n *CombineNode) UnmarshalJSON(data []byte) error {
+	type Alias CombineNode
+	var raw = &struct {
+		*TypeOf
+		*Alias
+		Tolerance string `json:"tolerance"`
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.Type != "combine" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as CombineNode", raw.ID, raw.Type)
+	}
+	n.Tolerance, err = influxql.ParseDuration(raw.Tolerance)
+	if err != nil {
+		return err
+	}
+	n.setID(raw.ID)
+	return nil
 }
 
 // Prefix names for all fields from the respective nodes.

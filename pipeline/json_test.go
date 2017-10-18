@@ -1288,22 +1288,23 @@ var _ Node = &MockNode{}
 type MockNode struct {
 }
 
-func (m *MockNode) Parents() []Node       { return nil }
-func (m *MockNode) Children() []Node      { return nil }
-func (m *MockNode) addParent(p Node)      {}
-func (m *MockNode) linkChild(c Node)      {}
-func (m *MockNode) Desc() string          { return "" }
-func (m *MockNode) Name() string          { return "" }
-func (m *MockNode) SetName(string)        {}
-func (m *MockNode) ID() ID                { return 0 }
-func (m *MockNode) setID(ID)              {}
-func (m *MockNode) Wants() EdgeType       { return StreamEdge }
-func (m *MockNode) Provides() EdgeType    { return StreamEdge }
-func (m *MockNode) validate() error       { return nil }
-func (m *MockNode) tMark() bool           { return true }
-func (m *MockNode) setTMark(b bool)       {}
-func (m *MockNode) pMark() bool           { return true }
-func (m *MockNode) setPMark(b bool)       {}
-func (m *MockNode) setPipeline(*Pipeline) {}
-func (m *MockNode) pipeline() *Pipeline   { return nil }
-func (m *MockNode) dot(buf *bytes.Buffer) {}
+func (m *MockNode) Parents() []Node              { return nil }
+func (m *MockNode) Children() []Node             { return nil }
+func (m *MockNode) addParent(p Node)             {}
+func (m *MockNode) linkChild(c Node)             {}
+func (m *MockNode) Desc() string                 { return "" }
+func (m *MockNode) Name() string                 { return "" }
+func (m *MockNode) SetName(string)               {}
+func (m *MockNode) ID() ID                       { return 0 }
+func (m *MockNode) setID(ID)                     {}
+func (m *MockNode) Wants() EdgeType              { return StreamEdge }
+func (m *MockNode) Provides() EdgeType           { return StreamEdge }
+func (m *MockNode) validate() error              { return nil }
+func (m *MockNode) tMark() bool                  { return true }
+func (m *MockNode) setTMark(b bool)              {}
+func (m *MockNode) pMark() bool                  { return true }
+func (m *MockNode) setPMark(b bool)              {}
+func (m *MockNode) setPipeline(*Pipeline)        {}
+func (m *MockNode) pipeline() *Pipeline          { return nil }
+func (m *MockNode) dot(buf *bytes.Buffer)        {}
+func (m *MockNode) MarshalJSON() ([]byte, error) { return nil, nil }
