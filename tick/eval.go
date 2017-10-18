@@ -32,11 +32,9 @@ type SelfDescriber interface {
 
 	HasChainMethod(name string) bool
 	CallChainMethod(name string, args ...interface{}) (interface{}, error)
-	ChainMethodTypes(name string) []reflect.Kind
 
 	HasProperty(name string) bool
 	Property(name string) interface{}
-	PropertyType(name string) reflect.Kind
 	SetProperty(name string, args ...interface{}) (interface{}, error)
 }
 
@@ -588,14 +586,10 @@ type ReflectionDescriber struct {
 	obj interface{}
 	// Set of chain methods
 	chainMethods map[string]reflect.Value
-	// chainMethodArgs are the argument kinds for a named method
-	chainMethodArgs map[string][]reflect.Kind
 	// Set of methods that modify properties
 	propertyMethods map[string]reflect.Value
 	// Set of fields on obj that can be set
 	properties map[string]reflect.Value
-	// Set of types for each field
-	propertyTypes map[string]reflect.Kind
 }
 
 // Create a NewReflectionDescriber from an object.
@@ -638,19 +632,18 @@ func NewReflectionDescriber(obj interface{}, chainMethods map[string]reflect.Val
 
 	// Get all properties
 	var err error
-	r.properties, r.propertyMethods, r.propertyTypes, err = getProperties(r.Desc(), rv)
+	r.properties, r.propertyMethods, err = getProperties(r.Desc(), rv)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get all methods
-	r.chainMethods, r.chainMethodArgs, err = getChainMethods(r.Desc(), rv, r.propertyMethods)
+	r.chainMethods, err = getChainMethods(r.Desc(), rv, r.propertyMethods)
 	if err != nil {
 		return nil, err
 	}
 	for k, v := range chainMethods {
 		r.chainMethods[k] = v
-		r.chainMethodArgs[k] = methodTypes(v)
 	}
 
 	return r, nil
@@ -664,23 +657,21 @@ func getProperties(
 ) (
 	map[string]reflect.Value,
 	map[string]reflect.Value,
-	map[string]reflect.Kind,
 	error,
 ) {
 	if rv.Kind() != reflect.Ptr {
-		return nil, nil, nil, errors.New("cannot get properties of non pointer value")
+		return nil, nil, errors.New("cannot get properties of non pointer value")
 	}
 	element := rv.Elem()
 	if !element.IsValid() {
-		return nil, nil, nil, errors.New("cannot get properties of nil pointer")
+		return nil, nil, errors.New("cannot get properties of nil pointer")
 	}
 	rStructType := element.Type()
 	if rStructType.Kind() != reflect.Struct {
-		return nil, nil, nil, errors.New("cannot get properties of non struct")
+		return nil, nil, errors.New("cannot get properties of non struct")
 	}
 	properties := make(map[string]reflect.Value, rStructType.NumField())
 	propertyMethods := make(map[string]reflect.Value)
-	propertyTypes := make(map[string]reflect.Kind, rStructType.NumField())
 	for i := 0; i < rStructType.NumField(); i++ {
 		property := rStructType.Field(i)
 		if property.Anonymous {
@@ -693,9 +684,9 @@ func getProperties(
 				// Skip nil fields
 				continue
 			}
-			props, propMethods, propTypes, err := getProperties(fmt.Sprintf("%s.%s", desc, property.Name), anonValue)
+			props, propMethods, err := getProperties(fmt.Sprintf("%s.%s", desc, property.Name), anonValue)
 			if err != nil {
-				return nil, nil, nil, err
+				return nil, nil, err
 			}
 			// Update local maps
 			for k, v := range props {
@@ -706,11 +697,6 @@ func getProperties(
 			for k, v := range propMethods {
 				if _, ok := propertyMethods[k]; !ok {
 					propertyMethods[k] = v
-				}
-			}
-			for k, v := range propTypes {
-				if _, ok := propertyTypes[k]; !ok {
-					propertyTypes[k] = v
 				}
 			}
 			continue
@@ -724,46 +710,41 @@ func getProperties(
 			}
 			if method.IsValid() {
 				propertyMethods[methodName] = method
-				propertyTypes[methodName] = property.Type.Kind()
 			} else {
-				return nil, nil, nil, fmt.Errorf("referenced method %s for type %s is invalid", methodName, desc)
+				return nil, nil, fmt.Errorf("referenced method %s for type %s is invalid", methodName, desc)
 			}
 		} else {
 			// Property is set directly via reflection.
 			field := reflect.Indirect(rv).FieldByName(property.Name)
 			if field.IsValid() && field.CanSet() {
 				properties[property.Name] = field
-				propertyTypes[property.Name] = property.Type.Kind()
 			}
 		}
 	}
-	return properties, propertyMethods, propertyTypes, nil
+	return properties, propertyMethods, nil
 }
 
-func getChainMethods(desc string, rv reflect.Value, propertyMethods map[string]reflect.Value) (map[string]reflect.Value, map[string][]reflect.Kind, error) {
+func getChainMethods(desc string, rv reflect.Value, propertyMethods map[string]reflect.Value) (map[string]reflect.Value, error) {
 	if rv.Kind() != reflect.Ptr {
-		return nil, nil, errors.New("cannot get chain methods of non pointer")
+		return nil, errors.New("cannot get chain methods of non pointer")
 	}
 	element := rv.Elem()
 	if !element.IsValid() {
-		return nil, nil, errors.New("cannot get chain methods of nil pointer")
+		return nil, errors.New("cannot get chain methods of nil pointer")
 	}
 	// Find all methods on value
 	rRecvType := rv.Type()
 	chainMethods := make(map[string]reflect.Value, rRecvType.NumMethod())
-	chainMethodArgs := make(map[string][]reflect.Kind)
 	for i := 0; i < rRecvType.NumMethod(); i++ {
 		method := rRecvType.Method(i)
 		if !goast.IsExported(method.Name) {
 			continue
 		}
 		if !rv.MethodByName(method.Name).IsValid() {
-			return nil, nil, fmt.Errorf("invalid method %s on type %s", method.Name, desc)
+			return nil, fmt.Errorf("invalid method %s on type %s", method.Name, desc)
 		}
 		if _, exists := propertyMethods[method.Name]; !exists {
-			m := rv.MethodByName(method.Name)
-			chainMethods[method.Name] = m
-			chainMethodArgs[method.Name] = methodTypes(m)
+			chainMethods[method.Name] = rv.MethodByName(method.Name)
 		}
 	}
 
@@ -776,23 +757,18 @@ func getChainMethods(desc string, rv reflect.Value, propertyMethods map[string]r
 			if anonValue.Kind() != reflect.Ptr && anonValue.CanAddr() {
 				anonValue = anonValue.Addr()
 			}
-			anonChainMethods, anonChainMethodArgs, err := getChainMethods(fmt.Sprintf("%s.%s", desc, field.Name), anonValue, propertyMethods)
+			anonChainMethods, err := getChainMethods(fmt.Sprintf("%s.%s", desc, field.Name), anonValue, propertyMethods)
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 			for k, v := range anonChainMethods {
 				if _, exists := chainMethods[k]; !exists {
 					chainMethods[k] = v
 				}
 			}
-			for k, v := range anonChainMethodArgs {
-				if _, exists := chainMethodArgs[k]; !exists {
-					chainMethodArgs[k] = v
-				}
-			}
 		}
 	}
-	return chainMethods, chainMethodArgs, nil
+	return chainMethods, nil
 }
 
 func (r *ReflectionDescriber) Desc() string {
@@ -805,12 +781,6 @@ func (r *ReflectionDescriber) HasChainMethod(name string) bool {
 	name = capitalizeFirst(name)
 	_, ok := r.chainMethods[name]
 	return ok
-}
-
-// ChainMethodTypes returns the types for each argument in the chain
-func (r *ReflectionDescriber) ChainMethodTypes(name string) []reflect.Kind {
-	name = capitalizeFirst(name)
-	return r.chainMethodArgs[name]
 }
 
 func (r *ReflectionDescriber) CallChainMethod(name string, args ...interface{}) (interface{}, error) {
@@ -838,12 +808,6 @@ func (r *ReflectionDescriber) Property(name string) interface{} {
 	name = capitalizeFirst(name)
 	property := r.properties[name]
 	return property.Interface()
-}
-
-func (r *ReflectionDescriber) PropertyType(name string) reflect.Kind {
-	// Properties set by property methods cannot be read
-	name = capitalizeFirst(name)
-	return r.propertyTypes[name]
 }
 
 func (r *ReflectionDescriber) SetProperty(name string, values ...interface{}) (interface{}, error) {
@@ -940,24 +904,4 @@ func resolveIdents(n ast.Node, scope *stateful.Scope) (_ ast.Node, err error) {
 		}
 	}
 	return n, nil
-}
-
-// methodTypes returns the Kind of all the parameters of the method.
-// If it is variadic it will transform the argument into the type
-// of the slice.  Panics if not a method
-func methodTypes(m reflect.Value) []reflect.Kind {
-	fn := m.Type()
-	// Method function's first argument is the receiver; skip it
-	args := []reflect.Kind{}
-	for i := 0; i < fn.NumIn(); i++ {
-		arg := fn.In(i)
-		// If the method is variadic, then it's last parameter
-		// We convert it from the slice to the element type
-		// so we can know valid types.
-		if i == fn.NumIn()-1 && fn.IsVariadic() {
-			arg = arg.Elem()
-		}
-		args = append(args, arg.Kind())
-	}
-	return args
 }
