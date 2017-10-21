@@ -8069,7 +8069,7 @@ func TestStream_AlertPagerDuty(t *testing.T) {
 	ts := pagerdutytest.NewServer()
 	defer ts.Close()
 
-	defaultDetailsTmpl := `{"Name":"cpu","TaskName":"TestStream_Alert","Group":"host=serverA","Tags":{"host":"serverA"},"ServerInfo":{"Hostname":"%v","ClusterID":"%v","ServerID":"%v"},"ID":"kapacitor/cpu/serverA","Fields":{"count":10},"Level":"CRITICAL","Time":"1971-01-01T00:00:10Z","Message":"CRITICAL alert for kapacitor/cpu/serverA"}
+	defaultDetailsTmpl := `{"Name":"cpu","TaskName":"TestStream_Alert","Group":"host=serverA","Tags":{"host":"serverA"},"ServerInfo":{"Hostname":"%v","ClusterID":"%v","ServerID":"%v"},"ID":"kapacitor/cpu/serverA","Fields":{"count":10},"Level":"CRITICAL","Time":"1971-01-01T00:00:10Z","Duration":0,"Message":"CRITICAL alert for kapacitor/cpu/serverA"}
 `
 	var defaultDetails string
 
