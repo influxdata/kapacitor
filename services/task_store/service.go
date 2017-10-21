@@ -18,7 +18,6 @@ import (
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/server/vars"
 	"github.com/influxdata/kapacitor/services/httpd"
-	"github.com/influxdata/kapacitor/services/replay"
 	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/influxdata/kapacitor/tick"
 	"github.com/influxdata/kapacitor/tick/ast"
@@ -464,36 +463,6 @@ func (ts *Service) handleTask(w http.ResponseWriter, r *http.Request) {
 	tmID := r.URL.Query().Get("replay-id")
 	if tmID == "" {
 		tmID = kapacitor.MainTaskMaster
-	}
-
-	finished := r.URL.Query().Get("finished")
-	if finished == "true" {
-		// get finished replays KV
-		st := ts.StorageService.Store("finished_replays_store")
-		cf := storage.DefaultIndexedStoreConfig("replays", func() storage.BinaryObject {
-			return new(replay.Replay)
-		})
-		is, err := storage.NewIndexedStore(st, cf)
-		if err != nil {
-			httpd.HttpError(w, fmt.Sprintf("no finished replay with ID: %s", tmID), true, http.StatusBadRequest)
-			return
-		}
-
-		rs, err := is.Get(tmID)
-		if err != nil {
-			httpd.HttpError(w, fmt.Sprintf("no finished replay with ID: %s", tmID), true, http.StatusBadRequest)
-			return
-		}
-
-		fr, err := replay.ConvertFinishedReplay(rs)
-		if err != nil {
-			httpd.HttpError(w, fmt.Sprintf("something wrong happened"), true, http.StatusBadRequest)
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
-		w.Write(httpd.MarshalJSON(fr, true))
-		return
 	}
 
 	tm := ts.TaskMasterLookup.Get(tmID)

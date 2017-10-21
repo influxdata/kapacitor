@@ -60,9 +60,8 @@ type Diagnostic interface {
 type Service struct {
 	saveDir string
 
-	recordings      RecordingDAO
-	replays         ReplayDAO
-	finishedReplays ReplayDAO
+	recordings RecordingDAO
+	replays    ReplayDAO
 
 	routes []httpd.Route
 
@@ -84,7 +83,6 @@ type Service struct {
 		Get(string) *kapacitor.TaskMaster
 		Set(*kapacitor.TaskMaster)
 		Delete(*kapacitor.TaskMaster)
-		Main() *kapacitor.TaskMaster
 	}
 	TaskMaster interface {
 		NewFork(name string, dbrps []kapacitor.DBRP, measurements []string) (edge.StatsEdge, error)
@@ -109,12 +107,9 @@ const (
 	recordingsAPIName = "recordings"
 	// Public name for the replays store
 	replaysAPIName = "replays"
-	// Public name for the finished replays store
-	finishedReplaysAPIName = "finished_replays"
 	// The storage namespace for all recording data.
-	recordingNamespace       = "recording_store"
-	replayNamespace          = "replay_store"
-	finishedReplaysNamespace = "finished_replays_store"
+	recordingNamespace = "recording_store"
+	replayNamespace    = "replay_store"
 )
 
 func (s *Service) Open() error {
@@ -132,13 +127,6 @@ func (s *Service) Open() error {
 	}
 	s.replays = replays
 	s.StorageService.Register(replaysAPIName, s.replays)
-
-	finishedReplays, err := newReplayKV(s.StorageService.Store(finishedReplaysNamespace))
-	if err != nil {
-		return err
-	}
-	s.finishedReplays = finishedReplays
-	s.StorageService.Register(finishedReplaysAPIName, s.finishedReplays)
 
 	if err := os.MkdirAll(s.saveDir, 0755); err != nil {
 		return err
@@ -443,20 +431,13 @@ func convertReplay(replay Replay) kclient.Replay {
 	}
 }
 
-func ConvertFinishedReplay(bo storage.BinaryObject) (kclient.Replay, error) {
-	data := httpd.MarshalJSON(bo, false)
-	replay := Replay{}
-	err := json.Unmarshal(data, &replay)
-	if err != nil {
-		return kclient.Replay{}, err
-	}
-	fr := convertReplay(replay)
-	// Add execution stats to finished replay
+func convertFinishedReplay(replay Replay) kclient.Replay {
+	r := convertReplay(replay)
 	stats := kclient.ExecutionStats{}
-	stats.TaskStats = replay.ReplayStats.TaskStats
-	stats.NodeStats = replay.ReplayStats.NodeStats
-	fr.ReplayStats = stats
-	return fr, nil
+	stats.TaskStats = replay.ExecutionStats.TaskStats
+	stats.NodeStats = replay.ExecutionStats.NodeStats
+	r.ExecutionStats = &stats
+	return r
 }
 
 var allRecordingFields = []string{
@@ -797,6 +778,13 @@ func (s *Service) updateReplayResult(replay Replay, err error) {
 	}
 	replay.Progress = 1.0
 	replay.Date = time.Now()
+
+	r, err := s.replays.Get(replay.ID)
+	if err != nil {
+		s.diag.Error("failed to save replay results", err)
+	}
+
+	replay.ExecutionStats = r.ExecutionStats
 	err = s.replays.Replace(replay)
 	if err != nil {
 		s.diag.Error("failed to save replay results", err)
@@ -811,9 +799,22 @@ func (s *Service) handleReplay(w http.ResponseWriter, req *http.Request) {
 	}
 	replay, err := s.replays.Get(id)
 	if err != nil {
-		httpd.HttpError(w, "could not find replay: "+err.Error(), true, http.StatusNotFound)
+		httpd.HttpError(w, "could not find replay: "+id, true, http.StatusNotFound)
 		return
 	}
+
+	finished := req.URL.Query().Get("finished")
+	if finished == "true" && replay.Status != Finished {
+		httpd.HttpError(w, "replay status is not Finished", true, http.StatusBadRequest)
+		return
+	}
+
+	if finished == "true" && replay.Status == Finished {
+		w.WriteHeader(http.StatusOK)
+		w.Write(httpd.MarshalJSON(convertFinishedReplay(replay), true))
+		return
+	}
+
 	if replay.Status == Running {
 		w.WriteHeader(http.StatusAccepted)
 	} else {
@@ -830,7 +831,6 @@ func (s *Service) handleDeleteReplay(w http.ResponseWriter, req *http.Request) {
 	}
 	//TODO: Cancel running replays
 	s.replays.Delete(id)
-	s.finishedReplays.Delete(id)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -980,14 +980,14 @@ func (s *Service) handleCreateReplay(w http.ResponseWriter, req *http.Request) {
 
 	// Successfully started replay
 	replay := Replay{
-		ID:            opt.ID,
-		RecordingID:   opt.Recording,
-		TaskID:        opt.Task,
-		RecordingTime: opt.RecordingTime,
-		Clock:         clockType,
-		Date:          time.Now(),
-		Status:        Running,
-		ReplayStats:   kapacitor.ExecutionStats{},
+		ID:             opt.ID,
+		RecordingID:    opt.Recording,
+		TaskID:         opt.Task,
+		RecordingTime:  opt.RecordingTime,
+		Clock:          clockType,
+		Date:           time.Now(),
+		Status:         Running,
+		ExecutionStats: ExecutionStats{},
 	}
 	s.replays.Create(replay)
 
@@ -1000,27 +1000,22 @@ func (s *Service) handleCreateReplay(w http.ResponseWriter, req *http.Request) {
 	w.Write(httpd.MarshalJSON(convertReplay(replay), true))
 }
 
-func (s *Service) handleFinishedReplay(id string, stats kapacitor.ExecutionStats) error {
+func (s *Service) storeExecutionStats(id string, st kapacitor.ExecutionStats) error {
 	r, err := s.replays.Get(id)
 	if err != nil {
 		return err
 	}
 
-	fr := Replay{
-		ID:            r.ID,
-		RecordingID:   r.RecordingID,
-		TaskID:        r.TaskID,
-		RecordingTime: r.RecordingTime,
-		Clock:         r.Clock,
-		Date:          r.Date,
-		Status:        r.Status,
-		ReplayStats:   stats,
-	}
+	stats := ExecutionStats{}
+	stats.TaskStats = st.TaskStats
+	stats.NodeStats = st.NodeStats
 
-	err = s.finishedReplays.Create(fr)
+	r.ExecutionStats = stats
+	err = s.replays.Replace(r)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -1279,9 +1274,9 @@ func (r *Service) doReplay(id string, task *kapacitor.Task, runReplay func(tm *k
 		return errors.Wrap(err, "getting executing stats replay")
 	}
 
-	err = r.handleFinishedReplay(id, stats)
+	err = r.storeExecutionStats(id, stats)
 	if err != nil {
-		return errors.Wrap(err, "creating finished replay")
+		return errors.Wrap(err, "error handling finished replay")
 	}
 
 	// Drain tm so the task can finish

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/influxdata/kapacitor"
 	"github.com/influxdata/kapacitor/services/storage"
 )
 
@@ -215,6 +214,11 @@ const (
 	Real
 )
 
+type ExecutionStats struct {
+	TaskStats map[string]interface{}
+	NodeStats map[string]map[string]interface{}
+}
+
 type Replay struct {
 	ID            string
 	RecordingID   string
@@ -226,7 +230,7 @@ type Replay struct {
 	Status        Status
 	Progress      float64
 	// Stores snapshot of finished replayed Task status
-	ReplayStats kapacitor.ExecutionStats
+	ExecutionStats ExecutionStats
 }
 
 type rawReplay Replay
