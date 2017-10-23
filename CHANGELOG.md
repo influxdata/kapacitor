@@ -12,6 +12,7 @@
     The breaking change is that the Combine and Flatten nodes previously, but erroneously, operated across batch boundaries; this has been fixed.
 - [#1497](https://github.com/influxdata/kapacitor/pull/1497): Add support for Docker Swarm autoscaling services.
 - [#1485](https://github.com/influxdata/kapacitor/issues/1485): Add bools field types to UDFs.
+- [#1549](https://github.com/influxdata/kapacitor/issues/1549): Add stateless now() function to get the current local time.
 - [#1545](https://github.com/influxdata/kapacitor/pull/1545): Add support for timeout, tags and service template in the Alerta AlertNode
 - [#1568](https://github.com/influxdata/kapacitor/issues/1568): Add support for custom HTTP Post bodies via a template system.
 - [#1569](https://github.com/influxdata/kapacitor/issues/1569): Add support for add the HTTP status code as a field when using httpPost

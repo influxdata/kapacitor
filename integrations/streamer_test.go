@@ -9037,6 +9037,83 @@ stream
 	}
 }
 
+func TestStream_LambdaNow(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('account')
+	|where(lambda: "expiration" < unixNano(now()))
+	|groupBy('owner')
+	|httpOut('TestStream_LambdaNow')
+`
+
+	expectedOutput := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "account",
+				Tags:    map[string]string{"owner": "ownerA"},
+				Columns: []string{"time", "expiration"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						float64(3.15533e+17), // 1980-01-01 00:00:00 (Unix ns timestamp)
+
+						// we expect "expiration" to be float64 and not int64 (even with input data consisting of ints)
+						// because httpOut uses JSON as serialization format for the results,
+						// resulting in the integers becoming floats
+					},
+				},
+			},
+
+			// the point with expiration = 4102440000000000000 should not be in the results
+			// as it represents a date past now (2100-01-01 00:00:00)
+
+			{
+				Name:    "account",
+				Tags:    map[string]string{"owner": "ownerC"},
+				Columns: []string{"time", "expiration"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						float64(6.56419e+17), // 1990-10-20 10:42:42
+					},
+				},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_LambdaNow", script, time.Second, expectedOutput, false, nil)
+}
+
+func TestStream_EvalNow(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('account')
+	|eval(lambda: year(now()))
+		.as('currentYear')
+	|httpOut('TestStream_EvalNow')
+`
+
+	expectedOutput := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "account",
+				Tags:    map[string]string{"owner": "ownerA"},
+				Columns: []string{"time", "currentYear"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						float64(time.Now().Year()),
+					},
+				},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_EvalNow", script, time.Second, expectedOutput, false, nil)
+}
+
 func TestStream_Autoscale(t *testing.T) {
 	testCases := map[string]struct {
 		script           string
