@@ -26,6 +26,7 @@ import (
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/sensu"
+	"github.com/influxdata/kapacitor/services/sideload"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/snmptrap"
@@ -1247,4 +1248,20 @@ func (h *SessionHandler) DeletedLogSession(id uuid.UUID, contentType string, tag
 	}
 
 	h.l.Info("deleted log session", Stringer("id", id), String("content-type", contentType), Strings("tags", ts))
+}
+
+type SideloadHandler struct {
+	l Logger
+}
+
+func (h *SideloadHandler) Error(msg string, err error) {
+	h.l.Error(msg, Error(err))
+}
+
+func (h *SideloadHandler) WithContext(ctx ...keyvalue.T) sideload.Diagnostic {
+	fields := logFieldsFromContext(ctx)
+
+	return &SideloadHandler{
+		l: h.l.With(fields...),
+	}
 }

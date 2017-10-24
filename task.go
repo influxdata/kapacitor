@@ -509,6 +509,8 @@ func (et *ExecutingTask) createNode(p pipeline.Node, d NodeDiagnostic) (n Node, 
 		n, err = newStateDurationNode(et, t, d)
 	case *pipeline.StateCountNode:
 		n, err = newStateCountNode(et, t, d)
+	case *pipeline.SideloadNode:
+		n, err = newSideloadNode(et, t, d)
 	default:
 		return nil, fmt.Errorf("unknown pipeline node type %T", p)
 	}

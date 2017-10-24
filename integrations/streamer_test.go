@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"html"
 	"io/ioutil"
@@ -49,6 +50,7 @@ import (
 	"github.com/influxdata/kapacitor/services/pushover/pushovertest"
 	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/sensu/sensutest"
+	"github.com/influxdata/kapacitor/services/sideload"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/slack/slacktest"
 	"github.com/influxdata/kapacitor/services/smtp"
@@ -73,7 +75,12 @@ import (
 var diagService *diagnostic.Service
 
 func init() {
-	diagService = diagnostic.NewService(diagnostic.NewConfig(), ioutil.Discard, ioutil.Discard)
+	flag.Parse()
+	out := ioutil.Discard
+	if testing.Verbose() {
+		out = os.Stderr
+	}
+	diagService = diagnostic.NewService(diagnostic.NewConfig(), out, out)
 	diagService.Open()
 }
 
@@ -9532,7 +9539,7 @@ stream
 		t.Fatal(err)
 	}
 	name := "TestStream_KapacitorLoopback"
-	data, err := os.Open(path.Join(dir, "data", name+".srpl"))
+	data, err := os.Open(path.Join(dir, "testdata", name+".srpl"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -9664,7 +9671,7 @@ stream
 		t.Fatal(err)
 	}
 	name := "TestStream_KapacitorLoopback"
-	data, err := os.Open(path.Join(dir, "data", name+".srpl"))
+	data, err := os.Open(path.Join(dir, "testdata", name+".srpl"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -9729,6 +9736,229 @@ stream
 	if eq, msg := compareResults(er, result); !eq {
 		t.Error(msg)
 	}
+}
+
+func TestStream_Sideload(t *testing.T) {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var script = fmt.Sprintf(`
+stream
+	|from()
+		.database('dbname')
+		.retentionPolicy('rpname')
+		.measurement('m')
+		.groupBy('t0', 't1', 't2')
+	|sideload()
+		.source('file://%s/testdata/sideload')
+		.order('t0/{{.t0}}.yml', 't1/{{.t1}}.yml', 't2/{{.t2}}.yml')
+		.field('f1', 0)
+		.field('f2', 0.0)
+		.tag('t3', 'one')
+	|log()
+	|httpOut('TestStream_Sideload')
+`, wd)
+
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "m",
+				Tags:    map[string]string{"t0": "a", "t1": "m", "t2": "x", "t3": "one"},
+				Columns: []string{"time", "f1", "f2", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						0.0,
+						0.0,
+						1.0,
+					},
+				},
+			},
+			{
+				Name:    "m",
+				Tags:    map[string]string{"t0": "b", "t1": "n", "t2": "y", "t3": "why"},
+				Columns: []string{"time", "f1", "f2", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						2.0,
+						3.5,
+						1.0,
+					},
+				},
+			},
+			{
+				Name:    "m",
+				Tags:    map[string]string{"t0": "c", "t1": "o", "t2": "y", "t3": "why"},
+				Columns: []string{"time", "f1", "f2", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						12.0,
+						13.5,
+						1.0,
+					},
+				},
+			},
+		},
+	}
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		tm.SideloadService = sideload.NewService(diagService.NewSideloadHandler())
+	}
+
+	testStreamerWithOutput(t, "TestStream_Sideload", script, 1*time.Second, er, true, tmInit)
+}
+
+func TestStream_Sideload_JSON(t *testing.T) {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var script = fmt.Sprintf(`
+stream
+	|from()
+		.database('dbname')
+		.retentionPolicy('rpname')
+		.measurement('m')
+		.groupBy('t0', 't1', 't2')
+	|sideload()
+		.source('file://%s/testdata/sideload')
+		.order('t0/{{.t0}}.json', 't1/{{.t1}}.json', 't2/{{.t2}}.yml')
+		.field('f1', 0)
+		.field('f2', 0.0)
+		.tag('t3', 'one')
+	|log()
+	|httpOut('TestStream_Sideload')
+`, wd)
+
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "m",
+				Tags:    map[string]string{"t0": "a", "t1": "m", "t2": "x", "t3": "one"},
+				Columns: []string{"time", "f1", "f2", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						0.0,
+						0.0,
+						1.0,
+					},
+				},
+			},
+			{
+				Name:    "m",
+				Tags:    map[string]string{"t0": "b", "t1": "n", "t2": "y", "t3": "why"},
+				Columns: []string{"time", "f1", "f2", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						2.0,
+						3.5,
+						1.0,
+					},
+				},
+			},
+			{
+				Name:    "m",
+				Tags:    map[string]string{"t0": "c", "t1": "o", "t2": "y", "t3": "why"},
+				Columns: []string{"time", "f1", "f2", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						12.0,
+						13.5,
+						1.0,
+					},
+				},
+			},
+		},
+	}
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		tm.SideloadService = sideload.NewService(diagService.NewSideloadHandler())
+	}
+
+	testStreamerWithOutput(t, "TestStream_Sideload", script, 1*time.Second, er, true, tmInit)
+}
+
+func TestStream_Sideload_Multiple(t *testing.T) {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var script = fmt.Sprintf(`
+stream
+	|from()
+		.database('dbname')
+		.retentionPolicy('rpname')
+		.measurement('m')
+		.groupBy('t0', 't1', 't2')
+	|sideload()
+		.source('file://%[1]s/testdata/sideload')
+		.order('t0/{{.t0}}.yml', 't1/{{.t1}}.yml', 't2/{{.t2}}.yml')
+		.field('f1', 0)
+		.field('f2', 0.0)
+		.tag('t3', 'one')
+	|sideload()
+		.source('file://%[1]s/testdata/sideload')
+		.order('t0/{{.t0}}.yml', 't1/{{.t1}}.yml', 't2/{{.t2}}.yml')
+		.field('other', -1.0)
+	|log()
+	|httpOut('TestStream_Sideload')
+`, wd)
+
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "m",
+				Tags:    map[string]string{"t0": "a", "t1": "m", "t2": "x", "t3": "one"},
+				Columns: []string{"time", "f1", "f2", "other", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						0.0,
+						0.0,
+						-1.0,
+						1.0,
+					},
+				},
+			},
+			{
+				Name:    "m",
+				Tags:    map[string]string{"t0": "b", "t1": "n", "t2": "y", "t3": "why"},
+				Columns: []string{"time", "f1", "f2", "other", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						2.0,
+						3.5,
+						56.0,
+						1.0,
+					},
+				},
+			},
+			{
+				Name:    "m",
+				Tags:    map[string]string{"t0": "c", "t1": "o", "t2": "y", "t3": "why"},
+				Columns: []string{"time", "f1", "f2", "other", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						12.0,
+						13.5,
+						56.0,
+						1.0,
+					},
+				},
+			},
+		},
+	}
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		tm.SideloadService = sideload.NewService(diagService.NewSideloadHandler())
+	}
+
+	testStreamerWithOutput(t, "TestStream_Sideload", script, 1*time.Second, er, true, tmInit)
 }
 
 func TestStream_InfluxDBOut(t *testing.T) {
@@ -10970,7 +11200,7 @@ func testStreamer(
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := os.Open(path.Join(dir, "data", name+".srpl"))
+	data, err := os.Open(path.Join(dir, "testdata", name+".srpl"))
 	if err != nil {
 		t.Fatal(err)
 	}

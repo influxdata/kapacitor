@@ -113,7 +113,7 @@ func PipelineTickTestHelper(t *testing.T, pipe *pipeline.Pipeline, want string) 
 	}
 
 	if got != want {
-		t.Errorf("%v, want %v", got, want)
+		t.Errorf("unexpected TICKscript:\ngot:\n%v\nwant:\n%v\n", got, want)
 		t.Log(got) // print is helpful to get the correct format.
 	}
 }

@@ -51,6 +51,7 @@ import (
 	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/serverset"
 	"github.com/influxdata/kapacitor/services/servicetest"
+	"github.com/influxdata/kapacitor/services/sideload"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/snmptrap"
@@ -106,6 +107,7 @@ type Server struct {
 	TaskMasterLookup *kapacitor.TaskMasterLookup
 
 	LoadService           *load.Service
+	SideloadService       *sideload.Service
 	AuthService           auth.Interface
 	HTTPDService          *httpd.Service
 	StorageService        *storage.Service
@@ -203,6 +205,7 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 	s.appendAuthService()
 	s.appendConfigOverrideService()
 	s.appendTesterService()
+	s.appendSideloadService()
 
 	// Init alert service
 	s.initAlertService()
@@ -262,11 +265,6 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 		return nil, errors.Wrap(err, "graphite service")
 	}
 
-	// Append StatsService and ReportingService after other services so all stats are ready
-	// to be reported
-	s.appendStatsService()
-	s.appendReportingService()
-
 	// Append Scraper and discovery services
 	s.appendScraperService()
 
@@ -288,6 +286,11 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 	s.appendServersetService()
 	s.appendStaticService()
 	s.appendTritonService()
+
+	// Append StatsService and ReportingService after other services so all stats are ready
+	// to be reported
+	s.appendStatsService()
+	s.appendReportingService()
 
 	// Append HTTPD Service last so that the API is not listening till everything else succeeded.
 	s.appendHTTPDService()
@@ -358,6 +361,16 @@ func (s *Server) appendTesterService() {
 
 	s.TesterService = srv
 	s.AppendService("tests", srv)
+}
+
+func (s *Server) appendSideloadService() {
+	d := s.DiagService.NewSideloadHandler()
+	srv := sideload.NewService(d)
+	srv.HTTPDService = s.HTTPDService
+
+	s.SideloadService = srv
+	s.TaskMaster.SideloadService = srv
+	s.AppendService("sideload", srv)
 }
 
 func (s *Server) appendSMTPService() {
@@ -1069,6 +1082,9 @@ func (s *Server) writeID(file string, id uuid.UUID) error {
 func (s *Server) Reload() {
 	if err := s.LoadService.Load(); err != nil {
 		s.Diag.Error("failed to reload tasks/templates/handlers", err)
+	}
+	if err := s.SideloadService.Reload(); err != nil {
+		s.Diag.Error("failed to reload sideload sources", err)
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -10892,6 +10893,93 @@ options:
 		}
 	}
 
+}
+
+func TestSideloadService(t *testing.T) {
+	dir := MustTempDir()
+	defer os.RemoveAll(dir)
+
+	if err := copyFiles("testdata/sideload", dir); err != nil {
+		t.Fatal(err)
+	}
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	id := "testSideloadTask"
+	ttype := client.StreamTask
+	dbrps := []client.DBRP{{
+		Database:        "mydb",
+		RetentionPolicy: "myrp",
+	}}
+	tick := fmt.Sprintf(`stream
+	|from()
+		.measurement('test')
+	|sideload()
+		.source('file://%s')
+		.order('host/{{.host}}.yml', 'service/{{.service}}.yml', 'region/{{.region}}.yml')
+		.field('cpu_usage_idle_warn', 30.0)
+		.field('cpu_usage_idle_crit', 15.0)
+	|httpOut('sideload')
+`, dir)
+
+	_, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Enabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	endpoint := fmt.Sprintf("%s/tasks/%s/sideload", s.URL(), id)
+
+	// Request data before any writes and expect null responses
+	nullResponse := `{"series":null}`
+	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
+	if err != nil {
+		t.Error(err)
+	}
+
+	points := `test,host=host002,service=cart,region=us-east-1 value=1 0000000000`
+	v := url.Values{}
+	v.Add("precision", "s")
+	s.MustWrite("mydb", "myrp", points, v)
+
+	exp := `{"series":[{"name":"test","tags":{"host":"host002","region":"us-east-1","service":"cart"},"columns":["time","cpu_usage_idle_crit","cpu_usage_idle_warn","value"],"values":[["1970-01-01T00:00:00Z",4,10,1]]}]}`
+	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Update source file
+	host002Override := `
+---
+cpu_usage_idle_warn: 8
+`
+	f, err := os.Create(filepath.Join(dir, "host/host002.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = io.Copy(f, strings.NewReader(host002Override))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	// reload
+	s.Reload()
+
+	// Write new points
+	points = `test,host=host002,service=cart,region=us-east-1 value=2 0000000001`
+	s.MustWrite("mydb", "myrp", points, v)
+
+	exp = `{"series":[{"name":"test","tags":{"host":"host002","region":"us-east-1","service":"cart"},"columns":["time","cpu_usage_idle_crit","cpu_usage_idle_warn","value"],"values":[["1970-01-01T00:00:01Z",5,8,2]]}]}`
+	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
+	if err != nil {
+		t.Error(err)
+	}
 }
 
 func TestLogSessions_HeaderJSON(t *testing.T) {

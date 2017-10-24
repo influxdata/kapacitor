@@ -1,0 +1,9 @@
+dbname
+rpname
+m,t0=a,t1=m,t2=x value=1 0000000000
+dbname
+rpname
+m,t0=b,t1=n,t2=y value=1 0000000000
+dbname
+rpname
+m,t0=c,t1=o,t2=y value=1 0000000000

@@ -132,6 +132,12 @@ func (s *Service) Close() error {
 	return nil
 }
 
+func (s *Service) NewSideloadHandler() *SideloadHandler {
+	return &SideloadHandler{
+		l: s.logger.With(String("service", "sideload")),
+	}
+}
+
 func (s *Service) NewVictorOpsHandler() *VictorOpsHandler {
 	return &VictorOpsHandler{
 		l: s.logger.With(String("service", "victorops")),

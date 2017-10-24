@@ -315,12 +315,10 @@ func (pm *pointMessage) ToRow() *models.Row {
 		Name: pm.name,
 		Tags: pm.tags,
 	}
-	row.Columns = make([]string, len(pm.fields)+1)
+	row.Columns = make([]string, 1, len(pm.fields)+1)
 	row.Columns[0] = "time"
-	i := 1
 	for f := range pm.fields {
-		row.Columns[i] = f
-		i++
+		row.Columns = append(row.Columns, f)
 	}
 	// Sort all columns but leave time as first
 	sort.Strings(row.Columns[1:])

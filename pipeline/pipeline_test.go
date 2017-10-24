@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 	"time"
 
@@ -106,8 +107,7 @@ func MarshalIndentTestHelper(t *testing.T, node interface{}, wantErr bool, want 
 		return
 	}
 	if string(got) != want {
-		t.Log(string(got))
-		t.Errorf("error = %s, want %s", string(got), want)
+		t.Errorf("unexpected JSON\ngot:\n%s\nwant:\n%s\n", string(got), want)
 	}
 }
 
@@ -121,5 +121,16 @@ func MarshalTestHelper(t *testing.T, node interface{}, wantErr bool, want string
 	if string(got) != want {
 		t.Log(string(got))
 		t.Errorf("error = %s, want %s", string(got), want)
+	}
+}
+func UnmarshalJSONTestHelper(t *testing.T, input []byte, node interface{}, wantErr bool, want interface{}) {
+	t.Helper()
+	err := json.Unmarshal(input, node)
+	if (err != nil) != wantErr {
+		t.Errorf("UnmarshalJSON() error = %v, wantErr %v", err, wantErr)
+		return
+	}
+	if !wantErr && !reflect.DeepEqual(node, want) {
+		t.Errorf("UnmarshalJSON() =\ngot:\n%#+v\nwant:\n%#+v\n", node, want)
 	}
 }
