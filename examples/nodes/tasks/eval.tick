@@ -1,0 +1,7 @@
+dbrp "telegraf"."autogen"
+
+stream
+    |from()
+        .measurement('cpu')
+    |eval(lambda: 100.0 - "usage_idle")
+        .as('usage_not_idle')

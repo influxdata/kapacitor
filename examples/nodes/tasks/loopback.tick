@@ -1,0 +1,9 @@
+dbrp "telegraf"."autogen"
+
+stream
+    |from()
+        .measurement('system')
+        .groupBy(*)
+    |kapacitorLoopback()
+        .database('loopback')
+        .retentionPolicy('autogen')

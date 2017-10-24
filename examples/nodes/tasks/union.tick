@@ -1,0 +1,17 @@
+dbrp "telegraf"."autogen"
+
+var cpu = stream
+    |from()
+        .measurement('cpu')
+
+var mem = stream
+    |from()
+        .measurement('mem')
+
+var system = stream
+    |from()
+        .measurement('system')
+
+cpu
+    |union(mem, system)
+        .rename('stats')
