@@ -30,11 +30,13 @@
 - [#916](https://github.com/influxdata/kapacitor/issues/916): Crash of Kapacitor on Windows x64 when starting a recording
 - [#1400](https://github.com/influxdata/kapacitor/issues/1400): Allow for `.yml` file extensions in `define-topic-handler`
 - [#1402](https://github.com/influxdata/kapacitor/pull/1402): Fix http server error logging.
-- [#1500](https://github.com/influxdata/kapacitor/pull/1500): Fix bugs with stopping running UDF agent.
 - [#1470](https://github.com/influxdata/kapacitor/pull/1470): Fix error messages for missing fields which are arguments to functions are not clear
+- [#1500](https://github.com/influxdata/kapacitor/pull/1500): Fix bugs with stopping running UDF agent.
 - [#1516](https://github.com/influxdata/kapacitor/pull/1516): Fix bad PagerDuty test the required server info.
-- [#1581](https://github.com/influxdata/kapacitor/pull/1581): Add SNMP sysUpTime to SNMP Trap service
 - [#1547](https://github.com/influxdata/kapacitor/issues/1547): Fix panic on recording replay with HTTPPostHandler.
+- [#1581](https://github.com/influxdata/kapacitor/pull/1581): Add SNMP sysUpTime to SNMP Trap service
+- [#1608](https://github.com/influxdata/kapacitor/pull/1608): Fixed missing k8s configuration bootstrapping
+
 
 ## v1.3.3 [2017-08-11]
 
