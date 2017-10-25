@@ -10,8 +10,8 @@ import (
 	"time"
 
 	imodels "github.com/influxdata/influxdb/models"
-	"github.com/influxdata/kapacitor/influxdb"
-	"github.com/influxdata/kapacitor/models"
+	"github.com/yozora-hitagi/kapacitor/influxdb"
+	"github.com/yozora-hitagi/kapacitor/models"
 )
 
 // Message represents data to be passed along an edge.

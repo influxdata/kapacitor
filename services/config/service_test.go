@@ -11,12 +11,12 @@ import (
 	"testing"
 	"time"
 
-	client "github.com/influxdata/kapacitor/client/v1"
-	"github.com/influxdata/kapacitor/services/config"
-	"github.com/influxdata/kapacitor/services/diagnostic"
-	"github.com/influxdata/kapacitor/services/httpd"
-	"github.com/influxdata/kapacitor/services/httpd/httpdtest"
-	"github.com/influxdata/kapacitor/services/storage/storagetest"
+	client "github.com/yozora-hitagi/kapacitor/client/v1"
+	"github.com/yozora-hitagi/kapacitor/services/config"
+	"github.com/yozora-hitagi/kapacitor/services/diagnostic"
+	"github.com/yozora-hitagi/kapacitor/services/httpd"
+	"github.com/yozora-hitagi/kapacitor/services/httpd/httpdtest"
+	"github.com/yozora-hitagi/kapacitor/services/storage/storagetest"
 )
 
 var diagService *diagnostic.Service

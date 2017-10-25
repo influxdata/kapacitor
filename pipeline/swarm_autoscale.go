@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/influxdata/kapacitor/tick/ast"
+	"github.com/yozora-hitagi/kapacitor/tick/ast"
 )
 
 // SwarmAutoscaleNode triggers autoscale events for a service on a Docker Swarm mode cluster.

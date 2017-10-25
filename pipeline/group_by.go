@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/influxdata/kapacitor/tick/ast"
+	"github.com/yozora-hitagi/kapacitor/tick/ast"
 )
 
 // A GroupByNode will group the incoming data.

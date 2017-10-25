@@ -23,8 +23,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/influxdata/kapacitor"
-	"github.com/influxdata/kapacitor/services/httpd"
+	"github.com/yozora-hitagi/kapacitor"
+	"github.com/yozora-hitagi/kapacitor/services/httpd"
 )
 
 const (

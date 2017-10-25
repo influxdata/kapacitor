@@ -10,27 +10,27 @@ import (
 	text "text/template"
 	"time"
 
-	"github.com/influxdata/kapacitor/alert"
-	"github.com/influxdata/kapacitor/edge"
-	"github.com/influxdata/kapacitor/expvar"
-	"github.com/influxdata/kapacitor/keyvalue"
-	"github.com/influxdata/kapacitor/models"
-	"github.com/influxdata/kapacitor/pipeline"
-	alertservice "github.com/influxdata/kapacitor/services/alert"
-	"github.com/influxdata/kapacitor/services/hipchat"
-	"github.com/influxdata/kapacitor/services/httppost"
-	"github.com/influxdata/kapacitor/services/mqtt"
-	"github.com/influxdata/kapacitor/services/opsgenie"
-	"github.com/influxdata/kapacitor/services/pagerduty"
-	"github.com/influxdata/kapacitor/services/pushover"
-	"github.com/influxdata/kapacitor/services/sensu"
-	"github.com/influxdata/kapacitor/services/slack"
-	"github.com/influxdata/kapacitor/services/smtp"
-	"github.com/influxdata/kapacitor/services/snmptrap"
-	"github.com/influxdata/kapacitor/services/telegram"
-	"github.com/influxdata/kapacitor/services/victorops"
-	"github.com/influxdata/kapacitor/tick/ast"
-	"github.com/influxdata/kapacitor/tick/stateful"
+	"github.com/yozora-hitagi/kapacitor/alert"
+	"github.com/yozora-hitagi/kapacitor/edge"
+	"github.com/yozora-hitagi/kapacitor/expvar"
+	"github.com/yozora-hitagi/kapacitor/keyvalue"
+	"github.com/yozora-hitagi/kapacitor/models"
+	"github.com/yozora-hitagi/kapacitor/pipeline"
+	alertservice "github.com/yozora-hitagi/kapacitor/services/alert"
+	"github.com/yozora-hitagi/kapacitor/services/hipchat"
+	"github.com/yozora-hitagi/kapacitor/services/httppost"
+	"github.com/yozora-hitagi/kapacitor/services/mqtt"
+	"github.com/yozora-hitagi/kapacitor/services/opsgenie"
+	"github.com/yozora-hitagi/kapacitor/services/pagerduty"
+	"github.com/yozora-hitagi/kapacitor/services/pushover"
+	"github.com/yozora-hitagi/kapacitor/services/sensu"
+	"github.com/yozora-hitagi/kapacitor/services/slack"
+	"github.com/yozora-hitagi/kapacitor/services/smtp"
+	"github.com/yozora-hitagi/kapacitor/services/snmptrap"
+	"github.com/yozora-hitagi/kapacitor/services/telegram"
+	"github.com/yozora-hitagi/kapacitor/services/victorops"
+	"github.com/yozora-hitagi/kapacitor/tick/ast"
+	"github.com/yozora-hitagi/kapacitor/tick/stateful"
 	"github.com/pkg/errors"
 )
 
@@ -172,6 +172,19 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		h, err := alertservice.NewLogHandler(c, an.diag)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create log alert handler")
+		}
+		an.handlers = append(an.handlers, h)
+	}
+
+	for _, log := range n.MlogHandlers {
+		c := alertservice.DefaultLogHandlerConfig()
+		c.Path = log.FilePath
+		if log.Mode != 0 {
+			c.Mode = os.FileMode(log.Mode)
+		}
+		h, err := alertservice.NewMlogHandler(c, an.diag)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create Mlog alert handler")
 		}
 		an.handlers = append(an.handlers, h)
 	}

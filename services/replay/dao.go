@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/influxdata/kapacitor/services/storage"
+	"github.com/yozora-hitagi/kapacitor/services/storage"
 )
 
 var (

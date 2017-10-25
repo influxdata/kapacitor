@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/influxdata/kapacitor/udf/agent"
+	"github.com/yozora-hitagi/kapacitor/udf/agent"
 )
 
 func TestMessage_ReadWrite(t *testing.T) {

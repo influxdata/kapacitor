@@ -12,7 +12,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/influxdata/kapacitor/uuid"
+	"github.com/yozora-hitagi/kapacitor/uuid"
 )
 
 type IntVar interface {

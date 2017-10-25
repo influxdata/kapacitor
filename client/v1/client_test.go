@@ -13,7 +13,7 @@ import (
 
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/models"
-	"github.com/influxdata/kapacitor/client/v1"
+	"github.com/yozora-hitagi/kapacitor/client/v1"
 )
 
 func newClient(handler http.Handler) (*httptest.Server, *client.Client, error) {

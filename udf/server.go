@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/influxdata/kapacitor/edge"
-	"github.com/influxdata/kapacitor/keyvalue"
-	"github.com/influxdata/kapacitor/models"
-	"github.com/influxdata/kapacitor/udf/agent"
+	"github.com/yozora-hitagi/kapacitor/edge"
+	"github.com/yozora-hitagi/kapacitor/keyvalue"
+	"github.com/yozora-hitagi/kapacitor/models"
+	"github.com/yozora-hitagi/kapacitor/udf/agent"
 )
 
 var ErrServerStopped = errors.New("server already stopped")

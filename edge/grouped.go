@@ -3,8 +3,8 @@ package edge
 import (
 	"errors"
 
-	"github.com/influxdata/kapacitor/expvar"
-	"github.com/influxdata/kapacitor/models"
+	"github.com/yozora-hitagi/kapacitor/expvar"
+	"github.com/yozora-hitagi/kapacitor/models"
 )
 
 // GroupedConsumer reads messages off an edge and passes them by group to receivers created from a grouped receiver.

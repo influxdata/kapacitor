@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/influxdata/kapacitor/services/k8s/client"
-	"github.com/influxdata/kapacitor/services/scraper"
+	"github.com/yozora-hitagi/kapacitor/services/k8s/client"
+	"github.com/yozora-hitagi/kapacitor/services/scraper"
 )
 
 // Doesn't actually get used, but its good to have a template here already

@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/influxdata/kapacitor/tick/ast"
-	"github.com/influxdata/kapacitor/tick/stateful"
+	"github.com/yozora-hitagi/kapacitor/tick/ast"
+	"github.com/yozora-hitagi/kapacitor/tick/stateful"
 )
 
 func TestScopePool_Sanity(t *testing.T) {

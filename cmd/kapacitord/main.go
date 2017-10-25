@@ -11,9 +11,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/influxdata/kapacitor/cmd/kapacitord/help"
-	"github.com/influxdata/kapacitor/cmd/kapacitord/run"
-	"github.com/influxdata/kapacitor/services/diagnostic"
+	"github.com/yozora-hitagi/kapacitor/cmd/kapacitord/help"
+	"github.com/yozora-hitagi/kapacitor/cmd/kapacitord/run"
+	"github.com/yozora-hitagi/kapacitor/services/diagnostic"
 )
 
 type Diagnostic run.Diagnostic

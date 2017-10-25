@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/influxdata/kapacitor"
-	"github.com/influxdata/kapacitor/edge"
-	"github.com/influxdata/kapacitor/models"
-	"github.com/influxdata/kapacitor/services/diagnostic"
-	"github.com/influxdata/kapacitor/udf"
-	"github.com/influxdata/kapacitor/udf/agent"
-	udf_test "github.com/influxdata/kapacitor/udf/test"
+	"github.com/yozora-hitagi/kapacitor"
+	"github.com/yozora-hitagi/kapacitor/edge"
+	"github.com/yozora-hitagi/kapacitor/models"
+	"github.com/yozora-hitagi/kapacitor/services/diagnostic"
+	"github.com/yozora-hitagi/kapacitor/udf"
+	"github.com/yozora-hitagi/kapacitor/udf/agent"
+	udf_test "github.com/yozora-hitagi/kapacitor/udf/test"
 )
 
 var diagService *diagnostic.Service

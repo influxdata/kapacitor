@@ -40,7 +40,7 @@ DEFAULT_BUCKET = "dl.influxdata.com/kapacitor/artifacts"
 
 # META-PACKAGE VARIABLES
 PACKAGE_LICENSE = "MIT"
-PACKAGE_URL = "github.com/influxdata/kapacitor"
+PACKAGE_URL = "github.com/yozora-hitagi/kapacitor"
 MAINTAINER = "support@influxdb.com"
 VENDOR = "InfluxData"
 DESCRIPTION = "Time series data processing engine"

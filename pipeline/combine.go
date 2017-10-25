@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/influxdata/kapacitor/tick/ast"
+	"github.com/yozora-hitagi/kapacitor/tick/ast"
 )
 
 const (

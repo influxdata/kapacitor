@@ -11,9 +11,9 @@ import (
 	"sync"
 	"text/template"
 
-	"github.com/influxdata/kapacitor/alert"
-	"github.com/influxdata/kapacitor/bufpool"
-	"github.com/influxdata/kapacitor/keyvalue"
+	"github.com/yozora-hitagi/kapacitor/alert"
+	"github.com/yozora-hitagi/kapacitor/bufpool"
+	"github.com/yozora-hitagi/kapacitor/keyvalue"
 	"github.com/pkg/errors"
 )
 

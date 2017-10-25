@@ -4,7 +4,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/yozora-hitagi/kapacitor/pipeline"
 )
 
 // Edge represents the connection between two nodes that communicate via messages.

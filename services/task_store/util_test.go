@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	client "github.com/influxdata/kapacitor/client/v1"
+	client "github.com/yozora-hitagi/kapacitor/client/v1"
 )
 
 func TestDBRPsFromProgram(t *testing.T) {

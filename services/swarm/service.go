@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/influxdata/kapacitor/services/swarm/client"
+	"github.com/yozora-hitagi/kapacitor/services/swarm/client"
 	"github.com/pkg/errors"
 )
 

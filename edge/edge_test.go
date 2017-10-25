@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/influxdata/kapacitor/edge"
-	"github.com/influxdata/kapacitor/models"
-	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/yozora-hitagi/kapacitor/edge"
+	"github.com/yozora-hitagi/kapacitor/models"
+	"github.com/yozora-hitagi/kapacitor/pipeline"
 )
 
 const defaultEdgeBufferSize = 1000

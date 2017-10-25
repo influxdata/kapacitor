@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/influxdata/kapacitor/services/k8s/client"
-	"github.com/influxdata/kapacitor/tick/ast"
+	"github.com/yozora-hitagi/kapacitor/services/k8s/client"
+	"github.com/yozora-hitagi/kapacitor/tick/ast"
 )
 
 const (

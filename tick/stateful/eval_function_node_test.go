@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/influxdata/kapacitor/tick/ast"
-	"github.com/influxdata/kapacitor/tick/stateful"
+	"github.com/yozora-hitagi/kapacitor/tick/ast"
+	"github.com/yozora-hitagi/kapacitor/tick/stateful"
 )
 
 func TestEvalFunctionNode_InvalidNodeAsArgument(t *testing.T) {

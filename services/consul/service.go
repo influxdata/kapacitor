@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/influxdata/kapacitor/services/scraper"
+	"github.com/yozora-hitagi/kapacitor/services/scraper"
 	"github.com/prometheus/prometheus/config"
 	pconsul "github.com/prometheus/prometheus/discovery/consul"
 )

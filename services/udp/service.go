@@ -8,9 +8,9 @@ import (
 	"sync"
 
 	"github.com/influxdata/influxdb/models"
-	"github.com/influxdata/kapacitor/expvar"
-	"github.com/influxdata/kapacitor/keyvalue"
-	"github.com/influxdata/kapacitor/server/vars"
+	"github.com/yozora-hitagi/kapacitor/expvar"
+	"github.com/yozora-hitagi/kapacitor/keyvalue"
+	"github.com/yozora-hitagi/kapacitor/server/vars"
 )
 
 const (

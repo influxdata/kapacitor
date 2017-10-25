@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/influxdata/kapacitor/tick/ast"
+	"github.com/yozora-hitagi/kapacitor/tick/ast"
 	"github.com/pkg/errors"
 )
 
@@ -311,6 +311,9 @@ type AlertNode struct {
 	// Log JSON alert data to file. One event per line.
 	// tick:ignore
 	LogHandlers []*LogHandler `tick:"Log"`
+
+//添加一个一条log 一个文件的handler
+	MlogHandlers []*MlogHandler `tick:"Mlog"`
 
 	// Send alert to VictorOps.
 	// tick:ignore
@@ -719,6 +722,29 @@ func (a *AlertNode) Log(filepath string) *LogHandler {
 
 // tick:embedded:AlertNode.Log
 type LogHandler struct {
+	*AlertNode
+
+	// Absolute path the the log file.
+	// It will be created if it does not exist.
+	// tick:ignore
+	FilePath string
+
+	// File's mode and permissions, default is 0600
+	// NOTE: The leading 0 is required to interpret the value as an octal integer.
+	Mode int64
+}
+
+func (a *AlertNode) Mlog(filepath string) *MlogHandler {
+	log := &MlogHandler{
+		AlertNode: a,
+		FilePath:  filepath,
+	}
+	a.MlogHandlers = append(a.MlogHandlers, log)
+	return log
+}
+
+// tick:embedded:AlertNode.Log
+type MlogHandler struct {
 	*AlertNode
 
 	// Absolute path the the log file.

@@ -1,6 +1,6 @@
 package storagetest
 
-import "github.com/influxdata/kapacitor/services/storage"
+import "github.com/yozora-hitagi/kapacitor/services/storage"
 
 type TestStore struct {
 	versions  storage.Versions

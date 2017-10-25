@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/influxdata/kapacitor/tick"
-	"github.com/influxdata/kapacitor/udf/agent"
+	"github.com/yozora-hitagi/kapacitor/tick"
+	"github.com/yozora-hitagi/kapacitor/udf/agent"
 )
 
 // A UDFNode is a node that can run a User Defined Function (UDF) in a separate process.

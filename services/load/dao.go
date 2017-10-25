@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"path"
 
-	"github.com/influxdata/kapacitor/services/storage"
+	"github.com/yozora-hitagi/kapacitor/services/storage"
 )
 
 // version is the current version of the Item structure.

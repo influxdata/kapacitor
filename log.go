@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/influxdata/kapacitor/edge"
-	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/yozora-hitagi/kapacitor/edge"
+	"github.com/yozora-hitagi/kapacitor/pipeline"
 )
 
 type LogNode struct {

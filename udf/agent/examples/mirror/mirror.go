@@ -8,7 +8,7 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/influxdata/kapacitor/udf/agent"
+	"github.com/yozora-hitagi/kapacitor/udf/agent"
 )
 
 // Mirrors all points it receives back to Kapacitor

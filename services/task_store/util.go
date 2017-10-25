@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	client "github.com/influxdata/kapacitor/client/v1"
-	"github.com/influxdata/kapacitor/tick/ast"
+	client "github.com/yozora-hitagi/kapacitor/client/v1"
+	"github.com/yozora-hitagi/kapacitor/tick/ast"
 )
 
 func newProgramNodeFromTickscript(tickscript string) (*ast.ProgramNode, error) {

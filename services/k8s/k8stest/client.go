@@ -1,6 +1,6 @@
 package k8stest
 
-import "github.com/influxdata/kapacitor/services/k8s/client"
+import "github.com/yozora-hitagi/kapacitor/services/k8s/client"
 
 type Client struct {
 	ScalesGetFunc    func(kind, name string) (*client.Scale, error)

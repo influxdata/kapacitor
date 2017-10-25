@@ -5,7 +5,7 @@ import (
 	"os"
 	"sort"
 
-	"github.com/influxdata/kapacitor/udf/agent"
+	"github.com/yozora-hitagi/kapacitor/udf/agent"
 )
 
 // Find outliers via the Tukey method. As defined in the README.md

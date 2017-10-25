@@ -12,12 +12,12 @@ import (
 	text "text/template"
 	"time"
 
-	"github.com/influxdata/kapacitor/alert"
-	"github.com/influxdata/kapacitor/bufpool"
-	"github.com/influxdata/kapacitor/command"
-	"github.com/influxdata/kapacitor/keyvalue"
-	"github.com/influxdata/kapacitor/tick/ast"
-	"github.com/influxdata/kapacitor/tick/stateful"
+	"github.com/yozora-hitagi/kapacitor/alert"
+	"github.com/yozora-hitagi/kapacitor/bufpool"
+	"github.com/yozora-hitagi/kapacitor/command"
+	"github.com/yozora-hitagi/kapacitor/keyvalue"
+	"github.com/yozora-hitagi/kapacitor/tick/ast"
+	"github.com/yozora-hitagi/kapacitor/tick/stateful"
 	"github.com/pkg/errors"
 )
 
@@ -72,6 +72,39 @@ func (h *logHandler) Handle(event alert.Event) {
 	f, err := os.OpenFile(h.logpath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, h.mode)
 	if err != nil {
 		h.diag.Error("failed to open file for alert logging", err, keyvalue.KV("file", h.logpath))
+		return
+	}
+	defer f.Close()
+
+	err = json.NewEncoder(f).Encode(ad)
+	if err != nil {
+		h.diag.Error("failed to marshal alert data json", err)
+	}
+}
+
+type mlogHandler struct {
+	logpath string
+	mode    os.FileMode
+	diag    HandlerDiagnostic
+}
+
+func NewMlogHandler(c LogHandlerConfig, d HandlerDiagnostic) (alert.Handler, error) {
+	if err := c.Validate(); err != nil {
+		return nil, err
+	}
+	return &mlogHandler{
+		logpath: c.Path,
+		mode:    c.Mode,
+		diag:    d,
+	}, nil
+}
+
+func (h *mlogHandler) Handle(event alert.Event) {
+	ad := event.AlertData()
+	file := fmt.Sprintf("%s/%d_%s.log", h.logpath, ad.Time.Unix(), ad.ID)
+	f, err := os.OpenFile(file, os.O_WRONLY|os.O_APPEND|os.O_CREATE, h.mode)
+	if err != nil {
+		h.diag.Error("failed to open file for alert logging", err, keyvalue.KV("file", file))
 		return
 	}
 	defer f.Close()

@@ -3,9 +3,9 @@ package edge
 import (
 	"sync"
 
-	expvar "github.com/influxdata/kapacitor/expvar"
-	"github.com/influxdata/kapacitor/models"
-	"github.com/influxdata/kapacitor/pipeline"
+	expvar "github.com/yozora-hitagi/kapacitor/expvar"
+	"github.com/yozora-hitagi/kapacitor/models"
+	"github.com/yozora-hitagi/kapacitor/pipeline"
 )
 
 // StatsEdge is an edge that tracks various statistics about message passing through the edge.

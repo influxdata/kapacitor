@@ -4,7 +4,7 @@ import (
 	"time"
 
 	pahomqtt "github.com/eclipse/paho.mqtt.golang"
-	"github.com/influxdata/kapacitor/tlsconfig"
+	"github.com/yozora-hitagi/kapacitor/tlsconfig"
 )
 
 // Client describes an immutable MQTT client, designed to accommodate the

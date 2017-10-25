@@ -13,9 +13,9 @@ import (
 	text "text/template"
 	"time"
 
-	"github.com/influxdata/kapacitor/alert"
-	"github.com/influxdata/kapacitor/keyvalue"
-	"github.com/influxdata/kapacitor/models"
+	"github.com/yozora-hitagi/kapacitor/alert"
+	"github.com/yozora-hitagi/kapacitor/keyvalue"
+	"github.com/yozora-hitagi/kapacitor/models"
 	"github.com/pkg/errors"
 )
 

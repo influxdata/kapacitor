@@ -3,7 +3,7 @@ package pipeline
 import (
 	"fmt"
 
-	"github.com/influxdata/kapacitor/tick/ast"
+	"github.com/yozora-hitagi/kapacitor/tick/ast"
 )
 
 // Evaluates expressions on each data point it receives.

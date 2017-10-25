@@ -17,9 +17,9 @@ import (
 	"time"
 
 	iclient "github.com/influxdata/influxdb/client/v2"
-	"github.com/influxdata/kapacitor/client/v1"
-	"github.com/influxdata/kapacitor/server"
-	"github.com/influxdata/kapacitor/services/diagnostic"
+	"github.com/yozora-hitagi/kapacitor/client/v1"
+	"github.com/yozora-hitagi/kapacitor/server"
+	"github.com/yozora-hitagi/kapacitor/services/diagnostic"
 	"github.com/influxdata/wlog"
 )
 

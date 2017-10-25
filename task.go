@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/influxdata/kapacitor/edge"
-	"github.com/influxdata/kapacitor/keyvalue"
-	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/yozora-hitagi/kapacitor/edge"
+	"github.com/yozora-hitagi/kapacitor/keyvalue"
+	"github.com/yozora-hitagi/kapacitor/pipeline"
 )
 
 type TaskDiagnostic interface {

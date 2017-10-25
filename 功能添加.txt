@@ -1,0 +1,1 @@
+1. alert 中添加 mlog ， 和 log 相同，mlog 一条告警一个日志， 日志文件名 file := fmt.Sprintf("%s/%d.log", h.logpath, time.Now().UnixNano())
