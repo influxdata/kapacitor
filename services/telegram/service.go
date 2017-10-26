@@ -25,6 +25,7 @@ type Diagnostic interface {
 
 type Service struct {
 	configValue atomic.Value
+	clientValue atomic.Value
 	diag        Diagnostic
 }
 
@@ -33,6 +34,11 @@ func NewService(c Config, d Diagnostic) *Service {
 		diag: d,
 	}
 	s.configValue.Store(c)
+	s.clientValue.Store(&http.Client{
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+		},
+	})
 	return s
 }
 
@@ -56,6 +62,11 @@ func (s *Service) Update(newConfig []interface{}) error {
 		return fmt.Errorf("expected config object to be of type %T, got %T", c, newConfig[0])
 	} else {
 		s.configValue.Store(c)
+		s.clientValue.Store(&http.Client{
+			Transport: &http.Transport{
+				Proxy: http.ProxyFromEnvironment,
+			},
+		})
 	}
 	return nil
 }
@@ -108,7 +119,8 @@ func (s *Service) Alert(chatId, parseMode, message string, disableWebPagePreview
 		return err
 	}
 
-	resp, err := http.Post(url, "application/json", post)
+	client := s.clientValue.Load().(*http.Client)
+	resp, err := client.Post(url, "application/json", post)
 	if err != nil {
 		return err
 	}
