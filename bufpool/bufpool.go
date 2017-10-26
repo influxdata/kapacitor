@@ -2,39 +2,28 @@ package bufpool
 
 import (
 	"bytes"
-	"io"
 	"sync"
 )
 
 type Pool struct {
-	p *sync.Pool
+	p sync.Pool
 }
 
 func New() *Pool {
-	syncPool := sync.Pool{}
-	syncPool.New = func() interface{} {
-		return &closingBuffer{
-			pool: &syncPool,
-		}
-	}
-
 	return &Pool{
-		p: &syncPool,
+		p: sync.Pool{
+			New: func() interface{} {
+				return new(bytes.Buffer)
+			},
+		},
 	}
 }
 
-func (p *Pool) Get() *closingBuffer {
-	return p.p.Get().(*closingBuffer)
+func (p *Pool) Get() *bytes.Buffer {
+	return p.p.Get().(*bytes.Buffer)
 }
 
-type closingBuffer struct {
-	bytes.Buffer
-	io.Closer
-	pool *sync.Pool
-}
-
-func (cb *closingBuffer) Close() error {
-	cb.Reset()
-	cb.pool.Put(cb)
-	return nil
+func (p *Pool) Put(b *bytes.Buffer) {
+	b.Reset()
+	p.p.Put(b)
 }

@@ -110,7 +110,7 @@ func NewExecHandler(c ExecHandlerConfig, d HandlerDiagnostic) alert.Handler {
 
 func (h *execHandler) Handle(event alert.Event) {
 	buf := h.bp.Get()
-	defer buf.Close()
+	defer h.bp.Put(buf)
 	ad := event.AlertData()
 
 	err := json.NewEncoder(buf).Encode(ad)
@@ -156,7 +156,7 @@ func NewTCPHandler(c TCPHandlerConfig, d HandlerDiagnostic) alert.Handler {
 
 func (h *tcpHandler) Handle(event alert.Event) {
 	buf := h.bp.Get()
-	defer buf.Close()
+	defer h.bp.Put(buf)
 	ad := event.AlertData()
 
 	err := json.NewEncoder(buf).Encode(ad)

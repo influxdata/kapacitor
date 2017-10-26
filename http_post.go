@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"bytes"
 	"context"
-	"github.com/influxdata/kapacitor/bufpool"
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/models"
@@ -24,7 +24,6 @@ type HTTPPostNode struct {
 	c        *pipeline.HTTPPostNode
 	endpoint *httppost.Endpoint
 	mu       sync.RWMutex
-	bp       *bufpool.Pool
 	timeout  time.Duration
 	hc       *http.Client
 }
@@ -35,7 +34,6 @@ func newHTTPPostNode(et *ExecutingTask, n *pipeline.HTTPPostNode, d NodeDiagnost
 	hn := &HTTPPostNode{
 		node:    node{Node: n, et: et, diag: d},
 		c:       n,
-		bp:      bufpool.New(),
 		timeout: n.Timeout,
 	}
 
@@ -164,7 +162,7 @@ func (n *HTTPPostNode) doPost(row *models.Row) int {
 }
 
 func (n *HTTPPostNode) postRow(row *models.Row) (*http.Response, error) {
-	body := n.bp.Get()
+	body := new(bytes.Buffer)
 
 	var contentType string
 	if n.endpoint.RowTemplate() != nil {

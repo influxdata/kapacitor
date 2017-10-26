@@ -15,7 +15,6 @@ import (
 
 	"context"
 	"github.com/influxdata/kapacitor/alert"
-	"github.com/influxdata/kapacitor/bufpool"
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/pkg/errors"
 )
@@ -242,8 +241,7 @@ type HandlerConfig struct {
 }
 
 type handler struct {
-	s  *Service
-	bp *bufpool.Pool
+	s *Service
 
 	endpoint *Endpoint
 	headers  map[string]string
@@ -264,7 +262,6 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
 	}
 	return &handler{
 		s:               s,
-		bp:              bufpool.New(),
 		endpoint:        e,
 		diag:            s.diag.WithContext(ctx...),
 		headers:         c.Headers,
@@ -290,7 +287,7 @@ func (h *handler) Handle(event alert.Event) {
 	var err error
 
 	// Construct the body of the HTTP request
-	body := h.bp.Get()
+	body := new(bytes.Buffer)
 	ad := event.AlertData()
 
 	var contentType string
