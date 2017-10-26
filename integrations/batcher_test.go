@@ -1449,10 +1449,11 @@ func TestBatch_AlertStateChangesOnly(t *testing.T) {
 		atomic.AddInt32(&requestCount, 1)
 		if rc := atomic.LoadInt32(&requestCount); rc == 1 {
 			expAd := alert.Data{
-				ID:      "cpu_usage_idle:cpu=cpu-total",
-				Message: "cpu_usage_idle:cpu=cpu-total is CRITICAL",
-				Time:    time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
-				Level:   alert.Critical,
+				ID:            "cpu_usage_idle:cpu=cpu-total",
+				Message:       "cpu_usage_idle:cpu=cpu-total is CRITICAL",
+				Time:          time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+				Level:         alert.Critical,
+				PreviousLevel: alert.OK,
 			}
 			ad.Data = models.Result{}
 			if eq, msg := compareAlertData(expAd, ad); !eq {
@@ -1460,11 +1461,12 @@ func TestBatch_AlertStateChangesOnly(t *testing.T) {
 			}
 		} else {
 			expAd := alert.Data{
-				ID:       "cpu_usage_idle:cpu=cpu-total",
-				Message:  "cpu_usage_idle:cpu=cpu-total is OK",
-				Time:     time.Date(1971, 1, 1, 0, 0, 38, 0, time.UTC),
-				Duration: 38 * time.Second,
-				Level:    alert.OK,
+				ID:            "cpu_usage_idle:cpu=cpu-total",
+				Message:       "cpu_usage_idle:cpu=cpu-total is OK",
+				Time:          time.Date(1971, 1, 1, 0, 0, 38, 0, time.UTC),
+				Duration:      38 * time.Second,
+				Level:         alert.OK,
+				PreviousLevel: alert.Critical,
 			}
 			ad.Data = models.Result{}
 			if eq, msg := compareAlertData(expAd, ad); !eq {
@@ -1516,21 +1518,33 @@ func TestBatch_AlertStateChangesOnlyExpired(t *testing.T) {
 		var expAd alert.Data
 		atomic.AddInt32(&requestCount, 1)
 		rc := atomic.LoadInt32(&requestCount)
-		if rc < 3 {
+		switch rc {
+		case 1:
 			expAd = alert.Data{
-				ID:       "cpu_usage_idle:cpu=cpu-total",
-				Message:  "cpu_usage_idle:cpu=cpu-total is CRITICAL",
-				Time:     time.Date(1971, 1, 1, 0, 0, int(rc-1)*20, 0, time.UTC),
-				Duration: time.Duration(rc-1) * 20 * time.Second,
-				Level:    alert.Critical,
+				ID:            "cpu_usage_idle:cpu=cpu-total",
+				Message:       "cpu_usage_idle:cpu=cpu-total is CRITICAL",
+				Time:          time.Date(1971, 1, 1, 0, 0, int(rc-1)*20, 0, time.UTC),
+				Duration:      time.Duration(rc-1) * 20 * time.Second,
+				Level:         alert.Critical,
+				PreviousLevel: alert.OK,
 			}
-		} else {
+		case 2:
 			expAd = alert.Data{
-				ID:       "cpu_usage_idle:cpu=cpu-total",
-				Message:  "cpu_usage_idle:cpu=cpu-total is OK",
-				Time:     time.Date(1971, 1, 1, 0, 0, 38, 0, time.UTC),
-				Duration: 38 * time.Second,
-				Level:    alert.OK,
+				ID:            "cpu_usage_idle:cpu=cpu-total",
+				Message:       "cpu_usage_idle:cpu=cpu-total is CRITICAL",
+				Time:          time.Date(1971, 1, 1, 0, 0, int(rc-1)*20, 0, time.UTC),
+				Duration:      time.Duration(rc-1) * 20 * time.Second,
+				Level:         alert.Critical,
+				PreviousLevel: alert.Critical,
+			}
+		case 3:
+			expAd = alert.Data{
+				ID:            "cpu_usage_idle:cpu=cpu-total",
+				Message:       "cpu_usage_idle:cpu=cpu-total is OK",
+				Time:          time.Date(1971, 1, 1, 0, 0, 38, 0, time.UTC),
+				Duration:      38 * time.Second,
+				Level:         alert.OK,
+				PreviousLevel: alert.Critical,
 			}
 		}
 		if eq, msg := compareAlertData(expAd, ad); !eq {
