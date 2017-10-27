@@ -5,14 +5,14 @@ import (
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
-// Union converts the union pipeline node into the TICKScript AST
-type Union struct {
+// UnionNode converts the union pipeline node into the TICKScript AST
+type UnionNode struct {
 	Function
 }
 
 // NewUnion creates a Union function builder
-func NewUnion(parents []ast.Node) *Union {
-	return &Union{
+func NewUnion(parents []ast.Node) *UnionNode {
+	return &UnionNode{
 		Function{
 			Parents: parents,
 		},
@@ -20,7 +20,7 @@ func NewUnion(parents []ast.Node) *Union {
 }
 
 // Build creates a union ast.Node
-func (n *Union) Build(u *pipeline.UnionNode) (ast.Node, error) {
+func (n *UnionNode) Build(u *pipeline.UnionNode) (ast.Node, error) {
 	unioned := []interface{}{}
 	for _, p := range n.Parents[1:] {
 		unioned = append(unioned, p)

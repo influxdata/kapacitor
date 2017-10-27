@@ -1,7 +1,6 @@
 package tick_test
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -81,7 +80,7 @@ func TestAlert(t *testing.T) {
 `
 	if got != want {
 		t.Errorf("TestAlert = %v, want %v", got, want)
-		fmt.Println(got) // print is helpful to get the correct format.
+		t.Log(got) // print is helpful to get the correct format.
 	}
 }
 
@@ -105,7 +104,7 @@ func TestAlertStateChanges(t *testing.T) {
 `
 	if got != want {
 		t.Errorf("TestAlert = %v, want %v", got, want)
-		fmt.Println(got) // print is helpful to get the correct format.
+		t.Log(got) // print is helpful to get the correct format.
 	}
 }
 
@@ -132,7 +131,7 @@ func TestAlertHTTPPost(t *testing.T) {
 `
 	if got != want {
 		t.Errorf("TestAlert = %v, want %v", got, want)
-		fmt.Println(got) // print is helpful to get the correct format.
+		t.Log(got) // print is helpful to get the correct format.
 	}
 }
 func TestAlertTCP(t *testing.T) {
@@ -155,7 +154,7 @@ func TestAlertTCP(t *testing.T) {
 `
 	if got != want {
 		t.Errorf("TestAlert = %v, want %v", got, want)
-		fmt.Println(got) // print is helpful to get the correct format.
+		t.Log(got) // print is helpful to get the correct format.
 	}
 }
 
@@ -180,7 +179,7 @@ func TestAlertEmail(t *testing.T) {
 `
 	if got != want {
 		t.Errorf("TestAlert = %v, want %v", got, want)
-		fmt.Println(got) // print is helpful to get the correct format.
+		t.Log(got) // print is helpful to get the correct format.
 	}
 }
 
@@ -203,7 +202,7 @@ func TestAlertExec(t *testing.T) {
 `
 	if got != want {
 		t.Errorf("TestAlert = %v, want %v", got, want)
-		fmt.Println(got) // print is helpful to get the correct format.
+		t.Log(got) // print is helpful to get the correct format.
 	}
 }
 
@@ -228,7 +227,7 @@ func TestAlertLog(t *testing.T) {
 `
 	if got != want {
 		t.Errorf("TestAlert = %v, want %v", got, want)
-		fmt.Println(got) // print is helpful to get the correct format.
+		t.Log(got) // print is helpful to get the correct format.
 	}
 }
 
@@ -253,7 +252,7 @@ func TestAlertVictorOps(t *testing.T) {
 `
 	if got != want {
 		t.Errorf("TestAlert = %v, want %v", got, want)
-		fmt.Println(got) // print is helpful to get the correct format.
+		t.Log(got) // print is helpful to get the correct format.
 	}
 }
 
@@ -278,7 +277,7 @@ func TestAlertPagerDuty(t *testing.T) {
 `
 	if got != want {
 		t.Errorf("TestAlert = %v, want %v", got, want)
-		fmt.Println(got) // print is helpful to get the correct format.
+		t.Log(got) // print is helpful to get the correct format.
 	}
 }
 
@@ -313,7 +312,7 @@ func TestAlertPushover(t *testing.T) {
 `
 	if got != want {
 		t.Errorf("TestAlert = %v, want %v", got, want)
-		fmt.Println(got) // print is helpful to get the correct format.
+		t.Log(got) // print is helpful to get the correct format.
 	}
 }
 
@@ -340,7 +339,7 @@ func TestAlertSensu(t *testing.T) {
 `
 	if got != want {
 		t.Errorf("TestAlert = %v, want %v", got, want)
-		fmt.Println(got) // print is helpful to get the correct format.
+		t.Log(got) // print is helpful to get the correct format.
 	}
 }
 
@@ -369,7 +368,7 @@ func TestAlertSlack(t *testing.T) {
 `
 	if got != want {
 		t.Errorf("TestAlert = %v, want %v", got, want)
-		fmt.Println(got) // print is helpful to get the correct format.
+		t.Log(got) // print is helpful to get the correct format.
 	}
 }
 
@@ -399,7 +398,7 @@ func TestAlertTelegram(t *testing.T) {
 `
 	if got != want {
 		t.Errorf("TestAlert = %v, want %v", got, want)
-		fmt.Println(got) // print is helpful to get the correct format.
+		t.Log(got) // print is helpful to get the correct format.
 	}
 }
 
@@ -426,7 +425,7 @@ func TestAlertHipchat(t *testing.T) {
 `
 	if got != want {
 		t.Errorf("TestAlert = %v, want %v", got, want)
-		fmt.Println(got) // print is helpful to get the correct format.
+		t.Log(got) // print is helpful to get the correct format.
 	}
 }
 
@@ -465,7 +464,7 @@ func TestAlertAlerta(t *testing.T) {
 `
 	if got != want {
 		t.Errorf("TestAlert = %v, want %v", got, want)
-		fmt.Println(got) // print is helpful to get the correct format.
+		t.Log(got) // print is helpful to get the correct format.
 	}
 }
 
@@ -492,7 +491,7 @@ func TestAlertOpsGenie(t *testing.T) {
 `
 	if got != want {
 		t.Errorf("TestAlert = %v, want %v", got, want)
-		fmt.Println(got) // print is helpful to get the correct format.
+		t.Log(got) // print is helpful to get the correct format.
 	}
 }
 
@@ -515,7 +514,7 @@ func TestAlertTalk(t *testing.T) {
 `
 	if got != want {
 		t.Errorf("TestAlert = %v, want %v", got, want)
-		fmt.Println(got) // print is helpful to get the correct format.
+		t.Log(got) // print is helpful to get the correct format.
 	}
 }
 
@@ -545,7 +544,7 @@ func TestAlertMQTT(t *testing.T) {
 `
 	if got != want {
 		t.Errorf("TestAlert = %v, want %v", got, want)
-		fmt.Println(got) // print is helpful to get the correct format.
+		t.Log(got) // print is helpful to get the correct format.
 	}
 }
 
@@ -572,6 +571,6 @@ func TestAlertSNMP(t *testing.T) {
 `
 	if got != want {
 		t.Errorf("TestAlert = %v, want %v", got, want)
-		fmt.Println(got) // print is helpful to get the correct format.
+		t.Log(got) // print is helpful to get the correct format.
 	}
 }

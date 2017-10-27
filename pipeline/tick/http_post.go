@@ -7,22 +7,22 @@ import (
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
-// HTTPPost converts the HTTPPost pipeline node into the TICKScript AST
-type HTTPPost struct {
+// HTTPPostNode converts the HTTPPostNode pipeline node into the TICKScript AST
+type HTTPPostNode struct {
 	Function
 }
 
-// NewHTTPPost creates a HTTPPost function builder
-func NewHTTPPost(parents []ast.Node) *HTTPPost {
-	return &HTTPPost{
+// NewHTTPPost creates a HTTPPostNode function builder
+func NewHTTPPost(parents []ast.Node) *HTTPPostNode {
+	return &HTTPPostNode{
 		Function{
 			Parents: parents,
 		},
 	}
 }
 
-// Build creates a HTTPPost ast.Node
-func (n *HTTPPost) Build(h *pipeline.HTTPPostNode) (ast.Node, error) {
+// Build creates a HTTPPostNode ast.Node
+func (n *HTTPPostNode) Build(h *pipeline.HTTPPostNode) (ast.Node, error) {
 	n.Pipe("httpPost", args(h.URLs)...)
 	for _, e := range h.Endpoints {
 		n.Dot("endpoint", e)

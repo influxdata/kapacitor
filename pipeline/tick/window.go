@@ -5,14 +5,14 @@ import (
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
-// Window converts the window pipeline node into the TICKScript AST
-type Window struct {
+// WindowNode converts the window pipeline node into the TICKScript AST
+type WindowNode struct {
 	Function
 }
 
-// NewWindowcreates a Window function builder
-func NewWindow(parents []ast.Node) *Window {
-	return &Window{
+// NewWindowNode creates a Window function builder
+func NewWindowNode(parents []ast.Node) *WindowNode {
+	return &WindowNode{
 		Function{
 			Parents: parents,
 		},
@@ -20,7 +20,7 @@ func NewWindow(parents []ast.Node) *Window {
 }
 
 // Build creates a window ast.Node
-func (n *Window) Build(w *pipeline.WindowNode) (ast.Node, error) {
+func (n *WindowNode) Build(w *pipeline.WindowNode) (ast.Node, error) {
 	n.Pipe("window").
 		Dot("period", w.Period).
 		Dot("every", w.Every).

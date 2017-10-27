@@ -5,14 +5,14 @@ import (
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
-// Where converts the where pipeline node into the TICKScript AST
-type Where struct {
+// WhereNode converts the where pipeline node into the TICKScript AST
+type WhereNode struct {
 	Function
 }
 
 // NewWhere creates a Where function builder
-func NewWhere(parents []ast.Node) *Where {
-	return &Where{
+func NewWhere(parents []ast.Node) *WhereNode {
+	return &WhereNode{
 		Function{
 			Parents: parents,
 		},
@@ -20,7 +20,7 @@ func NewWhere(parents []ast.Node) *Where {
 }
 
 // Build creates a where ast.Node
-func (n *Where) Build(w *pipeline.WhereNode) (ast.Node, error) {
+func (n *WhereNode) Build(w *pipeline.WhereNode) (ast.Node, error) {
 	n.Pipe("where", w.Lambda)
 	return n.prev, n.err
 }

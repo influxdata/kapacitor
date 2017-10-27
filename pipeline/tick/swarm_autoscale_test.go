@@ -1,7 +1,6 @@
 package tick_test
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -108,7 +107,7 @@ func TestSwarmAutoscale(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("%q. TestSwarmAutoscale() =\n%v\n want\n%v\n", tt.name, got, tt.want)
-				fmt.Println(got)
+				t.Log(got)
 			}
 		})
 	}

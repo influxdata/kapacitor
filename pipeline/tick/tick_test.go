@@ -2,10 +2,80 @@ package tick_test
 
 import (
 	"bytes"
+	"go/importer"
+	"go/types"
+	"testing"
 
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/pipeline/tick"
 )
+
+// TestPipelineImplemented checks if all nodes in the pipeline package
+// have corresponding implementations in the tick package.
+//
+// If you get a test error here, then you need to implement
+// a conversion node from pipeline node to the ast node.
+func TestPipelineImplemented(t *testing.T) {
+	tickPkg, err := importer.Default().Import("github.com/influxdata/kapacitor/pipeline/tick")
+	if err != nil {
+		t.Fatalf("error importing github.com/influxdata/kapacitor/pipeline: %v", err)
+	}
+	// tickScope lists all the types in the tick package
+	tickScope := tickPkg.Scope()
+
+	pipelinePkg, err := importer.Default().Import("github.com/influxdata/kapacitor/pipeline")
+	if err != nil {
+		t.Fatalf("error importing github.com/influxdata/kapacitor/pipeline: %v; perhaps kapacitor is not in $GOPATH/src/influxdata/kapacitor?", err)
+	}
+
+	pipelineScope := pipelinePkg.Scope()
+	node := pipelineScope.Lookup("Node")
+	if node == nil {
+		t.Fatalf("%s.Node not found", pipelinePkg.Path())
+	}
+	nodeIface := node.Type()
+
+	for _, name := range pipelineScope.Names() {
+		strct := pipelineScope.Lookup(name)
+		if !strct.Exported() {
+			continue
+		}
+		// Only review the types whose pointers implement the pipeline.Node interface
+		typ := strct.Type()
+		if !types.AssignableTo(types.NewPointer(typ), nodeIface) {
+			continue
+		}
+
+		// AlertNodeData have special behavior because each alert type embeds
+		// AlertNodeData.  If a type embeds AlertNodeData we will skip it.
+		// NoOpNode is a special case that doesn't have an AST representation
+		if name == "AlertNodeData" || name == "NoOpNode" {
+			continue
+		}
+		var isAlert bool
+		if strct, ok := typ.Underlying().(*types.Struct); ok {
+			for i := 0; i < strct.NumFields(); i++ {
+				field := strct.Field(i)
+				if field.Name() == "AlertNodeData" {
+					isAlert = true
+					break
+				}
+			}
+		}
+
+		if isAlert {
+			continue
+		}
+
+		// All pipeline nodes must have corresponding tick structs that
+		// can convert to an AST.  By convention you'll need to name node in the
+		// tick package with the same name as in the pipeline package.
+		if tickScope.Lookup(name) == nil {
+			t.Errorf("Pipeline Node %s.%s not does not have an implementation in %s.%s to convert to AST representation",
+				pipelinePkg.Path(), name, tickPkg.Path(), name)
+		}
+	}
+}
 
 // StreamFrom builds a simple pipeline for testing
 func StreamFrom() (pipe *pipeline.Pipeline, stream *pipeline.StreamNode, from *pipeline.FromNode) {

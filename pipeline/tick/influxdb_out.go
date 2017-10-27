@@ -7,22 +7,22 @@ import (
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
-// InfluxDBOut converts the InfluxDBOut pipeline node into the TICKScript AST
-type InfluxDBOut struct {
+// InfluxDBOutNode converts the InfluxDBOutNode pipeline node into the TICKScript AST
+type InfluxDBOutNode struct {
 	Function
 }
 
 // NewInfluxDBOut creates a InfluxQL function builder
-func NewInfluxDBOut(parents []ast.Node) *InfluxDBOut {
-	return &InfluxDBOut{
+func NewInfluxDBOut(parents []ast.Node) *InfluxDBOutNode {
+	return &InfluxDBOutNode{
 		Function{
 			Parents: parents,
 		},
 	}
 }
 
-// Build creates a InfluxDBOut ast.Node
-func (n *InfluxDBOut) Build(db *pipeline.InfluxDBOutNode) (ast.Node, error) {
+// Build creates a InfluxDBOutNode ast.Node
+func (n *InfluxDBOutNode) Build(db *pipeline.InfluxDBOutNode) (ast.Node, error) {
 	n.Pipe("influxDBOut").
 		Dot("cluster", db.Cluster).
 		Dot("database", db.Database).

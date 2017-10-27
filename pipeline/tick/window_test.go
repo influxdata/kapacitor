@@ -7,7 +7,7 @@ import (
 	"github.com/influxdata/kapacitor/pipeline"
 )
 
-func TestWindow(t *testing.T) {
+func TestWindowNode(t *testing.T) {
 	type args struct {
 		period      time.Duration
 		every       time.Duration

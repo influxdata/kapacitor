@@ -7,14 +7,14 @@ import (
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
-// Default converts the Default pipeline node into the TICKScript AST
-type Default struct {
+// DefaultNode converts the Default pipeline node into the TICKScript AST
+type DefaultNode struct {
 	Function
 }
 
 // NewDefault creates a Default function builder
-func NewDefault(parents []ast.Node) *Default {
-	return &Default{
+func NewDefault(parents []ast.Node) *DefaultNode {
+	return &DefaultNode{
 		Function{
 			Parents: parents,
 		},
@@ -22,7 +22,7 @@ func NewDefault(parents []ast.Node) *Default {
 }
 
 // Build creates a Default ast.Node
-func (n *Default) Build(d *pipeline.DefaultNode) (ast.Node, error) {
+func (n *DefaultNode) Build(d *pipeline.DefaultNode) (ast.Node, error) {
 	n.Pipe("default")
 	var fieldKeys []string
 	for k := range d.Fields {

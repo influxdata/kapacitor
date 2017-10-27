@@ -1,7 +1,6 @@
 package tick_test
 
 import (
-	"fmt"
 	"testing"
 	"time"
 )
@@ -20,6 +19,6 @@ func TestShift(t *testing.T) {
 `
 	if got != want {
 		t.Errorf("TestShift = %v, want %v", got, want)
-		fmt.Println(got) // print is helpful to get the correct format.
+		t.Log(got) // print is helpful to get the correct format.
 	}
 }

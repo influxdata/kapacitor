@@ -114,6 +114,8 @@ func (a *AST) Create(n pipeline.Node, parents []ast.Node) (ast.Node, error) {
 		return NewInfluxQL(parents).Build(node)
 	case *pipeline.K8sAutoscaleNode:
 		return NewK8sAutoscale(parents).Build(node)
+	case *pipeline.KapacitorLoopbackNode:
+		return NewKapacitorLoopbackNode(parents).Build(node)
 	case *pipeline.LogNode:
 		return NewLog(parents).Build(node)
 	case *pipeline.QueryNode:
@@ -133,12 +135,12 @@ func (a *AST) Create(n pipeline.Node, parents []ast.Node) (ast.Node, error) {
 	case *pipeline.WhereNode:
 		return NewWhere(parents).Build(node)
 	case *pipeline.WindowNode:
-		return NewWindow(parents).Build(node)
+		return NewWindowNode(parents).Build(node)
 	case *pipeline.StreamNode:
-		s := Stream{}
+		s := StreamNode{}
 		return s.Build()
 	case *pipeline.BatchNode:
-		b := Batch{}
+		b := BatchNode{}
 		return b.Build()
 	case *pipeline.StatsNode:
 		return NewStats(a.statParent(node)).Build(node)

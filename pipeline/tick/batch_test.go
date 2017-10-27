@@ -1,7 +1,6 @@
 package tick_test
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -17,6 +16,6 @@ func TestBatch(t *testing.T) {
 `
 	if got != want {
 		t.Errorf("TestBatch = %v, want %v", got, want)
-		fmt.Println(got) // print is helpful to get the correct format.
+		t.Log(got) // print is helpful to get the correct format.
 	}
 }

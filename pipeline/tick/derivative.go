@@ -5,14 +5,14 @@ import (
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
-// Derivative converts the Derivative pipeline node into the TICKScript AST
-type Derivative struct {
+// DerivativeNode converts the Derivative pipeline node into the TICKScript AST
+type DerivativeNode struct {
 	Function
 }
 
 // NewDerivative creates a Derivative function builder
-func NewDerivative(parents []ast.Node) *Derivative {
-	return &Derivative{
+func NewDerivative(parents []ast.Node) *DerivativeNode {
+	return &DerivativeNode{
 		Function{
 			Parents: parents,
 		},
@@ -20,7 +20,7 @@ func NewDerivative(parents []ast.Node) *Derivative {
 }
 
 // Build creates a Derivative ast.Node
-func (n *Derivative) Build(d *pipeline.DerivativeNode) (ast.Node, error) {
+func (n *DerivativeNode) Build(d *pipeline.DerivativeNode) (ast.Node, error) {
 	n.Pipe("derivative", d.Field).
 		Dot("as", d.As).
 		Dot("unit", d.Unit).

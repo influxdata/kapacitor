@@ -5,22 +5,22 @@ import (
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
-// Log converts the Log pipeline node into the TICKScript AST
-type Log struct {
+// LogNode converts the LogNode pipeline node into the TICKScript AST
+type LogNode struct {
 	Function
 }
 
-// NewLog creates a Log function builder
-func NewLog(parents []ast.Node) *Log {
-	return &Log{
+// NewLog creates a LogNode function builder
+func NewLog(parents []ast.Node) *LogNode {
+	return &LogNode{
 		Function{
 			Parents: parents,
 		},
 	}
 }
 
-// Build creates a Log ast.Node
-func (n *Log) Build(l *pipeline.LogNode) (ast.Node, error) {
+// Build creates a LogNode ast.Node
+func (n *LogNode) Build(l *pipeline.LogNode) (ast.Node, error) {
 	n.Pipe("log").
 		Dot("level", l.Level).
 		Dot("prefix", l.Prefix)

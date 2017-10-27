@@ -5,22 +5,22 @@ import (
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
-// StateDuration converts the StateDuration pipeline node into the TICKScript AST
-type StateDuration struct {
+// StateDurationNode converts the StateDurationNode pipeline node into the TICKScript AST
+type StateDurationNode struct {
 	Function
 }
 
-// NewStateDuration creates a StateDuration function builder
-func NewStateDuration(parents []ast.Node) *StateDuration {
-	return &StateDuration{
+// NewStateDuration creates a StateDurationNode function builder
+func NewStateDuration(parents []ast.Node) *StateDurationNode {
+	return &StateDurationNode{
 		Function{
 			Parents: parents,
 		},
 	}
 }
 
-// Build creates a StateDuration ast.Node
-func (n *StateDuration) Build(s *pipeline.StateDurationNode) (ast.Node, error) {
+// Build creates a StateDurationNode ast.Node
+func (n *StateDurationNode) Build(s *pipeline.StateDurationNode) (ast.Node, error) {
 	n.Pipe("stateDuration", s.Lambda).
 		Dot("as", s.As).
 		Dot("unit", s.Unit)
@@ -28,22 +28,22 @@ func (n *StateDuration) Build(s *pipeline.StateDurationNode) (ast.Node, error) {
 	return n.prev, n.err
 }
 
-// StateCount converts the StateCount pipeline node into the TICKScript AST
-type StateCount struct {
+// StateCountNode converts the StateCountNode pipeline node into the TICKScript AST
+type StateCountNode struct {
 	Function
 }
 
-// NewStateCount creates a StateCount function builder
-func NewStateCount(parents []ast.Node) *StateCount {
-	return &StateCount{
+// NewStateCount creates a StateCountNode function builder
+func NewStateCount(parents []ast.Node) *StateCountNode {
+	return &StateCountNode{
 		Function{
 			Parents: parents,
 		},
 	}
 }
 
-// Build creates a StateCount ast.Node
-func (n *StateCount) Build(s *pipeline.StateCountNode) (ast.Node, error) {
+// Build creates a StateCountNode ast.Node
+func (n *StateCountNode) Build(s *pipeline.StateCountNode) (ast.Node, error) {
 	n.Pipe("stateCount", s.Lambda).
 		Dot("as", s.As)
 

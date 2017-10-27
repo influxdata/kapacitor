@@ -2,11 +2,11 @@ package tick
 
 import "github.com/influxdata/kapacitor/tick/ast"
 
-// Batch converts the batch pipeline node into the TICKScript AST
-type Batch struct{}
+// BatchNode converts the batch pipeline node into the TICKScript AST
+type BatchNode struct{}
 
 // Build batch ast.Node
-func (b *Batch) Build() (ast.Node, error) {
+func (b *BatchNode) Build() (ast.Node, error) {
 	return &ast.IdentifierNode{
 		Ident: "batch",
 	}, nil

@@ -7,14 +7,14 @@ import (
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
-// Alert converts the Alert pipeline node into the TICKScript AST
-type Alert struct {
+// AlertNode converts the Alert pipeline node into the TICKScript AST
+type AlertNode struct {
 	Function
 }
 
 // NewAlert creates an Alert function builder
-func NewAlert(parents []ast.Node) *Alert {
-	return &Alert{
+func NewAlert(parents []ast.Node) *AlertNode {
+	return &AlertNode{
 		Function{
 			Parents: parents,
 		},
@@ -22,7 +22,7 @@ func NewAlert(parents []ast.Node) *Alert {
 }
 
 // Build creates a Alert ast.Node
-func (n *Alert) Build(a *pipeline.AlertNode) (ast.Node, error) {
+func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 	n.Pipe("alert").
 		Dot("topic", a.Topic).
 		Dot("id", a.Id).

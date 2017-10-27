@@ -5,14 +5,14 @@ import (
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
-// Eval converts the Eval pipeline node into the TICKScript AST
-type Eval struct {
+// EvalNode converts the EvalNode pipeline node into the TICKScript AST
+type EvalNode struct {
 	Function
 }
 
-// NewEval creates a Eval function builder
-func NewEval(parents []ast.Node) *Eval {
-	return &Eval{
+// NewEval creates a EvalNode function builder
+func NewEval(parents []ast.Node) *EvalNode {
+	return &EvalNode{
 		Function{
 			Parents: parents,
 		},
@@ -20,7 +20,7 @@ func NewEval(parents []ast.Node) *Eval {
 }
 
 // Build creates a Eval ast.Node
-func (n *Eval) Build(e *pipeline.EvalNode) (ast.Node, error) {
+func (n *EvalNode) Build(e *pipeline.EvalNode) (ast.Node, error) {
 	n.Pipe("eval", largs(e.Lambdas)...).
 		Dot("as", args(e.AsList)...).
 		Dot("tags", args(e.TagsList)...).

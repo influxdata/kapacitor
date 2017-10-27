@@ -5,22 +5,22 @@ import (
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
-// K8sAutoscale converts the k8s autoscaling pipeline node into the TICKScript AST
-type K8sAutoscale struct {
+// K8sAutoscaleNode converts the K8sAutoscaleNode pipeline node into the TICKScript AST
+type K8sAutoscaleNode struct {
 	Function
 }
 
-// NewK8sAutoscale creates a K8sAutoscale function builder
-func NewK8sAutoscale(parents []ast.Node) *K8sAutoscale {
-	return &K8sAutoscale{
+// NewK8sAutoscale creates a K8sAutoscaleNode function builder
+func NewK8sAutoscale(parents []ast.Node) *K8sAutoscaleNode {
+	return &K8sAutoscaleNode{
 		Function{
 			Parents: parents,
 		},
 	}
 }
 
-// Build creates a K8sAutoscale ast.Node
-func (n *K8sAutoscale) Build(k *pipeline.K8sAutoscaleNode) (ast.Node, error) {
+// Build creates a K8sAutoscaleNode ast.Node
+func (n *K8sAutoscaleNode) Build(k *pipeline.K8sAutoscaleNode) (ast.Node, error) {
 	n.Pipe("k8sAutoscale").
 		Dot("cluster", k.Cluster).
 		Dot("namespace", k.Namespace).

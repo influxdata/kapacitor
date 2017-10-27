@@ -5,14 +5,14 @@ import (
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
-// From converts the from pipeline node into the TICKScript AST
-type From struct {
+// FromNode converts the FromNode pipeline node into the TICKScript AST
+type FromNode struct {
 	Function
 }
 
-// NewFrom creates a Flatten function builder
-func NewFrom(parents []ast.Node) *From {
-	return &From{
+// NewFrom creates a FromNode function builder
+func NewFrom(parents []ast.Node) *FromNode {
+	return &FromNode{
 		Function{
 			Parents: parents,
 		},
@@ -20,7 +20,7 @@ func NewFrom(parents []ast.Node) *From {
 }
 
 // Build creates a from ast.Node
-func (n *From) Build(f *pipeline.FromNode) (ast.Node, error) {
+func (n *FromNode) Build(f *pipeline.FromNode) (ast.Node, error) {
 	n.Pipe("from").
 		Dot("database", f.Database).
 		Dot("retentionPolicy", f.RetentionPolicy).

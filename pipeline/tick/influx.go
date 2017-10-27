@@ -5,22 +5,22 @@ import (
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
-// InfluxQL converts the InfluxQL pipeline node into the TICKScript AST
-type InfluxQL struct {
+// InfluxQLNode converts the InfluxQLNode pipeline node into the TICKScript AST
+type InfluxQLNode struct {
 	Function
 }
 
-// NewInfluxQL creates a InfluxQL function builder
-func NewInfluxQL(parents []ast.Node) *InfluxQL {
-	return &InfluxQL{
+// NewInfluxQL creates a InfluxQLNode function builder
+func NewInfluxQL(parents []ast.Node) *InfluxQLNode {
+	return &InfluxQLNode{
 		Function{
 			Parents: parents,
 		},
 	}
 }
 
-// Build creates a InfluxQL ast.Node
-func (n *InfluxQL) Build(q *pipeline.InfluxQLNode) (ast.Node, error) {
+// Build creates a InfluxQLNode ast.Node
+func (n *InfluxQLNode) Build(q *pipeline.InfluxQLNode) (ast.Node, error) {
 	args := []interface{}{}
 	if q.Field != "" {
 		args = append(args, q.Field)

@@ -8,14 +8,14 @@ import (
 	"github.com/influxdata/kapacitor/udf/agent"
 )
 
-// UDF converts the UDF pipeline node into the TICKScript AST
-type UDF struct {
+// UDFNode converts the UDF pipeline node into the TICKScript AST
+type UDFNode struct {
 	Function
 }
 
 // NewUDF creates a UDF function builder
-func NewUDF(parents []ast.Node) *UDF {
-	return &UDF{
+func NewUDF(parents []ast.Node) *UDFNode {
+	return &UDFNode{
 		Function{
 			Parents: parents,
 		},
@@ -23,7 +23,7 @@ func NewUDF(parents []ast.Node) *UDF {
 }
 
 // Build creates a UDF ast.Node
-func (n *UDF) Build(u *pipeline.UDFNode) (ast.Node, error) {
+func (n *UDFNode) Build(u *pipeline.UDFNode) (ast.Node, error) {
 	n.At(u.UDFName)
 	for _, o := range u.Options {
 		args := []interface{}{}

@@ -5,22 +5,22 @@ import (
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
-// Query converts the Query pipeline node into the TICKScript AST
-type Query struct {
+// QueryNode converts the QueryNode pipeline node into the TICKScript AST
+type QueryNode struct {
 	Function
 }
 
-// NewQuery creates a Query function builder
-func NewQuery(parents []ast.Node) *Query {
-	return &Query{
+// NewQuery creates a QueryNode function builder
+func NewQuery(parents []ast.Node) *QueryNode {
+	return &QueryNode{
 		Function{
 			Parents: parents,
 		},
 	}
 }
 
-// Build creates a Query ast.Node
-func (n *Query) Build(q *pipeline.QueryNode) (ast.Node, error) {
+// Build creates a QueryNode ast.Node
+func (n *QueryNode) Build(q *pipeline.QueryNode) (ast.Node, error) {
 	n.Pipe("query", q.QueryStr).
 		Dot("period", q.Period).
 		Dot("every", q.Every).

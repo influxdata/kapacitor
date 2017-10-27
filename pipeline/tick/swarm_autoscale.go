@@ -5,14 +5,14 @@ import (
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
-// SwarmAutoscale converts the swarm autoscaling pipeline node into the TICKScript AST
-type SwarmAutoscale struct {
+// SwarmAutoscaleNode converts the swarm autoscaling pipeline node into the TICKScript AST
+type SwarmAutoscaleNode struct {
 	Function
 }
 
 // NewSwarmAutoscale creates a SwarmAutoscale function builder
-func NewSwarmAutoscale(parents []ast.Node) *SwarmAutoscale {
-	return &SwarmAutoscale{
+func NewSwarmAutoscale(parents []ast.Node) *SwarmAutoscaleNode {
+	return &SwarmAutoscaleNode{
 		Function{
 			Parents: parents,
 		},
@@ -20,7 +20,7 @@ func NewSwarmAutoscale(parents []ast.Node) *SwarmAutoscale {
 }
 
 // Build creates a SwarmAutoscale ast.Node
-func (n *SwarmAutoscale) Build(s *pipeline.SwarmAutoscaleNode) (ast.Node, error) {
+func (n *SwarmAutoscaleNode) Build(s *pipeline.SwarmAutoscaleNode) (ast.Node, error) {
 	n.Pipe("swarmAutoscale").
 		Dot("cluster", s.Cluster).
 		Dot("servceName", s.ServiceNameTag).

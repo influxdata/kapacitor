@@ -5,14 +5,14 @@ import (
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
-// Combine converts the Combine pipeline node into the TICKScript AST
-type Combine struct {
+// CombineNode converts the Combine pipeline node into the TICKScript AST
+type CombineNode struct {
 	Function
 }
 
 // NewCombine creates a Combine function builder
-func NewCombine(parents []ast.Node) *Combine {
-	return &Combine{
+func NewCombine(parents []ast.Node) *CombineNode {
+	return &CombineNode{
 		Function{
 			Parents: parents,
 		},
@@ -20,7 +20,7 @@ func NewCombine(parents []ast.Node) *Combine {
 }
 
 // Build creates a Combine ast.Node
-func (n *Combine) Build(c *pipeline.CombineNode) (ast.Node, error) {
+func (n *CombineNode) Build(c *pipeline.CombineNode) (ast.Node, error) {
 	n.Pipe("combine", largs(c.Lambdas)...).
 		Dot("as", args(c.Names)...).
 		Dot("delimiter", c.Delimiter).

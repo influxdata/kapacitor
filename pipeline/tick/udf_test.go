@@ -1,7 +1,6 @@
 package tick_test
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -90,6 +89,6 @@ func TestUDF(t *testing.T) {
 `
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("TestUDF = %v, want %v", got, want)
-		fmt.Println(got)
+		t.Log(got)
 	}
 }

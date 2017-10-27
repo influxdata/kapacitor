@@ -5,14 +5,14 @@ import (
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
-// Delete converts the Delete pipeline node into the TICKScript AST
-type Delete struct {
+// DeleteNode converts the Delete pipeline node into the TICKScript AST
+type DeleteNode struct {
 	Function
 }
 
 // NewDelete creates a Delete function builder
-func NewDelete(parents []ast.Node) *Delete {
-	return &Delete{
+func NewDelete(parents []ast.Node) *DeleteNode {
+	return &DeleteNode{
 		Function{
 			Parents: parents,
 		},
@@ -20,7 +20,7 @@ func NewDelete(parents []ast.Node) *Delete {
 }
 
 // Build creates a Delete ast.Node
-func (n *Delete) Build(d *pipeline.DeleteNode) (ast.Node, error) {
+func (n *DeleteNode) Build(d *pipeline.DeleteNode) (ast.Node, error) {
 	n.Pipe("delete")
 	for _, f := range d.Fields {
 		n.Dot("field", f)

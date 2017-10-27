@@ -5,14 +5,14 @@ import (
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
-// Flatten converts the Flatten pipeline node into the TICKScript AST
-type Flatten struct {
+// FlattenNode converts the FlattenNode pipeline node into the TICKScript AST
+type FlattenNode struct {
 	Function
 }
 
-// NewFlatten creates a Flatten function builder
-func NewFlatten(parents []ast.Node) *Flatten {
-	return &Flatten{
+// NewFlatten creates a FlattenNode function builder
+func NewFlatten(parents []ast.Node) *FlattenNode {
+	return &FlattenNode{
 		Function{
 			Parents: parents,
 		},
@@ -20,7 +20,7 @@ func NewFlatten(parents []ast.Node) *Flatten {
 }
 
 // Build creates a Flatten ast.Node
-func (n *Flatten) Build(f *pipeline.FlattenNode) (ast.Node, error) {
+func (n *FlattenNode) Build(f *pipeline.FlattenNode) (ast.Node, error) {
 	n.Pipe("flatten").
 		Dot("on", args(f.Dimensions)...).
 		Dot("delimiter", f.Delimiter).
