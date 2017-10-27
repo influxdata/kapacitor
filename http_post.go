@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"time"
 
-	"github.com/influxdata/kapacitor/bufpool"
+	"bytes"
+	"context"
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/models"
@@ -22,16 +24,17 @@ type HTTPPostNode struct {
 	c        *pipeline.HTTPPostNode
 	endpoint *httppost.Endpoint
 	mu       sync.RWMutex
-	bp       *bufpool.Pool
+	timeout  time.Duration
+	hc       *http.Client
 }
 
 // Create a new  HTTPPostNode which submits received items via POST to an HTTP endpoint
 func newHTTPPostNode(et *ExecutingTask, n *pipeline.HTTPPostNode, d NodeDiagnostic) (*HTTPPostNode, error) {
 
 	hn := &HTTPPostNode{
-		node: node{Node: n, et: et, diag: d},
-		c:    n,
-		bp:   bufpool.New(),
+		node:    node{Node: n, et: et, diag: d},
+		c:       n,
+		timeout: n.Timeout,
 	}
 
 	// Should only ever be 0 or 1 from validation of n
@@ -159,8 +162,7 @@ func (n *HTTPPostNode) doPost(row *models.Row) int {
 }
 
 func (n *HTTPPostNode) postRow(row *models.Row) (*http.Response, error) {
-	body := n.bp.Get()
-	defer n.bp.Put(body)
+	body := new(bytes.Buffer)
 
 	var contentType string
 	if n.endpoint.RowTemplate() != nil {
@@ -184,12 +186,21 @@ func (n *HTTPPostNode) postRow(row *models.Row) (*http.Response, error) {
 		return nil, errors.Wrap(err, "failed to marshal row data json")
 	}
 
+	// Set content type and other headers
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
 	for k, v := range n.c.Headers {
 		req.Header.Set(k, v)
 	}
+
+	// Set timeout
+	if n.timeout > 0 {
+		ctx, cancel := context.WithTimeout(req.Context(), n.timeout)
+		defer cancel()
+		req = req.WithContext(ctx)
+	}
+
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err

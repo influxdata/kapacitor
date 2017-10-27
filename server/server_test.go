@@ -8042,6 +8042,7 @@ func TestServer_ListServiceTests(t *testing.T) {
 					"endpoint": "example",
 					"url":      "http://localhost:3000/",
 					"headers":  map[string]interface{}{"Auth": "secret"},
+					"timeout":  float64(0),
 				},
 			},
 			{
