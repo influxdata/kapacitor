@@ -1750,15 +1750,15 @@ func Test_ReplayRunning(t *testing.T) {
 		t.Fatal(err)
 	}
 	exp := client.Replay{
-		Link:          	client.Link{Relation: client.Self, Href: "/kapacitor/v1/replays/replayid"},
-		ID:            	"replayid",
-		Task:          	"taskid",
-		Recording:     	"recordingid",
-		RecordingTime: 	false,
-		Clock:         	client.Fast,
-		Error:         	"",
-		Status:        	client.Running,
-		Progress:      	0.67,
+		Link:           client.Link{Relation: client.Self, Href: "/kapacitor/v1/replays/replayid"},
+		ID:             "replayid",
+		Task:           "taskid",
+		Recording:      "recordingid",
+		RecordingTime:  false,
+		Clock:          client.Fast,
+		Error:          "",
+		Status:         client.Running,
+		Progress:       0.67,
 		ExecutionStats: client.ExecutionStats{},
 	}
 	if !reflect.DeepEqual(exp, replay) {
@@ -1968,25 +1968,25 @@ func Test_ListReplays(t *testing.T) {
 	}
 	exp := []client.Replay{
 		{
-			Link:          	client.Link{Relation: client.Self, Href: "/kapacitor/v1/replays/rpid1"},
-			ID:            	"rpid1",
-			Task:          	"taskid",
-			Recording:     	"recordingid",
-			Clock:         	client.Fast,
-			RecordingTime: 	true,
-			Status:        	client.Running,
-			Progress:      	0.67,
+			Link:           client.Link{Relation: client.Self, Href: "/kapacitor/v1/replays/rpid1"},
+			ID:             "rpid1",
+			Task:           "taskid",
+			Recording:      "recordingid",
+			Clock:          client.Fast,
+			RecordingTime:  true,
+			Status:         client.Running,
+			Progress:       0.67,
 			ExecutionStats: client.ExecutionStats{},
 		},
 		{
-			Link:          	client.Link{Relation: client.Self, Href: "/kapacitor/v1/replays/rpid2"},
-			ID:            	"rpid2",
-			Task:          	"taskid2",
-			Recording:     	"recordingid2",
-			Clock:         	client.Real,
-			RecordingTime: 	false,
-			Status:        	client.Finished,
-			Progress:      	1.0,
+			Link:          client.Link{Relation: client.Self, Href: "/kapacitor/v1/replays/rpid2"},
+			ID:            "rpid2",
+			Task:          "taskid2",
+			Recording:     "recordingid2",
+			Clock:         client.Real,
+			RecordingTime: false,
+			Status:        client.Finished,
+			Progress:      1.0,
 			ExecutionStats: client.ExecutionStats{
 				TaskStats: map[string]interface{}{
 					"throughput": 5.6,
@@ -2047,10 +2047,10 @@ func Test_ListReplays_Filter(t *testing.T) {
 	}
 	exp := []client.Replay{
 		{
-			Link:     		client.Link{Relation: client.Self, Href: "/kapacitor/v1/replays/rpid1"},
-			ID:       		"rpid1",
-			Status:   		client.Running,
-			Progress: 		0.67,
+			Link:           client.Link{Relation: client.Self, Href: "/kapacitor/v1/replays/rpid1"},
+			ID:             "rpid1",
+			Status:         client.Running,
+			Progress:       0.67,
 			ExecutionStats: client.ExecutionStats{},
 		},
 	}
