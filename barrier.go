@@ -89,7 +89,7 @@ type idleBarrier struct {
 	timer *time.Timer
 	wg    sync.WaitGroup
 	outs  []edge.StatsEdge
-	stopC chan bool
+	stopC chan interface{}
 }
 
 func newIdleBarrier(name string, group edge.GroupInfo, idle time.Duration, outs []edge.StatsEdge) *idleBarrier {
@@ -101,7 +101,7 @@ func newIdleBarrier(name string, group edge.GroupInfo, idle time.Duration, outs 
 		timer: time.NewTimer(idle),
 		wg:    sync.WaitGroup{},
 		outs:  outs,
-		stopC: make(chan bool, 1),
+		stopC: make(chan interface{}, 1),
 	}
 
 	r.Init()
@@ -117,7 +117,7 @@ func (n *idleBarrier) Init() {
 }
 
 func (n *idleBarrier) Stop() {
-	n.stopC <- true
+	close(n.stopC)
 	n.timer.Stop()
 	n.wg.Wait()
 }
@@ -158,9 +158,7 @@ func (n *idleBarrier) Point(m edge.PointMessage) (edge.Message, error) {
 }
 
 func (n *idleBarrier) resetTimer() {
-	if n.idle > 0 {
-		n.timer.Reset(n.idle)
-	}
+	n.timer.Reset(n.idle)
 }
 
 func (n *idleBarrier) emitBarrier() error {

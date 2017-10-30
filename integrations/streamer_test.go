@@ -1513,7 +1513,7 @@ stream
 		}
 	}()
 
-	// TODO: may have to update if groupedconsumer adds default group or some support for when there are no messages
+	// groupedconsumers do not run any logic until at least one message is seen
 	data := make([]edge.PointMessage, len(testValues))
 	for i, testValue := range testValues {
 		data[i] = edge.NewPointMessage(
@@ -1924,7 +1924,7 @@ stream
 		}
 	}()
 
-	// TODO: may have to update if groupedconsumer adds default group or some support for when there are no messages
+	// groupedconsumers do not run any logic until at least one message is seen
 	data := make([]edge.PointMessage, len(testValues))
 	for i, testValue := range testValues {
 		data[i] = edge.NewPointMessage(
