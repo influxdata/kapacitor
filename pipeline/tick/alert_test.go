@@ -68,8 +68,6 @@ func TestAlert(t *testing.T) {
         .idField('idField')
         .all()
         .noRecoveries()
-        .idField('idField')
-        .idField('idField')
         .stateChangesOnly(1h)
         .flapping(0.4, 0.7)
 `
@@ -97,6 +95,8 @@ func TestAlertHTTPPost(t *testing.T) {
 	handler := from.Alert().Post("http://coinop.com", "http://polybius.gov")
 	handler.Endpoint = "CIA"
 	handler.Header("publisher", "Sinneslöschen")
+	handler.CaptureResponseFlag = true
+	handler.Timeout = 10 * time.Second
 
 	want := `stream
     |from()
@@ -107,6 +107,8 @@ func TestAlertHTTPPost(t *testing.T) {
         .history(21)
         .post('http://coinop.com')
         .endpoint('CIA')
+        .captureResponse()
+        .timeout(10s)
         .header('publisher', 'Sinneslöschen')
 `
 	PipelineTickTestHelper(t, pipe, want)

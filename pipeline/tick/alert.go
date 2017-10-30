@@ -42,9 +42,7 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 		Dot("idTag", a.IdTag).
 		Dot("idField", a.IdField).
 		DotIf("all", a.AllFlag).
-		DotIf("noRecoveries", a.NoRecoveriesFlag).
-		Dot("idField", a.IdField).
-		Dot("idField", a.IdField)
+		DotIf("noRecoveries", a.NoRecoveriesFlag)
 
 	if a.IsStateChangesOnly {
 		if a.StateChangesOnlyDuration == 0 {
@@ -60,7 +58,9 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 
 	for _, h := range a.HTTPPostHandlers {
 		n.Dot("post", h.URL).
-			Dot("endpoint", h.Endpoint)
+			Dot("endpoint", h.Endpoint).
+			DotIf("captureResponse", h.CaptureResponseFlag).
+			Dot("timeout", h.Timeout)
 
 		var headers []string
 		for k := range h.Headers {

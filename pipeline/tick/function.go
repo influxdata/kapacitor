@@ -147,6 +147,27 @@ func (f *Function) DotNotNil(name string, arg interface{}) *Function {
 	return f
 }
 
+// DotNotEmpty produces an ast.FunctionNode within a Dot Chain if the argument list is not empty.
+// Assumes a previous node has been created.
+func (f *Function) DotNotEmpty(name string, arg ...interface{}) *Function {
+	if f.err != nil {
+		return f
+	}
+
+	if len(arg) == 0 {
+		return f
+	}
+
+	fn, err := Func(name, arg...)
+	if err != nil {
+		f.err = err
+		return f
+	}
+
+	f.prev = Dot(f.prev, fn)
+	return f
+}
+
 // Pipe produces a Pipe ast.ChainNode
 func Pipe(left, right ast.Node) ast.Node {
 	return &ast.ChainNode{
