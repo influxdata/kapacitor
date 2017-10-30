@@ -156,7 +156,8 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 			Dot("group", h.Group).
 			Dot("value", h.Value).
 			Dot("origin", h.Origin).
-			Dot("services", args(h.Service)...)
+			Dot("services", args(h.Service)...).
+			Dot("timeout", h.Timeout)
 	}
 
 	for _, h := range a.OpsGenieHandlers {
