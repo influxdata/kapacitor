@@ -261,6 +261,7 @@ func writeJSON(w Writer, now time.Time, level string, msg string, context, field
 		f.WriteJSONTo(w)
 	}
 	w.WriteByte('}')
+	w.WriteByte('\n')
 }
 
 func writeJSONTimestamp(w Writer, now time.Time) {
