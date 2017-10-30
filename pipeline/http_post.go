@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/influxdata/influxdb/influxql"
 )
 
 // An HTTPPostNode will take the incoming data stream and POST it to an HTTP endpoint.
@@ -43,16 +45,16 @@ type HTTPPostNode struct {
 
 	// CodeField is the name of the field in which to place the HTTP status code.
 	// If the HTTP request fails at a layer below HTTP, (i.e. rejected TCP connection), then the status code is set to 0.
-	CodeField string
+	CodeField string `json:"codeField"`
 
 	// tick:ignore
-	CaptureResponseFlag bool `tick:"CaptureResponse"`
+	CaptureResponseFlag bool `tick:"CaptureResponse" json:"captureResponse"`
 
 	// tick:ignore
-	URLs []string
+	URLs []string `json:"urls"`
 
 	// Timeout for HTTP Post
-	Timeout time.Duration
+	Timeout time.Duration `json:"timeout"`
 }
 
 func newHTTPPostNode(wants EdgeType, urls ...string) *HTTPPostNode {
@@ -68,12 +70,14 @@ func (n *HTTPPostNode) MarshalJSON() ([]byte, error) {
 	var raw = &struct {
 		TypeOf
 		*Alias
+		Timeout string `json:"timeout"`
 	}{
 		TypeOf: TypeOf{
 			Type: "httpPost",
 			ID:   n.ID(),
 		},
-		Alias: (*Alias)(n),
+		Alias:   (*Alias)(n),
+		Timeout: influxql.FormatDuration(n.Timeout),
 	}
 	return json.Marshal(raw)
 }

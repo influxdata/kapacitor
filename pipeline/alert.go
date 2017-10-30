@@ -565,10 +565,10 @@ type AlertHTTPPostHandler struct {
 	Headers map[string]string `tick:"Header" json:"headers"`
 
 	// tick:ignore
-	CaptureResponseFlag bool `tick:"CaptureResponse"`
+	CaptureResponseFlag bool `tick:"CaptureResponse" json:"captureResponse"`
 
 	// Timeout for HTTP Post
-	Timeout time.Duration
+	Timeout time.Duration `json:"timeout"`
 }
 
 // Set a header key and value on the post request.
