@@ -9,10 +9,6 @@ func TestGroupBy(t *testing.T) {
 	logger := from.Log()
 	logger.Level = "Coxeter"
 	logger.GroupBy("simplex", "cube", "orthoplpex", "demicube").Exclude("4_21", "2_41", "1_42").ByMeasurement()
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
 
 	want := `stream
     |from()
@@ -22,8 +18,5 @@ func TestGroupBy(t *testing.T) {
         .exclude('4_21', '2_41', '1_42')
         .byMeasurement()
 `
-	if got != want {
-		t.Errorf("TestGroupBy = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }

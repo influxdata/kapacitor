@@ -19,11 +19,6 @@ func TestInfluxDBOut(t *testing.T) {
 	influx.FlushInterval = time.Second
 	influx.Create()
 
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
-
 	want := `stream
     |from()
     |influxDBOut()
@@ -38,8 +33,5 @@ func TestInfluxDBOut(t *testing.T) {
         .tag('kapacitor', 'true')
         .tag('version', '0.2')
 `
-	if got != want {
-		t.Errorf("TestInfluxDBOut = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }

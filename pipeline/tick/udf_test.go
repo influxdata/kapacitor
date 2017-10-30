@@ -1,7 +1,6 @@
 package tick_test
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/influxdata/kapacitor/pipeline"
@@ -74,10 +73,7 @@ func TestUDF(t *testing.T) {
 			},
 		},
 	}
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
+
 	want := `stream
     |from()
     @delorean()
@@ -87,8 +83,5 @@ func TestUDF(t *testing.T) {
         .martySays('Doc!')
         .future(15778476m, 'years')
 `
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("TestUDF = %v, want %v", got, want)
-		t.Log(got)
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }

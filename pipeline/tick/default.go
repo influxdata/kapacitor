@@ -37,6 +37,7 @@ func (n *DefaultNode) Build(d *pipeline.DefaultNode) (ast.Node, error) {
 	for k := range d.Tags {
 		tagKeys = append(tagKeys, k)
 	}
+	sort.Strings(tagKeys)
 	for _, k := range tagKeys {
 		n.Dot("tag", k, d.Tags[k])
 	}

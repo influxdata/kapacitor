@@ -58,11 +58,6 @@ func TestK8sAutoscale(t *testing.T) {
 		},
 	}
 
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
-
 	want := `stream
     |from()
     |k8sAutoscale()
@@ -81,8 +76,5 @@ func TestK8sAutoscale(t *testing.T) {
         .kindTag('deployment')
         .resourceTag('dock')
 `
-	if got != want {
-		t.Errorf("TestK8sAutoscale = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }

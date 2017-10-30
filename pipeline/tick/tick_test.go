@@ -103,3 +103,16 @@ func PipelineTick(pipe *pipeline.Pipeline) (string, error) {
 	ast.Program.Format(&buf, "", false)
 	return buf.String(), nil
 }
+
+func PipelineTickTestHelper(t *testing.T, pipe *pipeline.Pipeline, want string) {
+	t.Helper() //mark test as helper so its excluded from the test stack trace.
+	got, err := PipelineTick(pipe)
+	if err != nil {
+		t.Fatalf("Unexpected error building pipeline %v", err)
+	}
+
+	if got != want {
+		t.Errorf("%v, want %v", got, want)
+		t.Log(got) // print is helpful to get the correct format.
+	}
+}

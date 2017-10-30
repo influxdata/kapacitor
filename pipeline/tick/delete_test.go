@@ -12,11 +12,6 @@ func TestDelete(t *testing.T) {
 	delete.Tag("race")
 	delete.Tag("city")
 
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
-
 	want := `stream
     |from()
     |delete()
@@ -25,8 +20,6 @@ func TestDelete(t *testing.T) {
         .tag('race')
         .tag('city')
 `
-	if got != want {
-		t.Errorf("TestDelete = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+
+	PipelineTickTestHelper(t, pipe, want)
 }

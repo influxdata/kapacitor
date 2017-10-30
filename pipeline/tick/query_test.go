@@ -18,10 +18,6 @@ func TestQuery(t *testing.T) {
 	query.Fill = "linear"
 	query.Cluster = "mycluster"
 
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
 	want := `batch
     |query('select cpu_usage from cpu')
         .period(1m)
@@ -34,8 +30,5 @@ func TestQuery(t *testing.T) {
         .fill('linear')
         .cluster('mycluster')
 `
-	if got != want {
-		t.Errorf("TestQuery = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }

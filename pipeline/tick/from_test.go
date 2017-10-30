@@ -43,11 +43,6 @@ func TestFrom(t *testing.T) {
 	from.Truncate = time.Second
 	from.Round = time.Second
 
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
-
 	want := `stream
     |from()
         .database('mydb')
@@ -59,8 +54,5 @@ func TestFrom(t *testing.T) {
         .where(lambda: lambda: "cpu" != 'cpu-total' AND lambda: "host" =~ /logger\d+/)
         .groupBy('this', 'that', 'these', 'those')
 `
-	if got != want {
-		t.Errorf("TestFrom = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }

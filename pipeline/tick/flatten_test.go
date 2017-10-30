@@ -12,10 +12,6 @@ func TestFlatten(t *testing.T) {
 	flatten.Delimiter = "blackline"
 	flatten.Tolerance = time.Second
 	flatten.DropOriginalFieldName()
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
 
 	want := `stream
     |from()
@@ -25,8 +21,5 @@ func TestFlatten(t *testing.T) {
         .tolerance(1s)
         .dropOriginalFieldName()
 `
-	if got != want {
-		t.Errorf("TestFlatten = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }

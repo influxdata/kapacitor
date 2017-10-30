@@ -10,11 +10,6 @@ func TestInfluxQL(t *testing.T) {
 	influx.As = "my"
 	influx.UsePointTimes()
 
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
-
 	want := `stream
     |from()
     |mean('streets')
@@ -23,8 +18,5 @@ func TestInfluxQL(t *testing.T) {
         .as('my')
         .usePointTimes()
 `
-	if got != want {
-		t.Errorf("TestInfluxQL = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }

@@ -25,10 +25,6 @@ func TestJoin(t *testing.T) {
 	join.Tolerance = time.Second
 	join.StreamName = "kwh"
 
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
 	want := `var from3 = stream
     |from()
         .measurement('floor_power')
@@ -45,8 +41,5 @@ stream
         .streamName('kwh')
         .tolerance(1s)
 `
-	if got != want {
-		t.Errorf("TestJoin = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }

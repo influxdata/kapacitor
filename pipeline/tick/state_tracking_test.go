@@ -25,21 +25,13 @@ func TestStateDuration(t *testing.T) {
 	sd.As = "AKA"
 	sd.Unit = time.Minute
 
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
-
 	want := `stream
     |from()
     |stateDuration(lambda: "cpu" != 'cpu-total')
         .as('AKA')
         .unit(1m)
 `
-	if got != want {
-		t.Errorf("TestStateDuration = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }
 
 func TestStateCount(t *testing.T) {
@@ -59,18 +51,10 @@ func TestStateCount(t *testing.T) {
 	sd := from.StateCount(lambda)
 	sd.As = "AKA"
 
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
-
 	want := `stream
     |from()
     |stateCount(lambda: "cpu" != 'cpu-total')
         .as('AKA')
 `
-	if got != want {
-		t.Errorf("TestStateCount = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }

@@ -46,11 +46,6 @@ func TestAlert(t *testing.T) {
 	alert.IdField = "idField"
 	alert.All().NoRecoveries().StateChangesOnly(time.Hour)
 
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
-
 	want := `stream
     |from()
     |alert()
@@ -78,20 +73,12 @@ func TestAlert(t *testing.T) {
         .stateChangesOnly(1h)
         .flapping(0.4, 0.7)
 `
-	if got != want {
-		t.Errorf("TestAlert = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }
 
 func TestAlertStateChanges(t *testing.T) {
 	pipe, _, from := StreamFrom()
 	from.Alert().StateChangesOnly()
-
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
 
 	want := `stream
     |from()
@@ -102,10 +89,7 @@ func TestAlertStateChanges(t *testing.T) {
         .history(21)
         .stateChangesOnly()
 `
-	if got != want {
-		t.Errorf("TestAlert = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }
 
 func TestAlertHTTPPost(t *testing.T) {
@@ -113,10 +97,6 @@ func TestAlertHTTPPost(t *testing.T) {
 	handler := from.Alert().Post("http://coinop.com", "http://polybius.gov")
 	handler.Endpoint = "CIA"
 	handler.Header("publisher", "Sinneslöschen")
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
 
 	want := `stream
     |from()
@@ -129,18 +109,11 @@ func TestAlertHTTPPost(t *testing.T) {
         .endpoint('CIA')
         .header('publisher', 'Sinneslöschen')
 `
-	if got != want {
-		t.Errorf("TestAlert = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }
 func TestAlertTCP(t *testing.T) {
 	pipe, _, from := StreamFrom()
 	from.Alert().Tcp("echo:7")
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
 
 	want := `stream
     |from()
@@ -152,19 +125,12 @@ func TestAlertTCP(t *testing.T) {
         .tcp()
         .address('echo:7')
 `
-	if got != want {
-		t.Errorf("TestAlert = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }
 
 func TestAlertEmail(t *testing.T) {
 	pipe, _, from := StreamFrom()
 	from.Alert().Email("gaben@valvesoftware.com", "zoidberg@freemail.web")
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
 
 	want := `stream
     |from()
@@ -177,19 +143,12 @@ func TestAlertEmail(t *testing.T) {
         .to('gaben@valvesoftware.com')
         .to('zoidberg@freemail.web')
 `
-	if got != want {
-		t.Errorf("TestAlert = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }
 
 func TestAlertExec(t *testing.T) {
 	pipe, _, from := StreamFrom()
 	from.Alert().Exec("send", "-watch", "-verbose") // maybe I should rewrite mh in go?
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
 
 	want := `stream
     |from()
@@ -200,20 +159,13 @@ func TestAlertExec(t *testing.T) {
         .history(21)
         .exec('send', '-watch', '-verbose')
 `
-	if got != want {
-		t.Errorf("TestAlert = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }
 
 func TestAlertLog(t *testing.T) {
 	pipe, _, from := StreamFrom()
 	handler := from.Alert().Log("/var/log/messages")
 	handler.Mode = 420
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
 
 	want := `stream
     |from()
@@ -225,20 +177,13 @@ func TestAlertLog(t *testing.T) {
         .log('/var/log/messages')
         .mode(0644)
 `
-	if got != want {
-		t.Errorf("TestAlert = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }
 
 func TestAlertVictorOps(t *testing.T) {
 	pipe, _, from := StreamFrom()
 	handler := from.Alert().VictorOps()
 	handler.RoutingKey = "Seatec Astronomy"
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
 
 	want := `stream
     |from()
@@ -250,20 +195,13 @@ func TestAlertVictorOps(t *testing.T) {
         .victorOps()
         .routingKey('Seatec Astronomy')
 `
-	if got != want {
-		t.Errorf("TestAlert = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }
 
 func TestAlertPagerDuty(t *testing.T) {
 	pipe, _, from := StreamFrom()
 	handler := from.Alert().PagerDuty()
 	handler.ServiceKey = "Seatec Astronomy"
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
 
 	want := `stream
     |from()
@@ -275,10 +213,7 @@ func TestAlertPagerDuty(t *testing.T) {
         .pagerDuty()
         .serviceKey('Seatec Astronomy')
 `
-	if got != want {
-		t.Errorf("TestAlert = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }
 
 func TestAlertPushover(t *testing.T) {
@@ -290,10 +225,6 @@ func TestAlertPushover(t *testing.T) {
 	handler.URL = "http://playtronics.com"
 	handler.URLTitle = "Cosmo's Office"
 	handler.Sound = "click"
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
 
 	want := `stream
     |from()
@@ -310,10 +241,7 @@ func TestAlertPushover(t *testing.T) {
         .urlTitle('Cosmo\'s Office')
         .sound('click')
 `
-	if got != want {
-		t.Errorf("TestAlert = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }
 
 func TestAlertSensu(t *testing.T) {
@@ -321,10 +249,6 @@ func TestAlertSensu(t *testing.T) {
 	handler := from.Alert().Sensu()
 	handler.Source = "Henry Hill"
 	handler.Handlers("FBI", "Witness", "Protection")
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
 
 	want := `stream
     |from()
@@ -337,10 +261,7 @@ func TestAlertSensu(t *testing.T) {
         .source('Henry Hill')
         .handlers('FBI', 'Witness', 'Protection')
 `
-	if got != want {
-		t.Errorf("TestAlert = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }
 
 func TestAlertSlack(t *testing.T) {
@@ -349,10 +270,6 @@ func TestAlertSlack(t *testing.T) {
 	handler.Channel = "#application"
 	handler.Username = "prbot"
 	handler.IconEmoji = ":non-potable_water:"
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
 
 	want := `stream
     |from()
@@ -366,10 +283,7 @@ func TestAlertSlack(t *testing.T) {
         .username('prbot')
         .iconEmoji(':non-potable_water:')
 `
-	if got != want {
-		t.Errorf("TestAlert = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }
 
 func TestAlertTelegram(t *testing.T) {
@@ -378,10 +292,6 @@ func TestAlertTelegram(t *testing.T) {
 	handler.ChatId = "samuel morris"
 	handler.ParseMode = "analog"
 	handler.DisableWebPagePreview().DisableNotification()
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
 
 	want := `stream
     |from()
@@ -396,10 +306,7 @@ func TestAlertTelegram(t *testing.T) {
         .disableWebPagePreview()
         .disableNotification()
 `
-	if got != want {
-		t.Errorf("TestAlert = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }
 
 func TestAlertHipchat(t *testing.T) {
@@ -407,10 +314,6 @@ func TestAlertHipchat(t *testing.T) {
 	handler := from.Alert().HipChat()
 	handler.Room = "escape room"
 	handler.Token = "waxed mustache and plaid shirt"
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
 
 	want := `stream
     |from()
@@ -423,10 +326,7 @@ func TestAlertHipchat(t *testing.T) {
         .room('escape room')
         .token('waxed mustache and plaid shirt')
 `
-	if got != want {
-		t.Errorf("TestAlert = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }
 
 func TestAlertAlerta(t *testing.T) {
@@ -440,10 +340,6 @@ func TestAlertAlerta(t *testing.T) {
 	handler.Value = "Save the Galaxy"
 	handler.Origin = "Omega"
 	handler.Services("legion", "vent", "garrus", "distraction team", "grunt", "crew", "samara", "barrier")
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
 
 	want := `stream
     |from()
@@ -462,10 +358,7 @@ func TestAlertAlerta(t *testing.T) {
         .origin('Omega')
         .services('legion', 'vent', 'garrus', 'distraction team', 'grunt', 'crew', 'samara', 'barrier')
 `
-	if got != want {
-		t.Errorf("TestAlert = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }
 
 func TestAlertOpsGenie(t *testing.T) {
@@ -473,10 +366,6 @@ func TestAlertOpsGenie(t *testing.T) {
 	handler := from.Alert().OpsGenie()
 	handler.Teams("radiant", "dire")
 	handler.Recipients("huskar", "dazzle", "nature's prophet", "faceless void", "bounty hunter")
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
 
 	want := `stream
     |from()
@@ -489,19 +378,12 @@ func TestAlertOpsGenie(t *testing.T) {
         .teams('radiant', 'dire')
         .recipients('huskar', 'dazzle', 'nature\'s prophet', 'faceless void', 'bounty hunter')
 `
-	if got != want {
-		t.Errorf("TestAlert = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }
 
 func TestAlertTalk(t *testing.T) {
 	pipe, _, from := StreamFrom()
 	from.Alert().Talk()
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
 
 	want := `stream
     |from()
@@ -512,10 +394,7 @@ func TestAlertTalk(t *testing.T) {
         .history(21)
         .talk()
 `
-	if got != want {
-		t.Errorf("TestAlert = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }
 
 func TestAlertMQTT(t *testing.T) {
@@ -524,10 +403,6 @@ func TestAlertMQTT(t *testing.T) {
 	handler.BrokerName = "toy 'r us"
 	handler.Qos = 1
 	handler.Retained = true
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
 
 	want := `stream
     |from()
@@ -542,10 +417,7 @@ func TestAlertMQTT(t *testing.T) {
         .qos(1)
         .retained()
 `
-	if got != want {
-		t.Errorf("TestAlert = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }
 
 func TestAlertSNMP(t *testing.T) {
@@ -553,10 +425,6 @@ func TestAlertSNMP(t *testing.T) {
 	handler := from.Alert().SnmpTrap("trap")
 	handler.Data("Petrov's Defence", "opening trap", "Marshall Trap")
 	handler.Data("Queen's Gambit Declined", "opening trap", "Rubinstein Trap")
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
 
 	want := `stream
     |from()
@@ -569,8 +437,5 @@ func TestAlertSNMP(t *testing.T) {
         .data('Petrov\'s Defence', 'opening trap', 'Marshall Trap')
         .data('Queen\'s Gambit Declined', 'opening trap', 'Rubinstein Trap')
 `
-	if got != want {
-		t.Errorf("TestAlert = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }

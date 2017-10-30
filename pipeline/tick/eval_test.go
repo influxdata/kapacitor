@@ -37,11 +37,6 @@ func TestEval(t *testing.T) {
 	})
 	eval.As("multiply", "divide").Tags("cells").Keep("petri", "dish").Quiet()
 
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
-
 	want := `stream
     |from()
     |eval(lambda: lambda: "cpu" != 'cpu-total' AND lambda: "host" =~ /logger\d+/)
@@ -50,8 +45,5 @@ func TestEval(t *testing.T) {
         .quiet()
         .keep('petri', 'dish')
 `
-	if got != want {
-		t.Errorf("TestEval = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }

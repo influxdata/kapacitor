@@ -10,20 +10,15 @@ func TestDefault(t *testing.T) {
 	def.Field("judgement", "plantiff")
 	def.Field("finance", "loan")
 	def.Tag("vocabulary", "volcano")
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
+	def.Tag("make", "toyota")
 
 	want := `stream
     |from()
     |default()
         .field('finance', 'loan')
         .field('judgement', 'plantiff')
+        .tag('make', 'toyota')
         .tag('vocabulary', 'volcano')
 `
-	if got != want {
-		t.Errorf("TestDefault = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }

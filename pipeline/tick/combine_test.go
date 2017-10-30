@@ -40,10 +40,6 @@ func TestCombine(t *testing.T) {
 	combine.Delimiter = "cup"
 	combine.Tolerance = time.Hour + 10*time.Minute
 	combine.Max = 1
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
 
 	want := `stream
     |from()
@@ -53,8 +49,5 @@ func TestCombine(t *testing.T) {
         .tolerance(70m)
         .max(1)
 `
-	if got != want {
-		t.Errorf("TestCombine = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }

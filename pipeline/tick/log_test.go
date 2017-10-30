@@ -11,10 +11,6 @@ func TestLog(t *testing.T) {
 	logger.Prefix = "oh no"
 	logger.Log() // default options
 
-	got, err := PipelineTick(pipe)
-	if err != nil {
-		t.Fatalf("Unexpected error building pipeline %v", err)
-	}
 	want := `batch
     |query('select cpu_usage from cpu')
     |log()
@@ -23,8 +19,5 @@ func TestLog(t *testing.T) {
     |log()
         .level('INFO')
 `
-	if got != want {
-		t.Errorf("TestLog = %v, want %v", got, want)
-		t.Log(got) // print is helpful to get the correct format.
-	}
+	PipelineTickTestHelper(t, pipe, want)
 }
