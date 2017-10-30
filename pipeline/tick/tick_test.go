@@ -16,14 +16,14 @@ import (
 // If you get a test error here, then you need to implement
 // a conversion node from pipeline node to the ast node.
 func TestPipelineImplemented(t *testing.T) {
-	tickPkg, err := importer.Default().Import("github.com/influxdata/kapacitor/pipeline/tick")
+	tickPkg, err := importer.For("source", nil).Import("github.com/influxdata/kapacitor/pipeline/tick")
 	if err != nil {
 		t.Fatalf("error importing github.com/influxdata/kapacitor/pipeline: %v", err)
 	}
 	// tickScope lists all the types in the tick package
 	tickScope := tickPkg.Scope()
 
-	pipelinePkg, err := importer.Default().Import("github.com/influxdata/kapacitor/pipeline")
+	pipelinePkg, err := importer.For("source", nil).Import("github.com/influxdata/kapacitor/pipeline")
 	if err != nil {
 		t.Fatalf("error importing github.com/influxdata/kapacitor/pipeline: %v; perhaps kapacitor is not in $GOPATH/src/influxdata/kapacitor?", err)
 	}
@@ -67,6 +67,7 @@ func TestPipelineImplemented(t *testing.T) {
 			continue
 		}
 
+		// IF YOU GET A TEST ERROR HERE:
 		// All pipeline nodes must have corresponding tick structs that
 		// can convert to an AST.  By convention you'll need to name node in the
 		// tick package with the same name as in the pipeline package.
