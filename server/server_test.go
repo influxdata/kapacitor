@@ -4851,11 +4851,12 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 	defer f.Close()
 	exp := []alert.Data{
 		{
-			ID:       "test-stream-query",
-			Message:  "test-stream-query is CRITICAL",
-			Time:     time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
-			Level:    alert.Critical,
-			Duration: 0 * time.Second,
+			ID:            "test-stream-query",
+			Message:       "test-stream-query is CRITICAL",
+			Time:          time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.OK,
+			Duration:      0 * time.Second,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -4872,11 +4873,12 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			},
 		},
 		{
-			ID:       "test-stream-query",
-			Message:  "test-stream-query is CRITICAL",
-			Time:     time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
-			Level:    alert.Critical,
-			Duration: 1 * time.Second,
+			ID:            "test-stream-query",
+			Message:       "test-stream-query is CRITICAL",
+			Time:          time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      1 * time.Second,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -4893,11 +4895,12 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			},
 		},
 		{
-			ID:       "test-stream-query",
-			Message:  "test-stream-query is CRITICAL",
-			Time:     time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
-			Level:    alert.Critical,
-			Duration: 2 * time.Second,
+			ID:            "test-stream-query",
+			Message:       "test-stream-query is CRITICAL",
+			Time:          time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      2 * time.Second,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -4916,11 +4919,12 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			},
 		},
 		{
-			ID:       "test-stream-query",
-			Message:  "test-stream-query is CRITICAL",
-			Time:     time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
-			Level:    alert.Critical,
-			Duration: 3 * time.Second,
+			ID:            "test-stream-query",
+			Message:       "test-stream-query is CRITICAL",
+			Time:          time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      3 * time.Second,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -4939,11 +4943,12 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			},
 		},
 		{
-			ID:       "test-stream-query",
-			Message:  "test-stream-query is CRITICAL",
-			Time:     time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
-			Level:    alert.Critical,
-			Duration: 4 * time.Second,
+			ID:            "test-stream-query",
+			Message:       "test-stream-query is CRITICAL",
+			Time:          time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      4 * time.Second,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -4962,11 +4967,12 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			},
 		},
 		{
-			ID:       "test-stream-query",
-			Message:  "test-stream-query is CRITICAL",
-			Time:     time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
-			Level:    alert.Critical,
-			Duration: 5 * time.Second,
+			ID:            "test-stream-query",
+			Message:       "test-stream-query is CRITICAL",
+			Time:          time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      5 * time.Second,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -4984,11 +4990,12 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			},
 		},
 		{
-			ID:       "test-stream-query",
-			Message:  "test-stream-query is CRITICAL",
-			Time:     time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
-			Level:    alert.Critical,
-			Duration: 6 * time.Second,
+			ID:            "test-stream-query",
+			Message:       "test-stream-query is CRITICAL",
+			Time:          time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      6 * time.Second,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -5006,11 +5013,12 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			},
 		},
 		{
-			ID:       "test-stream-query",
-			Message:  "test-stream-query is CRITICAL",
-			Time:     time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
-			Level:    alert.Critical,
-			Duration: 7 * time.Second,
+			ID:            "test-stream-query",
+			Message:       "test-stream-query is CRITICAL",
+			Time:          time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      7 * time.Second,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -5028,11 +5036,12 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			},
 		},
 		{
-			ID:       "test-stream-query",
-			Message:  "test-stream-query is CRITICAL",
-			Time:     time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
-			Level:    alert.Critical,
-			Duration: 8 * time.Second,
+			ID:            "test-stream-query",
+			Message:       "test-stream-query is CRITICAL",
+			Time:          time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      8 * time.Second,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -5050,11 +5059,12 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			},
 		},
 		{
-			ID:       "test-stream-query",
-			Message:  "test-stream-query is CRITICAL",
-			Time:     time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
-			Level:    alert.Critical,
-			Duration: 9 * time.Second,
+			ID:            "test-stream-query",
+			Message:       "test-stream-query is CRITICAL",
+			Time:          time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      9 * time.Second,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -5071,11 +5081,12 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			},
 		},
 		{
-			ID:       "test-stream-query",
-			Message:  "test-stream-query is CRITICAL",
-			Time:     time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
-			Level:    alert.Critical,
-			Duration: 10 * time.Second,
+			ID:            "test-stream-query",
+			Message:       "test-stream-query is CRITICAL",
+			Time:          time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      10 * time.Second,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -8031,6 +8042,7 @@ func TestServer_ListServiceTests(t *testing.T) {
 					"endpoint": "example",
 					"url":      "http://localhost:3000/",
 					"headers":  map[string]interface{}{"Auth": "secret"},
+					"timeout":  float64(0),
 				},
 			},
 			{

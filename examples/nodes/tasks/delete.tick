@@ -1,0 +1,9 @@
+dbrp "telegraf"."autogen"
+
+stream
+    |from()
+        .measurement('cpu')
+        .groupBy(*)
+    |delete()
+        .tag('cpu')
+        .field('usuage_idle')

@@ -1,0 +1,9 @@
+dbrp "telegraf"."autogen"
+
+stream
+    |from()
+        .measurement('system')
+    |window()
+        .period(1m)
+        .every(10s)
+    |httpOut('data')

@@ -41,6 +41,7 @@ type Command struct {
 	Commit  string
 
 	closing chan struct{}
+	pidfile string
 	Closed  chan struct{}
 
 	Stdin  io.Reader
@@ -104,7 +105,7 @@ func (cmd *Command) Run(args ...string) error {
 	// Initialize Logging Services
 	cmd.diagService = diagnostic.NewService(config.Logging, cmd.Stdout, cmd.Stderr)
 	if err := cmd.diagService.Open(); err != nil {
-		return fmt.Errorf("failed to opend diagnostic service: %v", err)
+		return fmt.Errorf("failed to open diagnostic service: %v", err)
 	}
 
 	// Initialize cmd diagnostic
@@ -118,6 +119,7 @@ func (cmd *Command) Run(args ...string) error {
 	if err := cmd.writePIDFile(options.PIDFile); err != nil {
 		return fmt.Errorf("write pid file: %s", err)
 	}
+	cmd.pidfile = options.PIDFile
 
 	// Create server from config and start it.
 	buildInfo := server.BuildInfo{Version: cmd.Version, Commit: cmd.Commit, Branch: cmd.Branch}
@@ -142,6 +144,7 @@ func (cmd *Command) Run(args ...string) error {
 // Close shuts down the server.
 func (cmd *Command) Close() error {
 	defer close(cmd.Closed)
+	defer cmd.removePIDFile()
 	close(cmd.closing)
 	if cmd.Server != nil {
 		return cmd.Server.Close()
@@ -161,6 +164,14 @@ func (cmd *Command) monitorServerErrors() {
 			}
 		case <-cmd.closing:
 			return
+		}
+	}
+}
+
+func (cmd *Command) removePIDFile() {
+	if cmd.pidfile != "" {
+		if err := os.Remove(cmd.pidfile); err != nil {
+			cmd.Diag.Error("unable to remove pidfile", err)
 		}
 	}
 }
@@ -191,8 +202,7 @@ func (cmd *Command) writePIDFile(path string) error {
 	}
 
 	// Ensure the required directory structure exists.
-	err := os.MkdirAll(filepath.Dir(path), 0777)
-	if err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0777); err != nil {
 		return fmt.Errorf("mkdir: %s", err)
 	}
 

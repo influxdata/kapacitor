@@ -1,0 +1,8 @@
+dbrp "telegraf"."autogen"
+
+stream
+    |from()
+        .measurement('cpu')
+        .groupBy(*)
+    |combine(lambda: "cpu" == 'cpu-total', lambda: TRUE)
+        .as('total', 'cpu')

@@ -3,7 +3,9 @@
 ## Unreleased
 
 ### Features
+- [#1408](https://github.com/influxdata/kapacitor/issues/1408): Add Previous state
 
+- [#1461](https://github.com/influxdata/kapacitor/issues/1461): alert.post and https_post timeouts needed.
 - [#1413](https://github.com/influxdata/kapacitor/issues/1413): Add subscriptions modes to InfluxDB subscriptions.
 - [#1436](https://github.com/influxdata/kapacitor/issues/1436): Add linear fill support for QueryNode.
 - [#1345](https://github.com/influxdata/kapacitor/issues/1345): Add MQTT Alert Handler
@@ -12,6 +14,7 @@
     The breaking change is that the Combine and Flatten nodes previously, but erroneously, operated across batch boundaries; this has been fixed.
 - [#1497](https://github.com/influxdata/kapacitor/pull/1497): Add support for Docker Swarm autoscaling services.
 - [#1485](https://github.com/influxdata/kapacitor/issues/1485): Add bools field types to UDFs.
+- [#1549](https://github.com/influxdata/kapacitor/issues/1549): Add stateless now() function to get the current local time.
 - [#1545](https://github.com/influxdata/kapacitor/pull/1545): Add support for timeout, tags and service template in the Alerta AlertNode
 - [#1568](https://github.com/influxdata/kapacitor/issues/1568): Add support for custom HTTP Post bodies via a template system.
 - [#1569](https://github.com/influxdata/kapacitor/issues/1569): Add support for add the HTTP status code as a field when using httpPost
@@ -24,6 +27,7 @@
     Load service was added; the service can load tasks/handlers from a directory.
 - [#1606](https://github.com/influxdata/kapacitor/pull/1606): Update Go version to 1.9.1
 - [#1578](https://github.com/influxdata/kapacitor/pull/1578): Add support for exposing logs via the API.
+- [#1605](https://github.com/influxdata/kapacitor/issues/1605): Add support for {{ .Duration }} on Alert Message property
 
 ### Bugfixes
 
@@ -35,6 +39,8 @@
 - [#1516](https://github.com/influxdata/kapacitor/pull/1516): Fix bad PagerDuty test the required server info.
 - [#1581](https://github.com/influxdata/kapacitor/pull/1581): Add SNMP sysUpTime to SNMP Trap service
 - [#1547](https://github.com/influxdata/kapacitor/issues/1547): Fix panic on recording replay with HTTPPostHandler.
+- [#1623](https://github.com/influxdata/kapacitor/issues/1623): Fix k8s incluster master api dns resolution
+- [#1630](https://github.com/influxdata/kapacitor/issues/1630): Remove the pidfile after the server has exited.
 
 ## v1.3.3 [2017-08-11]
 
