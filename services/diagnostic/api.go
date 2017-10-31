@@ -104,13 +104,13 @@ func (s *SessionService) handleSessions(w http.ResponseWriter, r *http.Request) 
 
 	contentType := r.Header.Get("Content-Type")
 
-	session := s.SessionsStore.Create(w, contentType, level, tags)
-	defer s.SessionsStore.Delete(session)
-
 	header := w.Header()
 	header.Add("Transfer-Encoding", "chunked")
 	header.Add("Content-Type", r.Header.Get("Content-Type"))
 	w.WriteHeader(http.StatusOK)
+
+	session := s.SessionsStore.Create(w, contentType, level, tags)
+	defer s.SessionsStore.Delete(session)
 
 	<-r.Context().Done()
 }
