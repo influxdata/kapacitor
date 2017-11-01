@@ -1207,7 +1207,7 @@ All replays are assigned an ID which is returned in this format with a link.
     "status" : "running",
     "progress" : 0.57,
     "error" : "",
-    "stats": {},
+    "stats": {}
 }
 ```
 
@@ -1251,7 +1251,7 @@ GET /kapacitor/v1/replays/ad95677b-096b-40c8-82a8-912706f41d4c
     "status" : "running",
     "progress" : 0.57,
     "error" : "",
-    "stats": {},
+    "stats": {}
 }
 ```
 
@@ -1327,7 +1327,7 @@ GET /kapacitor/v1/replays/ad95677b-096b-40c8-82a8-912706f41d4c
     "status" : "failed",
     "progress" : 1,
     "error" : "error message explaining failure",
-    "stats": {},
+    "stats": {}
 }
 ```
 
