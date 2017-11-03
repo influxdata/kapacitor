@@ -1,0 +1,9 @@
+dbrp "telegraf"."autogen"
+
+stream
+    |from()
+        .measurement('cpu')
+        .groupBy(*)
+    |default()
+        .tag('sweet_new_tag', 'this_is')
+        .field('value', 10.9)

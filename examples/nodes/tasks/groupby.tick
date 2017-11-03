@@ -1,0 +1,6 @@
+dbrp "telegraf"."autogen"
+
+stream
+    |from()
+        .measurement('system')
+    |groupBy(*)

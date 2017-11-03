@@ -1449,10 +1449,11 @@ func TestBatch_AlertStateChangesOnly(t *testing.T) {
 		atomic.AddInt32(&requestCount, 1)
 		if rc := atomic.LoadInt32(&requestCount); rc == 1 {
 			expAd := alert.Data{
-				ID:      "cpu_usage_idle:cpu=cpu-total",
-				Message: "cpu_usage_idle:cpu=cpu-total is CRITICAL",
-				Time:    time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
-				Level:   alert.Critical,
+				ID:            "cpu_usage_idle:cpu=cpu-total",
+				Message:       "cpu_usage_idle:cpu=cpu-total is CRITICAL",
+				Time:          time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+				Level:         alert.Critical,
+				PreviousLevel: alert.OK,
 			}
 			ad.Data = models.Result{}
 			if eq, msg := compareAlertData(expAd, ad); !eq {
@@ -1460,11 +1461,12 @@ func TestBatch_AlertStateChangesOnly(t *testing.T) {
 			}
 		} else {
 			expAd := alert.Data{
-				ID:       "cpu_usage_idle:cpu=cpu-total",
-				Message:  "cpu_usage_idle:cpu=cpu-total is OK",
-				Time:     time.Date(1971, 1, 1, 0, 0, 38, 0, time.UTC),
-				Duration: 38 * time.Second,
-				Level:    alert.OK,
+				ID:            "cpu_usage_idle:cpu=cpu-total",
+				Message:       "cpu_usage_idle:cpu=cpu-total is OK",
+				Time:          time.Date(1971, 1, 1, 0, 0, 38, 0, time.UTC),
+				Duration:      38 * time.Second,
+				Level:         alert.OK,
+				PreviousLevel: alert.Critical,
 			}
 			ad.Data = models.Result{}
 			if eq, msg := compareAlertData(expAd, ad); !eq {
@@ -1516,21 +1518,33 @@ func TestBatch_AlertStateChangesOnlyExpired(t *testing.T) {
 		var expAd alert.Data
 		atomic.AddInt32(&requestCount, 1)
 		rc := atomic.LoadInt32(&requestCount)
-		if rc < 3 {
+		switch rc {
+		case 1:
 			expAd = alert.Data{
-				ID:       "cpu_usage_idle:cpu=cpu-total",
-				Message:  "cpu_usage_idle:cpu=cpu-total is CRITICAL",
-				Time:     time.Date(1971, 1, 1, 0, 0, int(rc-1)*20, 0, time.UTC),
-				Duration: time.Duration(rc-1) * 20 * time.Second,
-				Level:    alert.Critical,
+				ID:            "cpu_usage_idle:cpu=cpu-total",
+				Message:       "cpu_usage_idle:cpu=cpu-total is CRITICAL",
+				Time:          time.Date(1971, 1, 1, 0, 0, int(rc-1)*20, 0, time.UTC),
+				Duration:      time.Duration(rc-1) * 20 * time.Second,
+				Level:         alert.Critical,
+				PreviousLevel: alert.OK,
 			}
-		} else {
+		case 2:
 			expAd = alert.Data{
-				ID:       "cpu_usage_idle:cpu=cpu-total",
-				Message:  "cpu_usage_idle:cpu=cpu-total is OK",
-				Time:     time.Date(1971, 1, 1, 0, 0, 38, 0, time.UTC),
-				Duration: 38 * time.Second,
-				Level:    alert.OK,
+				ID:            "cpu_usage_idle:cpu=cpu-total",
+				Message:       "cpu_usage_idle:cpu=cpu-total is CRITICAL",
+				Time:          time.Date(1971, 1, 1, 0, 0, int(rc-1)*20, 0, time.UTC),
+				Duration:      time.Duration(rc-1) * 20 * time.Second,
+				Level:         alert.Critical,
+				PreviousLevel: alert.Critical,
+			}
+		case 3:
+			expAd = alert.Data{
+				ID:            "cpu_usage_idle:cpu=cpu-total",
+				Message:       "cpu_usage_idle:cpu=cpu-total is OK",
+				Time:          time.Date(1971, 1, 1, 0, 0, 38, 0, time.UTC),
+				Duration:      38 * time.Second,
+				Level:         alert.OK,
+				PreviousLevel: alert.Critical,
 			}
 		}
 		if eq, msg := compareAlertData(expAd, ad); !eq {
@@ -2964,6 +2978,177 @@ batch
 	}
 
 	testBatcherWithOutput(t, "TestBatch_HttpPost", script, 30*time.Second, er, false)
+}
+
+func TestBatch_HttpPost_Timeout(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		result := models.Result{}
+		dec := json.NewDecoder(r.Body)
+		err := dec.Decode(&result)
+		if err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}))
+	defer ts.Close()
+
+	var script = `
+batch
+	|query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "host" = 'serverA' AND "cpu" != 'cpu-total'
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s), 'cpu')
+	|httpPost('` + ts.URL + `').timeout(1ms)
+	|httpOut('TestBatch_HttpPost_Timeout')
+`
+
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"cpu": "cpu-total"},
+				Columns: []string{"time", "mean"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 20, 0, time.UTC),
+						91.06416290101595,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 22, 0, time.UTC),
+						85.9694442394385,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 24, 0, time.UTC),
+						90.62985736134186,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 26, 0, time.UTC),
+						86.45443196005628,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+						88.97243107764031,
+					},
+				},
+			},
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"cpu": "cpu0"},
+				Columns: []string{"time", "mean"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 20, 0, time.UTC),
+						85.08910891088406,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 22, 0, time.UTC),
+						78.00000000002001,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 24, 0, time.UTC),
+						84.23607066586464,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 26, 0, time.UTC),
+						80.85858585861834,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+						80.61224489791657,
+					},
+				},
+			},
+			{
+				Name:    "cpu_usage_idle",
+				Tags:    map[string]string{"cpu": "cpu1"},
+				Columns: []string{"time", "mean"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 20, 0, time.UTC),
+						96.49999999996908,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 22, 0, time.UTC),
+						93.46464646468584,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 24, 0, time.UTC),
+						95.00950095007724,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 26, 0, time.UTC),
+						92.99999999998636,
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 28, 0, time.UTC),
+						90.99999999998545,
+					},
+				},
+			},
+		},
+	}
+
+	c := make(chan bool, 1)
+	go func() {
+		testBatcherWithOutput(t, "TestBatch_HttpPost_Timeout", script, 30*time.Second, er, false)
+		c <- true
+	}()
+	select {
+	case <-c:
+	case <-time.After(time.Second):
+		t.Fatal("Test timeout reached, httpPost().timeout() may not be functioning")
+	}
+}
+
+func TestBatch_AlertPost_Timeout(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ad := alert.Data{}
+		dec := json.NewDecoder(r.Body)
+		err := dec.Decode(&ad)
+		if err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(time.Second)
+	}))
+	defer ts.Close()
+	var script = `
+batch
+	|query('''
+		SELECT mean("value")
+		FROM "telegraf"."default".cpu_usage_idle
+		WHERE "host" = 'serverA' AND "cpu" != 'cpu-total'
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s), 'cpu')
+	|alert()
+		.crit(lambda:"mean" > 90)
+		.stateChangesOnly()
+		.levelField('level')
+		.details('')
+		.post('` + ts.URL + `').timeout(1ms)
+`
+
+	c := make(chan bool, 1)
+	go func() {
+		clock, et, replayErr, tm := testBatcher(t, "TestBatch_AlertPostTimeout", script)
+		defer tm.Close()
+
+		err := fastForwardTask(clock, et, replayErr, tm, 40*time.Second)
+		if err != nil {
+			t.Error(err)
+		}
+		c <- true
+	}()
+	select {
+	case <-c:
+	case <-time.After(time.Second):
+		t.Fatal("Test timeout reached, alert().post().timeout() may not be functioning")
+	}
 }
 
 // Helper test function for batcher

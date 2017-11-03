@@ -186,6 +186,7 @@ type AlertNode struct {
 	//    * Level -- Alert Level, one of: INFO, WARNING, CRITICAL.
 	//    * Fields -- Map of fields. Use '{{ index .Fields "key" }}' to get a specific field value.
 	//    * Time -- The time of the point that triggered the event.
+	//    * Duration -- The duration of the alert.
 	//
 	// Example:
 	//   stream
@@ -523,6 +524,9 @@ type AlertHTTPPostHandler struct {
 
 	// tick:ignore
 	CaptureResponseFlag bool `tick:"CaptureResponse"`
+
+	// Timeout for HTTP Post
+	Timeout time.Duration
 }
 
 // Set a header key and value on the post request.

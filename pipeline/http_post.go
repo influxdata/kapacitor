@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 )
 
 // An HTTPPostNode will take the incoming data stream and POST it to an HTTP endpoint.
@@ -47,6 +48,9 @@ type HTTPPostNode struct {
 
 	// tick:ignore
 	URLs []string
+
+	// Timeout for HTTP Post
+	Timeout time.Duration
 }
 
 func newHTTPPostNode(wants EdgeType, urls ...string) *HTTPPostNode {

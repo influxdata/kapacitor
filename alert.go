@@ -360,6 +360,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 			Endpoint:        p.Endpoint,
 			Headers:         p.Headers,
 			CaptureResponse: p.CaptureResponseFlag,
+			Timeout:         p.Timeout,
 		}
 		h := et.tm.HTTPPostService.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
@@ -695,7 +696,7 @@ func (n *AlertNode) event(
 	d time.Duration,
 	result models.Result,
 ) (alert.Event, error) {
-	msg, details, err := n.renderMessageAndDetails(id, name, t, group, tags, fields, level)
+	msg, details, err := n.renderMessageAndDetails(id, name, t, group, tags, fields, level, d)
 	if err != nil {
 		return alert.Event{}, err
 	}
@@ -1046,6 +1047,9 @@ type messageInfo struct {
 
 	// Time
 	Time time.Time
+
+	// Duration of the alert
+	Duration time.Duration
 }
 
 type detailsInfo struct {
@@ -1087,7 +1091,7 @@ func (n *AlertNode) renderID(name string, group models.GroupID, tags models.Tags
 	return id.String(), nil
 }
 
-func (n *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group models.GroupID, tags models.Tags, fields models.Fields, level alert.Level) (string, string, error) {
+func (n *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group models.GroupID, tags models.Tags, fields models.Fields, level alert.Level, d time.Duration) (string, string, error) {
 	g := string(group)
 	if group == models.NilGroup {
 		g = "nil"
@@ -1100,10 +1104,11 @@ func (n *AlertNode) renderMessageAndDetails(id, name string, t time.Time, group 
 			Tags:       tags,
 			ServerInfo: n.serverInfo(),
 		},
-		ID:     id,
-		Fields: fields,
-		Level:  level.String(),
-		Time:   t,
+		ID:       id,
+		Fields:   fields,
+		Level:    level.String(),
+		Time:     t,
+		Duration: d,
 	}
 
 	// Grab a buffer for the message template and the details template

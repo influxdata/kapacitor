@@ -6374,11 +6374,12 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 			}
 		case 2:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is INFO",
-				Time:     time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
-				Duration: 0,
-				Level:    alert.Info,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is INFO",
+				Time:          time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+				Duration:      0,
+				Level:         alert.Info,
+				PreviousLevel: alert.Warning,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -6395,11 +6396,12 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 			}
 		case 3:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is WARNING",
-				Time:     time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
-				Duration: time.Second,
-				Level:    alert.Warning,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is WARNING",
+				Time:          time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+				Duration:      time.Second,
+				Level:         alert.Warning,
+				PreviousLevel: alert.Info,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -6416,11 +6418,12 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 			}
 		case 4:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is WARNING",
-				Time:     time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
-				Duration: 2 * time.Second,
-				Level:    alert.Warning,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is WARNING",
+				Time:          time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+				Duration:      2 * time.Second,
+				Level:         alert.Warning,
+				PreviousLevel: alert.Warning,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -6437,11 +6440,12 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 			}
 		case 5:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is CRITICAL",
-				Time:     time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
-				Duration: 3 * time.Second,
-				Level:    alert.Critical,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is CRITICAL",
+				Time:          time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+				Duration:      3 * time.Second,
+				Level:         alert.Critical,
+				PreviousLevel: alert.Warning,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -6458,11 +6462,12 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 			}
 		case 6:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is INFO",
-				Time:     time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
-				Duration: 0,
-				Level:    alert.Info,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is INFO",
+				Time:          time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+				Duration:      0,
+				Level:         alert.Info,
+				PreviousLevel: alert.Critical,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -6561,12 +6566,13 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 			}
 		case 2:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is INFO",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
-				Duration: time.Second,
-				Level:    alert.Info,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is INFO",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+				Duration:      time.Second,
+				Level:         alert.Info,
+				PreviousLevel: alert.Info,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -6583,12 +6589,13 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 			}
 		case 3:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is INFO",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
-				Duration: 2 * time.Second,
-				Level:    alert.Info,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is INFO",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+				Duration:      2 * time.Second,
+				Level:         alert.Info,
+				PreviousLevel: alert.Info,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -6605,12 +6612,13 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 			}
 		case 4:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is OK",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
-				Duration: 3 * time.Second,
-				Level:    alert.OK,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is OK",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+				Duration:      3 * time.Second,
+				Level:         alert.OK,
+				PreviousLevel: alert.Info,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -6627,12 +6635,13 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 			}
 		case 5:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is INFO",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
-				Duration: 0 * time.Second,
-				Level:    alert.Info,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is INFO",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+				Duration:      0 * time.Second,
+				Level:         alert.Info,
+				PreviousLevel: alert.OK,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -6649,12 +6658,13 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 			}
 		case 6:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is WARNING",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
-				Duration: 1 * time.Second,
-				Level:    alert.Warning,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is WARNING",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+				Duration:      1 * time.Second,
+				Level:         alert.Warning,
+				PreviousLevel: alert.Info,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -6671,12 +6681,13 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 			}
 		case 7:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is WARNING",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
-				Duration: 2 * time.Second,
-				Level:    alert.Warning,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is WARNING",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+				Duration:      2 * time.Second,
+				Level:         alert.Warning,
+				PreviousLevel: alert.Warning,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -6693,12 +6704,13 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 			}
 		case 8:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is OK",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
-				Duration: 3 * time.Second,
-				Level:    alert.OK,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is OK",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+				Duration:      3 * time.Second,
+				Level:         alert.OK,
+				PreviousLevel: alert.Warning,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -6715,12 +6727,13 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 			}
 		case 9:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is INFO",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
-				Duration: 0 * time.Second,
-				Level:    alert.Info,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is INFO",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+				Duration:      0 * time.Second,
+				Level:         alert.Info,
+				PreviousLevel: alert.OK,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -6737,12 +6750,13 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 			}
 		case 10:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is WARNING",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
-				Duration: 1 * time.Second,
-				Level:    alert.Warning,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is WARNING",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
+				Duration:      1 * time.Second,
+				Level:         alert.Warning,
+				PreviousLevel: alert.Info,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -6759,12 +6773,13 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 			}
 		case 11:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is CRITICAL",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
-				Duration: 2 * time.Second,
-				Level:    alert.Critical,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is CRITICAL",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+				Duration:      2 * time.Second,
+				Level:         alert.Critical,
+				PreviousLevel: alert.Warning,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -6781,12 +6796,13 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 			}
 		case 12:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is OK",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
-				Duration: 3 * time.Second,
-				Level:    alert.OK,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is OK",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
+				Duration:      3 * time.Second,
+				Level:         alert.OK,
+				PreviousLevel: alert.Critical,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -6899,12 +6915,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 			}
 		case 2:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is INFO",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
-				Duration: time.Second,
-				Level:    alert.Info,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is INFO",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+				Duration:      time.Second,
+				Level:         alert.Info,
+				PreviousLevel: alert.Info,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -6921,12 +6938,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 			}
 		case 3:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is INFO",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
-				Duration: 2 * time.Second,
-				Level:    alert.Info,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is INFO",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+				Duration:      2 * time.Second,
+				Level:         alert.Info,
+				PreviousLevel: alert.Info,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -6943,12 +6961,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 			}
 		case 4:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is OK",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
-				Duration: 3 * time.Second,
-				Level:    alert.OK,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is OK",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+				Duration:      3 * time.Second,
+				Level:         alert.OK,
+				PreviousLevel: alert.Info,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -6965,12 +6984,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 			}
 		case 5:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is INFO",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
-				Duration: 0 * time.Second,
-				Level:    alert.Info,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is INFO",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+				Duration:      0 * time.Second,
+				Level:         alert.Info,
+				PreviousLevel: alert.OK,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -6987,12 +7007,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 			}
 		case 6:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is WARNING",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
-				Duration: 1 * time.Second,
-				Level:    alert.Warning,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is WARNING",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+				Duration:      1 * time.Second,
+				Level:         alert.Warning,
+				PreviousLevel: alert.Info,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7009,12 +7030,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 			}
 		case 7:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is INFO",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
-				Duration: 2 * time.Second,
-				Level:    alert.Info,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is INFO",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+				Duration:      2 * time.Second,
+				Level:         alert.Info,
+				PreviousLevel: alert.Warning,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7031,12 +7053,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 			}
 		case 8:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is OK",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
-				Duration: 3 * time.Second,
-				Level:    alert.OK,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is OK",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+				Duration:      3 * time.Second,
+				Level:         alert.OK,
+				PreviousLevel: alert.Info,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7053,12 +7076,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 			}
 		case 9:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is INFO",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
-				Duration: 0 * time.Second,
-				Level:    alert.Info,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is INFO",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+				Duration:      0 * time.Second,
+				Level:         alert.Info,
+				PreviousLevel: alert.OK,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7075,12 +7099,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 			}
 		case 10:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is WARNING",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
-				Duration: 1 * time.Second,
-				Level:    alert.Warning,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is WARNING",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
+				Duration:      1 * time.Second,
+				Level:         alert.Warning,
+				PreviousLevel: alert.Info,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7097,12 +7122,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 			}
 		case 11:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is CRITICAL",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
-				Duration: 2 * time.Second,
-				Level:    alert.Critical,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is CRITICAL",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+				Duration:      2 * time.Second,
+				Level:         alert.Critical,
+				PreviousLevel: alert.Warning,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7119,12 +7145,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 			}
 		case 12:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is WARNING",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
-				Duration: 3 * time.Second,
-				Level:    alert.Warning,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is WARNING",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
+				Duration:      3 * time.Second,
+				Level:         alert.Warning,
+				PreviousLevel: alert.Critical,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7141,12 +7168,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 			}
 		case 13:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is WARNING",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 12, 0, time.UTC),
-				Duration: 4 * time.Second,
-				Level:    alert.Warning,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is WARNING",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 12, 0, time.UTC),
+				Duration:      4 * time.Second,
+				Level:         alert.Warning,
+				PreviousLevel: alert.Warning,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7163,12 +7191,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 			}
 		case 14:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is INFO",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 13, 0, time.UTC),
-				Duration: 5 * time.Second,
-				Level:    alert.Info,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is INFO",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 13, 0, time.UTC),
+				Duration:      5 * time.Second,
+				Level:         alert.Info,
+				PreviousLevel: alert.Warning,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7185,12 +7214,13 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 			}
 		case 15:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is OK",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 14, 0, time.UTC),
-				Duration: 6 * time.Second,
-				Level:    alert.OK,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is OK",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 14, 0, time.UTC),
+				Duration:      6 * time.Second,
+				Level:         alert.OK,
+				PreviousLevel: alert.Info,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7304,12 +7334,13 @@ func TestStream_AlertDuration(t *testing.T) {
 			}
 		case 2:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is WARNING",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
-				Duration: 2 * time.Second,
-				Level:    alert.Warning,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is WARNING",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+				Duration:      2 * time.Second,
+				Level:         alert.Warning,
+				PreviousLevel: alert.Critical,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7326,12 +7357,13 @@ func TestStream_AlertDuration(t *testing.T) {
 			}
 		case 3:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is OK",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
-				Duration: 4 * time.Second,
-				Level:    alert.OK,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is OK",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+				Duration:      4 * time.Second,
+				Level:         alert.OK,
+				PreviousLevel: alert.Warning,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7348,12 +7380,13 @@ func TestStream_AlertDuration(t *testing.T) {
 			}
 		case 4:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is WARNING",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
-				Duration: 0,
-				Level:    alert.Warning,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is WARNING",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+				Duration:      0,
+				Level:         alert.Warning,
+				PreviousLevel: alert.OK,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7370,12 +7403,13 @@ func TestStream_AlertDuration(t *testing.T) {
 			}
 		case 5:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is OK",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
-				Duration: 3 * time.Second,
-				Level:    alert.OK,
+				ID:            "kapacitor/cpu/serverA",
+				Message:       "kapacitor/cpu/serverA is OK",
+				Details:       "details",
+				Time:          time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+				Duration:      3 * time.Second,
+				Level:         alert.OK,
+				PreviousLevel: alert.Warning,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -8035,7 +8069,7 @@ func TestStream_AlertPagerDuty(t *testing.T) {
 	ts := pagerdutytest.NewServer()
 	defer ts.Close()
 
-	defaultDetailsTmpl := `{"Name":"cpu","TaskName":"TestStream_Alert","Group":"host=serverA","Tags":{"host":"serverA"},"ServerInfo":{"Hostname":"%v","ClusterID":"%v","ServerID":"%v"},"ID":"kapacitor/cpu/serverA","Fields":{"count":10},"Level":"CRITICAL","Time":"1971-01-01T00:00:10Z","Message":"CRITICAL alert for kapacitor/cpu/serverA"}
+	defaultDetailsTmpl := `{"Name":"cpu","TaskName":"TestStream_Alert","Group":"host=serverA","Tags":{"host":"serverA"},"ServerInfo":{"Hostname":"%v","ClusterID":"%v","ServerID":"%v"},"ID":"kapacitor/cpu/serverA","Fields":{"count":10},"Level":"CRITICAL","Time":"1971-01-01T00:00:10Z","Duration":0,"Message":"CRITICAL alert for kapacitor/cpu/serverA"}
 `
 	var defaultDetails string
 
@@ -8822,12 +8856,13 @@ func TestStream_AlertSigma(t *testing.T) {
 			}
 		} else {
 			expAd = alert.Data{
-				ID:       "cpu:nil",
-				Message:  "cpu:nil is OK",
-				Details:  "cpu:nil is OK",
-				Time:     time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
-				Duration: time.Second,
-				Level:    alert.OK,
+				ID:            "cpu:nil",
+				Message:       "cpu:nil is OK",
+				Details:       "cpu:nil is OK",
+				Time:          time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+				Duration:      time.Second,
+				Level:         alert.OK,
+				PreviousLevel: alert.Info,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -8967,21 +9002,32 @@ func TestStream_AlertStateChangesOnlyExpired(t *testing.T) {
 		var expAd alert.Data
 		atomic.AddInt32(&requestCount, 1)
 		rc := atomic.LoadInt32(&requestCount)
-		if rc < 6 {
+		if rc == 1 {
 			expAd = alert.Data{
-				ID:       "cpu:nil",
-				Message:  "cpu:nil is CRITICAL",
-				Time:     time.Date(1971, 1, 1, 0, 0, int(rc)*2-1, 0, time.UTC),
-				Duration: time.Duration(rc-1) * 2 * time.Second,
-				Level:    alert.Critical,
+				ID:            "cpu:nil",
+				Message:       "cpu:nil is CRITICAL",
+				Time:          time.Date(1971, 1, 1, 0, 0, int(rc)*2-1, 0, time.UTC),
+				Duration:      time.Duration(rc-1) * 2 * time.Second,
+				Level:         alert.Critical,
+				PreviousLevel: alert.OK,
+			}
+		} else if rc < 6 {
+			expAd = alert.Data{
+				ID:            "cpu:nil",
+				Message:       "cpu:nil is CRITICAL",
+				Time:          time.Date(1971, 1, 1, 0, 0, int(rc)*2-1, 0, time.UTC),
+				Duration:      time.Duration(rc-1) * 2 * time.Second,
+				Level:         alert.Critical,
+				PreviousLevel: alert.Critical,
 			}
 		} else {
 			expAd = alert.Data{
-				ID:       "cpu:nil",
-				Message:  "cpu:nil is OK",
-				Time:     time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
-				Duration: 9 * time.Second,
-				Level:    alert.OK,
+				ID:            "cpu:nil",
+				Message:       "cpu:nil is OK",
+				Time:          time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+				Duration:      9 * time.Second,
+				Level:         alert.OK,
+				PreviousLevel: alert.Critical,
 			}
 		}
 		if eq, msg := compareAlertData(expAd, ad); !eq {
@@ -9035,6 +9081,83 @@ stream
 	if rc := atomic.LoadInt32(&requestCount); rc != 9 {
 		t.Errorf("got %v exp %v", rc, 9)
 	}
+}
+
+func TestStream_LambdaNow(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('account')
+	|where(lambda: "expiration" < unixNano(now()))
+	|groupBy('owner')
+	|httpOut('TestStream_LambdaNow')
+`
+
+	expectedOutput := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "account",
+				Tags:    map[string]string{"owner": "ownerA"},
+				Columns: []string{"time", "expiration"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						float64(3.15533e+17), // 1980-01-01 00:00:00 (Unix ns timestamp)
+
+						// we expect "expiration" to be float64 and not int64 (even with input data consisting of ints)
+						// because httpOut uses JSON as serialization format for the results,
+						// resulting in the integers becoming floats
+					},
+				},
+			},
+
+			// the point with expiration = 4102440000000000000 should not be in the results
+			// as it represents a date past now (2100-01-01 00:00:00)
+
+			{
+				Name:    "account",
+				Tags:    map[string]string{"owner": "ownerC"},
+				Columns: []string{"time", "expiration"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						float64(6.56419e+17), // 1990-10-20 10:42:42
+					},
+				},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_LambdaNow", script, time.Second, expectedOutput, false, nil)
+}
+
+func TestStream_EvalNow(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('account')
+	|eval(lambda: year(now()))
+		.as('currentYear')
+	|httpOut('TestStream_EvalNow')
+`
+
+	expectedOutput := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "account",
+				Tags:    map[string]string{"owner": "ownerA"},
+				Columns: []string{"time", "currentYear"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						float64(time.Now().Year()),
+					},
+				},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_EvalNow", script, time.Second, expectedOutput, false, nil)
 }
 
 func TestStream_Autoscale(t *testing.T) {

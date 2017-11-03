@@ -1,0 +1,6 @@
+dbrp "telegraf"."autogen"
+
+batch
+    |query('SELECT mean("usage_user") FROM "telegraf"."autogen"."cpu"')
+        .period(1m)
+        .every(10s)

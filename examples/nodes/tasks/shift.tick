@@ -1,0 +1,7 @@
+dbrp "telegraf"."autogen"
+
+stream
+    |from()
+        .measurement('cpu')
+        .groupBy('host')
+    |shift(1m)
