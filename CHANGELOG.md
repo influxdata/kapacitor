@@ -4,6 +4,7 @@
 
 ### Features
 
+- [#1575](https://github.com/influxdata/kapacitor/issues/1575): Add support to persist replay status after it finishes.
 - [#1413](https://github.com/influxdata/kapacitor/issues/1413): Add subscriptions modes to InfluxDB subscriptions.
 - [#1436](https://github.com/influxdata/kapacitor/issues/1436): Add linear fill support for QueryNode.
 - [#1345](https://github.com/influxdata/kapacitor/issues/1345): Add MQTT Alert Handler
