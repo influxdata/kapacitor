@@ -4,7 +4,6 @@
 
 ### Features
 - [#1408](https://github.com/influxdata/kapacitor/issues/1408): Add Previous state
-
 - [#1575](https://github.com/influxdata/kapacitor/issues/1575): Add support to persist replay status after it finishes.
 - [#1461](https://github.com/influxdata/kapacitor/issues/1461): alert.post and https_post timeouts needed.
 - [#1413](https://github.com/influxdata/kapacitor/issues/1413): Add subscriptions modes to InfluxDB subscriptions.
