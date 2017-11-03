@@ -765,7 +765,7 @@ func (s *Service) updateRecordingResult(recording Recording, ds DataSource, err 
 	}
 }
 
-func (s *Service) updateReplayResult(replay Replay, err error) {
+func (s *Service) updateReplayResult(replay *Replay, err error) {
 	replay.Status = Finished
 	if err != nil {
 		replay.Status = Failed
@@ -774,12 +774,7 @@ func (s *Service) updateReplayResult(replay Replay, err error) {
 	replay.Progress = 1.0
 	replay.Date = time.Now()
 
-	r, err := s.replays.Get(replay.ID)
-	if err != nil {
-		s.diag.Error("failed to save replay results", err)
-	}
-	replay.ExecutionStats = r.ExecutionStats
-	err = s.replays.Replace(replay)
+	err = s.replays.Replace(*replay)
 	if err != nil {
 		s.diag.Error("failed to save replay results", err)
 	}
@@ -974,29 +969,12 @@ func (s *Service) handleCreateReplay(w http.ResponseWriter, req *http.Request) {
 	s.replays.Create(replay)
 
 	go func(replay Replay) {
-		err := s.doReplayFromRecording(opt.ID, t, recording, clk, opt.RecordingTime)
-		s.updateReplayResult(replay, err)
+		err := s.doReplayFromRecording(&replay, t, recording, clk, opt.RecordingTime)
+		s.updateReplayResult(&replay, err)
 	}(replay)
 
 	w.WriteHeader(http.StatusCreated)
 	w.Write(httpd.MarshalJSON(convertReplay(replay), true))
-}
-
-func (s *Service) storeExecutionStats(id string, st kapacitor.ExecutionStats) error {
-	r, err := s.replays.Get(id)
-	if err != nil {
-		return err
-	}
-	stats := ExecutionStats{}
-	stats.TaskStats = st.TaskStats
-	stats.NodeStats = st.NodeStats
-
-	r.ExecutionStats = stats
-	err = s.replays.Replace(r)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func (s *Service) handleReplayBatch(w http.ResponseWriter, req *http.Request) {
@@ -1057,8 +1035,8 @@ func (s *Service) handleReplayBatch(w http.ResponseWriter, req *http.Request) {
 	}
 
 	go func(replay Replay) {
-		err := s.doLiveBatchReplay(opt.ID, t, clk, opt.RecordingTime, opt.Start, opt.Stop)
-		s.updateReplayResult(replay, err)
+		err := s.doLiveBatchReplay(&replay, t, clk, opt.RecordingTime, opt.Start, opt.Stop)
+		s.updateReplayResult(&replay, err)
 	}(replay)
 
 	w.WriteHeader(http.StatusCreated)
@@ -1120,15 +1098,15 @@ func (r *Service) handleReplayQuery(w http.ResponseWriter, req *http.Request) {
 	}
 
 	go func(replay Replay) {
-		err := r.doLiveQueryReplay(replay.ID, t, clk, opt.RecordingTime, opt.Query, opt.Cluster)
-		r.updateReplayResult(replay, err)
+		err := r.doLiveQueryReplay(&replay, t, clk, opt.RecordingTime, opt.Query, opt.Cluster)
+		r.updateReplayResult(&replay, err)
 	}(replay)
 
 	w.WriteHeader(http.StatusCreated)
 	w.Write(httpd.MarshalJSON(convertReplay(replay), true))
 }
 
-func (r *Service) doReplayFromRecording(id string, task *kapacitor.Task, recording Recording, clk clock.Clock, recTime bool) error {
+func (r *Service) doReplayFromRecording(replay *Replay, task *kapacitor.Task, recording Recording, clk clock.Clock, recTime bool) error {
 	dataSource, err := parseDataSourceURL(recording.DataURL)
 	if err != nil {
 		return errors.Wrap(err, "load data source")
@@ -1156,11 +1134,11 @@ func (r *Service) doReplayFromRecording(id string, task *kapacitor.Task, recordi
 		}
 		return <-replayC
 	}
-	return r.doReplay(id, task, runReplay)
+	return r.doReplay(replay, task, runReplay)
 
 }
 
-func (r *Service) doLiveBatchReplay(id string, task *kapacitor.Task, clk clock.Clock, recTime bool, start, stop time.Time) error {
+func (r *Service) doLiveBatchReplay(replay *Replay, task *kapacitor.Task, clk clock.Clock, recTime bool, start, stop time.Time) error {
 	runReplay := func(tm *kapacitor.TaskMaster) error {
 		sources, recordErrC, err := r.startRecordBatch(task, start, stop)
 		if err != nil {
@@ -1180,10 +1158,10 @@ func (r *Service) doLiveBatchReplay(id string, task *kapacitor.Task, clk clock.C
 		}
 		return nil
 	}
-	return r.doReplay(id, task, runReplay)
+	return r.doReplay(replay, task, runReplay)
 }
 
-func (r *Service) doLiveQueryReplay(id string, task *kapacitor.Task, clk clock.Clock, recTime bool, query, cluster string) error {
+func (r *Service) doLiveQueryReplay(replay *Replay, task *kapacitor.Task, clk clock.Clock, recTime bool, query, cluster string) error {
 	runReplay := func(tm *kapacitor.TaskMaster) error {
 		var replayErrC <-chan error
 		runErrC := make(chan error, 1)
@@ -1193,7 +1171,7 @@ func (r *Service) doLiveQueryReplay(id string, task *kapacitor.Task, clk clock.C
 			go func() {
 				runErrC <- r.runQueryStream(source, query, cluster)
 			}()
-			stream, err := tm.Stream(id)
+			stream, err := tm.Stream(replay.ID)
 			if err != nil {
 				return errors.Wrap(err, "stream start")
 			}
@@ -1218,12 +1196,12 @@ func (r *Service) doLiveQueryReplay(id string, task *kapacitor.Task, clk clock.C
 		}
 		return nil
 	}
-	return r.doReplay(id, task, runReplay)
+	return r.doReplay(replay, task, runReplay)
 }
 
-func (r *Service) doReplay(id string, task *kapacitor.Task, runReplay func(tm *kapacitor.TaskMaster) error) error {
+func (r *Service) doReplay(replay *Replay, task *kapacitor.Task, runReplay func(tm *kapacitor.TaskMaster) error) error {
 	// Create new isolated task master
-	tm := r.TaskMaster.New(id)
+	tm := r.TaskMaster.New(replay.ID)
 	r.TaskMasterLookup.Set(tm)
 	defer r.TaskMasterLookup.Delete(tm)
 
@@ -1252,10 +1230,9 @@ func (r *Service) doReplay(id string, task *kapacitor.Task, runReplay func(tm *k
 		return errors.Wrap(err, "getting executing stats replay")
 	}
 
-	err = r.storeExecutionStats(id, stats)
-	if err != nil {
-		return errors.Wrap(err, "error handling finished replay")
-	}
+	// Set stats on replay
+	replay.ExecutionStats.TaskStats = stats.TaskStats
+	replay.ExecutionStats.NodeStats = stats.NodeStats
 
 	// Drain tm so the task can finish
 	tm.Drain()
