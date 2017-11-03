@@ -1114,7 +1114,8 @@ The request returns once the replay is started and provides a replay ID and link
     "recording-time" : false,
     "status" : "running",
     "progress" : 0,
-    "error" : ""
+    "error" : "",
+    "stats": {},
 }
 ```
 
@@ -1205,7 +1206,8 @@ All replays are assigned an ID which is returned in this format with a link.
     "recording-time" : false,
     "status" : "running",
     "progress" : 0.57,
-    "error" : ""
+    "error" : "",
+    "stats": {}
 }
 ```
 
@@ -1248,7 +1250,8 @@ GET /kapacitor/v1/replays/ad95677b-096b-40c8-82a8-912706f41d4c
     "recording-time" : false,
     "status" : "running",
     "progress" : 0.57,
-    "error" : ""
+    "error" : "",
+    "stats": {}
 }
 ```
 
@@ -1268,9 +1271,44 @@ GET /kapacitor/v1/replays/ad95677b-096b-40c8-82a8-912706f41d4c
     "recording-time" : false,
     "status" : "finished",
     "progress" : 1,
-    "error" : ""
+    "error" : "",
+    "stats": {
+        "task-stats": {
+            "throughput": 0
+        },
+        "node-stats": {
+            "alert2": {
+                "alerts_triggered": 5,
+                "avg_exec_time_ns": 1267486,
+                "collected": 8,
+                "crits_triggered": 2,
+                "emitted": 0,
+                "errors": 0,
+                "infos_triggered": 0,
+                "oks_triggered": 1,
+                "warns_triggered": 2,
+                "working_cardinality": 1
+            },
+            "from1": {
+                "avg_exec_time_ns": 0,
+                "collected": 8,
+                "emitted": 8,
+                "errors": 0,
+                "working_cardinality": 0
+            },
+            "stream0": {
+                "avg_exec_time_ns": 0,
+                "collected": 8,
+                "emitted": 8,
+                "errors": 0,
+                "working_cardinality": 0
+            }
+        }
+    }
 }
 ```
+
+If the replay has finished, the `stats` field contains the statistics about the replay.
 
 Or if the replay fails.
 
@@ -1288,7 +1326,8 @@ GET /kapacitor/v1/replays/ad95677b-096b-40c8-82a8-912706f41d4c
     "recording-time" : false,
     "status" : "failed",
     "progress" : 1,
-    "error" : "error message explaining failure"
+    "error" : "error message explaining failure",
+    "stats": {}
 }
 ```
 

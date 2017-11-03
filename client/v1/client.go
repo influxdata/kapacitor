@@ -226,9 +226,9 @@ func (d DBRP) String() string {
 // Statistics about the execution of a task.
 type ExecutionStats struct {
 	// Summary stats about the entire task
-	TaskStats map[string]interface{} `json:"task-stats"`
+	TaskStats map[string]interface{} `json:"task-stats,omitempty"`
 	// Stats for each node in the task
-	NodeStats map[string]map[string]interface{} `json:"node-stats"`
+	NodeStats map[string]map[string]interface{} `json:"node-stats,omitempty"`
 }
 
 type TaskType int
@@ -600,16 +600,17 @@ type Recording struct {
 
 // Information about a replay.
 type Replay struct {
-	Link          Link      `json:"link"`
-	ID            string    `json:"id"`
-	Task          string    `json:"task"`
-	Recording     string    `json:"recording"`
-	RecordingTime bool      `json:"recording-time"`
-	Clock         Clock     `json:"clock"`
-	Date          time.Time `json:"date"`
-	Error         string    `json:"error"`
-	Status        Status    `json:"status"`
-	Progress      float64   `json:"progress"`
+	Link           Link           `json:"link"`
+	ID             string         `json:"id"`
+	Task           string         `json:"task"`
+	Recording      string         `json:"recording"`
+	RecordingTime  bool           `json:"recording-time"`
+	Clock          Clock          `json:"clock"`
+	Date           time.Time      `json:"date"`
+	Error          string         `json:"error"`
+	Status         Status         `json:"status"`
+	Progress       float64        `json:"progress"`
+	ExecutionStats ExecutionStats `json:"stats,omitempty"`
 }
 
 type JSONOperation struct {

@@ -1665,7 +1665,18 @@ func Test_Replay(t *testing.T) {
 		"clock": "fast",
 		"error": "",
 		"status": "finished",
-		"progress": 1.0
+		"progress": 1.0,
+		"stats": {
+			"task-stats" : {
+				"throughput" : 5.6
+			},
+			"node-stats" : {
+				"stream1" : {
+					"processed" : 1500,
+					"avg_exec_time_ns": 2345.83
+				}
+			}
+		}
 }`)
 		} else {
 			w.WriteHeader(http.StatusBadRequest)
@@ -1691,6 +1702,17 @@ func Test_Replay(t *testing.T) {
 		Error:         "",
 		Status:        client.Finished,
 		Progress:      1.0,
+		ExecutionStats: client.ExecutionStats{
+			TaskStats: map[string]interface{}{
+				"throughput": 5.6,
+			},
+			NodeStats: map[string]map[string]interface{}{
+				"stream1": map[string]interface{}{
+					"processed":        1500.0,
+					"avg_exec_time_ns": 2345.83,
+				},
+			},
+		},
 	}
 	if !reflect.DeepEqual(exp, replay) {
 		t.Errorf("unexpected replay got: %v exp %v", replay, exp)
@@ -1710,7 +1732,8 @@ func Test_ReplayRunning(t *testing.T) {
 		"clock": "fast",
 		"error": "",
 		"status": "running",
-		"progress": 0.67
+		"progress": 0.67,
+		"stats": {}
 }`)
 		} else {
 			w.WriteHeader(http.StatusBadRequest)
@@ -1727,15 +1750,16 @@ func Test_ReplayRunning(t *testing.T) {
 		t.Fatal(err)
 	}
 	exp := client.Replay{
-		Link:          client.Link{Relation: client.Self, Href: "/kapacitor/v1/replays/replayid"},
-		ID:            "replayid",
-		Task:          "taskid",
-		Recording:     "recordingid",
-		RecordingTime: false,
-		Clock:         client.Fast,
-		Error:         "",
-		Status:        client.Running,
-		Progress:      0.67,
+		Link:           client.Link{Relation: client.Self, Href: "/kapacitor/v1/replays/replayid"},
+		ID:             "replayid",
+		Task:           "taskid",
+		Recording:      "recordingid",
+		RecordingTime:  false,
+		Clock:          client.Fast,
+		Error:          "",
+		Status:         client.Running,
+		Progress:       0.67,
+		ExecutionStats: client.ExecutionStats{},
 	}
 	if !reflect.DeepEqual(exp, replay) {
 		t.Errorf("unexpected replay got: %v exp %v", replay, exp)
@@ -1901,7 +1925,8 @@ func Test_ListReplays(t *testing.T) {
 		"recording-time": true,
 		"error": "",
 		"status": "running",
-		"progress": 0.67
+		"progress": 0.67,
+		"stats": {}
 	},
 	{
 		"link": {"rel":"self", "href":"/kapacitor/v1/replays/rpid2"},
@@ -1912,7 +1937,19 @@ func Test_ListReplays(t *testing.T) {
 		"recording-time": false,
 		"error": "",
 		"status": "finished",
-		"progress": 1.0
+		"progress": 1.0,
+		"stats": {
+			"task-stats" : {
+				"throughput" : 5.6
+			},
+			"node-stats" : {
+				"stream1" : {
+					"processed" : 1500,
+					"avg_exec_time_ns": 2345.83
+				}
+			}
+		}
+
 	}
 ]}`)
 		} else {
@@ -1931,14 +1968,15 @@ func Test_ListReplays(t *testing.T) {
 	}
 	exp := []client.Replay{
 		{
-			Link:          client.Link{Relation: client.Self, Href: "/kapacitor/v1/replays/rpid1"},
-			ID:            "rpid1",
-			Task:          "taskid",
-			Recording:     "recordingid",
-			Clock:         client.Fast,
-			RecordingTime: true,
-			Status:        client.Running,
-			Progress:      0.67,
+			Link:           client.Link{Relation: client.Self, Href: "/kapacitor/v1/replays/rpid1"},
+			ID:             "rpid1",
+			Task:           "taskid",
+			Recording:      "recordingid",
+			Clock:          client.Fast,
+			RecordingTime:  true,
+			Status:         client.Running,
+			Progress:       0.67,
+			ExecutionStats: client.ExecutionStats{},
 		},
 		{
 			Link:          client.Link{Relation: client.Self, Href: "/kapacitor/v1/replays/rpid2"},
@@ -1949,6 +1987,17 @@ func Test_ListReplays(t *testing.T) {
 			RecordingTime: false,
 			Status:        client.Finished,
 			Progress:      1.0,
+			ExecutionStats: client.ExecutionStats{
+				TaskStats: map[string]interface{}{
+					"throughput": 5.6,
+				},
+				NodeStats: map[string]map[string]interface{}{
+					"stream1": map[string]interface{}{
+						"processed":        1500.0,
+						"avg_exec_time_ns": 2345.83,
+					},
+				},
+			},
 		},
 	}
 	if !reflect.DeepEqual(exp, tasks) {
@@ -1974,7 +2023,8 @@ func Test_ListReplays_Filter(t *testing.T) {
 		"id": "rpid1",
 		"error": "",
 		"status": "running",
-		"progress": 0.67
+		"progress": 0.67,
+		"stats": {}
 	}
 ]}`)
 		} else {
@@ -1997,10 +2047,11 @@ func Test_ListReplays_Filter(t *testing.T) {
 	}
 	exp := []client.Replay{
 		{
-			Link:     client.Link{Relation: client.Self, Href: "/kapacitor/v1/replays/rpid1"},
-			ID:       "rpid1",
-			Status:   client.Running,
-			Progress: 0.67,
+			Link:           client.Link{Relation: client.Self, Href: "/kapacitor/v1/replays/rpid1"},
+			ID:             "rpid1",
+			Status:         client.Running,
+			Progress:       0.67,
+			ExecutionStats: client.ExecutionStats{},
 		},
 	}
 	if !reflect.DeepEqual(exp, tasks) {
