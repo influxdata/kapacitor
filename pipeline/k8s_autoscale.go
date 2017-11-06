@@ -1,10 +1,12 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
+	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor/services/k8s/client"
 	"github.com/influxdata/kapacitor/tick/ast"
 )
@@ -77,24 +79,24 @@ const (
 //    * errors          -- number of errors encountered, typically related to communicating with the Kubernetes API.
 //
 type K8sAutoscaleNode struct {
-	chainnode
+	chainnode `json:"-"`
 
 	// Cluster is the name of the Kubernetes cluster to use.
-	Cluster string
+	Cluster string `json:"cluster"`
 
 	// Namespace is the namespace of the resource, if empty the default namespace will be used.
-	Namespace string
+	Namespace string `json:"namespace"`
 
 	// Kind is the type of resources to autoscale.
 	// Currently only "deployments", "replicasets" and "replicationcontrollers" are supported.
 	// Default: "deployments"
-	Kind string
+	Kind string `json:"kind"`
 
 	// ResourceName is the name of the resource to autoscale.
-	ResourceName string
+	ResourceName string `json:"resourceName"`
 
 	// ResourceNameTag is the name of a tag that names the resource to autoscale.
-	ResourceNameTag string
+	ResourceNameTag string `json:"resourceNameTag"`
 
 	// CurrentField is the name of a field into which the current replica count will be set as an int.
 	// If empty no field will be set.
@@ -106,39 +108,39 @@ type K8sAutoscaleNode struct {
 	//        // Increase the replicas by 1 if the qps is over the threshold
 	//        .replicas(lambda: if("qps" > threshold, "replicas" + 1, "replicas"))
 	//
-	CurrentField string
+	CurrentField string `json:"currentField"`
 
 	// The maximum scale factor to set.
 	// If 0 then there is no upper limit.
 	// Default: 0, a.k.a no limit.
-	Max int64
+	Max int64 `json:"max"`
 
 	// The minimum scale factor to set.
 	// Default: 1
-	Min int64
+	Min int64 `json:"min"`
 
 	// Replicas is a lambda expression that should evaluate to the desired number of replicas for the resource.
-	Replicas *ast.LambdaNode
+	Replicas *ast.LambdaNode `json:"replicas"`
 
 	// Only one increase event can be triggered per resource every IncreaseCooldown interval.
-	IncreaseCooldown time.Duration
+	IncreaseCooldown time.Duration `json:"increaseCooldown"`
 	// Only one decrease event can be triggered per resource every DecreaseCooldown interval.
-	DecreaseCooldown time.Duration
+	DecreaseCooldown time.Duration `json:"decreaseCooldown"`
 
 	// NamespaceTag is the name of a tag to use when tagging emitted points with the namespace.
 	// If empty the point will not be tagged with the resource.
 	// Default: namespace
-	NamespaceTag string
+	NamespaceTag string `json:"namespaceTag"`
 
 	// KindTag is the name of a tag to use when tagging emitted points with the kind.
 	// If empty the point will not be tagged with the resource.
 	// Default: kind
-	KindTag string
+	KindTag string `json:"kindTag"`
 
 	// ResourceTag is the name of a tag to use when tagging emitted points the resource.
 	// If empty the point will not be tagged with the resource.
 	// Default: resource
-	ResourceTag string
+	ResourceTag string `json:"resourceTag"`
 }
 
 func newK8sAutoscaleNode(e EdgeType) *K8sAutoscaleNode {
@@ -151,6 +153,60 @@ func newK8sAutoscaleNode(e EdgeType) *K8sAutoscaleNode {
 		ResourceTag:  DefaultResourceTag,
 	}
 	return k
+}
+
+// MarshalJSON converts K8sAutoscaleNode to JSON
+func (n *K8sAutoscaleNode) MarshalJSON() ([]byte, error) {
+	type Alias K8sAutoscaleNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		IncreaseCooldown string `json:"increaseCooldown"`
+		DecreaseCooldown string `json:"decreaseCooldown"`
+	}{
+		TypeOf: TypeOf{
+			Type: "k8sAutoscale",
+			ID:   n.ID(),
+		},
+		Alias:            (*Alias)(n),
+		IncreaseCooldown: influxql.FormatDuration(n.IncreaseCooldown),
+		DecreaseCooldown: influxql.FormatDuration(n.DecreaseCooldown),
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to an K8sAutoscaleNode
+func (n *K8sAutoscaleNode) UnmarshalJSON(data []byte) error {
+	type Alias K8sAutoscaleNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		IncreaseCooldown string `json:"increaseCooldown"`
+		DecreaseCooldown string `json:"decreaseCooldown"`
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+
+	if raw.Type != "k8sAutoscale" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as K8sAutoscaleNode", raw.ID, raw.Type)
+	}
+
+	n.IncreaseCooldown, err = influxql.ParseDuration(raw.IncreaseCooldown)
+	if err != nil {
+		return err
+	}
+
+	n.DecreaseCooldown, err = influxql.ParseDuration(raw.DecreaseCooldown)
+	if err != nil {
+		return err
+	}
+
+	n.setID(raw.ID)
+	return nil
 }
 
 func (n *K8sAutoscaleNode) validate() error {

@@ -1,6 +1,12 @@
 package pipeline
 
-import "time"
+import (
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"github.com/influxdata/influxdb/influxql"
+)
 
 // A StatsNode emits internal statistics about the another node at a given interval.
 //
@@ -35,14 +41,14 @@ import "time"
 // Since they operate on different clocks you could potentially create a deadlock.
 // This is a limitation of the current implementation and may be removed in the future.
 type StatsNode struct {
-	chainnode
+	chainnode `json:"-"`
 	// tick:ignore
-	SourceNode Node
+	SourceNode Node `json:"-"`
 	// tick:ignore
-	Interval time.Duration
+	Interval time.Duration `json:"interval"`
 
 	// tick:ignore
-	AlignFlag bool `tick:"Align"`
+	AlignFlag bool `tick:"Align" json:"align"`
 }
 
 func newStatsNode(n Node, interval time.Duration) *StatsNode {
@@ -51,6 +57,49 @@ func newStatsNode(n Node, interval time.Duration) *StatsNode {
 		SourceNode: n,
 		Interval:   interval,
 	}
+}
+
+// MarshalJSON converts StatsNode to JSON
+func (n *StatsNode) MarshalJSON() ([]byte, error) {
+	type Alias StatsNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		Interval string `json:"interval"`
+	}{
+		TypeOf: TypeOf{
+			Type: "stats",
+			ID:   n.ID(),
+		},
+		Alias:    (*Alias)(n),
+		Interval: influxql.FormatDuration(n.Interval),
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to an StatsNode
+func (n *StatsNode) UnmarshalJSON(data []byte) error {
+	type Alias StatsNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		Interval string `json:"interval"`
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.Type != "stats" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as StatsNode", raw.ID, raw.Type)
+	}
+	n.Interval, err = influxql.ParseDuration(raw.Interval)
+	if err != nil {
+		return err
+	}
+	n.setID(raw.ID)
+	return nil
 }
 
 // Round times to the StatsNode.Interval value.

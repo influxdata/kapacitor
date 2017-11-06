@@ -1,7 +1,11 @@
 package pipeline
 
 import (
+	"encoding/json"
+	"fmt"
 	"time"
+
+	"github.com/influxdata/influxdb/influxql"
 )
 
 // Compute the derivative of a stream or batch.
@@ -27,24 +31,24 @@ import (
 // because of boundary conditions the first point is
 // dropped.
 type DerivativeNode struct {
-	chainnode
+	chainnode `json:"-"`
 
 	// The field to use when calculating the derivative
 	// tick:ignore
-	Field string
+	Field string `json:"field"`
 
 	// The new name of the derivative field.
 	// Default is the name of the field used
 	// when calculating the derivative.
-	As string
+	As string `json:"as"`
 
 	// The time unit of the resulting derivative value.
 	// Default: 1s
-	Unit time.Duration
+	Unit time.Duration `json:"unit"`
 
 	// Where negative values are acceptable.
 	// tick:ignore
-	NonNegativeFlag bool `tick:"NonNegative"`
+	NonNegativeFlag bool `tick:"NonNegative" json:"nonNegative"`
 }
 
 func newDerivativeNode(wants EdgeType, field string) *DerivativeNode {
@@ -54,6 +58,49 @@ func newDerivativeNode(wants EdgeType, field string) *DerivativeNode {
 		Field:     field,
 		As:        field,
 	}
+}
+
+// MarshalJSON converts DerivativeNode to JSON
+func (n *DerivativeNode) MarshalJSON() ([]byte, error) {
+	type Alias DerivativeNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		Unit string `json:"unit"`
+	}{
+		TypeOf: TypeOf{
+			Type: "derivative",
+			ID:   n.ID(),
+		},
+		Alias: (*Alias)(n),
+		Unit:  influxql.FormatDuration(n.Unit),
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to an DerivativeNode
+func (n *DerivativeNode) UnmarshalJSON(data []byte) error {
+	type Alias DerivativeNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		Unit string `json:"unit"`
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.Type != "derivative" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as DerivativeNode", raw.ID, raw.Type)
+	}
+	n.Unit, err = influxql.ParseDuration(raw.Unit)
+	if err != nil {
+		return err
+	}
+	n.setID(raw.ID)
+	return nil
 }
 
 // If called the derivative will skip negative results.

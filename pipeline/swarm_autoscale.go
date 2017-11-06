@@ -1,10 +1,12 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
+	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
@@ -66,19 +68,19 @@ import (
 //    * errors          -- number of errors encountered, typically related to communicating with the Swarm manager API.
 //
 type SwarmAutoscaleNode struct {
-	chainnode
+	chainnode `json:"-"`
 
 	// Cluster is the ID docker swarm cluster to use.
 	// The ID of the cluster is specified in the kapacitor configuration.
-	Cluster string
+	Cluster string `json:"cluster"`
 
 	// ServiceName is the name of the docker swarm service to autoscale.
-	ServiceName string
+	ServiceName string `json:"serviceName"`
 	// ServiceName is the name of a tag which contains the name of the docker swarm service to autoscale.
-	ServiceNameTag string
+	ServiceNameTag string `json:"serviceNameTag"`
 	// OutputServiceName is the name of a tag into which the service name will be written for output autoscale events.
 	// Defaults to the value of ServiceNameTag if its not empty.
-	OutputServiceNameTag string
+	OutputServiceNameTag string `json:"outputServiceNameTag"`
 
 	// CurrentField is the name of a field into which the current replica count will be set as an int.
 	// If empty no field will be set.
@@ -90,24 +92,24 @@ type SwarmAutoscaleNode struct {
 	//        // Increase the replicas by 1 if the qps is over the threshold
 	//        .replicas(lambda: if("qps" > threshold, "replicas" + 1, "replicas"))
 	//
-	CurrentField string
+	CurrentField string `json:"currentField"`
 
 	// The maximum scale factor to set.
 	// If 0 then there is no upper limit.
 	// Default: 0, a.k.a no limit.
-	Max int64
+	Max int64 `json:"max"`
 
 	// The minimum scale factor to set.
 	// Default: 1
-	Min int64
+	Min int64 `json:"min"`
 
 	// Replicas is a lambda expression that should evaluate to the desired number of replicas for the resource.
-	Replicas *ast.LambdaNode
+	Replicas *ast.LambdaNode `json:"replicas"`
 
 	// Only one increase event can be triggered per resource every IncreaseCooldown interval.
-	IncreaseCooldown time.Duration
+	IncreaseCooldown time.Duration `json:"increaseCooldown"`
 	// Only one decrease event can be triggered per resource every DecreaseCooldown interval.
-	DecreaseCooldown time.Duration
+	DecreaseCooldown time.Duration `json:"decreaseCooldown"`
 }
 
 func newSwarmAutoscaleNode(e EdgeType) *SwarmAutoscaleNode {
@@ -119,6 +121,7 @@ func newSwarmAutoscaleNode(e EdgeType) *SwarmAutoscaleNode {
 }
 
 func (n *SwarmAutoscaleNode) validate() error {
+
 	if (n.ServiceName == "" && n.ServiceNameTag == "") ||
 		(n.ServiceName != "" && n.ServiceNameTag != "") {
 		return fmt.Errorf("must specify exactly one of ServiceName or ServiceNameTag")
@@ -129,5 +132,59 @@ func (n *SwarmAutoscaleNode) validate() error {
 	if n.Replicas == nil {
 		return errors.New("must provide a replicas lambda expression")
 	}
+	return nil
+}
+
+// MarshalJSON converts SwarmAutoscaleNode to JSON
+func (n *SwarmAutoscaleNode) MarshalJSON() ([]byte, error) {
+	type Alias SwarmAutoscaleNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		IncreaseCooldown string `json:"increaseCooldown"`
+		DecreaseCooldown string `json:"decreaseCooldown"`
+	}{
+		TypeOf: TypeOf{
+			Type: "swarmAutoscale",
+			ID:   n.ID(),
+		},
+		Alias:            (*Alias)(n),
+		IncreaseCooldown: influxql.FormatDuration(n.IncreaseCooldown),
+		DecreaseCooldown: influxql.FormatDuration(n.DecreaseCooldown),
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to an SwarmAutoscaleNode
+func (n *SwarmAutoscaleNode) UnmarshalJSON(data []byte) error {
+	type Alias SwarmAutoscaleNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		IncreaseCooldown string `json:"increaseCooldown"`
+		DecreaseCooldown string `json:"decreaseCooldown"`
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+
+	if raw.Type != "swarmAutoscale" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as SwarmAutoscaleNode", raw.ID, raw.Type)
+	}
+
+	n.IncreaseCooldown, err = influxql.ParseDuration(raw.IncreaseCooldown)
+	if err != nil {
+		return err
+	}
+
+	n.DecreaseCooldown, err = influxql.ParseDuration(raw.DecreaseCooldown)
+	if err != nil {
+		return err
+	}
+
+	n.setID(raw.ID)
 	return nil
 }

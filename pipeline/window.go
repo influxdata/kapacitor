@@ -1,9 +1,12 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/influxdata/influxdb/influxql"
 )
 
 // A `window` node caches data within a moving time range.
@@ -29,30 +32,83 @@ import (
 //
 // NOTE: Because no `align` property is defined, the `window` edge is defined relative to the first data point.
 type WindowNode struct {
-	chainnode
+	chainnode `json:"-"`
 	// The period, or length in time, of the window.
-	Period time.Duration
+	Period time.Duration `json:"period"`
 	// How often the current window is emitted into the pipeline.
 	// If equal to zero, then every new point will emit the current window.
-	Every time.Duration
+	Every time.Duration `json:"every"`
 	// Whether to align the window edges with the zero time
 	// tick:ignore
-	AlignFlag bool `tick:"Align"`
+	AlignFlag bool `json:"align" tick:"Align"`
 	// Whether to wait till the period is full before the first emit.
 	// tick:ignore
-	FillPeriodFlag bool `tick:"FillPeriod"`
+	FillPeriodFlag bool `json:"fillPeriod" tick:"FillPeriod"`
 
 	// PeriodCount is the number of points per window.
-	PeriodCount int64
+	PeriodCount int64 `json:"periodCount"`
 	// EveryCount determines how often the window is emitted based on the count of points.
 	// A value of 1 means that every new point will emit the window.
-	EveryCount int64
+	EveryCount int64 `json:"everyCount"`
 }
 
 func newWindowNode() *WindowNode {
 	return &WindowNode{
 		chainnode: newBasicChainNode("window", StreamEdge, BatchEdge),
 	}
+}
+
+// MarshalJSON converts WindowNode to JSON
+func (n *WindowNode) MarshalJSON() ([]byte, error) {
+	type Alias WindowNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		Period string `json:"period"`
+		Every  string `json:"every"`
+	}{
+		TypeOf: TypeOf{
+			Type: "window",
+			ID:   n.ID(),
+		},
+		Alias:  (*Alias)(n),
+		Period: influxql.FormatDuration(n.Period),
+		Every:  influxql.FormatDuration(n.Every),
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to an WindowNode
+func (n *WindowNode) UnmarshalJSON(data []byte) error {
+	type Alias WindowNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		Period string `json:"period"`
+		Every  string `json:"every"`
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.Type != "window" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as WindowNode", raw.ID, raw.Type)
+	}
+
+	n.Period, err = influxql.ParseDuration(raw.Period)
+	if err != nil {
+		return err
+	}
+
+	n.Every, err = influxql.ParseDuration(raw.Every)
+	if err != nil {
+		return err
+	}
+
+	n.setID(raw.ID)
+	return nil
 }
 
 // If the `align` property is not used to modify the `window` node, then the

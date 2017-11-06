@@ -1,5 +1,10 @@
 package pipeline
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 // Takes the union of all of its parents.
 // The union is just a simple pass through.
 // Each data points received from each parent is passed onto children nodes
@@ -22,11 +27,11 @@ package pipeline
 //        ...
 //
 type UnionNode struct {
-	chainnode
+	chainnode `json:"-"`
 	// The new name of the stream.
 	// If empty the name of the left node
 	// (i.e. `leftNode.union(otherNode1, otherNode2)`) is used.
-	Rename string
+	Rename string `json:"rename"`
 }
 
 func newUnionNode(e EdgeType, nodes []Node) *UnionNode {
@@ -37,4 +42,40 @@ func newUnionNode(e EdgeType, nodes []Node) *UnionNode {
 		n.linkChild(u)
 	}
 	return u
+}
+
+// MarshalJSON converts UnionNode to JSON
+func (n *UnionNode) MarshalJSON() ([]byte, error) {
+	type Alias UnionNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+	}{
+		TypeOf: TypeOf{
+			Type: "union",
+			ID:   n.ID(),
+		},
+		Alias: (*Alias)(n),
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to an UnionNode
+func (n *UnionNode) UnmarshalJSON(data []byte) error {
+	type Alias UnionNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.Type != "union" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as UnionNode", raw.ID, raw.Type)
+	}
+	n.setID(raw.ID)
+	return nil
 }

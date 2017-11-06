@@ -1,9 +1,12 @@
 package pipeline
 
 import (
+	"encoding/json"
+	"fmt"
 	"reflect"
 	"time"
 
+	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
@@ -24,6 +27,42 @@ func newStreamNode() *StreamNode {
 			provides: StreamEdge,
 		},
 	}
+}
+
+// MarshalJSON converts StreamNode to JSON
+func (n *StreamNode) MarshalJSON() ([]byte, error) {
+	type Alias StreamNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+	}{
+		TypeOf: TypeOf{
+			Type: "stream",
+			ID:   n.ID(),
+		},
+		Alias: (*Alias)(n),
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to an StreamNode
+func (n *StreamNode) UnmarshalJSON(data []byte) error {
+	type Alias StreamNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.Type != "stream" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as StreamNode", raw.ID, raw.Type)
+	}
+	n.setID(raw.ID)
+	return nil
 }
 
 // Creates a new FromNode that can be further
@@ -72,31 +111,31 @@ func (s *StreamNode) From() *FromNode {
 // and retention policy `myrp` and measurement `mymeasurement` where
 // the tag `host` matches the regex `logger\d+`
 type FromNode struct {
-	chainnode
+	chainnode `json:"-"`
 
 	// An expression to filter the data stream.
 	// tick:ignore
-	Lambda *ast.LambdaNode `tick:"Where"`
+	Lambda *ast.LambdaNode `tick:"Where" json:"where"`
 
 	// The dimensions by which to group to the data.
 	// tick:ignore
-	Dimensions []interface{} `tick:"GroupBy"`
+	Dimensions []interface{} `tick:"GroupBy" json:"groupBy"`
 
 	// Whether to include the measurement in the group ID.
 	// tick:ignore
-	GroupByMeasurementFlag bool `tick:"GroupByMeasurement"`
+	GroupByMeasurementFlag bool `tick:"GroupByMeasurement" json:"groupByMeasurement"`
 
 	// The database name.
 	// If empty any database will be used.
-	Database string
+	Database string `json:"database"`
 
 	// The retention policy name
 	// If empty any retention policy will be used.
-	RetentionPolicy string
+	RetentionPolicy string `json:"retentionPolicy"`
 
 	// The measurement name
 	// If empty any measurement will be used.
-	Measurement string
+	Measurement string `json:"measurement"`
 
 	// Optional duration for truncating timestamps.
 	// Helpful to ensure data points land on specific boundaries
@@ -107,7 +146,7 @@ type FromNode struct {
 	//           .truncate(1s)
 	//
 	// All incoming data will be truncated to 1 second resolution.
-	Truncate time.Duration
+	Truncate time.Duration `json:"truncate"`
 
 	// Optional duration for rounding timestamps.
 	// Helpful to ensure data points land on specific boundaries
@@ -118,13 +157,66 @@ type FromNode struct {
 	//           .round(1s)
 	//
 	// All incoming data will be rounded to the nearest 1 second boundary.
-	Round time.Duration
+	Round time.Duration `json:"round"`
 }
 
 func newFromNode() *FromNode {
 	return &FromNode{
 		chainnode: newBasicChainNode("from", StreamEdge, StreamEdge),
 	}
+}
+
+// MarshalJSON converts FromNode to JSON
+func (n *FromNode) MarshalJSON() ([]byte, error) {
+	type Alias FromNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		Round    string `json:"round"`
+		Truncate string `json:"truncate"`
+	}{
+		TypeOf: TypeOf{
+			Type: "from",
+			ID:   n.ID(),
+		},
+		Alias:    (*Alias)(n),
+		Round:    influxql.FormatDuration(n.Round),
+		Truncate: influxql.FormatDuration(n.Truncate),
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to an FromNode
+func (n *FromNode) UnmarshalJSON(data []byte) error {
+	type Alias FromNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		Round    string `json:"round"`
+		Truncate string `json:"truncate"`
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.Type != "from" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as FromNode", raw.ID, raw.Type)
+	}
+
+	n.Round, err = influxql.ParseDuration(raw.Round)
+	if err != nil {
+		return err
+	}
+
+	n.Truncate, err = influxql.ParseDuration(raw.Truncate)
+	if err != nil {
+		return err
+	}
+
+	n.setID(raw.ID)
+	return nil
 }
 
 //tick:ignore

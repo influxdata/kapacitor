@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -21,6 +22,8 @@ const defaultMessageTmpl = "{{ .ID }} is {{ .Level }}"
 
 // Default template for constructing a details message.
 const defaultDetailsTmpl = "{{ json . }}"
+
+type AlertNode struct{ *AlertNodeData }
 
 // An AlertNode can trigger an event of varying severity levels,
 // and pass the event to alert handlers. The criteria for triggering
@@ -120,13 +123,13 @@ const defaultDetailsTmpl = "{{ json . }}"
 //    * warns_triggered -- Number of Warn alerts triggered
 //    * crits_triggered -- Number of Crit alerts triggered
 //
-type AlertNode struct {
+type AlertNodeData struct {
 	chainnode
 
 	// Topic specifies the name of an alert topic to which,
 	// alerts will be published.
 	// Alert handlers can be configured per topic, see the API documentation.
-	Topic string
+	Topic string `json:"topic"`
 
 	// Template for constructing a unique ID for a given alert.
 	//
@@ -171,7 +174,7 @@ type AlertNode struct {
 	// ID: kapacitor/authentication/auth001.example.com
 	//
 	// Default: {{ .Name }}:{{ .Group }}
-	Id string
+	Id string `json:"alertId"`
 
 	// Template for constructing a meaningful message for the alert.
 	//
@@ -200,7 +203,7 @@ type AlertNode struct {
 	// Message: authentication/auth001.example.com is CRITICAL value:42
 	//
 	// Default: {{ .ID }} is {{ .Level }}
-	Message string
+	Message string `json:"message"`
 
 	// Template for constructing a detailed HTML message for the alert.
 	// The same template data is available as the AlertNode.Message property,
@@ -227,160 +230,199 @@ type AlertNode struct {
 	//       .email()
 	//
 	// Default: {{ json . }}
-	Details string
+	Details string `json:"details"`
 
 	// Filter expression for the INFO alert level.
 	// An empty value indicates the level is invalid and is skipped.
-	Info *ast.LambdaNode
+	Info *ast.LambdaNode `json:"info"`
 	// Filter expression for the WARNING alert level.
 	// An empty value indicates the level is invalid and is skipped.
-	Warn *ast.LambdaNode
+	Warn *ast.LambdaNode `json:"warn"`
 	// Filter expression for the CRITICAL alert level.
 	// An empty value indicates the level is invalid and is skipped.
-	Crit *ast.LambdaNode
+	Crit *ast.LambdaNode `json:"crit"`
 
 	// Filter expression for reseting the INFO alert level to lower level.
-	InfoReset *ast.LambdaNode
+	InfoReset *ast.LambdaNode `json:"infoReset"`
 	// Filter expression for reseting the WARNING alert level to lower level.
-	WarnReset *ast.LambdaNode
+	WarnReset *ast.LambdaNode `json:"warnReset"`
 	// Filter expression for reseting the CRITICAL alert level to lower level.
-	CritReset *ast.LambdaNode
+	CritReset *ast.LambdaNode `json:"critReset"`
 
 	//tick:ignore
-	UseFlapping bool `tick:"Flapping"`
+	UseFlapping bool `tick:"Flapping" json:"useFlapping"`
 	//tick:ignore
-	FlapLow float64
+	FlapLow float64 `json:"flapLow"`
 	//tick:ignore
-	FlapHigh float64
+	FlapHigh float64 `json:"flapHigh"`
 
 	// Number of previous states to remember when computing flapping levels and
 	// checking for state changes.
 	// Minimum value is 2 in order to keep track of current and previous states.
 	//
 	// Default: 21
-	History int64
+	History int64 `json:"history"`
 
 	// Optional tag key to use when tagging the data with the alert level.
-	LevelTag string
+	LevelTag string `json:"levelTag"`
 	// Optional field key to add to the data, containing the alert level as a string.
-	LevelField string
+	LevelField string `json:"levelField"`
 
 	// Optional field key to add to the data, containing the alert message.
-	MessageField string
+	MessageField string `json:"messageField"`
 
 	// Optional field key to add the alert duration to the data.
 	// The duration is always in units of nanoseconds.
-	DurationField string
+	DurationField string `json:"durationField"`
 
 	// Optional tag key to use when tagging the data with the alert ID.
-	IdTag string
+	IdTag string `json:"idTag"`
 	// Optional field key to add to the data, containing the alert ID as a string.
-	IdField string
+	IdField string `json:"idField"`
 
 	// Indicates an alert should trigger only if all points in a batch match the criteria
 	// tick:ignore
-	AllFlag bool `tick:"All"`
+	AllFlag bool `tick:"All" json:"all"`
 
 	// Do not send recovery events.
 	// tick:ignore
-	NoRecoveriesFlag bool `tick:"NoRecoveries"`
+	NoRecoveriesFlag bool `tick:"NoRecoveries" json:"noRecoveries"`
 
 	// Send alerts only on state changes.
 	// tick:ignore
-	IsStateChangesOnly bool `tick:"StateChangesOnly"`
+	IsStateChangesOnly bool `tick:"StateChangesOnly" json:"stateChangesOnly"`
 
 	// Maximum interval to ignore non state changed events
 	// tick:ignore
-	StateChangesOnlyDuration time.Duration
+	StateChangesOnlyDuration time.Duration `json:"stateChangesOnlyDuration"`
 
 	// Post the JSON alert data to the specified URL.
 	// tick:ignore
-	HTTPPostHandlers []*AlertHTTPPostHandler `tick:"Post"`
+	HTTPPostHandlers []*AlertHTTPPostHandler `tick:"Post" json:"post"`
 
 	// Send the JSON alert data to the specified endpoint via TCP.
 	// tick:ignore
-	TcpHandlers []*TcpHandler `tick:"Tcp"`
+	TcpHandlers []*TcpHandler `tick:"Tcp" json:"tcp"`
 
 	// Email handlers
 	// tick:ignore
-	EmailHandlers []*EmailHandler `tick:"Email"`
+	EmailHandlers []*EmailHandler `tick:"Email" json:"email"`
 
 	// A commands to run when an alert triggers
 	// tick:ignore
-	ExecHandlers []*ExecHandler `tick:"Exec"`
+	ExecHandlers []*ExecHandler `tick:"Exec" json:"exec"`
 
 	// Log JSON alert data to file. One event per line.
 	// tick:ignore
-	LogHandlers []*LogHandler `tick:"Log"`
+	LogHandlers []*LogHandler `tick:"Log" json:"log"`
 
 	// Send alert to VictorOps.
 	// tick:ignore
-	VictorOpsHandlers []*VictorOpsHandler `tick:"VictorOps"`
+	VictorOpsHandlers []*VictorOpsHandler `tick:"VictorOps" json:"victorOps"`
 
 	// Send alert to PagerDuty.
 	// tick:ignore
-	PagerDutyHandlers []*PagerDutyHandler `tick:"PagerDuty"`
+	PagerDutyHandlers []*PagerDutyHandler `tick:"PagerDuty" json:"pagerDuty"`
 
 	// Send alert to Pushover.
 	// tick:ignore
-	PushoverHandlers []*PushoverHandler `tick:"Pushover"`
+	PushoverHandlers []*PushoverHandler `tick:"Pushover" json:"pushover"`
 
 	// Send alert to Sensu.
 	// tick:ignore
-	SensuHandlers []*SensuHandler `tick:"Sensu"`
+	SensuHandlers []*SensuHandler `tick:"Sensu" json:"sensu"`
 
 	// Send alert to Slack.
 	// tick:ignore
-	SlackHandlers []*SlackHandler `tick:"Slack"`
+	SlackHandlers []*SlackHandler `tick:"Slack" json:"slack"`
 
 	// Send alert to Telegram.
 	// tick:ignore
-	TelegramHandlers []*TelegramHandler `tick:"Telegram"`
+	TelegramHandlers []*TelegramHandler `tick:"Telegram" json:"telegram"`
 
 	// Send alert to HipChat.
 	// tick:ignore
-	HipChatHandlers []*HipChatHandler `tick:"HipChat"`
+	HipChatHandlers []*HipChatHandler `tick:"HipChat" json:"hipChat"`
 
 	// Send alert to Alerta.
 	// tick:ignore
-	AlertaHandlers []*AlertaHandler `tick:"Alerta"`
+	AlertaHandlers []*AlertaHandler `tick:"Alerta" json:"alerta"`
 
 	// Send alert to OpsGenie
 	// tick:ignore
-	OpsGenieHandlers []*OpsGenieHandler `tick:"OpsGenie"`
+	OpsGenieHandlers []*OpsGenieHandler `tick:"OpsGenie" json:"opsGenie"`
 
 	// Send alert to Talk.
 	// tick:ignore
-	TalkHandlers []*TalkHandler `tick:"Talk"`
+	TalkHandlers []*TalkHandler `tick:"Talk" json:"talk"`
 
 	// Send alert to MQTT
 	// tick:ignore
-	MQTTHandlers []*MQTTHandler `tick:"Mqtt"`
+	MQTTHandlers []*MQTTHandler `tick:"Mqtt" json:"mqtt"`
 
 	// Send alert using SNMPtraps.
 	// tick:ignore
-	SNMPTrapHandlers []*SNMPTrapHandler `tick:"SnmpTrap"`
+	SNMPTrapHandlers []*SNMPTrapHandler `tick:"SnmpTrap" json:"snmpTrap"`
 }
 
 func newAlertNode(wants EdgeType) *AlertNode {
 	a := &AlertNode{
-		chainnode: newBasicChainNode("alert", wants, wants),
-		History:   defaultFlapHistory,
-		Id:        defaultIDTmpl,
-		Message:   defaultMessageTmpl,
-		Details:   defaultDetailsTmpl,
+		AlertNodeData: &AlertNodeData{
+			chainnode: newBasicChainNode("alert", wants, wants),
+			History:   defaultFlapHistory,
+			Id:        defaultIDTmpl,
+			Message:   defaultMessageTmpl,
+			Details:   defaultDetailsTmpl,
+		},
 	}
 	return a
 }
 
+// MarshalJSON converts AlertNode to JSON
+func (n *AlertNode) MarshalJSON() ([]byte, error) {
+	type Alias AlertNodeData
+	var raw = &struct {
+		TypeOf
+		*Alias
+	}{
+		TypeOf: TypeOf{
+			Type: "alert",
+			ID:   n.ID(),
+		},
+		Alias: (*Alias)(n.AlertNodeData),
+	}
+
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to an AlertNode
+func (n *AlertNode) UnmarshalJSON(data []byte) error {
+	type Alias AlertNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.Type != "alert" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as AlertNode", raw.ID, raw.Type)
+	}
+	n.setID(raw.ID)
+	return nil
+}
+
 //tick:ignore
-func (n *AlertNode) ChainMethods() map[string]reflect.Value {
+func (n *AlertNodeData) ChainMethods() map[string]reflect.Value {
 	return map[string]reflect.Value{
 		"Log": reflect.ValueOf(n.chainnode.Log),
 	}
 }
 
-func (n *AlertNode) validate() error {
+func (n *AlertNodeData) validate() error {
 	for _, snmp := range n.SNMPTrapHandlers {
 		if err := snmp.validate(); err != nil {
 			return errors.Wrapf(err, "invalid SNMP trap %q", snmp.TrapOid)
@@ -398,14 +440,14 @@ func (n *AlertNode) validate() error {
 // Indicates an alert should trigger only if all points in a batch match the criteria.
 // Does not apply to stream alerts.
 // tick:property
-func (n *AlertNode) All() *AlertNode {
+func (n *AlertNodeData) All() *AlertNodeData {
 	n.AllFlag = true
 	return n
 }
 
 // Do not send recovery alerts.
 // tick:property
-func (n *AlertNode) NoRecoveries() *AlertNode {
+func (n *AlertNodeData) NoRecoveries() *AlertNodeData {
 	n.NoRecoveriesFlag = true
 	return n
 }
@@ -452,12 +494,12 @@ func (n *AlertNode) NoRecoveries() *AlertNode {
 // The above usage will only trigger alerts to slack on state changes or at least every 10 minutes.
 //
 // tick:property
-func (a *AlertNode) StateChangesOnly(maxInterval ...time.Duration) *AlertNode {
-	a.IsStateChangesOnly = true
+func (n *AlertNodeData) StateChangesOnly(maxInterval ...time.Duration) *AlertNodeData {
+	n.IsStateChangesOnly = true
 	if len(maxInterval) == 1 {
-		a.StateChangesOnlyDuration = maxInterval[0]
+		n.StateChangesOnlyDuration = maxInterval[0]
 	}
-	return a
+	return n
 }
 
 // Perform flap detection on the alerts.
@@ -473,11 +515,11 @@ func (a *AlertNode) StateChangesOnly(maxInterval ...time.Duration) *AlertNode {
 // over the total possible number of state changes. A percentage change of 0.5 means that the alert changed
 // state in half of the recorded history, and remained the same in the other half of the history.
 // tick:property
-func (a *AlertNode) Flapping(low, high float64) *AlertNode {
-	a.UseFlapping = true
-	a.FlapLow = low
-	a.FlapHigh = high
-	return a
+func (n *AlertNodeData) Flapping(low, high float64) *AlertNodeData {
+	n.UseFlapping = true
+	n.FlapLow = low
+	n.FlapHigh = high
+	return n
 }
 
 // HTTP POST JSON alert data to a specified URL.
@@ -494,11 +536,11 @@ func (a *AlertNode) Flapping(low, high float64) *AlertNode {
 //             .post('http://example.com')
 //
 // tick:property
-func (a *AlertNode) Post(urls ...string) *AlertHTTPPostHandler {
+func (n *AlertNodeData) Post(urls ...string) *AlertHTTPPostHandler {
 	post := &AlertHTTPPostHandler{
-		AlertNode: a,
+		AlertNodeData: n,
 	}
-	a.HTTPPostHandlers = append(a.HTTPPostHandlers, post)
+	n.HTTPPostHandlers = append(n.HTTPPostHandlers, post)
 
 	if len(urls) == 0 {
 		return post
@@ -510,23 +552,23 @@ func (a *AlertNode) Post(urls ...string) *AlertHTTPPostHandler {
 
 // tick:embedded:AlertNode.Post
 type AlertHTTPPostHandler struct {
-	*AlertNode
+	*AlertNodeData `json:"-"`
 
 	// The POST URL.
 	// tick:ignore
-	URL string
+	URL string `json:"url"`
 
 	// Name of the endpoint to be used, as is defined in the configuration file
-	Endpoint string
+	Endpoint string `json:"endpoint"`
 
 	// tick:ignore
-	Headers map[string]string `tick:"Header"`
+	Headers map[string]string `tick:"Header" json:"headers"`
 
 	// tick:ignore
-	CaptureResponseFlag bool `tick:"CaptureResponse"`
+	CaptureResponseFlag bool `tick:"CaptureResponse" json:"captureResponse"`
 
 	// Timeout for HTTP Post
-	Timeout time.Duration
+	Timeout time.Duration `json:"timeout"`
 }
 
 // Set a header key and value on the post request.
@@ -568,21 +610,21 @@ func (a *AlertHTTPPostHandler) validate() error {
 
 // Send JSON alert data to a specified address over TCP.
 // tick:property
-func (a *AlertNode) Tcp(address string) *TcpHandler {
+func (n *AlertNodeData) Tcp(address string) *TcpHandler {
 	tcp := &TcpHandler{
-		AlertNode: a,
-		Address:   address,
+		AlertNodeData: n,
+		Address:       address,
 	}
-	a.TcpHandlers = append(a.TcpHandlers, tcp)
+	n.TcpHandlers = append(n.TcpHandlers, tcp)
 	return tcp
 }
 
 // tick:embedded:AlertNode.Tcp
 type TcpHandler struct {
-	*AlertNode
+	*AlertNodeData `json:"-"`
 
 	// The endpoint address.
-	Address string
+	Address string `json:"address"`
 }
 
 // Email the alert data.
@@ -631,23 +673,23 @@ type TcpHandler struct {
 // Send email to 'oncall@example.com' from 'kapacitor@example.com'
 //
 // tick:property
-func (a *AlertNode) Email(to ...string) *EmailHandler {
+func (n *AlertNodeData) Email(to ...string) *EmailHandler {
 	em := &EmailHandler{
-		AlertNode: a,
-		ToList:    to,
+		AlertNodeData: n,
+		ToList:        to,
 	}
-	a.EmailHandlers = append(a.EmailHandlers, em)
+	n.EmailHandlers = append(n.EmailHandlers, em)
 	return em
 }
 
 // Email AlertHandler
 // tick:embedded:AlertNode.Email
 type EmailHandler struct {
-	*AlertNode
+	*AlertNodeData `json:"-"`
 
 	// List of email recipients.
 	// tick:ignore
-	ToList []string `tick:"To"`
+	ToList []string `tick:"To" json:"to"`
 }
 
 // Define the To addresses for the email alert.
@@ -680,22 +722,22 @@ func (h *EmailHandler) To(to ...string) *EmailHandler {
 
 // Execute a command whenever an alert is triggered and pass the alert data over STDIN in JSON format.
 // tick:property
-func (a *AlertNode) Exec(executable string, args ...string) *ExecHandler {
+func (n *AlertNodeData) Exec(executable string, args ...string) *ExecHandler {
 	exec := &ExecHandler{
-		AlertNode: a,
-		Command:   append([]string{executable}, args...),
+		AlertNodeData: n,
+		Command:       append([]string{executable}, args...),
 	}
-	a.ExecHandlers = append(a.ExecHandlers, exec)
+	n.ExecHandlers = append(n.ExecHandlers, exec)
 	return exec
 }
 
 // tick:embedded:AlertNode.Exec
 type ExecHandler struct {
-	*AlertNode
+	*AlertNodeData `json:"-"`
 
 	// The command to execute
 	// tick:ignore
-	Command []string
+	Command []string `json:"command"`
 }
 
 // Log JSON alert data to file. One event per line.
@@ -712,27 +754,27 @@ type ExecHandler struct {
 //             .log('/tmp/alert')
 //             .mode(0644)
 // tick:property
-func (a *AlertNode) Log(filepath string) *LogHandler {
+func (n *AlertNodeData) Log(filepath string) *LogHandler {
 	log := &LogHandler{
-		AlertNode: a,
-		FilePath:  filepath,
+		AlertNodeData: n,
+		FilePath:      filepath,
 	}
-	a.LogHandlers = append(a.LogHandlers, log)
+	n.LogHandlers = append(n.LogHandlers, log)
 	return log
 }
 
 // tick:embedded:AlertNode.Log
 type LogHandler struct {
-	*AlertNode
+	*AlertNodeData `json:"-"`
 
 	// Absolute path the the log file.
 	// It will be created if it does not exist.
 	// tick:ignore
-	FilePath string
+	FilePath string `json:"filePath"`
 
 	// File's mode and permissions, default is 0600
 	// NOTE: The leading 0 is required to interpret the value as an octal integer.
-	Mode int64
+	Mode int64 `json:"mode"`
 }
 
 // Send alert to VictorOps.
@@ -780,21 +822,21 @@ type LogHandler struct {
 //
 // Send alert to VictorOps using the default routing key, found in the configuration.
 // tick:property
-func (a *AlertNode) VictorOps() *VictorOpsHandler {
+func (n *AlertNodeData) VictorOps() *VictorOpsHandler {
 	vo := &VictorOpsHandler{
-		AlertNode: a,
+		AlertNodeData: n,
 	}
-	a.VictorOpsHandlers = append(a.VictorOpsHandlers, vo)
+	n.VictorOpsHandlers = append(n.VictorOpsHandlers, vo)
 	return vo
 }
 
 // tick:embedded:AlertNode.VictorOps
 type VictorOpsHandler struct {
-	*AlertNode
+	*AlertNodeData `json:"-"`
 
 	// The routing key to use for the alert.
 	// Defaults to the value in the configuration if empty.
-	RoutingKey string
+	RoutingKey string `json:"routingKey"`
 }
 
 // Send the alert to PagerDuty.
@@ -837,21 +879,21 @@ type VictorOpsHandler struct {
 //
 // Send alert to PagerDuty.
 // tick:property
-func (a *AlertNode) PagerDuty() *PagerDutyHandler {
+func (n *AlertNodeData) PagerDuty() *PagerDutyHandler {
 	pd := &PagerDutyHandler{
-		AlertNode: a,
+		AlertNodeData: n,
 	}
-	a.PagerDutyHandlers = append(a.PagerDutyHandlers, pd)
+	n.PagerDutyHandlers = append(n.PagerDutyHandlers, pd)
 	return pd
 }
 
 // tick:embedded:AlertNode.PagerDuty
 type PagerDutyHandler struct {
-	*AlertNode
+	*AlertNodeData `json:"-"`
 
 	// The service key to use for the alert.
 	// Defaults to the value in the configuration if empty.
-	ServiceKey string
+	ServiceKey string `json:"serviceKey"`
 }
 
 // Send the alert to HipChat.
@@ -906,25 +948,25 @@ type PagerDutyHandler struct {
 //
 // Send alert to HipChat using default room 'Test Room'.
 // tick:property
-func (a *AlertNode) HipChat() *HipChatHandler {
+func (n *AlertNodeData) HipChat() *HipChatHandler {
 	hipchat := &HipChatHandler{
-		AlertNode: a,
+		AlertNodeData: n,
 	}
-	a.HipChatHandlers = append(a.HipChatHandlers, hipchat)
+	n.HipChatHandlers = append(n.HipChatHandlers, hipchat)
 	return hipchat
 }
 
 // tick:embedded:AlertNode.HipChat
 type HipChatHandler struct {
-	*AlertNode
+	*AlertNodeData `json:"-"`
 
 	// HipChat room in which to post messages.
 	// If empty uses the channel from the configuration.
-	Room string
+	Room string `json:"room"`
 
 	// HipChat authentication token.
 	// If empty uses the token from the configuration.
-	Token string
+	Token string `json:"token"`
 }
 
 // Send the alert to Alerta.
@@ -964,58 +1006,58 @@ type HipChatHandler struct {
 //
 // NOTE: Alerta cannot be configured globally because of its required properties.
 // tick:property
-func (a *AlertNode) Alerta() *AlertaHandler {
+func (n *AlertNodeData) Alerta() *AlertaHandler {
 	alerta := &AlertaHandler{
-		AlertNode: a,
+		AlertNodeData: n,
 	}
-	a.AlertaHandlers = append(a.AlertaHandlers, alerta)
+	n.AlertaHandlers = append(n.AlertaHandlers, alerta)
 	return alerta
 }
 
 // tick:embedded:AlertNode.Alerta
 type AlertaHandler struct {
-	*AlertNode
+	*AlertNodeData `json:"-"`
 
 	// Alerta authentication token.
 	// If empty uses the token from the configuration.
-	Token string
+	Token string `json:"token"`
 
 	// Alerta resource.
 	// Can be a template and has access to the same data as the AlertNode.Details property.
 	// Default: {{ .Name }}
-	Resource string
+	Resource string `json:"resource"`
 
 	// Alerta event.
 	// Can be a template and has access to the same data as the idInfo property.
 	// Default: {{ .ID }}
-	Event string
+	Event string `json:"event"`
 
 	// Alerta environment.
 	// Can be a template and has access to the same data as the AlertNode.Details property.
 	// Defaut is set from the configuration.
-	Environment string
+	Environment string `json:"environment"`
 
 	// Alerta group.
 	// Can be a template and has access to the same data as the AlertNode.Details property.
 	// Default: {{ .Group }}
-	Group string
+	Group string `json:"group"`
 
 	// Alerta value.
 	// Can be a template and has access to the same data as the AlertNode.Details property.
 	// Default is an empty string.
-	Value string
+	Value string `json:"value"`
 
 	// Alerta origin.
 	// If empty uses the origin from the configuration.
-	Origin string
+	Origin string `json:"origin"`
 
 	// List of effected Services
 	// tick:ignore
-	Service []string `tick:"Services"`
+	Service []string `tick:"Services" json:"service"`
 
 	// Alerta timeout.
 	// Default: 24h
-	Timeout time.Duration
+	Timeout time.Duration `json:"timeout"`
 }
 
 // List of effected services.
@@ -1028,25 +1070,25 @@ func (a *AlertaHandler) Services(service ...string) *AlertaHandler {
 
 // Send alert to an MQTT broker
 // tick:property
-func (a *AlertNode) Mqtt(topic string) *MQTTHandler {
+func (n *AlertNodeData) Mqtt(topic string) *MQTTHandler {
 	m := &MQTTHandler{
-		AlertNode: a,
-		Topic:     topic,
+		AlertNodeData: n,
+		Topic:         topic,
 	}
-	a.MQTTHandlers = append(a.MQTTHandlers, m)
+	n.MQTTHandlers = append(n.MQTTHandlers, m)
 	return m
 }
 
 // tick:embedded:AlertNode.Mqtt
 type MQTTHandler struct {
-	*AlertNode
+	*AlertNodeData `json:"-"`
 
 	// BrokerName is the name of the configured MQTT broker to use when publishing the alert.
 	// If empty defaults to the configured default broker.
-	BrokerName string
+	BrokerName string `json:"brokerName"`
 
 	// The topic where alerts will be dispatched to
-	Topic string
+	Topic string `json:"topic"`
 
 	// The Qos that will be used to deliver the alerts
 	//
@@ -1056,11 +1098,11 @@ type MQTTHandler struct {
 	//    * 1 - At least once delivery
 	//    * 2 - Exactly once delivery
 	//
-	Qos int64
+	Qos int64 `json:"qos"`
 
 	// Retained indicates whether this alert should be delivered to
 	// clients that were not connected to the broker at the time of the alert.
-	Retained bool
+	Retained bool `json:"retained"`
 }
 
 // Send the alert to Sensu.
@@ -1088,26 +1130,26 @@ type MQTTHandler struct {
 // Send alerts to Sensu specifying the handlers
 //
 // tick:property
-func (a *AlertNode) Sensu() *SensuHandler {
+func (n *AlertNodeData) Sensu() *SensuHandler {
 	sensu := &SensuHandler{
-		AlertNode: a,
+		AlertNodeData: n,
 	}
-	a.SensuHandlers = append(a.SensuHandlers, sensu)
+	n.SensuHandlers = append(n.SensuHandlers, sensu)
 	return sensu
 }
 
 // tick:embedded:AlertNode.Sensu
 type SensuHandler struct {
-	*AlertNode
+	*AlertNodeData `json:"-"`
 
 	// Sensu source in which to post messages.
 	// If empty uses the Source from the configuration.
-	Source string
+	Source string `json:"source"`
 
 	// Sensu handler list
 	// If empty uses the handler list from the configuration
 	// tick:ignore
-	HandlersList []string `tick:"Handlers"`
+	HandlersList []string `tick:"Handlers" json:"handlers"`
 }
 
 // List of effected services.
@@ -1149,41 +1191,41 @@ func (s *SensuHandler) Handlers(handlers ...string) *SensuHandler {
 // Send alerts to Pushover.
 //
 // tick:property
-func (a *AlertNode) Pushover() *PushoverHandler {
+func (n *AlertNodeData) Pushover() *PushoverHandler {
 	pushover := &PushoverHandler{
-		AlertNode: a,
+		AlertNodeData: n,
 	}
-	a.PushoverHandlers = append(a.PushoverHandlers, pushover)
+	n.PushoverHandlers = append(n.PushoverHandlers, pushover)
 	return pushover
 }
 
 // tick:embedded:AlertNode.Pushover
 type PushoverHandler struct {
-	*AlertNode
+	*AlertNodeData `json:"-"`
 
 	// User/Group key of your user (or you), viewable when logged
 	// into the Pushover dashboard. Often referred to as USER_KEY
 	// in the Pushover documentation.
 	// If empty uses the user from the configuration.
-	UserKey string
+	UserKey string `json:"userKey"`
 
 	// Users device name to send message directly to that device,
 	// rather than all of a user's devices (multiple device names may
 	// be separated by a comma)
-	Device string
+	Device string `json:"device"`
 
 	// Your message's title, otherwise your apps name is used
-	Title string
+	Title string `json:"title"`
 
 	// A supplementary URL to show with your message
-	URL string
+	URL string `json:"url"`
 
 	// A title for your supplementary URL, otherwise just URL is shown
-	URLTitle string
+	URLTitle string `json:"urlTitle"`
 
 	// The name of one of the sounds supported by the device clients to override
 	// the user's default sound choice
-	Sound string
+	Sound string `json:"sound"`
 }
 
 // Send the alert to Slack.
@@ -1243,29 +1285,29 @@ type PushoverHandler struct {
 //
 // Send alert to Slack using default channel '#general'.
 // tick:property
-func (a *AlertNode) Slack() *SlackHandler {
+func (n *AlertNodeData) Slack() *SlackHandler {
 	slack := &SlackHandler{
-		AlertNode: a,
+		AlertNodeData: n,
 	}
-	a.SlackHandlers = append(a.SlackHandlers, slack)
+	n.SlackHandlers = append(n.SlackHandlers, slack)
 	return slack
 }
 
 // tick:embedded:AlertNode.Slack
 type SlackHandler struct {
-	*AlertNode
+	*AlertNodeData `json:"-"`
 
 	// Slack channel in which to post messages.
 	// If empty uses the channel from the configuration.
-	Channel string
+	Channel string `json:"channel"`
 
 	// Username of the Slack bot.
 	// If empty uses the username from the configuration.
-	Username string
+	Username string `json:"username"`
 
 	// IconEmoji is an emoji name surrounded in ':' characters.
 	// The emoji image will replace the normal user icon for the slack bot.
-	IconEmoji string
+	IconEmoji string `json:"iconEmoji"`
 }
 
 // Send the alert to Telegram.
@@ -1318,32 +1360,32 @@ type SlackHandler struct {
 //
 // Send alert to Telegram using default chat-id 'xxxxxxxx'.
 // tick:property
-func (a *AlertNode) Telegram() *TelegramHandler {
+func (n *AlertNodeData) Telegram() *TelegramHandler {
 	telegram := &TelegramHandler{
-		AlertNode: a,
+		AlertNodeData: n,
 	}
-	a.TelegramHandlers = append(a.TelegramHandlers, telegram)
+	n.TelegramHandlers = append(n.TelegramHandlers, telegram)
 	return telegram
 }
 
 // tick:embedded:AlertNode.Telegram
 type TelegramHandler struct {
-	*AlertNode
+	*AlertNodeData `json:"-"`
 
 	// Telegram user/group ID to post messages to.
 	// If empty uses the chati-d from the configuration.
-	ChatId string
+	ChatId string `json:"chatId"`
 	// Parse node, defaults to Mardown
 	// If empty uses the parse-mode from the configuration.
-	ParseMode string
+	ParseMode string `json:"parseMode"`
 	// Web Page preview
 	// If empty uses the disable-web-page-preview from the configuration.
 	// tick:ignore
-	IsDisableWebPagePreview bool `tick:"DisableWebPagePreview"`
+	IsDisableWebPagePreview bool `tick:"DisableWebPagePreview" json:"disableWebPagePreview"`
 	// Disables Notification
 	// If empty uses the disable-notification from the configuration.
 	// tick:ignore
-	IsDisableNotification bool `tick:"DisableNotification"`
+	IsDisableNotification bool `tick:"DisableNotification" json:"disableNotification"`
 }
 
 // Disables the Notification. If empty defaults to the configuration.
@@ -1406,25 +1448,25 @@ func (tel *TelegramHandler) DisableWebPagePreview() *TelegramHandler {
 //
 // Send alert to OpsGenie using the default recipients, found in the configuration.
 // tick:property
-func (a *AlertNode) OpsGenie() *OpsGenieHandler {
+func (n *AlertNodeData) OpsGenie() *OpsGenieHandler {
 	og := &OpsGenieHandler{
-		AlertNode: a,
+		AlertNodeData: n,
 	}
-	a.OpsGenieHandlers = append(a.OpsGenieHandlers, og)
+	n.OpsGenieHandlers = append(n.OpsGenieHandlers, og)
 	return og
 }
 
 // tick:embedded:AlertNode.OpsGenie
 type OpsGenieHandler struct {
-	*AlertNode
+	*AlertNodeData `json:"-"`
 
 	// OpsGenie Teams.
 	// tick:ignore
-	TeamsList []string `tick:"Teams"`
+	TeamsList []string `tick:"Teams" json:"teams"`
 
 	// OpsGenie Recipients.
 	// tick:ignore
-	RecipientsList []string `tick:"Recipients"`
+	RecipientsList []string `tick:"Recipients" json:"recipients"`
 }
 
 // The list of teams to be alerted. If empty defaults to the teams from the configuration.
@@ -1466,17 +1508,17 @@ func (og *OpsGenieHandler) Recipients(recipients ...string) *OpsGenieHandler {
 // Send alerts to Talk client.
 //
 // tick:property
-func (a *AlertNode) Talk() *TalkHandler {
+func (n *AlertNodeData) Talk() *TalkHandler {
 	talk := &TalkHandler{
-		AlertNode: a,
+		AlertNodeData: n,
 	}
-	a.TalkHandlers = append(a.TalkHandlers, talk)
+	n.TalkHandlers = append(n.TalkHandlers, talk)
 	return talk
 }
 
 // tick:embedded:AlertNode.Talk
 type TalkHandler struct {
-	*AlertNode
+	*AlertNodeData `json:"-"`
 }
 
 // Send the alert using SNMP traps.
@@ -1497,34 +1539,34 @@ type TalkHandler struct {
 // Send alerts to `target-ip:target-port` on OID '1.3.6.1.2.1.1.7'
 //
 // tick:property
-func (a *AlertNode) SnmpTrap(trapOid string) *SNMPTrapHandler {
+func (n *AlertNodeData) SnmpTrap(trapOid string) *SNMPTrapHandler {
 	snmpTrap := &SNMPTrapHandler{
-		AlertNode: a,
-		TrapOid:   trapOid,
+		AlertNodeData: n,
+		TrapOid:       trapOid,
 	}
-	a.SNMPTrapHandlers = append(a.SNMPTrapHandlers, snmpTrap)
+	n.SNMPTrapHandlers = append(n.SNMPTrapHandlers, snmpTrap)
 	return snmpTrap
 }
 
 // SNMPTrap AlertHandler
 // tick:embedded:AlertNode.SnmpTrap
 type SNMPTrapHandler struct {
-	*AlertNode
+	*AlertNodeData `json:"-"`
 
 	// TrapOid
 	// tick:ignore
-	TrapOid string
+	TrapOid string `json:"trapOid"`
 
 	// List of trap data.
 	// tick:ignore
-	DataList []SNMPData `tick:"Data"`
+	DataList []SNMPData `tick:"Data" json:"data"`
 }
 
 // tick:ignore
 type SNMPData struct {
-	Oid   string
-	Type  string
-	Value string
+	Oid   string `json:"oid"`
+	Type  string `json:"type"`
+	Value string `json:"value"`
 }
 
 // Define Data for SNMP Trap alert.

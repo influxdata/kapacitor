@@ -1,6 +1,9 @@
 package pipeline
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/influxdata/influxdb/influxql"
@@ -28,22 +31,25 @@ import (
 // Note: Derivative has its own implementation as a DerivativeNode instead of as part of the
 // InfluxQL functions.
 type InfluxQLNode struct {
-	chainnode
+	chainnode `json:"-"`
 
 	// tick:ignore
-	Method string
+	Method string `json:"-"`
 	// tick:ignore
-	Field string
+	Field string `json:"field"`
 
 	// The name of the field, defaults to the name of
 	// function used (i.e. .mean -> 'mean')
-	As string
+	As string `json:"as"`
 
 	// tick:ignore
-	ReduceCreater ReduceCreater
+	ReduceCreater ReduceCreater `json:"-"`
 
 	// tick:ignore
-	PointTimes bool `tick:"UsePointTimes"`
+	PointTimes bool `tick:"UsePointTimes" json:"usePointTimes"`
+
+	// tick:ignore
+	Args []interface{} `json:"args"`
 }
 
 func newInfluxQLNode(method, field string, wants, provides EdgeType, reducer ReduceCreater) *InfluxQLNode {
@@ -54,6 +60,96 @@ func newInfluxQLNode(method, field string, wants, provides EdgeType, reducer Red
 		As:            method,
 		ReduceCreater: reducer,
 	}
+}
+
+// MarshalJSON converts InfluxQLNode to JSON
+func (n *InfluxQLNode) MarshalJSON() ([]byte, error) {
+	type Alias InfluxQLNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		Args []interface{} `json:"args"`
+	}{
+		TypeOf: TypeOf{
+			Type: n.Method,
+			ID:   n.ID(),
+		},
+		Alias: (*Alias)(n),
+		Args:  n.Args,
+	}
+	for i, arg := range raw.Args {
+		switch dur := arg.(type) {
+		case time.Duration:
+			raw.Args[i] = influxql.FormatDuration(dur)
+		}
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to an InfluxQLNode
+func (n *InfluxQLNode) UnmarshalJSON(data []byte) error {
+	type Alias InfluxQLNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		Args []interface{} `json:"args"`
+	}{
+		Alias: (*Alias)(n),
+	}
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	err := dec.Decode(&raw)
+	if err != nil {
+		return err
+	}
+	switch raw.Type {
+	case "count", "distinct", "mean", "median", "mode", "spread", "sum", "first":
+	case "last", "min", "max", "stddev", "difference", "cumulativeSum":
+	case "top", "bottom", "movingAverage":
+		for i, arg := range raw.Args {
+			switch num := arg.(type) {
+			case json.Number:
+				if raw.Args[i], err = num.Int64(); err != nil {
+					return err
+				}
+			}
+		}
+	case "elapsed", "holtWinters", "holtWintersWithFit":
+		for i, arg := range raw.Args {
+			switch a := arg.(type) {
+			case json.Number:
+				if raw.Args[i], err = a.Int64(); err != nil {
+					return err
+				}
+			case string:
+				if raw.Args[i], err = influxql.ParseDuration(a); err != nil {
+					return err
+				}
+			}
+		}
+	case "percentile":
+		for i, arg := range raw.Args {
+			switch a := arg.(type) {
+			case json.Number:
+				if raw.Args[i], err = a.Float64(); err != nil {
+					return err
+				}
+			}
+		}
+	default:
+		return fmt.Errorf("error unmarshaling node %d of type %s as InfluxQLNode", raw.ID, raw.Type)
+	}
+
+	for i, arg := range raw.Args {
+		switch integer := arg.(type) {
+		case int:
+			raw.Args[i] = int64(integer)
+		}
+	}
+	n.Args = raw.Args
+	n.Method = raw.Type
+	n.setID(raw.ID)
+	return nil
 }
 
 // Use the time of the selected point instead of the time of the batch.
@@ -302,6 +398,7 @@ func (n *chainnode) Percentile(field string, percentile float64) *InfluxQLNode {
 		},
 		IsSimpleSelector: true,
 	})
+	i.Args = []interface{}{percentile}
 	n.linkChild(i)
 	return i
 }
@@ -338,6 +435,10 @@ func (n *chainnode) Top(num int64, field string, fieldsAndTags ...string) *Influ
 			FieldsAndTags: fieldsAndTags,
 		},
 	})
+	i.Args = []interface{}{num}
+	for _, ft := range fieldsAndTags {
+		i.Args = append(i.Args, ft)
+	}
 	n.linkChild(i)
 	return i
 }
@@ -369,6 +470,10 @@ func (n *chainnode) Bottom(num int64, field string, fieldsAndTags ...string) *In
 			FieldsAndTags: fieldsAndTags,
 		},
 	})
+	i.Args = []interface{}{num}
+	for _, ft := range fieldsAndTags {
+		i.Args = append(i.Args, ft)
+	}
 	n.linkChild(i)
 	return i
 }
@@ -414,6 +519,7 @@ func (n *chainnode) Elapsed(field string, unit time.Duration) *InfluxQLNode {
 		},
 		IsStreamTransformation: true,
 	})
+	i.Args = []interface{}{unit}
 	n.linkChild(i)
 	return i
 }
@@ -449,6 +555,7 @@ func (n *chainnode) MovingAverage(field string, window int64) *InfluxQLNode {
 		},
 		IsStreamTransformation: true,
 	})
+	i.Args = []interface{}{window}
 	n.linkChild(i)
 	return i
 }
@@ -477,6 +584,7 @@ func (n *chainnode) holtWinters(field string, h, m int64, interval time.Duration
 	})
 	// Always use point times for Holt Winters
 	i.PointTimes = true
+	i.Args = []interface{}{h, m, interval, includeFitData}
 	n.linkChild(i)
 	return i
 }

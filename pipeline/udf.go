@@ -1,9 +1,14 @@
 package pipeline
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"sort"
+	"strconv"
 	"time"
 
+	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/kapacitor/tick"
 	"github.com/influxdata/kapacitor/udf/agent"
 )
@@ -154,4 +159,201 @@ func (u *UDFNode) SetProperty(name string, args ...interface{}) (interface{}, er
 		return u, nil
 	}
 	return u.describer.SetProperty(name, args...)
+}
+
+// MarshalJSON converts UDFNode to JSON
+func (u *UDFNode) MarshalJSON() ([]byte, error) {
+	props := JSONNode{}.
+		SetType("udf").
+		SetID(u.ID()).
+		Set("udfName", u.UDFName)
+	for _, o := range u.Options {
+		args := []interface{}{}
+		for _, v := range o.Values {
+			switch v.Type {
+			case agent.ValueType_BOOL:
+				args = append(args, v.GetBoolValue())
+			case agent.ValueType_INT:
+				args = append(args, v.GetIntValue())
+			case agent.ValueType_DOUBLE:
+				args = append(args, v.GetDoubleValue())
+			case agent.ValueType_STRING:
+				args = append(args, v.GetStringValue())
+			case agent.ValueType_DURATION:
+				dur := influxql.FormatDuration(time.Duration(v.GetDurationValue()))
+				args = append(args, dur)
+			}
+		}
+		props = props.Set(o.Name, args)
+	}
+	return json.Marshal(&props)
+}
+
+func (u *UDFNode) unmarshal(props JSONNode) error {
+	err := props.CheckTypeOf("udf")
+	if err != nil {
+		return err
+	}
+
+	if u.id, err = props.ID(); err != nil {
+		return err
+	}
+
+	if u.UDFName, err = props.String("udfName"); err != nil {
+		return err
+	}
+
+	properties := map[string][]*agent.OptionValue{}
+	for name, v := range props {
+		if name == NodeID || name == NodeTypeOf || name == "udfName" {
+			continue
+		}
+		args, ok := v.([]interface{})
+		if !ok {
+			return fmt.Errorf("property %s is not a list of values but is %T", name, v)
+		}
+		values := make([]*agent.OptionValue, len(args))
+		for i, arg := range args {
+			switch v := arg.(type) {
+			case bool:
+				values[i] = &agent.OptionValue{
+					Type:  agent.ValueType_BOOL,
+					Value: &agent.OptionValue_BoolValue{v},
+				}
+			case json.Number:
+				integer, err := v.Int64()
+				if err == nil {
+					values[i] = &agent.OptionValue{
+						Type:  agent.ValueType_INT,
+						Value: &agent.OptionValue_IntValue{integer},
+					}
+					break
+				}
+
+				flt, err := v.Float64()
+				if err != nil {
+					return err
+				}
+				values[i] = &agent.OptionValue{
+					Type:  agent.ValueType_DOUBLE,
+					Value: &agent.OptionValue_DoubleValue{flt},
+				}
+			case string:
+				dur, err := influxql.ParseDuration(v)
+				if err == nil {
+					values[i] = &agent.OptionValue{
+						Type:  agent.ValueType_DURATION,
+						Value: &agent.OptionValue_DurationValue{int64(dur)},
+					}
+					break
+				}
+				values[i] = &agent.OptionValue{
+					Type:  agent.ValueType_STRING,
+					Value: &agent.OptionValue_StringValue{v},
+				}
+			}
+		}
+		properties[name] = values
+	}
+	var names []string
+	for name := range properties {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		u.Options = append(u.Options, &agent.Option{
+			Name:   name,
+			Values: properties[name],
+		})
+	}
+	return nil
+}
+
+// UnmarshalJSON converts JSON to UDFNode
+func (u *UDFNode) UnmarshalJSON(data []byte) error {
+	props, err := NewJSONNode(data)
+	if err != nil {
+		return err
+	}
+	return u.unmarshal(props)
+}
+
+// JSONNode contains all fields associated with a node.  `typeOf`
+// is used to determine which type of node this is.
+// JSONNode is used by UDFNode specifically for marshaling and unmarshaling
+// the UDF to json
+type JSONNode map[string]interface{}
+
+// NewJSONNode decodes JSON bytes into a JSONNode
+func NewJSONNode(data []byte) (JSONNode, error) {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	var input JSONNode
+	err := dec.Decode(&input)
+	return input, err
+}
+
+// CheckTypeOf tests that the typeOf field is correctly set to typ.
+func (j JSONNode) CheckTypeOf(typ string) error {
+	t, ok := j[NodeTypeOf]
+	if !ok {
+		return fmt.Errorf("missing typeOf field")
+	}
+
+	if t != typ {
+		return fmt.Errorf("error unmarshaling node type %s; received %s", typ, t)
+	}
+	return nil
+}
+
+// SetType adds the Node type information
+func (j JSONNode) SetType(typ string) JSONNode {
+	j[NodeTypeOf] = typ
+	return j
+}
+
+// SetID adds the Node ID information
+func (j JSONNode) SetID(id ID) JSONNode {
+	j[NodeID] = fmt.Sprintf("%d", id)
+	return j
+}
+
+// Set adds the key/value to the JSONNode
+func (j JSONNode) Set(key string, value interface{}) JSONNode {
+	j[key] = value
+	return j
+}
+
+// Field returns expected field or error if field doesn't exist
+func (j JSONNode) Field(field string) (interface{}, error) {
+	fld, ok := j[field]
+	if !ok {
+		return nil, fmt.Errorf("missing expected field %s", field)
+	}
+	return fld, nil
+}
+
+// String reads the field for a string value
+func (j JSONNode) String(field string) (string, error) {
+	s, err := j.Field(field)
+	if err != nil {
+		return "", err
+	}
+
+	str, ok := s.(string)
+	if !ok {
+		return "", fmt.Errorf("field %s is not a string value but is %T", field, s)
+	}
+	return str, nil
+}
+
+// ID returns the unique ID for this node.  This ID is used
+// as the id of the parent and children in the Edges structure.
+func (j JSONNode) ID() (ID, error) {
+	i, err := j.String(NodeID)
+	if err != nil {
+		return 0, err
+	}
+	id, err := strconv.Atoi(i)
+	return ID(id), err
 }

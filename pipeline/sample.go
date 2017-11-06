@@ -1,7 +1,11 @@
 package pipeline
 
 import (
+	"encoding/json"
+	"fmt"
 	"time"
+
+	"github.com/influxdata/influxdb/influxql"
 )
 
 // Sample points or batches.
@@ -21,15 +25,15 @@ import (
 // See FromNode.Truncate, QueryNode.GroupBy time or WindowNode.Align
 // for ensuring data is aligned with a boundary.
 type SampleNode struct {
-	chainnode
+	chainnode `json:"-"`
 
 	// Keep every N point or batch
 	// tick:ignore
-	N int64
+	N int64 `json:"n"`
 
 	// Keep one point or batch every Duration
 	// tick:ignore
-	Duration time.Duration
+	Duration time.Duration `json:"duration"`
 }
 
 func newSampleNode(wants EdgeType, rate interface{}) *SampleNode {
@@ -49,4 +53,47 @@ func newSampleNode(wants EdgeType, rate interface{}) *SampleNode {
 		N:         n,
 		Duration:  d,
 	}
+}
+
+// MarshalJSON converts SampleNode to JSON
+func (n *SampleNode) MarshalJSON() ([]byte, error) {
+	type Alias SampleNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		Duration string `json:"duration"`
+	}{
+		TypeOf: TypeOf{
+			Type: "sample",
+			ID:   n.ID(),
+		},
+		Alias:    (*Alias)(n),
+		Duration: influxql.FormatDuration(n.Duration),
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to an SampleNode
+func (n *SampleNode) UnmarshalJSON(data []byte) error {
+	type Alias SampleNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		Duration string `json:"duration"`
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.Type != "sample" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as SampleNode", raw.ID, raw.Type)
+	}
+	n.Duration, err = influxql.ParseDuration(raw.Duration)
+	if err != nil {
+		return err
+	}
+	n.setID(raw.ID)
+	return nil
 }
