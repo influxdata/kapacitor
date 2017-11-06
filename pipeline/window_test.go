@@ -52,15 +52,7 @@ func TestWindowNode_MarshalJSON(t *testing.T) {
 			w.FillPeriodFlag = tt.fields.FillPeriodFlag
 			w.PeriodCount = tt.fields.PeriodCount
 			w.EveryCount = tt.fields.EveryCount
-			g, err := json.Marshal(w)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("WindowNode.MarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			got := string(g)
-			if got != tt.want {
-				t.Errorf("WindowNode.MarshalJSON() = \n%s\n, want\n%s\n", got, tt.want)
-			}
+			MarshalTestHelper(t, w, tt.wantErr, tt.want)
 		})
 	}
 }

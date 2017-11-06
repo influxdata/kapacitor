@@ -102,15 +102,7 @@ func TestWhereNode_MarshalJSON(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			w := newWhereNode(StreamEdge, tt.lambda)
 			w.setID(tt.id)
-			g, err := json.MarshalIndent(w, "", "    ")
-			if (err != nil) != tt.wantErr {
-				t.Errorf("WhereNode.MarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			got := string(g)
-			if got != tt.want {
-				t.Errorf("WhereNode.MarshalJSON() = %s, want %s", got, tt.want)
-			}
+			MarshalIndentTestHelper(t, w, tt.wantErr, tt.want)
 		})
 	}
 }

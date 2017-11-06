@@ -2,7 +2,6 @@ package pipeline
 
 import (
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -117,16 +116,7 @@ func TestUDFNode_MarshalJSON(t *testing.T) {
 				Options: tt.fields.Options,
 				UDFName: tt.fields.UDFName,
 			}
-			g, err := json.MarshalIndent(u, "", "    ")
-			if (err != nil) != tt.wantErr {
-				t.Errorf("UDFNode.MarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			got := string(g)
-			if got != tt.want {
-				fmt.Println(got)
-				t.Errorf("UDFNode.MarshalJSON() = %s, want %s", got, tt.want)
-			}
+			MarshalIndentTestHelper(t, u, tt.wantErr, tt.want)
 		})
 	}
 }

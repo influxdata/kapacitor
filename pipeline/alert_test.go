@@ -1,8 +1,6 @@
 package pipeline
 
 import (
-	"encoding/json"
-	"fmt"
 	"testing"
 )
 
@@ -82,15 +80,7 @@ func TestAlertNode_MarshalJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := json.MarshalIndent(&tt.node, "", "    ")
-			if (err != nil) != tt.wantErr {
-				t.Errorf("AlertNode.MarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if string(got) != tt.want {
-				fmt.Println(string(got))
-				t.Errorf("AlertNode.MarshalJSON() = %s, want %s", string(got), tt.want)
-			}
+			MarshalIndentTestHelper(t, &tt.node, tt.wantErr, tt.want)
 		})
 	}
 }

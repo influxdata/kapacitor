@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -95,4 +96,30 @@ func TestPipelineSort(t *testing.T) {
 	}
 
 	assert.Equal(sorted, p.sorted)
+}
+
+func MarshalIndentTestHelper(t *testing.T, node interface{}, wantErr bool, want string) {
+	t.Helper()
+	got, err := json.MarshalIndent(node, "", "    ")
+	if (err != nil) != wantErr {
+		t.Errorf("error = %v, wantErr %v", err, wantErr)
+		return
+	}
+	if string(got) != want {
+		t.Log(string(got))
+		t.Errorf("error = %s, want %s", string(got), want)
+	}
+}
+
+func MarshalTestHelper(t *testing.T, node interface{}, wantErr bool, want string) {
+	t.Helper()
+	got, err := json.Marshal(node)
+	if (err != nil) != wantErr {
+		t.Errorf("error = %v, wantErr %v", err, wantErr)
+		return
+	}
+	if string(got) != want {
+		t.Log(string(got))
+		t.Errorf("error = %s, want %s", string(got), want)
+	}
 }
