@@ -481,6 +481,10 @@ func isChainNode(node Node) (chainnodeAlias, bool) {
 	if ok {
 		return &alert.AlertNodeData.chainnode, true
 	}
+	shift, ok := node.(*ShiftNode)
+	if ok {
+		return &shift.chainnode, true
+	}
 	return nil, false
 }
 
