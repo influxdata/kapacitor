@@ -33,7 +33,7 @@ const (
 	basePreviewPath   = "/kapacitor/v1preview"
 	pingPath          = basePath + "/ping"
 	logLevelPath      = basePath + "/loglevel"
-	logsPath          = basePath + "/logs"
+	logsPath          = basePreviewPath + "/logs"
 	debugVarsPath     = basePath + "/debug/vars"
 	tasksPath         = basePath + "/tasks"
 	templatesPath     = basePath + "/templates"
