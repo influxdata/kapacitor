@@ -53,7 +53,7 @@ func (s *Service) SetLogLevelFromName(lvl string) error {
 	defer s.levelMu.Unlock()
 	level := strings.ToUpper(lvl)
 	switch level {
-	case "INFO", "ERROR", "WARN", "DEBUG":
+	case "INFO", "ERROR", "DEBUG":
 		s.level = level
 	default:
 		return errors.New("invalid log level")
@@ -69,8 +69,6 @@ func logLevelFromName(lvl string) Level {
 		level = InfoLevel
 	case "ERROR", "error":
 		level = ErrorLevel
-	case "WARN", "warn":
-		level = WarnLevel
 	case "DEBUG", "debug":
 		level = DebugLevel
 	}
@@ -418,8 +416,6 @@ func (s *Service) NewStaticLevelHandler(level string, service string) (*StaticLe
 		ll = llError
 	case "info":
 		ll = llInfo
-	case "warn":
-		ll = llWarn
 	default:
 		ll = llInvalid
 	}
