@@ -45,6 +45,7 @@
 - [#1630](https://github.com/influxdata/kapacitor/issues/1630): Remove the pidfile after the server has exited.
 - [#1641](https://github.com/influxdata/kapacitor/issues/1641): Logs API writes multiple http headers.
 - [#1657](https://github.com/influxdata/kapacitor/issues/1657): Fix missing dependency in rpm package.
+- [#1660](https://github.com/influxdata/kapacitor/pull/1660): Force tar owner/group to be root.
 
 ## v1.3.3 [2017-08-11]
 
