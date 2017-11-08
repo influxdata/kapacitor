@@ -9,6 +9,7 @@
 * [Alerts](#alerts)
 * [Configuration](#configuration)
 * [Storage](#storage)
+* [Logs](#logs)
 * [Testing Services](#testing-services)
 * [Miscellaneous](#miscellaneous)
 
@@ -2205,6 +2206,47 @@ POST /kapacitor/v1/storage/stores/tasks
 | 204  | Success                            |
 | 400  | Unknown action                     |
 | 404  | The specified store does not exist |
+
+## Logs
+The logging API is being release under [Technical Preview](#technical-preview).
+Kapacitor allows users to retrieve the kapacitor logs remotely via HTTP using
+[Chunked Transfer Encoding](https://en.wikipedia.org/wiki/Chunked_transfer_encoding).
+The logs may be queried using key-value pairs correspoding to the log entry.
+These key-value are specified as query parameter.
+
+The logging API will return logs in two formats: [logfmt](https://brandur.org/logfmt) and JSON.
+To receive logs in JSON format, you must specify `Content-Type: application/json`. If we receive
+any content type other than `application/json`, we will return the logs in logfmt format.
+
+Each chunk returned to the client will contain a single complete log followed by a `\n`.
+
+### Example
+
+#### Logs as JSON
+```
+GET /kapacitor/v1preview/logs?task=mytask
+Content-Type: application/json
+```
+returns the following
+
+```
+{"ts":"2017-11-08T17:40:47.183-05:00","lvl":"info","msg":"created log session","service":"sessions","id":"7021fb9d-467e-482f-870c-d811aa9e74b7","content-type":"application/json","tags":"nil"}
+{"ts":"2017-11-08T17:40:47.183-05:00","lvl":"info","msg":"created log session","service":"sessions","id":"7021fb9d-467e-482f-870c-d811aa9e74b7","content-type":"application/json","tags":"nil"}
+{"ts":"2017-11-08T17:40:47.183-05:00","lvl":"info","msg":"created log session","service":"sessions","id":"7021fb9d-467e-482f-870c-d811aa9e74b7","content-type":"application/json","tags":"nil"}
+```
+
+#### Logs as logfmt
+```
+GET /kapacitor/v1preview/logs?task=mytask
+```
+returns the following
+
+```
+ts=2017-11-08T17:42:47.014-05:00 lvl=info msg="created log session" service=sessions id=ce4d7819-1e38-4bf4-ba54-78b0a8769b7e content-type=
+ts=2017-11-08T17:42:47.014-05:00 lvl=info msg="created log session" service=sessions id=ce4d7819-1e38-4bf4-ba54-78b0a8769b7e content-type=
+ts=2017-11-08T17:42:47.014-05:00 lvl=info msg="created log session" service=sessions id=ce4d7819-1e38-4bf4-ba54-78b0a8769b7e content-type=
+```
+
 
 ## Testing Services
 
