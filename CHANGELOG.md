@@ -43,6 +43,7 @@
 - [#1623](https://github.com/influxdata/kapacitor/issues/1623): Fix k8s incluster master api dns resolution
 - [#1630](https://github.com/influxdata/kapacitor/issues/1630): Remove the pidfile after the server has exited.
 - [#1641](https://github.com/influxdata/kapacitor/issues/1641): Logs API writes multiple http headers.
+- [#1657](https://github.com/influxdata/kapacitor/issues/1657): Fix missing dependency in rpm package.
 
 ## v1.3.3 [2017-08-11]
 
