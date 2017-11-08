@@ -46,7 +46,7 @@ const (
 	replayQueryPath   = basePath + "/replays/query"
 	configPath        = basePath + "/config"
 	serviceTestsPath  = basePath + "/service-tests"
-	alertsPath        = basePreviewPath + "/alerts"
+	alertsPath        = basePath + "/alerts"
 	topicsPath        = alertsPath + "/topics"
 	topicEventsPath   = "events"
 	topicHandlersPath = "handlers"

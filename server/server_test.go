@@ -8553,7 +8553,7 @@ func TestServer_AlertHandlers_CRUD(t *testing.T) {
 				},
 			},
 			expCreate: client.TopicHandler{
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/system/handlers/myhandler"},
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/system/handlers/myhandler"},
 				ID:   "myhandler",
 				Kind: "slack",
 				Options: map[string]interface{}{
@@ -8577,7 +8577,7 @@ func TestServer_AlertHandlers_CRUD(t *testing.T) {
 				},
 			},
 			expPatch: client.TopicHandler{
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/system/handlers/myhandler"},
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/system/handlers/myhandler"},
 				ID:   "myhandler",
 				Kind: "log",
 				Options: map[string]interface{}{
@@ -8592,7 +8592,7 @@ func TestServer_AlertHandlers_CRUD(t *testing.T) {
 				},
 			},
 			expPut: client.TopicHandler{
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/system/handlers/newid"},
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/system/handlers/newid"},
 				ID:   "newid",
 				Kind: "smtp",
 				Options: map[string]interface{}{
@@ -9521,7 +9521,7 @@ stream
 		Link:  l,
 		Topic: topic,
 		Events: []client.TopicEvent{{
-			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1preview/alerts/topics/%s/events/id", topic)},
+			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1/alerts/topics/%s/events/id", topic)},
 			ID:   "id",
 			State: client.EventState{
 				Message:  "message",
@@ -9561,7 +9561,7 @@ stream
 		Link:  l,
 		Topic: topic,
 		Events: []client.TopicEvent{{
-			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1preview/alerts/topics/%s/events/id", topic)},
+			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1/alerts/topics/%s/events/id", topic)},
 			ID:   "id",
 			State: client.EventState{
 				Message:  "message",
@@ -9710,7 +9710,7 @@ alert value=2 0000000000002
 		Link:  l,
 		Topic: tcpTopic,
 		Events: []client.TopicEvent{{
-			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1preview/alerts/topics/%s/events/id-agg", tcpTopic)},
+			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1/alerts/topics/%s/events/id-agg", tcpTopic)},
 			ID:   "id-agg",
 			State: client.EventState{
 				Message:  "Received 3 events in the last 100ms.",
@@ -9838,7 +9838,7 @@ stream
 		Link:  l,
 		Topic: tcpTopic,
 		Events: []client.TopicEvent{{
-			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1preview/alerts/topics/%s/events/id", tcpTopic)},
+			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1/alerts/topics/%s/events/id", tcpTopic)},
 			ID:   "id",
 			State: client.EventState{
 				Message:  "message",
@@ -9959,7 +9959,7 @@ alert,host=serverB value=0 0000000004
 		Link:  l,
 		Topic: topic,
 		Events: []client.TopicEvent{{
-			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1preview/alerts/topics/%s/events/id", topic)},
+			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1/alerts/topics/%s/events/id", topic)},
 			ID:   "id",
 			State: client.EventState{
 				Message:  "message",
@@ -10036,7 +10036,7 @@ stream
 		Link:  l,
 		Topic: topic,
 		Events: []client.TopicEvent{{
-			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1preview/alerts/topics/%s/events/id", topic)},
+			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1/alerts/topics/%s/events/id", topic)},
 			ID:   "id",
 			State: client.EventState{
 				Message:  "message",
@@ -10184,7 +10184,7 @@ stream
 			Link:  l,
 			Topic: topic,
 			Events: []client.TopicEvent{{
-				Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1preview/alerts/topics/%s/events/id", topic)},
+				Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1/alerts/topics/%s/events/id", topic)},
 				ID:   "id",
 				State: client.EventState{
 					Message:  "message",
@@ -10263,23 +10263,23 @@ func TestServer_AlertListHandlers(t *testing.T) {
 	}
 
 	expHandlers := client.TopicHandlers{
-		Link:  client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/test/handlers?pattern="},
+		Link:  client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/test/handlers?pattern="},
 		Topic: "test",
 		Handlers: []client.TopicHandler{
 			{
-				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/test/handlers/handler0"},
+				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/test/handlers/handler0"},
 				ID:      "handler0",
 				Kind:    "tcp",
 				Options: map[string]interface{}{"address": ts.Addr},
 			},
 			{
-				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/test/handlers/handler1"},
+				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/test/handlers/handler1"},
 				ID:      "handler1",
 				Kind:    "tcp",
 				Options: map[string]interface{}{"address": ts.Addr},
 			},
 			{
-				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/test/handlers/handler2"},
+				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/test/handlers/handler2"},
 				ID:      "handler2",
 				Kind:    "tcp",
 				Options: map[string]interface{}{"address": ts.Addr},
@@ -10317,7 +10317,7 @@ func TestServer_AlertListHandlers(t *testing.T) {
 		t.Fatal(err)
 	}
 	exp = expHandlers
-	exp.Link.Href = "/kapacitor/v1preview/alerts/topics/test/handlers?pattern=%2A"
+	exp.Link.Href = "/kapacitor/v1/alerts/topics/test/handlers?pattern=%2A"
 	if !reflect.DeepEqual(handlers, exp) {
 		t.Errorf("unexpected handlers with pattern \"*\":\ngot\n%+v\nexp\n%+v\n", handlers, exp)
 	}
@@ -10330,7 +10330,7 @@ func TestServer_AlertListHandlers(t *testing.T) {
 		t.Fatal(err)
 	}
 	exp = expHandlers
-	exp.Link.Href = "/kapacitor/v1preview/alerts/topics/test/handlers?pattern=handler%2A"
+	exp.Link.Href = "/kapacitor/v1/alerts/topics/test/handlers?pattern=handler%2A"
 	if !reflect.DeepEqual(handlers, exp) {
 		t.Errorf("unexpected handlers with pattern \"handler*\":\ngot\n%+v\nexp\n%+v\n", handlers, exp)
 	}
@@ -10343,7 +10343,7 @@ func TestServer_AlertListHandlers(t *testing.T) {
 		t.Fatal(err)
 	}
 	exp = expHandlers
-	exp.Link.Href = "/kapacitor/v1preview/alerts/topics/test/handlers?pattern=handler0"
+	exp.Link.Href = "/kapacitor/v1/alerts/topics/test/handlers?pattern=handler0"
 	exp.Handlers = expHandlers.Handlers[0:1]
 	if !reflect.DeepEqual(handlers, exp) {
 		t.Errorf("unexpected handlers with pattern \"handler0\":\ngot\n%+v\nexp\n%+v\n", handlers, exp)
@@ -10366,12 +10366,12 @@ func TestServer_AlertTopic(t *testing.T) {
 	}
 
 	expTopic := client.Topic{
-		Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/misc"},
+		Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/misc"},
 		ID:           "misc",
 		Level:        "OK",
 		Collected:    0,
-		EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1preview/alerts/topics/misc/events"},
-		HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1preview/alerts/topics/misc/handlers"},
+		EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1/alerts/topics/misc/events"},
+		HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1/alerts/topics/misc/handlers"},
 	}
 	topic, err := cli.Topic(cli.TopicLink("misc"))
 	if err != nil {
@@ -10407,28 +10407,28 @@ func TestServer_AlertListTopics(t *testing.T) {
 	}
 
 	expTopics := client.Topics{
-		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics?min-level=OK&pattern="},
+		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics?min-level=OK&pattern="},
 		Topics: []client.Topic{
 			{
-				Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/misc"},
+				Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/misc"},
 				ID:           "misc",
 				Level:        "OK",
-				EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1preview/alerts/topics/misc/events"},
-				HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1preview/alerts/topics/misc/handlers"},
+				EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1/alerts/topics/misc/events"},
+				HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1/alerts/topics/misc/handlers"},
 			},
 			{
-				Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/system"},
+				Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/system"},
 				ID:           "system",
 				Level:        "OK",
-				EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1preview/alerts/topics/system/events"},
-				HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1preview/alerts/topics/system/handlers"},
+				EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1/alerts/topics/system/events"},
+				HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1/alerts/topics/system/handlers"},
 			},
 			{
-				Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/test"},
+				Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/test"},
 				ID:           "test",
 				Level:        "OK",
-				EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1preview/alerts/topics/test/events"},
-				HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1preview/alerts/topics/test/handlers"},
+				EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1/alerts/topics/test/events"},
+				HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1/alerts/topics/test/handlers"},
 			},
 		},
 	}
@@ -10495,7 +10495,7 @@ stream
 		t.Fatal(err)
 	}
 	exp = expTopics
-	exp.Link.Href = "/kapacitor/v1preview/alerts/topics?min-level=OK&pattern=%2A"
+	exp.Link.Href = "/kapacitor/v1/alerts/topics?min-level=OK&pattern=%2A"
 	if !reflect.DeepEqual(topics, exp) {
 		t.Errorf("unexpected topics with pattern \"*\":\ngot\n%+v\nexp\n%+v\n", topics, exp)
 	}
@@ -10508,7 +10508,7 @@ stream
 		t.Fatal(err)
 	}
 	exp = expTopics
-	exp.Link.Href = "/kapacitor/v1preview/alerts/topics?min-level=OK&pattern=test"
+	exp.Link.Href = "/kapacitor/v1/alerts/topics?min-level=OK&pattern=test"
 	exp.Topics = expTopics.Topics[2:]
 	if !reflect.DeepEqual(topics, exp) {
 		t.Errorf("unexpected topics with pattern \"test\":\ngot\n%+v\nexp\n%+v\n", topics, exp)
@@ -10522,7 +10522,7 @@ stream
 		t.Fatal(err)
 	}
 	exp = expTopics
-	exp.Link.Href = "/kapacitor/v1preview/alerts/topics?min-level=INFO&pattern="
+	exp.Link.Href = "/kapacitor/v1/alerts/topics?min-level=INFO&pattern="
 	exp.Topics = expTopics.Topics[2:]
 	if !reflect.DeepEqual(topics, exp) {
 		t.Errorf("unexpected topics min level \"info\":\ngot\n%+v\nexp\n%+v\n", topics, exp)

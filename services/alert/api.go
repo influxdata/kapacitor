@@ -22,8 +22,8 @@ const (
 
 	topicsPath             = alertsPath + "/topics"
 	topicsPathAnchored     = alertsPath + "/topics/"
-	topicsBasePath         = httpd.BasePreviewPath + topicsPath
-	topicsBasePathAnchored = httpd.BasePreviewPath + topicsPathAnchored
+	topicsBasePath         = httpd.BasePath + topicsPath
+	topicsBasePathAnchored = httpd.BasePath + topicsPathAnchored
 
 	topicEventsPath   = "events"
 	topicHandlersPath = "handlers"
@@ -43,7 +43,7 @@ type apiServer struct {
 	Persister    TopicPersister
 	routes       []httpd.Route
 	HTTPDService interface {
-		AddPreviewRoutes([]httpd.Route) error
+		AddRoutes([]httpd.Route) error
 		DelRoutes([]httpd.Route)
 	}
 	diag Diagnostic
@@ -90,7 +90,7 @@ func (s *apiServer) Open() error {
 		},
 	}
 
-	return s.HTTPDService.AddPreviewRoutes(s.routes)
+	return s.HTTPDService.AddRoutes(s.routes)
 }
 
 func (s *apiServer) Close() error {

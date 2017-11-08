@@ -2517,13 +2517,13 @@ func Test_DoServiceTest(t *testing.T) {
 
 func Test_Topic(t *testing.T) {
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.String() == "/kapacitor/v1preview/alerts/topics/system" &&
+		if r.URL.String() == "/kapacitor/v1/alerts/topics/system" &&
 			r.Method == "GET" {
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, `{
-	"link": {"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system"},
-	"events-link" : {"rel":"events","href":"/kapacitor/v1preview/alerts/topics/system/events"},
-	"handlers-link": {"rel":"handlers","href":"/kapacitor/v1preview/alerts/topics/system/handlers"},
+	"link": {"rel":"self","href":"/kapacitor/v1/alerts/topics/system"},
+	"events-link" : {"rel":"events","href":"/kapacitor/v1/alerts/topics/system/events"},
+	"handlers-link": {"rel":"handlers","href":"/kapacitor/v1/alerts/topics/system/handlers"},
 	"id": "system",
 	"level":"CRITICAL",
 	"collected": 5
@@ -2544,9 +2544,9 @@ func Test_Topic(t *testing.T) {
 	}
 	exp := client.Topic{
 		ID:           "system",
-		Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/system"},
-		EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1preview/alerts/topics/system/events"},
-		HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1preview/alerts/topics/system/handlers"},
+		Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/system"},
+		EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1/alerts/topics/system/events"},
+		HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1/alerts/topics/system/handlers"},
 		Level:        "CRITICAL",
 		Collected:    5,
 	}
@@ -2557,23 +2557,23 @@ func Test_Topic(t *testing.T) {
 
 func Test_ListTopics(t *testing.T) {
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.String() == "/kapacitor/v1preview/alerts/topics?min-level=WARNING&pattern=%2A" &&
+		if r.URL.String() == "/kapacitor/v1/alerts/topics?min-level=WARNING&pattern=%2A" &&
 			r.Method == "GET" {
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, `{
-	"link": {"rel":"self","href":"/kapacitor/v1preview/alerts/topics"},
+	"link": {"rel":"self","href":"/kapacitor/v1/alerts/topics"},
 	"topics": [
 		{
-			"link": {"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system"},
-			"events-link" : {"rel":"events","href":"/kapacitor/v1preview/alerts/topics/system/events"},
-			"handlers-link": {"rel":"handlers","href":"/kapacitor/v1preview/alerts/topics/system/handlers"},
+			"link": {"rel":"self","href":"/kapacitor/v1/alerts/topics/system"},
+			"events-link" : {"rel":"events","href":"/kapacitor/v1/alerts/topics/system/events"},
+			"handlers-link": {"rel":"handlers","href":"/kapacitor/v1/alerts/topics/system/handlers"},
 			"id": "system",
 			"level":"CRITICAL"
 		},
 		{
-			"link": {"rel":"self","href":"/kapacitor/v1preview/alerts/topics/app"},
-			"events-link" : {"rel":"events","href":"/kapacitor/v1preview/alerts/topics/app/events"},
-			"handlers-link": {"rel":"handlers","href":"/kapacitor/v1preview/alerts/topics/app/handlers"},
+			"link": {"rel":"self","href":"/kapacitor/v1/alerts/topics/app"},
+			"events-link" : {"rel":"events","href":"/kapacitor/v1/alerts/topics/app/events"},
+			"handlers-link": {"rel":"handlers","href":"/kapacitor/v1/alerts/topics/app/handlers"},
 			"id": "app",
 			"level":"WARNING"
 		}
@@ -2597,20 +2597,20 @@ func Test_ListTopics(t *testing.T) {
 		t.Fatal(err)
 	}
 	exp := client.Topics{
-		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics"},
+		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics"},
 		Topics: []client.Topic{
 			{
 				ID:           "system",
-				Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/system"},
-				EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1preview/alerts/topics/system/events"},
-				HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1preview/alerts/topics/system/handlers"},
+				Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/system"},
+				EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1/alerts/topics/system/events"},
+				HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1/alerts/topics/system/handlers"},
 				Level:        "CRITICAL",
 			},
 			{
 				ID:           "app",
-				Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/app"},
-				EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1preview/alerts/topics/app/events"},
-				HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1preview/alerts/topics/app/handlers"},
+				Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/app"},
+				EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1/alerts/topics/app/events"},
+				HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1/alerts/topics/app/handlers"},
 				Level:        "WARNING",
 			},
 		},
@@ -2622,7 +2622,7 @@ func Test_ListTopics(t *testing.T) {
 
 func Test_DeleteTopic(t *testing.T) {
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.String() == "/kapacitor/v1preview/alerts/topics/system" &&
+		if r.URL.String() == "/kapacitor/v1/alerts/topics/system" &&
 			r.Method == "DELETE" {
 			w.WriteHeader(http.StatusNoContent)
 		} else {
@@ -2643,11 +2643,11 @@ func Test_DeleteTopic(t *testing.T) {
 
 func Test_TopicEvent(t *testing.T) {
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.String() == "/kapacitor/v1preview/alerts/topics/system/events/cpu" &&
+		if r.URL.String() == "/kapacitor/v1/alerts/topics/system/events/cpu" &&
 			r.Method == "GET" {
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, `{
-	"link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/events/cpu"},
+	"link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/events/cpu"},
 	"id": "cpu",
 	"state": {
 		"level": "WARNING",
@@ -2672,7 +2672,7 @@ func Test_TopicEvent(t *testing.T) {
 	}
 	exp := client.TopicEvent{
 		ID:   "cpu",
-		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/system/events/cpu"},
+		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/system/events/cpu"},
 		State: client.EventState{
 			Message:  "cpu is WARNING",
 			Time:     time.Date(2016, 12, 1, 0, 0, 0, 0, time.UTC),
@@ -2687,15 +2687,15 @@ func Test_TopicEvent(t *testing.T) {
 
 func Test_ListTopicEvents(t *testing.T) {
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.String() == "/kapacitor/v1preview/alerts/topics/system/events?min-level=OK" &&
+		if r.URL.String() == "/kapacitor/v1/alerts/topics/system/events?min-level=OK" &&
 			r.Method == "GET" {
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, `{
-	"link": {"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/events?min-level=OK"},
+	"link": {"rel":"self","href":"/kapacitor/v1/alerts/topics/system/events?min-level=OK"},
 	"topic": "system",
 	"events": [
 		{
-			"link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/events/cpu"},
+			"link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/events/cpu"},
 			"id": "cpu",
 			"state": {
 				"level": "WARNING",
@@ -2705,7 +2705,7 @@ func Test_ListTopicEvents(t *testing.T) {
 			}
 		},
 		{
-			"link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/events/mem"},
+			"link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/events/mem"},
 			"id": "mem",
 			"state": {
 				"level": "CRITICAL",
@@ -2731,12 +2731,12 @@ func Test_ListTopicEvents(t *testing.T) {
 		t.Fatal(err)
 	}
 	exp := client.TopicEvents{
-		Link:  client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/system/events?min-level=OK"},
+		Link:  client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/system/events?min-level=OK"},
 		Topic: "system",
 		Events: []client.TopicEvent{
 			{
 				ID:   "cpu",
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/system/events/cpu"},
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/system/events/cpu"},
 				State: client.EventState{
 					Message:  "cpu is WARNING",
 					Time:     time.Date(2016, 12, 1, 0, 0, 0, 0, time.UTC),
@@ -2746,7 +2746,7 @@ func Test_ListTopicEvents(t *testing.T) {
 			},
 			{
 				ID:   "mem",
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/system/events/mem"},
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/system/events/mem"},
 				State: client.EventState{
 					Message:  "mem is CRITICAL",
 					Time:     time.Date(2016, 12, 1, 0, 10, 0, 0, time.UTC),
@@ -2762,15 +2762,15 @@ func Test_ListTopicEvents(t *testing.T) {
 }
 func Test_ListTopicHandlers(t *testing.T) {
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.String() == "/kapacitor/v1preview/alerts/topics/system/handlers?pattern=" &&
+		if r.URL.String() == "/kapacitor/v1/alerts/topics/system/handlers?pattern=" &&
 			r.Method == "GET" {
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, `{
-	"link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/handlers?pattern="},
+	"link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/handlers?pattern="},
 	"topic": "system",
 	"handlers": [
 		{
-			"link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/handlers/slack"},
+			"link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/handlers/slack"},
 			"id":"slack",
 			"kind":"slack",
 			"options":{
@@ -2778,7 +2778,7 @@ func Test_ListTopicHandlers(t *testing.T) {
 			}
 		},
 		{
-			"link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/handlers/smtp"},
+			"link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/handlers/smtp"},
 			"id":"smtp",
 			"kind":"smtp"
 		}
@@ -2799,12 +2799,12 @@ func Test_ListTopicHandlers(t *testing.T) {
 		t.Fatal(err)
 	}
 	exp := client.TopicHandlers{
-		Link:  client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/system/handlers?pattern="},
+		Link:  client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/system/handlers?pattern="},
 		Topic: "system",
 		Handlers: []client.TopicHandler{
 			{
 				ID:   "slack",
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/system/handlers/slack"},
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/system/handlers/slack"},
 				Kind: "slack",
 				Options: map[string]interface{}{
 					"channel": "#alerts",
@@ -2812,7 +2812,7 @@ func Test_ListTopicHandlers(t *testing.T) {
 			},
 			{
 				ID:   "smtp",
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/system/handlers/smtp"},
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/system/handlers/smtp"},
 				Kind: "smtp",
 			},
 		},
@@ -2823,11 +2823,11 @@ func Test_ListTopicHandlers(t *testing.T) {
 }
 func Test_TopicHandler(t *testing.T) {
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.String() == "/kapacitor/v1preview/alerts/topics/system/handlers/slack" &&
+		if r.URL.String() == "/kapacitor/v1/alerts/topics/system/handlers/slack" &&
 			r.Method == "GET" {
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, `{
-	"link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/handlers/slack"},
+	"link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/handlers/slack"},
 	"id":"slack",
 	"topic": "system",
 	"kind":"slack",
@@ -2851,7 +2851,7 @@ func Test_TopicHandler(t *testing.T) {
 	}
 	exp := client.TopicHandler{
 		ID:   "slack",
-		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/system/handlers/slack"},
+		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/system/handlers/slack"},
 		Kind: "slack",
 		Options: map[string]interface{}{
 			"channel": "#alerts",
@@ -2872,12 +2872,12 @@ func Test_CreateTopicHandler(t *testing.T) {
 				"channel": "#alerts",
 			},
 		}
-		if r.URL.String() == "/kapacitor/v1preview/alerts/topics/system/handlers" &&
+		if r.URL.String() == "/kapacitor/v1/alerts/topics/system/handlers" &&
 			r.Method == "POST" &&
 			reflect.DeepEqual(expOptions, options) {
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, `{
-	"link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/handlers/slack"},
+	"link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/handlers/slack"},
 	"id": "slack",
 	"kind":"slack",
 	"options": {
@@ -2906,7 +2906,7 @@ func Test_CreateTopicHandler(t *testing.T) {
 	}
 	exp := client.TopicHandler{
 		ID:   "slack",
-		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/system/handlers/slack"},
+		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/system/handlers/slack"},
 		Kind: "slack",
 		Options: map[string]interface{}{
 			"channel": "#alerts",
@@ -2932,12 +2932,12 @@ func Test_PatchTopicHandler(t *testing.T) {
 				Value:     "#testing_alerts",
 			},
 		}
-		if r.URL.String() == "/kapacitor/v1preview/alerts/topics/system/handlers/slack" &&
+		if r.URL.String() == "/kapacitor/v1/alerts/topics/system/handlers/slack" &&
 			r.Method == "PATCH" &&
 			reflect.DeepEqual(expPatch, patch) {
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, `{
-	"link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/handlers/slack"},
+	"link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/handlers/slack"},
 	"id": "slack",
 	"kind":"slack",
 	"options": {
@@ -2971,7 +2971,7 @@ func Test_PatchTopicHandler(t *testing.T) {
 	}
 	exp := client.TopicHandler{
 		ID:   "slack",
-		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/system/handlers/slack"},
+		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/system/handlers/slack"},
 		Kind: "slack",
 		Options: map[string]interface{}{
 			"channel": "#testing_alerts",
@@ -2992,12 +2992,12 @@ func Test_ReplaceTopicHandler(t *testing.T) {
 				"channel": "#testing_alerts",
 			},
 		}
-		if r.URL.String() == "/kapacitor/v1preview/alerts/topics/system/handlers/slack" &&
+		if r.URL.String() == "/kapacitor/v1/alerts/topics/system/handlers/slack" &&
 			r.Method == "PUT" &&
 			reflect.DeepEqual(expOptions, options) {
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, `{
-	"link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/handlers/slack"},
+	"link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/handlers/slack"},
 	"id": "slack",
 	"kind":"slack",
 	"options": {
@@ -3026,7 +3026,7 @@ func Test_ReplaceTopicHandler(t *testing.T) {
 	}
 	exp := client.TopicHandler{
 		ID:   "slack",
-		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/system/handlers/slack"},
+		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/system/handlers/slack"},
 		Kind: "slack",
 		Options: map[string]interface{}{
 			"channel": "#testing_alerts",
@@ -3038,7 +3038,7 @@ func Test_ReplaceTopicHandler(t *testing.T) {
 }
 func Test_DeleteTopicHandler(t *testing.T) {
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.String() == "/kapacitor/v1preview/alerts/topics/system/handlers/slack" &&
+		if r.URL.String() == "/kapacitor/v1/alerts/topics/system/handlers/slack" &&
 			r.Method == "DELETE" {
 			w.WriteHeader(http.StatusNoContent)
 		} else {
