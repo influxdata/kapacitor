@@ -194,16 +194,25 @@ func (n *NumberNode) unmarshal(props JSONNode) error {
 	if n.IsInt, err = props.Bool("isint"); err != nil {
 		return err
 	}
+	if n.IsInt {
+		if n.Int64, err = props.Int64("int64"); err != nil {
+			return err
+		}
+		base, err := props.Int64("base")
+		if err != nil {
+			return err
+		}
+		if base == 0 {
+			return fmt.Errorf("integer base cannot be zero")
+		}
+		n.Base = int(base)
+	}
 
 	if n.IsFloat, err = props.Bool("isfloat"); err != nil {
 		return err
 	}
-
-	if n.Float64, err = props.Float64("float64"); err != nil {
-		return err
-	}
-
-	if n.Int64, err = props.Int64("int64"); err != nil {
+	if n.IsFloat {
+		n.Float64, err = props.Float64("float64")
 		return err
 	}
 

@@ -300,7 +300,7 @@ func (p *Pipeline) unmarshalNode(data []byte, typ TypeOf, parents []Node) (Node,
 			return nil, fmt.Errorf("expected one parent for node %d but found %d", typ.ID, len(parents))
 		}
 		parent := parents[0]
-		chainParent, ok := parent.(chainnodeAlias)
+		chainParent, ok := isChainNode(parent)
 		if !ok {
 			return nil, fmt.Errorf("parent node is not a chain node but is %T", parent)
 		}
@@ -324,7 +324,7 @@ func (p *Pipeline) unmarshalNode(data []byte, typ TypeOf, parents []Node) (Node,
 			return nil, fmt.Errorf("expected more than one parent for node %d but received %d", typ.ID, len(parents))
 		}
 		parent := parents[0]
-		chainParent, ok := parent.(chainnodeAlias)
+		chainParent, ok := isChainNode(parent)
 		if !ok {
 			return nil, fmt.Errorf("parent node is not a chain node but is %T", parent)
 		}
@@ -339,7 +339,7 @@ func (p *Pipeline) unmarshalNode(data []byte, typ TypeOf, parents []Node) (Node,
 			return nil, fmt.Errorf("expected one parent for node %d but found %d", typ.ID, len(parents))
 		}
 		parent := parents[0]
-		chainParent, ok := parent.(chainnodeAlias)
+		chainParent, ok := isChainNode(parent)
 		if !ok {
 			return nil, fmt.Errorf("parent node is not a chain node but is %T", parent)
 		}
@@ -434,7 +434,7 @@ func unmarshalTopBottom(data []byte, parents []Node, typ TypeOf) (Node, error) {
 		return nil, fmt.Errorf("expected one parent for node %d but found %d", typ.ID, len(parents))
 	}
 	parent := parents[0]
-	chainParent, ok := parent.(chainnodeAlias)
+	chainParent, ok := isChainNode(parent)
 	if !ok {
 		return nil, fmt.Errorf("parent node is not a chain node but is %T", parent)
 	}
@@ -470,6 +470,22 @@ func unmarshalUDF(data []byte, parents []Node, typ TypeOf) (Node, error) {
 	parent.linkChild(child)
 	err := json.Unmarshal(data, child)
 	return child, err
+}
+
+func isChainNode(node Node) (chainnodeAlias, bool) {
+	a, ok := node.(chainnodeAlias)
+	if ok {
+		return a, ok
+	}
+	alert, ok := node.(*AlertNode)
+	if ok {
+		return &alert.AlertNodeData.chainnode, true
+	}
+	shift, ok := node.(*ShiftNode)
+	if ok {
+		return &shift.chainnode, true
+	}
+	return nil, false
 }
 
 // chainnodeAlias is used to check for the presence of a chain node

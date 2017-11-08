@@ -105,7 +105,11 @@ func (j JSONNode) Int64(field string) (int64, error) {
 
 	num, ok := n.(int64)
 	if !ok {
-		return 0, fmt.Errorf("field %s is not an integer value but is %T", field, n)
+		flt, ok := n.(float64)
+		if !ok {
+			return 0, fmt.Errorf("field %s is not an integer value but is %T", field, n)
+		}
+		num = int64(flt)
 	}
 	return num, nil
 }
@@ -119,7 +123,11 @@ func (j JSONNode) Float64(field string) (float64, error) {
 
 	num, ok := n.(float64)
 	if !ok {
-		return 0, fmt.Errorf("field %s is not a floating point value but is %T", field, n)
+		integer, ok := n.(int64)
+		if !ok {
+			return 0, fmt.Errorf("field %s is not a floating point value but is %T", field, n)
+		}
+		num = float64(integer)
 	}
 	return num, nil
 }
