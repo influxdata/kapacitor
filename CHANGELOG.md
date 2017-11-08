@@ -50,6 +50,7 @@
 - [#1663](https://github.com/influxdata/kapacitor/pull/1663): Fixed install/remove of kapacitor on non-systemd Debian/Ubuntu systems.
     Fixes packaging to not enable services on RHEL systems.
     Fixes issues with recusive symlinks on systemd systems.
+- [#1662](https://github.com/influxdata/kapacitor/issues/1662): Fix invalid default MQTT config.
 
 ## v1.3.3 [2017-08-11]
 
