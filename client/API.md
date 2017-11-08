@@ -1407,12 +1407,6 @@ GET /kapacitor/v1/replays
 Kapacitor can generate and handle alerts.
 The API allows you to see the current state of any alert and to configure various handlers for the alerts.
 
->NOTE: All API endpoints related to alerts are in a technical preview.
-Meaning that they are subject to change in the future until the technical preview is completed.
-As such the URL for the endpoints uses the base path `/kapacitor/v1preview`.
-Once the technical preview is deemed complete the endpoint paths will be promoted to use the v1 `/kapacitor/v1` base path.
-
-
 ### Topics
 
 Alerts are grouped into topics.
@@ -1422,7 +1416,7 @@ You can either specify the alert topic in the TICKscript or one will be generate
 ### Creating and Removing Topics
 
 Topics are created dynamically when they referenced in TICKscripts or in handlers.
-To delete a topic make a `DELETE` request to `/kapacitor/v1preview/alerts/topics/<topic id>`.
+To delete a topic make a `DELETE` request to `/kapacitor/v1/alerts/topics/<topic id>`.
 This will delete all known events and state for the topic.
 
 >NOTE: Since topics are dynamically created, a topic may return after having deleted it, if a new event is created for the topic.
@@ -1431,11 +1425,11 @@ This will delete all known events and state for the topic.
 #### Example
 
 ```
-DELETE /kapacitor/v1preview/alerts/topics/system
+DELETE /kapacitor/v1/alerts/topics/system
 ```
 
 ### List Topics
-To query the list of available topics make a GET requests to `/kapacitor/v1preview/alerts/topics`.
+To query the list of available topics make a GET requests to `/kapacitor/v1/alerts/topics`.
 
 | Query Parameter | Default | Purpose                                                                                                                                                            |
 | --------------- | ------- | -------                                                                                                                                                            |
@@ -1448,24 +1442,24 @@ To query the list of available topics make a GET requests to `/kapacitor/v1previ
 Get all topics.
 
 ```
-GET /kapacitor/v1preview/alerts/topics
+GET /kapacitor/v1/alerts/topics
 ```
 
 ```
 {
-    "link": {"rel":"self","href":"/kapacitor/v1preview/alerts/topics"},
+    "link": {"rel":"self","href":"/kapacitor/v1/alerts/topics"},
     "topics": [
         {
-            "link": {"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system"},
-            "events-link" : {"rel":"events","href":"/kapacitor/v1preview/alerts/topics/system/events"},
-            "handlers-link": {"rel":"handlers","href":"/kapacitor/v1preview/alerts/topics/system/handlers"},
+            "link": {"rel":"self","href":"/kapacitor/v/alerts/topics/system"},
+            "events-link" : {"rel":"events","href":"/kapacitor/v1/alerts/topics/system/events"},
+            "handlers-link": {"rel":"handlers","href":"/kapacitor/v1/alerts/topics/system/handlers"},
             "id": "system",
             "level":"CRITICAL"
         },
         {
-            "link": {"rel":"self","href":"/kapacitor/v1preview/alerts/topics/app"},
-            "events-link" : {"rel":"events","href":"/kapacitor/v1preview/alerts/topics/app/events"},
-            "handlers-link": {"rel":"handlers","href":"/kapacitor/v1preview/alerts/topics/app/handlers"},
+            "link": {"rel":"self","href":"/kapacitor/v1/alerts/topics/app"},
+            "events-link" : {"rel":"events","href":"/kapacitor/v1/alerts/topics/app/events"},
+            "handlers-link": {"rel":"handlers","href":"/kapacitor/v1/alerts/topics/app/handlers"},
             "id": "app",
             "level":"OK"
         }
@@ -1477,17 +1471,17 @@ Get all topics in a WARNING or CRITICAL state.
 
 
 ```
-GET /kapacitor/v1preview/alerts/topics?min-level=WARNING
+GET /kapacitor/v1/alerts/topics?min-level=WARNING
 ```
 
 ```
 {
-    "link": {"rel":"self","href":"/kapacitor/v1preview/alerts/topics"},
+    "link": {"rel":"self","href":"/kapacitor/v1/alerts/topics"},
     "topics": [
         {
-            "link": {"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system"},
-            "events-link" : {"rel":"events","href":"/kapacitor/v1preview/alerts/topics/system/events"},
-            "handlers-link": {"rel":"handlers","href":"/kapacitor/v1preview/alerts/topics/system/handlers"},
+            "link": {"rel":"self","href":"/kapacitor/v1/alerts/topics/system"},
+            "events-link" : {"rel":"events","href":"/kapacitor/v1/alerts/topics/system/events"},
+            "handlers-link": {"rel":"handlers","href":"/kapacitor/v1/alerts/topics/system/handlers"},
             "id": "system",
             "level":"CRITICAL"
         }
@@ -1497,27 +1491,27 @@ GET /kapacitor/v1preview/alerts/topics?min-level=WARNING
 
 ### Topic State
 
-To query the state of a topic make a GET request to `/kapacitor/v1preview/alerts/topics/<topic id>`.
+To query the state of a topic make a GET request to `/kapacitor/v1/alerts/topics/<topic id>`.
 
 #### Example
 
 ```
-GET /kapacitor/v1preview/alerts/topics/system
+GET /kapacitor/v1/alerts/topics/system
 ```
 
 ```
 {
-    "link": {"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system"},
+    "link": {"rel":"self","href":"/kapacitor/v1/alerts/topics/system"},
     "id": "system",
     "level":"CRITICAL"
-    "events-link" : {"rel":"events","href":"/kapacitor/v1preview/alerts/topics/system/events"},
-    "handlers-link": {"rel":"handlers","href":"/kapacitor/v1preview/alerts/topics/system/handlers"},
+    "events-link" : {"rel":"events","href":"/kapacitor/v1/alerts/topics/system/events"},
+    "handlers-link": {"rel":"handlers","href":"/kapacitor/v1/alerts/topics/system/handlers"},
 }
 ```
 
 ### List Topic Events
 
-To query all the events within a topic make a GET request to `/kapacitor/v1preview/alerts/topics/<topic id>/events`.
+To query all the events within a topic make a GET request to `/kapacitor/v1/alerts/topics/<topic id>/events`.
 
 | Query Parameter | Default | Purpose                                                                                                          |
 | --------------- | ------- | -------                                                                                                          |
@@ -1526,16 +1520,16 @@ To query all the events within a topic make a GET request to `/kapacitor/v1previ
 #### Example
 
 ```
-GET /kapacitor/v1preview/alerts/topics/system/events
+GET /kapacitor/v1/alerts/topics/system/events
 ```
 
 ```
 {
-    "link": {"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/events"},
+    "link": {"rel":"self","href":"/kapacitor/v1/alerts/topics/system/events"},
     "topic": "system",
     "events": [
         {
-            "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/events/cpu"},
+            "link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/events/cpu"},
             "id": "cpu",
             "state": {
                 "level": "WARNING",
@@ -1545,7 +1539,7 @@ GET /kapacitor/v1preview/alerts/topics/system/events
             }
         },
         {
-            "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/events/mem"},
+            "link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/events/mem"},
             "id": "mem",
             "state": {
                 "level": "CRITICAL",
@@ -1560,17 +1554,17 @@ GET /kapacitor/v1preview/alerts/topics/system/events
 
 ### Topic Event
 
-You can query a specific event within a topic by making a GET request to `/kapacitor/v1preview/alerts/topics/<topic id>/events/<event id>`.
+You can query a specific event within a topic by making a GET request to `/kapacitor/v1/alerts/topics/<topic id>/events/<event id>`.
 
 #### Example
 
 ```
-GET /kapacitor/v1preview/alerts/topics/system/events/cpu
+GET /kapacitor/v1/alerts/topics/system/events/cpu
 ```
 
 ```
 {
-    "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/events/cpu"},
+    "link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/events/cpu"},
     "id": "cpu",
     "state": {
         "level": "WARNING",
@@ -1584,7 +1578,7 @@ GET /kapacitor/v1preview/alerts/topics/system/events/cpu
 ### List Topic Handlers
 
 Handlers are created within a topic.
-You can get a list of handlers configured for a topic by making a GET request to `/kapacitor/v1preview/alerts/topics/<topic id>/handlers`.
+You can get a list of handlers configured for a topic by making a GET request to `/kapacitor/v1/alerts/topics/<topic id>/handlers`.
 
 | Query Parameter | Default | Purpose                                                                                                                                                               |
 | --------------- | ------- | -------                                                                                                                                                               |
@@ -1598,16 +1592,16 @@ You can get a list of handlers configured for a topic by making a GET request to
 Get the handlers for the `system` topic.
 
 ```
-GET /kapacitor/v1preview/alerts/topics/system/handlers
+GET /kapacitor/v1/alerts/topics/system/handlers
 ```
 
 ```
 {
-    "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/handlers"},
+    "link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/handlers"},
     "topic": "system",
     "handlers": [
         {
-            "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/handlers/slack"},
+            "link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/handlers/slack"},
             "id":"slack",
             "actions": [{
                 "kind":"slack",
@@ -1617,7 +1611,7 @@ GET /kapacitor/v1preview/alerts/topics/system/handlers
             }]
         },
         {
-            "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/handlers/smtp"},
+            "link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/handlers/smtp"},
             "id":"smtp",
             "actions": [{
                 "kind":"smtp"
@@ -1631,12 +1625,12 @@ This `main:alert_cpu:alert5` topic represents an auto-generated topic from a tas
 Anonymous handlers cannot be listed or modified via the API.
 
 ```
-GET /kapacitor/v1preview/alerts/topics/main:alert_cpu:alert5/handlers
+GET /kapacitor/v1/alerts/topics/main:alert_cpu:alert5/handlers
 ```
 
 ```
 {
-    "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/handlers"},
+    "link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/handlers"},
     "topic": "main:alert_cpu:alert5",
     "handlers": null
 }
@@ -1644,17 +1638,17 @@ GET /kapacitor/v1preview/alerts/topics/main:alert_cpu:alert5/handlers
 
 ### Get a Handler
 
-To query information about a specific handler make a GET request to `/kapacitor/v1preview/alerts/topics/<topic id>/handlers/<handler id>`.
+To query information about a specific handler make a GET request to `/kapacitor/v1/alerts/topics/<topic id>/handlers/<handler id>`.
 
 #### Example
 
 ```
-GET /kapacitor/v1preview/alerts/topics/system/handlers/slack
+GET /kapacitor/v1/alerts/topics/system/handlers/slack
 ```
 
 ```
 {
-    "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/handlers/slack"},
+    "link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/handlers/slack"},
     "id":"slack",
     "actions": [{
         "kind":"slack",
@@ -1667,10 +1661,10 @@ GET /kapacitor/v1preview/alerts/topics/system/handlers/slack
 
 ### Create a Handler
 
-To create a new handler make a POST request to `/kapacitor/v1preview/alerts/topics/system/handlers`.
+To create a new handler make a POST request to `/kapacitor/v1/alerts/topics/system/handlers`.
 
 ```
-POST /kapacitor/v1preview/alerts/topics/system/handlers
+POST /kapacitor/v1/alerts/topics/system/handlers
 {
     "id":"slack",
     "actions": [{
@@ -1685,7 +1679,7 @@ POST /kapacitor/v1preview/alerts/topics/system/handlers
 
 ```
 {
-    "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/handlers/slack"},
+    "link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/handlers/slack"},
     "id": "slack",
     "actions": [{
         "kind":"slack",
@@ -1698,7 +1692,7 @@ POST /kapacitor/v1preview/alerts/topics/system/handlers
 
 ### Update a Handler
 
-To update an existing handler you can either make a PUT or PATCH request to `/kapacitor/v1preview/alerts/topics/system/handlers/<handler id>`.
+To update an existing handler you can either make a PUT or PATCH request to `/kapacitor/v1/alerts/topics/system/handlers/<handler id>`.
 
 Using PUT will replace the entire handler, by using PATCH specific parts of the handler can be modified.
 
@@ -1709,7 +1703,7 @@ PATCH will apply JSON patch object to the existing handler, see [rfc6902](https:
 Update the topics and actions for a handler using the PATCH method.
 
 ```
-PATCH /kapacitor/v1preview/alerts/topics/system/handlers/slack
+PATCH /kapacitor/v1/alerts/topics/system/handlers/slack
 [
     {"op":"replace", "path":"/topics", "value":["system", "test"]},
     {"op":"replace", "path":"/actions/0/options/channel", "value":"#testing_alerts"}
@@ -1718,7 +1712,7 @@ PATCH /kapacitor/v1preview/alerts/topics/system/handlers/slack
 
 ```
 {
-    "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/handlers/slack"},
+    "link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/handlers/slack"},
     "id": "slack",
     "actions": [
         {
@@ -1734,7 +1728,7 @@ PATCH /kapacitor/v1preview/alerts/topics/system/handlers/slack
 Replace an entire handler using the PUT method.
 
 ```
-PUT /kapacitor/v1preview/alerts/topics/system/handlers/slack
+PUT /kapacitor/v1/alerts/topics/system/handlers/slack
 {
     "id": "slack",
     "actions": [
@@ -1750,7 +1744,7 @@ PUT /kapacitor/v1preview/alerts/topics/system/handlers/slack
 
 ```
 {
-    "link":{"rel":"self","href":"/kapacitor/v1preview/alerts/topics/system/handlers/slack"},
+    "link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/handlers/slack"},
     "id": "slack",
     "actions": [
         {
@@ -1765,10 +1759,10 @@ PUT /kapacitor/v1preview/alerts/topics/system/handlers/slack
 
 ### Remove a Handler
 
-To remove an existing handler make a DELETE request to `/kapacitor/v1preview/alerts/topics/system/handlers/<handler id>`.
+To remove an existing handler make a DELETE request to `/kapacitor/v1/alerts/topics/system/handlers/<handler id>`.
 
 ```
-DELETE /kapacitor/v1preview/alerts/topics/system/handlers/<handler id>
+DELETE /kapacitor/v1/alerts/topics/system/handlers/<handler id>
 ```
 
 
