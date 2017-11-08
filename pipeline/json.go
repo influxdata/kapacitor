@@ -166,6 +166,7 @@ func init() {
 		"stateDuration":     func(parent chainnodeAlias) Node { return parent.StateDuration(nil) },
 		"stateCount":        func(parent chainnodeAlias) Node { return parent.StateCount(nil) },
 		"shift":             func(parent chainnodeAlias) Node { return parent.Shift(0) },
+		"sideload":          func(parent chainnodeAlias) Node { return parent.Sideload() },
 		"sample":            func(parent chainnodeAlias) Node { return parent.Sample(0) },
 		"log":               func(parent chainnodeAlias) Node { return parent.Log() },
 		"kapacitorLoopback": func(parent chainnodeAlias) Node { return parent.KapacitorLoopback() },
@@ -531,6 +532,7 @@ type chainnodeAlias interface {
 	Sample(interface{}) *SampleNode
 	SetName(string)
 	Shift(time.Duration) *ShiftNode
+	Sideload() *SideloadNode
 	Spread(string) *InfluxQLNode
 	StateCount(*ast.LambdaNode) *StateCountNode
 	StateDuration(*ast.LambdaNode) *StateDurationNode

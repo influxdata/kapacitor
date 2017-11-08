@@ -2357,6 +2357,22 @@ GET /kapacitor/v1/ping
 | ---- | ------- |
 | 204  | Success |
 
+### Sideload Reload
+
+You can trigger a reload of all sideload sources by making a POST request to `kapacitor/v1/sideload/reload`, with an empty body.
+
+#### Example
+
+```
+POST /kapacitor/v1/sideload/reload
+```
+
+#### Response
+
+| Code | Meaning |
+| ---- | ------- |
+| 204  | Success |
+
 
 ### Debug Vars
 

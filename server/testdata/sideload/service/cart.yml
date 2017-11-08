@@ -1,0 +1,3 @@
+---
+cpu_usage_idle_warn: 10
+cpu_usage_idle_crit: 5

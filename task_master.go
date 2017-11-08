@@ -28,6 +28,7 @@ import (
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/sensu"
+	"github.com/influxdata/kapacitor/services/sideload"
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/snmptrap"
@@ -173,6 +174,10 @@ type TaskMaster struct {
 		Client(string) (swarm.Client, error)
 	}
 
+	SideloadService interface {
+		Source(dir string) (sideload.Source, error)
+	}
+
 	Commander command.Commander
 
 	DefaultRetentionPolicy string
@@ -263,6 +268,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.TimingService = tm.TimingService
 	n.K8sService = tm.K8sService
 	n.Commander = tm.Commander
+	n.SideloadService = tm.SideloadService
 	return n
 }
 

@@ -3187,7 +3187,7 @@ func testBatcher(t *testing.T, name, script string) (clock.Setter, *kapacitor.Ex
 	var data io.ReadCloser
 	for i := 0; err == nil; {
 		f := fmt.Sprintf("%s.%d.brpl", name, i)
-		data, err = os.Open(path.Join("data", f))
+		data, err = os.Open(path.Join("testdata", f))
 		if err == nil {
 			allData = append(allData, data)
 			i++

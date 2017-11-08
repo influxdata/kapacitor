@@ -124,6 +124,8 @@ func (a *AST) Create(n pipeline.Node, parents []ast.Node) (ast.Node, error) {
 		return NewSample(parents).Build(node)
 	case *pipeline.ShiftNode:
 		return NewShift(parents).Build(node)
+	case *pipeline.SideloadNode:
+		return NewSideload(parents).Build(node)
 	case *pipeline.StateCountNode:
 		return NewStateCount(parents).Build(node)
 	case *pipeline.StateDurationNode:

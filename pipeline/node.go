@@ -488,3 +488,10 @@ func (n *chainnode) StateCount(expression *ast.LambdaNode) *StateCountNode {
 	n.linkChild(sc)
 	return sc
 }
+
+// Create a node that can load data from external sources
+func (n *chainnode) Sideload() *SideloadNode {
+	s := newSideloadNode(n.provides)
+	n.linkChild(s)
+	return s
+}
