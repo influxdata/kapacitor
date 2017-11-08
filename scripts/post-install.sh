@@ -12,14 +12,17 @@ function install_init {
 
 function install_systemd {
     cp -f $SCRIPT_DIR/kapacitor.service /lib/systemd/system/kapacitor.service
+}
+
+function enable_systemd {
     systemctl enable kapacitor
 }
 
-function install_update_rcd {
+function enable_update_rcd {
     update-rc.d kapacitor defaults
 }
 
-function install_chkconfig {
+function enable_chkconfig {
     chkconfig --add kapacitor
 }
 
@@ -40,28 +43,25 @@ if [[ -f /etc/redhat-release ]]; then
     # RHEL-variant logic
     if [[ "$(readlink /proc/1/exe)" == */systemd ]]; then
         install_systemd
+        # Do not enable service
     else
-        # Assuming SysVinit
+        # Assuming SysV
         install_init
-        # Run update-rc.d or fallback to chkconfig if not available
-        if which update-rc.d &>/dev/null; then
-            install_update_rcd
-        else
-            install_chkconfig
-        fi
+        # Do not enable service
     fi
 elif [[ -f /etc/debian_version ]]; then
     # Debian/Ubuntu logic
     if [[ "$(readlink /proc/1/exe)" == */systemd ]]; then
         install_systemd
+        enable_systemd
     else
-        # Assuming SysVinit
+        # Assuming SysV
         install_init
         # Run update-rc.d or fallback to chkconfig if not available
         if which update-rc.d &>/dev/null; then
-            install_update_rcd
+            enable_update_rcd
         else
-            install_chkconfig
+            enable_chkconfig
         fi
     fi
 elif [[ -f /etc/os-release ]]; then
@@ -69,11 +69,6 @@ elif [[ -f /etc/os-release ]]; then
     if [[ $ID = "amzn" ]]; then
         # Amazon Linux logic
         install_init
-        # Run update-rc.d or fallback to chkconfig if not available
-        if which update-rc.d &>/dev/null; then
-            install_update_rcd
-        else
-            install_chkconfig
-        fi
+        # Do not enable service
     fi
 fi

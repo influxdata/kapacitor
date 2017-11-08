@@ -1,18 +1,23 @@
 #!/bin/bash
 
-function disable_systemd {
-    systemctl disable kapacitor
+function uninstall_init {
+    rm -f /etc/init.d/kapacitor
+}
+
+function uninstall_systemd {
     rm -f /lib/systemd/system/kapacitor.service
 }
 
+function disable_systemd {
+    systemctl disable kapacitor
+}
+
 function disable_update_rcd {
-    update-rc.d kapacitor remove
-    rm -f /etc/init.d/kapacitor
+    update-rc.d -f kapacitor remove
 }
 
 function disable_chkconfig {
     chkconfig --del kapacitor
-    rm -f /etc/init.d/kapacitor
 }
 
 if [[ -f /etc/redhat-release ]]; then
@@ -23,9 +28,16 @@ if [[ -f /etc/redhat-release ]]; then
 
         if [[ "$(readlink /proc/1/exe)" == */systemd ]]; then
             disable_systemd
+            uninstall_systemd
         else
-            # Assuming sysv
-            disable_chkconfig
+            # Assuming SysV
+            # Run update-rc.d or fallback to chkconfig if not available
+            if which update-rc.d &>/dev/null; then
+                disable_update_rcd
+            else
+                disable_chkconfig
+            fi
+            uninstall_init
         fi
     fi
 elif [[ -f /etc/debian_version ]]; then
@@ -36,9 +48,16 @@ elif [[ -f /etc/debian_version ]]; then
 
         if [[ "$(readlink /proc/1/exe)" == */systemd ]]; then
             disable_systemd
+            uninstall_systemd
         else
-            # Assuming sysv
-            disable_update_rcd
+            # Assuming SysV
+            # Run update-rc.d or fallback to chkconfig if not available
+            if which update-rc.d &>/dev/null; then
+                disable_update_rcd
+            else
+                disable_chkconfig
+            fi
+            uninstall_init
         fi
     fi
 elif [[ -f /etc/os-release ]]; then
@@ -48,7 +67,14 @@ elif [[ -f /etc/os-release ]]; then
         if [[ "$1" = "0" ]]; then
             # Kapacitor is no longer installed, remove from init system
             rm -f /etc/default/kapacitor
-            disable_chkconfig
+
+            # Run update-rc.d or fallback to chkconfig if not available
+            if which update-rc.d &>/dev/null; then
+                disable_update_rcd
+            else
+                disable_chkconfig
+            fi
+            uninstall_init
         fi
     fi
 fi
