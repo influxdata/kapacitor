@@ -226,7 +226,7 @@ func (j JSONNode) NodeList(field string) ([]Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	list, ok := l.([]map[string]interface{})
+	list, ok := l.([]interface{})
 	if !ok {
 		return nil, fmt.Errorf("field %s is not a list of values but is %T", field, l)
 	}
