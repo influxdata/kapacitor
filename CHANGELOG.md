@@ -46,6 +46,9 @@
 - [#1641](https://github.com/influxdata/kapacitor/issues/1641): Logs API writes multiple http headers.
 - [#1657](https://github.com/influxdata/kapacitor/issues/1657): Fix missing dependency in rpm package.
 - [#1660](https://github.com/influxdata/kapacitor/pull/1660): Force tar owner/group to be root.
+- [#1663](https://github.com/influxdata/kapacitor/pull/1663): Fixed install/remove of kapacitor on non-systemd Debian/Ubuntu systems.
+    Fixes packaging to not enable services on RHEL systems.
+    Fixes issues with recusive symlinks on systemd systems.
 
 ## v1.3.3 [2017-08-11]
 
