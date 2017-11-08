@@ -111,7 +111,7 @@ func (cs Configs) Validate() error {
 			return err
 		}
 	}
-	if defaultCount > 0 {
+	if defaultCount > 1 {
 		return errors.New("more than one configuration is marked as the default")
 	}
 	if defaultCount == 0 && len(cs) > 1 {
