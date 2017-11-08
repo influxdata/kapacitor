@@ -9,8 +9,6 @@ import (
 	"text/template"
 	"time"
 
-	"fmt"
-
 	"github.com/influxdata/kapacitor/cmd/kapacitord/run"
 )
 
@@ -34,12 +32,13 @@ func TestCommand_PIDFile(t *testing.T) {
   dir = "{{.TempDir}}/tasks"
 [load]
   dir = "{{.TempDir}}/load"
+[reporting]
+  enabled = false
 `))
 	var buf bytes.Buffer
 	if err := configTemplate.Execute(&buf, map[string]string{"TempDir": tmpdir}); err != nil {
 		t.Fatalf("unable to generate config file: %s", err)
 	}
-	fmt.Println(buf.String())
 	if err := ioutil.WriteFile(configFile, buf.Bytes(), 0600); err != nil {
 		t.Fatalf("unable to write %s: %s", configFile, err)
 	}
