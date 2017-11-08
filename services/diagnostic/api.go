@@ -25,7 +25,7 @@ type SessionService struct {
 
 	SessionsStore SessionsStore
 	HTTPDService  interface {
-		AddRoutes([]httpd.Route) error
+		AddPreviewRoutes([]httpd.Route) error
 		DelRoutes([]httpd.Route)
 	}
 }
@@ -71,7 +71,7 @@ func (s *SessionService) Open() error {
 		return errors.New("must set HTTPDService")
 	}
 
-	if err := s.HTTPDService.AddRoutes(s.routes); err != nil {
+	if err := s.HTTPDService.AddPreviewRoutes(s.routes); err != nil {
 		return fmt.Errorf("failed to add routes: %v", err)
 	}
 	return nil
