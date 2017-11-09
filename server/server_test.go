@@ -3318,7 +3318,7 @@ test value=1 0000000012
 			t.Fatal(err)
 		}
 		retry++
-		if retry > 10 {
+		if retry > 100 {
 			t.Fatal("failed to finish recording")
 		}
 	}
@@ -3525,7 +3525,7 @@ test value=1 0000000012
 			t.Fatal(err)
 		}
 		retry++
-		if retry > 10 {
+		if retry > 100 {
 			t.Fatal("failed to finish recording")
 		}
 	}

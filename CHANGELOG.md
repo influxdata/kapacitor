@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.4.0-rc1 [2017-11-09]
 
 ### Features
 - [#1408](https://github.com/influxdata/kapacitor/issues/1408): Add Previous state
