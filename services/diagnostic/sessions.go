@@ -108,12 +108,6 @@ func (s *Session) Error(msg string, context, fields []Field) {
 	}
 }
 
-func (s *Session) Warn(msg string, context, fields []Field) {
-	if s.level <= WarnLevel && match(s.tags, msg, "warn", context, fields) {
-		s.Log(time.Now(), "warn", msg, context, fields)
-	}
-}
-
 func (s *Session) Debug(msg string, context, fields []Field) {
 	if s.level <= DebugLevel && match(s.tags, msg, "debug", context, fields) {
 		s.Log(time.Now(), "debug", msg, context, fields)

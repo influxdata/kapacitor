@@ -259,8 +259,6 @@ func (h *KapacitorHandler) LogPointData(level, prefix string, point edge.PointMe
 		log = h.l.Error
 	case "DEBUG":
 		log = h.l.Debug
-	case "WARN":
-		log = h.l.Warn
 	default:
 		log = h.l.Info
 	}
@@ -278,8 +276,6 @@ func (h *KapacitorHandler) LogBatchData(level, prefix string, batch edge.Buffere
 		log = h.l.Error
 	case "DEBUG":
 		log = h.l.Debug
-	case "WARN":
-		log = h.l.Warn
 	default:
 		log = h.l.Info
 	}
@@ -492,7 +488,7 @@ type SlackHandler struct {
 }
 
 func (h *SlackHandler) InsecureSkipVerify() {
-	h.l.Warn("service is configured to skip ssl verification")
+	h.l.Info("service is configured to skip ssl verification")
 }
 
 func (h *SlackHandler) Error(msg string, err error) {
@@ -921,11 +917,11 @@ type NoAuthHandler struct {
 }
 
 func (h *NoAuthHandler) FakedUserAuthentication(username string) {
-	h.l.Warn("using noauth auth backend. Faked Authentication for user", String("user", username))
+	h.l.Info("using noauth auth backend. Faked Authentication for user", String("user", username))
 }
 
 func (h *NoAuthHandler) FakedSubscriptionUserToken() {
-	h.l.Warn("using noauth auth backend. Faked authentication for subscription user token")
+	h.l.Info("using noauth auth backend. Faked authentication for subscription user token")
 }
 
 // Stats handler
@@ -979,7 +975,7 @@ func (h *InfluxDBHandler) WithUDPContext(db string, rp string) udp.Diagnostic {
 }
 
 func (h *InfluxDBHandler) InsecureSkipVerify(urls []string) {
-	h.l.Warn("using InsecureSkipVerify when connecting to InfluxDB; this is insecure", Strings("urls", urls))
+	h.l.Info("using InsecureSkipVerify when connecting to InfluxDB; this is insecure", Strings("urls", urls))
 }
 
 func (h *InfluxDBHandler) UnlinkingSubscriptions(cluster string) {
@@ -1052,7 +1048,7 @@ func (h *ScraperHandler) Warn(ctx ...interface{}) {
 	defer h.buf.Reset()
 	fmt.Fprint(h.buf, ctx...)
 
-	h.l.Warn(h.buf.String())
+	h.l.Info(h.buf.String())
 }
 
 func (h *ScraperHandler) Warnln(ctx ...interface{}) {
@@ -1061,11 +1057,11 @@ func (h *ScraperHandler) Warnln(ctx ...interface{}) {
 	defer h.buf.Reset()
 	fmt.Fprintln(h.buf, ctx...)
 
-	h.l.Warn(strconv.Quote(h.buf.String()))
+	h.l.Info(strconv.Quote(h.buf.String()))
 }
 
 func (h *ScraperHandler) Warnf(s string, ctx ...interface{}) {
-	h.l.Warn(fmt.Sprintf(s, ctx...))
+	h.l.Info(fmt.Sprintf(s, ctx...))
 }
 
 func (h *ScraperHandler) Error(ctx ...interface{}) {
@@ -1161,7 +1157,6 @@ const (
 	llDebug
 	llError
 	llInfo
-	llWarn
 )
 
 type StaticLevelHandler struct {
@@ -1177,8 +1172,6 @@ func (h *StaticLevelHandler) Write(buf []byte) (int, error) {
 		h.l.Error(string(buf))
 	case llInfo:
 		h.l.Info(string(buf))
-	case llWarn:
-		h.l.Warn(string(buf))
 	default:
 		return 0, errors.New("invalid log level")
 	}
