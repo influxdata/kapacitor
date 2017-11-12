@@ -75,7 +75,7 @@ func TestSwarmAutoscale(t *testing.T) {
     |from()
     |swarmAutoscale()
         .cluster('zerg')
-        .servceName('mutalisk')
+        .serviceName('mutalisk')
         .serviceNameTag('mutalisk')
         .outputServiceNameTag('guardian')
         .currentField('hitPoints')
