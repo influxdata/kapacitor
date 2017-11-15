@@ -530,7 +530,7 @@ func (n *Node) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node, wei
 	}
 	config.headerTemplate.Execute(buf, info)
 
-  if len(n.AnonFields) > 0 && n.AnonFields[0] != "chainnode" && n.AnonFields[0] != "node" {
+  if len(n.AnonFields) > 0 && n.AnonFields[0] == "AlertNodeData" {
 		renderDoc(buf, nodes, r, nodes[n.AnonFields[0]].Doc)
 	} else {
 	  renderDoc(buf, nodes, r, n.Doc)
