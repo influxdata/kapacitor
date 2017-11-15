@@ -26,7 +26,7 @@ import (
 //            .every(5m)
 //        |httpOut('recent')
 //
-// his example emits the last `10 minute` period  every `5 minutes` to the pipeline's `httpOut` node.
+// This example emits the last `10 minute` period  every `5 minutes` to the pipeline's `httpOut` node.
 // Because `every` is less than `period`, each time the window is emitted it contains `5 minutes` of
 // new data and `5 minutes` of the previous period's data.
 //
