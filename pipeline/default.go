@@ -43,6 +43,7 @@ func newDefaultNode(e EdgeType) *DefaultNode {
 }
 
 // MarshalJSON converts DefaultNode to JSON
+// tick:ignore
 func (n *DefaultNode) MarshalJSON() ([]byte, error) {
 	type Alias DefaultNode
 	var raw = &struct {
@@ -59,6 +60,7 @@ func (n *DefaultNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an DefaultNode
+// tick:ignore
 func (n *DefaultNode) UnmarshalJSON(data []byte) error {
 	type Alias DefaultNode
 	var raw = &struct {

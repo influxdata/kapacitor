@@ -63,6 +63,7 @@ func newInfluxQLNode(method, field string, wants, provides EdgeType, reducer Red
 }
 
 // MarshalJSON converts InfluxQLNode to JSON
+// tick:ignore
 func (n *InfluxQLNode) MarshalJSON() ([]byte, error) {
 	type Alias InfluxQLNode
 	var raw = &struct {
@@ -87,6 +88,7 @@ func (n *InfluxQLNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an InfluxQLNode
+// tick:ignore
 func (n *InfluxQLNode) UnmarshalJSON(data []byte) error {
 	type Alias InfluxQLNode
 	var raw = &struct {

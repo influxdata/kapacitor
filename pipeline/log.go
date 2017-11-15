@@ -34,6 +34,7 @@ func newLogNode(wants EdgeType) *LogNode {
 }
 
 // MarshalJSON converts LogNode to JSON
+// tick:ignore
 func (n *LogNode) MarshalJSON() ([]byte, error) {
 	type Alias LogNode
 	var raw = &struct {
@@ -50,6 +51,7 @@ func (n *LogNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an LogNode
+// tick:ignore
 func (n *LogNode) UnmarshalJSON(data []byte) error {
 	type Alias LogNode
 	var raw = &struct {

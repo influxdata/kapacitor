@@ -51,6 +51,7 @@ func newKapacitorLoopbackNode(wants EdgeType) *KapacitorLoopbackNode {
 }
 
 // MarshalJSON converts KapacitorLoopbackNode to JSON
+// tick:ignore
 func (n *KapacitorLoopbackNode) MarshalJSON() ([]byte, error) {
 	type Alias KapacitorLoopbackNode
 	var raw = &struct {
@@ -67,6 +68,7 @@ func (n *KapacitorLoopbackNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an KapacitorLoopbackNode
+// tick:ignore
 func (n *KapacitorLoopbackNode) UnmarshalJSON(data []byte) error {
 	type Alias KapacitorLoopbackNode
 	var raw = &struct {

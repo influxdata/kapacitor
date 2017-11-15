@@ -60,6 +60,7 @@ func newEvalNode(e EdgeType, exprs []*ast.LambdaNode) *EvalNode {
 }
 
 // MarshalJSON converts EvalNode to JSON
+// tick:ignore
 func (n *EvalNode) MarshalJSON() ([]byte, error) {
 	type Alias EvalNode
 	var raw = &struct {
@@ -76,6 +77,7 @@ func (n *EvalNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an EvalNode
+// tick:ignore
 func (n *EvalNode) UnmarshalJSON(data []byte) error {
 	type Alias EvalNode
 	var raw = &struct {

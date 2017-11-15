@@ -45,6 +45,7 @@ func newGroupByNode(wants EdgeType, dims []interface{}) *GroupByNode {
 }
 
 // MarshalJSON converts GroupByNode to JSON
+// tick:ignore
 func (n *GroupByNode) MarshalJSON() ([]byte, error) {
 	type Alias GroupByNode
 	var raw = &struct {
@@ -61,6 +62,7 @@ func (n *GroupByNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an GroupByNode
+// tick:ignore
 func (n *GroupByNode) UnmarshalJSON(data []byte) error {
 	type Alias GroupByNode
 	var raw = &struct {

@@ -56,6 +56,7 @@ func newSampleNode(wants EdgeType, rate interface{}) *SampleNode {
 }
 
 // MarshalJSON converts SampleNode to JSON
+// tick:ignore
 func (n *SampleNode) MarshalJSON() ([]byte, error) {
 	type Alias SampleNode
 	var raw = &struct {
@@ -74,6 +75,7 @@ func (n *SampleNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an SampleNode
+// tick:ignore
 func (n *SampleNode) UnmarshalJSON(data []byte) error {
 	type Alias SampleNode
 	var raw = &struct {

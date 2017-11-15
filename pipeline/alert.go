@@ -379,6 +379,7 @@ func newAlertNode(wants EdgeType) *AlertNode {
 }
 
 // MarshalJSON converts AlertNode to JSON
+// tick:ignore
 func (n *AlertNode) MarshalJSON() ([]byte, error) {
 	type Alias AlertNodeData
 	var raw = &struct {
@@ -396,6 +397,7 @@ func (n *AlertNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an AlertNode
+// tick:ignore
 func (n *AlertNode) UnmarshalJSON(data []byte) error {
 	type Alias AlertNode
 	var raw = &struct {

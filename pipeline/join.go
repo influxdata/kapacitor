@@ -138,6 +138,7 @@ func newJoinNode(e EdgeType, parents []Node) *JoinNode {
 }
 
 // MarshalJSON converts JoinNode to JSON
+// tick:ignore
 func (n *JoinNode) MarshalJSON() ([]byte, error) {
 	type Alias JoinNode
 	var raw = &struct {
@@ -156,6 +157,7 @@ func (n *JoinNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an JoinNode
+// tick:ignore
 func (n *JoinNode) UnmarshalJSON(data []byte) error {
 	type Alias JoinNode
 	var raw = &struct {

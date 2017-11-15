@@ -30,6 +30,7 @@ func newStreamNode() *StreamNode {
 }
 
 // MarshalJSON converts StreamNode to JSON
+// tick:ignore
 func (n *StreamNode) MarshalJSON() ([]byte, error) {
 	type Alias StreamNode
 	var raw = &struct {
@@ -46,6 +47,7 @@ func (n *StreamNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an StreamNode
+// tick:ignore
 func (n *StreamNode) UnmarshalJSON(data []byte) error {
 	type Alias StreamNode
 	var raw = &struct {
@@ -167,6 +169,7 @@ func newFromNode() *FromNode {
 }
 
 // MarshalJSON converts FromNode to JSON
+// tick:ignore
 func (n *FromNode) MarshalJSON() ([]byte, error) {
 	type Alias FromNode
 	var raw = &struct {
@@ -187,6 +190,7 @@ func (n *FromNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an FromNode
+// tick:ignore
 func (n *FromNode) UnmarshalJSON(data []byte) error {
 	type Alias FromNode
 	var raw = &struct {

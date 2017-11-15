@@ -62,6 +62,7 @@ func newStateDurationNode(wants EdgeType, predicate *ast.LambdaNode) *StateDurat
 }
 
 // MarshalJSON converts StateDurationNode to JSON
+// tick:ignore
 func (n *StateDurationNode) MarshalJSON() ([]byte, error) {
 	type Alias StateDurationNode
 	var raw = &struct {
@@ -80,6 +81,7 @@ func (n *StateDurationNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an StateDurationNode
+// tick:ignore
 func (n *StateDurationNode) UnmarshalJSON(data []byte) error {
 	type Alias StateDurationNode
 	var raw = &struct {

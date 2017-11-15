@@ -112,10 +112,34 @@ func main() {
 			return true
 		})
 	}
+/*
+  fmt.Println("DEBUG: Nodes size ", len(nodes))
+	for key, nd := range nodes {
+		 fmt.Printf("   DEBUG-[%s]: %s %t\n", key, nd.Name, nd.Embedded)
 
+        fmt.Printf("    DEBUG-ANON-FIELDS: %s\n", nd.AnonFields)
+
+		    if(nd.Embedded){
+				   fmt.Printf("      DEBUG-EMBD: %s:%s\n", nd.EmbeddedParent, nd.EmbeddedProperty)
+				}
+
+		    for _, ppty := range nd.Properties {
+					fmt.Printf("      DEBUG-PROP: %s \n", ppty.Name)
+				}
+
+				for _, md := range nd.Methods {
+					fmt.Printf("      DEBUG-METH: %s \n", md.Name)
+				}
+	}
+
+	fmt.Printf("DEBUG-ALERTNODE: Properties %d, AnonFields %s\n", len(nodes["AlertNode"].Properties), nodes["AlertNode"].AnonFields)
+	for _, alert_prop := range nodes["AlertNode"].Properties {
+		fmt.Printf("     %s\n", alert_prop.Name)
+	}
+*/
 	ordered := make([]string, 0, len(nodes))
 	for name, node := range nodes {
-		if name == "" || !ast.IsExported(name) || node.Name == "" {
+		if name == "" || !ast.IsExported(name) || node.Name == "" || isAnonField(node, nodes) {
 			continue
 		}
 		if node.Embedded {
@@ -272,6 +296,17 @@ func shouldIgnore(cg *ast.CommentGroup) bool {
 		s := strings.TrimSpace(strings.TrimLeft(l.Text, "/"))
 		if s == tickIgnore {
 			return true
+		}
+	}
+	return false
+}
+
+func isAnonField(nd *Node, nodes map[string]*Node) bool {
+	for _, node := range nodes{
+		for _, field := range node.AnonFields {
+        if field == nd.Name {
+					  return true
+					}
 		}
 	}
 	return false
@@ -462,6 +497,17 @@ func (n *Node) Embed(nodes map[string]*Node) error {
 	}
 	if prop, ok := parent.Properties[n.EmbeddedProperty]; ok {
 		prop.EmbeddedProperties = n.Properties
+	} else if len(parent.AnonFields) > 0 {
+		 anon_parent := nodes[parent.AnonFields[0]]
+		 if anon_parent == nil {
+	 		return fmt.Errorf("no node %s from anon_field in node %s", parent.AnonFields[0], n.EmbeddedParent)
+	 	}
+
+		 if prop, ok := anon_parent.Properties[n.EmbeddedProperty]; ok {
+			  prop.EmbeddedProperties = n.Properties
+		 }else{
+			 fmt.Errorf("no property %s no node %s not even in node from AnonField %s", n.EmbeddedProperty, n.EmbeddedParent, parent.AnonFields[0])
+		 }
 	} else {
 		return fmt.Errorf("no property %s no node %s", n.EmbeddedProperty, n.EmbeddedParent)
 	}
@@ -484,7 +530,11 @@ func (n *Node) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node, wei
 	}
 	config.headerTemplate.Execute(buf, info)
 
-	renderDoc(buf, nodes, r, n.Doc)
+  if len(n.AnonFields) > 0 && n.AnonFields[0] != "chainnode" && n.AnonFields[0] != "node" {
+		renderDoc(buf, nodes, r, nodes[n.AnonFields[0]].Doc)
+	} else {
+	  renderDoc(buf, nodes, r, n.Doc)
+	}
 
 	properties := make([]string, len(n.Properties))
 	i := 0
