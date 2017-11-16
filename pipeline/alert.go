@@ -23,6 +23,7 @@ const defaultMessageTmpl = "{{ .ID }} is {{ .Level }}"
 // Default template for constructing a details message.
 const defaultDetailsTmpl = "{{ json . }}"
 
+// tick:wraps"AlertNodeData"
 type AlertNode struct{ *AlertNodeData }
 
 // An AlertNode can trigger an event of varying severity levels,

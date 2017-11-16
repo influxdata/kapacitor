@@ -51,6 +51,7 @@ import (
 
 const tickIgnore = "tick:ignore"
 const tickProperty = "tick:property"
+const tickWraps = "tick:wraps"
 const tickExample = "Example:"
 const tickLang = "javascript"
 
@@ -112,31 +113,7 @@ func main() {
 			return true
 		})
 	}
-/*
-  fmt.Println("DEBUG: Nodes size ", len(nodes))
-	for key, nd := range nodes {
-		 fmt.Printf("   DEBUG-[%s]: %s %t\n", key, nd.Name, nd.Embedded)
 
-        fmt.Printf("    DEBUG-ANON-FIELDS: %s\n", nd.AnonFields)
-
-		    if(nd.Embedded){
-				   fmt.Printf("      DEBUG-EMBD: %s:%s\n", nd.EmbeddedParent, nd.EmbeddedProperty)
-				}
-
-		    for _, ppty := range nd.Properties {
-					fmt.Printf("      DEBUG-PROP: %s \n", ppty.Name)
-				}
-
-				for _, md := range nd.Methods {
-					fmt.Printf("      DEBUG-METH: %s \n", md.Name)
-				}
-	}
-
-	fmt.Printf("DEBUG-ALERTNODE: Properties %d, AnonFields %s\n", len(nodes["AlertNode"].Properties), nodes["AlertNode"].AnonFields)
-	for _, alert_prop := range nodes["AlertNode"].Properties {
-		fmt.Printf("     %s\n", alert_prop.Name)
-	}
-*/
 	ordered := make([]string, 0, len(nodes))
 	for name, node := range nodes {
 		if name == "" || !ast.IsExported(name) || node.Name == "" || isAnonField(node, nodes) {
@@ -201,6 +178,7 @@ func handleGenDecl(nodes map[string]*Node, decl *ast.GenDecl) {
 			node.Doc = decl.Doc
 			node.Embedded, node.EmbeddedParent, node.EmbeddedProperty = isEmbedded(decl.Doc)
 			processFields(node, s)
+			getWrapped(node)
 		}
 	}
 }
@@ -310,6 +288,21 @@ func isAnonField(nd *Node, nodes map[string]*Node) bool {
 		}
 	}
 	return false
+}
+
+func getWrapped(nd *Node) string {
+	 if nd.Doc == nil {
+		 return ""
+	 }
+	 for _, ln := range nd.Doc.List {
+		  s := strings.TrimSpace(strings.TrimLeft(ln.Text, "/"))
+			if strings.Contains(s, tickWraps) {
+				 tokens := strings.Split(s, "\"")
+				 return tokens[1]
+			}
+	 }
+
+	 return ""
 }
 
 func isEmbedded(cg *ast.CommentGroup) (bool, string, string) {
@@ -530,8 +523,8 @@ func (n *Node) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node, wei
 	}
 	config.headerTemplate.Execute(buf, info)
 
-  if len(n.AnonFields) > 0 && n.AnonFields[0] == "AlertNodeData" {
-		renderDoc(buf, nodes, r, nodes[n.AnonFields[0]].Doc)
+  if len(getWrapped(n)) > 0 {
+		renderDoc(buf, nodes, r, nodes[getWrapped(n)].Doc)
 	} else {
 	  renderDoc(buf, nodes, r, n.Doc)
 	}
