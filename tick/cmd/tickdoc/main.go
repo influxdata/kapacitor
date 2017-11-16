@@ -66,6 +66,8 @@ var usageStr = `Usage: %s [options] [package dir] [output dir]
 Options:
 `
 
+var constrTemplStr = "\n### Constructor\n**{{ .Name }}({{ if .Params }}{{range .Params}} `{{ .Name }} {{ .Type }}` {{ end }}{{ end }})** - " //"{{range .Doc.List }}{{ .Text }}{{ end }}\n\n"
+
 func usage() {
 	fmt.Fprintf(os.Stderr, usageStr, os.Args[0])
 	flag.PrintDefaults()
@@ -112,6 +114,15 @@ func main() {
 			}
 			return true
 		})
+	}
+
+	for _, nd := range nodes {
+	   fmt.Printf("DEBUG NODE[%s] methods: %d\n", nd.Name, len(nd.Methods))
+		 if nd.Name == "chainnode"{
+			 for _, meth := range nd.Methods {
+				  fmt.Printf("   DEBUG METH - %s\n", meth.Name)
+			 }
+		 }
 	}
 
 	ordered := make([]string, 0, len(nodes))
@@ -303,6 +314,16 @@ func getWrapped(nd *Node) string {
 	 }
 
 	 return ""
+}
+
+func getConstructor(target string, source *Node) *Method {
+
+   for _, meth := range source.Methods {
+		  if strings.ToUpper(meth.Name) == strings.ToUpper(target) {
+				return meth
+			}
+	 }
+   return nil
 }
 
 func isEmbedded(cg *ast.CommentGroup) (bool, string, string) {
@@ -523,11 +544,39 @@ func (n *Node) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node, wei
 	}
 	config.headerTemplate.Execute(buf, info)
 
+
+	//constructor
+	shortName := strings.TrimSuffix(n.Name,"Node")
+	fmt.Printf("DEBUG shortName: %s\n", shortName)
+	constructor := getConstructor(shortName, n)
+	if constructor == nil {
+		 fmt.Printf("DEBUG PANIC found no constructor\n")
+		 buf.Write([]byte("###Constructor \n\n **" + n.Name + "** has no constructor\n\n<hr>"))
+	}else{
+		fmt.Printf("DEBUG found constructor %s(%s) %s\n", constructor.Name, constructor.Params, constructor.Result)
+		for _, param := range constructor.Params {
+			fmt.Printf("    param: %s\n", param)
+		}
+		constructorTemplate, err := template.New("Constructor").Parse(constrTemplStr)
+		if err != nil { panic(err) }
+		err = constructorTemplate.Execute(buf, constructor)
+		if err != nil { panic(err) }
+		var lines bytes.Buffer
+		for _, line := range constructor.Doc.List {
+			  lines.Write([]byte(strings.TrimSpace(strings.TrimLeft(fmt.Sprint(line.Text), "/"))))
+				lines.Write([]byte(" "))
+		}
+		lines.Write([]byte("\n\n<hr>"))
+		buf.Write(lines.Bytes())
+    lines.Reset()
+	}
+
   if len(getWrapped(n)) > 0 {
 		renderDoc(buf, nodes, r, nodes[getWrapped(n)].Doc)
 	} else {
 	  renderDoc(buf, nodes, r, n.Doc)
 	}
+
 
 	properties := make([]string, len(n.Properties))
 	i := 0
