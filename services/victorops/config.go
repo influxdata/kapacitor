@@ -19,6 +19,8 @@ type Config struct {
 	URL string `toml:"url" override:"url"`
 	// Whether every alert should automatically go to VictorOps.
 	Global bool `toml:"global" override:"global"`
+	// JSONData indicates that the VictorOps "data" field should contain JSON and not a string.
+	JSONData bool `toml:"json-data" override:"json-data"`
 }
 
 func NewConfig() Config {

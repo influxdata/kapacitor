@@ -7784,6 +7784,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"global":      false,
 						"routing-key": "test",
 						"url":         victorops.DefaultVictorOpsAPIURL,
+						"json-data":   false,
 					},
 					Redacted: []string{
 						"api-key",
@@ -7798,6 +7799,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"global":      false,
 					"routing-key": "test",
 					"url":         victorops.DefaultVictorOpsAPIURL,
+					"json-data":   false,
 				},
 				Redacted: []string{
 					"api-key",
@@ -7807,8 +7809,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 				{
 					updateAction: client.ConfigUpdateAction{
 						Set: map[string]interface{}{
-							"api-key": "",
-							"global":  true,
+							"api-key":   "",
+							"global":    true,
+							"json-data": true,
 						},
 					},
 					expSection: client.ConfigSection{
@@ -7821,6 +7824,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"global":      true,
 								"routing-key": "test",
 								"url":         victorops.DefaultVictorOpsAPIURL,
+								"json-data":   true,
 							},
 							Redacted: []string{
 								"api-key",
@@ -7835,6 +7839,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"global":      true,
 							"routing-key": "test",
 							"url":         victorops.DefaultVictorOpsAPIURL,
+							"json-data":   true,
 						},
 						Redacted: []string{
 							"api-key",

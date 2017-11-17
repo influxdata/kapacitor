@@ -1,5 +1,11 @@
 # Changelog
 
+## unreleased
+
+### Bugfixes
+
+- [#1250](https://github.com/influxdata/kapacitor/issues/1250): Fix VictorOps "data" field being a string instead of actual JSON.
+
 ## v1.4.0-rc1 [2017-11-09]
 
 ### Features
