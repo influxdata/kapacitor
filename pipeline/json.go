@@ -126,6 +126,20 @@ func (p *Pipeline) MarshalJSON() ([]byte, error) {
 	}{}
 
 	for _, n := range p.sorted {
+		// we skip all noop nodes
+		if _, ok := n.(*NoOpNode); ok {
+			continue
+		}
+
+		// With a stats node we "fake" a parent to hook it correctly into the graph
+		if stat, ok := n.(*StatsNode); ok {
+			raw.Edges = append(raw.Edges,
+				Edge{
+					Parent: stat.SourceNode.ID(),
+					Child:  stat.ID(),
+				})
+		}
+
 		raw.Nodes = append(raw.Nodes, n)
 		for _, parent := range n.Parents() {
 			raw.Edges = append(raw.Edges,
