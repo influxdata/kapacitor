@@ -142,11 +142,15 @@ func (s *Service) preparePost(routingKey, messageType, message, entityID string,
 	voData["timestamp"] = t.Unix()
 	voData["monitoring_tool"] = "kapacitor"
 
-	b, err := json.Marshal(details)
-	if err != nil {
-		return "", nil, err
+	if c.JSONData {
+		voData["data"] = details
+	} else {
+		b, err := json.Marshal(details)
+		if err != nil {
+			return "", nil, err
+		}
+		voData["data"] = string(b)
 	}
-	voData["data"] = string(b)
 
 	if routingKey == "" {
 		routingKey = c.RoutingKey
@@ -155,7 +159,7 @@ func (s *Service) preparePost(routingKey, messageType, message, entityID string,
 	// Post data to VO
 	var post bytes.Buffer
 	enc := json.NewEncoder(&post)
-	err = enc.Encode(voData)
+	err := enc.Encode(voData)
 	if err != nil {
 		return "", nil, err
 	}

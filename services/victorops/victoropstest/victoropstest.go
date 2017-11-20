@@ -49,10 +49,10 @@ type Request struct {
 	PostData PostData
 }
 type PostData struct {
-	MessageType    string `json:"message_type"`
-	EntityID       string `json:"entity_id"`
-	StateMessage   string `json:"state_message"`
-	Timestamp      int    `json:"timestamp"`
-	MonitoringTool string `json:"monitoring_tool"`
-	Data           string `json:"data"`
+	MessageType    string      `json:"message_type"`
+	EntityID       string      `json:"entity_id"`
+	StateMessage   string      `json:"state_message"`
+	Timestamp      int         `json:"timestamp"`
+	MonitoringTool string      `json:"monitoring_tool"`
+	Data           interface{} `json:"data"`
 }

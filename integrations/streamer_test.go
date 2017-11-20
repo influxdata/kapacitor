@@ -8361,6 +8361,79 @@ stream
 	}
 }
 
+func TestStream_AlertVictorOps_JSON_Data(t *testing.T) {
+	ts := victoropstest.NewServer()
+	defer ts.Close()
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.victorOps()
+`
+
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := victorops.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL
+		c.APIKey = "api_key"
+		c.RoutingKey = "routing_key"
+		c.JSONData = true
+		d := diagService.NewVictorOpsHandler().WithContext(keyvalue.KV("test", "vo"))
+		vo := victorops.NewService(c, d)
+		tm.VictorOpsService = vo
+	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	exp := []interface{}{
+		victoropstest.Request{
+			URL: "/api_key/routing_key",
+			PostData: victoropstest.PostData{
+				MessageType:    "CRITICAL",
+				EntityID:       "kapacitor/cpu/serverA",
+				StateMessage:   "kapacitor/cpu/serverA is CRITICAL",
+				Timestamp:      31536010,
+				MonitoringTool: "kapacitor",
+				Data: map[string]interface{}{
+					"series": []interface{}{
+						map[string]interface{}{
+							"name": "cpu",
+							"tags": map[string]interface{}{
+								"host": "serverA",
+							},
+							"columns": []interface{}{"time", "count"},
+							"values": []interface{}{
+								[]interface{}{"1971-01-01T00:00:10Z", 10.0},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Requests() {
+		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+		t.Error(err)
+	}
+}
+
 func TestStream_AlertTalk(t *testing.T) {
 	ts := talktest.NewServer()
 	defer ts.Close()
