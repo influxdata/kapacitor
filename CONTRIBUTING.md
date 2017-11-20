@@ -107,7 +107,7 @@ go fmt ./...
 go vet ./...
 ```
 
-For more information on `go vet`, [read the GoDoc](https://godoc.org/golang.org/x/tools/cmd/vet).
+For more information on `go vet`, [read the GoDoc](https://golang.org/pkg/cmd/go/internal/vet/).
 
 Build and Test
 --------------
