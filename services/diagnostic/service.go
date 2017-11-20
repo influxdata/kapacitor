@@ -186,7 +186,7 @@ func (s *Service) NewKapacitorHandler() *KapacitorHandler {
 
 func (s *Service) NewAlertServiceHandler() *AlertServiceHandler {
 	return &AlertServiceHandler{
-		l: s.Logger.With(String("service", "alert")),
+		L: s.Logger.With(String("service", "alert")),
 	}
 }
 

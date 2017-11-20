@@ -131,7 +131,7 @@ func Debug(l Logger, msg string, ctx []keyvalue.T) {
 // Alert Service Handler
 
 type AlertServiceHandler struct {
-	l Logger
+	L Logger
 }
 
 func logFieldsFromContext(ctx []keyvalue.T) []Field {
@@ -147,32 +147,32 @@ func (h *AlertServiceHandler) WithHandlerContext(ctx ...keyvalue.T) alertservice
 	fields := logFieldsFromContext(ctx)
 
 	return &AlertServiceHandler{
-		l: h.l.With(fields...),
+		L: h.L.With(fields...),
 	}
 }
 
 func (h *AlertServiceHandler) MigratingHandlerSpecs() {
-	h.l.Debug("migrating old v1.2 handler specs")
+	h.L.Debug("migrating old v1.2 handler specs")
 }
 
 func (h *AlertServiceHandler) MigratingOldHandlerSpec(spec string) {
-	h.l.Debug("migrating old handler spec", String("handler", spec))
+	h.L.Debug("migrating old handler spec", String("handler", spec))
 }
 
 func (h *AlertServiceHandler) FoundHandlerRows(length int) {
-	h.l.Debug("found handler rows", Int("handler_row_count", length))
+	h.L.Debug("found handler rows", Int("handler_row_count", length))
 }
 
 func (h *AlertServiceHandler) CreatingNewHandlers(length int) {
-	h.l.Debug("creating new handlers in place of old handlers", Int("handler_row_count", length))
+	h.L.Debug("creating new handlers in place of old handlers", Int("handler_row_count", length))
 }
 
 func (h *AlertServiceHandler) FoundNewHandler(key string) {
-	h.l.Debug("found new handler skipping", String("handler", key))
+	h.L.Debug("found new handler skipping", String("handler", key))
 }
 
 func (h *AlertServiceHandler) Error(msg string, err error, ctx ...keyvalue.T) {
-	Err(h.l, msg, err, ctx)
+	Err(h.L, msg, err, ctx)
 }
 
 // Kapcitor Handler
