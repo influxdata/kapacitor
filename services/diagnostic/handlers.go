@@ -91,8 +91,7 @@ func Info(l Logger, msg string, ctx []keyvalue.T) {
 
 	// Use the allocation version for any length
 	fields := make([]Field, len(ctx))
-	for i := 1; i < len(fields); i++ {
-		kv := ctx[i-1]
+	for i, kv := range ctx {
 		fields[i] = String(kv.Key, kv.Value)
 	}
 
@@ -120,8 +119,7 @@ func Debug(l Logger, msg string, ctx []keyvalue.T) {
 
 	// Use the allocation version for any length
 	fields := make([]Field, len(ctx))
-	for i := 1; i < len(fields); i++ {
-		kv := ctx[i-1]
+	for i, kv := range ctx {
 		fields[i] = String(kv.Key, kv.Value)
 	}
 
