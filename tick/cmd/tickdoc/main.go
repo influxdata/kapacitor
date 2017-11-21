@@ -66,7 +66,8 @@ var usageStr = `Usage: %s [options] [package dir] [output dir]
 Options:
 `
 
-var constrTemplStr = "\n### Constructor\n**{{ .Name }}({{ if .Params }}{{range .Params}} `{{ .Name }} {{ .Type }}` {{ end }}{{ end }})** - " //"{{range .Doc.List }}{{ .Text }}{{ end }}\n\n"
+var constrTemplStr = "**[{{ .Name }}](#descr)&nbsp;({{ if .Params }}{{range .Params}}&nbsp;`{{ .Name }}`&nbsp;`{{ .Type }}`&nbsp;{{ end }}{{ end }})**"
+//var paramTemplStr = "**[{{ .Name }}](#{{.Name}})&nbsp;({{ if .Params }}{{range .Params}}&nbsp;`{{ .Name }}`&nbsp;`{{ .Type }}`&nbsp;{{ end }}{{ end }})**"
 
 func usage() {
 	fmt.Fprintf(os.Stderr, usageStr, os.Args[0])
@@ -301,6 +302,8 @@ func isAnonField(nd *Node, nodes map[string]*Node) bool {
 	return false
 }
 
+// some nodes are wrappers - e.g. AlertNode{ *AlertNodeData }
+// this looks into the wrapped field
 func getWrapped(nd *Node) string {
 	 if nd.Doc == nil {
 		 return ""
@@ -316,13 +319,15 @@ func getWrapped(nd *Node) string {
 	 return ""
 }
 
-func getConstructor(target string, source *Node) *Method {
+func getConstructor(target string, sources ...*Node) *Method {
 
-   for _, meth := range source.Methods {
-		  if strings.ToUpper(meth.Name) == strings.ToUpper(target) {
-				return meth
-			}
-	 }
+   for _, source := range sources {
+	   for _, meth := range source.Methods {
+			  if strings.ToUpper(meth.Name) == strings.ToUpper(target) {
+					return meth
+				}
+		 }
+ }
    return nil
 }
 
@@ -536,47 +541,6 @@ type headerInfo struct {
 }
 
 func (n *Node) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node, weight int) error {
-	info := headerInfo{
-		Title:      n.Name,
-		Name:       strings.Replace(n.Name, "Node", "", 1),
-		Identifier: snaker.CamelToSnake(n.Name),
-		Weight:     weight,
-	}
-	config.headerTemplate.Execute(buf, info)
-
-
-	//constructor
-	shortName := strings.TrimSuffix(n.Name,"Node")
-	fmt.Printf("DEBUG shortName: %s\n", shortName)
-	constructor := getConstructor(shortName, n)
-	if constructor == nil {
-		 fmt.Printf("DEBUG PANIC found no constructor\n")
-		 buf.Write([]byte("###Constructor \n\n **" + n.Name + "** has no constructor\n\n<hr>"))
-	}else{
-		fmt.Printf("DEBUG found constructor %s(%s) %s\n", constructor.Name, constructor.Params, constructor.Result)
-		for _, param := range constructor.Params {
-			fmt.Printf("    param: %s\n", param)
-		}
-		constructorTemplate, err := template.New("Constructor").Parse(constrTemplStr)
-		if err != nil { panic(err) }
-		err = constructorTemplate.Execute(buf, constructor)
-		if err != nil { panic(err) }
-		var lines bytes.Buffer
-		for _, line := range constructor.Doc.List {
-			  lines.Write([]byte(strings.TrimSpace(strings.TrimLeft(fmt.Sprint(line.Text), "/"))))
-				lines.Write([]byte(" "))
-		}
-		lines.Write([]byte("\n\n<hr>"))
-		buf.Write(lines.Bytes())
-    lines.Reset()
-	}
-
-  if len(getWrapped(n)) > 0 {
-		renderDoc(buf, nodes, r, nodes[getWrapped(n)].Doc)
-	} else {
-	  renderDoc(buf, nodes, r, n.Doc)
-	}
-
 
 	properties := make([]string, len(n.Properties))
 	i := 0
@@ -594,22 +558,102 @@ func (n *Node) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node, wei
 	}
 	sort.Strings(methods)
 
+	info := headerInfo{
+		Title:      n.Name,
+		Name:       strings.Replace(n.Name, "Node", "", 1),
+		Identifier: snaker.CamelToSnake(n.Name),
+		Weight:     weight,
+	}
+	config.headerTemplate.Execute(buf, info)
+
+
+	//constructor
+	shortName := strings.TrimSuffix(n.Name,"Node")
+	fmt.Printf("DEBUG shortName: %s\n", shortName)
+	//buf.Write([]byte("<a id='top'/>\n\n"))
+	buf.Write([]byte("### Constructor \n\n| Chaining Method | Description |\n|:---------|:---------|\n"))
+	constructor := getConstructor(shortName, n, nodes["chainnode"], nodes["BatchNode"], nodes["StreamNode"])
+	if constructor == nil {
+		     fmt.Printf("DEBUG PANIC found no constructor\n")
+		     buf.Write([]byte("| **[" + n.Name + "](#descr)** | has no constructor |\n"))
+	}else{
+		fmt.Printf("DEBUG found constructor %s(%s) %s\n", constructor.Name, constructor.Params, constructor.Result)
+		for _, param := range constructor.Params {
+			fmt.Printf("    param: %s\n", param)
+		}
+		constructorTemplate, err := template.New("Constructor").Parse(constrTemplStr)
+
+		buf.Write([]byte("| "))
+		if err != nil { panic(err) }
+		err = constructorTemplate.Execute(buf, constructor)
+		if err != nil { panic(err) }
+
+		buf.Write([]byte(" | "))
+		for _, line := range constructor.Doc.List {
+			   //Use only first paragraph - so stop on empty line
+			  if len(strings.TrimSpace(strings.TrimLeft(fmt.Sprint(line.Text), "/"))) == 0 {
+					break
+				}
+			  buf.Write([]byte(strings.TrimSpace(strings.TrimLeft(fmt.Sprint(line.Text), "/"))))
+				buf.Write([]byte(" "))
+		}
+		buf.Write([]byte(" |\n\n"))
+	}
+	//end constructor rendering
+
+	buf.Write([]byte("### Property Methods\n"))
+
+	if(len(n.Properties) > 0){
+	   renderPropertiesTable(buf, r, n.Properties, nodes, 3, "node", "")
+  }else{
+		buf.Write([]byte("This node has no properties that can be set.\n\n"))
+	}
+
+	r.Header(buf, func() bool { buf.Write([]byte("Chaining Methods")); return true }, 3, "")
+
+	for i, name := range methods {
+		 buf.Write([]byte(fmt.Sprintf("[%s](%s)", name, methodNameToLink(n.Name, name))))
+		 if (i+1) < len(methods) {
+			 buf.Write([]byte(", "))
+		 }
+	}
+
+
+  // Need to add a few lines to push description below search bar
+	buf.Write([]byte("\n<a id='descr'/><hr/><br/>\n### Description <br/><br/>"))
+  // some nodes are wrappers - e.g. AlertNode{ *AlertNodeData }
+	// if so - use Doc for wrapped field instead
+  if len(getWrapped(n)) > 0 {
+		renderDoc(buf, nodes, r, nodes[getWrapped(n)].Doc)
+	} else {
+	  renderDoc(buf, nodes, r, n.Doc)
+	}
+
+//	buf.Write([]byte("<a href=\"javascript:document.getElementById('top').scrollIntoView();\" title=\"top\">^</a>\n"))
+	buf.Write([]byte("<a href=\"javascript:document.getElementsByClassName('article')[0].scrollIntoView();\" title=\"top\">^</a>\n"))
+
+
+
+
 	// Index
-	r.Header(buf, func() bool { buf.Write([]byte("Index")); return true }, 2, "")
-	r.Header(buf, func() bool { buf.Write([]byte("Properties")); return true }, 3, "")
+//	r.Header(buf, func() bool { buf.Write([]byte("Index")); return true }, 2, "")
+/*	r.Header(buf, func() bool { buf.Write([]byte("Properties")); return true }, 3, "")
 	r.List(buf, func() bool {
 		for _, name := range properties {
 			r.ListItem(buf, []byte(fmt.Sprintf("[%s](%s)", name, methodNameToLink(n.Name, name))), 1024)
 		}
 		return true
 	}, 0)
-	r.Header(buf, func() bool { buf.Write([]byte("Chaining Methods")); return true }, 3, "")
+	*/
+
+	/*
 	r.List(buf, func() bool {
 		for _, name := range methods {
 			r.ListItem(buf, []byte(fmt.Sprintf("[%s](%s)", name, methodNameToLink(n.Name, name))), 1024)
 		}
 		return true
 	}, 0)
+	*/
 
 	// Properties
 	if len(n.Properties) > 0 {
@@ -631,6 +675,8 @@ func (n *Node) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node, wei
 		for _, name := range methods {
 			n.Methods[name].Render(buf, r, nodes)
 			buf.Write([]byte("\n"))
+			buf.Write([]byte("<a href=\"javascript:document.getElementsByClassName('article')[0].scrollIntoView();\" title=\"top\">^</a>\n"))
+//			buf.Write([]byte("<a href=\"javascript:document.getElementById('top').scrollIntoView();\" title=\"top\">^</a>\n"))
 		}
 	}
 
@@ -649,6 +695,27 @@ func renderProperties(buf *bytes.Buffer, r Renderer, properties map[string]*Prop
 		properties[name].Render(buf, r, nodes, header, node, namePrefix)
 		buf.Write([]byte("\n"))
 	}
+}
+
+func renderPropertiesTable (buf *bytes.Buffer, r Renderer, properties map[string]*Property, nodes map[string]*Node, header int, node, namePrefix string) {
+   props := make([]string, len(properties))
+	 i := 0
+
+	 for name, _ := range properties {
+ 		props[i] = name
+ 		i++
+ 	}
+ 	sort.Strings(props)
+
+   buf.Write([]byte("\n"))
+	 buf.Write([]byte("| Setters | Description |\n|:---|:---|\n"))
+
+	 for  _, name := range props {
+       properties[name].RenderAsRow(buf, r, nodes, header, node, namePrefix)
+	 }
+
+	 buf.Write([]byte("\n\n"))
+
 }
 
 type Property struct {
@@ -675,14 +742,55 @@ func (p *Property) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node,
 		code.Write([]byte(param.Text()))
 	}
 	code.Write([]byte(")\n"))
+//  code.Write([]byte("<a href=\"javascript:document.getElementById('top').scrollIntoView();\" title=\"top\">^</a>\n"))
 
 	r.BlockCode(buf, code.Bytes(), tickLang)
+
+	buf.Write([]byte("<a href=\"javascript:document.getElementsByClassName('article')[0].scrollIntoView();\" title=\"top\">^</a>\n"))
+  //buf.Write([]byte("<a href=\"javascript:document.getElementById('top').scrollIntoView();\" title=\"top\">^</a>\n"))
 
 	if len(p.EmbeddedProperties) > 0 {
 		renderProperties(buf, r, p.EmbeddedProperties, nodes, header+1, code.String()+"      ", p.Name+" ")
 	}
 
 	return nil
+}
+
+func (p *Property) RenderAsRow(buf *bytes.Buffer, r Renderer, nodes map[string]*Node, header int, node, namePrefix string) error {
+
+	 //var code bytes.Buffer
+
+	 //propertyTemplate, err := template.New("Property").Parse(paramTemplStr)
+
+	 buf.Write([]byte("| "))
+	 //if err != nil { panic(err) }
+	 //err = propertyTemplate.Execute(buf, p)
+	 //if err != nil { panic(err) }
+	 buf.Write([]byte(fmt.Sprintf("**[%s](#%s)&nbsp;(&nbsp;", p.Name, strings.ToLower(p.Name))))
+//	 buf.Write([]byte(fmt.Sprintf("**[%s](javascript:void())&nbsp;(&nbsp;", p.Name, strings.ToLower(p.Name))))
+
+	 for _, param := range p.Params {
+		   buf.Write([]byte(fmt.Sprintf("`%s`&nbsp;`%s`", param.Name, param.Type)))
+	 }
+
+	 buf.Write([]byte(")**"))
+
+	 buf.Write([]byte(" | "))
+	 if( p.Doc != nil && len(p.Doc.List) > 0){
+		 for _, line := range p.Doc.List {
+			   //Use only first paragraph - so stop on empty line
+			   if len(strings.TrimSpace(strings.TrimLeft(fmt.Sprint(line.Text), "/"))) == 0 {
+				   break
+			   }
+				 buf.Write([]byte(strings.TrimSpace(strings.TrimLeft(fmt.Sprint(line.Text), "/"))))
+				 buf.Write([]byte(" "))
+		 }
+ }
+	 buf.Write([]byte(" |\n"))
+
+	// r.BlockCode(buf, code.Bytes(), tickLang)
+	return nil
+
 }
 
 type Method struct {

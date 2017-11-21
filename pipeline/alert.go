@@ -930,7 +930,7 @@ type PagerDutyHandler struct {
 //             .room('Kapacitor')
 //
 // Send alerts to HipChat room 'Kapacitor'
-
+//
 //
 // If the 'hipchat' section in the configuration has the option: global = true
 // then all alerts are sent to HipChat without the need to explicitly state it
