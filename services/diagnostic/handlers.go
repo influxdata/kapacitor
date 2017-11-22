@@ -59,9 +59,7 @@ func Err(l Logger, msg string, err error, ctx []keyvalue.T) {
 		return
 	}
 
-	// This isn't great wrt to allocation, but should be rare. Currently
-	// no calls to Error use more than 2 ctx values. If a new call to
-	// Error uses more than 2, update this function
+	// Use the allocation version for any length
 	fields := make([]Field, len(ctx)+1) // +1 for error
 	fields[0] = Error(err)
 	for i := 1; i < len(fields); i++ {
@@ -72,10 +70,66 @@ func Err(l Logger, msg string, err error, ctx []keyvalue.T) {
 	l.Error(msg, fields...)
 }
 
+func Info(l Logger, msg string, ctx []keyvalue.T) {
+	if len(ctx) == 0 {
+		l.Info(msg)
+		return
+	}
+
+	if len(ctx) == 1 {
+		el := ctx[0]
+		l.Info(msg, String(el.Key, el.Value))
+		return
+	}
+
+	if len(ctx) == 2 {
+		x := ctx[0]
+		y := ctx[1]
+		l.Info(msg, String(x.Key, x.Value), String(y.Key, y.Value))
+		return
+	}
+
+	// Use the allocation version for any length
+	fields := make([]Field, len(ctx))
+	for i, kv := range ctx {
+		fields[i] = String(kv.Key, kv.Value)
+	}
+
+	l.Info(msg, fields...)
+}
+
+func Debug(l Logger, msg string, ctx []keyvalue.T) {
+	if len(ctx) == 0 {
+		l.Debug(msg)
+		return
+	}
+
+	if len(ctx) == 1 {
+		el := ctx[0]
+		l.Debug(msg, String(el.Key, el.Value))
+		return
+	}
+
+	if len(ctx) == 2 {
+		x := ctx[0]
+		y := ctx[1]
+		l.Debug(msg, String(x.Key, x.Value), String(y.Key, y.Value))
+		return
+	}
+
+	// Use the allocation version for any length
+	fields := make([]Field, len(ctx))
+	for i, kv := range ctx {
+		fields[i] = String(kv.Key, kv.Value)
+	}
+
+	l.Debug(msg, fields...)
+}
+
 // Alert Service Handler
 
 type AlertServiceHandler struct {
-	l Logger
+	L Logger
 }
 
 func logFieldsFromContext(ctx []keyvalue.T) []Field {
@@ -91,32 +145,32 @@ func (h *AlertServiceHandler) WithHandlerContext(ctx ...keyvalue.T) alertservice
 	fields := logFieldsFromContext(ctx)
 
 	return &AlertServiceHandler{
-		l: h.l.With(fields...),
+		L: h.L.With(fields...),
 	}
 }
 
 func (h *AlertServiceHandler) MigratingHandlerSpecs() {
-	h.l.Debug("migrating old v1.2 handler specs")
+	h.L.Debug("migrating old v1.2 handler specs")
 }
 
 func (h *AlertServiceHandler) MigratingOldHandlerSpec(spec string) {
-	h.l.Debug("migrating old handler spec", String("handler", spec))
+	h.L.Debug("migrating old handler spec", String("handler", spec))
 }
 
 func (h *AlertServiceHandler) FoundHandlerRows(length int) {
-	h.l.Debug("found handler rows", Int("handler_row_count", length))
+	h.L.Debug("found handler rows", Int("handler_row_count", length))
 }
 
 func (h *AlertServiceHandler) CreatingNewHandlers(length int) {
-	h.l.Debug("creating new handlers in place of old handlers", Int("handler_row_count", length))
+	h.L.Debug("creating new handlers in place of old handlers", Int("handler_row_count", length))
 }
 
 func (h *AlertServiceHandler) FoundNewHandler(key string) {
-	h.l.Debug("found new handler skipping", String("handler", key))
+	h.L.Debug("found new handler skipping", String("handler", key))
 }
 
 func (h *AlertServiceHandler) Error(msg string, err error, ctx ...keyvalue.T) {
-	Err(h.l, msg, err, ctx)
+	Err(h.L, msg, err, ctx)
 }
 
 // Kapcitor Handler
@@ -785,59 +839,11 @@ func (h *ServerHandler) Error(msg string, err error, ctx ...keyvalue.T) {
 }
 
 func (h *ServerHandler) Info(msg string, ctx ...keyvalue.T) {
-	if len(ctx) == 0 {
-		h.l.Info(msg)
-		return
-	}
-
-	if len(ctx) == 1 {
-		el := ctx[0]
-		h.l.Info(msg, String(el.Key, el.Value))
-		return
-	}
-
-	if len(ctx) == 2 {
-		x := ctx[0]
-		y := ctx[1]
-		h.l.Info(msg, String(x.Key, x.Value), String(y.Key, y.Value))
-		return
-	}
-
-	fields := make([]Field, len(ctx))
-	for i := 0; i < len(fields); i++ {
-		kv := ctx[i]
-		fields[i] = String(kv.Key, kv.Value)
-	}
-
-	h.l.Info(msg, fields...)
+	Info(h.l, msg, ctx)
 }
 
 func (h *ServerHandler) Debug(msg string, ctx ...keyvalue.T) {
-	if len(ctx) == 0 {
-		h.l.Debug(msg)
-		return
-	}
-
-	if len(ctx) == 1 {
-		el := ctx[0]
-		h.l.Debug(msg, String(el.Key, el.Value))
-		return
-	}
-
-	if len(ctx) == 2 {
-		x := ctx[0]
-		y := ctx[1]
-		h.l.Debug(msg, String(x.Key, x.Value), String(y.Key, y.Value))
-		return
-	}
-
-	fields := make([]Field, len(ctx))
-	for i := 0; i < len(fields); i++ {
-		kv := ctx[i]
-		fields[i] = String(kv.Key, kv.Value)
-	}
-
-	h.l.Debug(msg, fields...)
+	Debug(h.l, msg, ctx)
 }
 
 type ReplayHandler struct {
@@ -849,31 +855,7 @@ func (h *ReplayHandler) Error(msg string, err error, ctx ...keyvalue.T) {
 }
 
 func (h *ReplayHandler) Debug(msg string, ctx ...keyvalue.T) {
-	if len(ctx) == 0 {
-		h.l.Debug(msg)
-		return
-	}
-
-	if len(ctx) == 1 {
-		el := ctx[0]
-		h.l.Debug(msg, String(el.Key, el.Value))
-		return
-	}
-
-	if len(ctx) == 2 {
-		x := ctx[0]
-		y := ctx[1]
-		h.l.Debug(msg, String(x.Key, x.Value), String(y.Key, y.Value))
-		return
-	}
-
-	fields := make([]Field, len(ctx))
-	for i := 0; i < len(fields); i++ {
-		kv := ctx[i]
-		fields[i] = String(kv.Key, kv.Value)
-	}
-
-	h.l.Debug(msg, fields...)
+	Debug(h.l, msg, ctx)
 }
 
 // K8s handler
