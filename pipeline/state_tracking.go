@@ -149,6 +149,7 @@ func newStateCountNode(wants EdgeType, predicate *ast.LambdaNode) *StateCountNod
 }
 
 // MarshalJSON converts StateCountNode to JSON
+// tick:ignore
 func (n *StateCountNode) MarshalJSON() ([]byte, error) {
 	type Alias StateCountNode
 	var raw = &struct {
@@ -165,6 +166,7 @@ func (n *StateCountNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an StateCountNode
+// tick:ignore
 func (n *StateCountNode) UnmarshalJSON(data []byte) error {
 	type Alias StateCountNode
 	var raw = &struct {

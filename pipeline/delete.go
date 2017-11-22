@@ -40,6 +40,7 @@ func newDeleteNode(e EdgeType) *DeleteNode {
 }
 
 // MarshalJSON converts DeleteNode to JSON
+// tick:ignore
 func (n *DeleteNode) MarshalJSON() ([]byte, error) {
 	type Alias DeleteNode
 	var raw = &struct {
@@ -56,6 +57,7 @@ func (n *DeleteNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an DeleteNode
+// tick:ignore
 func (n *DeleteNode) UnmarshalJSON(data []byte) error {
 	type Alias DeleteNode
 	var raw = &struct {

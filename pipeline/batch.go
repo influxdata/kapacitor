@@ -190,6 +190,7 @@ func newQueryNode() *QueryNode {
 }
 
 // MarshalJSON converts QueryNode to JSON
+// tick:ignore
 func (n *QueryNode) MarshalJSON() ([]byte, error) {
 	type Alias QueryNode
 	var raw = &struct {
@@ -212,6 +213,7 @@ func (n *QueryNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an QueryNode
+// tick:ignore
 func (n *QueryNode) UnmarshalJSON(data []byte) error {
 	type Alias QueryNode
 	var raw = &struct {
