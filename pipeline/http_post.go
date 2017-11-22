@@ -144,6 +144,8 @@ func (p *HTTPPostNode) Endpoint(endpoint string) *HTTPPostNode {
 	return p
 }
 
+// Add a header to the POST request
+//
 // Example:
 //    stream
 //         |httpPost()

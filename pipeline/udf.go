@@ -48,7 +48,7 @@ import (
 //         |httpOut('movingaverage')
 //
 // NOTE: The UDF process runs as the same user as the Kapacitor daemon.
-// As a result make the user is properly secured as well as the configuration file.
+// As a result, make sure the user is properly secured, as well as the configuration file.
 type UDFNode struct {
 	chainnode
 
