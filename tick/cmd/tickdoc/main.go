@@ -34,7 +34,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-_	"html"
+	_ "html"
 	"log"
 	"os"
 	"path/filepath"
@@ -67,7 +67,6 @@ var usageStr = `Usage: %s [options] [package dir] [output dir]
 
 Options:
 `
-
 
 func usage() {
 	fmt.Fprintf(os.Stderr, usageStr, os.Args[0])
@@ -283,11 +282,11 @@ func shouldIgnore(cg *ast.CommentGroup) bool {
 }
 
 func isAnonField(nd *Node, nodes map[string]*Node) bool {
-	for _, node := range nodes{
+	for _, node := range nodes {
 		for _, field := range node.AnonFields {
-        if field == nd.Name {
-					  return true
-					}
+			if field == nd.Name {
+				return true
+			}
 		}
 	}
 	return false
@@ -296,30 +295,30 @@ func isAnonField(nd *Node, nodes map[string]*Node) bool {
 // some nodes are wrappers - e.g. AlertNode{ *AlertNodeData }
 // this looks into the wrapped field
 func getWrapped(nd *Node) string {
-	 if nd.Doc == nil {
-		 return ""
-	 }
-	 for _, ln := range nd.Doc.List {
-		  s := strings.TrimSpace(strings.TrimLeft(ln.Text, "/"))
-			if strings.Contains(s, tickWraps) {
-				 tokens := strings.Split(s, ":")
-				 return tokens[2]
-			}
-	 }
+	if nd.Doc == nil {
+		return ""
+	}
+	for _, ln := range nd.Doc.List {
+		s := strings.TrimSpace(strings.TrimLeft(ln.Text, "/"))
+		if strings.Contains(s, tickWraps) {
+			tokens := strings.Split(s, ":")
+			return tokens[2]
+		}
+	}
 
-	 return ""
+	return ""
 }
 
 func getConstructor(target string, sources ...*Node) *Method {
 
-   for _, source := range sources {
-	   for _, meth := range source.Methods {
-			  if strings.ToUpper(meth.Name) == strings.ToUpper(target) {
-					return meth
-				}
-		 }
- }
-   return nil
+	for _, source := range sources {
+		for _, meth := range source.Methods {
+			if strings.ToUpper(meth.Name) == strings.ToUpper(target) {
+				return meth
+			}
+		}
+	}
+	return nil
 }
 
 func isEmbedded(cg *ast.CommentGroup) (bool, string, string) {
@@ -383,7 +382,7 @@ func nameToTickName(name string) string {
 }
 
 func nodeNameToTickName(name string) string {
-	result := strings.TrimSuffix(name, "Node");
+	result := strings.TrimSuffix(name, "Node")
 	if strings.HasPrefix(strings.ToUpper(result), "HTTP") {
 		return strings.ToLower(result[0:4]) + result[4:]
 	}
@@ -517,16 +516,16 @@ func (n *Node) Embed(nodes map[string]*Node) error {
 	if prop, ok := parent.Properties[n.EmbeddedProperty]; ok {
 		prop.EmbeddedProperties = n.Properties
 	} else if len(parent.AnonFields) > 0 {
-		 anon_parent := nodes[parent.AnonFields[0]]
-		 if anon_parent == nil {
-	 		return fmt.Errorf("no node %s from anon_field in node %s", parent.AnonFields[0], n.EmbeddedParent)
-	 	}
+		anon_parent := nodes[parent.AnonFields[0]]
+		if anon_parent == nil {
+			return fmt.Errorf("no node %s from anon_field in node %s", parent.AnonFields[0], n.EmbeddedParent)
+		}
 
-		 if prop, ok := anon_parent.Properties[n.EmbeddedProperty]; ok {
-			  prop.EmbeddedProperties = n.Properties
-		 }else{
-			 fmt.Errorf("no property %s no node %s not even in node from AnonField %s", n.EmbeddedProperty, n.EmbeddedParent, parent.AnonFields[0])
-		 }
+		if prop, ok := anon_parent.Properties[n.EmbeddedProperty]; ok {
+			prop.EmbeddedProperties = n.Properties
+		} else {
+			fmt.Errorf("no property %s no node %s not even in node from AnonField %s", n.EmbeddedProperty, n.EmbeddedParent, parent.AnonFields[0])
+		}
 	} else {
 		return fmt.Errorf("no property %s no node %s", n.EmbeddedProperty, n.EmbeddedParent)
 	}
@@ -540,69 +539,68 @@ type headerInfo struct {
 	Weight     int
 }
 
-func (n *Node) renderConstructor(buf *bytes.Buffer, nodes map[string]*Node){
+func (n *Node) renderConstructor(buf *bytes.Buffer, nodes map[string]*Node) {
 
-	shortName := strings.TrimSuffix(n.Name,"Node")
+	shortName := strings.TrimSuffix(n.Name, "Node")
 
 	buf.Write([]byte("### Constructor \n\n| Chaining Method | Description |\n|:---------|:---------|\n"))
 	constructor := getConstructor(shortName, n, nodes["chainnode"], nodes["BatchNode"], nodes["StreamNode"])
 	if constructor == nil {
-		     buf.Write([]byte("| **[" + nodeNameToTickName(n.Name) + "](#descr)** | Has no constructor signature. |\n"))
-	}else{
+		buf.Write([]byte("| **[" + nodeNameToTickName(n.Name) + "](#descr)** | Has no constructor signature. |\n"))
+	} else {
 
 		buf.Write([]byte("| "))
-  	buf.Write([]byte(fmt.Sprintf("**[%s](#descr)&nbsp;(&nbsp;", nameToTickName(constructor.Name))))
+		buf.Write([]byte(fmt.Sprintf("**[%s](#descr)&nbsp;(&nbsp;", nameToTickName(constructor.Name))))
 
- 	 for i, param := range constructor.Params {
- 		   buf.Write([]byte(fmt.Sprintf("`%s`&nbsp;`%s`", param.Name, param.Type)))
- 			 if (i+1) < len(constructor.Params) {
- 				 buf.Write([]byte(",&nbsp;"))
- 			 }
- 	 }
+		for i, param := range constructor.Params {
+			buf.Write([]byte(fmt.Sprintf("`%s`&nbsp;`%s`", param.Name, param.Type)))
+			if (i + 1) < len(constructor.Params) {
+				buf.Write([]byte(",&nbsp;"))
+			}
+		}
 
- 	 buf.Write([]byte(")**"))
+		buf.Write([]byte(")**"))
 
- 	 buf.Write([]byte(" | "))
+		buf.Write([]byte(" | "))
 
-	 for _, line := range constructor.Doc.List {
-			   //Use only first paragraph - so stop on empty line
-			  if len(strings.TrimSpace(strings.TrimLeft(fmt.Sprint(line.Text), "/"))) == 0 {
-					break
-				}
-			  buf.Write([]byte(strings.TrimSpace(strings.TrimLeft(fmt.Sprint(line.Text), "/"))))
-				buf.Write([]byte(" "))
+		for _, line := range constructor.Doc.List {
+			//Use only first paragraph - so stop on empty line
+			if len(strings.TrimSpace(strings.TrimLeft(fmt.Sprint(line.Text), "/"))) == 0 {
+				break
+			}
+			buf.Write([]byte(strings.TrimSpace(strings.TrimLeft(fmt.Sprint(line.Text), "/"))))
+			buf.Write([]byte(" "))
 		}
 		buf.Write([]byte(" |\n\n"))
 	}
 
-
 }
 
 func (n *Node) renderPropertiesTable(buf *bytes.Buffer, nodes map[string]*Node) {
-	 buf.Write([]byte("### Property Methods\n"))
+	buf.Write([]byte("### Property Methods\n"))
 
-	 if(len(n.Properties) > 0){
+	if len(n.Properties) > 0 {
 
-	   props := make([]string, len(n.Properties))
-		 i := 0
+		props := make([]string, len(n.Properties))
+		i := 0
 
-		 for name, _ := range n.Properties {
-	 		props[i] = name
-	 		i++
-	 	}
-	 	sort.Strings(props)
+		for name, _ := range n.Properties {
+			props[i] = name
+			i++
+		}
+		sort.Strings(props)
 
-	   buf.Write([]byte("\n"))
-		 buf.Write([]byte("| Setters | Description |\n|:---|:---|\n"))
+		buf.Write([]byte("\n"))
+		buf.Write([]byte("| Setters | Description |\n|:---|:---|\n"))
 
-		 for  _, name := range props {
-	       n.Properties[name].RenderAsRow(buf, nodes)
-		 }
+		for _, name := range props {
+			n.Properties[name].RenderAsRow(buf, nodes)
+		}
 
-		 buf.Write([]byte("\n\n"))
- }else{
-	 buf.Write([]byte("This node has no properties that can be set.\n\n"))
- }
+		buf.Write([]byte("\n\n"))
+	} else {
+		buf.Write([]byte("This node has no properties that can be set.\n\n"))
+	}
 
 }
 
@@ -634,27 +632,27 @@ func (n *Node) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node, wei
 
 	n.renderConstructor(buf, nodes)
 
-  n.renderPropertiesTable(buf, nodes)
+	n.renderPropertiesTable(buf, nodes)
 
 	r.Header(buf, func() bool { buf.Write([]byte("Chaining Methods")); return true }, 3, "")
 
 	for i, name := range methods {
-		 buf.Write([]byte(fmt.Sprintf("[%s](%s)", name, methodNameToLink(n.Name, name))))
-		 if (i+1) < len(methods) {
-			 buf.Write([]byte(", "))
-		 }
+		buf.Write([]byte(fmt.Sprintf("[%s](%s)", name, methodNameToLink(n.Name, name))))
+		if (i + 1) < len(methods) {
+			buf.Write([]byte(", "))
+		}
 	}
 
-  // Need to add a few lines to push description below search bar
+	// Need to add a few lines to push description below search bar
 	// when jumping to it from internal link in Constructor table
 	buf.Write([]byte("\n<a id='descr'/><hr/><br/>\n### Description\n"))
 
-  // some nodes are wrappers - e.g. AlertNode{ *AlertNodeData }
+	// some nodes are wrappers - e.g. AlertNode{ *AlertNodeData }
 	// if so - use Doc for wrapped field instead
-  if len(getWrapped(n)) > 0 {
+	if len(getWrapped(n)) > 0 {
 		renderDoc(buf, nodes, r, nodes[getWrapped(n)].Doc)
 	} else {
-	  renderDoc(buf, nodes, r, n.Doc)
+		renderDoc(buf, nodes, r, n.Doc)
 	}
 
 	buf.Write([]byte("\n<a href=\"javascript:document.getElementsByClassName('article')[0].scrollIntoView();\" title=\"top\">^</a>\n"))
@@ -738,31 +736,30 @@ func (p *Property) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node,
 
 func (p *Property) RenderAsRow(buf *bytes.Buffer, nodes map[string]*Node) error {
 
+	buf.Write([]byte("| "))
+	buf.Write([]byte(fmt.Sprintf("**[%s](#%s)&nbsp;(&nbsp;", nameToTickName(p.Name), strings.ToLower(p.Name))))
 
-	 buf.Write([]byte("| "))
-	 buf.Write([]byte(fmt.Sprintf("**[%s](#%s)&nbsp;(&nbsp;", nameToTickName(p.Name), strings.ToLower(p.Name))))
+	for i, param := range p.Params {
+		buf.Write([]byte(fmt.Sprintf("`%s`&nbsp;`%s`", param.Name, param.Type)))
+		if (i + 1) < len(p.Params) {
+			buf.Write([]byte(",&nbsp;"))
+		}
+	}
 
-	 for i, param := range p.Params {
-		   buf.Write([]byte(fmt.Sprintf("`%s`&nbsp;`%s`", param.Name, param.Type)))
-			 if (i+1) < len(p.Params) {
-				 buf.Write([]byte(",&nbsp;"))
-			 }
-	 }
+	buf.Write([]byte(")**"))
 
-	 buf.Write([]byte(")**"))
-
-	 buf.Write([]byte(" | "))
-	 if( p.Doc != nil && len(p.Doc.List) > 0){
-		 for _, line := range p.Doc.List {
-			   //Use only first paragraph - so stop on empty line
-			   if len(strings.TrimSpace(strings.TrimLeft(fmt.Sprint(line.Text), "/"))) == 0 {
-				   break
-			   }
-				 buf.Write([]byte(strings.TrimSpace(strings.TrimLeft(fmt.Sprint(line.Text), "/"))))
-				 buf.Write([]byte(" "))
-		 }
- }
-	 buf.Write([]byte(" |\n"))
+	buf.Write([]byte(" | "))
+	if p.Doc != nil && len(p.Doc.List) > 0 {
+		for _, line := range p.Doc.List {
+			//Use only first paragraph - so stop on empty line
+			if len(strings.TrimSpace(strings.TrimLeft(fmt.Sprint(line.Text), "/"))) == 0 {
+				break
+			}
+			buf.Write([]byte(strings.TrimSpace(strings.TrimLeft(fmt.Sprint(line.Text), "/"))))
+			buf.Write([]byte(" "))
+		}
+	}
+	buf.Write([]byte(" |\n"))
 
 	return nil
 }
