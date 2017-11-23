@@ -524,7 +524,7 @@ func (n *Node) Embed(nodes map[string]*Node) error {
 		if prop, ok := anon_parent.Properties[n.EmbeddedProperty]; ok {
 			prop.EmbeddedProperties = n.Properties
 		} else {
-			fmt.Errorf("no property %s no node %s not even in node from AnonField %s", n.EmbeddedProperty, n.EmbeddedParent, parent.AnonFields[0])
+			return fmt.Errorf("no property %s no node %s not even in node from AnonField %s", n.EmbeddedProperty, n.EmbeddedParent, parent.AnonFields[0])
 		}
 	} else {
 		return fmt.Errorf("no property %s no node %s", n.EmbeddedProperty, n.EmbeddedParent)
