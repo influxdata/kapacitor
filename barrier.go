@@ -89,7 +89,7 @@ type idleBarrier struct {
 	timer *time.Timer
 	wg    sync.WaitGroup
 	outs  []edge.StatsEdge
-	stopC chan interface{}
+	stopC chan struct{}
 }
 
 func newIdleBarrier(name string, group edge.GroupInfo, idle time.Duration, outs []edge.StatsEdge) *idleBarrier {
@@ -101,7 +101,7 @@ func newIdleBarrier(name string, group edge.GroupInfo, idle time.Duration, outs 
 		timer: time.NewTimer(idle),
 		wg:    sync.WaitGroup{},
 		outs:  outs,
-		stopC: make(chan interface{}, 1),
+		stopC: make(chan struct{}, 1),
 	}
 
 	r.Init()
