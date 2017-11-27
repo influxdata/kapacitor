@@ -84,24 +84,26 @@ type idleBarrier struct {
 	name  string
 	group edge.GroupInfo
 
-	idle  time.Duration
-	lastT atomic.Value
-	timer *time.Timer
-	wg    sync.WaitGroup
-	outs  []edge.StatsEdge
-	stopC chan struct{}
+	idle        time.Duration
+	lastT       atomic.Value
+	timer       *time.Timer
+	wg          sync.WaitGroup
+	outs        []edge.StatsEdge
+	stopC       chan struct{}
+	resetTimerC chan struct{}
 }
 
 func newIdleBarrier(name string, group edge.GroupInfo, idle time.Duration, outs []edge.StatsEdge) *idleBarrier {
 	r := &idleBarrier{
-		name:  name,
-		group: group,
-		idle:  idle,
-		lastT: atomic.Value{},
-		timer: time.NewTimer(idle),
-		wg:    sync.WaitGroup{},
-		outs:  outs,
-		stopC: make(chan struct{}, 1),
+		name:        name,
+		group:       group,
+		idle:        idle,
+		lastT:       atomic.Value{},
+		timer:       time.NewTimer(idle),
+		wg:          sync.WaitGroup{},
+		outs:        outs,
+		stopC:       make(chan struct{}),
+		resetTimerC: make(chan struct{}),
 	}
 
 	r.Init()
@@ -158,8 +160,7 @@ func (n *idleBarrier) Point(m edge.PointMessage) (edge.Message, error) {
 }
 
 func (n *idleBarrier) resetTimer() {
-	n.timer.Stop()
-	n.timer.Reset(n.idle)
+	n.resetTimerC <- struct{}{}
 }
 
 func (n *idleBarrier) emitBarrier() error {
@@ -172,9 +173,14 @@ func (n *idleBarrier) idleHandler() {
 	defer n.wg.Done()
 	for {
 		select {
+		case <-n.resetTimerC:
+			if !n.timer.Stop() {
+				<-n.timer.C
+			}
+			n.timer.Reset(n.idle)
 		case <-n.timer.C:
 			n.emitBarrier()
-			n.resetTimer()
+			n.timer.Reset(n.idle)
 		case <-n.stopC:
 			return
 		}
@@ -189,7 +195,7 @@ type periodicBarrier struct {
 	ticker *time.Ticker
 	wg     sync.WaitGroup
 	outs   []edge.StatsEdge
-	stopC  chan bool
+	stopC  chan struct{}
 }
 
 func newPeriodicBarrier(name string, group edge.GroupInfo, period time.Duration, outs []edge.StatsEdge) *periodicBarrier {
@@ -200,7 +206,7 @@ func newPeriodicBarrier(name string, group edge.GroupInfo, period time.Duration,
 		ticker: time.NewTicker(period),
 		wg:     sync.WaitGroup{},
 		outs:   outs,
-		stopC:  make(chan bool, 1),
+		stopC:  make(chan struct{}),
 	}
 
 	r.Init()
@@ -216,7 +222,7 @@ func (n *periodicBarrier) Init() {
 }
 
 func (n *periodicBarrier) Stop() {
-	n.stopC <- true
+	close(n.stopC)
 	n.ticker.Stop()
 	n.wg.Wait()
 }
