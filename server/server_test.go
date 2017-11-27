@@ -8935,7 +8935,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 							"Level":           "CRITICAL",
 							"Monitoring Tool": "Kapacitor",
 						},
-						Description: resultJSON,
+						Description: "details",
 						Teams:       []string{"A team", "B team"},
 						Recipients:  []string{"test_recipient1", "test_recipient2"},
 					},

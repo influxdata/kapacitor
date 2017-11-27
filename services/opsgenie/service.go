@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -13,7 +14,6 @@ import (
 
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/keyvalue"
-	"github.com/influxdata/kapacitor/models"
 )
 
 type Diagnostic interface {
@@ -95,11 +95,11 @@ func (s *Service) Test(options interface{}) error {
 		o.Message,
 		o.EntityID,
 		time.Now(),
-		models.Result{},
+		"",
 	)
 }
 
-func (s *Service) Alert(teams []string, recipients []string, messageType, message, entityID string, t time.Time, details models.Result) error {
+func (s *Service) Alert(teams []string, recipients []string, messageType, message, entityID string, t time.Time, details string) error {
 	url, post, err := s.preparePost(teams, recipients, messageType, message, entityID, t, details)
 	if err != nil {
 		return err
@@ -127,7 +127,7 @@ func (s *Service) Alert(teams []string, recipients []string, messageType, messag
 	return nil
 }
 
-func (s *Service) preparePost(teams []string, recipients []string, messageType, message, entityID string, t time.Time, details models.Result) (string, io.Reader, error) {
+func (s *Service) preparePost(teams []string, recipients []string, messageType, message, entityID string, t time.Time, details string) (string, io.Reader, error) {
 	c := s.config()
 	if !c.Enabled {
 		return "", nil, errors.New("service is not enabled")
@@ -156,11 +156,7 @@ func (s *Service) preparePost(teams []string, recipients []string, messageType, 
 		ogData["note"] = message
 	}
 
-	b, err := json.Marshal(details)
-	if err != nil {
-		return "", nil, err
-	}
-	ogData["description"] = string(b)
+	ogData["description"] = html.UnescapeString(details)
 
 	if len(teams) == 0 {
 		teams = c.Teams
@@ -181,7 +177,7 @@ func (s *Service) preparePost(teams []string, recipients []string, messageType, 
 	// Post data to VO
 	var post bytes.Buffer
 	enc := json.NewEncoder(&post)
-	err = enc.Encode(ogData)
+	err := enc.Encode(ogData)
 	if err != nil {
 		return "", nil, err
 	}
@@ -226,7 +222,7 @@ func (h *handler) Handle(event alert.Event) {
 		event.State.Message,
 		event.State.ID,
 		event.State.Time,
-		event.Data.Result,
+		event.State.Details,
 	); err != nil {
 		h.diag.Error("failed to send event to OpsGenie", err)
 	}
