@@ -7991,6 +7991,10 @@ func TestStream_AlertOpsGenie(t *testing.T) {
 	ts := opsgenietest.NewServer()
 	defer ts.Close()
 
+	defaultDetailsTmpl := `{"Name":"cpu","TaskName":"TestStream_Alert","Group":"host=serverA","Tags":{"host":"serverA"},"ServerInfo":{"Hostname":"%v","ClusterID":"%v","ServerID":"%v"},"ID":"kapacitor/cpu/serverA","Fields":{"count":10},"Level":"CRITICAL","Time":"1971-01-01T00:00:10Z","Duration":0,"Message":"kapacitor/cpu/serverA is CRITICAL"}
+`
+	var defaultDetails string
+
 	var script = `
 stream
 	|from()
@@ -8014,6 +8018,12 @@ stream
 			.recipients('test_recipient2', 'another_recipient')
 `
 	tmInit := func(tm *kapacitor.TaskMaster) {
+		si := tm.ServerInfo
+		defaultDetails = fmt.Sprintf(defaultDetailsTmpl,
+			si.Hostname(),
+			si.ClusterID(),
+			si.ServerID(),
+		)
 		c := opsgenie.NewConfig()
 		c.Enabled = true
 		c.URL = ts.URL
@@ -8036,7 +8046,7 @@ stream
 					"Level":           "CRITICAL",
 					"Monitoring Tool": "Kapacitor",
 				},
-				Description: "{\"Name\":\"cpu\",\"TaskName\":\"TestStream_Alert\",\"Group\":\"host=serverA\",\"Tags\":{\"host\":\"serverA\"},\"ServerInfo\":{\"Hostname\":\"localhost\",\"ClusterID\":\"289dd1e1-ceee-412f-ada3-867160b5dd5b\",\"ServerID\":\"2deddd5e-b2e5-48a8-923b-2619befae2e4\"},\"ID\":\"kapacitor/cpu/serverA\",\"Fields\":{\"count\":10},\"Level\":\"CRITICAL\",\"Time\":\"1971-01-01T00:00:10Z\",\"Duration\":0,\"Message\":\"kapacitor/cpu/serverA is CRITICAL\"}\n",
+				Description: defaultDetails,
 				Teams:       []string{"test_team", "another_team"},
 				Recipients:  []string{"test_recipient", "another_recipient"},
 			},
@@ -8053,7 +8063,7 @@ stream
 					"Level":           "CRITICAL",
 					"Monitoring Tool": "Kapacitor",
 				},
-				Description: "{\"Name\":\"cpu\",\"TaskName\":\"TestStream_Alert\",\"Group\":\"host=serverA\",\"Tags\":{\"host\":\"serverA\"},\"ServerInfo\":{\"Hostname\":\"localhost\",\"ClusterID\":\"289dd1e1-ceee-412f-ada3-867160b5dd5b\",\"ServerID\":\"2deddd5e-b2e5-48a8-923b-2619befae2e4\"},\"ID\":\"kapacitor/cpu/serverA\",\"Fields\":{\"count\":10},\"Level\":\"CRITICAL\",\"Time\":\"1971-01-01T00:00:10Z\",\"Duration\":0,\"Message\":\"kapacitor/cpu/serverA is CRITICAL\"}\n",
+				Description: defaultDetails,
 				Teams:       []string{"test_team2"},
 				Recipients:  []string{"test_recipient2", "another_recipient"},
 			},
