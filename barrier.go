@@ -158,6 +158,7 @@ func (n *idleBarrier) Point(m edge.PointMessage) (edge.Message, error) {
 }
 
 func (n *idleBarrier) resetTimer() {
+	n.timer.Stop()
 	n.timer.Reset(n.idle)
 }
 
