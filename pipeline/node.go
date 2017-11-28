@@ -417,6 +417,15 @@ func (n *chainnode) Window() *WindowNode {
 	return w
 }
 
+// Create a new Barrier node that emits a BarrierMessage periodically
+//
+// One BarrierMessage will be emitted every period duration
+func (n *chainnode) Barrier() *BarrierNode {
+	b := newBarrierNode(n.provides)
+	n.linkChild(b)
+	return b
+}
+
 // Create a new node that samples the incoming points or batches.
 //
 // One point will be emitted every count or duration specified.

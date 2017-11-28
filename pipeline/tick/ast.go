@@ -88,6 +88,8 @@ func (a *AST) Create(n pipeline.Node, parents []ast.Node) (ast.Node, error) {
 		return NewJoin(parents).Build(node)
 	case *pipeline.AlertNode:
 		return NewAlert(parents).Build(node)
+	case *pipeline.BarrierNode:
+		return NewBarrierNode(parents).Build(node)
 	case *pipeline.CombineNode:
 		return NewCombine(parents).Build(node)
 	case *pipeline.DefaultNode:

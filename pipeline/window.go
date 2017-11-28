@@ -15,9 +15,9 @@ import (
 // The `every` property of `window` defines the frequency at which the window
 // is emitted to the next node in the pipeline.
 //
-//The `align` property of `window` defines how to align the window edges.
-//(By default, the edges are defined relative to the first data point the `window`
-//node receives.)
+// The `align` property of `window` defines how to align the window edges.
+// (By default, the edges are defined relative to the first data point the `window`
+// node receives.)
 //
 // Example:
 //    stream
@@ -26,7 +26,7 @@ import (
 //            .every(5m)
 //        |httpOut('recent')
 //
-// his example emits the last `10 minute` period  every `5 minutes` to the pipeline's `httpOut` node.
+// This example emits the last `10 minute` period  every `5 minutes` to the pipeline's `httpOut` node.
 // Because `every` is less than `period`, each time the window is emitted it contains `5 minutes` of
 // new data and `5 minutes` of the previous period's data.
 //
@@ -139,7 +139,7 @@ func (w *WindowNode) validate() error {
 		return errors.New("can only align windows based off time, not count")
 	}
 	if w.PeriodCount != 0 && w.EveryCount <= 0 {
-		return fmt.Errorf("everyCount must be greater than zero")
+		return errors.New("everyCount must be greater than zero")
 	}
 	return nil
 }
