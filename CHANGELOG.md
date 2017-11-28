@@ -1,12 +1,11 @@
 # Changelog
 
 ## unreleased
-## Unreleased
-- [#1566](https://github.com/influxdata/kapacitor/pull/1566): Add BarrierNode to emit BarrierMessage periodically
 
 ### Features
 
 - [#1622](https://github.com/influxdata/kapacitor/pull/1622): Add support for AWS EC2 autoscaling services.
+- [#1566](https://github.com/influxdata/kapacitor/pull/1566): Add BarrierNode to emit BarrierMessage periodically
 
 ### Bugfixes
 
