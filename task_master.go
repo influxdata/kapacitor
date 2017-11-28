@@ -19,6 +19,7 @@ import (
 	"github.com/influxdata/kapacitor/server/vars"
 	alertservice "github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
+	ec2 "github.com/influxdata/kapacitor/services/ec2/client"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/httppost"
@@ -172,6 +173,9 @@ type TaskMaster struct {
 	}
 	SwarmService interface {
 		Client(string) (swarm.Client, error)
+	}
+	EC2Service interface {
+		Client(string) (ec2.Client, error)
 	}
 
 	SideloadService interface {

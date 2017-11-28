@@ -475,6 +475,13 @@ func (n *chainnode) SwarmAutoscale() *SwarmAutoscaleNode {
 	return k
 }
 
+// Create a node that can trigger autoscale events for a ec2 autoscalegroup.
+func (n *chainnode) Ec2Autoscale() *Ec2AutoscaleNode {
+	k := newEc2AutoscaleNode(n.Provides())
+	n.linkChild(k)
+	return k
+}
+
 // Create a node that tracks duration in a given state.
 func (n *chainnode) StateDuration(expression *ast.LambdaNode) *StateDurationNode {
 	sd := newStateDurationNode(n.provides, expression)
