@@ -161,7 +161,7 @@ func (n *idleBarrier) resetTimer() {
 }
 
 func (n *idleBarrier) emitBarrier() error {
-	nowT := time.Now()
+	nowT := time.Now().UTC()
 	n.lastT.Store(nowT)
 	return edge.Forward(n.outs, edge.NewBarrierMessage(n.group, nowT))
 }
@@ -259,7 +259,7 @@ func (n *periodicBarrier) Point(m edge.PointMessage) (edge.Message, error) {
 }
 
 func (n *periodicBarrier) emitBarrier() error {
-	nowT := time.Now()
+	nowT := time.Now().UTC()
 	n.lastT.Store(nowT)
 	return edge.Forward(n.outs, edge.NewBarrierMessage(n.group, nowT))
 }
