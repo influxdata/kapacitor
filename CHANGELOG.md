@@ -2,6 +2,8 @@
 
 ## unreleased
 
+## v1.4.0-rc2 [2017-11-28]
+
 ### Features
 
 - [#1622](https://github.com/influxdata/kapacitor/pull/1622): Add support for AWS EC2 autoscaling services.
