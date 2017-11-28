@@ -86,7 +86,6 @@ type idleBarrier struct {
 
 	idle        time.Duration
 	lastT       atomic.Value
-	timer       *time.Timer
 	wg          sync.WaitGroup
 	outs        []edge.StatsEdge
 	stopC       chan struct{}
@@ -99,7 +98,6 @@ func newIdleBarrier(name string, group edge.GroupInfo, idle time.Duration, outs 
 		group:       group,
 		idle:        idle,
 		lastT:       atomic.Value{},
-		timer:       time.NewTimer(idle),
 		wg:          sync.WaitGroup{},
 		outs:        outs,
 		stopC:       make(chan struct{}),
@@ -120,7 +118,6 @@ func (n *idleBarrier) Init() {
 
 func (n *idleBarrier) Stop() {
 	close(n.stopC)
-	n.timer.Stop()
 	n.wg.Wait()
 }
 
@@ -171,17 +168,19 @@ func (n *idleBarrier) emitBarrier() error {
 
 func (n *idleBarrier) idleHandler() {
 	defer n.wg.Done()
+	idleTimer := time.NewTimer(n.idle)
 	for {
 		select {
 		case <-n.resetTimerC:
-			if !n.timer.Stop() {
-				<-n.timer.C
+			if !idleTimer.Stop() {
+				<-idleTimer.C
 			}
-			n.timer.Reset(n.idle)
-		case <-n.timer.C:
+			idleTimer.Reset(n.idle)
+		case <-idleTimer.C:
 			n.emitBarrier()
-			n.timer.Reset(n.idle)
+			idleTimer.Reset(n.idle)
 		case <-n.stopC:
+			idleTimer.Stop()
 			return
 		}
 	}
