@@ -406,7 +406,6 @@ func renderDoc(buf *bytes.Buffer, nodes map[string]*Node, r Renderer, doc *ast.C
 	var lines bytes.Buffer
 	for i := 0; i < len(doc.List); i++ {
 		s := strings.TrimSpace(strings.TrimLeft(doc.List[i].Text, "/"))
-		//s = html.EscapeString(s) // Rendering to Markdown not HTML - this interferes with generic URL strings
 		lines.Write(addNodeLinks(nodes, s))
 		lines.Write([]byte("\n"))
 		if s == tickExample {
