@@ -1,6 +1,7 @@
 package tick_test
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -124,8 +125,50 @@ func TestAlertTCP(t *testing.T) {
         .message('{{ .ID }} is {{ .Level }}')
         .details('{{ json . }}')
         .history(21)
-        .tcp()
-        .address('echo:7')
+        .tcp('echo:7')
+`
+	PipelineTickTestHelper(t, pipe, want)
+}
+func TestAlertTCPJSON(t *testing.T) {
+	pipe, _, from := StreamFrom()
+	j := `
+    {
+        "typeOf": "alert",
+        "stateChangesOnly": false,
+        "useFlapping": false,
+        "message": "",
+        "details": "",
+        "post": null,
+        "tcp": [
+            {
+                "address": "echo:7"
+            }
+        ],
+        "email": null,
+        "exec": null,
+        "log": null,
+        "victorOps": null,
+        "pagerDuty": null,
+        "pushover": null,
+        "sensu": null,
+        "slack": null,
+        "telegram": null,
+        "hipChat": null,
+        "alerta": null,
+        "opsGenie": null,
+        "talk": null
+    }`
+	node := from.Alert()
+	if err := json.Unmarshal([]byte(j), node); err != nil {
+		t.Errorf("unable to unmarshal alert %v", err)
+	}
+
+	want := `stream
+    |from()
+    |alert()
+        .id('{{ .Name }}:{{ .Group }}')
+        .history(21)
+        .tcp('echo:7')
 `
 	PipelineTickTestHelper(t, pipe, want)
 }
