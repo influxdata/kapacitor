@@ -73,8 +73,7 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 	}
 
 	for _, h := range a.TcpHandlers {
-		n.Dot("tcp").
-			Dot("address", h.Address)
+		n.Dot("tcp", h.Address)
 	}
 
 	for _, h := range a.EmailHandlers {
