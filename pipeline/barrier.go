@@ -1,8 +1,12 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
+
+	"github.com/influxdata/influxdb/influxql"
 )
 
 // A BarrierNode will emit a barrier with the current time, according to the system
@@ -27,12 +31,12 @@ type BarrierNode struct {
 
 	// Emit barrier based on idle time since the last received message.
 	// Must be greater than zero.
-	Idle time.Duration
+	Idle time.Duration `json:"idle"`
 
 	// Emit barrier based on periodic timer.  The timer is based on system
 	// clock rather than message time.
 	// Must be greater than zero.
-	Period time.Duration
+	Period time.Duration `json:"period"`
 }
 
 func newBarrierNode(wants EdgeType) *BarrierNode {
@@ -53,5 +57,60 @@ func (b *BarrierNode) validate() error {
 		return errors.New("period must be greater than zero")
 	}
 
+	return nil
+}
+
+// MarshalJSON converts BarrierNode to JSON
+// tick:ignore
+func (n *BarrierNode) MarshalJSON() ([]byte, error) {
+	type Alias BarrierNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		Period string `json:"period"`
+		Idle   string `json:"idle"`
+	}{
+		TypeOf: TypeOf{
+			Type: "barrier",
+			ID:   n.ID(),
+		},
+		Alias:  (*Alias)(n),
+		Period: influxql.FormatDuration(n.Period),
+		Idle:   influxql.FormatDuration(n.Idle),
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to an BarrierNode
+// tick:ignore
+func (n *BarrierNode) UnmarshalJSON(data []byte) error {
+	type Alias BarrierNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		Period string `json:"period"`
+		Idle   string `json:"idle"`
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.Type != "barrier" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as BarrierNode", raw.ID, raw.Type)
+	}
+
+	n.Period, err = influxql.ParseDuration(raw.Period)
+	if err != nil {
+		return err
+	}
+
+	n.Idle, err = influxql.ParseDuration(raw.Idle)
+	if err != nil {
+		return err
+	}
+
+	n.setID(raw.ID)
 	return nil
 }
