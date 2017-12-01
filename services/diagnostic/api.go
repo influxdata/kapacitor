@@ -102,11 +102,18 @@ func (s *SessionService) handleSessions(w http.ResponseWriter, r *http.Request) 
 		tags = append(tags, tag{key: k, value: v[0]})
 	}
 
-	contentType := r.Header.Get("Content-Type")
+	acceptedContentType := r.Header.Get("Accept")
+	var contentType string
+	switch acceptedContentType {
+	case "application/json":
+		contentType = acceptedContentType
+	default:
+		contentType = "application/logfmt"
+	}
 
 	header := w.Header()
 	header.Add("Transfer-Encoding", "chunked")
-	header.Add("Content-Type", r.Header.Get("Content-Type"))
+	header.Add("Content-Type", contentType)
 	w.WriteHeader(http.StatusOK)
 
 	session := s.SessionsStore.Create(w, contentType, level, tags)
