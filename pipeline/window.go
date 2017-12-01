@@ -59,6 +59,7 @@ func newWindowNode() *WindowNode {
 }
 
 // MarshalJSON converts WindowNode to JSON
+// tick:ignore
 func (n *WindowNode) MarshalJSON() ([]byte, error) {
 	type Alias WindowNode
 	var raw = &struct {
@@ -79,6 +80,7 @@ func (n *WindowNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an WindowNode
+// tick:ignore
 func (n *WindowNode) UnmarshalJSON(data []byte) error {
 	type Alias WindowNode
 	var raw = &struct {

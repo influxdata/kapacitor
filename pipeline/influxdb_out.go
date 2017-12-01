@@ -76,6 +76,7 @@ func newInfluxDBOutNode(wants EdgeType) *InfluxDBOutNode {
 }
 
 // MarshalJSON converts InfluxDBOutNode to JSON
+// tick:ignore
 func (n *InfluxDBOutNode) MarshalJSON() ([]byte, error) {
 	type Alias InfluxDBOutNode
 	var raw = &struct {
@@ -94,6 +95,7 @@ func (n *InfluxDBOutNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an InfluxDBOutNode
+// tick:ignore
 func (n *InfluxDBOutNode) UnmarshalJSON(data []byte) error {
 	type Alias InfluxDBOutNode
 	var raw = &struct {

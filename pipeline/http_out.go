@@ -21,6 +21,13 @@ import (
 //        //Publish the top 10 results over the last 10s updated every 5s.
 //        |httpOut('top10')
 //
+// Beware of adding a final slash ‘/’ to the URL. This will result in a 404 error for a
+// task that does not exist.
+//
+// Note that the example script above comes from the
+// [scores](https://github.com/influxdata/kapacitor/tree/master/examples/scores) example.
+// See the complete scores example for a concrete demonstration.
+//
 type HTTPOutNode struct {
 	chainnode
 
@@ -37,6 +44,7 @@ func newHTTPOutNode(wants EdgeType, endpoint string) *HTTPOutNode {
 }
 
 // MarshalJSON converts HTTPOutNode to JSON
+// tick:ignore
 func (n *HTTPOutNode) MarshalJSON() ([]byte, error) {
 	type Alias HTTPOutNode
 	var raw = &struct {
@@ -53,6 +61,7 @@ func (n *HTTPOutNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an HTTPOutNode
+// tick:ignore
 func (n *HTTPOutNode) UnmarshalJSON(data []byte) error {
 	type Alias HTTPOutNode
 	var raw = &struct {

@@ -36,6 +36,7 @@ func newWhereNode(wants EdgeType, predicate *ast.LambdaNode) *WhereNode {
 }
 
 // MarshalJSON converts WhereNode to JSON
+// tick:ignore
 func (n *WhereNode) MarshalJSON() ([]byte, error) {
 	type Alias WhereNode
 	var raw = &struct {
@@ -52,6 +53,7 @@ func (n *WhereNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an WhereNode
+// tick:ignore
 func (n *WhereNode) UnmarshalJSON(data []byte) error {
 	type Alias WhereNode
 	var raw = &struct {

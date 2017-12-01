@@ -45,6 +45,7 @@ func newBatchNode() *BatchNode {
 }
 
 // MarshalJSON converts BatchNode to JSON
+// tick:ignore
 func (n *BatchNode) MarshalJSON() ([]byte, error) {
 	type Alias BatchNode
 	var raw = &struct {
@@ -61,6 +62,7 @@ func (n *BatchNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an BatchNode
+// tick:ignore
 func (n *BatchNode) UnmarshalJSON(data []byte) error {
 	type Alias BatchNode
 	var raw = &struct {
@@ -188,6 +190,7 @@ func newQueryNode() *QueryNode {
 }
 
 // MarshalJSON converts QueryNode to JSON
+// tick:ignore
 func (n *QueryNode) MarshalJSON() ([]byte, error) {
 	type Alias QueryNode
 	var raw = &struct {
@@ -210,6 +213,7 @@ func (n *QueryNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an QueryNode
+// tick:ignore
 func (n *QueryNode) UnmarshalJSON(data []byte) error {
 	type Alias QueryNode
 	var raw = &struct {

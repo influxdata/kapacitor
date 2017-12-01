@@ -23,6 +23,7 @@ const defaultMessageTmpl = "{{ .ID }} is {{ .Level }}"
 // Default template for constructing a details message.
 const defaultDetailsTmpl = "{{ json . }}"
 
+// tick:wraps:AlertNodeData
 type AlertNode struct{ *AlertNodeData }
 
 // An AlertNode can trigger an event of varying severity levels,
@@ -379,6 +380,7 @@ func newAlertNode(wants EdgeType) *AlertNode {
 }
 
 // MarshalJSON converts AlertNode to JSON
+// tick:ignore
 func (n *AlertNode) MarshalJSON() ([]byte, error) {
 	type Alias AlertNodeData
 	var raw = &struct {
@@ -396,6 +398,7 @@ func (n *AlertNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an AlertNode
+// tick:ignore
 func (n *AlertNode) UnmarshalJSON(data []byte) error {
 	type Alias AlertNode
 	var raw = &struct {
@@ -927,7 +930,7 @@ type PagerDutyHandler struct {
 //             .room('Kapacitor')
 //
 // Send alerts to HipChat room 'Kapacitor'
-
+//
 //
 // If the 'hipchat' section in the configuration has the option: global = true
 // then all alerts are sent to HipChat without the need to explicitly state it

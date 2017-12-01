@@ -48,7 +48,7 @@ import (
 //         |httpOut('movingaverage')
 //
 // NOTE: The UDF process runs as the same user as the Kapacitor daemon.
-// As a result make the user is properly secured as well as the configuration file.
+// As a result, make sure the user is properly secured, as well as the configuration file.
 type UDFNode struct {
 	chainnode
 
@@ -162,6 +162,7 @@ func (u *UDFNode) SetProperty(name string, args ...interface{}) (interface{}, er
 }
 
 // MarshalJSON converts UDFNode to JSON
+// tick:ignore
 func (u *UDFNode) MarshalJSON() ([]byte, error) {
 	props := JSONNode{}.
 		SetType("udf").
@@ -270,6 +271,7 @@ func (u *UDFNode) unmarshal(props JSONNode) error {
 }
 
 // UnmarshalJSON converts JSON to UDFNode
+// tick:ignore
 func (u *UDFNode) UnmarshalJSON(data []byte) error {
 	props, err := NewJSONNode(data)
 	if err != nil {

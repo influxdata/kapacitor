@@ -156,6 +156,7 @@ func newK8sAutoscaleNode(e EdgeType) *K8sAutoscaleNode {
 }
 
 // MarshalJSON converts K8sAutoscaleNode to JSON
+// tick:ignore
 func (n *K8sAutoscaleNode) MarshalJSON() ([]byte, error) {
 	type Alias K8sAutoscaleNode
 	var raw = &struct {
@@ -176,6 +177,7 @@ func (n *K8sAutoscaleNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an K8sAutoscaleNode
+// tick:ignore
 func (n *K8sAutoscaleNode) UnmarshalJSON(data []byte) error {
 	type Alias K8sAutoscaleNode
 	var raw = &struct {

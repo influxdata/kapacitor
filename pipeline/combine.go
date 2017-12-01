@@ -94,6 +94,7 @@ func newCombineNode(e EdgeType, lambdas []*ast.LambdaNode) *CombineNode {
 }
 
 // MarshalJSON converts CombineNode to JSON
+// tick:ignore
 func (n *CombineNode) MarshalJSON() ([]byte, error) {
 	type Alias CombineNode
 	var raw = &struct {
@@ -112,6 +113,7 @@ func (n *CombineNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an CombineNode
+// tick:ignore
 func (n *CombineNode) UnmarshalJSON(data []byte) error {
 	type Alias CombineNode
 	var raw = &struct {

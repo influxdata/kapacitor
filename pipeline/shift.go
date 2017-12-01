@@ -38,6 +38,7 @@ func newShiftNode(wants EdgeType, shift time.Duration) *ShiftNode {
 }
 
 // MarshalJSON converts ShiftNode to JSON
+// tick:ignore
 func (n *ShiftNode) MarshalJSON() ([]byte, error) {
 	type Alias ShiftNode
 	var raw = &struct {
@@ -56,6 +57,7 @@ func (n *ShiftNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an ShiftNode
+// tick:ignore
 func (n *ShiftNode) UnmarshalJSON(data []byte) error {
 	type Alias ShiftNode
 	var raw = &struct {

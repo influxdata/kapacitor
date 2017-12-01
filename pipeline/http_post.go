@@ -65,6 +65,7 @@ func newHTTPPostNode(wants EdgeType, urls ...string) *HTTPPostNode {
 }
 
 // MarshalJSON converts HTTPPostNode to JSON
+// tick:ignore
 func (n *HTTPPostNode) MarshalJSON() ([]byte, error) {
 	type Alias HTTPPostNode
 	var raw = &struct {
@@ -83,6 +84,7 @@ func (n *HTTPPostNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an HTTPPostNode
+// tick:ignore
 func (n *HTTPPostNode) UnmarshalJSON(data []byte) error {
 	type Alias HTTPPostNode
 	var raw = &struct {
@@ -142,6 +144,8 @@ func (p *HTTPPostNode) Endpoint(endpoint string) *HTTPPostNode {
 	return p
 }
 
+// Add a header to the POST request
+//
 // Example:
 //    stream
 //         |httpPost()

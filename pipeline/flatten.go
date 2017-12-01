@@ -74,6 +74,7 @@ func newFlattenNode(e EdgeType) *FlattenNode {
 }
 
 // MarshalJSON converts FlattenNode to JSON
+// tick:ignore
 func (n *FlattenNode) MarshalJSON() ([]byte, error) {
 	type Alias FlattenNode
 	var raw = &struct {
@@ -92,6 +93,7 @@ func (n *FlattenNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an FlattenNode
+// tick:ignore
 func (n *FlattenNode) UnmarshalJSON(data []byte) error {
 	type Alias FlattenNode
 	var raw = &struct {
