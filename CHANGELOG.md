@@ -2,6 +2,10 @@
 
 ## unreleased
 
+### Bugfixes
+
+- [#1703](https://github.com/influxdata/kapacitor/pull/1703): Fix issues where log API checked wrong header for the desired content type.
+
 ## v1.4.0-rc2 [2017-11-28]
 
 ### Features
@@ -13,7 +17,6 @@
 
 - [#1250](https://github.com/influxdata/kapacitor/issues/1250): Fix VictorOps "data" field being a string instead of actual JSON.
 - [#1697](https://github.com/influxdata/kapacitor/issues/1697): Fix panic with MQTT toml configuration generation.
-- [#1703](https://github.com/influxdata/kapacitor/pull/1703): Fix issues where log API checked wrong header for the desired content type.
 
 ## v1.4.0-rc1 [2017-11-09]
 
