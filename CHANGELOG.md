@@ -2,9 +2,11 @@
 
 ## unreleased
 
+## v1.4.0-rc3 [2017-12-04]
+
 ### Bugfixes
 
-- [#1703](https://github.com/influxdata/kapacitor/pull/1703): Fix issues where log API checked wrong header for the desired content type.
+- [#1703](https://github.com/influxdata/kapacitor/pull/1703): Fix issues where log API checked the wrong header for the desired content type.
 
 ## v1.4.0-rc2 [2017-11-28]
 
