@@ -8028,6 +8028,7 @@ stream
 		c.Enabled = true
 		c.URL = ts.URL
 		c.APIKey = "api_key"
+		c.Entity = "clusterX"
 		og := opsgenie.NewService(c, diagService.NewOpsGenieHandler())
 		tm.OpsGenieService = og
 	}
@@ -8037,35 +8038,25 @@ stream
 		opsgenietest.Request{
 			URL: "/",
 			PostData: opsgenietest.PostData{
-				ApiKey:  "api_key",
-				Message: "kapacitor/cpu/serverA is CRITICAL",
-				Entity:  "kapacitor/cpu/serverA",
-				Alias:   "kapacitor/cpu/serverA",
-				Note:    "",
-				Details: map[string]interface{}{
-					"Level":           "CRITICAL",
-					"Monitoring Tool": "Kapacitor",
-				},
+				Alias:       "kapacitor/cpu/serverA",
+				Message:     "kapacitor/cpu/serverA is CRITICAL",
+				Priority:    "P2",
 				Description: defaultDetails,
 				Teams:       []string{"test_team", "another_team"},
 				Recipients:  []string{"test_recipient", "another_recipient"},
+				Entity:      "clusterX",
 			},
 		},
 		opsgenietest.Request{
 			URL: "/",
 			PostData: opsgenietest.PostData{
-				ApiKey:  "api_key",
-				Message: "kapacitor/cpu/serverA is CRITICAL",
-				Entity:  "kapacitor/cpu/serverA",
-				Alias:   "kapacitor/cpu/serverA",
-				Note:    "",
-				Details: map[string]interface{}{
-					"Level":           "CRITICAL",
-					"Monitoring Tool": "Kapacitor",
-				},
+				Alias:       "kapacitor/cpu/serverA",
+				Message:     "kapacitor/cpu/serverA is CRITICAL",
+				Priority:    "P2",
 				Description: defaultDetails,
 				Teams:       []string{"test_team2"},
 				Recipients:  []string{"test_recipient2", "another_recipient"},
+				Entity:      "clusterX",
 			},
 		},
 	}

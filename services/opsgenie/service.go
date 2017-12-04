@@ -25,6 +25,7 @@ type Diagnostic interface {
 type Service struct {
 	configValue atomic.Value
 	diag        Diagnostic
+	client      http.Client
 }
 
 func NewService(c Config, d Diagnostic) *Service {
@@ -32,6 +33,7 @@ func NewService(c Config, d Diagnostic) *Service {
 		diag: d,
 	}
 	s.configValue.Store(c)
+	s.client = http.Client{}
 	return s
 }
 
@@ -65,21 +67,25 @@ func (s *Service) Global() bool {
 }
 
 type testOptions struct {
+	Alias       string   `json:"entity-id"`
+	Message     string   `json:"message"`
+	Priority    string   `json:"priority"`
+	Description string   `json:"details"`
 	Teams       []string `json:"teams"`
 	Recipients  []string `json:"recipients"`
-	MessageType string   `json:"message-type"`
-	Message     string   `json:"message"`
-	EntityID    string   `json:"entity-id"`
+	Entity      string   `json:"entity"`
 }
 
 func (s *Service) TestOptions() interface{} {
 	c := s.config()
 	return &testOptions{
+		Alias:       "testEntityID",
+		Message:     "test opsgenie message",
+		Priority:    "P2",
+		Description: "",
 		Teams:       c.Teams,
 		Recipients:  c.Recipients,
-		MessageType: "CRITICAL",
-		Message:     "test opsgenie message",
-		EntityID:    "testEntityID",
+		Entity:      c.Entity,
 	}
 }
 
@@ -89,32 +95,41 @@ func (s *Service) Test(options interface{}) error {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
 	return s.Alert(
+		o.Alias,
+		o.Message,
+		o.Priority,
+		o.Description,
 		o.Teams,
 		o.Recipients,
-		o.MessageType,
-		o.Message,
-		o.EntityID,
+		o.Entity,
 		time.Now(),
-		"",
 	)
 }
 
-func (s *Service) Alert(teams []string, recipients []string, messageType, message, entityID string, t time.Time, details string) error {
-	url, post, err := s.preparePost(teams, recipients, messageType, message, entityID, t, details)
+func (s *Service) runRequest(method string, url string, post io.Reader) error {
+	c := s.config()
+
+	req, err := http.NewRequest(method, url, post)
 	if err != nil {
 		return err
 	}
 
-	resp, err := http.Post(url, "application/json", post)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("GenieKey %s", c.APIKey))
+
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
+
+	// read entire body to reuse connection
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusAccepted {
 		type response struct {
 			Message string `json:"message"`
 		}
@@ -127,62 +142,58 @@ func (s *Service) Alert(teams []string, recipients []string, messageType, messag
 	return nil
 }
 
-func (s *Service) preparePost(teams []string, recipients []string, messageType, message, entityID string, t time.Time, details string) (string, io.Reader, error) {
+func (s *Service) preparePost(alias, message, priority, description string, teams, recipients []string, entity string, t time.Time) (io.Reader, error) {
 	c := s.config()
-	if !c.Enabled {
-		return "", nil, errors.New("service is not enabled")
-	}
 
 	ogData := make(map[string]interface{})
-	url := c.URL + "/"
 
-	ogData["apiKey"] = c.APIKey
-	ogData["entity"] = entityID
-	ogData["alias"] = entityID
+	ogData["alias"] = alias
 	ogData["message"] = message
-	ogData["note"] = ""
-	ogData["monitoring_tool"] = "kapacitor"
+	ogData["priority"] = priority
+	ogData["description"] = html.UnescapeString(description)
+	ogData["teams"] = teams
+	ogData["recipients"] = recipients
+	ogData["entity"] = c.Entity
 
-	//Extra Fields (can be used for filtering)
-	ogDetails := make(map[string]interface{})
-	ogDetails["Level"] = messageType
-	ogDetails["Monitoring Tool"] = "Kapacitor"
-
-	ogData["details"] = ogDetails
-
-	switch messageType {
-	case "RECOVERY":
-		url = c.RecoveryURL + "/"
-		ogData["note"] = message
-	}
-
-	ogData["description"] = html.UnescapeString(details)
-
-	if len(teams) == 0 {
-		teams = c.Teams
-	}
-
-	if len(teams) > 0 {
-		ogData["teams"] = teams
-	}
-
-	if len(recipients) == 0 {
-		recipients = c.Recipients
-	}
-
-	if len(recipients) > 0 {
-		ogData["recipients"] = recipients
-	}
-
-	// Post data to VO
 	var post bytes.Buffer
 	enc := json.NewEncoder(&post)
 	err := enc.Encode(ogData)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 
-	return url, &post, nil
+	return &post, nil
+}
+
+func (s *Service) Alert(alias, message, priority, description string, teams, recipients []string, entity string, t time.Time) error {
+	c := s.config()
+
+	post, err := s.preparePost(alias, message, priority, description, teams, recipients, entity, t)
+	if err != nil {
+		return err
+	}
+
+	// Run initial create
+	if err := s.runRequest(http.MethodPost, c.URL, post); err != nil {
+		return err
+	}
+
+	// Run Priority update
+	url := c.URL + "/" + alias + "/priority?identifierType=alias"
+	payload := bytes.NewBufferString(fmt.Sprintf(`{"priority":"%s"}`, priority))
+	if err := s.runRequest(http.MethodPut, url, payload); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Service) Recover(entityID string) error {
+	c := s.config()
+	url := c.URL
+	post := bytes.NewBufferString(`{}`)
+	url += "/" + entityID + "/close?identifierType=alias"
+	return s.runRequest(http.MethodPost, url, post)
 }
 
 type HandlerConfig struct {
@@ -191,6 +202,9 @@ type HandlerConfig struct {
 
 	// OpsGenie Recipients.
 	RecipientsList []string `mapstructure:"recipients-list"`
+
+	// OpsGenie Entity.
+	Entity string `mapstructure:"entity"`
 }
 
 type handler struct {
@@ -208,22 +222,50 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
 }
 
 func (h *handler) Handle(event alert.Event) {
-	var messageType string
-	switch event.State.Level {
-	case alert.OK:
-		messageType = "RECOVERY"
-	default:
-		messageType = event.State.Level.String()
+	c := h.s.config()
+	if !c.Enabled {
+		h.diag.Error("wouldn't send event to OpsGenie", errors.New("service is not enabled"))
+		return
 	}
-	if err := h.s.Alert(
-		h.c.TeamsList,
-		h.c.RecipientsList,
-		messageType,
-		event.State.Message,
+
+	if event.State.Level == alert.OK {
+		err := h.s.Recover(event.State.ID)
+		if err != nil {
+			h.diag.Error("failed to recover at OpsGenie", err)
+		}
+		return
+	}
+
+	priorityMap := map[alert.Level]string{
+		alert.Info:     "P5",
+		alert.Warning:  "P3",
+		alert.Critical: "P2",
+	}
+
+	teams := h.c.TeamsList
+	if len(teams) == 0 {
+		teams = c.Teams
+	}
+	recipients := h.c.RecipientsList
+	if len(recipients) == 0 {
+		recipients = c.Recipients
+	}
+	entity := h.c.Entity
+	if len(entity) == 0 {
+		entity = c.Entity
+	}
+
+	err := h.s.Alert(
 		event.State.ID,
-		event.State.Time,
+		event.State.Message,
+		priorityMap[event.State.Level],
 		event.State.Details,
-	); err != nil {
+		teams,
+		recipients,
+		entity,
+		event.State.Time,
+	)
+	if err != nil {
 		h.diag.Error("failed to send event to OpsGenie", err)
 	}
 }

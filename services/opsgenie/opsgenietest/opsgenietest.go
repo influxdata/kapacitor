@@ -50,13 +50,12 @@ type Request struct {
 }
 
 type PostData struct {
-	ApiKey      string                 `json:"apiKey"`
-	Message     string                 `json:"message"`
-	Entity      string                 `json:"entity"`
-	Alias       string                 `json:"alias"`
-	Note        string                 `json:"note"`
-	Details     map[string]interface{} `json:"details"`
-	Description string                 `json:"description"`
-	Teams       []string               `json:"teams"`
-	Recipients  []string               `json:"recipients"`
+	ApiKey      string   `json:"apiKey"`
+	Alias       string   `json:"alias"`
+	Message     string   `json:"message"`
+	Priority    string   `json:"priority"`
+	Description string   `json:"description"`
+	Teams       []string `json:"teams"`
+	Recipients  []string `json:"recipients"`
+	Entity      string   `json:"entity"`
 }
