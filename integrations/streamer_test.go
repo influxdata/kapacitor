@@ -1507,7 +1507,6 @@ stream
 	defer func() {
 		cleanupTest()
 
-		// barrier should emit at least 4 times
 		if rc := atomic.LoadInt32(&requestCount); rc != 2 {
 			t.Errorf("got %v exp %v", rc, 2)
 		}
