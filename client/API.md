@@ -1604,19 +1604,15 @@ GET /kapacitor/v1/alerts/topics/system/handlers
         {
             "link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/handlers/slack"},
             "id":"slack",
-            "actions": [{
-                "kind":"slack",
-                "options":{
-                    "channel":"#alerts"
-                }
-            }]
+            "kind":"slack",
+            "options":{
+              "channel":"#alerts"
+            },
         },
         {
             "link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/handlers/smtp"},
             "id":"smtp",
-            "actions": [{
-                "kind":"smtp"
-            }]
+            "kind":"smtp"
         }
     ]
 }
@@ -1649,14 +1645,16 @@ GET /kapacitor/v1/alerts/topics/system/handlers/slack
 
 ```
 {
-    "link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/handlers/slack"},
-    "id":"slack",
-    "actions": [{
-        "kind":"slack",
-        "options": {
-            "channel":"#alerts"
-        }
-    }]
+  "link": {
+    "rel": "self",
+      "href": "/kapacitor/v1/alerts/topics/system/handlers/slack"
+  },
+  "id": "slack",
+  "kind": "slack",
+  "options": {
+    "channel": "#alerts"
+  },
+  "match": ""
 }
 ```
 
@@ -1667,27 +1665,26 @@ To create a new handler make a POST request to `/kapacitor/v1/alerts/topics/syst
 ```
 POST /kapacitor/v1/alerts/topics/system/handlers
 {
-    "id":"slack",
-    "actions": [{
-        "kind":"slack",
-        "options": {
-            "channel":"#alerts"
-        }
-    }]
-
+  "id":"slack",
+  "kind":"slack",
+  "options": {
+    "channel":"#alerts"
+  }
 }
 ```
 
 ```
 {
-    "link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/handlers/slack"},
-    "id": "slack",
-    "actions": [{
-        "kind":"slack",
-        "options": {
-            "channel":"#alerts"
-        }
-    }]
+  "link": {
+    "rel": "self",
+      "href": "/kapacitor/v1/alerts/topics/system/handlers/slack"
+  },
+  "id": "slack",
+  "kind": "slack",
+  "options": {
+    "channel": "#alerts"
+  },
+  "match": ""
 }
 ```
 
@@ -1707,22 +1704,22 @@ Update the topics and actions for a handler using the PATCH method.
 PATCH /kapacitor/v1/alerts/topics/system/handlers/slack
 [
     {"op":"replace", "path":"/topics", "value":["system", "test"]},
-    {"op":"replace", "path":"/actions/0/options/channel", "value":"#testing_alerts"}
+    {"op":"replace", "path":"/options/channel", "value":"#testing_alerts"}
 ]
 ```
 
 ```
 {
-    "link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/handlers/slack"},
-    "id": "slack",
-    "actions": [
-        {
-            "kind":"slack",
-            "options": {
-                "channel":"#testing_alerts"
-            }
-        }
-    ]
+  "link": {
+    "rel": "self",
+      "href": "/kapacitor/v1/alerts/topics/system/handlers/slack"
+  },
+  "id": "slack",
+  "kind": "slack",
+  "options": {
+    "channel": "#testing_alerts"
+  },
+  "match": ""
 }
 ```
 
@@ -1731,30 +1728,26 @@ Replace an entire handler using the PUT method.
 ```
 PUT /kapacitor/v1/alerts/topics/system/handlers/slack
 {
-    "id": "slack",
-    "actions": [
-        {
-            "kind":"slack",
-            "options": {
-                "channel":"#testing_alerts"
-            }
-        }
-    ]
+  "id": "slack",
+  "kind":"slack",
+  "options": {
+    "channel":"#testing_alerts"
+  }
 }
 ```
 
 ```
 {
-    "link":{"rel":"self","href":"/kapacitor/v1/alerts/topics/system/handlers/slack"},
-    "id": "slack",
-    "actions": [
-        {
-            "kind":"slack",
-            "options": {
-                "channel":"#testing_alerts"
-            }
-        }
-    ]
+  "link": {
+    "rel": "self",
+      "href": "/kapacitor/v1/alerts/topics/system/handlers/slack"
+  },
+  "id": "slack",
+  "kind": "slack",
+  "options": {
+    "channel": "#testing_alerts"
+  },
+  "match": ""
 }
 ```
 
