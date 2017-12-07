@@ -20,6 +20,7 @@ import (
 	"github.com/influxdata/kapacitor/client/v1"
 	"github.com/influxdata/kapacitor/server"
 	"github.com/influxdata/kapacitor/services/diagnostic"
+	"github.com/influxdata/kapacitor/services/mqtt"
 	"github.com/influxdata/wlog"
 )
 
@@ -220,6 +221,7 @@ func (s *Server) Stats() (stats, error) {
 // NewConfig returns the default config with temporary paths.
 func NewConfig() *server.Config {
 	c := server.NewConfig()
+	c.MQTT = mqtt.Configs{}
 	c.Reporting.Enabled = false
 	c.Replay.Dir = MustTempDir()
 	c.Storage.BoltDBPath = filepath.Join(MustTempDir(), "bolt.db")
