@@ -2,6 +2,10 @@
 
 ## unreleased
 
+### Bugfixes
+
+- [#1710](https://github.com/influxdata/kapacitor/issues/1710): Idle Barrier is dropping all messages when source has clock offset
+
 ## v1.4.0-rc3 [2017-12-04]
 
 ### Bugfixes

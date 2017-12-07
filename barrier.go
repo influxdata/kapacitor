@@ -84,24 +84,26 @@ type idleBarrier struct {
 	name  string
 	group edge.GroupInfo
 
-	idle        time.Duration
-	lastT       atomic.Value
-	wg          sync.WaitGroup
-	outs        []edge.StatsEdge
-	stopC       chan struct{}
-	resetTimerC chan struct{}
+	idle         time.Duration
+	lastPointT   atomic.Value
+	lastBarrierT atomic.Value
+	wg           sync.WaitGroup
+	outs         []edge.StatsEdge
+	stopC        chan struct{}
+	resetTimerC  chan struct{}
 }
 
 func newIdleBarrier(name string, group edge.GroupInfo, idle time.Duration, outs []edge.StatsEdge) *idleBarrier {
 	r := &idleBarrier{
-		name:        name,
-		group:       group,
-		idle:        idle,
-		lastT:       atomic.Value{},
-		wg:          sync.WaitGroup{},
-		outs:        outs,
-		stopC:       make(chan struct{}),
-		resetTimerC: make(chan struct{}),
+		name:         name,
+		group:        group,
+		idle:         idle,
+		lastPointT:   atomic.Value{},
+		lastBarrierT: atomic.Value{},
+		wg:           sync.WaitGroup{},
+		outs:         outs,
+		stopC:        make(chan struct{}),
+		resetTimerC:  make(chan struct{}),
 	}
 
 	r.Init()
@@ -110,7 +112,8 @@ func newIdleBarrier(name string, group edge.GroupInfo, idle time.Duration, outs 
 }
 
 func (n *idleBarrier) Init() {
-	n.lastT.Store(time.Time{})
+	n.lastPointT.Store(time.Now().UTC())
+	n.lastBarrierT.Store(time.Time{})
 	n.wg.Add(1)
 
 	go n.idleHandler()
@@ -125,8 +128,9 @@ func (n *idleBarrier) BeginBatch(m edge.BeginBatchMessage) (edge.Message, error)
 	return m, nil
 }
 func (n *idleBarrier) BatchPoint(m edge.BatchPointMessage) (edge.Message, error) {
-	if !m.Time().Before(n.lastT.Load().(time.Time)) {
+	if !m.Time().Before(n.lastBarrierT.Load().(time.Time)) {
 		n.resetTimer()
+		n.lastPointT.Store(m.Time())
 		return m, nil
 	}
 	return nil, nil
@@ -135,8 +139,10 @@ func (n *idleBarrier) EndBatch(m edge.EndBatchMessage) (edge.Message, error) {
 	return m, nil
 }
 func (n *idleBarrier) Barrier(m edge.BarrierMessage) (edge.Message, error) {
-	if !m.Time().Before(n.lastT.Load().(time.Time)) {
+	if !m.Time().Before(n.lastBarrierT.Load().(time.Time)) {
 		n.resetTimer()
+		n.lastPointT.Store(m.Time())
+		n.lastBarrierT.Store(m.Time())
 		return m, nil
 	}
 	return nil, nil
@@ -149,8 +155,9 @@ func (n *idleBarrier) DeleteGroup(m edge.DeleteGroupMessage) (edge.Message, erro
 }
 
 func (n *idleBarrier) Point(m edge.PointMessage) (edge.Message, error) {
-	if !m.Time().Before(n.lastT.Load().(time.Time)) {
+	if !m.Time().Before(n.lastBarrierT.Load().(time.Time)) {
 		n.resetTimer()
+		n.lastPointT.Store(m.Time())
 		return m, nil
 	}
 	return nil, nil
@@ -161,9 +168,10 @@ func (n *idleBarrier) resetTimer() {
 }
 
 func (n *idleBarrier) emitBarrier() error {
-	nowT := time.Now().UTC()
-	n.lastT.Store(nowT)
-	return edge.Forward(n.outs, edge.NewBarrierMessage(n.group, nowT))
+	newT := n.lastPointT.Load().(time.Time).Add(n.idle)
+	n.lastPointT.Store(newT)
+	n.lastBarrierT.Store(newT)
+	return edge.Forward(n.outs, edge.NewBarrierMessage(n.group, newT))
 }
 
 func (n *idleBarrier) idleHandler() {
