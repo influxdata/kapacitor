@@ -41,7 +41,10 @@ func (c *Config) SetNewClientF(fn func(c Config) (Client, error)) {
 }
 
 func NewConfig() Config {
-	return Config{}
+	return Config{
+		Enabled: false,
+		Name:    "default",
+	}
 }
 
 func (c Config) Validate() error {
