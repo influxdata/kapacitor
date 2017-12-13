@@ -57,7 +57,7 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 	}
 
 	for _, h := range a.HTTPPostHandlers {
-		n.Dot("post", h.URL).
+		n.DotRemoveZeroValue("post", h.URL).
 			Dot("endpoint", h.Endpoint).
 			DotIf("captureResponse", h.CaptureResponseFlag).
 			Dot("timeout", h.Timeout)
@@ -73,7 +73,7 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 	}
 
 	for _, h := range a.TcpHandlers {
-		n.Dot("tcp", h.Address)
+		n.DotRemoveZeroValue("tcp", h.Address)
 	}
 
 	for _, h := range a.EmailHandlers {
@@ -84,11 +84,11 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 	}
 
 	for _, h := range a.ExecHandlers {
-		n.Dot("exec", args(h.Command)...)
+		n.DotRemoveZeroValue("exec", args(h.Command)...)
 	}
 
 	for _, h := range a.LogHandlers {
-		n.Dot("log", h.FilePath)
+		n.DotRemoveZeroValue("log", h.FilePath)
 		if h.Mode != 0 {
 			mode := &ast.NumberNode{
 				IsInt: true,
@@ -114,8 +114,8 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 			Dot("userKey", h.UserKey).
 			Dot("device", h.Device).
 			Dot("title", h.Title).
-			Dot("url", h.URL).
-			Dot("urlTitle", h.URLTitle).
+			Dot("uRL", h.URL).
+			Dot("uRLTitle", h.URLTitle).
 			Dot("sound", h.Sound)
 	}
 
@@ -170,15 +170,14 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 	}
 
 	for _, h := range a.MQTTHandlers {
-		n.Dot("mqtt").
+		n.DotRemoveZeroValue("mqtt", h.Topic).
 			Dot("brokerName", h.BrokerName).
-			Dot("topic", h.Topic).
 			Dot("qos", h.Qos).
-			DotIf("retained", h.Retained)
+			Dot("retained", h.Retained)
 	}
 
 	for _, h := range a.SNMPTrapHandlers {
-		n.Dot("snmpTrap", h.TrapOid)
+		n.DotRemoveZeroValue("snmpTrap", h.TrapOid)
 		for _, d := range h.DataList {
 			n.Dot("data", d.Oid, d.Type, d.Value)
 		}
