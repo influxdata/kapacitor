@@ -201,7 +201,7 @@ POINTS:
 				}
 				fieldPrefix.WriteString(v)
 			} else {
-				n.diag.Error("poing missing tag for flatten operation", fmt.Errorf("tag %s is missing from point", tag))
+				n.diag.Error("point missing tag for flatten operation", fmt.Errorf("tag %s is missing from point", tag))
 				continue POINTS
 			}
 		}
