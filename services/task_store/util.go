@@ -75,6 +75,8 @@ func taskTypeFromProgram(n *ast.ProgramNode) client.TaskType {
 						tts = append(tts, ident)
 					}
 					break ChainLoop
+				default:
+					break ChainLoop
 				}
 			}
 		}
