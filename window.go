@@ -28,10 +28,11 @@ func newWindowNode(et *ExecutingTask, n *pipeline.WindowNode, d NodeDiagnostic) 
 	return wn, nil
 }
 
-func (n *WindowNode) runWindow([]byte) error {
+func (n *WindowNode) runWindow([]byte) (err error) {
 	consumer := edge.NewGroupedConsumer(n.ins[0], n)
 	n.statMap.Set(statCardinalityGauge, consumer.CardinalityVar())
-	return consumer.Consume()
+	err = consumer.Consume()
+	return
 }
 
 func (n *WindowNode) NewGroup(group edge.GroupInfo, first edge.PointMeta) (edge.Receiver, error) {
@@ -145,9 +146,39 @@ func (w *windowByTime) BatchPoint(edge.BatchPointMessage) (edge.Message, error) 
 func (w *windowByTime) EndBatch(edge.EndBatchMessage) (edge.Message, error) {
 	return nil, errors.New("window does not support batch data")
 }
-func (w *windowByTime) Barrier(b edge.BarrierMessage) (edge.Message, error) {
-	//TODO(nathanielc): Implement barrier messages to flush window
-	return b, nil
+func (w *windowByTime) Barrier(b edge.BarrierMessage) (msg edge.Message, err error) {
+	if w.every == 0 {
+		// Since we are emitting every point we can use a right aligned window (oldest, now]
+		if !b.Time().Before(w.nextEmit) {
+			// purge old points
+			oldest := b.Time().Add(-1 * w.period)
+			w.buf.purge(oldest, false)
+
+			// get current batch
+			msg = w.batch(b.Time())
+
+			// Next emit time is now
+			w.nextEmit = b.Time()
+		}
+	} else {
+		// Since more points can arrive with the same time we need to use a left aligned window [oldest, now).
+		if !b.Time().Before(w.nextEmit) {
+			// purge old points
+			oldest := w.nextEmit.Add(-1 * w.period)
+			w.buf.purge(oldest, true)
+
+			// get current batch
+			msg = w.batch(w.nextEmit)
+
+			// Determine next emit time.
+			// This is dependent on the current time not the last time we emitted.
+			w.nextEmit = b.Time().Add(w.every)
+			if w.align {
+				w.nextEmit = w.nextEmit.Truncate(w.every)
+			}
+		}
+	}
+	return
 }
 func (w *windowByTime) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
 	return d, nil

@@ -25,7 +25,7 @@ type SessionService struct {
 
 	SessionsStore SessionsStore
 	HTTPDService  interface {
-		AddRoutes([]httpd.Route) error
+		AddPreviewRoutes([]httpd.Route) error
 		DelRoutes([]httpd.Route)
 	}
 }
@@ -71,7 +71,7 @@ func (s *SessionService) Open() error {
 		return errors.New("must set HTTPDService")
 	}
 
-	if err := s.HTTPDService.AddRoutes(s.routes); err != nil {
+	if err := s.HTTPDService.AddPreviewRoutes(s.routes); err != nil {
 		return fmt.Errorf("failed to add routes: %v", err)
 	}
 	return nil
@@ -102,15 +102,22 @@ func (s *SessionService) handleSessions(w http.ResponseWriter, r *http.Request) 
 		tags = append(tags, tag{key: k, value: v[0]})
 	}
 
-	contentType := r.Header.Get("Content-Type")
-
-	session := s.SessionsStore.Create(w, contentType, level, tags)
-	defer s.SessionsStore.Delete(session)
+	acceptedContentType := r.Header.Get("Accept")
+	var contentType string
+	switch acceptedContentType {
+	case "application/json":
+		contentType = acceptedContentType
+	default:
+		contentType = "application/logfmt"
+	}
 
 	header := w.Header()
 	header.Add("Transfer-Encoding", "chunked")
-	header.Add("Content-Type", r.Header.Get("Content-Type"))
+	header.Add("Content-Type", contentType)
 	w.WriteHeader(http.StatusOK)
+
+	session := s.SessionsStore.Create(w, contentType, level, tags)
+	defer s.SessionsStore.Delete(session)
 
 	<-r.Context().Done()
 }

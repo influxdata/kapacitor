@@ -1,5 +1,10 @@
 package pipeline
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 // An HTTPOutNode caches the most recent data for each group it has received.
 //
 // The cached data is available at the given endpoint.
@@ -16,12 +21,19 @@ package pipeline
 //        //Publish the top 10 results over the last 10s updated every 5s.
 //        |httpOut('top10')
 //
+// Beware of adding a final slash ‘/’ to the URL. This will result in a 404 error for a
+// task that does not exist.
+//
+// Note that the example script above comes from the
+// [scores](https://github.com/influxdata/kapacitor/tree/master/examples/scores) example.
+// See the complete scores example for a concrete demonstration.
+//
 type HTTPOutNode struct {
 	chainnode
 
 	// The relative path where the cached data is exposed
 	// tick:ignore
-	Endpoint string
+	Endpoint string `json:"endpoint"`
 }
 
 func newHTTPOutNode(wants EdgeType, endpoint string) *HTTPOutNode {
@@ -29,4 +41,42 @@ func newHTTPOutNode(wants EdgeType, endpoint string) *HTTPOutNode {
 		chainnode: newBasicChainNode("http_out", wants, wants),
 		Endpoint:  endpoint,
 	}
+}
+
+// MarshalJSON converts HTTPOutNode to JSON
+// tick:ignore
+func (n *HTTPOutNode) MarshalJSON() ([]byte, error) {
+	type Alias HTTPOutNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+	}{
+		TypeOf: TypeOf{
+			Type: "httpOut",
+			ID:   n.ID(),
+		},
+		Alias: (*Alias)(n),
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to an HTTPOutNode
+// tick:ignore
+func (n *HTTPOutNode) UnmarshalJSON(data []byte) error {
+	type Alias HTTPOutNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.Type != "httpOut" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as HTTPOutNode", raw.ID, raw.Type)
+	}
+	n.setID(raw.ID)
+	return nil
 }

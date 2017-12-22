@@ -87,7 +87,7 @@ But instead of cloning the main repo, instead clone your fork. Follow the steps 
     export GOPATH=$HOME/go
     mkdir -p $GOPATH/src/github.com/influxdata
     cd $GOPATH/src/github.com/influxdata
-    git clone git@github.com:<username>/kapacitor
+    git clone git@github.com:<username>/kapacitor.git
 
 Retaining the directory structure `$GOPATH/src/github.com/influxdata` is necessary so that Go imports work correctly.
 
@@ -107,7 +107,7 @@ go fmt ./...
 go vet ./...
 ```
 
-For more information on `go vet`, [read the GoDoc](https://godoc.org/golang.org/x/tools/cmd/vet).
+For more information on `go vet`, [read the GoDoc](https://golang.org/pkg/cmd/go/internal/vet/).
 
 Build and Test
 --------------

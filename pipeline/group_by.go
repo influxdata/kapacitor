@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -24,16 +25,16 @@ type GroupByNode struct {
 	chainnode
 	//The dimensions by which to group to the data.
 	// tick:ignore
-	Dimensions []interface{}
+	Dimensions []interface{} `json:"dimensions"`
 
 	// The dimensions to exclude.
 	// Useful for substractive tags from using *.
 	// tick:ignore
-	ExcludedDimensions []string `tick:"Exclude"`
+	ExcludedDimensions []string `tick:"Exclude" json:"exclude"`
 
 	// Whether to include the measurement in the group ID.
 	// tick:ignore
-	ByMeasurementFlag bool `tick:"ByMeasurement"`
+	ByMeasurementFlag bool `tick:"ByMeasurement" json:"byMeasurement"`
 }
 
 func newGroupByNode(wants EdgeType, dims []interface{}) *GroupByNode {
@@ -41,6 +42,44 @@ func newGroupByNode(wants EdgeType, dims []interface{}) *GroupByNode {
 		chainnode:  newBasicChainNode("groupby", wants, wants),
 		Dimensions: dims,
 	}
+}
+
+// MarshalJSON converts GroupByNode to JSON
+// tick:ignore
+func (n *GroupByNode) MarshalJSON() ([]byte, error) {
+	type Alias GroupByNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+	}{
+		TypeOf: TypeOf{
+			Type: "groupBy",
+			ID:   n.ID(),
+		},
+		Alias: (*Alias)(n),
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to an GroupByNode
+// tick:ignore
+func (n *GroupByNode) UnmarshalJSON(data []byte) error {
+	type Alias GroupByNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.Type != "groupBy" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as GroupByNode", raw.ID, raw.Type)
+	}
+	n.setID(raw.ID)
+	return nil
 }
 
 func (n *GroupByNode) validate() error {

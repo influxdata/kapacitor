@@ -1,0 +1,29 @@
+dbrp "telegraf"."autogen"
+
+var cpu = stream
+    |from()
+        .measurement('cpu')
+        .groupBy(*)
+    |window()
+        .period(30s)
+        .every(10s)
+        .align()
+    |mean('usage_user')
+        .as('value')
+
+var mem = stream
+    |from()
+        .measurement('mem')
+        .groupBy(*)
+    |window()
+        .period(30s)
+        .every(10s)
+        .align()
+    |mean('free')
+        .as('value')
+
+cpu
+    |join(mem)
+        .as('cpu', 'mem')
+    |eval(lambda: "cpu.value" / "mem.value")
+        .as('cpu_mem_free_ratio')

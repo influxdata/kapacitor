@@ -1,0 +1,7 @@
+dbrp "telegraf"."autogen"
+
+stream
+    |from()
+        .measurement('cpu')
+    |flatten()
+        .on('cpu')

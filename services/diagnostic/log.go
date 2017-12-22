@@ -15,13 +15,11 @@ type Level int
 const (
 	DebugLevel Level = iota
 	InfoLevel
-	WarnLevel
 	ErrorLevel
 )
 
 type Logger interface {
 	Error(msg string, ctx ...Field)
-	Warn(msg string, ctx ...Field)
 	Debug(msg string, ctx ...Field)
 	Info(msg string, ctx ...Field)
 	With(ctx ...Field) Logger
@@ -51,12 +49,6 @@ func NewMultiLogger(loggers ...Logger) *MultiLogger {
 func (l *MultiLogger) Error(msg string, ctx ...Field) {
 	for _, logger := range l.loggers {
 		logger.Error(msg, ctx...)
-	}
-}
-
-func (l *MultiLogger) Warn(msg string, ctx ...Field) {
-	for _, logger := range l.loggers {
-		logger.Warn(msg, ctx...)
 	}
 }
 
@@ -141,15 +133,6 @@ func (l *ServerLogger) Debug(msg string, ctx ...Field) {
 	}
 }
 
-func (l *ServerLogger) Warn(msg string, ctx ...Field) {
-	l.levelMu.RLock()
-	logLine := l.levelF(WarnLevel)
-	l.levelMu.RUnlock()
-	if logLine {
-		l.Log(time.Now(), "warn", msg, ctx)
-	}
-}
-
 func (l *ServerLogger) Info(msg string, ctx ...Field) {
 	l.levelMu.RLock()
 	logLine := l.levelF(InfoLevel)
@@ -175,12 +158,6 @@ type sessionsLogger struct {
 func (s *sessionsLogger) Error(msg string, ctx ...Field) {
 	s.store.Each(func(sn *Session) {
 		sn.Error(msg, s.context, ctx)
-	})
-}
-
-func (s *sessionsLogger) Warn(msg string, ctx ...Field) {
-	s.store.Each(func(sn *Session) {
-		sn.Warn(msg, s.context, ctx)
 	})
 }
 
@@ -261,6 +238,7 @@ func writeJSON(w Writer, now time.Time, level string, msg string, context, field
 		f.WriteJSONTo(w)
 	}
 	w.WriteByte('}')
+	w.WriteByte('\n')
 }
 
 func writeJSONTimestamp(w Writer, now time.Time) {

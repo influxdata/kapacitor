@@ -18,3 +18,9 @@ func newNoOpNode(wants EdgeType) *NoOpNode {
 		chainnode: newBasicChainNode("noop", wants, wants),
 	}
 }
+
+// tick:ignore
+func (n *NoOpNode) MarshalJSON() ([]byte, error) { return nil, nil }
+
+// tick:ignore
+func (n *NoOpNode) UnmarshalJSON(data []byte) error { return nil }

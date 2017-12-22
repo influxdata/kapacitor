@@ -11,9 +11,11 @@ import (
 	"sync"
 	"text/template"
 
-	"github.com/yozora-hitagi/kapacitor/alert"
-	"github.com/yozora-hitagi/kapacitor/bufpool"
-	"github.com/yozora-hitagi/kapacitor/keyvalue"
+	"time"
+
+	"context"
+	"github.com/influxdata/kapacitor/alert"
+	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/pkg/errors"
 )
 
@@ -185,6 +187,7 @@ type testOptions struct {
 	Endpoint string            `json:"endpoint"`
 	URL      string            `json:"url"`
 	Headers  map[string]string `json:"headers"`
+	Timeout  time.Duration     `json:"timeout"`
 }
 
 func (s *Service) TestOptions() interface{} {
@@ -234,11 +237,11 @@ type HandlerConfig struct {
 	Endpoint        string            `mapstructure:"endpoint"`
 	Headers         map[string]string `mapstructure:"headers"`
 	CaptureResponse bool              `mapstructure:"capture-response"`
+	Timeout         time.Duration     `mapstructure:"timeout"`
 }
 
 type handler struct {
-	s  *Service
-	bp *bufpool.Pool
+	s *Service
 
 	endpoint *Endpoint
 	headers  map[string]string
@@ -246,6 +249,10 @@ type handler struct {
 	captureResponse bool
 
 	diag Diagnostic
+
+	timeout time.Duration
+
+	hc *http.Client
 }
 
 func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
@@ -255,11 +262,11 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
 	}
 	return &handler{
 		s:               s,
-		bp:              bufpool.New(),
 		endpoint:        e,
 		diag:            s.diag.WithContext(ctx...),
 		headers:         c.Headers,
 		captureResponse: c.CaptureResponse,
+		timeout:         c.Timeout,
 	}
 }
 
@@ -280,8 +287,7 @@ func (h *handler) Handle(event alert.Event) {
 	var err error
 
 	// Construct the body of the HTTP request
-	body := h.bp.Get()
-	defer h.bp.Put(body)
+	body := new(bytes.Buffer)
 	ad := event.AlertData()
 
 	var contentType string
@@ -308,6 +314,13 @@ func (h *handler) Handle(event alert.Event) {
 
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
+	}
+
+	// Set timeout
+	if h.timeout > 0 {
+		ctx, cancel := context.WithTimeout(req.Context(), h.timeout)
+		defer cancel()
+		req = req.WithContext(ctx)
 	}
 
 	// Execute the request

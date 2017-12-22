@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -3317,7 +3318,7 @@ test value=1 0000000012
 			t.Fatal(err)
 		}
 		retry++
-		if retry > 10 {
+		if retry > 100 {
 			t.Fatal("failed to finish recording")
 		}
 	}
@@ -3524,7 +3525,7 @@ test value=1 0000000012
 			t.Fatal(err)
 		}
 		retry++
-		if retry > 10 {
+		if retry > 100 {
 			t.Fatal("failed to finish recording")
 		}
 	}
@@ -4851,11 +4852,12 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 	defer f.Close()
 	exp := []alert.Data{
 		{
-			ID:       "test-stream-query",
-			Message:  "test-stream-query is CRITICAL",
-			Time:     time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
-			Level:    alert.Critical,
-			Duration: 0 * time.Second,
+			ID:            "test-stream-query",
+			Message:       "test-stream-query is CRITICAL",
+			Time:          time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.OK,
+			Duration:      0 * time.Second,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -4872,11 +4874,12 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			},
 		},
 		{
-			ID:       "test-stream-query",
-			Message:  "test-stream-query is CRITICAL",
-			Time:     time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
-			Level:    alert.Critical,
-			Duration: 1 * time.Second,
+			ID:            "test-stream-query",
+			Message:       "test-stream-query is CRITICAL",
+			Time:          time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      1 * time.Second,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -4893,11 +4896,12 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			},
 		},
 		{
-			ID:       "test-stream-query",
-			Message:  "test-stream-query is CRITICAL",
-			Time:     time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
-			Level:    alert.Critical,
-			Duration: 2 * time.Second,
+			ID:            "test-stream-query",
+			Message:       "test-stream-query is CRITICAL",
+			Time:          time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      2 * time.Second,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -4916,11 +4920,12 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			},
 		},
 		{
-			ID:       "test-stream-query",
-			Message:  "test-stream-query is CRITICAL",
-			Time:     time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
-			Level:    alert.Critical,
-			Duration: 3 * time.Second,
+			ID:            "test-stream-query",
+			Message:       "test-stream-query is CRITICAL",
+			Time:          time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      3 * time.Second,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -4939,11 +4944,12 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			},
 		},
 		{
-			ID:       "test-stream-query",
-			Message:  "test-stream-query is CRITICAL",
-			Time:     time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
-			Level:    alert.Critical,
-			Duration: 4 * time.Second,
+			ID:            "test-stream-query",
+			Message:       "test-stream-query is CRITICAL",
+			Time:          time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      4 * time.Second,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -4962,11 +4968,12 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			},
 		},
 		{
-			ID:       "test-stream-query",
-			Message:  "test-stream-query is CRITICAL",
-			Time:     time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
-			Level:    alert.Critical,
-			Duration: 5 * time.Second,
+			ID:            "test-stream-query",
+			Message:       "test-stream-query is CRITICAL",
+			Time:          time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      5 * time.Second,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -4984,11 +4991,12 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			},
 		},
 		{
-			ID:       "test-stream-query",
-			Message:  "test-stream-query is CRITICAL",
-			Time:     time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
-			Level:    alert.Critical,
-			Duration: 6 * time.Second,
+			ID:            "test-stream-query",
+			Message:       "test-stream-query is CRITICAL",
+			Time:          time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      6 * time.Second,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -5006,11 +5014,12 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			},
 		},
 		{
-			ID:       "test-stream-query",
-			Message:  "test-stream-query is CRITICAL",
-			Time:     time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
-			Level:    alert.Critical,
-			Duration: 7 * time.Second,
+			ID:            "test-stream-query",
+			Message:       "test-stream-query is CRITICAL",
+			Time:          time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      7 * time.Second,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -5028,11 +5037,12 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			},
 		},
 		{
-			ID:       "test-stream-query",
-			Message:  "test-stream-query is CRITICAL",
-			Time:     time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
-			Level:    alert.Critical,
-			Duration: 8 * time.Second,
+			ID:            "test-stream-query",
+			Message:       "test-stream-query is CRITICAL",
+			Time:          time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      8 * time.Second,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -5050,11 +5060,12 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			},
 		},
 		{
-			ID:       "test-stream-query",
-			Message:  "test-stream-query is CRITICAL",
-			Time:     time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
-			Level:    alert.Critical,
-			Duration: 9 * time.Second,
+			ID:            "test-stream-query",
+			Message:       "test-stream-query is CRITICAL",
+			Time:          time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      9 * time.Second,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -5071,11 +5082,12 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			},
 		},
 		{
-			ID:       "test-stream-query",
-			Message:  "test-stream-query is CRITICAL",
-			Time:     time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
-			Level:    alert.Critical,
-			Duration: 10 * time.Second,
+			ID:            "test-stream-query",
+			Message:       "test-stream-query is CRITICAL",
+			Time:          time.Date(1971, 1, 1, 0, 0, 11, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      10 * time.Second,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -6936,11 +6948,14 @@ func TestServer_UpdateConfig(t *testing.T) {
 		{
 			section: "mqtt",
 			setDefaults: func(c *server.Config) {
-				c.MQTT = mqtt.Configs{mqtt.Config{
-					Name:       "default",
-					URL:        "tcp://mqtt.example.com:1883",
-					NewClientF: mqtttest.NewClient,
-				}}
+				cfg := &mqtt.Config{
+					Name: "default",
+					URL:  "tcp://mqtt.example.com:1883",
+				}
+				cfg.SetNewClientF(mqtttest.NewClient)
+				c.MQTT = mqtt.Configs{
+					*cfg,
+				}
 			},
 			element: "default",
 			expDefaultSection: client.ConfigSection{
@@ -7772,6 +7787,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 						"global":      false,
 						"routing-key": "test",
 						"url":         victorops.DefaultVictorOpsAPIURL,
+						"json-data":   false,
 					},
 					Redacted: []string{
 						"api-key",
@@ -7786,6 +7802,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 					"global":      false,
 					"routing-key": "test",
 					"url":         victorops.DefaultVictorOpsAPIURL,
+					"json-data":   false,
 				},
 				Redacted: []string{
 					"api-key",
@@ -7795,8 +7812,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 				{
 					updateAction: client.ConfigUpdateAction{
 						Set: map[string]interface{}{
-							"api-key": "",
-							"global":  true,
+							"api-key":   "",
+							"global":    true,
+							"json-data": true,
 						},
 					},
 					expSection: client.ConfigSection{
@@ -7809,6 +7827,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 								"global":      true,
 								"routing-key": "test",
 								"url":         victorops.DefaultVictorOpsAPIURL,
+								"json-data":   true,
 							},
 							Redacted: []string{
 								"api-key",
@@ -7823,6 +7842,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"global":      true,
 							"routing-key": "test",
 							"url":         victorops.DefaultVictorOpsAPIURL,
+							"json-data":   true,
 						},
 						Redacted: []string{
 							"api-key",
@@ -8031,6 +8051,7 @@ func TestServer_ListServiceTests(t *testing.T) {
 					"endpoint": "example",
 					"url":      "http://localhost:3000/",
 					"headers":  map[string]interface{}{"Auth": "secret"},
+					"timeout":  float64(0),
 				},
 			},
 			{
@@ -8540,7 +8561,7 @@ func TestServer_AlertHandlers_CRUD(t *testing.T) {
 				},
 			},
 			expCreate: client.TopicHandler{
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/system/handlers/myhandler"},
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/system/handlers/myhandler"},
 				ID:   "myhandler",
 				Kind: "slack",
 				Options: map[string]interface{}{
@@ -8564,7 +8585,7 @@ func TestServer_AlertHandlers_CRUD(t *testing.T) {
 				},
 			},
 			expPatch: client.TopicHandler{
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/system/handlers/myhandler"},
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/system/handlers/myhandler"},
 				ID:   "myhandler",
 				Kind: "log",
 				Options: map[string]interface{}{
@@ -8579,7 +8600,7 @@ func TestServer_AlertHandlers_CRUD(t *testing.T) {
 				},
 			},
 			expPut: client.TopicHandler{
-				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/system/handlers/newid"},
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/system/handlers/newid"},
 				ID:   "newid",
 				Kind: "smtp",
 				Options: map[string]interface{}{
@@ -8849,15 +8870,15 @@ func TestServer_AlertHandlers(t *testing.T) {
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				cc := new(mqtttest.ClientCreator)
 				ctxt := context.WithValue(nil, "clientCreator", cc)
-
-				c.MQTT = mqtt.Configs{
-					mqtt.Config{
-						Enabled:    true,
-						Name:       "test",
-						URL:        "tcp://mqtt.example.com:1883",
-						NewClientF: cc.NewClient,
-					},
+				cfg := &mqtt.Config{
+					Enabled: true,
+					Name:    "test",
+					URL:     "tcp://mqtt.example.com:1883",
 				}
+
+				cfg.SetNewClientF(cc.NewClient)
+
+				c.MQTT = mqtt.Configs{*cfg}
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
@@ -9508,7 +9529,7 @@ stream
 		Link:  l,
 		Topic: topic,
 		Events: []client.TopicEvent{{
-			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1preview/alerts/topics/%s/events/id", topic)},
+			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1/alerts/topics/%s/events/id", topic)},
 			ID:   "id",
 			State: client.EventState{
 				Message:  "message",
@@ -9548,7 +9569,7 @@ stream
 		Link:  l,
 		Topic: topic,
 		Events: []client.TopicEvent{{
-			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1preview/alerts/topics/%s/events/id", topic)},
+			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1/alerts/topics/%s/events/id", topic)},
 			ID:   "id",
 			State: client.EventState{
 				Message:  "message",
@@ -9697,7 +9718,7 @@ alert value=2 0000000000002
 		Link:  l,
 		Topic: tcpTopic,
 		Events: []client.TopicEvent{{
-			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1preview/alerts/topics/%s/events/id-agg", tcpTopic)},
+			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1/alerts/topics/%s/events/id-agg", tcpTopic)},
 			ID:   "id-agg",
 			State: client.EventState{
 				Message:  "Received 3 events in the last 100ms.",
@@ -9825,7 +9846,7 @@ stream
 		Link:  l,
 		Topic: tcpTopic,
 		Events: []client.TopicEvent{{
-			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1preview/alerts/topics/%s/events/id", tcpTopic)},
+			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1/alerts/topics/%s/events/id", tcpTopic)},
 			ID:   "id",
 			State: client.EventState{
 				Message:  "message",
@@ -9946,7 +9967,7 @@ alert,host=serverB value=0 0000000004
 		Link:  l,
 		Topic: topic,
 		Events: []client.TopicEvent{{
-			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1preview/alerts/topics/%s/events/id", topic)},
+			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1/alerts/topics/%s/events/id", topic)},
 			ID:   "id",
 			State: client.EventState{
 				Message:  "message",
@@ -10023,7 +10044,7 @@ stream
 		Link:  l,
 		Topic: topic,
 		Events: []client.TopicEvent{{
-			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1preview/alerts/topics/%s/events/id", topic)},
+			Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1/alerts/topics/%s/events/id", topic)},
 			ID:   "id",
 			State: client.EventState{
 				Message:  "message",
@@ -10171,7 +10192,7 @@ stream
 			Link:  l,
 			Topic: topic,
 			Events: []client.TopicEvent{{
-				Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1preview/alerts/topics/%s/events/id", topic)},
+				Link: client.Link{Relation: client.Self, Href: fmt.Sprintf("/kapacitor/v1/alerts/topics/%s/events/id", topic)},
 				ID:   "id",
 				State: client.EventState{
 					Message:  "message",
@@ -10250,23 +10271,23 @@ func TestServer_AlertListHandlers(t *testing.T) {
 	}
 
 	expHandlers := client.TopicHandlers{
-		Link:  client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/test/handlers?pattern="},
+		Link:  client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/test/handlers?pattern="},
 		Topic: "test",
 		Handlers: []client.TopicHandler{
 			{
-				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/test/handlers/handler0"},
+				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/test/handlers/handler0"},
 				ID:      "handler0",
 				Kind:    "tcp",
 				Options: map[string]interface{}{"address": ts.Addr},
 			},
 			{
-				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/test/handlers/handler1"},
+				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/test/handlers/handler1"},
 				ID:      "handler1",
 				Kind:    "tcp",
 				Options: map[string]interface{}{"address": ts.Addr},
 			},
 			{
-				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/test/handlers/handler2"},
+				Link:    client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/test/handlers/handler2"},
 				ID:      "handler2",
 				Kind:    "tcp",
 				Options: map[string]interface{}{"address": ts.Addr},
@@ -10304,7 +10325,7 @@ func TestServer_AlertListHandlers(t *testing.T) {
 		t.Fatal(err)
 	}
 	exp = expHandlers
-	exp.Link.Href = "/kapacitor/v1preview/alerts/topics/test/handlers?pattern=%2A"
+	exp.Link.Href = "/kapacitor/v1/alerts/topics/test/handlers?pattern=%2A"
 	if !reflect.DeepEqual(handlers, exp) {
 		t.Errorf("unexpected handlers with pattern \"*\":\ngot\n%+v\nexp\n%+v\n", handlers, exp)
 	}
@@ -10317,7 +10338,7 @@ func TestServer_AlertListHandlers(t *testing.T) {
 		t.Fatal(err)
 	}
 	exp = expHandlers
-	exp.Link.Href = "/kapacitor/v1preview/alerts/topics/test/handlers?pattern=handler%2A"
+	exp.Link.Href = "/kapacitor/v1/alerts/topics/test/handlers?pattern=handler%2A"
 	if !reflect.DeepEqual(handlers, exp) {
 		t.Errorf("unexpected handlers with pattern \"handler*\":\ngot\n%+v\nexp\n%+v\n", handlers, exp)
 	}
@@ -10330,7 +10351,7 @@ func TestServer_AlertListHandlers(t *testing.T) {
 		t.Fatal(err)
 	}
 	exp = expHandlers
-	exp.Link.Href = "/kapacitor/v1preview/alerts/topics/test/handlers?pattern=handler0"
+	exp.Link.Href = "/kapacitor/v1/alerts/topics/test/handlers?pattern=handler0"
 	exp.Handlers = expHandlers.Handlers[0:1]
 	if !reflect.DeepEqual(handlers, exp) {
 		t.Errorf("unexpected handlers with pattern \"handler0\":\ngot\n%+v\nexp\n%+v\n", handlers, exp)
@@ -10353,12 +10374,12 @@ func TestServer_AlertTopic(t *testing.T) {
 	}
 
 	expTopic := client.Topic{
-		Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/misc"},
+		Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/misc"},
 		ID:           "misc",
 		Level:        "OK",
 		Collected:    0,
-		EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1preview/alerts/topics/misc/events"},
-		HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1preview/alerts/topics/misc/handlers"},
+		EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1/alerts/topics/misc/events"},
+		HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1/alerts/topics/misc/handlers"},
 	}
 	topic, err := cli.Topic(cli.TopicLink("misc"))
 	if err != nil {
@@ -10394,28 +10415,28 @@ func TestServer_AlertListTopics(t *testing.T) {
 	}
 
 	expTopics := client.Topics{
-		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics?min-level=OK&pattern="},
+		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics?min-level=OK&pattern="},
 		Topics: []client.Topic{
 			{
-				Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/misc"},
+				Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/misc"},
 				ID:           "misc",
 				Level:        "OK",
-				EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1preview/alerts/topics/misc/events"},
-				HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1preview/alerts/topics/misc/handlers"},
+				EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1/alerts/topics/misc/events"},
+				HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1/alerts/topics/misc/handlers"},
 			},
 			{
-				Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/system"},
+				Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/system"},
 				ID:           "system",
 				Level:        "OK",
-				EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1preview/alerts/topics/system/events"},
-				HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1preview/alerts/topics/system/handlers"},
+				EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1/alerts/topics/system/events"},
+				HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1/alerts/topics/system/handlers"},
 			},
 			{
-				Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1preview/alerts/topics/test"},
+				Link:         client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/test"},
 				ID:           "test",
 				Level:        "OK",
-				EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1preview/alerts/topics/test/events"},
-				HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1preview/alerts/topics/test/handlers"},
+				EventsLink:   client.Link{Relation: "events", Href: "/kapacitor/v1/alerts/topics/test/events"},
+				HandlersLink: client.Link{Relation: "handlers", Href: "/kapacitor/v1/alerts/topics/test/handlers"},
 			},
 		},
 	}
@@ -10482,7 +10503,7 @@ stream
 		t.Fatal(err)
 	}
 	exp = expTopics
-	exp.Link.Href = "/kapacitor/v1preview/alerts/topics?min-level=OK&pattern=%2A"
+	exp.Link.Href = "/kapacitor/v1/alerts/topics?min-level=OK&pattern=%2A"
 	if !reflect.DeepEqual(topics, exp) {
 		t.Errorf("unexpected topics with pattern \"*\":\ngot\n%+v\nexp\n%+v\n", topics, exp)
 	}
@@ -10495,7 +10516,7 @@ stream
 		t.Fatal(err)
 	}
 	exp = expTopics
-	exp.Link.Href = "/kapacitor/v1preview/alerts/topics?min-level=OK&pattern=test"
+	exp.Link.Href = "/kapacitor/v1/alerts/topics?min-level=OK&pattern=test"
 	exp.Topics = expTopics.Topics[2:]
 	if !reflect.DeepEqual(topics, exp) {
 		t.Errorf("unexpected topics with pattern \"test\":\ngot\n%+v\nexp\n%+v\n", topics, exp)
@@ -10509,7 +10530,7 @@ stream
 		t.Fatal(err)
 	}
 	exp = expTopics
-	exp.Link.Href = "/kapacitor/v1preview/alerts/topics?min-level=INFO&pattern="
+	exp.Link.Href = "/kapacitor/v1/alerts/topics?min-level=INFO&pattern="
 	exp.Topics = expTopics.Topics[2:]
 	if !reflect.DeepEqual(topics, exp) {
 		t.Errorf("unexpected topics min level \"info\":\ngot\n%+v\nexp\n%+v\n", topics, exp)
@@ -10880,6 +10901,93 @@ options:
 		}
 	}
 
+}
+
+func TestSideloadService(t *testing.T) {
+	dir := MustTempDir()
+	defer os.RemoveAll(dir)
+
+	if err := copyFiles("testdata/sideload", dir); err != nil {
+		t.Fatal(err)
+	}
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	id := "testSideloadTask"
+	ttype := client.StreamTask
+	dbrps := []client.DBRP{{
+		Database:        "mydb",
+		RetentionPolicy: "myrp",
+	}}
+	tick := fmt.Sprintf(`stream
+	|from()
+		.measurement('test')
+	|sideload()
+		.source('file://%s')
+		.order('host/{{.host}}.yml', 'service/{{.service}}.yml', 'region/{{.region}}.yml')
+		.field('cpu_usage_idle_warn', 30.0)
+		.field('cpu_usage_idle_crit', 15.0)
+	|httpOut('sideload')
+`, dir)
+
+	_, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Enabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	endpoint := fmt.Sprintf("%s/tasks/%s/sideload", s.URL(), id)
+
+	// Request data before any writes and expect null responses
+	nullResponse := `{"series":null}`
+	err = s.HTTPGetRetry(endpoint, nullResponse, 100, time.Millisecond*5)
+	if err != nil {
+		t.Error(err)
+	}
+
+	points := `test,host=host002,service=cart,region=us-east-1 value=1 0000000000`
+	v := url.Values{}
+	v.Add("precision", "s")
+	s.MustWrite("mydb", "myrp", points, v)
+
+	exp := `{"series":[{"name":"test","tags":{"host":"host002","region":"us-east-1","service":"cart"},"columns":["time","cpu_usage_idle_crit","cpu_usage_idle_warn","value"],"values":[["1970-01-01T00:00:00Z",4,10,1]]}]}`
+	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Update source file
+	host002Override := `
+---
+cpu_usage_idle_warn: 8
+`
+	f, err := os.Create(filepath.Join(dir, "host/host002.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = io.Copy(f, strings.NewReader(host002Override))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	// reload
+	s.Reload()
+
+	// Write new points
+	points = `test,host=host002,service=cart,region=us-east-1 value=2 0000000001`
+	s.MustWrite("mydb", "myrp", points, v)
+
+	exp = `{"series":[{"name":"test","tags":{"host":"host002","region":"us-east-1","service":"cart"},"columns":["time","cpu_usage_idle_crit","cpu_usage_idle_warn","value"],"values":[["1970-01-01T00:00:01Z",5,8,2]]}]}`
+	err = s.HTTPGetRetry(endpoint, exp, 100, time.Millisecond*5)
+	if err != nil {
+		t.Error(err)
+	}
 }
 
 func TestLogSessions_HeaderJSON(t *testing.T) {

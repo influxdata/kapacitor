@@ -2083,7 +2083,7 @@ func doDelete(args []string) error {
 
 // Level
 func levelUsage() {
-	var u = `Usage: kapacitor level (debug|info|warn|error)
+	var u = `Usage: kapacitor level (debug|info|error)
 
 	Sets the logging level on the kapacitord server.
 `

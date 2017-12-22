@@ -29,12 +29,22 @@ type Config struct {
 	Username string `toml:"username" override:"username"`
 	Password string `toml:"password" override:"password,redact"`
 
-	// NewClientF is a function that returns a client for a given config.
-	NewClientF func(c Config) (Client, error) `toml:"-" override:"-"`
+	// newClientF is a function that returns a client for a given config.
+	// It is used exclusively for testing.
+	newClientF func(c Config) (Client, error) `override:"-"`
+}
+
+// SetNewClientF sets the newClientF on a Config.
+// It is used exclusively for testing.
+func (c *Config) SetNewClientF(fn func(c Config) (Client, error)) {
+	c.newClientF = fn
 }
 
 func NewConfig() Config {
-	return Config{}
+	return Config{
+		Enabled: false,
+		Name:    "default",
+	}
 }
 
 func (c Config) Validate() error {
@@ -52,8 +62,8 @@ func (c Config) Validate() error {
 // NewClient creates a new client based off this configuration.
 func (c Config) NewClient() (Client, error) {
 	newC := newClient
-	if c.NewClientF != nil {
-		newC = c.NewClientF
+	if c.newClientF != nil {
+		newC = c.newClientF
 	}
 	return newC(c)
 }
@@ -111,7 +121,7 @@ func (cs Configs) Validate() error {
 			return err
 		}
 	}
-	if defaultCount > 0 {
+	if defaultCount > 1 {
 		return errors.New("more than one configuration is marked as the default")
 	}
 	if defaultCount == 0 && len(cs) > 1 {

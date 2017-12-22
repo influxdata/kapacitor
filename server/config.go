@@ -144,11 +144,11 @@ func NewConfig() *Config {
 
 	c.Alerta = alerta.NewConfig()
 	c.HipChat = hipchat.NewConfig()
-	c.MQTT = mqtt.Configs{}
+	c.MQTT = mqtt.Configs{mqtt.NewConfig()}
 	c.OpsGenie = opsgenie.NewConfig()
 	c.PagerDuty = pagerduty.NewConfig()
 	c.Pushover = pushover.NewConfig()
-	c.HTTPPost = httppost.Configs{}
+	c.HTTPPost = httppost.Configs{httppost.NewConfig()}
 	c.SMTP = smtp.NewConfig()
 	c.Sensu = sensu.NewConfig()
 	c.Slack = slack.NewConfig()

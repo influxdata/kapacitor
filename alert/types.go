@@ -19,13 +19,14 @@ type Event struct {
 
 func (e Event) AlertData() Data {
 	return Data{
-		ID:       e.State.ID,
-		Message:  e.State.Message,
-		Details:  e.State.Details,
-		Time:     e.State.Time,
-		Duration: e.State.Duration,
-		Level:    e.State.Level,
-		Data:     e.Data.Result,
+		ID:            e.State.ID,
+		Message:       e.State.Message,
+		Details:       e.State.Details,
+		Time:          e.State.Time,
+		Duration:      e.State.Duration,
+		Level:         e.State.Level,
+		Data:          e.Data.Result,
+		PreviousLevel: e.previousState.Level,
 	}
 }
 
@@ -170,11 +171,12 @@ type TopicState struct {
 // Data is a structure that contains relevant data about an alert event.
 // The structure is intended to be JSON encoded, providing a consistent data format.
 type Data struct {
-	ID       string        `json:"id"`
-	Message  string        `json:"message"`
-	Details  string        `json:"details"`
-	Time     time.Time     `json:"time"`
-	Duration time.Duration `json:"duration"`
-	Level    Level         `json:"level"`
-	Data     models.Result `json:"data"`
+	ID            string        `json:"id"`
+	Message       string        `json:"message"`
+	Details       string        `json:"details"`
+	Time          time.Time     `json:"time"`
+	Duration      time.Duration `json:"duration"`
+	Level         Level         `json:"level"`
+	Data          models.Result `json:"data"`
+	PreviousLevel Level         `json:"previousLevel"`
 }

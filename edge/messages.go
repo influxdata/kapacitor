@@ -315,12 +315,10 @@ func (pm *pointMessage) ToRow() *models.Row {
 		Name: pm.name,
 		Tags: pm.tags,
 	}
-	row.Columns = make([]string, len(pm.fields)+1)
+	row.Columns = make([]string, 1, len(pm.fields)+1)
 	row.Columns[0] = "time"
-	i := 1
 	for f := range pm.fields {
-		row.Columns[i] = f
-		i++
+		row.Columns = append(row.Columns, f)
 	}
 	// Sort all columns but leave time as first
 	sort.Strings(row.Columns[1:])
@@ -878,15 +876,21 @@ func (l BatchPointMessages) Swap(i int, j int)      { l[i], l[j] = l[j], l[i] }
 type BarrierMessage interface {
 	Message
 	ShallowCopy() BarrierMessage
-	TimeSetter
+	GroupInfoer
+	NameGetter
+	DimensionGetter
+	TagGetter
+	TimeGetter
 }
 type barrierMessage struct {
-	time time.Time
+	group GroupInfo
+	time  time.Time
 }
 
-func NewBarrierMessage(time time.Time) BarrierMessage {
+func NewBarrierMessage(group GroupInfo, time time.Time) BarrierMessage {
 	return &barrierMessage{
-		time: time,
+		group: group,
+		time:  time,
 	}
 }
 
@@ -896,14 +900,29 @@ func (b *barrierMessage) ShallowCopy() BarrierMessage {
 	return c
 }
 
+func (*barrierMessage) Name() string {
+	return "barrier"
+}
+
+func (*barrierMessage) Dimensions() models.Dimensions {
+	return models.Dimensions{}
+}
+
+func (*barrierMessage) Tags() models.Tags {
+	return models.Tags{}
+}
+
 func (*barrierMessage) Type() MessageType {
 	return Barrier
 }
+func (b *barrierMessage) GroupID() models.GroupID {
+	return b.group.ID
+}
+func (b *barrierMessage) GroupInfo() GroupInfo {
+	return b.group
+}
 func (b *barrierMessage) Time() time.Time {
 	return b.time
-}
-func (b *barrierMessage) SetTime(time time.Time) {
-	b.time = time
 }
 
 type DeleteGroupMessage interface {

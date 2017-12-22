@@ -1,0 +1,6 @@
+dbrp "loopback"."autogen"
+
+stream
+    |from()
+        .measurement('system')
+        .groupBy(*)

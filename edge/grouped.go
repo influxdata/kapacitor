@@ -108,13 +108,11 @@ func (c *groupedConsumer) Point(p PointMessage) error {
 }
 
 func (c *groupedConsumer) Barrier(b BarrierMessage) error {
-	// Barriers messages apply to all gorups
-	for _, r := range c.groups {
-		if err := r.Barrier(b); err != nil {
-			return err
-		}
+	r, err := c.getOrCreateGroup(b.GroupInfo(), b)
+	if err != nil {
+		return err
 	}
-	return nil
+	return r.Barrier(b)
 }
 
 func (c *groupedConsumer) DeleteGroup(d DeleteGroupMessage) error {

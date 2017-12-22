@@ -133,6 +133,7 @@ func ValueToLiteralNode(pos Position, v interface{}) (Node, error) {
 			position: p,
 			IsInt:    true,
 			Int64:    value,
+			Base:     10,
 		}, nil
 	case float64:
 		return &NumberNode{
@@ -163,6 +164,10 @@ func ValueToLiteralNode(pos Position, v interface{}) (Node, error) {
 		return &LambdaNode{
 			position:   p,
 			Expression: e,
+		}, nil
+	case *StarNode:
+		return &StarNode{
+			position: p,
 		}, nil
 	case []interface{}:
 		nodes := make([]Node, len(value))

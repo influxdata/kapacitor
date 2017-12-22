@@ -15,58 +15,59 @@ import (
 	"github.com/influxdata/influxdb/services/graphite"
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/influxdb/services/opentsdb"
-	"github.com/yozora-hitagi/kapacitor"
-	"github.com/yozora-hitagi/kapacitor/auth"
-	"github.com/yozora-hitagi/kapacitor/command"
-	iclient "github.com/yozora-hitagi/kapacitor/influxdb"
-	"github.com/yozora-hitagi/kapacitor/keyvalue"
-	"github.com/yozora-hitagi/kapacitor/server/vars"
-	"github.com/yozora-hitagi/kapacitor/services/alert"
-	"github.com/yozora-hitagi/kapacitor/services/alerta"
-	"github.com/yozora-hitagi/kapacitor/services/azure"
-	"github.com/yozora-hitagi/kapacitor/services/config"
-	"github.com/yozora-hitagi/kapacitor/services/consul"
-	"github.com/yozora-hitagi/kapacitor/services/deadman"
-	"github.com/yozora-hitagi/kapacitor/services/diagnostic"
-	"github.com/yozora-hitagi/kapacitor/services/dns"
-	"github.com/yozora-hitagi/kapacitor/services/ec2"
-	"github.com/yozora-hitagi/kapacitor/services/file_discovery"
-	"github.com/yozora-hitagi/kapacitor/services/gce"
-	"github.com/yozora-hitagi/kapacitor/services/hipchat"
-	"github.com/yozora-hitagi/kapacitor/services/httpd"
-	"github.com/yozora-hitagi/kapacitor/services/httppost"
-	"github.com/yozora-hitagi/kapacitor/services/influxdb"
-	"github.com/yozora-hitagi/kapacitor/services/k8s"
-	"github.com/yozora-hitagi/kapacitor/services/load"
-	"github.com/yozora-hitagi/kapacitor/services/marathon"
-	"github.com/yozora-hitagi/kapacitor/services/mqtt"
-	"github.com/yozora-hitagi/kapacitor/services/nerve"
-	"github.com/yozora-hitagi/kapacitor/services/noauth"
-	"github.com/yozora-hitagi/kapacitor/services/opsgenie"
-	"github.com/yozora-hitagi/kapacitor/services/pagerduty"
-	"github.com/yozora-hitagi/kapacitor/services/pushover"
-	"github.com/yozora-hitagi/kapacitor/services/replay"
-	"github.com/yozora-hitagi/kapacitor/services/reporting"
-	"github.com/yozora-hitagi/kapacitor/services/scraper"
-	"github.com/yozora-hitagi/kapacitor/services/sensu"
-	"github.com/yozora-hitagi/kapacitor/services/serverset"
-	"github.com/yozora-hitagi/kapacitor/services/servicetest"
-	"github.com/yozora-hitagi/kapacitor/services/slack"
-	"github.com/yozora-hitagi/kapacitor/services/smtp"
-	"github.com/yozora-hitagi/kapacitor/services/snmptrap"
-	"github.com/yozora-hitagi/kapacitor/services/static_discovery"
-	"github.com/yozora-hitagi/kapacitor/services/stats"
-	"github.com/yozora-hitagi/kapacitor/services/storage"
-	"github.com/yozora-hitagi/kapacitor/services/swarm"
-	"github.com/yozora-hitagi/kapacitor/services/talk"
-	"github.com/yozora-hitagi/kapacitor/services/task_store"
-	"github.com/yozora-hitagi/kapacitor/services/telegram"
-	"github.com/yozora-hitagi/kapacitor/services/triton"
-	"github.com/yozora-hitagi/kapacitor/services/udf"
-	"github.com/yozora-hitagi/kapacitor/services/udp"
-	"github.com/yozora-hitagi/kapacitor/services/victorops"
-	"github.com/yozora-hitagi/kapacitor/uuid"
-	"github.com/yozora-hitagi/kapacitor/waiter"
+	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/auth"
+	"github.com/influxdata/kapacitor/command"
+	iclient "github.com/influxdata/kapacitor/influxdb"
+	"github.com/influxdata/kapacitor/keyvalue"
+	"github.com/influxdata/kapacitor/server/vars"
+	"github.com/influxdata/kapacitor/services/alert"
+	"github.com/influxdata/kapacitor/services/alerta"
+	"github.com/influxdata/kapacitor/services/azure"
+	"github.com/influxdata/kapacitor/services/config"
+	"github.com/influxdata/kapacitor/services/consul"
+	"github.com/influxdata/kapacitor/services/deadman"
+	"github.com/influxdata/kapacitor/services/diagnostic"
+	"github.com/influxdata/kapacitor/services/dns"
+	"github.com/influxdata/kapacitor/services/ec2"
+	"github.com/influxdata/kapacitor/services/file_discovery"
+	"github.com/influxdata/kapacitor/services/gce"
+	"github.com/influxdata/kapacitor/services/hipchat"
+	"github.com/influxdata/kapacitor/services/httpd"
+	"github.com/influxdata/kapacitor/services/httppost"
+	"github.com/influxdata/kapacitor/services/influxdb"
+	"github.com/influxdata/kapacitor/services/k8s"
+	"github.com/influxdata/kapacitor/services/load"
+	"github.com/influxdata/kapacitor/services/marathon"
+	"github.com/influxdata/kapacitor/services/mqtt"
+	"github.com/influxdata/kapacitor/services/nerve"
+	"github.com/influxdata/kapacitor/services/noauth"
+	"github.com/influxdata/kapacitor/services/opsgenie"
+	"github.com/influxdata/kapacitor/services/pagerduty"
+	"github.com/influxdata/kapacitor/services/pushover"
+	"github.com/influxdata/kapacitor/services/replay"
+	"github.com/influxdata/kapacitor/services/reporting"
+	"github.com/influxdata/kapacitor/services/scraper"
+	"github.com/influxdata/kapacitor/services/sensu"
+	"github.com/influxdata/kapacitor/services/serverset"
+	"github.com/influxdata/kapacitor/services/servicetest"
+	"github.com/influxdata/kapacitor/services/sideload"
+	"github.com/influxdata/kapacitor/services/slack"
+	"github.com/influxdata/kapacitor/services/smtp"
+	"github.com/influxdata/kapacitor/services/snmptrap"
+	"github.com/influxdata/kapacitor/services/static_discovery"
+	"github.com/influxdata/kapacitor/services/stats"
+	"github.com/influxdata/kapacitor/services/storage"
+	"github.com/influxdata/kapacitor/services/swarm"
+	"github.com/influxdata/kapacitor/services/talk"
+	"github.com/influxdata/kapacitor/services/task_store"
+	"github.com/influxdata/kapacitor/services/telegram"
+	"github.com/influxdata/kapacitor/services/triton"
+	"github.com/influxdata/kapacitor/services/udf"
+	"github.com/influxdata/kapacitor/services/udp"
+	"github.com/influxdata/kapacitor/services/victorops"
+	"github.com/influxdata/kapacitor/uuid"
+	"github.com/influxdata/kapacitor/waiter"
 	"github.com/pkg/errors"
 )
 
@@ -106,6 +107,7 @@ type Server struct {
 	TaskMasterLookup *kapacitor.TaskMasterLookup
 
 	LoadService           *load.Service
+	SideloadService       *sideload.Service
 	AuthService           auth.Interface
 	HTTPDService          *httpd.Service
 	StorageService        *storage.Service
@@ -203,6 +205,7 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 	s.appendAuthService()
 	s.appendConfigOverrideService()
 	s.appendTesterService()
+	s.appendSideloadService()
 
 	// Init alert service
 	s.initAlertService()
@@ -262,11 +265,6 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 		return nil, errors.Wrap(err, "graphite service")
 	}
 
-	// Append StatsService and ReportingService after other services so all stats are ready
-	// to be reported
-	s.appendStatsService()
-	s.appendReportingService()
-
 	// Append Scraper and discovery services
 	s.appendScraperService()
 
@@ -276,11 +274,13 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 	if err := s.appendSwarmService(); err != nil {
 		return nil, errors.Wrap(err, "docker swarm service")
 	}
+	if err := s.appendEC2Service(); err != nil {
+		return nil, errors.Wrap(err, "Aws service")
+	}
 
 	s.appendAzureService()
 	s.appendConsulService()
 	s.appendDNSService()
-	s.appendEC2Service()
 	s.appendFileService()
 	s.appendGCEService()
 	s.appendMarathonService()
@@ -288,6 +288,11 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 	s.appendServersetService()
 	s.appendStaticService()
 	s.appendTritonService()
+
+	// Append StatsService and ReportingService after other services so all stats are ready
+	// to be reported
+	s.appendStatsService()
+	s.appendReportingService()
 
 	// Append HTTPD Service last so that the API is not listening till everything else succeeded.
 	s.appendHTTPDService()
@@ -358,6 +363,16 @@ func (s *Server) appendTesterService() {
 
 	s.TesterService = srv
 	s.AppendService("tests", srv)
+}
+
+func (s *Server) appendSideloadService() {
+	d := s.DiagService.NewSideloadHandler()
+	srv := sideload.NewService(d)
+	srv.HTTPDService = s.HTTPDService
+
+	s.SideloadService = srv
+	s.TaskMaster.SideloadService = srv
+	s.AppendService("sideload", srv)
 }
 
 func (s *Server) appendSMTPService() {
@@ -498,7 +513,19 @@ func (s *Server) appendSwarmService() error {
 	s.AppendService("swarm", srv)
 	return nil
 }
+func (s *Server) appendEC2Service() error {
+	c := s.config.EC2
+	d := s.DiagService.NewEC2Handler()
+	srv, err := ec2.NewService(c, s.ScraperService, d)
+	if err != nil {
+		return err
+	}
 
+	s.TaskMaster.EC2Service = srv
+	s.SetDynamicService("ec2", srv)
+	s.AppendService("ec2", srv)
+	return nil
+}
 func (s *Server) appendDeadmanService() {
 	d := s.DiagService.NewDeadmanHandler()
 	srv := deadman.NewService(s.config.Deadman, d)
@@ -824,14 +851,6 @@ func (s *Server) appendDNSService() {
 	s.AppendService("dns", srv)
 }
 
-func (s *Server) appendEC2Service() {
-	c := s.config.EC2
-	d := s.DiagService.NewEC2Handler()
-	srv := ec2.NewService(c, s.ScraperService, d)
-	s.SetDynamicService("ec2", srv)
-	s.AppendService("ec2", srv)
-}
-
 func (s *Server) appendFileService() {
 	c := s.config.FileDiscovery
 	d := s.DiagService.NewFileDiscoveryHandler()
@@ -1069,6 +1088,9 @@ func (s *Server) writeID(file string, id uuid.UUID) error {
 func (s *Server) Reload() {
 	if err := s.LoadService.Load(); err != nil {
 		s.Diag.Error("failed to reload tasks/templates/handlers", err)
+	}
+	if err := s.SideloadService.Reload(); err != nil {
+		s.Diag.Error("failed to reload sideload sources", err)
 	}
 }
 

@@ -459,11 +459,14 @@ func (ts *Service) handleTask(w http.ResponseWriter, r *http.Request) {
 		httpd.HttpError(w, fmt.Sprintf("invalid dot-view parameter %q", dotView), true, http.StatusBadRequest)
 		return
 	}
+
 	tmID := r.URL.Query().Get("replay-id")
 	if tmID == "" {
 		tmID = kapacitor.MainTaskMaster
 	}
+
 	tm := ts.TaskMasterLookup.Get(tmID)
+
 	if tm == nil {
 		httpd.HttpError(w, fmt.Sprintf("no running replay with ID: %s", tmID), true, http.StatusBadRequest)
 		return
@@ -472,7 +475,6 @@ func (ts *Service) handleTask(w http.ResponseWriter, r *http.Request) {
 		httpd.HttpError(w, fmt.Sprintf("replay %s is not for task: %s", tmID, raw.ID), true, http.StatusBadRequest)
 		return
 	}
-
 	t, err := ts.convertTask(raw, scriptFormat, dotView, tm)
 	if err != nil {
 		httpd.HttpError(w, fmt.Sprintf("invalid task stored in db: %s", err.Error()), true, http.StatusInternalServerError)

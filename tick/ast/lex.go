@@ -190,6 +190,15 @@ func (t TokenType) String() string {
 	return fmt.Sprintf("%d", t)
 }
 
+// NewTokenType converts string to TokenType
+func NewTokenType(token string) (TokenType, error) {
+	typ, ok := strToOperator[token]
+	if !ok {
+		return TokenError, fmt.Errorf("unknown operator %s", token)
+	}
+	return typ, nil
+}
+
 // True if token type is an operator used in mathematical or boolean expressions.
 func IsExprOperator(typ TokenType) bool {
 	return typ > begin_tok_operator && typ < end_tok_operator

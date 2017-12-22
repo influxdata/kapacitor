@@ -321,13 +321,6 @@ func TestLogger_SetLeveF(t *testing.T) {
 		t.Fatal("expected info log")
 		return
 	}
-	buf.Reset()
-	l.Warn(msg)
-	logLine = buf.String()
-	if logLine == "" {
-		t.Fatal("expected warn log")
-		return
-	}
 	l.Error(msg)
 	logLine = buf.String()
 	buf.Reset()
@@ -354,44 +347,6 @@ func TestLogger_SetLeveF(t *testing.T) {
 		return
 	}
 	buf.Reset()
-	l.Warn(msg)
-	logLine = buf.String()
-	if logLine == "" {
-		t.Fatal("expected warn log")
-		return
-	}
-	l.Error(msg)
-	logLine = buf.String()
-	buf.Reset()
-	if logLine == "" {
-		t.Fatal("expected error log")
-		return
-	}
-
-	l.SetLevelF(func(lvl diagnostic.Level) bool {
-		return lvl >= diagnostic.WarnLevel
-	})
-	l.Debug(msg)
-	logLine = buf.String()
-	buf.Reset()
-	if logLine != "" {
-		t.Fatal("expected no debug log")
-		return
-	}
-	l.Info(msg)
-	logLine = buf.String()
-	buf.Reset()
-	if logLine != "" {
-		t.Fatal("expected no info log")
-		return
-	}
-	buf.Reset()
-	l.Warn(msg)
-	logLine = buf.String()
-	if logLine == "" {
-		t.Fatal("expected warn log")
-		return
-	}
 	l.Error(msg)
 	logLine = buf.String()
 	buf.Reset()
@@ -418,12 +373,6 @@ func TestLogger_SetLeveF(t *testing.T) {
 		return
 	}
 	buf.Reset()
-	l.Warn(msg)
-	logLine = buf.String()
-	if logLine != "" {
-		t.Fatal("expected no warn log")
-		return
-	}
 	l.Error(msg)
 	logLine = buf.String()
 	buf.Reset()

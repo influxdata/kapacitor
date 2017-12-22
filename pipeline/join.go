@@ -1,9 +1,12 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/influxdata/influxdb/influxql"
 )
 
 const (
@@ -51,31 +54,31 @@ const (
 // In the above example the `errors` and `requests` streams are joined
 // and then transformed to calculate a combined field.
 type JoinNode struct {
-	chainnode
+	chainnode `json:"-"`
 	// The alias names of the two parents.
 	// Note:
 	//       Names[1] corresponds to the left  parent
 	//       Names[0] corresponds to the right parent
 	// tick:ignore
-	Names []string `tick:"As"`
+	Names []string `tick:"As" json:"as"`
 
 	// The dimensions on which to join
 	// tick:ignore
-	Dimensions []string `tick:"On"`
+	Dimensions []string `tick:"On" json:"on"`
 
 	// The delimiter for the field name prefixes.
 	// Can be the empty string.
-	Delimiter string
+	Delimiter string `json:"delimiter"`
 
 	// The name of this new joined data stream.
 	// If empty the name of the left parent is used.
-	StreamName string
+	StreamName string `json:"streamName"`
 
 	// The maximum duration of time that two incoming points
 	// can be apart and still be considered to be equal in time.
 	// The joined data point's time will be rounded to the nearest
 	// multiple of the tolerance duration.
-	Tolerance time.Duration
+	Tolerance time.Duration `json:"tolerance"`
 
 	// Fill the data.
 	// The fill option implies the type of join: inner or full outer
@@ -120,7 +123,7 @@ type JoinNode struct {
 	//        // drop any points that are in maintenance mode.
 	//        |where(lambda: "maintlock.mode")
 	//        |...
-	Fill interface{}
+	Fill interface{} `json:"fill"`
 }
 
 func newJoinNode(e EdgeType, parents []Node) *JoinNode {
@@ -132,6 +135,51 @@ func newJoinNode(e EdgeType, parents []Node) *JoinNode {
 		n.linkChild(j)
 	}
 	return j
+}
+
+// MarshalJSON converts JoinNode to JSON
+// tick:ignore
+func (n *JoinNode) MarshalJSON() ([]byte, error) {
+	type Alias JoinNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		Tolerance string `json:"tolerance"`
+	}{
+		TypeOf: TypeOf{
+			Type: "join",
+			ID:   n.ID(),
+		},
+		Alias:     (*Alias)(n),
+		Tolerance: influxql.FormatDuration(n.Tolerance),
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to an JoinNode
+// tick:ignore
+func (n *JoinNode) UnmarshalJSON(data []byte) error {
+	type Alias JoinNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+		Tolerance string `json:"tolerance"`
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.Type != "join" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as JoinNode", raw.ID, raw.Type)
+	}
+	n.Tolerance, err = influxql.ParseDuration(raw.Tolerance)
+	if err != nil {
+		return err
+	}
+	n.setID(raw.ID)
+	return nil
 }
 
 // Prefix names for all fields from the respective nodes.

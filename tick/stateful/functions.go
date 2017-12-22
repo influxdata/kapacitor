@@ -225,6 +225,7 @@ func init() {
 	statelessFuncs["day"] = day{}
 	statelessFuncs["month"] = month{}
 	statelessFuncs["year"] = year{}
+	statelessFuncs["now"] = now{}
 
 	// Humanize functions
 	statelessFuncs["humanBytes"] = humanBytes{}
@@ -1352,6 +1353,34 @@ func (year) Call(args ...interface{}) (v interface{}, err error) {
 
 func (year) Signature() map[Domain]ast.ValueType {
 	return timeFuncSignature
+}
+
+var nowFuncSignature = map[Domain]ast.ValueType{}
+
+// Initialize Now function signature
+func init() {
+	d := Domain{}
+	nowFuncSignature[d] = ast.TTime
+}
+
+type now struct {
+}
+
+func (now) Reset() {
+}
+
+// Return the current local time.
+func (now) Call(args ...interface{}) (v interface{}, err error) {
+	if len(args) != 0 {
+		return 0, errors.New("now expects exactly zero argument")
+	}
+	v = time.Now()
+
+	return
+}
+
+func (now) Signature() map[Domain]ast.ValueType {
+	return nowFuncSignature
 }
 
 type humanBytes struct {

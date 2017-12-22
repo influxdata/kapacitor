@@ -1,6 +1,9 @@
 package pipeline
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // Defaults fields and tags on data points.
 //
@@ -19,15 +22,15 @@ import "fmt"
 //    * tags_defaulted -- number of tags that were missing
 //
 type DefaultNode struct {
-	chainnode
+	chainnode `json:"-"`
 
 	// Set of fields to default
 	// tick:ignore
-	Fields map[string]interface{} `tick:"Field"`
+	Fields map[string]interface{} `tick:"Field" json:"fields"`
 
 	// Set of tags to default
 	// tick:ignore
-	Tags map[string]string `tick:"Tag"`
+	Tags map[string]string `tick:"Tag" json:"tags"`
 }
 
 func newDefaultNode(e EdgeType) *DefaultNode {
@@ -37,6 +40,44 @@ func newDefaultNode(e EdgeType) *DefaultNode {
 		Tags:      make(map[string]string),
 	}
 	return n
+}
+
+// MarshalJSON converts DefaultNode to JSON
+// tick:ignore
+func (n *DefaultNode) MarshalJSON() ([]byte, error) {
+	type Alias DefaultNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+	}{
+		TypeOf: TypeOf{
+			Type: "default",
+			ID:   n.ID(),
+		},
+		Alias: (*Alias)(n),
+	}
+	return json.Marshal(raw)
+}
+
+// UnmarshalJSON converts JSON to an DefaultNode
+// tick:ignore
+func (n *DefaultNode) UnmarshalJSON(data []byte) error {
+	type Alias DefaultNode
+	var raw = &struct {
+		TypeOf
+		*Alias
+	}{
+		Alias: (*Alias)(n),
+	}
+	err := json.Unmarshal(data, raw)
+	if err != nil {
+		return err
+	}
+	if raw.Type != "default" {
+		return fmt.Errorf("error unmarshaling node %d of type %s as DefaultNode", raw.ID, raw.Type)
+	}
+	n.setID(raw.ID)
+	return nil
 }
 
 // Define a field default.

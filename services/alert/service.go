@@ -59,7 +59,7 @@ type Service struct {
 	EventCollector EventCollector
 
 	HTTPDService interface {
-		AddPreviewRoutes([]httpd.Route) error
+		AddRoutes([]httpd.Route) error
 		DelRoutes([]httpd.Route)
 	}
 

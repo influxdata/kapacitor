@@ -17,6 +17,7 @@ import (
 	"github.com/yozora-hitagi/kapacitor/models"
 	alertservice "github.com/yozora-hitagi/kapacitor/services/alert"
 	"github.com/yozora-hitagi/kapacitor/services/alerta"
+	"github.com/yozora-hitagi/kapacitor/services/ec2"
 	"github.com/yozora-hitagi/kapacitor/services/hipchat"
 	"github.com/yozora-hitagi/kapacitor/services/httppost"
 	"github.com/yozora-hitagi/kapacitor/services/influxdb"
@@ -26,6 +27,7 @@ import (
 	"github.com/yozora-hitagi/kapacitor/services/pagerduty"
 	"github.com/yozora-hitagi/kapacitor/services/pushover"
 	"github.com/yozora-hitagi/kapacitor/services/sensu"
+	"github.com/yozora-hitagi/kapacitor/services/sideload"
 	"github.com/yozora-hitagi/kapacitor/services/slack"
 	"github.com/yozora-hitagi/kapacitor/services/smtp"
 	"github.com/yozora-hitagi/kapacitor/services/snmptrap"
@@ -58,9 +60,7 @@ func Err(l Logger, msg string, err error, ctx []keyvalue.T) {
 		return
 	}
 
-	// This isn't great wrt to allocation, but should be rare. Currently
-	// no calls to Error use more than 2 ctx values. If a new call to
-	// Error uses more than 2, update this function
+	// Use the allocation version for any length
 	fields := make([]Field, len(ctx)+1) // +1 for error
 	fields[0] = Error(err)
 	for i := 1; i < len(fields); i++ {
@@ -71,10 +71,66 @@ func Err(l Logger, msg string, err error, ctx []keyvalue.T) {
 	l.Error(msg, fields...)
 }
 
+func Info(l Logger, msg string, ctx []keyvalue.T) {
+	if len(ctx) == 0 {
+		l.Info(msg)
+		return
+	}
+
+	if len(ctx) == 1 {
+		el := ctx[0]
+		l.Info(msg, String(el.Key, el.Value))
+		return
+	}
+
+	if len(ctx) == 2 {
+		x := ctx[0]
+		y := ctx[1]
+		l.Info(msg, String(x.Key, x.Value), String(y.Key, y.Value))
+		return
+	}
+
+	// Use the allocation version for any length
+	fields := make([]Field, len(ctx))
+	for i, kv := range ctx {
+		fields[i] = String(kv.Key, kv.Value)
+	}
+
+	l.Info(msg, fields...)
+}
+
+func Debug(l Logger, msg string, ctx []keyvalue.T) {
+	if len(ctx) == 0 {
+		l.Debug(msg)
+		return
+	}
+
+	if len(ctx) == 1 {
+		el := ctx[0]
+		l.Debug(msg, String(el.Key, el.Value))
+		return
+	}
+
+	if len(ctx) == 2 {
+		x := ctx[0]
+		y := ctx[1]
+		l.Debug(msg, String(x.Key, x.Value), String(y.Key, y.Value))
+		return
+	}
+
+	// Use the allocation version for any length
+	fields := make([]Field, len(ctx))
+	for i, kv := range ctx {
+		fields[i] = String(kv.Key, kv.Value)
+	}
+
+	l.Debug(msg, fields...)
+}
+
 // Alert Service Handler
 
 type AlertServiceHandler struct {
-	l Logger
+	L Logger
 }
 
 func logFieldsFromContext(ctx []keyvalue.T) []Field {
@@ -90,32 +146,32 @@ func (h *AlertServiceHandler) WithHandlerContext(ctx ...keyvalue.T) alertservice
 	fields := logFieldsFromContext(ctx)
 
 	return &AlertServiceHandler{
-		l: h.l.With(fields...),
+		L: h.L.With(fields...),
 	}
 }
 
 func (h *AlertServiceHandler) MigratingHandlerSpecs() {
-	h.l.Debug("migrating old v1.2 handler specs")
+	h.L.Debug("migrating old v1.2 handler specs")
 }
 
 func (h *AlertServiceHandler) MigratingOldHandlerSpec(spec string) {
-	h.l.Debug("migrating old handler spec", String("handler", spec))
+	h.L.Debug("migrating old handler spec", String("handler", spec))
 }
 
 func (h *AlertServiceHandler) FoundHandlerRows(length int) {
-	h.l.Debug("found handler rows", Int("handler_row_count", length))
+	h.L.Debug("found handler rows", Int("handler_row_count", length))
 }
 
 func (h *AlertServiceHandler) CreatingNewHandlers(length int) {
-	h.l.Debug("creating new handlers in place of old handlers", Int("handler_row_count", length))
+	h.L.Debug("creating new handlers in place of old handlers", Int("handler_row_count", length))
 }
 
 func (h *AlertServiceHandler) FoundNewHandler(key string) {
-	h.l.Debug("found new handler skipping", String("handler", key))
+	h.L.Debug("found new handler skipping", String("handler", key))
 }
 
 func (h *AlertServiceHandler) Error(msg string, err error, ctx ...keyvalue.T) {
-	Err(h.l, msg, err, ctx)
+	Err(h.L, msg, err, ctx)
 }
 
 // Kapcitor Handler
@@ -258,8 +314,6 @@ func (h *KapacitorHandler) LogPointData(level, prefix string, point edge.PointMe
 		log = h.l.Error
 	case "DEBUG":
 		log = h.l.Debug
-	case "WARN":
-		log = h.l.Warn
 	default:
 		log = h.l.Info
 	}
@@ -277,8 +331,6 @@ func (h *KapacitorHandler) LogBatchData(level, prefix string, batch edge.Buffere
 		log = h.l.Error
 	case "DEBUG":
 		log = h.l.Debug
-	case "WARN":
-		log = h.l.Warn
 	default:
 		log = h.l.Info
 	}
@@ -491,7 +543,7 @@ type SlackHandler struct {
 }
 
 func (h *SlackHandler) InsecureSkipVerify() {
-	h.l.Warn("service is configured to skip ssl verification")
+	h.l.Info("service is configured to skip ssl verification")
 }
 
 func (h *SlackHandler) Error(msg string, err error) {
@@ -788,59 +840,11 @@ func (h *ServerHandler) Error(msg string, err error, ctx ...keyvalue.T) {
 }
 
 func (h *ServerHandler) Info(msg string, ctx ...keyvalue.T) {
-	if len(ctx) == 0 {
-		h.l.Info(msg)
-		return
-	}
-
-	if len(ctx) == 1 {
-		el := ctx[0]
-		h.l.Info(msg, String(el.Key, el.Value))
-		return
-	}
-
-	if len(ctx) == 2 {
-		x := ctx[0]
-		y := ctx[1]
-		h.l.Info(msg, String(x.Key, x.Value), String(y.Key, y.Value))
-		return
-	}
-
-	fields := make([]Field, len(ctx))
-	for i := 0; i < len(fields); i++ {
-		kv := ctx[i]
-		fields[i] = String(kv.Key, kv.Value)
-	}
-
-	h.l.Info(msg, fields...)
+	Info(h.l, msg, ctx)
 }
 
 func (h *ServerHandler) Debug(msg string, ctx ...keyvalue.T) {
-	if len(ctx) == 0 {
-		h.l.Debug(msg)
-		return
-	}
-
-	if len(ctx) == 1 {
-		el := ctx[0]
-		h.l.Debug(msg, String(el.Key, el.Value))
-		return
-	}
-
-	if len(ctx) == 2 {
-		x := ctx[0]
-		y := ctx[1]
-		h.l.Debug(msg, String(x.Key, x.Value), String(y.Key, y.Value))
-		return
-	}
-
-	fields := make([]Field, len(ctx))
-	for i := 0; i < len(fields); i++ {
-		kv := ctx[i]
-		fields[i] = String(kv.Key, kv.Value)
-	}
-
-	h.l.Debug(msg, fields...)
+	Debug(h.l, msg, ctx)
 }
 
 type ReplayHandler struct {
@@ -852,31 +856,7 @@ func (h *ReplayHandler) Error(msg string, err error, ctx ...keyvalue.T) {
 }
 
 func (h *ReplayHandler) Debug(msg string, ctx ...keyvalue.T) {
-	if len(ctx) == 0 {
-		h.l.Debug(msg)
-		return
-	}
-
-	if len(ctx) == 1 {
-		el := ctx[0]
-		h.l.Debug(msg, String(el.Key, el.Value))
-		return
-	}
-
-	if len(ctx) == 2 {
-		x := ctx[0]
-		y := ctx[1]
-		h.l.Debug(msg, String(x.Key, x.Value), String(y.Key, y.Value))
-		return
-	}
-
-	fields := make([]Field, len(ctx))
-	for i := 0; i < len(fields); i++ {
-		kv := ctx[i]
-		fields[i] = String(kv.Key, kv.Value)
-	}
-
-	h.l.Debug(msg, fields...)
+	Debug(h.l, msg, ctx)
 }
 
 // K8s handler
@@ -903,6 +883,20 @@ func (h *SwarmHandler) WithClusterContext(cluster string) swarm.Diagnostic {
 	}
 }
 
+// EC2 handler
+
+type EC2Handler struct {
+	*ScraperHandler
+}
+
+func (h *EC2Handler) WithClusterContext(cluster string) ec2.Diagnostic {
+	return &EC2Handler{
+		ScraperHandler: &ScraperHandler{
+			l: h.ScraperHandler.l.With(String("cluster_id", cluster)),
+		},
+	}
+}
+
 // Deadman handler
 
 type DeadmanHandler struct {
@@ -920,11 +914,11 @@ type NoAuthHandler struct {
 }
 
 func (h *NoAuthHandler) FakedUserAuthentication(username string) {
-	h.l.Warn("using noauth auth backend. Faked Authentication for user", String("user", username))
+	h.l.Info("using noauth auth backend. Faked Authentication for user", String("user", username))
 }
 
 func (h *NoAuthHandler) FakedSubscriptionUserToken() {
-	h.l.Warn("using noauth auth backend. Faked authentication for subscription user token")
+	h.l.Info("using noauth auth backend. Faked authentication for subscription user token")
 }
 
 // Stats handler
@@ -978,7 +972,7 @@ func (h *InfluxDBHandler) WithUDPContext(db string, rp string) udp.Diagnostic {
 }
 
 func (h *InfluxDBHandler) InsecureSkipVerify(urls []string) {
-	h.l.Warn("using InsecureSkipVerify when connecting to InfluxDB; this is insecure", Strings("urls", urls))
+	h.l.Info("using InsecureSkipVerify when connecting to InfluxDB; this is insecure", Strings("urls", urls))
 }
 
 func (h *InfluxDBHandler) UnlinkingSubscriptions(cluster string) {
@@ -1051,7 +1045,7 @@ func (h *ScraperHandler) Warn(ctx ...interface{}) {
 	defer h.buf.Reset()
 	fmt.Fprint(h.buf, ctx...)
 
-	h.l.Warn(h.buf.String())
+	h.l.Info(h.buf.String())
 }
 
 func (h *ScraperHandler) Warnln(ctx ...interface{}) {
@@ -1060,11 +1054,11 @@ func (h *ScraperHandler) Warnln(ctx ...interface{}) {
 	defer h.buf.Reset()
 	fmt.Fprintln(h.buf, ctx...)
 
-	h.l.Warn(strconv.Quote(h.buf.String()))
+	h.l.Info(strconv.Quote(h.buf.String()))
 }
 
 func (h *ScraperHandler) Warnf(s string, ctx ...interface{}) {
-	h.l.Warn(fmt.Sprintf(s, ctx...))
+	h.l.Info(fmt.Sprintf(s, ctx...))
 }
 
 func (h *ScraperHandler) Error(ctx ...interface{}) {
@@ -1160,7 +1154,6 @@ const (
 	llDebug
 	llError
 	llInfo
-	llWarn
 )
 
 type StaticLevelHandler struct {
@@ -1176,8 +1169,6 @@ func (h *StaticLevelHandler) Write(buf []byte) (int, error) {
 		h.l.Error(string(buf))
 	case llInfo:
 		h.l.Info(string(buf))
-	case llWarn:
-		h.l.Warn(string(buf))
 	default:
 		return 0, errors.New("invalid log level")
 	}
@@ -1247,4 +1238,20 @@ func (h *SessionHandler) DeletedLogSession(id uuid.UUID, contentType string, tag
 	}
 
 	h.l.Info("deleted log session", Stringer("id", id), String("content-type", contentType), Strings("tags", ts))
+}
+
+type SideloadHandler struct {
+	l Logger
+}
+
+func (h *SideloadHandler) Error(msg string, err error) {
+	h.l.Error(msg, Error(err))
+}
+
+func (h *SideloadHandler) WithContext(ctx ...keyvalue.T) sideload.Diagnostic {
+	fields := logFieldsFromContext(ctx)
+
+	return &SideloadHandler{
+		l: h.l.With(fields...),
+	}
 }

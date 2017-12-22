@@ -1,9 +1,47 @@
 # Changelog
 
-## Unreleased
+## v1.4.0 [2017-12-08]
+
+The v1.4.0 release has many new features, here is a list of some of the highlights:
+
+1. Load TICKscripts and alert handlers from a directory.
+2. Structed Logging  with a logging API endpoints to be able to tail logs for given tasks.
+3. Autoscale support for Docker Swarm and EC2 Autoscaling.
+4. Sideload data into your TICKscript streams from external sources.
+5. Fully customizable POST body for the alert POST handler and the httpPost node.
+
+See the complete list of bug fixes and features below.
+
+### Bugfixes
+
+- [#1710](https://github.com/influxdata/kapacitor/issues/1710): Idle Barrier is dropping all messages when source has clock offset
+- [#1719](https://github.com/influxdata/kapacitor/pull/1719): Fix oddly generated TOML for mqtt & httppost
+
+## v1.4.0-rc3 [2017-12-04]
+
+### Bugfixes
+
+- [#1703](https://github.com/influxdata/kapacitor/pull/1703): Fix issues where log API checked the wrong header for the desired content type.
+
+## v1.4.0-rc2 [2017-11-28]
 
 ### Features
 
+- [#1622](https://github.com/influxdata/kapacitor/pull/1622): Add support for AWS EC2 autoscaling services.
+- [#1566](https://github.com/influxdata/kapacitor/pull/1566): Add BarrierNode to emit BarrierMessage periodically
+
+### Bugfixes
+
+- [#1250](https://github.com/influxdata/kapacitor/issues/1250): Fix VictorOps "data" field being a string instead of actual JSON.
+- [#1697](https://github.com/influxdata/kapacitor/issues/1697): Fix panic with MQTT toml configuration generation.
+
+## v1.4.0-rc1 [2017-11-09]
+
+### Features
+
+- [#1408](https://github.com/influxdata/kapacitor/issues/1408): Add Previous state
+- [#1575](https://github.com/influxdata/kapacitor/issues/1575): Add support to persist replay status after it finishes.
+- [#1461](https://github.com/influxdata/kapacitor/issues/1461): alert.post and https_post timeouts needed.
 - [#1413](https://github.com/influxdata/kapacitor/issues/1413): Add subscriptions modes to InfluxDB subscriptions.
 - [#1436](https://github.com/influxdata/kapacitor/issues/1436): Add linear fill support for QueryNode.
 - [#1345](https://github.com/influxdata/kapacitor/issues/1345): Add MQTT Alert Handler
@@ -12,6 +50,7 @@
     The breaking change is that the Combine and Flatten nodes previously, but erroneously, operated across batch boundaries; this has been fixed.
 - [#1497](https://github.com/influxdata/kapacitor/pull/1497): Add support for Docker Swarm autoscaling services.
 - [#1485](https://github.com/influxdata/kapacitor/issues/1485): Add bools field types to UDFs.
+- [#1549](https://github.com/influxdata/kapacitor/issues/1549): Add stateless now() function to get the current local time.
 - [#1545](https://github.com/influxdata/kapacitor/pull/1545): Add support for timeout, tags and service template in the Alerta AlertNode
 - [#1568](https://github.com/influxdata/kapacitor/issues/1568): Add support for custom HTTP Post bodies via a template system.
 - [#1569](https://github.com/influxdata/kapacitor/issues/1569): Add support for add the HTTP status code as a field when using httpPost
@@ -23,7 +62,12 @@
     Topic-Handler file format was modified to include the TopicID and HandlerID in the file.
     Load service was added; the service can load tasks/handlers from a directory.
 - [#1606](https://github.com/influxdata/kapacitor/pull/1606): Update Go version to 1.9.1
-- [#1578](https://github.com/influxdata/kapacitor/pull/1578): Add support for exposing logs via the API.
+- [#1578](https://github.com/influxdata/kapacitor/pull/1578): Add support for exposing logs via the API. API is released as a technical preview.
+- [#1605](https://github.com/influxdata/kapacitor/issues/1605): Add support for {{ .Duration }} on Alert Message property.
+- [#1644](https://github.com/influxdata/kapacitor/issues/1644): Add support for [JSON lines](https://en.wikipedia.org/wiki/JSON_Streaming#Line_delimited_JSON) for steaming HTTP logs.
+- [#1637](https://github.com/influxdata/kapacitor/issues/1637): Add new node Sideload, that allows loading data from files into the stream of data. Data can be loaded using a hierarchy.
+- [#1667](https://github.com/influxdata/kapacitor/pull/1667): Promote Alert API to stable v1 path.
+- [#1668](https://github.com/influxdata/kapacitor/pull/1668): Change WARN level logs to INFO level.
 
 ### Bugfixes
 
@@ -35,6 +79,15 @@
 - [#1516](https://github.com/influxdata/kapacitor/pull/1516): Fix bad PagerDuty test the required server info.
 - [#1581](https://github.com/influxdata/kapacitor/pull/1581): Add SNMP sysUpTime to SNMP Trap service
 - [#1547](https://github.com/influxdata/kapacitor/issues/1547): Fix panic on recording replay with HTTPPostHandler.
+- [#1623](https://github.com/influxdata/kapacitor/issues/1623): Fix k8s incluster master api dns resolution
+- [#1630](https://github.com/influxdata/kapacitor/issues/1630): Remove the pidfile after the server has exited.
+- [#1641](https://github.com/influxdata/kapacitor/issues/1641): Logs API writes multiple http headers.
+- [#1657](https://github.com/influxdata/kapacitor/issues/1657): Fix missing dependency in rpm package.
+- [#1660](https://github.com/influxdata/kapacitor/pull/1660): Force tar owner/group to be root.
+- [#1663](https://github.com/influxdata/kapacitor/pull/1663): Fixed install/remove of kapacitor on non-systemd Debian/Ubuntu systems.
+    Fixes packaging to not enable services on RHEL systems.
+    Fixes issues with recusive symlinks on systemd systems.
+- [#1662](https://github.com/influxdata/kapacitor/issues/1662): Fix invalid default MQTT config.
 
 ## v1.3.3 [2017-08-11]
 
