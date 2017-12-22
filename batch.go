@@ -8,10 +8,10 @@ import (
 
 	"github.com/gorhill/cronexpr"
 	"github.com/influxdata/influxdb/influxql"
-	"github.com/yozora-hitagi/kapacitor/edge"
-	"github.com/yozora-hitagi/kapacitor/expvar"
-	"github.com/yozora-hitagi/kapacitor/influxdb"
-	"github.com/yozora-hitagi/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/edge"
+	"github.com/influxdata/kapacitor/expvar"
+	"github.com/influxdata/kapacitor/influxdb"
+	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/pkg/errors"
 )
 

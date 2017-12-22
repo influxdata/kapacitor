@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yozora-hitagi/kapacitor/uuid"
+	"github.com/influxdata/kapacitor/uuid"
 )
 
 type SessionsStore interface {

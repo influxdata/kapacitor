@@ -18,6 +18,6 @@ setup(name='kapacitor_udf',
     ],
     maintainer_email="support@influxdb.com",
     license="MIT",
-    url="github.com/yozora-hitagi/kapacitor",
+    url="github.com/influxdata/kapacitor",
     description="Kapacitor UDF Agent library",
 )

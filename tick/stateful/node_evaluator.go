@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/yozora-hitagi/kapacitor/tick/ast"
+	"github.com/influxdata/kapacitor/tick/ast"
 )
 
 // ErrTypeGuardFailed is returned when a speicifc value type is requested thorugh NodeEvaluator (for example: "Float64Value")

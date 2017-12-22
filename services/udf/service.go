@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yozora-hitagi/kapacitor"
-	"github.com/yozora-hitagi/kapacitor/command"
-	"github.com/yozora-hitagi/kapacitor/udf"
+	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/command"
+	"github.com/influxdata/kapacitor/udf"
 )
 
 type Diagnostic interface {

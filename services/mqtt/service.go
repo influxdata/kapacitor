@@ -5,8 +5,8 @@ import (
 	"log"
 	"sync"
 
-	"github.com/yozora-hitagi/kapacitor/alert"
-	"github.com/yozora-hitagi/kapacitor/keyvalue"
+	"github.com/influxdata/kapacitor/alert"
+	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/pkg/errors"
 )
 

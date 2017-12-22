@@ -5,10 +5,10 @@ import (
 	"io"
 	"io/ioutil"
 
-	"github.com/yozora-hitagi/kapacitor"
-	"github.com/yozora-hitagi/kapacitor/services/diagnostic"
-	"github.com/yozora-hitagi/kapacitor/udf"
-	"github.com/yozora-hitagi/kapacitor/udf/agent"
+	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/services/diagnostic"
+	"github.com/influxdata/kapacitor/udf"
+	"github.com/influxdata/kapacitor/udf/agent"
 )
 
 var diagService *diagnostic.Service

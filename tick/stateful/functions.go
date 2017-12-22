@@ -12,7 +12,7 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/influxdata/influxdb/influxql"
-	"github.com/yozora-hitagi/kapacitor/tick/ast"
+	"github.com/influxdata/kapacitor/tick/ast"
 )
 
 // maxArgs is used to specify the largest number of arguments that a

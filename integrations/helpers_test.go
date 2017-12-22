@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yozora-hitagi/kapacitor"
-	"github.com/yozora-hitagi/kapacitor/alert"
-	"github.com/yozora-hitagi/kapacitor/influxdb"
-	"github.com/yozora-hitagi/kapacitor/models"
-	"github.com/yozora-hitagi/kapacitor/services/httpd"
-	"github.com/yozora-hitagi/kapacitor/udf"
-	"github.com/yozora-hitagi/kapacitor/uuid"
+	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/alert"
+	"github.com/influxdata/kapacitor/influxdb"
+	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/services/httpd"
+	"github.com/influxdata/kapacitor/udf"
+	"github.com/influxdata/kapacitor/uuid"
 )
 
 func newHTTPDService() *httpd.Service {

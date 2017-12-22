@@ -8,9 +8,9 @@ import (
 	"os"
 	"sync"
 
-	"github.com/yozora-hitagi/kapacitor/alert"
-	"github.com/yozora-hitagi/kapacitor/command"
-	"github.com/yozora-hitagi/kapacitor/command/commandtest"
+	"github.com/influxdata/kapacitor/alert"
+	"github.com/influxdata/kapacitor/command"
+	"github.com/influxdata/kapacitor/command/commandtest"
 )
 
 type Log struct {

@@ -1,8 +1,8 @@
 package swarm
 
 import (
-	"github.com/yozora-hitagi/kapacitor/services/swarm/client"
-	"github.com/yozora-hitagi/kapacitor/tlsconfig"
+	"github.com/influxdata/kapacitor/services/swarm/client"
+	"github.com/influxdata/kapacitor/tlsconfig"
 	"github.com/pkg/errors"
 )
 

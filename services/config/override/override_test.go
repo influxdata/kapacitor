@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/yozora-hitagi/kapacitor/services/config/override"
+	"github.com/influxdata/kapacitor/services/config/override"
 	"github.com/mitchellh/copystructure"
 )
 

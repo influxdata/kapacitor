@@ -5,8 +5,8 @@ import (
 	"io/ioutil"
 	"net/http/httptest"
 
-	"github.com/yozora-hitagi/kapacitor/services/diagnostic"
-	"github.com/yozora-hitagi/kapacitor/services/httpd"
+	"github.com/influxdata/kapacitor/services/diagnostic"
+	"github.com/influxdata/kapacitor/services/httpd"
 )
 
 type Server struct {

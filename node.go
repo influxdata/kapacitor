@@ -9,14 +9,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/yozora-hitagi/kapacitor/alert"
-	"github.com/yozora-hitagi/kapacitor/edge"
-	kexpvar "github.com/yozora-hitagi/kapacitor/expvar"
-	"github.com/yozora-hitagi/kapacitor/keyvalue"
-	"github.com/yozora-hitagi/kapacitor/models"
-	"github.com/yozora-hitagi/kapacitor/pipeline"
-	"github.com/yozora-hitagi/kapacitor/server/vars"
-	"github.com/yozora-hitagi/kapacitor/timer"
+	"github.com/influxdata/kapacitor/alert"
+	"github.com/influxdata/kapacitor/edge"
+	kexpvar "github.com/influxdata/kapacitor/expvar"
+	"github.com/influxdata/kapacitor/keyvalue"
+	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/server/vars"
+	"github.com/influxdata/kapacitor/timer"
 	"github.com/pkg/errors"
 )
 

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yozora-hitagi/kapacitor/tick/ast"
+	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/influxdb/influxql"
 )
 

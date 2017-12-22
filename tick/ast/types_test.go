@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yozora-hitagi/kapacitor/tick/ast"
+	"github.com/influxdata/kapacitor/tick/ast"
 )
 
 func Test_TypeOf(t *testing.T) {

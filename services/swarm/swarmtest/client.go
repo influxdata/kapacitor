@@ -2,7 +2,7 @@ package swarmtest
 
 import (
 	"github.com/docker/docker/api/types/swarm"
-	"github.com/yozora-hitagi/kapacitor/services/swarm/client"
+	"github.com/influxdata/kapacitor/services/swarm/client"
 )
 
 type Client struct {

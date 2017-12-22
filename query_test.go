@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yozora-hitagi/kapacitor"
+	"github.com/influxdata/kapacitor"
 )
 
 func TestQuery_Clone(t *testing.T) {

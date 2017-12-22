@@ -4,10 +4,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yozora-hitagi/kapacitor/alert"
-	"github.com/yozora-hitagi/kapacitor/edge"
-	"github.com/yozora-hitagi/kapacitor/keyvalue"
-	"github.com/yozora-hitagi/kapacitor/models"
+	"github.com/influxdata/kapacitor/alert"
+	"github.com/influxdata/kapacitor/edge"
+	"github.com/influxdata/kapacitor/keyvalue"
+	"github.com/influxdata/kapacitor/models"
 	"github.com/stretchr/testify/assert"
 )
 

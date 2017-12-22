@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb/influxql"
-	"github.com/yozora-hitagi/kapacitor/services/k8s/client"
-	"github.com/yozora-hitagi/kapacitor/tick/ast"
+	"github.com/influxdata/kapacitor/services/k8s/client"
+	"github.com/influxdata/kapacitor/tick/ast"
 )
 
 const (

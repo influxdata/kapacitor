@@ -3,7 +3,7 @@ package swarm
 import (
 	"sync/atomic"
 
-	"github.com/yozora-hitagi/kapacitor/services/swarm/client"
+	"github.com/influxdata/kapacitor/services/swarm/client"
 	"github.com/pkg/errors"
 )
 

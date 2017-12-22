@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yozora-hitagi/kapacitor/influxdb"
+	"github.com/influxdata/kapacitor/influxdb"
 )
 
 func TestPoint_Bytes(t *testing.T) {

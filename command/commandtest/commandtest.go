@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/yozora-hitagi/kapacitor/command"
+	"github.com/influxdata/kapacitor/command"
 )
 
 type Commander struct {

@@ -86,7 +86,7 @@ import (
 	"net/http"
 	"sync/atomic"
 
-	"github.com/yozora-hitagi/kapacitor/alert"
+	"github.com/influxdata/kapacitor/alert"
 )
 
 type Service struct {

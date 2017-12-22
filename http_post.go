@@ -11,11 +11,11 @@ import (
 
 	"bytes"
 	"context"
-	"github.com/yozora-hitagi/kapacitor/edge"
-	"github.com/yozora-hitagi/kapacitor/keyvalue"
-	"github.com/yozora-hitagi/kapacitor/models"
-	"github.com/yozora-hitagi/kapacitor/pipeline"
-	"github.com/yozora-hitagi/kapacitor/services/httppost"
+	"github.com/influxdata/kapacitor/edge"
+	"github.com/influxdata/kapacitor/keyvalue"
+	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/pkg/errors"
 )
 

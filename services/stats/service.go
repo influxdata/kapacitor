@@ -26,11 +26,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yozora-hitagi/kapacitor"
-	"github.com/yozora-hitagi/kapacitor/edge"
-	"github.com/yozora-hitagi/kapacitor/models"
-	"github.com/yozora-hitagi/kapacitor/server/vars"
-	"github.com/yozora-hitagi/kapacitor/timer"
+	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/edge"
+	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/server/vars"
+	"github.com/influxdata/kapacitor/timer"
 )
 
 type Diagnostic interface {

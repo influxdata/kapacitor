@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/yozora-hitagi/kapacitor/services/storage"
+	"github.com/influxdata/kapacitor/services/storage"
 )
 
 type object struct {

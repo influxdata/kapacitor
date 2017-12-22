@@ -8,7 +8,7 @@ import (
 	"os"
 
 	"github.com/BurntSushi/toml"
-	"github.com/yozora-hitagi/kapacitor/server"
+	"github.com/influxdata/kapacitor/server"
 )
 
 // PrintConfigCommand represents the command executed by "kapacitord config".

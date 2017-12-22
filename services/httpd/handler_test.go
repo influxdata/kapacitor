@@ -3,7 +3,7 @@ package httpd
 import (
 	"testing"
 
-	"github.com/yozora-hitagi/kapacitor/auth"
+	"github.com/influxdata/kapacitor/auth"
 )
 
 func Test_RequiredPrilegeForHTTPMethod(t *testing.T) {

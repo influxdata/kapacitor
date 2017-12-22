@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/yozora-hitagi/kapacitor/tick/ast"
+	"github.com/influxdata/kapacitor/tick/ast"
 )
 
 type EvalReferenceNode struct {

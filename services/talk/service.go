@@ -10,8 +10,8 @@ import (
 	"net/http"
 	"sync/atomic"
 
-	"github.com/yozora-hitagi/kapacitor/alert"
-	"github.com/yozora-hitagi/kapacitor/keyvalue"
+	"github.com/influxdata/kapacitor/alert"
+	"github.com/influxdata/kapacitor/keyvalue"
 )
 
 type Diagnostic interface {

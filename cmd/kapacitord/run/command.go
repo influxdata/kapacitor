@@ -11,8 +11,8 @@ import (
 	"strconv"
 
 	"github.com/BurntSushi/toml"
-	"github.com/yozora-hitagi/kapacitor/server"
-	"github.com/yozora-hitagi/kapacitor/services/diagnostic"
+	"github.com/influxdata/kapacitor/server"
+	"github.com/influxdata/kapacitor/services/diagnostic"
 )
 
 const logo = `

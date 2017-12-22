@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yozora-hitagi/kapacitor/models"
+	"github.com/influxdata/kapacitor/models"
 )
 
 type Event struct {

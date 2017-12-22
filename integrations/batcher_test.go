@@ -12,13 +12,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yozora-hitagi/kapacitor"
-	"github.com/yozora-hitagi/kapacitor/alert"
-	"github.com/yozora-hitagi/kapacitor/clock"
-	"github.com/yozora-hitagi/kapacitor/models"
-	alertservice "github.com/yozora-hitagi/kapacitor/services/alert"
-	"github.com/yozora-hitagi/kapacitor/services/httppost"
-	"github.com/yozora-hitagi/kapacitor/services/storage/storagetest"
+	"github.com/influxdata/kapacitor"
+	"github.com/influxdata/kapacitor/alert"
+	"github.com/influxdata/kapacitor/clock"
+	"github.com/influxdata/kapacitor/models"
+	alertservice "github.com/influxdata/kapacitor/services/alert"
+	"github.com/influxdata/kapacitor/services/httppost"
+	"github.com/influxdata/kapacitor/services/storage/storagetest"
 	"github.com/influxdata/wlog"
 )
 

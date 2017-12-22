@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yozora-hitagi/kapacitor/server/vars"
+	"github.com/influxdata/kapacitor/server/vars"
 	client "github.com/influxdata/usage-client/v1"
 )
 

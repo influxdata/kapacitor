@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/BurntSushi/toml"
-	"github.com/yozora-hitagi/kapacitor/server"
+	"github.com/influxdata/kapacitor/server"
 )
 
 // Ensure the configuration can be parsed.

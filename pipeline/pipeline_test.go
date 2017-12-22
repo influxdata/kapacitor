@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yozora-hitagi/kapacitor/tick/stateful"
+	"github.com/influxdata/kapacitor/tick/stateful"
 	"github.com/stretchr/testify/assert"
 )
 

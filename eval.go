@@ -4,12 +4,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/yozora-hitagi/kapacitor/edge"
-	"github.com/yozora-hitagi/kapacitor/expvar"
-	"github.com/yozora-hitagi/kapacitor/models"
-	"github.com/yozora-hitagi/kapacitor/pipeline"
-	"github.com/yozora-hitagi/kapacitor/tick/ast"
-	"github.com/yozora-hitagi/kapacitor/tick/stateful"
+	"github.com/influxdata/kapacitor/edge"
+	"github.com/influxdata/kapacitor/expvar"
+	"github.com/influxdata/kapacitor/models"
+	"github.com/influxdata/kapacitor/pipeline"
+	"github.com/influxdata/kapacitor/tick/ast"
+	"github.com/influxdata/kapacitor/tick/stateful"
 )
 
 type EvalNode struct {

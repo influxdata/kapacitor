@@ -12,12 +12,12 @@ import (
 	text "text/template"
 	"time"
 
-	"github.com/yozora-hitagi/kapacitor/alert"
-	"github.com/yozora-hitagi/kapacitor/bufpool"
-	"github.com/yozora-hitagi/kapacitor/command"
-	"github.com/yozora-hitagi/kapacitor/keyvalue"
-	"github.com/yozora-hitagi/kapacitor/tick/ast"
-	"github.com/yozora-hitagi/kapacitor/tick/stateful"
+	"github.com/influxdata/kapacitor/alert"
+	"github.com/influxdata/kapacitor/bufpool"
+	"github.com/influxdata/kapacitor/command"
+	"github.com/influxdata/kapacitor/keyvalue"
+	"github.com/influxdata/kapacitor/tick/ast"
+	"github.com/influxdata/kapacitor/tick/stateful"
 	"github.com/pkg/errors"
 )
 

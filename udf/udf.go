@@ -1,8 +1,8 @@
 package udf
 
 import (
-	"github.com/yozora-hitagi/kapacitor/edge"
-	"github.com/yozora-hitagi/kapacitor/udf/agent"
+	"github.com/influxdata/kapacitor/edge"
+	"github.com/influxdata/kapacitor/udf/agent"
 )
 
 // Interface for communicating with a UDF

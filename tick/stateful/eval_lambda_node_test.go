@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yozora-hitagi/kapacitor/tick/ast"
-	"github.com/yozora-hitagi/kapacitor/tick/stateful"
+	"github.com/influxdata/kapacitor/tick/ast"
+	"github.com/influxdata/kapacitor/tick/stateful"
 )
 
 func TestEvalLambdaNode_EvalBool_Sanity(t *testing.T) {

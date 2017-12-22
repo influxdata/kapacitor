@@ -3,7 +3,7 @@ package k8s
 import (
 	"sync/atomic"
 
-	"github.com/yozora-hitagi/kapacitor/services/k8s/client"
+	"github.com/influxdata/kapacitor/services/k8s/client"
 	"github.com/pkg/errors"
 )
 

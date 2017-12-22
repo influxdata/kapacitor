@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/yozora-hitagi/kapacitor/tick"
+	"github.com/influxdata/kapacitor/tick"
 )
 
 const backupExt = ".orig"

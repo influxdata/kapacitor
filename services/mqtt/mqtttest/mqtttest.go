@@ -3,7 +3,7 @@ package mqtttest
 import (
 	"errors"
 
-	"github.com/yozora-hitagi/kapacitor/services/mqtt"
+	"github.com/influxdata/kapacitor/services/mqtt"
 )
 
 // ClientCreator provides a NewClient method for creating new MockClients.
