@@ -60,6 +60,7 @@ func newStatsNode(n Node, interval time.Duration) *StatsNode {
 }
 
 // MarshalJSON converts StatsNode to JSON
+// tick:ignore
 func (n *StatsNode) MarshalJSON() ([]byte, error) {
 	type Alias StatsNode
 	var raw = &struct {
@@ -78,6 +79,7 @@ func (n *StatsNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an StatsNode
+// tick:ignore
 func (n *StatsNode) UnmarshalJSON(data []byte) error {
 	type Alias StatsNode
 	var raw = &struct {

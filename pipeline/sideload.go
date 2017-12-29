@@ -73,6 +73,7 @@ func (n *SideloadNode) Tag(t string, v string) *SideloadNode {
 }
 
 // MarshalJSON converts SideloadNode to JSON
+// tick:ignore
 func (n *SideloadNode) MarshalJSON() ([]byte, error) {
 	type Alias SideloadNode
 	var raw = &struct {
@@ -89,6 +90,7 @@ func (n *SideloadNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an SideloadNode
+// tick:ignore
 func (n *SideloadNode) UnmarshalJSON(data []byte) error {
 	type Alias SideloadNode
 	var raw = &struct {

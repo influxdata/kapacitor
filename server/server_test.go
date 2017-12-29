@@ -6947,11 +6947,14 @@ func TestServer_UpdateConfig(t *testing.T) {
 		{
 			section: "mqtt",
 			setDefaults: func(c *server.Config) {
-				c.MQTT = mqtt.Configs{mqtt.Config{
-					Name:       "default",
-					URL:        "tcp://mqtt.example.com:1883",
-					NewClientF: mqtttest.NewClient,
-				}}
+				cfg := &mqtt.Config{
+					Name: "default",
+					URL:  "tcp://mqtt.example.com:1883",
+				}
+				cfg.SetNewClientF(mqtttest.NewClient)
+				c.MQTT = mqtt.Configs{
+					*cfg,
+				}
 			},
 			element: "default",
 			expDefaultSection: client.ConfigSection{
@@ -8869,15 +8872,15 @@ func TestServer_AlertHandlers(t *testing.T) {
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				cc := new(mqtttest.ClientCreator)
 				ctxt := context.WithValue(nil, "clientCreator", cc)
-
-				c.MQTT = mqtt.Configs{
-					mqtt.Config{
-						Enabled:    true,
-						Name:       "test",
-						URL:        "tcp://mqtt.example.com:1883",
-						NewClientF: cc.NewClient,
-					},
+				cfg := &mqtt.Config{
+					Enabled: true,
+					Name:    "test",
+					URL:     "tcp://mqtt.example.com:1883",
 				}
+
+				cfg.SetNewClientF(cc.NewClient)
+
+				c.MQTT = mqtt.Configs{*cfg}
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {

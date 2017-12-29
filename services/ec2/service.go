@@ -6,18 +6,22 @@ import (
 	"sync"
 	"time"
 
+	"github.com/influxdata/kapacitor/services/ec2/client"
 	"github.com/influxdata/kapacitor/services/scraper"
 	"github.com/prometheus/prometheus/config"
 	pec2 "github.com/prometheus/prometheus/discovery/ec2"
 )
 
-type Diagnostic scraper.Diagnostic
+type Diagnostic interface {
+	scraper.Diagnostic
+	WithClusterContext(region string) Diagnostic
+}
 
-// Service is the ec2 discovery service
+// Service is the ec2 discovery and autoscale service
 type Service struct {
-	Configs []Config
-	mu      sync.Mutex
-
+	Configs  []Config
+	mu       sync.Mutex
+	clusters map[string]*Cluster
 	registry scraper.Registry
 
 	diag Diagnostic
@@ -25,26 +29,34 @@ type Service struct {
 }
 
 // NewService creates a new unopened service
-func NewService(c []Config, r scraper.Registry, d Diagnostic) *Service {
+func NewService(c []Config, r scraper.Registry, d Diagnostic) (*Service, error) {
+	clusters := make(map[string]*Cluster, len(c))
+	for i := range c {
+		cluster, err := NewCluster(c[i], d.WithClusterContext(c[i].ID))
+		if err != nil {
+			return nil, err
+		}
+		clusters[c[i].ID] = cluster
+	}
+
 	return &Service{
+		clusters: clusters,
 		Configs:  c,
 		registry: r,
 		diag:     d,
-	}
+	}, nil
 }
 
 // Open starts the service
 func (s *Service) Open() error {
-	if s.open {
-		return nil
-	}
-
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	s.open = true
+	for _, c := range s.clusters {
+		if err := c.Open(); err != nil {
+			return err
+		}
+	}
 	s.register()
-
 	return s.registry.Commit()
 }
 
@@ -52,12 +64,9 @@ func (s *Service) Open() error {
 func (s *Service) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	if !s.open {
-		return nil
+	for _, c := range s.clusters {
+		c.Close()
 	}
-
-	s.open = false
 	s.deregister()
 
 	return s.registry.Commit()
@@ -83,21 +92,44 @@ func (s *Service) register() {
 func (s *Service) Update(newConfigs []interface{}) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
 	configs := make([]Config, len(newConfigs))
-	for i, c := range newConfigs {
-		if config, ok := c.(Config); ok {
-			configs[i] = config
-		} else {
-			return fmt.Errorf("unexpected config object type, got %T exp %T", c, config)
+	existingClusters := make(map[string]bool, len(newConfigs))
+	for i := range newConfigs {
+		c, ok := newConfigs[i].(Config)
+		if !ok {
+			return fmt.Errorf("expected config object to be of type %T, got %T", c, newConfigs[i])
 		}
+		configs[i] = c
+		cluster, ok := s.clusters[c.ID]
+		if !ok {
+			var err error
+			cluster, err = NewCluster(c, s.diag.WithClusterContext(c.ID))
+			if err != nil {
+				return err
+			}
+			if err := cluster.Open(); err != nil {
+				return err
+			}
+			s.clusters[c.ID] = cluster
+		} else {
+			if err := cluster.Update(c); err != nil {
+				return err
+			}
+		}
+		existingClusters[c.ID] = true
 	}
 
+	// Close and delete any removed clusters
+	for id := range s.clusters {
+		if !existingClusters[id] {
+			s.clusters[id].Close()
+			delete(s.clusters, id)
+		}
+	}
 	s.deregister()
 	s.Configs = configs
 	s.register()
-
-	return s.registry.Commit()
+	return nil
 }
 
 type testOptions struct {
@@ -149,4 +181,14 @@ func (s *Service) Test(options interface{}) error {
 	cancel()
 
 	return err
+}
+
+func (s *Service) Client(id string) (client.Client, error) {
+	s.mu.Lock()
+	cluster, ok := s.clusters[id]
+	s.mu.Unlock()
+	if !ok {
+		return nil, fmt.Errorf("unknown ec2 region %q, cannot get client", id)
+	}
+	return cluster.Client()
 }

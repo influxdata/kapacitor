@@ -505,12 +505,16 @@ func (et *ExecutingTask) createNode(p pipeline.Node, d NodeDiagnostic) (n Node, 
 		n, err = newK8sAutoscaleNode(et, t, d)
 	case *pipeline.SwarmAutoscaleNode:
 		n, err = newSwarmAutoscaleNode(et, t, d)
+	case *pipeline.Ec2AutoscaleNode:
+		n, err = newEc2AutoscaleNode(et, t, d)
 	case *pipeline.StateDurationNode:
 		n, err = newStateDurationNode(et, t, d)
 	case *pipeline.StateCountNode:
 		n, err = newStateCountNode(et, t, d)
 	case *pipeline.SideloadNode:
 		n, err = newSideloadNode(et, t, d)
+	case *pipeline.BarrierNode:
+		n, err = newBarrierNode(et, t, d)
 	default:
 		return nil, fmt.Errorf("unknown pipeline node type %T", p)
 	}

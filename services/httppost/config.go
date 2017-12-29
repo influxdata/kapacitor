@@ -41,6 +41,13 @@ type Config struct {
 	RowTemplateFile   string            `toml:"row-template-file" override:"row-template-file"`
 }
 
+func NewConfig() Config {
+	return Config{
+		Endpoint: "example",
+		URL:      "http://example.com",
+	}
+}
+
 // Validate ensures that all configurations options are valid. The Endpoint,
 // and URL parameters must be set to be considered valid.
 func (c Config) Validate() error {

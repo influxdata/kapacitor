@@ -1,14 +1,44 @@
 # Changelog
 
-## unreleased
+## v1.4.0 [2017-12-08]
+
+The v1.4.0 release has many new features, here is a list of some of the highlights:
+
+1. Load TICKscripts and alert handlers from a directory.
+2. Structed Logging  with a logging API endpoints to be able to tail logs for given tasks.
+3. Autoscale support for Docker Swarm and EC2 Autoscaling.
+4. Sideload data into your TICKscript streams from external sources.
+5. Fully customizable POST body for the alert POST handler and the httpPost node.
+
+See the complete list of bug fixes and features below.
+
+### Bugfixes
+
+- [#1710](https://github.com/influxdata/kapacitor/issues/1710): Idle Barrier is dropping all messages when source has clock offset
+- [#1719](https://github.com/influxdata/kapacitor/pull/1719): Fix oddly generated TOML for mqtt & httppost
+
+## v1.4.0-rc3 [2017-12-04]
+
+### Bugfixes
+
+- [#1703](https://github.com/influxdata/kapacitor/pull/1703): Fix issues where log API checked the wrong header for the desired content type.
+
+## v1.4.0-rc2 [2017-11-28]
+
+### Features
+
+- [#1622](https://github.com/influxdata/kapacitor/pull/1622): Add support for AWS EC2 autoscaling services.
+- [#1566](https://github.com/influxdata/kapacitor/pull/1566): Add BarrierNode to emit BarrierMessage periodically
 
 ### Bugfixes
 
 - [#1250](https://github.com/influxdata/kapacitor/issues/1250): Fix VictorOps "data" field being a string instead of actual JSON.
+- [#1697](https://github.com/influxdata/kapacitor/issues/1697): Fix panic with MQTT toml configuration generation.
 
 ## v1.4.0-rc1 [2017-11-09]
 
 ### Features
+
 - [#1408](https://github.com/influxdata/kapacitor/issues/1408): Add Previous state
 - [#1575](https://github.com/influxdata/kapacitor/issues/1575): Add support to persist replay status after it finishes.
 - [#1461](https://github.com/influxdata/kapacitor/issues/1461): alert.post and https_post timeouts needed.

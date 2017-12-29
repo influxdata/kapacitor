@@ -45,6 +45,7 @@ func newUnionNode(e EdgeType, nodes []Node) *UnionNode {
 }
 
 // MarshalJSON converts UnionNode to JSON
+// tick:ignore
 func (n *UnionNode) MarshalJSON() ([]byte, error) {
 	type Alias UnionNode
 	var raw = &struct {
@@ -61,6 +62,7 @@ func (n *UnionNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an UnionNode
+// tick:ignore
 func (n *UnionNode) UnmarshalJSON(data []byte) error {
 	type Alias UnionNode
 	var raw = &struct {

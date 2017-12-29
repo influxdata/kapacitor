@@ -18,18 +18,21 @@ const (
 )
 
 // TypeOf is a helper struct to add type information for each pipeline node
+// tick:ignore
 type TypeOf struct {
 	Type string `json:"typeOf"`
 	ID   ID     `json:"id,string"`
 }
 
 // Edge is a connection between a parent ID and a ChildID
+// tick:ignore
 type Edge struct {
 	Parent ID `json:"parent,string"`
 	Child  ID `json:"child,string"`
 }
 
 // JSONPipeline is the JSON serialization format for Pipeline
+// tick:ignore
 type JSONPipeline struct {
 	Nodes []json.RawMessage `json:"nodes"`
 	Edges []Edge            `json:"edges"`
@@ -39,6 +42,7 @@ type JSONPipeline struct {
 type Graph map[ID][]ID
 
 // PipelineSorter performs topological sort on the Edges of JSONPipeline.
+// tick:ignore
 type PipelineSorter struct {
 	Edges         []Edge
 	ChildrenOf    Graph
@@ -236,6 +240,7 @@ func init() {
 }
 
 // IRNode is the intermediate representation of a node between JSON unmarshaling and a pipeline Node
+// tick:ignore
 type IRNode struct {
 	Raw    json.RawMessage
 	TypeOf TypeOf

@@ -61,6 +61,7 @@ func newDerivativeNode(wants EdgeType, field string) *DerivativeNode {
 }
 
 // MarshalJSON converts DerivativeNode to JSON
+// tick:ignore
 func (n *DerivativeNode) MarshalJSON() ([]byte, error) {
 	type Alias DerivativeNode
 	var raw = &struct {
@@ -79,6 +80,7 @@ func (n *DerivativeNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an DerivativeNode
+// tick:ignore
 func (n *DerivativeNode) UnmarshalJSON(data []byte) error {
 	type Alias DerivativeNode
 	var raw = &struct {

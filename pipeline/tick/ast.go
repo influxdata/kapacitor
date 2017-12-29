@@ -88,6 +88,8 @@ func (a *AST) Create(n pipeline.Node, parents []ast.Node) (ast.Node, error) {
 		return NewJoin(parents).Build(node)
 	case *pipeline.AlertNode:
 		return NewAlert(parents).Build(node)
+	case *pipeline.BarrierNode:
+		return NewBarrierNode(parents).Build(node)
 	case *pipeline.CombineNode:
 		return NewCombine(parents).Build(node)
 	case *pipeline.DefaultNode:
@@ -96,6 +98,8 @@ func (a *AST) Create(n pipeline.Node, parents []ast.Node) (ast.Node, error) {
 		return NewDelete(parents).Build(node)
 	case *pipeline.DerivativeNode:
 		return NewDerivative(parents).Build(node)
+	case *pipeline.Ec2AutoscaleNode:
+		return NewEc2Autoscale(parents).Build(node)
 	case *pipeline.EvalNode:
 		return NewEval(parents).Build(node)
 	case *pipeline.FlattenNode:

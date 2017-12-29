@@ -20,6 +20,8 @@ import (
 	"text/template"
 	"time"
 
+	"math/rand"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/influxdata/influxdb/client"
@@ -29,6 +31,7 @@ import (
 	"github.com/influxdata/kapacitor/clock"
 	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/command/commandtest"
+	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/models"
 	alertservice "github.com/influxdata/kapacitor/services/alert"
@@ -1457,6 +1460,825 @@ stream
 	}
 
 	testStreamerWithOutput(t, "TestStream_Window_FillPeriod_Aligned", script, 21*time.Second, er, false, nil)
+}
+
+func TestStream_Barrier_Idle_No_Data(t *testing.T) {
+	// Set up clock to current time - 22 seconds since we're going to send 21 data points
+	clock := clock.New(time.Now().UTC())
+	requestCount := int32(0)
+
+	testValues := make([][]interface{}, 1)
+	for i := 0; i < 1; i++ {
+		testValues[i] = []interface{}{
+			clock.Zero().Add(time.Duration(i) * time.Second),
+			rand.Float64(),
+		}
+	}
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		result := models.Result{}
+		dec := json.NewDecoder(r.Body)
+		err := dec.Decode(&result)
+		if err != nil {
+			t.Fatal(err)
+		}
+		atomic.AddInt32(&requestCount, 1)
+	}))
+	defer ts.Close()
+
+	var script = `
+var period = 14s
+var every = 2s
+var idle = 2s
+stream
+	|from()
+		.database('dbname')
+		.retentionPolicy('rpname')
+		.measurement('cpu')
+	|barrier().idle(idle)
+	|window()
+		.period(period)
+		.every(every)
+	|httpPost('` + ts.URL + `')
+`
+
+	dataChannel := make(chan edge.PointMessage)
+	cleanupTest := testStreamerWithInputChannel(t, "TestStream_Barrier_Idle_No_Data", script, dataChannel, clock, nil)
+	defer func() {
+		cleanupTest()
+
+		if rc := atomic.LoadInt32(&requestCount); rc != 2 {
+			t.Errorf("got %v exp %v", rc, 2)
+		}
+	}()
+
+	// groupedconsumers do not run any logic until at least one message is seen
+	data := make([]edge.PointMessage, len(testValues))
+	for i, testValue := range testValues {
+		data[i] = edge.NewPointMessage(
+			"cpu",
+			"dbname",
+			"rpname",
+			models.Dimensions{},
+			models.Fields{"value": testValue[1]},
+			models.Tags{},
+			testValue[0].(time.Time),
+		)
+	}
+	for _, point := range data {
+		dataChannel <- point
+	}
+
+	time.Sleep(5 * time.Second)
+	close(dataChannel)
+}
+
+func TestStream_Barrier_Idle(t *testing.T) {
+	// Set up clock to current time - 22 seconds since we're going to send 21 data points
+	clock := clock.New(time.Now().UTC().Add(-22 * time.Second))
+	clock.Set(time.Now().UTC())
+	testValues := make([][]interface{}, 21)
+	for i := 0; i < 21; i++ {
+		testValues[i] = []interface{}{
+			clock.Zero().Add(time.Duration(i) * time.Second),
+			rand.Float64(),
+		}
+	}
+	requestCount := int32(0)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		result := models.Result{}
+		dec := json.NewDecoder(r.Body)
+		err := dec.Decode(&result)
+		if err != nil {
+			t.Fatal(err)
+		}
+		atomic.AddInt32(&requestCount, 1)
+		rc := atomic.LoadInt32(&requestCount)
+
+		var er models.Result
+		switch rc {
+		case 1:
+			er = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values:  testValues[0:10],
+					},
+				},
+			}
+		case 2:
+			er = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values:  testValues[6:20],
+					},
+				},
+			}
+		case 3:
+			er = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values:  testValues[16:21],
+					},
+				},
+			}
+		}
+		if eq, msg := compareResults(er, result); !eq {
+			t.Errorf("unexpected alert data for request: %d %s", rc, msg)
+		}
+	}))
+	defer ts.Close()
+
+	var script = `
+var period = 14s
+var every = 10s
+var idle = 10s
+stream
+	|from()
+		.database('dbname')
+		.retentionPolicy('rpname')
+		.measurement('cpu')
+	|barrier().idle(idle)
+	|window()
+		.period(period)
+		.every(every)
+	|httpPost('` + ts.URL + `')
+`
+
+	dataChannel := make(chan edge.PointMessage)
+	cleanupTest := testStreamerWithInputChannel(t, "TestStream_Barrier_Idle", script, dataChannel, clock, nil)
+	defer func() {
+		cleanupTest()
+
+		// Force emit should force the last window to emit
+		if rc := atomic.LoadInt32(&requestCount); rc != 3 {
+			t.Errorf("got %v exp %v", rc, 3)
+		}
+	}()
+
+	data := make([]edge.PointMessage, len(testValues))
+	for i, testValue := range testValues {
+		data[i] = edge.NewPointMessage(
+			"cpu",
+			"dbname",
+			"rpname",
+			models.Dimensions{},
+			models.Fields{"value": testValue[1]},
+			models.Tags{},
+			testValue[0].(time.Time),
+		)
+	}
+	for _, point := range data {
+		dataChannel <- point
+	}
+	time.Sleep(11 * time.Second)
+	close(dataChannel)
+}
+
+func TestStream_Barrier_Idle_No_Idle(t *testing.T) {
+	// Set up clock to current time - 22 seconds since we're going to send 21 data points
+	clock := clock.New(time.Now().UTC().Add(-22 * time.Second))
+	clock.Set(time.Now().UTC())
+	testValues := make([][]interface{}, 21)
+	for i := 0; i < 21; i++ {
+		testValues[i] = []interface{}{
+			clock.Zero().Add(time.Duration(i) * time.Second),
+			rand.Float64(),
+		}
+	}
+	requestCount := int32(0)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		result := models.Result{}
+		dec := json.NewDecoder(r.Body)
+		err := dec.Decode(&result)
+		if err != nil {
+			t.Fatal(err)
+		}
+		atomic.AddInt32(&requestCount, 1)
+		rc := atomic.LoadInt32(&requestCount)
+
+		var er models.Result
+		switch rc {
+		case 1:
+			er = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values:  testValues[0:10],
+					},
+				},
+			}
+		case 2:
+			er = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values:  testValues[6:20],
+					},
+				},
+			}
+		case 3:
+			er = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values:  testValues[16:21],
+					},
+				},
+			}
+		}
+		if eq, msg := compareResults(er, result); !eq {
+			t.Errorf("unexpected alert data for request: %d %s", rc, msg)
+		}
+	}))
+	defer ts.Close()
+
+	var script = `
+var period = 14s
+var every = 10s
+var idle = 10s
+stream
+	|from()
+		.database('dbname')
+		.retentionPolicy('rpname')
+		.measurement('cpu')
+	|barrier().idle(idle)
+	|window()
+		.period(period)
+		.every(every)
+	|httpPost('` + ts.URL + `')
+`
+
+	dataChannel := make(chan edge.PointMessage)
+	cleanupTest := testStreamerWithInputChannel(t, "TestStream_Barrier_Idle_No_Idle", script, dataChannel, clock, nil)
+	defer func() {
+		cleanupTest()
+
+		// Force emit should force the last window to emit
+		if rc := atomic.LoadInt32(&requestCount); rc != 2 {
+			t.Errorf("got %v exp %v", rc, 2)
+		}
+	}()
+
+	data := make([]edge.PointMessage, len(testValues))
+	for i, testValue := range testValues {
+		data[i] = edge.NewPointMessage(
+			"cpu",
+			"dbname",
+			"rpname",
+			models.Dimensions{},
+			models.Fields{"value": testValue[1]},
+			models.Tags{},
+			testValue[0].(time.Time),
+		)
+	}
+	for _, point := range data {
+		dataChannel <- point
+	}
+	close(dataChannel)
+}
+
+func TestStream_Barrier_Idle_Replay_After_Idle(t *testing.T) {
+	// Set up clock to current time - 22 seconds since we're going to send 21 data points
+	clock := clock.New(time.Now().UTC().Add(-22 * time.Second))
+	clock.Set(time.Now().UTC())
+	testValues := make([][]interface{}, 21)
+	for i := 0; i < 21; i++ {
+		testValues[i] = []interface{}{
+			clock.Zero().Add(time.Duration(i) * time.Second),
+			rand.Float64(),
+		}
+	}
+	requestCount := int32(0)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		result := models.Result{}
+		dec := json.NewDecoder(r.Body)
+		err := dec.Decode(&result)
+		if err != nil {
+			t.Fatal(err)
+		}
+		atomic.AddInt32(&requestCount, 1)
+		rc := atomic.LoadInt32(&requestCount)
+
+		var er models.Result
+		switch rc {
+		case 1:
+			er = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values:  testValues[0:10],
+					},
+				},
+			}
+		case 2:
+			er = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values:  testValues[6:20],
+					},
+				},
+			}
+		case 3:
+			er = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values:  testValues[16:21],
+					},
+				},
+			}
+		}
+		if eq, msg := compareResults(er, result); !eq {
+			t.Errorf("unexpected alert data for request: %d %s", rc, msg)
+		}
+	}))
+	defer ts.Close()
+
+	var script = `
+var period = 14s
+var every = 10s
+var idle = 10s
+stream
+	|from()
+		.database('dbname')
+		.retentionPolicy('rpname')
+		.measurement('cpu')
+	|barrier().idle(idle)
+	|window()
+		.period(period)
+		.every(every)
+	|httpPost('` + ts.URL + `')
+`
+
+	dataChannel := make(chan edge.PointMessage)
+	cleanupTest := testStreamerWithInputChannel(t, "TestStream_Barrier_Idle", script, dataChannel, clock, nil)
+	defer func() {
+		cleanupTest()
+
+		// Force emit should force the last window to emit
+		if rc := atomic.LoadInt32(&requestCount); rc != 3 {
+			t.Errorf("got %v exp %v", rc, 3)
+		}
+	}()
+
+	data := make([]edge.PointMessage, len(testValues))
+	for i, testValue := range testValues {
+		data[i] = edge.NewPointMessage(
+			"cpu",
+			"dbname",
+			"rpname",
+			models.Dimensions{},
+			models.Fields{"value": testValue[1]},
+			models.Tags{},
+			testValue[0].(time.Time),
+		)
+	}
+	for _, point := range data {
+		dataChannel <- point
+	}
+	time.Sleep(11 * time.Second)
+	for i, testValue := range testValues {
+		data[i] = edge.NewPointMessage(
+			"cpu",
+			"dbname",
+			"rpname",
+			models.Dimensions{},
+			models.Fields{"value": testValue[1]},
+			models.Tags{},
+			testValue[0].(time.Time),
+		)
+	}
+	for _, point := range data {
+		dataChannel <- point
+	}
+	close(dataChannel)
+}
+
+func TestStream_Barrier_Period_No_Data(t *testing.T) {
+	// Set up clock to current time - 22 seconds since we're going to send 21 data points
+	clock := clock.New(time.Now().UTC())
+	requestCount := int32(0)
+
+	testValues := make([][]interface{}, 1)
+	for i := 0; i < 1; i++ {
+		testValues[i] = []interface{}{
+			clock.Zero().Add(time.Duration(i) * time.Second),
+			rand.Float64(),
+		}
+	}
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		result := models.Result{}
+		dec := json.NewDecoder(r.Body)
+		err := dec.Decode(&result)
+		if err != nil {
+			t.Fatal(err)
+		}
+		atomic.AddInt32(&requestCount, 1)
+	}))
+	defer ts.Close()
+
+	// NOTE: using a slightly higher than 2s idle because timer was going off within a few ms of window period 50% of
+	// the time
+	var script = `
+var period = 14s
+var every = 2s
+var idle = 2100ms
+stream
+	|from()
+		.database('dbname')
+		.retentionPolicy('rpname')
+		.measurement('cpu')
+	|barrier().period(idle)
+	|window()
+		.period(period)
+		.every(every)
+	|httpPost('` + ts.URL + `')
+`
+
+	dataChannel := make(chan edge.PointMessage)
+	cleanupTest := testStreamerWithInputChannel(t, "TestStream_Barrier_Period_No_Data", script, dataChannel, clock, nil)
+	defer func() {
+		cleanupTest()
+
+		// barrier should emit at least 4 times
+		if rc := atomic.LoadInt32(&requestCount); rc != 2 {
+			t.Errorf("got %v exp %v", rc, 2)
+		}
+	}()
+
+	// groupedconsumers do not run any logic until at least one message is seen
+	data := make([]edge.PointMessage, len(testValues))
+	for i, testValue := range testValues {
+		data[i] = edge.NewPointMessage(
+			"cpu",
+			"dbname",
+			"rpname",
+			models.Dimensions{},
+			models.Fields{"value": testValue[1]},
+			models.Tags{},
+			testValue[0].(time.Time),
+		)
+	}
+	for _, point := range data {
+		dataChannel <- point
+	}
+
+	time.Sleep(5 * time.Second)
+	close(dataChannel)
+}
+
+func TestStream_Barrier_Period(t *testing.T) {
+	// Set up clock to current time - 22 seconds since we're going to send 21 data points
+	clock := clock.New(time.Now().UTC().Add(-22 * time.Second))
+	clock.Set(time.Now().UTC())
+	testValues := make([][]interface{}, 21)
+	for i := 0; i < 21; i++ {
+		testValues[i] = []interface{}{
+			clock.Zero().Add(time.Duration(i) * time.Second),
+			rand.Float64(),
+		}
+	}
+	requestCount := int32(0)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		result := models.Result{}
+		dec := json.NewDecoder(r.Body)
+		err := dec.Decode(&result)
+		if err != nil {
+			t.Fatal(err)
+		}
+		atomic.AddInt32(&requestCount, 1)
+		rc := atomic.LoadInt32(&requestCount)
+
+		var er models.Result
+		switch rc {
+		case 1:
+			er = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values:  testValues[0:10],
+					},
+				},
+			}
+		case 2:
+			er = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values:  testValues[6:20],
+					},
+				},
+			}
+		case 3:
+			er = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values:  testValues[16:21],
+					},
+				},
+			}
+		}
+		if eq, msg := compareResults(er, result); !eq {
+			t.Errorf("unexpected alert data for request: %d %s", rc, msg)
+		}
+	}))
+	defer ts.Close()
+
+	var script = `
+var period = 14s
+var every = 10s
+var idle = 10s
+stream
+	|from()
+		.database('dbname')
+		.retentionPolicy('rpname')
+		.measurement('cpu')
+	|barrier().period(idle)
+	|window()
+		.period(period)
+		.every(every)
+	|httpPost('` + ts.URL + `')
+`
+
+	dataChannel := make(chan edge.PointMessage)
+	cleanupTest := testStreamerWithInputChannel(t, "TestStream_Barrier_Period", script, dataChannel, clock, nil)
+	defer func() {
+		cleanupTest()
+
+		// Force emit should force the last window to emit
+		if rc := atomic.LoadInt32(&requestCount); rc != 3 {
+			t.Errorf("got %v exp %v", rc, 3)
+		}
+	}()
+
+	data := make([]edge.PointMessage, len(testValues))
+	for i, testValue := range testValues {
+		data[i] = edge.NewPointMessage(
+			"cpu",
+			"dbname",
+			"rpname",
+			models.Dimensions{},
+			models.Fields{"value": testValue[1]},
+			models.Tags{},
+			testValue[0].(time.Time),
+		)
+	}
+	for _, point := range data {
+		dataChannel <- point
+	}
+	time.Sleep(11 * time.Second)
+	close(dataChannel)
+}
+
+func TestStream_Barrier_Period_No_Idle(t *testing.T) {
+	// Set up clock to current time - 22 seconds since we're going to send 21 data points
+	clock := clock.New(time.Now().UTC().Add(-22 * time.Second))
+	clock.Set(time.Now().UTC())
+	testValues := make([][]interface{}, 21)
+	for i := 0; i < 21; i++ {
+		testValues[i] = []interface{}{
+			clock.Zero().Add(time.Duration(i) * time.Second),
+			rand.Float64(),
+		}
+	}
+	requestCount := int32(0)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		result := models.Result{}
+		dec := json.NewDecoder(r.Body)
+		err := dec.Decode(&result)
+		if err != nil {
+			t.Fatal(err)
+		}
+		atomic.AddInt32(&requestCount, 1)
+		rc := atomic.LoadInt32(&requestCount)
+
+		var er models.Result
+		switch rc {
+		case 1:
+			er = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values:  testValues[0:10],
+					},
+				},
+			}
+		case 2:
+			er = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values:  testValues[6:20],
+					},
+				},
+			}
+		case 3:
+			er = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values:  testValues[16:21],
+					},
+				},
+			}
+		}
+		if eq, msg := compareResults(er, result); !eq {
+			t.Errorf("unexpected alert data for request: %d %s", rc, msg)
+		}
+	}))
+	defer ts.Close()
+
+	var script = `
+var period = 14s
+var every = 10s
+var idle = 10s
+stream
+	|from()
+		.database('dbname')
+		.retentionPolicy('rpname')
+		.measurement('cpu')
+	|barrier().period(idle)
+	|window()
+		.period(period)
+		.every(every)
+	|httpPost('` + ts.URL + `')
+`
+
+	dataChannel := make(chan edge.PointMessage)
+	cleanupTest := testStreamerWithInputChannel(t, "TestStream_Barrier_Period_No_Idle", script, dataChannel, clock, nil)
+	defer func() {
+		cleanupTest()
+
+		// Force emit should force the last window to emit
+		if rc := atomic.LoadInt32(&requestCount); rc != 2 {
+			t.Errorf("got %v exp %v", rc, 2)
+		}
+	}()
+
+	data := make([]edge.PointMessage, len(testValues))
+	for i, testValue := range testValues {
+		data[i] = edge.NewPointMessage(
+			"cpu",
+			"dbname",
+			"rpname",
+			models.Dimensions{},
+			models.Fields{"value": testValue[1]},
+			models.Tags{},
+			testValue[0].(time.Time),
+		)
+	}
+	for _, point := range data {
+		dataChannel <- point
+	}
+	close(dataChannel)
+}
+
+func TestStream_Barrier_Period_Replay_After_Idle(t *testing.T) {
+	// Set up clock to current time - 22 seconds since we're going to send 21 data points
+	clock := clock.New(time.Now().UTC().Add(-22 * time.Second))
+	clock.Set(time.Now().UTC())
+	testValues := make([][]interface{}, 21)
+	for i := 0; i < 21; i++ {
+		testValues[i] = []interface{}{
+			clock.Zero().Add(time.Duration(i) * time.Second),
+			rand.Float64(),
+		}
+	}
+	requestCount := int32(0)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		result := models.Result{}
+		dec := json.NewDecoder(r.Body)
+		err := dec.Decode(&result)
+		if err != nil {
+			t.Fatal(err)
+		}
+		atomic.AddInt32(&requestCount, 1)
+		rc := atomic.LoadInt32(&requestCount)
+
+		var er models.Result
+		switch rc {
+		case 1:
+			er = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values:  testValues[0:10],
+					},
+				},
+			}
+		case 2:
+			er = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values:  testValues[6:20],
+					},
+				},
+			}
+		case 3:
+			er = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Columns: []string{"time", "value"},
+						Values:  testValues[16:21],
+					},
+				},
+			}
+		}
+		if eq, msg := compareResults(er, result); !eq {
+			t.Errorf("unexpected alert data for request: %d %s", rc, msg)
+		}
+	}))
+	defer ts.Close()
+
+	var script = `
+var period = 14s
+var every = 10s
+var idle = 10s
+stream
+	|from()
+		.database('dbname')
+		.retentionPolicy('rpname')
+		.measurement('cpu')
+	|barrier().period(idle)
+	|window()
+		.period(period)
+		.every(every)
+	|httpPost('` + ts.URL + `')
+`
+
+	dataChannel := make(chan edge.PointMessage)
+	cleanupTest := testStreamerWithInputChannel(t, "TestStream_Barrier_Period", script, dataChannel, clock, nil)
+	defer func() {
+		cleanupTest()
+
+		// Force emit should force the last window to emit
+		if rc := atomic.LoadInt32(&requestCount); rc != 3 {
+			t.Errorf("got %v exp %v", rc, 3)
+		}
+	}()
+
+	data := make([]edge.PointMessage, len(testValues))
+	for i, testValue := range testValues {
+		data[i] = edge.NewPointMessage(
+			"cpu",
+			"dbname",
+			"rpname",
+			models.Dimensions{},
+			models.Fields{"value": testValue[1]},
+			models.Tags{},
+			testValue[0].(time.Time),
+		)
+	}
+	for _, point := range data {
+		dataChannel <- point
+	}
+	time.Sleep(11 * time.Second)
+	for i, testValue := range testValues {
+		data[i] = edge.NewPointMessage(
+			"cpu",
+			"dbname",
+			"rpname",
+			models.Dimensions{},
+			models.Fields{"value": testValue[1]},
+			models.Tags{},
+			testValue[0].(time.Time),
+		)
+	}
+	for _, point := range data {
+		dataChannel <- point
+	}
+	close(dataChannel)
 }
 
 func TestStream_Aggregate_Changing_Type(t *testing.T) {
@@ -11318,6 +12140,68 @@ func fastForwardTask(
 		return err
 	}
 	return nil
+}
+
+func testStreamerWithInputChannel(
+	t *testing.T,
+	name,
+	script string,
+	points <-chan edge.PointMessage,
+	clck clock.Clock,
+	tmInit func(tm *kapacitor.TaskMaster),
+) (cleanup func()) {
+	if testing.Verbose() {
+		wlog.SetLevel(wlog.DEBUG)
+	} else {
+		wlog.SetLevel(wlog.OFF)
+	}
+
+	// Create a new execution env
+	tm, err := createTaskMaster()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tmInit != nil {
+		tmInit(tm)
+	}
+	tm.Open()
+
+	//Create the task
+	task, err := tm.NewTask(name, script, kapacitor.StreamTask, dbrps, 0, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	//Start the task
+	et, err := tm.StartTask(task)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Replay data from channel to exectutor
+	stream, err := tm.Stream(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replayErr := kapacitor.ReplayStreamFromChan(clck, points, stream, false)
+
+	// Return cleanup function to caller to execute after data has all been sent
+	cleanup = func() {
+		// Wait till the replay has finished
+		if err := <-replayErr; err != nil {
+			t.Error(err)
+		}
+		tm.Drain()
+		et.StopStats()
+		// Wait till the task is finished
+		if err := et.Wait(); err != nil {
+			t.Error(err)
+		}
+
+		t.Log(string(et.Task.Dot()))
+		return
+	}
+	return
 }
 
 func testStreamerNoOutput(

@@ -417,6 +417,15 @@ func (n *chainnode) Window() *WindowNode {
 	return w
 }
 
+// Create a new Barrier node that emits a BarrierMessage periodically
+//
+// One BarrierMessage will be emitted every period duration
+func (n *chainnode) Barrier() *BarrierNode {
+	b := newBarrierNode(n.provides)
+	n.linkChild(b)
+	return b
+}
+
 // Create a new node that samples the incoming points or batches.
 //
 // One point will be emitted every count or duration specified.
@@ -471,6 +480,13 @@ func (n *chainnode) K8sAutoscale() *K8sAutoscaleNode {
 // Create a node that can trigger autoscale events for a docker swarm cluster.
 func (n *chainnode) SwarmAutoscale() *SwarmAutoscaleNode {
 	k := newSwarmAutoscaleNode(n.Provides())
+	n.linkChild(k)
+	return k
+}
+
+// Create a node that can trigger autoscale events for a ec2 autoscalegroup.
+func (n *chainnode) Ec2Autoscale() *Ec2AutoscaleNode {
+	k := newEc2AutoscaleNode(n.Provides())
 	n.linkChild(k)
 	return k
 }

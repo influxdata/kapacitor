@@ -9,6 +9,8 @@
 //
 // 3. tick:embedded:[NODE_NAME].[PROPERTY_NAME] -- The object's properties are embedded into a parent node's property identified by NODE_NAME.PROPERTY_NAME.
 //
+// 4. tick:wraps:[INTERNAL_FIELD] - use the comments associate with the internal field to describe the wrapper type
+//
 // Just place one of these comments on a line all by itself and tickdoc will find it and behave accordingly.
 //
 // Example:
@@ -32,7 +34,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"html"
+	_ "html"
 	"log"
 	"os"
 	"path/filepath"
@@ -51,6 +53,7 @@ import (
 
 const tickIgnore = "tick:ignore"
 const tickProperty = "tick:property"
+const tickWraps = "tick:wraps"
 const tickExample = "Example:"
 const tickLang = "javascript"
 
@@ -115,7 +118,7 @@ func main() {
 
 	ordered := make([]string, 0, len(nodes))
 	for name, node := range nodes {
-		if name == "" || !ast.IsExported(name) || node.Name == "" {
+		if name == "" || !ast.IsExported(name) || node.Name == "" || isAnonField(node, nodes) {
 			continue
 		}
 		if node.Embedded {
@@ -177,6 +180,7 @@ func handleGenDecl(nodes map[string]*Node, decl *ast.GenDecl) {
 			node.Doc = decl.Doc
 			node.Embedded, node.EmbeddedParent, node.EmbeddedProperty = isEmbedded(decl.Doc)
 			processFields(node, s)
+			getWrapped(node)
 		}
 	}
 }
@@ -277,6 +281,46 @@ func shouldIgnore(cg *ast.CommentGroup) bool {
 	return false
 }
 
+func isAnonField(nd *Node, nodes map[string]*Node) bool {
+	for _, node := range nodes {
+		for _, field := range node.AnonFields {
+			if field == nd.Name {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// some nodes are wrappers - e.g. AlertNode{ *AlertNodeData }
+// this looks into the wrapped field
+func getWrapped(nd *Node) string {
+	if nd.Doc == nil {
+		return ""
+	}
+	for _, ln := range nd.Doc.List {
+		s := strings.TrimSpace(strings.TrimLeft(ln.Text, "/"))
+		if strings.Contains(s, tickWraps) {
+			tokens := strings.Split(s, ":")
+			return tokens[2]
+		}
+	}
+
+	return ""
+}
+
+func getConstructor(target string, sources ...*Node) *Method {
+
+	for _, source := range sources {
+		for _, meth := range source.Methods {
+			if strings.ToUpper(meth.Name) == strings.ToUpper(target) {
+				return meth
+			}
+		}
+	}
+	return nil
+}
+
 func isEmbedded(cg *ast.CommentGroup) (bool, string, string) {
 	if cg == nil {
 		return false, "", ""
@@ -337,6 +381,15 @@ func nameToTickName(name string) string {
 	return strings.ToLower(name[0:1]) + name[1:]
 }
 
+func nodeNameToTickName(name string) string {
+	result := strings.TrimSuffix(name, "Node")
+	if strings.HasPrefix(strings.ToUpper(result), "HTTP") {
+		return strings.ToLower(result[0:4]) + result[4:]
+	}
+
+	return nameToTickName(result)
+}
+
 func nodeNameToLink(name string) string {
 	return fmt.Sprintf("%s/%s/", config.Root, snaker.CamelToSnake(name))
 }
@@ -353,7 +406,6 @@ func renderDoc(buf *bytes.Buffer, nodes map[string]*Node, r Renderer, doc *ast.C
 	var lines bytes.Buffer
 	for i := 0; i < len(doc.List); i++ {
 		s := strings.TrimSpace(strings.TrimLeft(doc.List[i].Text, "/"))
-		s = html.EscapeString(s)
 		lines.Write(addNodeLinks(nodes, s))
 		lines.Write([]byte("\n"))
 		if s == tickExample {
@@ -462,6 +514,17 @@ func (n *Node) Embed(nodes map[string]*Node) error {
 	}
 	if prop, ok := parent.Properties[n.EmbeddedProperty]; ok {
 		prop.EmbeddedProperties = n.Properties
+	} else if len(parent.AnonFields) > 0 {
+		anon_parent := nodes[parent.AnonFields[0]]
+		if anon_parent == nil {
+			return fmt.Errorf("no node %s from anon_field in node %s", parent.AnonFields[0], n.EmbeddedParent)
+		}
+
+		if prop, ok := anon_parent.Properties[n.EmbeddedProperty]; ok {
+			prop.EmbeddedProperties = n.Properties
+		} else {
+			return fmt.Errorf("no property %s no node %s not even in node from AnonField %s", n.EmbeddedProperty, n.EmbeddedParent, parent.AnonFields[0])
+		}
 	} else {
 		return fmt.Errorf("no property %s no node %s", n.EmbeddedProperty, n.EmbeddedParent)
 	}
@@ -475,16 +538,72 @@ type headerInfo struct {
 	Weight     int
 }
 
-func (n *Node) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node, weight int) error {
-	info := headerInfo{
-		Title:      n.Name,
-		Name:       strings.Replace(n.Name, "Node", "", 1),
-		Identifier: snaker.CamelToSnake(n.Name),
-		Weight:     weight,
-	}
-	config.headerTemplate.Execute(buf, info)
+func (n *Node) renderConstructor(buf *bytes.Buffer, nodes map[string]*Node) {
 
-	renderDoc(buf, nodes, r, n.Doc)
+	shortName := strings.TrimSuffix(n.Name, "Node")
+
+	buf.Write([]byte("### Constructor \n\n| Chaining Method | Description |\n|:---------|:---------|\n"))
+	constructor := getConstructor(shortName, n, nodes["chainnode"], nodes["BatchNode"], nodes["StreamNode"])
+	if constructor == nil {
+		buf.Write([]byte("| **[" + nodeNameToTickName(n.Name) + "](#descr)** | Has no constructor signature. |\n"))
+	} else {
+
+		buf.Write([]byte("| "))
+		buf.Write([]byte(fmt.Sprintf("**[%s](#descr)&nbsp;(&nbsp;", nameToTickName(constructor.Name))))
+
+		for i, param := range constructor.Params {
+			buf.Write([]byte(fmt.Sprintf("`%s`&nbsp;`%s`", param.Name, param.Type)))
+			if (i + 1) < len(constructor.Params) {
+				buf.Write([]byte(",&nbsp;"))
+			}
+		}
+
+		buf.Write([]byte(")**"))
+
+		buf.Write([]byte(" | "))
+
+		for _, line := range constructor.Doc.List {
+			//Use only first paragraph - so stop on empty line
+			if len(strings.TrimSpace(strings.TrimLeft(fmt.Sprint(line.Text), "/"))) == 0 {
+				break
+			}
+			buf.Write([]byte(strings.TrimSpace(strings.TrimLeft(fmt.Sprint(line.Text), "/"))))
+			buf.Write([]byte(" "))
+		}
+		buf.Write([]byte(" |\n\n"))
+	}
+
+}
+
+func (n *Node) renderPropertiesTable(buf *bytes.Buffer, nodes map[string]*Node) {
+	buf.Write([]byte("### Property Methods\n"))
+
+	if len(n.Properties) > 0 {
+
+		props := make([]string, len(n.Properties))
+		i := 0
+
+		for name, _ := range n.Properties {
+			props[i] = name
+			i++
+		}
+		sort.Strings(props)
+
+		buf.Write([]byte("\n"))
+		buf.Write([]byte("| Setters | Description |\n|:---|:---|\n"))
+
+		for _, name := range props {
+			n.Properties[name].RenderAsRow(buf, nodes)
+		}
+
+		buf.Write([]byte("\n\n"))
+	} else {
+		buf.Write([]byte("This node has no properties that can be set.\n\n"))
+	}
+
+}
+
+func (n *Node) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node, weight int) error {
 
 	properties := make([]string, len(n.Properties))
 	i := 0
@@ -502,22 +621,40 @@ func (n *Node) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node, wei
 	}
 	sort.Strings(methods)
 
-	// Index
-	r.Header(buf, func() bool { buf.Write([]byte("Index")); return true }, 2, "")
-	r.Header(buf, func() bool { buf.Write([]byte("Properties")); return true }, 3, "")
-	r.List(buf, func() bool {
-		for _, name := range properties {
-			r.ListItem(buf, []byte(fmt.Sprintf("[%s](%s)", name, methodNameToLink(n.Name, name))), 1024)
-		}
-		return true
-	}, 0)
+	info := headerInfo{
+		Title:      n.Name,
+		Name:       strings.Replace(n.Name, "Node", "", 1),
+		Identifier: snaker.CamelToSnake(n.Name),
+		Weight:     weight,
+	}
+	config.headerTemplate.Execute(buf, info)
+
+	n.renderConstructor(buf, nodes)
+
+	n.renderPropertiesTable(buf, nodes)
+
 	r.Header(buf, func() bool { buf.Write([]byte("Chaining Methods")); return true }, 3, "")
-	r.List(buf, func() bool {
-		for _, name := range methods {
-			r.ListItem(buf, []byte(fmt.Sprintf("[%s](%s)", name, methodNameToLink(n.Name, name))), 1024)
+
+	for i, name := range methods {
+		buf.Write([]byte(fmt.Sprintf("[%s](%s)", name, methodNameToLink(n.Name, name))))
+		if (i + 1) < len(methods) {
+			buf.Write([]byte(", "))
 		}
-		return true
-	}, 0)
+	}
+
+	// Need to add a few lines to push description below search bar
+	// when jumping to it from internal link in Constructor table
+	buf.Write([]byte("\n<a id='descr'/><hr/><br/>\n### Description\n"))
+
+	// some nodes are wrappers - e.g. AlertNode{ *AlertNodeData }
+	// if so - use Doc for wrapped field instead
+	if len(getWrapped(n)) > 0 {
+		renderDoc(buf, nodes, r, nodes[getWrapped(n)].Doc)
+	} else {
+		renderDoc(buf, nodes, r, n.Doc)
+	}
+
+	buf.Write([]byte("\n<a href=\"javascript:document.getElementsByClassName('article')[0].scrollIntoView();\" title=\"top\">^</a>\n"))
 
 	// Properties
 	if len(n.Properties) > 0 {
@@ -526,7 +663,7 @@ func (n *Node) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node, wei
 			buf.Write([]byte(config.PropertyMethodDesc))
 			return true
 		})
-		renderProperties(buf, r, n.Properties, nodes, 3, "node", "")
+		renderProperties(buf, r, n.Properties, nodes, 3, nodeNameToTickName(n.Name), "")
 	}
 
 	// Methods
@@ -537,8 +674,9 @@ func (n *Node) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node, wei
 			return true
 		})
 		for _, name := range methods {
-			n.Methods[name].Render(buf, r, nodes)
+			n.Methods[name].Render(buf, r, nodes, nodeNameToTickName(n.Name))
 			buf.Write([]byte("\n"))
+			buf.Write([]byte("<a href=\"javascript:document.getElementsByClassName('article')[0].scrollIntoView();\" title=\"top\">^</a>\n"))
 		}
 	}
 
@@ -586,9 +724,41 @@ func (p *Property) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node,
 
 	r.BlockCode(buf, code.Bytes(), tickLang)
 
+	buf.Write([]byte("\n<a href=\"javascript:document.getElementsByClassName('article')[0].scrollIntoView();\" title=\"top\">^</a>\n"))
+
 	if len(p.EmbeddedProperties) > 0 {
 		renderProperties(buf, r, p.EmbeddedProperties, nodes, header+1, code.String()+"      ", p.Name+" ")
 	}
+
+	return nil
+}
+
+func (p *Property) RenderAsRow(buf *bytes.Buffer, nodes map[string]*Node) error {
+
+	buf.Write([]byte("| "))
+	buf.Write([]byte(fmt.Sprintf("**[%s](#%s)&nbsp;(&nbsp;", nameToTickName(p.Name), strings.ToLower(p.Name))))
+
+	for i, param := range p.Params {
+		buf.Write([]byte(fmt.Sprintf("`%s`&nbsp;`%s`", param.Name, param.Type)))
+		if (i + 1) < len(p.Params) {
+			buf.Write([]byte(",&nbsp;"))
+		}
+	}
+
+	buf.Write([]byte(")**"))
+
+	buf.Write([]byte(" | "))
+	if p.Doc != nil && len(p.Doc.List) > 0 {
+		for _, line := range p.Doc.List {
+			//Use only first paragraph - so stop on empty line
+			if len(strings.TrimSpace(strings.TrimLeft(fmt.Sprint(line.Text), "/"))) == 0 {
+				break
+			}
+			buf.Write([]byte(strings.TrimSpace(strings.TrimLeft(fmt.Sprint(line.Text), "/"))))
+			buf.Write([]byte(" "))
+		}
+	}
+	buf.Write([]byte(" |\n"))
 
 	return nil
 }
@@ -600,13 +770,14 @@ type Method struct {
 	Result string
 }
 
-func (m *Method) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node) error {
+func (m *Method) Render(buf *bytes.Buffer, r Renderer, nodes map[string]*Node, node string) error {
 	r.Header(buf, func() bool { buf.Write([]byte(m.Name)); return true }, 3, "")
 
 	renderDoc(buf, nodes, r, m.Doc)
 
 	var code bytes.Buffer
-	code.Write([]byte("node|"))
+	code.Write([]byte(node))
+	code.Write([]byte("|"))
 	code.Write([]byte(nameToTickName(m.Name)))
 	code.Write([]byte("("))
 	for i, param := range m.Params {

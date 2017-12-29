@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb/toml"
+	"github.com/influxdata/kapacitor/services/ec2/client"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/config"
 )
@@ -43,6 +44,14 @@ func (e Config) Prom(c *config.ScrapeConfig) {
 	c.ServiceDiscoveryConfig.EC2SDConfigs = []*config.EC2SDConfig{
 		e.PromConfig(),
 	}
+}
+
+func (c Config) ClientConfig() (client.Config, error) {
+	return client.Config{
+		AccessKey: c.AccessKey,
+		SecretKey: c.SecretKey,
+		Region:    c.Region,
+	}, nil
 }
 
 // PromConfig returns the prometheus configuration for this discoverer

@@ -17,6 +17,7 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	alertservice "github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
+	"github.com/influxdata/kapacitor/services/ec2"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/influxdb"
@@ -879,6 +880,20 @@ type SwarmHandler struct {
 func (h *SwarmHandler) WithClusterContext(cluster string) swarm.Diagnostic {
 	return &SwarmHandler{
 		l: h.l.With(String("cluster_id", cluster)),
+	}
+}
+
+// EC2 handler
+
+type EC2Handler struct {
+	*ScraperHandler
+}
+
+func (h *EC2Handler) WithClusterContext(cluster string) ec2.Diagnostic {
+	return &EC2Handler{
+		ScraperHandler: &ScraperHandler{
+			l: h.ScraperHandler.l.With(String("cluster_id", cluster)),
+		},
 	}
 }
 

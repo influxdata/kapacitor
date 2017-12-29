@@ -23,7 +23,7 @@ func NewSwarmAutoscale(parents []ast.Node) *SwarmAutoscaleNode {
 func (n *SwarmAutoscaleNode) Build(s *pipeline.SwarmAutoscaleNode) (ast.Node, error) {
 	n.Pipe("swarmAutoscale").
 		Dot("cluster", s.Cluster).
-		Dot("servceName", s.ServiceNameTag).
+		Dot("serviceName", s.ServiceNameTag).
 		Dot("serviceNameTag", s.ServiceNameTag).
 		Dot("outputServiceNameTag", s.OutputServiceNameTag).
 		Dot("currentField", s.CurrentField).

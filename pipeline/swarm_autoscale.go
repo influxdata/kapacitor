@@ -136,6 +136,7 @@ func (n *SwarmAutoscaleNode) validate() error {
 }
 
 // MarshalJSON converts SwarmAutoscaleNode to JSON
+// tick:ignore
 func (n *SwarmAutoscaleNode) MarshalJSON() ([]byte, error) {
 	type Alias SwarmAutoscaleNode
 	var raw = &struct {
@@ -156,6 +157,7 @@ func (n *SwarmAutoscaleNode) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON converts JSON to an SwarmAutoscaleNode
+// tick:ignore
 func (n *SwarmAutoscaleNode) UnmarshalJSON(data []byte) error {
 	type Alias SwarmAutoscaleNode
 	var raw = &struct {
