@@ -167,6 +167,9 @@ func (s *Service) preparePost(alias, message, priority, description string, team
 
 func (s *Service) Alert(alias, message, priority, description string, teams, recipients []string, entity string, t time.Time) error {
 	c := s.config()
+	if !c.Enabled {
+		return errors.New("service is not enabled")
+	}
 
 	post, err := s.preparePost(alias, message, priority, description, teams, recipients, entity, t)
 	if err != nil {
