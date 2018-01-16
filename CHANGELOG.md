@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.5.0 [unreleased]
+
+### Bugfixes
+
+### Features
+
+
 ## v1.4.0 [2017-12-08]
 
 The v1.4.0 release has many new features, here is a list of some of the highlights:

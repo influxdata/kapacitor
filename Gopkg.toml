@@ -37,6 +37,12 @@ required = ["github.com/benbjohnson/tmpl","github.com/golang/protobuf/protoc-gen
   name = "github.com/eclipse/paho.mqtt.golang"
   version = "~1.0.0"
 
+# Pin BurntSushi/toml to the same version used in influxdb
+# This also avoids using a version with the WTFPL license
+[[constraint]]
+  name= "github.com/BurntSushi/toml"
+  revision = "a368813c5e648fee92e5f6c30e3944ff9d5e8895"
+
 # Force the Azure projects to be a specific older version that Prometheus needs
 [[override]]
   name = "github.com/Azure/azure-sdk-for-go"

@@ -1,7 +1,7 @@
 Dependencies
 ============
 
-* github.com/BurntSushi/toml [WTFPL](https://github.com/BurntSushi/toml/blob/master/COPYING)
+* github.com/BurntSushi/toml [MIT](https://github.com/BurntSushi/toml/blob/master/COPYING)
 * github.com/boltdb/bolt [MIT](https://github.com/boltdb/bolt/blob/master/LICENSE)
 * github.com/cenkalti/backoff [MIT](https://github.com/cenkalti/backoff/blob/master/LICENSE)
 * github.com/dgrijalva/jwt-go [MIT](https://github.com/dgrijalva/jwt-go/blob/master/LICENSE)
