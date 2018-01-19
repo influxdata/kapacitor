@@ -62,6 +62,7 @@ type Service struct {
 	addr  string
 	https bool
 	cert  string
+	key   string
 	err   chan error
 
 	externalURL string
@@ -98,6 +99,7 @@ func NewService(c Config, hostname string, d Diagnostic) *Service {
 		addr:            c.BindAddress,
 		https:           c.HttpsEnabled,
 		cert:            c.HttpsCertificate,
+		key:             c.HttpsPrivateKey,
 		externalURL:     u.String(),
 		err:             make(chan error, 1),
 		shutdownTimeout: time.Duration(c.ShutdownTimeout),
@@ -126,7 +128,7 @@ func (s *Service) Open() error {
 
 	// Open listener.
 	if s.https {
-		cert, err := tls.LoadX509KeyPair(s.cert, s.cert)
+		cert, err := tls.LoadX509KeyPair(s.cert, s.key)
 		if err != nil {
 			return err
 		}
