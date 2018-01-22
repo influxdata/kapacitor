@@ -193,7 +193,7 @@ If you want to generate code run:
 If you want to build packages run:
 
 ```bash
-./build.py --packages
+./build.py --package
 ```
 
 There are many more options available see
