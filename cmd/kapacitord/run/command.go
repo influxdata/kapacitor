@@ -252,7 +252,7 @@ run starts the Kapacitor server.
                           Write logs to a file.
 
         -log-level <level>
-                          Sets the log level. One of debug,info,warn,error.
+                          Sets the log level. One of debug,info,error.
 `
 
 // Options represents the command line options that can be parsed.
