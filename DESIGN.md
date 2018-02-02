@@ -52,7 +52,7 @@ A batch consists of a type that describes the common attributes of all data poin
 and a list of all the individual data points.
 
 A data point consists of a timestamp, a map of fields, and a map of tags.
-When data points are transfered as a stream not within the context of a batch they
+When data points are transferred as a stream not within the context of a batch they
 also contain information on their scope, i.e database, retention policy and measurement.
 This data model is schemaless in that the names of fields and tags are arbitrary and opaque to Kapacitor.
 
@@ -86,8 +86,8 @@ A node can want and provide the same or different type of edges. For example the
 while providing a batch edge.
 
 Modeling data flow through edges allows for the transport mechanism to be abstracted.
-If the data is being transfered within the same process then it can be sent via in-memory structures;
-if the data is being transfered to another Kapacitor host it can be serialized and transfered accordingly.
+If the data is being transferred within the same process then it can be sent via in-memory structures;
+if the data is being transferred to another Kapacitor host it can be serialized and transferred accordingly.
 
 The current implementation of an edge uses Go channels and can be found in `edge.go`.
 There are three channel per edge instance but only ever one channel is non nil based on the type of the edge.
@@ -123,7 +123,7 @@ The results of the queries are passed to the root nodes of the task directly.
 ### Windowing
 
 Windowing data is an important piece to creating pipelines.
-Windowing is concerned with how you can slice a data stream into multiple windows and is orthogonal to how batches are transfered.
+Windowing is concerned with how you can slice a data stream into multiple windows and is orthogonal to how batches are transferred.
 Kapacitor handles windowing explicitly, by allowing the user to define a WindowNode
 that has two parameters. First, the `period` is the length of the window in time.
 Second, the `every` property defines how often an window should be emitted into the stream.
@@ -158,4 +158,3 @@ Challenges with the current implementation:
 * Fragile, so far the smallest of changes to the way the system work almost always results in a deadlock, because of the order of processing data.
 * If data flow stops so does time. In many use cases this is exactly what you want, but in some cases you would still like the data in transit to be flushed out.
     As for monitoring the throughput of tasks this is possible out-of-band of the task so even if the task stop processing data you can still trigger an event in a different task.
-
