@@ -23,6 +23,7 @@ import (
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/opsgenie2"
 	"github.com/influxdata/kapacitor/services/pagerduty"
+	"github.com/influxdata/kapacitor/services/pagerduty2"
 	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/slack"
@@ -200,6 +201,19 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 	if len(n.PagerDutyHandlers) == 0 && (et.tm.PagerDutyService != nil && et.tm.PagerDutyService.Global()) {
 		c := pagerduty.HandlerConfig{}
 		h := et.tm.PagerDutyService.Handler(c, ctx...)
+		an.handlers = append(an.handlers, h)
+	}
+
+	for _, pd := range n.PagerDuty2Handlers {
+		c := pagerduty2.HandlerConfig{
+			ServiceKey: pd.ServiceKey,
+		}
+		h := et.tm.PagerDuty2Service.Handler(c, ctx...)
+		an.handlers = append(an.handlers, h)
+	}
+	if len(n.PagerDuty2Handlers) == 0 && (et.tm.PagerDuty2Service != nil && et.tm.PagerDuty2Service.Global()) {
+		c := pagerduty2.HandlerConfig{}
+		h := et.tm.PagerDuty2Service.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
 	}
 

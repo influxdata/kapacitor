@@ -28,6 +28,7 @@ import (
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/opsgenie2"
 	"github.com/influxdata/kapacitor/services/pagerduty"
+	"github.com/influxdata/kapacitor/services/pagerduty2"
 	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/sideload"
@@ -134,6 +135,10 @@ type TaskMaster struct {
 	PagerDutyService interface {
 		Global() bool
 		Handler(pagerduty.HandlerConfig, ...keyvalue.T) alert.Handler
+	}
+	PagerDuty2Service interface {
+		Global() bool
+		Handler(pagerduty2.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 	PushoverService interface {
 		Handler(pushover.HandlerConfig, ...keyvalue.T) alert.Handler
@@ -266,6 +271,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.OpsGenie2Service = tm.OpsGenie2Service
 	n.VictorOpsService = tm.VictorOpsService
 	n.PagerDutyService = tm.PagerDutyService
+	n.PagerDuty2Service = tm.PagerDuty2Service
 	n.PushoverService = tm.PushoverService
 	n.HTTPPostService = tm.HTTPPostService
 	n.SlackService = tm.SlackService

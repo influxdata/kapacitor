@@ -109,6 +109,11 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 			Dot("serviceKey", h.ServiceKey)
 	}
 
+	for _, h := range a.PagerDuty2Handlers {
+		n.Dot("pagerDuty2").
+			Dot("serviceKey", h.ServiceKey)
+	}
+
 	for _, h := range a.PushoverHandlers {
 		n.Dot("pushover").
 			Dot("userKey", h.UserKey).
