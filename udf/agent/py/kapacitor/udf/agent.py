@@ -2,11 +2,16 @@
 #
 # Requires protobuf v3
 #   pip install protobuf==3.0.0b2
+from __future__ import absolute_import
 
 import sys
-import udf_pb2
+from . import udf_pb2
 from threading import Lock, Thread
-from Queue import Queue
+try:
+    from queue import Queue
+except ImportError:
+    # Must be Python 2
+    from Queue import Queue
 import io
 import traceback
 import socket
