@@ -23,7 +23,7 @@ const (
 	UptimeVarName = "uptime"
 
 	// The name of the product
-	Product = "kapacitor"
+	Product = "kapacitor oss"
 )
 
 var (

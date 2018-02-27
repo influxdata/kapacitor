@@ -2329,6 +2329,7 @@ type DebugVars struct {
 	NumTasks         int                    `json:"num_tasks"`
 	Memstats         map[string]interface{} `json:"memstats"`
 	Version          string                 `json:"version"`
+	Product          string                 `json:"product"`
 }
 
 type Stat struct {
