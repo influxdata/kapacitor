@@ -24,6 +24,7 @@ import (
 	"github.com/influxdata/kapacitor/services/k8s"
 	"github.com/influxdata/kapacitor/services/mqtt"
 	"github.com/influxdata/kapacitor/services/opsgenie"
+	"github.com/influxdata/kapacitor/services/opsgenie2"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/sensu"
@@ -648,6 +649,22 @@ func (h *OpsGenieHandler) WithContext(ctx ...keyvalue.T) opsgenie.Diagnostic {
 	fields := logFieldsFromContext(ctx)
 
 	return &OpsGenieHandler{
+		l: h.l.With(fields...),
+	}
+}
+
+type OpsGenie2Handler struct {
+	l Logger
+}
+
+func (h *OpsGenie2Handler) Error(msg string, err error) {
+	h.l.Error(msg, Error(err))
+}
+
+func (h *OpsGenie2Handler) WithContext(ctx ...keyvalue.T) opsgenie2.Diagnostic {
+	fields := logFieldsFromContext(ctx)
+
+	return &OpsGenie2Handler{
 		l: h.l.With(fields...),
 	}
 }

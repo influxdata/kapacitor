@@ -72,6 +72,7 @@ func TestAlertNode_MarshalJSON(t *testing.T) {
     "hipChat": null,
     "alerta": null,
     "opsGenie": null,
+    "opsGenie2": null,
     "talk": null,
     "mqtt": null,
     "snmpTrap": null

@@ -26,6 +26,7 @@ import (
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
 	"github.com/influxdata/kapacitor/services/mqtt"
 	"github.com/influxdata/kapacitor/services/opsgenie"
+	"github.com/influxdata/kapacitor/services/opsgenie2"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/sensu"
@@ -121,6 +122,10 @@ type TaskMaster struct {
 	OpsGenieService interface {
 		Global() bool
 		Handler(opsgenie.HandlerConfig, ...keyvalue.T) alert.Handler
+	}
+	OpsGenie2Service interface {
+		Global() bool
+		Handler(opsgenie2.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 	VictorOpsService interface {
 		Global() bool
@@ -258,6 +263,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.SMTPService = tm.SMTPService
 	n.MQTTService = tm.MQTTService
 	n.OpsGenieService = tm.OpsGenieService
+	n.OpsGenie2Service = tm.OpsGenie2Service
 	n.VictorOpsService = tm.VictorOpsService
 	n.PagerDutyService = tm.PagerDutyService
 	n.PushoverService = tm.PushoverService

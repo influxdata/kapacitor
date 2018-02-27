@@ -1,0 +1,9 @@
+dbname
+rpname
+cpu,type=idle,host=serverA v=2 0000000001
+dbname
+rpname
+cpu,type=idle,host=serverA v=0 0000000002
+dbname
+rpname
+cpu,type=idle,host=serverA v=0 0000000003

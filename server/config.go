@@ -32,6 +32,7 @@ import (
 	"github.com/influxdata/kapacitor/services/mqtt"
 	"github.com/influxdata/kapacitor/services/nerve"
 	"github.com/influxdata/kapacitor/services/opsgenie"
+	"github.com/influxdata/kapacitor/services/opsgenie2"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/replay"
@@ -82,6 +83,7 @@ type Config struct {
 	HipChat   hipchat.Config   `toml:"hipchat" override:"hipchat"`
 	MQTT      mqtt.Configs     `toml:"mqtt" override:"mqtt,element-key=name"`
 	OpsGenie  opsgenie.Config  `toml:"opsgenie" override:"opsgenie"`
+	OpsGenie2 opsgenie2.Config `toml:"opsgenie2" override:"opsgenie2"`
 	PagerDuty pagerduty.Config `toml:"pagerduty" override:"pagerduty"`
 	Pushover  pushover.Config  `toml:"pushover" override:"pushover"`
 	HTTPPost  httppost.Configs `toml:"httppost" override:"httppost,element-key=endpoint"`
@@ -146,6 +148,7 @@ func NewConfig() *Config {
 	c.HipChat = hipchat.NewConfig()
 	c.MQTT = mqtt.Configs{mqtt.NewConfig()}
 	c.OpsGenie = opsgenie.NewConfig()
+	c.OpsGenie2 = opsgenie2.NewConfig()
 	c.PagerDuty = pagerduty.NewConfig()
 	c.Pushover = pushover.NewConfig()
 	c.HTTPPost = httppost.Configs{httppost.NewConfig()}
@@ -262,6 +265,9 @@ func (c *Config) Validate() error {
 	}
 	if err := c.OpsGenie.Validate(); err != nil {
 		return errors.Wrap(err, "opsgenie")
+	}
+	if err := c.OpsGenie2.Validate(); err != nil {
+		return errors.Wrap(err, "opsgenie2")
 	}
 	if err := c.PagerDuty.Validate(); err != nil {
 		return errors.Wrap(err, "pagerduty")
