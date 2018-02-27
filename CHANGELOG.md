@@ -5,7 +5,7 @@
 ### Bugfixes
 
 ### Features
-
+- [#1690](https://github.com/influxdata/kapacitor/issues/1690): Add https-private-key option to httpd config.
 
 ## v1.4.0 [2017-12-08]
 
