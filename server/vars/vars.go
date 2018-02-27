@@ -15,6 +15,7 @@ const (
 	HostVarName      = "host"
 	ProductVarName   = "product"
 	VersionVarName   = "version"
+	PlatformVarName  = "platform"
 
 	NumTasksVarName         = "num_tasks"
 	NumEnabledTasksVarName  = "num_enabled_tasks"
@@ -23,7 +24,8 @@ const (
 	UptimeVarName = "uptime"
 
 	// The name of the product
-	Product = "kapacitor oss"
+	Product  = "kapacitor"
+	Platform = "OSS"
 )
 
 var (
@@ -37,6 +39,7 @@ var (
 	HostVar      = &kexpvar.String{}
 	ProductVar   = &kexpvar.String{}
 	VersionVar   = &kexpvar.String{}
+	PlatformVar  = &kexpvar.String{}
 )
 
 var (
@@ -55,6 +58,7 @@ func init() {
 	expvar.Publish(HostVarName, HostVar)
 	expvar.Publish(ProductVarName, ProductVar)
 	expvar.Publish(VersionVarName, VersionVar)
+	expvar.Publish(PlatformVarName, PlatformVar)
 }
 
 func uptime() time.Duration {
@@ -91,6 +95,9 @@ func (info) Version() string {
 }
 func (info) Product() string {
 	return ProductVar.StringValue()
+}
+func (info) Platform() string {
+	return PlatformVar.StringValue()
 }
 
 func (info) NumTasks() int64 {

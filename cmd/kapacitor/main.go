@@ -2151,7 +2151,7 @@ func doStats(args []string) error {
 		fmt.Fprintf(os.Stdout, outFmtNum, "Tasks:", vars.NumTasks)
 		fmt.Fprintf(os.Stdout, outFmtNum, "Enabled Tasks:", vars.NumEnabledTasks)
 		fmt.Fprintf(os.Stdout, outFmtNum, "Subscriptions:", vars.NumSubscriptions)
-		fmt.Fprintf(os.Stdout, outFmtStr, "Product:", vars.Product)
+		fmt.Fprintf(os.Stdout, outFmtStr, "Platform:", vars.Platform)
 		fmt.Fprintf(os.Stdout, outFmtStr, "Version:", vars.Version)
 	case "ingress":
 		maxDB := 8  // len("Database")
@@ -2220,7 +2220,7 @@ func versionUsage() {
 }
 
 func doVersion(args []string) error {
-	fmt.Fprintf(os.Stdout, "Kapacitor oss %s (git: %s %s)\n", version, branch, commit)
+	fmt.Fprintf(os.Stdout, "Kapacitor OSS %s (git: %s %s)\n", version, branch, commit)
 	return nil
 }
 
