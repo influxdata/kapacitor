@@ -184,6 +184,7 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 	vars.ServerIDVar.Set(s.ServerID)
 	vars.HostVar.Set(s.hostname)
 	vars.ProductVar.Set(vars.Product)
+	vars.PlatformVar.Set(vars.Platform)
 	vars.VersionVar.Set(s.BuildInfo.Version)
 	s.Diag.Info("listing ClusterID and ServerID",
 		keyvalue.KV("cluster_id", s.ClusterID.String()), keyvalue.KV("server_id", s.ServerID.String()))

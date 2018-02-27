@@ -71,6 +71,7 @@ type Infoer interface {
 	Hostname() string
 	Version() string
 	Product() string
+	Platform() string
 	NumTasks() int64
 	NumEnabledTasks() int64
 	NumSubscriptions() int64
