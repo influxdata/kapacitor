@@ -24,8 +24,7 @@ const (
 	UptimeVarName = "uptime"
 
 	// The name of the product
-	Product  = "kapacitor"
-	Platform = "OSS"
+	Product = "kapacitor"
 )
 
 var (

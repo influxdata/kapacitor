@@ -77,6 +77,7 @@ func (m *Main) Run(args ...string) error {
 		cmd.Version = version
 		cmd.Commit = commit
 		cmd.Branch = branch
+		cmd.Platform = "OSS"
 
 		err := cmd.Run(args...)
 		// Use diagnostic from cmd since it may have special config now.
