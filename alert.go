@@ -725,13 +725,12 @@ func (n *AlertNode) event(
 			Level:    level,
 		},
 		Data: alert.EventData{
-			Name:        name,
-			TaskName:    n.et.Task.ID,
-			Group:       string(group),
-			Tags:        tags,
-			Fields:      fields,
-			Result:      result,
-			Recoverable: !n.a.NoRecoveriesFlag,
+			Name:     name,
+			TaskName: n.et.Task.ID,
+			Group:    string(group),
+			Tags:     tags,
+			Fields:   fields,
+			Result:   result,
 		},
 	}
 	return event, nil
