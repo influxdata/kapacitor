@@ -666,8 +666,8 @@ func doDefine(args []string) error {
 		defineFlags.Usage()
 		os.Exit(2)
 	}
-	defineFlags.Parse(args[1:])
-	id := args[0]
+	defineFlags.Parse(args)
+	id := defineFlags.Arg(0)
 
 	var script string
 	if *dtick != "" {
@@ -695,7 +695,7 @@ func doDefine(args []string) error {
 	if *dvars != "" {
 		f, err := os.Open(*dvars)
 		if err != nil {
-			return errors.Wrapf(err, "faild to open file %s", *dvars)
+			return errors.Wrapf(err, "failed to open file %s", *dvars)
 		}
 		defer f.Close()
 		dec := json.NewDecoder(f)
@@ -736,6 +736,9 @@ func doDefine(args []string) error {
 	if task.ID == "" {
 		if *dfile != "" {
 			o, err := fileVars.CreateTaskOptions()
+			if o.ID == "" {
+				o.ID = id
+			}
 			if err != nil {
 				return err
 			}
