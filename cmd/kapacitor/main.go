@@ -661,13 +661,14 @@ Options:
 }
 
 func doDefine(args []string) error {
-	if len(args) < 1 {
+	defineFlags.Parse(args)
+	id := defineFlags.Arg(0)
+
+	if id == "" {
 		fmt.Fprintln(os.Stderr, "Must provide a task ID.")
 		defineFlags.Usage()
 		os.Exit(2)
 	}
-	defineFlags.Parse(args)
-	id := defineFlags.Arg(0)
 
 	var script string
 	if *dtick != "" {
@@ -738,6 +739,8 @@ func doDefine(args []string) error {
 			o, err := fileVars.CreateTaskOptions()
 			if o.ID == "" {
 				o.ID = id
+			} else if o.ID != id {
+				return errors.New("Task id given on command line does not match id in " + *dfile)
 			}
 			if err != nil {
 				return err
