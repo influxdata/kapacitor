@@ -27,6 +27,7 @@ func (e Event) AlertData() Data {
 		Level:         e.State.Level,
 		Data:          e.Data.Result,
 		PreviousLevel: e.previousState.Level,
+		Recoverable:   e.Data.Recoverable,
 	}
 }
 
@@ -79,6 +80,8 @@ type EventData struct {
 
 	// Fields of alerting data point.
 	Fields map[string]interface{}
+
+	Recoverable bool
 
 	Result models.Result
 }
@@ -179,4 +182,5 @@ type Data struct {
 	Level         Level         `json:"level"`
 	Data          models.Result `json:"data"`
 	PreviousLevel Level         `json:"previousLevel"`
+	Recoverable   bool          `json:"recoverable"`
 }
