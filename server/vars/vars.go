@@ -15,6 +15,7 @@ const (
 	HostVarName      = "host"
 	ProductVarName   = "product"
 	VersionVarName   = "version"
+	PlatformVarName  = "platform"
 
 	NumTasksVarName         = "num_tasks"
 	NumEnabledTasksVarName  = "num_enabled_tasks"
@@ -37,6 +38,7 @@ var (
 	HostVar      = &kexpvar.String{}
 	ProductVar   = &kexpvar.String{}
 	VersionVar   = &kexpvar.String{}
+	PlatformVar  = &kexpvar.String{}
 )
 
 var (
@@ -55,6 +57,7 @@ func init() {
 	expvar.Publish(HostVarName, HostVar)
 	expvar.Publish(ProductVarName, ProductVar)
 	expvar.Publish(VersionVarName, VersionVar)
+	expvar.Publish(PlatformVarName, PlatformVar)
 }
 
 func uptime() time.Duration {
@@ -67,6 +70,7 @@ type Infoer interface {
 	Hostname() string
 	Version() string
 	Product() string
+	Platform() string
 	NumTasks() int64
 	NumEnabledTasks() int64
 	NumSubscriptions() int64
@@ -91,6 +95,9 @@ func (info) Version() string {
 }
 func (info) Product() string {
 	return ProductVar.StringValue()
+}
+func (info) Platform() string {
+	return PlatformVar.StringValue()
 }
 
 func (info) NumTasks() int64 {

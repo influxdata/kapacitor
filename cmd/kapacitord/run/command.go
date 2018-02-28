@@ -36,9 +36,10 @@ type Diagnostic interface {
 
 // Command represents the command executed by "kapacitord run".
 type Command struct {
-	Version string
-	Branch  string
-	Commit  string
+	Version  string
+	Branch   string
+	Commit   string
+	Platform string
 
 	closing chan struct{}
 	pidfile string
@@ -122,7 +123,7 @@ func (cmd *Command) Run(args ...string) error {
 	cmd.pidfile = options.PIDFile
 
 	// Create server from config and start it.
-	buildInfo := server.BuildInfo{Version: cmd.Version, Commit: cmd.Commit, Branch: cmd.Branch}
+	buildInfo := server.BuildInfo{Version: cmd.Version, Commit: cmd.Commit, Branch: cmd.Branch, Platform: cmd.Platform}
 	s, err := server.New(config, buildInfo, cmd.diagService)
 	if err != nil {
 		return fmt.Errorf("create server: %s", err)
