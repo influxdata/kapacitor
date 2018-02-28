@@ -661,14 +661,15 @@ Options:
 }
 
 func doDefine(args []string) error {
-	defineFlags.Parse(args)
-	id := defineFlags.Arg(0)
-
-	if id == "" {
+	// should be getting 1 task ID and 0 or more pairs of flags
+	if len(args)%2 == 0 {
 		fmt.Fprintln(os.Stderr, "Must provide a task ID.")
 		defineFlags.Usage()
 		os.Exit(2)
 	}
+
+	defineFlags.Parse(args[1:])
+	id := args[0]
 
 	var script string
 	if *dtick != "" {
