@@ -22,6 +22,7 @@ type Config struct {
 	PprofEnabled     bool          `toml:"pprof-enabled"`
 	HttpsEnabled     bool          `toml:"https-enabled"`
 	HttpsCertificate string        `toml:"https-certificate"`
+	HTTPSPrivateKey  string        `toml:"https-private-key"`
 	ShutdownTimeout  toml.Duration `toml:"shutdown-timeout"`
 	SharedSecret     string        `toml:"shared-secret"`
 
