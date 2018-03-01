@@ -121,7 +121,7 @@ func (n *InfluxDBOutNode) UnmarshalJSON(data []byte) error {
 }
 
 // Add a static tag to all data points.
-// Tag can be called more than once.
+// Tag can be called more then once.
 //
 // tick:property
 func (i *InfluxDBOutNode) Tag(key, value string) *InfluxDBOutNode {
@@ -131,7 +131,7 @@ func (i *InfluxDBOutNode) Tag(key, value string) *InfluxDBOutNode {
 
 // Create indicates that both the database and retention policy
 // will be created, when the task is started.
-// If the retention policy name is empty than no
+// If the retention policy name is empty then no
 // retention policy will be specified and
 // the default retention policy name will be created.
 //
