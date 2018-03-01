@@ -3,6 +3,7 @@
 ## v1.5.0 [unreleased]
 
 ### Bugfixes
+- [#1794](https://github.com/influxdata/kapacitor/issues/1794): Kapacitor ticks generating a hash instead of their actual given name.
 
 ### Features
 
