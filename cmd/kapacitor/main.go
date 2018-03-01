@@ -771,6 +771,13 @@ func doDefine(args []string) error {
 			if err != nil {
 				return err
 			}
+
+			if o.ID == "" {
+				o.ID = id
+			} else if o.ID != id {
+				return errors.New("Task id given on command line does not match id in " + *dfile)
+			}
+
 			_, err = cli.UpdateTask(
 				l,
 				o,
