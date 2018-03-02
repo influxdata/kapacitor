@@ -12,27 +12,23 @@ func TestFrom(t *testing.T) {
 	from.Where(&ast.LambdaNode{
 		Expression: &ast.BinaryNode{
 			Operator: ast.TokenAnd,
-			Left: &ast.LambdaNode{
-				Expression: &ast.BinaryNode{
-					Left: &ast.ReferenceNode{
-						Reference: "cpu",
-					},
-					Right: &ast.StringNode{
-						Literal: "cpu-total",
-					},
-					Operator: ast.TokenNotEqual,
+			Left: &ast.BinaryNode{
+				Left: &ast.ReferenceNode{
+					Reference: "cpu",
 				},
+				Right: &ast.StringNode{
+					Literal: "cpu-total",
+				},
+				Operator: ast.TokenNotEqual,
 			},
-			Right: &ast.LambdaNode{
-				Expression: &ast.BinaryNode{
-					Left: &ast.ReferenceNode{
-						Reference: "host",
-					},
-					Right: &ast.RegexNode{
-						Literal: `logger\d+`,
-					},
-					Operator: ast.TokenRegexEqual,
+			Right: &ast.BinaryNode{
+				Left: &ast.ReferenceNode{
+					Reference: "host",
 				},
+				Right: &ast.RegexNode{
+					Literal: `logger\d+`,
+				},
+				Operator: ast.TokenRegexEqual,
 			},
 		},
 	})
@@ -51,7 +47,7 @@ func TestFrom(t *testing.T) {
         .groupByMeasurement()
         .round(1s)
         .truncate(1s)
-        .where(lambda: lambda: "cpu" != 'cpu-total' AND lambda: "host" =~ /logger\d+/)
+        .where(lambda: "cpu" != 'cpu-total' AND "host" =~ /logger\d+/)
         .groupBy('this', 'that', 'these', 'those')
 `
 	PipelineTickTestHelper(t, pipe, want)

@@ -1,6 +1,8 @@
 package tick
 
 import (
+	"strings"
+
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick/ast"
 )
@@ -22,10 +24,18 @@ func NewInfluxQL(parents []ast.Node) *InfluxQLNode {
 // Build creates a InfluxQLNode ast.Node
 func (n *InfluxQLNode) Build(q *pipeline.InfluxQLNode) (ast.Node, error) {
 	args := []interface{}{}
-	if q.Field != "" {
-		args = append(args, q.Field)
+	if strings.ToLower(q.Method) == "bottom" || strings.ToLower(q.Method) == "top" {
+		if len(q.Args) > 0 {
+			args = append(args, q.Args[0])
+			args = append(args, q.Field)
+			args = append(args, q.Args[1:]...)
+		}
+	} else {
+		if q.Field != "" {
+			args = append(args, q.Field)
+		}
+		args = append(args, q.Args...)
 	}
-	args = append(args, q.Args...)
 	n.Pipe(q.Method, args...).
 		Dot("as", q.As).
 		DotIf("usePointTimes", q.PointTimes)

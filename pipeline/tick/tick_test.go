@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"go/importer"
 	"go/types"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/pipeline/tick"
+	"github.com/influxdata/kapacitor/tick/stateful"
 )
 
 // TestPipelineImplemented checks if all nodes in the pipeline package
@@ -105,7 +108,7 @@ func PipelineTick(pipe *pipeline.Pipeline) (string, error) {
 	return buf.String(), nil
 }
 
-func PipelineTickTestHelper(t *testing.T, pipe *pipeline.Pipeline, want string) {
+func PipelineTickTestHelper(t *testing.T, pipe *pipeline.Pipeline, want string, udfs ...*pipeline.UDFNode) {
 	t.Helper() //mark test as helper so its excluded from the test stack trace.
 	got, err := PipelineTick(pipe)
 	if err != nil {
@@ -116,4 +119,35 @@ func PipelineTickTestHelper(t *testing.T, pipe *pipeline.Pipeline, want string) 
 		t.Errorf("unexpected TICKscript:\ngot:\n%v\nwant:\n%v\n", got, want)
 		t.Log(got) // print is helpful to get the correct format.
 	}
+
+	d := deadman{}
+	edge := pipeline.StreamEdge
+	if strings.Contains(got, "batch") {
+		edge = pipeline.BatchEdge
+	}
+	scope := stateful.NewScope()
+	for _, udf := range udfs {
+		scope.SetDynamicMethod(udf.UDFName, func(self interface{}, args ...interface{}) (interface{}, error) {
+			return udf, nil
+		})
+	}
+
+	_, err = pipeline.CreatePipeline(got, edge, scope, d, nil)
+	if err != nil {
+		t.Errorf("TICKscript not able to be parsed %v", err)
+	}
 }
+
+type deadman struct {
+	interval  time.Duration
+	threshold float64
+	id        string
+	message   string
+	global    bool
+}
+
+func (d deadman) Interval() time.Duration { return d.interval }
+func (d deadman) Threshold() float64      { return d.threshold }
+func (d deadman) Id() string              { return d.id }
+func (d deadman) Message() string         { return d.message }
+func (d deadman) Global() bool            { return d.global }

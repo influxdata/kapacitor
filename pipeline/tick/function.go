@@ -105,6 +105,23 @@ func (f *Function) DotZeroValueOK(name string, args ...interface{}) *Function {
 	return f
 }
 
+// DotRemoveZeroValue produces an ast.FunctionNode within a Dot Chain.
+// Assumes a previous node has been created. Remove all zero argument values from func.
+func (f *Function) DotRemoveZeroValue(name string, args ...interface{}) *Function {
+	if f.err != nil {
+		return f
+	}
+
+	fn, err := FuncRemoveZero(name, args...)
+	if err != nil {
+		f.err = err
+		return f
+	}
+
+	f.prev = Dot(f.prev, fn)
+	return f
+}
+
 // DotIf produces an ast.FunctionNode within a Dot Chain if use is true
 // Assumes a previous node has been created.
 func (f *Function) DotIf(name string, use bool) *Function {
@@ -240,6 +257,34 @@ func FuncWithZero(name string, args ...interface{}) (ast.Node, error) {
 
 	astArgs := []ast.Node{}
 	for _, arg := range args {
+		lit, err := Literal(arg)
+		if err != nil {
+			return nil, err
+		}
+		astArgs = append(astArgs, lit)
+	}
+
+	return &ast.FunctionNode{
+		Func: name,
+		Args: astArgs,
+	}, nil
+}
+
+// FuncRemoveZero produces an ast.FunctionNode.
+// All function arguments that evaluate to the zero value are removed from func.
+func FuncRemoveZero(name string, args ...interface{}) (ast.Node, error) {
+	if len(args) == 0 {
+		return &ast.FunctionNode{
+			Func: name,
+		}, nil
+	}
+
+	astArgs := []ast.Node{}
+	for _, arg := range args {
+		// Skip zero values as they don't need to be rendered
+		if IsZero(arg) {
+			continue
+		}
 		lit, err := Literal(arg)
 		if err != nil {
 			return nil, err

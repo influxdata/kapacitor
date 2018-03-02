@@ -9,7 +9,35 @@ import (
 
 func TestUDF(t *testing.T) {
 	pipe, _, from := StreamFrom()
-	udf := pipeline.NewUDF(from, "delorean", agent.EdgeType_STREAM, agent.EdgeType_STREAM, nil)
+	options := map[string]*agent.OptionInfo{
+		"mph": &agent.OptionInfo{
+			ValueTypes: []agent.ValueType{
+				agent.ValueType_INT,
+			},
+		},
+		"gigawatts": &agent.OptionInfo{
+			ValueTypes: []agent.ValueType{
+				agent.ValueType_DOUBLE,
+			},
+		},
+		"nearClockTower": &agent.OptionInfo{
+			ValueTypes: []agent.ValueType{
+				agent.ValueType_BOOL,
+			},
+		},
+		"martySays": &agent.OptionInfo{
+			ValueTypes: []agent.ValueType{
+				agent.ValueType_STRING,
+			},
+		},
+		"future": &agent.OptionInfo{
+			ValueTypes: []agent.ValueType{
+				agent.ValueType_DURATION,
+				agent.ValueType_STRING,
+			},
+		},
+	}
+	udf := pipeline.NewUDF(from, "delorean", agent.EdgeType_STREAM, agent.EdgeType_STREAM, options)
 	udf.Options = []*agent.Option{
 		{
 			Name: "mph",
@@ -83,5 +111,5 @@ func TestUDF(t *testing.T) {
         .martySays('Doc!')
         .future(15778476m, 'years')
 `
-	PipelineTickTestHelper(t, pipe, want)
+	PipelineTickTestHelper(t, pipe, want, udf)
 }

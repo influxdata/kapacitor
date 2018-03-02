@@ -114,6 +114,49 @@ func TestAlertHTTPPost(t *testing.T) {
 `
 	PipelineTickTestHelper(t, pipe, want)
 }
+
+func TestAlertHTTPPostMultipleHeaders(t *testing.T) {
+	pipe, _, from := StreamFrom()
+	handler := from.Alert().Post("")
+	handler.Endpoint = "CIA"
+	handler.Header("publisher", "Sinneslöschen")
+	handler.Header("howdy", "doody")
+	handler.CaptureResponseFlag = true
+	handler.Timeout = 10 * time.Second
+
+	want := `stream
+    |from()
+    |alert()
+        .id('{{ .Name }}:{{ .Group }}')
+        .message('{{ .ID }} is {{ .Level }}')
+        .details('{{ json . }}')
+        .history(21)
+        .post()
+        .endpoint('CIA')
+        .captureResponse()
+        .timeout(10s)
+        .header('howdy', 'doody')
+        .header('publisher', 'Sinneslöschen')
+`
+	PipelineTickTestHelper(t, pipe, want)
+}
+
+func TestAlertHTTPPostEmptyURL(t *testing.T) {
+	pipe, _, from := StreamFrom()
+	from.Alert().Post("")
+
+	want := `stream
+    |from()
+    |alert()
+        .id('{{ .Name }}:{{ .Group }}')
+        .message('{{ .ID }} is {{ .Level }}')
+        .details('{{ json . }}')
+        .history(21)
+        .post()
+`
+	PipelineTickTestHelper(t, pipe, want)
+}
+
 func TestAlertTCP(t *testing.T) {
 	pipe, _, from := StreamFrom()
 	from.Alert().Tcp("echo:7")
@@ -129,6 +172,7 @@ func TestAlertTCP(t *testing.T) {
 `
 	PipelineTickTestHelper(t, pipe, want)
 }
+
 func TestAlertTCPJSON(t *testing.T) {
 	pipe, _, from := StreamFrom()
 	j := `
@@ -282,8 +326,8 @@ func TestAlertPushover(t *testing.T) {
         .userKey('mother')
         .device('LTX-71')
         .title('Faked Apollo Moon Landings')
-        .url('http://playtronics.com')
-        .urlTitle('Cosmo\'s Office')
+        .uRL('http://playtronics.com')
+        .uRLTitle('Cosmo\'s Office')
         .sound('click')
 `
 	PipelineTickTestHelper(t, pipe, want)
@@ -458,11 +502,31 @@ func TestAlertMQTT(t *testing.T) {
         .message('{{ .ID }} is {{ .Level }}')
         .details('{{ json . }}')
         .history(21)
-        .mqtt()
+        .mqtt('mattel')
         .brokerName('toy \'r us')
-        .topic('mattel')
         .qos(1)
-        .retained()
+        .retained(TRUE)
+`
+	PipelineTickTestHelper(t, pipe, want)
+}
+
+func TestAlertMQTTNotRetained(t *testing.T) {
+	pipe, _, from := StreamFrom()
+	handler := from.Alert().Mqtt("mattel")
+	handler.BrokerName = "toy 'r us"
+	handler.Qos = 1
+	handler.Retained = false
+
+	want := `stream
+    |from()
+    |alert()
+        .id('{{ .Name }}:{{ .Group }}')
+        .message('{{ .ID }} is {{ .Level }}')
+        .details('{{ json . }}')
+        .history(21)
+        .mqtt('mattel')
+        .brokerName('toy \'r us')
+        .qos(1)
 `
 	PipelineTickTestHelper(t, pipe, want)
 }
@@ -470,8 +534,8 @@ func TestAlertMQTT(t *testing.T) {
 func TestAlertSNMP(t *testing.T) {
 	pipe, _, from := StreamFrom()
 	handler := from.Alert().SnmpTrap("trap")
-	handler.Data("Petrov's Defence", "opening trap", "Marshall Trap")
-	handler.Data("Queen's Gambit Declined", "opening trap", "Rubinstein Trap")
+	handler.Data("Petrov's Defence", "t", "Marshall Trap")
+	handler.Data("Queen's Gambit Declined", "t", "Rubinstein Trap")
 
 	want := `stream
     |from()
@@ -481,8 +545,8 @@ func TestAlertSNMP(t *testing.T) {
         .details('{{ json . }}')
         .history(21)
         .snmpTrap('trap')
-        .data('Petrov\'s Defence', 'opening trap', 'Marshall Trap')
-        .data('Queen\'s Gambit Declined', 'opening trap', 'Rubinstein Trap')
+        .data('Petrov\'s Defence', 't', 'Marshall Trap')
+        .data('Queen\'s Gambit Declined', 't', 'Rubinstein Trap')
 `
 	PipelineTickTestHelper(t, pipe, want)
 }
