@@ -21,6 +21,7 @@ import (
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/mqtt"
 	"github.com/influxdata/kapacitor/services/opsgenie"
+	"github.com/influxdata/kapacitor/services/opsgenie2"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/sensu"
@@ -377,6 +378,19 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 	if len(n.OpsGenieHandlers) == 0 && (et.tm.OpsGenieService != nil && et.tm.OpsGenieService.Global()) {
 		c := opsgenie.HandlerConfig{}
 		h := et.tm.OpsGenieService.Handler(c, ctx...)
+		an.handlers = append(an.handlers, h)
+	}
+	for _, og := range n.OpsGenie2Handlers {
+		c := opsgenie2.HandlerConfig{
+			TeamsList:      og.TeamsList,
+			RecipientsList: og.RecipientsList,
+		}
+		h := et.tm.OpsGenie2Service.Handler(c, ctx...)
+		an.handlers = append(an.handlers, h)
+	}
+	if len(n.OpsGenie2Handlers) == 0 && (et.tm.OpsGenie2Service != nil && et.tm.OpsGenie2Service.Global()) {
+		c := opsgenie2.HandlerConfig{}
+		h := et.tm.OpsGenie2Service.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
 	}
 

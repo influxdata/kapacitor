@@ -200,6 +200,7 @@ func TestAlertTCPJSON(t *testing.T) {
         "hipChat": null,
         "alerta": null,
         "opsGenie": null,
+        "opsGenie2": null,
         "talk": null
     }`
 	node := from.Alert()
@@ -466,6 +467,26 @@ func TestAlertOpsGenie(t *testing.T) {
         .details('{{ json . }}')
         .history(21)
         .opsGenie()
+        .teams('radiant', 'dire')
+        .recipients('huskar', 'dazzle', 'nature\'s prophet', 'faceless void', 'bounty hunter')
+`
+	PipelineTickTestHelper(t, pipe, want)
+}
+
+func TestAlertOpsGenie2(t *testing.T) {
+	pipe, _, from := StreamFrom()
+	handler := from.Alert().OpsGenie2()
+	handler.Teams("radiant", "dire")
+	handler.Recipients("huskar", "dazzle", "nature's prophet", "faceless void", "bounty hunter")
+
+	want := `stream
+    |from()
+    |alert()
+        .id('{{ .Name }}:{{ .Group }}')
+        .message('{{ .ID }} is {{ .Level }}')
+        .details('{{ json . }}')
+        .history(21)
+        .opsGenie2()
         .teams('radiant', 'dire')
         .recipients('huskar', 'dazzle', 'nature\'s prophet', 'faceless void', 'bounty hunter')
 `

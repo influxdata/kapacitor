@@ -2,10 +2,16 @@
 
 ## v1.5.0 [unreleased]
 
+### Features
+
+- [#1823](https://github.com/influxdata/kapacitor/pull/1823): Update OpsGenie integration to use the v2 API.
+    To upgrade to using the new API simply update your config and TICKscripts to use opsgenie2 instead of opsgenie.
+    If your `opsgenie` config uses the `recovery_url` option, for `opsgenie2` you will need to change it to the `recovery_action` option.
+    This is because the new v2 API is not structured with static URLs, and so only the action can be defined and not the entire URL.
+- [#1690](https://github.com/influxdata/kapacitor/issues/1690): Add https-private-key option to httpd config.
+
 ### Bugfixes
 
-### Features
-- [#1690](https://github.com/influxdata/kapacitor/issues/1690): Add https-private-key option to httpd config.
 
 ## v1.4.0 [2017-12-08]
 

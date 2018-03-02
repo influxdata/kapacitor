@@ -164,6 +164,11 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 			Dot("teams", args(h.TeamsList)...).
 			Dot("recipients", args(h.RecipientsList)...)
 	}
+	for _, h := range a.OpsGenie2Handlers {
+		n.Dot("opsGenie2").
+			Dot("teams", args(h.TeamsList)...).
+			Dot("recipients", args(h.RecipientsList)...)
+	}
 
 	for _ = range a.TalkHandlers {
 		n.Dot("talk")

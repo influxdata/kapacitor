@@ -219,6 +219,11 @@ func (s *Service) NewOpsGenieHandler() *OpsGenieHandler {
 		l: s.Logger.With(String("service", "opsgenie")),
 	}
 }
+func (s *Service) NewOpsGenie2Handler() *OpsGenie2Handler {
+	return &OpsGenie2Handler{
+		l: s.Logger.With(String("service", "opsgenie2")),
+	}
+}
 
 func (s *Service) NewPushoverHandler() *PushoverHandler {
 	return &PushoverHandler{

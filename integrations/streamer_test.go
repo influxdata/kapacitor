@@ -24,6 +24,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/docker/api/types/swarm"
+	"github.com/google/go-cmp/cmp"
 	"github.com/influxdata/influxdb/client"
 	imodels "github.com/influxdata/influxdb/models"
 	"github.com/influxdata/kapacitor"
@@ -47,6 +48,8 @@ import (
 	"github.com/influxdata/kapacitor/services/k8s/k8stest"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/opsgenie/opsgenietest"
+	"github.com/influxdata/kapacitor/services/opsgenie2"
+	"github.com/influxdata/kapacitor/services/opsgenie2/opsgenie2test"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pagerduty/pagerdutytest"
 	"github.com/influxdata/kapacitor/services/pushover"
@@ -8809,6 +8812,7 @@ stream
 		t.Error(err)
 	}
 }
+
 func TestStream_AlertOpsGenie(t *testing.T) {
 	ts := opsgenietest.NewServer()
 	defer ts.Close()
@@ -8891,7 +8895,173 @@ stream
 	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
 		t.Error(err)
 	}
+}
 
+func TestStream_AlertOpsGenie2(t *testing.T) {
+	ts := opsgenie2test.NewServer()
+	defer ts.Close()
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.opsGenie2()
+			.teams('test_team', 'another_team')
+			.recipients('test_recipient', 'another_recipient')
+		.opsGenie2()
+			.teams('test_team2' )
+			.recipients('test_recipient2', 'another_recipient')
+`
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := opsgenie2.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL
+		c.APIKey = "api_key"
+		og := opsgenie2.NewService(c, diagService.NewOpsGenie2Handler())
+		tm.OpsGenie2Service = og
+	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	exp := []interface{}{
+		opsgenie2test.Request{
+			URL:           "/",
+			Authorization: "GenieKey api_key",
+			PostData: opsgenie2test.PostData{
+				Message:  "kapacitor/cpu/serverA is CRITICAL",
+				Entity:   "kapacitor/cpu/serverA",
+				Alias:    "a2FwYWNpdG9yL2NwdS9zZXJ2ZXJB",
+				Note:     "",
+				Priority: "P1",
+				Details: map[string]string{
+					"Level":               "CRITICAL",
+					"Monitoring Tool":     "Kapacitor",
+					"Kapacitor Task Name": "cpu",
+					"host":                "serverA",
+				},
+				Description: `{"series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}]}`,
+				Responders: []map[string]string{
+					{"name": "test_team", "type": "team"},
+					{"name": "another_team", "type": "team"},
+					{"username": "test_recipient", "type": "user"},
+					{"username": "another_recipient", "type": "user"},
+				},
+			},
+		},
+		opsgenie2test.Request{
+			URL:           "/",
+			Authorization: "GenieKey api_key",
+			PostData: opsgenie2test.PostData{
+				Message:  "kapacitor/cpu/serverA is CRITICAL",
+				Entity:   "kapacitor/cpu/serverA",
+				Alias:    "a2FwYWNpdG9yL2NwdS9zZXJ2ZXJB",
+				Note:     "",
+				Priority: "P1",
+				Details: map[string]string{
+					"Level":               "CRITICAL",
+					"Monitoring Tool":     "Kapacitor",
+					"Kapacitor Task Name": "cpu",
+					"host":                "serverA",
+				},
+				Description: `{"series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}]}`,
+				Responders: []map[string]string{
+					{"name": "test_team2", "type": "team"},
+					{"username": "test_recipient2", "type": "user"},
+					{"username": "another_recipient", "type": "user"},
+				},
+			},
+		},
+	}
+
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Requests() {
+		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestStream_AlertOpsGenie2_Recovery(t *testing.T) {
+	ts := opsgenie2test.NewServer()
+	defer ts.Close()
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.crit(lambda: "v" > 1.0)
+		.opsGenie2()
+			.teams('test_team')
+`
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := opsgenie2.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL
+		c.RecoveryAction = "notes"
+		c.APIKey = "api_key"
+		og := opsgenie2.NewService(c, diagService.NewOpsGenie2Handler())
+		tm.OpsGenie2Service = og
+	}
+	testStreamerNoOutput(t, "TestStream_AlertRecovery", script, 4*time.Second, tmInit)
+
+	exp := []interface{}{
+		opsgenie2test.Request{
+			URL:           "/",
+			Authorization: "GenieKey api_key",
+			PostData: opsgenie2test.PostData{
+				Message:  "kapacitor/cpu/serverA is CRITICAL",
+				Entity:   "kapacitor/cpu/serverA",
+				Alias:    "a2FwYWNpdG9yL2NwdS9zZXJ2ZXJB",
+				Note:     "",
+				Priority: "P1",
+				Details: map[string]string{
+					"Level":               "CRITICAL",
+					"Monitoring Tool":     "Kapacitor",
+					"Kapacitor Task Name": "cpu",
+					"host":                "serverA",
+					"type":                "idle",
+				},
+				Description: `{"series":[{"name":"cpu","tags":{"host":"serverA","type":"idle"},"columns":["time","v"],"values":[["1971-01-01T00:00:00Z",2]]}]}`,
+				Responders: []map[string]string{
+					{"name": "test_team", "type": "team"},
+				},
+			},
+		},
+		opsgenie2test.Request{
+			URL:           "/a2FwYWNpdG9yL2NwdS9zZXJ2ZXJB/notes?identifierType=alias",
+			Authorization: "GenieKey api_key",
+			PostData: opsgenie2test.PostData{
+				Note: "kapacitor/cpu/serverA is OK",
+			},
+		},
+	}
+
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Requests() {
+		got = append(got, g)
+	}
+
+	if !cmp.Equal(got, exp) {
+		t.Errorf("unexpected OpsGenie2 requests -got/+want%s", cmp.Diff(got, exp))
+	}
 }
 
 func TestStream_AlertPagerDuty(t *testing.T) {

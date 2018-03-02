@@ -43,6 +43,7 @@ import (
 	"github.com/influxdata/kapacitor/services/mqtt/mqtttest"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/opsgenie/opsgenietest"
+	"github.com/influxdata/kapacitor/services/opsgenie2/opsgenie2test"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pagerduty/pagerdutytest"
 	"github.com/influxdata/kapacitor/services/pushover/pushovertest"
@@ -7136,6 +7137,90 @@ func TestServer_UpdateConfig(t *testing.T) {
 			},
 		},
 		{
+			section: "opsgenie2",
+			setDefaults: func(c *server.Config) {
+				c.OpsGenie2.URL = "http://opsgenie2.example.com"
+				c.OpsGenie2.RecoveryAction = "notes"
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/opsgenie2"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/opsgenie2/"},
+					Options: map[string]interface{}{
+						"api-key":         false,
+						"enabled":         false,
+						"global":          false,
+						"recipients":      nil,
+						"teams":           nil,
+						"url":             "http://opsgenie2.example.com",
+						"recovery_action": "notes",
+					},
+					Redacted: []string{
+						"api-key",
+					},
+				}},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/opsgenie2/"},
+				Options: map[string]interface{}{
+					"api-key":         false,
+					"enabled":         false,
+					"global":          false,
+					"recipients":      nil,
+					"teams":           nil,
+					"url":             "http://opsgenie2.example.com",
+					"recovery_action": "notes",
+				},
+				Redacted: []string{
+					"api-key",
+				},
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"api-key": "token",
+							"global":  true,
+							"teams":   []string{"teamA", "teamB"},
+						},
+					},
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/opsgenie2"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/opsgenie2/"},
+							Options: map[string]interface{}{
+								"api-key":         true,
+								"enabled":         false,
+								"global":          true,
+								"recipients":      nil,
+								"teams":           []interface{}{"teamA", "teamB"},
+								"url":             "http://opsgenie2.example.com",
+								"recovery_action": "notes",
+							},
+							Redacted: []string{
+								"api-key",
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/opsgenie2/"},
+						Options: map[string]interface{}{
+							"api-key":         true,
+							"enabled":         false,
+							"global":          true,
+							"recipients":      nil,
+							"teams":           []interface{}{"teamA", "teamB"},
+							"url":             "http://opsgenie2.example.com",
+							"recovery_action": "notes",
+						},
+						Redacted: []string{
+							"api-key",
+						},
+					},
+				},
+			},
+		},
+		{
 			section: "pagerduty",
 			setDefaults: func(c *server.Config) {
 				c.PagerDuty.ServiceKey = "secret"
@@ -8105,6 +8190,17 @@ func TestServer_ListServiceTests(t *testing.T) {
 				},
 			},
 			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/opsgenie2"},
+				Name: "opsgenie2",
+				Options: client.ServiceTestOptions{
+					"teams":        nil,
+					"recipients":   nil,
+					"message-type": "CRITICAL",
+					"message":      "test opsgenie message",
+					"entity-id":    "testEntityID",
+				},
+			},
+			{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/pagerduty"},
 				Name: "pagerduty",
 				Options: client.ServiceTestOptions{
@@ -8435,6 +8531,14 @@ func TestServer_DoServiceTest(t *testing.T) {
 			exp: client.ServiceTestResult{
 				Success: false,
 				Message: "service is not enabled",
+			},
+		},
+		{
+			service: "opsgenie2",
+			options: client.ServiceTestOptions{},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "failed to prepare API request: service is not enabled",
 			},
 		},
 		{
@@ -8945,6 +9049,57 @@ func TestServer_AlertHandlers(t *testing.T) {
 				}}
 				if !reflect.DeepEqual(exp, got) {
 					return fmt.Errorf("unexpected opsgenie request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handler: client.TopicHandler{
+				Kind: "opsgenie2",
+				Options: map[string]interface{}{
+					"teams-list":      []string{"A team", "B team"},
+					"recipients-list": []string{"test_recipient1", "test_recipient2"},
+				},
+			},
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
+				ts := opsgenie2test.NewServer()
+				ctxt := context.WithValue(nil, "server", ts)
+
+				c.OpsGenie2.Enabled = true
+				c.OpsGenie2.URL = ts.URL
+				c.OpsGenie2.RecoveryAction = "notes"
+				c.OpsGenie2.APIKey = "api_key"
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*opsgenie2test.Server)
+				ts.Close()
+				got := ts.Requests()
+				exp := []opsgenie2test.Request{{
+					URL:           "/",
+					Authorization: "GenieKey api_key",
+					PostData: opsgenie2test.PostData{
+						Message:  "message",
+						Entity:   "id",
+						Alias:    "aWQ=",
+						Note:     "",
+						Priority: "P1",
+						Details: map[string]string{
+							"Level":               "CRITICAL",
+							"Monitoring Tool":     "Kapacitor",
+							"Kapacitor Task Name": "alert",
+						},
+						Description: resultJSON,
+						Responders: []map[string]string{
+							{"name": "A team", "type": "team"},
+							{"name": "B team", "type": "team"},
+							{"username": "test_recipient1", "type": "user"},
+							{"username": "test_recipient2", "type": "user"},
+						},
+					},
+				}}
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected opsgenie2 request:\nexp\n%+v\ngot\n%+v\n", exp, got)
 				}
 				return nil
 			},

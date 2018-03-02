@@ -353,6 +353,10 @@ type AlertNodeData struct {
 	// tick:ignore
 	OpsGenieHandlers []*OpsGenieHandler `tick:"OpsGenie" json:"opsGenie"`
 
+	// Send alert to OpsGenie using v2 API
+	// tick:ignore
+	OpsGenie2Handlers []*OpsGenie2Handler `tick:"OpsGenie2" json:"opsGenie2"`
+
 	// Send alert to Talk.
 	// tick:ignore
 	TalkHandlers []*TalkHandler `tick:"Talk" json:"talk"`
@@ -1482,6 +1486,87 @@ func (og *OpsGenieHandler) Teams(teams ...string) *OpsGenieHandler {
 // The list of recipients to be alerted. If empty defaults to the recipients from the configuration.
 // tick:property
 func (og *OpsGenieHandler) Recipients(recipients ...string) *OpsGenieHandler {
+	og.RecipientsList = recipients
+	return og
+}
+
+// Send alert to OpsGenie using the v2 API.
+// To use OpsGenie2 alerting you must first enable the 'Alert Ingestion API'
+// in the 'Integrations' section of OpsGenie2.
+// Then place the API key from the URL into the 'opsgenie2' section of the Kapacitor configuration.
+//
+// Example:
+//    [opsgenie2]
+//      enabled = true
+//      api-key = "xxxxx"
+//      teams = ["everyone"]
+//      recipients = ["jim", "bob"]
+//
+// With the correct configuration you can now use OpsGenie2 in TICKscripts.
+//
+// Example:
+//    stream
+//         |alert()
+//             .opsGenie()
+//
+// Send alerts to OpsGenie2 using the teams and recipients in the configuration file.
+//
+// Example:
+//    stream
+//         |alert()
+//             .opsGenie()
+//             .teams('team_rocket','team_test')
+//
+// Send alerts to OpsGenie2 with team set to 'team_rocket' and 'team_test'
+//
+// If the 'opsgenie2' section in the configuration has the option: global = true
+// then all alerts are sent to OpsGenie2 without the need to explicitly state it
+// in the TICKscript.
+//
+// Example:
+//    [opsgenie2]
+//      enabled = true
+//      api-key = "xxxxx"
+//      recipients = ["johndoe"]
+//      global = true
+//
+// Example:
+//    stream
+//         |alert()
+//
+// Send alert to OpsGenie2 using the default recipients, found in the configuration.
+// tick:property
+func (n *AlertNodeData) OpsGenie2() *OpsGenie2Handler {
+	og := &OpsGenie2Handler{
+		AlertNodeData: n,
+	}
+	n.OpsGenie2Handlers = append(n.OpsGenie2Handlers, og)
+	return og
+}
+
+// tick:embedded:AlertNode.OpsGenie2
+type OpsGenie2Handler struct {
+	*AlertNodeData `json:"-"`
+
+	// OpsGenie2 Teams.
+	// tick:ignore
+	TeamsList []string `tick:"Teams" json:"teams"`
+
+	// OpsGenie2 Recipients.
+	// tick:ignore
+	RecipientsList []string `tick:"Recipients" json:"recipients"`
+}
+
+// The list of teams to be alerted. If empty defaults to the teams from the configuration.
+// tick:property
+func (og *OpsGenie2Handler) Teams(teams ...string) *OpsGenie2Handler {
+	og.TeamsList = teams
+	return og
+}
+
+// The list of recipients to be alerted. If empty defaults to the recipients from the configuration.
+// tick:property
+func (og *OpsGenie2Handler) Recipients(recipients ...string) *OpsGenie2Handler {
 	og.RecipientsList = recipients
 	return og
 }

@@ -43,6 +43,7 @@ import (
 	"github.com/influxdata/kapacitor/services/nerve"
 	"github.com/influxdata/kapacitor/services/noauth"
 	"github.com/influxdata/kapacitor/services/opsgenie"
+	"github.com/influxdata/kapacitor/services/opsgenie2"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/replay"
@@ -231,6 +232,7 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 		return nil, errors.Wrap(err, "mqtt service")
 	}
 	s.appendOpsGenieService()
+	s.appendOpsGenie2Service()
 	s.appendPagerDutyService()
 	s.appendPushoverService()
 	if err := s.appendHTTPPostService(); err != nil {
@@ -579,6 +581,17 @@ func (s *Server) appendOpsGenieService() {
 
 	s.SetDynamicService("opsgenie", srv)
 	s.AppendService("opsgenie", srv)
+}
+func (s *Server) appendOpsGenie2Service() {
+	c := s.config.OpsGenie2
+	d := s.DiagService.NewOpsGenie2Handler()
+	srv := opsgenie2.NewService(c, d)
+
+	s.TaskMaster.OpsGenie2Service = srv
+	s.AlertService.OpsGenie2Service = srv
+
+	s.SetDynamicService("opsgenie2", srv)
+	s.AppendService("opsgenie2", srv)
 }
 
 func (s *Server) appendVictorOpsService() {
