@@ -41,7 +41,6 @@ import (
 	"github.com/influxdata/kapacitor/services/k8s"
 	"github.com/influxdata/kapacitor/services/mqtt"
 	"github.com/influxdata/kapacitor/services/mqtt/mqtttest"
-	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/opsgenie/opsgenietest"
 	"github.com/influxdata/kapacitor/services/opsgenie2/opsgenie2test"
 	"github.com/influxdata/kapacitor/services/pagerduty"
@@ -7063,13 +7062,13 @@ func TestServer_UpdateConfig(t *testing.T) {
 				Elements: []client.ConfigElement{{
 					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/opsgenie/"},
 					Options: map[string]interface{}{
-						"api-key":      false,
-						"enabled":      false,
-						"global":       false,
-						"recipients":   nil,
-						"recovery_url": opsgenie.DefaultOpsGenieRecoveryURL,
-						"teams":        nil,
-						"url":          "http://opsgenie.example.com",
+						"api-key":    false,
+						"enabled":    false,
+						"global":     false,
+						"recipients": nil,
+						"teams":      nil,
+						"entity":     "",
+						"url":        "http://opsgenie.example.com",
 					},
 					Redacted: []string{
 						"api-key",
@@ -7079,13 +7078,13 @@ func TestServer_UpdateConfig(t *testing.T) {
 			expDefaultElement: client.ConfigElement{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/opsgenie/"},
 				Options: map[string]interface{}{
-					"api-key":      false,
-					"enabled":      false,
-					"global":       false,
-					"recipients":   nil,
-					"recovery_url": opsgenie.DefaultOpsGenieRecoveryURL,
-					"teams":        nil,
-					"url":          "http://opsgenie.example.com",
+					"api-key":    false,
+					"enabled":    false,
+					"global":     false,
+					"recipients": nil,
+					"teams":      nil,
+					"entity":     "",
+					"url":        "http://opsgenie.example.com",
 				},
 				Redacted: []string{
 					"api-key",
@@ -7098,6 +7097,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 							"api-key": "token",
 							"global":  true,
 							"teams":   []string{"teamA", "teamB"},
+							"entity":  "clusterX",
 						},
 					},
 					expSection: client.ConfigSection{
@@ -7105,13 +7105,13 @@ func TestServer_UpdateConfig(t *testing.T) {
 						Elements: []client.ConfigElement{{
 							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/opsgenie/"},
 							Options: map[string]interface{}{
-								"api-key":      true,
-								"enabled":      false,
-								"global":       true,
-								"recipients":   nil,
-								"recovery_url": opsgenie.DefaultOpsGenieRecoveryURL,
-								"teams":        []interface{}{"teamA", "teamB"},
-								"url":          "http://opsgenie.example.com",
+								"api-key":    true,
+								"enabled":    false,
+								"global":     true,
+								"recipients": nil,
+								"teams":      []interface{}{"teamA", "teamB"},
+								"entity":     "clusterX",
+								"url":        "http://opsgenie.example.com",
 							},
 							Redacted: []string{
 								"api-key",
@@ -7121,13 +7121,13 @@ func TestServer_UpdateConfig(t *testing.T) {
 					expElement: client.ConfigElement{
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/opsgenie/"},
 						Options: map[string]interface{}{
-							"api-key":      true,
-							"enabled":      false,
-							"global":       true,
-							"recipients":   nil,
-							"recovery_url": opsgenie.DefaultOpsGenieRecoveryURL,
-							"teams":        []interface{}{"teamA", "teamB"},
-							"url":          "http://opsgenie.example.com",
+							"api-key":    true,
+							"enabled":    false,
+							"global":     true,
+							"recipients": nil,
+							"teams":      []interface{}{"teamA", "teamB"},
+							"entity":     "clusterX",
+							"url":        "http://opsgenie.example.com",
 						},
 						Redacted: []string{
 							"api-key",
@@ -8182,11 +8182,13 @@ func TestServer_ListServiceTests(t *testing.T) {
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/opsgenie"},
 				Name: "opsgenie",
 				Options: client.ServiceTestOptions{
-					"teams":        nil,
-					"recipients":   nil,
-					"message-type": "CRITICAL",
-					"message":      "test opsgenie message",
-					"entity-id":    "testEntityID",
+					"teams":      nil,
+					"recipients": nil,
+					"priority":   "P2",
+					"details":    "",
+					"entity":     "",
+					"message":    "test opsgenie message",
+					"entity-id":  "testEntityID",
 				},
 			},
 			{
@@ -9024,6 +9026,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				c.OpsGenie.Enabled = true
 				c.OpsGenie.URL = ts.URL
 				c.OpsGenie.APIKey = "api_key"
+				c.OpsGenie.Entity = "clusterX"
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
@@ -9033,16 +9036,11 @@ func TestServer_AlertHandlers(t *testing.T) {
 				exp := []opsgenietest.Request{{
 					URL: "/",
 					PostData: opsgenietest.PostData{
-						ApiKey:  "api_key",
-						Message: "message",
-						Entity:  "id",
-						Alias:   "id",
-						Note:    "",
-						Details: map[string]interface{}{
-							"Level":           "CRITICAL",
-							"Monitoring Tool": "Kapacitor",
-						},
-						Description: resultJSON,
+						Message:     "message",
+						Entity:      "clusterX",
+						Alias:       "id",
+						Priority:    "P2",
+						Description: "details",
 						Teams:       []string{"A team", "B team"},
 						Recipients:  []string{"test_recipient1", "test_recipient2"},
 					},

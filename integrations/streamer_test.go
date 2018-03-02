@@ -8817,6 +8817,10 @@ func TestStream_AlertOpsGenie(t *testing.T) {
 	ts := opsgenietest.NewServer()
 	defer ts.Close()
 
+	defaultDetailsTmpl := `{"Name":"cpu","TaskName":"TestStream_Alert","Group":"host=serverA","Tags":{"host":"serverA"},"ServerInfo":{"Hostname":"%v","ClusterID":"%v","ServerID":"%v"},"ID":"kapacitor/cpu/serverA","Fields":{"count":10},"Level":"CRITICAL","Time":"1971-01-01T00:00:10Z","Duration":0,"Message":"kapacitor/cpu/serverA is CRITICAL"}
+`
+	var defaultDetails string
+
 	var script = `
 stream
 	|from()
@@ -8840,10 +8844,17 @@ stream
 			.recipients('test_recipient2', 'another_recipient')
 `
 	tmInit := func(tm *kapacitor.TaskMaster) {
+		si := tm.ServerInfo
+		defaultDetails = fmt.Sprintf(defaultDetailsTmpl,
+			si.Hostname(),
+			si.ClusterID(),
+			si.ServerID(),
+		)
 		c := opsgenie.NewConfig()
 		c.Enabled = true
 		c.URL = ts.URL
 		c.APIKey = "api_key"
+		c.Entity = "clusterX"
 		og := opsgenie.NewService(c, diagService.NewOpsGenieHandler())
 		tm.OpsGenieService = og
 	}
@@ -8853,35 +8864,25 @@ stream
 		opsgenietest.Request{
 			URL: "/",
 			PostData: opsgenietest.PostData{
-				ApiKey:  "api_key",
-				Message: "kapacitor/cpu/serverA is CRITICAL",
-				Entity:  "kapacitor/cpu/serverA",
-				Alias:   "kapacitor/cpu/serverA",
-				Note:    "",
-				Details: map[string]interface{}{
-					"Level":           "CRITICAL",
-					"Monitoring Tool": "Kapacitor",
-				},
-				Description: `{"series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}]}`,
+				Alias:       "kapacitor/cpu/serverA",
+				Message:     "kapacitor/cpu/serverA is CRITICAL",
+				Priority:    "P2",
+				Description: defaultDetails,
 				Teams:       []string{"test_team", "another_team"},
 				Recipients:  []string{"test_recipient", "another_recipient"},
+				Entity:      "clusterX",
 			},
 		},
 		opsgenietest.Request{
 			URL: "/",
 			PostData: opsgenietest.PostData{
-				ApiKey:  "api_key",
-				Message: "kapacitor/cpu/serverA is CRITICAL",
-				Entity:  "kapacitor/cpu/serverA",
-				Alias:   "kapacitor/cpu/serverA",
-				Note:    "",
-				Details: map[string]interface{}{
-					"Level":           "CRITICAL",
-					"Monitoring Tool": "Kapacitor",
-				},
-				Description: `{"series":[{"name":"cpu","tags":{"host":"serverA"},"columns":["time","count"],"values":[["1971-01-01T00:00:10Z",10]]}]}`,
+				Alias:       "kapacitor/cpu/serverA",
+				Message:     "kapacitor/cpu/serverA is CRITICAL",
+				Priority:    "P2",
+				Description: defaultDetails,
 				Teams:       []string{"test_team2"},
 				Recipients:  []string{"test_recipient2", "another_recipient"},
+				Entity:      "clusterX",
 			},
 		},
 	}
