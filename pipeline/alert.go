@@ -1113,7 +1113,7 @@ type MQTTHandler struct {
 // Example:
 //    [sensu]
 //      enabled = true
-//      url = "http://sensu:3030"
+//      addr = "sensu:3030"
 //      source = "Kapacitor"
 //      handlers = ["sns","slack"]
 //
