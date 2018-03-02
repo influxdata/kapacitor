@@ -12,6 +12,8 @@
 
 ### Bugfixes
 
+- [#1827](https://github.com/influxdata/kapacitor/pull/1827): Fix deadlock in load service when task has an error.
+
 
 ## v1.4.0 [2017-12-08]
 
