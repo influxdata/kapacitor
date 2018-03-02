@@ -558,7 +558,7 @@ var (
 	dtype       = defineFlags.String("type", "", "The task type (stream|batch)")
 	dtemplate   = defineFlags.String("template", "", "Optional template ID")
 	dvars       = defineFlags.String("vars", "", "Optional path to a JSON vars file")
-	dfile       = defineFlags.String("file", "", "Optional path to a YAML or JSON template task file")
+	dfile       = defineFlags.String("file", "", "Optional path to a YAML or JSON template task file. If id is given in the task file, it must match the Task id given on the command line.")
 	dnoReload   = defineFlags.Bool("no-reload", false, "Do not reload the task even if it is enabled")
 	ddbrp       = make(dbrps, 0)
 )
@@ -661,11 +661,13 @@ Options:
 }
 
 func doDefine(args []string) error {
-	if len(args) < 1 {
+	// should be getting 1 task ID and 0 or more pairs of flags
+	if len(args)%2 == 0 {
 		fmt.Fprintln(os.Stderr, "Must provide a task ID.")
 		defineFlags.Usage()
 		os.Exit(2)
 	}
+
 	defineFlags.Parse(args[1:])
 	id := args[0]
 
@@ -695,7 +697,7 @@ func doDefine(args []string) error {
 	if *dvars != "" {
 		f, err := os.Open(*dvars)
 		if err != nil {
-			return errors.Wrapf(err, "faild to open file %s", *dvars)
+			return errors.Wrapf(err, "failed to open file %s", *dvars)
 		}
 		defer f.Close()
 		dec := json.NewDecoder(f)
@@ -736,6 +738,11 @@ func doDefine(args []string) error {
 	if task.ID == "" {
 		if *dfile != "" {
 			o, err := fileVars.CreateTaskOptions()
+			if o.ID == "" {
+				o.ID = id
+			} else if o.ID != id {
+				return errors.New("Task id given on command line does not match id in " + *dfile)
+			}
 			if err != nil {
 				return err
 			}
@@ -764,6 +771,13 @@ func doDefine(args []string) error {
 			if err != nil {
 				return err
 			}
+
+			if o.ID == "" {
+				o.ID = id
+			} else if o.ID != id {
+				return errors.New("Task id given on command line does not match id in " + *dfile)
+			}
+
 			_, err = cli.UpdateTask(
 				l,
 				o,

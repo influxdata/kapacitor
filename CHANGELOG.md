@@ -11,6 +11,7 @@
 - [#1690](https://github.com/influxdata/kapacitor/issues/1690): Add https-private-key option to httpd config.
 
 ### Bugfixes
+- [#1794](https://github.com/influxdata/kapacitor/issues/1794): Kapacitor ticks generating a hash instead of their actual given name.
 
 - [#1827](https://github.com/influxdata/kapacitor/pull/1827): Fix deadlock in load service when task has an error.
 
