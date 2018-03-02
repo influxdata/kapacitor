@@ -558,7 +558,7 @@ var (
 	dtype       = defineFlags.String("type", "", "The task type (stream|batch)")
 	dtemplate   = defineFlags.String("template", "", "Optional template ID")
 	dvars       = defineFlags.String("vars", "", "Optional path to a JSON vars file")
-	dfile       = defineFlags.String("file", "", "Optional path to a YAML or JSON template task file")
+	dfile       = defineFlags.String("file", "", "Optional path to a YAML or JSON template task file. If id is given in the task file, it must match the Task id given on the command line.")
 	dnoReload   = defineFlags.Bool("no-reload", false, "Do not reload the task even if it is enabled")
 	ddbrp       = make(dbrps, 0)
 )
