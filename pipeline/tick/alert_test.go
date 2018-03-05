@@ -379,6 +379,7 @@ func TestAlertSensu(t *testing.T) {
 func TestAlertSlack(t *testing.T) {
 	pipe, _, from := StreamFrom()
 	handler := from.Alert().Slack()
+	handler.Workspace = "openchannel"
 	handler.Channel = "#application"
 	handler.Username = "prbot"
 	handler.IconEmoji = ":non-potable_water:"
@@ -391,6 +392,7 @@ func TestAlertSlack(t *testing.T) {
         .details('{{ json . }}')
         .history(21)
         .slack()
+        .workspace('openchannel')
         .channel('#application')
         .username('prbot')
         .iconEmoji(':non-potable_water:')

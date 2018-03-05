@@ -1370,7 +1370,7 @@ type PushoverHandler struct {
 //         |alert()
 //             .slack()
 //
-// Send alerts to Slack channel in the configuration file.
+// Send alerts to the default worskace Slack channel in the configuration file.
 //
 // Example:
 //    stream
@@ -1378,7 +1378,7 @@ type PushoverHandler struct {
 //             .slack()
 //             .channel('#alerts')
 //
-// Send alerts to Slack channel '#alerts'
+// Send alerts to the default workspace with Slack channel '#alerts'
 //
 // Example:
 //    stream
@@ -1388,13 +1388,24 @@ type PushoverHandler struct {
 //
 // Send alert to user '@jsmith'
 //
+// Example:
+// stream
+//      |alert()
+//          .slack()
+//          .workspace('opencommunity')
+//          .channel('#support')
+//
+// send alerts to the opencommunity workspace on the channel '#support'
+//
 // If the 'slack' section in the configuration has the option: global = true
 // then all alerts are sent to Slack without the need to explicitly state it
 // in the TICKscript.
 //
 // Example:
-//    [slack]
+//    [[slack]]
 //      enabled = true
+//      default = true
+//      workspace = examplecorp
 //      url = "https://hooks.slack.com/services/xxxxxxxxx/xxxxxxxxx/xxxxxxxxxxxxxxxxxxxxxxxx"
 //      channel = "#general"
 //      global = true
@@ -1417,6 +1428,10 @@ func (n *AlertNodeData) Slack() *SlackHandler {
 // tick:embedded:AlertNode.Slack
 type SlackHandler struct {
 	*AlertNodeData `json:"-"`
+
+	// The workspace to publish the alert to.  If empty defaults to the configured
+	// default broker.
+	Workspace string `json:"workspace"`
 
 	// Slack channel in which to post messages.
 	// If empty uses the channel from the configuration.
