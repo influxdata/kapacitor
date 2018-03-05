@@ -90,7 +90,7 @@ type Config struct {
 	SMTP      smtp.Config      `toml:"smtp" override:"smtp"`
 	SNMPTrap  snmptrap.Config  `toml:"snmptrap" override:"snmptrap"`
 	Sensu     sensu.Config     `toml:"sensu" override:"sensu"`
-	Slack     slack.Config     `toml:"slack" override:"slack"`
+	Slack     slack.Configs    `toml:"slack" override:"slack"`
 	Talk      talk.Config      `toml:"talk" override:"talk"`
 	Telegram  telegram.Config  `toml:"telegram" override:"telegram"`
 	VictorOps victorops.Config `toml:"victorops" override:"victorops"`

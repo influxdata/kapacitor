@@ -3,6 +3,7 @@ package slack
 import (
 	"net/url"
 
+	"github.com/influxdata/kapacitor/listmap"
 	"github.com/pkg/errors"
 )
 
@@ -11,6 +12,8 @@ const DefaultUsername = "kapacitor"
 type Config struct {
 	// Whether Slack integration is enabled.
 	Enabled bool `toml:"enabled" override:"enabled"`
+	// ID assigned if multiple slack configs are given
+	ID string `toml:"id" override:"id"`
 	// The Slack webhook URL, can be obtained by adding Incoming Webhook integration.
 	URL string `toml:"url" override:"url,redact"`
 	// The default channel, can be overridden per alert.
@@ -49,6 +52,26 @@ func (c Config) Validate() error {
 	}
 	if _, err := url.Parse(c.URL); err != nil {
 		return errors.Wrapf(err, "invalid url %q", c.URL)
+	}
+	return nil
+}
+
+type Configs []Config
+
+func (cs *Configs) UnmarshalTOML(data interface{}) error {
+	return listmap.DoUnmarshalTOML(cs, data)
+}
+
+func (cs Configs) Validate() error {
+	l := len(cs)
+	for _, c := range cs {
+		if err := c.Validate(); err != nil {
+			return err
+		}
+		// ID must not be empty when we have more than one.
+		if l > 1 && c.ID == "" {
+			return errors.New("id must not be empty")
+		}
 	}
 	return nil
 }
