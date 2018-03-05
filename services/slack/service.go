@@ -7,7 +7,8 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"sync/atomic"
+
+	"sync"
 
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/keyvalue"
@@ -23,31 +24,98 @@ type Diagnostic interface {
 	Error(msg string, err error)
 }
 
-type Service struct {
-	configValue atomic.Value
-	clientValue atomic.Value
-	diag        Diagnostic
-	client      *http.Client
+type Workspace struct {
+	mu     sync.RWMutex
+	config Config
+	client *http.Client
 }
 
-func NewService(c Config, d Diagnostic) (*Service, error) {
+func NewWorkspace(c Config) (*Workspace, error) {
 	tlsConfig, err := tlsconfig.Create(c.SSLCA, c.SSLCert, c.SSLKey, c.InsecureSkipVerify)
 	if err != nil {
 		return nil, err
 	}
-	if tlsConfig.InsecureSkipVerify {
-		d.InsecureSkipVerify()
-	}
-	s := &Service{
-		diag: d,
-	}
-	s.configValue.Store(c)
-	s.clientValue.Store(&http.Client{
+
+	cl := &http.Client{
 		Transport: &http.Transport{
 			Proxy:           http.ProxyFromEnvironment,
 			TLSClientConfig: tlsConfig,
 		},
-	})
+	}
+
+	return &Workspace{
+		config: c,
+		client: cl,
+	}, nil
+}
+
+func (w *Workspace) Config() Config {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return w.config
+}
+
+func (w *Workspace) Client() *http.Client {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return w.client
+}
+
+func (w *Workspace) Update(c Config) error {
+	tlsConfig, err := tlsconfig.Create(c.SSLCA, c.SSLCert, c.SSLKey, c.InsecureSkipVerify)
+	if err != nil {
+		return err
+	}
+
+	cl := &http.Client{
+		Transport: &http.Transport{
+			Proxy:           http.ProxyFromEnvironment,
+			TLSClientConfig: tlsConfig,
+		},
+	}
+
+	w.client = cl
+	w.config = c
+
+	return nil
+}
+
+type Service struct {
+	mu         sync.RWMutex
+	workspaces map[string]*Workspace
+	diag       Diagnostic
+}
+
+func NewService(confs []Config, d Diagnostic) (*Service, error) {
+	s := &Service{
+		diag:       d,
+		workspaces: make(map[string]*Workspace),
+	}
+
+	if len(confs) == 1 {
+		confs[0].Default = true
+	}
+	for _, c := range confs {
+
+		if c.InsecureSkipVerify {
+			s.diag.InsecureSkipVerify()
+		}
+
+		w, err := NewWorkspace(c)
+		if err != nil {
+			return nil, err
+		}
+		s.workspaces[c.Workspace] = w
+
+		// We'll stash the default workspace with the empty string as a key.
+		// Either there's a single config with no workspace name, or else
+		// we have multiple configs that all have names.
+		if c.Default && c.Workspace != "" {
+			s.workspaces[""] = s.workspaces[c.Workspace]
+		}
+
+	}
+
 	return s, nil
 }
 
@@ -59,43 +127,81 @@ func (s *Service) Close() error {
 	return nil
 }
 
-func (s *Service) config() Config {
-	return s.configValue.Load().(Config)
+func (s *Service) workspace(wid string) (*Workspace, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if len(s.workspaces) == 0 {
+		return &Workspace{}, errors.New("no slack configuration found")
+	}
+	v, ok := s.workspaces[wid]
+	if !ok {
+		return &Workspace{}, errors.New("workspace id not found")
+	}
+	return v, nil
 }
 
-func (s *Service) Update(newConfig []interface{}) error {
-	if l := len(newConfig); l != 1 {
-		return fmt.Errorf("expected only one new config object, got %d", l)
+func (s *Service) config(wid string) (Config, error) {
+	w, err := s.workspace(wid)
+	if err != nil {
+		return Config{}, err
 	}
-	if c, ok := newConfig[0].(Config); !ok {
-		return fmt.Errorf("expected config object to be of type %T, got %T", c, newConfig[0])
-	} else {
-		tlsConfig, err := tlsconfig.Create(c.SSLCA, c.SSLCert, c.SSLKey, c.InsecureSkipVerify)
-		if err != nil {
-			return err
+
+	return w.Config(), nil
+}
+
+func (s *Service) defaultConfig() Config {
+	conf, _ := s.config("")
+	return conf
+}
+
+func (s *Service) client(wid string) (*http.Client, error) {
+	w, err := s.workspace(wid)
+	if err != nil {
+		return &http.Client{}, err
+	}
+	return w.Client(), nil
+}
+
+func (s *Service) Update(newConfigs []interface{}) error {
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, v := range newConfigs {
+		if conf, ok := v.(Config); ok {
+			if conf.InsecureSkipVerify {
+				s.diag.InsecureSkipVerify()
+			}
+			_, ok := s.workspaces[conf.Workspace]
+			if !ok {
+				w, err := NewWorkspace(conf)
+				s.workspaces[conf.Workspace] = w
+				if err != nil {
+					return err
+				}
+			} else {
+				s.workspaces[conf.Workspace].Update(conf)
+			}
+
+			// We'll stash the default workspace with the empty string as a key.
+			// Either there's a single config with no workspace name, or else
+			// we have multiple configs that all have names.
+			if conf.Default && conf.Workspace != "" {
+				s.workspaces[""] = s.workspaces[conf.Workspace]
+			}
+		} else {
+			return fmt.Errorf("expected config object to be of type %T, got %T", v, conf)
 		}
-		if tlsConfig.InsecureSkipVerify {
-			s.diag.InsecureSkipVerify()
-		}
-		s.configValue.Store(c)
-		s.clientValue.Store(&http.Client{
-			Transport: &http.Transport{
-				Proxy:           http.ProxyFromEnvironment,
-				TLSClientConfig: tlsConfig,
-			},
-		})
 	}
 	return nil
 }
 
 func (s *Service) Global() bool {
-	c := s.config()
-	return c.Global
+	return s.defaultConfig().Global
 }
 
 func (s *Service) StateChangesOnly() bool {
-	c := s.config()
-	return c.StateChangesOnly
+	return s.defaultConfig().Global
 }
 
 // slack attachment info
@@ -107,6 +213,7 @@ type attachment struct {
 }
 
 type testOptions struct {
+	Workspace string      `json:"workspace"`
 	Channel   string      `json:"channel"`
 	Message   string      `json:"message"`
 	Level     alert.Level `json:"level"`
@@ -115,11 +222,12 @@ type testOptions struct {
 }
 
 func (s *Service) TestOptions() interface{} {
-	c := s.config()
+	c, _ := s.config("")
 	return &testOptions{
-		Channel: c.Channel,
-		Message: "test slack message",
-		Level:   alert.Critical,
+		Workspace: c.Workspace,
+		Channel:   c.Channel,
+		Message:   "test slack message",
+		Level:     alert.Critical,
 	}
 }
 
@@ -128,15 +236,20 @@ func (s *Service) Test(options interface{}) error {
 	if !ok {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
-	return s.Alert(o.Channel, o.Message, o.Username, o.IconEmoji, o.Level)
+	return s.Alert("", o.Channel, o.Message, o.Username, o.IconEmoji, o.Level)
 }
 
-func (s *Service) Alert(channel, message, username, iconEmoji string, level alert.Level) error {
-	url, post, err := s.preparePost(channel, message, username, iconEmoji, level)
+func (s *Service) Alert(workspace, channel, message, username, iconEmoji string, level alert.Level) error {
+	url, post, err := s.preparePost(workspace, channel, message, username, iconEmoji, level)
 	if err != nil {
 		return err
 	}
-	client := s.clientValue.Load().(*http.Client)
+
+	client, err := s.client(workspace)
+	if err != nil {
+		return err
+	}
+
 	resp, err := client.Post(url, "application/json", post)
 	if err != nil {
 		return err
@@ -159,9 +272,11 @@ func (s *Service) Alert(channel, message, username, iconEmoji string, level aler
 	return nil
 }
 
-func (s *Service) preparePost(channel, message, username, iconEmoji string, level alert.Level) (string, io.Reader, error) {
-	c := s.config()
-
+func (s *Service) preparePost(workspace, channel, message, username, iconEmoji string, level alert.Level) (string, io.Reader, error) {
+	c, err := s.config(workspace)
+	if err != nil {
+		return "", nil, err
+	}
 	if !c.Enabled {
 		return "", nil, errors.New("service is not enabled")
 	}
@@ -201,7 +316,7 @@ func (s *Service) preparePost(channel, message, username, iconEmoji string, leve
 
 	var post bytes.Buffer
 	enc := json.NewEncoder(&post)
-	err := enc.Encode(postData)
+	err = enc.Encode(postData)
 	if err != nil {
 		return "", nil, err
 	}
@@ -210,6 +325,10 @@ func (s *Service) preparePost(channel, message, username, iconEmoji string, leve
 }
 
 type HandlerConfig struct {
+	// Slack workspace ID to use when posting messages
+	// If empty uses the default config
+	Workspace string `mapstructure:"workspace"`
+
 	// Slack channel in which to post messages.
 	// If empty uses the channel from the configuration.
 	Channel string `mapstructure:"channel"`
@@ -238,7 +357,9 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
 }
 
 func (h *handler) Handle(event alert.Event) {
+
 	if err := h.s.Alert(
+		h.c.Workspace,
 		h.c.Channel,
 		event.State.Message,
 		h.c.Username,

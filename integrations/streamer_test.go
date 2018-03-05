@@ -8471,18 +8471,25 @@ stream
 		.warn(lambda: "count" > 7.0)
 		.crit(lambda: "count" > 8.0)
 		.slack()
+		.workspace('company_private')
 		.channel('#alerts')
 		.slack()
 		.channel('@jim')
 `
 
 	tmInit := func(tm *kapacitor.TaskMaster) {
-		c := slack.NewConfig()
-		c.Enabled = true
-		c.URL = ts.URL + "/test/slack/url"
-		c.Channel = "#channel"
+		c1 := slack.NewConfig()
+		c1.Default = true
+		c1.Enabled = true
+		c1.URL = ts.URL + "/test/slack/url"
+		c1.Channel = "#channel"
+		c2 := slack.NewConfig()
+		c2.Workspace = "company_private"
+		c2.Enabled = true
+		c2.URL = ts.URL + "/test/slack/url2"
+		c2.Channel = "#channel"
 		d := diagService.NewSlackHandler().WithContext(keyvalue.KV("test", "slack"))
-		sl, err := slack.NewService(c, d)
+		sl, err := slack.NewService([]slack.Config{c1, c2}, d)
 		if err != nil {
 			t.Error(err)
 		}
@@ -8508,7 +8515,7 @@ stream
 			},
 		},
 		slacktest.Request{
-			URL: "/test/slack/url",
+			URL: "/test/slack/url2",
 			PostData: slacktest.PostData{
 				Channel:  "#alerts",
 				Username: "kapacitor",

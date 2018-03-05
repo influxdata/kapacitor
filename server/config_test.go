@@ -81,3 +81,120 @@ headers = { Authorization = "your-key" }
 		t.Fatalf("unexpected header Authorization: %s", c.InfluxDB[0].URLs[0])
 	}
 }
+
+// Ensure the configuration can be parsed.
+func TestConfig_Single_Conf(t *testing.T) {
+	// Parse configuration.
+	var c server.Config
+	if _, err := toml.Decode(`
+[slack]
+enabled = true
+channel = "#kapacitor_test"
+`, &c); err != nil {
+		t.Fatal(err)
+	}
+
+	// Validate configuration.
+	if c.Slack[0].Channel != "#kapacitor_test" || c.Slack[0].Enabled != true {
+		t.Fatalf("unexpected slack channel or channel not enabled: %s, %v", c.Slack[0].Channel, c.Slack[0].Enabled)
+	}
+}
+
+// Ensure the configuration can be parsed.
+func TestConfig_Single_Multiple_Conf(t *testing.T) {
+	// Parse configuration.
+	var c server.Config
+	if _, err := toml.Decode(`
+[[slack]]
+enabled = true
+channel = "#kapacitor_test"
+`, &c); err != nil {
+		t.Fatal(err)
+	}
+
+	// Validate configuration.
+	if c.Slack[0].Channel != "#kapacitor_test" || c.Slack[0].Enabled != true {
+		t.Fatalf("unexpected slack channel or channel not enabled: %s, %v", c.Slack[0].Channel, c.Slack[0].Enabled)
+	}
+}
+
+// Ensure the configuration can be parsed.
+func TestConfig_Multiple_Multiple_Conf(t *testing.T) {
+	// Parse configuration.
+	var c server.Config
+	if _, err := toml.Decode(`
+[[slack]]
+workspace = "private"
+url = "private.slack.com"
+default = true
+enabled = true
+channel = "#kapacitor_private"
+[[slack]]
+workspace = "public"
+url = "public.slack.com"
+default = false
+enabled = false
+channel = "#kapacitor_public"
+`, &c); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := c.Slack.Validate(); err != nil {
+		t.Fatalf("Expected config to be valid, %v", err)
+	}
+
+	// Validate configuration.
+	if c.Slack[0].Workspace != "private" || c.Slack[0].Channel != "#kapacitor_private" || c.Slack[0].Enabled != true {
+		t.Fatalf("unexpected slack workspace, channel or channel not enabled: %s %s, %v", c.Slack[0].Workspace, c.Slack[0].Channel, c.Slack[0].Enabled)
+	} else if c.Slack[1].Workspace != "public" || c.Slack[1].Channel != "#kapacitor_public" || c.Slack[1].Enabled != false {
+		t.Fatalf("unexpected slack workspace, channel or channel enabled: %s %s, %v", c.Slack[1].Workspace, c.Slack[1].Channel, c.Slack[1].Enabled)
+	}
+}
+
+// Ensure the configuration can be parsed.
+func TestConfig_Invalid_Multiple_Conf(t *testing.T) {
+	// Parse configuration.
+	var c server.Config
+	cStr := `
+[[slack]]
+workspace = "private"
+url = "private.slack.com"
+default = false
+enabled = true
+channel = "#kapacitor_private"
+[[slack]]
+workspace = "public"
+url = "public.slack.com"
+default = false
+enabled = false
+channel = "#kapacitor_public"
+`
+	if _, err := toml.Decode(cStr, &c); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := c.Slack.Validate(); err == nil {
+		t.Fatalf("Expected config to be invalid, %s", cStr)
+	}
+
+	cStr = `
+[[slack]]
+workspace = "private"
+default = true
+enabled = true
+channel = "#kapacitor_private"
+[[slack]]
+workspace = "public"
+url = "public.slack.com"
+default = false
+enabled = false
+channel = "#kapacitor_public"
+`
+	if _, err := toml.Decode(cStr, &c); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := c.Slack.Validate(); err == nil {
+		t.Fatalf("Expected config to be invalid, %s", cStr)
+	}
+}
