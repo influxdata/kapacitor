@@ -9843,7 +9843,7 @@ alert value=2 0000000000002
 		Time:        time.Date(1970, 1, 1, 0, 0, 0, 2000000, time.UTC),
 		Level:       alert.Critical,
 		Duration:    2 * time.Millisecond,
-		Recoverable: true,
+		Recoverable: false,
 		Data: models.Result{
 			Series: models.Rows{
 				{
