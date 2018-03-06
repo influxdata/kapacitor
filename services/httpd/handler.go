@@ -426,7 +426,7 @@ func ServeOptions(w http.ResponseWriter, r *http.Request) {
 // servePing returns a simple response to let the client know the server is running.
 func (h *Handler) servePing(w http.ResponseWriter, r *http.Request) {
 	h.statMap.Add(statPingRequest, 1)
-	w.WriteHeader(http.StatusNoContent)
+	w.WriteHeader(http.StatusOK)
 }
 
 func (h *Handler) serveWrite(w http.ResponseWriter, r *http.Request, user auth.User) {

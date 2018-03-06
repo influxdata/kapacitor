@@ -9,12 +9,11 @@
     If your `opsgenie` config uses the `recovery_url` option, for `opsgenie2` you will need to change it to the `recovery_action` option.
     This is because the new v2 API is not structured with static URLs, and so only the action can be defined and not the entire URL.
 - [#1690](https://github.com/influxdata/kapacitor/issues/1690): Add https-private-key option to httpd config.
-
+- [#1831](https://github.com/influxdata/kapacitor/pull/1831): changed `/ping` endpoint status code to `200` to support ELB health checks OOTB
 ### Bugfixes
 - [#1794](https://github.com/influxdata/kapacitor/issues/1794): Kapacitor ticks generating a hash instead of their actual given name.
 
 - [#1827](https://github.com/influxdata/kapacitor/pull/1827): Fix deadlock in load service when task has an error.
-
 
 ## v1.4.0 [2017-12-08]
 
