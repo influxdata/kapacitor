@@ -13,9 +13,9 @@ type Config struct {
 	// Whether Slack integration is enabled.
 	Enabled bool `toml:"enabled" override:"enabled"`
 	// Whether this is the default slack config.
-	Default bool `toml:"enabled" override:"enabled"'`
+	Default bool `toml:"enabled" override:"default"`
 	// ID assigned if multiple slack configs are given
-	Workspace string `toml:"workspace" override:"workspace"`
+	Workspace string `toml:"workspace"  override:"workspace"`
 	// The Slack webhook URL, can be obtained by adding Incoming Webhook integration.
 	URL string `toml:"url" override:"url,redact"`
 	// The default channel, can be overridden per alert.

@@ -7456,6 +7456,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 			section: "slack",
 			setDefaults: func(c *server.Config) {
 				c.Slack[0].Global = true
+				c.Slack[0].Default = true
 			},
 			expDefaultSection: client.ConfigSection{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack"},
@@ -7463,6 +7464,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/"},
 					Options: map[string]interface{}{
 						"workspace":            "",
+						"default":              true,
 						"channel":              "",
 						"enabled":              false,
 						"global":               true,
@@ -7484,6 +7486,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/"},
 				Options: map[string]interface{}{
 					"workspace":            "",
+					"default":              true,
 					"channel":              "",
 					"enabled":              false,
 					"global":               true,
@@ -7504,11 +7507,10 @@ func TestServer_UpdateConfig(t *testing.T) {
 				{
 					updateAction: client.ConfigUpdateAction{
 						Set: map[string]interface{}{
-							"workspace": "company",
-							"enabled":   true,
-							"global":    false,
-							"channel":   "#general",
-							"url":       "http://slack.example.com/secret-token",
+							"enabled": true,
+							"global":  false,
+							"channel": "#general",
+							"url":     "http://slack.example.com/secret-token",
 						},
 					},
 					expSection: client.ConfigSection{
@@ -7516,8 +7518,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 						Elements: []client.ConfigElement{{
 							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/"},
 							Options: map[string]interface{}{
-								"workspace":            "company",
+								"workspace":            "",
 								"channel":              "#general",
+								"default":              true,
 								"enabled":              true,
 								"global":               false,
 								"icon-emoji":           "",
@@ -7537,8 +7540,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 					expElement: client.ConfigElement{
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/"},
 						Options: map[string]interface{}{
-							"workspace":            "company",
+							"workspace":            "",
 							"channel":              "#general",
+							"default":              true,
 							"enabled":              true,
 							"global":               false,
 							"icon-emoji":           "",
