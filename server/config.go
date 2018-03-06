@@ -90,7 +90,7 @@ type Config struct {
 	SMTP      smtp.Config      `toml:"smtp" override:"smtp"`
 	SNMPTrap  snmptrap.Config  `toml:"snmptrap" override:"snmptrap"`
 	Sensu     sensu.Config     `toml:"sensu" override:"sensu"`
-	Slack     slack.Configs    `toml:"slack" override:"slack"`
+	Slack     slack.Configs    `toml:"slack" override:"slack,element-key=workspace"`
 	Talk      talk.Config      `toml:"talk" override:"talk"`
 	Telegram  telegram.Config  `toml:"telegram" override:"telegram"`
 	VictorOps victorops.Config `toml:"victorops" override:"victorops"`
@@ -154,7 +154,7 @@ func NewConfig() *Config {
 	c.HTTPPost = httppost.Configs{httppost.NewConfig()}
 	c.SMTP = smtp.NewConfig()
 	c.Sensu = sensu.NewConfig()
-	c.Slack = slack.NewConfig()
+	c.Slack = slack.Configs{slack.NewConfig()}
 	c.Talk = talk.NewConfig()
 	c.SNMPTrap = snmptrap.NewConfig()
 	c.Telegram = telegram.NewConfig()

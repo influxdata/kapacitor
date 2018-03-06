@@ -12,8 +12,10 @@ const DefaultUsername = "kapacitor"
 type Config struct {
 	// Whether Slack integration is enabled.
 	Enabled bool `toml:"enabled" override:"enabled"`
+	// Whether this is the default slack config.
+	Default bool `toml:"enabled" override:"enabled"'`
 	// ID assigned if multiple slack configs are given
-	ID string `toml:"id" override:"id"`
+	Workspace string `toml:"workspace" override:"workspace"`
 	// The Slack webhook URL, can be obtained by adding Incoming Webhook integration.
 	URL string `toml:"url" override:"url,redact"`
 	// The default channel, can be overridden per alert.
@@ -69,7 +71,7 @@ func (cs Configs) Validate() error {
 			return err
 		}
 		// ID must not be empty when we have more than one.
-		if l > 1 && c.ID == "" {
+		if l > 1 && c.Workspace == "" {
 			return errors.New("id must not be empty")
 		}
 	}

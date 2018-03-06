@@ -8391,7 +8391,7 @@ stream
 		c.URL = ts.URL + "/test/slack/url"
 		c.Channel = "#channel"
 		d := diagService.NewSlackHandler().WithContext(keyvalue.KV("test", "slack"))
-		sl, err := slack.NewService(c, d)
+		sl, err := slack.NewService([]slack.Config{c}, d)
 		if err != nil {
 			t.Error(err)
 		}
