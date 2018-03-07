@@ -211,6 +211,7 @@ func (g *influxqlGroup) Barrier(b edge.BarrierMessage) (edge.Message, error) {
 func (g *influxqlGroup) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
 	return d, nil
 }
+func (g *influxqlGroup) Done() {}
 
 type influxqlStreamingTransformGroup struct {
 	influxqlGroup

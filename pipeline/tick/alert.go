@@ -44,6 +44,15 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 		DotIf("all", a.AllFlag).
 		DotIf("noRecoveries", a.NoRecoveriesFlag)
 
+	for _, in := range a.Inhibitors {
+		args := make([]interface{}, len(in.EqualTags)+1)
+		args[0] = in.Category
+		for i, t := range in.EqualTags {
+			args[i+1] = t
+		}
+		n.Dot("inhibit", args...)
+	}
+
 	if a.IsStateChangesOnly {
 		if a.StateChangesOnlyDuration == 0 {
 			n.Dot("stateChangesOnly")

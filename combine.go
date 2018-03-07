@@ -138,6 +138,7 @@ func (b *combineBuffer) Barrier(barrier edge.BarrierMessage) error {
 func (b *combineBuffer) DeleteGroup(d edge.DeleteGroupMessage) error {
 	return edge.Forward(b.n.outs, d)
 }
+func (b *combineBuffer) Done() {}
 
 // Combine a set of points into all their combinations.
 func (b *combineBuffer) combine() error {

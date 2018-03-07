@@ -176,6 +176,7 @@ func (g *autoscaleGroup) Barrier(b edge.BarrierMessage) (edge.Message, error) {
 func (g *autoscaleGroup) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
 	return d, nil
 }
+func (g *autoscaleGroup) Done() {}
 
 func (n *AutoscaleNode) handlePoint(streamName string, dims models.Dimensions, p edge.FieldsTagsTimeGetter, expr stateful.Expression) (edge.PointMessage, error) {
 	id, err := n.a.ResourceIDFromTags(p.Tags())

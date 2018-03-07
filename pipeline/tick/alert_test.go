@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/influxdata/kapacitor/pipeline"
 	"github.com/influxdata/kapacitor/tick/ast"
 )
 
@@ -46,6 +47,7 @@ func TestAlert(t *testing.T) {
 	alert.IdTag = "idTag"
 	alert.IdField = "idField"
 	alert.All().NoRecoveries().StateChangesOnly(time.Hour)
+	alert.Inhibitors = []pipeline.Inhibitor{{Category: "other", EqualTags: []string{"t1", "t2"}}}
 
 	want := `stream
     |from()
@@ -69,6 +71,7 @@ func TestAlert(t *testing.T) {
         .idField('idField')
         .all()
         .noRecoveries()
+        .inhibit('other', 't1', 't2')
         .stateChangesOnly(1h)
         .flapping(0.4, 0.7)
 `

@@ -105,3 +105,4 @@ func (g *whereGroup) Barrier(b edge.BarrierMessage) (edge.Message, error) {
 func (g *whereGroup) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
 	return d, nil
 }
+func (g *whereGroup) Done() {}

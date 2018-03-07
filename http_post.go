@@ -11,6 +11,7 @@ import (
 
 	"bytes"
 	"context"
+
 	"github.com/influxdata/kapacitor/edge"
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/models"
@@ -136,6 +137,7 @@ func (g *httpPostGroup) Barrier(b edge.BarrierMessage) (edge.Message, error) {
 func (g *httpPostGroup) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
 	return d, nil
 }
+func (g *httpPostGroup) Done() {}
 
 func (n *HTTPPostNode) doPost(row *models.Row) int {
 	resp, err := n.postRow(row)

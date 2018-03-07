@@ -107,6 +107,7 @@ type TaskMaster struct {
 		alertservice.AnonHandlerRegistrar
 		alertservice.Events
 		alertservice.TopicPersister
+		alertservice.InhibitorLookup
 	}
 	InfluxDBService interface {
 		NewNamedClient(name string) (influxdb.Client, error)

@@ -129,6 +129,7 @@ func (n *GroupByNode) Barrier(b edge.BarrierMessage) error {
 func (n *GroupByNode) DeleteGroup(d edge.DeleteGroupMessage) error {
 	return edge.Forward(n.outs, d)
 }
+func (n *GroupByNode) Done() {}
 
 // emit sends all groups before time t to children nodes.
 // The node timer must be started when calling this method.
