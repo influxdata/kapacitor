@@ -79,6 +79,7 @@ func (n *DefaultNode) Barrier(b edge.BarrierMessage) (edge.Message, error) {
 func (n *DefaultNode) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
 	return d, nil
 }
+func (n *DefaultNode) Done() {}
 
 func (n *DefaultNode) setDefaults(fields models.Fields, tags models.Tags) (models.Fields, models.Tags) {
 	newFields := fields

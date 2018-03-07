@@ -9,6 +9,9 @@ type ForwardReceiver interface {
 	Point(p PointMessage) (Message, error)
 	Barrier(b BarrierMessage) (Message, error)
 	DeleteGroup(d DeleteGroupMessage) (Message, error)
+
+	// Done is called once the receiver will no longer receive any messages.
+	Done()
 }
 
 // ForwardBufferedReceiver handles messages as they arrive and can return a message to be forwarded to output edges.
@@ -77,6 +80,9 @@ func (fr *forwardingReceiver) Barrier(b BarrierMessage) error {
 }
 func (fr *forwardingReceiver) DeleteGroup(d DeleteGroupMessage) error {
 	return fr.forward(fr.r.DeleteGroup(d))
+}
+func (fr *forwardingReceiver) Done() {
+	fr.r.Done()
 }
 
 func (fr *forwardingReceiver) forward(msg Message, err error) error {

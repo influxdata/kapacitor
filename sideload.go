@@ -169,6 +169,7 @@ func (n *SideloadNode) Barrier(b edge.BarrierMessage) (edge.Message, error) {
 func (n *SideloadNode) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
 	return d, nil
 }
+func (n *SideloadNode) Done() {}
 
 func convertType(src, dflt interface{}) (interface{}, error) {
 	switch dflt.(type) {

@@ -90,6 +90,7 @@ func (n *DeleteNode) Barrier(b edge.BarrierMessage) (edge.Message, error) {
 func (n *DeleteNode) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
 	return d, nil
 }
+func (n *DeleteNode) Done() {}
 
 // checkForDeletedDimension checks if we deleted a group by dimension
 func (n *DeleteNode) checkForDeletedDimension(dimensions models.Dimensions) bool {

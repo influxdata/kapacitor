@@ -106,6 +106,7 @@ func (g *stateTrackingGroup) Barrier(b edge.BarrierMessage) (edge.Message, error
 func (g *stateTrackingGroup) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
 	return d, nil
 }
+func (g *stateTrackingGroup) Done() {}
 
 type stateDurationTracker struct {
 	sd *pipeline.StateDurationNode

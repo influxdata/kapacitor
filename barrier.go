@@ -153,6 +153,7 @@ func (n *idleBarrier) DeleteGroup(m edge.DeleteGroupMessage) (edge.Message, erro
 	}
 	return m, nil
 }
+func (n *idleBarrier) Done() {}
 
 func (n *idleBarrier) Point(m edge.PointMessage) (edge.Message, error) {
 	if !m.Time().Before(n.lastBarrierT.Load().(time.Time)) {
@@ -258,6 +259,7 @@ func (n *periodicBarrier) DeleteGroup(m edge.DeleteGroupMessage) (edge.Message, 
 	}
 	return m, nil
 }
+func (n *periodicBarrier) Done() {}
 
 func (n *periodicBarrier) Point(m edge.PointMessage) (edge.Message, error) {
 	if !m.Time().Before(n.lastT.Load().(time.Time)) {

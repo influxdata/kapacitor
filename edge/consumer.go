@@ -19,6 +19,9 @@ type Receiver interface {
 	Point(p PointMessage) error
 	Barrier(b BarrierMessage) error
 	DeleteGroup(d DeleteGroupMessage) error
+
+	// Done is called once the receiver will no longer receive any messages.
+	Done()
 }
 
 type consumer struct {
@@ -35,6 +38,7 @@ func NewConsumerWithReceiver(e Edge, r Receiver) Consumer {
 }
 
 func (ec *consumer) Consume() error {
+	defer ec.r.Done()
 	for msg, ok := ec.edge.Emit(); ok; msg, ok = ec.edge.Emit() {
 		switch m := msg.(type) {
 		case BeginBatchMessage:

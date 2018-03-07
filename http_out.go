@@ -174,3 +174,4 @@ func (g *httpOutGroup) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, err
 	g.n.deleteGroup(g.idx)
 	return d, nil
 }
+func (g *httpOutGroup) Done() {}

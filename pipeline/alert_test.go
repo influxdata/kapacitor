@@ -26,6 +26,7 @@ func TestAlertNode_MarshalJSON(t *testing.T) {
 			want: `{
     "typeOf": "alert",
     "id": "0",
+    "category": "",
     "topic": "",
     "alertId": "",
     "message": "",
@@ -50,6 +51,7 @@ func TestAlertNode_MarshalJSON(t *testing.T) {
     "noRecoveries": false,
     "stateChangesOnly": false,
     "stateChangesOnlyDuration": 0,
+    "inhibitors": null,
     "post": [
         {
             "url": "http://howdy.local",

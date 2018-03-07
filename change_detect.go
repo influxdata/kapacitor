@@ -104,6 +104,7 @@ func (g *changeDetectGroup) Barrier(b edge.BarrierMessage) (edge.Message, error)
 func (g *changeDetectGroup) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
 	return d, nil
 }
+func (g *changeDetectGroup) Done() {}
 
 // changeDetect calculates the changeDetect between prev and cur.
 // Return is the resulting changeDetect, whether the current point should be

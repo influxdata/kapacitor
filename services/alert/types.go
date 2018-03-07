@@ -1,6 +1,9 @@
 package alert
 
-import "github.com/influxdata/kapacitor/alert"
+import (
+	"github.com/influxdata/kapacitor/alert"
+	"github.com/influxdata/kapacitor/models"
+)
 
 // HandlerSpecRegistrar is responsible for registering and persisting handler spec definitions.
 type HandlerSpecRegistrar interface {
@@ -66,4 +69,11 @@ type TopicPersister interface {
 type handler struct {
 	Spec    HandlerSpec
 	Handler alert.Handler
+}
+
+// InhibitorLookup provides lookup access to inhibitors
+type InhibitorLookup interface {
+	IsInhibited(name string, tags models.Tags) bool
+	AddInhibitor(*alert.Inhibitor)
+	RemoveInhibitor(*alert.Inhibitor)
 }

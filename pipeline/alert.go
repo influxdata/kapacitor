@@ -128,6 +128,10 @@ type AlertNode struct{ *AlertNodeData }
 type AlertNodeData struct {
 	chainnode
 
+	// Category places this alert in a named category.
+	// Categories are used to inhibit alerts.
+	Category string `json:"category"`
+
 	// Topic specifies the name of an alert topic to which,
 	// alerts will be published.
 	// Alert handlers can be configured per topic, see the API documentation.
@@ -297,6 +301,10 @@ type AlertNodeData struct {
 	// Maximum interval to ignore non state changed events
 	// tick:ignore
 	StateChangesOnlyDuration time.Duration `json:"stateChangesOnlyDuration"`
+
+	// Inhibitors
+	// tick:ignore
+	Inhibitors []Inhibitor `tick:"Inhibit" json:"inhibitors"`
 
 	// Post the JSON alert data to the specified URL.
 	// tick:ignore
@@ -532,6 +540,49 @@ func (n *AlertNodeData) Flapping(low, high float64) *AlertNodeData {
 	n.FlapLow = low
 	n.FlapHigh = high
 	return n
+}
+
+// Inhibit other alerts in a category.
+// The equal tags provides a list of tags that must be equal in order for an alert event to be inhibited.
+//
+// The following two TICKscripts demonstrate how to use the inhibit feature.
+//
+// Example:
+//    //cpu_alert.tick
+//    stream
+//        |from()
+//            .measurement('cpu')
+//            .groupBy('host')
+//        |alert()
+//            .category('system_alerts')
+//            .crit(lambda: "usage_idle" < 10.0)
+//
+//    //host_alert.tick
+//    stream
+//        |from()
+//            .measurement('uptime')
+//            .groupBy('host')
+//        |deadman(0.0, 1m)
+//            .inhibit('system_alerts', 'host')
+//
+// The deadman is a kind of alert node and so can be used to inhibit all alerts in the `system_alerts` category when it triggers.
+// The 'host` argument to the inhibit function says that the host tag must be equal between the cpu alert and the host alert in order for it to be inhibited.
+// This has the effect of the deadman alerts only inhibits cpu alerts for hosts are are currently dead.
+//
+// tick:property
+func (n *AlertNodeData) Inhibit(category string, equalTags ...string) *AlertNodeData {
+	n.Inhibitors = append(n.Inhibitors, Inhibitor{
+		Category:  category,
+		EqualTags: equalTags,
+	})
+	return n
+}
+
+// Inhibitor represents a single alert inhibitor
+// tick:ignore
+type Inhibitor struct {
+	Category  string   `json:"category"`
+	EqualTags []string `json:"equalTags"`
 }
 
 // HTTP POST JSON alert data to a specified URL.
