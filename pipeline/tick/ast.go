@@ -98,6 +98,8 @@ func (a *AST) Create(n pipeline.Node, parents []ast.Node) (ast.Node, error) {
 		return NewDelete(parents).Build(node)
 	case *pipeline.DerivativeNode:
 		return NewDerivative(parents).Build(node)
+	case *pipeline.ChangeDetectNode:
+		return NewChangeDetect(parents).Build(node)
 	case *pipeline.Ec2AutoscaleNode:
 		return NewEc2Autoscale(parents).Build(node)
 	case *pipeline.EvalNode:

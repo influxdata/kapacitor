@@ -22,8 +22,6 @@ func NewChangeDetect(parents []ast.Node) *ChangeDetectNode {
 // Build creates a ChangeDetect ast.Node
 func (n *ChangeDetectNode) Build(d *pipeline.ChangeDetectNode) (ast.Node, error) {
 	n.Pipe("changeDetect", d.Field).
-		Dot("as", d.As).
-		Dot("unit", d.Unit).
-		DotIf("nonNegative", d.NonNegativeFlag)
+		Dot("as", d.As)
 	return n.prev, n.err
 }

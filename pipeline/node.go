@@ -442,6 +442,13 @@ func (n *chainnode) Derivative(field string) *DerivativeNode {
 	return s
 }
 
+// Create a new node that only emits new points if different from the previous point
+func (n *chainnode) ChangeDetect(field string) *ChangeDetectNode {
+	s := newChangeDetectNode(n.Provides(), field)
+	n.linkChild(s)
+	return s
+}
+
 // Create a new node that shifts the incoming points or batches in time.
 func (n *chainnode) Shift(shift time.Duration) *ShiftNode {
 	s := newShiftNode(n.Provides(), shift)

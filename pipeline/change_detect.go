@@ -3,9 +3,6 @@ package pipeline
 import (
 	"encoding/json"
 	"fmt"
-	"time"
-
-	"github.com/influxdata/influxdb/influxql"
 )
 
 // Compute the changeDetect of a stream or batch.
@@ -41,20 +38,11 @@ type ChangeDetectNode struct {
 	// Default is the name of the field used
 	// when calculating the changeDetect.
 	As string `json:"as"`
-
-	// The time unit of the resulting changeDetect value.
-	// Default: 1s
-	Unit time.Duration `json:"unit"`
-
-	// Where negative values are acceptable.
-	// tick:ignore
-	NonNegativeFlag bool `tick:"NonNegative" json:"nonNegative"`
 }
 
 func newChangeDetectNode(wants EdgeType, field string) *ChangeDetectNode {
 	return &ChangeDetectNode{
 		chainnode: newBasicChainNode("changeDetect", wants, wants),
-		Unit:      time.Second,
 		Field:     field,
 		As:        field,
 	}
@@ -74,7 +62,6 @@ func (n *ChangeDetectNode) MarshalJSON() ([]byte, error) {
 			ID:   n.ID(),
 		},
 		Alias: (*Alias)(n),
-		Unit:  influxql.FormatDuration(n.Unit),
 	}
 	return json.Marshal(raw)
 }
@@ -97,17 +84,7 @@ func (n *ChangeDetectNode) UnmarshalJSON(data []byte) error {
 	if raw.Type != "changeDetect" {
 		return fmt.Errorf("error unmarshaling node %d of type %s as ChangeDetectNode", raw.ID, raw.Type)
 	}
-	n.Unit, err = influxql.ParseDuration(raw.Unit)
-	if err != nil {
-		return err
-	}
+
 	n.setID(raw.ID)
 	return nil
-}
-
-// If called the changeDetect will skip negative results.
-// tick:property
-func (d *ChangeDetectNode) NonNegative() *ChangeDetectNode {
-	d.NonNegativeFlag = true
-	return d
 }
