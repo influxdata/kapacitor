@@ -1,9 +1,11 @@
 package kapacitor
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/influxdata/kapacitor/edge"
+	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 )
@@ -105,7 +107,7 @@ func (g *changeDetectGroup) doChangeDetect(p edge.FieldsTagsTimeGetter, n edge.F
 	}
 
 	fields := n.Fields().Copy()
-	fields[g.n.d.As] = value
+	fields[g.n.d.Field] = value
 	n.SetFields(fields)
 	return true
 }
@@ -122,7 +124,13 @@ func (g *changeDetectGroup) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message
 // stored as previous, and whether the point result should be emitted.
 func (n *ChangeDetectNode) changeDetect(prev, curr models.Fields, prevTime, currTime time.Time) (interface{}, bool, bool) {
 
-	value := curr[n.d.Field]
+	value, ok := curr[n.d.Field]
+	if !ok {
+		n.diag.Error("Invalid field in change detect",
+			fmt.Errorf("expected field %s not found", n.d.Field),
+			keyvalue.KV("field", n.d.Field))
+		return 0, false, false
+	}
 	if prev[n.d.Field] == value {
 		return value, false, false
 	}

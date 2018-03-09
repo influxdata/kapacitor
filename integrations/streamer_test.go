@@ -164,27 +164,27 @@ stream
 				Columns: []string{"time", "value"},
 				Values: [][]interface{}{
 					[]interface{}{
-						time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 						"bad",
+					},
+					[]interface{}{
+						time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+						"good",
 					},
 					[]interface{}{
 						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
-						"good",
-					},
-					[]interface{}{
-						time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
 						"bad",
 					},
 					[]interface{}{
-						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
 						"good",
+					},
+					[]interface{}{
+						time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+						"bad",
 					},
 					[]interface{}{
 						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
-						"bad",
-					},
-					[]interface{}{
-						time.Date(1971, 1, 1, 0, 0, 9, 0, time.UTC),
 						"good",
 					},
 				},

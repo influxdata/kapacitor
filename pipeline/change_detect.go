@@ -33,18 +33,12 @@ type ChangeDetectNode struct {
 	// The field to use when calculating the changeDetect
 	// tick:ignore
 	Field string `json:"field"`
-
-	// The new name of the changeDetect field.
-	// Default is the name of the field used
-	// when calculating the changeDetect.
-	As string `json:"as"`
 }
 
 func newChangeDetectNode(wants EdgeType, field string) *ChangeDetectNode {
 	return &ChangeDetectNode{
 		chainnode: newBasicChainNode("changeDetect", wants, wants),
 		Field:     field,
-		As:        field,
 	}
 }
 
@@ -55,7 +49,6 @@ func (n *ChangeDetectNode) MarshalJSON() ([]byte, error) {
 	var raw = &struct {
 		TypeOf
 		*Alias
-		Unit string `json:"unit"`
 	}{
 		TypeOf: TypeOf{
 			Type: "changeDetect",
@@ -73,7 +66,6 @@ func (n *ChangeDetectNode) UnmarshalJSON(data []byte) error {
 	var raw = &struct {
 		TypeOf
 		*Alias
-		Unit string `json:"unit"`
 	}{
 		Alias: (*Alias)(n),
 	}

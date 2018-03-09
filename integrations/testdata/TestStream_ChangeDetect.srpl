@@ -18,7 +18,7 @@ rpname
 packets value="good" 0000000005
 dbname
 rpname
-packets value="good" 0000000006
+packets value2="good" 0000000006
 dbname
 rpname
 packets value="bad" 0000000007
