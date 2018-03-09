@@ -6,27 +6,20 @@ import (
 )
 
 // Compute the changeDetect of a stream or batch.
-// The changeDetect is computed on a single field
-// and behaves similarly to the InfluxQL changeDetect
-// function. Kapacitor has its own implementation
-// of the changeDetect function, and, as a result, is
-// not part of the normal InfluxQL functions.
+// The changeDetect is computed on a single field,
+// discarding consecutive duplicate values, detecting
+// detects the points at which the series field
+// changes from one value to another.
+//
 //
 // Example:
 //     stream
 //         |from()
 //             .measurement('net_rx_packets')
 //         |changeDetect('value')
-//            .unit(1s) // default
-//            .nonNegative()
 //         ...
 //
-// Computes the changeDetect via:
-//    (current - previous ) / ( time_difference / unit)
-//
-// The changeDetect is computed for each point, and
-// because of boundary conditions the first point is
-// dropped.
+
 type ChangeDetectNode struct {
 	chainnode `json:"-"`
 
