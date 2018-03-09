@@ -393,10 +393,10 @@ func (s *Server) appendLoadService() error {
 	if s.HTTPDService == nil {
 		return errors.New("httpd service must be set for load service")
 	}
-	if s.HTTPDService.Handler == nil {
+	if s.HTTPDService.LocalHandler == nil {
 		return errors.New("httpd service handler must be set for load service")
 	}
-	srv, err := load.NewService(c, s.HTTPDService.Handler, d)
+	srv, err := load.NewService(c, s.HTTPDService.LocalHandler, d)
 	if err != nil {
 		return err
 	}
@@ -442,8 +442,13 @@ func (s *Server) initHTTPDService() {
 	d := s.DiagService.NewHTTPDHandler()
 	srv := httpd.NewService(s.config.HTTP, s.hostname, d)
 
+	srv.LocalHandler.PointsWriter = s.TaskMaster
 	srv.Handler.PointsWriter = s.TaskMaster
+
+	srv.LocalHandler.DiagService = s.DiagService
 	srv.Handler.DiagService = s.DiagService
+
+	srv.LocalHandler.Version = s.BuildInfo.Version
 	srv.Handler.Version = s.BuildInfo.Version
 
 	s.HTTPDService = srv
