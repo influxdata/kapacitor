@@ -753,7 +753,7 @@ func (c *Client) Ping() (time.Duration, string, error) {
 		return 0, "", err
 	}
 
-	resp, err := c.Do(req, nil, http.StatusNoContent)
+	resp, err := c.Do(req, nil, http.StatusOK)
 	if err != nil {
 		return 0, "", err
 	}
