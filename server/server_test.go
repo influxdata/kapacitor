@@ -4859,6 +4859,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			Level:         alert.Critical,
 			PreviousLevel: alert.OK,
 			Duration:      0 * time.Second,
+			Recoverable:   true,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -4881,6 +4882,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			Level:         alert.Critical,
 			PreviousLevel: alert.Critical,
 			Duration:      1 * time.Second,
+			Recoverable:   true,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -4903,6 +4905,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			Level:         alert.Critical,
 			PreviousLevel: alert.Critical,
 			Duration:      2 * time.Second,
+			Recoverable:   true,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -4927,6 +4930,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			Level:         alert.Critical,
 			PreviousLevel: alert.Critical,
 			Duration:      3 * time.Second,
+			Recoverable:   true,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -4951,6 +4955,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			Level:         alert.Critical,
 			PreviousLevel: alert.Critical,
 			Duration:      4 * time.Second,
+			Recoverable:   true,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -4975,6 +4980,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			Level:         alert.Critical,
 			PreviousLevel: alert.Critical,
 			Duration:      5 * time.Second,
+			Recoverable:   true,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -4998,6 +5004,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			Level:         alert.Critical,
 			PreviousLevel: alert.Critical,
 			Duration:      6 * time.Second,
+			Recoverable:   true,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -5021,6 +5028,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			Level:         alert.Critical,
 			PreviousLevel: alert.Critical,
 			Duration:      7 * time.Second,
+			Recoverable:   true,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -5044,6 +5052,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			Level:         alert.Critical,
 			PreviousLevel: alert.Critical,
 			Duration:      8 * time.Second,
+			Recoverable:   true,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -5067,6 +5076,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			Level:         alert.Critical,
 			PreviousLevel: alert.Critical,
 			Duration:      9 * time.Second,
+			Recoverable:   true,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -5089,6 +5099,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			Level:         alert.Critical,
 			PreviousLevel: alert.Critical,
 			Duration:      10 * time.Second,
+			Recoverable:   true,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -8775,11 +8786,12 @@ func TestServer_AlertHandlers(t *testing.T) {
 	resultJSON := `{"series":[{"name":"alert","columns":["time","value"],"values":[["1970-01-01T00:00:00Z",1]]}]}`
 
 	alertData := alert.Data{
-		ID:      "id",
-		Message: "message",
-		Details: "details",
-		Time:    time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
-		Level:   alert.Critical,
+		ID:          "id",
+		Message:     "message",
+		Details:     "details",
+		Time:        time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
+		Level:       alert.Critical,
+		Recoverable: true,
 		Data: models.Result{
 			Series: models.Rows{
 				{
@@ -9825,12 +9837,13 @@ alert value=2 0000000000002
 
 	// Check TCP handler got event
 	alertData := alert.Data{
-		ID:       "id-agg",
-		Message:  "Received 3 events in the last 100ms.",
-		Details:  "message\nmessage\nmessage",
-		Time:     time.Date(1970, 1, 1, 0, 0, 0, 2000000, time.UTC),
-		Level:    alert.Critical,
-		Duration: 2 * time.Millisecond,
+		ID:          "id-agg",
+		Message:     "Received 3 events in the last 100ms.",
+		Details:     "message\nmessage\nmessage",
+		Time:        time.Date(1970, 1, 1, 0, 0, 0, 2000000, time.UTC),
+		Level:       alert.Critical,
+		Duration:    2 * time.Millisecond,
+		Recoverable: false,
 		Data: models.Result{
 			Series: models.Rows{
 				{
@@ -9970,11 +9983,12 @@ stream
 
 	// Check TCP handler got event
 	alertData := alert.Data{
-		ID:      "id",
-		Message: "message",
-		Details: "details",
-		Time:    time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
-		Level:   alert.Critical,
+		ID:          "id",
+		Message:     "message",
+		Details:     "details",
+		Time:        time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
+		Level:       alert.Critical,
+		Recoverable: true,
 		Data: models.Result{
 			Series: models.Rows{
 				{
@@ -10090,11 +10104,12 @@ alert,host=serverB value=0 0000000004
 	s.Restart()
 
 	alertData := alert.Data{
-		ID:      "id",
-		Message: "message",
-		Details: "details",
-		Time:    time.Date(1970, 1, 1, 0, 0, 3, 0, time.UTC),
-		Level:   alert.Critical,
+		ID:          "id",
+		Message:     "message",
+		Details:     "details",
+		Time:        time.Date(1970, 1, 1, 0, 0, 3, 0, time.UTC),
+		Level:       alert.Critical,
+		Recoverable: true,
 		Data: models.Result{
 			Series: models.Rows{
 				{
