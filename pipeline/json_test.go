@@ -246,6 +246,7 @@ func TestPipeline_MarshalJSON(t *testing.T) {
             "log": null,
             "victorOps": null,
             "pagerDuty": null,
+            "pagerDuty2": null,
             "pushover": null,
             "sensu": null,
             "slack": null,

@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/dgrijalva/jwt-go"
 	iclient "github.com/influxdata/influxdb/client/v2"
 	"github.com/influxdata/influxdb/influxql"
@@ -46,6 +47,8 @@ import (
 	"github.com/influxdata/kapacitor/services/opsgenie2/opsgenie2test"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pagerduty/pagerdutytest"
+	"github.com/influxdata/kapacitor/services/pagerduty2"
+	"github.com/influxdata/kapacitor/services/pagerduty2/pagerduty2test"
 	"github.com/influxdata/kapacitor/services/pushover/pushovertest"
 	"github.com/influxdata/kapacitor/services/sensu/sensutest"
 	"github.com/influxdata/kapacitor/services/slack/slacktest"
@@ -7302,6 +7305,76 @@ func TestServer_UpdateConfig(t *testing.T) {
 			},
 		},
 		{
+			section: "pagerduty2",
+			setDefaults: func(c *server.Config) {
+				c.PagerDuty2.ServiceKey = "secret"
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/pagerduty2"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/pagerduty2/"},
+					Options: map[string]interface{}{
+						"enabled":     false,
+						"global":      false,
+						"service-key": true,
+						"url":         pagerduty2.DefaultPagerDuty2APIURL,
+					},
+					Redacted: []string{
+						"service-key",
+					},
+				}},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/pagerduty2/"},
+				Options: map[string]interface{}{
+					"enabled":     false,
+					"global":      false,
+					"service-key": true,
+					"url":         pagerduty2.DefaultPagerDuty2APIURL,
+				},
+				Redacted: []string{
+					"service-key",
+				},
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"service-key": "",
+							"enabled":     true,
+						},
+					},
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/pagerduty2"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/pagerduty2/"},
+							Options: map[string]interface{}{
+								"enabled":     true,
+								"global":      false,
+								"service-key": false,
+								"url":         pagerduty2.DefaultPagerDuty2APIURL,
+							},
+							Redacted: []string{
+								"service-key",
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/pagerduty2/"},
+						Options: map[string]interface{}{
+							"enabled":     true,
+							"global":      false,
+							"service-key": false,
+							"url":         pagerduty2.DefaultPagerDuty2APIURL,
+						},
+						Redacted: []string{
+							"service-key",
+						},
+					},
+				},
+			},
+		},
+		{
 			section: "smtp",
 			setDefaults: func(c *server.Config) {
 				c.SMTP.Host = "smtp.example.com"
@@ -8222,6 +8295,27 @@ func TestServer_ListServiceTests(t *testing.T) {
 				},
 			},
 			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/pagerduty2"},
+				Name: "pagerduty2",
+				Options: client.ServiceTestOptions{
+					"incident-key": "testIncidentKey",
+					"description":  "test pagerduty2 message",
+					"level":        "CRITICAL",
+					"event_data": map[string]interface{}{
+						"Fields": map[string]interface{}{},
+						"Result": map[string]interface{}{
+							"series": interface{}(nil),
+						},
+						"Name":        "testPagerDuty2",
+						"TaskName":    "",
+						"Group":       "",
+						"Tags":        map[string]interface{}{},
+						"Recoverable": false,
+					},
+					"timestamp": "2014-11-12T11:45:26.371Z",
+				},
+			},
+			{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/pushover"},
 				Name: "pushover",
 				Options: client.ServiceTestOptions{
@@ -8554,6 +8648,14 @@ func TestServer_DoServiceTest(t *testing.T) {
 		},
 		{
 			service: "pagerduty",
+			options: client.ServiceTestOptions{},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "service is not enabled",
+			},
+		},
+		{
+			service: "pagerduty2",
 			options: client.ServiceTestOptions{},
 			exp: client.ServiceTestResult{
 				Success: false,
@@ -9150,6 +9252,64 @@ func TestServer_AlertHandlers(t *testing.T) {
 				if !reflect.DeepEqual(exp, got) {
 					return fmt.Errorf("unexpected pagerduty request:\nexp\n%+v\ngot\n%+v\n", exp, got)
 				}
+				return nil
+			},
+		},
+		{
+			handler: client.TopicHandler{
+				Kind: "pagerduty2",
+				Options: map[string]interface{}{
+					"service-key": "service_key",
+				},
+			},
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
+				ts := pagerduty2test.NewServer()
+				ctxt := context.WithValue(nil, "server", ts)
+
+				c.PagerDuty2.Enabled = true
+				c.PagerDuty2.URL = ts.URL
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*pagerduty2test.Server)
+				kapacitorURL := ctxt.Value("kapacitorURL").(string)
+				ts.Close()
+				got := ts.Requests()
+				exp := []pagerduty2test.Request{{
+					URL: "/",
+					PostData: pagerduty2test.PostData{
+						Client:      "kapacitor",
+						ClientURL:   kapacitorURL,
+						EventAction: "trigger",
+						DedupKey:    "id",
+						Payload: &pagerduty2test.PDCEF{
+							Summary:  "message",
+							Source:   "unknown",
+							Severity: "critical",
+							Class:    "testAlertHandlers",
+							CustomDetails: map[string]interface{}{
+								"result": map[string]interface{}{
+									"series": []interface{}{
+										map[string]interface{}{
+											"name":    "alert",
+											"columns": []interface{}{"time", "value"},
+											"values": []interface{}{
+												[]interface{}{"1970-01-01T00:00:00Z", float64(1)},
+											},
+										},
+									},
+								},
+							},
+							Timestamp: "1970-01-01T00:00:00.000000000Z",
+						},
+						RoutingKey: "service_key",
+					},
+				}}
+
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected pagerduty2 request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+
 				return nil
 			},
 		},
@@ -11212,4 +11372,33 @@ func TestLogSessions_HeaderGzip(t *testing.T) {
 		return
 	}
 
+}
+
+func compareListIgnoreOrder(got, exp []interface{}, cmpF func(got, exp interface{}) bool) error {
+	if len(got) != len(exp) {
+		return fmt.Errorf("unequal lists ignoring order:\ngot\n%s\nexp\n%s\n", spew.Sdump(got), spew.Sdump(exp))
+	}
+
+	if cmpF == nil {
+		cmpF = func(got, exp interface{}) bool {
+			if !reflect.DeepEqual(got, exp) {
+				return false
+			}
+			return true
+		}
+	}
+
+	for _, e := range exp {
+		found := false
+		for _, g := range got {
+			if cmpF(g, e) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("unequal lists ignoring order:\ngot\n%s\nexp\n%s\n", spew.Sdump(got), spew.Sdump(exp))
+		}
+	}
+	return nil
 }

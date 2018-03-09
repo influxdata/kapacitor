@@ -20,6 +20,7 @@ import (
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/opsgenie2"
 	"github.com/influxdata/kapacitor/services/pagerduty"
+	"github.com/influxdata/kapacitor/services/pagerduty2"
 	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/slack"
@@ -92,6 +93,9 @@ type Service struct {
 	}
 	PagerDutyService interface {
 		Handler(pagerduty.HandlerConfig, ...keyvalue.T) alert.Handler
+	}
+	PagerDuty2Service interface {
+		Handler(pagerduty2.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 	PushoverService interface {
 		Handler(pushover.HandlerConfig, ...keyvalue.T) alert.Handler
@@ -822,6 +826,14 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 			return handler{}, err
 		}
 		h = s.PagerDutyService.Handler(c, ctx...)
+		h = newExternalHandler(h)
+	case "pagerduty2":
+		c := pagerduty2.HandlerConfig{}
+		err = decodeOptions(spec.Options, &c)
+		if err != nil {
+			return handler{}, err
+		}
+		h = s.PagerDuty2Service.Handler(c, ctx...)
 		h = newExternalHandler(h)
 	case "pushover":
 		c := pushover.HandlerConfig{}

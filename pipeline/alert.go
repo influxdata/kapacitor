@@ -23,6 +23,7 @@ const defaultMessageTmpl = "{{ .ID }} is {{ .Level }}"
 // Default template for constructing a details message.
 const defaultDetailsTmpl = "{{ json . }}"
 
+// AlertNode struct wraps the default AlertNodeData
 // tick:wraps:AlertNodeData
 type AlertNode struct{ *AlertNodeData }
 
@@ -324,6 +325,10 @@ type AlertNodeData struct {
 	// Send alert to PagerDuty.
 	// tick:ignore
 	PagerDutyHandlers []*PagerDutyHandler `tick:"PagerDuty" json:"pagerDuty"`
+
+	// Send alert to PagerDuty API v2.
+	// tick:ignore
+	PagerDuty2Handlers []*PagerDuty2Handler `tick:"PagerDuty2" json:"pagerDuty2"`
 
 	// Send alert to Pushover.
 	// tick:ignore
@@ -896,6 +901,64 @@ func (n *AlertNodeData) PagerDuty() *PagerDutyHandler {
 
 // tick:embedded:AlertNode.PagerDuty
 type PagerDutyHandler struct {
+	*AlertNodeData `json:"-"`
+
+	// The service key to use for the alert.
+	// Defaults to the value in the configuration if empty.
+	ServiceKey string `json:"serviceKey"`
+}
+
+// Send the alert to PagerDuty API v2.
+// To use PagerDuty alerting you must first follow the steps to enable a new 'Generic API' service.
+// NOTE: the API v2 endpoint is different and requires a new configuration in order to process/handle alerts
+//
+// From https://developer.pagerduty.com/documentation/integration/events
+//
+//    1. In your account, under the Services tab, click "Add New Service".
+//    2. Enter a name for the service and select an escalation policy. Then, select "Generic API" for the Service Type.
+//    3. Click the "Add Service" button.
+//    4. Once the service is created, you'll be taken to the service page. On this page, you'll see the "Service key", which is needed to access the API
+//
+// Place the 'service key' into the 'pagerduty' section of the Kapacitor configuration as the option 'service-key'.
+//
+// Example:
+//    [pagerduty2]
+//      enabled = true
+//      service-key = "xxxxxxxxx"
+//
+// With the correct configuration you can now use PagerDuty in TICKscripts.
+//
+// Example:
+//    stream
+//         |alert()
+//             .pagerDuty2()
+//
+// If the 'pagerduty' section in the configuration has the option: global = true
+// then all alerts are sent to PagerDuty without the need to explicitly state it
+// in the TICKscript.
+//
+// Example:
+//    [pagerduty2]
+//      enabled = true
+//      service-key = "xxxxxxxxx"
+//      global = true
+//
+// Example:
+//    stream
+//         |alert()
+//
+// Send alert to PagerDuty API v2.
+// tick:property
+func (n *AlertNodeData) PagerDuty2() *PagerDuty2Handler {
+	pd2 := &PagerDuty2Handler{
+		AlertNodeData: n,
+	}
+	n.PagerDuty2Handlers = append(n.PagerDuty2Handlers, pd2)
+	return pd2
+}
+
+// tick:embedded:AlertNode.PagerDuty
+type PagerDuty2Handler struct {
 	*AlertNodeData `json:"-"`
 
 	// The service key to use for the alert.
