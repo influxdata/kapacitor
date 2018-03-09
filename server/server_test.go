@@ -7455,13 +7455,16 @@ func TestServer_UpdateConfig(t *testing.T) {
 		{
 			section: "slack",
 			setDefaults: func(c *server.Config) {
-				c.Slack.Global = true
+				c.Slack[0].Global = true
+				c.Slack[0].Default = true
 			},
 			expDefaultSection: client.ConfigSection{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack"},
 				Elements: []client.ConfigElement{{
 					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/"},
 					Options: map[string]interface{}{
+						"workspace":            "",
+						"default":              true,
 						"channel":              "",
 						"enabled":              false,
 						"global":               true,
@@ -7482,6 +7485,8 @@ func TestServer_UpdateConfig(t *testing.T) {
 			expDefaultElement: client.ConfigElement{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/"},
 				Options: map[string]interface{}{
+					"workspace":            "",
+					"default":              true,
 					"channel":              "",
 					"enabled":              false,
 					"global":               true,
@@ -7513,7 +7518,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 						Elements: []client.ConfigElement{{
 							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/"},
 							Options: map[string]interface{}{
+								"workspace":            "",
 								"channel":              "#general",
+								"default":              true,
 								"enabled":              true,
 								"global":               false,
 								"icon-emoji":           "",
@@ -7533,7 +7540,9 @@ func TestServer_UpdateConfig(t *testing.T) {
 					expElement: client.ConfigElement{
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/"},
 						Options: map[string]interface{}{
+							"workspace":            "",
 							"channel":              "#general",
+							"default":              true,
 							"enabled":              true,
 							"global":               false,
 							"icon-emoji":           "",
@@ -8253,6 +8262,7 @@ func TestServer_ListServiceTests(t *testing.T) {
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/slack"},
 				Name: "slack",
 				Options: client.ServiceTestOptions{
+					"workspace":  "",
 					"channel":    "",
 					"icon-emoji": "",
 					"level":      "CRITICAL",
@@ -8391,6 +8401,7 @@ func TestServer_ListServiceTests_WithPattern(t *testing.T) {
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/slack"},
 				Name: "slack",
 				Options: client.ServiceTestOptions{
+					"workspace":  "",
 					"channel":    "",
 					"icon-emoji": "",
 					"level":      "CRITICAL",
@@ -9273,8 +9284,8 @@ func TestServer_AlertHandlers(t *testing.T) {
 				ts := slacktest.NewServer()
 				ctxt := context.WithValue(nil, "server", ts)
 
-				c.Slack.Enabled = true
-				c.Slack.URL = ts.URL + "/test/slack/url"
+				c.Slack[0].Enabled = true
+				c.Slack[0].URL = ts.URL + "/test/slack/url"
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
@@ -10700,8 +10711,8 @@ func TestServer_AlertHandler_MultipleHandlers(t *testing.T) {
 
 	// Configure slack
 	slack := slacktest.NewServer()
-	c.Slack.Enabled = true
-	c.Slack.URL = slack.URL + "/test/slack/url"
+	c.Slack[0].Enabled = true
+	c.Slack[0].URL = slack.URL + "/test/slack/url"
 
 	// Configure victorops
 	vo := victoropstest.NewServer()

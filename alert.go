@@ -217,6 +217,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 
 	for _, s := range n.SlackHandlers {
 		c := slack.HandlerConfig{
+			Workspace: s.Workspace,
 			Channel:   s.Channel,
 			Username:  s.Username,
 			IconEmoji: s.IconEmoji,

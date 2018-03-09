@@ -195,6 +195,7 @@ func init() {
 		"flatten":           func(parent chainnodeAlias) Node { return parent.Flatten() },
 		"eval":              func(parent chainnodeAlias) Node { return parent.Eval() },
 		"derivative":        func(parent chainnodeAlias) Node { return parent.Derivative("") },
+		"changeDetect":      func(parent chainnodeAlias) Node { return parent.ChangeDetect("") },
 		"delete":            func(parent chainnodeAlias) Node { return parent.Delete() },
 		"default":           func(parent chainnodeAlias) Node { return parent.Default() },
 		"combine":           func(parent chainnodeAlias) Node { return parent.Combine(nil) },
@@ -520,6 +521,7 @@ type chainnodeAlias interface {
 	Default() *DefaultNode
 	Delete() *DeleteNode
 	Derivative(string) *DerivativeNode
+	ChangeDetect(string) *ChangeDetectNode
 	Desc() string
 	Difference(string) *InfluxQLNode
 	Distinct(string) *InfluxQLNode

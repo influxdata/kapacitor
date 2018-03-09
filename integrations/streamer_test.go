@@ -144,6 +144,57 @@ stream
 	testStreamerWithOutput(t, "TestStream_InfluxQLNodeMissingValue", script, 15*time.Second, er, false, nil)
 }
 
+func TestStream_ChangeDetect(t *testing.T) {
+
+	var script = `
+stream
+	|from().measurement('packets')
+	|changeDetect('value')
+    |window()
+		.period(10s)
+		.every(10s)
+	|httpOut('TestStream_ChangeDetect')
+`
+
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "packets",
+				Tags:    nil,
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{
+					[]interface{}{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						"bad",
+					},
+					[]interface{}{
+						time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+						"good",
+					},
+					[]interface{}{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						"bad",
+					},
+					[]interface{}{
+						time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+						"good",
+					},
+					[]interface{}{
+						time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+						"bad",
+					},
+					[]interface{}{
+						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+						"good",
+					},
+				},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_ChangeDetect", script, 15*time.Second, er, false, nil)
+}
+
 func TestStream_Derivative(t *testing.T) {
 
 	var script = `
@@ -8391,7 +8442,7 @@ stream
 		c.URL = ts.URL + "/test/slack/url"
 		c.Channel = "#channel"
 		d := diagService.NewSlackHandler().WithContext(keyvalue.KV("test", "slack"))
-		sl, err := slack.NewService(c, d)
+		sl, err := slack.NewService([]slack.Config{c}, d)
 		if err != nil {
 			t.Error(err)
 		}
