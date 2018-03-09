@@ -146,8 +146,7 @@ stream
 
 func TestStream_ChangeDetect(t *testing.T) {
 
-	var script = `
-stream
+	var script = `stream
 	|from().measurement('packets')
 	|changeDetect('value')
     |window()

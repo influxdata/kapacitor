@@ -15,10 +15,27 @@ import (
 // Example:
 //     stream
 //         |from()
-//             .measurement('net_rx_packets')
+//             .measurement('packets')
 //         |changeDetect('value')
 //         ...
 //
+// with source data:
+// packets value="bad" 0000000000
+// packets value="good" 0000000001
+// packets value="bad" 0000000002
+// packets value="bad" 0000000003
+// packets value="bad" 0000000004
+// packets value="good" 0000000005
+//
+// Would have output:
+// packets value="bad" 0000000000
+// packets value="good" 0000000001
+// packets value="bad" 0000000002
+// packets value="good" 0000000005
+//
+// Where the data are unchanged, but only the points
+// where the value changes from the previous value are
+// emitted.
 
 type ChangeDetectNode struct {
 	chainnode `json:"-"`
