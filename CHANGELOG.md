@@ -4,9 +4,11 @@
 
 ### Features
 
+
 - [#1844](https://github.com/influxdata/kapacitor/pull/1844): Added a new kapacitor node changeDetect that emits a value
     for each time a series field changes.
-
+- [#1828](https://github.com/influxdata/kapacitor/pull/1828): Add recoverable field to JSON alert response to indicate whether the
+alert will auto-recover.
 - [#1823](https://github.com/influxdata/kapacitor/pull/1823): Update OpsGenie integration to use the v2 API.
     To upgrade to using the new API simply update your config and TICKscripts to use opsgenie2 instead of opsgenie.
     If your `opsgenie` config uses the `recovery_url` option, for `opsgenie2` you will need to change it to the `recovery_action` option.

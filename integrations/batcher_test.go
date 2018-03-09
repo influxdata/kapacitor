@@ -1507,6 +1507,7 @@ func TestBatch_AlertStateChangesOnly(t *testing.T) {
 				Time:          time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 				Level:         alert.Critical,
 				PreviousLevel: alert.OK,
+				Recoverable:   true,
 			}
 			ad.Data = models.Result{}
 			if eq, msg := compareAlertData(expAd, ad); !eq {
@@ -1520,6 +1521,7 @@ func TestBatch_AlertStateChangesOnly(t *testing.T) {
 				Duration:      38 * time.Second,
 				Level:         alert.OK,
 				PreviousLevel: alert.Critical,
+				Recoverable:   true,
 			}
 			ad.Data = models.Result{}
 			if eq, msg := compareAlertData(expAd, ad); !eq {
@@ -1580,6 +1582,7 @@ func TestBatch_AlertStateChangesOnlyExpired(t *testing.T) {
 				Duration:      time.Duration(rc-1) * 20 * time.Second,
 				Level:         alert.Critical,
 				PreviousLevel: alert.OK,
+				Recoverable:   true,
 			}
 		case 2:
 			expAd = alert.Data{
@@ -1589,6 +1592,7 @@ func TestBatch_AlertStateChangesOnlyExpired(t *testing.T) {
 				Duration:      time.Duration(rc-1) * 20 * time.Second,
 				Level:         alert.Critical,
 				PreviousLevel: alert.Critical,
+				Recoverable:   true,
 			}
 		case 3:
 			expAd = alert.Data{
@@ -1598,6 +1602,7 @@ func TestBatch_AlertStateChangesOnlyExpired(t *testing.T) {
 				Duration:      38 * time.Second,
 				Level:         alert.OK,
 				PreviousLevel: alert.Critical,
+				Recoverable:   true,
 			}
 		}
 		if eq, msg := compareAlertData(expAd, ad); !eq {
