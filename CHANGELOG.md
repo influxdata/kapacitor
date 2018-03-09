@@ -4,7 +4,7 @@
 
 ### Features
 
-- [#1843](https://github.com/influxdata/kapacitor/pull/1843): Added a new kapacitor node changeDetect that emits a value
+- [#1844](https://github.com/influxdata/kapacitor/pull/1844): Added a new kapacitor node changeDetect that emits a value
     for each time a series field changes.
 
 - [#1823](https://github.com/influxdata/kapacitor/pull/1823): Update OpsGenie integration to use the v2 API.
