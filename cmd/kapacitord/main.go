@@ -77,6 +77,7 @@ func (m *Main) Run(args ...string) error {
 		cmd.Version = version
 		cmd.Commit = commit
 		cmd.Branch = branch
+		cmd.Platform = "OSS"
 
 		err := cmd.Run(args...)
 		// Use diagnostic from cmd since it may have special config now.
@@ -198,7 +199,7 @@ func (cmd *VersionCommand) Run(args ...string) error {
 	}
 
 	// Print version info.
-	fmt.Fprintf(cmd.Stdout, "Kapacitor %s (git: %s %s)\n", version, branch, commit)
+	fmt.Fprintf(cmd.Stdout, "Kapacitor OSS version %s (git: %s %s)\n", version, branch, commit)
 
 	return nil
 }

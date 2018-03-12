@@ -178,7 +178,8 @@ type serverInfo struct {
 
 	hostname,
 	version,
-	product string
+	product,
+	platform string
 
 	numTasks,
 	numEnabledTasks,
@@ -215,6 +216,10 @@ func (i serverInfo) Version() string {
 
 func (i serverInfo) Product() string {
 	return i.product
+}
+
+func (i serverInfo) Platform() string {
+	return i.platform
 }
 
 func (i serverInfo) NumTasks() int64 {

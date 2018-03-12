@@ -76,9 +76,10 @@ const serverIDFilename = "server.id"
 
 // BuildInfo represents the build details for the server code.
 type BuildInfo struct {
-	Version string
-	Commit  string
-	Branch  string
+	Version  string
+	Commit   string
+	Branch   string
+	Platform string
 }
 
 type Diagnostic interface {
@@ -184,6 +185,7 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 	vars.ServerIDVar.Set(s.ServerID)
 	vars.HostVar.Set(s.hostname)
 	vars.ProductVar.Set(vars.Product)
+	vars.PlatformVar.Set(s.BuildInfo.Platform)
 	vars.VersionVar.Set(s.BuildInfo.Version)
 	s.Diag.Info("listing ClusterID and ServerID",
 		keyvalue.KV("cluster_id", s.ClusterID.String()), keyvalue.KV("server_id", s.ServerID.String()))
