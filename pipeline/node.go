@@ -63,6 +63,9 @@ type Node interface {
 	// The type of output the node provides.
 	Provides() EdgeType
 
+	// IsQuiet reports whether the node should suppress all errors during evaluation.
+	IsQuiet() bool
+
 	// Check that the definition of the node is consistent
 	validate() error
 
@@ -89,6 +92,16 @@ type node struct {
 	provides EdgeType
 	tm       bool
 	pm       bool
+
+	// tick:ignore
+	QuietFlag bool `tick:"Quiet" json:"quiet,omitempty"`
+}
+
+func (n *node) IsQuiet() bool {
+	return n.QuietFlag
+}
+func (n *node) Quiet() {
+	n.QuietFlag = true
 }
 
 // tick:ignore

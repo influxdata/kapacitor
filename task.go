@@ -521,7 +521,7 @@ func (et *ExecutingTask) createNode(p pipeline.Node, d NodeDiagnostic) (n Node, 
 		return nil, fmt.Errorf("unknown pipeline node type %T", p)
 	}
 	if err == nil && n != nil {
-		n.init()
+		n.init(p.IsQuiet())
 	}
 	return n, err
 }
