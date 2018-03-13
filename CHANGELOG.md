@@ -1,10 +1,10 @@
 # Changelog
 
-## v1.4.1 [unreleased]
+## v1.4.1 [2018-04-13]
 
 ### Bugfixes
 
-- [#1834](https://github.com/influxdata/kapacitor/issue/1834): Fix bug where task type was invalid when using var for stream/batch
+- [#1834](https://github.com/influxdata/kapacitor/issues/1834): Fix bug where task type was invalid when using var for stream/batch
 
 ## v1.4.0 [2017-12-08]
 
