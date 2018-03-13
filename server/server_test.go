@@ -1777,6 +1777,76 @@ stream
 	}
 }
 
+func TestServer_DynamicStreamTask(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	testCases := []struct {
+		name string
+		tick string
+		want client.TaskType
+	}{
+		{
+			name: "stream",
+			tick: `
+dbrp "db"."rp"
+stream
+    |from()
+         .measurement('test')
+`,
+			want: client.StreamTask,
+		},
+		{
+			name: "stream_through_var",
+			tick: `
+dbrp "db"."rp"
+var s = stream
+s
+    |from()
+         .measurement('test')
+`,
+			want: client.StreamTask,
+		},
+		{
+			name: "batch",
+			tick: `
+dbrp "db"."rp"
+batch
+    |query('select * from db.rp.m')
+`,
+			want: client.BatchTask,
+		},
+		{
+			name: "batch_through_var",
+			tick: `
+dbrp "db"."rp"
+var b = batch
+b
+    |query('select * from db.rp.m')
+`,
+			want: client.BatchTask,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			task, err := cli.CreateTask(client.CreateTaskOptions{
+				ID:         tc.name,
+				TICKscript: tc.tick,
+				Status:     client.Disabled,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if task.Type != tc.want {
+				t.Fatalf("unexpected task type: got: %v want: %v", task.Type, tc.want)
+			}
+		})
+	}
+}
+
 func TestServer_StreamTask(t *testing.T) {
 	s, cli := OpenDefaultServer()
 	defer s.Close()
