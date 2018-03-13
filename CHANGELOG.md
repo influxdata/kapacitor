@@ -21,6 +21,11 @@ alert will auto-recover.
 - [#1827](https://github.com/influxdata/kapacitor/pull/1827): Fix deadlock in load service when task has an error.
 
 - [#1795](https://github.com/influxdata/kapacitor/pull/1795): Support PagerDuty API v2
+## v1.4.1 [2018-04-13]
+
+### Bugfixes
+
+- [#1834](https://github.com/influxdata/kapacitor/issues/1834): Fix bug where task type was invalid when using var for stream/batch
 
 ## v1.4.0 [2017-12-08]
 
