@@ -29,9 +29,10 @@ import (
 
 // These variables are populated via the Go linker.
 var (
-	version string
-	commit  string
-	branch  string
+	version  string
+	commit   string
+	branch   string
+	platform string
 )
 
 var defaultURL = "http://localhost:9092"
@@ -2220,7 +2221,7 @@ func versionUsage() {
 }
 
 func doVersion(args []string) error {
-	fmt.Fprintf(os.Stdout, "Kapacitor OSS %s (git: %s %s)\n", version, branch, commit)
+	fmt.Fprintf(os.Stdout, "Kapacitor %s %s (git: %s %s)\n", platform, version, branch, commit)
 	return nil
 }
 
