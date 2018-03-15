@@ -183,8 +183,7 @@ func TestPipeline_MarshalJSON(t *testing.T) {
                 }
             ],
             "keep": false,
-            "keepList": null,
-            "quiet": false
+            "keepList": null
         },
         {
             "typeOf": "alert",
@@ -1318,3 +1317,4 @@ func (m *MockNode) setPipeline(*Pipeline)        {}
 func (m *MockNode) pipeline() *Pipeline          { return nil }
 func (m *MockNode) dot(buf *bytes.Buffer)        {}
 func (m *MockNode) MarshalJSON() ([]byte, error) { return nil, nil }
+func (m *MockNode) IsQuiet() bool                { return false }

@@ -46,9 +46,6 @@ type EvalNode struct {
 	// keep all fields.
 	// tick:ignore
 	KeepList []string `json:"keepList"`
-
-	// tick:ignore
-	QuietFlag bool `tick:"Quiet" json:"quiet"`
 }
 
 func newEvalNode(e EdgeType, exprs []*ast.LambdaNode) *EvalNode {
@@ -192,12 +189,5 @@ func (e *EvalNode) Tags(names ...string) *EvalNode {
 func (e *EvalNode) Keep(fields ...string) *EvalNode {
 	e.KeepFlag = true
 	e.KeepList = fields
-	return e
-}
-
-// Suppress errors during evaluation.
-// tick:property
-func (e *EvalNode) Quiet() *EvalNode {
-	e.QuietFlag = true
 	return e
 }

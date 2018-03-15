@@ -60,7 +60,9 @@ func newNodeDiagnostic(n *node, diag NodeDiagnostic) *nodeDiagnostic {
 
 func (n *nodeDiagnostic) Error(msg string, err error, ctx ...keyvalue.T) {
 	n.node.incrementErrorCount()
-	n.NodeDiagnostic.Error(msg, err, ctx...)
+	if !n.node.quiet {
+		n.NodeDiagnostic.Error(msg, err, ctx...)
+	}
 }
 
 // A node that can be  in an executor.
@@ -69,7 +71,7 @@ type Node interface {
 
 	addParentEdge(edge.StatsEdge)
 
-	init()
+	init(quiet bool)
 
 	// start the node and its children
 	start(snapshot []byte)
@@ -124,6 +126,8 @@ type node struct {
 	statsKey   string
 	statMap    *kexpvar.Map
 
+	quiet bool
+
 	nodeErrors *kexpvar.Int
 }
 
@@ -137,7 +141,7 @@ func (n *node) abortParentEdges() {
 	}
 }
 
-func (n *node) init() {
+func (n *node) init(quiet bool) {
 	tags := map[string]string{
 		"task": n.et.Task.ID,
 		"node": n.Name(),
@@ -153,6 +157,7 @@ func (n *node) init() {
 	n.statMap.Set(statCardinalityGauge, kexpvar.NewIntFuncGauge(nil))
 	n.timer = n.et.tm.TimingService.NewTimer(avgExecVar)
 	n.errCh = make(chan error, 1)
+	n.quiet = quiet
 }
 
 func (n *node) start(snapshot []byte) {
