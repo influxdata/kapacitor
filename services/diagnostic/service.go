@@ -196,6 +196,12 @@ func (s *Service) NewHipChatHandler() *HipChatHandler {
 	}
 }
 
+func (s *Service) NewKafkaHandler() *KafkaHandler {
+	return &KafkaHandler{
+		l: s.Logger.With(String("service", "kafka")),
+	}
+}
+
 func (s *Service) NewPagerDutyHandler() *PagerDutyHandler {
 	return &PagerDutyHandler{
 		l: s.Logger.With(String("service", "pagerduty")),

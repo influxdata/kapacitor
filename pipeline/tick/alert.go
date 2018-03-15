@@ -160,6 +160,13 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 			Dot("token", h.Token)
 	}
 
+	for _, h := range a.KafkaHandlers {
+		n.Dot("kafka").
+			Dot("cluster", h.Cluster).
+			Dot("kafkaTopic", h.KafkaTopic).
+			Dot("template", h.Template)
+	}
+
 	for _, h := range a.AlertaHandlers {
 		n.Dot("alerta").
 			Dot("token", h.Token).

@@ -19,6 +19,7 @@ import (
 	alertservice "github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httppost"
+	"github.com/influxdata/kapacitor/services/kafka"
 	"github.com/influxdata/kapacitor/services/mqtt"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/opsgenie2"
@@ -312,6 +313,19 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		et.tm.HipChatService.Global() &&
 		et.tm.HipChatService.StateChangesOnly() {
 		n.IsStateChangesOnly = true
+	}
+
+	for _, k := range n.KafkaHandlers {
+		c := kafka.HandlerConfig{
+			Cluster:  k.Cluster,
+			Topic:    k.Topic,
+			Template: k.Template,
+		}
+		h, err := et.tm.KafkaService.Handler(c, ctx...)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to create kafka handler")
+		}
+		an.handlers = append(an.handlers, h)
 	}
 
 	for _, a := range n.AlertaHandlers {

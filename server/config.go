@@ -27,6 +27,7 @@ import (
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/influxdb"
 	"github.com/influxdata/kapacitor/services/k8s"
+	"github.com/influxdata/kapacitor/services/kafka"
 	"github.com/influxdata/kapacitor/services/load"
 	"github.com/influxdata/kapacitor/services/marathon"
 	"github.com/influxdata/kapacitor/services/mqtt"
@@ -82,6 +83,7 @@ type Config struct {
 	// Alert handlers
 	Alerta     alerta.Config     `toml:"alerta" override:"alerta"`
 	HipChat    hipchat.Config    `toml:"hipchat" override:"hipchat"`
+	Kafka      kafka.Configs     `toml:"kafka" override:"kafka,element-key=id"`
 	MQTT       mqtt.Configs      `toml:"mqtt" override:"mqtt,element-key=name"`
 	OpsGenie   opsgenie.Config   `toml:"opsgenie" override:"opsgenie"`
 	OpsGenie2  opsgenie2.Config  `toml:"opsgenie2" override:"opsgenie2"`
@@ -262,6 +264,9 @@ func (c *Config) Validate() error {
 	}
 	if err := c.HipChat.Validate(); err != nil {
 		return errors.Wrap(err, "hipchat")
+	}
+	if err := c.Kafka.Validate(); err != nil {
+		return errors.Wrap(err, "kafka")
 	}
 	if err := c.MQTT.Validate(); err != nil {
 		return errors.Wrap(err, "mqtt")
