@@ -41,6 +41,8 @@ import (
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/httppost/httpposttest"
 	"github.com/influxdata/kapacitor/services/k8s"
+	"github.com/influxdata/kapacitor/services/kafka"
+	"github.com/influxdata/kapacitor/services/kafka/kafkatest"
 	"github.com/influxdata/kapacitor/services/mqtt"
 	"github.com/influxdata/kapacitor/services/mqtt/mqtttest"
 	"github.com/influxdata/kapacitor/services/opsgenie"
@@ -8700,6 +8702,16 @@ func TestServer_ListServiceTests(t *testing.T) {
 				},
 			},
 			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/kafka"},
+				Name: "kafka",
+				Options: client.ServiceTestOptions{
+					"cluster": "example",
+					"topic":   "test",
+					"key":     "key",
+					"message": "test kafka message",
+				},
+			},
+			{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/kubernetes"},
 				Name: "kubernetes",
 				Options: client.ServiceTestOptions{
@@ -9501,6 +9513,49 @@ func TestServer_AlertHandlers(t *testing.T) {
 				}}
 				if !reflect.DeepEqual(exp, got) {
 					return fmt.Errorf("unexpected hipchat request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handler: client.TopicHandler{
+				Kind: "kafka",
+				Options: map[string]interface{}{
+					"cluster": "default",
+					"topic":   "test",
+				},
+			},
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
+				ts, err := kafkatest.NewServer()
+				if err != nil {
+					return nil, err
+				}
+				ctxt := context.WithValue(nil, "server", ts)
+
+				c.Kafka = kafka.Configs{{
+					Enabled: true,
+					ID:      "default",
+					Brokers: []string{ts.Addr.String()},
+				}}
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*kafkatest.Server)
+				time.Sleep(2 * time.Second)
+				ts.Close()
+				got, err := ts.Messages()
+				if err != nil {
+					return err
+				}
+				exp := []kafkatest.Message{{
+					Topic:     "test",
+					Partition: 1,
+					Offset:    0,
+					Key:       "id",
+					Message:   string(adJSON) + "\n",
+				}}
+				if !cmp.Equal(exp, got) {
+					return fmt.Errorf("unexpected kafak messages -exp/+got:\n%s", cmp.Diff(exp, got))
 				}
 				return nil
 			},

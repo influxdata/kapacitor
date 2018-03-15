@@ -443,6 +443,28 @@ func TestAlertHipchat(t *testing.T) {
 	PipelineTickTestHelper(t, pipe, want)
 }
 
+func TestAlertKafka(t *testing.T) {
+	pipe, _, from := StreamFrom()
+	handler := from.Alert().Kafka()
+	handler.Cluster = "default"
+	handler.KafkaTopic = "test"
+	handler.Template = "tmpl"
+
+	want := `stream
+    |from()
+    |alert()
+        .id('{{ .Name }}:{{ .Group }}')
+        .message('{{ .ID }} is {{ .Level }}')
+        .details('{{ json . }}')
+        .history(21)
+        .kafka()
+        .cluster('default')
+        .kafkaTopic('test')
+        .template('tmpl')
+`
+	PipelineTickTestHelper(t, pipe, want)
+}
+
 func TestAlertAlerta(t *testing.T) {
 	pipe, _, from := StreamFrom()
 	handler := from.Alert().Alerta()

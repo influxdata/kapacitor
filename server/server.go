@@ -37,6 +37,7 @@ import (
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/influxdb"
 	"github.com/influxdata/kapacitor/services/k8s"
+	"github.com/influxdata/kapacitor/services/kafka"
 	"github.com/influxdata/kapacitor/services/load"
 	"github.com/influxdata/kapacitor/services/marathon"
 	"github.com/influxdata/kapacitor/services/mqtt"
@@ -229,6 +230,7 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 	// Append Alert integration services
 	s.appendAlertaService()
 	s.appendHipChatService()
+	s.appendKafkaService()
 	if err := s.appendMQTTService(); err != nil {
 		return nil, errors.Wrap(err, "mqtt service")
 	}
@@ -729,6 +731,18 @@ func (s *Server) appendHipChatService() {
 
 	s.SetDynamicService("hipchat", srv)
 	s.AppendService("hipchat", srv)
+}
+
+func (s *Server) appendKafkaService() {
+	c := s.config.Kafka
+	d := s.DiagService.NewKafkaHandler()
+	srv := kafka.NewService(c, d)
+
+	s.TaskMaster.KafkaService = srv
+	s.AlertService.KafkaService = srv
+
+	s.SetDynamicService("kafka", srv)
+	s.AppendService("kafka", srv)
 }
 
 func (s *Server) appendAlertaService() {

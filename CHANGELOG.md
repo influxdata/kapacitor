@@ -17,6 +17,7 @@ alert will auto-recover.
     This is because the new v2 API is not structured with static URLs, and so only the action can be defined and not the entire URL.
 - [#1690](https://github.com/influxdata/kapacitor/issues/1690): Add https-private-key option to httpd config.
 - [#1561](https://github.com/influxdata/kapacitor/issues/1561): Add .quiet to all nodes to silence any errors reported by the node.
+- [#1826](https://github.com/influxdata/kapacitor/issues/1826): Add Kafka alert handler.
 
 ### Bugfixes
 - [#1794](https://github.com/influxdata/kapacitor/issues/1794): Kapacitor ticks generating a hash instead of their actual given name.
