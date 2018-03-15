@@ -21,7 +21,8 @@ alert will auto-recover.
 - [#1827](https://github.com/influxdata/kapacitor/pull/1827): Fix deadlock in load service when task has an error.
 
 - [#1795](https://github.com/influxdata/kapacitor/pull/1795): Support PagerDuty API v2
-## v1.4.1 [2018-04-13]
+
+## v1.4.1 [2018-03-13]
 
 ### Bugfixes
 
