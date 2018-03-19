@@ -121,8 +121,8 @@ A task is defined by its id, type, TICKscript, and list of database retention po
 
 ### Define Task
 
-To define a task POST to the `/kapacitor/v1/tasks` endpoint.
-If a task already exists then use the `PATCH` method to modify any property of the task.
+To define a task, POST to the `/kapacitor/v1/tasks` endpoint.
+If a task already exists, then use the `PATCH` method to modify any property of the task.
 
 Define a task using a JSON object with the following options:
 
@@ -136,7 +136,11 @@ Define a task using a JSON object with the following options:
 | status      | One of `enabled` or `disabled`.                                                           |
 | vars        | A set of vars for overwriting any defined vars in the TICKscript.                         |
 
-When using PATCH, if any option is missing it will be left unmodified.
+When using `PATCH`, if any property is missing, the task will be left unmodified.
+
+> **Note:** When patching a task, no changes are made to the running task.
+> The task must be disabled and re-enabled for any changes to take effect.
+
 
 ##### Vars
 
@@ -171,7 +175,7 @@ The following is a table of valid types and example values.
 
 #### Example
 
-Create a new task with ID TASK_ID.
+Create a new task with `id` `TASK_ID`.
 
 ```
 POST /kapacitor/v1/tasks
@@ -189,7 +193,7 @@ POST /kapacitor/v1/tasks
 }
 ```
 
-Response with task id and link.
+Response with task `id` and `link`.
 
 ```json
 {
@@ -214,7 +218,7 @@ Response with task id and link.
 }
 ```
 
-Modify only the dbrps of the task.
+Modify only the `dbrps` of the task.
 
 ```
 PATCH /kapacitor/v1/tasks/TASK_ID
@@ -258,7 +262,7 @@ POST /kapacitor/v1/tasks
 }
 ```
 
-Response with task id and link.
+Response with task `id` and `link`.
 
 ```json
 {
@@ -276,7 +280,7 @@ Response with task id and link.
 
 ### Get Task
 
-To get information about a task make a GET request to the `/kapacitor/v1/tasks/TASK_ID` endpoint.
+To get information about a task, make a `GET` request to the `/kapacitor/v1/tasks/TASK_ID` endpoint.
 
 | Query Parameter | Default    | Purpose                                                                                                                          |
 | --------------- | -------    | -------                                                                                                                          |
@@ -285,7 +289,7 @@ To get information about a task make a GET request to the `/kapacitor/v1/tasks/T
 | replay-id       |            | Optional ID of a running replay. The returned task information will be in the context of the task for the running replay.        |
 
 
-A task has these read only properties in addition to the properties listed [above](#define-task).
+A task has these read-only properties in addition to the properties listed [above](#define-task).
 
 | Property     | Description                                                                                                                     |
 | --------     | -----------                                                                                                                     |
@@ -369,7 +373,7 @@ DELETE /kapacitor/v1/tasks/TASK_ID
 | ---- | ------- |
 | 204  | Success |
 
->NOTE: Deleting a non-existent task is not an error and will return a 204 success.
+> **Note:** Deleting a non-existent task is not an error and will return a 204 success.
 
 
 ### List Tasks
@@ -449,7 +453,7 @@ GET /kapacitor/v1/tasks?pattern=TASK*
 }
 ```
 
-Get all tasks, but only the status, executing and error fields.
+Get all tasks, but only the `status`, `executing` and `error` fields.
 
 ```
 GET /kapacitor/v1/tasks?fields=status&fields=executing&fields=error
@@ -482,7 +486,7 @@ GET /kapacitor/v1/tasks?fields=status&fields=executing&fields=error
 | ---- | ------- |
 | 200  | Success |
 
->NOTE: If the pattern does not match any tasks an empty list will be returned, with a 200 success.
+>NOTE: If the pattern does not match any tasks, an empty list will be returned, with a 200 success.
 
 ### Custom Task HTTP Endpoints
 
