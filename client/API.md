@@ -49,7 +49,7 @@ about a request is found in the query parameters of the URL or when they are par
 
 Query parameters are used only for GET requests and all other requests expect parameters to be specified in the JSON body.
 
->NOTE: The /kapacitor/v1/write endpoint is the one exception to this rule since Kapacitor is compatible with the InfluxDB /write endpoint.
+>**Note:**  The /kapacitor/v1/write endpoint is the one exception to this rule since Kapacitor is compatible with the InfluxDB /write endpoint.
 
 
 ### Links
@@ -83,7 +83,7 @@ All v1 endpoints are available under the v1preview path so that your client need
 The technical preview endpoints are only available under the v1preview path.
 
 
->NOTE: Using a technical preview means that you may have to update your client for breaking changes to the previewed endpoints.
+>**Note:**  Using a technical preview means that you may have to update your client for breaking changes to the previewed endpoints.
 
 ## Writing Data
 
@@ -95,7 +95,7 @@ This endpoint is identical in nature to the InfluxDB write endpoint.
 | db              | Database name for the writes.         |
 | rp              | Retention policy name for the writes. |
 
->NOTE: Kapacitor scopes all points by their database and retention policy.
+>**Note:**  Kapacitor scopes all points by their database and retention policy.
 This means you MUST specify the `rp` for writes or Kapacitor will not know which retention policy to use.
 
 #### Example
@@ -227,7 +227,7 @@ PATCH /kapacitor/v1/tasks/TASK_ID
 }
 ```
 
->NOTE: Setting any DBRP will overwrite all stored DBRPs.
+>**Note:**  Setting any DBRP will overwrite all stored DBRPs.
 Setting any Vars will overwrite all stored Vars.
 
 
@@ -486,7 +486,7 @@ GET /kapacitor/v1/tasks?fields=status&fields=executing&fields=error
 | ---- | ------- |
 | 200  | Success |
 
->NOTE: If the pattern does not match any tasks, an empty list will be returned, with a 200 success.
+>**Note:**  If the pattern does not match any tasks, an empty list will be returned, with a 200 success.
 
 ### Custom Task HTTP Endpoints
 
@@ -672,7 +672,7 @@ GET /kapacitor/v1/templates/TEMPLATE_ID
 
 To delete a template make a DELETE request to the `/kapacitor/v1/templates/TEMPLATE_ID` endpoint.
 
->NOTE:Deleting a template renders all associated tasks as orphans. The current state of the orphaned tasks will be left unmodified,
+>**Note:** Deleting a template renders all associated tasks as orphans. The current state of the orphaned tasks will be left unmodified,
 but orphaned tasks will not be able to be enabled.
 
 ```
@@ -685,7 +685,7 @@ DELETE /kapacitor/v1/templates/TEMPLATE_ID
 | ---- | ------- |
 | 204  | Success |
 
->NOTE: Deleting a non-existent template is not an error and will return a 204 success.
+>**Note:** Deleting a non-existent template is not an error and will return a 204 success.
 
 
 ### List Templates
@@ -783,7 +783,7 @@ GET /kapacitor/v1/templates?fields=status&fields=executing&fields=error
 | ---- | ------- |
 | 200  | Success |
 
->NOTE: If the pattern does not match any templates an empty list will be returned, with a 200 success.
+>**Note:** If the pattern does not match any templates an empty list will be returned, with a 200 success.
 
 
 ## Recordings
@@ -830,7 +830,7 @@ A recording ID is returned to later identify the recording.
 | query     | Query to execute.                                                          |
 | cluster   | Name of a configured InfluxDB cluster. If empty uses the default cluster.  |
 
->NOTE: A recording itself is typed as either a stream or batch recording and can only be replayed to a task of a corresponding type.
+>**Note:** A recording itself is typed as either a stream or batch recording and can only be replayed to a task of a corresponding type.
 Therefore when you record the result of a raw query you must specify the type recording you wish to create.
 
 
@@ -1002,7 +1002,7 @@ DELETE /kapacitor/v1/recordings/RECORDING_ID
 | ---- | ------- |
 | 204  | Success |
 
->NOTE: Deleting a non-existent recording is not an error and will return a 204 success.
+>**Note:** Deleting a non-existent recording is not an error and will return a 204 success.
 
 ### List Recordings
 
@@ -1216,7 +1216,7 @@ All replays are assigned an ID which is returned in this format with a link.
 }
 ```
 
->NOTE: For a replay created in this manner the `recording` ID will be empty since no recording was used or created.
+>**Note:** For a replay created in this manner the `recording` ID will be empty since no recording was used or created.
 
 
 | Code | Meaning                          |
@@ -1358,7 +1358,7 @@ DELETE /kapacitor/v1/replays/REPLAY_ID
 | ---- | ------- |
 | 204  | Success |
 
->NOTE: Deleting a non-existent replay is not an error and will return a 204 success.
+>**Note:** Deleting a non-existent replay is not an error and will return a 204 success.
 
 
 ### List Replays
@@ -1424,7 +1424,7 @@ Topics are created dynamically when they referenced in TICKscripts or in handler
 To delete a topic make a `DELETE` request to `/kapacitor/v1/alerts/topics/<topic id>`.
 This will delete all known events and state for the topic.
 
->NOTE: Since topics are dynamically created, a topic may return after having deleted it, if a new event is created for the topic.
+>**Note:** Since topics are dynamically created, a topic may return after having deleted it, if a new event is created for the topic.
 
 
 #### Example
@@ -1589,7 +1589,7 @@ You can get a list of handlers configured for a topic by making a GET request to
 | --------------- | ------- | -------                                                                                                                                                               |
 | pattern         | *       | Filter results based on the pattern. Uses standard shell glob matching on the service name, see [this](https://golang.org/pkg/path/filepath/#Match) for more details. |
 
->NOTE: Anonymous handlers (created automatically from TICKscripts) will not be listed under their associated anonymous topic as they are not configured via the API.
+>**Note:** Anonymous handlers (created automatically from TICKscripts) will not be listed under their associated anonymous topic as they are not configured via the API.
 
 #### Example
 
@@ -1799,7 +1799,7 @@ skip-config-overrides = true
 
 This allows you to still access the API to fix any unwanted configuration without applying that configuration during statup.
 
->NOTE: It is probably easiest and safest to set this option as an environment variable `KAPACITOR_SKIP_CONFIG_OVERRIDES=true`, since it is meant to be temporary.
+>**Note:** It is probably easiest and safest to set this option as an environment variable `KAPACITOR_SKIP_CONFIG_OVERRIDES=true`, since it is meant to be temporary.
 That way you do not have to modify your on disk configuration file or accidentally leave it in place causing issues later on.
 
 ### Overview
@@ -1970,7 +1970,7 @@ GET /kapacitor/v1/config/smtp/
 }
 ```
 
->NOTE: Sections that are not lists can be treated as having an empty string for their element name.
+>**Note:** Sections that are not lists can be treated as having an empty string for their element name.
 
 Retrieve only the InfluxDB section.
 
@@ -2034,7 +2034,7 @@ GET /kapacitor/v1/config/influxdb/remote
 }
 ```
 
->NOTE: The password value is not returned, but the `true` value indicates that a non empty password has been set.
+>**Note:** The password value is not returned, but the `true` value indicates that a non empty password has been set.
 
 #### Response
 
@@ -2124,7 +2124,7 @@ POST /kapacitor/v1/config/influxdb
 }
 ```
 
->NOTE: Only the overrides can be removed, this means that InfluxDB clusters that exist in the configuration cannot be removed.
+>**Note:** Only the overrides can be removed, this means that InfluxDB clusters that exist in the configuration cannot be removed.
 
 Modify an existing InfluxDB cluster:
 
@@ -2375,7 +2375,7 @@ A failed response looks like:
 You can 'ping' the Kapacitor server to validate you have a successful connection.
 A ping request does nothing but respond with a 204.
 
->NOTE: The Kapacitor server version is returned in the `X-Kapacitor-Version` HTTP header on all requests.
+>**Note:** The Kapacitor server version is returned in the `X-Kapacitor-Version` HTTP header on all requests.
 Ping is a useful request if you simply need the verify the version of server you are talking to.
 
 #### Example
@@ -2426,7 +2426,7 @@ Kapacitor also the standard Go [net/http/pprof](https://golang.org/pkg/net/http/
 GET /kapacitor/v1/debug/pprof/...
 ```
 
->NOTE: Not all of these endpoints return JSON content.
+>**Note:** Not all of these endpoints return JSON content.
 
 ### Routes
 
