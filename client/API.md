@@ -63,7 +63,7 @@ The API allows the client to specify IDs for the various resources.
 This way you can control the meaning of the IDs.
 If you do not specify an ID a random UUID will be generated for the resource.
 
-All IDs must match this regex `^[-\._\p{L}0-9]+$`, which is essentially numbers, unicode letters, '-', '.' and '_'.
+All IDs must match this regex `^[-\._\p{L}0-9]+$`, which is essentially numbers, unicode letters, `-`, `.` and `_`.
 
 
 ### Backwards Compatibility
@@ -121,7 +121,7 @@ A task is defined by its id, type, TICKscript, and list of database retention po
 
 ### Define Task
 
-To define a task, POST to the `/kapacitor/v1/tasks` endpoint.
+To define a task, `POST` to the `/kapacitor/v1/tasks` endpoint.
 If a task already exists, then use the `PATCH` method to modify any property of the task.
 
 Define a task using a JSON object with the following options:
@@ -361,7 +361,7 @@ GET /kapacitor/v1/tasks/TASK_ID?dot-view=labels&script-format=raw
 
 ### Delete Task
 
-To delete a task make a DELETE request to the `/kapacitor/v1/tasks/TASK_ID` endpoint.
+To delete a task make a `DELETE` request to the `/kapacitor/v1/tasks/TASK_ID` endpoint.
 
 ```
 DELETE /kapacitor/v1/tasks/TASK_ID
@@ -378,7 +378,7 @@ DELETE /kapacitor/v1/tasks/TASK_ID
 
 ### List Tasks
 
-To get information about several tasks make a GET request to the `/kapacitor/v1/tasks` endpoint.
+To get information about several tasks make a `GET` request to the `/kapacitor/v1/tasks` endpoint.
 
 | Query Parameter | Default    | Purpose                                                                                                                                           |
 | --------------- | -------    | -------                                                                                                                                           |
@@ -453,7 +453,7 @@ GET /kapacitor/v1/tasks?pattern=TASK*
 }
 ```
 
-Get all tasks, but only the `status`, `executing` and `error` fields.
+Get all tasks, but only the `status`, `executing`, and `error` fields.
 
 ```
 GET /kapacitor/v1/tasks?fields=status&fields=executing&fields=error
