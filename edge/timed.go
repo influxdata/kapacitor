@@ -76,3 +76,9 @@ func (tr *timedForwardReceiver) DeleteGroup(d DeleteGroupMessage) (m Message, er
 	tr.timer.Stop()
 	return
 }
+
+func (tr *timedForwardReceiver) Done() {
+	tr.timer.Start()
+	tr.r.Done()
+	tr.timer.Stop()
+}

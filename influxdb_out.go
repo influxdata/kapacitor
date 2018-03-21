@@ -141,6 +141,7 @@ func (n *InfluxDBOutNode) Barrier(b edge.BarrierMessage) (edge.Message, error) {
 func (n *InfluxDBOutNode) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
 	return d, nil
 }
+func (n *InfluxDBOutNode) Done() {}
 
 func (n *InfluxDBOutNode) stopOut() {
 	n.wb.flush()

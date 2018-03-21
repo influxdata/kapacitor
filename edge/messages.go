@@ -934,6 +934,12 @@ type deleteGroupMessage struct {
 	groupID models.GroupID
 }
 
+func NewDeleteGroupMessage(id models.GroupID) DeleteGroupMessage {
+	return &deleteGroupMessage{
+		groupID: id,
+	}
+}
+
 func (d *deleteGroupMessage) Type() MessageType {
 	return DeleteGroup
 }

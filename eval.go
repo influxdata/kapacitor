@@ -224,3 +224,4 @@ func (g *evalGroup) Barrier(b edge.BarrierMessage) (edge.Message, error) {
 func (g *evalGroup) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
 	return d, nil
 }
+func (g *evalGroup) Done() {}

@@ -119,6 +119,7 @@ func (g *derivativeGroup) Barrier(b edge.BarrierMessage) (edge.Message, error) {
 func (g *derivativeGroup) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
 	return d, nil
 }
+func (g *derivativeGroup) Done() {}
 
 // derivative calculates the derivative between prev and cur.
 // Return is the resulting derivative, whether the current point should be

@@ -125,3 +125,8 @@ func (c *groupedConsumer) DeleteGroup(d DeleteGroupMessage) error {
 	}
 	return nil
 }
+func (c *groupedConsumer) Done() {
+	for _, r := range c.groups {
+		r.Done()
+	}
+}

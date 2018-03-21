@@ -12,6 +12,7 @@ import (
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/keyvalue"
+	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
@@ -56,6 +57,8 @@ type Service struct {
 	handlers map[string]map[string]handler
 
 	closedTopics map[string]bool
+
+	inhibitorLookup *alert.InhibitorLookup
 
 	topics         *alert.Topics
 	EventCollector EventCollector
@@ -128,10 +131,11 @@ type Service struct {
 
 func NewService(d Diagnostic) *Service {
 	s := &Service{
-		handlers:     make(map[string]map[string]handler),
-		closedTopics: make(map[string]bool),
-		topics:       alert.NewTopics(),
-		diag:         d,
+		handlers:        make(map[string]map[string]handler),
+		closedTopics:    make(map[string]bool),
+		topics:          alert.NewTopics(),
+		diag:            d,
+		inhibitorLookup: alert.NewInhibitorLookup(),
 	}
 	s.APIServer = &apiServer{
 		Registrar: s,
@@ -936,4 +940,14 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		h, err = newMatchHandler(spec.Match, h, handlerDiag)
 	}
 	return handler{Spec: spec, Handler: h}, err
+}
+
+func (s *Service) IsInhibited(name string, tags models.Tags) bool {
+	return s.inhibitorLookup.IsInhibited(name, tags)
+}
+func (s *Service) AddInhibitor(in *alert.Inhibitor) {
+	s.inhibitorLookup.AddInhibitor(in)
+}
+func (s *Service) RemoveInhibitor(in *alert.Inhibitor) {
+	s.inhibitorLookup.RemoveInhibitor(in)
 }
