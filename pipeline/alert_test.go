@@ -78,7 +78,8 @@ func TestAlertNode_MarshalJSON(t *testing.T) {
     "opsGenie2": null,
     "talk": null,
     "mqtt": null,
-    "snmpTrap": null
+    "snmpTrap": null,
+    "kafka": null
 }`,
 		},
 	}

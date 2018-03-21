@@ -572,6 +572,12 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/segmentio/kafka-go"
+  packages = ["."]
+  revision = "140b1a903e1421f33b16a24312a19ff024e13625"
+
+[[projects]]
+  branch = "master"
   name = "github.com/serenize/snaker"
   packages = ["."]
   revision = "543781d2b79bd95c51ffe70e70a55c946ca211ff"
@@ -886,6 +892,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "553955f0d04a6196beef13bce4c1117cbfe5c9c6b1f08cc4337443eb7d24b292"
+  inputs-digest = "471285daf6e6beceaa938816b65b7b835f7e8883968f6c7582f830173bb57a73"
   solver-name = "gps-cdcl"
   solver-version = 1

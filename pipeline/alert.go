@@ -381,6 +381,10 @@ type AlertNodeData struct {
 	// Send alert using SNMPtraps.
 	// tick:ignore
 	SNMPTrapHandlers []*SNMPTrapHandler `tick:"SnmpTrap" json:"snmpTrap"`
+
+	// Send alert to Kafka topic
+	// tick:ignore
+	KafkaHandlers []*KafkaHandler `tick:"Kafka" json:"kafka"`
 }
 
 func newAlertNode(wants EdgeType) *AlertNode {
@@ -1832,4 +1836,45 @@ func (h *SNMPTrapHandler) validate() error {
 		}
 	}
 	return nil
+}
+
+// Send the alert to a Kafka topic.
+//
+// Example:
+//    [[kafka]]
+//      enabled = true
+//      id = "default"
+//      brokers = ["localhost:9092"]
+//
+// Example:
+//    stream
+//         |alert()
+//             .kafka()
+//                 .cluster('default')
+//                 .kafkaTopic('alerts')
+//
+//
+// tick:property
+func (n *AlertNodeData) Kafka() *KafkaHandler {
+	k := &KafkaHandler{
+		AlertNodeData: n,
+	}
+	n.KafkaHandlers = append(n.KafkaHandlers, k)
+	return k
+}
+
+// Kafka alert Handler
+// tick:embedded:AlertNode.Kafka
+type KafkaHandler struct {
+	*AlertNodeData `json:"-"`
+
+	// Cluster is the id of the configure kafka cluster
+	Cluster string `json:"cluster"`
+
+	// Kafka Topic
+	KafkaTopic string `json:"kafka-topic"`
+
+	// Template used to construct the message body
+	// If empty the alert data in JSON is sent as the message body.
+	Template string `json:"template"`
 }

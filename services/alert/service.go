@@ -17,6 +17,7 @@ import (
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/httppost"
+	"github.com/influxdata/kapacitor/services/kafka"
 	"github.com/influxdata/kapacitor/services/mqtt"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/opsgenie2"
@@ -84,6 +85,9 @@ type Service struct {
 	}
 	HipChatService interface {
 		Handler(hipchat.HandlerConfig, ...keyvalue.T) alert.Handler
+	}
+	KafkaService interface {
+		Handler(kafka.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
 	}
 	MQTTService interface {
 		Handler(mqtt.HandlerConfig, ...keyvalue.T) alert.Handler
@@ -786,6 +790,17 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 			return handler{}, err
 		}
 		h = s.HipChatService.Handler(c, ctx...)
+		h = newExternalHandler(h)
+	case "kafka":
+		c := kafka.HandlerConfig{}
+		err = decodeOptions(spec.Options, &c)
+		if err != nil {
+			return handler{}, err
+		}
+		h, err = s.KafkaService.Handler(c, ctx...)
+		if err != nil {
+			return handler{}, err
+		}
 		h = newExternalHandler(h)
 	case "log":
 		c := DefaultLogHandlerConfig()
