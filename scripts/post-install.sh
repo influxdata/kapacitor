@@ -4,6 +4,7 @@ BIN_DIR=/usr/bin
 DATA_DIR=/var/lib/kapacitor
 LOG_DIR=/var/log/kapacitor
 SCRIPT_DIR=/usr/lib/kapacitor/scripts
+LOGROTATE_DIR=/etc/logrotate.d
 
 function install_init {
     cp -f $SCRIPT_DIR/init.sh /etc/init.d/kapacitor
