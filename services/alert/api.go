@@ -25,8 +25,9 @@ const (
 	topicsBasePath         = httpd.BasePath + topicsPath
 	topicsBasePathAnchored = httpd.BasePath + topicsPathAnchored
 
-	topicEventsPath   = "events"
-	topicHandlersPath = "handlers"
+	topicEventsPath           = "events"
+	topicHandlersPath         = "handlers"
+	topicHandlersPathAnchored = topicHandlersPath + "/"
 
 	eventsPattern   = "*/" + topicEventsPath
 	eventPattern    = "*/" + topicEventsPath + "/*"
@@ -147,8 +148,12 @@ func (s *apiServer) topicIDFromPath(p string) (id string) {
 	return
 }
 
-func (s *apiServer) handlerIDFromPath(p string) (id string) {
-	return path.Base(p)
+func (s *apiServer) handlerIDFromPath(p string) (string, bool) {
+	dir, id := path.Split(p)
+	if !strings.HasSuffix(dir, topicHandlersPathAnchored) {
+		return "", false
+	}
+	return id, true
 }
 
 func (s *apiServer) eventIDFromPath(p string) (id string) {
@@ -181,7 +186,7 @@ func (s *apiServer) handleRouteTopicGet(w http.ResponseWriter, r *http.Request) 
 	case pathMatch(handlersPattern, p):
 		s.handleListHandlers(id, w, r)
 	case pathMatch(handlerPattern, p):
-		handler := s.handlerIDFromPath(p)
+		handler, _ := s.handlerIDFromPath(p)
 		s.handleGetHandler(id, handler, w, r)
 	default:
 		s.handleGetTopic(id, w, r)
@@ -197,22 +202,24 @@ func (s *apiServer) handleRouteTopicPost(w http.ResponseWriter, r *http.Request)
 func (s *apiServer) handleRouteTopicPut(w http.ResponseWriter, r *http.Request) {
 	p := strings.TrimPrefix(r.URL.Path, topicsBasePathAnchored)
 	topic := s.topicIDFromPath(p)
-	handler := s.handlerIDFromPath(p)
+	handler, _ := s.handlerIDFromPath(p)
 	s.handlePutHandler(topic, handler, w, r)
 }
 func (s *apiServer) handleRouteTopicPatch(w http.ResponseWriter, r *http.Request) {
 	p := strings.TrimPrefix(r.URL.Path, topicsBasePathAnchored)
 	topic := s.topicIDFromPath(p)
-	handler := s.handlerIDFromPath(p)
+	handler, _ := s.handlerIDFromPath(p)
 	s.handlePatchHandler(topic, handler, w, r)
 }
 func (s *apiServer) handleRouteTopicDelete(w http.ResponseWriter, r *http.Request) {
 	p := strings.TrimPrefix(r.URL.Path, topicsBasePathAnchored)
 	topic := s.topicIDFromPath(p)
-	handler := s.handlerIDFromPath(p)
-	if topic == handler {
+	handler, ok := s.handlerIDFromPath(p)
+	if !ok {
+		// We only have a topic path
 		s.handleDeleteTopic(topic, w, r)
 	} else {
+		// We have a topic handler path
 		s.handleDeleteHandler(topic, handler, w, r)
 	}
 }
