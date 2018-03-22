@@ -9309,6 +9309,64 @@ func TestServer_AlertHandlers_CRUD(t *testing.T) {
 				},
 			},
 		},
+		{
+			// Topic and handler have same name
+			topic: "slack",
+			create: client.TopicHandlerOptions{
+				ID:   "slack",
+				Kind: "slack",
+				Options: map[string]interface{}{
+					"channel": "#test",
+				},
+			},
+			expCreate: client.TopicHandler{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/slack/handlers/slack"},
+				ID:   "slack",
+				Kind: "slack",
+				Options: map[string]interface{}{
+					"channel": "#test",
+				},
+			},
+			patch: client.JSONPatch{
+				{
+					Path:      "/kind",
+					Operation: "replace",
+					Value:     "log",
+				},
+				{
+					Path:      "/options/channel",
+					Operation: "remove",
+				},
+				{
+					Path:      "/options/path",
+					Operation: "add",
+					Value:     AlertLogPath,
+				},
+			},
+			expPatch: client.TopicHandler{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/slack/handlers/slack"},
+				ID:   "slack",
+				Kind: "log",
+				Options: map[string]interface{}{
+					"path": AlertLogPath,
+				},
+			},
+			put: client.TopicHandlerOptions{
+				ID:   "slack",
+				Kind: "smtp",
+				Options: map[string]interface{}{
+					"to": []string{"oncall@example.com"},
+				},
+			},
+			expPut: client.TopicHandler{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/slack/handlers/slack"},
+				ID:   "slack",
+				Kind: "smtp",
+				Options: map[string]interface{}{
+					"to": []interface{}{"oncall@example.com"},
+				},
+			},
+		},
 	}
 	for _, tc := range testCases {
 		// Create default config
@@ -9363,6 +9421,17 @@ func TestServer_AlertHandlers_CRUD(t *testing.T) {
 		_, err = cli.TopicHandler(h.Link)
 		if err == nil {
 			t.Errorf("expected handler to be deleted")
+		}
+
+		handlers, err := cli.ListTopicHandlers(cli.TopicHandlersLink(tc.topic), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, h := range handlers.Handlers {
+			if h.ID == tc.expPut.ID {
+				t.Errorf("expected handler to be deleted")
+				break
+			}
 		}
 	}
 }
