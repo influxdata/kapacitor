@@ -52,6 +52,8 @@ import (
 	"github.com/influxdata/kapacitor/services/opsgenie2/opsgenie2test"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pagerduty/pagerdutytest"
+	"github.com/influxdata/kapacitor/services/pagerduty2"
+	"github.com/influxdata/kapacitor/services/pagerduty2/pagerduty2test"
 	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/pushover/pushovertest"
 	"github.com/influxdata/kapacitor/services/sensu"
@@ -142,6 +144,56 @@ stream
 	}
 
 	testStreamerWithOutput(t, "TestStream_InfluxQLNodeMissingValue", script, 15*time.Second, er, false, nil)
+}
+
+func TestStream_ChangeDetect(t *testing.T) {
+
+	var script = `stream
+	|from().measurement('packets')
+	|changeDetect('value')
+    |window()
+		.period(10s)
+		.every(10s)
+	|httpOut('TestStream_ChangeDetect')
+`
+
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "packets",
+				Tags:    nil,
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{
+					[]interface{}{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						"bad",
+					},
+					[]interface{}{
+						time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+						"good",
+					},
+					[]interface{}{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						"bad",
+					},
+					[]interface{}{
+						time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+						"good",
+					},
+					[]interface{}{
+						time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+						"bad",
+					},
+					[]interface{}{
+						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+						"good",
+					},
+				},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_ChangeDetect", script, 15*time.Second, er, false, nil)
 }
 
 func TestStream_Derivative(t *testing.T) {
@@ -7092,11 +7144,12 @@ func TestStream_Alert(t *testing.T) {
 		atomic.AddInt32(&requestCount, 1)
 		rc := atomic.LoadInt32(&requestCount)
 		expAd := alert.Data{
-			ID:      "kapacitor/cpu/serverA",
-			Message: "kapacitor/cpu/serverA is CRITICAL",
-			Details: "details",
-			Time:    time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
-			Level:   alert.Critical,
+			ID:          "kapacitor/cpu/serverA",
+			Message:     "kapacitor/cpu/serverA is CRITICAL",
+			Details:     "details",
+			Time:        time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+			Level:       alert.Critical,
+			Recoverable: true,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -7185,11 +7238,12 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 		switch rc {
 		case 1:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is WARNING",
-				Time:     time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
-				Duration: 0,
-				Level:    alert.Warning,
+				ID:          "kapacitor/cpu/serverA",
+				Message:     "kapacitor/cpu/serverA is WARNING",
+				Time:        time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+				Duration:    0,
+				Level:       alert.Warning,
+				Recoverable: false,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7212,6 +7266,7 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 				Duration:      0,
 				Level:         alert.Info,
 				PreviousLevel: alert.Warning,
+				Recoverable:   false,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7234,6 +7289,7 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 				Duration:      time.Second,
 				Level:         alert.Warning,
 				PreviousLevel: alert.Info,
+				Recoverable:   false,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7256,6 +7312,7 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 				Duration:      2 * time.Second,
 				Level:         alert.Warning,
 				PreviousLevel: alert.Warning,
+				Recoverable:   false,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7278,6 +7335,7 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 				Duration:      3 * time.Second,
 				Level:         alert.Critical,
 				PreviousLevel: alert.Warning,
+				Recoverable:   false,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7300,6 +7358,7 @@ func TestStream_Alert_NoRecoveries(t *testing.T) {
 				Duration:      0,
 				Level:         alert.Info,
 				PreviousLevel: alert.Critical,
+				Recoverable:   false,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7377,11 +7436,12 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 		switch rc {
 		case 1:
 			expAd = alert.Data{
-				ID:      "kapacitor/cpu/serverA",
-				Message: "kapacitor/cpu/serverA is INFO",
-				Details: "details",
-				Time:    time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
-				Level:   alert.Info,
+				ID:          "kapacitor/cpu/serverA",
+				Message:     "kapacitor/cpu/serverA is INFO",
+				Details:     "details",
+				Time:        time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+				Level:       alert.Info,
+				Recoverable: true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7405,6 +7465,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Duration:      time.Second,
 				Level:         alert.Info,
 				PreviousLevel: alert.Info,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7428,6 +7489,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Duration:      2 * time.Second,
 				Level:         alert.Info,
 				PreviousLevel: alert.Info,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7451,6 +7513,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Duration:      3 * time.Second,
 				Level:         alert.OK,
 				PreviousLevel: alert.Info,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7474,6 +7537,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Duration:      0 * time.Second,
 				Level:         alert.Info,
 				PreviousLevel: alert.OK,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7497,6 +7561,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Duration:      1 * time.Second,
 				Level:         alert.Warning,
 				PreviousLevel: alert.Info,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7520,6 +7585,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Duration:      2 * time.Second,
 				Level:         alert.Warning,
 				PreviousLevel: alert.Warning,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7543,6 +7609,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Duration:      3 * time.Second,
 				Level:         alert.OK,
 				PreviousLevel: alert.Warning,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7566,6 +7633,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Duration:      0 * time.Second,
 				Level:         alert.Info,
 				PreviousLevel: alert.OK,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7589,6 +7657,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Duration:      1 * time.Second,
 				Level:         alert.Warning,
 				PreviousLevel: alert.Info,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7612,6 +7681,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Duration:      2 * time.Second,
 				Level:         alert.Critical,
 				PreviousLevel: alert.Warning,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7635,6 +7705,7 @@ func TestStream_Alert_WithReset_0(t *testing.T) {
 				Duration:      3 * time.Second,
 				Level:         alert.OK,
 				PreviousLevel: alert.Critical,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7726,11 +7797,12 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 		switch rc {
 		case 1:
 			expAd = alert.Data{
-				ID:      "kapacitor/cpu/serverA",
-				Message: "kapacitor/cpu/serverA is INFO",
-				Details: "details",
-				Time:    time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
-				Level:   alert.Info,
+				ID:          "kapacitor/cpu/serverA",
+				Message:     "kapacitor/cpu/serverA is INFO",
+				Details:     "details",
+				Time:        time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+				Level:       alert.Info,
+				Recoverable: true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7754,6 +7826,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Duration:      time.Second,
 				Level:         alert.Info,
 				PreviousLevel: alert.Info,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7777,6 +7850,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Duration:      2 * time.Second,
 				Level:         alert.Info,
 				PreviousLevel: alert.Info,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7800,6 +7874,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Duration:      3 * time.Second,
 				Level:         alert.OK,
 				PreviousLevel: alert.Info,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7823,6 +7898,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Duration:      0 * time.Second,
 				Level:         alert.Info,
 				PreviousLevel: alert.OK,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7846,6 +7922,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Duration:      1 * time.Second,
 				Level:         alert.Warning,
 				PreviousLevel: alert.Info,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7869,6 +7946,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Duration:      2 * time.Second,
 				Level:         alert.Info,
 				PreviousLevel: alert.Warning,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7892,6 +7970,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Duration:      3 * time.Second,
 				Level:         alert.OK,
 				PreviousLevel: alert.Info,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7915,6 +7994,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Duration:      0 * time.Second,
 				Level:         alert.Info,
 				PreviousLevel: alert.OK,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7938,6 +8018,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Duration:      1 * time.Second,
 				Level:         alert.Warning,
 				PreviousLevel: alert.Info,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7961,6 +8042,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Duration:      2 * time.Second,
 				Level:         alert.Critical,
 				PreviousLevel: alert.Warning,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -7984,6 +8066,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Duration:      3 * time.Second,
 				Level:         alert.Warning,
 				PreviousLevel: alert.Critical,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -8007,6 +8090,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Duration:      4 * time.Second,
 				Level:         alert.Warning,
 				PreviousLevel: alert.Warning,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -8030,6 +8114,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Duration:      5 * time.Second,
 				Level:         alert.Info,
 				PreviousLevel: alert.Warning,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -8053,6 +8138,7 @@ func TestStream_Alert_WithReset_1(t *testing.T) {
 				Duration:      6 * time.Second,
 				Level:         alert.OK,
 				PreviousLevel: alert.Info,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -8144,12 +8230,13 @@ func TestStream_AlertDuration(t *testing.T) {
 		switch rc {
 		case 1:
 			expAd = alert.Data{
-				ID:       "kapacitor/cpu/serverA",
-				Message:  "kapacitor/cpu/serverA is CRITICAL",
-				Details:  "details",
-				Time:     time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
-				Duration: 0,
-				Level:    alert.Critical,
+				ID:          "kapacitor/cpu/serverA",
+				Message:     "kapacitor/cpu/serverA is CRITICAL",
+				Details:     "details",
+				Time:        time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+				Duration:    0,
+				Level:       alert.Critical,
+				Recoverable: true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -8173,6 +8260,7 @@ func TestStream_AlertDuration(t *testing.T) {
 				Duration:      2 * time.Second,
 				Level:         alert.Warning,
 				PreviousLevel: alert.Critical,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -8196,6 +8284,7 @@ func TestStream_AlertDuration(t *testing.T) {
 				Duration:      4 * time.Second,
 				Level:         alert.OK,
 				PreviousLevel: alert.Warning,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -8219,6 +8308,7 @@ func TestStream_AlertDuration(t *testing.T) {
 				Duration:      0,
 				Level:         alert.Warning,
 				PreviousLevel: alert.OK,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -8242,6 +8332,7 @@ func TestStream_AlertDuration(t *testing.T) {
 				Duration:      3 * time.Second,
 				Level:         alert.OK,
 				PreviousLevel: alert.Warning,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -8380,18 +8471,25 @@ stream
 		.warn(lambda: "count" > 7.0)
 		.crit(lambda: "count" > 8.0)
 		.slack()
+		.workspace('company_private')
 		.channel('#alerts')
 		.slack()
 		.channel('@jim')
 `
 
 	tmInit := func(tm *kapacitor.TaskMaster) {
-		c := slack.NewConfig()
-		c.Enabled = true
-		c.URL = ts.URL + "/test/slack/url"
-		c.Channel = "#channel"
+		c1 := slack.NewConfig()
+		c1.Default = true
+		c1.Enabled = true
+		c1.URL = ts.URL + "/test/slack/url"
+		c1.Channel = "#channel"
+		c2 := slack.NewConfig()
+		c2.Workspace = "company_private"
+		c2.Enabled = true
+		c2.URL = ts.URL + "/test/slack/url2"
+		c2.Channel = "#channel"
 		d := diagService.NewSlackHandler().WithContext(keyvalue.KV("test", "slack"))
-		sl, err := slack.NewService(c, d)
+		sl, err := slack.NewService([]slack.Config{c1, c2}, d)
 		if err != nil {
 			t.Error(err)
 		}
@@ -8417,7 +8515,7 @@ stream
 			},
 		},
 		slacktest.Request{
-			URL: "/test/slack/url",
+			URL: "/test/slack/url2",
 			PostData: slacktest.PostData{
 				Channel:  "#alerts",
 				Username: "kapacitor",
@@ -8547,10 +8645,11 @@ stream
 
 	exp := []interface{}{
 		alert.Data{
-			ID:      "kapacitor.cpu.serverA",
-			Message: "kapacitor.cpu.serverA is CRITICAL",
-			Time:    time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
-			Level:   alert.Critical,
+			ID:          "kapacitor.cpu.serverA",
+			Message:     "kapacitor.cpu.serverA is CRITICAL",
+			Time:        time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+			Level:       alert.Critical,
+			Recoverable: true,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -9149,6 +9248,112 @@ stream
 	}
 }
 
+func TestStream_AlertPagerDuty2(t *testing.T) {
+	ts := pagerduty2test.NewServer()
+	defer ts.Close()
+
+	detailsTmpl := map[string]interface{}{
+		"result": map[string]interface{}{
+			"series": []interface{}{
+				map[string]interface{}{
+					"name": "cpu",
+					"tags": map[string]interface{}{
+						"host": "serverA",
+					},
+					"columns": []interface{}{"time", "count"},
+					"values": []interface{}{
+						[]interface{}{"1971-01-01T00:00:10Z", float64(10)},
+					},
+				},
+			},
+		},
+	}
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.message('{{ .Level }} alert for {{ .ID }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.pagerDuty2()
+		.pagerDuty2()
+		    .serviceKey('test_override_key')
+	`
+
+	var kapacitorURL string
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := pagerduty2.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL
+		c.ServiceKey = "service_key"
+		pd := pagerduty2.NewService(c, diagService.NewPagerDuty2Handler())
+		pd.HTTPDService = tm.HTTPDService
+		tm.PagerDuty2Service = pd
+
+		kapacitorURL = tm.HTTPDService.URL()
+	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	exp := []interface{}{
+		pagerduty2test.Request{
+			URL: "/",
+			PostData: pagerduty2test.PostData{
+				Client:      "kapacitor",
+				ClientURL:   kapacitorURL,
+				EventAction: "trigger",
+				DedupKey:    "kapacitor/cpu/serverA",
+				Payload: &pagerduty2test.PDCEF{
+					Summary:       "CRITICAL alert for kapacitor/cpu/serverA",
+					Source:        "serverA",
+					Severity:      "critical",
+					Class:         "TestStream_Alert",
+					CustomDetails: detailsTmpl,
+					Timestamp:     "1971-01-01T00:00:10.000000000Z",
+				},
+				RoutingKey: "service_key",
+			},
+		},
+		pagerduty2test.Request{
+			URL: "/",
+			PostData: pagerduty2test.PostData{
+				Client:      "kapacitor",
+				ClientURL:   kapacitorURL,
+				EventAction: "trigger",
+				DedupKey:    "kapacitor/cpu/serverA",
+				Payload: &pagerduty2test.PDCEF{
+					Summary:       "CRITICAL alert for kapacitor/cpu/serverA",
+					Source:        "serverA",
+					Severity:      "critical",
+					Class:         "TestStream_Alert",
+					CustomDetails: detailsTmpl,
+					Timestamp:     "1971-01-01T00:00:10.000000000Z",
+				},
+				RoutingKey: "test_override_key",
+			},
+		},
+	}
+
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Requests() {
+		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+		t.Error(err)
+	}
+}
+
 func TestStream_AlertHTTPPost(t *testing.T) {
 	ts := httpposttest.NewAlertServer(nil, false)
 	defer ts.Close()
@@ -9178,10 +9383,11 @@ stream
 		httpposttest.AlertRequest{
 			MatchingHeaders: true,
 			Data: alert.Data{
-				ID:      "kapacitor.cpu.serverA",
-				Message: "kapacitor.cpu.serverA is CRITICAL",
-				Time:    time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
-				Level:   alert.Critical,
+				ID:          "kapacitor.cpu.serverA",
+				Message:     "kapacitor.cpu.serverA is CRITICAL",
+				Time:        time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+				Level:       alert.Critical,
+				Recoverable: true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -9248,10 +9454,11 @@ stream
 		httpposttest.AlertRequest{
 			MatchingHeaders: true,
 			Data: alert.Data{
-				ID:      "kapacitor.cpu.serverA",
-				Message: "kapacitor.cpu.serverA is CRITICAL",
-				Time:    time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
-				Level:   alert.Critical,
+				ID:          "kapacitor.cpu.serverA",
+				Message:     "kapacitor.cpu.serverA is CRITICAL",
+				Time:        time.Date(1971, 1, 1, 0, 0, 10, 0, time.UTC),
+				Level:       alert.Critical,
+				Recoverable: true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -9514,10 +9721,11 @@ stream
 `, normalPath, modePath)
 
 	expAD := []alert.Data{{
-		ID:      "kapacitor.cpu.serverA",
-		Message: "kapacitor.cpu.serverA is CRITICAL",
-		Time:    time.Date(1971, 01, 01, 0, 0, 10, 0, time.UTC),
-		Level:   alert.Critical,
+		ID:          "kapacitor.cpu.serverA",
+		Message:     "kapacitor.cpu.serverA is CRITICAL",
+		Time:        time.Date(1971, 01, 01, 0, 0, 10, 0, time.UTC),
+		Level:       alert.Critical,
+		Recoverable: true,
 		Data: models.Result{
 			Series: models.Rows{
 				{
@@ -9584,10 +9792,11 @@ stream
 `
 
 	expAD := alert.Data{
-		ID:      "kapacitor.cpu.serverA",
-		Message: "kapacitor.cpu.serverA is CRITICAL",
-		Time:    time.Date(1971, 01, 01, 0, 0, 10, 0, time.UTC),
-		Level:   alert.Critical,
+		ID:          "kapacitor.cpu.serverA",
+		Message:     "kapacitor.cpu.serverA is CRITICAL",
+		Time:        time.Date(1971, 01, 01, 0, 0, 10, 0, time.UTC),
+		Level:       alert.Critical,
+		Recoverable: true,
 		Data: models.Result{
 			Series: models.Rows{
 				{
@@ -9906,11 +10115,12 @@ func TestStream_AlertSigma(t *testing.T) {
 		rc := atomic.LoadInt32(&requestCount)
 		if rc := atomic.LoadInt32(&requestCount); rc == 1 {
 			expAd = alert.Data{
-				ID:      "cpu:nil",
-				Message: "cpu:nil is INFO",
-				Details: "cpu:nil is INFO",
-				Time:    time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
-				Level:   alert.Info,
+				ID:          "cpu:nil",
+				Message:     "cpu:nil is INFO",
+				Details:     "cpu:nil is INFO",
+				Time:        time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+				Level:       alert.Info,
+				Recoverable: true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -9935,6 +10145,7 @@ func TestStream_AlertSigma(t *testing.T) {
 				Duration:      time.Second,
 				Level:         alert.OK,
 				PreviousLevel: alert.Info,
+				Recoverable:   true,
 				Data: models.Result{
 					Series: models.Rows{
 						{
@@ -9992,11 +10203,12 @@ func TestStream_AlertComplexWhere(t *testing.T) {
 		}
 		atomic.AddInt32(&requestCount, 1)
 		expAd := alert.Data{
-			ID:      "cpu:nil",
-			Message: "cpu:nil is CRITICAL",
-			Details: "",
-			Time:    time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
-			Level:   alert.Critical,
+			ID:          "cpu:nil",
+			Message:     "cpu:nil is CRITICAL",
+			Details:     "",
+			Time:        time.Date(1971, 1, 1, 0, 0, 7, 0, time.UTC),
+			Level:       alert.Critical,
+			Recoverable: true,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -10082,6 +10294,7 @@ func TestStream_AlertStateChangesOnlyExpired(t *testing.T) {
 				Duration:      time.Duration(rc-1) * 2 * time.Second,
 				Level:         alert.Critical,
 				PreviousLevel: alert.OK,
+				Recoverable:   true,
 			}
 		} else if rc < 6 {
 			expAd = alert.Data{
@@ -10091,6 +10304,7 @@ func TestStream_AlertStateChangesOnlyExpired(t *testing.T) {
 				Duration:      time.Duration(rc-1) * 2 * time.Second,
 				Level:         alert.Critical,
 				PreviousLevel: alert.Critical,
+				Recoverable:   true,
 			}
 		} else {
 			expAd = alert.Data{
@@ -10100,6 +10314,7 @@ func TestStream_AlertStateChangesOnlyExpired(t *testing.T) {
 				Duration:      9 * time.Second,
 				Level:         alert.OK,
 				PreviousLevel: alert.Critical,
+				Recoverable:   true,
 			}
 		}
 		if eq, msg := compareAlertData(expAd, ad); !eq {
@@ -11779,6 +11994,7 @@ stream
 			"warns_triggered":     int64(0),
 			"crits_triggered":     int64(0),
 			"alerts_triggered":    int64(0),
+			"alerts_inhibited":    int64(0),
 			"oks_triggered":       int64(0),
 			"infos_triggered":     int64(0),
 		},
@@ -12055,6 +12271,7 @@ stream
 			"warns_triggered":     int64(0),
 			"crits_triggered":     int64(0),
 			"alerts_triggered":    int64(0),
+			"alerts_inhibited":    int64(0),
 			"oks_triggered":       int64(0),
 			"infos_triggered":     int64(0),
 		},

@@ -37,6 +37,7 @@ import (
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/influxdb"
 	"github.com/influxdata/kapacitor/services/k8s"
+	"github.com/influxdata/kapacitor/services/kafka"
 	"github.com/influxdata/kapacitor/services/load"
 	"github.com/influxdata/kapacitor/services/marathon"
 	"github.com/influxdata/kapacitor/services/mqtt"
@@ -45,6 +46,7 @@ import (
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/opsgenie2"
 	"github.com/influxdata/kapacitor/services/pagerduty"
+	"github.com/influxdata/kapacitor/services/pagerduty2"
 	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/replay"
 	"github.com/influxdata/kapacitor/services/reporting"
@@ -228,12 +230,14 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 	// Append Alert integration services
 	s.appendAlertaService()
 	s.appendHipChatService()
+	s.appendKafkaService()
 	if err := s.appendMQTTService(); err != nil {
 		return nil, errors.Wrap(err, "mqtt service")
 	}
 	s.appendOpsGenieService()
 	s.appendOpsGenie2Service()
 	s.appendPagerDutyService()
+	s.appendPagerDuty2Service()
 	s.appendPushoverService()
 	if err := s.appendHTTPPostService(); err != nil {
 		return nil, errors.Wrap(err, "httppost service")
@@ -397,10 +401,10 @@ func (s *Server) appendLoadService() error {
 	if s.HTTPDService == nil {
 		return errors.New("httpd service must be set for load service")
 	}
-	if s.HTTPDService.Handler == nil {
+	if s.HTTPDService.LocalHandler == nil {
 		return errors.New("httpd service handler must be set for load service")
 	}
-	srv, err := load.NewService(c, s.HTTPDService.Handler, d)
+	srv, err := load.NewService(c, s.HTTPDService.LocalHandler, d)
 	if err != nil {
 		return err
 	}
@@ -446,8 +450,13 @@ func (s *Server) initHTTPDService() {
 	d := s.DiagService.NewHTTPDHandler()
 	srv := httpd.NewService(s.config.HTTP, s.hostname, d)
 
+	srv.LocalHandler.PointsWriter = s.TaskMaster
 	srv.Handler.PointsWriter = s.TaskMaster
+
+	srv.LocalHandler.DiagService = s.DiagService
 	srv.Handler.DiagService = s.DiagService
+
+	srv.LocalHandler.Version = s.BuildInfo.Version
 	srv.Handler.Version = s.BuildInfo.Version
 
 	s.HTTPDService = srv
@@ -619,6 +628,19 @@ func (s *Server) appendPagerDutyService() {
 	s.AppendService("pagerduty", srv)
 }
 
+func (s *Server) appendPagerDuty2Service() {
+	c := s.config.PagerDuty2
+	d := s.DiagService.NewPagerDuty2Handler()
+	srv := pagerduty2.NewService(c, d)
+	srv.HTTPDService = s.HTTPDService
+
+	s.TaskMaster.PagerDuty2Service = srv
+	s.AlertService.PagerDuty2Service = srv
+
+	s.SetDynamicService("pagerduty2", srv)
+	s.AppendService("pagerduty2", srv)
+}
+
 func (s *Server) appendPushoverService() {
 	c := s.config.Pushover
 	d := s.DiagService.NewPushoverHandler()
@@ -709,6 +731,18 @@ func (s *Server) appendHipChatService() {
 
 	s.SetDynamicService("hipchat", srv)
 	s.AppendService("hipchat", srv)
+}
+
+func (s *Server) appendKafkaService() {
+	c := s.config.Kafka
+	d := s.DiagService.NewKafkaHandler()
+	srv := kafka.NewService(c, d)
+
+	s.TaskMaster.KafkaService = srv
+	s.AlertService.KafkaService = srv
+
+	s.SetDynamicService("kafka", srv)
+	s.AppendService("kafka", srv)
 }
 
 func (s *Server) appendAlertaService() {

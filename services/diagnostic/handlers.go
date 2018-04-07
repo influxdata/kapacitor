@@ -22,10 +22,12 @@ import (
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/influxdb"
 	"github.com/influxdata/kapacitor/services/k8s"
+	"github.com/influxdata/kapacitor/services/kafka"
 	"github.com/influxdata/kapacitor/services/mqtt"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/opsgenie2"
 	"github.com/influxdata/kapacitor/services/pagerduty"
+	"github.com/influxdata/kapacitor/services/pagerduty2"
 	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/sideload"
@@ -408,6 +410,26 @@ func (h *HipChatHandler) Error(msg string, err error) {
 	h.l.Error(msg, Error(err))
 }
 
+// Kafka handler
+type KafkaHandler struct {
+	l Logger
+}
+
+func (h *KafkaHandler) WithContext(ctx ...keyvalue.T) kafka.Diagnostic {
+	fields := logFieldsFromContext(ctx)
+
+	return &KafkaHandler{
+		l: h.l.With(fields...),
+	}
+}
+
+func (h *KafkaHandler) Error(msg string, err error) {
+	h.l.Error(msg, Error(err))
+}
+func (h *KafkaHandler) InsecureSkipVerify() {
+	h.l.Info("service is configured to skip ssl verification")
+}
+
 // HTTPD handler
 
 type HTTPDHandler struct {
@@ -534,6 +556,23 @@ func (h *PagerDutyHandler) WithContext(ctx ...keyvalue.T) pagerduty.Diagnostic {
 }
 
 func (h *PagerDutyHandler) Error(msg string, err error) {
+	h.l.Error(msg, Error(err))
+}
+
+// PagerDuty2 handler
+type PagerDuty2Handler struct {
+	l Logger
+}
+
+func (h *PagerDuty2Handler) WithContext(ctx ...keyvalue.T) pagerduty2.Diagnostic {
+	fields := logFieldsFromContext(ctx)
+
+	return &PagerDuty2Handler{
+		l: h.l.With(fields...),
+	}
+}
+
+func (h *PagerDuty2Handler) Error(msg string, err error) {
 	h.l.Error(msg, Error(err))
 }
 

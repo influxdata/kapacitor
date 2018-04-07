@@ -46,25 +46,25 @@ func dbrpsFromProgram(n *ast.ProgramNode) []client.DBRP {
 func taskTypeFromProgram(n *ast.ProgramNode) client.TaskType {
 	tts := []string{}
 	for _, nn := range n.Nodes {
-		switch nn.(type) {
+		switch node := nn.(type) {
 		case *ast.DeclarationNode:
-			if cn, ok := nn.(*ast.DeclarationNode).Right.(*ast.ChainNode); ok {
-				var n = cn.Left
-			DeclLoop:
-				for {
-					switch n.(type) {
-					case *ast.ChainNode:
-						n = n.(*ast.ChainNode).Left
-					case *ast.IdentifierNode:
-						if ident := n.(*ast.IdentifierNode).Ident; ident == "batch" || ident == "stream" {
-							tts = append(tts, ident)
-						}
-						break DeclLoop
+			n := node.Right
+		DeclLoop:
+			for {
+				switch n.(type) {
+				case *ast.ChainNode:
+					n = n.(*ast.ChainNode).Left
+				case *ast.IdentifierNode:
+					if ident := n.(*ast.IdentifierNode).Ident; ident == "batch" || ident == "stream" {
+						tts = append(tts, ident)
 					}
+					break DeclLoop
+				default:
+					break DeclLoop
 				}
 			}
 		case *ast.ChainNode:
-			var n = nn.(*ast.ChainNode).Left
+			n := node.Left
 		ChainLoop:
 			for {
 				switch n.(type) {

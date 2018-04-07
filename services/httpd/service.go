@@ -79,6 +79,9 @@ type Service struct {
 	shutdownTimeout time.Duration
 
 	Handler *Handler
+	// LocalHandler handler is used internally only for the local transport clients.
+	// It does not have authentication enabled.
+	LocalHandler *Handler
 
 	diag                  Diagnostic
 	httpServerErrorLogger *log.Logger
@@ -87,6 +90,9 @@ type Service struct {
 func NewService(c Config, hostname string, d Diagnostic) *Service {
 	statMap := &expvar.Map{}
 	statMap.Init()
+
+	localStatMap := &expvar.Map{}
+	localStatMap.Init()
 	port, _ := c.Port()
 	u := url.URL{
 		Host:   fmt.Sprintf("%s:%d", hostname, port),
@@ -112,6 +118,16 @@ func NewService(c Config, hostname string, d Diagnostic) *Service {
 			statMap,
 			d,
 			c.SharedSecret,
+		),
+		LocalHandler: NewHandler(
+			false,
+			false,
+			false,
+			false,
+			false,
+			localStatMap,
+			d,
+			"",
 		),
 		diag: d,
 		httpServerErrorLogger: d.NewHTTPServerErrorLogger(),
@@ -323,13 +339,16 @@ func (s *Service) ExternalURL() string {
 }
 
 func (s *Service) AddRoutes(routes []Route) error {
+	s.LocalHandler.AddRoutes(routes)
 	return s.Handler.AddRoutes(routes)
 }
 
 func (s *Service) AddPreviewRoutes(routes []Route) error {
+	s.LocalHandler.AddPreviewRoutes(routes)
 	return s.Handler.AddPreviewRoutes(routes)
 }
 
 func (s *Service) DelRoutes(routes []Route) {
+	s.LocalHandler.DelRoutes(routes)
 	s.Handler.DelRoutes(routes)
 }

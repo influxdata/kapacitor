@@ -27,6 +27,7 @@ import (
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/influxdb"
 	"github.com/influxdata/kapacitor/services/k8s"
+	"github.com/influxdata/kapacitor/services/kafka"
 	"github.com/influxdata/kapacitor/services/load"
 	"github.com/influxdata/kapacitor/services/marathon"
 	"github.com/influxdata/kapacitor/services/mqtt"
@@ -34,6 +35,7 @@ import (
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/opsgenie2"
 	"github.com/influxdata/kapacitor/services/pagerduty"
+	"github.com/influxdata/kapacitor/services/pagerduty2"
 	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/replay"
 	"github.com/influxdata/kapacitor/services/reporting"
@@ -79,21 +81,23 @@ type Config struct {
 	UDP      []udp.Config      `toml:"udp"`
 
 	// Alert handlers
-	Alerta    alerta.Config    `toml:"alerta" override:"alerta"`
-	HipChat   hipchat.Config   `toml:"hipchat" override:"hipchat"`
-	MQTT      mqtt.Configs     `toml:"mqtt" override:"mqtt,element-key=name"`
-	OpsGenie  opsgenie.Config  `toml:"opsgenie" override:"opsgenie"`
-	OpsGenie2 opsgenie2.Config `toml:"opsgenie2" override:"opsgenie2"`
-	PagerDuty pagerduty.Config `toml:"pagerduty" override:"pagerduty"`
-	Pushover  pushover.Config  `toml:"pushover" override:"pushover"`
-	HTTPPost  httppost.Configs `toml:"httppost" override:"httppost,element-key=endpoint"`
-	SMTP      smtp.Config      `toml:"smtp" override:"smtp"`
-	SNMPTrap  snmptrap.Config  `toml:"snmptrap" override:"snmptrap"`
-	Sensu     sensu.Config     `toml:"sensu" override:"sensu"`
-	Slack     slack.Config     `toml:"slack" override:"slack"`
-	Talk      talk.Config      `toml:"talk" override:"talk"`
-	Telegram  telegram.Config  `toml:"telegram" override:"telegram"`
-	VictorOps victorops.Config `toml:"victorops" override:"victorops"`
+	Alerta     alerta.Config     `toml:"alerta" override:"alerta"`
+	HipChat    hipchat.Config    `toml:"hipchat" override:"hipchat"`
+	Kafka      kafka.Configs     `toml:"kafka" override:"kafka,element-key=id"`
+	MQTT       mqtt.Configs      `toml:"mqtt" override:"mqtt,element-key=name"`
+	OpsGenie   opsgenie.Config   `toml:"opsgenie" override:"opsgenie"`
+	OpsGenie2  opsgenie2.Config  `toml:"opsgenie2" override:"opsgenie2"`
+	PagerDuty  pagerduty.Config  `toml:"pagerduty" override:"pagerduty"`
+	PagerDuty2 pagerduty2.Config `toml:"pagerduty2" override:"pagerduty2"`
+	Pushover   pushover.Config   `toml:"pushover" override:"pushover"`
+	HTTPPost   httppost.Configs  `toml:"httppost" override:"httppost,element-key=endpoint"`
+	SMTP       smtp.Config       `toml:"smtp" override:"smtp"`
+	SNMPTrap   snmptrap.Config   `toml:"snmptrap" override:"snmptrap"`
+	Sensu      sensu.Config      `toml:"sensu" override:"sensu"`
+	Slack      slack.Configs     `toml:"slack" override:"slack,element-key=workspace"`
+	Talk       talk.Config       `toml:"talk" override:"talk"`
+	Telegram   telegram.Config   `toml:"telegram" override:"telegram"`
+	VictorOps  victorops.Config  `toml:"victorops" override:"victorops"`
 
 	// Discovery for scraping
 	Scraper         []scraper.Config          `toml:"scraper" override:"scraper,element-key=name"`
@@ -150,11 +154,12 @@ func NewConfig() *Config {
 	c.OpsGenie = opsgenie.NewConfig()
 	c.OpsGenie2 = opsgenie2.NewConfig()
 	c.PagerDuty = pagerduty.NewConfig()
+	c.PagerDuty2 = pagerduty2.NewConfig()
 	c.Pushover = pushover.NewConfig()
 	c.HTTPPost = httppost.Configs{httppost.NewConfig()}
 	c.SMTP = smtp.NewConfig()
 	c.Sensu = sensu.NewConfig()
-	c.Slack = slack.NewConfig()
+	c.Slack = slack.Configs{slack.NewDefaultConfig()}
 	c.Talk = talk.NewConfig()
 	c.SNMPTrap = snmptrap.NewConfig()
 	c.Telegram = telegram.NewConfig()
@@ -260,6 +265,9 @@ func (c *Config) Validate() error {
 	if err := c.HipChat.Validate(); err != nil {
 		return errors.Wrap(err, "hipchat")
 	}
+	if err := c.Kafka.Validate(); err != nil {
+		return errors.Wrap(err, "kafka")
+	}
 	if err := c.MQTT.Validate(); err != nil {
 		return errors.Wrap(err, "mqtt")
 	}
@@ -271,6 +279,9 @@ func (c *Config) Validate() error {
 	}
 	if err := c.PagerDuty.Validate(); err != nil {
 		return errors.Wrap(err, "pagerduty")
+	}
+	if err := c.PagerDuty2.Validate(); err != nil {
+		return errors.Wrap(err, "pagerduty2")
 	}
 	if err := c.Pushover.Validate(); err != nil {
 		return errors.Wrap(err, "pushover")

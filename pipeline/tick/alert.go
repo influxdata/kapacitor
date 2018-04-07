@@ -44,6 +44,15 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 		DotIf("all", a.AllFlag).
 		DotIf("noRecoveries", a.NoRecoveriesFlag)
 
+	for _, in := range a.Inhibitors {
+		args := make([]interface{}, len(in.EqualTags)+1)
+		args[0] = in.Category
+		for i, t := range in.EqualTags {
+			args[i+1] = t
+		}
+		n.Dot("inhibit", args...)
+	}
+
 	if a.IsStateChangesOnly {
 		if a.StateChangesOnlyDuration == 0 {
 			n.Dot("stateChangesOnly")
@@ -109,6 +118,11 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 			Dot("serviceKey", h.ServiceKey)
 	}
 
+	for _, h := range a.PagerDuty2Handlers {
+		n.Dot("pagerDuty2").
+			Dot("serviceKey", h.ServiceKey)
+	}
+
 	for _, h := range a.PushoverHandlers {
 		n.Dot("pushover").
 			Dot("userKey", h.UserKey).
@@ -127,6 +141,7 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 
 	for _, h := range a.SlackHandlers {
 		n.Dot("slack").
+			Dot("workspace", h.Workspace).
 			Dot("channel", h.Channel).
 			Dot("username", h.Username).
 			Dot("iconEmoji", h.IconEmoji)
@@ -144,6 +159,13 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 		n.Dot("hipChat").
 			Dot("room", h.Room).
 			Dot("token", h.Token)
+	}
+
+	for _, h := range a.KafkaHandlers {
+		n.Dot("kafka").
+			Dot("cluster", h.Cluster).
+			Dot("kafkaTopic", h.KafkaTopic).
+			Dot("template", h.Template)
 	}
 
 	for _, h := range a.AlertaHandlers {

@@ -136,7 +136,7 @@ Kapacitor uses the golang [dep](https://github.com/golang/dep) tool.
 Install the dep tool:
 
 ```
-go get -u github.com/golang/dep
+go get -v -u github.com/golang/dep/cmd/dep
 ```
 
 See the dep help for usage and documentation.

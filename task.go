@@ -483,6 +483,8 @@ func (et *ExecutingTask) createNode(p pipeline.Node, d NodeDiagnostic) (n Node, 
 		n, err = newSampleNode(et, t, d)
 	case *pipeline.DerivativeNode:
 		n, err = newDerivativeNode(et, t, d)
+	case *pipeline.ChangeDetectNode:
+		n, err = newChangeDetectNode(et, t, d)
 	case *pipeline.UDFNode:
 		n, err = newUDFNode(et, t, d)
 	case *pipeline.StatsNode:
@@ -519,7 +521,7 @@ func (et *ExecutingTask) createNode(p pipeline.Node, d NodeDiagnostic) (n Node, 
 		return nil, fmt.Errorf("unknown pipeline node type %T", p)
 	}
 	if err == nil && n != nil {
-		n.init()
+		n.init(p.IsQuiet())
 	}
 	return n, err
 }

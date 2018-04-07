@@ -19,10 +19,12 @@ import (
 	alertservice "github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httppost"
+	"github.com/influxdata/kapacitor/services/kafka"
 	"github.com/influxdata/kapacitor/services/mqtt"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/opsgenie2"
 	"github.com/influxdata/kapacitor/services/pagerduty"
+	"github.com/influxdata/kapacitor/services/pagerduty2"
 	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/slack"
@@ -37,6 +39,7 @@ import (
 
 const (
 	statsAlertsTriggered = "alerts_triggered"
+	statsAlertsInhibited = "alerts_inhibited"
 	statsOKsTriggered    = "oks_triggered"
 	statsInfosTriggered  = "infos_triggered"
 	statsWarnsTriggered  = "warns_triggered"
@@ -63,6 +66,7 @@ type AlertNode struct {
 	detailsTmpl *html.Template
 
 	alertsTriggered *expvar.Int
+	alertsInhibited *expvar.Int
 	oksTriggered    *expvar.Int
 	infosTriggered  *expvar.Int
 	warnsTriggered  *expvar.Int
@@ -203,6 +207,19 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		an.handlers = append(an.handlers, h)
 	}
 
+	for _, pd := range n.PagerDuty2Handlers {
+		c := pagerduty2.HandlerConfig{
+			ServiceKey: pd.ServiceKey,
+		}
+		h := et.tm.PagerDuty2Service.Handler(c, ctx...)
+		an.handlers = append(an.handlers, h)
+	}
+	if len(n.PagerDuty2Handlers) == 0 && (et.tm.PagerDuty2Service != nil && et.tm.PagerDuty2Service.Global()) {
+		c := pagerduty2.HandlerConfig{}
+		h := et.tm.PagerDuty2Service.Handler(c, ctx...)
+		an.handlers = append(an.handlers, h)
+	}
+
 	for _, s := range n.SensuHandlers {
 		c := sensu.HandlerConfig{
 			Source:   s.Source,
@@ -217,6 +234,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 
 	for _, s := range n.SlackHandlers {
 		c := slack.HandlerConfig{
+			Workspace: s.Workspace,
 			Channel:   s.Channel,
 			Username:  s.Username,
 			IconEmoji: s.IconEmoji,
@@ -296,6 +314,19 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		et.tm.HipChatService.Global() &&
 		et.tm.HipChatService.StateChangesOnly() {
 		n.IsStateChangesOnly = true
+	}
+
+	for _, k := range n.KafkaHandlers {
+		c := kafka.HandlerConfig{
+			Cluster:  k.Cluster,
+			Topic:    k.Topic,
+			Template: k.Template,
+		}
+		h, err := et.tm.KafkaService.Handler(c, ctx...)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to create kafka handler")
+		}
+		an.handlers = append(an.handlers, h)
 	}
 
 	for _, a := range n.AlertaHandlers {
@@ -500,6 +531,9 @@ func (n *AlertNode) runAlert([]byte) error {
 	n.alertsTriggered = &expvar.Int{}
 	n.statMap.Set(statsAlertsTriggered, n.alertsTriggered)
 
+	n.alertsInhibited = &expvar.Int{}
+	n.statMap.Set(statsAlertsInhibited, n.alertsInhibited)
+
 	n.oksTriggered = &expvar.Int{}
 	n.statMap.Set(statsOKsTriggered, n.oksTriggered)
 
@@ -533,6 +567,7 @@ func (n *AlertNode) runAlert([]byte) error {
 	for _, h := range n.handlers {
 		n.et.tm.AlertService.DeregisterAnonHandler(n.anonTopic, h)
 	}
+
 	return nil
 }
 
@@ -543,7 +578,7 @@ func (n *AlertNode) NewGroup(group edge.GroupInfo, first edge.PointMeta) (edge.R
 	}
 	t := first.Time()
 
-	state := n.restoreEventState(id, t)
+	state := n.restoreEventState(id, t, group.Tags)
 
 	return edge.NewReceiverFromForwardReceiverWithStats(
 		n.outs,
@@ -554,8 +589,8 @@ func (n *AlertNode) NewGroup(group edge.GroupInfo, first edge.PointMeta) (edge.R
 	), nil
 }
 
-func (n *AlertNode) restoreEventState(id string, t time.Time) *alertState {
-	state := n.newAlertState()
+func (n *AlertNode) restoreEventState(id string, t time.Time, tags models.Tags) *alertState {
+	state := n.newAlertState(tags)
 	currentLevel, triggered := n.restoreEvent(id)
 	if currentLevel != alert.OK {
 		// Add initial event
@@ -566,11 +601,23 @@ func (n *AlertNode) restoreEventState(id string, t time.Time) *alertState {
 	return state
 }
 
-func (n *AlertNode) newAlertState() *alertState {
+func (n *AlertNode) newAlertState(tags models.Tags) *alertState {
+	inhibitors := make([]*alert.Inhibitor, len(n.a.Inhibitors))
+	for i, in := range n.a.Inhibitors {
+		tagset := make(models.Tags, len(in.EqualTags))
+		for _, t := range in.EqualTags {
+			tagset[t] = tags[t]
+		}
+
+		inhibitor := alert.NewInhibitor(in.Category, tagset)
+		inhibitors[i] = inhibitor
+		n.et.tm.AlertService.AddInhibitor(inhibitor)
+	}
 	return &alertState{
-		history: make([]alert.Level, n.a.History),
-		n:       n,
-		buffer:  new(edge.BatchBuffer),
+		history:    make([]alert.Level, n.a.History),
+		n:          n,
+		buffer:     new(edge.BatchBuffer),
+		inhibitors: inhibitors,
 	}
 }
 
@@ -630,6 +677,12 @@ func (n *AlertNode) hasTopic() bool {
 }
 
 func (n *AlertNode) handleEvent(event alert.Event) {
+	// Check if alert is inhibited
+	if n.et.tm.AlertService.IsInhibited(event.Data.Category, event.Data.Tags) {
+		n.alertsInhibited.Add(1)
+		return
+	}
+
 	n.alertsTriggered.Add(1)
 	switch event.State.Level {
 	case alert.OK:
@@ -725,12 +778,14 @@ func (n *AlertNode) event(
 			Level:    level,
 		},
 		Data: alert.EventData{
-			Name:     name,
-			TaskName: n.et.Task.ID,
-			Group:    string(group),
-			Tags:     tags,
-			Fields:   fields,
-			Result:   result,
+			Name:        name,
+			TaskName:    n.et.Task.ID,
+			Category:    n.a.Category,
+			Group:       string(group),
+			Tags:        tags,
+			Fields:      fields,
+			Result:      result,
+			Recoverable: !n.a.NoRecoveriesFlag,
 		},
 	}
 	return event, nil
@@ -753,6 +808,8 @@ type alertState struct {
 	// Note: Alerts are not triggered for every event.
 	lastTriggered time.Time
 	expired       bool
+
+	inhibitors []*alert.Inhibitor
 }
 
 func (a *alertState) BeginBatch(begin edge.BeginBatchMessage) (edge.Message, error) {
@@ -941,8 +998,14 @@ func (a *alertState) augmentFieldsWithEventState(p edge.FieldSetter, eventState 
 func (a *alertState) Barrier(b edge.BarrierMessage) (edge.Message, error) {
 	return b, nil
 }
+
 func (a *alertState) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
 	return d, nil
+}
+func (a *alertState) Done() {
+	for _, inhibitor := range a.inhibitors {
+		a.n.et.tm.AlertService.RemoveInhibitor(inhibitor)
+	}
 }
 
 // Return the duration of the current alert state.
@@ -962,6 +1025,12 @@ func (a *alertState) triggered(t time.Time) {
 	if a.history[p] == alert.OK {
 		a.firstTriggered = t
 	}
+
+	// Update inhibitor state
+	inhibited := a.history[a.idx] != alert.OK
+	for _, in := range a.inhibitors {
+		in.Set(inhibited)
+	}
 }
 
 // Record an event in the alert history.
@@ -975,6 +1044,7 @@ func (a *alertState) addEvent(t time.Time, level alert.Level) {
 
 	a.updateFlapping()
 	a.updateExpired(t)
+
 }
 
 // Return current level of this state

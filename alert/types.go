@@ -27,6 +27,7 @@ func (e Event) AlertData() Data {
 		Level:         e.State.Level,
 		Data:          e.Data.Result,
 		PreviousLevel: e.previousState.Level,
+		Recoverable:   e.Data.Recoverable,
 	}
 }
 
@@ -70,6 +71,9 @@ type EventData struct {
 	// TaskName is the name of the task that generated this event.
 	TaskName string
 
+	// Category is the category of the alert that generated this event.
+	Category string
+
 	// Concatenation of all group-by tags of the form [key=value,]+.
 	// If not groupBy is performed equal to literal 'nil'
 	Group string
@@ -79,6 +83,8 @@ type EventData struct {
 
 	// Fields of alerting data point.
 	Fields map[string]interface{}
+
+	Recoverable bool
 
 	Result models.Result
 }
@@ -179,4 +185,5 @@ type Data struct {
 	Level         Level         `json:"level"`
 	Data          models.Result `json:"data"`
 	PreviousLevel Level         `json:"previousLevel"`
+	Recoverable   bool          `json:"recoverable"`
 }

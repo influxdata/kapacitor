@@ -22,7 +22,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/google/go-cmp/cmp"
 	iclient "github.com/influxdata/influxdb/client/v2"
 	"github.com/influxdata/influxdb/influxql"
 	imodels "github.com/influxdata/influxdb/models"
@@ -39,6 +41,8 @@ import (
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/httppost/httpposttest"
 	"github.com/influxdata/kapacitor/services/k8s"
+	"github.com/influxdata/kapacitor/services/kafka"
+	"github.com/influxdata/kapacitor/services/kafka/kafkatest"
 	"github.com/influxdata/kapacitor/services/mqtt"
 	"github.com/influxdata/kapacitor/services/mqtt/mqtttest"
 	"github.com/influxdata/kapacitor/services/opsgenie"
@@ -46,8 +50,11 @@ import (
 	"github.com/influxdata/kapacitor/services/opsgenie2/opsgenie2test"
 	"github.com/influxdata/kapacitor/services/pagerduty"
 	"github.com/influxdata/kapacitor/services/pagerduty/pagerdutytest"
+	"github.com/influxdata/kapacitor/services/pagerduty2"
+	"github.com/influxdata/kapacitor/services/pagerduty2/pagerduty2test"
 	"github.com/influxdata/kapacitor/services/pushover/pushovertest"
 	"github.com/influxdata/kapacitor/services/sensu/sensutest"
+	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/slack/slacktest"
 	"github.com/influxdata/kapacitor/services/smtp/smtptest"
 	"github.com/influxdata/kapacitor/services/snmptrap/snmptraptest"
@@ -309,6 +316,67 @@ func TestServer_CreateTask(t *testing.T) {
 	tick := `stream
     |from()
         .measurement('test')
+`
+	task, err := cli.CreateTask(client.CreateTaskOptions{
+		ID:         id,
+		Type:       ttype,
+		DBRPs:      dbrps,
+		TICKscript: tick,
+		Status:     client.Disabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ti, err := cli.Task(task.Link, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ti.Error != "" {
+		t.Fatal(ti.Error)
+	}
+	if ti.ID != id {
+		t.Fatalf("unexpected id got %s exp %s", ti.ID, id)
+	}
+	if ti.Type != client.StreamTask {
+		t.Fatalf("unexpected type got %v exp %v", ti.Type, client.StreamTask)
+	}
+	if ti.Status != client.Disabled {
+		t.Fatalf("unexpected status got %v exp %v", ti.Status, client.Disabled)
+	}
+	if !reflect.DeepEqual(ti.DBRPs, dbrps) {
+		t.Fatalf("unexpected dbrps got %s exp %s", ti.DBRPs, dbrps)
+	}
+	if ti.TICKscript != tick {
+		t.Fatalf("unexpected TICKscript got %s exp %s", ti.TICKscript, tick)
+	}
+	dot := "digraph testTaskID {\nstream0 -> from1;\n}"
+	if ti.Dot != dot {
+		t.Fatalf("unexpected dot\ngot\n%s\nexp\n%s\n", ti.Dot, dot)
+	}
+}
+
+func TestServer_CreateTask_Quiet(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	id := "testTaskID"
+	ttype := client.StreamTask
+	dbrps := []client.DBRP{
+		{
+			Database:        "mydb",
+			RetentionPolicy: "myrp",
+		},
+		{
+			Database:        "otherdb",
+			RetentionPolicy: "default",
+		},
+	}
+	tick := `stream
+    |from()
+        .measurement('test')
+        .quiet()
 `
 	task, err := cli.CreateTask(client.CreateTaskOptions{
 		ID:         id,
@@ -1350,7 +1418,7 @@ stream
 	}
 
 	updateTick := `var x = 5
-	
+
 	stream
 	    |from()
 	        .measurement('test')
@@ -1370,7 +1438,7 @@ stream
 	dbrp "telegraf"."not_autogen"
 
 	var x = 5
-	
+
 	stream
 	    |from()
 	        .measurement('test')
@@ -1775,6 +1843,76 @@ stream
 	}
 	if !reflect.DeepEqual(taskInfo.Vars, vars) {
 		t.Fatalf("unexpected task.vars got %s exp %s", taskInfo.Vars, vars)
+	}
+}
+
+func TestServer_DynamicStreamTask(t *testing.T) {
+	s, cli := OpenDefaultServer()
+	defer s.Close()
+
+	testCases := []struct {
+		name string
+		tick string
+		want client.TaskType
+	}{
+		{
+			name: "stream",
+			tick: `
+dbrp "db"."rp"
+stream
+    |from()
+         .measurement('test')
+`,
+			want: client.StreamTask,
+		},
+		{
+			name: "stream_through_var",
+			tick: `
+dbrp "db"."rp"
+var s = stream
+s
+    |from()
+         .measurement('test')
+`,
+			want: client.StreamTask,
+		},
+		{
+			name: "batch",
+			tick: `
+dbrp "db"."rp"
+batch
+    |query('select * from db.rp.m')
+`,
+			want: client.BatchTask,
+		},
+		{
+			name: "batch_through_var",
+			tick: `
+dbrp "db"."rp"
+var b = batch
+b
+    |query('select * from db.rp.m')
+`,
+			want: client.BatchTask,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			task, err := cli.CreateTask(client.CreateTaskOptions{
+				ID:         tc.name,
+				TICKscript: tc.tick,
+				Status:     client.Disabled,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if task.Type != tc.want {
+				t.Fatalf("unexpected task type: got: %v want: %v", task.Type, tc.want)
+			}
+		})
 	}
 }
 
@@ -4859,6 +4997,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			Level:         alert.Critical,
 			PreviousLevel: alert.OK,
 			Duration:      0 * time.Second,
+			Recoverable:   true,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -4881,6 +5020,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			Level:         alert.Critical,
 			PreviousLevel: alert.Critical,
 			Duration:      1 * time.Second,
+			Recoverable:   true,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -4903,6 +5043,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			Level:         alert.Critical,
 			PreviousLevel: alert.Critical,
 			Duration:      2 * time.Second,
+			Recoverable:   true,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -4927,6 +5068,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			Level:         alert.Critical,
 			PreviousLevel: alert.Critical,
 			Duration:      3 * time.Second,
+			Recoverable:   true,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -4951,6 +5093,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			Level:         alert.Critical,
 			PreviousLevel: alert.Critical,
 			Duration:      4 * time.Second,
+			Recoverable:   true,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -4975,6 +5118,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			Level:         alert.Critical,
 			PreviousLevel: alert.Critical,
 			Duration:      5 * time.Second,
+			Recoverable:   true,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -4998,6 +5142,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			Level:         alert.Critical,
 			PreviousLevel: alert.Critical,
 			Duration:      6 * time.Second,
+			Recoverable:   true,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -5021,6 +5166,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			Level:         alert.Critical,
 			PreviousLevel: alert.Critical,
 			Duration:      7 * time.Second,
+			Recoverable:   true,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -5044,6 +5190,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			Level:         alert.Critical,
 			PreviousLevel: alert.Critical,
 			Duration:      8 * time.Second,
+			Recoverable:   true,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -5067,6 +5214,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			Level:         alert.Critical,
 			PreviousLevel: alert.Critical,
 			Duration:      9 * time.Second,
+			Recoverable:   true,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -5089,6 +5237,7 @@ func TestServer_RecordReplayQuery_Missing(t *testing.T) {
 			Level:         alert.Critical,
 			PreviousLevel: alert.Critical,
 			Duration:      10 * time.Second,
+			Recoverable:   true,
 			Data: models.Result{
 				Series: models.Rows{
 					{
@@ -7291,6 +7440,76 @@ func TestServer_UpdateConfig(t *testing.T) {
 			},
 		},
 		{
+			section: "pagerduty2",
+			setDefaults: func(c *server.Config) {
+				c.PagerDuty2.ServiceKey = "secret"
+			},
+			expDefaultSection: client.ConfigSection{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/pagerduty2"},
+				Elements: []client.ConfigElement{{
+					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/pagerduty2/"},
+					Options: map[string]interface{}{
+						"enabled":     false,
+						"global":      false,
+						"service-key": true,
+						"url":         pagerduty2.DefaultPagerDuty2APIURL,
+					},
+					Redacted: []string{
+						"service-key",
+					},
+				}},
+			},
+			expDefaultElement: client.ConfigElement{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/pagerduty2/"},
+				Options: map[string]interface{}{
+					"enabled":     false,
+					"global":      false,
+					"service-key": true,
+					"url":         pagerduty2.DefaultPagerDuty2APIURL,
+				},
+				Redacted: []string{
+					"service-key",
+				},
+			},
+			updates: []updateAction{
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"service-key": "",
+							"enabled":     true,
+						},
+					},
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/pagerduty2"},
+						Elements: []client.ConfigElement{{
+							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/pagerduty2/"},
+							Options: map[string]interface{}{
+								"enabled":     true,
+								"global":      false,
+								"service-key": false,
+								"url":         pagerduty2.DefaultPagerDuty2APIURL,
+							},
+							Redacted: []string{
+								"service-key",
+							},
+						}},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/pagerduty2/"},
+						Options: map[string]interface{}{
+							"enabled":     true,
+							"global":      false,
+							"service-key": false,
+							"url":         pagerduty2.DefaultPagerDuty2APIURL,
+						},
+						Redacted: []string{
+							"service-key",
+						},
+					},
+				},
+			},
+		},
+		{
 			section: "smtp",
 			setDefaults: func(c *server.Config) {
 				c.SMTP.Host = "smtp.example.com"
@@ -7455,13 +7674,24 @@ func TestServer_UpdateConfig(t *testing.T) {
 		{
 			section: "slack",
 			setDefaults: func(c *server.Config) {
-				c.Slack.Global = true
+				cfg := &slack.Config{
+					Global:   true,
+					Default:  true,
+					Username: slack.DefaultUsername,
+				}
+
+				c.Slack = slack.Configs{
+					*cfg,
+				}
 			},
+			element: "",
 			expDefaultSection: client.ConfigSection{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack"},
 				Elements: []client.ConfigElement{{
 					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/"},
 					Options: map[string]interface{}{
+						"workspace":            "",
+						"default":              true,
 						"channel":              "",
 						"enabled":              false,
 						"global":               true,
@@ -7482,6 +7712,8 @@ func TestServer_UpdateConfig(t *testing.T) {
 			expDefaultElement: client.ConfigElement{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/"},
 				Options: map[string]interface{}{
+					"workspace":            "",
+					"default":              true,
 					"channel":              "",
 					"enabled":              false,
 					"global":               true,
@@ -7501,24 +7733,29 @@ func TestServer_UpdateConfig(t *testing.T) {
 			updates: []updateAction{
 				{
 					updateAction: client.ConfigUpdateAction{
-						Set: map[string]interface{}{
-							"enabled": true,
-							"global":  false,
-							"channel": "#general",
-							"url":     "http://slack.example.com/secret-token",
+						Add: map[string]interface{}{
+							"workspace": "company_private",
+							"enabled":   true,
+							"global":    false,
+							"channel":   "#general",
+							"username":  slack.DefaultUsername,
+							"url":       "http://slack.example.com/secret-token",
 						},
 					},
+					element: "company_private",
 					expSection: client.ConfigSection{
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack"},
 						Elements: []client.ConfigElement{{
 							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/"},
 							Options: map[string]interface{}{
-								"channel":              "#general",
-								"enabled":              true,
-								"global":               false,
+								"workspace":            "",
+								"default":              true,
+								"channel":              "",
+								"enabled":              false,
+								"global":               true,
 								"icon-emoji":           "",
 								"state-changes-only":   false,
-								"url":                  true,
+								"url":                  false,
 								"username":             "kapacitor",
 								"ssl-ca":               "",
 								"ssl-cert":             "",
@@ -7528,18 +7765,336 @@ func TestServer_UpdateConfig(t *testing.T) {
 							Redacted: []string{
 								"url",
 							},
-						}},
+						},
+							{
+								Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/company_private"},
+								Options: map[string]interface{}{
+									"workspace":            "company_private",
+									"channel":              "#general",
+									"default":              false,
+									"enabled":              true,
+									"global":               false,
+									"icon-emoji":           "",
+									"state-changes-only":   false,
+									"url":                  true,
+									"username":             "kapacitor",
+									"ssl-ca":               "",
+									"ssl-cert":             "",
+									"ssl-key":              "",
+									"insecure-skip-verify": false,
+								},
+								Redacted: []string{
+									"url",
+								},
+							}},
 					},
 					expElement: client.ConfigElement{
-						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/"},
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/company_private"},
 						Options: map[string]interface{}{
+							"workspace":            "company_private",
 							"channel":              "#general",
+							"default":              false,
 							"enabled":              true,
 							"global":               false,
 							"icon-emoji":           "",
 							"state-changes-only":   false,
 							"url":                  true,
 							"username":             "kapacitor",
+							"ssl-ca":               "",
+							"ssl-cert":             "",
+							"ssl-key":              "",
+							"insecure-skip-verify": false,
+						},
+						Redacted: []string{
+							"url",
+						},
+					},
+				},
+				{
+					updateAction: client.ConfigUpdateAction{
+						Add: map[string]interface{}{
+							"workspace": "company_public",
+							"enabled":   true,
+							"global":    false,
+							"channel":   "#general",
+							"username":  slack.DefaultUsername,
+							"url":       "http://slack.example.com/secret-token",
+						},
+					},
+					element: "company_public",
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack"},
+						Elements: []client.ConfigElement{
+							{
+								Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/"},
+								Options: map[string]interface{}{
+									"workspace":            "",
+									"default":              true,
+									"channel":              "",
+									"enabled":              false,
+									"global":               true,
+									"icon-emoji":           "",
+									"state-changes-only":   false,
+									"url":                  false,
+									"username":             "kapacitor",
+									"ssl-ca":               "",
+									"ssl-cert":             "",
+									"ssl-key":              "",
+									"insecure-skip-verify": false,
+								},
+								Redacted: []string{
+									"url",
+								},
+							},
+							{
+								Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/company_private"},
+								Options: map[string]interface{}{
+									"workspace":            "company_private",
+									"channel":              "#general",
+									"default":              false,
+									"enabled":              true,
+									"global":               false,
+									"icon-emoji":           "",
+									"state-changes-only":   false,
+									"url":                  true,
+									"username":             "kapacitor",
+									"ssl-ca":               "",
+									"ssl-cert":             "",
+									"ssl-key":              "",
+									"insecure-skip-verify": false,
+								},
+								Redacted: []string{
+									"url",
+								},
+							},
+							{
+								Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/company_public"},
+								Options: map[string]interface{}{
+									"workspace":            "company_public",
+									"channel":              "#general",
+									"default":              false,
+									"enabled":              true,
+									"global":               false,
+									"icon-emoji":           "",
+									"state-changes-only":   false,
+									"url":                  true,
+									"username":             "kapacitor",
+									"ssl-ca":               "",
+									"ssl-cert":             "",
+									"ssl-key":              "",
+									"insecure-skip-verify": false,
+								},
+								Redacted: []string{
+									"url",
+								},
+							},
+						},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/company_public"},
+						Options: map[string]interface{}{
+							"workspace":            "company_public",
+							"channel":              "#general",
+							"default":              false,
+							"enabled":              true,
+							"global":               false,
+							"icon-emoji":           "",
+							"state-changes-only":   false,
+							"url":                  true,
+							"username":             "kapacitor",
+							"ssl-ca":               "",
+							"ssl-cert":             "",
+							"ssl-key":              "",
+							"insecure-skip-verify": false,
+						},
+						Redacted: []string{
+							"url",
+						},
+					},
+				},
+				{
+					updateAction: client.ConfigUpdateAction{
+						Set: map[string]interface{}{
+							"enabled":  false,
+							"username": "testbot",
+						},
+					},
+					element: "company_public",
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack"},
+						Elements: []client.ConfigElement{
+							{
+								Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/"},
+								Options: map[string]interface{}{
+									"workspace":            "",
+									"default":              true,
+									"channel":              "",
+									"enabled":              false,
+									"global":               true,
+									"icon-emoji":           "",
+									"state-changes-only":   false,
+									"url":                  false,
+									"username":             "kapacitor",
+									"ssl-ca":               "",
+									"ssl-cert":             "",
+									"ssl-key":              "",
+									"insecure-skip-verify": false,
+								},
+								Redacted: []string{
+									"url",
+								},
+							},
+							{
+								Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/company_private"},
+								Options: map[string]interface{}{
+									"workspace":            "company_private",
+									"channel":              "#general",
+									"default":              false,
+									"enabled":              true,
+									"global":               false,
+									"icon-emoji":           "",
+									"state-changes-only":   false,
+									"url":                  true,
+									"username":             "kapacitor",
+									"ssl-ca":               "",
+									"ssl-cert":             "",
+									"ssl-key":              "",
+									"insecure-skip-verify": false,
+								},
+								Redacted: []string{
+									"url",
+								},
+							},
+							{
+								Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/company_public"},
+								Options: map[string]interface{}{
+									"workspace":            "company_public",
+									"channel":              "#general",
+									"default":              false,
+									"enabled":              false,
+									"global":               false,
+									"icon-emoji":           "",
+									"state-changes-only":   false,
+									"url":                  true,
+									"username":             "testbot",
+									"ssl-ca":               "",
+									"ssl-cert":             "",
+									"ssl-key":              "",
+									"insecure-skip-verify": false,
+								},
+								Redacted: []string{
+									"url",
+								},
+							},
+						},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/company_public"},
+						Options: map[string]interface{}{
+							"workspace":            "company_public",
+							"channel":              "#general",
+							"default":              false,
+							"enabled":              false,
+							"global":               false,
+							"icon-emoji":           "",
+							"state-changes-only":   false,
+							"url":                  true,
+							"username":             "testbot",
+							"ssl-ca":               "",
+							"ssl-cert":             "",
+							"ssl-key":              "",
+							"insecure-skip-verify": false,
+						},
+						Redacted: []string{
+							"url",
+						},
+					},
+				},
+				{
+					updateAction: client.ConfigUpdateAction{
+						Delete: []string{"username"},
+					},
+					element: "company_public",
+					expSection: client.ConfigSection{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack"},
+						Elements: []client.ConfigElement{
+							{
+								Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/"},
+								Options: map[string]interface{}{
+									"workspace":            "",
+									"default":              true,
+									"channel":              "",
+									"enabled":              false,
+									"global":               true,
+									"icon-emoji":           "",
+									"state-changes-only":   false,
+									"url":                  false,
+									"username":             "kapacitor",
+									"ssl-ca":               "",
+									"ssl-cert":             "",
+									"ssl-key":              "",
+									"insecure-skip-verify": false,
+								},
+								Redacted: []string{
+									"url",
+								},
+							},
+							{
+								Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/company_private"},
+								Options: map[string]interface{}{
+									"workspace":            "company_private",
+									"channel":              "#general",
+									"default":              false,
+									"enabled":              true,
+									"global":               false,
+									"icon-emoji":           "",
+									"state-changes-only":   false,
+									"url":                  true,
+									"username":             "kapacitor",
+									"ssl-ca":               "",
+									"ssl-cert":             "",
+									"ssl-key":              "",
+									"insecure-skip-verify": false,
+								},
+								Redacted: []string{
+									"url",
+								},
+							},
+							{
+								Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/company_public"},
+								Options: map[string]interface{}{
+									"workspace":            "company_public",
+									"channel":              "#general",
+									"default":              false,
+									"enabled":              false,
+									"global":               false,
+									"icon-emoji":           "",
+									"state-changes-only":   false,
+									"url":                  true,
+									"username":             "",
+									"ssl-ca":               "",
+									"ssl-cert":             "",
+									"ssl-key":              "",
+									"insecure-skip-verify": false,
+								},
+								Redacted: []string{
+									"url",
+								},
+							},
+						},
+					},
+					expElement: client.ConfigElement{
+						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/slack/company_public"},
+						Options: map[string]interface{}{
+							"workspace":            "company_public",
+							"channel":              "#general",
+							"default":              false,
+							"enabled":              false,
+							"global":               false,
+							"icon-emoji":           "",
+							"state-changes-only":   false,
+							"url":                  true,
+							"username":             "",
 							"ssl-ca":               "",
 							"ssl-cert":             "",
 							"ssl-key":              "",
@@ -8147,6 +8702,16 @@ func TestServer_ListServiceTests(t *testing.T) {
 				},
 			},
 			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/kafka"},
+				Name: "kafka",
+				Options: client.ServiceTestOptions{
+					"cluster": "example",
+					"topic":   "test",
+					"key":     "key",
+					"message": "test kafka message",
+				},
+			},
+			{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/kubernetes"},
 				Name: "kubernetes",
 				Options: client.ServiceTestOptions{
@@ -8211,6 +8776,28 @@ func TestServer_ListServiceTests(t *testing.T) {
 				},
 			},
 			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/pagerduty2"},
+				Name: "pagerduty2",
+				Options: client.ServiceTestOptions{
+					"incident-key": "testIncidentKey",
+					"description":  "test pagerduty2 message",
+					"level":        "CRITICAL",
+					"event_data": map[string]interface{}{
+						"Fields": map[string]interface{}{},
+						"Result": map[string]interface{}{
+							"series": interface{}(nil),
+						},
+						"Name":        "testPagerDuty2",
+						"TaskName":    "",
+						"Group":       "",
+						"Tags":        map[string]interface{}{},
+						"Recoverable": false,
+						"Category":    "",
+					},
+					"timestamp": "2014-11-12T11:45:26.371Z",
+				},
+			},
+			{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/pushover"},
 				Name: "pushover",
 				Options: client.ServiceTestOptions{
@@ -8253,6 +8840,7 @@ func TestServer_ListServiceTests(t *testing.T) {
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/slack"},
 				Name: "slack",
 				Options: client.ServiceTestOptions{
+					"workspace":  "",
 					"channel":    "",
 					"icon-emoji": "",
 					"level":      "CRITICAL",
@@ -8345,7 +8933,7 @@ func TestServer_ListServiceTests(t *testing.T) {
 		exp := expServiceTests.Services[i]
 		got := serviceTests.Services[i]
 		if !reflect.DeepEqual(got, exp) {
-			t.Errorf("unexpected server test %s:\ngot\n%#v\nexp\n%#v\n", exp.Name, got, exp)
+			t.Errorf("unexpected server test %s:\n%s", exp.Name, cmp.Diff(exp, got))
 		}
 	}
 }
@@ -8391,6 +8979,7 @@ func TestServer_ListServiceTests_WithPattern(t *testing.T) {
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/slack"},
 				Name: "slack",
 				Options: client.ServiceTestOptions{
+					"workspace":  "",
 					"channel":    "",
 					"icon-emoji": "",
 					"level":      "CRITICAL",
@@ -8543,6 +9132,14 @@ func TestServer_DoServiceTest(t *testing.T) {
 		},
 		{
 			service: "pagerduty",
+			options: client.ServiceTestOptions{},
+			exp: client.ServiceTestResult{
+				Success: false,
+				Message: "service is not enabled",
+			},
+		},
+		{
+			service: "pagerduty2",
 			options: client.ServiceTestOptions{},
 			exp: client.ServiceTestResult{
 				Success: false,
@@ -8712,6 +9309,64 @@ func TestServer_AlertHandlers_CRUD(t *testing.T) {
 				},
 			},
 		},
+		{
+			// Topic and handler have same name
+			topic: "slack",
+			create: client.TopicHandlerOptions{
+				ID:   "slack",
+				Kind: "slack",
+				Options: map[string]interface{}{
+					"channel": "#test",
+				},
+			},
+			expCreate: client.TopicHandler{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/slack/handlers/slack"},
+				ID:   "slack",
+				Kind: "slack",
+				Options: map[string]interface{}{
+					"channel": "#test",
+				},
+			},
+			patch: client.JSONPatch{
+				{
+					Path:      "/kind",
+					Operation: "replace",
+					Value:     "log",
+				},
+				{
+					Path:      "/options/channel",
+					Operation: "remove",
+				},
+				{
+					Path:      "/options/path",
+					Operation: "add",
+					Value:     AlertLogPath,
+				},
+			},
+			expPatch: client.TopicHandler{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/slack/handlers/slack"},
+				ID:   "slack",
+				Kind: "log",
+				Options: map[string]interface{}{
+					"path": AlertLogPath,
+				},
+			},
+			put: client.TopicHandlerOptions{
+				ID:   "slack",
+				Kind: "smtp",
+				Options: map[string]interface{}{
+					"to": []string{"oncall@example.com"},
+				},
+			},
+			expPut: client.TopicHandler{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/slack/handlers/slack"},
+				ID:   "slack",
+				Kind: "smtp",
+				Options: map[string]interface{}{
+					"to": []interface{}{"oncall@example.com"},
+				},
+			},
+		},
 	}
 	for _, tc := range testCases {
 		// Create default config
@@ -8767,6 +9422,17 @@ func TestServer_AlertHandlers_CRUD(t *testing.T) {
 		if err == nil {
 			t.Errorf("expected handler to be deleted")
 		}
+
+		handlers, err := cli.ListTopicHandlers(cli.TopicHandlersLink(tc.topic), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, h := range handlers.Handlers {
+			if h.ID == tc.expPut.ID {
+				t.Errorf("expected handler to be deleted")
+				break
+			}
+		}
 	}
 }
 
@@ -8775,11 +9441,12 @@ func TestServer_AlertHandlers(t *testing.T) {
 	resultJSON := `{"series":[{"name":"alert","columns":["time","value"],"values":[["1970-01-01T00:00:00Z",1]]}]}`
 
 	alertData := alert.Data{
-		ID:      "id",
-		Message: "message",
-		Details: "details",
-		Time:    time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
-		Level:   alert.Critical,
+		ID:          "id",
+		Message:     "message",
+		Details:     "details",
+		Time:        time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
+		Level:       alert.Critical,
+		Recoverable: true,
 		Data: models.Result{
 			Series: models.Rows{
 				{
@@ -8915,6 +9582,49 @@ func TestServer_AlertHandlers(t *testing.T) {
 				}}
 				if !reflect.DeepEqual(exp, got) {
 					return fmt.Errorf("unexpected hipchat request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handler: client.TopicHandler{
+				Kind: "kafka",
+				Options: map[string]interface{}{
+					"cluster": "default",
+					"topic":   "test",
+				},
+			},
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
+				ts, err := kafkatest.NewServer()
+				if err != nil {
+					return nil, err
+				}
+				ctxt := context.WithValue(nil, "server", ts)
+
+				c.Kafka = kafka.Configs{{
+					Enabled: true,
+					ID:      "default",
+					Brokers: []string{ts.Addr.String()},
+				}}
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*kafkatest.Server)
+				time.Sleep(2 * time.Second)
+				ts.Close()
+				got, err := ts.Messages()
+				if err != nil {
+					return err
+				}
+				exp := []kafkatest.Message{{
+					Topic:     "test",
+					Partition: 1,
+					Offset:    0,
+					Key:       "id",
+					Message:   string(adJSON) + "\n",
+				}}
+				if !cmp.Equal(exp, got) {
+					return fmt.Errorf("unexpected kafak messages -exp/+got:\n%s", cmp.Diff(exp, got))
 				}
 				return nil
 			},
@@ -9143,6 +9853,64 @@ func TestServer_AlertHandlers(t *testing.T) {
 		},
 		{
 			handler: client.TopicHandler{
+				Kind: "pagerduty2",
+				Options: map[string]interface{}{
+					"service-key": "service_key",
+				},
+			},
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
+				ts := pagerduty2test.NewServer()
+				ctxt := context.WithValue(nil, "server", ts)
+
+				c.PagerDuty2.Enabled = true
+				c.PagerDuty2.URL = ts.URL
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*pagerduty2test.Server)
+				kapacitorURL := ctxt.Value("kapacitorURL").(string)
+				ts.Close()
+				got := ts.Requests()
+				exp := []pagerduty2test.Request{{
+					URL: "/",
+					PostData: pagerduty2test.PostData{
+						Client:      "kapacitor",
+						ClientURL:   kapacitorURL,
+						EventAction: "trigger",
+						DedupKey:    "id",
+						Payload: &pagerduty2test.PDCEF{
+							Summary:  "message",
+							Source:   "unknown",
+							Severity: "critical",
+							Class:    "testAlertHandlers",
+							CustomDetails: map[string]interface{}{
+								"result": map[string]interface{}{
+									"series": []interface{}{
+										map[string]interface{}{
+											"name":    "alert",
+											"columns": []interface{}{"time", "value"},
+											"values": []interface{}{
+												[]interface{}{"1970-01-01T00:00:00Z", float64(1)},
+											},
+										},
+									},
+								},
+							},
+							Timestamp: "1970-01-01T00:00:00.000000000Z",
+						},
+						RoutingKey: "service_key",
+					},
+				}}
+
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected pagerduty2 request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+
+				return nil
+			},
+		},
+		{
+			handler: client.TopicHandler{
 				Kind: "post",
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
@@ -9273,8 +10041,8 @@ func TestServer_AlertHandlers(t *testing.T) {
 				ts := slacktest.NewServer()
 				ctxt := context.WithValue(nil, "server", ts)
 
-				c.Slack.Enabled = true
-				c.Slack.URL = ts.URL + "/test/slack/url"
+				c.Slack[0].Enabled = true
+				c.Slack[0].URL = ts.URL + "/test/slack/url"
 				return ctxt, nil
 			},
 			result: func(ctxt context.Context) error {
@@ -9825,12 +10593,13 @@ alert value=2 0000000000002
 
 	// Check TCP handler got event
 	alertData := alert.Data{
-		ID:       "id-agg",
-		Message:  "Received 3 events in the last 100ms.",
-		Details:  "message\nmessage\nmessage",
-		Time:     time.Date(1970, 1, 1, 0, 0, 0, 2000000, time.UTC),
-		Level:    alert.Critical,
-		Duration: 2 * time.Millisecond,
+		ID:          "id-agg",
+		Message:     "Received 3 events in the last 100ms.",
+		Details:     "message\nmessage\nmessage",
+		Time:        time.Date(1970, 1, 1, 0, 0, 0, 2000000, time.UTC),
+		Level:       alert.Critical,
+		Duration:    2 * time.Millisecond,
+		Recoverable: false,
 		Data: models.Result{
 			Series: models.Rows{
 				{
@@ -9970,11 +10739,12 @@ stream
 
 	// Check TCP handler got event
 	alertData := alert.Data{
-		ID:      "id",
-		Message: "message",
-		Details: "details",
-		Time:    time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
-		Level:   alert.Critical,
+		ID:          "id",
+		Message:     "message",
+		Details:     "details",
+		Time:        time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
+		Level:       alert.Critical,
+		Recoverable: true,
 		Data: models.Result{
 			Series: models.Rows{
 				{
@@ -10090,11 +10860,12 @@ alert,host=serverB value=0 0000000004
 	s.Restart()
 
 	alertData := alert.Data{
-		ID:      "id",
-		Message: "message",
-		Details: "details",
-		Time:    time.Date(1970, 1, 1, 0, 0, 3, 0, time.UTC),
-		Level:   alert.Critical,
+		ID:          "id",
+		Message:     "message",
+		Details:     "details",
+		Time:        time.Date(1970, 1, 1, 0, 0, 3, 0, time.UTC),
+		Level:       alert.Critical,
+		Recoverable: true,
 		Data: models.Result{
 			Series: models.Rows{
 				{
@@ -10394,6 +11165,480 @@ stream
 			t.Fatalf("expected error for deleted topic %q", topic)
 		}
 	}
+}
+func TestServer_Alert_Inhibition(t *testing.T) {
+	// Test Overview
+	// Create several alerts:
+	//  * cpu - alert on host cpu usage by region,host,cpu
+	//  * mem - alert on host mem usage by region,host
+	//  * host - alert on host up/down by region,host
+	//  * region - alert on region up/down by region
+	//
+	// The host alert will inhibit the cpu and mem alerts by host
+	// The region alert will inhibit the cpu mem and host alerts by region
+	//
+
+	// Create default config
+	c := NewConfig()
+	s := OpenServer(c)
+	cli := Client(s)
+	closed := false
+	defer func() {
+		if !closed {
+			s.Close()
+		}
+	}()
+
+	// Setup test TCP server
+	ts, err := alerttest.NewTCPServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ts.Close()
+
+	if _, err := cli.CreateTopicHandler(cli.TopicHandlersLink("inhibition"), client.TopicHandlerOptions{
+		ID:      "tcpHandler",
+		Kind:    "tcp",
+		Options: map[string]interface{}{"address": ts.Addr},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	memAlert := `
+stream
+	|from()
+		.measurement('mem')
+		.groupBy(*)
+	|alert()
+		.category('system')
+		.topic('inhibition')
+		.message('mem')
+		.details('')
+		.crit(lambda: "v")
+`
+	cpuAlert := `
+stream
+	|from()
+		.measurement('cpu')
+		.groupBy(*)
+	|alert()
+		.category('system')
+		.topic('inhibition')
+		.message('cpu')
+		.details('')
+		.crit(lambda: "v")
+`
+	hostAlert := `
+stream
+	|from()
+		.measurement('host')
+		.groupBy(*)
+	|alert()
+		.category('host_alert')
+		.topic('inhibition')
+		.message('host')
+		.details('')
+		.crit(lambda: "v")
+		.inhibit('system', 'region', 'host')
+`
+	regionAlert := `
+stream
+	|from()
+		.measurement('region')
+		.groupBy(*)
+	|alert()
+		.category('region_alert')
+		.topic('inhibition')
+		.message('region')
+		.details('')
+		.crit(lambda: "v")
+		.inhibit('host_alert', 'region')
+		.inhibit('system', 'region')
+`
+
+	tasks := map[string]string{
+		"cpu":    cpuAlert,
+		"mem":    memAlert,
+		"host":   hostAlert,
+		"region": regionAlert,
+	}
+	for id, tick := range tasks {
+		if _, err := cli.CreateTask(client.CreateTaskOptions{
+			ID:   id,
+			Type: client.StreamTask,
+			DBRPs: []client.DBRP{{
+				Database:        "mydb",
+				RetentionPolicy: "myrp",
+			}},
+			TICKscript: tick,
+			Status:     client.Enabled,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	batches := []string{
+		//#0 Send initial batch with all alerts in the green state
+		`cpu,region=west,host=A,cpu=0 v=false 0
+cpu,region=west,host=A,cpu=1 v=false 0
+cpu,region=west,host=B,cpu=0 v=false 0
+cpu,region=west,host=B,cpu=1 v=false 0
+cpu,region=east,host=A,cpu=0 v=false 0
+cpu,region=east,host=A,cpu=1 v=false 0
+cpu,region=east,host=B,cpu=0 v=false 0
+cpu,region=east,host=B,cpu=1 v=false 0
+mem,region=west,host=A v=false 0
+mem,region=west,host=B v=false 0
+mem,region=east,host=A v=false 0
+mem,region=east,host=B v=false 0
+host,region=west,host=A v=false 0
+host,region=west,host=B v=false 0
+host,region=east,host=A v=false 0
+host,region=east,host=B v=false 0
+region,region=west v=false 0
+region,region=east v=false 0
+`,
+		//#1 Send batch where some mem and cpu alerts fire
+		`cpu,region=west,host=B,cpu=0 v=true 1
+cpu,region=east,host=A,cpu=1 v=true 1
+mem,region=west,host=B v=true 1
+mem,region=east,host=A v=true 1
+`,
+		//#2 Send batch where some host alerts fire
+		`host,region=west,host=B v=true 2
+host,region=east,host=B v=true 2
+`,
+		//#3 Send batch where some mem and cpu alerts fire
+		`cpu,region=west,host=B,cpu=0 v=true 3
+cpu,region=east,host=A,cpu=1 v=true 3
+mem,region=west,host=B v=true 3
+mem,region=east,host=A v=true 3
+`,
+		//#4 Send batch were hosts alerts recover
+		`host,region=west,host=B v=false 4
+host,region=east,host=B v=false 4
+`,
+		//#5 Send batch where some mem and cpu alerts fire
+		`cpu,region=west,host=B,cpu=0 v=true 5
+cpu,region=east,host=A,cpu=1 v=true 5
+mem,region=west,host=B v=true 5
+mem,region=east,host=A v=true 5
+`,
+		//#6 Send batch where region alert fires
+		`region,region=east v=true 6`,
+
+		//#7 Send batch where some mem, cpu and host alerts fire
+		`cpu,region=west,host=B,cpu=0 v=true 7
+cpu,region=east,host=A,cpu=1 v=true 7
+mem,region=west,host=B v=true 7
+mem,region=east,host=A v=true 7
+host,region=west,host=A v=true 7
+host,region=east,host=B v=true 7
+`,
+		//#8 Send batch where region alert recovers
+		`region,region=east v=false 8`,
+
+		//#9 Send batch where some mem, cpu and host alerts fire
+		`cpu,region=west,host=B,cpu=0 v=true 9
+cpu,region=east,host=A,cpu=1 v=true 9
+mem,region=west,host=B v=true 9
+mem,region=east,host=A v=true 9
+host,region=west,host=A v=true 9
+host,region=east,host=B v=true 9
+`,
+	}
+
+	v := url.Values{}
+	v.Add("precision", "s")
+	for _, p := range batches {
+		s.MustWrite("mydb", "myrp", p, v)
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// Close the entire server to ensure all data is processed
+	s.Close()
+	closed = true
+
+	want := []alert.Data{
+		// #1
+
+		{
+			ID:            "cpu:cpu=0,host=B,region=west",
+			Message:       "cpu",
+			Time:          time.Date(1970, 1, 1, 0, 0, 1, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.OK,
+			Duration:      0,
+			Recoverable:   true,
+		},
+		{
+			ID:            "cpu:cpu=1,host=A,region=east",
+			Message:       "cpu",
+			Time:          time.Date(1970, 1, 1, 0, 0, 1, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.OK,
+			Duration:      0,
+			Recoverable:   true,
+		},
+		{
+			ID:            "mem:host=A,region=east",
+			Message:       "mem",
+			Time:          time.Date(1970, 1, 1, 0, 0, 1, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.OK,
+			Duration:      0,
+			Recoverable:   true,
+		},
+		{
+			ID:            "mem:host=B,region=west",
+			Message:       "mem",
+			Time:          time.Date(1970, 1, 1, 0, 0, 1, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.OK,
+			Duration:      0,
+			Recoverable:   true,
+		},
+
+		// #2
+
+		{
+			ID:            "host:host=B,region=east",
+			Message:       "host",
+			Time:          time.Date(1970, 1, 1, 0, 0, 2, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.OK,
+			Duration:      0,
+			Recoverable:   true,
+		},
+		{
+			ID:            "host:host=B,region=west",
+			Message:       "host",
+			Time:          time.Date(1970, 1, 1, 0, 0, 2, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.OK,
+			Duration:      0,
+			Recoverable:   true,
+		},
+
+		// #3
+
+		{
+			ID:            "cpu:cpu=1,host=A,region=east",
+			Message:       "cpu",
+			Time:          time.Date(1970, 1, 1, 0, 0, 3, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      2 * time.Second,
+			Recoverable:   true,
+		},
+		{
+			ID:            "mem:host=A,region=east",
+			Message:       "mem",
+			Time:          time.Date(1970, 1, 1, 0, 0, 3, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      2 * time.Second,
+			Recoverable:   true,
+		},
+
+		// #4
+
+		{
+			ID:            "host:host=B,region=east",
+			Message:       "host",
+			Time:          time.Date(1970, 1, 1, 0, 0, 4, 0, time.UTC),
+			Level:         alert.OK,
+			PreviousLevel: alert.Critical,
+			Duration:      2 * time.Second,
+			Recoverable:   true,
+		},
+		{
+			ID:            "host:host=B,region=west",
+			Message:       "host",
+			Time:          time.Date(1970, 1, 1, 0, 0, 4, 0, time.UTC),
+			Level:         alert.OK,
+			PreviousLevel: alert.Critical,
+			Duration:      2 * time.Second,
+			Recoverable:   true,
+		},
+
+		// #5
+
+		{
+			ID:            "cpu:cpu=0,host=B,region=west",
+			Message:       "cpu",
+			Time:          time.Date(1970, 1, 1, 0, 0, 5, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      4 * time.Second,
+			Recoverable:   true,
+		},
+		{
+			ID:            "cpu:cpu=1,host=A,region=east",
+			Message:       "cpu",
+			Time:          time.Date(1970, 1, 1, 0, 0, 5, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      4 * time.Second,
+			Recoverable:   true,
+		},
+		{
+			ID:            "mem:host=A,region=east",
+			Message:       "mem",
+			Time:          time.Date(1970, 1, 1, 0, 0, 5, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      4 * time.Second,
+			Recoverable:   true,
+		},
+		{
+			ID:            "mem:host=B,region=west",
+			Message:       "mem",
+			Time:          time.Date(1970, 1, 1, 0, 0, 5, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      4 * time.Second,
+			Recoverable:   true,
+		},
+
+		// #6
+
+		{
+			ID:            "region:region=east",
+			Message:       "region",
+			Time:          time.Date(1970, 1, 1, 0, 0, 6, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.OK,
+			Duration:      0,
+			Recoverable:   true,
+		},
+
+		// #7
+		{
+			ID:            "cpu:cpu=0,host=B,region=west",
+			Message:       "cpu",
+			Time:          time.Date(1970, 1, 1, 0, 0, 7, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      6 * time.Second,
+			Recoverable:   true,
+		},
+		{
+			ID:            "host:host=A,region=west",
+			Message:       "host",
+			Time:          time.Date(1970, 1, 1, 0, 0, 7, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.OK,
+			Duration:      0,
+			Recoverable:   true,
+		},
+		{
+			ID:            "mem:host=B,region=west",
+			Message:       "mem",
+			Time:          time.Date(1970, 1, 1, 0, 0, 7, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      6 * time.Second,
+			Recoverable:   true,
+		},
+
+		// #8
+
+		{
+			ID:            "region:region=east",
+			Message:       "region",
+			Time:          time.Date(1970, 1, 1, 0, 0, 8, 0, time.UTC),
+			Level:         alert.OK,
+			PreviousLevel: alert.Critical,
+			Duration:      2 * time.Second,
+			Recoverable:   true,
+		},
+
+		// #9
+
+		{
+			ID:            "cpu:cpu=0,host=B,region=west",
+			Message:       "cpu",
+			Time:          time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      8 * time.Second,
+			Recoverable:   true,
+		},
+		{
+			ID:            "cpu:cpu=1,host=A,region=east",
+			Message:       "cpu",
+			Time:          time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      8 * time.Second,
+			Recoverable:   true,
+		},
+		{
+			ID:            "host:host=A,region=west",
+			Message:       "host",
+			Time:          time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      2 * time.Second,
+			Recoverable:   true,
+		},
+		{
+			ID:            "host:host=B,region=east",
+			Message:       "host",
+			Time:          time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.OK,
+			Duration:      2 * time.Second,
+			Recoverable:   true,
+		},
+		{
+			ID:            "mem:host=A,region=east",
+			Message:       "mem",
+			Time:          time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      8 * time.Second,
+			Recoverable:   true,
+		},
+		{
+			ID:            "mem:host=B,region=west",
+			Message:       "mem",
+			Time:          time.Date(1970, 1, 1, 0, 0, 9, 0, time.UTC),
+			Level:         alert.Critical,
+			PreviousLevel: alert.Critical,
+			Duration:      8 * time.Second,
+			Recoverable:   true,
+		},
+	}
+	ts.Close()
+	got := ts.Data()
+	// Remove the .Data result from the alerts
+	for i := range got {
+		got[i].Data = models.Result{}
+	}
+	// Sort results since order doesn't matter
+	//sort.Slice(want, func(i, j int) bool {
+	//	if want[i].Time.Equal(want[j].Time) {
+	//		return want[i].ID < want[j].ID
+	//	}
+	//	return want[i].Time.Before(want[j].Time)
+	//})
+	sort.Slice(got, func(i, j int) bool {
+		if got[i].Time.Equal(got[j].Time) {
+			return got[i].ID < got[j].ID
+		}
+		return got[i].Time.Before(got[j].Time)
+	})
+	t.Logf("want: %d got: %d", len(want), len(got))
+	if !cmp.Equal(got, want) {
+		t.Errorf("unexpected alert during inhibited run -want/+got\n%s", cmp.Diff(want, got))
+	}
+	//for i := range want {
+	//	if !cmp.Equal(got[i], want[i]) {
+	//		t.Errorf("unexpected alert during inhibited run -want/+got\n%s", cmp.Diff(want[i], got[i]))
+	//	}
+	//}
 }
 
 func TestServer_AlertListHandlers(t *testing.T) {
@@ -10700,8 +11945,8 @@ func TestServer_AlertHandler_MultipleHandlers(t *testing.T) {
 
 	// Configure slack
 	slack := slacktest.NewServer()
-	c.Slack.Enabled = true
-	c.Slack.URL = slack.URL + "/test/slack/url"
+	c.Slack[0].Enabled = true
+	c.Slack[0].URL = slack.URL + "/test/slack/url"
 
 	// Configure victorops
 	vo := victoropstest.NewServer()
@@ -11197,4 +12442,33 @@ func TestLogSessions_HeaderGzip(t *testing.T) {
 		return
 	}
 
+}
+
+func compareListIgnoreOrder(got, exp []interface{}, cmpF func(got, exp interface{}) bool) error {
+	if len(got) != len(exp) {
+		return fmt.Errorf("unequal lists ignoring order:\ngot\n%s\nexp\n%s\n", spew.Sdump(got), spew.Sdump(exp))
+	}
+
+	if cmpF == nil {
+		cmpF = func(got, exp interface{}) bool {
+			if !reflect.DeepEqual(got, exp) {
+				return false
+			}
+			return true
+		}
+	}
+
+	for _, e := range exp {
+		found := false
+		for _, g := range got {
+			if cmpF(g, e) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("unequal lists ignoring order:\ngot\n%s\nexp\n%s\n", spew.Sdump(got), spew.Sdump(exp))
+		}
+	}
+	return nil
 }

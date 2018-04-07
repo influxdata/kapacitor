@@ -26,6 +26,7 @@ func TestAlertNode_MarshalJSON(t *testing.T) {
 			want: `{
     "typeOf": "alert",
     "id": "0",
+    "category": "",
     "topic": "",
     "alertId": "",
     "message": "",
@@ -50,6 +51,7 @@ func TestAlertNode_MarshalJSON(t *testing.T) {
     "noRecoveries": false,
     "stateChangesOnly": false,
     "stateChangesOnlyDuration": 0,
+    "inhibitors": null,
     "post": [
         {
             "url": "http://howdy.local",
@@ -65,6 +67,7 @@ func TestAlertNode_MarshalJSON(t *testing.T) {
     "log": null,
     "victorOps": null,
     "pagerDuty": null,
+    "pagerDuty2": null,
     "pushover": null,
     "sensu": null,
     "slack": null,
@@ -75,7 +78,8 @@ func TestAlertNode_MarshalJSON(t *testing.T) {
     "opsGenie2": null,
     "talk": null,
     "mqtt": null,
-    "snmpTrap": null
+    "snmpTrap": null,
+    "kafka": null
 }`,
 		},
 	}

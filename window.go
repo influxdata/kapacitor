@@ -183,6 +183,7 @@ func (w *windowByTime) Barrier(b edge.BarrierMessage) (msg edge.Message, err err
 func (w *windowByTime) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
 	return d, nil
 }
+func (w *windowByTime) Done() {}
 
 func (w *windowByTime) Point(p edge.PointMessage) (msg edge.Message, err error) {
 	if w.every == 0 {
@@ -411,6 +412,7 @@ func (w *windowByCount) Barrier(b edge.BarrierMessage) (edge.Message, error) {
 func (w *windowByCount) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
 	return d, nil
 }
+func (w *windowByCount) Done() {}
 
 func (w *windowByCount) Point(p edge.PointMessage) (msg edge.Message, err error) {
 	w.buf[w.stop] = edge.BatchPointFromPoint(p)

@@ -3,7 +3,6 @@ package pipeline
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -183,12 +182,12 @@ func TestPipeline_MarshalJSON(t *testing.T) {
                 }
             ],
             "keep": false,
-            "keepList": null,
-            "quiet": false
+            "keepList": null
         },
         {
             "typeOf": "alert",
             "id": "3",
+            "category": "",
             "topic": "",
             "alertId": "Ruley McRuleface:{{.Group}}",
             "message": " {{.ID}} is  {{.Level}}",
@@ -231,6 +230,7 @@ func TestPipeline_MarshalJSON(t *testing.T) {
             "noRecoveries": false,
             "stateChangesOnly": true,
             "stateChangesOnlyDuration": 0,
+            "inhibitors": null,
             "post": [
                 {
                     "url": "http://howdy.local",
@@ -246,6 +246,7 @@ func TestPipeline_MarshalJSON(t *testing.T) {
             "log": null,
             "victorOps": null,
             "pagerDuty": null,
+            "pagerDuty2": null,
             "pushover": null,
             "sensu": null,
             "slack": null,
@@ -256,7 +257,8 @@ func TestPipeline_MarshalJSON(t *testing.T) {
             "opsGenie2": null,
             "talk": null,
             "mqtt": null,
-            "snmpTrap": null
+            "snmpTrap": null,
+            "kafka": null
         },
         {
             "typeOf": "httpOut",
@@ -321,8 +323,7 @@ func TestPipeline_MarshalJSON(t *testing.T) {
 				return
 			}
 			if string(got) != tt.want {
-				fmt.Println(string(got))
-				t.Errorf("Pipeline.MarshalJSON() = %v, want %v", string(got), tt.want)
+				t.Errorf("Pipeline.MarshalJSON()\ngot:\n%v\nwant:\n%v\n", string(got), tt.want)
 			}
 		})
 	}
@@ -1317,3 +1318,4 @@ func (m *MockNode) setPipeline(*Pipeline)        {}
 func (m *MockNode) pipeline() *Pipeline          { return nil }
 func (m *MockNode) dot(buf *bytes.Buffer)        {}
 func (m *MockNode) MarshalJSON() ([]byte, error) { return nil, nil }
+func (m *MockNode) IsQuiet() bool                { return false }

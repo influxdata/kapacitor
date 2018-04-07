@@ -12,14 +12,17 @@ import (
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/keyvalue"
+	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/httppost"
+	"github.com/influxdata/kapacitor/services/kafka"
 	"github.com/influxdata/kapacitor/services/mqtt"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/opsgenie2"
 	"github.com/influxdata/kapacitor/services/pagerduty"
+	"github.com/influxdata/kapacitor/services/pagerduty2"
 	"github.com/influxdata/kapacitor/services/pushover"
 	"github.com/influxdata/kapacitor/services/sensu"
 	"github.com/influxdata/kapacitor/services/slack"
@@ -56,6 +59,8 @@ type Service struct {
 
 	closedTopics map[string]bool
 
+	inhibitorLookup *alert.InhibitorLookup
+
 	topics         *alert.Topics
 	EventCollector EventCollector
 
@@ -81,6 +86,9 @@ type Service struct {
 	HipChatService interface {
 		Handler(hipchat.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
+	KafkaService interface {
+		Handler(kafka.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
+	}
 	MQTTService interface {
 		Handler(mqtt.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
@@ -92,6 +100,9 @@ type Service struct {
 	}
 	PagerDutyService interface {
 		Handler(pagerduty.HandlerConfig, ...keyvalue.T) alert.Handler
+	}
+	PagerDuty2Service interface {
+		Handler(pagerduty2.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 	PushoverService interface {
 		Handler(pushover.HandlerConfig, ...keyvalue.T) alert.Handler
@@ -124,10 +135,11 @@ type Service struct {
 
 func NewService(d Diagnostic) *Service {
 	s := &Service{
-		handlers:     make(map[string]map[string]handler),
-		closedTopics: make(map[string]bool),
-		topics:       alert.NewTopics(),
-		diag:         d,
+		handlers:        make(map[string]map[string]handler),
+		closedTopics:    make(map[string]bool),
+		topics:          alert.NewTopics(),
+		diag:            d,
+		inhibitorLookup: alert.NewInhibitorLookup(),
 	}
 	s.APIServer = &apiServer{
 		Registrar: s,
@@ -779,6 +791,17 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		}
 		h = s.HipChatService.Handler(c, ctx...)
 		h = newExternalHandler(h)
+	case "kafka":
+		c := kafka.HandlerConfig{}
+		err = decodeOptions(spec.Options, &c)
+		if err != nil {
+			return handler{}, err
+		}
+		h, err = s.KafkaService.Handler(c, ctx...)
+		if err != nil {
+			return handler{}, err
+		}
+		h = newExternalHandler(h)
 	case "log":
 		c := DefaultLogHandlerConfig()
 		err = decodeOptions(spec.Options, &c)
@@ -822,6 +845,14 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 			return handler{}, err
 		}
 		h = s.PagerDutyService.Handler(c, ctx...)
+		h = newExternalHandler(h)
+	case "pagerduty2":
+		c := pagerduty2.HandlerConfig{}
+		err = decodeOptions(spec.Options, &c)
+		if err != nil {
+			return handler{}, err
+		}
+		h = s.PagerDuty2Service.Handler(c, ctx...)
 		h = newExternalHandler(h)
 	case "pushover":
 		c := pushover.HandlerConfig{}
@@ -924,4 +955,14 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		h, err = newMatchHandler(spec.Match, h, handlerDiag)
 	}
 	return handler{Spec: spec, Handler: h}, err
+}
+
+func (s *Service) IsInhibited(name string, tags models.Tags) bool {
+	return s.inhibitorLookup.IsInhibited(name, tags)
+}
+func (s *Service) AddInhibitor(in *alert.Inhibitor) {
+	s.inhibitorLookup.AddInhibitor(in)
+}
+func (s *Service) RemoveInhibitor(in *alert.Inhibitor) {
+	s.inhibitorLookup.RemoveInhibitor(in)
 }

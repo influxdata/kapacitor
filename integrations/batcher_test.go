@@ -61,6 +61,59 @@ func TestBatch_InvalidQuery(t *testing.T) {
 	}
 }
 
+//{"name":"packets","points":[
+// {"fields":{"value":"bad"},"time":"2015-10-18T00:00:00Z"},
+// {"fields":{"value":"good"},"time":"2015-10-18T00:00:02Z"},
+// {"fields":{"value":"good"},"time":"2015-10-18T00:00:04Z"},
+// {"fields":{"value2":"good"},"time":"2015-10-18T00:00:05Z"},
+// {"fields":{"value":"bad"},"time":"2015-10-18T00:00:06Z"},
+// {"fields":{"value":"good"},"time":"2015-10-18T00:00:08Z"}]}
+func TestBatch_ChangeDetect(t *testing.T) {
+
+	var script = `
+batch
+	|query('''
+		SELECT "value"
+		FROM "telegraf"."default".packets
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s))
+	|changeDetect('value')
+	|httpOut('TestBatch_ChangeDetect')
+`
+
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "packets",
+				Tags:    nil,
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{
+					{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						"bad",
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						"good",
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						"bad",
+					},
+					{
+						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+						"good",
+					},
+				},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_ChangeDetect", script, 21*time.Second, er, false)
+}
+
 func TestBatch_Derivative(t *testing.T) {
 
 	var script = `
@@ -1454,6 +1507,7 @@ func TestBatch_AlertStateChangesOnly(t *testing.T) {
 				Time:          time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
 				Level:         alert.Critical,
 				PreviousLevel: alert.OK,
+				Recoverable:   true,
 			}
 			ad.Data = models.Result{}
 			if eq, msg := compareAlertData(expAd, ad); !eq {
@@ -1467,6 +1521,7 @@ func TestBatch_AlertStateChangesOnly(t *testing.T) {
 				Duration:      38 * time.Second,
 				Level:         alert.OK,
 				PreviousLevel: alert.Critical,
+				Recoverable:   true,
 			}
 			ad.Data = models.Result{}
 			if eq, msg := compareAlertData(expAd, ad); !eq {
@@ -1527,6 +1582,7 @@ func TestBatch_AlertStateChangesOnlyExpired(t *testing.T) {
 				Duration:      time.Duration(rc-1) * 20 * time.Second,
 				Level:         alert.Critical,
 				PreviousLevel: alert.OK,
+				Recoverable:   true,
 			}
 		case 2:
 			expAd = alert.Data{
@@ -1536,6 +1592,7 @@ func TestBatch_AlertStateChangesOnlyExpired(t *testing.T) {
 				Duration:      time.Duration(rc-1) * 20 * time.Second,
 				Level:         alert.Critical,
 				PreviousLevel: alert.Critical,
+				Recoverable:   true,
 			}
 		case 3:
 			expAd = alert.Data{
@@ -1545,6 +1602,7 @@ func TestBatch_AlertStateChangesOnlyExpired(t *testing.T) {
 				Duration:      38 * time.Second,
 				Level:         alert.OK,
 				PreviousLevel: alert.Critical,
+				Recoverable:   true,
 			}
 		}
 		if eq, msg := compareAlertData(expAd, ad); !eq {

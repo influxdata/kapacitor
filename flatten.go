@@ -183,6 +183,7 @@ func (b *flattenBuffer) Barrier(barrier edge.BarrierMessage) error {
 func (b *flattenBuffer) DeleteGroup(d edge.DeleteGroupMessage) error {
 	return edge.Forward(b.n.outs, d)
 }
+func (b *flattenBuffer) Done() {}
 
 func (n *FlattenNode) flatten(points []edge.FieldsTagsTimeGetter) (models.Fields, error) {
 	fields := make(models.Fields)

@@ -72,3 +72,4 @@ func (n *ShiftNode) Barrier(b edge.BarrierMessage) (edge.Message, error) {
 func (n *ShiftNode) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
 	return d, nil
 }
+func (n *ShiftNode) Done() {}

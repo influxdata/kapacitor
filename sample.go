@@ -92,6 +92,7 @@ func (g *sampleGroup) Barrier(b edge.BarrierMessage) (edge.Message, error) {
 func (g *sampleGroup) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message, error) {
 	return d, nil
 }
+func (g *sampleGroup) Done() {}
 
 func (n *SampleNode) shouldKeep(count int64, t time.Time) bool {
 	if n.duration != 0 {

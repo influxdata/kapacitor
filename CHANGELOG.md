@@ -4,16 +4,34 @@
 
 ### Features
 
+- [#1833](https://github.com/influxdata/kapacitor/pull/1833): Config format updated to allow for more than one slack configuration.  
+- [#1844](https://github.com/influxdata/kapacitor/pull/1844): Added a new kapacitor node changeDetect that emits a value
+    for each time a series field changes.
+- [#1828](https://github.com/influxdata/kapacitor/pull/1828): Add recoverable field to JSON alert response to indicate whether the
+alert will auto-recover.
 - [#1823](https://github.com/influxdata/kapacitor/pull/1823): Update OpsGenie integration to use the v2 API.
     To upgrade to using the new API simply update your config and TICKscripts to use opsgenie2 instead of opsgenie.
     If your `opsgenie` config uses the `recovery_url` option, for `opsgenie2` you will need to change it to the `recovery_action` option.
     This is because the new v2 API is not structured with static URLs, and so only the action can be defined and not the entire URL.
 - [#1690](https://github.com/influxdata/kapacitor/issues/1690): Add https-private-key option to httpd config.
 - [#1831](https://github.com/influxdata/kapacitor/pull/1831): changed `/ping` endpoint status code to `200` to support ELB health checks OOTB
+- [#1561](https://github.com/influxdata/kapacitor/issues/1561): Add .quiet to all nodes to silence any errors reported by the node.
+- [#1826](https://github.com/influxdata/kapacitor/issues/1826): Add Kafka alert handler.
+
 ### Bugfixes
 - [#1794](https://github.com/influxdata/kapacitor/issues/1794): Kapacitor ticks generating a hash instead of their actual given name.
 
 - [#1827](https://github.com/influxdata/kapacitor/pull/1827): Fix deadlock in load service when task has an error.
+
+- [#1795](https://github.com/influxdata/kapacitor/pull/1795): Support PagerDuty API v2
+- [#1842](https://github.com/influxdata/kapacitor/pull/1842): Add alert inhibitors that allow an alert to supress events from other matching alerts.
+- [#1776](https://github.com/influxdata/kapacitor/issues/1776): Fix bug where you could not delete a topic handler with the same name as its topic.
+
+## v1.4.1 [2018-03-13]
+
+### Bugfixes
+
+- [#1834](https://github.com/influxdata/kapacitor/issues/1834): Fix bug where task type was invalid when using var for stream/batch
 
 ## v1.4.0 [2017-12-08]
 
