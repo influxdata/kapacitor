@@ -372,7 +372,7 @@ func Test_PingVersion(t *testing.T) {
 	s, c, err := newClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/kapacitor/v1/ping" && r.Method == "GET" {
 			w.Header().Set("X-Kapacitor-Version", "versionStr")
-			w.WriteHeader(http.StatusNoContent)
+			w.WriteHeader(http.StatusOK)
 		} else {
 			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprintf(w, "request: %v", r)
@@ -2907,6 +2907,7 @@ func Test_CreateTopicHandler(t *testing.T) {
 	exp := client.TopicHandler{
 		ID:   "slack",
 		Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/alerts/topics/system/handlers/slack"},
+
 		Kind: "slack",
 		Options: map[string]interface{}{
 			"channel": "#alerts",
@@ -3129,7 +3130,7 @@ func Test_UserAuthentication(t *testing.T) {
 			u == "bob" &&
 			p == "don't look" {
 			w.Header().Set("X-Kapacitor-Version", "versionStr")
-			w.WriteHeader(http.StatusNoContent)
+			w.WriteHeader(http.StatusOK)
 		} else {
 			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprintf(w, "request: %v", r)
