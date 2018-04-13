@@ -35,6 +35,9 @@ type SideloadNode struct {
 	// Tags is a list of tags to load.
 	// tick:ignore
 	Tags map[string]string `tick:"Tag" json:"tags"`
+
+	HttpUser     string `json:"httpuser"`
+	HttpPassword string `json:"httppassword"`
 }
 
 func newSideloadNode(wants EdgeType) *SideloadNode {
@@ -72,6 +75,17 @@ func (n *SideloadNode) Tag(t string, v string) *SideloadNode {
 	return n
 }
 
+/*
+func (n *SideloadNode) HttpUser(httpuser string) *SideloadNode {
+	n.HttpUser = httpuser
+	return n
+}
+
+func (n *SideloadNode) HttpPassword(httppassword string) *SideloadNode {
+	n.HttpPassword = httppassword
+	return n
+}
+*/
 // MarshalJSON converts SideloadNode to JSON
 // tick:ignore
 func (n *SideloadNode) MarshalJSON() ([]byte, error) {

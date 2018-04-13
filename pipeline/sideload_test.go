@@ -6,10 +6,12 @@ import (
 
 func TestSideloadNode_MarshalJSON(t *testing.T) {
 	type fields struct {
-		Source string
-		Order  []string
-		Fields map[string]interface{}
-		Tags   map[string]string
+		Source       string
+		Order        []string
+		Fields       map[string]interface{}
+		Tags         map[string]string
+		HttpUser     string
+		HttpPassword string
 	}
 	tests := []struct {
 		name    string
@@ -20,8 +22,10 @@ func TestSideloadNode_MarshalJSON(t *testing.T) {
 		{
 			name: "all fields set",
 			fields: fields{
-				Source: "file:///src",
-				Order:  []string{"a", "b", "c"},
+				Source:       "file:///src",
+				Order:        []string{"a", "b", "c"},
+				HttpUser:     "",
+				HttpPassword: "",
 				Fields: map[string]interface{}{
 					"f1": 42.0,
 					"f2": "",
@@ -47,7 +51,9 @@ func TestSideloadNode_MarshalJSON(t *testing.T) {
     "tags": {
         "t1": "k1",
         "t2": ""
-    }
+    },
+    "httpuser": "",
+    "httppassword": ""
 }`,
 		},
 	}
@@ -59,6 +65,8 @@ func TestSideloadNode_MarshalJSON(t *testing.T) {
 			w.OrderList = tt.fields.Order
 			w.Fields = tt.fields.Fields
 			w.Tags = tt.fields.Tags
+			w.HttpUser = tt.fields.HttpUser
+			w.HttpPassword = tt.fields.HttpPassword
 			MarshalIndentTestHelper(t, w, tt.wantErr, tt.want)
 		})
 	}

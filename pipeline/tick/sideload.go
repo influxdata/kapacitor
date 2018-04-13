@@ -26,6 +26,9 @@ func (n *SideloadNode) Build(d *pipeline.SideloadNode) (ast.Node, error) {
 	n.Pipe("sideload")
 
 	n.Dot("source", d.Source)
+	n.Dot("httpUser", d.HttpUser)
+	n.Dot("httpPassword", d.HttpPassword)
+
 	order := make([]interface{}, len(d.OrderList))
 	for i := range d.OrderList {
 		order[i] = d.OrderList[i]
