@@ -188,11 +188,13 @@ func (s *Service) preparePost(teams []string, recipients []string, level alert.L
 		ogDetails["Monitoring Tool"] = "Kapacitor"
 		ogDetails["Level"] = level.String()
 
-		row := details.Series[0]
-		for k, v := range row.Tags {
-			ogDetails[k] = v
+		if len(details.Series) > 0 {
+			row := details.Series[0]
+			for k, v := range row.Tags {
+				ogDetails[k] = v
+			}
+			ogDetails["Kapacitor Task Name"] = row.Name
 		}
-		ogDetails["Kapacitor Task Name"] = row.Name
 
 		ogData["details"] = ogDetails
 
