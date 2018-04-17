@@ -21,7 +21,9 @@ type SideloadNode struct {
 	source     sideload.Source
 	orderTmpls []orderTmpl
 
-	order []string
+	order        []string
+	httpUser     string
+	httpPassword string
 
 	bufferPool *bufpool.Pool
 }
@@ -29,11 +31,13 @@ type SideloadNode struct {
 // Create a new SideloadNode which loads fields and tags from external sources.
 func newSideloadNode(et *ExecutingTask, n *pipeline.SideloadNode, d NodeDiagnostic) (*SideloadNode, error) {
 	sn := &SideloadNode{
-		node:       node{Node: n, et: et, diag: d},
-		s:          n,
-		bufferPool: bufpool.New(),
-		order:      make([]string, len(n.OrderList)),
-		orderTmpls: make([]orderTmpl, len(n.OrderList)),
+		node:         node{Node: n, et: et, diag: d},
+		s:            n,
+		httpUser:     n.HttpUser,
+		httpPassword: n.HttpPassword,
+		bufferPool:   bufpool.New(),
+		order:        make([]string, len(n.OrderList)),
+		orderTmpls:   make([]orderTmpl, len(n.OrderList)),
 	}
 	src, err := et.tm.SideloadService.Source(n.Source)
 	if err != nil {

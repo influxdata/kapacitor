@@ -29,34 +29,31 @@ func TestService_Source_Lookup(t *testing.T) {
 	defer src.Close()
 
 	testCases := []struct {
-		order []string
-		key   string
-		want  interface{}
+		order        []string
+		key          string
+		httpuser     string
+		httppassword string
+		want         interface{}
 	}{
 		{
 			order: []string{
 				"host/hostA.yml",
 				"default.yml",
 			},
-			key:  "key0",
-			want: 5.0,
+			httpuser:     "",
+			httppassword: "",
+			key:          "key0",
+			want:         5.0,
 		},
 		{
 			order: []string{
 				"host/hostA.yml",
 				"default.yml",
 			},
-			key:  "key1",
-			want: "one",
-		},
-		{
-			order: []string{
-				"host/hostA.yml",
-				"hostgroup/foo.yml",
-				"default.yml",
-			},
-			key:  "key0",
-			want: 5.0,
+			httpuser:     "",
+			httppassword: "",
+			key:          "key1",
+			want:         "one",
 		},
 		{
 			order: []string{
@@ -64,8 +61,21 @@ func TestService_Source_Lookup(t *testing.T) {
 				"hostgroup/foo.yml",
 				"default.yml",
 			},
-			key:  "key1",
-			want: "foo",
+			httpuser:     "",
+			httppassword: "",
+			key:          "key0",
+			want:         5.0,
+		},
+		{
+			order: []string{
+				"host/hostA.yml",
+				"hostgroup/foo.yml",
+				"default.yml",
+			},
+			httpuser:     "",
+			httppassword: "",
+			key:          "key1",
+			want:         "foo",
 		},
 	}
 	for i, tc := range testCases {
