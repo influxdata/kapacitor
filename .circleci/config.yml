@@ -9,7 +9,6 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker:
-          reusable: true
           docker_layer_caching: true
       - run:
           name: Tests
