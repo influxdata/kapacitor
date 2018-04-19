@@ -35,6 +35,9 @@ type SideloadNode struct {
 	// Tags is a list of tags to load.
 	// tick:ignore
 	Tags map[string]string `tick:"Tag" json:"tags"`
+
+	HttpUser     string `json:"httpuser"`
+	HttpPassword string `json:"httppassword"`
 }
 
 func newSideloadNode(wants EdgeType) *SideloadNode {

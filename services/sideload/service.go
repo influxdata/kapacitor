@@ -3,12 +3,14 @@ package sideload
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/ghodss/yaml"
 	"github.com/influxdata/kapacitor/keyvalue"
@@ -86,27 +88,43 @@ func (s *Service) Reload() error {
 }
 
 func (s *Service) Source(srcURL string) (Source, error) {
+	var src Source
+
 	u, err := url.Parse(srcURL)
 	if err != nil {
 		return nil, err
 	}
-	if u.Scheme != "file" {
-		return nil, fmt.Errorf("unsupported source scheme %q, must be 'file'", u.Scheme)
+	if u.Scheme != "file" && u.Scheme != "http" {
+		return nil, fmt.Errorf("unsupported source scheme %q, must be 'file' or 'http'", u.Scheme)
 	}
-	if !filepath.IsAbs(u.Path) {
-		return nil, fmt.Errorf("sideload source path must be absolute %q", u.Path)
+
+	if u.Scheme == "file" {
+		src, err = s.SourceFile(u.Path)
+	} else if u.Scheme == "http" {
+		src, err = s.SourceHttp(srcURL)
 	}
-	dir := filepath.Clean(u.Path)
+
+	return src, err
+}
+
+func (s *Service) SourceHttp(srcURL string) (Source, error) {
+	var err error
+	dir := srcURL
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
+	/*
+		if err != nil {
+			return nil,fmt.Errorf("Error creating request for sideload data from %s :: %s",srcURL,err.Error())
+		}
+	*/
 	src, ok := s.sources[dir]
 	if !ok {
 		src = &source{
-			s:   s,
-			dir: dir,
+			s:      s,
+			dir:    dir,
+			scheme: "http",
 		}
-		err := src.updateCache()
+		err = src.updateCache()
 		if err != nil {
 			return nil, err
 		}
@@ -114,9 +132,37 @@ func (s *Service) Source(srcURL string) (Source, error) {
 	}
 	src.referenceCount++
 
+	if err != nil {
+		return nil, fmt.Errorf("Error fetching sideload data from %s :: %s", srcURL, err.Error())
+	}
 	return src, nil
 }
+func (s *Service) SourceFile(path string) (Source, error) {
+	if !filepath.IsAbs(path) {
+		return nil, fmt.Errorf("sideload source path must be absolute %q", path)
+	}
+	dir := filepath.Clean(path)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	src, ok := s.sources[dir]
+	if !ok {
+		src = &source{
+			s:      s,
+			dir:    dir,
+			scheme: "file",
+		}
+		err := src.updateCache()
+		if err != nil {
+			return nil, err
+		}
 
+		s.sources[dir] = src
+	}
+	src.referenceCount++
+
+	return src, nil
+
+}
 func (s *Service) removeSource(src *source) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -132,9 +178,13 @@ type Source interface {
 }
 
 type source struct {
-	s              *Service
-	dir            string
-	mu             sync.RWMutex
+	s            *Service
+	scheme       string
+	dir          string
+	mu           sync.RWMutex
+	httpUser     string
+	httpPassword string
+
 	cache          map[string]map[string]interface{}
 	referenceCount int
 }
@@ -143,10 +193,7 @@ func (s *source) Close() {
 	s.s.removeSource(s)
 }
 
-func (s *source) updateCache() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.cache = make(map[string]map[string]interface{})
+func (s *source) updateCacheFile() error {
 	err := filepath.Walk(s.dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -172,6 +219,42 @@ func (s *source) updateCache() error {
 		return nil
 	})
 	return errors.Wrapf(err, "failed to update sideload cache for source %q", s.dir)
+}
+func (s *source) updateCacheHttp() error {
+	req, err := http.NewRequest("GET", s.dir, nil)
+	if s.httpUser != "" {
+		req.SetBasicAuth(s.httpUser, s.httpPassword)
+	}
+	client := &http.Client{
+		Timeout: time.Second * 10,
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	values, err := loadValues(resp.Body)
+	if err != nil {
+		return errors.Wrapf(err, "failed to update sideload cache for source %q", s.dir)
+	}
+	for k, v := range values {
+		s.cache[k] = v
+	}
+	return nil
+}
+
+func (s *source) updateCache() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.cache = make(map[string]map[string]interface{})
+
+	if s.scheme == "file" {
+		return s.updateCacheFile()
+	} else if s.scheme == "http" {
+		return s.updateCacheHttp()
+	}
+	return nil
 }
 
 func (s *source) Lookup(order []string, key string) (value interface{}) {
@@ -218,5 +301,19 @@ func readValues(p string) (map[string]interface{}, error) {
 			return nil, errors.Wrapf(err, "failed to unmarshal json values %q", p)
 		}
 	}
+
+	return values, nil
+}
+
+func loadValues(resp io.ReadCloser) (map[string]map[string]interface{}, error) {
+	data, err := ioutil.ReadAll(resp)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to read response body")
+	}
+	values := make(map[string]map[string]interface{})
+	if err := json.Unmarshal(data, &values); err != nil {
+		return nil, errors.Wrapf(err, "failed to unmarshal json values in response body")
+	}
+
 	return values, nil
 }

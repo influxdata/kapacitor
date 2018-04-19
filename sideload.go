@@ -21,9 +21,10 @@ type SideloadNode struct {
 	source     sideload.Source
 	orderTmpls []orderTmpl
 
-	order []string
-
-	bufferPool *bufpool.Pool
+	order        []string
+	httpUser     string
+	httpPassword string
+	bufferPool   *bufpool.Pool
 }
 
 // Create a new SideloadNode which loads fields and tags from external sources.
