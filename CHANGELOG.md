@@ -3,7 +3,7 @@
 ## v1.5.0 [unreleased]
 
 ### Features
-
+- [#1894](https://github.com/influxdata/kapacitor/pull/1894): Add HTTP sources for sideload configuration. 
 - [#1833](https://github.com/influxdata/kapacitor/pull/1833): Config format updated to allow for more than one slack configuration.  
 - [#1844](https://github.com/influxdata/kapacitor/pull/1844): Added a new kapacitor node changeDetect that emits a value
     for each time a series field changes.
