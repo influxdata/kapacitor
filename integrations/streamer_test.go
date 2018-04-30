@@ -9295,7 +9295,7 @@ stream
 		c := pagerduty2.NewConfig()
 		c.Enabled = true
 		c.URL = ts.URL
-		c.ServiceKey = "service_key"
+		c.RoutingKey = "service_key"
 		pd := pagerduty2.NewService(c, diagService.NewPagerDuty2Handler())
 		pd.HTTPDService = tm.HTTPDService
 		tm.PagerDuty2Service = pd

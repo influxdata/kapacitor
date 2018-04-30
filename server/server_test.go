@@ -7442,7 +7442,7 @@ func TestServer_UpdateConfig(t *testing.T) {
 		{
 			section: "pagerduty2",
 			setDefaults: func(c *server.Config) {
-				c.PagerDuty2.ServiceKey = "secret"
+				c.PagerDuty2.RoutingKey = "secret"
 			},
 			expDefaultSection: client.ConfigSection{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/pagerduty2"},
@@ -7451,11 +7451,11 @@ func TestServer_UpdateConfig(t *testing.T) {
 					Options: map[string]interface{}{
 						"enabled":     false,
 						"global":      false,
-						"service-key": true,
+						"routing-key": true,
 						"url":         pagerduty2.DefaultPagerDuty2APIURL,
 					},
 					Redacted: []string{
-						"service-key",
+						"routing-key",
 					},
 				}},
 			},
@@ -7464,18 +7464,18 @@ func TestServer_UpdateConfig(t *testing.T) {
 				Options: map[string]interface{}{
 					"enabled":     false,
 					"global":      false,
-					"service-key": true,
+					"routing-key": true,
 					"url":         pagerduty2.DefaultPagerDuty2APIURL,
 				},
 				Redacted: []string{
-					"service-key",
+					"routing-key",
 				},
 			},
 			updates: []updateAction{
 				{
 					updateAction: client.ConfigUpdateAction{
 						Set: map[string]interface{}{
-							"service-key": "",
+							"routing-key": "",
 							"enabled":     true,
 						},
 					},
@@ -7486,11 +7486,11 @@ func TestServer_UpdateConfig(t *testing.T) {
 							Options: map[string]interface{}{
 								"enabled":     true,
 								"global":      false,
-								"service-key": false,
+								"routing-key": false,
 								"url":         pagerduty2.DefaultPagerDuty2APIURL,
 							},
 							Redacted: []string{
-								"service-key",
+								"routing-key",
 							},
 						}},
 					},
@@ -7499,11 +7499,11 @@ func TestServer_UpdateConfig(t *testing.T) {
 						Options: map[string]interface{}{
 							"enabled":     true,
 							"global":      false,
-							"service-key": false,
+							"routing-key": false,
 							"url":         pagerduty2.DefaultPagerDuty2APIURL,
 						},
 						Redacted: []string{
-							"service-key",
+							"routing-key",
 						},
 					},
 				},
@@ -8779,9 +8779,9 @@ func TestServer_ListServiceTests(t *testing.T) {
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/pagerduty2"},
 				Name: "pagerduty2",
 				Options: client.ServiceTestOptions{
-					"incident-key": "testIncidentKey",
-					"description":  "test pagerduty2 message",
-					"level":        "CRITICAL",
+					"alert_id":    "testAlertID",
+					"description": "test pagerduty2 message",
+					"level":       "CRITICAL",
 					"event_data": map[string]interface{}{
 						"Fields": map[string]interface{}{},
 						"Result": map[string]interface{}{
@@ -9855,7 +9855,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 			handler: client.TopicHandler{
 				Kind: "pagerduty2",
 				Options: map[string]interface{}{
-					"service-key": "service_key",
+					"routing-key": "rkey",
 				},
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
@@ -9898,7 +9898,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 							},
 							Timestamp: "1970-01-01T00:00:00.000000000Z",
 						},
-						RoutingKey: "service_key",
+						RoutingKey: "rkey",
 					},
 				}}
 
