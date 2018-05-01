@@ -209,7 +209,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 
 	for _, pd := range n.PagerDuty2Handlers {
 		c := pagerduty2.HandlerConfig{
-			ServiceKey: pd.ServiceKey,
+			RoutingKey: pd.ServiceKey,
 		}
 		h := et.tm.PagerDuty2Service.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
