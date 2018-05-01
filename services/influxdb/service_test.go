@@ -375,7 +375,7 @@ func TestService_Open_LinkSubscriptions(t *testing.T) {
 				}},
 			secondClusters: map[string]clusterInfo{
 				testClusterName: {
-				// db1 had been dropped
+					// db1 had been dropped
 				}},
 			tokens: []string{
 				randomToken,

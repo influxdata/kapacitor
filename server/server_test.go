@@ -104,22 +104,22 @@ func TestServer_Pprof_Index(t *testing.T) {
 		{
 			path:        "/debug/pprof/block",
 			code:        http.StatusOK,
-			contentType: "text/plain; charset=utf-8",
+			contentType: "application/octet-stream",
 		},
 		{
 			path:        "/debug/pprof/goroutine",
 			code:        http.StatusOK,
-			contentType: "text/plain; charset=utf-8",
+			contentType: "application/octet-stream",
 		},
 		{
 			path:        "/debug/pprof/heap",
 			code:        http.StatusOK,
-			contentType: "text/plain; charset=utf-8",
+			contentType: "application/octet-stream",
 		},
 		{
 			path:        "/debug/pprof/threadcreate",
 			code:        http.StatusOK,
-			contentType: "text/plain; charset=utf-8",
+			contentType: "application/octet-stream",
 		},
 	}
 	for _, tc := range testCases {
