@@ -44,6 +44,10 @@ type Config struct {
 	InsecureSkipVerify bool `toml:"insecure-skip-verify" override:"insecure-skip-verify"`
 }
 
+func NewConfig() Config {
+	return Config{}
+}
+
 func (c Config) Validate() error {
 	if !c.Enabled {
 		return nil
