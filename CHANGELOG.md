@@ -26,6 +26,7 @@ alert will auto-recover.
 - [#1842](https://github.com/influxdata/kapacitor/pull/1842): Add alert inhibitors that allow an alert to supress events from other matching alerts.
 - [#1776](https://github.com/influxdata/kapacitor/issues/1776): Fix bug where you could not delete a topic handler with the same name as its topic.
 - [#1905](https://github.com/influxdata/kapacitor/pull/1905): Adjust PagerDuty v2 service-test names and capture detailed error messages.
+- [#1913](https://github.com/influxdata/kapacitor/pull/1913): Fix Kafka configuration.
 
 ## v1.4.1 [2018-03-13]
 
