@@ -97,9 +97,13 @@ type node struct {
 	QuietFlag bool `tick:"Quiet" json:"quiet,omitempty"`
 }
 
+// tick:ignore
 func (n *node) IsQuiet() bool {
 	return n.QuietFlag
 }
+
+// Quiet suppresses all error logging events from this node.
+// tick:property
 func (n *node) Quiet() {
 	n.QuietFlag = true
 }
