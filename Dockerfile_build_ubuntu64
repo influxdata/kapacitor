@@ -1,4 +1,4 @@
-FROM ubuntu:latest
+FROM ubuntu:16.04
 
 # This dockerfile is capabable of performing all
 # build/test/package/deploy actions needed for Kapacitor.
