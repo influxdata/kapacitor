@@ -236,7 +236,7 @@ func (s *Service) Test(options interface{}) error {
 	if !ok {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
-	return s.Alert("", o.Channel, o.Message, o.Username, o.IconEmoji, o.Level)
+	return s.Alert(o.Workspace, o.Channel, o.Message, o.Username, o.IconEmoji, o.Level)
 }
 
 func (s *Service) Alert(workspace, channel, message, username, iconEmoji string, level alert.Level) error {
