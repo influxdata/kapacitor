@@ -14,6 +14,7 @@ const (
 	DefaultTimeout      = 10 * time.Second
 	DefaultBatchSize    = 100
 	DefaultBatchTimeout = 1 * time.Second
+	DefaultID           = "default"
 )
 
 type Config struct {
@@ -45,7 +46,7 @@ type Config struct {
 }
 
 func NewConfig() Config {
-	return Config{}
+	return Config{ID: DefaultID}
 }
 
 func (c Config) Validate() error {
