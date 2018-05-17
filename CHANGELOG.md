@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.5.0 [unreleased]
+## v1.5.0 [i2018-05-17]
 
 ### Features
 
