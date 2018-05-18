@@ -3,7 +3,8 @@
 ## v1.5.0 [unreleased]
 
 ### Features
-
+- [#1839](https://github.com/influxdata/kapacitor/pull/1839): Add Subscription
+path configuration option to allow Kapacitor to run behind a reverse proxy.
 - [#1833](https://github.com/influxdata/kapacitor/pull/1833): Config format updated to allow for more than one slack configuration.  
 - [#1844](https://github.com/influxdata/kapacitor/pull/1844): Added a new kapacitor node changeDetect that emits a value
     for each time a series field changes.
