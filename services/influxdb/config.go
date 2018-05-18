@@ -58,6 +58,7 @@ type Config struct {
 	UDPReadBuffer            int                 `toml:"udp-read-buffer" override:"udp-read-buffer"`
 	StartUpTimeout           toml.Duration       `toml:"startup-timeout" override:"startup-timeout"`
 	SubscriptionSyncInterval toml.Duration       `toml:"subscriptions-sync-interval" override:"subscriptions-sync-interval"`
+	SubscriptionPath         string              `toml:"subscription-path" override:"subscription-path"`
 }
 
 func NewConfig() Config {

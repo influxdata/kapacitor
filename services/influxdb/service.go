@@ -400,6 +400,7 @@ type influxdbCluster struct {
 	startupTimeout           time.Duration
 	subscriptionSyncInterval time.Duration
 	subscriptionMode         SubscriptionMode
+	subscriptionPath         string
 	disableSubs              bool
 	runningSubs              map[subEntry]bool
 	useTokens                bool
@@ -484,6 +485,7 @@ func newInfluxDBCluster(c Config, hostname string, ider IDer, httpPort int, useT
 		startupTimeout:           time.Duration(c.StartUpTimeout),
 		subscriptionSyncInterval: time.Duration(c.SubscriptionSyncInterval),
 		subscriptionMode:         c.SubscriptionMode,
+		subscriptionPath:         c.SubscriptionPath,
 		ider:                     ider,
 		subName:                  subName,
 		disableSubs:              c.DisableSubscriptions,
@@ -1007,12 +1009,14 @@ func (c *influxdbCluster) linkSubscriptions(ctx context.Context, subName string)
 						Scheme: c.protocol,
 						User:   url.UserPassword(httpd.SubscriptionUser, token),
 						Host:   fmt.Sprintf("%s:%d", c.hostname, c.httpPort),
+						Path:   c.subscriptionPath,
 					}
 					destination = u.String()
 				} else {
 					u := url.URL{
 						Scheme: c.protocol,
 						Host:   fmt.Sprintf("%s:%d", c.hostname, c.httpPort),
+						Path:   c.subscriptionPath,
 					}
 					destination = u.String()
 				}
