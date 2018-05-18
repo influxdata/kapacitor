@@ -79,6 +79,7 @@ func (c *Config) Init() {
 	c.SubscriptionProtocol = DefaultSubscriptionProtocol
 	c.SubscriptionSyncInterval = toml.Duration(DefaultSubscriptionSyncInterval)
 	c.SubscriptionMode = ClusterMode
+	c.SubscriptionPath = ""
 }
 
 func (c *Config) ApplyConditionalDefaults() {
