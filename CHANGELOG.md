@@ -4,6 +4,7 @@
 
 ### Features
 
+- [#1842](https://github.com/influxdata/kapacitor/pull/1842): Add alert inhibitors that allow an alert to supress events from other matching alerts.
 - [#1833](https://github.com/influxdata/kapacitor/pull/1833): Config format updated to allow for more than one slack configuration.  
 - [#1844](https://github.com/influxdata/kapacitor/pull/1844): Added a new kapacitor node changeDetect that emits a value
     for each time a series field changes.
@@ -19,11 +20,8 @@ alert will auto-recover.
 
 ### Bugfixes
 - [#1794](https://github.com/influxdata/kapacitor/issues/1794): Kapacitor ticks generating a hash instead of their actual given name.
-
 - [#1827](https://github.com/influxdata/kapacitor/pull/1827): Fix deadlock in load service when task has an error.
-
 - [#1795](https://github.com/influxdata/kapacitor/pull/1795): Support PagerDuty API v2
-- [#1842](https://github.com/influxdata/kapacitor/pull/1842): Add alert inhibitors that allow an alert to supress events from other matching alerts.
 - [#1776](https://github.com/influxdata/kapacitor/issues/1776): Fix bug where you could not delete a topic handler with the same name as its topic.
 - [#1905](https://github.com/influxdata/kapacitor/pull/1905): Adjust PagerDuty v2 service-test names and capture detailed error messages.
 - [#1913](https://github.com/influxdata/kapacitor/pull/1913): Fix Kafka configuration.
