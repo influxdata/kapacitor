@@ -9287,7 +9287,7 @@ stream
 		.crit(lambda: "count" > 8.0)
 		.pagerDuty2()
 		.pagerDuty2()
-		    .serviceKey('test_override_key')
+		    .routingKey('test_override_key')
 	`
 
 	var kapacitorURL string
@@ -9295,7 +9295,7 @@ stream
 		c := pagerduty2.NewConfig()
 		c.Enabled = true
 		c.URL = ts.URL
-		c.RoutingKey = "service_key"
+		c.RoutingKey = "routing_key"
 		pd := pagerduty2.NewService(c, diagService.NewPagerDuty2Handler())
 		pd.HTTPDService = tm.HTTPDService
 		tm.PagerDuty2Service = pd
@@ -9320,7 +9320,7 @@ stream
 					CustomDetails: detailsTmpl,
 					Timestamp:     "1971-01-01T00:00:10.000000000Z",
 				},
-				RoutingKey: "service_key",
+				RoutingKey: "routing_key",
 			},
 		},
 		pagerduty2test.Request{
