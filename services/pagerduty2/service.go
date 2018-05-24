@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"sync/atomic"
+	text "text/template"
 	"time"
 
 	"github.com/influxdata/kapacitor/alert"
@@ -160,6 +161,7 @@ type testOptions struct {
 	Level       alert.Level     `json:"level"`
 	Data        alert.EventData `json:"event_data"`
 	Timestamp   time.Time       `json:"timestamp"`
+	Links       []LinkTemplate  `json:"links"`
 }
 
 // TestOptions returns optional values for the test harness
@@ -179,6 +181,14 @@ func (s *Service) TestOptions() interface{} {
 			Fields: make(map[string]interface{}),
 			Result: models.Result{},
 		},
+		Links: []LinkTemplate{{
+			Href: "https://example.com/a",
+			Text: "a",
+		}, {
+			Href: "https://example.com/b",
+			Text: "b",
+		},
+		},
 	}
 }
 
@@ -191,6 +201,7 @@ func (s *Service) Test(options interface{}) error {
 	c := s.config()
 	return s.Alert(
 		c.RoutingKey,
+		o.Links,
 		o.AlertID,
 		o.Description,
 		o.Level,
@@ -203,8 +214,8 @@ func (s *Service) Test(options interface{}) error {
 //
 // The req headers are now required with the API v2:
 // https://v2.developer.pagerduty.com/docs/migrating-to-api-v2
-func (s *Service) Alert(routingKey, alertID, desc string, level alert.Level, timestamp time.Time, data alert.EventData) error {
-	url, post, err := s.preparePost(routingKey, alertID, desc, level, timestamp, data)
+func (s *Service) Alert(routingKey string, links []LinkTemplate, alertID, desc string, level alert.Level, timestamp time.Time, data alert.EventData) error {
+	url, post, err := s.preparePost(routingKey, links, alertID, desc, level, timestamp, data)
 	if err != nil {
 		return err
 	}
@@ -272,7 +283,7 @@ func (s *Service) sendResolve(c Config, routingKey, alertID string) (string, io.
 }
 
 // preparePost is a helper method that sets up the payload for transmission to PagerDuty
-func (s *Service) preparePost(routingKey, alertID, desc string, level alert.Level, timestamp time.Time, data alert.EventData) (string, io.Reader, error) {
+func (s *Service) preparePost(routingKey string, links []LinkTemplate, alertID, desc string, level alert.Level, timestamp time.Time, data alert.EventData) (string, io.Reader, error) {
 	c := s.config()
 	if !c.Enabled {
 		return "", nil, errors.New("service is not enabled")
@@ -318,6 +329,13 @@ func (s *Service) preparePost(routingKey, alertID, desc string, level alert.Leve
 	ap.Payload.Summary = desc
 	ap.Payload.Timestamp = timestamp.Format("2006-01-02T15:04:05.000000000Z07:00")
 
+	if len(links) > 0 {
+		ap.Links = make([]Link, len(links))
+		for i, l := range links {
+			ap.Links[i] = Link{Href: l.Href, Text: l.Text}
+		}
+	}
+
 	if _, ok := data.Tags["host"]; ok {
 		ap.Payload.Source = data.Tags["host"]
 	}
@@ -333,11 +351,19 @@ func (s *Service) preparePost(routingKey, alertID, desc string, level alert.Leve
 	return c.URL, &post, nil
 }
 
+type LinkTemplate struct {
+	Href     string `mapstructure:"href" json:"href"`
+	Text     string `mapstructure:"text" json:"text"`
+	hrefTmpl *text.Template
+	textTmpl *text.Template
+}
+
 // HandlerConfig defines the high-level struct required to connect to PagerDuty
 type HandlerConfig struct {
 	// The routing key to use for the alert.
 	// Defaults to the value in the configuration if empty.
-	RoutingKey string `mapstructure:"routing-key"`
+	RoutingKey string         `mapstructure:"routing-key"`
+	Links      []LinkTemplate `mapstructure:"links"`
 }
 
 type handler struct {
@@ -347,18 +373,60 @@ type handler struct {
 }
 
 // Handler is a bound method to the Service struct that returns the appropriate alert handler for PagerDuty
-func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
+func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler, error) {
+	// Compile link templates
+	for i, l := range c.Links {
+		hrefTmpl, err := text.New("href").Parse(l.Href)
+		if err != nil {
+			return nil, err
+		}
+		c.Links[i].hrefTmpl = hrefTmpl
+		if l.Text != "" {
+			textTmpl, err := text.New("text").Parse(l.Text)
+			if err != nil {
+				return nil, err
+			}
+			c.Links[i].textTmpl = textTmpl
+		}
+	}
 	return &handler{
 		s:    s,
 		c:    c,
 		diag: s.diag.WithContext(ctx...),
-	}
+	}, nil
 }
 
 // Handle is a bound method to the handler that processes a given alert
 func (h *handler) Handle(event alert.Event) {
+	// Execute templates
+	td := event.TemplateData()
+	var hrefBuf bytes.Buffer
+	var textBuf bytes.Buffer
+	for i, l := range h.c.Links {
+		err := l.hrefTmpl.Execute(&hrefBuf, td)
+		if err != nil {
+			h.diag.Error("failed to handle event", err)
+			return
+		}
+		h.c.Links[i].Href = hrefBuf.String()
+		hrefBuf.Reset()
+
+		if l.textTmpl != nil {
+			err = l.textTmpl.Execute(&textBuf, td)
+			if err != nil {
+				h.diag.Error("failed to handle event", err)
+				return
+			}
+			h.c.Links[i].Text = textBuf.String()
+			textBuf.Reset()
+		} else {
+			h.c.Links[i].Text = h.c.Links[i].Href
+		}
+	}
+
 	if err := h.s.Alert(
 		h.c.RoutingKey,
+		h.c.Links,
 		event.State.ID,
 		event.State.Message,
 		event.State.Level,

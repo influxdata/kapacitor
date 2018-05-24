@@ -2,6 +2,10 @@
 
 ## v1.5.1 [2018-08-06]
 
+### Features
+
+- [#1961](https://github.com/influxdata/kapacitor/pull/1961): Add links to pagerduty2 alerts
+
 ### Bugfixes
 
 - [#1938](https://github.com/influxdata/kapacitor/issues/1938): pagerduty2 should use routingKey rather than serviceKey
