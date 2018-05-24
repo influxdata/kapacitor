@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.5.1 [unreleased]
+
+### Bugfixes
+
+- [#1938](https://github.com/influxdata/kapacitor/issues/1938): pagerduty2 should use routingKey rather than serviceKey
+
 ## v1.5.0 [2018-05-17]
 
 ### Features
