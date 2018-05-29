@@ -328,6 +328,24 @@ func TestAlertPagerDuty2(t *testing.T) {
 	PipelineTickTestHelper(t, pipe, want)
 }
 
+func TestAlertPagerDuty2_ServiceKey(t *testing.T) {
+	pipe, _, from := StreamFrom()
+	handler := from.Alert().PagerDuty2()
+	handler.ServiceKey("LeafsNation")
+
+	want := `stream
+    |from()
+    |alert()
+        .id('{{ .Name }}:{{ .Group }}')
+        .message('{{ .ID }} is {{ .Level }}')
+        .details('{{ json . }}')
+        .history(21)
+        .pagerDuty2()
+        .routingKey('LeafsNation')
+`
+	PipelineTickTestHelper(t, pipe, want)
+}
+
 func TestAlertPushover(t *testing.T) {
 	pipe, _, from := StreamFrom()
 	handler := from.Alert().Pushover()

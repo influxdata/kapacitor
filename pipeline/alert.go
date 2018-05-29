@@ -1019,6 +1019,16 @@ type PagerDuty2Handler struct {
 	// The routing key to use for the alert.
 	// Defaults to the value in the configuration if empty.
 	RoutingKey string `json:"routingKey"`
+
+	// tick:ignore
+	_ string `tick:"ServiceKey"`
+}
+
+// Allow ServiceKey as backwards compatible way to set the routing key
+// tick:property
+func (pd2 *PagerDuty2Handler) ServiceKey(serviceKey string) *PagerDuty2Handler {
+	pd2.RoutingKey = serviceKey
+	return pd2
 }
 
 // Send the alert to HipChat.

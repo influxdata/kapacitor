@@ -9354,6 +9354,112 @@ stream
 	}
 }
 
+func TestStream_AlertPagerDuty2_ServiceKey(t *testing.T) {
+	ts := pagerduty2test.NewServer()
+	defer ts.Close()
+
+	detailsTmpl := map[string]interface{}{
+		"result": map[string]interface{}{
+			"series": []interface{}{
+				map[string]interface{}{
+					"name": "cpu",
+					"tags": map[string]interface{}{
+						"host": "serverA",
+					},
+					"columns": []interface{}{"time", "count"},
+					"values": []interface{}{
+						[]interface{}{"1971-01-01T00:00:10Z", float64(10)},
+					},
+				},
+			},
+		},
+	}
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.message('{{ .Level }} alert for {{ .ID }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.pagerDuty2()
+		.pagerDuty2()
+		    .serviceKey('test_override_key')
+	`
+
+	var kapacitorURL string
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := pagerduty2.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL
+		c.RoutingKey = "routing_key"
+		pd := pagerduty2.NewService(c, diagService.NewPagerDuty2Handler())
+		pd.HTTPDService = tm.HTTPDService
+		tm.PagerDuty2Service = pd
+
+		kapacitorURL = tm.HTTPDService.URL()
+	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	exp := []interface{}{
+		pagerduty2test.Request{
+			URL: "/",
+			PostData: pagerduty2test.PostData{
+				Client:      "kapacitor",
+				ClientURL:   kapacitorURL,
+				EventAction: "trigger",
+				DedupKey:    "kapacitor/cpu/serverA",
+				Payload: &pagerduty2test.PDCEF{
+					Summary:       "CRITICAL alert for kapacitor/cpu/serverA",
+					Source:        "serverA",
+					Severity:      "critical",
+					Class:         "TestStream_Alert",
+					CustomDetails: detailsTmpl,
+					Timestamp:     "1971-01-01T00:00:10.000000000Z",
+				},
+				RoutingKey: "routing_key",
+			},
+		},
+		pagerduty2test.Request{
+			URL: "/",
+			PostData: pagerduty2test.PostData{
+				Client:      "kapacitor",
+				ClientURL:   kapacitorURL,
+				EventAction: "trigger",
+				DedupKey:    "kapacitor/cpu/serverA",
+				Payload: &pagerduty2test.PDCEF{
+					Summary:       "CRITICAL alert for kapacitor/cpu/serverA",
+					Source:        "serverA",
+					Severity:      "critical",
+					Class:         "TestStream_Alert",
+					CustomDetails: detailsTmpl,
+					Timestamp:     "1971-01-01T00:00:10.000000000Z",
+				},
+				RoutingKey: "test_override_key",
+			},
+		},
+	}
+
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Requests() {
+		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+		t.Error(err)
+	}
+}
+
 func TestStream_AlertHTTPPost(t *testing.T) {
 	ts := httpposttest.NewAlertServer(nil, false)
 	defer ts.Close()
