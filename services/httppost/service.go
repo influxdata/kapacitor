@@ -27,9 +27,9 @@ type Diagnostic interface {
 // Only one of name and url should be non-empty
 type Endpoint struct {
 	mu            sync.RWMutex
-	url           string
+	Url           string
 	headers       map[string]string
-	auth          BasicAuth
+	Auth          BasicAuth
 	alertTemplate *template.Template
 	rowTemplate   *template.Template
 	closed        bool
@@ -37,9 +37,9 @@ type Endpoint struct {
 
 func NewEndpoint(url string, headers map[string]string, auth BasicAuth, at, rt *template.Template) *Endpoint {
 	return &Endpoint{
-		url:           url,
+		Url:           url,
 		headers:       headers,
-		auth:          auth,
+		Auth:          auth,
 		alertTemplate: at,
 		rowTemplate:   rt,
 	}
@@ -54,9 +54,9 @@ func (e *Endpoint) Close() {
 func (e *Endpoint) Update(c Config) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	e.url = c.URL
+	e.Url = c.URL
 	e.headers = c.Headers
-	e.auth = c.BasicAuth
+	e.Auth = c.BasicAuth
 	at, err := c.getAlertTemplate()
 	if err != nil {
 		return err
@@ -89,13 +89,13 @@ func (e *Endpoint) NewHTTPRequest(body io.Reader) (req *http.Request, err error)
 		return nil, errors.New("endpoint was closed")
 	}
 
-	req, err = http.NewRequest("POST", e.url, body)
+	req, err = http.NewRequest("POST", e.Url, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create POST request: %v", err)
 	}
 
-	if e.auth.valid() {
-		req.SetBasicAuth(e.auth.Username, e.auth.Password)
+	if e.Auth.valid() {
+		req.SetBasicAuth(e.Auth.Username, e.Auth.Password)
 	}
 
 	for k, v := range e.headers {
@@ -217,7 +217,7 @@ func (s *Service) Test(options interface{}) error {
 	// Create the HTTP request
 	var req *http.Request
 	e := &Endpoint{
-		url:     o.URL,
+		Url:     o.URL,
 		headers: o.Headers,
 	}
 	req, err = e.NewHTTPRequest(body)

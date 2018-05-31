@@ -13,15 +13,11 @@ func TestSideload(t *testing.T) {
 	def.Field("finance", "loan")
 	def.Tag("vocabulary", "volcano")
 	def.Tag("make", "toyota")
-	def.HttpUser = ("user")
-	def.HttpPassword = ("password")
 
 	want := `stream
     |from()
     |sideload()
         .source('file:///tmpdir')
-        .httpUser('user')
-        .httpPassword('password')
         .order('a', 'b', 'c')
         .field('finance', 'loan')
         .field('judgement', 'plantiff')

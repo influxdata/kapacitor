@@ -194,7 +194,7 @@ type TaskMaster struct {
 	}
 
 	SideloadService interface {
-		Source(dir string) (sideload.Source, error)
+		Source(*httppost.Endpoint) (sideload.Source, error)
 	}
 
 	Commander command.Commander

@@ -15,6 +15,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/services/httpd"
+	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/pkg/errors"
 )
 
@@ -87,29 +88,29 @@ func (s *Service) Reload() error {
 	return nil
 }
 
-func (s *Service) Source(srcURL string) (Source, error) {
+func (s *Service) Source(endpoint *httppost.Endpoint) (Source, error) {
 	var src Source
 
-	u, err := url.Parse(srcURL)
+	u, err := url.Parse(endpoint.Url)
 	if err != nil {
 		return nil, err
 	}
-	if u.Scheme != "file" && u.Scheme != "http" {
+	if u.Scheme != "file" && u.Scheme != "http" && u.Scheme != "https" {
 		return nil, fmt.Errorf("unsupported source scheme %q, must be 'file' or 'http'", u.Scheme)
 	}
 
 	if u.Scheme == "file" {
 		src, err = s.SourceFile(u.Path)
-	} else if u.Scheme == "http" {
-		src, err = s.SourceHttp(srcURL)
+	} else if u.Scheme == "http" || u.Scheme == "https" {
+		src, err = s.SourceHttp(endpoint, u.Scheme)
 	}
 
 	return src, err
 }
 
-func (s *Service) SourceHttp(srcURL string) (Source, error) {
+func (s *Service) SourceHttp(endpoint *httppost.Endpoint, scheme string) (Source, error) {
 	var err error
-	dir := srcURL
+	dir := endpoint.Url
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	/*
@@ -122,7 +123,8 @@ func (s *Service) SourceHttp(srcURL string) (Source, error) {
 		src = &source{
 			s:      s,
 			dir:    dir,
-			scheme: "http",
+			scheme: scheme,
+			e:      endpoint,
 		}
 		err = src.updateCache()
 		if err != nil {
@@ -133,7 +135,7 @@ func (s *Service) SourceHttp(srcURL string) (Source, error) {
 	src.referenceCount++
 
 	if err != nil {
-		return nil, fmt.Errorf("Error fetching sideload data from %s :: %s", srcURL, err.Error())
+		return nil, fmt.Errorf("Error fetching sideload data from %s :: %s", dir, err.Error())
 	}
 	return src, nil
 }
@@ -178,12 +180,11 @@ type Source interface {
 }
 
 type source struct {
-	s            *Service
-	scheme       string
-	dir          string
-	mu           sync.RWMutex
-	httpUser     string
-	httpPassword string
+	s      *Service
+	scheme string
+	dir    string
+	mu     sync.RWMutex
+	e      *httppost.Endpoint
 
 	cache          map[string]map[string]interface{}
 	referenceCount int
@@ -222,9 +223,10 @@ func (s *source) updateCacheFile() error {
 }
 func (s *source) updateCacheHttp() error {
 	req, err := http.NewRequest("GET", s.dir, nil)
-	if s.httpUser != "" {
-		req.SetBasicAuth(s.httpUser, s.httpPassword)
+	if s.e.Auth.Username != "" && s.e.Auth.Password != "" {
+		req.SetBasicAuth(s.e.Auth.Username, s.e.Auth.Password)
 	}
+
 	client := &http.Client{
 		Timeout: time.Second * 10,
 	}
@@ -251,7 +253,7 @@ func (s *source) updateCache() error {
 
 	if s.scheme == "file" {
 		return s.updateCacheFile()
-	} else if s.scheme == "http" {
+	} else if s.scheme == "http" || s.scheme == "https" {
 		return s.updateCacheHttp()
 	}
 	return nil
