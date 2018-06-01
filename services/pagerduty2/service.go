@@ -155,12 +155,11 @@ func (s *Service) Global() bool {
 }
 
 type testOptions struct {
-	IncidentKey string `json:"incident-key"`
-	Description string `json:"description"`
-	//	Details     string          `json:"details"`
-	Level     alert.Level     `json:"level"`
-	Data      alert.EventData `json:"event_data"`
-	Timestamp time.Time       `json:"timestamp"`
+	AlertID     string          `json:"alert_id"`
+	Description string          `json:"description"`
+	Level       alert.Level     `json:"level"`
+	Data        alert.EventData `json:"event_data"`
+	Timestamp   time.Time       `json:"timestamp"`
 }
 
 // TestOptions returns optional values for the test harness
@@ -170,11 +169,10 @@ func (s *Service) TestOptions() interface{} {
 	t, _ := time.Parse(layout, str)
 
 	return &testOptions{
-		IncidentKey: "testIncidentKey",
+		AlertID:     "testAlertID",
 		Description: "test pagerduty2 message",
 		Level:       alert.Critical,
 		Timestamp:   t,
-		//		Details:     html.EscapeString(`{"Test": "test_value"}`),
 		Data: alert.EventData{
 			Name:   "testPagerDuty2",
 			Tags:   make(map[string]string),
@@ -192,8 +190,8 @@ func (s *Service) Test(options interface{}) error {
 	}
 	c := s.config()
 	return s.Alert(
-		c.ServiceKey,
-		o.IncidentKey,
+		c.RoutingKey,
+		o.AlertID,
 		o.Description,
 		o.Level,
 		o.Timestamp,
@@ -205,8 +203,8 @@ func (s *Service) Test(options interface{}) error {
 //
 // The req headers are now required with the API v2:
 // https://v2.developer.pagerduty.com/docs/migrating-to-api-v2
-func (s *Service) Alert(serviceKey, incidentKey, desc string, level alert.Level, timestamp time.Time, data alert.EventData) error {
-	url, post, err := s.preparePost(serviceKey, incidentKey, desc, level, timestamp, data)
+func (s *Service) Alert(serviceKey, alertID, desc string, level alert.Level, timestamp time.Time, data alert.EventData) error {
+	url, post, err := s.preparePost(serviceKey, alertID, desc, level, timestamp, data)
 	if err != nil {
 		return err
 	}
@@ -231,18 +229,20 @@ func (s *Service) Alert(serviceKey, incidentKey, desc string, level alert.Level,
 			return err
 		}
 		type response struct {
-			Message string `json:"message"`
+			Status  string   `json:"status"`
+			Message string   `json:"message"`
+			Errors  []string `json:"errors"`
 		}
 		r := &response{Message: fmt.Sprintf("failed to understand PagerDuty2 response. code: %d content: %s", resp.StatusCode, string(body))}
 		b := bytes.NewReader(body)
 		dec := json.NewDecoder(b)
 		dec.Decode(r)
-		return errors.New(r.Message)
+		return fmt.Errorf("Status: %s, Message: %s Errors: %v", r.Status, r.Message, r.Errors)
 	}
 	return nil
 }
 
-func (s *Service) sendResolve(c Config, serviceKey, incidentKey string) (string, io.Reader, error) {
+func (s *Service) sendResolve(c Config, serviceKey, alertID string) (string, io.Reader, error) {
 	// create a new AlertPayload for us to fire off
 	type Resolve struct {
 		RoutingKey  string `json:"routing_key"`
@@ -253,12 +253,12 @@ func (s *Service) sendResolve(c Config, serviceKey, incidentKey string) (string,
 	ap := Resolve{}
 
 	if serviceKey == "" {
-		ap.RoutingKey = c.ServiceKey
+		ap.RoutingKey = c.RoutingKey
 	} else {
 		ap.RoutingKey = serviceKey
 	}
 
-	ap.DedupKey = incidentKey
+	ap.DedupKey = alertID
 	ap.EventAction = "resolve"
 
 	var post bytes.Buffer
@@ -272,7 +272,7 @@ func (s *Service) sendResolve(c Config, serviceKey, incidentKey string) (string,
 }
 
 // preparePost is a helper method that sets up the payload for transmission to PagerDuty
-func (s *Service) preparePost(serviceKey, incidentKey, desc string, level alert.Level, timestamp time.Time, data alert.EventData) (string, io.Reader, error) {
+func (s *Service) preparePost(serviceKey, alertID, desc string, level alert.Level, timestamp time.Time, data alert.EventData) (string, io.Reader, error) {
 	c := s.config()
 	if !c.Enabled {
 		return "", nil, errors.New("service is not enabled")
@@ -290,7 +290,7 @@ func (s *Service) preparePost(serviceKey, incidentKey, desc string, level alert.
 		severity = "info"
 	default:
 		// default is a 'resolve' function
-		return s.sendResolve(c, serviceKey, incidentKey)
+		return s.sendResolve(c, serviceKey, alertID)
 	}
 
 	// create a new AlertPayload for us to fire off
@@ -299,33 +299,24 @@ func (s *Service) preparePost(serviceKey, incidentKey, desc string, level alert.
 	}
 
 	if serviceKey == "" {
-		ap.RoutingKey = c.ServiceKey
+		ap.RoutingKey = c.RoutingKey
 	} else {
 		ap.RoutingKey = serviceKey
 	}
 
 	ap.Client = "kapacitor"
 	ap.ClientURL = s.HTTPDService.URL()
-	ap.DedupKey = incidentKey
+	ap.DedupKey = alertID
 	ap.EventAction = eventType
 
 	ap.Payload.CustomDetails = make(map[string]interface{})
 	ap.Payload.CustomDetails["result"] = data.Result
 
-	// The API doesn't explicitly mention a requirement for nanosecond resolution but payloads seem to
-	// fail if we don't include it (even zeroes). This hack is not graceful, but adds a negligible
-	// nanosecond resolution to our timestamp
-	m := timestamp.Format("2006-01-02T15:04:05.000000000Z07:00")
-	//	m := timestamp.Format(time.RFC3339Nano)
-	//	if timestamp.Nanosecond() == 0 {
-	//		m = time.Unix(timestamp.Unix(), 1).In(timestamp.Location()).Format(time.RFC3339Nano)
-	//	}
-
 	ap.Payload.Class = data.TaskName
 	ap.Payload.Severity = severity
 	ap.Payload.Source = "unknown"
 	ap.Payload.Summary = desc
-	ap.Payload.Timestamp = m
+	ap.Payload.Timestamp = timestamp.Format("2006-01-02T15:04:05.000000000Z07:00")
 
 	if _, ok := data.Tags["host"]; ok {
 		ap.Payload.Source = data.Tags["host"]
@@ -344,9 +335,9 @@ func (s *Service) preparePost(serviceKey, incidentKey, desc string, level alert.
 
 // HandlerConfig defines the high-level struct required to connect to PagerDuty
 type HandlerConfig struct {
-	// The service key to use for the alert.
+	// The routing key to use for the alert.
 	// Defaults to the value in the configuration if empty.
-	ServiceKey string `mapstructure:"service-key"`
+	RoutingKey string `mapstructure:"routing-key"`
 }
 
 type handler struct {
@@ -367,7 +358,7 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
 // Handle is a bound method to the handler that processes a given alert
 func (h *handler) Handle(event alert.Event) {
 	if err := h.s.Alert(
-		h.c.ServiceKey,
+		h.c.RoutingKey,
 		event.State.ID,
 		event.State.Message,
 		event.State.Level,

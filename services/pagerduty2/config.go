@@ -15,8 +15,8 @@ type Config struct {
 	Enabled bool `toml:"enabled" override:"enabled"`
 	// The PagerDuty API URL, should not need to be changed.
 	URL string `toml:"url" override:"url"`
-	// The PagerDuty service key.
-	ServiceKey string `toml:"service-key" override:"service-key,redact"`
+	// The PagerDuty routing key, this is associated with an Event v2 API integration service.
+	RoutingKey string `toml:"routing-key" override:"routing-key,redact"`
 	// Whether every alert should automatically go to PagerDuty
 	Global bool `toml:"global" override:"global"`
 }

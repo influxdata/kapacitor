@@ -14,6 +14,7 @@ const (
 	DefaultTimeout      = 10 * time.Second
 	DefaultBatchSize    = 100
 	DefaultBatchTimeout = 1 * time.Second
+	DefaultID           = "default"
 )
 
 type Config struct {
@@ -42,6 +43,10 @@ type Config struct {
 	SSLKey string `toml:"ssl-key" override:"ssl-key"`
 	// Use SSL but skip chain & host verification
 	InsecureSkipVerify bool `toml:"insecure-skip-verify" override:"insecure-skip-verify"`
+}
+
+func NewConfig() Config {
+	return Config{ID: DefaultID}
 }
 
 func (c Config) Validate() error {

@@ -150,6 +150,7 @@ func NewConfig() *Config {
 
 	c.Alerta = alerta.NewConfig()
 	c.HipChat = hipchat.NewConfig()
+	c.Kafka = kafka.Configs{kafka.NewConfig()}
 	c.MQTT = mqtt.Configs{mqtt.NewConfig()}
 	c.OpsGenie = opsgenie.NewConfig()
 	c.OpsGenie2 = opsgenie2.NewConfig()

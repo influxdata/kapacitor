@@ -247,6 +247,7 @@ func handleFuncDecl(nodes map[string]*Node, decl *ast.FuncDecl) {
 		if typ == ChainFunc {
 
 			// Get result
+			log.Println(decl)
 			result := decl.Type.Results.List[0]
 			rtype := resolveTypeExpr(result.Type)
 
