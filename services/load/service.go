@@ -205,6 +205,10 @@ func (s *Service) handlerFiles() ([]string, error) {
 }
 
 func (s *Service) Load() error {
+	if !s.config.Enabled {
+		return nil
+	}
+
 	s.mu.Lock()
 	s.tasks = map[string]bool{}
 	s.templates = map[string]bool{}
@@ -227,9 +231,6 @@ func (s *Service) Load() error {
 }
 
 func (s *Service) load() error {
-	if !s.config.Enabled {
-		return nil
-	}
 
 	if _, err := ioutil.ReadDir(s.config.Dir); os.IsNotExist(err) {
 		s.diag.Debug("skipping load... load directory does not exists")
