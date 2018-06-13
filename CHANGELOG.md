@@ -4,6 +4,7 @@
 
 ### Features
 
+- [#1965](https://github.com/influxdata/kapacitor/pull/1965): Alert handler for Microsoft Teams.
 
 ## v1.5.0 [2018-05-17]
 
