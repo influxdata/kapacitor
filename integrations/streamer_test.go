@@ -69,6 +69,8 @@ import (
 	"github.com/influxdata/kapacitor/services/swarm/swarmtest"
 	"github.com/influxdata/kapacitor/services/talk"
 	"github.com/influxdata/kapacitor/services/talk/talktest"
+	"github.com/influxdata/kapacitor/services/teams"
+	"github.com/influxdata/kapacitor/services/teams/teamstest"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/telegram/telegramtest"
 	"github.com/influxdata/kapacitor/services/victorops"
@@ -9672,6 +9674,77 @@ stream
 				AuthorName: "Kapacitor",
 				Text:       "kapacitor/cpu/serverA is CRITICAL",
 				Title:      "kapacitor/cpu/serverA",
+			},
+		},
+	}
+
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Requests() {
+		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestStream_AlertTeams(t *testing.T) {
+	ts := teamstest.NewServer()
+	defer ts.Close()
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.teams()
+		.teams()
+			.channelURL('%s')
+`
+	// To test with live webhook, replace "ts.URL" in line below with your
+	// webhook URL.  The test will fail, but ONE message will post to Teams.
+	script = fmt.Sprintf(script, ts.URL)
+
+	tmInit := func(tm *kapacitor.TaskMaster) {
+
+		c := teams.NewConfig()
+		c.Enabled = true
+		c.ChannelURL = ts.URL
+		sl := teams.NewService(c, diagService.NewTeamsHandler())
+		tm.TeamsService = sl
+	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	exp := []interface{}{
+		teamstest.Request{
+			URL: "/",
+			Card: teams.Card{
+				CardType: "MessageCard",
+				Context:  "http://schema.org/extensions",
+				Title:    "CRITICAL: [kapacitor/cpu/serverA]",
+				Text:     "kapacitor/cpu/serverA is CRITICAL",
+				Summary:  "CRITICAL: [kapacitor/cpu/serverA] - kapacitor/cpu/serverA is CRITICAL...",
+			},
+		},
+		teamstest.Request{
+			URL: "/",
+			Card: teams.Card{
+				CardType: "MessageCard",
+				Context:  "http://schema.org/extensions",
+				Title:    "CRITICAL: [kapacitor/cpu/serverA]",
+				Text:     "kapacitor/cpu/serverA is CRITICAL",
+				Summary:  "CRITICAL: [kapacitor/cpu/serverA] - kapacitor/cpu/serverA is CRITICAL...",
 			},
 		},
 	}

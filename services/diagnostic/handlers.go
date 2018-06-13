@@ -36,6 +36,7 @@ import (
 	"github.com/influxdata/kapacitor/services/snmptrap"
 	"github.com/influxdata/kapacitor/services/swarm"
 	"github.com/influxdata/kapacitor/services/talk"
+	"github.com/influxdata/kapacitor/services/teams"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
@@ -1310,4 +1311,21 @@ func (h *SideloadHandler) WithContext(ctx ...keyvalue.T) sideload.Diagnostic {
 	return &SideloadHandler{
 		l: h.l.With(fields...),
 	}
+}
+
+// Teams handler
+type TeamsHandler struct {
+	l Logger
+}
+
+func (h *TeamsHandler) WithContext(ctx ...keyvalue.T) teams.Diagnostic {
+	fields := logFieldsFromContext(ctx)
+
+	return &TeamsHandler{
+		l: h.l.With(fields...),
+	}
+}
+
+func (h *TeamsHandler) Error(msg string, err error) {
+	h.l.Error(msg, Error(err))
 }

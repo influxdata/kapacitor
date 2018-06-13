@@ -30,6 +30,7 @@ import (
 	"github.com/influxdata/kapacitor/services/slack"
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/snmptrap"
+	"github.com/influxdata/kapacitor/services/teams"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/tick/ast"
@@ -440,6 +441,26 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		h := et.tm.MQTTService.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
 	}
+
+	for _, t := range n.TeamsHandlers {
+		c := teams.HandlerConfig{
+			ChannelURL: t.ChannelURL,
+		}
+		h := et.tm.TeamsService.Handler(c, ctx...)
+		an.handlers = append(an.handlers, h)
+	}
+	if len(n.TeamsHandlers) == 0 && (et.tm.TeamsService != nil && et.tm.TeamsService.Global()) {
+		c := teams.HandlerConfig{}
+		h := et.tm.TeamsService.Handler(c, ctx...)
+		an.handlers = append(an.handlers, h)
+	}
+	// If Teams has been configured with state changes only set it.
+	if et.tm.TeamsService != nil &&
+		et.tm.TeamsService.Global() &&
+		et.tm.TeamsService.StateChangesOnly() {
+		n.IsStateChangesOnly = true
+	}
+
 	// Parse level expressions
 	an.levels = make([]stateful.Expression, alert.Critical+1)
 	an.scopePools = make([]stateful.ScopePool, alert.Critical+1)

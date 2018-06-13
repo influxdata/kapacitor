@@ -37,6 +37,7 @@ import (
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/snmptrap"
 	swarm "github.com/influxdata/kapacitor/services/swarm/client"
+	"github.com/influxdata/kapacitor/services/teams"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/tick"
@@ -197,6 +198,12 @@ type TaskMaster struct {
 		Source(dir string) (sideload.Source, error)
 	}
 
+	TeamsService interface {
+		Global() bool
+		StateChangesOnly() bool
+		Handler(teams.HandlerConfig, ...keyvalue.T) alert.Handler
+	}
+
 	Commander command.Commander
 
 	DefaultRetentionPolicy string
@@ -290,6 +297,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.K8sService = tm.K8sService
 	n.Commander = tm.Commander
 	n.SideloadService = tm.SideloadService
+	n.TeamsService = tm.TeamsService
 	return n
 }
 

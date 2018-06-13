@@ -51,6 +51,7 @@ import (
 	"github.com/influxdata/kapacitor/services/swarm"
 	"github.com/influxdata/kapacitor/services/talk"
 	"github.com/influxdata/kapacitor/services/task_store"
+	"github.com/influxdata/kapacitor/services/teams"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/triton"
 	"github.com/influxdata/kapacitor/services/udf"
@@ -96,6 +97,7 @@ type Config struct {
 	Sensu      sensu.Config      `toml:"sensu" override:"sensu"`
 	Slack      slack.Configs     `toml:"slack" override:"slack,element-key=workspace"`
 	Talk       talk.Config       `toml:"talk" override:"talk"`
+	Teams      teams.Config      `toml:"teams" override:"teams"`
 	Telegram   telegram.Config   `toml:"telegram" override:"telegram"`
 	VictorOps  victorops.Config  `toml:"victorops" override:"victorops"`
 
@@ -162,6 +164,7 @@ func NewConfig() *Config {
 	c.Sensu = sensu.NewConfig()
 	c.Slack = slack.Configs{slack.NewDefaultConfig()}
 	c.Talk = talk.NewConfig()
+	c.Teams = teams.NewConfig()
 	c.SNMPTrap = snmptrap.NewConfig()
 	c.Telegram = telegram.NewConfig()
 	c.VictorOps = victorops.NewConfig()
@@ -304,6 +307,9 @@ func (c *Config) Validate() error {
 	}
 	if err := c.Talk.Validate(); err != nil {
 		return errors.Wrap(err, "talk")
+	}
+	if err := c.Teams.Validate(); err != nil {
+		return errors.Wrap(err, "teams")
 	}
 	if err := c.Telegram.Validate(); err != nil {
 		return errors.Wrap(err, "telegram")
