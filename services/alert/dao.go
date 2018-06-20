@@ -9,6 +9,7 @@ import (
 
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/services/storage"
+	"github.com/mailru/easyjson/jlexer"
 	"github.com/pkg/errors"
 )
 
@@ -243,11 +244,13 @@ type TopicStateDAO interface {
 
 const topicStateVersion = 1
 
+//easyjson:json
 type TopicState struct {
 	Topic       string                `json:"topic"`
 	EventStates map[string]EventState `json:"event-states"`
 }
 
+//easyjson:json
 type EventState struct {
 	Message  string        `json:"message"`
 	Details  string        `json:"details"`
@@ -265,8 +268,9 @@ func (t TopicState) MarshalBinary() ([]byte, error) {
 }
 
 func (t *TopicState) UnmarshalBinary(data []byte) error {
-	return storage.VersionJSONDecode(data, func(version int, dec *json.Decoder) error {
-		return dec.Decode(&t)
+	return storage.VersionEasyJSONDecode(data, func(version int, dec *jlexer.Lexer) error {
+		t.UnmarshalEasyJSON(dec)
+		return dec.Error()
 	})
 }
 

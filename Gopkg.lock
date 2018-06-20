@@ -423,14 +423,18 @@
   version = "v1.0.0"
 
 [[projects]]
-  branch = "master"
   name = "github.com/mailru/easyjson"
   packages = [
+    ".",
+    "bootstrap",
     "buffer",
+    "easyjson",
+    "gen",
     "jlexer",
-    "jwriter"
+    "jwriter",
+    "parser"
   ]
-  revision = "9e74fe5423dca819cf8fd940d9a5d5307ac7aa10"
+  revision = "3fdea8d05856a0c8df22ed4bc71b3219245e4485"
 
 [[projects]]
   name = "github.com/mattn/go-runewidth"
@@ -759,7 +763,7 @@
   name = "gopkg.in/fsnotify.v1"
   packages = ["."]
   revision = "629574ca2a5df945712d3079857300b5e4da0236"
-  version = "v1.4.2"
+  source = "git@github.com:fsnotify/fsnotify"
 
 [[projects]]
   name = "gopkg.in/gomail.v2"
@@ -892,6 +896,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "471285daf6e6beceaa938816b65b7b835f7e8883968f6c7582f830173bb57a73"
+  inputs-digest = "56af1e788a09d8f7de6794281d692aa2de5b7d4e8c930e67c33f05e902300389"
   solver-name = "gps-cdcl"
   solver-version = 1
