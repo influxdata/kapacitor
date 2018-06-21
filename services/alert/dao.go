@@ -1,5 +1,7 @@
 package alert
 
+//go:generate easyjson dao.go
+
 import (
 	"encoding/json"
 	"fmt"

@@ -1,5 +1,7 @@
 package storage
 
+//go:generate easyjson version.go
+
 import (
 	"bytes"
 	"encoding/json"
