@@ -153,6 +153,7 @@ def run_generate():
     logging.info("Running generate...")
     run("go install ./vendor/github.com/golang/protobuf/protoc-gen-go")
     run("go install ./vendor/github.com/benbjohnson/tmpl")
+    run("go install ./vendor/github.com/mailru/easyjson/easyjson")
     generate_cmd = ["go", "generate"]
     generate_cmd.extend(go_list())
     p = subprocess.Popen(generate_cmd)
