@@ -1275,6 +1275,9 @@ type SensuHandler struct {
 	// If empty uses the handler list from the configuration
 	// tick:ignore
 	HandlersList []string `tick:"Handlers" json:"handlers"`
+
+	// Sensu Metadata
+	Metadata map[string]interface{} `json:"metadata"`
 }
 
 // List of effected services.

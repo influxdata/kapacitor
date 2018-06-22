@@ -13,6 +13,8 @@ type Config struct {
 	Source string `toml:"source" override:"source"`
 	// The sensu handler to use
 	Handlers []string `toml:"handlers" override:"handlers"`
+	// A place to add additional metadata
+	Metadata map[string]interface{} `toml:"metadata" override:"metadata"`
 }
 
 func NewConfig() Config {

@@ -224,6 +224,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		c := sensu.HandlerConfig{
 			Source:   s.Source,
 			Handlers: s.HandlersList,
+			Metadata: s.Metadata,
 		}
 		h, err := et.tm.SensuService.Handler(c, ctx...)
 		if err != nil {
