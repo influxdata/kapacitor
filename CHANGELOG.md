@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.5.1 [unreleased]
+
+- [#1982](https://github.com/influxdata/kapacitor/pull/1982): Fix KafkaTopic not working from TICKscript
+
 ## v1.5.0 [2018-05-17]
 
 ### Features

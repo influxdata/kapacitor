@@ -9624,7 +9624,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 					Message:   string(adJSON) + "\n",
 				}}
 				if !cmp.Equal(exp, got) {
-					return fmt.Errorf("unexpected kafak messages -exp/+got:\n%s", cmp.Diff(exp, got))
+					return fmt.Errorf("unexpected kafka messages -exp/+got:\n%s", cmp.Diff(exp, got))
 				}
 				return nil
 			},
