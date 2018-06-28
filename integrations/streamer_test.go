@@ -8575,9 +8575,10 @@ stream
 
 	tmInit := func(tm *kapacitor.TaskMaster) {
 		configs := kafka.Configs{{
-			Enabled: true,
-			ID:      "default",
-			Brokers: []string{ts.Addr.String()},
+			Enabled:   true,
+			ID:        "default",
+			Brokers:   []string{ts.Addr.String()},
+			BatchSize: 1,
 		}}
 		d := diagService.NewKafkaHandler().WithContext(keyvalue.KV("test", "kafka"))
 		tm.KafkaService = kafka.NewService(configs, d)
@@ -8593,6 +8594,9 @@ stream
 			Message:   "kapacitor/cpu/serverA is CRITICAL",
 		},
 	}
+
+	// Wait for kakfa messages to be written
+	time.Sleep(time.Second)
 
 	ts.Close()
 	msgs, err := ts.Messages()

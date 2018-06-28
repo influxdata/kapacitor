@@ -1853,6 +1853,13 @@ func (h *SNMPTrapHandler) validate() error {
 //                 .cluster('default')
 //                 .kafkaTopic('alerts')
 //
+// Mesasges are written to Kafka asynchronously.
+// As such, errors are not reported for individual writes to Kafka, rather an error counter is recorded.
+//
+// Kapacitor tracks these stats for Kafka:
+//
+// * write_errors - Reports the number of errors encountered when writing to Kafka for a given topic and cluster.
+// * write_messages - Reports the number of messages written to Kafka for a given topic and cluster.
 //
 // tick:property
 func (n *AlertNodeData) Kafka() *KafkaHandler {
