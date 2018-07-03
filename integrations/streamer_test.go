@@ -46,6 +46,8 @@ import (
 	"github.com/influxdata/kapacitor/services/httppost/httpposttest"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
 	"github.com/influxdata/kapacitor/services/k8s/k8stest"
+	"github.com/influxdata/kapacitor/services/kafka"
+	"github.com/influxdata/kapacitor/services/kafka/kafkatest"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/opsgenie/opsgenietest"
 	"github.com/influxdata/kapacitor/services/opsgenie2"
@@ -8536,6 +8538,70 @@ stream
 	var got []interface{}
 	for _, g := range ts.Requests() {
 		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestStream_AlertKafka(t *testing.T) {
+	ts, err := kafkatest.NewServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ts.Close()
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.kafka()
+		.cluster('default')
+		.kafkaTopic('testTopic')
+		.template('{{.Message}}')
+`
+
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		configs := kafka.Configs{{
+			Enabled: true,
+			ID:      "default",
+			Brokers: []string{ts.Addr.String()},
+		}}
+		d := diagService.NewKafkaHandler().WithContext(keyvalue.KV("test", "kafka"))
+		tm.KafkaService = kafka.NewService(configs, d)
+	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	exp := []interface{}{
+		kafkatest.Message{
+			Topic:     "testTopic",
+			Partition: 1,
+			Offset:    0,
+			Key:       "kapacitor/cpu/serverA",
+			Message:   "kapacitor/cpu/serverA is CRITICAL",
+		},
+	}
+
+	ts.Close()
+	msgs, err := ts.Messages()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := make([]interface{}, len(msgs))
+	for i, m := range msgs {
+		got[i] = m
 	}
 
 	if err := compareListIgnoreOrder(got, exp, nil); err != nil {

@@ -29,7 +29,7 @@ RUN apt-get -qq update && apt-get -qq install -y \
 RUN gem install fpm
 
 # Install protobuf3 protoc binary
-ENV PROTO_VERSION 3.0.0
+ENV PROTO_VERSION 3.4.0
 RUN wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protoc-${PROTO_VERSION}-linux-x86_64.zip \
     && unzip -j protoc-${PROTO_VERSION}-linux-x86_64.zip bin/protoc -d /bin \
     rm protoc-${PROTO_VERSION}-linux-x86_64.zip

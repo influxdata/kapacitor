@@ -319,7 +319,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 	for _, k := range n.KafkaHandlers {
 		c := kafka.HandlerConfig{
 			Cluster:  k.Cluster,
-			Topic:    k.Topic,
+			Topic:    k.KafkaTopic,
 			Template: k.Template,
 		}
 		h, err := et.tm.KafkaService.Handler(c, ctx...)
