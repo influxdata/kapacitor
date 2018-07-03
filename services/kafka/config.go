@@ -94,7 +94,12 @@ func (c Config) WriterConfig() (kafka.WriterConfig, error) {
 		Dialer:       dialer,
 		ReadTimeout:  time.Duration(c.Timeout),
 		WriteTimeout: time.Duration(c.Timeout),
+		BatchSize:    c.BatchSize,
 		BatchTimeout: time.Duration(c.BatchTimeout),
+		// Async=true allows internal batching of the messages to take place.
+		// It also means that no errors will be captured from the WriteMessages method.
+		// As such we track the WriteStats for errors and report them with Kapacitor's normal diagnostics.
+		Async: true,
 	}, nil
 }
 
