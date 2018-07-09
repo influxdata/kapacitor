@@ -4,6 +4,7 @@
 
 - [#1982](https://github.com/influxdata/kapacitor/pull/1982): Fix KafkaTopic not working from TICKscript
 - [#1989](https://github.com/influxdata/kapacitor/pull/1989): Improve Kafka alert throughput.
+- [#1980](https://github.com/influxdata/kapacitor/pull/1980): Fix discovery service lost config.
 
 ## v1.5.0 [2018-05-17]
 
