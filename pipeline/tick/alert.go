@@ -120,7 +120,7 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 
 	for _, h := range a.PagerDuty2Handlers {
 		n.Dot("pagerDuty2").
-			Dot("serviceKey", h.ServiceKey)
+			Dot("routingKey", h.RoutingKey)
 	}
 
 	for _, h := range a.PushoverHandlers {

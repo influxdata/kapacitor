@@ -203,8 +203,8 @@ func (s *Service) Test(options interface{}) error {
 //
 // The req headers are now required with the API v2:
 // https://v2.developer.pagerduty.com/docs/migrating-to-api-v2
-func (s *Service) Alert(serviceKey, alertID, desc string, level alert.Level, timestamp time.Time, data alert.EventData) error {
-	url, post, err := s.preparePost(serviceKey, alertID, desc, level, timestamp, data)
+func (s *Service) Alert(routingKey, alertID, desc string, level alert.Level, timestamp time.Time, data alert.EventData) error {
+	url, post, err := s.preparePost(routingKey, alertID, desc, level, timestamp, data)
 	if err != nil {
 		return err
 	}
@@ -242,7 +242,7 @@ func (s *Service) Alert(serviceKey, alertID, desc string, level alert.Level, tim
 	return nil
 }
 
-func (s *Service) sendResolve(c Config, serviceKey, alertID string) (string, io.Reader, error) {
+func (s *Service) sendResolve(c Config, routingKey, alertID string) (string, io.Reader, error) {
 	// create a new AlertPayload for us to fire off
 	type Resolve struct {
 		RoutingKey  string `json:"routing_key"`
@@ -252,10 +252,10 @@ func (s *Service) sendResolve(c Config, serviceKey, alertID string) (string, io.
 
 	ap := Resolve{}
 
-	if serviceKey == "" {
+	if routingKey == "" {
 		ap.RoutingKey = c.RoutingKey
 	} else {
-		ap.RoutingKey = serviceKey
+		ap.RoutingKey = routingKey
 	}
 
 	ap.DedupKey = alertID
@@ -272,7 +272,7 @@ func (s *Service) sendResolve(c Config, serviceKey, alertID string) (string, io.
 }
 
 // preparePost is a helper method that sets up the payload for transmission to PagerDuty
-func (s *Service) preparePost(serviceKey, alertID, desc string, level alert.Level, timestamp time.Time, data alert.EventData) (string, io.Reader, error) {
+func (s *Service) preparePost(routingKey, alertID, desc string, level alert.Level, timestamp time.Time, data alert.EventData) (string, io.Reader, error) {
 	c := s.config()
 	if !c.Enabled {
 		return "", nil, errors.New("service is not enabled")
@@ -290,7 +290,7 @@ func (s *Service) preparePost(serviceKey, alertID, desc string, level alert.Leve
 		severity = "info"
 	default:
 		// default is a 'resolve' function
-		return s.sendResolve(c, serviceKey, alertID)
+		return s.sendResolve(c, routingKey, alertID)
 	}
 
 	// create a new AlertPayload for us to fire off
@@ -298,10 +298,10 @@ func (s *Service) preparePost(serviceKey, alertID, desc string, level alert.Leve
 		Payload: &PDCEF{},
 	}
 
-	if serviceKey == "" {
+	if routingKey == "" {
 		ap.RoutingKey = c.RoutingKey
 	} else {
-		ap.RoutingKey = serviceKey
+		ap.RoutingKey = routingKey
 	}
 
 	ap.Client = "kapacitor"
