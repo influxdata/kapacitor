@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.5.1 [unreleased]
+## v1.5.1 [2018-08-06]
 
 ### Bugfixes
 
