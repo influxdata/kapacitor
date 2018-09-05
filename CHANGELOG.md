@@ -1,5 +1,11 @@
 # Changelog
 
+## unreleased
+
+### Bugfixes
+
+- [#](https://github.com/influxdata/kapacitor/pull/): Fix join not catching up fast enough after a pause in the data stream.
+
 ## v1.5.1 [2018-08-06]
 
 ### Bugfixes
