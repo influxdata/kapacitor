@@ -18,6 +18,8 @@ import argparse
 
 # Enable Go vendoring
 os.environ["GO15VENDOREXPERIMENT"] = "1"
+# Enable Go 1.11 modules
+os.environ["GO111MODULE"] = "on"
 
 # PACKAGING VARIABLES
 PACKAGE_NAME = "kapacitor"
@@ -151,9 +153,9 @@ def run_generate():
     """Run 'go generate' to rebuild any static assets.
     """
     logging.info("Running generate...")
-    run("go install ./vendor/github.com/golang/protobuf/protoc-gen-go")
-    run("go install ./vendor/github.com/benbjohnson/tmpl")
-    run("go install ./vendor/github.com/mailru/easyjson/easyjson")
+    run("go install github.com/golang/protobuf/protoc-gen-go")
+    run("go install github.com/benbjohnson/tmpl")
+    run("go install github.com/mailru/easyjson/easyjson")
     generate_cmd = ["go", "generate"]
     generate_cmd.extend(go_list())
     p = subprocess.Popen(generate_cmd)
