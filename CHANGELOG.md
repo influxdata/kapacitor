@@ -1,5 +1,9 @@
 # Changelog
 
+## unreleased
+### Features
+- [#xxx](https://github.com/influxdata/kapacitor/pull/xxx): Add support for correlate in the Alerta AlertNode
+
 ## v1.5.1 [2018-08-06]
 
 ### Bugfixes
