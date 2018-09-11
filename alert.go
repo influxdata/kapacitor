@@ -355,6 +355,9 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		if len(a.Service) != 0 {
 			c.Service = a.Service
 		}
+		if len(a.Correlate) != 0 {
+			c.Correlate = a.Correlate
+		}
 		if a.Timeout != 0 {
 			c.Timeout = a.Timeout
 		}

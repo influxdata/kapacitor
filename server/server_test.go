@@ -8631,6 +8631,10 @@ func TestServer_ListServiceTests(t *testing.T) {
 						"testServiceA",
 						"testServiceB",
 					},
+					"correlate": []interface{}{
+						"testServiceX",
+						"testServiceY",
+					},
 					"timeout": "24h0m0s",
 				},
 			},
@@ -9504,6 +9508,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 						Text:        "message",
 						Origin:      "kapacitor",
 						Service:     []string{"alert"},
+						Correlate:   []string{"alert"},
 						Timeout:     86400,
 					},
 				}}

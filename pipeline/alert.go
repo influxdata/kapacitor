@@ -1190,6 +1190,9 @@ type AlertaHandler struct {
 	// tick:ignore
 	Service []string `tick:"Services" json:"service"`
 
+	// List of Correlated
+	Correlate []string `tick:"Correlated" json:"correlate"`
+
 	// Alerta timeout.
 	// Default: 24h
 	Timeout time.Duration `json:"timeout"`
@@ -1200,6 +1203,11 @@ type AlertaHandler struct {
 // tick:property
 func (a *AlertaHandler) Services(service ...string) *AlertaHandler {
 	a.Service = service
+	return a
+}
+
+func (a *AlertaHandler) Correlated(correlate ...string) *AlertaHandler {
+	a.Correlate = correlate
 	return a
 }
 
