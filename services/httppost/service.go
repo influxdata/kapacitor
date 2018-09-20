@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"context"
+
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/pkg/errors"
@@ -237,7 +238,8 @@ type HandlerConfig struct {
 	Endpoint        string            `mapstructure:"endpoint"`
 	Headers         map[string]string `mapstructure:"headers"`
 	CaptureResponse bool              `mapstructure:"capture-response"`
-	Timeout         time.Duration     `mapstructure:"timeout"`
+	Timeout         time.Duration     `mapstructure:"-"`
+	TimeoutRaw      string            `mapstructure:"timeout" json:""`
 }
 
 type handler struct {
@@ -260,7 +262,7 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
 	if !ok {
 		e = NewEndpoint(c.URL, nil, BasicAuth{}, nil, nil)
 	}
-	return &handler{
+	h := handler{
 		s:               s,
 		endpoint:        e,
 		diag:            s.diag.WithContext(ctx...),
@@ -268,6 +270,18 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
 		captureResponse: c.CaptureResponse,
 		timeout:         c.Timeout,
 	}
+	if c.Timeout != 0 {
+		h.timeout = c.Timeout
+	}
+	if c.TimeoutRaw != "" {
+		parsedTimeout, err := time.ParseDuration(c.TimeoutRaw)
+		if err != nil {
+			s.diag.Error("can't parse timeout value, ignored: ", err)
+		} else {
+			h.timeout = parsedTimeout
+		}
+	}
+	return &h
 }
 
 func (h *handler) NewHTTPRequest(body io.Reader) (req *http.Request, err error) {
