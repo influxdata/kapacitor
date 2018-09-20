@@ -7,13 +7,14 @@
 - [#1938](https://github.com/influxdata/kapacitor/issues/1938): pagerduty2 should use routingKey rather than serviceKey
 - [#1982](https://github.com/influxdata/kapacitor/pull/1982): Fix KafkaTopic not working from TICKscript
 - [#1989](https://github.com/influxdata/kapacitor/pull/1989): Improve Kafka alert throughput.
+- [#2062](https://github.com/influxdata/kapacitor/pull/2062): Fix alerta node hang by adding http timeout and fix time.Duration convert when define topic handler with httppost.
 
 ## v1.5.0 [2018-05-17]
 
 ### Features
 
 - [#1842](https://github.com/influxdata/kapacitor/pull/1842): Add alert inhibitors that allow an alert to suppress events from other matching alerts.
-- [#1833](https://github.com/influxdata/kapacitor/pull/1833): Config format updated to allow for more than one slack configuration.  
+- [#1833](https://github.com/influxdata/kapacitor/pull/1833): Config format updated to allow for more than one slack configuration.
 - [#1844](https://github.com/influxdata/kapacitor/pull/1844): Added a new kapacitor node changeDetect that emits a value
     for each time a series field changes.
 - [#1828](https://github.com/influxdata/kapacitor/pull/1828): Add recoverable field to JSON alert response to indicate whether the
@@ -1337,5 +1338,3 @@ Some bug fixes including one that cause Kapacitor to deadlock.
 ### Release Notes
 
 Major public release.
-
-
