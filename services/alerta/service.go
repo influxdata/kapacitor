@@ -2,6 +2,7 @@ package alerta
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -24,6 +25,7 @@ const (
 	defaultEvent       = "{{ .ID }}"
 	defaultGroup       = "{{ .Group }}"
 	defaultTimeout     = time.Duration(24 * time.Hour)
+	defaultPostTimeout = time.Duration(5 * time.Second)
 	defaultTokenPrefix = "Bearer"
 )
 
@@ -64,6 +66,7 @@ type testOptions struct {
 	Origin      string   `json:"origin"`
 	Service     []string `json:"service"`
 	Timeout     string   `json:"timeout"`
+	PostTimeout string   `json:"post-timeout"`
 }
 
 func (s *Service) TestOptions() interface{} {
@@ -79,6 +82,7 @@ func (s *Service) TestOptions() interface{} {
 		Origin:      c.Origin,
 		Service:     []string{"testServiceA", "testServiceB"},
 		Timeout:     "24h0m0s",
+		PostTimeout: "10s",
 	}
 }
 
@@ -89,6 +93,7 @@ func (s *Service) Test(options interface{}) error {
 	}
 	c := s.config()
 	timeout, _ := time.ParseDuration(o.Timeout)
+	postTimeout, _ := time.ParseDuration(o.PostTimeout)
 	return s.Alert(
 		c.Token,
 		c.TokenPrefix,
@@ -102,6 +107,7 @@ func (s *Service) Test(options interface{}) error {
 		o.Origin,
 		o.Service,
 		timeout,
+		postTimeout,
 		map[string]string{},
 		models.Result{},
 	)
@@ -138,7 +144,7 @@ func (s *Service) Update(newConfig []interface{}) error {
 	return nil
 }
 
-func (s *Service) Alert(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin string, service []string, timeout time.Duration, tags map[string]string, data models.Result) error {
+func (s *Service) Alert(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin string, service []string, timeout time.Duration, postTimeout time.Duration, tags map[string]string, data models.Result) error {
 	if resource == "" || event == "" {
 		return errors.New("Resource and Event are required to send an alert")
 	}
@@ -146,6 +152,12 @@ func (s *Service) Alert(token, tokenPrefix, resource, event, environment, severi
 	req, err := s.preparePost(token, tokenPrefix, resource, event, environment, severity, group, value, message, origin, service, timeout, tags, data)
 	if err != nil {
 		return err
+	}
+
+	if postTimeout > 0 {
+		ctx, cancel := context.WithTimeout(req.Context(), postTimeout)
+		defer cancel()
+		req = req.WithContext(ctx)
 	}
 
 	client := s.clientValue.Load().(*http.Client)
@@ -286,6 +298,10 @@ type HandlerConfig struct {
 	// Alerta timeout.
 	// Default: 24h
 	Timeout time.Duration `mapstructure:"timeout"`
+
+	// HTTP Post timeout.
+	// Default 5s
+	PostTimeout time.Duration `mapstructure:"post-timeout"`
 }
 
 type handler struct {
@@ -303,10 +319,11 @@ type handler struct {
 
 func (s *Service) DefaultHandlerConfig() HandlerConfig {
 	return HandlerConfig{
-		Resource: defaultResource,
-		Event:    defaultEvent,
-		Group:    defaultGroup,
-		Timeout:  defaultTimeout,
+		Resource:    defaultResource,
+		Event:       defaultEvent,
+		Group:       defaultGroup,
+		Timeout:     defaultTimeout,
+		PostTimeout: defaultPostTimeout,
 	}
 }
 
@@ -464,6 +481,7 @@ func (h *handler) Handle(event alert.Event) {
 		h.c.Origin,
 		service,
 		h.c.Timeout,
+		h.c.PostTimeout,
 		event.Data.Tags,
 		event.Data.Result,
 	); err != nil {

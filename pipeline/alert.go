@@ -1193,6 +1193,9 @@ type AlertaHandler struct {
 	// Alerta timeout.
 	// Default: 24h
 	Timeout time.Duration `json:"timeout"`
+
+	// HTTP Post timeout
+	PostTimeout time.Duration `json:"post-timeout"`
 }
 
 // List of effected services.
