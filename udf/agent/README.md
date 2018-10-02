@@ -8,7 +8,7 @@ You can find those agent implementations in this directory and subdirectories ba
 
 Example uses of the agents can be found in the `examples` directory.
 These examples are working examples and are executed as part of the testing suite,
-see [server_test.go](https://github.com/influxdata/kapacitor/blob/master/cmd/kapacitord/run/server_test.go).
+see [server_test.go](https://github.com/influxdata/kapacitor/blob/master/server/server_test.go).
 
 ## Child process vs Socket
 
