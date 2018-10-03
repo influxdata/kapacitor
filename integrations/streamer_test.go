@@ -46,6 +46,8 @@ import (
 	"github.com/influxdata/kapacitor/services/httppost/httpposttest"
 	k8s "github.com/influxdata/kapacitor/services/k8s/client"
 	"github.com/influxdata/kapacitor/services/k8s/k8stest"
+	"github.com/influxdata/kapacitor/services/kafka"
+	"github.com/influxdata/kapacitor/services/kafka/kafkatest"
 	"github.com/influxdata/kapacitor/services/opsgenie"
 	"github.com/influxdata/kapacitor/services/opsgenie/opsgenietest"
 	"github.com/influxdata/kapacitor/services/opsgenie2"
@@ -8543,6 +8545,74 @@ stream
 	}
 }
 
+func TestStream_AlertKafka(t *testing.T) {
+	ts, err := kafkatest.NewServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ts.Close()
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.kafka()
+		.cluster('default')
+		.kafkaTopic('testTopic')
+		.template('{{.Message}}')
+`
+
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		configs := kafka.Configs{{
+			Enabled:   true,
+			ID:        "default",
+			Brokers:   []string{ts.Addr.String()},
+			BatchSize: 1,
+		}}
+		d := diagService.NewKafkaHandler().WithContext(keyvalue.KV("test", "kafka"))
+		tm.KafkaService = kafka.NewService(configs, d)
+	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	exp := []interface{}{
+		kafkatest.Message{
+			Topic:     "testTopic",
+			Partition: 1,
+			Offset:    0,
+			Key:       "kapacitor/cpu/serverA",
+			Message:   "kapacitor/cpu/serverA is CRITICAL",
+		},
+	}
+
+	// Wait for kakfa messages to be written
+	time.Sleep(time.Second)
+
+	ts.Close()
+	msgs, err := ts.Messages()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := make([]interface{}, len(msgs))
+	for i, m := range msgs {
+		got[i] = m
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+		t.Error(err)
+	}
+}
+
 func TestStream_AlertTelegram(t *testing.T) {
 	ts := telegramtest.NewServer()
 	defer ts.Close()
@@ -9287,7 +9357,7 @@ stream
 		.crit(lambda: "count" > 8.0)
 		.pagerDuty2()
 		.pagerDuty2()
-		    .serviceKey('test_override_key')
+		    .routingKey('test_override_key')
 	`
 
 	var kapacitorURL string
@@ -9295,7 +9365,7 @@ stream
 		c := pagerduty2.NewConfig()
 		c.Enabled = true
 		c.URL = ts.URL
-		c.RoutingKey = "service_key"
+		c.RoutingKey = "routing_key"
 		pd := pagerduty2.NewService(c, diagService.NewPagerDuty2Handler())
 		pd.HTTPDService = tm.HTTPDService
 		tm.PagerDuty2Service = pd
@@ -9320,7 +9390,113 @@ stream
 					CustomDetails: detailsTmpl,
 					Timestamp:     "1971-01-01T00:00:10.000000000Z",
 				},
-				RoutingKey: "service_key",
+				RoutingKey: "routing_key",
+			},
+		},
+		pagerduty2test.Request{
+			URL: "/",
+			PostData: pagerduty2test.PostData{
+				Client:      "kapacitor",
+				ClientURL:   kapacitorURL,
+				EventAction: "trigger",
+				DedupKey:    "kapacitor/cpu/serverA",
+				Payload: &pagerduty2test.PDCEF{
+					Summary:       "CRITICAL alert for kapacitor/cpu/serverA",
+					Source:        "serverA",
+					Severity:      "critical",
+					Class:         "TestStream_Alert",
+					CustomDetails: detailsTmpl,
+					Timestamp:     "1971-01-01T00:00:10.000000000Z",
+				},
+				RoutingKey: "test_override_key",
+			},
+		},
+	}
+
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Requests() {
+		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestStream_AlertPagerDuty2_ServiceKey(t *testing.T) {
+	ts := pagerduty2test.NewServer()
+	defer ts.Close()
+
+	detailsTmpl := map[string]interface{}{
+		"result": map[string]interface{}{
+			"series": []interface{}{
+				map[string]interface{}{
+					"name": "cpu",
+					"tags": map[string]interface{}{
+						"host": "serverA",
+					},
+					"columns": []interface{}{"time", "count"},
+					"values": []interface{}{
+						[]interface{}{"1971-01-01T00:00:10Z", float64(10)},
+					},
+				},
+			},
+		},
+	}
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.message('{{ .Level }} alert for {{ .ID }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.pagerDuty2()
+		.pagerDuty2()
+		    .serviceKey('test_override_key')
+	`
+
+	var kapacitorURL string
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := pagerduty2.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL
+		c.RoutingKey = "routing_key"
+		pd := pagerduty2.NewService(c, diagService.NewPagerDuty2Handler())
+		pd.HTTPDService = tm.HTTPDService
+		tm.PagerDuty2Service = pd
+
+		kapacitorURL = tm.HTTPDService.URL()
+	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	exp := []interface{}{
+		pagerduty2test.Request{
+			URL: "/",
+			PostData: pagerduty2test.PostData{
+				Client:      "kapacitor",
+				ClientURL:   kapacitorURL,
+				EventAction: "trigger",
+				DedupKey:    "kapacitor/cpu/serverA",
+				Payload: &pagerduty2test.PDCEF{
+					Summary:       "CRITICAL alert for kapacitor/cpu/serverA",
+					Source:        "serverA",
+					Severity:      "critical",
+					Class:         "TestStream_Alert",
+					CustomDetails: detailsTmpl,
+					Timestamp:     "1971-01-01T00:00:10.000000000Z",
+				},
+				RoutingKey: "routing_key",
 			},
 		},
 		pagerduty2test.Request{

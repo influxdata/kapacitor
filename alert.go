@@ -209,7 +209,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 
 	for _, pd := range n.PagerDuty2Handlers {
 		c := pagerduty2.HandlerConfig{
-			RoutingKey: pd.ServiceKey,
+			RoutingKey: pd.RoutingKey,
 		}
 		h := et.tm.PagerDuty2Service.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
@@ -319,7 +319,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 	for _, k := range n.KafkaHandlers {
 		c := kafka.HandlerConfig{
 			Cluster:  k.Cluster,
-			Topic:    k.Topic,
+			Topic:    k.KafkaTopic,
 			Template: k.Template,
 		}
 		h, err := et.tm.KafkaService.Handler(c, ctx...)

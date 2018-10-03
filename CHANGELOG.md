@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.5.1 [2018-08-06]
+
+### Bugfixes
+
+- [#1938](https://github.com/influxdata/kapacitor/issues/1938): pagerduty2 should use routingKey rather than serviceKey
+- [#1982](https://github.com/influxdata/kapacitor/pull/1982): Fix KafkaTopic not working from TICKscript
+- [#1989](https://github.com/influxdata/kapacitor/pull/1989): Improve Kafka alert throughput.
+
 ## v1.5.0 [2018-05-17]
 
 ### Features

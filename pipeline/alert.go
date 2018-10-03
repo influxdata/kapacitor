@@ -972,14 +972,14 @@ type PagerDutyHandler struct {
 //    1. In your account, under the Services tab, click "Add New Service".
 //    2. Enter a name for the service and select an escalation policy. Then, select "Generic API" for the Service Type.
 //    3. Click the "Add Service" button.
-//    4. Once the service is created, you'll be taken to the service page. On this page, you'll see the "Service key", which is needed to access the API
+//    4. Once the service is created, you'll be taken to the service page. On this page, you'll see the "Integration key", which is needed to access the API
 //
-// Place the 'service key' into the 'pagerduty' section of the Kapacitor configuration as the option 'service-key'.
+// Place the 'integration key' into the 'pagerduty' section of the Kapacitor configuration as the option 'routing-key'.
 //
 // Example:
 //    [pagerduty2]
 //      enabled = true
-//      service-key = "xxxxxxxxx"
+//      routing-key = "xxxxxxxxx"
 //
 // With the correct configuration you can now use PagerDuty in TICKscripts.
 //
@@ -995,7 +995,7 @@ type PagerDutyHandler struct {
 // Example:
 //    [pagerduty2]
 //      enabled = true
-//      service-key = "xxxxxxxxx"
+//      routing-key = "xxxxxxxxx"
 //      global = true
 //
 // Example:
@@ -1016,9 +1016,19 @@ func (n *AlertNodeData) PagerDuty2() *PagerDuty2Handler {
 type PagerDuty2Handler struct {
 	*AlertNodeData `json:"-"`
 
-	// The service key to use for the alert.
+	// The routing key to use for the alert.
 	// Defaults to the value in the configuration if empty.
-	ServiceKey string `json:"serviceKey"`
+	RoutingKey string `json:"routingKey"`
+
+	// tick:ignore
+	_ string `tick:"ServiceKey"`
+}
+
+// Allow ServiceKey as backwards compatible way to set the routing key
+// tick:property
+func (pd2 *PagerDuty2Handler) ServiceKey(serviceKey string) *PagerDuty2Handler {
+	pd2.RoutingKey = serviceKey
+	return pd2
 }
 
 // Send the alert to HipChat.
@@ -1853,6 +1863,13 @@ func (h *SNMPTrapHandler) validate() error {
 //                 .cluster('default')
 //                 .kafkaTopic('alerts')
 //
+// Mesasges are written to Kafka asynchronously.
+// As such, errors are not reported for individual writes to Kafka, rather an error counter is recorded.
+//
+// Kapacitor tracks these stats for Kafka:
+//
+// * write_errors - Reports the number of errors encountered when writing to Kafka for a given topic and cluster.
+// * write_messages - Reports the number of messages written to Kafka for a given topic and cluster.
 //
 // tick:property
 func (n *AlertNodeData) Kafka() *KafkaHandler {
