@@ -14,6 +14,7 @@ const (
 	DefaultTimeout      = 10 * time.Second
 	DefaultBatchSize    = 100
 	DefaultBatchTimeout = 1 * time.Second
+	DefaultID           = "default"
 )
 
 type Config struct {
@@ -42,6 +43,10 @@ type Config struct {
 	SSLKey string `toml:"ssl-key" override:"ssl-key"`
 	// Use SSL but skip chain & host verification
 	InsecureSkipVerify bool `toml:"insecure-skip-verify" override:"insecure-skip-verify"`
+}
+
+func NewConfig() Config {
+	return Config{ID: DefaultID}
 }
 
 func (c Config) Validate() error {
@@ -89,7 +94,12 @@ func (c Config) WriterConfig() (kafka.WriterConfig, error) {
 		Dialer:       dialer,
 		ReadTimeout:  time.Duration(c.Timeout),
 		WriteTimeout: time.Duration(c.Timeout),
+		BatchSize:    c.BatchSize,
 		BatchTimeout: time.Duration(c.BatchTimeout),
+		// Async=true allows internal batching of the messages to take place.
+		// It also means that no errors will be captured from the WriteMessages method.
+		// As such we track the WriteStats for errors and report them with Kapacitor's normal diagnostics.
+		Async: true,
 	}, nil
 }
 

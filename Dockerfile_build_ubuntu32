@@ -19,7 +19,7 @@ RUN apt-get -qq update && apt-get -qq install -y \
     curl
 
 # Install protobuf3 protoc binary
-ENV PROTO_VERSION 3.0.0
+ENV PROTO_VERSION 3.4.0
 RUN wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protoc-${PROTO_VERSION}-linux-x86_32.zip\
     && unzip -j protoc-${PROTO_VERSION}-linux-x86_32.zip bin/protoc -d /bin \
     rm protoc-${PROTO_VERSION}-linux-x86_64.zip
@@ -33,7 +33,7 @@ RUN wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSIO
 
 # Install go
 ENV GOPATH /root/go
-ENV GO_VERSION 1.9.2
+ENV GO_VERSION 1.10.2
 ENV GO_ARCH 386
 RUN wget -q https://storage.googleapis.com/golang/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz; \
    tar -C /usr/local/ -xf /go${GO_VERSION}.linux-${GO_ARCH}.tar.gz ; \
