@@ -337,13 +337,7 @@ func (g *joinGroup) Collect(src int, p timeMessage) error {
 	// Update head
 	g.head[src] = t
 
-	onlyReadySets := false
-	for _, t := range g.head {
-		if !t.After(g.oldestTime) {
-			onlyReadySets = true
-			break
-		}
-	}
+	onlyReadySets := g.checkOnlyReadSets()
 	err := g.emit(onlyReadySets)
 	if err != nil {
 		return err
@@ -367,6 +361,9 @@ func (g *joinGroup) newJoinset(t time.Time) *joinset {
 
 // emit a set and update the oldestTime.
 func (g *joinGroup) emit(onlyReadySets bool) error {
+	if len(g.sets) == 0 {
+		return nil
+	}
 	sets := g.sets[g.oldestTime]
 	i := 0
 	for ; i < len(sets); i++ {
@@ -391,7 +388,29 @@ func (g *joinGroup) emit(onlyReadySets bool) error {
 			g.oldestTime = t
 		}
 	}
+	// Check if there are more non ready sets we can emit.
+	// This occurs when one of the parents missed a section of data
+	// while the other parents continued on.
+	// We need to emit all the buffered sets as soon as all the parent heads have passed the oldesttime.
+	if !onlyReadySets {
+		onlyReadySets = g.checkOnlyReadSets()
+		return g.emit(onlyReadySets)
+	}
 	return nil
+}
+
+// checkOnlyReadSets reports if all heads are past the oldesttime,
+// indicated whether its ok to emit non ready sets.
+func (g *joinGroup) checkOnlyReadSets() bool {
+	onlyReadySets := false
+	// Check if heads are past oldest time
+	for _, t := range g.head {
+		if !t.After(g.oldestTime) {
+			onlyReadySets = true
+			break
+		}
+	}
+	return onlyReadySets
 }
 
 // emit sets until we have none left.
