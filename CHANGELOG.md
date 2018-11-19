@@ -2,6 +2,10 @@
 
 ## unreleased
 
+### Features
+
+- [#2095](https://github.com/influxdata/kapacitor/issues/2095): Add barrier node support to join node.
+
 ### Bugfixes
 
 - [#2048](https://github.com/influxdata/kapacitor/pull/2048): Fix join not catching up fast enough after a pause in the data stream.
