@@ -443,7 +443,6 @@ func (s *Service) Collect(event alert.Event) error {
 	if err != nil {
 		return err
 	}
-
 	return s.persistTopicState(event.Topic)
 }
 
