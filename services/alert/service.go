@@ -50,8 +50,9 @@ type Diagnostic interface {
 type Service struct {
 	mu sync.RWMutex
 
-	specsDAO  HandlerSpecDAO
-	topicsDAO TopicStateDAO
+	specsDAO      HandlerSpecDAO
+	topicsDAO     TopicStateDAO
+	PersistTopics bool
 
 	APIServer *apiServer
 
@@ -442,10 +443,15 @@ func (s *Service) Collect(event alert.Event) error {
 	if err != nil {
 		return err
 	}
+
 	return s.persistTopicState(event.Topic)
 }
 
 func (s *Service) persistTopicState(topic string) error {
+	if !s.PersistTopics {
+		return nil
+	}
+
 	t, ok := s.topics.Topic(topic)
 	if !ok {
 		// Topic was deleted since event was collected, nothing to do.
