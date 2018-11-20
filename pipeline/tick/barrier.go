@@ -23,6 +23,7 @@ func NewBarrierNode(parents []ast.Node) *BarrierNode {
 func (n *BarrierNode) Build(b *pipeline.BarrierNode) (ast.Node, error) {
 	n.Pipe("barrier").
 		Dot("idle", b.Idle).
-		Dot("period", b.Period)
+		Dot("period", b.Period).
+		Dot("delete", b.Delete)
 	return n.prev, n.err
 }
