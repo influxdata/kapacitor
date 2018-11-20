@@ -88,6 +88,8 @@ func (n *JoinNode) Point(src int, p edge.PointMessage) error {
 }
 
 func (n *JoinNode) Barrier(src int, b edge.BarrierMessage) error {
+	g := n.getOrCreateGroup(b.GroupID())
+	g.Barrier(src, b.Time())
 	return edge.Forward(n.outs, b)
 }
 
@@ -333,6 +335,25 @@ func (g *joinGroup) Collect(src int, p timeMessage) error {
 		g.sets[t] = sets
 	}
 	set.Set(src, p)
+
+	// Update head
+	g.head[src] = t
+
+	onlyReadySets := g.checkOnlyReadSets()
+	err := g.emit(onlyReadySets)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Barrier signals a src will not produce points older than time.
+// Emit the oldest set if we have collected enough data.
+func (g *joinGroup) Barrier(src int, t time.Time) error {
+	t = t.Round(g.n.j.Tolerance)
+	if t.Before(g.oldestTime) || g.oldestTime.IsZero() {
+		g.oldestTime = t
+	}
 
 	// Update head
 	g.head[src] = t
