@@ -6,7 +6,7 @@
 
 - [#2095](https://github.com/influxdata/kapacitor/issues/2095): Add barrier node support to join node.
 - [#1157](https://github.com/influxdata/kapacitor/issues/1157): Add ability to expire groups using the barrier node.
-
+- [#2099](https://github.com/influxdata/kapacitor/issues/2099): Add `alert/persist-topics` to config
 ### Bugfixes
 
 - [#2048](https://github.com/influxdata/kapacitor/pull/2048): Fix join not catching up fast enough after a pause in the data stream.
