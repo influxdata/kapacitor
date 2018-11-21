@@ -1,0 +1,11 @@
+{
+    "name":"packets",
+    "points":[
+        {"fields":{"a":"bad","b":0},"time":"2015-10-18T00:00:00Z"},
+        {"fields":{"a":"good","b":0},"time":"2015-10-18T00:00:02Z"},
+        {"fields":{"a":"good","b":0},"time":"2015-10-18T00:00:04Z"},
+        {"fields":{"a":"good","b":0,"c":"something else"},"time":"2015-10-18T00:00:05Z"},
+        {"fields":{"a":"bad","b":1},"time":"2015-10-18T00:00:06Z"},
+        {"fields":{"a":"bad","b":0},"time":"2015-10-18T00:00:08Z"}
+    ]
+}
