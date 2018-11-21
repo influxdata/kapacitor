@@ -27,8 +27,8 @@ type InfluxQLNode struct {
 
 func newInfluxQLNode(et *ExecutingTask, n *pipeline.InfluxQLNode, d NodeDiagnostic) (*InfluxQLNode, error) {
 	m := &InfluxQLNode{
-		node: node{Node: n, et: et, diag: d},
-		n:    n,
+		node:                   node{Node: n, et: et, diag: d},
+		n:                      n,
 		isStreamTransformation: n.ReduceCreater.IsStreamTransformation,
 	}
 	m.node.runF = m.runInfluxQL

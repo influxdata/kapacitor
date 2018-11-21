@@ -39,6 +39,10 @@ type Cluster struct {
 
 // writer wraps a kafka.Writer and tracks stats
 type writer struct {
+	// These fields are use with atomic we want to ensure they are aligned properly so we place them at the top of the struct
+	messageCount int64
+	errorCount   int64
+
 	kafka *kafka.Writer
 
 	cluster,
@@ -46,10 +50,8 @@ type writer struct {
 
 	wg sync.WaitGroup
 
-	statsKey     string
-	ticker       *time.Ticker
-	messageCount int64
-	errorCount   int64
+	statsKey string
+	ticker   *time.Ticker
 }
 
 func (w *writer) Open() {

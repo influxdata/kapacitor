@@ -114,6 +114,56 @@ batch
 	testBatcherWithOutput(t, "TestBatch_ChangeDetect", script, 21*time.Second, er, false)
 }
 
+func TestBatch_ChangeDetect_Many(t *testing.T) {
+
+	var script = `
+batch
+	|query('''
+		SELECT "value"
+		FROM "telegraf"."default".packets
+''')
+		.period(10s)
+		.every(10s)
+		.groupBy(time(2s))
+	|changeDetect('a','b')
+	|httpOut('TestBatch_ChangeDetect_Many')
+`
+
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "packets",
+				Tags:    nil,
+				Columns: []string{"time", "a", "b"},
+				Values: [][]interface{}{
+					[]interface{}{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						"bad",
+						0.0,
+					},
+					[]interface{}{
+						time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+						"good",
+						0.0,
+					},
+					[]interface{}{
+						time.Date(1971, 1, 1, 0, 0, 6, 0, time.UTC),
+						"bad",
+						1.0,
+					},
+					[]interface{}{
+						time.Date(1971, 1, 1, 0, 0, 8, 0, time.UTC),
+						"bad",
+						0.0,
+					},
+				},
+			},
+		},
+	}
+
+	testBatcherWithOutput(t, "TestBatch_ChangeDetect_Many", script, 21*time.Second, er, false)
+}
+
 func TestBatch_Derivative(t *testing.T) {
 
 	var script = `
