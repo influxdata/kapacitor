@@ -64,8 +64,37 @@ func (s *Server) run() {
 }
 
 type Request struct {
-	Name   string `json:"name"`
-	Source string `json:"source"`
-	Output string `json:"output"`
-	Status int    `json:"status"`
+	Name     string                 `json:"name"`
+	Source   string                 `json:"source"`
+	Output   string                 `json:"output"`
+	Status   int                    `json:"status"`
+	Handlers []string               `json:"handlers"`
+	Metadata map[string]interface{} `json:"-"`
+}
+
+func (r *Request) UnmarshalJSON(data []byte) error {
+	type Alias Request
+	raw := struct {
+		*Alias
+	}{}
+	err := json.Unmarshal(data, &raw)
+	if err != nil {
+		return err
+	}
+	if raw.Alias != nil {
+		*r = *(*Request)(raw.Alias)
+	}
+	if r.Metadata == nil {
+		r.Metadata = make(map[string]interface{})
+	}
+	json.Unmarshal(data, &r.Metadata)
+	delete(r.Metadata, "name")
+	delete(r.Metadata, "source")
+	delete(r.Metadata, "output")
+	delete(r.Metadata, "status")
+	delete(r.Metadata, "handlers")
+	if len(r.Metadata) == 0 {
+		r.Metadata = nil
+	}
+	return nil
 }

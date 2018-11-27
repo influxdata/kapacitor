@@ -423,6 +423,11 @@ func TestAlertSensu(t *testing.T) {
 	handler := from.Alert().Sensu()
 	handler.Source = "Henry Hill"
 	handler.Handlers("FBI", "Witness", "Protection")
+	handler.MetadataMap = map[string]interface{}{
+		"k1": "v1",
+		"k2": int64(5),
+		"k3": float64(5),
+	}
 
 	want := `stream
     |from()
@@ -434,6 +439,9 @@ func TestAlertSensu(t *testing.T) {
         .sensu()
         .source('Henry Hill')
         .handlers('FBI', 'Witness', 'Protection')
+        .metadata('k1', 'v1')
+        .metadata('k2', 5)
+        .metadata('k3', 5.0)
 `
 	PipelineTickTestHelper(t, pipe, want)
 }

@@ -1316,6 +1316,10 @@ type SensuHandler struct {
 	// If empty uses the handler list from the configuration
 	// tick:ignore
 	HandlersList []string `tick:"Handlers" json:"handlers"`
+
+	// MetadataMap is a map of arbitrary metadata
+	// tick:ignore
+	MetadataMap map[string]interface{} `tick:"Metadata" json:"metadata"`
 }
 
 // List of effected services.
@@ -1323,6 +1327,18 @@ type SensuHandler struct {
 // tick:property
 func (s *SensuHandler) Handlers(handlers ...string) *SensuHandler {
 	s.HandlersList = handlers
+	return s
+}
+
+// Metadata adds key values pairs to the sensu request.
+// The keys are added at the root level on the sensu JSON object.
+// Metadata for standard Sensu keys will be ignored.
+// tick:property
+func (s *SensuHandler) Metadata(key string, value interface{}) *SensuHandler {
+	if s.MetadataMap == nil {
+		s.MetadataMap = make(map[string]interface{})
+	}
+	s.MetadataMap[key] = value
 	return s
 }
 
