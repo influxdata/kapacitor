@@ -8,16 +8,13 @@
 - [#1157](https://github.com/influxdata/kapacitor/issues/1157): Add ability to expire groups using the barrier node.
 - [#2099](https://github.com/influxdata/kapacitor/issues/2099): Add `alert/persist-topics` to config
 - [#2101](https://github.com/influxdata/kapacitor/issues/2101): Add multiple field support to the change detect node.
+- [#1961](https://github.com/influxdata/kapacitor/pull/1961): Add links to pagerduty2 alerts
 
 ### Bugfixes
 
 - [#2048](https://github.com/influxdata/kapacitor/pull/2048): Fix join not catching up fast enough after a pause in the data stream.
 
 ## v1.5.1 [2018-08-06]
-
-### Features
-
-- [#1961](https://github.com/influxdata/kapacitor/pull/1961): Add links to pagerduty2 alerts
 
 ### Bugfixes
 
