@@ -1019,15 +1019,46 @@ type PagerDuty2Handler struct {
 	// The routing key to use for the alert.
 	// Defaults to the value in the configuration if empty.
 	RoutingKey string `json:"routingKey"`
+	// tick:ignore
+	Links []Link `tick:"Link" json:"links"`
 
 	// tick:ignore
 	_ string `tick:"ServiceKey"`
+}
+
+// tick:ignore
+type Link struct {
+	Href string `json:"href"`
+	Text string `json:"text"`
 }
 
 // Allow ServiceKey as backwards compatible way to set the routing key
 // tick:property
 func (pd2 *PagerDuty2Handler) ServiceKey(serviceKey string) *PagerDuty2Handler {
 	pd2.RoutingKey = serviceKey
+	return pd2
+}
+
+// Set a link to be reported to pagerduty
+//
+// Example:
+//    stream
+//      |alert()
+//        .pagerduty2()
+//          .link('https://grafana.example.com/dashboard/db/thechart', 'Overview Graph')
+//          .link('https://grafana.example.com/dashboard/db/service_{{ .index Tags "service" }}', 'Service Graph')
+//          .link('https://grafana.example.com/')
+// tick:property
+func (pd2 *PagerDuty2Handler) Link(url string, text ...string) *PagerDuty2Handler {
+	linkText := ""
+	if len(text) > 0 {
+		linkText = text[0]
+	}
+	link := Link{
+		Href: url,
+		Text: linkText,
+	}
+	pd2.Links = append(pd2.Links, link)
 	return pd2
 }
 

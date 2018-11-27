@@ -121,6 +121,13 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 	for _, h := range a.PagerDuty2Handlers {
 		n.Dot("pagerDuty2").
 			Dot("routingKey", h.RoutingKey)
+		for _, l := range h.Links {
+			if len(l.Text) > 0 {
+				n.Dot("link", l.Href, l.Text)
+			} else {
+				n.Dot("link", l.Href)
+			}
+		}
 	}
 
 	for _, h := range a.PushoverHandlers {

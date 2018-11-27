@@ -8795,6 +8795,16 @@ func TestServer_ListServiceTests(t *testing.T) {
 						"Category":    "",
 					},
 					"timestamp": "2014-11-12T11:45:26.371Z",
+					"links": []interface{}{
+						map[string]interface{}{
+							"href": "https://example.com/a",
+							"text": "a",
+						},
+						map[string]interface{}{
+							"href": "https://example.com/b",
+							"text": "b",
+						},
+					},
 				},
 			},
 			{
