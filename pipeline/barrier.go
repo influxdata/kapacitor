@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/influxdata/influxdb/influxql"
@@ -37,6 +38,14 @@ type BarrierNode struct {
 	// clock rather than message time.
 	// Must be greater than zero.
 	Period time.Duration `json:"period"`
+
+	// Delete indicates that the group should be deleted after processing each barrier.
+	// This includes the barrier node itself, meaning that if delete is true then the barrier will be triggered
+	// only once for each group and then the barrier node will forget about that group.
+	// The group will be created again if a new point is received for that group.
+	// This is useful if you have increasing cardinality over time as once a barrier is triggered for a group it is then deleted,
+	// freeing any resources managing the group.
+	Delete bool `json:"delete,omitempty"`
 }
 
 func newBarrierNode(wants EdgeType) *BarrierNode {
@@ -113,4 +122,11 @@ func (n *BarrierNode) UnmarshalJSON(data []byte) error {
 
 	n.setID(raw.ID)
 	return nil
+}
+
+//tick:ignore
+func (n *BarrierNode) ChainMethods() map[string]reflect.Value {
+	return map[string]reflect.Value{
+		"Delete": reflect.ValueOf(n.chainnode.Delete),
+	}
 }
