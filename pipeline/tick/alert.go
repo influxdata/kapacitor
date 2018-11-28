@@ -144,6 +144,16 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 		n.Dot("sensu").
 			Dot("source", h.Source).
 			Dot("handlers", args(h.HandlersList)...)
+
+		// Use stable key order
+		keys := make([]string, 0, len(h.MetadataMap))
+		for k := range h.MetadataMap {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			n.Dot("metadata", k, h.MetadataMap[k])
+		}
 	}
 
 	for _, h := range a.SlackHandlers {

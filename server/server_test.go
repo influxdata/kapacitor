@@ -8836,6 +8836,7 @@ func TestServer_ListServiceTests(t *testing.T) {
 					"output":   "testOutput",
 					"source":   "Kapacitor",
 					"handlers": []interface{}{},
+					"metadata": map[string]interface{}{},
 					"level":    "CRITICAL",
 				},
 			},
@@ -8975,6 +8976,7 @@ func TestServer_ListServiceTests_WithPattern(t *testing.T) {
 					"output":   "testOutput",
 					"source":   "Kapacitor",
 					"handlers": []interface{}{},
+					"metadata": map[string]interface{}{},
 					"level":    "CRITICAL",
 				},
 			},
@@ -10024,6 +10026,10 @@ func TestServer_AlertHandlers(t *testing.T) {
 				Kind: "sensu",
 				Options: map[string]interface{}{
 					"source": "Kapacitor",
+					"metadata": map[string]interface{}{
+						"k1": "v1",
+						"k2": 5,
+					},
 				},
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
@@ -10046,6 +10052,10 @@ func TestServer_AlertHandlers(t *testing.T) {
 					Output: "message",
 					Name:   "id",
 					Status: 2,
+					Metadata: map[string]interface{}{
+						"k1": "v1",
+						"k2": float64(5),
+					},
 				}}
 				got := ts.Requests()
 				if !reflect.DeepEqual(exp, got) {

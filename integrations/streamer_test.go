@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"html"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"net/mail"
@@ -19,8 +20,6 @@ import (
 	"testing"
 	"text/template"
 	"time"
-
-	"math/rand"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/docker/api/types/swarm"
@@ -8466,6 +8465,8 @@ stream
 		.warn(lambda: "count" > 7.0)
 		.crit(lambda: "count" > 8.0)
 		.sensu()
+			.metadata('k1', 'v1')
+			.metadata('k2', 5)
 `
 	tmInit := func(tm *kapacitor.TaskMaster) {
 		c := sensu.NewConfig()
@@ -8483,6 +8484,10 @@ stream
 			Output: "kapacitor.cpu.serverA is CRITICAL",
 			Name:   "kapacitor.cpu.serverA",
 			Status: 2,
+			Metadata: map[string]interface{}{
+				"k1": "v1",
+				"k2": float64(5),
+			},
 		},
 	}
 
