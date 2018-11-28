@@ -9866,6 +9866,16 @@ func TestServer_AlertHandlers(t *testing.T) {
 				Kind: "pagerduty2",
 				Options: map[string]interface{}{
 					"routing-key": "rkey",
+					"links": []interface{}{
+						map[string]string{
+							"href": "http://example.com",
+							"text": "t1",
+						},
+						map[string]string{
+							"href": "http://example.com/{{.TaskName}}",
+							"text": "t2",
+						},
+					},
 				},
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
@@ -9909,6 +9919,10 @@ func TestServer_AlertHandlers(t *testing.T) {
 							Timestamp: "1970-01-01T00:00:00.000000000Z",
 						},
 						RoutingKey: "rkey",
+						Links: []pagerduty2test.Link{
+							{Href: "http://example.com", Text: "t1"},
+							{Href: "http://example.com/testAlertHandlers", Text: "t2"},
+						},
 					},
 				}}
 

@@ -9403,6 +9403,8 @@ stream
 		.pagerDuty2()
 		.pagerDuty2()
 		    .routingKey('test_override_key')
+			.link('http://example.com')
+			.link('http://example.com/{{.TaskName}}','task')
 	`
 
 	var kapacitorURL string
@@ -9454,6 +9456,10 @@ stream
 					Timestamp:     "1971-01-01T00:00:10.000000000Z",
 				},
 				RoutingKey: "test_override_key",
+				Links: []pagerduty2test.Link{
+					{Href: "http://example.com", Text: "http://example.com"},
+					{Href: "http://example.com/TestStream_Alert", Text: "task"},
+				},
 			},
 		},
 	}
