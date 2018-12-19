@@ -68,7 +68,13 @@ elif [[ -f /etc/os-release ]]; then
     source /etc/os-release
     if [[ $ID = "amzn" ]]; then
         # Amazon Linux logic
-        install_init
-        # Do not enable service
+        if [[ "$(readlink /proc/1/exe)" == */systemd ]]; then
+            install_systemd
+            # Do not enable service
+        else
+            # Assuming SysV
+            install_init
+            # Do not enable service
+        fi
     fi
 fi
