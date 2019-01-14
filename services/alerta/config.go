@@ -25,6 +25,8 @@ type Config struct {
 	Origin string `toml:"origin" override:"origin"`
 	// Optional timeout, can be overridden per alert.
 	Timeout toml.Duration `toml:"timeout" override:"timeout"`
+	// Optional http post-timeout, can be overridden per alert.
+	PostTimeout toml.Duration `toml:"post-timeout" override:"post-timeout"`
 }
 
 func NewConfig() Config {
