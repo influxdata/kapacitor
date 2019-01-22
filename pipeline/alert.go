@@ -636,6 +636,9 @@ type AlertHTTPPostHandler struct {
 
 	// Timeout for HTTP Post
 	Timeout time.Duration `json:"timeout"`
+
+	// tick:ignore
+	SkipSSLVerificationFlag bool `tick:"SkipSSLVerification" json:"skipSSLVerification"`
 }
 
 // Set a header key and value on the post request.
@@ -663,6 +666,19 @@ func (a *AlertHTTPPostHandler) Header(k, v string) *AlertHTTPPostHandler {
 // tick:property
 func (a *AlertHTTPPostHandler) CaptureResponse() *AlertHTTPPostHandler {
 	a.CaptureResponseFlag = true
+	return a
+}
+
+// SkipSSLVerification disables ssl verification for the POST request
+// Example:
+//    stream
+//         |alert()
+//             .post()
+//                 .endpoint('https'://user@pw/example/resource')
+//                 .skipSSLVerification()
+// tick:property
+func (a *AlertHTTPPostHandler) SkipSSLVerification() *AlertHTTPPostHandler {
+	a.SkipSSLVerificationFlag = true
 	return a
 }
 

@@ -160,6 +160,30 @@ func TestAlertHTTPPostEmptyURL(t *testing.T) {
 	PipelineTickTestHelper(t, pipe, want)
 }
 
+func TestAlertHTTPPostSkipSSLVerify(t *testing.T) {
+	pipe, _, from := StreamFrom()
+	handler := from.Alert().Post("http://coinop.com", "http://polybius.gov")
+	handler.Endpoint = "CIA"
+	handler.Header("publisher", "Sinneslöschen")
+	handler.CaptureResponseFlag = true
+	handler.SkipSSLVerificationFlag = true
+
+	want := `stream
+    |from()
+    |alert()
+        .id('{{ .Name }}:{{ .Group }}')
+        .message('{{ .ID }} is {{ .Level }}')
+        .details('{{ json . }}')
+        .history(21)
+        .post('http://coinop.com')
+        .endpoint('CIA')
+        .captureResponse()
+        .skipSSLVerification()
+        .header('publisher', 'Sinneslöschen')
+`
+	PipelineTickTestHelper(t, pipe, want)
+}
+
 func TestAlertTCP(t *testing.T) {
 	pipe, _, from := StreamFrom()
 	from.Alert().Tcp("echo:7")

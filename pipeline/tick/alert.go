@@ -69,7 +69,8 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 		n.DotRemoveZeroValue("post", h.URL).
 			Dot("endpoint", h.Endpoint).
 			DotIf("captureResponse", h.CaptureResponseFlag).
-			Dot("timeout", h.Timeout)
+			Dot("timeout", h.Timeout).
+			DotIf("skipSSLVerification", h.SkipSSLVerificationFlag)
 
 		var headers []string
 		for k := range h.Headers {
