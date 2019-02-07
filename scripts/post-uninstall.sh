@@ -62,12 +62,16 @@ elif [[ -f /etc/debian_version ]]; then
     fi
 elif [[ -f /etc/os-release ]]; then
     source /etc/os-release
-    if [[ $ID = "amzn" ]]; then
-        # Amazon Linux logic
-        if [[ "$1" = "0" ]]; then
-            # Kapacitor is no longer installed, remove from init system
-            rm -f /etc/default/kapacitor
+    if [[ "$ID" = "amzn" ]] && [[ "$1" = "0" ]]; then
+        # Kapacitor is no longer installed, remove from init system
+        rm -f /etc/default/kapacitor
 
+        if [[ "$NAME" = "Amazon Linux" ]]; then
+            # Amazon Linux 2+ logic
+            disable_systemd
+            uninstall_systemd
+        elif [[ "$NAME" = "Amazon Linux AMI" ]]; then
+            # Amazon Linux logic
             # Run update-rc.d or fallback to chkconfig if not available
             if which update-rc.d &>/dev/null; then
                 disable_update_rcd
