@@ -1,14 +1,14 @@
 # UDF Agents and Servers
 
 A UDF is a User Defined Function, meaning that you can write your own functions/algorithms and plug them into Kapacitor.
-Your custom function runs in its own process and Kapacitor communicates with it via a defined protocol, see [udf.proto](https://github.com/influxdata/kapacitor/blob/master/udf/udf.proto).
+Your custom function runs in its own process and Kapacitor communicates with it via a defined protocol, see [udf.proto](https://github.com/influxdata/kapacitor/blob/master/udf/agent/udf.proto).
 To facilitate working with the protocol several `agents` have been written in various languages that abstract the protocol communication through an interface in the respective languages.
 You can find those agent implementations in this directory and subdirectories based on language name.
 
 
 Example uses of the agents can be found in the `examples` directory.
 These examples are working examples and are executed as part of the testing suite,
-see [server_test.go](https://github.com/influxdata/kapacitor/blob/master/cmd/kapacitord/run/server_test.go).
+see [server_test.go](https://github.com/influxdata/kapacitor/blob/master/server/server_test.go).
 
 ## Child process vs Socket
 
