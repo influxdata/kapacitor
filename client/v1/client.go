@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb/influxql"
+	khttp "github.com/influxdata/kapacitor/http"
 	"github.com/pkg/errors"
 )
 
@@ -176,12 +177,9 @@ func New(conf Config) (*Client, error) {
 	var tr *http.Transport
 
 	if rt == nil {
-		tr = &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: conf.InsecureSkipVerify,
-			},
-		}
+		tr = khttp.NewDefaultTransportWithTLS(&tls.Config{
+			InsecureSkipVerify: conf.InsecureSkipVerify,
+		})
 		if conf.TLSConfig != nil {
 			tr.TLSClientConfig = conf.TLSConfig
 		}

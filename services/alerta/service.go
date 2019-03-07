@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor/alert"
+	khttp "github.com/influxdata/kapacitor/http"
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/pkg/errors"
@@ -45,10 +46,7 @@ func NewService(c Config, d Diagnostic) *Service {
 	}
 	s.configValue.Store(c)
 	s.clientValue.Store(&http.Client{
-		Transport: &http.Transport{
-			Proxy:           http.ProxyFromEnvironment,
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: c.InsecureSkipVerify},
-		},
+		Transport: khttp.NewDefaultTransportWithTLS(&tls.Config{InsecureSkipVerify: c.InsecureSkipVerify}),
 	})
 	return s
 }
@@ -128,10 +126,7 @@ func (s *Service) Update(newConfig []interface{}) error {
 	} else {
 		s.configValue.Store(c)
 		s.clientValue.Store(&http.Client{
-			Transport: &http.Transport{
-				Proxy:           http.ProxyFromEnvironment,
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: c.InsecureSkipVerify},
-			},
+			Transport: khttp.NewDefaultTransportWithTLS(&tls.Config{InsecureSkipVerify: c.InsecureSkipVerify}),
 		})
 	}
 

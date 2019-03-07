@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/influxdata/kapacitor/alert"
+	khttp "github.com/influxdata/kapacitor/http"
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/tlsconfig"
 	"github.com/pkg/errors"
@@ -37,10 +38,7 @@ func NewWorkspace(c Config) (*Workspace, error) {
 	}
 
 	cl := &http.Client{
-		Transport: &http.Transport{
-			Proxy:           http.ProxyFromEnvironment,
-			TLSClientConfig: tlsConfig,
-		},
+		Transport: khttp.NewDefaultTransportWithTLS(tlsConfig),
 	}
 
 	return &Workspace{
@@ -68,10 +66,7 @@ func (w *Workspace) Update(c Config) error {
 	}
 
 	cl := &http.Client{
-		Transport: &http.Transport{
-			Proxy:           http.ProxyFromEnvironment,
-			TLSClientConfig: tlsConfig,
-		},
+		Transport: khttp.NewDefaultTransportWithTLS(tlsConfig),
 	}
 
 	w.client = cl
