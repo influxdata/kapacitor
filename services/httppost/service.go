@@ -329,8 +329,9 @@ func (h *handler) Handle(event alert.Event) {
 		req = req.WithContext(ctx)
 	}
 
+	httpClient := &http.Client{}
+
 	// Skip SSL verification?
-	httpClient := http.DefaultClient
 	if h.skipSSLVerification {
 		httpClient.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{
