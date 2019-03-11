@@ -17,6 +17,7 @@ import (
 	"context"
 
 	"github.com/influxdata/kapacitor/alert"
+	khttp "github.com/influxdata/kapacitor/http"
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/pkg/errors"
 )
@@ -329,15 +330,16 @@ func (h *handler) Handle(event alert.Event) {
 		req = req.WithContext(ctx)
 	}
 
-	httpClient := &http.Client{}
-
-	// Skip SSL verification?
+	// Setup HTTP client
+	var tlsConfig *tls.Config
 	if h.skipSSLVerification {
-		httpClient.Transport = &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
+		tlsConfig = &tls.Config{
+			InsecureSkipVerify: true,
 		}
+	}
+
+	httpClient := &http.Client{
+		Transport: khttp.NewDefaultTransportWithTLS(tlsConfig),
 	}
 
 	// Execute the request

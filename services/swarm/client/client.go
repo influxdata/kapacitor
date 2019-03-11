@@ -15,6 +15,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/swarm"
+	khttp "github.com/influxdata/kapacitor/http"
 	"github.com/pkg/errors"
 )
 
@@ -52,9 +53,7 @@ func New(c Config) (Client, error) {
 		config: c,
 		urls:   urls,
 		client: &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: c.TLSConfig,
-			},
+			Transport: khttp.NewDefaultTransportWithTLS(c.TLSConfig),
 		},
 	}, nil
 }
@@ -92,9 +91,7 @@ func (c *httpClient) Update(new Config) error {
 
 	if old.TLSConfig != new.TLSConfig {
 		c.client = &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: new.TLSConfig,
-			},
+			Transport: khttp.NewDefaultTransportWithTLS(new.TLSConfig),
 		}
 	}
 	return nil

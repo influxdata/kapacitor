@@ -2,6 +2,14 @@
 
 ## unreleased
 
+### Features
+
+- [#2154](https://github.com/influxdata/kapacitor/pull/2154): Add ability to skip ssl verification with an alert post node. Thanks @itsHabib!
+
+### Bugfixes
+
+- [#2167](https://github.com/influxdata/kapacitor/pull/2167): Use default transport consistently.
+
 ## v1.5.2 [2018-12-12]
 
 ### Features
@@ -12,7 +20,6 @@
 - [#2101](https://github.com/influxdata/kapacitor/issues/2101): Add multiple field support to the change detect node.
 - [#1961](https://github.com/influxdata/kapacitor/pull/1961): Add links to pagerduty2 alerts
 - [#1974](https://github.com/influxdata/kapacitor/issues/1974): Add additional metadata to Sensu alerts.
-- [#2154](https://github.com/influxdata/kapacitor/pull/2154): Add ability to skip ssl verification with an alert post node.
 
 ### Bugfixes
 
