@@ -2,6 +2,7 @@ package httppost
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"context"
+
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/pkg/errors"
@@ -233,11 +235,12 @@ func (s *Service) Test(options interface{}) error {
 }
 
 type HandlerConfig struct {
-	URL             string            `mapstructure:"url"`
-	Endpoint        string            `mapstructure:"endpoint"`
-	Headers         map[string]string `mapstructure:"headers"`
-	CaptureResponse bool              `mapstructure:"capture-response"`
-	Timeout         time.Duration     `mapstructure:"timeout"`
+	URL                 string            `mapstructure:"url"`
+	Endpoint            string            `mapstructure:"endpoint"`
+	Headers             map[string]string `mapstructure:"headers"`
+	CaptureResponse     bool              `mapstructure:"capture-response"`
+	Timeout             time.Duration     `mapstructure:"timeout"`
+	SkipSSLVerification bool              `mapstructure:"skip-ssl-verification"`
 }
 
 type handler struct {
@@ -252,6 +255,8 @@ type handler struct {
 
 	timeout time.Duration
 
+	skipSSLVerification bool
+
 	hc *http.Client
 }
 
@@ -261,12 +266,13 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
 		e = NewEndpoint(c.URL, nil, BasicAuth{}, nil, nil)
 	}
 	return &handler{
-		s:               s,
-		endpoint:        e,
-		diag:            s.diag.WithContext(ctx...),
-		headers:         c.Headers,
-		captureResponse: c.CaptureResponse,
-		timeout:         c.Timeout,
+		s:                   s,
+		endpoint:            e,
+		diag:                s.diag.WithContext(ctx...),
+		headers:             c.Headers,
+		captureResponse:     c.CaptureResponse,
+		timeout:             c.Timeout,
+		skipSSLVerification: c.SkipSSLVerification,
 	}
 }
 
@@ -323,8 +329,19 @@ func (h *handler) Handle(event alert.Event) {
 		req = req.WithContext(ctx)
 	}
 
+	httpClient := &http.Client{}
+
+	// Skip SSL verification?
+	if h.skipSSLVerification {
+		httpClient.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		}
+	}
+
 	// Execute the request
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		h.diag.Error("failed to POST alert data", err)
 		return
