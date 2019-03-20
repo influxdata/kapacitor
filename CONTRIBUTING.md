@@ -60,7 +60,7 @@ Signing the CLA
 ---------------
 
 If you are going to be contributing back to Kapacitor please take a second to sign our CLA, which can be found
-[on our website](http://influxdb.com/community/cla.html).
+[on our website](https://www.influxdata.com/legal/cla/).
 
 Installing Go
 -------------
