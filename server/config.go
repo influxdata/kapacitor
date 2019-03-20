@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/influxdata/kapacitor/command"
+	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/azure"
 	"github.com/influxdata/kapacitor/services/config"
@@ -65,6 +66,7 @@ import (
 
 // Config represents the configuration format for the kapacitord binary.
 type Config struct {
+	Alert          alert.Config      `toml:"alert"`
 	HTTP           httpd.Config      `toml:"http"`
 	Replay         replay.Config     `toml:"replay"`
 	Storage        storage.Config    `toml:"storage"`
@@ -137,6 +139,7 @@ func NewConfig() *Config {
 		Commander: command.ExecCommander,
 	}
 
+	c.Alert = alert.NewConfig()
 	c.HTTP = httpd.NewConfig()
 	c.Storage = storage.NewConfig()
 	c.Replay = replay.NewConfig()

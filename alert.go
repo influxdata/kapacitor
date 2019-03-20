@@ -208,15 +208,30 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 	}
 
 	for _, pd := range n.PagerDuty2Handlers {
+		links := make([]pagerduty2.LinkTemplate, len(pd.Links))
+		for i, l := range pd.Links {
+			links[i] = pagerduty2.LinkTemplate{
+				Href: l.Href,
+				Text: l.Text,
+			}
+		}
 		c := pagerduty2.HandlerConfig{
 			RoutingKey: pd.RoutingKey,
+			Links:      links,
 		}
-		h := et.tm.PagerDuty2Service.Handler(c, ctx...)
+		h, err := et.tm.PagerDuty2Service.Handler(c, ctx...)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to create PagerDuty2 handler")
+		}
 		an.handlers = append(an.handlers, h)
 	}
 	if len(n.PagerDuty2Handlers) == 0 && (et.tm.PagerDuty2Service != nil && et.tm.PagerDuty2Service.Global()) {
 		c := pagerduty2.HandlerConfig{}
-		h := et.tm.PagerDuty2Service.Handler(c, ctx...)
+
+		h, err := et.tm.PagerDuty2Service.Handler(c, ctx...)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to create PagerDuty2 handler")
+		}
 		an.handlers = append(an.handlers, h)
 	}
 
@@ -224,6 +239,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		c := sensu.HandlerConfig{
 			Source:   s.Source,
 			Handlers: s.HandlersList,
+			Metadata: s.MetadataMap,
 		}
 		h, err := et.tm.SensuService.Handler(c, ctx...)
 		if err != nil {

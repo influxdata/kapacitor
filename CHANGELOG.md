@@ -1,5 +1,30 @@
 # Changelog
 
+## unreleased
+
+### Features
+
+- [#2154](https://github.com/influxdata/kapacitor/pull/2154): Add ability to skip ssl verification with an alert post node. Thanks @itsHabib!
+
+### Bugfixes
+
+- [#2167](https://github.com/influxdata/kapacitor/pull/2167): Use default transport consistently.
+
+## v1.5.2 [2018-12-12]
+
+### Features
+
+- [#2095](https://github.com/influxdata/kapacitor/issues/2095): Add barrier node support to join node.
+- [#1157](https://github.com/influxdata/kapacitor/issues/1157): Add ability to expire groups using the barrier node.
+- [#2099](https://github.com/influxdata/kapacitor/issues/2099): Add `alert/persist-topics` to config
+- [#2101](https://github.com/influxdata/kapacitor/issues/2101): Add multiple field support to the change detect node.
+- [#1961](https://github.com/influxdata/kapacitor/pull/1961): Add links to pagerduty2 alerts
+- [#1974](https://github.com/influxdata/kapacitor/issues/1974): Add additional metadata to Sensu alerts.
+
+### Bugfixes
+
+- [#2048](https://github.com/influxdata/kapacitor/pull/2048): Fix join not catching up fast enough after a pause in the data stream.
+
 ## v1.5.1 [2018-08-06]
 
 ### Bugfixes

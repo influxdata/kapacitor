@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"html"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"net/mail"
@@ -19,8 +20,6 @@ import (
 	"testing"
 	"text/template"
 	"time"
-
-	"math/rand"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/docker/api/types/swarm"
@@ -196,6 +195,51 @@ func TestStream_ChangeDetect(t *testing.T) {
 	}
 
 	testStreamerWithOutput(t, "TestStream_ChangeDetect", script, 15*time.Second, er, false, nil)
+}
+func TestStream_ChangeDetect_Many(t *testing.T) {
+
+	var script = `stream
+	|from().measurement('packets')
+	|changeDetect('a','b')
+    |window()
+		.period(6s)
+		.every(6s)
+	|httpOut('TestStream_ChangeDetect_Many')
+`
+
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "packets",
+				Tags:    nil,
+				Columns: []string{"time", "a", "b"},
+				Values: [][]interface{}{
+					[]interface{}{
+						time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+						"bad",
+						0.0,
+					},
+					[]interface{}{
+						time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+						"good",
+						0.0,
+					},
+					[]interface{}{
+						time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+						"bad",
+						1.0,
+					},
+					[]interface{}{
+						time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+						"bad",
+						0.0,
+					},
+				},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_ChangeDetect_Many", script, 15*time.Second, er, false, nil)
 }
 
 func TestStream_Derivative(t *testing.T) {
@@ -8421,6 +8465,8 @@ stream
 		.warn(lambda: "count" > 7.0)
 		.crit(lambda: "count" > 8.0)
 		.sensu()
+			.metadata('k1', 'v1')
+			.metadata('k2', 5)
 `
 	tmInit := func(tm *kapacitor.TaskMaster) {
 		c := sensu.NewConfig()
@@ -8438,6 +8484,10 @@ stream
 			Output: "kapacitor.cpu.serverA is CRITICAL",
 			Name:   "kapacitor.cpu.serverA",
 			Status: 2,
+			Metadata: map[string]interface{}{
+				"k1": "v1",
+				"k2": float64(5),
+			},
 		},
 	}
 
@@ -9358,6 +9408,8 @@ stream
 		.pagerDuty2()
 		.pagerDuty2()
 		    .routingKey('test_override_key')
+			.link('http://example.com')
+			.link('http://example.com/{{.TaskName}}','task')
 	`
 
 	var kapacitorURL string
@@ -9409,6 +9461,10 @@ stream
 					Timestamp:     "1971-01-01T00:00:10.000000000Z",
 				},
 				RoutingKey: "test_override_key",
+				Links: []pagerduty2test.Link{
+					{Href: "http://example.com", Text: "http://example.com"},
+					{Href: "http://example.com/TestStream_Alert", Text: "task"},
+				},
 			},
 		},
 	}
@@ -10071,9 +10127,9 @@ Value: {{ index .Fields "count" }}
 				"Mime-Version":              []string{"1.0"},
 				"Content-Type":              []string{"text/html; charset=UTF-8"},
 				"Content-Transfer-Encoding": []string{"quoted-printable"},
-				"To":      []string{"user1@example.com, user2@example.com"},
-				"From":    []string{"test@example.com"},
-				"Subject": []string{"kapacitor.cpu.serverA is CRITICAL"},
+				"To":                        []string{"user1@example.com, user2@example.com"},
+				"From":                      []string{"test@example.com"},
+				"Subject":                   []string{"kapacitor.cpu.serverA is CRITICAL"},
 			},
 			Body: `
 <b>kapacitor.cpu.serverA is CRITICAL</b>
@@ -10087,9 +10143,9 @@ Value: 10
 				"Mime-Version":              []string{"1.0"},
 				"Content-Type":              []string{"text/html; charset=UTF-8"},
 				"Content-Transfer-Encoding": []string{"quoted-printable"},
-				"To":      []string{"user1@example.com, user2@example.com"},
-				"From":    []string{"test@example.com"},
-				"Subject": []string{"kapacitor.cpu.serverA is CRITICAL"},
+				"To":                        []string{"user1@example.com, user2@example.com"},
+				"From":                      []string{"test@example.com"},
+				"Subject":                   []string{"kapacitor.cpu.serverA is CRITICAL"},
 			},
 			Body: `
 <b>kapacitor.cpu.serverA is CRITICAL</b>

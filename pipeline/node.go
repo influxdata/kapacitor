@@ -460,8 +460,8 @@ func (n *chainnode) Derivative(field string) *DerivativeNode {
 }
 
 // Create a new node that only emits new points if different from the previous point
-func (n *chainnode) ChangeDetect(field string) *ChangeDetectNode {
-	s := newChangeDetectNode(n.Provides(), field)
+func (n *chainnode) ChangeDetect(fields ...string) *ChangeDetectNode {
+	s := newChangeDetectNode(n.Provides(), fields)
 	n.linkChild(s)
 	return s
 }

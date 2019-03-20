@@ -129,7 +129,7 @@ func NewService(c Config, hostname string, d Diagnostic) *Service {
 			d,
 			"",
 		),
-		diag: d,
+		diag:                  d,
 		httpServerErrorLogger: d.NewHTTPServerErrorLogger(),
 	}
 	if s.key == "" {

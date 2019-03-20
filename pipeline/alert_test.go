@@ -58,7 +58,8 @@ func TestAlertNode_MarshalJSON(t *testing.T) {
             "endpoint": "/endpoint",
             "headers": null,
             "captureResponse": false,
-            "timeout": 0
+            "timeout": 0,
+            "skipSSLVerification": false
         }
     ],
     "tcp": null,

@@ -521,7 +521,7 @@ type chainnodeAlias interface {
 	Default() *DefaultNode
 	Delete() *DeleteNode
 	Derivative(string) *DerivativeNode
-	ChangeDetect(string) *ChangeDetectNode
+	ChangeDetect(...string) *ChangeDetectNode
 	Desc() string
 	Difference(string) *InfluxQLNode
 	Distinct(string) *InfluxQLNode

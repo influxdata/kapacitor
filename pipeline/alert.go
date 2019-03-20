@@ -636,6 +636,9 @@ type AlertHTTPPostHandler struct {
 
 	// Timeout for HTTP Post
 	Timeout time.Duration `json:"timeout"`
+
+	// tick:ignore
+	SkipSSLVerificationFlag bool `tick:"SkipSSLVerification" json:"skipSSLVerification"`
 }
 
 // Set a header key and value on the post request.
@@ -663,6 +666,19 @@ func (a *AlertHTTPPostHandler) Header(k, v string) *AlertHTTPPostHandler {
 // tick:property
 func (a *AlertHTTPPostHandler) CaptureResponse() *AlertHTTPPostHandler {
 	a.CaptureResponseFlag = true
+	return a
+}
+
+// SkipSSLVerification disables ssl verification for the POST request
+// Example:
+//    stream
+//         |alert()
+//             .post()
+//                 .endpoint('https'://user@pw/example/resource')
+//                 .skipSSLVerification()
+// tick:property
+func (a *AlertHTTPPostHandler) SkipSSLVerification() *AlertHTTPPostHandler {
+	a.SkipSSLVerificationFlag = true
 	return a
 }
 
@@ -1019,15 +1035,46 @@ type PagerDuty2Handler struct {
 	// The routing key to use for the alert.
 	// Defaults to the value in the configuration if empty.
 	RoutingKey string `json:"routingKey"`
+	// tick:ignore
+	Links []Link `tick:"Link" json:"links"`
 
 	// tick:ignore
 	_ string `tick:"ServiceKey"`
+}
+
+// tick:ignore
+type Link struct {
+	Href string `json:"href"`
+	Text string `json:"text"`
 }
 
 // Allow ServiceKey as backwards compatible way to set the routing key
 // tick:property
 func (pd2 *PagerDuty2Handler) ServiceKey(serviceKey string) *PagerDuty2Handler {
 	pd2.RoutingKey = serviceKey
+	return pd2
+}
+
+// Set a link to be reported to pagerduty
+//
+// Example:
+//    stream
+//      |alert()
+//        .pagerduty2()
+//          .link('https://grafana.example.com/dashboard/db/thechart', 'Overview Graph')
+//          .link('https://grafana.example.com/dashboard/db/service_{{ .index Tags "service" }}', 'Service Graph')
+//          .link('https://grafana.example.com/')
+// tick:property
+func (pd2 *PagerDuty2Handler) Link(url string, text ...string) *PagerDuty2Handler {
+	linkText := ""
+	if len(text) > 0 {
+		linkText = text[0]
+	}
+	link := Link{
+		Href: url,
+		Text: linkText,
+	}
+	pd2.Links = append(pd2.Links, link)
 	return pd2
 }
 
@@ -1285,6 +1332,10 @@ type SensuHandler struct {
 	// If empty uses the handler list from the configuration
 	// tick:ignore
 	HandlersList []string `tick:"Handlers" json:"handlers"`
+
+	// MetadataMap is a map of arbitrary metadata
+	// tick:ignore
+	MetadataMap map[string]interface{} `tick:"Metadata" json:"metadata"`
 }
 
 // List of effected services.
@@ -1292,6 +1343,18 @@ type SensuHandler struct {
 // tick:property
 func (s *SensuHandler) Handlers(handlers ...string) *SensuHandler {
 	s.HandlersList = handlers
+	return s
+}
+
+// Metadata adds key values pairs to the sensu request.
+// The keys are added at the root level on the sensu JSON object.
+// Metadata for standard Sensu keys will be ignored.
+// tick:property
+func (s *SensuHandler) Metadata(key string, value interface{}) *SensuHandler {
+	if s.MetadataMap == nil {
+		s.MetadataMap = make(map[string]interface{})
+	}
+	s.MetadataMap[key] = value
 	return s
 }
 
