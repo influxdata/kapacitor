@@ -132,6 +132,29 @@ func FuncDomains(f Func) Domains {
 // Lookup for functions
 type Funcs map[string]Func
 
+func (funcs Funcs) Get(name string) Func {
+	if f := funcs[name]; f != nil {
+		return f
+	}
+	if f := statelessFuncs[name]; f != nil {
+		funcs[name] = f
+		return f
+	}
+	switch name {
+	case "sigma":
+		funcs[name] = &sigma{}
+		return funcs[name]
+	case "count":
+		funcs[name] = &count{}
+		return funcs[name]
+	case "spread":
+		funcs[name] = &spread{min: math.Inf(+1), max: math.Inf(-1)}
+		return funcs[name]
+	default:
+		return nil
+	}
+}
+
 var statelessFuncs Funcs
 
 var builtinFuncs Funcs
@@ -250,6 +273,11 @@ func NewFunctions() Funcs {
 	funcs["spread"] = &spread{min: math.Inf(+1), max: math.Inf(-1)}
 
 	return funcs
+}
+
+// Return empty Funcs
+func NewEmptyFuncs() Funcs {
+	return make(Funcs, 0)
 }
 
 type math1Func func(float64) float64

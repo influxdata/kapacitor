@@ -259,7 +259,7 @@ func eval(n NodeEvaluator, scope *Scope, executionState ExecutionState) (interfa
 }
 
 func lookupFunc(name string, funcs Funcs, scope ReadOnlyScope) Func {
-	f := funcs[name]
+	f := funcs.Get(name)
 	if f != nil {
 		return f
 	}
