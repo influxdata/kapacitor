@@ -9,6 +9,7 @@
 ### Bugfixes
 
 - [#2167](https://github.com/influxdata/kapacitor/pull/2167): Use default transport consistently.
+- [#2144](https://github.com/influxdata/kapacitor/issues/2144): Fix deadlock in barrier node when delete is used.
 
 ## v1.5.2 [2018-12-12]
 
