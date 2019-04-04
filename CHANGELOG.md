@@ -10,6 +10,7 @@
 
 - [#2167](https://github.com/influxdata/kapacitor/pull/2167): Use default transport consistently.
 - [#2144](https://github.com/influxdata/kapacitor/issues/2144): Fix deadlock in barrier node when delete is used.
+- [#2186](https://github.com/influxdata/kapacitor/pull/2186): Make RPM create files with correct ownership on install.
 
 ## v1.5.2 [2018-12-12]
 
