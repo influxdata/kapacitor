@@ -128,6 +128,14 @@ func (e *statsEdge) incEmitted(group models.GroupID, infoF func() GroupInfo, cou
 	e.mu.Unlock()
 }
 
+// deleteGroup removes a group's stats
+func (e *statsEdge) deleteGroup(group models.GroupID) {
+	// Manually unlock below as defer was too much of a performance hit
+	e.mu.Lock()
+	delete(e.groupStats, group)
+	e.mu.Unlock()
+}
+
 type batchStatsEdge struct {
 	statsEdge
 
@@ -159,6 +167,8 @@ func (e *batchStatsEdge) Collect(m Message) error {
 		e.collected.Add(1)
 		begin := b.Begin()
 		e.incCollected(begin.GroupID(), begin.GroupInfo, int64(len(b.Points())))
+	case DeleteGroupMessage:
+		e.deleteGroup(b.GroupID())
 	default:
 		// Do not count other messages
 		// TODO(nathanielc): How should we count other messages?
@@ -207,10 +217,15 @@ func (e *streamStatsEdge) Collect(m Message) error {
 	if err := e.edge.Collect(m); err != nil {
 		return err
 	}
-	if m.Type() == Point {
+	switch m := m.(type) {
+	case PointMessage:
 		e.collected.Add(1)
-		p := m.(GroupInfoer)
-		e.incCollected(p.GroupID(), p.GroupInfo, 1)
+		e.incCollected(m.GroupID(), m.GroupInfo, 1)
+	case DeleteGroupMessage:
+		e.deleteGroup(m.GroupID())
+	default:
+		// Do not count other messages
+		// TODO(nathanielc): How should we count other messages?
 	}
 	return nil
 }
