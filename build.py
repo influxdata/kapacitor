@@ -1,16 +1,15 @@
 #!/usr/bin/python2.7 -u
 
-import sys
-import os
-import subprocess
-import time
-from datetime import datetime
-import shutil
-import tempfile
-import hashlib
-import re
-import logging
 import argparse
+import hashlib
+import logging
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from datetime import datetime
 
 ################
 #### Kapacitor Variables
@@ -21,6 +20,8 @@ os.environ["GO15VENDOREXPERIMENT"] = "1"
 
 # PACKAGING VARIABLES
 PACKAGE_NAME = "kapacitor"
+USER = "kapacitor"
+GROUP = "kapacitor"
 INSTALL_ROOT_DIR = "/usr/bin"
 LOG_DIR = "/var/log/kapacitor"
 DATA_DIR = "/var/lib/kapacitor"
@@ -60,6 +61,8 @@ fpm_common_args = "-f -s dir --log error \
  --config-files {} \
  --config-files {} \
  --directories {} \
+ --rpm-attr 755,{},{}:{} \
+ --rpm-attr 755,{},{}:{} \
  --description \"{}\"".format(
         VENDOR,
         PACKAGE_URL,
@@ -76,6 +79,8 @@ fpm_common_args = "-f -s dir --log error \
                          os.path.dirname(SCRIPT_DIR[1:]),
                          os.path.dirname(DEFAULT_CONFIG),
                     ]),
+        USER, GROUP, LOG_DIR,
+        USER, GROUP, DATA_DIR,
         DESCRIPTION)
 
 targets = {
