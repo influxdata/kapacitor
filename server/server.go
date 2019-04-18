@@ -2,6 +2,7 @@
 package server
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -98,7 +99,8 @@ type Server struct {
 	dataDir  string
 	hostname string
 
-	config *Config
+	config    *Config
+	tlsConfig *tls.Config
 
 	err chan error
 
@@ -158,9 +160,18 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 	if err != nil {
 		return nil, fmt.Errorf("invalid configuration: %s. To generate a valid configuration file run `kapacitord config > kapacitor.generated.conf`.", err)
 	}
+	// Setup base TLS config used for the Kapacitor API
+	tlsConfig, err := c.TLS.Parse()
+	if err != nil {
+		return nil, errors.Wrap(err, "tls configuration")
+	}
+	if tlsConfig == nil {
+		tlsConfig = new(tls.Config)
+	}
 	d := diagService.NewServerHandler()
 	s := &Server{
 		config:           c,
+		tlsConfig:        tlsConfig,
 		BuildInfo:        buildInfo,
 		dataDir:          c.DataDir,
 		hostname:         c.Hostname,
@@ -448,7 +459,7 @@ func (s *Server) appendInfluxDBService() error {
 
 func (s *Server) initHTTPDService() {
 	d := s.DiagService.NewHTTPDHandler()
-	srv := httpd.NewService(s.config.HTTP, s.hostname, d)
+	srv := httpd.NewService(s.config.HTTP, s.hostname, s.tlsConfig, d)
 
 	srv.LocalHandler.PointsWriter = s.TaskMaster
 	srv.Handler.PointsWriter = s.TaskMaster
