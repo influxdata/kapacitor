@@ -5,6 +5,7 @@
 ### Features
 
 - [#2154](https://github.com/influxdata/kapacitor/pull/2154): Add ability to skip ssl verification with an alert post node. Thanks @itsHabib!
+- [#2202](https://github.com/influxdata/kapacitor/pull/2202): Add templating for MQTT topics.
 
 ### Bugfixes
 

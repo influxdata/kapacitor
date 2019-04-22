@@ -1,9 +1,12 @@
 package mqtt
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"sync"
+	text "text/template"
+	"time"
 
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/keyvalue"
@@ -64,6 +67,7 @@ const (
 type Service struct {
 	diag Diagnostic
 
+	bufPool sync.Pool
 	mu      sync.RWMutex
 	clients map[string]Client
 	configs map[string]Config
@@ -93,7 +97,12 @@ func NewService(cs Configs, d Diagnostic) (*Service, error) {
 	}
 
 	return &Service{
-		diag:              d,
+		diag: d,
+		bufPool: sync.Pool{
+			New: func() interface{} {
+				return new(bytes.Buffer)
+			},
+		},
 		configs:           configs,
 		clients:           clients,
 		defaultBrokerName: defaultBrokerName,
@@ -233,9 +242,79 @@ type handler struct {
 
 func (h *handler) Handle(event alert.Event) {
 	h.diag.HandlingEvent()
-	if err := h.s.Alert(h.c.BrokerName, h.c.Topic, h.c.QoS, h.c.Retained, event.State.Message); err != nil {
+	topic, err := h.renderTopic(h.c.Topic, event)
+	if err != nil {
+		h.diag.Error("failed to create MQTT topic from template", err)
+	} else if err = h.s.Alert(h.c.BrokerName, topic, h.c.QoS, h.c.Retained, event.State.Message); err != nil {
 		h.diag.Error("failed to post message to MQTT broker", err)
 	}
+}
+
+type idInfo struct {
+	// Measurement name
+	Name string
+
+	// Task name
+	TaskName string
+
+	// Concatenation of all group-by tags of the form [key=value,]+.
+	// If not groupBy is performed equal to literal 'nil'
+	Group string
+
+	// Map of tags
+	Tags map[string]string
+}
+
+type messageInfo struct {
+	idInfo
+
+	// The ID of the alert.
+	ID string
+
+	// Fields of alerting data point.
+	Fields map[string]interface{}
+
+	// Alert Level, one of: INFO, WARNING, CRITICAL.
+	Level string
+
+	// Time
+	Time time.Time
+
+	// Duration of the alert
+	Duration time.Duration
+}
+
+func (h *handler) renderTopic(topic string, event alert.Event) (string, error) {
+	minfo := messageInfo{
+		idInfo: idInfo{
+			Name:     event.Data.Name,
+			TaskName: event.Data.TaskName,
+			Group:    event.Data.Group,
+			Tags:     event.Data.Tags,
+		},
+		ID:       event.State.ID,
+		Fields:   event.Data.Fields,
+		Level:    event.State.Level.String(),
+		Time:     event.State.Time,
+		Duration: event.State.Duration,
+	}
+
+	topicBuf := h.s.bufPool.Get().(*bytes.Buffer)
+	defer func() {
+		topicBuf.Reset()
+		h.s.bufPool.Put(topicBuf)
+	}()
+
+	topicTmpl, err := text.New("topic").Parse(topic)
+	if err != nil {
+		return "", err
+	}
+
+	err = topicTmpl.Execute(topicBuf, minfo)
+	if err != nil {
+		return "", err
+	}
+	return topicBuf.String(), nil
 }
 
 type testOptions struct {
