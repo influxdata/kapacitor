@@ -62,8 +62,8 @@ func (g *changeDetectGroup) BeginBatch(begin edge.BeginBatchMessage) (edge.Messa
 }
 
 func (g *changeDetectGroup) BatchPoint(bp edge.BatchPointMessage) (edge.Message, error) {
-	emit := g.doChangeDetect(bp)
-	if emit {
+	changed := g.doChangeDetect(bp)
+	if changed {
 		return bp, nil
 	}
 	return nil, nil
@@ -74,8 +74,8 @@ func (g *changeDetectGroup) EndBatch(end edge.EndBatchMessage) (edge.Message, er
 }
 
 func (g *changeDetectGroup) Point(p edge.PointMessage) (edge.Message, error) {
-	emit := g.doChangeDetect(p)
-	if emit {
+	changed := g.doChangeDetect(p)
+	if changed {
 		return p, nil
 	}
 	return nil, nil
@@ -89,9 +89,9 @@ func (g *changeDetectGroup) doChangeDetect(p edge.FieldsTagsTimeGetter) bool {
 		prevFields = g.previous.Fields()
 	}
 	currFields = p.Fields()
-	emit := g.n.changeDetect(prevFields, currFields)
+	changed := g.n.changeDetect(prevFields, currFields)
 
-	if !emit {
+	if !changed {
 		return false
 	}
 	g.previous = p
@@ -106,21 +106,19 @@ func (g *changeDetectGroup) DeleteGroup(d edge.DeleteGroupMessage) (edge.Message
 }
 func (g *changeDetectGroup) Done() {}
 
-// changeDetect calculates the changeDetect between prev and cur.
-// Return is the resulting changeDetect, whether the current point should be
-// stored as previous, and whether the point result should be emitted.
+// changeDetect reports whether there was a change between prev and cur.
 func (n *ChangeDetectNode) changeDetect(prev, curr models.Fields) bool {
-
-	value, ok := curr[n.d.Field]
-	if !ok {
-		n.diag.Error("Invalid field in change detect",
-			fmt.Errorf("expected field %s not found", n.d.Field),
-			keyvalue.KV("field", n.d.Field))
-		return false
+	for _, field := range n.d.Fields {
+		value, ok := curr[field]
+		if !ok {
+			n.diag.Error("Invalid field in change detect",
+				fmt.Errorf("expected field %s not found", field),
+				keyvalue.KV("field", field))
+			continue
+		}
+		if prev[field] != value {
+			return true
+		}
 	}
-	if prev[n.d.Field] == value {
-		return false
-	}
-
-	return true
+	return false
 }

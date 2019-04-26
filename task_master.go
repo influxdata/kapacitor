@@ -141,7 +141,7 @@ type TaskMaster struct {
 	}
 	PagerDuty2Service interface {
 		Global() bool
-		Handler(pagerduty2.HandlerConfig, ...keyvalue.T) alert.Handler
+		Handler(pagerduty2.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
 	}
 	PushoverService interface {
 		Handler(pushover.HandlerConfig, ...keyvalue.T) alert.Handler

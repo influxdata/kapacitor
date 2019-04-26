@@ -32,7 +32,7 @@ To get started using Kapacitor see [this guide](https://docs.influxdata.com/kapa
 
 # Basic Example
 
-Kapacitor use a DSL named [TICKscript](https://docs.influxdata.com/kapacitor/latest/tick/) to define tasks.
+Kapacitor uses a DSL named [TICKscript](https://docs.influxdata.com/kapacitor/latest/tick/) to define tasks.
 
 A simple TICKscript that alerts on high cpu usage looks like this:
 

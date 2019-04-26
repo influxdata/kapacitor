@@ -358,7 +358,7 @@ func (s *Server) initAlertService() {
 	srv.Commander = s.Commander
 	srv.HTTPDService = s.HTTPDService
 	srv.StorageService = s.StorageService
-
+	srv.PersistTopics = s.config.Alert.PersistTopics
 	s.AlertService = srv
 	s.TaskMaster.AlertService = srv
 }

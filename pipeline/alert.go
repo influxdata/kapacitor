@@ -641,6 +641,9 @@ type AlertHTTPPostHandler struct {
 
 	// Timeout for HTTP Post
 	Timeout time.Duration `json:"timeout"`
+
+	// tick:ignore
+	SkipSSLVerificationFlag bool `tick:"SkipSSLVerification" json:"skipSSLVerification"`
 }
 
 // Set a header key and value on the post request.
@@ -668,6 +671,19 @@ func (a *AlertHTTPPostHandler) Header(k, v string) *AlertHTTPPostHandler {
 // tick:property
 func (a *AlertHTTPPostHandler) CaptureResponse() *AlertHTTPPostHandler {
 	a.CaptureResponseFlag = true
+	return a
+}
+
+// SkipSSLVerification disables ssl verification for the POST request
+// Example:
+//    stream
+//         |alert()
+//             .post()
+//                 .endpoint('https'://user@pw/example/resource')
+//                 .skipSSLVerification()
+// tick:property
+func (a *AlertHTTPPostHandler) SkipSSLVerification() *AlertHTTPPostHandler {
+	a.SkipSSLVerificationFlag = true
 	return a
 }
 
@@ -977,14 +993,14 @@ type PagerDutyHandler struct {
 //    1. In your account, under the Services tab, click "Add New Service".
 //    2. Enter a name for the service and select an escalation policy. Then, select "Generic API" for the Service Type.
 //    3. Click the "Add Service" button.
-//    4. Once the service is created, you'll be taken to the service page. On this page, you'll see the "Service key", which is needed to access the API
+//    4. Once the service is created, you'll be taken to the service page. On this page, you'll see the "Integration key", which is needed to access the API
 //
-// Place the 'service key' into the 'pagerduty' section of the Kapacitor configuration as the option 'service-key'.
+// Place the 'integration key' into the 'pagerduty' section of the Kapacitor configuration as the option 'routing-key'.
 //
 // Example:
 //    [pagerduty2]
 //      enabled = true
-//      service-key = "xxxxxxxxx"
+//      routing-key = "xxxxxxxxx"
 //
 // With the correct configuration you can now use PagerDuty in TICKscripts.
 //
@@ -1000,7 +1016,7 @@ type PagerDutyHandler struct {
 // Example:
 //    [pagerduty2]
 //      enabled = true
-//      service-key = "xxxxxxxxx"
+//      routing-key = "xxxxxxxxx"
 //      global = true
 //
 // Example:
@@ -1021,9 +1037,50 @@ func (n *AlertNodeData) PagerDuty2() *PagerDuty2Handler {
 type PagerDuty2Handler struct {
 	*AlertNodeData `json:"-"`
 
-	// The service key to use for the alert.
+	// The routing key to use for the alert.
 	// Defaults to the value in the configuration if empty.
-	ServiceKey string `json:"serviceKey"`
+	RoutingKey string `json:"routingKey"`
+	// tick:ignore
+	Links []Link `tick:"Link" json:"links"`
+
+	// tick:ignore
+	_ string `tick:"ServiceKey"`
+}
+
+// tick:ignore
+type Link struct {
+	Href string `json:"href"`
+	Text string `json:"text"`
+}
+
+// Allow ServiceKey as backwards compatible way to set the routing key
+// tick:property
+func (pd2 *PagerDuty2Handler) ServiceKey(serviceKey string) *PagerDuty2Handler {
+	pd2.RoutingKey = serviceKey
+	return pd2
+}
+
+// Set a link to be reported to pagerduty
+//
+// Example:
+//    stream
+//      |alert()
+//        .pagerduty2()
+//          .link('https://grafana.example.com/dashboard/db/thechart', 'Overview Graph')
+//          .link('https://grafana.example.com/dashboard/db/service_{{ .index Tags "service" }}', 'Service Graph')
+//          .link('https://grafana.example.com/')
+// tick:property
+func (pd2 *PagerDuty2Handler) Link(url string, text ...string) *PagerDuty2Handler {
+	linkText := ""
+	if len(text) > 0 {
+		linkText = text[0]
+	}
+	link := Link{
+		Href: url,
+		Text: linkText,
+	}
+	pd2.Links = append(pd2.Links, link)
+	return pd2
 }
 
 // Send the alert to HipChat.
@@ -1280,6 +1337,10 @@ type SensuHandler struct {
 	// If empty uses the handler list from the configuration
 	// tick:ignore
 	HandlersList []string `tick:"Handlers" json:"handlers"`
+
+	// MetadataMap is a map of arbitrary metadata
+	// tick:ignore
+	MetadataMap map[string]interface{} `tick:"Metadata" json:"metadata"`
 }
 
 // List of effected services.
@@ -1287,6 +1348,18 @@ type SensuHandler struct {
 // tick:property
 func (s *SensuHandler) Handlers(handlers ...string) *SensuHandler {
 	s.HandlersList = handlers
+	return s
+}
+
+// Metadata adds key values pairs to the sensu request.
+// The keys are added at the root level on the sensu JSON object.
+// Metadata for standard Sensu keys will be ignored.
+// tick:property
+func (s *SensuHandler) Metadata(key string, value interface{}) *SensuHandler {
+	if s.MetadataMap == nil {
+		s.MetadataMap = make(map[string]interface{})
+	}
+	s.MetadataMap[key] = value
 	return s
 }
 
@@ -1858,6 +1931,13 @@ func (h *SNMPTrapHandler) validate() error {
 //                 .cluster('default')
 //                 .kafkaTopic('alerts')
 //
+// Mesasges are written to Kafka asynchronously.
+// As such, errors are not reported for individual writes to Kafka, rather an error counter is recorded.
+//
+// Kapacitor tracks these stats for Kafka:
+//
+// * write_errors - Reports the number of errors encountered when writing to Kafka for a given topic and cluster.
+// * write_messages - Reports the number of messages written to Kafka for a given topic and cluster.
 //
 // tick:property
 func (n *AlertNodeData) Kafka() *KafkaHandler {

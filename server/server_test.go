@@ -6673,12 +6673,12 @@ func TestServer_UpdateConfig(t *testing.T) {
 				Elements: []client.ConfigElement{{
 					Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/alerta/"},
 					Options: map[string]interface{}{
-						"enabled":      false,
-						"environment":  "",
-						"origin":       "",
-						"token":        false,
-						"token-prefix": "",
-						"url":          "http://alerta.example.com",
+						"enabled":              false,
+						"environment":          "",
+						"origin":               "",
+						"token":                false,
+						"token-prefix":         "",
+						"url":                  "http://alerta.example.com",
 						"insecure-skip-verify": false,
 						"timeout":              "0s",
 					},
@@ -6690,12 +6690,12 @@ func TestServer_UpdateConfig(t *testing.T) {
 			expDefaultElement: client.ConfigElement{
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/alerta/"},
 				Options: map[string]interface{}{
-					"enabled":      false,
-					"environment":  "",
-					"origin":       "",
-					"token":        false,
-					"token-prefix": "",
-					"url":          "http://alerta.example.com",
+					"enabled":              false,
+					"environment":          "",
+					"origin":               "",
+					"token":                false,
+					"token-prefix":         "",
+					"url":                  "http://alerta.example.com",
 					"insecure-skip-verify": false,
 					"timeout":              "0s",
 				},
@@ -6717,12 +6717,12 @@ func TestServer_UpdateConfig(t *testing.T) {
 						Elements: []client.ConfigElement{{
 							Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/alerta/"},
 							Options: map[string]interface{}{
-								"enabled":      false,
-								"environment":  "",
-								"origin":       "kapacitor",
-								"token":        true,
-								"token-prefix": "",
-								"url":          "http://alerta.example.com",
+								"enabled":              false,
+								"environment":          "",
+								"origin":               "kapacitor",
+								"token":                true,
+								"token-prefix":         "",
+								"url":                  "http://alerta.example.com",
 								"insecure-skip-verify": false,
 								"timeout":              "3h0m0s",
 							},
@@ -6734,12 +6734,12 @@ func TestServer_UpdateConfig(t *testing.T) {
 					expElement: client.ConfigElement{
 						Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/config/alerta/"},
 						Options: map[string]interface{}{
-							"enabled":      false,
-							"environment":  "",
-							"origin":       "kapacitor",
-							"token":        true,
-							"token-prefix": "",
-							"url":          "http://alerta.example.com",
+							"enabled":              false,
+							"environment":          "",
+							"origin":               "kapacitor",
+							"token":                true,
+							"token-prefix":         "",
+							"url":                  "http://alerta.example.com",
 							"insecure-skip-verify": false,
 							"timeout":              "3h0m0s",
 						},
@@ -8856,6 +8856,16 @@ func TestServer_ListServiceTests(t *testing.T) {
 						"Category":    "",
 					},
 					"timestamp": "2014-11-12T11:45:26.371Z",
+					"links": []interface{}{
+						map[string]interface{}{
+							"href": "https://example.com/a",
+							"text": "a",
+						},
+						map[string]interface{}{
+							"href": "https://example.com/b",
+							"text": "b",
+						},
+					},
 				},
 			},
 			{
@@ -8887,6 +8897,7 @@ func TestServer_ListServiceTests(t *testing.T) {
 					"output":   "testOutput",
 					"source":   "Kapacitor",
 					"handlers": []interface{}{},
+					"metadata": map[string]interface{}{},
 					"level":    "CRITICAL",
 				},
 			},
@@ -9037,6 +9048,7 @@ func TestServer_ListServiceTests_WithPattern(t *testing.T) {
 					"output":   "testOutput",
 					"source":   "Kapacitor",
 					"handlers": []interface{}{},
+					"metadata": map[string]interface{}{},
 					"level":    "CRITICAL",
 				},
 			},
@@ -9704,7 +9716,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 					Message:   string(adJSON) + "\n",
 				}}
 				if !cmp.Equal(exp, got) {
-					return fmt.Errorf("unexpected kafak messages -exp/+got:\n%s", cmp.Diff(exp, got))
+					return fmt.Errorf("unexpected kafka messages -exp/+got:\n%s", cmp.Diff(exp, got))
 				}
 				return nil
 			},
@@ -9936,6 +9948,16 @@ func TestServer_AlertHandlers(t *testing.T) {
 				Kind: "pagerduty2",
 				Options: map[string]interface{}{
 					"routing-key": "rkey",
+					"links": []interface{}{
+						map[string]string{
+							"href": "http://example.com",
+							"text": "t1",
+						},
+						map[string]string{
+							"href": "http://example.com/{{.TaskName}}",
+							"text": "t2",
+						},
+					},
 				},
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
@@ -9979,6 +10001,10 @@ func TestServer_AlertHandlers(t *testing.T) {
 							Timestamp: "1970-01-01T00:00:00.000000000Z",
 						},
 						RoutingKey: "rkey",
+						Links: []pagerduty2test.Link{
+							{Href: "http://example.com", Text: "t1"},
+							{Href: "http://example.com/testAlertHandlers", Text: "t2"},
+						},
 					},
 				}}
 
@@ -10080,6 +10106,10 @@ func TestServer_AlertHandlers(t *testing.T) {
 				Kind: "sensu",
 				Options: map[string]interface{}{
 					"source": "Kapacitor",
+					"metadata": map[string]interface{}{
+						"k1": "v1",
+						"k2": 5,
+					},
 				},
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
@@ -10102,6 +10132,10 @@ func TestServer_AlertHandlers(t *testing.T) {
 					Output: "message",
 					Name:   "id",
 					Status: 2,
+					Metadata: map[string]interface{}{
+						"k1": "v1",
+						"k2": float64(5),
+					},
 				}}
 				got := ts.Requests()
 				if !reflect.DeepEqual(exp, got) {
@@ -10185,9 +10219,9 @@ func TestServer_AlertHandlers(t *testing.T) {
 						"Mime-Version":              []string{"1.0"},
 						"Content-Type":              []string{"text/html; charset=UTF-8"},
 						"Content-Transfer-Encoding": []string{"quoted-printable"},
-						"To":      []string{"oncall@example.com, backup@example.com"},
-						"From":    []string{"test@example.com"},
-						"Subject": []string{"message"},
+						"To":                        []string{"oncall@example.com, backup@example.com"},
+						"From":                      []string{"test@example.com"},
+						"Subject":                   []string{"message"},
 					},
 					Body: "details\n",
 				}}

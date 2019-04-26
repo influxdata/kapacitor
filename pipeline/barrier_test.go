@@ -9,6 +9,7 @@ func TestBarrierNode_MarshalJSON(t *testing.T) {
 	type fields struct {
 		Period time.Duration
 		Idle   time.Duration
+		Delete bool
 	}
 	tests := []struct {
 		name    string
@@ -21,8 +22,9 @@ func TestBarrierNode_MarshalJSON(t *testing.T) {
 			fields: fields{
 				Period: time.Hour,
 				Idle:   time.Minute,
+				Delete: true,
 			},
-			want: `{"typeOf":"barrier","id":"0","period":"1h","idle":"1m"}`,
+			want: `{"typeOf":"barrier","id":"0","delete":true,"period":"1h","idle":"1m"}`,
 		},
 		{
 			name: "only period ",
@@ -37,6 +39,7 @@ func TestBarrierNode_MarshalJSON(t *testing.T) {
 			b := newBarrierNode(StreamEdge)
 			b.Period = tt.fields.Period
 			b.Idle = tt.fields.Idle
+			b.Delete = tt.fields.Delete
 			MarshalTestHelper(t, b, tt.wantErr, tt.want)
 		})
 	}

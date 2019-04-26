@@ -51,8 +51,9 @@ type Diagnostic interface {
 type Service struct {
 	mu sync.RWMutex
 
-	specsDAO  HandlerSpecDAO
-	topicsDAO TopicStateDAO
+	specsDAO      HandlerSpecDAO
+	topicsDAO     TopicStateDAO
+	PersistTopics bool
 
 	APIServer *apiServer
 
@@ -103,7 +104,7 @@ type Service struct {
 		Handler(pagerduty.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 	PagerDuty2Service interface {
-		Handler(pagerduty2.HandlerConfig, ...keyvalue.T) alert.Handler
+		Handler(pagerduty2.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
 	}
 	PushoverService interface {
 		Handler(pushover.HandlerConfig, ...keyvalue.T) alert.Handler
@@ -450,6 +451,10 @@ func (s *Service) Collect(event alert.Event) error {
 }
 
 func (s *Service) persistTopicState(topic string) error {
+	if !s.PersistTopics {
+		return nil
+	}
+
 	t, ok := s.topics.Topic(topic)
 	if !ok {
 		// Topic was deleted since event was collected, nothing to do.
@@ -856,7 +861,10 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		if err != nil {
 			return handler{}, err
 		}
-		h = s.PagerDuty2Service.Handler(c, ctx...)
+		h, err = s.PagerDuty2Service.Handler(c, ctx...)
+		if err != nil {
+			return handler{}, err
+		}
 		h = newExternalHandler(h)
 	case "pushover":
 		c := pushover.HandlerConfig{}

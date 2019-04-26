@@ -63,16 +63,20 @@ func (n *BarrierNode) newBarrier(group edge.GroupInfo, first edge.PointMeta) (ed
 		idleBarrier := newIdleBarrier(
 			first.Name(),
 			group,
+			n.ins[0],
 			n.b.Idle,
 			n.outs,
+			n.b.Delete,
 		)
 		return idleBarrier, idleBarrier.Stop, nil
 	case n.b.Period != 0:
 		periodicBarrier := newPeriodicBarrier(
 			first.Name(),
 			group,
+			n.ins[0],
 			n.b.Period,
 			n.outs,
+			n.b.Delete,
 		)
 		return periodicBarrier, periodicBarrier.Stop, nil
 	default:
@@ -83,7 +87,9 @@ func (n *BarrierNode) newBarrier(group edge.GroupInfo, first edge.PointMeta) (ed
 type idleBarrier struct {
 	name  string
 	group edge.GroupInfo
+	in    edge.Edge
 
+	del          bool
 	idle         time.Duration
 	lastPointT   atomic.Value
 	lastBarrierT atomic.Value
@@ -93,17 +99,19 @@ type idleBarrier struct {
 	resetTimerC  chan struct{}
 }
 
-func newIdleBarrier(name string, group edge.GroupInfo, idle time.Duration, outs []edge.StatsEdge) *idleBarrier {
+func newIdleBarrier(name string, group edge.GroupInfo, in edge.Edge, idle time.Duration, outs []edge.StatsEdge, del bool) *idleBarrier {
 	r := &idleBarrier{
 		name:         name,
 		group:        group,
+		in:           in,
 		idle:         idle,
 		lastPointT:   atomic.Value{},
 		lastBarrierT: atomic.Value{},
 		wg:           sync.WaitGroup{},
 		outs:         outs,
-		stopC:        make(chan struct{}),
-		resetTimerC:  make(chan struct{}),
+		stopC:        make(chan struct{}, 1),
+		resetTimerC:  make(chan struct{}, 1),
+		del:          del,
 	}
 
 	r.Init()
@@ -120,8 +128,18 @@ func (n *idleBarrier) Init() {
 }
 
 func (n *idleBarrier) Stop() {
-	close(n.stopC)
+	n.stop()
 	n.wg.Wait()
+}
+
+func (n *idleBarrier) stop() {
+	// Send a stop signal at least once to the stop channel.
+	// The stop channel has a buffer of size one and only the
+	// first stop signal matters.
+	select {
+	case n.stopC <- struct{}{}:
+	default:
+	}
 }
 
 func (n *idleBarrier) BeginBatch(m edge.BeginBatchMessage) (edge.Message, error) {
@@ -149,7 +167,8 @@ func (n *idleBarrier) Barrier(m edge.BarrierMessage) (edge.Message, error) {
 }
 func (n *idleBarrier) DeleteGroup(m edge.DeleteGroupMessage) (edge.Message, error) {
 	if m.GroupID() == n.group.ID {
-		n.Stop()
+		// Signal that the idle barrier should stop.
+		n.stop()
 	}
 	return m, nil
 }
@@ -165,14 +184,28 @@ func (n *idleBarrier) Point(m edge.PointMessage) (edge.Message, error) {
 }
 
 func (n *idleBarrier) resetTimer() {
-	n.resetTimerC <- struct{}{}
+	// The first reset will be buffered and subsequent resets when the
+	// channel is full can be safely discarded because the reset signal
+	// has already been sent.
+	select {
+	case n.resetTimerC <- struct{}{}:
+	default:
+	}
 }
 
 func (n *idleBarrier) emitBarrier() error {
 	newT := n.lastPointT.Load().(time.Time).Add(n.idle)
 	n.lastPointT.Store(newT)
 	n.lastBarrierT.Store(newT)
-	return edge.Forward(n.outs, edge.NewBarrierMessage(n.group, newT))
+
+	err := edge.Forward(n.outs, edge.NewBarrierMessage(n.group, newT))
+	if err != nil {
+		return err
+	}
+	if n.del {
+		return n.in.Collect(edge.NewDeleteGroupMessage(n.group.ID))
+	}
+	return nil
 }
 
 func (n *idleBarrier) idleHandler() {
@@ -198,7 +231,9 @@ func (n *idleBarrier) idleHandler() {
 type periodicBarrier struct {
 	name  string
 	group edge.GroupInfo
+	in    edge.Edge
 
+	del    bool
 	lastT  atomic.Value
 	ticker *time.Ticker
 	wg     sync.WaitGroup
@@ -206,15 +241,17 @@ type periodicBarrier struct {
 	stopC  chan struct{}
 }
 
-func newPeriodicBarrier(name string, group edge.GroupInfo, period time.Duration, outs []edge.StatsEdge) *periodicBarrier {
+func newPeriodicBarrier(name string, group edge.GroupInfo, in edge.Edge, period time.Duration, outs []edge.StatsEdge, del bool) *periodicBarrier {
 	r := &periodicBarrier{
 		name:   name,
 		group:  group,
+		in:     in,
 		lastT:  atomic.Value{},
 		ticker: time.NewTicker(period),
 		wg:     sync.WaitGroup{},
 		outs:   outs,
 		stopC:  make(chan struct{}),
+		del:    del,
 	}
 
 	r.Init()
@@ -230,9 +267,13 @@ func (n *periodicBarrier) Init() {
 }
 
 func (n *periodicBarrier) Stop() {
-	close(n.stopC)
-	n.ticker.Stop()
-	n.wg.Wait()
+	select {
+	case <-n.stopC:
+	default:
+		close(n.stopC)
+		n.ticker.Stop()
+		n.wg.Wait()
+	}
 }
 
 func (n *periodicBarrier) BeginBatch(m edge.BeginBatchMessage) (edge.Message, error) {
@@ -271,7 +312,15 @@ func (n *periodicBarrier) Point(m edge.PointMessage) (edge.Message, error) {
 func (n *periodicBarrier) emitBarrier() error {
 	nowT := time.Now().UTC()
 	n.lastT.Store(nowT)
-	return edge.Forward(n.outs, edge.NewBarrierMessage(n.group, nowT))
+	err := edge.Forward(n.outs, edge.NewBarrierMessage(n.group, nowT))
+	if err != nil {
+		return err
+	}
+	if n.del {
+		// Send DeleteGroupMessage into self
+		return n.in.Collect(edge.NewDeleteGroupMessage(n.group.ID))
+	}
+	return nil
 }
 
 func (n *periodicBarrier) periodicEmitter() {
