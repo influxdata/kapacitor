@@ -12,6 +12,7 @@
 - [#2144](https://github.com/influxdata/kapacitor/issues/2144): Fix deadlock in barrier node when delete is used.
 - [#2186](https://github.com/influxdata/kapacitor/pull/2186): Make RPM create files with correct ownership on install.
 - [#2189](https://github.com/influxdata/kapacitor/pull/2189): Delete group stats when a group is deleted
+- [#2207](https://github.com/influxdata/kapacitor/pull/2207): Avoid extra allocation when building GroupID
 
 ## v1.5.2 [2018-12-12]
 
