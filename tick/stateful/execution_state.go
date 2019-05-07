@@ -8,7 +8,7 @@ type ExecutionState struct {
 
 func CreateExecutionState() ExecutionState {
 	return ExecutionState{
-		Funcs: NewFunctions(),
+		Funcs: NewEmptyFuncs(),
 	}
 }
 

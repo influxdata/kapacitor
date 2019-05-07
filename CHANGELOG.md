@@ -5,6 +5,7 @@
 ### Features
 
 - [#2154](https://github.com/influxdata/kapacitor/pull/2154): Add ability to skip ssl verification with an alert post node. Thanks @itsHabib!
+- [#2177](https://github.com/influxdata/kapacitor/issues/2177): NewFunctions func occupies many memory when state_count has large working_cardinality
 
 ### Bugfixes
 
