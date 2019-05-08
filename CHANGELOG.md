@@ -5,6 +5,7 @@
 ### Features
 
 - [#2154](https://github.com/influxdata/kapacitor/pull/2154): Add ability to skip ssl verification with an alert post node. Thanks @itsHabib!
+- [#2193](https://github.com/influxdata/kapacitor/issues/2193): Add TLS configuration options.
 
 ### Bugfixes
 
