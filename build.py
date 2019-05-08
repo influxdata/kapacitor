@@ -29,12 +29,12 @@ SCRIPT_DIR = "/usr/lib/kapacitor/scripts"
 
 INIT_SCRIPT = "scripts/init.sh"
 SYSTEMD_SCRIPT = "scripts/kapacitor.service"
+PREINST_SCRIPT = "scripts/pre-install.sh"
 POSTINST_SCRIPT = "scripts/post-install.sh"
 POSTUNINST_SCRIPT = "scripts/post-uninstall.sh"
 LOGROTATE_CONFIG = "etc/logrotate.d/kapacitor"
 BASH_COMPLETION_SH = "usr/share/bash-completion/completions/kapacitor"
 DEFAULT_CONFIG = "etc/kapacitor/kapacitor.conf"
-PREINST_SCRIPT = None
 
 # Default AWS S3 bucket for uploads
 DEFAULT_BUCKET = "dl.influxdata.com/kapacitor/artifacts"
@@ -54,6 +54,7 @@ optional_prereqs = [ 'fpm', 'rpmbuild', 'gpg' ]
 fpm_common_args = "-f -s dir --log error \
  --vendor {} \
  --url {} \
+ --before-install {} \
  --after-install {} \
  --after-remove {} \
  --license {} \
@@ -66,6 +67,7 @@ fpm_common_args = "-f -s dir --log error \
  --description \"{}\"".format(
         VENDOR,
         PACKAGE_URL,
+        PREINST_SCRIPT,
         POSTINST_SCRIPT,
         POSTUNINST_SCRIPT,
         PACKAGE_LICENSE,
