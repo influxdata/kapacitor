@@ -71,7 +71,7 @@ func floatPopulateAuxFieldsAndTags(ap *influxql.FloatPoint, fieldsAndTags []stri
 func (a *floatPointAggregator) AggregatePoint(name string, p edge.FieldsTagsTimeGetter) error {
 	ap, err := convertFloatPoint(name, p, a.field, a.isSimpleSelector, a.topBottomInfo)
 	if err != nil {
-		return nil
+		return err
 	}
 	a.aggregator.AggregateFloat(ap)
 	return nil
@@ -229,7 +229,7 @@ func integerPopulateAuxFieldsAndTags(ap *influxql.IntegerPoint, fieldsAndTags []
 func (a *integerPointAggregator) AggregatePoint(name string, p edge.FieldsTagsTimeGetter) error {
 	ap, err := convertIntegerPoint(name, p, a.field, a.isSimpleSelector, a.topBottomInfo)
 	if err != nil {
-		return nil
+		return err
 	}
 	a.aggregator.AggregateInteger(ap)
 	return nil
@@ -387,7 +387,7 @@ func stringPopulateAuxFieldsAndTags(ap *influxql.StringPoint, fieldsAndTags []st
 func (a *stringPointAggregator) AggregatePoint(name string, p edge.FieldsTagsTimeGetter) error {
 	ap, err := convertStringPoint(name, p, a.field, a.isSimpleSelector, a.topBottomInfo)
 	if err != nil {
-		return nil
+		return err
 	}
 	a.aggregator.AggregateString(ap)
 	return nil
@@ -545,7 +545,7 @@ func booleanPopulateAuxFieldsAndTags(ap *influxql.BooleanPoint, fieldsAndTags []
 func (a *booleanPointAggregator) AggregatePoint(name string, p edge.FieldsTagsTimeGetter) error {
 	ap, err := convertBooleanPoint(name, p, a.field, a.isSimpleSelector, a.topBottomInfo)
 	if err != nil {
-		return nil
+		return err
 	}
 	a.aggregator.AggregateBoolean(ap)
 	return nil
