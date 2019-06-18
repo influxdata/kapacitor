@@ -1,6 +1,6 @@
 # Changelog
 
-## unreleased
+## v1.5.3 [2019-06-18]
 
 ### Features
 
