@@ -21,6 +21,7 @@ import io
 import traceback
 import socket
 import os
+import struct
 
 import logging
 logger = logging.getLogger()
@@ -176,10 +177,10 @@ def encodeUvarint(writer, value):
     bits = value & varintMask
     value >>= shiftSize
     while value:
-        writer.write(chr(varintMoreMask|bits).encode())
+        writer.write(struct.pack("B", varintMoreMask | bits))
         bits = value & varintMask
         value >>= shiftSize
-    return writer.write(chr(bits).encode())
+    return writer.write(struct.pack("B", bits))
 
 # Decode an unsigned varint, max of 32 bits
 def decodeUvarint32(reader):
@@ -189,7 +190,7 @@ def decodeUvarint32(reader):
         byte = reader.read(1)
         if len(byte) == 0:
             raise EOF
-        b = ord(byte)
+        b = struct.unpack("B", byte)[0]
         result |= ((b & varintMask) << shift)
         if not (b & varintMoreMask):
             result &= mask32uint
