@@ -2,6 +2,7 @@
 #
 # Requires protobuf v3
 #   pip install protobuf==3.0.0
+from __future__ import absolute_import
 
 import sys
 from . import udf_pb2
@@ -70,6 +71,9 @@ class Agent(object):
                 self._out = out.buffer
             else:
                 self._out = out
+        else:
+            self._in = _in
+            self._out = out
 
         self._thread = None
         self.handler = handler
