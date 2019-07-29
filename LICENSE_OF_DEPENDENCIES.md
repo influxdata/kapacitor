@@ -23,4 +23,3 @@ Dependencies
 * github.com/shurcooL/sanitized\_anchor\_name [MIT](https://github.com/shurcooL/sanitized_anchor_name/blob/master/LICENSE)
 * github.com/stretchr/testify [MIT](https://github.com/stretchr/testify/blob/master/LICENSE)
 * gopkg.in/gomail.v2 [MIT](https://github.com/go-gomail/gomail/blob/v2/LICENSE)
-* github.com/mailru/easyjson [MIT](https://github.com/mailru/easyjson/blob/3fdea8d05856a0c8df22ed4bc71b3219245e4485/LICENSE)
