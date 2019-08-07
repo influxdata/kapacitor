@@ -6,7 +6,6 @@ import (
 	"log"
 	"sync"
 	text "text/template"
-	"time"
 
 	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/keyvalue"
@@ -217,21 +216,29 @@ func (s *Service) update(cs Configs) error {
 	return nil
 }
 
-func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
+func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler, error) {
 	d := s.diag.WithContext(ctx...)
 	d.CreatingAlertHandler(c)
+
+	topicTmpl, err := text.New("topic").Parse(c.Topic)
+	if err != nil {
+		return nil, err
+	}
+	c.TopicTemplate = topicTmpl
+
 	return &handler{
 		s:    s,
 		c:    c,
 		diag: d,
-	}
+	}, nil
 }
 
 type HandlerConfig struct {
-	BrokerName string   `mapstructure:"broker-name"`
-	Topic      string   `mapstructure:"topic"`
-	QoS        QoSLevel `mapstructure:"qos"`
-	Retained   bool     `mapstructure:"retained"`
+	BrokerName    string         `mapstructure:"broker-name"`
+	Topic         string         `mapstructure:"topic"`
+	QoS           QoSLevel       `mapstructure:"qos"`
+	Retained      bool           `mapstructure:"retained"`
+	TopicTemplate *text.Template `mapstructure:"topic-template"`
 }
 
 type handler struct {
@@ -242,7 +249,7 @@ type handler struct {
 
 func (h *handler) Handle(event alert.Event) {
 	h.diag.HandlingEvent()
-	topic, err := h.renderTopic(h.c.Topic, event)
+	topic, err := h.renderTopic(h.c.TopicTemplate, event)
 	if err != nil {
 		h.diag.Error("failed to create MQTT topic from template", err)
 	} else if err = h.s.Alert(h.c.BrokerName, topic, h.c.QoS, h.c.Retained, event.State.Message); err != nil {
@@ -250,54 +257,8 @@ func (h *handler) Handle(event alert.Event) {
 	}
 }
 
-type idInfo struct {
-	// Measurement name
-	Name string
-
-	// Task name
-	TaskName string
-
-	// Concatenation of all group-by tags of the form [key=value,]+.
-	// If not groupBy is performed equal to literal 'nil'
-	Group string
-
-	// Map of tags
-	Tags map[string]string
-}
-
-type messageInfo struct {
-	idInfo
-
-	// The ID of the alert.
-	ID string
-
-	// Fields of alerting data point.
-	Fields map[string]interface{}
-
-	// Alert Level, one of: INFO, WARNING, CRITICAL.
-	Level string
-
-	// Time
-	Time time.Time
-
-	// Duration of the alert
-	Duration time.Duration
-}
-
-func (h *handler) renderTopic(topic string, event alert.Event) (string, error) {
-	minfo := messageInfo{
-		idInfo: idInfo{
-			Name:     event.Data.Name,
-			TaskName: event.Data.TaskName,
-			Group:    event.Data.Group,
-			Tags:     event.Data.Tags,
-		},
-		ID:       event.State.ID,
-		Fields:   event.Data.Fields,
-		Level:    event.State.Level.String(),
-		Time:     event.State.Time,
-		Duration: event.State.Duration,
-	}
+func (h *handler) renderTopic(topicTmpl *text.Template, event alert.Event) (string, error) {
+	td := event.TemplateData()
 
 	topicBuf := h.s.bufPool.Get().(*bytes.Buffer)
 	defer func() {
@@ -305,12 +266,7 @@ func (h *handler) renderTopic(topic string, event alert.Event) (string, error) {
 		h.s.bufPool.Put(topicBuf)
 	}()
 
-	topicTmpl, err := text.New("topic").Parse(topic)
-	if err != nil {
-		return "", err
-	}
-
-	err = topicTmpl.Execute(topicBuf, minfo)
+	err := topicTmpl.Execute(topicBuf, td)
 	if err != nil {
 		return "", err
 	}
