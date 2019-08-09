@@ -453,7 +453,10 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 			QoS:        mqtt.QoSLevel(m.Qos),
 			Retained:   m.Retained,
 		}
-		h := et.tm.MQTTService.Handler(c, ctx...)
+		h, err := et.tm.MQTTService.Handler(c, ctx...)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create MQTT handler")
+		}
 		an.handlers = append(an.handlers, h)
 	}
 	// Parse level expressions

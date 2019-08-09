@@ -1,5 +1,11 @@
 # Changelog
 
+## unreleased
+
+### Features
+
+- [#2202](https://github.com/influxdata/kapacitor/pull/2202): Add templating for MQTT topics.
+
 ## v1.5.3 [2019-06-18]
 
 ### Features
