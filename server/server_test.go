@@ -9733,6 +9733,53 @@ func TestServer_AlertHandlers(t *testing.T) {
 		},
 		{
 			handler: client.TopicHandler{
+				Kind: "mqtt",
+				Options: map[string]interface{}{
+					"topic":    "test/{{.TaskName}}",
+					"qos":      "at-least-once",
+					"retained": true,
+				},
+			},
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
+				cc := new(mqtttest.ClientCreator)
+				ctxt := context.WithValue(nil, "clientCreator", cc)
+				cfg := &mqtt.Config{
+					Enabled: true,
+					Name:    "test",
+					URL:     "tcp://mqtt.example.com:1883",
+				}
+
+				cfg.SetNewClientF(cc.NewClient)
+
+				c.MQTT = mqtt.Configs{*cfg}
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				s := ctxt.Value("clientCreator").(*mqtttest.ClientCreator)
+				if got, exp := len(s.Clients), 1; got != exp {
+					return fmt.Errorf("unexpected number of clients created : exp %d got: %d", exp, got)
+				}
+				if got, exp := len(s.Configs), 1; got != exp {
+					return fmt.Errorf("unexpected number of configs received: exp %d got: %d", exp, got)
+				}
+				if got, exp := s.Configs[0].URL, "tcp://mqtt.example.com:1883"; exp != got {
+					return fmt.Errorf("unexpected config URL: exp %q got %q", exp, got)
+				}
+				got := s.Clients[0].PublishData
+				exp := []mqtttest.PublishData{{
+					Topic:    "test/testAlertHandlers",
+					QoS:      mqtt.AtLeastOnce,
+					Retained: true,
+					Message:  []byte("message"),
+				}}
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected mqtt publish data:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handler: client.TopicHandler{
 				Kind: "opsgenie",
 				Options: map[string]interface{}{
 					"teams-list":      []string{"A team", "B team"},
