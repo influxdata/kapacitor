@@ -10236,7 +10236,7 @@ stream
 				"Content-Type":              []string{"text/html; charset=UTF-8"},
 				"Content-Transfer-Encoding": []string{"quoted-printable"},
 			},
-			Body: strings.ReplaceAll(quotedPrintableDetails.String(), "\r", ""),
+			Body: strings.Replace(quotedPrintableDetails.String(), "\r", "", -1),
 		},
 	}
 
@@ -10316,7 +10316,7 @@ stream
 				"Content-Type":              []string{"text/html; charset=UTF-8"},
 				"Content-Transfer-Encoding": []string{"quoted-printable"},
 			},
-			Body: strings.ReplaceAll(quotedPrintableDetails.String(), "\r", ""),
+			Body: strings.Replace(quotedPrintableDetails.String(), "\r", "", -1),
 		},
 	}
 
@@ -10399,7 +10399,7 @@ stream
 				"Content-Type":              []string{"text/html; charset=UTF-8"},
 				"Content-Transfer-Encoding": []string{"quoted-printable"},
 			},
-			Body: strings.ReplaceAll(quotedPrintableDetails.String(), "\r", ""),
+			Body: strings.Replace(quotedPrintableDetails.String(), "\r", "", -1),
 		},
 	}
 
@@ -10480,7 +10480,7 @@ stream
 				"Content-Type":              []string{"text/html; charset=UTF-8"},
 				"Content-Transfer-Encoding": []string{"quoted-printable"},
 			},
-			Body: strings.ReplaceAll(quotedPrintableDetails.String(), "\r", ""),
+			Body: strings.Replace(quotedPrintableDetails.String(), "\r", "", -1),
 		},
 	}
 
