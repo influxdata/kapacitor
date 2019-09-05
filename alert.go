@@ -126,6 +126,9 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 
 			return html.JS(tmpBuffer.String())
 		},
+		"safeHtml": func(v interface{}) html.HTML {
+			return html.HTML(v.(string))
+		},
 	}).Parse(n.Details)
 	if err != nil {
 		return nil, err

@@ -9,6 +9,7 @@ import (
 	"html"
 	"io/ioutil"
 	"math/rand"
+	"mime/quotedprintable"
 	"net/http"
 	"net/http/httptest"
 	"net/mail"
@@ -16,6 +17,7 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"text/template"
@@ -10153,6 +10155,332 @@ Value: 10
 Value: 10
 <a href=3D"http://graphs.example.com/host/serverA">Details</a>
 `,
+		},
+	}
+
+	smtpServer, err := smtptest.NewServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer smtpServer.Close()
+	sc := smtp.Config{
+		Enabled: true,
+		Host:    smtpServer.Host,
+		Port:    smtpServer.Port,
+		From:    "test@example.com",
+	}
+	smtpService := smtp.NewService(sc, diagService.NewSMTPHandler())
+	if err := smtpService.Open(); err != nil {
+		t.Fatal(err)
+	}
+	defer smtpService.Close()
+
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		tm.SMTPService = smtpService
+	}
+
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	// Close both client and server to ensure all message are processed
+	smtpService.Close()
+	smtpServer.Close()
+
+	errors := smtpServer.Errors()
+	if got, exp := len(errors), 0; got != exp {
+		t.Errorf("unexpected smtp server errors: %v", errors)
+	}
+
+	msgs := smtpServer.SentMessages()
+	if got, exp := len(msgs), len(expMail); got != exp {
+		t.Errorf("unexpected number of messages sent: got %d exp %d", got, exp)
+	}
+	for i, exp := range expMail {
+		got := msgs[i]
+		if err := exp.Compare(got); err != nil {
+			t.Errorf("%d %s", i, err)
+		}
+	}
+}
+
+func TestStream_AlertEmail_HtmlEscape_Field(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|eval(lambda: 'HTML <i arg="1">escape</i> test')
+		.keep()
+		.as('htmlFieldTest')
+	|alert()
+		.id('')
+		.details('<b arg="11">Details</b> with {{ index .Fields "htmlFieldTest" }} field.')
+		.crit(lambda: "count" > 8.0)
+		.email('user1@example.com')
+`
+	expEscape := html.EscapeString("HTML <i arg=\"1\">escape</i> test")
+	expDetails := fmt.Sprintf("<b arg=\"11\">Details</b> with %v field.\n", expEscape)
+	var quotedPrintableDetails bytes.Buffer
+	quotedPrintableWriter := quotedprintable.NewWriter(&quotedPrintableDetails)
+	_, _ = quotedPrintableWriter.Write([]byte(expDetails))
+	_ = quotedPrintableWriter.Close()
+
+	expMail := []*smtptest.Message{
+		{
+			Header: mail.Header{
+				"Mime-Version":              []string{"1.0"},
+				"Content-Type":              []string{"text/html; charset=UTF-8"},
+				"Content-Transfer-Encoding": []string{"quoted-printable"},
+			},
+			Body: strings.ReplaceAll(quotedPrintableDetails.String(), "\r", ""),
+		},
+	}
+
+	smtpServer, err := smtptest.NewServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer smtpServer.Close()
+	sc := smtp.Config{
+		Enabled: true,
+		Host:    smtpServer.Host,
+		Port:    smtpServer.Port,
+		From:    "test@example.com",
+	}
+	smtpService := smtp.NewService(sc, diagService.NewSMTPHandler())
+	if err := smtpService.Open(); err != nil {
+		t.Fatal(err)
+	}
+	defer smtpService.Close()
+
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		tm.SMTPService = smtpService
+	}
+
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	// Close both client and server to ensure all message are processed
+	smtpService.Close()
+	smtpServer.Close()
+
+	errors := smtpServer.Errors()
+	if got, exp := len(errors), 0; got != exp {
+		t.Errorf("unexpected smtp server errors: %v", errors)
+	}
+
+	msgs := smtpServer.SentMessages()
+	if got, exp := len(msgs), len(expMail); got != exp {
+		t.Errorf("unexpected number of messages sent: got %d exp %d", got, exp)
+	}
+	for i, exp := range expMail {
+		got := msgs[i]
+		if err := exp.Compare(got); err != nil {
+			t.Errorf("%d %s", i, err)
+		}
+	}
+}
+func TestStream_AlertEmail_NoHtmlEscape_Field(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|eval(lambda: 'HTML <i arg="1">escape</i> test')
+		.keep()
+		.as('htmlFieldTest')
+	|alert()
+		.id('')
+		.details('<b arg="11">Details</b> with {{ index .Fields "htmlFieldTest" | safeHtml }} field.')
+		.crit(lambda: "count" > 8.0)
+		.email('user1@example.com')
+`
+	expDetails := "<b arg=\"11\">Details</b> with HTML <i arg=\"1\">escape</i> test field.\n"
+	var quotedPrintableDetails bytes.Buffer
+	quotedPrintableWriter := quotedprintable.NewWriter(&quotedPrintableDetails)
+	_, _ = quotedPrintableWriter.Write([]byte(expDetails))
+	_ = quotedPrintableWriter.Close()
+
+	expMail := []*smtptest.Message{
+		{
+			Header: mail.Header{
+				"Mime-Version":              []string{"1.0"},
+				"Content-Type":              []string{"text/html; charset=UTF-8"},
+				"Content-Transfer-Encoding": []string{"quoted-printable"},
+			},
+			Body: strings.ReplaceAll(quotedPrintableDetails.String(), "\r", ""),
+		},
+	}
+
+	smtpServer, err := smtptest.NewServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer smtpServer.Close()
+	sc := smtp.Config{
+		Enabled: true,
+		Host:    smtpServer.Host,
+		Port:    smtpServer.Port,
+		From:    "test@example.com",
+	}
+	smtpService := smtp.NewService(sc, diagService.NewSMTPHandler())
+	if err := smtpService.Open(); err != nil {
+		t.Fatal(err)
+	}
+	defer smtpService.Close()
+
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		tm.SMTPService = smtpService
+	}
+
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	// Close both client and server to ensure all message are processed
+	smtpService.Close()
+	smtpServer.Close()
+
+	errors := smtpServer.Errors()
+	if got, exp := len(errors), 0; got != exp {
+		t.Errorf("unexpected smtp server errors: %v", errors)
+	}
+
+	msgs := smtpServer.SentMessages()
+	if got, exp := len(msgs), len(expMail); got != exp {
+		t.Errorf("unexpected number of messages sent: got %d exp %d", got, exp)
+	}
+	for i, exp := range expMail {
+		got := msgs[i]
+		if err := exp.Compare(got); err != nil {
+			t.Errorf("%d %s", i, err)
+		}
+	}
+}
+
+func TestStream_AlertEmail_HtmlEscape_Tags(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|eval(lambda: 'HTML <i arg="1">escape</i> test')
+		.keep()
+		.as('htmlTagsTest')
+		.tags('htmlTagsTest')
+	|alert()
+		.id('')
+		.details('<b arg="11">Details</b> with {{ index .Tags "htmlTagsTest" }} tag.')
+		.crit(lambda: "count" > 8.0)
+		.email('user1@example.com')
+`
+	expEscape := html.EscapeString("HTML <i arg=\"1\">escape</i> test")
+	expDetails := fmt.Sprintf("<b arg=\"11\">Details</b> with %v tag.\n", expEscape)
+	var quotedPrintableDetails bytes.Buffer
+	quotedPrintableWriter := quotedprintable.NewWriter(&quotedPrintableDetails)
+	_, _ = quotedPrintableWriter.Write([]byte(expDetails))
+	_ = quotedPrintableWriter.Close()
+
+	expMail := []*smtptest.Message{
+		{
+			Header: mail.Header{
+				"Mime-Version":              []string{"1.0"},
+				"Content-Type":              []string{"text/html; charset=UTF-8"},
+				"Content-Transfer-Encoding": []string{"quoted-printable"},
+			},
+			Body: strings.ReplaceAll(quotedPrintableDetails.String(), "\r", ""),
+		},
+	}
+
+	smtpServer, err := smtptest.NewServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer smtpServer.Close()
+	sc := smtp.Config{
+		Enabled: true,
+		Host:    smtpServer.Host,
+		Port:    smtpServer.Port,
+		From:    "test@example.com",
+	}
+	smtpService := smtp.NewService(sc, diagService.NewSMTPHandler())
+	if err := smtpService.Open(); err != nil {
+		t.Fatal(err)
+	}
+	defer smtpService.Close()
+
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		tm.SMTPService = smtpService
+	}
+
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	// Close both client and server to ensure all message are processed
+	smtpService.Close()
+	smtpServer.Close()
+
+	errors := smtpServer.Errors()
+	if got, exp := len(errors), 0; got != exp {
+		t.Errorf("unexpected smtp server errors: %v", errors)
+	}
+
+	msgs := smtpServer.SentMessages()
+	if got, exp := len(msgs), len(expMail); got != exp {
+		t.Errorf("unexpected number of messages sent: got %d exp %d", got, exp)
+	}
+	for i, exp := range expMail {
+		got := msgs[i]
+		if err := exp.Compare(got); err != nil {
+			t.Errorf("%d %s", i, err)
+		}
+	}
+}
+func TestStream_AlertEmail_NoHtmlEscape_Tags(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|eval(lambda: 'HTML <i arg="1">escape</i> test')
+		.keep()
+		.as('htmlTagsTest')
+		.tags('htmlTagsTest')
+	|alert()
+		.id('')
+		.details('<b arg="11">Details</b> with {{ index .Tags "htmlTagsTest" | safeHtml }} tag.')
+		.crit(lambda: "count" > 8.0)
+		.email('user1@example.com')
+`
+	expDetails := "<b arg=\"11\">Details</b> with HTML <i arg=\"1\">escape</i> test tag.\n"
+	var quotedPrintableDetails bytes.Buffer
+	quotedPrintableWriter := quotedprintable.NewWriter(&quotedPrintableDetails)
+	_, _ = quotedPrintableWriter.Write([]byte(expDetails))
+	_ = quotedPrintableWriter.Close()
+
+	expMail := []*smtptest.Message{
+		{
+			Header: mail.Header{
+				"Mime-Version":              []string{"1.0"},
+				"Content-Type":              []string{"text/html; charset=UTF-8"},
+				"Content-Transfer-Encoding": []string{"quoted-printable"},
+			},
+			Body: strings.ReplaceAll(quotedPrintableDetails.String(), "\r", ""),
 		},
 	}
 
