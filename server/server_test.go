@@ -9634,8 +9634,22 @@ func TestServer_AlertHandlers(t *testing.T) {
 					Offset:    0,
 					Key:       "id",
 					Message:   string(adJSON) + "\n",
+					Time:      time.Now().UTC(),
 				}}
-				if !cmp.Equal(exp, got) {
+				cmpopts := []cmp.Option{
+					cmp.Comparer(func(a, b time.Time) bool {
+						diff := a.Sub(b)
+						if diff < 0 {
+							diff = -diff
+						}
+						// It is ok as long as the timestamp is within
+						// 5 seconds of the current time. If we are that close,
+						// then it likely means the timestamp was correctly
+						// written.
+						return diff < 5*time.Second
+					}),
+				}
+				if !cmp.Equal(exp, got, cmpopts...) {
 					return fmt.Errorf("unexpected kafka messages -exp/+got:\n%s", cmp.Diff(exp, got))
 				}
 				return nil
