@@ -8642,6 +8642,7 @@ stream
 			Offset:    0,
 			Key:       "kapacitor/cpu/serverA",
 			Message:   "kapacitor/cpu/serverA is CRITICAL",
+			Time:      time.Now().UTC(),
 		},
 	}
 
@@ -8658,7 +8659,23 @@ stream
 		got[i] = m
 	}
 
-	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+	cmpopts := []cmp.Option{
+		cmp.Comparer(func(a, b time.Time) bool {
+			diff := a.Sub(b)
+			if diff < 0 {
+				diff = -diff
+			}
+			// It is ok as long as the timestamp is within
+			// 5 seconds of the current time. If we are that close,
+			// then it likely means the timestamp was correctly
+			// written.
+			return diff < 5*time.Second
+		}),
+	}
+	cmpF := func(got, exp interface{}) bool {
+		return cmp.Equal(exp, got, cmpopts...)
+	}
+	if err := compareListIgnoreOrder(got, exp, cmpF); err != nil {
 		t.Error(err)
 	}
 }
