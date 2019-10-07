@@ -6,6 +6,10 @@
 
 - [#2202](https://github.com/influxdata/kapacitor/pull/2202): Add templating for MQTT topics.
 
+### Bugfixes
+
+- [#2253](https://github.com/influxdata/kapacitor/pull/2253): Upgrade the kafka library to set the timestamp correctly.
+
 ## v1.5.3 [2019-06-18]
 
 ### Features
