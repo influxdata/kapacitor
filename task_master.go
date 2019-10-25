@@ -3,6 +3,7 @@ package kapacitor
 import (
 	"errors"
 	"fmt"
+	"github.com/influxdata/kapacitor/services/alertmanager"
 	"log"
 	"sync"
 	"time"
@@ -174,6 +175,10 @@ type TaskMaster struct {
 		DefaultHandlerConfig() alerta.HandlerConfig
 		Handler(alerta.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
 	}
+	AlertManagerService interface {
+		DefaultHandlerConfig() alertmanager.HandlerConfig
+		Handler(alerta.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
+	}
 	SensuService interface {
 		Handler(sensu.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
 	}
@@ -269,6 +274,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.DeadmanService = tm.DeadmanService
 	n.UDFService = tm.UDFService
 	n.AlertService = tm.AlertService
+	n.AlertManagerService = tm.AlertManagerService
 	n.InfluxDBService = tm.InfluxDBService
 	n.SMTPService = tm.SMTPService
 	n.MQTTService = tm.MQTTService

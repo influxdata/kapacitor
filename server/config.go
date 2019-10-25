@@ -3,6 +3,7 @@ package server
 import (
 	"encoding"
 	"fmt"
+	"github.com/influxdata/kapacitor/services/alertmanager"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -85,23 +86,24 @@ type Config struct {
 	UDP      []udp.Config      `toml:"udp"`
 
 	// Alert handlers
-	Alerta     alerta.Config     `toml:"alerta" override:"alerta"`
-	HipChat    hipchat.Config    `toml:"hipchat" override:"hipchat"`
-	Kafka      kafka.Configs     `toml:"kafka" override:"kafka,element-key=id"`
-	MQTT       mqtt.Configs      `toml:"mqtt" override:"mqtt,element-key=name"`
-	OpsGenie   opsgenie.Config   `toml:"opsgenie" override:"opsgenie"`
-	OpsGenie2  opsgenie2.Config  `toml:"opsgenie2" override:"opsgenie2"`
-	PagerDuty  pagerduty.Config  `toml:"pagerduty" override:"pagerduty"`
-	PagerDuty2 pagerduty2.Config `toml:"pagerduty2" override:"pagerduty2"`
-	Pushover   pushover.Config   `toml:"pushover" override:"pushover"`
-	HTTPPost   httppost.Configs  `toml:"httppost" override:"httppost,element-key=endpoint"`
-	SMTP       smtp.Config       `toml:"smtp" override:"smtp"`
-	SNMPTrap   snmptrap.Config   `toml:"snmptrap" override:"snmptrap"`
-	Sensu      sensu.Config      `toml:"sensu" override:"sensu"`
-	Slack      slack.Configs     `toml:"slack" override:"slack,element-key=workspace"`
-	Talk       talk.Config       `toml:"talk" override:"talk"`
-	Telegram   telegram.Config   `toml:"telegram" override:"telegram"`
-	VictorOps  victorops.Config  `toml:"victorops" override:"victorops"`
+	Alerta       alerta.Config       `toml:"alerta" override:"alerta"`
+	AlertManager alertmanager.Config `toml:"alertmanager" override:"alertmanager"`
+	HipChat      hipchat.Config      `toml:"hipchat" override:"hipchat"`
+	Kafka        kafka.Configs       `toml:"kafka" override:"kafka,element-key=id"`
+	MQTT         mqtt.Configs        `toml:"mqtt" override:"mqtt,element-key=name"`
+	OpsGenie     opsgenie.Config     `toml:"opsgenie" override:"opsgenie"`
+	OpsGenie2    opsgenie2.Config    `toml:"opsgenie2" override:"opsgenie2"`
+	PagerDuty    pagerduty.Config    `toml:"pagerduty" override:"pagerduty"`
+	PagerDuty2   pagerduty2.Config   `toml:"pagerduty2" override:"pagerduty2"`
+	Pushover     pushover.Config     `toml:"pushover" override:"pushover"`
+	HTTPPost     httppost.Configs    `toml:"httppost" override:"httppost,element-key=endpoint"`
+	SMTP         smtp.Config         `toml:"smtp" override:"smtp"`
+	SNMPTrap     snmptrap.Config     `toml:"snmptrap" override:"snmptrap"`
+	Sensu        sensu.Config        `toml:"sensu" override:"sensu"`
+	Slack        slack.Configs       `toml:"slack" override:"slack,element-key=workspace"`
+	Talk         talk.Config         `toml:"talk" override:"talk"`
+	Telegram     telegram.Config     `toml:"telegram" override:"telegram"`
+	VictorOps    victorops.Config    `toml:"victorops" override:"victorops"`
 
 	// Discovery for scraping
 	Scraper         []scraper.Config          `toml:"scraper" override:"scraper,element-key=name"`
@@ -142,6 +144,7 @@ func NewConfig() *Config {
 	}
 
 	c.Alert = alert.NewConfig()
+	c.AlertManager = alertmanager.NewConfig()
 	c.HTTP = httpd.NewConfig()
 	c.Storage = storage.NewConfig()
 	c.Replay = replay.NewConfig()
@@ -155,6 +158,7 @@ func NewConfig() *Config {
 	c.OpenTSDB = opentsdb.NewConfig()
 
 	c.Alerta = alerta.NewConfig()
+	c.AlertManager = alertmanager.NewConfig()
 	c.HipChat = hipchat.NewConfig()
 	c.Kafka = kafka.Configs{kafka.NewConfig()}
 	c.MQTT = mqtt.Configs{mqtt.NewConfig()}
@@ -229,6 +233,9 @@ func (c *Config) Validate() error {
 		return errors.Wrap(err, "tls")
 	}
 	if err := c.Load.Validate(); err != nil {
+		return err
+	}
+	if err := c.AlertManager.Validate(); err != nil {
 		return err
 	}
 	// Validate the set of InfluxDB configs.

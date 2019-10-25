@@ -4,7 +4,9 @@ package server
 import (
 	"crypto/tls"
 	"fmt"
+	"github.com/influxdata/kapacitor/services/alertmanager"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -240,6 +242,7 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 
 	// Append Alert integration services
 	s.appendAlertaService()
+	s.appendAlertManagerService()
 	s.appendHipChatService()
 	s.appendKafkaService()
 	if err := s.appendMQTTService(); err != nil {
@@ -766,6 +769,18 @@ func (s *Server) appendAlertaService() {
 
 	s.SetDynamicService("alerta", srv)
 	s.AppendService("alerta", srv)
+}
+
+func (s *Server) appendAlertManagerService() {
+	c := s.config.AlertManager
+	d := s.DiagService.NewAlertManagerHandler()
+	srv := alertmanager.NewService(c, d)
+
+	s.TaskMaster.AlertManagerService = srv
+	s.AlertService.AlertManagerService = srv
+
+	s.SetDynamicService("alertmanager", srv)
+	s.AppendService("alertmanager", srv)
 }
 
 func (s *Server) appendTalkService() {

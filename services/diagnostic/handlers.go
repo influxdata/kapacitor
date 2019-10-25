@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/influxdata/kapacitor/services/alertmanager"
 	"log"
 	"runtime"
 	"strconv"
@@ -390,6 +391,24 @@ func (h *AlertaHandler) TemplateError(err error, kv keyvalue.T) {
 }
 
 func (h *AlertaHandler) Error(msg string, err error) {
+	h.l.Error(msg, Error(err))
+}
+
+// Alertmanager handler
+
+type AlertManagerHandler struct {
+	l Logger
+}
+
+func (h *AlertManagerHandler) WithContext(ctx ...keyvalue.T) alertmanager.Diagnostic {
+	fields := logFieldsFromContext(ctx)
+
+	return &AlertManagerHandler{
+		l: h.l.With(fields...),
+	}
+}
+
+func (h *AlertManagerHandler) Error(msg string, err error) {
 	h.l.Error(msg, Error(err))
 }
 

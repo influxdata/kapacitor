@@ -4,6 +4,7 @@ import (
 	"encoding"
 	"encoding/json"
 	"fmt"
+	"github.com/influxdata/kapacitor/services/alertmanager"
 	"path"
 	"reflect"
 	"regexp"
@@ -84,6 +85,12 @@ type Service struct {
 		DefaultHandlerConfig() alerta.HandlerConfig
 		Handler(alerta.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
 	}
+
+	AlertManagerService interface {
+		DefaultHandlerConfig() alertmanager.HandlerConfig
+		Handler(alertmanager.HandlerConfig, ...keyvalue.T) alert.Handler
+	}
+
 	HipChatService interface {
 		Handler(hipchat.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
