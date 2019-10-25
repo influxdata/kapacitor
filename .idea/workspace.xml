@@ -1,13 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="219f99fa-ec92-4ebc-bbbd-e22d94ea5417" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/services/alertmanager/alertmanagertest/alertmanagertest.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/alert.go" beforeDir="false" afterPath="$PROJECT_DIR$/alert.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/server/server_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/server/server_test.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/alert/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/alert/service.go" afterDir="false" />
-    </list>
+    <list default="true" id="219f99fa-ec92-4ebc-bbbd-e22d94ea5417" name="Default Changelist" comment="" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -34,11 +28,11 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/server/server_test.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="134">
-              <caret line="9532" column="37" lean-forward="true" selection-start-line="9532" selection-start-column="37" selection-end-line="9532" selection-end-column="37" />
+            <state relative-caret-position="173">
+              <caret line="9531" column="48" lean-forward="true" selection-start-line="9531" selection-start-column="48" selection-end-line="9531" selection-end-column="48" />
               <folding>
                 <element signature="e#21#2610#0" expanded="true" />
               </folding>
@@ -46,11 +40,11 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/services/alertmanager/alertmanagertest/alertmanagertest.go">
+      <file pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/services/alertmanager/service.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="180">
-              <caret line="17" column="14" selection-start-line="17" selection-start-column="5" selection-end-line="17" selection-end-column="14" />
+            <state relative-caret-position="225">
+              <caret line="70" column="42" lean-forward="true" selection-start-line="70" selection-start-column="42" selection-end-line="70" selection-end-column="42" />
             </state>
           </provider>
         </entry>
@@ -124,6 +118,7 @@
       <find>alert.</find>
       <find>case &quot;alert</find>
       <find>alertmanager_test</find>
+      <find>Alert</find>
       <find>NewServer</find>
     </findStrings>
   </component>
@@ -277,10 +272,15 @@
     <history-entry file="TestServer_AlertHandlers_in_github_com_influxdata_kapacitor_server - 2019.10.25 at 18h 53m 55s.xml">
       <configuration name="TestServer_AlertHandlers in github.com/influxdata/kapacitor/server" configurationId="GoTestRunConfiguration" />
     </history-entry>
+    <history-entry file="TestServer_AlertHandlers_in_github_com_influxdata_kapacitor_server - 2019.10.25 at 19h 04m 42s.xml">
+      <configuration name="TestServer_AlertHandlers in github.com/influxdata/kapacitor/server" configurationId="GoTestRunConfiguration" />
+    </history-entry>
+    <history-entry file="TestServer_AlertHandlers_in_github_com_influxdata_kapacitor_server - 2019.10.25 at 19h 05m 11s.xml">
+      <configuration name="TestServer_AlertHandlers in github.com/influxdata/kapacitor/server" configurationId="GoTestRunConfiguration" />
+    </history-entry>
   </component>
   <component name="ToolWindowManager">
     <frame x="0" y="23" width="1920" height="1017" extended-state="0" />
-    <editor active="true" />
     <layout>
       <window_info id="Favorites" side_tool="true" />
       <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.24920128" />
@@ -292,8 +292,8 @@
       <window_info anchor="bottom" id="Event Log" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" weight="0.32936078" />
-      <window_info active="true" anchor="bottom" id="Run" order="2" visible="true" weight="0.32936078" />
-      <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
+      <window_info anchor="bottom" id="Run" order="2" weight="0.32936078" />
+      <window_info anchor="bottom" id="Debug" order="3" weight="0.3997833" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
       <window_info anchor="bottom" id="TODO" order="6" />
@@ -416,16 +416,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/services/alertmanager/service.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="498">
-          <caret line="127" column="1" lean-forward="true" selection-start-line="127" selection-start-column="1" selection-end-line="127" selection-end-column="1" />
-          <folding>
-            <element signature="e#21#150#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/services/alerta/alertatest/alertatest.go">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="345">
@@ -442,18 +432,25 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/services/alertmanager/alertmanagertest/alertmanagertest.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="180">
-          <caret line="17" column="14" selection-start-line="17" selection-start-column="5" selection-end-line="17" selection-end-column="14" />
+        <state relative-caret-position="285">
+          <caret line="24" column="32" lean-forward="true" selection-start-line="24" selection-start-column="32" selection-end-line="24" selection-end-column="32" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/server/server_test.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="134">
-          <caret line="9532" column="37" lean-forward="true" selection-start-line="9532" selection-start-column="37" selection-end-line="9532" selection-end-column="37" />
+        <state relative-caret-position="173">
+          <caret line="9531" column="48" lean-forward="true" selection-start-line="9531" selection-start-column="48" selection-end-line="9531" selection-end-column="48" />
           <folding>
             <element signature="e#21#2610#0" expanded="true" />
           </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/services/alertmanager/service.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="225">
+          <caret line="70" column="42" lean-forward="true" selection-start-line="70" selection-start-column="42" selection-end-line="70" selection-end-column="42" />
         </state>
       </provider>
     </entry>
