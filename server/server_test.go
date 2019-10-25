@@ -37,6 +37,7 @@ import (
 	"github.com/influxdata/kapacitor/server"
 	"github.com/influxdata/kapacitor/services/alert/alerttest"
 	"github.com/influxdata/kapacitor/services/alerta/alertatest"
+	"github.com/influxdata/kapacitor/services/alertmanager/alertmanagertest"
 	"github.com/influxdata/kapacitor/services/hipchat/hipchattest"
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/httppost/httpposttest"
@@ -9521,6 +9522,38 @@ func TestServer_AlertHandlers(t *testing.T) {
 				}}
 				if !reflect.DeepEqual(exp, got) {
 					return fmt.Errorf("unexpected alerta request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handler: client.TopicHandler{
+				Kind: "alertmanager",
+				Options: map[string]interface{}{
+					"room": "alerts",
+				},
+			},
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
+				ts := alertmanagertest.NewServer()
+				ctxt := context.WithValue(nil, "server", ts)
+
+				c.AlertManager.Enabled = true
+				c.AlertManager.URL = ts.URL
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*alertmanagertest.Server)
+				ts.Close()
+				got := ts.Requests()
+				exp := []alertmanagertest.Request{{
+					URL: "/",
+					PostData: alertmanagertest.PostData{
+						Room:    "alerts",
+						Message: "message",
+					},
+				}}
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected foo request:\nexp\n%+v\ngot\n%+v\n", exp, got)
 				}
 				return nil
 			},

@@ -784,6 +784,17 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 			return handler{}, err
 		}
 		h = newExternalHandler(h)
+	case "alertmanager":
+		c := s.AlertManagerService.DefaultHandlerConfig()
+		err = decodeOptions(spec.Options, &c)
+		if err != nil {
+			return handler{}, err
+		}
+		h, err  := s.AlertManagerService.Handler(c, ctx...)
+		if err != nil {
+			return handler{}, err
+		}
+		h = newExternalHandler(h)
 	case "exec":
 		c := ExecHandlerConfig{
 			Commander: s.Commander,
