@@ -88,7 +88,7 @@ type Service struct {
 
 	AlertManagerService interface {
 		DefaultHandlerConfig() alertmanager.HandlerConfig
-		Handler(alertmanager.HandlerConfig, ...keyvalue.T) alert.Handler
+		Handler(alertmanager.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
 	}
 
 	HipChatService interface {

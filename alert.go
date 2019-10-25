@@ -269,6 +269,15 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		n.IsStateChangesOnly = true
 	}
 
+	for _, f := range n.AlertManagerHandlers {
+		c := et.tm.AlertManagerService.DefaultHandlerConfig()
+		if f.Room != "" {
+		c.Room = f.Room
+	}
+		h := et.tm.AlertManagerService.Handler(c)
+		an.handlers = append(an.handlers, h)
+	}
+
 	for _, t := range n.TelegramHandlers {
 		c := telegram.HandlerConfig{
 			ChatId:                t.ChatId,

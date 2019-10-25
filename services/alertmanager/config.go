@@ -18,7 +18,7 @@ func NewConfig() Config {
 
 func (c Config) Validate() error {
 	if c.Enabled && c.URL == "" {
-		return errors.New("must specify the Foo server URL")
+		return errors.New("must specify the alertmanager server URL")
 	}
 	return nil
 }

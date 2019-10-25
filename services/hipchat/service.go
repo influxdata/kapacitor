@@ -199,6 +199,6 @@ func (h *handler) Handle(event alert.Event) {
 		event.State.Message,
 		event.State.Level,
 	); err != nil {
-		h.diag.Error("failed to send event to Alerta", err)
+		h.diag.Error("failed to send event to Hipchat", err)
 	}
 }

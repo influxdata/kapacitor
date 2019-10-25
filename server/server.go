@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/influxdata/kapacitor/services/alertmanager"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -774,7 +773,7 @@ func (s *Server) appendAlertaService() {
 func (s *Server) appendAlertManagerService() {
 	c := s.config.AlertManager
 	d := s.DiagService.NewAlertManagerHandler()
-	srv := alertmanager.NewService(c, d)
+	srv :=  alertmanager.NewService(c, d)
 
 	s.TaskMaster.AlertManagerService = srv
 	s.AlertService.AlertManagerService = srv

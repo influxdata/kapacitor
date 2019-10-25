@@ -177,7 +177,7 @@ type TaskMaster struct {
 	}
 	AlertManagerService interface {
 		DefaultHandlerConfig() alertmanager.HandlerConfig
-		Handler(alerta.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
+		Handler(alertmanager.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
 	}
 	SensuService interface {
 		Handler(sensu.HandlerConfig, ...keyvalue.T) (alert.Handler, error)

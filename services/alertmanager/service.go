@@ -81,7 +81,7 @@ func (s *Service) Alert(room, message string) error {
 	}
 	r.Body.Close()
 	if r.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected response code %d from Foo service", r.StatusCode)
+		return fmt.Errorf("unexpected response code %d from Alertmanager service", r.StatusCode)
 	}
 	return nil
 }
@@ -107,12 +107,12 @@ func (s *Service) DefaultHandlerConfig() HandlerConfig {
 	}
 }
 
-func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
+func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler , error){
 	return &handler{
 		s:    s,
 		c:    c,
 		diag: s.diag.WithContext(ctx...),
-	}
+	}, nil
 }
 
 // Handle takes an event and posts its message to the Foo service chat room.

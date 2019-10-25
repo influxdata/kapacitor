@@ -362,6 +362,10 @@ type AlertNodeData struct {
 	// tick:ignore
 	AlertaHandlers []*AlertaHandler `tick:"Alerta" json:"alerta"`
 
+	// Send alert to AlertManager.
+	// tick:ignore
+	AlertManagerHandlers []*AlertManagerHandler `tick:"AlertManager" json:"alertManager"`
+
 	// Send alert to OpsGenie
 	// tick:ignore
 	OpsGenieHandlers []*OpsGenieHandler `tick:"OpsGenie" json:"opsGenie"`
@@ -1248,6 +1252,25 @@ type AlertaHandler struct {
 func (a *AlertaHandler) Services(service ...string) *AlertaHandler {
 	a.Service = service
 	return a
+}
+
+// Send alert to an AlertManager
+// tick:property
+func (n *AlertNodeData) AlertManager(topic string) *AlertManagerHandler {
+	alertmanager := &AlertManagerHandler{
+		AlertNodeData: n,
+	}
+	alertmanager.AlertManagerHandlers = append(n.AlertManagerHandlers, alertmanager)
+	return alertmanager
+}
+
+// tick:embedded:AlertNode.AlertManager
+type AlertManagerHandler struct {
+	*AlertNodeData `json:"-"`
+
+	// The room for the messages.
+	// Defaults to the room in the configuration if empty.
+	Room string `json:"room"`
 }
 
 // Send alert to an MQTT broker

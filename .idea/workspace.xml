@@ -2,13 +2,16 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="219f99fa-ec92-4ebc-bbbd-e22d94ea5417" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/services/alertmanager/config.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/services/alertmanager/service.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/alert.go" beforeDir="false" afterPath="$PROJECT_DIR$/alert.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pipeline/alert.go" beforeDir="false" afterPath="$PROJECT_DIR$/pipeline/alert.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/server/config.go" beforeDir="false" afterPath="$PROJECT_DIR$/server/config.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/server/server.go" beforeDir="false" afterPath="$PROJECT_DIR$/server/server.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/services/alert/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/alert/service.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/alertmanager/config.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/alertmanager/config.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/alertmanager/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/alertmanager/service.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/services/diagnostic/handlers.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/diagnostic/handlers.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/services/diagnostic/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/diagnostic/service.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/hipchat/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/hipchat/service.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/task_master.go" beforeDir="false" afterPath="$PROJECT_DIR$/task_master.go" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -22,8 +25,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/services/alertmanager/config.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="345">
-              <caret line="23" column="1" lean-forward="true" selection-start-line="23" selection-start-column="1" selection-end-line="23" selection-end-column="1" />
+            <state relative-caret-position="315">
+              <caret line="21" column="5" lean-forward="true" selection-start-line="21" selection-start-column="5" selection-end-line="21" selection-end-column="5" />
             </state>
           </provider>
         </entry>
@@ -31,38 +34,47 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/services/alertmanager/service.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-1095">
-              <caret line="8" column="4" selection-start-line="8" selection-start-column="4" selection-end-line="8" selection-end-column="4" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/services/hipchat/service.go">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="603">
-              <caret line="185" lean-forward="true" selection-start-line="185" selection-end-line="185" />
+            <state relative-caret-position="468">
+              <caret line="125" column="32" lean-forward="true" selection-start-line="125" selection-start-column="32" selection-end-line="125" selection-end-column="32" />
               <folding>
-                <element signature="e#17#221#0" expanded="true" />
+                <element signature="e#21#150#0" expanded="true" />
               </folding>
             </state>
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="false">
+      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/server/server.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="566">
-              <caret line="783" column="1" lean-forward="true" selection-start-line="783" selection-start-column="1" selection-end-line="783" selection-end-column="1" />
+            <state relative-caret-position="371">
+              <caret line="781" column="40" lean-forward="true" selection-start-line="781" selection-start-column="40" selection-end-line="781" selection-end-column="40" />
             </state>
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/services/alert/service.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="163">
-              <caret line="86" column="5" lean-forward="true" selection-start-line="86" selection-start-column="5" selection-end-line="86" selection-end-column="5" />
+            <state relative-caret-position="298">
+              <caret line="88" column="35" lean-forward="true" selection-start-line="88" selection-start-column="35" selection-end-line="88" selection-end-column="35" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/pipeline/alert.go">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="341">
+              <caret line="1273" column="1" lean-forward="true" selection-start-line="1273" selection-start-column="1" selection-end-line="1273" selection-end-column="1" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/alert.go">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="135">
+              <caret line="168" column="5" lean-forward="true" selection-start-line="168" selection-start-column="5" selection-end-line="168" selection-end-column="5" />
             </state>
           </provider>
         </entry>
@@ -70,17 +82,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/task_master.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="86">
-              <caret line="170" column="28" lean-forward="true" selection-start-line="170" selection-start-column="28" selection-end-line="170" selection-end-column="28" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/services/diagnostic/service.go">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="305">
-              <caret line="181" column="23" selection-start-line="181" selection-start-column="23" selection-end-line="181" selection-end-column="23" />
+            <state relative-caret-position="716">
+              <caret line="179" column="15" selection-start-line="179" selection-start-column="8" selection-end-line="179" selection-end-column="15" />
             </state>
           </provider>
         </entry>
@@ -106,11 +109,15 @@
   <component name="FindInProjectRecents">
     <findStrings>
       <find>NewServer</find>
-      <find>alerta</find>
       <find>new</find>
       <find>foo</find>
+      <find>hipchat</find>
+      <find>alertman</find>
       <find>Handle</find>
       <find>DefaultHandlerConfig</find>
+      <find>handle</find>
+      <find>alerta</find>
+      <find>alert.</find>
     </findStrings>
   </component>
   <component name="GOROOT" path="/usr/local/go" />
@@ -123,14 +130,17 @@
   <component name="IdeDocumentHistory">
     <option name="CHANGED_PATHS">
       <list>
-        <option value="$PROJECT_DIR$/services/alertmanager/config.go" />
         <option value="$PROJECT_DIR$/server/config.go" />
         <option value="$PROJECT_DIR$/services/diagnostic/service.go" />
         <option value="$PROJECT_DIR$/services/diagnostic/handlers.go" />
+        <option value="$PROJECT_DIR$/pipeline/alert.go" />
+        <option value="$PROJECT_DIR$/alert.go" />
+        <option value="$PROJECT_DIR$/services/alertmanager/config.go" />
         <option value="$PROJECT_DIR$/server/server.go" />
-        <option value="$PROJECT_DIR$/services/alert/service.go" />
+        <option value="$PROJECT_DIR$/services/hipchat/service.go" />
         <option value="$PROJECT_DIR$/task_master.go" />
         <option value="$PROJECT_DIR$/services/alertmanager/service.go" />
+        <option value="$PROJECT_DIR$/services/alert/service.go" />
       </list>
     </option>
   </component>
@@ -176,25 +186,7 @@
               <item name="kapacitor" type="b2602c69:ProjectViewProjectNode" />
               <item name="kapacitor" type="462c0819:PsiDirectoryNode" />
               <item name="services" type="462c0819:PsiDirectoryNode" />
-              <item name="alerta" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="kapacitor" type="b2602c69:ProjectViewProjectNode" />
-              <item name="kapacitor" type="462c0819:PsiDirectoryNode" />
-              <item name="services" type="462c0819:PsiDirectoryNode" />
               <item name="alertmanager" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="kapacitor" type="b2602c69:ProjectViewProjectNode" />
-              <item name="kapacitor" type="462c0819:PsiDirectoryNode" />
-              <item name="services" type="462c0819:PsiDirectoryNode" />
-              <item name="hipchat" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="kapacitor" type="b2602c69:ProjectViewProjectNode" />
-              <item name="kapacitor" type="462c0819:PsiDirectoryNode" />
-              <item name="services" type="462c0819:PsiDirectoryNode" />
-              <item name="kafka" type="462c0819:PsiDirectoryNode" />
             </path>
           </expand>
           <select />
@@ -290,34 +282,10 @@
     <entry file="file://$PROJECT_DIR$/services/hipchat/config.go">
       <provider selected="true" editor-type-id="text-editor" />
     </entry>
-    <entry file="file://$PROJECT_DIR$/services/diagnostic/handlers.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="380">
-          <caret line="407" column="5" lean-forward="true" selection-start-line="407" selection-start-column="5" selection-end-line="407" selection-end-column="5" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/services/diagnostic/service.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="305">
-          <caret line="181" column="23" selection-start-line="181" selection-start-column="23" selection-end-line="181" selection-end-column="23" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/services/alerta/service.go">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="-2910">
           <caret line="65" lean-forward="true" selection-start-line="65" selection-end-line="65" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/services/hipchat/service.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="603">
-          <caret line="185" lean-forward="true" selection-start-line="185" selection-end-line="185" />
-          <folding>
-            <element signature="e#17#221#0" expanded="true" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -328,38 +296,79 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/services/alertmanager/config.go">
+    <entry file="file://$PROJECT_DIR$/services/diagnostic/service.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="345">
-          <caret line="23" column="1" lean-forward="true" selection-start-line="23" selection-start-column="1" selection-end-line="23" selection-end-column="1" />
+        <state relative-caret-position="305">
+          <caret line="181" column="23" selection-start-line="181" selection-start-column="23" selection-end-line="181" selection-end-column="23" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/services/alertmanager/service.go">
+    <entry file="file://$PROJECT_DIR$/services/diagnostic/handlers.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-1095">
-          <caret line="8" column="4" selection-start-line="8" selection-start-column="4" selection-end-line="8" selection-end-column="4" />
+        <state relative-caret-position="380">
+          <caret line="407" column="5" lean-forward="true" selection-start-line="407" selection-start-column="5" selection-end-line="407" selection-end-column="5" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/server/server.go">
+    <entry file="file://$PROJECT_DIR$/alert.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="566">
-          <caret line="783" column="1" lean-forward="true" selection-start-line="783" selection-start-column="1" selection-end-line="783" selection-end-column="1" />
+        <state relative-caret-position="135">
+          <caret line="168" column="5" lean-forward="true" selection-start-line="168" selection-start-column="5" selection-end-line="168" selection-end-column="5" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/services/hipchat/service.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="2925">
+          <caret line="195" column="24" lean-forward="true" selection-start-line="195" selection-start-column="24" selection-end-line="195" selection-end-column="24" />
+          <folding>
+            <element signature="e#17#221#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/task_master.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="86">
-          <caret line="170" column="28" lean-forward="true" selection-start-line="170" selection-start-column="28" selection-end-line="170" selection-end-column="28" />
+        <state relative-caret-position="716">
+          <caret line="179" column="15" selection-start-line="179" selection-start-column="8" selection-end-line="179" selection-end-column="15" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/pipeline/alert.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="341">
+          <caret line="1273" column="1" lean-forward="true" selection-start-line="1273" selection-start-column="1" selection-end-line="1273" selection-end-column="1" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/services/alertmanager/config.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="315">
+          <caret line="21" column="5" lean-forward="true" selection-start-line="21" selection-start-column="5" selection-end-line="21" selection-end-column="5" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/services/alert/service.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="163">
-          <caret line="86" column="5" lean-forward="true" selection-start-line="86" selection-start-column="5" selection-end-line="86" selection-end-column="5" />
+        <state relative-caret-position="298">
+          <caret line="88" column="35" lean-forward="true" selection-start-line="88" selection-start-column="35" selection-end-line="88" selection-end-column="35" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/services/alertmanager/service.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="468">
+          <caret line="125" column="32" lean-forward="true" selection-start-line="125" selection-start-column="32" selection-end-line="125" selection-end-column="32" />
+          <folding>
+            <element signature="e#21#150#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/server/server.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="371">
+          <caret line="781" column="40" lean-forward="true" selection-start-line="781" selection-start-column="40" selection-end-line="781" selection-end-column="40" />
         </state>
       </provider>
     </entry>
