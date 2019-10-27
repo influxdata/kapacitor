@@ -593,6 +593,25 @@ func TestAlertAlerta(t *testing.T) {
 	PipelineTickTestHelper(t, pipe, want)
 }
 
+func TestAlertAlertManager(t *testing.T) {
+	pipe, _, from := StreamFrom()
+	handler := from.Alert().AlertManager()
+	handler.Room = "test"
+
+	want := `stream
+    |from()
+    |alert()
+        .id('{{ .Name }}:{{ .Group }}')
+        .message('{{ .ID }} is {{ .Level }}')
+        .details('{{ json . }}')
+        .history(21)
+        .alertManager()
+        .room('test')
+`
+	PipelineTickTestHelper(t, pipe, want)
+}
+
+
 func TestAlertOpsGenie(t *testing.T) {
 	pipe, _, from := StreamFrom()
 	handler := from.Alert().OpsGenie()

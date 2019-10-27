@@ -131,7 +131,7 @@ func (s *Service) TestOptions() interface{} {
 	c := s.config()
 	return &testOptions{
 		Room:    c.Room,
-		Message: "test foo message",
+		Message: "test alertmanager message",
 	}
 }
 

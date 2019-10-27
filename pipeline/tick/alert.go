@@ -199,6 +199,11 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 			Dot("timeout", h.Timeout)
 	}
 
+	for _, h := range a.AlertManagerHandlers {
+		n.Dot("alertManager").
+			Dot("room", h.Room)
+	}
+
 	for _, h := range a.OpsGenieHandlers {
 		n.Dot("opsGenie").
 			Dot("teams", args(h.TeamsList)...).

@@ -38,6 +38,8 @@ import (
 	"github.com/influxdata/kapacitor/services/alert/alerttest"
 	"github.com/influxdata/kapacitor/services/alerta"
 	"github.com/influxdata/kapacitor/services/alerta/alertatest"
+	"github.com/influxdata/kapacitor/services/alertmanager"
+	"github.com/influxdata/kapacitor/services/alertmanager/alertmanagertest"
 	"github.com/influxdata/kapacitor/services/diagnostic"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/hipchat/hipchattest"
@@ -8956,6 +8958,67 @@ stream
 				Service:     []string{"serviceA", "serviceB", "cpu"},
 				Value:       "10",
 				Timeout:     86400,
+			},
+		},
+	}
+
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Requests() {
+		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestStream_AlertAlertManager(t *testing.T) {
+	ts := alertmanagertest.NewServer()
+	defer ts.Close()
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.alertManager()
+			.room('general')
+		.alertManager()
+`
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c := alertmanager.NewConfig()
+		c.Enabled = true
+		c.URL = ts.URL
+		c.Room = "alertmanager"
+		sl := alertmanager.NewService(c, diagService.NewAlertManagerHandler())
+		tm.AlertManagerService = sl
+	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	exp := []interface{}{
+		alertmanagertest.Request{
+			URL: "/",
+			PostData: alertmanagertest.PostData{
+				Room:    "general",
+				Message: "kapacitor/cpu/serverA is CRITICAL",
+			},
+		},
+		alertmanagertest.Request{
+			URL: "/",
+			PostData: alertmanagertest.PostData{
+				Room:    "alertmanager",
+				Message: "kapacitor/cpu/serverA is CRITICAL",
 			},
 		},
 	}

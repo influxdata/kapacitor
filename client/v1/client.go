@@ -2071,6 +2071,7 @@ func (c *Client) CreateTopicHandler(link Link, opt TopicHandlerOptions) (TopicHa
 
 	h := TopicHandler{}
 	_, err = c.Do(req, &h, http.StatusOK)
+
 	return h, err
 }
 

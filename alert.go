@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/influxdata/kapacitor/services/alertmanager"
 	html "html/template"
 	"os"
 	"sync"
@@ -270,18 +269,6 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		n.IsStateChangesOnly = true
 	}
 
-	for _, f := range n.AlertManagerHandlers {
-		c := et.tm.AlertManagerService.DefaultHandlerConfig()
-		if f.Room != "" {
-		c.Room = f.Room
-	}
-		h, err := et.tm.AlertManagerService.Handler(c)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to create alertmanager handler")
-		}
-		an.handlers = append(an.handlers, h)
-	}
-
 	for _, t := range n.TelegramHandlers {
 		c := telegram.HandlerConfig{
 			ChatId:                t.ChatId,
@@ -309,15 +296,6 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		h, err := et.tm.SNMPTrapService.Handler(c, ctx...)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create SNMP handler")
-		}
-		an.handlers = append(an.handlers, h)
-	}
-
-	if len(n.AlertManagerHandlers) == 0 && (et.tm.AlertManagerService != nil ) {
-		c := alertmanager.HandlerConfig{}
-		h, err := et.tm.AlertManagerService.Handler(c, ctx...)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to create alertmanager handler")
 		}
 		an.handlers = append(an.handlers, h)
 	}
@@ -366,6 +344,27 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		}
 		an.handlers = append(an.handlers, h)
 	}
+
+	for _, f := range n.AlertManagerHandlers {
+		c := et.tm.AlertManagerService.DefaultHandlerConfig()
+		if f.Room != "" {
+			c.Room = f.Room
+		}
+		h, err := et.tm.AlertManagerService.Handler(c)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to create alertmanager handler")
+		}
+		an.handlers = append(an.handlers, h)
+	}
+
+	//if len(n.AlertManagerHandlers) == 0 && (et.tm.AlertManagerService != nil )&& et.tm.AlertManagerService.Global() {
+	//	c := alertmanager.HandlerConfig{}
+	//	h, err := et.tm.AlertManagerService.Handler(c, ctx...)
+	//	if err != nil {
+	//		return nil, errors.Wrapf(err, "failed to create alertmanager handler")
+	//	}
+	//	an.handlers = append(an.handlers, h)
+	//}
 
 	for _, a := range n.AlertaHandlers {
 		c := et.tm.AlertaService.DefaultHandlerConfig()

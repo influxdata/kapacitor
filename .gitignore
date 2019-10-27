@@ -21,3 +21,5 @@ kapacitor*.zip
 /kapacitord
 /tickfmt
 /tickdoc
+
+.idea

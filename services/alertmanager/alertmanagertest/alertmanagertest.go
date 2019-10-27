@@ -18,13 +18,13 @@ type Server struct {
 func NewServer() *Server {
 	s := new(Server)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fr := Request{
+		ar := Request{
 			URL: r.URL.String(),
 		}
 		dec := json.NewDecoder(r.Body)
-		dec.Decode(&fr.PostData)
+		dec.Decode(&ar.PostData)
 		s.mu.Lock()
-		s.requests = append(s.requests, fr)
+		s.requests = append(s.requests, ar)
 		s.mu.Unlock()
 	}))
 	s.ts = ts

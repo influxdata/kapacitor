@@ -45,6 +45,7 @@ type AlertNode struct{ *AlertNodeData }
 //    * exec -- Execute a command passing alert data over STDIN.
 //    * HipChat -- Post alert message to HipChat room.
 //    * Alerta -- Post alert message to Alerta.
+//    * AlertManager -- Post alert message to AlertManager.
 //    * Sensu -- Post alert message to Sensu client.
 //    * Slack -- Post alert message to Slack channel.
 //    * SNMPTraps -- Trigger SNMP traps.
@@ -1256,7 +1257,7 @@ func (a *AlertaHandler) Services(service ...string) *AlertaHandler {
 
 // Send alert to an AlertManager
 // tick:property
-func (n *AlertNodeData) AlertManager(topic string) *AlertManagerHandler {
+func (n *AlertNodeData) AlertManager() *AlertManagerHandler {
 	alertmanager := &AlertManagerHandler{
 		AlertNodeData: n,
 	}

@@ -3,7 +3,6 @@ package server
 import (
 	"encoding"
 	"fmt"
-	"github.com/influxdata/kapacitor/services/alertmanager"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -15,6 +14,7 @@ import (
 	"github.com/influxdata/kapacitor/command"
 	"github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
+	"github.com/influxdata/kapacitor/services/alertmanager"
 	"github.com/influxdata/kapacitor/services/azure"
 	"github.com/influxdata/kapacitor/services/config"
 	"github.com/influxdata/kapacitor/services/consul"
@@ -235,9 +235,6 @@ func (c *Config) Validate() error {
 	if err := c.Load.Validate(); err != nil {
 		return err
 	}
-	if err := c.AlertManager.Validate(); err != nil {
-		return err
-	}
 	// Validate the set of InfluxDB configs.
 	// All names should be unique.
 	names := make(map[string]bool, len(c.InfluxDB))
@@ -278,6 +275,9 @@ func (c *Config) Validate() error {
 	// Validate alert handlers
 	if err := c.Alerta.Validate(); err != nil {
 		return errors.Wrap(err, "alerta")
+	}
+	if err := c.AlertManager.Validate(); err != nil {
+		return errors.Wrap(err, "alertmanager")
 	}
 	if err := c.HipChat.Validate(); err != nil {
 		return errors.Wrap(err, "hipchat")
