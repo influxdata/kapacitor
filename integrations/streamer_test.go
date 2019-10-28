@@ -8994,6 +8994,10 @@ stream
 		.crit(lambda: "count" > 8.0)
 		.alertManager()
 			.room('general')
+            .alertManagerTagName('foo')
+            .alertManagerTagValue('far')
+            .alertManagerAnnotationName('boo')
+            .alertManagerAnnotationValue('bar')
 		.alertManager()
 `
 	tmInit := func(tm *kapacitor.TaskMaster) {
@@ -9010,15 +9014,11 @@ stream
 		alertmanagertest.Request{
 			URL: "/",
 			PostData: alertmanagertest.PostData{
-				Room:    "general",
-				Message: "kapacitor/cpu/serverA is CRITICAL",
 			},
 		},
 		alertmanagertest.Request{
 			URL: "/",
 			PostData: alertmanagertest.PostData{
-				Room:    "alertmanager",
-				Message: "kapacitor/cpu/serverA is CRITICAL",
 			},
 		},
 	}

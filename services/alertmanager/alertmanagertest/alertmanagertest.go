@@ -2,6 +2,7 @@ package alertmanagertest
 
 import (
 	"encoding/json"
+	"github.com/influxdata/kapacitor/services/alertmanager"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -50,7 +51,4 @@ type Request struct {
 	PostData PostData
 }
 
-type PostData struct {
-	Room    string `json:"room"`
-	Message string `json:"message"`
-}
+type PostData alertmanager.PostAlertManager

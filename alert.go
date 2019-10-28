@@ -350,6 +350,19 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		if f.Room != "" {
 			c.Room = f.Room
 		}
+		if len(f.AlertManagerTagName) == 0{
+			c.AlertManagerTagName = f.AlertManagerTagName
+		}
+		if len(f.AlertManagerTagValue) == 0{
+			c.AlertManagerTagValue = f.AlertManagerTagValue
+		}
+		if len(f.AlertManagerAnnotationName) == 0{
+			c.AlertManagerAnnotationName = f.AlertManagerAnnotationName
+		}
+		if len(f.AlertManagerAnnotationValue) == 0{
+			c.AlertManagerAnnotationValue = f.AlertManagerAnnotationValue
+		}
+		
 		h, err := et.tm.AlertManagerService.Handler(c)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create alertmanager handler")

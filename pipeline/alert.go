@@ -1272,6 +1272,10 @@ type AlertManagerHandler struct {
 	// The room for the messages.
 	// Defaults to the room in the configuration if empty.
 	Room string `json:"room"`
+	AlertManagerTagName []string `json:"alertManagerTagName"`
+	AlertManagerTagValue []string `json:"alertManagerTagValue"`
+	AlertManagerAnnotationName []string `json:"alertManagerAnnotationName"`
+	AlertManagerAnnotationValue []string `json:"alertManagerAnnotationValue"`
 }
 
 // Send alert to an MQTT broker

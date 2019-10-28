@@ -5,11 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/influxdata/kapacitor/alert"
 	"github.com/influxdata/kapacitor/keyvalue"
 	"net/http"
 	"sync/atomic"
-
-	"github.com/influxdata/kapacitor/alert"
 )
 
 type Diagnostic interface {
@@ -20,6 +19,26 @@ type Diagnostic interface {
 type Service struct {
 	configValue atomic.Value
 	diag        Diagnostic
+}
+
+type AlertmanagerRequest struct {
+	Status      string                  `json:"status"`
+	Labels      AlertmanagerLabels      `json:"labels"`
+	Annotations AlertmanagerAnnotations `json:"annotations"`
+}
+type AlertmanagerLabels struct {
+	Instance    string   `json:"instance"`
+	Event       string   `json:"event"`
+	Environment string   `json:"environment"`
+	Origin      string   `json:"origin"`
+	Service     []string `json:"service"`
+	Group       string   `json:"group"`
+	Customer    string   `json:"customer"`
+}
+type AlertmanagerAnnotations struct {
+	Summary  string `json:"summary"`
+	Value    string `json:"value"`
+	Severity string `json:"severity"`
 }
 
 func NewService(c Config, d Diagnostic) *Service {
@@ -58,23 +77,47 @@ func (s *Service) config() Config {
 	return s.configValue.Load().(Config)
 }
 
+type PostAlertManager []AlertManagerAlert
+type AlertManagerAlert struct {
+	Status      string
+	Labels      map[string]string
+	Annotations map[string]string
+}
+
 // Alert sends a message to the specified room.
-func (s *Service) Alert(room, message string) error {
+func (s *Service) Alert(room string, tagName []string, tagValue []string, annotationName []string, annotationValue []string, alertLevel interface{}) error {
 	c := s.config()
 	if !c.Enabled {
 		return errors.New("service is not enabled")
 	}
-	type postMessage struct {
-		Room    string `json:"room"`
-		Message string `json:"message"`
+
+	alertStatus := "firing"
+	if alertLevel == alert.OK {
+		alertStatus = "resolved"
 	}
-	data, err := json.Marshal(postMessage{
-		Room:    room,
-		Message: message,
-	})
+	alertLabels := map[string]string{}
+	for i := 0; i < len(tagName)-1; i++ {
+		alertLabels[tagName[i]] = tagValue[i]
+	}
+
+	alertAnnotations := map[string]string{}
+	for i := 0; i < len(tagName)-1; i++ {
+		alertAnnotations[annotationName[i]] = annotationValue[i]
+	}
+
+	newAlert := AlertManagerAlert{
+		Status:      alertStatus,
+		Labels:      alertLabels,
+		Annotations: alertAnnotations,
+	}
+
+	postMessage := PostAlertManager{newAlert}
+
+	data, err := json.Marshal(postMessage)
 	if err != nil {
 		return err
 	}
+
 	r, err := http.Post(c.URL, "application/json", bytes.NewReader(data))
 	if err != nil {
 		return err
@@ -89,6 +132,14 @@ func (s *Service) Alert(room, message string) error {
 type HandlerConfig struct {
 	//Room specifies the destination room for the chat messages.
 	Room string `mapstructure:"room"`
+	// tag name for alert in alertmanager
+	AlertManagerTagName []string `mapstructure:"alertManagerTagName"`
+	// tag value of alertmanager
+	AlertManagerTagValue []string `mapstructure:"alertManagerTagValue"`
+	// annotation name for alert in alertmanager
+	AlertManagerAnnotationName []string `mapstructure:"alertManagerAnnotationName"`
+	// annotation value for alert in alertmanager
+	AlertManagerAnnotationValue []string `mapstructure: "alertManagerAnnotationName"`
 }
 
 // handler provides the implementation of the alert.Handler interface for the Foo service.
@@ -107,7 +158,7 @@ func (s *Service) DefaultHandlerConfig() HandlerConfig {
 	}
 }
 
-func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler , error){
+func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler, error) {
 	return &handler{
 		s:    s,
 		c:    c,
@@ -117,14 +168,22 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler , e
 
 // Handle takes an event and posts its message to the Foo service chat room.
 func (h *handler) Handle(event alert.Event) {
-	if err := h.s.Alert(h.c.Room, event.State.Message); err != nil {
+	//if err := h.s.Alert(h.c.Room, event.State.Message); err != nil {
+	//	h.diag.Error("E! failed to handle event", err)
+	//}
+
+	if err := h.s.Alert(h.c.Room, h.c.AlertManagerTagName, h.c.AlertManagerTagValue, h.c.AlertManagerAnnotationName, h.c.AlertManagerAnnotationValue, event.State.Level); err != nil {
 		h.diag.Error("E! failed to handle event", err)
 	}
 }
 
 type testOptions struct {
-	Room    string `json:"room"`
-	Message string `json:"message"`
+	Room                        string   `json:"room"`
+	Message                     string   `json:"message"`
+	AlertManagerTagName         []string `json:"alertManagerTagName"`
+	AlertManagerTagValue        []string `json:"alertManagerTagValue"`
+	AlertManagerAnnotationName  []string `json:"alertManagerAnnotationName"`
+	AlertManagerAnnotationValue []string `json:"alertManagerAnnotationValue"`
 }
 
 func (s *Service) TestOptions() interface{} {
@@ -140,5 +199,5 @@ func (s *Service) Test(o interface{}) error {
 	if !ok {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
-	return s.Alert(options.Room, options.Message)
+	return s.Alert(options.Room, options.AlertManagerTagName, options.AlertManagerTagValue, options.AlertManagerAnnotationName, options.AlertManagerAnnotationValue, alert.Critical)
 }
