@@ -8993,8 +8993,8 @@ stream
 		.warn(lambda: "count" > 7.0)
 		.crit(lambda: "count" > 8.0)
 		.alertManager()
-            .alertManagerTagNames('foo1', 'foo2')
-            .alertManagerTagValues('far1', 'far2')
+            .alertManagerTagNames('resource', 'alertname')
+            .alertManagerTagValues('{{ index .Tags "host" }}', '{{ .ID }}')
             .alertManagerAnnotationNames('boo1', 'boo2')
             .alertManagerAnnotationValues('bar1', 'bar2')
         .alertManager()
@@ -9018,7 +9018,7 @@ stream
 				Status      string
 				Labels      map[string]string
 				Annotations map[string]string
-			}{Status: "firing", Labels: map[string]string{"foo1":"far1","foo2":"far2"},
+			}{Status: "firing", Labels: map[string]string{"resource":"serverA","alertname":"kapacitor/cpu/serverA"},
 				Annotations: map[string]string{"boo1":"bar1","boo2":"bar2"}}},
 		},
 		alertmanagertest.Request{

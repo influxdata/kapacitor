@@ -401,6 +401,10 @@ type AlertManagerHandler struct {
 	l Logger
 }
 
+func (h *AlertManagerHandler) TemplateError(err error, kv keyvalue.T) {
+	h.l.Error("failed to evaluate Alerta template", Error(err), String(kv.Key, kv.Value))
+}
+
 func (h *AlertManagerHandler) WithContext(ctx ...keyvalue.T) alertmanager.Diagnostic {
 	fields := logFieldsFromContext(ctx)
 

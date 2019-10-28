@@ -9,10 +9,12 @@ import (
 	"github.com/influxdata/kapacitor/keyvalue"
 	"net/http"
 	"sync/atomic"
+	text "text/template"
 )
 
 type Diagnostic interface {
 	WithContext(ctx ...keyvalue.T) Diagnostic
+	TemplateError(err error, kv keyvalue.T)
 	Error(msg string, err error)
 }
 
@@ -87,10 +89,10 @@ type AlertManagerAlert struct {
 // Alert sends a to alertmanager .
 func (s *Service) Alert(tagName []string, tagValue []string, annotationName []string, annotationValue []string, alertLevel interface{}) error {
 	c := s.config()
-	if len(tagName) != len(tagValue){
+	if len(tagName) != len(tagValue) {
 		return errors.New("Lenght of tagName and tagValue is not equal")
 	}
-	if len(annotationName) != len(annotationValue){
+	if len(annotationName) != len(annotationValue) {
 		return errors.New("Lenght of annotationName and annotationValue is not equal")
 	}
 
@@ -152,6 +154,11 @@ type handler struct {
 	s    *Service
 	c    HandlerConfig
 	diag Diagnostic
+
+	tagNametmpl   []*text.Template
+	tagValuetmpl  []*text.Template
+	annoNametmpl  []*text.Template
+	annoValuetmpl []*text.Template
 }
 
 // DefaultHandlerConfig returns a HandlerConfig struct with defaults applied.
@@ -160,16 +167,97 @@ func (s *Service) DefaultHandlerConfig() HandlerConfig {
 }
 
 func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler, error) {
+	var tagNametmpl []*text.Template
+	for _, tagName := range c.AlertManagerTagName {
+		tmpl, err := text.New("service").Parse(tagName)
+		if err != nil {
+			return nil, err
+		}
+		tagNametmpl = append(tagNametmpl, tmpl)
+	}
+	var tagValuetmpl []*text.Template
+	for _, tagValue := range c.AlertManagerTagValue {
+		tmpl, err := text.New("service").Parse(tagValue)
+		if err != nil {
+			return nil, err
+		}
+		tagValuetmpl = append(tagValuetmpl, tmpl)
+	}
+	var annoNametmpl []*text.Template
+	for _, annoName := range c.AlertManagerAnnotationName {
+		tmpl, err := text.New("service").Parse(annoName)
+		if err != nil {
+			return nil, err
+		}
+		annoNametmpl = append(annoNametmpl, tmpl)
+	}
+
+	var annoValuetmpl []*text.Template
+	for _, annoValue := range c.AlertManagerAnnotationValue {
+		tmpl, err := text.New("service").Parse(annoValue)
+		if err != nil {
+			return nil, err
+		}
+		annoValuetmpl = append(annoValuetmpl, tmpl)
+	}
+
 	return &handler{
 		s:    s,
 		c:    c,
 		diag: s.diag.WithContext(ctx...),
+
+		tagNametmpl:   tagNametmpl,
+		tagValuetmpl:  tagValuetmpl,
+		annoNametmpl:  annoNametmpl,
+		annoValuetmpl: annoValuetmpl,
 	}, nil
 }
 
 // Handle takes an event and posts its message to the alertmanager
 func (h *handler) Handle(event alert.Event) {
-	if err := h.s.Alert(h.c.AlertManagerTagName, h.c.AlertManagerTagValue, h.c.AlertManagerAnnotationName, h.c.AlertManagerAnnotationValue, event.State.Level); err != nil {
+	td := event.TemplateData()
+	var buf bytes.Buffer
+	var err error
+	var tagName,tagValue,annoName, annoValue []string
+	for _, tmpl := range h.tagNametmpl {
+		err = tmpl.Execute(&buf, td)
+		if err != nil {
+			h.diag.TemplateError(err, keyvalue.KV("alertManagerTagName", tmpl.Name()))
+			return
+		}
+		tagName = append(tagName, buf.String())
+		buf.Reset()
+	}
+
+	for _, tmpl := range h.tagValuetmpl {
+		err = tmpl.Execute(&buf, td)
+		if err != nil {
+			h.diag.TemplateError(err, keyvalue.KV("alertManagerTagValue", tmpl.Name()))
+			return
+		}
+		tagValue = append(tagValue, buf.String())
+		buf.Reset()
+	}
+	for _, tmpl := range h.annoNametmpl {
+		err = tmpl.Execute(&buf, td)
+		if err != nil {
+			h.diag.TemplateError(err, keyvalue.KV("alertManagerAnnotationName", tmpl.Name()))
+			return
+		}
+		annoName = append(annoName, buf.String())
+		buf.Reset()
+	}
+	for _, tmpl := range h.annoValuetmpl {
+		err = tmpl.Execute(&buf, td)
+		if err != nil {
+			h.diag.TemplateError(err, keyvalue.KV("alertManagerAnnotationValue", tmpl.Name()))
+			return
+		}
+		annoValue = append(annoValue, buf.String())
+		buf.Reset()
+	}
+
+	if err := h.s.Alert(tagName, tagValue, annoName, annoValue, event.State.Level); err != nil {
 		h.diag.Error("E! failed to handle event", err)
 	}
 }
