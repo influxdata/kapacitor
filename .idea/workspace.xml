@@ -2,12 +2,12 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="b4db349f-f8a3-49f8-abb3-d7e1b84deafd" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/alert.go" beforeDir="false" afterPath="$PROJECT_DIR$/alert.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/integrations/streamer_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/integrations/streamer_test.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pipeline/alert.go" beforeDir="false" afterPath="$PROJECT_DIR$/pipeline/alert.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pipeline/tick/alert.go" beforeDir="false" afterPath="$PROJECT_DIR$/pipeline/tick/alert.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/alertmanager/alertmanagertest/alertmanagertest.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/alertmanager/alertmanagertest/alertmanagertest.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pipeline/tick/alert_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/pipeline/tick/alert_test.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/server/server_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/server/server_test.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/services/alertmanager/config.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/alertmanager/config.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/services/alertmanager/service.go" beforeDir="false" afterPath="$PROJECT_DIR$/services/alertmanager/service.go" afterDir="false" />
     </list>
@@ -20,19 +20,19 @@
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/integrations/streamer_test.go">
+        <entry file="file://$PROJECT_DIR$/alert/topics.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="132450">
-              <caret line="8911" column="24" selection-start-line="8911" selection-start-column="24" selection-end-line="8911" selection-end-column="24" />
+            <state relative-caret-position="203">
+              <caret line="395" column="28" lean-forward="true" selection-start-line="395" selection-start-column="28" selection-end-line="395" selection-end-column="28" />
             </state>
           </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/pipeline/tick/alert.go">
+        <entry file="file://$PROJECT_DIR$/services/servicetest/service.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="2880">
-              <caret line="197" column="48" selection-start-line="197" selection-start-column="48" selection-end-line="197" selection-end-column="48" />
+            <state relative-caret-position="509">
+              <caret line="162" column="5" selection-start-line="162" selection-start-column="5" selection-end-line="162" selection-end-column="5" />
             </state>
           </provider>
         </entry>
@@ -40,20 +40,17 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/services/alertmanager/config.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="30">
-              <caret line="2" column="15" selection-start-line="2" selection-start-column="15" selection-end-line="2" selection-end-column="15" />
+            <state relative-caret-position="311">
+              <caret line="28" column="17" selection-start-line="28" selection-start-column="17" selection-end-line="28" selection-end-column="17" />
             </state>
           </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/services/alerta/service.go">
+        <entry file="file://$PROJECT_DIR$/services/alertmanager/alertmanagertest/alertmanagertest.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="4005">
-              <caret line="285" column="11" selection-start-line="285" selection-start-column="5" selection-end-line="285" selection-end-column="11" />
-              <folding>
-                <element signature="e#16#361#0" expanded="true" />
-              </folding>
+            <state relative-caret-position="71">
+              <caret line="27" column="43" lean-forward="true" selection-start-line="27" selection-start-column="43" selection-end-line="27" selection-end-column="43" />
             </state>
           </provider>
         </entry>
@@ -61,26 +58,8 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/services/alertmanager/service.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="555">
-              <caret line="188" column="45" lean-forward="true" selection-start-line="188" selection-start-column="45" selection-end-line="188" selection-end-column="45" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file:///usr/local/go/src/text/template/template.go">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="345">
-              <caret line="27" column="5" selection-start-line="27" selection-start-column="5" selection-end-line="27" selection-end-column="5" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/services/alerta/config.go">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="480">
-              <caret line="37" column="26" selection-start-line="37" selection-start-column="26" selection-end-line="37" selection-end-column="26" />
+            <state relative-caret-position="281">
+              <caret line="170" column="45" lean-forward="true" selection-start-line="170" selection-start-column="45" selection-end-line="170" selection-end-column="45" />
             </state>
           </provider>
         </entry>
@@ -89,12 +68,22 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>alerta</find>
       <find>ser</find>
       <find>service</find>
-      <find>alert</find>
-      <find>validate</find>
       <find>handle</find>
+      <find>AlertAlertManager</find>
+      <find>kafka</find>
+      <find>AlertManager</find>
+      <find>alertManagerTagNames</find>
+      <find>alert</find>
+      <find>alertma</find>
+      <find>alertManager</find>
+      <find>test</find>
+      <find>room</find>
+      <find>alertmanager</find>
+      <find>alertManagerTagValue</find>
+      <find>alerta</find>
+      <find>validate</find>
     </findStrings>
   </component>
   <component name="GOROOT" path="/usr/local/go" />
@@ -108,6 +97,12 @@
     <option name="CHANGED_PATHS">
       <list>
         <option value="$PROJECT_DIR$/pipeline/tick/alert.go" />
+        <option value="$PROJECT_DIR$/pipeline/tick/alert_test.go" />
+        <option value="$PROJECT_DIR$/server/server_test.go" />
+        <option value="$PROJECT_DIR$/alert.go" />
+        <option value="$PROJECT_DIR$/pipeline/alert.go" />
+        <option value="$PROJECT_DIR$/integrations/streamer_test.go" />
+        <option value="$PROJECT_DIR$/services/alertmanager/config.go" />
         <option value="$PROJECT_DIR$/services/alertmanager/service.go" />
       </list>
     </option>
@@ -123,6 +118,7 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
+      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
@@ -144,26 +140,19 @@
               <item name="kapacitor" type="b2602c69:ProjectViewProjectNode" />
               <item name="kapacitor" type="462c0819:PsiDirectoryNode" />
               <item name="services" type="462c0819:PsiDirectoryNode" />
-              <item name="alerta" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="kapacitor" type="b2602c69:ProjectViewProjectNode" />
-              <item name="kapacitor" type="462c0819:PsiDirectoryNode" />
-              <item name="services" type="462c0819:PsiDirectoryNode" />
-              <item name="alerta" type="462c0819:PsiDirectoryNode" />
-              <item name="alertatest" type="462c0819:PsiDirectoryNode" />
+              <item name="alertmanager" type="462c0819:PsiDirectoryNode" />
             </path>
             <path>
               <item name="kapacitor" type="b2602c69:ProjectViewProjectNode" />
               <item name="kapacitor" type="462c0819:PsiDirectoryNode" />
               <item name="services" type="462c0819:PsiDirectoryNode" />
               <item name="alertmanager" type="462c0819:PsiDirectoryNode" />
+              <item name="alertmanagertest" type="462c0819:PsiDirectoryNode" />
             </path>
           </expand>
           <select />
         </subPane>
       </pane>
-      <pane id="Scope" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -189,38 +178,136 @@
       </list>
     </option>
   </component>
-  <component name="RunManager">
+  <component name="RunManager" selected="Go Test.TestStream_AlertAlertManager in github.com/influxdata/kapacitor/integrations">
+    <configuration name="TestServer_AlertHandlers in github.com/influxdata/kapacitor/server" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
+      <module name="kapacitor" />
+      <working_directory value="$PROJECT_DIR$/server" />
+      <framework value="gotest" />
+      <kind value="PACKAGE" />
+      <package value="github.com/influxdata/kapacitor/server" />
+      <directory value="$PROJECT_DIR$/" />
+      <filePath value="$PROJECT_DIR$/" />
+      <pattern value="^TestServer_AlertHandlers$" />
+      <method v="2" />
+    </configuration>
+    <configuration name="TestServer_ListServiceTests in github.com/influxdata/kapacitor/server" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
+      <module name="kapacitor" />
+      <working_directory value="$PROJECT_DIR$/server" />
+      <framework value="gotest" />
+      <kind value="PACKAGE" />
+      <package value="github.com/influxdata/kapacitor/server" />
+      <directory value="$PROJECT_DIR$/" />
+      <filePath value="$PROJECT_DIR$/" />
+      <pattern value="^TestServer_ListServiceTests$" />
+      <method v="2" />
+    </configuration>
+    <configuration name="TestStream_AlertAlertManager in github.com/influxdata/kapacitor/integrations" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
+      <module name="kapacitor" />
+      <working_directory value="$PROJECT_DIR$/integrations" />
+      <framework value="gotest" />
+      <kind value="PACKAGE" />
+      <package value="github.com/influxdata/kapacitor/integrations" />
+      <directory value="$PROJECT_DIR$/" />
+      <filePath value="$PROJECT_DIR$/" />
+      <pattern value="^TestStream_AlertAlertManager$" />
+      <method v="2" />
+    </configuration>
     <configuration name="TestStream_AlertAlerta in github.com/influxdata/kapacitor/integrations" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
       <module name="kapacitor" />
       <working_directory value="$PROJECT_DIR$/integrations" />
       <framework value="gotest" />
       <kind value="PACKAGE" />
       <package value="github.com/influxdata/kapacitor/integrations" />
+      <directory value="$PROJECT_DIR$/" />
+      <filePath value="$PROJECT_DIR$/" />
       <pattern value="^TestStream_AlertAlerta$" />
+      <method v="2" />
+    </configuration>
+    <configuration name="server_test.go" type="GoTestRunConfiguration" factoryName="Go Test" temporary="true" nameIsGenerated="true">
+      <module name="kapacitor" />
+      <working_directory value="$PROJECT_DIR$/server" />
+      <framework value="gotest" />
+      <kind value="FILE" />
+      <package value="github.com/influxdata/kapacitor" />
+      <directory value="$PROJECT_DIR$/" />
+      <filePath value="$PROJECT_DIR$/server/server_test.go" />
       <method v="2" />
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Go Test.TestStream_AlertAlertManager in github.com/influxdata/kapacitor/integrations" />
         <item itemvalue="Go Test.TestStream_AlertAlerta in github.com/influxdata/kapacitor/integrations" />
+        <item itemvalue="Go Test.TestServer_AlertHandlers in github.com/influxdata/kapacitor/server" />
+        <item itemvalue="Go Test.server_test.go" />
+        <item itemvalue="Go Test.TestServer_ListServiceTests in github.com/influxdata/kapacitor/server" />
       </list>
     </recent_temporary>
   </component>
   <component name="TestHistory">
-    <history-entry file="TestStream_AlertAlerta_in_github_com_influxdata_kapacitor_integrations - 2019.10.28 at 11h 48m 10s.xml">
-      <configuration name="TestStream_AlertAlerta in github.com/influxdata/kapacitor/integrations" configurationId="GoTestRunConfiguration" />
+    <history-entry file="TestStream_AlertAlertManager_in_github_com_influxdata_kapacitor_integrations - 2019.10.28 at 18h 01m 08s.xml">
+      <configuration name="TestStream_AlertAlertManager in github.com/influxdata/kapacitor/integrations" configurationId="GoTestRunConfiguration" />
+    </history-entry>
+    <history-entry file="TestStream_AlertAlertManager_in_github_com_influxdata_kapacitor_integrations - 2019.10.28 at 18h 06m 12s.xml">
+      <configuration name="TestStream_AlertAlertManager in github.com/influxdata/kapacitor/integrations" configurationId="GoTestRunConfiguration" />
+    </history-entry>
+    <history-entry file="TestStream_AlertAlertManager_in_github_com_influxdata_kapacitor_integrations - 2019.10.28 at 18h 12m 14s.xml">
+      <configuration name="TestStream_AlertAlertManager in github.com/influxdata/kapacitor/integrations" configurationId="GoTestRunConfiguration" />
+    </history-entry>
+    <history-entry file="TestStream_AlertAlertManager_in_github_com_influxdata_kapacitor_integrations - 2019.10.28 at 18h 15m 48s.xml">
+      <configuration name="TestStream_AlertAlertManager in github.com/influxdata/kapacitor/integrations" configurationId="GoTestRunConfiguration" />
+    </history-entry>
+    <history-entry file="TestStream_AlertAlertManager_in_github_com_influxdata_kapacitor_integrations - 2019.10.28 at 18h 37m 08s.xml">
+      <configuration name="TestStream_AlertAlertManager in github.com/influxdata/kapacitor/integrations" configurationId="GoTestRunConfiguration" />
+    </history-entry>
+    <history-entry file="TestStream_AlertAlertManager_in_github_com_influxdata_kapacitor_integrations - 2019.10.28 at 18h 38m 42s.xml">
+      <configuration name="TestStream_AlertAlertManager in github.com/influxdata/kapacitor/integrations" configurationId="GoTestRunConfiguration" />
+    </history-entry>
+    <history-entry file="TestStream_AlertAlertManager_in_github_com_influxdata_kapacitor_integrations - 2019.10.28 at 18h 41m 25s.xml">
+      <configuration name="TestStream_AlertAlertManager in github.com/influxdata/kapacitor/integrations" configurationId="GoTestRunConfiguration" />
+    </history-entry>
+    <history-entry file="TestStream_AlertAlertManager_in_github_com_influxdata_kapacitor_integrations - 2019.10.28 at 18h 42m 44s.xml">
+      <configuration name="TestStream_AlertAlertManager in github.com/influxdata/kapacitor/integrations" configurationId="GoTestRunConfiguration" />
+    </history-entry>
+    <history-entry file="TestStream_AlertAlertManager_in_github_com_influxdata_kapacitor_integrations - 2019.10.28 at 18h 45m 37s.xml">
+      <configuration name="TestStream_AlertAlertManager in github.com/influxdata/kapacitor/integrations" configurationId="GoTestRunConfiguration" />
+    </history-entry>
+    <history-entry file="TestStream_AlertAlertManager_in_github_com_influxdata_kapacitor_integrations - 2019.10.28 at 18h 46m 40s.xml">
+      <configuration name="TestStream_AlertAlertManager in github.com/influxdata/kapacitor/integrations" configurationId="GoTestRunConfiguration" />
     </history-entry>
   </component>
   <component name="ToolWindowManager">
     <frame x="8" y="31" width="1920" height="1017" extended-state="0" />
     <editor active="true" />
     <layout>
-      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.25239617" />
+      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.2550586" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Favorites" order="2" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" />
-      <window_info anchor="bottom" id="Run" order="2" weight="0.32936078" />
-      <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
+      <window_info anchor="bottom" id="Run" order="2" visible="true" weight="0.32936078" />
+      <window_info anchor="bottom" id="Debug" order="3" weight="0.3997833" />
+      <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
+      <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
+      <window_info anchor="bottom" id="TODO" order="6" />
+      <window_info anchor="bottom" id="Docker" order="7" show_stripe_button="false" />
+      <window_info anchor="bottom" id="Database Changes" order="8" />
+      <window_info anchor="bottom" id="Version Control" order="9" />
+      <window_info anchor="bottom" id="Terminal" order="10" />
+      <window_info anchor="bottom" id="Event Log" order="11" side_tool="true" />
+      <window_info anchor="right" id="Coverage" side_tool="true" weight="0.32960597" />
+      <window_info anchor="right" id="Commander" internal_type="SLIDING" order="0" type="SLIDING" weight="0.4" />
+      <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
+      <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
+      <window_info anchor="right" id="Database" order="3" />
+    </layout>
+    <layout-to-restore>
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.2550586" />
+      <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
+      <window_info id="Favorites" order="2" side_tool="true" />
+      <window_info anchor="bottom" id="Message" order="0" />
+      <window_info anchor="bottom" id="Find" order="1" />
+      <window_info active="true" anchor="bottom" id="Run" order="2" visible="true" weight="0.32936078" />
+      <window_info anchor="bottom" id="Debug" order="3" weight="0.3997833" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
       <window_info anchor="bottom" id="TODO" order="6" />
@@ -233,43 +320,27 @@
       <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
       <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
       <window_info anchor="right" id="Database" order="3" />
-    </layout>
+    </layout-to-restore>
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="1" />
   </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
+          <url>file://$PROJECT_DIR$/alert.go</url>
+          <line>392</line>
+          <properties />
+          <option name="timeStamp" value="18" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/kapacitor$TestStream_AlertAlertManager_in_github_com_influxdata_kapacitor_integrations.out" NAME="TestStream_AlertAlertManager in github.com/influxdata/kapacitor/integrations Coverage Results" MODIFIED="1572261348184" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="GoCoverage" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" />
+  </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/integrations/streamer_test.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="132450">
-          <caret line="8911" column="24" selection-start-line="8911" selection-start-column="24" selection-end-line="8911" selection-end-column="24" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/pipeline/tick/alert.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="2880">
-          <caret line="197" column="48" selection-start-line="197" selection-start-column="48" selection-end-line="197" selection-end-column="48" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/services/alertmanager/config.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="30">
-          <caret line="2" column="15" selection-start-line="2" selection-start-column="15" selection-end-line="2" selection-end-column="15" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/services/alerta/service.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="4005">
-          <caret line="285" column="11" selection-start-line="285" selection-start-column="5" selection-end-line="285" selection-end-column="11" />
-          <folding>
-            <element signature="e#16#361#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file:///usr/local/go/src/text/template/template.go">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="345">
@@ -277,17 +348,187 @@
         </state>
       </provider>
     </entry>
+    <entry file="file:///usr/local/go/src/reflect/value.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="167">
+          <caret line="307" selection-start-line="307" selection-end-line="307" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/pipeline/tick/function.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="175">
+          <caret line="321" column="5" selection-start-line="321" selection-start-column="5" selection-end-line="321" selection-end-column="5" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/services/diagnostic/service.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="310">
+          <caret line="180" column="18" selection-start-line="180" selection-start-column="18" selection-end-line="180" selection-end-column="18" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/services/alerta/alertatest/alertatest.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="840">
+          <caret line="61" column="24" selection-start-line="61" selection-start-column="18" selection-end-line="61" selection-end-column="24" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/pipeline/pipeline.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="250">
+          <caret line="168" selection-start-line="168" selection-end-line="168" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/pipeline/tick/ast.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="272">
+          <caret line="38" column="28" lean-forward="true" selection-start-line="38" selection-start-column="28" selection-end-line="38" selection-end-column="28" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/pipeline/tick/tick_test.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-975">
+          <caret line="51" column="65" selection-start-line="51" selection-start-column="65" selection-end-line="51" selection-end-column="65" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/pipeline/alert_test.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="60">
+          <caret line="6" column="16" selection-start-line="6" selection-start-column="16" selection-end-line="6" selection-end-column="16" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/pipeline/tick/alert.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="324">
+          <caret line="204" column="56" selection-start-line="204" selection-start-column="56" selection-end-line="204" selection-end-column="56" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file:///usr/local/go/src/runtime/asm_amd64.s">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="175">
+          <caret line="519" selection-start-line="519" selection-end-line="519" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/pipeline/tick/alert_test.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="107">
+          <caret line="594" lean-forward="true" selection-start-line="594" selection-end-line="594" />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/services/alerta/config.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="480">
-          <caret line="37" column="26" selection-start-line="37" selection-start-column="26" selection-end-line="37" selection-end-column="26" />
+        <state relative-caret-position="111">
+          <caret line="22" column="28" selection-start-line="22" selection-start-column="28" selection-end-line="22" selection-end-column="28" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/tick/doc.go">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/tick/eval_test.go">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/tick/eval.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="945">
+          <caret line="172" selection-start-line="172" selection-end-line="172" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/alert.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="347">
+          <caret line="438" selection-start-line="438" selection-end-line="438" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/server/server_test.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1559">
+          <caret line="9636" column="26" lean-forward="true" selection-start-line="9636" selection-start-column="26" selection-end-line="9636" selection-end-column="26" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/pipeline/alert.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="3490">
+          <caret line="1298" column="29" lean-forward="true" selection-start-line="1298" selection-start-column="29" selection-end-line="1298" selection-end-column="29" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/integrations/streamer_test.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="150">
+          <caret line="91" column="23" lean-forward="true" selection-start-line="91" selection-start-column="23" selection-end-line="91" selection-end-column="23" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/task_master.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1118">
+          <caret line="440" column="26" lean-forward="true" selection-start-line="440" selection-start-column="26" selection-end-line="440" selection-end-column="26" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/services/alerta/service.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="300">
+          <caret line="89" column="19" lean-forward="true" selection-start-line="89" selection-start-column="19" selection-end-line="89" selection-end-column="19" />
+          <folding>
+            <element signature="e#16#361#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/server/config.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="540">
+          <caret line="100" column="68" lean-forward="true" selection-start-line="100" selection-start-column="68" selection-end-line="100" selection-end-column="68" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/services/alertmanager/alertmanagertest/alertmanagertest.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="71">
+          <caret line="27" column="43" lean-forward="true" selection-start-line="27" selection-start-column="43" selection-end-line="27" selection-end-column="43" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/services/alertmanager/config.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="311">
+          <caret line="28" column="17" selection-start-line="28" selection-start-column="17" selection-end-line="28" selection-end-column="17" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/alert/topics.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="203">
+          <caret line="395" column="28" lean-forward="true" selection-start-line="395" selection-start-column="28" selection-end-line="395" selection-end-column="28" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/services/servicetest/service.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="509">
+          <caret line="162" column="5" selection-start-line="162" selection-start-column="5" selection-end-line="162" selection-end-column="5" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/services/alertmanager/service.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="555">
-          <caret line="188" column="45" lean-forward="true" selection-start-line="188" selection-start-column="45" selection-end-line="188" selection-end-column="45" />
+        <state relative-caret-position="281">
+          <caret line="170" column="45" lean-forward="true" selection-start-line="170" selection-start-column="45" selection-end-line="170" selection-end-column="45" />
         </state>
       </provider>
     </entry>

@@ -6,10 +6,8 @@ import "errors"
 type Config struct {
 	// Enabled indicates whether the service should be enabled.
 	Enabled bool `toml:"enabled" override:"enabled"`
-	// URL of the Foo server.
+	// URL of the alertmanager server.
 	URL string `toml:"url" override:"url"`
-	// Room specifies the default room to use for all handlers.
-	Room string `toml:"room" override:"room"`
 	// tag name for alert in alertmanager
 	AlertManagerTagName []string `toml:"alertManagerTagName" override:"alertManagerTagName"`
 	// tag value of alertmanager
@@ -26,7 +24,7 @@ func NewConfig() Config {
 
 func (c Config) Validate() error {
 	if c.Enabled && c.URL == "" {
-		return errors.New("must specify the alertmanager server URL")
+		return errors.New("Must specify the alertmanager server URL")
 	}
 	if c.Enabled{
 		if len(c.AlertManagerTagName) != len(c.AlertManagerTagValue){

@@ -345,39 +345,27 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		an.handlers = append(an.handlers, h)
 	}
 
-	for _, f := range n.AlertManagerHandlers {
+	for _, am := range n.AlertManagerHandlers {
 		c := et.tm.AlertManagerService.DefaultHandlerConfig()
-		if f.Room != "" {
-			c.Room = f.Room
+		if len(am.AlertManagerTagName) != 0{
+			c.AlertManagerTagName = am.AlertManagerTagName
 		}
-		if len(f.AlertManagerTagName) == 0{
-			c.AlertManagerTagName = f.AlertManagerTagName
+		if len(am.AlertManagerTagValue) != 0{
+			c.AlertManagerTagValue = am.AlertManagerTagValue
 		}
-		if len(f.AlertManagerTagValue) == 0{
-			c.AlertManagerTagValue = f.AlertManagerTagValue
+		if len(am.AlertManagerAnnotationName) != 0{
+			c.AlertManagerAnnotationName = am.AlertManagerAnnotationName
 		}
-		if len(f.AlertManagerAnnotationName) == 0{
-			c.AlertManagerAnnotationName = f.AlertManagerAnnotationName
-		}
-		if len(f.AlertManagerAnnotationValue) == 0{
-			c.AlertManagerAnnotationValue = f.AlertManagerAnnotationValue
+		if len(am.AlertManagerAnnotationValue) != 0{
+			c.AlertManagerAnnotationValue = am.AlertManagerAnnotationValue
 		}
 		
-		h, err := et.tm.AlertManagerService.Handler(c)
+		h, err := et.tm.AlertManagerService.Handler(c,ctx...)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create alertmanager handler")
 		}
 		an.handlers = append(an.handlers, h)
 	}
-
-	//if len(n.AlertManagerHandlers) == 0 && (et.tm.AlertManagerService != nil )&& et.tm.AlertManagerService.Global() {
-	//	c := alertmanager.HandlerConfig{}
-	//	h, err := et.tm.AlertManagerService.Handler(c, ctx...)
-	//	if err != nil {
-	//		return nil, errors.Wrapf(err, "failed to create alertmanager handler")
-	//	}
-	//	an.handlers = append(an.handlers, h)
-	//}
 
 	for _, a := range n.AlertaHandlers {
 		c := et.tm.AlertaService.DefaultHandlerConfig()

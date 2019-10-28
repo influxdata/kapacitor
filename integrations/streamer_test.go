@@ -8993,18 +8993,19 @@ stream
 		.warn(lambda: "count" > 7.0)
 		.crit(lambda: "count" > 8.0)
 		.alertManager()
-			.room('general')
-            .alertManagerTagName('foo')
-            .alertManagerTagValue('far')
-            .alertManagerAnnotationName('boo')
-            .alertManagerAnnotationValue('bar')
-		.alertManager()
+            .alertManagerTagNames('foo1', 'foo2')
+            .alertManagerTagValues('far1', 'far2')
+            .alertManagerAnnotationNames('boo1', 'boo2')
+            .alertManagerAnnotationValues('bar1', 'bar2')
+        .alertManager()
+            .alertManagerTagNames('foo1', 'foo2')
+            .alertManagerTagValues('far1', 'far2')
+        
 `
 	tmInit := func(tm *kapacitor.TaskMaster) {
 		c := alertmanager.NewConfig()
 		c.Enabled = true
 		c.URL = ts.URL
-		c.Room = "alertmanager"
 		sl := alertmanager.NewService(c, diagService.NewAlertManagerHandler())
 		tm.AlertManagerService = sl
 	}
@@ -9013,13 +9014,21 @@ stream
 	exp := []interface{}{
 		alertmanagertest.Request{
 			URL: "/",
-			PostData: alertmanagertest.PostData{
-			},
+			PostData: alertmanagertest.PostData{struct {
+				Status      string
+				Labels      map[string]string
+				Annotations map[string]string
+			}{Status: "firing", Labels: map[string]string{"foo1":"far1","foo2":"far2"},
+				Annotations: map[string]string{"boo1":"bar1","boo2":"bar2"}}},
 		},
 		alertmanagertest.Request{
 			URL: "/",
-			PostData: alertmanagertest.PostData{
-			},
+			PostData: alertmanagertest.PostData{struct {
+				Status      string
+				Labels      map[string]string
+				Annotations map[string]string
+			}{Status: "firing", Labels: map[string]string{"foo1":"far1","foo2":"far2"},
+				Annotations: map[string]string{}}},
 		},
 	}
 

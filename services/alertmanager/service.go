@@ -84,9 +84,16 @@ type AlertManagerAlert struct {
 	Annotations map[string]string
 }
 
-// Alert sends a message to the specified room.
-func (s *Service) Alert(room string, tagName []string, tagValue []string, annotationName []string, annotationValue []string, alertLevel interface{}) error {
+// Alert sends a to alertmanager .
+func (s *Service) Alert(tagName []string, tagValue []string, annotationName []string, annotationValue []string, alertLevel interface{}) error {
 	c := s.config()
+	if len(tagName) != len(tagValue){
+		return errors.New("Lenght of tagName and tagValue is not equal")
+	}
+	if len(annotationName) != len(annotationValue){
+		return errors.New("Lenght of annotationName and annotationValue is not equal")
+	}
+
 	if !c.Enabled {
 		return errors.New("service is not enabled")
 	}
@@ -96,12 +103,12 @@ func (s *Service) Alert(room string, tagName []string, tagValue []string, annota
 		alertStatus = "resolved"
 	}
 	alertLabels := map[string]string{}
-	for i := 0; i < len(tagName)-1; i++ {
+	for i := 0; i < len(tagName); i++ {
 		alertLabels[tagName[i]] = tagValue[i]
 	}
 
 	alertAnnotations := map[string]string{}
-	for i := 0; i < len(tagName)-1; i++ {
+	for i := 0; i < len(annotationName); i++ {
 		alertAnnotations[annotationName[i]] = annotationValue[i]
 	}
 
@@ -130,8 +137,6 @@ func (s *Service) Alert(room string, tagName []string, tagValue []string, annota
 }
 
 type HandlerConfig struct {
-	//Room specifies the destination room for the chat messages.
-	Room string `mapstructure:"room"`
 	// tag name for alert in alertmanager
 	AlertManagerTagName []string `mapstructure:"alertManagerTagName"`
 	// tag value of alertmanager
@@ -139,7 +144,7 @@ type HandlerConfig struct {
 	// annotation name for alert in alertmanager
 	AlertManagerAnnotationName []string `mapstructure:"alertManagerAnnotationName"`
 	// annotation value for alert in alertmanager
-	AlertManagerAnnotationValue []string `mapstructure: "alertManagerAnnotationName"`
+	AlertManagerAnnotationValue []string `mapstructure: "alertManagerAnnotationValue"`
 }
 
 // handler provides the implementation of the alert.Handler interface for the Foo service.
@@ -151,11 +156,7 @@ type handler struct {
 
 // DefaultHandlerConfig returns a HandlerConfig struct with defaults applied.
 func (s *Service) DefaultHandlerConfig() HandlerConfig {
-	// return a handler config populated with the default room from the service config.
-	c := s.config()
-	return HandlerConfig{
-		Room: c.Room,
-	}
+	return HandlerConfig{}
 }
 
 func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler, error) {
@@ -166,20 +167,15 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler, er
 	}, nil
 }
 
-// Handle takes an event and posts its message to the Foo service chat room.
+// Handle takes an event and posts its message to the alertmanager
 func (h *handler) Handle(event alert.Event) {
-	//if err := h.s.Alert(h.c.Room, event.State.Message); err != nil {
-	//	h.diag.Error("E! failed to handle event", err)
-	//}
-
-	if err := h.s.Alert(h.c.Room, h.c.AlertManagerTagName, h.c.AlertManagerTagValue, h.c.AlertManagerAnnotationName, h.c.AlertManagerAnnotationValue, event.State.Level); err != nil {
+	if err := h.s.Alert(h.c.AlertManagerTagName, h.c.AlertManagerTagValue, h.c.AlertManagerAnnotationName, h.c.AlertManagerAnnotationValue, event.State.Level); err != nil {
 		h.diag.Error("E! failed to handle event", err)
 	}
 }
 
 type testOptions struct {
-	Room                        string   `json:"room"`
-	Message                     string   `json:"message"`
+	//Message                     string   `json:"message"`
 	AlertManagerTagName         []string `json:"alertManagerTagName"`
 	AlertManagerTagValue        []string `json:"alertManagerTagValue"`
 	AlertManagerAnnotationName  []string `json:"alertManagerAnnotationName"`
@@ -187,10 +183,11 @@ type testOptions struct {
 }
 
 func (s *Service) TestOptions() interface{} {
-	c := s.config()
 	return &testOptions{
-		Room:    c.Room,
-		Message: "test alertmanager message",
+		AlertManagerTagName:         []string{"tagA", "tagB"},
+		AlertManagerTagValue:        []string{"tag_valueA", "tag_valueB"},
+		AlertManagerAnnotationName:  []string{"annA", "annB"},
+		AlertManagerAnnotationValue: []string{"ann_valueA", "ann_valueB"},
 	}
 }
 
@@ -199,5 +196,5 @@ func (s *Service) Test(o interface{}) error {
 	if !ok {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
-	return s.Alert(options.Room, options.AlertManagerTagName, options.AlertManagerTagValue, options.AlertManagerAnnotationName, options.AlertManagerAnnotationValue, alert.Critical)
+	return s.Alert(options.AlertManagerTagName, options.AlertManagerTagValue, options.AlertManagerAnnotationName, options.AlertManagerAnnotationValue, alert.Critical)
 }

@@ -596,8 +596,10 @@ func TestAlertAlerta(t *testing.T) {
 func TestAlertAlertManager(t *testing.T) {
 	pipe, _, from := StreamFrom()
 	handler := from.Alert().AlertManager()
-	handler.Room = "test"
-
+	handler.AlertManagerTagNames("foo1","foo2")
+	handler.AlertManagerTagValues("far1","far2")
+	handler.AlertManagerAnnotationNames("boo1","boo2")
+	handler.AlertManagerAnnotationValues("bar1","bar2")
 	want := `stream
     |from()
     |alert()
@@ -606,7 +608,10 @@ func TestAlertAlertManager(t *testing.T) {
         .details('{{ json . }}')
         .history(21)
         .alertManager()
-        .room('test')
+        .alertManagerTagNames('foo1', 'foo2')
+        .alertManagerTagValues('far1', 'far2')
+        .alertManagerAnnotationNames('boo1', 'boo2')
+        .alertManagerAnnotationValues('bar1', 'bar2')
 `
 	PipelineTickTestHelper(t, pipe, want)
 }

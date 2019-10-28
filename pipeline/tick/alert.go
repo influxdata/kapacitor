@@ -202,10 +202,10 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 	for _, h := range a.AlertManagerHandlers {
 		n.Dot("alertManager").
 			Dot("room", h.Room).
-			Dot("alertManagerTagName", args(h.AlertManagerTagName)...).
-			Dot("alertManagerTagValue", args(h.AlertManagerTagValue)...).
-			Dot("alertManagerAnnotationName", args(h.AlertManagerAnnotationName)...).
-			Dot("alertManagerAnnotationValue", args(h.AlertManagerAnnotationValue)...)
+			Dot("alertManagerTagNames", args(h.AlertManagerTagName)...).
+			Dot("alertManagerTagValues", args(h.AlertManagerTagValue)...).
+			Dot("alertManagerAnnotationNames", args(h.AlertManagerAnnotationName)...).
+			Dot("alertManagerAnnotationValues", args(h.AlertManagerAnnotationValue)...)
 	}
 
 	for _, h := range a.OpsGenieHandlers {

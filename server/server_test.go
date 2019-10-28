@@ -8689,6 +8689,28 @@ func TestServer_ListServiceTests(t *testing.T) {
 				},
 			},
 			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/alertmanager"},
+				Name: "alertmanager",
+				Options: client.ServiceTestOptions{
+					"alertManagerTagName": []interface{}{
+						"tagA",
+						"tagB",
+					},
+					"alertManagerTagValue": []interface{}{
+						"tag_valueA",
+						"tag_valueB",
+					},
+					"alertManagerAnnotationName": []interface{}{
+						"annA",
+						"annB",
+					},
+					"alertManagerAnnotationValue": []interface{}{
+						"ann_valueA",
+						"ann_valueB",
+					},
+				},
+			},
+			{
 				Link: client.Link{Relation: "self", Href: "/kapacitor/v1/service-tests/azure"},
 				Name: "azure",
 				Options: client.ServiceTestOptions{
@@ -9591,13 +9613,11 @@ func TestServer_AlertHandlers(t *testing.T) {
 			handler: client.TopicHandler{
 				Kind: "alertmanager",
 				Options: map[string]interface{}{
-					"room": "alertmanager",
 				},
 			},
 			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
 				ts := alertmanagertest.NewServer()
 				ctxt := context.WithValue(nil, "server", ts)
-
 				c.AlertManager.Enabled = true
 				c.AlertManager.URL = ts.URL
 				return ctxt, nil
@@ -9609,8 +9629,6 @@ func TestServer_AlertHandlers(t *testing.T) {
 				exp := []alertmanagertest.Request{{
 					URL: "/",
 					PostData: alertmanagertest.PostData{
-						Room:    "alertmanager",
-						Message: "message",
 					},
 				}}
 				if !reflect.DeepEqual(exp, got) {

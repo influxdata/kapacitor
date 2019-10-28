@@ -1265,17 +1265,30 @@ func (n *AlertNodeData) AlertManager() *AlertManagerHandler {
 	return alertmanager
 }
 
+func (a *AlertManagerHandler) AlertManagerTagNames(alertManagerTagName ...string) *AlertManagerHandler {
+	a.AlertManagerTagName = alertManagerTagName
+	return a
+}
+func (a *AlertManagerHandler) AlertManagerTagValues(alertManagerTagValue ...string) *AlertManagerHandler {
+	a.AlertManagerTagValue = alertManagerTagValue
+	return a
+}
+func (a *AlertManagerHandler) AlertManagerAnnotationNames(alertManagerAnnotationName ...string) *AlertManagerHandler {
+	a.AlertManagerAnnotationName = alertManagerAnnotationName
+	return a
+}
+func (a *AlertManagerHandler) AlertManagerAnnotationValues(alertManagerAnnotationValue ...string) *AlertManagerHandler {
+	a.AlertManagerAnnotationValue = alertManagerAnnotationValue
+	return a
+}
+
 // tick:embedded:AlertNode.AlertManager
 type AlertManagerHandler struct {
 	*AlertNodeData `json:"-"`
-
-	// The room for the messages.
-	// Defaults to the room in the configuration if empty.
-	Room string `json:"room"`
-	AlertManagerTagName []string `json:"alertManagerTagName"`
-	AlertManagerTagValue []string `json:"alertManagerTagValue"`
-	AlertManagerAnnotationName []string `json:"alertManagerAnnotationName"`
-	AlertManagerAnnotationValue []string `json:"alertManagerAnnotationValue"`
+	AlertManagerTagName []string `tick:"AlertManagerTagNames" json:"alertManagerTagName"`
+	AlertManagerTagValue []string `tick:"AlertManagerTagValues" json:"alertManagerTagValue"`
+	AlertManagerAnnotationName []string `tick:"AlertManagerAnnotationNames" json:"alertManagerAnnotationName"`
+	AlertManagerAnnotationValue []string `tick:"AlertManagerAnnotationValues" json:"alertManagerAnnotationValue"`
 }
 
 // Send alert to an MQTT broker
