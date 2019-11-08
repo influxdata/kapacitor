@@ -39,6 +39,7 @@ import (
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
+	"github.com/influxdata/kapacitor/services/webexteams"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/uuid"
 	plog "github.com/prometheus/common/log"
@@ -175,6 +176,22 @@ func (h *AlertServiceHandler) FoundNewHandler(key string) {
 
 func (h *AlertServiceHandler) Error(msg string, err error, ctx ...keyvalue.T) {
 	Err(h.L, msg, err, ctx)
+}
+
+// Webex Teams Handler
+type WebexTeamsHandler struct {
+	l Logger
+}
+
+func (h *WebexTeamsHandler) WithContext(ctx ...keyvalue.T) webexteams.Diagnostic {
+	fields := logFieldsFromContext(ctx)
+	return &WebexTeamsHandler{
+		l: h.l.With(fields...),
+	}
+}
+
+func (h *WebexTeamsHandler) Error(msg string, err error) {
+	h.l.Error(msg, Error(err))
 }
 
 // Kapcitor Handler

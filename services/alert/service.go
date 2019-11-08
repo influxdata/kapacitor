@@ -31,6 +31,7 @@ import (
 	"github.com/influxdata/kapacitor/services/storage"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
+	"github.com/influxdata/kapacitor/services/webexteams"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 )
@@ -83,6 +84,10 @@ type Service struct {
 	AlertaService interface {
 		DefaultHandlerConfig() alerta.HandlerConfig
 		Handler(alerta.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
+	}
+	WebexTeamsService interface {
+		DefaultHandlerConfig() webexteams.HandlerConfig
+		Handler(webexteams.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 	HipChatService interface {
 		Handler(hipchat.HandlerConfig, ...keyvalue.T) alert.Handler
@@ -795,6 +800,15 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 			return handler{}, err
 		}
 		h = s.HipChatService.Handler(c, ctx...)
+		h = newExternalHandler(h)
+	case "webexteams":
+		fmt.Println("case is webexteams")
+		c := webexteams.HandlerConfig{}
+		err = decodeOptions(spec.Options, &c)
+		if err != nil {
+			return handler{}, err
+		}
+		h = s.WebexTeamsService.Handler(c, ctx...)
 		h = newExternalHandler(h)
 	case "kafka":
 		c := kafka.HandlerConfig{}

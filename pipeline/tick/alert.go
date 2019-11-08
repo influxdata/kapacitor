@@ -179,6 +179,15 @@ func (n *AlertNode) Build(a *pipeline.AlertNode) (ast.Node, error) {
 			Dot("token", h.Token)
 	}
 
+	for _, h := range a.WebexTeamsHandlers {
+		n.Dot("webexTeams").
+			Dot("roomId", h.RoomID).
+			Dot("toPersonId", h.ToPersonID).
+			Dot("toPersonEmail", h.ToPersonEmail).
+			Dot("markdown", h.Markdown).
+			Dot("token", h.Token)
+	}
+
 	for _, h := range a.KafkaHandlers {
 		n.Dot("kafka").
 			Dot("cluster", h.Cluster).

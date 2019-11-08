@@ -196,6 +196,12 @@ func (s *Service) NewHipChatHandler() *HipChatHandler {
 	}
 }
 
+func (s *Service) NewWebexTeamsHandler() *WebexTeamsHandler {
+	return &WebexTeamsHandler{
+		l: s.Logger.With(String("service", "webexteams")),
+	}
+}
+
 func (s *Service) NewKafkaHandler() *KafkaHandler {
 	return &KafkaHandler{
 		l: s.Logger.With(String("service", "kafka")),

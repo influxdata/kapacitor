@@ -32,6 +32,7 @@ import (
 	"github.com/influxdata/kapacitor/services/snmptrap"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
+	"github.com/influxdata/kapacitor/services/webexteams"
 	"github.com/influxdata/kapacitor/tick/ast"
 	"github.com/influxdata/kapacitor/tick/stateful"
 	"github.com/pkg/errors"
@@ -329,6 +330,25 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 	if et.tm.HipChatService != nil &&
 		et.tm.HipChatService.Global() &&
 		et.tm.HipChatService.StateChangesOnly() {
+		n.IsStateChangesOnly = true
+	}
+
+	for _, teams := range n.WebexTeamsHandlers {
+		d.UDFLog("webex teams handlers")
+		d.UDFLog("teams room-id: " + teams.RoomID)
+		c := webexteams.HandlerConfig{
+			ToPersonID:    teams.ToPersonID,
+			RoomID:        teams.RoomID,
+			ToPersonEmail: teams.ToPersonEmail,
+			Markdown:      teams.Markdown,
+			Token:         teams.Token,
+		}
+		h := et.tm.WebexTeamsService.Handler(c, ctx...)
+		an.handlers = append(an.handlers, h)
+	}
+	if et.tm.WebexTeamsService != nil &&
+		et.tm.WebexTeamsService.Global() &&
+		et.tm.WebexTeamsService.StateChangesOnly() {
 		n.IsStateChangesOnly = true
 	}
 
