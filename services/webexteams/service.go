@@ -67,32 +67,6 @@ func (s *Service) Alert(roomID, personID, personEmail, token, text string, markd
 	if !c.Enabled {
 		return errors.New(ServiceUnavailableErr)
 	}
-	// debugmessage := fmt.Sprintf(`
-	// c.Enabled				= %v
-	// c.RoomID				= %v
-	// c.ToPersonEmail			= %v
-	// c.ToPersonID			= %v
-	// c.Token					= %v
-	// c.URL					= %v
-	// roomID					= %v
-	// personID				= %v
-	// personEmail				= %v
-	// markdown				= %v
-	// token					= %v
-	// text					= %v
-	// `, c.Enabled,
-	// 	c.RoomID,
-	// 	c.ToPersonEmail,
-	// 	c.ToPersonID,
-	// 	c.Token,
-	// 	c.URL,
-	// 	roomID,
-	// 	personID,
-	// 	personEmail,
-	// 	markdown,
-	// 	token,
-	// 	text,
-	// )
 	postData := map[string]interface{}{}
 	// decide the message destination
 
