@@ -20,10 +20,9 @@ type Batch struct {
 	mutex         sync.Mutex
 	conn          *Conn
 	lock          *sync.Mutex
-	reader        *bufio.Reader
+	msgs          *messageSetReader
 	deadline      time.Time
 	throttle      time.Duration
-	remain        int
 	topic         string
 	partition     int
 	offset        int64
@@ -65,7 +64,9 @@ func (batch *Batch) close() (err error) {
 
 	batch.conn = nil
 	batch.lock = nil
-	batch.discard(batch.remain)
+	if batch.msgs != nil {
+		batch.msgs.discard()
+	}
 
 	if err = batch.err; err == io.EOF {
 		err = nil
@@ -91,6 +92,19 @@ func (batch *Batch) close() (err error) {
 	return
 }
 
+// Err returns a non-nil error if the batch is broken. This is the same error
+// that would be returned by Read, ReadMessage or Close (except in the case of
+// io.EOF which is never returned by Close).
+//
+// This method is useful when building retry mechanisms for (*Conn).ReadBatch,
+// the program can check whether the batch carried a error before attempting to
+// read the first message.
+//
+// Note that checking errors on a batch is optional, calling Read or ReadMessage
+// is always valid and can be used to either read a message or an error in cases
+// where that's convenient.
+func (batch *Batch) Err() error { return batch.err }
+
 // Read reads the value of the next message from the batch into b, returning the
 // number of bytes read, or an error if the next message couldn't be read.
 //
@@ -107,7 +121,7 @@ func (batch *Batch) Read(b []byte) (int, error) {
 	batch.mutex.Lock()
 	offset := batch.offset
 
-	_, _, err := batch.readMessage(
+	_, _, _, err := batch.readMessage(
 		func(r *bufio.Reader, size int, nbytes int) (int, error) {
 			if nbytes < 0 {
 				return size, nil
@@ -118,9 +132,17 @@ func (batch *Batch) Read(b []byte) (int, error) {
 			if nbytes < 0 {
 				return size, nil
 			}
+			// make sure there are enough bytes for the message value.  return
+			// errShortRead if the message is truncated.
+			if nbytes > size {
+				return size, errShortRead
+			}
 			n = nbytes // return value
+			if nbytes > cap(b) {
+				nbytes = cap(b)
+			}
 			if nbytes > len(b) {
-				nbytes = len(b)
+				b = b[:nbytes]
 			}
 			nbytes, err := io.ReadFull(r, b[:nbytes])
 			if err != nil {
@@ -149,7 +171,11 @@ func (batch *Batch) ReadMessage() (Message, error) {
 	msg := Message{}
 	batch.mutex.Lock()
 
-	offset, timestamp, err := batch.readMessage(
+	var offset, timestamp int64
+	var headers []Header
+	var err error
+
+	offset, timestamp, headers, err = batch.readMessage(
 		func(r *bufio.Reader, size int, nbytes int) (remain int, err error) {
 			msg.Key, remain, err = readNewBytes(r, size, nbytes)
 			return
@@ -159,30 +185,41 @@ func (batch *Batch) ReadMessage() (Message, error) {
 			return
 		},
 	)
+	for batch.conn != nil && offset < batch.conn.offset {
+		if err != nil {
+			break
+		}
+		offset, timestamp, headers, err = batch.readMessage(
+			func(r *bufio.Reader, size int, nbytes int) (remain int, err error) {
+				msg.Key, remain, err = readNewBytes(r, size, nbytes)
+				return
+			},
+			func(r *bufio.Reader, size int, nbytes int) (remain int, err error) {
+				msg.Value, remain, err = readNewBytes(r, size, nbytes)
+				return
+			},
+		)
+	}
 
 	batch.mutex.Unlock()
 	msg.Topic = batch.topic
 	msg.Partition = batch.partition
 	msg.Offset = offset
 	msg.Time = timestampToTime(timestamp)
+	msg.Headers = headers
+
 	return msg, err
 }
 
 func (batch *Batch) readMessage(
 	key func(*bufio.Reader, int, int) (int, error),
 	val func(*bufio.Reader, int, int) (int, error),
-) (offset int64, timestamp int64, err error) {
+) (offset int64, timestamp int64, headers []Header, err error) {
 	if err = batch.err; err != nil {
 		return
 	}
 
-	offset, timestamp, batch.remain, err = readMessage(
-		batch.reader,
-		batch.remain,
-		batch.offset,
-		key, val,
-	)
-
+	offset, timestamp, headers, err = batch.msgs.readMessage(batch.offset, key, val)
 	switch err {
 	case nil:
 		batch.offset = offset + 1
@@ -190,7 +227,21 @@ func (batch *Batch) readMessage(
 		// As an "optimization" kafka truncates the returned response after
 		// producing MaxBytes, which could then cause the code to return
 		// errShortRead.
-		err = batch.discard(batch.remain)
+		err = batch.msgs.discard()
+		switch {
+		case err != nil:
+			batch.err = err
+		case batch.msgs.remaining() == 0:
+			// Because we use the adjusted deadline we could end up returning
+			// before the actual deadline occurred. This is necessary otherwise
+			// timing out the connection for real could end up leaving it in an
+			// unpredictable state, which would require closing it.
+			// This design decision was made to maximize the chances of keeping
+			// the connection open, the trade off being to lose precision on the
+			// read deadline management.
+			err = checkTimeoutErr(batch.deadline)
+			batch.err = err
+		}
 	default:
 		batch.err = err
 	}
@@ -198,25 +249,11 @@ func (batch *Batch) readMessage(
 	return
 }
 
-func (batch *Batch) discard(n int) (err error) {
-	batch.remain, err = discardN(batch.reader, batch.remain, n)
-	switch {
-	case err != nil:
-		batch.err = err
-	case batch.err == nil && batch.remain == 0:
-		// Because we use the adjusted deadline we could end up returning
-		// before the actual deadline occurred. This is necessary otherwise
-		// timing out the connection for real could end up leaving it in an
-		// unpredictable state, which would require closing it.
-		// This design decision was main to maximize the changes of keeping
-		// the connection open, the trade off being to lose precision on the
-		// read deadline management.
-		if !batch.deadline.IsZero() && time.Now().After(batch.deadline) {
-			err = RequestTimedOut
-		} else {
-			err = io.EOF
-		}
-		batch.err = err
+func checkTimeoutErr(deadline time.Time) (err error) {
+	if !deadline.IsZero() && time.Now().After(deadline) {
+		err = RequestTimedOut
+	} else {
+		err = io.EOF
 	}
 	return
 }
