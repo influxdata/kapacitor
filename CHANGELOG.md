@@ -4,6 +4,7 @@
 
 ### Features
 
+- [#2269](https://github.com/influxdata/kapacitor/pull/2269): Change CLI to support JSON formatted for kapacitord service.
 - [#2202](https://github.com/influxdata/kapacitor/pull/2202): Add templating for MQTT topics.
 
 ### Bugfixes
