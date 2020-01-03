@@ -702,6 +702,9 @@ func doDefine(args []string) error {
 		}
 		defer f.Close()
 		data, err := ioutil.ReadAll(f)
+		if err != nil {
+			return errors.Wrapf(err, "failed to read task vars file %q", *dvars)
+		}
 
 		dec := json.NewDecoder(strings.NewReader(string(data)))
 		if err := dec.Decode(&vars); err != nil {
