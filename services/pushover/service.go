@@ -114,7 +114,7 @@ func (s *Service) Alert(message, device, title, URL, URLTitle, sound string, lev
 		pushoverResponse := struct {
 			Errors []string `json:"errors"`
 		}{}
-		err = json.Unmarshal(body, pushoverResponse)
+		err = json.Unmarshal(body, &pushoverResponse)
 		if err != nil {
 			return err
 		}

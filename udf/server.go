@@ -303,7 +303,7 @@ func (s *Server) Snapshot() ([]byte, error) {
 // Request to restore a snapshot.
 func (s *Server) Restore(snapshot []byte) error {
 	req := &agent.Request{Message: &agent.Request_Restore{
-		Restore: &agent.RestoreRequest{snapshot},
+		Restore: &agent.RestoreRequest{Snapshot: snapshot},
 	}}
 	resp, err := s.doRequestResponse(req, s.restoreResponse)
 	if err != nil {

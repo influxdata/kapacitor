@@ -9,6 +9,7 @@
 ### Bugfixes
 
 - [#2253](https://github.com/influxdata/kapacitor/pull/2253): Upgrade the kafka library to set the timestamp correctly.
+- [#2274](https://github.com/influxdata/kapacitor/pull/2274): Upgrade to Go 1.13, fixes various go vet issues.
 
 ## v1.5.3 [2019-06-18]
 
