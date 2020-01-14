@@ -52,13 +52,13 @@ class OutliersHandler(Handler):
             l = len(data)
             m = l / 2
             if l%2 == 0:
-                left = m
-                right = m + 1
-                median = (data[left][0]+ data[right][0]) / 2.0
+                left = int(m)
+                right = int(min(m + 1,l-1))
+                median = (data[left][0] + data[right][0]) / 2.0
             else:
-                left = m
-                right = m
-                median = data[m][0]
+                left = int(m)
+                right = int(m)
+                median = data[int(m)][0]
             return left, right, median
 
 
