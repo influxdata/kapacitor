@@ -76,7 +76,7 @@ import (
 	"github.com/influxdata/kapacitor/services/victorops/victoropstest"
 	"github.com/influxdata/kapacitor/udf"
 	"github.com/influxdata/kapacitor/udf/agent"
-	"github.com/influxdata/kapacitor/udf/test"
+	udf_test "github.com/influxdata/kapacitor/udf/test"
 	"github.com/influxdata/wlog"
 	"github.com/k-sone/snmpgo"
 )
@@ -84,6 +84,7 @@ import (
 var diagService *diagnostic.Service
 
 func init() {
+	testing.Init()
 	flag.Parse()
 	out := ioutil.Discard
 	if testing.Verbose() {
@@ -7091,7 +7092,7 @@ stream
 				exp.Values = []*agent.OptionValue{
 					{
 						Type:  agent.ValueType_STRING,
-						Value: &agent.OptionValue_StringValue{"count"},
+						Value: &agent.OptionValue_StringValue{StringValue: "count"},
 					},
 				}
 			case 1:
@@ -7099,23 +7100,23 @@ stream
 				exp.Values = []*agent.OptionValue{
 					{
 						Type:  agent.ValueType_BOOL,
-						Value: &agent.OptionValue_BoolValue{false},
+						Value: &agent.OptionValue_BoolValue{BoolValue: false},
 					},
 					{
 						Type:  agent.ValueType_INT,
-						Value: &agent.OptionValue_IntValue{1},
+						Value: &agent.OptionValue_IntValue{IntValue: 1},
 					},
 					{
 						Type:  agent.ValueType_DOUBLE,
-						Value: &agent.OptionValue_DoubleValue{1.0},
+						Value: &agent.OptionValue_DoubleValue{DoubleValue: 1.0},
 					},
 					{
 						Type:  agent.ValueType_STRING,
-						Value: &agent.OptionValue_StringValue{"1.0"},
+						Value: &agent.OptionValue_StringValue{StringValue: "1.0"},
 					},
 					{
 						Type:  agent.ValueType_DURATION,
-						Value: &agent.OptionValue_DurationValue{int64(time.Second)},
+						Value: &agent.OptionValue_DurationValue{DurationValue: int64(time.Second)},
 					},
 				}
 			}
