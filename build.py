@@ -743,13 +743,6 @@ def package(build_output, pkg_name, version, nightly=False, iteration=1, static=
                                 new_outfile = outfile.replace("{}-{}".format(package_version, package_iteration), "nightly")
                                 os.rename(outfile, new_outfile)
                                 outfile = new_outfile
-                            else:
-                                if package_type == 'rpm':
-                                    # rpm's convert any dashes to underscores
-                                    package_version = package_version.replace("-", "_")
-                                new_outfile = outfile.replace("{}-{}".format(package_version, package_iteration), package_version)
-                                os.rename(outfile, new_outfile)
-                                outfile = new_outfile
                             outfiles.append(os.path.join(os.getcwd(), outfile))
         logging.debug("Produced package files: {}".format(outfiles))
         return outfiles
