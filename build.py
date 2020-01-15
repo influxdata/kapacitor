@@ -745,9 +745,10 @@ def package(build_output, pkg_name, version, nightly=False, iteration=1, static=
                                 outfile = new_outfile
                             else:
                                 if package_type == 'rpm':
-                                    # rpm's convert any dashes to underscores
-                                    package_version = package_version.replace("-", "_")
-                                new_outfile = outfile.replace("{}-{}".format(package_version, package_iteration), package_version)
+                                    # rpm naming convention requires us to include the package_iteration value
+                                    new_outfile = outfile
+                                else:
+                                    new_outfile = outfile.replace("{}-{}".format(package_version, package_iteration), package_version)
                                 os.rename(outfile, new_outfile)
                                 outfile = new_outfile
                             outfiles.append(os.path.join(os.getcwd(), outfile))
