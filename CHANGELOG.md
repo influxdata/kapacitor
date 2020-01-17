@@ -4,6 +4,12 @@
 
 ### Features
 
+### Bugfixes
+
+## v1.5.4 [2020-01-16]
+
+### Features
+
 - [#2202](https://github.com/influxdata/kapacitor/pull/2202): Add templating for MQTT topics.
 - [#2276](https://github.com/influxdata/kapacitor/pull/2276): Upgrade to support python 3 for UDFs, Thanks @N-Coder !
 
