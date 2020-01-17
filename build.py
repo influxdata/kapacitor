@@ -1,4 +1,4 @@
-#!/usr/bin/python2.7 -u
+#!/usr/bin/python
 
 import argparse
 import hashlib
