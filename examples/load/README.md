@@ -167,7 +167,7 @@ Topic Handler files must be placed in the `handlers` subdirectory of the load se
 directory.
 
 ```
-id: hanlder-id
+id: handler-id
 topic: cpu
 kind: slack
 match: changed() == TRUE
