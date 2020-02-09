@@ -5,7 +5,7 @@
 ### Features
 
 ### Bugfixes
-
+- [#2286](https://github.com/influxdata/kapacitor/pull/2286): Corrected issue with `go vet` invocation in .hooks/pre-commit which would cause the hook to fail.
 ## v1.5.4 [2020-01-16]
 
 ### Features
