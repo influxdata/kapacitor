@@ -209,22 +209,25 @@ type embed struct {
 }
 
 type testOptions struct {
-	Workspace    string      `json:"workspace"`
-	Message      string      `json:"message"`
-	Level        alert.Level `json:"level"`
-	Username     string      `json:"username"`
-	AvatarURL    string      `json:"avatar-url"`
-	EmbedTitle   string      `json:"embed-title"`
-	Timestamp    bool        `json:"timestamp"`
-	TimestampStr string      `json:"color"`
+	Workspace  string      `json:"workspace"`
+	Message    string      `json:"message"`
+	Level      alert.Level `json:"level"`
+	Username   string      `json:"username"`
+	AvatarURL  string      `json:"avatar-url"`
+	EmbedTitle string      `json:"embed-title"`
+	Timestamp  bool        `json:"timestamp"`
+	Time       time.Time   `json:"color"`
 }
 
 func (s *Service) TestOptions() interface{} {
 	c, _ := s.config("")
 	return &testOptions{
-		Workspace: c.Workspace,
-		Message:   "test discord message",
-		Level:     alert.Info,
+		Workspace:  c.Workspace,
+		Message:    "test discord message",
+		Level:      alert.Info,
+		EmbedTitle: "Kapacitor Alert",
+		Timestamp:  true,
+		Time:       time.Now(),
 	}
 }
 
@@ -233,12 +236,12 @@ func (s *Service) Test(options interface{}) error {
 	if !ok {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
-	return s.Alert(o.Workspace, o.Message, o.Username, o.AvatarURL, o.EmbedTitle, o.TimestampStr, o.Timestamp, o.Level)
+	return s.Alert(o.Workspace, o.Message, o.Username, o.AvatarURL, o.EmbedTitle, o.Timestamp, o.Time, o.Level)
 }
 
 // Alert sends a message to the specified room.
-func (s *Service) Alert(workspace, message, username, avatarURL, embedTitle, timestampStr string, timestamp bool, level alert.Level) error {
-	url, post, err := s.preparePost(workspace, message, username, avatarURL, embedTitle, timestampStr, timestamp, level)
+func (s *Service) Alert(workspace, message, username, avatarURL, embedTitle string, timestamp bool, time time.Time, level alert.Level) error {
+	url, post, err := s.preparePost(workspace, message, username, avatarURL, embedTitle, timestamp, time, level)
 	if err != nil {
 		return err
 	}
@@ -291,7 +294,7 @@ type HandlerConfig struct {
 	EmbedTitle string `mapstructure:"embed-title"`
 }
 
-func (s *Service) preparePost(workspace, message, username, avatarURL, embedTitle, timestampStr string, timestamp bool, level alert.Level) (string, io.Reader, error) {
+func (s *Service) preparePost(workspace, message, username, avatarURL, embedTitle string, timestamp bool, timeVal time.Time, level alert.Level) (string, io.Reader, error) {
 	c, err := s.config(workspace)
 	if err != nil {
 		return "", nil, err
@@ -308,23 +311,15 @@ func (s *Service) preparePost(workspace, message, username, avatarURL, embedTitl
 	default:
 		color = 0x7A65F2
 	}
+	var timeStr string
 	if timestamp {
-		if timestampStr == "" {
-			timestampStr = time.Now().Format(time.RFC3339)
-		} else {
-			_, err := time.Parse(time.RFC3339, timestampStr)
-			if err != nil {
-				return "", nil, errors.New("timestampStr is not a valid ISO8601 string")
-			}
-		}
-	} else {
-		timestampStr = ""
+		timeStr = timeVal.Format(time.RFC3339)
 	}
 	a := embed{
 		Description: message,
 		Color:       color,
 		Title:       embedTitle,
-		Timestamp:   timestampStr,
+		Timestamp:   timeStr,
 	}
 	postData := make(map[string]interface{})
 	if username != "" {
@@ -360,15 +355,14 @@ func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
 }
 
 func (h *handler) Handle(event alert.Event) {
-
 	if err := h.s.Alert(
 		h.c.Workspace,
 		event.State.Message,
 		h.c.Username,
 		h.c.AvatarURL,
 		h.c.EmbedTitle,
-		h.c.TimestampStr,
 		h.c.Timestamp,
+		event.State.Time,
 		event.State.Level,
 	); err != nil {
 		h.diag.Error("failed to send event", err)

@@ -55,6 +55,7 @@ type AlertNode struct{ *AlertNodeData }
 //    * Talk -- Post alert message to Talk client.
 //    * Telegram -- Post alert message to Telegram client.
 //    * MQTT -- Post alert message to MQTT.
+//	  * Discord -- Post alert message to Discord webhook.
 //
 // See below for more details on configuring each handler.
 //
@@ -349,6 +350,10 @@ type AlertNodeData struct {
 	// Send alert to Slack.
 	// tick:ignore
 	SlackHandlers []*SlackHandler `tick:"Slack" json:"slack"`
+
+	// Send alert to Discord.
+	// tick:ignore
+	DiscordHandlers []*DiscordHandler `tick:"Discord" json:"discord"`
 
 	// Send alert to Telegram.
 	// tick:ignore
@@ -1521,6 +1526,38 @@ type SlackHandler struct {
 	// IconEmoji is an emoji name surrounded in ':' characters.
 	// The emoji image will replace the normal user icon for the slack bot.
 	IconEmoji string `json:"iconEmoji"`
+}
+
+func (n *AlertNodeData) Discord() *DiscordHandler {
+	discord := &DiscordHandler{
+		AlertNodeData: n,
+	}
+	n.DiscordHandlers = append(n.DiscordHandlers, discord)
+	return discord
+}
+
+// tick:embedded:AlertNode.Discord
+type DiscordHandler struct {
+	*AlertNodeData `json:"-"`
+
+	// Discord workspace ID to use when posting to webhook
+	// If empty uses the default config
+	Workspace string `json:"workspace"`
+	// Whether to display timestamp in the footer of the embed
+	// If empty uses the default config
+	Timestamp bool `json:"timestamp"`
+	// Timestamp string in ISO 8601 format
+	// If empty and HandlerCOnfig.Timestamp is true will use time that alert is fired
+	TimestampStr string `json:"timestampStr"`
+	// Username of webhook
+	// If empty uses the default config
+	Username string `json:"username"`
+	// URL of webhook's avatar
+	// If empty uses the default config
+	AvatarURL string `json:"avatarUrl"`
+	// Embed title
+	// If empty uses the default config
+	EmbedTitle string `json:"embedTitle"`
 }
 
 // Send the alert to Telegram.
