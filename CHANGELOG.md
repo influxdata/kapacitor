@@ -3,7 +3,7 @@
 ## unreleased
 
 ### Features
-
+- [#2287](https://github.com/influxdata/kapacitor/pull/2287): Added Discord Webhook Alert Handler
 ### Bugfixes
 
 ## v1.5.4 [2020-01-16]
