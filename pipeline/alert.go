@@ -1546,13 +1546,6 @@ type SlackHandler struct {
 // Example:
 //    stream
 //         |alert()
-//             .slack()
-//
-// Send alerts to the default worskace Slack channel in the configuration file.
-//
-// Example:
-//    stream
-//         |alert()
 //             .discord()
 //
 // Send alerts to the default workspace
@@ -1566,7 +1559,7 @@ type SlackHandler struct {
 // send alerts to the opencommunity workspace
 //
 // If the 'discord' section in the configuration has the option: global = true
-// then all alerts are sent to Slack without the need to explicitly state it
+// then all alerts are sent to Discord without the need to explicitly state it
 // in the TICKscript.
 //
 // Example:

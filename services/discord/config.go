@@ -25,7 +25,7 @@ type Config struct {
 	AvatarURL string `toml:"avatar-url" override:"avatar-url"`
 	// Embed Title
 	EmbedTitle string `toml:"embed-title" override:"embed-title"`
-	// Whether all alerts should automatically post to slack
+	// Whether all alerts should automatically post to discord
 	Global bool `toml:"global" override:"global"`
 	// Whether all alerts should automatically use stateChangesOnly mode.
 	// Only applies if global is also set.

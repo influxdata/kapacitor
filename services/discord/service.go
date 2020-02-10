@@ -159,7 +159,6 @@ func (s *Service) client(wid string) (*http.Client, error) {
 }
 
 func (s *Service) Update(newConfigs []interface{}) error {
-
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -267,7 +266,7 @@ func (s *Service) Alert(workspace, message, username, avatarURL, embedTitle stri
 		type response struct {
 			Error string `json:"error"`
 		}
-		r := &response{Error: fmt.Sprintf("failed to understand Slack response. code: %d content: %s", resp.StatusCode, string(body))}
+		r := &response{Error: fmt.Sprintf("failed to understand Discord response. code: %d content: %s", resp.StatusCode, string(body))}
 		b := bytes.NewReader(body)
 		dec := json.NewDecoder(b)
 		dec.Decode(r)

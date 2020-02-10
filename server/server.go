@@ -242,7 +242,7 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 	// Append Alert integration services
 	s.appendAlertaService()
 	if err := s.appendDiscordService(); err != nil {
-		return nil, errors.Wrap(err, "slack service")
+		return nil, errors.Wrap(err, "discord service")
 	}
 	s.appendHipChatService()
 	s.appendKafkaService()

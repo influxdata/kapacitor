@@ -599,7 +599,7 @@ func (h *SlackHandler) WithContext(ctx ...keyvalue.T) slack.Diagnostic {
 	}
 }
 
-// Slack Handler
+// Discord Handler
 
 type DiscordHandler struct {
 	l Logger
