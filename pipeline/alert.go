@@ -1528,6 +1528,62 @@ type SlackHandler struct {
 	IconEmoji string `json:"iconEmoji"`
 }
 
+// Send the alert to Discord.
+// To allow Kapacitor to post to Discord,
+// follow this guide https://support.discordapp.com/hc/en-us/articles/228383668
+// and create a new webhook and place the generated URL
+// in the 'discord' configuration section.
+//
+// Example:
+//    [[discord]]
+//      enabled = true
+//      url = "https://discordapp.com/api/webhooks/xxxxxxxxxxxxxxxxxx/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+//
+// In order to not post a message every alert interval
+// use AlertNode.StateChangesOnly so that only events
+// where the alert changed state are posted to the channel.
+//
+// Example:
+//    stream
+//         |alert()
+//             .slack()
+//
+// Send alerts to the default worskace Slack channel in the configuration file.
+//
+// Example:
+//    stream
+//         |alert()
+//             .discord()
+//
+// Send alerts to the default workspace
+//
+// Example:
+// stream
+//      |alert()
+//          .discord()
+//          .workspace('opencommunity')
+//
+// send alerts to the opencommunity workspace
+//
+// If the 'discord' section in the configuration has the option: global = true
+// then all alerts are sent to Slack without the need to explicitly state it
+// in the TICKscript.
+//
+// Example:
+//    [[discord]]
+//      enabled = true
+//      default = true
+//      workspace = examplecorp
+//      url = "https://discordapp.com/api/webhooks/xxxxxxxxxxxxxxxxxx/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+//      global = true
+//      state-changes-only = true
+//
+// Example:
+//    stream
+//         |alert()
+//
+// Send alert to Discord.
+// tick:property
 func (n *AlertNodeData) Discord() *DiscordHandler {
 	discord := &DiscordHandler{
 		AlertNodeData: n,
