@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/influxdata/kapacitor/services/discord/discordtest"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -8706,6 +8707,20 @@ func TestServer_ListServiceTests(t *testing.T) {
 				},
 			},
 			{
+				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/discord"},
+				Name: "discord",
+				Options: client.ServiceTestOptions{
+					"workspace":   "",
+					"avatar-url":  "https://influxdata.github.io/branding/img/downloads/influxdata-logo--symbol--pool-alpha.png",
+					"level":       "INFO",
+					"message":     "test discord message",
+					"username":    "Kapacitor",
+					"embed-title": "Kapacitor Alert",
+					"timestamp":   true,
+					"time-val":    "1970-01-01T00:00:01Z",
+				},
+			},
+			{
 				Link: client.Link{Relation: "self", Href: "/kapacitor/v1/service-tests/dns"},
 				Name: "dns",
 				Options: client.ServiceTestOptions{
@@ -9578,6 +9593,49 @@ func TestServer_AlertHandlers(t *testing.T) {
 				}}
 				if !reflect.DeepEqual(exp, got) {
 					return fmt.Errorf("unexpected alerta request:\nexp\n%+v\ngot\n%+v\n", exp, got)
+				}
+				return nil
+			},
+		},
+		{
+			handler: client.TopicHandler{
+				Kind: "discord",
+				Options: map[string]interface{}{
+					"username":    "Kapacitor",
+					"avatar-url":  "https://influxdata.github.io/branding/img/downloads/influxdata-logo--symbol--pool-alpha.png",
+					"timestamp":   true,
+					"embed-title": "Kapacitor Alert",
+				},
+			},
+			setup: func(c *server.Config, ha *client.TopicHandler) (context.Context, error) {
+				ts := discordtest.NewServer()
+				ctxt := context.WithValue(nil, "server", ts)
+
+				c.Discord[0].Enabled = true
+				c.Discord[0].URL = ts.URL + "/test/discord/url"
+				return ctxt, nil
+			},
+			result: func(ctxt context.Context) error {
+				ts := ctxt.Value("server").(*discordtest.Server)
+				ts.Close()
+				got := ts.Requests()
+				exp := []discordtest.Request{{
+					URL: "/test/discord/url",
+					PostData: discordtest.PostData{
+						Username:  "Kapacitor",
+						AvatarURL: "https://influxdata.github.io/branding/img/downloads/influxdata-logo--symbol--pool-alpha.png",
+						Embeds: []discordtest.Embed{
+							{
+								Color:       0xF95F53,
+								Title:       "Kapacitor Alert",
+								Timestamp:   "1970-01-01T00:00:00Z",
+								Description: "message",
+							},
+						},
+					},
+				}}
+				if !reflect.DeepEqual(exp, got) {
+					return fmt.Errorf("unexpected discord request:\nexp\n%+v\ngot\n%+v\n", exp, got)
 				}
 				return nil
 			},

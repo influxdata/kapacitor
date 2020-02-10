@@ -13,7 +13,7 @@ type Config struct {
 	Enabled bool `toml:"enabled" override:"enabled"`
 	// Whether this is the default discord config.
 	Default bool `toml:"default" override:"default"`
-	// ID assigned if multiple slack c`onfigs are given
+	// ID assigned if multiple discord configs are given
 	Workspace string `toml:"workspace" override:"workspace"`
 	// Discord channel webhook URL
 	URL string `toml:"url" override:"url"`

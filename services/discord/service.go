@@ -216,18 +216,21 @@ type testOptions struct {
 	AvatarURL  string      `json:"avatar-url"`
 	EmbedTitle string      `json:"embed-title"`
 	Timestamp  bool        `json:"timestamp"`
-	Time       time.Time   `json:"color"`
+	Time       time.Time   `json:"time-val"`
 }
 
 func (s *Service) TestOptions() interface{} {
 	c, _ := s.config("")
+	t, _ := time.Parse(time.RFC3339, "1970-01-01T00:00:01Z")
 	return &testOptions{
 		Workspace:  c.Workspace,
 		Message:    "test discord message",
 		Level:      alert.Info,
+		AvatarURL:  "https://influxdata.github.io/branding/img/downloads/influxdata-logo--symbol--pool-alpha.png",
+		Username:   "Kapacitor",
 		EmbedTitle: "Kapacitor Alert",
 		Timestamp:  true,
-		Time:       time.Now(),
+		Time:       t,
 	}
 }
 
@@ -256,7 +259,7 @@ func (s *Service) Alert(workspace, message, username, avatarURL, embedTitle stri
 		return err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusNoContent {
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return err
@@ -280,9 +283,6 @@ type HandlerConfig struct {
 	// Whether to display timestamp in the footer of the embed
 	// If empty uses the default config
 	Timestamp bool `mapstructure:"timestamp"`
-	// Timestamp string in ISO 8601 format
-	// If empty and HandlerCOnfig.Timestamp is true will use time that alert is fired
-	TimestampStr string `mapstructure:"timestamp-str"`
 	// Username of webhook
 	// If empty uses the default config
 	Username string `mapstructure:"username"`
@@ -305,11 +305,11 @@ func (s *Service) preparePost(workspace, message, username, avatarURL, embedTitl
 	var color int
 	switch level {
 	case alert.Critical:
-		color = 0xF95F53
+		color = 0xF95F53 // #F95F53
 	case alert.Warning:
-		color = 0xF48D38
+		color = 0xF48D38 // #F48D38
 	default:
-		color = 0x7A65F2
+		color = 0x7A65F2 // #7A65F2
 	}
 	var timeStr string
 	if timestamp {
@@ -322,12 +322,14 @@ func (s *Service) preparePost(workspace, message, username, avatarURL, embedTitl
 		Timestamp:   timeStr,
 	}
 	postData := make(map[string]interface{})
-	if username != "" {
-		postData["username"] = username
+	if username == "" {
+		username = c.Username
 	}
-	if avatarURL != "" {
-		postData["avatar_url"] = avatarURL
+	postData["username"] = username
+	if avatarURL == "" {
+		avatarURL = c.AvatarURL
 	}
+	postData["avatar_url"] = avatarURL
 	postData["embeds"] = []embed{a}
 
 	var post bytes.Buffer
