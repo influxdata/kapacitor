@@ -550,6 +550,7 @@ def build(version=None,
                 build_command += "GOARM=6 "
             elif fullarch == "arm64":
                 # GOARM not used - see https://github.com/golang/go/wiki/GoArm
+                pass
             else:
                 logging.error("Invalid ARM architecture specified: {}".format(arch))
                 logging.error("Please specify either 'armel', 'armhf', or 'arm64'.")
