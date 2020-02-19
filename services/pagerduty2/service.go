@@ -204,6 +204,7 @@ func (s *Service) Test(options interface{}) error {
 		o.Links,
 		o.AlertID,
 		o.Description,
+		o.Description,
 		o.Level,
 		o.Timestamp,
 		o.Data,
@@ -214,8 +215,8 @@ func (s *Service) Test(options interface{}) error {
 //
 // The req headers are now required with the API v2:
 // https://v2.developer.pagerduty.com/docs/migrating-to-api-v2
-func (s *Service) Alert(routingKey string, links []LinkTemplate, alertID, desc string, level alert.Level, timestamp time.Time, data alert.EventData) error {
-	url, post, err := s.preparePost(routingKey, links, alertID, desc, level, timestamp, data)
+func (s *Service) Alert(routingKey string, links []LinkTemplate, alertID, desc string, details string, level alert.Level, timestamp time.Time, data alert.EventData) error {
+	url, post, err := s.preparePost(routingKey, links, alertID, desc, details, level, timestamp, data)
 	if err != nil {
 		return err
 	}
@@ -283,7 +284,7 @@ func (s *Service) sendResolve(c Config, routingKey, alertID string) (string, io.
 }
 
 // preparePost is a helper method that sets up the payload for transmission to PagerDuty
-func (s *Service) preparePost(routingKey string, links []LinkTemplate, alertID, desc string, level alert.Level, timestamp time.Time, data alert.EventData) (string, io.Reader, error) {
+func (s *Service) preparePost(routingKey string, links []LinkTemplate, alertID, desc string, details string, level alert.Level, timestamp time.Time, data alert.EventData) (string, io.Reader, error) {
 	c := s.config()
 	if !c.Enabled {
 		return "", nil, errors.New("service is not enabled")
@@ -321,7 +322,11 @@ func (s *Service) preparePost(routingKey string, links []LinkTemplate, alertID, 
 	ap.EventAction = eventType
 
 	ap.Payload.CustomDetails = make(map[string]interface{})
-	ap.Payload.CustomDetails["result"] = data.Result
+	if details != "" {
+	  ap.Payload.CustomDetails["result"] = details
+        } else {
+	  ap.Payload.CustomDetails["result"] = data.Result
+        }
 
 	ap.Payload.Class = data.TaskName
 	ap.Payload.Severity = severity
@@ -429,6 +434,7 @@ func (h *handler) Handle(event alert.Event) {
 		h.c.Links,
 		event.State.ID,
 		event.State.Message,
+		event.State.Details,
 		event.State.Level,
 		event.State.Time,
 		event.Data,
