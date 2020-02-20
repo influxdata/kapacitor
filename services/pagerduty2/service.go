@@ -204,7 +204,7 @@ func (s *Service) Test(options interface{}) error {
 		o.Links,
 		o.AlertID,
 		o.Description,
-		o.Description,
+		"",
 		o.Level,
 		o.Timestamp,
 		o.Data,
