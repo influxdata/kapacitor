@@ -323,10 +323,10 @@ func (s *Service) preparePost(routingKey string, links []LinkTemplate, alertID, 
 
 	ap.Payload.CustomDetails = make(map[string]interface{})
 	if details != "" {
-	  ap.Payload.CustomDetails["result"] = details
-        } else {
-	  ap.Payload.CustomDetails["result"] = data.Result
-        }
+		ap.Payload.CustomDetails["result"] = details
+	} else {
+		ap.Payload.CustomDetails["result"] = data.Result
+	}
 
 	ap.Payload.Class = data.TaskName
 	ap.Payload.Severity = severity
