@@ -442,6 +442,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		c := opsgenie2.HandlerConfig{
 			TeamsList:      og.TeamsList,
 			RecipientsList: og.RecipientsList,
+			RecoveryAction: og.RecoveryActionString,
 		}
 		h := et.tm.OpsGenie2Service.Handler(c, ctx...)
 		an.handlers = append(an.handlers, h)
