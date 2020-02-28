@@ -1761,6 +1761,10 @@ type OpsGenie2Handler struct {
 	// OpsGenie2 Recipients.
 	// tick:ignore
 	RecipientsList []string `tick:"Recipients" json:"recipients"`
+
+	// OpsGenie2 recovery_action
+	// tick:ignore
+	RecoveryActionString string `tick:"RecoveryAction" json:"recoveryAction"`
 }
 
 // The list of teams to be alerted. If empty defaults to the teams from the configuration.
@@ -1774,6 +1778,13 @@ func (og *OpsGenie2Handler) Teams(teams ...string) *OpsGenie2Handler {
 // tick:property
 func (og *OpsGenie2Handler) Recipients(recipients ...string) *OpsGenie2Handler {
 	og.RecipientsList = recipients
+	return og
+}
+
+// The action to perform when the alarm recovers. If empty defaults to the recovery_action from the configuration.
+// tick:property
+func (og *OpsGenie2Handler) RecoveryAction(recoveryAction string) *OpsGenie2Handler {
+	og.RecoveryActionString = recoveryAction
 	return og
 }
 
