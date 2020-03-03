@@ -30,7 +30,8 @@ type Config struct {
 
 func NewConfig() Config {
 	return Config{
-		URL: DefaultOpsGenieAPIURL,
+		URL:            DefaultOpsGenieAPIURL,
+		RecoveryAction: DefaultOpsGenieRecoveryAction,
 	}
 }
 
