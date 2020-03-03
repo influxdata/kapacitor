@@ -1851,7 +1851,7 @@ type OpsGenie2Handler struct {
 
 	// OpsGenie2 recovery_action
 	// tick:ignore
-	RecoveryActionString string `tick:"RecoveryAction" json:"recoveryAction"`
+	RecoveryActionString string `tick:"RecoveryAction" json:"recovery_action"`
 }
 
 // The list of teams to be alerted. If empty defaults to the teams from the configuration.
