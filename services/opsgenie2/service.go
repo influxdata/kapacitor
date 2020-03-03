@@ -69,7 +69,7 @@ func (s *Service) Global() bool {
 type testOptions struct {
 	Teams          []string `json:"teams"`
 	Recipients     []string `json:"recipients"`
-	RecoveryAction string   `json:"recovery-action"`
+	RecoveryAction string   `json:"recovery_action"`
 	MessageType    string   `json:"message-type"`
 	Message        string   `json:"message"`
 	EntityID       string   `json:"entity-id"`
@@ -267,7 +267,7 @@ type HandlerConfig struct {
 	RecipientsList []string `mapstructure:"recipients-list"`
 
 	// OpsGenie RecoveryAction
-	RecoveryAction string `mapstructure:"recovery-action"`
+	RecoveryAction string `mapstructure:"recovery_action"`
 }
 
 type handler struct {
