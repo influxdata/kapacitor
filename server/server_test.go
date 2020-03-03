@@ -8815,11 +8815,12 @@ func TestServer_ListServiceTests(t *testing.T) {
 				Link: client.Link{Relation: client.Self, Href: "/kapacitor/v1/service-tests/opsgenie2"},
 				Name: "opsgenie2",
 				Options: client.ServiceTestOptions{
-					"teams":        nil,
-					"recipients":   nil,
-					"message-type": "CRITICAL",
-					"message":      "test opsgenie message",
-					"entity-id":    "testEntityID",
+					"teams":           nil,
+					"recipients":      nil,
+					"message-type":    "CRITICAL",
+					"message":         "test opsgenie message",
+					"entity-id":       "testEntityID",
+					"recovery_action": "notes",
 				},
 			},
 			{
