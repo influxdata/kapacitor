@@ -101,9 +101,9 @@ func (s *Service) Alert(tagName []string, tagValue []string, annotationName []st
 	}
 
 	alertStatus := "firing"
-	if alertLevel == alert.OK {
-		alertStatus = "resolved"
-	}
+	//if alertLevel == alert.OK {
+	//	alertStatus = "resolved"
+	//}
 	alertLabels := map[string]string{}
 	for i := 0; i < len(tagName); i++ {
 		alertLabels[tagName[i]] = tagValue[i]
