@@ -1,4 +1,4 @@
-#!/usr/bin/python2.7 -u
+#!/usr/bin/python
 
 import argparse
 import hashlib
@@ -47,7 +47,7 @@ VENDOR = "InfluxData"
 DESCRIPTION = "Time series data processing engine"
 
 # SCRIPT START
-go_vet_command = "go tool vet -composites=false"
+go_vet_command = "go vet ./..."
 prereqs = [ 'git', 'go' ]
 optional_prereqs = [ 'fpm', 'rpmbuild', 'gpg' ]
 
@@ -161,8 +161,7 @@ def run_generate():
     run("go install ./vendor/github.com/golang/protobuf/protoc-gen-go")
     run("go install ./vendor/github.com/benbjohnson/tmpl")
     run("go install ./vendor/github.com/mailru/easyjson/easyjson")
-    generate_cmd = ["go", "generate"]
-    generate_cmd.extend(go_list())
+    generate_cmd = ["go", "generate", "./..."]
     p = subprocess.Popen(generate_cmd)
     code = p.wait()
     if code == 0:
@@ -201,13 +200,13 @@ def run_tests(race, parallel, timeout, no_vet):
         logging.info("Using parallel: {}".format(parallel))
     if timeout is not None:
         logging.info("Using timeout: {}".format(timeout))
-    out = run("go fmt {}".format(' '.join(go_list())))
+    out = run("go fmt ./...")
     if len(out) > 0:
         logging.error("Code not formatted. Please use 'go fmt ./...' to fix formatting errors.")
         logging.error("{}".format(out))
         return False
     if not no_vet:
-        vet_cmd = go_vet_command + " {}".format(" ".join(go_list(relative=True)))
+        vet_cmd = go_vet_command
         out = run(vet_cmd)
         if len(out) > 0:
             logging.error("Go vet failed. Please run '{}' and fix any errors.".format(vet_cmd))
@@ -215,14 +214,14 @@ def run_tests(race, parallel, timeout, no_vet):
             return False
     else:
         logging.info("Skipping 'go vet' call...")
-    test_command = "go test -v"
+    test_command = "go test"
     if race:
         test_command += " -race"
     if parallel is not None:
         test_command += " -parallel {}".format(parallel)
     if timeout is not None:
         test_command += " -timeout {}".format(timeout)
-    test_command += " {}".format(' '.join(go_list()))
+    test_command += " ./..."
     logging.info("Running tests...")
     output = run(test_command, printOutput=logging.getLogger().getEffectiveLevel() == logging.DEBUG)
     return True
@@ -488,32 +487,6 @@ def upload_packages(packages, bucket_name=None, overwrite=False):
             logging.warn("Not uploading file {}, as it already exists in the target bucket.".format(name))
     return True
 
-def go_list(vendor=False, relative=False):
-    """
-    Return a list of packages
-    If vendor is False vendor package are not included
-    If relative is True the package prefix defined by PACKAGE_URL is stripped
-    """
-    p = subprocess.Popen(["go", "list", "./..."], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    out, err = p.communicate()
-    packages = out.split('\n')
-    if packages[-1] == '':
-        packages = packages[:-1]
-    if not vendor:
-        non_vendor = []
-        for p in packages:
-            if '/vendor/' not in p:
-                non_vendor.append(p)
-        packages = non_vendor
-    if relative:
-        relative_pkgs = []
-        for p in packages:
-            r = p.replace(PACKAGE_URL, '.')
-            if r != '.':
-                relative_pkgs.append(r)
-        packages = relative_pkgs
-    return packages
-
 def build(version=None,
           platform=None,
           arch=None,
@@ -768,13 +741,6 @@ def package(build_output, pkg_name, version, nightly=False, iteration=1, static=
                             if nightly:
                                 # Strip nightly version from package name
                                 new_outfile = outfile.replace("{}-{}".format(package_version, package_iteration), "nightly")
-                                os.rename(outfile, new_outfile)
-                                outfile = new_outfile
-                            else:
-                                if package_type == 'rpm':
-                                    # rpm's convert any dashes to underscores
-                                    package_version = package_version.replace("-", "_")
-                                new_outfile = outfile.replace("{}-{}".format(package_version, package_iteration), package_version)
                                 os.rename(outfile, new_outfile)
                                 outfile = new_outfile
                             outfiles.append(os.path.join(os.getcwd(), outfile))

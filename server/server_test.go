@@ -5321,6 +5321,21 @@ func TestServer_UDFStreamAgents(t *testing.T) {
 				},
 			},
 		},
+		// Python 2
+		{
+			buildFunc: func() error { return nil },
+			config: udf.FunctionConfig{
+				Prog:    Python2Executable,
+				Args:    []string{"-u", filepath.Join(udfDir, "agent/examples/moving_avg/moving_avg.py")},
+				Timeout: toml.Duration(time.Minute),
+				Env: map[string]string{
+					"PYTHONPATH": strings.Join(
+						[]string{filepath.Join(udfDir, "agent/py"), os.Getenv("PYTHONPATH")},
+						string(filepath.ListSeparator),
+					),
+				},
+			},
+		},
 	}
 	for _, agent := range agents {
 		err := agent.buildFunc()
@@ -5498,6 +5513,33 @@ func TestServer_UDFStreamAgentsSocket(t *testing.T) {
 				Timeout: toml.Duration(time.Minute),
 			},
 		},
+		// Python 2
+		{
+			startFunc: func() *exec.Cmd {
+				cmd := exec.Command(
+					Python2Executable,
+					"-u",
+					filepath.Join(udfDir, "agent/examples/mirror/mirror.py"),
+					filepath.Join(tdir, "mirror.py.sock"),
+				)
+				cmd.Stderr = os.Stderr
+				env := os.Environ()
+				env = append(env, fmt.Sprintf(
+					"%s=%s",
+					"PYTHONPATH",
+					strings.Join(
+						[]string{filepath.Join(udfDir, "agent/py"), os.Getenv("PYTHONPATH")},
+						string(filepath.ListSeparator),
+					),
+				))
+				cmd.Env = env
+				return cmd
+			},
+			config: udf.FunctionConfig{
+				Socket:  filepath.Join(tdir, "mirror.py.sock"),
+				Timeout: toml.Duration(time.Minute),
+			},
+		},
 	}
 	for _, agent := range agents {
 		cmd := agent.startFunc()
@@ -5636,6 +5678,21 @@ func TestServer_UDFBatchAgents(t *testing.T) {
 			buildFunc: func() error { return nil },
 			config: udf.FunctionConfig{
 				Prog:    PythonExecutable,
+				Args:    []string{"-u", filepath.Join(udfDir, "agent/examples/outliers/outliers.py")},
+				Timeout: toml.Duration(time.Minute),
+				Env: map[string]string{
+					"PYTHONPATH": strings.Join(
+						[]string{filepath.Join(udfDir, "agent/py"), os.Getenv("PYTHONPATH")},
+						string(filepath.ListSeparator),
+					),
+				},
+			},
+		},
+		// Python 2
+		{
+			buildFunc: func() error { return nil },
+			config: udf.FunctionConfig{
+				Prog:    Python2Executable,
 				Args:    []string{"-u", filepath.Join(udfDir, "agent/examples/outliers/outliers.py")},
 				Timeout: toml.Duration(time.Minute),
 				Env: map[string]string{

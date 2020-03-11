@@ -1,16 +1,34 @@
 # Kapacitor UDF Agent implementation in Python
 #
 # Requires protobuf v3
-#   pip install protobuf==3.0.0b2
+#   pip install protobuf==3.11.1
+from __future__ import absolute_import
 
 import sys
-import udf_pb2
+from . import udf_pb2
 from threading import Lock, Thread
-from Queue import Queue
+
+try:
+    from queue import Queue
+except ImportError:
+    from Queue import Queue
+
+
+# Setup default in/out io
+defaultIn = sys.stdin
+defaultOut = sys.stdout
+
+# Check for python3
+# https://stackoverflow.com/a/38939320/703144
+if sys.version_info >= (3, 0):
+    defaultIn = sys.stdin.buffer
+    defaultOut = sys.stdout.buffer
+
 import io
 import traceback
 import socket
 import os
+import struct
 
 import logging
 logger = logging.getLogger()
@@ -42,15 +60,17 @@ class Handler(object):
         pass
 
 
+
 # Python implementation of a Kapacitor UDF agent.
 # This agent is responsible for reading and writing
 # messages over STDIN and STDOUT.
 #
 # The Agent requires a Handler object in order to fulfill requests.
 class Agent(object):
-    def __init__(self, _in=sys.stdin, out=sys.stdout,handler=None):
+    def __init__(self, _in=defaultIn, out=defaultOut,handler=None):
         self._in = _in
         self._out = out
+
         self._thread = None
         self.handler = handler
         self._write_lock = Lock()
@@ -87,7 +107,7 @@ class Agent(object):
         finally:
             self._write_lock.release()
 
-    # Read requests off stdin
+    # Read requests off input stream
     def _read_loop(self):
         request = udf_pb2.Request()
         while True:
@@ -152,10 +172,10 @@ def encodeUvarint(writer, value):
     bits = value & varintMask
     value >>= shiftSize
     while value:
-        writer.write(chr(varintMoreMask|bits))
+        writer.write(struct.pack("B", varintMoreMask | bits))
         bits = value & varintMask
         value >>= shiftSize
-    return writer.write(chr(bits))
+    return writer.write(struct.pack("B", bits))
 
 # Decode an unsigned varint, max of 32 bits
 def decodeUvarint32(reader):
@@ -165,7 +185,7 @@ def decodeUvarint32(reader):
         byte = reader.read(1)
         if len(byte) == 0:
             raise EOF
-        b = ord(byte)
+        b = struct.unpack("B", byte)[0]
         result |= ((b & varintMask) << shift)
         if not (b & varintMoreMask):
             result &= mask32uint
@@ -186,7 +206,7 @@ class Server(object):
         try:
             while True:
                 conn, addr = self._listener.accept()
-                conn = conn.makefile()
+                conn = conn.makefile(mode='rwb')
                 thread = Thread(target=self._accepter.accept, args=(conn,addr))
                 thread.start()
         except:
