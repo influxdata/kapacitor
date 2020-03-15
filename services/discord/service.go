@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	text "text/template"
 	"time"
 
 	"sync"
@@ -20,7 +21,7 @@ import (
 
 type Diagnostic interface {
 	WithContext(ctx ...keyvalue.T) Diagnostic
-
+	TemplateError(err error, kv keyvalue.T)
 	InsecureSkipVerify()
 
 	Error(msg string, err error)
@@ -345,27 +346,41 @@ type handler struct {
 	s    *Service
 	c    HandlerConfig
 	diag Diagnostic
+
+	embedTitleTmpl *text.Template
 }
 
-func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) alert.Handler {
-	return &handler{
-		s:    s,
-		c:    c,
-		diag: s.diag.WithContext(ctx...),
+func (s *Service) Handler(c HandlerConfig, ctx ...keyvalue.T) (alert.Handler, error) {
+	ettmpl, err := text.New("embedTitle").Parse(c.EmbedTitle)
+	if err != nil {
+		return nil, err
 	}
+	return &handler{
+		s:              s,
+		c:              c,
+		diag:           s.diag.WithContext(ctx...),
+		embedTitleTmpl: ettmpl,
+	}, nil
 }
 
 func (h *handler) Handle(event alert.Event) {
+	td := event.TemplateData()
+	var buf bytes.Buffer
+
+	if err := h.embedTitleTmpl.Execute(&buf, td); err != nil {
+		h.diag.TemplateError(err, keyvalue.KV("embedTitle", h.c.EmbedTitle))
+		return
+	}
 	if err := h.s.Alert(
 		h.c.Workspace,
 		event.State.Message,
 		h.c.Username,
 		h.c.AvatarURL,
-		h.c.EmbedTitle,
+		buf.String(), // Parsed embedtitle template
 		h.c.Timestamp,
 		event.State.Time,
 		event.State.Level,
 	); err != nil {
-		h.diag.Error("failed to send event", err)
+		h.diag.Error("failed to send event to Discord", err)
 	}
 }
