@@ -119,7 +119,7 @@ type Service struct {
 		Handler(slack.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 	DiscordService interface {
-		Handler(discord.HandlerConfig, ...keyvalue.T) alert.Handler
+		Handler(discord.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
 	}
 	SMTPService interface {
 		Handler(smtp.HandlerConfig, ...keyvalue.T) alert.Handler
@@ -787,7 +787,10 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		if err != nil {
 			return handler{}, err
 		}
-		h = s.DiscordService.Handler(c, ctx...)
+		h, err = s.DiscordService.Handler(c, ctx...)
+		if err != nil {
+			return handler{}, err
+		}
 		h = newExternalHandler(h)
 	case "exec":
 		c := ExecHandlerConfig{

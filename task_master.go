@@ -153,7 +153,7 @@ type TaskMaster struct {
 	DiscordService interface {
 		Global() bool
 		StateChangesOnly() bool
-		Handler(discord.HandlerConfig, ...keyvalue.T) alert.Handler
+		Handler(discord.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
 	}
 	SlackService interface {
 		Global() bool

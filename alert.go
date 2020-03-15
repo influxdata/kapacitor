@@ -469,11 +469,17 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 			AvatarURL:  s.AvatarURL,
 			EmbedTitle: s.EmbedTitle,
 		}
-		h := et.tm.DiscordService.Handler(c, ctx...)
+		h, err := et.tm.DiscordService.Handler(c, ctx...)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create Discord handler")
+		}
 		an.handlers = append(an.handlers, h)
 	}
 	if len(n.DiscordHandlers) == 0 && (et.tm.DiscordService != nil && et.tm.DiscordService.Global()) {
-		h := et.tm.DiscordService.Handler(discord.HandlerConfig{}, ctx...)
+		h, err := et.tm.DiscordService.Handler(discord.HandlerConfig{}, ctx...)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create Discord handler")
+		}
 		an.handlers = append(an.handlers, h)
 	}
 	// If discord has been configured with state changes only set it.

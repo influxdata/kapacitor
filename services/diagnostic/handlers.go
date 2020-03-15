@@ -613,6 +613,10 @@ func (h *DiscordHandler) Error(msg string, err error) {
 	h.l.Error(msg, Error(err))
 }
 
+func (h *DiscordHandler) TemplateError(err error, kv keyvalue.T) {
+	h.l.Error("failed to evaluate Discord template", Error(err), String(kv.Key, kv.Value))
+}
+
 func (h *DiscordHandler) WithContext(ctx ...keyvalue.T) discord.Diagnostic {
 	fields := logFieldsFromContext(ctx)
 
