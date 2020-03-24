@@ -54,7 +54,7 @@ class Handler(object):
         pass
     def begin_batch(self, begin_req):
         pass
-    def point(self):
+    def point(self, point_req):
         pass
     def end_batch(self, end_req):
         pass
