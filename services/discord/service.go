@@ -215,12 +215,12 @@ type testOptions struct {
 	Username   string      `json:"username"`
 	AvatarURL  string      `json:"avatar-url"`
 	EmbedTitle string      `json:"embed-title"`
-	Timestamp  bool        `json:"timestamp"`
 	Time       time.Time   `json:"time-val"`
 }
 
 func (s *Service) TestOptions() interface{} {
 	c, _ := s.config("")
+	c.Timestamp = true
 	t, _ := time.Parse(time.RFC3339, "1970-01-01T00:00:01Z")
 	return &testOptions{
 		Workspace:  c.Workspace,
@@ -229,7 +229,6 @@ func (s *Service) TestOptions() interface{} {
 		AvatarURL:  "https://influxdata.github.io/branding/img/downloads/influxdata-logo--symbol--pool-alpha.png",
 		Username:   "Kapacitor",
 		EmbedTitle: "Kapacitor Alert",
-		Timestamp:  true,
 		Time:       t,
 	}
 }

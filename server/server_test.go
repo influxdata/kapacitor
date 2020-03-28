@@ -8716,7 +8716,6 @@ func TestServer_ListServiceTests(t *testing.T) {
 					"message":     "test discord message",
 					"username":    "Kapacitor",
 					"embed-title": "Kapacitor Alert",
-					"timestamp":   true,
 					"time-val":    "1970-01-01T00:00:01Z",
 				},
 			},
@@ -9603,7 +9602,6 @@ func TestServer_AlertHandlers(t *testing.T) {
 				Options: map[string]interface{}{
 					"username":    "Kapacitor",
 					"avatar-url":  "https://influxdata.github.io/branding/img/downloads/influxdata-logo--symbol--pool-alpha.png",
-					"timestamp":   true,
 					"embed-title": "Kapacitor Alert",
 				},
 			},
@@ -9628,7 +9626,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 							{
 								Color:       0xF95F53,
 								Title:       "Kapacitor Alert",
-								Timestamp:   "1970-01-01T00:00:00Z",
+								Timestamp:   "",
 								Description: "message",
 							},
 						},
