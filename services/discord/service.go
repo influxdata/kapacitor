@@ -239,12 +239,12 @@ func (s *Service) Test(options interface{}) error {
 	if !ok {
 		return fmt.Errorf("unexpected options type %T", options)
 	}
-	return s.Alert(o.Workspace, o.Message, o.Username, o.AvatarURL, o.EmbedTitle, o.Timestamp, o.Time, o.Level)
+	return s.Alert(o.Workspace, o.Message, o.Username, o.AvatarURL, o.EmbedTitle, o.Time, o.Level)
 }
 
 // Alert sends a message to the specified room.
-func (s *Service) Alert(workspace, message, username, avatarURL, embedTitle string, timestamp bool, time time.Time, level alert.Level) error {
-	url, post, err := s.preparePost(workspace, message, username, avatarURL, embedTitle, timestamp, time, level)
+func (s *Service) Alert(workspace, message, username, avatarURL, embedTitle string, time time.Time, level alert.Level) error {
+	url, post, err := s.preparePost(workspace, message, username, avatarURL, embedTitle, time, level)
 	if err != nil {
 		return err
 	}
@@ -280,9 +280,6 @@ type HandlerConfig struct {
 	// Discord workspace ID to use when posting to webhook
 	// If empty uses the default config
 	Workspace string `mapstructure:"workspace"`
-	// Whether to display timestamp in the footer of the embed
-	// If empty uses the default config
-	Timestamp bool `mapstructure:"timestamp"`
 	// Username of webhook
 	// If empty uses the default config
 	Username string `mapstructure:"username"`
@@ -294,7 +291,7 @@ type HandlerConfig struct {
 	EmbedTitle string `mapstructure:"embed-title"`
 }
 
-func (s *Service) preparePost(workspace, message, username, avatarURL, embedTitle string, timestamp bool, timeVal time.Time, level alert.Level) (string, io.Reader, error) {
+func (s *Service) preparePost(workspace, message, username, avatarURL, embedTitle string, timeVal time.Time, level alert.Level) (string, io.Reader, error) {
 	c, err := s.config(workspace)
 	if err != nil {
 		return "", nil, err
@@ -312,7 +309,7 @@ func (s *Service) preparePost(workspace, message, username, avatarURL, embedTitl
 		color = 0x7A65F2 // #7A65F2
 	}
 	var timeStr string
-	if timestamp {
+	if c.Timestamp {
 		timeStr = timeVal.Format(time.RFC3339)
 	}
 	a := embed{
@@ -377,7 +374,6 @@ func (h *handler) Handle(event alert.Event) {
 		h.c.Username,
 		h.c.AvatarURL,
 		buf.String(), // Parsed embedtitle template
-		h.c.Timestamp,
 		event.State.Time,
 		event.State.Level,
 	); err != nil {

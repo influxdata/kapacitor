@@ -464,7 +464,6 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 	for _, s := range n.DiscordHandlers {
 		c := discord.HandlerConfig{
 			Workspace:  s.Workspace,
-			Timestamp:  s.Timestamp,
 			Username:   s.Username,
 			AvatarURL:  s.AvatarURL,
 			EmbedTitle: s.EmbedTitle,

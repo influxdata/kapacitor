@@ -1592,12 +1592,6 @@ type DiscordHandler struct {
 	// Discord workspace ID to use when posting to webhook
 	// If empty uses the default config
 	Workspace string `json:"workspace"`
-	// Whether to display timestamp in the footer of the embed
-	// If empty uses the default config
-	Timestamp bool `json:"timestamp"`
-	// Timestamp string in ISO 8601 format
-	// If empty and HandlerCOnfig.Timestamp is true will use time that alert is fired
-	TimestampStr string `json:"timestampStr"`
 	// Username of webhook
 	// If empty uses the default config
 	Username string `json:"username"`
