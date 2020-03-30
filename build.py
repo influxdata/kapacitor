@@ -586,10 +586,10 @@ def build(version=None,
         logging.info("Time taken: {}s".format((end_time - start_time).total_seconds()))
     return True
 
-def generate_md5_from_file(path):
-    """Generate MD5 signature based on the contents of the file at path.
+def generate_sha256_from_file(path):
+    """Generate SHA256 signature based on the contents of the file at path.
     """
-    m = hashlib.md5()
+    m = hashlib.sha256()
     with open(path, 'rb') as f:
         for chunk in iter(lambda: f.read(4096), b""):
             m.update(chunk)
@@ -879,8 +879,8 @@ def main(args):
                 return 1
         logging.info("Packages created:")
         for p in packages:
-            logging.info("{} (MD5={})".format(p.split('/')[-1:][0],
-                                              generate_md5_from_file(p)))
+            logging.info("{} (sha256={})".format(p.split('/')[-1:][0],
+                                              generate_sha256_from_file(p)))
 
 
     if orig_branch != get_current_branch():
