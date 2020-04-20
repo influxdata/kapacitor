@@ -6,6 +6,14 @@
 
 ### Bugfixes
 
+## v1.5.5 [2020-04-20]
+
+### bugfixes
+- [#2319](https://github.com/influxdata/kapacitor/pull/2319): Update kafka lib; make kafka errors unsilent.
+
+### features
+- [#2312](https://github.com/influxdata/kapacitor/pull/2312): Switched from md5 to sha256 for release checksums.
+
 ## v1.5.4 [2020-01-16]
 
 ### Features
