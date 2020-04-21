@@ -4,6 +4,8 @@
 
 ### Features
 
+- [#2318](https://github.com/influxdata/kapacitor/pull/2322): Add support for TLS 1.3.
+
 ### Bugfixes
 
 ## v1.5.5 [2020-04-20]
