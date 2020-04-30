@@ -11,6 +11,9 @@
 
 - [#2286](https://github.com/influxdata/kapacitor/pull/2286): Corrected issue with `go vet` invocation in .hooks/pre-commit which would cause the hook to fail.
 
+### Depreciated
+- [#2331](https://github.com/influxdata/kapacitor/pull/2331): Depreciate ssl 3.0 as it is insecure and is removed from newer versions of go.
+
 ## v1.5.5 [2020-04-20]
 
 ### bugfixes

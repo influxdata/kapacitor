@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"sort"
 	"strings"
 )
@@ -99,6 +100,11 @@ func (c Config) Parse() (out *tls.Config, err error) {
 		out.MaxVersion = version
 	}
 
+	if out != nil && (out.MinVersion == tls.VersionSSL30 || out.MaxVersion == tls.VersionSSL30) {
+		_, _ = fmt.Fprintln(os.Stderr, "WARNING: SSL 3.0 is depreciated and support for it will be removed soon")
+		return out, nil
+	}
+
 	return out, nil
 }
 
@@ -144,7 +150,7 @@ func unknownCipher(name string) error {
 }
 
 var versionsMap = map[string]uint16{
-	"SSL3.0": tls.VersionSSL30,
+	"SSL3.0": tls.VersionSSL30, // DEPRECIATED!!
 	"TLS1.0": tls.VersionTLS10,
 	"1.0":    tls.VersionTLS10,
 	"TLS1.1": tls.VersionTLS11,
