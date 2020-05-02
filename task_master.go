@@ -39,6 +39,7 @@ import (
 	swarm "github.com/influxdata/kapacitor/services/swarm/client"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
+	"github.com/influxdata/kapacitor/services/webexteams"
 	"github.com/influxdata/kapacitor/tick"
 	"github.com/influxdata/kapacitor/tick/stateful"
 	"github.com/influxdata/kapacitor/timer"
@@ -166,6 +167,12 @@ type TaskMaster struct {
 		Global() bool
 		StateChangesOnly() bool
 		Handler(hipchat.HandlerConfig, ...keyvalue.T) alert.Handler
+	}
+	WebexTeamsService interface {
+		Global() bool
+		StateChangesOnly() bool
+		DefaultHandlerConfig() webexteams.HandlerConfig
+		Handler(webexteams.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 	KafkaService interface {
 		Handler(kafka.HandlerConfig, ...keyvalue.T) (alert.Handler, error)

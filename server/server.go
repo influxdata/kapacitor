@@ -70,6 +70,7 @@ import (
 	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
+	"github.com/influxdata/kapacitor/services/webexteams"
 	"github.com/influxdata/kapacitor/uuid"
 	"github.com/influxdata/kapacitor/waiter"
 	"github.com/pkg/errors"
@@ -262,6 +263,9 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 	s.appendSensuService()
 	s.appendTalkService()
 	s.appendVictorOpsService()
+
+	// append Webex Teams Service
+	s.appendWebexTeamsService()
 
 	// Append alert service
 	s.appendAlertService()
@@ -742,6 +746,16 @@ func (s *Server) appendHipChatService() {
 
 	s.SetDynamicService("hipchat", srv)
 	s.AppendService("hipchat", srv)
+}
+
+func (s *Server) appendWebexTeamsService() {
+	c := s.config.WebexTeams
+	d := s.DiagService.NewWebexTeamsHandler()
+	srv := webexteams.NewService(c, d)
+	s.TaskMaster.WebexTeamsService = srv
+	s.AlertService.WebexTeamsService = srv
+	s.SetDynamicService("webexteams", srv)
+	s.AppendService("webexteams", srv)
 }
 
 func (s *Server) appendKafkaService() {

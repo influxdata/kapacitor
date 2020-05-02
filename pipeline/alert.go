@@ -385,6 +385,10 @@ type AlertNodeData struct {
 	// Send alert to Kafka topic
 	// tick:ignore
 	KafkaHandlers []*KafkaHandler `tick:"Kafka" json:"kafka"`
+
+	//Send alert to Webex Teams
+	// tick:ignore
+	WebexTeamsHandlers []*WebexTeamsHandler `tick:"WebexTeams" json:"webexTeams"`
 }
 
 func newAlertNode(wants EdgeType) *AlertNode {
@@ -1149,6 +1153,23 @@ type HipChatHandler struct {
 	// HipChat authentication token.
 	// If empty uses the token from the configuration.
 	Token string `json:"token"`
+}
+
+type WebexTeamsHandler struct {
+	*AlertNodeData `json:"-"`
+	RoomID         string `json:"roomId"`
+	ToPersonID     string `json:"toPersonId"`
+	ToPersonEmail  string `json:"toPersonEmail"`
+	Token          string `json:"token"`
+	Markdown       bool   `json:"markdown"`
+}
+
+func (n *AlertNodeData) WebexTeams() *WebexTeamsHandler {
+	webexteams := &WebexTeamsHandler{
+		AlertNodeData: n,
+	}
+	n.WebexTeamsHandlers = append(n.WebexTeamsHandlers, webexteams)
+	return webexteams
 }
 
 // Send the alert to Alerta.
