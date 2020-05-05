@@ -3,13 +3,13 @@
 ## unreleased
 
 ### Features
-- [#2287](https://github.com/influxdata/kapacitor/pull/2287): Added Discord Webhook Alert Handler
-- [#2311](https://github.com/influxdata/kapacitor/pull/2311): UDF Agent Python3 fixes.
+- [#2287](https://github.com/influxdata/kapacitor/pull/2287): Added Discord Webhook Alert Handler, thanks @mattnotmitt!
+- [#2311](https://github.com/influxdata/kapacitor/pull/2311): UDF Agent Python3 fixes, thanks @elohmeier!
 - [#2318](https://github.com/influxdata/kapacitor/pull/2322): Add support for TLS 1.3.
 
 ### Bugfixes
 
-- [#2286](https://github.com/influxdata/kapacitor/pull/2286): Corrected issue with `go vet` invocation in .hooks/pre-commit which would cause the hook to fail.
+- [#2286](https://github.com/influxdata/kapacitor/pull/2286): Corrected issue with `go vet` invocation in .hooks/pre-commit which would cause the hook to fail, thanks @mattnotmitt!
 
 ## v1.5.5 [2020-04-20]
 
