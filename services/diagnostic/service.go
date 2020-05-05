@@ -148,6 +148,12 @@ func (s *Service) NewSlackHandler() *SlackHandler {
 	}
 }
 
+func (s *Service) NewDiscordHandler() *DiscordHandler {
+	return &DiscordHandler{
+		l: s.Logger.With(String("service", "discord")),
+	}
+}
+
 func (s *Service) NewTaskStoreHandler() *TaskStoreHandler {
 	return &TaskStoreHandler{
 		l: s.Logger.With(String("service", "task_store")),

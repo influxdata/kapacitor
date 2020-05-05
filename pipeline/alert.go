@@ -55,6 +55,7 @@ type AlertNode struct{ *AlertNodeData }
 //    * Talk -- Post alert message to Talk client.
 //    * Telegram -- Post alert message to Telegram client.
 //    * MQTT -- Post alert message to MQTT.
+//	  * Discord -- Post alert message to Discord webhook.
 //
 // See below for more details on configuring each handler.
 //
@@ -349,6 +350,10 @@ type AlertNodeData struct {
 	// Send alert to Slack.
 	// tick:ignore
 	SlackHandlers []*SlackHandler `tick:"Slack" json:"slack"`
+
+	// Send alert to Discord.
+	// tick:ignore
+	DiscordHandlers []*DiscordHandler `tick:"Discord" json:"discord"`
 
 	// Send alert to Telegram.
 	// tick:ignore
@@ -1521,6 +1526,81 @@ type SlackHandler struct {
 	// IconEmoji is an emoji name surrounded in ':' characters.
 	// The emoji image will replace the normal user icon for the slack bot.
 	IconEmoji string `json:"iconEmoji"`
+}
+
+// Send the alert to Discord.
+// To allow Kapacitor to post to Discord,
+// follow this guide https://support.discordapp.com/hc/en-us/articles/228383668
+// and create a new webhook and place the generated URL
+// in the 'discord' configuration section.
+//
+// Example:
+//    [[discord]]
+//      enabled = true
+//      url = "https://discordapp.com/api/webhooks/xxxxxxxxxxxxxxxxxx/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+//
+// In order to not post a message every alert interval
+// use AlertNode.StateChangesOnly so that only events
+// where the alert changed state are posted to the channel.
+//
+// Example:
+//    stream
+//         |alert()
+//             .discord()
+//
+// Send alerts to the default workspace
+//
+// Example:
+// stream
+//      |alert()
+//          .discord()
+//          .workspace('opencommunity')
+//
+// send alerts to the opencommunity workspace
+//
+// If the 'discord' section in the configuration has the option: global = true
+// then all alerts are sent to Discord without the need to explicitly state it
+// in the TICKscript.
+//
+// Example:
+//    [[discord]]
+//      enabled = true
+//      default = true
+//      workspace = examplecorp
+//      url = "https://discordapp.com/api/webhooks/xxxxxxxxxxxxxxxxxx/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+//      global = true
+//      state-changes-only = true
+//
+// Example:
+//    stream
+//         |alert()
+//
+// Send alert to Discord.
+// tick:property
+func (n *AlertNodeData) Discord() *DiscordHandler {
+	discord := &DiscordHandler{
+		AlertNodeData: n,
+	}
+	n.DiscordHandlers = append(n.DiscordHandlers, discord)
+	return discord
+}
+
+// tick:embedded:AlertNode.Discord
+type DiscordHandler struct {
+	*AlertNodeData `json:"-"`
+
+	// Discord workspace ID to use when posting to webhook
+	// If empty uses the default config
+	Workspace string `json:"workspace"`
+	// Username of webhook
+	// If empty uses the default config
+	Username string `json:"username"`
+	// URL of webhook's avatar
+	// If empty uses the default config
+	AvatarURL string `json:"avatarUrl"`
+	// Embed title
+	// If empty uses the default config
+	EmbedTitle string `json:"embedTitle"`
 }
 
 // Send the alert to Telegram.

@@ -29,6 +29,7 @@ import (
 	"github.com/influxdata/kapacitor/services/consul"
 	"github.com/influxdata/kapacitor/services/deadman"
 	"github.com/influxdata/kapacitor/services/diagnostic"
+	"github.com/influxdata/kapacitor/services/discord"
 	"github.com/influxdata/kapacitor/services/dns"
 	"github.com/influxdata/kapacitor/services/ec2"
 	"github.com/influxdata/kapacitor/services/file_discovery"
@@ -240,6 +241,9 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 
 	// Append Alert integration services
 	s.appendAlertaService()
+	if err := s.appendDiscordService(); err != nil {
+		return nil, errors.Wrap(err, "discord service")
+	}
 	s.appendHipChatService()
 	s.appendKafkaService()
 	if err := s.appendMQTTService(); err != nil {
@@ -766,6 +770,22 @@ func (s *Server) appendAlertaService() {
 
 	s.SetDynamicService("alerta", srv)
 	s.AppendService("alerta", srv)
+}
+
+func (s *Server) appendDiscordService() error {
+	c := s.config.Discord
+	d := s.DiagService.NewDiscordHandler()
+	srv, err := discord.NewService(c, d)
+	if err != nil {
+		return err
+	}
+
+	s.TaskMaster.DiscordService = srv
+	s.AlertService.DiscordService = srv
+
+	s.SetDynamicService("discord", srv)
+	s.AppendService("discord", srv)
+	return nil
 }
 
 func (s *Server) appendTalkService() {

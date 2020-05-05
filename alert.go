@@ -17,6 +17,7 @@ import (
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/pipeline"
 	alertservice "github.com/influxdata/kapacitor/services/alert"
+	"github.com/influxdata/kapacitor/services/discord"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httppost"
 	"github.com/influxdata/kapacitor/services/kafka"
@@ -459,6 +460,34 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		}
 		an.handlers = append(an.handlers, h)
 	}
+
+	for _, s := range n.DiscordHandlers {
+		c := discord.HandlerConfig{
+			Workspace:  s.Workspace,
+			Username:   s.Username,
+			AvatarURL:  s.AvatarURL,
+			EmbedTitle: s.EmbedTitle,
+		}
+		h, err := et.tm.DiscordService.Handler(c, ctx...)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create Discord handler")
+		}
+		an.handlers = append(an.handlers, h)
+	}
+	if len(n.DiscordHandlers) == 0 && (et.tm.DiscordService != nil && et.tm.DiscordService.Global()) {
+		h, err := et.tm.DiscordService.Handler(discord.HandlerConfig{}, ctx...)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create Discord handler")
+		}
+		an.handlers = append(an.handlers, h)
+	}
+	// If discord has been configured with state changes only set it.
+	if et.tm.DiscordService != nil &&
+		et.tm.DiscordService.Global() &&
+		et.tm.DiscordService.StateChangesOnly() {
+		n.IsStateChangesOnly = true
+	}
+
 	// Parse level expressions
 	an.levels = make([]stateful.Expression, alert.Critical+1)
 	an.scopePools = make([]stateful.ScopePool, alert.Critical+1)

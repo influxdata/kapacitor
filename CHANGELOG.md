@@ -3,7 +3,7 @@
 ## unreleased
 
 ### Features
-
+- [#2287](https://github.com/influxdata/kapacitor/pull/2287): Added Discord Webhook Alert Handler
 - [#2311](https://github.com/influxdata/kapacitor/pull/2311): UDF Agent Python3 fixes.
 - [#2318](https://github.com/influxdata/kapacitor/pull/2322): Add support for TLS 1.3.
 

@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/influxdata/kapacitor/services/discord"
+	"github.com/influxdata/kapacitor/services/discord/discordtest"
 	"html"
 	"io/ioutil"
 	"math/rand"
@@ -8957,6 +8959,94 @@ stream
 				Service:     []string{"serviceA", "serviceB", "cpu"},
 				Value:       "10",
 				Timeout:     86400,
+			},
+		},
+	}
+
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Requests() {
+		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestStream_AlertDiscord(t *testing.T) {
+	ts := discordtest.NewServer()
+	defer ts.Close()
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.discord()
+		.workspace('company_private')
+		.discord()
+		.username('testy')
+`
+
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c1 := discord.NewConfig()
+		c1.Default = true
+		c1.Enabled = true
+		c1.URL = ts.URL + "/test/discord/url"
+		c2 := discord.NewConfig()
+		c2.Workspace = "company_private"
+		c2.Username = "comp testy"
+		c2.Enabled = true
+		c2.URL = ts.URL + "/test/discord/url2"
+		d := diagService.NewDiscordHandler().WithContext(keyvalue.KV("test", "discord"))
+		sl, err := discord.NewService([]discord.Config{c1, c2}, d)
+		if err != nil {
+			t.Error(err)
+		}
+		tm.DiscordService = sl
+	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	exp := []interface{}{
+		discordtest.Request{
+			URL: "/test/discord/url",
+			PostData: discordtest.PostData{
+				Username:  "testy",
+				AvatarURL: "",
+				Embeds: []discordtest.Embed{
+					{
+						Color:       0xF95F53,
+						Description: "kapacitor/cpu/serverA is CRITICAL",
+						Title:       "",
+						Timestamp:   "",
+					},
+				},
+			},
+		},
+		discordtest.Request{
+			URL: "/test/discord/url2",
+			PostData: discordtest.PostData{
+				Username:  "comp testy",
+				AvatarURL: "",
+				Embeds: []discordtest.Embed{
+					{
+						Color:       0xF95F53,
+						Description: "kapacitor/cpu/serverA is CRITICAL",
+						Title:       "",
+						Timestamp:   "",
+					},
+				},
 			},
 		},
 	}

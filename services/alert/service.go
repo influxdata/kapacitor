@@ -14,6 +14,7 @@ import (
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/services/alerta"
+	"github.com/influxdata/kapacitor/services/discord"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/httppost"
@@ -116,6 +117,9 @@ type Service struct {
 	}
 	SlackService interface {
 		Handler(slack.HandlerConfig, ...keyvalue.T) alert.Handler
+	}
+	DiscordService interface {
+		Handler(discord.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
 	}
 	SMTPService interface {
 		Handler(smtp.HandlerConfig, ...keyvalue.T) alert.Handler
@@ -773,6 +777,17 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 			return handler{}, err
 		}
 		h, err = s.AlertaService.Handler(c, ctx...)
+		if err != nil {
+			return handler{}, err
+		}
+		h = newExternalHandler(h)
+	case "discord":
+		c := discord.HandlerConfig{}
+		err = decodeOptions(spec.Options, &c)
+		if err != nil {
+			return handler{}, err
+		}
+		h, err = s.DiscordService.Handler(c, ctx...)
 		if err != nil {
 			return handler{}, err
 		}
