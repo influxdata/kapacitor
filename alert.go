@@ -491,6 +491,8 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 	if et.tm.TeamsService != nil &&
 		et.tm.TeamsService.Global() &&
 		et.tm.TeamsService.StateChangesOnly() {
+		n.IsStateChangesOnly = true
+	}
 
   if len(n.DiscordHandlers) == 0 && (et.tm.DiscordService != nil && et.tm.DiscordService.Global()) {
 		h, err := et.tm.DiscordService.Handler(discord.HandlerConfig{}, ctx...)
