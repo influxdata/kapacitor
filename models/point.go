@@ -1,8 +1,8 @@
 package models
 
 import (
-	"bytes"
 	"sort"
+	"strings"
 )
 
 type GroupID string
@@ -86,7 +86,7 @@ func ToGroupID(name string, tags map[string]string, dims Dimensions) GroupID {
 		}
 		return NilGroup
 	}
-	var buf bytes.Buffer
+	var buf strings.Builder
 	if dims.ByName {
 		buf.WriteString(name)
 		// Add delimiter that is not allowed in name.
@@ -101,5 +101,5 @@ func ToGroupID(name string, tags map[string]string, dims Dimensions) GroupID {
 		buf.WriteString(tags[d])
 
 	}
-	return GroupID(buf.Bytes())
+	return GroupID(buf.String())
 }

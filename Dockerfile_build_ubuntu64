@@ -1,4 +1,4 @@
-FROM ubuntu:16.04
+FROM ubuntu:18.04
 
 # This dockerfile is capabable of performing all
 # build/test/package/deploy actions needed for Kapacitor.
@@ -6,7 +6,6 @@ FROM ubuntu:16.04
 MAINTAINER support@influxdb.com
 
 RUN apt-get -qq update && apt-get -qq install -y \
-    python-software-properties \
     software-properties-common \
     wget \
     unzip \
@@ -18,18 +17,22 @@ RUN apt-get -qq update && apt-get -qq install -y \
     rpm \
     zip \
     python \
-    python-boto \
+    python-setuptools \
+    python3 \
+    python3-setuptools \
+    python3-boto \
     build-essential \
     autoconf \
     automake \
     libtool \
-    python-setuptools \
     curl
+
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 10
 
 RUN gem install fpm
 
 # Install protobuf3 protoc binary
-ENV PROTO_VERSION 3.4.0
+ENV PROTO_VERSION 3.11.1
 RUN wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protoc-${PROTO_VERSION}-linux-x86_64.zip \
     && unzip -j protoc-${PROTO_VERSION}-linux-x86_64.zip bin/protoc -d /bin \
     rm protoc-${PROTO_VERSION}-linux-x86_64.zip
@@ -38,12 +41,13 @@ RUN wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSIO
 RUN wget -q https://github.com/google/protobuf/releases/download/v${PROTO_VERSION}/protobuf-python-${PROTO_VERSION}.tar.gz \
     && tar -xf protobuf-python-${PROTO_VERSION}.tar.gz \
     && cd /protobuf-${PROTO_VERSION}/python \
-    && python setup.py install \
+    && python2 setup.py install \
+    && python3 setup.py install \
     && rm -rf /protobuf-${PROTO_VERSION} protobuf-python-${PROTO_VERSION}.tar.gz
 
 # Install go
 ENV GOPATH /root/go
-ENV GO_VERSION 1.11.2
+ENV GO_VERSION 1.13.6
 ENV GO_ARCH amd64
 RUN wget -q https://storage.googleapis.com/golang/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz; \
    tar -C /usr/local/ -xf /go${GO_VERSION}.linux-${GO_ARCH}.tar.gz ; \

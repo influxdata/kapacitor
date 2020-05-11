@@ -58,12 +58,13 @@ type Diagnostic interface {
 }
 
 type Service struct {
-	ln    net.Listener
-	addr  string
-	https bool
-	cert  string
-	key   string
-	err   chan error
+	ln        net.Listener
+	addr      string
+	https     bool
+	cert      string
+	tlsConfig *tls.Config
+	key       string
+	err       chan error
 
 	externalURL string
 
@@ -87,7 +88,7 @@ type Service struct {
 	httpServerErrorLogger *log.Logger
 }
 
-func NewService(c Config, hostname string, d Diagnostic) *Service {
+func NewService(c Config, hostname string, t *tls.Config, d Diagnostic) *Service {
 	statMap := &expvar.Map{}
 	statMap.Init()
 
@@ -108,6 +109,7 @@ func NewService(c Config, hostname string, d Diagnostic) *Service {
 		key:             c.HTTPSPrivateKey,
 		externalURL:     u.String(),
 		err:             make(chan error, 1),
+		tlsConfig:       t,
 		shutdownTimeout: time.Duration(c.ShutdownTimeout),
 		Handler: NewHandler(
 			c.AuthEnabled,
@@ -153,9 +155,9 @@ func (s *Service) Open() error {
 			return err
 		}
 
-		listener, err := tls.Listen("tcp", s.addr, &tls.Config{
-			Certificates: []tls.Certificate{cert},
-		})
+		tlsConfig := s.tlsConfig.Clone()
+		tlsConfig.Certificates = []tls.Certificate{cert}
+		listener, err := tls.Listen("tcp", s.addr, tlsConfig)
 		if err != nil {
 			return err
 		}

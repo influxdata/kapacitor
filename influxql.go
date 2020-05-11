@@ -114,10 +114,10 @@ func (g *influxqlGroup) BatchPoint(bp edge.BatchPointMessage) (edge.Message, err
 			return nil, nil
 		}
 	}
-	g.batchSize++
 	if err := g.rc.AggregatePoint(g.begin.Name(), bp); err != nil {
 		g.n.diag.Error("failed to aggregate point in batch", err)
 	}
+	g.batchSize++
 	return nil, nil
 }
 

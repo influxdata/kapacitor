@@ -6,6 +6,7 @@ import (
 )
 
 // Error represents the different error codes that may be returned by kafka.
+// https://kafka.apache.org/protocol#protocol_error_codes
 type Error int
 
 const (
@@ -22,6 +23,7 @@ const (
 	MessageSizeTooLarge                Error = 10
 	StaleControllerEpoch               Error = 11
 	OffsetMetadataTooLarge             Error = 12
+	NetworkException                   Error = 13
 	GroupLoadInProgress                Error = 14
 	GroupCoordinatorNotAvailable       Error = 15
 	NotCoordinatorForGroup             Error = 16
@@ -64,6 +66,33 @@ const (
 	TransactionalIDAuthorizationFailed Error = 53
 	SecurityDisabled                   Error = 54
 	BrokerAuthorizationFailed          Error = 55
+	KafkaStorageError                  Error = 56
+	LogDirNotFound                     Error = 57
+	SASLAuthenticationFailed           Error = 58
+	UnknownProducerId                  Error = 59
+	ReassignmentInProgress             Error = 60
+	DelegationTokenAuthDisabled        Error = 61
+	DelegationTokenNotFound            Error = 62
+	DelegationTokenOwnerMismatch       Error = 63
+	DelegationTokenRequestNotAllowed   Error = 64
+	DelegationTokenAuthorizationFailed Error = 65
+	DelegationTokenExpired             Error = 66
+	InvalidPrincipalType               Error = 67
+	NonEmptyGroup                      Error = 68
+	GroupIdNotFound                    Error = 69
+	FetchSessionIDNotFound             Error = 70
+	InvalidFetchSessionEpoch           Error = 71
+	ListenerNotFound                   Error = 72
+	TopicDeletionDisabled              Error = 73
+	FencedLeaderEpoch                  Error = 74
+	UnknownLeaderEpoch                 Error = 75
+	UnsupportedCompressionType         Error = 76
+	StaleBrokerEpoch                   Error = 77
+	OffsetNotAvailable                 Error = 78
+	MemberIDRequired                   Error = 79
+	PreferredLeaderNotAvailable        Error = 80
+	GroupMaxSizeReached                Error = 81
+	FencedInstanceID                   Error = 82
 )
 
 // Error satisfies the error interface.
@@ -78,14 +107,35 @@ func (e Error) Timeout() bool {
 
 // Temporary returns true if the operation that generated the error may succeed
 // if retried at a later time.
+// Kafka error documentation specifies these as "retriable"
+// https://kafka.apache.org/protocol#protocol_error_codes
 func (e Error) Temporary() bool {
-	return e == LeaderNotAvailable ||
-		e == BrokerNotAvailable ||
-		e == ReplicaNotAvailable ||
-		e == GroupLoadInProgress ||
-		e == GroupCoordinatorNotAvailable ||
-		e == RebalanceInProgress ||
-		e.Timeout()
+	switch e {
+	case InvalidMessage,
+		UnknownTopicOrPartition,
+		LeaderNotAvailable,
+		NotLeaderForPartition,
+		RequestTimedOut,
+		NetworkException,
+		GroupLoadInProgress,
+		GroupCoordinatorNotAvailable,
+		NotCoordinatorForGroup,
+		NotEnoughReplicas,
+		NotEnoughReplicasAfterAppend,
+		NotController,
+		KafkaStorageError,
+		FetchSessionIDNotFound,
+		InvalidFetchSessionEpoch,
+		ListenerNotFound,
+		FencedLeaderEpoch,
+		UnknownLeaderEpoch,
+		OffsetNotAvailable,
+		PreferredLeaderNotAvailable:
+		return true
+
+	default:
+		return false
+	}
 }
 
 // Title returns a human readable title for the error.
@@ -201,6 +251,48 @@ func (e Error) Title() string {
 		return "Security Disabled"
 	case BrokerAuthorizationFailed:
 		return "Broker Authorization Failed"
+	case KafkaStorageError:
+		return "Kafka Storage Error"
+	case LogDirNotFound:
+		return "Log Dir Not Found"
+	case SASLAuthenticationFailed:
+		return "SASL Authentication Failed"
+	case UnknownProducerId:
+		return "Unknown Producer ID"
+	case ReassignmentInProgress:
+		return "Reassignment In Progress"
+	case DelegationTokenAuthDisabled:
+		return "Delegation Token Auth Disabled"
+	case DelegationTokenNotFound:
+		return "Delegation Token Not Found"
+	case DelegationTokenOwnerMismatch:
+		return "Delegation Token Owner Mismatch"
+	case DelegationTokenRequestNotAllowed:
+		return "Delegation Token Request Not Allowed"
+	case DelegationTokenAuthorizationFailed:
+		return "Delegation Token Authorization Failed"
+	case DelegationTokenExpired:
+		return "Delegation Token Expired"
+	case InvalidPrincipalType:
+		return "Invalid Principal Type"
+	case NonEmptyGroup:
+		return "Non Empty Group"
+	case GroupIdNotFound:
+		return "Group ID Not Found"
+	case FetchSessionIDNotFound:
+		return "Fetch Session ID Not Found"
+	case InvalidFetchSessionEpoch:
+		return "Invalid Fetch Session Epoch"
+	case ListenerNotFound:
+		return "Listener Not Found"
+	case TopicDeletionDisabled:
+		return "Topic Deletion Disabled"
+	case FencedLeaderEpoch:
+		return "Fenced Leader Epoch"
+	case UnknownLeaderEpoch:
+		return "Unknown Leader Epoch"
+	case UnsupportedCompressionType:
+		return "Unsupported Compression Type"
 	}
 	return ""
 }
@@ -318,6 +410,48 @@ func (e Error) Description() string {
 		return "the security features are disabled"
 	case BrokerAuthorizationFailed:
 		return "the broker authorization failed"
+	case KafkaStorageError:
+		return "disk error when trying to access log file on the disk"
+	case LogDirNotFound:
+		return "the user-specified log directory is not found in the broker config"
+	case SASLAuthenticationFailed:
+		return "SASL Authentication failed"
+	case UnknownProducerId:
+		return "the broker could not locate the producer metadata associated with the producer ID"
+	case ReassignmentInProgress:
+		return "a partition reassignment is in progress"
+	case DelegationTokenAuthDisabled:
+		return "delegation token feature is not enabled"
+	case DelegationTokenNotFound:
+		return "delegation token is not found on server"
+	case DelegationTokenOwnerMismatch:
+		return "specified principal is not valid owner/renewer"
+	case DelegationTokenRequestNotAllowed:
+		return "delegation token requests are not allowed on plaintext/1-way ssl channels and on delegation token authenticated channels"
+	case DelegationTokenAuthorizationFailed:
+		return "delegation token authorization failed"
+	case DelegationTokenExpired:
+		return "delegation token is expired"
+	case InvalidPrincipalType:
+		return "supplied principaltype is not supported"
+	case NonEmptyGroup:
+		return "the group is not empty"
+	case GroupIdNotFound:
+		return "the group ID does not exist"
+	case FetchSessionIDNotFound:
+		return "the fetch session ID was not found"
+	case InvalidFetchSessionEpoch:
+		return "the fetch session epoch is invalid"
+	case ListenerNotFound:
+		return "there is no listener on the leader broker that matches the listener on which metadata request was processed"
+	case TopicDeletionDisabled:
+		return "topic deletion is disabled"
+	case FencedLeaderEpoch:
+		return "the leader epoch in the request is older than the epoch on the broker"
+	case UnknownLeaderEpoch:
+		return "the leader epoch in the request is newer than the epoch on the broker"
+	case UnsupportedCompressionType:
+		return "the requesting client does not support the compression type of given partition"
 	}
 	return ""
 }
@@ -357,4 +491,13 @@ func coalesceErrors(errs ...error) error {
 		}
 	}
 	return nil
+}
+
+type MessageTooLargeError struct {
+	Message   Message
+	Remaining []Message
+}
+
+func (e MessageTooLargeError) Error() string {
+	return MessageSizeTooLarge.Error()
 }

@@ -19,6 +19,7 @@ import (
 	"github.com/influxdata/kapacitor/services/consul"
 	"github.com/influxdata/kapacitor/services/deadman"
 	"github.com/influxdata/kapacitor/services/diagnostic"
+	"github.com/influxdata/kapacitor/services/discord"
 	"github.com/influxdata/kapacitor/services/dns"
 	"github.com/influxdata/kapacitor/services/ec2"
 	"github.com/influxdata/kapacitor/services/file_discovery"
@@ -58,6 +59,7 @@ import (
 	"github.com/influxdata/kapacitor/services/udf"
 	"github.com/influxdata/kapacitor/services/udp"
 	"github.com/influxdata/kapacitor/services/victorops"
+	"github.com/influxdata/kapacitor/tlsconfig"
 	"github.com/pkg/errors"
 
 	"github.com/influxdata/influxdb/services/collectd"
@@ -76,6 +78,7 @@ type Config struct {
 	InfluxDB       []influxdb.Config `toml:"influxdb" override:"influxdb,element-key=name"`
 	Logging        diagnostic.Config `toml:"logging"`
 	ConfigOverride config.Config     `toml:"config-override"`
+	TLS            tlsconfig.Config  `toml:"tls"`
 
 	// Input services
 	Graphite []graphite.Config `toml:"graphite"`
@@ -85,6 +88,7 @@ type Config struct {
 
 	// Alert handlers
 	Alerta     alerta.Config     `toml:"alerta" override:"alerta"`
+	Discord    discord.Configs   `toml:"discord" override:"discord,element-key=workspace"`
 	HipChat    hipchat.Config    `toml:"hipchat" override:"hipchat"`
 	Kafka      kafka.Configs     `toml:"kafka" override:"kafka,element-key=id"`
 	MQTT       mqtt.Configs      `toml:"mqtt" override:"mqtt,element-key=name"`
@@ -149,11 +153,13 @@ func NewConfig() *Config {
 	c.InfluxDB = []influxdb.Config{influxdb.NewConfig()}
 	c.Logging = diagnostic.NewConfig()
 	c.ConfigOverride = config.NewConfig()
+	c.TLS = tlsconfig.NewConfig()
 
 	c.Collectd = collectd.NewConfig()
 	c.OpenTSDB = opentsdb.NewConfig()
 
 	c.Alerta = alerta.NewConfig()
+	c.Discord = discord.Configs{discord.NewDefaultConfig()}
 	c.HipChat = hipchat.NewConfig()
 	c.Kafka = kafka.Configs{kafka.NewConfig()}
 	c.MQTT = mqtt.Configs{mqtt.NewConfig()}
@@ -225,6 +231,9 @@ func (c *Config) Validate() error {
 	if err := c.Task.Validate(); err != nil {
 		return errors.Wrap(err, "task")
 	}
+	if err := c.TLS.Validate(); err != nil {
+		return errors.Wrap(err, "tls")
+	}
 	if err := c.Load.Validate(); err != nil {
 		return err
 	}
@@ -268,6 +277,9 @@ func (c *Config) Validate() error {
 	// Validate alert handlers
 	if err := c.Alerta.Validate(); err != nil {
 		return errors.Wrap(err, "alerta")
+	}
+	if err := c.Discord.Validate(); err != nil {
+		return err
 	}
 	if err := c.HipChat.Validate(); err != nil {
 		return errors.Wrap(err, "hipchat")
