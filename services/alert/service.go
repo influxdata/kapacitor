@@ -30,6 +30,7 @@ import (
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/snmptrap"
 	"github.com/influxdata/kapacitor/services/storage"
+	"github.com/influxdata/kapacitor/services/teams"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/mitchellh/mapstructure"
@@ -135,6 +136,9 @@ type Service struct {
 	}
 	VictorOpsService interface {
 		Handler(victorops.HandlerConfig, ...keyvalue.T) alert.Handler
+	}
+	TeamsService interface {
+		Handler(teams.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 }
 
@@ -955,6 +959,14 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		}
 		handlerDiag := s.diag.WithHandlerContext(ctx...)
 		h = NewTCPHandler(c, handlerDiag)
+		h = newExternalHandler(h)
+	case "teams":
+		c := teams.HandlerConfig{}
+		err = decodeOptions(spec.Options, &c)
+		if err != nil {
+			return handler{}, err
+		}
+		h = s.TeamsService.Handler(c, ctx...)
 		h = newExternalHandler(h)
 	case "telegram":
 		c := telegram.HandlerConfig{}

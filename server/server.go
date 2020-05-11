@@ -66,6 +66,7 @@ import (
 	"github.com/influxdata/kapacitor/services/swarm"
 	"github.com/influxdata/kapacitor/services/talk"
 	"github.com/influxdata/kapacitor/services/task_store"
+	"github.com/influxdata/kapacitor/services/teams"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/triton"
 	"github.com/influxdata/kapacitor/services/udf"
@@ -258,6 +259,7 @@ func New(c *Config, buildInfo BuildInfo, diagService *diagnostic.Service) (*Serv
 		return nil, errors.Wrap(err, "httppost service")
 	}
 	s.appendSMTPService()
+	s.appendTeamsService()
 	s.appendTelegramService()
 	if err := s.appendSlackService(); err != nil {
 		return nil, errors.Wrap(err, "slack service")
@@ -985,6 +987,18 @@ func (s *Server) appendTritonService() {
 	srv := triton.NewService(c, s.ScraperService, d)
 	s.SetDynamicService("triton", srv)
 	s.AppendService("triton", srv)
+}
+
+func (s *Server) appendTeamsService() {
+	c := s.config.Teams
+	d := s.DiagService.NewTeamsHandler()
+	srv := teams.NewService(c, d)
+
+	s.TaskMaster.TeamsService = srv
+	s.AlertService.TeamsService = srv
+
+	s.SetDynamicService("teams", srv)
+	s.AppendService("teams", srv)
 }
 
 // Err returns an error channel that multiplexes all out of band errors received from all services.

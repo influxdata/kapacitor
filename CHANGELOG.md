@@ -1,11 +1,14 @@
 # Changelog
 
+## v1.5.1 [unreleased]
+
 ## unreleased
 
 ### Features
 - [#2287](https://github.com/influxdata/kapacitor/pull/2287): Added Discord Webhook Alert Handler, thanks @mattnotmitt!
 - [#2311](https://github.com/influxdata/kapacitor/pull/2311): UDF Agent Python3 fixes, thanks @elohmeier!
 - [#2318](https://github.com/influxdata/kapacitor/pull/2322): Add support for TLS 1.3.
+- [#1965](https://github.com/influxdata/kapacitor/pull/1965): Alert handler for Microsoft Teams, thanks @mmindenhall!
 
 ### Bugfixes
 

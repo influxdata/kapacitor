@@ -55,6 +55,7 @@ type AlertNode struct{ *AlertNodeData }
 //    * Talk -- Post alert message to Talk client.
 //    * Telegram -- Post alert message to Telegram client.
 //    * MQTT -- Post alert message to MQTT.
+//    * Teams -- Post alert message to Microsoft Teams.
 //	  * Discord -- Post alert message to Discord webhook.
 //
 // See below for more details on configuring each handler.
@@ -390,6 +391,10 @@ type AlertNodeData struct {
 	// Send alert to Kafka topic
 	// tick:ignore
 	KafkaHandlers []*KafkaHandler `tick:"Kafka" json:"kafka"`
+
+	// Send alert to Microsoft Teams channel.
+	// tick:ignore
+	TeamsHandlers []*TeamsHandler `tick:"Teams" json:"teams"`
 }
 
 func newAlertNode(wants EdgeType) *AlertNode {
@@ -2037,4 +2042,67 @@ type KafkaHandler struct {
 	// Template used to construct the message body
 	// If empty the alert data in JSON is sent as the message body.
 	Template string `json:"template"`
+}
+
+// Send the alert to a Microsoft Teams channel.
+// To allow Kapacitor to post to Teams, to to the URL
+// https://docs.microsoft.com/en-us/microsoftteams/platform/concepts/connectors#setting-up-a-custom-incoming-webhook
+// and follow instructions to create a webhook for a Teams channel.  Add the webhook URL to the configuration.
+//
+// Example:
+//    [teams]
+//      enabled = true
+//      channel-url = "https://outlook.office.com/webhook/..."
+//
+// In order to not post a message every alert interval
+// use AlertNode.StateChangesOnly so that only events
+// where the alert changed state are posted to the room.
+//
+// Example:
+//    stream
+//         |alert()
+//             .teams()
+//
+// Send alerts to Teams channel in the configuration file.
+//
+// Example:
+//    stream
+//         |alert()
+//             .teams()
+//             .channelURL('https://outlook.office.com/webhook/...')
+//
+// Send alerts to Teams channel with webhook (overrides configuration file).
+//
+// If the 'teams' section in the configuration has the option: global = true
+// then all alerts are sent to Teams without the need to explicitly state it
+// in the TICKscript.
+//
+// Example:
+//    [teams]
+//      enabled = true
+//      channel-url = "https://outlook.office.com/webhook/..."
+//      global = true
+//      state-changes-only = true
+//
+// Example:
+//    stream
+//         |alert()
+//
+// Send alert to Teams using default channel.
+// tick:property
+func (n *AlertNodeData) Teams() *TeamsHandler {
+	teams := &TeamsHandler{
+		AlertNodeData: n,
+	}
+	n.TeamsHandlers = append(n.TeamsHandlers, teams)
+	return teams
+}
+
+// tick:embedded:AlertNode.Teams
+type TeamsHandler struct {
+	*AlertNodeData `json:"-"`
+
+	// Teams channel webhook URL to post messages.
+	// If empty uses the URL from the configuration.
+	ChannelURL string `json:"channel_url"`
 }

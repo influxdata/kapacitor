@@ -472,3 +472,9 @@ func (s *Service) NewLoadHandler() *LoadHandler {
 		l: s.Logger.With(String("service", "load")),
 	}
 }
+
+func (s *Service) NewTeamsHandler() *TeamsHandler {
+	return &TeamsHandler{
+		l: s.Logger.With(String("service", "teams")),
+	}
+}
