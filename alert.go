@@ -494,7 +494,7 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		n.IsStateChangesOnly = true
 	}
 
-  if len(n.DiscordHandlers) == 0 && (et.tm.DiscordService != nil && et.tm.DiscordService.Global()) {
+	if len(n.DiscordHandlers) == 0 && (et.tm.DiscordService != nil && et.tm.DiscordService.Global()) {
 		h, err := et.tm.DiscordService.Handler(discord.HandlerConfig{}, ctx...)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create Discord handler")
