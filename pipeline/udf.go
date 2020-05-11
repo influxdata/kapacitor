@@ -134,19 +134,19 @@ func (u *UDFNode) SetProperty(name string, args ...interface{}) (interface{}, er
 			switch v := arg.(type) {
 			case bool:
 				values[i].Type = agent.ValueType_BOOL
-				values[i].Value = &agent.OptionValue_BoolValue{v}
+				values[i].Value = &agent.OptionValue_BoolValue{BoolValue: v}
 			case int64:
 				values[i].Type = agent.ValueType_INT
-				values[i].Value = &agent.OptionValue_IntValue{v}
+				values[i].Value = &agent.OptionValue_IntValue{IntValue: v}
 			case float64:
 				values[i].Type = agent.ValueType_DOUBLE
-				values[i].Value = &agent.OptionValue_DoubleValue{v}
+				values[i].Value = &agent.OptionValue_DoubleValue{DoubleValue: v}
 			case string:
 				values[i].Type = agent.ValueType_STRING
-				values[i].Value = &agent.OptionValue_StringValue{v}
+				values[i].Value = &agent.OptionValue_StringValue{StringValue: v}
 			case time.Duration:
 				values[i].Type = agent.ValueType_DURATION
-				values[i].Value = &agent.OptionValue_DurationValue{int64(v)}
+				values[i].Value = &agent.OptionValue_DurationValue{DurationValue: int64(v)}
 			}
 			if values[i].Type != opt.ValueTypes[i] {
 				return nil, fmt.Errorf("unexpected arg to %s, got %v expected %v", name, values[i].Type, opt.ValueTypes[i])
@@ -219,14 +219,14 @@ func (u *UDFNode) unmarshal(props JSONNode) error {
 			case bool:
 				values[i] = &agent.OptionValue{
 					Type:  agent.ValueType_BOOL,
-					Value: &agent.OptionValue_BoolValue{v},
+					Value: &agent.OptionValue_BoolValue{BoolValue: v},
 				}
 			case json.Number:
 				integer, err := v.Int64()
 				if err == nil {
 					values[i] = &agent.OptionValue{
 						Type:  agent.ValueType_INT,
-						Value: &agent.OptionValue_IntValue{integer},
+						Value: &agent.OptionValue_IntValue{IntValue: integer},
 					}
 					break
 				}
@@ -237,20 +237,20 @@ func (u *UDFNode) unmarshal(props JSONNode) error {
 				}
 				values[i] = &agent.OptionValue{
 					Type:  agent.ValueType_DOUBLE,
-					Value: &agent.OptionValue_DoubleValue{flt},
+					Value: &agent.OptionValue_DoubleValue{DoubleValue: flt},
 				}
 			case string:
 				dur, err := influxql.ParseDuration(v)
 				if err == nil {
 					values[i] = &agent.OptionValue{
 						Type:  agent.ValueType_DURATION,
-						Value: &agent.OptionValue_DurationValue{int64(dur)},
+						Value: &agent.OptionValue_DurationValue{DurationValue: int64(dur)},
 					}
 					break
 				}
 				values[i] = &agent.OptionValue{
 					Type:  agent.ValueType_STRING,
-					Value: &agent.OptionValue_StringValue{v},
+					Value: &agent.OptionValue_StringValue{StringValue: v},
 				}
 			}
 		}

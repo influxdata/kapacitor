@@ -69,7 +69,7 @@ func {{.name}}PopulateAuxFieldsAndTags(ap *influxql.{{.Name}}Point, fieldsAndTag
 func (a *{{.name}}PointAggregator) AggregatePoint(name string, p edge.FieldsTagsTimeGetter) error {
 	ap, err := convert{{.Name}}Point(name, p, a.field, a.isSimpleSelector, a.topBottomInfo)
 	if err != nil {
-		return nil
+		return err
 	}
 	a.aggregator.Aggregate{{.Name}}(ap)
 	return nil

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Provides an incomplete Kafka Server implementation.
@@ -60,6 +61,7 @@ func (s *Server) prepareBrokerMsg() {
 	s.brokerMessage = writeStr(s.brokerMessage, host)
 	portN, _ := strconv.Atoi(port)
 	s.brokerMessage = writeInt32(s.brokerMessage, int32(portN))
+	s.brokerMessage = writeInt16(s.brokerMessage, -1)
 }
 
 func (s *Server) preparePartitionMsg() {
@@ -122,11 +124,17 @@ func (s *Server) run(l net.Listener) {
 			go func() {
 				defer s.wg.Done()
 				defer c.Close()
-				if err := s.handle(c); err != nil {
-					s.errors = append(s.errors, err)
+				for {
+					if err := s.handle(c); err != nil {
+						if err == io.EOF {
+							return
+						}
+						s.errors = append(s.errors, err)
+					}
 				}
 			}()
 		case <-s.closing:
+			l.Close()
 			return
 		}
 	}
@@ -165,13 +173,15 @@ func (s *Server) handle(c net.Conn) error {
 		response = writeInt32(response, partition)
 		response = writeInt16(response, 0) // Error Code
 		response = writeInt64(response, offset)
-		response = writeInt64(response, -1) // Timestamp
-		response = writeInt32(response, 0)  // ThrottleTime
+		response = writeInt32(response, 0) // ThrottleTime
 	case 3: // Metadata
 		topics, _ := readStrList(request)
 
 		// Write broker message
 		response = writeArray(response, [][]byte{s.brokerMessage})
+
+		// Write controller id
+		response = writeInt32(response, 0)
 
 		// Write topic metadata
 		response = writeArrayHeader(response, int32(len(topics)))
@@ -180,10 +190,29 @@ func (s *Server) handle(c net.Conn) error {
 			response = writeInt16(response, 0)
 			// Write topic name
 			response = writeStr(response, t)
+			// Write is_internal
+			response = writeBool(response, false)
 
 			// Write partition
 			response = writeArray(response, [][]byte{s.partitionMessage})
 		}
+	case 18:
+		// Hard code the api versions we are implementing to ensure
+		// the client knows which ones we plan on implementing.
+		response = writeInt16(response, 0) // Error Code
+
+		// Write api versions
+		response = writeArrayHeader(response, 2)
+
+		// Write produce request version
+		response = writeInt16(response, 0)
+		response = writeInt16(response, 2)
+		response = writeInt16(response, 2)
+
+		// Write metadata request version
+		response = writeInt16(response, 3)
+		response = writeInt16(response, 1)
+		response = writeInt16(response, 1)
 	default:
 		return fmt.Errorf("unsupported apiKey %d", apiKey)
 	}
@@ -213,7 +242,10 @@ func (s *Server) readProduceRequest(request []byte) (topic string, partition int
 	offset = readInt64(request[pos:])
 	pos += 8
 
-	pos += 4 + 4 + 1 + 1 + 8 // skip size, crc, magic, attributes, timestamp
+	pos += 4 + 4 + 1 + 1 // skip size, crc, magic, attributes
+
+	msecs := readInt64(request[pos:])
+	pos += 8
 
 	key, n := readByteArray(request[pos:])
 	pos += n
@@ -227,6 +259,7 @@ func (s *Server) readProduceRequest(request []byte) (topic string, partition int
 		Offset:    offset,
 		Key:       string(key),
 		Message:   string(message),
+		Time:      time.Unix(msecs/1000, msecs%1000*1000000).UTC(),
 	})
 	return
 }
@@ -285,6 +318,16 @@ func writeInt16(dst []byte, n int) []byte {
 	return dst
 }
 
+func writeBool(dst []byte, b bool) []byte {
+	v := int8(0)
+	if b {
+		v = 1
+	}
+	return writeInt8(dst, v)
+}
+func writeInt8(dst []byte, n int8) []byte {
+	return append(dst, byte(n))
+}
 func writeInt32(dst []byte, n int32) []byte {
 	l := len(dst)
 	dst = append(dst, []byte{0, 0, 0, 0}...)
@@ -326,4 +369,5 @@ type Message struct {
 	Offset    int64
 	Key       string
 	Message   string
+	Time      time.Time
 }

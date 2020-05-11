@@ -260,7 +260,7 @@ func (v *Map) DoSorted(f func(expvar.KeyValue)) {
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		f(expvar.KeyValue{k, v.m[k]})
+		f(expvar.KeyValue{Key: k, Value: v.m[k]})
 	}
 }
 
@@ -268,7 +268,7 @@ func (v *Map) DoSorted(f func(expvar.KeyValue)) {
 // v.mu must be held for reads.
 func (v *Map) doLocked(f func(expvar.KeyValue)) {
 	for k, v := range v.m {
-		f(expvar.KeyValue{k, v})
+		f(expvar.KeyValue{Key: k, Value: v})
 	}
 }
 
