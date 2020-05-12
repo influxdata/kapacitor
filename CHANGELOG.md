@@ -13,6 +13,7 @@
 ### Bugfixes
 
 - [#2286](https://github.com/influxdata/kapacitor/pull/2286): Corrected issue with `go vet` invocation in .hooks/pre-commit which would cause the hook to fail, thanks @mattnotmitt!
+- [#1980](https://github.com/influxdata/kapacitor/pull/1980): Fix discovery service lost config, thanks @flisky!
 
 ## v1.5.5 [2020-04-20]
 
@@ -71,7 +72,6 @@
 - [#1938](https://github.com/influxdata/kapacitor/issues/1938): pagerduty2 should use routingKey rather than serviceKey
 - [#1982](https://github.com/influxdata/kapacitor/pull/1982): Fix KafkaTopic not working from TICKscript
 - [#1989](https://github.com/influxdata/kapacitor/pull/1989): Improve Kafka alert throughput.
-- [#1980](https://github.com/influxdata/kapacitor/pull/1980): Fix discovery service lost config.
 
 ## v1.5.0 [2018-05-17]
 
