@@ -1,7 +1,5 @@
 # Changelog
 
-## v1.5.1 [unreleased]
-
 ## unreleased
 
 ### Features
