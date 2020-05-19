@@ -1,6 +1,7 @@
 package stateful
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -88,50 +89,64 @@ func (se *expression) EvalMissing(scope *Scope) (*ast.Missing, error) {
 	return se.nodeEvaluator.EvalMissing(scope, se.executionState)
 }
 
-func (se *expression) Eval(scope *Scope) (interface{}, error) {
-	typ, err := se.nodeEvaluator.Type(scope)
+func (se *expression) Eval(scope *Scope) (result interface{}, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			switch r := r.(type) {
+			case string:
+				err = errors.New(r)
+			case error:
+				err = r
+			case fmt.Stringer:
+				err = errors.New(r.String())
+			}
+		}
+	}()
+	var typ ast.ValueType
+	typ, err = se.nodeEvaluator.Type(scope)
 	if err != nil {
 		return nil, err
 	}
 
 	switch typ {
 	case ast.TInt:
-		result, err := se.EvalInt(scope)
+		result, err = se.EvalInt(scope)
 		if err != nil {
 			return nil, err
 		}
 		return result, err
 	case ast.TFloat:
-		result, err := se.EvalFloat(scope)
+		result, err = se.EvalFloat(scope)
 		if err != nil {
 			return nil, err
 		}
 		return result, err
 	case ast.TString:
-		result, err := se.EvalString(scope)
+		result, err = se.EvalString(scope)
 		if err != nil {
 			return nil, err
 		}
 		return result, err
 	case ast.TBool:
-		result, err := se.EvalBool(scope)
+		result, err = se.EvalBool(scope)
 		if err != nil {
 			return nil, err
 		}
 		return result, err
 	case ast.TDuration:
-		result, err := se.EvalDuration(scope)
+		result, err = se.EvalDuration(scope)
 		if err != nil {
 			return nil, err
 		}
 		return result, err
 	case ast.TMissing:
-		result, err := se.EvalMissing(scope)
+		result, err = se.EvalMissing(scope)
 		if err != nil {
 			return nil, err
 		}
 		return result, err
 	default:
-		return nil, fmt.Errorf("expression returned unexpected type %s", typ)
+		err = fmt.Errorf("expression returned unexpected type %s", typ)
+		return
 	}
 }

@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/influxdata/kapacitor/services/discord"
-	"github.com/influxdata/kapacitor/services/discord/discordtest"
 	"html"
 	"io/ioutil"
 	"math/rand"
@@ -22,6 +20,9 @@ import (
 	"testing"
 	"text/template"
 	"time"
+
+	"github.com/influxdata/kapacitor/services/discord"
+	"github.com/influxdata/kapacitor/services/discord/discordtest"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/docker/api/types/swarm"
@@ -2689,6 +2690,20 @@ stream
 	}
 
 	testStreamerWithOutput(t, "TestStream_EvalAllTypes", script, 2*time.Second, er, false, nil)
+}
+
+func TestStream_EvalDivisionByZero(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('data')
+	|eval(lambda: 10/"n")
+		.as('n')
+	|httpOut('TestStream_EvalDivisionByZero')
+`
+
+	testStreamerNoOutput(t, "TestStream_EvalDivisionByZero", script, 2*time.Second, nil)
+
 }
 
 func TestStream_Eval_KeepAll(t *testing.T) {
@@ -12868,6 +12883,7 @@ func testStreamer(
 	<-chan error,
 	*kapacitor.TaskMaster,
 ) {
+	t.Helper()
 	if testing.Verbose() {
 		wlog.SetLevel(wlog.DEBUG)
 	} else {
@@ -13027,6 +13043,7 @@ func testStreamerWithOutput(
 	ignoreOrder bool,
 	tmInit func(tm *kapacitor.TaskMaster),
 ) {
+	t.Helper()
 	clock, et, replayErr, tm := testStreamer(t, name, script, tmInit)
 	defer tm.Close()
 
