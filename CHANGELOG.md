@@ -3,9 +3,25 @@
 ## unreleased
 
 ### Features
-- [#2301](https://github.com/influxdata/kapacitor/pull/2301): Allow for overriding OpsGenieV2's alert recovery action in tickSCRIPT
+- [#2287](https://github.com/influxdata/kapacitor/pull/2287): Added Discord Webhook Alert Handler, thanks @mattnotmitt!
+- [#2311](https://github.com/influxdata/kapacitor/pull/2311): UDF Agent Python3 fixes, thanks @elohmeier!
+- [#2318](https://github.com/influxdata/kapacitor/pull/2322): Add support for TLS 1.3.
+- [#1965](https://github.com/influxdata/kapacitor/pull/1965): Alert handler for Microsoft Teams, thanks @mmindenhall!
+- [#2301](https://github.com/influxdata/kapacitor/pull/2301): Allow for overriding OpsGenieV2's alert recovery action in tickSCRIPT, thanks @zabullet!
 
 ### Bugfixes
+- [#2286](https://github.com/influxdata/kapacitor/pull/2286): Corrected issue with `go vet` invocation in .hooks/pre-commit which would cause the hook to fail, thanks @mattnotmitt!
+- [#1980](https://github.com/influxdata/kapacitor/pull/1980): Fix discovery service lost config, thanks @flisky!
+- [#2335](https://github.com/influxdata/kapacitor/pull/2335): Fix panic when setting a zero interval for ticker, this affected deadman and stats nodes.
+- [#2340](https://github.com/influxdata/kapacitor/pull/2340): Fix a panic on int div-by-zero, instead return an error.
+
+## v1.5.5 [2020-04-20]
+
+### bugfixes
+- [#2319](https://github.com/influxdata/kapacitor/pull/2319): Update kafka lib; make kafka errors unsilent.
+
+### features
+- [#2312](https://github.com/influxdata/kapacitor/pull/2312): Switched from md5 to sha256 for release checksums.
 
 ## v1.5.4 [2020-01-16]
 

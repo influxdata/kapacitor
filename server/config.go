@@ -19,6 +19,7 @@ import (
 	"github.com/influxdata/kapacitor/services/consul"
 	"github.com/influxdata/kapacitor/services/deadman"
 	"github.com/influxdata/kapacitor/services/diagnostic"
+	"github.com/influxdata/kapacitor/services/discord"
 	"github.com/influxdata/kapacitor/services/dns"
 	"github.com/influxdata/kapacitor/services/ec2"
 	"github.com/influxdata/kapacitor/services/file_discovery"
@@ -52,6 +53,7 @@ import (
 	"github.com/influxdata/kapacitor/services/swarm"
 	"github.com/influxdata/kapacitor/services/talk"
 	"github.com/influxdata/kapacitor/services/task_store"
+	"github.com/influxdata/kapacitor/services/teams"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/triton"
 	"github.com/influxdata/kapacitor/services/udf"
@@ -86,6 +88,7 @@ type Config struct {
 
 	// Alert handlers
 	Alerta     alerta.Config     `toml:"alerta" override:"alerta"`
+	Discord    discord.Configs   `toml:"discord" override:"discord,element-key=workspace"`
 	HipChat    hipchat.Config    `toml:"hipchat" override:"hipchat"`
 	Kafka      kafka.Configs     `toml:"kafka" override:"kafka,element-key=id"`
 	MQTT       mqtt.Configs      `toml:"mqtt" override:"mqtt,element-key=name"`
@@ -100,6 +103,7 @@ type Config struct {
 	Sensu      sensu.Config      `toml:"sensu" override:"sensu"`
 	Slack      slack.Configs     `toml:"slack" override:"slack,element-key=workspace"`
 	Talk       talk.Config       `toml:"talk" override:"talk"`
+	Teams      teams.Config      `toml:"teams" override:"teams"`
 	Telegram   telegram.Config   `toml:"telegram" override:"telegram"`
 	VictorOps  victorops.Config  `toml:"victorops" override:"victorops"`
 
@@ -155,6 +159,7 @@ func NewConfig() *Config {
 	c.OpenTSDB = opentsdb.NewConfig()
 
 	c.Alerta = alerta.NewConfig()
+	c.Discord = discord.Configs{discord.NewDefaultConfig()}
 	c.HipChat = hipchat.NewConfig()
 	c.Kafka = kafka.Configs{kafka.NewConfig()}
 	c.MQTT = mqtt.Configs{mqtt.NewConfig()}
@@ -168,6 +173,7 @@ func NewConfig() *Config {
 	c.Sensu = sensu.NewConfig()
 	c.Slack = slack.Configs{slack.NewDefaultConfig()}
 	c.Talk = talk.NewConfig()
+	c.Teams = teams.NewConfig()
 	c.SNMPTrap = snmptrap.NewConfig()
 	c.Telegram = telegram.NewConfig()
 	c.VictorOps = victorops.NewConfig()
@@ -272,6 +278,9 @@ func (c *Config) Validate() error {
 	if err := c.Alerta.Validate(); err != nil {
 		return errors.Wrap(err, "alerta")
 	}
+	if err := c.Discord.Validate(); err != nil {
+		return err
+	}
 	if err := c.HipChat.Validate(); err != nil {
 		return errors.Wrap(err, "hipchat")
 	}
@@ -313,6 +322,9 @@ func (c *Config) Validate() error {
 	}
 	if err := c.Talk.Validate(); err != nil {
 		return errors.Wrap(err, "talk")
+	}
+	if err := c.Teams.Validate(); err != nil {
+		return errors.Wrap(err, "teams")
 	}
 	if err := c.Telegram.Validate(); err != nil {
 		return errors.Wrap(err, "telegram")

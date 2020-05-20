@@ -717,15 +717,15 @@
   revision = "1d7be4effb13d2d908342d349d71a284a7542693"
 
 [[projects]]
-  digest = "1:b4b2e722848c38227ef9b926b7f93ba150d80e18fcf4aa3d1ea4830ca0de61a4"
+  digest = "1:b1184e4b8e474f452b201392428a78f93471ec90a7ef72fd00bf2b11a2511b30"
   name = "github.com/segmentio/kafka-go"
   packages = [
     ".",
     "sasl",
   ]
   pruneopts = "NUT"
-  revision = "531c50bb11447b43c02f52718f9213631921fad3"
-  version = "v0.3.3"
+  revision = "9a956db8bd00245835f16007fbfe8ec58b31b8b9"
+  version = "v0.3.5"
 
 [[projects]]
   branch = "master"

@@ -21,6 +21,9 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/influxdata/kapacitor/services/discord"
+	"github.com/influxdata/kapacitor/services/discord/discordtest"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/google/go-cmp/cmp"
@@ -70,6 +73,8 @@ import (
 	"github.com/influxdata/kapacitor/services/swarm/swarmtest"
 	"github.com/influxdata/kapacitor/services/talk"
 	"github.com/influxdata/kapacitor/services/talk/talktest"
+	"github.com/influxdata/kapacitor/services/teams"
+	"github.com/influxdata/kapacitor/services/teams/teamstest"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/telegram/telegramtest"
 	"github.com/influxdata/kapacitor/services/victorops"
@@ -2685,6 +2690,20 @@ stream
 	}
 
 	testStreamerWithOutput(t, "TestStream_EvalAllTypes", script, 2*time.Second, er, false, nil)
+}
+
+func TestStream_EvalDivisionByZero(t *testing.T) {
+	var script = `
+stream
+	|from()
+		.measurement('data')
+	|eval(lambda: 10/"n")
+		.as('n')
+	|httpOut('TestStream_EvalDivisionByZero')
+`
+
+	testStreamerNoOutput(t, "TestStream_EvalDivisionByZero", script, 2*time.Second, nil)
+
 }
 
 func TestStream_Eval_KeepAll(t *testing.T) {
@@ -8972,6 +8991,94 @@ stream
 	}
 }
 
+func TestStream_AlertDiscord(t *testing.T) {
+	ts := discordtest.NewServer()
+	defer ts.Close()
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.discord()
+		.workspace('company_private')
+		.discord()
+		.username('testy')
+`
+
+	tmInit := func(tm *kapacitor.TaskMaster) {
+		c1 := discord.NewConfig()
+		c1.Default = true
+		c1.Enabled = true
+		c1.URL = ts.URL + "/test/discord/url"
+		c2 := discord.NewConfig()
+		c2.Workspace = "company_private"
+		c2.Username = "comp testy"
+		c2.Enabled = true
+		c2.URL = ts.URL + "/test/discord/url2"
+		d := diagService.NewDiscordHandler().WithContext(keyvalue.KV("test", "discord"))
+		sl, err := discord.NewService([]discord.Config{c1, c2}, d)
+		if err != nil {
+			t.Error(err)
+		}
+		tm.DiscordService = sl
+	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	exp := []interface{}{
+		discordtest.Request{
+			URL: "/test/discord/url",
+			PostData: discordtest.PostData{
+				Username:  "testy",
+				AvatarURL: "",
+				Embeds: []discordtest.Embed{
+					{
+						Color:       0xF95F53,
+						Description: "kapacitor/cpu/serverA is CRITICAL",
+						Title:       "",
+						Timestamp:   "",
+					},
+				},
+			},
+		},
+		discordtest.Request{
+			URL: "/test/discord/url2",
+			PostData: discordtest.PostData{
+				Username:  "comp testy",
+				AvatarURL: "",
+				Embeds: []discordtest.Embed{
+					{
+						Color:       0xF95F53,
+						Description: "kapacitor/cpu/serverA is CRITICAL",
+						Title:       "",
+						Timestamp:   "",
+					},
+				},
+			},
+		},
+	}
+
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Requests() {
+		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+		t.Error(err)
+	}
+}
+
 func TestStream_AlertPushover(t *testing.T) {
 	ts := pushovertest.NewServer()
 	defer ts.Close()
@@ -9922,6 +10029,77 @@ stream
 				AuthorName: "Kapacitor",
 				Text:       "kapacitor/cpu/serverA is CRITICAL",
 				Title:      "kapacitor/cpu/serverA",
+			},
+		},
+	}
+
+	ts.Close()
+	var got []interface{}
+	for _, g := range ts.Requests() {
+		got = append(got, g)
+	}
+
+	if err := compareListIgnoreOrder(got, exp, nil); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestStream_AlertTeams(t *testing.T) {
+	ts := teamstest.NewServer()
+	defer ts.Close()
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|window()
+		.period(10s)
+		.every(10s)
+	|count('value')
+	|alert()
+		.id('kapacitor/{{ .Name }}/{{ index .Tags "host" }}')
+		.info(lambda: "count" > 6.0)
+		.warn(lambda: "count" > 7.0)
+		.crit(lambda: "count" > 8.0)
+		.teams()
+		.teams()
+			.channelURL('%s')
+`
+	// To test with live webhook, replace "ts.URL" in line below with your
+	// webhook URL.  The test will fail, but ONE message will post to Teams.
+	script = fmt.Sprintf(script, ts.URL)
+
+	tmInit := func(tm *kapacitor.TaskMaster) {
+
+		c := teams.NewConfig()
+		c.Enabled = true
+		c.ChannelURL = ts.URL
+		sl := teams.NewService(c, diagService.NewTeamsHandler())
+		tm.TeamsService = sl
+	}
+	testStreamerNoOutput(t, "TestStream_Alert", script, 13*time.Second, tmInit)
+
+	exp := []interface{}{
+		teamstest.Request{
+			URL: "/",
+			Card: teams.Card{
+				CardType: "MessageCard",
+				Context:  "http://schema.org/extensions",
+				Title:    "CRITICAL: [kapacitor/cpu/serverA]",
+				Text:     "kapacitor/cpu/serverA is CRITICAL",
+				Summary:  "CRITICAL: [kapacitor/cpu/serverA] - kapacitor/cpu/serverA is CRITICAL...",
+			},
+		},
+		teamstest.Request{
+			URL: "/",
+			Card: teams.Card{
+				CardType: "MessageCard",
+				Context:  "http://schema.org/extensions",
+				Title:    "CRITICAL: [kapacitor/cpu/serverA]",
+				Text:     "kapacitor/cpu/serverA is CRITICAL",
+				Summary:  "CRITICAL: [kapacitor/cpu/serverA] - kapacitor/cpu/serverA is CRITICAL...",
 			},
 		},
 	}
@@ -12705,6 +12883,7 @@ func testStreamer(
 	<-chan error,
 	*kapacitor.TaskMaster,
 ) {
+	t.Helper()
 	if testing.Verbose() {
 		wlog.SetLevel(wlog.DEBUG)
 	} else {
@@ -12864,6 +13043,7 @@ func testStreamerWithOutput(
 	ignoreOrder bool,
 	tmInit func(tm *kapacitor.TaskMaster),
 ) {
+	t.Helper()
 	clock, et, replayErr, tm := testStreamer(t, name, script, tmInit)
 	defer tm.Close()
 

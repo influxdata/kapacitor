@@ -83,7 +83,7 @@ func (s *Service) register() {
 	// Add all configurations to registry
 	for _, d := range s.Configs {
 		if d.Enabled {
-			s.registry.AddDiscoverer(&d)
+			s.registry.AddDiscoverer(d)
 		}
 	}
 }

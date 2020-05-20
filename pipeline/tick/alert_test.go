@@ -224,6 +224,7 @@ func TestAlertTCPJSON(t *testing.T) {
         "pushover": null,
         "sensu": null,
         "slack": null,
+		"discord": null,
         "telegram": null,
         "hipChat": null,
         "alerta": null,

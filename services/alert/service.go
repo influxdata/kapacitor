@@ -14,6 +14,7 @@ import (
 	"github.com/influxdata/kapacitor/keyvalue"
 	"github.com/influxdata/kapacitor/models"
 	"github.com/influxdata/kapacitor/services/alerta"
+	"github.com/influxdata/kapacitor/services/discord"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
 	"github.com/influxdata/kapacitor/services/httppost"
@@ -29,6 +30,7 @@ import (
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/snmptrap"
 	"github.com/influxdata/kapacitor/services/storage"
+	"github.com/influxdata/kapacitor/services/teams"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/mitchellh/mapstructure"
@@ -117,6 +119,9 @@ type Service struct {
 	SlackService interface {
 		Handler(slack.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
+	DiscordService interface {
+		Handler(discord.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
+	}
 	SMTPService interface {
 		Handler(smtp.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
@@ -131,6 +136,9 @@ type Service struct {
 	}
 	VictorOpsService interface {
 		Handler(victorops.HandlerConfig, ...keyvalue.T) alert.Handler
+	}
+	TeamsService interface {
+		Handler(teams.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 }
 
@@ -777,6 +785,17 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 			return handler{}, err
 		}
 		h = newExternalHandler(h)
+	case "discord":
+		c := discord.HandlerConfig{}
+		err = decodeOptions(spec.Options, &c)
+		if err != nil {
+			return handler{}, err
+		}
+		h, err = s.DiscordService.Handler(c, ctx...)
+		if err != nil {
+			return handler{}, err
+		}
+		h = newExternalHandler(h)
 	case "exec":
 		c := ExecHandlerConfig{
 			Commander: s.Commander,
@@ -940,6 +959,14 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		}
 		handlerDiag := s.diag.WithHandlerContext(ctx...)
 		h = NewTCPHandler(c, handlerDiag)
+		h = newExternalHandler(h)
+	case "teams":
+		c := teams.HandlerConfig{}
+		err = decodeOptions(spec.Options, &c)
+		if err != nil {
+			return handler{}, err
+		}
+		h = s.TeamsService.Handler(c, ctx...)
 		h = newExternalHandler(h)
 	case "telegram":
 		c := telegram.HandlerConfig{}

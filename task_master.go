@@ -19,6 +19,7 @@ import (
 	"github.com/influxdata/kapacitor/server/vars"
 	alertservice "github.com/influxdata/kapacitor/services/alert"
 	"github.com/influxdata/kapacitor/services/alerta"
+	"github.com/influxdata/kapacitor/services/discord"
 	ec2 "github.com/influxdata/kapacitor/services/ec2/client"
 	"github.com/influxdata/kapacitor/services/hipchat"
 	"github.com/influxdata/kapacitor/services/httpd"
@@ -37,6 +38,7 @@ import (
 	"github.com/influxdata/kapacitor/services/smtp"
 	"github.com/influxdata/kapacitor/services/snmptrap"
 	swarm "github.com/influxdata/kapacitor/services/swarm/client"
+	"github.com/influxdata/kapacitor/services/teams"
 	"github.com/influxdata/kapacitor/services/telegram"
 	"github.com/influxdata/kapacitor/services/victorops"
 	"github.com/influxdata/kapacitor/tick"
@@ -149,6 +151,11 @@ type TaskMaster struct {
 		Handler(httppost.HandlerConfig, ...keyvalue.T) alert.Handler
 		Endpoint(string) (*httppost.Endpoint, bool)
 	}
+	DiscordService interface {
+		Global() bool
+		StateChangesOnly() bool
+		Handler(discord.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
+	}
 	SlackService interface {
 		Global() bool
 		StateChangesOnly() bool
@@ -195,6 +202,12 @@ type TaskMaster struct {
 
 	SideloadService interface {
 		Source(dir string) (sideload.Source, error)
+	}
+
+	TeamsService interface {
+		Global() bool
+		StateChangesOnly() bool
+		Handler(teams.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 
 	Commander command.Commander
@@ -279,6 +292,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.PagerDuty2Service = tm.PagerDuty2Service
 	n.PushoverService = tm.PushoverService
 	n.HTTPPostService = tm.HTTPPostService
+	n.DiscordService = tm.DiscordService
 	n.SlackService = tm.SlackService
 	n.TelegramService = tm.TelegramService
 	n.SNMPTrapService = tm.SNMPTrapService
@@ -290,6 +304,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.K8sService = tm.K8sService
 	n.Commander = tm.Commander
 	n.SideloadService = tm.SideloadService
+	n.TeamsService = tm.TeamsService
 	return n
 }
 

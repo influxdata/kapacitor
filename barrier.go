@@ -59,7 +59,7 @@ func (n *BarrierNode) NewGroup(group edge.GroupInfo, first edge.PointMeta) (edge
 
 func (n *BarrierNode) newBarrier(group edge.GroupInfo, first edge.PointMeta) (edge.ForwardReceiver, func(), error) {
 	switch {
-	case n.b.Idle != 0:
+	case n.b.Idle > 0:
 		idleBarrier := newIdleBarrier(
 			first.Name(),
 			group,
@@ -69,7 +69,7 @@ func (n *BarrierNode) newBarrier(group edge.GroupInfo, first edge.PointMeta) (ed
 			n.b.Delete,
 		)
 		return idleBarrier, idleBarrier.Stop, nil
-	case n.b.Period != 0:
+	case n.b.Period > 0:
 		periodicBarrier := newPeriodicBarrier(
 			first.Name(),
 			group,
@@ -80,7 +80,7 @@ func (n *BarrierNode) newBarrier(group edge.GroupInfo, first edge.PointMeta) (ed
 		)
 		return periodicBarrier, periodicBarrier.Stop, nil
 	default:
-		return nil, nil, errors.New("unreachable code, barrier node should have non-zero idle or non-zero period")
+		return nil, nil, errors.New("unreachable code, barrier node should have positive idle or positive period")
 	}
 }
 
