@@ -1396,6 +1396,8 @@ func (s *SensuHandler) Metadata(key string, value interface{}) *SensuHandler {
 //              .URL('myurl')
 //              .URLTitle('mytitle')
 //
+// If the userKey() is omitted from above, the default userKey is used from the global pushover configuration
+//
 // Send alerts to Pushover.
 //
 // tick:property
