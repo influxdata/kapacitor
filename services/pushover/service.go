@@ -87,6 +87,7 @@ func (s *Service) Test(options interface{}) error {
 		o.URL,
 		o.URLTitle,
 		o.Sound,
+		o.UserKey,
 		o.Level,
 	)
 }
@@ -95,8 +96,8 @@ func (s *Service) config() Config {
 	return s.configValue.Load().(Config)
 }
 
-func (s *Service) Alert(message, device, title, URL, URLTitle, sound string, level alert.Level) error {
-	url, post, err := s.preparePost(message, device, title, URL, URLTitle, sound, level)
+func (s *Service) Alert(message, device, title, URL, URLTitle, sound string, userKey string, level alert.Level) error {
+	url, post, err := s.preparePost(message, device, title, URL, URLTitle, sound, userKey, level)
 	if err != nil {
 		return err
 	}
@@ -166,7 +167,6 @@ type postData struct {
 
 func (p *postData) Values() url.Values {
 	v := url.Values{}
-
 	v.Set("token", p.Token)
 	v.Set("user", p.UserKey)
 	v.Set("message", p.Message)
@@ -196,16 +196,20 @@ func (p *postData) Values() url.Values {
 
 }
 
-func (s *Service) preparePost(message, device, title, URL, URLTitle, sound string, level alert.Level) (string, url.Values, error) {
+func (s *Service) preparePost(message, device, title, URL, URLTitle, sound string, userKey string, level alert.Level) (string, url.Values, error) {
 	c := s.config()
 
 	if !c.Enabled {
 		return "", nil, errors.New("service is not enabled")
 	}
 
+	if userKey == "" {
+		userKey = c.UserKey
+	}
+
 	p := postData{
 		Token:   c.Token,
-		UserKey: c.UserKey,
+		UserKey: userKey,
 		Message: message,
 	}
 
@@ -237,6 +241,9 @@ type HandlerConfig struct {
 	// The name of one of the sounds supported by the device clients to override
 	// the user's default sound choice
 	Sound string `mapstructure:"sound"`
+
+	// The User Key or Delivery Group key
+	UserKey string `mapstructure:"user-key"`
 }
 
 type handler struct {
@@ -261,6 +268,7 @@ func (h *handler) Handle(event alert.Event) {
 		h.c.URL,
 		h.c.URLTitle,
 		h.c.Sound,
+		h.c.UserKey,
 		event.State.Level,
 	); err != nil {
 		h.diag.Error("failed to send event to Pushover", err)
