@@ -1383,14 +1383,14 @@ func (s *SensuHandler) Metadata(key string, value interface{}) *SensuHandler {
 //    [pushover]
 //      enabled = true
 //      token = "9hiWoDOZ9IbmHsOTeST123ABciWTIqXQVFDo63h9"
-//      userKey = "Pushover"
+//      user-key = "Pushover"
 //
 // Example:
 //    stream
 //         |alert()
 //             .pushover()
 //              .sound('siren')
-//              .userKey('other user')
+//              .userKey('other user key or delivery group key')
 //              .device('mydev')
 //              .title('mytitle')
 //              .URL('myurl')
