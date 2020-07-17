@@ -2,18 +2,24 @@
 
 ## unreleased
 
+## v1.5.6 [2020-07-17]
+
 ### Features
+- [#1965](https://github.com/influxdata/kapacitor/pull/1965): Alert handler for Microsoft Teams, thanks @mmindenhall!
 - [#2287](https://github.com/influxdata/kapacitor/pull/2287): Added Discord Webhook Alert Handler, thanks @mattnotmitt!
 - [#2311](https://github.com/influxdata/kapacitor/pull/2311): UDF Agent Python3 fixes, thanks @elohmeier!
-- [#2318](https://github.com/influxdata/kapacitor/pull/2322): Add support for TLS 1.3.
-- [#1965](https://github.com/influxdata/kapacitor/pull/1965): Alert handler for Microsoft Teams, thanks @mmindenhall!
+- [#2312](https://github.com/influxdata/kapacitor/pull/2312): feat(build): switch from md5 to sha256
+- [#2322](https://github.com/influxdata/kapacitor/pull/2322): Add support for TLS 1.3.
 
 ### Bugfixes
-- [#2286](https://github.com/influxdata/kapacitor/pull/2286): Corrected issue with `go vet` invocation in .hooks/pre-commit which would cause the hook to fail, thanks @mattnotmitt!
 - [#1980](https://github.com/influxdata/kapacitor/pull/1980): Fix discovery service lost config, thanks @flisky!
+- [#2156](https://github.com/influxdata/kapacitor/pull/2156): Use Systemd for Amazon Linux 2
+- [#2282](https://github.com/influxdata/kapacitor/pull/2282): fix small typo.
+- [#2286](https://github.com/influxdata/kapacitor/pull/2286): Corrected issue with `go vet` invocation in .hooks/pre-commit which would cause the hook to fail, thanks @mattnotmitt!
+- [#2289](https://github.com/influxdata/kapacitor/pull/2289): Update build.py to support arm64, thanks @povlhp
 - [#2335](https://github.com/influxdata/kapacitor/pull/2335): Fix panic when setting a zero interval for ticker, this affected deadman and stats nodes.
 - [#2340](https://github.com/influxdata/kapacitor/pull/2340): Fix a panic on int div-by-zero, instead return an error.
-- [#2358](https://github.com/influxdata/kapacitor/pull/2360): Fix Kapacitor ignoring the pushover().userKey('') TICKScript operation
+- [#2358](https://github.com/influxdata/kapacitor/pull/2360): Fix Kapacitor ignoring the pushover().userKey('') TICKScript operation.
 
 ## v1.5.5 [2020-04-20]
 
