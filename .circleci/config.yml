@@ -2,30 +2,23 @@
 version:  "2.1"
 
 commands:
-    deploy_release_packages:
-        description:  >
-            This will build and publish release packages for tag "$CIRCLE_TAG"
-        steps:
-           - run:
-                name: Deploy Release Packages
-                command:  |
-                    ./build.sh --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases --platform=all --arch=all --release
+      deploy_release_packages:
+            description:  >
+                  This will build and publish release packages for tag "$CIRCLE_TAG"
+            steps:
+                  - run:
+                        name: Deploy Release Packages
+                        command:  |
+                              ./build.sh --debug --clean --generate --package --package-udfs --upload --bucket=dl.influxdata.com/kapacitor/releases --platform=all --arch=all --release
 
-    run_tests:
-        description:  >
-            This will run Kapacitor Tests
-        steps:
-          - run:
-                name: Tests
-                command:  |
-                    ./circle-test.sh
-
-    echo_var:
-        steps:
-           - run:
-                 name: Print  Env Var
-                 command: |
-                     echo $CIRCLE_TAG
+      run_tests:
+            description:  >
+                  This will run Kapacitor Tests
+            steps:
+                  - run:
+                        name: Running Kapacitor Tests
+                        command:  |
+                              ./circle-test.sh
 
 jobs:
       build:
@@ -47,7 +40,7 @@ jobs:
                   - checkout
                   - setup_remote_docker:
                         docker_layer_caching: true
-                  - echo_var
+                  - deploy_release_packages
 
 workflows:
       version:  2
