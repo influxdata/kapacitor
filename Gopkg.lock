@@ -404,12 +404,12 @@
   revision = "9af46dd5a1713e8b5cd71106287eba3cefdde50b"
 
 [[projects]]
-  digest = "1:412beefef71413b580631c12a681ba2acab1ffdad9f967c38ed37e19fd101631"
+  branch = "master"
+  digest = "1:b60e505ed8574c018837ba28d824a9c2172f8a2837c79dda6c32e70e2e596d1c"
   name = "github.com/gorhill/cronexpr"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "a557574d6c024ed6e36acc8b610f5f211c91568a"
-  version = "1.0.0"
+  revision = "88b0669f7d75f171bd612b874e52b95c190218df"
 
 [[projects]]
   digest = "1:064c7f0ccdb4036791092fb93ec214a6f09119711801b9e587b6d1e76acc55de"
