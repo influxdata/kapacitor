@@ -125,8 +125,10 @@ func (u *UDFNode) Property(name string) interface{} {
 func (u *UDFNode) SetProperty(name string, args ...interface{}) (interface{}, error) {
 	opt, ok := u.options[name]
 	if ok {
-		if got, exp := len(args), len(opt.ValueTypes); got != exp {
-			return nil, fmt.Errorf("unexpected number of args to %s, got %d expected %d", name, got, exp)
+		if !opt.IsVariadic {
+			if got, exp := len(args), len(opt.ValueTypes); got != exp {
+				return nil, fmt.Errorf("unexpected number of args to %s, got %d expected %d", name, got, exp)
+			}
 		}
 		values := make([]*agent.OptionValue, len(args))
 		for i, arg := range args {
@@ -148,7 +150,7 @@ func (u *UDFNode) SetProperty(name string, args ...interface{}) (interface{}, er
 				values[i].Type = agent.ValueType_DURATION
 				values[i].Value = &agent.OptionValue_DurationValue{DurationValue: int64(v)}
 			}
-			if values[i].Type != opt.ValueTypes[i] {
+			if !opt.IsVariadic && values[i].Type != opt.ValueTypes[i] {
 				return nil, fmt.Errorf("unexpected arg to %s, got %v expected %v", name, values[i].Type, opt.ValueTypes[i])
 			}
 		}

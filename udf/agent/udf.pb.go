@@ -126,6 +126,7 @@ func (m *InfoResponse) GetOptions() map[string]*OptionInfo {
 
 type OptionInfo struct {
 	ValueTypes []ValueType `protobuf:"varint,1,rep,name=valueTypes,enum=agent.ValueType" json:"valueTypes,omitempty"`
+	IsVariadic bool        `protobuf:"varint,2,opt,name=isVariadic" json:"isVariadic,omitempty"`
 }
 
 func (m *OptionInfo) Reset()                    { *m = OptionInfo{} }

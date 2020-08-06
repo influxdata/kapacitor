@@ -63,6 +63,7 @@ enum ValueType {
 
 message OptionInfo {
     repeated ValueType valueTypes = 1;
+    bool isVariadic               = 2;
 }
 
 // Request that the process initialize itself with the provided options.
