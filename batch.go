@@ -282,13 +282,22 @@ func (n *QueryNode) doQuery(in edge.Edge) error {
 		return errors.Wrap(err, "failed to get InfluxDB client")
 	}
 	tickC := n.ticker.Start()
+	if n.ticker.Err() != nil {
+		return err
+	}
 	for {
 		select {
 		case <-n.closing:
+			if n.ticker.Err() != nil {
+				return err
+			}
 			return nil
 		case <-n.aborting:
 			return errors.New("batch doQuery aborted")
 		case now := <-tickC:
+			if n.ticker.Err() != nil {
+				return err
+			}
 			n.timer.Start()
 			// Update times for query
 			stop := now.Add(-1 * n.b.Offset)
@@ -341,7 +350,17 @@ func (n *QueryNode) runBatch([]byte) error {
 	errC := make(chan error, 1)
 	go func() {
 		defer func() {
-			err := recover()
+			var err error
+			if recoverRes := recover(); recoverRes != nil {
+				switch recoverRes := recoverRes.(type) {
+				case string:
+					err = errors.New(recoverRes)
+				case error:
+					err = recoverRes
+				default:
+					err = errors.New("Unknown panic")
+				}
+			}
 			if err != nil {
 				errC <- fmt.Errorf("%v", err)
 			}
@@ -392,6 +411,7 @@ func (n *QueryNode) stopBatch() {
 type ticker interface {
 	Start() <-chan time.Time
 	Stop()
+	Err() error
 	// Return the next time the ticker will tick after now.
 	Next(now time.Time) time.Time
 }
@@ -404,6 +424,8 @@ type timeTicker struct {
 	ticker    *time.Ticker
 	mu        sync.Mutex
 	wg        sync.WaitGroup
+	err       error
+	errLock   sync.Mutex
 }
 
 func newTimeTicker(every time.Duration, align bool) *timeTicker {
@@ -416,6 +438,13 @@ func newTimeTicker(every time.Duration, align bool) *timeTicker {
 		t.stopping = make(chan struct{})
 	}
 	return t
+}
+
+func (t *timeTicker) Err() (err error) {
+	t.errLock.Lock()
+	err = t.err
+	t.errLock.Unlock()
+	return err
 }
 
 func (t *timeTicker) Start() <-chan time.Time {
@@ -481,10 +510,29 @@ type cronTicker struct {
 	ticker  chan time.Time
 	closing chan struct{}
 	wg      sync.WaitGroup
+	err     error
+	errMu   sync.Mutex
 }
 
-func newCronTicker(cronExpr string) (*cronTicker, error) {
-	expr, err := cronexpr.Parse(cronExpr)
+func newCronTicker(cronExpr string) (ticker *cronTicker, err error) {
+	defer func() {
+		if recoverRes := recover(); recoverRes != nil {
+			switch recoverRes := recoverRes.(type) {
+			case string:
+				err = errors.New(recoverRes)
+			case error:
+				err = recoverRes
+			default:
+				err = errors.New("Unknown panic")
+			}
+		}
+	}()
+	if err != nil {
+		return nil, err
+	}
+
+	var expr *cronexpr.Expression
+	expr, err = cronexpr.Parse(cronExpr)
 	if err != nil {
 		return nil, err
 	}
@@ -498,6 +546,24 @@ func newCronTicker(cronExpr string) (*cronTicker, error) {
 func (c *cronTicker) Start() <-chan time.Time {
 	c.wg.Add(1)
 	go func() {
+		defer func() {
+			var err error
+			if recoverRes := recover(); recoverRes != nil {
+				switch recoverRes := recoverRes.(type) {
+				case string:
+					err = errors.New(recoverRes)
+				case error:
+					err = recoverRes
+				default:
+					err = errors.New("Unknown panic")
+				}
+				if err != nil {
+					c.errMu.Lock()
+					c.err = err
+					c.errMu.Unlock()
+				}
+			}
+		}()
 		defer c.wg.Done()
 		for {
 			now := time.Now()
@@ -514,11 +580,36 @@ func (c *cronTicker) Start() <-chan time.Time {
 	return c.ticker
 }
 
+func (c *cronTicker) Err() (err error) {
+	c.errMu.Lock()
+	err = c.err
+	c.errMu.Unlock()
+	return err
+}
+
 func (c *cronTicker) Stop() {
 	close(c.closing)
 	c.wg.Wait()
 }
 
 func (c *cronTicker) Next(now time.Time) time.Time {
+	defer func() {
+		var err error
+		if recoverRes := recover(); recoverRes != nil {
+			switch recoverRes := recoverRes.(type) {
+			case string:
+				err = errors.New(recoverRes)
+			case error:
+				err = recoverRes
+			default:
+				err = errors.New("Unknown panic")
+			}
+			if err != nil {
+				c.errMu.Lock()
+				c.err = err
+				c.errMu.Unlock()
+			}
+		}
+	}()
 	return c.expr.Next(now)
 }
