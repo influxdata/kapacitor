@@ -408,6 +408,9 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 	}
 
 	for _, p := range n.HTTPPostHandlers {
+		if p.Endpoint == "" && p.URL == "" {
+			return nil, errors.New("Either URL or endpoint must be non-empty")
+		}
 		c := httppost.HandlerConfig{
 			URL:             p.URL,
 			Endpoint:        p.Endpoint,
@@ -415,7 +418,10 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 			CaptureResponse: p.CaptureResponseFlag,
 			Timeout:         p.Timeout,
 		}
-		h := et.tm.HTTPPostService.Handler(c, ctx...)
+		h, err := et.tm.HTTPPostService.Handler(c, ctx...)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create HTTPPostService.Handler")
+		}
 		an.handlers = append(an.handlers, h)
 	}
 
