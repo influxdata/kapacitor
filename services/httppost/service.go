@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"text/template"
 
@@ -30,7 +31,7 @@ type Diagnostic interface {
 // Only one of name and url should be non-empty
 type Endpoint struct {
 	mu            sync.RWMutex
-	urlTemplate   template.Template
+	urlTemplate   *template.Template
 	headers       map[string]string
 	auth          BasicAuth
 	alertTemplate *template.Template
@@ -40,7 +41,7 @@ type Endpoint struct {
 
 func NewEndpoint(urlt *template.Template, headers map[string]string, auth BasicAuth, at, rt *template.Template) *Endpoint {
 	return &Endpoint{
-		urlTemplate:   *urlt,
+		urlTemplate:   urlt,
 		headers:       headers,
 		auth:          auth,
 		alertTemplate: at,
@@ -61,7 +62,7 @@ func (e *Endpoint) Update(c Config) error {
 	if err != nil {
 		return err
 	}
-	e.urlTemplate = *ut
+	e.urlTemplate = ut
 	e.headers = c.Headers
 	e.auth = c.BasicAuth
 	at, err := c.getAlertTemplate()
@@ -92,7 +93,7 @@ func (e *Endpoint) RowTemplate() *template.Template {
 func (e *Endpoint) URL() *template.Template {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	return &e.urlTemplate
+	return e.urlTemplate
 }
 
 func (e *Endpoint) NewHTTPRequest(body io.Reader, tmplCtx interface{}) (req *http.Request, err error) {
@@ -101,7 +102,7 @@ func (e *Endpoint) NewHTTPRequest(body io.Reader, tmplCtx interface{}) (req *htt
 	if e.closed {
 		return nil, errors.New("endpoint was closed")
 	}
-	eURL := &bytes.Buffer{}
+	eURL := &strings.Builder{}
 	if err = e.URL().Execute(eURL, tmplCtx); err != nil {
 		return nil, errors.Wrap(err, "failed to execute url template")
 	}
@@ -242,7 +243,7 @@ func (s *Service) Test(options interface{}) error {
 	// Create the HTTP request
 	var req *http.Request
 	e := &Endpoint{
-		urlTemplate: *ut,
+		urlTemplate: ut,
 		headers:     o.Headers,
 	}
 	req, err = e.NewHTTPRequest(body, ad)
