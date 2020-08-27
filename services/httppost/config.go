@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"path"
+	"strings"
 	"text/template"
 
 	"github.com/pkg/errors"
@@ -62,7 +63,7 @@ func (c Config) Validate() error {
 	if err != nil {
 		return errors.Wrapf(err, "invalid URL template syntax %q", c.URLTemplate)
 	}
-	buf := &bytes.Buffer{}
+	buf := &strings.Builder{}
 	if err = urlTemplate.Execute(buf, nil); err != nil {
 		return errors.Wrapf(err, "invalid URL template syntax %q", c.URLTemplate)
 	}
