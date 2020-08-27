@@ -2,6 +2,12 @@
 
 ## unreleased
 
+### Features
+- [#2388](https://github.com/influxdata/kapacitor/pull/2388): Added templating for the url in the `httpPost` node and the `alert().post()` node.
+- [#2351](https://github.com/influxdata/kapacitor/pull/2351): Upgraded github.com/gorhill/cronexpr, thanks @wuguanyu!
+### Bugfixes
+- [#2201](https://github.com/influxdata/kapacitor/pull/2201): Added missing err check of a buf scanner, thanks @johncming!
+
 ## v1.5.6 [2020-07-17]
 
 ### Features
