@@ -111,7 +111,7 @@ type Service struct {
 		Handler(pushover.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 	HTTPPostService interface {
-		Handler(httppost.HandlerConfig, ...keyvalue.T) alert.Handler
+		Handler(httppost.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
 	}
 	SensuService interface {
 		Handler(sensu.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
@@ -898,7 +898,10 @@ func (s *Service) createHandlerFromSpec(spec HandlerSpec) (handler, error) {
 		if err != nil {
 			return handler{}, err
 		}
-		h = s.HTTPPostService.Handler(c, ctx...)
+		h, err = s.HTTPPostService.Handler(c, ctx...)
+		if err != nil {
+			return handler{}, err
+		}
 		h = newExternalHandler(h)
 	case "publish":
 		c := PublishHandlerConfig{

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/influxdata/kapacitor/services/discord/discordtest"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -22,6 +21,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/influxdata/kapacitor/services/discord/discordtest"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dgrijalva/jwt-go"
@@ -6813,8 +6814,8 @@ func TestServer_UpdateConfig(t *testing.T) {
 			element: "test",
 			setDefaults: func(c *server.Config) {
 				apc := httppost.Config{
-					Endpoint: "test",
-					URL:      "http://httppost.example.com",
+					Endpoint:    "test",
+					URLTemplate: "http://httppost.example.com",
 					Headers: map[string]string{
 						"testing": "works",
 					},
@@ -10224,7 +10225,7 @@ func TestServer_AlertHandlers(t *testing.T) {
 				ctxt := context.WithValue(nil, "server", ts)
 				c.HTTPPost = httppost.Configs{{
 					Endpoint:      "test",
-					URL:           ts.URL,
+					URLTemplate:   ts.URL,
 					AlertTemplate: `{{.Message}}`,
 				}}
 				return ctxt, nil

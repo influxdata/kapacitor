@@ -148,7 +148,7 @@ type TaskMaster struct {
 		Handler(pushover.HandlerConfig, ...keyvalue.T) alert.Handler
 	}
 	HTTPPostService interface {
-		Handler(httppost.HandlerConfig, ...keyvalue.T) alert.Handler
+		Handler(httppost.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
 		Endpoint(string) (*httppost.Endpoint, bool)
 	}
 	DiscordService interface {
