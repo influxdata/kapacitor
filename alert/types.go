@@ -42,6 +42,7 @@ func (e Event) TemplateData() TemplateData {
 		Level:    e.State.Level.String(),
 		Time:     e.State.Time,
 		Duration: e.State.Duration,
+		Details:  e.State.Details,
 		Name:     e.Data.Name,
 		TaskName: e.Data.TaskName,
 		Group:    e.Data.Group,
@@ -105,6 +106,9 @@ type TemplateData struct {
 
 	// Duration of the event
 	Duration time.Duration
+
+	// Details
+	Details string
 
 	// Measurement name
 	Name string

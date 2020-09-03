@@ -10561,6 +10561,7 @@ stream
 		.info(lambda: "count" > 6.0)
 		.warn(lambda: "count" > 7.0)
 		.crit(lambda: "count" > 8.0)
+		.details('{{ "here" }}/{{ .Name }}')
 		.snmpTrap('1.1.1')
 			.data('1.1.1.2', 'c', '1')
 			.data('1.1.1.2', 's', 'SNMP ALERT')
@@ -10569,6 +10570,7 @@ stream
 			.data('1.1.2.3', 'i', '10')
 			.data('1.1.2.3', 'n', '')
 			.data('1.1.2.3', 't', '20000')
+			.data('1.1.2.3', 's', '{{ .Details }}')
 `
 
 	expTraps := []interface{}{
@@ -10634,6 +10636,11 @@ stream
 						Oid:   "1.1.2.3",
 						Value: "20000",
 						Type:  "TimeTicks",
+					},
+					{
+						Oid:   "1.1.2.3",
+						Value: "here/cpu",
+						Type:  "OctetString",
 					},
 				},
 			},
