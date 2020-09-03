@@ -3370,6 +3370,154 @@ stream
 	}
 }
 
+func TestStream_HttpPost_URL_Template(t *testing.T) {
+	requestCount := int32(0)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		result := models.Result{}
+		dec := json.NewDecoder(r.Body)
+		err := dec.Decode(&result)
+		if err != nil {
+			t.Fatal(err)
+		}
+		atomic.AddInt32(&requestCount, 1)
+		rc := atomic.LoadInt32(&requestCount)
+
+		er := struct {
+			models.Result
+			url string
+		}{}
+		switch rc {
+		case 1:
+			er.Result = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA", "type": "idle", "cpu": "a"},
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC),
+							97.1,
+						}},
+					},
+				},
+			}
+			er.url = `/cpu/?host=serverA&cpu=a`
+		case 2:
+			er.Result = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA", "type": "idle", "cpu": "b"},
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 1, 0, time.UTC),
+							92.6,
+						}},
+					},
+				},
+			}
+			er.url = `/cpu/?host=serverA&cpu=b`
+		case 3:
+			er.Result = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA", "type": "idle", "cpu": "b"},
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 2, 0, time.UTC),
+							95.6,
+						}},
+					},
+				},
+			}
+			er.url = `/cpu/?host=serverA&cpu=b`
+		case 4:
+			er.Result = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA", "type": "idle", "cpu": "c"},
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 3, 0, time.UTC),
+							93.1,
+						}},
+					},
+				},
+			}
+			er.url = `/cpu/?host=serverA&cpu=c`
+		case 5:
+			er.Result = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA", "type": "idle", "cpu": "c"},
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 4, 0, time.UTC),
+							92.6,
+						}},
+					},
+				},
+			}
+			er.url = `/cpu/?host=serverA&cpu=c`
+		case 6:
+			er.Result = models.Result{
+				Series: models.Rows{
+					{
+						Name:    "cpu",
+						Tags:    map[string]string{"host": "serverA", "type": "idle", "cpu": "a"},
+						Columns: []string{"time", "value"},
+						Values: [][]interface{}{[]interface{}{
+							time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+							95.8,
+						}},
+					},
+				},
+			}
+			er.url = `/cpu/?host=serverA&cpu=a`
+		}
+		if eq, msg := compareResults(er.Result, result); !eq {
+			t.Errorf("unexpected alert data for request: %d %s", rc, msg)
+		}
+		if er.url != r.URL.String() {
+			t.Errorf("enexpected url for data, expected: %s  got: %s", er.url, r.URL.String())
+		}
+	}))
+	defer ts.Close()
+
+	var script = `
+stream
+	|from()
+		.measurement('cpu')
+		.where(lambda: "host" == 'serverA')
+		.groupBy('host')
+	|httpPost('` + ts.URL + `/{{ .Name }}/?host={{ index .Tags "host"}}&cpu={{ index .Tags "cpu" }}')
+	|httpOut('TestStream_HttpPost_URL_Template')
+`
+
+	er := models.Result{
+		Series: models.Rows{
+			{
+				Name:    "cpu",
+				Tags:    map[string]string{"host": "serverA", "type": "idle", "cpu": "a"},
+				Columns: []string{"time", "value"},
+				Values: [][]interface{}{[]interface{}{
+					time.Date(1971, 1, 1, 0, 0, 5, 0, time.UTC),
+					95.8,
+				}},
+			},
+		},
+	}
+
+	testStreamerWithOutput(t, "TestStream_HttpPost_URL_Template", script, 13*time.Second, er, false, nil)
+
+	if rc := atomic.LoadInt32(&requestCount); rc != 6 {
+		t.Errorf("got %v exp %v", rc, 6)
+	}
+}
+
 func TestStream_HttpPostEndpoint(t *testing.T) {
 	headers := map[string]string{"my": "header"}
 	requestCount := int32(0)
@@ -3510,7 +3658,7 @@ stream
 
 	tmInit := func(tm *kapacitor.TaskMaster) {
 		c := httppost.Config{}
-		c.URL = ts.URL
+		c.URLTemplate = ts.URL
 		c.Endpoint = "test"
 		sl, _ := httppost.NewService(httppost.Configs{c}, diagService.NewHTTPPostHandler())
 		tm.HTTPPostService = sl
@@ -3589,7 +3737,7 @@ stream
 
 	tmInit := func(tm *kapacitor.TaskMaster) {
 		c := httppost.Config{}
-		c.URL = ts.URL
+		c.URLTemplate = ts.URL
 		c.Endpoint = "test"
 		c.RowTemplate = `{{.Name}} host={{index .Tags "host"}} type={{index .Tags "type"}}{{range .Values}} {{index . "time"}} {{index . "value"}}{{end}}`
 		sl, _ := httppost.NewService(httppost.Configs{c}, diagService.NewHTTPPostHandler())
@@ -3693,7 +3841,7 @@ stream
 
 	tmInit := func(tm *kapacitor.TaskMaster) {
 		c := httppost.Config{}
-		c.URL = ts.URL
+		c.URLTemplate = ts.URL
 		c.Endpoint = "test"
 		sl, _ := httppost.NewService(httppost.Configs{c}, diagService.NewHTTPPostHandler())
 		tm.HTTPPostService = sl
@@ -9799,7 +9947,7 @@ stream
 `
 	tmInit := func(tm *kapacitor.TaskMaster) {
 		c := httppost.Config{}
-		c.URL = ts.URL
+		c.URLTemplate = ts.URL
 		c.Endpoint = "test"
 		c.Headers = headers
 		sl, _ := httppost.NewService(httppost.Configs{c}, diagService.NewHTTPPostHandler())
@@ -10413,6 +10561,7 @@ stream
 		.info(lambda: "count" > 6.0)
 		.warn(lambda: "count" > 7.0)
 		.crit(lambda: "count" > 8.0)
+		.details('{{ "here" }}/{{ .Name }}')
 		.snmpTrap('1.1.1')
 			.data('1.1.1.2', 'c', '1')
 			.data('1.1.1.2', 's', 'SNMP ALERT')
@@ -10421,6 +10570,7 @@ stream
 			.data('1.1.2.3', 'i', '10')
 			.data('1.1.2.3', 'n', '')
 			.data('1.1.2.3', 't', '20000')
+			.data('1.1.2.3', 's', '{{ .Details }}')
 `
 
 	expTraps := []interface{}{
@@ -10486,6 +10636,11 @@ stream
 						Oid:   "1.1.2.3",
 						Value: "20000",
 						Type:  "TimeTicks",
+					},
+					{
+						Oid:   "1.1.2.3",
+						Value: "here/cpu",
+						Type:  "OctetString",
 					},
 				},
 			},

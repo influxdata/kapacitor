@@ -106,6 +106,9 @@ func readPointsFromIO(data io.ReadCloser, points chan<- edge.PointMessage, preci
 		)
 		points <- p
 	}
+	if err := in.Err(); err != nil {
+		return fmt.Errorf("read replay file failed: %s", err)
+	}
 	return nil
 }
 
