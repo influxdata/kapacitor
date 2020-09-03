@@ -3,6 +3,7 @@
 ## unreleased
 
 ### Features
+- [#2301](https://github.com/influxdata/kapacitor/pull/2301): Allow for overriding OpsGenieV2's alert recovery action in tickSCRIPT, thanks @zabullet!
 - [#2388](https://github.com/influxdata/kapacitor/pull/2388): Added templating for the url in the `httpPost` node and the `alert().post()` node.
 - [#2351](https://github.com/influxdata/kapacitor/pull/2351): Upgraded github.com/gorhill/cronexpr, thanks @wuguanyu!
 ### Bugfixes
@@ -16,7 +17,6 @@
 - [#2311](https://github.com/influxdata/kapacitor/pull/2311): UDF Agent Python3 fixes, thanks @elohmeier!
 - [#2312](https://github.com/influxdata/kapacitor/pull/2312): feat(build): switch from md5 to sha256
 - [#2322](https://github.com/influxdata/kapacitor/pull/2322): Add support for TLS 1.3.
-- [#2301](https://github.com/influxdata/kapacitor/pull/2301): Allow for overriding OpsGenieV2's alert recovery action in tickSCRIPT
 
 ### Bugfixes
 - [#1980](https://github.com/influxdata/kapacitor/pull/1980): Fix discovery service lost config, thanks @flisky!
