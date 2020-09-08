@@ -67,21 +67,23 @@ func (s *Service) Global() bool {
 }
 
 type testOptions struct {
-	Teams       []string `json:"teams"`
-	Recipients  []string `json:"recipients"`
-	MessageType string   `json:"message-type"`
-	Message     string   `json:"message"`
-	EntityID    string   `json:"entity-id"`
+	Teams          []string `json:"teams"`
+	Recipients     []string `json:"recipients"`
+	RecoveryAction string   `json:"recovery_action"`
+	MessageType    string   `json:"message-type"`
+	Message        string   `json:"message"`
+	EntityID       string   `json:"entity-id"`
 }
 
 func (s *Service) TestOptions() interface{} {
 	c := s.config()
 	return &testOptions{
-		Teams:       c.Teams,
-		Recipients:  c.Recipients,
-		MessageType: "CRITICAL",
-		Message:     "test opsgenie message",
-		EntityID:    "testEntityID",
+		Teams:          c.Teams,
+		Recipients:     c.Recipients,
+		RecoveryAction: c.RecoveryAction,
+		MessageType:    "CRITICAL",
+		Message:        "test opsgenie message",
+		EntityID:       "testEntityID",
 	}
 }
 
@@ -103,6 +105,7 @@ func (s *Service) Test(options interface{}) error {
 	return s.Alert(
 		o.Teams,
 		o.Recipients,
+		o.RecoveryAction,
 		level,
 		o.Message,
 		o.EntityID,
@@ -111,8 +114,8 @@ func (s *Service) Test(options interface{}) error {
 	)
 }
 
-func (s *Service) Alert(teams []string, recipients []string, level alert.Level, message, entityID string, t time.Time, details models.Result) error {
-	req, err := s.preparePost(teams, recipients, level, message, entityID, t, details)
+func (s *Service) Alert(teams []string, recipients []string, recoveryAction string, level alert.Level, message, entityID string, t time.Time, details models.Result) error {
+	req, err := s.preparePost(teams, recipients, recoveryAction, level, message, entityID, t, details)
 	if err != nil {
 		return errors.Wrap(err, "failed to prepare API request")
 	}
@@ -139,7 +142,7 @@ func (s *Service) Alert(teams []string, recipients []string, level alert.Level, 
 	return nil
 }
 
-func (s *Service) preparePost(teams []string, recipients []string, level alert.Level, message, entityID string, t time.Time, details models.Result) (*http.Request, error) {
+func (s *Service) preparePost(teams []string, recipients []string, recoveryAction string, level alert.Level, message, entityID string, t time.Time, details models.Result) (*http.Request, error) {
 	c := s.config()
 	if !c.Enabled {
 		return nil, errors.New("service is not enabled")
@@ -155,7 +158,18 @@ func (s *Service) preparePost(teams []string, recipients []string, level alert.L
 		if err != nil {
 			return nil, err
 		}
-		recoveryURL.Path = path.Join(recoveryURL.Path, alias, c.RecoveryAction)
+		validRecoveryActions := map[string]bool{
+			"close": true,
+			"notes": true,
+		}
+		if !validRecoveryActions[recoveryAction] { // use parameter
+			if !validRecoveryActions[c.RecoveryAction] { //use global config
+				recoveryAction = DefaultOpsGenieRecoveryAction //use default
+			} else {
+				recoveryAction = c.RecoveryAction
+			}
+		}
+		recoveryURL.Path = path.Join(recoveryURL.Path, alias, recoveryAction)
 		recoveryURL.RawQuery = "identifierType=alias"
 		u = recoveryURL.String()
 		ogData["note"] = message
@@ -251,6 +265,9 @@ type HandlerConfig struct {
 
 	// OpsGenie Recipients.
 	RecipientsList []string `mapstructure:"recipients-list"`
+
+	// OpsGenie RecoveryAction
+	RecoveryAction string `mapstructure:"recovery_action"`
 }
 
 type handler struct {
@@ -271,6 +288,7 @@ func (h *handler) Handle(event alert.Event) {
 	if err := h.s.Alert(
 		h.c.TeamsList,
 		h.c.RecipientsList,
+		h.c.RecoveryAction,
 		event.State.Level,
 		event.State.Message,
 		event.State.ID,
