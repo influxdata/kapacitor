@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/influxdata/kapacitor/services/bigpanda"
 	html "html/template"
 	"os"
 	"sync"
@@ -486,6 +487,18 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 		}
 		an.handlers = append(an.handlers, h)
 	}
+
+	for _, s := range n.BigPandaHandlers {
+		c := bigpanda.HandlerConfig{
+			AppKey: s.AppKey,
+		}
+		h, err := et.tm.BigPandaService.Handler(c, ctx...)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create BigPanda handler")
+		}
+		an.handlers = append(an.handlers, h)
+	}
+
 	for _, t := range n.TeamsHandlers {
 		c := teams.HandlerConfig{
 			ChannelURL: t.ChannelURL,
@@ -540,6 +553,20 @@ func newAlertNode(et *ExecutingTask, n *pipeline.AlertNode, d NodeDiagnostic) (a
 	if et.tm.ServiceNowService != nil &&
 		et.tm.ServiceNowService.Global() &&
 		et.tm.ServiceNowService.StateChangesOnly() {
+		n.IsStateChangesOnly = true
+	}
+
+	if len(n.BigPandaHandlers) == 0 && (et.tm.BigPandaService != nil && et.tm.BigPandaService.Global()) {
+		h, err := et.tm.BigPandaService.Handler(bigpanda.HandlerConfig{}, ctx...)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create BigPanda handler")
+		}
+		an.handlers = append(an.handlers, h)
+	}
+	// If BigPanda has been configured with state changes only set it.
+	if et.tm.BigPandaService != nil &&
+		et.tm.BigPandaService.Global() &&
+		et.tm.BigPandaService.StateChangesOnly() {
 		n.IsStateChangesOnly = true
 	}
 

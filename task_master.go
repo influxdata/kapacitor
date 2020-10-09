@@ -3,6 +3,7 @@ package kapacitor
 import (
 	"errors"
 	"fmt"
+	"github.com/influxdata/kapacitor/services/bigpanda"
 	"log"
 	"sync"
 	"time"
@@ -157,6 +158,11 @@ type TaskMaster struct {
 		StateChangesOnly() bool
 		Handler(discord.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
 	}
+	BigPandaService interface {
+		Global() bool
+		StateChangesOnly() bool
+		Handler(bigpanda.HandlerConfig, ...keyvalue.T) (alert.Handler, error)
+	}
 	SlackService interface {
 		Global() bool
 		StateChangesOnly() bool
@@ -299,6 +305,7 @@ func (tm *TaskMaster) New(id string) *TaskMaster {
 	n.PushoverService = tm.PushoverService
 	n.HTTPPostService = tm.HTTPPostService
 	n.DiscordService = tm.DiscordService
+	n.BigPandaService = tm.BigPandaService
 	n.SlackService = tm.SlackService
 	n.TelegramService = tm.TelegramService
 	n.SNMPTrapService = tm.SNMPTrapService

@@ -357,6 +357,10 @@ type AlertNodeData struct {
 	// tick:ignore
 	DiscordHandlers []*DiscordHandler `tick:"Discord" json:"discord"`
 
+	// Send alert to BigPanda
+	// tick:ignore
+	BigPandaHandlers []*BigPandaHandler `tick:"BigPanda" json:"bigPanda"`
+
 	// Send alert to Telegram.
 	// tick:ignore
 	TelegramHandlers []*TelegramHandler `tick:"Telegram" json:"telegram"`
@@ -1613,6 +1617,24 @@ type DiscordHandler struct {
 	// Embed title
 	// If empty uses the default config
 	EmbedTitle string `json:"embedTitle"`
+}
+
+//TODO documentation
+// Send the alert to BigPanda
+func (n *AlertNodeData) BigPanda() *BigPandaHandler {
+	bigPanda := &BigPandaHandler{
+		AlertNodeData: n,
+	}
+	n.BigPandaHandlers = append(n.BigPandaHandlers, bigPanda)
+	return bigPanda
+}
+
+// tick:embedded:AlertNode.Discord
+type BigPandaHandler struct {
+	*AlertNodeData `json:"-"`
+	// Application id
+	// If empty uses the default config
+	AppKey string `json:"app-key"`
 }
 
 // Send the alert to Telegram.
