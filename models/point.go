@@ -87,6 +87,17 @@ func ToGroupID(name string, tags map[string]string, dims Dimensions) GroupID {
 		return NilGroup
 	}
 	var buf strings.Builder
+	l := 0
+	if dims.ByName {
+		l += len(name) + 1
+	}
+	for i, d := range dims.TagNames {
+		if i != 0 {
+			l++
+		}
+		l += len(d) + len(tags[d]) + 1
+	}
+	buf.Grow(l)
 	if dims.ByName {
 		buf.WriteString(name)
 		// Add delimiter that is not allowed in name.
