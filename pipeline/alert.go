@@ -1821,6 +1821,7 @@ func (og *OpsGenieHandler) Recipients(recipients ...string) *OpsGenieHandler {
 //      enabled = true
 //      api-key = "xxxxx"
 //      recipients = ["johndoe"]
+//      details = false
 //      global = true
 //
 // Example:
@@ -1852,6 +1853,10 @@ type OpsGenie2Handler struct {
 	// OpsGenie2 recovery_action
 	// tick:ignore
 	RecoveryActionString string `tick:"RecoveryAction" json:"recovery_action"`
+
+	// OpsGenie2 details
+	// tick:ignore
+	IsDetails bool `tick:"Details" json:"details"`
 }
 
 // The list of teams to be alerted. If empty defaults to the teams from the configuration.
@@ -1872,6 +1877,13 @@ func (og *OpsGenie2Handler) Recipients(recipients ...string) *OpsGenie2Handler {
 // tick:property
 func (og *OpsGenie2Handler) RecoveryAction(recoveryAction string) *OpsGenie2Handler {
 	og.RecoveryActionString = recoveryAction
+	return og
+}
+
+// The action to perform when the alarm recovers. If empty defaults to the recovery_action from the configuration.
+// tick:property
+func (og *OpsGenie2Handler) Details() *OpsGenie2Handler {
+	og.IsDetails = true
 	return og
 }
 
