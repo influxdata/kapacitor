@@ -192,7 +192,7 @@ func (s *Service) preparePost(teams []string, recipients []string, recoveryActio
 		ogData["priority"] = priority
 
 		// Use event details as description if available
-		if len(eventDetails) > 0 {
+		if c.Details && len(eventDetails) > 0 {
 			ogData["description"] = eventDetails
 		} else {
 			// Otherwise encode details as description
