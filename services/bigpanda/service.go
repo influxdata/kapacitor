@@ -2,10 +2,11 @@ package bigpanda
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	khttp "github.com/influxdata/kapacitor/http"
 	"github.com/influxdata/kapacitor/models"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -17,6 +18,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	defaultTokenPrefix = "Bearer"
+)
+
 type Diagnostic interface {
 	WithContext(ctx ...keyvalue.T) Diagnostic
 	Error(msg string, err error)
@@ -24,6 +29,7 @@ type Diagnostic interface {
 
 type Service struct {
 	configValue atomic.Value
+	clientValue atomic.Value
 	diag        Diagnostic
 }
 
@@ -32,6 +38,10 @@ func NewService(c Config, d Diagnostic) (*Service, error) {
 		diag: d,
 	}
 	s.configValue.Store(c)
+	s.clientValue.Store(&http.Client{
+		Transport: khttp.NewDefaultTransportWithTLS(&tls.Config{InsecureSkipVerify: c.InsecureSkipVerify}),
+	})
+
 	return s, nil
 }
 
@@ -55,6 +65,9 @@ func (s *Service) Update(newConfig []interface{}) error {
 		return fmt.Errorf("expected config object to be of type %T, got %T", c, newConfig[0])
 	} else {
 		s.configValue.Store(c)
+		s.clientValue.Store(&http.Client{
+			Transport: khttp.NewDefaultTransportWithTLS(&tls.Config{InsecureSkipVerify: c.InsecureSkipVerify}),
+		})
 	}
 	return nil
 }
@@ -107,17 +120,21 @@ func (s *Service) Test(options interface{}) error {
 }
 
 func (s *Service) Alert(alertTopic, alertID, message string, level alert.Level, timestamp time.Time, data alert.EventData) error {
-	url, post, err := s.preparePost(alertTopic, alertID, message, level, timestamp, data)
+
+	req, err := s.preparePost(alertTopic, alertID, message, level, timestamp, data)
+
 	if err != nil {
 		return err
 	}
 
-	resp, err := http.Post(url, "application/json", post)
+	client := s.clientValue.Load().(*http.Client)
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+
+	if resp.StatusCode != http.StatusCreated {
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return err
@@ -125,12 +142,13 @@ func (s *Service) Alert(alertTopic, alertID, message string, level alert.Level, 
 		type response struct {
 			Error string `json:"error"`
 		}
-		r := &response{Error: fmt.Sprintf("failed to understand Teams response. code: %d content: %s", resp.StatusCode, string(body))}
+		r := &response{Error: fmt.Sprintf("failed to understand BigPanda response. code: %d content: %s", resp.StatusCode, string(body))}
 		b := bytes.NewReader(body)
 		dec := json.NewDecoder(b)
 		dec.Decode(r)
 		return errors.New(r.Error)
 	}
+
 	return nil
 }
 
@@ -192,14 +210,16 @@ func (o BPAlert) MarshalJSON() ([]byte, error) {
 	}
 }
 
-func (s *Service) preparePost(alertTopic, alertID, message string, level alert.Level, timestamp time.Time, data alert.EventData) (string, io.Reader, error) {
+func (s *Service) preparePost(alertTopic, alertID, message string, level alert.Level, timestamp time.Time, data alert.EventData) (*http.Request, error) {
 	c := s.config()
 	if !c.Enabled {
-		return "", nil, errors.New("service is not enabled")
+		return nil, errors.New("service is not enabled")
 	}
 
 	var status string
 	switch level {
+	case alert.OK:
+		status = "ok"
 	case alert.Warning:
 		status = "warning"
 	case alert.Critical:
@@ -214,24 +234,32 @@ func (s *Service) preparePost(alertTopic, alertID, message string, level alert.L
 	payload.Description = message
 	payload.Timestamp = timestamp.Format("2006-01-02T15:04:05.000000000Z07:00")
 	payload.Status = status
+	payload.AppKey = c.AppKey
 
 	postBytes, err := payload.MarshalJSON()
 	if err != nil {
-		return "", nil, errors.Wrap(err, "error marshaling card struct")
+		return nil, errors.Wrap(err, "error marshaling card struct")
 	}
 
 	post := bytes.NewBuffer(postBytes)
-	alertUrl, err := url.Parse("https://api.bigpanda.io/data/v2/alerts")
+	alertUrl, err := url.Parse(c.Url)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 
-	return alertUrl.String(), post, nil
+	req, err := http.NewRequest("POST", alertUrl.String(), post)
+	req.Header.Add("Authorization", defaultTokenPrefix+" "+c.Token)
+	req.Header.Add("Content-Type", "application/json")
+	if err != nil {
+		return nil, err
+	}
+	return req, nil
 }
 
 // HandlerConfig defines the high-level struct required to connect to BigPanda
 type HandlerConfig struct {
 	AppKey string `mapstructure:"app-key"`
+	ApiUrl string `mapstructure:"api-url"`
 }
 
 type handler struct {

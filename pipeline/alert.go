@@ -1629,7 +1629,7 @@ func (n *AlertNodeData) BigPanda() *BigPandaHandler {
 	return bigPanda
 }
 
-// tick:embedded:AlertNode.Discord
+// tick:embedded:AlertNode.BigPanda
 type BigPandaHandler struct {
 	*AlertNodeData `json:"-"`
 	// Application id

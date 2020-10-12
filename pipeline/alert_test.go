@@ -73,6 +73,7 @@ func TestAlertNode_MarshalJSON(t *testing.T) {
     "sensu": null,
     "slack": null,
     "discord": null,
+    "bigPanda": null,
     "telegram": null,
     "hipChat": null,
     "alerta": null,
